@@ -2,7 +2,7 @@
 
 一个 macOS 原生风格的剪贴板历史管理工具。
 
-![platform](https://img.shields.io/badge/platform-macOS%2015%2B-silver)
+![platform](https://img.shields.io/badge/platform-macOS%2012%2B-silver)
 ![swift](https://img.shields.io/badge/swift-6.0-orange)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
