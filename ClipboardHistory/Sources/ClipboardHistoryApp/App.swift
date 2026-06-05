@@ -15,15 +15,13 @@ struct ClipboardHistoryApp: App {
                 .background(WindowConfigurator())
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentMinSize)
-        .defaultSize(width: 750, height: 480)
         .commands {
             CommandGroup(replacing: .newItem) {}
         }
     }
 }
 
-/// 透明标题栏 + 禁用全屏
+/// 透明标题栏 + 禁用全屏 + 跨版本窗口尺寸设置
 struct WindowConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -32,6 +30,8 @@ struct WindowConfigurator: NSViewRepresentable {
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = .fullScreenNone
+            window.setContentSize(NSSize(width: 750, height: 480))
+            window.minSize = NSSize(width: 600, height: 400)
         }
         return view
     }

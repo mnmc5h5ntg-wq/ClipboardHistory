@@ -2,16 +2,27 @@ import SwiftUI
 import Quartz
 
 struct ContentView: View {
-    @Bindable var manager: ClipboardManager
+    @ObservedObject var manager: ClipboardManager
 
     var body: some View {
-        NavigationSplitView {
-            sidebar.navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
-        } detail: {
-            detailView
+        if #available(macOS 13, *) {
+            NavigationSplitView {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
+            } detail: {
+                detailView
+            }
+            .navigationTitle("")
+            .windowBackground()
+        } else {
+            NavigationView {
+                sidebar
+                    .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                detailView
+            }
+            .navigationTitle("")
+            .windowBackground()
         }
-        .navigationTitle("")
-        .containerBackground(.thickMaterial, for: .window)
     }
 
     @ViewBuilder private var sidebar: some View {
@@ -133,8 +144,6 @@ struct DetailImageView: View {
                 dbg("[DETAIL.Geo] container=\(geo.size)")
             }
         }
-        .border(Color.blue.opacity(0.3), width: 2)
-        .background(Color.red.opacity(0.05))
     }
 }
 
@@ -209,7 +218,6 @@ struct DetailFileView: View {
                     .padding(20)
             }
         }
-        .border(Color.green.opacity(0.3), width: 2)
     }
 
     // MARK: - Text Preview
@@ -225,7 +233,6 @@ struct DetailFileView: View {
                         .padding(20)
                         .textSelection(.enabled)
                 }
-                .border(Color.yellow.opacity(0.3), width: 2)
             } else {
                 fallbackView
             }
@@ -236,7 +243,6 @@ struct DetailFileView: View {
 
     private var documentPreview: some View {
         QuickLookPreview(url: url)
-            .border(Color.orange.opacity(0.3), width: 2)
     }
 
     // MARK: - Fallback
@@ -380,6 +386,20 @@ struct HistoryRow: View {
                 Text(entry.timestamp, style: .relative)
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }
+        }
+    }
+}
+
+
+// MARK: - Window Background (macOS 12/15 compat)
+
+extension View {
+    @ViewBuilder
+    func windowBackground() -> some View {
+        if #available(macOS 15, *) {
+            self.containerBackground(.thickMaterial, for: .window)
+        } else {
+            self.background(.thickMaterial)
         }
     }
 }

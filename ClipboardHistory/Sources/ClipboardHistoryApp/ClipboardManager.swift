@@ -17,8 +17,7 @@ struct StoredImage: Equatable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(ObjectIdentifier(nsImage)) }
 }
 
-@Observable
-final class ClipboardManager: @unchecked Sendable {
+final class ClipboardManager: ObservableObject, @unchecked Sendable {
 
     enum EntryContent: Equatable, Hashable {
         case text(String)
@@ -61,9 +60,9 @@ final class ClipboardManager: @unchecked Sendable {
         var shortPreview: String { content.preview }
     }
 
-    var entries: [Entry] = []
-    var selectedEntry: Entry?
-    private(set) var searchText = ""
+    @Published var entries: [Entry] = []
+    @Published var selectedEntry: Entry?
+    @Published private(set) var searchText = ""
     var filteredEntries: [Entry] {
         guard !searchText.isEmpty else { return entries }
         return entries.filter {

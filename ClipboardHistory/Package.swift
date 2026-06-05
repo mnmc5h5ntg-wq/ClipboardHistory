@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "ClipboardHistory",
     platforms: [
-        .macOS(.v15)
+        .macOS(.v12)
     ],
     targets: [
         .executableTarget(
