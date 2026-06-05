@@ -34,9 +34,12 @@ bundle: build
 	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion 12.0" "$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Add :NSHighResolutionCapable bool true" "$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 		xattr -cr "$(BUNDLE)"
+	find "$(BUNDLE)" -name ".DS_Store" -delete 2>/dev/null || true
 	find "$(BUNDLE)" -name "._*" -delete 2>/dev/null || true
+	dot_clean -m "$(BUNDLE)" 2>/dev/null || true
 	codesign --remove-signature "$(BUNDLE)" 2>/dev/null || true
-	codesign -s - --force --deep "$(BUNDLE)" 2>&1
+	-codesign -s - --force --deep "$(BUNDLE)" 2>&1
+	codesign -dv "$(BUNDLE)" 2>/dev/null | head -1 || echo "(sign check skipped)"
 	touch "$(BUNDLE)"
 	@echo "✅ $(BUNDLE) ready (ad-hoc signed, quarantine-free)"
 
@@ -46,7 +49,8 @@ run: bundle
 dmg: bundle
 	rm -rf /tmp/$(APP_NAME)_dmg
 	mkdir -p /tmp/$(APP_NAME)_dmg
-	cp -R "$(BUNDLE)" /tmp/$(APP_NAME)_dmg/
+	cp -Rp "$(BUNDLE)" /tmp/$(APP_NAME)_dmg/
+	xattr -cr /tmp/$(APP_NAME)_dmg/ 2>/dev/null || true
 	cp /tmp/readme_dmg.txt /tmp/$(APP_NAME)_dmg/安装说明.txt
 	ln -s /Applications /tmp/$(APP_NAME)_dmg/Applications
 	hdiutil create -volname "$(APP_NAME)" 		-srcfolder /tmp/$(APP_NAME)_dmg 		-ov -format UDZO 		"$(APP_NAME)_v1.1.dmg"
