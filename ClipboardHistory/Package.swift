@@ -9,11 +9,15 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "ClipboardHistoryApp",
+            exclude: [
+                "icon_alpha.png"
+            ],
             resources: [
                 .copy("AppIcon.icns"),
                 .process("icon.png")
             ],
             linkerSettings: [
+                .linkedFramework("AVFoundation"),
                 .linkedFramework("Quartz")
             ]
         )

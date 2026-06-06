@@ -1,39 +1,66 @@
 import SwiftUI
-import AppKit
 
 @main
 struct ClipboardHistoryApp: App {
 
-    @State private var manager = ClipboardManager()
+    @StateObject private var manager = ClipboardManager()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
             ContentView(manager: manager)
                 .frame(minWidth: 600, minHeight: 400)
-                .onAppear { manager.startMonitoring() }
-                .onDisappear { manager.stopMonitoring() }
+                .onAppear {
+                    appDelegate.configure(manager: manager)
+                }
                 .background(WindowConfigurator())
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("关于时间剪史") {
+                    showAboutPanel()
+                }
+            }
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .windowSize) {}
         }
-    }
-}
 
-/// 透明标题栏 + 禁用全屏 + 跨版本窗口尺寸设置
-struct WindowConfigurator: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async {
-            guard let window = view.window else { return }
-            window.titlebarAppearsTransparent = true
-            window.styleMask.insert(.fullSizeContentView)
-            window.collectionBehavior = .fullScreenNone
-            window.setContentSize(NSSize(width: 750, height: 480))
-            window.minSize = NSSize(width: 600, height: 400)
+        if #available(macOS 13, *) {
+            MenuBarExtra("时间剪史", systemImage: "clipboard") {
+                Text("时间剪史")
+                Button("显示主窗口") {
+                    appDelegate.showMainWindow()
+                }
+                Button("刷新历史") {
+                    appDelegate.refreshHistory()
+                }
+                Button("清空历史…") {
+                    appDelegate.confirmAndClearHistory()
+                }
+                Divider()
+                Button("退出时间剪史") {
+                    appDelegate.quit()
+                }
+            }
         }
-        return view
     }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private func showAboutPanel() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.1"
+        let githubURL = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [
+            .applicationName: "时间剪史",
+            .applicationVersion: version,
+            .credits: NSAttributedString(
+                string: """
+                作者：王子懿
+                License：MIT
+                GitHub：\(githubURL)
+
+                一个 macOS 原生风格的剪贴板历史管理工具，支持文本、图片和常见文件预览。
+                """
+            )
+        ])
+    }
 }
