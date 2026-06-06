@@ -18,6 +18,7 @@
 - 视频预览
 - 视频缩略图
 - macOS12 生命周期修复
+- macOS 15 原生全屏顶部白条问题
 
 ## 进行中 / 保留
 
@@ -33,10 +34,14 @@
 发布 v1.2.1 后新增或需要显式跟踪的问题：
 
 - Release 附件命名过于简略：当前为 `v1.2.1.dmg`，建议后续统一为 `时间剪史_vX.Y.Z.dmg` 或 `ClipboardHistory_vX.Y.Z.dmg`，便于用户识别和归档。
-- 当前 Release 包未进行 Developer ID 公证：首次打开可能出现“Apple 无法验证”的提示，需要补齐 Developer ID 签名与 Apple notarization。
 - 多版本安装后 Launchpad 可能显示旧版图标：用户测试旧版/新版 DMG 后，启动台可能残留旧版入口，需要补充升级/卸载说明，并检查 Bundle Identifier、安装路径和 LaunchServices 缓存影响。
-- macOS 全屏顶部白条问题：macOS 15 下 `NavigationSplitView` 详情区顶部出现系统白条，目前已暂时禁用原生全屏，后续需要原生级修复。
 - 历史记录尚未持久化：退出应用后记录不会保留，需要设计本地存储方案。
+
+## 长期规划 / 暂不处理
+
+以下问题已确认存在，但短期内不作为开发重点：
+
+- Developer ID 签名与 Apple notarization：当前 Release 包未进行 Developer ID 公证，首次打开可能出现“Apple 无法验证”的提示。短期内继续通过 README 安装说明引导用户手动允许打开，后续有 Apple Developer Program 条件后再处理。
 
 ## 待规划
 
@@ -58,4 +63,6 @@
 
 1. 关闭 #2、#3、#4、#6、#7、#8、#9、#12。
 2. 保留 #5、#10、#11、#13。
-3. 新建 v1.2.2 / v1.3 规划 Issues：Release 附件命名、Developer ID 公证、多版本安装/Launchpad 旧图标、全屏白条、历史持久化、缩略图缓存、收藏夹、全局快捷键、开机启动、菜单栏快速粘贴、Release 自动化校验、性能优化剩余项。
+3. 如果 GitHub 上已有“macOS 全屏顶部白条问题”，建议标记为已完成并关闭。
+4. 如果 GitHub 上已有“Developer ID 公证”相关 Issue，建议改为长期规划 / wontfix-now，不放入 v1.3 短期开发范围。
+5. 新建 v1.2.2 / v1.3 规划 Issues：Release 附件命名、多版本安装/Launchpad 旧图标、历史持久化、缩略图缓存、收藏夹、全局快捷键、开机启动、菜单栏快速粘贴、Release 自动化校验、性能优化剩余项。
