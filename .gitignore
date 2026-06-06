@@ -1,9 +1,12 @@
 # Swift / Xcode
 .build/
+**/.build/
 *.swiftpm/
+**/*.swiftpm/
 *.xcodeproj/
 *.xcworkspace/
 DerivedData/
+**/DerivedData/
 xcuserdata/
 *.xcuserstate
 
@@ -14,6 +17,9 @@ xcuserdata/
 
 # App bundle (built product)
 *.app/
+*.app
+**/*.app/
+**/*.app
 
 # Temp / debug
 /tmp/
@@ -24,6 +30,9 @@ xcuserdata/
 测试图片.png
 
 # Release artifacts
+*.dmg
+*.dmg/
 时间剪史_v*.dmg
+history_dmg/
 PROJECT_DOCUMENTATION.txt
 utm_share/
