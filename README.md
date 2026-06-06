@@ -88,6 +88,7 @@ swift build --package-path ClipboardHistory
 
 - 原生全屏模式暂时禁用：macOS 15 下曾出现 `NavigationSplitView` 详情区顶部白条问题，后续会继续寻找更稳定的原生修复方案。
 - 当前 Release 包未进行 Apple 公证，首次打开可能需要手动允许。
+- 反复安装旧版和新版后，Launchpad 可能残留旧版入口；建议先删除旧版 App，再安装新版。
 - 历史记录目前为内存存储，退出应用后不会持久保存。
 
 ## Roadmap
