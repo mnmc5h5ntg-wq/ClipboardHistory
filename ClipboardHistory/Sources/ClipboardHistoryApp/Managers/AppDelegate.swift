@@ -2,90 +2,114 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private weak var manager: ClipboardManager?
-    private let menuBarController = MenuBarController()
-    private var isConfigured = false
-    private var didDeferInitialActivationRestore = false
+    private let hotKeySettings = HotKeySettings()
+    private lazy var shell = ApplicationShell(hotKeySettings: hotKeySettings)
 
     func configure(manager: ClipboardManager) {
-        LifecycleDebugLogger.log("AppDelegate.configure called isConfigured=\(isConfigured)")
-        self.manager = manager
-        menuBarController.configure(manager: manager)
-        LifecycleDebugLogger.logAppState("after AppDelegate.configure", menuBarController: menuBarController)
-
-        guard !isConfigured else { return }
-        isConfigured = true
-        manager.startMonitoring(after: 0.4)
-        LifecycleDebugLogger.log("ClipboardManager.startMonitoring scheduled from AppDelegate.configure")
+        shell.configure(manager: manager)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LifecycleDebugLogger.reset()
         LifecycleDebugLogger.log("applicationDidFinishLaunching called")
         NSApp.setActivationPolicy(.regular)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShowMainWindowHotKeyPressed(_:)),
+            name: .showMainWindowHotKeyPressed,
+            object: nil
+        )
+        hotKeySettings.start()
         installReopenAppleEventHandler()
-        LifecycleDebugLogger.logAppState("after applicationDidFinishLaunching", menuBarController: menuBarController)
+        shell.applicationDidFinishLaunching(appDelegate: self)
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationDidBecomeActive called")
-        LifecycleDebugLogger.logAppState("after applicationDidBecomeActive", menuBarController: menuBarController)
-        if didDeferInitialActivationRestore {
-            menuBarController.restoreMainWindowIfNeeded(reason: "applicationDidBecomeActive")
-        } else {
-            didDeferInitialActivationRestore = true
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                self.menuBarController.restoreMainWindowIfNeeded(reason: "initial applicationDidBecomeActive deferred")
-            }
-        }
-        LifecycleDebugLogger.logAppState("after applicationDidBecomeActive restore check", menuBarController: menuBarController)
+        shell.applicationDidBecomeActive()
     }
 
     func applicationDidResignActive(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationDidResignActive called")
-        LifecycleDebugLogger.logAppState("after applicationDidResignActive", menuBarController: menuBarController)
+        shell.applicationDidResignActive()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         LifecycleDebugLogger.log("applicationShouldHandleReopen called hasVisibleWindows=\(flag)")
-        LifecycleDebugLogger.logAppState("before applicationShouldHandleReopen show", menuBarController: menuBarController)
-        menuBarController.showMainWindow()
-        LifecycleDebugLogger.logAppState("after applicationShouldHandleReopen show", menuBarController: menuBarController)
+        shell.handleReopen()
         return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         LifecycleDebugLogger.log("applicationShouldTerminateAfterLastWindowClosed called -> false")
-        LifecycleDebugLogger.logAppState("after applicationShouldTerminateAfterLastWindowClosed", menuBarController: menuBarController)
-        return false
+        return shell.shouldTerminateAfterLastWindowClosed()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationWillTerminate called")
-        LifecycleDebugLogger.logAppState("before applicationWillTerminate", menuBarController: menuBarController)
+        shell.applicationWillTerminate()
         NSAppleEventManager.shared().removeEventHandler(
             forEventClass: AEEventClass(kCoreEventClass),
             andEventID: AEEventID(kAEReopenApplication)
         )
-        manager?.stopMonitoring()
+        NotificationCenter.default.removeObserver(
+            self,
+            name: .showMainWindowHotKeyPressed,
+            object: nil
+        )
+        hotKeySettings.stop()
         LifecycleDebugLogger.close()
     }
 
     func showMainWindow() {
-        menuBarController.showMainWindow()
+        shell.showMainWindow()
     }
 
     func refreshHistory() {
-        menuBarController.refreshHistory()
+        shell.refreshHistory()
     }
 
     func confirmAndClearHistory() {
-        menuBarController.confirmAndClearHistory()
+        shell.confirmAndClearHistory()
+    }
+
+    func showSettings() {
+        shell.showSettings()
+    }
+
+    @objc func showSettingsFromMenu() {
+        showSettings()
+    }
+
+    @objc func showAboutPanel() {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.1"
+        let githubURL = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"
+        NSApplication.shared.orderFrontStandardAboutPanel(options: [
+            .applicationName: "时间剪史",
+            .applicationVersion: version,
+            .credits: NSAttributedString(
+                string: """
+                作者：王子懿
+                License：MIT
+                GitHub：\(githubURL)
+
+                一个 macOS 原生风格的剪贴板历史管理工具，支持文本、图片和常见文件预览。
+                """
+            )
+        ])
+    }
+
+    @objc func openGitHubRepository() {
+        guard let url = URL(string: "https://github.com/mnmc5h5ntg-wq/ClipboardHistory") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func quit() {
-        menuBarController.quit()
+        shell.quit()
+    }
+
+    @objc func quitFromMenu() {
+        quit()
     }
 
     private func installReopenAppleEventHandler() {
@@ -103,8 +127,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         withReplyEvent replyEvent: NSAppleEventDescriptor
     ) {
         LifecycleDebugLogger.log("handleReopenApplicationEvent called")
-        LifecycleDebugLogger.logAppState("before handleReopenApplicationEvent show", menuBarController: menuBarController)
-        menuBarController.showMainWindow()
-        LifecycleDebugLogger.logAppState("after handleReopenApplicationEvent show", menuBarController: menuBarController)
+        shell.handleReopen()
     }
+
+    @objc private func handleShowMainWindowHotKeyPressed(_ notification: Notification) {
+        LifecycleDebugLogger.log("handleShowMainWindowHotKeyPressed called")
+        shell.showMainWindow()
+    }
+
 }

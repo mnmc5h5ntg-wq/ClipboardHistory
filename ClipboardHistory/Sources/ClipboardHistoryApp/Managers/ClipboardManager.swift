@@ -22,9 +22,9 @@ final class ClipboardManager: ObservableObject, @unchecked Sendable {
         }
     }
 
-    private var lastChangeCount = NSPasteboard.general.changeCount
     private var timer: Timer?
     private var delayedStartTask: Task<Void, Never>?
+    private var intake = ClipboardIntake()
     private let maxEntries = 100
 
     func startMonitoring(after delay: TimeInterval = 0) {
@@ -50,32 +50,19 @@ final class ClipboardManager: ObservableObject, @unchecked Sendable {
     }
 
     func refreshHistory() {
-        let pb = NSPasteboard.general
-        lastChangeCount = pb.changeCount
-        if let (content, thumbnail) = Self.readEntry(from: pb) {
-            addEntry(content, thumbnail: thumbnail)
+        if let intakeEntry = intake.refresh() {
+            addEntry(intakeEntry)
         }
     }
 
     private func checkPasteboard() {
-        let pb = NSPasteboard.general
-        guard pb.changeCount != lastChangeCount else { return }
-        lastChangeCount = pb.changeCount
-        if let (content, thumbnail) = Self.readEntry(from: pb) {
-            addEntry(content, thumbnail: thumbnail); return
+        if let intakeEntry = intake.readChangedEntry() {
+            addEntry(intakeEntry)
         }
     }
 
-    private func addEntry(_ content: EntryContent, thumbnail: StoredImage?) {
-        if let f = entries.first, f.content == content { return }
-        let sourceUTIs = (NSPasteboard.general.types ?? []).map { $0.rawValue }
-        let e = Entry(
-            content: content,
-            timestamp: Date(),
-            thumbnail: thumbnail,
-            sourceURL: content.sourceURL,
-            sourceUTIs: sourceUTIs
-        )
+    private func addEntry(_ intakeEntry: ClipboardIntake.Entry) {
+        guard let e = intakeEntry.makeHistoryEntry(unlessDuplicateOf: entries.first) else { return }
         entries.insert(e, at: 0)
         if entries.count > maxEntries { entries = Array(entries.prefix(maxEntries)) }
         selectedEntry = entries.first
@@ -88,7 +75,7 @@ final class ClipboardManager: ObservableObject, @unchecked Sendable {
         case .image(let img): pb.writeObjects([img.nsImage])
         case .file(let url): pb.writeObjects([url as NSURL])
         }
-        lastChangeCount = pb.changeCount
+        intake.markCurrentChangeCount(from: pb)
     }
 
     func copyToClipboardAndBringToTop(_ entry: Entry) {

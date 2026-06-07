@@ -71,26 +71,19 @@ struct HistoryRow: View {
 private struct FileNameText: View {
     let url: URL
 
-    private var baseName: String {
-        let fileName = url.lastPathComponent
-        let fileExtension = url.pathExtension
-        guard !fileExtension.isEmpty else { return fileName }
-        return String(fileName.dropLast(fileExtension.count + 1))
-    }
-
-    private var fileExtension: String {
-        url.pathExtension
+    private var fileNameParts: EntryPresentation.FileNameParts {
+        EntryPresentation.fileNameParts(for: url)
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            Text(baseName.isEmpty ? url.lastPathComponent : baseName)
+            Text(fileNameParts.displayBaseName)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .layoutPriority(0)
 
-            if !fileExtension.isEmpty {
-                Text(".\(fileExtension)")
+            if !fileNameParts.fileExtension.isEmpty {
+                Text(".\(fileNameParts.fileExtension)")
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)

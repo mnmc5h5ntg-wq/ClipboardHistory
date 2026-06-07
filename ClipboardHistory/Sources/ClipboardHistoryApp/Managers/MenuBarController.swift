@@ -46,6 +46,7 @@ final class MenuBarController: NSObject {
         menu.addItem(titleItem)
 
         menu.addItem(NSMenuItem(title: "显示主窗口", action: #selector(showMainWindowFromMenu), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "设置…", action: #selector(showSettingsFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "刷新历史", action: #selector(refreshHistoryFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "清空历史…", action: #selector(confirmAndClearHistoryFromMenu), keyEquivalent: ""))
         menu.addItem(.separator())
@@ -134,6 +135,10 @@ final class MenuBarController: NSObject {
 
     @objc private func showMainWindowFromMenu() {
         showMainWindow()
+    }
+
+    @objc private func showSettingsFromMenu() {
+        (NSApplication.shared.delegate as? AppDelegate)?.showSettings()
     }
 
     @objc private func refreshHistoryFromMenu() {

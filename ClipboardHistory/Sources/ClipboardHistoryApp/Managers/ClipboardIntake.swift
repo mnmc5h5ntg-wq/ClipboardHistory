@@ -1,42 +1,98 @@
 import AppKit
 import AVFoundation
 
-extension ClipboardManager {
+struct ClipboardIntake {
+    struct Entry {
+        let content: ClipboardEntryContent
+        let thumbnail: StoredImage?
+        let sourceUTIs: [String]
+
+        func makeHistoryEntry(timestamp: Date = Date()) -> ClipboardEntry {
+            ClipboardEntry(
+                content: content,
+                timestamp: timestamp,
+                thumbnail: thumbnail,
+                sourceURL: content.sourceURL,
+                sourceUTIs: sourceUTIs
+            )
+        }
+
+        func makeHistoryEntry(unlessDuplicateOf latestEntry: ClipboardEntry?) -> ClipboardEntry? {
+            guard latestEntry?.content != content else { return nil }
+            return makeHistoryEntry()
+        }
+    }
+
+    private var lastChangeCount: Int
+
+    init(pasteboard: NSPasteboard = .general) {
+        self.lastChangeCount = pasteboard.changeCount
+    }
+
+    mutating func refresh(from pasteboard: NSPasteboard = .general) -> Entry? {
+        lastChangeCount = pasteboard.changeCount
+        return readEntry(from: pasteboard)
+    }
+
+    mutating func markCurrentChangeCount(from pasteboard: NSPasteboard = .general) {
+        lastChangeCount = pasteboard.changeCount
+    }
+
+    mutating func readChangedEntry(from pasteboard: NSPasteboard = .general) -> Entry? {
+        guard pasteboard.changeCount != lastChangeCount else { return nil }
+        lastChangeCount = pasteboard.changeCount
+        return readEntry(from: pasteboard)
+    }
+
     /// 统一入口：file-url → png → tiff → text
-    static func readEntry(from pb: NSPasteboard) -> (EntryContent, StoredImage?)? {
-        if let url = readFileURL(from: pb) {
+    private func readEntry(from pasteboard: NSPasteboard) -> Entry? {
+        if let url = readFileURL(from: pasteboard) {
             var thumb = thumbnailForFile(at: url)
             if thumb == nil {
-                if let tiff = pb.data(forType: .tiff),
+                if let tiff = pasteboard.data(forType: .tiff),
                    let img = NSImage(data: tiff) {
                     thumb = StoredImage(img)
-                } else if let icnsData = pb.data(forType: NSPasteboard.PasteboardType(rawValue: "com.apple.icns")),
+                } else if let icnsData = pasteboard.data(forType: NSPasteboard.PasteboardType(rawValue: "com.apple.icns")),
                           let img = NSImage(data: icnsData) {
                     thumb = StoredImage(img)
                 }
             }
-            return (.file(url), thumb)
+            return makeEntry(content: .file(url), thumbnail: thumb, pasteboard: pasteboard)
         }
 
-        if let pngData = pb.data(forType: .png),
+        if let pngData = pasteboard.data(forType: .png),
            let image = NSImage(data: pngData) {
-            return (.image(StoredImage(image)), StoredImage(image))
+            let stored = StoredImage(image)
+            return makeEntry(content: .image(stored), thumbnail: stored, pasteboard: pasteboard)
         }
 
-        if let tiffData = pb.data(forType: .tiff),
+        if let tiffData = pasteboard.data(forType: .tiff),
            let image = NSImage(data: tiffData) {
-            return (.image(StoredImage(image)), StoredImage(image))
+            let stored = StoredImage(image)
+            return makeEntry(content: .image(stored), thumbnail: stored, pasteboard: pasteboard)
         }
 
-        if let t = pb.string(forType: .string),
+        if let t = pasteboard.string(forType: .string),
            !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return (.text(t), nil)
+            return makeEntry(content: .text(t), thumbnail: nil, pasteboard: pasteboard)
         }
 
         return nil
     }
 
-    private static func readFileURL(from pb: NSPasteboard) -> URL? {
+    private func makeEntry(
+        content: ClipboardEntryContent,
+        thumbnail: StoredImage?,
+        pasteboard: NSPasteboard
+    ) -> Entry {
+        Entry(
+            content: content,
+            thumbnail: thumbnail,
+            sourceUTIs: (pasteboard.types ?? []).map { $0.rawValue }
+        )
+    }
+
+    private func readFileURL(from pb: NSPasteboard) -> URL? {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
            let url = urls.first {
             return url
@@ -48,7 +104,7 @@ extension ClipboardManager {
         return nil
     }
 
-    private static func thumbnailForFile(at url: URL) -> StoredImage? {
+    private func thumbnailForFile(at url: URL) -> StoredImage? {
         let ext = url.pathExtension.lowercased()
         if FileTypeSupport.imageExtensions.contains(ext), let image = NSImage(contentsOf: url) {
             return StoredImage(scaledImage(image, maxPixelSize: 512))
@@ -59,7 +115,7 @@ extension ClipboardManager {
         return nil
     }
 
-    private static func videoThumbnail(for url: URL) -> NSImage? {
+    private func videoThumbnail(for url: URL) -> NSImage? {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -77,7 +133,7 @@ extension ClipboardManager {
             generator.generateCGImageAsynchronously(for: time) { cgImage, _, error in
                 lock.lock()
                 if let cgImage {
-                    result.thumbnail = Self.image(from: cgImage)
+                    result.thumbnail = image(from: cgImage)
                 } else {
                     result.error = error
                 }
@@ -100,11 +156,11 @@ extension ClipboardManager {
         }
     }
 
-    private static func image(from cgImage: CGImage) -> NSImage {
+    private func image(from cgImage: CGImage) -> NSImage {
         NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
     }
 
-    private static func scaledImage(_ image: NSImage, maxPixelSize: CGFloat) -> NSImage {
+    private func scaledImage(_ image: NSImage, maxPixelSize: CGFloat) -> NSImage {
         let width = image.size.width
         let height = image.size.height
         guard width > maxPixelSize || height > maxPixelSize else { return image }

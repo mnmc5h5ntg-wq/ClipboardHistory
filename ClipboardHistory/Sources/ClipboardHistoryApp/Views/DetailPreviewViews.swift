@@ -18,61 +18,41 @@ struct QuickLookPreview: NSViewRepresentable {
 struct DetailFileView: View {
     let url: URL
     let thumbnail: StoredImage?
+    private let preview: FilePreview
 
-    private var fileExtension: String { url.pathExtension.lowercased() }
-
-    private var isImageFile: Bool {
-        FileTypeSupport.imageExtensions.contains(fileExtension)
-    }
-
-    private var isVideoFile: Bool {
-        FileTypeSupport.videoExtensions.contains(fileExtension)
-    }
-
-    private var isTextFile: Bool {
-        FileTypeSupport.textExtensions.contains(fileExtension)
-    }
-
-    private var isDocumentFile: Bool {
-        FileTypeSupport.documentExtensions.contains(fileExtension)
+    init(url: URL, thumbnail: StoredImage?) {
+        self.url = url
+        self.thumbnail = thumbnail
+        self.preview = FilePreviewLoader.load(url: url, thumbnail: thumbnail)
     }
 
     var body: some View {
-        if isImageFile, let nsImage = NSImage(contentsOf: url) {
+        switch preview.content {
+        case .image(let nsImage):
             ImagePreviewView(nsImage: nsImage)
-        } else if isTextFile {
-            textPreview
-        } else if isDocumentFile || isVideoFile {
-            documentPreview
-        } else {
-            fallbackView
+        case .text(let content):
+            textPreview(content)
+        case .quickLook:
+            QuickLookPreview(url: preview.url)
+        case .fallback:
+            fallbackView(preview)
         }
     }
 
-    private var textPreview: some View {
-        Group {
-            if let content = try? String(contentsOf: url, encoding: .utf8) {
-                ScrollView([.vertical, .horizontal]) {
-                    Text(content)
-                        .font(.system(size: 13, design: .monospaced))
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(20)
-                        .textSelection(.enabled)
-                }
-            } else {
-                fallbackView
-            }
+    private func textPreview(_ content: String) -> some View {
+        ScrollView([.vertical, .horizontal]) {
+            Text(content)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+                .textSelection(.enabled)
         }
     }
 
-    private var documentPreview: some View {
-        QuickLookPreview(url: url)
-    }
-
-    private var fallbackView: some View {
+    private func fallbackView(_ preview: FilePreview) -> some View {
         VStack(spacing: 16) {
-            if let thumb = thumbnail {
+            if let thumb = preview.thumbnail {
                 Image(nsImage: thumb.nsImage)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -82,9 +62,9 @@ struct DetailFileView: View {
                     .font(.system(size: 48))
                     .foregroundStyle(.quaternary)
             }
-            Text(url.lastPathComponent)
+            Text(preview.url.lastPathComponent)
                 .font(.system(size: 14))
-            Text(url.path)
+            Text(preview.url.path)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .textSelection(.enabled)

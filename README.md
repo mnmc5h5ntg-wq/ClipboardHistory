@@ -19,6 +19,7 @@
 - 📄 文件预览：支持 PDF、Word、Excel、PowerPoint、Pages、Numbers、Keynote、代码文件等常见格式。
 - 🏷 标签系统：保留条目语义分类，区分文本、图片内容和文件引用。
 - 📌 菜单栏模式：顶部菜单栏可显示主窗口、刷新历史、清空历史和退出应用。
+- ⌨️ 全局快捷键：关闭主窗口后，可按默认快捷键 `⌃⌥V` 呼出主窗口，并可在设置中自定义。
 - 🧭 macOS 12+：兼容 macOS 12 及以上版本。
 - 💻 Universal Binary：同时支持 Intel 与 Apple Silicon Mac。
 
