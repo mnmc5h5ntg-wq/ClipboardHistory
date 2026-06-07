@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
+## [v1.2.2beta] - 2026-06-08
+
+### Added
+
+- 新增设置窗口，可修改和恢复呼出主窗口的全局快捷键。
+- 新增快捷键录制控件，支持在设置中直接录入组合快捷键。
+- 新增本轮架构重构总结文档，记录五个模块深化点和验证结果。
+
+### Changed
+
+- 深化剪贴板输入模块，将轮询、解析、缩略图生成、来源 UTI 和相邻去重集中到 `ClipboardIntake`。
+- 深化文件预览模块，将文件类型判断、文本读取、QuickLook 与 fallback 预览集中到 `FilePreview`。
+- 深化应用外壳模块，将应用生命周期意图、主菜单、菜单栏、设置窗口和窗口恢复逻辑从 `AppDelegate` 中拆分。
+- 深化快捷键配置模块，将偏好保存、Carbon 注册、失败回滚和错误提示集中管理。
+- 将条目展示文案、文件名、大小和预览文本集中到 `EntryPresentation`，减少视图中的格式化逻辑。
+- 更新 Release / 仓库整理文档，继续保持 DMG、App bundle 和分析产物不进入源码提交。
+
+### Fixed
+
+- 改善文件、图片和文本预览路径的一致性，减少视图层直接做磁盘读取的情况。
+- 改善关闭窗口后的快捷键呼出路径，快捷键注册失败时会回滚到上一个可用配置。
+
 ## [v1.2.1] - 2026-06-06
 
 ### Added

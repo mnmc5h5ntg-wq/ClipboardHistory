@@ -1,5 +1,5 @@
 APP_NAME := 时间剪史
-VERSION  := 1.2.1
+VERSION  := 1.2.2beta
 BUNDLE  := $(APP_NAME).app
 BINARY  := ClipboardHistoryApp
 BUILD_A := ClipboardHistory/.build/arm64-apple-macosx/debug

@@ -7,7 +7,7 @@
 ![platform](https://img.shields.io/badge/platform-macOS%2012%2B-silver)
 ![swift](https://img.shields.io/badge/swift-6.0-orange)
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![version](https://img.shields.io/badge/version-v1.2.1-lightgrey)
+![version](https://img.shields.io/badge/version-v1.2.2beta-lightgrey)
 
 ## 功能特性
 
@@ -97,7 +97,6 @@ v1.3 计划：
 
 - 收藏夹
 - 历史持久化
-- 全局快捷键
 - 开机启动
 - 菜单栏快速粘贴
 - 缩略图缓存系统

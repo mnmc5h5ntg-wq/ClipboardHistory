@@ -82,7 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAboutPanel() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.1"
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.2beta"
         let githubURL = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"
         NSApplication.shared.orderFrontStandardAboutPanel(options: [
             .applicationName: "时间剪史",
