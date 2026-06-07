@@ -115,4 +115,4 @@ v1.3 计划：
 
 ## License
 
-MIT © 王子懿
+WTFPL © 王子懿
