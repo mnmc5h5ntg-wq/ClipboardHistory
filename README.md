@@ -7,7 +7,7 @@
 
 ![platform](https://img.shields.io/badge/platform-macOS%2012%2B-silver)
 ![swift](https://img.shields.io/badge/swift-6.0-orange)
-![license](https://img.shields.io/badge/license-MIT-blue)
+![license](https://img.shields.io/badge/license-WTFPL-blue)
 ![version](https://img.shields.io/badge/version-v1.2.2beta-lightgrey)
 
 ## 功能特性
