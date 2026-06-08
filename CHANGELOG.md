@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
-## [Unreleased]
+## [v1.3] - 2026-06-09
 
 ### Added
 
@@ -20,16 +20,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 历史保留策略改为普通记录默认 500 条 / 30 天，收藏项不受自动清理影响。
 - 清空历史改为只清空未收藏记录，收藏记录会保留。
 - 视频文件预览改用原生播放器，默认静音自动播放。
+- 视频控制条改为保留右下角操作区空间，避免宽视频控件被收藏/复制/删除按钮遮挡。
 - 主窗口改为固定边栏布局，移除边栏折叠入口。
 - 发布脚本默认先运行自动测试，构建后校验 App `Info.plist` 版本号。
 - README 更新为 v1.3 持久化版本的实际能力和数据保存说明。
 
 ### Fixed
 
+- 修复同一张图片隔多条记录后再次复制仍生成重复历史的问题。
+- 修复视频预览控件需要折叠/展开边栏后才容易出现的问题。
+- 修复关闭主窗口后视频仍继续播放的问题。
+- 修复竖屏视频下方播放控件缺少进度条调节能力的问题。
+- 修复边栏折叠按钮在重新打开窗口后又出现的问题。
 - 测试环境改用内存存储，避免单元测试读取或污染本机真实历史记录。
 - 持久化启动加载只读取一次历史文件，减少不必要磁盘读取。
-- 修复视频预览控件需要折叠/展开边栏后才容易出现的问题。
 - 统一左侧清空按钮和右侧悬浮操作按钮的玻璃样式与 hover 动效。
+
+### Release
+
+- DMG：`releases/时间剪史_v1.3.dmg`
+- SHA256：`8a59d872cdccfe4caa334c055c1bf92a62facb7fa36d148345e5abfb8c095538`
+
+## [Unreleased]
+
+暂无未发布变更。
 
 ## [v1.2.2beta] - 2026-06-08
 
