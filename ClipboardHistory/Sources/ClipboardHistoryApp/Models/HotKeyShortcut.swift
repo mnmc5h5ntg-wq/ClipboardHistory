@@ -10,6 +10,11 @@ struct HotKeyShortcut: Codable, Equatable {
         modifiers: UInt32(controlKey | optionKey)
     )
 
+    static let defaultRepeatCopyShortcut = HotKeyShortcut(
+        keyCode: UInt32(kVK_ANSI_C),
+        modifiers: UInt32(controlKey | optionKey)
+    )
+
     var displayString: String {
         modifierDisplayString + keyDisplayString
     }

@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
+## [Unreleased]
+
+### Added
+
+- 新增历史持久化，文本、图片、文件引用和缩略图可在重启后恢复。
+- 新增收藏功能，收藏项可在侧边栏筛选和菜单栏收藏区快速使用。
+- 新增开机启动设置，支持在系统允许时从设置窗口开启或关闭。
+- 新增菜单栏最近记录/收藏记录快速复制入口。
+- 新增“再次复制”全局快捷键，默认 `⌃⌥C` 复制当前选中记录，并支持在设置中自定义和恢复默认。
+- 新增发布流程文档，说明本地发版、校验和人工检查步骤。
+
+### Changed
+
+- 历史保留策略改为普通记录默认 500 条 / 30 天，收藏项不受自动清理影响。
+- 清空历史改为只清空未收藏记录，收藏记录会保留。
+- 视频文件预览改用原生播放器，默认静音自动播放。
+- 主窗口改为固定边栏布局，移除边栏折叠入口。
+- 发布脚本默认先运行自动测试，构建后校验 App `Info.plist` 版本号。
+- README 更新为 v1.3 持久化版本的实际能力和数据保存说明。
+
+### Fixed
+
+- 测试环境改用内存存储，避免单元测试读取或污染本机真实历史记录。
+- 持久化启动加载只读取一次历史文件，减少不必要磁盘读取。
+- 修复视频预览控件需要折叠/展开边栏后才容易出现的问题。
+- 统一左侧清空按钮和右侧悬浮操作按钮的玻璃样式与 hover 动效。
+
 ## [v1.2.2beta] - 2026-06-08
 
 ### Added

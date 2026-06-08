@@ -3,27 +3,65 @@ import Carbon
 
 extension Notification.Name {
     static let showMainWindowHotKeyPressed = Notification.Name("ClipboardHistoryShowMainWindowHotKeyPressed")
+    static let repeatCopyHotKeyPressed = Notification.Name("ClipboardHistoryRepeatCopyHotKeyPressed")
 }
 
 private let globalHotKeySignature = fourCharacterCode("TJSJ")
-private let globalHotKeyIdentifier: UInt32 = 1
 
 @MainActor
-final class GlobalHotKeyController {
-    private(set) var shortcut = HotKeyShortcut.defaultShortcut
+enum HotKeyUpdateResult: Equatable {
+    case updated
+    case newShortcutUnavailable(restoredPrevious: Bool)
+}
 
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandlerRef: EventHandlerRef?
+@MainActor
+protocol HotKeyControlling {
+    var shortcut: HotKeyShortcut { get }
 
     @discardableResult
-    func updateShortcut(_ newShortcut: HotKeyShortcut) -> Bool {
+    func updateShortcut(_ newShortcut: HotKeyShortcut) -> HotKeyUpdateResult
+
+    @discardableResult
+    func register(shortcut newShortcut: HotKeyShortcut) -> Bool
+
+    func stop()
+}
+
+@MainActor
+final class GlobalHotKeyController: HotKeyControlling {
+    private let action: HotKeyAction
+    private(set) var shortcut: HotKeyShortcut
+
+    private var hotKeyRef: EventHotKeyRef?
+    private static var eventHandlerRef: EventHandlerRef?
+
+    init(action: HotKeyAction = .showMainWindow) {
+        self.action = action
+        self.shortcut = action.defaultShortcut
+    }
+
+    @discardableResult
+    func updateShortcut(_ newShortcut: HotKeyShortcut) -> HotKeyUpdateResult {
         let previousShortcut = shortcut
-        if register(shortcut: newShortcut) {
-            return true
+        guard newShortcut != previousShortcut else { return .updated }
+
+        guard let probeHotKeyRef = registerHotKeyRef(
+            for: newShortcut,
+            hotKeyIdentifier: action.probeHotKeyIdentifier
+        ) else {
+            let restoredPrevious = hotKeyRef != nil || register(shortcut: previousShortcut)
+            return .newShortcutUnavailable(restoredPrevious: restoredPrevious)
         }
 
-        _ = register(shortcut: previousShortcut)
-        return false
+        UnregisterEventHotKey(probeHotKeyRef)
+        stop()
+
+        if register(shortcut: newShortcut) {
+            return .updated
+        }
+
+        let restoredPrevious = register(shortcut: previousShortcut)
+        return .newShortcutUnavailable(restoredPrevious: restoredPrevious)
     }
 
     @discardableResult
@@ -34,6 +72,28 @@ final class GlobalHotKeyController {
         }
 
         stop()
+
+        if let newHotKeyRef = registerHotKeyRef(for: newShortcut, hotKeyIdentifier: action.hotKeyIdentifier) {
+            hotKeyRef = newHotKeyRef
+            shortcut = newShortcut
+            LifecycleDebugLogger.log("GlobalHotKeyController registered \(action.title) shortcut=\(shortcut.displayString)")
+            return true
+        }
+
+        return false
+    }
+
+    func stop() {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+    }
+
+    private static func installSharedEventHandler() -> Bool {
+        if eventHandlerRef != nil {
+            return true
+        }
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
@@ -49,14 +109,26 @@ final class GlobalHotKeyController {
             &eventHandlerRef
         )
 
-        guard handlerStatus == noErr else {
+        if handlerStatus != noErr {
             LifecycleDebugLogger.log("GlobalHotKeyController InstallEventHandler failed status=\(handlerStatus)")
             return false
         }
 
+        return true
+    }
+
+    private func registerHotKeyRef(
+        for newShortcut: HotKeyShortcut,
+        hotKeyIdentifier: UInt32
+    ) -> EventHotKeyRef? {
+        guard Self.installSharedEventHandler() else {
+            return nil
+        }
+
+        var newHotKeyRef: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(
             signature: globalHotKeySignature,
-            id: globalHotKeyIdentifier
+            id: hotKeyIdentifier
         )
         let registerStatus = RegisterEventHotKey(
             newShortcut.keyCode,
@@ -64,33 +136,15 @@ final class GlobalHotKeyController {
             hotKeyID,
             GetApplicationEventTarget(),
             0,
-            &hotKeyRef
+            &newHotKeyRef
         )
 
-        guard registerStatus == noErr else {
+        guard registerStatus == noErr, let newHotKeyRef else {
             LifecycleDebugLogger.log("GlobalHotKeyController RegisterEventHotKey failed status=\(registerStatus)")
-            removeEventHandler()
-            return false
+            return nil
         }
 
-        shortcut = newShortcut
-        LifecycleDebugLogger.log("GlobalHotKeyController registered shortcut=\(shortcut.displayString)")
-        return true
-    }
-
-    func stop() {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-            self.hotKeyRef = nil
-        }
-        removeEventHandler()
-    }
-
-    private func removeEventHandler() {
-        if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-            self.eventHandlerRef = nil
-        }
+        return newHotKeyRef
     }
 }
 
@@ -114,12 +168,12 @@ private func globalHotKeyEventHandler(
 
     guard status == noErr,
           hotKeyID.signature == globalHotKeySignature,
-          hotKeyID.id == globalHotKeyIdentifier else {
+          let action = HotKeyAction(hotKeyIdentifier: hotKeyID.id) else {
         return noErr
     }
 
     DispatchQueue.main.async {
-        NotificationCenter.default.post(name: .showMainWindowHotKeyPressed, object: nil)
+        NotificationCenter.default.post(name: action.notificationName, object: nil)
     }
 
     return noErr

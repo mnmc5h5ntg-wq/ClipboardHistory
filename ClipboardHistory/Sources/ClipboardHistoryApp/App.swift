@@ -3,15 +3,15 @@ import SwiftUI
 @main
 struct ClipboardHistoryApp: App {
 
-    @StateObject private var manager = ClipboardManager()
+    @StateObject private var historyStore = HistoryStore()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
-            ContentView(manager: manager)
+            ContentView(historyStore: historyStore)
                 .frame(minWidth: 600, minHeight: 400)
                 .onAppear {
-                    appDelegate.configure(manager: manager)
+                    appDelegate.configure(historyStore: historyStore)
                 }
                 .background(WindowConfigurator())
         }
@@ -20,21 +20,34 @@ struct ClipboardHistoryApp: App {
         if #available(macOS 13, *) {
             MenuBarExtra("时间剪史", systemImage: "clipboard") {
                 Text("时间剪史")
-                Button("显示主窗口") {
-                    appDelegate.showMainWindow()
-                }
-                Button("设置…") {
-                    appDelegate.showSettings()
-                }
-                Button("刷新历史") {
-                    appDelegate.refreshHistory()
-                }
-                Button("清空历史…") {
-                    appDelegate.confirmAndClearHistory()
+                quickCopyItems
+                Divider()
+                ForEach(AppCommandCatalog.menuBarCommands.filter { $0 != .quit }, id: \.self) { command in
+                    Button(command.title) {
+                        appDelegate.perform(command)
+                    }
                 }
                 Divider()
-                Button("退出时间剪史") {
-                    appDelegate.quit()
+                Button(AppCommand.quit.title) {
+                    appDelegate.perform(.quit)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var quickCopyItems: some View {
+        ForEach(QuickCopyMenu.sections(entries: historyStore.entries)) { section in
+            Divider()
+            Text(section.title)
+            ForEach(section.entries) { entry in
+                Button {
+                    appDelegate.copyHistoryEntry(id: entry.id)
+                } label: {
+                    Label(
+                        EntryPresentation.privateMenuTitle(for: entry),
+                        systemImage: EntryPresentation.menuSymbol(for: entry)
+                    )
                 }
             }
         }

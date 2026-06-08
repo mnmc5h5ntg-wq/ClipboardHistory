@@ -2,11 +2,17 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let hotKeySettings = HotKeySettings()
-    private lazy var shell = ApplicationShell(hotKeySettings: hotKeySettings)
+    private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
+    private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
+    private let loginItemSettings = LoginItemSettings()
+    private lazy var shell = ApplicationShell(
+        showMainWindowHotKeySettings: showMainWindowHotKeySettings,
+        repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+        loginItemSettings: loginItemSettings
+    )
 
-    func configure(manager: ClipboardManager) {
-        shell.configure(manager: manager)
+    func configure(historyStore: HistoryStore) {
+        shell.configure(historyStore: historyStore)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -19,7 +25,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .showMainWindowHotKeyPressed,
             object: nil
         )
-        hotKeySettings.start()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRepeatCopyHotKeyPressed(_:)),
+            name: .repeatCopyHotKeyPressed,
+            object: nil
+        )
+        showMainWindowHotKeySettings.start()
+        repeatCopyHotKeySettings.start()
+        loginItemSettings.refresh()
         installReopenAppleEventHandler()
         shell.applicationDidFinishLaunching(appDelegate: self)
     }
@@ -57,7 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .showMainWindowHotKeyPressed,
             object: nil
         )
-        hotKeySettings.stop()
+        NotificationCenter.default.removeObserver(
+            self,
+            name: .repeatCopyHotKeyPressed,
+            object: nil
+        )
+        showMainWindowHotKeySettings.stop()
+        repeatCopyHotKeySettings.stop()
         LifecycleDebugLogger.close()
     }
 
@@ -69,8 +89,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shell.refreshHistory()
     }
 
+    func copyHistoryEntry(id: UUID) {
+        shell.copyHistoryEntry(id: id)
+    }
+
     func confirmAndClearHistory() {
         shell.confirmAndClearHistory()
+    }
+
+    func perform(_ command: AppCommand) {
+        shell.perform(command)
     }
 
     func showSettings() {
@@ -90,10 +118,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .credits: NSAttributedString(
                 string: """
                 作者：王子懿
-                License：MIT
+                License：WTFPL
                 GitHub：\(githubURL)
 
-                一个 macOS 原生风格的剪贴板历史管理工具，支持文本、图片和常见文件预览。
+                一个 macOS 原生风格的剪贴板历史管理工具，支持文本、图片、文件和视频预览。
                 """
             )
         ])
@@ -133,6 +161,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func handleShowMainWindowHotKeyPressed(_ notification: Notification) {
         LifecycleDebugLogger.log("handleShowMainWindowHotKeyPressed called")
         shell.showMainWindow()
+    }
+
+    @objc private func handleRepeatCopyHotKeyPressed(_ notification: Notification) {
+        LifecycleDebugLogger.log("handleRepeatCopyHotKeyPressed called")
+        shell.repeatCopySelectedEntry()
     }
 
 }

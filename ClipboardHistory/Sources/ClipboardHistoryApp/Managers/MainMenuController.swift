@@ -14,7 +14,6 @@ final class MainMenuController {
         let mainMenu = NSMenu()
         mainMenu.addItem(makeAppMenuItem())
         mainMenu.addItem(makeEditMenuItem())
-        mainMenu.addItem(makeViewMenuItem())
         mainMenu.addItem(makeWindowMenuItem())
         mainMenu.addItem(makeHelpMenuItem())
         NSApplication.shared.mainMenu = mainMenu
@@ -33,13 +32,13 @@ final class MainMenuController {
         let menu = NSMenu(title: "时间剪史")
         menu.addItem(item("关于时间剪史", action: #selector(AppDelegate.showAboutPanel), key: ""))
         menu.addItem(.separator())
-        menu.addItem(item("设置…", action: #selector(AppDelegate.showSettingsFromMenu), key: ","))
+        menu.addItem(item(for: .showSettings, action: #selector(AppDelegate.showSettingsFromMenu)))
         menu.addItem(.separator())
         menu.addItem(item("隐藏时间剪史", action: #selector(NSApplication.hide(_:)), key: "h", target: NSApplication.shared))
         menu.addItem(item("隐藏其他应用", action: #selector(NSApplication.hideOtherApplications(_:)), key: "h", modifiers: [.command, .option], target: NSApplication.shared))
         menu.addItem(item("显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), key: "", target: NSApplication.shared))
         menu.addItem(.separator())
-        menu.addItem(item("退出时间剪史", action: #selector(AppDelegate.quitFromMenu), key: "q"))
+        menu.addItem(item(for: .quit, action: #selector(AppDelegate.quitFromMenu)))
 
         return topLevelItem("时间剪史", submenu: menu)
     }
@@ -56,12 +55,6 @@ final class MainMenuController {
         menu.addItem(item("全选", action: #selector(NSText.selectAll(_:)), key: "a", target: nil))
 
         return topLevelItem("编辑", submenu: menu)
-    }
-
-    private func makeViewMenuItem() -> NSMenuItem {
-        let menu = NSMenu(title: "显示")
-        menu.addItem(item("显示/隐藏边栏", action: #selector(NSSplitViewController.toggleSidebar(_:)), key: "s", modifiers: [.command, .control], target: nil))
-        return topLevelItem("显示", submenu: menu)
     }
 
     private func makeWindowMenuItem() -> NSMenuItem {
@@ -97,5 +90,14 @@ final class MainMenuController {
         item.keyEquivalentModifierMask = key.isEmpty ? [] : modifiers
         item.target = target ?? appDelegate
         return item
+    }
+
+    private func item(for command: AppCommand, action: Selector) -> NSMenuItem {
+        item(
+            command.title,
+            action: action,
+            key: command.keyEquivalent,
+            modifiers: command.keyModifiers
+        )
     }
 }

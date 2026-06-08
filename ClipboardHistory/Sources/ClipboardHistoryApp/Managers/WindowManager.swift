@@ -2,6 +2,8 @@ import AppKit
 
 @MainActor
 enum WindowManager {
+    static let mainWindowIdentifier = NSUserInterfaceItemIdentifier("AppWindow")
+
     static func showMainWindow(menuBarController: MenuBarController? = nil) {
         LifecycleDebugLogger.log("WindowManager.showMainWindow called")
         LifecycleDebugLogger.logAppState("before showMainWindow", menuBarController: menuBarController)
@@ -43,10 +45,10 @@ enum WindowManager {
         }
     }
 
-    private static func isAppContentWindow(_ window: NSWindow) -> Bool {
+    static func isAppContentWindow(_ window: NSWindow) -> Bool {
         let className = String(describing: type(of: window))
         return !(window is NSPanel)
             && !className.contains("NSStatusBarWindow")
-            && window.identifier?.rawValue.contains("AppWindow") == true
+            && window.identifier == mainWindowIdentifier
     }
 }

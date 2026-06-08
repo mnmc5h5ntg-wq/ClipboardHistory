@@ -1,24 +1,43 @@
 import SwiftUI
 
 struct HistorySidebarView: View {
-    @ObservedObject var manager: ClipboardManager
+    @ObservedObject var historyStore: HistoryStore
     @State private var showClearConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
-            SearchField(
-                text: Binding(get: { manager.searchText }, set: { manager.updateSearch($0) })
-            )
+            VStack(spacing: 8) {
+                SearchField(
+                    text: Binding(
+                        get: { historyStore.searchText },
+                        set: { historyStore.perform(.updateSearch($0)) }
+                    )
+                )
+
+                Picker(
+                    "范围",
+                    selection: Binding(
+                        get: { historyStore.filter },
+                        set: { historyStore.perform(.updateFilter($0)) }
+                    )
+                ) {
+                    ForEach(HistoryStore.Filter.allCases) { filter in
+                        Text(filter.title).tag(filter)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
 
             Divider()
             header
 
-            if manager.filteredEntries.isEmpty {
+            if historyStore.filteredEntries.isEmpty {
                 EmptyStateView(
                     systemName: "clipboard",
-                    title: manager.entries.isEmpty ? "暂无剪贴板历史" : "无匹配结果"
+                    title: emptyTitle
                 )
                 .padding(.vertical, 40)
                 Spacer()
@@ -38,36 +57,58 @@ struct HistorySidebarView: View {
 
             Spacer()
 
-            Text("\(manager.filteredEntries.count) 条记录")
+            Text(countText)
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(.tertiary)
 
-            if !manager.entries.isEmpty {
-                GlassCircleButton(symbol: "trash.slash", helpText: "清空全部") {
+            if historyStore.ordinaryCount > 0 {
+                GlassCircleButton(
+                    symbol: "trash.slash",
+                    helpText: "清空未收藏记录",
+                    foregroundStyle: AnyShapeStyle(Color.red)
+                ) {
                     showClearConfirmation = true
                 }
-                .foregroundStyle(.red)
                 .padding(.leading, 6)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .alert("清空全部记录", isPresented: $showClearConfirmation) {
+        .alert("清空未收藏记录", isPresented: $showClearConfirmation) {
             Button("取消", role: .cancel) {}
-            Button("清空", role: .destructive) { manager.clearAll() }
+            Button("清空", role: .destructive) { historyStore.perform(.clear) }
         } message: {
-            Text("确定要清空所有剪贴板记录吗？此操作不可撤销。")
+            Text("收藏记录会保留，其余历史会被清空。")
         }
+    }
+
+    private var countText: String {
+        switch historyStore.filter {
+        case .all:
+            return "\(historyStore.filteredEntries.count) 条记录"
+        case .favorites:
+            return "\(historyStore.filteredEntries.count) 个收藏"
+        }
+    }
+
+    private var emptyTitle: String {
+        if historyStore.entries.isEmpty {
+            return "暂无剪贴板历史"
+        }
+        if historyStore.filter == .favorites {
+            return historyStore.favoriteCount == 0 ? "暂无收藏" : "无匹配结果"
+        }
+        return "无匹配结果"
     }
 
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(manager.filteredEntries) { entry in
+                ForEach(historyStore.filteredEntries) { entry in
                     HistoryRowButton(
                         entry: entry,
-                        selected: manager.selectedEntry?.id == entry.id,
-                        action: { manager.selectedEntry = entry }
+                        selected: historyStore.selectedEntry?.id == entry.id,
+                        action: { historyStore.perform(.select(entry)) }
                     )
                 }
             }

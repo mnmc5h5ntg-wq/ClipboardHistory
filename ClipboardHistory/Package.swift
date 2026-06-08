@@ -18,9 +18,14 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
+                .linkedFramework("AVKit"),
                 .linkedFramework("Carbon"),
                 .linkedFramework("Quartz")
             ]
+        ),
+        .testTarget(
+            name: "ClipboardHistoryAppTests",
+            dependencies: ["ClipboardHistoryApp"]
         )
     ]
 )

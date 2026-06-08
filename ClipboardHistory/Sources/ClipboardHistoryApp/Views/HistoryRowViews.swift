@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct HistoryRowButton: View {
-    let entry: ClipboardManager.Entry
+    let entry: HistoryStore.Entry
     let selected: Bool
     let action: () -> Void
     @State private var isHovered = false
@@ -33,7 +33,7 @@ struct HistoryRowButton: View {
 }
 
 struct HistoryRow: View {
-    let entry: ClipboardManager.Entry
+    let entry: HistoryStore.Entry
 
     var body: some View {
         HStack(spacing: 8) {
@@ -63,6 +63,15 @@ struct HistoryRow: View {
                 }
                 Text(ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp))
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if entry.isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.yellow)
+                    .frame(width: 14, height: 14)
+                    .help("已收藏")
             }
         }
     }

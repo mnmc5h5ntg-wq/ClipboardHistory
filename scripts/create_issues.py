@@ -1,29 +1,46 @@
 #!/usr/bin/env python3
-"""一键创建时间剪史 v1.2 全部 12 条 GitHub Issue — 使用 curl 避免编码问题"""
+"""Release-only helper for promoting curated local items to GitHub Issues.
 
-import json, os, subprocess, sys
+During active development, issues and PRDs live under .scratch/. This script is
+kept only for a deliberate release-preparation pass, after deciding which local
+items should become public GitHub Issues.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
 
 REPO = "mnmc5h5ntg-wq/ClipboardHistory"
-TOKEN = os.environ.get("GITHUB_TOKEN") or input("GitHub Personal Access Token: ").strip()
+GITHUB_API = "https://api.github.com"
 
 
-def post(title, body, labels):
-    payload = json.dumps({"title": title, "body": body, "labels": labels}, ensure_ascii=False)
-    cmd = [
-        "curl", "-s", "-X", "POST",
-        f"https://api.github.com/repos/{REPO}/issues",
-        "-H", f"Authorization: token {TOKEN}",
-        "-H", "Accept: application/vnd.github+json",
-        "-H", "Content-Type: application/json; charset=utf-8",
-        "-H", "User-Agent: 时间剪史-bot",
-        "--data-binary", payload
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, env={"LANG": "en_US.UTF-8", "PATH": "/usr/bin"})
-    if result.returncode != 0:
-        raise RuntimeError(f"curl failed: {result.stderr}")
-    data = json.loads(result.stdout)
+def post(title, body, labels, *, token, repo=REPO):
+    payload = json.dumps({"title": title, "body": body, "labels": labels}, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        f"{GITHUB_API}/repos/{repo}/issues",
+        data=payload,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "ClipboardHistory-release-helper",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"GitHub API failed ({error.code}): {body[:200]}") from error
+
     if "number" not in data:
-        raise RuntimeError(f"Unexpected response: {result.stdout[:200]}")
+        raise RuntimeError(f"Unexpected response: {json.dumps(data, ensure_ascii=False)[:200]}")
     print(f"  ✅ #{data['number']} {title}")
     return data["number"]
 
@@ -89,15 +106,43 @@ def all_issues():
     ]
 
 
-if __name__ == "__main__":
-    print(f"在 {REPO} 创建 Issue...\n")
+def parse_args(argv):
+    parser = argparse.ArgumentParser(description="Promote curated release items to GitHub Issues.")
+    parser.add_argument("--repo", default=REPO, help="GitHub repo, for example owner/name")
+    parser.add_argument(
+        "--confirm-release-publish",
+        action="store_true",
+        help="Actually create GitHub Issues. Without this flag, only prints the planned items.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    issues = all_issues()
+    if not args.confirm_release_publish:
+        print("预演：不会创建 GitHub Issue。开发期请继续使用 .scratch/ 本地 markdown。")
+        print("如确认要在 release 准备阶段发布这些 Issue，请添加 --confirm-release-publish。")
+        for index, (title, _body, labels) in enumerate(issues, start=1):
+            print(f"{index:02d}. {title} [{', '.join(labels)}]")
+        return 0
+
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        print("缺少 GITHUB_TOKEN。请只在 release 准备阶段通过环境变量提供 token。", file=sys.stderr)
+        return 1
+
+    print(f"在 {args.repo} 创建 Issue...\n")
     ok = 0
-    total = 0
-    for title, body, labels in all_issues():
-        total += 1
+    for title, body, labels in issues:
         try:
-            post(title, body, labels)
+            post(title, body, labels, token=token, repo=args.repo)
             ok += 1
         except Exception as e:
             print(f"  ❌ {title}: {e}")
-    print(f"\n完成: {ok}/{total} 创建成功")
+    print(f"\n完成: {ok}/{len(issues)} 创建成功")
+    return 0 if ok == len(issues) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

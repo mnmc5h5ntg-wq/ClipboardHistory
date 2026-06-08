@@ -1,5 +1,7 @@
 # 时间剪史 v1.2.1 架构审查
 
+> 历史快照：本文记录 v1.2.1 时期的架构状态，包含当时的 `ClipboardManager` / `ClipboardReader` 等旧模块名称。当前 v1.3 工作区已经以 `HistoryStore`、`ClipboardIntake`、`MediaLoader`、`ClipboardWriter` 和 `ApplicationShell` 为核心；继续开发请优先参考 `docs/ARCHITECTURE_REFACTOR_2026_06_08.md`、`docs/SUBAGENT_CODE_REVIEW_2026_06_08.md` 和 `docs/REVIEW_FIX_PROGRESS_2026_06_08.md`。
+
 ## 1. 当前架构概览
 
 项目主体是一个 Swift Package，可执行 target 位于 `ClipboardHistory/Sources/ClipboardHistoryApp`，最低支持 macOS 12，继续兼容 Intel 与 Apple Silicon。

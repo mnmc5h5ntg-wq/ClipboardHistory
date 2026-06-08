@@ -3,11 +3,19 @@ import SwiftUI
 
 @MainActor
 final class SettingsWindowController {
-    private let hotKeySettings: HotKeySettings
+    private let showMainWindowHotKeySettings: HotKeySettings
+    private let repeatCopyHotKeySettings: HotKeySettings
+    private let loginItemSettings: LoginItemSettings
     private var windowController: NSWindowController?
 
-    init(hotKeySettings: HotKeySettings) {
-        self.hotKeySettings = hotKeySettings
+    init(
+        showMainWindowHotKeySettings: HotKeySettings,
+        repeatCopyHotKeySettings: HotKeySettings,
+        loginItemSettings: LoginItemSettings
+    ) {
+        self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
+        self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
+        self.loginItemSettings = loginItemSettings
     }
 
     func show() {
@@ -22,13 +30,19 @@ final class SettingsWindowController {
             return windowController
         }
 
-        let hostingController = NSHostingController(rootView: SettingsView(hotKeySettings: hotKeySettings))
+        let hostingController = NSHostingController(
+            rootView: SettingsView(
+                showMainWindowHotKeySettings: showMainWindowHotKeySettings,
+                repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+                loginItemSettings: loginItemSettings
+            )
+        )
         let window = NSWindow(contentViewController: hostingController)
         window.title = "设置"
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 500, height: 180))
-        window.minSize = NSSize(width: 500, height: 180)
+        window.setContentSize(NSSize(width: 520, height: 330))
+        window.minSize = NSSize(width: 520, height: 330)
 
         let controller = NSWindowController(window: window)
         windowController = controller

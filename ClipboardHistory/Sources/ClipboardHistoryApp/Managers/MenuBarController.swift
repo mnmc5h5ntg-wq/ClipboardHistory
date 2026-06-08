@@ -1,13 +1,25 @@
 import AppKit
 
 @MainActor
-final class MenuBarController: NSObject {
-    private var statusItem: NSStatusItem?
-    private weak var manager: ClipboardManager?
+final class MenuBarController: NSObject, NSMenuDelegate {
+    typealias CommandHandler = (AppCommand) -> Void
+    typealias EntryProvider = () -> [HistoryStore.Entry]
+    typealias EntryHandler = (HistoryStore.Entry) -> Void
 
-    func configure(manager: ClipboardManager) {
+    private var statusItem: NSStatusItem?
+    private var commandHandler: CommandHandler?
+    private var entriesProvider: EntryProvider = { [] }
+    private var entryHandler: EntryHandler?
+
+    func configure(
+        commandHandler: @escaping CommandHandler,
+        entriesProvider: @escaping EntryProvider = { [] },
+        entryHandler: EntryHandler? = nil
+    ) {
         LifecycleDebugLogger.log("MenuBarController.configure called")
-        self.manager = manager
+        self.commandHandler = commandHandler
+        self.entriesProvider = entriesProvider
+        self.entryHandler = entryHandler
 
         if #available(macOS 13, *) {
             LifecycleDebugLogger.log("MenuBarController.configure skipped NSStatusItem on macOS 13+")
@@ -40,21 +52,80 @@ final class MenuBarController: NSObject {
     private func makeMenu() -> NSMenu {
         LifecycleDebugLogger.log("makeMenu called")
         let menu = NSMenu()
+        menu.delegate = self
+        populate(menu)
+        LifecycleDebugLogger.log("menu bound itemCount=\(menu.items.count)")
+        return menu
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        populate(menu)
+    }
+
+    private func populate(_ menu: NSMenu) {
+        menu.removeAllItems()
 
         let titleItem = NSMenuItem(title: "时间剪史", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
 
-        menu.addItem(NSMenuItem(title: "显示主窗口", action: #selector(showMainWindowFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "设置…", action: #selector(showSettingsFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "刷新历史", action: #selector(refreshHistoryFromMenu), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "清空历史…", action: #selector(confirmAndClearHistoryFromMenu), keyEquivalent: ""))
+        QuickCopyMenu.sections(entries: entriesProvider()).forEach { section in
+            addEntrySection(section, to: menu)
+        }
+
+        AppCommandCatalog.menuBarCommands.filter { $0 != .quit }.forEach { command in
+            menu.addItem(menuItem(for: command))
+        }
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "退出时间剪史", action: #selector(quitFromMenu), keyEquivalent: "q"))
+        menu.addItem(menuItem(for: .quit))
 
         menu.items.forEach { $0.target = self }
-        LifecycleDebugLogger.log("menu bound itemCount=\(menu.items.count)")
-        return menu
+    }
+
+    private func addEntrySection(_ section: QuickCopyMenuSection, to menu: NSMenu) {
+        menu.addItem(.separator())
+        let sectionItem = NSMenuItem(title: section.title, action: nil, keyEquivalent: "")
+        sectionItem.isEnabled = false
+        menu.addItem(sectionItem)
+
+        section.entries.forEach { entry in
+            let item = NSMenuItem(
+                title: EntryPresentation.privateMenuTitle(for: entry),
+                action: #selector(copyHistoryEntryFromMenu(_:)),
+                keyEquivalent: ""
+            )
+            item.representedObject = entry.id.uuidString
+            item.image = NSImage(
+                systemSymbolName: EntryPresentation.menuSymbol(for: entry),
+                accessibilityDescription: nil
+            )
+            menu.addItem(item)
+        }
+    }
+
+    private func menuItem(for command: AppCommand) -> NSMenuItem {
+        let item = NSMenuItem(
+            title: command.title,
+            action: selector(for: command),
+            keyEquivalent: command.keyEquivalent
+        )
+        item.keyEquivalentModifierMask = command.keyModifiers
+        return item
+    }
+
+    private func selector(for command: AppCommand) -> Selector {
+        switch command {
+        case .showMainWindow:
+            return #selector(showMainWindowFromMenu)
+        case .showSettings:
+            return #selector(showSettingsFromMenu)
+        case .refreshHistory:
+            return #selector(refreshHistoryFromMenu)
+        case .clearHistory:
+            return #selector(confirmAndClearHistoryFromMenu)
+        case .quit:
+            return #selector(quitFromMenu)
+        }
     }
 
     private func makeStatusBarIcon() -> NSImage {
@@ -89,40 +160,6 @@ final class MenuBarController: NSObject {
         return image
     }
 
-    func showMainWindow() {
-        LifecycleDebugLogger.log("MenuBarController.showMainWindow called")
-        WindowManager.showMainWindow(menuBarController: self)
-    }
-
-    func restoreMainWindowIfNeeded(reason: String) {
-        WindowManager.restoreMainWindowIfNeeded(reason: reason, menuBarController: self)
-    }
-
-    func refreshHistory() {
-        LifecycleDebugLogger.log("MenuBarController.refreshHistory called")
-        manager?.refreshHistory()
-    }
-
-    func confirmAndClearHistory() {
-        LifecycleDebugLogger.log("MenuBarController.confirmAndClearHistory called")
-        let alert = NSAlert()
-        alert.messageText = "清空全部记录"
-        alert.informativeText = "确定要清空所有剪贴板记录吗？此操作不可撤销。"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "清空")
-        alert.addButton(withTitle: "取消")
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            manager?.clearAll()
-        }
-    }
-
-    func quit() {
-        LifecycleDebugLogger.log("MenuBarController.quit called")
-        NSApplication.shared.terminate(nil)
-    }
-
     func logStatusItemState(context: String) {
         LifecycleDebugLogger.log(
             "StatusItem state context='\(context)' " +
@@ -133,23 +170,35 @@ final class MenuBarController: NSObject {
         )
     }
 
+    private func perform(_ command: AppCommand) {
+        LifecycleDebugLogger.log("MenuBarController.perform command=\(command.title)")
+        commandHandler?(command)
+    }
+
     @objc private func showMainWindowFromMenu() {
-        showMainWindow()
+        perform(.showMainWindow)
     }
 
     @objc private func showSettingsFromMenu() {
-        (NSApplication.shared.delegate as? AppDelegate)?.showSettings()
+        perform(.showSettings)
     }
 
     @objc private func refreshHistoryFromMenu() {
-        refreshHistory()
+        perform(.refreshHistory)
     }
 
     @objc private func confirmAndClearHistoryFromMenu() {
-        confirmAndClearHistory()
+        perform(.clearHistory)
     }
 
     @objc private func quitFromMenu() {
-        quit()
+        perform(.quit)
+    }
+
+    @objc private func copyHistoryEntryFromMenu(_ sender: NSMenuItem) {
+        guard let idString = sender.representedObject as? String,
+              let id = UUID(uuidString: idString) else { return }
+        guard let entry = entriesProvider().first(where: { $0.id == id }) else { return }
+        entryHandler?(entry)
     }
 }

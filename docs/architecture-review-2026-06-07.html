@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>架构体检报告 - 时间剪史</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif; }
+      .card { box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08); }
+      .deep { background: linear-gradient(135deg, #0f172a, #263244); color: white; }
+      .thin { background: #f8fafc; border: 1px solid #cbd5e1; }
+      .leak { color: #dc2626; border-color: #fca5a5; }
+      .soft-grid {
+        background-image:
+          linear-gradient(rgba(148, 163, 184, 0.18) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(148, 163, 184, 0.18) 1px, transparent 1px);
+        background-size: 22px 22px;
+      }
+      .seam-line { border-top: 2px dashed #64748b; }
+      .mass-interface { background: #fee2e2; border: 1px solid #fca5a5; }
+      .mass-implementation { background: #e0f2fe; border: 1px solid #7dd3fc; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900">
+    <main class="max-w-6xl mx-auto px-6 py-10 space-y-10">
+      <header class="space-y-6">
+        <div>
+          <p class="text-xs uppercase tracking-wider text-slate-500">架构体检报告</p>
+          <h1 class="text-4xl font-semibold tracking-normal mt-2">时间剪史</h1>
+          <p class="text-slate-600 mt-2">2026-06-07 · SwiftUI + AppKit macOS 剪贴板历史工具</p>
+        </div>
+        <div class="grid gap-3 md:grid-cols-4 text-sm">
+          <div class="rounded-lg border border-slate-200 bg-white p-3"><span class="inline-block w-4 h-4 border border-slate-400 align-middle mr-2"></span>实线框 = 模块</div>
+          <div class="rounded-lg border border-slate-200 bg-white p-3"><span class="inline-block w-8 border-t-2 border-dashed border-slate-500 align-middle mr-2"></span>虚线 = 接缝</div>
+          <div class="rounded-lg border border-slate-200 bg-white p-3"><span class="text-red-600 font-bold mr-2">→</span>红色箭头 = 泄漏</div>
+          <div class="rounded-lg border border-slate-200 bg-white p-3"><span class="inline-block w-4 h-4 rounded bg-slate-900 align-middle mr-2"></span>深色框 = 更深的模块</div>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-8">
+        <article id="clipboard-pipeline" class="card rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-2xl font-semibold">把“剪贴板摄取”做成更深的模块</h2>
+            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">强烈建议</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">进程内模块</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">涉及文件</p>
+            <div class="grid gap-1 font-mono text-sm text-slate-700">
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/ClipboardManager.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/ClipboardReader.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Models/ClipboardEntry.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Models/EntryContent.swift</code>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">现在</p>
+              <div class="rounded-md bg-white p-3">
+                <pre class="mermaid">
+flowchart TB
+  UI[界面视图] --> M[ClipboardManager]
+  M --> PB[NSPasteboard]
+  M --> R[readEntry 扩展]
+  R --> F[文件 URL 解析]
+  R --> I[图片解析]
+  R --> V[视频缩略图]
+  R -.泄漏.-> FT[FileTypeSupport]
+  M -.泄漏.-> PB2[来源 UTI]
+  M --> H[历史数组]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class R,FT,PB2 leak
+                </pre>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">建议</p>
+              <div class="relative h-72 rounded-md bg-white p-4 soft-grid">
+                <div class="absolute left-5 top-5 w-32 rounded-lg border border-slate-300 bg-white p-3 text-center text-xs uppercase tracking-wider">界面视图</div>
+                <div class="absolute left-48 top-5 h-20 w-64 rounded-xl deep p-4 text-center">
+                  <div class="text-xs uppercase tracking-wider opacity-80">剪贴板摄取模块</div>
+                  <div class="mt-2 text-sm">轮询 · 解析 · 标准化 · 去重</div>
+                </div>
+                <div class="absolute left-48 top-36 h-20 w-64 rounded-xl border border-slate-300 bg-slate-100 p-4 text-center text-slate-600">
+                  <div class="text-xs uppercase tracking-wider">内部实现</div>
+                  <div class="mt-2 text-sm">剪贴板读取 + 缩略图生成</div>
+                </div>
+                <div class="absolute right-8 top-5 w-40 rounded-lg border border-slate-300 bg-white p-3 text-center text-xs uppercase tracking-wider">历史状态</div>
+                <svg class="absolute inset-0 h-full w-full" viewBox="0 0 700 288" aria-hidden="true">
+                  <path d="M150 45 L190 45" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
+                  <path d="M450 45 L535 45" stroke="#334155" stroke-width="2" marker-end="url(#arrow)"/>
+                  <path d="M320 100 L320 145" stroke="#64748b" stroke-width="2" stroke-dasharray="5 5"/>
+                  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L6,3 z" fill="#334155"/></marker></defs>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">问题</p><p class="mt-1">ClipboardManager 的接口偏浅：调用者会同时碰到历史状态、剪贴板时序、解析顺序和缩略图副作用。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">建议</p><p class="mt-1">做一个剪贴板摄取模块：对外只交付标准化条目，对内隐藏剪贴板解析和缩略图实现。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">收益</p><ul class="mt-1 list-disc pl-5"><li>解析问题集中处理</li><li>一个摄取接口覆盖多场景</li><li>测试只看标准化条目</li><li>缩略图成本变明确</li></ul></div>
+          </div>
+        </article>
+
+        <article id="preview-module" class="card rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-2xl font-semibold">把“文件预览”做成一个模块</h2>
+            <span class="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">强烈建议</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">本地可替换</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">涉及文件</p>
+            <div class="grid gap-1 font-mono text-sm text-slate-700">
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/DetailPreviewViews.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/ClipboardReader.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/FileTypeSupport.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/ImagePreviewView.swift</code>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">现在</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="thin rounded-lg p-3">
+                  <p class="text-xs uppercase tracking-wider">DetailFileView 接口</p>
+                  <div class="mt-3 h-28 rounded mass-interface p-2 text-sm">知道图片、视频、文本、文档分支</div>
+                  <div class="mt-2 h-20 rounded mass-implementation p-2 text-sm">在 View body 中读取磁盘</div>
+                </div>
+                <div class="thin rounded-lg p-3">
+                  <p class="text-xs uppercase tracking-wider">ClipboardReader 接口</p>
+                  <div class="mt-3 h-24 rounded mass-interface p-2 text-sm">知道缩略图分支规则</div>
+                  <div class="mt-2 h-24 rounded mass-implementation p-2 text-sm">读取文件元信息</div>
+                </div>
+              </div>
+              <p class="mt-3 text-sm leak">文件类型判断泄漏在多个接缝之间。</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">建议</p>
+              <div class="rounded-xl deep p-5">
+                <div class="text-xs uppercase tracking-wider opacity-80">文件预览模块</div>
+                <div class="mt-4 grid gap-2 text-sm text-slate-200">
+                  <div class="rounded border border-white/20 p-2">接口：根据 URL + 可选缩略图返回预览状态</div>
+                  <div class="rounded border border-white/20 p-2 opacity-70">实现：图片读取、文本读取、QuickLook 选择、fallback</div>
+                  <div class="rounded border border-white/20 p-2 opacity-70">内部接缝：大文件异步加载</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">问题</p><p class="mt-1">DetailFileView 表面上只是 View，但内部在做文件分类和磁盘 IO，接口偏浅。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">建议</p><p class="mt-1">把文件预览选择和加载放到一个模块里，View 只负责渲染预览状态。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">收益</p><ul class="mt-1 list-disc pl-5"><li>文件规则集中</li><li>一个预览接口</li><li>测试不用跑 SwiftUI body</li><li>异步加载有接缝</li></ul></div>
+          </div>
+        </article>
+
+        <article id="application-shell" class="card rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-2xl font-semibold">把“应用外壳”做深</h2>
+            <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">值得探索</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">端口与适配器</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">涉及文件</p>
+            <div class="grid gap-1 font-mono text-sm text-slate-700">
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/App.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/AppDelegate.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/MenuBarController.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/WindowManager.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/WindowConfigurator.swift</code>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">现在</p>
+              <div class="rounded-md bg-white p-3">
+                <pre class="mermaid">
+flowchart LR
+  SwiftUI[App.swift] --> AD[AppDelegate]
+  AD --> MB[MenuBarController]
+  AD --> HK[GlobalHotKeyController]
+  AD --> MM[MainMenuController]
+  MB --> WM[WindowManager]
+  WC[WindowConfigurator] --> NSW[NSWindow]
+  AD -.泄漏.-> AE[Apple Events]
+  AD -.泄漏.-> NC[NotificationCenter]
+  WM -.泄漏.-> NSApp[NSApplication 窗口]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class AE,NC,NSApp leak
+                </pre>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">建议</p>
+              <div class="relative h-72 rounded-md bg-white p-4">
+                <div class="absolute inset-x-6 top-6 rounded-xl deep p-4 text-center">
+                  <div class="text-xs uppercase tracking-wider opacity-80">应用外壳模块</div>
+                  <div class="mt-2 text-sm">显示主窗口 · 关闭时隐藏 · Dock 重开 · 退出 · 设置</div>
+                </div>
+                <div class="seam-line absolute left-8 right-8 top-32"></div>
+                <div class="absolute left-8 bottom-7 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-sm">macOS 12 NSStatusItem 适配器</div>
+                <div class="absolute left-1/2 bottom-7 -translate-x-1/2 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-sm">macOS 13 MenuBarExtra 适配器</div>
+                <div class="absolute right-8 bottom-7 rounded-lg border border-slate-300 bg-slate-50 p-3 text-center text-sm">NSWindow 适配器</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">问题</p><p class="mt-1">窗口生命周期知识分散在多个模块里，macOS 12/13 行为很难通过一个接口验证。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">建议</p><p class="mt-1">创建应用外壳模块：接口只描述用户意图，AppKit 细节藏在适配器后面。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">收益</p><ul class="mt-1 list-disc pl-5"><li>生命周期问题集中</li><li>一个意图接口</li><li>适配器接缝合理</li><li>回归测试可按意图脚本化</li></ul></div>
+          </div>
+        </article>
+
+        <article id="hotkey-module" class="card rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-2xl font-semibold">把“快捷键配置”做深</h2>
+            <span class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">值得探索</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">本地可替换</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">涉及文件</p>
+            <div class="grid gap-1 font-mono text-sm text-slate-700">
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Models/HotKeyShortcut.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/HotKeyPreferences.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Managers/GlobalHotKeyController.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/SettingsView.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift</code>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">现在</p>
+              <div class="space-y-2">
+                <div class="thin rounded-lg p-3 text-sm">HotKeyShortcut：校验 + 展示 + Carbon 键名</div>
+                <div class="thin rounded-lg p-3 text-sm">HotKeyPreferences：UserDefaults 编解码</div>
+                <div class="thin rounded-lg p-3 text-sm">SettingsView：保存 + 失败回滚</div>
+                <div class="thin rounded-lg p-3 text-sm">GlobalHotKeyController：Carbon 注册</div>
+                <div class="thin rounded-lg p-3 text-sm leak">NotificationCenter：变更与失败消息</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">建议</p>
+              <div class="rounded-xl deep p-5">
+                <div class="text-xs uppercase tracking-wider opacity-80">快捷键设置模块</div>
+                <div class="mt-4 grid gap-2 text-sm text-slate-200">
+                  <div class="rounded border border-white/20 p-2">接口：当前值、录制、保存、重置、注册状态</div>
+                  <div class="rounded border border-white/20 p-2 opacity-70">实现：校验、持久化、Carbon 适配器、失败回滚</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">问题</p><p class="mt-1">快捷键变更流程分散在模型、View、偏好设置、通知和 Carbon 注册里，接口偏浅。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">建议</p><p class="mt-1">让快捷键配置成为一个模块；Carbon 只是适配器，注册状态直接通过接口暴露。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">收益</p><ul class="mt-1 list-disc pl-5"><li>失败回滚只写一次</li><li>一个设置接口</li><li>测试可替换 Carbon 适配器</li><li>通知不再泄漏</li></ul></div>
+          </div>
+        </article>
+
+        <article id="presentation-formatting" class="card rounded-xl border border-slate-200 bg-white p-6 space-y-6">
+          <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-2xl font-semibold">把“展示文案格式化”收进小模块</h2>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">暂时观察</span>
+            <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">进程内模块</span>
+          </div>
+          <div>
+            <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">涉及文件</p>
+            <div class="grid gap-1 font-mono text-sm text-slate-700">
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Models/EntryContent.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Models/ClipboardEntry.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/DetailView.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift</code>
+              <code>ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/ClipboardDateFormatters.swift</code>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">现在</p>
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div class="thin rounded-lg p-3">EntryContent<br><span class="text-red-600">预览文案</span></div>
+                <div class="thin rounded-lg p-3">DetailView<br><span class="text-red-600">尺寸文案</span></div>
+                <div class="thin rounded-lg p-3">HistoryRow<br><span class="text-red-600">文件名拆分</span></div>
+                <div class="thin rounded-lg p-3">DateFormatters</div>
+                <div class="thin rounded-lg p-3">FileTypeSupport</div>
+                <div class="thin rounded-lg p-3">README 术语</div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p class="mb-3 text-xs uppercase tracking-wider text-slate-500">建议</p>
+              <div class="rounded-xl border-4 border-slate-900 bg-white p-5">
+                <div class="text-xs uppercase tracking-wider text-slate-500">条目展示模块</div>
+                <div class="mt-4 h-10 rounded mass-interface p-2 text-sm">小接口：行标题、详情副标题、尺寸文案</div>
+                <div class="mt-2 h-28 rounded mass-implementation p-3 text-sm">较大的实现：本地化、截断、文件名、日期、类型描述</div>
+              </div>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">问题</p><p class="mt-1">展示字符串散在模型和 View 里；现在不严重，但本地化继续增长后会变浅。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">建议</p><p class="mt-1">等 v1.3 文案和本地化增多时，把预览、尺寸、文件名展示收进一个格式化模块。</p></div>
+            <div><p class="text-xs uppercase tracking-wider text-slate-500">收益</p><ul class="mt-1 list-disc pl-5"><li>文案变化集中</li><li>一个格式化接口</li><li>测试不用渲染 SwiftUI</li><li>模型更纯粹</li></ul></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="top-recommendation" class="card rounded-xl border border-emerald-200 bg-emerald-50 p-6">
+        <p class="text-xs uppercase tracking-wider text-emerald-800">最推荐先做</p>
+        <h2 class="mt-2 text-2xl font-semibold">先从 <a class="underline decoration-emerald-500" href="#clipboard-pipeline">把“剪贴板摄取”做成更深的模块</a> 开始。</h2>
+        <p class="mt-2 text-slate-700">它最靠近“时间剪史”的核心价值，也会直接帮助后续历史持久化、缩略图缓存、搜索和测试。</p>
+      </section>
+    </main>
+  </body>
+</html>

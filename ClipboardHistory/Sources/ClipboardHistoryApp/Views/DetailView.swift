@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct DetailView: View {
-    @ObservedObject var manager: ClipboardManager
+    @ObservedObject var historyStore: HistoryStore
 
     var body: some View {
-        if let entry = manager.selectedEntry {
+        if let entry = historyStore.selectedEntry {
             selectedEntryView(entry)
         } else {
             EmptyStateView(
@@ -17,7 +17,7 @@ struct DetailView: View {
         }
     }
 
-    private func selectedEntryView(_ entry: ClipboardManager.Entry) -> some View {
+    private func selectedEntryView(_ entry: HistoryStore.Entry) -> some View {
         VStack(spacing: 0) {
             header(for: entry)
             Divider()
@@ -26,14 +26,16 @@ struct DetailView: View {
         .ignoresSafeArea(edges: .top)
         .overlay(alignment: .bottomTrailing) {
             GlassPill(
-                copyAction: { manager.copyToClipboardAndBringToTop(entry) },
-                deleteAction: { manager.delete(entry) }
+                isFavorite: entry.isFavorite,
+                favoriteAction: { historyStore.perform(.toggleFavorite(entry)) },
+                copyAction: { historyStore.perform(.copyAndPromote(entry)) },
+                deleteAction: { historyStore.perform(.delete(entry)) }
             )
             .padding(12)
         }
     }
 
-    private func header(for entry: ClipboardManager.Entry) -> some View {
+    private func header(for entry: HistoryStore.Entry) -> some View {
         HStack {
             Spacer()
             VStack(alignment: .center, spacing: 2) {
@@ -52,7 +54,7 @@ struct DetailView: View {
     }
 
     @ViewBuilder
-    private func preview(for entry: ClipboardManager.Entry) -> some View {
+    private func preview(for entry: HistoryStore.Entry) -> some View {
         switch entry.content {
         case .text(let text):
             ScrollView(.vertical) {

@@ -3,6 +3,7 @@ import SwiftUI
 struct GlassCircleButton: View {
     let symbol: String
     let helpText: String
+    var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
     let action: () -> Void
     @State private var isHovered = false
 
@@ -10,11 +11,12 @@ struct GlassCircleButton: View {
         Button(action: action) {
             GlassIconControl(
                 symbol: symbol,
-                size: 40,
+                size: 44,
                 iconSize: 16,
                 isHovered: isHovered,
                 hasOwnSurface: true,
-                showsBorder: true
+                showsBorder: true,
+                foregroundStyle: foregroundStyle
             )
         }
         .buttonStyle(.plain)
@@ -24,15 +26,29 @@ struct GlassCircleButton: View {
             }
         }
         .help(helpText)
+        .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
     }
 }
 
 struct GlassPill: View {
+    let isFavorite: Bool
+    let favoriteAction: () -> Void
     let copyAction: () -> Void
     let deleteAction: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
+            GlassPillButton(
+                symbol: isFavorite ? "star.fill" : "star",
+                helpText: isFavorite ? "取消收藏" : "收藏",
+                foregroundStyle: isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.primary),
+                action: favoriteAction
+            )
+
+            Rectangle()
+                .fill(.white.opacity(0.18))
+                .frame(width: 28, height: 1)
+
             GlassPillButton(symbol: "doc.on.doc", helpText: "再次复制", action: copyAction)
 
             Rectangle()
@@ -53,6 +69,7 @@ struct GlassPill: View {
 private struct GlassPillButton: View {
     let symbol: String
     let helpText: String
+    var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
     let action: () -> Void
     @State private var isHovered = false
 
@@ -64,7 +81,8 @@ private struct GlassPillButton: View {
                 iconSize: 18,
                 isHovered: isHovered,
                 hasOwnSurface: false,
-                showsBorder: false
+                showsBorder: false,
+                foregroundStyle: foregroundStyle
             )
         }
         .buttonStyle(.plain)
@@ -84,6 +102,7 @@ private struct GlassIconControl: View {
     let isHovered: Bool
     let hasOwnSurface: Bool
     let showsBorder: Bool
+    var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
 
     var body: some View {
         content
@@ -104,7 +123,7 @@ private struct GlassIconControl: View {
         Image(systemName: symbol)
             .font(.system(size: iconSize, weight: .medium))
             .symbolRenderingMode(.hierarchical)
-            .foregroundStyle(.primary)
+            .foregroundStyle(foregroundStyle)
             .frame(width: size, height: size)
     }
 
