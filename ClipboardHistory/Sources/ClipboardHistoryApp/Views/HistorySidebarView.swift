@@ -75,21 +75,21 @@ struct HistorySidebarView: View {
             } label: {
                 Image(systemName: "star")
             }
-            .help("收藏所选记录")
+            .helpLabel("收藏所选记录")
 
             Button {
                 historyStore.perform(.unfavoriteSelection)
             } label: {
                 Image(systemName: "star.slash")
             }
-            .help("取消收藏所选记录")
+            .helpLabel("取消收藏所选记录")
 
             Button(role: .destructive) {
                 historyStore.perform(.deleteSelection)
             } label: {
                 Image(systemName: "trash")
             }
-            .help("删除所选记录")
+            .helpLabel("删除所选记录")
             .foregroundStyle(.red)
         }
         .buttonStyle(.borderless)

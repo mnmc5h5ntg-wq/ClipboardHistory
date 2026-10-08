@@ -231,7 +231,7 @@ private struct VideoPlaybackControls: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help(playback.isPlaying ? "暂停" : "播放")
+            .helpLabel(playback.isPlaying ? "暂停" : "播放")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.currentTime))
                 .font(.system(size: 12, design: .monospaced))
@@ -248,7 +248,7 @@ private struct VideoPlaybackControls: View {
                 in: 0...max(playback.duration, 1)
             )
             .frame(minWidth: VideoPlaybackMetrics.minimumTimelineWidth)
-            .help("调整播放进度")
+            .helpLabel("调整播放进度")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.duration))
                 .font(.system(size: 12, design: .monospaced))
@@ -261,7 +261,7 @@ private struct VideoPlaybackControls: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help(playback.isMuted ? "取消静音" : "静音")
+            .helpLabel(playback.isMuted ? "取消静音" : "静音")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)

@@ -25,7 +25,7 @@ struct GlassCircleButton: View {
                 isHovered = hovering
             }
         }
-        .help(helpText)
+        .helpLabel(helpText)
         .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
     }
 }
@@ -91,7 +91,7 @@ private struct GlassPillButton: View {
                 isHovered = hovering
             }
         }
-        .help(helpText)
+        .helpLabel(helpText)
     }
 }
 

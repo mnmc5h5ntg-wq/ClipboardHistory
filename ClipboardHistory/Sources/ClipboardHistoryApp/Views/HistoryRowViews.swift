@@ -41,7 +41,10 @@ struct HistoryRow: View {
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(entry.isFavorite ? .yellow : .clear)
                 .frame(width: 14, height: 14)
-                .help(entry.isFavorite ? "已收藏" : "")
+                // 未收藏时这颗星是 .clear（完全隐形），既不该占视觉位置也不该被朗读；
+                // 已收藏时它是这一行唯一的收藏线索，必须能被 VoiceOver 读到（审计 R-54）。
+                .accessibilityHidden(!entry.isFavorite)
+                .helpLabel("已收藏")
 
             switch entry.content {
             case .text:
