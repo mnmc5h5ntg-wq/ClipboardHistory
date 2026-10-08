@@ -276,6 +276,24 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 4)
             }
+
+            // 这些文案早就写好了（`HistoryPrivacyCopy`，还有单测守着不重复、不为空），
+            // 但一直没接进界面：隐私承诺只有写在代码里才算数吗？（审计 R-14）
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("数据与保留")
+                        .font(.subheadline)
+
+                    ForEach(Array(HistoryPrivacyCopy.settingsBullets.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
+            }
         }
     }
 

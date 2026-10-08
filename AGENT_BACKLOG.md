@@ -79,9 +79,9 @@ M1×边界、M1×内存、M1×打包、M1×迁移、M2×无障碍、M2×打包�
 
 | ID | 项 | 证据 | 判定 | 价值 | 状态 |
 |---|---|---|---|---|---|
-| R-14 | 死代码 12 处（AI 层 250 行、`HistoryPrivacyCopy` 未接入、`menuTitle`、`recordIgnored/Reverted/reset/forEntry`、`switchPattern`、`markCurrentChangeCount`、`reset*Shortcut`、`registerMainWindow`、侧栏 Magic 状态、孤儿注释、空 `if let`） | `02-确认缺陷.md` D-1 全清单 | **选择性做**：删空 `if let`（唯一告警）、把 `HistoryPrivacyCopy` 接入隐私页（有价值的文案）、`registerMainWindow` 补调用或删死分支；AI 层与 `docs/ai/` 保留但标注"设计稿"（删除会毁掉设计意图记录） | 低-中 | 待办 |
+| R-14 | 死代码：`HistoryPrivacyCopy` 已接入隐私页（见 D-013）；`registerMainWindow` 已有调用者；剩余 AI 层与 `docs/ai/` 保留为设计稿（AI 层 250 行、`HistoryPrivacyCopy` 未接入、`menuTitle`、`recordIgnored/Reverted/reset/forEntry`、`switchPattern`、`markCurrentChangeCount`、`reset*Shortcut`、`registerMainWindow`、侧栏 Magic 状态、孤儿注释、空 `if let`） | `02-确认缺陷.md` D-1 全清单 | **选择性做**：删空 `if let`（唯一告警）、把 `HistoryPrivacyCopy` 接入隐私页（有价值的文案）、`registerMainWindow` 补调用或删死分支；AI 层与 `docs/ai/` 保留但标注"设计稿"（删除会毁掉设计意图记录） | 低-中 | 部分完成(隐私文案已接入) |
 | R-16b | `ocrLog` 无条件写 | 并入 R-01/R-30 | 低 | 待办 |
-| R-25 | `CompatibleSplitView` 双宽度约束冗余 | `SettingsView.swift:526-527` | 删一行 | 低 | 待办 |
+| R-25 | `CompatibleSplitView` 双宽度约束冗余 | `SettingsView.swift` 尾部 | **不改**：本机 macOS 13+，该分支不可达，删了无法视觉复验；与 R-24 同一处置 | 低 | 记录不改 |
 | R-29 | 测试无性能基准；本轮引入 4 条基准用例后需注意其耗时 | 新增 `PerfBudgetTests` | 基准用"上界断言"，设宽松阈值避免抖动 | 低 | 待办 |
 | R-32 | 快捷键键名表 59 项手写、未覆盖符号键 | `HotKeyShortcut.swift:82-144` | 只补 `/`、`-`、`=`、`[`、`]`，不引入 `UCKeyTranslate` | 低 | 待办 |
 | R-36 | 9 个推荐滑杆可减到 3 个 | `RecommendationWeights.swift` | **不做**：用户可自定权重是产品卖点，R-17 修好后才有意义 | 低 | 记录不改 |
