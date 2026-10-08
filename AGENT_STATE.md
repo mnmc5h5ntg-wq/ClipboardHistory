@@ -32,13 +32,33 @@
 第四批（UI 视觉审计与修复）：U-01..U-0n，方法见 `AGENT_UI_AUDIT.md`（离屏渲染真实视图取像素，不依赖屏幕录制授权）。
 第五批（矩阵新维度补审计）：边界/错误/内存/兼容/可访问性/国际化/可观测性/类型/迁移/回滚 逐格填平，`待审` 必须归零。
 
-## 已完成
-
-（进行中，完成后在此列出：每项 = 改了哪些文件 + 验证命令 + 实测前后数字 + 对应提交号）
+## 已完成（每项 = 提交号 + 验证方式）
 
 | 项 | 提交 | 验证结果 |
 |---|---|---|
-| 待补 | | |
+| R-01 调试日志门控 + 移出 /tmp（顺带恢复测试闸） | `cb8db30` | `swift test` 退出码 0，**Executed 135→146→176** 用例全绿；`/tmp` 两个日志不再新增；`DebugLoggingTests` 7 条守卫 |
+| R-02 存档损坏恢复 + 滚动备份 + 原件保全 | `0792e6b` 前一次 | 4 条 `HistoryPersistenceRecoveryTests`；变异检查：去掉修复即报 "P-06 修复验证：图片文件不得被连带删除" |
+| R-03 菜单"清空未收藏"必须确认 | `cc0c2df` 后 | `HistoryClearConfirmationTests` 3 条；去掉确认 ⇒ 立即变红 |
+| R-04 浏览器链接不再当文件条目 | `cc0c2df` | `ClipboardIntakeURLKindTests` 4 条；变异回 `options:nil` ⇒ 复现 `.file(https://…)` 与 `fileDoesNotExist` |
+| R-05 重复复制保留来源 App；`ClipboardIntake` 真正使用注入的 pasteboard | `cc0c2df` | `SourceAttributionTests` 3 条 + `ClipboardIntakeInjectionTests` 2 条；变异 ⇒ 断言变红 |
+| R-06 反馈不再存正文 + 删除级联 + 导出失败可见 | `0792e6b` | `FeedbackStorageHygieneTests` 7 条；实测用户 plist 该键 blob 66,716,424 字节会被收窄 |
+| R-48 推荐排序确定性（字典求和 + 次级排序键） | `f17fc86`/`f8ce4dd` 同批 | `RecommendationDeterminismTests` 4 条；两处变异各自可复现地变红 |
+| R-07/R-08/R-09/R-10 主线程热点（载入/保存/预览/列表） | `f8ce4dd` | `PerfBudgetTests` 5 条：413.9→3.2ms、667.8→5.2ms、45.8→0.02ms、14.07→0.00ms/次 |
+
+当前基线（复跑命令见 `AGENT_STATE.md` 恢复指令）：
+
+| 指标 | 现在 |
+|---|---|
+| `swift build` | OK，**0 告警**（干净重建复扫） |
+| `swift test` | 退出码 0，**Executed 176 tests, 0 failures**，连跑 6 次稳定 |
+| `python3 -m unittest discover -s scripts/tests` | OK，11 tests |
+| 工作区 | `git status` 干净（改动已提交） |
+
+本轮新发现（原审计未覆盖，已进 backlog）：
+- **R-49** `ClipboardIntake` 各读取方法的 `from:` 默认 `.general` ⇒ 注入的 pasteboard 被静默忽略，测试因此读到**用户真实剪贴板内容**。已修（R-05 同批）并把所有断言改成"只报类型不报正文"，避免回归时把用户内容写进测试日志。
+- **R-48** 推荐排序跨启动不稳定（`features.values.reduce` + 依赖 `sorted` 稳定性）。已修。
+- **R-50** `HistoryStoreTests` 的排序断言依赖"测试期间谁是前台 App" ⇒ 随机失败。已修（夹具固定来源）。
+- **实测确认 R-06 的现实规模**：`~/Library/Preferences/com.clipboardhistory.app.plist` = 66,724,574 字节，其中反馈键 66,716,424 字节。
 
 ## 恢复指令（若上下文丢失，从这里续做）
 
