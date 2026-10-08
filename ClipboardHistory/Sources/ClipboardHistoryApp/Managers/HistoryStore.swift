@@ -605,17 +605,9 @@ final class HistoryStore: ObservableObject {
     ]
 
         private nonisolated static func ocrLog(_ message: String) {
-        let line = "[OCR] \(Date()) \(message)\n"
-        if let data = line.data(using: .utf8) {
-            let url = URL(fileURLWithPath: "/tmp/ocr_debug.log")
-            if let fh = try? FileHandle(forWritingTo: url) {
-                _ = try? fh.seekToEnd()
-                try? fh.write(contentsOf: data)
-                try? fh.close()
-            } else {
-                try? data.write(to: url, options: .atomic)
-            }
-        }
+        // 统一走调试开关（CLIPBOARD_HISTORY_DEBUG=1）。
+        // 旧实现无条件写 /tmp/ocr_debug.log，会把图片文件名与 OCR 文本前缀抄送到全局可写目录。
+        LifecycleDebugLogger.logFromBackground("[OCR] \(Date()) \(message)")
     }
 
         private var appSwitchTimer: Timer?

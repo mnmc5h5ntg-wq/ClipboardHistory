@@ -140,10 +140,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // 诊断A: 记录当前 frontmostApp
-        if let front = NSWorkspace.shared.frontmostApplication {
-        }
-
         historyStore.perform(.recordRecommendationAccepted(entry.id))
         shell.copyAndPasteEntry(entry)
     }
