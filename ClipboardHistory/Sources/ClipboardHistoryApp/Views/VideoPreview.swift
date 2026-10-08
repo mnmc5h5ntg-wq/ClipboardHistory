@@ -92,6 +92,11 @@ final class VideoPlaybackController: ObservableObject {
         isMuted = player.isMuted
     }
 
+    deinit {
+        // timeControlObserver 此前从不释放（审计 R-42）
+        timeControlObserver?.invalidate()
+    }
+
     func pause() {
         player.pause()
         isPlaying = false

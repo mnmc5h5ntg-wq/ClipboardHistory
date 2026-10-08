@@ -47,6 +47,32 @@ enum EntryPresentation {
         }
     }
 
+    /// 菜单栏/`MenuBarExtra` 用的标题：普通内容给短摘要（否则无法分辨要粘哪一条），
+    /// 但被规则判为疑似密钥/密码/验证码的内容只显示类型与时间，不显示正文（审计 R-43）。
+    static func menuLabel(for entry: ClipboardEntry) -> String {
+        if PrivacyClassifier.mayContainSecrets(entry) {
+            let kind: String
+            switch entry.content {
+            case .text: kind = "文本"
+            case .image: kind = "图片"
+            case .file: kind = "文件"
+            case .files: kind = "多个文件"
+            }
+            return "疑似敏感内容（\(kind)）· \(relativeTime(entry.timestamp))"
+        }
+        return menuTitle(for: entry, maxLength: 24)
+    }
+
+    static func relativeTime(_ date: Date, now: Date = Date()) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        switch seconds {
+        case 0..<60: return "刚刚"
+        case 60..<3_600: return "\(seconds / 60) 分钟前"
+        case 3_600..<86_400: return "\(seconds / 3_600) 小时前"
+        default: return "\(seconds / 86_400) 天前"
+        }
+    }
+
     static func menuTitle(for entry: ClipboardEntry, maxLength: Int = 42) -> String {
         let title: String
         switch entry.content {

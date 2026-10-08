@@ -54,6 +54,16 @@ struct ClipboardIntake {
     /// `changeCount`，各读取方法的 `from:` 参数默认 `.general`，于是"注入了替身、
     /// 读的却是真实系统剪贴板"——测试会静默测到用户真实内容（本轮实测踩到）。
     private let pasteboard: NSPasteboard
+    /// 文本正文上限（字符）。超过则截断并留标记：一条超大文本会常驻内存、
+    /// 进 JSON 存档，并让每次搜索/渲染都扫它（审计 R-22）。
+    static let maxTextCharacters = 512_000
+
+    static func bounded(_ text: String) -> String {
+        guard text.count > maxTextCharacters else { return text }
+        let end = text.index(text.startIndex, offsetBy: maxTextCharacters)
+        return String(text[..<end]) + "\n…（内容过长，已截断保存）"
+    }
+
     private var lastChangeCount: Int
 
     init(pasteboard: NSPasteboard = .general) {
@@ -111,7 +121,7 @@ struct ClipboardIntake {
 
         if let t = pasteboard.string(forType: .string),
            !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return makeEntry(content: .text(t), thumbnail: nil, pasteboard: pasteboard)
+            return makeEntry(content: .text(Self.bounded(t)), thumbnail: nil, pasteboard: pasteboard)
         }
 
         return nil

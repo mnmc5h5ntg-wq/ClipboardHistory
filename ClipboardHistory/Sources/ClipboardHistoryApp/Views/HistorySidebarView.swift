@@ -188,7 +188,9 @@ struct HistorySidebarView: View {
             )
         }
         .onPreferenceChange(HistoryRowFramePreferenceKey.self) { value in
-            rowFrames.merge(value) { _, new in new }
+            // 原来是 merge：过滤/删除后消失的行永远留在表里，
+            // 拖动选择可能命中已经不在列表中的条目，且表只增不减（审计 R-40）。
+            rowFrames = value
         }
     }
 }

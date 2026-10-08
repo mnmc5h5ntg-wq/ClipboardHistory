@@ -527,7 +527,8 @@ private struct CompatibleSplitView<Sidebar: View, Detail: View>: NSViewRepresent
         splitView.addArrangedSubview(sidebarNSView)
         splitView.addArrangedSubview(detailNSView)
 
-        sidebarNSView.widthAnchor.constraint(greaterThanOrEqualToConstant: sidebarMinWidth).isActive = true
+        // 只保留一条等宽约束：旧写法同时激活 ">= min" 与 "== ideal"，
+        // 前者永远被后者吃掉，还让分栏看起来能拖却拖不动（审计 R-25）。
         sidebarNSView.widthAnchor.constraint(equalToConstant: sidebarIdealWidth).isActive = true
 
         return splitView

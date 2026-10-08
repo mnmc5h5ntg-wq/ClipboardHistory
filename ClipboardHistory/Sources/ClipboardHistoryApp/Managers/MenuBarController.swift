@@ -88,7 +88,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                     keyEquivalent: ""
                 )
                 item.representedObject = entry.id
-                let title = NSMutableAttributedString(string: entry.shortPreview, attributes: [
+                let title = NSMutableAttributedString(string: EntryPresentation.menuLabel(for: entry), attributes: [
                     .font: NSFont.systemFont(ofSize: 13)
                 ])
                 if !reason.isEmpty {

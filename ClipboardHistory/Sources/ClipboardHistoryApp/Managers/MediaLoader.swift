@@ -122,7 +122,7 @@ enum MediaLoader {
         }
 
         if FileTypeSupport.textExtensions.contains(ext),
-           let text = try? String(contentsOf: url, encoding: .utf8) {
+           let text = readTextPreview(url) {
             return .text(text)
         }
 
@@ -163,8 +163,49 @@ enum MediaLoader {
         }
     }
 
+    /// 预览文本的读取上限：整份读入一个 200MB 日志（旧行为）会直接把等大的正文
+    /// 放进 NSTextView（审计 R-22 / R-42）。
+    static let maxPreviewTextBytes = 256_000
+
+    nonisolated private static func readTextPreview(_ url: URL) -> String? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: maxPreviewTextBytes) else { return nil }
+        var text = String(data: data, encoding: .utf8)
+        if text == nil {
+            // 常见非 UTF-8 日志/中文旧编码，退回 ISO Latin 保证可读而不是报错
+            text = String(data: data, encoding: .isoLatin1)
+        }
+        guard let text else { return nil }
+        // 读满上限即视为可能还有后续内容（多打一个标记无害，少打会误导）
+        return data.count >= maxPreviewTextBytes ? text + "\n…（预览仅读取前 \(maxPreviewTextBytes / 1024)KB）" : text
+    }
+
     nonisolated private static func defaultFilePreviewResolver(url: URL) async -> FilePreviewPayload? {
         filePreviewPayloadSync(url: url)
+    }
+}
+
+/// 视频预览的两条路：能拿到比例就放播放器，拿不到就明确说"读不到信息"。
+/// （旧写法在比例未知时画一个 16:9 的黑色播放器，看起来像视频坏了 —— 审计 R-41）
+enum VideoPreviewPlan: Equatable {
+    case player(aspectRatio: CGFloat)
+    case informationUnavailable
+
+    static func resolve(preview: FilePreview) -> VideoPreviewPlan {
+        if let ratio = preview.videoAspectRatio, ratio > 0, ratio.isFinite {
+            return .player(aspectRatio: ratio)
+        }
+        if let thumbnail = preview.thumbnail {
+            let size = thumbnail.nsImage.size
+            if size.width > 0, size.height > 0 {
+                return .player(aspectRatio: size.width / size.height)
+            }
+        }
+        if let size = ImageProperties.pixelSize(of: preview.url), size.height > 0, size.width > 0 {
+            return .player(aspectRatio: size.width / size.height)
+        }
+        return .informationUnavailable
     }
 }
 

@@ -191,9 +191,8 @@ enum MultiFilePreviewLayout {
     }
 
     private static func preferredImageHeight(for url: URL, availableWidth: CGFloat) -> CGFloat? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        let size = image.size
-        guard size.width > 0, size.height > 0 else { return nil }
+        // 旧写法 `NSImage(contentsOf:)` 会把整张图解码进内存，仅仅为了拿宽高。
+        guard let size = ImageProperties.pixelSize(of: url), size.width > 0, size.height > 0 else { return nil }
 
         let widthLimit = max(availableWidth - previewOuterHorizontalPadding - previewInnerPadding, 100)
         let displayWidth = min(widthLimit, size.width)
@@ -316,7 +315,9 @@ private struct MultiFileRow: View {
                         .font(.system(size: 13))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(url.deletingLastPathComponent().path)
+                    // 只显示上一级目录名（"…/Downloads"），不再把完整绝对路径
+                    // 摊在界面上：屏幕共享/截屏时这是泄露点（审计 R-43）
+                    Text(url.parentDirectoryLabel)
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)

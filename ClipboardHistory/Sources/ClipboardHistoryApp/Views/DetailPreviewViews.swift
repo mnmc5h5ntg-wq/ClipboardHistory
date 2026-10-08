@@ -215,8 +215,15 @@ struct DetailFileView: View {
         case .text(let content):
             textPreview(content)
         case .video:
-            VideoPreview(url: preview.url, aspectRatio: videoAspectRatio(for: preview))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // 宽高既取不到、又没有缩略图可参考时，旧写法会画一个 16:9 的黑色播放器
+            // —— 看起来像"视频坏了"，实际是我们读不到信息（审计 R-41）。
+            switch VideoPreviewPlan.resolve(preview: preview) {
+            case .player(let ratio):
+                VideoPreview(url: preview.url, aspectRatio: ratio)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .informationUnavailable:
+                videoInfoUnavailableView(preview.url)
+            }
         case .quickLook:
             QuickLookPreview(url: preview.url)
         case .fallback:
@@ -249,6 +256,22 @@ struct DetailFileView: View {
 
     private func textPreview(_ content: String) -> some View {
         ChineseSelectableTextView(text: content, font: .monospacedSystemFont(ofSize: 13, weight: .regular))
+    }
+
+    private func videoInfoUnavailableView(_ url: URL) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "questionable")
+                .font(.system(size: 32))
+                .foregroundStyle(.secondary)
+            Text("无法读取这段视频的分辨率信息")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+            Button("在 Finder 中显示") {
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            }
+            .controlSize(.small)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func videoAspectRatio(for preview: FilePreview) -> CGFloat {

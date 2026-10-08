@@ -3,7 +3,9 @@ import AppKit
 @MainActor
 enum WindowManager {
     static let mainWindowIdentifier = NSUserInterfaceItemIdentifier("AppWindow")
-    private(set) nonisolated(unsafe) static weak var _mainWindow: NSWindow?
+    /// 由 `WindowConfigurator` 在窗口挂载时注册；只从 MainActor 访问，
+    /// 因此不需要 nonisolated(unsafe)（那是把数据竞争静音掉的写法）。
+    private(set) static weak var _mainWindow: NSWindow?
 
     static func registerMainWindow(_ window: NSWindow) {
         _mainWindow = window

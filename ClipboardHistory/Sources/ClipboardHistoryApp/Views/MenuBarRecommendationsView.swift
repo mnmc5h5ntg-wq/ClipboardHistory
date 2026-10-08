@@ -24,11 +24,14 @@ struct MenuBarRecommendationsView: View {
                     Button {
                         appDelegate.copyAndPasteHistoryEntry(id: entry.id)
                     } label: {
+                        // 与 macOS 12 的状态栏菜单同一套脱敏标签（审计 R-43：
+                        // 上一轮文档承诺"菜单只显示类型信息"，两版实现都不符）
+                        let label = EntryPresentation.menuLabel(for: entry)
                         if reasonText.isEmpty {
-                            Text(entry.shortPreview)
+                            Text(label)
                                 .lineLimit(1)
                         } else {
-                            Text(entry.shortPreview + "\n" + reasonText)
+                            Text(label + "\n" + reasonText)
                                 .font(.system(size: 11))
                                 .lineLimit(2)
                         }

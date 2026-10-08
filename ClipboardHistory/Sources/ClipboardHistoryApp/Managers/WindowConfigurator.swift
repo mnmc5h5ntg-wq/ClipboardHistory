@@ -33,6 +33,7 @@ struct WindowConfigurator: NSViewRepresentable {
         view.configureWindow = { [coordinator = context.coordinator] window in
             LifecycleDebugLogger.log("WindowConfigurator found window")
             window.identifier = WindowManager.mainWindowIdentifier
+            WindowManager.registerMainWindow(window)
             window.titlebarAppearsTransparent = true
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = [.managed, .fullScreenNone]
@@ -133,13 +134,10 @@ struct WindowConfigurator: NSViewRepresentable {
         }
 
         func windowWillClose(_ notification: Notification) {
-            LifecycleDebugLogger.log("[RED-BTN] windowWillClose FIRED — THIS MEANS WINDOW IS BEING DESTROYED DESPITE return false!")
-            if let w = notification.object as? NSWindow {
-                LifecycleDebugLogger.log("[RED-BTN] windowWillClose title='\(w.title)' isVisible=\(w.isVisible)")
-            }
+            // 保留这个回调：`windowShouldClose` 返回 false 时它不该触发，
+            // 一旦触发说明窗口被销毁（历史 bug 的表现形式），值得进日志。
             LifecycleDebugLogger.logAppState("windowWillClose")
         }
-
 
         private func alignTrafficLights(in window: NSWindow) {
             guard let closeButton = window.standardWindowButton(.closeButton),

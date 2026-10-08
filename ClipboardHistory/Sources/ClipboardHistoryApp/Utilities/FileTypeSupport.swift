@@ -1,3 +1,5 @@
+import Foundation
+
 enum FileTypeSupport {
     static let imageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif", "heic", "heif", "webp", "ico"
@@ -21,4 +23,14 @@ enum FileTypeSupport {
         "pages", "numbers", "keynote", "odt", "ods", "odp",
         "rtf", "rtfd"
     ]
+}
+
+extension URL {
+    /// 上一级目录的显示名，形如 `…/Downloads`；根目录或空路径退回 `…`。
+    var parentDirectoryLabel: String {
+        let parent = deletingLastPathComponent().path
+        let name = URL(fileURLWithPath: parent).lastPathComponent
+        guard !name.isEmpty, name != "/", name != "." else { return "…" }
+        return "…/\(name)"
+    }
 }

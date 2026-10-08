@@ -485,8 +485,7 @@ final class HistoryStore: ObservableObject {
         persist()
         scheduleOCRIfNeeded(for: entry)
         _ = contextCollector.recordCopy(entryID: entry.id)
-        // 序列模式追踪
-        
+
         // 显露偏好：如果推荐窗口打开期间用户手动复制了别的
         if revealedPreferenceWindowTimer != nil, !lastPredictionEntryIDs.contains(entry.id) {
             let context = contextCollector.currentContext(
@@ -522,7 +521,6 @@ final class HistoryStore: ObservableObject {
         reconcileSelection(preferredEntryID: updatedEntry.id)
         persist()
         scheduleOCRIfNeeded(for: updatedEntry)
-        // 序列模式追踪
 
         return true
     }
