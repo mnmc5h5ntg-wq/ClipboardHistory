@@ -59,6 +59,9 @@ final class DisplayPrivacyAndCapsTests: XCTestCase {
         let url = URL(fileURLWithPath: "/Users/someone/Documents/项目/a.swift")
         XCTAssertEqual(url.parentDirectoryLabel, "…/项目")
         XCTAssertEqual(URL(fileURLWithPath: "/").parentDirectoryLabel, "…")
+        // 根目录下的一层：父目录就是根，不该出现 "…/.."（CI 上真实踩到过）
+        XCTAssertEqual(URL(fileURLWithPath: "/a.txt").parentDirectoryLabel, "…")
+        XCTAssertEqual(URL(fileURLWithPath: "/Applications/X.app").parentDirectoryLabel, "…/Applications")
     }
 
     // MARK: R-22 体积上限

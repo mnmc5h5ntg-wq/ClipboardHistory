@@ -28,9 +28,12 @@ enum FileTypeSupport {
 extension URL {
     /// 上一级目录的显示名，形如 `…/Downloads`；根目录或空路径退回 `…`。
     var parentDirectoryLabel: String {
-        let parent = deletingLastPathComponent().path
-        let name = URL(fileURLWithPath: parent).lastPathComponent
-        guard !name.isEmpty, name != "/", name != "." else { return "…" }
+        // 先标准化：`URL(fileURLWithPath: "/").deletingLastPathComponent()` 在不同
+        // Foundation 版本上给出 "/" 或 "/.."（CI 的 Swift 6.1.2 给后者），
+        // 不标准化的话根目录下的文件会被标成 "…/.."。
+        let parent = deletingLastPathComponent().standardizedFileURL.path
+        let name = URL(fileURLWithPath: parent).standardizedFileURL.lastPathComponent
+        guard !name.isEmpty, name != "/", name != ".", name != ".." else { return "…" }
         return "…/\(name)"
     }
 }
