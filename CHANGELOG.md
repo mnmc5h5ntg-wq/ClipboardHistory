@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
+## [v1.4.7] - 2026-10-09
+
+### Fixed
+
+- **卷根目录下的文件不再把父目录标签渲染成 `…/..`**：`URL.parentDirectoryLabel` 先 `standardizedFileURL`
+  再取目录名，并在守卫里补上 `..`。旧实现在部分 Foundation 版本上（CI 的 macOS 15 / Swift 6.1.2）会把
+  `/a.txt` 的父路径算成 `/..`；macOS 26/27 上原本显示正确，所以本版是补严谨而非救急。
+
+### Tests
+
+- 测试不再覆写 XCTest 的 `tearDown()`：原 `try await super.tearDown()` 在 CI 的 Swift 6.1.2 下被判
+  「sending value of non-Sendable type 'XCTestCase' risks causing data races」，整个测试 target 编译失败；
+  改为每条用例开头复位偏好设置，用例顺序无关。
+- 父目录标签补两条断言：`/a.txt → …`、`/Applications/X.app → …/Applications`。
+- 发布脚本环境加一条断言：交给子进程的 `SDKROOT` 必须等于 `xcrun` 解析出来的那个。
+
+### Release
+
+- DMG：`releases/时间剪史_v1.4.7.dmg`
+- SHA256：`5046475defcf6f25b829bd872595475b93cfda7e832cdcb0a78e13db499073a2`
+
 ## [v1.4.6] - 2026-10-09
 
 ### Added
