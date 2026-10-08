@@ -21,6 +21,11 @@ enum EntryPresentation {
             return "图片 \(Int(image.nsImage.size.width))×\(Int(image.nsImage.size.height))"
         case .file(let url):
             return "📄 \(url.lastPathComponent)"
+        case .files(let urls):
+            if let firstURL = urls.first {
+                return "📄 \(firstURL.lastPathComponent) 等 \(urls.count) 个文件"
+            }
+            return "📄 多个文件"
         }
     }
 
@@ -32,6 +37,8 @@ enum EntryPresentation {
             return "\(Int(image.nsImage.size.width)) × \(Int(image.nsImage.size.height)) 像素"
         case .file(let url):
             return "文件: \(url.lastPathComponent)"
+        case .files(let urls):
+            return "\(urls.count) 个文件"
         }
     }
 
@@ -46,37 +53,12 @@ enum EntryPresentation {
             title = preview(for: entry.content)
         case .file(let url):
             title = url.lastPathComponent
+        case .files(let urls):
+            title = urls.first.map { "\($0.lastPathComponent) 等 \(urls.count) 个文件" } ?? "多个文件"
         }
 
         guard title.count > maxLength else { return title }
         return String(title.prefix(maxLength - 1)) + "…"
-    }
-
-    static func privateMenuTitle(for entry: ClipboardEntry) -> String {
-        let prefix = entry.isFavorite ? "收藏" : "最近"
-        switch entry.content {
-        case .text:
-            return "\(prefix)文本记录"
-        case .image:
-            return "\(prefix)图片记录"
-        case .file:
-            return "\(prefix)文件记录"
-        }
-    }
-
-    static func menuSymbol(for entry: ClipboardEntry) -> String {
-        if entry.isFavorite {
-            return "star.fill"
-        }
-
-        switch entry.content {
-        case .text:
-            return "doc.text"
-        case .image:
-            return "photo"
-        case .file:
-            return "doc"
-        }
     }
 
     static func fileNameParts(for url: URL) -> FileNameParts {

@@ -2,17 +2,50 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static let sharedHistoryStore = HistoryStore()
+
+    let historyStore = AppDelegate.sharedHistoryStore
     private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
     private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
     private let loginItemSettings = LoginItemSettings()
+    let contextPreferences = ContextPreferenceSettings()
     private lazy var shell = ApplicationShell(
         showMainWindowHotKeySettings: showMainWindowHotKeySettings,
         repeatCopyHotKeySettings: repeatCopyHotKeySettings,
-        loginItemSettings: loginItemSettings
+        loginItemSettings: loginItemSettings,
+        contextPreferences: contextPreferences
     )
 
-    func configure(historyStore: HistoryStore) {
+    func configure() {
+        historyStore.contextPreferences = contextPreferences
         shell.configure(historyStore: historyStore)
+    }
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        clearSavedApplicationStateIfNeeded()
+        shell.applicationWillFinishLaunching(appDelegate: self)
+    }
+
+    // MARK: - State Restoration (prevent crash on macOS 12)
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        false
+    }
+
+    func applicationShouldSaveApplicationState(_ coder: NSCoder) -> Bool {
+        false
+    }
+
+    func applicationShouldRestoreApplicationState(_ coder: NSCoder) -> Bool {
+        false
+    }
+
+    private func clearSavedApplicationStateIfNeeded() {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        let savedStateURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Saved Application State")
+            .appendingPathComponent("\(bundleID).savedState")
+        try? FileManager.default.removeItem(at: savedStateURL)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -35,12 +68,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         repeatCopyHotKeySettings.start()
         loginItemSettings.refresh()
         installReopenAppleEventHandler()
+        configure()
         shell.applicationDidFinishLaunching(appDelegate: self)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            shell.showExistingMainWindowIfAvailable()
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationDidBecomeActive called")
         shell.applicationDidBecomeActive()
+        // macOS 12: 从隐藏状态恢复时重新显示窗口
+        if NSApp.windows.allSatisfy({ $0.isVisible == false || $0.isMiniaturized }) {
+            shell.showMainWindow()
+        }
     }
 
     func applicationDidResignActive(_ notification: Notification) {
@@ -91,6 +133,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func copyHistoryEntry(id: UUID) {
         shell.copyHistoryEntry(id: id)
+    }
+
+    func copyAndPasteHistoryEntry(id: UUID) {
+        guard let entry = historyStore.entries.first(where: { $0.id == id }) else {
+            return
+        }
+
+        // 诊断A: 记录当前 frontmostApp
+        if let front = NSWorkspace.shared.frontmostApplication {
+        }
+
+        historyStore.perform(.recordRecommendationAccepted(entry.id))
+        shell.copyAndPasteEntry(entry)
     }
 
     func confirmAndClearHistory() {

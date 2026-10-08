@@ -4,14 +4,175 @@ import SwiftUI
 struct QuickLookPreview: NSViewRepresentable {
     let url: URL
 
-    func makeNSView(context: Context) -> QLPreviewView {
-        let view = QLPreviewView()
-        view.autostarts = true
+    func makeNSView(context: Context) -> QuickLookPreviewContainerView {
+        QuickLookPreviewContainerView()
+    }
+
+    func updateNSView(_ nsView: QuickLookPreviewContainerView, context: Context) {
+        nsView.update(url: url)
+    }
+
+    static func dismantleNSView(_ nsView: QuickLookPreviewContainerView, coordinator: ()) {
+        nsView.dismantle()
+    }
+}
+
+enum QuickLookPreviewLoadDecision: Equatable {
+    case skip
+    case load(requiresFreshView: Bool)
+}
+
+struct QuickLookPreviewLifecycle {
+    private(set) var loadedURL: URL?
+    private(set) var requiresFreshView = false
+
+    mutating func decision(for url: URL) -> QuickLookPreviewLoadDecision {
+        if loadedURL == url {
+            return .skip
+        }
+
+        return .load(requiresFreshView: requiresFreshView || loadedURL != nil)
+    }
+
+    mutating func markLoaded(_ url: URL) {
+        loadedURL = url
+        requiresFreshView = false
+    }
+
+    mutating func markDetached() {
+        loadedURL = nil
+        requiresFreshView = true
+    }
+}
+
+final class QuickLookPreviewContainerView: NSView {
+    private var previewView: QLPreviewView?
+    private var previewConstraints: [NSLayoutConstraint] = []
+    private var requestedURL: URL?
+    private var lifecycle = QuickLookPreviewLifecycle()
+    private var isDismantled = false
+    private var loadGeneration = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
+
+    func update(url: URL) {
+        guard !isDismantled else { return }
+        requestedURL = url
+        schedulePendingPreview()
+    }
+
+    func dismantle() {
+        isDismantled = true
+        loadGeneration += 1
+        requestedURL = nil
+        lifecycle.markDetached()
+        discardPreviewView()
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+
+        guard newWindow == nil, !isDismantled else { return }
+        loadGeneration += 1
+        lifecycle.markDetached()
+        discardPreviewView()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+
+        guard !isDismantled else { return }
+        if window == nil {
+            loadGeneration += 1
+            lifecycle.markDetached()
+            discardPreviewView()
+        } else {
+            schedulePendingPreview()
+        }
+    }
+
+    private func schedulePendingPreview() {
+        guard window != nil, let requestedURL else { return }
+        loadGeneration += 1
+        let generation = loadGeneration
+
+        DispatchQueue.main.async { [weak self] in
+            self?.applyPendingPreview(generation: generation, requestedURL: requestedURL)
+        }
+    }
+
+    private func applyPendingPreview(generation: Int, requestedURL: URL) {
+        guard !isDismantled,
+              generation == loadGeneration,
+              window != nil,
+              self.requestedURL == requestedURL,
+              let previewView = ensurePreviewView(),
+              previewView.superview === self else {
+            return
+        }
+
+        switch lifecycle.decision(for: requestedURL) {
+        case .skip:
+            return
+        case .load(let requiresFreshView):
+            if requiresFreshView {
+                discardPreviewView()
+            }
+            guard let previewView = ensurePreviewView() else { return }
+            guard generation == loadGeneration,
+                  window != nil,
+                  previewView.superview === self else {
+                return
+            }
+            previewView.previewItem = requestedURL as QLPreviewItem
+            lifecycle.markLoaded(requestedURL)
+        }
+    }
+
+    private func discardPreviewView() {
+        if previewView?.previewItem != nil {
+            previewView?.previewItem = nil
+        }
+        NSLayoutConstraint.deactivate(previewConstraints)
+        previewConstraints = []
+        previewView?.removeFromSuperview()
+        previewView = nil
+    }
+
+    private func ensurePreviewView() -> QLPreviewView? {
+        guard window != nil, !isDismantled else { return nil }
+        if let previewView {
+            return previewView
+        }
+
+        let view = Self.makePreviewView()
+        previewView = view
+        install(view)
         return view
     }
 
-    func updateNSView(_ nsView: QLPreviewView, context: Context) {
-        nsView.previewItem = url as QLPreviewItem
+    private func install(_ previewView: QLPreviewView) {
+        previewView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(previewView)
+        previewConstraints = [
+            previewView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            previewView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            previewView.topAnchor.constraint(equalTo: topAnchor),
+            previewView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ]
+        NSLayoutConstraint.activate(previewConstraints)
+    }
+
+    private static func makePreviewView() -> QLPreviewView {
+        let view = QLPreviewView()
+        view.autostarts = true
+        return view
     }
 }
 
@@ -87,14 +248,7 @@ struct DetailFileView: View {
     }
 
     private func textPreview(_ content: String) -> some View {
-        ScrollView([.vertical, .horizontal]) {
-            Text(content)
-                .font(.system(size: 13, design: .monospaced))
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
-                .textSelection(.enabled)
-        }
+        ChineseSelectableTextView(text: content, font: .monospacedSystemFont(ofSize: 13, weight: .regular))
     }
 
     private func videoAspectRatio(for preview: FilePreview) -> CGFloat {

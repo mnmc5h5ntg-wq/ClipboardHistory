@@ -54,10 +54,22 @@ final class FileHistoryPersistence: HistoryPersisting {
         let contentKind: ContentKind
         let text: String?
         let urlString: String?
+        let urlStrings: [String]?
         let imageFileName: String?
         let thumbnailFileName: String?
         let isFavorite: Bool?
         let sourceUTIs: [String]
+        let ocrText: String?
+
+        var fileURLs: [URL] {
+            if let urlStrings, !urlStrings.isEmpty {
+                return urlStrings.compactMap(URL.init(string:))
+            }
+            if let urlString, let url = URL(string: urlString) {
+                return [url]
+            }
+            return []
+        }
     }
 
     private struct PendingImageWrite: Sendable {
@@ -115,12 +127,13 @@ final class FileHistoryPersistence: HistoryPersisting {
                 }
                 return entry(from: storedEntry, content: .image(image), thumbnail: image)
             case .file:
-                guard let urlString = storedEntry.urlString,
-                      let url = URL(string: urlString) else {
+                let urls = storedEntry.fileURLs
+                guard !urls.isEmpty else {
                     return nil
                 }
+                let content: ClipboardEntryContent = urls.count == 1 ? .file(urls[0]) : .files(urls)
                 let thumbnail = storedEntry.thumbnailFileName.flatMap { loadImage(named: $0) }
-                return entry(from: storedEntry, content: .file(url), thumbnail: thumbnail)
+                return entry(from: storedEntry, content: content, thumbnail: thumbnail)
             }
         }
     }
@@ -163,7 +176,8 @@ final class FileHistoryPersistence: HistoryPersisting {
             thumbnail: thumbnail,
             sourceURL: content.sourceURL,
             isFavorite: storedEntry.isFavorite ?? false,
-            sourceUTIs: storedEntry.sourceUTIs
+            sourceUTIs: storedEntry.sourceUTIs,
+            ocrText: storedEntry.ocrText
         )
     }
 
@@ -189,10 +203,12 @@ final class FileHistoryPersistence: HistoryPersisting {
                 contentKind: .text,
                 text: text,
                 urlString: nil,
+                urlStrings: nil,
                 imageFileName: nil,
                 thumbnailFileName: nil,
                 isFavorite: entry.isFavorite,
-                sourceUTIs: entry.sourceUTIs
+                sourceUTIs: entry.sourceUTIs,
+                ocrText: entry.ocrText
             )
         case .image(let image):
             let imageFileName = "\(entry.id.uuidString)-image.png"
@@ -203,10 +219,12 @@ final class FileHistoryPersistence: HistoryPersisting {
                 contentKind: .image,
                 text: nil,
                 urlString: nil,
+                urlStrings: nil,
                 imageFileName: imageFileName,
                 thumbnailFileName: nil,
                 isFavorite: entry.isFavorite,
-                sourceUTIs: entry.sourceUTIs
+                sourceUTIs: entry.sourceUTIs,
+                ocrText: entry.ocrText
             )
         case .file(let url):
             let thumbnailFileName: String?
@@ -223,10 +241,34 @@ final class FileHistoryPersistence: HistoryPersisting {
                 contentKind: .file,
                 text: nil,
                 urlString: url.absoluteString,
+                urlStrings: [url.absoluteString],
                 imageFileName: nil,
                 thumbnailFileName: thumbnailFileName,
                 isFavorite: entry.isFavorite,
-                sourceUTIs: entry.sourceUTIs
+                sourceUTIs: entry.sourceUTIs,
+                ocrText: entry.ocrText
+            )
+        case .files(let urls):
+            let thumbnailFileName: String?
+            if let thumbnail = entry.thumbnail {
+                let fileName = "\(entry.id.uuidString)-thumbnail.png"
+                try append(thumbnail, named: fileName, to: &imageWrites)
+                thumbnailFileName = fileName
+            } else {
+                thumbnailFileName = nil
+            }
+            return StoredEntry(
+                id: entry.id,
+                timestamp: entry.timestamp,
+                contentKind: .file,
+                text: nil,
+                urlString: urls.first?.absoluteString,
+                urlStrings: urls.map(\.absoluteString),
+                imageFileName: nil,
+                thumbnailFileName: thumbnailFileName,
+                isFavorite: entry.isFavorite,
+                sourceUTIs: entry.sourceUTIs,
+                ocrText: entry.ocrText
             )
         }
     }

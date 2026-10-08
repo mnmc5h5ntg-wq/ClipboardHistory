@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import ServiceManagement
+import AppKit
 
 @MainActor
 protocol LoginItemManaging {
@@ -11,30 +12,74 @@ protocol LoginItemManaging {
 
 @MainActor
 struct SystemLoginItemManager: LoginItemManaging {
-    var isSupported: Bool {
-        if #available(macOS 13, *) {
-            return true
-        }
-        return false
-    }
+    private static let loginItemName = "时间剪史"
+
+    var isSupported: Bool { true }
 
     var isEnabled: Bool {
         if #available(macOS 13, *) {
             return SMAppService.mainApp.status == .enabled
         }
-        return false
+        return Self.checkLoginItemExistsViaAppleScript()
     }
 
     func setEnabled(_ enabled: Bool) throws {
-        guard #available(macOS 13, *) else {
-            throw LoginItemSettings.Error.unsupportedSystem
-        }
-
-        if enabled {
-            try SMAppService.mainApp.register()
+        if #available(macOS 13, *) {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
         } else {
-            try SMAppService.mainApp.unregister()
+            guard let appPath = Bundle.main.bundlePath as String? else {
+                throw LoginItemSettings.Error.unsupportedSystem
+            }
+            if enabled {
+                Self.addLoginItemViaAppleScript(appPath: appPath)
+            } else {
+                Self.removeLoginItemViaAppleScript(appPath: appPath)
+            }
         }
+    }
+
+    private static func checkLoginItemExistsViaAppleScript() -> Bool {
+        let script = """
+        tell application "System Events"
+            set itemNames to name of every login item
+            if itemNames contains "\(loginItemName)" then
+                return "1"
+            end if
+            return "0"
+        end tell
+        """
+        guard let appleScript = NSAppleScript(source: script) else { return false }
+        var error: NSDictionary?
+        let result = appleScript.executeAndReturnError(&error)
+        return result.stringValue == "1"
+    }
+
+    private static func addLoginItemViaAppleScript(appPath: String) {
+        let script = """
+        tell application "System Events"
+            if not (exists login item "\(loginItemName)") then
+                make new login item at end with properties {path:"\(appPath)", name:"\(loginItemName)", hidden:false}
+            end if
+        end tell
+        """
+        guard let appleScript = NSAppleScript(source: script) else { return }
+        var error: NSDictionary?
+        appleScript.executeAndReturnError(&error)
+    }
+
+    private static func removeLoginItemViaAppleScript(appPath: String) {
+        let script = """
+        tell application "System Events"
+            delete every login item whose path is "\(appPath)"
+        end tell
+        """
+        guard let appleScript = NSAppleScript(source: script) else { return }
+        var error: NSDictionary?
+        appleScript.executeAndReturnError(&error)
     }
 }
 

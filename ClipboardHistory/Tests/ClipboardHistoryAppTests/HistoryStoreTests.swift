@@ -185,6 +185,45 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.clipboardWriteErrorMessage, ClipboardWriteError.failedToWriteText.localizedDescription)
     }
 
+    func testPredictionSuggestionsAreHiddenUntilToggledAndLimitedToTopThree() {
+        let store = makeStore(maxEntries: 10)
+        for index in 0..<5 {
+            store.add(
+                intakeEntry(text: "item \(index)"),
+                timestamp: Date(timeIntervalSince1970: Double(index))
+            )
+        }
+
+        XCTAssertTrue(store.predictionSuggestionEntries.isEmpty)
+
+        store.perform(.togglePredictionSuggestions)
+
+        let exp = expectation(description: "predictions refreshed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exp.fulfill() }
+        wait(for: [exp], timeout: 3.0)
+
+        XCTAssertTrue(store.showsPredictionSuggestions)
+        XCTAssertEqual(store.predictionSuggestionEntries.count, 3)
+        XCTAssertEqual(store.predictionSuggestionEntries.first?.shortPreview, "item 4")
+    }
+
+    func testSelectingPredictionSuggestionUsesNormalSelectionState() throws {
+        let store = makeStore(maxEntries: 10)
+        store.add(intakeEntry(text: "older"), timestamp: Date(timeIntervalSince1970: 1))
+        store.add(intakeEntry(text: "newer"), timestamp: Date(timeIntervalSince1970: 2))
+        store.perform(.togglePredictionSuggestions)
+
+        let exp = expectation(description: "predictions refreshed")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exp.fulfill() }
+        wait(for: [exp], timeout: 3.0)
+
+        let suggestion = try XCTUnwrap(store.predictionSuggestionEntries.first)
+        store.perform(.selectOnly(suggestion))
+
+        XCTAssertEqual(store.selectedEntry?.id, suggestion.id)
+        XCTAssertEqual(store.selectedEntryIDs, Set([suggestion.id]))
+    }
+
     func testPerformCopyAndPromoteWritesAndMovesEntryToTop() {
         let writer = RecordingClipboardWriter()
         let store = makeStore(clipboardWriter: writer, maxEntries: 10)
@@ -275,6 +314,60 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedEntry?.content, .text("two"))
     }
 
+    func testSelectionSupportsRangeToggleBulkFavoriteAndBulkDelete() {
+        let store = makeStore(maxEntries: 10)
+        store.add(intakeEntry(text: "one"), timestamp: Date(timeIntervalSince1970: 1))
+        store.add(intakeEntry(text: "two"), timestamp: Date(timeIntervalSince1970: 2))
+        store.add(intakeEntry(text: "three"), timestamp: Date(timeIntervalSince1970: 3))
+        let newest = store.entries[0]
+        let oldest = store.entries[2]
+
+        store.perform(.selectOnly(newest))
+        store.perform(.selectRange(to: oldest))
+
+        XCTAssertEqual(store.selectedCount, 3)
+        XCTAssertEqual(store.selectedEntry?.content, .text("one"))
+
+        store.perform(.toggleSelection(store.entries[1]))
+
+        XCTAssertEqual(store.selectedCount, 2)
+        XCTAssertFalse(store.isSelected(store.entries[1]))
+
+        store.perform(.favoriteSelection)
+
+        XCTAssertEqual(store.entries.filter(\.isFavorite).map(\.content), [.text("three"), .text("one")])
+
+        store.perform(.deleteSelection)
+
+        XCTAssertEqual(store.entries.map(\.content), [.text("two")])
+        XCTAssertEqual(store.selectedEntry?.content, .text("two"))
+        XCTAssertEqual(store.selectedCount, 1)
+    }
+
+    func testTogglingCurrentSelectionKeepsDetailOnRemainingSelectedEntry() {
+        let store = makeStore(maxEntries: 10)
+        store.add(intakeEntry(text: "one"), timestamp: Date(timeIntervalSince1970: 1))
+        store.add(intakeEntry(text: "two"), timestamp: Date(timeIntervalSince1970: 2))
+
+        store.perform(.selectOnly(store.entries[0]))
+        store.perform(.toggleSelection(store.entries[1]))
+        store.perform(.toggleSelection(store.entries[1]))
+
+        XCTAssertEqual(store.selectedCount, 1)
+        XCTAssertEqual(store.selectedEntry?.content, .text("two"))
+    }
+
+    func testAddSupportsMultipleFileContent() throws {
+        let store = makeStore(maxEntries: 10)
+        let firstURL = URL(fileURLWithPath: "/tmp/first.txt")
+        let secondURL = URL(fileURLWithPath: "/tmp/second.txt")
+
+        store.add(intakeEntry(files: [firstURL, secondURL]))
+
+        XCTAssertEqual(store.entries.map(\.content), [.files([firstURL, secondURL])])
+        XCTAssertEqual(store.selectedEntry?.content, .files([firstURL, secondURL]))
+    }
+
     func testAddingOrdinaryEntryWhileFavoriteFilterIsActiveKeepsVisibleSelection() {
         let store = makeStore(maxEntries: 10)
         store.add(intakeEntry(text: "favorite"), timestamp: Date(timeIntervalSince1970: 1))
@@ -315,6 +408,10 @@ final class HistoryStoreTests: XCTestCase {
 
     private func intakeEntry(file url: URL, thumbnail: StoredImage) -> ClipboardIntake.Entry {
         ClipboardIntake.Entry(content: .file(url), thumbnail: thumbnail, sourceUTIs: ["public.file-url"])
+    }
+
+    private func intakeEntry(files urls: [URL]) -> ClipboardIntake.Entry {
+        ClipboardIntake.Entry(content: .files(urls), thumbnail: nil, sourceUTIs: ["public.file-url"])
     }
 
     private func makeStore(

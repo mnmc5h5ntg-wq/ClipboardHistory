@@ -5,22 +5,17 @@ struct ContentView: View {
 
     var body: some View {
         if #available(macOS 13, *) {
-            NavigationSplitView {
-                HistorySidebarView(historyStore: historyStore)
-                    .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 320)
-            } detail: {
-                DetailView(historyStore: historyStore)
-            }
-            .removeSidebarToggleIfAvailable()
-            .windowBackground()
-            .onAppear {
-                LifecycleDebugLogger.log("NavigationSplitView appeared")
-                LifecycleDebugLogger.logKeyWindowLayout("NavigationSplitView appear")
-            }
+            splitView
+                .removeSidebarToggleToolbarItem()
+                .windowBackground()
+                .onAppear {
+                    LifecycleDebugLogger.log("NavigationSplitView appeared")
+                    LifecycleDebugLogger.logKeyWindowLayout("NavigationSplitView appear")
+                }
         } else {
             NavigationView {
                 HistorySidebarView(historyStore: historyStore)
-                    .frame(minWidth: 220, idealWidth: 260, maxWidth: 320)
+                    .frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
                 DetailView(historyStore: historyStore)
             }
             .windowBackground()
@@ -30,15 +25,26 @@ struct ContentView: View {
             }
         }
     }
+
+    @available(macOS 13, *)
+    private var splitView: some View {
+        NavigationSplitView {
+            HistorySidebarView(historyStore: historyStore)
+                .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
+        } detail: {
+            DetailView(historyStore: historyStore)
+        }
+    }
 }
 
 private extension View {
     @ViewBuilder
-    func removeSidebarToggleIfAvailable() -> some View {
+    func removeSidebarToggleToolbarItem() -> some View {
         if #available(macOS 14, *) {
             toolbar(removing: .sidebarToggle)
         } else {
             self
         }
     }
+
 }

@@ -1,7 +1,7 @@
 import AppKit
 import CryptoKit
 
-struct StoredImage: Equatable, Hashable {
+struct StoredImage: Equatable, Hashable, @unchecked Sendable {
     let nsImage: NSImage
     private let fingerprint: String
 

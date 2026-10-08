@@ -7,12 +7,15 @@ struct ClipboardIntake {
         let sourceUTIs: [String]
 
         func makeHistoryEntry(timestamp: Date = Date()) -> ClipboardEntry {
-            ClipboardEntry(
+            let app = NSWorkspace.shared.frontmostApplication
+            return ClipboardEntry(
                 content: content,
                 timestamp: timestamp,
                 thumbnail: thumbnail,
                 sourceURL: content.sourceURL,
-                sourceUTIs: sourceUTIs
+                sourceUTIs: sourceUTIs,
+                sourceAppBundleID: app?.bundleIdentifier,
+                sourceAppName: app?.localizedName
             )
         }
 
@@ -47,9 +50,9 @@ struct ClipboardIntake {
         return readEntry(from: pasteboard)
     }
 
-    /// 统一入口：file-url → png → tiff → text
+    /// 统一入口：file-url(s) → png → tiff → text
     private func readEntry(from pasteboard: NSPasteboard) -> Entry? {
-        if let url = readFileURL(from: pasteboard) {
+        if let urls = readFileURLs(from: pasteboard), !urls.isEmpty {
             var thumb: StoredImage?
             if let tiff = pasteboard.data(forType: .tiff),
                let img = NSImage(data: tiff) {
@@ -58,7 +61,8 @@ struct ClipboardIntake {
                       let img = NSImage(data: icnsData) {
                 thumb = StoredImage(img)
             }
-            return makeEntry(content: .file(url), thumbnail: thumb, pasteboard: pasteboard)
+            let content: ClipboardEntryContent = urls.count == 1 ? .file(urls[0]) : .files(urls)
+            return makeEntry(content: content, thumbnail: thumb, pasteboard: pasteboard)
         }
 
         if let pngData = pasteboard.data(forType: .png),
@@ -93,14 +97,14 @@ struct ClipboardIntake {
         )
     }
 
-    private func readFileURL(from pb: NSPasteboard) -> URL? {
+    private func readFileURLs(from pb: NSPasteboard) -> [URL]? {
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
-           let url = urls.first {
-            return url
+           !urls.isEmpty {
+            return urls
         }
         if let urlString = pb.string(forType: .fileURL),
            let url = URL(string: urlString) {
-            return url
+            return [url]
         }
         return nil
     }

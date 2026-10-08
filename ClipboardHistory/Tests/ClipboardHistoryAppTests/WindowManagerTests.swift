@@ -24,4 +24,17 @@ final class WindowManagerTests: XCTestCase {
 
         XCTAssertFalse(WindowManager.isAppContentWindow(panel))
     }
+
+    func testShowMainWindowDoesNotCreateFallbackMainWindow() {
+        let existingMainWindowCount = NSApplication.shared.windows.filter {
+            WindowManager.isAppContentWindow($0)
+        }.count
+
+        WindowManager.showMainWindow()
+
+        let currentMainWindowCount = NSApplication.shared.windows.filter {
+            WindowManager.isAppContentWindow($0)
+        }.count
+        XCTAssertEqual(currentMainWindowCount, existingMainWindowCount)
+    }
 }

@@ -166,6 +166,26 @@ final class FileHistoryPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.first?.sourceUTIs, ["public.file-url"])
     }
 
+    func testSaveAndLoadMultipleFileEntryPreservesAllURLs() throws {
+        let root = try temporaryRoot()
+        let persistence = FileHistoryPersistence(rootDirectory: root)
+        let urls = [
+            URL(fileURLWithPath: "/tmp/first.mov"),
+            URL(fileURLWithPath: "/tmp/second.mov")
+        ]
+        let entry = makeClipboardEntry(
+            content: .files(urls),
+            sourceUTIs: ["public.file-url"]
+        )
+
+        try persistence.save([entry])
+        persistence.flushPendingSaves()
+        let loaded = persistence.load()
+
+        XCTAssertEqual(loaded.first?.content, .files(urls))
+        XCTAssertEqual(loaded.first?.sourceUTIs, ["public.file-url"])
+    }
+
     func testLoadDropsImageEntriesWhoseImageFileIsMissing() throws {
         let root = try temporaryRoot()
         let persistence = FileHistoryPersistence(rootDirectory: root)

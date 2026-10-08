@@ -49,6 +49,18 @@ final class ClipboardIntakeTests: XCTestCase {
         XCTAssertEqual(entry?.content, .file(url))
     }
 
+    func testRefreshReadsMultipleFileURLsFromPasteboard() throws {
+        let pasteboard = makePasteboard()
+        let firstURL = URL(fileURLWithPath: "/tmp/first.txt")
+        let secondURL = URL(fileURLWithPath: "/tmp/second.txt")
+        XCTAssertTrue(pasteboard.writeObjects([firstURL as NSURL, secondURL as NSURL]))
+        var intake = ClipboardIntake()
+
+        let entry = intake.refresh(from: pasteboard)
+
+        XCTAssertEqual(entry?.content, .files([firstURL, secondURL]))
+    }
+
     func testFileURLTakesPriorityOverText() throws {
         let pasteboard = makePasteboard()
         let url = URL(fileURLWithPath: "/tmp/example.mov")

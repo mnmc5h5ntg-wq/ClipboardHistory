@@ -14,10 +14,8 @@ struct SearchField: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(isActive ? .primary : .secondary)
 
-            TextField("搜索历史……", text: $text)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+            ChineseEditableTextField(text: $text, placeholder: "搜索历史……")
+                .frame(maxWidth: .infinity, minHeight: 17, maxHeight: 17)
 
             if !text.isEmpty {
                 Button(action: { text = "" }) {

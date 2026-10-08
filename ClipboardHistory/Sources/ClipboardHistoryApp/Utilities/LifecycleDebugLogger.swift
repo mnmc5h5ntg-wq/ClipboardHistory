@@ -4,7 +4,8 @@ import Foundation
 @MainActor
 enum LifecycleDebugLogger {
     private static let fileName = "时间剪史_lifecycle_debug.log"
-    private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_DEBUG"] == "1"
+        private static let _isEnabledOverride: Bool? = true  // 临时开启用于诊断红按钮问题
+    private static var isEnabled: Bool { _isEnabledOverride ?? (ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_DEBUG"] == "1") }
     private static let logURL = URL(fileURLWithPath: "/tmp/\(fileName)")
     private static var fileHandle: FileHandle?
 

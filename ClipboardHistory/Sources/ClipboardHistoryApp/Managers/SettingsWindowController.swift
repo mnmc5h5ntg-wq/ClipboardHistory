@@ -6,16 +6,33 @@ final class SettingsWindowController {
     private let showMainWindowHotKeySettings: HotKeySettings
     private let repeatCopyHotKeySettings: HotKeySettings
     private let loginItemSettings: LoginItemSettings
+    private let contextPreferences: ContextPreferenceSettings
+    private var weightsStore: RecommendationWeightsStore
+    private weak var historyStore: HistoryStore?
     private var windowController: NSWindowController?
 
     init(
         showMainWindowHotKeySettings: HotKeySettings,
         repeatCopyHotKeySettings: HotKeySettings,
-        loginItemSettings: LoginItemSettings
+        loginItemSettings: LoginItemSettings,
+        contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
+        weightsStore: RecommendationWeightsStore = RecommendationWeightsStore()
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
         self.loginItemSettings = loginItemSettings
+        self.contextPreferences = contextPreferences
+        self.weightsStore = weightsStore
+    }
+
+    func configure(historyStore: HistoryStore, weightsStore: RecommendationWeightsStore? = nil) {
+        self.historyStore = historyStore
+        if let ws = weightsStore {
+            self.weightsStore = ws
+        }
+        if let hostingController = windowController?.contentViewController as? NSHostingController<SettingsView> {
+            hostingController.rootView = makeSettingsView()
+        }
     }
 
     func show() {
@@ -30,22 +47,30 @@ final class SettingsWindowController {
             return windowController
         }
 
-        let hostingController = NSHostingController(
-            rootView: SettingsView(
-                showMainWindowHotKeySettings: showMainWindowHotKeySettings,
-                repeatCopyHotKeySettings: repeatCopyHotKeySettings,
-                loginItemSettings: loginItemSettings
-            )
-        )
+        let hostingController = NSHostingController(rootView: makeSettingsView())
         let window = NSWindow(contentViewController: hostingController)
         window.title = "设置"
-        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 520, height: 330))
-        window.minSize = NSSize(width: 520, height: 330)
+        window.setContentSize(NSSize(width: SettingsViewLayout.windowContentSize.width, height: SettingsViewLayout.windowContentSize.height))
+        window.minSize = NSSize(width: SettingsViewLayout.minimumWindowSize.width, height: SettingsViewLayout.minimumWindowSize.height)
 
         let controller = NSWindowController(window: window)
         windowController = controller
         return controller
+    }
+
+    private func makeSettingsView() -> SettingsView {
+        SettingsView(
+            showMainWindowHotKeySettings: showMainWindowHotKeySettings,
+            repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+            loginItemSettings: loginItemSettings,
+            contextPreferences: contextPreferences,
+            weightsStore: weightsStore,
+            feedbackStore: historyStore?.feedbackStore ?? RecommendationFeedbackStore(),
+            clearHistoryAction: { [weak self] in
+                self?.historyStore?.perform(.clear)
+            }
+        )
     }
 }

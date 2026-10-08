@@ -3,33 +3,67 @@ import AppKit
 @MainActor
 enum WindowManager {
     static let mainWindowIdentifier = NSUserInterfaceItemIdentifier("AppWindow")
+    private(set) nonisolated(unsafe) static weak var _mainWindow: NSWindow?
 
-    static func showMainWindow(menuBarController: MenuBarController? = nil) {
+    static func registerMainWindow(_ window: NSWindow) {
+        _mainWindow = window
+        window.identifier = mainWindowIdentifier
+    }
+
+    static func showMainWindow(
+        menuBarController: MenuBarController? = nil
+    ) {
         LifecycleDebugLogger.log("WindowManager.showMainWindow called")
         LifecycleDebugLogger.logAppState("before showMainWindow", menuBarController: menuBarController)
+        LifecycleDebugLogger.log("[SHOW-WIN] showMainWindow called. _mainWindow=\(_mainWindow != nil) NSApp.windows.count=\(NSApp.windows.count)")
+        for (i, w) in NSApp.windows.enumerated() {
+            LifecycleDebugLogger.log("[SHOW-WIN] window[\(i)] title='\(w.title)' visible=\(w.isVisible) miniaturized=\(w.isMiniaturized) id=\(w.identifier?.rawValue ?? "nil") class=\(String(describing: type(of: w)))")
+        }
+        
         NSApplication.shared.unhide(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
 
-        if let window = mainWindow {
+        LifecycleDebugLogger.log("[SHOW-WIN] after unhide+activate _mainWindow=\(_mainWindow != nil)")
+
+        // 优先使用直接引用
+        if let window = _mainWindow {
+            LifecycleDebugLogger.log("[SHOW-WIN] found via weak ref. isMiniaturized=\(window.isMiniaturized) isVisible=\(window.isVisible)")
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
-            LifecycleDebugLogger.logAppState("after showMainWindow existing window", menuBarController: menuBarController)
+            LifecycleDebugLogger.logAppState("after showMainWindow via weak ref", menuBarController: menuBarController)
             return
         }
 
-        LifecycleDebugLogger.log("WindowManager.showMainWindow no app content window found")
-        LifecycleDebugLogger.logAppState("after showMainWindow fallback", menuBarController: menuBarController)
+        // 回退：在窗口列表中搜索
+        if let window = mainWindow {
+            LifecycleDebugLogger.log("[SHOW-WIN] found via identifier search. isMiniaturized=\(window.isMiniaturized) isVisible=\(window.isVisible)")
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+            LifecycleDebugLogger.logAppState("after showMainWindow via identifier search", menuBarController: menuBarController)
+            return
+        }
+
+        LifecycleDebugLogger.log("WindowManager.showMainWindow no existing SwiftUI main window found")
+        LifecycleDebugLogger.logAppState("after showMainWindow no existing window", menuBarController: menuBarController)
     }
 
-    static func restoreMainWindowIfNeeded(reason: String, menuBarController: MenuBarController? = nil) {
+    static func restoreMainWindowIfNeeded(
+        reason: String,
+        menuBarController: MenuBarController? = nil
+    ) {
         LifecycleDebugLogger.log("restoreMainWindowIfNeeded reason='\(reason)'")
         let hasVisibleAppWindow = isVisibleAppContentWindowPresent
         LifecycleDebugLogger.log("restoreMainWindowIfNeeded hasVisibleAppWindow=\(hasVisibleAppWindow)")
         if !hasVisibleAppWindow {
-            showMainWindow(menuBarController: menuBarController)
+            showMainWindow(
+                menuBarController: menuBarController
+            )
         }
     }
 

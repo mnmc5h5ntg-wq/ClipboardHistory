@@ -54,22 +54,4 @@ final class EntryPresentationTests: XCTestCase {
         XCTAssertEqual(EntryPresentation.menuTitle(for: fileEntry), "report.pdf")
     }
 
-    func testPrivateMenuTitleHidesTextAndFileName() {
-        let textEntry = makeClipboardEntry(content: .text("secret token 123"))
-        let fileEntry = makeClipboardEntry(
-            content: .file(URL(fileURLWithPath: "/Users/me/private/report.pdf")),
-            isFavorite: true
-        )
-
-        XCTAssertEqual(EntryPresentation.privateMenuTitle(for: textEntry), "最近文本记录")
-        XCTAssertEqual(EntryPresentation.privateMenuTitle(for: fileEntry), "收藏文件记录")
-        XCTAssertFalse(EntryPresentation.privateMenuTitle(for: textEntry).contains("secret"))
-        XCTAssertFalse(EntryPresentation.privateMenuTitle(for: fileEntry).contains("report.pdf"))
-    }
-
-    func testMenuSymbolUsesFavoriteStarBeforeContentType() {
-        let entry = makeClipboardEntry(content: .text("saved"), isFavorite: true)
-
-        XCTAssertEqual(EntryPresentation.menuSymbol(for: entry), "star.fill")
-    }
 }

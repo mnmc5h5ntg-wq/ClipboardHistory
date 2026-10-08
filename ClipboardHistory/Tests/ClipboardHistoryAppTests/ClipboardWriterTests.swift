@@ -18,4 +18,20 @@ final class ClipboardWriterTests: XCTestCase {
         }
         XCTAssertEqual(pasteboard.string(forType: .string), "keep me")
     }
+
+    func testWritingMultipleFileURLsWritesAllFiles() throws {
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        pasteboard.clearContents()
+        let directory = try makeTemporaryDirectory()
+        let firstURL = directory.appendingPathComponent("first.txt")
+        let secondURL = directory.appendingPathComponent("second.txt")
+        try "first".write(to: firstURL, atomically: true, encoding: .utf8)
+        try "second".write(to: secondURL, atomically: true, encoding: .utf8)
+        let writer = SystemClipboardWriter(pasteboard: pasteboard)
+
+        try writer.write(.files([firstURL, secondURL]))
+
+        let urls = try XCTUnwrap(pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL])
+        XCTAssertEqual(urls, [firstURL, secondURL])
+    }
 }

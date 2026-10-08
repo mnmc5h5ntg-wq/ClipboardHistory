@@ -1,6 +1,6 @@
 import Foundation
 
-struct ClipboardEntry: Identifiable, Equatable, Hashable {
+struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
     let id: UUID
     let content: ClipboardEntryContent
     let timestamp: Date
@@ -8,6 +8,9 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable {
     let sourceURL: URL?
     let isFavorite: Bool
     let sourceUTIs: [String]
+    let sourceAppBundleID: String?
+    let sourceAppName: String?
+    let ocrText: String?
 
     init(
         id: UUID = UUID(),
@@ -16,7 +19,10 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable {
         thumbnail: StoredImage?,
         sourceURL: URL?,
         isFavorite: Bool = false,
-        sourceUTIs: [String]
+        sourceUTIs: [String],
+        sourceAppBundleID: String? = nil,
+        sourceAppName: String? = nil,
+        ocrText: String? = nil
     ) {
         self.id = id
         self.content = content
@@ -25,13 +31,16 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable {
         self.sourceURL = sourceURL
         self.isFavorite = isFavorite
         self.sourceUTIs = sourceUTIs
+        self.sourceAppBundleID = sourceAppBundleID
+        self.sourceAppName = sourceAppName
+        self.ocrText = ocrText
     }
 
     var shortPreview: String {
         content.preview
     }
 
-    func updating(timestamp: Date? = nil, isFavorite: Bool? = nil) -> ClipboardEntry {
+    func updating(timestamp: Date? = nil, isFavorite: Bool? = nil, ocrText: String?? = nil) -> ClipboardEntry {
         ClipboardEntry(
             id: id,
             content: content,
@@ -39,7 +48,10 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable {
             thumbnail: thumbnail,
             sourceURL: sourceURL,
             isFavorite: isFavorite ?? self.isFavorite,
-            sourceUTIs: sourceUTIs
+            sourceUTIs: sourceUTIs,
+            sourceAppBundleID: sourceAppBundleID,
+            sourceAppName: sourceAppName,
+            ocrText: ocrText ?? self.ocrText
         )
     }
 }

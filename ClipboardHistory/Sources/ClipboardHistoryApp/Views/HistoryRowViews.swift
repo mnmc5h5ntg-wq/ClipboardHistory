@@ -37,6 +37,12 @@ struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            Image(systemName: "star.fill")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(entry.isFavorite ? .yellow : .clear)
+                .frame(width: 14, height: 14)
+                .help(entry.isFavorite ? "已收藏" : "")
+
             switch entry.content {
             case .text:
                 Image(systemName: "doc.text")
@@ -49,11 +55,20 @@ struct HistoryRow: View {
                 } else {
                     ThumbnailSymbol(systemName: "doc")
                 }
+            case .files:
+                if let thumb = entry.thumbnail {
+                    ThumbnailImage(nsImage: thumb.nsImage)
+                } else {
+                    ThumbnailSymbol(systemName: "doc.on.doc")
+                }
             }
             VStack(alignment: .leading, spacing: 2) {
                 switch entry.content {
                 case .file(let url):
                     FileNameText(url: url)
+                        .font(.system(size: 12))
+                case .files(let urls):
+                    MultiFileTitle(urls: urls)
                         .font(.system(size: 12))
                 default:
                     Text(entry.shortPreview)
@@ -65,14 +80,6 @@ struct HistoryRow: View {
                     .font(.system(size: 10)).foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            if entry.isFavorite {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.yellow)
-                    .frame(width: 14, height: 14)
-                    .help("已收藏")
-            }
         }
     }
 }
@@ -97,6 +104,25 @@ private struct FileNameText: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
             }
+        }
+    }
+}
+
+private struct MultiFileTitle: View {
+    let urls: [URL]
+
+    var body: some View {
+        if let firstURL = urls.first {
+            HStack(spacing: 0) {
+                FileNameText(url: firstURL)
+                    .layoutPriority(0)
+                Text(" 等 \(urls.count) 个")
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+        } else {
+            Text("多个文件")
         }
     }
 }

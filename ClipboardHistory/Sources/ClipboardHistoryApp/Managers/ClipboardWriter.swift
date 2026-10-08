@@ -36,8 +36,17 @@ struct SystemClipboardWriter: ClipboardWriting {
 
     @discardableResult
     func write(_ content: ClipboardEntryContent) throws -> Int {
-        if case .file(let url) = content,
-           !FileManager.default.fileExists(atPath: url.path) {
+        let fileURLs: [URL]
+        switch content {
+        case .file(let url):
+            fileURLs = [url]
+        case .files(let urls):
+            fileURLs = urls
+        case .text, .image:
+            fileURLs = []
+        }
+
+        if fileURLs.contains(where: { !FileManager.default.fileExists(atPath: $0.path) }) {
             throw ClipboardWriteError.fileDoesNotExist
         }
 
@@ -50,6 +59,8 @@ struct SystemClipboardWriter: ClipboardWriting {
             didWrite = pasteboard.writeObjects([image.nsImage])
         case .file(let url):
             didWrite = pasteboard.writeObjects([url as NSURL])
+        case .files(let urls):
+            didWrite = pasteboard.writeObjects(urls.map { $0 as NSURL })
         }
 
         guard didWrite else {
@@ -58,7 +69,7 @@ struct SystemClipboardWriter: ClipboardWriting {
                 throw ClipboardWriteError.failedToWriteText
             case .image:
                 throw ClipboardWriteError.failedToWriteImage
-            case .file:
+            case .file, .files:
                 throw ClipboardWriteError.failedToWriteFileURL
             }
         }

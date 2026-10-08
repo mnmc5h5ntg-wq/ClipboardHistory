@@ -3,23 +3,21 @@ import AppKit
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     typealias CommandHandler = (AppCommand) -> Void
-    typealias EntryProvider = () -> [HistoryStore.Entry]
-    typealias EntryHandler = (HistoryStore.Entry) -> Void
 
     private var statusItem: NSStatusItem?
     private var commandHandler: CommandHandler?
-    private var entriesProvider: EntryProvider = { [] }
-    private var entryHandler: EntryHandler?
+    private var pasteHandler: ((HistoryStore.Entry) -> Void)?
+    weak var historyStore: HistoryStore?
 
     func configure(
         commandHandler: @escaping CommandHandler,
-        entriesProvider: @escaping EntryProvider = { [] },
-        entryHandler: EntryHandler? = nil
+        historyStore: HistoryStore? = nil,
+        pasteHandler: ((HistoryStore.Entry) -> Void)? = nil
     ) {
         LifecycleDebugLogger.log("MenuBarController.configure called")
         self.commandHandler = commandHandler
-        self.entriesProvider = entriesProvider
-        self.entryHandler = entryHandler
+        self.historyStore = historyStore
+        self.pasteHandler = pasteHandler
 
         if #available(macOS 13, *) {
             LifecycleDebugLogger.log("MenuBarController.configure skipped NSStatusItem on macOS 13+")
@@ -59,6 +57,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func menuWillOpen(_ menu: NSMenu) {
+        historyStore?.refreshPredictions()
         populate(menu)
     }
 
@@ -69,10 +68,54 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         titleItem.isEnabled = false
         menu.addItem(titleItem)
 
-        QuickCopyMenu.sections(entries: entriesProvider()).forEach { section in
-            addEntrySection(section, to: menu)
+        // 猜你要粘贴
+        if let store = historyStore, !store.predictionSuggestionEntries.isEmpty {
+            menu.addItem(.separator())
+            let headerItem = NSMenuItem(title: "猜你要粘贴", action: nil, keyEquivalent: "")
+            headerItem.isEnabled = false
+            headerItem.attributedTitle = NSAttributedString(
+                string: "猜你要粘贴",
+                attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .semibold),
+                             .foregroundColor: NSColor.tertiaryLabelColor]
+            )
+            menu.addItem(headerItem)
+
+            for entry in store.predictionSuggestionEntries.prefix(3) {
+                let reason = store.predictionReasonByEntryID[entry.id] ?? ""
+                let item = NSMenuItem(
+                    title: "",
+                    action: #selector(selectRecommendationFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                item.representedObject = entry.id
+                let title = NSMutableAttributedString(string: entry.shortPreview, attributes: [
+                    .font: NSFont.systemFont(ofSize: 13)
+                ])
+                if !reason.isEmpty {
+                    title.append(NSAttributedString(string: "\n\(reason)", attributes: [
+                        .font: NSFont.systemFont(ofSize: 10),
+                        .foregroundColor: NSColor.tertiaryLabelColor
+                    ]))
+                }
+                item.attributedTitle = title
+                menu.addItem(item)
+            }
+
+            // "都不是我想要的" 按钮
+            menu.addItem(.separator())
+            let dismissItem = NSMenuItem(
+                title: "都不是我想要的",
+                action: #selector(dismissAllRecommendationsFromMenu),
+                keyEquivalent: ""
+            )
+            dismissItem.attributedTitle = NSAttributedString(
+                string: "都不是我想要的",
+                attributes: [.foregroundColor: NSColor.systemBlue]
+            )
+            menu.addItem(dismissItem)
         }
 
+        menu.addItem(.separator())
         AppCommandCatalog.menuBarCommands.filter { $0 != .quit }.forEach { command in
             menu.addItem(menuItem(for: command))
         }
@@ -80,27 +123,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(menuItem(for: .quit))
 
         menu.items.forEach { $0.target = self }
-    }
-
-    private func addEntrySection(_ section: QuickCopyMenuSection, to menu: NSMenu) {
-        menu.addItem(.separator())
-        let sectionItem = NSMenuItem(title: section.title, action: nil, keyEquivalent: "")
-        sectionItem.isEnabled = false
-        menu.addItem(sectionItem)
-
-        section.entries.forEach { entry in
-            let item = NSMenuItem(
-                title: EntryPresentation.privateMenuTitle(for: entry),
-                action: #selector(copyHistoryEntryFromMenu(_:)),
-                keyEquivalent: ""
-            )
-            item.representedObject = entry.id.uuidString
-            item.image = NSImage(
-                systemSymbolName: EntryPresentation.menuSymbol(for: entry),
-                accessibilityDescription: nil
-            )
-            menu.addItem(item)
-        }
     }
 
     private func menuItem(for command: AppCommand) -> NSMenuItem {
@@ -113,6 +135,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return item
     }
 
+    @objc private func selectRecommendationFromMenu(_ sender: NSMenuItem) {
+        guard let entryID = sender.representedObject as? UUID else { return }
+        guard let entry = historyStore?.entries.first(where: { $0.id == entryID }) else { return }
+        historyStore?.perform(.recordRecommendationAccepted(entryID))
+        pasteHandler?(entry)
+    }
+
     private func selector(for command: AppCommand) -> Selector {
         switch command {
         case .showMainWindow:
@@ -123,6 +152,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return #selector(refreshHistoryFromMenu)
         case .clearHistory:
             return #selector(confirmAndClearHistoryFromMenu)
+        case .dismissAllRecommendations:
+            return #selector(dismissAllRecommendationsFromMenu)
         case .quit:
             return #selector(quitFromMenu)
         }
@@ -130,31 +161,36 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func makeStatusBarIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
-        let image = NSImage(size: size)
-        image.lockFocus()
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
 
-        NSColor.black.setStroke()
+            // Clipboard body
+            let bodyRect = NSRect(x: 4, y: 2, width: 10, height: 13.5)
+            let bodyPath = NSBezierPath(roundedRect: bodyRect, xRadius: 2, yRadius: 2)
+            bodyPath.lineWidth = 1.6
+            bodyPath.stroke()
 
-        let bodyRect = NSRect(x: 4.5, y: 2.5, width: 9, height: 12)
-        let bodyPath = NSBezierPath(roundedRect: bodyRect, xRadius: 1.8, yRadius: 1.8)
-        bodyPath.lineWidth = 1.8
-        bodyPath.stroke()
+            // Clip at top
+            let clipRect = NSRect(x: 6.2, y: 14, width: 5.6, height: 2.8)
+            let clipPath = NSBezierPath(roundedRect: clipRect, xRadius: 1.3, yRadius: 1.3)
+            clipPath.lineWidth = 1.6
+            clipPath.stroke()
 
-        let clipRect = NSRect(x: 6.5, y: 13, width: 5, height: 3)
-        let clipPath = NSBezierPath(roundedRect: clipRect, xRadius: 1.3, yRadius: 1.3)
-        clipPath.lineWidth = 1.8
-        clipPath.stroke()
+            // Text lines
+            let lineWidth: CGFloat = 1.3
+            let lineLeft: CGFloat = 6.2
+            let lineRight: CGFloat = 11.8
+            for y in stride(from: 11.5, through: 4, by: -3.5) {
+                let line = NSBezierPath()
+                line.move(to: NSPoint(x: lineLeft, y: y))
+                line.line(to: NSPoint(x: lineRight, y: y))
+                line.lineWidth = lineWidth
+                line.stroke()
+            }
 
-        let lineWidth: CGFloat = 1.4
-        for y in [10.5, 7.5, 4.5] {
-            let line = NSBezierPath()
-            line.move(to: NSPoint(x: 6.7, y: y))
-            line.line(to: NSPoint(x: 11.3, y: y))
-            line.lineWidth = lineWidth
-            line.stroke()
+            return true
         }
-
-        image.unlockFocus()
         image.isTemplate = true
         image.accessibilityDescription = "时间剪史"
         return image
@@ -191,14 +227,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         perform(.clearHistory)
     }
 
+    @objc private func dismissAllRecommendationsFromMenu() {
+        perform(.dismissAllRecommendations)
+    }
+
     @objc private func quitFromMenu() {
         perform(.quit)
     }
 
-    @objc private func copyHistoryEntryFromMenu(_ sender: NSMenuItem) {
-        guard let idString = sender.representedObject as? String,
-              let id = UUID(uuidString: idString) else { return }
-        guard let entry = entriesProvider().first(where: { $0.id == id }) else { return }
-        entryHandler?(entry)
-    }
 }

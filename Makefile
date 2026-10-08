@@ -1,5 +1,5 @@
 APP_NAME := 时间剪史
-VERSION  := 1.3
+VERSION  := 1.4.5
 BUNDLE  := $(APP_NAME).app
 BINARY  := ClipboardHistoryApp
 BUILD_A := ClipboardHistory/.build/arm64-apple-macosx/debug
@@ -29,6 +29,13 @@ bundle: build
 	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.clipboardhistory.app" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Add :CFBundleName string $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Set :CFBundleName $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations:0" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $(VERSION)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
 	/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
@@ -51,7 +58,7 @@ bundle: build
 	@echo "✅ $(BUNDLE) ready (ad-hoc signed, quarantine-free)"
 
 run: bundle
-	open "$(STAGE)/$(BUNDLE)"
+	open -n "$(STAGE)/$(BUNDLE)"
 
 dmg: bundle
 	rm -rf /tmp/$(APP_NAME)_dmg
