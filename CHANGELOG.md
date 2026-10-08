@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **设置 → 隐私「数据与保留」分组**：保存位置、保存内容类型、500 条 / 30 天、收藏长期保留、清空历史语义、敏感内容提醒 —— 这些文案此前只存在于代码里，产品从未显示（对应 #16）。
 - **窗口顶部提示条**：存档恢复结果、自动粘贴失败原因、成批清理过期记录三类事件第一次变得可见（对应 #5）。
-- **CI workflow**：构建零告警 + `Executed N tests` 只准涨不准跌 + 发布脚本测试 + Info.plist 闸（需自行启用 GitHub Actions）。
+- **CI workflow**：构建零告警 + `Executed N tests` 只准涨不准跌 + 发布脚本测试 + Info.plist 闸。已在 main 上跑通（首跑抓到两条只在 CI 工具链下暴露的缺陷，见下）。
 - **无障碍**：纯图标按钮在悬停提示之外补上 `accessibilityLabel`，并加静态守卫防止回归。
 - **系统「减弱动态效果」**：展开 / 收起与缩放改为尊重该设置；0.11–0.14s 的颜色渐变有意保留。
 
