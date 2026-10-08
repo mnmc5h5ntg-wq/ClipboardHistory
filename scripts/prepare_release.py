@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import os
 import plistlib
 import re
 import shutil
@@ -160,6 +161,33 @@ def render_release_notes(version: str, today: dt.date, checksum: str) -> str:
 - 支持架构：Intel + Apple Silicon。
 - 当前流程使用本地 ad-hoc 签名；如未做 Apple 公证，首次打开仍可能需要手动允许。
 """
+
+
+def build_child_environment() -> dict[str, str]:
+    """给子进程一套与编译器一致的 SDK 环境。
+
+    本机实测（2026-10-09）：`/usr/bin/python3` 会主动给它的整棵进程树注入
+    `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`，连 `env -u SDKROOT` 都去不掉；
+    而 `swift` 编译器来自 Xcode。结果：脚本里任何 `swift …` 子进程都报
+    "this SDK is not supported by the compiler" 并在第一步就把发布链打断 ——
+    同一条命令在 shell 里手动跑却是好的。所以这里显式把 SDKROOT 设成 `xcrun` 解析出来的那个，
+    让"能不能编译"不再取决于脚本是被谁启动的。
+    """
+    env = dict(os.environ)
+    try:
+        resolved = subprocess.run(
+            ["xcrun", "--sdk", "macosx", "--show-sdk-path"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        resolved = ""
+    if resolved:
+        env["SDKROOT"] = resolved
+    else:
+        env.pop("SDKROOT", None)
+    return env
 
 
 class ReleasePreparer:
@@ -337,7 +365,7 @@ class ReleasePreparer:
 
     @staticmethod
     def _default_runner(command: Sequence[str], cwd: Path) -> None:
-        subprocess.run(list(command), cwd=cwd, check=True)
+        subprocess.run(list(command), cwd=cwd, check=True, env=build_child_environment())
 
 
     def _archive_existing_release_dmg(self, release_dmg: Path) -> Path | None:

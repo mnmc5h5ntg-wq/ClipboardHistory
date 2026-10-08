@@ -2,6 +2,7 @@ import datetime as dt
 import hashlib
 import os
 import plistlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -225,6 +226,30 @@ class PrepareReleaseTests(unittest.TestCase):
             self.assertFalse((root / "releases" / f"{APP_NAME}_v1.2.3.dmg").exists())
             self.assertEqual(stale.read_bytes(), b"stale-bytes")
 
+
+    def test_child_environment_matches_the_selected_toolchain(self):
+        """发布脚本交给子进程的 SDKROOT 必须与编译器同源。
+
+        本机真实事故（2026-10-09）：`/usr/bin/python3` 会给整棵进程树注入 CLT 的
+        `SDKROOT`，而 `swift` 来自 Xcode ⇒ `swift test` 子进程报
+        "this SDK is not supported by the compiler"，整条发布链在第一步就断，
+        而同一条命令在 shell 里手跑却是好的。
+        """
+        probe = subprocess.run(
+            ["xcrun", "--sdk", "macosx", "--show-sdk-path"], capture_output=True, text=True
+        )
+        resolved = probe.stdout.strip()
+        if not resolved:
+            self.skipTest("本机没有可用的 xcrun SDK 解析")
+
+        env = prepare_release.build_child_environment()
+        self.assertEqual(env.get("SDKROOT"), resolved,
+                         "子进程 SDK 必须等于 xcrun 解析出来的那个，否则编译必然失败")
+
+        dev = subprocess.run(["xcode-select", "-p"], capture_output=True, text=True).stdout.strip()
+        if dev and "CommandLineTools" not in dev:
+            self.assertNotIn("CommandLineTools/SDKs", env.get("SDKROOT", ""),
+                             "开发者目录是 Xcode，子进程却拿到 CLT 的 SDK —— 就是本次事故本身")
 
 if __name__ == "__main__":
     unittest.main()
