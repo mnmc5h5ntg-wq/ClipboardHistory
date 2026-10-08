@@ -317,7 +317,7 @@ final class HistoryStore: ObservableObject {
         }
         let loadedEntries = persistence.load()
         let loadedRecoveryNotice = persistence.recoveryNotice
-        let persistedEntries = Self.collapsingDuplicates(in: self.retentionPolicy.retaining(loadedEntries))
+        let persistedEntries = Self.collapsingDuplicates(in: retainingByPolicy(loadedEntries, reason: "载入"))
         self.entries = persistedEntries
         self.selectedEntry = persistedEntries.first
         self.selectedEntryIDs = persistedEntries.first.map { [$0.id] } ?? []
@@ -335,6 +335,38 @@ final class HistoryStore: ObservableObject {
     /// UI 消费掉恢复提示后调用，避免同一条提示反复出现。
     func dismissHistoryRecoveryNotice() {
         historyRecoveryNotice = nil
+    }
+
+    /// 一次清理掉很多条过期记录时给用户的解释（审计 R-20）。
+    @Published private(set) var retentionNotice: String?
+
+    func dismissRetentionNotice() {
+        retentionNotice = nil
+    }
+
+    /// 走保留策略，并说清"少了哪些、为什么"。
+    ///
+    /// 这里刻意**不做**"猜时钟异常"的启发式：一次清掉几十条，既可能是用户两个月没打开
+    /// 这个 App（策略本来就该这样执行），也可能是系统时间被往前调。两种情况从时间戳上
+    /// 无法区分，让程序去赌就会留下"永远不过期"的洞；所以把数字与原因摆到界面上，由人判断。
+    private func retainingByPolicy(_ candidate: [ClipboardEntry], reason: String) -> [ClipboardEntry] {
+        let trimmed = retentionPolicy.retaining(candidate)
+        let droppedCount = candidate.count - trimmed.count
+        guard droppedCount > 0 else { return trimmed }
+        let keptIDs = Set(trimmed.map(\.id))
+        let dropped = candidate.filter { !keptIDs.contains($0.id) }
+        var expiredCount = 0
+        if let days = retentionPolicy.maxAgeDays {
+            let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
+            expiredCount = dropped.filter { !$0.isFavorite && $0.timestamp < cutoff }.count
+        }
+        LifecycleDebugLogger.log("保留策略(\(reason))移除 \(droppedCount) 条：按时间过期 \(expiredCount) 条，"
+            + "其余 \(droppedCount - expiredCount) 条属于条数上限")
+        if expiredCount >= 10, let days = retentionPolicy.maxAgeDays {
+            retentionNotice = "本次清理移除了 \(expiredCount) 条超过 \(days) 天的历史记录。"
+                + "如果这不是你预期的结果，请检查系统时间是否正确。"
+        }
+        return trimmed
     }
 
     /// 记录一次自动粘贴失败。只接受调用方已经脱敏过的原因文案（见 `SystemEventsPasteKey`）。
@@ -491,7 +523,7 @@ final class HistoryStore: ObservableObject {
         }
 
         entries.insert(entry, at: 0)
-        entries = retentionPolicy.retaining(entries)
+        entries = retainingByPolicy(entries, reason: "新增记录")
         reconcileSelection(preferredEntryID: entry.id)
         persist()
         scheduleOCRIfNeeded(for: entry)
@@ -528,7 +560,7 @@ final class HistoryStore: ObservableObject {
             isFavorite: isFavorite
         )
         entries.insert(updatedEntry, at: 0)
-        entries = retentionPolicy.retaining(entries)
+        entries = retainingByPolicy(entries, reason: "提升重复记录")
         reconcileSelection(preferredEntryID: updatedEntry.id)
         persist()
         scheduleOCRIfNeeded(for: updatedEntry)

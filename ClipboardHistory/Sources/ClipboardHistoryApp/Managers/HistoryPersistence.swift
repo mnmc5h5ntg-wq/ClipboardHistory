@@ -40,6 +40,10 @@ extension HistoryPersisting {
 
 @MainActor
 final class FileHistoryPersistence: HistoryPersisting {
+    /// 存档格式版本。以前这个字段只写不读（审计 R-20）：装了更新的版本再退回本版本时，
+    /// 新格式的字段会被当成不认识的东西丢掉，而下一次保存就把 v2 覆盖成 v1 —— 静默数据损失。
+    static let currentSchemaVersion = 1
+
     private struct StoredHistory: Codable, Sendable {
         let version: Int
         let entries: [StoredEntry]
@@ -96,6 +100,9 @@ final class FileHistoryPersistence: HistoryPersisting {
     /// 本次运行内必须保护的图片文件名（来自损坏原件与备份的尽力提取）。
     private var protectedImageFileNames: Set<String> = []
 
+    /// 存档来自更高版本时置位：本程序只读打开，不再写盘。
+    private(set) var isArchiveFromNewerVersion = false
+
     var recoveryNotice: String? { loadedRecoveryNotice }
     var backupHistoryURL: URL { FileHistoryPersistence.backupURL(for: historyURL) }
 
@@ -146,7 +153,31 @@ final class FileHistoryPersistence: HistoryPersisting {
             return []
         }
 
-        return entries(from: storedHistory)
+        return entries(from: accept(storedHistory))
+    }
+
+    /// 版本闸门：高于本程序支持的版本 ⇒ 只读打开并说明原因；否则走显式迁移。
+    private func accept(_ storedHistory: StoredHistory) -> StoredHistory {
+        if storedHistory.version > Self.currentSchemaVersion {
+            isArchiveFromNewerVersion = true
+            loadedRecoveryNotice = "这份历史存档由更新的版本写入（v\(storedHistory.version) > v\(Self.currentSchemaVersion)），"
+                + "本版本只读打开，不会覆盖它。请升级回原来的版本继续使用该存档。"
+            LifecycleDebugLogger.log("存档版本 v\(storedHistory.version) 高于本程序 v\(Self.currentSchemaVersion)：进入只读")
+            return storedHistory
+        }
+        return Self.migrate(storedHistory)
+    }
+
+    /// 唯一的迁移入口。以后改格式必须在这里加一级显式升级，
+    /// 让"忘了写迁移"成为一件会在代码评审里被看见的事，而不是静默行为差异。
+    nonisolated private static func migrate(_ history: StoredHistory) -> StoredHistory {
+        switch history.version {
+        case 1:
+            return history
+        default:
+            // 比当前更低的版本：目前没有需要升格的旧格式；字段都是可选的，原样载入不会崩。
+            return history
+        }
     }
 
     private func decodeStoredHistory(at url: URL) -> StoredHistory? {
@@ -179,6 +210,11 @@ final class FileHistoryPersistence: HistoryPersisting {
     }
 
     func save(_ entries: [ClipboardEntry]) throws {
+        guard !isArchiveFromNewerVersion else {
+            // 覆盖一份更高版本的存档 = 把它的新字段抹掉。宁可这次复制不落盘，也不能毁数据。
+            LifecycleDebugLogger.log("存档来自更高版本：跳过写入")
+            return
+        }
         let snapshot = try saveSnapshot(from: entries)
         let workItem = Self.makeSaveWorkItem(
             snapshot: snapshot,

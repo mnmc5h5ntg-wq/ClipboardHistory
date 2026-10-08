@@ -42,6 +42,11 @@ struct ContentView: View {
                 historyStore.dismissPasteFailure()
             }
         }
+        if let retention = historyStore.retentionNotice {
+            NoticeBanner(message: retention, tone: .warning) {
+                historyStore.dismissRetentionNotice()
+            }
+        }
     }
 
     @available(macOS 13, *)
