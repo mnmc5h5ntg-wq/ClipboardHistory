@@ -7,6 +7,7 @@ final class ApplicationShell {
     private let menuBarController = MenuBarController()
     private let settingsWindowController: SettingsWindowController
     private let confirmation: DestructiveConfirming
+    private let pasteKey: PasteKeyExecuting
     private var isConfigured = false
     private var didDeferInitialActivationRestore = false
 
@@ -15,9 +16,11 @@ final class ApplicationShell {
         repeatCopyHotKeySettings: HotKeySettings,
         loginItemSettings: LoginItemSettings,
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
-        confirmation: DestructiveConfirming = SystemDestructiveConfirming()
+        confirmation: DestructiveConfirming = SystemDestructiveConfirming(),
+        pasteKey: PasteKeyExecuting = SystemEventsPasteKey()
     ) {
         self.confirmation = confirmation
+        self.pasteKey = pasteKey
         self.settingsWindowController = SettingsWindowController(
             showMainWindowHotKeySettings: showMainWindowHotKeySettings,
             repeatCopyHotKeySettings: repeatCopyHotKeySettings,
@@ -151,13 +154,25 @@ final class ApplicationShell {
             if let app = previousApp {
                 app.activate(options: .activateIgnoringOtherApps)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                let task = Process()
-                task.launchPath = "/usr/bin/osascript"
-                task.arguments = ["-e", "tell application \"System Events\" to keystroke \"v\" using command down"]
-                task.launch()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+                self?.sendPasteKeystroke()
             }
         }
+    }
+
+    /// 按下 ⌘V 这一步单独拆出来：失败可见性是这条链路唯一需要被测试锁住的行为。
+    /// 测试直接调它，既不用等前面两段 activate 延迟，也不会真的往用户界面按键。
+    func sendPasteKeystroke() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.reportPasteOutcome(await self.pasteKey.synthesizePaste())
+        }
+    }
+
+    func reportPasteOutcome(_ reason: String?) {
+        guard let reason else { return }
+        LifecycleDebugLogger.log("自动粘贴失败：\(reason)")
+        historyStore?.reportPasteFailure(reason)
     }
     func perform(_ command: AppCommand) {
         switch command {

@@ -188,6 +188,27 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store))
         })
 
+        // R-13/R-02 的提示条：既拍组件本身，也拍它插进 ContentView 之后
+        // 会不会把 NavigationSplitView 的布局挤坏。
+        let pasteFailureText = "系统未授权本 App 控制「System Events」，无法自动粘贴。请在「系统设置 → 隐私与安全性 → 自动化」里允许后重试；记录本身已复制到剪贴板，可手动粘贴。"
+        let noticeStore = makePopulatedStore()
+        noticeStore.reportPasteFailure(pasteFailureText)
+        results.append(Fixture("content-with-notice", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: noticeStore))
+        })
+        results.append(Fixture("notice-banner", NSSize(width: 560, height: 170)) {
+            AnyView(
+                VStack(spacing: 12) {
+                    NoticeBanner(message: "主存档无法读取，已从备份恢复 12 条记录；损坏原件保留为 history.corrupt-1.json。",
+                                 tone: .warning, onDismiss: {})
+                    NoticeBanner(message: pasteFailureText, tone: .error, onDismiss: {})
+                }
+                .padding(12)
+                .frame(width: 560, height: 170)
+                .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+
         return results
     }
 

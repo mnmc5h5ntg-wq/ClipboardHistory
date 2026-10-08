@@ -57,6 +57,8 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var clipboardWriteErrorMessage: String?
     /// 存档损坏时的恢复提示（备份回退 / 原件保全）。UI 层可据此显示一次性提示。
     @Published private(set) var historyRecoveryNotice: String?
+    /// 自动粘贴失败时要让用户看见原因，而不是"点了没反应"（审计 R-13）。
+    @Published private(set) var pasteFailureNotice: String?
 
     /// 过滤结果缓存。`filteredEntries` 在一次界面求值里会被多处读取
     /// （列表、计数文案、空态标题、选中态协调），旧写法每次都全表重扫：
@@ -333,6 +335,15 @@ final class HistoryStore: ObservableObject {
     /// UI 消费掉恢复提示后调用，避免同一条提示反复出现。
     func dismissHistoryRecoveryNotice() {
         historyRecoveryNotice = nil
+    }
+
+    /// 记录一次自动粘贴失败。只接受调用方已经脱敏过的原因文案（见 `SystemEventsPasteKey`）。
+    func reportPasteFailure(_ reason: String) {
+        pasteFailureNotice = reason
+    }
+
+    func dismissPasteFailure() {
+        pasteFailureNotice = nil
     }
 
     func startMonitoring(after delay: TimeInterval = 0) {
