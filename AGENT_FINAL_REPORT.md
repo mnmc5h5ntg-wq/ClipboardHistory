@@ -1,7 +1,7 @@
 # AGENT_FINAL REPORT · 时间剪史 审计整改（分支 `fix/audit-remediation`）
 
 生成时间：2026-10-09（本地）
-基线：`main` @ `db077f6`；修复前工作点 `8007b19`；本分支 **31 个提交，全部未推送**
+基线：`main` @ `db077f6`；修复前工作点 `8007b19`；本分支 **33 个提交，全部未推送**
 账本：`AGENT_STATE.md`（状态与复跑命令）、`AGENT_BACKLOG.md`（190 格矩阵 + 54 行待办）、`AGENT_DECISIONS.md`（D-000…D-014）、`AGENT_UI_AUDIT.md`（视觉审计与复验记录）
 外部审计报告（只读阶段产物，仓库外）：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-08/`
 
