@@ -12,3 +12,10 @@ The repo uses the default mattpocock/skills triage labels: `needs-triage`, `need
 ### Domain docs
 
 This is a single-context repo: use `CONTEXT.md` at the repo root and `docs/adr/` for architecture decisions when they exist. See `docs/agents/domain.md`.
+
+### Third-party agent assets
+
+`.agents/skills/` and `skills-lock.json` are agent-side tooling pinned into this repo. They are not part of
+the app: nothing under them is compiled, bundled, or shipped, and the product's build (`make bundle`/`make dmg`)
+never reads them. Treat them as third-party code with its own upstream — do not import their conventions into
+`Sources/` or assume they are reviewed like product code.

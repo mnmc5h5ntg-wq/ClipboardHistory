@@ -1,5 +1,7 @@
 # Issue tracker: Local Markdown
 
+> 现状（本轮实测）：`.scratch/` 目前是空目录，真正的 issue 追踪在 GitHub（`gh issue list`，当前 open 的是 #5、#13、#16）。下面的约定描述的是**草稿怎么起草**，不是说那些文件已经存在。
+
 Issues, PRDs, bugs, and development ideas for this repo live as markdown files in `.scratch/` while the project is in active development. Formal bugs and release-ready development ideas can be copied or rewritten into GitHub Issues during release preparation.
 
 ## Conventions
