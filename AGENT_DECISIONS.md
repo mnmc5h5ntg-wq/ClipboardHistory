@@ -13,6 +13,8 @@ name: decisions
 - 理由：让每个改动都可 `git revert`，且能在 `8007b19` 上复现"修复前"状态做对照测量。
 - 兼容性：纯版本控制动作，不改代码。
 - 回滚：`git checkout main`（回到 `db077f6`）即完全丢弃本轮改动；`git revert <sha>` 丢弃单项。
+  **2026-10-09 更新：这条回滚路径已经不存在了** —— 分支已 fast-forward 合进 `main` 并删除（本地与远端，删前用 `git log main..fix/audit-remediation` 验过为 0），
+  且 v1.4.6/v1.4.7 已从 `main` 发布。现在只能按单项 `git revert <sha>`，不要再去找那个分支；判据 `git branch -a` 里应当没有它。
 
 ## D-001 日志开关与落盘位置（R-01 / R-30）
 
@@ -148,3 +150,12 @@ name: decisions
 - 兼容性：无数据格式变化；对单实例用户完全无感。
 - 回滚：删掉 `applicationDidFinishLaunching` 开头那段 guard（一个 hunk）即可，`InstanceGuard.swift` 可整体删除。
 - 验证：`InstanceGuardTests` 7 条，其中一条拿本机真实存在的 Finder 进程喂给适配器，证明"读系统进程列表"这条路不是空跑。**未做**端到端双实例实跑：那需要真的启动 App，而它会读写用户真实数据目录（D-002 明令禁止），除非先给数据目录加一个环境变量接缝（已记在报告"未验证清单"里）。
+
+## D-015 仓库移出 iCloud 同步范围（2026-10-09）
+
+- 背景：`~/Documents` 在 iCloud「桌面与文稿」的同步范围内。判据不是"它是不是符号链接"（它不是，我这样误判过一次），而是 `~/Library/Mobile Documents/com~apple~CloudDocs/Documents -> ~/Documents` 这条反向链接加上 `bird`/`cloudd` 在跑。同步在这个仓库里留下了 **29 个 `名字 2.扩展名` 的重复副本**，其中含 `Sources/**.swift`；SwiftPM 按目录 glob 编译 ⇒ 同一批类型声明出现两遍 ⇒ `swift build` 报类型歧义，而报错会伪装成 SDK 不兼容。**重复副本由谁产生没有查清**：`Codex_Project0_backups` 是 6 月 8 日的手工快照、`Codex_Project0.zip` 是 6 月 5 日的，实测都不是元凶；移出同步范围只消除了最可能的一条路径，不保证不复发。
+- 决定：整仓复制到 `/Users/wangziyi/Codex_Project0`，旧路径 `~/Documents/Codex_Project0` 换成指向新位置的符号链接；那 29 个副本先逐字节与原件比对、确认全同，再连同临时目录一起删掉。
+- 为什么不是 `mv`：跨出同步边界的 `mv` 以 `Operation timed out` 失败（File Provider 要先物化）。改成 `rsync -a` 复制 → 校验 → 删源；旧 rsync(2.6.9) 不支持 `--info=stats1`，会打 usage 退出。
+- 兼容性：仓库内容零改动（与旧路径唯一的差异是 `.git/index`）。旧路径以符号链接保持可用，指向 `~/Documents/Codex_Project0` 的既有习惯不破。项目级记忆的键随绝对路径改变，已把 `~/.qoder-cn/projects/-Users-wangziyi-Documents-Codex_Project0/memory/` 复制到 `-Users-wangziyi-Codex_Project0`（只带记忆目录，8K）。已发布产物与 tag 不受影响。
+- 回滚：两条互相独立 —— ① 只撤销链接：`rm ~/Documents/Codex_Project0 && rsync -a /Users/wangziyi/Codex_Project0/ ~/Documents/Codex_Project0/`；② 整体退回旧路径同上。任何一条都不涉及数据迁移，`history.json` 在 `~/Library/Application Support/` 下、本来与仓库位置无关。
+- 验证：两侧文件数相同（`find . -path ./.build -prune -o -type f -print | wc -l`，当时 1158/1158）、`git rev-parse HEAD` 相同、`git status` 干净、`git fsck` 无报错、`diff -rq` 只差 `.git/index`。新路径上重新跑过全套判据：`swift build` 0 告警、`swift test` 229 例全绿（1 条按设计 skip）、`python3 -m unittest discover -s scripts/tests` 18 例 OK、视觉套件 58 帧且未绘制比例闸门全过（退出码 0）、`make bundle` 产出 x86_64+arm64 通用二进制、包内版本 1.4.7、`codesign --verify --deep --strict` 退出码 0、Info.plist 16 键。**复发时的特征**：`Sources/` 下出现 `* 2.swift`，判据 `find ClipboardHistory/Sources -name '* 2.*' | wc -l` 应为 0（本轮结束时实测 0）。

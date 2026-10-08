@@ -133,11 +133,14 @@ CI 不是装饰：runner 是 Swift 6.1.2、开发机是 6.2.1，两条只有远�
 
 仓库已从 `~/Documents/Codex_Project0` 移到 **`/Users/wangziyi/Codex_Project0`**，脱离 iCloud「桌面与文稿」同步范围；旧路径留了一个指向新位置的符号链接，确认无误后可删。
 移动后的验证：`swift build` 0 告警、`swift test` 229 例全绿、发布脚本测试 18 例、`make bundle` 产出通用二进制且包内版本 1.4.7、`git status` 干净。
-**远端一致性当时成立、现在不成立了**：那条记录写完之后又多出只改账本的提交，而当天 GitHub 整体不可达
-（`github.com:443` TLS 握手被断、`ssh -T git@github.com` 被 `Connection closed ... port 22`，同期 apple.com 正常 200），所以
-本地 `main` 领先远端。领先几条**不写死在这里**，用 `git log --oneline origin/main..main` 现取
-（当日已知的远端顶端是 `69c4e21`）。推送命令与 tag 核对方式写在 `AGENT_STATE.md` 的"恢复指令"第 6 条；
-这些未推送提交只改账本，不影响任何已发布产物，但**在推上去之前，远端 main 上没有这份移动记录**。
+**这条当时就过期了**：写完那行的同一天，GitHub 从这台机器整体不可达（`github.com:443` TLS 握手被断、
+`ssh -T git@github.com` 被 `Connection closed ... port 22`，同期 apple.com 正常 200），只改账本的提交推不出去，
+于是"与远端一致"变成了一句过期话 —— 这正是这本账反复提醒的那个失效模式。网络恢复后已全部推上去，并改用**服务端**取证核对：
+远端 `main` 与本地相同、`refs/tags/v1.4.6 → e4ac62b`、`v1.4.7 → 5190ad1`（与本地 `git rev-list -n1` 一致），
+两个 Release 附件的 `digest` 与本地 `.dmg.sha256` 逐字相同，CI 在发布提交与之后的账本提交上都是 `success`。
+一条环境经验值得记：**`git ls-remote` 走 22 端口、`gh` 走 443 API，两者会在同一时刻一个通一个不通** ——
+那天 `git push` 成功后紧接着三次 `ls-remote` 全失败，差点被判成"没推上去"；最终定性由 API 侧给出。
+复查命令写在 `AGENT_STATE.md` 的"恢复指令"第 6 条，数字一律现取，不写在这里。
 
 两条实测事实值得记下来：跨出 iCloud 同步边界的 `mv` 会 `Operation timed out`，必须改用 `rsync -a` 复制 + 校验 + 删源；而 `~/Documents` 下的 `名字 2.扩展名` 重复副本**具体由谁产生我没有查清**（`Codex_Project0_backups` 是 6 月 8 日的手工快照、`Codex_Project0.zip` 是 6 月 5 日的，都不是），只能说移出同步范围消除了最可能的那条路径，不能保证它永不复发 —— 复发时的特征是`Sources/` 下出现重复类型声明、构建报类型歧义。
 
