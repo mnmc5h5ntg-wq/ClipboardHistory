@@ -76,11 +76,15 @@ struct SettingsView: View {
     }
 
     private func exportFeedbackData() {
-        if let url = feedbackStore.exportToFile() {
+        // 失败必须可见：旧实现写盘失败也返回 URL，界面照样显示"已导出"。
+        do {
+            let url = try feedbackStore.exportToFile()
             exportMessage = "已导出：\(url.lastPathComponent)"
             NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else {
+        } catch RecommendationFeedbackStore.ExportError.noData {
             exportMessage = "暂无反馈数据可导出"
+        } catch {
+            exportMessage = "导出失败：\(error.localizedDescription)"
         }
         showExportAlert = true
     }

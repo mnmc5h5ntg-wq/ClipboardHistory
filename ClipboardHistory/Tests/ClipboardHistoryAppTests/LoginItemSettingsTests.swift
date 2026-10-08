@@ -35,24 +35,3 @@ final class LoginItemSettingsTests: XCTestCase {
         XCTAssertEqual(settings.message, "当前系统不支持从应用内设置开机启动。")
     }
 }
-
-@MainActor
-private final class FakeLoginItemManager: LoginItemManaging {
-    let isSupported: Bool
-    private(set) var requestedStates: [Bool] = []
-    var error: Error?
-    var isEnabled: Bool
-
-    init(isSupported: Bool, isEnabled: Bool) {
-        self.isSupported = isSupported
-        self.isEnabled = isEnabled
-    }
-
-    func setEnabled(_ enabled: Bool) throws {
-        requestedStates.append(enabled)
-        if let error {
-            throw error
-        }
-        isEnabled = enabled
-    }
-}

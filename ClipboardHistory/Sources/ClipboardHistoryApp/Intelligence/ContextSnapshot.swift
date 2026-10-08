@@ -64,6 +64,30 @@ struct ContextSnapshot: Codable, Equatable, Hashable {
     var selectedEntryID: UUID?
     var permissionState: ContextPermissionState
 
+    /// 只保留排序需要的元数据：前台 App、事件数量、时间。
+    /// 反馈记录里存完整快照曾把剪贴板正文的 160 字预览副本写进 UserDefaults
+    /// （实测把该 plist 撑到 66MB），因此存储前必须去掉正文类字段。
+    func strippedOfClipboardContent() -> ContextSnapshot {
+        var copy = self
+        copy.recentEntries = []
+        copy.activeWindow = copy.activeWindow.map { WindowContext(title: nil, sensitivity: $0.sensitivity) }
+        copy.browser = copy.browser.map { BrowserContext(urlString: nil, domain: nil, title: nil, sensitivity: $0.sensitivity) }
+        copy.finderDirectory = nil
+        copy.finderSelection = nil
+        copy.focusedDocument = nil
+        copy.selectedEntryID = nil
+        copy.recentEvents = copy.recentEvents.map { event in
+            ContextEvent(
+                id: event.id,
+                kind: event.kind,
+                timestamp: event.timestamp,
+                frontmostApplication: event.frontmostApplication,
+                entryID: nil            // 事件里也不留 entry 级关联
+            )
+        }
+        return copy
+    }
+
     static func minimal(
         recentEntries: [ClipboardEntrySummary],
         selectedEntryID: UUID? = nil,

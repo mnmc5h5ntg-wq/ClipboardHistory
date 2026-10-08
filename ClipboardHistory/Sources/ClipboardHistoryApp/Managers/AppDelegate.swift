@@ -144,10 +144,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shell.copyAndPasteEntry(entry)
     }
 
-    func confirmAndClearHistory() {
-        shell.confirmAndClearHistory()
-    }
-
     func perform(_ command: AppCommand) {
         shell.perform(command)
     }

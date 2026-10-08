@@ -88,3 +88,25 @@ func makeTemporaryDirectory(
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     return directory
 }
+
+/// 多个测试共用的登录项替身（原为 LoginItemSettingsTests 私有）。
+@MainActor
+final class FakeLoginItemManager: LoginItemManaging {
+    let isSupported: Bool
+    private(set) var requestedStates: [Bool] = []
+    var error: Error?
+    var isEnabled: Bool
+
+    init(isSupported: Bool, isEnabled: Bool) {
+        self.isSupported = isSupported
+        self.isEnabled = isEnabled
+    }
+
+    func setEnabled(_ enabled: Bool) throws {
+        requestedStates.append(enabled)
+        if let error {
+            throw error
+        }
+        isEnabled = enabled
+    }
+}

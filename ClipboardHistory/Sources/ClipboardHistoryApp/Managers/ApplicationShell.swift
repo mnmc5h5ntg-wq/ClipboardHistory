@@ -6,6 +6,7 @@ final class ApplicationShell {
     private weak var historyStore: HistoryStore?
     private let menuBarController = MenuBarController()
     private let settingsWindowController: SettingsWindowController
+    private let confirmation: DestructiveConfirming
     private var isConfigured = false
     private var didDeferInitialActivationRestore = false
 
@@ -13,8 +14,10 @@ final class ApplicationShell {
         showMainWindowHotKeySettings: HotKeySettings,
         repeatCopyHotKeySettings: HotKeySettings,
         loginItemSettings: LoginItemSettings,
-        contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings()
+        contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
+        confirmation: DestructiveConfirming = SystemDestructiveConfirming()
     ) {
+        self.confirmation = confirmation
         self.settingsWindowController = SettingsWindowController(
             showMainWindowHotKeySettings: showMainWindowHotKeySettings,
             repeatCopyHotKeySettings: repeatCopyHotKeySettings,
@@ -123,18 +126,17 @@ final class ApplicationShell {
         historyStore?.perform(.repeatCopySelected)
     }
 
+    /// 清空未收藏：必须先确认。菜单栏与命令面板都走这里
+    /// （审计 X-01：旧代码里 .clearHistory 直接删除，带弹窗的函数没有任何调用者）。
     func confirmAndClearHistory() {
-        let alert = NSAlert()
-        alert.messageText = "清空未收藏记录"
-        alert.informativeText = "收藏记录会保留，其余历史会被清空。"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "清空")
-        alert.addButton(withTitle: "取消")
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            historyStore?.perform(.clear)
-        }
+        let confirmed = confirmation.confirm(
+            title: "清空未收藏记录",
+            message: "收藏记录会保留，其余历史会被清空。",
+            confirmTitle: "清空",
+            cancelTitle: "取消"
+        )
+        guard confirmed else { return }
+        historyStore?.perform(.clear)
     }
 
     func copyAndPasteEntry(_ entry: HistoryStore.Entry) {
@@ -166,7 +168,7 @@ final class ApplicationShell {
         case .refreshHistory:
             refreshHistory()
         case .clearHistory:
-            historyStore?.perform(.clear)
+            confirmAndClearHistory()
         case .dismissAllRecommendations:
             historyStore?.perform(.dismissAllRecommendations)
         case .quit:

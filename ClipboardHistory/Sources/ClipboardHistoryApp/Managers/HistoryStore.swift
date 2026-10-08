@@ -699,13 +699,16 @@ final class HistoryStore: ObservableObject {
 
     private func delete(_ entry: Entry) {
         entries.removeAll { $0.id == entry.id }
+        feedbackStore.removeEntries(withID: entry.id)
         reconcileSelection()
         persist()
     }
 
     private func deleteSelection() {
         guard !selectedEntryIDs.isEmpty else { return }
-        entries.removeAll { selectedEntryIDs.contains($0.id) }
+        let removedIDs = selectedEntryIDs
+        entries.removeAll { removedIDs.contains($0.id) }
+        feedbackStore.removeEntries(withIDs: removedIDs)
         reconcileSelection()
         persist()
     }
@@ -728,7 +731,9 @@ final class HistoryStore: ObservableObject {
     }
 
     private func clearAll() {
+        let removedIDs = Set(entries.filter { !$0.isFavorite }.map(\.id))
         entries.removeAll { !$0.isFavorite }
+        feedbackStore.removeEntries(withIDs: removedIDs)
         reconcileSelection()
         persist()
     }
