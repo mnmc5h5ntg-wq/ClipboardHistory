@@ -59,13 +59,13 @@
 | 指标 | 现在 |
 |---|---|
 | `swift build`（清空 .build 后干净重建） | OK，**0 告警** |
-| `swift test` | 退出码 0，**Executed 227 tests, 1 test skipped, 0 failures**；连跑 6 次全部一致（那个 skip 是离屏视觉套件，按设计只在设了 `CLIPBOARD_HISTORY_UI_SHOTS` 时跑） |
-| `python3 -m unittest discover -s scripts/tests` | OK，**17 tests** |
+| `swift test` | 退出码 0，**Executed 229 tests, 1 test skipped, 0 failures**（2026-10-09 在新路径复跑核实；`grep -E 'Executed .* tests' /tmp/test.log \| tail -1` 取当前值，别信这里写的数字）；那个 skip 是离屏视觉套件，按设计只在设了 `CLIPBOARD_HISTORY_UI_SHOTS` 时跑 |
+| `python3 -m unittest discover -s scripts/tests` | OK，**18 tests**（必须在**仓库根目录**跑；`ClipboardHistory/` 下没有 `scripts/tests`，在那里跑以退出码 1 报 `Start directory is not importable`） |
 | `make build` / `make bundle` / `make dmg` | 全部退出码 0；DMG 挂载后复核：通用二进制（x86_64 + arm64）、`codesign --verify --deep --strict` 通过、Info.plist 16 键含 `NSAppleEventsUsageDescription`、`.sha256` 可校验且改一个字节就失败 |
 | 离屏视觉捕获 | 58 帧（29 夹具 × 亮/暗），未绘制比例全部 <95%，最后一轮与上一轮逐帧差异 <0.6%（无回归） |
 | 审计矩阵 | 190/190 格全部判定完毕，**待审 0** |
 | Backlog | 54 行，**待办 0**（其余为 已完成(提交号) / 记录不改(理由)） |
-| 工作区 | `git status` 干净；**已推送，Latest = v1.4.7**（v1.4.6 保留；`main` 与远端一致，两个 tag 均已上传，CI 在发布提交上全绿） |
+| 工作区 | `git status` 干净；**已推送，Latest = v1.4.7**（v1.4.6 保留；CI 在发布提交上全绿）。2026-10-09 之后状态变了：本地 `main` 比远端多 1 条只改账本的提交 `629c6f8`，**尚未推送** —— 当天 GitHub 整体不可达（443 TLS 被断、22 端口被关），远端 `main` 停在 `69c4e21`；`v1.4.6/v1.4.7` 两个远端 tag 指向哪天提交当日无法核对，网络恢复后用文末"恢复指令"第 6 条复核 |
 
 本轮新发现（原审计未覆盖，已进 backlog）：
 - **R-49** `ClipboardIntake` 各读取方法的 `from:` 默认 `.general` ⇒ 注入的 pasteboard 被静默忽略，测试会读到**用户真实剪贴板内容**。已修（R-05 同批），断言改成"只报类型不报正文"。
@@ -83,3 +83,11 @@
 3. 读 `AGENT_BACKLOG.md` 找第一条未关闭的高/中价值项；`AGENT_DECISIONS.md` 读最近 5 条决定；`AGENT_UI_AUDIT.md` 看视觉项。
 4. 外部参考：审计报告在仓库外 `/Users/wangziyi/Documents/时间剪史_审计_2026-10-08/`（145 条记录 + 21 条探针源码 `probes/`，探针断言的是"缺陷存在"，接入仓库时需逐条翻转）。
 5. 停止条件见本文件开头与 AGENT_BACKLOG.md 末尾的"发布前检查单"。
+6. 网络恢复后的收尾（本轮唯一遗留项）：
+   ```bash
+   cd /Users/wangziyi/Codex_Project0
+   git push origin main                                   # 只推账本提交 629c6f8
+   git ls-remote origin main refs/tags/v1.4.6 refs/tags/v1.4.7   # 应为 629c6f8 / e4ac62b / 5190ad1
+   ```
+   远端 tag 若与上面不一致，**只记录差异、不去改已发布的 tag**。另外用户从新路径确认过项目能打开之后，
+   旧路径的兼容符号链接 `~/Documents/Codex_Project0` 可以直接删除。

@@ -132,18 +132,29 @@ CI 不是装饰：runner 是 Swift 6.1.2、开发机是 6.2.1，两条只有远�
 ## 8c. 仓库位置变更（发布之后）
 
 仓库已从 `~/Documents/Codex_Project0` 移到 **`/Users/wangziyi/Codex_Project0`**，脱离 iCloud「桌面与文稿」同步范围；旧路径留了一个指向新位置的符号链接，确认无误后可删。
-移动后的验证：`swift build` 0 告警、`swift test` 229 例全绿、发布脚本测试 18 例、`make bundle` 产出通用二进制且包内版本 1.4.7、`git status` 干净、HEAD 与 tag 与远端一致。
+移动后的验证：`swift build` 0 告警、`swift test` 229 例全绿、发布脚本测试 18 例、`make bundle` 产出通用二进制且包内版本 1.4.7、`git status` 干净。
+**远端一致性当时成立、现在不成立了**：那条记录写完之后又多出一个只改账本的提交 `629c6f8`，而当天 GitHub 整体不可达
+（`github.com:443` TLS 握手被断、`ssh -T git@github.com` 被 `Connection closed ... port 22`，同期 apple.com 正常 200），所以
+本地 `main` 领先远端 `69c4e21` 一个提交。推送命令与 tag 核对方式写在 `AGENT_STATE.md` 的"恢复指令"第 6 条；
+它不影响任何已发布产物，但**在推上去之前，远端 main 上没有这份移动记录**。
 
 两条实测事实值得记下来：跨出 iCloud 同步边界的 `mv` 会 `Operation timed out`，必须改用 `rsync -a` 复制 + 校验 + 删源；而 `~/Documents` 下的 `名字 2.扩展名` 重复副本**具体由谁产生我没有查清**（`Codex_Project0_backups` 是 6 月 8 日的手工快照、`Codex_Project0.zip` 是 6 月 5 日的，都不是），只能说移出同步范围消除了最可能的那条路径，不能保证它永不复发 —— 复发时的特征是`Sources/` 下出现重复类型声明、构建报类型歧义。
 
 ## 9. 复跑（本轮结束时的实际输出）
 
 ```bash
-cd ClipboardHistory
-swift build                      # 清空 .build 后干净重建：0 告警
-swift test                       # Executed 229 tests, 1 skipped, 0 failures（227 之后又补了 2 条减弱动态的判定测试；连跑 6 次一致）
-python3 -m unittest discover -s scripts/tests    # Ran 17 tests, OK
-cd .. && make dmg                # 退出码 0，产出 .dmg 与 .dmg.sha256
-shasum -a 256 -c 时间剪史_v1.4.5.dmg.sha256      # OK（改一个字节即 FAILED，已验证）
-CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests   # 58 帧
+cd /Users/wangziyi/Codex_Project0/ClipboardHistory
+swift build                      # 新路径复跑过：0 告警
+swift test                       # 新路径复跑过：Executed 229 tests, with 1 test skipped and 0 failures
+CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests
+                                 # 新路径复跑过：退出码 0、58 帧（29 夹具 × 亮/暗），未绘制比例闸门全过
+cd /Users/wangziyi/Codex_Project0
+python3 -m unittest discover -s scripts/tests    # 新路径复跑过：Ran 18 tests, OK —— 只能在仓库根目录跑
+make bundle                      # 新路径复跑过：通用二进制（x86_64 + arm64），包内版本 1.4.7
+shasum -a 256 -c 时间剪史_v1.4.7.dmg.sha256      # 实测 OK；改一个字节即 FAILED，已验证
+make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖已发布的 v1.4.7 产物与 .sha256（重编必然得到字节不同的 dmg）
 ```
+
+这一版是**把每条真跑过之后重写的**。原来那段有两处照着敲就跑不通：python 那条排在 `cd ClipboardHistory` 之后，
+而那个目录里没有 `scripts/tests`（实测退出码 1、报 `Start directory is not importable`）；`make dmg` 被写成"复跑"，
+实际在新路径复跑它会覆盖已发布产物的校验和 —— 现在明确标成"不要重跑"，并补了一条真实可跑的 `shasum -c`。
