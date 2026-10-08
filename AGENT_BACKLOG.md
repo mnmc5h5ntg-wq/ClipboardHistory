@@ -106,7 +106,7 @@
 | R-38 | 历史改 SQLite / 加密 / 沙箱 / 云同步 | — | **不做**（推翻既有承诺，成本高于收益） | 低 | 记录不改 |
 | R-39 | 严格并发全改造以零警告 | — | **不做**：只做 R-19 的边界收敛 | 低 | 记录不改 |
 | R-44 | 网络维度整体不适用 | `Sources` 内无 `URLSession`/`NWConnection`；`AIProviderModels` 是纯类型 | 保留一条守卫测试：断言产品 target 不出现网络 API 符号（这是"本地优先"承诺的机器化） | 低-中 | 已完成(cb8db30) |
-| R-45 | 无 CI | 仓库无 `.github/workflows` | 加一个最小 workflow（build 零告警 + `Executed N` 只准涨不准跌 + python 用例数下限 + Info.plist 闸）；**启用需 push**，本轮只把闸放进仓库 | 中 | 已完成(文件已加，每条命令本机逐条跑通) |
+| R-45 | 无 CI | 仓库无 `.github/workflows` | 加一个最小 workflow（build 零告警 + `Executed N` 只准涨不准跌 + python 用例数下限 + Info.plist 闸）；**启用需 push**，本轮只把闸放进仓库 | 中 | 已完成(已在 main 上跑绿，7 步全 success) |
 | R-46 | `docs/agents/*` 引用 `.scratch/` 约定但目录为空；`AGENTS.md` 声称 `CONTEXT.md`/`docs/adr/` 存在 | `AGENTS.md:13` | 更正 `AGENTS.md`；`.scratch/` 保持空或写入首条 PRD | 低 | 已完成(4b95b12) |
 | R-47 | `skills-lock.json` + `.agents/skills`（30+ 第三方技能文件）是仓库内唯一外部来源内容 | `.agents/`（曾未跟踪） | 纳入跟踪或明确声明"不属于产品"；不做代码改动 | 低 | 已完成(声明为非产品资产) |
 | R-34b | 发布链路剩余：`quarantine` 被 `xattr -cr` 剥掉、ad-hoc 签名被 `spctl` 拒绝、无 entitlements（`make dmg` 现在已产出 `.sha256` 并自校验） | `Makefile:46-58,63-72`；审计 06 附 6.2(3) 实测 rejected | **不改**：本机自用场景下公证需要 Developer ID（Roadmap 已列）；README 已写清真实报错与解法 | `spctl` 仍 rejected（记为已知限制，不是回归） | 中 | 记录不改 |

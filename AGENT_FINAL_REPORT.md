@@ -1,7 +1,9 @@
 # AGENT_FINAL REPORT · 时间剪史 审计整改（分支 `fix/audit-remediation`）
 
 生成时间：2026-10-09（本地）
-基线：`main` @ `db077f6`；修复前工作点 `8007b19`；本分支提交**全部未推送**（条数用 `git log --oneline db077f6..HEAD | wc -l` 现取，别信我抄在这里的数字）
+基线：`main` @ `db077f6`；修复前工作点 `8007b19`
+**已发布**：`main` 已推送，tag `v1.4.6` → 发布准备提交，GitHub Release 已上线并接管 Latest
+（附件 `ClipboardHistory_v1.4.6.dmg` + `.sha256`，发布后重新下载校验通过）。发布说明：https://github.com/mnmc5h5ntg-wq/ClipboardHistory/releases/tag/v1.4.6
 账本：`AGENT_STATE.md`（状态与复跑命令）、`AGENT_BACKLOG.md`（190 格矩阵 + 54 行待办）、`AGENT_DECISIONS.md`（D-000…D-014）、`AGENT_UI_AUDIT.md`（视觉审计与复验记录）
 外部审计报告（只读阶段产物，仓库外）：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-08/`
 
@@ -94,9 +96,9 @@
 
 ## 7. 遗留与建议（按建议顺序）
 
-1. **发布 v1.4.5**：GitHub 上 Latest 仍是 v1.3，本地 `VERSION := 1.4.5` 且 DMG 已能出。`python3 scripts/prepare_release.py <版本>` 会跑测试、校验 Info.plist 版本、算 sha256、失败自动回滚 —— 现在它还多了一道：**`make dmg` 没真的重写 DMG 就拒绝发布**（变异验证过：闸门摘掉，陈旧产物会被当成本版归档）。
-2. **CI 需要 push 才生效**：`.github/workflows/ci.yml` 已写好，6 个步骤逐条在本机跑通过（0 告警、执行数 209→227 只准涨、python 17、plist 闸）。
-3. **GitHub issue #5**（"历史保留策略缺少可见说明和清理反馈"）现在已被本轮实现覆盖（成批过期提示 + 隐私页数据说明），可以关闭；#13、#16 仍 open。
+1. ~~发布~~ **已完成**：v1.4.6 已发布并接管 Latest。发布过程中修掉发布脚本自身一个必然失败的缺陷 —— `/usr/bin/python3` 会给整棵子进程树注入 CommandLineTools 的 `SDKROOT`，而编译器来自 Xcode，于是脚本里的 `swift test` / `make dmg` 必挂（同一条命令在 shell 里手跑却是好的）。现在子进程环境由 `build_child_environment()` 显式对齐 `xcrun` 的解析结果，并有单测钉住。
+2. ~~CI~~ **已完成并跑通**：`.github/workflows/ci.yml` 在 main 上首绿，7 步全 success（含零告警闸与执行数闸）。
+3. ~~issue~~ **已完成**：#5、#16 已带逐条验收证据关闭；#13（右键菜单汉化）本轮未触碰，保持 open。
 4. **R-51（图片采样成本）已按实测判定为不改**：把采样值持久化只能省掉"启动后第一次"那 64ms，省不掉新图本身那次采样，代价却是数据格式变更。数字已钉在测试里，将来要动有基线。
 5. 若将来要真验证运行时分支或双实例行为，先加一个数据目录的环境变量接缝（与 `CLIPBOARD_HISTORY_LOG_DIR` 同构），否则任何实跑都会碰到用户真实数据。
 
@@ -109,6 +111,15 @@
 - 数据兼容：本轮所有数据布局改动都是"新写旧读" —— `history.json` 文件名、v1 格式、字段全部不变；新增的 `.bak`、`history.corrupt-*.json` 是附加文件，旧版本读不到也不受影响，因此**降级可运行**，回滚不产生需要清理的残留。
 
 ---
+
+## 8b. 发布后 CI 首跑抓到的两条（值得记下来）
+
+CI 不是装饰：runner 是 Swift 6.1.2、开发机是 6.2.1，两条只有远端能暴露的缺陷第一次跑就红了。
+
+1. `HotKeySettingsTests` 覆写 `tearDown() async throws` 并 `try await super.tearDown()` —— 本机编得过，runner 上报 `sending value of non-Sendable type 'XCTestCase' risks causing data races`，**整个测试 target 编译失败**。修法是不再依赖 XCTest 生命周期签名，改为每条用例开头复位偏好（顺带让用例顺序无关）。
+2. `URL(fileURLWithPath: "/").deletingLastPathComponent()` 在 runner 的 Foundation 上给出 `/..`，于是根目录下的文件父目录标签被渲染成 `…/..`。这是**实现的可移植性缺陷**，改的是代码（先 `standardizedFileURL`）而不是断言。
+
+两条都是"我本机全绿"覆盖不到的那类问题 —— 也是这条 CI 存在的理由。
 
 ## 9. 复跑（本轮结束时的实际输出）
 
