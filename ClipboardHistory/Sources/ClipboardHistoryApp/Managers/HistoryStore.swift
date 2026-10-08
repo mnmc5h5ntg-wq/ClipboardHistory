@@ -846,6 +846,8 @@ final class HistoryStore: ObservableObject {
             sourceURL: intakeEntry.content.sourceURL,
             isFavorite: isFavorite,
             sourceUTIs: intakeEntry.sourceUTIs.isEmpty ? duplicateEntry.sourceUTIs : intakeEntry.sourceUTIs,
+            sourceAppBundleID: intakeEntry.sourceAppBundleID ?? duplicateEntry.sourceAppBundleID,
+            sourceAppName: intakeEntry.sourceAppName ?? duplicateEntry.sourceAppName,
             ocrText: duplicateEntry.ocrText
         )
     }
