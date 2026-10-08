@@ -78,7 +78,7 @@
 | R-21 | 三个轮询从不暂停（电池） | `HistoryStore.swift:344,626`、`MenuBarRecommendationsView.swift:8` | App 切换改 `NSWorkspace.didActivateApplicationNotification`；失焦时降频/暂停 | 实测静置 60s 的定时器触发次数（前/后） | 中 | 已完成(cb3a69b) |
 | R-22 | 无剪贴板体积/张数上限 | `ClipboardIntake.swift:80-83`、`MediaLoader.swift:124-127`、P-08（2MB 入库） | 文本 256KB 截断标记；预览读 256KB；图片像素上限只存缩略 | 单测：2MB 文本入库后 `content` 有截断标记且 <阈值；预览不含全量 | 中 | 已完成(50e5a4e) |
 | R-23 | 图片/文件条目的 OCR 取帧在主线程 | `HistoryStore.swift:528-556`（`scheduleOCRIfNeeded` 同步 `NSImage(contentsOf:)` + `cgImage(forProposedRect:)`，只有 Vision 调用进了后台队列）；启动路径 `ApplicationShell.swift:50 → scheduleOCRForExistingImages()` 对**每一张**待 OCR 图片各跑一遍；P-13 = 16.9ms/张 | 取帧移到后台队列，主线程只写回 `ocrText` | 单测：`add` 期间无 `NSImage(contentsOf:)` 主线程调用（以计时/替身验证） | 中 | 已完成(4324441) |
-| R-24 | macOS 12/13/14 三条分支无验证手段 | `App.swift:23`、`ContentView.swift:43`、`MenuBarController.swift:22`、`ViewExtensions.swift:6` | 建立"版本分支清单 + 每支的离屏渲染快照"；在 CI 至少编译两个 SDK 目标 | `swift build --triple x86_64-apple-macosx` 通过 + 快照可看 | 中 | 待办 |
+| R-24 | macOS 12/13/14 三条分支的**运行时**行为无法在本机验证 | `App.swift`、`ContentView.swift`、`MenuBarController.swift`、`ViewExtensions.swift` 等 11 处可用性守卫 | 编译期已经有闸：`Package.swift` 声明 `.macOS(.v12)`，任何未按版本守卫的新 API 都会编译失败，CI 每次都编两个 triple。**运行时**需要 12/13/14 三套系统，本机（macOS 27 beta）拿不到 ⇒ 记为已知限制，不做假验证 | `swift build` 通过 = 编译期结论；运行时结论一律标注「未验证」 | 中 | 记录不改(环境不可得) |
 | R-26 | 测试覆盖缺口（本次全部缺陷都无守卫） | `Tests/` 23 文件 135 用例名清单 | 为 R-02..R-11 各补 1–2 条回归用例；夹具支持来源 App 与损坏存档 | 用例数上升且全部执行（退出码 0） | 中 | 已完成(195 例全绿) |
 | R-27 | UI 层零测试 + 视觉从未验证 | `GlassControls`/`HistoryRowViews`/`WindowConfigurator` 无测试 | 新增离屏渲染工具 target 产出真实像素；关键视图加像素/布局断言 | 快照文件存在且肉眼检查记录在 `AGENT_UI_AUDIT.md` | 中 | 已完成(95b4301) |
 | R-28 | 并发/异步测试缺失（预测竞态、取消） | `HistoryStore.swift:145-289` | 用可控时钟 + 假服务写竞态测试；`Task` 取消路径测试 | 新用例能通过"删掉代际防护"变异打出红 | 中 | 已完成(cb3a69b) |
@@ -114,7 +114,7 @@
 | R-53 | `.build/<triple>` 被部分删除后 make build 卡死 | 实测：删掉 `.build/x86_64-apple-macosx` 后 `swift build --triple` 报 swift-version not registered 与 missing inputs: DerivedSources/resource_bundle_accessor.swift，失败点在 build 阶段（本轮真实撞到两次，第三次靠 `rm -rf .build` 才通） | make 检测到该报错时提示「先 rm -rf ClipboardHistory/.build 再试」；或把这条恢复路径写进 README 编译方法 | 复现命令能稳定触发；改后给出可执行提示而不是裸报错 | 中 | 已完成(本提交) |
 | R-54 | 无障碍：收藏状态与纯图标按钮读不到；焦点无法验证 | `HistoryRowViews.swift` 用 `.foregroundStyle(isFavorite ? .yellow : .clear)` 表达收藏；`GlassPill`/`bulkActionButtons` 只有 `.help()`；离屏窗口不建无障碍树（实测 BFS 只走到根节点） | 给收藏星标与图标按钮补 `accessibilityLabel`；Tab 焦点顺序需要真机 VoiceOver，本机环境做不到 | 单测只能锁 label 存在；VoiceOver 朗读结果记为未验证 | 中 | 已完成(ba707d4) |
 | R-55 | 同一个 entryID 可以占掉两个推荐名额 | `RuleBasedRecommendationEngine.recommend` 逐条生成候选，不按 id 去重；存档可被手改或从半截恢复出同 id 两条，界面按 id 回查会让 Top 3 显示成两行同样内容 | 排序后、截断前按 entryID 去重 | `RecommendationBoundaryTests` 8 条边界用例覆盖；重复 id 那条在修复前确实变红 | 中 | 已完成(4bb02ef) |
-| R-51 | 图片去重仍需为「同尺寸不同内容」的一对图各解一帧（3000x2000 冷比较实测 148ms，在主线程） | `Models/StoredImage.swift` 的 `sampledFingerprint(fromPNG:)`；`HistoryStore.add` 只与 `entries.first` 比较，故每次复制最多一对 | 把 64px 采样值作为可选字段随条目持久化（新写旧读、v1 兼容），载入后比较退化为字符串比较 | 单测：重载后同一对图的比较不再触发采样；界值 <5ms | 中 | 待办 |
+| R-51 | 图片去重要为每张新图算一次 64px 采样：稳态一次 83ms，启动后第一次比较 147ms（3200x2100，主线程） | `Models/StoredImage.swift` 的 `sampledFingerprint(fromPNG:)`；`HistoryStore.add` 只与 `entries.first` 比较，故每次复制最多一对 | **不改**：本轮实测推翻了原设想。把采样值随存档持久化只能省掉「启动后第一次」那一侧的 64ms，省不掉新图自身那次采样 —— 而做到与编码方式无关的去重（TIFF 往返必须认得是同一张）恰恰依赖那次采样。代价却是数据格式变更 | `PerfBudgetTests` 已把 147/83ms 两个数字钉住（含「一侧焐热后必须更快」这条缓存共享断言），将来要优化有基线 | 中 | 记录不改(实测收益不足) |
 
 ## 发布前检查单（全部为绿才写最终报告）
 
