@@ -1,65 +1,116 @@
 # AGENT_UI_AUDIT · 视觉与交互审计（ macOS / SwiftUI + AppKit）
 
-状态：**未开始（方法已定，待执行）**。本文件随审计推进填充；最终报告只引用这里已验证的部分。
+状态：**第 2 轮进行中**。捕获链路已跑通并修掉 4 类"假帧"；本轮修了 3 个真实缺陷（图标隐形、破坏性按钮重复、信息文字对比度不足），全部有改动前/后同参数帧与量化数字。
+帧目录：`/tmp/shots5`（改后）与 `/tmp/shots4`（改前），共 54 张 = 27 个夹具 × 亮/暗。
 
 ## 方法：为什么不用截屏
 
-本机是 macOS 27 beta。截图类通道有两个已知坑（上一轮在别的项目里踩过）：
+本机是 macOS 27 beta。截图类通道有两个已知坑：
 1. `screencapture` 在没有"屏幕录制"授权时返回全黑或报 `could not create image`，与页面是否真的绘制无关；
-2. 浏览器/后台窗口的 `document.hidden` 会让动画时间线冻结，产生"看起来空白"的假帧。
+2. 后台窗口的动画时间线会冻结，产生"看起来空白"的假帧。
 
-因此这里的取证方式是**离屏渲染真实视图**：`NSHostingView(rootView:)` + `cacheDisplay(in:to:)` 把实际视图绘制进 `NSBitmapImageRep` 再存 PNG。它不需要任何系统授权，拿到的就是产品将要显示的那套视图树（含 AppKit 桥接的 `NSTextView`、`QLPreviewView`、`AVPlayerLayer` 等）。
+取证方式是**离屏渲染真实视图**：`NSWindow` + `NSHostingView` + `cacheDisplay(in:to:)` 绘制进 `NSBitmapImageRep` 再存 PNG。不需要任何系统授权，拿到的就是产品将要显示的那套视图树。
 
-实现形态：**测试 target 内的捕获套件**（`UICaptureTests`），由环境变量 `CLIPBOARD_HISTORY_UI_SHOTS=<输出目录>` 触发，未设置时 `XCTSkip`。
-选择它而不是新增 executable target 的理由：不改 `Package.swift` 结构、不引入第二个产品构建产物，随时可整体删除（回滚成本≈0）。
+实现形态：**测试 target 内的捕获套件**（`Tests/ClipboardHistoryAppTests/UICaptureHarness.swift`），由 `CLIPBOARD_HISTORY_UI_SHOTS=<目录>` 触发，未设置时 `XCTSkip`，不拖慢普通测试。不改 `Package.swift`、不新增产品构建产物，随时可整体删除（回滚成本≈0）。
 
-## 覆盖清单（每张都要肉眼看过，暗/亮各一遍）
+命令：
+```
+cd ClipboardHistory && CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests
+```
 
-| 视图 | 状态变体 | 尺寸变体 | 已拍 | 结论 |
+## 捕获链路自己产出的 4 类假帧（都已修，逐条有证据）
+
+| # | 症状 | 根因 | 修法 | 证据 |
 |---|---|---|---|---|
-| `ContentView` | 空历史 / 有历史 / 搜索有结果 / 搜索无结果 / 收藏筛选 | 600×440（最小）750×560（默认）1100×800（放大） | ☐ | |
-| `HistorySidebarView` | 单选 / 多选(批量条) / 拖拽选中间态 | 窄栏 250 / 宽栏 340 | ☐ | |
-| `HistoryRow` | 文本 / 长文本 / 图片 / 单文件 / 多文件 / 收藏星标 | 行宽 250–340 | ☐ | |
-| `DetailView` | 文本 / 图片 / 文件(图/文/视频/QuickLook/未知) / 多文件展开 | 600 / 1100 宽 | ☐ | |
-| `GlassPill` / `GlassCircleButton` | 未收藏 / 已收藏 / hover | — | ☐ | |
-| `SearchField` | 空 / 有文本 / hover | 400 与 180 窄 | ☐ | |
-| `EmptyStateView` | 两个调用点的文案 | — | ☐ | |
-| `SettingsView` | 快捷键 / 通用 / 隐私 / 推荐 / 数据 五个分类 | 640×440 最小 与 720×540 | ☐ | |
-| `HotKeyRecorderView` | 常态 / 录制态（"请输入快捷键"） | 128×28 | ☐ | |
-| `RecommendationWeightsView` | 默认 / 0% / 200% | — | ☐ | |
-| `MenuBarRecommendationsView` | 无推荐 / 有推荐 + 理由行 | 菜单宽度自适应 | ☐ | |
-| `MultiFileDetailView` | 折叠 / 展开（文本、图片、视频、文档） | 600 / 1100 | ☐ | |
+| A | 整块内容缩在左下角 | 裸 `NSHostingView` 没有 window，`GeometryReader`/`maxWidth` 退化 | 放进真实离屏 `NSWindow` | 修后 `content-*` 帧铺满 |
+| B | 内容只占 1/4 画面 | 手工把 `rep.size` 翻倍，绘制仍按原尺寸 | 不改 `rep.size`，用 `bitmapImageRepForCachingDisplay` 给的尺寸 | 修后尺寸正确 |
+| C | "暗色下详情区整块空白" | `cacheDisplay` 不画 AppKit 滚动视图/分栏的底 → 未绘制区是透明的，看图器把透明合成成白，于是"白底 + 白字" | 写 PNG 前铺一层该外观下的 `windowBackgroundColor`；并逐帧打印"未绘制像素比例"，>95% 直接判失败 | `settings-default-*-dark` 铺底后 5 个分类全部可见；比例数据见下表 |
+| D | "暗色下侧栏是黑字，读不出来" | `NavigationSplitView` 的 sidebar 列在离屏 `cacheDisplay` 下不跟随强制外观：同一帧里详情列白字、侧栏列黑字；亮暗两帧侧栏像素 96.7% 完全相同 | 侧栏脱离分栏器单独拍（`sidebar-*` 夹具）；`content-*` 帧只用于核对几何与布局 | 最小复现 `/tmp/probe/split-dark.png`；同一 `HistoryRow` 独立拍是白字（`row-text-*-dark`） |
 
-## 量化检查（脚本化，不只靠眼睛）
+D 类值得记一笔：它一度看起来像 S1 级产品缺陷（暗色主界面完全不可读）。判据是**同一个组件在两种容器里的表现**——独立 `HistoryRow` 白字、`List`/`ScrollView` 探针白字、只有 `NavigationSplitView` 的 sidebar 列黑字。产品代码里没有任何硬编码黑字（`grep Color.black/Color.white` 只命中材质描边与阴影）。所以结论是"捕获限制"，不是缺陷；代价是 `content-*` 帧的侧栏颜色不可信，改用 `sidebar-*` 帧验收。
 
-1. **空白帧判定**：每帧算"量化颜色种数 + 亮像素占比"，`≤3 种且 <0.1%` 判为无效帧重拍（避免把"渲染通道问题"当成产品结论）。
-2. **对比度**：对文本区域取前景/背景亮度，按 WCAG AA（正文 4.5:1、大字 3:1）算比值并记录；`foregroundStyle(.tertiary)` 在浅底上最可能不达标。
-3. **截断与重叠**：检查是否有 `truncationMode` 生效但仍挤在一起的情况；`fixedSize` + `layoutPriority` 的文件名扩展名是否始终可见。
-4. **暗/亮一致**：同一视图两遍渲染，比较关键元素是否存在且非隐形（`.clear` 前景色、只在高对比度下可见的描边等）。
-5. **减少动态效果**：`NSWorkspace.shared.accessibilityDisplayShouldReduceMotion` 为 true 时，动画路径是否退化为无位移（代码级检查 + 快照）。
+## 已知盲区（不当作已验收）
 
-## 可访问性（代码级清单）
+- 材质背景（`.thickMaterial` / `.ultraThinMaterial`）不被 `cacheDisplay` 绘制，`content-*` 帧 42–68%、`detail-*` 帧 78–87% 的像素是未绘制的；这些区域只能看几何，不能看颜色。
+- `MenuBarRecommendationsView` / `MenuBarController` 不拍：构造 `AppDelegate()` 会加载**用户真实历史库**，为了拍帧去读真实数据是不可接受的。菜单文案改用 `EntryPresentation.menuLabel` 的单元测试覆盖。
+- hover 态、拖拽选中间态（`.ultraThickMaterial` 选框）、`HotKeyRecorderView` 录制态、`MultiFileDetailView` 展开态：需要真实鼠标事件，离屏拿不到 → 未覆盖。
+- macOS 12 的 `CompatibleSplitView` 分支：本机 13+，走不到。
+- VoiceOver 实际朗读、键盘焦点跳转：无障碍树在离屏窗口里根本不建（BFS 只能走到根节点，实测"已遍历 1 个节点，标签样本=[]"）→ 只能做代码级清单，见下。
 
-- 所有 `Image(systemName:)` 装饰性图标是否需要 `accessibilityHidden`；收藏星标当前用 `.foregroundStyle(.clear)` 表达"未收藏"，VoiceOver 读不到状态。
-- `Button` 仅有图标时是否都有 `.help()`（现有 `GlassPill`/`bulkActionButtons` 有 help，但 help 不等于 accessibilityLabel）。
-- 键盘焦点：主窗口是否可 Tab 到列表项、搜索框、`⌘,` 打开设置后的焦点归属；`HotKeyRecorderButton` 录制态失焦是否能退出（已有 `resignFirstResponder` 处理，需实机确认）。
-- 搜索框右键被完全吞掉（`ChineseMenuTextField.rightMouseDown` 不调 super）——粘贴搜索词的路径是否受影响。
+## 覆盖清单
 
-## 已发现的 UI 缺陷（待修，与 AGENT_BACKLOG.md 对应）
+| 视图 | 状态变体 | 尺寸 | 已拍 | 肉眼看过 | 结论 |
+|---|---|---|---|---|---|
+| `ContentView` | 空 / 有历史 / 无结果 / 最小 / 放大 | 600×440、750×560、1100×800 | ☑ | ☑（暗：有历史、空；亮：空） | 布局正常；侧栏颜色见盲区 D |
+| `HistorySidebarView` | 单选 / 多选批量条 / 收藏筛选 / 无结果 | 300×520 | ☑ | ☑（暗：单选、多选、收藏） | 暗色文字可读；多选相邻行高亮有圆角接缝（U-10，低） |
+| `HistoryRow` | 文本 / 图片 / 单文件 / 多文件 / 收藏星标 | 300×74 | ☑ | （暗：文本） | 正常 |
+| `DetailView` | 文本 / 图片 / 文件 / 多文件 | 720×520 | ☑ | （暗：文本、多文件） | 正常；父目录文字改后达标 |
+| `GlassPill` | 未收藏 / 已收藏 | 120×200 | ☑ | ☐ | 待肉眼复核 |
+| `SearchField` | 空 / 有文本 | 320×96 | ☑ | ☐ | 待肉眼复核 |
+| `EmptyStateView` | 空状态文案 | 320×160 | ☑ | ☑（亮，经 `content-empty`） | 对比度已修 |
+| `SettingsView` | 快捷键 / 通用 / 隐私 / 推荐 / 数据 / 最小 | 720×540、640×440 | ☑ | ☑（暗：快捷键、通用、隐私；亮：通用、推荐、数据） | 5 个分类全部拍到；U-5、U-7 已修 |
+| `RecommendationWeightsView` | 默认权重 | 520×560 | ☑ | ☐ | 待肉眼复核 |
+| `MenuBarRecommendationsView` | — | — | ☐ |  | 故意不拍（会读真实数据） |
+| `HotKeyRecorderView` | 常态 / 录制态 | — | ☐ |  | 未覆盖 |
+| `MultiFileDetailView` | 折叠 / 展开 | — | ☑折叠 | ☑（暗） | 展开态未覆盖 |
 
-| ID | 现象（先在代码/静态层发现，视觉审计复验） | backlog |
-|---|---|---|
-| U-1 | 侧栏拖选的行位置表只增不减，过滤后可能命中已消失的行 | R-40 |
-| U-2 | 视频宽高未知时画 16:9 空播放器而非错误态 | R-41 |
-| U-3 | 详情整解大图；KVO observer 未释放 | R-42 |
-| U-4 | 菜单/详情直接暴露正文与完整父目录 | R-43 |
-| U-5 | 设置里"清空未收藏"在两个分类各出现一次（重复） | 待补 |
-| U-6 | macOS 12 设置分栏宽度约束冗余（侧栏不可拖） | R-25 |
+## 量化检查
 
-## 修复后的复验规则
+**1. 未绘制像素比例（假帧闸）** — 每帧打印，>95% 判失败。实测：自带底色的组件帧 0.0%；`content-min` 43.0%、`content-with-history` 54.1%、`content-wide` 68.3%、`settings-*` 28.6–74.1%、`detail-*` 78.3–87.1%。
 
-每项修复必须：改动前拍一组 → 改动后同参数再拍一组 → 在下方"复验记录"里写清**哪两张对比、看到什么差别**。没有复验的项不得标"已完成"。
+**2. 文本对比度（WCAG）** — 从 PNG 直接取像素：背景=亮度众数，前景=偏离背景最大的 5% 像素均值。改动前（`/tmp/shots4`）→ 改动后（`/tmp/shots5`）：
+
+| 文本 | 字号 | 改前 暗 / 亮 | 改后 暗 / 亮 | 判定 |
+|---|---|---|---|---|
+| 侧栏行时间戳 | 10pt | 2.22 / 1.89 | **5.79 / 3.98** | 暗达标 AA；亮为系统 secondaryLabelColor 上限 |
+| 侧栏计数"5 条记录" | 15pt | 2.22 / 1.89 | **5.79 / 3.98** | 同上 |
+| 详情"52 个字符" | 11pt | 2.47 / 2.00 | **5.65 / 4.39** | 暗达标；亮接近 AA |
+| 多文件父目录 | 11pt | 2.22 / 1.89 | **5.79 / 3.98** | 同上 |
+| 空状态标题 | 13pt | 2.22 / 1.89 | **5.79 / 3.98** | 同上 |
+| 侧栏行标题（正文） | 12pt | 12.00 / 15.07 | 12.00 / 15.07 | 未改，一直达标 |
+
+亮色下 3.98:1 是 macOS `secondaryLabelColor` 本身的值（50% 黑压白底）。再往上只剩 `.primary`，会抹掉整个信息层级，所以停在这里，把"亮色小字未达严格 AA 4.5:1"记为**有意取舍**而不是待修项。
+
+**3. 截断与重叠** — 行标题 2 行 + 中间省略、文件名 middle truncation、父目录只显示上一级名，均在帧中确认无重叠、无溢出。
+
+**4. 暗/亮一致** — 逐对比较：改前 `settings-default-*-dark` 详情区"空白"经铺底后确认为捕获产物；`content-*` 侧栏两帧像素 96.7% 相同 → 定位为盲区 D。
+
+**5. 减少动态效果** — 未做（动画类帧需要真实时间线）。
+
+## 可访问性（代码级清单，离屏拍不到）
+
+- `EmptyStateView` 的图标从 `.quaternary` 提到 `.tertiary`：装饰图标在暗色下原本几乎不可见。
+- 收藏星标用 `.foregroundStyle(entry.isFavorite ? .yellow : .clear)` 表达"未收藏"——VoiceOver 读不到状态，且 `.clear` 让未收藏行少一个视觉锚点。**未修，记为 U-11**：需要 `accessibilityLabel` 补状态，属于交互改造，风险高于本轮收益。
+- `GlassPill` / `bulkActionButtons` 有 `.help()`，但 help ≠ accessibilityLabel。未修，同上。
+- `ChineseMenuTextField` 吞掉 `rightMouseDown`：粘贴搜索词的路径受影响。未修。
+- 键盘焦点：Tab 能否走到列表项、`⌘,` 后焦点归属，无法在离屏验证。
+
+## 缺陷表
+
+| ID | 现象 | 状态 | 严重度 |
+|---|---|---|---|
+| U-1 | 侧栏拖选行位置表只增不减 | 已修（R-40，`rowFrames = value`） | 中 |
+| U-2 | 视频宽高未知时画 16:9 空播放器 | 已修（R-41，`VideoPreviewPlan.resolve` + 错误态） | 中 |
+| U-3 | 详情整理解大图；KVO observer 未释放 | 已修（R-42，`deinit` 里 `invalidate`） | 中 |
+| U-4 | 菜单/详情暴露正文与完整父目录 | 已修（R-43，`menuLabel` 脱敏 + `parentDirectoryLabel`） | 高 |
+| U-5 | 设置侧栏未选中行的 SF Symbol 几乎不可见 | **已修**，见复验 R-a | 中 |
+| U-6 | "清空未收藏记录 + 清空"在「通用」和「数据」各一份 | **已修**，只留「数据」，见复验 R-b | 中 |
+| U-7 | 5 处承载信息的文字用 `.tertiary`，暗色实测 2.2:1 | **已修**，见复验 R-c | 中 |
+| U-8 | `NavigationSplitView` 侧栏列离屏不跟随暗色 | 判定为**捕获限制**，改测法；非产品缺陷 | — |
+| U-9 | macOS 12 设置分栏宽度约束冗余 | 未修（R-25） | 低 |
+| U-10 | 多选时相邻行高亮各自圆角，交界处有暗色缺口 | 未修：要按邻居决定圆角，改动面 > 收益 | 低 |
+| U-11 | 收藏状态只靠 `.clear`/`.yellow` 表达，VoiceOver 读不到 | 未修，需交互改造 | 低 |
+| U-12 | 主窗口侧栏完整显示敏感 token 原文，菜单栏却脱敏 | 判定为**有意规则**：主窗口是用户显式打开的，菜单栏是环境常驻；规则写进 D-011 | 低 |
 
 ## 复验记录
 
-（待填）
+**R-a（U-5）** `/tmp/shots3/settings-recommendations-720x540-light.png` vs 修复前帧。
+取像素：未选中行图标核心亮度均值 (37–49)，同行文字 (46) —— 图标与文字已同为 `labelColor`；修复前图标随 `foregroundColor` 失效而落到系统弱化色。选中行图标 (22,121,246) = accentColor，正常。
+
+**R-b（U-6）** `settings-general-720x540-light.png` 改前（`/tmp/shots2`）含"清空未收藏记录 + 清空"，改后（`/tmp/shots4`、`/tmp/shots5`）只剩"开机启动"；`settings-data-720x540-*` 仍保留该按钮与确认弹窗。测试：`swift test` 195 例全绿（无测试依赖被删）。
+
+**R-c（U-7）** 同一夹具、同一坐标框、同一脚本，改前 `/tmp/shots4` vs 改后 `/tmp/shots5`，数字见"量化检查 2"表：5 个区域暗色全部从 2.2–2.5:1 提到 5.65–5.79:1，亮色从 1.89–2.00:1 提到 3.98–4.39:1。改动仅 5 处 `foregroundStyle` 取值，无布局变化。
+
+## 规则
+
+每项修复必须：改动前拍一组 → 改动后同参数再拍一组 → 在上表写清**哪两张对比、看到什么差别**。没有复验的项不得标"已完成"。

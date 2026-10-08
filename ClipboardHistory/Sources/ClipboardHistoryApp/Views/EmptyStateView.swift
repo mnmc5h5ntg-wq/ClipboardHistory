@@ -11,10 +11,11 @@ struct EmptyStateView: View {
         VStack(spacing: spacing) {
             Image(systemName: systemName)
                 .font(.system(size: imageSize))
-                .foregroundStyle(.quaternary)
+                .foregroundStyle(.tertiary)
             Text(title)
                 .font(.system(size: titleSize))
-                .foregroundStyle(.tertiary)
+                // 空状态里这句话就是全部信息，不能压到 tertiary（暗色实测 2.2:1）
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

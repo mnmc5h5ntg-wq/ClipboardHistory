@@ -56,7 +56,7 @@ struct HistorySidebarView: View {
             } else {
                 Text(countText)
                     .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }

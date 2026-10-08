@@ -8,7 +8,7 @@ enum SettingsViewLayout {
     static let clearButtonTitle = "清空"
 }
 
-private enum SettingsCategory: String, CaseIterable, Identifiable {
+enum SettingsCategory: String, CaseIterable, Identifiable {
     case shortcuts
     case general
     case privacy
@@ -52,7 +52,7 @@ struct SettingsView: View {
     @ObservedObject private var contextPreferences: ContextPreferenceSettings
     @ObservedObject private var weightsStore: RecommendationWeightsStore
     private let clearHistoryAction: (() -> Void)?
-    @State private var selectedCategory: SettingsCategory? = .shortcuts
+    @State private var selectedCategory: SettingsCategory?
 
     init(
         showMainWindowHotKeySettings: HotKeySettings,
@@ -61,7 +61,8 @@ struct SettingsView: View {
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore(),
         feedbackStore: RecommendationFeedbackStore = RecommendationFeedbackStore(),
-        clearHistoryAction: (() -> Void)? = nil
+        clearHistoryAction: (() -> Void)? = nil,
+        initialCategory: SettingsCategory? = .shortcuts
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
@@ -73,6 +74,10 @@ struct SettingsView: View {
         _showMainWindowShortcut = State(initialValue: showMainWindowHotKeySettings.shortcut)
         _repeatCopyShortcut = State(initialValue: repeatCopyHotKeySettings.shortcut)
         _launchAtLogin = State(initialValue: loginItemSettings.isEnabled)
+        // 默认值与改动前的字面量初值一致：调用方不传就是"快捷键"页。
+        // 存在的唯一理由：离屏窗口的无障碍树不会被 SwiftUI 建立，
+        // 视觉验收没法用点击切分类，只能让初值可注入（见 AGENT_UI_AUDIT.md）。
+        _selectedCategory = State(initialValue: initialCategory)
     }
 
     private func exportFeedbackData() {
@@ -216,27 +221,8 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 4)
             }
-
-            Divider()
-
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("清空未收藏记录")
-                        .font(.subheadline)
-                    Text("收藏记录会保留。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
-                    showClearHistoryConfirmation = true
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .disabled(clearHistoryAction == nil)
-            }
+            // 清空历史只在「数据」页出现一次：同一个破坏性按钮在两个分类里
+            // 各放一份，用户无法判断是不是两件事，两份实现还会各自漂移。
         }
     }
 
@@ -470,6 +456,10 @@ private struct SettingsSidebarRow: View {
     var body: some View {
         Button(action: action) {
             Label(category.title, systemImage: category.icon)
+                // 不显式上色的话，未选中行的 SF Symbol 会按系统弱化色渲染，
+                // 在浅色主题下几乎看不见（离屏渲染验收时发现的真实缺陷）
+                .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+                .symbolRenderingMode(.hierarchical)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
@@ -480,7 +470,6 @@ private struct SettingsSidebarRow: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
         )
-        .foregroundColor(isSelected ? .accentColor : .primary)
         .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
         .padding(.horizontal, 6)
         .animation(.easeInOut(duration: 0.11), value: isHovered)

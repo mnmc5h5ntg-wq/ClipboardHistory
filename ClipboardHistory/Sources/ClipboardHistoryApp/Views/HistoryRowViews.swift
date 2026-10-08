@@ -77,7 +77,8 @@ struct HistoryRow: View {
                         .truncationMode(.tail)
                 }
                 Text(ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp))
-                    .font(.system(size: 10)).foregroundStyle(.tertiary)
+                    // 复制时间是行内唯一的时间信息，tertiary 在暗色下实测 2.2:1，读不出来
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

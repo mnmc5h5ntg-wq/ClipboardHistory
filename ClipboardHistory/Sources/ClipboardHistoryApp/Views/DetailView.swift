@@ -45,7 +45,7 @@ struct DetailView: View {
                     .foregroundStyle(.secondary)
                 Text(entry.content.sizeDescription)
                     .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -319,7 +319,7 @@ private struct MultiFileRow: View {
                     // 摊在界面上：屏幕共享/截屏时这是泄露点（审计 R-43）
                     Text(url.parentDirectoryLabel)
                         .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
