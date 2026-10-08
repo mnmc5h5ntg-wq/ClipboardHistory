@@ -29,10 +29,13 @@ protocol HistoryPersisting {
     func load() -> [ClipboardEntry]
     func save(_ entries: [ClipboardEntry]) throws
     func flushPendingSaves()
+    /// 上一次载入时是否走了"存档损坏 → 保全原件/从备份恢复"路径。
+    var recoveryNotice: String? { get }
 }
 
 extension HistoryPersisting {
     func flushPendingSaves() {}
+    var recoveryNotice: String? { nil }
 }
 
 @MainActor
@@ -89,6 +92,12 @@ final class FileHistoryPersistence: HistoryPersisting {
     private let decoder: JSONDecoder
     private let saveQueue: DispatchQueue
     private var pendingSave: DispatchWorkItem?
+    private var loadedRecoveryNotice: String?
+    /// 本次运行内必须保护的图片文件名（来自损坏原件与备份的尽力提取）。
+    private var protectedImageFileNames: Set<String> = []
+
+    var recoveryNotice: String? { loadedRecoveryNotice }
+    var backupHistoryURL: URL { FileHistoryPersistence.backupURL(for: historyURL) }
 
     init(
         rootDirectory: URL = FileHistoryPersistence.defaultRootDirectory(),
@@ -110,11 +119,42 @@ final class FileHistoryPersistence: HistoryPersisting {
 
     func load() -> [ClipboardEntry] {
         flushPendingSaves()
-        guard let data = try? Data(contentsOf: historyURL),
-              let storedHistory = try? decoder.decode(StoredHistory.self, from: data) else {
+        loadedRecoveryNotice = nil
+        protectedImageFileNames = []
+
+        guard let storedHistory = decodeStoredHistory(at: historyURL) else {
+            // 文件不存在 = 首次运行（或用户手工清空），正常空态。
+            if !fileManager.fileExists(atPath: historyURL.path) {
+                guard let backup = decodeStoredHistory(at: backupHistoryURL) else { return [] }
+                loadedRecoveryNotice = "主存档不存在，已从备份恢复 \(backup.entries.count) 条记录。"
+                protectedImageFileNames.formUnion(Self.imageFileNames(from: backup))
+                return entries(from: backup)
+            }
+            // 存在但解析不了（崩溃/断电留下的半截 JSON）。
+            // 关键：先保全原件副本，再尝试滚动备份；两种手段都失败时也要保护旧图片文件，
+            // 否则"下一次复制"就会把整个历史库连图片一起删掉（审计 P-06 复现过的缺陷）。
+            let preserved = Self.preserveCorruptFile(at: historyURL)
+            protectedImageFileNames.formUnion(Self.looseImageFileNames(inFileAt: historyURL))
+            if let backup = decodeStoredHistory(at: backupHistoryURL) {
+                protectedImageFileNames.formUnion(Self.imageFileNames(from: backup))
+                loadedRecoveryNotice = "存档无法解析，已从备份恢复 \(backup.entries.count) 条记录；"
+                    + "损坏原件保全在 \(preserved?.lastPathComponent ?? "未知位置")。"
+                return entries(from: backup)
+            }
+            loadedRecoveryNotice = "存档无法解析，原件保全在 "
+                + "\(preserved?.lastPathComponent ?? "未知位置")；本次以空历史启动，旧图片文件不会被删除。"
             return []
         }
 
+        return entries(from: storedHistory)
+    }
+
+    private func decodeStoredHistory(at url: URL) -> StoredHistory? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decoder.decode(StoredHistory.self, from: data)
+    }
+
+    private func entries(from storedHistory: StoredHistory) -> [ClipboardEntry] {
         return storedHistory.entries.compactMap { storedEntry in
             switch storedEntry.contentKind {
             case .text:
@@ -140,7 +180,11 @@ final class FileHistoryPersistence: HistoryPersisting {
 
     func save(_ entries: [ClipboardEntry]) throws {
         let snapshot = try saveSnapshot(from: entries)
-        let workItem = Self.makeSaveWorkItem(snapshot: snapshot, rootDirectory: rootDirectory)
+        let workItem = Self.makeSaveWorkItem(
+            snapshot: snapshot,
+            rootDirectory: rootDirectory,
+            protectedImageFileNames: protectedImageFileNames
+        )
         pendingSave = workItem
         saveQueue.async(execute: workItem)
     }
@@ -292,11 +336,12 @@ final class FileHistoryPersistence: HistoryPersisting {
 
     nonisolated private static func makeSaveWorkItem(
         snapshot: SaveSnapshot,
-        rootDirectory: URL
+        rootDirectory: URL,
+        protectedImageFileNames: Set<String>
     ) -> DispatchWorkItem {
         DispatchWorkItem {
             do {
-                try write(snapshot, rootDirectory: rootDirectory)
+                try write(snapshot, rootDirectory: rootDirectory, protectedImageFileNames: protectedImageFileNames)
             } catch {
                 let message = String(describing: error)
                 Task { @MainActor in
@@ -306,7 +351,11 @@ final class FileHistoryPersistence: HistoryPersisting {
         }
     }
 
-    nonisolated private static func write(_ snapshot: SaveSnapshot, rootDirectory: URL) throws {
+    nonisolated private static func write(
+        _ snapshot: SaveSnapshot,
+        rootDirectory: URL,
+        protectedImageFileNames: Set<String>
+    ) throws {
         let fileManager = FileManager.default
         let historyURL = rootDirectory.appendingPathComponent("history.json")
         let imagesDirectory = rootDirectory.appendingPathComponent("images", isDirectory: true)
@@ -323,13 +372,66 @@ final class FileHistoryPersistence: HistoryPersisting {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(snapshot.storedHistory)
+        let backupURL = Self.backupURL(for: historyURL)
+
         try data.write(to: historyURL, options: .atomic)
         try setPrivateFilePermissions(historyURL, fileManager: fileManager)
+        // 滚动备份：永远是一份完整且成功写盘过的快照，损坏时可回退。
+        try data.write(to: backupURL, options: .atomic)
+        try setPrivateFilePermissions(backupURL, fileManager: fileManager)
+
+        // 保护集只来自"本次运行遇到过损坏存档"时尽力提取出的文件名（见 load()）。
+        // 正常路径保持既有语义：被删除条目的图片应当在下一次保存时清理掉
+        // （testSaveRemovesUnusedImageFiles 锁住这一行为）。
         try removeUnusedImages(
-            keeping: snapshot.usedImageFileNames,
+            keeping: snapshot.usedImageFileNames.union(protectedImageFileNames),
             imagesDirectory: imagesDirectory,
             fileManager: fileManager
         )
+    }
+
+    /// 存档的滚动备份位置：`history.json.bak`。
+    nonisolated static func backupURL(for historyURL: URL) -> URL {
+        URL(fileURLWithPath: historyURL.path + ".bak")
+    }
+
+    /// 把无法解析的原件保全成 `history.corrupt-<时间戳>.json`，绝不删除原件。
+    nonisolated private static func preserveCorruptFile(at url: URL) -> URL? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let candidate = url.deletingPathExtension()
+            .appendingPathExtension("corrupt-\(formatter.string(from: Date())).json")
+        guard !FileManager.default.fileExists(atPath: candidate.path) else { return nil }
+        do {
+            try FileManager.default.copyItem(at: url, to: candidate)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: candidate.path)
+            return candidate
+        } catch {
+            return nil
+        }
+    }
+
+    nonisolated private static func imageFileNames(from storedHistory: StoredHistory) -> Set<String> {
+        Set(storedHistory.entries.flatMap { [$0.imageFileName, $0.thumbnailFileName].compactMap(\ .self) })
+    }
+
+    /// 尽力从（可能半截的）JSON 文本里提取图片文件名，用于在损坏事件中保住对应文件。
+    nonisolated private static func looseImageFileNames(inFileAt url: URL) -> Set<String> {
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        return looseImageFileNames(in: text)
+    }
+
+    nonisolated private static func looseImageFileNames(in text: String) -> Set<String> {
+        let pattern = "[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}-(?:image|thumbnail)\\.png"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        var names: Set<String> = []
+        for match in regex.matches(in: text, range: range) {
+            if let swiftRange = Range(match.range, in: text) {
+                names.insert(String(text[swiftRange]))
+            }
+        }
+        return names
     }
 
     nonisolated private static func ensurePrivateDirectory(

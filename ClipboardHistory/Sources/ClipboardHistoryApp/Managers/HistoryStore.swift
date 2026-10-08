@@ -50,6 +50,8 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var searchText = ""
     @Published private(set) var filter: Filter = .all
     @Published private(set) var clipboardWriteErrorMessage: String?
+    /// 存档损坏时的恢复提示（备份回退 / 原件保全）。UI 层可据此显示一次性提示。
+    @Published private(set) var historyRecoveryNotice: String?
     @Published private(set) var showsPredictionSuggestions = false
 
     var filteredEntries: [Entry] {
@@ -320,6 +322,7 @@ final class HistoryStore: ObservableObject {
             self.retentionPolicy = retentionPolicy
         }
         let loadedEntries = persistence.load()
+        let loadedRecoveryNotice = persistence.recoveryNotice
         let persistedEntries = Self.collapsingDuplicates(in: self.retentionPolicy.retaining(loadedEntries))
         self.entries = persistedEntries
         self.selectedEntry = persistedEntries.first
@@ -327,6 +330,15 @@ final class HistoryStore: ObservableObject {
         if persistedEntries != loadedEntries {
             persist()
         }
+        historyRecoveryNotice = loadedRecoveryNotice
+        if let loadedRecoveryNotice {
+            LifecycleDebugLogger.log("[历史存档恢复] \(loadedRecoveryNotice)")
+        }
+    }
+
+    /// UI 消费掉恢复提示后调用，避免同一条提示反复出现。
+    func dismissHistoryRecoveryNotice() {
+        historyRecoveryNotice = nil
     }
 
     func startMonitoring(after delay: TimeInterval = 0) {
