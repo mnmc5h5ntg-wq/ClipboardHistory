@@ -1,39 +1,194 @@
 import Foundation
 
 struct ClipboardEntryIntelligenceAdapter {
-    func summary(for entry: ClipboardEntry) -> ClipboardEntrySummary {
+    // MARK: - 以字符串快照为输入的分析（可跨线程）
+
+    func summary(for snapshot: ClipboardEntryRawSnapshot) -> ClipboardEntrySummary {
         ClipboardEntrySummary(
-            id: entry.id,
-            contentKind: contentKind(for: entry.content),
-            preview: preview(for: entry),
-            isFavorite: entry.isFavorite,
-            copiedAt: entry.timestamp,
-            sourceUTIs: entry.sourceUTIs,
-            sourceAppBundleID: entry.sourceAppBundleID
+            id: snapshot.id,
+            contentKind: contentKind(for: snapshot.kind),
+            preview: preview(for: snapshot),
+            isFavorite: snapshot.isFavorite,
+            copiedAt: snapshot.timestamp,
+            sourceUTIs: snapshot.sourceUTIs,
+            sourceAppBundleID: snapshot.sourceAppBundleID,
+            sensitivitySample: sensitivitySample(for: snapshot),
+            sourceDirectoryPath: sourceDirectoryPath(for: snapshot.kind)
         )
     }
 
-    func summaries(for entries: [ClipboardEntry]) -> [ClipboardEntrySummary] {
-        entries.map(summary(for:))
+    func summaries(for snapshots: [ClipboardEntryRawSnapshot]) -> [ClipboardEntrySummary] {
+        snapshots.map(summary(for:))
     }
 
-    func intelligence(for entry: ClipboardEntry, analyzedAt: Date? = nil) -> EntryIntelligence {
-        let tags = tags(for: entry)
+    func intelligence(for snapshot: ClipboardEntryRawSnapshot, analyzedAt: Date? = nil) -> EntryIntelligence {
+        let tags = tags(for: snapshot)
         return EntryIntelligence(
-            entryID: entry.id,
-            summary: intelligenceSummary(for: entry, tags: tags),
+            entryID: snapshot.id,
+            summary: intelligenceSummary(for: snapshot, tags: tags),
             tags: tags,
             detectedLanguage: nil,
-            sensitivity: sensitivity(for: entry, tags: tags),
-            embeddingStatus: embeddingStatus(for: entry),
+            sensitivity: sensitivity(for: snapshot, tags: tags),
+            embeddingStatus: embeddingStatus(for: snapshot.kind),
             lastAnalyzedAt: analyzedAt,
             source: .ruleBased
         )
     }
 
+    private func text(of kind: ClipboardEntryRawSnapshot.Kind) -> String? {
+        if case .text(let text) = kind { return text }
+        return nil
+    }
+
+    private func preview(for snapshot: ClipboardEntryRawSnapshot) -> String {
+        switch snapshot.kind {
+        case .text(let string):
+            return String(string.replacingOccurrences(of: "\n", with: " ↵ ").prefix(160))
+        case .image(let description):
+            return "图片 \(description)"
+        case .file(let path):
+            return URL(fileURLWithPath: path).lastPathComponent
+        case .files(let paths):
+            return paths.prefix(3).map { URL(fileURLWithPath: $0).lastPathComponent }.joined(separator: ", ")
+        }
+    }
+
+    private func sensitivitySample(for snapshot: ClipboardEntryRawSnapshot) -> String {
+        let text = self.text(of: snapshot.kind) ?? snapshot.ocrText ?? ""
+        guard !text.isEmpty else { return "" }
+        let end = text.index(
+            text.startIndex,
+            offsetBy: Self.sensitivitySampleLimit,
+            limitedBy: text.endIndex
+        ) ?? text.endIndex
+        return String(text[text.startIndex..<end])
+    }
+
+    private func sourceDirectoryPath(for kind: ClipboardEntryRawSnapshot.Kind) -> String? {
+        let path: String?
+        switch kind {
+        case .file(let single):
+            path = single
+        case .files(let many):
+            path = many.first
+        default:
+            path = nil
+        }
+        guard let directory = path.map({ URL(fileURLWithPath: $0).deletingLastPathComponent().path }),
+              !directory.isEmpty else { return nil }
+        return directory
+    }
+
+    private func contentKind(for kind: ClipboardEntryRawSnapshot.Kind) -> String {
+        switch kind {
+        case .text(let text):
+            if Self.urlDetector.matches(text) { return "url" }
+            if Self.emailDetector.matches(text) { return "email" }
+            if Self.shellCommandDetector.matches(text) { return "shell-command" }
+            if Self.codeDetector.matches(text) { return "code" }
+            return "text"
+        case .image:
+            return "image"
+        case .file(let path):
+            return fileKind(for: URL(fileURLWithPath: path))
+        case .files:
+            return "files"
+        }
+    }
+
+    private func tags(for snapshot: ClipboardEntryRawSnapshot) -> [EntryIntelligenceTag] {
+        var tags = Set<EntryIntelligenceTag>()
+        switch snapshot.kind {
+        case .text(let text):
+            tags.insert(.plainText)
+            if Self.urlDetector.matches(text) { tags.insert(.url) }
+            if Self.emailDetector.matches(text) { tags.insert(.email) }
+            if Self.phoneDetector.matches(text) { tags.insert(.phoneNumber) }
+            if Self.shellCommandDetector.matches(text) { tags.insert(.shellCommand) }
+            if Self.codeDetector.matches(text) { tags.insert(.code) }
+            if Self.filePathDetector.matches(text) { tags.insert(.filePath) }
+            if Self.passwordDetector.matches(text) { tags.insert(.passwordCandidate) }
+            if Self.verificationCodeDetector.matches(text) { tags.insert(.verificationCode) }
+            if Self.apiKeyDetector.matches(text) { tags.insert(.apiKeyCandidate) }
+        case .image:
+            tags.insert(.image)
+        case .file(let path):
+            tags.formUnion(fileTags(for: URL(fileURLWithPath: path)))
+        case .files(let paths):
+            paths.map { URL(fileURLWithPath: $0) }.forEach { tags.formUnion(fileTags(for: $0)) }
+        }
+        return tags.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    private func intelligenceSummary(for snapshot: ClipboardEntryRawSnapshot, tags: [EntryIntelligenceTag]) -> String? {
+        switch snapshot.kind {
+        case .text(let text):
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            return String(trimmed.replacingOccurrences(of: "\n", with: " ").prefix(80))
+        case .image:
+            return "图片内容"
+        case .file(let path):
+            return "文件：\(URL(fileURLWithPath: path).lastPathComponent)"
+        case .files(let paths):
+            return "\(paths.count) 个文件"
+        }
+    }
+
+    private func sensitivity(for snapshot: ClipboardEntryRawSnapshot, tags: [EntryIntelligenceTag]) -> AIPrivacySensitivity {
+        if tags.contains(.apiKeyCandidate) || tags.contains(.passwordCandidate) {
+            return .secret
+        }
+        if tags.contains(.verificationCode) {
+            return .sensitive
+        }
+        switch snapshot.kind {
+        case .text(let text):
+            return text.count > 240 ? .personal : .publicLike
+        case .image:
+            return .sensitive
+        case .file, .files:
+            return .personal
+        }
+    }
+
+    private func embeddingStatus(for kind: ClipboardEntryRawSnapshot.Kind) -> EmbeddingStatus {
+        switch kind {
+        case .text:
+            return .notRequested
+        case .image:
+            return .unavailable(reason: "图片内容暂不生成文本向量。")
+        case .file, .files:
+            return .notRequested
+        }
+    }
+
+    // MARK: - 兼容入口（以 ClipboardEntry 为输入，内部转成字符串快照）
+
+    /// 敏感判定样本上限：8KB。够覆盖真实密钥/令牌出现的位置，又把每次分析的代价封在有界范围内。
+    static let sensitivitySampleLimit = 8_192
+
+    func summary(for entry: ClipboardEntry) -> ClipboardEntrySummary {
+        summary(for: entry.analysisSnapshot)
+    }
+
+    func summaries(for entries: [ClipboardEntry]) -> [ClipboardEntrySummary] {
+        entries.map { summary(for: $0.analysisSnapshot) }
+    }
+
+    func intelligence(for entry: ClipboardEntry, analyzedAt: Date? = nil) -> EntryIntelligence {
+        intelligence(for: entry.analysisSnapshot, analyzedAt: analyzedAt)
+    }
+
     func intelligenceByEntryID(for entries: [ClipboardEntry], analyzedAt: Date? = nil) -> [UUID: EntryIntelligence] {
         Dictionary(uniqueKeysWithValues: entries.map { entry in
-            (entry.id, intelligence(for: entry, analyzedAt: analyzedAt))
+            (entry.id, intelligence(for: entry.analysisSnapshot, analyzedAt: analyzedAt))
+        })
+    }
+
+    func intelligenceByEntryID(for snapshots: [ClipboardEntryRawSnapshot], analyzedAt: Date? = nil) -> [UUID: EntryIntelligence] {
+        Dictionary(uniqueKeysWithValues: snapshots.map { snapshot in
+            (snapshot.id, intelligence(for: snapshot, analyzedAt: analyzedAt))
         })
     }
 
@@ -54,85 +209,15 @@ struct ClipboardEntryIntelligenceAdapter {
         }
     }
 
-    private func preview(for entry: ClipboardEntry) -> String {
-        switch entry.content {
-        case .text(let string):
-            return String(string.replacingOccurrences(of: "\n", with: " ↵ ").prefix(160))
-        case .image:
-            return entry.shortPreview
-        case .file(let url):
-            return url.lastPathComponent
-        case .files(let urls):
-            return urls.map(\.lastPathComponent).prefix(3).joined(separator: ", ")
-        }
-    }
 
-    private func tags(for entry: ClipboardEntry) -> [EntryIntelligenceTag] {
-        var tags = Set<EntryIntelligenceTag>()
-        switch entry.content {
-        case .text(let text):
-            tags.insert(.plainText)
-            if Self.urlDetector.matches(text) { tags.insert(.url) }
-            if Self.emailDetector.matches(text) { tags.insert(.email) }
-            if Self.phoneDetector.matches(text) { tags.insert(.phoneNumber) }
-            if Self.shellCommandDetector.matches(text) { tags.insert(.shellCommand) }
-            if Self.codeDetector.matches(text) { tags.insert(.code) }
-            if Self.filePathDetector.matches(text) { tags.insert(.filePath) }
-            if Self.passwordDetector.matches(text) { tags.insert(.passwordCandidate) }
-            if Self.verificationCodeDetector.matches(text) { tags.insert(.verificationCode) }
-            if Self.apiKeyDetector.matches(text) { tags.insert(.apiKeyCandidate) }
-        case .image:
-            tags.insert(.image)
-        case .file(let url):
-            tags.formUnion(fileTags(for: url))
-        case .files(let urls):
-            urls.forEach { tags.formUnion(fileTags(for: $0)) }
-        }
-        return tags.sorted { $0.rawValue < $1.rawValue }
-    }
 
-    private func intelligenceSummary(for entry: ClipboardEntry, tags: [EntryIntelligenceTag]) -> String? {
-        switch entry.content {
-        case .text(let text):
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            return String(trimmed.replacingOccurrences(of: "\n", with: " ").prefix(80))
-        case .image:
-            return "图片内容"
-        case .file(let url):
-            return "文件：\(url.lastPathComponent)"
-        case .files(let urls):
-            return "\(urls.count) 个文件"
-        }
-    }
 
-    private func sensitivity(for entry: ClipboardEntry, tags: [EntryIntelligenceTag]) -> AIPrivacySensitivity {
-        if tags.contains(.apiKeyCandidate) || tags.contains(.passwordCandidate) {
-            return .secret
-        }
-        if tags.contains(.verificationCode) {
-            return .sensitive
-        }
-        switch entry.content {
-        case .text(let text):
-            return text.count > 240 ? .personal : .publicLike
-        case .image:
-            return .sensitive
-        case .file, .files:
-            return .personal
-        }
-    }
 
-    private func embeddingStatus(for entry: ClipboardEntry) -> EmbeddingStatus {
-        switch entry.content {
-        case .text:
-            return .notRequested
-        case .image:
-            return .unavailable(reason: "图片内容暂不生成文本向量。")
-        case .file, .files:
-            return .notRequested
-        }
-    }
+
+
+
+
+
 
     private func fileKind(for url: URL) -> String {
         let ext = url.pathExtension.lowercased()
@@ -165,7 +250,10 @@ private extension ClipboardEntryIntelligenceAdapter {
     static let codeDetector = TextPatternDetector(pattern: #"\b(import|func|struct|class|enum|let|var|return|if|else|for|while)\b|[{};]"#)
     static let filePathDetector = TextPatternDetector(pattern: #"(/Users/|~/|\./|\.\./)[^\n]+"#)
     static let passwordDetector = TextPatternDetector(pattern: #"(?i)\b(password|passwd|pwd|密码)\b\s*[:=]"#)
-    static let verificationCodeDetector = TextPatternDetector(pattern: #"(?<!\d)\d{6}(?!\d)"#)
+    /// 旧规则 `\d{6}` 会把房间号、订单片段一律标成验证码（⇒ sensitivity=.sensitive ⇒ 被降权）。
+    static let verificationCodeDetector = TextPatternDetector(
+        pattern: #"(?i)(?:验证码|校验码|动态码|短信码|verification code|otp code)\D{0,8}\d{4,8}\b"#
+    )
     static let apiKeyDetector = TextPatternDetector(pattern: #"\b(sk-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b"#)
 }
 

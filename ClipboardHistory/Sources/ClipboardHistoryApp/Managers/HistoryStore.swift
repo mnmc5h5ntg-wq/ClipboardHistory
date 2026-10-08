@@ -22,7 +22,6 @@ final class HistoryStore: ObservableObject {
         case deleteSelection
         case favoriteSelection
         case unfavoriteSelection
-        case togglePredictionSuggestions
         case recordRecommendationAccepted(UUID)
         case dismissAllRecommendations
         case clear
@@ -58,7 +57,6 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var clipboardWriteErrorMessage: String?
     /// 存档损坏时的恢复提示（备份回退 / 原件保全）。UI 层可据此显示一次性提示。
     @Published private(set) var historyRecoveryNotice: String?
-    @Published private(set) var showsPredictionSuggestions = false
 
     /// 过滤结果缓存。`filteredEntries` 在一次界面求值里会被多处读取
     /// （列表、计数文案、空态标题、选中态协调），旧写法每次都全表重扫：
@@ -129,56 +127,49 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var predictionReasonByEntryID: [UUID: String] = [:]
 
     func refreshPredictions() {
-        // 显露偏好：启动 30s 监听窗口
-        lastPredictionEntryIDs = Set(predictionSuggestionEntries.prefix(3).map(\.id))
-        if lastPredictionEntryIDs.isEmpty { lastPredictionEntryIDs = [] }
-        revealedPreferenceWindowTimer?.invalidate()
-        revealedPreferenceWindowTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.revealedPreferenceWindowTimer = nil
-            }
-        }
-        let capturedAt = Date()
-        var collector = contextCollector
-        let prefs = contextPreferences
-        collector.preferences = prefs
+        // "显露偏好窗口"在结果真正显示出来的那一刻开启（见 applyPredictionResult），
+        // 这里只负责：新一代开始计算时不要提前开窗。
 
-        // 真实前台 App：优先用 monitor 实时记录的 lastFrontmostBundleID
-        var effectiveApp: RunningApplicationContext?
-        if let bid = lastFrontmostBundleID,
-           let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) {
-            effectiveApp = RunningApplicationContext(
-                localizedName: app.localizedName,
-                bundleIdentifier: bid,
-                processIdentifier: app.processIdentifier
-            )
-        }
-        if effectiveApp == nil {
-            effectiveApp = entries.first.flatMap { e in
-                e.sourceAppBundleID.map { RunningApplicationContext(localizedName: e.sourceAppName, bundleIdentifier: $0, processIdentifier: nil) }
-            }
-        }
-        let currentAppName = effectiveApp?.localizedName
-        let capturedEntries = entries
+        // 代际号：只有最新一代的结果允许回写界面。旧实现不取消也不比对代际，
+        // 连续复制时后台任务完成顺序不确定 ⇒ 陈旧结果会盖掉新结果（审计 R-11）。
+        predictionGeneration += 1
+        let generation = predictionGeneration
+
+        let capturedAt = Date()
+        // 只把字符串快照交给后台：带 NSImage 的条目不再跨 actor 边界（审计 R-19）。
+        let capturedSnapshots = entries.map(\.analysisSnapshot)
         let capturedSelectedID = selectedEntry?.id
         let capturedWeights = weightsStore.weights
         let capturedFeedback = feedbackStore.recent()
-        let capturedEffectiveApp = effectiveApp
-        let capturedPermissionState = prefs.permissionState
-        let capturedEnablePrivacyFilter = prefs.canFilterSensitiveContent
-        let capturedRecentEvents = collector.currentContext(recentEntries: [], selectedEntryID: nil, capturedAt: capturedAt, skipAppleScript: true).recentEvents
+        let capturedEnablePrivacyFilter = contextPreferences.canFilterSensitiveContent
+        let capturedEffectiveApp = effectiveFrontmostApp()
+
+        var collector = contextCollector
+        collector.preferences = contextPreferences
+        let capturedRecentEvents = collector.currentContext(
+            recentEntries: [],
+            selectedEntryID: nil,
+            capturedAt: capturedAt,
+            skipAppleScript: true
+        ).recentEvents
+
+        var presenterContext = ContextSnapshot.minimal(recentEntries: [], capturedAt: capturedAt)
+        presenterContext.frontmostApplication = capturedEffectiveApp
+        presenterContext.recentEvents = capturedRecentEvents
+
+        let capturedContextSummary = Self.predictionContextSummary(
+            app: capturedEffectiveApp,
+            eventCount: capturedRecentEvents.count,
+            feedbackCount: capturedFeedback.count
+        )
+        let capturedCurrentAppName = capturedEffectiveApp?.localizedName
+        let capturedReuseCounts = Self.reuseCounts(byEntryID: capturedFeedback)
 
         Task.detached(priority: .userInitiated) { [weak self] in
-            let summaries = ClipboardEntryIntelligenceAdapter().summaries(for: capturedEntries)
-            var context = ContextSnapshot.minimal(recentEntries: summaries, selectedEntryID: capturedSelectedID, capturedAt: capturedAt)
-            context.frontmostApplication = capturedEffectiveApp
-            context.permissionState = capturedPermissionState
-            context.recentEvents = capturedRecentEvents
-
             let result = LocalRecommendationService(
                 engine: RuleBasedRecommendationEngine(now: capturedAt, weights: capturedWeights)
             ).recommend(
-                entries: capturedEntries,
+                snapshots: capturedSnapshots,
                 selectedEntryID: capturedSelectedID,
                 feedback: capturedFeedback,
                 frontmostApplication: capturedEffectiveApp,
@@ -186,134 +177,110 @@ final class HistoryStore: ObservableObject {
                 capturedAt: capturedAt,
                 enablePrivacyFilter: capturedEnablePrivacyFilter
             )
-            let candidateIDs = result.candidates.map { $0.entryID }
-            let entryMap = Dictionary(uniqueKeysWithValues: capturedEntries.map { ($0.id, $0) })
-            var reasons: [UUID: String] = [:]
-            for c in result.candidates {
-                guard let entry = entryMap[c.entryID] else { continue }
-
-                let kindLabel: String = {
-                    switch entry.content {
-                    case .text(let t):
-                        if t.hasPrefix("http") { return "链接" }
-                        if t.count < 200 && t.contains("\n") { return "文本片段" }
-                        return "文本"
-                    case .image: return "图片"
-                    case .file: return "文件"
-                    case .files: return "多文件"
-                    }
-                }()
-
-                let f = c.score.features
-                var tags: [String] = []
-
-                if let current = currentAppName, let src = entry.sourceAppName, current == src {
-                    // same app, no label
-                } else if let current = currentAppName {
-                    tags.append("当前在\(current)")
-                }
-                if let app = entry.sourceAppName, !tags.contains(where: { $0.hasPrefix("当前在") }) {
-                    tags.append(app)
-                }
-                if (f[.recency] ?? 0) >= 0.34 { tags.append("刚刚复制") }
-                if (f[.reuseFrequency] ?? 0) > 0 { tags.append("复用\(Int((f[.reuseFrequency] ?? 0)/0.08))次") }
-
-                if (f[.contentTypeAffinity] ?? 0) > 0 {
-                    let currentBID = context.frontmostApplication?.bundleIdentifier?.lowercased() ?? ""
-                    if currentBID.contains("safari") || currentBID.contains("chrome") {
-                        tags.append("偏好链接")
-                    } else if currentBID.contains("finder") {
-                        tags.append("偏好文件")
-                    } else if currentBID.contains("xcode") || currentBID.contains("terminal") {
-                        tags.append("偏好命令/代码")
-                    } else if currentBID.contains("wechat") || currentBID.contains("telegram") {
-                        tags.append("偏好文本/图片")
-                    } else {
-                        tags.append("内容匹配")
-                    }
-                }
-
-                if (f[.appAffinity] ?? 0) > 0 {
-                    if let src = entry.sourceAppName, let cur = currentAppName, src == cur {
-                        tags.append("回到\(src)")
-                    } else if let src = entry.sourceAppName, let cur = currentAppName {
-                        tags.append("\(src)→\(cur)")
-                    } else {
-                        tags.append("App匹配")
-                    }
-                }
-
-                if (f[.semanticSimilarity] ?? 0) > 0 {
-                    let events = context.recentEvents
-                    let copyBurst = events.suffix(4).filter { $0.kind == .copy }.count
-                    let switches = events.suffix(4).filter { $0.kind == .switchToApp }.count
-                    if copyBurst >= 3 && switches >= 1 {
-                        tags.append("跨应用连续复制")
-                    } else if copyBurst >= 3 {
-                        tags.append("短时间内多次复制")
-                    } else if switches >= 2 {
-                        tags.append("频繁切换应用中")
-                    } else {
-                        tags.append("你刚复制过同类内容")
-                    }
-                }
-
-                if (f[.finderDirectoryAffinity] ?? 0) > 0.5 {
-                    if let dir = context.finderDirectory?.path {
-                        let name = URL(fileURLWithPath: dir).lastPathComponent
-                        tags.append("来自「\(name)」")
-                    } else {
-                        tags.append("同目录文件")
-                    }
-                }
-
-                if (f[.finderSelectionAffinity] ?? 0) > 0.5 {
-                    if let exts = context.finderSelection?.fileExtensions, !exts.isEmpty {
-                        let extList = exts.prefix(2).joined(separator: "、")
-                        if exts.count > 2 {
-                            tags.append("选中 .\(extList) 等文件")
-                        } else {
-                            tags.append("选中 .\(extList)")
-                        }
-                    } else {
-                        tags.append("同类文件被选中")
-                    }
-                }
-
-                if (f[.negativeFeedback] ?? 0) < 0 { tags.append("已降权") }
-
-                var parts: [String] = ["\(kindLabel)"]
-                if !tags.isEmpty { parts.append(tags.joined(separator: " · ")) }
-                parts.append("\(Int(c.score.value * 100))%")
-
-                reasons[c.entryID] = parts.joined(separator: " · ")
-            }
-
-            var parts: [String] = []
-            if let app = capturedEffectiveApp?.localizedName {
-                parts.append("来源: \(app)")
-            }
-            let eventCount = context.recentEvents.count
-            if eventCount > 0 {
-                parts.append("轨迹: \(eventCount) 事件")
-            }
-            let fbCount = capturedFeedback.count
-            if fbCount > 0 {
-                parts.append("反馈: \(fbCount) 条")
-            }
-            let ctxSummary = parts.isEmpty ? "无额外上下文" : parts.joined(separator: " · ")
-
-            let suggestionEntries = candidateIDs.compactMap { candidateID in
-                capturedEntries.first { $0.id == candidateID }
-            }
-
             await MainActor.run { [weak self] in
-                self?.predictionReasonByEntryID = reasons
-                self?.predictionContextSummary = ctxSummary
-                self?.predictionSuggestionEntries = suggestionEntries
+                guard let self, self.predictionGeneration == generation else { return }
+                self.applyPredictionResult(
+                    result,
+                    contextSummary: capturedContextSummary,
+                    currentAppName: capturedCurrentAppName,
+                    reuseCounts: capturedReuseCounts,
+                    presenterContext: presenterContext
+                )
             }
         }
     }
+
+    private func applyPredictionResult(
+        _ result: RecommendationResult,
+        contextSummary: String,
+        currentAppName: String?,
+        reuseCounts: [UUID: Int],
+        presenterContext: ContextSnapshot
+    ) {
+        var reasons: [UUID: String] = [:]
+        var suggestionEntries: [Entry] = []
+        for candidate in result.candidates {
+            guard let entry = entries.first(where: { $0.id == candidate.entryID }) else { continue }
+            reasons[candidate.entryID] = RecommendationPresenter.reason(
+                for: candidate,
+                entry: entry,
+                context: presenterContext,
+                currentAppName: currentAppName,
+                reuseCount: reuseCounts[candidate.entryID] ?? 0
+            )
+            suggestionEntries.append(entry)
+        }
+        predictionReasonByEntryID = reasons
+        predictionContextSummary = contextSummary
+        predictionSuggestionEntries = suggestionEntries
+        armRevealedPreferenceWindow(shownEntryIDs: suggestionEntries.prefix(3).map(\.id))
+    }
+
+    /// 推荐可见后的 30s 窗口：期间手动复制了不在这批推荐里的内容，
+    /// 记为 copiedManually（隐式采纳信号）。不开窗 ⇒ 每次复制都会被当成"采纳"，
+    /// 排序被自我强化（本轮实测：无条件开窗时反馈数从 2 变 3）。
+    private func armRevealedPreferenceWindow(shownEntryIDs: [UUID]) {
+        revealedPreferenceWindowTimer?.invalidate()
+        guard !shownEntryIDs.isEmpty else {
+            lastPredictionEntryIDs = []
+            return
+        }
+        lastPredictionEntryIDs = Set(shownEntryIDs)
+        revealedPreferenceWindowTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.revealedPreferenceWindowTimer = nil
+                self?.lastPredictionEntryIDs = []
+            }
+        }
+    }
+
+    /// 真实前台 App：优先用应用切换监听记录的 bundleID，回退到最近一条记录的来源。
+    private func effectiveFrontmostApp() -> RunningApplicationContext? {
+        if let bundleID = lastFrontmostBundleID,
+           let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleID }) {
+            return RunningApplicationContext(
+                localizedName: app.localizedName,
+                bundleIdentifier: bundleID,
+                processIdentifier: app.processIdentifier
+            )
+        }
+        return entries.first.flatMap { entry in
+            entry.sourceAppBundleID.map {
+                RunningApplicationContext(
+                    localizedName: entry.sourceAppName,
+                    bundleIdentifier: $0,
+                    processIdentifier: nil
+                )
+            }
+        }
+    }
+
+    private static func predictionContextSummary(
+        app: RunningApplicationContext?,
+        eventCount: Int,
+        feedbackCount: Int
+    ) -> String {
+        var parts: [String] = []
+        if let name = app?.localizedName {
+            parts.append("来源: \(name)")
+        }
+        if eventCount > 0 {
+            parts.append("轨迹: \(eventCount) 事件")
+        }
+        if feedbackCount > 0 {
+            parts.append("反馈: \(feedbackCount) 条")
+        }
+        return parts.isEmpty ? "无额外上下文" : parts.joined(separator: " · ")
+    }
+
+    private static func reuseCounts(byEntryID feedback: [RecommendationFeedback]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for item in feedback where item.kind == .accepted || item.kind == .copiedManually {
+            counts[item.entryID, default: 0] += 1
+        }
+        return counts
+    }
+
 
     private var timer: Timer?
     private var delayedStartTask: Task<Void, Never>?
@@ -326,6 +293,7 @@ final class HistoryStore: ObservableObject {
     var feedbackStore = RecommendationFeedbackStore()
     private var revealedPreferenceWindowTimer: Timer?
     private var lastPredictionEntryIDs: Set<UUID> = []
+    private var predictionGeneration = 0
 
     var weightsStore = RecommendationWeightsStore()
     private var contextCollector = SystemContextCollector()
@@ -436,14 +404,6 @@ final class HistoryStore: ObservableObject {
             setFavoriteForSelection(true)
         case .unfavoriteSelection:
             setFavoriteForSelection(false)
-        case .togglePredictionSuggestions:
-            showsPredictionSuggestions.toggle()
-            if showsPredictionSuggestions {
-                refreshPredictions()
-            } else {
-                predictionSuggestionEntries = []
-                predictionContextSummary = ""
-            }
         case .recordRecommendationAccepted(let entryID):
             let context = contextCollector.currentContext(
                 recentEntries: ClipboardEntryIntelligenceAdapter().summaries(for: entries),
@@ -536,9 +496,10 @@ final class HistoryStore: ObservableObject {
             )
             feedbackStore.recordCopiedManually(entryID: entry.id, context: context)
         }
-        if showsPredictionSuggestions {
-            refreshPredictions()
-        }
+        // 每次新复制都重算一次推荐：菜单栏可能随时被打开，而"每 2 秒轮询"在
+        // 无事发生时也在做全库分析（审计 R-11/R-21）。按复制事件驱动，
+        // 频率由用户动作决定，代价有界。
+        refreshPredictions()
     }
 
     private func promoteExistingEntryIfNeeded(for intakeEntry: ClipboardIntake.Entry, timestamp: Date) -> Bool {
@@ -648,30 +609,40 @@ final class HistoryStore: ObservableObject {
         LifecycleDebugLogger.logFromBackground("[OCR] \(Date()) \(message)")
     }
 
-        private var appSwitchTimer: Timer?
+        private var appSwitchObserver: NSObjectProtocol?
     private var lastFrontmostBundleID: String?
 
+    /// 用 `NSWorkspace.didActivateApplicationNotification` 取代 1 秒轮询：
+    /// 事件精确（不会漏掉 1s 内的来回切换），空闲时完全不产生 wake-up（审计 R-21）。
     private func startAppSwitchMonitor() {
         stopAppSwitchMonitor()
-        appSwitchTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        appSwitchObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
             Task { @MainActor [weak self] in
-                self?.checkAppSwitch()
+                self?.handleApplicationActivated(app)
             }
         }
     }
 
     private func stopAppSwitchMonitor() {
-        appSwitchTimer?.invalidate()
-        appSwitchTimer = nil
+        if let appSwitchObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(appSwitchObserver)
+            self.appSwitchObserver = nil
+        }
     }
 
-    private func checkAppSwitch() {
-        guard let app = NSWorkspace.shared.frontmostApplication,
-              let bundleID = app.bundleIdentifier,
+    private func handleApplicationActivated(_ app: NSRunningApplication?) {
+        guard let bundleID = app?.bundleIdentifier,
               bundleID != Bundle.main.bundleIdentifier else { return }
         if bundleID != lastFrontmostBundleID {
             lastFrontmostBundleID = bundleID
             _ = contextCollector.recordAppSwitch()
+            // 前台 App 变了，"猜你要粘贴"的依据就变了
+            refreshPredictions()
         }
     }
 

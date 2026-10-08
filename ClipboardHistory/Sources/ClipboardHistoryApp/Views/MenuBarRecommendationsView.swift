@@ -5,7 +5,6 @@ struct MenuBarRecommendationsView: View {
     @ObservedObject var historyStore: HistoryStore
     let appDelegate: AppDelegate
 
-    @State private var refreshTimer = Timer.publish(every: 2, on: .main, in: .common).autoconnect()
 
     var body: some View {
         Group {
@@ -50,7 +49,9 @@ struct MenuBarRecommendationsView: View {
             }
             Divider()
         }
-        .onReceive(refreshTimer) { _ in
+        .onAppear {
+            // 打开菜单时算一次即可。旧实现是每 2 秒无条件重算一次全库分析
+            // （500 条 × 两套正则），合上菜单也在跑（审计 R-11/R-21）。
             historyStore.refreshPredictions()
         }
     }

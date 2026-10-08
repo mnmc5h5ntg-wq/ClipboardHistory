@@ -215,7 +215,10 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.clipboardWriteErrorMessage, ClipboardWriteError.failedToWriteText.localizedDescription)
     }
 
-    func testPredictionSuggestionsAreHiddenUntilToggledAndLimitedToTopThree() {
+    /// 原来这条叫 "...AreHiddenUntilToggled..."：开关 `showsPredictionSuggestions`
+    /// 在全仓没有任何调用者（README 却宣传"侧边栏 Magic 可展开"），随死代码一起删除；
+    /// 保留的意图是 Top-3 上限与排序，改为直接触发 refreshPredictions()。
+    func testPredictionsAreCappedToTopThreeInRecencyOrder() {
         let store = makeStore(maxEntries: 10)
         for index in 0..<5 {
             store.add(
@@ -224,9 +227,7 @@ final class HistoryStoreTests: XCTestCase {
             )
         }
 
-        XCTAssertTrue(store.predictionSuggestionEntries.isEmpty)
-
-        store.perform(.togglePredictionSuggestions)
+        store.refreshPredictions()
 
         // 预测是在后台任务里算完再回主线程赋值的，用"等到真的有结果"取代固定 sleep：
         // 固定 0.3s 的写法在机器负载变化时会随机失败（本轮实测 5 次挂 3 次）。
@@ -234,7 +235,6 @@ final class HistoryStoreTests: XCTestCase {
             store.predictionSuggestionEntries.count == 3
         }
 
-        XCTAssertTrue(store.showsPredictionSuggestions)
         XCTAssertEqual(store.predictionSuggestionEntries.count, 3)
         XCTAssertEqual(store.predictionSuggestionEntries.first?.shortPreview, "item 4")
     }
@@ -257,7 +257,7 @@ final class HistoryStoreTests: XCTestCase {
         let store = makeStore(maxEntries: 10)
         store.add(intakeEntry(text: "older"), timestamp: Date(timeIntervalSince1970: 1))
         store.add(intakeEntry(text: "newer"), timestamp: Date(timeIntervalSince1970: 2))
-        store.perform(.togglePredictionSuggestions)
+        store.refreshPredictions()
 
         waitUntil(description: "预测结果就绪", timeout: 5.0) {
             !store.predictionSuggestionEntries.isEmpty

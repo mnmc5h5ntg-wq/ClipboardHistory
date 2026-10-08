@@ -33,6 +33,12 @@ struct ClipboardEntrySummary: Identifiable, Codable, Equatable, Hashable {
     var copiedAt: Date
     var sourceUTIs: [String]
     var sourceAppBundleID: String?
+    /// 敏感判定用的有界正文样本（最多 8KB）。以前只看 `preview` 的前 160 字，
+    /// 密钥出现在 161 字之后就会被漏过（审计 R-16 的"漏检"那一半）。
+    var sensitivitySample: String = ""
+    /// 文件条目的所在目录，Finder 目录亲和因子需要它
+    /// （旧实现拿 preview 比对整条目录路径，而 preview 只有文件名 ⇒ 该因子永远打不到满分）。
+    var sourceDirectoryPath: String? = nil
 }
 
 struct ContextPermissionState: Codable, Equatable, Hashable {

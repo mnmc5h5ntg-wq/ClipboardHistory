@@ -71,7 +71,9 @@ struct RuleBasedRecommendationEngine {
         features[.reuseFrequency] = reuseScore(for: entry, feedback: feedback) * weights.reuseFrequency
         features[.negativeFeedback] = negativeFeedbackScore(for: entry, feedback: feedback) * weights.negativeFeedback
         features[.semanticSimilarity] = behavioralRhythmScore(for: entry, context: request.context) * weights.semanticSimilarity
-        let hybrid = hybridFrequencyRecencyScore(for: entry, feedback: feedback)
+        // 频率×新鲜度混合分同样受"近因"权重控制：旧写法直接 max() 覆盖，
+        // 于是设置里把近因调到 0 也仍然打分（审计 P-02）。
+        let hybrid = hybridFrequencyRecencyScore(for: entry, feedback: feedback) * weights.recency
         features[.recency] = max(features[.recency] ?? 0, hybrid)
 
         if intelligence?.tags.contains(.passwordCandidate) == true
@@ -123,10 +125,10 @@ struct RuleBasedRecommendationEngine {
 
     /// 隐私过滤器：排除密码、API 密钥、信用卡号等敏感内容
     /// 检测敏感内容（GitHub Token / API Key / 信用卡 / 私钥 / JWT / 数据库连接串等）。
-    /// 注意：当前基于 `entry.preview`（前 160 字符），超长文本中的敏感内容可能漏检。
-    /// 完整改进方向：在 `HistoryStore.add()` 存储前对完整文本调用此检测。
+    /// 判定文本用 `sensitivitySample`（正文前 8KB），而不是只有 160 字的 preview；
+    /// 老数据/测试夹具里没有样本时退回 preview，保持可用。
     static func containsSensitiveContent(_ entry: ClipboardEntrySummary) -> Bool {
-        let text = entry.preview
+        let text = entry.sensitivitySample.isEmpty ? entry.preview : entry.sensitivitySample
         // GitHub token: ghp_...
         if text.range(of: "ghp_[A-Za-z0-9]{36,}", options: .regularExpression) != nil { return true }
         // OpenAI/API key: sk-...
@@ -146,10 +148,14 @@ struct RuleBasedRecommendationEngine {
             let digits = String(text[match]).filter { $0.isNumber }
             if Self.luhnCheck(digits) { return true }
         }
-        // AWS 等常见密钥前缀
-        let secretPrefixes = ["AKIA", "ABIA", "ACCA", "AGPA", "AIDA", "AIPA", "AKID", "ANPA", "APKA", "AROA", "ASIA"]
-        for prefix in secretPrefixes {
-            if text.contains(prefix) && text.count >= 20 { return true }
+        // AWS 等常见密钥前缀：必须紧跟 12 位以上大写字母/数字才算密钥。
+        // 旧写法只看"包含前缀 + 长度≥20"，于是 "ASIA-East 东京机房…"、"AROA 角色的信任策略…"
+        // 这类普通中文都会被剔除出推荐（审计 P-03 实测 2/4 误报）。
+        if text.range(
+            of: #"\b(?:AKIA|ABIA|ACCA|AGPA|AIDA|AIPA|AKID|ANPA|APKA|AROA|ASIA)[A-Z0-9]{12,}\b"#,
+            options: .regularExpression
+        ) != nil {
+            return true
         }
         // 纯 hex 超长串（可能是私钥）
         if text.range(of: "\\b[0-9a-fA-F]{64,}\\b", options: .regularExpression) != nil {
@@ -249,9 +255,10 @@ struct RuleBasedRecommendationEngine {
 
     private func finderDirectoryScore(for entry: ClipboardEntrySummary, context: ContextSnapshot) -> Double {
         guard let dir = context.finderDirectory?.path else { return 0 }
-        let preview = entry.preview.lowercased()
-        // 条目来自同目录 → 高匹配
-        if preview.contains(dir.lowercased()) {
+        // 旧实现拿 preview 去比对整条目录路径，而文件条目的 preview 只有文件名 ⇒
+        // "同目录 ⇒ 1.0" 这条分支实际不可达，该因子只剩 0.3 的"是文件"常数分。
+        if let sourceDirectory = entry.sourceDirectoryPath,
+           sourceDirectory.caseInsensitiveCompare(dir) == .orderedSame {
             return 1.0
         }
         // 条目是文件类型且 Finder 在前台 → 轻微加分
@@ -305,10 +312,16 @@ struct RuleBasedRecommendationEngine {
         return 0
     }
 
-    private func reuseScore(for entry: ClipboardEntrySummary, feedback: [RecommendationFeedback]) -> Double {
-        let acceptedCount = feedback.filter { item in
-            item.entryID == entry.id && (item.kind == .accepted || item.kind == .copiedManually)
+    /// 被采纳/再次复制的次数。文案层需要的是这个"次数"，
+    /// 不能从乘过权重的特征值反推（旧写法 `f[.reuseFrequency]/0.08` 在用户调权重后就错）。
+    static func reuseCount(for entryID: UUID, feedback: [RecommendationFeedback]) -> Int {
+        feedback.filter { item in
+            item.entryID == entryID && (item.kind == .accepted || item.kind == .copiedManually)
         }.count
+    }
+
+    private func reuseScore(for entry: ClipboardEntrySummary, feedback: [RecommendationFeedback]) -> Double {
+        let acceptedCount = Self.reuseCount(for: entry.id, feedback: feedback)
         return min(Double(acceptedCount) * 0.08, 0.24)
     }
 

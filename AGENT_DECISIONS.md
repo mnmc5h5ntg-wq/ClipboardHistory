@@ -22,6 +22,29 @@ name: decisions
 - 兼容性/迁移：不涉及数据格式。旧 `/tmp` 日志文件**不主动删除**（不是本 Agent 生成的也可能存在），只停止写入。`logAppState` 的调用点与文案不变 ⇒ 依赖它排查的工作流只需加环境变量。
 - 回滚：`git revert` 该提交即恢复原开关；无数据迁移。
 
+## D-008 推荐刷新改为事件驱动 + 显露偏好窗口语义修正（R-11 / R-21）
+
+- 背景：三处常驻轮询（0.5s 剪贴板、1s 前台 App、2s 菜单推荐）。2s 那次每次都对全库跑两套正则分析，且合上菜单也在跑。
+- 决定：① 前台 App 改用 `NSWorkspace.didActivateApplicationNotification`（顺带修掉"1 秒内的来回切换被合并成一次"的漏采）；② 删掉 2s 定时器，改为"菜单内容 `onAppear` + 每次新复制 + 前台切换"三类事件驱动；③ 保留 0.5s 剪贴板轮询（NSPasteboard 没有变更回调，这是这类工具的必需项）；④ 预测任务加代际号，只有最新一代可回写界面。
+- 行为变化（重要）：**"显露偏好窗口"（30s 内手动复制 ⇒ 记一条 copiedManually 隐式反馈）的开启时机从"开始计算推荐时"改为"推荐真正显示出来时"**。
+  - 为什么：事件驱动后 `refreshPredictions()` 每次复制都会跑，若沿用"开始计算就开窗"，第二次复制起每一条复制都会被记成反馈，而引擎把 `copiedManually` 当作复用加分 ⇒ 排序自我强化。这个错误是我在改造过程中被自己的测试抓到的（反馈数 2 变 3）。
+  - 影响面：反馈记录变少（只统计"看过推荐之后又复制了别的东西"），排序更保守；不改数据格式。
+  - 回滚：`git revert` 本提交。
+- 关联删除：`showsPredictionSuggestions` / `.togglePredictionSuggestions` 随死代码删除（全仓无调用者）；README 里"侧边栏 Magic 可展开"的承诺因此必须改（R-12，待办）。
+
+## D-009 反馈载荷瘦身带来的跨版本读取差异（R-06 补充）
+
+- 决定：`ClipboardEntrySummary` 新增两个**带默认值**的字段（`sensitivitySample`、`sourceDirectoryPath`）。
+- 兼容性：成员初始化器对新字段给默认值 ⇒ 既有调用点与旧 `history.json`（不含这两个字段）都能解码；反馈 blob 已收窄为元数据，因此旧版本读新记录会得到"无反馈"而不是崩溃。
+- 回滚：`git revert`。旧字段缺失时按默认值处理，不产生不可读状态。
+
+## D-010 图片分析跨线程边界（R-19）
+
+- 背景：`Task.detached` 里处理 `[ClipboardEntry]`（`.image` 携带 `NSImage`），靠 `@unchecked Sendable` 才编得过；上一轮文档把同类问题标成"已完成"。
+- 决定：新增 `ClipboardEntryRawSnapshot`（纯字符串快照，含图片的像素尺寸描述），分析入口改为 `recommend(snapshots:)`；`ClipboardEntryIntelligenceAdapter` 的 entry 版本保留并委托给 snapshot 版本。
+- 效果：NSImage 不再跨 actor；分析仍是一次全库扫描（现在只在事件驱动时发生）；`LocalRecommendationService.recommend(entries:)` 旧签名保留 ⇒ 现有测试与调用点不动。
+- 回滚：`git revert`。
+
 ## D-008 图片重复判定改为"尺寸 + 64×64 采样哈希"（R-08）
 
 - 背景：`StoredImage` 指纹原本把整张位图绘制进 `宽×高×4` 的缓冲区再做 SHA256，且在主线程、构造即算。实测 1200×900 单张 7.4ms；启动载入 8 张 2000×1500 共 605.8ms；12 张 1600×1200 载入 413.9ms。
