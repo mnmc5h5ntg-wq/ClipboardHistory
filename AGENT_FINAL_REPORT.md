@@ -129,6 +129,13 @@ CI 不是装饰：runner 是 Swift 6.1.2、开发机是 6.2.1，两条只有远�
 
 两条都是"我本机全绿"覆盖不到的那类问题 —— 也是这条 CI 存在的理由。
 
+## 8c. 仓库位置变更（发布之后）
+
+仓库已从 `~/Documents/Codex_Project0` 移到 **`/Users/wangziyi/Codex_Project0`**，脱离 iCloud「桌面与文稿」同步范围；旧路径留了一个指向新位置的符号链接，确认无误后可删。
+移动后的验证：`swift build` 0 告警、`swift test` 229 例全绿、发布脚本测试 18 例、`make bundle` 产出通用二进制且包内版本 1.4.7、`git status` 干净、HEAD 与 tag 与远端一致。
+
+两条实测事实值得记下来：跨出 iCloud 同步边界的 `mv` 会 `Operation timed out`，必须改用 `rsync -a` 复制 + 校验 + 删源；而 `~/Documents` 下的 `名字 2.扩展名` 重复副本**具体由谁产生我没有查清**（`Codex_Project0_backups` 是 6 月 8 日的手工快照、`Codex_Project0.zip` 是 6 月 5 日的，都不是），只能说移出同步范围消除了最可能的那条路径，不能保证它永不复发 —— 复发时的特征是`Sources/` 下出现重复类型声明、构建报类型歧义。
+
 ## 9. 复跑（本轮结束时的实际输出）
 
 ```bash

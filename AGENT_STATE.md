@@ -1,7 +1,12 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
 最后更新：2026-10-09 01:4x（本地）
-分支：`fix/audit-remediation`（从 `main` @ `db077f6` "Prepare v1.3 release" 切出）
+**仓库位置（2026-10-09 起）**：`/Users/wangziyi/Codex_Project0`。
+原先在 `~/Documents/Codex_Project0`，那在 iCloud「桌面与文稿」同步范围内（`CloudDocs/Documents` 是指向 `~/Documents` 的符号链接，
+`bird` 在跑），同步会在仓库里留下 `名字 2.扩展名` 的重复副本 —— 本次就出现 29 个，SwiftPM 把 `Sources/` 下的类型编译两遍，构建直接崩，
+第一次发布准备因此失败。旧路径现在是一个指向新位置的**符号链接**（保住旧书签/旧会话路径），确认无误后可以删掉它。
+搬离时实测：跨出同步边界的 `mv` 会 `Operation timed out`（File Provider 需要先物化），要用 `rsync -a` 复制 + 校验 + 再删源。
+分支：`fix/audit-remediation` 已删除（本地与远端；其提交全部在 `main` 上，删除前用 `git log main..分支` 验过为 0）
 回滚基线：提交 `8007b19` "Checkpoint: 1.4.5 working state before audit remediation" —— 修复前工作区的全部 WIP（含此前未被 git 跟踪的 `Intelligence/` 等 25 个路径）已入该提交。**任何一步都可以 `git revert` 或 `git diff 8007b19..HEAD` 审查。**
 
 ## 权限与边界（本轮）
