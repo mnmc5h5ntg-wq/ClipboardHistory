@@ -2,8 +2,9 @@
 
 生成时间：2026-10-09（本地）
 基线：`main` @ `db077f6`；修复前工作点 `8007b19`
-**已发布**：`main` 已推送，tag `v1.4.6` → 发布准备提交，GitHub Release 已上线并接管 Latest
-（附件 `ClipboardHistory_v1.4.6.dmg` + `.sha256`，发布后重新下载校验通过）。发布说明：https://github.com/mnmc5h5ntg-wq/ClipboardHistory/releases/tag/v1.4.6
+**已发布**：`main` 已推送；**Latest = v1.4.7**（v1.4.6 保留不动）。
+两版都是发布后从 GitHub 重新下载两个附件、`shasum -a 256 -c` 通过，并挂载 DMG 复核包内版本与通用二进制。
+发布说明：https://github.com/mnmc5h5ntg-wq/ClipboardHistory/releases/tag/v1.4.7
 账本：`AGENT_STATE.md`（状态与复跑命令）、`AGENT_BACKLOG.md`（190 格矩阵 + 54 行待办）、`AGENT_DECISIONS.md`（D-000…D-014）、`AGENT_UI_AUDIT.md`（视觉审计与复验记录）
 外部审计报告（只读阶段产物，仓库外）：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-08/`
 
@@ -111,6 +112,13 @@
 - 数据兼容：本轮所有数据布局改动都是"新写旧读" —— `history.json` 文件名、v1 格式、字段全部不变；新增的 `.bak`、`history.corrupt-*.json` 是附加文件，旧版本读不到也不受影响，因此**降级可运行**，回滚不产生需要清理的残留。
 
 ---
+
+## 8a. 为什么有两个版本号（v1.4.6 与 v1.4.7）
+
+v1.4.6 的 tag 打在发布准备提交上，而 CI 首跑抓到的两处修复在其后才合入 main —— 于是**已上传的产物里没有那两处修复**。
+这正是本文件一直警惕的「源码已修 ≠ 已交付」。处置：不动 v1.4.6，把增量单独发成 v1.4.7（用户选定），
+并在 v1.4.7 的发布说明里写清两版关系与唯一的产品行为差异。附带一条流程改进：**Release 附件名一律用 ASCII**，
+因为 GitHub 会吞掉非 ASCII 前缀，导致 `.sha256` 记录的名字与实际附件名不一致、用户校验必然失败（v1.4.6 首传就中了）。
 
 ## 8b. 发布后 CI 首跑抓到的两条（值得记下来）
 
