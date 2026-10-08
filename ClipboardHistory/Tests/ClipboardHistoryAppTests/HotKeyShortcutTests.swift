@@ -1,4 +1,5 @@
 import Carbon
+import Carbon.HIToolbox
 import XCTest
 @testable import ClipboardHistoryApp
 
@@ -46,5 +47,26 @@ final class HotKeyShortcutTests: XCTestCase {
         )
 
         XCTAssertEqual(shortcut.displayString, "⇧⌘←")
+    }
+    /// R-32：符号键必须显示成字形本身，而不是退化成「Key 27」。
+    func testSymbolKeysHaveReadableNames() {
+        let expected: [(UInt32, String)] = [
+            (UInt32(kVK_ANSI_Minus), "-"),
+            (UInt32(kVK_ANSI_Equal), "="),
+            (UInt32(kVK_ANSI_LeftBracket), "["),
+            (UInt32(kVK_ANSI_RightBracket), "]"),
+            (UInt32(kVK_ANSI_Backslash), "\\"),
+            (UInt32(kVK_ANSI_Semicolon), ";"),
+            (UInt32(kVK_ANSI_Quote), "'"),
+            (UInt32(kVK_ANSI_Comma), ","),
+            (UInt32(kVK_ANSI_Period), "."),
+            (UInt32(kVK_ANSI_Slash), "/"),
+            (UInt32(kVK_ANSI_Grave), "`"),
+        ]
+        for (code, name) in expected {
+            let shortcut = HotKeyShortcut(keyCode: code, modifiers: UInt32(cmdKey))
+            XCTAssertEqual(shortcut.displayString, "\u{2318}" + name,
+                           "键位 \(code) 应显示成 \u{2318}\(name)，而不是退化成 Key N")
+        }
     }
 }

@@ -7,12 +7,16 @@ BUILD_X := ClipboardHistory/.build/x86_64-apple-macosx/debug
 UNI     := /tmp/$(BINARY)_universal
 ICONS   := ClipboardHistory/.build/arm64-apple-macosx/debug/ClipboardHistory_ClipboardHistoryApp.bundle/AppIcon.icns
 STAGE   := /tmp/$(APP_NAME)_bundle
+BUILD_HINT := 构建失败：若报错里有 not registered 或 missing inputs: DerivedSources，说明 .build 处于半删除状态；执行 rm -rf ClipboardHistory/.build 后重试
 
 .PHONY: build run clean bundle dmg
 
+# SwiftPM 的两个 --triple 目录共用一份构建数据库；只删掉其中一个（或被中断）之后，
+# 下一次 build 会报 `not registered` / `missing inputs: DerivedSources/...`，
+# 而且不会自己恢复。本轮实测撞到两次，所以失败时把唯一有效的处置打出来。
 build:
-	cd ClipboardHistory && swift build --triple arm64-apple-macosx
-	cd ClipboardHistory && swift build --triple x86_64-apple-macosx
+	cd ClipboardHistory && swift build --triple arm64-apple-macosx || { echo "$(BUILD_HINT)"; exit 1; }
+	cd ClipboardHistory && swift build --triple x86_64-apple-macosx || { echo "$(BUILD_HINT)"; exit 1; }
 	lipo -create "$(BUILD_A)/$(BINARY)" "$(BUILD_X)/$(BINARY)" -output "$(UNI)"
 	@echo "✅ Universal Binary ready (arm64 + x86_64)"
 
