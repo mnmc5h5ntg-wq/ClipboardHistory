@@ -152,6 +152,36 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.map(\.content), [.text("three"), .text("two")])
     }
 
+    func testFilteredEntriesCacheReflectsEveryKindOfMutation() throws {
+        let store = makeStore(maxEntries: 10)
+        store.add(intakeEntry(text: "alpha"), timestamp: Date(timeIntervalSince1970: 1))
+        store.add(intakeEntry(text: "beta"), timestamp: Date(timeIntervalSince1970: 2))
+
+        // 1) entries 变化后必须立刻可见
+        store.perform(.updateSearch("alpha"))
+        XCTAssertEqual(store.filteredEntries.map(\.shortPreview), ["alpha"])
+        store.add(intakeEntry(text: "alphabet"), timestamp: Date(timeIntervalSince1970: 3))
+        XCTAssertEqual(store.filteredEntries.map(\.shortPreview), ["alphabet", "alpha"], "新增条目必须让缓存失效")
+
+        // 2) 删除后不得留在缓存里
+        let target = try XCTUnwrap(store.entries.first { $0.content == .text("alpha") })
+        store.perform(.delete(target))
+        XCTAssertEqual(store.filteredEntries.map(\.shortPreview), ["alphabet"])
+
+        // 3) 筛选条件变化
+        store.perform(.updateSearch(""))
+        store.perform(.updateFilter(.favorites))
+        XCTAssertTrue(store.filteredEntries.isEmpty, "没有收藏项时收藏筛选应为空")
+        let kept = try XCTUnwrap(store.entries.first)
+        store.perform(.toggleFavorite(kept))
+        XCTAssertEqual(store.filteredEntries.map(\.shortPreview), ["alphabet"], "收藏变化后必须重新求值")
+
+        // 4) 清空
+        store.perform(.updateFilter(.all))
+        store.perform(.clear)
+        XCTAssertEqual(store.filteredEntries.count, 1)
+    }
+
     func testPerformUpdatesSearchAndFiltersEntries() {
         let store = makeStore(maxEntries: 10)
         store.add(intakeEntry(text: "hello"))

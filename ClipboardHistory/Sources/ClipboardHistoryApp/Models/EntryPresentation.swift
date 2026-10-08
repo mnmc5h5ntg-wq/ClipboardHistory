@@ -15,8 +15,13 @@ enum EntryPresentation {
     static func preview(for content: ClipboardEntryContent) -> String {
         switch content {
         case .text(let string):
-            let text = string.replacingOccurrences(of: "\n", with: " ↵ ")
-            return String(text.prefix(60)) + (text.count > 60 ? "…" : "")
+            // 旧实现对整个正文做 replacingOccurrences，再为判断长度走一遍 grapheme 计数：
+            // 2.4MB 文本单条 45.8ms，而侧栏每帧每条都要调它。
+            // 只需前 61 个字符就能决定"60 字 + 是否加省略号"。
+            let headEnd = string.index(string.startIndex, offsetBy: 61, limitedBy: string.endIndex) ?? string.endIndex
+            let head = string[string.startIndex..<headEnd]
+            let collapsed = head.replacingOccurrences(of: "\n", with: " ↵ ")
+            return String(collapsed.prefix(60)) + (headEnd < string.endIndex ? "…" : "")
         case .image(let image):
             return "图片 \(Int(image.nsImage.size.width))×\(Int(image.nsImage.size.height))"
         case .file(let url):

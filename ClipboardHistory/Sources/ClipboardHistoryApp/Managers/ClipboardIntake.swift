@@ -99,7 +99,7 @@ struct ClipboardIntake {
 
         if let pngData = pasteboard.data(forType: .png),
            let image = NSImage(data: pngData) {
-            let stored = StoredImage(image)
+            let stored = StoredImage(image, pngData: pngData)
             return makeEntry(content: .image(stored), thumbnail: stored, pasteboard: pasteboard)
         }
 
