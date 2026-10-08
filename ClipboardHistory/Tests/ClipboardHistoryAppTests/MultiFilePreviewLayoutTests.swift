@@ -52,4 +52,21 @@ final class MultiFilePreviewLayoutTests: XCTestCase {
 
         XCTAssertEqual(height, MultiFilePreviewLayout.maximumPreviewHeight)
     }
+
+    /// UI 量化检查 5：系统「减弱动态效果」必须真的把会改变尺寸/位置的动画退化为无动画。
+    /// `accessibilityDisplayShouldReduceMotion` 是全局状态、测试改不了，
+    /// 所以断言打在"取值参数化"后的纯函数上。
+    func testReduceMotionRemovesLayoutAnimation() {
+        XCTAssertEqual(MultiFilePreviewLayout.animation(reduceMotion: true), .linear(duration: 0),
+                       "开启减弱动态后展开/收起不该再有位移")
+        XCTAssertNotEqual(MultiFilePreviewLayout.animation(reduceMotion: false), .linear(duration: 0),
+                          "没开的时候不能顺手把动画也关掉")
+    }
+
+    func testReduceMotionKeepsCollapsedRowAtFullSize() {
+        XCTAssertEqual(MultiFilePreviewLayout.collapsedScale(reduceMotion: true), 1,
+                       "缩放也属于会动的那一类")
+        XCTAssertEqual(MultiFilePreviewLayout.collapsedScale(reduceMotion: false),
+                       MultiFilePreviewLayout.collapsedScale)
+    }
 }

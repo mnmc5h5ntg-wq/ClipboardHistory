@@ -9,7 +9,7 @@
 
 ## 1. 一句话结论
 
-审计发现的 6 个 S1 级问题全部关闭，其中 4 个是**真实的数据丢失或隐私泄露路径**；主线程上四条最热的卡顿路径被实测消除；测试从"只跑 3 个用例就崩"变成 **227 个用例、连跑 6 次全绿、干净构建 0 告警**；矩阵 190 格全部判定完毕，backlog 待办归零。有 5 件事我**没能验证**，写在第 6 节，没有混进"已完成"。
+审计发现的 6 个 S1 级问题全部关闭，其中 4 个是**真实的数据丢失或隐私泄露路径**；主线程上四条最热的卡顿路径被实测消除；测试从"只跑 3 个用例就崩"变成 **229 个用例、连跑 6 次全绿、干净构建 0 告警**；矩阵 190 格全部判定完毕，backlog 待办归零。有 7 件事我**没能验证**，写在第 6 节，没有混进"已完成"。
 
 ---
 
@@ -85,7 +85,8 @@
 3. **hover / 拖拽选中间态 / 快捷键录制态 / 多文件展开态**：需要真实鼠标事件，离屏拿不到。
 4. **菜单栏视图的帧**：故意不拍 —— 构造 `AppDelegate()` 会加载**用户真实历史库**，为拍一张图去读真实数据不可接受（D-002）。改用 `menuLabel` 的单元测试覆盖。
 5. **双实例守卫的端到端实跑**：真要跑就得启动 App，而它会读写用户真实数据目录；除非先给数据目录加一个环境变量接缝（这一条我明确没做，见第 7 节建议）。
-6. **Gatekeeper/公证**：产物仍是 ad-hoc 签名，`spctl` 依旧 rejected。这需要 Developer ID，属于 Roadmap，不是代码能解决的。
+6. **减弱动态效果的真实观感**：判定逻辑有单测，但本环境无法切换系统设置去实看。
+7. **Gatekeeper/公证**：产物仍是 ad-hoc 签名，`spctl` 依旧 rejected。这需要 Developer ID，属于 Roadmap，不是代码能解决的。
 
 顺带：子代理报来 44 条文档不符，其中 **2 条被我判为误报**并留下理由 —— README 的 `git clone` 后 `cd ClipboardHistory && make build` 其实是对的（仓库名就是 ClipboardHistory，Makefile 就在那一层）；`docs/agents/domain.md` 原文已带 "if it exists" 限定。
 
@@ -114,7 +115,7 @@
 ```bash
 cd ClipboardHistory
 swift build                      # 清空 .build 后干净重建：0 告警
-swift test                       # Executed 227 tests, 1 skipped, 0 failures（连跑 6 次一致）
+swift test                       # Executed 229 tests, 1 skipped, 0 failures（227 之后又补了 2 条减弱动态的判定测试；连跑 6 次一致）
 python3 -m unittest discover -s scripts/tests    # Ran 17 tests, OK
 cd .. && make dmg                # 退出码 0，产出 .dmg 与 .dmg.sha256
 shasum -a 256 -c 时间剪史_v1.4.5.dmg.sha256      # OK（改一个字节即 FAILED，已验证）

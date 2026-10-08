@@ -135,10 +135,25 @@ enum MultiFilePreviewLayout {
     static let animationDuration = 0.22
 
     static var animation: Animation {
+        animation(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+    }
+
+    /// 纯函数版：`accessibilityDisplayShouldReduceMotion` 是系统全局状态，测试改不了，
+    /// 所以把判断留在这里、把取值做成参数，才有办法被断言（审计 UI 量化检查 5）。
+    static func animation(reduceMotion: Bool) -> Animation {
+        // 「减弱动态效果」开启时，展开/收起与高度变化直接跳到终态。
+        // 只掐会改变位置或尺寸的动画；0.11–0.14s 的颜色/透明度渐变保留，
+        // 那类不是前庭刺激源，去掉只会让界面显得迟钝。
+        if reduceMotion { return .linear(duration: 0) }
         if #available(macOS 14, *) {
             return .snappy(duration: animationDuration, extraBounce: 0)
         }
         return .interactiveSpring(response: animationDuration, dampingFraction: 0.88, blendDuration: 0.02)
+    }
+
+    /// 收起态的缩放同样属于"会动的"那一类：减弱动态时保持原尺寸。
+    static func collapsedScale(reduceMotion: Bool) -> CGFloat {
+        reduceMotion ? 1 : collapsedScale
     }
 
     static func preferredHeight(for url: URL, availableWidth: CGFloat) -> CGFloat {
@@ -232,7 +247,9 @@ private struct CollapsibleFilePreview<Content: View>: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .clipped()
                     .scaleEffect(
-                        isExpanded ? 1 : MultiFilePreviewLayout.collapsedScale,
+                        isExpanded ? 1 : MultiFilePreviewLayout.collapsedScale(
+                            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                        ),
                         anchor: .top
                     )
                     .frame(height: isExpanded ? targetHeight : 0, alignment: .top)
