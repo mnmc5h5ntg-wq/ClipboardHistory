@@ -2,7 +2,8 @@
 
 ### Issue tracker
 
-Issues and PRDs are tracked as local markdown files under `.scratch/`, then can be promoted to GitHub Issues during release preparation. See `docs/agents/issue-tracker.md`.
+Issues and PRDs are drafted as local markdown files under `.scratch/` (currently empty) and promoted to
+GitHub Issues, which is where the live tracker actually is (`gh issue list`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

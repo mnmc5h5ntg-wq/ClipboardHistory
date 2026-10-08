@@ -1,3 +1,5 @@
+> **历史快照**：本文里的行数、测试数、文件清单与结论都是**写下它那天**的状态，不代表当前代码（当前基线请看 `AGENT_STATE.md` 与 `swift test` 的实际输出）。保留原文是为了留痕，不要照它行事。
+
 # v1.2.1 Issue 状态报告
 
 更新时间：2026-06-06
@@ -57,12 +59,13 @@
 
 ## GitHub 操作建议
 
-本地当前环境没有可用的 `gh` 命令，也没有 `GITHUB_TOKEN` 或 GitHub HTTPS credential，因此无法自动关闭/新增 Issues。
+（此段为当时状态）现在本机 `gh` 可用且已认证：`/opt/homebrew/bin/gh`，`gh issue list` / `gh release list` 均可直接执行，无需再去网页操作。
 
 建议在 GitHub 网页中执行：
 
 1. 关闭 #2、#3、#4、#6、#7、#8、#9、#12。
 2. 保留 #5、#10、#11、#13。
+   更新：#10、#11 已关闭；当前 open 的是 #5、#13、#16（`gh issue list --state open` 实测）。
 3. 如果 GitHub 上已有“macOS 全屏顶部白条问题”，建议标记为已完成并关闭。
 4. 如果 GitHub 上已有“Developer ID 公证”相关 Issue，建议改为长期规划 / wontfix-now，不放入 v1.3 短期开发范围。
 5. 新建 v1.2.2 / v1.3 规划 Issues：Release 附件命名、多版本安装/Launchpad 旧图标、历史持久化、缩略图缓存、收藏夹、全局快捷键、开机启动、菜单栏快速粘贴、Release 自动化校验、性能优化剩余项。

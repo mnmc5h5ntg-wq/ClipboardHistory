@@ -6,10 +6,11 @@
 
 - App「时间剪史」，GitHub `mnmc5h5ntg-wq/ClipboardHistory`
 - 本地：v1.4.5，OCR/反馈/推荐/粘贴 均已完成
-- 构建：`swift build` ✅（135 个测试全绿），DMG：`时间剪史_v1.4.5.dmg`
-- 五维度审查报告：`docs/CODE_REVIEW_v1.4.5.md`（安全/质量/Bug/并发/架构）
+- 构建：`swift build` ✅，`swift test` ✅（实测 `Executed 224 tests, 1 skipped, 0 failures`；
+  那个 skip 是离屏视觉捕获套件，只在设置 `CLIPBOARD_HISTORY_UI_SHOTS` 时才跑）；DMG：`时间剪史_v1.4.5.dmg`
+- 五维度审查报告：`docs/CODE_REVIEW_v1.4.4.md`（安全/质量/Bug/并发/架构）—— 仓库里没有 v1.4.5 那份
 - 已修复 8 项中高优先级审查问题（含隐私过滤开关可配置化）
-- 未提交 Git（大量未推送修改）
+- 工作区干净（`git status --short` 无输出）；提交都还没 push 到远端
 
 ## 2. 核心架构决策
 
@@ -143,13 +144,13 @@ Sources/ClipboardHistoryApp/
 
 ## 6. 已知未完成
 
-- 大量代码未提交 Git，未推送 GitHub
+- 提交已全部落在本地分支，未推送 GitHub
 - 折叠按钮移除方案不优雅
 - 窗口/浏览器域名采集时机需修复
 - DMG 为 ad-hoc 签名，未 notarize
 - 剪贴板内容明文存储（history.json + images/）— 高优先级加密待做
 - 搜索框右键菜单未能彻底清除（field editor 层级复杂）
-- HistoryStore 852 行 God Object 倾向 — 建议后续提取 PredictionCoordinator
+- HistoryStore 928 行 God Object 倾向 — 建议后续提取 PredictionCoordinator
 
 ## 7. 测试启动命令
 
@@ -167,9 +168,9 @@ open -n /Users/wangziyi/Documents/Codex_Project0/时间剪史.app
 ### 验证状态
 - `swift build` ✅
 - `swift build --triple arm64-apple-macosx12.0` ✅
-- `swift test` ✅ 135/135
+- `swift test` ✅ 224 执行 / 1 按设计 skip / 0 失败
 - `make bundle` ✅ (Universal Binary, ad-hoc signed)
-- 所有 12 处 `#available`/`@available` 守卫均有正确的退化路径
+- 所有 11 处 `#available`/`@available` 守卫均有正确的退化路径
 
 ### 已知 macOS 12 差异（设计如此，非缺陷）
 | 功能 | macOS 12 | macOS 13+ |
@@ -206,7 +207,7 @@ open -n /Users/wangziyi/Documents/Codex_Project0/时间剪史.app
 - `DispatchQueue.main.async { NSApp.hide(nil) }`延迟执行 ← 不行
 - 弱引用直接窗口恢复 ← 不行
 
-**当前状态**：已加入详细诊断日志（WindowConfigurator.windowShouldClose / windowWillClose + WindowManager.showMainWindow）。LifecycleDebugLogger 临时默认开启。
+**当前状态**：已加入详细诊断日志（WindowConfigurator.windowShouldClose / windowWillClose + WindowManager.showMainWindow）。LifecycleDebugLogger **默认关闭**，只有设 `CLIPBOARD_HISTORY_DEBUG=1` 才写，且写在 `~/Library/Logs/时间剪史/`（目录 0700、文件 0600）—— 早先「临时默认开启 + 写 /tmp」那一版已经改掉。
 
 **下一步**：在 macOS 12 虚拟机上测试，抓取 `/tmp/时间剪史_lifecycle_debug.log`，分析 `windowShouldClose` 返回 false 后系统是否仍然销毁了窗口。
 

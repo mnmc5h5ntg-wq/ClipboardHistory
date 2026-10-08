@@ -106,18 +106,22 @@ ClipboardHistory/Tests/ClipboardHistoryAppTests/IntelligenceModelsTests.swift
 - `RuleBasedRecommendationEngineTests`：验证最近内容、收藏、反馈、浏览器 URL 上下文、敏感标签降权。
 - `ClipboardEntryIntelligenceAdapterTests` 和 `LocalRecommendationServiceTests`：验证现有历史条目可以进入推荐链路。
 
-该内核目前没有接入 UI，也不会改变用户体验。
+（更新）该内核已经接入用户可见入口：菜单栏「猜你要粘贴」Top 3（`MenuBarController` / `MenuBarRecommendationsView`）与 `HistoryStore` 的事件驱动预测刷新。仍然不接任何云端模型。
 
 
-## Magic 推荐入口 MVP
+## Magic 推荐入口 MVP（设计稿，入口形态已改）
 
-当前已将本地推荐链路接入一个轻量用户可见入口：
+下面是当初的设计；**侧边栏 `Magic` 按钮从未实现**（`grep -r Magic Sources/` 无命中），
+入口最终落在菜单栏，且行为与设计不同。保留本节只为留痕。
 
-- 侧边栏顶部原「时间剪史」标题在普通单选状态下改为 `Magic` 按钮。
-- 点击后展开「猜你要粘贴」。
-- 只展示 `RuleBasedRecommendationEngine` 生成的 Top 3。
-- 不接模型，不改剪贴板内容，不拦截 `⌘V`。
-- 点击推荐条目复用普通历史选择逻辑。
+设计（未实现部分已标注）：
+
+- ~~侧边栏顶部标题改为 `Magic` 按钮~~ —— 未实现，侧边栏标题仍是纯文本。
+- 「猜你要粘贴」入口实际在**菜单栏**里，不需要先展开。
+- 只展示 `RuleBasedRecommendationEngine` 生成的 Top 3 —— 与现状一致。
+- ~~不改剪贴板内容、不拦截 `⌘V`、点击等同普通选择~~ —— **与现状相反**：
+  点击一条推荐会复制该记录并向「系统事件」发送一次 `⌘V` 把它粘贴到前台应用。
+  这条差异曾让 README 写出与代码相反的承诺（审计 R-12），现已按现状改正。
 
 这一步的目的不是宣称 AI 已完成，而是用真实 UI 逐步观察规则推荐是否有价值。
 
