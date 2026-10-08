@@ -74,7 +74,7 @@
 | R-17 | 推荐"复用 N 次"随权重显示错误数字；权重全 0 仍打分 | `Managers/HistoryStore.swift:193`、`RuleBasedRecommendationEngine.swift:63-64`；P-02 | 文案直接用 feedback 计数；hybrid 分数乘 `weights.recency` | 单测：权重 0.5 ⇒ 次数不变；全 0 ⇒ 排序退化为收藏/时间为序 | 中 | 已完成(cb3a69b) |
 | R-18 | Finder 目录因子不可达 + 6 位数字过度标注 | `RuleBasedRecommendationEngine.swift:236-249` vs `ClipboardEntryIntelligenceAdapter.swift:57-68`；P-04 | summary 带上目录路径使因子可达；验证码规则要求"验证码/短信/校验"上下文词 | 单测：同目录文件得 1.0；`会议室 823417` 不再标 verificationCode | 中 | 已完成(cb3a69b) |
 | R-19 | `@unchecked Sendable` 让 NSImage 进后台 | `Models/ClipboardEntry.swift:3`、`StoredImage.swift:4`、`HistoryStore.swift:145-146` | detached 任务只接收 `ClipboardEntrySummary`（值类型），NSImage 不入后台 | `swift build -Xswiftc -strict-concurrency=complete` 告警数下降；行为不变 | 中 | 已完成(cb3a69b) |
-| R-20 | 历史数据 version 字段从未做迁移；时钟异常即批量丢弃 | `HistoryPersistence.swift:188`（`version: 1` 从不读）、P-16 | 载入时按 version 走显式迁移函数（当前 v1→v1 占位）；过期项移到 `history.expired.json` 而非直接覆盖 | 单测：version=2 的存档能载入；41 天条目不被静默删除而是移入 expired | 中 | 待办 |
+| R-20 | 历史数据 version 字段从未做迁移；时钟异常即批量丢弃 | `HistoryPersistence.swift:188`（`version: 1` 从不读）、P-16 | 载入时按 version 走显式迁移函数（当前 v1→v1 占位）；过期项移到 `history.expired.json` 而非直接覆盖 | 单测：version=2 的存档能载入；41 天条目不被静默删除而是移入 expired | 中 | 已完成(6c08620) |
 | R-21 | 三个轮询从不暂停（电池） | `HistoryStore.swift:344,626`、`MenuBarRecommendationsView.swift:8` | App 切换改 `NSWorkspace.didActivateApplicationNotification`；失焦时降频/暂停 | 实测静置 60s 的定时器触发次数（前/后） | 中 | 已完成(cb3a69b) |
 | R-22 | 无剪贴板体积/张数上限 | `ClipboardIntake.swift:80-83`、`MediaLoader.swift:124-127`、P-08（2MB 入库） | 文本 256KB 截断标记；预览读 256KB；图片像素上限只存缩略 | 单测：2MB 文本入库后 `content` 有截断标记且 <阈值；预览不含全量 | 中 | 已完成(50e5a4e) |
 | R-23 | 图片/文件条目的 OCR 取帧在主线程 | `HistoryStore.swift:528-556`（`scheduleOCRIfNeeded` 同步 `NSImage(contentsOf:)` + `cgImage(forProposedRect:)`，只有 Vision 调用进了后台队列）；启动路径 `ApplicationShell.swift:50 → scheduleOCRForExistingImages()` 对**每一张**待 OCR 图片各跑一遍；P-13 = 16.9ms/张 | 取帧移到后台队列，主线程只写回 `ocrText` | 单测：`add` 期间无 `NSImage(contentsOf:)` 主线程调用（以计时/替身验证） | 中 | 已完成(4324441) |
@@ -97,22 +97,22 @@
 | ID | 项 | 证据 | 判定 | 价值 | 状态 |
 |---|---|---|---|---|---|
 | R-14 | 死代码：`HistoryPrivacyCopy` 已接入隐私页（见 D-013）；`registerMainWindow` 已有调用者；剩余 AI 层与 `docs/ai/` 保留为设计稿（AI 层 250 行、`HistoryPrivacyCopy` 未接入、`menuTitle`、`recordIgnored/Reverted/reset/forEntry`、`switchPattern`、`markCurrentChangeCount`、`reset*Shortcut`、`registerMainWindow`、侧栏 Magic 状态、孤儿注释、空 `if let`） | `02-确认缺陷.md` D-1 全清单 | **选择性做**：删空 `if let`（唯一告警）、把 `HistoryPrivacyCopy` 接入隐私页（有价值的文案）、`registerMainWindow` 补调用或删死分支；AI 层与 `docs/ai/` 保留但标注"设计稿"（删除会毁掉设计意图记录） | 低-中 | 部分完成(隐私文案已接入) |
-| R-16b | `ocrLog` 无条件写 | 并入 R-01/R-30 | 低 | 待办 |
+| R-16b | `ocrLog` 无条件写 | 并入 R-01/R-30 | 低 | 已完成(cb8db30) |
 | R-25 | `CompatibleSplitView` 双宽度约束冗余 | `SettingsView.swift` 尾部 | **不改**：本机 macOS 13+，该分支不可达，删了无法视觉复验；与 R-24 同一处置 | 低 | 记录不改 |
-| R-29 | 测试无性能基准；本轮引入 4 条基准用例后需注意其耗时 | 新增 `PerfBudgetTests` | 基准用"上界断言"，设宽松阈值避免抖动 | 低 | 待办 |
-| R-32 | 快捷键键名表 59 项手写、未覆盖符号键 | `HotKeyShortcut.swift:82-144` | 只补 `/`、`-`、`=`、`[`、`]`，不引入 `UCKeyTranslate` | 低 | 待办 |
+| R-29 | 测试无性能基准；本轮引入 4 条基准用例后需注意其耗时 | 新增 `PerfBudgetTests` | 基准用"上界断言"，设宽松阈值避免抖动 | 低 | 已完成(4324441) |
+| R-32 | 快捷键键名表 59 项手写、未覆盖符号键 | `HotKeyShortcut.swift:82-144` | 只补 `/`、`-`、`=`、`[`、`]`，不引入 `UCKeyTranslate` | 低 | 已完成(本提交) |
 | R-36 | 9 个推荐滑杆可减到 3 个 | `RecommendationWeights.swift` | **不做**：用户可自定权重是产品卖点，R-17 修好后才有意义 | 低 | 记录不改 |
 | R-37 | 拆 `HistoryStore` | 848 行 | **不做**：只搬 95 行推荐理由文案 | 低 | 记录不改 |
 | R-38 | 历史改 SQLite / 加密 / 沙箱 / 云同步 | — | **不做**（推翻既有承诺，成本高于收益） | 低 | 记录不改 |
 | R-39 | 严格并发全改造以零警告 | — | **不做**：只做 R-19 的边界收敛 | 低 | 记录不改 |
 | R-44 | 网络维度整体不适用 | `Sources` 内无 `URLSession`/`NWConnection`；`AIProviderModels` 是纯类型 | 保留一条守卫测试：断言产品 target 不出现网络 API 符号（这是"本地优先"承诺的机器化） | 低-中 | 已完成(cb8db30) |
 | R-45 | 无 CI | 仓库无 `.github/workflows` | 加一个最小 workflow（build 零告警 + `Executed N` 只准涨不准跌 + python 用例数下限 + Info.plist 闸）；**启用需 push**，本轮只把闸放进仓库 | 中 | 已完成(文件已加，每条命令本机逐条跑通) |
-| R-46 | `docs/agents/*` 引用 `.scratch/` 约定但目录为空；`AGENTS.md` 声称 `CONTEXT.md`/`docs/adr/` 存在 | `AGENTS.md:13` | 更正 `AGENTS.md`；`.scratch/` 保持空或写入首条 PRD | 低 | 待办 |
-| R-47 | `skills-lock.json` + `.agents/skills`（30+ 第三方技能文件）是仓库内唯一外部来源内容 | `.agents/`（曾未跟踪） | 纳入跟踪或明确声明"不属于产品"；不做代码改动 | 低 | 待办 |
+| R-46 | `docs/agents/*` 引用 `.scratch/` 约定但目录为空；`AGENTS.md` 声称 `CONTEXT.md`/`docs/adr/` 存在 | `AGENTS.md:13` | 更正 `AGENTS.md`；`.scratch/` 保持空或写入首条 PRD | 低 | 已完成(4b95b12) |
+| R-47 | `skills-lock.json` + `.agents/skills`（30+ 第三方技能文件）是仓库内唯一外部来源内容 | `.agents/`（曾未跟踪） | 纳入跟踪或明确声明"不属于产品"；不做代码改动 | 低 | 已完成(声明为非产品资产) |
 | R-34b | 发布链路剩余：`quarantine` 被 `xattr -cr` 剥掉、ad-hoc 签名被 `spctl` 拒绝、无 entitlements（`make dmg` 现在已产出 `.sha256` 并自校验） | `Makefile:46-58,63-72`；审计 06 附 6.2(3) 实测 rejected | **不改**：本机自用场景下公证需要 Developer ID（Roadmap 已列）；README 已写清真实报错与解法 | `spctl` 仍 rejected（记为已知限制，不是回归） | 中 | 记录不改 |
 | R-52 | 第二实例会整片覆盖第一实例写入的存档（数据丢失） | `AppDelegate.applicationDidFinishLaunching` 原先没有任何「已在运行」检查；`Makefile` 的 run 目标用 `open -n` 强制新实例 | `InstanceGuard`：纯函数判定 + 适配器读真实进程列表；命中即记日志并静默退出（不弹窗，与 macOS 对单实例 App 的常规行为一致） | `InstanceGuardTests` 7 条（含「自己不算冲突」「已退出的实例不算」「无 bundle id 时放行」）；适配器那条拿 Finder 做真实数据 | 高 | 已完成(83d3a11) |
-| R-53 | `.build/<triple>` 被部分删除后 make build 卡死 | 实测：删掉 `.build/x86_64-apple-macosx` 后 `swift build --triple` 报 swift-version not registered 与 missing inputs: DerivedSources/resource_bundle_accessor.swift，失败点在 build 阶段（本轮真实撞到两次，第三次靠 `rm -rf .build` 才通） | make 检测到该报错时提示「先 rm -rf ClipboardHistory/.build 再试」；或把这条恢复路径写进 README 编译方法 | 复现命令能稳定触发；改后给出可执行提示而不是裸报错 | 中 | 待办 |
-| R-54 | 无障碍：收藏状态与纯图标按钮读不到；焦点无法验证 | `HistoryRowViews.swift` 用 `.foregroundStyle(isFavorite ? .yellow : .clear)` 表达收藏；`GlassPill`/`bulkActionButtons` 只有 `.help()`；离屏窗口不建无障碍树（实测 BFS 只走到根节点） | 给收藏星标与图标按钮补 `accessibilityLabel`；Tab 焦点顺序需要真机 VoiceOver，本机环境做不到 | 单测只能锁 label 存在；VoiceOver 朗读结果记为未验证 | 中 | 待办 |
+| R-53 | `.build/<triple>` 被部分删除后 make build 卡死 | 实测：删掉 `.build/x86_64-apple-macosx` 后 `swift build --triple` 报 swift-version not registered 与 missing inputs: DerivedSources/resource_bundle_accessor.swift，失败点在 build 阶段（本轮真实撞到两次，第三次靠 `rm -rf .build` 才通） | make 检测到该报错时提示「先 rm -rf ClipboardHistory/.build 再试」；或把这条恢复路径写进 README 编译方法 | 复现命令能稳定触发；改后给出可执行提示而不是裸报错 | 中 | 已完成(本提交) |
+| R-54 | 无障碍：收藏状态与纯图标按钮读不到；焦点无法验证 | `HistoryRowViews.swift` 用 `.foregroundStyle(isFavorite ? .yellow : .clear)` 表达收藏；`GlassPill`/`bulkActionButtons` 只有 `.help()`；离屏窗口不建无障碍树（实测 BFS 只走到根节点） | 给收藏星标与图标按钮补 `accessibilityLabel`；Tab 焦点顺序需要真机 VoiceOver，本机环境做不到 | 单测只能锁 label 存在；VoiceOver 朗读结果记为未验证 | 中 | 已完成(ba707d4) |
 | R-55 | 同一个 entryID 可以占掉两个推荐名额 | `RuleBasedRecommendationEngine.recommend` 逐条生成候选，不按 id 去重；存档可被手改或从半截恢复出同 id 两条，界面按 id 回查会让 Top 3 显示成两行同样内容 | 排序后、截断前按 entryID 去重 | `RecommendationBoundaryTests` 8 条边界用例覆盖；重复 id 那条在修复前确实变红 | 中 | 已完成(4bb02ef) |
 | R-51 | 图片去重仍需为「同尺寸不同内容」的一对图各解一帧（3000x2000 冷比较实测 148ms，在主线程） | `Models/StoredImage.swift` 的 `sampledFingerprint(fromPNG:)`；`HistoryStore.add` 只与 `entries.first` 比较，故每次复制最多一对 | 把 64px 采样值作为可选字段随条目持久化（新写旧读、v1 兼容），载入后比较退化为字符串比较 | 单测：重载后同一对图的比较不再触发采样；界值 <5ms | 中 | 待办 |
 

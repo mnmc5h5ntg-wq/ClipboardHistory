@@ -99,6 +99,13 @@ final class PerfBudgetTests: XCTestCase {
         XCTAssertNotEqual(coldPlain, coldMarked, "同尺寸不同内容不得被判为同一张")
         XCTAssertLessThan(sameBytesMs, 5, "重复复制同一张图是最常见路径，不该付解码成本")
         XCTAssertLessThan(largeSampleMs, 250, "3000x2000 的一次去重比较必须明显低于旧实测 434ms")
+
+        // 稳态成本：旧图那一侧的指纹已经算过（缓存是 class 盒子，随值拷贝共享），
+        // 所以"再复制一张新图"只该付一次采样，而不是每次两张。
+        let anotherNew = try markedStoredImage(size: NSSize(width: 3200, height: 2100))
+        let warmMs = milliseconds { _ = (coldPlain == anotherNew) }
+        print("PERF 稳态一次比较（一侧已焐热）=\(String(format: "%.1f", warmMs))ms")
+        XCTAssertLessThan(warmMs, largeSampleMs, "缓存没共享出去的话，这条会红")
     }
 
     /// 采样指纹必须仍能区分同尺寸不同内容的图（否则去重会把不同截图合并）。
