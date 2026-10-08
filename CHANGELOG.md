@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **推荐排序确定化**：同一份历史在两次启动之间不再给出不同结果；同一条记录不再占两个推荐名额。
 - **敏感内容误判收紧**（前缀需紧跟 ≥12 位 `[A-Z0-9]`）；反馈载荷不再保存剪贴板原文且随删除 / 清空级联清理；导出失败不再假装成功。
 - **界面**：设置侧栏未选中行图标恢复可见；破坏性「清空」按钮不再在两个分类各放一份；5 处信息文字对比度暗色 2.22:1 → 5.79:1、亮色 1.89:1 → 3.98:1。
+- **CI 首跑抓到的两条本机看不出的缺陷**（runner 是 Swift 6.1.2，开发机是 6.2.1）：`HotKeySettingsTests` 覆写的 `tearDown() async throws` 在 runner 上因 `await super.tearDown()` 被判并发错误、整个测试 target 编译不过（改为用例内复位，不再依赖 XCTest 生命周期签名）；`URL.parentDirectoryLabel` 对根目录下的文件返回 `…/..`（先 `standardizedFileURL` 再取名字）。
 - **视频宽高未知时显示错误态而非 16:9 空播放器**；播放器 KVO 观察者在 `deinit` 释放；侧栏拖选的行位置表不再只增不减。
 
 ### Tests
