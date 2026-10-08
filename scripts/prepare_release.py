@@ -210,7 +210,9 @@ class ReleasePreparer:
                 self._run_tests()
             self._write_makefile_version(version)
             if not self.skip_build:
+                stamp_before = ReleasePreparer._dmg_stamp(root_dmg)
                 self._run_make_dmg()
+                ReleasePreparer._require_fresh_dmg(root_dmg, stamp_before)
                 self._verify_info_plist(version)
 
             if not root_dmg.exists():
@@ -296,6 +298,29 @@ class ReleasePreparer:
 
     def _run_make_dmg(self) -> None:
         self.runner(["make", "dmg"], self.paths.root)
+
+    @staticmethod
+    def _dmg_stamp(path: Path) -> int | None:
+        """DMG 的 mtime_ns；文件不存在返回 None（意味着必须被新建出来）。"""
+        return path.stat().st_mtime_ns if path.exists() else None
+
+    @staticmethod
+    def _require_fresh_dmg(path: Path, stamp_before: int | None) -> None:
+        """构建后必须真的出现一个新 DMG。
+
+        少了这道闸，`make dmg` 静默失败时脚本会把**上一版的字节**当成本版归档，
+        还会顺手算出"自洽"的 sha256 写进 CHANGELOG —— 下游没有任何办法发现
+        v1.4.6 里装的是 v1.4.5（审计 R-15/R-34）。
+        """
+        if not path.exists():
+            raise ReleaseError(f"make dmg 之后没有找到 {path.name}：构建没有产出 DMG。")
+        if stamp_before is None:
+            return
+        if path.stat().st_mtime_ns <= stamp_before:
+            raise ReleaseError(
+                f"{path.name} 在 make dmg 之后没有被改写（mtime 未变），"
+                "拒绝把上一版的产物当成本版发布。"
+            )
 
     def _verify_info_plist(self, version: str) -> None:
         if not self.paths.app_info_plist.exists():

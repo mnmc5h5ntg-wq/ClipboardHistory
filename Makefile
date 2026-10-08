@@ -22,27 +22,9 @@ bundle: build
 	mkdir -p "$(STAGE)/$(BUNDLE)/Contents/MacOS"
 	mkdir -p "$(STAGE)/$(BUNDLE)/Contents/Resources"
 	cp "$(UNI)" "$(STAGE)/$(BUNDLE)/Contents/MacOS/$(BINARY)"
-	cp "$(ICONS)" "$(STAGE)/$(BUNDLE)/Contents/Resources/AppIcon.icns" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string $(BINARY)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $(BINARY)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string com.clipboardhistory.app" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.clipboardhistory.app" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleName string $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleName $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $(APP_NAME)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleDevelopmentRegion zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations array" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Delete :CFBundleLocalizations:0" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleLocalizations:0 string zh-Hans" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $(VERSION)" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile AppIcon" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 12.0" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion 12.0" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :NSHighResolutionCapable bool true" "$(STAGE)/$(BUNDLE)/Contents/Info.plist" 2>/dev/null || true
+	if [ ! -f "$(ICONS)" ]; then echo "❌ 找不到图标 $(ICONS)（先跑 make build）"; exit 1; fi
+	cp "$(ICONS)" "$(STAGE)/$(BUNDLE)/Contents/Resources/AppIcon.icns"
+	scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist "$(STAGE)/$(BUNDLE)/Contents/Info.plist" "$(VERSION)"
 	xattr -cr "$(STAGE)/$(BUNDLE)"
 	find "$(STAGE)/$(BUNDLE)" -name ".DS_Store" -delete 2>/dev/null || true
 	find "$(STAGE)/$(BUNDLE)" -name "._*" -delete 2>/dev/null || true
@@ -69,8 +51,10 @@ dmg: bundle
 	sed "s/时间剪史 v.* — 安装说明/时间剪史 v$(VERSION) — 安装说明/" 安装说明.txt > /tmp/$(APP_NAME)_dmg/安装说明.txt
 	ln -s /Applications /tmp/$(APP_NAME)_dmg/Applications
 	hdiutil create -volname "$(APP_NAME)" 		-srcfolder /tmp/$(APP_NAME)_dmg 		-ov -format UDZO 		"$(APP_NAME)_v$(VERSION).dmg"
-	@echo "✅ DMG created: $(APP_NAME)_v$(VERSION).dmg"
+	shasum -a 256 "$(APP_NAME)_v$(VERSION).dmg" > "$(APP_NAME)_v$(VERSION).dmg.sha256"
+	shasum -a 256 -c "$(APP_NAME)_v$(VERSION).dmg.sha256"
+	@echo "✅ DMG created: $(APP_NAME)_v$(VERSION).dmg (+ .sha256)"
 
 clean:
-	rm -rf "$(BUNDLE)" "$(APP_NAME)_v$(VERSION).dmg"
+	rm -rf "$(BUNDLE)" "$(APP_NAME)_v$(VERSION).dmg" "$(APP_NAME)_v$(VERSION).dmg.sha256"
 	cd ClipboardHistory && swift package clean

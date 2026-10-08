@@ -1,5 +1,6 @@
 import datetime as dt
 import hashlib
+import os
 import plistlib
 import sys
 import tempfile
@@ -188,6 +189,41 @@ class PrepareReleaseTests(unittest.TestCase):
             )
             self.assertEqual(result.info_plist, root / f"{APP_NAME}.app" / "Contents" / "Info.plist")
             self.assertIn("VERSION  := 1.2.3", (root / "Makefile").read_text(encoding="utf-8"))
+
+    def test_prepare_refuses_dmg_that_make_dmg_did_not_rewrite(self):
+        """`make dmg` 退出码为 0 但没重写 DMG ⇒ 必须停下并回滚。
+
+        这是发布链路上最危险的一种失败：拿到的是上一版的字节，
+        而脚本会给它算出一个"看起来正确"的 sha256 并写进 CHANGELOG。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "Makefile").write_text(
+                "APP_NAME := 时间剪史\nVERSION  := 1.2.2beta\n", encoding="utf-8"
+            )
+            (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+            stale = root / f"{APP_NAME}_v1.2.3.dmg"
+            stale.write_bytes(b"stale-bytes")
+            old_ns = 946_684_800_000_000_000  # 2000-01-01
+            os.utime(stale, ns=(old_ns, old_ns))
+
+            def runner(command, cwd):
+                info_plist = root / f"{APP_NAME}.app" / "Contents" / "Info.plist"
+                info_plist.parent.mkdir(parents=True, exist_ok=True)
+                info_plist.write_bytes(plistlib.dumps({"CFBundleShortVersionString": "1.2.3"}))
+
+            with self.assertRaises(prepare_release.ReleaseError) as ctx:
+                ReleasePreparer(
+                    ReleasePaths(root), today=dt.date(2026, 6, 8), runner=runner
+                ).prepare("1.2.3")
+
+            self.assertIn("mtime", str(ctx.exception))
+            self.assertIn(
+                "VERSION  := 1.2.2beta", (root / "Makefile").read_text(encoding="utf-8")
+            )
+            self.assertFalse((root / "releases" / f"{APP_NAME}_v1.2.3.dmg").exists())
+            self.assertEqual(stale.read_bytes(), b"stale-bytes")
 
 
 if __name__ == "__main__":

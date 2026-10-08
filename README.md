@@ -7,7 +7,7 @@
 ![platform](https://img.shields.io/badge/platform-macOS%2012%2B-silver)
 ![swift](https://img.shields.io/badge/swift-6.0-orange)
 ![license](https://img.shields.io/badge/license-WTFPL-blue)
-![version](https://img.shields.io/badge/version-v1.3-lightgrey)
+![version](https://img.shields.io/badge/version-v1.4.5-lightgrey)
 
 ## 功能特性
 
@@ -16,12 +16,12 @@
 - ⭐ 收藏夹：重要记录可收藏保存，收藏项不受自动清理策略影响。
 - 🧹 批量管理：侧边栏支持按住 `Shift` / `Command` 多选，也支持拖动滑选后批量收藏、取消收藏或删除。
 - 🔍 搜索：快速筛选文本、图片和文件记录。
-- 🪄 猜你要粘贴：侧边栏 Magic 可展开 Top 3 本地规则推荐，点击等同于选择普通历史记录。
+- 🪄 猜你要粘贴：菜单栏顶部列出本地规则算出的 Top 3 候选，**点击即复制并自动粘贴到前台应用**（详见下方"猜你要粘贴"）。
 - 🖼 图片预览：支持截图、Preview 复制图片内容和 Finder 图片文件大图预览。
 - 🎬 视频预览：支持常见视频文件内置播放器预览，默认静音自动播放。
 - 📄 文件预览：支持 PDF、Word、Excel、PowerPoint、Pages、Numbers、Keynote、代码文件等常见格式。
-- 🏷 标签系统：保留条目语义分类，区分文本、图片内容和文件引用。
-- 📌 菜单栏模式：顶部菜单栏可显示主窗口、打开设置、刷新历史、清空历史和退出应用。
+- 🏷 本地内容分类：规则引擎区分文本、图片、文件、链接、验证码等语义类别，用于搜索匹配与推荐排序；不上传任何内容。
+- 📌 菜单栏模式：顶部菜单栏可显示主窗口、打开设置、清空未收藏记录、退出应用；有候选时还会显示"猜你要粘贴"与"都不是我想要的"。
 - ⌨️ 全局快捷键：默认 `⌃⌥V` 呼出主窗口，默认 `⌃⌥C` 再次复制当前选中记录，均可在设置中自定义。
 - 🚀 开机启动：可在设置中开启或关闭登录后自动启动。
 - 🧭 macOS 12+：兼容 macOS 12 及以上版本。
@@ -57,7 +57,7 @@ cd ClipboardHistory
 make build    # 编译 Intel + Apple Silicon Universal Binary
 make bundle   # 生成本地 时间剪史.app
 make run      # 编译并运行 App
-make dmg      # 生成 DMG 安装包
+make dmg      # 生成 DMG 安装包，并生成可校验的 .sha256
 make clean    # 清理构建产物
 ```
 
@@ -92,9 +92,14 @@ swift build --package-path ClipboardHistory
 
 ### 猜你要粘贴
 
-- Magic 推荐只使用本地 `RuleBasedRecommendationEngine`，不会接入云端模型。
-- 推荐结果不会修改剪贴板内容，也不会拦截系统 `⌘V`。
-- 点击推荐条目只等同于点击普通历史记录；是否再次复制仍由用户决定。
+⚠️ **点击推荐条目会立刻把内容粘贴到当前前台应用**，不是"只选中"。这是这个功能存在的目的，
+但也意味着：在错误的输入框上点击，内容就会进入那个输入框。
+
+- 推荐只使用本地 `RuleBasedRecommendationEngine`，不接入云端模型，不上传任何内容。
+- 自动粘贴通过向「系统事件」发送一次 `⌘V` 完成，需要在「系统设置 → 隐私与安全性 → 自动化」里
+  首次授权；未授权时记录仍会复制到剪贴板，窗口顶部会给出提示，可手动粘贴。
+- 默认开启"推荐过滤"：疑似密钥、令牌、密码一类的敏感内容不会进入推荐列表（可在设置的"隐私"页调整）。
+- 不拦截系统 `⌘V`，也不会替你按除 `⌘V` 以外的任何键。
 
 ### 历史与隐私
 

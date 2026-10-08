@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  App bundle 的 Info.plist 模板。`make bundle` 用 sed 把 __VERSION__ 换成
+  Makefile 里的 VERSION，然后 plutil -lint + 逐键校验；缺键就构建失败。
+  以前这里是 20 行 PlistBuddy 且每行都 `|| true`：任何一步失败都会被吞掉，
+  构建"成功"产出一个字段缺失的 bundle（审计 R-15/R-34）。
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hans</string>
+	<key>CFBundleDisplayName</key>
+	<string>时间剪史</string>
+	<key>CFBundleExecutable</key>
+	<string>ClipboardHistoryApp</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.clipboardhistory.app</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>zh-Hans</string>
+	</array>
+	<key>CFBundleName</key>
+	<string>时间剪史</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>「时间剪史」需要向「系统事件」发送一次按键，用来把你选中的记录自动粘贴回刚才正在使用的应用。仅发送 ⌘V，不读取其他应用的内容。</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+</dict>
+</plist>

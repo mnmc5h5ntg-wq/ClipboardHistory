@@ -33,6 +33,7 @@ xcuserdata/
 *.dmg
 *.dmg/
 时间剪史_v*.dmg
+/时间剪史_v*.dmg.sha256   # make dmg 的根目录校验文件（releases/ 下的仍纳入版本管理）
 history_dmg/
 PROJECT_DOCUMENTATION.txt
 utm_share/
