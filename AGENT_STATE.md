@@ -1,6 +1,6 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-08 14:1x（本地）
+最后更新：2026-10-09 01:4x（本地）
 分支：`fix/audit-remediation`（从 `main` @ `db077f6` "Prepare v1.3 release" 切出）
 回滚基线：提交 `8007b19` "Checkpoint: 1.4.5 working state before audit remediation" —— 修复前工作区的全部 WIP（含此前未被 git 跟踪的 `Intelligence/` 等 25 个路径）已入该提交。**任何一步都可以 `git revert` 或 `git diff 8007b19..HEAD` 审查。**
 
@@ -37,33 +37,41 @@
 | 项 | 提交 | 验证结果 |
 |---|---|---|
 | R-01 调试日志门控 + 移出 /tmp（顺带恢复测试闸） | `cb8db30` | `swift test` 退出码 0，**Executed 135→146→176** 用例全绿；`/tmp` 两个日志不再新增；`DebugLoggingTests` 7 条守卫 |
-| R-02 存档损坏恢复 + 滚动备份 + 原件保全 | `0792e6b` 前一次 | 4 条 `HistoryPersistenceRecoveryTests`；变异检查：去掉修复即报 "P-06 修复验证：图片文件不得被连带删除" |
-| R-03 菜单"清空未收藏"必须确认 | `cc0c2df` 后 | `HistoryClearConfirmationTests` 3 条；去掉确认 ⇒ 立即变红 |
-| R-04 浏览器链接不再当文件条目 | `cc0c2df` | `ClipboardIntakeURLKindTests` 4 条；变异回 `options:nil` ⇒ 复现 `.file(https://…)` 与 `fileDoesNotExist` |
-| R-05 重复复制保留来源 App；`ClipboardIntake` 真正使用注入的 pasteboard | `cc0c2df` | `SourceAttributionTests` 3 条 + `ClipboardIntakeInjectionTests` 2 条；变异 ⇒ 断言变红 |
-| R-06 反馈不再存正文 + 删除级联 + 导出失败可见 | `0792e6b` | `FeedbackStorageHygieneTests` 7 条；实测用户 plist 该键 blob 66,716,424 字节会被收窄 |
-| R-48 推荐排序确定性（字典求和 + 次级排序键） | `f17fc86`/`f8ce4dd` 同批 | `RecommendationDeterminismTests` 4 条；两处变异各自可复现地变红 |
-| R-07/R-08/R-09/R-10 主线程热点（载入/保存/预览/列表） | `f8ce4dd` | `PerfBudgetTests` 5 条：413.9→3.2ms、667.8→5.2ms、45.8→0.02ms、14.07→0.00ms/次 |
+| R-02 存档损坏恢复 + 滚动备份 + 原件保全 | `0792e6b` | 4 条 `HistoryPersistenceRecoveryTests`；变异检查：去掉修复即报 "P-06 修复验证：图片文件不得被连带删除" |
+| R-03/R-04/R-05 菜单确认、Web URL 误判、来源 App 归因 | `cc0c2df` | 3 组新测试；各自变异回旧实现即复现缺陷 |
+| R-06 反馈不再存正文 + 级联清理 + 导出失败可见 | `0792e6b` | `FeedbackStorageHygieneTests` 7 条；实测用户 plist 该键 66,716,424 字节会被收窄 |
+| R-48 推荐排序确定性 | `f17fc86`/`f8ce4dd` | `RecommendationDeterminismTests` 4 条；两处变异各自可复现地变红 |
+| R-07/R-09/R-10 主线程热点（保存/派生列表/预览文案） | `f8ce4dd` | `PerfBudgetTests`：667.8→5.2ms、14.07→0.00ms/次、45.8→0.02ms |
+| R-11/R-17/R-18/R-19/R-21 事件驱动预测 + 语义收敛 | `cb3a69b` | `PredictionSchedulingTests`（含代际丢弃）；静置不再 2s 轮询 |
+| R-22/R-40/R-41/R-42/R-43 上限、拖选表、视频错误态、观察者释放、菜单脱敏 | `50e5a4e` | `DisplayPrivacyAndCapsTests` 等；离屏帧复验 |
+| 第四批 · 视觉审计链路与 3 个真实缺陷 | `95b4301` | 离屏捕获 54 帧；修：设置侧栏图标隐形、破坏性按钮重复、5 处信息文字 `.tertiary`（暗色 2.2:1 → 5.79:1，亮色 1.89 → 3.98） |
+| R-13 自动粘贴失败可见 + 存档恢复提示上屏 | `654a787` | `PasteFailureVisibilityTests` 7 条；变异（把上报改成空函数）⇒ 以正确原因变红；离屏帧确认横幅不破坏布局 |
+| R-12/R-15/R-34 README 三条虚承诺、Info.plist 模板化、DMG 新鲜度与校验 | `1d442f5`,`fd59dbb` | `make dmg` 全链路跑通：通用二进制 + 16 键 Info.plist（含 `NSAppleEventsUsageDescription`）+ `.sha256`；挂载 DMG 复核内部产物；`scripts/tests` 17 条（新增 6 条，含"缺键必须构建失败"与"mtime 未变必须拒发"，两条都做过变异验证） |
+| R-23 OCR 像素解码移出主线程 + R-08 残留的图片比较成本 | `4324441` | 实测 `add(3000x2000)` 主线程 94ms → 0.04~0.77ms；冷 `==` 4000x3000 217ms → 148ms（同字节重复 0.17ms）；`PerfBudgetTests` 那条**恒绿假守卫**（计时对象根本没算指纹）已重写 |
 
-当前基线（复跑命令见 `AGENT_STATE.md` 恢复指令）：
+当前基线（复跑命令见下方恢复指令）：
 
 | 指标 | 现在 |
 |---|---|
-| `swift build` | OK，**0 告警**（干净重建复扫） |
-| `swift test` | 退出码 0，**Executed 176 tests, 0 failures**，连跑 6 次稳定 |
-| `python3 -m unittest discover -s scripts/tests` | OK，11 tests |
-| 工作区 | `git status` 干净（改动已提交） |
+| `swift build` / `swift test` | 退出码 0，**Executed 205 tests, 1 skipped（离屏捕获套件按设计 skip）, 0 failures**，0 编译告警 |
+| `python3 -m unittest discover -s scripts/tests` | OK，**17 tests** |
+| `make bundle` / `make dmg` | 退出码 0；产物挂载后 `codesign --verify --deep --strict` 通过，`lipo -info` = x86_64 + arm64 |
+| `CLIPBOARD_HISTORY_UI_SHOTS=... swift test --filter UICaptureTests` | 退出码 0，58 帧，未绘制比例全部 <95% |
+| 工作区 | `git status` 干净（构建产物 `时间剪史.app`/`*.dmg*` 均在 .gitignore 内） |
 
 本轮新发现（原审计未覆盖，已进 backlog）：
-- **R-49** `ClipboardIntake` 各读取方法的 `from:` 默认 `.general` ⇒ 注入的 pasteboard 被静默忽略，测试因此读到**用户真实剪贴板内容**。已修（R-05 同批）并把所有断言改成"只报类型不报正文"，避免回归时把用户内容写进测试日志。
-- **R-48** 推荐排序跨启动不稳定（`features.values.reduce` + 依赖 `sorted` 稳定性）。已修。
-- **R-50** `HistoryStoreTests` 的排序断言依赖"测试期间谁是前台 App" ⇒ 随机失败。已修（夹具固定来源）。
+- **R-49** `ClipboardIntake` 各读取方法的 `from:` 默认 `.general` ⇒ 注入的 pasteboard 被静默忽略，测试会读到**用户真实剪贴板内容**。已修（R-05 同批），断言改成"只报类型不报正文"。
+- **R-48** 推荐排序跨启动不稳定。已修。
+- **R-50** `HistoryStoreTests` 排序断言依赖前台 App。已修。
+- **R-51** 图片去重仍要"同尺寸不同内容"时两侧各解一帧（148ms/次，主线程）。已比旧实现快 2.9×，残留部分记为待办：把 64px 采样值随条目一起持久化即可彻底摘掉。
+- **守卫本身的失效模式**（方法级发现）：`PerfBudgetTests` 的指纹用例计时的是"构造"而不是"比较"，惰性缓存令它永远 0.00ms —— 已重写，并把"每类比较用各自第一次被比较的对象"写进注释。同类问题也出现在视觉捕获上（4 类假帧，见 `AGENT_UI_AUDIT.md`）。
 - **实测确认 R-06 的现实规模**：`~/Library/Preferences/com.clipboardhistory.app.plist` = 66,724,574 字节，其中反馈键 66,716,424 字节。
 
 ## 恢复指令（若上下文丢失，从这里续做）
 
 1. `git log --oneline` 与 `git diff 8007b19..HEAD --stat` 看清已完成什么。
 2. 跑 `cd ClipboardHistory && swift build && swift test`（**必须看退出码与 `Executed N tests`，不要用管道**）。
+2b. 视觉帧：`cd ClipboardHistory && CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests`（改 UI 前后各拍一组同参数帧，见 AGENT_UI_AUDIT.md 的复验规则）。
 3. 读 `AGENT_BACKLOG.md` 找第一条未关闭的高/中价值项；`AGENT_DECISIONS.md` 读最近 5 条决定；`AGENT_UI_AUDIT.md` 看视觉项。
 4. 外部参考：审计报告在仓库外 `/Users/wangziyi/Documents/时间剪史_审计_2026-10-08/`（145 条记录 + 21 条探针源码 `probes/`，探针断言的是"缺陷存在"，接入仓库时需逐条翻转）。
 5. 停止条件见本文件开头与 AGENT_BACKLOG.md 末尾的"发布前检查单"。
