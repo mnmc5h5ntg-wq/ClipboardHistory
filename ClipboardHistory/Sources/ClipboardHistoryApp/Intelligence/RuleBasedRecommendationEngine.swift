@@ -45,11 +45,15 @@ struct RuleBasedRecommendationEngine {
                 }
                 return lhs.entryID.uuidString < rhs.entryID.uuidString
             }
-            .prefix(max(request.limit, 0))
+        // 同一个 entryID 只能占一个名额：候选是逐条输入生成的，而存档理论上
+        // 可能含同 id 的两条（手改过、或从半截存档里恢复出来），界面是按 id 回查
+        // 记录的 —— 那样"Top 3"会显示成同一行出现两遍，实际只有两条不同内容。
+        var seenEntryIDs: Set<UUID> = []
+        let uniqueCandidates = candidates.filter { seenEntryIDs.insert($0.entryID).inserted }
 
         return RecommendationResult(
             generatedAt: now,
-            candidates: Array(candidates),
+            candidates: Array(uniqueCandidates.prefix(max(request.limit, 0))),
             usedAI: false,
             explanation: "使用本地规则排序，未调用 AI 模型。"
         )
