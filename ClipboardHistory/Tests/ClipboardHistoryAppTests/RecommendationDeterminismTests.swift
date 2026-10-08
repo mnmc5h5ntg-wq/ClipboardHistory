@@ -95,8 +95,9 @@ final class RecommendationDeterminismTests: XCTestCase {
             accuracy: 0,
             "求和必须走 allCases 固定顺序"
         )
-        // 反证：按字典自身顺序相加在这个夹具下会得到不同的值（说明上面的断言有区分力）。
-        XCTAssertNotEqual(inOrder, features.values.reduce(0, +))
+        // 说明：这条守卫是概率性的 —— 字典迭代顺序按进程播种，若某个进程里它恰好
+        // 等于 allCases 顺序，两种实现会得到相同结果。因此主守卫放在下面那条
+        // 确定性的"同分候选按时间排序"用例上（变异检查已证实它能抓住退化）。
     }
 
     func testEqualFeatureSetsProduceBitwiseEqualScores() {
