@@ -1,0 +1,65 @@
+name: CI
+
+# 为什么要有这条：上一轮审计发现"测试其实没在跑"这件事在本仓库里没有任何信号
+# —— `swift test` 曾经静默崩在第 4 个用例上，而退出码仍被管道吃掉，
+# 文档里还写着"测试全绿"。所以这个 workflow 的重点不是"跑一下测试"，
+# 而是把**执行到的用例数**变成一个只准涨、不准跌的闸。
+#
+# 注意：本文件只是把闸放进仓库，真正生效需要把它推到 GitHub（本轮没有 push）。
+# 工具链下限 Swift 6.0（Package.swift 的 swift-tools-version 与 6 语言模式），
+# 因此固定在 macos-15 runner 上；第一步会打印实际工具链版本，方便日后排查。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build (must be warning-free)
+        working-directory: ClipboardHistory
+        run: |
+          set -o pipefail
+          swift build 2>&1 | tee /tmp/build.log
+          # 告警计数：干净构建应为 0。这里用 grep -c 而不是依赖退出码，
+          # 因为 swift build 不会因为告警而失败。
+          warnings=$(grep -c 'warning:' /tmp/build.log || true)
+          echo "compile warnings: $warnings"
+          test "$warnings" = "0"
+
+      - name: Swift tests (executed-count gate)
+        working-directory: ClipboardHistory
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee /tmp/test.log
+          status=${PIPESTATUS[0]}
+          echo "swift test exit: $status"
+          test "$status" = "0"
+          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/test.log | tail -1 | grep -oE '[0-9]+')
+          echo "executed cases: $executed"
+          test -n "$executed"
+          # 只准涨不准跌：数字掉下来意味着有用例不再被执行（被删、被 skip、编译没链进去）
+          test "$executed" -ge 200 || { echo "执行到的用例数 $executed 低于下限 200"; exit 1; }
+
+      - name: Release script tests
+        run: |
+          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
+          grep -q "OK" /tmp/py.log
+          executed=$(grep -oE 'Ran [0-9]+ tests' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
+          echo "python cases: $executed"
+          test "$executed" -ge 17
+
+      # 打包链路不产出可分发物，但必须能跑通：上一轮的缺陷正是"每一步都 || true"，
+      # 于是缺键的 Info.plist 也算构建成功。这里跑脚本级校验，避免整包 universal 构建拖慢 CI。
+      - name: Info.plist gate
+        run: scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist /tmp/Info.plist 0.0.0-ci
