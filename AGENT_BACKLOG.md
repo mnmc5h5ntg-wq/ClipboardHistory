@@ -3,24 +3,41 @@
 矩阵：10 模块 × 19 维度 = **190 格**。单元格含义：
 `F:R-xx` = 已审计且有发现（见下方 backlog）· `OK` = 已审计且无问题 · `NA` = 不适用（附理由在"矩阵说明"）· `?` = **待审，必须归零**。
 
-当前：**待审 12 · NA 60 · 有发现 92 · 已审无问题 26**（合计 190 格已判定 178，判定率 94%）。
+当前：**待审 0 · NA 48 · 有发现 114 · 已审无问题 28**（合计 190 格，判定率 100%）。
 
 | 模块 | 正确性 | 边界 | 错误 | 并发 | 性能 | 内存 | 安全 | 可靠 | 兼容 | 无障碍 | 国际化 | 可观测 | 测试 | 类型 | 构建 | 打包 | 迁移 | 回滚 | 文档 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| M1 入口/生命周期 | F:R-03 | ? | F:R-13 | F:R-11 | F:R-01/R-21 | ? | F:R-13 | F:R-02 | F:R-24 | ? | F:R-31 | F:R-01 | F:R-26 | F:R-01 | OK | ? | ? | F:R-35 | F:R-33 |
-| M2 核心·剪贴板 | F:R-04/R-05 | F:R-22 | F:R-04 | F:R-19 | F:R-08/R-23 | F:R-22 | F:R-06 | F:R-05 | F:R-24 | ? | F:R-31 | F:R-01 | F:R-26 | OK | OK | NA | ? | F:R-22 | F:R-33 |
-| M3 数据·持久化 | OK | F:R-22 | F:R-02 | OK | F:R-07 | F:R-07 | F:R-06/R-30 | F:R-02 | F:R-20 | NA | NA | F:R-02 | F:R-26 | OK | OK | F:R-34 | F:R-20 | F:R-02 | F:R-33 |
-| M4 状态·推荐 | F:R-17/R-18 | ? | F:R-16 | F:R-11/R-19 | F:R-09/R-11 | F:R-06 | F:R-06 | F:R-11 | ? | NA | F:R-18 | OK | F:R-26 | F:R-19 | OK | NA | OK | OK | F:R-33 |
-| M5 UI·视图与窗口 | F:R-40 | ? | F:R-41 | ? | F:R-09/R-10 | F:R-42 | F:R-43 | F:R-40 | F:R-24 | ? | F:R-31 | F:R-01 | F:R-27 | OK | OK | NA | NA | NA | F:R-33 |
-| M6 网络 | NA | NA | NA | NA | NA | NA | F:R-44 | NA | NA | NA | NA | NA | F:R-44 | NA | NA | NA | NA | NA | F:R-44 |
-| M7 构建 | F:R-15 | ? | F:R-15 | OK | OK | NA | F:R-34 | F:R-15 | F:R-24 | NA | NA | F:R-15 | F:R-45 | OK | F:R-15 | F:R-34 | ? | F:R-35 | F:R-33 |
-| M8 测试 | F:R-01 | F:R-26 | F:R-26 | F:R-28 | F:R-29 | F:R-29 | F:R-45 | F:R-01 | F:R-24 | F:R-27 | NA | F:R-01 | F:R-26 | F:R-28 | OK | NA | F:R-20 | OK | F:R-46 |
-| M9 文档 | F:R-33 | NA | NA | NA | NA | NA | F:R-33 | NA | F:R-33 | NA | NA | OK | F:R-33 | NA | F:R-33 | NA | ? | F:R-35 | F:R-33 |
-| M10 依赖 | OK | NA | NA | NA | OK | OK | F:R-47 | OK | F:R-24 | NA | NA | NA | NA | OK | OK | OK | NA | F:R-35 | F:R-47 |
+| M1 入口/生命周期  | F:R-03 | F:R-52 | F:R-13 | F:R-11 | F:R-01/R-21 | OK | F:R-13 | F:R-02 | F:R-24 | F:R-54 | F:R-31 | F:R-01 | F:R-26 | F:R-01 | OK | F:R-34 | F:R-20 | F:R-35 | F:R-33 |
+| M2 核心·剪贴板  | F:R-04/R-05 | F:R-22 | F:R-04 | F:R-19 | F:R-08/R-23 | F:R-22 | F:R-06 | F:R-05 | F:R-24 | NA | F:R-31 | F:R-01 | F:R-26 | OK | OK | NA | F:R-20 | F:R-22 | F:R-33 |
+| M3 数据·持久化  | OK | F:R-22 | F:R-02 | OK | F:R-07 | F:R-07 | F:R-06/R-30 | F:R-02 | F:R-20 | NA | NA | F:R-02 | F:R-26 | OK | OK | F:R-34 | F:R-20 | F:R-02 | F:R-33 |
+| M4 状态·推荐  | F:R-17/R-18 | F:R-55 | F:R-16 | F:R-11/R-19 | F:R-09/R-11 | F:R-06 | F:R-06 | F:R-11 | F:R-06 | NA | F:R-18 | OK | F:R-26 | F:R-19 | OK | NA | OK | OK | F:R-33 |
+| M5 UI·视图与窗口  | F:R-40 | F:R-27 | F:R-41 | OK | F:R-09/R-10 | F:R-42 | F:R-43 | F:R-40 | F:R-24 | F:R-54 | F:R-31 | F:R-01 | F:R-27 | OK | OK | NA | NA | NA | F:R-33 |
+| M6 网络  | NA | NA | NA | NA | NA | NA | F:R-44 | NA | NA | NA | NA | NA | F:R-44 | NA | NA | NA | NA | NA | F:R-44 |
+| M7 构建  | F:R-15 | F:R-53 | F:R-15 | OK | OK | NA | F:R-34 | F:R-15 | F:R-24 | NA | NA | F:R-15 | F:R-45 | OK | F:R-15 | F:R-34 | F:R-15 | F:R-35 | F:R-33 |
+| M8 测试  | F:R-01 | F:R-26 | F:R-26 | F:R-28 | F:R-29 | F:R-29 | F:R-45 | F:R-01 | F:R-24 | F:R-27 | NA | F:R-01 | F:R-26 | F:R-28 | OK | NA | F:R-20 | OK | F:R-46 |
+| M9 文档  | F:R-33 | NA | NA | NA | NA | NA | F:R-33 | NA | F:R-33 | NA | NA | OK | F:R-33 | NA | F:R-33 | NA | F:R-33 | F:R-35 | F:R-33 |
+| M10 依赖  | OK | NA | NA | NA | OK | OK | F:R-47 | OK | F:R-24 | NA | NA | NA | NA | OK | OK | OK | NA | F:R-35 | F:R-47 |
 
-## 待审的 12 格（下一步必须填）
+## 最后 15 格的判定（本轮填平，待审归零）
 
-M1×边界、M1×内存、M1×打包、M1×迁移、M2×无障碍、M2×打包、M3 无待审、M4×边界、M4×兼容、M5×边界、M5×并发、M5×无障碍、M7×边界、M7×迁移、M9×迁移（其中"迁移"统一按 §R-20 的数据版本迁移来审；"打包"统一按 §R-34 的 bundle/DMG 内容来审）。
+| 格 | 判定 | 依据 |
+|---|---|---|
+| M1×边界 | F:R-52 | 没有任何「已经有一份在跑」的检查 ⇒ 两个实例各自整库写 history.json，后写的整片盖掉先写的记录；而 `make run` 用的正是 `open -n`。已修（83d3a11） |
+| M1×内存 | OK | `applicationWillTerminate` 成对 removeObserver 并摘掉 Apple Event handler；`stopMonitoring()` 同时 cancel 延迟任务、invalidate 定时器、移除前台切换观察者；`WindowManager` 持窗口用 weak |
+| M1×无障碍 | F:R-54 | 启动后焦点归属（窗口是否成为 key、⌘, 之后焦点在哪）无法在离屏环境验证；与 M5×无障碍同一处置 |
+| M1×打包 | F:R-34 | bundle 缺 NSPrincipalClass / CFBundlePackageType / 用途描述也能「构建成功」；现在由模板 + 脚本生成并逐键校验 |
+| M1×迁移 | F:R-20 | 见 D-012：读到更高 version 就只读打开，不覆盖 |
+| M2×无障碍 | NA | 剪贴板采集/写入这一层没有界面元素；无障碍问题全部落在 M5（见 R-54） |
+| M2×迁移 | F:R-20 | intake 产出的条目结构与存档同版本；降级只读闸门同样覆盖这一层 |
+| M4×边界 | F:R-55 | 补 8 条边界用例（空历史、单条、limit 0/负数、500 条、全 0 权重、未来时间戳、重复 id、隐私开关两侧）；其中「重复 id」暴露出真实缺陷并已修 |
+| M4×兼容 | F:R-06 | 旧反馈 blob 与新精简快照互相兼容解码；缺字段容错，不要求重写用户数据 |
+| M5×边界 | F:R-27 | 离屏帧覆盖最小 600×440 / 放大 1100×800 / 空 / 无结果 / 多选 / 收藏筛选 / 提示条插入后的布局 |
+| M5×并发 | OK | Swift 6 严格并发下 0 告警（不是靠 nonisolated(unsafe) 静音）；OCR、预测、保存的回调一律 hop 回主线程 |
+| M5×无障碍 | F:R-54 | 收藏状态只靠 .clear/.yellow 表达、help 不等于 accessibilityLabel、离屏窗口根本不建无障碍树 ⇒ 只能做代码级检查，VoiceOver 实测在本环境无法完成 |
+| M7×边界 | F:R-53 | 实测复现：`.build/x86_64-apple-macosx` 被部分删除后 `make build` 报 swift-version not registered 并卡死，只能整目录清掉；`|| true` 类吞错已收干 |
+| M7×迁移 | F:R-15 | 20 行 PlistBuddy ⇒ 模板 + scripts/make_info_plist.sh，可单测、可回滚（还原 Makefile 即回旧路） |
+| M9×迁移 | F:R-33 | 数据格式变更的说明进 AGENT_DECISIONS.md（D-012/D-013），带日期的旧文档统一加「历史快照」横幅 |
+
 
 ---
 
@@ -67,7 +84,7 @@ M1×边界、M1×内存、M1×打包、M1×迁移、M2×无障碍、M2×打包�
 | R-28 | 并发/异步测试缺失（预测竞态、取消） | `HistoryStore.swift:145-289` | 用可控时钟 + 假服务写竞态测试；`Task` 取消路径测试 | 新用例能通过"删掉代际防护"变异打出红 | 中 | 已完成(cb3a69b) |
 | R-30 | `/tmp` 可预测路径 + 跟随符号链接截断 | `LifecycleDebugLogger.swift:9,12-18`、`HistoryStore.swift:607-619` | 与 R-01 合并：日志进 `~/Library/Logs`，写前先判断是否为符号链接 | 单测：路径为 symlink 时拒绝写；目录权限 0700 | 中 | 已完成(cb8db30) |
 | R-31 | 国际化：仅中文硬编码，无本地化资源 | `Package.swift:15-18`（只打包图标）、各界面字符串、`docs/ISSUE_STATUS_REPORT.md:28` | 判定：产品定位就是中文单语言，**不做本地化改造**；但把用户可见字符串集中到一处（现有 `AppCommand`/`HistoryPrivacyCopy` 已部分做到），并修 `EntryPresentation` 中混排的表情符号 | 记录不改（低价值改造成本高）| 中 | 记录不改 |
-| R-33 | 文档与代码不符（20+ 条） | `docs/ARCHITECTURE_REVIEW.md:60,96`、`docs/CODE_REVIEW_v1.4.4.md:77-80`、`CLIPBOARDHISTORY_HANDOFF.md:9,10`、`安装说明.txt:2`、`CHANGELOG.md` 顺序 | 逐条更正；把"测试全绿"改为带执行数；`AGENTS.md` 不再声称 `CONTEXT.md`/`docs/adr/` 存在 | 每条更正后 `grep` 复验 | 中 | 待办 |
+| R-33 | 文档与代码不符（20+ 条） | `docs/ARCHITECTURE_REVIEW.md:60,96`、`docs/CODE_REVIEW_v1.4.4.md:77-80`、`CLIPBOARDHISTORY_HANDOFF.md:9,10`、`安装说明.txt:2`、`CHANGELOG.md` 顺序 | 逐条更正；把"测试全绿"改为带执行数；`AGENTS.md` 不再声称 `CONTEXT.md`/`docs/adr/` 存在 | 每条更正后 `grep` 复验 | 中 | 已完成(4b95b12) |
 | R-34 | 打包内容：无 entitlements、无用途描述、quarantine 被剥、DMG 无校验文件 | `Makefile:46-58,63-72`；`spctl` rejected | 打包阶段生成 `Info.plist` 全量键；`make dmg` 同时产出 `.sha256`；文档写清真实报错与解法 | `plutil -p` 含用途描述；`shasum -a 256 -c` 通过 | 中 | 部分完成(1d442f5) |
 | R-35 | 回滚：数据格式/目录变更没有可回退路径 | `HistoryPersistence.swift:159-165` | 所有数据布局改动都走"新写旧读"，保留 `history.json` 原名与 v1 兼容；迁移前自动 `.bak` | 单测：新格式写入后，旧版本可读回（字段不删只加可选） | 中 | 已完成(36768e8) |
 | R-40 | UI 行为缺陷：`rowFrames` 只增不减（拖选可能命中已消失行） | `Views/HistorySidebarView.swift:7,183-193` | 用最新一帧完整字典替换，或按可见 ID 裁剪 | 视觉/交互验证 + 单测（若可抽纯函数） | 中 | 已完成(50e5a4e) |
@@ -93,6 +110,10 @@ M1×边界、M1×内存、M1×打包、M1×迁移、M2×无障碍、M2×打包�
 | R-46 | `docs/agents/*` 引用 `.scratch/` 约定但目录为空；`AGENTS.md` 声称 `CONTEXT.md`/`docs/adr/` 存在 | `AGENTS.md:13` | 更正 `AGENTS.md`；`.scratch/` 保持空或写入首条 PRD | 低 | 待办 |
 | R-47 | `skills-lock.json` + `.agents/skills`（30+ 第三方技能文件）是仓库内唯一外部来源内容 | `.agents/`（曾未跟踪） | 纳入跟踪或明确声明"不属于产品"；不做代码改动 | 低 | 待办 |
 | R-34b | 发布链路剩余：`quarantine` 被 `xattr -cr` 剥掉、ad-hoc 签名被 `spctl` 拒绝、无 entitlements（`make dmg` 现在已产出 `.sha256` 并自校验） | `Makefile:46-58,63-72`；审计 06 附 6.2(3) 实测 rejected | **不改**：本机自用场景下公证需要 Developer ID（Roadmap 已列）；README 已写清真实报错与解法 | `spctl` 仍 rejected（记为已知限制，不是回归） | 中 | 记录不改 |
+| R-52 | 第二实例会整片覆盖第一实例写入的存档（数据丢失） | `AppDelegate.applicationDidFinishLaunching` 原先没有任何「已在运行」检查；`Makefile` 的 run 目标用 `open -n` 强制新实例 | `InstanceGuard`：纯函数判定 + 适配器读真实进程列表；命中即记日志并静默退出（不弹窗，与 macOS 对单实例 App 的常规行为一致） | `InstanceGuardTests` 7 条（含「自己不算冲突」「已退出的实例不算」「无 bundle id 时放行」）；适配器那条拿 Finder 做真实数据 | 高 | 已完成(83d3a11) |
+| R-53 | `.build/<triple>` 被部分删除后 make build 卡死 | 实测：删掉 `.build/x86_64-apple-macosx` 后 `swift build --triple` 报 swift-version not registered 与 missing inputs: DerivedSources/resource_bundle_accessor.swift，失败点在 build 阶段（本轮真实撞到两次，第三次靠 `rm -rf .build` 才通） | make 检测到该报错时提示「先 rm -rf ClipboardHistory/.build 再试」；或把这条恢复路径写进 README 编译方法 | 复现命令能稳定触发；改后给出可执行提示而不是裸报错 | 中 | 待办 |
+| R-54 | 无障碍：收藏状态与纯图标按钮读不到；焦点无法验证 | `HistoryRowViews.swift` 用 `.foregroundStyle(isFavorite ? .yellow : .clear)` 表达收藏；`GlassPill`/`bulkActionButtons` 只有 `.help()`；离屏窗口不建无障碍树（实测 BFS 只走到根节点） | 给收藏星标与图标按钮补 `accessibilityLabel`；Tab 焦点顺序需要真机 VoiceOver，本机环境做不到 | 单测只能锁 label 存在；VoiceOver 朗读结果记为未验证 | 中 | 待办 |
+| R-55 | 同一个 entryID 可以占掉两个推荐名额 | `RuleBasedRecommendationEngine.recommend` 逐条生成候选，不按 id 去重；存档可被手改或从半截恢复出同 id 两条，界面按 id 回查会让 Top 3 显示成两行同样内容 | 排序后、截断前按 entryID 去重 | `RecommendationBoundaryTests` 8 条边界用例覆盖；重复 id 那条在修复前确实变红 | 中 | 已完成(4bb02ef) |
 | R-51 | 图片去重仍需为「同尺寸不同内容」的一对图各解一帧（3000x2000 冷比较实测 148ms，在主线程） | `Models/StoredImage.swift` 的 `sampledFingerprint(fromPNG:)`；`HistoryStore.add` 只与 `entries.first` 比较，故每次复制最多一对 | 把 64px 采样值作为可选字段随条目持久化（新写旧读、v1 兼容），载入后比较退化为字符串比较 | 单测：重载后同一对图的比较不再触发采样；界值 <5ms | 中 | 待办 |
 
 ## 发布前检查单（全部为绿才写最终报告）
