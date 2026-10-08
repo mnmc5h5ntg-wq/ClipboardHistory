@@ -53,11 +53,14 @@
 
 | 指标 | 现在 |
 |---|---|
-| `swift build` / `swift test` | 退出码 0，**Executed 205 tests, 1 skipped（离屏捕获套件按设计 skip）, 0 failures**，0 编译告警 |
+| `swift build`（清空 .build 后干净重建） | OK，**0 告警** |
+| `swift test` | 退出码 0，**Executed 227 tests, 1 test skipped, 0 failures**；连跑 6 次全部一致（那个 skip 是离屏视觉套件，按设计只在设了 `CLIPBOARD_HISTORY_UI_SHOTS` 时跑） |
 | `python3 -m unittest discover -s scripts/tests` | OK，**17 tests** |
-| `make bundle` / `make dmg` | 退出码 0；产物挂载后 `codesign --verify --deep --strict` 通过，`lipo -info` = x86_64 + arm64 |
-| `CLIPBOARD_HISTORY_UI_SHOTS=... swift test --filter UICaptureTests` | 退出码 0，58 帧，未绘制比例全部 <95% |
-| 工作区 | `git status` 干净（构建产物 `时间剪史.app`/`*.dmg*` 均在 .gitignore 内） |
+| `make build` / `make bundle` / `make dmg` | 全部退出码 0；DMG 挂载后复核：通用二进制（x86_64 + arm64）、`codesign --verify --deep --strict` 通过、Info.plist 16 键含 `NSAppleEventsUsageDescription`、`.sha256` 可校验且改一个字节就失败 |
+| 离屏视觉捕获 | 58 帧（29 夹具 × 亮/暗），未绘制比例全部 <95%，最后一轮与上一轮逐帧差异 <0.6%（无回归） |
+| 审计矩阵 | 190/190 格全部判定完毕，**待审 0** |
+| Backlog | 54 行，**待办 0**（其余为 已完成(提交号) / 记录不改(理由)） |
+| 工作区 | `git status` 干净；分支 `fix/audit-remediation`，31 个提交未推送 |
 
 本轮新发现（原审计未覆盖，已进 backlog）：
 - **R-49** `ClipboardIntake` 各读取方法的 `from:` 默认 `.general` ⇒ 注入的 pasteboard 被静默忽略，测试会读到**用户真实剪贴板内容**。已修（R-05 同批），断言改成"只报类型不报正文"。
