@@ -4,15 +4,20 @@ import XCTest
 
 @MainActor
 final class HotKeySettingsTests: XCTestCase {
-    override func tearDown() async throws {
-        await MainActor.run {
-            HotKeyPreferences.resetShowMainWindowShortcut()
-            HotKeyPreferences.resetRepeatCopyShortcut()
-        }
-        try await super.tearDown()
+    /// 这些用例读写的是 UserDefaults 里的真实键位，所以在**每条开头**复位，
+    /// 而不是靠 tearDown —— 这样用例顺序无关，也不必覆写 XCTest 的生命周期方法。
+    ///
+    /// 原来这里覆写的是 `tearDown() async throws` + `try await super.tearDown()`：
+    /// 本机 Swift 6.2.1 编得过，GitHub runner 的 Swift/Xcode 组合却报
+    /// "sending value of non-Sendable type 'XCTestCase' risks causing data races"，
+    /// 整个测试 target 编译失败（CI 首跑就是这么红的）。不依赖生命周期签名才是可移植的。
+    private func resetPreferences() {
+        HotKeyPreferences.resetShowMainWindowShortcut()
+        HotKeyPreferences.resetRepeatCopyShortcut()
     }
 
     func testSaveSuccessUpdatesShortcutAndClearsMessage() {
+        resetPreferences()
         let controller = RecordingHotKeyController()
         let settings = HotKeySettings(controller: controller)
         let shortcut = HotKeyShortcut(
@@ -29,6 +34,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testRepeatCopyShortcutUsesIndependentPreference() {
+        resetPreferences()
         let showMainWindowShortcut = HotKeyShortcut(
             keyCode: UInt32(kVK_ANSI_A),
             modifiers: UInt32(cmdKey)
@@ -51,6 +57,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testSaveFailureRollsBackToPreviousShortcut() {
+        resetPreferences()
         let previous = HotKeyShortcut(
             keyCode: UInt32(kVK_ANSI_B),
             modifiers: UInt32(optionKey)
@@ -72,6 +79,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testSaveFailureReportsWhenPreviousShortcutCannotBeRestored() {
+        resetPreferences()
         let previous = HotKeyShortcut(
             keyCode: UInt32(kVK_ANSI_B),
             modifiers: UInt32(optionKey)
@@ -93,6 +101,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testStartFallsBackToDefaultShortcutWhenStoredShortcutIsUnavailable() {
+        resetPreferences()
         let stored = HotKeyShortcut(
             keyCode: UInt32(kVK_ANSI_B),
             modifiers: UInt32(optionKey)
@@ -110,6 +119,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testStartReportsDisabledWhenStoredAndDefaultShortcutsAreUnavailable() {
+        resetPreferences()
         let stored = HotKeyShortcut(
             keyCode: UInt32(kVK_ANSI_B),
             modifiers: UInt32(optionKey)
@@ -125,6 +135,7 @@ final class HotKeySettingsTests: XCTestCase {
     }
 
     func testInvalidShortcutDoesNotReachController() {
+        resetPreferences()
         let controller = RecordingHotKeyController()
         let settings = HotKeySettings(controller: controller)
         let invalid = HotKeyShortcut(
