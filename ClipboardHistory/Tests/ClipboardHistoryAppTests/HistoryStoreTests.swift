@@ -198,13 +198,29 @@ final class HistoryStoreTests: XCTestCase {
 
         store.perform(.togglePredictionSuggestions)
 
-        let exp = expectation(description: "predictions refreshed")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exp.fulfill() }
-        wait(for: [exp], timeout: 3.0)
+        // 预测是在后台任务里算完再回主线程赋值的，用"等到真的有结果"取代固定 sleep：
+        // 固定 0.3s 的写法在机器负载变化时会随机失败（本轮实测 5 次挂 3 次）。
+        waitUntil(description: "预测结果就绪", timeout: 5.0) {
+            store.predictionSuggestionEntries.count == 3
+        }
 
         XCTAssertTrue(store.showsPredictionSuggestions)
         XCTAssertEqual(store.predictionSuggestionEntries.count, 3)
         XCTAssertEqual(store.predictionSuggestionEntries.first?.shortPreview, "item 4")
+    }
+
+    /// 轮询直到条件成立（在主线程 runloop 上跑，让 MainActor.run 回调有机会执行）。
+    private func waitUntil(
+        description: String,
+        timeout: TimeInterval,
+        condition: @MainActor () -> Bool
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        XCTFail("\(description)：在 \(timeout)s 内未成立")
     }
 
     func testSelectingPredictionSuggestionUsesNormalSelectionState() throws {
@@ -213,9 +229,9 @@ final class HistoryStoreTests: XCTestCase {
         store.add(intakeEntry(text: "newer"), timestamp: Date(timeIntervalSince1970: 2))
         store.perform(.togglePredictionSuggestions)
 
-        let exp = expectation(description: "predictions refreshed")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exp.fulfill() }
-        wait(for: [exp], timeout: 3.0)
+        waitUntil(description: "预测结果就绪", timeout: 5.0) {
+            !store.predictionSuggestionEntries.isEmpty
+        }
 
         let suggestion = try XCTUnwrap(store.predictionSuggestionEntries.first)
         store.perform(.selectOnly(suggestion))
@@ -395,7 +411,15 @@ final class HistoryStoreTests: XCTestCase {
     }
 
     private func intakeEntry(text: String) -> ClipboardIntake.Entry {
-        ClipboardIntake.Entry(content: .text(text), thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"])
+        // 固定来源 App：否则来源取自由于真实前台应用（NSWorkspace.frontmostApplication），
+        // 排序断言会随测试期间谁在焦点上而随机失败。R-05 之后来源可以在采集时注入。
+        ClipboardIntake.Entry(
+            content: .text(text),
+            thumbnail: nil,
+            sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Safari",
+            sourceAppName: "Safari"
+        )
     }
 
     private func intakeEntry(image: StoredImage) -> ClipboardIntake.Entry {

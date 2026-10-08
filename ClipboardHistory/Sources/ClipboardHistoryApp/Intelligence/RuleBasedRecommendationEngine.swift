@@ -19,6 +19,9 @@ struct RuleBasedRecommendationEngine {
             ? entries.filter { !Self.containsSensitiveContent($0) }
             : entries
         let filtered = effectiveEntries
+        // 同分候选需要一个确定的次级排序键：Swift 的 sorted(by:) 文档明确不保证稳定，
+        // 只靠"输入顺序"会让同一份历史在不同次运行里给出不同推荐（本轮实测复现）。
+        let copiedAtByEntryID = Dictionary(filtered.map { ($0.id, $0.copiedAt) }, uniquingKeysWith: { first, _ in first })
         let candidates = filtered
             .map { entry in
                 candidate(
@@ -29,10 +32,18 @@ struct RuleBasedRecommendationEngine {
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.score.value == rhs.score.value {
+                if lhs.score.value != rhs.score.value {
+                    return lhs.score.value > rhs.score.value
+                }
+                if lhs.reason != rhs.reason {
                     return lhs.reason < rhs.reason
                 }
-                return lhs.score.value > rhs.score.value
+                let lhsCopiedAt = copiedAtByEntryID[lhs.entryID] ?? .distantPast
+                let rhsCopiedAt = copiedAtByEntryID[rhs.entryID] ?? .distantPast
+                if lhsCopiedAt != rhsCopiedAt {
+                    return lhsCopiedAt > rhsCopiedAt
+                }
+                return lhs.entryID.uuidString < rhs.entryID.uuidString
             }
             .prefix(max(request.limit, 0))
 
@@ -68,7 +79,10 @@ struct RuleBasedRecommendationEngine {
             features[.negativeFeedback, default: 0] -= 0.35
         }
 
-        let value = features.values.reduce(0, +).clamped(to: 0...1)
+        // 必须按固定顺序累加：`features` 是 Dictionary，Dictionary 的迭代顺序按进程随机
+        // 播种，`reduce(0, +)` 的浮点求和因此会有 1 ULP 级别的抖动 —— 实测让 5 条同分候选
+        // 在两次启动之间排出不同次序（0.23999999999999999 vs 0.24000000000000002）。
+        let value = Self.summedScore(from: features).clamped(to: 0...1)
         return RecommendationCandidate(
             entryID: entry.id,
             score: RecommendationScore(value: value, features: features),
@@ -333,6 +347,17 @@ struct RuleBasedRecommendationEngine {
             return "低置信度候选，仅作为历史备选。"
         }
         return "根据本地历史特征推荐。"
+    }
+}
+
+extension RuleBasedRecommendationEngine {
+    /// 按 `RecommendationFeature.allCases` 的固定顺序求和。
+    /// 不要改成 `features.values.reduce(0, +)`：Dictionary 的迭代顺序按进程随机播种，
+    /// 浮点加法不满足结合律，同一份历史会在不同启动里排出不同推荐次序（本轮实测复现）。
+    nonisolated static func summedScore(from features: [RecommendationFeature: Double]) -> Double {
+        RecommendationFeature.allCases.reduce(0.0) { total, feature in
+            total + (features[feature] ?? 0)
+        }
     }
 }
 
