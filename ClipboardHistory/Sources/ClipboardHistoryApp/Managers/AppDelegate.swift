@@ -51,6 +51,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         LifecycleDebugLogger.reset()
         LifecycleDebugLogger.log("applicationDidFinishLaunching called")
+        // 两份进程各自整库写 history.json，后写的会整片盖掉先写的记录（见 InstanceGuard）。
+        // 这里静默退出而不是弹窗：正常双击第二个图标时 macOS 本来就是把已有实例带到前台，
+        // 只有 `open -n`（make run 用的就是它）才会真的开第二份。
+        if let otherPID = InstanceGuard.conflictingPID() {
+            LifecycleDebugLogger.log("检测到同 bundle 的另一实例 pid=\(otherPID)：本次启动取消，避免互相覆盖存档")
+            NSApp.terminate(nil)
+            return
+        }
         NSApp.setActivationPolicy(.regular)
         NotificationCenter.default.addObserver(
             self,
