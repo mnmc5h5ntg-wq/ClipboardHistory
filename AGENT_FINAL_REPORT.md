@@ -133,10 +133,11 @@ CI 不是装饰：runner 是 Swift 6.1.2、开发机是 6.2.1，两条只有远�
 
 仓库已从 `~/Documents/Codex_Project0` 移到 **`/Users/wangziyi/Codex_Project0`**，脱离 iCloud「桌面与文稿」同步范围；旧路径留了一个指向新位置的符号链接，确认无误后可删。
 移动后的验证：`swift build` 0 告警、`swift test` 229 例全绿、发布脚本测试 18 例、`make bundle` 产出通用二进制且包内版本 1.4.7、`git status` 干净。
-**远端一致性当时成立、现在不成立了**：那条记录写完之后又多出一个只改账本的提交 `629c6f8`，而当天 GitHub 整体不可达
+**远端一致性当时成立、现在不成立了**：那条记录写完之后又多出只改账本的提交，而当天 GitHub 整体不可达
 （`github.com:443` TLS 握手被断、`ssh -T git@github.com` 被 `Connection closed ... port 22`，同期 apple.com 正常 200），所以
-本地 `main` 领先远端 `69c4e21` 一个提交。推送命令与 tag 核对方式写在 `AGENT_STATE.md` 的"恢复指令"第 6 条；
-它不影响任何已发布产物，但**在推上去之前，远端 main 上没有这份移动记录**。
+本地 `main` 领先远端。领先几条**不写死在这里**，用 `git log --oneline origin/main..main` 现取
+（当日已知的远端顶端是 `69c4e21`）。推送命令与 tag 核对方式写在 `AGENT_STATE.md` 的"恢复指令"第 6 条；
+这些未推送提交只改账本，不影响任何已发布产物，但**在推上去之前，远端 main 上没有这份移动记录**。
 
 两条实测事实值得记下来：跨出 iCloud 同步边界的 `mv` 会 `Operation timed out`，必须改用 `rsync -a` 复制 + 校验 + 删源；而 `~/Documents` 下的 `名字 2.扩展名` 重复副本**具体由谁产生我没有查清**（`Codex_Project0_backups` 是 6 月 8 日的手工快照、`Codex_Project0.zip` 是 6 月 5 日的，都不是），只能说移出同步范围消除了最可能的那条路径，不能保证它永不复发 —— 复发时的特征是`Sources/` 下出现重复类型声明、构建报类型歧义。
 
