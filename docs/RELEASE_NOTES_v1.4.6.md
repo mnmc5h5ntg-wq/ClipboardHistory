@@ -77,6 +77,10 @@
 
 ## 校验
 
+下载本页的两个附件后，在同一个目录里执行：
+
 ```
-shasum -a 256 -c 时间剪史_v1.4.6.dmg.sha256
+shasum -a 256 -c ClipboardHistory_v1.4.6.dmg.sha256
 ```
+
+预期输出 `ClipboardHistory_v1.4.6.dmg: OK`。已在本版发布后实测：从 Releases 重新下载两个附件、校验通过，哈希与上面记录的一致。

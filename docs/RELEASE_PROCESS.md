@@ -69,3 +69,33 @@ xattr -cr /Applications/时间剪史.app
 ```
 
 这条命令不应写入面向普通用户的 README、Release 正文或 DMG 安装说明。
+
+## 5. 提交、打 tag、发布
+
+脚本只到"生成本地材料"为止，后面这几步要手动做（本版实测过的命令）：
+
+```bash
+git add CHANGELOG.md Makefile docs/RELEASE_NOTES_v<版本>.md "releases/<App>_v<版本>.dmg.sha256"
+git commit -m "Prepare v<版本> release"
+git tag v<版本>                       # 与 v1.3 一致：轻量 tag 打在发布准备提交上
+git push origin main && git push origin v<版本>
+gh release create v<版本> <两个附件> --title "时间剪史 v<版本>" --notes-file docs/RELEASE_NOTES_v<版本>.md
+```
+
+两条必须知道的坑（都是 v1.4.6 发布当天踩到的）：
+
+- **附件名不要用中文**。GitHub 会把非 ASCII 前缀吞掉：`时间剪史_v1.4.6.dmg` 上传后变成 `_v1.4.6.dmg`，
+  而 `.sha256` 里写的还是原名 ⇒ 用户下载两个附件后 `shasum -c` 直接失败。
+  发布资产统一用 ASCII 名（`ClipboardHistory_v<版本>.dmg`），仓库内 `releases/` 下的中文名文件不受影响。
+  上传时可用 `gh release upload <tag> <文件> --clobber`，改名后要 `gh release delete-asset` 清掉旧的。
+- **发布说明由脚本生成的是占位草稿**（"待补充…""构建 App：待确认。"），
+  模板自己也写了要在发布前替换。发布前必须把 `docs/RELEASE_NOTES_v<版本>.md` 和
+  `CHANGELOG.md` 里那一节的占位内容换成真实改动，否则会把"待补充"发出去。
+
+发布后自检（本版实际跑过）：
+
+```bash
+gh release list -L 3                                   # 确认 Latest 已切到新版本
+gh release download v<版本> -R <owner>/<repo> -D /tmp/x # 非 git 目录里必须带 -R
+cd /tmp/x && shasum -a 256 -c ClipboardHistory_v<版本>.dmg.sha256   # 必须 OK
+```
