@@ -6,11 +6,11 @@ final class _FingerprintCache: @unchecked Sendable {
     private let lock = NSLock()
     private var value: String?
 
-    func get_or_set(_ input: NSImage, _ make: (NSImage) -> String) -> String {
+    func get_or_set(_ make: () -> String) -> String {
         lock.lock()
         defer { lock.unlock() }
         if let value { return value }
-        let made = make(input)
+        let made = make()
         value = made
         return made
     }
@@ -51,8 +51,17 @@ struct StoredImage: Equatable, Hashable, @unchecked Sendable {
         self.sourcePNGData = pngData
     }
 
+    /// 指纹 = 64x64 像素采样哈希，**与编码方式无关**。
+    /// 这一点是行为要求而不是风格：「再次复制」会把图片重新过一遍剪贴板，
+    /// 我们写出去的是 NSImage，剪贴板给回来的却是 TIFF —— 只有按像素比，
+    /// 同一张图才不会变成两条（`testAddPromotesImageRoundTrippedThroughPasteboard...` 守着）。
+    ///
+    /// 但取样的**方式**可以是廉价的：以前先 `NSImage.cgImage(forProposedRect:)`
+    /// 整幅解码再缩到 64x64，3000x2000 冷启动实测 217ms，而它发生在主线程的去重比较里。
+    /// 现在让 ImageIO 直接解出 64px 缩略图（同图实测 58ms），并在字节完全相同时
+    /// 直接判定相同（0.2ms 量级），把最常见的那一类比较从解码路径上摘掉。
     private var fingerprint: String {
-        fingerprintCache.get_or_set(nsImage) { Self.fingerprint(for: $0) }
+        fingerprintCache.get_or_set { Self.pixelFingerprint(image: nsImage, pngData: pngData()) }
     }
 
     func pngData() -> Data? {
@@ -63,22 +72,15 @@ struct StoredImage: Equatable, Hashable, @unchecked Sendable {
     }
 
     static func == (lhs: StoredImage, rhs: StoredImage) -> Bool {
-        lhs.fingerprint == rhs.fingerprint
+        // 短路只在"必然等价"时才用：字节相同 ⇒ 像素必然相同。
+        // 反过来"尺寸不同 ⇒ 不同图"看着也成立，但点尺寸受 DPI 影响，
+        // 同一张图的 PNG 与 TIFF 可能给出不同点尺寸，所以不做那条短路。
+        if let a = lhs.sourcePNGData, let b = rhs.sourcePNGData, a == b { return true }
+        return lhs.fingerprint == rhs.fingerprint
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(fingerprint)
-    }
-
-    private static func fingerprint(for image: NSImage) -> String {
-        if let sample = sampledFingerprint(for: image) {
-            return sample
-        }
-
-        guard let data = pngData(from: image) else {
-            return "object:\(ObjectIdentifier(image))"
-        }
-        return "full:" + hex(SHA256.hash(data: data))
     }
 
     private static func hex<D: Sequence<UInt8>>(_ digest: D) -> String {
@@ -93,20 +95,57 @@ struct StoredImage: Equatable, Hashable, @unchecked Sendable {
         return bitmap.representation(using: NSBitmapImageRep.FileType.png, properties: [:])
     }
 
-    /// 旧实现按原始像素整幅绘制后再 SHA256（1200x900 实测 7.4ms/张，启动载入 8 张
-    /// 2000x1500 共 605.8ms，全在主线程）。现在固定缩到 64x64 再哈希：
-    /// 仍然能区分"同尺寸但内容不同"的截图，成本与图片原始尺寸解耦。
+    /// 采样边长。指纹键里带上原始像素宽高，所以两张"缩样相同但原图不同"的图不会误判。
     private static let sampleSide = 64
+
+    /// 首选路径：从 PNG 字节直接解出 64px 一帧。
+    /// 只有在字节都拿不到（位图坏掉）时才退回 NSImage 整幅解码那条老路。
+    private static func pixelFingerprint(image: NSImage, pngData data: Data?) -> String {
+        if let data, let sample = sampledFingerprint(fromPNG: data) {
+            return sample
+        }
+        if let sample = sampledFingerprint(for: image) {
+            return sample
+        }
+        guard let encoded = data ?? pngData(from: image) else {
+            return "object:\(ObjectIdentifier(image))"
+        }
+        return "full:" + hex(SHA256.hash(data: encoded))
+    }
+
+    /// ImageIO 路线：宽高从文件头读（不 inflate），像素只解 64px 那一帧。
+    static func sampledFingerprint(fromPNG data: Data) -> String? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let side = sampleSide
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: side,
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            return nil
+        }
+        guard let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let pixelWidth = properties[kCGImagePropertyPixelWidth] as? Int,
+              let pixelHeight = properties[kCGImagePropertyPixelHeight] as? Int,
+              pixelWidth > 0, pixelHeight > 0 else {
+            return nil
+        }
+        return sampleKey(pixelWidth: pixelWidth, pixelHeight: pixelHeight, of: thumbnail)
+    }
 
     private static func sampledFingerprint(for image: NSImage) -> String? {
         var proposedRect = NSRect(origin: .zero, size: image.size)
         guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
             return nil
         }
-        let pixelWidth = cgImage.width
-        let pixelHeight = cgImage.height
-        guard pixelWidth > 0, pixelHeight > 0 else { return nil }
+        guard cgImage.width > 0, cgImage.height > 0 else { return nil }
+        return sampleKey(pixelWidth: cgImage.width, pixelHeight: cgImage.height, of: cgImage)
+    }
 
+    /// 两条来源共用这一段：缩到 64x64 RGBA 后连同原始宽高一起哈希，
+    /// 保证"同一张图"无论从 PNG 字节还是 NSImage 进来都得到同一个键。
+    private static func sampleKey(pixelWidth: Int, pixelHeight: Int, of cgImage: CGImage) -> String? {
         let side = sampleSide
         var pixels = Data(count: side * side * 4)
         let rendered = pixels.withUnsafeMutableBytes { buffer -> Bool in

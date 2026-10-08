@@ -60,15 +60,45 @@ final class PerfBudgetTests: XCTestCase {
         XCTAssertLessThan(saveMs, 200, "保存不得随图片数量线性重编码（修复前 667.8ms）")
     }
 
-    /// R-08：单张图片的指纹成本应与图片尺寸解耦。
+    /// R-08：图片去重比较的成本。
+    ///
+    /// 这条以前是**恒绿的假守卫**：它计时的是 `StoredImage(nsImage)` 这个构造调用，
+    /// 而指纹是惰性的，所以 4000x3000 与 200x150 都报 0.00ms，什么都没测。
+    /// 现在分别量三类真实比较：同字节重复（走短路）、同尺寸不同内容（必须采样）、
+    /// 以及小图采样，作为对照。旧实现里第二类在 3000x2000 上两侧各整幅解码，
+    /// 实测 434ms 起，全部发生在主线程的 `add()` 里。
     @MainActor
-    func testImageFingerprintIsSampledNotFullSize() throws {
-        let large = try makeStoredImage(size: NSSize(width: 4000, height: 3000))
-        let small = try makeStoredImage(size: NSSize(width: 200, height: 150))
-        let largeMs = milliseconds { _ = StoredImage(large.nsImage) }
-        let smallMs = milliseconds { _ = StoredImage(small.nsImage) }
-        print("PERF fingerprint 4000x3000=\(String(format: "%.2f", largeMs))ms 200x150=\(String(format: "%.2f", smallMs))ms")
-        XCTAssertLessThan(largeMs, max(smallMs * 4, 8), "指纹成本不应随像素数线性增长（审计基线 1200x900 = 7.4ms/张）")
+    func testImageComparisonCostStaysBounded() throws {
+        let big = NSSize(width: 3000, height: 2000)
+        // 每一类比较都用各自"第一次被比较"的对象：指纹是惰性缓存的，
+        // 拿同一对对象先断言再计时，量到的永远是 0ms（本条测试的第一版就这么假绿过）。
+        // 取 3 次最快值：单次计时在本机抖动可达 ±40%，而界值与旧实测只差 3 倍。
+        var samplePairs: [(StoredImage, StoredImage)] = []
+        for _ in 0..<3 {
+            samplePairs.append((try makeStoredImage(color: .red, size: big),
+                                try markedStoredImage(size: big)))
+        }
+        let sampleRuns = samplePairs.map { pair in milliseconds { _ = (pair.0 == pair.1) } }
+        let largeSampleMs = sampleRuns.min() ?? .infinity
+        let coldPlain = samplePairs[0].0
+        let coldMarked = samplePairs[0].1
+
+        let smallPlain = try makeStoredImage(color: .red, size: NSSize(width: 200, height: 150))
+        let smallMarked = try markedStoredImage(size: NSSize(width: 200, height: 150))
+        let smallSampleMs = milliseconds { _ = (smallPlain == smallMarked) }
+
+        let twinA = try makeStoredImage(color: .red, size: big)
+        let twinB = try makeStoredImage(color: .red, size: big)
+        let sameBytesMs = milliseconds { _ = (twinA == twinB) }
+
+        print("PERF 图片比较（冷）：同字节=\(String(format: "%.2f", sameBytesMs))ms"
+            + " 大图采样=\(sampleRuns.map { String(format: "%.0f", $0) }.joined(separator: "/"))ms（取最快）"
+            + " 小图采样=\(String(format: "%.2f", smallSampleMs))ms")
+
+        XCTAssertTrue(twinA == twinB, "同字节的两张图必须判为同一张")
+        XCTAssertNotEqual(coldPlain, coldMarked, "同尺寸不同内容不得被判为同一张")
+        XCTAssertLessThan(sameBytesMs, 5, "重复复制同一张图是最常见路径，不该付解码成本")
+        XCTAssertLessThan(largeSampleMs, 250, "3000x2000 的一次去重比较必须明显低于旧实测 434ms")
     }
 
     /// 采样指纹必须仍能区分同尺寸不同内容的图（否则去重会把不同截图合并）。

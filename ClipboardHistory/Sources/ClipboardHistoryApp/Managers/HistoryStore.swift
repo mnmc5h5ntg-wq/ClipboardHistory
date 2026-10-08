@@ -536,45 +536,47 @@ final class HistoryStore: ObservableObject {
         return true
     }
 
+    /// OCR 的像素解码不再发生在主线程（审计 R-23）。
+    ///
+    /// 主线程只负责拿到"字节或 URL"——存档里的条目本来就带 PNG 字节，这一步是零成本；
+    /// 解码与识别都在一条串行后台队列上完成，所以启动时扫描 N 张图不会再
+    /// 连续 N 次卡主线程，也不会并发抢满 CPU 核。
+    /// 解码上限 1200px：认字不需要原始分辨率，整幅解一张 4000×3000 只是浪费。
     private func scheduleOCRIfNeeded(for entry: Entry) {
         let entryID = entry.id
-        let cgImage: CGImage?
+        let source: OCRImageSource
 
         switch entry.content {
         case .image(let stored):
-            Self.ocrLog("OCR triggered for .image entry \(entryID.uuidString.prefix(8))..., imageSize=\(stored.nsImage.size)")
-            cgImage = stored.nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
-                ?? stored.nsImage.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0)?.cgImage })
+            guard let data = stored.pngData() else {
+                Self.ocrLog("FAIL no image bytes for \(entryID.uuidString.prefix(8))...")
+                return
+            }
+            Self.ocrLog("OCR queued for .image entry \(entryID.uuidString.prefix(8))..., bytes=\(data.count)")
+            source = .data(data)
         case .file(let url):
             guard Self.supportedImageExtensions.contains(url.pathExtension.lowercased()) else {
                 Self.ocrLog("skip file OCR - \(url.lastPathComponent) not an image extension")
                 return
             }
-            Self.ocrLog("OCR triggered for .file entry \(entryID.uuidString.prefix(8))..., url=\(url.lastPathComponent)")
-            guard let img = NSImage(contentsOf: url) else {
-                Self.ocrLog("FAIL could not load NSImage from \(url.lastPathComponent)")
-                return
-            }
-            cgImage = img.cgImage(forProposedRect: nil, context: nil, hints: nil)
-                ?? img.tiffRepresentation.flatMap({ NSBitmapImageRep(data: $0)?.cgImage })
+            Self.ocrLog("OCR queued for .file entry \(entryID.uuidString.prefix(8))..., name=\(url.lastPathComponent)")
+            source = .url(url)
         default:
             Self.ocrLog("skip OCR - not image or image-file entry")
             return
         }
 
-        guard let cg = cgImage else {
-            Self.ocrLog("FAIL cgImage extraction for \(entryID.uuidString.prefix(8))...")
-            return
-        }
-        Self.ocrLog("cgImage extracted OK: \(cg.width)x\(cg.height)")
-
-        DispatchQueue.global(qos: .utility).async {
+        Self.ocrQueue.async {
+            guard let cg = Self.decodeImageForOCR(source) else {
+                Self.ocrLog("FAIL decode for \(entryID.uuidString.prefix(8))...")
+                return
+            }
             guard let text = SystemContextCollector.recognizeText(in: cg) else {
                 Self.ocrLog("OCR returned nil text for \(entryID.uuidString.prefix(8))...")
                 return
             }
-            let wordCount = text.split(separator: " ").count
-            Self.ocrLog("OCR done for \(entryID.uuidString.prefix(8))...: \(text.prefix(80))... (\(wordCount) tokens)")
+            // 只记长度，不记内容：截图 OCR 出来的文字完全可能就是密码或令牌。
+            Self.ocrLog("OCR done for \(entryID.uuidString.prefix(8))...: chars=\(text.count) \(cg.width)x\(cg.height)")
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 guard let idx = self.entries.firstIndex(where: { $0.id == entryID }) else {
@@ -611,6 +613,35 @@ final class HistoryStore: ObservableObject {
     private static let supportedImageExtensions: Set<String> = [
         "png", "jpg", "jpeg", "gif", "bmp", "tiff", "tif", "heic", "heif", "webp", "ico", "svg"
     ]
+
+    /// 给 OCR 用的图片来源：只有字节或 URL 是 Sendable 的，NSImage 不进后台（D-010）。
+    enum OCRImageSource: Sendable {
+        case data(Data)
+        case url(URL)
+    }
+
+    /// 串行队列：启动时扫描整库图片也不会并发抢满核心，且主线程完全不参与解码。
+    nonisolated private static let ocrQueue = DispatchQueue(label: "com.clipboardhistory.ocr", qos: .utility)
+
+    /// 用 ImageIO 直接解出"够认字"的一帧，顺带处理 EXIF 方向。
+    /// 比 `NSImage(contentsOf:)` + `cgImage(forProposedRect:)` 少一次整幅位图落地。
+    /// internal 而非 private：这条函数是"像素解码发生在哪儿"这件事唯一可测的接缝。
+    nonisolated static func decodeImageForOCR(_ source: OCRImageSource, maxPixel: Int = 1_200) -> CGImage? {
+        let imageSource: CGImageSource?
+        switch source {
+        case .data(let data):
+            imageSource = CGImageSourceCreateWithData(data as CFData, nil)
+        case .url(let url):
+            imageSource = CGImageSourceCreateWithURL(url as CFURL, nil)
+        }
+        guard let imageSource else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary)
+    }
 
         private nonisolated static func ocrLog(_ message: String) {
         // 统一走调试开关（CLIPBOARD_HISTORY_DEBUG=1）。
