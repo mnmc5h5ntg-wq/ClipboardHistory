@@ -98,10 +98,11 @@ struct ClipboardIntake {
             var thumb: StoredImage?
             if let tiff = pasteboard.data(forType: .tiff),
                let img = NSImage(data: tiff) {
-                thumb = StoredImage(img)
+                // 缩略图也会落盘，所以走同一套上限。
+                thumb = StoredImage.downsamplingIfNeeded(img)
             } else if let icnsData = pasteboard.data(forType: NSPasteboard.PasteboardType(rawValue: "com.apple.icns")),
                       let img = NSImage(data: icnsData) {
-                thumb = StoredImage(img)
+                thumb = StoredImage.downsamplingIfNeeded(img)
             }
             let content: ClipboardEntryContent = urls.count == 1 ? .file(urls[0]) : .files(urls)
             return makeEntry(content: content, thumbnail: thumb, pasteboard: pasteboard)
@@ -109,13 +110,15 @@ struct ClipboardIntake {
 
         if let pngData = pasteboard.data(forType: .png),
            let image = NSImage(data: pngData) {
-            let stored = StoredImage(image, pngData: pngData)
+            // 超过 4096px 最长边才降采样（审计第二轮 B-4 / 账本 R2-08）；
+            // 4K 截图（3840×2160）及以下**逐字节不动**，阈值依据见 ImageIntakePolicy。
+            let stored = StoredImage.downsamplingIfNeeded(image, pngData: pngData)
             return makeEntry(content: .image(stored), thumbnail: stored, pasteboard: pasteboard)
         }
 
         if let tiffData = pasteboard.data(forType: .tiff),
            let image = NSImage(data: tiffData) {
-            let stored = StoredImage(image)
+            let stored = StoredImage.downsamplingIfNeeded(image)
             return makeEntry(content: .image(stored), thumbnail: stored, pasteboard: pasteboard)
         }
 
