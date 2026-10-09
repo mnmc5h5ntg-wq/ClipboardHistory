@@ -70,11 +70,15 @@ final class UICaptureTests: XCTestCase {
     struct Fixture {
         let name: String
         let size: NSSize
+        /// 布局完成之后、按快门之前跑一次。给"内容要等一次异步刷新才落定"的视图用：
+        /// 不 settle 就只能拍到刷新途中的那一帧，而那一帧是不是最终态取决于机器快慢。
+        let settle: (() -> Void)?
         let build: () -> AnyView
 
-        init(_ name: String, _ size: NSSize, _ build: @escaping () -> AnyView) {
+        init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
+            self.settle = settle
             self.build = build
         }
     }
@@ -97,10 +101,62 @@ final class UICaptureTests: XCTestCase {
             Fixture("content-no-results", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: searching)) },
         ]
 
-        // 菜单栏推荐面板**不进离屏夹具**：试过（D-019 的注入接缝就是为它加的），
-        // 但离屏渲染下菜单表面 97.7% 像素未被绘制（材质不画），会被本文件的
-        // "未绘制 >95% 判失败"闸门拦下 —— 那层闸门是对的，拍出来的假帧不能当证据。
-        // 菜单栏视觉仍标 NOT-RUN，等 R2-17 的在屏探针路线。
+        // 菜单栏面板的内容层。以前这里一直标 NOT-RUN（D-019：整块 NSMenu 离屏画不出材质表面，
+        // 97.7% 像素未绘制，会被本文件第 2 条规矩拦下 —— 那层判断本身没错）。
+        // 但真正上线的是 macOS 13+ 的 SwiftUI `MenuBarExtra`，它的内容就是一个普通 View
+        // （`MenuBarRecommendationsView`），可以和其他夹具一样离屏渲染：字号、层级、间距、
+        // 空态文案、脱敏标签都拍得到；**拍不到的仍然是系统菜单的材质与圆角**（那层由系统画）。
+        // 可复现性：reason 文案会带"当前在<App 名>"，取自 `effectiveFrontmostApp()`；
+        // 测试进程从不 `startMonitoring()` ⇒ `lastFrontmostBundleID` 恒为 nil ⇒ 走"第一条记录的来源 App"，
+        // 由夹具固定（Safari），所以这些帧仍可做逐字节比对。
+        if #available(macOS 13, *) {
+            let recommendationStore = makePopulatedStore()
+            recommendationStore.refreshPredictions()
+            waitUntil("菜单栏面板需要候选") { !recommendationStore.predictionSuggestionEntries.isEmpty }
+            results.append(Fixture("menubar-recommendations", NSSize(width: 320, height: 320), settle: {
+                self.waitUntil("推荐刷新要收尾") { !recommendationStore.isRefreshingPredictions }
+            }) {
+                AnyView(self.menuBarFrame(MenuBarRecommendationsView(
+                    historyStore: recommendationStore,
+                    appDelegate: AppDelegate(historyStore: recommendationStore)
+                )))
+            })
+
+            // 刷新途中的那一帧：视图 `onAppear` 自己会发起一次刷新，所以不 settle，
+            // 并在快门前一瞬**断言它仍在途中** —— 否则这帧的名字就在说谎，
+            // 而"名字说正在算、画面上却写着暂无推荐"这种错用肉眼比对很难发现。
+            let refreshingStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+            )
+            results.append(Fixture("menubar-refreshing", NSSize(width: 320, height: 120), settle: {
+                XCTAssertTrue(refreshingStore.isRefreshingPredictions,
+                              "这一帧叫「正在整理推荐」，拍的时候刷新必须仍在途中")
+            }) {
+                AnyView(self.menuBarFrame(MenuBarRecommendationsView(
+                    historyStore: refreshingStore,
+                    appDelegate: AppDelegate(historyStore: refreshingStore)
+                )))
+            })
+
+            // 算完确实没有推荐：settle 到刷新收尾，必须说"暂无推荐"而不是整段消失。
+            let emptyMenuBarStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+            )
+            results.append(Fixture("menubar-empty", NSSize(width: 320, height: 120), settle: {
+                self.waitUntil("空库的预测刷新要收尾") { !emptyMenuBarStore.isRefreshingPredictions }
+                XCTAssertTrue(emptyMenuBarStore.predictionSuggestionEntries.isEmpty,
+                              "空库不该有候选，否则这帧拍的不是空态")
+            }) {
+                AnyView(self.menuBarFrame(MenuBarRecommendationsView(
+                    historyStore: emptyMenuBarStore,
+                    appDelegate: AppDelegate(historyStore: emptyMenuBarStore)
+                )))
+            })
+        }
 
         // 侧栏脱离分栏器单独拍：实测 NavigationSplitView 的 sidebar 列在离屏
         // cacheDisplay 下不跟随强制暗色（同一帧里详情列是白字、侧栏列是黑字），
@@ -229,6 +285,26 @@ final class UICaptureTests: XCTestCase {
             .background(Color(nsColor: .windowBackgroundColor))
     }
 
+    /// 菜单栏面板的离屏外框。真实面板由系统给宽度和材质，这里只固定宽度并铺一层窗口底色，
+    /// 让内容层的排版与对比度可测；材质本身不在这帧的责任范围内。
+    private func menuBarFrame<V: View>(_ view: V) -> some View {
+        view
+            .padding(.vertical, 6)
+            .frame(width: 320, alignment: .topLeading)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 等异步预测落地。超时是**失败**而不是"那就拍没候选的帧"：
+    /// 后者会让"有推荐"这一帧在退化时静默变成"暂无推荐"，像素仍然合法、缺陷却被吞掉。
+    private func waitUntil(_ description: String, timeout: TimeInterval = 5.0, condition: @MainActor () -> Bool) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        XCTFail("\(description)：\(timeout)s 内未成立，这一帧不能拍")
+    }
+
     private func makeSettingsView(store: HistoryStore, initialCategory: SettingsCategory? = .shortcuts) -> some View {
         SettingsView(
             showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
@@ -328,6 +404,10 @@ final class UICaptureTests: XCTestCase {
         window.setContentSize(size)
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
+
+        // 内容要等一次异步刷新才落定的夹具在这里 settle（会转 runloop）。
+        // 放在"关 caret"之前：转完 runloop 可能装出新的 field editor，必须让后面的静默与重排照常生效。
+        fixture.settle?()
 
         // 拍帧前先把插入点 caret 清掉：field editor 的光标是**闪烁**的，
         // 同一份代码连拍两次会因此出现最大 251 的通道差（实测：亮色 content 帧 x≈262 处
