@@ -23,6 +23,11 @@ python3 scripts/prepare_release.py 1.3.0
 - 写入 `Makefile` 中的 `VERSION`。
 - 通过 `make dmg` 构建 App 和 DMG。
 - 校验 App 内 `Info.plist` 的版本号。
+- 启动闸门：反汇编包内二进制（`otool -tvV -arch arm64`），确认没有给 `AppDelegate` 留
+  「未实现初始化器」桩。这一关是 v1.4.8 才补上的（D-029：包能构建、签名能过、几百个用例全绿，
+  但用户一打开就 `EXC_BREAKPOINT` 闪退 —— 因为 Swift 侧写 `AppDelegate()` 走的是带默认参数的
+  `init(historyStore:)`，永远碰不到 ObjC 的 `-init`，而发布链路里没有任何一步真的打开过 .app）。
+  只读反汇编，不启动用户的 app（那会读他真实存档）。
 - 复制 DMG 到 `releases/`。
 - 生成 `.sha256` 校验文件。
 - 生成 `docs/RELEASE_NOTES_v版本号.md`。
@@ -52,7 +57,8 @@ python3 scripts/prepare_release.py 1.3.0 --force
 ## 4. 发布前人工检查
 
 - 打开 DMG，确认图标、应用和 `Applications` 入口显示正常。
-- 将 App 拖入 `/Applications` 后启动一次。
+- 将 App 拖入 `/Applications` 后启动一次。上面的闸门只保证"不会一打开就闪退"这一类，
+  启动之后的功能仍要人看一遍。
 - 检查文本、图片、文件、视频复制和预览。
 - 检查收藏、菜单栏快速复制、快捷键、开机启动设置。
 - 检查 `releases/时间剪史_v版本号.dmg.sha256` 是否能和 DMG 匹配。

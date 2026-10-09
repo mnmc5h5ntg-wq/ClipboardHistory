@@ -21,6 +21,7 @@ APP_NAME = "时间剪史"
 MAKEFILE_VERSION_PATTERN = re.compile(r"^(VERSION\s*:=\s*).+$", re.MULTILINE)
 VERSION_PATTERN = re.compile(r"^v?(\d+\.\d+(?:\.\d+)?[A-Za-z0-9._-]*)$")
 CommandRunner = Callable[[Sequence[str], Path], None]
+DisassemblyReader = Callable[[Path], str]
 
 
 @dataclass(frozen=True)
@@ -98,6 +99,74 @@ def sha256_for(path: Path) -> str:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+UNIMPLEMENTED_INITIALIZER_CALL = re.compile(r"^\s*[0-9a-f]+\s+(?:bl|b|call[a-z]*)\s+\S*unimplementedInitializer")
+LITERAL_POOL_STRING = re.compile(r'^.*literal pool for: "([^"]*)"$')
+MODULE_CLASS_NAME = re.compile(r"^[A-Za-z_$][A-Za-z0-9_$]*\.[A-Za-z_$][A-Za-z0-9_$]*$")
+
+# 只有"会被 ObjC 元类型构造"的类才是致命的：AppDelegate 由 SwiftUI 的
+# @NSApplicationDelegateAdaptor(AppDelegate.self) 通过 -init 创建，桩一命中就闪退。
+LAUNCH_CRITICAL_CLASSES = ("ClipboardHistoryApp.AppDelegate",)
+
+
+def classes_with_unimplemented_initializers(disassembly: str) -> set[str]:
+    """从 `otool -tvV` 的输出里挑出"带未实现初始化器桩"的类名。
+
+    两个架构的桩形状不一样，都是实测：
+
+        x86_64:  leaq ...  ## literal pool for: "ClipboardHistoryApp.Coordinator"
+                 callq _$ss25_unimplementedInitializer...
+        arm64 :  add  x5, x5, #0x3b0 ; literal pool for: "ClipboardHistoryApp.ChineseSelectableNSTextView"
+                 ...（中间还有一串 mov）
+                 bl   _$ss25_unimplementedInitializer...
+                 brk  #0x1
+
+    arm64 里 className 的字面量离 `bl` 有二十几行，所以**不能用固定小窗口往前找** ——
+    那样会在真正坏掉的产物上报"干净"，一把永远绿的假闸门比没有闸门更坏。
+    这里改成按块扫：两条桩调用之间的所有字面量里，取最后一条形如 `Module.Class` 的。
+    文件路径那条（`ClipboardHistoryApp/ChineseTextContextMenu.swift`，含 `/`）必须排除，
+    否则它会被当成类名，检查在正确产物上也会误报。
+    """
+    lines = disassembly.splitlines()
+    call_indexes = [index for index, line in enumerate(lines) if UNIMPLEMENTED_INITIALIZER_CALL.search(line)]
+    found: set[str] = set()
+    for position, call_index in enumerate(call_indexes):
+        block_start = 0 if position == 0 else call_indexes[position - 1] + 1
+        nearest_class: str | None = None
+        for previous in lines[block_start:call_index]:
+            match = LITERAL_POOL_STRING.search(previous)
+            if match and MODULE_CLASS_NAME.match(match.group(1)):
+                nearest_class = match.group(1)
+        if nearest_class:
+            found.add(nearest_class)
+    return found
+
+
+def read_disassembly(executable: Path) -> str:
+    """跑 `otool -tvV` 读一个二进制的反汇编（arm64 切片）。
+
+    单独成函数是为了可注入：发布脚本的测试用假产物，真机跑时读真包。
+    """
+    completed = subprocess.run(
+        ["otool", "-tvV", "-arch", "arm64", str(executable)],
+        capture_output=True,
+        text=True,
+        env=build_child_environment(),
+    )
+    if completed.returncode != 0:
+        raise ReleaseError(
+            f"otool 反汇编失败（退出码 {completed.returncode}）："
+            f"{completed.stderr.strip()[:200] or '无 stderr'}"
+        )
+    return completed.stdout
+
+
+def find_launch_blockers(disassembly: str,
+                         critical: Sequence[str] = LAUNCH_CRITICAL_CLASSES) -> list[str]:
+    """返回"有 -init 桩且必须由 ObjC 构造"的类名列表；空列表才允许发布。"""
+    stubbed = classes_with_unimplemented_initializers(disassembly)
+    return sorted(name for name in critical if name in stubbed)
 
 
 def replace_makefile_version(text: str, version: str) -> str:
@@ -202,6 +271,7 @@ class ReleasePreparer:
         today: dt.date | None = None,
         timestamp: str | None = None,
         runner: CommandRunner | None = None,
+        disassembly_reader: DisassemblyReader | None = None,
     ) -> None:
         self.paths = paths
         self.dry_run = dry_run
@@ -211,6 +281,7 @@ class ReleasePreparer:
         self.today = today or dt.date.today()
         self.timestamp = timestamp or dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         self.runner = runner or self._default_runner
+        self.disassembly_reader = disassembly_reader or read_disassembly
 
     def prepare(self, raw_version: str) -> ReleaseResult:
         version, tag = normalize_version(raw_version)
@@ -242,6 +313,7 @@ class ReleasePreparer:
                 self._run_make_dmg()
                 ReleasePreparer._require_fresh_dmg(root_dmg, stamp_before)
                 self._verify_info_plist(version)
+                self._verify_launchable_binary()
 
             if not root_dmg.exists():
                 raise ReleaseError(f"没有找到 DMG：{root_dmg}")
@@ -295,6 +367,7 @@ class ReleasePreparer:
         else:
             steps.append("运行 make dmg 构建 App 并生成 DMG")
             steps.append("验证 App 的 Info.plist 版本号")
+            steps.append("反汇编包内二进制，确认没有给 AppDelegate 留 -init 桩（启动闸门）")
         steps.extend(
             [
                 f"复制 DMG 到 releases/{APP_NAME}_v{version}.dmg",
@@ -361,6 +434,37 @@ class ReleasePreparer:
         if actual_version != version:
             raise ReleaseError(
                 f"Info.plist 版本号不匹配：期望 {version}，实际 {actual_version or '空'}。"
+            )
+
+    def _verify_launchable_binary(self) -> None:
+        """启动闸门（R2-21）：包里的二进制不许给 AppDelegate 留 `-init` 桩。
+
+        D-029 那次闪退就是这个形状：Swift 侧写 `AppDelegate()` 会解析到带默认参数的
+        `init(historyStore:)`，所以几百个用例与 CI 全绿也碰不到 ObjC 的 `-init`；
+        而 SwiftUI 的 `@NSApplicationDelegateAdaptor(AppDelegate.self)` 正是通过 ObjC 发 `-init`，
+        桩一命中就 `EXC_BREAKPOINT`。只有真的打开 .app 才看得见 —— 而发布链路里没人打开它。
+
+        这里不启动用户的 app（那会读他真实存档、还可能触发写盘），改成读反汇编：
+        编译器留没留那个桩，和"打开就 trap"是同一件事，且完全可离线判定。
+        只反汇编 arm64 切片（发布包是 universal，两切片同源同结论，省一半时间）。
+        """
+        if not self.paths.app_info_plist.exists():
+            raise ReleaseError(f"没有找到 App Info.plist：{self.paths.app_info_plist}")
+        with self.paths.app_info_plist.open("rb") as file:
+            executable_name = plistlib.load(file).get("CFBundleExecutable")
+        if not executable_name:
+            raise ReleaseError("Info.plist 里没有 CFBundleExecutable，无法做启动检查。")
+
+        executable = self.paths.app_bundle / "Contents" / "MacOS" / str(executable_name)
+        if not executable.exists():
+            raise ReleaseError(f"没有找到可执行文件：{executable}")
+
+        blockers = find_launch_blockers(self.disassembly_reader(executable))
+        if blockers:
+            raise ReleaseError(
+                "包里的二进制给这些类留了「未实现初始化器」桩，用户一打开就会闪退："
+                + "、".join(blockers)
+                + "。修法见 AGENT_DECISIONS.md 的 D-029（显式 override init()）。"
             )
 
     @staticmethod

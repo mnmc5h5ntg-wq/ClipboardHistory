@@ -10,6 +10,7 @@ from pathlib import Path
 
 from scripts.prepare_release import (
     APP_NAME,
+    ReleaseError,
     ReleasePaths,
     ReleasePreparer,
     insert_changelog_release,
@@ -170,14 +171,23 @@ class PrepareReleaseTests(unittest.TestCase):
                     root_dmg.write_bytes(b"dmg")
                     info_plist = root / f"{APP_NAME}.app" / "Contents" / "Info.plist"
                     info_plist.parent.mkdir(parents=True)
+                    # 真包里 Contents/MacOS/<CFBundleExecutable> 一定存在，闸门会检查它。
+                    executable = info_plist.parent / "MacOS" / "ClipboardHistoryApp"
+                    executable.parent.mkdir(parents=True)
+                    executable.write_bytes(b"fake binary")
                     info_plist.write_bytes(
-                        plistlib.dumps({"CFBundleShortVersionString": "1.2.3"})
+                        plistlib.dumps({
+                            "CFBundleShortVersionString": "1.2.3",
+                            # 真的包一定有这个键；启动闸门靠它找到可执行文件。
+                            "CFBundleExecutable": "ClipboardHistoryApp",
+                        })
                     )
 
             result = ReleasePreparer(
                 ReleasePaths(root),
                 today=dt.date(2026, 6, 8),
                 runner=runner,
+                disassembly_reader=lambda executable: "",
             ).prepare("1.2.3")
 
             self.assertEqual(
@@ -190,6 +200,51 @@ class PrepareReleaseTests(unittest.TestCase):
             )
             self.assertEqual(result.info_plist, root / f"{APP_NAME}.app" / "Contents" / "Info.plist")
             self.assertIn("VERSION  := 1.2.3", (root / "Makefile").read_text(encoding="utf-8"))
+
+    def test_prepare_refuses_a_bundle_that_cannot_launch(self):
+        """启动闸门必须真的接在 prepare() 里 —— 只定义不调用等于没有。
+
+        产物形状照抄 D-029：包能构建、签名能过、Info.plist 版本也对，
+        但二进制里 AppDelegate 还留着 -init 桩 ⇒ 用户一打开就闪退。这种包不许出门。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir()
+            (root / "Makefile").write_text(
+                "APP_NAME := 时间剪史\nVERSION  := 1.2.2beta\n", encoding="utf-8"
+            )
+            (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+
+            def runner(command, cwd):
+                if list(command) == ["make", "dmg"]:
+                    (root / f"{APP_NAME}_v1.2.3.dmg").write_bytes(b"dmg")
+                    contents = root / f"{APP_NAME}.app" / "Contents"
+                    contents.mkdir(parents=True)
+                    (contents / "Info.plist").write_bytes(plistlib.dumps({
+                        "CFBundleShortVersionString": "1.2.3",
+                        "CFBundleExecutable": "ClipboardHistoryApp",
+                    }))
+                    executable = contents / "MacOS" / "ClipboardHistoryApp"
+                    executable.parent.mkdir()
+                    executable.write_bytes(b"fake binary")
+
+            stub = LaunchGateTests.ARM64_STUB_BLOCK.replace(
+                '"ClipboardHistoryApp.ChineseSelectableNSTextView"',
+                '"ClipboardHistoryApp.AppDelegate"',
+            )
+            with self.assertRaises(ReleaseError) as caught:
+                ReleasePreparer(
+                    ReleasePaths(root),
+                    today=dt.date(2026, 6, 8),
+                    runner=runner,
+                    disassembly_reader=lambda executable: stub,
+                ).prepare("1.2.3")
+
+            message = str(caught.exception)
+            self.assertIn("ClipboardHistoryApp.AppDelegate", message, message)
+            self.assertIn("VERSION  := 1.2.2beta", (root / "Makefile").read_text(encoding="utf-8"),
+                          "闸门拦下之后必须回滚 VERSION，别留下改了一半的工作区")
+            self.assertFalse((root / "docs" / "RELEASE_NOTES_v1.2.3.md").exists())
 
     def test_prepare_refuses_dmg_that_make_dmg_did_not_rewrite(self):
         """`make dmg` 退出码为 0 但没重写 DMG ⇒ 必须停下并回滚。
@@ -250,6 +305,73 @@ class PrepareReleaseTests(unittest.TestCase):
         if dev and "CommandLineTools" not in dev:
             self.assertNotIn("CommandLineTools/SDKs", env.get("SDKROOT", ""),
                              "开发者目录是 Xcode，子进程却拿到 CLT 的 SDK —— 就是本次事故本身")
+
+
+class LaunchGateTests(unittest.TestCase):
+    """R2-21：发布链路里"能不能启动"这一关。
+
+    夹具是 `otool -tvV -arch arm64` 的**真实输出**（取自 v1.4.8 候选包，逐字照抄），
+    不是凭印象编的 —— arm64 与 x86_64 的桩形状本来就不同（`bl`+`brk` 对 `callq`+`ud2`，
+    且 className 字面量离调用点有二十几行），编的夹具会测出一个"绿着的死闸门"。
+    """
+
+    # 真取自 ClipboardHistoryApp 的 arm64 切片（ChineseSelectableNSTextView 的桩块）。
+    ARM64_STUB_BLOCK = """000000010001ce18	add	x29, sp, #0x30
+000000010001ce1c	adrp	x0, 510 ; 0x10021a000
+000000010001ce20	add	x0, x0, #0x3e0 ; literal pool for: "init(frame:)"
+000000010001ce24	adrp	x2, 510 ; 0x10021a000
+000000010001ce28	add	x2, x2, #0x330 ; literal pool for: "ClipboardHistoryApp/ChineseTextContextMenu.swift"
+000000010001ce2c	adrp	x5, 510 ; 0x10021a000
+000000010001ce30	add	x5, x5, #0x3b0 ; literal pool for: "ClipboardHistoryApp.ChineseSelectableNSTextView"
+000000010001ce34	movi.2d	v4, #0000000000000000
+000000010001ce38	str	q4, [sp, #0x10]
+000000010001ce3c	str	q4, [sp, #0x20]
+000000010001ce40	mov	w9, #0xd
+000000010001ce44	str	x9, [x10]
+000000010001ce48	mov	x1, x9
+000000010001ce4c	mov	w9, #0x30
+000000010001ce50	mov	x3, x9
+000000010001ce54	mov	w4, #0x2
+000000010001ce58	bl	_$ss25_unimplementedInitializer9className04initD04file4line6columns5NeverOs12StaticStringV_A2JS2utFySRys5UInt8VGXEfU_yAMXEfU_
+000000010001ce5c	brk	#0x1"""
+
+    def test_reads_the_class_from_a_real_arm64_stub_block(self):
+        found = prepare_release.classes_with_unimplemented_initializers(self.ARM64_STUB_BLOCK)
+        self.assertEqual(found, {"ClipboardHistoryApp.ChineseSelectableNSTextView"},
+                         "读不出类名，闸门就会在坏产物上报干净")
+
+    def test_file_path_literal_is_not_mistaken_for_a_class(self):
+        found = prepare_release.classes_with_unimplemented_initializers(self.ARM64_STUB_BLOCK)
+        self.assertNotIn("ChineseTextContextMenu.swift", found,
+                         "文件路径字面量含 .swift，按'带点的字符串'算类名会在正确产物上误报")
+
+    def test_app_delegate_stub_blocks_the_release_and_the_current_shape_does_not(self):
+        broken = self.ARM64_STUB_BLOCK.replace(
+            '"ClipboardHistoryApp.ChineseSelectableNSTextView"', '"ClipboardHistoryApp.AppDelegate"'
+        )
+        self.assertEqual(prepare_release.find_launch_blockers(broken),
+                         ["ClipboardHistoryApp.AppDelegate"],
+                         "D-029 那个形状必须被拦下：桩在 AppDelegate 上 = 一打开就闪退")
+        self.assertEqual(prepare_release.find_launch_blockers(self.ARM64_STUB_BLOCK), [],
+                         "良性桩（只在 Swift 侧显式构造的类型）不该挡住发布")
+
+    def test_built_bundle_carries_no_app_delegate_stub(self):
+        """端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。"""
+        root = Path(__file__).resolve().parents[2]
+        executable = root / "时间剪史.app" / "Contents" / "MacOS" / "ClipboardHistoryApp"
+        if not executable.exists():
+            self.skipTest("仓库根目录没有已构建的 .app（先跑 make bundle 再验）")
+        completed = subprocess.run(
+            ["otool", "-tvV", "-arch", "arm64", str(executable)],
+            capture_output=True, text=True, env=prepare_release.build_child_environment(),
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr[:200])
+        stubbed = prepare_release.classes_with_unimplemented_initializers(completed.stdout)
+        self.assertNotIn("ClipboardHistoryApp.AppDelegate", stubbed,
+                         "包里的 AppDelegate 仍有 -init 桩 —— 用户一打开就闪退（D-029）")
+        self.assertTrue(stubbed,
+                        "一个桩都没读到 = 解析器瞎了（这个包按实测应有 3 个良性桩），别把死闸门当守卫")
+
 
 if __name__ == "__main__":
     unittest.main()
