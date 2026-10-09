@@ -15,6 +15,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.historyStore = historyStore ?? AppDelegate.sharedHistoryStore
         super.init()
     }
+
+    /// 必须显式写出来，不能指望继承 —— 这是 v1.4.8 候选包启动即闪退的原因（D-019 的副作用）。
+    ///
+    /// Swift 侧写 `AppDelegate()` 会解析到上面那个带默认参数的 `init(historyStore:)`，
+    /// 看起来"有 init()"；但 SwiftUI 的 `@NSApplicationDelegateAdaptor(AppDelegate.self)` 存的是
+    /// **元类型**，它通过 ObjC 发 `-init`。NSObject 子类一旦自己声明 designated initializer 而没有
+    /// `override init()`，编译器就给 `-init` 留一个 trap 桩，于是产品一打开就：
+    /// `Fatal error: Use of unimplemented initializer 'init()' for class AppDelegate`。
+    /// 守卫在 `AppDelegateStoreInjectionTests`（运行时走元类型那条 + 源码扫描兜底）。
+    override convenience init() {
+        self.init(historyStore: nil)
+    }
     private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
     private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
     private let loginItemSettings = LoginItemSettings()
