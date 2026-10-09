@@ -170,8 +170,9 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
 被审对象是 HEAD `81bce8d`。本轮在它之上做的提交数**现取**（写死就会随下一次提交过期）：
 `git rev-list --count 81bce8d..HEAD`，其中只动 `AGENT_*.md` 的那些用逐提交 `git show --pretty=format: --name-only` 归类；
-全部已推送。`swift build` 0 告警、`swift test` **325 例 / 8 skip / 0 失败**、
-python 脚本测试 **25 例 OK**、68 帧离屏捕获（第二轮 58 → 64 → 68）。**尚未发布**：线上 Latest 仍是 v1.4.7。
+全部已推送。`swift build` 0 告警；用例数同样**现取**（它会随下一次提交变，写死必过期）：
+`cd ClipboardHistory && swift test 2>&1 | grep -E "Executed [0-9]+ tests" | tail -1`；
+python 脚本测试 25 例（`python3 -m unittest discover -s scripts/tests`）；离屏帧 68 个（第二轮 58 → 64 → 68）。**尚未发布**：线上 Latest 仍是 v1.4.7。
 
 ### 10.1 修了什么（按审计编号）
 
@@ -203,6 +204,7 @@ python 脚本测试 **25 例 OK**、68 帧离屏捕获（第二轮 58 → 64 →
 | 工具栏"猜出来再删"补测试（08-08 / 13-08） | `85c6ba5`（D-026） | 9 条正反用例，负向更承重（自己的复制/筛选/搜索项不许被误删）；顺带量出 `item.view = nil` 会清掉 `item.action`，以及那条 action 直判其实是冗余保险（删了仍全绿） |
 | 快捷键录制器（13-08） | `14a37a0`（D-027） | 6 条只测可观测行为的用例里，5 条直接绿、1 条红在**产品**：录完合法组合后按钮仍写着"请输入快捷键"（`didSet` 在录制态跳过回显，之后再没人改）。加一行显式回显修掉；失焦那条守卫经变异对照承重 |
 | 行内直接操作（用户提出） | `1395425`（D-028） | 双击行 = 复制这条（与浮层「再次复制」同一个动作）；行首星标 = 就地收藏。星标从 `.clear` 指示器变成真控件，两态颜色都量化到 ≥3:1（未收藏 1.76/2.17 → 3.54/4.64，已收藏 黄 1.67 → 琥珀 3.90/4.28）；**这次是在屏合成点击真点验证的**，而且是在真实侧栏容器里（外层 ScrollView + 列表级拖选手势并存）：点星标翻收藏、点行改选中、双击恰好写一次剪贴板且写的就是刚点中的那条；删掉手势即红（变异对照）。帧 64 → 68 |
+| 启动闪退回归（D-029，S1） | 本次提交 | D-019 的显式 `init(historyStore:)` 让 ObjC `-init` 变成 trap 桩，SwiftUI 的 `@NSApplicationDelegateAdaptor` 走的就是它 ⇒ 包一打开就 `SIGTRAP`。三行 `override convenience init()` 修掉 + 两条守卫；**测试全绿挡不住的原因**：Swift 侧 `AppDelegate()` 走默认参数那条，CI 又从不启动 .app（缺口开成 R2-21） |
 | 看画面才看见的文案缺陷 | `16d658d` | 推荐理由一行里把来源 App 说两遍（`Safari · 偏好链接 · 回到Safari`）。改成「没有别的标签点过来源 App 才补裸名」；断言先写、对旧实现报红（2 次）后才动实现 |
 
 ### 10.2 本轮自己制造并被测试抓住的问题
@@ -227,6 +229,7 @@ python 脚本测试 **25 例 OK**、68 帧离屏捕获（第二轮 58 → 64 →
 其余未验证：`NSAlert` 的真实按键行为、真实鼠标拖放、VoiceOver 实际朗读（测试进程里 AX 树为空）。
 菜单栏面板**内容层已验收**（6 帧，见 10.1 与 D-024），仍未验证的只有系统菜单的材质/圆角与菜单项 chrome —— 那两层由系统绘制，需要在屏捕获。
 设置侧栏图标：已量成"离屏语义色不解析"（D-025），但**真机上那一列长什么样仍未验收** —— 在屏捕获要么撞上已废弃 API 的告警闸门，要么弹屏幕录制授权框。
+**CI 缺"能不能启动"这一关（R2-21，高）**：本轮的启动闪退说明"327 例全绿 + CI 绿"对"包能不能打开"是零覆盖。
 明确不做：`List(selection:)` 整体重写（`.draggable` 要 macOS 13、会改掉 4 个捕获帧、丢 `dragSelectRange` 锚点语义）、设置侧栏符号风格统一（唯一证据来自不可信的捕获列）、签名与公证（需证书与授权）。
 另外**要去看而不是只在这里断言的一件事**：性能守卫在新 runner 上到底下没下结论。检查方法（已实跑过一次，见 D-023）：
 
@@ -240,7 +243,7 @@ gh run view <run-id> --log | grep -E "PERF\[|同操作样本跨度"
 
 ```bash
 cd /Users/wangziyi/Codex_Project0/ClipboardHistory
-swift build && swift test                       # 318 例 / 6 skip / 0 失败
+swift build && swift test                       # 判据取：swift test 2>&1 | grep -E "Executed [0-9]+ tests" | tail -1
 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 68 帧
 CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests    # 在屏探针（会抢前台）
 cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK

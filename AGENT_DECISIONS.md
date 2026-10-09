@@ -355,6 +355,37 @@ name: decisions
   变异对照：删掉 `resignFirstResponder` 覆写 ⇒ 恰好失焦那条红。
 - 13-08 剩下的两块（设置页交互、生命周期回调）本轮**没做**，理由记在 `AGENT_BACKLOG.md` 快照 11。
 
+## D-029 修掉 D-019 带进去的启动闪退（S1：产品一打开就 trap）
+
+- 现象（用户报）：从仓库根目录打开新打的包**闪退**。`~/Library/Logs/DiagnosticReports/` 里 23:05 有两份 .ips，
+  历史里这个 app 从未崩溃过 ⇒ 新包特有。
+- 定性：崩溃 PC `0x100011620` 的上一条是
+  `bl _unimplementedInitializer(className:"ClipboardHistoryApp.AppDelegate", initName:"init()", file:"AppDelegate.swift")`，
+  紧跟 `brk #0x1`（`EXC_BREAKPOINT`/SIGTRAP）。即 Swift 的**"未实现初始化器"桩**，不是空指针、不是手势改动。
+  包的 arm64 UUID `6993EE12-…308B2` 与崩溃报告一致 ⇒ 就是仓库根目录那个包。
+- 根因：D-019 把 `AppDelegate` 从"只有隐式 init + 属性默认值"改成显式
+  `init(historyStore: HistoryStore? = nil)`。NSObject 子类一旦自己声明 designated initializer 而**不**
+  `override init()`，编译器就给 ObjC 的 `-init` 留 trap 桩；而 SwiftUI 的
+  `@NSApplicationDelegateAdaptor(AppDelegate.self)` 存的是**元类型**，正是通过 ObjC 发 `-init`。
+- 为什么 327 个用例与 CI 全绿却挡不住：Swift 侧写 `AppDelegate()` 会解析到 `init(historyStore: nil)`
+  （默认参数），**永远碰不到** `-init` 那条路径；CI 只跑 `swift build && swift test`，从不启动 .app。
+  对照：`81bce8d`（v1.4.7 那条线）没有显式 init，所以线上版本不会崩 —— 这个崩溃从没进过任何发布。
+- 修法：`override convenience init() { self.init(historyStore: nil) }`（三行，产品语义一字未变）。
+- 守卫两条，形状不同所以互补：
+  ① 运行时 —— `(AppDelegate.self as NSObject.Type).init()`，走的就是 SwiftUI 那条元类型调用。
+     **修之前它让测试进程原地打出同一句 fatal error 并 signal 5 退出**（与 .ips 同一条消息），修之后绿。
+     代价是这条红法是"整个进程没"，所以不能只靠它。
+  ② 源码扫描 —— `AppDelegate.swift` 的正文（去注释后）必须含 `override init()` / `override convenience init()`。
+     便宜、确定性、上面那条被删也还在。
+- 顺带记下：二进制里还剩 3 个同类桩（两个 SwiftUI `Coordinator` + `ChineseSelectableNSTextView`），
+  它们都只在 Swift 侧被显式构造，不经 ObjC 元类型 ⇒ 良性。下次审计别再从零查一遍。
+- 交付验证（不启动用户 app 也能盖章）：`make bundle VERSION=1.4.7-fix1` 重打，
+  新包 arm64 UUID `8A1FB38C-…`（≠ 崩溃那份，证明确实重编过），反汇编里 AppDelegate 的桩消失、
+  `unimplemented` 站点 4 → 3。**真机启动仍待用户确认**（我不去启用户的 app：会读他真实存档并可能触发写盘）。
+- 兼容性/回滚：`git revert` 本提交即可；无数据格式变化。本地包版本标成 `1.4.7-fix1` 只是为让用户能分辨，
+  仓库里的 `Makefile: VERSION := 1.4.7` 未动 —— 发不发 v1.4.8 仍是用户决定。
+- 结构性缺口另开条目（R2-21，高）：**发布链路没有"能不能启动"这一关**。
+
 ## D-028 行内直接操作：双击复制 + 行首星标收藏（用户提出）
 
 - 需求（用户原话）："选了一条记录要把鼠标滑到最右边才能操作收藏和复制" ⇒ 双击条目复制、点行首星标收藏/取消。

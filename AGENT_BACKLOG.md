@@ -280,4 +280,9 @@
 | R2-17 | 03 §0 / 04 §4.2 N-1 | 中 | 已完成(f7398f3 接缝 + 37f43f6 补拍 6 帧)；系统菜单材质与菜单项 chrome 仍 NOT-RUN | 菜单栏面板至今拍不到帧：构造 `AppDelegate` 会读用户真实存档，而 `HOME` 重定向实测**不改变** `applicationSupportDirectory`。给 `AppDelegate` 加一个 store 注入接缝（`AppDelegate(store:)`）后即可安全拍帧 —— 这是"UI 验收覆盖菜单栏"的前置条件 |
 | R2-18 | 03 §方法 | 高 | 已完成(bdb557b) | 视觉捕获的时序噪声：同一份代码连拍两次即有 30/58 帧不同(闪烁插入点)。修法是拍前交出第一响应者并把插入点画成透明 |
 | R2-19 | 03 §方法 | 高 | 已完成(bdb557b) | 捕获夹具用 Date() 当时钟 ⇒ 跨分钟连拍时字符串本身在变像素。改用固定参考时刻，此后同代码连拍 0 帧不同 |
-| R2-20 | 用户反馈 / D-028 | 中 | 待办 | 收藏切换会把**多选收成一条**：`HistoryStore.toggleFavorite` 走 `reconcileSelection(preferredEntryID:)`，那里 `selectedEntryIDs = [preferredEntryID]`。行内星标（`1395425`）把这个动作搬到手边之后更容易撞到。改之前要先定"取消收藏后这条离开收藏筛选时，选择该落到哪"，并同步 `copyAndPromote` 是否也该保留多选 |
+| R2-21 | D-029 | 高 | 待办 | **发布链路没有「能不能启动」这一关**：CI 只跑 `swift build && swift test`，从不启动 .app，于是 D-019 那个「Swift 侧看不见、ObjC 侧才走」的启动 trap 带着 327 个绿用例出了包。补法：CI 里 `make bundle` 之后跑一次启动冒烟（fresh runner 上没有用户数据，安全），判据是进程活过 N 秒或 app 自己写的启动日志里出现「守卫放行 + 窗口建好」；或者加一个只在环境变量下走的 self-test 入口，让它经元类型构造 AppDelegate 后立刻退出 | | R2-20 | 用户反馈 / D-028 | 中 | 待办 | 收藏切换会把**多选收成一条**：`HistoryStore.toggleFavorite` 走 `reconcileSelection(preferredEntryID:)`，那里 `selectedEntryIDs = [preferredEntryID]`。行内星标（`1395425`）把这个动作搬到手边之后更容易撞到。改之前要先定"取消收藏后这条离开收藏筛选时，选择该落到哪"，并同步 `copyAndPromote` 是否也该保留多选 |
+**进度快照 13（D-029：修掉自己带进去的启动闪退）**：用户报「从仓库根目录打开新版 app 闪退」。
+两份 .ips 的崩溃 PC 紧跟 `_unimplementedInitializer(AppDelegate, "init()")` + `brk #1`，包 UUID 与仓库产物一致 ⇒ D-019 给 `AppDelegate` 加显式 `init(historyStore:)` 之后，ObjC 的 `-init` 变成编译器留下的 trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过元类型调它。
+327 个用例与 CI 全绿挡不住的原因：Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init，永远走不到 `-init`；CI 也从不启动 .app。修法是三行 `override convenience init()`，守卫两条互补（运行时走元类型 + 源码扫描必须声明 override init）。修之前那条运行时守卫原地复现了同一句 fatal error（signal 5），修之后绿。
+重打包 `make bundle VERSION=1.4.7-fix1`：新 UUID `8A1FB38C…`、AppDelegate 的桩消失、unimplemented 站点 4→3（剩下 3 个是只在 Swift 侧构造的 Coordinator / 自定义 NSView，良性）。**真机启动待用户确认**；结构性缺口开成 R2-21（CI 没有「能不能启动」这一关）。
+当前判据：`swift build` 0 告警 · `swift test` **327 例 / 8 skip / 0 失败** · 包已重打并二进制层核对。
