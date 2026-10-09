@@ -1,4 +1,5 @@
 import Foundation
+import ClipboardHistoryIntelligenceCore
 
 enum AIProviderKind: String, Codable, CaseIterable, Hashable {
     case openAI

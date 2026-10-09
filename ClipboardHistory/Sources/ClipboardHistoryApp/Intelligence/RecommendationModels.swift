@@ -1,4 +1,5 @@
 import Foundation
+import ClipboardHistoryIntelligenceCore
 
 enum RecommendationFeature: String, Codable, CaseIterable, Hashable {
     case recency

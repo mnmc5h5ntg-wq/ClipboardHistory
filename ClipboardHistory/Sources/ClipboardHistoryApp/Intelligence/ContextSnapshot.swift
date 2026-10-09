@@ -1,4 +1,5 @@
 import Foundation
+import ClipboardHistoryIntelligenceCore
 
 struct RunningApplicationContext: Codable, Equatable, Hashable {
     var localizedName: String?

@@ -1,40 +1,5 @@
 import Foundation
-
-enum AIPrivacyScope: String, Codable, CaseIterable, Hashable {
-    case localOnly
-    case metadataOnly
-    case redactedContent
-    case fullContentWithConsent
-
-    var allowsNetworkRequest: Bool {
-        switch self {
-        case .localOnly:
-            return false
-        case .metadataOnly, .redactedContent, .fullContentWithConsent:
-            return true
-        }
-    }
-}
-
-enum AIPrivacySensitivity: String, Codable, CaseIterable, Hashable, Comparable {
-    case publicLike
-    case personal
-    case sensitive
-    case secret
-
-    static func < (lhs: AIPrivacySensitivity, rhs: AIPrivacySensitivity) -> Bool {
-        lhs.rank < rhs.rank
-    }
-
-    private var rank: Int {
-        switch self {
-        case .publicLike: return 0
-        case .personal: return 1
-        case .sensitive: return 2
-        case .secret: return 3
-        }
-    }
-}
+import ClipboardHistoryIntelligenceCore
 
 struct AIPrivacyDecision: Codable, Equatable, Hashable {
     enum Action: String, Codable, Hashable {

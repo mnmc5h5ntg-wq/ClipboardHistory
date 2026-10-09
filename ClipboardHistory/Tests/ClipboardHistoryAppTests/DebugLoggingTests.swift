@@ -86,28 +86,28 @@ final class DebugLoggingTests: XCTestCase {
 /// R-44：产品 target 里不得出现网络 API（"本地优先"承诺的机器化守卫）。
 final class LocalOnlyGuardTests: XCTestCase {
     func testProductSourcesDoNotReferenceNetworkingAPIs() throws {
-        // 从测试文件位置逐级上溯，找到包含 Sources/ClipboardHistoryApp 的包根目录。
+        // 从测试文件位置逐级上溯，找到产品 target 的源码目录。
         var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         var url: URL?
         for _ in 0..<6 {
             let probe = candidate.appendingPathComponent("Sources/ClipboardHistoryApp", isDirectory: true)
             if FileManager.default.fileExists(atPath: probe.path) {
-                url = candidate.appendingPathComponent("Sources", isDirectory: true)
+                // 只扫**产品 target**。AI 设计稿已移到独立 target（账本 R2-15），
+                // 既不进交付二进制，也不该再靠"白名单跳过"来让这道守卫变绿 ——
+                // 以前的 forbiddenFiles 例外等于给守卫挖了一个永远不检查的洞。
+                url = probe
                 break
             }
             candidate = candidate.deletingLastPathComponent()
         }
         guard let url else {
-            throw XCTSkip("找不到包根目录的 Sources（从 \(#filePath) 上溯 6 层未果）")
+            throw XCTSkip("找不到 Sources/ClipboardHistoryApp（从 \(#filePath) 上溯 6 层未果）")
         }
         let forbidden = ["URLSession", "NWConnection", "CFStream", "Socket(", "WebKit.loadURL"]
-        let forbiddenFiles = ["AIProviderModels.swift", "AIPrivacyPolicy.swift"]
         var violations: [String] = []
         let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: nil)
         while let file = enumerator?.nextObject() as? URL {
             guard file.pathExtension == "swift" else { continue }
-            // AI 设计稿文件本身含 URL 字段定义，属于未接线的设计稿，跳过。
-            if forbiddenFiles.contains(file.lastPathComponent) { continue }
             guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
             for needle in forbidden where text.contains(needle) {
                 violations.append("\(file.lastPathComponent): \(needle)")

@@ -1,4 +1,5 @@
 import Foundation
+import ClipboardHistoryIntelligenceCore
 
 struct ClipboardEntryIntelligenceAdapter {
     // MARK: - 以字符串快照为输入的分析（可跨线程）

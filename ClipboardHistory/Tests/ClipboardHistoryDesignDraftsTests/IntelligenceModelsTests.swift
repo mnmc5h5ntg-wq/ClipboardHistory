@@ -1,4 +1,6 @@
 import XCTest
+import ClipboardHistoryIntelligenceCore
+@testable import ClipboardHistoryDesignDrafts
 @testable import ClipboardHistoryApp
 
 final class IntelligenceModelsTests: XCTestCase {

@@ -1,4 +1,5 @@
 import Foundation
+import ClipboardHistoryIntelligenceCore
 
 struct EntryIntelligence: Identifiable, Codable, Equatable, Hashable {
     var id: UUID { entryID }
