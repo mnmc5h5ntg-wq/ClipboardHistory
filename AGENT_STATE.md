@@ -77,6 +77,39 @@
 
 ## 恢复指令（若上下文丢失，从这里续做）
 
+## 第二轮审计（2026-10-09）· 修复进度
+
+审计交付在仓库外：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`
+（`00-README` / `01-增量台账`（15 模块 × 9 维度 = 135 格全覆盖）/ `02-新缺陷与回归` / `03-UI与HIG视觉审查` / `04-验证附录` + `frames/` + `probes/`），
+被审对象是 HEAD `81bce8d`（v1.4.7，工作区干净）。它的结论：修复轮质量高于平均，但自己留下 4 条新缺陷（N-1…N-4，其中 2 条是"为修 A 引入 B"），
+UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrome 不可见、拖拽能力为零。
+
+本轮已完成（每条一个提交；提交后 `swift build` 0 告警、`swift test` **229 例 / 1 skip / 0 失败**）：
+
+| 审计项 | 提交 | 做了什么 |
+|---|---|---|
+| N-1（S2 崩溃） | `876c015` | `intelligenceByEntryID` 两个重载不再用 `Dictionary(uniqueKeysWithValues:)`（重复键 = `fatalError`），改为保留首条 |
+| N-2（S2 数据丢失） | `bacde44` | `HistoryStore.init` 不再写盘，首次写回推迟到 `startMonitoring`（守卫已放行）；3 条原"init 即持久化"的用例保留全部断言并新增"init 阶段零写入" |
+| N-3（S4） | `fb37c4b` | `load()` 开头复位 `isArchiveFromNewerVersion` |
+| N-4（S4 假绿） | `a56f2e5` | `guard … else { return }` 换成钉住两侧的断言；**顺带暴露一个真行为**：只含非文件 `NSURL` 的剪贴板当前不被记录（`readFileURLs` 限定 `.urlReadingFileURLsOnly`，是 P-15 的修法） |
+
+本轮**还欠**（明细见 `AGENT_BACKLOG.md` 的 R2-* 条目，按价值排序）：
+
+1. **N-1 的端到端守卫还没写** —— 审计明确要求"走 `HistoryStore`、不走 engine"的用例（存档含同 id 两条 ⇒ 预测刷新不崩且只出一条）。
+   现在只有实现改动，`RecommendationBoundaryTests:96-103` 仍然绕过 adapter ⇒ **这条修复还没有一条会红的测试**，
+   必须补上并用变异对照（把实现改回 `uniqueKeysWithValues`）证明它真的会红。这是本轮第一优先。
+2. B-1…B-6（保存仍重写全部图片文件、来源 App 不落盘、`sizeDescription` 全串计数、图片无像素上限、过期项文档、粘贴前不复核目标 App）。
+3. UI 批次 A/B/C：亮色 chrome 9 处 `.white.opacity`、`"questionable"` 非法符号、破坏性确认的默认按钮、减少动态未门控、
+   **键盘焦点链**（审计实测 14 次 Tab 全落在同一个 `NSTextView`）、拖拽缺失。
+4. 一个待决策的产品问题：只含 `public.url` 的剪贴板要不要记成文本条目（现在是丢弃；浏览器复制链接同时带字符串，所以日常不受影响）。
+
+子代理调研结论（只读，已采纳）：**不要**把自绘列表整体换成 `List(selection:)` —— `.draggable` 是 macOS 13+ 而本项目下限是 macOS 12，
+`List` 的系统 chrome 会改掉 4 个 `sidebar-*` 帧的像素，还会丢掉 `dragSelectRange` 的锚点语义（只有 store 级测试钉着）。
+改走最小方案：恢复搜索框焦点环、行 `focusable` + `onMoveCommand` 方向键映射到既有 store 动作、行上暴露 `isSelected` 语义；
+拖出条目用 `onDrag { NSItemProvider }`（macOS 10.15+ 可用），不是 `.draggable`。
+
+## 恢复指令（若上下文丢失，从这里续做）
+
 1. `git log --oneline` 与 `git diff 8007b19..HEAD --stat` 看清已完成什么。
 2. 跑 `cd ClipboardHistory && swift build && swift test`（**必须看退出码与 `Executed N tests`，不要用管道**）。
 2b. 视觉帧：`cd ClipboardHistory && CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests`（改 UI 前后各拍一组同参数帧，见 AGENT_UI_AUDIT.md 的复验规则）。

@@ -118,12 +118,37 @@
 
 ## 发布前检查单（全部为绿才写最终报告）
 
-- [ ] `swift build` 零告警（当前 1 条）
-- [ ] `swift test` 退出码 0 且 `Executed N tests` ≥ 源码用例数（基线 135）
-- [ ] `python3 -m unittest discover -s scripts/tests` OK（基线 11）
+- [ ] `swift build` 零告警（当前 **0 条**；判据 `swift build > /tmp/b.log 2>&1; grep -c 'warning:' /tmp/b.log`）
+- [ ] `swift test` 退出码 0 且 `Executed N tests` ≥ 源码用例数（当前 229 例 / 1 skip / 0 失败；判据 `grep -E 'Executed [0-9]+ tests' /tmp/test.log | tail -1`）
+- [ ] `python3 -m unittest discover -s scripts/tests` OK（当前 18 例；**必须在仓库根目录跑**）
 - [ ] 性能基准达标签（R-07..R-10 的上界）
 - [ ] 视觉审计：所有关键视图 + 暗亮色 + 边界尺寸有快照且逐张看过，缺陷修复后重拍
 - [ ] 矩阵 `?` 归零
 - [ ] backlog 无"高/中价值 且 状态≠已完成/记录不改"
 - [ ] `AGENT_DECISIONS.md` 覆盖所有数据/接口/依赖/架构改动，且每条写明回滚方式
 - [ ] `git log` 每项一个可 revert 提交；工作区与 HEAD 一致
+
+## 第二轮（2026-10-09）待办 · R2-*
+
+来源：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`。价值排序即下面的顺序；
+每条动手前先在当前代码上复核一遍（审计清单也会掺误报），做完要有会红的测试 + 变异对照。
+
+| # | 审计出处 | 价值 | 状态 | 内容 |
+|---|---|---|---|---|
+| R2-01 | 02 §A N-1 | 高 | **待办（实现已改，守卫未补）** | 补"存档含同 id 两条 ⇒ 预测刷新不崩且只出一条"的**端到端**用例：走 `HistoryStore` 的预测刷新路径，不走 `engine().recommend`（`RecommendationBoundaryTests:96-103` 正是这样绕过了 adapter，所以 `876c015` 之前一直是绿的）。做完用变异对照证明：把实现改回 `Dictionary(uniqueKeysWithValues:)` ⇒ 该用例必须红/崩 |
+| R2-02 | 03 §3.1 / §1.10 | 高 | 待办 | 键盘焦点链。实测 14 次 `selectNextKeyView` 全落在同一个 `NSTextView`；`ChineseTextContextMenu.swift:40` 把搜索框 `focusRingType` 设成 `.none`；全仓 `.buttonStyle(.plain)` 无焦点环、无 `.focusable()`/`@FocusState`。**不采纳**"整体换 `List(selection:)`"（`.draggable` 需 macOS 13+，本项目下限 12；系统 chrome 会改掉 4 个 `sidebar-*` 帧像素；会丢 `dragSelectRange` 锚点语义）。改最小方案：搜索框恢复焦点环、列表容器 `focusable` + `onMoveCommand` 映射到既有 store 动作（`selectOnly`/`selectRange`/`toggleSelection`）、行上 `accessibilityAddTraits(.isSelected)`、必要时 `ScrollViewReader` 滚到选中项 |
+| R2-03 | 03 §3.2 / 14-06 | 高 | 待办 | 亮色 chrome：`GlassControls.swift:49,55,138,151-152`、`ThumbnailView.swift:14,28,32`、`VideoPreview.swift:272` 共 9 处 `.white.opacity(0.08–0.42)` 换 `.separator`/`.quaternary`/`controlBorderColor`；顺带统一设置侧栏符号风格（outline 与 filled 混用）与 GlassPill 图标重量（`doc.on.doc` 因 `.hierarchical` 比 `star`/`trash` 淡）。改前改后各拍 58 帧，给逐帧差异与对比度数字 |
+| R2-04 | 02 §B B-1 | 高 | 待办 | `saveSnapshot` 每次保存仍重写**每个**图片文件（`HistoryPersistence.swift:264-272,401-405`），无去抖、不 cancel 旧 work item（`:212-226`）⇒ 磁盘 IO 与图片数线性。按内容指纹/已存在且同尺寸跳过未变文件 + 去抖并取消旧任务；测试要证明"N 次保存不再重写未变图片"（写入计数或 mtime），并保持崩溃/回滚语义 |
+| R2-05 | 03 §3.4 / §1.5 | 中高 | 待办 | 拖拽能力为零（`onDrag/draggable/NSItemProvider/onDrop` 全仓 0 命中）。给行加 `onDrag { NSItemProvider }`（macOS 10.15+，**不要**用 13+ 的 `.draggable`）：文件给 fileURL、图片给 PNG、文本给 string。真实拖放无法离屏验证 ⇒ 验证等级要分开写（实现+单测 vs 人工拖一次） |
+| R2-06 | 03 §3.3 / §1.7 | 中 | 待办 | `DestructiveConfirmation.swift:23-29` 的 `NSAlert` 里"清空"是第一个即默认按钮、无 cancel 角色 ⇒ 违反 HIG"默认按钮 = 最安全动作、Escape 取消"。改成取消为默认，或与设置页 `.alert` 共用同一语义 |
+| R2-07 | 02 §B B-2 | 中 | 待办 | `StoredEntry`（`HistoryPersistence.swift:52-69`）无 `sourceAppBundleID/Name` ⇒ 重启后来源归因全丢、`appAffinity` 对载入历史恒 0。加**可选**字段（schema 仍 v1：旧存档缺字段读为 nil），补"存盘再载入仍带来源 App"的往返测试；写进 `AGENT_DECISIONS.md` |
+| R2-08 | 02 §B B-4 | 中 | 待办 | 图片无像素上限，原分辨率 PNG 整张入库（`ClipboardIntake.swift:110-114`），一张 4K 截图数十 MB。阈值要有依据并写进决策/README；只影响新采集、不改已存图片；测试覆盖"超限被降采样、未超限逐字节不变" |
+| R2-09 | 03 §3.5 | 中 | 待办 | `DetailPreviewViews.swift:263` 的 `"questionable"` 不是合法 SF Symbol ⇒ 视频信息不可用时画空白图标，改 `"questionmark"`；菜单栏推荐面板补"暂无推荐/加载中"空态（`MenuBarRecommendationsView.swift:14-52`）；详情 spinner 加超时兜底（`:234-243`） |
+| R2-10 | 03 §3.6 / §1.12 | 中 | 待办 | 筛选 pill 的 `spring(0.38,0.72)` 过冲与 hover `scaleEffect(1.08)`（`HistorySidebarView.swift:244,259`）不读 `accessibilityDisplayShouldReduceMotion` ⇒ 门控；纯函数分支要有单测 |
+| R2-11 | 02 §B B-3 | 中 | 待办 | `sizeDescription` 仍全串 `string.count`（`EntryPresentation.swift:40`），`PerfBudgetTests.swift:129` 自述把上界放宽到 20ms。改 O(1)/缓存后**把上界收回来**（放宽的阈值不许留着） |
+| R2-12 | 02 §B B-6 / 03-04 | 中 | 待办 | 注入前不复核"250ms 后前台是否还是预期 App"（`ApplicationShell.swift` paste 流程）；补校验，失败原因走既有 NoticeBanner |
+| R2-13 | 03 §3.7 | 中低 | 待办 | 字号越线两处：行时间戳 10pt（`HistoryRowViews.swift:84`）、菜单理由行 10pt `.tertiary`（`MenuBarController.swift:96-97`、`MenuBarRecommendationsView.swift:18`）；约 40 处固定字号可分批换 text style，先换用户必读的三处 |
+| R2-14 | 02 §B B-5 | 低 | 待办 | backlog 里"过期项移到 `history.expired.json`"从未实现（被 D-012 的 NoticeBanner 方案取代），文档行未更正 ⇒ 改成"记录不改（理由）" |
+| R2-15 | 02 §C 仍开放 / 10-07 | 低中 | 待办 | AI 脚手架仍在产品路径：`AIProviderModels.swift`/`AIPrivacyPolicy.swift` 在 `Sources/` 且零产品调用。移出产品 target 或删除（**不许**顺手删掉守着真行为的测试） |
+| R2-16 | N-4 副产物 | 待定 | 待决策 | 只含非文件 `NSURL`（`public.url`）的剪贴板当前**不记录**。要不要记成文本条目？浏览器复制链接同时带字符串所以日常无感，但"复制即丢"对剪贴板管理器是功能缺口。决定后改 `ClipboardIntake` 并翻转 `ClipboardSourceAttributionTests` 里那条钉住"不记录"的断言 |
+| R2-17 | 03 §0 / 04 §4.2 N-1 | 中 | 待办 | 菜单栏面板至今拍不到帧：构造 `AppDelegate` 会读用户真实存档，而 `HOME` 重定向实测**不改变** `applicationSupportDirectory`。给 `AppDelegate` 加一个 store 注入接缝（`AppDelegate(store:)`）后即可安全拍帧 —— 这是"UI 验收覆盖菜单栏"的前置条件 |
