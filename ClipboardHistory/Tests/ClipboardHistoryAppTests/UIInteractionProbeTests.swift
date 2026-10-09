@@ -488,6 +488,89 @@ final class UIInteractionProbeTests: XCTestCase {
                        "复制走的是 .copyAndPromote，这条应当被顶到列表最前")
     }
 
+    /// 用户报的现象：双击列表里的条目之后，整个左侧列表外面多了一圈蓝色边框。
+    /// 那是 `.focusable()` 让列表容器成为 key view 后，AppKit 给它画的**系统焦点环**。
+    /// 这条探针把"环在不在"变成一个可打印、可断言的量：沿第一响应者往上读 `focusRingType`。
+    func testSidebarListFocusRingAfterClick() throws {
+        try skipUnlessEnabled()
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        for index in 0..<6 {
+            store.add(ClipboardIntake.Entry(
+                content: .text("焦点环探针第 \(index) 条"), thumbnail: nil,
+                sourceUTIs: ["public.utf8-plain-text"]
+            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
+        }
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+        // 点一行（走的是真实点击路径，和双击时容器拿到焦点是同一件事）。
+        var rowProxies: [NSView] = []
+        func walk(_ view: NSView) {
+            if String(describing: type(of: view)) == "KeyViewProxy",
+               view.frame.width > 200, view.frame.width < 290, view.frame.minX > 30, view.frame.height < 40 {
+                rowProxies.append(view)
+            }
+            for sub in view.subviews { walk(sub) }
+        }
+        walk(host)
+        guard let row = rowProxies.min(by: { $0.frame.minY < $1.frame.minY }) else {
+            XCTFail("找不到行代理，探针无法点击")
+            return
+        }
+        let windowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        func send(_ type: NSEvent.EventType) {
+            if let event = NSEvent.mouseEvent(with: type, location: windowPoint, modifierFlags: [],
+                                              timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: window.windowNumber, context: nil,
+                                              eventNumber: 0, clickCount: 1, pressure: 1.0) {
+                NSApp.sendEvent(event)
+            }
+        }
+        send(.leftMouseDown); send(.leftMouseUp)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        var chain: [String] = []
+        var view = window.firstResponder as? NSView
+        while let current = view {
+            chain.append("\(type(of: current))=\(current.focusRingType.rawValue)")
+            view = current === window.contentView ? nil : current.superview
+        }
+        print("FOCUSCHAIN-RING firstResponder=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil") "
+            + "链(视图=focusRingType；0=none 1=default 2=around)：\(chain.joined(separator: " ← "))")
+
+        // AppKit 的环这一路读出来是 .none ⇒ 那圈蓝框不是 AppKit 画的，是 SwiftUI 的 `_FocusRingView`。
+        // 判据：点过一行之后，**不允许**存在覆盖整块列表的焦点环视图。
+        // 实测（本机 macOS 27）：加 `focusEffectDisabled()` 之前共 15 个环视图，其中一个是列表整块
+        // {{0,125},{320,335}} —— 正是用户看到的那圈蓝框；加上之后只剩 2 个，都是筛选 pill 自己的。
+        var ringFrames: [NSRect] = []
+        func collectRings(_ v: NSView) {
+            if String(describing: type(of: v)).contains("FocusRing") { ringFrames.append(v.frame) }
+            for sub in v.subviews { collectRings(sub) }
+        }
+        collectRings(host)
+        let listSizedRings = ringFrames.filter {
+            $0.width >= host.frame.width * 0.9 && $0.height > 200
+        }
+        print("RINGVIEWS 总数=\(ringFrames.count) 覆盖整块列表的=\(listSizedRings.map { NSStringFromRect($0) })")
+        XCTAssertTrue(listSizedRings.isEmpty,
+                      "列表容器上还挂着一圈覆盖整块列表的焦点环（用户要移除的蓝框）。"
+                      + "如果这是在 macOS 13 及更早跑出来的：`focusEffectDisabled()` 需要 macOS 14+，那属于平台限制而不是回归。")
+    }
+
     private func describeChain(_ root: NSView, at point: NSPoint) -> String {
         var views: [String] = []
         var current: NSView? = root.hitTest(point)

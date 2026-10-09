@@ -72,6 +72,12 @@ final class SidebarKeyboardNavigationTests: XCTestCase {
         XCTAssertTrue(source.contains(".onMoveCommand(perform: moveSelection)"),
                       "列表没有接方向键：键盘导航等于没接上")
         XCTAssertTrue(source.contains(".focusable()"), "列表容器不可聚焦，方向键永远到不了它")
+        // 上一条留着 `.focusable()`，这一条钉住"环被关掉"：两件事必须同时成立 ——
+        // 只留 focusable 就是用户报的那圈蓝框，只关环而不 focusable 方向键就废了。
+        XCTAssertTrue(source.contains(".sidebarFocusRingHidden()"),
+                      "列表容器的系统焦点环没有被抑制：鼠标点一下，整块列表外面就会出现一圈蓝框")
+        XCTAssertTrue(source.contains("self.focusEffectDisabled()"),
+                      "抑制函数是个空壳（没有真的调用 focusEffectDisabled），上面那条守卫会被骗过")
         XCTAssertEqual(
             source.components(separatedBy: "SidebarKeyboardNavigation.targetIndex(").count - 1, 1,
             "落点计算应当恰好由策略给出一处"

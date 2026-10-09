@@ -205,6 +205,10 @@ struct HistorySidebarView: View {
         }
         // 让列表进入焦点环：`.focusable()` 由系统画焦点环，方向键交给下面的 moveSelection。
         .focusable()
+        // 但 `.focusable()` 的容器在**鼠标点一下**之后也会拿到焦点，于是整个列表外面凭空多一圈
+        // 蓝色焦点环（用户报的现象；探针量到的那个 `_FocusRingView` frame = 列表整块 {{0,125},{320,335}}）。
+        // 键盘导航要留着，环要关掉：`focusEffectDisabled()` 正是这个开关（macOS 14+；12/13 无对应 API，只能留着）。
+        .sidebarFocusRingHidden()
         .focused($listHasFocus)
         .onMoveCommand(perform: moveSelection)
         .accessibilityLabel("历史记录列表")
@@ -381,6 +385,21 @@ enum FilterPillMotion {
     static func hoverScale(isHovered: Bool, reduceMotion: Bool) -> CGFloat {
         guard isHovered, !reduceMotion else { return 1.0 }
         return 1.08
+    }
+}
+
+/// 保留"可聚焦"（方向键必须还能用），只关掉系统画的那一圈焦点环。
+///
+/// `focusEffectDisabled()` 是 macOS 14 才有的 API；本项目部署下限是 12，所以 12/13 上这圈环仍然会画
+/// —— 那是平台没有对应开关，不是漏了。守卫见 `SidebarKeyboardNavigationTests`
+/// （它同时钉住"还挂着 `.focusable()`"和"环被关掉了"两件事，防止改一个坏另一个）。
+fileprivate extension View {
+    @ViewBuilder func sidebarFocusRingHidden() -> some View {
+        if #available(macOS 14.0, *) {
+            self.focusEffectDisabled()
+        } else {
+            self
+        }
     }
 }
 
