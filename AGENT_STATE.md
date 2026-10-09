@@ -137,7 +137,8 @@ UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrom
 即「完全键盘访问」关闭），此时 macOS 的 Tab 只在文本框与列表之间走，`.focusable()` 的自绘视图根本不进环；
 所以"键盘用户能用方向键浏览列表"目前只有**纯函数单测 + 接线守卫**，没有在屏证据，需要人工开一次该开关后用
 `CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests` 复测。
-同理未验证：`NSAlert` 的真实按键行为（Return/Escape）、拖拽（尚未实现）、菜单栏面板视觉（R2-17 的接缝还没加）。
+同理未验证：`NSAlert` 的真实按键行为（Return/Escape）、真实拖放（拖出已实现并有单测，但需要鼠标拖拽与接收方 App，离屏测不了）。
+菜单栏面板视觉在 D-019 加了注入接缝之后**仍然** NOT-RUN，理由更新为"离屏 `cacheDisplay` 不画菜单表面材质，试拍帧 97.7% 未绘制，被捕获闸门判为无效证据"。
 
 ### 第二轮进度快照 2（收尾时；上面那张表仍有效，这里是增量）
 
@@ -148,16 +149,18 @@ UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrom
 | R2-12 粘贴前复核目标 App | `d218803` | 6 条真值表 + "复核必须在注入之前"的顺序守卫；变异对照（延时直接注入）红过并还原 |
 | R2-13 行时间戳 11pt | `d218803` | 帧差异 3.3–13.1% vs 同代码对照 0.12–0.38%；肉眼核对未裁切；**差异里混着夹具时钟字符串变化（R2-19）** |
 
-当前判据：`swift build` 0 告警 · `swift test` **284 例 / 5 skip / 0 失败** · `python3 -m unittest discover -s scripts/tests` **25 例 OK** ·
-远端 `main` 与本地一致 · CI 在 `a009dd5` 全绿（8 步全 success）。
+当前判据：`swift build` 0 告警 · `swift test` **286 例 / 5 skip / 0 失败** · `python3 -m unittest discover -s scripts/tests` **25 例 OK** ·
+远端 `main` 与本地一致 · CI 在 `a009dd5` 全绿（8 步全 success），其后 `d463ef9`/`d160b52` 也全绿，`f7398f3` 之后的复跑以 `gh run list` 现取。
 
 **CI 红过两次，都是同一类错**（`1183f9f`/`d218803`）：`testPixelDimensionsReadsARealPNG` 把本机的 2× 渲染倍率当成了契约，
 CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52` 改成与倍率无关的不变量（与 `NSImage` 自己的位图表示一致）。
 教训记在 `~/.qoder-cn/memory/feedback-probe-and-assertion-hygiene.md`：**本机实测的数字进断言前，先问别的机器上它还是不是这个数**。
 
-仍未做（明细与理由在 `AGENT_BACKLOG.md` 的 R2-*）：R2-02 的在屏复测（需人工开「完全键盘访问」）、R2-14 文档更正、
-R2-15 AI 脚手架移出产品路径、R2-16 待决策、R2-17 菜单栏面板接缝、R2-18/R2-19 捕获噪声与夹具时钟、
-UI 批次 A 剩两处（设置侧栏符号风格、GlassPill 图标重量）。
+仍未做（明细与理由在 `AGENT_BACKLOG.md` 的 R2-* 与"进度快照 3"）：R2-02 的在屏复测（需人工开「完全键盘访问」）、
+设置侧栏符号风格统一（离屏证据不可信，标 NOT-RUN）、菜单栏面板视觉（等 D-019 的接缝走在屏探针）、
+多文件条目的拖出（需要 NSView 级 dragging session）。
+本轮**证伪**的一条审计结论：R2-15 说 AI 脚手架"零产品调用"，实际 `AIPrivacyScope`/`AIPrivacySensitivity` 被 4 个产品文件使用，
+整体搬走编译失败；最终按编译器给的事实拆成"词汇表 target + 草案 target"（D-020）。
 
 ## 恢复指令（若上下文丢失，从这里续做）
 

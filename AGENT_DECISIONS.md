@@ -196,3 +196,13 @@ name: decisions
 - **结果要诚实记下来**：接缝加上了，但菜单栏**离屏仍然拍不了** —— 试拍一帧发现菜单表面 97.7% 像素未被绘制（离屏 `cacheDisplay` 不画菜单的材质表面），被捕获 harness 自己的"未绘制 >95% 判失败"闸门拦下。那道闸门是对的：假帧不能当证据。所以菜单栏视觉继续标 NOT-RUN，但理由从"怕碰真实存档"更新为"离屏画不出菜单表面"；接缝保留给在屏探针路线（`UIInteractionProbeTests`）。
 - 兼容性/回滚：默认参数保证所有既有调用点不变；`git revert` 即回到隐式 init。
 - 验证：`AppDelegateStoreInjectionTests` 2 条 —— 注入的 store 确实被 delegate 使用（身份比较）；默认构造仍然拿到共享 store（接缝没有改变产品路径）。试拍的 97.7% 记在 `UICaptureHarness` 的注释里，防止下一个人再花一次同样的时间。
+
+## D-020 AI 草案拆出产品 target，共享词汇表另立 target（第二轮 R2-15）
+
+- 背景：审计第二轮 10-07 说"AI 脚手架仍在产品路径且零产品调用"。**第一次整体搬走就编译失败**：`AIPrivacyScope` / `AIPrivacySensitivity` 被 4 个产品文件用着（`RecommendationModels.swift:34`、`ContextSnapshot.swift`、`EntryIntelligence.swift`、`ClipboardEntryIntelligenceAdapter.swift:138`）—— 那条审计结论只对了一半。
+- 决定：拆成三个 target。`ClipboardHistoryIntelligenceCore` 只放这两个枚举（产品 target 依赖它）；`ClipboardHistoryDesignDrafts` 放真正无人调用的 `AIProviderModels.swift` 与 `AIPrivacyPolicy` / `AIPrivacyDecision`；`ClipboardHistoryApp` 不变。草案的既有用例**整体搬**到新的 `ClipboardHistoryDesignDraftsTests`（用 `@testable` 取内部 API），一条没删，也不必把草案 API 改成 public。
+- 理由：草案不该进交付二进制；但"什么算没人用"必须由编译器裁定，不能靠 grep 的印象（这次 grep 就漏了 `AIPrivacySensitivity`）。
+- 兼容性：无数据、无对外接口变化。顺带修掉一个守卫的洞：`LocalOnlyGuardTests` 以前扫整个 `Sources/` 再按文件名跳过两个草案文件，现在扫描根就是产品 target 目录，例外名单删除。
+- 回滚：`git revert` 本提交（Package.swift + 5 处 import + 3 个文件位置 + 1 个测试目录）。
+- 验证：用 `nm` 数产品可执行文件里的符号 —— `AIProviderKind` / `AIPrivacyPolicy` / `AIPrivacyDecision` 均为 **0**，`AIPrivacyScope` 61、`AIPrivacySensitivity` 110（仍在，因为真的在用）。`swift build` 0 告警、`swift test` 286 例 / 5 skip / 0 失败。
+- 同一提交里的另一处方法修正：图片比较的性能闸在负载 28.8（10 核）时报出 997ms 假红，而单跑三次是 155–171ms。现在它先打印 `load1` 与活跃核数，比值 > 2 时 skip 而不是误判回归；**<250ms 的判据本身没动**（仍低于它要否证的旧值 434ms）。
