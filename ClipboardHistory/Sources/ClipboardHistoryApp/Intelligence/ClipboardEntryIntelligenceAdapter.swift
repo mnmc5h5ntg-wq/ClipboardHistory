@@ -180,16 +180,22 @@ struct ClipboardEntryIntelligenceAdapter {
         intelligence(for: entry.analysisSnapshot, analyzedAt: analyzedAt)
     }
 
+    /// 存档可能被手改、或从半截恢复里出现"同 id 两条"（`HistoryStore.collapsingDuplicates` 只按**内容**合并，
+    /// 同 id 不同内容会原样留下）。`Dictionary(uniqueKeysWithValues:)` 对重复键是 `fatalError`，
+    /// 而这条路径每次预测刷新（菜单打开 / 新复制 / 前台切换）都会走 ⇒ 一次刷新就能把进程 trap 掉。
+    /// 所以这里**保留首条**，既不崩也不会为重复项重复算一遍 intelligence。
     func intelligenceByEntryID(for entries: [ClipboardEntry], analyzedAt: Date? = nil) -> [UUID: EntryIntelligence] {
-        Dictionary(uniqueKeysWithValues: entries.map { entry in
-            (entry.id, intelligence(for: entry.analysisSnapshot, analyzedAt: analyzedAt))
-        })
+        entries.reduce(into: [UUID: EntryIntelligence]()) { result, entry in
+            guard result[entry.id] == nil else { return }
+            result[entry.id] = intelligence(for: entry.analysisSnapshot, analyzedAt: analyzedAt)
+        }
     }
 
     func intelligenceByEntryID(for snapshots: [ClipboardEntryRawSnapshot], analyzedAt: Date? = nil) -> [UUID: EntryIntelligence] {
-        Dictionary(uniqueKeysWithValues: snapshots.map { snapshot in
-            (snapshot.id, intelligence(for: snapshot, analyzedAt: analyzedAt))
-        })
+        snapshots.reduce(into: [UUID: EntryIntelligence]()) { result, snapshot in
+            guard result[snapshot.id] == nil else { return }
+            result[snapshot.id] = intelligence(for: snapshot, analyzedAt: analyzedAt)
+        }
     }
 
     private func contentKind(for content: ClipboardEntryContent) -> String {
