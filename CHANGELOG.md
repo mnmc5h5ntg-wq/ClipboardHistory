@@ -4,6 +4,67 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
+## [v1.4.8] - 2026-10-10
+
+### Added
+
+- **行内直接操作**：双击列表条目 = 复制这一条（与详情区浮层「再次复制」同一个动作，会把这条顶到最前）；
+  行首星标 = 一键收藏/取消。带 shift / command 的双击不复制（那两个键是范围选择/多选的前缀）。
+  星标做成行的**兄弟控件**而不是嵌在行按钮里，实测点它只翻收藏、不改变选中集合。
+- **拖拽双向**：条目可拖出（文本 / PNG / 单个文件引用，`EntryDrag`）；文件可拖入列表入库
+  （`DroppedFileImport`，多个文件记成一条 `.files`）。落点刻意只在列表区域，不抢详情文本视图的文字拖放。
+- 只含非文件 `NSURL`（网页链接）的剪贴板现在记成文本条目，不再静默丢弃。
+- 离屏视觉夹具新增菜单栏面板三个状态与行内星标两态：帧数 58 → 68。
+
+### Changed
+
+- 行首星标从"未收藏即 `.clear`（不可见）"变成真控件：未收藏 `primary.opacity(0.55)`
+  （实测对比度 3.54:1 亮 / 4.64:1 暗），已收藏压深成琥珀 `(0.86,0.45,0)`（3.90:1 / 4.28:1）。
+  行内星标与浮层共用 `FavoriteTogglePresentation`，并有源码扫描禁止两处各写字面量。
+- 左侧列表支持方向键移动选择（`SidebarKeyboardNavigation`）+ `ScrollViewReader` 滚动到选中项；
+  macOS 14+ 抑制列表容器的系统焦点环（12/13 无对应 API，仍会出现，已在守卫里注明）。
+- 菜单栏面板区分「正在整理推荐…」与「暂无推荐」（`isRefreshingPredictions`）——
+  菜单同步构建而预测异步计算，把"还不知道"说成"没有"是本轮自己引入又修掉的误导。
+- 亮色 chrome：9 处 `.white.opacity` 换成 `.separator` / `.quaternary` / `primary.opacity`；
+  破坏性确认框 Return 改为「取消」，破坏性按钮标 `hasDestructiveAction` 且不带快捷键。
+- 详情预览加 8 秒兜底（`PreviewLoadTimeoutPolicy`）；系统「减少动态效果」接入筛选 pill 动画与悬停放大。
+- 推荐理由不再一行里把来源 App 说两遍；隐私页文案披露"来源 App 名称"及其用途。
+
+### Fixed
+
+- **启动闪退（S1）**：D-019 给 `AppDelegate` 加 `init(historyStore:)` 后，ObjC 的 `-init` 只剩编译器留下的
+  trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过它构造 delegate ⇒ 新包一打开就
+  `EXC_BREAKPOINT`。补 `override convenience init()`。328 个用例与 CI 全绿都看不见它
+  （Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init），线上 v1.4.7 不受影响。
+- 存档含同 id 两条时，预测管线 `Dictionary(uniqueKeysWithValues:)` 触发 fatalError：改为保留首条，
+  并补一条走 `HistoryStore` 全链路的端到端守卫。
+- 快捷键录制成功后按钮仍显示「请输入快捷键」（`shortcut.didSet` 在录制态跳过回显，之后再没人改）：录完立刻回显。
+- 保存不再重写未变更的图片文件、被取代的落盘任务会取消；`load()` 不再遗留只读标志。
+- 超长文本的字符统计改为有界计数；图片入库按 4096px 上限降采样（4K 及以下逐字节不变）。
+- 来源 App 归属（`sourceAppBundleID` / `sourceAppName`）落盘并在重启后恢复；schema 仍 v1，字段可选。
+- 字号/图标可达性若干：行时间戳与菜单理由行 10pt → 11pt、非法 SF Symbol `"questionable"` → `questionmark.circle`、
+  缩略图与图片预览补无障碍名称。
+
+### Build / Release
+
+- **发布链路新增启动闸门**（`scripts/prepare_release.py`）：反汇编包内二进制，若 `AppDelegate` 还留着
+  「未实现初始化器」桩就拒绝发布。arm64 上类名字面量离调用点二十几行，所以按桩块扫描而不是固定窗口回看。
+- AI 草案代码移出产品 target（`ClipboardHistoryDesignDrafts` + `ClipboardHistoryIntelligenceCore`），
+  `nm` 证明草案符号在产品二进制里为 0；本地网络守卫的扫描根收窄到产品目录。
+- 测试判据不再依赖机器负载：性能守卫改为"N 次同操作采样取最快 + 样本跨度超阈值才 skip"，阈值未动。
+
+### Tests
+
+- Swift 单元测试 328 例 / 9 跳过 / 0 失败；发布脚本测试 30 例通过；`swift build` 0 告警。
+- 在屏交互探针（`CLIPBOARD_HISTORY_UI_INTERACTION=1`）：合成真实鼠标事件，在**完整侧栏容器**里验证
+  单击选中 / 双击恰好复制一次 / 点星标不动选中；焦点环以视图树清点为判据（截图那条路不可信）。
+- 每条新守卫都做过变异对照（含"删掉调用点 ⇒ 恰好那条红"），源码按 sha 逐字节还原。
+
+### Release
+
+- DMG：`releases/时间剪史_v1.4.8.dmg`
+- SHA256：`c31a16e0c144d71063e522f980a25c5cad17409d08a2ab09bac5451a6997e88d`
+
 ## [v1.4.7] - 2026-10-09
 
 ### Fixed
