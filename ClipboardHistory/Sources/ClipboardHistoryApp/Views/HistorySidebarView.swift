@@ -47,6 +47,8 @@ struct HistorySidebarView: View {
     /// 只有键盘造成的选择变化才自动滚到选中行：鼠标点击时那一行本来就在视野里，
     /// 跟着滚反而会把用户点的位置挪走。
     @State private var selectionChangedByKeyboard = false
+    /// 拖放悬停反馈（虚线框）。
+    @State private var isDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -203,6 +205,55 @@ struct HistorySidebarView: View {
         .focused($listHasFocus)
         .onMoveCommand(perform: moveSelection)
         .accessibilityLabel("历史记录列表")
+        // 拖入文件入库（审计第二轮 1.5 / R2-05 的另一半：整个应用以前不接受任何拖入）。
+        // 落点刻意只在列表区域而不是整窗：详情的文本视图自己接受文字拖放，
+        // 窗口级 .onDrop 会抢走它。
+        .onDrop(of: DroppedFileImport.acceptedTypeIdentifiers, isTargeted: $isDropTargeted) { providers in
+            acceptDroppedFileProviders(providers)
+        }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(Color.accentColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+
+    /// 把 provider 里的 file URL 解出来交给 store。解码是异步的，所以这里只回答"我接住了"，
+    /// 真正的入库在收集完之后发生；一个 provider 解不出来不影响其余。
+    /// 这段胶水需要真实拖放才能验收（账本 R2-05 标为未验证），因此所有可判定的逻辑
+    /// 都推到了 `DroppedFileImport.plan` 与 `HistoryStore.addDroppedFiles` 这两处有测试的地方。
+    private func acceptDroppedFileProviders(_ providers: [NSItemProvider]) -> Bool {
+        let identifier = DroppedFileImport.acceptedTypeIdentifiers[0]
+        let wanted = providers.filter { $0.hasItemConformingToTypeIdentifier(identifier) }
+        guard !wanted.isEmpty else { return false }
+        Task { @MainActor [weak historyStore] in
+            var urls: [URL] = []
+            for provider in wanted {
+                urls.append(contentsOf: await Self.fileURLs(from: provider, identifier: identifier))
+            }
+            _ = historyStore?.addDroppedFiles(urls: urls)
+        }
+        return true
+    }
+
+    /// 单个 provider → 文件 URL 列表。`loadItem` 是回调式的，包一层 continuation 才能顺序收集，
+    /// 避免多个回调并发往同一个数组里写。
+    private static func fileURLs(from provider: NSItemProvider, identifier: String) async -> [URL] {
+        await withCheckedContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: identifier) { item, _ in
+                var result: [URL] = []
+                if let data = item as? Data {
+                    if let url = URL(dataRepresentation: data, relativeTo: nil) { result.append(url) }
+                } else if let url = item as? URL {
+                    result.append(url)
+                } else if let nsurl = item as? NSURL {
+                    result.append(nsurl as URL)
+                }
+                continuation.resume(returning: result)
+            }
+        }
     }
 
     /// 方向键 → 既有的 store 动作（与鼠标点击共用同一套语义，所以 store 级测试依然有效）。

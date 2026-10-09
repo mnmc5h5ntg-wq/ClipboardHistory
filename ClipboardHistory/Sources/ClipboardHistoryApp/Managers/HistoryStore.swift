@@ -393,6 +393,22 @@ final class HistoryStore: ObservableObject {
         pasteFailureNotice = nil
     }
 
+    /// 把拖进窗口的文件登记为一条历史（审计第二轮 1.5 / 账本 R2-05 的另一半：
+    /// 以前整个应用不接受任何拖入）。返回 0 表示这批 URL 里没有可用的文件
+    /// （例如只拖进来一个 Web 链接），此时不产生条目也不报错。
+    @discardableResult
+    func addDroppedFiles(urls: [URL], timestamp: Date = Date()) -> Int {
+        guard let planned = DroppedFileImport.plan(for: urls) else { return 0 }
+        add(ClipboardIntake.Entry(
+            content: planned.content,
+            thumbnail: nil,
+            sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: nil,
+            sourceAppName: nil
+        ), timestamp: timestamp)
+        return 1
+    }
+
     func startMonitoring(after delay: TimeInterval = 0) {
         stopMonitoring()
         if delay > 0 {
