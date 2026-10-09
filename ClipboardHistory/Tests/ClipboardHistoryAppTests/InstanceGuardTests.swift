@@ -59,8 +59,27 @@ final class InstanceGuardTests: XCTestCase {
             finder?.processIdentifier,
             "适配器应能把系统里的真实进程认成冲突实例"
         )
+    }
+
+    /// 「排除自己」必须单独一条用例：xctest 进程不是 GUI App，本机 `NSWorkspace.runningApplications`
+    /// 里根本没有它（实测 `ownPIDs=[]`），所以这条在本环境只能 skip。
+    /// 放在同一条用例里会把上面 Finder 那个**阳性对照**一起染成 skipped，等于丢掉证据。
+    ///
+    /// 还有一层原因：这一条以前是拿产品的 bundle id 去问机器，于是用户开着
+    /// `/Applications/时间剪史.app` 时它就是红的（本轮实测 pid 75412）—— 那是真冲突、不是缺陷，
+    /// 测试的红绿不该由"用户开没开 App"决定。
+    func testAdapterExcludesItselfWhenItIsTheOnlyInstance() throws {
+        let mine = ProcessInfo.processInfo.processIdentifier
+        let ownBundleID = Bundle.main.bundleIdentifier
+        let ownPIDs = NSWorkspace.shared.runningApplications
+            .filter { $0.bundleIdentifier == ownBundleID }
+            .map(\.processIdentifier)
+        guard let ownBundleID, ownPIDs == [mine] else {
+            throw XCTSkip("测试进程的 bundle id 在本机不唯一或根本没被列出（ownPIDs=\(ownPIDs)，mine=\(mine)）；"
+                + "「排除自己」由上面的纯函数用例覆盖")
+        }
         XCTAssertNil(
-            InstanceGuard.conflictingPID(excluding: mine, bundleIdentifier: "com.clipboardhistory.app"),
+            InstanceGuard.conflictingPID(excluding: mine, bundleIdentifier: ownBundleID),
             "测试进程自己不该被当成同 bundle 的另一实例"
         )
     }
