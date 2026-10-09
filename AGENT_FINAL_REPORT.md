@@ -205,6 +205,7 @@ python 脚本测试 25 例（`python3 -m unittest discover -s scripts/tests`）�
 | 快捷键录制器（13-08） | `14a37a0`（D-027） | 6 条只测可观测行为的用例里，5 条直接绿、1 条红在**产品**：录完合法组合后按钮仍写着"请输入快捷键"（`didSet` 在录制态跳过回显，之后再没人改）。加一行显式回显修掉；失焦那条守卫经变异对照承重 |
 | 行内直接操作（用户提出） | `1395425`（D-028） | 双击行 = 复制这条（与浮层「再次复制」同一个动作）；行首星标 = 就地收藏。星标从 `.clear` 指示器变成真控件，两态颜色都量化到 ≥3:1（未收藏 1.76/2.17 → 3.54/4.64，已收藏 黄 1.67 → 琥珀 3.90/4.28）；**这次是在屏合成点击真点验证的**，而且是在真实侧栏容器里（外层 ScrollView + 列表级拖选手势并存）：点星标翻收藏、点行改选中、双击恰好写一次剪贴板且写的就是刚点中的那条；删掉手势即红（变异对照）。帧 64 → 68 |
 | 启动闪退回归（D-029，S1） | 本次提交 | D-019 的显式 `init(historyStore:)` 让 ObjC `-init` 变成 trap 桩，SwiftUI 的 `@NSApplicationDelegateAdaptor` 走的就是它 ⇒ 包一打开就 `SIGTRAP`。三行 `override convenience init()` 修掉 + 两条守卫；**测试全绿挡不住的原因**：Swift 侧 `AppDelegate()` 走默认参数那条，CI 又从不启动 .app（缺口开成 R2-21） |
+| 列表蓝框（D-030，用户报） | 本次提交 | 那是 R2-02 `.focusable()` 带来的系统焦点环。保留可聚焦、加 macOS 14+ 的 `focusEffectDisabled()`；**macOS 12/13 仍会有环**（平台无开关）。前后都量过：`_FocusRingView` 15 → 2，其中整块列表那圈消失 |
 | 看画面才看见的文案缺陷 | `16d658d` | 推荐理由一行里把来源 App 说两遍（`Safari · 偏好链接 · 回到Safari`）。改成「没有别的标签点过来源 App 才补裸名」；断言先写、对旧实现报红（2 次）后才动实现 |
 
 ### 10.2 本轮自己制造并被测试抓住的问题
@@ -249,4 +250,4 @@ CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests  
 cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
-账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-20 + 12 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-028）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。
+账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-21 + 14 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-028）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。

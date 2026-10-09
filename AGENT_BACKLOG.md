@@ -286,3 +286,13 @@
 327 个用例与 CI 全绿挡不住的原因：Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init，永远走不到 `-init`；CI 也从不启动 .app。修法是三行 `override convenience init()`，守卫两条互补（运行时走元类型 + 源码扫描必须声明 override init）。修之前那条运行时守卫原地复现了同一句 fatal error（signal 5），修之后绿。
 重打包 `make bundle VERSION=1.4.7-fix1`：新 UUID `8A1FB38C…`、AppDelegate 的桩消失、unimplemented 站点 4→3（剩下 3 个是只在 Swift 侧构造的 Coordinator / 自定义 NSView，良性）。**真机启动待用户确认**；结构性缺口开成 R2-21（CI 没有「能不能启动」这一关）。
 当前判据：`swift build` 0 告警 · `swift test` **327 例 / 8 skip / 0 失败** · 包已重打并二进制层核对。
+**进度快照 14（D-030：关掉列表那圈蓝框）**：用户报"双击后左侧列表周围出现一个蓝色框"。
+定性过程里有两次反直觉：第一响应者的 `focusRingType` 本来就是 `.none`（⇒ 环不是 AppKit 画的），
+而拍窗口再肉眼看的办法在"已聚焦的真实窗口"上会画歪（⇒ 像素不能当证据）。
+最后用视图树清点 SwiftUI 的 `_FocusRingView` 拿到可判别信号：改前 15 个（含整块列表那圈 {{0,125},{320,335}}），
+改后 2 个（筛选 pill 自己的）。修法保留 `.focusable()`（方向键不能坏），加 macOS 14+ 的 `focusEffectDisabled()`；
+**macOS 12/13 上环仍会出现**，平台没有对应开关，探针失败消息里写明这一区分。
+守卫三条（在屏探针 + 源码扫描同时钉 focusable 与抑制 + 抑制函数不许是空壳），②的牙用变异对照验过。
+顺带记一个 Swift 坑：`XCTAssertEqual(x?.enum, .none)` 的 `.none` 是 `Optional.none`，断言恒不成立。
+当前判据：`swift build` 0 告警 · `swift test` **328 例 / 9 skip / 0 失败** · 68 帧与改动前 sha 全同 ·
+包重打为 `1.4.7-fix2`（UUID `1FBD7DF5…`）。
