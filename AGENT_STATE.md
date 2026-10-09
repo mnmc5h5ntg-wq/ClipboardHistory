@@ -108,6 +108,37 @@ UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrom
 改走最小方案：恢复搜索框焦点环、行 `focusable` + `onMoveCommand` 方向键映射到既有 store 动作、行上暴露 `isSelected` 语义；
 拖出条目用 `onDrag { NSItemProvider }`（macOS 10.15+ 可用），不是 `.draggable`。
 
+### 第二轮进度快照（本节为最新状态，上面那份"还欠"清单写于开工时）
+
+已完成并推送（每条一个提交，全部有会红的测试；`swift build` 0 告警、`swift test` **265 例 / 5 skip / 0 失败**、`python3 -m unittest discover -s scripts/tests` **25 例 OK**）：
+
+| 审计项 | 提交 | 证据 |
+|---|---|---|
+| N-1 端到端守卫（R2-01） | `ca12531` | 变异对照：改回 `uniqueKeysWithValues` ⇒ 测试进程 `Fatal error: Duplicate values for key`，退出码 1；随后按 sha 逐字节还原 |
+| R2-09 非法符号 / 菜单空态 / spinner 兜底 | `1214526` | 新增 `SystemSymbolValidityTests`：扫出 **24 个符号名字面量 / 22 个不同名**，全部可解析；识别器用含 `questionable` 的合成源自证；数量下限 18 由 grep 独立得出 |
+| R2-03 亮色 chrome（9 处） | `6a2c040` | `scripts/frame_audit.py`：亮色 pill 的 chrome 从 245–250（背景 247，≤3 级差 = 不可见）变成 202–207（43 级差）；暗色 81→64（背景 34，仍高 30 级） |
+| R2-06 破坏性确认默认按钮 | `a841337` | `DestructiveAlertLayoutTests` 2 条钉住按钮顺序/角色/快捷键与 `runModal` 返回值映射 |
+| R2-10 pill 减少动态门控 | `2438aa6` | `FilterPillMotionTests` 3 条（含接线守卫：视图里不许再出现写死的 `.spring(response: 0.38`） |
+| R2-11 有界字符计数 | `8cfdfe5` | 2.4MB 文本 `sizeDescription` 实测 **0.87–1.11ms**（旧实现基线 5.5ms），性能上界从 20ms 收回 **5ms** |
+| R2-04 保存不再重写全部图片 | `9ac4661` | `ImageWriteAmortizationTests` 4 条，判据是 inode（原子写必换 inode）+ "history.json 必须每次换 inode" 的阳性对照；变异对照：去掉跳过 ⇒ 2 条红 |
+| R2-07 来源 App 落盘（D-016） | `d8d11f4` | 4 条用例（文本/图片/文件往返、手写旧存档仍可读且读成 nil、隐私文案披露）；变异对照：四处写 nil ⇒ 2 条红 |
+| R2-02 键盘可达性（部分） | `d4edf1f` | 在屏探针实测：真实 Tab 按键现在能到搜索框（`NSTextView(fieldEditor)`）；改动前 14 次 Tab 全停在详情的 `NSTextView` |
+
+顺手修掉的一个**测试环境依赖**（`fe4ca27`）：`InstanceGuardTests` 有一条断言"本机没有产品 bundle id 的其他进程"，
+用户一打开 `/Applications/时间剪史.app` 它就红（本轮实测 pid 75412）—— 那是在断言机器状态而不是代码行为。
+现在改成按测试进程自己的 bundle id 判定，本机因为 xctest 不是 GUI App 而 skip；**Finder 那个阳性对照单独成一条用例**，
+否则一个 skip 会把它一起染成"没跑过"。
+
+新工具：`scripts/frame_audit.py`（`diff` / `stats` / `band`，纯标准库解 PNG，自带 7 条单测；它自己抓到一个真 bug ——
+亮度用截断而非四舍五入会把纯白算成 254）。捕获 harness 也修了一处证据污染源：**闪烁的插入点**曾让同一份代码连拍两次
+有 30/58 帧不同（最大通道差 251），现在捕获前交出第一响应者并把插入点设为透明，噪声降到 16/58 且只剩 `content-*`/`detail-*`。
+
+**验证等级要分清**（本轮明确记为未验证的）：Tab 能否走到列表行 —— 本机 `AppleKeyboardUIMode` 读出来是 `-1`（缺省，
+即「完全键盘访问」关闭），此时 macOS 的 Tab 只在文本框与列表之间走，`.focusable()` 的自绘视图根本不进环；
+所以"键盘用户能用方向键浏览列表"目前只有**纯函数单测 + 接线守卫**，没有在屏证据，需要人工开一次该开关后用
+`CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests` 复测。
+同理未验证：`NSAlert` 的真实按键行为（Return/Escape）、拖拽（尚未实现）、菜单栏面板视觉（R2-17 的接缝还没加）。
+
 ## 恢复指令（若上下文丢失，从这里续做）
 
 1. `git log --oneline` 与 `git diff 8007b19..HEAD --stat` 看清已完成什么。
