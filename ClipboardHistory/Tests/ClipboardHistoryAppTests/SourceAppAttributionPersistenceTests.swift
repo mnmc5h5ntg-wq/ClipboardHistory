@@ -8,21 +8,23 @@ import XCTest
 /// 这三条用例分别钉住：① 存盘再载入仍然带着来源 App；② **旧存档**（没有这两个键）照样能读，
 /// 读成 nil —— 这是"加可选字段、不升 schema 版本"的兼容性前提；③ 隐私文案里说清了会保存来源 App，
 /// 免得代码里多存了一样东西而界面上的承诺没跟着变。
+///
+/// 临时目录在每条用例里自建（不用 `setUp` + 存储属性）：`@MainActor` 类的 setUp/tearDown 在
+/// CI 的 Swift 6.1.2 上是 nonisolated 覆写，写隔离属性会编译失败，而本机 6.2.1 放行。
 @MainActor
 final class SourceAppAttributionPersistenceTests: XCTestCase {
-    private var root: URL!
-
-    override func setUpWithError() throws {
-        root = FileManager.default.temporaryDirectory
+    private func makeRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("来源App持久化-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-    }
-
-    override func tearDownWithError() throws {
-        try? FileManager.default.removeItem(at: root)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: root)
+        }
+        return root
     }
 
     func testSourceAppSurvivesASaveLoadRoundTrip() throws {
+        let root = try makeRoot()
         let entry = makeClipboardEntry(
             content: .text("一条带来源的记录"),
             timestamp: Date(timeIntervalSince1970: 1_700_000_000),
@@ -42,6 +44,7 @@ final class SourceAppAttributionPersistenceTests: XCTestCase {
     }
 
     func testSourceAppSurvivesRoundTripForImageAndFileEntriesToo() throws {
+        let root = try makeRoot()
         let image = try makeStoredImage(color: .systemTeal, size: NSSize(width: 12, height: 9))
         let fileURL = URL(fileURLWithPath: "/tmp/来源归因-\(UUID().uuidString).txt")
         let entries = [
@@ -71,6 +74,7 @@ final class SourceAppAttributionPersistenceTests: XCTestCase {
     }
 
     func testArchiveWrittenBeforeTheFieldExistedStillLoads() throws {
+        let root = try makeRoot()
         // 手写的"旧存档"：没有 sourceAppBundleID / sourceAppName 两个键。
         let json = """
         {
