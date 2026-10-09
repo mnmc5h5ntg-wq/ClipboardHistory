@@ -159,3 +159,13 @@ name: decisions
 - 兼容性：仓库内容零改动（与旧路径唯一的差异是 `.git/index`）。旧路径以符号链接保持可用，指向 `~/Documents/Codex_Project0` 的既有习惯不破。项目级记忆的键随绝对路径改变，已把 `~/.qoder-cn/projects/-Users-wangziyi-Documents-Codex_Project0/memory/` 复制到 `-Users-wangziyi-Codex_Project0`（只带记忆目录，8K）。已发布产物与 tag 不受影响。
 - 回滚：两条互相独立 —— ① 只撤销链接：`rm ~/Documents/Codex_Project0 && rsync -a /Users/wangziyi/Codex_Project0/ ~/Documents/Codex_Project0/`；② 整体退回旧路径同上。任何一条都不涉及数据迁移，`history.json` 在 `~/Library/Application Support/` 下、本来与仓库位置无关。
 - 验证：两侧文件数相同（`find . -path ./.build -prune -o -type f -print | wc -l`，当时 1158/1158）、`git rev-parse HEAD` 相同、`git status` 干净、`git fsck` 无报错、`diff -rq` 只差 `.git/index`。新路径上重新跑过全套判据：`swift build` 0 告警、`swift test` 229 例全绿（1 条按设计 skip）、`python3 -m unittest discover -s scripts/tests` 18 例 OK、视觉套件 58 帧且未绘制比例闸门全过（退出码 0）、`make bundle` 产出 x86_64+arm64 通用二进制、包内版本 1.4.7、`codesign --verify --deep --strict` 退出码 0、Info.plist 16 键。**复发时的特征**：`Sources/` 下出现 `* 2.swift`，判据 `find ClipboardHistory/Sources -name '* 2.*' | wc -l` 应为 0（本轮结束时实测 0）。
+
+## D-016 来源 App 落盘：`StoredEntry` 新增两个可选字段（第二轮 B-2 / R2-07）
+
+- 背景：`ClipboardEntry` 一直带着 `sourceAppBundleID` / `sourceAppName`（采集时从 `NSWorkspace.frontmostApplication` 取），但 `StoredEntry` **没有**这两个字段 ⇒ 每次重启后归因全部丢失，推荐权重里的 `appAffinity` 对"载入的历史"恒为 0。也就是说那一项权重从上线起就没真正生效过，而界面上它一直显示为可调项。
+- 决定：`StoredEntry` 新增 `sourceAppBundleID: String?` 与 `sourceAppName: String?`，四种内容类型（文本 / 图片 / 文件 / 多文件）一律写入，`entry(from:)` 读回。**schema 版本保持 1，不加迁移步骤。**
+- 理由：两个字段都是 Optional —— 旧存档缺键时解出 `nil`（有一份手写旧 JSON 的用例钉住）；旧版本程序遇到多出来的键会忽略（`Codable` 默认行为），所以**双向兼容**。刻意不升版本号：升了反而会让"新版本写出的存档"在旧版本里被判成只读（D-012 的闸门），那是更差的取舍。
+- 隐私影响（必须一起改）：这是**新增的落盘内容**，所以设置页的隐私说明同步改了 —— `HistoryPrivacyCopy.capturedContent` 现在明写"以及复制时的来源 App 名称（仅用于推荐排序）"，并有一条用例钉住"文案必须提到来源 App，且这条文案真的出现在设置页的 bullets 里"。落盘内容与界面承诺不一致，比不落盘更坏。
+- 兼容性/迁移：无需迁移。旧存档读出的条目来源为 `nil`，`appAffinity` 对这些条目仍为 0（与改动前一致），新复制的条目开始累积归因。
+- 回滚：`git revert` 本提交。回滚后新写出的存档少这两个键，已写出的存档里多出的键被忽略 ⇒ 无残留状态、无需数据修复。
+- 验证：`SourceAppAttributionPersistenceTests` 4 条（文本往返、图片+文件往返、旧存档仍可读且读成 `nil`、隐私文案披露）。变异对照已实跑：把四处写入改成 `sourceAppBundleID: nil, sourceAppName: nil` ⇒ 前两条用例红（消息正是"bundle id 没有落盘"），随后按 sha 逐字节还原。全量 `swift test` 265 例 / 5 skip / 0 失败。

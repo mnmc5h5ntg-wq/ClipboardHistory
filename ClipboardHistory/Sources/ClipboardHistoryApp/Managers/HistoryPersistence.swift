@@ -66,6 +66,12 @@ final class FileHistoryPersistence: HistoryPersisting {
         let thumbnailFileName: String?
         let isFavorite: Bool?
         let sourceUTIs: [String]
+        /// 来源 App（审计第二轮 B-2 / 账本 R2-07）：以前只在内存里，重启后归因全丢，
+        /// 于是 `appAffinity` 对"载入的历史"恒为 0 —— 推荐权重里有一项永远算不出来。
+        /// 两个字段都是 Optional，旧存档缺键时解出 nil，**不需要**升 schema 版本；
+        /// 旧版本程序读到多出来的键也会忽略（Codable 默认行为），所以双向兼容。
+        let sourceAppBundleID: String?
+        let sourceAppName: String?
         let ocrText: String?
 
         var fileURLs: [URL] {
@@ -264,6 +270,8 @@ final class FileHistoryPersistence: HistoryPersisting {
             sourceURL: content.sourceURL,
             isFavorite: storedEntry.isFavorite ?? false,
             sourceUTIs: storedEntry.sourceUTIs,
+            sourceAppBundleID: storedEntry.sourceAppBundleID,
+            sourceAppName: storedEntry.sourceAppName,
             ocrText: storedEntry.ocrText
         )
     }
@@ -295,6 +303,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 thumbnailFileName: nil,
                 isFavorite: entry.isFavorite,
                 sourceUTIs: entry.sourceUTIs,
+                sourceAppBundleID: entry.sourceAppBundleID,
+                sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText
             )
         case .image(let image):
@@ -311,6 +321,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 thumbnailFileName: nil,
                 isFavorite: entry.isFavorite,
                 sourceUTIs: entry.sourceUTIs,
+                sourceAppBundleID: entry.sourceAppBundleID,
+                sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText
             )
         case .file(let url):
@@ -333,6 +345,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 thumbnailFileName: thumbnailFileName,
                 isFavorite: entry.isFavorite,
                 sourceUTIs: entry.sourceUTIs,
+                sourceAppBundleID: entry.sourceAppBundleID,
+                sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText
             )
         case .files(let urls):
@@ -355,6 +369,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 thumbnailFileName: thumbnailFileName,
                 isFavorite: entry.isFavorite,
                 sourceUTIs: entry.sourceUTIs,
+                sourceAppBundleID: entry.sourceAppBundleID,
+                sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText
             )
         }

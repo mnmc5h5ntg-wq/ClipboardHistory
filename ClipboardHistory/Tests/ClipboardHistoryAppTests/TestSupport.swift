@@ -49,7 +49,9 @@ func makeClipboardEntry(
     timestamp: Date = Date(timeIntervalSince1970: 1_000),
     thumbnail: StoredImage? = nil,
     isFavorite: Bool = false,
-    sourceUTIs: [String] = []
+    sourceUTIs: [String] = [],
+    sourceAppBundleID: String? = nil,
+    sourceAppName: String? = nil
 ) -> ClipboardEntry {
     ClipboardEntry(
         id: id,
@@ -58,7 +60,9 @@ func makeClipboardEntry(
         thumbnail: thumbnail,
         sourceURL: content.sourceURL,
         isFavorite: isFavorite,
-        sourceUTIs: sourceUTIs
+        sourceUTIs: sourceUTIs,
+        sourceAppBundleID: sourceAppBundleID,
+        sourceAppName: sourceAppName
     )
 }
 
