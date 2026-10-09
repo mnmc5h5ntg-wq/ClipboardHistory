@@ -176,7 +176,10 @@ struct WindowConfigurator: NSViewRepresentable {
             }
         }
 
-        private func isSidebarToolbarItem(_ item: NSToolbarItem) -> Bool {
+        /// 不是 private：审计第二轮 08-08 / 13-08 指出这条"猜出来再删"的判断没有任何测试。
+        /// 它决定要不要从窗口工具栏里摘掉一个按钮，误判的代价是**用户少了一个按钮**，
+        /// 所以正反两方向都得有断言钉住（放宽只为测试，行为未变）。
+        func isSidebarToolbarItem(_ item: NSToolbarItem) -> Bool {
             if item.action == #selector(NSSplitViewController.toggleSidebar(_:)) {
                 return true
             }
