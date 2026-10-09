@@ -149,8 +149,11 @@ UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrom
 | R2-12 粘贴前复核目标 App | `d218803` | 6 条真值表 + "复核必须在注入之前"的顺序守卫；变异对照（延时直接注入）红过并还原 |
 | R2-13 行时间戳 11pt | `d218803` | 帧差异 3.3–13.1% vs 同代码对照 0.12–0.38%；肉眼核对未裁切；**差异里混着夹具时钟字符串变化（R2-19）** |
 
-当前判据：`swift build` 0 告警 · `swift test` **286 例 / 5 skip / 0 失败** · `python3 -m unittest discover -s scripts/tests` **25 例 OK** ·
-远端 `main` 与本地一致 · CI 在 `a009dd5` 全绿（8 步全 success），其后 `d463ef9`/`d160b52` 也全绿，`f7398f3` 之后的复跑以 `gh run list` 现取。
+当前判据：`swift build` 0 告警 · `swift test` **287 例 / 5 skip / 0 失败** · `python3 -m unittest discover -s scripts/tests` **25 例 OK** ·
+远端 `main` 与本地一致 · CI 最近三次（`d0b2416`/`a22d394`/`268ccaa`）全 success；再往后的以 `gh run list --limit 3` 现取。
+本轮 CI 一共红过三次，根因分别是：`@MainActor` 测试类的 setUp 写隔离属性（6.1.2 更严）、把本机 2× 渲染倍率当契约、
+以及"热比较快于冷比较"这条在 2 核 runner 上没有分辨力的计时判据 —— 三次都是**本地绿、远端红**，
+所以"本机全绿"在本项目里从来不算交付证据。
 
 **CI 红过两次，都是同一类错**（`1183f9f`/`d218803`）：`testPixelDimensionsReadsARealPNG` 把本机的 2× 渲染倍率当成了契约，
 CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52` 改成与倍率无关的不变量（与 `NSImage` 自己的位图表示一致）。
