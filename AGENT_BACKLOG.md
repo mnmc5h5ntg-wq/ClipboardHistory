@@ -214,13 +214,22 @@
 **看画面立刻抓到一个内容缺陷**：推荐理由 `文本 · Safari · 偏好链接 · 回到Safari · 24%` 一行里把来源 App 说两遍，
 `16d658d` 修掉（断言先写、对旧实现报红 2 次）。仍 NOT-RUN：系统菜单材质/圆角/菜单项 chrome（需要在屏捕获）。
 当前判据：`swift build` 0 告警 · `swift test` 301 例 / 5 skip / 0 失败 · python 25 例 OK · 64 帧连拍两次 sha 一致。
+
+**进度快照 9（把"侧栏图标不可见"量成数字，D-025）**：审计 1.9 那一项原来靠一句推断（"真机不可能长这样"）判成捕获伪影。
+现在有三组数：产品里未选中四行图标列墨水 **0.0000**；同一图标临时改固定 `Color.black` → **0.175–0.402**；
+复刻的 `List(.sidebar)` 行里 `.primary` 与固定色一样能画（带/不带 `.plain` Button 四种组合全测）。
+⇒ 判为离屏语义色伪影，**产品一字未改**，注释换成测量。中途我先动了实现（icon 闭包 + `.monochrome`），
+复刻实验一出来就回退了 —— 教训写进 D-025："帧里看不见"要先问管线会不会说谎。
+探针形状：常规套件只留版本无关的前提断言（固定色必须画得出来），语义色部分与视觉审计同开关、只打印结论不做断言。
+删掉了十分钟前自己写的一条通过 `.primary` 断言产品可见性的用例（读法无效，被替换而非删绿）。
+当前判据：`swift build` 0 告警 · `swift test` **303 例 / 6 skip / 0 失败** · python 25 例 OK · 64 帧与改注释前 sha 全同。
 **待观察**：新头推送后去 CI 日志 `grep "PERF\["` 确认 5 条守卫真的下结论而不是全部 skip（命令已写进报告 10.3）。
 
 | # | 审计出处 | 价值 | 状态 | 内容 |
 |---|---|---|---|---|
 | R2-01 | 02 §A N-1 | 高 | 已完成(876c015+ca12531) | 补"存档含同 id 两条 ⇒ 预测刷新不崩且只出一条"的**端到端**用例：走 `HistoryStore` 的预测刷新路径，不走 `engine().recommend`（`RecommendationBoundaryTests:96-103` 正是这样绕过了 adapter，所以 `876c015` 之前一直是绿的）。做完用变异对照证明：把实现改回 `Dictionary(uniqueKeysWithValues:)` ⇒ 该用例必须红/崩 |
 | R2-02 | 03 §3.1 / §1.10 | 高 | 部分完成(d4edf1f)：真实 Tab 到搜索框已实测；「Tab 能否走到列表行」需人工开完全键盘访问后复测 | 键盘焦点链。实测 14 次 `selectNextKeyView` 全落在同一个 `NSTextView`；`ChineseTextContextMenu.swift:40` 把搜索框 `focusRingType` 设成 `.none`；全仓 `.buttonStyle(.plain)` 无焦点环、无 `.focusable()`/`@FocusState`。**不采纳**"整体换 `List(selection:)`"（`.draggable` 需 macOS 13+，本项目下限 12；系统 chrome 会改掉 4 个 `sidebar-*` 帧像素；会丢 `dragSelectRange` 锚点语义）。改最小方案：搜索框恢复焦点环、列表容器 `focusable` + `onMoveCommand` 映射到既有 store 动作（`selectOnly`/`selectRange`/`toggleSelection`）、行上 `accessibilityAddTraits(.isSelected)`、必要时 `ScrollViewReader` 滚到选中项 |
-| R2-03 | 03 §3.2 / 14-06 | 高 | 已完成(6a2c040)：9 处亮色 chrome；设置侧栏符号风格判 NOT-RUN 并已回退 | 亮色 chrome：`GlassControls.swift:49,55,138,151-152`、`ThumbnailView.swift:14,28,32`、`VideoPreview.swift:272` 共 9 处 `.white.opacity(0.08–0.42)` 换 `.separator`/`.quaternary`/`controlBorderColor`；顺带统一设置侧栏符号风格（outline 与 filled 混用）与 GlassPill 图标重量（`doc.on.doc` 因 `.hierarchical` 比 `star`/`trash` 淡）。改前改后各拍 58 帧，给逐帧差异与对比度数字 |
+| R2-03 | 03 §3.2 / 14-06 | 高 | 已完成(6a2c040)：9 处亮色 chrome；设置侧栏符号风格已量成数字，判为离屏语义色伪影，产品不改(D-025) | 亮色 chrome：`GlassControls.swift:49,55,138,151-152`、`ThumbnailView.swift:14,28,32`、`VideoPreview.swift:272` 共 9 处 `.white.opacity(0.08–0.42)` 换 `.separator`/`.quaternary`/`controlBorderColor`；顺带统一设置侧栏符号风格（outline 与 filled 混用）与 GlassPill 图标重量（`doc.on.doc` 因 `.hierarchical` 比 `star`/`trash` 淡）。改前改后各拍 58 帧，给逐帧差异与对比度数字 |
 | R2-04 | 02 §B B-1 | 高 | 已完成(9ac4661) | `saveSnapshot` 每次保存仍重写**每个**图片文件（`HistoryPersistence.swift:264-272,401-405`），无去抖、不 cancel 旧 work item（`:212-226`）⇒ 磁盘 IO 与图片数线性。按内容指纹/已存在且同尺寸跳过未变文件 + 去抖并取消旧任务；测试要证明"N 次保存不再重写未变图片"（写入计数或 mtime），并保持崩溃/回滚语义 |
 | R2-05 | 03 §3.4 / §1.5 | 中高 | 已完成(d463ef9 拖出 + 53bbe85 拖入)；多文件拖出未做(需 NSView dragging session) | 拖拽能力为零（`onDrag/draggable/NSItemProvider/onDrop` 全仓 0 命中）。给行加 `onDrag { NSItemProvider }`（macOS 10.15+，**不要**用 13+ 的 `.draggable`）：文件给 fileURL、图片给 PNG、文本给 string。真实拖放无法离屏验证 ⇒ 验证等级要分开写（实现+单测 vs 人工拖一次） |
 | R2-06 | 03 §3.3 / §1.7 | 中 | 已完成(a841337) | `DestructiveConfirmation.swift:23-29` 的 `NSAlert` 里"清空"是第一个即默认按钮、无 cancel 角色 ⇒ 违反 HIG"默认按钮 = 最安全动作、Escape 取消"。改成取消为默认，或与设置页 `.alert` 共用同一语义 |
