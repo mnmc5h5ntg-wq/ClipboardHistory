@@ -185,6 +185,12 @@
   先验证再动，避免为改而改）；把设置窗口改成 `Settings` scene（审计自己也说"二选一，别叠两层"）；拖入文件入库（`.onDrop`，
   需要真实拖放才能验收）。
 
+**进度快照 5（菜单覆盖，D-021）**：`populate(_:)` 从 private 放宽到 internal，新增 `MenuBarPopulationTests` 6 条 ——
+关闭审计 09-08（"populate 无测试"）与 13-08 的一部分（菜单内容此前只能靠 `menuLabel` 间接覆盖）。
+写这批测试时**暴露了本轮自己引入的一个误导**：菜单同步构建而预测异步计算，所以打开瞬间必然空，
+"暂无推荐"会在有候选的机器上先闪一下。已用 `isRefreshingPredictions` 把"还在算"与"确实没有"分开（两条菜单路径同步改），
+并有变异对照证明这条区分是承重的。当前判据：`swift test` 293 例 / 5 skip / 0 失败、`swift build` 0 告警、58 帧 0/58 不同。
+
 | # | 审计出处 | 价值 | 状态 | 内容 |
 |---|---|---|---|---|
 | R2-01 | 02 §A N-1 | 高 | **待办（实现已改，守卫未补）** | 补"存档含同 id 两条 ⇒ 预测刷新不崩且只出一条"的**端到端**用例：走 `HistoryStore` 的预测刷新路径，不走 `engine().recommend`（`RecommendationBoundaryTests:96-103` 正是这样绕过了 adapter，所以 `876c015` 之前一直是绿的）。做完用变异对照证明：把实现改回 `Dictionary(uniqueKeysWithValues:)` ⇒ 该用例必须红/崩 |

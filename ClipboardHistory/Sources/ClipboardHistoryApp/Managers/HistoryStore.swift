@@ -127,6 +127,9 @@ final class HistoryStore: ObservableObject {
 
     @Published private(set) var predictionSuggestionEntries: [Entry] = []
     @Published private(set) var predictionReasonByEntryID: [UUID: String] = [:]
+    /// 有一次预测刷新正在进行中。菜单需要它，否则"刚打开、还没算完"会被显示成
+    /// "暂无推荐" —— 那是把"还不知道"说成"没有"（本轮加空态文案时暴露出来的问题）。
+    @Published private(set) var isRefreshingPredictions = false
 
     func refreshPredictions() {
         // "显露偏好窗口"在结果真正显示出来的那一刻开启（见 applyPredictionResult），
@@ -136,6 +139,7 @@ final class HistoryStore: ObservableObject {
         // 连续复制时后台任务完成顺序不确定 ⇒ 陈旧结果会盖掉新结果（审计 R-11）。
         predictionGeneration += 1
         let generation = predictionGeneration
+        isRefreshingPredictions = true
 
         let capturedAt = Date()
         // 只把字符串快照交给后台：带 NSImage 的条目不再跨 actor 边界（审计 R-19）。
@@ -181,6 +185,9 @@ final class HistoryStore: ObservableObject {
             )
             await MainActor.run { [weak self] in
                 guard let self, self.predictionGeneration == generation else { return }
+                // 只有"这一代仍是最新"时才收工；被更新的代次取代时保持 true，
+                // 否则菜单会在新一代还没算完时误报"暂无推荐"。
+                self.isRefreshingPredictions = false
                 self.applyPredictionResult(
                     result,
                     contextSummary: capturedContextSummary,

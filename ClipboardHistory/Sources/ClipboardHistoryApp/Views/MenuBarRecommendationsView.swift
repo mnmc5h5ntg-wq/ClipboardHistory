@@ -12,9 +12,10 @@ struct MenuBarRecommendationsView: View {
                 .font(.headline)
 
             if historyStore.predictionSuggestionEntries.isEmpty {
-                // 旧实现在没有推荐时整段静默消失，用户分不清"算过了没有结果"和"这块坏了"
-                // （审计第二轮 R2-09 / 1.8）。给一句明确的话，字号与下面的理由行一致。
-                Text("暂无推荐")
+                // 旧实现在没有推荐时整段静默消失，用户分不清"算过了没结果"和"这块坏了"
+                // （审计第二轮 R2-09 / 1.8）。而"还在算"也不能说成"没有"：菜单是同步画的，
+                // 刷新是异步的，所以这里跟着 `isRefreshingPredictions` 分两种说法。
+                Text(historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else {

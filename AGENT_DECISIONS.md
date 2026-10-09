@@ -206,3 +206,22 @@ name: decisions
 - 回滚：`git revert` 本提交（Package.swift + 5 处 import + 3 个文件位置 + 1 个测试目录）。
 - 验证：用 `nm` 数产品可执行文件里的符号 —— `AIProviderKind` / `AIPrivacyPolicy` / `AIPrivacyDecision` 均为 **0**，`AIPrivacyScope` 61、`AIPrivacySensitivity` 110（仍在，因为真的在用）。`swift build` 0 告警、`swift test` 286 例 / 5 skip / 0 失败。
 - 同一提交里的另一处方法修正：图片比较的性能闸在负载 28.8（10 核）时报出 997ms 假红，而单跑三次是 155–171ms。现在它先打印 `load1` 与活跃核数，比值 > 2 时 skip 而不是误判回归；**<250ms 的判据本身没动**（仍低于它要否证的旧值 434ms）。
+
+## D-021 菜单区分"还在算推荐"与"确实没有推荐"（第二轮 R2-09 的后续）
+
+- 背景：本轮给菜单栏补了空态文案（"暂无推荐"）之后，写 `MenuBarPopulationTests` 时暴露一个**我自己引入的误导**：
+  `menuWillOpen` 先发起异步刷新、再**同步**填菜单，所以每次打开的那一刻候选必然是空 ⇒ 界面会先说一句"暂无推荐"，
+  过一会儿才出候选。把"还不知道"说成"没有"，比原来的整段消失更糟。
+- 决定：`HistoryStore` 增加 `@Published private(set) var isRefreshingPredictions`：`refreshPredictions()` 开头置 true，
+  结果回写时**仅当代次仍是最新**才置 false（被更新的代次取代时保持 true）。两条菜单路径
+  （macOS 12 的 AppKit `populate` 与 macOS 13 的 `MenuBarRecommendationsView`）据此在"空"时分两种说法：
+  "正在整理推荐…" / "暂无推荐"。
+- 理由：菜单必须同步给出内容，这是 AppKit 的约束；能改的是**别让它说谎**。用代次守卫而不是"永远 true"，
+  是为了让真的空库仍然显示"暂无推荐"。
+- 兼容性：新增的是只读发布属性，无数据格式变化；两条菜单路径同步改文案，不留分叉。
+- 回滚：`git revert` 本提交（属性 + 两处赋值 + 两处文案分支）。回滚后回到"打开瞬间误报暂无推荐"。
+- 验证：`MenuBarPopulationTests` 6 条（`populate` 从 private 放宽到 internal 才可测，行为未变）：真的空库说"暂无推荐"、
+  刷新在飞时说"正在整理推荐…"且不得同时出现"暂无推荐"、有候选时表头 + ≤3 条 + 标题以脱敏标签开头、
+  疑似令牌原文不得出现在任何标题、命令区完整。变异对照已实跑：把 `isRefreshingPredictions = true` 改成 `false`
+  ⇒ 三条断言红（消息里带实际标题列表）；文件按 sha 逐字节还原。`swift build` 0 告警、`swift test` 293 例 / 5 skip / 0 失败、
+  58 帧 **0/58 不同** —— 这是零噪声捕获管道第一次用来证明"这个改动不画任何东西"。

@@ -61,7 +61,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         populate(menu)
     }
 
-    private func populate(_ menu: NSMenu) {
+    /// 不是 private：审计第二轮 09-08 指出"菜单内容只能靠 `menuLabel` 单测间接覆盖，`populate` 本身没有测试"。
+    /// 放宽到 internal 让 `MenuBarPopulationTests` 能直接喂一个 store 进来看菜单项，
+    /// 而不是把整套逻辑复制进测试。行为本身没变。
+    func populate(_ menu: NSMenu) {
         menu.removeAllItems()
 
         let titleItem = NSMenuItem(title: "时间剪史", action: nil, keyEquivalent: "")
@@ -115,15 +118,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 attributes: [.foregroundColor: NSColor.systemBlue]
             )
             menu.addItem(dismissItem)
-        } else if historyStore != nil {
+        } else if let store = historyStore {
             // 没有推荐时也要说一句话：旧实现在这种情况下整段静默消失，用户分不清
             // "算过了没有结果"和"这块坏了"（审计第二轮 R2-09 / 1.8）。
-            // 与 macOS 13 的 MenuBarRecommendationsView 用同一句文案与同一档字号。
+            // 但"还在算"与"算完确实没有"是两回事 —— 菜单是同步构建的，而刷新是异步的，
+            // 不区分就会在每次打开时先误报一句"暂无推荐"。
+            // 与 macOS 13 的 MenuBarRecommendationsView 用同一套文案与同一档字号。
+            let placeholder = store.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐"
             menu.addItem(.separator())
-            let emptyItem = NSMenuItem(title: "暂无推荐", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: placeholder, action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             emptyItem.attributedTitle = NSAttributedString(
-                string: "暂无推荐",
+                string: placeholder,
                 attributes: [.font: NSFont.systemFont(ofSize: 11),
                              .foregroundColor: NSColor.secondaryLabelColor]
             )
