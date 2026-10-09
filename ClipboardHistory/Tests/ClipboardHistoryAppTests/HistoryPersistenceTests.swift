@@ -255,17 +255,25 @@ final class HistoryStorePersistenceTests: XCTestCase {
         XCTAssertEqual(store.selectedEntry?.content, .text("new"))
     }
 
-    func testInitPersistsTrimmedEntriesWhenStoredHistoryExceedsLimit() {
+    func testInitTrimsWithoutWritingThenPersistsOnFlush() {
         let persistence = RecordingHistoryPersistence(entriesToLoad: [
             makeClipboardEntry(content: .text("one"), timestamp: Date(timeIntervalSince1970: 1)),
             makeClipboardEntry(content: .text("two"), timestamp: Date(timeIntervalSince1970: 2))
         ])
 
-        _ = HistoryStore(
+        let store = HistoryStore(
             persistence: persistence,
             retentionPolicy: HistoryRetentionPolicy(maxEntries: 1, maxAgeDays: nil)
         )
 
+        // init 阶段**绝不能写盘**：`AppDelegate.sharedHistoryStore` 是 static let，
+        // 在 `applicationDidFinishLaunching` 的单实例守卫之前就已构造，第二份实例若在这里写回，
+        // 就会用它自己那份裁剪结果覆盖第一份实例更新的记录（审计 N-2）。
+        XCTAssertEqual(store.entries.map(\.content), [.text("two")], "内存里的裁剪结果仍然要立刻生效")
+        XCTAssertTrue(persistence.savedEntriesSnapshots.isEmpty,
+                      "init 阶段写了 \(persistence.savedEntriesSnapshots.count) 次盘")
+
+        store.flushPendingPersistence()
         XCTAssertEqual(persistence.savedEntriesSnapshots.last?.map(\.content), [.text("two")])
     }
 
@@ -299,6 +307,9 @@ final class HistoryStorePersistenceTests: XCTestCase {
         XCTAssertEqual(store.entries.first?.timestamp, Date(timeIntervalSince1970: 3))
         XCTAssertEqual(store.entries.first?.isFavorite, true)
         XCTAssertEqual(store.entries.map(\.content), [.image(image), .text("between")])
+        // init 不写盘（审计 N-2）：合并结果先在内存里，写回推迟到守卫放行之后。
+        XCTAssertTrue(persistence.savedEntriesSnapshots.isEmpty, "init 阶段写了盘")
+        store.flushPendingPersistence()
         XCTAssertEqual(persistence.savedEntriesSnapshots.last?.map(\.content), [.image(image), .text("between")])
         XCTAssertEqual(persistence.savedEntriesSnapshots.last?.first?.isFavorite, true)
     }
@@ -333,6 +344,9 @@ final class HistoryStorePersistenceTests: XCTestCase {
         XCTAssertEqual(store.entries.first?.timestamp, Date(timeIntervalSince1970: 3))
         XCTAssertEqual(store.entries.first?.isFavorite, true)
         XCTAssertEqual(store.entries.map(\.content), [.file(url), .text("between")])
+        // init 不写盘（审计 N-2）：合并结果先在内存里，写回推迟到守卫放行之后。
+        XCTAssertTrue(persistence.savedEntriesSnapshots.isEmpty, "init 阶段写了盘")
+        store.flushPendingPersistence()
         XCTAssertEqual(persistence.savedEntriesSnapshots.last?.map(\.content), [.file(url), .text("between")])
         XCTAssertEqual(persistence.savedEntriesSnapshots.last?.first?.isFavorite, true)
     }

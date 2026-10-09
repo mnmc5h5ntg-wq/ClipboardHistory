@@ -296,6 +296,8 @@ final class HistoryStore: ObservableObject {
     private var revealedPreferenceWindowTimer: Timer?
     private var lastPredictionEntryIDs: Set<UUID> = []
     private var predictionGeneration = 0
+    /// 载入时裁剪/去重改变了存档 ⇒ 需要写回一次，但**不能在 init 里写**（见 `flushPendingInitialPersist`）。
+    private var pendingInitialPersist = false
 
     var weightsStore = RecommendationWeightsStore()
     private var contextCollector = SystemContextCollector()
@@ -322,7 +324,13 @@ final class HistoryStore: ObservableObject {
         self.selectedEntry = persistedEntries.first
         self.selectedEntryIDs = persistedEntries.first.map { [$0.id] } ?? []
         if persistedEntries != loadedEntries {
-            persist()
+            // 这里以前直接 persist()。但 `@NSApplicationDelegateAdaptor` 构造 AppDelegate 时
+            // 就会构造 HistoryStore（`static let sharedHistoryStore`），而这**早于**
+            // `applicationDidFinishLaunching` 里的单实例守卫（D-014）。于是 `open -n` 起的第二份
+            // 进程会：读档 → 按 30 天/500 条裁剪（用了几天后几乎必然非空）→ **写回** → 然后才被守卫终止，
+            // 把它那份旧裁剪结果盖到第一份实例更新的记录上。写盘推迟到守卫放行之后（startMonitoring）。
+            pendingInitialPersist = true
+            LifecycleDebugLogger.log("[启动] 载入结果与存档不同，写回推迟到开始监听之后")
         }
         cachedFilteredEntries = computeFilteredEntries()
         filteredCacheIsValid = true
@@ -390,6 +398,8 @@ final class HistoryStore: ObservableObject {
             return
         }
 
+        flushPendingInitialPersist()
+
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkPasteboard()
@@ -408,6 +418,7 @@ final class HistoryStore: ObservableObject {
     }
 
     func flushPendingPersistence() {
+        flushPendingInitialPersist()
         persistence.flushPendingSaves()
     }
 
@@ -813,6 +824,15 @@ final class HistoryStore: ObservableObject {
         } catch {
             LifecycleDebugLogger.log("HistoryStore persistence failed error=\(error)")
         }
+    }
+
+    /// 把"载入时裁剪/去重造成的差异"写回存档。不在 init 里写的原因见 init 内注释：
+    /// 第二实例会在单实例守卫终止它之前先覆盖一次存档，正是 D-014 要防的数据丢失。
+    /// 只有真正开始监听剪贴板（守卫已放行）或调用方显式 flush 时才落盘。
+    private func flushPendingInitialPersist() {
+        guard pendingInitialPersist else { return }
+        pendingInitialPersist = false
+        persist()
     }
 
     private func reconcileSelection(preferredEntryID: Entry.ID? = nil) {
