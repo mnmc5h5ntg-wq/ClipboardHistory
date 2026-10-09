@@ -128,6 +128,9 @@ final class FileHistoryPersistence: HistoryPersisting {
         flushPendingSaves()
         loadedRecoveryNotice = nil
         protectedImageFileNames = []
+        // 只读标志也必须跟着每次载入复位：否则同一实例先载入一份"更新版本写的存档"、
+        // 再载入一份当前版本存档时，save() 仍被上一次的标志错误地禁用（审计 N-3）。
+        isArchiveFromNewerVersion = false
 
         guard let storedHistory = decodeStoredHistory(at: historyURL) else {
             // 文件不存在 = 首次运行（或用户手工清空），正常空态。
