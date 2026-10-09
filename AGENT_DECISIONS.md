@@ -313,3 +313,25 @@ name: decisions
 - 验证：`swift build` 0 告警、`swift test` **303 例 / 6 skip / 0 失败**、64 帧与改动前 **sha 全同**（证明注释改动不改变画面）。
 - **仍未验收**：真机上这一列图标到底长什么样（需要在屏捕获；`CGWindowListCreateImage` 在 14+ 已废弃，
   用在测试里会打破 CI 的 0 告警闸门，ScreenCaptureKit 又要屏幕录制授权 —— 会弹用户机器的权限框，故未做）。
+
+## D-026 给"猜出来再删按钮"的判断补上测试（第二轮 08-08 / 13-08）
+
+- 背景：`WindowConfigurator.Coordinator.isSidebarToolbarItem` 靠一串关键词决定从窗口工具栏**摘掉哪些项**，
+  审计两轮都记着它没有任何测试（08-08、13-08）。误判的代价是用户少一个按钮且没有任何提示，
+  所以这条比一般的"没测试"更值得补。
+- 决定：`private` 放宽到 internal（与 D-021 放宽 `populate(_:)` 同一手法，行为一字未改），
+  补 `WindowToolbarSidebarClassificationTests` 9 条：正向覆盖 SwiftUI 生成的标识、英文 label / paletteLabel / toolTip、
+  中文「边栏」「侧边栏」、包在自定义 view 里的子视图 action、无障碍标签、AppKit 的 tracking separator；
+  负向（更承重）覆盖我们自己的复制/筛选/搜索项、空项、只含「窗口」「side」「split」的项必须活下来。
+- 两条实测发现，都写进了注释：
+  1. **`item.view = nil` 会顺手清掉 `item.action`**。第一版夹具无条件赋值，于是"按 action 认出 toggleSidebar"那条红了 ——
+     红的是夹具不是产品（`swift` 脚本单独复现：赋 view=nil 后 action 读回 nil）。
+  2. **函数里那条 `item.action == #selector(toggleSidebar(_:))` 直判是冗余保险**：把它删掉，9 条仍然全绿，
+     因为字符串路径也会命中 `"togglesidebar:"`。用例注释按这个口径写，不让读者以为那条分支被覆盖了。
+- 变异对照（都实跑、跑完 `cmp` 逐字节还原）：删「边栏」关键词 ⇒ 恰好中文那条红；删子视图递归 ⇒ 恰好 custom-view 那条红。
+- 兼容性/回滚：只有可见性放宽 + 新测试文件；`git revert` 本提交即可。
+- 验证：`swift build` 0 告警、`swift test` **312 例 / 6 skip / 0 失败**。
+- 同批另一条（`e8a59e4`，CI 第五次红）：离屏图标探针把"文字列数出 5 行"写进了断言，
+  macos-15 runner 上同一段列表只数出 4 行 ⇒ 红。改成量"整列墨水"（不依赖行几何），
+  并用"把符号名换成不存在的名字 ⇒ 墨水 0.0000 判红"证明这条判据不是装饰。
+  **同一个根因（本机实测数字进断言）这一轮已经付过五次代价**，见 D-023 与 `AGENT_STATE.md` 的 CI 记录。
