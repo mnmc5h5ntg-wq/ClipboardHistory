@@ -176,11 +176,33 @@ final class QuickLookPreviewContainerView: NSView {
     }
 }
 
+/// 详情预览的加载兜底（审计第二轮 R2-09：`MediaLoader` 不返回时 spinner 会永远转下去）。
+/// 纯值类型，方便单测；界面侧只负责计时与改状态。
+enum PreviewLoadTimeoutPolicy {
+    /// 8 秒：QuickLook/AVFoundation 对网络卷或损坏文件可能长时间不返回，
+    /// 而本地正常文件的预览都在 1 秒内出结果，8 秒足够宽又不会让用户干等。
+    static let timeoutSeconds: UInt64 = 8
+
+    static let timeoutNanoseconds: UInt64 = timeoutSeconds * 1_000_000_000
+
+    /// 只有"仍是同一次加载"且"还在等"时才允许放弃：
+    /// 否则一个陈旧超时会把用户已经切到的下一条预览的结果覆盖掉。
+    static func shouldGiveUp(stillWaiting: Bool, isCurrentLoad: Bool) -> Bool {
+        stillWaiting && isCurrentLoad
+    }
+
+    static func failureMessage(timeoutSeconds: UInt64 = Self.timeoutSeconds) -> String {
+        "预览加载超过 \(timeoutSeconds) 秒仍未返回，已停止等待。"
+    }
+}
+
 struct DetailFileView: View {
     let url: URL
     let thumbnail: StoredImage?
     @State private var previewState: MediaLoadingState<FilePreview> = .loading
     @State private var loadingHandle: MediaLoadHandle?
+    @State private var loadGeneration = 0
+    @State private var timeoutTask: Task<Void, Never>?
 
     init(url: URL, thumbnail: StoredImage?) {
         self.url = url
@@ -204,6 +226,8 @@ struct DetailFileView: View {
         .onDisappear {
             loadingHandle?.cancel()
             loadingHandle = nil
+            timeoutTask?.cancel()
+            timeoutTask = nil
         }
     }
 
@@ -260,7 +284,10 @@ struct DetailFileView: View {
 
     private func videoInfoUnavailableView(_ url: URL) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: "questionable")
+            // `"questionable"` 不是合法的 SF Symbol 名字，SwiftUI 会画一个**空白图标**
+            // （审计第二轮 R2-09 / 1.3）。这类错误编译期不报，所以有一道扫描式守卫：
+            // `SystemSymbolValidityTests` 会把产品源码里所有 systemName 字面量拿去问 NSImage。
+            Image(systemName: "questionmark.circle")
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary)
             Text("无法读取这段视频的分辨率信息")
@@ -309,12 +336,31 @@ struct DetailFileView: View {
     @MainActor
     private func loadPreview() async {
         loadingHandle?.cancel()
+        timeoutTask?.cancel()
         previewState = .loading
+        loadGeneration += 1
+        let generation = loadGeneration
 
         let handle = MediaLoader.loadFilePreviewHandle(url: url, thumbnail: thumbnail)
         loadingHandle = handle
+
+        // 兜底：MediaLoader 对网络卷/损坏文件可能永远不返回，而旧实现只有一个转不完的 spinner。
+        timeoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: PreviewLoadTimeoutPolicy.timeoutNanoseconds)
+            guard !Task.isCancelled else { return }
+            guard PreviewLoadTimeoutPolicy.shouldGiveUp(
+                stillWaiting: loadingHandle != nil,
+                isCurrentLoad: generation == loadGeneration
+            ) else { return }
+            loadingHandle?.cancel()
+            loadingHandle = nil
+            previewState = .failure(PreviewLoadTimeoutPolicy.failureMessage())
+        }
+
         let result = await handle.value
-        guard !Task.isCancelled else { return }
+        timeoutTask?.cancel()
+        timeoutTask = nil
+        guard !Task.isCancelled, generation == loadGeneration else { return }
         previewState = result
         loadingHandle = nil
     }

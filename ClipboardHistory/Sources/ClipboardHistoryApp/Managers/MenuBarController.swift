@@ -75,8 +75,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             headerItem.isEnabled = false
             headerItem.attributedTitle = NSAttributedString(
                 string: "猜你要粘贴",
-                attributes: [.font: NSFont.systemFont(ofSize: 10, weight: .semibold),
-                             .foregroundColor: NSColor.tertiaryLabelColor]
+                // 10pt + tertiary 低于 HIG 对菜单文字的下限，且菜单里本该最多用到 .secondary
+                // （审计第二轮 1.2 / R2-13）。与 macOS 13 的 MenuBarRecommendationsView 保持同一套字号。
+                attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+                             .foregroundColor: NSColor.secondaryLabelColor]
             )
             menu.addItem(headerItem)
 
@@ -93,8 +95,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 ])
                 if !reason.isEmpty {
                     title.append(NSAttributedString(string: "\n\(reason)", attributes: [
-                        .font: NSFont.systemFont(ofSize: 10),
-                        .foregroundColor: NSColor.tertiaryLabelColor
+                        .font: NSFont.systemFont(ofSize: 11),
+                        .foregroundColor: NSColor.secondaryLabelColor
                     ]))
                 }
                 item.attributedTitle = title
@@ -113,6 +115,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 attributes: [.foregroundColor: NSColor.systemBlue]
             )
             menu.addItem(dismissItem)
+        } else if historyStore != nil {
+            // 没有推荐时也要说一句话：旧实现在这种情况下整段静默消失，用户分不清
+            // "算过了没有结果"和"这块坏了"（审计第二轮 R2-09 / 1.8）。
+            // 与 macOS 13 的 MenuBarRecommendationsView 用同一句文案与同一档字号。
+            menu.addItem(.separator())
+            let emptyItem = NSMenuItem(title: "暂无推荐", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            emptyItem.attributedTitle = NSAttributedString(
+                string: "暂无推荐",
+                attributes: [.font: NSFont.systemFont(ofSize: 11),
+                             .foregroundColor: NSColor.secondaryLabelColor]
+            )
+            menu.addItem(emptyItem)
         }
 
         menu.addItem(.separator())
