@@ -173,7 +173,10 @@ struct HistorySidebarView: View {
                         HistoryRowButton(
                             entry: entry,
                             selected: historyStore.isSelected(entry),
-                            action: { select(entry) }
+                            action: { select(entry) },
+                            // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
+                            copyAction: { historyStore.perform(.copyAndPromote(entry)) },
+                            favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
                         )
                         .background(rowFrameReader(for: entry.id))
                         // ScrollViewReader 的锚点：键盘移动选择后要把选中行滚进视野，

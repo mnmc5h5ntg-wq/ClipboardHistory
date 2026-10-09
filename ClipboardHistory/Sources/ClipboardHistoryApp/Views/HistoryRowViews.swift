@@ -4,6 +4,10 @@ struct HistoryRowButton: View {
     let entry: HistoryStore.Entry
     let selected: Bool
     let action: () -> Void
+    /// 双击这一行 = 复制这条（与详情区浮层的"再次复制"同一个动作，见 `copyAction` 的接线处）。
+    let copyAction: () -> Void
+    /// 点行首星标 = 收藏/取消收藏。
+    let favoriteAction: () -> Void
     @State private var isHovered = false
 
     private var backgroundOpacity: Double {
@@ -12,18 +16,34 @@ struct HistoryRowButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            HistoryRow(entry: entry)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(selected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
-                )
-                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        HStack(spacing: 2) {
+            // 星标刻意放在行的 Button **外面**，是兄弟控件而不是嵌套控件：
+            // 嵌套 Button 在 macOS 上点击归属不可靠，点星标会顺手把这一行选中。
+            RowFavoriteButton(isFavorite: entry.isFavorite, action: favoriteAction)
+
+            Button(action: action) {
+                HistoryRow(entry: entry)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            // 用 simultaneousGesture 而不是把行改成裸手势：Button 的单击要**立刻**改选中，
+            // 而 `onTapGesture(count: 2)` 与单击手势并列时，系统会等一个双击间隔再放行单击 ——
+            // 那会让每次点选都慢半拍。这里第一击照常选中（幂等），第二击触发复制。
+            .simultaneousGesture(
+                TapGesture(count: 2).onEnded {
+                    guard RowDoubleTap.shouldCopy(modifiers: NSEvent.modifierFlags) else { return }
+                    copyAction()
+                }
+            )
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(selected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         // 行以前不暴露 selected 态：VoiceOver 用户听不出自己选中了哪一条（审计第二轮 1.11 / R2-02）。
         .accessibilityAddTraits(selected ? .isSelected : [])
         // 拖出这条记录（审计第二轮 1.5 / R2-05）：文本给字符串、图片给 PNG、单个文件给 file URL 引用。
@@ -38,20 +58,44 @@ struct HistoryRowButton: View {
     }
 }
 
+/// 行首的收藏星标。以前它只是"已收藏"的指示器（未收藏时整颗是 `.clear`，等于不存在），
+/// 现在它是真正的控件：未收藏时也要看得见、点得到，否则用户不知道有这个东西。
+private struct RowFavoriteButton: View {
+    let isFavorite: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite))
+                .font(.system(size: 11, weight: .regular))
+                .foregroundStyle(tint)
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .helpLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
+        .accessibilityLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
+        .animation(.easeInOut(duration: 0.11), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+
+    /// 未收藏时不能是 `.clear`（看不见就没人会去点），也不能太抢眼（一行里它是配角）。
+    /// 0.45 这个值是量出来的：0.28 时星标与行底的对比度只有亮色 1.76:1 / 暗色 2.17:1，
+    /// 达不到"可交互控件至少 3:1"这一条；提到 0.45 后两边都过 3:1，悬停再抬到 0.7。
+    private var tint: AnyShapeStyle {
+        if isFavorite { return AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) }
+        return AnyShapeStyle(Color.primary.opacity(isHovered ? 0.78 : 0.55))
+    }
+}
+
 struct HistoryRow: View {
     let entry: HistoryStore.Entry
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(entry.isFavorite ? .yellow : .clear)
-                .frame(width: 14, height: 14)
-                // 未收藏时这颗星是 .clear（完全隐形），既不该占视觉位置也不该被朗读；
-                // 已收藏时它是这一行唯一的收藏线索，必须能被 VoiceOver 读到（审计 R-54）。
-                .accessibilityHidden(!entry.isFavorite)
-                .helpLabel("已收藏")
-
             switch entry.content {
             case .text:
                 Image(systemName: "doc.text")

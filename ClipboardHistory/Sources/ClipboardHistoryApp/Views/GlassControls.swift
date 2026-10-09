@@ -39,9 +39,9 @@ struct GlassPill: View {
     var body: some View {
         VStack(spacing: 0) {
             GlassPillButton(
-                symbol: isFavorite ? "star.fill" : "star",
-                helpText: isFavorite ? "取消收藏" : "收藏",
-                foregroundStyle: isFavorite ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.primary),
+                symbol: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite),
+                helpText: FavoriteTogglePresentation.helpText(isFavorite: isFavorite),
+                foregroundStyle: isFavorite ? AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) : AnyShapeStyle(.primary),
                 action: favoriteAction
             )
 

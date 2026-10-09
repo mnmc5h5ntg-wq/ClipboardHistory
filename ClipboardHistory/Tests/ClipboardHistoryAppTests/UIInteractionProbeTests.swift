@@ -309,6 +309,101 @@ final class UIInteractionProbeTests: XCTestCase {
                        "有无名称的可交互元素：\(unnamedInteractive.joined(separator: ","))")
     }
 
+    // MARK: - 行内手势（双击复制 / 点星标收藏）
+
+    /// 在屏合成一次真实点击序列，验证行上的三个手势各自落到正确的动作上。
+    ///
+    /// 为什么值得单独一条：这三个动作的**接线**在离屏帧里看不见，而纯函数用例只钉了判定规则
+    /// （`RowInteractionTests`），钉不住"SwiftUI 真的把这两击当成一次双击"。
+    /// 这里刻意用一行孤立的窗口而不是整侧栏：几何完全已知，点不中就是点不中，不会和
+    /// "列表里第几行在哪"纠缠。
+    func testRowGesturesFireTheRightActions() throws {
+        try skipUnlessEnabled()
+        var selectFired = 0
+        var copyFired = 0
+        var favoriteFired = 0
+        let entry = makeClipboardEntry(content: .text("双击我这条"), timestamp: Date())
+        let row = HistoryRowButton(
+            entry: entry,
+            selected: false,
+            action: { selectFired += 1 },
+            copyAction: { copyFired += 1 },
+            favoriteAction: { favoriteFired += 1 }
+        )
+
+        _ = NSApplication.shared
+        let size = NSSize(width: 300, height: 74)
+        let window = NSWindow(contentRect: NSRect(x: 260, y: 260, width: size.width, height: size.height),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(row))
+        host.frame = NSRect(origin: .zero, size: size)
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+
+        func click(_ viewPoint: NSPoint, clickCount: Int, down: Bool = true) {
+            // 合成事件走的是 `locationInWindow`（窗口基坐标），所以要把视图坐标换算过去，
+            // 而不是自己按 titlebar 高度猜 —— 换算交给 AppKit。
+            let windowPoint = host.convert(viewPoint, to: nil)
+            func event(_ type: NSEvent.EventType, count: Int) -> NSEvent? {
+                NSEvent.mouseEvent(with: type,
+                                   location: windowPoint,
+                                   modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: window.windowNumber,
+                                   context: nil,
+                                   eventNumber: 0,
+                                   clickCount: count,
+                                   pressure: 1.0)
+            }
+            let count = max(1, clickCount)
+            if down, let downEvent = event(.leftMouseDown, count: count) { NSApp.sendEvent(downEvent) }
+            if let upEvent = event(.leftMouseUp, count: count) { NSApp.sendEvent(upEvent) }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        // 坐标一律从宿主视图的真实高度推，不写死：这一版最初写 y=37（以为行高 74），
+        // 而 `HistoryRowButton` 的自然高度是 47，星标只有 20pt 高，于是点在了它下面 ——
+        // 表现为"点星标没反应"，其实是探针点错了地方（网格扫描 x=8..26 / y=16..28 全部命中）。
+        let midY = host.frame.height / 2
+        let rowCenter = NSPoint(x: 150, y: midY)
+        let starCenter = NSPoint(x: 18, y: midY)
+        print("HITTEST 行中心 y=\(Int(midY)) 命中链：\(describeChain(host, at: rowCenter))")
+        click(rowCenter, clickCount: 1)
+        let afterSingle = selectFired
+        click(rowCenter, clickCount: 1)
+        XCTAssertEqual(afterSingle, 1, "第一次单击没有触发行选中：点击根本没送进这一行")
+        XCTAssertEqual(selectFired, 2, "第二次单击也应照常选中（复制走的是双击手势）")
+
+        // 双击：两下紧凑的 clickCount 1→2。
+        let copyBefore = copyFired
+        click(rowCenter, clickCount: 1)
+        click(rowCenter, clickCount: 2)
+        print("GESTURE 双击之后 copyFired=\(copyFired - copyBefore) selectFired=\(selectFired)")
+        XCTAssertEqual(copyFired - copyBefore, 1,
+                       "合成双击没有触发复制：要么 SwiftUI 没把这两击当成一次双击，要么手势被 Button 吃掉了")
+
+        // 星标：点它只该翻收藏，不该选中这一行。
+        let selectBeforeStar = selectFired
+        click(starCenter, clickCount: 1)
+        print("GESTURE 星标之后 favoriteFired=\(favoriteFired) selectFired=\(selectFired - selectBeforeStar)")
+        XCTAssertEqual(favoriteFired, 1, "点行首星标没有触发收藏")
+        XCTAssertEqual(selectFired, selectBeforeStar, "点星标顺带把这一行选中了：两个控件的命中区重叠")
+    }
+
+    private func describeChain(_ root: NSView, at point: NSPoint) -> String {
+        var views: [String] = []
+        var current: NSView? = root.hitTest(point)
+        while let view = current {
+            views.append(String(describing: type(of: view)))
+            current = view.superview
+        }
+        return views.isEmpty ? "（命中为空）" : views.joined(separator: " ← ")
+    }
+
     private func capture(window: NSWindow, to file: URL, dark: Bool) throws {
         let appearance: NSAppearance.Name = dark ? .darkAqua : .aqua
         let previous = NSApp.appearance

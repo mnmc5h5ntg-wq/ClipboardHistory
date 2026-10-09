@@ -183,14 +183,27 @@ final class UICaptureTests: XCTestCase {
 
         for entry in store.entries.prefix(4) {            let captured = entry
             results.append(Fixture("row-\(rowKind(captured))", NSSize(width: 300, height: 74)) {
-                AnyView(
-                    HistoryRow(entry: captured)
-                        .padding(8)
-                        .frame(width: 300, height: 74, alignment: .leading)
-                        .background(Color(nsColor: .windowBackgroundColor))
-                )
+                AnyView(self.rowFrame(HistoryRowButton(
+                    entry: captured, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+                )))
             })
         }
+
+        // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
+        // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
+        let starTarget = store.entries[0]
+        let starOn = starTarget.updating(timestamp: starTarget.timestamp, isFavorite: true)
+        let starOff = starTarget.updating(timestamp: starTarget.timestamp, isFavorite: false)
+        results.append(Fixture("row-favorite-on", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: starOn, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+            )))
+        })
+        results.append(Fixture("row-favorite-off", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: starOff, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+            )))
+        })
 
         // 每个详情都用"重建同一份数据 + 按序号选中"，因为重建会生成新的 UUID
         for (index, entry) in store.entries.prefix(4).enumerated() {
@@ -282,6 +295,14 @@ final class UICaptureTests: XCTestCase {
     private func sidebarFrame<V: View>(_ view: V) -> some View {
         view
             .frame(width: 300, height: 520, alignment: .top)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 单行夹具的外框。拍的是 `HistoryRowButton`（带星标与悬停底色的那一层）而不是裸内容，
+    /// 这样行上新增的可点控件会真的进帧。
+    private func rowFrame<V: View>(_ view: V) -> some View {
+        view
+            .frame(width: 300, height: 74, alignment: .leading)
             .background(Color(nsColor: .windowBackgroundColor))
     }
 
