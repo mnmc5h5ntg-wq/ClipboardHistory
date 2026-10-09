@@ -168,7 +168,9 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 ## 10. 第二轮审计整改（2026-10-09 晚）
 
 审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
-被审对象是 HEAD `81bce8d`。本轮在它之上做了 **46 个提交**（34 个动代码或测试、12 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **312 例 / 6 skip / 0 失败**、
+被审对象是 HEAD `81bce8d`。本轮在它之上做的提交数**现取**（写死就会随下一次提交过期）：
+`git rev-list --count 81bce8d..HEAD`，其中只动 `AGENT_*.md` 的那些用逐提交 `git show --pretty=format: --name-only` 归类；
+全部已推送。`swift build` 0 告警、`swift test` **318 例 / 6 skip / 0 失败**、
 python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64）。**尚未发布**：线上 Latest 仍是 v1.4.7。
 
 ### 10.1 修了什么（按审计编号）
@@ -199,6 +201,7 @@ python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64�
 | 侧栏图标"看不见"量成数字（D-025） | `2817a93` | 产品里未选中四行图标列墨水 0.0000，同一图标改固定 `Color.black` 就是 0.175–0.402，复刻 List 行里 `.primary` 又正常 ⇒ 离屏语义色伪影，**产品一字未改**，注释换成测量 |
 | CI 第五次红（同族） | `e8a59e4` | 离屏探针把"文字列能数出 5 行"当断言，runner 上只有 4 行 ⇒ 判据换成"整列图标墨水"（与行几何无关）；变异（不存在的符号名 ⇒ 0.0000）证明它有牙 |
 | 工具栏"猜出来再删"补测试（08-08 / 13-08） | `85c6ba5`（D-026） | 9 条正反用例，负向更承重（自己的复制/筛选/搜索项不许被误删）；顺带量出 `item.view = nil` 会清掉 `item.action`，以及那条 action 直判其实是冗余保险（删了仍全绿） |
+| 快捷键录制器（13-08） | `14a37a0`（D-027） | 6 条只测可观测行为的用例里，5 条直接绿、1 条红在**产品**：录完合法组合后按钮仍写着"请输入快捷键"（`didSet` 在录制态跳过回显，之后再没人改）。加一行显式回显修掉；失焦那条守卫经变异对照承重 |
 | 看画面才看见的文案缺陷 | `16d658d` | 推荐理由一行里把来源 App 说两遍（`Safari · 偏好链接 · 回到Safari`）。改成「没有别的标签点过来源 App 才补裸名」；断言先写、对旧实现报红（2 次）后才动实现 |
 
 ### 10.2 本轮自己制造并被测试抓住的问题
@@ -236,11 +239,10 @@ gh run view <run-id> --log | grep -E "PERF\[|同操作样本跨度"
 
 ```bash
 cd /Users/wangziyi/Codex_Project0/ClipboardHistory
-swift build && swift test                       # 301 例 / 5 skip / 0 失败
+swift build && swift test                       # 318 例 / 6 skip / 0 失败
 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 64 帧
 CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests    # 在屏探针（会抢前台）
 cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
-账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 8 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-024）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍）。
-上面那句"46 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 12 个用逐提交 `git show --name-only` 归类得到。
+账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 11 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-027）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。
