@@ -256,5 +256,37 @@ name: decisions
   skip 侧 —— 把 `preview` 那条的阈值参数临时改成 0.01 ⇒ 该条 `skipped`，断言未执行。skip 分支不是永不可达的死代码。
 - 顺带把同一条测试里两处"只测一次"的计时改成 3 次采样（同字节比较那对原来第 2、3 次会量到已焐热的缓存，所以每轮都换新对象）。
 - 回滚：`git revert` 本提交，只动 `Tests/ClipboardHistoryAppTests/PerfBudgetTests.swift`，产品代码零改动。
-- 待观察（记录，不假装已验证）：CI 上 `改一次搜索词` 的样本跨度是否长期超过 60ms 阈值。若连续几轮 skip，
-  说明该判据在 runner 上不可用，应该按 runner 重新定标而不是留着一条永不裁决的守卫。
+- 已观察（`c952905` 的 CI 原始日志，实跑核对）：runner 上 **load1=27.7 / 活跃核=3**（比值 9.2 —— 比我先删掉的那道闸门
+  的 2.0 高四倍多），而 8 条 `PERF[...]` 采样**全部下结论、零 skip**：搜索词代价 最快 25.04 / 均值 37.07 / 最慢 56.99ms
+  （跨度 31.95 < 阈值 60）、图片比较 47.83/57.76/76.27ms（跨度 28.4 < 250）、filteredEntries 0.00/0.00/0.01ms。
+  也就是说旧闸门会把这 8 条全部变成 skip，而它们其实完全分辨得清 —— 这条判据在 CI 上是活的。
+  若后续出现"同操作样本跨度 > 阈值"的 skip，说明该判据在 runner 上真的不可用，应按 runner 重新定标而不是留着一条永不裁决的守卫。
+
+## D-024 菜单栏面板从"拍不到"变成三个可复现的帧（顺带修掉一行重复文案）
+
+- 背景：D-019 记下"菜单栏离屏拍不到 —— 菜单表面 97.7% 像素未绘制"，此后这一项一直挂 NOT-RUN。
+  那句话**只对 macOS 12 的 NSStatusItem/NSMenu 路径成立**：`MenuBarController.configure` 在 13+ 直接 return，
+  真正上线的是 `App.swift:24` 的 SwiftUI `MenuBarExtra`，它的 body（`MenuBarRecommendationsView`）就是一个普通 View，
+  可以像其他 63 个夹具一样离屏渲染。之前"拍不到"是把"NSMenu 拍不到"错当成"整个面板拍不到"。
+- 决定：帧数 58 → 64，三个状态各拍亮/暗：有推荐、`isRefreshingPredictions == true`（"正在整理推荐…"）、
+  确实没有（"暂无推荐"）。给 `Fixture` 加一个可选 `settle`（布局完成、按快门之前跑一次），
+  专给"内容要等一次异步刷新才落定"的视图；不 settle 的帧只能拍到刷新途中，而那一帧是不是最终态取决于机器快慢。
+- **"正在整理"那一帧在快门前断言刷新仍在途**：帧名声称的状态必须由帧自己证明，
+  否则"名字叫 refreshing、画面上写着暂无推荐"这种错，肉眼比对 diff 也发现不了。
+  变异对照（`refreshPredictions()` 直接 return）⇒ 该套件红 4 次（两个状态 × 亮暗），说明这两道闸都有牙。
+- 数据安全：store 一律 `RecordingHistoryPersistence` + `TestClipboardWriter`，`AppDelegate` 走 D-019 的注入接缝，
+  不调 `configure()`、不 `startMonitoring()` ⇒ 不读不写 `~/Library/Application Support/时间剪史/`（D-002）。
+- 可复现性前提（必须先确认，否则这组帧不能进逐字节比对集合）：reason 文案含"当前在<App 名>"，
+  取自 `effectiveFrontmostApp()`；测试进程 `lastFrontmostBundleID` 恒 nil ⇒ 回落到"第一条记录的来源 App"，由夹具固定。
+  实测同代码连拍两次 **64 帧 sha 集合完全一致**。
+- 结果（这才是做视觉审计的目的）：**第一次用眼睛看这一面板就发现一处内容缺陷** ——
+  首行 `文本 · Safari · 偏好链接 · 回到Safari · 24%` 把来源 App 在同一行里说了两遍，
+  而该行只有两行位置。`16d658d` 修掉：先算 App 亲和标签，只有没有任何标签点过来源 App 时才补裸名；
+  无亲和标签时裸名保留（唯一来源信息），跨应用（`Safari→Notes`）也钉成只出现一次。断言先写、对旧实现报红（2 次）后才改实现。
+- 明确不做的：不在离屏帧上判"按钮宽度不齐/文字居中"是缺陷 —— 真实 `MenuBarExtra` 是菜单样式，
+  Button 会变成整宽左对齐的菜单项，离屏宿主给的是 `.bordered` 居中圆角按钮。系统菜单的材质/圆角仍 NOT-RUN，
+  那两层需要在屏捕获（未做）。
+- 兼容性/回滚：`RecommendationPresenter.reason` 只改文案组合，签名、特征、打分全未变；
+  数据格式未变。回滚 = `git revert 16d658d 37f43f6`。
+- 验证：`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**（含新写的 3 条 reason 断言）、
+  64 帧两次连拍 sha 相同、变异对照双向点亮（红侧 + skip 侧，见 D-023 与本条）。

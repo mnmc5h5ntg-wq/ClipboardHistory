@@ -65,7 +65,7 @@
 
 ## 5. 视觉与交互审计
 
-方法：离屏渲染真实视图（`NSWindow` + `NSHostingView` + `cacheDisplay`），不需要屏幕录制授权；由 `CLIPBOARD_HISTORY_UI_SHOTS` 触发，未设置时整组 skip。共 **58 帧**（29 夹具 × 亮/暗）。
+方法：离屏渲染真实视图（`NSWindow` + `NSHostingView` + `cacheDisplay`），不需要屏幕录制授权；由 `CLIPBOARD_HISTORY_UI_SHOTS` 触发，未设置时整组 skip。共 **64 帧**（32 夹具 × 亮/暗）—— 第一轮是 29 夹具 58 帧，第二轮末把菜单栏面板的三个状态补了进来（D-024）。
 
 先修掉捕获链路自己产出的 **4 类假帧**（每一类都曾让我得出过错误结论）：裸 hosting view 导致内容缩到一角、手工翻倍位图尺寸、`cacheDisplay` 不画 AppKit 底色导致"白底白字看起来整块空白"、以及 `NavigationSplitView` 的 sidebar 列在离屏下根本不跟随强制外观（"暗色主界面黑字不可读"其实是捕获产物 —— 用最小复现 + 同一组件独立拍帧两条证据判定，非产品缺陷）。
 
@@ -168,8 +168,8 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 ## 10. 第二轮审计整改（2026-10-09 晚）
 
 审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
-被审对象是 HEAD `81bce8d`。本轮在它之上做了 **37 个提交**（29 个动代码或测试、8 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**、
-python 脚本测试 **25 例 OK**、58 帧离屏捕获。**尚未发布**：线上 Latest 仍是 v1.4.7。
+被审对象是 HEAD `81bce8d`。本轮在它之上做了 **40 个提交**（31 个动代码或测试、9 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**、
+python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64）。**尚未发布**：线上 Latest 仍是 v1.4.7。
 
 ### 10.1 修了什么（按审计编号）
 
@@ -193,8 +193,10 @@ python 脚本测试 **25 例 OK**、58 帧离屏捕获。**尚未发布**：线�
 | R2-14 文档 | `f7398f3` | R-20 那行"移到 history.expired.json"的假承诺已更正 |
 | R2-15 AI 脚手架 | `d0b2416`（D-020） | 拆三个 target；`nm` 证明草案符号在产品二进制里为 0 |
 | R2-16 只含 public.url | `f7398f3`（D-018） | 现在记成文本条目 |
-| R2-17 注入接缝 | `f7398f3`（D-019） | `AppDelegate(historyStore:)`；菜单栏离屏仍拍不到（97.7% 未绘制），理由已更新 |
+| R2-17 注入接缝 | `f7398f3`（D-019） | `AppDelegate(historyStore:)`；当时记为「菜单栏离屏仍拍不到（97.7% 未绘制）」，那句话下一轮被推翻，见下面 `37f43f6` |
 | R2-18 / R2-19 证据管道 | `bdb557b` | 插入点闪烁 + 夹具用 `Date()` 是全部噪声来源；修完**同代码连拍 0/58 帧不同** |
+| R2-17 补拍（D-024） | `37f43f6` | **菜单栏面板第一次有像素**：`MenuBarExtra` 的 body 是普通 SwiftUI View，可以离屏渲染（以前那句「拍不到」只对 13 以下的 NSMenu 路径成立）。三个状态 × 亮暗，58 → 64 帧；`Fixture.settle` 钩子 + 「帧名必须由帧自己证明」；变异对照红 4 次 |
+| 看画面才看见的文案缺陷 | `16d658d` | 推荐理由一行里把来源 App 说两遍（`Safari · 偏好链接 · 回到Safari`）。改成「没有别的标签点过来源 App 才补裸名」；断言先写、对旧实现报红（2 次）后才动实现 |
 
 ### 10.2 本轮自己制造并被测试抓住的问题
 
@@ -211,24 +213,26 @@ python 脚本测试 **25 例 OK**、58 帧离屏捕获。**尚未发布**：线�
 ### 10.3 明确没做/没验证的
 
 键盘：真实 Tab 现在能到搜索框（在屏探针实测），**但"Tab 能否走到列表行"仍未验证** —— 本机 `AppleKeyboardUIMode = -1`（完全键盘访问关闭）时 macOS 本来就不让 Tab 经过自绘可聚焦视图。复测方法：人工开该开关后跑 `CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests`。
-其余未验证：`NSAlert` 的真实按键行为、真实鼠标拖放、菜单栏面板视觉、VoiceOver 实际朗读（测试进程里 AX 树为空）。
+其余未验证：`NSAlert` 的真实按键行为、真实鼠标拖放、VoiceOver 实际朗读（测试进程里 AX 树为空）。
+菜单栏面板**内容层已验收**（6 帧，见 10.1 与 D-024），仍未验证的只有系统菜单的材质/圆角与菜单项 chrome —— 那两层由系统绘制，需要在屏捕获。
 明确不做：`List(selection:)` 整体重写（`.draggable` 要 macOS 13、会改掉 4 个捕获帧、丢 `dragSelectRange` 锚点语义）、设置侧栏符号风格统一（唯一证据来自不可信的捕获列）、签名与公证（需证书与授权）。
 另外**要去看而不是只在这里断言的一件事**：性能守卫在新 runner 上到底下没下结论。检查方法（已实跑过一次，见 D-023）：
 
 ```bash
 gh run view <run-id> --log | grep -E "PERF\[|同操作样本跨度"
 ```
-如果 5 条 `PERF[...]` 全部变成"同操作样本跨度…已超过阈值"，说明这条判据在 CI 上永不裁决，应当按 runner 重新定标而不是留一条不会红的守卫。
+**已核（`c952905` 的 CI 日志）**：runner 实测 `load1=27.7 / 活跃核=3`，8 条 `PERF[...]` 采样**全部下结论、零 skip**（搜索词代价 最快 25.04 / 均值 37.07 / 最慢 56.99ms）。先删掉的那道 load 闸门会把这 8 条全部变成 skip。
+以后每次看到「同操作样本跨度…已超过阈值」才需要重新按 runner 定标 —— 那说明该判据在远端真的分辨不了。
 
 ### 10.4 复跑（本轮结束时）
 
 ```bash
 cd /Users/wangziyi/Codex_Project0/ClipboardHistory
 swift build && swift test                       # 301 例 / 5 skip / 0 失败
-CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 58 帧
+CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 64 帧
 CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests    # 在屏探针（会抢前台）
 cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
-账本：`AGENT_STATE.md`（第二轮章节 + 2 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 7 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-023）、`AGENT_UI_AUDIT.md`（第二轮章节）。
-上面那句"37 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 8 个用逐提交 `git show --name-only` 归类得到。
+账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 8 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-024）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍）。
+上面那句"40 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 9 个用逐提交 `git show --name-only` 归类得到。

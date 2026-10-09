@@ -62,7 +62,7 @@
 | `swift test` | 退出码 0，**Executed 229 tests, 1 test skipped, 0 failures**（2026-10-09 在新路径复跑核实；现取方法：`swift test > /tmp/test.log 2>&1; rc=$?; grep -E 'Executed [0-9]+ tests' /tmp/test.log | tail -1`（`tail -1` 单独用会取到 swift-testing 那行 `Test run with 0 tests`，看着像"一条都没跑"），别信这里写的数字）；那个 skip 是离屏视觉套件，按设计只在设了 `CLIPBOARD_HISTORY_UI_SHOTS` 时跑 |
 | `python3 -m unittest discover -s scripts/tests` | OK，**18 tests**（必须在**仓库根目录**跑；`ClipboardHistory/` 下没有 `scripts/tests`，在那里跑以退出码 1 报 `Start directory is not importable`） |
 | `make build` / `make bundle` / `make dmg` | 全部退出码 0；DMG 挂载后复核：通用二进制（x86_64 + arm64）、`codesign --verify --deep --strict` 通过、Info.plist 16 键含 `NSAppleEventsUsageDescription`、`.sha256` 可校验且改一个字节就失败 |
-| 离屏视觉捕获 | 58 帧（29 夹具 × 亮/暗），未绘制比例全部 <95%，最后一轮与上一轮逐帧差异 <0.6%（无回归） |
+| 离屏视觉捕获 | 64 帧（32 夹具 × 亮/暗；第二轮末加了菜单栏面板的三个状态），未绘制比例全部 <95%，同代码连拍 sha 完全一致 |
 | 审计矩阵 | 190/190 格全部判定完毕，**待审 0** |
 | Backlog | 54 行，**待办 0**（其余为 已完成(提交号) / 记录不改(理由)） |
 | 工作区 | `git status` 干净；**已推送并核对，Latest = v1.4.7**（v1.4.6 保留；CI 在发布提交与之后的账本提交上都全绿）。当日一度因 GitHub 不可达而落后，网络恢复后推上去了，并用 API 核对：远端 `main` == 本地 `main`、`v1.4.6→e4ac62b`、`v1.4.7→5190ad1`，两个 Release 附件的 sha256 与本地 `.dmg.sha256` 逐字相同。核对命令写在文末"恢复指令"第 6 条（别信这里写的 SHA，跑一遍现取） |
@@ -167,6 +167,18 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 多文件条目的拖出（需要 NSView 级 dragging session）。
 本轮**证伪**的一条审计结论：R2-15 说 AI 脚手架"零产品调用"，实际 `AIPrivacyScope`/`AIPrivacySensitivity` 被 4 个产品文件使用，
 整体搬走编译失败；最终按编译器给的事实拆成"词汇表 target + 草案 target"（D-020）。
+
+### 第二轮进度快照 3（同夜最后两件：性能判据的自我推翻 + 菜单栏面板补拍）
+
+- CI 第四次红（搜索词代价均值 69.0ms vs 上界 60ms）后我先加的 load1 闸门**是错的**：CI 实测 `load1=11.8/3 核`，
+  比值 3.9 ⇒ 5 条性能守卫会在唯一的自动化环境里永久 skip。已改成"N 次同操作采样取最快 + 跨度 > 该条阈值才 skip"，
+  阈值一个没动，双向变异对照都实跑（D-023）。**已核**：`c952905` 的 CI 上 runner 是 `load1=27.7/3 核`，
+  8 条 `PERF[...]` 全部下结论、零 skip。
+- 菜单栏面板从"从未画出一帧"变成 6 帧（有推荐 / 还在整理 / 暂无推荐 × 亮暗，58 → 64）：
+  以前那句"离屏拍不到"只对 macOS 12 的 NSMenu 成立，13+ 的 `MenuBarExtra` body 是普通 View（D-024）。
+  第一次看画面就抓到"来源 App 在一行里说两遍"，`16d658d` 修掉。
+- 当前判据：`swift build` 0 告警 · `swift test` **301 例 / 5 skip / 0 失败** · python **25 例 OK** ·
+  64 帧同代码连拍两次 sha 完全一致 · 远端 `main` 与本地一致（`gh run list --limit 1` 现取）。
 
 ## 恢复指令（若上下文丢失，从这里续做）
 
