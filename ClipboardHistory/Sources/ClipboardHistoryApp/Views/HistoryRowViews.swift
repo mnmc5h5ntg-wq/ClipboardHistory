@@ -26,6 +26,10 @@ struct HistoryRowButton: View {
         .buttonStyle(.plain)
         // 行以前不暴露 selected 态：VoiceOver 用户听不出自己选中了哪一条（审计第二轮 1.11 / R2-02）。
         .accessibilityAddTraits(selected ? .isSelected : [])
+        // 拖出这条记录（审计第二轮 1.5 / R2-05）：文本给字符串、图片给 PNG、单个文件给 file URL 引用。
+        // 没有可用载荷时（多文件条目、Web URL、空文本）**不挂** onDrag，避免"拖起来什么都没发生"。
+        // 真机拖放无法离屏验证，验证等级见账本 R2-05。
+        .modifier(EntryDragModifier(content: entry.content))
         .animation(.easeInOut(duration: 0.11), value: isHovered)
         .animation(.easeInOut(duration: 0.11), value: selected)
         .onHover { hovering in
