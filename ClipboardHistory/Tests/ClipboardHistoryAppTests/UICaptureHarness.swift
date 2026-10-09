@@ -318,6 +318,15 @@ final class UICaptureTests: XCTestCase {
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
 
+        // 拍帧前先把插入点 caret 清掉：field editor 的光标是**闪烁**的，
+        // 同一份代码连拍两次会因此出现最大 251 的通道差（实测：亮色 content 帧 x≈262 处
+        // 一条约 100 像素高的竖线时有时无，30/58 帧都受这层噪声影响）。
+        // 噪声在，"改动前后逐帧对比"就没有判别力 —— 所以先让窗口交出第一响应者，
+        // 再递归把子树里所有 NSTextView 的插入点关掉。
+        window.makeFirstResponder(nil)
+        Self.silenceCarets(in: host)
+        host.layoutSubtreeIfNeeded()
+
         guard let contentView = window.contentView else {
             throw XCTSkip("窗口没有 contentView（\(file.lastPathComponent)）")
         }
@@ -343,6 +352,22 @@ final class UICaptureTests: XCTestCase {
         let (data, transparent) = try flattenedPNG(from: rep, appearance: appearance)
         try data.write(to: file)
         return transparent
+    }
+
+    /// 递归关掉子树里所有文本视图的插入点（含 `NSTextField` 的 field editor）。
+    /// 只 `makeFirstResponder(nil)` 不够：SwiftUI 包着的 `NSTextField` 可能已经装好了 field editor，
+    /// 而闪烁由定时器驱动，两次拍摄落在闪/不闪的两拍上就会出现整条竖线的差异。
+    /// 注意 `shouldDrawInsertionPoint` 是只读的，所以用"把插入点画成透明"这一条路径。
+    private static func silenceCarets(in view: NSView) {
+        if let textView = view as? NSTextView {
+            textView.insertionPointColor = .clear
+            textView.needsDisplay = true
+        }
+        if let textField = view as? NSTextField, let editor = textField.currentEditor() as? NSTextView {
+            editor.insertionPointColor = .clear
+            editor.needsDisplay = true
+        }
+        view.subviews.forEach { silenceCarets(in: $0) }
     }
 
     /// 量出"没被画出来的像素"比例，并把帧铺到真实窗口底色上。
