@@ -46,13 +46,13 @@ struct GlassPill: View {
             )
 
             Rectangle()
-                .fill(.white.opacity(0.18))
+                .fill(.separator)
                 .frame(width: 28, height: 1)
 
             GlassPillButton(symbol: "doc.on.doc", helpText: "再次复制", action: copyAction)
 
             Rectangle()
-                .fill(.white.opacity(0.18))
+                .fill(.separator)
                 .frame(width: 28, height: 1)
 
             GlassPillButton(symbol: "trash", helpText: "删除", action: deleteAction)
@@ -135,7 +135,9 @@ private struct GlassIconControl: View {
 
     private var hoverLayer: some View {
         Circle()
-            .fill(.white.opacity(isHovered ? 0.13 : 0))
+            // 亮色材质上 `.white.opacity` 是看不见的（审计第二轮 14-06 / R2-03）：
+            // 描边、分隔线、悬停层一律改用语义色或 primary 派生的透明度，两种外观下都在。
+            .fill(.primary.opacity(isHovered ? 0.10 : 0))
     }
 }
 
@@ -148,8 +150,8 @@ private struct GlassBorder<S: InsettableShape>: View {
             .strokeBorder(
                 LinearGradient(
                     colors: [
-                        .white.opacity(isHovered ? 0.42 : 0.24),
-                        .white.opacity(0.08)
+                        Color.primary.opacity(isHovered ? 0.34 : 0.20),
+                        Color.primary.opacity(0.07)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing

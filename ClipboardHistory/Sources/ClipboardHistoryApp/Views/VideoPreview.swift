@@ -269,7 +269,8 @@ private struct VideoPlaybackControls: View {
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(
             Capsule()
-                .strokeBorder(.white.opacity(0.18), lineWidth: 0.7)
+                // 亮色材质上白色描边不可见（审计第二轮 14-06 / R2-03）：改用语义分隔色
+                .strokeBorder(.separator, lineWidth: 0.7)
         )
         .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
