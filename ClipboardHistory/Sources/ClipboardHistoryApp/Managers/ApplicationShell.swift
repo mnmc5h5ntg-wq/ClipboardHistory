@@ -56,6 +56,14 @@ final class ApplicationShell {
     }
 
     func applicationWillFinishLaunching(appDelegate: AppDelegate) {
+        // 窗口级系统项从源头关掉（issue #13）：允许自动标签页时，AppKit 会往**任何**含标准
+        // 编辑动作的菜单里塞「Show All Tabs / Hide Tab Bar / Move Tab to New Window」，
+        // 右键菜单也照塞不误，而本产品是单窗口工具，这些项既英文又无关。
+        // 必须在建窗之前设 —— 所以放在 willFinishLaunching，而不是某个窗口的配置里。
+        NSWindow.allowsAutomaticWindowTabbing = false
+        // 编辑态搜索框的右键要在事件派发前截走，否则弹的是共享 field editor 那份系统菜单
+        // （issue #13；实测覆盖 `editor.menu` 会被 AppKit 复原，改不动）。
+        FieldEditorRightClickInterceptor.install()
         LifecycleDebugLogger.logAppState("after ApplicationShell.applicationWillFinishLaunching", menuBarController: menuBarController)
     }
 

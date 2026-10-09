@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
+## [Unreleased]
+
+### Fixed
+
+- **右键菜单未汉化且含无关系统项**（issue #13）：搜索框（编辑态与非编辑态）现在弹
+  `撤销 / 重做 / 剪切 / 复制 / 粘贴 / 全选`，详情只读区弹 `复制 / 全选 / 查找…`，每一项都是中文，
+  不再出现快速查看附件 / 字体 / 书写方向 / 布局方向 / 服务 / 查询 / Show All Tabs 这类系统注入项。
+  编辑态的右键原本落在**窗口共享的 field editor** 上（改它的 `menu` 会被 AppKit 复原），
+  现在由 `FieldEditorRightClickInterceptor` 在派发前截走；只认领我们自己的搜索框，别的控件不受影响。
+  屏幕上的观感仍需人眼核对：`docs/MANUAL_TEST_v1.4.8_issue13.md`。
+
 ## [v1.4.8] - 2026-10-10
 
 ### Added

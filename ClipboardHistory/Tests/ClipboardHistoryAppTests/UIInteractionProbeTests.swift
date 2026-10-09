@@ -571,6 +571,185 @@ final class UIInteractionProbeTests: XCTestCase {
                       + "如果这是在 macOS 13 及更早跑出来的：`focusEffectDisabled()` 需要 macOS 14+，那属于平台限制而不是回归。")
     }
 
+    // MARK: - 右键菜单（issue #13）
+
+    /// 用户那条路径上，AppKit 决定要弹的那份右键菜单长什么样（issue #13）。
+    ///
+    /// 三条实测结论决定了判据为什么长成这样：
+    /// ① 编辑态下右键**不经过搜索框自己**：事件直接投给窗口共享的 field editor
+    ///    （`NSTextView`，挂在 `_NSKeyboardFocusClipView` 下，`isDescendant(of: 搜索框) == true`）。
+    ///    所以"用 `hitTest` 把右键让位给文本框"那套在这条路径上是走不到的分支 ——
+    ///    拿它当判据只会测出一个**假缺陷**（本轮差点把探针的测不到当成产品坏）。
+    /// ② 合成事件派发期间 `NSApp.currentEvent` 是 nil（HITTEST 日志逐条 nil），
+    ///    任何"看当前事件类型"的分支都无法用合成事件验证。
+    /// ③ 让它真弹起来也量不到：`popUpContextMenu` 是模态的，实测在 `didBeginTracking` 里调
+    ///    `cancelTrackingWithoutAnimation()` **不能**让它返回（8 秒监视线程直接 exit(71)）。
+    ///
+    /// 所以仓库里的判据取 AppKit 决定"弹哪份菜单"的那个入口 —— `NSResponder.menu(for:)`：
+    /// 右键要弹菜单时 AppKit 问的就是它。屏幕上真弹出来长什么样，留给手工清单核对。
+    func testRightClickMenusAppKitWouldShowAreChinese() throws {
+        try skipUnlessEnabled()
+        let store = syntheticStore()
+        let (window, host) = makeWindow(width: 820, height: 600, origin: CGPoint(x: 200, y: 180), store: store)
+        defer { window.orderOut(nil) }
+
+        var fields: [ChineseMenuTextField] = []
+        func walk(_ view: NSView) {
+            if let field = view as? ChineseMenuTextField { fields.append(field) }
+            for sub in view.subviews { walk(sub) }
+        }
+        walk(host)
+        guard let search = fields.first else {
+            XCTFail("窗口里找不到搜索框（ChineseMenuTextField），这条探针没测到东西")
+            return
+        }
+
+        func send(_ type: NSEvent.EventType, to point: NSPoint, clicks: Int) {
+            NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                               timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: window.windowNumber, context: nil,
+                               eventNumber: 0, clickCount: clicks, pressure: 1.0)
+                .map { NSApp.sendEvent($0) }
+        }
+        let rightEvent = try XCTUnwrap(
+            NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+                               timestamp: ProcessInfo.processInfo.systemUptime,
+                               windowNumber: window.windowNumber, context: nil,
+                               eventNumber: 0, clickCount: 1, pressure: 1.0),
+            "合成不了右键事件"
+        )
+
+        // 阳性对照：点击点得真的落在搜索框上（本轮已经踩过两次点错东西：筛选 pill 当成行、y 落在相邻行）。
+        let frameInWindow = search.convert(search.bounds, to: nil)
+        let center = NSPoint(x: frameInWindow.midX + 20, y: frameInWindow.midY)
+        let hitChain = describeChain(host, at: center)
+        emit("MENUS 搜索框(窗口坐标)=\(NSStringFromRect(frameInWindow)) 点击=\(NSStringFromPoint(center)) 命中链=\(hitChain)")
+        XCTAssertTrue(hitChain.contains("ChineseMenuTextField"),
+                      "点击点没命中搜索框（命中链：\(hitChain)），这条探针测不到右键菜单")
+
+        // 真实左键进编辑态（makeFirstResponder 那条捷径不走用户那套路径）。
+        send(.leftMouseDown, to: center, clicks: 1)
+        send(.leftMouseUp, to: center, clicks: 1)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        guard search.currentEditor() is NSTextView else {
+            XCTFail("左键没能进入搜索框编辑态（editor=\(String(describing: search.currentEditor()))），右键那条路谈不上")
+            return
+        }
+
+        // ① 编辑态：右键归共享 field editor，而它的 `menu`/`menu(for:)` 我们改不动
+        //    （实测：挂上去会被 AppKit 复原；`menu(for:)` 每次现造一份新的）。
+        //    所以这条判据量的是**拦截器**：事件是不是归我们、我们给出的是不是中文那六项。
+        XCTAssertTrue(FieldEditorRightClickInterceptor.owns(event: rightEvent),
+                      "编辑态右键没有被拦截器认领 —— 会弹 AppKit 那份系统菜单（issue #13 报的就是它）")
+        // 反面对照：同一个拦截器在"不是我们的框在编辑"时必须放手，否则它会吞掉全 App 的右键。
+        window.makeFirstResponder(host)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertFalse(FieldEditorRightClickInterceptor.owns(event: rightEvent),
+                       "拦截器在搜索框没在编辑时也认领了右键 —— 那是把别人的菜单吞了")
+
+        // 交付路径：装监视器 → 换掉真弹 → 投一个真实右键事件 → 看我们给出去的是哪份菜单。
+        var presented: NSMenu?
+        FieldEditorRightClickInterceptor.install()
+        FieldEditorRightClickInterceptor.present = { _, _, menu in presented = menu }
+        defer {
+            FieldEditorRightClickInterceptor.uninstall()
+            FieldEditorRightClickInterceptor.present = { view, event, menu in
+                NSMenu.popUpContextMenu(menu, with: event, for: view)
+            }
+        }
+        // 回到编辑态再投右键（第一响应者得是 field editor，拦截器才认领）。
+        send(.leftMouseDown, to: center, clicks: 1)
+        send(.leftMouseUp, to: center, clicks: 1)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        // 看门狗：拦截一旦断了，AppKit 会去弹它自己那份系统菜单 —— 那是**模态**的，
+        // 实测取消不掉（`cancelTrackingWithoutAnimation` 也叫它不返回），探针就会挂住开发者的机器。
+        // 变异实验（让 `handle` 不吞事件）正是这么挂住的，所以这条边界不是假设。
+        let watchdog = PopupWatchdog()
+        defer { watchdog.disarm() }
+        watchdog.arm(after: 20, why: "拦截断了：AppKit 正在模态弹它自己那份 field editor 菜单")
+        send(.rightMouseDown, to: center, clicks: 1)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        watchdog.disarm()
+        emit("MENUS 编辑态拦截器给出=\(presented.map { titles(of: $0) } ?? [])")
+        let handedOver = try XCTUnwrap(
+            presented,
+            "装了监视器、投了右键，拦截器却没给出菜单 —— 要么 `addLocalMonitorForEvents` 看不到合成事件（那这条判据测不到，得改成手工核对），要么拦截路径断了"
+        )
+        assertChineseEditingMenu(handedOver, where: "编辑态拦截器给出的菜单")
+        presented = nil
+
+        // ② 非编辑态（还没进 field editor）时右键，AppKit 问的是文本框自己。
+        window.makeFirstResponder(host)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let fieldMenu = try XCTUnwrap(
+            search.menu(for: rightEvent),
+            "搜索框非编辑态的 menu(for:) 返回空 —— 用户右键会一个菜单都没有"
+        )
+        emit("MENUS 非编辑态 搜索框菜单=\(titles(of: fieldMenu)) plugIns=\(fieldMenu.allowsContextMenuPlugIns)")
+        assertChineseEditingMenu(fieldMenu, where: "非编辑态的搜索框")
+
+        // ③ 详情只读区：同一份判据。先选中一条，否则详情区是占位文案，压根没有文本视图。
+        if let first = store.entries.first {
+            store.perform(.selectOnly(first))
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        }
+        var previews: [ChineseSelectableNSTextView] = []
+        func walk2(_ view: NSView) {
+            if let preview = view as? ChineseSelectableNSTextView { previews.append(preview) }
+            for sub in view.subviews { walk2(sub) }
+        }
+        walk2(host)
+        XCTAssertFalse(previews.isEmpty, "选中一条记录后详情区仍然没有只读文本视图 —— 这条判据没有对照物")
+        for preview in previews {
+            // 阳性对照：这个点得真的落在只读文本区上。取 visibleRect 而不是 bounds ——
+            // 文本区可垂直缩放，bounds 可能比视口大得多，拿 bounds 的角去点会点到窗口外面。
+            let visible = preview.visibleRect
+            let previewPoint = preview.convert(
+                NSPoint(x: visible.midX, y: visible.minY + min(20, visible.height / 2)),
+                to: nil
+            )
+            let chain = describeChain(host, at: previewPoint)
+            emit("MENUS 只读区 可见区=\(NSStringFromRect(visible)) 点(窗口)=\(NSStringFromPoint(previewPoint)) 命中链=\(chain)")
+            XCTAssertTrue(chain.contains("ChineseSelectableNSTextView"),
+                          "点击点没命中详情只读文本区（命中链：\(chain)）")
+
+            let previewMenu = try XCTUnwrap(
+                preview.menu(for: rightEvent),
+                "只读文本区的 menu(for:) 返回空 —— 用户在详情区右键一个菜单都没有"
+            )
+            let previewTitles = titles(of: previewMenu)
+            emit("MENUS 只读区菜单=\(previewTitles) plugIns=\(previewMenu.allowsContextMenuPlugIns)")
+            XCTAssertEqual(previewTitles, ["复制", "全选", "查找…"], "详情只读区 AppKit 要弹的菜单被污染")
+            XCTAssertFalse(previewMenu.allowsContextMenuPlugIns,
+                           "只读区弹出来的菜单没关自动附加项 —— 系统项还能往里塞")
+            for item in previewMenu.items where !item.isSeparatorItem {
+                XCTAssertFalse(ChineseTextContextMenu.isBlocked(item), "只读区混进系统项：\(item.title)")
+                XCTAssertTrue(containsCJK(item.title), "只读区混进非中文项：\(item.title)")
+            }
+        }
+        emit("MENUS 只读区数量=\(previews.count)")
+    }
+
+    private func titles(of menu: NSMenu) -> [String] {
+        menu.items.filter { !$0.isSeparatorItem }.map(\.title)
+    }
+
+    /// 搜索框两份菜单（编辑态 / 非编辑态）共用的判据：中文、只有那六项、没关的附加项通道、没混进系统项。
+    private func assertChineseEditingMenu(_ menu: NSMenu, where place: String) {
+        XCTAssertEqual(titles(of: menu), ["撤销", "重做", "剪切", "复制", "粘贴", "全选"],
+                       "\(place) 里 AppKit 要弹的不是那份中文可编辑菜单")
+        XCTAssertFalse(menu.allowsContextMenuPlugIns,
+                       "\(place) 的菜单没关自动附加项 —— 系统项还能往里塞")
+        for item in menu.items where !item.isSeparatorItem {
+            XCTAssertFalse(ChineseTextContextMenu.isBlocked(item), "\(place) 混进系统项：\(item.title)")
+            XCTAssertTrue(containsCJK(item.title), "\(place) 混进非中文项：\(item.title)")
+        }
+    }
+
+    private func containsCJK(_ string: String) -> Bool {
+        string.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+    }
+
     private func describeChain(_ root: NSView, at point: NSPoint) -> String {
         var views: [String] = []
         var current: NSView? = root.hitTest(point)
@@ -595,5 +774,36 @@ final class UIInteractionProbeTests: XCTestCase {
         guard let cgImage = rep.cgImage,
               let data = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:]) else { return }
         try data.write(to: file)
+    }
+}
+
+/// stderr 是无缓冲的：探针被监视线程/超时杀掉时，已经写出的行还在，`print` 的会丢。
+/// 写在文件级而不是实例上，是因为 `@Sendable` 回调不能捕获 `self`。
+private func emit(_ string: String) {
+    FileHandle.standardError.write((string + "\n").data(using: .utf8)!)
+}
+
+/// 模态弹菜单的看门狗：到点还没被 `disarm` 就写清原因后退出进程。
+/// 为什么必须是进程级：`NSMenu.popUpContextMenu` 在主线程模态循环里不返回，
+/// 同线程没有任何办法打断它；让它挂在那儿等于把这条探针变成"跑一次就再也跑不动"。
+private final class PopupWatchdog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var armed = true
+
+    func disarm() {
+        lock.lock(); armed = false; lock.unlock()
+    }
+
+    private var isArmed: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return armed
+    }
+
+    func arm(after seconds: TimeInterval, why: String) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+            guard self.isArmed else { return }
+            emit("WATCHDOG 探针挂住：\(why)")
+            exit(73)
+        }
     }
 }
