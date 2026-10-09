@@ -155,8 +155,30 @@ final class ApplicationShell {
                 app.activate(options: .activateIgnoringOtherApps)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-                self?.sendPasteKeystroke()
+                self?.sendPasteKeystrokeAfterVerifyingTarget(expected: previousApp)
             }
+        }
+    }
+
+    /// 注入 ⌘V 之前复核"目标 App 还在不在前台"（审计第二轮 B-6 / 03-04 / 账本 R2-12）。
+    ///
+    /// `copyAndPasteEntry` 从复制到注入之间有 250ms，这段时间里用户完全可能切走窗口，
+    /// 目标 App 也可能自己退出 —— 那时照常注入就会把内容粘进**别的**应用：
+    /// 既是正确性问题，也是隐私问题（粘错地方比不粘更糟）。
+    /// 取消时要说清"内容还在剪贴板里"，否则用户会以为这次复制丢了。
+    func sendPasteKeystrokeAfterVerifyingTarget(expected: NSRunningApplication?) {
+        let outcome = PasteTargetCheck.evaluate(
+            expectedBundleID: expected?.bundleIdentifier,
+            actualBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+            expectedTerminated: expected?.isTerminated ?? false
+        )
+        switch outcome {
+        case .proceed:
+            sendPasteKeystroke()
+        case .targetChanged:
+            reportPasteOutcome("目标应用已切换到别处，已取消自动粘贴；内容仍在剪贴板，可手动 ⌘V。")
+        case .targetGone:
+            reportPasteOutcome("目标应用已退出，已取消自动粘贴；内容仍在剪贴板，可手动 ⌘V。")
         }
     }
 

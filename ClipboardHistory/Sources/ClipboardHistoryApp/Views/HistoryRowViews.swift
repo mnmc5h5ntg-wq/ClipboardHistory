@@ -86,8 +86,10 @@ struct HistoryRow: View {
                         .truncationMode(.tail)
                 }
                 Text(ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp))
-                    // 复制时间是行内唯一的时间信息，tertiary 在暗色下实测 2.2:1，读不出来
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    // 复制时间是行内唯一的时间信息，tertiary 在暗色下实测 2.2:1，读不出来。
+                    // 字号也从 10pt 提到 11pt：10pt 低于 HIG 的正文下限，而这一行没有别的冗余信息
+                    // 可以让它更小（审计第二轮 1.2 / 账本 R2-13）。
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
