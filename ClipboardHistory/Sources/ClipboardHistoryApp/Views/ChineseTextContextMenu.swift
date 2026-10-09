@@ -37,7 +37,9 @@ struct ChineseEditableTextField: NSViewRepresentable {
         textField.isBordered = false
         textField.isBezeled = false
         textField.drawsBackground = false
-        textField.focusRingType = .none
+        // 以前这里是 `.none`：搜索框拿不到任何可见焦点提示，键盘用户 Tab 过来也看不出
+        // 焦点在哪（审计第二轮 1.10 / R2-02）。恢复系统焦点环。
+        textField.focusRingType = .default
         textField.font = .systemFont(ofSize: 13)
         textField.textColor = .secondaryLabelColor
         textField.placeholderString = placeholder

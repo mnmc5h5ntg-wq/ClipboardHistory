@@ -24,6 +24,8 @@ struct SearchField: View {
                         .foregroundStyle(isHovered ? .secondary : .tertiary)
                 }
                 .buttonStyle(.plain)
+                // 图标按钮没有可读文本，VoiceOver 会念不出用途（审计第二轮 1.11）
+                .helpLabel("清除搜索")
             }
         }
         .padding(.horizontal, 9)

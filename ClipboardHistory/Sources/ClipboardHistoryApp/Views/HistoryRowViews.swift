@@ -24,6 +24,8 @@ struct HistoryRowButton: View {
                 .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
         .buttonStyle(.plain)
+        // 行以前不暴露 selected 态：VoiceOver 用户听不出自己选中了哪一条（审计第二轮 1.11 / R2-02）。
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .animation(.easeInOut(duration: 0.11), value: isHovered)
         .animation(.easeInOut(duration: 0.11), value: selected)
         .onHover { hovering in
