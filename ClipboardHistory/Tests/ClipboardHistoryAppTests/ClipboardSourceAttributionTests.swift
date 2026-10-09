@@ -35,11 +35,20 @@ final class ClipboardIntakeURLKindTests: XCTestCase {
 
         var intake = ClipboardIntake(pasteboard: pasteboard)
         intake.markChangeCount(-1)
-        guard let entry = intake.readChangedEntry() else { return }   // 不记也算通过
-        if case .file(let recorded) = entry.content, !recorded.isFileURL {
-            XCTFail("Web URL 被当成文件条目：\(recorded.absoluteString)")
+        // 以前这里是 `guard … else { return }`（注释写着"不记也算通过"）：断言永远不可能失败，
+        // intake 回归成任何形状都是绿的（审计 N-4）。现在把**两侧**都钉住：
+        // ① 只含非文件 NSURL 的剪贴板按当前设计不产生条目 —— `readFileURLs` 限定
+        //    `.urlReadingFileURLsOnly`（审计 P-15 的修法），而这类剪贴板没有字符串可读；
+        // ② 万一它开始产生条目，也绝不允许是"非文件的 .file 条目"（P-15 的原始缺陷）。
+        // 若哪天决定"把 public.url 记成文本条目"，①会红，那时连同本文件的姊妹用例一起改。
+        let recorded = intake.readChangedEntry()
+        XCTAssertNil(recorded, "只含 Web URL 的剪贴板当前不应产生条目；这条红了说明 intake 行为变了")
+        if let entry = recorded, case .file(let fileURL) = entry.content, !fileURL.isFileURL {
+            XCTFail("Web URL 被当成文件条目：\(fileURL.absoluteString)")
         }
-        XCTAssertTrue(entry.content != .file(url), "不应记成该 Web URL 的文件条目")
+        if let entry = recorded {
+            XCTAssertTrue(entry.content != .file(url), "不应记成该 Web URL 的文件条目")
+        }
     }
 
     func testRealFileURLStillBecomesFileEntry() throws {
