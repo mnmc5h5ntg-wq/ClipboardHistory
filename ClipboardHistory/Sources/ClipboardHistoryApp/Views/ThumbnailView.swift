@@ -15,6 +15,9 @@ struct ThumbnailImage: View {
                     .stroke(Color.primary.opacity(0.16), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(0.08), radius: 1, y: 0.5)
+            // 真图片缩略图以前对 VoiceOver 完全沉默（审计第二轮 1.11）：读一句"图片缩略图"，
+            // 刻意不读内容 —— 缩略图里可能是截图里的密码或聊天记录。
+            .accessibilityLabel("图片缩略图")
     }
 }
 
@@ -33,5 +36,8 @@ struct ThumbnailSymbol: View {
                     .stroke(Color.primary.opacity(0.14), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(0.06), radius: 1, y: 0.5)
+            // 类型占位符号只是图形线索，"文件 / 图片 / 多文件"这一行文字里已经说清了，
+            // 再读一遍符号名反而是噪音。
+            .accessibilityHidden(true)
     }
 }

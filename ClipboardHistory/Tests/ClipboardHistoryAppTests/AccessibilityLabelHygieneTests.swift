@@ -55,4 +55,23 @@ final class AccessibilityLabelHygieneTests: XCTestCase {
         XCTAssertTrue(body.contains(".help(text)") && body.contains(".accessibilityLabel(text)"),
                       "helpLabel 必须同时上 help 与 accessibilityLabel，否则守卫是假的")
     }
+
+    /// 图片视图必须要么给自己一个名字、要么显式声明"我是装饰"（审计第二轮 1.11）。
+    /// 标签一律是固定文案：缩略图里可能是截图带出来的密码或聊天记录，
+    /// 所以这里钉的是"有名字"，绝不是"名字里带内容"。
+    func testImageViewsEitherNameThemselvesOrDeclareThemselvesDecorative() throws {
+        let root = try sourcesRoot()
+        let cases: [(file: String, needles: [String])] = [
+            ("ClipboardHistoryApp/Views/ThumbnailView.swift", ["图片缩略图", "accessibilityHidden(true)"]),
+            ("ClipboardHistoryApp/Views/ImagePreviewView.swift", ["图片内容"])
+        ]
+        for entry in cases {
+            let url = root.appendingPathComponent(entry.file)
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for needle in entry.needles {
+                XCTAssertTrue(text.contains(needle),
+                              "\(entry.file) 里找不到 \(needle)：真图片要有标签，占位符号要显式标为装饰")
+            }
+        }
+    }
 }
