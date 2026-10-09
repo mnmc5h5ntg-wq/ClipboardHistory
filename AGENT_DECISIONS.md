@@ -379,6 +379,14 @@ name: decisions
   **探针一开始是错的**：它按"行高 74"点了 y=37，而 `HistoryRowButton` 的自然高度是 47，星标只有 20pt 高，
   于是表现为"点星标毫无反应"。网格扫描（x=8..26 / y=16..28 全部命中）证明控件是活的、是探针瞄偏了 14pt。
   修法是把 y 从宿主视图真实高度推，不写死。
+- 补一条**真实容器**里的同一验证（`testRowGesturesWorkInsideTheRealSidebarContainer`）：孤立一行没有外层
+  `ScrollView` + `LazyVStack` + 列表级拖选 `DragGesture` + `.focusable()`，而双击恰恰要穿过这一层。
+  从宿主视图树里按几何挑出 6 个星标代理 (16,y,20×20) 与 6 个行代理 (38,y,266×31)，
+  点最下面那一行：实测星标翻收藏、行改选中、双击**恰好写一次剪贴板**且写的就是刚点中的那条、并被顶到列表最前。
+  这条探针也先错过一次：用"宽度 ≥26"挑行，结果挑中了 148×25 的筛选 pill，又是探针点错东西。
+  判据改用 `TestClipboardWriter.writtenContents` 的计数与内容 —— 不依赖"第几行在最上面"这种几何猜测，
+  也不会因为点的正好是第一行而恒真。变异对照：删掉 `.simultaneousGesture(TapGesture(count: 2))` ⇒
+  该条立刻红（"写了 0 次"），还原后 `cmp` 逐字节相同。
 - 兼容性/回滚：无数据格式变化；`HistoryRowButton` 多了两个闭包参数（调用点只有侧栏与夹具）。
   回滚 = `git revert` 本提交。`HistoryRow` 不再自带星标，`row-*` 夹具改为拍整条可交互行（帧 64 → 68）。
 - 验证汇总：`swift build` 0 告警 · `swift test` **324 例 / 7 skip / 0 失败** · 68 帧两次连拍 sha 相同 ·

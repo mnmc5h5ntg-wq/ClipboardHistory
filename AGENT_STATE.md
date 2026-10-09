@@ -179,7 +179,7 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 - 菜单栏面板从"从未画出一帧"变成 6 帧（有推荐 / 还在整理 / 暂无推荐 × 亮暗，58 → 64）：
   以前那句"离屏拍不到"只对 macOS 12 的 NSMenu 成立，13+ 的 `MenuBarExtra` body 是普通 View（D-024）。
   第一次看画面就抓到"来源 App 在一行里说两遍"，`16d658d` 修掉。
-- 当前判据：`swift build` 0 告警 · `swift test` **324 例 / 7 skip / 0 失败** · python **25 例 OK** ·
+- 当前判据：`swift build` 0 告警 · `swift test` **325 例 / 8 skip / 0 失败** · python **25 例 OK** ·
   68 帧同代码连拍两次 sha 完全一致。
   **已确认**：`14a37a0`（录制器修复）与账本提交在 CI 上 success（run 37927639110），
   远端 `main` 与本地 HEAD 一致（`git ls-remote origin refs/heads/main`，与 API 是两条独立通道）。

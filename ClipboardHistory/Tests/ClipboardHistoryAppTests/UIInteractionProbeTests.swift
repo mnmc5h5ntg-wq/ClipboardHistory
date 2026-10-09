@@ -394,6 +394,100 @@ final class UIInteractionProbeTests: XCTestCase {
         XCTAssertEqual(selectFired, selectBeforeStar, "点星标顺带把这一行选中了：两个控件的命中区重叠")
     }
 
+    /// 上面那条点的是**孤立的一行**。真实列表里行外面还套着 `ScrollView` + `LazyVStack` +
+    /// 列表级的拖选 `DragGesture` + `.focusable()`，双击要穿过的正是这一层。
+    /// 所以这里把整条侧栏摆上屏，从视图树里按几何找出行/星标的可点代理再点它。
+    func testRowGesturesWorkInsideTheRealSidebarContainer() throws {
+        try skipUnlessEnabled()
+        let writer = TestClipboardWriter()
+        let store = HistoryStore(
+            clipboardWriter: writer,
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        for index in 0..<6 {
+            store.add(ClipboardIntake.Entry(
+                content: .text("侧栏里的第 \(index) 条记录"), thumbnail: nil,
+                sourceUTIs: ["public.utf8-plain-text"]
+            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
+        }
+
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+        func clickCenter(of view: NSView, count: Int = 1) {
+            let windowPoint = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
+            func event(_ type: NSEvent.EventType, _ clicks: Int) -> NSEvent? {
+                NSEvent.mouseEvent(with: type, location: windowPoint, modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: window.windowNumber, context: nil,
+                                   eventNumber: 0, clickCount: clicks, pressure: 1.0)
+            }
+            if let down = event(.leftMouseDown, count) { NSApp.sendEvent(down) }
+            if let up = event(.leftMouseUp, count) { NSApp.sendEvent(up) }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        // 每个可点击控件在宿主视图里都有一个 KeyViewProxy。按几何挑：
+        // 实测 6 个星标 (16, y, 20×20) 与 6 个行 (38, y, 266×31)；
+        // 另有 148×25 的筛选 pill 和 320×335 的滚动区 —— 第一版把 pill 当成了行，
+        // 于是"点行没反应"又是探针点错了东西，不是产品。
+        var starProxies: [NSView] = []
+        var otherProxies: [NSView] = []
+        func walk(_ view: NSView) {
+            if String(describing: type(of: view)) == "KeyViewProxy" {
+                if view.frame.width < 26 { starProxies.append(view) } else { otherProxies.append(view) }
+            }
+            for sub in view.subviews { walk(sub) }
+        }
+        walk(host)
+        let starCandidates = starProxies.filter { abs($0.frame.width - 20) < 1 && abs($0.frame.height - 20) < 1 }
+        let rowCandidates = otherProxies.filter {
+            $0.frame.width > 200 && $0.frame.width < 290 && $0.frame.minX > 30 && $0.frame.height < 40
+        }
+        print("TREE2 星标代理=\(starCandidates.count) 行代理=\(rowCandidates.count) "
+            + "收藏前=\(store.entries.filter(\.isFavorite).count) 写入=\(writer.writtenContents.count)")
+        let star = try XCTUnwrap(starCandidates.max { $0.frame.minY < $1.frame.minY }, "找不到行首星标代理")
+        // 刻意点**最下面**那一行：默认选中的是最上面那条，点它看不出"选中变了"。
+        let row = try XCTUnwrap(rowCandidates.min { $0.frame.minY < $1.frame.minY }, "找不到行代理")
+
+        let favoriteBefore = store.entries.filter(\.isFavorite).count
+        clickCenter(of: star)
+        XCTAssertEqual(store.entries.filter(\.isFavorite).count, favoriteBefore + 1,
+                       "真实侧栏里点星标没有翻收藏（孤立一行时是好的 —— 说明外层容器吃掉了这一下）")
+
+        let selectedBefore = store.selectedEntry?.id
+        clickCenter(of: row)
+        let clickedEntryID = store.selectedEntry?.id
+        XCTAssertNotNil(clickedEntryID, "真实侧栏里点行没有选中任何东西")
+        XCTAssertNotEqual(clickedEntryID, selectedBefore,
+                          "真实侧栏里点行没有改选中：外层滚动/拖选手势把点击截走了")
+
+        // 双击同一行：列表级 DragGesture 与行内双击并存。判据取剪贴板写入 ——
+        // 这条路径唯一的硬后果，而且能同时验证"复制的就是刚点中的那条"。
+        let writesBefore = writer.writtenContents.count
+        clickCenter(of: row, count: 1)
+        clickCenter(of: row, count: 2)
+        XCTAssertEqual(writer.writtenContents.count, writesBefore + 1,
+                       "真实侧栏里双击没有触发复制（写了 \(writer.writtenContents.count - writesBefore) 次）："
+                       + "双击被外层滚动手势截走了，或者 SwiftUI 没把这两击当成一次双击")
+        XCTAssertEqual(writer.writtenContents.last,
+                       store.entries.first(where: { $0.id == clickedEntryID })?.content,
+                       "复制出去的不是刚点中的那一条")
+        XCTAssertEqual(store.entries.first?.id, clickedEntryID,
+                       "复制走的是 .copyAndPromote，这条应当被顶到列表最前")
+    }
+
     private func describeChain(_ root: NSView, at point: NSPoint) -> String {
         var views: [String] = []
         var current: NSView? = root.hitTest(point)
