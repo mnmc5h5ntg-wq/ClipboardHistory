@@ -114,12 +114,21 @@ final class PerfBudgetTests: XCTestCase {
         XCTAssertLessThan(sameBytesMs, 5, "重复复制同一张图是最常见路径，不该付解码成本")
         XCTAssertLessThan(largeSampleMs, 250, "3000x2000 的一次去重比较必须明显低于旧实测 434ms")
 
-        // 稳态成本：旧图那一侧的指纹已经算过（缓存是 class 盒子，随值拷贝共享），
-        // 所以"再复制一张新图"只该付一次采样，而不是每次两张。
+        // 稳态不变量：旧图那一侧的指纹已经算过（缓存是 class 盒子，随值拷贝共享），
+        // 所以"再复制一张新图"只该付**一次**采样，而不是每次两张。
         let anotherNew = try markedStoredImage(size: NSSize(width: 3200, height: 2100))
         let warmMs = milliseconds { _ = (coldPlain == anotherNew) }
-        print("PERF 稳态一次比较（一侧已焐热）=\(String(format: "%.1f", warmMs))ms")
-        XCTAssertLessThan(warmMs, largeSampleMs, "缓存没共享出去的话，这条会红")
+        print("PERF 稳态一次比较（一侧已焐热）=\(String(format: "%.1f", warmMs))ms（冷=\(String(format: "%.0f", largeSampleMs))ms）")
+
+        // 判据改用**计数**而不是计时。CI 的 2 核 runner 上冷/热差值会被调度噪声吃掉 ——
+        // `f7398f3` 就是这样假红的（冷 34.5ms、热 40.7ms，"热 < 冷"必然失败，而缓存其实是好的）。
+        // 计数与机器快慢无关：焐热之后再比 3 次，旧图那一侧的指纹计算次数必须一动不动。
+        let computationsBefore = coldPlain.fingerprintComputations
+        for _ in 0..<3 { _ = (coldPlain == anotherNew) }
+        XCTAssertEqual(coldPlain.fingerprintComputations, computationsBefore,
+                       "旧图那一侧的指纹被重算了：缓存没有随值拷贝共享出去")
+        XCTAssertEqual(anotherNew.fingerprintComputations, 1,
+                       "新图一侧算了 \(anotherNew.fingerprintComputations) 次指纹，应当只有第一次")
     }
 
     /// 采样指纹必须仍能区分同尺寸不同内容的图（否则去重会把不同截图合并）。

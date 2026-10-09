@@ -5,11 +5,15 @@ import CryptoKit
 final class _FingerprintCache: @unchecked Sendable {
     private let lock = NSLock()
     private var value: String?
+    /// 指纹**实际被计算**的次数。给测试用：证明"一侧焐热之后再比较不会把两张都重算"
+    /// —— 这条不变量用计时判在 2 核 CI 上没有分辨力（见 `PerfBudgetTests`）。
+    private(set) var computationCount = 0
 
     func get_or_set(_ make: () -> String) -> String {
         lock.lock()
         defer { lock.unlock() }
         if let value { return value }
+        computationCount += 1
         let made = make()
         value = made
         return made
@@ -70,6 +74,9 @@ struct StoredImage: Equatable, Hashable, @unchecked Sendable {
             Self.pngData(from: nsImage)
         }
     }
+
+    /// 这张图的指纹被真正计算过几次（缓存是 class 盒子，随值拷贝共享 ⇒ 同一份指纹只算一次）。
+    var fingerprintComputations: Int { fingerprintCache.computationCount }
 
     static func == (lhs: StoredImage, rhs: StoredImage) -> Bool {
         // 短路只在"必然等价"时才用：字节相同 ⇒ 像素必然相同。
