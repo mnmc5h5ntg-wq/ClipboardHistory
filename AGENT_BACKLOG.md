@@ -293,6 +293,8 @@ arm64 上类名字面量离调用点二十几行（固定窗口回看会在坏�
 | R2-18 | 03 §方法 | 高 | 已完成(bdb557b) | 视觉捕获的时序噪声：同一份代码连拍两次即有 30/58 帧不同(闪烁插入点)。修法是拍前交出第一响应者并把插入点画成透明 |
 | R2-19 | 03 §方法 | 高 | 已完成(bdb557b) | 捕获夹具用 Date() 当时钟 ⇒ 跨分钟连拍时字符串本身在变像素。改用固定参考时刻，此后同代码连拍 0 帧不同 |
 | R2-21 | D-029 | 高 | **部分完成(d698a4c)** | 发布链路加了启动闸门，但只挡住 D-029 那一类：`prepare_release.py` 现在反汇编包内二进制，`AppDelegate` 若还留着「未实现初始化器」桩就拒绝发布（v1.4.8 已按此闸门出包，且对 DMG 内产物重跑过一次）。**仍欠的是「真的打开一次」**：进程活过 N 秒 / 启动日志里出现「守卫放行 + 窗口建好」这类运行时冒烟还没做 —— 静态桩只能证明不会在 `-init` 上 trap，证明不了窗口建得起来。原建议（CI 里 `make bundle` 后跑启动冒烟，fresh runner 无用户数据）仍然有效 |
+| R2-22 | D-032 | 中 | 未开始 | 右键菜单"屏幕上真弹出来的样子"无法在仓库里自动断言：`NSMenu.popUpContextMenu` 模态，实测 `didBeginTracking` 里 `cancelTrackingWithoutAnimation()` 也叫它不返回。现在靠 `docs/MANUAL_TEST_v1.4.8_issue13.md` 人眼核对。**可做的修法**：给菜单窗口做屏上取证（弹一份自己的菜单 → `CGWindowListCreateImage` 截那块 → 立刻 `perform` 一个取消），需要屏幕录制权限，先验可行性再动仓库；否则每次 UI 发版都要把清单第 1/3 节重跑一遍 |
+| R2-23 | D-032 | 低 | 未开始 | 拦截器只认领 `ChineseMenuTextField` 里的 field editor。今天全仓库只有搜索框一处可编辑文本所以够用；**新增任何文本输入**若不走 `ChineseMenuTextField`，那份右键菜单就又会是系统 12 项。修法：要么把 `TextField` 统一包一层（配合一条源码守卫"Sources 里不许出现裸 `TextField(`"），要么把认领判据扩成"本 App 窗口内的 field editor"并补反面对照 |
 **进度快照 13（D-029：修掉自己带进去的启动闪退）**：用户报「从仓库根目录打开新版 app 闪退」。
 两份 .ips 的崩溃 PC 紧跟 `_unimplementedInitializer(AppDelegate, "init()")` + `brk #1`，包 UUID 与仓库产物一致 ⇒ D-019 给 `AppDelegate` 加显式 `init(historyStore:)` 之后，ObjC 的 `-init` 变成编译器留下的 trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过元类型调它。
 327 个用例与 CI 全绿挡不住的原因：Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init，永远走不到 `-init`；CI 也从不启动 .app。修法是三行 `override convenience init()`，守卫两条互补（运行时走元类型 + 源码扫描必须声明 override init）。修之前那条运行时守卫原地复现了同一句 fatal error（signal 5），修之后绿。
@@ -308,3 +310,13 @@ arm64 上类名字面量离调用点二十几行（固定窗口回看会在坏�
 顺带记一个 Swift 坑：`XCTAssertEqual(x?.enum, .none)` 的 `.none` 是 `Optional.none`，断言恒不成立。
 当前判据：`swift build` 0 告警 · `swift test` **328 例 / 9 skip / 0 失败** · 68 帧与改动前 sha 全同 ·
 包重打为 `1.4.7-fix2`（UUID `1FBD7DF5…`）。
+**进度快照 15（D-032：issue #13 右键菜单汉化）**：真正修好的不是"菜单文案"，而是"编辑态的右键根本不归我们"。
+被实测证伪的三条自己人做法（`hitTest` 让位 / 给共享 field editor 挂 `menu` / 就地改 `menu(for:)` 那份）
+与"让菜单真弹起来量"这条一起记进 D-032；最后落地的是 `addLocalMonitorForEvents` 在派发前截走。
+两个值得留下来的手感：① **探针的挂住本身是证据** —— 变异"让拦截不吞事件"时进程卡死在 AppKit 那份模态菜单上，
+这既证明拦截器是有效路径，也证明"量弹出来的那份"这条判据不能进仓库；于是加了 20 秒看门狗
+（写清原因再 `exit(73)`），broken 时是有边界的红而不是钉住机器。
+② "源码里写了 `editor.menu =`"曾经被当成已修 —— 读回来是系统那 12 项（快速查看附件/字体/书写方向/布局方向都在），
+所以留了一条**反模式守卫**禁止这条路再回来。
+当前判据：`swift build` 0 告警 · `swift test` **339 例 / 10 skip / 0 失败** · 在屏右键探针绿 ·
+5 组变异对照全部按预期点亮。屏幕上真弹出来的样子仍需人眼（R2-22，清单在 `docs/MANUAL_TEST_v1.4.8_issue13.md`）。

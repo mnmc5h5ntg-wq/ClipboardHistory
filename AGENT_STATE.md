@@ -201,6 +201,24 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 - 审计 1.9 的"侧栏图标看不见"从推断升级为测量（D-025）：产品里 0.0000、固定色 0.175–0.402、复刻 List 行里
   `.primary` 正常 ⇒ 离屏语义色伪影，**产品一字未改**；真机那一列仍未验收（在屏捕获要付权限框或废弃 API 的代价）。
 
+### 第二轮进度快照 4（2026-10-10 夜：issue #13 右键菜单汉化，D-032）
+
+- 用户点名修 #13。落地的不是"改文案"，是**把编辑态右键的所有权拿回来**：
+  实测共享 field editor 才是右键的接收者，`hitTest` 让位 / 给 `editor.menu` 赋值 / 就地改 `menu(for:)` 三条
+  都被数字推翻（第三位的证据是两次调用 `!==`，改完再问又是满的、`allowsContextMenuPlugIns` 回到 `true`）。
+  最终用 `addLocalMonitorForEvents` 在派发前截走，认领判据是"field editor 沿 superview 往上属于 `ChineseMenuTextField`"。
+- 菜单交付：搜索框 `撤销/重做/剪切/复制/粘贴/全选`、只读详情区 `复制/全选/查找…`；
+  `NSWindow.allowsAutomaticWindowTabbing = false` 建窗前设；每次弹出前 `sanitize`（常驻 `MenuSanitizer` 代理，
+  因 `NSMenu.delegate` 是 weak）。
+- **测量上的一条硬限制**：`popUpContextMenu` 模态且 `didBeginTracking` 里 `cancelTrackingWithoutAnimation()`
+  叫它不返回（8 秒看门狗 exit） ⇒ "屏幕上真弹出来的样子"不进仓库判据，改成
+  `docs/MANUAL_TEST_v1.4.8_issue13.md` 人眼核对（记成 R2-22；顺带 R2-23：将来新增裸 `TextField` 会绕开拦截器）。
+- 在屏探针 `testRightClickMenusAppKitWouldShowAreChinese` 带反面对照（搜索框没在编辑时 `owns == false`）
+  和 20 秒看门狗；变异对照 5 组逐一点亮，其中"让拦截不吞事件"那一组表现为**挂住后看门狗报红**，
+  这正是它有效的方式。
+- 当前判据：`swift build` 0 告警 · `swift test` **339 例 / 10 skip / 0 失败** · 在屏右键探针绿。
+  10 条 skip 已逐条核对，全是 env 门控的在屏探针（含这条新增的）。
+
 ## 恢复指令（若上下文丢失，从这里续做）
 
 1. `git log --oneline` 与 `git diff 8007b19..HEAD --stat` 看清已完成什么。

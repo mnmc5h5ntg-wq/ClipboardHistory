@@ -288,3 +288,35 @@ python3 scripts/frame_audit.py diff /tmp/A /tmp/B                               
 数据兼容：存档格式仍是 v1，只新增两个可选字段；回退到 v1.4.7 只会忽略它们。
 
 仍开着的 issue：#13「右键菜单未汉化且含无关项」—— 本轮没碰右键菜单，没有顺手关掉它。
+
+## 12. issue #13 修复（2026-10-10 夜，D-032）
+
+用户点名修上一条留下的 #13。表面症状是"右键菜单里有英文的系统项"，实际要修的是**所有权**：
+编辑态下右键根本不落在我们的搜索框上。
+
+被实测证伪的三条做法（都是我们自己先写出来、再被数字推翻的）：
+
+| 做法 | 证据 | 结论 |
+|---|---|---|
+| `hitTest` 把右键让位给文本框 | 编辑态 `rightMouseDown`/`menu(for:)` 一次都没被调用；合成事件派发期间 `NSApp.currentEvent` **7 条日志全为 nil** | 走不到的分支，且无法验证 ⇒ 删除 |
+| `editor.menu = 我们那份` | 右键时读回 12 项，含**快速查看附件 / 字体 / 书写方向 / 布局方向** | 被 AppKit 复原，等于没修 ⇒ 留一条反模式守卫禁止再回来 |
+| 就地改 `menu(for:)` 返回的那份 | 两次调用 `!==`；`removeAllItems()` + 关开关后再问，内容又满、开关又 `true` | 每次现造，改不动 |
+
+落地：`FieldEditorRightClickInterceptor` 用 `addLocalMonitorForEvents(matching: [.rightMouseDown, .otherMouseDown])`
+在 AppKit 派发**之前**截走；只在"第一响应者的 field editor 沿 superview 往上属于某个 `ChineseMenuTextField`"时认领，
+否则原样交回。交付 `撤销/重做/剪切/复制/粘贴/全选`（搜索框）与 `复制/全选/查找…`（只读详情区），
+两份都 `allowsContextMenuPlugIns = false`、弹出前 `sanitize`；`NSWindow.allowsAutomaticWindowTabbing = false`
+建窗前设掉窗口级项。全仓库只有搜索框一处可编辑文本，所以范围是完整的。
+
+一条**没做成的验证**要讲清楚：`NSMenu.popUpContextMenu` 是模态的，在 `NSMenu.didBeginTrackingNotification`
+里 `cancelTrackingWithoutAnimation()` 也叫它不返回（8 秒看门狗 exit）。所以"屏幕上真弹出来的样子"
+**没有**自动断言，改由 `docs/MANUAL_TEST_v1.4.8_issue13.md` 人眼核对；仓库里的判据取
+AppKit 决定菜单的入口（`menu(for:)`）+ 拦截器实际交付的那份。
+
+验证：`ChineseTextContextMenuTests` 13 例（含认领判据两个方向、三条源码守卫）·
+在屏 `testRightClickMenusAppKitWouldShowAreChinese`（真左键进编辑态 + 真右键事件 + 反面对照 + 20 秒看门狗）·
+变异对照 5 组逐一点亮（其中"让拦截不吞事件"表现为挂住后被看门狗判红 —— 那就是它有效的方式）·
+`swift build` 0 告警 · `swift test` **339 例 / 10 skip / 0 失败**（skip 逐条核对，全是 env 门控在屏探针）。
+
+遗留：R2-22（弹层观感无法自动断言）、R2-23（将来新增裸 `TextField` 会绕开拦截器）。
+回滚：`git revert` 本次提交；监视器有 `uninstall()`，幂等。

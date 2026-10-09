@@ -476,3 +476,50 @@ name: decisions
   与颜色改动前的帧相比 `row-*`/`sidebar-*` 有预期差异（新增星列），其余帧不变。
 - 已知遗留（记成 R2-20，未修）：`toggleFavorite` 走 `reconcileSelection(preferredEntryID:)`，
   会把多选**收成那一条**。这是浮层收藏一直以来的行为，行内星标只是把它搬近了手边。
+
+## D-032 右键菜单汉化：编辑态的右键只能从事件层截走（issue #13）
+
+- 需求（issue #13）：应用内右键菜单里有未汉化的系统项（快速查看附件 / 字体 / 书写方向 / 布局方向 / 服务 / 查询…），
+  既英文又与本产品无关。
+- **四条被实测证伪的做法**（前三条都曾经是这里的方案）：
+  1. "给搜索框子类化的 `hitTest` 做让位，就能把右键从共享 field editor 手里拿回来" —— 实测编辑态下 AppKit 把
+     `rightMouseDown` **直接投给 field editor**：`ChineseMenuTextField` 既不收到 `rightMouseDown`、`menu(for:)` 也不被问；
+     而 `NSApp.currentEvent` 在合成事件派发期间**逐条为 nil**（7 条 HITTEST 日志全 nil），
+     所以"看当前事件类型"那条分支连测都测不出来。这套机制已从仓库删除，不留下测不到的代码。
+  2. "`editor.menu = 我们那份` 就能改掉 field editor 的右键菜单" —— 实测会被 AppKit 复原：右键时读 `editor.menu`
+     得到 12 项「剪切/拷贝/粘贴/粘贴并匹配样式/**快速查看附件**/**字体**/拼写和语法/替换/转换/语音/**书写方向**/**布局方向**」，
+     正是 issue #13 报的那一串。那段挂菜单的代码看着像修好了，其实什么都没改。
+  3. "`menu(for:)` 返回的是可以就地改的那一份" —— 实测每次现造新的（两次调用 `!==`）；把第一份 `removeAllItems()`
+     并关 `allowsContextMenuPlugIns` 之后再问一次，内容又是满的（7 项）、开关又回到 `true`。
+  4. "让菜单真弹起来量屏幕上那份" —— `NSMenu.popUpContextMenu` 是模态的，在 `NSMenu.didBeginTrackingNotification`
+     回调里 `cancelTrackingWithoutAnimation()` **不能**让它返回（8 秒监视线程直接 exit）。判据因此改用
+     AppKit 决定菜单的那个入口（`NSResponder.menu(for:)`）+ 拦截器的实际交付，不靠"弹出来再看"。
+- 采用的机制：`NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .otherMouseDown])`
+  （新类型 `FieldEditorRightClickInterceptor`，装在 `ApplicationShell.applicationWillFinishLaunching`）。
+  它在 AppKit 派发**之前**看到事件，只作用于本 App 的事件流，不需要换 window delegate、不碰私有 API。
+  认领判据 = "第一响应者是 `NSTextView`，且它沿 superview 往上属于某个 `ChineseMenuTextField`" ——
+  实测 field editor 确实挂在搜索框子树里（`editor.superview == _NSKeyboardFocusClipView`、
+  `isDescendant(of: 搜索框) == true`），所以不需要私有 API 也能把"这次编辑是谁的"问出来。
+  认领就吞掉事件并弹我们那份，不认领原样交回 —— 别的控件的右键不受影响（有反面对照钉着）。
+  范围是完整的：全仓库只有 `SearchField.swift` 一处可编辑文本（`grep "TextField("` 只有它 + 它自己的构造），
+  只读详情区由 `ChineseSelectableNSTextView` 自己接管，非编辑态搜索框由 `menu(for:)` 接管。
+- 交付的菜单（每一项都中文、都 `allowsContextMenuPlugIns = false`、弹出前再 `sanitize` 一次）：
+  搜索框 `撤销/重做/剪切/复制/粘贴/全选`；只读详情区 `复制/全选/查找…`。
+  另加 `NSWindow.allowsAutomaticWindowTabbing = false`（建窗之前设）从源头压掉「Show All Tabs」那一类窗口级项。
+- 验证：
+  - 单元 `ChineseTextContextMenuTests` 13 例：菜单内容与顺序、通用"任何一项都必须含中文"、
+    `sanitize` 的阳性对照与首尾分隔线规则、`menuWillOpen` 真会清、拦截器认领判据的**两个方向**、
+    三条源码守卫（不许回到 `editor.menu =` 反模式、启动时必须 `install()`、`install()` 不许装到视图层）。
+  - 在屏（`CLIPBOARD_HISTORY_UI_INTERACTION=1`）`testRightClickMenusAppKitWouldShowAreChinese`：
+    真左键进编辑态 → 装监视器 → 投**真实右键事件** → 断言交出去的就是那六项；只读区取 `visibleRect`
+    而不是 `bounds`（bounds 比视口大得多，拿它的角去点会点到窗口外，报假缺陷）。
+  - 变异对照 5 组，全部按预期点亮：删 `install()` ⇒ 启动守卫红；把认领判据改成"凡是文本视图都认领" ⇒ 3 条红；
+    让 `handle` 不吞事件 ⇒ 在屏探针挂在 AppKit 那份模态菜单上，**看门狗 20 秒写清原因后 `exit(73)`**
+    （所以这条探针 broken 时是 bounded 的红，不是把机器钉住）；往菜单塞一项挡名单外的英文 ⇒ 两条路径同时红；
+    把 `editor.menu =` 那段加回来 ⇒ 反模式守卫红。每组还原后 `cmp` 逐字节相同。
+  - `swift build` 0 告警 · `swift test` **339 例 / 10 skip / 0 失败**（skip 全是 env 门控的在屏探针）。
+- 兼容性/回滚：无数据格式变化、无依赖变化、无对外 API 破坏，新增类型都是 internal；
+  监视器成对提供 `install()/uninstall()` 且幂等。回滚 = `git revert` 本提交。
+- 已知遗留（进 `AGENT_BACKLOG.md`）：① 屏幕上"真弹出来的样子"无法在仓库里自动断言（模态），
+  只能手工核对，清单在 `docs/MANUAL_TEST_v1.4.8_issue13.md`；② 将来若新增可编辑文本控件，
+  必须走 `ChineseMenuTextField`，否则拦截器不认领，那份右键菜单又会是系统的。
