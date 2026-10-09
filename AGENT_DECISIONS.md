@@ -178,4 +178,21 @@ name: decisions
 - 兼容性：只影响**新采集**的图片。已入库的图片不动、不迁移、不重写（配合 R2-04 的"同名同长度就跳过"，旧文件连一次写都不会有）。存档格式不变：仍是 PNG 文件 + v1 JSON。
 - 隐私：不新增落盘内容，反而减少磁盘上的原图数据量；隐私文案无需改动。
 - 回滚：`git revert` 本提交（一个 helper 文件 + 三处调用点）。**唯一的不可逆面**：已经降采样入库的图片无法还原，信息已经丢了 —— 这正是把阈值取在"常见截图完全不受影响"那一侧的原因。
-- 验证：`ImageIntakePolicyTests` 6 条，其中一条走**真实采集管线**（pasteboard → `ClipboardIntake.readChangedEntry`），断言入库像素 ≤ 4096 且落盘字节数严格小于原图；另有"未超限的图逐字节保留"（不重新编码）与"非图片数据返回 nil 而不是编一组宽高"。顺带记下一条容易踩的事实：`makeStoredImage` 在本机以 **2×** 位图渲染，所以 41×17 点的图会得到 82×34 像素 —— 所有捕获帧也是"名字里是点、文件里是 2× 像素"。
+- 验证：`ImageIntakePolicyTests` 6 条，其中一条走**真实采集管线**（pasteboard → `ClipboardIntake.readChangedEntry`），断言入库像素 ≤ 4096 且落盘字节数严格小于原图；另有"未超限的图逐字节保留"（不重新编码）与"非图片数据返回 nil 而不是编一组宽高"。顺带记下一条容易踩的事实：`makeStoredImage` 在本机以 **2×** 位图渲染，所以 41×17 点的图会得到 82×34 像素 —— 所有捕获帧也是"名字里是点、文件里是 2× 像素"；**CI runner 是 1×**，所以断言不能写死任何一种倍率（`d160b52` 就是修这个）。
+
+## D-018 只含 `public.url` 的剪贴板记成文本条目（第二轮 N-4 副产物 / R2-16）
+
+- 背景：N-4 把那条假绿断言换成"钉住现状"之后，暴露一个真行为：剪贴板里只有非文件 `NSURL` 时 `readEntry` 返回 nil ⇒ 这次复制凭空消失。浏览器复制链接通常同时带字符串，所以日常无感；但只发布 URL 对象的应用（部分终端 / IDE 的"复制链接"）会让记录直接丢掉 —— 对剪贴板管理器这是功能缺口。
+- 决定：在字符串分支之后、`return nil` 之前加兜底：读到非文件 `NSURL` 就记成 `.text(absoluteString)`（仍过 `bounded` 体积上限）。
+- 理由：与"链接带字符串时记成文本"的既有行为一致；文件路径不会走到这里（`readFileURLs` 限定 `.urlReadingFileURLsOnly` 且先返回），所以不会复活 P-15 那类"Web URL 被当文件"的缺陷。
+- 兼容性：只影响以前被丢弃的输入；已存数据与存档格式都不变。
+- 回滚：`git revert` 本提交，回滚后这类剪贴板恢复为不记录。
+- 验证：翻转 `ClipboardIntakeURLKindTests.testWebURLOnlyPasteboardIsNotMistakenForFileEntry` —— 现在断言"必须记到、且是文本、且不是 `.file`"。变异对照已实跑：把兜底条件反转（`first.isFileURL`）⇒ 该用例红（"只含 Web URL 的剪贴板不应被丢弃"）；第一次跑变异时**过滤器写错类名导致 0 条用例执行**，那轮"绿"作废重跑，这也是"0 条执行 = 探针没跑"的又一次现场。
+
+## D-019 `AppDelegate` 的 store 注入接缝（第二轮 R2-17）
+
+- 背景：菜单栏面板的视觉从第一轮起就标 NOT-RUN。原因链：构造 `AppDelegate` 会求值 `static let sharedHistoryStore = HistoryStore()`，也就是读用户真实存档；而 `HOME=/tmp/…` 重定向实测**不改变** `applicationSupportDirectory`（审计 04 §4.1(6)），所以隔离只能靠注入。
+- 决定：`AppDelegate.init(historyStore: HistoryStore? = nil)`。默认 `nil` 时仍取 `sharedHistoryStore`，产品路径一字不变；`@NSApplicationDelegateAdaptor` 走的就是这个默认路径。
+- **结果要诚实记下来**：接缝加上了，但菜单栏**离屏仍然拍不了** —— 试拍一帧发现菜单表面 97.7% 像素未被绘制（离屏 `cacheDisplay` 不画菜单的材质表面），被捕获 harness 自己的"未绘制 >95% 判失败"闸门拦下。那道闸门是对的：假帧不能当证据。所以菜单栏视觉继续标 NOT-RUN，但理由从"怕碰真实存档"更新为"离屏画不出菜单表面"；接缝保留给在屏探针路线（`UIInteractionProbeTests`）。
+- 兼容性/回滚：默认参数保证所有既有调用点不变；`git revert` 即回到隐式 init。
+- 验证：`AppDelegateStoreInjectionTests` 2 条 —— 注入的 store 确实被 delegate 使用（身份比较）；默认构造仍然拿到共享 store（接缝没有改变产品路径）。试拍的 97.7% 记在 `UICaptureHarness` 的注释里，防止下一个人再花一次同样的时间。

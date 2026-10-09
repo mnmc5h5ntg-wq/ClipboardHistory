@@ -127,6 +127,16 @@ struct ClipboardIntake {
             return makeEntry(content: .text(Self.bounded(t)), thumbnail: nil, pasteboard: pasteboard)
         }
 
+        // 只含非文件 NSURL（`public.url`）的剪贴板以前被整条丢弃（审计 N-4 的副产物 / 账本 R2-16，
+        // 决策 D-018）：浏览器复制链接通常同时带字符串所以日常无感，但只发布 URL 对象的应用
+        // 会让这次复制凭空消失 —— 对剪贴板管理器这是功能缺口。记成文本条目，与"链接带字符串时
+        // 记成文本"的既有行为一致；文件路径不会走到这里（上面的 readFileURLs 限定
+        // `.urlReadingFileURLsOnly` 且先返回），所以不会复活 P-15 那类"Web URL 被当文件"的缺陷。
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           let first = urls.first, !first.isFileURL {
+            return makeEntry(content: .text(Self.bounded(first.absoluteString)), thumbnail: nil, pasteboard: pasteboard)
+        }
+
         return nil
     }
 

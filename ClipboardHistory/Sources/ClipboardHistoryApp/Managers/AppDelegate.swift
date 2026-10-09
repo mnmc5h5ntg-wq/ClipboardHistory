@@ -4,7 +4,17 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static let sharedHistoryStore = HistoryStore()
 
-    let historyStore = AppDelegate.sharedHistoryStore
+    let historyStore: HistoryStore
+
+    /// 默认仍走全局共享 store（产品路径一字不变）。这个注入接缝是给测试与离屏捕获用的：
+    /// 传一个用 `RecordingHistoryPersistence` 造的 store，就能构造 AppDelegate 而**不碰**
+    /// `~/Library/Application Support/时间剪史/`。审计第二轮 04 §4.2 N-1 说明为什么必须有它：
+    /// 菜单栏面板以前拍不到帧，因为构造 AppDelegate 会读用户真实存档，而 `HOME` 重定向
+    /// 实测**不改变** `applicationSupportDirectory`，隔离只能靠注入。
+    init(historyStore: HistoryStore? = nil) {
+        self.historyStore = historyStore ?? AppDelegate.sharedHistoryStore
+        super.init()
+    }
     private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
     private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
     private let loginItemSettings = LoginItemSettings()

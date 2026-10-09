@@ -97,6 +97,11 @@ final class UICaptureTests: XCTestCase {
             Fixture("content-no-results", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: searching)) },
         ]
 
+        // 菜单栏推荐面板**不进离屏夹具**：试过（D-019 的注入接缝就是为它加的），
+        // 但离屏渲染下菜单表面 97.7% 像素未被绘制（材质不画），会被本文件的
+        // "未绘制 >95% 判失败"闸门拦下 —— 那层闸门是对的，拍出来的假帧不能当证据。
+        // 菜单栏视觉仍标 NOT-RUN，等 R2-17 的在屏探针路线。
+
         // 侧栏脱离分栏器单独拍：实测 NavigationSplitView 的 sidebar 列在离屏
         // cacheDisplay 下不跟随强制暗色（同一帧里详情列是白字、侧栏列是黑字），
         // 所以 content-* 帧只能用来核对几何与布局，颜色验收看 sidebar-*。
@@ -117,8 +122,7 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
         })
-        results.append(Fixture("sidebar-no-results", NSSize(width: 300, height: 520)) {
-            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: searching)))
+        results.append(Fixture("sidebar-no-results", NSSize(width: 300, height: 520)) {            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: searching)))
         })
 
         for entry in store.entries.prefix(4) {            let captured = entry
