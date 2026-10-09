@@ -354,3 +354,34 @@ name: decisions
   （这条路径不在捕获夹具里，帧不变是预期，但仍然是测出来的）；
   变异对照：删掉 `resignFirstResponder` 覆写 ⇒ 恰好失焦那条红。
 - 13-08 剩下的两块（设置页交互、生命周期回调）本轮**没做**，理由记在 `AGENT_BACKLOG.md` 快照 11。
+
+## D-028 行内直接操作：双击复制 + 行首星标收藏（用户提出）
+
+- 需求（用户原话）："选了一条记录要把鼠标滑到最右边才能操作收藏和复制" ⇒ 双击条目复制、点行首星标收藏/取消。
+  这两个动作以前**只存在于详情区右下角的浮层**（`DetailView` 的 `GlassPill`），行上没有任何入口。
+- 结构决定：星标做成行的**兄弟控件**，不是嵌在行 Button 里的控件。嵌套 Button 在 macOS 上点击归属不可靠；
+  并且这条决定是可测的 —— 在屏探针断言"点星标之后选中集合不变"，实测 `favoriteFired=1 / selectFired+=0`。
+  双击用 `Button(单击选中) + .simultaneousGesture(TapGesture(count: 2))`，**不是**把行改成
+  `onTapGesture(count:2)+onTapGesture`：后者会让系统为一个可能的双击先等一个间隔，每次点选都慢半拍。
+  代价是双击时第一击照常选中（幂等），实测 `copyFired=1`、`selectFired+=2`，符合预期。
+- 语义选择：双击 = `.copyAndPromote`，与浮层那颗"再次复制"**同一个动作**（会写剪贴板并把这条顶到最前）。
+  带 shift / command 的双击**不复制**（那两个键是本列表范围选择/多选的前缀，误双击不该写剪贴板），
+  规则抽成 `RowDoubleTap.shouldCopy`，并有一条守卫去读 `select(_:)` 真正用了哪些修饰键 ——
+  将来选择侧改用 option，这条会红着提醒例外名单要同步。
+- 颜色是量出来的，不是挑的：未收藏的星以前是 `.clear`（等于这个控件不存在）。
+  `primary.opacity(0.28)` 实测对比度 **1.76:1（亮）/ 2.17:1（暗）**，低于可交互控件的 3:1 下限；
+  提到 0.55 后 **3.54:1 / 4.64:1**。已收藏的星从 `Color.yellow`（亮色 **1.67:1**）压深成琥珀
+  `Color(red:0.86,green:0.45,blue:0)` ⇒ **3.90:1 / 4.28:1**。行内星标与浮层共用
+  `FavoriteTogglePresentation`（符号/文案/收藏色），并有一条源码扫描守卫禁止两处再各写字面量。
+- 验证（关键区别：这次是**真点**）：`UIInteractionProbeTests.testRowGesturesFireTheRightActions` 往一扇
+  真实在屏窗口里的孤立一行投递合成的 `leftMouseDown/Up`，断言三件事 —— 单击选中、1→2 序列恰好触发一次复制、
+  点星标翻收藏且不动选中。
+  **探针一开始是错的**：它按"行高 74"点了 y=37，而 `HistoryRowButton` 的自然高度是 47，星标只有 20pt 高，
+  于是表现为"点星标毫无反应"。网格扫描（x=8..26 / y=16..28 全部命中）证明控件是活的、是探针瞄偏了 14pt。
+  修法是把 y 从宿主视图真实高度推，不写死。
+- 兼容性/回滚：无数据格式变化；`HistoryRowButton` 多了两个闭包参数（调用点只有侧栏与夹具）。
+  回滚 = `git revert` 本提交。`HistoryRow` 不再自带星标，`row-*` 夹具改为拍整条可交互行（帧 64 → 68）。
+- 验证汇总：`swift build` 0 告警 · `swift test` **324 例 / 7 skip / 0 失败** · 68 帧两次连拍 sha 相同 ·
+  与颜色改动前的帧相比 `row-*`/`sidebar-*` 有预期差异（新增星列），其余帧不变。
+- 已知遗留（记成 R2-20，未修）：`toggleFavorite` 走 `reconcileSelection(preferredEntryID:)`，
+  会把多选**收成那一条**。这是浮层收藏一直以来的行为，行内星标只是把它搬近了手边。

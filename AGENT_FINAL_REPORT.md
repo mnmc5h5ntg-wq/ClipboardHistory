@@ -65,7 +65,7 @@
 
 ## 5. 视觉与交互审计
 
-方法：离屏渲染真实视图（`NSWindow` + `NSHostingView` + `cacheDisplay`），不需要屏幕录制授权；由 `CLIPBOARD_HISTORY_UI_SHOTS` 触发，未设置时整组 skip。共 **64 帧**（32 夹具 × 亮/暗）—— 第一轮是 29 夹具 58 帧，第二轮末把菜单栏面板的三个状态补了进来（D-024）。
+方法：离屏渲染真实视图（`NSWindow` + `NSHostingView` + `cacheDisplay`），不需要屏幕录制授权；由 `CLIPBOARD_HISTORY_UI_SHOTS` 触发，未设置时整组 skip。共 **68 帧**（34 夹具 × 亮/暗）—— 第一轮是 29 夹具 58 帧，第二轮末把菜单栏面板的三个状态补了进来（D-024）。
 
 先修掉捕获链路自己产出的 **4 类假帧**（每一类都曾让我得出过错误结论）：裸 hosting view 导致内容缩到一角、手工翻倍位图尺寸、`cacheDisplay` 不画 AppKit 底色导致"白底白字看起来整块空白"、以及 `NavigationSplitView` 的 sidebar 列在离屏下根本不跟随强制外观（"暗色主界面黑字不可读"其实是捕获产物 —— 用最小复现 + 同一组件独立拍帧两条证据判定，非产品缺陷）。
 
@@ -170,8 +170,8 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
 被审对象是 HEAD `81bce8d`。本轮在它之上做的提交数**现取**（写死就会随下一次提交过期）：
 `git rev-list --count 81bce8d..HEAD`，其中只动 `AGENT_*.md` 的那些用逐提交 `git show --pretty=format: --name-only` 归类；
-全部已推送。`swift build` 0 告警、`swift test` **318 例 / 6 skip / 0 失败**、
-python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64）。**尚未发布**：线上 Latest 仍是 v1.4.7。
+全部已推送。`swift build` 0 告警、`swift test` **324 例 / 7 skip / 0 失败**、
+python 脚本测试 **25 例 OK**、68 帧离屏捕获（第二轮 58 → 64 → 68）。**尚未发布**：线上 Latest 仍是 v1.4.7。
 
 ### 10.1 修了什么（按审计编号）
 
@@ -202,6 +202,7 @@ python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64�
 | CI 第五次红（同族） | `e8a59e4` | 离屏探针把"文字列能数出 5 行"当断言，runner 上只有 4 行 ⇒ 判据换成"整列图标墨水"（与行几何无关）；变异（不存在的符号名 ⇒ 0.0000）证明它有牙 |
 | 工具栏"猜出来再删"补测试（08-08 / 13-08） | `85c6ba5`（D-026） | 9 条正反用例，负向更承重（自己的复制/筛选/搜索项不许被误删）；顺带量出 `item.view = nil` 会清掉 `item.action`，以及那条 action 直判其实是冗余保险（删了仍全绿） |
 | 快捷键录制器（13-08） | `14a37a0`（D-027） | 6 条只测可观测行为的用例里，5 条直接绿、1 条红在**产品**：录完合法组合后按钮仍写着"请输入快捷键"（`didSet` 在录制态跳过回显，之后再没人改）。加一行显式回显修掉；失焦那条守卫经变异对照承重 |
+| 行内直接操作（用户提出） | `1395425`（D-028） | 双击行 = 复制这条（与浮层「再次复制」同一个动作）；行首星标 = 就地收藏。星标从 `.clear` 指示器变成真控件，两态颜色都量化到 ≥3:1（未收藏 1.76/2.17 → 3.54/4.64，已收藏 黄 1.67 → 琥珀 3.90/4.28）；**这次是在屏合成点击真点验证的**。帧 64 → 68 |
 | 看画面才看见的文案缺陷 | `16d658d` | 推荐理由一行里把来源 App 说两遍（`Safari · 偏好链接 · 回到Safari`）。改成「没有别的标签点过来源 App 才补裸名」；断言先写、对旧实现报红（2 次）后才动实现 |
 
 ### 10.2 本轮自己制造并被测试抓住的问题
@@ -240,9 +241,9 @@ gh run view <run-id> --log | grep -E "PERF\[|同操作样本跨度"
 ```bash
 cd /Users/wangziyi/Codex_Project0/ClipboardHistory
 swift build && swift test                       # 318 例 / 6 skip / 0 失败
-CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 64 帧
+CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 68 帧
 CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests    # 在屏探针（会抢前台）
 cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
-账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 11 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-027）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。
+账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-20 + 12 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-028）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。
