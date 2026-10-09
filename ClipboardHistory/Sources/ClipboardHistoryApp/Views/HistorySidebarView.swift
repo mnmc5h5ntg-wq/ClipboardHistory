@@ -208,8 +208,45 @@ private struct HistoryRowFramePreferenceKey: PreferenceKey {
 
 // MARK: - Segmented Filter Picker — sliding pill with spring overshoot
 
+/// 筛选 pill 的动效（审计第二轮 1.1 / 1.12 / R2-10）。
+///
+/// 滑块的过冲弹簧与 hover 放大属于"为动而动"：系统分段控件没有这种弹性，
+/// 而且它们以前**不读**系统的「减弱动态效果」开关。抽成纯函数，
+/// 一是为了单测两个分支，二是为了让"减少动态时到底退化成什么"写在同一处。
+enum FilterPillMotion {
+    /// 滑块动效的**参数**（纯值，可测）。`Animation` 本身不便比较，
+    /// 所以让视图消费这个值，测试断言这个值 —— 否则"减少动态时到底退化成什么"没有判据。
+    struct SlideMotion: Equatable {
+        /// true = 瞬移，不做动画。
+        let isInstant: Bool
+        let response: Double
+        /// < 1 表示有过冲（弹簧）；等于 1 表示不过冲。
+        let damping: Double
+    }
+
+    static func slideMotion(reduceMotion: Bool) -> SlideMotion {
+        reduceMotion
+            ? SlideMotion(isInstant: true, response: 0, damping: 1)
+            : SlideMotion(isInstant: false, response: 0.38, damping: 0.72)
+    }
+
+    static func slideAnimation(reduceMotion: Bool) -> Animation {
+        let motion = slideMotion(reduceMotion: reduceMotion)
+        return motion.isInstant
+            ? .linear(duration: 0)
+            : .spring(response: motion.response, dampingFraction: motion.damping)
+    }
+
+    /// hover 放大：减少动态时不放大（1.0 = 原尺寸）。
+    static func hoverScale(isHovered: Bool, reduceMotion: Bool) -> CGFloat {
+        guard isHovered, !reduceMotion else { return 1.0 }
+        return 1.08
+    }
+}
+
 private struct SegmentedFilterPicker: View {
     @Binding var selection: HistoryStore.Filter
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -241,7 +278,7 @@ private struct SegmentedFilterPicker: View {
                 .frame(width: geo.size.width / count - 2)
                 .padding(.vertical, 1)
                 .offset(x: idx * (geo.size.width / count) + 1)
-                .animation(.spring(response: 0.38, dampingFraction: 0.72), value: selection)
+                .animation(FilterPillMotion.slideAnimation(reduceMotion: reduceMotion), value: selection)
         }
     }
 }
@@ -251,12 +288,13 @@ private struct FilterSegmentButton: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .scaleEffect(isHovered ? 1.08 : 1.0)
+                .scaleEffect(FilterPillMotion.hoverScale(isHovered: isHovered, reduceMotion: reduceMotion))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
                 .padding(.horizontal, 10)
