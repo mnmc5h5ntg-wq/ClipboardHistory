@@ -86,6 +86,10 @@ final class HotKeyRecorderButton: NSButton {
 
         shortcut = newShortcut
         isRecording = false
+        // 立刻回显新组合。`shortcut` 的 didSet 在 `isRecording` 还是 true 的那一步被跳过，
+        // 而以前之后再没人改过标题 —— 按钮会一直停在"请输入快捷键"，
+        // 直到下一次 SwiftUI 刷新把同一个值重新赋一遍才恢复（`updateNSView`）。
+        title = shortcut.displayString
         window?.makeFirstResponder(nil)
         onShortcutChange?(newShortcut)
     }
