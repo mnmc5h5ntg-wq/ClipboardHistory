@@ -151,6 +151,10 @@ UI 侧暗色与 60fps 达标、**键盘可达性实测不达标**、亮色 chrom
 当前判据：`swift build` 0 告警 · `swift test` **284 例 / 5 skip / 0 失败** · `python3 -m unittest discover -s scripts/tests` **25 例 OK** ·
 远端 `main` 与本地一致 · CI 在 `a009dd5` 全绿（8 步全 success）。
 
+**CI 红过两次，都是同一类错**（`1183f9f`/`d218803`）：`testPixelDimensionsReadsARealPNG` 把本机的 2× 渲染倍率当成了契约，
+CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52` 改成与倍率无关的不变量（与 `NSImage` 自己的位图表示一致）。
+教训记在 `~/.qoder-cn/memory/feedback-probe-and-assertion-hygiene.md`：**本机实测的数字进断言前，先问别的机器上它还是不是这个数**。
+
 仍未做（明细与理由在 `AGENT_BACKLOG.md` 的 R2-*）：R2-02 的在屏复测（需人工开「完全键盘访问」）、R2-14 文档更正、
 R2-15 AI 脚手架移出产品路径、R2-16 待决策、R2-17 菜单栏面板接缝、R2-18/R2-19 捕获噪声与夹具时钟、
 UI 批次 A 剩两处（设置侧栏符号风格、GlassPill 图标重量）。
