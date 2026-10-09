@@ -477,12 +477,13 @@ private struct SettingsSidebarRow: View {
                 // 不显式上色的话，未选中行的 SF Symbol 会按系统弱化色渲染，
                 // 在浅色主题下几乎看不见（离屏渲染验收时发现的真实缺陷）
                 .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
-                // 这里**刻意保持** `.hierarchical`，不改 monochrome：审计第二轮 1.9 说侧栏图标
-                // "outline 与 filled 混用、未选中的比选中的轻"，但离屏帧给不出可靠证据 ——
-                // 单层符号（command/gearshape/folder）即使显式 `.primary` 在这些帧里仍画成近白，
-                // 真机上不可能长这样，说明 settings-* 帧的侧栏图标列是捕获伪影（与 content-* 侧栏同族）。
-                // 在不可信的证据上改渲染模式只会把"推荐"的实心 sparkle 改淡（实测如此），
-                // 所以本项标 NOT-RUN：要真机看一次，或把设置页也纳入在屏捕获（R2-17 的接缝之后）。
+                // 这里**刻意保持** `.hierarchical`。审计第二轮 1.9 说侧栏图标"outline 与 filled 混用、
+                // 未选中的比选中的轻"，看起来像缺陷；本轮把这件事量成了数字（`OffscreenSymbolInkProbeTests`）：
+                // 在这一帧里未选中四行的图标列墨水是 0.0000，而把同一个图标的颜色换成固定的 `Color.black`
+                // 就能画到 0.175–0.402 —— 也就是说不可见来自**离屏管线对语义色的解析**，不是产品。
+                // 结论：既不能按这帧判缺陷，也不能为了讨好这一帧把 `.primary` 换成固定色
+                // （那会在真实深浅色切换时把颜色写死）。哪一层导致的没有定论，探针每次视觉审计会重量一遍。
+                // 以前这里写的是"真机不可能长这样"的推断，现在换成测量。
                 .symbolRenderingMode(.hierarchical)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
