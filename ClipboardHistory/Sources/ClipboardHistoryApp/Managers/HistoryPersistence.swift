@@ -219,6 +219,10 @@ final class FileHistoryPersistence: HistoryPersisting {
             return
         }
         let snapshot = try saveSnapshot(from: entries)
+        // 去抖：连续保存时，让还没开始执行的那一次被后一次取代 —— 快照是**整库**的，
+        // 后一次包含前一次的全部内容，所以丢弃前一次不会丢数据。
+        // 刻意**不**用定时器延时落盘：那会在"复制完立刻退出 App"时丢掉最后一条。
+        pendingSave?.cancel()
         let workItem = Self.makeSaveWorkItem(
             snapshot: snapshot,
             rootDirectory: rootDirectory,
@@ -373,6 +377,26 @@ final class FileHistoryPersistence: HistoryPersisting {
         return StoredImage(pngData: data)
     }
 
+    /// 磁盘上那份图片是否已经就是"我们这次要写的字节"。
+    ///
+    /// 判据是**存在 + 字节长度相同**。文件名由条目 UUID 派生，所以只有"同一条目的图片换了内容"
+    /// 才可能需要重写，而两张不同的图 PNG 压出来长度恰好相同的概率可以忽略；真出现
+    /// "同名同长度不同内容"只有手改存档一条路，而那种情况下 `load()` 本来就以磁盘为准。
+    /// 换来的是稳态保存不再把整库图片重写一遍（审计第二轮 B-1 / R2-04：磁盘 IO 与图片数线性，
+    /// 500 条带图的库每次复制都要重写几百个文件）。
+    /// 外部把文件删掉时这里返回 false ⇒ 自动补写，不会留下"存档指着不存在的图片"。
+    nonisolated private static func isAlreadyOnDisk(
+        _ url: URL,
+        data: Data,
+        fileManager: FileManager
+    ) -> Bool {
+        guard let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+              let size = attributes[.size] as? NSNumber else {
+            return false
+        }
+        return size.int64Value == Int64(data.count)
+    }
+
     nonisolated private static func makeSaveWorkItem(
         snapshot: SaveSnapshot,
         rootDirectory: URL,
@@ -403,6 +427,9 @@ final class FileHistoryPersistence: HistoryPersisting {
         try ensurePrivateDirectory(imagesDirectory, fileManager: fileManager)
         for imageWrite in snapshot.imageWrites {
             let imageURL = imagesDirectory.appendingPathComponent(imageWrite.fileName)
+            if isAlreadyOnDisk(imageURL, data: imageWrite.data, fileManager: fileManager) {
+                continue
+            }
             try imageWrite.data.write(to: imageURL, options: .atomic)
             try setPrivateFilePermissions(imageURL, fileManager: fileManager)
         }
