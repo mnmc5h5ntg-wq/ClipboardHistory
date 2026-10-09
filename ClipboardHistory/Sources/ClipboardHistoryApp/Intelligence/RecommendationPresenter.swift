@@ -34,13 +34,37 @@ enum RecommendationPresenter {
         let features = candidate.score.features
         var tags: [String] = []
 
+        // App 亲和标签先算出来：它可能已经把来源 App 的名字说了一遍（"回到Safari"），
+        // 下面决定是否还要补一个裸 App 名时要用到这个事实。
+        // 顺序保持不变 —— 这里只是**提前计算**，追加仍在原来的位置。
+        var appAffinityTag: String?
+        if (features[.appAffinity] ?? 0) > 0 {
+            let source = entry.sourceAppName
+            switch (source, currentAppName) {
+            case let (source?, current?) where source == current:
+                appAffinityTag = "回到\(source)"
+            case let (source?, current?):
+                appAffinityTag = "\(source)→\(current)"
+            default:
+                appAffinityTag = "App匹配"
+            }
+        }
+
         if let current = currentAppName, let source = entry.sourceAppName, current == source {
             // 就在原应用里，不必重复说明
         } else if let current = currentAppName {
             tags.append("当前在\(current)")
         }
-        if let source = entry.sourceAppName,
-           !tags.contains(where: { $0.hasPrefix("当前在") }) {
+        // 裸来源 App 名只在"没有任何标签点过来源 App"时才补：
+        // "当前在X"（跨应用时来源会由 "Safari→X" 说）与 "回到Safari" 都算点过。
+        // 以前只挡了前者，于是"就在原应用里 + 有 App 亲和"这一最常见组合会写成
+        // "Safari · 回到Safari"（菜单栏面板第一次拍出真像素时看到的问题）。
+        let sourceAlreadyNamed: Bool = {
+            if tags.contains(where: { $0.hasPrefix("当前在") }) { return true }
+            guard let tag = appAffinityTag, let source = entry.sourceAppName else { return false }
+            return tag.contains(source)
+        }()
+        if let source = entry.sourceAppName, !sourceAlreadyNamed {
             tags.append(source)
         }
         if (features[.recency] ?? 0) >= 0.34 {
@@ -52,16 +76,8 @@ enum RecommendationPresenter {
         if (features[.contentTypeAffinity] ?? 0) > 0 {
             tags.append(contentTypeTag(bundleID: context.frontmostApplication?.bundleIdentifier))
         }
-        if (features[.appAffinity] ?? 0) > 0 {
-            let source = entry.sourceAppName
-            switch (source, currentAppName) {
-            case let (source?, current?) where source == current:
-                tags.append("回到\(source)")
-            case let (source?, current?):
-                tags.append("\(source)→\(current)")
-            default:
-                tags.append("App匹配")
-            }
+        if let appAffinityTag {
+            tags.append(appAffinityTag)
         }
         if (features[.semanticSimilarity] ?? 0) > 0 {
             tags.append(behavioralTag(events: context.recentEvents))

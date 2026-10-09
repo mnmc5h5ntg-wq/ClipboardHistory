@@ -74,6 +74,10 @@ final class RecommendationPresenterTests: XCTestCase {
     }
 
     func testAppAffinityLabels() {
+        func mentions(_ haystack: String, _ needle: String) -> Int {
+            haystack.components(separatedBy: needle).count - 1
+        }
+
         let same = RecommendationPresenter.reason(
             for: candidate(features: [.appAffinity: 0.1]),
             entry: textEntry("x", source: "Safari"),
@@ -82,6 +86,10 @@ final class RecommendationPresenterTests: XCTestCase {
             reuseCount: 0
         )
         XCTAssertTrue(same.contains("回到Safari"), same)
+        // 菜单栏面板第一次拍出真像素时暴露的缺陷：来源 App 在同一行里被说了两遍
+        // （"文本 · Safari · 偏好链接 · 回到Safari · 24%"）。「回到Safari」已经点明来源，
+        // 再列一个裸名只是把 2 行的菜单位置吃掉。
+        XCTAssertEqual(mentions(same, "Safari"), 1, "来源 App 不得重复出现：\(same)")
 
         let crossing = RecommendationPresenter.reason(
             for: candidate(features: [.appAffinity: 0.1]),
@@ -91,6 +99,17 @@ final class RecommendationPresenterTests: XCTestCase {
             reuseCount: 0
         )
         XCTAssertTrue(crossing.contains("Safari→Notes"), crossing)
+        XCTAssertEqual(mentions(crossing, "Safari"), 1, "跨应用时也不该再多列一个裸来源名：\(crossing)")
+
+        // 反向：没有亲和标签时，裸来源名是**唯一**的来源信息，不能被一起去掉。
+        let noAffinity = RecommendationPresenter.reason(
+            for: candidate(features: [:]),
+            entry: textEntry("x", source: "Safari"),
+            context: context(),
+            currentAppName: "Safari",
+            reuseCount: 0
+        )
+        XCTAssertTrue(noAffinity.contains("Safari"), "去掉重复时不能把来源信息一起删掉：\(noAffinity)")
     }
 
     func testBehavioralTags() {
