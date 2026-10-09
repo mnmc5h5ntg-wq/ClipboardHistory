@@ -355,6 +355,34 @@ name: decisions
   变异对照：删掉 `resignFirstResponder` 覆写 ⇒ 恰好失焦那条红。
 - 13-08 剩下的两块（设置页交互、生命周期回调）本轮**没做**，理由记在 `AGENT_BACKLOG.md` 快照 11。
 
+## D-031 v1.4.8 出包与发布（用户授权）
+
+- 触发：用户看完侧边任务修掉的两个缺陷（D-029 启动闪退、D-030 焦点环）后说"这一版可以封装为 release 提交为 v1.4.8"。
+  本轮整改的全部改动（审计第二轮 N-1…N-4 / R2-01…R2-19 + 行内交互 D-028）第一次进交付物。
+- 决定 1：**出包前先补发布链路的启动闸门**（`d698a4c`，见 R2-21）。理由是 v1.4.8 的前一版构建物就是"全绿但打不开"，
+  而链路上没有任何一步真的执行过它。闸门做成静态读反汇编而不是启动用户的 app：后者会读他真实存档、还可能触发写盘（D-002）。
+- 决定 2：**发布说明与 CHANGELOG 由脚本草稿重写成真实内容**。脚本产出的是"待补充/待确认"占位（v1.4.6 那次差点发出去，
+  已写在 `docs/RELEASE_PROCESS.md` 的坑里），本版逐条对着提交历史重写，并明确列出"还没做到的"四条
+  （未公证、多文件拖出、AI 未接线、Tab 到列表行未在其机器复测）。
+- 决定 3：**R2-21 只标"部分完成"**。静态闸门证明的是"不会在 `-init` 上 trap"，证明不了"窗口建得起来"；
+  运行时冒烟（进程活过 N 秒 / 启动日志出现守卫放行）仍是缺口。把闸门当成功劳全关掉，下一轮就不会再有人补那一步。
+- 资产命名沿用 v1.4.7 的实测口径：仓库内 `releases/时间剪史_v1.4.8.dmg(.sha256)`（中文），
+  GitHub 资产用 ASCII 名 `ClipboardHistory_v1.4.8.dmg(.sha256)`，且**上传的那份 .sha256 里写的是 ASCII 文件名** ——
+  否则用户下回来 `shasum -c` 必然失败（v1.4.6 踩过）。
+- 交付验证（都对**产物**做，不是对构建前的中间物）：
+  · DMG `hdiutil verify` 通过；挂载后 `Info.plist` 的 `CFBundleShortVersionString` = 1.4.8、`CFBundleExecutable` = ClipboardHistoryApp；
+  · 启动闸门对 DMG 内的二进制再跑一次：通过，且仍读到 2 个良性桩类名（证明解析器不是瞎的，"通过"是有内容的通过）；
+  · `codesign --verify --deep --strict` 有效；`spctl -a -t execute` **rejected** —— ad-hoc 签名未公证，预期如此，
+    所以发布说明里保留 Control-点击「打开」的指引；
+  · 发布后自检：`gh release list` 的 Latest = v1.4.8；`gh release view --json assets` 里 GitHub 自己算的
+    `sha256:c31a16e0…e88d` 与本地/仓库内 .sha256 逐字一致（独立第二估计器）；
+    在仓库外目录 `gh release download` 后 `shasum -a 256 -c` 报 OK。
+- 代码状态：`e4aee3c`（tag `v1.4.8`，轻量 tag 打在发布准备提交上，与 v1.3 起的做法一致）。
+  该提交上实测 `swift build` 0 告警 · `swift test` 328 例 / 9 skip / 0 失败 · 发布脚本测试 30 例 OK · 68 帧基线。
+- 回滚：线上 Latest 可退回 v1.4.7（`gh release edit v1.4.7 --latest` 语义等价于把 Latest 指回去）；
+  存档格式仍是 v1，v1.4.7 读 v1.4.8 写出的存档只会忽略两个新增可选字段。
+
+
 ## D-029 修掉 D-019 带进去的启动闪退（S1：产品一打开就 trap）
 
 - 现象（用户报）：从仓库根目录打开新打的包**闪退**。`~/Library/Logs/DiagnosticReports/` 里 23:05 有两份 .ips，

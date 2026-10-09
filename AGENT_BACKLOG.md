@@ -243,6 +243,18 @@
 按"不在没接缝的地方硬凑测试"处理，留在下轮。
 当前判据：`swift build` 0 告警 · `swift test` **318 例 / 6 skip / 0 失败** · python 25 例 OK · 64 帧与修复前 sha 全同。
 
+**进度快照 13（v1.4.8 出包，D-031）**：用户授权后发布，tag `v1.4.8` 打在 `e4aee3c`，线上 Latest 已切换。
+出包前先把 R2-21 的闸门补上：`prepare_release.py` 反汇编包内二进制，`AppDelegate` 还留着「未实现初始化器」桩就拒绝发布
+—— D-029 那一版正是"327 例绿、CI 绿、codesign 有效，用户一打开就闪退"，而链路里没有任何一步真的执行过它。
+闸门做成静态读产物而不是启动用户的 app（后者会读他真实存档）。两个坑都踩过并写进注释：
+arm64 上类名字面量离调用点二十几行（固定窗口回看会在坏产物上报"干净"），
+文件路径字面量含 `.swift` 会被当成类名（在正确产物上误报）。
+变异对照两轮：把 D-029 装回去重打包 ⇒ 闸门点名 `ClipboardHistoryApp.AppDelegate`、端到端用例红；
+删掉 `prepare()` 里的调用点 ⇒ 接线用例红。发布说明与 CHANGELOG 的占位内容全部重写成真实改动并列出"还没做到的"。
+**R2-21 只标部分完成**：静态桩证明不了"窗口建得起来"，运行时冒烟（真的打开、活过 N 秒）仍欠。
+当前判据（发布提交上实测）：`swift build` 0 告警 · `swift test` 328 例 / 9 skip / 0 失败 ·
+发布脚本测试 30 例 OK · 68 帧基线 · 线上 Latest = v1.4.8。
+
 **进度快照 12（用户提的交互需求：行内双击复制 + 星标收藏，D-028）**：收藏/复制以前只在详情区右下角浮层里，
 鼠标要横穿整个窗口。现在行上直接有：双击 = 与浮层"再次复制"同一个动作（`.copyAndPromote`），
 行首星标 = 就地收藏/取消。星标做成行的**兄弟控件**而不是嵌套 Button，双击用
@@ -280,7 +292,7 @@
 | R2-17 | 03 §0 / 04 §4.2 N-1 | 中 | 已完成(f7398f3 接缝 + 37f43f6 补拍 6 帧)；系统菜单材质与菜单项 chrome 仍 NOT-RUN | 菜单栏面板至今拍不到帧：构造 `AppDelegate` 会读用户真实存档，而 `HOME` 重定向实测**不改变** `applicationSupportDirectory`。给 `AppDelegate` 加一个 store 注入接缝（`AppDelegate(store:)`）后即可安全拍帧 —— 这是"UI 验收覆盖菜单栏"的前置条件 |
 | R2-18 | 03 §方法 | 高 | 已完成(bdb557b) | 视觉捕获的时序噪声：同一份代码连拍两次即有 30/58 帧不同(闪烁插入点)。修法是拍前交出第一响应者并把插入点画成透明 |
 | R2-19 | 03 §方法 | 高 | 已完成(bdb557b) | 捕获夹具用 Date() 当时钟 ⇒ 跨分钟连拍时字符串本身在变像素。改用固定参考时刻，此后同代码连拍 0 帧不同 |
-| R2-21 | D-029 | 高 | 待办 | **发布链路没有「能不能启动」这一关**：CI 只跑 `swift build && swift test`，从不启动 .app，于是 D-019 那个「Swift 侧看不见、ObjC 侧才走」的启动 trap 带着 327 个绿用例出了包。补法：CI 里 `make bundle` 之后跑一次启动冒烟（fresh runner 上没有用户数据，安全），判据是进程活过 N 秒或 app 自己写的启动日志里出现「守卫放行 + 窗口建好」；或者加一个只在环境变量下走的 self-test 入口，让它经元类型构造 AppDelegate 后立刻退出 | | R2-20 | 用户反馈 / D-028 | 中 | 待办 | 收藏切换会把**多选收成一条**：`HistoryStore.toggleFavorite` 走 `reconcileSelection(preferredEntryID:)`，那里 `selectedEntryIDs = [preferredEntryID]`。行内星标（`1395425`）把这个动作搬到手边之后更容易撞到。改之前要先定"取消收藏后这条离开收藏筛选时，选择该落到哪"，并同步 `copyAndPromote` 是否也该保留多选 |
+| R2-21 | D-029 | 高 | **部分完成(d698a4c)** | 发布链路加了启动闸门，但只挡住 D-029 那一类：`prepare_release.py` 现在反汇编包内二进制，`AppDelegate` 若还留着「未实现初始化器」桩就拒绝发布（v1.4.8 已按此闸门出包，且对 DMG 内产物重跑过一次）。**仍欠的是「真的打开一次」**：进程活过 N 秒 / 启动日志里出现「守卫放行 + 窗口建好」这类运行时冒烟还没做 —— 静态桩只能证明不会在 `-init` 上 trap，证明不了窗口建得起来。原建议（CI 里 `make bundle` 后跑启动冒烟，fresh runner 无用户数据）仍然有效 |
 **进度快照 13（D-029：修掉自己带进去的启动闪退）**：用户报「从仓库根目录打开新版 app 闪退」。
 两份 .ips 的崩溃 PC 紧跟 `_unimplementedInitializer(AppDelegate, "init()")` + `brk #1`，包 UUID 与仓库产物一致 ⇒ D-019 给 `AppDelegate` 加显式 `init(historyStore:)` 之后，ObjC 的 `-init` 变成编译器留下的 trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过元类型调它。
 327 个用例与 CI 全绿挡不住的原因：Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init，永远走不到 `-init`；CI 也从不启动 .app。修法是三行 `override convenience init()`，守卫两条互补（运行时走元类型 + 源码扫描必须声明 override init）。修之前那条运行时守卫原地复现了同一句 fatal error（signal 5），修之后绿。

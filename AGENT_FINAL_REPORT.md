@@ -172,7 +172,7 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 `git rev-list --count 81bce8d..HEAD`，其中只动 `AGENT_*.md` 的那些用逐提交 `git show --pretty=format: --name-only` 归类；
 全部已推送。`swift build` 0 告警；用例数同样**现取**（它会随下一次提交变，写死必过期）：
 `cd ClipboardHistory && swift test 2>&1 | grep -E "Executed [0-9]+ tests" | tail -1`；
-python 脚本测试 25 例（`python3 -m unittest discover -s scripts/tests`）；离屏帧 68 个（第二轮 58 → 64 → 68）。**尚未发布**：线上 Latest 仍是 v1.4.7。
+python 脚本测试 25 例（`python3 -m unittest discover -s scripts/tests`）；离屏帧 68 个（第二轮 58 → 64 → 68）。**已发布**：v1.4.8，见下面 §11。
 
 ### 10.1 修了什么（按审计编号）
 
@@ -251,3 +251,40 @@ cd .. && python3 -m unittest discover -s scripts/tests                          
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
 账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-21 + 14 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-028）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍 + 侧栏图标测量）。
+
+---
+
+## 11. v1.4.8 发布（2026-10-10）
+
+用户授权后出包。发布对象是 `e4aee3c`（轻量 tag `v1.4.8`），线上 Latest 已切到本版：
+<https://github.com/mnmc5h5ntg-wq/ClipboardHistory/releases/tag/v1.4.8>
+
+**这一版含**：审计第二轮的全部整改（N-1…N-4、R2-01…R2-19，见 §10）、行内直接操作（双击复制 + 星标收藏，D-028）、
+以及侧边任务修掉的两处（D-029 启动闪退、D-030 焦点环）。
+
+**出包前先补了一道闸门**（D-031 / R2-21）：`prepare_release.py` 现在会反汇编包内二进制，
+`AppDelegate` 若还留着「未实现初始化器」桩就拒绝发布。必要性由 D-029 本身证明——
+那一版"327 个用例绿、CI 绿、codesign 有效"，用户一打开就闪退，因为链路里没有任何一步真的执行过它。
+闸门只挡到"不会在 `-init` 上 trap"，**运行时冒烟（真的打开、活过 N 秒）仍是缺口**，所以 R2-21 标的是部分完成。
+
+对**产物**而不是对中间构建做的验证：
+
+| 检查 | 结果 |
+|---|---|
+| `hdiutil verify` DMG | VALID |
+| 挂载后读 `Info.plist` | `CFBundleShortVersionString` = 1.4.8、`CFBundleExecutable` = ClipboardHistoryApp |
+| 启动闸门跑在 DMG 内的二进制上 | 通过；同时仍读到 2 个良性桩类名 ⇒ "通过"是有内容的通过，解析器不是瞎的 |
+| `codesign --verify --deep --strict` | valid on disk / satisfies DR |
+| `spctl -a -t execute` | **rejected**（ad-hoc 未公证，预期）⇒ 发布说明保留 Control-点击指引 |
+| `gh release list` | Latest = v1.4.8 |
+| 服务端自算摘要 vs 仓库 `.sha256` | `c31a16e0…e88d` 逐字一致（独立第二估计器） |
+| 仓库外 `gh release download` + `shasum -a 256 -c` | OK |
+
+发布时该提交的实测：`swift build` 0 告警 · `swift test` 328 例 / 9 skip / 0 失败 ·
+发布脚本测试 30 例 OK（现取：`python3 -m unittest discover -s scripts/tests`）· 68 帧基线。
+资产命名沿用 v1.4.7 口径：仓库内中文名、GitHub 用 ASCII 名，且上传那份 `.sha256` 内写 ASCII 文件名
+（否则用户下回来 `shasum -c` 必失败，v1.4.6 踩过）。
+
+数据兼容：存档格式仍是 v1，只新增两个可选字段；回退到 v1.4.7 只会忽略它们。
+
+仍开着的 issue：#13「右键菜单未汉化且含无关项」—— 本轮没碰右键菜单，没有顺手关掉它。
