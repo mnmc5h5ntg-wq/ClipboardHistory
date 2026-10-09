@@ -168,7 +168,7 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 ## 10. 第二轮审计整改（2026-10-09 晚）
 
 审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
-被审对象是 HEAD `81bce8d`。本轮在它之上做了 **40 个提交**（31 个动代码或测试、9 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**、
+被审对象是 HEAD `81bce8d`。本轮在它之上做了 **41 个提交**（31 个动代码或测试、10 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**、
 python 脚本测试 **25 例 OK**、64 帧离屏捕获（第二轮末 58 → 64）。**尚未发布**：线上 Latest 仍是 v1.4.7。
 
 ### 10.1 修了什么（按审计编号）
@@ -235,4 +235,4 @@ cd .. && python3 -m unittest discover -s scripts/tests                          
 python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
 ```
 账本：`AGENT_STATE.md`（第二轮章节 + 3 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 8 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-024）、`AGENT_UI_AUDIT.md`（第二轮章节 + 菜单栏面板补拍）。
-上面那句"40 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 9 个用逐提交 `git show --name-only` 归类得到。
+上面那句"41 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 10 个用逐提交 `git show --name-only` 归类得到。
