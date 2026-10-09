@@ -126,7 +126,7 @@ final class PerfBudgetTests: XCTestCase {
         let sizeMs = milliseconds { _ = content.sizeDescription }
         print("PERF preview(2.4MB)=\(String(format: "%.2f", previewMs))ms sizeDescription=\(String(format: "%.2f", sizeMs))ms")
         XCTAssertLessThan(previewMs, 5, "单条预览必须是常数级（修复前 45.8ms）")
-        XCTAssertLessThan(sizeMs, 20, "尺寸文案仍走整串计数（grapheme 计数），暂以 20ms 为上界；基线 5.5ms")
+        XCTAssertLessThan(sizeMs, 5, "尺寸文案已改成有界计数（数到 10 万即停）：实测 1.11ms，上界从 20ms 收回 5ms；旧实现整串计数基线 5.5ms")
     }
 
     /// R-09：一次过滤求值不应是全表重复扫描级别的成本。

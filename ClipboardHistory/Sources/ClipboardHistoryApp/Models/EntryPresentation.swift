@@ -34,10 +34,27 @@ enum EntryPresentation {
         }
     }
 
+    /// 显示用的字符数上限。`String.count` 是整串 grapheme 遍历（2.4MB 文本实测 5.5ms，
+    /// 审计第一轮 R-10 / 第二轮 B-3），而这行文案只需要量级正确：数到上限就停。
+    static let sizeCountLimit = 100_000
+
+    /// 数到 `limit` 就放弃并返回 `nil`（表示"超过上限"），让成本有界而不是随内容线性增长。
+    static func characterCount(of string: String, limit: Int = sizeCountLimit) -> Int? {
+        var count = 0
+        for _ in string {
+            count += 1
+            if count > limit { return nil }
+        }
+        return count
+    }
+
     static func sizeDescription(for content: ClipboardEntryContent) -> String {
         switch content {
         case .text(let string):
-            return "\(string.count) 个字符"
+            if let count = characterCount(of: string) {
+                return "\(count) 个字符"
+            }
+            return "超过 \(sizeCountLimit) 个字符"
         case .image(let image):
             return "\(Int(image.nsImage.size.width)) × \(Int(image.nsImage.size.height)) 像素"
         case .file(let url):
