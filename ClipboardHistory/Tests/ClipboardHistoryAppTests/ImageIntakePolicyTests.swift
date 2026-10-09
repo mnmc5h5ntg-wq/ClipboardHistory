@@ -29,11 +29,13 @@ final class ImageIntakePolicyTests: XCTestCase {
         let image = try makeStoredImage(color: .systemTeal, size: NSSize(width: 41, height: 17))
         let bytes = try XCTUnwrap(image.pngData())
         let dimensions = try XCTUnwrap(ImageIntakePolicy.pixelDimensions(of: bytes))
-        // 读出来的必须是**像素**而不是点：本机 `makeStoredImage` 以 2× 位图渲染，
-        // 所以 41×17 点会得到 82×34 像素（这也是所有捕获帧"名字里是点、文件里是 2× 像素"的原因）。
-        // 断言写成"严格大于点尺寸 + 宽高比不变"，不把某个倍数钉死 —— 换个非 retina 环境倍数就变了。
-        XCTAssertGreaterThan(dimensions.width, 41)
-        XCTAssertGreaterThan(dimensions.height, 17)
+        // 判据必须是**与渲染倍率无关**的：读出来的像素尺寸要和 NSImage 自己那份位图一致。
+        // 第一版写的是"严格大于点尺寸"，那是把本机的 2× 当成了契约 —— CI runner 是 1×，
+        // 41×17 点就编码成 41×17 像素，那条断言立刻红（又一次"环境依赖的测试"）。
+        let representation = try XCTUnwrap(image.nsImage.representations.first)
+        XCTAssertEqual(dimensions.width, representation.pixelsWide)
+        XCTAssertEqual(dimensions.height, representation.pixelsHigh)
+        // 宽高比不变（无论 1× 还是 2× 都成立）。
         XCTAssertEqual(dimensions.width * 17, dimensions.height * 41, "宽高比必须与请求的一致")
         XCTAssertNil(ImageIntakePolicy.pixelDimensions(of: Data("这不是图片".utf8)),
                      "非图片数据必须返回 nil，而不是编一组宽高")
