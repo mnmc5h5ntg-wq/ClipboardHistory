@@ -162,3 +162,73 @@ make dmg                         # ⚠ 唯一没重跑的一条：它会覆盖�
 这一版是**把每条真跑过之后重写的**。原来那段有两处照着敲就跑不通：python 那条排在 `cd ClipboardHistory` 之后，
 而那个目录里没有 `scripts/tests`（实测退出码 1、报 `Start directory is not importable`）；`make dmg` 被写成"复跑"，
 实际在新路径复跑它会覆盖已发布产物的校验和 —— 现在明确标成"不要重跑"，并补了一条真实可跑的 `shasum -c`。
+
+---
+
+## 10. 第二轮审计整改（2026-10-09 晚）
+
+审计交付：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-09_第二轮/`（135 格全覆盖 + 4 条新缺陷 + 6 条"修了一半" + 13 轴 HIG 审查），
+被审对象是 HEAD `81bce8d`。本轮在它之上做了 **37 个提交**（29 个动代码或测试、8 个只动账本；本节的这次改动算在内），全部推送；`swift build` 0 告警、`swift test` **301 例 / 5 skip / 0 失败**、
+python 脚本测试 **25 例 OK**、58 帧离屏捕获。**尚未发布**：线上 Latest 仍是 v1.4.7。
+
+### 10.1 修了什么（按审计编号）
+
+| 审计项 | 提交 | 一句话 |
+|---|---|---|
+| N-1（S2 崩溃） | `876c015` + 守卫 `ca12531` | adapter 的两个 `Dictionary(uniqueKeysWithValues:)` 改为保留首条；补**走 HistoryStore 全管线**的端到端用例，变异对照把实现改回去会让进程 trap |
+| N-2（S2 数据丢失） | `bacde44` | `HistoryStore.init` 不再写盘，首次写回推迟到守卫放行之后；原三条"init 即持久化"用例保留全部断言并新增"init 阶段零写入" |
+| N-3 / N-4 | `fb37c4b` / `a56f2e5` | `load()` 复位只读标志；把"不记也算通过"的假绿断言钉成两侧 |
+| R2-01 | `ca12531` | 见 N-1 |
+| R2-03 亮色 chrome | `6a2c040` | 9 处 `.white.opacity` → 语义色；亮色 pill 的 chrome 从"与背景差 ≤3 级"变成 43 级 |
+| R2-04 保存 IO | `9ac4661` | 同名同长度的图片文件不再重写；被取代的落盘任务取消；inode 判据 + "history.json 每次必换" 阳性对照 |
+| R2-05 拖拽 | `d463ef9` + `53bbe85` | 拖出（文本/PNG/文件引用）与拖入（文件入库）都通了；多文件拖出需要 NSView 级 session，明确不做半截动作 |
+| R2-06 破坏性确认 | `a841337` | Return 现在是"取消"，破坏性按钮无快捷键且标 `hasDestructiveAction` |
+| R2-07 来源 App 落盘 | `d8d11f4`（D-016） | schema 仍 v1，两个可选字段；隐私文案同步披露 |
+| R2-08 图片上限 | `1183f9f`（D-017） | 4096px 最长边，4K 截图逐字节不动；端到端采集用例 |
+| R2-09 图标/空态/超时 | `1214526` | `"questionable"` 非法符号 → `questionmark.circle`，并加了一道全仓 SF Symbol 扫描守卫；菜单补空态；spinner 8 秒兜底 |
+| R2-10 减少动态 | `2438aa6` | pill 的过冲弹簧与 hover 放大读系统开关 |
+| R2-11 全串计数 | `8cfdfe5` | 有界字符计数，性能上界从 20ms 收回 5ms |
+| R2-12 粘贴前复核 | `d218803` | 250ms 内目标 App 换了/退了就不再注入，并说明内容仍在剪贴板 |
+| R2-13 字号 | `1214526` + `d218803` | 菜单理由行与行时间戳都提到 11pt |
+| R2-14 文档 | `f7398f3` | R-20 那行"移到 history.expired.json"的假承诺已更正 |
+| R2-15 AI 脚手架 | `d0b2416`（D-020） | 拆三个 target；`nm` 证明草案符号在产品二进制里为 0 |
+| R2-16 只含 public.url | `f7398f3`（D-018） | 现在记成文本条目 |
+| R2-17 注入接缝 | `f7398f3`（D-019） | `AppDelegate(historyStore:)`；菜单栏离屏仍拍不到（97.7% 未绘制），理由已更新 |
+| R2-18 / R2-19 证据管道 | `bdb557b` | 插入点闪烁 + 夹具用 `Date()` 是全部噪声来源；修完**同代码连拍 0/58 帧不同** |
+
+### 10.2 本轮自己制造并被测试抓住的问题
+
+四条，都值得留着当下轮的对照：
+1. 新加的"暂无推荐"空态会在**有候选的机器上先闪一下**（菜单同步构建、预测异步计算）—— 写菜单测试时暴露，用 `isRefreshingPredictions` 区分"还在算"与"确实没有"（D-021）。
+2. 把本机 2× 渲染倍率当契约、把"热比较快于冷比较"当不变量 —— 两次 CI 红（`d160b52`、`268ccaa` 修）；更早还有一次是 `@MainActor`
+   测试类的 `setUpWithError` 写隔离属性，本机 Swift 6.2.1 放行、CI 的 6.1.2 拒绝（`a009dd5` 改成每条自建临时目录 + `addTeardownBlock`）。
+3. 一次变异对照的过滤器写错类名，得到"0 条执行"的假绿 —— 作废重跑（记在 D-018）。
+4. **为了压 CI 抖动加的 load1 闸门自己是个缺陷**：它把"性能判据"变成"只在安静的机器上生效的判据"。
+   拉 CI 原始日志实测 `load1=11.8 活跃核=3`（比值 3.9 > 我写的 2.0 闸门），照那写法 5 条守卫会在唯一的自动化环境里永久 skip。
+   改成用**被测样本自己的跨度**决定能不能下结论（`最慢 − 最快 > 该条阈值` 才 skip），阈值一个没动，双向变异对照都实跑（D-023）。
+   反面证据也记着：本机注入 12 个 `yes` 进程把 load1 顶到 44.4，`preview(2.4MB)` 的样本跨度仍只有 0.07ms —— 旧闸门会在**能分辨**的时候误 skip。
+
+### 10.3 明确没做/没验证的
+
+键盘：真实 Tab 现在能到搜索框（在屏探针实测），**但"Tab 能否走到列表行"仍未验证** —— 本机 `AppleKeyboardUIMode = -1`（完全键盘访问关闭）时 macOS 本来就不让 Tab 经过自绘可聚焦视图。复测方法：人工开该开关后跑 `CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests`。
+其余未验证：`NSAlert` 的真实按键行为、真实鼠标拖放、菜单栏面板视觉、VoiceOver 实际朗读（测试进程里 AX 树为空）。
+明确不做：`List(selection:)` 整体重写（`.draggable` 要 macOS 13、会改掉 4 个捕获帧、丢 `dragSelectRange` 锚点语义）、设置侧栏符号风格统一（唯一证据来自不可信的捕获列）、签名与公证（需证书与授权）。
+另外**要去看而不是只在这里断言的一件事**：性能守卫在新 runner 上到底下没下结论。检查方法（已实跑过一次，见 D-023）：
+
+```bash
+gh run view <run-id> --log | grep -E "PERF\[|同操作样本跨度"
+```
+如果 5 条 `PERF[...]` 全部变成"同操作样本跨度…已超过阈值"，说明这条判据在 CI 上永不裁决，应当按 runner 重新定标而不是留一条不会红的守卫。
+
+### 10.4 复跑（本轮结束时）
+
+```bash
+cd /Users/wangziyi/Codex_Project0/ClipboardHistory
+swift build && swift test                       # 301 例 / 5 skip / 0 失败
+CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests          # 58 帧
+CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests    # 在屏探针（会抢前台）
+cd .. && python3 -m unittest discover -s scripts/tests                            # 25 例 OK
+python3 scripts/frame_audit.py diff /tmp/A /tmp/B                                 # 逐帧差异
+```
+账本：`AGENT_STATE.md`（第二轮章节 + 2 段进度快照）、`AGENT_BACKLOG.md`（R2-01…R2-19 + 7 张进度快照）、`AGENT_DECISIONS.md`（本轮 D-015…D-023）、`AGENT_UI_AUDIT.md`（第二轮章节）。
+上面那句"37 个提交"的测法：`git rev-list --count 81bce8d..HEAD`；其中只动 `AGENT_*.md` 的 8 个用逐提交 `git show --name-only` 归类得到。
