@@ -477,6 +477,12 @@ private struct SettingsSidebarRow: View {
                 // 不显式上色的话，未选中行的 SF Symbol 会按系统弱化色渲染，
                 // 在浅色主题下几乎看不见（离屏渲染验收时发现的真实缺陷）
                 .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+                // 这里**刻意保持** `.hierarchical`，不改 monochrome：审计第二轮 1.9 说侧栏图标
+                // "outline 与 filled 混用、未选中的比选中的轻"，但离屏帧给不出可靠证据 ——
+                // 单层符号（command/gearshape/folder）即使显式 `.primary` 在这些帧里仍画成近白，
+                // 真机上不可能长这样，说明 settings-* 帧的侧栏图标列是捕获伪影（与 content-* 侧栏同族）。
+                // 在不可信的证据上改渲染模式只会把"推荐"的实心 sparkle 改淡（实测如此），
+                // 所以本项标 NOT-RUN：要真机看一次，或把设置页也纳入在屏捕获（R2-17 的接缝之后）。
                 .symbolRenderingMode(.hierarchical)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)

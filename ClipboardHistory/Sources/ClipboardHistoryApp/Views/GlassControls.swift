@@ -122,7 +122,10 @@ private struct GlassIconControl: View {
     private var content: some View {
         Image(systemName: symbol)
             .font(.system(size: iconSize, weight: .medium))
-            .symbolRenderingMode(.hierarchical)
+            // `.hierarchical` 会把多层符号（如 `doc.on.doc`）的次层画淡，于是同一个
+            // GlassPill 里三个图标的视觉重量不一致（审计第二轮 1.3 / §3.8）。
+            // 单色渲染让每个符号都按前景色满权重画，控件内部才统一。
+            .symbolRenderingMode(.monochrome)
             .foregroundStyle(foregroundStyle)
             .frame(width: size, height: size)
     }

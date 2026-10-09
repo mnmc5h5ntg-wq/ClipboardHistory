@@ -18,6 +18,13 @@ import XCTest
 ///    List 这类 AppKit 承载控件仍按 aqua 取色，会拍出"深底黑字"的假不可读帧。
 @MainActor
 final class UICaptureTests: XCTestCase {
+    /// 夹具时间戳的固定参考时刻（账本 R2-19）。
+    ///
+    /// 以前这里用 `Date()`：行里显示的时间会随真实时钟走，于是**跨分钟连拍两次，
+    /// 时钟字符串自己就在变像素** —— 逐帧对比里混进一层与代码无关的差异
+    /// （11pt 字号那轮 row 帧 3.3–13% 的差异里就有它）。固定之后，两帧的差异才只反映代码改动。
+    static let referenceDate = Date(timeIntervalSince1970: 1_760_000_000)
+
     private enum CaptureError: Error {
         case noBitmap
         case noPNG
@@ -251,16 +258,16 @@ final class UICaptureTests: XCTestCase {
             content: .text("这是一段用于视觉验收的普通文本记录，包含足够长度以便观察截断与换行表现 abcdefghijklmnop"),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Safari", sourceAppName: "Safari"
-        ), timestamp: Date().addingTimeInterval(-30))
+        ), timestamp: Self.referenceDate.addingTimeInterval(-30))
         store.add(ClipboardIntake.Entry(
             content: .image(image), thumbnail: image, sourceUTIs: ["public.png"],
             sourceAppBundleID: "com.apple.Preview", sourceAppName: "预览"
-        ), timestamp: Date().addingTimeInterval(-120))
+        ), timestamp: Self.referenceDate.addingTimeInterval(-120))
         store.add(ClipboardIntake.Entry(
             content: .file(URL(fileURLWithPath: "/Users/tester/Desktop/合同 终版 v3.pdf")),
             thumbnail: nil, sourceUTIs: ["public.file-url"],
             sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
-        ), timestamp: Date().addingTimeInterval(-300))
+        ), timestamp: Self.referenceDate.addingTimeInterval(-300))
         store.add(ClipboardIntake.Entry(
             content: .files([
                 URL(fileURLWithPath: "/Users/tester/Downloads/IMG_0201.HEIC"),
@@ -269,12 +276,12 @@ final class UICaptureTests: XCTestCase {
             ]),
             thumbnail: nil, sourceUTIs: ["public.file-url"],
             sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
-        ), timestamp: Date().addingTimeInterval(-600))
+        ), timestamp: Self.referenceDate.addingTimeInterval(-600))
         store.add(ClipboardIntake.Entry(
             content: .text("ghp_" + String(repeating: "A", count: 36)),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Terminal", sourceAppName: "终端"
-        ), timestamp: Date().addingTimeInterval(-900))
+        ), timestamp: Self.referenceDate.addingTimeInterval(-900))
         if let index, index < store.entries.count {
             store.perform(.selectOnly(store.entries[index]))
         }
