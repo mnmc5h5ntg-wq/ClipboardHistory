@@ -181,8 +181,15 @@ final class SidebarListSelectionTests: XCTestCase {
     /// 于是"双击=复制、点星标=收藏"在自动化这一侧只剩下接线可钉 —— 行为本身进手工清单。
     func testRowGesturesAreStillWiredToTheirActions() throws {
         let source = codeOnly(try productSource(named: "Views/HistoryRowViews.swift"))
-        XCTAssertTrue(source.contains(".onTapGesture(count: 2)"),
+        XCTAssertTrue(source.contains("TapGesture(count: 2).onEnded"),
                       "行上没有双击手势了：双击复制这条交互等于不存在")
+        XCTAssertTrue(source.contains(".simultaneousGesture("),
+                      "双击必须走 simultaneousGesture，见下面那条反向守卫")
+        // 这条反向守卫是用户真机反馈换来的（D-036）：`.onTapGesture(count: 2)` 里
+        // count:2 的识别器要等一个双击间隔才放行单击，而 `List` 的选中正走同一套行内点击识别
+        // ⇒「点一行到显示已选中」出现可感知延迟。
+        XCTAssertFalse(source.contains(".onTapGesture(count: 2)"),
+                       "行上的双击又换回 onTapGesture(count: 2) 了 —— 那会让选中延迟一个双击间隔")
         XCTAssertTrue(source.contains("RowDoubleTap.shouldCopy(modifiers: NSEvent.modifierFlags)"),
                       "双击没有走带例外名单的判定（shift/⌘ 双击不该写剪贴板）")
         XCTAssertTrue(source.contains("copyAction()"), "双击手势没有接到 copyAction")

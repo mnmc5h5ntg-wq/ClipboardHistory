@@ -29,16 +29,20 @@ struct HistoryRowButton: View {
         }
         .padding(.vertical, 6)
         .contentShape(Rectangle())
-        // 双击用 `onTapGesture(count: 2)`，**不是** `simultaneousGesture(TapGesture(count: 2))`：
-        // 换成 `List(selection:)` 之后行里没有自己的 Button 了，没有兄弟手势时 simultaneousGesture
-        // 在离屏宿主里实测收不到第二击（探针 copyFired=0），而 onTapGesture 会。
-        // 单击选中仍然立刻生效 —— 那是 NSTableView 在 mouseDown 里做的，不与这个手势竞争。
-        // （以前这里用 simultaneousGesture 是为了绕开"Button 单击要等双击间隔"；那个前提已经不成立，
-        // 见 D-028 与本次 D-1 的取舍。）
-        .onTapGesture(count: 2) {
-            guard RowDoubleTap.shouldCopy(modifiers: NSEvent.modifierFlags) else { return }
-            copyAction()
-        }
+        // 双击必须用 `simultaneousGesture(TapGesture(count: 2))`，**不能**用 `.onTapGesture(count: 2)`。
+        // 用户真机反馈：换成 onTapGesture 之后"点一行到显示已选中"有可感知的延迟 ——
+        // `count: 2` 的 tap 识别器要等一个双击间隔才能确定"这只是一次单击"，
+        // 而 `List` 的选中走的正是这一套行内点击识别，于是高亮被整体推迟了一个双击间隔。
+        // `simultaneousGesture` 不参与"谁赢"的仲裁：行的选中照常立刻发生，第二击仍然触发复制
+        // （这是 D-028 当时在真实侧栏容器里验证过的形状）。
+        // 我当初换成 onTapGesture 是为了迁就一条**离屏孤立宿主**里收不到第二击的探针 ——
+        // 那是夹具不代表真实容器，拿产品行为去迁就它是要写进账本的错误（D-036）。
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                guard RowDoubleTap.shouldCopy(modifiers: NSEvent.modifierFlags) else { return }
+                copyAction()
+            }
+        )
         // 有载荷才挂（判据 `EntryDragGate.offersDrag`）：多文件条目、网页链接、空文本不提供拖出。
         .modifier(EntryDragModifier(content: entry.content))
         // 提示语为空时整个 modifier 都不挂：`.help("")` 在 macOS 上会弹出一个空气泡。
