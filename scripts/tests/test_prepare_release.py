@@ -21,6 +21,17 @@ from scripts import prepare_release
 
 
 class PrepareReleaseTests(unittest.TestCase):
+    @staticmethod
+    def _seed_frame_manifest(base: Path) -> None:
+        """发布流程现在**要求**有一份工作帧基线可冻结（少一句 raise 会让 C-2 的
+        历史比对悄悄退化成"和工作基线比"）。别的测试不是来测这件事的，给它一份即可。
+        """
+        docs = base / "docs"
+        docs.mkdir(parents=True, exist_ok=True)
+        (docs / "frame_baseline.json").write_text(
+            '{"schema": 1, "count": 1, "frames": {"a.png": "1"}}\n', encoding="utf-8")
+
+
     def test_normalize_version_accepts_plain_or_tagged_versions(self):
         self.assertEqual(normalize_version("1.2.3"), ("1.2.3", "v1.2.3"))
         self.assertEqual(normalize_version("v1.2.3beta"), ("1.2.3beta", "v1.2.3beta"))
@@ -59,6 +70,7 @@ class PrepareReleaseTests(unittest.TestCase):
                 "# Changelog\n\nIntro\n\n## [v1.2.2beta] - 2026-06-08\n",
                 encoding="utf-8",
             )
+            self._seed_frame_manifest(root)
             root_dmg = root / f"{APP_NAME}_v1.2.3.dmg"
             root_dmg.write_bytes(b"new dmg")
             old_release = root / "releases" / f"{APP_NAME}_v1.2.3.dmg"
@@ -122,6 +134,7 @@ class PrepareReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "CHANGELOG.md").write_text("# Changelog\n\nold changelog\n", encoding="utf-8")
+            self._seed_frame_manifest(root)
             root_dmg = root / f"{APP_NAME}_v1.2.3.dmg"
             root_dmg.write_bytes(b"new dmg")
             release_dmg = root / "releases" / f"{APP_NAME}_v1.2.3.dmg"
@@ -157,6 +170,7 @@ class PrepareReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "docs").mkdir()
+            self._seed_frame_manifest(root)   # 发布末尾要冻结帧基线，这条测试不是来测它的
             (root / "Makefile").write_text(
                 "APP_NAME := 时间剪史\nVERSION  := 1.2.2beta\n",
                 encoding="utf-8",
@@ -433,11 +447,20 @@ class FrameBaselineSnapshotOnReleaseTests(unittest.TestCase):
             after = sorted(p.name for p in (root / "docs" / "frame_baselines").iterdir())
             self.assertEqual(before, after, "失败的发布留下了帧基线")
 
-    def test_no_working_manifest_means_no_snapshot(self):
-        with tempfile.TemporaryDirectory() as root:
+    def test_missing_working_manifest_stops_the_release_loudly(self):
+        """没有工作基线时**不许**静默跳过。
+
+        静默跳过会让 C-2 的"和上一版比"悄悄退化成"和工作基线比"，
+        而发布本身仍然全绿 —— 这种"链路断在没人看的地方"正是本轮反复记的那类错。
+        （`_snapshot_frame_baseline` 只在**整套帧工具都不存在**时才安静返回 None。）
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir(parents=True)
             preparer = ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True)
-            self.assertIsNone(preparer._snapshot_frame_baseline("2.0.0"),
-                              "没有工作基线时不该凭空造一个版本基线")
+            with self.assertRaises(ReleaseError) as caught:
+                preparer._snapshot_frame_baseline("2.0.0")
+            self.assertIn("frame_baseline.py update", str(caught.exception))
 
     def test_the_step_is_announced_before_it_runs(self):
         with tempfile.TemporaryDirectory() as root:

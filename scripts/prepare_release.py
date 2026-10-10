@@ -368,13 +368,23 @@ class ReleasePreparer:
         """
         sibling = Path(__file__).with_name("frame_baseline.py")
         if not sibling.exists():
+            # 别处的仓库里没有这套帧工具，安静跳过（这条挂钩是本仓自己的约定）。
             return None
         spec = importlib.util.spec_from_file_location("frame_baseline_for_release", sibling)
         if spec is None or spec.loader is None:
             return None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        return module.snapshot(str(self.paths.root), version)
+        frozen = module.snapshot(str(self.paths.root), version)
+        if frozen is None:
+            # **不许静默地不发基线**：C-2 的"和上一版比"整条链就靠这份文件存在。
+            # 少一句 raise 的话，这里会一路绿着发布完，然后下一版的比对悄悄退化成
+            # "和工作基线比" —— 而没人会去查是谁把历史问句弄丢的。
+            raise ReleaseError(
+                "没能冻结帧基线：docs/frame_baseline.json 不存在或读不出来。"
+                "发布前先跑 scripts/frame_baseline.py update（第三轮审计 §3 C-2）。"
+            )
+        return frozen
 
     def planned_steps(self, raw_version: str) -> list[str]:
         version, tag = normalize_version(raw_version)
