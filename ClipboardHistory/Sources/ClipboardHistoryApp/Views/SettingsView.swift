@@ -56,11 +56,19 @@ struct SettingsView: View {
         Binding(get: { !ocrSearchDisabled }, set: { ocrSearchDisabled = !$0 })
     }
     @State private var showClearHistoryConfirmation = false
+    @State private var archiveMessage: String?
+    @AppStorage(CapturePolicy.userExcludedKey) private var excludedBundleIDsRaw = ""
+    @State private var newExcludedBundleID = ""
+    @AppStorage(OCRPolicy.modeKey) private var ocrModeRaw = OCRPolicy.StorageMode.persisted.rawValue
     @State private var exportMessage: String?
     @State private var showExportAlert = false
     @ObservedObject private var contextPreferences: ContextPreferenceSettings
     @ObservedObject private var weightsStore: RecommendationWeightsStore
     private let clearHistoryAction: (() -> Void)?
+    /// 历史的导出 / 导入（第三轮审计 §5 F-5）。和 `clearHistoryAction` 一样由窗口控制器注入，
+    /// 因为 `SettingsView` 在两个窗口里都会重建，不该直接持有 store。
+    private let exportHistoryAction: ((URL) -> String?)?
+    private let importHistoryAction: ((URL) -> String?)?
     @State private var selectedCategory: SettingsCategory?
 
     init(
@@ -71,6 +79,8 @@ struct SettingsView: View {
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore(),
         feedbackStore: RecommendationFeedbackStore = RecommendationFeedbackStore(),
         clearHistoryAction: (() -> Void)? = nil,
+        exportHistoryAction: ((URL) -> String?)? = nil,
+        importHistoryAction: ((URL) -> String?)? = nil,
         initialCategory: SettingsCategory? = .shortcuts
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
@@ -78,6 +88,8 @@ struct SettingsView: View {
         self.loginItemSettings = loginItemSettings
         self.contextPreferences = contextPreferences
         self.weightsStore = weightsStore
+        self.exportHistoryAction = exportHistoryAction
+        self.importHistoryAction = importHistoryAction
         self.feedbackStore = feedbackStore
         self.clearHistoryAction = clearHistoryAction
         _showMainWindowShortcut = State(initialValue: showMainWindowHotKeySettings.shortcut)
@@ -87,6 +99,27 @@ struct SettingsView: View {
         // 存在的唯一理由：离屏窗口的无障碍树不会被 SwiftUI 建立，
         // 视觉验收没法用点击切分类，只能让初值可注入（见 AGENT_UI_AUDIT.md）。
         _selectedCategory = State(initialValue: initialCategory)
+    }
+
+    private func exportHistory() {
+        guard let exportHistoryAction else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "时间剪史-历史.json"
+        panel.message = "导出内容包含完整剪贴板原文，请当作敏感文件保管。"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        archiveMessage = exportHistoryAction(url)
+    }
+
+    private func importHistory() {
+        guard let importHistoryAction else { return }
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [.json]
+        panel.message = "导入会把文件里的记录合并进历史（同一条不会重复导入）。"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        archiveMessage = importHistoryAction(url)
     }
 
     private func exportFeedbackData() {
@@ -294,6 +327,66 @@ struct SettingsView: View {
                     Text("过滤敏感内容（密钥、令牌、密码等），防止其进入推荐。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    // MARK: 按 App 排除（第三轮审计 §5 F-1：密码管理器/钥匙串一类内容不该入库）
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("不记录这些 App 的复制")
+                            .font(.subheadline)
+                        Text("默认已包含密码管理器与系统钥匙串。这里添加的是**你额外**要排除的；"
+                             + "排除只作用于自动采集 —— 你主动拖进历史的内容仍然会入库。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \.self) { id in
+                            Text("默认排除：\(id)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)).sorted(), id: \.self) { id in
+                            HStack {
+                                Text(id)
+                                Spacer()
+                                Button("移除") {
+                                    excludedBundleIDsRaw = CapturePolicy.encodeUserExcluded(
+                                        Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)).filter { $0 != id }
+                                    )
+                                }
+                                .buttonStyle(.borderless)
+                            }
+                        }
+                        HStack {
+                            TextField("com.example.app", text: $newExcludedBundleID)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: 260)
+                            Button("添加") {
+                                let id = newExcludedBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !id.isEmpty else { return }
+                                excludedBundleIDsRaw = CapturePolicy.encodeUserExcluded(
+                                    Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)) + [id]
+                                )
+                                newExcludedBundleID = ""
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // MARK: OCR 结果的存放方式（§5 F-4 的"只索引不落盘"）
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("截图文字识别结果")
+                            .font(.subheadline)
+                        Picker("存放方式", selection: $ocrModeRaw) {
+                            Text("随历史保存（重启后仍可搜）").tag(OCRPolicy.StorageMode.persisted.rawValue)
+                            Text("只索引不落盘（重启后重新识别）").tag(OCRPolicy.StorageMode.indexOnly.rawValue)
+                        }
+                        .pickerStyle(.radioGroup)
+                        .labelsHidden()
+                        Text("「只索引不落盘」时，截图里识别出的文字不会写进 history.json；"
+                             + "代价是每次启动要重新识别一遍。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 4)
@@ -372,6 +465,29 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 4)
+            }
+
+            Divider()
+
+            // MARK: 导出 / 导入（第三轮审计 §5 F-5：以前用户没有任何方式把历史带走）
+            VStack(alignment: .leading, spacing: 8) {
+                Text("导出与导入")
+                    .font(.subheadline)
+                Text("导出的是自包含 JSON：默认不含图片，内容是完整的剪贴板原文（可能含账号、验证码、私人对话），请当作敏感文件保管。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Button("导出历史…") { exportHistory() }
+                        .disabled(exportHistoryAction == nil)
+                    Button("导入历史…") { importHistory() }
+                        .disabled(importHistoryAction == nil)
+                }
+                if let archiveMessage {
+                    Text(archiveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
             }
 
             Divider()

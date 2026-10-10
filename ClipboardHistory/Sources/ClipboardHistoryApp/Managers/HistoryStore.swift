@@ -25,6 +25,8 @@ final class HistoryStore: ObservableObject {
         case copyAndPromote(Entry)
         case repeatCopySelected
         case toggleFavorite(Entry)
+        case togglePin(Entry)
+        case pinSelection(isPinned: Bool)
         case delete(Entry)
         case deleteSelection
         case favoriteSelection
@@ -89,6 +91,25 @@ final class HistoryStore: ObservableObject {
     /// 拖入文件之后给用户的反馈（第三轮审计 D-4）：以前"接住了但什么都没发生"是静默的。
     @Published private(set) var droppedFilesNotice: String?
 
+    /// 导出 / 导入的结果提示（第三轮审计 §5 F-5）。
+    @Published private(set) var transferNotice: String?
+
+    /// 「只索引不落盘」模式下的识别文本：只在内存里，不进条目、不进存档。
+    private var ocrIndex: [Entry.ID: String] = [:]
+
+    /// OCR 结果的存放方式（决策时读，同 D-033 那两个开关）。
+    var ocrStorageMode: OCRPolicy.StorageMode {
+        get { OCRPolicy.mode(from: policyDefaults) }
+        set { OCRPolicy.setMode(newValue, defaults: policyDefaults) }
+    }
+
+    /// 采集与存放策略从**哪个 defaults 域**读。
+    ///
+    /// 生产代码就是 `.standard`（设置页写的也是它）；单测注入一个独立 suite，于是
+    /// "设置页写了那个键 → 采集侧真的读到了"这一段可以从产品入口验证，
+    /// 而不用往用户的标准域里写东西（AGENTS.md 的定义完成标准第 1 条）。
+    var policyDefaults: UserDefaults = .standard
+
     /// 过滤结果缓存。`filteredEntries` 在一次界面求值里会被多处读取
     /// （列表、计数文案、空态标题、选中态协调），旧写法每次都全表重扫：
     /// 实测 500 条 ×1KB + 搜索词 = 13.8ms/次，一帧 3–5 次。
@@ -117,18 +138,19 @@ final class HistoryStore: ObservableObject {
             }
         }
 
-        guard !searchText.isEmpty else { return entriesForFilter }
-        return entriesForFilter.filter { entry in
+        let ordered = EntryOrdering.ordered(entriesForFilter)
+        guard !searchText.isEmpty else { return ordered }
+        return ordered.filter { entry in
             switch entry.content {
             case .text(let string):
                 return string.localizedCaseInsensitiveContains(searchText)
             case .image:
                 if "图片".localizedCaseInsensitiveContains(searchText) { return true }
-                if let ocr = entry.ocrText, ocr.localizedCaseInsensitiveContains(searchText) { return true }
+                if OCRPolicy.matches(entry: entry, index: ocrIndex, query: searchText) { return true }
                 return false
             case .file(let url):
                 if url.lastPathComponent.localizedCaseInsensitiveContains(searchText) { return true }
-                if let ocr = entry.ocrText, ocr.localizedCaseInsensitiveContains(searchText) { return true }
+                if OCRPolicy.matches(entry: entry, index: ocrIndex, query: searchText) { return true }
                 return false
             case .files(let urls):
                 return urls.contains { $0.lastPathComponent.localizedCaseInsensitiveContains(searchText) }
@@ -192,13 +214,13 @@ final class HistoryStore: ObservableObject {
         presenterContext.frontmostApplication = capturedEffectiveApp
         presenterContext.recentEvents = capturedRecentEvents
 
-        let capturedContextSummary = Self.predictionContextSummary(
+        let capturedContextSummary = RecommendationFeatureSupport.predictionContextSummary(
             app: capturedEffectiveApp,
             eventCount: capturedRecentEvents.count,
             feedbackCount: capturedFeedback.count
         )
         let capturedCurrentAppName = capturedEffectiveApp?.localizedName
-        let capturedReuseCounts = Self.reuseCounts(byEntryID: capturedFeedback)
+        let capturedReuseCounts = RecommendationFeatureSupport.reuseCounts(byEntryID: capturedFeedback)
 
         Task.detached(priority: .userInitiated) { [weak self] in
             let result = LocalRecommendationService(
@@ -293,31 +315,7 @@ final class HistoryStore: ObservableObject {
         }
     }
 
-    private static func predictionContextSummary(
-        app: RunningApplicationContext?,
-        eventCount: Int,
-        feedbackCount: Int
-    ) -> String {
-        var parts: [String] = []
-        if let name = app?.localizedName {
-            parts.append("来源: \(name)")
-        }
-        if eventCount > 0 {
-            parts.append("轨迹: \(eventCount) 事件")
-        }
-        if feedbackCount > 0 {
-            parts.append("反馈: \(feedbackCount) 条")
-        }
-        return parts.isEmpty ? "无额外上下文" : parts.joined(separator: " · ")
-    }
 
-    private static func reuseCounts(byEntryID feedback: [RecommendationFeedback]) -> [UUID: Int] {
-        var counts: [UUID: Int] = [:]
-        for item in feedback where item.kind == .accepted || item.kind == .copiedManually {
-            counts[item.entryID, default: 0] += 1
-        }
-        return counts
-    }
 
 
     private var timer: Timer?
@@ -355,7 +353,7 @@ final class HistoryStore: ObservableObject {
                 }
         let loadedEntries = persistence.load()
         let loadedRecoveryNotice = persistence.recoveryNotice
-        let persistedEntries = Self.collapsingDuplicates(in: retainingByPolicy(loadedEntries, reason: "载入"))
+        let persistedEntries = EntryDeduplication.collapsingDuplicates(in: retainingByPolicy(loadedEntries, reason: "载入"))
         self.entries = persistedEntries
         self.selectedEntry = persistedEntries.first
         self.selectedEntryIDs = persistedEntries.first.map { [$0.id] } ?? []
@@ -394,7 +392,7 @@ final class HistoryStore: ObservableObject {
     /// 这个 App（策略本来就该这样执行），也可能是系统时间被往前调。两种情况从时间戳上
     /// 无法区分，让程序去赌就会留下"永远不过期"的洞；所以把数字与原因摆到界面上，由人判断。
     private func retainingByPolicy(_ candidate: [ClipboardEntry], reason: String) -> [ClipboardEntry] {
-        let trimmed = retentionPolicy.retaining(candidate)
+        let trimmed = EntryOrdering.retaining(candidate, by: retentionPolicy)
         let droppedCount = candidate.count - trimmed.count
         guard droppedCount > 0 else { return trimmed }
         let keptIDs = Set(trimmed.map(\.id))
@@ -453,6 +451,31 @@ final class HistoryStore: ObservableObject {
 
     func dismissDroppedFilesNotice() {
         droppedFilesNotice = nil
+    }
+
+    func dismissTransferNotice() {
+        transferNotice = nil
+    }
+
+    /// 导出为自包含 JSON（默认不含图片）。返回字节与"跳过了几条图片"。
+    func exportArchiveJSON(includeImages: Bool = false) -> (Data, ArchiveTransfer.Summary) {
+        let result = ArchiveTransfer.export(entries: entries, includeImages: includeImages)
+        transferNotice = ArchiveTransfer.exportWarningText(summary: result.1)
+        return result
+    }
+
+    /// 导入并合并：已存在的 id 跳过，新条目按原时间戳插回，固定/收藏状态保留。
+    @discardableResult
+    func importArchiveJSON(_ data: Data) throws -> ArchiveTransfer.Summary {
+        let (incoming, base) = try ArchiveTransfer.import(data)
+        let merged = ArchiveTransfer.merging(existing: entries, incoming: incoming, summary: base)
+        entries = EntryOrdering.ordered(retainingByPolicy(merged.entries, reason: "导入合并"))
+        let summary = merged.summary
+        reconcileSelection()
+        persist()
+        transferNotice = "导入完成：新增 \(summary.importedCount - summary.skippedDuplicateCount) 条，"
+            + "跳过重复 \(summary.skippedDuplicateCount) 条。"
+        return summary
     }
 
     func startMonitoring(after delay: TimeInterval = 0) {
@@ -519,6 +542,10 @@ final class HistoryStore: ObservableObject {
             repeatCopySelectedEntry()
         case .toggleFavorite(let entry):
             toggleFavorite(entry)
+        case .togglePin(let entry):
+            togglePin(entry)
+        case .pinSelection(let isPinned):
+            pinSelection(isPinned: isPinned)
         case .delete(let entry):
             delete(entry)
         case .deleteSelection:
@@ -622,7 +649,12 @@ final class HistoryStore: ObservableObject {
     ///   「暂停记录」只挡后台自动采集：**changeCount 照常推进**（否则恢复的那一瞬间
     ///   会把暂停期间的旧内容补记一条），而点名要存的导入不能被静默丢掉（审计 D-3 的验收点）。
     func add(_ intakeEntry: ClipboardIntake.Entry, timestamp: Date = Date(), isUserInitiated: Bool = false) {
-        guard RecordingGate.accepts(isPaused: isRecordingPaused, isUserInitiated: isUserInitiated) else {
+        // 暂停与"按 App 排除"都在 `CapturePolicy` 里判（第三轮审计 §5 F-1）。
+        // 排除按 `sourceAppBundleID` 判 —— 这个字段本轮刚被持久化过（B-2），采集处也已经在取。
+        guard CapturePolicy.accepts(sourceAppBundleID: intakeEntry.sourceAppBundleID,
+                                    paused: isRecordingPaused,
+                                    isUserInitiated: isUserInitiated,
+                                    excluded: CapturePolicy.effectiveExcludedBundleIDs(from: policyDefaults)) else {
             return
         }
         if promoteExistingEntryIfNeeded(for: intakeEntry, timestamp: timestamp) {
@@ -632,7 +664,7 @@ final class HistoryStore: ObservableObject {
         guard let entry = intakeEntry.makeHistoryEntry(unlessDuplicateOf: entries.first, timestamp: timestamp) else {            return
         }
 
-        entries.insert(entry, at: 0)
+        entries.insert(entry, at: EntryOrdering.promotionIndex(entries))
         entries = retainingByPolicy(entries, reason: "新增记录")
         reconcileSelection(preferredEntryID: entry.id)
         persist()
@@ -657,7 +689,7 @@ final class HistoryStore: ObservableObject {
     }
 
     private func promoteExistingEntryIfNeeded(for intakeEntry: ClipboardIntake.Entry, timestamp: Date) -> Bool {
-        let matchingEntries = entries.filter { Self.isDuplicate($0, of: intakeEntry) }
+        let matchingEntries = entries.filter { EntryDeduplication.isDuplicate($0, of: intakeEntry) }
         guard let duplicateEntry = matchingEntries.first else {
             return false
         }
@@ -665,13 +697,13 @@ final class HistoryStore: ObservableObject {
         let matchingIDs = Set(matchingEntries.map(\.id))
         let isFavorite = matchingEntries.contains { $0.isFavorite }
         entries.removeAll { matchingIDs.contains($0.id) }
-        let updatedEntry = Self.entry(
+        let updatedEntry = EntryDeduplication.mergedEntry(
             from: duplicateEntry,
             replacingWith: intakeEntry,
             timestamp: timestamp,
             isFavorite: isFavorite
         )
-        entries.insert(updatedEntry, at: 0)
+        entries.insert(updatedEntry, at: EntryOrdering.promotionIndex(entries))
         entries = retainingByPolicy(entries, reason: "提升重复记录")
         reconcileSelection(preferredEntryID: updatedEntry.id)
         persist()
@@ -688,8 +720,11 @@ final class HistoryStore: ObservableObject {
     /// 解码上限 1200px：认字不需要原始分辨率，整幅解一张 4000×3000 只是浪费。
     private func scheduleOCRIfNeeded(for entry: Entry) {
         // 「识别截图文字」关掉后不排任务（第三轮审计 D-3 / §5 F4）。
-        // 判据本身在 `RecordingGate.schedulesOCR`，这样"关了就什么都不排"可被真值表钉住。
-        guard isOCRSearchEnabled else { return }
+        // 判据本身在 `OCRPolicy.shouldSchedule`，这样"关了就什么都不排"能被真值表钉住。
+        guard OCRPolicy.shouldSchedule(isEnabled: isOCRSearchEnabled, hasImage: entry.content.isOCRTarget) else {
+            Self.ocrLog("skip OCR - disabled or not an OCR target")
+            return
+        }
         let entryID = entry.id
         let source: OCRImageSource
 
@@ -730,7 +765,14 @@ final class HistoryStore: ObservableObject {
                     Self.ocrLog("WARN entry \(entryID.uuidString.prefix(8))... no longer in entries array")
                     return
                 }
-                self.entries[idx] = self.entries[idx].updating(ocrText: text)
+                // 「只索引不落盘」：识别文本留在内存索引里，条目本身不带 ocrText，
+                // 于是 `history.json` 的字节里不会出现截图里的文字（第三轮审计 §5 F-4）。
+                if OCRPolicy.persistsResult(self.ocrStorageMode) {
+                    self.entries[idx] = self.entries[idx].updating(ocrText: text)
+                } else {
+                    self.ocrIndex[entryID] = text
+                    self.invalidateFilteredCache()
+                }
                 self.persist()
                 Self.ocrLog("persisted ocrText for \(entryID.uuidString.prefix(8))...")
             }
@@ -895,7 +937,7 @@ final class HistoryStore: ObservableObject {
         let isFavorite = entries.first { $0.id == entry.id }?.isFavorite ?? entry.isFavorite
         entries.removeAll { $0.id == entry.id }
         let updatedEntry = entry.updating(timestamp: Date(), isFavorite: isFavorite)
-        entries.insert(updatedEntry, at: 0)
+        entries.insert(updatedEntry, at: EntryOrdering.promotionIndex(entries))
         entries = retentionPolicy.retaining(entries)
         reconcileSelection(preferredEntryID: updatedEntry.id)
         persist()
@@ -918,6 +960,22 @@ final class HistoryStore: ObservableObject {
             LifecycleDebugLogger.log("HistoryStore clipboard write failed error=\(error)")
             return false
         }
+    }
+
+    /// 固定/取消固定。固定项置顶、不被复用提升挤下去、也不被保留策略裁剪（`EntryOrdering`）。
+    private func togglePin(_ entry: Entry) {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        entries[index] = entries[index].updating(isPinned: !entries[index].isPinned)
+        reconcileSelection(preferredEntryID: entry.id)
+        persist()
+    }
+
+    /// 批量固定/取消固定（多选时表头那颗按钮）。
+    private func pinSelection(isPinned: Bool) {
+        let ids = selectedEntryIDs
+        guard !ids.isEmpty else { return }
+        entries = entries.map { ids.contains($0.id) ? $0.updating(isPinned: isPinned) : $0 }
+        persist()
     }
 
     private func toggleFavorite(_ entry: Entry) {
@@ -1017,84 +1075,9 @@ final class HistoryStore: ObservableObject {
         selectedEntryIDs = selectedEntry.map { [$0.id] } ?? []
     }
 
-    private static func collapsingDuplicates(in entries: [Entry]) -> [Entry] {
-        entries.reduce(into: []) { collapsedEntries, entry in
-            guard let existingIndex = collapsedEntries.firstIndex(where: { isDuplicate($0, of: entry) }) else {
-                collapsedEntries.append(entry)
-                return
-            }
 
-            collapsedEntries[existingIndex] = collapsedEntries[existingIndex]
-                .updating(isFavorite: collapsedEntries[existingIndex].isFavorite || entry.isFavorite)
-        }
-    }
 
-    private static func isDuplicate(_ entry: Entry, of intakeEntry: ClipboardIntake.Entry) -> Bool {
-        hasSameDuplicateIdentity(
-            content: entry.content,
-            thumbnail: entry.thumbnail,
-            as: intakeEntry.content,
-            thumbnail: intakeEntry.thumbnail
-        )
-    }
 
-    private static func isDuplicate(_ lhs: Entry, of rhs: Entry) -> Bool {
-        hasSameDuplicateIdentity(
-            content: lhs.content,
-            thumbnail: lhs.thumbnail,
-            as: rhs.content,
-            thumbnail: rhs.thumbnail
-        )
-    }
 
-    private static func hasSameDuplicateIdentity(
-        content lhsContent: ClipboardEntryContent,
-        thumbnail lhsThumbnail: StoredImage?,
-        as rhsContent: ClipboardEntryContent,
-        thumbnail rhsThumbnail: StoredImage?
-    ) -> Bool {
-        if lhsContent == rhsContent {
-            return true
-        }
 
-        guard let lhsImage = duplicateImageIdentity(for: lhsContent, thumbnail: lhsThumbnail),
-              let rhsImage = duplicateImageIdentity(for: rhsContent, thumbnail: rhsThumbnail) else {
-            return false
-        }
-        return lhsImage == rhsImage
-    }
-
-    private static func duplicateImageIdentity(
-        for content: ClipboardEntryContent,
-        thumbnail: StoredImage?
-    ) -> StoredImage? {
-        switch content {
-        case .image(let image):
-            return image
-        case .file(let url) where FileTypeSupport.imageExtensions.contains(url.pathExtension.lowercased()):
-            return thumbnail
-        case .files, .file, .text:
-            return nil
-        }
-    }
-
-    private static func entry(
-        from duplicateEntry: Entry,
-        replacingWith intakeEntry: ClipboardIntake.Entry,
-        timestamp: Date,
-        isFavorite: Bool
-    ) -> Entry {
-        Entry(
-            id: duplicateEntry.id,
-            content: intakeEntry.content,
-            timestamp: timestamp,
-            thumbnail: intakeEntry.thumbnail ?? duplicateEntry.thumbnail,
-            sourceURL: intakeEntry.content.sourceURL,
-            isFavorite: isFavorite,
-            sourceUTIs: intakeEntry.sourceUTIs.isEmpty ? duplicateEntry.sourceUTIs : intakeEntry.sourceUTIs,
-            sourceAppBundleID: intakeEntry.sourceAppBundleID ?? duplicateEntry.sourceAppBundleID,
-            sourceAppName: intakeEntry.sourceAppName ?? duplicateEntry.sourceAppName,
-            ocrText: duplicateEntry.ocrText
-        )
-    }
 }

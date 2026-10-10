@@ -33,14 +33,14 @@ final class Round3AuditFixTests: XCTestCase {
     // MARK: - D-3 暂停记录
 
     func testRecordingGateTruthTable() {
-        XCTAssertTrue(RecordingGate.accepts(isPaused: false, isUserInitiated: false))
-        XCTAssertFalse(RecordingGate.accepts(isPaused: true, isUserInitiated: false),
+        XCTAssertTrue(CapturePolicy.accepts(paused: false, isUserInitiated: false))
+        XCTAssertFalse(CapturePolicy.accepts(paused: true, isUserInitiated: false),
                        "暂停时后台采集必须不入库")
-        XCTAssertTrue(RecordingGate.accepts(isPaused: true, isUserInitiated: true),
+        XCTAssertTrue(CapturePolicy.accepts(paused: true, isUserInitiated: true),
                        "用户点名要存的（拖入文件）不能被暂停静默丢掉")
-        XCTAssertTrue(RecordingGate.schedulesOCR(isEnabled: true, hasImage: true))
-        XCTAssertFalse(RecordingGate.schedulesOCR(isEnabled: false, hasImage: true))
-        XCTAssertFalse(RecordingGate.schedulesOCR(isEnabled: true, hasImage: false))
+        XCTAssertTrue(OCRPolicy.shouldSchedule(isEnabled: true, hasImage: true))
+        XCTAssertFalse(OCRPolicy.shouldSchedule(isEnabled: false, hasImage: true))
+        XCTAssertFalse(OCRPolicy.shouldSchedule(isEnabled: true, hasImage: false))
     }
 
     func testPausedStoreDoesNotRecordButStillAcceptsExplicitImport() throws {
@@ -79,9 +79,9 @@ final class Round3AuditFixTests: XCTestCase {
     /// 接线守卫：两个开关必须真的在采集/OCR 那两条路径上，而且通用页真的有它们。
     func testSwitchesAreWiredIntoProductPathsAndSettingsPane() throws {
         let store = codeOnly(try productSource(named: "Managers/HistoryStore.swift"))
-        XCTAssertTrue(store.contains("RecordingGate.accepts(isPaused: isRecordingPaused"),
+        XCTAssertTrue(store.contains("CapturePolicy.accepts(sourceAppBundleID:"),
                       "暂停开关没接在入库入口上")
-        XCTAssertTrue(store.contains("guard isOCRSearchEnabled else { return }"),
+        XCTAssertTrue(store.contains("OCRPolicy.shouldSchedule(isEnabled: isOCRSearchEnabled"),
                       "OCR 开关没接在排任务的地方")
         let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
         XCTAssertTrue(settings.contains("recordingPaused"), "通用页没有「暂停记录」")

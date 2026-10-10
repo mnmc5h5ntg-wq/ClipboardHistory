@@ -37,6 +37,12 @@ struct ContentView: View {
                 historyStore.dismissHistoryRecoveryNotice()
             }
         }
+        if let transfer = historyStore.transferNotice {
+            NoticeBanner(message: transfer, tone: .warning) {
+                historyStore.dismissTransferNotice()
+            }
+        }
+
         if let dropped = historyStore.droppedFilesNotice {
             NoticeBanner(message: dropped, tone: .warning) {
                 historyStore.dismissDroppedFilesNotice()

@@ -205,6 +205,17 @@ final class UICaptureTests: XCTestCase {
             )))
         })
 
+        results.append(Fixture("row-pinned-on", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: starTarget.updating(isPinned: true), copyAction: {}, favoriteAction: {}
+            )))
+        })
+        results.append(Fixture("row-pinned-off", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: starTarget.updating(isPinned: false), copyAction: {}, favoriteAction: {}
+            )))
+        })
+
         // 图片**文件**条目带缩略图的一行（用户报的缺陷：详情区看得到图，列表里只有文档符号）。
         // 这条帧存在的意义是：行首视觉列"有缩略图就用图"这件事从此有像素可查，
         // 不再只能靠真机眼睛看。PDF/多文件那两条仍然没有缩略图，保持文档符号是对的。
@@ -232,15 +243,28 @@ final class UICaptureTests: XCTestCase {
             })
         }
 
-        results.append(Fixture("glass-pill", NSSize(width: 120, height: 200)) {
+        // 一颗浮层药丸一张帧。以前两张挤在 200pt 高的框里（四颗按钮 + 分隔线 + padding 实际
+        // 需要 ~187pt，加上 32pt padding 就被裁掉了），加了固定按钮后更放不下 ——
+        // 被裁的帧会让人误判"按钮少了"，所以一种状态一帧，高度按内容给足。
+        results.append(Fixture("glass-pill", NSSize(width: 120, height: 232)) {
             AnyView(
-                VStack(spacing: 12) {
-                    GlassPill(isFavorite: false, favoriteAction: {}, copyAction: {}, deleteAction: {})
-                    GlassPill(isFavorite: true, favoriteAction: {}, copyAction: {}, deleteAction: {})
-                }
-                .padding(16)
-                .frame(width: 120, height: 200)
-                .background(Color(nsColor: .windowBackgroundColor))
+                GlassPill(isFavorite: false, favoriteAction: {},
+                          isPinned: false, pinAction: {},
+                          copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .frame(width: 120, height: 232)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+
+        results.append(Fixture("glass-pill-states", NSSize(width: 120, height: 232)) {
+            AnyView(
+                GlassPill(isFavorite: true, favoriteAction: {},
+                          isPinned: true, pinAction: {},
+                          copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .frame(width: 120, height: 232)
+                    .background(Color(nsColor: .windowBackgroundColor))
             )
         })
 

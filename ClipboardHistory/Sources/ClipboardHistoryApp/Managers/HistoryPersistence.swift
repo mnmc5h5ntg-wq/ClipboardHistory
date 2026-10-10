@@ -73,6 +73,9 @@ final class FileHistoryPersistence: HistoryPersisting {
         let sourceAppBundleID: String?
         let sourceAppName: String?
         let ocrText: String?
+        /// 「固定」位（第三轮审计 §5 F-5）。可选字段、缺键读为 false ⇒ 按 D-016 的
+        /// "只加可选字段不升版"策略，`currentSchemaVersion` 保持 1；旧版读到这个键会忽略它。
+        let isPinned: Bool?
 
         var fileURLs: [URL] {
             if let urlStrings, !urlStrings.isEmpty {
@@ -280,7 +283,8 @@ final class FileHistoryPersistence: HistoryPersisting {
             sourceUTIs: storedEntry.sourceUTIs,
             sourceAppBundleID: storedEntry.sourceAppBundleID,
             sourceAppName: storedEntry.sourceAppName,
-            ocrText: storedEntry.ocrText
+            ocrText: storedEntry.ocrText,
+            isPinned: storedEntry.isPinned ?? false
         )
     }
 
@@ -313,7 +317,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceUTIs: entry.sourceUTIs,
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
-                ocrText: entry.ocrText
+                ocrText: entry.ocrText,
+                isPinned: entry.isPinned
             )
         case .image(let image):
             let imageFileName = "\(entry.id.uuidString)-image.png"
@@ -331,7 +336,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceUTIs: entry.sourceUTIs,
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
-                ocrText: entry.ocrText
+                ocrText: entry.ocrText,
+                isPinned: entry.isPinned
             )
         case .file(let url):
             let thumbnailFileName: String?
@@ -355,7 +361,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceUTIs: entry.sourceUTIs,
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
-                ocrText: entry.ocrText
+                ocrText: entry.ocrText,
+                isPinned: entry.isPinned
             )
         case .files(let urls):
             let thumbnailFileName: String?
@@ -379,7 +386,8 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceUTIs: entry.sourceUTIs,
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
-                ocrText: entry.ocrText
+                ocrText: entry.ocrText,
+                isPinned: entry.isPinned
             )
         }
     }

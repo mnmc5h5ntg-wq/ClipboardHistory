@@ -34,3 +34,23 @@ enum FavoriteTogglePresentation {
     /// 换底色或换行高时要重新量，别把这个数当常数。
     static var favoriteColor: Color { Color(red: 0.86, green: 0.45, blue: 0.0) }
 }
+
+/// 固定（置顶且不参与清理）的呈现。行内徽标、详情浮层按钮、表头批量按钮共用一份符号与文案 ——
+/// 和 `FavoriteTogglePresentation` 存在的原因是同一件事：三处各写各的字，改一处忘一处。
+/// （第三轮审计 §5 F-5；D-034 之后 `pin.fill` 这个字面量只允许出现在这里。）
+enum PinTogglePresentation {
+    static func symbolName(isPinned: Bool) -> String {
+        isPinned ? "pin.fill" : "pin"
+    }
+
+    static func helpText(isPinned: Bool) -> String {
+        isPinned ? "取消固定" : "固定（置顶且不参与清理）"
+    }
+
+    /// 批量按钮用的符号：固定=描线 `pin`（"点它我会固定"），取消固定= `pin.slash`。
+    /// 行内徽标用实心 `pin.fill` 表示**状态**，这里用动作符号表示**意图**，
+    /// 两者刻意不同 —— 一个控件不该同时既像状态又像结果。
+    static func actionSymbolName(isPinning: Bool) -> String {
+        isPinning ? "pin" : "pin.slash"
+    }
+}

@@ -137,7 +137,7 @@ final class PipelineAcceptanceTests: XCTestCase {
             store.components(separatedBy: "func add(_ intakeEntry: ClipboardIntake.Entry").dropFirst().first
         )
         let addBody = try XCTUnwrap(afterAdd.components(separatedBy: "\n    }").first)
-        XCTAssertTrue(addBody.contains("RecordingGate.accepts"),
+        XCTAssertTrue(addBody.contains("CapturePolicy.accepts"),
                       "暂停判据不在入库入口上，顺序保证不成立：" + String(addBody.prefix(200)))
     }
 

@@ -29,6 +29,8 @@ struct DetailView: View {
             GlassPill(
                 isFavorite: entry.isFavorite,
                 favoriteAction: { historyStore.perform(.toggleFavorite(entry)) },
+                isPinned: entry.isPinned,
+                pinAction: { historyStore.perform(.togglePin(entry)) },
                 copyAction: { historyStore.perform(.copyAndPromote(entry)) },
                 deleteAction: { historyStore.perform(.delete(entry)) }
             )

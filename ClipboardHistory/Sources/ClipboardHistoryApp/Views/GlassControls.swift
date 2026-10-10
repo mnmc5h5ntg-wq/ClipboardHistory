@@ -33,6 +33,11 @@ struct GlassCircleButton: View {
 struct GlassPill: View {
     let isFavorite: Bool
     let favoriteAction: () -> Void
+    /// 固定态与固定动作（§5 F-5）。单条记录的固定入口放在这里而不是行上：
+    /// 行首的徽标是状态不是控件（`HistoryRowButton` 里那颗星已经是唯一的行内控件了），
+    /// 而表头的批量按钮只在多选时出现 —— 没有这一颗，"只固定一条"在界面上做不到。
+    let isPinned: Bool
+    let pinAction: () -> Void
     let copyAction: () -> Void
     let deleteAction: () -> Void
 
@@ -43,6 +48,17 @@ struct GlassPill: View {
                 helpText: FavoriteTogglePresentation.helpText(isFavorite: isFavorite),
                 foregroundStyle: isFavorite ? AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) : AnyShapeStyle(.primary),
                 action: favoriteAction
+            )
+
+            Rectangle()
+                .fill(.separator)
+                .frame(width: 28, height: 1)
+
+            GlassPillButton(
+                symbol: PinTogglePresentation.symbolName(isPinned: isPinned),
+                helpText: PinTogglePresentation.helpText(isPinned: isPinned),
+                foregroundStyle: isPinned ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.78)),
+                action: pinAction
             )
 
             Rectangle()

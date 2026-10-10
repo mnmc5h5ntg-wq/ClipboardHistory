@@ -282,3 +282,14 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
   `2>/dev/null` 不改退出码），一并兜底并给自检补两格。规矩：**`bash -e` 里"允许失败"的步骤，
   每一行都要问"它非零了脚本还活着吗"，包括清理动作与取值动作。**附带一条自检教训：测"看门狗挂死"时自己的夹具**不能用管道读子进程输出** ——
   孤儿 `sleep` 持有继承的 stdout，`communicate()` 等不到 EOF，实测把自己吊死在超时上；改写文件 + 独立会话按 pgid 收。
+
+## 当前状态（2026-10-11，批次 2 收尾）
+
+- 第三轮审计 §5 的 F-1 / F-4 / F-5 已落地并验证：全量 382 tests 0 失败、`make bundle` 0 warning、
+  帧 76 张两次同 sha、4 条新守卫全部变异对照（其中一条最初是假守卫，加强后才红）。
+- 下一批：批次 3 = U-4（详情排版 ≤68ch / 单行左对齐 meta / 搜索命中高亮）+ U-5（状态语言统一）。
+  再往后：批次 4（U-2 拖拽图像、F-2 RTF/HTML 保真）、批次 5（F-3 快速选择浮层——**先 spike**、C-4 运行时启动冒烟）。
+- 恢复要点：`cd ~/Codex_Project0/ClipboardHistory && swift test`；帧
+  `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots_x swift test --filter UICaptureTests`；
+  用 python 驱动 swift 时必须显式设 `SDKROOT=$(xcrun --sdk macosx --show-sdk-path)`（否则报 SDK 不兼容，
+  那条红是环境问题）。

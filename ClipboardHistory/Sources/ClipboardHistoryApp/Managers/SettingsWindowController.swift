@@ -70,6 +70,26 @@ final class SettingsWindowController {
             feedbackStore: historyStore?.feedbackStore ?? RecommendationFeedbackStore(),
             clearHistoryAction: { [weak self] in
                 self?.historyStore?.perform(.clear)
+            },
+            exportHistoryAction: { [weak self] url in
+                guard let self, let store = self.historyStore else { return "历史记录不可用" }
+                let (data, summary) = store.exportArchiveJSON()
+                do {
+                    try data.write(to: url, options: .atomic)
+                    return ArchiveTransfer.exportWarningText(summary: summary)
+                } catch {
+                    return "导出失败：\(error.localizedDescription)"
+                }
+            },
+            importHistoryAction: { [weak self] url in
+                guard let self, let store = self.historyStore else { return "历史记录不可用" }
+                do {
+                    let summary = try store.importArchiveJSON(Data(contentsOf: url))
+                    return "导入完成：新增 \(summary.importedCount - summary.skippedDuplicateCount) 条，"
+                        + "跳过重复 \(summary.skippedDuplicateCount) 条。"
+                } catch {
+                    return "导入失败：\(error.localizedDescription)"
+                }
             }
         )
     }

@@ -78,6 +78,21 @@ struct HistorySidebarView: View {
             .helpLabel("收藏所选记录")
 
             Button {
+                // 固定 = "这条我要长期留着，别被复制顶下去、别被保留策略删掉"（§5 F-5）
+                historyStore.perform(.pinSelection(isPinned: true))
+            } label: {
+                Image(systemName: PinTogglePresentation.actionSymbolName(isPinning: true))
+            }
+            .helpLabel(PinTogglePresentation.helpText(isPinned: false))
+
+            Button {
+                historyStore.perform(.pinSelection(isPinned: false))
+            } label: {
+                Image(systemName: PinTogglePresentation.actionSymbolName(isPinning: false))
+            }
+            .helpLabel(PinTogglePresentation.helpText(isPinned: true))
+
+            Button {
                 historyStore.perform(.unfavoriteSelection)
             } label: {
                 Image(systemName: "star.slash")

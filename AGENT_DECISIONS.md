@@ -738,3 +738,51 @@ run 38064293655（上面那次修法之后）里 `captured frames: 70 executed: 
 - `Ran 31 tests`（python 侧，含 `test_ci_report_selftest` 那一格）。整轮 `completed success`。
 - 顺带把 R3-D9 的边界量化了：在屏探针在无头 runner 上**一个用例都没下结论**（0/0），
   所以"在屏表格行为"这条自动化覆盖在 CI 里等于不存在，别再把它当成一道门 —— 它是清单，不是闸门。
+
+## D-038 批次 2：F-1 按 App 排除 / F-4 只索引不落盘 / F-5 固定与导出导入
+
+**做了什么**（第三轮审计 §5，全部落到产品代码与判据，不是建议）：
+
+- F-1：`Utilities/CapturePolicy.swift` 承担采集准入。默认排除名单钉住密码管理器与系统钥匙串
+  （1Password ×2、`com.apple.keychainaccess`、`com.apple.Passwords`、Bitwarden、LastPass、Dashlane…），
+  用户名单存成 `excludedAppBundleIDs` 一个分号连接串 —— `@AppStorage` 在部署下限 macOS 12 不支持 `[String]`，
+  所以配一对纯编解码函数（顺带能被单测钉住空串/重复/首尾空格）。设置「隐私」页给了一张可增可删的名单表。
+  判据是三条：暂停 < 用户显式动作 < 名单，且**来源读不到（nil）时不排除** ——
+  拿"读不到来源"当理由挡掉复制，表现是"历史记录莫名其妙不工作"，比漏挡一次更坏。
+- F-4：`OCRPolicy.StorageMode` 两态（落盘 / 只索引）。只索引时识别文本进 `ocrIndex`（内存）而不是条目，
+  于是它可搜、可显示，但不进 `history.json`；设置页用单选按钮暴露，默认仍是落盘（不改老行为）。
+- F-5：条目加 `isPinned`，`EntryOrdering` 管排序（固定项恒在前）、插入位（`promotionIndex`，
+  复用提升不能把固定项挤下去）、保留裁剪（`retaining` 里固定项豁免）；
+  行上画 `pin.fill` 徽标，批量入口在表头，单条入口在详情浮层第四颗按钮；
+  `ArchiveTransfer` 做导出/导入（图片一律跳过并计数，同 id 视为重复不复制第二份），
+  设置「数据」页走 `NSSavePanel` / `NSOpenPanel`，导出后给一条"这次少了什么"的横幅。
+
+**存档兼容**：`isPinned` 走 D-016/D-034 那条"只加可选字段不升 schema 版"的路，
+`StoredEntry.isPinned: Bool?` 读回 `?? false`；老存档不需要迁移，新存档给老版本读也只是少一个字段。
+`PipelineAcceptanceTests.testOldArchiveWithoutNewFieldsLoadsWithDefaults` 用真存档删键复现了这条。
+
+**关键设计：`HistoryStore.policyDefaults`**。策略读取原本硬写 `UserDefaults.standard`，
+那样"设置页写了那个键 → 采集侧真的读到"这一段只能靠往测试进程的标准域里写东西来验，
+既污染同批用例又碰了 D-002 的边界。改成注入点（生产仍是 `.standard`）后，
+F-1 的验收用例走的是 `HistoryStore.add` 这个产品入口 + 独立 suite，
+把 `from: policyDefaults` 变异成 `from: .standard` 时它精确红在「用户加的排除项没生效」上。
+
+**量到的数字**：全量 382 tests / 10 skipped / 0 failures；`make bundle` 0 warning；
+`HistoryStore` 1084 行（上限 1120）、最长方法 66 行（上限 70）；
+帧 76 张两次捕获逐帧同 sha；固定徽标实测 7.0×11.0pt 画在恒定 12pt 槽位里，
+`row-pinned-on` 与 `row-pinned-off` 除这 182 个像素外**逐像素相同** —— 这句话同时是
+"徽标画出来了"和"文本没有横向跳动"两条判据；对比度亮色 7.23:1 / 暗色 7.86:1（阈值 ≥3:1）。
+
+**两次自己差点信了的假信号**（都是探针自己的错，不是产品的）：
+
+1. 第一版接线守卫写的是 `row.contains("RowPinnedBadge")`。把 HStack 里那一行删掉，守卫仍然绿 ——
+   因为类型定义还留在同一个文件里。改成判**使用处** `RowPinnedBadge(isPinned: entry.isPinned)` 后
+   变异才精确红。同理 `pill.contains("pinAction")` 改成了 `contains("action: pinAction")`：
+   整颗按钮删掉时前者还是绿的（声明还在）。
+2. 对比度探针取"差异像素里对比度最大的那个墨色"，我第一版写成了 `min` ——
+   于是读出 1.11:1，看起来像"徽标淡到看不见"。方向搞反的读数会直接把我推向"改设计"，
+   而设计本来没问题（改 `max` 后 7.23/7.86:1）。小徽标的墨色要用**最**高对比度的那个像素。
+
+**没做到的（记账，不假装）**：F-4 的"只索引不落盘"只证到策略真值表 + Store 侧的写回分支存在 +
+搜索能命中内存索引，**没有**跑一次真实 Vision 识别去证明落盘文件里确实没有 ocrText；
+导出/导入的文件面板也要手点。两条都写进了 `docs/MANUAL_TEST_v1.4.9_round3.md`。

@@ -25,6 +25,8 @@ struct HistoryRowButton: View {
             RowLeadingVisual(entry: entry)
                 .frame(width: 30)
 
+            RowPinnedBadge(isPinned: entry.isPinned)
+
             RowTextColumn(entry: entry)
         }
         .padding(.vertical, 6)
@@ -104,6 +106,32 @@ private struct RowFavoriteButton: View {
     private var tint: AnyShapeStyle {
         if isFavorite { return AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) }
         return AnyShapeStyle(Color.primary.opacity(isHovered ? 0.78 : 0.55))
+    }
+}
+
+/// 行首的固定徽标（§5 F-5）。
+///
+/// 位置刻意做成一个**恒定占位**的 12pt 槽：未固定时什么都不画，固定时画 `pin.fill`。
+/// 不占位的话固定/取消固定会让整列文本横向平移 18pt —— 用户点一下"固定"，看到的是所有行
+/// 一起抖，这比看不见徽标更糟。`row-pinned-on` / `row-pinned-off` 两帧就是"文本起点没动"的证据。
+///
+/// 对比度沿用收藏那颗星量出来的值（0.55 是"可看见"下限、0.78 是"可交互"值）：这一版取 0.78，
+/// 因为"已固定"是这一行存在的理由（它会跳到列表顶部），不该比一个空闲控件更难看见。
+private struct RowPinnedBadge: View {
+    let isPinned: Bool
+
+    var body: some View {
+        Group {
+            if isPinned {
+                Image(systemName: PinTogglePresentation.symbolName(isPinned: true))
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.primary.opacity(0.78))
+                    .accessibilityLabel("已固定")
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: 12, height: 14)
     }
 }
 

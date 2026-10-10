@@ -11,6 +11,9 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
     let sourceAppBundleID: String?
     let sourceAppName: String?
     let ocrText: String?
+    /// 「固定」的收藏项：置顶、不参与复用提升的排序、也不被保留策略裁剪（第三轮审计 §5 F-5）。
+    /// 存档里是**可选字段**，缺键读为 false —— 按 D-016/D-034 的策略不升 schema 版本。
+    let isPinned: Bool
 
     init(
         id: UUID = UUID(),
@@ -22,7 +25,8 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
         sourceUTIs: [String],
         sourceAppBundleID: String? = nil,
         sourceAppName: String? = nil,
-        ocrText: String? = nil
+        ocrText: String? = nil,
+        isPinned: Bool = false
     ) {
         self.id = id
         self.content = content
@@ -34,6 +38,7 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
         self.sourceAppBundleID = sourceAppBundleID
         self.sourceAppName = sourceAppName
         self.ocrText = ocrText
+        self.isPinned = isPinned
     }
 
     var shortPreview: String {
@@ -43,6 +48,7 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
     func updating(
         timestamp: Date? = nil,
         isFavorite: Bool? = nil,
+        isPinned: Bool? = nil,
         ocrText: String?? = nil,
         thumbnail: StoredImage?? = nil
     ) -> ClipboardEntry {
@@ -56,7 +62,8 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
             sourceUTIs: sourceUTIs,
             sourceAppBundleID: sourceAppBundleID,
             sourceAppName: sourceAppName,
-            ocrText: ocrText ?? self.ocrText
+            ocrText: ocrText ?? self.ocrText,
+            isPinned: isPinned ?? self.isPinned
         )
     }
 }
