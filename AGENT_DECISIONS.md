@@ -899,3 +899,81 @@ N3 多文件退回不给拖、N4 富文本不落盘、N5 路径数组解码少�
 **一个已知弱点，写清楚不藏着**：`ClipboardWriting` 给 `write(_:richText:)` 的默认实现是"丢掉富文本"，
 这样夹具用的 `TestClipboardWriter` 不必逐个改。代价是"格式真的进了剪贴板"这条判据
 **必须**用 `SystemClipboardWriter` + 命名剪贴板来测；拿夹具测会恒绿。测试文件头部写了这句话。
+
+## D-041 F-3 快速选择浮层：spike 先证伪了它的前提，于是换了形状
+
+审计 §5 F-3 要的是"⌘⇧V 呼出浮层，打字筛选，回车直接粘回原应用"，
+而 §7 特别写了**不许跳过 spike**：非激活面板的键盘焦点是 macOS 的已知坑。
+
+**spike 怎么做的**（仓库外，`/tmp/f3_spike.swift`）：建一个 `.nonactivatingPanel` 的 NSPanel + NSTextField，
+`makeKeyAndOrderFront` → 读 `panel.isKeyWindow` / `NSApp.isActive`；再往窗口 `sendEvent` 合成按键，
+读 field editor 的字符串确认打字进得去；然后 `NSApp.activate(ignoringOtherApps: true)` 再读一次。
+
+**spike 的结论是"这个 spike 没有判别力"**：
+
+| 观测 | 不激活 | 激活之后 |
+| --- | --- | --- |
+| `NSApp.isActive` | false | **false** |
+| `panel.isKeyWindow` | false | **false** |
+
+两个变体的读数**一模一样**。原因：裸二进制（`swiftc` 直出的可执行文件，以及 xctest 宿主）里
+`NSApp.activate(ignoringOtherApps:)` 基本是空操作 —— 没有 LaunchServices 注册就没有可激活的会话。
+我也试着把 spike 包成一个最小 .app 用 `open -W` 启动，`open` 报 `-10825`（本机 launchservices
+不认这个 /tmp 里的包），`lsregister -f` 之后仍是不认。
+所以"非激活面板能不能拿到键盘焦点"这一个问题，**在这台机器上量不出来**，
+无论答"能"还是"不能"都是猜。
+
+**于是换形状而不是赌**：走本产品已经跑着、线上已经可用的一条路 ——
+主窗口呼出用的就是 `WindowManager.showMainWindow` 里 `activate(ignoringOtherApps: true)` + 成 key，
+用户今天按 ⌃⌥V 能立刻打字，这就是这条路的现成证据。浮层复用它，只在"轻"上做差异：
+一个搜索框 + 候选列表，回车 = `copyAndPasteEntry`（产品里现成的"复制 + 粘回原应用"），Esc = 什么都不做。
+
+**另一个必须偏离审计的地方：默认组合键不是 ⌘⇧V。**
+⌘⇧V 在 Chrome / VS Code / Slack 里是"粘贴并匹配样式"。全局快捷键注册上它，等于让所有用户那个功能失灵 ——
+这是拿别人的功能换一个新功能，不值。本产品既有约定是 ⌃⌥V（呼出）/ ⌃⌥C（再次复制），
+所以浮层默认 **⌃⌥⇧V**，同族且不撞车；想改回 ⌘⇧V 的人在「快捷键」页自己录，录得进去（守卫只钉默认值）。
+
+**判据为什么长这样**：真按键路由进面板测不到（就是上面那条事实），
+所以把"输入 → 候选 → 移动 → 提交哪一条"全部做成隔着一层面板也能驱动的函数
+（`QuickPickModel` 纯函数 + `QuickPickController.handle(keyEvent:)` 的按键判定 + `refreshEntries()`），
+逐条钉住。其中最重要的一条是 **`setQuery` 必须把下标归零**：
+不换的话，用户搜"电话"、回车却粘走了原来第 4 条 —— 这个浮层最危险的错法就是这个。
+变异 M2（回车提交 `visible.first` 而不是选中项）、M3（不归零）都精确点亮了它。
+
+**这台机器上的一个意外收获，记下来免得再犯**：
+我在开发机上真跑了两次冒烟启动，而**用户自己的 时间剪史 正在运行**（PID 54005，23:17 起）。
+第二个实例开出了自己的窗口 —— 也就是说 `InstanceGuard` 在这种"直接 exec 包内二进制"的启动方式下
+没有把它挡掉。桌面被多开的窗口打扰是我的操作失误，之后的真启动验证一律交给 CI 的干净 runner，
+本地只用假包（`scripts/tests/test_launch_smoke.py` 里那两个端到端用例）。
+顺带这条产品事实值得单独看一眼：守卫对"非 LaunchServices 启动"的第二实例是否漏判，
+已在 backlog 记成待查项。
+
+## D-042 C-4 运行时启动冒烟：静态闸门之外，真启一次
+
+审计 §3 C-4 的判据是"构建产物能被真启动"，而 R2-21 那道闸门是**静态**的
+（`prepare_release.py` 读反汇编，确认没给 `AppDelegate` 留 `-init` 桩）。
+静态那道能证明"没有已知的启动障碍"，证明不了"真的起得来"。这一步补运行时那一半。
+
+- 产品侧加了一个隔离开关：`CLIPBOARD_HISTORY_DATA_DIR`（`FileHistoryPersistence.dataDirectoryEnvironmentKey`），
+  没设时行为与改动前逐字节相同，设了就把存档根目录指过去。
+  **没有它就不能做这件事**：真启一次会读 `~/Library/Application Support/时间剪史/`，
+  而 D-002 的边界是那份用户数据只读不写、也不许被测试实例覆盖。
+  日志侧本来就有 `CLIPBOARD_HISTORY_LOG_DIR`，两个一起用就完全落在临时区。
+- `scripts/launch_smoke.py` 判据来自生命周期日志，**不来自退出码**：GUI app 是我们 terminate 的，
+  退出码必然是负的，拿 `== 0` 当结论会把所有成功都判成失败。
+  三条失败理由：日志为空 / 没有启动成功标记 / 第二实例守卫命中（那个是**静默退出**的，
+  不当成独立理由就会被读成"启动成功但立刻退了"）。
+- 判定 `evaluate()` 是纯函数，所以它被硬门住在 `scripts/tests/test_launch_smoke.py`（43 个用例里新增 8 个）；
+  真启动那一步在 CI 里是 `continue-on-error` 的报告型步骤（无头 runner 上 GUI 会话是否可用未证明，
+  拿它当硬门只会让人学会无视红色 —— D-7 那一轮付过学费）。
+  这样"这一步永远绿"不可能是因为判据坏了：判据坏了会先红在自测里。
+- 顺手把 CI 里 Python 用例数下限从 17 提到 **40**（只准涨不准跌那条老规矩），
+  否则将来被删掉的自测不会有人发现。
+
+**踩到的两个探针故障**（都是"看着像产品坏了，其实是我量错了"）：
+1. 第一版把日志文件名写成自己臆造的 `smoke-lifecycle.log` → 读到空文件 → 报"app 没跑到能写日志的地方"，
+   而 app 其实正常启动了。现在文件名是常量 `LOG_FILE_NAME`，并且**自测会去 Swift 源里核对它**
+   （`test_log_file_name_matches_the_product`）：文案/文件名漂移时先红在自测里。
+2. 进程**已经退出**才轮到那次轮询时，循环是 `break` 出来的、`text` 还是空的 ——
+   于是"退出了但日志写过成功标记"被误判成"没有日志"。修法是不管怎么退出循环，
+   最后都再读一次日志。快速崩溃/快速自杀那一类才有可读的证据。

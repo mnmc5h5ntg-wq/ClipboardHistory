@@ -15,6 +15,13 @@ struct HotKeyShortcut: Codable, Equatable {
         modifiers: UInt32(controlKey | optionKey)
     )
 
+    /// 快速选择浮层。与 ⌃⌥V / ⌃⌥C 同族再加一个 ⇧，
+    /// 刻意避开 ⌘⇧V（浏览器/编辑器里是"粘贴并匹配样式"）。
+    static let defaultQuickPickShortcut = HotKeyShortcut(
+        keyCode: UInt32(kVK_ANSI_V),
+        modifiers: UInt32(controlKey | optionKey | shiftKey)
+    )
+
     var displayString: String {
         modifierDisplayString + keyDisplayString
     }

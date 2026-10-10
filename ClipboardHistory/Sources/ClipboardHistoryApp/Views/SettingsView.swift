@@ -42,9 +42,11 @@ struct SettingsView: View {
     @ObservedObject private var showMainWindowHotKeySettings: HotKeySettings
     private let feedbackStore: RecommendationFeedbackStore
     @ObservedObject private var repeatCopyHotKeySettings: HotKeySettings
+    @ObservedObject private var quickPickHotKeySettings: HotKeySettings
     @ObservedObject private var loginItemSettings: LoginItemSettings
     @State private var showMainWindowShortcut: HotKeyShortcut
     @State private var repeatCopyShortcut: HotKeyShortcut
+    @State private var quickPickShortcut: HotKeyShortcut
     @State private var launchAtLogin: Bool
     // 这两个键与 `HistoryStore.recordingPausedKey` / `ocrSearchDisabledKey` 是同一对，
     // 写在这里而不引用 store 是因为设置页在两个窗口里都会重建（@AppStorage 自带跨实例同步）。
@@ -77,6 +79,9 @@ struct SettingsView: View {
     init(
         showMainWindowHotKeySettings: HotKeySettings,
         repeatCopyHotKeySettings: HotKeySettings,
+        // 有默认值只是为了让旧的测试夹具不必一起改；生产侧（AppDelegate）始终显式传入，
+        // 而"确实传了"由 Round3QuickPickTests 的接线守卫钉住。
+        quickPickHotKeySettings: HotKeySettings = HotKeySettings(action: .quickPick),
         loginItemSettings: LoginItemSettings,
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore(),
@@ -88,6 +93,7 @@ struct SettingsView: View {
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
+        self.quickPickHotKeySettings = quickPickHotKeySettings
         self.loginItemSettings = loginItemSettings
         self.contextPreferences = contextPreferences
         self.weightsStore = weightsStore
@@ -97,6 +103,7 @@ struct SettingsView: View {
         self.clearHistoryAction = clearHistoryAction
         _showMainWindowShortcut = State(initialValue: showMainWindowHotKeySettings.shortcut)
         _repeatCopyShortcut = State(initialValue: repeatCopyHotKeySettings.shortcut)
+        _quickPickShortcut = State(initialValue: quickPickHotKeySettings.shortcut)
         _launchAtLogin = State(initialValue: loginItemSettings.isEnabled)
         // 默认值与改动前的字面量初值一致：调用方不传就是"快捷键"页。
         // 存在的唯一理由：离屏窗口的无障碍树不会被 SwiftUI 建立，
@@ -158,6 +165,12 @@ struct SettingsView: View {
             }
             .onChange(of: repeatCopyHotKeySettings.shortcut) { newValue in
                 repeatCopyShortcut = newValue
+            }
+            .onChange(of: quickPickShortcut) { newValue in
+                saveQuickPickShortcut(newValue)
+            }
+            .onChange(of: quickPickHotKeySettings.shortcut) { newValue in
+                quickPickShortcut = newValue
             }
             .onChange(of: launchAtLogin) { newValue in
                 saveLaunchAtLogin(newValue)
@@ -239,6 +252,13 @@ struct SettingsView: View {
                     HotKeySettingsRow(
                         settings: repeatCopyHotKeySettings,
                         shortcut: $repeatCopyShortcut
+                    )
+
+                    Divider()
+
+                    HotKeySettingsRow(
+                        settings: quickPickHotKeySettings,
+                        shortcut: $quickPickShortcut
                     )
                 }
             }
@@ -536,6 +556,13 @@ struct SettingsView: View {
         guard shortcut != repeatCopyHotKeySettings.shortcut else { return }
         if !repeatCopyHotKeySettings.save(shortcut) {
             repeatCopyShortcut = repeatCopyHotKeySettings.shortcut
+        }
+    }
+
+    private func saveQuickPickShortcut(_ shortcut: HotKeyShortcut) {
+        guard shortcut != quickPickHotKeySettings.shortcut else { return }
+        if !quickPickHotKeySettings.save(shortcut) {
+            quickPickShortcut = quickPickHotKeySettings.shortcut
         }
     }
 

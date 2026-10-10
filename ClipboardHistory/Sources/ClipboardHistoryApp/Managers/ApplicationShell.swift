@@ -10,10 +10,15 @@ final class ApplicationShell {
     private let pasteKey: PasteKeyExecuting
     private var isConfigured = false
     private var didDeferInitialActivationRestore = false
+    /// 快速选择浮层（§5 F-3）。懒建：没有历史数据时它连列表都填不出来。
+    private var quickPick: QuickPickController?
 
     init(
         showMainWindowHotKeySettings: HotKeySettings,
         repeatCopyHotKeySettings: HotKeySettings,
+        // 有默认值只是为了让旧的测试夹具不必一起改；生产侧（AppDelegate）始终显式传入，
+        // 而"确实传了"由 Round3QuickPickTests 的接线守卫钉住。
+        quickPickHotKeySettings: HotKeySettings = HotKeySettings(action: .quickPick),
         loginItemSettings: LoginItemSettings,
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         confirmation: DestructiveConfirming = SystemDestructiveConfirming(),
@@ -24,6 +29,7 @@ final class ApplicationShell {
         self.settingsWindowController = SettingsWindowController(
             showMainWindowHotKeySettings: showMainWindowHotKeySettings,
             repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+            quickPickHotKeySettings: quickPickHotKeySettings,
             loginItemSettings: loginItemSettings,
             contextPreferences: contextPreferences
         )
@@ -131,6 +137,23 @@ final class ApplicationShell {
         historyStore?.flushPendingPersistence()
     }
 
+    /// 呼出/收起快速选择浮层。回车走的是和主窗口"再次复制 + 粘回"**同一个**动作
+    /// （`copyAndPasteEntry`），不是第二套粘贴逻辑 —— 两套粘贴实现迟早做出两种行为。
+    func ensureQuickPick(historyStore: HistoryStore) -> QuickPickController {
+        if let quickPick { return quickPick }
+        let created = QuickPickController(
+            historyStore: { [weak self] in self?.historyStore },
+            commit: { [weak self] entry in self?.copyAndPasteEntry(entry) }
+        )
+        quickPick = created
+        return created
+    }
+
+    func toggleQuickPick() {
+        guard let historyStore else { return }
+        ensureQuickPick(historyStore: historyStore).toggle()
+    }
+
     func showMainWindow() {
         WindowManager.showMainWindow(menuBarController: menuBarController)
     }
@@ -227,6 +250,8 @@ final class ApplicationShell {
         switch command {
         case .showMainWindow:
             showMainWindow()
+        case .showQuickPick:
+            toggleQuickPick()
         case .showSettings:
             showSettings()
         case .refreshHistory:

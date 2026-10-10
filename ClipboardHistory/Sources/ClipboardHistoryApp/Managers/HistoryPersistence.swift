@@ -266,7 +266,19 @@ final class FileHistoryPersistence: HistoryPersisting {
         pendingSave = nil
     }
 
+    /// 存档根目录。
+    ///
+    /// `CLIPBOARD_HISTORY_DATA_DIR` 是给**运行时冒烟测试**用的隔离开关（第三轮审计 C-4）：
+    /// 它让 CI 可以真的把打包后的 app 启起来看一眼，而不碰用户 `~/Library/Application Support/时间剪史/`
+    /// 里那份真存档（D-002 的边界）。名字里带 DATA 而不是 HOME，就是为了不冒充别的语义。
+    /// 只有显式设置且非空才生效，没设置时行为与改动前逐字节相同。
+    static let dataDirectoryEnvironmentKey = "CLIPBOARD_HISTORY_DATA_DIR"
+
     static func defaultRootDirectory() -> URL {
+        if let override = ProcessInfo.processInfo.environment[dataDirectoryEnvironmentKey],
+           !override.isEmpty {
+            return URL(fileURLWithPath: (override as NSString).expandingTildeInPath, isDirectory: true)
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("时间剪史", isDirectory: true)

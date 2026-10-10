@@ -29,11 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
     private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
+    private let quickPickHotKeySettings = HotKeySettings(action: .quickPick)
     private let loginItemSettings = LoginItemSettings()
     let contextPreferences = ContextPreferenceSettings()
     private lazy var shell = ApplicationShell(
         showMainWindowHotKeySettings: showMainWindowHotKeySettings,
         repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+        quickPickHotKeySettings: quickPickHotKeySettings,
         loginItemSettings: loginItemSettings,
         contextPreferences: contextPreferences
     )
@@ -94,8 +96,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .repeatCopyHotKeyPressed,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleQuickPickHotKeyPressed(_:)),
+            name: .quickPickHotKeyPressed,
+            object: nil
+        )
         showMainWindowHotKeySettings.start()
         repeatCopyHotKeySettings.start()
+        // 快速选择的 ⌃⌥⇧V 也在这里注册：它和另外两个走同一个 Carbon 路径，
+        // 注册失败（被别的 App 占了）时 `HotKeySettings` 会自己给出可见的提示文案。
+        quickPickHotKeySettings.start()
         loginItemSettings.refresh()
         installReopenAppleEventHandler()
         configure()
@@ -150,6 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         showMainWindowHotKeySettings.stop()
         repeatCopyHotKeySettings.stop()
+        quickPickHotKeySettings.stop()
         LifecycleDebugLogger.close()
     }
 
@@ -238,6 +250,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func handleShowMainWindowHotKeyPressed(_ notification: Notification) {
         LifecycleDebugLogger.log("handleShowMainWindowHotKeyPressed called")
         shell.showMainWindow()
+    }
+
+    @objc private func handleQuickPickHotKeyPressed(_ notification: Notification) {
+        LifecycleDebugLogger.log("handleQuickPickHotKeyPressed called")
+        shell.toggleQuickPick()
     }
 
     @objc private func handleRepeatCopyHotKeyPressed(_ notification: Notification) {

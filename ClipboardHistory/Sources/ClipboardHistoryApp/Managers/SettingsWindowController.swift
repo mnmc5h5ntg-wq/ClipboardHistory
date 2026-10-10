@@ -5,6 +5,7 @@ import SwiftUI
 final class SettingsWindowController {
     private let showMainWindowHotKeySettings: HotKeySettings
     private let repeatCopyHotKeySettings: HotKeySettings
+    private let quickPickHotKeySettings: HotKeySettings
     private let loginItemSettings: LoginItemSettings
     private let contextPreferences: ContextPreferenceSettings
     private var weightsStore: RecommendationWeightsStore
@@ -14,12 +15,16 @@ final class SettingsWindowController {
     init(
         showMainWindowHotKeySettings: HotKeySettings,
         repeatCopyHotKeySettings: HotKeySettings,
+        // 有默认值只是为了让旧的测试夹具不必一起改；生产侧（AppDelegate）始终显式传入，
+        // 而"确实传了"由 Round3QuickPickTests 的接线守卫钉住。
+        quickPickHotKeySettings: HotKeySettings = HotKeySettings(action: .quickPick),
         loginItemSettings: LoginItemSettings,
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore()
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
+        self.quickPickHotKeySettings = quickPickHotKeySettings
         self.loginItemSettings = loginItemSettings
         self.contextPreferences = contextPreferences
         self.weightsStore = weightsStore
@@ -64,6 +69,7 @@ final class SettingsWindowController {
         SettingsView(
             showMainWindowHotKeySettings: showMainWindowHotKeySettings,
             repeatCopyHotKeySettings: repeatCopyHotKeySettings,
+            quickPickHotKeySettings: quickPickHotKeySettings,
             loginItemSettings: loginItemSettings,
             contextPreferences: contextPreferences,
             weightsStore: weightsStore,

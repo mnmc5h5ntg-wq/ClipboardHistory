@@ -127,9 +127,27 @@ jobs:
           grep -q "OK" /tmp/py.log
           executed=$(grep -oE 'Ran [0-9]+ tests' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
           echo "python cases: $executed"
-          test "$executed" -ge 17
+          test "$executed" -ge 40
 
       # 打包链路不产出可分发物，但必须能跑通：上一轮的缺陷正是"每一步都 || true"，
       # 于是缺键的 Info.plist 也算构建成功。这里跑脚本级校验，避免整包 universal 构建拖慢 CI。
       - name: Info.plist gate
         run: scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist /tmp/Info.plist 0.0.0-ci
+
+      # 第三轮审计 C-4：R2-21 那道"启动闸门"是**静态**的（读反汇编看有没有 -init 桩），
+      # 它能证明"没有已知的启动障碍"，不能证明"真的起得来"。这一步补运行时那一半。
+      # 报告型（continue-on-error）：无头 runner 上 GUI 会话是否可用未证明，
+      # 拿它当硬门只会让人学会无视红色 —— 这是 D-7 那一轮已经付过学费的教训。
+      # 判定逻辑本身由 scripts/tests/test_launch_smoke.py 硬门住（上一步的 unittest 里），
+      # 所以这一步红与不红都有意义：红可能是环境，但"永远绿"绝不可能是因为判据坏了。
+      - name: Runtime launch smoke (report-only)
+        continue-on-error: true
+        timeout-minutes: 6
+        run: |
+          set -o pipefail
+          make bundle > /tmp/bundle.log 2>&1 || { echo "打包失败"; tail -20 /tmp/bundle.log; exit 1; }
+          # 隔离：数据目录与日志目录都在 /tmp，绝不写用户的 ~/Library/Application Support/时间剪史
+          status=0
+          python3 scripts/launch_smoke.py "时间剪史.app" --timeout 30 | tee /tmp/smoke.log || status=$?
+          grep -E "SMOKE_" /tmp/smoke.log
+          exit "$status"

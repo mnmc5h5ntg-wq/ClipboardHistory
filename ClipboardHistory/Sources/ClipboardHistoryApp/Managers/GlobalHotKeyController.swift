@@ -4,6 +4,7 @@ import Carbon
 extension Notification.Name {
     static let showMainWindowHotKeyPressed = Notification.Name("ClipboardHistoryShowMainWindowHotKeyPressed")
     static let repeatCopyHotKeyPressed = Notification.Name("ClipboardHistoryRepeatCopyHotKeyPressed")
+    static let quickPickHotKeyPressed = Notification.Name("ClipboardHistoryQuickPickHotKeyPressed")
 }
 
 private let globalHotKeySignature = fourCharacterCode("TJSJ")

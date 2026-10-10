@@ -173,6 +173,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return #selector(refreshHistoryFromMenu)
         case .clearHistory:
             return #selector(confirmAndClearHistoryFromMenu)
+        case .showQuickPick:
+            // 菜单项与全局快捷键共用同一个 `AppCommand.showQuickPick`，
+            // 于是两条入口是同一段代码 —— 不开第二条粘贴/显示路径。
+            return #selector(quickPickFromMenu)
         case .dismissAllRecommendations:
             return #selector(dismissAllRecommendationsFromMenu)
         case .quit:
@@ -230,6 +234,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private func perform(_ command: AppCommand) {
         LifecycleDebugLogger.log("MenuBarController.perform command=\(command.title)")
         commandHandler?(command)
+    }
+
+    @objc private func quickPickFromMenu() {
+        perform(.showQuickPick)   // 与其它菜单项同一条 dispatch（含日志），不开第二条路
     }
 
     @objc private func showMainWindowFromMenu() {
