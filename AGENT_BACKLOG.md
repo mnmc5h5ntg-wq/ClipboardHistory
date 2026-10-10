@@ -305,6 +305,7 @@ arm64 上类名字面量离调用点二十几行（固定窗口回看会在坏�
 | R3-D8 | 第三轮 D-8 | 低 | 已完成(D-033) | 设置侧栏符号统一描线（`sparkles`→`wand.and.stars`）+ 守卫。 |
 | R3-D9 | D-033 | 中 | 未开始 | **在屏表格行为没有自动化覆盖**：合成鼠标事件送不进 `NSTableView`（`clickedRow` 恒 -1）。要么找一条能真正驱动表格的通道（CGEvent + 辅助功能授权，代价是要权限），要么每版发版前把 `docs/MANUAL_TEST_v1.4.9_round3.md` 第 1、2 节人肉跑一遍。 |
 | R3-D10 | D-033 | 低 | 未开始 | 多文件条目仍不能拖出（需要 `NSView` 级 dragging session，R2-05 的另一半）。换 `List` 之后做它的成本比之前低（行由表格管理），下一轮做 U-2 时顺手。 |
+| R3-D11 | D-033 / CI 实测 | 中 | 未开始 | **CI runner 上才有的两条事实**（run 38050339974 / 38050990090）：① `content-wide-1100x800` 亮暗两帧在 macos-15 runner 上有 95% 像素未被绘制 ⇒ 捕获失效闸门锁住不认它，真机这两帧正常，需要判定是 runner 的离屏渲染限制还是尺寸相关的产品问题；② `UIInteractionProbeTests` 在 runner 上直接挂死（8 分钟被 GitHub 掐掉），现在改成自带 240 秒看门狗并汇报「跑到哪儿了」。两条都不挡发布（报告型），但都是下一轮 CI 加固的入口。 |
 **进度快照 13（D-029：修掉自己带进去的启动闪退）**：用户报「从仓库根目录打开新版 app 闪退」。
 两份 .ips 的崩溃 PC 紧跟 `_unimplementedInitializer(AppDelegate, "init()")` + `brk #1`，包 UUID 与仓库产物一致 ⇒ D-019 给 `AppDelegate` 加显式 `init(historyStore:)` 之后，ObjC 的 `-init` 变成编译器留下的 trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过元类型调它。
 327 个用例与 CI 全绿挡不住的原因：Swift 侧 `AppDelegate()` 解析到带默认参数的那个 init，永远走不到 `-init`；CI 也从不启动 .app。修法是三行 `override convenience init()`，守卫两条互补（运行时走元类型 + 源码扫描必须声明 override init）。修之前那条运行时守卫原地复现了同一句 fatal error（signal 5），修之后绿。
