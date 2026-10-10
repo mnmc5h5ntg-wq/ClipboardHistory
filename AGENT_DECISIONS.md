@@ -614,3 +614,40 @@ name: decisions
   这次改的是手势与拖拽源归属，不动像素，所以帧基线不需要重录。
 - 兼容性与回滚：删掉的是 internal 的 `Action` case 与视图私有状态，无对外 API、无存档格式变化；
   回滚 = `git revert` 本次提交（要恢复拖选则需同时回退 D-034 与 D-033 的把手设计，或改走候选①）。
+
+## D-035 图片文件条目补行内缩略图（用户真机反馈）
+
+- 现象（用户截图）：详情区能显示 `board-icon-fullbleed…png` 的内容，左侧列表那一行却只有通用文档符号；
+  同一列表里"图片 1188×1280"那条（剪贴板直接带图像数据的）是有预览的。
+- 根因是**两条路径的差别**，不是渲染坏了：`.file` 条目的 `thumbnail` 来自剪贴板**顺带**给的
+  TIFF/icns（`ClipboardIntake.readEntry`），从 Finder 复制文件时系统通常不给 ⇒ `thumbnail == nil`
+  ⇒ 行首退回 `doc` 符号；详情区是按 URL 现读文件，所以两边不一致。拖拽入库（`addDroppedFiles`）
+  更是直接写死 `thumbnail: nil`。
+- 修法：新增 `FileThumbnailPolicy`（判据 + 从磁盘解图），`HistoryStore.attachFileThumbnailIfNeeded`
+  走 OCR 那一套既有形状 —— **后台队列解码、主线程写回、写回后 `persist()`**，
+  在 `add(...)` 里与 `scheduleOCRIfNeeded` 并排调用；另加启动回填 `attachMissingFileThumbnails()`
+  （与 `scheduleOCRForExistingImages()` 同一时机），让老历史里那些条目也能补上。
+- 两个刻意的设计约束：
+  ① **只解小图**（长边 256px）。缩略图会落盘（`thumbnailFileName`），解全尺寸等于把用户文件
+     复制一份进历史目录；行首只有约 32pt，256px 在 retina 上已经够清晰。实测 1200×900 的 PNG
+     解出 256×192、1031 字节。
+  ② **扩展名集合与 OCR 那条不同**：用 `FileTypeSupport.imageExtensions`（不含 svg），
+     因为 ImageIO 解不了 SVG；OCR 的集合里有 svg（识别失败只是白跑）。两个集合的差别写在代码注释里，
+     避免以后有人"顺手统一成一个"。
+- 写回只有一条路：`applyThumbnail(entryID:thumbnail:)` 里"条目已不存在 ⇒ false"、
+  "已经有缩略图 ⇒ false（不覆盖剪贴板带来的那一份）"，成功才 `persist()`。
+  抽成独立方法而不是内联在闭包里，是为了让这一步能被直接测 —— 不用赌后台队列什么时候跑完。
+- 验证：新增 `FileThumbnailTests` 7 例（真值表 6 个方向、真实 PNG 解码 + 尺寸上限 + 自带 PNG 字节、
+  文件不存在/非图片返回 nil、写回一次且不覆盖、**端到端 `add` 后异步补上**、启动回填与行首分支两条接线守卫）。
+  夹具新增 `row-file-thumb` 亮暗两帧（帧数 **68 → 70**，其余 68 帧逐帧不变）——
+  这条帧存在的意义就是"图片文件行有预览"从此有像素可查。
+  变异对照四组逐一点亮：判据恒 false ⇒ 2 条红；缩略图不限尺寸 ⇒ 尺寸判据红；
+  `add` 里不排补图 ⇒ 端到端红；行首 `.file` 分支不看缩略图 ⇒ 2 条红。还原后 `cmp` 逐字节相同。
+  `swift build` 0 告警 · `swift test` **362 例 / 10 skip / 0 失败**。
+- 一条判据强度的自我更正：`testStartupBackfillIsWired` 里"store 必须包含
+  `attachFileThumbnailIfNeeded(for: entry)`"这一条**分不清**调用点在 `add` 还是在启动回填里
+  （两处文本相同），所以真正抓住 P3 的是端到端那条。留着它是因为它还钉着"启动必须回填"，
+  但别再把它当成"新复制的条目接上了"的证据。
+- 兼容性与回滚：无存档格式变化（`thumbnailFileName` 早就存在，只是以前对这类条目是空的）；
+  新增的都是 internal 类型与方法。回滚 = `git revert` 本次提交，已补的缩略图留在磁盘上但不再显示，
+  不影响读取。
