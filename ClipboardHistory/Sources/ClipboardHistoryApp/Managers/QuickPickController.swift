@@ -72,8 +72,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 输入变化：查询词进模型、刷新列表、下标夹住。
     func queryChanged(_ text: String) {
         model.setQuery(text)
+        // rebuildRows 里已经有 reloadData —— 这里以前还再调一次，
+        // 两次刷新会让表格在输入法的每个候选字上重排两遍（打字时肉眼可见的抖动）。
         rebuildRows()
-        table?.reloadData()
         selectCurrentRow()
     }
 
@@ -170,13 +171,19 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
 
+        guard let content = panel.contentView else {
+            // 带 .titled 的面板正常一定有 contentView；这里不 force unwrap 是因为
+            // 这个函数在快捷键回调链上跑，一次崩溃的表现是"按 ⌃⌥⇧V 应用直接没了"。
+            // 拿不到容器就安静地不显示，比崩掉更可用（下面调用方按 isVisible 决定 toggle 方向）。
+            return panel
+        }
         let stack = NSStackView(views: [field, scroll])
         stack.orientation = .vertical
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-        stack.frame = panel.contentView!.bounds
+        stack.frame = content.bounds
         stack.autoresizingMask = [.width, .height]
-        panel.contentView?.addSubview(stack)
+        content.addSubview(stack)
 
         self.panel = panel
         self.field = field
