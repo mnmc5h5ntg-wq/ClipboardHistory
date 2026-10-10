@@ -576,3 +576,41 @@ name: decisions
 - 兼容性与回滚：无存档格式变化（D-5 明确不升版）、无新依赖；`HistoryStore.add` 新增的是**带默认值的参数**；
   `SidebarKeyboardNavigation` 的删除是唯一被移除的旧符号（只有视图与它的用例用过）。
   回滚 = `git revert` 本轮提交；两个 UserDefaults 键即使留着，旧版也不读，不影响回退。
+
+## D-034 拖选与拖出不能共存于 `List`：保留拖出、放弃拖选（用户真机反馈后决定）
+
+- 触发：D-033 落地后用户真机一试就报"从第 1 行按下拖到第 n 行不会多选，只会把第一行拖成一个半透明条目跟着鼠标走"。
+  这正是 D-1 的验收点（清单第 1.2 条），也是我在 D-033 里明说"只能真机看"的那条缺口被抓到。
+- **被实测否掉的设计**：修法③原本想"拖出只从行首把手发起、行体留给拖选"，代码也确实只把 `.onDrag`
+  挂在 30pt 的 `RowDragHandle` 上。但 `List` 底下是 `NSTableView`，**SwiftUI 会把行内任何一处 `.onDrag`
+  提升成"整行是拖拽源"** —— 作用域不在子视图上。于是从行里任意位置按下都会开会话，
+  而会话一旦开始，挂在容器上的 `DragGesture(minimumDistance: 4)` 就拿不到这串鼠标事件，拖选必然不发生。
+  结论：在 `List` 里这个分工做不到，不是实现细节问题。
+- 三条候选与取舍：① 自己实现 AppKit 级拖拽源（`NSView` 只占把手那一格，`mouseDragged` 里
+  `beginDraggingSession`）可以同时保住拖出与拖选；② **保留整行拖出、去掉拖选**；③ 退回自绘列表用①的分工
+  （但会丢掉修法③换来的原生键盘/VO/多选）。用户选 ②，理由与系统行为一致：
+  macOS 的侧栏本来不做橡皮筋多选（Finder 侧栏也不做），而"拖一行去别的应用"是这个产品最有用的动作之一。
+- 因此删除的东西要列清楚，避免下一轮有人以为是漏实现：`HistorySidebarView` 的 `DragGesture`、
+  `updateDragSelection`/`endDragSelection`/`entry(at:)`/`rowFrameReader`/`HistoryRowFramePreferenceKey`、
+  `rowFrames` 与 `dragSelectionAnchorID` 状态；`HistoryStore.Action.dragSelectRange`
+  （`selectRange(from:to:)` 保留，锚点来源收回 shift 扩选一处）；`EntryDragGate` 从
+  `prepareForDrag(origin:content:)` 退化成 `offersDrag(for:)`，`RowDragHandle` 这层消失，
+  拖出与提示改挂在整行上（`EntryDragModifier` + `RowDragHelpModifier`）。
+  **没有留任何半套死码**：一个永远抢不过表格会话的手势，比没有手势更坏，因为它让人以为拖选还在。
+- 判据（都是能被打红的）：`testNoCompetingDragSelectGestureRemains`（侧栏不许再出现 `DragGesture`/
+  `dragSelectRange`/`rowFrames`，store 里不许留 `dragSelectRange`）、
+  `testDragAffordanceIsExactlyOneAndLivesOnTheRow`（出入口恰好一处、`RowDragHandle` 不许回来）、
+  `testOffersDragOnlyWhenSomethingWouldActuallyBeCarriedOut`、`testDragHelpTextMatchesTheAffordance`、
+  `testSidebarIsWiredToTheSystemList`。原来那条拖选探针（`testDragSelectExpandsSelectionInsideTheRealList`）
+  删除并在原位置留了一段解释 —— 被测手势已不存在，留着就是假闸门。
+- 变异对照三组，逐一点亮：把手势加回侧栏 ⇒ 守卫红；把手层写回行视图 ⇒ 守卫红；
+  `offersDrag` 改成恒真 ⇒ 真值表与提示文案共 4 条红。三组还原后 `cmp` 逐字节相同。
+- **一条对判据层的教训**（与"源码已修≠已交付"同族）：D-033 里我有一条守卫是"拖出入口恰好一处且挂在把手上"，
+  它在**源码层为真**、在**效果层为假**，因为效果取决于 `List` 怎么提升作用域。守卫量错了层，
+  所以它绿着放过了一个真回归。规矩：**凡是"作用域/归属"类断言，要有一条能落到真实容器上的判据**
+  （这里只能落到真机清单），源码扫描只能钉"写法"，钉不住"AppKit 怎么处理这个写法"。
+- 验证：`swift build` 0 告警 · `swift test` **355 例 / 10 skip / 0 失败** ·
+  离屏 68 帧与改动前逐帧相同（`frame_audit.py diff` 合计 0/68 有变化）——
+  这次改的是手势与拖拽源归属，不动像素，所以帧基线不需要重录。
+- 兼容性与回滚：删掉的是 internal 的 `Action` case 与视图私有状态，无对外 API、无存档格式变化；
+  回滚 = `git revert` 本次提交（要恢复拖选则需同时回退 D-034 与 D-033 的把手设计，或改走候选①）。
