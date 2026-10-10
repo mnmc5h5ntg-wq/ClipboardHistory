@@ -473,10 +473,10 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 "哪一行有键盘焦点"的信号，`List(selection:)` 不给；在没有替代环之前先删掉唯一的焦点指示，
 等于在最老的两个系统版本上把键盘用户丢掉。留成 ready-for-human，需要 12/13 真机。
 
-**判据总量（现取）**：`swift build --build-tests` 0 告警 · `swift test` **430 例 / 10 skip / 0 失败** ·
-`python3 -m unittest discover -s scripts/tests` **54 例 OK**（CI 下限从 17 提到 48） ·
+**判据总量（现取）**：`swift build --build-tests` 0 告警 · `swift test` **431 例 / 10 skip / 0 失败** ·
+`python3 -m unittest discover -s scripts/tests` **63 例 OK**（CI 下限从 17 提到 48） ·
 `make bundle` 0 告警 · 78 张帧两次捕获逐帧同 sha · 帧基线 `docs/frame_baseline.json` 已入库（78 条）。
-本阶段共 **19 条新守卫做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
+本阶段共 **22 条新守卫做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
 或替换文本不完整导致编译错误），加强后才真正点亮。
 
 **仍然没闭合的，列清楚**：
