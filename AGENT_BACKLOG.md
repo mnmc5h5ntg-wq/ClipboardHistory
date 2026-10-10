@@ -431,3 +431,10 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 - Python 用例 43 → 50，CI 下限 40 → 48。
 - 15 条建议账面：全部要么落地、要么写明不做的理由（见 `AGENT_FINAL_REPORT.md` §16 的表）。
 - 待办只剩三类：真机手点清单、InstanceGuard 对直接 exec 的第二实例是否漏判、12/13 焦点环。
+
+## 快照 22（2026-10-11，修回 CI 形状）
+
+- 23f8da5 把 main 的流水线打成 0 秒失败（步骤名里裸的冒号+空格）。已修（加引号）。
+- 新增 `scripts/tests/test_ci_workflow_shape.py`：4 例，不依赖 pyyaml，纳入 Python 硬门步骤。
+  Python 用例 50 → 54。变异对照做过（去掉引号即红）。
+- 观察点：`gh run view --json jobs` 为空数组 + 日志 not found ⇒ 工作流没解析成功，不是步骤失败。

@@ -139,7 +139,7 @@ jobs:
       # 两步拆开：**少帧是硬门**（夹具不再被执行 = 回归，没有商量余地）；
       # **变帧是报告型**（新功能本来就会改像素，硬门只会让人学会无视红色）。
       # 改了界面要在同一个 commit 里跑 `scripts/frame_baseline.py update`，否则基线一路过期。
-      - name: Frame baseline: missing frames gate
+      - name: "Frame baseline: missing frames gate"
         run: |
           set -o pipefail
           rm -rf /tmp/shots-baseline
@@ -156,7 +156,7 @@ jobs:
           python3 scripts/frame_baseline.py check /tmp/shots-baseline | tee /tmp/baseline.log
           test "${PIPESTATUS[0]}" -eq 0
 
-      - name: Frame baseline: change report (report-only)
+      - name: "Frame baseline: change report (report-only)"
         continue-on-error: true
         run: |
           set -o pipefail

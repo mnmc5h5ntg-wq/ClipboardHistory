@@ -1004,3 +1004,33 @@ CI 里拆成两步，一硬一软：
 **踩到过的一次假结论**：`compare` 最初如果写成"只比字节数"，一帧都没动但格式变了也会报"一致"。
 自测里那条 `test_three_kinds_of_difference_are_reported_separately` 用三个显式期望值钉住了分类，
 变异（把 changed 恒置空）会点亮"变帧必须让退出码非零"。
+
+## D-044 我自己把 CI 弄红了一次：步骤名里的"冒号+空格"让工作流 0 秒失败
+
+C-2 那一提交（23f8da5）把 `main` 的流水线打成了 **0 秒失败**，原因只是我新加的步骤叫
+`- name: Frame baseline: missing frames gate` —— 值里那个 `": "` 让 YAML 把这一行读成映射，
+整个 workflow 解析不出来。GitHub 的表现是：run 有记录、conclusion=failure、`jobs` 是空数组、
+日志"not found"。也就是说**它连一行代码都没编译，通知里却和"构建失败"长得一样**。
+
+三个可复用的事实：
+
+1. `gh run view <id> --json jobs` 返回空数组 + `--log` 报 "log not found"
+   ⇒ 这是"工作流文件本身没解析成功"，不是某个步骤失败。看到这个组合就不用再猜是哪一步。
+2. 本机没有 pyyaml，但有 ruby：`ruby -ryaml -e 'YAML.load_file(...)'` 能给出
+   `mapping values are not allowed in this context at line 142 column 29`。
+   这一条把"推上去才知道红"变成"推之前就知道红"。
+3. 但"记得跑一下校验"这件事本身不可靠 —— 我把 CI 改坏的那次就是没记得。
+   所以补了 `scripts/tests/test_ci_workflow_shape.py`（不需要第三方模块，纯行级检查）：
+   - 步骤名不许含裸 `": "`；
+   - 每个 step 必须找得到 `run/uses/with`，且同级缩进一致；
+   - 第三轮补过的四个步骤名必须还在（步骤被误删时 CI 只会更绿，不会更真）；
+   - 每个 `continue-on-error: true` 附近必须有注释解释它为什么不当硬门（D-7 的规矩）。
+   变异对照：把引号去掉还原成我犯错的那一行，这 4 个用例立刻红在
+   "步骤名里有裸的冒号+空格…"上（退出码 1，文件已还原）。
+
+修法是引号包起来：`- name: "Frame baseline: missing frames gate"`。
+另外把 Python 用例下限从 48 保持不动（现在是 54），并把这条守卫纳入 CI 的硬门步骤里 ——
+以后再有工作流形状问题，红在 `Release script tests` 那一行，而不是 0 秒空 run。
+
+**自我批评一句**：我这一轮给产品加了 19 条变异对照，却第一次没给"改 CI 文件"这个动作留任何自动检查。
+判据的严密程度是按"我想到要防的东西"分配的，不是按风险分配的 —— 这就是差别。
