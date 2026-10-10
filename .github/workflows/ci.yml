@@ -51,6 +51,28 @@ jobs:
           # 只准涨不准跌：数字掉下来意味着有用例不再被执行（被删、被 skip、编译没链进去）
           test "$executed" -ge 200 || { echo "执行到的用例数 $executed 低于下限 200"; exit 1; }
 
+      - name: On-screen UI probes and frame capture (report-only)
+        # 第三轮审计 D-7：`UIInteractionProbeTests` / `UICaptureTests` 需要环境变量才启用，
+        # 而它们恰恰是"焦点链、行手势、右键菜单、帧基线"这几项的验收手段 —— 以前 CI 一次也没跑过。
+        # 先以"允许失败 + 记录数字"起步：在屏窗口在无头 runner 上的稳定性还没被证明，
+        # 拿它当硬门只会让人学会无视红色。稳定后再摘掉 continue-on-error。
+        continue-on-error: true
+        working-directory: ClipboardHistory
+        run: |
+          set -o pipefail
+          CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
+            swift test --filter "UIInteractionProbeTests|UICaptureTests" 2>&1 | tee /tmp/ui.log
+          status=${PIPESTATUS[0]}
+          echo "ui suite exit: $status"
+          frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+          echo "captured frames: $frames"
+          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/ui.log | tail -1 | grep -oE '[0-9]+')
+          echo "ui executed cases: ${executed:-0}"
+          # 这三条是这个步骤自己的判据（不是产品判据）：帧必须真的拍出来、执行数不能是 0，
+          # 否则"跑过了"只是"跑了一个空集"。
+          test "${executed:-0}" -ge 1
+          test "$frames" -ge 60
+
       - name: Release script tests
         run: |
           python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log

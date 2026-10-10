@@ -3,9 +3,10 @@ import XCTest
 
 /// 推荐理由文案（从 `HistoryStore.refreshPredictions()` 搬出来后的可测性）。
 final class RecommendationPresenterTests: XCTestCase {
-    private func textEntry(_ text: String, source: String? = nil) -> ClipboardEntry {
+    private func textEntry(_ text: String, content: ClipboardEntryContent? = nil, source: String? = nil) -> ClipboardEntry {
+
         ClipboardEntry(
-            content: .text(text),
+            content: content ?? .text(text),
             timestamp: Date(),
             thumbnail: nil,
             sourceURL: nil,
@@ -55,22 +56,37 @@ final class RecommendationPresenterTests: XCTestCase {
         XCTAssertFalse(reason.contains("复用1次"), "不得从乘过权重的特征值反推次数：\(reason)")
     }
 
-    func testContentTypeTagsPerFrontmostApp() {
-        func tag(_ bundleID: String) -> String {
+    /// 第三轮审计 D-2：这条用例**原来钉的是缺陷本身** —— 它断言
+    /// 「前台是 Safari ⇒ 理由里写偏好链接」「前台是 Finder ⇒ 偏好文件」……
+    /// 于是每一条推荐（PDF、HEIC、纯文本）在 Safari 里都被说成"偏好链接"。
+    /// 修法是把标签的来源换成条目自身，所以这里把断言**翻转**而不是删除：
+    /// 同一份条目在前台 App 怎么变时，类型标签都不许变，而且不许出现按 App 猜出来的说法。
+    func testContentTypeTagFollowsTheEntryAcrossFrontmostApps() {
+        func reason(bundleID: String?, content: ClipboardEntryContent) -> String {
             RecommendationPresenter.reason(
                 for: candidate(features: [.contentTypeAffinity: 0.1]),
-                entry: textEntry("x"),
+                entry: textEntry("x", content: content),
                 context: context(bundleID: bundleID),
                 currentAppName: nil,
                 reuseCount: 0
             )
         }
-        XCTAssertTrue(tag("com.apple.Safari").contains("偏好链接"))
-        XCTAssertTrue(tag("com.google.Chrome").contains("偏好链接"))
-        XCTAssertTrue(tag("com.apple.finder").contains("偏好文件"))
-        XCTAssertTrue(tag("com.apple.dt.Xcode").contains("偏好命令/代码"))
-        XCTAssertTrue(tag("com.tencent.xinWeChat").contains("偏好文本/图片"))
-        XCTAssertTrue(tag("com.unknown.app").contains("内容匹配"))
+        let apps = ["com.apple.Safari", "com.google.Chrome", "com.apple.finder",
+                    "com.apple.dt.Xcode", "com.tencent.xinWeChat", "com.unknown.app"]
+        for content: ClipboardEntryContent in [.text("x"), .text("https://example.com")] {
+            let tags = Set(apps.map { reason(bundleID: $0, content: content) })
+            XCTAssertEqual(tags.count, 1,
+                           "同一份条目的理由随前台 App 变了 \(tags)：内容类型标签不该跟着 App 走")
+            for text in tags {
+                XCTAssertFalse(text.contains("偏好链接"), "按 App 猜类型的旧说法又回来了：\(text)")
+                XCTAssertFalse(text.contains("偏好文件"), "按 App 猜类型的旧说法又回来了：\(text)")
+                XCTAssertFalse(text.contains("偏好命令/代码"), "按 App 猜类型的旧说法又回来了：\(text)")
+                XCTAssertFalse(text.contains("偏好文本/图片"), "按 App 猜类型的旧说法又回来了：\(text)")
+                XCTAssertFalse(text.contains("内容匹配"), "又回落到与条目无关的笼统说法：\(text)")
+            }
+        }
+        XCTAssertTrue(reason(bundleID: "com.apple.Safari", content: .text("x")).contains("常用文本"))
+        XCTAssertTrue(reason(bundleID: "com.apple.Safari", content: .text("https://example.com")).contains("常用链接"))
     }
 
     func testAppAffinityLabels() {

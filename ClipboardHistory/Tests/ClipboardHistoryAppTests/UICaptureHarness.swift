@@ -184,7 +184,7 @@ final class UICaptureTests: XCTestCase {
         for entry in store.entries.prefix(4) {            let captured = entry
             results.append(Fixture("row-\(rowKind(captured))", NSSize(width: 300, height: 74)) {
                 AnyView(self.rowFrame(HistoryRowButton(
-                    entry: captured, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+                    entry: captured, copyAction: {}, favoriteAction: {}
                 )))
             })
         }
@@ -196,12 +196,12 @@ final class UICaptureTests: XCTestCase {
         let starOff = starTarget.updating(timestamp: starTarget.timestamp, isFavorite: false)
         results.append(Fixture("row-favorite-on", NSSize(width: 300, height: 74)) {
             AnyView(self.rowFrame(HistoryRowButton(
-                entry: starOn, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+                entry: starOn, copyAction: {}, favoriteAction: {}
             )))
         })
         results.append(Fixture("row-favorite-off", NSSize(width: 300, height: 74)) {
             AnyView(self.rowFrame(HistoryRowButton(
-                entry: starOff, selected: false, action: {}, copyAction: {}, favoriteAction: {}
+                entry: starOff, copyAction: {}, favoriteAction: {}
             )))
         })
 

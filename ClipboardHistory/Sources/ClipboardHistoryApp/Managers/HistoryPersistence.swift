@@ -179,6 +179,14 @@ final class FileHistoryPersistence: HistoryPersisting {
 
     /// 唯一的迁移入口。以后改格式必须在这里加一级显式升级，
     /// 让"忘了写迁移"成为一件会在代码评审里被看见的事，而不是静默行为差异。
+    ///
+    /// 版本策略（D-016 的决定，第三轮审计 D-5 把它写成边界而不只是注释）：
+    /// ① **只加可选字段不升版** —— 升版会让旧版程序把存档判成只读（见上面 `进入只读` 那条分支），
+    ///    用户"升级后又能用"的承诺会被打断；
+    /// ② 一旦**改语义或删字段**就必须升 v2 并在这里加一级显式升级 ——
+    ///    可选字段的 additive 规则救不了"同一个键含义变了"。
+    /// ① 的可信度由 `Round3AuditFixTests.testArchiveWrittenByNewerCodeStillOpensForOlderCode` 钉住
+    /// （新→旧→新 的往返），不要只靠这段话。
     nonisolated private static func migrate(_ history: StoredHistory) -> StoredHistory {
         switch history.version {
         case 1:

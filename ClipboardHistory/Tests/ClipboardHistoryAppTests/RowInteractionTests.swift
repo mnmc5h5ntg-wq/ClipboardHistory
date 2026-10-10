@@ -20,23 +20,24 @@ final class RowInteractionTests: XCTestCase {
         XCTAssertTrue(RowDoubleTap.shouldCopy(modifiers: .control))
     }
 
-    /// 规则必须和真正的选择前缀保持一致：`HistorySidebarView.select(_:)` 用的是 shift / command。
-    /// 两边各写各的迟早会漂移，所以这里直接把"选择侧用了哪些键"当判据读出来。
+    /// 规则必须和真正的选择前缀保持一致。
+    ///
+    /// D-1 之后侧栏不再有手写的 `select(_:)`：**shift 扩选与 ⌘ 加选由系统 `List(selection:)` 负责**，
+    /// 我们只剩"选中集合的落库"和拖选。所以这条守卫改读两件事：
+    /// ① 选中确实委托给了 `List(selection:`（没人把手工前缀加回来）；
+    /// ② 侧栏里没有开始使用 `option` 作为选择前缀 —— 一旦用了，双击的例外名单要一起加，
+    ///    否则两个手势会抢同一次点击（这正是这条守卫原本要防的漂移）。
     func testModifierRuleMatchesWhatRowSelectionActuallyUses() throws {
-        let source = try productSource(named: "Views/HistorySidebarView.swift")
-        let afterSelect = try XCTUnwrap(
-            source.components(separatedBy: "private func select(_ entry:").dropFirst().first,
-            "找不到 select(_:)，这条守卫的锚点失效了"
-        )
-        let selectBody = try XCTUnwrap(
-            afterSelect.components(separatedBy: "private func ").first,
-            "select(_:) 之后取不到函数体"
-        )
-        let code = codeOnly(in: selectBody)
-        XCTAssertTrue(code.contains(".shift"), "select 里已经没有 shift 了，规则要跟着改：\(selectBody)")
-        XCTAssertTrue(code.contains(".command"), "select 里已经没有 command 了，规则要跟着改：\(selectBody)")
-        XCTAssertFalse(code.contains(".option"),
-                       "select 现在开始用 option 了 —— 双击的例外名单要一起加，否则两个手势会抢同一次点击")
+        let source = codeOnly(in: try productSource(named: "Views/HistorySidebarView.swift"))
+        XCTAssertTrue(source.contains("List(selection:"),
+                      "选中不再是系统 List 的职责了：双击例外名单的前提要重新核")
+        XCTAssertFalse(source.contains("modifiers.contains(.option)"),
+                       "侧栏开始用 option 做选择前缀了 —— `RowDoubleTap` 的例外名单要一起加")
+        // 手工的 shift/command 分支不该重新长回来（两套选中语言会互相抢）。
+        XCTAssertFalse(source.contains("modifiers.contains(.shift)"),
+                       "侧栏又出现了手工 shift 选择：与 List(selection:) 重复")
+        XCTAssertFalse(source.contains("modifiers.contains(.command)"),
+                       "侧栏又出现了手工 ⌘ 选择：与 List(selection:) 重复")
     }
 
     // MARK: - 收藏星标的呈现

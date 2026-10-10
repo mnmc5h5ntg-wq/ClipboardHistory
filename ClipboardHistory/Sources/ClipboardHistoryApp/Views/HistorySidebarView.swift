@@ -1,52 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// 侧栏列表的键盘导航（审计第二轮 1.10 / R2-02）。
-///
-/// 在屏实测：连按 14 次 Tab，第一响应者 14 次都是详情那个 `NSTextView`，
-/// 搜索框、筛选、列表行、浮层按钮一个都进不了焦点环 —— 键盘用户既到不了列表也做不了操作。
-///
-/// 修法**不是**把自绘列表整体换成 `List(selection:)`：`.draggable` 要 macOS 13（本项目下限 12），
-/// `List` 的系统 chrome 会改掉 4 个 `sidebar-*` 捕获帧的像素，还会丢掉 `dragSelectRange`
-/// 的锚点语义（目前只有 store 级测试钉着）。所以走最小可达方案：
-/// ① 列表容器可聚焦（系统焦点环）+ 方向键走既有 store 动作；② 搜索框恢复焦点环；
-/// ③ 行向 VoiceOver 暴露 selected。这里放的是 ① 的纯决策部分，便于单测。
-enum SidebarKeyboardNavigation {
-    enum Direction {
-        case up, down, left, right
-    }
-
-    /// 方向键应当选中的下标；`nil` = 不动（越界、列表为空，或左右键在单列列表里没有语义）。
-    /// 左右键刻意**不**当成上下：把没有语义的键偷偷映射成别的动作，会让键盘用户建立错误的心智模型。
-    static func targetIndex(currentIndex: Int?, count: Int, direction: Direction, step: Int = 1) -> Int? {
-        guard count > 0, step > 0 else { return nil }
-        switch direction {
-        case .left, .right:
-            return nil
-        case .up, .down:
-            break
-        }
-        // 还没有选中项时：向下从第一条开始，向上从最后一条开始（与 Finder/邮件一致）。
-        let anchor = currentIndex ?? (direction == .down ? -1 : count)
-        let target = direction == .down ? anchor + step : anchor - step
-        guard target >= 0, target < count else { return nil }
-        return target
-    }
-
-    /// Page Up/Down 一次跳多少行：留一行重叠，翻页后上下文不断（同 Finder）。
-    static func pageStep(visibleRows: Int) -> Int {
-        max(visibleRows - 1, 1)
-    }
-}
-
 struct HistorySidebarView: View {
     @ObservedObject var historyStore: HistoryStore
     @State private var dragSelectionAnchorID: HistoryStore.Entry.ID?
     @State private var rowFrames: [HistoryStore.Entry.ID: CGRect] = [:]
-    @FocusState private var listHasFocus: Bool
-    /// 只有键盘造成的选择变化才自动滚到选中行：鼠标点击时那一行本来就在视野里，
-    /// 跟着滚反而会把用户点的位置挪走。
-    @State private var selectionChangedByKeyboard = false
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
 
@@ -166,51 +124,28 @@ struct HistorySidebarView: View {
     }
 
     private var historyList: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(historyStore.filteredEntries) { entry in
-                        HistoryRowButton(
-                            entry: entry,
-                            selected: historyStore.isSelected(entry),
-                            action: { select(entry) },
-                            // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
-                            copyAction: { historyStore.perform(.copyAndPromote(entry)) },
-                            favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
-                        )
-                        .background(rowFrameReader(for: entry.id))
-                        // ScrollViewReader 的锚点：键盘移动选择后要把选中行滚进视野，
-                        // 否则"能导航"但"看不见自己导航到哪"。
-                        .id(entry.id)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            }
-            .coordinateSpace(name: "history-list")
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 4, coordinateSpace: .named("history-list"))
-                    .onChanged { value in
-                        updateDragSelection(at: value.location)
-                    }
-                    .onEnded { _ in
-                        endDragSelection()
-                    }
-            )
-            .onChange(of: historyStore.selectedEntry?.id) { selectedID in
-                guard selectionChangedByKeyboard, let selectedID else { return }
-                selectionChangedByKeyboard = false
-                proxy.scrollTo(selectedID, anchor: nil)
+        List(selection: selectionBinding) {
+            ForEach(historyStore.filteredEntries) { entry in
+                HistoryRowButton(
+                    entry: entry,
+                    // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
+                    copyAction: { historyStore.perform(.copyAndPromote(entry)) },
+                    favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
+                )
+                .background(rowFrameReader(for: entry.id))
             }
         }
-        // 让列表进入焦点环：`.focusable()` 由系统画焦点环，方向键交给下面的 moveSelection。
-        .focusable()
-        // 但 `.focusable()` 的容器在**鼠标点一下**之后也会拿到焦点，于是整个列表外面凭空多一圈
-        // 蓝色焦点环（用户报的现象；探针量到的那个 `_FocusRingView` frame = 列表整块 {{0,125},{320,335}}）。
-        // 键盘导航要留着，环要关掉：`focusEffectDisabled()` 正是这个开关（macOS 14+；12/13 无对应 API，只能留着）。
-        .sidebarFocusRingHidden()
-        .focused($listHasFocus)
-        .onMoveCommand(perform: moveSelection)
+        .listStyle(.sidebar)
+        .coordinateSpace(name: "history-list")
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 4, coordinateSpace: .named("history-list"))
+                .onChanged { value in
+                    updateDragSelection(at: value.location)
+                }
+                .onEnded { _ in
+                    endDragSelection()
+                }
+        )
         .accessibilityLabel("历史记录列表")
         // 拖入文件入库（审计第二轮 1.5 / R2-05 的另一半：整个应用以前不接受任何拖入）。
         // 落点刻意只在列表区域而不是整窗：详情的文本视图自己接受文字拖放，
@@ -225,6 +160,25 @@ struct HistorySidebarView: View {
                     .allowsHitTesting(false)
             }
         }
+        // 系统的 `List` 在自己拿到焦点时也会画一圈焦点环；鼠标点一下不该留下它（D-030 那圈蓝框），
+        // 键盘导航要留着，所以只关"效果"不关"可聚焦"。`focusEffectDisabled()` 是 macOS 14+，
+        // 12/13 没有对应 API ⇒ 那两版上环会留着，是平台限制不是漏了。
+        .sidebarFocusRingHidden()
+    }
+
+    /// 选中集合：`List` 是唯一作者，store 只是落状态（D-1 修法③）。
+    ///
+    /// 以前这里是"行自己的 Button 调 `select(_:)`，再按 `NSEvent.modifierFlags` 手工分成
+    /// `selectOnly`/`selectRange`/`toggleSelection`"，方向键另走 `onMoveCommand`。
+    /// 换到 `List(selection:)` 之后 shift 扩选、⌘ 加选、方向键移动、滚动跟随、VoiceOver 的
+    /// selected 语义全部由系统负责 —— 那四件事正是审计 D-1 说"一次解决"的部分。
+    /// `selectOnly`/`selectRange`/`dragSelectRange` 仍然留着：**拖选**（我们自己的手势）还要用它们，
+    /// 而且 store 级语义测试钉的就是这些动作，不是列表。
+    private var selectionBinding: Binding<Set<HistoryStore.Entry.ID>> {
+        Binding(
+            get: { historyStore.selectedEntryIDs },
+            set: { historyStore.perform(.setSelection($0)) }
+        )
     }
 
     /// 把 provider 里的 file URL 解出来交给 store。解码是异步的，所以这里只回答"我接住了"，
@@ -260,46 +214,6 @@ struct HistorySidebarView: View {
                 }
                 continuation.resume(returning: result)
             }
-        }
-    }
-
-    /// 方向键 → 既有的 store 动作（与鼠标点击共用同一套语义，所以 store 级测试依然有效）。
-    /// shift+方向键 = 扩选，与 shift+点击一致。
-    private func moveSelection(_ direction: MoveCommandDirection) {
-        let entries = historyStore.filteredEntries
-        guard !entries.isEmpty else { return }
-        let mapped: SidebarKeyboardNavigation.Direction?
-        switch direction {
-        case .up: mapped = .up
-        case .down: mapped = .down
-        case .left: mapped = .left
-        case .right: mapped = .right
-        @unknown default: mapped = nil   // 系统以后新增的方向：没有确定语义就不动，不要猜
-        }
-        guard let mapped else { return }
-        let currentIndex = entries.firstIndex { historyStore.isSelected($0) }
-        guard let target = SidebarKeyboardNavigation.targetIndex(
-            currentIndex: currentIndex,
-            count: entries.count,
-            direction: mapped
-        ) else { return }
-        let entry = entries[target]
-        selectionChangedByKeyboard = true
-        if NSEvent.modifierFlags.contains(.shift) {
-            historyStore.perform(.selectRange(to: entry))
-        } else {
-            historyStore.perform(.selectOnly(entry))
-        }
-    }
-
-    private func select(_ entry: HistoryStore.Entry) {
-        let modifiers = NSEvent.modifierFlags
-        if modifiers.contains(.shift) {
-            historyStore.perform(.selectRange(to: entry))
-        } else if modifiers.contains(.command) {
-            historyStore.perform(.toggleSelection(entry))
-        } else {
-            historyStore.perform(.selectOnly(entry))
         }
     }
 

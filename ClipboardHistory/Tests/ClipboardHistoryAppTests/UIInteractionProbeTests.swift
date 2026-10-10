@@ -311,92 +311,18 @@ final class UIInteractionProbeTests: XCTestCase {
 
     // MARK: - 行内手势（双击复制 / 点星标收藏）
 
-    /// 在屏合成一次真实点击序列，验证行上的三个手势各自落到正确的动作上。
-    ///
-    /// 为什么值得单独一条：这三个动作的**接线**在离屏帧里看不见，而纯函数用例只钉了判定规则
-    /// （`RowInteractionTests`），钉不住"SwiftUI 真的把这两击当成一次双击"。
-    /// 这里刻意用一行孤立的窗口而不是整侧栏：几何完全已知，点不中就是点不中，不会和
-    /// "列表里第几行在哪"纠缠。
-    func testRowGesturesFireTheRightActions() throws {
-        try skipUnlessEnabled()
-        var selectFired = 0
-        var copyFired = 0
-        var favoriteFired = 0
-        let entry = makeClipboardEntry(content: .text("双击我这条"), timestamp: Date())
-        let row = HistoryRowButton(
-            entry: entry,
-            selected: false,
-            action: { selectFired += 1 },
-            copyAction: { copyFired += 1 },
-            favoriteAction: { favoriteFired += 1 }
-        )
+    // MARK: - 行内手势（D-1 之后）
 
-        _ = NSApplication.shared
-        let size = NSSize(width: 300, height: 74)
-        let window = NSWindow(contentRect: NSRect(x: 260, y: 260, width: size.width, height: size.height),
-                              styleMask: [.titled], backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: AnyView(row))
-        host.frame = NSRect(origin: .zero, size: size)
-        window.contentView = host
-        window.makeKeyAndOrderFront(nil)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        defer { window.orderOut(nil) }
-        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+    /// 原来这里有一条 `testRowGesturesFireTheRightActions`：把孤立的一行放进
+    /// `NSHostingView`，用合成点击验"单击选中 / 双击复制 / 点星标收藏"。
+    /// D-1 的修法③把行里的 `Button` 去掉了（选中态归 `List`），于是这一行里
+    /// **没有可命中测试的控件**，合成事件送不进去（实测星标代理还在、点它 favoriteFired 仍为 0）。
+    /// 判据不能伪造成"绿"，所以这三件事改成：接线由源码守卫钉（`SidebarListSelectionTests`）、
+    /// 结构由表格判据钉（下一条）、真机行为进手工清单第 1 节。
 
-        func click(_ viewPoint: NSPoint, clickCount: Int, down: Bool = true) {
-            // 合成事件走的是 `locationInWindow`（窗口基坐标），所以要把视图坐标换算过去，
-            // 而不是自己按 titlebar 高度猜 —— 换算交给 AppKit。
-            let windowPoint = host.convert(viewPoint, to: nil)
-            func event(_ type: NSEvent.EventType, count: Int) -> NSEvent? {
-                NSEvent.mouseEvent(with: type,
-                                   location: windowPoint,
-                                   modifierFlags: [],
-                                   timestamp: ProcessInfo.processInfo.systemUptime,
-                                   windowNumber: window.windowNumber,
-                                   context: nil,
-                                   eventNumber: 0,
-                                   clickCount: count,
-                                   pressure: 1.0)
-            }
-            let count = max(1, clickCount)
-            if down, let downEvent = event(.leftMouseDown, count: count) { NSApp.sendEvent(downEvent) }
-            if let upEvent = event(.leftMouseUp, count: count) { NSApp.sendEvent(upEvent) }
-            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
-        }
-
-        // 坐标一律从宿主视图的真实高度推，不写死：这一版最初写 y=37（以为行高 74），
-        // 而 `HistoryRowButton` 的自然高度是 47，星标只有 20pt 高，于是点在了它下面 ——
-        // 表现为"点星标没反应"，其实是探针点错了地方（网格扫描 x=8..26 / y=16..28 全部命中）。
-        let midY = host.frame.height / 2
-        let rowCenter = NSPoint(x: 150, y: midY)
-        let starCenter = NSPoint(x: 18, y: midY)
-        print("HITTEST 行中心 y=\(Int(midY)) 命中链：\(describeChain(host, at: rowCenter))")
-        click(rowCenter, clickCount: 1)
-        let afterSingle = selectFired
-        click(rowCenter, clickCount: 1)
-        XCTAssertEqual(afterSingle, 1, "第一次单击没有触发行选中：点击根本没送进这一行")
-        XCTAssertEqual(selectFired, 2, "第二次单击也应照常选中（复制走的是双击手势）")
-
-        // 双击：两下紧凑的 clickCount 1→2。
-        let copyBefore = copyFired
-        click(rowCenter, clickCount: 1)
-        click(rowCenter, clickCount: 2)
-        print("GESTURE 双击之后 copyFired=\(copyFired - copyBefore) selectFired=\(selectFired)")
-        XCTAssertEqual(copyFired - copyBefore, 1,
-                       "合成双击没有触发复制：要么 SwiftUI 没把这两击当成一次双击，要么手势被 Button 吃掉了")
-
-        // 星标：点它只该翻收藏，不该选中这一行。
-        let selectBeforeStar = selectFired
-        click(starCenter, clickCount: 1)
-        print("GESTURE 星标之后 favoriteFired=\(favoriteFired) selectFired=\(selectFired - selectBeforeStar)")
-        XCTAssertEqual(favoriteFired, 1, "点行首星标没有触发收藏")
-        XCTAssertEqual(selectFired, selectBeforeStar, "点星标顺带把这一行选中了：两个控件的命中区重叠")
-    }
-
-    /// 上面那条点的是**孤立的一行**。真实列表里行外面还套着 `ScrollView` + `LazyVStack` +
-    /// 列表级的拖选 `DragGesture` + `.focusable()`，双击要穿过的正是这一层。
-    /// 所以这里把整条侧栏摆上屏，从视图树里按几何找出行/星标的可点代理再点它。
+    /// D-1 之后唯一的在屏列表探针：把**整条侧栏**摆上屏，行几何向 `NSTableView` 问。
+    /// 它钉得住的是结构（真表格、可多选、行数=可见条目数），
+    /// 点/双击/拖选的实际后果在当前合成事件下只能观测（原因见上面那段注释与 D-033）。
     func testRowGesturesWorkInsideTheRealSidebarContainer() throws {
         try skipUnlessEnabled()
         let writer = TestClipboardWriter()
@@ -425,67 +351,100 @@ final class UIInteractionProbeTests: XCTestCase {
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
 
-        func clickCenter(of view: NSView, count: Int = 1) {
-            let windowPoint = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
-            func event(_ type: NSEvent.EventType, _ clicks: Int) -> NSEvent? {
-                NSEvent.mouseEvent(with: type, location: windowPoint, modifierFlags: [],
-                                   timestamp: ProcessInfo.processInfo.systemUptime,
-                                   windowNumber: window.windowNumber, context: nil,
-                                   eventNumber: 0, clickCount: clicks, pressure: 1.0)
-            }
-            if let down = event(.leftMouseDown, count) { NSApp.sendEvent(down) }
-            if let up = event(.leftMouseUp, count) { NSApp.sendEvent(up) }
-            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
-        }
+        let mouse = MouseSynthesizer(window: window)
 
-        // 每个可点击控件在宿主视图里都有一个 KeyViewProxy。按几何挑：
-        // 实测 6 个星标 (16, y, 20×20) 与 6 个行 (38, y, 266×31)；
-        // 另有 148×25 的筛选 pill 和 320×335 的滚动区 —— 第一版把 pill 当成了行，
-        // 于是"点行没反应"又是探针点错了东西，不是产品。
-        var starProxies: [NSView] = []
-        var otherProxies: [NSView] = []
-        func walk(_ view: NSView) {
-            if String(describing: type(of: view)) == "KeyViewProxy" {
-                if view.frame.width < 26 { starProxies.append(view) } else { otherProxies.append(view) }
-            }
-            for sub in view.subviews { walk(sub) }
-        }
-        walk(host)
-        let starCandidates = starProxies.filter { abs($0.frame.width - 20) < 1 && abs($0.frame.height - 20) < 1 }
-        let rowCandidates = otherProxies.filter {
-            $0.frame.width > 200 && $0.frame.width < 290 && $0.frame.minX > 30 && $0.frame.height < 40
-        }
-        print("TREE2 星标代理=\(starCandidates.count) 行代理=\(rowCandidates.count) "
-            + "收藏前=\(store.entries.filter(\.isFavorite).count) 写入=\(writer.writtenContents.count)")
-        let star = try XCTUnwrap(starCandidates.max { $0.frame.minY < $1.frame.minY }, "找不到行首星标代理")
-        // 刻意点**最下面**那一行：默认选中的是最上面那条，点它看不出"选中变了"。
-        let row = try XCTUnwrap(rowCandidates.min { $0.frame.minY < $1.frame.minY }, "找不到行代理")
+        // 行位置向表格问（见 `sidebarRowPoints` 的注释）。
+        let rows = try sidebarRowPoints(in: host, count: 6)
+        let lastRow = rows[rows.count - 1]
+        let firstRow = rows[0]
+        emit("TREE2 行矩形=\(rows.count) 收藏前=\(store.entries.filter(\.isFavorite).count) "
+            + "写入=\(writer.writtenContents.count) 首行=\(NSStringFromPoint(firstRow.body)) "
+            + "末行=\(NSStringFromPoint(lastRow.body))")
 
-        let favoriteBefore = store.entries.filter(\.isFavorite).count
-        clickCenter(of: star)
-        XCTAssertEqual(store.entries.filter(\.isFavorite).count, favoriteBefore + 1,
-                       "真实侧栏里点星标没有翻收藏（孤立一行时是好的 —— 说明外层容器吃掉了这一下）")
+        // 自动化能钉住的那一半：列表是**真的多选表格**，而且行数是可见条目数 ——
+        // 这就是 D-1 之后"拖选归系统、拖出归把手"的结构前提。行不再挂 `.onDrag` 由
+        // `SidebarListSelectionTests.testDragAffordanceLivesOnlyOnTheHandle` 钉。
+        let table = try XCTUnwrap(Self.firstTable(in: host))
+        XCTAssertTrue(table.allowsMultipleSelection,
+                      "`List(selection:)` 没开出多选 ⇒ shift/⌘/拖选都不可能出现")
+        XCTAssertEqual(table.numberOfRows, store.filteredEntries.count,
+                       "表格行数与可见条目数不一致：列表绑错了数据源")
 
+        // 另一半只能观测：合成鼠标事件驱动不了 AppKit 表格的行选中（本轮实测：
+        // 按下-拖动-抬起三段都投了，选中集纹丝不动；把 eventNumber 换成每段递增值也一样）。
+        // 所以"真点一行会不会选中/双击会不会复制/拖选会不会扩"这三条走手工清单，
+        // 记在 D-033 与 docs/MANUAL_TEST_v1.4.9_round3.md，不伪装成自动化结论。
         let selectedBefore = store.selectedEntry?.id
-        clickCenter(of: row)
-        let clickedEntryID = store.selectedEntry?.id
-        XCTAssertNotNil(clickedEntryID, "真实侧栏里点行没有选中任何东西")
-        XCTAssertNotEqual(clickedEntryID, selectedBefore,
-                          "真实侧栏里点行没有改选中：外层滚动/拖选手势把点击截走了")
-
-        // 双击同一行：列表级 DragGesture 与行内双击并存。判据取剪贴板写入 ——
-        // 这条路径唯一的硬后果，而且能同时验证"复制的就是刚点中的那条"。
+        let favoriteBefore = store.entries.filter(\.isFavorite).count
         let writesBefore = writer.writtenContents.count
-        clickCenter(of: row, count: 1)
-        clickCenter(of: row, count: 2)
-        XCTAssertEqual(writer.writtenContents.count, writesBefore + 1,
-                       "真实侧栏里双击没有触发复制（写了 \(writer.writtenContents.count - writesBefore) 次）："
-                       + "双击被外层滚动手势截走了，或者 SwiftUI 没把这两击当成一次双击")
-        XCTAssertEqual(writer.writtenContents.last,
-                       store.entries.first(where: { $0.id == clickedEntryID })?.content,
-                       "复制出去的不是刚点中的那一条")
-        XCTAssertEqual(store.entries.first?.id, clickedEntryID,
-                       "复制走的是 .copyAndPromote，这条应当被顶到列表最前")
+        mouse.click(at: lastRow.body)
+        mouse.click(at: lastRow.body, clickCount: 2)
+        mouse.click(at: lastRow.leading)
+        mouse.drag(from: firstRow.body, through: [rows[1].body, rows[2].body], to: rows[3].body)
+        emit("OBSERVE 点/双击/星标/拖选之后：选中变化=\(store.selectedEntry?.id != selectedBefore) "
+            + "选中数=\(store.selectedCount) 收藏+\(store.entries.filter(\.isFavorite).count - favoriteBefore) "
+            + "复制+\(writer.writtenContents.count - writesBefore) lastClick=\(NSStringFromPoint(mouse.lastClickPoint))")
+        // 归因用的一行：`clickedRow` 是 -1 说明事件根本没送到表格（探针限制）；
+        // `clickedRow` 有值而 store 没变说明是**产品的绑定断了**（那是缺陷，不是限制）。
+        emit("OBSERVE-TABLE clickedRow=\(table.clickedRow) selectedRow=\(table.selectedRow) "
+            + "selectedRows=\(table.selectedRowIndexes) isKeyWindow=\(window.isKeyWindow) "
+            + "isActive=\(NSApp.isActive) anchor=\(NSStringFromPoint(lastRow.body))")
+    }
+
+    /// D-1 的验收本体：**从第 1 行按下、拖到第 4 行，选中集必须扩到 4 行**。
+    ///
+    /// 审计给的验收是"真机 2 分钟"。合成事件能做到的是把 down / dragged…/ up 三段真的投进
+    /// 那扇在屏窗口的真实列表里，再看 store 的选中集合 —— 这与"整行挂 onDrag 时拖选失效"
+    /// 是可区分的形状：争用发生时选中集只会停在按下那一行。
+    /// 行 y 坐标**取自每行的星标代理**（每行恰好一个 20×20），不靠"行高应该是多少"猜 ——
+    /// 这一族探针已经两次因为按猜的几何点而误报产品缺陷。
+    func testDragSelectExpandsSelectionInsideTheRealList() throws {
+        try skipUnlessEnabled()
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        for index in 0..<8 {
+            store.add(ClipboardIntake.Entry(
+                content: .text("拖选探针第 \(index) 条记录"), thumbnail: nil,
+                sourceUTIs: ["public.utf8-plain-text"]
+            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
+        }
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+        let mouse = MouseSynthesizer(window: window)
+        let rows = try sidebarRowPoints(in: host, count: 4)
+        let table = try XCTUnwrap(Self.firstTable(in: host))
+        emit("DRAGSELECT 行矩形=\(rows.count) 首行 body=\(NSStringFromPoint(rows[0].body))")
+
+        let before = store.selectedCount
+        mouse.drag(from: rows[0].body, through: [rows[1].body, rows[2].body], to: rows[3].body)
+        emit("DRAGSELECT 拖之后选中=\(store.selectedCount) clickedRow=\(table.clickedRow) "
+            + "selectedRows=\(table.selectedRowIndexes)")
+
+        // 判据是**有条件的**：表格收到了这一下（clickedRow 不是 -1）才谈产品；
+        // 没收到就是合成事件的限制，不许拿它判缺陷，也不许悄悄 skip 到看不见 ——
+        // 限制本身要打印出来并写进手工清单。
+        if table.clickedRow < 0 && store.selectedCount == before {
+            emit("DRAGSELECT-LIMIT 合成拖动没有送到 NSTableView（clickedRow=-1），"
+                 + "这条验收改由人工：真机在含 5 条文本的列表里从第 1 行按下拖到第 4 行，选中集应扩到 4 行")
+            throw XCTSkip("合成鼠标事件驱动不了表格行选中（本轮实测），见 D-033 与手工清单第 2 节")
+        }
+        XCTAssertGreaterThanOrEqual(store.selectedCount, 4,
+                                   "从第 1 行按下拖到第 4 行，选中集只扩到 \(store.selectedCount) 行 —— "
+                                   + "这正是 D-1 的形状：拖出会话在阈值处抢走了这次拖动")
     }
 
     /// 用户报的现象：双击列表里的条目之后，整个左侧列表外面多了一圈蓝色边框。
@@ -748,6 +707,101 @@ final class UIInteractionProbeTests: XCTestCase {
 
     private func containsCJK(_ string: String) -> Bool {
         string.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+    }
+
+    /// 真实列表里的行位置**向 `NSTableView` 自己问**（SwiftUI 的 `List` 底下就是它）。
+    ///
+    /// 为什么不能再用 KeyViewProxy 的几何：换成 `List` 之后宿主树里数不到行代理了
+    /// （实测 `星标代理=0 行代理=0`），可点控件的代理被表格接管了；而猜行高这一族已经两次
+    /// 把探针点空、报成产品缺陷。表格的 `rect(ofRow:)` 是唯一权威来源。
+    /// 返回的是**窗口基坐标**（`NSEvent.mouseEvent` 要的那个）。
+    /// 合成鼠标事件的投递器。`eventNumber` **每一段按下-抬起会话共用一个递增值**：
+    /// SwiftUI 的自绘手势不在乎它（所以旧探针写 0 也能点中行），但 `NSTableView` 的行选中
+    /// 走 AppKit 的鼠标跟踪状态机，`eventNumber` 恒为 0 时 down/up 配不成对 ⇒
+    /// 表现为"点了没选中"，那是探针的错，不是产品的错（本轮实测踩过）。
+    @MainActor
+    private final class MouseSynthesizer {
+        private let window: NSWindow
+        private var session = 0
+        var lastClickPoint = NSPoint.zero
+
+        init(window: NSWindow) {
+            self.window = window
+        }
+
+        func click(at windowPoint: NSPoint, clickCount: Int = 1) {
+            session += 1
+            let number = session
+            lastClickPoint = windowPoint
+            send(.leftMouseDown, at: windowPoint, clicks: max(1, clickCount), number: number)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+            send(.leftMouseUp, at: windowPoint, clicks: max(1, clickCount), number: number)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        /// 按下 → 依次经过 via → 在终点抬起：一整段拖动共用一个 eventNumber。
+        func drag(from start: NSPoint, through via: [NSPoint], to end: NSPoint) {
+            session += 1
+            let number = session
+            send(.leftMouseDown, at: start, clicks: 1, number: number)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+            for point in via {
+                send(.leftMouseDragged, at: point, clicks: 1, number: number)
+                RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            }
+            send(.leftMouseDragged, at: end, clicks: 1, number: number)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            send(.leftMouseUp, at: end, clicks: 1, number: number)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        }
+
+        private func send(_ type: NSEvent.EventType, at point: NSPoint, clicks: Int, number: Int) {
+            guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime,
+                                                 windowNumber: window.windowNumber, context: nil,
+                                                 eventNumber: number, clickCount: clicks, pressure: 1.0) else { return }
+            // 走 `window.sendEvent` 而不是 `NSApp.sendEvent`：xctest 进程里 `NSApp.isActive`
+            // 起不来（实测 isKeyWindow=false isActive=false），应用级派发会把鼠标事件丢掉，
+            // 于是表格的 `clickedRow` 恒为 -1 —— 那会被读成"点击没生效"的假产品缺陷。
+            // 直接向窗口派发是同一条 AppKit 路径的入口，`NSTableView` 的行命中因此可测。
+            window.sendEvent(event)
+        }
+    }
+
+    private func sidebarRowPoints(in host: NSView, count: Int) throws -> [(body: NSPoint, leading: NSPoint)] {
+        // 用 `is NSTableView` 而不是类名字符串：SwiftUI 底下那个类是 NSTableView 的**子类**，
+        // 它自己的名字里没有 "NSTableView"（第一版按类名匹配 ⇒ 找不到 ⇒ 探针静默 skip，
+        // 而 skip 会把"D-1 到底修没修"这条判据整个吃掉）。
+        guard let table = Self.firstTable(in: host) else {
+            var names: [String] = []
+            func collect(_ view: NSView) {
+                names.append(String(describing: type(of: view)))
+                for sub in view.subviews { collect(sub) }
+            }
+            collect(host)
+            // 抛错而不是 skip：skip 会把"D-1 到底修没修"这条判据整个吃掉。
+            throw NSError(domain: "UIInteractionProbe", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "侧栏里找不到 NSTableView，无法取行几何。视图类名（前 30）：\(names.prefix(30))",
+            ])
+        }
+        XCTAssertGreaterThanOrEqual(table.numberOfRows, count,
+                                    "表格行数 \(table.numberOfRows) 少于探针要的 \(count) 行，几何无从取")
+        return (0..<count).map { index in
+            let rect = table.rect(ofRow: index)
+            let midY = rect.midY
+            return (
+                body: table.convert(NSPoint(x: rect.midX, y: midY), to: nil),
+                leading: table.convert(NSPoint(x: rect.minX + 14, y: midY), to: nil)
+            )
+        }
+    }
+
+    private static func firstTable(in view: NSView) -> NSTableView? {
+        if let table = view as? NSTableView { return table }
+        for sub in view.subviews {
+            if let table = firstTable(in: sub) { return table }
+        }
+        return nil
     }
 
     private func describeChain(_ root: NSView, at point: NSPoint) -> String {

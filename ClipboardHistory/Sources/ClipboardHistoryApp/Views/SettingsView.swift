@@ -32,7 +32,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .shortcuts: return "command"
         case .general: return "gearshape"
         case .privacy: return "hand.raised"
-        case .recommendations: return "sparkles"
+        case .recommendations: return "wand.and.stars"
         case .data: return "folder"
         }
     }
@@ -46,6 +46,15 @@ struct SettingsView: View {
     @State private var showMainWindowShortcut: HotKeyShortcut
     @State private var repeatCopyShortcut: HotKeyShortcut
     @State private var launchAtLogin: Bool
+    // 这两个键与 `HistoryStore.recordingPausedKey` / `ocrSearchDisabledKey` 是同一对，
+    // 写在这里而不引用 store 是因为设置页在两个窗口里都会重建（@AppStorage 自带跨实例同步）。
+    @AppStorage("recordingPaused") private var recordingPaused = false
+    @AppStorage("ocrSearchDisabled") private var ocrSearchDisabled = false
+
+    /// OCR 开关的界面语义是"启用"，而存储键是"禁用"（默认值取反的必要性见 `HistoryStore`）。
+    private var ocrSearchEnabled: Binding<Bool> {
+        Binding(get: { !ocrSearchDisabled }, set: { ocrSearchDisabled = !$0 })
+    }
     @State private var showClearHistoryConfirmation = false
     @State private var exportMessage: String?
     @State private var showExportAlert = false
@@ -211,6 +220,19 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("开机启动", isOn: $launchAtLogin)
                         .disabled(!loginItemSettings.isSupported)
+
+                    // 下面两项是「通用」真正该管的**全局行为开关**（第三轮审计 D-3）：
+                    // 这一页以前被 U-6 的去重删到只剩一个开关，整页 90% 空白 ——
+                    // 修法不是再塞一个没用的东西，而是把"随时能一键停用/降敏感度"的两件事放这儿。
+                    Toggle("暂停记录剪贴板（暂时不想被记录时）", isOn: $recordingPaused)
+                    Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
+                    Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     if let message = loginItemSettings.message {
                         Text(message)

@@ -69,14 +69,36 @@ enum EntryDragPlanner {
     }
 }
 
-/// 有载荷才挂 `onDrag`。SwiftUI 没有"条件性 modifier"，所以分两条路径：
-/// 给没有载荷的条目挂一个返回空 provider 的 `onDrag`，会让用户拖起来毫无反应 —— 比不挂更糟。
+/// 拖动分工的判据（第三轮审计 D-1，修法③里"拖出用 `.onDrag` 配 dragging session 的 prepareForDrag 判定"那一半）。
+///
+/// 换到 `List(selection:)` 之后，"按下并移动超过阈值"这件事仍然有两个互斥的用途：
+/// **拖出这一条** 与 **拖选一批**。系统只会把这次拖动交给先接管它的那一个 ——
+/// 缺陷 D-1 就是这么来的：整行都挂 `onDrag` ⇒ 拖出会话在每个阈值处抢先，列表的拖选整片失效
+/// （只有 `payload == nil` 的多文件行还能拖选，所以症状是"大部分条目拖不动"）。
+///
+/// 分工在这里写死：**只有从行的把手（缩略图/图标那一列）发起的拖动才是拖出**，
+/// 行体与空白处的按下-移动全部留给列表拖选。两个方向都可判：
+/// `.handle` + 有载荷 ⇒ 挂拖出；`.rowBody` ⇒ 永远不挂（载荷再满也不挂，那正是缺陷的形状）。
+enum EntryDragGate {
+    enum Origin: Equatable {
+        case handle
+        case rowBody
+    }
+
+    static func prepareForDrag(origin: Origin, content: ClipboardEntryContent) -> Bool {
+        guard origin == .handle else { return false }
+        return EntryDragPlanner.payload(for: content) != nil
+    }
+}
+
+/// 把手（行首的缩略图/图标）上的拖出 affordance。**只**给把手用。
+/// 整行挂 `onDrag` 会吃掉列表的拖选 —— 见 `EntryDragGate`，判据由它给，别在这里绕过它。
 struct EntryDragModifier: ViewModifier {
     let content: ClipboardEntryContent
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if EntryDragPlanner.payload(for: self.content) != nil {
+        if EntryDragGate.prepareForDrag(origin: .handle, content: self.content) {
             content.onDrag {
                 EntryDragPlanner.itemProvider(forContent: self.content) ?? NSItemProvider()
             }

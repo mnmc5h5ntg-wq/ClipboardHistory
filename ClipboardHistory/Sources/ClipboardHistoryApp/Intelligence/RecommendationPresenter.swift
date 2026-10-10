@@ -74,7 +74,7 @@ enum RecommendationPresenter {
             tags.append("复用\(reuseCount)次")
         }
         if (features[.contentTypeAffinity] ?? 0) > 0 {
-            tags.append(contentTypeTag(bundleID: context.frontmostApplication?.bundleIdentifier))
+            tags.append(contentTypeTag(for: entry))
         }
         if let appAffinityTag {
             tags.append(appAffinityTag)
@@ -102,13 +102,23 @@ enum RecommendationPresenter {
         return parts.joined(separator: " · ")
     }
 
-    private static func contentTypeTag(bundleID: String?) -> String {
-        let app = bundleID?.lowercased() ?? ""
-        if app.contains("safari") || app.contains("chrome") { return "偏好链接" }
-        if app.contains("finder") { return "偏好文件" }
-        if app.contains("xcode") || app.contains("terminal") { return "偏好命令/代码" }
-        if app.contains("wechat") || app.contains("telegram") { return "偏好文本/图片" }
-        return "内容匹配"
+    /// 内容类型亲和的文案：**由条目自己的类型决定**（第三轮审计 D-2）。
+    ///
+    /// 旧实现只看前台 App 的 bundle id，于是"当前在 Safari"这条一出现，**每一条**推荐都被说成
+    /// "偏好链接" —— 帧里直接读到 `合同 终版 v3.pdf` 的理由是"文件 · 当前在 Safari · 偏好链接"。
+    /// "链接"讲的是条目类型，跟用户此刻在哪个 App 里没有半点关系；前台 App 已经由
+    /// "当前在X"那条标签讲清楚了，这里不再重复它、也不再靠它猜类型。
+    static func contentTypeTag(for entry: ClipboardEntry) -> String {
+        switch entry.content {
+        case .text(let text):
+            return text.hasPrefix("http") ? "常用链接" : "常用文本"
+        case .image:
+            return "常用图片"
+        case .file:
+            return "常用文件"
+        case .files:
+            return "常用多文件"
+        }
     }
 
     private static func behavioralTag(events: [ContextEvent]) -> String {

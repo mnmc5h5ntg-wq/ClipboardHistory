@@ -5,6 +5,13 @@ import Combine
 final class HistoryStore: ObservableObject {
     typealias Entry = ClipboardEntry
 
+    /// 这两个键刻意直接落在标准 `UserDefaults` 上：它们是**用户偏好**，
+    /// 不是历史数据（历史数据一律走 `HistoryPersisting`，见 D-002 的数据目录边界）。
+    /// `recordingPaused` 缺省 false、`ocrSearchDisabled` 缺省 false ⇒ 不写字典时行为与今天一致。
+    private static let defaults = UserDefaults.standard
+    private static let recordingPausedKey = "recordingPaused"
+    private static let ocrSearchDisabledKey = "ocrSearchDisabled"
+
     enum Action {
         case refresh
         case updateSearch(String)
@@ -14,6 +21,7 @@ final class HistoryStore: ObservableObject {
         case toggleSelection(Entry)
         case selectRange(to: Entry)
         case dragSelectRange(anchorID: Entry.ID, target: Entry)
+        case setSelection(Set<Entry.ID>)
         case copy(Entry)
         case copyAndPromote(Entry)
         case repeatCopySelected
@@ -59,6 +67,28 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var historyRecoveryNotice: String?
     /// 自动粘贴失败时要让用户看见原因，而不是"点了没反应"（审计 R-13）。
     @Published private(set) var pasteFailureNotice: String?
+
+    /// 「暂停记录」（第三轮审计 D-3 / §5 F1）。
+    ///
+    /// 刻意**每次决策时读** UserDefaults 而不是缓存在 `@Published` 上：缓存在这里需要一个
+    /// 跨窗口/跨进程的双向同步（设置页写、采集侧读，还要处理旧值），而这种"全局开关"
+    /// 的正确语义就是"下一次判断时生效"。CFPreferences 自己会缓存，读取成本可以忽略。
+    var isRecordingPaused: Bool {
+        get { Self.defaults.bool(forKey: Self.recordingPausedKey) }
+        set { Self.defaults.set(newValue, forKey: Self.recordingPausedKey) }
+    }
+
+    /// 「识别截图文字用于搜索」（第三轮审计 D-3 / §5 F4）。默认开 ——
+    /// 键写成"禁用"取反，是因为 `bool(forKey:)` 对没写过的键返回 false，
+    /// 直接用一个 `ocrSearchEnabled` 键会让"从没进过设置页的用户"默认关闭 OCR，
+    /// 那等于悄悄改了历史行为。
+    var isOCRSearchEnabled: Bool {
+        get { !Self.defaults.bool(forKey: Self.ocrSearchDisabledKey) }
+        set { Self.defaults.set(!newValue, forKey: Self.ocrSearchDisabledKey) }
+    }
+
+    /// 拖入文件之后给用户的反馈（第三轮审计 D-4）：以前"接住了但什么都没发生"是静默的。
+    @Published private(set) var droppedFilesNotice: String?
 
     /// 过滤结果缓存。`filteredEntries` 在一次界面求值里会被多处读取
     /// （列表、计数文案、空态标题、选中态协调），旧写法每次都全表重扫：
@@ -323,7 +353,7 @@ final class HistoryStore: ObservableObject {
             self.retentionPolicy = HistoryRetentionPolicy(maxEntries: maxEntries, maxAgeDays: retentionPolicy.maxAgeDays)
         } else {
             self.retentionPolicy = retentionPolicy
-        }
+                }
         let loadedEntries = persistence.load()
         let loadedRecoveryNotice = persistence.recoveryNotice
         let persistedEntries = Self.collapsingDuplicates(in: retainingByPolicy(loadedEntries, reason: "载入"))
@@ -396,17 +426,34 @@ final class HistoryStore: ObservableObject {
     /// 把拖进窗口的文件登记为一条历史（审计第二轮 1.5 / 账本 R2-05 的另一半：
     /// 以前整个应用不接受任何拖入）。返回 0 表示这批 URL 里没有可用的文件
     /// （例如只拖进来一个 Web 链接），此时不产生条目也不报错。
+    /// 拖入文件入库。返回**实际入库的条数**（0 = 一项都没进来）。
+    ///
+    /// 第三轮审计 D-4：`DroppedFileImport.Planned.ignoredCount` 一直算得出来，却没有任何调用方读它
+    /// ⇒ 用户看到虚线落点框闪一下、什么都没发生。现在两种情况都会给出横幅：
+    /// ① 一个都不是本机文件；② 混着来（"3 个里有 1 个不是文件"）。
     @discardableResult
     func addDroppedFiles(urls: [URL], timestamp: Date = Date()) -> Int {
-        guard let planned = DroppedFileImport.plan(for: urls) else { return 0 }
+        guard let planned = DroppedFileImport.plan(for: urls) else {
+            if !urls.isEmpty {
+                droppedFilesNotice = "拖入的 \(urls.count) 项不是本机文件，未加入历史"
+            }
+            return 0
+        }
         add(ClipboardIntake.Entry(
             content: planned.content,
             thumbnail: nil,
             sourceUTIs: ["public.file-url"],
             sourceAppBundleID: nil,
             sourceAppName: nil
-        ), timestamp: timestamp)
+        ), timestamp: timestamp, isUserInitiated: true)
+        if planned.ignoredCount > 0 {
+            droppedFilesNotice = "已加入历史，另有 \(planned.ignoredCount) 项不是本机文件、已忽略"
+        }
         return 1
+    }
+
+    func dismissDroppedFilesNotice() {
+        droppedFilesNotice = nil
     }
 
     func startMonitoring(after delay: TimeInterval = 0) {
@@ -465,6 +512,8 @@ final class HistoryStore: ObservableObject {
             selectRange(to: entry)
         case .dragSelectRange(anchorID: let anchorID, target: let entry):
             selectRange(from: anchorID, to: entry)
+        case .setSelection(let ids):
+            applyListSelection(ids)
         case .copy(let entry):
             copyToClipboard(entry)
         case .copyAndPromote(let entry):
@@ -535,6 +584,26 @@ final class HistoryStore: ObservableObject {
         selectRange(from: selectedEntry?.id ?? selectedEntryIDs.first, to: entry)
     }
 
+    /// `List(selection:)` 汇报上来的选中集合（第三轮审计 D-1 的修法③）。
+    ///
+    /// 列表侧的点击语义（shift 扩选、⌘ 加选、方向键移动）现在由系统的 `List` 负责，
+    /// 这里只做两件事：把集合落成 store 的权威状态，并且**只接受当前可见的条目** ——
+    /// 过滤/搜索之后 `List` 可能把已经不在列表里的 id 一起报回来，那些必须被丢掉，
+    /// 否则会出现"看不见的条目被收藏/删除"（同 U-1 那类"表只增不减"的坑）。
+    /// 主选中项（`selectedEntry`）的不变量沿用 `reconcileSelection`：还在集合里就保留，
+    /// 否则退到列表顺序上的第一条。
+    private func applyListSelection(_ ids: Set<Entry.ID>) {
+        let visible = filteredEntries
+        let visibleIDs = Set(visible.map(\.id))
+        let kept = ids.intersection(visibleIDs)
+        selectedEntryIDs = kept
+        if let current = selectedEntry, kept.contains(current.id) {
+            selectedEntry = visible.first { $0.id == current.id } ?? current
+        } else {
+            selectedEntry = visible.first { kept.contains($0.id) }
+        }
+    }
+
     private func selectRange(from anchorID: Entry.ID?, to entry: Entry) {
         let visibleEntries = filteredEntries
         guard let targetIndex = visibleEntries.firstIndex(where: { $0.id == entry.id }) else { return }
@@ -548,7 +617,13 @@ final class HistoryStore: ObservableObject {
         selectedEntry = entry
     }
 
-    func add(_ intakeEntry: ClipboardIntake.Entry, timestamp: Date = Date()) {
+    /// - Parameter isUserInitiated: 用户明确要求的入库（拖入文件）。
+    ///   「暂停记录」只挡后台自动采集：**changeCount 照常推进**（否则恢复的那一瞬间
+    ///   会把暂停期间的旧内容补记一条），而点名要存的导入不能被静默丢掉（审计 D-3 的验收点）。
+    func add(_ intakeEntry: ClipboardIntake.Entry, timestamp: Date = Date(), isUserInitiated: Bool = false) {
+        guard RecordingGate.accepts(isPaused: isRecordingPaused, isUserInitiated: isUserInitiated) else {
+            return
+        }
         if promoteExistingEntryIfNeeded(for: intakeEntry, timestamp: timestamp) {
             return
         }
@@ -609,6 +684,9 @@ final class HistoryStore: ObservableObject {
     /// 连续 N 次卡主线程，也不会并发抢满 CPU 核。
     /// 解码上限 1200px：认字不需要原始分辨率，整幅解一张 4000×3000 只是浪费。
     private func scheduleOCRIfNeeded(for entry: Entry) {
+        // 「识别截图文字」关掉后不排任务（第三轮审计 D-3 / §5 F4）。
+        // 判据本身在 `RecordingGate.schedulesOCR`，这样"关了就什么都不排"可被真值表钉住。
+        guard isOCRSearchEnabled else { return }
         let entryID = entry.id
         let source: OCRImageSource
 

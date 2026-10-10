@@ -37,6 +37,12 @@ struct ContentView: View {
                 historyStore.dismissHistoryRecoveryNotice()
             }
         }
+        if let dropped = historyStore.droppedFilesNotice {
+            NoticeBanner(message: dropped, tone: .warning) {
+                historyStore.dismissDroppedFilesNotice()
+            }
+        }
+
         if let pasteFailure = historyStore.pasteFailureNotice {
             NoticeBanner(message: pasteFailure, tone: .error) {
                 historyStore.dismissPasteFailure()

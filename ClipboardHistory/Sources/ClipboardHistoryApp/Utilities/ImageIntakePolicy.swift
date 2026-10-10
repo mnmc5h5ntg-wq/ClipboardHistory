@@ -69,10 +69,17 @@ extension StoredImage {
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
             return untouched
         }
-        // 注意：不再把原来的 pngData 传下去 —— 那份字节对应的是**大尺寸**的图，
+        // 注意：不再把**原来的** pngData 传下去 —— 那份字节对应的是大尺寸的图，
         // 留着会让去重与落盘写出与内存不一致的内容。
-        return StoredImage(
-            NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
-        )
+        let downsampled = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width, height: cgImage.height))
+        // 但要把**新尺寸**的 PNG 字节一起交下去（第三轮审计 D-6）：只给 NSImage 时
+        // `pngData()` 要走 `encodedCache` 现算，而第一次算恰好落在两个最不该慢的时刻 ——
+        // 保存快照（`@MainActor`）与用户按住鼠标拖出的那一瞬间（`EntryDrag.payload`）。
+        // 4096px 的 PNG 编码是几十毫秒级；在这里（采集的后台路径）算一次，两处都受益。
+        let png = NSBitmapImageRep(cgImage: cgImage).representation(using: .png, properties: [:])
+        if let png {
+            return StoredImage(downsampled, pngData: png)
+        }
+        return StoredImage(downsampled)
     }
 }
