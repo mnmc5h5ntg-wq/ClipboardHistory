@@ -98,8 +98,26 @@ enum RecommendationPresenter {
 
         var parts: [String] = [kindLabel(for: entry)]
         if !tags.isEmpty { parts.append(tags.joined(separator: " · ")) }
-        parts.append("\(Int(candidate.score.value * 100))%")
+        // 以前这里直接拼 `Int(score*100)%`（如 "24%"）。把内部指标原样端给用户是三件坏事：
+        // ① 它不是概率，用户会按概率读；② 它让一行中文里混进一个数字噪声；
+        // ③ 权重滑杆一动，同一个数含义就变。第三轮审计 U-1 要求换成词化置信（或干脆不显示）。
+        if let confidence = confidenceWord(for: candidate.score.value) {
+            parts.append(confidence)
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// 把内部打分压成三档人话。**低于 `noConfidenceFloor` 就不说** ——
+    /// "把握较低"这种说法只会让用户以为系统在猜，而它本来就有理由标签可看。
+    /// 阈值来自本轮帧里的实际分布（0.12 / 0.24 这类小分数），不是凭感觉：
+    /// 见 `RecommendationPresenterTests.testConfidenceWordThresholdsMatchTheObservedSpread`。
+    static let noConfidenceFloor = 0.15
+    static let highConfidenceFloor = 0.5
+
+    static func confidenceWord(for value: Double) -> String? {
+        if value < noConfidenceFloor { return nil }
+        if value < highConfidenceFloor { return "把握中等" }
+        return "把握较大"
     }
 
     /// 内容类型亲和的文案：**由条目自己的类型决定**（第三轮审计 D-2）。

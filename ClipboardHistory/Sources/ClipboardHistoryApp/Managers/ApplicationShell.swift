@@ -58,6 +58,15 @@ final class ApplicationShell {
         LifecycleDebugLogger.log("HistoryStore.startMonitoring scheduled from ApplicationShell.configure")
     }
 
+    /// 「启动时打开主窗口」。与 D-033 那两个开关同一形状：**决策时读** UserDefaults，
+    /// 不缓存成 `@Published`（跨窗口双向同步的坑不值得为省一次读换进来）。
+    /// 键写成 `hideMainWindowOnLaunch` 取反，因为 `bool(forKey:)` 对没写过的键返回 false，
+    /// 正向键会让"从没进过设置页的用户"默认不打开主窗口 —— 那是悄悄改行为。
+    var showMainWindowOnLaunch: Bool {
+        get { !UserDefaults.standard.bool(forKey: "hideMainWindowOnLaunch") }
+        set { UserDefaults.standard.set(!newValue, forKey: "hideMainWindowOnLaunch") }
+    }
+
     func applicationWillFinishLaunching(appDelegate: AppDelegate) {
         // 窗口级系统项从源头关掉（issue #13）：允许自动标签页时，AppKit 会往**任何**含标准
         // 编辑动作的菜单里塞「Show All Tabs / Hide Tab Bar / Move Tab to New Window」，
@@ -83,12 +92,19 @@ final class ApplicationShell {
             )
         } else {
             didDeferInitialActivationRestore = true
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 300_000_000)
-                WindowManager.restoreMainWindowIfNeeded(
-                    reason: "initial applicationDidBecomeActive deferred",
-                    menuBarController: self.menuBarController
-                )
+            // 「启动时打开主窗口」（第三轮审计 U-3：「通用」页真正属于它的一项）。
+            // 默认 **开** —— 今天的行为就是首次激活后恢复主窗口，关掉它是新选项，不是改默认。
+            // 关掉之后仍然可以按呼出快捷键打开（`AppCommand.showMainWindow` 不受这个开关影响）。
+            if showMainWindowOnLaunch {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    WindowManager.restoreMainWindowIfNeeded(
+                        reason: "initial applicationDidBecomeActive deferred",
+                        menuBarController: self.menuBarController
+                    )
+                }
+            } else {
+                LifecycleDebugLogger.log("showMainWindowOnLaunch=0：跳过启动时的主窗口恢复")
             }
         }
         LifecycleDebugLogger.logAppState("after ApplicationShell restore check", menuBarController: menuBarController)

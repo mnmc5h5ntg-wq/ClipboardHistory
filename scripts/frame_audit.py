@@ -183,6 +183,60 @@ def command_band(path, row=None, column=None):
     return 0
 
 
+def command_align(path, threshold=40):
+    """量"文字左边缘是否对齐"：逐行找第一个明显有墨的列，报这些列位的分布。
+
+    为什么需要这个子命令：审计 U-1 的验收写的是"用 band 证明左边缘对齐"，
+    但 band 只能回答"某一列上有没有墨"，回答不了"每一行的起点是不是同一个 x" ——
+    居中卡片与左对齐列表在单列 band 上可以给出完全相同的直方图（本仓库踩过一次选错列的坑）。
+    所以这里直接量左边缘：`spread` 小 = 对齐；`spread` 大 = 各行起点散开（居中/卡片式）。
+    """
+    width, height, channels, pixels = read_png(path)
+    stride = width * channels
+    # 底色取整帧众数（菜单栏面板是纯色底），墨色 = 与底色亮度差超过阈值的像素
+    hist = {}
+    for y in range(height):
+        base = y * stride
+        for x in range(width):
+            pixel = tuple(pixels[base + x * channels: base + (x + 1) * channels])
+            hist[pixel] = hist.get(pixel, 0) + 1
+    background = max(hist, key=hist.get)
+    background_lum = luminance(background)
+    left_edges = []
+    for y in range(height):
+        base = y * stride
+        for x in range(width):
+            pixel = tuple(pixels[base + x * channels: base + (x + 1) * channels])
+            if abs(luminance(pixel) - background_lum) > threshold:
+                left_edges.append(x)
+                break
+    if not left_edges:
+        print("%s: 整帧没有可判定的墨色（底色亮度 %d）" % (os.path.basename(path), background_lum))
+        return 1
+    ordered = sorted(left_edges)
+    median = ordered[len(ordered) // 2]
+    spread = ordered[-1] - ordered[0]
+    within = sum(1 for x in ordered if abs(x - median) <= 2)
+    # 直方图才是可解释的数字：只报跨度会让人以为"还是散的"，
+    # 而分隔线（左边缘 0）与文字行（左边缘同一个 x）本来就该分开看。
+    counts = {}
+    for x in ordered:
+        bucket = (x // 4) * 4
+        counts[bucket] = counts.get(bucket, 0) + 1
+    top = sorted(counts.items(), key=lambda kv: -kv[1])[:4]
+    text_rows = [x for x in ordered if x > 0]
+    text_median = sorted(text_rows)[len(text_rows) // 2] if text_rows else -1
+    text_within = sum(1 for x in text_rows if abs(x - text_median) <= 4) if text_rows else 0
+    print("%s: 有墨的行=%d 左边缘中位=%d 跨度=%d 分桶直方图=%s"
+          % (os.path.basename(path), len(ordered), median, spread,
+             " ".join("x≈%d:%d" % kv for kv in top)))
+    print("  文字行(排除左边缘 0 的分隔线)=%d 其中落在 x=%d±4 内=%d (%.1f%%)"
+          % (len(text_rows), text_median, text_within,
+             100.0 * text_within / len(text_rows) if text_rows else 0.0))
+    return 0
+
+
+
 def command_diff(directory_a, directory_b):
     names_a = set(n for n in os.listdir(directory_a) if n.endswith(".png"))
     names_b = set(n for n in os.listdir(directory_b) if n.endswith(".png"))
@@ -240,11 +294,17 @@ def main(argv=None):
     band.add_argument("--row", type=int)
     band.add_argument("--column", type=int)
 
+    align = sub.add_parser("align", help="逐行文字左边缘的对齐程度（判断居中/左对齐）")
+    align.add_argument("path")
+    align.add_argument("--threshold", type=int, default=40)
+
     args = parser.parse_args(argv)
     if args.command == "diff":
         return command_diff(args.directory_a, args.directory_b)
     if args.command == "stats":
         return command_stats(args.path)
+    if args.command == "align":
+        return command_align(args.path, threshold=args.threshold)
     return command_band(args.path, row=args.row, column=args.column)
 
 

@@ -34,15 +34,28 @@ struct MenuBarRecommendationsView: View {
                         // 与 macOS 12 的状态栏菜单同一套脱敏标签（审计 R-43：
                         // 上一轮文档承诺"菜单只显示类型信息"，两版实现都不符）
                         let label = EntryPresentation.menuLabel(for: entry)
-                        if reasonText.isEmpty {
+                        // 第三轮审计 U-1：macOS 菜单项一律左对齐、不画自绘底、不把内部指标端出来。
+                        // 旧写法是"标题\n理由"两行居中卡片，理由还带着 24% 这种原始分数。
+                        // 现在：标题在左、理由在右且更弱色，一行读完，与系统菜单同一套语言。
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
                             Text(label)
                                 .lineLimit(1)
-                        } else {
-                            Text(label + "\n" + reasonText)
-                                .font(.system(size: 11))
-                                .lineLimit(2)
+                            Spacer(minLength: 12)
+                            if !reasonText.isEmpty {
+                                Text(reasonText)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                    .layoutPriority(-1)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
+                    // 系统菜单项没有按钮底：`.plain` 去掉 SwiftUI 默认那层，
+                    // 悬停高亮交给菜单自己的选中态（帧里之前那种"卡片"就是这么来的）。
+                    .buttonStyle(.plain)
                 }
 
                 Divider()
@@ -54,7 +67,7 @@ struct MenuBarRecommendationsView: View {
                         .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             Divider()
         }

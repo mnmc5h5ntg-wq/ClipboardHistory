@@ -1,3 +1,5 @@
+// 不覆盖管线：本文件钉的是判定规则与接线守卫。「行在真实列表里被点到」属于在屏/人工验收，
+// 见 `UIInteractionProbeTests` 与 docs/MANUAL_TEST_v1.4.9_round3.md 第 1 节。
 import AppKit
 import XCTest
 @testable import ClipboardHistoryApp

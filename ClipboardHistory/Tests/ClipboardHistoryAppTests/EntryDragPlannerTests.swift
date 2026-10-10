@@ -1,3 +1,7 @@
+// 不覆盖管线：本文件只钉载荷规划的纯函数真值表。真实拖放（拖出到 Finder、拖入入库）需要
+// `NSDraggingSession`，离屏测不到；管线级验收见 `PipelineAcceptanceTests`（C-1 的三条之一）
+// 与 docs/MANUAL_TEST_v1.4.9_round3.md 第 2 节。
+// （第三轮审计 C-1：这类文件要自己写明边界，别让读者以为它覆盖了产品路径。）
 import AppKit
 import UniformTypeIdentifiers
 import XCTest

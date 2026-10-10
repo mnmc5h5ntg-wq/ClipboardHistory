@@ -186,14 +186,62 @@ final class RecommendationPresenterTests: XCTestCase {
         XCTAssertTrue(demoted.contains("已降权"), demoted)
     }
 
-    func testPercentSuffixAlwaysPresent() {
-        let reason = RecommendationPresenter.reason(
-            for: candidate(features: [:], value: 0.77),
-            entry: textEntry("x"),
-            context: context(),
-            currentAppName: nil,
-            reuseCount: 0
-        )
-        XCTAssertTrue(reason.hasSuffix("77%"), reason)
+    /// 第三轮审计 U-1：理由尾巴上那个 `24%` 是**内部指标**，不是概率，用户会按概率读，
+    /// 而且权重滑杆一动它的含义就变。所以这里把原来那条
+    /// `testPercentSuffixAlwaysPresent`（钉的就是"必须有百分号"）**翻转**成：
+    /// 面向用户的文案里不许出现百分号，尾巴改成人话三档。
+    func testReasonNeverExposesRawPercentage() throws {
+        for value in [0.05, 0.12, 0.24, 0.5, 0.77, 0.99] {
+            let reason = RecommendationPresenter.reason(
+                for: candidate(features: [:], value: value),
+                entry: textEntry("x"),
+                context: context(),
+                currentAppName: nil,
+                reuseCount: 0
+            )
+            XCTAssertFalse(reason.contains("%"), "文案里仍有原始分数（\(value)）：\(reason)")
+        }
+        XCTAssertTrue(RecommendationPresenter.reason(
+            for: candidate(features: [:], value: 0.77), entry: textEntry("x"),
+            context: context(), currentAppName: nil, reuseCount: 0
+        ).hasSuffix("把握较大"))
+    }
+
+    func testConfidenceWordThresholdsMatchTheObservedSpread() {
+        // 帧里实测到的真实分布是 0.12 / 0.24 这一档，所以"低到不值得说"的下限必须盖住它。
+        XCTAssertNil(RecommendationPresenter.confidenceWord(for: 0.0))
+        XCTAssertNil(RecommendationPresenter.confidenceWord(for: 0.12),
+                     "0.12 这种小分数说出来只会让用户以为系统在猜")
+        XCTAssertEqual(RecommendationPresenter.confidenceWord(for: 0.24), "把握中等")
+        XCTAssertEqual(RecommendationPresenter.confidenceWord(for: 0.5), "把握较大")
+        XCTAssertEqual(RecommendationPresenter.confidenceWord(for: 0.9), "把握较大")
+    }
+
+    /// 菜单栏面板要回到原生菜单语言：左对齐、不自绘底、不居中（U-1 的验收）。
+    func testMenuBarPanelUsesNativeMenuLanguage() throws {
+        let source = codeOnly(try productSource(named: "Views/MenuBarRecommendationsView.swift"))
+        XCTAssertFalse(source.contains("alignment: .center"),
+                       "菜单栏面板里还有居中的行：系统菜单项一律左对齐")
+        XCTAssertFalse(source.contains("RoundedRectangle"),
+                       "菜单栏面板还在画自绘卡片底：那是 macOS 菜单里没有的语言")
+        XCTAssertTrue(source.contains("alignment: .leading"), "标题/理由没有左对齐")
+        XCTAssertTrue(source.contains("foregroundStyle(.secondary)"), "理由没有降成次要色")
+    }
+
+    private func codeOnly(_ source: String) -> String {
+        source.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
+
+    private func productSource(named relativePath: String) throws -> String {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = candidate.appendingPathComponent("Sources/ClipboardHistoryApp", isDirectory: true)
+                .appendingPathComponent(relativePath)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw XCTSkip("找不到 Sources/ClipboardHistoryApp/\(relativePath)")
     }
 }

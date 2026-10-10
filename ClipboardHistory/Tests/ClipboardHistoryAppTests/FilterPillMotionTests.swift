@@ -1,3 +1,5 @@
+// 不覆盖管线：本文件只钉动效参数的纯函数分支，不证明屏幕上真的按这套参数在动。
+// 在屏证据在 `UIInteractionProbeTests.testFrameIntervalsUnderStateChanges`（需要环境变量才跑）。
 import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
