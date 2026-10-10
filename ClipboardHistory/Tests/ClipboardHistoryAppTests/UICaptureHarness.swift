@@ -246,6 +246,19 @@ final class UICaptureTests: XCTestCase {
         // 一颗浮层药丸一张帧。以前两张挤在 200pt 高的框里（四颗按钮 + 分隔线 + padding 实际
         // 需要 ~187pt，加上 32pt padding 就被裁掉了），加了固定按钮后更放不下 ——
         // 被裁的帧会让人误判"按钮少了"，所以一种状态一帧，高度按内容给足。
+        // 搜索命中高亮 + 可读行长（审计 §4 U-4）。
+        // 这一帧存在的意义是把两件事变成像素：正文列被限制在一个可读宽度内、
+        // 以及当前搜索词在正文里真的被涂了底色。判据在 `Round3DetailTypographyTests` 里，
+        // 它先钉住夹具前提（确有这条含"视觉验收"的条目，且设了搜索词之后它仍是选中项）。
+        results.append(Fixture("detail-text-highlight", NSSize(width: 720, height: 520)) {
+            let target = self.makePopulatedStore(selectingIndex: nil)
+            if let hit = target.entries.first(where: { $0.shortPreview.contains("视觉验收") }) {
+                target.perform(.selectOnly(hit))
+                target.perform(.updateSearch("视觉"))
+            }
+            return AnyView(DetailView(historyStore: target))
+        })
+
         results.append(Fixture("glass-pill", NSSize(width: 120, height: 232)) {
             AnyView(
                 GlassPill(isFavorite: false, favoriteAction: {},
@@ -390,7 +403,10 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
-    private func makePopulatedStore(selectingIndex index: Int? = nil) -> HistoryStore {
+    /// internal 是刻意的：`detail-text-highlight` 这类夹具的**前提**需要被另一套用例断言
+    /// （夹具里到底有没有那条含"视觉验收"的正文、设了搜索词之后选中项有没有换人）。
+    /// 前提不成立时帧是白的或量的不是命中 —— 那种帧看着像证据，其实什么都没说。
+    func makePopulatedStore(selectingIndex index: Int? = nil) -> HistoryStore {
         let store = HistoryStore(
             clipboardWriter: TestClipboardWriter(),
             persistence: RecordingHistoryPersistence(),

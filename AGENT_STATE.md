@@ -293,3 +293,11 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
   `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots_x swift test --filter UICaptureTests`；
   用 python 驱动 swift 时必须显式设 `SDKROOT=$(xcrun --sdk macosx --show-sdk-path)`（否则报 SDK 不兼容，
   那条红是环境问题）。
+
+## 当前状态（2026-10-11，批次 3 收尾）
+
+- §4 U-4 与 U-5 已落地并验证：407 tests 0 失败、`make bundle` 0 warning、78 帧两次同 sha、5 条新守卫变异对照全过。
+- U-5 的"12/13 自绘焦点环"这半条**刻意没做**，理由与所需前提写在 D-039 与快照 18，backlog 标 ready-for-human。
+- 下一批：批次 4（U-2 拖出 drag image 含多文件 / F-2 RTF·HTML 保真）。
+- 帧取证的一个新坑（别再撞）：逐行取最右墨点会把右下角浮层的按钮数成正文行 ——
+  这类"改动有没有进像素"的问题，用两两帧 diff 的包围盒比用行数统计更难被污染。

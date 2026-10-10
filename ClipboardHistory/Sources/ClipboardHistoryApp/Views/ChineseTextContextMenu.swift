@@ -290,11 +290,18 @@ final class ChineseMenuTextField: NSTextField {
 struct ChineseSelectableTextView: NSViewRepresentable {
     let text: String
     let font: NSFont
+    /// 当前搜索词。非空时给正文里所有命中处加**临时属性**底色，
+    /// 字符串本身一个字都不改 —— 用 `NSAttributedString` 把命中写成黄色 runs 的话，
+    /// 用户选中一段复制出来就带上富文本，而且 `isRichText = false` 的只读区会被迫改成富文本。
+    var highlightQuery: String = ""
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = true
+        // 横向滚动条关掉（U-4）。以前正文是"容器宽无限 + 可横向缩放"，
+        // 于是长文本一行铺满 ~700pt 还要往右滚，读起来每行都要找下一行的起点。
+        // 现在正文按 `DetailTypography.columnWidth` 限出一个可读列，超长行折行。
+        scrollView.hasHorizontalScroller = false
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
 
@@ -304,16 +311,16 @@ struct ChineseSelectableTextView: NSViewRepresentable {
         textView.drawsBackground = false
         textView.font = font
         textView.textColor = .labelColor
-        textView.textContainerInset = NSSize(width: 20, height: 20)
-        textView.textContainer?.widthTracksTextView = false
+        textView.textContainerInset = NSSize(width: DetailTypography.containerGutter, height: 20)
+        textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.heightTracksTextView = false
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.isHorizontallyResizable = true
+        textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
         textView.applyReadOnlyMenuBehavior()
-        textView.string = text
+        textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
 
         scrollView.documentView = textView
         return scrollView
@@ -321,10 +328,8 @@ struct ChineseSelectableTextView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
-        if textView.string != text {
-            textView.string = text
-        }
-        textView.font = font
+        textView.autoresizingMask = [.width]
+        textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
         textView.applyReadOnlyMenuBehavior()
     }
 }
@@ -370,6 +375,48 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
             .backgroundColor: NSColor.selectedTextBackgroundColor,
             .foregroundColor: NSColor.selectedTextColor
         ]
+    }
+
+    /// 只读正文的唯一写入口：设文本、设字体、再打命中高亮。
+    ///
+    /// 顺序有意义：`string` 一赋值，旧的临时属性就跟着字形没了，所以高亮必须在设完文本之后打。
+    /// 文本没变时不重新赋值 —— 重新赋值会把用户的选中区清空，
+    /// 而 `updateNSView` 在每次 SwiftUI 求值时都会走这里（选中一条记录、输入搜索词都算）。
+    @discardableResult
+    func updateBody(text: String, font: NSFont, highlightQuery: String) -> Int {
+        if string != text { string = text }
+        self.font = font
+        return applySearchHighlight(query: highlightQuery)
+    }
+
+    /// 给当前正文里的搜索命中加底色，返回命中标了几段。
+    ///
+    /// 走 `NSLayoutManager` 的**临时属性**而不是改 `attributedString`：
+    /// 临时属性不参与文本内容，所以选中复制、`isRichText = false`、以及
+    /// 用户在这段文字上做查找都不受影响。
+    /// 先整段清一遍再打：查询词变短/条目切换时，不清就会留着上一轮命中位置的黄块 ——
+    /// 那是比"没有高亮"更错的呈现（它会把用户指向一个不含搜索词的位置）。
+    @discardableResult
+    func applySearchHighlight(query: String) -> Int {
+        guard let layoutManager else { return 0 }
+        let storage = self.string as NSString
+        let whole = NSRange(location: 0, length: storage.length)
+        layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: whole)
+        guard !query.isEmpty, storage.length > 0 else {
+            needsDisplay = true
+            return 0
+        }
+        var marked = 0
+        for span in MatchHighlighting.spans(in: self.string, query: query) {
+            let range = NSRange(location: span.location, length: span.length)
+            guard NSMaxRange(range) <= storage.length else { continue }
+            layoutManager.addTemporaryAttribute(.backgroundColor,
+                                                value: DetailTypography.highlightColor,
+                                                forCharacterRange: range)
+            marked += 1
+        }
+        needsDisplay = true
+        return marked
     }
 
     /// 只读文本区自己就是命中视图（在屏实测：右键确实落到这里），

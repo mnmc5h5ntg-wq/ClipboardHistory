@@ -32,7 +32,11 @@ struct HistorySidebarView: View {
             if historyStore.filteredEntries.isEmpty {
                 EmptyStateView(
                     systemName: "clipboard",
-                    title: emptyTitle
+                    title: emptyTitle,
+                    // "无匹配结果"必须给下一步（审计 §4 U-5 的那句"说清发生了什么 + 说清下一步"）：
+                    // 用户搜不出东西时，最该出现的不是"这里空着"，而是"把搜索词清掉"。
+                    actionTitle: historyStore.searchText.isEmpty ? nil : "清除搜索",
+                    action: historyStore.searchText.isEmpty ? nil : { historyStore.perform(.updateSearch("")) }
                 )
                 .padding(.vertical, 40)
                 Spacer()

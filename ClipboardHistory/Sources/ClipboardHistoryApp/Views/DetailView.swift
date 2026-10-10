@@ -39,20 +39,28 @@ struct DetailView: View {
     }
 
     private func header(for entry: HistoryStore.Entry) -> some View {
-        HStack {
-            Spacer()
-            VStack(alignment: .center, spacing: 2) {
-                Text("\(ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp)) 复制")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                Text(entry.content.sizeDescription)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
+        // U-4：两行居中 meta → 一条左对齐，并且和正文**共用同一个可读列**。
+        // 居中元信息的问题不是"不好看"，是它把时间、大小这类次要信息抬到了和正文同一视觉层级，
+        // 而读者要先判断"这两行属于谁"；来源 App 以前干脆没在详情里露出（B-2 已经把它持久化了）。
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            Text(DetailTypography.metaText(
+                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+                size: entry.content.sizeDescription,
+                sourceAppName: entry.sourceAppName
+            ))
+            .font(.system(size: DetailTypography.metaFontSize))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            // 左缘对齐靠的是"同一个列宽 + 同一个 gutter"，不是靠肉眼调 padding。
+            // `columnWidth` 里的 gutter 与正文 `textContainerInset` 是同一个常数（见 DetailTypography）。
+            .padding(.horizontal, DetailTypography.containerGutter)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: DetailTypography.columnWidth())
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .background(.ultraThinMaterial)
     }
 
@@ -60,7 +68,16 @@ struct DetailView: View {
     private func preview(for entry: HistoryStore.Entry) -> some View {
         switch entry.content {
         case .text(let text):
-            ChineseSelectableTextView(text: text, font: .monospacedSystemFont(ofSize: 14, weight: .regular))
+            // 正文限一个可读列（U-4）：以前它无限宽，700pt 的详情区一行能排 100+ 字符，
+            // 而且带一条横向滚动条 —— 读长文本要来回扫视和横向滚动。
+            // 列宽由字体推进推出来（68ch），字号一改列宽自己跟着改。
+            ChineseSelectableTextView(
+                text: text,
+                font: DetailTypography.bodyFont,
+                highlightQuery: historyStore.searchText
+            )
+            .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
         case .image(let stored):
             ImagePreviewView(nsImage: stored.nsImage)
         case .file(let url):

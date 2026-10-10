@@ -15,9 +15,14 @@ struct MenuBarRecommendationsView: View {
                 // 旧实现在没有推荐时整段静默消失，用户分不清"算过了没结果"和"这块坏了"
                 // （审计第二轮 R2-09 / 1.8）。而"还在算"也不能说成"没有"：菜单是同步画的，
                 // 刷新是异步的，所以这里跟着 `isRefreshingPredictions` 分两种说法。
-                Text(historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                //
+                // 字号与图标现在取自 `StatePresentation`（审计 §4 U-5）：以前这句是 11pt、
+                // 横幅是 `.callout`、空态是 13pt，同一件"没有东西可看"在三个地方三种大小。
+                // 加载态刻意不画转圈 —— 菜单是同步渲染的，一个不动的循环箭头加一句"正在整理"
+                // 比一个真转的指示器更诚实，也不会让人以为点了能取消。
+                let kind: StatePresentation.Kind = historyStore.isRefreshingPredictions ? .loading : .empty
+                StateLine(kind: kind,
+                          message: historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
             } else {
                 Divider()
 
