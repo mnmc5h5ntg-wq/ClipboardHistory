@@ -523,3 +523,56 @@ name: decisions
 - 已知遗留（进 `AGENT_BACKLOG.md`）：① 屏幕上"真弹出来的样子"无法在仓库里自动断言（模态），
   只能手工核对，清单在 `docs/MANUAL_TEST_v1.4.8_issue13.md`；② 将来若新增可编辑文本控件，
   必须走 `ChineseMenuTextField`，否则拦截器不认领，那份右键菜单又会是系统的。
+
+## D-033 第三轮审计整改：列表换成 `List(selection:)`（用户指定修法③）+ D-2…D-8
+
+- 输入：`/Users/wangziyi/Documents/时间剪史_审计_2026-10-10_第三轮/00-第三轮审计与改进方向.md`，本轮 8 条新缺陷 D-1…D-8。
+  用户点名两处做法：**D-1 用文档里的第三种修法**；**D-3 给「通用」补上真正属于它的两项**（不选"合并进数据"那条）。
+- **D-1（S2）换 `List(selection:)`，是对 R2-02/D-028 那条"不要整体换成 List"决定的推翻**。
+  推翻的理由写清，否则下一个读账本的人会以为我在反复：当初三条理由里 ——
+  ① `.draggable` 要 macOS 13：现在仍然不用它，拖出走 `onDrag` + 把手；
+  ② 系统 chrome 会改掉 `sidebar-*` 帧：接受，帧已重基线（`sidebar-history-dark` 与审计帧差 72.87%）；
+  ③ 会丢 `dragSelectRange` 锚点语义：拖选仍然是我们自己的手势，store 动作一个没删。
+  收益就是审计说的那四件事一起解决：单击选中、shift/⌘ 多选、方向键与滚动跟随、VoiceOver 的 selected 语义
+  全部交回系统，`SidebarKeyboardNavigation`（方向键落点纯函数）与 `onMoveCommand` / `ScrollViewReader` 一起删除。
+- **拖出与拖选的分工**写在 `EntryDragGate.prepareForDrag(origin:content:)`：只有 `.handle`（行首缩略图/图标）
+  且条目有载荷才开拖出会话；`.rowBody` 永远判 false —— 那正是缺陷的形状（整行挂 `onDrag` ⇒ 系统在每个阈值处
+  先开会话，拖选整片失效）。行体不再自带"选中用的 Button"，选中只剩系统一套语言。
+- **一条被实测出来的测量限制（重要）**：换成 `List` 之后**合成鼠标事件驱动不了表格**
+  （`NSApp.sendEvent` 与 `window.sendEvent` 两条都试过；`table.clickedRow` 恒为 -1，
+  伴随 `isKeyWindow=false isActive=false` —— xctest 进程拿不到激活）。
+  后果：D-1 的三条行为判据（点选 / 双击复制 / 拖选扩选）与孤立行的星标点击**都不再能自动化**。
+  处理是拆开而不是假装：结构判据进常规套件（真 `NSTableView`、`allowsMultipleSelection`、行数=可见条目数、
+  把手是唯一拖出入口、双击与星标的接线守卫），行为判据进手工清单第 1/2 节。
+  原 `testRowGesturesFireTheRightActions` 删除 —— 它测的是"孤立一行 + 行内 Button"，那个东西按修法③已不存在；
+  判据的去处写在探针文件原位置的一段注释里，不留"看起来还在测"的空壳。
+- **D-2**：`contentTypeTag` 从"看前台 App 的 bundle id"改成"看条目自身类型"（常用链接/常用文本/常用文件/常用多文件）。
+  这里有一条**旧用例钉的就是缺陷**（`testContentTypeTagsPerFrontmostApp` 断言 Safari⇒偏好链接）：
+  按事实把它**翻转**成"同一份条目，前台怎么变标签都不许变"，而不是删掉。
+- **D-3**：「通用」补两项，取审计 §5 点名的 F1/F4 —— 暂停记录、识别截图文字（OCR）。
+  两个开关落 `UserDefaults`（用户偏好，不是历史数据，守 D-002 的数据目录边界）；
+  OCR 的键写成 `ocrSearchDisabled` **取反**，因为 `bool(forKey:)` 对没写过的键返回 false，
+  正向键会让"从没进过设置页的用户"默认关掉 OCR —— 那是悄悄改行为。
+  判据抽成 `RecordingGate`：暂停只挡后台自动采集，**用户点名拖入的文件照常入库**，
+  且 changeCount 照常推进（恢复瞬间不会补记暂停期间的旧内容）。
+  开关刻意**每次决策时读** UserDefaults 而不是缓存成 `@Published`：跨窗口双向同步的坑不值得为省一次读换进来。
+- **D-4**：`addDroppedFiles` 现在读 `ignoredCount` 并发 `droppedFilesNotice`，`ContentView` 用既有 `NoticeBanner` 呈现。
+  以前这个数算出来没人读 ⇒ 用户看到落点框闪一下就什么都没发生。
+- **D-5**：给 D-016"只加可选字段不升版"补上**新→旧→新往返用例**（真实写入器产出的 `history.json`
+  交给一份按"加字段之前"形状定义的解码器，必须解得动、条目不缩水），并把边界写进 `migrate` 注释：
+  改语义/删字段必须升 v2。
+- **D-6**：降采样之后在同一后台路径里算出**新尺寸**的 PNG 字节再交给 `StoredImage`，
+  首次编码不再掉到保存快照（`@MainActor`）或用户按住鼠标拖出的那一瞬间。
+- **D-7**：CI 增加一个 `continue-on-error: true` 的步骤，真的跑 `UIInteractionProbeTests|UICaptureTests`
+  并打印执行数与帧数（帧数 <60 或执行数 0 判这一步红）。先报告型不转硬门：无头 runner 上在屏窗口稳定性未证。
+- **D-8**：设置侧栏 `sparkles`（实心）→ `wand.and.stars`（描线），与同列四项统一；配一条守卫禁止这组里再出现实心符号。
+  **注意**：D-025 已证明"图标看不见"是离屏语义色伪影，这条只是设计一致性，不是对比度问题。
+- 验证：`swift build` 0 告警 · `swift test` **355 例 / 10 skip / 0 失败** · 68 帧同代码连拍两次 sha 相同 ·
+  变异对照 5 组（暂停开关恒真 / 拖入不提反馈 / 把手分工放宽 / 符号改回实心 / 标签回去看前台 App）逐一点亮，
+  其中"拖入不提反馈"第一次因正则没命中而**变异没落地**，改用 python 断言锚点命中后重跑才拿到红。
+- **帧里新出现的伪影要记账**：`sidebar-*`/`row-*` 帧里被选中的行画成一整块黑（文字不可见、缩略图还在），
+  黑块精确跟随选中集合（三行选中⇒三块黑）⇒ 判定为 `List` 选中高亮在离屏 `cacheDisplay` 下的语义色伪影，
+  与 D-025 同源，**不据此判产品**；真机看手工清单第 1 节即可确认。
+- 兼容性与回滚：无存档格式变化（D-5 明确不升版）、无新依赖；`HistoryStore.add` 新增的是**带默认值的参数**；
+  `SidebarKeyboardNavigation` 的删除是唯一被移除的旧符号（只有视图与它的用例用过）。
+  回滚 = `git revert` 本轮提交；两个 UserDefaults 键即使留着，旧版也不读，不影响回退。
