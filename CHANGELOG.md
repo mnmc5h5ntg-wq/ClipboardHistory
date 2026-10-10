@@ -49,6 +49,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- CI 的两个报告型步骤（帧捕获 / 在屏探针）现在**必然打印数字**：抽取汇总行的 `grep` 自己失手时也会
+  在 `bash -e` + `pipefail` 下中止脚本，而 runner 的 XCTest 打的是单数 `Executed 1 test`，
+  于是那两步第三轮又退回"红了但没有数字"（见账本 D-037）。修法是抽取行全部兜底 + 正则允许单数，
+  并新增 `scripts/tests/test_ci_report_selftest.py` 把这两个步骤的脚本原文抽出来、喂三种日志形状验证
+  （它随 CI 的 `unittest discover` 真的执行，变异对照已点亮）。
 - CI 新增一个报告型步骤，真的执行在屏交互探针与帧捕获并打印执行数/帧数（D-7，`continue-on-error` 起步）。
 - 视觉基线重拍：`sidebar-*`/`row-*` 帧因系统列表 chrome 发生变化；离屏帧里 `List` 的选中高亮会画成整块黑
   （语义色伪影，跟随选中集合），不作为产品判据。

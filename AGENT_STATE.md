@@ -270,3 +270,10 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
    与本地 `git rev-list -n1 <tag>` 一致；两个 Release 附件的 `digest` 与本地 `时间剪史_v1.4.x.dmg.sha256` 逐字相同。
    **注意 `git ls-remote` 走 22 端口、`gh` 走 443 API：同一时刻前者可能失败而后者成功**，别因为一条失败就判定"没推上去"。
    另外用户从新路径确认过项目能打开之后，旧路径的兼容符号链接 `~/Documents/Codex_Project0` 可以直接删除。
+
+- **D-037（同一夜，CI 侧）**：报告型步骤第三次"红了但没有数字"，根因换到了汇报行自己身上
+  （runner 的 XCTest 打单数 `Executed 1 test`，抽取用的 `grep 'Executed [0-9]+ tests'` 失手 ⇒ 非零 ⇒
+  `bash -e`+`pipefail` 中止 ⇒ 结论行没打、"没跑完"分支永远走不到）。修法：抽取行全部 `|| true` + 正则允许单数；
+  新增 `scripts/tests/test_ci_report_selftest.py`（抽 ci.yml 原文、喂三种日志形状，随 CI discovery 真执行，
+  变异对照已点亮）。附带一条自检教训：测"看门狗挂死"时自己的夹具**不能用管道读子进程输出** ——
+  孤儿 `sleep` 持有继承的 stdout，`communicate()` 等不到 EOF，实测把自己吊死在超时上；改写文件 + 独立会话按 pgid 收。

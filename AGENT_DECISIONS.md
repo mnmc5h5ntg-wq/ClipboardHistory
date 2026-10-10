@@ -684,3 +684,28 @@ name: decisions
   变异对照：把行上手势改回 `.onTapGesture(count: 2)` ⇒ 该文件 3 条红，还原后 `cmp` 逐字节相同 ·
   离屏帧改前改后**0/70 有变化**（这次改的是手势仲裁，不动像素，帧基线无需重录）。
 - 兼容性与回滚：无 API、无存档变化，纯视图层手势修饰符。回滚 = `git revert` 本次提交。
+
+## D-037 CI 报告型步骤：汇报行自己的 grep 也能中止脚本（同族第三次）
+
+- 现象：CI 两个"报告型"步骤（离屏帧 / 在屏探针）在 run 38062956819 里**又是红了但没有数字**。
+  日志尾部只有 `##[error]Process completed with exit code 1.`，`captured frames:` 与 `ui suite exit:`
+  两行根本没打出来。
+- 根因不在被测命令，那层早就 `|| true` 了。坏在**汇报行自己的抽取命令**：
+  - 离屏步骤里 runner 的 XCTest 只打了 `Executed 1 test,`（**单数**，因为只有 1 个用例被 filter 命中），
+    而抽取用的是 `grep -oE 'Executed [0-9]+ tests'` ⇒ 匹配失败返回 1，`set -o pipefail` 把非零传给
+    赋值语句，`bash -e` 当场中止。
+  - 在屏步骤同理：看门狗收掉进程后日志被截断、根本没有汇总行 ⇒ 抽取非零 ⇒ 中止 ⇒
+    我为"没跑完"写的那条分支**永远走不到**，而那条分支就是这段脚本存在的理由。
+- 修法：抽取行全部 `|| true`，正则改成 `tests?`（以及 `tests? skipped`）。
+- **同族第三次**（前两次：run 38050990090 的 `pipefail + tee`、run 38051846033 的 `wait "$pid"; status=$?`）。
+  归纳出的规矩：**在 `bash -e` 里，"允许失败"的步骤中每一处可能非零的命令都必须自带兜底，
+  包括那些只为拼一行日志而存在的 grep/awk** —— 汇报行不是日志，它就是这一步的全部产出。
+- 判据：新增 `scripts/tests/test_ci_report_selftest.py`，它把 ci.yml 里这两个步骤的 run 脚本**原文**抽出来，
+  只把被测命令换成夹具，喂三种形状（单数汇总 / 截断日志 / 正常复数）断言结论行必然打印、退出码符合预期。
+  文件名按 `scripts/tests` 的 `test_*.py` 约定，所以 CI 的 `unittest discover` 会真的执行它（31 例）。
+- 变异对照（本地实测）：把两处抽取改回旧写法 ⇒ `AssertionError: offscreen/singular_summary: 结论行缺失`、
+  `Ran 31 tests ... FAILED (failures=1)`、退出码 1；还原后 `cmp` 逐字节相同、`Ran 31 tests / OK`。
+  另有一条**自证**：这个自检第一版自己被吊死在超时上 —— 看门狗的 `sleep 240` 变成孤儿后仍持有继承的
+  stdout 管道，`communicate()` 等不到 EOF；改成"输出写文件 + 独立会话按 pgid 收组"才通。
+  教训：**测别人的挂死时，自己的夹具不能靠管道读输出**（真实 runner 不挂是因为它一直在读管道）。
+- 兼容性与回滚：只动工作流与新增测试脚本，不碰产品码。回滚 = `git revert`。

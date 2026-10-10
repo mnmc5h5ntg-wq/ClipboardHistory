@@ -358,3 +358,10 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 （"不要换成 onTapGesture(count:2)，会让每次点选慢半拍"），我改的时候没查，等于账本白记。
 当前判据：`swift build` 0 告警 · `swift test` **362 例 / 10 skip / 0 失败** ·
 70 帧逐帧不变 · 变异对照累计 8 组（D-034 三 + D-035 四 + D-036 一）。
+
+**进度快照 19（2026-10-10 深夜：D-037，报告型 CI 步骤第三次"红了但没有数字"）**：这次坏在汇报行自己
+—— 抽取 `Executed N tests` 的 grep 在 runner 上匹配不到**单数** `Executed 1 test`，非零 + `pipefail` +
+`bash -e` 让脚本在 echo 之前中止。同族第三次（前两次是 tee 与 wait），已归纳成规矩并落成守卫：
+新脚本把两个步骤的 run 正文原文抽出来喂三种日志形状，随 CI 的 unittest discovery 真执行。
+当前判据：`python3 -m unittest discover -s scripts/tests` **31 例 / OK** · 变异 1 组点亮（还原 `cmp` 相同）·
+Swift 侧不变：362 例 / 10 skip / 0 失败。

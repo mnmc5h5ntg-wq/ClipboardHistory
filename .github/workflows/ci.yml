@@ -72,7 +72,11 @@ jobs:
           CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
             swift test --filter UICaptureTests 2>&1 | tee /tmp/frames.log || true
           frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
-          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/frames.log | tail -1 | grep -oE '[0-9]+')
+          # 每一条抽取都必须自己吞掉非零：`bash -e` + `set -o pipefail` 下，
+          # **汇报行自己的 grep 失手**也会中止脚本（实测 run 38062956819：runner 上 XCTest 只打了
+          # "Executed 1 test"，单数，于是匹配 'tests' 的 grep 返回 1，captured frames 那行根本没打出来，
+          # 这一步又退回"红了但没有数字"）。被测命令的 || true 挡不住这一层。
+          executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/frames.log | tail -1 | grep -oE '[0-9]+' || true)
           undrawn=$(grep -c '未被绘制，判定为捕获失效' /tmp/frames.log || true)
           echo "captured frames: ${frames:-0}  executed: ${executed:-0}  捕获失效帧: ${undrawn:-0}"
           # 实测（run 38050990090）：macos-15 的 runner 上 `content-wide-1100x800` 亮暗两帧
@@ -100,8 +104,10 @@ jobs:
           # （实测 run 38051846033 就是这个形状：看门狗正常收掉了进程，日志里却没有结论行）。
           wait "$pid" && status=0 || status=$?
           kill "$killer" 2>/dev/null
-          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/ui.log | tail -1 | grep -oE '[0-9]+')
-          skipped=$(grep -oE 'with [0-9]+ tests skipped' /tmp/ui.log | tail -1 | grep -oE '[0-9]+')
+          # 同上：抽取行必须自己 `|| true`，否则"没跑完"这条分支永远走不到（脚本在这行就中止了），
+          # 而那恰好是这段代码存在的理由。单数 "Executed 1 test" 也要能匹配。
+          executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/ui.log | tail -1 | grep -oE '[0-9]+' || true)
+          skipped=$(grep -oE 'with [0-9]+ tests? skipped' /tmp/ui.log | tail -1 | grep -oE '[0-9]+' || true)
           done_count=$(grep -cE "Test Case .*(passed|failed|skipped)" /tmp/ui.log || true)
           echo "ui suite exit: $status  executed: ${executed:-0}  skipped: ${skipped:-?}  已下结论的用例: $done_count"
           if [ -z "$executed" ]; then
