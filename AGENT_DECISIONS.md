@@ -651,3 +651,30 @@ name: decisions
 - 兼容性与回滚：无存档格式变化（`thumbnailFileName` 早就存在，只是以前对这类条目是空的）；
   新增的都是 internal 类型与方法。回滚 = `git revert` 本次提交，已补的缩略图留在磁盘上但不再显示，
   不影响读取。
+
+## D-036 点选延迟一个双击间隔：为了过离屏探针改了产品行为（用户真机反馈）
+
+- 现象（用户原话）："现在点击列表条目到显示为已选择有可感知的延迟，这是bug吗"。是 bug，而且是我这条会话里改出来的。
+- 引入点：D-1 把行从 `Button` 换成 `HistoryRowButton`（行里没有兄弟手势了）之后，离屏交互探针测到
+  `simultaneousGesture(TapGesture(count: 2))` 在**孤立宿主**里收不到第二击（`copyFired=0`），
+  而 `.onTapGesture(count: 2)` 会。我于是把手势换成 `onTapGesture(count: 2)`，并在注释里写
+  "单击选中仍然立刻生效 —— 那是 NSTableView 在 mouseDown 里做的，不与这个手势竞争"。
+- 根因：那句注释是**假设，不是测量**。`count: 2` 的 tap 识别器要等一个双击间隔才能确定"这只是一次单击"，
+  而换 `List(selection:)` 之后行的选中正是经由这一套行内点击识别下发的，于是高亮整体推迟了一个双击间隔。
+  `simultaneousGesture` 不参与"谁赢"的仲裁，所以它没有这个副作用（D-028 当年在真实侧栏容器里验过这个形状）。
+- **真正的错误在方法论**：夹具不代表真实容器，我却拿产品行为去迁就它。
+  离屏探针的宿主是临时挂上去的行视图，不在 `List` 的层级里，它的"收不到第二击"是夹具属性；
+  正确的处置是**把这条判据标记为测不到、转人工**（和拖选探针同一处置，见 D-034），
+  而不是改手势让假绿变绿。规矩：**任何"为了让某条自动化判据点亮而改产品交互"的动作，
+  先问这个夹具代不代表真实容器；不代表就只能改判据，不能改产品。**
+- 修法：行上的双击改回 `.simultaneousGesture(TapGesture(count: 2).onEnded { ... })`，
+  例外名单（shift/⌘ 双击不写剪贴板）与 `copyAction()` 接线不变。
+- 判据（这次钉"写法"，效果转人工）：`testRowGesturesAreStillWiredToTheirActions` 现在要求
+  源里出现 `TapGesture(count: 2).onEnded` 与 `.simultaneousGesture(`，并新增一条**反向守卫**
+  —— `.onTapGesture(count: 2)` 不许再出现在行上（出现即红，红由这条延迟回归本身引起，不是加载报错）。
+  双击复制与点选无延迟这两条**效果**只能真机看，写进手工清单 §1 的 1.1 / 1.5 并具名。
+- 验证：`swift build --build-tests` 0 告警 · `swift test` **362 例 / 10 skip / 0 失败** ·
+  `SidebarListSelectionTests` 单跑 11 例全绿 ·
+  变异对照：把行上手势改回 `.onTapGesture(count: 2)` ⇒ 该文件 3 条红，还原后 `cmp` 逐字节相同 ·
+  离屏帧改前改后**0/70 有变化**（这次改的是手势仲裁，不动像素，帧基线无需重录）。
+- 兼容性与回滚：无 API、无存档变化，纯视图层手势修饰符。回滚 = `git revert` 本次提交。
