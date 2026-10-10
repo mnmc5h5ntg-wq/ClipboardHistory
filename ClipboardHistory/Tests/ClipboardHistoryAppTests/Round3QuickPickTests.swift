@@ -185,6 +185,16 @@ final class Round3QuickPickTests: XCTestCase {
                       "空预览也要有个说法，不能画一行只有时间的东西")
     }
 
+    /// 浮层在快捷键回调链上：那里一次崩溃的表现是"按下 ⌃⌥⇧V 应用直接没了"，
+    /// 所以这条 UI 路径里不许有力解包。判的是源码形状 —— 它防的是回归，不是新功能。
+    func testPanelPathHasNoForceUnwraps() throws {
+        let source = codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
+        XCTAssertFalse(source.contains("contentView!"),
+                       "面板构建里力解包 contentView：一次布局时序变化就会让应用在快捷键上崩掉")
+        XCTAssertTrue(source.contains("guard let content = panel.contentView"),
+                      "安静不显示的那条回退路径不见了")
+    }
+
     // MARK: - 接线守卫
 
     func testHotKeyAndMenuAreWired() throws {
