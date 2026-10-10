@@ -55,6 +55,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   它靠新的 `CLIPBOARD_HISTORY_DATA_DIR` 环境变量把存档与日志都关在临时目录里，
   不会读写用户自己的历史存档。CI 里以报告型步骤运行；判定逻辑本身有硬门自测。
 
+- **帧基线进 CI**（第三轮审计 §3 C-2）：`docs/frame_baseline.json` 保存每张离屏帧的 sha256，
+  `scripts/frame_baseline.py` 分开报「变了 / 少了 / 多了」三类差异；CI 里"少帧"是硬门、"变帧"是报告型步骤。
+  以前 CI 只回答"今天拍得出帧吗"，现在能回答"哪几帧和上一版不一样"。
+
 ### Fixed
 
 - **点选列表条目后有可感知的延迟**（用户真机反馈，见账本 D-036）：行上的双击手势一度改成

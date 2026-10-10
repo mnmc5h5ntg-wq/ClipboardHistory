@@ -431,3 +431,58 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 判据（现取）：`swift build --build-tests` 0 告警 · `swift test` **362 例 / 10 skip / 0 失败** ·
 `SidebarListSelectionTests` 11 例 · 变异 1 组（换回 `onTapGesture` ⇒ 3 红，还原 `cmp` 逐字节相同）·
 离屏帧 **0/70 有变化**。
+
+## 16. 第三轮 15 条改进建议全部落地（2026-10-11 凌晨，D-038…D-043）
+
+目标来自用户那句话：**"根据第三轮审计文档的代码审计/UI/功能各自的五项建议进行更新。自主做，
+不要让我进行确认。不能停留在建议阶段。"** 下面这张表是账面结果，每一行都能指到代码、判据与帧。
+
+| 建议 | 做了什么 | 判据在哪 | 账本 |
+| --- | --- | --- | --- |
+| C-1 管线级验收 | `AGENTS.md` 写死"验收要从产品入口进"，纯函数文件必须自写边界 | `PipelineAcceptanceTests` + 三个文件头上的 `不覆盖管线：` | D-038 |
+| C-2 帧基线进 CI | `scripts/frame_baseline.py`（只存 sha256）+ 硬门"少帧" + 报告型"变帧" | `scripts/tests/test_frame_baseline.py` 7 例，含变异对照 | D-043 |
+| C-3 存档策略成文 | 老存档缺键读默认值 + 只加可选字段不升版 | `testOldArchiveWithoutNewFieldsLoadsWithDefaults`（真存档删键） | D-038 |
+| C-4 运行时启动冒烟 | `CLIPBOARD_HISTORY_DATA_DIR` 隔离 + 真启一次看生命周期日志 | `Round3LaunchIsolationTests` 3 例 + 自测 8 例 | D-042 |
+| C-5 Store 只减不加 | 单调指标守卫（最长方法 / 总行数），逻辑外迁成四个纯模块 | `testHistoryStoreStaysThin`（+27 行的变异把它点亮） | D-038 |
+| U-1 菜单栏原生语言 | 推荐理由左对齐、把握词替代百分数 | `MenuBarRecommendationsView` 结构判据 | D-038 |
+| U-2 拖拽反馈 | 多文件条目现在真能拖出（路径数组表示），解码核对 | `testMultipleFileEntriesCarryEveryPath` | D-040 |
+| U-3 通用页再补一项 | 暂停记录 + OCR 开关进「通用」 | `testSettingsPanesExposeTheNewControls` | D-038 |
+| U-4 详情排版 | 68ch 可读列（由字体推进推出来）、meta 单行左对齐、搜索命中高亮 | `Round3DetailTypographyTests` 18 例 + 帧 | D-039 |
+| U-5 状态语言统一 | `StatePresentation` + `StateLine` 组件统一三处；空态给「清除搜索」 | `Round3StateLanguageTests` 7 例 + 帧 | D-039 |
+| F-1 按 App 排除 | 默认挡密码管理器/钥匙串 + 用户名单 + 优先级判据 | `testExcludedAppCopyIsNotRecordedThroughStore`（走 Store） | D-038 |
+| F-2 富文本保真 | RTF/HTML 采集→存档→写回，默认关，超限整份丢 | `Round3RichTextTests` 9 例（含命名剪贴板往返） | D-040 |
+| F-3 快速选择浮层 | ⌃⌥⇧V 浮层：打字即筛、↑↓、回车粘回原应用、Esc 不动 | `Round3QuickPickTests` 11 例 + 5 条变异 | D-041 |
+| F-4 OCR 只索引不落盘 | 识别文本可只在内存，搜索仍命中 | 真值表 + Store 侧写回分支判据 | D-038 |
+| F-5 固定与导出导入 | 置顶/豁免清理/行内徽标/批量与单条入口/JSON 导出（图片跳过并计数） | `Round3FeatureTests` 12 例 | D-038 |
+
+**三处刻意偏离审计，都写明了理由，不是漏掉**：
+
+1. **F-3 的默认组合键不是 ⌘⇧V**（D-041）。⌘⇧V 在 Chrome/VS Code/Slack 里是"粘贴并匹配样式"，
+   全局注册等于拿别人的功能换一个新功能。改用与本产品同族的 ⌃⌥⇧V，用户可自行录制。
+   这一条有变异对照：把默认值改成 ⌘⇧V 会精确点亮"默认组合键漂了"。
+2. **F-3 的形状换了，因为 spike 否掉了原前提**（D-041）。审计 §7 明令先 spike"非激活面板能不能接键盘"，
+   做了：裸二进制里 `NSApp.activate` 是空操作，激活前后 `isKeyWindow` 都是 false ——
+   **两个变体读数相同意味着 spike 没有判别力**，而不是"答案是否"。
+   打包成最小 .app 再用 `open` 启动被 `-10825` 拒绝（`lsregister -f` 之后仍然）。
+   于是没有赌，改成复用产品里已经跑着、用户今天能立刻打字的那条激活路径。
+3. **U-2 没有做自定义 drag image 卡片**（D-040）。系统跟手的剪影就是那一行本身（含预览与缩略图），
+   "知道会带走什么"已经被满足；换成自定义图要自起 `NSDraggingSession`，
+   而那正是 D-034 被真机否掉的形状。做掉的是真缺的能力：多文件拖出。
+
+另外 U-5 里"macOS 12/13 焦点环改自绘细环"这一半也没做（D-039）：关掉系统环需要
+"哪一行有键盘焦点"的信号，`List(selection:)` 不给；在没有替代环之前先删掉唯一的焦点指示，
+等于在最老的两个系统版本上把键盘用户丢掉。留成 ready-for-human，需要 12/13 真机。
+
+**判据总量（现取）**：`swift build --build-tests` 0 告警 · `swift test` **430 例 / 10 skip / 0 失败** ·
+`python3 -m unittest discover -s scripts/tests` **50 例 OK**（CI 下限从 17 提到 48） ·
+`make bundle` 0 告警 · 78 张帧两次捕获逐帧同 sha · 帧基线 `docs/frame_baseline.json` 已入库（78 条）。
+本阶段共 **19 条新守卫做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
+或替换文本不完整导致编译错误），加强后才真正点亮。
+
+**仍然没闭合的，列清楚**：
+
+- 需要真机手点的：导出/导入面板、OCR 只索引的端到端、富文本往返、多文件拖出、浮层按键手感
+  （`docs/MANUAL_TEST_v1.4.9_round3.md` 批次 2–5 各节）。
+- `InstanceGuard` 对"直接 exec 包内二进制"的第二实例疑似漏判（本机实测：用户实例在跑时冒烟仍开出了窗口）。
+  我的操作失误是把冒烟跑在了开发机上，已改为本地只用假包，真启动交给 CI 的干净 runner。
+- 12/13 的整块蓝色焦点环仍在（见上）。
