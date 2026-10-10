@@ -16,9 +16,13 @@ from scripts.frame_baseline import (  # noqa: E402
     BASELINE_RELATIVE,
     collect,
     compare,
+    latest_released_baseline,
     load_baseline,
     main,
     manifest_path,
+    released_baselines,
+    snapshot,
+    version_key,
     write_baseline,
 )
 
@@ -106,6 +110,45 @@ class FrameBaselineTests(unittest.TestCase):
                              "d.png 不在名单里却缺席：这才是真回归，必须红")
             self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 1,
                              "没给名单时两张缺席都要红")
+
+    def test_version_ordering_is_numeric_not_lexicographic(self):
+        """v1.4.10 必须排在 v1.4.9 之后。
+
+        按字符串排会得到 `v1.4.9 > v1.4.10`，于是"上一版"会选错对象，
+        整条 diff 语义就悄悄反了 —— 而这正是这条守卫唯一的存在理由。
+        """
+        self.assertGreater(version_key("v1.4.10.json"), version_key("v1.4.9.json"))
+        self.assertGreater(version_key("v1.10.0.json"), version_key("v1.9.2.json"))
+        names = ["v1.4.8.json", "v1.4.10.json", "v1.9.0.json"]
+        self.assertEqual(sorted(names, key=version_key),
+                         ["v1.4.8.json", "v1.4.10.json", "v1.9.0.json"])
+
+    def test_snapshot_freezes_the_working_manifest_and_becomes_the_default_target(self):
+        """C-2 要的是"和**上一版**比"。只有一份可随时 update 的工作基线的话，
+        "上一版"其实等于"上一次有人记得 update 的时候"。所以发布时冻结一份逐版本快照，
+        而 `auto` 优先解析到最新的那一版。
+        """
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = os.path.join(root, "frames")
+            os.mkdir(frames_dir)
+            make_frame(frames_dir, "a.png", b"1")
+            main(["update", frames_dir, "--repo-root", root])
+            self.assertIsNone(latest_released_baseline(root), "还没发布过就不该有逐版本基线")
+
+            self.assertEqual(main(["snapshot", "--version", "1.4.8", "--repo-root", root]), 0)
+            self.assertEqual(main(["snapshot", "--version", "1.4.9", "--repo-root", root]), 0)
+            self.assertEqual(released_baselines(root), ["v1.4.8.json", "v1.4.9.json"])
+
+            # 改了内容：默认对最新一版比，仍然是"没变"；把版本顺序反过来就会红 —— 那条排序才是关键
+            self.assertEqual(main(["compare", frames_dir, "--repo-root", root]), 0)
+            make_frame(frames_dir, "a.png", b"2")
+            self.assertEqual(main(["compare", frames_dir, "--repo-root", root]), 1)
+
+    def test_snapshot_without_a_working_manifest_is_an_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.assertEqual(main(["snapshot", "--version", "9.9.9", "--repo-root", root]), 2)
+            self.assertEqual(main(["compare", "--repo-root", root]), 2,
+                             "缺 frames 目录参数要报用法错误，不是崩在 argparse 之外")
 
     def test_roundtrip_preserves_every_entry(self):
         with tempfile.TemporaryDirectory() as root:

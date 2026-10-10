@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import datetime as dt
 import hashlib
 import os
@@ -297,6 +298,7 @@ class ReleasePreparer:
         original_checksum_text = checksum_file.read_text(encoding="utf-8") if checksum_file.exists() else None
         had_release_dmg = release_dmg.exists()
         archived_dmg: Path | None = None
+        snapshot_path: str | None = None
 
         if self.dry_run:
             checksum = "DRY-RUN"
@@ -327,7 +329,15 @@ class ReleasePreparer:
 
             self._write_release_notes(release_notes, version, checksum)
             self._write_changelog(version, checksum)
+            snapshot_path = self._snapshot_frame_baseline(version)
         except Exception:
+            # 回滚也要覆盖这一步：留下一个「这次没发成功的版本」的帧基线，
+            # CI 的"和上一版比"会把半成品当基准，比缺这个文件更糟。
+            if snapshot_path is not None:
+                try:
+                    os.remove(snapshot_path)
+                except OSError:
+                    pass
             self._rollback_release_files(
                 release_dmg=release_dmg,
                 archived_dmg=archived_dmg,
@@ -352,6 +362,25 @@ class ReleasePreparer:
             None if self.skip_build else self.paths.app_info_plist,
         )
 
+    def _snapshot_frame_baseline(self, version: str) -> str | None:
+        """发布时把帧基线冻结成逐版本的一份（第三轮审计 §3 C-2）。
+
+        为什么挂在发布流程里而不是"想起来就跑一下"：只有一份可随时 `update` 的工作基线时，
+        "和上一版比"里的"上一版"实际是"上一次有人记得 update 的时候" —— 那不是版本，是习惯。
+
+        用 importlib 按文件路径加载：这个脚本既被 `python3 scripts/prepare_release.py` 直接执行，
+        也被测试当作 `scripts.prepare_release` 导入，两种入口下的包路径不一样。
+        """
+        sibling = Path(__file__).with_name("frame_baseline.py")
+        if not sibling.exists():
+            return None
+        spec = importlib.util.spec_from_file_location("frame_baseline_for_release", sibling)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.snapshot(str(self.paths.root), version)
+
     def planned_steps(self, raw_version: str) -> list[str]:
         version, tag = normalize_version(raw_version)
         steps = [
@@ -368,6 +397,7 @@ class ReleasePreparer:
             steps.append("运行 make dmg 构建 App 并生成 DMG")
             steps.append("验证 App 的 Info.plist 版本号")
             steps.append("反汇编包内二进制，确认没有给 AppDelegate 留 -init 桩（启动闸门）")
+        steps.append("把帧基线冻结成 docs/frame_baselines/v%s.json（下一版据此回答「哪些帧变了」）" % version)
         steps.extend(
             [
                 f"复制 DMG 到 releases/{APP_NAME}_v{version}.dmg",

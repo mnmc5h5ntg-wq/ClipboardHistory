@@ -24,10 +24,26 @@ import hashlib
 import json
 import os
 import sys
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 BASELINE_RELATIVE = os.path.join("docs", "frame_baseline.json")
+# 发布时冻结的**逐版本**基线放这里（§3 C-2 要的是"和上一版比"，
+# 只有一份可随时 update 的工作基线的话，"上一版"其实是"上一次有人记得 update 的时候"）。
+RELEASE_DIR_RELATIVE = os.path.join("docs", "frame_baselines")
 SCHEMA_VERSION = 1
+import re as _re
+
+_VERSION_IN_NAME = _re.compile(r"v(\d+)\.(\d+)(?:\.(\d+))?")
+
+
+def version_key(name: str):
+    """`v1.4.10` 必须排在 `v1.4.9` 之后 —— 按字符串排会得到相反的答案，
+    而这条错误会让"上一版"选错对象，整条 diff 的语义就没了。"""
+    match = _VERSION_IN_NAME.search(name)
+    if not match:
+        return (0, 0, 0, name)
+    parts = [int(x) if x else 0 for x in match.groups()]
+    return (parts[0], parts[1], parts[2], name)
 
 
 def manifest_path(repo_root: str) -> str:
@@ -86,28 +102,98 @@ def write_baseline(path: str, frames: Dict[str, str]) -> None:
         handle.write("\n")
 
 
+def release_dir(repo_root: str) -> str:
+    return os.path.join(repo_root, RELEASE_DIR_RELATIVE)
+
+
+def released_baselines(repo_root: str) -> List[str]:
+    """按版本号排序的逐版本基线文件名（旧 → 新）。"""
+    directory = release_dir(repo_root)
+    if not os.path.isdir(directory):
+        return []
+    return sorted((n for n in os.listdir(directory) if n.endswith(".json")), key=version_key)
+
+
+def latest_released_baseline(repo_root: str) -> Optional[str]:
+    names = released_baselines(repo_root)
+    return os.path.join(repo_root, RELEASE_DIR_RELATIVE, names[-1]) if names else None
+
+
+def snapshot(repo_root: str, version: str) -> Optional[str]:
+    """把当前工作基线冻结成 `docs/frame_baselines/vX.Y.Z.json`。
+
+    发布脚本调它（不重拍帧）：冻结的是"这次发出去的包对应的界面"，
+    而那份帧在发布前就该由 `update` 确认过是最新的。
+    """
+    source = manifest_path(repo_root)
+    if not os.path.exists(source):
+        return None
+    frames = load_baseline(source)
+    target = os.path.join(release_dir(repo_root), "%s.json" % ("v%s" % version.lstrip("v")))
+    write_baseline(target, frames)
+    return target
+
+
+def resolve_baseline_path(repo_root: str, against: str = "auto") -> Tuple[str, str]:
+    """返回 (路径, 说明)。`auto` = 有逐版本基线就用最新的那一版，否则退回工作基线。"""
+    if against == "working":
+        return manifest_path(repo_root), "working"
+    latest = latest_released_baseline(repo_root)
+    if against == "latest-release":
+        if not latest:
+            raise ValueError("还没有任何逐版本基线（跑一次 snapshot 才有）")
+        return latest, os.path.basename(latest)[:-5]
+    if latest:
+        return latest, os.path.basename(latest)[:-5]
+    return manifest_path(repo_root), "working"
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="离屏帧基线的比对与更新")
-    parser.add_argument("action", choices=["compare", "update", "check"])
-    parser.add_argument("frames_dir")
+    parser.add_argument("action", choices=["compare", "update", "check", "snapshot"])
+    parser.add_argument("frames_dir", nargs="?", default=None,
+                        help="compare / check / update 必需；snapshot 只冻结已有的工作基线")
+    parser.add_argument("--version", default=None, help="snapshot 用：要冻结成哪个版本（如 1.4.8）")
     parser.add_argument("--allow-missing", action="append", default=[],
                         help="允许缺席的帧名（可重复）。无头 runner 上有几帧注定拍不出来 —— "
                              "「捕获失效闸门」拒绝把 95%% 空白的帧当证据写盘，那是诚实的行为。"
                              "把它们列在这里，剩下的缺席才是真回归。")
     parser.add_argument("--repo-root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    parser.add_argument("--against", default="auto", choices=["auto", "working", "latest-release"],
+                        help="比对对象：默认 auto，即有逐版本基线就和最新一版比，否则和工作基线比")
     args = parser.parse_args(argv)
 
-    path = manifest_path(args.repo_root)
-    if not os.path.isdir(args.frames_dir):
+    if args.action != "snapshot":
+        if not args.frames_dir:
+            print("FRAME_BASELINE_ERROR=%s 需要 frames 目录参数" % args.action)
+            return 2
+    if args.frames_dir is not None and not os.path.isdir(args.frames_dir):
         print("FRAME_BASELINE_ERROR=frames 目录不存在：%s" % args.frames_dir)
         return 2
 
+    if args.action == "snapshot":
+        if not args.version:
+            print("FRAME_BASELINE_ERROR=snapshot 需要版本号")
+            return 2
+        target = snapshot(args.repo_root, args.version)
+        if not target:
+            print("FRAME_BASELINE_ERROR=还没有工作基线可冻结（先跑 update）")
+            return 2
+        print("FRAME_BASELINE_SNAPSHOT=%s" % target)
+        return 0
+
     if args.action == "update":
         frames = collect(args.frames_dir)
-        write_baseline(path, frames)
+        # 工作基线永远写在 docs/frame_baseline.json：逐版本的那份是它的快照，不是替代品。
+        write_baseline(manifest_path(args.repo_root), frames)
         print("FRAME_BASELINE_UPDATED=%d" % len(frames))
         return 0
 
+    try:
+        path, against_label = resolve_baseline_path(args.repo_root, args.against)
+    except ValueError as error:
+        print("FRAME_BASELINE_ERROR=%s" % error)
+        return 2
     if not os.path.exists(path):
         print("FRAME_BASELINE_ERROR=基线不存在：%s（先跑 update）" % path)
         return 2
@@ -123,6 +209,7 @@ def main(argv=None) -> int:
     # 先扣掉许可名单，再谈"少帧"：否则这条硬门只是把 runner 的物理限制每天复述一遍。
     allowed = [name for name in missing if name in set(args.allow_missing)]
     missing = [name for name in missing if name not in set(args.allow_missing)]
+    print("FRAME_BASELINE_AGAINST=%s" % against_label)
     print("FRAME_BASELINE_COMPARED=%d" % len(current))
     if allowed:
         print("FRAME_BASELINE_ALLOW_MISSING=%d  %s" % (len(allowed), ", ".join(allowed)))

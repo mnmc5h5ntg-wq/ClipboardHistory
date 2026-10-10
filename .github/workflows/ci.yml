@@ -134,11 +134,11 @@ jobs:
       - name: Info.plist gate
         run: scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist /tmp/Info.plist 0.0.0-ci
 
-      # 第三轮审计 C-2：CI 会拍帧，但只回答"今天拍得出来吗"，不回答"和上一版比哪些帧变了"。
-      # 基线是仓库里的 docs/frame_baseline.json（只存 sha256，不存图片）。
-      # **少帧是硬门**（夹具不再被执行 = 回归）；**变帧是报告型**（新功能本来就会改像素，
-      # 硬门只会让人学会无视红色）。改了界面要在同一个 commit 里跑 `scripts/frame_baseline.py update`。
-      - name: "Frame baseline vs previous version (missing-frame gate)"
+      # 第三轮审计 §3 C-2 分两问，这里一一对应：
+      #   硬门问的是"夹具集有没有在不改基线的情况下变小"（防的是纪律，不是像素）；
+      #   报告型问的才是审计原话"和上一版比哪些帧变了"（基准 = 发布时冻结的逐版本基线）。
+      # 改了界面要在同一个 commit 里跑 `scripts/frame_baseline.py update`，硬门就是这条纪律的执行器。
+      - name: "Frame baseline vs working manifest (fixture-set gate)"
         timeout-minutes: 3
         run: |
           set -o pipefail
@@ -154,15 +154,21 @@ jobs:
             exit 0
           fi
           status=0
-          # 无头 runner 上 content-wide 那两帧注定拍不出来（17:52 那次日志原文：
-          # "content-wide-1100x800-light.png 有 95% 像素未被绘制，判定为捕获失效"）。
-          # 许可名单是**按名字**的：只赦免"已知为什么缺席"的那几张，其余一张都不许溜走。
-          python3 scripts/frame_baseline.py check "$frames" \
+          # 基准是**工作基线**而不是发布快照：这一门防的是"夹具/界面变了却没在同一个 commit 里
+          # update 基线"。拿发布快照当硬门基准的话，每次合理的改名都得回来改 CI，
+          # 而豁免列表就是这么腐烂成噪声的。
+          # 无头 runner 上 content-wide 那两帧注定拍不出来（17:52 日志原文：
+          # "content-wide-1100x800-light.png 有 95% 像素未被绘制，判定为捕获失效"）——
+          # 那是**环境**缺席而不是夹具缺席，所以按名字赦免这两张，其余一张都不许溜走。
+          python3 scripts/frame_baseline.py check "$frames" --against working \
             --allow-missing content-wide-1100x800-light.png \
             --allow-missing content-wide-1100x800-dark.png | tee /tmp/baseline.log || status=$?
           exit "$status"
 
-      - name: "Frame baseline: change report (report-only)"
+      # 审计 §3 C-2 的原话问句在这里回答："和**上一版**比，哪些帧变了"。
+      # 基准是发布时由 prepare_release.py 冻结的 docs/frame_baselines/vX.Y.Z.json（auto 取最新一版）。
+      # 报告型而不是硬门：新版本本来就该改像素，把"改了 62 帧"挡成红色只会训练人看红不看红。
+      - name: "Frame baseline vs previous release (change report, report-only)"
         continue-on-error: true
         run: |
           set -o pipefail

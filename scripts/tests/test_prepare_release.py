@@ -373,5 +373,45 @@ class LaunchGateTests(unittest.TestCase):
                         "一个桩都没读到 = 解析器瞎了（这个包按实测应有 3 个良性桩），别把死闸门当守卫")
 
 
+
+class FrameBaselineSnapshotOnReleaseTests(unittest.TestCase):
+    """§3 C-2：发布流程必须把帧基线冻结成**逐版本**的一份。
+
+    只有一份可以随时 `update` 的工作基线，"和上一版比"就是一句空话 ——
+    "上一版"实际等于"上一次有人记得 update 的时候"。所以这一步挂在发布流程里，
+    而不是写在一句"记得跑一下"里。
+    """
+
+    def _root_with_working_manifest(self, root: str) -> Path:
+        docs = Path(root) / "docs"
+        docs.mkdir(parents=True, exist_ok=True)
+        (docs / "frame_baseline.json").write_text(
+            '{"schema": 1, "count": 2, "frames": {"a.png": "1", "b.png": "2"}}\n',
+            encoding="utf-8")
+        return docs
+
+    def test_release_freezes_a_versioned_baseline(self):
+        with tempfile.TemporaryDirectory() as root:
+            docs = self._root_with_working_manifest(root)
+            preparer = ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True)
+            target = preparer._snapshot_frame_baseline("1.4.9")
+            self.assertEqual(target, str(docs / "frame_baselines" / "v1.4.9.json"))
+            written = Path(target).read_text(encoding="utf-8")
+            self.assertIn("a.png", written)
+
+    def test_no_working_manifest_means_no_snapshot(self):
+        with tempfile.TemporaryDirectory() as root:
+            preparer = ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True)
+            self.assertIsNone(preparer._snapshot_frame_baseline("2.0.0"),
+                              "没有工作基线时不该凭空造一个版本基线")
+
+    def test_the_step_is_announced_before_it_runs(self):
+        with tempfile.TemporaryDirectory() as root:
+            self._root_with_working_manifest(root)
+            steps = ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True).planned_steps("1.4.9")
+            self.assertTrue(any("frame_baselines" in step for step in steps),
+                            "冻结基线这一步要出现在计划里，dry-run 时用户才看得见它会动哪些文件")
+
+
 if __name__ == "__main__":
     unittest.main()

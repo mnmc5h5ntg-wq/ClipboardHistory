@@ -447,3 +447,11 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 
 - `--allow-missing` 的 help 串里裸 `%` 让 CI 的 python 3.14 构造 parser 就炸（D-046）。已改成 `%%`。
 - 新增 `scripts/tests/test_script_help_runs.py`：每个脚本的 `--help` 都要跑得动。Python 用例 55 → 57。
+
+## 快照 25（2026-10-11，C-2 补成"逐版本"）
+
+- `snapshot` / `--against` / `prepare_release` 挂钩 + 真 v1.4.8 基线（worktree 重拍 68 帧）。
+- 本轮 vs v1.4.8：变 62 帧、新增 12、缺席 2（glass-pill 改名）。硬门 vs 工作基线 = 全 0。
+- Python 用例 57 → 63；CI 两个步骤分别答"纪律"和"历史"两个问句。
+- CI 实测（run 38074651028）：全部步骤绿，含 `Runtime launch smoke → SMOKE_OK=1 / SAW_START=True`
+  —— C-4 的运行时证据是在 CI 的干净 runner 上拿到的，不是在本机。

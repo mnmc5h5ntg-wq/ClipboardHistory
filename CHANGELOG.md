@@ -57,7 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **帧基线进 CI**（第三轮审计 §3 C-2）：`docs/frame_baseline.json` 保存每张离屏帧的 sha256，
   `scripts/frame_baseline.py` 分开报「变了 / 少了 / 多了」三类差异；CI 里"少帧"是硬门、"变帧"是报告型步骤。
-  以前 CI 只回答"今天拍得出帧吗"，现在能回答"哪几帧和上一版不一样"。
+  以前 CI 只回答"今天拍得出来吗"；现在硬门答"夹具/界面变了却没更新基线"，报告型答"和上一版（发布时冻结在 `docs/frame_baselines/vX.Y.Z.json` 的基线）比哪些帧变了"。
 
 ### Fixed
 
