@@ -85,6 +85,28 @@ class FrameBaselineTests(unittest.TestCase):
             Path(bad).write_text(json.dumps({"schema": 1}), encoding="utf-8")
             self.assertEqual(main(["compare", frames_dir, "--repo-root", root]), 2)
 
+    def test_allow_missing_only_absolves_the_named_frames(self):
+        """许可名单是**按名字**的，不是"允许少 N 张"。
+
+        按数字容差的话，夹具丢一张、另一张改名，两条都会被"反正差一张"吃掉；
+        按名字则只赦免"我们已经知道为什么缺席"的那几张，其余一张都不许溜走。
+        """
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = os.path.join(root, "frames")
+            os.mkdir(frames_dir)
+            make_frame(frames_dir, "a.png", b"1")
+            make_frame(frames_dir, "b.png", b"2")
+            write_baseline(manifest_path(root), {"a.png": "1", "b.png": "2", "c.png": "3", "d.png": "4"})
+
+            self.assertEqual(main(["check", frames_dir, "--repo-root", root,
+                                   "--allow-missing", "c.png", "--allow-missing", "d.png"]), 0,
+                             "两张都在许可名单里，check 不该判红")
+            self.assertEqual(main(["check", frames_dir, "--repo-root", root,
+                                   "--allow-missing", "c.png"]), 1,
+                             "d.png 不在名单里却缺席：这才是真回归，必须红")
+            self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 1,
+                             "没给名单时两张缺席都要红")
+
     def test_roundtrip_preserves_every_entry(self):
         with tempfile.TemporaryDirectory() as root:
             path = os.path.join(root, "docs", "frame_baseline.json")

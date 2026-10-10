@@ -438,3 +438,8 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 - 新增 `scripts/tests/test_ci_workflow_shape.py`：4 例，不依赖 pyyaml，纳入 Python 硬门步骤。
   Python 用例 50 → 54。变异对照做过（去掉引号即红）。
 - 观察点：`gh run view --json jobs` 为空数组 + 日志 not found ⇒ 工作流没解析成功，不是步骤失败。
+
+## 快照 23（2026-10-11，C-2 硬门修到能跑）
+
+- `frame_baseline.py check --allow-missing`（按名字赦免）；CI 复用 /tmp/shots-ci 不再重拍。
+- Python 用例 54 → 55。CI run 38073307465 那次红是这一步自己的形状错（D-045），不是产品回归。

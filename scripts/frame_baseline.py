@@ -90,6 +90,10 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="离屏帧基线的比对与更新")
     parser.add_argument("action", choices=["compare", "update", "check"])
     parser.add_argument("frames_dir")
+    parser.add_argument("--allow-missing", action="append", default=[],
+                        help="允许缺席的帧名（可重复）。无头 runner 上有几帧注定拍不出来 —— "
+                             "「捕获失效闸门」拒绝把 95% 空白的帧当证据写盘，那是诚实的行为。"
+                             "把它们列在这里，剩下的缺席才是真回归。")
     parser.add_argument("--repo-root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args = parser.parse_args(argv)
 
@@ -116,14 +120,19 @@ def main(argv=None) -> int:
 
     current = collect(args.frames_dir)
     changed, missing, added = compare(baseline, current)
+    # 先扣掉许可名单，再谈"少帧"：否则这条硬门只是把 runner 的物理限制每天复述一遍。
+    allowed = [name for name in missing if name in set(args.allow_missing)]
+    missing = [name for name in missing if name not in set(args.allow_missing)]
     print("FRAME_BASELINE_COMPARED=%d" % len(current))
+    if allowed:
+        print("FRAME_BASELINE_ALLOW_MISSING=%d  %s" % (len(allowed), ", ".join(allowed)))
     print("FRAME_BASELINE_CHANGED=%d" % len(changed))
     print("FRAME_BASELINE_MISSING=%d" % len(missing))
     print("FRAME_BASELINE_ADDED=%d" % len(added))
     for name in changed:
         print("  changed  %s" % name)
     for name in missing:
-        print("  missing  %s" % name)
+        print("  missing  %s  <- 夹具不再产出这一帧，必须查" % name)
     for name in added:
         print("  added    %s" % name)
     if args.action == "check":
