@@ -4,6 +4,19 @@ import AppKit
 protocol ClipboardWriting {
     @discardableResult
     func write(_ content: ClipboardEntryContent) throws -> Int
+
+    /// 带富文本的写回（§5 F-2）。默认实现**丢掉富文本**，所以夹具用的
+    /// `TestClipboardWriter` 不必逐个改 —— 代价是"RTF 真的进了剪贴板"这条判据
+    /// 必须用 `SystemClipboardWriter` + 命名剪贴板来测：拿夹具测会恒绿。
+    @discardableResult
+    func write(_ content: ClipboardEntryContent, richText: RichTextPayload?) throws -> Int
+}
+
+extension ClipboardWriting {
+    @discardableResult
+    func write(_ content: ClipboardEntryContent, richText: RichTextPayload?) throws -> Int {
+        try write(content)
+    }
 }
 
 enum ClipboardWriteError: LocalizedError, Equatable {
@@ -36,6 +49,11 @@ struct SystemClipboardWriter: ClipboardWriting {
 
     @discardableResult
     func write(_ content: ClipboardEntryContent) throws -> Int {
+        try write(content, richText: nil)
+    }
+
+    @discardableResult
+    func write(_ content: ClipboardEntryContent, richText: RichTextPayload?) throws -> Int {
         let fileURLs: [URL]
         switch content {
         case .file(let url):
@@ -51,6 +69,16 @@ struct SystemClipboardWriter: ClipboardWriting {
         }
 
         pasteboard.clearContents()
+        if case .text(let text) = content, let richText, !richText.isEmpty {
+            // 一条 `NSPasteboardItem`，按 RTF → HTML → 纯文本 的顺序登记：
+            // 富文本应用向前找它认的那一份，只认纯文本的目标拿到的仍是干净文本。
+            let item = NSPasteboardItem()
+            RichTextPolicy.write(text, payload: richText, to: item)
+            guard pasteboard.writeObjects([item]) else {
+                throw ClipboardWriteError.failedToWriteText
+            }
+            return pasteboard.changeCount
+        }
         let didWrite: Bool
         switch content {
         case .text(let text):

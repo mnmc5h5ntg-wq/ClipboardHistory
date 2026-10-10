@@ -76,6 +76,18 @@ final class FileHistoryPersistence: HistoryPersisting {
         /// 「固定」位（第三轮审计 §5 F-5）。可选字段、缺键读为 false ⇒ 按 D-016 的
         /// "只加可选字段不升版"策略，`currentSchemaVersion` 保持 1；旧版读到这个键会忽略它。
         let isPinned: Bool?
+        /// 富文本两份表示（§5 F-2）。都是 Optional：缺键 ⇒ nil ⇒ 老存档原样读回，
+        /// 按 D-016 的"只加可选字段不升版"，`currentSchemaVersion` 保持 1。
+        /// 它们会让 `history.json` 变大（上限见 `RichTextPolicy.maximumTotalBytes`），
+        /// 所以采集侧默认关；导出时和图片一样被跳过。
+        let richTextRTF: Data?
+        let richTextHTML: Data?
+
+        /// 读回来时两份都没有就当作没有富文本，而不是造一个空壳。
+        var richText: RichTextPayload? {
+            let payload = RichTextPayload(rtf: richTextRTF, html: richTextHTML)
+            return payload.isEmpty ? nil : payload
+        }
 
         var fileURLs: [URL] {
             if let urlStrings, !urlStrings.isEmpty {
@@ -284,7 +296,8 @@ final class FileHistoryPersistence: HistoryPersisting {
             sourceAppBundleID: storedEntry.sourceAppBundleID,
             sourceAppName: storedEntry.sourceAppName,
             ocrText: storedEntry.ocrText,
-            isPinned: storedEntry.isPinned ?? false
+            isPinned: storedEntry.isPinned ?? false,
+            richText: storedEntry.richText
         )
     }
 
@@ -318,7 +331,9 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText,
-                isPinned: entry.isPinned
+                isPinned: entry.isPinned,
+                richTextRTF: entry.richText?.rtf,
+                richTextHTML: entry.richText?.html
             )
         case .image(let image):
             let imageFileName = "\(entry.id.uuidString)-image.png"
@@ -337,7 +352,9 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText,
-                isPinned: entry.isPinned
+                isPinned: entry.isPinned,
+                richTextRTF: entry.richText?.rtf,
+                richTextHTML: entry.richText?.html
             )
         case .file(let url):
             let thumbnailFileName: String?
@@ -362,7 +379,9 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText,
-                isPinned: entry.isPinned
+                isPinned: entry.isPinned,
+                richTextRTF: entry.richText?.rtf,
+                richTextHTML: entry.richText?.html
             )
         case .files(let urls):
             let thumbnailFileName: String?
@@ -387,7 +406,9 @@ final class FileHistoryPersistence: HistoryPersisting {
                 sourceAppBundleID: entry.sourceAppBundleID,
                 sourceAppName: entry.sourceAppName,
                 ocrText: entry.ocrText,
-                isPinned: entry.isPinned
+                isPinned: entry.isPinned,
+                richTextRTF: entry.richText?.rtf,
+                richTextHTML: entry.richText?.html
             )
         }
     }

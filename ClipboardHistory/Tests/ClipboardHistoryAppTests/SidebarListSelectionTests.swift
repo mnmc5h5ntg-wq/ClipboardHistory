@@ -113,15 +113,24 @@ final class SidebarListSelectionTests: XCTestCase {
         XCTAssertTrue(EntryDragGate.offersDrag(for: .file(URL(fileURLWithPath: "/tmp/a.png"))))
         // "拖起来什么都没发生"比"没有拖出入口"更糟（R2-05 的原始理由）。
         XCTAssertFalse(EntryDragGate.offersDrag(for: .text("")))
-        XCTAssertFalse(EntryDragGate.offersDrag(for: .files([
-            URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.png"),
-        ])), "多文件拖出需要 NSView 级 dragging session，仍未提供（账本 R2-05 部分完成、R3-D10）")
         XCTAssertFalse(EntryDragGate.offersDrag(for: .file(URL(string: "https://example.com")!)))
+        // 第三轮 §4 U-2 改了这里的多文件那一行：以前多文件条目**不**提供拖出
+        // （一次拖多个 item 需要 NSView 级 dragging session，而 `onDrag` 只给一个 provider，
+        // 于是"拖 3 个只落地 1 个"）。现在 provider 里带的是 `NSFilenamesPboardType` 那份
+        // **路径数组**，三个路径真的都在里面 —— 字节级的核对见
+        // `EntryDragPlannerTests.testMultipleFileEntriesCarryEveryPath`。
+        XCTAssertTrue(EntryDragGate.offersDrag(for: .files([
+            URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.png"),
+        ])), "多文件条目已经能带出全部路径，这里还拒绝承诺拖拽 = 能力被埋着")
+        XCTAssertFalse(EntryDragGate.offersDrag(for: .files([])),
+                       "空列表仍然不许许空愿：这条不变")
     }
 
     /// 提示语不许对没有载荷的条目许空愿（空 `.help` 在 macOS 上还会弹一个空气泡）。
     func testDragHelpTextMatchesTheAffordance() {
-        XCTAssertEqual(RowDragHelp.text(for: .files([URL(fileURLWithPath: "/tmp/a")])), "")
+        XCTAssertFalse(RowDragHelp.text(for: .files([URL(fileURLWithPath: "/tmp/a")])).isEmpty,
+                       "§4 U-2 之后多文件条目是有载荷的，提示语必须跟着承诺")
+        XCTAssertTrue(RowDragHelp.text(for: .files([])).isEmpty, "空列表还是不该有提示")
         XCTAssertFalse(RowDragHelp.text(for: .text("x")).isEmpty)
     }
 

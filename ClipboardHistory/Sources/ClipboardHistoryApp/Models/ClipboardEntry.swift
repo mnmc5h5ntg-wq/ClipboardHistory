@@ -14,6 +14,9 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
     /// 「固定」的收藏项：置顶、不参与复用提升的排序、也不被保留策略裁剪（第三轮审计 §5 F-5）。
     /// 存档里是**可选字段**，缺键读为 false —— 按 D-016/D-034 的策略不升 schema 版本。
     let isPinned: Bool
+    /// 富文本表示（RTF / HTML），只在用户打开「保留富文本格式」时才会有值（§5 F-2）。
+    /// Optional + 缺键读为 nil ⇒ 同样不升 schema 版本；UI 一律仍显示纯文本预览。
+    let richText: RichTextPayload?
 
     init(
         id: UUID = UUID(),
@@ -26,7 +29,8 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
         sourceAppBundleID: String? = nil,
         sourceAppName: String? = nil,
         ocrText: String? = nil,
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        richText: RichTextPayload? = nil
     ) {
         self.id = id
         self.content = content
@@ -39,6 +43,7 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
         self.sourceAppName = sourceAppName
         self.ocrText = ocrText
         self.isPinned = isPinned
+        self.richText = richText
     }
 
     var shortPreview: String {

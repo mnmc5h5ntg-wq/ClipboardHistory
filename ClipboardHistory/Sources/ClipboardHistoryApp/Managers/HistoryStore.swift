@@ -951,7 +951,7 @@ final class HistoryStore: ObservableObject {
     @discardableResult
     private func writeToClipboard(_ entry: Entry) -> Bool {
         do {
-            let changeCount = try clipboardWriter.write(entry.content)
+            let changeCount = try clipboardWriter.write(entry.content, richText: entry.richText)
             clipboardWriteErrorMessage = nil
             intake.markChangeCount(changeCount)
             return true

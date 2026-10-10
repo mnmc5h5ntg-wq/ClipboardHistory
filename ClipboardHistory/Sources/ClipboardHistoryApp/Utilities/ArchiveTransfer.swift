@@ -35,6 +35,9 @@ enum ArchiveTransfer {
     struct Summary: Equatable {
         var exportedCount: Int
         var skippedImageCount: Int
+        /// 带富文本表示的条目数（§5 F-2）。导出不含它们：一份 RTF 动辄几十 KB，
+        /// 而且 Word 的 RTF 里常带着修订与作者信息 —— 那不该被"导一份到另一台机器"顺带拷走。
+        var skippedRichTextCount: Int = 0
         var importedCount: Int = 0
         var skippedDuplicateCount: Int = 0
     }
@@ -47,16 +50,21 @@ enum ArchiveTransfer {
         if summary.skippedImageCount > 0 {
             parts.append("另有 \(summary.skippedImageCount) 条图片记录未导出（默认不含图片）。")
         }
+        if summary.skippedRichTextCount > 0 {
+            parts.append("有 \(summary.skippedRichTextCount) 条记录带富文本格式，导出只保留纯文本。")
+        }
         return parts.joined()
     }
 
     static func export(entries: [ClipboardEntry], includeImages: Bool = false) -> (Data, Summary) {
         var skippedImages = 0
+        var skippedRichText = 0
         var items: [Item] = []
         items.reserveCapacity(entries.count)
         for entry in entries {
             switch entry.content {
             case .text(let text):
+                if entry.richText != nil { skippedRichText += 1 }
                 items.append(Item(id: entry.id, timestamp: entry.timestamp, kind: .text,
                                   text: text, urls: nil, isFavorite: entry.isFavorite,
                                   isPinned: entry.isPinned,
@@ -86,7 +94,8 @@ enum ArchiveTransfer {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let data = (try? encoder.encode(payload)) ?? Data()
-        return (data, Summary(exportedCount: items.count, skippedImageCount: skippedImages))
+        return (data, Summary(exportedCount: items.count, skippedImageCount: skippedImages,
+                              skippedRichTextCount: skippedRichText))
     }
 
     /// 合并规则（纯函数）：同 id 视为重复并跳过，其余按时间倒序排回原列表。

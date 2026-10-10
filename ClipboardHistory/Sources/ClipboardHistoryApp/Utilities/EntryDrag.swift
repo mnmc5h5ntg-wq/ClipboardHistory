@@ -14,6 +14,12 @@ enum EntryDragPayload: Equatable {
     case text(String)
     case png(Data)
     case fileURL(URL)
+    /// 多文件条目（§4 U-2）。一条 dragging item 带多个文件只能走
+    /// `NSFilenamesPboardType` 那份老而通用的表示 —— 它是**路径数组**，
+    /// 所以"拖 3 个文件只落地 1 个"这种情况不会发生。
+    /// 刻意不同时登记 `public.file-url`：那会让只读第一个类型的应用拿到 1 个文件，
+    /// 又变成半截动作。
+    case fileList([URL])
 }
 
 enum EntryDragPlanner {
@@ -34,9 +40,29 @@ enum EntryDragPlanner {
             // "把 Web URL 当文件"的混淆就是从这里开始的。
             guard url.isFileURL else { return nil }
             return .fileURL(url)
-        case .files:
-            return nil
+        case .files(let urls):
+            // 以前多文件条目整条不提供拖出（账本 R2-05 记为"部分完成"）：一次拖多个 item
+            // 需要 `NSView` 级的 dragging session，而 `onDrag` 只给一个 provider。
+            // §4 U-2 的补法是走 `NSFilenamesPboardType` 那份**路径数组**表示 —— 一个 provider
+            // 带全部路径，于是不会发生"拖 3 个只落地 1 个"。
+            // 这里刻意**不**过滤已删除的文件：`.file` 一直不过滤，两条路要保持同一套语义，
+            // 而且在拖出这一刻静默丢掉一项，正是"半截动作"。粘贴路径才有存在性校验（见 ClipboardWriter）。
+            guard !urls.isEmpty else { return nil }
+            return urls.count == 1 ? .fileURL(urls[0]) : .fileList(urls)
         }
+    }
+
+    /// 多文件的老类型名。AppKit 里它是 `NSPasteboard.NSFilenamesType`（已废弃），
+    /// 字符串值是 `NSFilenamesPboardType`；这里按字符串登记，避免引用废弃常量又被 0-warning 闸挡住。
+    static let fileListPasteboardType = "NSFilenamesPboardType"
+
+    /// 路径数组 -> plist 字节。纯函数，所以"这份数据里到底有几个文件"可测。
+    static func fileListData(for paths: [String]) -> Data {
+        guard !paths.isEmpty else { return Data() }
+        // 这个类型的正文是**字符串数组本身**，不包字典 —— 包了目标应用读不懂。
+        return (try? PropertyListSerialization.data(fromPropertyList: paths,
+                                                    format: .xml,
+                                                    options: 0)) ?? Data()
     }
 
     static func itemProvider(for payload: EntryDragPayload) -> NSItemProvider {
@@ -56,6 +82,15 @@ enum EntryDragPlanner {
             // `NSURL` 自己实现 `NSItemProviderWriting`：文件 URL 会登记成 `public.file-url`。
             // 交出的是引用 —— 不复制、也绝不删除原文件。
             provider.registerObject(url as NSURL, visibility: .all)
+        case .fileList(let urls):
+            let paths = urls.map { $0.path }
+            provider.registerDataRepresentation(
+                forTypeIdentifier: EntryDragPlanner.fileListPasteboardType,
+                visibility: .all
+            ) { completion in
+                completion(EntryDragPlanner.fileListData(for: paths), nil)
+                return nil
+            }
         }
         return provider
     }

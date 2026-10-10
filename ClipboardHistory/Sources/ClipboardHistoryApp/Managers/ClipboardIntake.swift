@@ -9,19 +9,23 @@ struct ClipboardIntake {
         /// 这样"重复复制被提升"时也不会丢 attribution（审计 P-01）。
         let sourceAppBundleID: String?
         let sourceAppName: String?
+        /// 富文本载荷（§5 F-2）。开关关 / 没有表示 / 全部超限时为 nil。
+        let richText: RichTextPayload?
 
         init(
             content: ClipboardEntryContent,
             thumbnail: StoredImage?,
             sourceUTIs: [String],
             sourceAppBundleID: String? = nil,
-            sourceAppName: String? = nil
+            sourceAppName: String? = nil,
+            richText: RichTextPayload? = nil
         ) {
             self.content = content
             self.thumbnail = thumbnail
             self.sourceUTIs = sourceUTIs
             self.sourceAppBundleID = sourceAppBundleID
             self.sourceAppName = sourceAppName
+            self.richText = richText
         }
 
         func makeHistoryEntry(timestamp: Date = Date()) -> ClipboardEntry {
@@ -32,7 +36,8 @@ struct ClipboardIntake {
                 sourceURL: content.sourceURL,
                 sourceUTIs: sourceUTIs,
                 sourceAppBundleID: resolvedSourceAppBundleID,
-                sourceAppName: resolvedSourceAppName
+                sourceAppName: resolvedSourceAppName,
+                richText: richText
             )
         }
 
@@ -53,6 +58,11 @@ struct ClipboardIntake {
     /// 注入的 pasteboard 必须真的用于后续读取。旧写法只在 `init` 里用它取一次
     /// `changeCount`，各读取方法的 `from:` 参数默认 `.general`，于是"注入了替身、
     /// 读的却是真实系统剪贴板"——测试会静默测到用户真实内容（本轮实测踩到）。
+    /// 采集策略（这一轮加的富文本开关）从哪个 defaults 域读。生产是 `.standard`，
+    /// 单测注入独立 suite，于是"设置页打开了开关 → 采集侧真的开始抓 RTF"这一段
+    /// 能从产品入口验，而不必往进程的標準域里写东西（与 `HistoryStore.policyDefaults` 同一套办法）。
+    var policyDefaults: UserDefaults = .standard
+
     private let pasteboard: NSPasteboard
     /// 文本正文上限（字符）。超过则截断并留标记：一条超大文本会常驻内存、
     /// 进 JSON 存档，并让每次搜索/渲染都扫它（审计 R-22）。
@@ -124,7 +134,11 @@ struct ClipboardIntake {
 
         if let t = pasteboard.string(forType: .string),
            !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return makeEntry(content: .text(Self.bounded(t)), thumbnail: nil, pasteboard: pasteboard)
+            // 纯文本之外再抓一份 RTF/HTML（§5 F-2）。抓取必须在采集这一刻而不是写回时：
+            // 剪贴板的内容只有这一刻还在，等用户从历史里粘贴时，原始表示早就被下一次复制覆盖了。
+            let rich = RichTextPolicy.capture(from: pasteboard, defaults: policyDefaults)
+            return makeEntry(content: .text(Self.bounded(t)), thumbnail: nil,
+                             pasteboard: pasteboard, richText: rich)
         }
 
         // 只含非文件 NSURL（`public.url`）的剪贴板以前被整条丢弃（审计 N-4 的副产物 / 账本 R2-16，
@@ -143,7 +157,8 @@ struct ClipboardIntake {
     private func makeEntry(
         content: ClipboardEntryContent,
         thumbnail: StoredImage?,
-        pasteboard: NSPasteboard
+        pasteboard: NSPasteboard,
+        richText: RichTextPayload? = nil
     ) -> Entry {
         let app = NSWorkspace.shared.frontmostApplication
         return Entry(
@@ -151,7 +166,8 @@ struct ClipboardIntake {
             thumbnail: thumbnail,
             sourceUTIs: (pasteboard.types ?? []).map { $0.rawValue },
             sourceAppBundleID: app?.bundleIdentifier,
-            sourceAppName: app?.localizedName
+            sourceAppName: app?.localizedName,
+            richText: richText
         )
     }
 

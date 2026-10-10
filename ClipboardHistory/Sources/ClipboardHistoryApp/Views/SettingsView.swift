@@ -58,6 +58,9 @@ struct SettingsView: View {
     @State private var showClearHistoryConfirmation = false
     @State private var archiveMessage: String?
     @AppStorage(CapturePolicy.userExcludedKey) private var excludedBundleIDsRaw = ""
+    /// 富文本保真开关（§5 F-2）。默认关：打开等于每条文本记录多存 2 份表示，
+    /// 存档体积翻几倍，而 RTF 里还常带着来源元数据。
+    @AppStorage(RichTextPolicy.enabledKey) private var preserveRichText = false
     @State private var newExcludedBundleID = ""
     @AppStorage(OCRPolicy.modeKey) private var ocrModeRaw = OCRPolicy.StorageMode.persisted.rawValue
     @State private var exportMessage: String?
@@ -263,6 +266,13 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
 
                     Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
+                    Toggle("保留富文本格式（RTF / HTML）", isOn: $preserveRichText)
+                    Text("打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
+                        + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
+                        + "导出与导入只带纯文本。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
                         .font(.caption)
                         .foregroundStyle(.secondary)

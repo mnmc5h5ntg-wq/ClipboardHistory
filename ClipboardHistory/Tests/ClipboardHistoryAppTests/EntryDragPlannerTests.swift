@@ -39,14 +39,44 @@ final class EntryDragPlannerTests: XCTestCase {
                      "Web URL 拖进 Finder 没有意义，而且这正是 P-15 那类'把链接当文件'混淆的起点")
     }
 
-    func testMultipleFileEntriesOfferNoDragRatherThanHalfADrag() {
+    /// 第三轮审计 §4 U-2：多文件条目现在**能**拖出了。
+    /// 这条以前断言的是"宁可没有拖拽"（`XCTAssertNil`），改成断言"provider 带全部路径" ——
+    /// 这是随能力变化而更新的契约，不是为了让测试变绿：判据比以前更强（要看回真实字节）。
+    func testMultipleFileEntriesCarryEveryPath() throws {
         let urls = [
             URL(fileURLWithPath: "/tmp/a-\(UUID().uuidString).txt"),
-            URL(fileURLWithPath: "/tmp/b-\(UUID().uuidString).txt")
+            URL(fileURLWithPath: "/tmp/b-\(UUID().uuidString).txt"),
+            URL(fileURLWithPath: "/tmp/c-\(UUID().uuidString).txt")
         ]
-        // 一次拖多个 item 需要 NSView 级 dragging session；`onDrag` 只给一个 provider。
-        // 宁可这一类没有拖拽，也不要"拖 2 个只落地 1 个"的假动作（账本 R2-05 记为部分完成）。
-        XCTAssertNil(EntryDragPlanner.payload(for: .files(urls)))
+        XCTAssertEqual(EntryDragPlanner.payload(for: .files(urls)), .fileList(urls))
+        XCTAssertTrue(EntryDragGate.offersDrag(for: .files(urls)),
+                      "多文件条目既然有载荷，就必须承诺可拖")
+
+        let provider = try XCTUnwrap(EntryDragPlanner.itemProvider(forContent: .files(urls)))
+        XCTAssertTrue(provider.hasItemConformingToTypeIdentifier(EntryDragPlanner.fileListPasteboardType),
+                      "没登记路径数组那份表示：拖出去只会落地一个文件\(provider.registeredTypeIdentifiers)")
+        // 半截动作的判据：**解码出来的**是全部三个路径，而不是"登记了某个类型"就算数
+        let decoded = try waitForData(from: provider, type: EntryDragPlanner.fileListPasteboardType)
+        let paths = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: decoded, format: nil) as? [String])
+        XCTAssertEqual(paths, urls.map { $0.path },
+                       "拖 3 个只带出去 \(paths.count) 个 —— 这正是当初拒绝多文件拖出的理由")
+
+        // 空数组不该承诺拖拽
+        XCTAssertNil(EntryDragPlanner.payload(for: .files([])))
+    }
+
+    private func waitForData(from provider: NSItemProvider, type: String) throws -> Data {
+        let expectation = XCTestExpectation(description: "provider 交回 \(type)")
+        let box = PayloadBox()
+        _ = provider.loadDataRepresentation(forTypeIdentifier: type) { data, error in
+            box.data = data
+            box.error = error
+            expectation.fulfill()
+        }
+        wait(for: [expectation], timeout: 2.0)
+        if let error = box.error { throw error }
+        return try XCTUnwrap(box.data, "provider 没交回 \(type) 的字节")
     }
 
     func testItemProvidersActuallyCarryTheirPayload() throws {
@@ -87,7 +117,8 @@ final class EntryDragPlannerTests: XCTestCase {
 
     func testContentWithoutPayloadGetsNoProviderAtAll() {
         XCTAssertNil(EntryDragPlanner.itemProvider(forContent: .text("")))
-        XCTAssertNil(EntryDragPlanner.itemProvider(forContent: .files([URL(fileURLWithPath: "/tmp/x")])))
+        XCTAssertNil(EntryDragPlanner.itemProvider(forContent: .files([])),
+                     "空的文件列表不该承诺拖出一个东西")
         XCTAssertNotNil(EntryDragPlanner.itemProvider(forContent: .text("有内容")))
     }
 
