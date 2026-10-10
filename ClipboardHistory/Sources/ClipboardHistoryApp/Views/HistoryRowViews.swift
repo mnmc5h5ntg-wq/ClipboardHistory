@@ -1,14 +1,15 @@
 import SwiftUI
 
-/// 侧栏里的一行（第三轮审计 D-1 之后）。
+/// 侧栏里的一行（第三轮审计 D-1，最终形态见账本 D-034）。
 ///
-/// 这一行现在活在建好的 `List(selection:)` 里，所以职责收窄成三件事：
-/// 星标、把手（唯一的拖出入口）、文本列。**选中态与选中高亮不再由这里画** ——
-/// 以前它是"行自己的 Button + 自绘圆角底色"，配合 `List` 会出现两套选中语言
-/// （系统给整行画蓝底，我们又叠一层 `primary.opacity`），而且键盘/VO 的选中语义只能信系统那一份。
+/// 这一行活在 `List(selection:)` 里，所以职责收窄成三件事：星标、行首视觉列、文本列。
+/// **选中态与选中高亮不再由这里画** —— 以前它是"行自己的 Button + 自绘圆角底色"，
+/// 配合 `List` 会出现两套选中语言（系统给整行画蓝底，我们又叠一层 `primary.opacity`），
+/// 而且键盘/VO 的选中语义只能信系统那一份。
 ///
-/// 也不再挂整行的 `.onDrag`：那正是缺陷 D-1（拖出会话在每个阈值处抢先，列表拖选整片失效）。
-/// 拖出只从把手发起，判据在 `EntryDragGate.prepareForDrag`。
+/// 拖出挂在**整行**上（`EntryDragModifier`）。这不是回到 D-1 之前的样子：那时的问题是
+/// "整行拖出"与"整行拖选"抢同一次按下；而 `List` 会把行内任何一处 `.onDrag` 提升成整行拖拽源，
+/// 所以"只让行首把手可拖"在系统列表里做不到。取舍是留拖出、去拖选（D-034）。
 struct HistoryRowButton: View {
     let entry: HistoryStore.Entry
     /// 双击这一行 = 复制这条（与详情区浮层的"再次复制"同一个动作，见 `copyAction` 的接线处）。
@@ -21,7 +22,8 @@ struct HistoryRowButton: View {
             // 星标刻意放在选中区之外：它是行的兄弟控件，点它不该改变选中（D-028 实测过归属）。
             RowFavoriteButton(isFavorite: entry.isFavorite, action: favoriteAction)
 
-            RowDragHandle(entry: entry)
+            RowLeadingVisual(entry: entry)
+                .frame(width: 30)
 
             RowTextColumn(entry: entry)
         }
@@ -36,6 +38,34 @@ struct HistoryRowButton: View {
         .onTapGesture(count: 2) {
             guard RowDoubleTap.shouldCopy(modifiers: NSEvent.modifierFlags) else { return }
             copyAction()
+        }
+        // 有载荷才挂（判据 `EntryDragGate.offersDrag`）：多文件条目、网页链接、空文本不提供拖出。
+        .modifier(EntryDragModifier(content: entry.content))
+        // 提示语为空时整个 modifier 都不挂：`.help("")` 在 macOS 上会弹出一个空气泡。
+        .modifier(RowDragHelpModifier(content: entry.content))
+    }
+}
+
+/// 拖出提示的文案与接线。**公开是为了让"没有载荷就不许承诺"这件事可测。**
+enum RowDragHelp {
+    static func text(for content: ClipboardEntryContent) -> String {
+        EntryDragGate.offersDrag(for: content)
+            ? "拖动这一行可导出到别的应用"
+            : ""
+    }
+}
+
+private struct RowDragHelpModifier: ViewModifier {
+    let content: ClipboardEntryContent
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let help = RowDragHelp.text(for: self.content)
+        if help.isEmpty {
+            content
+        } else {
+            // `helpLabel` 同时给 `.help` 与 `accessibilityLabel`：只给悬浮提示的话 VoiceOver 读不到。
+            content.helpLabel(help)
         }
     }
 }
@@ -73,38 +103,8 @@ private struct RowFavoriteButton: View {
     }
 }
 
-/// 把手的提示语。独立成一个类型是为了让"没有载荷就不许承诺"这件事可测
-/// （`RowDragHandle` 本身是 private，测试够不到它的静态方法）。
-enum RowDragHandleHelp {
-    /// 没有载荷的条目不挂拖出（`EntryDragGate` 会判 false），那就不该给一句承诺落空的提示。
-    static func helpText(for content: ClipboardEntryContent) -> String {
-        EntryDragGate.prepareForDrag(origin: .handle, content: content)
-            ? "按住这里拖到别的应用，即可导出这一条"
-            : ""
-    }
-}
-
-/// 拖出的**唯一**入口：行首的缩略图/图标那一列。
-/// 放在这里而不是整行，是 D-1 的修法本身 —— 见 `EntryDragGate`。
-private struct RowDragHandle: View {
-    let entry: HistoryStore.Entry
-
-    /// 提示语为空时**整个修饰符都不挂**：`.help("")` 在 macOS 上会弹出一个空气泡，
-    /// 而没载荷的行本来就没有拖出 affordance，什么都不说才对。
-    var body: some View {
-        let help = RowDragHandleHelp.helpText(for: entry.content)
-        if help.isEmpty {
-            RowLeadingVisual(entry: entry)
-                .frame(width: 30)
-        } else {
-            RowLeadingVisual(entry: entry)
-                .frame(width: 30)
-                .modifier(EntryDragModifier(content: entry.content))
-                .helpLabel(help)
-        }
-    }
-}
-
+/// 行内容的旧组合入口（行首视觉列 + 文本列）。侧栏现在直接用 `HistoryRowButton`，
+/// 这里保留给夹具与详情以外的调用点复用。
 struct HistoryRow: View {
     let entry: HistoryStore.Entry
 
@@ -116,7 +116,9 @@ struct HistoryRow: View {
     }
 }
 
-/// 行首的视觉（缩略图优先，没有缩略图才画符号）。它同时是拖出的把手。
+/// 行首的视觉列（缩略图优先，没有缩略图才画符号）。
+/// D-1 期间它曾叫"把手"并独占拖出入口 —— 那个设计被真机否掉了（`List` 会把行内 `.onDrag`
+/// 提升成整行拖拽源），现在拖出挂在整行上，见 `HistoryRowButton` 与账本 D-034。
 private struct RowLeadingVisual: View {
     let entry: HistoryStore.Entry
 

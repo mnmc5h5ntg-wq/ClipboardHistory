@@ -2,13 +2,17 @@ import AppKit
 import XCTest
 @testable import ClipboardHistoryApp
 
-/// 第三轮审计 D-1（修法③）：侧栏换成 `List(selection:)`，拖出只从把手发起。
+/// 第三轮审计 D-1 的最终形态（修法③ + D-034 的取舍）：侧栏是 `List(selection:)`，
+/// 拖出挂在整行上，**拖选这条路径整个不存在**。
 ///
 /// 这里钉三层，缺一层都会留下"看着像修好了"的空间：
 /// ① **store 侧**：`List` 汇报上来的集合怎么落成权威状态（含"不可见 id 必须丢掉"）；
-/// ② **判据侧**：`EntryDragGate.prepareForDrag` 的真值表 —— 行体永远不许开拖出会话，
-///    那正是 D-1 的形状（整行挂 `onDrag` ⇒ 拖选整片失效）；
-/// ③ **接线侧**：视图真的走的是系统 `List(selection:)`，而且没有偷偷把方向键/自绘选中态加回来。
+/// ② **判据侧**：哪些条目提供拖出（没有载荷就不许给一个拖起来没反应的入口）；
+/// ③ **接线侧**：视图真的走系统 `List`，手工方向键没有偷偷长回来，
+///    而被放弃的拖选手势也没有留下半套死码。
+///
+/// ②原本还包含"行体永远不许开拖出会话"——那是"把手才拖出"的设计，
+/// 真机验证 `List` 会把行内任何 `.onDrag` 提升成整行拖拽源，分工做不到，故 D-034 改取舍。
 @MainActor
 final class SidebarListSelectionTests: XCTestCase {
     private func makeStore() -> HistoryStore {
@@ -102,28 +106,23 @@ final class SidebarListSelectionTests: XCTestCase {
         XCTAssertNil(store.selectedEntry)
     }
 
-    // MARK: - ② 判据侧：拖出的分工
+    // MARK: - ② 判据侧：什么条目提供拖出
 
-    func testDragGateRefusesTheRowBodyEvenWhenPayloadExists() {
-        // 这一条就是缺陷 D-1 本体：载荷再满，行体也不许开拖出会话。
-        XCTAssertFalse(EntryDragGate.prepareForDrag(origin: .rowBody, content: .text("可拖的文本")),
-                       "行体开拖出会话 = 列表的拖选会被系统在每个阈值处抢走")
-        XCTAssertFalse(EntryDragGate.prepareForDrag(origin: .rowBody, content: .file(URL(fileURLWithPath: "/tmp/a.png"))))
-    }
-
-    func testDragGateAllowsTheHandleOnlyWhenThereIsAPayload() {
-        XCTAssertTrue(EntryDragGate.prepareForDrag(origin: .handle, content: .text("可拖的文本")))
-        XCTAssertTrue(EntryDragGate.prepareForDrag(origin: .handle, content: .file(URL(fileURLWithPath: "/tmp/a.png"))))
-    }
-
-    func testDragGateRefusesTheHandleWhenNothingWouldBeCarriedOut() {
-        // "拖起来什么都没发生"比"没有拖出入口"更糟（R2-05 的原始理由），所以载荷为空也要判 false。
-        XCTAssertFalse(EntryDragGate.prepareForDrag(origin: .handle, content: .text("")))
-        XCTAssertFalse(EntryDragGate.prepareForDrag(origin: .handle, content: .files([
+    func testOffersDragOnlyWhenSomethingWouldActuallyBeCarriedOut() {
+        XCTAssertTrue(EntryDragGate.offersDrag(for: .text("可拖的文本")))
+        XCTAssertTrue(EntryDragGate.offersDrag(for: .file(URL(fileURLWithPath: "/tmp/a.png"))))
+        // "拖起来什么都没发生"比"没有拖出入口"更糟（R2-05 的原始理由）。
+        XCTAssertFalse(EntryDragGate.offersDrag(for: .text("")))
+        XCTAssertFalse(EntryDragGate.offersDrag(for: .files([
             URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.png"),
-        ])), "多文件拖出需要 NSView 级 dragging session，本轮仍不提供（账本 R2-05 部分完成）")
-        XCTAssertFalse(EntryDragGate.prepareForDrag(
-            origin: .handle, content: .file(URL(string: "https://example.com")!)))
+        ])), "多文件拖出需要 NSView 级 dragging session，仍未提供（账本 R2-05 部分完成、R3-D10）")
+        XCTAssertFalse(EntryDragGate.offersDrag(for: .file(URL(string: "https://example.com")!)))
+    }
+
+    /// 提示语不许对没有载荷的条目许空愿（空 `.help` 在 macOS 上还会弹一个空气泡）。
+    func testDragHelpTextMatchesTheAffordance() {
+        XCTAssertEqual(RowDragHelp.text(for: .files([URL(fileURLWithPath: "/tmp/a")])), "")
+        XCTAssertFalse(RowDragHelp.text(for: .text("x")).isEmpty)
     }
 
     // MARK: - ③ 接线侧
@@ -134,8 +133,6 @@ final class SidebarListSelectionTests: XCTestCase {
         XCTAssertTrue(source.contains("List(selection: selectionBinding)"),
                       "侧栏还在用自绘的 ScrollView/LazyVStack —— D-1 的争用没有解决")
         XCTAssertFalse(source.contains("LazyVStack"), "旧的自绘列表容器还留着，两套选中语言会同时存在")
-        XCTAssertFalse(source.contains(".onDrag"),
-                       "拖出入口不该出现在侧栏容器/行上，它只属于把手（见 EntryDragGate）")
         // 键盘与滚动交给系统 List：手工接的方向键必须一起撤掉，否则两套实现同时改选中状态。
         XCTAssertFalse(source.contains(".onMoveCommand"),
                        "系统 List 已经负责方向键，手工那条路径会与之争用")
@@ -145,17 +142,30 @@ final class SidebarListSelectionTests: XCTestCase {
                       "整块列表的焦点环抑制被移除了：鼠标点一下就会出现用户报过的那圈蓝框")
     }
 
-    /// 拖出入口只许有一处，且挂在把手上。
-    func testDragAffordanceLivesOnlyOnTheHandle() throws {
+    /// 拖选这条路径必须**整个不存在**（D-034 的取舍）。留着半套最坏：
+    /// 一个永远抢不过表格拖拽会话的手势，会让人以为拖选还能用。
+    func testNoCompetingDragSelectGestureRemains() throws {
+        let sidebar = codeOnly(try sidebarSource())
+        XCTAssertFalse(sidebar.contains("DragGesture"),
+                       "侧栏还挂着一个拖选手势 —— 它在 `List` 里永远抢不过行拖拽会话，是死码")
+        XCTAssertFalse(sidebar.contains("dragSelectRange"),
+                       "store 的拖选动作已删，视图里不该再有引用")
+        XCTAssertFalse(sidebar.contains("rowFrames"),
+                       "行位置表只服务于拖选，留着就是没人读的账")
+        let store = codeOnly(try productSource(named: "Managers/HistoryStore.swift"))
+        XCTAssertFalse(store.contains("dragSelectRange"),
+                       "`dragSelectRange` 这个动作还在 store 里 —— 要么接回一条真实路径，要么删干净")
+    }
+
+    /// 拖出入口恰好一处，且在行上（`List` 会把行内 `.onDrag` 提升成整行拖拽源，
+    /// "只让行首可拖"在系统列表里做不到 —— 见 D-034 与用户真机反馈）。
+    func testDragAffordanceIsExactlyOneAndLivesOnTheRow() throws {
         let source = codeOnly(try productSource(named: "Views/HistoryRowViews.swift"))
         XCTAssertEqual(source.components(separatedBy: "EntryDragModifier(content:").count - 1, 1,
-                       "拖出入口应当恰好有一处（把手）。多一处就意味着又开始抢列表的拖选")
-        XCTAssertTrue(source.contains("RowDragHandle"), "行里找不到把手这一层")
-        XCTAssertFalse(source.contains(".onDrag"),
-                       "行视图里直接写 `.onDrag` 就绕过了 EntryDragGate 的分工判据")
-        // 把手的提示语不能对没有载荷的条目许空愿。
-        XCTAssertEqual(RowDragHandleHelp.helpText(for: .files([URL(fileURLWithPath: "/tmp/a")])), "")
-        XCTAssertFalse(RowDragHandleHelp.helpText(for: .text("x")).isEmpty)
+                       "拖出入口应当恰好一处；多一处就意味着又出现两个候选")
+        XCTAssertTrue(source.contains("RowLeadingVisual"), "行首视觉列不见了")
+        XCTAssertFalse(source.contains("RowDragHandle"),
+                       "旧的把手层还在 —— 那个设计已被真机否掉，别让它悄悄回来")
     }
 
     /// 源码扫描先把注释行滤掉：**"这里不再挂 `.onDrag`"这样一句解释会被裸关键词扫描当成违规**

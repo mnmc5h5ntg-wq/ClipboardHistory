@@ -3,8 +3,6 @@ import SwiftUI
 
 struct HistorySidebarView: View {
     @ObservedObject var historyStore: HistoryStore
-    @State private var dragSelectionAnchorID: HistoryStore.Entry.ID?
-    @State private var rowFrames: [HistoryStore.Entry.ID: CGRect] = [:]
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
 
@@ -123,6 +121,16 @@ struct HistorySidebarView: View {
         return "无匹配结果"
     }
 
+    /// 历史列表（第三轮审计 D-1，最终形态见账本 D-034）。
+    ///
+    /// 这里**刻意没有**列表级的拖选手势。原本 D-1 的修法③想同时保住"拖出"和"拖选"，
+    /// 做法是把 `.onDrag` 只挂在行首把手上；真机验证否掉了它 ——
+    /// `List` 底下是 `NSTableView`，SwiftUI 会把行内**任何**一处 `.onDrag` 提升成"整行是拖拽源"，
+    /// 于是从行里任意位置按下都会开会话（半透明剪影跟着鼠标走），
+    /// 而会话一开始，挂在容器上的 `DragGesture` 就拿不到这串鼠标事件了。
+    /// 结论：在 `List` 里"把手才拖出、行体拖选"这个分工做不到。
+    /// 取舍是**保留整行拖出、去掉拖选**（macOS 侧栏本来也不做橡皮筋多选，Finder 侧栏同样不做），
+    /// 选中交给单击 / shift / ⌘ / 方向键 —— 全部由系统 `List` 负责。
     private var historyList: some View {
         List(selection: selectionBinding) {
             ForEach(historyStore.filteredEntries) { entry in
@@ -132,20 +140,9 @@ struct HistorySidebarView: View {
                     copyAction: { historyStore.perform(.copyAndPromote(entry)) },
                     favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
                 )
-                .background(rowFrameReader(for: entry.id))
             }
         }
         .listStyle(.sidebar)
-        .coordinateSpace(name: "history-list")
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 4, coordinateSpace: .named("history-list"))
-                .onChanged { value in
-                    updateDragSelection(at: value.location)
-                }
-                .onEnded { _ in
-                    endDragSelection()
-                }
-        )
         .accessibilityLabel("历史记录列表")
         // 拖入文件入库（审计第二轮 1.5 / R2-05 的另一半：整个应用以前不接受任何拖入）。
         // 落点刻意只在列表区域而不是整窗：详情的文本视图自己接受文字拖放，
@@ -172,8 +169,8 @@ struct HistorySidebarView: View {
     /// `selectOnly`/`selectRange`/`toggleSelection`"，方向键另走 `onMoveCommand`。
     /// 换到 `List(selection:)` 之后 shift 扩选、⌘ 加选、方向键移动、滚动跟随、VoiceOver 的
     /// selected 语义全部由系统负责 —— 那四件事正是审计 D-1 说"一次解决"的部分。
-    /// `selectOnly`/`selectRange`/`dragSelectRange` 仍然留着：**拖选**（我们自己的手势）还要用它们，
-    /// 而且 store 级语义测试钉的就是这些动作，不是列表。
+    /// store 侧的 `selectOnly`/`selectRange`/`toggleSelection` 仍然留着：
+    /// 菜单栏面板、快捷键路径和 store 级语义测试都在用它们（被删掉的只有"拖选"那一条，见 D-034）。
     private var selectionBinding: Binding<Set<HistoryStore.Entry.ID>> {
         Binding(
             get: { historyStore.selectedEntryIDs },
@@ -215,52 +212,6 @@ struct HistorySidebarView: View {
                 continuation.resume(returning: result)
             }
         }
-    }
-
-    private func updateDragSelection(at location: CGPoint) {
-        guard let entry = entry(at: location) else { return }
-        if dragSelectionAnchorID == nil {
-            dragSelectionAnchorID = entry.id
-            historyStore.perform(.selectOnly(entry))
-            return
-        }
-        guard let dragSelectionAnchorID else { return }
-        historyStore.perform(.dragSelectRange(anchorID: dragSelectionAnchorID, target: entry))
-    }
-
-    private func endDragSelection() {
-        dragSelectionAnchorID = nil
-    }
-
-    private func entry(at location: CGPoint) -> HistoryStore.Entry? {
-        historyStore.filteredEntries.first { entry in
-            rowFrames[entry.id]?.contains(location) == true
-        }
-    }
-
-    private func rowFrameReader(for id: HistoryStore.Entry.ID) -> some View {
-        GeometryReader { proxy in
-            Color.clear.preference(
-                key: HistoryRowFramePreferenceKey.self,
-                value: [id: proxy.frame(in: .named("history-list"))]
-            )
-        }
-        .onPreferenceChange(HistoryRowFramePreferenceKey.self) { value in
-            // 原来是 merge：过滤/删除后消失的行永远留在表里，
-            // 拖动选择可能命中已经不在列表中的条目，且表只增不减（审计 R-40）。
-            rowFrames = value
-        }
-    }
-}
-
-private struct HistoryRowFramePreferenceKey: PreferenceKey {
-    static let defaultValue: [HistoryStore.Entry.ID: CGRect] = [:]
-
-    static func reduce(
-        value: inout [HistoryStore.Entry.ID: CGRect],
-        nextValue: () -> [HistoryStore.Entry.ID: CGRect]
-    ) {
-        value.merge(nextValue()) { _, new in new }
     }
 }
 

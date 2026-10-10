@@ -20,7 +20,6 @@ final class HistoryStore: ObservableObject {
         case selectOnly(Entry)
         case toggleSelection(Entry)
         case selectRange(to: Entry)
-        case dragSelectRange(anchorID: Entry.ID, target: Entry)
         case setSelection(Set<Entry.ID>)
         case copy(Entry)
         case copyAndPromote(Entry)
@@ -510,8 +509,6 @@ final class HistoryStore: ObservableObject {
             toggleSelection(entry)
         case .selectRange(to: let entry):
             selectRange(to: entry)
-        case .dragSelectRange(anchorID: let anchorID, target: let entry):
-            selectRange(from: anchorID, to: entry)
         case .setSelection(let ids):
             applyListSelection(ids)
         case .copy(let entry):
@@ -580,6 +577,10 @@ final class HistoryStore: ObservableObject {
         }
     }
 
+    /// shift 扩选：锚点是当前主选中项（没有主选中项时用集合里第一个）。
+    ///
+    /// 以前这里还有一个 `selectRange(from:to:)` 变体，锚点由**拖选手势**显式传入
+    /// （`dragSelectRange`）。那条路径随 D-034 一起删了，所以锚点来源重新收回到这一个。
     private func selectRange(to entry: Entry) {
         selectRange(from: selectedEntry?.id ?? selectedEntryIDs.first, to: entry)
     }

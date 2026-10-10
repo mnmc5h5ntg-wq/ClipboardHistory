@@ -79,26 +79,28 @@ enum EntryDragPlanner {
 /// 分工在这里写死：**只有从行的把手（缩略图/图标那一列）发起的拖动才是拖出**，
 /// 行体与空白处的按下-移动全部留给列表拖选。两个方向都可判：
 /// `.handle` + 有载荷 ⇒ 挂拖出；`.rowBody` ⇒ 永远不挂（载荷再满也不挂，那正是缺陷的形状）。
+/// 这一条提不提供拖出（第三轮审计 D-1，最终形态见账本 D-034）。
+///
+/// 这里曾经有一个 `prepareForDrag(origin:content:)`，想区分"从把手按下 = 拖出、从行体按下 = 拖选"。
+/// 真机验证否掉了它：`List` 底下是 `NSTableView`，SwiftUI 会把行内**任何**一处 `.onDrag`
+/// 提升成"整行是拖拽源"，所以作用域根本不在子视图上 —— 分工做不到，只能二选一。
+/// 选择是保留整行拖出、去掉拖选（macOS 侧栏本来不做橡皮筋多选）。
+/// 于是判据退化成一条：**没有载荷就不提供拖出**，
+/// 因为"拖起来什么都没发生"比"没有这个入口"更糟（R2-05 的原始理由）。
 enum EntryDragGate {
-    enum Origin: Equatable {
-        case handle
-        case rowBody
-    }
-
-    static func prepareForDrag(origin: Origin, content: ClipboardEntryContent) -> Bool {
-        guard origin == .handle else { return false }
-        return EntryDragPlanner.payload(for: content) != nil
+    static func offersDrag(for content: ClipboardEntryContent) -> Bool {
+        EntryDragPlanner.payload(for: content) != nil
     }
 }
 
-/// 把手（行首的缩略图/图标）上的拖出 affordance。**只**给把手用。
-/// 整行挂 `onDrag` 会吃掉列表的拖选 —— 见 `EntryDragGate`，判据由它给，别在这里绕过它。
+/// 有载荷才挂 `onDrag`。SwiftUI 没有"条件性 modifier"，所以分两条路径：
+/// 给没有载荷的条目挂一个返回空 provider 的 `onDrag`，会让用户拖起来毫无反应 —— 比不挂更糟。
 struct EntryDragModifier: ViewModifier {
     let content: ClipboardEntryContent
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if EntryDragGate.prepareForDrag(origin: .handle, content: self.content) {
+        if EntryDragGate.offersDrag(for: self.content) {
             content.onDrag {
                 EntryDragPlanner.itemProvider(forContent: self.content) ?? NSItemProvider()
             }

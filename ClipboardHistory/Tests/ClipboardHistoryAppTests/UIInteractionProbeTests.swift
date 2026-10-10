@@ -446,10 +446,12 @@ final class UIInteractionProbeTests: XCTestCase {
                                    "从第 1 行按下拖到第 4 行，选中集只扩到 \(store.selectedCount) 行 —— "
                                    + "这正是 D-1 的形状：拖出会话在阈值处抢走了这次拖动")
     }
+    // D-1 原本在这里有一条拖选探针（从第 1 行按下拖到第 4 行，断言选中集扩到 4 行）。
+    // 它随账本 D-034 一起删除：真机验证 `List` 会把行内任何 `.onDrag` 提升成整行拖拽源，
+    // 于是拖选与拖出在系统列表里不能共存，取舍是保留拖出、放弃拖选，
+    // 所以这个手势在产品里已经不存在了 —— 留一条永远点不出效果的探针就是留一个假闸门。
+    // 它当初也没真的门住过什么：合成事件驱动不了表格（见上一条探针里的 OBSERVE 行）。
 
-    /// 用户报的现象：双击列表里的条目之后，整个左侧列表外面多了一圈蓝色边框。
-    /// 那是 `.focusable()` 让列表容器成为 key view 后，AppKit 给它画的**系统焦点环**。
-    /// 这条探针把"环在不在"变成一个可打印、可断言的量：沿第一响应者往上读 `focusRingType`。
     func testSidebarListFocusRingAfterClick() throws {
         try skipUnlessEnabled()
         let store = HistoryStore(
