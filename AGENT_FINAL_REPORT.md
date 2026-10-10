@@ -474,7 +474,7 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 等于在最老的两个系统版本上把键盘用户丢掉。留成 ready-for-human，需要 12/13 真机。
 
 **判据总量（现取）**：`swift build --build-tests` 0 告警 · `swift test` **430 例 / 10 skip / 0 失败** ·
-`python3 -m unittest discover -s scripts/tests` **50 例 OK**（CI 下限从 17 提到 48） ·
+`python3 -m unittest discover -s scripts/tests` **54 例 OK**（CI 下限从 17 提到 48） ·
 `make bundle` 0 告警 · 78 张帧两次捕获逐帧同 sha · 帧基线 `docs/frame_baseline.json` 已入库（78 条）。
 本阶段共 **19 条新守卫做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
 或替换文本不完整导致编译错误），加强后才真正点亮。
@@ -486,3 +486,7 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 - `InstanceGuard` 对"直接 exec 包内二进制"的第二实例疑似漏判（本机实测：用户实例在跑时冒烟仍开出了窗口）。
   我的操作失误是把冒烟跑在了开发机上，已改为本地只用假包，真启动交给 CI 的干净 runner。
 - 12/13 的整块蓝色焦点环仍在（见上）。
+- 这一阶段我自己制造过一次 CI 事故（步骤名里裸的冒号+空格 → 工作流 0 秒失败、jobs 为空、无日志），
+  修法与那条教训记在 D-044：给"改 CI 文件"这个动作本身补了形状守卫 `test_ci_workflow_shape.py`。
+  前一轮我给产品加了 19 条变异对照，却第一次没给改工作流留任何自动检查 ——
+  判据的严密是按"我想到要防什么"分配的，而不是按风险分配的。
