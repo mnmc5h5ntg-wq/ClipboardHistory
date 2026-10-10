@@ -637,6 +637,8 @@ final class HistoryStore: ObservableObject {
         reconcileSelection(preferredEntryID: entry.id)
         persist()
         scheduleOCRIfNeeded(for: entry)
+        // 图片文件条目补一张行内缩略图（用户报的缺陷：详情区看得到图，列表里只有文档符号）。
+        attachFileThumbnailIfNeeded(for: entry)
         _ = contextCollector.recordCopy(entryID: entry.id)
 
         // 显露偏好：如果推荐窗口打开期间用户手动复制了别的
@@ -734,6 +736,54 @@ final class HistoryStore: ObservableObject {
             }
         }
     }
+
+    /// 给"单个图片文件"条目在后台补一张行内缩略图，解出来后回主线程写进条目并落盘。
+    ///
+    /// 走的是和 OCR 一样的形状（`scheduleOCRIfNeeded`）：**磁盘读与解码不许发生在主线程**，
+    /// 而写回必须回主线程并走 `entries[idx] = …updating(...)`，这样落盘与界面刷新只有一条路。
+    /// 判据本身在 `FileThumbnailPolicy.shouldAttachThumbnail`，可被真值表钉住。
+    private func attachFileThumbnailIfNeeded(for entry: Entry) {
+        guard FileThumbnailPolicy.shouldAttachThumbnail(for: entry) else { return }
+        guard case .file(let url) = entry.content else { return }
+        let entryID = entry.id
+        Self.thumbnailQueue.async { [weak self] in
+            guard let thumbnail = FileThumbnailPolicy.thumbnail(for: url) else {
+                // 只记文件名，不记路径以外的内容：路径本身可能敏感，而这里连内容都不需要。
+                LifecycleDebugLogger.log("file thumbnail skipped: \(url.lastPathComponent)")
+                return
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.applyThumbnail(entryID: entryID, thumbnail: thumbnail)
+            }
+        }
+    }
+
+    /// 主线程写回。抽成单独一个方法是为了让"缩略图落到条目 + 落盘"这一步可被直接测，
+    /// 不用去赌后台队列什么时候跑完。
+    @discardableResult
+    func applyThumbnail(entryID: Entry.ID, thumbnail: StoredImage) -> Bool {
+        guard let idx = entries.firstIndex(where: { $0.id == entryID }) else {
+            // 条目可能已经被清理/删除；这时候再写就是给一个不存在的条目补数据。
+            return false
+        }
+        guard entries[idx].thumbnail == nil else { return false }
+        entries[idx] = entries[idx].updating(thumbnail: thumbnail)
+        persist()
+        return true
+    }
+
+    /// 启动时给**已有**的图片文件条目补缩略图（与 `scheduleOCRForExistingImages` 同一时机）。
+    /// 老历史里那些"复制过图片文件但没有预览"的条目，升级后第一次启动就会陆续补上。
+    func attachMissingFileThumbnails() {
+        for entry in entries where FileThumbnailPolicy.shouldAttachThumbnail(for: entry) {
+            attachFileThumbnailIfNeeded(for: entry)
+        }
+    }
+
+    nonisolated private static let thumbnailQueue = DispatchQueue(
+        label: "com.clipboardhistory.file-thumbnail", qos: .utility
+    )
 
     private func refreshHistory() {
         if let intakeEntry = intake.refresh() {            add(intakeEntry)

@@ -40,12 +40,17 @@ struct ClipboardEntry: Identifiable, Equatable, Hashable, @unchecked Sendable {
         content.preview
     }
 
-    func updating(timestamp: Date? = nil, isFavorite: Bool? = nil, ocrText: String?? = nil) -> ClipboardEntry {
+    func updating(
+        timestamp: Date? = nil,
+        isFavorite: Bool? = nil,
+        ocrText: String?? = nil,
+        thumbnail: StoredImage?? = nil
+    ) -> ClipboardEntry {
         ClipboardEntry(
             id: id,
             content: content,
             timestamp: timestamp ?? self.timestamp,
-            thumbnail: thumbnail,
+            thumbnail: thumbnail ?? self.thumbnail,
             sourceURL: sourceURL,
             isFavorite: isFavorite ?? self.isFavorite,
             sourceUTIs: sourceUTIs,

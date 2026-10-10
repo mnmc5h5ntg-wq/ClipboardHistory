@@ -205,6 +205,24 @@ final class UICaptureTests: XCTestCase {
             )))
         })
 
+        // 图片**文件**条目带缩略图的一行（用户报的缺陷：详情区看得到图，列表里只有文档符号）。
+        // 这条帧存在的意义是：行首视觉列"有缩略图就用图"这件事从此有像素可查，
+        // 不再只能靠真机眼睛看。PDF/多文件那两条仍然没有缩略图，保持文档符号是对的。
+        let fileThumb = try! makeStoredImage(color: .systemIndigo, size: NSSize(width: 200, height: 150))
+        let fileWithThumb = ClipboardEntry(
+            content: .file(URL(fileURLWithPath: "/Users/tester/Desktop/board-icon-fullbleed.png")),
+            timestamp: Self.referenceDate.addingTimeInterval(-60),
+            thumbnail: fileThumb,
+            sourceURL: URL(fileURLWithPath: "/Users/tester/Desktop/board-icon-fullbleed.png"),
+            sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        )
+        results.append(Fixture("row-file-thumb", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: fileWithThumb, copyAction: {}, favoriteAction: {}
+            )))
+        })
+
         // 每个详情都用"重建同一份数据 + 按序号选中"，因为重建会生成新的 UUID
         for (index, entry) in store.entries.prefix(4).enumerated() {
             let kind = rowKind(entry)

@@ -51,6 +51,9 @@ final class ApplicationShell {
         // 启动后延迟扫描已有图片进行 OCR
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak historyStore] in
             historyStore?.scheduleOCRForExistingImages()
+            // 老历史里"复制过图片文件但没有行内预览"的条目，第一次启动就补上缩略图
+            // （同样是后台解码 + 主线程写回，见 `FileThumbnailPolicy`）。
+            historyStore?.attachMissingFileThumbnails()
         }
         LifecycleDebugLogger.log("HistoryStore.startMonitoring scheduled from ApplicationShell.configure")
     }
