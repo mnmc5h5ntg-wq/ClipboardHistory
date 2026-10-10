@@ -1057,3 +1057,25 @@ D-044 里我刚写完"要给改 CI 这个动作留自动检查"，一小时后�
 
 另外这条硬门有个诚实的边界：**它防的是"runner 少产出帧"，不是"这版比上版好"**。
 变帧仍然只报不挡 —— 新功能本来就会改像素，把它挡红等于训练自己看红不看红。
+
+## D-046 argparse 的 help 里写了一个裸 `%`，CI 的 python 3.14 当场炸掉整步
+
+第二次红（run 38074023728）跟判据、产品、runner 都无关：我给 `--allow-missing` 写的 help 文案里有
+"95% 空白"，而 **argparse 把 help 串当 `%` 格式串处理** —— 构造 parser 时就抛
+`ValueError: badly formed help string`。于是 `frame_baseline.py check` 连 main() 都没进，
+那一步"少帧硬门"红得像发现了视觉回归，实际是脚本自己起不来。
+
+细节：日志里 traceback 的完整路径是 `/opt/homebrew/Cellar/python@3.14/.../argparse.py:1750 _check_help`。
+本机 `/usr/bin/python3` 是 3.9。我以为"CI 的 python 更松，本机测过就算过"，
+但这条恰好相反 —— 3.14 在 add_argument 阶段就校验 help 串，3.9 只在 `format_help()` 时炸。
+**同一个错本机也能复现**，只要真的调用过一次 `--help`。我没调用过，我的 55 个自测一个也没调用过。
+
+补法不是"下次记得"，是给动作本身留检查：`scripts/tests/test_script_help_runs.py` 拿
+`sys.executable` 把 `scripts/*.py` 每个都跑一次 `--help`，退出码非零就红，
+并把报错尾巴打进断言消息里。现在本机也能抓到（3.9 会 raise ValueError → `--help` 非零退出）。
+
+这是同一族错误的第三次，值得单独一句：**我给 Swift 留了 0-warning 闸、给判据留了变异对照，
+却没有任何一条守卫覆盖"工具脚本自己能不能被启动"这件事**。
+产品代码的验证纪律远好于我自己写的脚手架 —— 而后者在 CI 的关键路径上。
+
+修法：help 串里的 `%` 写成 `%%`。

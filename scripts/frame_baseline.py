@@ -92,7 +92,7 @@ def main(argv=None) -> int:
     parser.add_argument("frames_dir")
     parser.add_argument("--allow-missing", action="append", default=[],
                         help="允许缺席的帧名（可重复）。无头 runner 上有几帧注定拍不出来 —— "
-                             "「捕获失效闸门」拒绝把 95% 空白的帧当证据写盘，那是诚实的行为。"
+                             "「捕获失效闸门」拒绝把 95%% 空白的帧当证据写盘，那是诚实的行为。"
                              "把它们列在这里，剩下的缺席才是真回归。")
     parser.add_argument("--repo-root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args = parser.parse_args(argv)
