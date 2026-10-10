@@ -467,3 +467,10 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 
 - 删掉 `prepare_release` 里一段永远走不到的回滚码，顺序改成被测试钉住的"最后一步"；
   Python 用例 63 → 64（走完整 `prepare()` 的集成测试 + 失败路径不留基线）。
+
+## 快照 28（2026-10-11，F-4 端到端补齐）
+
+- `HistoryStore.ocrRecognizer` 接缝 + `testIndexOnlyOCRStaysSearchableButLeavesTheArchiveClean`：
+  只索引模式下**存档字节里没有识别文本**、搜索仍能命中；落盘模式作正向对照。
+  两条变异对照（恒真分支 / 删掉内存索引）都点亮预期判据。
+- 15 条建议里对"从产品入口验收"最敷衍的一条已经补平。Swift 433 / Python 64 / bundle 0 告警。

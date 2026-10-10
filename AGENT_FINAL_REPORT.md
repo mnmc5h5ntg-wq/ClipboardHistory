@@ -452,7 +452,7 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 | F-1 按 App 排除 | 默认挡密码管理器/钥匙串 + 用户名单 + 优先级判据 | `testExcludedAppCopyIsNotRecordedThroughStore`（走 Store） | D-038 |
 | F-2 富文本保真 | RTF/HTML 采集→存档→写回，默认关，超限整份丢 | `Round3RichTextTests` 9 例（含命名剪贴板往返） | D-040 |
 | F-3 快速选择浮层 | ⌃⌥⇧V 浮层：打字即筛、↑↓、回车粘回原应用、Esc 不动 | `Round3QuickPickTests` 11 例 + 5 条变异 | D-041 |
-| F-4 OCR 只索引不落盘 | 识别文本可只在内存，搜索仍命中 | 真值表 + Store 侧写回分支判据 | D-038 |
+| F-4 OCR 只索引不落盘 | 识别文本可只在内存；`ocrRecognizer` 接缝让写回分支能被驱动 | `testIndexOnlyOCRStaysSearchableButLeavesTheArchiveClean`（直接读存档字节 + 落盘模式正向对照） | D-038 / D-049 |
 | F-5 固定与导出导入 | 置顶/豁免清理/行内徽标/批量与单条入口/JSON 导出（图片跳过并计数） | `Round3FeatureTests` 12 例 | D-038 |
 
 **三处刻意偏离审计，都写明了理由，不是漏掉**：
@@ -474,9 +474,9 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 等于在最老的两个系统版本上把键盘用户丢掉。留成 ready-for-human，需要 12/13 真机。
 
 **判据总量（现取）**：`swift build --build-tests` 0 告警 · `swift test` **432 例 / 10 skip / 0 失败** ·
-`python3 -m unittest discover -s scripts/tests` **63 例 OK**（CI 下限从 17 提到 48） ·
+`python3 -m unittest discover -s scripts/tests` **64 例 OK**（CI 下限从 17 提到 48） ·
 `make bundle` 0 告警 · 78 张帧两次捕获逐帧同 sha · 帧基线 `docs/frame_baseline.json` 已入库（78 条）。
-本阶段共 **23 条新守卫做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
+本阶段共 **26 条新守卫/判据做过变异对照**，其中 3 条最初是假守卫（判的是类型名/文件名字符串而不是使用处，
 或替换文本不完整导致编译错误），加强后才真正点亮。
 
 **仍然没闭合的，列清楚**：

@@ -97,6 +97,15 @@ final class HistoryStore: ObservableObject {
     /// 「只索引不落盘」模式下的识别文本：只在内存里，不进条目、不进存档。
     private var ocrIndex: [Entry.ID: String] = [:]
 
+    /// 文字识别的实现。默认是系统的 Vision 路径。
+    ///
+    /// 为什么开这个口子（不是"为了测试而测试"）：「只索引不落盘」这条特性的全部风险都在
+    /// **识别结果回来之后往哪儿写** —— 而以前那段分支只能靠真跑一次 OCR 才执行得到，
+    /// 于是它在仓库里从来没被执行过一次（D-038 自己记的就是这件事）。
+    /// 注入一个固定返回的识别器之后，`add` → 后台识别 → 写回分支 → 落盘/搜索
+    /// 这整条链能从产品入口走一遍，符合 `AGENTS.md` 的定义完成标准第 1 条。
+    var ocrRecognizer: @Sendable (CGImage) -> String? = { SystemContextCollector.recognizeText(in: $0) }
+
     /// OCR 结果的存放方式（决策时读，同 D-033 那两个开关）。
     var ocrStorageMode: OCRPolicy.StorageMode {
         get { OCRPolicy.mode(from: policyDefaults) }
@@ -748,12 +757,15 @@ final class HistoryStore: ObservableObject {
             return
         }
 
+        // 识别器在主线程取一次引用再交给后台队列：`HistoryStore` 是 @MainActor 的，
+        // 在 ocrQueue 上读它的属性就是跨 actor 取值（Swift 6 会拦，而且拦得对）。
+        let recognizer = ocrRecognizer
         Self.ocrQueue.async {
             guard let cg = Self.decodeImageForOCR(source) else {
                 Self.ocrLog("FAIL decode for \(entryID.uuidString.prefix(8))...")
                 return
             }
-            guard let text = SystemContextCollector.recognizeText(in: cg) else {
+            guard let text = recognizer(cg) else {
                 Self.ocrLog("OCR returned nil text for \(entryID.uuidString.prefix(8))...")
                 return
             }

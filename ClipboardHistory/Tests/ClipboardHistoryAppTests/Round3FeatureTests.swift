@@ -203,6 +203,98 @@ final class Round3FeatureTests: XCTestCase {
         XCTAssertEqual(store.entries.count, 1)
     }
 
+    /// F-4 的端到端：识别文本回来之后，「只索引不落盘」到底有没有把文字留在内存里。
+    ///
+    /// 这一条补的是 D-038 自己记下却没闭合的那半句：以前这段分支只能靠"真跑一次 Vision"
+    /// 才执行得到，于是它在仓库里从来没被执行过一次。现在识别器可注入（`HistoryStore.ocrRecognizer`），
+    /// 于是 `add` → 后台识别 → 写回分支 → 落盘 / 搜索 整条链从产品入口走一遍。
+    /// 断言刻意看**磁盘上的字节**：那才是"不落盘"这句话的意思。
+    func testIndexOnlyOCRStaysSearchableButLeavesTheArchiveClean() async throws {
+        let suiteName = "Round3F4-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let root = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("Round3F4-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let persistence = FileHistoryPersistence(rootDirectory: root)
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: persistence,
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 20, maxAgeDays: nil)
+        )
+        store.policyDefaults = defaults
+        store.ocrRecognizer = { _ in "截图里的口令 zebra-42" }
+
+        // 先确认"什么都不落盘"这条不是空转：没有识别结果时磁盘上当然也没有文字。
+        OCRPolicy.setMode(.indexOnly, defaults: defaults)
+        let firstImage = try makeStoredImage(color: .systemTeal, size: NSSize(width: 60, height: 24))
+        store.add(ClipboardIntake.Entry(content: .image(firstImage), thumbnail: firstImage,
+                                        sourceUTIs: ["public.png"],
+                                        sourceAppBundleID: "com.apple.Screenshot",
+                                        sourceAppName: "截图"),
+                  timestamp: Date(timeIntervalSince1970: 10))
+        try await awaitOCR(store, text: "zebra-42")
+
+        let archiveURL = root.appendingPathComponent("history.json")
+        let bytes = try Data(contentsOf: archiveURL)
+        let archive = String(decoding: bytes, as: UTF8.self)
+        XCTAssertFalse(archive.contains("zebra-42"),
+                       "只索引模式下识别文本仍然写进了 history.json")
+        XCTAssertFalse(archive.contains("ocrText"),
+                       "条目上仍然带着 ocrText 字段：说明写回分支看的是模式之外的东西")
+        // 同一份文字必须仍然搜得到 —— 否则"不落盘"就变成"把功能关掉了"
+        store.perform(.updateSearch("zebra-42"))
+        XCTAssertEqual(store.filteredEntries.count, 1,
+                       "只索引模式下搜不到：内存索引没接上，等于 OCR 白跑一次")
+        XCTAssertNil(store.entries.first?.ocrText)
+
+        // 正向对照：切成落盘模式后同样的路径必须把文字写进条目与存档。
+        // 没有这半条，上面那句"档案里没有"可以靠"OCR 根本没跑"糊过去。
+        OCRPolicy.setMode(.persisted, defaults: defaults)
+        let secondImage = try makeStoredImage(color: .systemOrange, size: NSSize(width: 60, height: 24))
+        store.perform(.updateSearch(""))
+        store.add(ClipboardIntake.Entry(content: .image(secondImage), thumbnail: secondImage,
+                                        sourceUTIs: ["public.png"],
+                                        sourceAppBundleID: "com.apple.Screenshot",
+                                        sourceAppName: "截图"),
+                  timestamp: Date(timeIntervalSince1970: 20))
+        try await awaitOCR(store, text: "zebra-42", expectingWrittenIntoEntry: true)
+
+        persistence.flushPendingSaves()
+        let after = String(decoding: try Data(contentsOf: archiveURL), as: UTF8.self)
+        XCTAssertTrue(after.contains("zebra-42"),
+                      "落盘模式下识别文本没进存档：那这条正向对照是空的")
+        XCTAssertTrue(store.entries.contains { $0.ocrText?.contains("zebra-42") == true })
+    }
+
+    /// 等后台识别回到主线程写完回。轮询而不是固定 sleep：
+    /// 固定等待在这类测试里只有两种结局 —— 要么偶发失败，要么把断言写成"永远成立"。
+    private func awaitOCR(_ store: HistoryStore, text: String,
+                          expectingWrittenIntoEntry: Bool = false) async throws {
+        let predicate: () -> Bool = {
+            store.perform(.updateSearch(text))
+            let searchable = !store.filteredEntries.isEmpty
+            store.perform(.updateSearch(""))
+            guard searchable else { return false }
+            // 落盘模式还要等"条目对象自己带上 ocrText"；只索引模式下这条永远不成立，
+            // 所以它必须是参数而不是无条件断言。
+            // （第一版我在这里加了 `shortPreview.contains("截图")`，把**来源 App 名**当成了
+            //  预览文本 —— 图片条目的预览是"图片"，于是这条等待永远不满足。）
+            if expectingWrittenIntoEntry {
+                return store.entries.contains { $0.ocrText?.contains(text) == true }
+            }
+            return true
+        }
+        for _ in 0..<40 {
+            if predicate() { return }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        // 只索引模式下条目永远不带 ocrText，所以那里等的是"搜索能命中"（内存索引），
+        // 两种模式都靠同一个轮询走到稳定态。
+        XCTAssertTrue(predicate(), "2 秒内 OCR 的写回没发生（识别器没被调用？还是分支被跳过了？）")
+    }
+
     func testExportWarningTextSaysWhatIsMissing() {
         let text = ArchiveTransfer.exportWarningText(
             summary: ArchiveTransfer.Summary(exportedCount: 3, skippedImageCount: 2))
