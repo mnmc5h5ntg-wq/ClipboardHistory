@@ -298,7 +298,6 @@ class ReleasePreparer:
         original_checksum_text = checksum_file.read_text(encoding="utf-8") if checksum_file.exists() else None
         had_release_dmg = release_dmg.exists()
         archived_dmg: Path | None = None
-        snapshot_path: str | None = None
 
         if self.dry_run:
             checksum = "DRY-RUN"
@@ -329,15 +328,11 @@ class ReleasePreparer:
 
             self._write_release_notes(release_notes, version, checksum)
             self._write_changelog(version, checksum)
-            snapshot_path = self._snapshot_frame_baseline(version)
+            # 冻结帧基线放在**整个流程的最后一步**：这样"发布没成功"时根本不会有
+            # 一个 `v<那个版本>.json` 留下来当下一版的基准 —— 顺序本身就是防护，
+            # 所以这里不需要（也不该有）一段永远走不到的回滚代码。
+            self._snapshot_frame_baseline(version)
         except Exception:
-            # 回滚也要覆盖这一步：留下一个「这次没发成功的版本」的帧基线，
-            # CI 的"和上一版比"会把半成品当基准，比缺这个文件更糟。
-            if snapshot_path is not None:
-                try:
-                    os.remove(snapshot_path)
-                except OSError:
-                    pass
             self._rollback_release_files(
                 release_dmg=release_dmg,
                 archived_dmg=archived_dmg,

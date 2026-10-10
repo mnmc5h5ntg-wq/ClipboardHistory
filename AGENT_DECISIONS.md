@@ -1152,3 +1152,15 @@ C-2 的第一版只有一份可随时 `update` 的 `docs/frame_baseline.json`，
 CI run 38075436591 全绿，含 `Frame baseline vs working manifest`（硬门）与
 `Frame baseline vs previous release`（报告型：变 66 / 少 2 / 多 12，runner 口径）
 与 `Runtime launch smoke → SMOKE_OK=1`。
+
+### D-047 补记：那段"回滚时删掉快照"的代码永远走不到，所以把它删了
+
+写完发布挂钩后回头读 `prepare()`：快照是 `try` 块的**最后一条语句**，那我在 `except` 里加的
+"删掉刚写出的版本基线"就是死码 —— 它防的情况（快照写完后再失败）根本不存在。
+处理方式不是留着当"以防万一"（那是把不确定的顺序当成确定的护栏），而是**删掉它并把顺序写进注释**：
+"冻结放在最后一步"本身就是那条保护，而且它现在是**被测的**
+（`test_a_real_release_freezes_the_baseline_last`：走完整 `prepare()` 断言文件落在版本名下，
+再用同版本二次发布被预检挡掉的那条路，断言基线目录前后一字不差）。
+
+顺带这条测试也补上了我之前那两条单测的空洞：它们只证明"方法能冻结"，不证明"发布流程会调它"。
+Python 用例 63 → 64。

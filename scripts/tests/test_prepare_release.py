@@ -399,6 +399,40 @@ class FrameBaselineSnapshotOnReleaseTests(unittest.TestCase):
             written = Path(target).read_text(encoding="utf-8")
             self.assertIn("a.png", written)
 
+    def test_a_real_release_freezes_the_baseline_last(self):
+        """走完整的 `prepare()`，而不是只单测那个方法。
+
+        这条存在的理由有两半：
+        1. 它证明冻结**确实发生在发布流程里**（被调到、文件落在版本名下），
+           而不是只在我的单元里被调到 —— 后者证明不了接线。
+        2. 顺带钉住"它是最后一步"：预检失败的那一路一个版本基线都不该留下，
+           否则"没发成功的版本"会变成下一版的比对基准。
+           （原先我在 except 里写了一段清理，那条路径其实永远走不到 ——
+           把顺序改对之后它就不需要存在了，见 D-047 的补记。）
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "docs").mkdir(parents=True)
+            (root / "releases").mkdir()
+            (root / "Makefile").write_text(
+                "APP_NAME := 时间剪史\nVERSION  := 1.2.2beta\n", encoding="utf-8")
+            (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
+            (root / "docs" / "frame_baseline.json").write_text(
+                '{"schema": 1, "count": 1, "frames": {"a.png": "1"}}\n', encoding="utf-8")
+            (root / ("%s_v1.2.3.dmg" % APP_NAME)).write_bytes(b"dmg")
+
+            ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True).prepare("1.2.3")
+            frozen = root / "docs" / "frame_baselines" / "v1.2.3.json"
+            self.assertTrue(frozen.exists(), "发布走完了却没冻结基线：下一版就没有可比的对象")
+            self.assertIn("a.png", frozen.read_text(encoding="utf-8"))
+
+            # 同一版本再发一次会被预检挡住（发布说明已存在）—— 那条路上不许留下新的基线
+            before = sorted(p.name for p in (root / "docs" / "frame_baselines").iterdir())
+            with self.assertRaises(Exception):
+                ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True).prepare("1.2.3")
+            after = sorted(p.name for p in (root / "docs" / "frame_baselines").iterdir())
+            self.assertEqual(before, after, "失败的发布留下了帧基线")
+
     def test_no_working_manifest_means_no_snapshot(self):
         with tempfile.TemporaryDirectory() as root:
             preparer = ReleasePreparer(ReleasePaths(root), skip_tests=True, skip_build=True)
