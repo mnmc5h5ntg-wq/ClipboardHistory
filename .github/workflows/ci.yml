@@ -52,6 +52,7 @@ jobs:
           test "$executed" -ge 200 || { echo "执行到的用例数 $executed 低于下限 200"; exit 1; }
 
       - name: On-screen UI probes and frame capture (report-only)
+        timeout-minutes: 10
         # 第三轮审计 D-7：`UIInteractionProbeTests` / `UICaptureTests` 需要环境变量才启用，
         # 而它们恰恰是"焦点链、行手势、右键菜单、帧基线"这几项的验收手段 —— 以前 CI 一次也没跑过。
         # 先以"允许失败 + 记录数字"起步：在屏窗口在无头 runner 上的稳定性还没被证明，
