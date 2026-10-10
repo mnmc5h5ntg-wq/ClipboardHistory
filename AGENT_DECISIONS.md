@@ -1126,3 +1126,29 @@ C-2 的第一版只有一份可随时 `update` 的 `docs/frame_baseline.json`，
 这是本轮第三次同一件事（前两次在 Swift 的中文字符串里）。
 它没造成损失只因为脚本是"全部检查后一次写盘"的写法，异常发生在任何写入之前。
 纪律：**账本类批处理脚本一律用 Write 工具落文件，不用 heredoc**。
+
+## D-048 仓库的"硬规矩"指着一条不存在的守卫：给文档本身加了守卫，顺手治了条 91 秒的测试
+
+改 C-2 的时候重读 `AGENTS.md` 的定义完成标准，发现它把 C-5 的守卫写成
+`testHistoryStoreAverageFunctionLengthDoesNotGrow` —— 那个"平均方法长度"的判据**在 D-038 里已经被
+变异对照证伪并换掉了**（塞进一个 33 行的方法，均值 20.02 → 20.25，守卫照绿），
+换成了 `testHistoryStoreStaysThin`（最长方法 ≤70 行、文件 ≤1120 行，两个单调上限）。
+代码换了、文档没跟着换。后果不是"文档旧了"这么简单：读那份文档的人（包括下一个我）
+会以为那里有一道闸，而那道闸不存在。这正是我自己记过的"源码已修不等于已交付"的同族，
+只是这次的"交付物"是一句规矩。
+
+于是补了 `DocumentationAnchorTests`：扫 `AGENTS.md` 与 `docs/agents/*.md` 里所有反引号点名的
+`testXxx`，逐个要求在测试源码里存在同名方法；读不到测试目录、或一个测试名都没解析出来，
+都算失败（否则这条守卫会静默变成"永远成立"）。变异对照：往文档里塞一条
+`testAGuardNobodyWroteEver`，它精确红在"文档点名的守卫不存在"上，之后 `cmp` 确认文件还原。
+
+**同一个文件的第一版跑了 91.8 秒**，原因是我用
+`String(characters[index...]).hasPrefix("func ")` 做扫描 —— 每个位置都构造一次后缀字符串，
+扫全仓测试文件就是平方级。改成单遍手工比较后 0.06 秒。
+慢不是小事：一条 91 秒的守卫会被人和"可以跳过的慢测试"划成一类，而那正是守卫最危险的死法。
+写扫描代码时"能跑对"不等于"能留下"。
+
+本轮判据总量：Swift 431 例 / 10 skip / 0 失败 · Python 63 例 OK · `make bundle` 0 告警 ·
+CI run 38075436591 全绿，含 `Frame baseline vs working manifest`（硬门）与
+`Frame baseline vs previous release`（报告型：变 66 / 少 2 / 多 12，runner 口径）
+与 `Runtime launch smoke → SMOKE_OK=1`。

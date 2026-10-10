@@ -455,3 +455,9 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 - Python 用例 57 → 63；CI 两个步骤分别答"纪律"和"历史"两个问句。
 - CI 实测（run 38074651028）：全部步骤绿，含 `Runtime launch smoke → SMOKE_OK=1 / SAW_START=True`
   —— C-4 的运行时证据是在 CI 的干净 runner 上拿到的，不是在本机。
+## 快照 26（2026-10-11）
+
+- `AGENTS.md` 的 C-5 守卫名是过期的（指向已被变异证伪的均值判据）→ 改为 `testHistoryStoreStaysThin`，
+  并新增 `DocumentationAnchorTests` 让"文档点名的守卫必须存在"变成一条会红的判据。
+- 那条测试第一版 91.8 秒（平方级扫描），改单遍后 0.06 秒。Swift 430 → 431 例。
+- CI run 38075436591 全绿：帧基线两步 + 运行时启动冒烟都过了。

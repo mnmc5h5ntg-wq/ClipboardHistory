@@ -32,4 +32,6 @@ never reads them. Treat them as third-party code with its own upstream — do no
    管线级样本见 `PipelineAcceptanceTests`（三条：采集→降采样→入库、来源归因→菜单标签、暂停→采集入口）。
 2. **`HistoryStore` 只减不加**：不拆类（500 条上限下拆是过度工程），但新特性一律先建
    `*Policy` / `*Planner` 纯函数，Store 里只留薄胶水。这条由一条会红的守卫钉住
-   （`testHistoryStoreAverageFunctionLengthDoesNotGrow`：行数 ÷ 顶层方法数，上限只准降不准升）。
+   （`testHistoryStoreStaysThin`：最长方法 ≤70 行、文件 ≤1120 行，两个上限都只准降不准升）。
+   刻意**不是**"行数 ÷ 方法数"的均值：那个指标被变异对照证伪过 —— 往 Store 里塞一个 33 行的方法，
+   均值从 20.02 只涨到 20.25，守卫照样绿。会红的必须是单调量（见账本 D-038）。
