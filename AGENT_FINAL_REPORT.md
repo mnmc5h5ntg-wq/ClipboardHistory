@@ -439,7 +439,7 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 
 | 建议 | 做了什么 | 判据在哪 | 账本 |
 | --- | --- | --- | --- |
-| C-1 管线级验收 | `AGENTS.md` 写死"验收要从产品入口进"，纯函数文件必须自写边界 | `PipelineAcceptanceTests` + 三个文件头上的 `不覆盖管线：` | D-038 |
+| C-1 管线级验收 | `AGENTS.md` 写死「验收要从产品入口进」，纯函数文件必须自写边界；**这条规矩本身也有一条守卫**（文档点名的测试必须存在，见 D-048） | `PipelineAcceptanceTests` + 三个文件头上的 `不覆盖管线：` + `DocumentationAnchorTests` | D-038 / D-048 |
 | C-2 帧基线进 CI | 两份基准：工作基线（硬门，答"夹具/界面变了却没更新基线"）+ 发布时冻结的逐版本快照（报告型，答"和上一版比哪些帧变了"）；`prepare_release.py` 负责冻结 | `test_frame_baseline.py` + `test_prepare_release.py` 共 12 例；真 v1.4.8 基线由 worktree 在那个 tag 上重拍 68 帧得到 | D-043 / D-047 |
 | C-3 存档策略成文 | 老存档缺键读默认值 + 只加可选字段不升版 | `testOldArchiveWithoutNewFieldsLoadsWithDefaults`（真存档删键） | D-038 |
 | C-4 运行时启动冒烟 | `CLIPBOARD_HISTORY_DATA_DIR` 隔离 + 真启一次看生命周期日志 | `Round3LaunchIsolationTests` 3 例 + 自测 8 例 | D-042 |
