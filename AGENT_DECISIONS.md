@@ -709,3 +709,23 @@ name: decisions
   stdout 管道，`communicate()` 等不到 EOF；改成"输出写文件 + 独立会话按 pgid 收组"才通。
   教训：**测别人的挂死时，自己的夹具不能靠管道读输出**（真实 runner 不挂是因为它一直在读管道）。
 - 兼容性与回滚：只动工作流与新增测试脚本，不碰产品码。回滚 = `git revert`。
+
+### D-037 追补：修完第一次仍然没有数字，根因换到了 `kill "$killer"`
+
+run 38064293655（上面那次修法之后）里 `captured frames: 70 executed: 1 捕获失效帧: 2` **终于打出来了**，
+但在屏步骤仍然只有 `line 13: Killed: 9` + `exit code 1`，`ui suite exit:` 一行没有。
+第二条中止点完全不同：**看门狗自己**。`( sleep 240; kill -9 "$pid" ) &` 执行完 kill 就退出，
+父脚本随后 `kill "$killer" 2>/dev/null` 得到 "No such process" ⇒ 返回 1 ⇒ `bash -e` 中止。
+`2>/dev/null` 只闭嘴不改退出码 —— 这是我前三次栽在同一个坑里时**唯一没检查的一行**。
+修法：`kill "$killer" 2>/dev/null || true`；同一形状在离屏步骤里对应的是
+`frames=$(find … | wc -l | tr -d ' ')`（目录不存在时 find 非零 + `pipefail` ⇒ 赋值非零），一并兜底。
+
+- **本地自检为什么没抓到它**：前三格夹具里的被测命令瞬间成功，`wait` 立刻返回，killer 还活着，
+  `kill "$killer"` 正常返回 0。新增第四格 `onscreen/watchdog_already_exited`：
+  把 watchdog 换成 `( exit ) &`、被测命令换成慢作业（1 秒），于是 `kill "$killer"` 必然落到已退出的进程上。
+  另补 `offscreen/missing_shots_dir`（帧目录不存在）。
+  变异对照（实测）：去掉这两处兜底 ⇒ `onscreen/watchdog_already_exited` 与
+  `offscreen/missing_shots_dir` 双双"结论行缺失"、退出码 1；还原后 `cmp` 逐字节相同、8 个形状全绿。
+- 归纳到一句可执行的规矩：**`bash -e` 里"允许失败"的步骤，每一行都要问一遍"它非零了脚本还活着吗"** ——
+  包括清理动作（`kill`、`rm`、`pkill`）和取值动作（`find`、`grep`），
+  它们的非零和被测命令的非零**在后果上一模一样**：结论行不会打印，闸门就变成装饰。

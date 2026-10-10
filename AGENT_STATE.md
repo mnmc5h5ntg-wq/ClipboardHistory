@@ -274,6 +274,9 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 - **D-037（同一夜，CI 侧）**：报告型步骤第三次"红了但没有数字"，根因换到了汇报行自己身上
   （runner 的 XCTest 打单数 `Executed 1 test`，抽取用的 `grep 'Executed [0-9]+ tests'` 失手 ⇒ 非零 ⇒
   `bash -e`+`pipefail` 中止 ⇒ 结论行没打、"没跑完"分支永远走不到）。修法：抽取行全部 `|| true` + 正则允许单数；
-  新增 `scripts/tests/test_ci_report_selftest.py`（抽 ci.yml 原文、喂三种日志形状，随 CI discovery 真执行，
-  变异对照已点亮）。附带一条自检教训：测"看门狗挂死"时自己的夹具**不能用管道读子进程输出** ——
+  新增 `scripts/tests/test_ci_report_selftest.py`（抽 ci.yml 原文、喂日志形状变体，随 CI discovery 真执行，
+  变异对照已点亮）。**这条修法还不够**：run 38064293655 里离屏步骤打出来了（`captured frames: 70 executed: 1
+  捕获失效帧: 2`），在屏步骤仍只有 `Killed: 9` —— 第二条中止点是 `kill "$killer"`（看门狗执行完 kill 自己退出了，
+  `2>/dev/null` 不改退出码），一并兜底并给自检补两格。规矩：**`bash -e` 里"允许失败"的步骤，
+  每一行都要问"它非零了脚本还活着吗"，包括清理动作与取值动作。**附带一条自检教训：测"看门狗挂死"时自己的夹具**不能用管道读子进程输出** ——
   孤儿 `sleep` 持有继承的 stdout，`communicate()` 等不到 EOF，实测把自己吊死在超时上；改写文件 + 独立会话按 pgid 收。

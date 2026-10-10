@@ -52,16 +52,29 @@ TRUNCATED = "Test Case '-[p probeA]' started.\n"
 NORMAL = ("Test Suite 'All tests' passed\n"
           "\t Executed 12 tests, with 3 tests skipped and 0 failures (0 unexpected) in 4.0 (4.1) seconds\n")
 
-# (步骤, 形状) → 日志正文, 必须出现的结论片段, 期望退出码
+# (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)
+#
+# 第四项是给"看门狗自己先退出"那个形状用的：实测 run 38064293655 里在屏步骤**仍然没有结论行**，
+# 但根因换了 —— 不是抽取失手，是 `kill "$killer" 2>/dev/null`：看门狗执行完 kill 就退出，
+# 父脚本再 kill 它得到 "No such process"（返回 1），`bash -e` 在这行中止，下面的 echo 一行都轮不到。
+# 本地前三形状测不到它，因为夹具里的被测命令瞬间就成功了，killer 还活着。
+# 所以这一格把 watchdog 换成 `( exit ) &`、把被测命令换成慢作业，让 `kill "$killer"` 必然落到已退出的进程上。
 EXPECT = {
-    ("offscreen", "singular_summary"): (SINGULAR, ["captured frames:"], 0),
+    ("offscreen", "singular_summary"): (SINGULAR, ["captured frames:"], 0, []),
     # 抽取落空时 offscreen 的 `test executed -ge 1` 应当给 1，但**结论行必须先打出来**
-    ("offscreen", "truncated_log"): (TRUNCATED, ["captured frames:"], 1),
-    ("offscreen", "normal"): (NORMAL, ["captured frames:"], 0),
-    ("onscreen", "singular_summary"): (SINGULAR, ["ui suite exit:"], 0),
+    ("offscreen", "truncated_log"): (TRUNCATED, ["captured frames:"], 1, []),
+    ("offscreen", "normal"): (NORMAL, ["captured frames:"], 0, []),
+    # 兜不住 find 的那格：目录不存在时 `find | wc | tr` 在 pipefail 下也是非零
+    ("offscreen", "missing_shots_dir"): (NORMAL, ["captured frames:"], None,
+                                         [(r"/tmp/shots-ci", "/tmp/definitely-not-here-xyz")]),
+    ("onscreen", "singular_summary"): (SINGULAR, ["ui suite exit:"], 0, []),
     # 看门狗收掉进程就是这个形状：旧脚本在这里中止，"没有跑完"那条分支永远走不到
-    ("onscreen", "truncated_log"): (TRUNCATED, ["ui suite exit:", "没有跑完"], 0),
-    ("onscreen", "normal"): (NORMAL, ["ui suite exit:"], 0),
+    ("onscreen", "truncated_log"): (TRUNCATED, ["ui suite exit:", "没有跑完"], 0, []),
+    ("onscreen", "normal"): (NORMAL, ["ui suite exit:"], 0, []),
+    ("onscreen", "watchdog_already_exited"): (
+        TRUNCATED, ["ui suite exit:", "没有跑完"], 0,
+        [(r"\( sleep 240; kill -9 \"\$pid\" 2>/dev/null \) &", "( exit ) &"),
+         (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
 }
 
 
@@ -81,13 +94,14 @@ def extract_run_block(text, step_name):
     return textwrap.dedent("\n".join(lines)).strip("\n")
 
 
-def build_script(block, fake_log, key):
+def build_script(block, fake_log, key, extra_subs=()):
     script = block
-    for pattern, replacement in SUBSTITUTIONS[key]:
+    for pattern, replacement in list(SUBSTITUTIONS[key]) + list(extra_subs):
         script, count = re.subn(
             pattern, lambda _m, r=replacement: r.replace("FAKE_LOG", fake_log), script)
-        if count != 1:
-            raise AssertionError("夹具替换没有落地（模式命中 %d 次）：%s" % (count, pattern))
+        # 额外替换允许命中 0 次的情形不存在：命中不了就是 ci.yml 改了写法，夹具已经失效
+        if count < 1:
+            raise AssertionError("夹具替换没有落地（命中 %d 次）：%s" % (count, pattern))
     return script
 
 
@@ -131,11 +145,11 @@ def check(ci_path):
         open(os.path.join(shots, "f%02d.png" % i), "wb").close()
 
     failures = []
-    for (key, case), (log_body, snippets, expected_code) in sorted(EXPECT.items()):
+    for (key, case), (log_body, snippets, expected_code, extra_subs) in sorted(EXPECT.items()):
         fake = os.path.join(shots, "log_%s_%s.txt" % (key, case))
         with open(fake, "w", encoding="utf-8") as handle:
             handle.write(log_body)
-        script = build_script(extract_run_block(text, STEPS[key]), fake, key)
+        script = build_script(extract_run_block(text, STEPS[key]), fake, key, extra_subs)
         try:
             code, out = run_bash(script, shots)
         except subprocess.TimeoutExpired:

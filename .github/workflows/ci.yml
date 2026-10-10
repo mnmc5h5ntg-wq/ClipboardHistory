@@ -71,7 +71,7 @@ jobs:
           # 后面的汇报行整段不执行 —— 那等于这一步又变成"红了但没有数字"。
           CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
             swift test --filter UICaptureTests 2>&1 | tee /tmp/frames.log || true
-          frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
+          frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ' || true)
           # 每一条抽取都必须自己吞掉非零：`bash -e` + `set -o pipefail` 下，
           # **汇报行自己的 grep 失手**也会中止脚本（实测 run 38062956819：runner 上 XCTest 只打了
           # "Executed 1 test"，单数，于是匹配 'tests' 的 grep 返回 1，captured frames 那行根本没打出来，
@@ -103,7 +103,11 @@ jobs:
           # bash -e 下 `wait` 拿到 137 会**当场中止脚本**，后面的汇报行一行都不会跑
           # （实测 run 38051846033 就是这个形状：看门狗正常收掉了进程，日志里却没有结论行）。
           wait "$pid" && status=0 || status=$?
-          kill "$killer" 2>/dev/null
+          # `|| true` 不是装饰：看门狗到点执行完 kill 之后**自己就退出了**，
+          # 于是这里的 `kill "$killer"` 报 "No such process" 返回 1 —— `bash -e` 当场中止，
+          # 下面三行抽取和结论行一行都轮不到（实测 run 38064293655 就是这个形状：
+          # 只有 `line 13: Killed: 9` 和 `exit code 1`，没有 `ui suite exit:`）。
+          kill "$killer" 2>/dev/null || true
           # 同上：抽取行必须自己 `|| true`，否则"没跑完"这条分支永远走不到（脚本在这行就中止了），
           # 而那恰好是这段代码存在的理由。单数 "Executed 1 test" 也要能匹配。
           executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/ui.log | tail -1 | grep -oE '[0-9]+' || true)

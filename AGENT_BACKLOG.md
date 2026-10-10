@@ -305,7 +305,7 @@ arm64 上类名字面量离调用点二十几行（固定窗口回看会在坏�
 | R3-D8 | 第三轮 D-8 | 低 | 已完成(D-033) | 设置侧栏符号统一描线（`sparkles`→`wand.and.stars`）+ 守卫。 |
 | R3-D9 | D-033 / D-034 | 中 | 部分完成(D-034) | **在屏表格行为没有自动化覆盖**：合成鼠标事件送不进 `NSTableView`（`clickedRow` 恒 -1）。D-034 已把"拖选"这条从需求里去掉（取舍），剩下的点选 / shift 扩选 / ⌘ 加选 / 双击复制 / 拖出落地仍只能真机看，每版发版前请把 `docs/MANUAL_TEST_v1.4.9_round3.md` 第 1、2 节人肉跑一遍。要么找一条能真正驱动表格的通道（CGEvent + 辅助功能授权，代价是要权限），要么接受这条人工门。 |
 | R3-D10 | D-033 | 低 | 未开始 | 多文件条目仍不能拖出（需要 `NSView` 级 dragging session，R2-05 的另一半）。换 `List` 之后做它的成本比之前低（行由表格管理），下一轮做 U-2 时顺手。 |
-| R3-D11 | D-033 / CI 实测 | 中 | 未开始 | **CI runner 上才有的两条事实**（run 38050339974 / 38050990090）：① `content-wide-1100x800` 亮暗两帧在 macos-15 runner 上有 95% 像素未被绘制 ⇒ 捕获失效闸门锁住不认它，真机这两帧正常，需要判定是 runner 的离屏渲染限制还是尺寸相关的产品问题；② `UIInteractionProbeTests` 在 runner 上直接挂死（8 分钟被 GitHub 掐掉），现在改成自带 240 秒看门狗并汇报「跑到哪儿了」。两条都不挡发布（报告型），但都是下一轮 CI 加固的入口。 |
+| R3-D11 | D-033 / CI 实测 | 中 | 部分完成(D-037) | **CI runner 上才有的两条事实**（run 38050339974 / 38050990090）：① `content-wide-1100x800` 亮暗两帧在 macos-15 runner 上有 95% 像素未被绘制 ⇒ 捕获失效闸门锁住不认它，真机这两帧正常，需要判定是 runner 的离屏渲染限制还是尺寸相关的产品问题（**仍未定，报告型不挡发布**）；② `UIInteractionProbeTests` 在 runner 上挂死，现在自带 240 秒看门狗 —— D-037 又发现"汇报了却一行数字都没有"其实是汇报行自己的 grep 在单数 `Executed 1 test` 上失手导致 `bash -e` 中止，已修并有守卫（`test_ci_report_selftest.py`）钉住"结论行必然打印"。两条都不挡发布，但都是下一轮 CI 加固的入口。 |
 | R3-D12 | 用户真机反馈 | 中 | 已完成(D-035) | 图片文件条目在左侧列表没有预览：剪贴板不带图像数据时 `.file` 条目的 thumbnail 是空的。现在 add 后在后台解一张 ≤256px 缩略图写回并落盘，启动时回填老历史；新增 `row-file-thumb` 亮暗两帧把这件事钉进帧集合（68→70）。 |
 **进度快照 13（D-029：修掉自己带进去的启动闪退）**：用户报「从仓库根目录打开新版 app 闪退」。
 两份 .ips 的崩溃 PC 紧跟 `_unimplementedInitializer(AppDelegate, "init()")` + `brk #1`，包 UUID 与仓库产物一致 ⇒ D-019 给 `AppDelegate` 加显式 `init(historyStore:)` 之后，ObjC 的 `-init` 变成编译器留下的 trap 桩，而 SwiftUI 的 `@NSApplicationDelegateAdaptor` 正是通过元类型调它。
@@ -363,5 +363,9 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 —— 抽取 `Executed N tests` 的 grep 在 runner 上匹配不到**单数** `Executed 1 test`，非零 + `pipefail` +
 `bash -e` 让脚本在 echo 之前中止。同族第三次（前两次是 tee 与 wait），已归纳成规矩并落成守卫：
 新脚本把两个步骤的 run 正文原文抽出来喂三种日志形状，随 CI 的 unittest discovery 真执行。
-当前判据：`python3 -m unittest discover -s scripts/tests` **31 例 / OK** · 变异 1 组点亮（还原 `cmp` 相同）·
-Swift 侧不变：362 例 / 10 skip / 0 失败。
+**第一版修法之后 run 38064293655 仍然缺结论行**：离屏步骤打出来了（`captured frames: 70 executed: 1 捕获失效帧: 2`），
+在屏步骤还是只有 `Killed: 9` + `exit code 1` —— 第二条中止点换到了 `kill "$killer"`：
+看门狗执行完 kill 自己就退出了，而 `2>/dev/null` 只闭嘴不改退出码。已一并兜底，并给自检补两格
+（看门狗已退出 / 帧目录不存在），变异对照下这两格都会"结论行缺失"。
+当前判据：`python3 -m unittest discover -s scripts/tests` **31 例 / OK（自检 5 个形状）** ·
+变异 2 组点亮（还原 `cmp` 相同）· Swift 侧不变：362 例 / 10 skip / 0 失败。
