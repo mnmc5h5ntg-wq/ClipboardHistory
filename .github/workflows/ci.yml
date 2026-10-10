@@ -67,8 +67,10 @@ jobs:
         working-directory: ClipboardHistory
         run: |
           set -o pipefail
+          # `|| true` 是必需的：`swift test` 非零（例如某帧被"捕获失效"闸门锁住）不该让
+          # 后面的汇报行整段不执行 —— 那等于这一步又变成"红了但没有数字"。
           CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
-            swift test --filter UICaptureTests 2>&1 | tee /tmp/frames.log
+            swift test --filter UICaptureTests 2>&1 | tee /tmp/frames.log || true
           frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ')
           executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/frames.log | tail -1 | grep -oE '[0-9]+')
           undrawn=$(grep -c '未被绘制，判定为捕获失效' /tmp/frames.log || true)
@@ -93,7 +95,10 @@ jobs:
           pid=$!
           ( sleep 240; kill -9 "$pid" 2>/dev/null ) &
           killer=$!
-          wait "$pid"; status=$?
+          # `&& ... || ...` 而不是 `wait "$pid"; status=$?`：
+          # bash -e 下 `wait` 拿到 137 会**当场中止脚本**，后面的汇报行一行都不会跑
+          # （实测 run 38051846033 就是这个形状：看门狗正常收掉了进程，日志里却没有结论行）。
+          wait "$pid" && status=0 || status=$?
           kill "$killer" 2>/dev/null
           executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/ui.log | tail -1 | grep -oE '[0-9]+')
           skipped=$(grep -oE 'with [0-9]+ tests skipped' /tmp/ui.log | tail -1 | grep -oE '[0-9]+')
