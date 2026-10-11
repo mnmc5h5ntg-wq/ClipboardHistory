@@ -65,11 +65,13 @@ final class WindowChromeMetrics: ObservableObject {
         if next != detailContentTopInset { detailContentTopInset = next }
     }
 
-    /// 测试专用：把单例恢复到"窗口还没配置过"的状态。
-    /// 不这么做的话，一条量真实窗口的用例会把值留给后面所有离屏帧夹具 ——
-    /// 同一进程里跑过的测试会悄悄改变帧。
-    func resetDetailContentTopInsetForTesting() {
-        detailContentTopInset = WindowChromeLayout.detailContentTopInsetFallback
+    /// 测试专用：还原到进入该用例之前的值。
+    /// 不做还原的话，一条量真实窗口的用例会把几何留给后面所有离屏帧夹具 ——
+    /// 同一进程里"跑过哪个测试"会悄悄改变帧。
+    /// 刻意要求调用方把原值传回来（而不是复位成兜底值）：兜底值和真实窗口的值不一定相等，
+    /// 复位成兜底值等于把"首帧状态"和"测过之后的状态"混为一谈。
+    func restoreDetailContentTopInsetForTesting(_ value: CGFloat) {
+        detailContentTopInset = value
     }
 }
 

@@ -6,14 +6,6 @@ import XCTest
 
 @MainActor
 final class WindowChromeLayoutTests: XCTestCase {
-    /// 这些用例里有"量真实窗口"的一条，它会写 `WindowChromeMetrics.shared`。
-    /// 单例被改掉之后，同一进程里后面的离屏帧夹具会继承那个值 —— 于是"测试改变了产品外观"。
-    /// 所以 tearDown 一律复位成"窗口还没配置过"的初值。
-    override func tearDown() {
-        WindowChromeMetrics.shared.resetDetailContentTopInsetForTesting()
-        super.tearDown()
-    }
-
     func testTrafficLightOriginUsesNativeCornerInset() {
         let origin = WindowChromeLayout.trafficLightOrigin(titlebarHeight: 52, buttonHeight: 14)
 
@@ -88,6 +80,13 @@ final class WindowChromeLayoutTests: XCTestCase {
     /// 只测纯函数的话，"摆按钮那段改了、发布那段没跟着改"这种分叉测不到。
     func testConfiguredWindowPublishesAtLeastTheMeasuredBand() throws {
         _ = NSApplication.shared
+        // 这条用例会写产品单例，所以进入时记下原值、离开时还原。
+        // 为什么写在测试体内而不是 `tearDown`：`tearDown` 是非隔离上下文，
+        // 够不到 MainActor 上的单例 —— CI 的 Swift 6.1.2 直接拒绝编译，
+        // 本机 6.2 却放行（"本地绿、CI 红"的老一族，这次栽在测试自己的隔离上）。
+        let savedInset = WindowChromeMetrics.shared.detailContentTopInset
+        defer { WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedInset) }
+
         // 先把单例摆成一个**不可能来自真实窗口**的假值，再建窗口。
         // 顺序反了就测不到接线：上一版把假值摆在窗口配置之后，于是"永远等不到覆盖"，
         // 这条判据在没变异的代码上也是红的 —— 判据要"平时绿、变异红"，两头都得验。
