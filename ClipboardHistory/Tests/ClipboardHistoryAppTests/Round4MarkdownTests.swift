@@ -298,6 +298,28 @@ final class Round4MarkdownTests: XCTestCase {
         XCTAssertFalse(MarkdownRenderingAffordance.offers(for: .image(try makeStoredImage())))
     }
 
+    func testTheToggleIsNotPromisedForAMarkdownFileThatIsGone() throws {
+        let here = try writeTemporaryFile(named: "在那.md", contents: sample)
+        let gone = URL(fileURLWithPath: "/tmp/absent-\(UUID().uuidString).md")
+        // 夹具前提：那个"不在了"的路径真的不在（否则这条测的是别的东西）。
+        XCTAssertFalse(FileManager.default.fileExists(atPath: gone.path))
+
+        XCTAssertFalse(MarkdownRenderingAffordance.offers(for: .file(gone), exists: { _ in false }),
+                       "文件都不在了还承诺有两种看法")
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: .file(here), exists: { _ in true }))
+        // 产品侧那一份走真实文件系统：把文件删掉，入口要跟着消失。
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: .file(here)))
+        try FileManager.default.removeItem(at: here)
+        XCTAssertFalse(MarkdownRenderingAffordance.offers(for: .file(here)),
+                       "文件被移走之后头部还挂着那颗控件")
+
+        // 多文件：只要有一个还在的 .md 就给；全都不在了就不给。
+        let another = try writeTemporaryFile(named: "另一个.md", contents: sample)
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: .files([gone, another]),
+                                                         exists: { $0 == gone ? false : true }))
+        XCTAssertFalse(MarkdownRenderingAffordance.offers(for: .files([gone, another]), exists: { _ in false }))
+    }
+
     func testAutolinkOnlyAcceptsWebAndMailSchemesInTheParser() {
         // 与 `linkURL(for:)` 的白名单逐个对齐；`file:` 不在名单里：
         // 一个只读预览不该把本地路径变成可点的东西。

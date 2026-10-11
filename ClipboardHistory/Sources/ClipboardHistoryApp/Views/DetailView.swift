@@ -120,7 +120,11 @@ struct DetailView: View {
                     // 这一档是全 App 的次要文字问题，单独记在 backlog，不在这里顺手改。
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    // 刻意**不加纵向 padding**：这颗控件的高度必须与 11pt 的 meta 文字同高，
+                    // 否则"这条记录有没有第二种看法"会顺带改变头部高度，
+                    // 换选一条 .md 与一条普通文本时下面的列表整块上下跳
+                    // （实测过：加了 2pt 纵向 padding 之后，22/82 帧因为几何移动而变）。
+                    // 悬停底色因此贴着字形那一行 —— 它本来就是个安静的行内动作，不是按钮区。
                     .background {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(.primary.opacity(isHovered ? 0.07 : 0))
