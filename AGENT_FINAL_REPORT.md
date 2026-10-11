@@ -521,7 +521,7 @@ D-1 换 `List(selection:)` 后行里没有 `Button` 了，离屏交互探针在*
 
 ### 验证
 
-- Swift 433 → **519 例 / 11 skip / 0 失败**；Python 64 例；`swift build` 与 `make bundle` 0 告警。
+- Swift 433 → **520 例 / 11 skip / 0 失败**；Python 64 例；`swift build` 与 `make bundle` 0 告警。
 - 判据分三层（`AGENTS.md` 定义完成标准）：纯函数真值表 54 例、
   呈现层 + 产品入口（临时目录真 `.md` 文件 → `MediaLoader` → 真文本视图）+ 视图树 + 源码锚点 28 例、
   在屏探针 1 例（真窗口里文件预览确实画成渲染结果）。

@@ -330,7 +330,7 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 - 账本：D-050（为什么自己写子集而不是引依赖）、D-051（四个被实测否掉的做法）、
   D-052（帧基线会随系统外观漂移，已钉死并加了双向守卫）。
   视觉验收在 `AGENT_UI_AUDIT.md` U-17（含每个元素的实量对比度）。
-- 数字：Swift 519 例 / 11 skip / 0 失败；Python 64 例；`swift build` 与 `make bundle` 0 告警；
+- 数字：Swift 520 例 / 11 skip / 0 失败；Python 64 例；`swift build` 与 `make bundle` 0 告警；
   82 帧多次连拍与工作基线 `CHANGED=0 MISSING=0 ADDED=0`（且是在系统深色时段拍的，修之前会漂 18 帧）。
   取法：`cd ClipboardHistory && swift test 2>&1 | grep -E 'Executed [0-9]+ tests' | tail -1`。
 - 新守卫 14 条全部实跑变异对照，**14/14 红在该红的那条用例**，跑完逐字节还原。
