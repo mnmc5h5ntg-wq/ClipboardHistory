@@ -89,6 +89,16 @@ final class MarkdownParsingTests: XCTestCase {
         XCTAssertFalse(MarkdownParsingPolicy.offersRendering(forText: ""))
     }
 
+    func testASingleStrayBacktickIsNotACodeSpanSignal() {
+        // 孤立反引号在日志与命令行里到处都是。把它算成"行内码"这一类，
+        // 就会和 `# 注释` 那类凑够两类，把一段普通文本排成带标题的文档。
+        let stray = "# 读取配置\n把 ` 这个字符当成占位符\n"
+        XCTAssertEqual(MarkdownParsingPolicy.signals(in: stray), [.heading])
+        XCTAssertFalse(MarkdownParsingPolicy.offersRendering(forText: stray))
+        // 成对才算（与解析器要求闭栏是同一条定义）。
+        XCTAssertTrue(MarkdownParsingPolicy.signals(in: "`占位符`").isSuperset(of: [.codeSpan]))
+    }
+
     func testControlTitleSaysWhatItWillBecomeNotWhatItIs() {
         XCTAssertEqual(MarkdownPreviewMode.controlTitle(for: .rendered), "原文")
         XCTAssertEqual(MarkdownPreviewMode.controlTitle(for: .source), "渲染")

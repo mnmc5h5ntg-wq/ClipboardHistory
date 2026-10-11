@@ -296,6 +296,18 @@ enum MarkdownScanner {
         body.contains("**") || body.contains("__") || body.contains("~~")
     }
 
+    /// 行内码信号同样只认**成对**的反引号。
+    ///
+    /// 为什么这条值得单独写：判定文本条目"是不是 Markdown"要两类信号同时出现，
+    /// 而任何单个反引号都算一类信号的话，`# 注释` 开头 + 正文里一个孤立反引号
+    /// （日志、配置、命令行里都有）就会凑够两类，把一段普通文本排成带标题的文档。
+    /// 成对是行内码的**定义**（`MarkdownScanner.findClosingBacktick` 也要求闭栏），
+    /// 所以这里不是加严，是把信号的定义和解析器的定义对齐。
+    static func containsCodeSpan(_ body: String) -> Bool {
+        guard let first = body.firstIndex(of: "`") else { return false }
+        return body[body.index(after: first)...].contains("`")
+    }
+
     // MARK: - 字符级：run 与闭栏
 
     /// "单词字符"（字母或数字）。下划线两侧的这个词界判定靠它。

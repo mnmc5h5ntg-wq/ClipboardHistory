@@ -84,7 +84,7 @@ enum MarkdownParsingPolicy {
             if MarkdownScanner.orderedMarker(of: body) != nil { found.insert(.orderedList) }
             if MarkdownScanner.isTableRule(body) { found.insert(.tableRule) }
             if MarkdownScanner.containsLinkSyntax(body) { found.insert(.link) }
-            if body.contains("`") { found.insert(.codeSpan) }
+            if MarkdownScanner.containsCodeSpan(body) { found.insert(.codeSpan) }
             if MarkdownScanner.containsEmphasisSyntax(body) { found.insert(.emphasis) }
         }
         return found
