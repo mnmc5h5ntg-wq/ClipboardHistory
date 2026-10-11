@@ -11,6 +11,11 @@ enum WindowChromeLayout {
     static let trafficLightTrailingGap: CGFloat = 8
     static let trafficLightTopInset: CGFloat = 19
 
+    /// 详情头部内容至少要从窗口顶往下留这么多，才不会被三个按钮压住。
+    /// 这是**拿不到真实窗口时的兜底值**；正常情况下由 `WindowChromeMetrics`
+    /// 用实测的标题栏高度算出来（见 `trafficLightBandBottom`）。
+    static let detailContentTopInsetFallback: CGFloat = 35
+
     static func trafficLightOrigin(titlebarHeight: CGFloat, buttonHeight: CGFloat) -> NSPoint {
         NSPoint(
             x: trafficLightLeading,
@@ -19,6 +24,52 @@ enum WindowChromeLayout {
                 trafficLightMinimumBottomInset
             )
         )
+    }
+
+    /// 按钮带在"距窗口顶多少 pt"这个坐标系里的下边缘。
+    ///
+    /// 为什么要单独把这个量算出来：详情列的内容是 `.ignoresSafeArea(edges: .top)` 铺到窗口顶的，
+    /// 于是它的头部那一行和交通灯住在同一条带里 —— 侧栏开着时灯压在侧栏上看不出来，
+    /// **一收起侧栏，详情头部就压到按钮上**（用户实测报的这条）。
+    /// 带工具栏时容器高 52pt、灯带底边在 33pt；没有工具栏时是 32pt / 26pt。
+    /// 所以这个数不能写死在视图里，得由真的摆放按钮的那段代码给出来。
+    static func trafficLightBandBottom(titlebarHeight: CGFloat, buttonHeight: CGFloat) -> CGFloat {
+        titlebarHeight - trafficLightOrigin(titlebarHeight: titlebarHeight,
+                                           buttonHeight: buttonHeight).y
+    }
+
+    /// 头部内容要留出的距离：灯带底边 + 一点呼吸，且不小于兜底值。
+    static func detailContentTopInset(titlebarHeight: CGFloat, buttonHeight: CGFloat) -> CGFloat {
+        max(trafficLightBandBottom(titlebarHeight: titlebarHeight, buttonHeight: buttonHeight) + 2,
+            10)
+    }
+}
+
+/// 把 AppKit 实测到的窗口装饰几何，交给需要躲开它的那一层（详情头部）。
+///
+/// 为什么不是视图自己算：SwiftUI 拿不到"这个窗口有没有工具栏、标题栏容器多高"，
+/// 而按钮正是 AppKit 那侧（`Coordinator.alignTrafficLights`）在每次 resize / 成为 key
+/// / 成为 main / 移动时重新摆放的。**谁摆的谁知道底边在哪**，所以由它发布。
+@MainActor
+final class WindowChromeMetrics: ObservableObject {
+    static let shared = WindowChromeMetrics()
+
+    /// 详情头部内容的顶部留白。初值是兜底值：窗口还没被配置过（离屏夹具、首帧）也要安全。
+    @Published private(set) var detailContentTopInset: CGFloat = WindowChromeLayout.detailContentTopInsetFallback
+
+    /// 只有真的变了才发布 —— 这个方法在每次 resize 与每次成为 key 时都会被调，
+    /// 无脑赋值会让详情区跟着重排。
+    func noteTrafficLights(titlebarHeight: CGFloat, buttonHeight: CGFloat) {
+        let next = WindowChromeLayout.detailContentTopInset(titlebarHeight: titlebarHeight,
+                                                           buttonHeight: buttonHeight)
+        if next != detailContentTopInset { detailContentTopInset = next }
+    }
+
+    /// 测试专用：把单例恢复到"窗口还没配置过"的状态。
+    /// 不这么做的话，一条量真实窗口的用例会把值留给后面所有离屏帧夹具 ——
+    /// 同一进程里跑过的测试会悄悄改变帧。
+    func resetDetailContentTopInsetForTesting() {
+        detailContentTopInset = WindowChromeLayout.detailContentTopInsetFallback
     }
 }
 
@@ -148,6 +199,11 @@ struct WindowConfigurator: NSViewRepresentable {
             }
 
             let buttonOrigin = WindowChromeLayout.trafficLightOrigin(
+                titlebarHeight: titlebarContainer.bounds.height,
+                buttonHeight: closeButton.frame.height
+            )
+            // 把"灯带底边在哪"发布给详情头部 —— 它铺到了窗口顶，必须躲开这三个按钮。
+            WindowChromeMetrics.shared.noteTrafficLights(
                 titlebarHeight: titlebarContainer.bounds.height,
                 buttonHeight: closeButton.frame.height
             )

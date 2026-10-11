@@ -3,6 +3,9 @@ import SwiftUI
 
 struct DetailView: View {
     @ObservedObject var historyStore: HistoryStore
+    /// 窗口装饰的实测几何。详情区是 `.ignoresSafeArea(edges: .top)` 铺到窗口顶的，
+    /// 所以它必须自己躲开左上角那三个按钮 —— 侧栏开着时看不出问题，一收起侧栏就压上了。
+    @ObservedObject private var chrome: WindowChromeMetrics = .shared
 
     /// 详情区是"看"的地方，所以 Markdown 默认给渲染结果；那颗「原文」控件负责另一头。
     ///
@@ -86,7 +89,11 @@ struct DetailView: View {
             .frame(maxWidth: DetailTypography.columnWidth())
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 10)
+        // 顶部留白不是审美值，是**窗口装饰的实测几何**：这一行文字必须从交通灯带下方开始，
+        // 否则侧栏一收起（详情列成了最左列）就会和关闭/最小化按钮叠在一起。
+        // 数值由 `WindowChromeMetrics` 在每次重新摆放按钮时发布。
+        .padding(.top, chrome.detailContentTopInset)
+        .padding(.bottom, 10)
         .background(.ultraThinMaterial)
     }
 
