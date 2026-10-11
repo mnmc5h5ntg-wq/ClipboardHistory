@@ -139,11 +139,13 @@ struct WindowConfigurator: NSViewRepresentable {
             configuredWindow = window
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
+            pinSidebarVisible(in: window)
             // Aggressive follow-up: SwiftUI may recreate the toggle across several frames
             for delay in [0.0, 0.02, 0.08, 0.2, 0.5, 1.0] {
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                     guard let self, let window = self.configuredWindow else { return }
                     self.removeSidebarToolbarButton(from: window)
+                    self.pinSidebarVisible(in: window)
                 }
             }
         }
@@ -152,23 +154,27 @@ struct WindowConfigurator: NSViewRepresentable {
             guard let window = notification.object as? NSWindow else { return }
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
+            pinSidebarVisible(in: window)
         }
 
         func windowDidBecomeMain(_ notification: Notification) {
             guard let window = notification.object as? NSWindow else { return }
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
+            pinSidebarVisible(in: window)
         }
 
         func windowDidResize(_ notification: Notification) {
             guard let window = notification.object as? NSWindow else { return }
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
+            pinSidebarVisible(in: window)
         }
 
         func windowDidEndLiveResize(_ notification: Notification) {
             guard let window = notification.object as? NSWindow else { return }
             removeSidebarToolbarButton(from: window)
+            pinSidebarVisible(in: window)
         }
 
         func windowDidMove(_ notification: Notification) {
@@ -232,6 +238,92 @@ struct WindowConfigurator: NSViewRepresentable {
                     toolbar.removeItem(at: index)
                 }
             }
+        }
+
+        /// 把侧栏钉成"永远在"（对齐系统设置那类 App）：不允许折叠，
+        /// 分隔条最多拖到列的最小宽度就停住；已经是折叠状态的（旧版本留下的窗口存档）当场展开。
+        ///
+        /// 为什么必须在 AppKit 层做：SwiftUI 那侧能拿掉的只有工具栏按钮和菜单命令
+        /// （`toolbar(removing: .sidebarToggle)` 还只在 macOS 14+ 生效），
+        /// 而**拖分隔条**这条路根本不经过它们 —— 用户报的"收起侧栏后左上角互相遮挡"
+        /// 就是从这条路走出来的。与其给遮挡打补丁再指望用户别那么用，不如让那个状态不可达。
+        ///
+        /// 为什么要顺手展开：`NavigationSplitView` 会把列的可见性存进窗口/场景存档，
+        /// 只在装新版**之前**收起过侧栏的那台机器上，第一帧可能就是收起的。
+        /// 只关 `canCollapse` 等于"以后不能再收，但这次还是空的"，对报缺陷的用户来说没修。
+        ///
+        /// 返回值表示"这次真的找到了分栏器并钉上了"。调用方（含测试）必须能区分
+        /// "钉好了"和"根本没找到分栏器"，否则一个找不到东西的实现会永远绿。
+        @discardableResult
+        func pinSidebarVisible(in window: NSWindow) -> Bool {
+            guard let split = Self.splitViewController(in: window) else {
+                LifecycleDebugLogger.log("pinSidebarVisible: 没找到 NSSplitViewController，侧栏仍可被拖没")
+                return false
+            }
+            guard let sidebar = Self.sidebarItem(of: split) else {
+                LifecycleDebugLogger.log("pinSidebarVisible: 分栏器里没有列项")
+                return false
+            }
+            var changed = false
+            if sidebar.canCollapse {
+                sidebar.canCollapse = false
+                changed = true
+            }
+            if sidebar.isCollapsed {
+                sidebar.isCollapsed = false
+                changed = true
+            }
+            if changed {
+                LifecycleDebugLogger.log("pinSidebarVisible: 侧栏已钉为永远显示（分栏器列项数=\(split.splitViewItems.count)）")
+            }
+            return true
+        }
+
+        /// 找到承载 SwiftUI `NavigationSplitView` 的那个 `NSSplitViewController`。两条路线都要走：
+        ///
+        /// ① 控制器树 BFS：`window.contentViewController` 有值的宿主（AppKit 壳、设置窗口）够用。
+        ///    但主窗口上它**是 nil** —— 我们是把 `NSHostingView` 直接摆进 `contentView` 的，
+        ///    没有中间控制器。第一版只写了这条，于是 `pinSidebarVisible` 在真窗口上永远返回
+        ///    false，只在日志里留一句"没找到"；是那条 A/B 判据（`WindowChromeLayoutTests`）把它抓出来的。
+        /// ② 视图树 BFS：SwiftUI 会把 `NSSplitView` 摆在 `contentView` 底下，而
+        ///    `NSSplitViewController` 就是那块 split view 的 `delegate`（AppKit 的既有约定），
+        ///    所以顺着视图树找 `NSSplitView`、再问它的 delegate，比依赖任何私有类名都稳。
+        ///
+        /// 层级与深度会随系统版本变（本机 27 与 CI 的 15 上垫的容器数就不一样），
+        /// 所以两条都是广度优先，而不是"取第 N 层第 M 个子视图"。
+        static func splitViewController(in window: NSWindow) -> NSSplitViewController? {
+            if let fromControllerTree = splitController(inControllerTreeOf: window) { return fromControllerTree }
+            return window.contentView.flatMap { splitController(inViewTreeOf: $0) }
+        }
+
+        private static func splitController(inControllerTreeOf window: NSWindow) -> NSSplitViewController? {
+            var queue: [NSViewController] = window.contentViewController.map { [$0] } ?? []
+            while let controller = queue.first {
+                queue.removeFirst()
+                if let split = controller as? NSSplitViewController { return split }
+                queue.append(contentsOf: controller.children)
+            }
+            return nil
+        }
+
+        private static func splitController(inViewTreeOf root: NSView) -> NSSplitViewController? {
+            var queue: [NSView] = [root]
+            while let view = queue.first {
+                queue.removeFirst()
+                if let split = view as? NSSplitView, let owner = split.delegate as? NSSplitViewController {
+                    return owner
+                }
+                queue.append(contentsOf: view.subviews)
+            }
+            return nil
+        }
+
+        /// 哪一列是侧栏。优先按 `behavior == .sidebar` 认；
+        /// 认不出来时退回第一列（SwiftUI 的分栏器里侧栏就是第一列），
+        /// 但**不退回"全部列都钉上"** —— 把内容列也钉成不可折叠，
+        /// 以后真要加可折叠的检查器列就会莫名其妙失效。
+        static func sidebarItem(of split: NSSplitViewController) -> NSSplitViewItem? {
+            split.splitViewItems.first { $0.behavior == .sidebar } ?? split.splitViewItems.first
         }
 
         /// 不是 private：审计第二轮 08-08 / 13-08 指出这条"猜出来再删"的判断没有任何测试。

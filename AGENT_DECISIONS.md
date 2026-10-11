@@ -1404,3 +1404,132 @@ U-4 那轮我写下过"两处引用同一个 `containerGutter`，所以左缘必
 （`WindowConfigurator` 的测试复位口 + 那条用例的还原位置）。已经推出去了，不改写历史，
 用这条说明补记 —— 和 D-048 那次是同一个形状：**消息描述的东西要当场 `git show --stat` 核一遍，
 漏描述和瞎描述一样会骗到下一个读历史的人**（那次是写了没做的，这次是做了没写的）。
+
+## D-054 不修遮挡，直接把"收起侧栏"这条路撤掉（用户提的）
+
+用户原话："哎我想到了，直接取消这个收起侧栏的功能，删掉这个按钮。像系统设置软件一样永远显示侧栏。"
+上一轮（D-053）是我给遮挡打补丁，这一轮是把那个状态变成**不可达** —— 后者是对的方向，
+因为它同时撤掉了"补丁本身还得一直对"这个负担。
+
+**先把"收起侧栏"有几条路数清楚**，这决定要动哪里：
+
+| 路 | 现状 |
+|---|---|
+| 工具栏那颗「显示/隐藏侧栏」 | macOS 14+ 由 `toolbar(removing: .sidebarToggle)`；14 以下由 AppKit 兜底 `removeSidebarToolbarButton`（判定是 `isSidebarToolbarItem`，已有真值表） |
+| 菜单命令 ⌃⌘S | `CommandGroup(replacing: .sidebar) {}` 早就清空了 |
+| **拖分隔条** | **谁都不管** —— 用户报的遮挡就是从这条路走出来的 |
+
+所以"删掉按钮"这件事本身其实已经做完了，真正缺的是第三条。做法是在窗口配置器里把侧栏那一列
+`canCollapse = false`，分隔条最多拖到该列最小宽度（`navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)`）就停住。
+
+**只关 `canCollapse` 是不够的**：`NavigationSplitView` 会把列的可见性存进存档，
+而这台报缺陷的机器**恰好收起过侧栏**。只关它就变成"以后不能再收，但这次打开还是空的"，
+对用户来说等于没修。所以钉之前要先看 `isCollapsed`，是折叠的就展开。
+
+### 两处被实测打回的地方（本轮真正该记的）
+
+**① 第一版的分栏器查找在生产里根本没跑通。** 我写的是从 `window.contentViewController`
+开始 BFS 控制器树 —— 干净、像样、测试里也一样能查。实测打印出来（临时探针，跑完删掉；原文照抄）：
+
+```
+PROBE contentViewController=nil
+PROBE   AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<NavigationSplitRepresentable>> frame={{0, 0}, {750, 560}}
+PROBE     NSView frame={{0, 0}, {750, 560}}
+PROBE       NSSplitView frame={{0, 0}, {750, 560}} delegate=Optional(<SwiftUI.NavigationSplitViewController: 0x7af6889700>)
+              items=Optional(["NSSplitViewItemBehavior(rawValue: 1)/collapsible=true/collapsed=false",
+                              "NSSplitViewItemBehavior(rawValue: 0)/collapsible=false/collapsed=false"])
+```
+
+`rawValue: 1` 就是 `.sidebar`、`rawValue: 0` 是 `.default`（对着 SDK 的
+`NSSplitViewItemBehavior` 枚举核过：Default/Sidebar/ContentList/Inspector 依次 0/1/2/3），
+所以那一列确实带 `.sidebar`、而且默认就是可折叠的 —— 判据的"平时绿"这半边有真内容。
+
+主窗口是把 `NSHostingView` 直接摆进 `contentView` 的，**中间没有控制器**，所以那条 BFS
+在第一帧就空手而归，`pinSidebarVisible` 只会 return false 并在日志里留一句"没找到"。
+抓它的正是那条 A/B 判据的**第一半**："不挂配置器的真窗口里，侧栏列项确实可以折叠，**而且我们的
+查找函数找得到它**"。只断言"挂上之后不可折叠"的话，一个找不到东西的实现会永远绿 ——
+这是 D-053 里那条"published ≥ measured 被兜底值满足"的同一族。
+最终两条路线都留：控制器树（AppKit 宿主用得上）+ 视图树（找 `NSSplitView`，问它的 `delegate`）。
+走 delegate 而不是猜 SwiftUI 的私有类名，是因为"控制器给自己的 splitView 当 delegate"是 AppKit 的既有约定。
+
+**② "旧存档展开"那条判据第一版是假绿。** 第一版造状态的方式是：未配置窗口 → `isCollapsed = true`
+→ 换根视图成带配置器的。它绿了，0.226 秒。加一条 `XCTAssertIdentical(判据盯的列项, 现场重新查到的列项)`
+之后当场红：**换根视图会把 `NSSplitViewItem` 重建**，我判的那个对象是个已经废弃的壳，
+它 `isCollapsed` 变 false 不代表产品展开了任何东西。
+现在的写法不靠换根视图：先让配置器把这一列钉住，再把它**恢复到 SwiftUI 刚建出来、带着折叠存档时的样子**
+（`canCollapse = true` + `isCollapsed = true` —— 不这么做就没法造出"打开时就是收起的"，因为
+`canCollapse == false` 时 AppKit 直接拒绝折叠），然后触发**真事件**（窗口缩放 → 产品自己装的 `windowDidResize`
+→ 再钉一次），判据是"活对象既被展开、又被重新钉住"。
+→ 提炼成一条通用规矩：**凡判据盯的是"从视图树里查出来的对象"，就必须同时断言它仍是现场那一个。**
+
+### 几个刻意的设计
+
+`pinSidebarVisible` 回报布尔，并且"找到了"和"什么都没找到"必须是两个颜色：否则实现退化成
+永远 return true 也测不出来（M5 就是这个变异，打红了）。认列只认 `behavior == .sidebar`，
+认不出来才退回第一列，**不许退回"全部列都钉上"** —— 那会让以后真要给某列可折叠时莫名其妙失效（M4）。
+`removeSidebarToolbarButton` 的判据这轮从"只有真值表"补到"走 `configure(window:)` 这个产品入口，
+在真 `NSToolbar` 上摘一次"：夹具必须同时造一颗普通项，否则"整条工具栏清空"这种坏实现也能通过（M6）。
+
+**D-053 那条头部让位保留**，即使遮挡现在不可达了。三个理由：① 它同时把正文挡在标题栏拖拽区之外；
+② macOS 13 及以下 `toolbar(removing:)` 不生效，那台上仍要靠 AppKit 摘按钮，多一层保险不要钱；
+③ 撤掉能力是"这条路不通"，让位是"就算通了也不撞"，两者不是重复。
+
+### 验证
+
+- Swift **531 例 / 0 失败**（比上一轮 +5：钉住 A/B、旧存档展开、认列真值表、工具栏摘除、分隔条拖不到 0）。
+  不带 `CLIPBOARD_HISTORY_UI_SHOTS` 时 11 skip；带上时那两条离屏捕获不再跳过，所以 skip 会少 2。
+  取法：`cd ClipboardHistory && swift test 2>&1 | grep -E 'Executed [0-9]+ tests' | tail -1`。
+- **"拖不动"是量出来的，不是推断的**（`testPinnedSidebarCannotBeDraggedDownToZeroWidth`，本机实测）：
+
+  | 量 | 未钉住 | 钉住之后 |
+  |---|---|---|
+  | 分隔条能去的最左位置 | **-1pt**（整条能拖没） | **250pt** |
+  | 侧栏列宽（起始） | 280pt | 280pt |
+  | 硬按 `setPosition(0)` 之后的列宽 | — | **250pt**（被夹住） |
+  | 列自己报的下限 `minimumThickness` | 250pt | 250pt |
+
+  判据用列自己报的 `minimumThickness`，不在测试里再抄一份 250。带 A/B 那一半（未钉住的极限必须更靠左）
+  是为了防"量的本来就是一条拖不动的分隔条"。
+  这里还有一个差点踩空的取数方式：第一版按 `splitView.subviews[index]` 取列宽，而实测那组子视图是
+  `[包装视图 750pt, NSTitlebarBackgroundView, NSTitlebarBackgroundView, _NSSplitViewShadowView, 侧栏包装视图 280pt]` ——
+  index 0 量到的是**内容列**，它永远 ≥250，这条判据就会**绿着通过**。改成问列自己的 `viewController.view`。
+- **7 条变异对照 7/7 红在该红的那条**：M1 不再关 `canCollapse` → A/B 红；M2 不再展开已折叠列 →
+  旧存档那条红；M3 finder 退回只查控制器树 → 两条都红（`XCTUnwrap` 大声说"探针失效"）;
+  M4 认列改成按顺序 → 真值表红；M5 什么都不做却 return true → 两条都红；M6 摘按钮改成清库 →
+  工具栏那条红（`items: []`）；**M7 钉错列（返回 `splitViewItems.last`）→ A/B 与拖拽两条都红**，
+  其中拖拽那条连失败 5 处，包括"未配置窗口本该还能折叠"这个夹具前提 —— 钉错列是这次改动最危险的失败方式，
+  所以每条判据开头都先确认 `behavior == .sidebar`。
+- 帧：82 帧与工作基线 `CHANGED=0 MISSING=0 ADDED=0`，**而且是带着新判据同一个进程里拍的**
+  （拖拽那条会把 `NSSplitView Subview Frames` 写进持久化，所以它在收尾 `setPosition(startWidth)` 复位；
+  复位之前它确实有把侧栏留在 250pt 的能力 —— 同一族的"谁污染谁还原"）。
+- `swift build` 0 告警；`python3 -m unittest discover -s scripts/tests` 64 例 OK。
+
+### 顺手证实了一件原先只能假设的事
+
+`NavigationSplitView` **确实**把列的可见性与宽度持久化：用户机上
+`defaults read com.clipboardhistory.app` 里躺着
+`NSSplitView Subview Frames …ContentView…-1-AppWindow-1, SidebarNavigationSplitView`，
+值是 `0.000000, 0.000000, 268.000000, 480.000000, NO, NO` 这种"每列一条"的形状。
+而在测试自己的 defaults 域（`ClipboardHistoryApp`，不是 app 的域）里，一台**收起过侧栏**的
+夹具窗口重新开出来时 `isCollapsed` 就是 `true` —— 于是 D-054 里"只关 `canCollapse` 等于没修"
+那句从推断变成了观测。（字段含义我没写死，只用到"会持久化列状态"这一条。）
+
+### 没跑到的 / not-run
+
+- **macOS 12/13 上这条路没验**：本机 27、CI 15。12/13 的 `NavigationSplitView` 落到的容器不一定带
+  `.sidebar` behavior，届时 `sidebarItem(of:)` 会退回第一列（真值表钉的就是这个兜底），
+  但"退回去之后钉的是不是侧栏"在这两台上我没法证。CI 绿只能说明 macOS 15 上成立。
+- **"存档会带折叠状态"是在测试域里观测到的，不是在用户域里验证的**：观测到的是"同一个 defaults 域里
+  收起过，重开出来的窗口 `isCollapsed` 就是 true"，以及用户域里确实存在那些 `NSSplitView Subview Frames` 键。
+  我没做的是"在用户机上先收起、装新版、看它有没有自己展开"这一步 —— 那需要真机操作，记在下面。
+- 用户侧验收只有一条：装完之后**试着拖分隔条**，拖不动即为成立（已写进手工清单）。
+
+### 一条流程上的自我提醒（变异脚本自己坏了那次）
+
+第一版把 `swift test` 放进 python 里 `subprocess.run`，6 条变异全部报 `DID NOT RUN`，
+而脚本最后打印 `SUMMARY mutants=6 caught=0 escaped=6` —— 看上去像"这批守卫全是空的"，
+实际是**探针自己没跑起来**（python 起的 `swift-test` 在编译清单/stdlib 那步就炸，前台同样的命令却好的）。
+判据一条都没执行，却给出一个像结论的数字。改法：python 只负责改文件与逐字节还原，
+`swift test` 由外层 shell 直接跑，每个变异一次调用。
+这就是账本里那条"退出码/汇总数字 ≠ 子进程真跑过"的复发，只不过这次被骗的方向是**反的**
+（把"没跑"读成"跑得很红"）。

@@ -79,6 +79,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   所以这个数不能写死），首帧用兜底值。改完详情 meta 在 42pt。
   注意：**这一类缺陷离屏帧永远拍不到**（帧捕获的是 `contentView`，不含标题栏），
   所以配套的是"真窗口量一次 + 能被打红的接线判据"，不是更多帧。
+  同一轮之后，收起侧栏这条路已被整体撤销（见上面「侧栏不再能收起」，D-054）——
+  这条让位补丁因此从"修缺陷"变成"防御纵深"。
 - **点选列表条目后有可感知的延迟**（用户真机反馈，见账本 D-036）：行上的双击手势一度改成
   `.onTapGesture(count: 2)`，那个识别器要等一个双击间隔才能确定"这只是一次单击"，而改成系统
   `List(selection:)` 之后行的选中正是经由这套行内点击识别下发的，于是高亮被整体推迟了一个双击间隔。
@@ -113,6 +115,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **侧栏不再能收起**（用户提出，见账本 D-054）：像系统设置那样永远显示。工具栏那颗
+  「显示/隐藏侧栏」按钮与菜单命令本来就已经摘掉，但**拖分隔条**这条路谁都不管 ——
+  上一条缺陷就是从这条路走出来的。现在窗口配置器把侧栏那一列钉成不可折叠
+  （`NSSplitViewItem.canCollapse = false`），分隔条最多拖到该列的最小宽度（250pt）就停住；
+  已经是折叠状态的（旧版本留下的列可见性存档）当场展开，否则"以后不能再收、这次还是空的"。
+  详情头部那条让位补丁保留：它同时把正文挡在标题栏拖拽区之外，属于防御纵深。
+  实现上有个坑值得记：真窗口是 `NSHostingView` 直接摆进 `contentView` 的，
+  `window.contentViewController` **是 nil**，所以顺着控制器树找分栏器在生产里永远空跑 ——
+  必须走视图树（`NSSplitView` 的 `delegate` 就是那个 `NavigationSplitViewController`）。
 - CI 的两个报告型步骤（帧捕获 / 在屏探针）现在**必然打印数字**：第三步坏了三次，两次坏在
   **汇报行自己**身上 —— ① 抽取 `Executed N tests` 的 `grep` 在 runner 上匹配不到单数
   `Executed 1 test`，非零 + `pipefail` + `bash -e` 让脚本在 echo 之前中止；② 看门狗子进程执行完

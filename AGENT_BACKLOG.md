@@ -536,3 +536,35 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
    都必须消费 `WindowChromeMetrics`，做成一条会红的扫描测试（现在只有详情区一处，靠人记着）。
 7. **详情头部与侧栏首行的水平关系没有判据**：现在 meta 在 42pt、侧栏搜索框在 62pt，
    两列首行不对齐（差 20pt）。本轮没动它，因为改哪一边都是设计决定。
+
+## 快照 32（2026-10-12 凌晨，用户提议：撤销"收起侧栏"这个能力）
+
+- 收起侧栏的三条路清点完：工具栏那颗（14+ 由 `toolbar(removing:)`、以下由 AppKit 摘）、
+  菜单 ⌃⌘S（空组）都早就没了；**真正缺的是拖分隔条**。现在窗口配置器把侧栏列
+  `canCollapse = false`，且已折叠的列当场展开（`NavigationSplitView` 会把列可见性存档，
+  收起过的那台机器装上新版第一帧就是空的 —— 只关不展开等于没修）。
+- 实测：分隔条最左从未钉住的 **-1pt** 变成 **250pt**；硬按到 0pt 之后列宽仍是 250pt（下限由列自己报）。
+- 两处被实测打回（详见 D-054）：① 分栏器查找第一版只走控制器树，而真窗口
+  `window.contentViewController` **是 nil**，生产里等于永远空跑；② "旧存档展开"那条第一版
+  **假绿** —— 换根视图会重建 `NSSplitViewItem`，判据盯的是废弃的壳，补 `XCTAssertIdentical` 才暴露。
+- 数字：Swift **531 例 / 0 失败**（+5 条判据）；**7 条变异 7/7 红在该红的那条**（含"钉错列"）；
+  82 帧与工作基线 `CHANGED=0 MISSING=0 ADDED=0`；`swift build` 0 告警；Python 64 例 OK。
+- 取法：`cd ClipboardHistory && swift test 2>&1 | grep -E 'Executed [0-9]+ tests' | tail -1`；
+  帧：`CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests` 之后
+  `python3 scripts/frame_baseline.py check /tmp/shots --against working`。
+
+### 这一轮新欠的
+
+8. **macOS 12/13 上这条没实测**（not-run）：本机 27、CI 15。那两台上 `NavigationSplitView`
+   落到的容器不一定带 `.sidebar` behavior；`sidebarItem(of:)` 会退回第一列（真值表钉的就是这个兜底），
+   但"退回去之后钉的是不是侧栏"证不了。CI 绿只支持 macOS 15。
+9. **用户真机验收还没做**：这一轮改动的唯一人眼判据是"试着拖分隔条，拖不动即成立"，
+   已写进 `docs/MANUAL_TEST_v1.4.9_round3.md` 批次 7。
+10. **`minimumThickness` 是 SwiftUI 翻译出来的**：判据绑的是"列自己报的下限"，
+    所以 `navigationSplitViewColumnWidth(min:)` 改小时判据不会红（这是刻意的：它测的是拖不动，不是宽度值）。
+    若哪一天 SwiftUI 不再把它翻译成 AppKit 的下限，"起始宽度 ≥ 下限"那条会先红 —— 届时该重新设计这条判据，
+    而不是把 250 抄回测试里。
+11. **`WindowConfigurator` 里"补做"的时间点是硬编码的**（`[0, 0.02, 0.08, 0.2, 0.5, 1.0]`）：
+    侧栏与工具栏按钮都靠它兜住 SwiftUI 的多次重建。现在有四条事件（成为 key / 成为 main /
+    resize / 结束实时缩放）+ 这 6 个延迟兜着，本机够用；但它本质是"轮询到看起来稳定"，
+    慢机器上仍可能有一瞬能拖。真正的修法需要 SwiftUI 侧的 API，目前没有。
