@@ -552,6 +552,12 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 - 取法：`cd ClipboardHistory && swift test 2>&1 | grep -E 'Executed [0-9]+ tests' | tail -1`；
   帧：`CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests` 之后
   `python3 scripts/frame_baseline.py check /tmp/shots --against working`。
+- 推上去之后 CI 服务端结论 **success**（`e4b5359`，Swift 6.1.2 / macOS 15）：531 例 / 11 skip / 0 失败，
+  且日志里有 `SIDEBAR_PIN 起始宽度=280.0pt 列下限=250.0pt 分隔条最左=250.0pt 按到 0pt 后=250.0pt`
+  与 `未钉住：最左=-1.0pt` —— 这五条新判据在 macOS 15 上是真的执行过、数字与本机一致，不是被跳过。
+- 已装机：`/Applications` 换成 `14f2f079…`，上一份 `bf761424…` 移到
+  `~/Documents/Codex_Project0_backups/before-pinned-sidebar-20261012-002001/`；
+  装完用 `ps`/`lsof` 确认跑起来的是新路径那一份；`history.json` 与 `images/` 前后逐字节未变（84 条 / 8 图）。
 
 ### 这一轮新欠的
 
