@@ -88,14 +88,13 @@ enum MarkdownPresentation {
 
     // MARK: - 缩进
 
-    static let baseGutter: CGFloat = 0
     static let listMarkerAdvance: CGFloat = 16
     static let quoteIndent: CGFloat = 18
     static let maximumListDepth: Int = MarkdownParsingPolicy.maximumListDepth
 
     /// 段落首行缩进：引用层数 × 引用缩进 + 列表深度 × 项目符宽度。
     static func firstLineHeadIndent(for block: MarkdownBlock) -> CGFloat {
-        baseGutter + CGFloat(block.quoteDepth) * quoteIndent
+        CGFloat(block.quoteDepth) * quoteIndent
             + listDepth(of: block.kind) * listMarkerAdvance
     }
 
@@ -250,7 +249,7 @@ enum MarkdownPresentation {
         var attributes: [NSAttributedString.Key: Any] = [:]
         // **颜色与可点必须同现同缺**：链接色只在真的能点时给。
         // 否则屏幕上会出现"蓝色、下划线、点了没反应"的字 —— 那是假 affordance，
-        // 比不给链接更坏（与 `EntryDrag` 里"Web URL 不给拖成文件"同一族决定）。
+        // 比不给链接更坏。名单与理由在下面的 `linkURL(for:)`。
         let clickable = run.marks.contains(.link) ? linkURL(for: run.destination ?? "") : nil
         attributes[.foregroundColor] = clickable == nil ? foregroundColor(for: block) : linkColor
         attributes[.font] = font(for: run, in: block)
