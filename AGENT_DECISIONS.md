@@ -1210,3 +1210,133 @@ D-038 里我自己记了一句"没做到的：F-4 只证到策略真值表 + 写
 手工清单里对应那条也跟着改口：现在需要人在真机确认的只剩"Vision 对你真实截图识别得准不准"，
 不再包括"只索引到底落不落盘"。
 Swift 用例 432 → 433。
+
+## D-050 右侧预览渲染 Markdown：一个自己写的子集，而不是一个依赖
+
+用户的要求是一句话："给右侧预览加上对 markdown 文档的渲染支持"。落到仓库里，第一个岔路口是
+**用什么渲染**，而这个决定会决定后面所有东西的形状：
+
+- 引第三方解析器（`swift-markdown` / Down / cmark）会是这个包的**第一个外部依赖**。
+  现在 `Package.swift` 里零依赖，`make bundle` 是纯 SwiftPM + 手工 Info.plist；
+  引入一个 C/cmark 目标要动链接、动 CI 构建时间、动供应链（本仓库连 `.agents/skills/`
+  都单独隔离成"第三方资产"，见 `AGENTS.md`）。为一个只读预览付这个代价不值。
+- `AttributedString(markdown:)` 是系统自带的，但它**只解行内语法**：`#` 标题、列表、
+  围栏代码、表格、引用一概不认。用它会得到"星号没了、标题还是普通字号"的结果 ——
+  那比不渲染更糟，因为它把"这是 Markdown"的证据擦掉了，却没给出层级。
+
+所以自己写，并且**只写一个明确的子集**：ATX 与 setext 标题、围栏与缩进代码、
+有序/无序/任务列表（含续行）、引用（可嵌套）、分隔线、管道表格、
+行内的粗体/斜体/删除线/行内码/链接/自动链接/反斜杠转义。
+刻意不做：引用式链接、图片、脚注、HTML 块、裸 URL 自动链接、松散列表语义、表格列重排。
+**不做的东西一律原样显示成文字**，因为渲染器最坏的错不是难看，是把用户的字弄丢了。
+
+这条"不丢字"是硬不变量，有一条用例对一批故意恶心的输入（未闭合、错配、CRLF、emoji、HTML）
+逐个词比对渲染结果。它有**三个显式例外**，全部单独钉了一条用例而不是写在注释里：
+链接地址（变成链接属性）、`[x]` 的任务标记（变成 ☑）、围栏信息串（变成 `codeBlock.language`）。
+三者共同点是"被吃掉的是语法而不是 prose"。
+
+两处**与 CommonMark 有意不同**，都写了理由：
+① 软换行不折叠成空格（中文笔记普遍一句一行，折叠会挤成一坨，而且折叠要删字符）；
+② 段落后面单个 `-` 不升级成二级标题（中文笔记里那通常是手写分隔线，
+   误升级的代价比漏认一个 setext 标题大）。
+
+架构按 `AGENTS.md` 的第 2 条走：判定与解析是纯函数（`MarkdownParsing.swift` + `MarkdownScanning.swift`，
+产出 `Sendable` 的值模型），呈现层单独一个文件（`MarkdownPresentation.swift`，值模型 → `NSAttributedString`），
+视图里只留 `MarkdownRenderingAffordance` 那几行胶水。`HistoryStore` 一行没动（1096/1120 不变，最长方法 66）。
+
+**默认态**：`.md` / `.markdown` 文件默认渲染（扩展名就是作者写下的意图，没有歧义）；
+文本条目要**两类不同语法同时出现**才给渲染入口并默认渲染 —— 阈值这么定是因为
+Python/Shell 里成片的 `# 注释` 单看就是 ATX 标题，误判会把代码排成大标题。
+两种情况都带一颗「原文」控件，且**渲染只改看法**：
+有一条用例从 store 走 `copyAndPromote`，断言写回剪贴板的仍然是用户原来那几个字节。
+
+性能上敢把构建放在主线程，是因为它绑在"源码变了才重建"这个条件上（搜索框每敲一个字都会
+`updateNSView`，不绑住就是每字重排整篇），并且实测过最坏情况：
+40000 字普通文档 6ms、真实样例 0–2ms、4 万个未闭合 `*` 的畸形输入 105ms。
+那个 105ms 是加了 `maximumInlineMarkupDistance = 240` 之后的数字 ——
+找闭栏原本是前向扫描，没有上界时这类输入是 O(n²)（几十亿次比较，主线程直接冻住）。
+上界本身有一条会红的用例守着（`testAdversarialUnclosedMarkupDoesNotQuadraticallyBlowUp`）。
+
+验收按第 1 条分三层：纯函数真值表（`MarkdownParsingTests` 54 例）、
+呈现层 + 产品入口 + 视图树（`Round4MarkdownTests` 28 例，含从临时目录真 `.md` 文件走
+`MediaLoader` → `FilePreview` → 真 `ChineseSelectableNSTextView`，以及把 `DetailView`
+铺进离屏窗口后从树里读回属性串）、在屏探针 1 例。Swift 用例 433 → 517（11 skip），Python 64 例，`make bundle` 0 告警。
+
+## D-051 这一轮被实测否掉的四个"看起来对"的做法
+
+新功能只花了一半时间，另一半都花在"我以为是对的"被量出来是错的。四条都留着，因为它们各自
+会长成下一个人顺手写出来的东西。
+
+**① `NSColor.labelColor.withAlphaComponent(0.8)` 不是"半透明的正文色"，是黑色。**
+第一版把引用正文和 meta 弱化用 alpha 做，亮色帧上量到 3.95:1（14pt 正文要 4.5:1），
+于是改成 0.8 alpha 想两全。暗色帧量出来是 **1.22:1** —— 整行消失。
+写了一条探针直接问系统：`resolve(labelColor.withAlphaComponent(0.8), under: .darkAqua)`
+给出 `a=0.80 r=0 g=0 b=0`，而同一外观下 `labelColor` 自己给的是 `r=255 g=255 b=255`。
+`withAlphaComponent` 会把动态色按**调用那一刻**的外观烤成固定 RGB。
+结论：文字色只用系统语义色；要"弱化但达标"就自己写 `NSColor(name:) { appearance in … }`
+动态 provider（`DetailTypography.highlightColor` 现在就是这么写的，
+它以前是 `systemYellow.withAlphaComponent(0.32)`，同一个毛病，只是黄色烤成黄色不明显）。
+引用最后改成**只靠缩进表达层级**：`secondaryLabelColor` 亮色 3.95:1 不达标，
+烤色暗色看不见，而引用是正文级散文 —— 不该为了"看起来像引用"把内容画糊。
+守卫：`testSemanticColorsAreNotBakedByWithAlphaComponent`（先证明烤色这个行为本身，
+再证明我们用的颜色没这个毛病）+ `testMarkdownPresentationDoesNotBakeDynamicColours`（源码里不许再出现 `withAlphaComponent`）。
+
+**② meta 与正文"共用同一个 gutter 常数"仍然差 5pt。**
+U-4 那轮我写下过"两处引用同一个 `containerGutter`，所以左缘必然对齐"。
+本轮实量：meta 55.0pt、正文 60.0pt。差的是 TextKit 给每个行片段默认再加的
+`lineFragmentPadding = 5` —— 它不在 `textContainerInset` 里，所以"同一个常数"这件事
+推不出"同一个左缘"。归零后两帧复量都是 55.0pt。
+副作用是预期的基线变化：`detail-*` 与 `content-*` 的正文整体左移 5 像素（18/82 帧有变）。
+这条也说明：**"共用常数"式的论证要看一眼真实像素**，常数一致只是必要条件。
+
+**③ 源码锚点挡得住"删掉分支"，挡不住"把分支改成恒假"。**
+第一轮变异对照里，把 `if MarkdownRenderingAffordance.renders(...)` 改成
+`if false && renders(...)`，锚点用例**全绿** —— 它只检查那串字还在不在。
+这正是 `AGENTS.md` 第 1 条要防的形状（纯函数全绿、产品照崩），只不过换了一层皮。
+补的是把 `DetailView` 铺进离屏窗口、从视图树里 BFS 出 `ChineseSelectableNSTextView`、
+读回它自己的 `attributedString` 那条判据（`testDetailViewRendersMarkdownInTheMountedViewTree`）：
+渲染分支死了它就红。文件那一路同一条判据在离屏量不到（`.task(id:)` 在不 order front 的窗口里
+不启动，树里永远停在 `NSProgressIndicator`），所以搬到了在屏探针。
+
+**④ 那颗「原文」控件的点击，在这个环境里量不到。**
+三条路都试了：跨进程 `AXUIElement*` 要"辅助功能"授权，测试进程实测整棵 AX 树是空的；
+进程内 `NSAccessibilityProtocol` 只回一个没有子节点的 `AXGroup`（SwiftUI 的按钮不是 NSView）；
+按几何算窗口坐标投鼠标事件 —— 从正文滚动视图量出来的矩形是 `{{280,0},{620,633}}`，
+比"窗口高度减头部"还高，说明它不在我以为的那层，点出去落在窗口外（判据如实报红）。
+所以这一条**没有**伪装成自动化通过：两帧（`detail-markdown-rendered` / `detail-markdown-source`）
+证明两种状态都画得出来、标题也跟着状态变，但那是**注入初始态**拍的，不是按出来的；
+"按下去真的会换"进手工清单批次 6 第 6.2 条。能自动化的只剩"翻转方向没写反"
+（`MarkdownPreviewMode.toggled()` 纯函数 + 一条标题与动作配套的锚点）。
+
+顺带记一条关于**跑批脚本自己**的教训：变异对照脚本第一版把正则里的 `[` 忘了转义、
+第二版把 `]'` 写成 `'\]`，两次都让 14 条变异整批读成"仍然全绿"，而退出码一切正常。
+"红没红"是判据的判据，所以它现在自带 `pairs` 为空就显式报错，并把 passed 名单一起打出来核对。
+
+## D-052 帧基线原来会随系统外观漂移（18 帧自己变了）
+
+更新完基线、代码一行没动，再拍一次：**18/82 帧变了**。差异全在图片区域
+（`row-image` 16×16pt 的缩略图、`detail-1-image` 正好 240×140pt 的预览图、`sidebar-history` 的行缩略图），
+最大通道差 17。第一反应是"我刚才哪次改动漏了什么"，但差异的位置根本不含代码路径。
+
+真正的原因在开发机自己身上：`defaults read -g AppleInterfaceStyleSwitchesAutomatically` = 1，
+这台机器会在傍晚自动从浅色切到深色。而夹具图片是 `makeStoredImage(color: .systemTeal, …)`
+用 `lockFocus()` 现画的 —— **`NSAppearance.current` 在填充那一刻决定目录色解析成哪份 RGB**，
+于是 PNG 字节在构造夹具时就跟着系统外观走。基线是 17:5x（浅）写的，第二次捕获是 18:2x（深），
+所以"同一份代码"拍出了两套像素。
+
+这条值得单独记账，因为它伤的不是某个功能，而是**整套视觉验收的前提**：
+"改了界面必须更新基线"那条硬门（C-2 / D-042）之所以有意义，是因为基线可复现。
+一个会随系统外观漂移的基线，会让硬门在傍晚自己变红，或者更糟 —— 让人养成"再 update 一次"的习惯。
+
+修法是把外观钉在生成器里（`makeStoredImage` 在 `performAsCurrentDrawingAppearance(aqua)` 内填充），
+并加一条**双向**守卫 `UICaptureTests.testFixtureImageBytesDoNotDependOnAmbientAppearance`：
+先证明"不钉就会漂"（同一句裸填充在两种外观下字节确实不同 —— 没有这半条，后半条只是在比两份常量），
+再证明钉过之后两种外观下字节相同。
+
+顺带记两个坑：① 测试进程里 `NSApp` 是隐式解包的可选值，不先 `_ = NSApplication.shared` 就直接崩
+（`render()` 里那行原来就是这个用途）；② 第一版对照用 `NSApp.appearance = …` 去制造漂移，
+**没漂** —— 起作用的是 `NSAppearance.current`（绘制外观），不是 `NSApp.appearance`（应用外观）。
+两个名字差一个词，行为完全不同，所以这里写下来。
+
+修完实测：机器处于深色模式下连拍两次，`frame_baseline.py check --against working` 两次都是
+`CHANGED=0 MISSING=0 ADDED=0`（修之前同样的深色时段会漂 18 帧）。
