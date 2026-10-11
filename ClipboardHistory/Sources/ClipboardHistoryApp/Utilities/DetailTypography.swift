@@ -64,5 +64,20 @@ enum DetailTypography {
     /// 用户正在选的东西误读成命中。alpha 取 0.32 是为了让 `.labelColor` 的正文
     /// 在亮暗两种底色下都还保住可读性（实际数字在 detail-text-highlight 帧上复量，
     /// 记在 `AGENT_UI_AUDIT.md`，换字号或换底色要重新量）。
-    static let highlightColor = NSColor.systemYellow.withAlphaComponent(0.32)
+    /// 命中底色。**刻意不用 `systemYellow.withAlphaComponent(0.32)`** ——
+    /// 那样写会在静态初始化那一刻按当前外观把动态色烤成固定 RGB：
+    /// 探针实测 `labelColor.withAlphaComponent(0.8)` 在暗色下解析成 `r=0 g=0 b=0`，
+    /// 同一个机制会让这里的黄色在暗色窗口里变成"aqua 的黄"而不是"darkAqua 的黄"。
+    /// 用 `dynamicProvider` 把解析推迟到绘制时，两种外观各自取自己那份黄色。
+    static let highlightColor: NSColor = NSColor(name: nil) { appearance in
+        var red: CGFloat = 1, green: CGFloat = 0.8, blue: CGFloat = 0
+        appearance.performAsCurrentDrawingAppearance {
+            if let yellow = NSColor.systemYellow.usingColorSpace(.sRGB) {
+                red = yellow.redComponent
+                green = yellow.greenComponent
+                blue = yellow.blueComponent
+            }
+        }
+        return NSColor(srgbRed: red, green: green, blue: blue, alpha: 0.32)
+    }
 }

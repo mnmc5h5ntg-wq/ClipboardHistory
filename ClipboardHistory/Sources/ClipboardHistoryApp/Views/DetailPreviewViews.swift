@@ -199,14 +199,19 @@ enum PreviewLoadTimeoutPolicy {
 struct DetailFileView: View {
     let url: URL
     let thumbnail: StoredImage?
+    /// 详情头部那颗「原文 / 渲染」的当前值。
+    /// 由 `DetailView` 传下来而不是在这里自己存一份：多文件展开时每条都走这个视图，
+    /// 各存一份就会各切各的 —— 那正是 D-1 那一轮在侧栏上栽过的"两套选中语言"的同族问题。
+    let markdownMode: MarkdownPreviewMode
     @State private var previewState: MediaLoadingState<FilePreview> = .loading
     @State private var loadingHandle: MediaLoadHandle?
     @State private var loadGeneration = 0
     @State private var timeoutTask: Task<Void, Never>?
 
-    init(url: URL, thumbnail: StoredImage?) {
+    init(url: URL, thumbnail: StoredImage?, markdownMode: MarkdownPreviewMode = .rendered) {
         self.url = url
         self.thumbnail = thumbnail
+        self.markdownMode = markdownMode
     }
 
     var body: some View {
@@ -278,8 +283,18 @@ struct DetailFileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    @ViewBuilder
     private func textPreview(_ content: String) -> some View {
-        ChineseSelectableTextView(text: content, font: .monospacedSystemFont(ofSize: 13, weight: .regular))
+        // Markdown **文件**走渲染（扩展名就是作者的意图，没有歧义所以默认给渲染结果），
+        // 并且和详情正文共用同一个可读列：切到「原文」时列宽不动，只有排版变。
+        // 其它文本文件保持原来的等宽显示 —— 那是代码和日志，本来就要数着字符看。
+        if MarkdownRenderingAffordance.renders(url: url, in: markdownMode) {
+            ChineseSelectableAttributedTextView(source: content)
+                .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            ChineseSelectableTextView(text: content, font: .monospacedSystemFont(ofSize: 13, weight: .regular))
+        }
     }
 
     private func videoInfoUnavailableView(_ url: URL) -> some View {

@@ -68,10 +68,21 @@ func makeClipboardEntry(
 
 func makeStoredImage(color: NSColor = .red, size: NSSize = NSSize(width: 2, height: 2)) throws -> StoredImage {
     let image = NSImage(size: size)
-    image.lockFocus()
-    color.setFill()
-    NSRect(origin: .zero, size: size).fill()
-    image.unlockFocus()
+    // 填充要在**固定的外观**下做。
+    //
+    // 这不是防御性编程，是本轮真实踩到的坑：`systemTeal` 这类目录色按"当前外观"解析，
+    // 而离屏帧基线在构造夹具时（`makePopulatedStore`）就把它烤成了 PNG 字节。
+    // 开发机开着"自动切换外观"，傍晚从浅切到深，**同一份代码两次捕获就有 18 帧自己变了**
+    // （`row-image` / `detail-1-image` / `sidebar-*` 的图片区域，最大通道差 17）。
+    // 那种漂移会把"帧基线"变成"看天吃饭"，所以把外观钉死在生成器里，
+    // 并由 `testFixtureImageBytesDoNotDependOnAmbientAppearance` 钉住。
+    let appearance = NSAppearance(named: .aqua) ?? NSAppearance(named: .vibrantLight)!
+    appearance.performAsCurrentDrawingAppearance {
+        image.lockFocus()
+        color.setFill()
+        NSRect(origin: .zero, size: size).fill()
+        image.unlockFocus()
+    }
 
     guard let data = image.tiffRepresentation,
           let bitmap = NSBitmapImageRep(data: data),

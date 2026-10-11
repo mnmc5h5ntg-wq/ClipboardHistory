@@ -65,6 +65,47 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// 夹具图片的字节**不能**随系统外观变。
+    ///
+    /// 这条是给"帧基线能不能当证据"加的：本轮实测到开发机开着自动切换外观，
+    /// 傍晚从浅切到深之后，**同一份代码两次捕获有 18 帧自己变了**
+    /// （`row-image` / `detail-1-image` / `sidebar-*` 的图片区域，最大通道差 17）。
+    /// 那种漂移会让"改了界面要更新基线"这条硬门变成看天吃饭，
+    /// 所以把外观钉死在 `makeStoredImage` 里，并由这条用例钉住它没被改回去。
+    func testFixtureImageBytesDoNotDependOnAmbientAppearance() throws {
+        // `NSApp` 是隐式解包的可选值：测试进程里没人创建过共享应用，直接读它就是崩溃
+        // （本轮第一次跑就是这么挂的）。`render()` 里那行 `_ = NSApplication.shared` 是同一个原因。
+        _ = NSApplication.shared
+        let size = NSSize(width: 24, height: 16)
+        // 阳性对照：先证明"不钉外观就会漂"这件事本身是真的。
+        let rawLight = try fillUnderAmbient(.labelColor, appearance: .aqua, size: size)
+        let rawDark = try fillUnderAmbient(.labelColor, appearance: .darkAqua, size: size)
+        XCTAssertFalse(rawLight.isEmpty)
+        XCTAssertNotEqual(rawLight, rawDark,
+                          "前提变了：动态色不再随外观解析，这条守卫就没有判别力了（要改写而不是删掉）")
+
+        let previous = NSApp.appearance
+        defer { NSApp.appearance = previous }
+        NSApp.appearance = NSAppearance(named: .aqua)
+        let light = try XCTUnwrap(makeStoredImage(color: .systemTeal, size: size).pngData())
+        NSApp.appearance = NSAppearance(named: .darkAqua)
+        let dark = try XCTUnwrap(makeStoredImage(color: .systemTeal, size: size).pngData())
+        XCTAssertEqual(light, dark,
+                       "同一份夹具代码在两种外观下生成了不同字节 ⇒ 帧基线会随系统外观漂移")
+    }
+
+    /// 在**给定外观**下裸填充一次（不经过 `makeStoredImage` 的钉死），用来证明漂移的机制。
+    private func fillUnderAmbient(_ color: NSColor, appearance name: NSAppearance.Name, size: NSSize) throws -> Data {
+        let image = NSImage(size: size)
+        NSAppearance(named: name)!.performAsCurrentDrawingAppearance {
+            image.lockFocus()
+            color.setFill()
+            NSRect(origin: .zero, size: size).fill()
+            image.unlockFocus()
+        }
+        return image.tiffRepresentation ?? Data()
+    }
+
     // MARK: - 夹具（用闭包延迟求值：否则四个 detail 拍到的都是"最后一次选中"）
 
     struct Fixture {
@@ -259,6 +300,21 @@ final class UICaptureTests: XCTestCase {
             return AnyView(DetailView(historyStore: target))
         })
 
+        // 第四轮新功能：右侧预览渲染 Markdown。**一对帧**而不是单独一张 ——
+        // 只拍"渲染"那一侧的话，"切换有效"这件事就只剩控件标题这个证据；两帧相减还能把
+        // 「原文里那些 # 和 * 在渲染态确实没了、而正文一个字没少」量成像素差。
+        // 夹具前提由 `Round4MarkdownTests.testTheMarkdownFrameFixtureIsNotLying` 钉住。
+        results.append(Fixture("detail-markdown-rendered", NSSize(width: 720, height: 520)) {
+            let target = self.makeMarkdownStore()
+            self.assertMarkdownFixturePremise(target, role: "detail-markdown-rendered")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        results.append(Fixture("detail-markdown-source", NSSize(width: 720, height: 520)) {
+            let target = self.makeMarkdownStore()
+            self.assertMarkdownFixturePremise(target, role: "detail-markdown-source")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
+        })
+
         results.append(Fixture("glass-pill", NSSize(width: 120, height: 232)) {
             AnyView(
                 GlassPill(isFavorite: false, favoriteAction: {},
@@ -401,6 +457,71 @@ final class UICaptureTests: XCTestCase {
         case .file: return "file"
         case .files: return "files"
         }
+    }
+
+    /// 详情区 Markdown 夹具的正文。固定内容、固定时间戳，所以两帧可以做逐字节比对。
+    /// 覆盖的是"渲染到底改变了什么"的每一个可量测面：字阶、字重、斜体/字重分叉、
+    /// 行内码底色、围栏代码、任务项勾选、有序编号、引用弱化、表格等宽、链接色。
+    static let markdownFixtureBody = """
+    # 发布时间剪史 1.4.9
+
+    这一段里有 **粗体**、一个 *emphasis*，还有行内 `swift build`。
+
+    - [x] 解析层完成
+    - [ ] 视觉复核待办
+    3. 第三步的内容不能被吃掉
+
+    > 引用里的话
+    > 第二行也要跟着缩进
+
+    ```swift
+    let release = Version(1, 4, 9)
+    ```
+
+    | 名称 | 数量 |
+    | --- | --- |
+    | 苹果 | 3 |
+
+    ## 安装
+
+    参考 [官方文档](https://example.com/doc) 与 <https://bare.example>。
+    中文的 *强调* 不能用合成斜体。
+    """
+
+    /// 夹具前提：这一帧拍的那条记录，按策略确实有渲染入口，正文里也确实带 Markdown 标记。
+    /// 前提不成立时必须**红** —— 一张名字叫 `detail-markdown-rendered` 却拍着普通文本的帧
+    /// 看着像证据，其实什么都没说（D-038 那一族；`detail-text-highlight` 同样有这条前置断言）。
+    private func assertMarkdownFixturePremise(_ store: HistoryStore, role: String,
+                                              file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry else {
+            XCTFail("\(role)：Markdown 夹具没有选中项", file: file, line: line)
+            return
+        }
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: entry.content),
+                      "\(role)：选中的这条按策略根本不该给渲染入口 —— 那这一帧的名字在说谎",
+                      file: file, line: line)
+        guard case .text(let body) = entry.content else {
+            XCTFail("\(role)：选中的不是文本条目", file: file, line: line)
+            return
+        }
+        XCTAssertTrue(body.contains("## 安装"),
+                      "\(role)：正文里没有 Markdown 标记，两帧会是同一张照片", file: file, line: line)
+        XCTAssertEqual(MarkdownParser.parse(body).blocks.first?.kind, .heading(level: 1),
+                       "\(role)：解析结果的第一块不是 h1，帧上要核对的东西就换了", file: file, line: line)
+    }
+
+    private func makeMarkdownStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.markdownFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
     }
 
     /// internal 是刻意的：`detail-text-highlight` 这类夹具的**前提**需要被另一套用例断言

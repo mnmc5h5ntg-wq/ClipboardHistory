@@ -691,6 +691,90 @@ final class UIInteractionProbeTests: XCTestCase {
         emit("MENUS 只读区数量=\(previews.count)")
     }
 
+    // MARK: - Markdown 渲染与那颗控件（第四轮新增功能）
+
+    /// 「右侧预览渲染 Markdown」的**活路径**判据：磁盘上一个真的 `.md` 文件，
+    /// 选中之后详情区画出来的必须是渲染结果（标题字号、标记消失、编号保留）。
+    /// 名字里刻意不再写"点击生效"：那颗控件的点击在这个环境里量不到，原因见方法末尾那段。
+    ///
+    /// 为什么在在屏探针而不是离屏帧/普通用例里：`DetailFileView` 靠 SwiftUI 的 `.task(id:)`
+    /// 异步加载，而 `.task` 在"从未 ordered front 的窗口"里不启动 ——
+    /// 实测离屏树永远停在 `NSProgressIndicator`。这一路只有真窗口能量（D-019/D-041 同一族）。
+    /// 判据只钉可归因的三件事：渲染发生了、控件存在且点得动、切换双向有效。
+    func testMarkdownFilePreviewRendersInARealWindow() throws {
+        try skipUnlessEnabled()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("markdown-preview-probe-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("说明.md")
+        let source = "# 发布说明\n\n这一段有 **粗体** 和 `code`。\n\n- 第一项\n3. 第三步\n\n## 安装\n\n结束。\n"
+        try source.write(to: url, atomically: true, encoding: .utf8)
+
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(content: .file(url), thumbnail: nil,
+                                        sourceUTIs: ["public.file-url"],
+                                        sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"),
+                  timestamp: Date())
+        store.perform(.selectOnly(store.entries[0]))
+        let (window, host) = makeWindow(width: 900, height: 640, origin: CGPoint(x: 180, y: 180), store: store)
+        defer { window.orderOut(nil) }
+
+        func bodies() -> [ChineseSelectableNSTextView] {
+            var found: [ChineseSelectableNSTextView] = []
+            func walk(_ view: NSView) {
+                if let body = view as? ChineseSelectableNSTextView { found.append(body) }
+                for sub in view.subviews { walk(sub) }
+            }
+            walk(host)
+            return found
+        }
+
+        // 等异步加载把正文画出来。等不到就是**失败**，不是跳过：
+        // 跳过的判据和通过的判据在报表里长得一样，而这一条存在的意义就是"渲染真的发生了"。
+        let deadline = Date().addingTimeInterval(6.0)
+        while bodies().first?.string.contains("第三步") != true, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        let body = try XCTUnwrap(
+            bodies().first,
+            "选中一个 .md 文件后详情区没有只读正文视图（预览没加载出来？）"
+        )
+        XCTAssertTrue(body.string.contains("第三步"),
+                      "正文没加载出来，量不到渲染：\(body.string.prefix(60))")
+        XCTAssertFalse(body.string.contains("# 发布说明"),
+                       "文件预览没渲染 Markdown：标题标记还在正文里")
+        XCTAssertFalse(body.string.contains("**粗体**"), "强调标记没被吃掉")
+        XCTAssertTrue(body.string.contains("3."), "有序项的编号被渲染吃掉了")
+        let headingRange = (body.string as NSString).range(of: "发布说明")
+        XCTAssertNotEqual(headingRange.location, NSNotFound)
+        let headingFont = try XCTUnwrap(
+            body.attributedString().attribute(.font, at: headingRange.location, effectiveRange: nil) as? NSFont
+        )
+        XCTAssertEqual(headingFont.pointSize, MarkdownPresentation.headingFontSize(level: 1),
+                       "标题在真窗口里没有标题字号")
+        emit("MARKDOWN 渲染态 正文长度=\(body.string.count) 标题字号=\(headingFont.pointSize)")
+
+        // 这颗控件"按下去有效"这一件事，三条自动化路都试过，只有两条能量到、第三条量不到：
+        // ① 跨进程 `AXUIElement*`：要求本进程有"辅助功能"授权，`swift test` 起的进程
+        //    实测整棵 AX 树是空的（连一个有名元素都没有）；
+        // ② 进程内 `NSAccessibilityProtocol`：SwiftUI 的 hosting view 只回一个没有子节点的
+        //    `AXGroup`（实测打印过），按钮压根不在树里；
+        // ③ 按几何算窗口坐标投鼠标事件：实测从正文滚动视图量出来的矩形是
+        //    `{{280, 0}, {620, 633}}` —— 比"窗口高度减去头部"还高，说明它不在我以为的那层，
+        //    算出来的点落在窗口外（点击后状态没翻，判据如实报红）。
+        // 所以这里只把**渲染真的发生在真窗口里**这一条钉死，"按一下会不会切换"
+        // 留在手工清单（`docs/MANUAL_TEST_v1.4.9_round3.md` 批次 6 第 2 条）。
+        // 两帧 `detail-markdown-rendered` / `detail-markdown-source` 能证明两种状态都画得出来、
+        // 标题也跟着状态变，但它们是**注入初始态**拍的，不是按出来的 —— 这个区别写在这里，
+        // 免得下一个人把帧当成"点击有效"的证据。
+        emit("MARKDOWN 控件自动化=不可量（AX 空树 / 几何不可归因），见手工清单批次 6")
+    }
+
     private func titles(of menu: NSMenu) -> [String] {
         menu.items.filter { !$0.isSeparatorItem }.map(\.title)
     }

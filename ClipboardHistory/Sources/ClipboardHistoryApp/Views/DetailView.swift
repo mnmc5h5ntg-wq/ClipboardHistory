@@ -4,6 +4,20 @@ import SwiftUI
 struct DetailView: View {
     @ObservedObject var historyStore: HistoryStore
 
+    /// 详情区是"看"的地方，所以 Markdown 默认给渲染结果；那颗「原文」控件负责另一头。
+    ///
+    /// 它是**视图态**，不进 store、不进存档：换一条记录带着它走没问题，
+    /// 但它绝不改 `HistoryStore` 里的任何一个字（C-5：Store 只减不加）。
+    @State private var markdownMode: MarkdownPreviewMode
+
+    init(historyStore: HistoryStore, initialMarkdownMode: MarkdownPreviewMode = .rendered) {
+        self.historyStore = historyStore
+        // 私有 @State 用注入参数的老手法（和 `SettingsView.initialCategory` 同一套）：
+        // 离屏窗口建不出无障碍树，"点一下那颗控件"在夹具里做不到，
+        // 而**没有夹具的两种状态就等于没有验收**。默认值不变，产品路径一行都没多。
+        _markdownMode = State(initialValue: initialMarkdownMode)
+    }
+
     var body: some View {
         if let entry = historyStore.selectedEntry {
             selectedEntryView(entry)
@@ -44,15 +58,27 @@ struct DetailView: View {
         // 而读者要先判断"这两行属于谁"；来源 App 以前干脆没在详情里露出（B-2 已经把它持久化了）。
         HStack(spacing: 0) {
             Spacer(minLength: 0)
-            Text(DetailTypography.metaText(
-                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
-                size: entry.content.sizeDescription,
-                sourceAppName: entry.sourceAppName
-            ))
-            .font(.system(size: DetailTypography.metaFontSize))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
+            HStack(spacing: 8) {
+                Text(DetailTypography.metaText(
+                    copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+                    size: entry.content.sizeDescription,
+                    sourceAppName: entry.sourceAppName
+                ))
+                .font(.system(size: DetailTypography.metaFontSize))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+                Spacer(minLength: 8)
+
+                // 控件只在"这条内容真的有两种看法"时出现。给一条图片或者纯文本
+                // 摆一颗「原文」按钮，是让用户去点一个什么都不会发生的东西。
+                if offersMarkdownRendering(for: entry) {
+                    MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode)) {
+                        markdownMode = markdownMode.toggled()
+                    }
+                }
+            }
             // 左缘对齐靠的是"同一个列宽 + 同一个 gutter"，不是靠肉眼调 padding。
             // `columnWidth` 里的 gutter 与正文 `textContainerInset` 是同一个常数（见 DetailTypography）。
             .padding(.horizontal, DetailTypography.containerGutter)
@@ -64,6 +90,53 @@ struct DetailView: View {
         .background(.ultraThinMaterial)
     }
 
+    /// 这条记录到底有没有"渲染 / 原文"之分。
+    ///
+    /// 文件按**扩展名**判定（那是作者写下的意图，没有歧义，所以默认就给渲染结果）；
+    /// 文本条目按**内容信号**判定（`MarkdownParsingPolicy.offersRendering`），
+    /// 而且判定只决定"给不给这颗控件"，默认仍是原文 —— 文本条目里大量是代码和日志，
+    /// 替它们改排版是越权。
+    private func offersMarkdownRendering(for entry: HistoryStore.Entry) -> Bool {
+        MarkdownRenderingAffordance.offers(for: entry.content)
+    }
+
+    /// 「原文 / 渲染」那颗控件。
+    ///
+    /// 放在头部那一行的右端而不是浮在正文上：正文区已经有一条 GlassPill（收藏/固定/复制/删除），
+    /// 再叠一颗浮层就是两块会抢焦点的玻璃；而这一行本来就是"次要信息"的住处。
+    /// 标题说"点下去会变成什么"，不说"现在是什么"（`MarkdownPreviewMode.controlTitle`）。
+    private struct MarkdownModeButton: View {
+        let title: String
+        let action: () -> Void
+        @State private var isHovered = false
+
+        var body: some View {
+            Button(action: action) {
+                Text(title)
+                    .font(.system(size: DetailTypography.metaFontSize))
+                    // 动作不用弱化色：`.secondary` 在亮色帧上实测 4.10:1，够"次要信息"用，
+                    // 不够一个**要点的东西**用（WCAG 1.4.3 对小字要求 4.5:1）。
+                    // 这一档是全 App 的次要文字问题，单独记在 backlog，不在这里顺手改。
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(.primary.opacity(isHovered ? 0.07 : 0))
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .fixedSize()
+            .helpLabel(MarkdownPreviewMode.controlHelp)
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.14)) {
+                    isHovered = hovering
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     private func preview(for entry: HistoryStore.Entry) -> some View {
         switch entry.content {
@@ -71,25 +144,34 @@ struct DetailView: View {
             // 正文限一个可读列（U-4）：以前它无限宽，700pt 的详情区一行能排 100+ 字符，
             // 而且带一条横向滚动条 —— 读长文本要来回扫视和横向滚动。
             // 列宽由字体推进推出来（68ch），字号一改列宽自己跟着改。
-            ChineseSelectableTextView(
-                text: text,
-                font: DetailTypography.bodyFont,
-                highlightQuery: historyStore.searchText
-            )
-            .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .center)
+            if MarkdownRenderingAffordance.renders(text: text, in: markdownMode) {
+                ChineseSelectableAttributedTextView(source: text,
+                                                    highlightQuery: historyStore.searchText)
+                    .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ChineseSelectableTextView(
+                    text: text,
+                    font: DetailTypography.bodyFont,
+                    highlightQuery: historyStore.searchText
+                )
+                .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
         case .image(let stored):
             ImagePreviewView(nsImage: stored.nsImage)
         case .file(let url):
-            DetailFileView(url: url, thumbnail: entry.thumbnail)
+            DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode)
         case .files(let urls):
-            MultiFileDetailView(urls: urls)
+            MultiFileDetailView(urls: urls, markdownMode: markdownMode)
         }
     }
 }
 
 private struct MultiFileDetailView: View {
     let urls: [URL]
+    /// 与详情头部同一份视图态：多文件里展开的每条 `.md` 跟着一起切换。
+    let markdownMode: MarkdownPreviewMode
     @State private var expandedURL: URL?
 
     var body: some View {
@@ -105,7 +187,7 @@ private struct MultiFileDetailView: View {
                         )
 
                         CollapsibleFilePreview(url: url, isExpanded: expandedURL == url) {
-                            DetailFileView(url: url, thumbnail: nil)
+                            DetailFileView(url: url, thumbnail: nil, markdownMode: markdownMode)
                         }
                     }
                     .clipped()

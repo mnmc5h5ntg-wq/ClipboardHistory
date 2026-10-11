@@ -296,33 +296,10 @@ struct ChineseSelectableTextView: NSViewRepresentable {
     var highlightQuery: String = ""
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        // 横向滚动条关掉（U-4）。以前正文是"容器宽无限 + 可横向缩放"，
-        // 于是长文本一行铺满 ~700pt 还要往右滚，读起来每行都要找下一行的起点。
-        // 现在正文按 `DetailTypography.columnWidth` 限出一个可读列，超长行折行。
-        scrollView.hasHorizontalScroller = false
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = false
-
-        let textView = ChineseSelectableNSTextView()
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.font = font
-        textView.textColor = .labelColor
-        textView.textContainerInset = NSSize(width: DetailTypography.containerGutter, height: 20)
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.heightTracksTextView = false
-        textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = true
-        textView.autoresizingMask = [.width]
-        textView.applyReadOnlyMenuBehavior()
-        textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
-
-        scrollView.documentView = textView
+        let scrollView = readOnlyBodyScrollView(font: font)
+        if let textView = scrollView.documentView as? ChineseSelectableNSTextView {
+            textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
+        }
         return scrollView
     }
 
@@ -332,6 +309,76 @@ struct ChineseSelectableTextView: NSViewRepresentable {
         textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
         textView.applyReadOnlyMenuBehavior()
     }
+}
+
+/// 只读的**富文本**正文（渲染后的 Markdown 走这里）。
+///
+/// 与上面那个的区别只有一件事：正文的属性由我们给，所以**不能**再走 `textView.font = …`
+/// （那是"整段刷成一个字体"，会把标题字阶、行内码、链接一起抹掉）。
+/// 滚动与文本视图的配置共用 `readOnlyBodyScrollView`，因此列宽、内缩、右键菜单、
+/// 选中色和纯文本那条路**逐字节相同** —— 切「原文 / 渲染」时正文列不会跳。
+struct ChineseSelectableAttributedTextView: NSViewRepresentable {
+    /// Markdown 源码。视图自己解析并只在它变化时重建属性串。
+    let source: String
+    var highlightQuery: String = ""
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = readOnlyBodyScrollView(font: nil)
+        if let textView = scrollView.documentView as? ChineseSelectableNSTextView {
+            textView.updateMarkdown(source: source, highlightQuery: highlightQuery)
+        }
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
+        textView.autoresizingMask = [.width]
+        textView.updateMarkdown(source: source, highlightQuery: highlightQuery)
+        textView.applyReadOnlyMenuBehavior()
+    }
+}
+
+/// 详情只读正文的**唯一**装配出口。
+///
+/// 两个 representable 共用它，是因为"改了一个忘了另一个"这种分歧在界面上的表现是
+/// 切换渲染/原文时正文跳位、或其中一种模式没有右键菜单 —— 都是要肉眼才看得出来的一类缺陷。
+/// `font` 传 nil 表示"字体由属性串自己决定"。
+@MainActor
+private func readOnlyBodyScrollView(font: NSFont?) -> NSScrollView {
+    let scrollView = NSScrollView()
+    scrollView.hasVerticalScroller = true
+    // 横向滚动条关掉（U-4）。以前正文是"容器宽无限 + 可横向缩放"，
+    // 于是长文本一行铺满 ~700pt 还要往右滚，读起来每行都要找下一行的起点。
+    // 现在正文按 `DetailTypography.columnWidth` 限出一个可读列，超长行折行。
+    scrollView.hasHorizontalScroller = false
+    scrollView.borderType = .noBorder
+    scrollView.drawsBackground = false
+
+    let textView = ChineseSelectableNSTextView()
+    textView.isEditable = false
+    textView.isSelectable = true
+    textView.drawsBackground = false
+    if let font {
+        textView.font = font
+    }
+    textView.textColor = .labelColor
+    textView.textContainerInset = NSSize(width: DetailTypography.containerGutter, height: 20)
+    textView.textContainer?.widthTracksTextView = true
+    // TextKit 默认给行片段再加 5pt 内边距，而它**不在** `textContainerInset` 里。
+    // 于是"meta 与正文同左缘"这件事一直是差的（帧上实测 55.0pt vs 60.0pt）：
+    // 两处引用的确实是同一个 `containerGutter`，但只有正文那一侧被偷偷加了 5pt。
+    // 归零之后 68ch 的列也才是真的 68 个字符（原来少 10pt 排不下）。
+    textView.textContainer?.lineFragmentPadding = 0
+    textView.textContainer?.heightTracksTextView = false
+    textView.minSize = NSSize(width: 0, height: 0)
+    textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+    textView.isHorizontallyResizable = false
+    textView.isVerticallyResizable = true
+    textView.autoresizingMask = [.width]
+    textView.applyReadOnlyMenuBehavior()
+
+    scrollView.documentView = textView
+    return scrollView
 }
 
 final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
@@ -386,6 +433,31 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     func updateBody(text: String, font: NSFont, highlightQuery: String) -> Int {
         if string != text { string = text }
         self.font = font
+        // 走纯文本这条路时，富文本那份的"已经应用过什么"必须作废：
+        // 否则同一个视图实例先渲染过 Markdown、后被当普通文本用，属性串就赖在存储里不走。
+        appliedMarkdownSource = nil
+        return applySearchHighlight(query: highlightQuery)
+    }
+
+    /// 已经渲染过的 Markdown 源码。
+    ///
+    /// 用它而不是比较属性串来决定"要不要重建"：`NSAttributedString` 的相等比较是
+    /// 逐字符逐属性的 O(n)，而这里真正的问题只是"内容换了没有"。
+    private var appliedMarkdownSource: String?
+
+    /// 渲染态正文的唯一写入口：只在源码变化时重建属性串，然后照旧打高亮。
+    ///
+    /// 为什么重建放在这里而不是视图外面：`updateNSView` 每次 SwiftUI 求值都会跑，
+    /// 而**搜索框每敲一个字**都会求值一次。把解析和构建绑在"源码变了"这个条件上，
+    /// 输入搜索词就只剩打高亮那点开销（临时属性，不动文本存储）。
+    @discardableResult
+    func updateMarkdown(source: String, highlightQuery: String) -> Int {
+        if source != appliedMarkdownSource, let textStorage {
+            textStorage.setAttributedString(
+                MarkdownPresentation.attributedString(for: MarkdownParser.parse(source))
+            )
+            appliedMarkdownSource = source
+        }
         return applySearchHighlight(query: highlightQuery)
     }
 
