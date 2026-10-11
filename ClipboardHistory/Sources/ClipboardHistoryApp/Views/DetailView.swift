@@ -92,10 +92,11 @@ struct DetailView: View {
 
     /// 这条记录到底有没有"渲染 / 原文"之分。
     ///
-    /// 文件按**扩展名**判定（那是作者写下的意图，没有歧义，所以默认就给渲染结果）；
-    /// 文本条目按**内容信号**判定（`MarkdownParsingPolicy.offersRendering`），
-    /// 而且判定只决定"给不给这颗控件"，默认仍是原文 —— 文本条目里大量是代码和日志，
-    /// 替它们改排版是越权。
+    /// 文件按**扩展名**判定（那是作者写下的意图，没有歧义）；文本条目按**内容信号**判定，
+    /// 要两类以上不同语法同时出现才给入口（`MarkdownParsingPolicy.offersRendering` 记了阈值与理由：
+    /// 单看一类的话 Python/Shell 的 `# 注释` 会被当成标题）。
+    /// 两边默认都是渲染态 —— 但这一层只改**看法**：存档、搜索、"再次复制"走的仍是原始字节，
+    /// 而顶部这颗控件就是退回原始字节的那一步。
     private func offersMarkdownRendering(for entry: HistoryStore.Entry) -> Bool {
         MarkdownRenderingAffordance.offers(for: entry.content)
     }
