@@ -4,7 +4,12 @@
 
 ## 当前状态（2026-10-12 晚 · 动效补做批次）
 
-- **HEAD**：`5d4e8e1`（工作树里是这一批的 16 改 + 4 新，尚未提交；`git status --porcelain` 数出来的）。
+- **HEAD**：`6fc8224`，工作树干净，全部已推送；CI 对最后一个代码提交 `155de63` 是绿的。
+- **已交付到本机**（D-057）：`install_local.sh --yes` 跑通并正在运行新构建
+  （pid 75839、exe 逐字对上 `/Applications/时间剪史.app`、`INSTALL_SHA_MATCH=1`、存档 92→92 条，
+  旧包留在 `~/Documents/Codex_Project0_backups/before-motion-batch9/`）。
+  注意版本号字符串仍是 **1.4.8**（`Makefile VERSION` 要到发版时才抬，CHANGELOG 里这批挂在 `[Unreleased]`）——
+  所以"看版本号判断装没装上"是无效的，要按上面的 exe/sha/pid 认。
 - **这一批做完的事**：用户反馈"新版本没加什么动画"→ 重读报告找回四条被我判错的条目
   （QuickPick 原生行动画 / 收藏固定的 `replace`+`bounce` 叠加 / M9 骨架扫光 / M8 落点光晕），
   两条主动撤下并写明理由（`reduce-transparency` 门、"跳转才动"的滚动策略）。
