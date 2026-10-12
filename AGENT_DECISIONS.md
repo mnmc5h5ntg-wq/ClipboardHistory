@@ -1667,8 +1667,21 @@ A/B 开关第一版给的是零时长：30 帧全等、峰值 0.000 —— 于�
 - 规矩：**还原必须逐文件字节级 `cp`；永远不要在仓库里拿 `git checkout --` 当还原手段** ——
   它还原的是"整个目录回到 HEAD"，不是"我改过的那几行"。
 
+### CI 那一闸的现状（2026-10-12 06:2x，run 38211772620）
+
+整轮 **completed / success**，新加的 `Motion filmstrip (report-only)` 一步确实跑了，
+用时 31 秒（06:23:48 → 06:24:19）。但**它到底报的是 `MOTION_SUMMARY` 还是
+"MOTION_NOT_RUN / 红而被容忍"，这次没读到**：`gh api .../jobs/<id>/logs` 连续 TLS 超时，
+而 `continue-on-error: true` 的步骤在 API 里 conclusion 一律是 `success`，
+所以"步骤成功"这句话在这个形状下**没有信息量** —— 只有日志正文能区分。
+下一轮第一件事就是把这三行读出来：
+`gh run view --job=<id> --log | grep -E "motion suite exit|MOTION_SUMMARY|MOTION_NOT_RUN"`。
+（31 秒这个数本身是个线索：本机这 8 条判据要跑 25.5 秒，加上增量编译刚好卡在这个量级，
+所以"跑完了"比"被看门狗收掉"可能性大 —— 但这是推断，不是读数，不当结论用。）
+
 ### 没跑到的 / not-run
 
+- **CI 上那一步的正文没读到**（GitHub 日志端点 TLS 超时），见上一节。
 - **Switch Control 那一格门没接**：没有公开 API，同类是读 `com.apple.universalaccess` 私有键。
 - **显示器休眠时帧间隔判据取不到数**（上面那条），CI runner 上同样取不到 —— 那一步会报
   `MOTION_NOT_RUN` / `n=0`，不会伪装成绿。
