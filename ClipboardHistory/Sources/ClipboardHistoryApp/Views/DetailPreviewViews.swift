@@ -282,7 +282,7 @@ struct DetailFileView: View {
     private func failureView(_ message: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 36))
+                .font(.system(size: VisualGlyph.state))
                 .foregroundStyle(.secondary)
             Text(message)
                 .font(.system(size: StatePresentation.messageFontSize))
@@ -311,7 +311,7 @@ struct DetailFileView: View {
             // （审计第二轮 R2-09 / 1.3）。这类错误编译期不报，所以有一道扫描式守卫：
             // `SystemSymbolValidityTests` 会把产品源码里所有 systemName 字面量拿去问 NSImage。
             Image(systemName: "questionmark.circle")
-                .font(.system(size: 32))
+                .font(.system(size: VisualGlyph.state))
                 .foregroundStyle(.secondary)
             Text("无法读取这段视频的分辨率信息")
                 .font(.system(size: StatePresentation.messageFontSize))
@@ -347,11 +347,11 @@ struct DetailFileView: View {
                     .frame(width: 128, height: 128)
             } else {
                 Image(systemName: "doc.fill")
-                    .font(.system(size: 48))
+                    .font(.system(size: VisualGlyph.placeholder))
                     .foregroundStyle(.quaternary)
             }
             Text(preview.url.lastPathComponent)
-                .font(.system(size: 14))
+                .font(.system(size: VisualFont.title))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

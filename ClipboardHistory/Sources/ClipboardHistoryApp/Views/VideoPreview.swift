@@ -227,14 +227,14 @@ private struct VideoPlaybackControls: View {
         HStack(spacing: 8) {
             Button(action: playback.togglePlayback) {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
             .helpLabel(playback.isPlaying ? "暂停" : "播放")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.currentTime))
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: VisualFont.row, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
@@ -251,13 +251,13 @@ private struct VideoPlaybackControls: View {
             .helpLabel("调整播放进度")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.duration))
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: VisualFont.row, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .frame(width: 45, alignment: .leading)
 
             Button(action: playback.toggleMuted) {
                 Image(systemName: playback.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)

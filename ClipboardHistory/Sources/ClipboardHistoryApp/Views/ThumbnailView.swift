@@ -27,7 +27,7 @@ struct ThumbnailSymbol: View {
 
     var body: some View {
         Image(systemName: systemName)
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: VisualGlyph.chipSymbol, weight: .medium))
             .foregroundStyle(.secondary)
             .frame(width: 16, height: 16)
             .background(VisualMaterial.track)

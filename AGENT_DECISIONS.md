@@ -2029,3 +2029,37 @@ CI 汇报自检加了第 14 个形状（`resolve_missing_from_log`）。
 （每条都带 not-run 原因）；**离屏帧 `CHANGED=0`**（82 帧采齐）⇒ 本轮视觉上完全惰性；
 `scripts/tests` 全绿；产品代码零改动，`HistoryStore` 零改动。决定与视觉账：D-059 / U-23，
 轮次记录见 `AGENT_VISUAL_ITERATION.md` 的 R2。
+
+## D-060 R3：字号收成一族刻度，顺带修一处层级倒置，并抓到两条假守卫
+
+R0 审计里"六种圆角"那一族在 R1 收口了，字号是剩下的最大一块：8 个文本字号 + 5 个大符号，
+其中两处不是风格分歧而是**能看出来的错**：侧栏"15 条记录"比区块标题"时间剪史"大一号
+（次要信息盖过标题），"固定"徽标 9pt（`pin.fill` 笔画并成一片，状态看不清等于没有状态）。
+
+**决定**：文本收成 `meta 11 · row 12 · body 13 · title 14` 四档，符号按角色命名
+（`badge / chipSymbol / rowIcon / control / emptyCompact / state / emptyPane / placeholder`），
+并把 10pt 写成全 App 的下限。`body` 不抄数字，**引用** `StatePresentation.messageFontSize`。
+判据同 R1 的形状：Views 里出现 `.font(.system(size: 数字` 打红，正向对照是"至少 35 处在读刻度"
+（防止扫描器瞎掉时的假绿），次序与下限是语义约束。
+
+**改完的可见结果**：20/82 帧变化，逐组归因（`row-pinned-on` 只有"已固定"那一版变 ⇒ 改动确实只落在徽标；
+`detail-*` / `glass-pill-*` / `search-field-*` 一个没变 ⇒ 没有牵连）。基线同提交更新。
+
+**这一轮真正的收获是两条被打红的"假守卫"**（第一轮 5 支变异里 2 支 ESCAPED）：
+
+1. **按名字查消费者 = 前缀白拿**。往 `VisualFill` 里加一个没人读的 `control`，守卫绿着通过，
+   因为 `VisualFill.controlHover` 里含 `VisualFill.control`。修法是**按族查 + 标识符边界**
+   （`VisualTokenScan.reads`），并且给它一条自证用例：前缀命中必须 false、真读取必须 true、
+   行尾命中必须 true —— 三个方向都要钉，否则"加了边界"通常意味着"开始漏报"。
+2. **数值断言证明不了来源**。把 `body = StatePresentation.messageFontSize` 改成 `= 13`，
+   那句 `XCTAssertEqual(VisualFont.body, StatePresentation.messageFontSize)` 打不红（13 就是等于 13）。
+   而"抄一个同样对的数"恰恰是分散的起点。改成扫源码看那一行**引用了什么**。
+   推广：凡是"这个值必须来自那个源"的要求，都要写成来源断言，不是值断言。
+3. **顺带一次自伤**：新断言里用 `try!` 读文件、路径少上一级 ⇒ 测试二进制当场 fatal，
+   12 条用例的汇总直接消失。守卫找不到被守卫的东西时必须 `XCTUnwrap` / `XCTFail`；
+   `try!` 会把"有一条红"伪装成"全都没跑"，比红更坏。
+
+数字：607 tests / 23 skipped / 0 failures（R2 后 605，本轮 +2）；5 支变异 5/5 CAUGHT（修完两处之后）；
+82 帧采齐、20 帧变化已归因、基线已更新；`scripts/tests` 全绿；`HistoryStore` 零改动。
+视觉账见 **U-24**，轮次记录见 `AGENT_VISUAL_ITERATION.md` 的 R3。
+

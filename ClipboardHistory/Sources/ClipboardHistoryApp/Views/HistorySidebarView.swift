@@ -52,7 +52,7 @@ struct HistorySidebarView: View {
     private var header: some View {
         HStack {
             Text(headerTitle)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: VisualFont.title, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
@@ -62,7 +62,7 @@ struct HistorySidebarView: View {
                 bulkActionButtons
             } else {
                 Text(countText)
-                    .font(.system(size: 15, weight: .regular))
+                    .font(.system(size: VisualFont.body, weight: .regular))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -372,7 +372,7 @@ private struct FilterSegmentButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                .font(.system(size: VisualFont.row, weight: isSelected ? .semibold : .regular))
                 .scaleEffect(FilterPillMotion.hoverScale(isHovered: isHovered, reduceMotion: reduceMotion))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)

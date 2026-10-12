@@ -123,19 +123,63 @@ final class VisualTokenTests: XCTestCase {
     func testEveryVisualTokenIsReadByTheProduct() throws {
         let declarations = codeOnly(try productSource(named: "Utilities/VisualTokens.swift"))
         let names = VisualTokenScan.tokenNames(declarations: declarations)
-        XCTAssertGreaterThanOrEqual(names.count, 25,
-                                    "只认出 \(names.count) 个令牌声明，低于 R1 落地的 25：解析器或文件锚点坏了")
+        XCTAssertGreaterThanOrEqual(names.count, 40,
+                                    "只认出 \(names.count) 个令牌声明，低于 R3 落地后的 40：解析器或文件锚点坏了")
 
         let product = try allProductSources()
             .filter { $0.file != "VisualTokens.swift" }
             .map { codeOnly($0.source) }
             .joined(separator: "\n")
-        let hosts = ["VisualRadius", "VisualShape", "VisualHairline", "VisualStroke",
-                     "VisualShadow", "VisualFill", "VisualTint", "VisualMaterial"]
-        for name in names {
-            XCTAssertTrue(hosts.contains { product.contains("\($0).\(name)") },
-                          "令牌 `\(name)` 只有声明没有消费者：接上它，或者把它删掉")
+        for (family, name) in names {
+            XCTAssertTrue(VisualTokenScan.reads(family, name, in: product),
+                          "令牌 `\(family).\(name)` 只有声明没有消费者：接上它，或者把它删掉"
+                              + "（按族查而不是按名字查：`control` 在两族里都有，按名字会互相白拿）")
         }
+    }
+
+    /// 字号只准从刻度里取（R3）。与圆角那条同一族：**"统一"如果没有判据，就只是一句共识**。
+    ///
+    /// R0 数出来的是 8 个文本字号（9/10/11/12/13/14/15/16）+ 5 个大符号（28/32/36/40/48），
+    /// 其中两处是真缺陷而不是"风格分歧"：侧栏的"15 条记录"比区块标题"时间剪史"还大一号
+    /// （次要信息盖过了标题），而"固定"徽标是 9pt（2× 下笔画并在一起，状态看不清等于没有状态）。
+    func testTextSizesComeFromTheScale() throws {
+        var offenders: [String] = []
+        var tokenised = 0
+        for (file, source) in try productSources(in: "Views") {
+            for line in codeOnly(source).components(separatedBy: "\n") {
+                guard let range = line.range(of: ".font(.system(size: ") else { continue }
+                let rest = line[range.upperBound...]
+                if let first = rest.first, first.isNumber {
+                    offenders.append("\(file): \(line.trimmingCharacters(in: .whitespaces))")
+                } else if rest.hasPrefix("VisualFont.") || rest.hasPrefix("VisualGlyph.")
+                    || rest.hasPrefix("StatePresentation.") || rest.hasPrefix("DetailTypography.") {
+                    tokenised += 1
+                }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(tokenised, 35,
+                                    "只有 \(tokenised) 处在读字号刻度：R3 落地时是 35 处，掉了说明扫描瞎了")
+        XCTAssertTrue(offenders.isEmpty,
+                      "这些行还在就地写字号：\n" + offenders.joined(separator: "\n"))
+    }
+
+    /// 字号刻度自身的次序：正文级不许出现"次要信息比标题响"。
+    func testTypeScaleIsMonotonicAndNeverBelowTheLegibilityFloor() throws {
+        XCTAssertLessThan(VisualFont.meta, VisualFont.row, "11 是次要比行标题更弱")
+        XCTAssertLessThan(VisualFont.row, VisualFont.body)
+        XCTAssertLessThan(VisualFont.body, VisualFont.title,
+                          "标题必须比正文响 —— 侧栏那句计数以前是 15，比 14 的标题还大")
+        XCTAssertGreaterThanOrEqual(VisualGlyph.badge, 10,
+                                    "10pt 是这个 App 的下限：再小的符号在 2× 下笔画会并在一起")
+        XCTAssertLessThan(VisualFont.meta, StatePresentation.messageFontSize,
+                          "状态文案是那句话的全部信息，必须比次要字更可读")
+        // **按来源判，不按数值判**：变异对照 P4 证明"13 == 13"这条数值断言打不红
+        // 把引用换成字面量 13 的改动 —— 而那个改动正是"两处各写一个数、日后各改各的"的起点。
+        let tokens = try productSource(named: "Utilities/VisualTokens.swift")
+        let bodyLine = tokens.components(separatedBy: "\n")
+            .first { $0.contains("static let body:") } ?? ""
+        XCTAssertTrue(bodyLine.contains("StatePresentation.messageFontSize"),
+                      "正文档必须**引用**规范本体，不许抄一个同样等于 13 的字面量：\(bodyLine.trimmingCharacters(in: .whitespaces))")
     }
 
     // MARK: - 死表面
@@ -216,15 +260,28 @@ final class VisualTokenTests: XCTestCase {
         XCTAssertEqual(VisualTokenScan.firstSignificant(after: "lineWidth:", in: "lineWidth: VisualHairline.edge"), "V")
         XCTAssertNil(VisualTokenScan.firstSignificant(after: "lineWidth:", in: "no match here"))
 
+        XCTAssertTrue(VisualTokenScan.reads("VisualFill", "hover", in: "x VisualFill.hover y"))
+        XCTAssertFalse(VisualTokenScan.reads("VisualFill", "control", in: "x VisualFill.controlHover y"),
+                       "前缀命中不算读取：这条边界就是变异 P3 漏掉的那个洞")
+        XCTAssertTrue(VisualTokenScan.reads("VisualFill", "control", in: "x VisualFill.control y"),
+                       "加了边界之后不许把真读取也漏掉（那会让守卫只会报绿）")
+        XCTAssertTrue(VisualTokenScan.reads("VisualFont", "body", in: "结尾就是 VisualFont.body"),
+                       "出现在行尾也要认得")
+
         XCTAssertEqual(
             VisualTokenScan.tokenNames(declarations: """
+            enum VisualRadius {
             static let chip: CGFloat = 4
             static var raised = Edge(color: .black)
             // static let commented: CGFloat = 1
             let instance: CGFloat = 2
-            """),
-            ["chip"],
-            "只认非注释的 `static let`：var / 实例常量 / 注释都不算，否则计数器会被注释喂饱")
+            }
+            enum VisualGlyph {
+            static let chipSymbol: CGFloat = 11
+            }
+            """).map { "\($0.family).\($0.name)" },
+            ["VisualRadius.chip", "VisualGlyph.chipSymbol"],
+            "只认非注释的 `static let`，并且要连族一起认：var / 实例常量 / 注释都不算")
 
         XCTAssertEqual(
             "private struct GlassBorder<S: InsettableShape>: View {\nstruct HistoryRowButton: View {\nstruct NotAView: ViewModifier {".viewStructNames(),
@@ -305,14 +362,41 @@ enum VisualTokenScan {
         return nil
     }
 
-    /// `static let NAME: Type = …` 里的名字。
-    static func tokenNames(declarations: String) -> [String] {
-        declarations.components(separatedBy: "\n").compactMap { rawLine in
+    /// `text` 里是否真的读了 `Family.name` —— **带标识符边界**。
+    ///
+    /// 为什么不能直接 `contains("\(family).\(name)")`：变异对照 P3 就是这么漏的 ——
+    /// 往 `VisualFill` 里塞一个没人读的 `control`，守卫照样绿，
+    /// 因为 `VisualFill.controlHover` 里含 `VisualFill.control` 这个前缀。
+    /// 名字必须是**整段**才算一次读取。
+    static func reads(_ family: String, _ name: String, in text: String) -> Bool {
+        let needle = family + "." + name
+        var search = text.startIndex
+        while let range = text.range(of: needle, range: search..<text.endIndex) {
+            let next = range.upperBound
+            if next == text.endIndex || !text[next].isLetter { return true }
+            search = text.index(after: range.lowerBound)
+        }
+        return false
+    }
+
+    /// `static let NAME: Type = …` 里的名字，**连同它所在的族**。
+    ///
+    /// 族必须一起认：`control` 在 `VisualRadius` 与 `VisualGlyph` 里都有，
+    /// 只按名字查"有没有人读"会让其中一族白拿另一族的消费者（R3 实测就是这样漏掉一处）。
+    static func tokenNames(declarations: String) -> [(family: String, name: String)] {
+        var family = ""
+        return declarations.components(separatedBy: "\n").compactMap { rawLine in
             let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("enum ") {
+                family = line.dropFirst(5).components(separatedBy: " ").first?
+                    .replacingOccurrences(of: "{", with: "") ?? ""
+                return nil
+            }
             let parts = line.split(separator: " ", omittingEmptySubsequences: true)
             guard parts.count >= 3, parts[0] == "static", parts[1] == "let" else { return nil }
             let name = String(parts[2].split(separator: ":").first ?? "")
-            return name.isEmpty ? nil : name
+            guard !name.isEmpty, !family.isEmpty else { return nil }
+            return (family, name)
         }
     }
 }

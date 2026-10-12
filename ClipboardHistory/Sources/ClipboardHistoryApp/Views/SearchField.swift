@@ -11,7 +11,7 @@ struct SearchField: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: VisualFont.body, weight: .medium))
                 .foregroundStyle(isActive ? .primary : .secondary)
 
             ChineseEditableTextField(text: $text, placeholder: "搜索历史……")
@@ -20,7 +20,7 @@ struct SearchField: View {
             if !text.isEmpty {
                 Button(action: { text = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: VisualFont.row, weight: .medium))
                         .foregroundStyle(isHovered ? .secondary : .tertiary)
                 }
                 .buttonStyle(.plain)

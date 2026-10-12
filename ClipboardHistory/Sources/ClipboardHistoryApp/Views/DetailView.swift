@@ -34,8 +34,8 @@ struct DetailView: View {
                 systemName: "doc.on.clipboard",
                 title: "选择一条记录查看详情",
                 spacing: 16,
-                imageSize: 40,
-                titleSize: 14
+                imageSize: VisualGlyph.emptyPane,
+                titleSize: VisualFont.body
             )
             .transition(MotionCatalog.transition(for: .contentFade))
         }
@@ -493,24 +493,24 @@ private struct MultiFileRow: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: VisualGlyph.badge, weight: .semibold))
                     .foregroundStyle(.tertiary)
                     .frame(width: 12)
 
                 Image(systemName: symbol)
-                    .font(.system(size: 14))
+                    .font(.system(size: VisualGlyph.rowIcon))
                     .foregroundStyle(.secondary)
                     .frame(width: 18)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(url.lastPathComponent)
-                        .font(.system(size: 13))
+                        .font(.system(size: VisualFont.body))
                         .lineLimit(1)
                         .truncationMode(.middle)
                     // 只显示上一级目录名（"…/Downloads"），不再把完整绝对路径
                     // 摊在界面上：屏幕共享/截屏时这是泄露点（审计 R-43）
                     Text(url.parentDirectoryLabel)
-                        .font(.system(size: 11))
+                        .font(.system(size: VisualFont.meta))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)

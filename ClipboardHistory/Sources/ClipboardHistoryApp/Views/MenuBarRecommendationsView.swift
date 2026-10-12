@@ -28,7 +28,7 @@ struct MenuBarRecommendationsView: View {
                 Divider()
 
                 Text("猜你要粘贴")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: VisualFont.meta, weight: .semibold))
                     .foregroundStyle(.secondary)
 
                 ForEach(historyStore.predictionSuggestionEntries.prefix(3)) { entry in
@@ -49,7 +49,7 @@ struct MenuBarRecommendationsView: View {
                             Spacer(minLength: 12)
                             if !reasonText.isEmpty {
                                 Text(reasonText)
-                                    .font(.system(size: 11))
+                                    .font(.system(size: VisualFont.meta))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .truncationMode(.tail)
@@ -69,7 +69,7 @@ struct MenuBarRecommendationsView: View {
                     historyStore.perform(.dismissAllRecommendations)
                 } label: {
                     Text("都不是我想要的")
-                        .font(.system(size: 11))
+                        .font(.system(size: VisualFont.meta))
                         .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)

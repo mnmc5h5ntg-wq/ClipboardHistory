@@ -9,7 +9,7 @@ struct EmptyStateView: View {
     let systemName: String
     let title: String
     var spacing: CGFloat = 12
-    var imageSize: CGFloat = 28
+    var imageSize: CGFloat = VisualGlyph.emptyCompact
     var titleSize: CGFloat = StatePresentation.messageFontSize
     /// 下一步动作。空态可以没有动作（"暂无剪贴板历史"就没有），但"无匹配结果"必须有。
     var actionTitle: String? = nil

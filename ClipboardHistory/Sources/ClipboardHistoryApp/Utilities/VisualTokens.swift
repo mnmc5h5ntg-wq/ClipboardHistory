@@ -182,6 +182,58 @@ enum VisualTint {
     static let dropTargetStroke: Double = 0.60
 }
 
+// MARK: - 字号（R3）
+
+enum VisualFont {
+    /// 11pt：一切"次要到只用来定位"的字 —— 行内时间戳、详情 meta、菜单栏推荐理由的说明行。
+    /// 它已经是这个 App 的下限：再小就跌破 HIG 的正文可读范围，暗色下 `.secondary` 会糊成一片。
+    static let meta: CGFloat = 11
+
+    /// 12pt：列表条目的标题（侧栏那一行、筛选段、多文件行的次行）。
+    /// 密集列表里 12 是"能一行看两条信息"的最大值。
+    static let row: CGFloat = 12
+
+    /// 13pt：正文级最小可读值。**刻意引用规范本体而不是重抄一个 13** ——
+    /// 状态文案的字号早就由 `StatePresentation` 定过一次，两处各写一个数就是"三处对齐"散掉的老路。
+    static let body: CGFloat = StatePresentation.messageFontSize
+
+    /// 14pt：区块标题（侧栏头部"时间剪史"、文件预览的文件名）。
+    /// 它是这一族里唯一带 `.semibold` 也仍然安静的尺寸：标题要比内容响，但只响一档。
+    static let title: CGFloat = 14
+}
+
+enum VisualGlyph {
+    /// 10pt：行内小符号 —— "固定"徽标、多文件行的展开箭头。
+    /// 徽标以前写 9：9pt 的 `pin.fill` 在 2× 下笔画会并在一起，而它表达的是"这条被钉住了"，
+    /// 看不清等于没有状态。9 与 10 收成同一档，同时把下限抬到 10。
+    static let badge: CGFloat = 10
+
+    /// 11pt：16pt 小方块里的类型符号。它要比 12pt 的正文弱一档（缩略图才是主角），
+    /// 又得还认得出图形 —— 9/10 的 `doc.fill` 在 2× 下会糊成一团墨。
+    static let chipSymbol: CGFloat = 11
+
+    /// 14pt：行首的类型图标（与 `row` 12pt 的标题并排时，图标要比字略大才同样显眼）。
+    static let rowIcon: CGFloat = 14
+
+    /// 16pt：播放控件条上的符号。以前同一排里播放键 16、静音键 15 ——
+    /// 两个尺寸在同一根 22pt 高的条上，读起来像"这两个按钮不是一组"。
+    static let control: CGFloat = 16
+
+    /// 28 / 40：整块面板空出来的那个图标，两档按**可用面积**分：
+    /// 详情区是一整列（40），侧栏与菜单只有窄窄一块（28）。
+    /// 刻意不按"哪个页面"分：按页面分就会每页各调一次，又回到六个数字的状态。
+    static let emptyCompact: CGFloat = 28
+    static let emptyPane: CGFloat = 40
+
+    /// 36pt：加载失败 / 读不到信息那类状态的大图标（以前 36 与 32 并存，
+    /// 同一个"这里出问题了"在详情区里画出两种音量）。
+    static let state: CGFloat = 36
+
+    /// 48pt：文件预览里"没有缩略图"时顶上的占位符号。它比状态图标更大，
+    /// 因为它不是提示，而是**内容本身**的替身。
+    static let placeholder: CGFloat = 48
+}
+
 // MARK: - 材质
 
 enum VisualMaterial {

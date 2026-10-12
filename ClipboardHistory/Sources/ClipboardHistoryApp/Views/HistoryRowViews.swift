@@ -86,7 +86,7 @@ private struct RowFavoriteButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite))
-                .font(.system(size: 11, weight: .regular))
+                .font(.system(size: VisualFont.meta, weight: .regular))
                 .foregroundStyle(tint)
                 // 行里这颗星**也会换符号**（star ↔ star.fill），而它就在用户点的那一行上：
                 // 上一轮只给详情浮层那颗胶囊接了过渡，行内这一处是漏的（M5 的原文是
@@ -133,7 +133,7 @@ private struct RowPinnedBadge: View {
         Group {
             if isPinned {
                 Image(systemName: PinTogglePresentation.symbolName(isPinned: true))
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(.system(size: VisualGlyph.badge, weight: .semibold))
                     .foregroundStyle(Color.primary.opacity(0.78))
                     .accessibilityLabel("已固定")
                     // 徽标是"从无到有"，所以给淡入而不是弹跳：槽位宽度恒定（见上面注释），
@@ -162,7 +162,7 @@ private struct RowLeadingVisual: View {
         switch entry.content {
         case .text:
             Image(systemName: "doc.text")
-                .font(.system(size: 12)).foregroundStyle(.secondary).frame(width: 16)
+                .font(.system(size: VisualFont.row)).foregroundStyle(.secondary).frame(width: 16)
         case .image(let stored):
             ThumbnailImage(nsImage: stored.nsImage)
         case .file:
@@ -190,13 +190,13 @@ private struct RowTextColumn: View {
             switch entry.content {
             case .file(let url):
                 FileNameText(url: url)
-                    .font(.system(size: 12))
+                    .font(.system(size: VisualFont.row))
             case .files(let urls):
                 MultiFileTitle(urls: urls)
-                    .font(.system(size: 12))
+                    .font(.system(size: VisualFont.row))
             default:
                 Text(entry.shortPreview)
-                    .font(.system(size: 12))
+                    .font(.system(size: VisualFont.row))
                     .lineLimit(2)
                     .truncationMode(.tail)
             }
@@ -204,7 +204,7 @@ private struct RowTextColumn: View {
                 // 复制时间是行内唯一的时间信息，tertiary 在暗色下实测 2.2:1，读不出来。
                 // 字号也从 10pt 提到 11pt：10pt 低于 HIG 的正文下限，而这一行没有别的冗余信息
                 // 可以让它更小（审计第二轮 1.2 / 账本 R2-13）。
-                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

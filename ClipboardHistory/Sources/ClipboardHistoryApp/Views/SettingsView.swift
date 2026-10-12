@@ -298,7 +298,7 @@ struct SettingsView: View {
                     Text("打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
                         + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
                         + "导出与导入只带纯文本。")
-                        .font(.system(size: 11))
+                        .font(.system(size: VisualFont.meta))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
@@ -678,7 +678,7 @@ private struct SettingsSidebarRow: View {
             VisualShape.rounded(VisualRadius.panel)
                 .fill(isSelected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
         )
-        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+        .font(.system(size: VisualFont.body, weight: isSelected ? .semibold : .regular))
         .padding(.horizontal, 6)
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)
         .animation(MotionCatalog.animation(for: .selection), value: isSelected)
