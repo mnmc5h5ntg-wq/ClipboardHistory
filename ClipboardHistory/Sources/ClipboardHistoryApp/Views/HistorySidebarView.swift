@@ -39,8 +39,10 @@ struct HistorySidebarView: View {
                     action: historyStore.searchText.isEmpty ? nil : { historyStore.perform(.updateSearch("")) }
                 )
                 .padding(.vertical, 40)
+                    // 过渡以前挂在下面那个 `Spacer()` 上（R5 修正）：Spacer 没有可见内容，
+                    // 于是"空态淡入"这句话在代码里存在、在屏幕上不存在。挪到 EmptyStateView 本体上。
+                    .transition(MotionCatalog.transition(for: .contentFade))
                 Spacer()
-                .transition(MotionCatalog.transition(for: .contentFade))
             } else {
                 historyList
             }

@@ -288,3 +288,79 @@ reduce 闸门失效、`pressed` 与 `hover` 同值、拆掉一处接线、新加
 **遗留**：按压态的**产物级**证据（真机眼看，批次 12.1–12.7）；键盘焦点那一半单独一轮；
 间距节奏（padding 一族）仍未收。
 
+
+
+---
+
+## Round 5 · 全页面逐元素审计（约 206 个位点）+ 三条"代码里有、屏幕上没有"
+
+**这一轮先量再改**。四个只读代理把主窗口 / 详情与提示条 / 设置窗口 / 菜单栏与浮层
+按元素过了一遍：**约 206 个位点**（侧栏与行 51 · 详情与横幅 52 · 设置 50 · 菜单栏/浮层/全局 53），
+产出在 `.scratch/motion-audit/`（含共享须知与合并清单）。
+代理的结论**一条都不直接采信**：我自己读码核实 8 条，6 条成立（A1–A6）、2 条被证伪并写明理由。
+
+**修掉的三条同一族缺陷 —— 声明在、屏幕不在**：
+
+| 位点 | 之前 | 现在 |
+|---|---|---|
+| 详情空态 `DetailView.body` | `.transition` 是**孤儿**：`body` 上没有任何 `.animation(value:)`，唯一那条在 `selectedEntryView` 里，而 `entry == nil` 时那棵子树已经不存在 | `body` 包一层 `Group`，挂 `value: historyStore.selectedEntry == nil`（键只取"有没有选中"：换选 A→B 不该演，那是读字不是找变化） |
+| 侧栏空态 | 过渡挂在 **`Spacer()`** 上 —— Spacer 没有可见内容 | 挪到 `EmptyStateView` 那一段 |
+| 收藏 / 固定胶囊 | `symbolMotion` 两臂**拿不到事务**：整个 `GlassControls.swift` 只有 hover 一处 `withAnimation`，而 `HistoryStore` 里 `grep -c withAnimation = 0` | 胶囊 `VStack` 上挂两条 `.emphasis` 按值事务 |
+
+**还修了一条"界面不说话"**（A4）：复制**失败**零回执 —— `clipboardWriteErrorMessage` 全仓只有一个
+guard 读取点、没有任何显示点，而 `DetailView.swift` 的注释声称"并弹顶部横幅"（不成立：那条横幅来自
+`pasteFailureNotice`，是另一条链路）。现在失败位是 `exclamationmark` + help 文案 + 1.1s 收回 +
+14+ 播报"复制失败，没能写进剪贴板"，**那句注释按实测改写**。
+**删掉一条**（A5）：菜单栏 `MenuBarRecommendationsView` 挂着 `.transition` 而整个文件
+`grep -c "animation(" = 0`，且 `MenuBarExtraStyle.menu` 的内容会被编译成真 `NSMenu`（D-055 / M15 实测）
+⇒ 声明根本不会执行，删掉，理由写在原地。
+
+**判据这一轮的三条都比改动本身贵**：
+- **A6 按族扫**：原来"不许留不会执行的过渡声明"只读 `HistorySidebarView.swift` 一个文件，
+  于是同一族缺陷在另外三处各活了一次。新增 `testNoUnexecutedTransitionClaimsAcrossViews`
+  扫 `Views/*.swift` 整目录。**按文件名的守卫 = 没有守卫。**
+- **A7 豁免不能写成子串**：A6 第一版用 `!line.contains("content")` 豁免 ViewModifier 工厂，
+  而角色名 `.contentFade` 里就含 "content" ⇒ 把它最该抓的那类声明整行放走。
+  变异 **M6 报 ESCAPED**（守卫一路绿灯，是变异把它戳穿的）。修成结构判据：豁免要求
+  修饰链根是标识符 `content` **且**该文件真的声明 `func body(content: Content)`；
+  检测面同时从"目录的两个工厂名"扩到任何 `.transition(`（裸写法 `.transition(.opacity)`
+  原来也从尺子底下走过去）。重跑 **M6 两支 2/2 CAUGHT**，并补
+  `testTransitionClaimScanIsATruthTable`（六个方向各钉一条，不门控、CI 每轮跑）。
+- **A8 读数也要换成时间**：`empty-state` 同一份代码本机三次跑出过渡帧数 `3 / 2 / 2`
+  （用 `git worktree` 在 HEAD 上对照，也读到 2 ⇒ **不是本轮引入的回归**），
+  而变化段时长是 `131 / 119 / 125ms`。R2 只把判据的**要求**换成了时间，**读数**还是帧数，
+  于是它跟着采样相位翻脸 —— 半套改造比不改更危险，因为它看起来已经改过了。
+  现在判据是 `judgeMotion`：`s ≤ 0.3d` 才有分辨率、`elapsed ≥ 0.4d` 才算演
+  （两个常数是解出来的：真过渡最坏读数 `d−2s`、跳变读数 `s`，要"真过渡必过、跳变必红"
+  就要 `s ≤ 0.3d`），推导写在函数注释里。**变异 M8**（摘掉侧栏空态的驱动）⇒ CAUGHT，
+  读数 `过渡帧数=1 变化段时长=27ms 峰值 0.192`（跳变的峰值比真过渡的任何一帧都大 ——
+  这正是"帧数判据"会读成 1、"时长判据"读成 27ms 的那个区分）。
+
+**顺带抓到变异分类器自己的一个 bug**：M8 第一次跑报 ESCAPED，真因是脚本忘了设
+`CLIPBOARD_HISTORY_UI_MOTION=1` ⇒ 整条测试 skip，而 skip 的输出里同样有"0 failures"。
+**"没跑"被读成"没抓到"**，与 D-055 那族同形。补了 `DID-NOT-RUN=skipped` 这一支分类。
+
+**覆盖损失也记账，不藏**：换成时长判据之后，本机 `detail-kind-change`（760×560，
+事件内最粗采样 61ms > 0.3×160=48ms）从"判绿"变成 `MOTION_NOT_RUN=clock-coarse-in-window`，
+`MOTION_RESOLVE_SUMMARY judged` 从 2/3 掉到 **1/3**。CI 那台 26–30ms 的 runner 上它仍然判。
+**宁可少判一条，不要判错。**
+
+**验证**：615 tests / 24 skipped / 0 failures（+1 条真值表）；动效套件 20 tests / 3 skipped /
+**0 failures**（本轮开工前它是红的）；0 warning；**82 帧 `CHANGED=0`**；`scripts/tests` 72 passed；
+变异 M6 2/2 + M8 1/1 CAUGHT；`HistoryStore` 零改动（1093/1120 行不变）。
+
+**自评 91 / 100**
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 18 / 20 | 详情空态与收藏/固定现在真的会演；菜单栏那条死声明删得干净（系统语言优先，不叠自绘） |
+| 流畅度 | 18 / 20 | 键只取"有没有选中"，换选不演；三处过渡都走目录同一档 160ms |
+| 层次与材质 | 14 / 15 | 没有新材质、没有新强度档；失败回执借用既有 `.emphasis` 那一档 |
+| 动效细节 | 14 / 15 | 本轮的"细节"花在**判据**上：一条会翻脸的判据修成了不翻脸的，并给出边界推导 |
+| 交互反馈 | 9 / 10 | 复制失败终于有回执（此前是"点了没反应还以为成功"）；**双击行复制那条路径仍无回执**（B 表 P3） |
+| 可访问性 | 9 / 10 | 失败回执带 VoiceOver 播报（12/13 无 API，如实记账）；reduce 路径未回归 |
+| 性能 | 9 / 10 | 无新计时器/图层；但判据换形之后本机少判一条（judged 1/3），这是本轮付出的可观测性代价 |
+
+**遗留（下一轮的输入）**：设置窗口与菜单栏的 B 表 P1/P2 还没有一条落地；
+按压态仍是"源码已接、产物未量"（人工批次 12.1）；`detail-kind-change` 的本机覆盖要靠
+更细的抓帧时钟或分带窗口转正；间距节奏（padding 一族）仍未收。

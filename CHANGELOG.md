@@ -63,6 +63,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   直接打红，令牌没人读打红，`Views/` 里出现没有构造点的死表面打红，强度与半径的**次序**是语义约束。
   减弱动态时整圈光不画（HIG 明确反对淡入淡出模糊），虚线框仍然淡入。
 
+- **三条"代码里写了过渡、屏幕上没有"的缺陷修掉**（视觉迭代 R5 / D-062 / U-26）：
+  详情空态的 `.transition` 原来是孤儿声明（`body` 上没有任何驱动）、侧栏空态的过渡挂在
+  `Spacer()` 上、收藏与固定两臂拿不到动画事务。现在三处都会真的淡入，
+  键分别是"有没有选中"与 `isFavorite` / `isPinned`（换选 A→B 不演）。
+- **复制失败终于有回执**：以前写进剪贴板失败时界面与成功长得一模一样，
+  而代码注释还声称"并弹顶部横幅"（那条横幅来自另一条链路）。
+  现在失败位显示 `exclamationmark` + 说明文案 + 1.1s 自动收回，macOS 14+ 同步向 VoiceOver 播报。
+- **菜单栏推荐列表删掉一条不会执行的声明**：`MenuBarExtraStyle.menu` 的内容会被编译成真的 `NSMenu`，
+  SwiftUI 的过渡在那一层根本不执行（D-055 / M15 实测）；留着一行只会让下一个人以为已经做过了。
+- **"不许留不会执行的过渡声明"这条判据从单文件扩成按族扫 `Views/*.swift`**，
+  并且豁免改成结构判据（ViewModifier 的 `content` 占位符 + 该文件确实声明了它）。
+  第一版的豁免写成 `!line.contains("content")`，被角色名 `.contentFade` 白拿 —— 变异 M6 实测 ESCAPED，
+  修完 2/2 CAUGHT，并新增一条不门控的真值表判据（`testTransitionClaimScanIsATruthTable`）。
+- **动效判据的读数从"几帧在动"换成"动了多久"**（D-063）：同一份代码本机三次读出过渡帧数 `3 / 2 / 2`
+  （HEAD 上也读到 2），而变化段时长 `131 / 119 / 125ms` 稳定。新判据 `judgeMotion` 用
+  "事件内最粗采样 ≤ 0.3×声明时长"定分辨率、"变化段时长 ≥ 0.4×声明时长"定过渡成立，
+  常数由 `d − 2s` 与 `s` 两个边界解出来；产品级变异 M8（摘掉侧栏空态驱动）CAUGHT。
+  代价如实记账：本机 `detail-kind-change` 转为 `MOTION_NOT_RUN=clock-coarse-in-window`，
+  `MOTION_RESOLVE_SUMMARY judged` 2/3 → 1/3（CI 的 26–30ms 时钟上仍然判）。
+
+
 ### Changed
 
 - **撤掉 QuickPick 与主窗口的呼出动画**（M3/M10 定稿）：热键 / 每天上百次的入口按规范

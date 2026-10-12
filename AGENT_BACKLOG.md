@@ -647,3 +647,18 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
 7. **两条本轮留下的观测缺口**（都不影响功能，影响的是"下一条判据能不能被相信"）：
    ① `VideoPreview` 的播放控件没有任何夹具帧 ⇒ R1 给它补的分组合成**只有源码级证据**；
    ② `testNoDeadSurfaceInViews` 只扫 `struct X: View`，`ViewModifier` / `ButtonStyle` 那类死包装还在视野外。
+
+
+8. **`detail-kind-change` 在本机从"判绿"变成 not-run**（R5 / D-063 的代价，不许忘）：
+   判据换成时长之后，760×560 窗口的事件内最粗采样 61ms > 0.3×160=48ms ⇒
+   `MOTION_NOT_RUN=clock-coarse-in-window`，本机 `judged=1/3`。
+   三条可选修法（**都不许改成"把阈值放宽到能过"**）：
+   ① 抓帧只抓详情区那一条带（`deltas(_:band:)` 已有，但抓帧成本是整窗的，要先量能不能降）；
+   ② 给这个场景单独声明更长的过渡档（改产品参数迁就尺子，优先考虑反面）；
+   ③ 接受"本机不判、CI 判"，并把 `judged=n/m` 的下限做成一条判据（**推荐**：
+   CI 上 `judged` 必须 ≥2/3，本机只作参考）。
+   在 ③ 落地之前，任何人看到 `judged=1/3` 都该知道那是覆盖掉了两条，不是"三条都绿"。
+9. **`Views/` 按族扫描的覆盖面仍然只有 `.transition(`**：同一族的"声明了但没供电"还有
+   `.animation(value:)` 挂在不存在的键上、`withAnimation` 包住一个不触发视图更新的闭包、
+   `symbolEffect` 用在 12/13 的产物上（D-055 已量：`cacheDisplay` 抓不到系统 symbol effect）。
+   现在这三类**没有一个按族判据**。R6 若动状态切换，先把 `.animation(value:)` 那一类补上。

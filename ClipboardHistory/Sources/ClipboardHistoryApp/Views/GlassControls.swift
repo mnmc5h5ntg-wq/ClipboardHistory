@@ -11,6 +11,10 @@ struct GlassPill: View {
     /// 「已复制」回执（M7）。这颗按钮平时是"复制"，点下去变成 1.1 秒的勾 ——
     /// 复制成功以前没有任何反馈（只有行位置变化），那是可用性缺口。
     var copyConfirmed: Bool = false
+    /// 复制**失败**那一档（R5）。以前失败是"什么都不演"：图标回到原样、界面一句话都没说，
+    /// 而 `clipboardWriteErrorMessage` 全仓只有一个 guard 读取点、没有任何显示点 ——
+    /// 用户按了、没写进去、接着去别处 ⌘V 粘出旧内容。那是给了一句假话，不是少了一个动画。
+    var copyFailed: Bool = false
     let copyAction: () -> Void
     let deleteAction: () -> Void
 
@@ -40,8 +44,10 @@ struct GlassPill: View {
 
             GlassPillDivider()
 
-            GlassPillButton(symbol: copyConfirmed ? "checkmark" : "doc.on.doc",
-                            helpText: copyConfirmed ? "已复制到剪贴板" : "再次复制",
+            GlassPillButton(symbol: copyFailed ? "exclamationmark"
+                                               : (copyConfirmed ? "checkmark" : "doc.on.doc"),
+                            helpText: copyFailed ? "复制失败：没能写进剪贴板"
+                                : (copyConfirmed ? "已复制到剪贴板" : "再次复制"),
                             // 图标换了要说"换过了"，不是"闪了一下"：14+ 用系统的符号替换过渡，
                             // 12/13 退化成交叉淡入（见 `SymbolMotion`）。
                             replaceSymbol: true,
@@ -51,6 +57,12 @@ struct GlassPill: View {
 
             GlassPillButton(symbol: "trash", helpText: "删除", action: deleteAction)
         }
+        // 收藏与固定是"状态被改了"：这两条事务是 `symbolMotion` 那两臂唯一的供电来源。
+        // 以前整个文件只有 hover 一处 `withAnimation`（`:105`），于是 14+ 的符号替换过渡与
+        // 12/13 的自绘淡入**都拿不到事务** —— 声明在、图标硬换，看起来像"动效做了没效果"。
+        // 复制那颗不挂在这里：它的状态是视图态 `copyConfirmed`，事务在 `DetailView.confirmCopy` 里。
+        .animation(MotionCatalog.animation(for: .emphasis), value: isFavorite)
+        .animation(MotionCatalog.animation(for: .emphasis), value: isPinned)
         .padding(4)
         .background(VisualMaterial.glass, in: Capsule())
         .clipShape(Capsule())

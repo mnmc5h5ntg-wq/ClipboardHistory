@@ -12,6 +12,9 @@ struct DetailView: View {
     /// 它是**视图态**，不进 store、不进存档：换一条记录带着它走没问题，
     /// 但它绝不改 `HistoryStore` 里的任何一个字（C-5：Store 只减不加）。
     @State private var markdownMode: MarkdownPreviewMode
+    /// 复制失败那一档的视图态（R5）。与 `copyConfirmed` 同族：不进 store、不进存档，
+    /// 只负责"这一下按下去，界面上有一件事发生过"。
+    @State private var copyFailed: Bool = false
 
     /// 「已复制」回执（M7）。复制成功以前没有任何反馈，只有行位置变化 ——
     /// 那是可用性缺口，不只是美观问题。
@@ -27,6 +30,10 @@ struct DetailView: View {
     }
 
     var body: some View {
+        // `Group` 是为了让下面那条 `.animation(value:)` 有地方挂：`body` 直接以 if/else 开头时，
+        // 修饰符没有可依附的表达式（编译器报的是"instance member 'animation' cannot be used on type 'View'"）。
+        // Group 不引入布局与尺寸变化。
+        Group {
         if let entry = historyStore.selectedEntry {
             selectedEntryView(entry)
         } else {
@@ -37,8 +44,16 @@ struct DetailView: View {
                 imageSize: VisualGlyph.emptyPane,
                 titleSize: VisualFont.body
             )
-            .transition(MotionCatalog.transition(for: .contentFade))
+                .transition(MotionCatalog.transition(for: .contentFade))
         }
+        }
+        // 上面那条 `.transition` 以前**没有供电**：整块 `body` 上没有任何 `.animation(value:)`，
+        // 唯一那条挂在 `selectedEntryView` 内部（键是"视图类型身份"），而 `entry == nil` 时
+        // 那棵子树已经不存在了。于是"删完最后一条 / 选中一条空"这两次整块换人是一帧跳变，
+        // 而代码里留着一行不会执行的过渡 —— 仓库对这一族的判据是"不执行的声明比没有更坏"。
+        // 键只取"有没有选中"这一个布尔：换选（A→B）不该演，那是读字，不是找变化。
+        .animation(MotionCatalog.animation(for: .contentFade),
+                   value: historyStore.selectedEntry == nil)
     }
 
     private func selectedEntryView(_ entry: HistoryStore.Entry) -> some View {
@@ -78,6 +93,7 @@ struct DetailView: View {
                 isPinned: entry.isPinned,
                 pinAction: { historyStore.perform(.togglePin(entry)) },
                 copyConfirmed: copyConfirmed,
+                copyFailed: copyFailed,
                 copyAction: {
                     historyStore.perform(.copyAndPromote(entry))
                     confirmCopy()
@@ -88,12 +104,18 @@ struct DetailView: View {
         }
     }
 
-    /// 复制回执。**只在真的写进剪贴板了**的时候给：
-    /// `copyAndPromote` 失败时会置 `clipboardWriteErrorMessage`（并弹顶部横幅），
-    /// 那时再说"已复制"是当着用户撒谎，而且那句错误和这句回执会同时出现在屏上。
+    /// 复制回执。**成功与失败都要说话**（R5 补了失败那一半）：
+    /// `copyAndPromote` 失败时会置 `clipboardWriteErrorMessage`，以前这里 `guard` 直接 return ——
+    /// "不撒谎"做到了，"说实话"没做：图标回到原样、界面一句话都没说。
+    /// （原注释声称"并弹顶部横幅"，实测**不成立**：全仓唯一那条横幅来自自动粘贴失败
+    /// `ApplicationShell` 的 `pasteFailureNotice`，是另一条链路；而在这之前
+    /// `clipboardWriteErrorMessage` 没有任何显示消费者，只有一个 guard 读取点。）
     /// （成功路径上 `writeToClipboard` 会把这条错误清成 nil，所以 nil 就是"这次成了"。）
     private func confirmCopy() {
-        guard historyStore.clipboardWriteErrorMessage == nil else { return }
+        guard historyStore.clipboardWriteErrorMessage == nil else {
+            showCopyFailure()
+            return
+        }
         copyResetTask?.cancel()
         withAnimation(MotionCatalog.animation(for: .emphasis)) { copyConfirmed = true }
         // 读屏用户拿不到那颗勾（MC-13）：播报的是同一句话，不是把视觉回执换个写法。
@@ -106,9 +128,26 @@ struct DetailView: View {
         }
     }
 
+    /// 失败位：与成功回执同一档（`.emphasis`）、同一个 1.1 秒、同一颗按钮，只是图标与人话换了。
+    /// 读屏那一边**不许播"已复制"**（那正是这条要防的谎），改播失败；12/13 没有播报 API，
+    /// 那一档只剩图标与 help 文案变化 —— 缺口照实写，不许当成已交付。
+    private func showCopyFailure() {
+        copyResetTask?.cancel()
+        copyResetTask = nil
+        copyConfirmed = false
+        withAnimation(MotionCatalog.animation(for: .emphasis)) { copyFailed = true }
+        VoiceOverReceipt.announce("复制失败，没能写进剪贴板")
+        copyResetTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(MotionCatalog.animation(for: .emphasis)) { copyFailed = false }
+        }
+    }
+
     private func clearCopyConfirmation(animated: Bool) {
         copyResetTask?.cancel()
         copyResetTask = nil
+        copyFailed = false
         guard copyConfirmed else { return }
         if animated {
             withAnimation(MotionCatalog.animation(for: .emphasis)) { copyConfirmed = false }

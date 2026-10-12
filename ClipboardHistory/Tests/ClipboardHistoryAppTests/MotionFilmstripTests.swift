@@ -78,6 +78,25 @@ final class MotionFilmstripTests: XCTestCase {
 
     static func peak(_ fractions: [Double]) -> Double { fractions.max() ?? 0 }
 
+    /// "画面还在变"覆盖了多长**时间**（ms），而不是几帧。
+    ///
+    /// 为什么需要它：`transitionFrameCount` 数的是帧，而一帧多长由抓帧耗时决定。
+    /// R2 把判据的**要求**换成了时间，但**读数**仍然是帧数，于是它跟着采样相位漂：
+    /// 本机实测同一份代码三次跑出 `2 / 3 / 2`（HEAD 上也给过 2）——
+    /// 同一段变更，采样恰好落在中间就读成 3 帧，落偏就读成 2 帧。
+    /// 一条"同一份代码会翻脸"的判据在判的是采样相位，不是产品。
+    /// 时间读数不看相位：第一个还在变的帧到最后一个还在变的帧之间隔了多少毫秒。
+    /// 返回 `nil` = 整段没有一次可见变化 ⇒ 无从判定，调用方必须报 not-run，不许判绿。
+    static func changedRunElapsedMilliseconds(stamps: [TimeInterval], fractions: [Double]) -> Double? {
+        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return nil }
+        let moving = fractions.indices.filter { fractions[$0] >= peak * stepFloorRatio }
+        guard let first = moving.first, let last = moving.last,
+              first < stamps.count, last + 1 < stamps.count else { return nil }
+        // `fractions[i]` 是"第 i 帧 → 第 i+1 帧"之间的变化，所以这段变更覆盖
+        // stamps[first] 到 stamps[last + 1] 这段时间。
+        return max(0, (stamps[last + 1] - stamps[first]) * 1000)
+    }
+
     /// 把窗口切成 cols×rows 的格子，打印"峰值那一格里每格的变化量"——用来回答
     /// "到底哪里变了"，而不是靠猜像素坐标去框区域（猜错的结果是整条判据读到 0.000，
     /// 看着像"没动"，其实是我没框到）。
@@ -148,18 +167,49 @@ final class MotionFilmstripTests: XCTestCase {
         return Int(durationMilliseconds / Double(sampleMilliseconds))
     }
 
-    /// 判据要求的"还在变的帧数"。
+    /// 判据：这段变更是"演了一段"还是"跳了一下"。
     ///
-    /// - 时钟够细（能切出 ≥3 帧）⇒ 维持原来的 3 帧，**不放松**；
-    /// - 只能切出 2 帧 ⇒ 要求降到 2：一帧跳变仍然读成 1 ⇒ 仍然红（这就是 ab7a759 说的"地板两帧"）；
-    /// - 连 2 帧都切不出（采样比整段过渡还粗）⇒ `nil` = **无从判定**，调用方必须报 not-run，
-    ///   既不许判红也不许判绿。把"尺子看不见"写成产品缺陷，和把它写成"通过"一样是假证据。
-    static func requiredTransitionFrames(durationMilliseconds: Double,
-                                        sampleMilliseconds: Int) -> Int? {
-        let resolvable = resolvableFrames(durationMilliseconds: durationMilliseconds,
-                                         sampleMilliseconds: sampleMilliseconds)
-        guard resolvable >= 2 else { return nil }
-        return min(minimumTransitionFrames, resolvable)
+    /// 为什么 R5 把"几帧在动"换成"动了多久"：本机同一份代码三次实测 `empty-state` 的
+    /// 过渡帧数是 `3 / 2 / 2`（HEAD 上也读到过 2），而**变化段时长**是 `131 / 119 / 125ms` ——
+    /// 帧数跟着采样相位翻脸，时长不翻脸。一条会翻脸的判据在判的是尺子，不是产品
+    /// （BACKLOG 第 6 条那一族）。
+    ///
+    /// 那两个常数不是调出来的，是解出来的。设整段过渡时长 `d`、事件那一段最粗的一次采样 `s`：
+    /// - 真过渡的"还在变"时间最少 `d − 2s`（首、末各可能错开一个采样）；
+    /// - 一次跳变的只有 `s`。
+    /// 要"真过渡必判绿、跳变必判红"就要 `d − 2s ≥ 0.4d` 且 `s < 0.4d` ⇒ **`s ≤ 0.3d` 时两条同时成立**。
+    /// 所以 `s > 0.3d` 是这把尺在事件这一段根本没有分辨率 ⇒ 报 `.clockTooCoarse`，
+    /// 既不判红也不判绿（把尺子的盲区写成产品缺陷，和写成"已交付"一样是假证据）。
+    static func judgeMotion(elapsedMilliseconds: Double,
+                           worstIntervalMilliseconds: Double,
+                           declaredDurationMilliseconds: Double) -> MotionVerdict {
+        guard declaredDurationMilliseconds > 0, worstIntervalMilliseconds > 0 else { return .clockTooCoarse }
+        guard worstIntervalMilliseconds <= 0.3 * declaredDurationMilliseconds else { return .clockTooCoarse }
+        return elapsedMilliseconds >= 0.4 * declaredDurationMilliseconds ? .transition : .jump
+    }
+
+    enum MotionVerdict {
+        /// 画面连续变了至少声明时长的四成 ⇒ 过渡在演。
+        case transition
+        /// 变化只覆盖了一个采样左右的时长 ⇒ 一帧跳变。
+        case jump
+        /// 事件那一段的采样比整段过渡的三成还粗 ⇒ 无从判定。
+        case clockTooCoarse
+    }
+
+    /// 事件那一段（第一个还在变的帧 → 最后一个还在变的帧之后一帧）**最粗的一次采样间隔**（ms）。
+    /// 用最大值而不是中位数：中位数会被"落定之后连拍的一堆快帧"拉低，
+    /// 而决定分辨率的是过渡正在演的那一段里最稀的一次。
+    /// 返回 `nil` = 整段没有可见变化 ⇒ 无从判定。
+    static func worstIntervalInsideChangedRun(stamps: [TimeInterval], fractions: [Double]) -> Double? {
+        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return nil }
+        let moving = fractions.indices.filter { fractions[$0] >= peak * stepFloorRatio }
+        guard let first = moving.first, let last = moving.last, last + 1 < stamps.count else { return nil }
+        var worst: Double = 0
+        for index in (first + 1)...(last + 1) {
+            worst = max(worst, (stamps[index] - stamps[index - 1]) * 1000)
+        }
+        return worst
     }
 
     /// "过渡的中点"对应的帧号 —— 给"必须还差得远"这类**阳性对照**用。
@@ -289,22 +339,65 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(Self.resolvableFrames(durationMilliseconds: 150, sampleMilliseconds: 0), 0,
                        "时钟没测到 ⇒ 不能当成「无限细」往下判")
 
-        XCTAssertEqual(Self.requiredTransitionFrames(durationMilliseconds: 160, sampleMilliseconds: 30), 3,
-                       "时钟够细时判据一点都不放松，还是 3 帧")
-        XCTAssertEqual(Self.requiredTransitionFrames(durationMilliseconds: 160, sampleMilliseconds: 60), 2,
-                       "只切得出 2 帧 ⇒ 要求降到 2；一帧跳变仍然读成 1 ⇒ 仍然红")
-        XCTAssertNil(Self.requiredTransitionFrames(durationMilliseconds: 160, sampleMilliseconds: 90),
-                     "采样比整段过渡还粗 ⇒ 必须报无从判定。判红是把尺子的盲区算成产品缺陷，判绿是把它算成交付")
-        XCTAssertNil(Self.requiredTransitionFrames(durationMilliseconds: 160, sampleMilliseconds: 0))
+        // MARK: R5 —— 判据从"几帧在动"换成"动了多久"，判别力必须重新钉一遍
+        //
+        // 原来这里钉的是 `requiredTransitionFrames`（"还在变的帧数 ≥ 几"）。R5 把它换成了
+        // 时长判据，所以那三行断言跟着删 —— **不留只被真值表喂着的旧判据**：
+        // 一个只有测试在读的辅助函数，读起来像"这条判据还在"，比没有更坏。
 
-        // 地板：只要还有解，就至少要求 2 帧 —— 这条是"改成时间表达之后还打不打得红"的正面回答。
-        for sample in 1...120 {
-            if let required = Self.requiredTransitionFrames(durationMilliseconds: 150,
-                                                           sampleMilliseconds: sample) {
-                XCTAssertGreaterThanOrEqual(required, 2,
-                                            "采样 \(sample)ms 时要求降到 \(required)：地板 2 帧是这条判据剩下的全部判别力")
-            }
+        // 本机实测：`empty-state` 同一份代码三次跑出过渡帧数 `3 / 2 / 2`（HEAD 上也读到 2），
+        // 而变化段时长是 `131 / 119 / 125ms`。下面两组合成数据就是那两次：
+        // **帧数不同、时长相同** —— 这就是"帧数在判采样相位"的最小复现。
+        let stamps = [0.0, 0.045, 0.090, 0.135, 0.180, 0.225, 0.270]
+        let fineSampling: [Double] = [0.05, 0.06, 0.05, 0.001, 0.0, 0.0]
+        let coarseSampling: [Double] = [0.11, 0.001, 0.10, 0.0, 0.0, 0.0]
+        XCTAssertEqual(Self.transitionFrameCount(fineSampling), 3)
+        XCTAssertEqual(Self.transitionFrameCount(coarseSampling), 2,
+                       "这两组读数是同一段 135ms 的淡入，只是采样相位不同")
+        for (name, fractions) in [("细相位", fineSampling), ("粗相位", coarseSampling)] {
+            let elapsed = Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: fractions) ?? -1
+            XCTAssertEqual(elapsed, 135, accuracy: 1, "\(name)：时长读数不该跟着相位翻脸")
+            let worst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: fractions) ?? -1
+            XCTAssertEqual(worst, 45, accuracy: 1, "事件内最粗采样 = 45ms")
+            XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: elapsed,
+                                            worstIntervalMilliseconds: worst,
+                                            declaredDurationMilliseconds: 160), .transition,
+                           "\(name)：两种相位都必须判成「过渡在演」")
         }
+
+        // 一帧跳变：变化段只剩一个采样 ⇒ 必须红（这条是上面那条绿的全部代价所在）。
+        let jump: [Double] = [0.12, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let jumpElapsed = Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: jump) ?? -1
+        let jumpWorst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: jump) ?? -1
+        XCTAssertEqual(jumpElapsed, 45, accuracy: 1, "跳变的「变化段」就是一个采样的长度")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: jumpElapsed,
+                                        worstIntervalMilliseconds: jumpWorst,
+                                        declaredDurationMilliseconds: 160), .jump,
+                       "45ms 的变化段对 160ms 的声明 ⇒ 必须判成跳变，否则这条判据没有判别力")
+        // 门槛之下：63ms 的变化段（160ms 声明、时钟 45ms）仍然算没演完。
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 63, worstIntervalMilliseconds: 45,
+                                        declaredDurationMilliseconds: 160), .jump)
+        // 边界：s = 0.3d 时真过渡的最坏读数 d−2s 正好等于 0.4d ⇒ 判据在边界上仍然自洽
+        //（"真过渡必过、跳变必红"这两个要求同时成立的那个点）。
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 64, worstIntervalMilliseconds: 48,
+                                        declaredDurationMilliseconds: 160), .transition)
+        XCTAssertNotEqual(Self.judgeMotion(elapsedMilliseconds: 48, worstIntervalMilliseconds: 48,
+                                           declaredDurationMilliseconds: 160), .transition,
+                         "跳变的最坏读数（=s）不许过线")
+        // 时钟太粗 ⇒ 无从判定，既不判红也不判绿。
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 200, worstIntervalMilliseconds: 100,
+                                        declaredDurationMilliseconds: 160), .clockTooCoarse,
+                       "事件那一段 100ms 一帧、整段过渡只有 160ms ⇒ 是尺子看不见，不是产品没动")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 0,
+                                        declaredDurationMilliseconds: 160), .clockTooCoarse,
+                       "时钟没测到 ⇒ 不能当成「无限细」往下判")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 30,
+                                        declaredDurationMilliseconds: 0), .clockTooCoarse,
+                       "没声明时长就没有门槛可言")
+        // 整段没有一次可见变化 ⇒ 两个读数都必须 nil（调用方报 not-run，不许判绿）。
+        let idleFractions: [Double] = [0.0, 0.001, 0.0, 0.001, 0.0, 0.0]
+        XCTAssertNil(Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: idleFractions))
+        XCTAssertNil(Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: idleFractions))
 
         XCTAssertEqual(Self.midFlightPreRollFrames(durationMilliseconds: 150, sampleMilliseconds: 40), 1,
                        "中点取样点至少要在过渡里面")
@@ -347,8 +440,10 @@ final class MotionFilmstripTests: XCTestCase {
 
         XCTAssertFalse(own.contains { $0.contains("Self.settleFrames(") },
                        "那个「预卷之后还有几帧在动」的计数器又被拿来当判据了：它的上限是帧数，会跟着时钟漂，见 `settledAtFrame`")
-        XCTAssertTrue(own.contains { $0.contains("Self.requiredTransitionFrames(") },
-                      "过渡判据没走采样率感知那条路 ⇒ 上面那两条就成了空转")
+        XCTAssertTrue(own.contains { $0.contains("Self.judgeMotion(") },
+                      "过渡判据没走「按声明时长与事件内采样判」那条路 ⇒ 上面那两条就成了空转。"
+                          + "（R5 之前这里钉的是 `requiredTransitionFrames`：换判据时这条自己红了，"
+                          + "说明它真的在看调用点，不是注释。）")
     }
 
     /// 空白对照：开着同一个窗口、什么也不触发，尺子必须读到"没有过渡"。
@@ -380,10 +475,10 @@ final class MotionFilmstripTests: XCTestCase {
                 continue
             }
             let interval = Self.sampleIntervalMilliseconds(film.motionStamps)
-            let resolvable = Self.resolvableFrames(durationMilliseconds: scenario.declaredDurationMilliseconds,
-                                                   sampleMilliseconds: interval)
             let fractions = Self.deltas(frames)
             let span = Self.transitionFrameCount(fractions)
+            let elapsed = Self.changedRunElapsedMilliseconds(stamps: film.motionStamps, fractions: fractions)
+            let worstInRun = Self.worstIntervalInsideChangedRun(stamps: film.motionStamps, fractions: fractions)
             // 每个场景都进 MOTION_SUMMARY（哪怕这一条今天判不了）：CI 那一步与它的自测夹具
             // 都按"三个键都在"的形状读，少一个键会让下游把"没测"读成"测了且为 0"。
             rows.append((scenario.name, span))
@@ -393,24 +488,41 @@ final class MotionFilmstripTests: XCTestCase {
                     + "这一卷里根本看不到「这次变更」，后面读到的几帧变化不能算在过渡头上")
                 continue
             }
-            let required = Self.requiredTransitionFrames(durationMilliseconds: scenario.declaredDurationMilliseconds,
-                                                        sampleMilliseconds: interval)
+            // 时钟自己也要进记录。`采样≈` 那一列是**整卷中位数**，它盖不住 burst：
+            // 落定之后连拍的一堆快帧会把中位数拉到 21ms，而过渡正在演的那一段实际是 45ms 一帧 ——
+            // 本机就是这样把"采样相位"读成"产品只跳了一帧"的。所以另外两列：
+            // `事件内最粗` = 变化段里最稀的一次采样（判分辨率用这个），`变化段时长` = 判过渡用这个。
+            let gaps = stride(from: 1, to: film.motionStamps.count, by: 1).map {
+                Int(((film.motionStamps[$0] - film.motionStamps[$0 - 1]) * 1000).rounded())
+            }
             print("MOTION \(scenario.name) frames=\(frames.count) "
-                + "声明=\(Int(scenario.declaredDurationMilliseconds))ms 采样≈\(interval)ms "
-                + "可分辨=\(resolvable)帧 要求=\(required.map(String.init) ?? "无从判定") 过渡帧数=\(span) "
+                + "声明=\(Int(scenario.declaredDurationMilliseconds))ms 整卷中位=\(interval)ms "
+                + "事件内最粗=\(worstInRun.map { String(format: "%.0f", $0) } ?? "无")ms "
+                + "变化段时长=\(elapsed.map { String(format: "%.0f", $0) } ?? "无")ms 过渡帧数=\(span) "
+                + "时刻ms=[\(gaps.map(String.init).joined(separator: " "))] "
                 + "逐帧=[\(fractions.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
             writeStrip(scenario.name, frames)
-            guard let required else {
+            guard let elapsed, let worstInRun else {
                 notRun.append(scenario.name)
-                print("MOTION_NOT_RUN=clock-too-coarse \(scenario.name)：\(interval)ms 一帧、整段过渡只有 "
-                    + "\(Int(scenario.declaredDurationMilliseconds))ms ⇒ 这把尺切不出「过程」这个概念，"
-                    + "既不判红也不判绿（判红是把尺子的盲区算成产品的缺陷）")
+                print("MOTION_NOT_RUN=no-changed-run \(scenario.name)：读不出「变化段」的时长 ⇒ 既不判红也不判绿")
                 continue
             }
-            judged += 1
-            XCTAssertGreaterThanOrEqual(span, required,
-                                        "\(scenario.name)：整段只有 \(span) 帧还在变，而 \(interval)ms 的采样能切出 "
-                                            + "\(resolvable) 帧、要求 \(required) 帧 ⇒ 这是一帧跳变，不是过渡")
+            switch Self.judgeMotion(elapsedMilliseconds: elapsed,
+                                    worstIntervalMilliseconds: worstInRun,
+                                    declaredDurationMilliseconds: scenario.declaredDurationMilliseconds) {
+            case .clockTooCoarse:
+                notRun.append(scenario.name)
+                print("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "
+                    + "一帧、整段过渡只有 \(Int(scenario.declaredDurationMilliseconds))ms（门槛 0.3×声明）⇒ "
+                    + "这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿")
+            case .jump:
+                judged += 1
+                XCTFail("\(scenario.name)：画面只变了 \(String(format: "%.0f", elapsed))ms 就停了，"
+                    + "而声明的过渡是 \(Int(scenario.declaredDurationMilliseconds))ms（事件内最粗采样 "
+                    + "\(String(format: "%.0f", worstInRun))ms）⇒ 这是一帧跳变，不是过渡")
+            case .transition:
+                judged += 1
+            }
         }
         // 形状固定：MOTION_SUMMARY 永远列出全部场景（CI 那一步与它的自测夹具都按这个形状读）。
         print("MOTION_SUMMARY " + rows.map { "\($0.name)=\($0.span)" }.joined(separator: " "))
@@ -505,6 +617,186 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertGreaterThan(fadingResidual, 0.15,
                              "连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率，上面那条绿是空的")
 
+    }
+
+    /// 全 `Views/` 一族的"不许留不会执行的过渡声明"（R5 扩的族）。
+    ///
+    /// 原来这条守卫只读 `HistorySidebarView.swift` 一个文件，于是同一族缺陷在另外三处各活了一次：
+    /// `MenuBarRecommendationsView` 挂着 `.transition` 而整个文件 `grep -c "animation(" = 0`；
+    /// `DetailView` 的详情空态挂在没有驱动的 `body` 上；侧栏那条干脆挂在 `Spacer()` 上
+    /// （Spacer 没有可见内容 —— 于是"空态淡入"在代码里存在、在屏幕上不存在）。
+    /// **按名字/按文件扫的守卫，漏一个文件就等于没写**（与 R3 那条"按族查消费者"同一课）。
+    func testNoUnexecutedTransitionClaimsAcrossViews() throws {
+        let offenders = Self.unexecutedTransitionOffenders(
+            try Self.viewsSources().map { (file: $0.0, source: $0.1) })
+        XCTAssertTrue(offenders.isEmpty,
+                      "这些文件留着不会执行的过渡声明（比没有更坏：下一个人会以为已经做了）：\n"
+                          + offenders.joined(separator: "\n"))
+
+        // 详情空态：过渡要挂在**有可见内容的那一支**上，并且 body 要有驱动。
+        let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
+        XCTAssertTrue(detail.contains("value: historyStore.selectedEntry == nil"),
+                      "详情空态的 .transition 又变成孤儿声明了：body 上没有按「有没有选中」驱动的动画")
+        // 侧栏空态：过渡必须落在 EmptyStateView 那一段里，不是后面的 Spacer。
+        let sidebar = codeOnly(try productSource(named: "Views/HistorySidebarView.swift"))
+        let emptyBranch = try XCTUnwrap(
+            sidebar.components(separatedBy: "EmptyStateView(").dropFirst().first?
+                .components(separatedBy: "Spacer()").first,
+            "找不到侧栏空态那一段：锚点失效")
+        XCTAssertTrue(emptyBranch.contains(".transition(MotionCatalog.transition(for: .contentFade))"),
+                      "侧栏空态的过渡不在 EmptyStateView 这一段里 —— 挂在 Spacer 上等于没挂")
+    }
+
+    /// 上面那条扫描器的**真值表**：两边都要钉住，一条只测"抓得住"的守卫会在下一次改排除项时失去刹车。
+    ///
+    /// 为什么单独一条：变异 M6 实测过 —— 往一个没有任何动画的文件里塞回
+    /// `.transition(MotionCatalog.transition(for: .contentFade))`，扫描器一声不响（ESCAPED），
+    /// 原因就在排除项写成了"这一行含 content 子串"。那种 bug 只有直接喂源码给扫描器才测得出来，
+    /// 不该等到有人在产品里写出同样的声明才发现。这条不开窗口、不受 `CLIPBOARD_HISTORY_UI_MOTION` 门，
+    /// CI 上每轮都跑。
+    func testTransitionClaimScanIsATruthTable() throws {
+        func lines(_ source: String) -> [String] {
+            Self.stripCommentLines(source).components(separatedBy: "\n")
+        }
+
+        // ① 角色名不是豁免：`.contentFade` 里含 "content"，但它是给某一屏许愿的声明，必须抓到。
+        let roleNamed = """
+        struct DeadPane: View {
+            var body: some View {
+                Text("空态")
+                    .transition(MotionCatalog.transition(for: .contentFade))
+            }
+        }
+        """
+        XCTAssertEqual(Self.transitionClaimLines(lines(roleNamed), declaresContentPlaceholder: false), [3],
+                       "带角色名 .contentFade 的死声明没被抓到（这就是变异 M6 曾经 ESCAPED 的那一支）")
+        XCTAssertEqual(Self.unexecutedTransitionOffenders([("DeadPane.swift", roleNamed)]),
+                       ["DeadPane.swift：1 处 .transition 声明，整个文件没有任何动画驱动"],
+                       "整个文件没有驱动时，扫描器要报出这个文件")
+
+        // ② 裸写法也逃不掉：以前只数 MotionCatalog 的两个工厂名，`.transition(.opacity)` 从尺子底下走过去。
+        let bare = """
+        struct BarePane: View {
+            var body: some View {
+                Text("空态").transition(.opacity)
+            }
+        }
+        """
+        XCTAssertEqual(Self.transitionClaimLines(lines(bare), declaresContentPlaceholder: false).count, 1,
+                       "`.transition(.opacity)` 这种不经过目录的声明不在检测面上")
+
+        // ③ 工厂那一条确实要豁免（否则守卫在 `SymbolMotion` 上是假阳性，而假阳性会逼人把守卫删掉）。
+        let factory = """
+        struct SymbolMotion: ViewModifier {
+            func body(content: Content) -> some View {
+                content.id("x").transition(MotionCatalog.transition(for: .contentFade))
+            }
+        }
+        """
+        XCTAssertTrue(Self.transitionClaimLines(lines(factory), declaresContentPlaceholder: true).isEmpty,
+                      "ViewModifier 工厂里挂在占位符 content 上的过渡被当成违规：这是守卫的假阳性")
+
+        // ④ 豁免要有前提：文件里没有 `func body(content: Content)`（占位符根本不存在）时，
+        //    同一行 `content.x.transition(...)` 不能再买到免死金牌。
+        XCTAssertEqual(Self.transitionClaimLines(lines(factory), declaresContentPlaceholder: false).count, 1,
+                       "没有 ViewModifier 占位符的文件里，content. 开头的行仍被豁免 ⇒ 排除项成了漏洞")
+
+        // ⑤ 换行写法：链根在上一行。
+        let split = """
+        func body(content: Content) -> some View {
+            content
+                .transition(MotionCatalog.transition(for: .bannerIn))
+        }
+        """
+        XCTAssertTrue(Self.transitionClaimLines(lines(split), declaresContentPlaceholder: true).isEmpty,
+                      "content 换行再挂 .transition 的写法没被认成工厂链")
+
+        // ⑥ 注释里的例子不是声明（`MotionModifiers` 的文档注释就写着 `.transition(.opacity)`）。
+        let documented = """
+        // 退化成交叉淡入（身份变了 + `.transition(.opacity)`）
+        struct P: View { var body: some View { Text("x") } }
+        """
+        XCTAssertTrue(Self.transitionClaimLines(lines(documented), declaresContentPlaceholder: false).isEmpty,
+                      "注释里的例子被当成了产品声明")
+    }
+
+    /// 上面那条按族扫描的**判据本体**：给定 (文件名, 源码)，返回"声明了过渡、整个文件却没有驱动"的报告。
+    ///
+    /// 抽成纯函数只为一件事：它能被真值表直接测（`testTransitionClaimScanIsATruthTable`），
+    /// 而不用等某人哪天手滑把一条死声明塞回产品里。
+    ///
+    /// 排除项只有一条，而且必须是**结构**的：`ViewModifier` 工厂里挂在占位符 `content` 上的那条
+    /// 不是"给某一屏许愿"的过渡，是给别人造过渡的工厂，它自己没有驱动是正常的（驱动来自调用方
+    /// 所在的那棵树）。**这一条曾经写成 `!line.contains("content")`** —— 于是 `.contentFade`
+    /// 这个*角色名*把它本来最该抓的那类声明整行豁免了（变异 M6 实测 ESCAPED：往
+    /// `MenuBarRecommendationsView` 塞回 `.transition(MotionCatalog.transition(for: .contentFade))`，
+    /// 守卫一声不响）。名字里带 content 不算豁免；豁免要求这一行的修饰链根就是标识符 `content`，
+    /// 并且这个文件真的声明了 `func body(content: Content)` —— 否则任何普通视图里出现
+    /// 一句 "content." 也能买到免死金牌。
+    static func unexecutedTransitionOffenders(_ sources: [(file: String, source: String)]) -> [String] {
+        var offenders: [String] = []
+        for entry in sources {
+            let code = stripCommentLines(entry.source)
+            let lines = code.components(separatedBy: "\n")
+            let claims = transitionClaimLines(lines,
+                                              declaresContentPlaceholder: code.contains("func body(content: Content)"))
+            guard !claims.isEmpty else { continue }
+            // 声明了过渡，这个文件里就必须有能驱动它的东西（事务或按值的动画）。
+            if !code.contains("withAnimation(") && !code.contains(".animation(") {
+                offenders.append("\(entry.file)：\(claims.count) 处 .transition 声明，整个文件没有任何动画驱动")
+            }
+        }
+        return offenders
+    }
+
+    /// 返回"这一行给某一屏许愿了过渡"的行下标。
+    ///
+    /// 匹配的是修饰符本身（`.transition(`），不是某个目录的函数名 —— 原来只数
+    /// `MotionCatalog.transition(for:` 与 `asymmetricTransition(`，于是有人写
+    /// `.transition(.opacity)` 这条死声明就直接从尺子底下走过去（同族第三次：检测面比缺陷面窄）。
+    static func transitionClaimLines(_ lines: [String], declaresContentPlaceholder: Bool) -> [Int] {
+        var claims: [Int] = []
+        for (index, raw) in lines.enumerated() {
+            guard raw.contains(".transition(") else { continue }
+            if declaresContentPlaceholder, isPlaceholderChain(raw, lines: lines, at: index) { continue }
+            claims.append(index)
+        }
+        return claims
+    }
+
+    /// 这一行的修饰链根是不是 ViewModifier 的占位符 `content`（两种写法都要认：
+    /// `content.id(x).transition(...)` 一行写法，以及 `content` 换行再挂修饰符的两行写法）。
+    private static func isPlaceholderChain(_ raw: String, lines: [String], at index: Int) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("content.") || trimmed.hasPrefix("content ") || trimmed == "content" { return true }
+        var previous = index - 1
+        while previous >= 0 {
+            let candidate = lines[previous].trimmingCharacters(in: .whitespaces)
+            if candidate.isEmpty { previous -= 1; continue }
+            // 只回看第一处非空行：链根在那儿就是 `content`，在别处就不算豁免。
+            return candidate == "content" || candidate.hasSuffix(" content")
+        }
+        return false
+    }
+
+    /// 列出 `Sources/ClipboardHistoryApp/Views/*.swift`。
+    /// 本文件原来只有 `productSource(named:)`（按一个文件名取），而**按族扫**需要整目录 ——
+    /// 没有它就只能一个文件一个文件写死，那正是这条守卫原来漏掉三处的原因。
+    private static func viewsSources() throws -> [(String, String)] {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = root.appendingPathComponent("Sources/ClipboardHistoryApp/Views", isDirectory: true)
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: url.path) else {
+                root = root.deletingLastPathComponent(); continue
+            }
+            return names.filter { $0.hasSuffix(".swift") }.compactMap { name in
+                guard let text = try? String(contentsOf: url.appendingPathComponent(name), encoding: .utf8)
+                else { return nil }
+                return (name, text)
+            }
+        }
+        throw NSError(domain: "MotionFilmstripTests", code: 2,
+                      userInfo: [NSLocalizedDescriptionKey: "找不到 Views 目录：这条按族扫描的守卫没有扫描对象时必须红"])
     }
 
     /// 上面那条判据的**源码那一半**，单独一条、不开窗口。
@@ -819,9 +1111,9 @@ final class MotionFilmstripTests: XCTestCase {
         /// 这个场景**声明**的过渡时长（ms），来自 `MotionCatalog.duration(for:)`。
         /// 0 = 这场景没有该动的东西（空白对照、换选同类型、列表行——后者是"确认动不了"的那族）。
         ///
-        /// 判据要用"声明时长 ÷ 实测采样间隔"来决定这次到底能不能分辨过程，
+        /// 判据要用"声明时长 ÷ 事件那一段的采样"来决定这次到底能不能分辨过程，
         /// 所以场景必须自带声明时长；写死在判据里的数字（"≥3 帧""第 3 帧之后"）
-        /// 量的其实是抓帧耗时（见 `requiredTransitionFrames` 的注释）。
+        /// 量的其实是抓帧耗时（见 `judgeMotion` 的推导注释）。
         let declaredDurationMilliseconds: Double
         /// 触发一次状态变更。`HistoryStore` 是 `@MainActor` 的，所以闭包也得是。
         let trigger: @MainActor (HistoryStore) -> Void
@@ -1093,6 +1385,12 @@ final class MotionFilmstripTests: XCTestCase {
     }
 
     private func codeOnly(_ source: String) -> String {
+        Self.stripCommentLines(source)
+    }
+
+    /// 去掉整行注释。静态：按族扫描的判据本体要用它，而注释里写的例子（比如
+    /// `MotionModifiers` 文档里那句 `.transition(.opacity)`）不是声明，算进去就是守卫的假阳性。
+    private static func stripCommentLines(_ source: String) -> String {
         source.components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .joined(separator: "\n")

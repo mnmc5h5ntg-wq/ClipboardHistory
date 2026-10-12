@@ -23,7 +23,10 @@ struct MenuBarRecommendationsView: View {
                 let kind: StatePresentation.Kind = historyStore.isRefreshingPredictions ? .loading : .empty
                 StateLine(kind: kind,
                           message: historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
-                    .transition(MotionCatalog.transition(for: .contentFade))
+                    // 刻意**不挂** `.transition`（R5 删掉了原来那条）：这个文件里没有任何动画事务
+                    // （`grep -c "animation(" = 0`），而 `MenuBarExtraStyle.menu` 的内容会被编译成真的
+                    // `NSMenu`（账本 D-055 / M15 实测），SwiftUI 的过渡在那一层根本不执行。
+                    // 留着一行不会执行的声明，只会让下一个人以为这里已经淡过了。
             } else {
                 Divider()
 
