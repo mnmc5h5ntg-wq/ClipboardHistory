@@ -756,3 +756,88 @@ CI 的动效那一步现在会打印各条读数与红用例名字（第一次�
   在整轮动效之前的提交上同样红。现场是一行变成两个半宽 `KeyViewProxy`，
   可能是无障碍结构真退化（一行被读成两个停靠点），已记 BACKLOG 单独查。
 - 报告 §12.4 的 API 拼写被更正：`insertRows(at:with:)` 从 Swift 编不过，正确是 `withAnimation:`。
+
+
+---
+
+## 21. 视觉迭代 R1–R8：全页面逐元素动效审计与自主开发（2026-10-13 凌晨，D-058…D-067 / U-22…U-29）
+
+**用户给的目标**（手机端 `/goal`，因不能打 `+` 复述了两遍）：对全部页面全部元素做一次
+超长时间、全面独立的动效审计与自主开发；逐个元素判断"加动效是否有积极作用"，
+有作用才加、无作用或有害就写明理由不加；每轮产出可编译代码 + 自评打分（<90 继续修）；
+不得破坏采集/存储/复制/固定/删除/搜索/快捷键/多选/拖拽；兼容 macOS 12 与本机；
+暗黑模式正确；优先系统 API 与材质；**连续五轮 ≥90 且无 P0/P1 回归才停**。
+
+### 21.1 八轮的落点（每轮一个主题，可回滚）
+
+| 轮 | 主题 | 交付 | 自评分 | 提交 |
+|---|---|---|---|---|
+| R1 | 几何与材质只有一个作者 | `VisualTokens`（半径/描边/投影/填充/材质/强度次序）+ 7 个视图改造 | 80 | `0929339` |
+| R2 | 动效判据与采样率解耦 | 判据从"第 N 帧"改成"声明时长 ÷ 实测间隔"+ `judged=n/m`；8 支变异 | 85 | `713ec62` |
+| R3 | 排版刻度与一处层级倒置 | `VisualFont` / `VisualGlyph` 一族 + 修字号层级；抓到两条**假守卫** | 88 | `752c9e4` |
+| R4 | 按压态（R0 审计里这件事是零） | `PressedStyle: ButtonStyle` 接 9 处、2 处刻意不接并写理由 | 90 | `8f49b75` |
+| R5 | 全页面逐元素审计（约 206 位点） | 修三条"声明在、屏幕不在"+ 复制失败回执 + 删一条菜单栏死声明 | 91 | `6dbb45e` |
+| R6 | 状态变化的可读性 | 详情预览三态软交接、清空后的数字回执（含播报）、箭头与揭示同曲线 | 92 | `f3f7c0b` |
+| R7 | 浮层与临时状态 | QuickPick 三种"空"说三句话、批量条两臂、视频两颗图标、**CI 覆盖率闸门** | 93 | `4544733` |
+| R8 | 设置页 · 排除名单 | 六种结局各有话术（`ExcludedAppListPolicy`）、名单增删过渡、`ReceiptLine` 可关掉 | 93 | `795174a` |
+| R8b | 闸门第一次跑就红 | 判据改三档（本机 1/3→2/3、CI 0/3→2–3/3），**闸门没放松** | — | `14d3909` |
+
+**连续五轮 ≥90 达成**：R4 90 → R5 91 → R6 92 → R7 93 → R8 93。
+
+### 21.2 数字（R8 收尾时）
+
+- 全量测试 **632 条 / 24 skip / 0 失败**（R1 之前是 613 条基线，八轮净增 19 条判据）；
+- 动效胶片套件 20 条 / 4 skip / **0 失败**（R5 开工前它是红的）；
+- 构建 **0 warning**（两个 triple）；**82 帧基线 `CHANGED=0`** —— 每一轮都没偷偷改动静止画面；
+- `scripts/tests` 72 条（含 CI 自检 18 个形状）；
+- 变异对照累计 **24 支**：R5 的 M6 2/2、R6 的 M8 + M6 共 3/3、R7 的 M9–M15 共 7/7（含一次"守卫是假的"复发）、
+  R8 的 M20–M23 4/4、R8b 重跑 M8 仍 CAUGHT；
+- `HistoryStore` 全程**零改动**（1093 / 1120 行，"只减不加"那条守卫一直绿）；
+- 本机安装：R5/R6/R7/R8 各换装一次，`INSTALL_RESULT=ok`、sha 相同、`SMOKE_OK=1`、
+  存档 92 → 92 条、旧包留在 `~/Documents/Codex_Project0_backups/before-local-*`。
+
+### 21.3 这一批里最值得留下的四条结论
+
+1. **"代码里写了"不等于"屏幕上演了"**，而且这一族有**三个方向**，每个方向都真出现过：
+   声明了过渡却没有驱动（R5 的 A1/A2/A5）；有驱动但键是常量（R6 的镜像判据）；
+   两臂只挂一臂（R8 的批量条与名单行）。
+2. **源码守卫的 needle 命中面必须窄到"那一段、那一个位置"**。三次同形复发：
+   `contains("content")` 被角色名 `.contentFade` 白拿（R5）、
+   `contains("applyEmptyState()")` 被函数定义行白拿（R7）、
+   整文件含 `.transition(` 会被另一个组件白拿（R8，这次提前避开了）。
+   规矩：**每写一条守卫，立刻配一支"删掉它应当打红"的变异**，不攒到最后统一跑。
+3. **判据的读数也要跟着单位走**。R2 把"要求"换成时间、R5 才把"读数"换成时间，
+   中间那半年它其实一直在判采样相位（本机同一份代码 `3/2/2`，HEAD 也读到 2 ——
+   用 `git worktree` 单独跑 HEAD 做的对照，才敢说不是本轮回归）。
+4. **一道从来不会红的闸门和一句 echo 没有区别**。R7 的覆盖率闸门第一次跑就把 main 判红，
+   指向的是一个真实空洞：CI 抓帧在事件那一段 ~55–62ms，R5 的分辨率前提根本不成立，
+   `MOTION_SUMMARY 3/3/3` 底下其实一条都没判。修的是判据（加中间档），不是闸门。
+
+### 21.4 明确不做或没做的（不粉饰）
+
+- **菜单栏**：`MenuBarExtraStyle.menu` 的内容会编译成真的 `NSMenu`，SwiftUI 过渡在那一层不执行
+  （D-055 / M15 实测）⇒ 那一族的"动效"只能是删声明。原生菜单在打开期间不重绘那条，
+  **动效是唯一不该用的修法**。
+- **暂停记录剪贴板**：缺的是常驻指示器（菜单栏图标变体），不是动画 ⇒ BACKLOG 第 10 条，标为非动效项。
+- **快捷键录制态**：已有"请输入快捷键"+ 系统焦点环 ⇒ 刻意不再加脉冲（红线 8）。
+- **产物级证据的边界**：`cacheDisplay` 抓的是模型树 —— AppKit 图层动画、系统 symbol effect、
+  真 NSMenu 三类**量不到**；合成鼠标事件驱动不了 SwiftUI Button 的按下跟踪
+  ⇒ 按压态（R4）与 QuickPick 淡入（R7）至今是"源码已接、产物未量"，人眼判据在批次 12 / 15 / 16。
+- **本机 `judged=2/3`**：`notice-banner` 那一卷触发前后逐像素相同（`premise-not-visible`），
+  是夹具问题，不是产品问题；`VideoPreview` 仍无帧夹具。
+- **已知两条红**（本轮之前就存在、未在本轮处理）：`testSidebarListFocusRingAfterClick`、
+  帧间隔 p95 > 20ms。
+- 实验 E1/E2/E3（决定菜单栏那族能不能做）仍未跑。
+
+### 21.5 复跑（R8 收尾时的实际输出）
+
+```
+swift test                       → Executed 632 tests, with 24 tests skipped and 0 failures
+MotionFilmstripTests（门控）     → Executed 20 tests, with 4 tests skipped and 0 failures
+MOTION_RESOLVE_SUMMARY           → judged=2/3 not-run=notice-banner
+frame_baseline.py check --against working → COMPARED=82 CHANGED=0 MISSING=0 ADDED=0
+make build（arm64 + x86_64）      → WARNINGS=0
+python3 -m unittest discover -s scripts/tests → Ran 72 tests OK
+python3 .scratch/motion-audit/mutate_round8_criteria.py → MUTATION_SUMMARY caught=4/4
+scripts/install_local.sh --yes   → INSTALL_RESULT=ok  INSTALL_SHA_MATCH=1  SMOKE_OK=1
+```
