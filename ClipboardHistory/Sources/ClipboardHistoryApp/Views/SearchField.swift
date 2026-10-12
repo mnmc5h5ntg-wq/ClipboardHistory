@@ -38,8 +38,8 @@ struct SearchField: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(Color.primary.opacity(isActive ? 0.095 : 0.05), lineWidth: 0.5)
         )
-        .animation(.easeInOut(duration: 0.12), value: isHovered)
-        .animation(.easeInOut(duration: 0.12), value: text.isEmpty)
+        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .contentFade), value: text.isEmpty)
         .onHover { hovering in
             isHovered = hovering
         }

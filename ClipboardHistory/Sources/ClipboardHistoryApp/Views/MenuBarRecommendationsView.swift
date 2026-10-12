@@ -23,6 +23,7 @@ struct MenuBarRecommendationsView: View {
                 let kind: StatePresentation.Kind = historyStore.isRefreshingPredictions ? .loading : .empty
                 StateLine(kind: kind,
                           message: historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
+                    .transition(MotionCatalog.transition(for: .contentFade))
             } else {
                 Divider()
 

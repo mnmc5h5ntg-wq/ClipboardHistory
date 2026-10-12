@@ -121,6 +121,39 @@ jobs:
           # 跑完了才谈产品结论；退出码原样报出来，但不挡发布（报告型）。
           exit "$status"
 
+      # 动效审计 MC-8：这道像素闸以前**只在作者本机跑过一次**，而测试文件的注释写着
+      # "CI 也取过数" —— 那是注释替事实背书。这一步把它真的接上 CI。
+      # 形状全部沿用上面两步踩过的坑：报告型（不挡发布）、自带看门狗（挂死必须留数字）、
+      # 每条抽取行自己吞掉非零（`bash -e` + `pipefail` 下汇报行失手会把整步中止）。
+      #
+      # 为什么不是硬门：无头 runner 上 SwiftUI 内容根本不被绘制（上面实测 95% 空白），
+      # 像素判据在那里必然拿不到帧。**环境给不出证据 ≠ 产品没有动效**，
+      # 所以这一版先把"有人跑、有数字、退出码被报出来"落下来；
+      # 抓帧驱动已经从 CADisplayLink 换成自旋时钟（不依赖屏幕在刷新），
+      # runner 上能不能真的出帧，以这一步第一次运行的日志为准，不预设。
+      - name: Motion filmstrip (report-only)
+        continue-on-error: true
+        timeout-minutes: 6
+        working-directory: ClipboardHistory
+        run: |
+          set -o pipefail
+          CLIPBOARD_HISTORY_UI_MOTION=1 CLIPBOARD_HISTORY_MOTION_OUT=/tmp/motion-ci \
+            swift test --filter MotionFilmstripTests > /tmp/motion.log 2>&1 &
+          pid=$!
+          ( sleep 200; kill -9 "$pid" 2>/dev/null ) &
+          killer=$!
+          wait "$pid" && status=0 || status=$?
+          kill "$killer" 2>/dev/null || true
+          summary=$(grep -m1 'MOTION_SUMMARY' /tmp/motion.log || true)
+          executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/motion.log | tail -1 | grep -oE '[0-9]+' || true)
+          strips=$(find /tmp/motion-ci -name '*-strip.png' 2>/dev/null | wc -l | tr -d ' ' || true)
+          echo "motion suite exit: $status  executed: ${executed:-0}  胶片: ${strips:-0}  ${summary:-无 MOTION_SUMMARY}"
+          if [ -z "$executed" ]; then
+            echo "MOTION_NOT_RUN=runner-did-not-finish 看门狗在 200s 收掉了进程，这条判据在 CI 上记为未覆盖"
+            exit 0
+          fi
+          exit "$status"
+
       - name: Release script tests
         run: |
           python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log

@@ -40,10 +40,13 @@ struct HistorySidebarView: View {
                 )
                 .padding(.vertical, 40)
                 Spacer()
+                .transition(MotionCatalog.transition(for: .contentFade))
             } else {
                 historyList
             }
         }
+        // 空态出现/消失（审计 §3："空态是停，不该演"⇒ 只淡入，不滑不缩）。
+        .animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)
     }
 
     private var header: some View {
@@ -67,7 +70,7 @@ struct HistorySidebarView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(height: 39)
-        .animation(.easeInOut(duration: 0.12), value: historyStore.selectedCount > 1)
+        .animation(MotionCatalog.animation(for: .selection), value: historyStore.selectedCount > 1)
     }
 
 
@@ -161,6 +164,20 @@ struct HistorySidebarView: View {
                 )
             }
         }
+        // 行的增删/重排**没有**过渡，这里刻意不留 `.transition`（动效审计 M1，账本 U-20 / D-055）。
+        //
+        // 不是没试，是四种写法都试过并且都量过：`.animation(value:)` 挂在 `List` 上、
+        // 挂在 `ForEach` 上、用 `.transaction` 给这棵子树装默认事务、以及把动画事务挂到
+        // **变更漏斗**（`HistoryStore.perform` / `add`）上 —— 最后这种在最小复现里也无效
+        // （报告 §13.2 的 S1/S5 与本仓库 `MotionFilmstripTests.testListRowsDoNotAnimateAndNothingClaimsTheyDo`
+        // 是同一份读数：列表中部那条带 0.283 一帧到位、落定残余 0.000）。
+        // `List` 底下是 `NSTableView`，SwiftUI 的行级 transition 拿不到它。
+        //
+        // 剩下的两条路都要付更大的代价：换 `ScrollView + LazyVStack` 能动画，
+        // 但会丢掉 D-034/D-1 花大力气换回来的系统选中与键盘语义；
+        // 走 `NSTableView.insertRows(with: .effectFade)` 要自己实现整个侧栏。
+        // 报告的结论和本轮的判断一致：**承认侧栏行不动，比把时长加大到"看得见"更正确**，
+        // 所以动效留在行内（收藏/固定的符号动效、悬停与选中淡入、复制回执）。
         .listStyle(.sidebar)
         .accessibilityLabel("历史记录列表")
         // 拖入文件入库（审计第二轮 1.5 / R2-05 的另一半：整个应用以前不接受任何拖入）。
@@ -174,8 +191,13 @@ struct HistorySidebarView: View {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .strokeBorder(Color.accentColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     .allowsHitTesting(false)
+                    // 落点框以前是"瞬间出现/瞬间消失"（审计 🟡）。
+                    // 淡入 + 一点点缩放是必要的：鼠标悬在窗口边缘时它每帧都在进出，
+                    // 没有过渡就会闪。减弱动态时只剩淡入（`shape` 里那条规则）。
+                    .transition(MotionCatalog.transition(for: .dropTarget))
             }
         }
+        .animation(MotionCatalog.animation(for: .dropTarget), value: isDropTargeted)
         // 系统的 `List` 在自己拿到焦点时也会画一圈焦点环；鼠标点一下不该留下它（D-030 那圈蓝框），
         // 键盘导航要留着，所以只关"效果"不关"可聚焦"。`focusEffectDisabled()` 是 macOS 14+，
         // 12/13 没有对应 API ⇒ 那两版上环会留着，是平台限制不是漏了。
@@ -344,8 +366,10 @@ private struct FilterSegmentButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.14), value: isHovered)
-        .animation(.easeInOut(duration: 0.14), value: isSelected)
+        // 参数从目录拿，不在这里写死 0.14：这一档以前散在四处、分别是 0.11/0.14/0.15/0.18，
+        // 没人说得出哪个对（M11）。悬停跟着鼠标 ⇒ 给最短的那一档。
+        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .selection), value: isSelected)
         .onHover { hovering in
             isHovered = hovering
         }

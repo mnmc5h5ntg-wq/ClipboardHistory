@@ -33,8 +33,7 @@ enum WindowManager {
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
+            present(window)
             LifecycleDebugLogger.logAppState("after showMainWindow via weak ref", menuBarController: menuBarController)
             return
         }
@@ -45,14 +44,24 @@ enum WindowManager {
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }
-            window.makeKeyAndOrderFront(nil)
-            window.orderFrontRegardless()
+            present(window)
             LifecycleDebugLogger.logAppState("after showMainWindow via identifier search", menuBarController: menuBarController)
             return
         }
 
         LifecycleDebugLogger.log("WindowManager.showMainWindow no existing SwiftUI main window found")
         LifecycleDebugLogger.logAppState("after showMainWindow no existing window", menuBarController: menuBarController)
+    }
+
+    /// 把窗口带到前台。**没有淡入**（动效审计 M10 被撤，理由在报告 §12.1 更正 #7 与红线 8）：
+    /// 主窗口和 QuickPick 一样是热键 / 菜单栏唤起的日常入口，那一类路径上同类全部瞬时出现；
+    /// 而这个仓库有过一整类"窗口其实存在但看不见"的缺陷（`[SHOW-WIN]` 那些日志就是为它加的），
+    /// 把"是否出现"交给一个可被打断、可能有代际竞态的动画，是拿可靠性换质感。
+    /// 动效仍然有，但只在内容与尺寸那一侧：行内状态、详情换类型、提示条进出。
+    /// 出现方式交给系统 —— 它知道 Stage Manager 与全屏空间要什么。
+    private static func present(_ window: NSWindow) {
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     static func restoreMainWindowIfNeeded(

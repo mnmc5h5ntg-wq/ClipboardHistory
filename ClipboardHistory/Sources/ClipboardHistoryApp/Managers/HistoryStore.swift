@@ -523,6 +523,18 @@ final class HistoryStore: ObservableObject {
         persistence.flushPendingSaves()
     }
 
+    /// 推荐反馈要的那份上下文快照。三处调用点原来各写一遍这五行参数，
+    /// 而 `skipAppleScript` 恰恰是最容易漏写的那一个（漏了就是在主线程上同步跑 AppleScript）。
+    /// 默认 `true`：记一条"用户接受了/忽略了推荐"不需要前台 App 的精确名字。
+    private func recommendationContext(skipAppleScript: Bool = true) -> ContextSnapshot {
+        contextCollector.currentContext(
+            recentEntries: ClipboardEntryIntelligenceAdapter().summaries(for: entries),
+            selectedEntryID: selectedEntry?.id,
+            capturedAt: Date(),
+            skipAppleScript: skipAppleScript
+        )
+    }
+
     func perform(_ action: Action) {
         switch action {
         case .refresh:
@@ -564,22 +576,12 @@ final class HistoryStore: ObservableObject {
         case .unfavoriteSelection:
             setFavoriteForSelection(false)
         case .recordRecommendationAccepted(let entryID):
-            let context = contextCollector.currentContext(
-                recentEntries: ClipboardEntryIntelligenceAdapter().summaries(for: entries),
-                selectedEntryID: selectedEntry?.id,
-                capturedAt: Date(),
-                skipAppleScript: true
-            )
+            let context = recommendationContext()
             feedbackStore.recordAccepted(entryID: entryID, context: context)
             revealedPreferenceWindowTimer?.invalidate()
             revealedPreferenceWindowTimer = nil
         case .dismissAllRecommendations:
-            let context = contextCollector.currentContext(
-                recentEntries: ClipboardEntryIntelligenceAdapter().summaries(for: entries),
-                selectedEntryID: selectedEntry?.id,
-                capturedAt: Date(),
-                skipAppleScript: true
-            )
+            let context = recommendationContext()
             for entry in predictionSuggestionEntries.prefix(3) {
                 feedbackStore.recordDismissed(entryID: entry.id, context: context)
             }
@@ -684,11 +686,7 @@ final class HistoryStore: ObservableObject {
 
         // 显露偏好：如果推荐窗口打开期间用户手动复制了别的
         if revealedPreferenceWindowTimer != nil, !lastPredictionEntryIDs.contains(entry.id) {
-            let context = contextCollector.currentContext(
-                recentEntries: ClipboardEntryIntelligenceAdapter().summaries(for: entries),
-                selectedEntryID: selectedEntry?.id,
-                capturedAt: Date()
-            )
+            let context = recommendationContext(skipAppleScript: false)
             feedbackStore.recordCopiedManually(entryID: entry.id, context: context)
         }
         // 每次新复制都重算一次推荐：菜单栏可能随时被打开，而"每 2 秒轮询"在

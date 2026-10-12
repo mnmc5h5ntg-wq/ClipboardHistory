@@ -214,23 +214,31 @@ struct SettingsView: View {
     private var detailScrollView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                switch selectedCategory {
-                case .shortcuts:
-                    shortcutsSection
-                case .general:
-                    generalSection
-                case .privacy:
-                    privacySection
-                case .recommendations:
-                    recommendationsSection
-                case .data:
-                    dataSection
-                case .none:
-                    EmptyView()
+                // 下面这棵 switch 的分支会随分类整个换掉 ⇒ 给它一次淡入（动效审计 M1 的
+                // 可行版本之一：普通容器上的 `.transition` 是工作的，`List` 行上不是）。
+                // 刻意**不**做横向推入：那是网页的形状，macOS 系统设置换分类时不推。
+                Group {
+                    switch selectedCategory {
+                    case .shortcuts:
+                        shortcutsSection
+                    case .general:
+                        generalSection
+                    case .privacy:
+                        privacySection
+                    case .recommendations:
+                        recommendationsSection
+                    case .data:
+                        dataSection
+                    case .none:
+                        EmptyView()
+                    }
                 }
+                .id(selectedCategory)
+                .transition(MotionCatalog.transition(for: .contentFade))
             }
             .padding(24)
         }
+        .animation(MotionCatalog.animation(for: .contentFade), value: selectedCategory)
     }
 
     // MARK: - Shortcuts Section
@@ -672,8 +680,8 @@ private struct SettingsSidebarRow: View {
         )
         .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
         .padding(.horizontal, 6)
-        .animation(.easeInOut(duration: 0.11), value: isHovered)
-        .animation(.easeInOut(duration: 0.11), value: isSelected)
+        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .selection), value: isSelected)
         .onHover { hovering in
             isHovered = hovering
         }

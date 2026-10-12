@@ -13,6 +13,11 @@ struct DetailView: View {
     /// 但它绝不改 `HistoryStore` 里的任何一个字（C-5：Store 只减不加）。
     @State private var markdownMode: MarkdownPreviewMode
 
+    /// 「已复制」回执（M7）。复制成功以前没有任何反馈，只有行位置变化 ——
+    /// 那是可用性缺口，不只是美观问题。
+    @State private var copyConfirmed = false
+    @State private var copyResetTask: Task<Void, Never>?
+
     init(historyStore: HistoryStore, initialMarkdownMode: MarkdownPreviewMode = .rendered) {
         self.historyStore = historyStore
         // 私有 @State 用注入参数的老手法（和 `SettingsView.initialCategory` 同一套）：
@@ -32,6 +37,7 @@ struct DetailView: View {
                 imageSize: 40,
                 titleSize: 14
             )
+            .transition(MotionCatalog.transition(for: .contentFade))
         }
     }
 
@@ -40,7 +46,30 @@ struct DetailView: View {
             header(for: entry)
             Divider()
             preview(for: entry)
+                .transition(MotionCatalog.transition(for: .contentFade))
         }
+        // 详情区换页的两条规则，都是量出来的（动效审计 M4，账本 U-20 / D-055）：
+        //
+        // ① **换类型才软交接**。`.transition` 只在"这一支被插入/移除"时执行，
+        //    所以文本→文本只是换字符串（不演），文本→图片是整块界面被换掉（交叉淡入）。
+        //    这条区分是有依据的：同一类内容之间，用户要读的是**字**；换了类型，
+        //    需要被解释的是"你看到的这块东西整个变了"。
+        // ② 为什么是**交叉**淡入而不是"淡入新内容"：淡入只能从全透明开始，
+        //    于是每次换选都有一帧空白详情；方向键连翻（key repeat ~30/s）时
+        //    这一帧空白每按一次重来一遍，整块永远到不了不透明 —— 比不动画更差。
+        //    交叉淡入没有那一帧：旧的一直在，直到新的完全显形。
+        //    第一版实现的正是"整块淡入"，砍掉它的理由是上面那两条，**不是**"它没跑"——
+        //    我一开始以为它没跑（本仓库那把整窗尺量出来是一帧跳变），
+        //    报告 §13.5 的场景 A 用小区域亮度重量了一遍：亮度 0.423 → 0.007 再用 8 帧爬回去，
+        //    动画确实在跑。同一次调用里"先裸赋值再 withAnimation"不会被合并掉。
+        //    （尺子看不见 ≠ 事情没发生；这条已经写进 `MotionFilmstripTests` 的分带判据。）
+        .animation(MotionCatalog.animation(for: .contentFade),
+                   value: DetailPreviewKind(entry: entry, markdownMode: markdownMode))
+        .onChange(of: entry.id) { _ in
+            // 上一条留下的「已复制」回执必须收掉（否则"已复制"挂在另一条记录上，那是说谎）。
+            clearCopyConfirmation(animated: false)
+        }
+        .onDisappear { copyResetTask?.cancel() }
         .ignoresSafeArea(edges: .top)
         .overlay(alignment: .bottomTrailing) {
             GlassPill(
@@ -48,10 +77,43 @@ struct DetailView: View {
                 favoriteAction: { historyStore.perform(.toggleFavorite(entry)) },
                 isPinned: entry.isPinned,
                 pinAction: { historyStore.perform(.togglePin(entry)) },
-                copyAction: { historyStore.perform(.copyAndPromote(entry)) },
+                copyConfirmed: copyConfirmed,
+                copyAction: {
+                    historyStore.perform(.copyAndPromote(entry))
+                    confirmCopy()
+                },
                 deleteAction: { historyStore.perform(.delete(entry)) }
             )
             .padding(12)
+        }
+    }
+
+    /// 复制回执。**只在真的写进剪贴板了**的时候给：
+    /// `copyAndPromote` 失败时会置 `clipboardWriteErrorMessage`（并弹顶部横幅），
+    /// 那时再说"已复制"是当着用户撒谎，而且那句错误和这句回执会同时出现在屏上。
+    /// （成功路径上 `writeToClipboard` 会把这条错误清成 nil，所以 nil 就是"这次成了"。）
+    private func confirmCopy() {
+        guard historyStore.clipboardWriteErrorMessage == nil else { return }
+        copyResetTask?.cancel()
+        withAnimation(MotionCatalog.animation(for: .emphasis)) { copyConfirmed = true }
+        // 读屏用户拿不到那颗勾（MC-13）：播报的是同一句话，不是把视觉回执换个写法。
+        VoiceOverReceipt.announce("已复制到剪贴板")
+        copyResetTask = Task { @MainActor in
+            // 1.1 秒：够读完"已复制"，又不至于让一颗勾长期占着按钮。
+            try? await Task.sleep(nanoseconds: 1_100_000_000)
+            guard !Task.isCancelled else { return }
+            clearCopyConfirmation(animated: true)
+        }
+    }
+
+    private func clearCopyConfirmation(animated: Bool) {
+        copyResetTask?.cancel()
+        copyResetTask = nil
+        guard copyConfirmed else { return }
+        if animated {
+            withAnimation(MotionCatalog.animation(for: .emphasis)) { copyConfirmed = false }
+        } else {
+            copyConfirmed = false
         }
     }
 
@@ -142,7 +204,7 @@ struct DetailView: View {
             .fixedSize()
             .helpLabel(MarkdownPreviewMode.controlHelp)
             .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.14)) {
+                withAnimation(MotionCatalog.animation(for: .hover)) {
                     isHovered = hovering
                 }
             }
@@ -248,7 +310,7 @@ enum MultiFilePreviewLayout {
     static let animationDuration = 0.22
 
     static var animation: Animation {
-        animation(reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        animation(reduceMotion: MotionCatalog.motionShouldBeReduced)
     }
 
     /// 纯函数版：`accessibilityDisplayShouldReduceMotion` 是系统全局状态，测试改不了，
@@ -361,7 +423,7 @@ private struct CollapsibleFilePreview<Content: View>: View {
                     .clipped()
                     .scaleEffect(
                         isExpanded ? 1 : MultiFilePreviewLayout.collapsedScale(
-                            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                            reduceMotion: MotionCatalog.motionShouldBeReduced
                         ),
                         anchor: .top
                     )
@@ -472,7 +534,7 @@ private struct MultiFileRow: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 3)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.14)) {
+            withAnimation(MotionCatalog.animation(for: .hover)) {
                 isHovered = hovering
             }
         }

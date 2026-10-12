@@ -1533,3 +1533,148 @@ PROBE       NSSplitView frame={{0, 0}, {750, 560}} delegate=Optional(<SwiftUI.Na
 `swift test` 由外层 shell 直接跑，每个变异一次调用。
 这就是账本里那条"退出码/汇总数字 ≠ 子进程真跑过"的复发，只不过这次被骗的方向是**反的**
 （把"没跑"读成"跑得很红"）。
+
+## D-055 动效专项：加进去的三条，价值都来自先砍掉的那几条
+
+输入是 `~/Documents/时间剪史_审计_2026-10-12_动效专项/00-动效审计报告.md`（501 行，
+它自己就在 §7/§11/§13 里被作者推翻过十五处）。用户的要求很明确：
+先判出最不合理的约 10% 并说明为什么不做，剩下的实现；每一条动手之前必须先确认它
+"视觉更精美/流畅、暗示功能或层级、或值得当宣传点"，否则宁可不做。只适配 macOS 12 与本机。
+
+### 决定表（做 / 砍 / 改，以及为什么）
+
+| 条目 | 处置 | 一句话理由 |
+|---|---|---|
+| M1 列表增删重排过渡 | **砍** | 实测跑不出来：`List` 底下是 `NSTableView`，四种写法（`.animation` 挂 List / 挂 ForEach / `.transaction` 装默认事务 / 把事务挂到**变更漏斗**上）全部一帧到位。见下面"分带归因" |
+| M2 提示条非对称过渡 | **做** | 真在动（3 帧、159ms 落定），而且它顺手消掉了"下方整块内容被顶一下"的布局瞬移 |
+| M3 QuickPick 呼出动画 | **砍**（我先加了，又删掉） | 报告 §12.1 用四家同类逐行核对 + Emil 一手频率表（"keyboard shortcuts → **No animation. Ever.**"）把这条自己撤回了。`animationBehavior = .none` 保留 |
+| M4 详情换页淡入 | **改成"换类型才交叉淡入"** | 整块淡入只能从全透明开始 ⇒ 每次换选一帧空白；方向键连翻时整块永远到不了不透明。文本→文本不演，文本→图片才软交接（`DetailPreviewKind`） |
+| M5 收藏/固定符号动效 | **做，但只留可达的那条** | 见 MC-12：`bounceValue` 恒非 nil，把 `replace` 永久挡住了 |
+| M6 自定义 drag image | **早已交付**（U-2 / D-040 那轮） | 本轮只核对，没重做 |
+| M7 复制成功回执 | **做 + 补两个洞** | 只有位置变化确实是可用性缺口；但回执原来会在写失败时也显示"已复制"（撒谎），而且读屏用户完全拿不到（MC-13） |
+| M8 落点框淡入 | **做** | 鼠标悬在窗口边缘时它每帧进出，没过渡就是闪 |
+| M9 骨架扫光 | **砍** | 要引入仓库第一条 `repeatForever`，而等待点只有两处、都没量到值得挂常驻动画的时长。菜单栏常驻进程里"一直在动"是负债 |
+| M10 主窗口呼出淡入 | **砍**（我先加了，又删掉） | 同 M3；另外这个 App 有一整类"窗口存在但看不见"的旧缺陷，把"是否出现"交给可被打断的动画是拿可靠性换质感 |
+| M11 `MotionConstants` | **做** | 17 处各写各的秒数收敛成一张表 + 一条会红的源码守卫 |
+| M12 行→详情共享元素 | **砍** | 和 M1 同一个根因（行在 `NSTableView` 里），且要维护"可被打断的过渡"状态 |
+| M13 命中高亮动效 | **砍**（报告自己已撤） | 键入驱动，等于给输入延迟上动画 |
+| M14 列表 stagger | **砍** | 报告红线 1，且 `List` 复用行会"滚到哪动到哪" |
+| M15 菜单栏"整理完成"淡入 | **缩窄** | `MenuBarExtraStyle.menu` 就是真 `NSMenu`，SwiftUI 过渡根本不跑；只保留状态行那一支能跑的部分 |
+| M16 全源门 | **做**（reduce-motion ∪ VoiceOver） | Switch Control 没有公开 API ⇒ 那一格留空并记 not-run，不拿私有键赌兼容性 |
+| M17 一手 cubic-bezier | **做** | 进场从 `.easeInOut`（前半段是 ease-in，方向反了）换成 `(0.23,1,0.32,1)`，退场 `(0.2,0,1,0.9)` |
+| M18 一次性庆祝动效 | **砍** | 报告自己排在 M1/M6/M7 之后；这个产品的宣传点是"看得懂的功能"，不是彩带 |
+
+### 三个改变结论的实测（本轮真正值钱的部分）
+
+**① 分带归因：整窗那四条"绿"里，有一条是假的。**
+把动画事务挂到 `HistoryStore.perform` / `add` 上之后，整窗逐帧从"一帧跳变"变成
+`0.069 0.078 0.079 0.078`（4 帧斜坡）—— 看起来 M1 成了。但它不是：把同一批帧**只量列表中部
+那条带**（第 4~8 行，既不是新进来的那行也不是被选中的那行），读数是
+`0.283` 一帧到位、落定残余 0.000，和把曲线整个关掉时**一模一样**。斜坡全部来自右侧详情区。
+⇒ 报告 §13.2 的 S5 成立，M1 在 `List` 上做不成。
+这条如果不做分带，我会把"详情区在淡"当成"列表在滑"交付出去，并在注释里写下这个错误结论。
+现在仓库里留下的是反向判据：`testListRowsDoNotAnimateAndNothingClaimsTheyDo`
+—— 它既量"仍然是一帧"，也扫"源码里不许再出现挂在 `List` 行上的 `.transition`"
+（一个不执行的声明比没有更糟：它会让下一个人以为做过了）。
+
+**② 尺子的时钟不能是 `CADisplayLink`，也不能是 `Timer`。**
+本机显示器一休眠：`CADisplayLink` 的 `ticks` 恒为 0（窗口、视图、
+`bitmapImageRepForCachingDisplay` 全是好的），六条判据一起"只抓到 0 帧"；
+换成 16ms `Timer` 之后仍然一次都不响（App Nap 节流）。
+最终把时钟换成**自旋循环本身**：runloop 每醒一次抓一张，抓帧走 `cacheDisplay`（离屏合成，
+不需要屏幕在刷新）。有效采样间隔照旧打印（本轮 21~55ms）。
+顺带把整个类的 `@available(macOS 15.0, *)` 摘掉了 —— 那扇门本来是因为 `CADisplayLink` 才存在的，
+带着它，macOS 12/13 上这六条判据是"静默不跑"而不是"跑不了"。
+
+**③ `Animation.linear(duration: 0)` 会让带 `.transition` 的插入根本不落地。**
+A/B 开关第一版给的是零时长：30 帧全等、峰值 0.000 —— 于是"关掉曲线必须还看得见一次跳变"
+这条对照从"一帧到位"退化成"什么都没发生"，等于没有对照。改成 0.001s 后立刻正常
+（`0.222` 单帧）。写进了 `animation(for:)` 的注释里。
+
+### 报告 §11/§13 那 15 条 MC 的处置
+
+| # | 处置 |
+|---|---|
+| MC-1 | 修：`defaultDamping 0.86`（注释写着"不过冲"是错的）→ `criticalDamping = 1.0`，过冲只留给… 现在一个都不留 |
+| MC-2 | 修：新增纯值 `Curve`，`Animation` 只能从它机械映射，`Curve.seconds` 只能来自 `duration(for:)`；守卫 `testCurveSecondsComeFromTheDurationTable` + 像素侧 `testSlidingRoleSettlesWithinItsBudget`（横幅实测 3 帧 ≈159ms，与声明的 150ms 一致） |
+| MC-3 | 接受下调后的严重度：几何过冲全部撤掉，"弹"交给 14+ 的 `symbolEffect` |
+| MC-4 | 修：`AppDelegate` 注册 `accessibilityDisplayOptionsDidChangeNotification`（必须走 `NSWorkspace.notificationCenter`），只发一次 `objectWillChange` 让视图回读目录，**不存第二份布尔值**；守卫扫这三件事都在 |
+| MC-5 | 修：删掉死值 `emphasisScale`、恒真的 `Shape.fades`、永不生效的 `.identity` 分支 |
+| MC-6 | 修：判据改成"只量目标 bbox + 相对峰值步长 + 绝对地板"，并且**两档打分**（`transitionFrameCount` 与 `settleResidualRatio`）；对照不再依赖某个恰好没动起来的界面（纯数据的 step/ramp 判别 + 空白对照 + A/B 三件） |
+| MC-7 | 接受：M1 改道，代码里那句"装了默认事务"的错注释已删 |
+| MC-8 | 修：CI 新增 `Motion filmstrip (report-only)` 一步（自带 200s 看门狗、抽取行全部自己吞非零、退出码照报）。测试文件头原来写"CI 也取过数"，那句话当时是假的，现在改成"CI 上这一步是报告型，第一次运行的日志为准" |
+| MC-9 | 修：9 处裸 `.easeInOut(duration:)` 全部收敛进目录，`hover`/`selection` 从零消费变成有消费；守卫 `testNoAdHocAnimationParametersOutsideTheCatalog` |
+| MC-10 | 由删除解决：AppKit 侧已经没有任何动画（`grep NSAnimationContext Sources/` → 0 命中），所以"同一个 `.panelIn` 两个真值"这个分叉不存在了 |
+| MC-11 | 修：热键路径去动画；那个恒真的 `guard shape.fades` 连同 `fades` 字段一起消失 |
+| MC-12 | 修：删掉 `bounceValue`，`SymbolMotion` 只剩两条都可达的分支；守卫扫调用点（`replaceSymbol: true` 恰好 3 处、且不许出现 `bounceValue`） |
+| MC-13 | 修（14+）：`VoiceOverReceipt.announce`。版本边界是**编译器实测**：本机 SDK 报 `'AccessibilityNotification' is only available in macOS 14.0 or newer` ⇒ 12/13 这一档发不出去，`announce` 返回 Bool 把这个事实暴露给判据，不静默 |
+| MC-14 | 修：我给 `DetailView` / `HistorySidebarView` 写的两处"账本 U-18"是**错锚**（U-18 讲的是详情头部遮挡交通灯）。已改成 U-20 / D-055。顺手确认了一件事：存在性检查抓不到错锚 —— 全仓 55 个 `D-0xx` 引用全部存在，而 U-18 也存在，只是说的不是这件事 |
+| MC-15 | 修：仓库根那个被跟踪的 0 字节文件 `=` 已 `git rm` |
+
+### 验证（本机 macOS 27 / Swift 6.2.1）
+
+- `swift build` → 0 warning 0 error；`swift test` → **560 用例，0 失败**，17 条按开关跳过。
+  `HistoryStore` 1094 行（本轮之前的基线是 1101，上限 1120 只准降）、最长方法 66 行（上限 70）。
+- `CLIPBOARD_HISTORY_UI_MOTION=1 swift test --filter MotionFilmstripTests` → 8 条全绿：
+  `MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4`；
+  反向 `MOTION_CUT list-insert-new-record 落定残余=0.000`、`MOTION_DETAIL same-kind 0.000`；
+  对照 `MOTION_BLANK 峰值=0.0000`、`MOTION_AB 曲线关闭 → 单帧 0.222`。
+- `MotionCatalogTests` 21 条全绿（含 4 条源码扫描守卫）。
+- 帧基线：`frame_baseline.py check --against working` → **COMPARED=82 CHANGED=0**。
+  动效只改"在途帧"，不改落定像素，所以 M17 换曲线与基线闸门没有冲突（报告 §13.7 第 6 条担心的那件事，
+  实测不发生）。
+- 帧间隔（报告 §6 要求"加完动画必须重测"）：给 `testFrameIntervalsUnderStateChanges` 加了
+  **同一条驱动的动画关闭对照臂**。实测 61 条、每 100ms 一次状态变更：
+  动画开 p95 16.67ms / worst 50.5ms / >33.4ms 1 帧；动画关 p95 16.67ms / worst 39.1ms / >33.4ms 3 帧。
+  ⇒ p95 两臂相同，worst 的差异在噪声内且方向不稳定（这一次关动画那臂反而更多超标帧）。
+  只报数不设闸，避免变成"环境吵就红"的假守卫。
+  注：这条判据在显示器休眠时 `n=0` 会**直接红**（它本来就写着"帧样本太少，结论无效"），
+  本轮用 `caffeinate -u -d` 唤醒后才取到数 —— 复现命令要带上这一步。
+
+### 变异对照：7 个变异，全部要红在该红的那条
+
+| 变异 | 期望 | 结果 |
+|---|---|---|
+| 把落点框的两处 `.dropTarget` 消费者都改成 `.contentFade`（造一个没人消费的档位） | `testEveryRoleHasAConsumer` 红 | **红** ✔ |
+| SearchField 里塞回一处 `.animation(.easeInOut(duration: 0.13))` | 裸参数守卫红 | **红** ✔ |
+| AppDelegate 把通知名换成 `didActivateApplicationNotification` | 观察守卫红 | **红** ✔ |
+| 收藏那颗按钮删掉 `replaceSymbol: true` | 接线守卫红 | **红** ✔ |
+| 位移档 `Curve.seconds` 写死 0.32（复现 MC-2 的原始病灶） | 曲线-时长同源守卫红 | **红** ✔ |
+| 在 `List` 的行上加回一句 `.transition(...)` | 源码守卫红 | **红** ✔（第一次跑其实是 DID-NOT-RUN，见下） |
+| reduce-motion 时把时长归零（Pearcleaner 那种写法） | `testReduceMotionNeverZeroesTheDuration` 红 | **红** ✔ |
+
+两条一开始被读成"逃过"的，其实都是**变异没打上**，不是守卫松：
+
+1. 第一版变异脚本里 `assert` 失败后没有中止，脚本继续跑测试 ⇒ 一条"补丁根本没生效"的绿被
+   打印成 `ESCAPED`。这正是账本里那条"退出码 / 汇总数字 ≠ 子进程真跑过"的又一次复发，
+   方向还是反的（把"没跑"读成"守卫失效"）。改法：补丁失败就直接判 `DID-NOT-RUN`，不出结论。
+2. 行过渡那条源码守卫原本和像素判据写在同一个测试里，而那一条被
+   `CLIPBOARD_HISTORY_UI_MOTION` 门住 ⇒ 不设环境变量时整条跳过，变异当然"逃过"。
+   **已拆成独立判据 `testNoTransitionIsClaimedOnListRows`（不看开关、CI 必跑）**。
+   这是本轮最值钱的一条流程收获：一条纯文本判据混在像素判据里，等于它在 CI 上从来没跑过。
+
+### 一件必须如实记下的自伤（变异脚本里的 `git checkout -- .`）
+
+第一版脚本每次变异后跑了一句 `git checkout -- .` 想"还原现场"。作用域是当时所在的
+`ClipboardHistory/` 目录，于是把**本轮已写进工作区、还没提交**的九个文件一起还原到了 HEAD：
+`HistoryStore`、`DetailView`、`ContentView`、`SettingsView`、`HistoryRowViews`、
+`MenuBarRecommendationsView`、`QuickPickController`、`WindowManager`、`UIInteractionProbeTests`。
+账本与 CI 文件在目录外，侥幸没被扫到。
+
+- 恢复靠变异前手工做的 5 份 `cp` 备份 + 逐条重放其余编辑；重放之后
+  `swift build` 0 告警、560 用例全绿、8 条像素判据数字与还原前逐项一致、82 帧 `CHANGED=0`。
+  **没有靠"应该差不多"，是重新跑出来的。**
+- 规矩：**还原必须逐文件字节级 `cp`；永远不要在仓库里拿 `git checkout --` 当还原手段** ——
+  它还原的是"整个目录回到 HEAD"，不是"我改过的那几行"。
+
+### 没跑到的 / not-run
+
+- **Switch Control 那一格门没接**：没有公开 API，同类是读 `com.apple.universalaccess` 私有键。
+- **显示器休眠时帧间隔判据取不到数**（上面那条），CI runner 上同样取不到 —— 那一步会报
+  `MOTION_NOT_RUN` / `n=0`，不会伪装成绿。
+- **设置页分类切换、菜单栏面板内容淡入没有各自的像素判据**：探针的夹具宿主是 `ContentView`，
+  换宿主要在无头环境里重建一套窗口，收益不抵成本。这两处用的是与提示条**同一套机制**
+  （普通容器上的 `.transition` + `.animation(value:)`），机制本身已被横幅/详情/空态三条量到。
+- **500 条时那一次 56ms 的帧没有定位**：它是本轮之前就存在的事实，而 M1 被砍之后
+  动效不再随条目数增长（行不动、只有横幅与详情动），所以本轮没有让它变好也没有让它变坏。
+- **真机观感**：减弱动态真开关、VoiceOver 真播报、方向键连翻详情时的主观感受，都需要人看。

@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     override convenience init() {
         self.init(historyStore: nil)
     }
+    /// `NSWorkspace` 通知中心里那条辅助显示选项观察者的凭据。
+    /// 它**不在** `NotificationCenter.default` 里，所以 `applicationWillTerminate` 要单独摘除；
+    /// 不摘的后果不是泄漏那么多字节，是"回调里访问的对象已经没了"。
+    private var accessibilityOptionsObserver: NSObjectProtocol?
+
     private let showMainWindowHotKeySettings = HotKeySettings(action: .showMainWindow)
     private let repeatCopyHotKeySettings = HotKeySettings(action: .repeatCopy)
     private let quickPickHotKeySettings = HotKeySettings(action: .quickPick)
@@ -107,6 +112,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 快速选择的 ⌃⌥⇧V 也在这里注册：它和另外两个走同一个 Carbon 路径，
         // 注册失败（被别的 App 占了）时 `HotKeySettings` 会自己给出可见的提示文案。
         quickPickHotKeySettings.start()
+        // 动效降级开关的**变化**也要接上（动效审计 MC-4）。`MotionCatalog.motionShouldBeReduced`
+        // 每次求值都现读系统，但界面不会自己重算 —— 用户在系统设置里打开「减弱动态效果」或
+        // 启动 VoiceOver 之后，已经开着的窗口会一直按老样子动。
+        // 这里刻意**不存**第二份布尔值（那会变成两个真值来源，正是 MC-4 的另一半），
+        // 只发一次失效信号让视图回去读目录。
+        // 这条通知必须用 `NSWorkspace.shared.notificationCenter` 注册才收得到，
+        // 用 `NotificationCenter.default` 会安静地什么都不发生。
+        accessibilityOptionsObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                LifecycleDebugLogger.log("辅助显示选项变化：让界面重读动效目录")
+                self?.historyStore.objectWillChange.send()
+            }
+        }
         loginItemSettings.refresh()
         installReopenAppleEventHandler()
         configure()
@@ -159,6 +180,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: .repeatCopyHotKeyPressed,
             object: nil
         )
+        if let accessibilityOptionsObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(accessibilityOptionsObserver)
+            self.accessibilityOptionsObserver = nil
+        }
         showMainWindowHotKeySettings.stop()
         repeatCopyHotKeySettings.stop()
         quickPickHotKeySettings.stop()

@@ -139,6 +139,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.collectionBehavior = [.transient, .ignoresCycle]
+        // 快速面板不要系统的 genie/缩放动画：那是"窗口被收进 Dock"的语义，
+        // 而这个面板是"呼出即输入"。同类工具 Maccy 的 `FloatingPanel.swift:38` 也是这么设的。
+        //
+        // 也**不自己补一段淡入**（动效审计 M3 定稿；报告 §12.1 更正 #7、红线 8）：
+        // 这是热键 / 每天上百次的入口，Maccy、alt-tab、CodeEdit、Ice 四家在热键呼出路径上
+        // 全部瞬时出现，alt-tab 连退场淡出都做成默认关闭的开关。
+        // 动效只留给内容与尺寸变化 —— 而这个面板是固定 420×300，没有可变尺寸那一步。
+        panel.animationBehavior = .none
 
         let field = QuickPickSearchField()
         field.forwarding = { [weak self] event in

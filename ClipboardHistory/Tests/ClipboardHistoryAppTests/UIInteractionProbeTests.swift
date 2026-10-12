@@ -243,7 +243,36 @@ final class UIInteractionProbeTests: XCTestCase {
         let loaded = meter.stats()
         meter.stop()
 
+        // 动效审计 §6："加完动画必须重测"。同一条驱动、同一个窗口，把目录曲线换成零时长
+        // 再跑一遍 —— 没有这一条，上面那行 p95 到底是"动画的代价"还是"本来就这样"没人知道。
+        // 只报数不判红：两臂之差受机器负载影响，把它做成闸门就会变成"环境吵就红"的假守卫。
+        // 判据仍然是动画那一臂（那才是交付配置）。
+        MotionCatalog.animationsEnabled = false
+        let offMeter = FrameMeter()
+        offMeter.start()
+        var offPhase = 0
+        let offDeadline = Date().addingTimeInterval(3.2)
+        var offNextStep = Date()
+        while Date() < offDeadline {
+            if Date() >= offNextStep {
+                let count = max(store.entries.count, 1)
+                switch offPhase % 4 {
+                case 0: store.perform(.select(store.entries[offPhase % count]))
+                case 1: store.perform(.updateSearch(offPhase % 2 == 0 ? "记录 3" : ""))
+                case 2: store.perform(.updateFilter(offPhase % 4 == 2 ? .favorites : .all))
+                default: store.perform(.toggleSelection(store.entries[offPhase % count]))
+                }
+                offPhase += 1
+                offNextStep = Date().addingTimeInterval(0.1)
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.008))
+        }
+        let off = offMeter.stats()
+        offMeter.stop()
+        MotionCatalog.animationsEnabled = true
+
         print("FPS-BASELINE n=\(baseline.n) p50=\(String(format: "%.2f", baseline.p50))ms p95=\(String(format: "%.2f", baseline.p95))ms worst=\(String(format: "%.1f", baseline.worst))ms >16.7ms:\(baseline.over16) >33.4ms:\(baseline.over33)")
+        print("FPS-MOTION-OFF n=\(off.n) p50=\(String(format: "%.2f", off.p50))ms p95=\(String(format: "%.2f", off.p95))ms worst=\(String(format: "%.1f", off.worst))ms >16.7ms:\(off.over16) >33.4ms:\(off.over33)")
         print("FPS-LOADED entries=\(store.entries.count) n=\(loaded.n) p50=\(String(format: "%.2f", loaded.p50))ms p95=\(String(format: "%.2f", loaded.p95))ms worst=\(String(format: "%.1f", loaded.worst))ms >16.7ms:\(loaded.over16) >33.4ms:\(loaded.over33)")
 
         XCTAssertGreaterThan(loaded.n, 60, "帧样本太少，结论无效")

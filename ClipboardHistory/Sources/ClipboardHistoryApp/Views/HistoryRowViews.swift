@@ -94,7 +94,7 @@ private struct RowFavoriteButton: View {
         .buttonStyle(.plain)
         .helpLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .accessibilityLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
-        .animation(.easeInOut(duration: 0.11), value: isHovered)
+        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }

@@ -21,7 +21,7 @@ struct GlassCircleButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(MotionCatalog.animation(for: .hover)) {
                 isHovered = hovering
             }
         }
@@ -38,6 +38,9 @@ struct GlassPill: View {
     /// 而表头的批量按钮只在多选时出现 —— 没有这一颗，"只固定一条"在界面上做不到。
     let isPinned: Bool
     let pinAction: () -> Void
+    /// 「已复制」回执（M7）。这颗按钮平时是"复制"，点下去变成 1.1 秒的勾 ——
+    /// 复制成功以前没有任何反馈（只有行位置变化），那是可用性缺口。
+    var copyConfirmed: Bool = false
     let copyAction: () -> Void
     let deleteAction: () -> Void
 
@@ -47,6 +50,7 @@ struct GlassPill: View {
                 symbol: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite),
                 helpText: FavoriteTogglePresentation.helpText(isFavorite: isFavorite),
                 foregroundStyle: isFavorite ? AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) : AnyShapeStyle(.primary),
+                replaceSymbol: true,
                 action: favoriteAction
             )
 
@@ -58,6 +62,7 @@ struct GlassPill: View {
                 symbol: PinTogglePresentation.symbolName(isPinned: isPinned),
                 helpText: PinTogglePresentation.helpText(isPinned: isPinned),
                 foregroundStyle: isPinned ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.78)),
+                replaceSymbol: true,
                 action: pinAction
             )
 
@@ -65,7 +70,12 @@ struct GlassPill: View {
                 .fill(.separator)
                 .frame(width: 28, height: 1)
 
-            GlassPillButton(symbol: "doc.on.doc", helpText: "再次复制", action: copyAction)
+            GlassPillButton(symbol: copyConfirmed ? "checkmark" : "doc.on.doc",
+                            helpText: copyConfirmed ? "已复制到剪贴板" : "再次复制",
+                            // 图标换了要说"换过了"，不是"闪了一下"：14+ 用系统的符号替换过渡，
+                            // 12/13 退化成交叉淡入（见 `SymbolMotion`）。
+                            replaceSymbol: true,
+                            action: copyAction)
 
             Rectangle()
                 .fill(.separator)
@@ -86,6 +96,9 @@ private struct GlassPillButton: View {
     let symbol: String
     let helpText: String
     var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
+    /// 符号本身会变的按钮（收藏 / 固定 / 已复制）打开这一档：换符号时给一次系统过渡，
+    /// 而不是"啪"地换成另一个图标。
+    var replaceSymbol = false
     let action: () -> Void
     @State private var isHovered = false
 
@@ -98,12 +111,13 @@ private struct GlassPillButton: View {
                 isHovered: isHovered,
                 hasOwnSurface: false,
                 showsBorder: false,
-                foregroundStyle: foregroundStyle
+                foregroundStyle: foregroundStyle,
+                replacesSymbol: replaceSymbol,
             )
         }
         .buttonStyle(.plain)
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(MotionCatalog.animation(for: .hover)) {
                 isHovered = hovering
             }
         }
@@ -119,6 +133,9 @@ private struct GlassIconControl: View {
     let hasOwnSurface: Bool
     let showsBorder: Bool
     var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
+    /// 状态反馈（换符号的连续过渡 / 值变了弹一下）。默认关：
+    /// 只有"图标代表一个状态"的那些按钮才开，纯动作按钮不该弹。
+    var replacesSymbol = false
 
     var body: some View {
         content
@@ -143,6 +160,7 @@ private struct GlassIconControl: View {
             // 单色渲染让每个符号都按前景色满权重画，控件内部才统一。
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(foregroundStyle)
+            .symbolMotion(symbol: symbol, replacesSymbol: replacesSymbol)
             .frame(width: size, height: size)
     }
 
