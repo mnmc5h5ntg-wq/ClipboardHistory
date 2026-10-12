@@ -2277,3 +2277,17 @@ CI 从 0/3 回到 2–3/3，而**闸门一格都没放松**。
 **这一条值得单独记账的原因**：它证明这道闸门不是装饰。
 一个"从来不会红的闸"和一条 echo 没有区别 —— R7 加的闸第一跑就红，
 而红指向的是一个真实的覆盖空洞（旧判据在 CI 上一直在**假装**判定）。
+
+
+### D-067 补记：闸门在 CI 上转绿的实测一行
+
+修完之后 runner 的读数（run 38320934227，job 成功）：
+```
+motion suite exit: 0  executed: 20  胶片: 3
+MOTION_SUMMARY notice-banner=3 detail-kind-change=4 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=2/3 not-run=notice-banner
+```
+`judged` 从 R7 那一次（run 38318889968）的 **0/3** 回到 **2/3**，闸门转绿，
+而门槛仍是 2/3 —— 没有为过闸门改判据。`notice-banner` 那一格是夹具问题
+（触发前后逐像素相同 ⇒ `premise-not-visible`），记在 BACKLOG，不算验到。
+main 上 R8 那次红（run 38319974826）由 R8b 转绿，两次的差异只有判据那一处。
