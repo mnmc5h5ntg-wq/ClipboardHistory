@@ -56,6 +56,26 @@
   **5 支变异 5/5 CAUGHT**（第一轮 2 支 ESCAPED，据此修掉两条假守卫：按名字查消费者会被
   `controlHover` 这类前缀白拿；数值断言证明不了来源，13 就等于 13）；`scripts/tests` 全绿。
 - **自评 88 / 100**（<90 ⇒ 继续）。R2 的 CI 已确认 success。
+## 当前状态（2026-10-13 · 视觉迭代 R4：按压态）
+
+- **改了什么**：新增 `Views/PressableStyle.swift`（`PressedStyle: ButtonStyle` + `PressableAppearance` 纯函数），
+  9 处按钮接上"缩放 0.97 + 底色 0.12 / 0.12s"的按压反馈；整行类不缩放只加深底色；
+  菜单栏两处刻意不接（系统菜单自己的高亮就是反馈，理由在代码旁边 + 白名单判据）；
+  新增 `MotionCatalog.pressScale` 与 `VisualFill.pressed`，次序 `hover < pressed < selected` 有判据。
+- **焦点那一半没做**：读码发现搜索框的 `focusRingType = .default` 早就恢复了（R2-02），再画就是两圈；
+  剩下的缺口（筛选段/设置行的键盘焦点）要先量 `List` 行代理，单独一轮。
+- **数字**：613 tests / 24 skipped / 0 failures（+6 条判据）；0 warning；**82 帧 `CHANGED=0`**；
+  5 支变异 5/5 CAUGHT（第一版 1 支 ESCAPED：像素断言把缩放与底色混在一起量，拆成分通道才打红）；
+  `scripts/tests` 72 passed。
+- **自评 90 / 100**（第一轮达到阈值线，但**这一分不敢给满**：按压态只有源码级与合成级证据）。
+- **按压态的产物级证据仍缺**：真按下探针在 xctest 里 `送达=0`、`keyWindow=nil isActive=false`
+  ⇒ SwiftUI Button 的按下跟踪要 key 窗口。已如实记为"源码已接、产物未量"，转人工批次 12.1–12.7。
+- **已装到本机**（R1–R4 一起进去）：`install_local.sh --yes` 跑通 —— `INSTALL_RESULT=ok`、
+  `INSTALL_SHA_MATCH=1`（staged 与 installed 都是 `ea29552ee41f0624…`）、新 pid 19048 的 exe
+  逐字对上 `/Applications/时间剪史.app`、存档 92→92 条、运行时冒烟 `SMOKE_OK=1`；
+  旧包留在 `~/Documents/Codex_Project0_backups/before-local-20261013-045123`。
+  **请按批次 12 判手感**（尤其 12.1 按住收藏键、12.6 开减弱动态再来一遍）。
+
 - **下一轮（R4）**：按压态与焦点态（全 App 现在只有 hover 一种反馈；`testSidebarListFocusRingAfterClick`
   那条已知红也在那一轮处理），并把间距节奏（padding 一族）一并收。
 

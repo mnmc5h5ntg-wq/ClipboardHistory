@@ -99,7 +99,8 @@ private struct GlassPillButton: View {
                 bounceValue: bounceValue
             )
         }
-        .buttonStyle(.plain)
+        // 按压态（R4）：这四颗是"状态被改了"的控件，点下去必须先有一下"收到了"。
+        .pressedStyle(in: Circle())
         .onHover { hovering in
             withAnimation(MotionCatalog.animation(for: .hover)) {
                 isHovered = hovering

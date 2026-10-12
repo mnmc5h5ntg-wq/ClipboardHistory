@@ -200,7 +200,7 @@ struct DetailView: View {
                     }
                     .contentShape(VisualShape.rounded(VisualRadius.chip))
             }
-            .buttonStyle(.plain)
+            .pressedStyle(in: VisualShape.rounded(VisualRadius.chip))
             .fixedSize()
             .helpLabel(MarkdownPreviewMode.controlHelp)
             .onHover { hovering in
@@ -531,7 +531,8 @@ private struct MultiFileRow: View {
             }
             .contentShape(VisualShape.rounded(VisualRadius.card))
         }
-        .buttonStyle(.plain)
+        // 整行类：`scales: false`。行的主反馈是选中与底色，缩放一条铺满的行会读成"布局抖了一下"。
+        .pressedStyle(in: VisualShape.rounded(VisualRadius.card), scales: false)
         .padding(.horizontal, 20)
         .padding(.vertical, 3)
         .onHover { hovering in

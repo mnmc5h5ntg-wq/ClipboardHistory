@@ -100,7 +100,7 @@ private struct RowFavoriteButton: View {
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .pressedStyle(in: Circle())
         .helpLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .accessibilityLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)

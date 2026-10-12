@@ -379,7 +379,7 @@ private struct FilterSegmentButton: View {
                 .padding(.horizontal, 10)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .pressedStyle(in: VisualShape.rounded(VisualRadius.control))
         // 参数从目录拿，不在这里写死 0.14：这一档以前散在四处、分别是 0.11/0.14/0.15/0.18，
         // 没人说得出哪个对（M11）。悬停跟着鼠标 ⇒ 给最短的那一档。
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)

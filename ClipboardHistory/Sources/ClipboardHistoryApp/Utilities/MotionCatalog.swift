@@ -151,6 +151,10 @@ enum MotionCatalog {
         shape(for: role, reduceMotion: reduceMotion).glows
     }
 
+    /// 按压缩放的量：0.97 = 44pt 的图标按钮收 1.3pt。看得见"压下去了"，又不会让图标跳位到
+    /// 让人以为点歪了。全仓只有这一档缩放给"按下"用（`dropTarget` 那一档是"命中"，另一件事）。
+    static let pressScale: CGFloat = 0.97
+
     /// 落点光晕的模糊半径与不透明度。只给 `dropTarget` 那一圈用。
     static let dropGlowRadius: CGFloat = 3
     static let dropGlowOpacity: Double = 0.45

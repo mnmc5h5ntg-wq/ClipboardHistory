@@ -230,7 +230,7 @@ private struct VideoPlaybackControls: View {
                     .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
             }
-            .buttonStyle(.plain)
+            .pressedStyle(in: Circle())
             .helpLabel(playback.isPlaying ? "暂停" : "播放")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.currentTime))
@@ -260,7 +260,7 @@ private struct VideoPlaybackControls: View {
                     .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
             }
-            .buttonStyle(.plain)
+            .pressedStyle(in: Circle())
             .helpLabel(playback.isMuted ? "取消静音" : "静音")
         }
         .padding(.horizontal, 10)

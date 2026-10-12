@@ -61,6 +61,8 @@ struct MenuBarRecommendationsView: View {
                     }
                     // 系统菜单项没有按钮底：`.plain` 去掉 SwiftUI 默认那层，
                     // 悬停高亮交给菜单自己的选中态（帧里之前那种"卡片"就是这么来的）。
+                    // 同理**不接按压态**（R4）：菜单自己的高亮已经是"收到了"的证据，
+                    // 再叠一层自绘底会把 U-1 刚拆掉的卡片感装回来。
                     .buttonStyle(.plain)
                 }
 

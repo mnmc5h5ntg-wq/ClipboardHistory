@@ -673,7 +673,7 @@ private struct SettingsSidebarRow: View {
                 .padding(.vertical, 8)
                 .contentShape(VisualShape.rounded(VisualRadius.panel))
         }
-        .buttonStyle(.plain)
+        .pressedStyle(in: VisualShape.rounded(VisualRadius.panel), scales: false)
         .background(
             VisualShape.rounded(VisualRadius.panel)
                 .fill(isSelected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
