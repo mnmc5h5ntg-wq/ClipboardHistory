@@ -31,6 +31,7 @@ STEPS = {
     "offscreen": "Offscreen frame capture (report-only)",
     "onscreen": "On-screen interaction probes (report-only)",
     "motion": "Motion filmstrip (report-only)",
+    "motion_floor": "Motion coverage floor",
 }
 
 # 被测命令 → 夹具。命中次数必须恰好 1，否则说明 ci.yml 改了写法、夹具已经失效。
@@ -57,6 +58,13 @@ SUBSTITUTIONS = {
         (r"CLIPBOARD_HISTORY_UI_MOTION=1 CLIPBOARD_HISTORY_MOTION_OUT=/tmp/motion-ci \\\n\s*"
          r"swift test --filter MotionFilmstripTests > /tmp/motion\.log 2>&1 &",
          "cp FAKE_LOG /tmp/motion.log &"),
+    ],
+    # 这一步没有"被测命令"：它读上一步留下的 /tmp/motion.log。
+    # 所以夹具挂在它的**第一行抽取**上 —— 先落一份日志再去读它，
+    # 这样测的仍然是 ci.yml 里那段判定逻辑本身，不是另抄一份。
+    "motion_floor": [
+        (r"resolve=\$\(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion\.log",
+         "cp FAKE_LOG /tmp/motion.log; resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log"),
     ],
 }
 
@@ -118,6 +126,19 @@ EXPECT = {
         + "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]'"
           " failed (0.123 seconds).\n",
         ["motion suite exit:", "MOTION_NATIVE", "testSkeletonSweepActuallySweeps"], 0, []),
+    # ---- R7：覆盖率下限那一步。三条形状各钉一件事：够 ⇒ 0；不够 ⇒ **必须 1**；
+    #      没跑完 ⇒ 0（不能把探针故障算成产品缺陷）。少了第二格，这道闸就是一句 echo。
+    ("motion_floor", "enough_coverage"): (
+        MOTION_NORMAL, ["motion floor:", "MOTION_FLOOR_OK=3/3"], 0, []),
+    ("motion_floor", "under_covered"): (
+        NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=2\n"
+        + "MOTION_RESOLVE_SUMMARY judged=1/3 not-run=notice-banner,detail-kind-change\n",
+        ["MOTION_UNDERCOVERED=1/3"], 1, []),
+    ("motion_floor", "suite_did_not_finish"): (
+        TRUNCATED, ["MOTION_FLOOR_SKIPPED=suite-did-not-finish"], 0, []),
+    ("motion_floor", "no_resolve_line"): (
+        NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n",
+        ["MOTION_FLOOR_SKIPPED=no-resolve-line"], 0, []),
 }
 
 

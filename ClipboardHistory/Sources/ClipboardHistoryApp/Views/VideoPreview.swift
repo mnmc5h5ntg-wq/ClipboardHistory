@@ -229,6 +229,13 @@ private struct VideoPlaybackControls: View {
                 Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
+                    // 换符号要有过程（R7 / 审计 B-P3：这两颗以前**根本没接** `symbolMotion`，
+                    // 而胶囊上那四颗早就接了 —— 同一个仓库里两套语言）。
+                    // 不给 bounce：播放/暂停是高频动作，频率闸门（报告红线 0/8）判它不该弹。
+                    .symbolMotion(symbol: playback.isPlaying ? "pause.fill" : "play.fill",
+                                  replacesSymbol: true)
+                    // 12/13 那一臂是"身份变了 + 淡入"，它要事务才演得出来（R5 的 A3 同一课）。
+                    .animation(MotionCatalog.animation(for: .contentFade), value: playback.isPlaying)
             }
             .pressedStyle(in: Circle())
             .helpLabel(playback.isPlaying ? "暂停" : "播放")
@@ -259,6 +266,9 @@ private struct VideoPlaybackControls: View {
                 Image(systemName: playback.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                     .font(.system(size: VisualGlyph.control, weight: .semibold))
                     .frame(width: 22, height: 22)
+                    .symbolMotion(symbol: playback.isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                                  replacesSymbol: true)
+                    .animation(MotionCatalog.animation(for: .contentFade), value: playback.isMuted)
             }
             .pressedStyle(in: Circle())
             .helpLabel(playback.isMuted ? "取消静音" : "静音")

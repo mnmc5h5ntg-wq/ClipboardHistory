@@ -701,3 +701,20 @@ C 段是判定"刻意不加"的几族，D 段是取证能力边界。
 其中 `M10-count-after-clear`（把计数挪到 `perform(.clear)` 之后）是唯一一支
 **只有顺序判据能抓、值断言抓不住**的 —— 文案照样合法，数字却永远是 0。
 这正是 AGENTS.md 那条"数值断言证明不了来源"的具体形状。
+
+
+---
+
+## 第 8 轮 · U-28 浮层与临时状态：三种"空"说三句话（D-065）
+
+| 表面 | 之前 | 现在 | 证据 |
+|---|---|---|---|
+| 快速选择浮层 · 空结果 | 一片空白，三种不同的"空"共用一个"什么都没有" | 三句不同的话 + 带回用户输入的词 + 给下一步；淡入 | 真值表 + 真 `HistoryStore` 管线级 + 接线判据（M15/M16 CAUGHT）；**产物未量**（AppKit 动画，D-055） |
+| 侧栏 · 批量条 | 有驱动没过渡 ⇒ 进软出硬 | 两臂各挂过渡 | `testBulkBarTransitionsOnBothArms`（M17 CAUGHT） |
+| 详情 · 视频两颗图标 | 没接 `symbolMotion`，与胶囊四颗两套语言 | 接唯一入口 + 按值事务；不给 bounce | `testVideoControlsShareTheSymbolMotionEntry`（M18 CAUGHT） |
+| 全 `Views/` · 符号替换 | 没有作者约束 | 除 `MotionModifiers.swift` 外不许出现 `.contentTransition(` | `testSymbolReplacementHasOneAuthor`（M19 CAUGHT） |
+| CI · 动效覆盖率 | 报告型 ⇒ 判 1 条与判 3 条长得一样 | `judged < 2/3` 且确实跑完 ⇒ **红** | `test_ci_report_selftest.py` 四形状（含"该红那格"） |
+
+**方法记录（会被复发的那一类）**：源码守卫用子串匹配"某个调用还在"，
+第一次删掉调用点后仍然全绿 —— 因为**函数定义那一行也含同一个子串**。
+本轮起写这类判据一律钉"调用点所在的体"，并且必须配一支"删掉它应当打红"的变异。

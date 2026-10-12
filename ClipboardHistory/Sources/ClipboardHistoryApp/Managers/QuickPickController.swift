@@ -22,6 +22,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     private var panel: NSPanel?
     private var field: NSTextField?
     private var table: NSTableView?
+    /// 空结果时那一句（R7 / 审计 B-P2）。以前是一片空白。
+    private var emptyLabel: NSTextField?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
 
@@ -185,7 +187,18 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             // 拿不到容器就安静地不显示，比崩掉更可用（下面调用方按 isVisible 决定 toggle 方向）。
             return panel
         }
-        let stack = NSStackView(views: [field, scroll])
+        // 空结果那一句放在表格**下面**而不是盖在上面：面板固定 420×300，
+        // 盖上去要自己算居中，而 stack 已经管好了间距与宽度。
+        let empty = NSTextField(labelWithString: "")
+        empty.font = .systemFont(ofSize: 13)
+        empty.textColor = .secondaryLabelColor
+        empty.alignment = .center
+        empty.lineBreakMode = .byTruncatingTail
+        empty.isHidden = true
+
+        let stack = NSStackView(views: [field, scroll, empty])
+        // 隐藏时必须真的从布局里拿掉，否则那句话会占着一行高度把表格挤短。
+        stack.detachesHiddenViews = true
         stack.orientation = .vertical
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
@@ -196,6 +209,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         self.panel = panel
         self.field = field
         self.table = table
+        self.emptyLabel = empty
         return panel
     }
 
@@ -203,6 +217,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// `NSTableView` 只有 `selectRowIndexes(_:byExtendingSelection:)` —— 这里统一走一个入口，
     /// 免得三处调用点各写一遍下标夹紧逻辑。
     private func selectCurrentRow() {
+        applyEmptyState()
         guard let table else { return }
         if model.visible.isEmpty {
             table.deselectAll(nil)
@@ -210,6 +225,49 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         }
         table.selectRowIndexes(IndexSet(integer: model.index), byExtendingSelection: false)
         table.scrollRowToVisible(model.index)
+    }
+
+    /// 把"没有候选"这句话摆出来，并淡入（R7）。
+    ///
+    /// 淡入用 AppKit 的 `alphaValue` 而不是直接 `isHidden` 一翻：这一句出现的位置
+    /// 就是刚才还有一堆候选的地方，突然出现读起来像"界面跳了一下"。
+    /// 时长与 reduce-motion 都走 `MotionCatalog`，与 SwiftUI 那一侧同一档参数。
+    ///
+    /// 已知取证边界：`cacheDisplay` 抓不到 AppKit 图层动画（账本 D-055），
+    /// 所以这一条只有源码级 + 人工批次 15 的证据，不拿它当"产物已量"。
+    private func applyEmptyState() {
+        guard let emptyLabel else { return }
+        let message = model.emptyMessage
+        let shouldShow = message != nil
+        if let message, emptyLabel.stringValue != message {
+            emptyLabel.stringValue = message
+        }
+        let duration = MotionCatalog.duration(for: .contentFade)
+        if MotionCatalog.motionShouldBeReduced {
+            emptyLabel.isHidden = !shouldShow
+            emptyLabel.alphaValue = shouldShow ? 1 : 0
+            return
+        }
+        if shouldShow {
+            // 先亮出来再推透明度：隐藏状态下没有图层，动画不会跑。
+            if emptyLabel.isHidden {
+                emptyLabel.isHidden = false
+                emptyLabel.alphaValue = 0
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = duration
+                context.allowsImplicitAnimation = false
+                emptyLabel.animator().alphaValue = 1
+            }
+        } else if !emptyLabel.isHidden {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = duration
+                emptyLabel.animator().alphaValue = 0
+            }, completionHandler: { [weak emptyLabel] in
+                // 完成回调不在主线程；`isHidden` 是 AppKit 状态，必须回主线程改。
+                DispatchQueue.main.async { emptyLabel?.isHidden = true }
+            })
+        }
     }
 
     /// 刷新候选列表。**刻意不再 `reloadData()` 一把梭**（动效审计 M1 的替代路径，报告 §12.4/§12.7）：

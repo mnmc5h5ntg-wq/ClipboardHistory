@@ -180,6 +180,33 @@ jobs:
           fi
           exit "$status"
 
+      # 覆盖率下限（R7 / BACKLOG 第 11 条）。上一步是**报告型**：红了也不挡发布，
+      # 于是"今天只判了 1 条"和"判了 3 条"在 CI 上长得一模一样 —— 而 R5 把判据换成时长之后，
+      # 本机确实掉到了 1/3。这句话必须有一个会红的地方来说，否则 `judged=n/m` 只是装饰。
+      # 三条前提缺一不可（`executed` 有值、结论行在、judged 读得出），
+      # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）。
+      - name: Motion coverage floor
+        run: |
+          set -o pipefail
+          resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log || true)
+          executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/motion.log | tail -1 | grep -oE '[0-9]+' || true)
+          judged=$(printf '%s' "$resolve" | grep -oE 'judged=[0-9]+' | grep -oE '[0-9]+' || true)
+          total=$(printf '%s' "$resolve" | grep -oE '/[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
+          echo "motion floor: executed=${executed:-0}  ${resolve:-无 MOTION_RESOLVE_SUMMARY}"
+          if [ -z "$executed" ] || [ "$executed" = "0" ]; then
+            echo "MOTION_FLOOR_SKIPPED=suite-did-not-finish 不能把「没跑完」判成「验得不够」"
+            exit 0
+          fi
+          if [ -z "$resolve" ] || [ -z "$judged" ]; then
+            echo "MOTION_FLOOR_SKIPPED=no-resolve-line 旧版判据没有这一行，由上一步的报告负责喊"
+            exit 0
+          fi
+          if [ "$judged" -lt 2 ]; then
+            echo "MOTION_UNDERCOVERED=$judged/${total:-?} 门槛 2/3 ⇒ 动效判据今天几乎没判任何东西"
+            exit 1
+          fi
+          echo "MOTION_FLOOR_OK=$judged/${total:-?}"
+
       - name: Release script tests
         run: |
           python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log

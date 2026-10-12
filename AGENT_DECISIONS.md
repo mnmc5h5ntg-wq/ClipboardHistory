@@ -2189,3 +2189,33 @@ R0 审计里**按压态是零**：没有一处 `isPressed`、没有任何自定�
 0 warning；82 帧 `CHANGED=0`；`scripts/tests` 72 passed；变异 6/6 CAUGHT；
 `HistoryStore` 零改动（回执的计数在控制器一侧）。
 视觉账见 **U-27**，轮次记录见 `AGENT_VISUAL_ITERATION.md` 的 R6。
+
+
+## D-065 R7：空态要说"下一步"，源码守卫要钉调用点，覆盖率要会红
+
+三件事，一条比一条更一般。
+
+**① 空态不是一句话，是三种话。** 快速选择浮层以前搜不出东西就是**一片空白**。
+"空"至少分三种：用户打的词没中、这里本来有东西但当前条件筛空了、这里从来就没有东西 ——
+**下一步不一样**（换词 / 清词 / 去复制），所以必须说三句。
+判定做成纯函数 `QuickPickModel.emptyMessage(query:hasAnyHistory:)`，
+面板那一层只负责摆与淡。词必须**原样带回正文**，否则用户分不清"搜索坏了"与"没匹配"。
+
+**② 源码守卫的 needle 命中面必须比意图窄 —— 这次又没做到。**
+`testQuickPickPanelWiresTheEmptyLabel` 第一版写 `contains("applyEmptyState()")`，
+变异 M15（把调用整行删掉）**绿着通过**：定义行 `private func applyEmptyState() {` 本身就含这个子串。
+这是 R5 的 A7 的同形复发（那次的 needle 是 `content`，被角色名 `.contentFade` 白拿）。
+修法：钉**调用点所在的函数体**，另加一条"排除 `func` 定义行"的兜底。
+**规矩落成一句话：源码守卫写完，先跑一支"把被守卫的东西删掉"的变异，再谈它存在过。**
+
+**③ 报告型判据的覆盖损失要有一道会红的闸。**
+R5 把过渡判据换成时长之后，本机 `judged` 从 2/3 掉到 1/3 —— 而 CI 那一步是
+`continue-on-error` 的报告型，"只判了一条"和"判了三条"在 CI 上长得一模一样。
+本轮加 `Motion coverage floor`：`executed` 有值 **且** 结论行存在 **且** `judged < 2` ⇒ 红。
+三条前提缺一不可，否则就是把"探针没跑完"算成"产品没验到"（D-055 那一族）。
+这道闸自己由四个形状钉住，其中 `under_covered` 那格**期望退出码 1** ——
+它就是"这道闸不是 echo"的证据。
+
+数字：629 tests / 24 skipped / 0 failures（+6）；动效套件 20 / 4 / 0；0 warning；
+82 帧 `CHANGED=0`；`scripts/tests` 72 passed（CI 自检 18 形状）；变异 5/5 CAUGHT；
+`HistoryStore` 零改动。视觉账见 **U-28**。

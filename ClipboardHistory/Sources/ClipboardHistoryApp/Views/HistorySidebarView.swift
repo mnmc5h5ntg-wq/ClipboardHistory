@@ -61,12 +61,16 @@ struct HistorySidebarView: View {
             Spacer()
 
             if historyStore.selectedCount > 1 {
+                // 两臂都要有过渡，否则"进批量"是软交接而"出批量"是一帧硬换
+                //（R7 / 审计 B-P3：这条以前整块没有 `.transition`，只有下面那条按值动画）。
                 bulkActionButtons
+                    .transition(MotionCatalog.transition(for: .contentFade))
             } else {
                 Text(countText)
                     .font(.system(size: VisualFont.body, weight: .regular))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
         .padding(.horizontal, 16)

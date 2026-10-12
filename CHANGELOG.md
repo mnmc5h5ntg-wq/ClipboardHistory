@@ -96,6 +96,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   这是第五轮"声明了过渡却没有供电"的**镜像**缺陷：挂了动画而键永远不变，
   读代码的人只看到"动画已接"。扫描器带真值表（字面量要抓 / 合法表达式不误报 / 跨行 / 嵌套括号）。
 
+- **快速选择浮层的空结果不再是一片空白**（视觉迭代 R7 / D-065 / U-28）：
+  三种"空"说三句不同的话 —— 打的词没中带「词」原样回来并给"换个词或按 Esc"，
+  有历史但筛空说"没有可显示的记录"，从来没有历史说"先复制点东西"。判定是纯函数，
+  面板里那一句话按目录时长淡入。
+- **侧栏批量条两臂都有过渡**（以前进批量软交接、出批量一帧硬换）；
+  **视频播放/静音两颗图标接上唯一的 `symbolMotion` 入口**（胶囊那四颗早就接了，
+  同一个仓库不该两套语言），高频动作刻意不给 bounce。
+- **新增一族判据 `OverlayStateTests`**（6 条）：符号替换在 `Views/` 里只能有一个作者
+  （除 `MotionModifiers.swift` 外出现 `.contentTransition(` 就打红）；
+  QuickPick 空态走真 `HistoryStore` 的管线级断言；面板判据**钉调用点而不是钉函数名**
+  （第一版只 `contains("applyEmptyState()")`，被函数定义行白拿，变异 M15 绿着通过 —— 与 R5 的
+  `content` 子串同形复发，重跑后 5/5 CAUGHT）。
+- **CI 多了道会红的覆盖率闸**：动效那一步是报告型，"今天只判了 1 条"和"判了 3 条"原来长得一样。
+  新增 `Motion coverage floor`：跑完了、有结论行、而 `judged < 2/3` ⇒ 红。
+  它自己由 `scripts/tests/test_ci_report_selftest.py` 四个形状钉住，其中一格期望退出码 1。
+
 ### Changed
 
 - **撤掉 QuickPick 与主窗口的呼出动画**（M3/M10 定稿）：热键 / 每天上百次的入口按规范

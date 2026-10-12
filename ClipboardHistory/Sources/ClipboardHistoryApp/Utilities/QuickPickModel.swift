@@ -66,4 +66,27 @@ struct QuickPickModel {
         query = ""
         index = 0
     }
+
+    // MARK: - 空结果那一句（R7 / 审计 B-P2）
+
+    /// 没有候选时要显示的话；有候选时 `nil`。
+    var emptyMessage: String? {
+        guard visible.isEmpty else { return nil }
+        return Self.emptyMessage(query: query, hasAnyHistory: !all.isEmpty)
+    }
+
+    /// 纯函数版：两种"空"必须分开说，因为**下一步不一样**。
+    ///
+    /// 以前"搜不出东西"是 420×300 的面板里一片空白，用户分不清
+    /// "没匹配上"、"历史本来就是空的"与"这个浮层坏了"（§4 U-5 那条"空态要说清下一步"的同一族）。
+    /// 有词 ⇒ 让他改词或清空；没词而历史也是空的 ⇒ 让他先去复制点东西。
+    static func emptyMessage(query: String, hasAnyHistory: Bool) -> String {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !needle.isEmpty {
+            return "没有匹配「\(needle)」的记录，换个词或按 Esc 清空。"
+        }
+        return hasAnyHistory
+            ? "没有可显示的记录。"
+            : "还没有历史记录，先复制点东西再按这个快捷键。"
+    }
 }
