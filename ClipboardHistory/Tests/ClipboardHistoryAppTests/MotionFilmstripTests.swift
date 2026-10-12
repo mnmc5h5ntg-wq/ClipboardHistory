@@ -39,6 +39,10 @@ import XCTest
 final class MotionFilmstripTests: XCTestCase {
     private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_MOTION"] == "1"
 
+    /// `requireObservableMotion` 的缓存。`nonisolated(unsafe)` 是因为它是个一次性布尔，
+    /// 而且只在主线程的测试里读写（整个类是 `@MainActor`）。
+    nonisolated(unsafe) static var motionIsObservable: Bool?
+
     private var outDir: URL {
         let url = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_MOTION_OUT"]
             ?? "/tmp/motion-films", isDirectory: true)
@@ -374,7 +378,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// 判据的形状和 `testSystemSymbolEffectsAreOutOfThisRulersReach` 一样是**双向**的：
     /// 两臂读数必须不同。如果相同 ⇒ 尺子看不见 AppKit 的图层动画（`cacheDisplay` 抓的是模型树），
     /// 那 ① 就只能记成"源码已接、产物未量"，**不许**写进"已交付"。
-    func testNativeRowAnimationIsVisibleToTheRuler() throws {
+    func testNativeRowAnimationIsVisibleToTheRuler() async throws {
         try skipUnlessEnabledAndCapable()
         let band = CGRect(x: 0.04, y: 0.10, width: 0.92, height: 0.78)   // 表格区，避开标题栏
         let probe = TableProbe()
@@ -391,6 +395,8 @@ final class MotionFilmstripTests: XCTestCase {
         let instantSpan = Self.transitionFrameCount(instant)
         print("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
         print("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
+        // 数字先打，再决定"是产品没动还是这台机器看不见"。
+        try await requireObservableMotion()
         XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
                              "带里什么都没变 ⇒ 我连表格在哪都没框到，两臂相同这条结论不成立（是探针坏了，不是动效坏了）")
         XCTAssertLessThanOrEqual(instantSpan, 1,
@@ -398,6 +404,35 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(animatedSpan, Self.minimumTransitionFrames,
                                     "开了 `.effectFade` 仍只读到 \(animatedSpan) 帧 ⇒ 这把尺看不见 AppKit 的行动画"
                                     + "（`cacheDisplay` 抓的是模型树）。① 只能记成'源码已接、产物未量'，不许写进已交付")
+    }
+
+    /// **产品形状的行动画判据**：插完行之后紧跟的那两句（`selectRowIndexes` + `scrollRowToVisible`）
+    /// 不能把刚起的行动画吃掉。
+    ///
+    /// 这条是被一次虚警逼出来的：`testNativeRowAnimationIsVisibleToTheRuler` 量的是"只插行"，
+    /// 而产品里 `queryChanged` 从来不会只插行 —— 它每次都跟着改选中。
+    /// 九臂实验（数字记在 D-056）给出的答案是：
+    /// **选中真的变了 ⇒ 行动画被吃掉；写的是同一个选中 ⇒ 动画活着。**
+    /// 打字时候选下标恒为 0，写下去的就是同一个行号 ⇒ 产品路径成立，代码不用改。
+    /// 两臂都留成判据：第一臂防"以后有人把选中写歪"，第二臂把"变了就会被吃掉"这个已知边界钉住
+    /// —— 哪天 AppKit 不这么表现了，第二条会红，那时才谈得上"顺手把方向键也做上动画"。
+    func testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt() async throws {
+        try skipUnlessEnabledAndCapable()
+        let probe = TableProbe()
+        let sameRow = Self.deltas(probe.recordProductSequence(selectionChanges: false))
+        let moved = Self.deltas(probe.recordProductSequence(selectionChanges: true))
+        let sameSpan = Self.transitionFrameCount(sameRow)
+        let movedSpan = Self.transitionFrameCount(moved)
+        print("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow)))")
+        print("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved)))")
+        try await requireObservableMotion()
+        XCTAssertGreaterThan(Self.peak(sameRow), Self.minimumVisibleChange,
+                             "带里什么都没变 ⇒ 探针坏了，两臂结论都不成立")
+        XCTAssertGreaterThanOrEqual(sameSpan, Self.minimumTransitionFrames,
+                                    "产品每次插行后都跟着写选中；写的是同一个选中就把行动画吃掉了 ⇒ ① 在真实调用点上是死的")
+        XCTAssertLessThanOrEqual(movedSpan, 1,
+                                 "选中变了却仍然读到 \(movedSpan) 帧在动：AppKit 的行为变了。"
+                                 + "先确认这不是探针误读，再把'方向键也做动画'重新评估")
     }
 
     // MARK: - 骨架扫光（M9）
@@ -416,7 +451,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// 这里再框一块，框错的代价反而是把一条真的在扫的动画读成"没动" ——
     /// 第一版就是这样（条带位置与分带的 y 翻转对不上，读到 0.000，
     /// 差点把结论写成"这把尺看不见渐变"，见 `testTheRulerSeesAStateDrivenSwiftUIUpdate` 的对照臂）。
-    func testSkeletonSweepActuallySweeps() throws {
+    func testSkeletonSweepActuallySweeps() async throws {
         try skipUnlessEnabledAndCapable()
         let probe = SkeletonProbe()
         let runningFrames = probe.record(reduceMotion: false)
@@ -425,6 +460,7 @@ final class MotionFilmstripTests: XCTestCase {
         let stopped = Self.deltas(probe.record(reduceMotion: true))
         print("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
         print("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
+        try await requireObservableMotion()
         XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
                              "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
         XCTAssertGreaterThanOrEqual(Self.transitionFrameCount(running), Self.minimumTransitionFrames,
@@ -453,6 +489,46 @@ final class MotionFilmstripTests: XCTestCase {
         let gradient = StateTickProbe().record(gradient: true)
         let gradientFractions = Self.deltas(gradient)
         print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+    }
+
+    /// **这台机器能不能观察到"一次状态变更被分摊到几帧"** —— 用一个已知该动的视图问一次，缓存下来。
+    ///
+    /// 为什么需要：CI 的无头 runner 不绘制 SwiftUI 内容（82 帧里那两帧 95% 空白是既有事实），
+    /// 于是"读不到动"有两种可能 —— 产品没动，或者这台机器看不见动。**把后者判成前者，
+    /// 就是拿探针的故障当被测系统的故障**（账本里记过整族）。
+    /// 所以新加的三条像素判据都先问这一句：问不出来就 `MOTION_NOT_RUN=` + skip，
+    /// 而不是红，也不是绿。数字仍然先打出来，日志里永远有读数可查。
+    private func requireObservableMotion() async throws {
+        if let cached = Self.motionIsObservable {
+            try XCTSkipIf(!cached, "MOTION_NOT_RUN=runner-cannot-observe-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
+            return
+        }
+        let control = Self.deltas(StateTickProbe().record())
+        let observable = Self.peak(control) > Self.minimumVisibleChange
+        Self.motionIsObservable = observable
+        if !observable {
+            print("MOTION_NOT_RUN=runner-cannot-observe-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control)))")
+        }
+        try XCTSkipIf(!observable, "MOTION_NOT_RUN=runner-cannot-observe-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
+    }
+
+    /// 对照臂本身：**已知该动的东西必须动**。
+    /// 它同时是上面那句 `requireObservableMotion` 的判据来源，所以它不 skip、只报数；
+    /// 但如果这台机器连它都看不见，那结论只能是"测不了"（skip），不是"产品全坏了"。
+    func testTheRulerSeesAStateDrivenSwiftUIUpdate() async throws {
+        try skipUnlessEnabledAndCapable()
+        let frames = StateTickProbe().record()
+        let fractions = Self.deltas(frames)
+        print("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
+        let gradient = StateTickProbe().record(gradient: true)
+        let gradientFractions = Self.deltas(gradient)
+        print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+        let observable = Self.peak(fractions) > Self.minimumVisibleChange
+        Self.motionIsObservable = observable
+        try XCTSkipUnless(observable,
+                          "MOTION_NOT_RUN=runner-cannot-observe-motion：每 50ms 换文字 + 平移方块都量不到 ⇒ 这把尺在这台机器上看不见 @State 驱动的位移")
+        XCTAssertGreaterThan(Self.transitionFrameCount(fractions), Self.minimumTransitionFrames,
+                             "看得见变化但只分摊到一帧 ⇒ 这个视图的时钟没在跑，`requireObservableMotion` 会跟着失效")
     }
 
     // MARK: - 场景
@@ -830,6 +906,64 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
         table.insertRows(at: IndexSet(integer: 2), withAnimation: animation)
         let deadline = Date().addingTimeInterval(2.0)
         while !grabber.finished, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
+            grabber.tick()
+        }
+        lastStamps = grabber.stamps
+        return grabber.frames
+    }
+
+    /// 产品形状的那一拍：`rebuildRows()` 插完行之后，`queryChanged` 紧跟着会做
+    /// `selectRowIndexes` + `scrollRowToVisible`（`selectCurrentRow()` 那两句）。
+    /// 这一臂回答一个问题：**那两句会不会把刚起的行动画吃掉。**
+    ///
+    /// 答案是"看选中有没有真的变"：
+    /// - `selectionChanges: true`（写一个别的行）⇒ 行动画被吃掉（1 对，峰值 0.129）；
+    /// - `selectionChanges: false`（打字时的真实形状：下标恒为 0，写的是**同一个**行）
+    ///   ⇒ 动画活着（11 对，峰值 0.028，和完全不写选中一样）。
+    /// 也就是说产品不需要为此改代码：AppKit 自己短路了重复的选中写入。
+    /// 而"把它推到下一拍"和 `CATransaction.setDisableActions(true)` 两条都**救不回来**
+    /// （各臂数字见 D-056），所以那两条路都没走。
+    func recordProductSequence(selectionChanges: Bool) -> [CGImage] {
+        texts = (1...6).map { "探针记录 \($0)：一行用来观察淡入的文字" }
+        let target = selectionChanges ? 4 : 0
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 300),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let table = NSTableView()
+        table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("probeColumn")))
+        table.headerView = nil
+        table.rowHeight = 34
+        table.backgroundColor = .clear
+        table.dataSource = self
+        table.delegate = self
+        let scroll = NSScrollView()
+        scroll.documentView = table
+        scroll.hasVerticalScroller = false
+        window.contentView = scroll
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.45))
+        // 起点必须已经是选中第 0 行 —— 否则"写同一个选中"这一臂就不成立
+        // （从"没选中"到"选中 0"本身就是一次真的选中变化）。
+        table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        let grabber = Grabber(view: scroll, limit: 400)
+        let prerollDeadline = Date().addingTimeInterval(0.15)
+        while grabber.ticks < 3, Date() < prerollDeadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
+            grabber.tick()
+        }
+        texts.insert("刚插进来的一行：它该淡入而不是把别人挤一下就算完", at: 2)
+        table.insertRows(at: IndexSet(integer: 2), withAnimation: .effectFade)
+        table.selectRowIndexes(IndexSet(integer: target), byExtendingSelection: false)
+        table.scrollRowToVisible(target)
+        let deadline = Date().addingTimeInterval(2.5)
+        while !grabber.finished, Date() < deadline {
+            // 与 `record(animation:)` **同一个采样节奏**：两臂要能横比，
+            // 否则"帧对少了"可能只是"每帧更长了"。
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }

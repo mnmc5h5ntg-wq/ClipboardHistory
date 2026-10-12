@@ -102,6 +102,14 @@ EXPECT = {
          (r"cp \S+ /tmp/motion\.log &", "( cp FAKE_LOG /tmp/motion.log; sleep 1 ) &")]),
     # 结论行丢了 MOTION_SUMMARY 时（比如抽取失手）这一格要红：它保证"跑过"和"读出内容"是两件事
     ("motion", "summary_missing_from_log"): (NORMAL, ["motion suite exit:", "无 MOTION_SUMMARY"], 0, []),
+    # 红必须可解释：只有 "exit 1" 的一步等于没有这一步（本轮 run 38256846956 就是这个形状）。
+    # 所以给它一份"有一条判据红了 + 各条读数都在"的日志，要求两样都出现在结论里。
+    ("motion", "failing_test_names"): (
+        MOTION_NORMAL
+        + "MOTION_NATIVE row-insert 开 帧数=11 峰值=0.042 采样≈9ms\n"
+        + "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]'"
+          " failed (0.123 seconds).\n",
+        ["motion suite exit:", "MOTION_NATIVE", "testSkeletonSweepActuallySweeps"], 0, []),
 }
 
 
