@@ -156,16 +156,19 @@ jobs:
           wait "$pid" && status=0 || status=$?
           kill "$killer" 2>/dev/null || true
           summary=$(grep -m1 'MOTION_SUMMARY' /tmp/motion.log || true)
+          # 绿不等于"验到了"：R2 之后每条过渡判据都会报"这次到底判了几条、哪几条是 not-run"。
+          # 少了这一行，一次"3/3 全绿"和一次"1/3 有内容"在 CI 上长得一模一样。
+          resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log || true)
           executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/motion.log | tail -1 | grep -oE '[0-9]+' || true)
           strips=$(find /tmp/motion-ci -name '*-strip.png' 2>/dev/null | wc -l | tr -d ' ' || true)
-          echo "motion suite exit: $status  executed: ${executed:-0}  胶片: ${strips:-0}  ${summary:-无 MOTION_SUMMARY}"
+          echo "motion suite exit: $status  executed: ${executed:-0}  胶片: ${strips:-0}  ${summary:-无 MOTION_SUMMARY}  ${resolve:-无 MOTION_RESOLVE_SUMMARY（旧版判据：不知道今天判了几条）}"
           # 红要能读：**只有退出码的红等于没有红**。这一步是报告型，如果它只留下
           # "motion suite exit: 1"，下一次没人知道是哪条判据红、读数是多少（本轮 run 38256846956
           # 就是这个形状：exit 1 / executed 12，日志里一个数字都没有）。
           # 所以固定把两样东西打出来：① 各条判据自己的读数；② 红的那几条的名字。
           # `|| true` 是必需的：grep 没匹配就是 1，而 run 默认 `bash -e`（同一步里已经栽过三次）。
           echo "---- 动效读数 ----"
-          grep -E "MOTION_(SUMMARY|NATIVE|SHIMMER|SEQUENCE|CONTROL|CUT|DETAIL|AB|BLANK|SETTLE|SYMBOL|NOT_RUN)" /tmp/motion.log | head -24 || true
+          grep -E "MOTION_(SUMMARY|RESOLVE_SUMMARY|NATIVE|SHIMMER|SEQUENCE|CONTROL|CUT|DETAIL|AB|BLANK|SETTLE|SYMBOL|NOT_RUN)" /tmp/motion.log | head -24 || true
           echo "---- 红的用例 ----"
           # 两级过滤而不是一个 ERE：macOS 的 BSD grep 里 `]`（以及 `\]`）在 ERE 中不可靠 ——
           # `test[A-Za-z]+'\] failed` 对着真实那行返回 0 命中，而 `grep -F "]' failed"` 命中。

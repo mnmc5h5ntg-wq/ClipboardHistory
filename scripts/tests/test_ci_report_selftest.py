@@ -68,7 +68,9 @@ NORMAL = ("Test Suite 'All tests' passed\n"
 
 # 动效那一步的结论行必须带上 MOTION_SUMMARY 本体（报告 MC-8 的要点：正文要能被读出来），
 # 所以夹具里给它一份"跑完了并且报了三个数"的日志。
-MOTION_NORMAL = NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n"
+MOTION_NORMAL = (NORMAL
+                 + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n"
+                 + "MOTION_RESOLVE_SUMMARY judged=3/3 not-run=-\n")
 
 # (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)
 #
@@ -93,7 +95,8 @@ EXPECT = {
         TRUNCATED, ["ui suite exit:", "没有跑完"], 0,
         [(r"\( sleep 240; kill -9 \"\$pid\" 2>/dev/null \) &", "( exit ) &"),
          (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
-    ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY"], 0, []),
+    ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY",
+                                           "MOTION_RESOLVE_SUMMARY"], 0, []),
     # 看门狗收掉进程 ⇒ 必须走 "MOTION_NOT_RUN" 那一支并且退出码 0（报告型不挡发布）
     ("motion", "truncated_log"): (TRUNCATED, ["motion suite exit:", "MOTION_NOT_RUN"], 0, []),
     ("motion", "watchdog_already_exited"): (
@@ -102,6 +105,11 @@ EXPECT = {
          (r"cp \S+ /tmp/motion\.log &", "( cp FAKE_LOG /tmp/motion.log; sleep 1 ) &")]),
     # 结论行丢了 MOTION_SUMMARY 时（比如抽取失手）这一格要红：它保证"跑过"和"读出内容"是两件事
     ("motion", "summary_missing_from_log"): (NORMAL, ["motion suite exit:", "无 MOTION_SUMMARY"], 0, []),
+    # R2 新增的形状：有 MOTION_SUMMARY 但没有"今天判了几条" ⇒ 结论行必须自己喊出来。
+    # 少这一格，"判据悄悄退化成只判一条"在 CI 上是看不见的。
+    ("motion", "resolve_missing_from_log"): (
+        NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n",
+        ["motion suite exit:", "MOTION_SUMMARY", "无 MOTION_RESOLVE_SUMMARY"], 0, []),
     # 红必须可解释：只有 "exit 1" 的一步等于没有这一步（本轮 run 38256846956 就是这个形状）。
     # 所以给它一份"有一条判据红了 + 各条读数都在"的日志，要求两样都出现在结论里。
     ("motion", "failing_test_names"): (
