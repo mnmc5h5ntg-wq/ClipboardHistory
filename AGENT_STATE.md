@@ -396,3 +396,21 @@ CI runner 是 1×，"编码后严格大于点尺寸"立刻红。已在 `d160b52`
 - 未覆盖：Switch Control 那一格（无公开 API）；设置页/菜单栏两处淡入没有各自的像素判据
   （机制与已量到的三条同源）；500 条时那一次 56ms 帧仍未定位（M1 砍掉后动效不再随条目数增长）；
   macOS 12/13 全档未跑（本机 27、CI 15）。
+
+
+## 2026-10-12 17:13 换装：新版已装到 /Applications 并在跑（HEAD `b4ee260`）
+
+- 用户要求"以后要手动运行检测都这么干"：需要真机验收的判据由我构建+换装+跑起来，不让他自己编。
+- 已装：universal 包，二进制 sha `aaa032b463dfc13b…`；**版本号仍是 1.4.8**（自上次发布没 bump），
+  所以"是哪一版"按 sha 与 HEAD 认，不要看 About 框。
+- 旧包（`14f2f079…`）移到 `~/Documents/Codex_Project0_backups/before-motion-round-20261012-171308/`，没删。
+- 证据链：`SMOKE_OK=1`（先退出旧版才拿得到，见下）→ staged 与 installed sha 相同 →
+  `codesign --verify --deep --strict` 通过 → 新 pid 44938、启动时刻晚于安装、`lsof` 的 txt 指向
+  `/Applications/…` → 存档 85 条未减少 → `DiagnosticReports` 无新崩溃。
+- 流程已固化成 **`scripts/install_local.sh`** + 4 条自检（`scripts/tests/test_install_local.py`）：
+  默认 dry-run、`--yes` 才动、失败自动回滚；沙箱三条判据（预检不过不许动现场 /
+  sha 必须相等 / **回滚回来的必须与新包内容可分辨**）都真跑过。脚本 68 条自检全过。
+- 三个坑写进了脚本注释与长期记忆：① 冒烟闸门必须排在退出旧版之后（守卫按 bundleIdentifier
+  找第二实例，否则假报 `SMOKE_OK=0`）；② 活着的 App 随时写存档，"逐字节相同"不是有效判据，
+  改判"条数只增不减"；③ CJK 路径在 `ps`/`lsof` 里是转义输出，别直接喂给 `shasum`。
+- 交给用户的只剩人眼判据：批次 8 的 9 条（本轮新增一条往返测试由用户自己点：复制一次看历史长没长）。
