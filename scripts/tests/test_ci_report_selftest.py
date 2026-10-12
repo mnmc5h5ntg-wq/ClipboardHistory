@@ -30,19 +30,33 @@ CI_DEFAULT = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 STEPS = {
     "offscreen": "Offscreen frame capture (report-only)",
     "onscreen": "On-screen interaction probes (report-only)",
+    "motion": "Motion filmstrip (report-only)",
 }
 
 # 被测命令 → 夹具。命中次数必须恰好 1，否则说明 ci.yml 改了写法、夹具已经失效。
 SUBSTITUTIONS = {
     "offscreen": [
+        # 被测命令现在多了一段真过滤器（`| sed '/Unrecognized colorspace number/d' | tee frames.log`）。
+        # 夹具因此只替到 **raw 那一层**：让 ci.yml 里那段 sed 真的跑起来，
+        # 否则改了过滤器而自检还在测旧形状，噪声回归时没人会红。
         (r"CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \\\n\s*"
-         r"swift test --filter UICaptureTests 2>&1 \| tee /tmp/frames\.log \|\| true",
-         "cp FAKE_LOG /tmp/frames.log || true"),
+         r"swift test --filter UICaptureTests 2>&1 \| tee /tmp/frames-raw\.log"
+         r" \| sed '/Unrecognized colorspace number/d' \| tee /tmp/frames\.log",
+         # 整段管道一起替掉，但**把那段 sed 原样搬进夹具**：只替前半截会让
+         # /tmp/frames.log 根本不生成（实测第一次就是这么红的），而"过滤器仍在链上"
+         # 正是这次改动唯一需要被证明的事。
+         "cp FAKE_LOG /tmp/frames-raw.log"
+         "; sed '/Unrecognized colorspace number/d' /tmp/frames-raw.log | tee /tmp/frames.log"),
     ],
     "onscreen": [
         (r"CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \\\n\s*"
          r"swift test --filter UIInteractionProbeTests > /tmp/ui\.log 2>&1 &",
          "cp FAKE_LOG /tmp/ui.log &"),
+    ],
+    "motion": [
+        (r"CLIPBOARD_HISTORY_UI_MOTION=1 CLIPBOARD_HISTORY_MOTION_OUT=/tmp/motion-ci \\\n\s*"
+         r"swift test --filter MotionFilmstripTests > /tmp/motion\.log 2>&1 &",
+         "cp FAKE_LOG /tmp/motion.log &"),
     ],
 }
 
@@ -51,6 +65,10 @@ SINGULAR = ("Test Suite 'UICaptureTests' failed\n"
 TRUNCATED = "Test Case '-[p probeA]' started.\n"
 NORMAL = ("Test Suite 'All tests' passed\n"
           "\t Executed 12 tests, with 3 tests skipped and 0 failures (0 unexpected) in 4.0 (4.1) seconds\n")
+
+# 动效那一步的结论行必须带上 MOTION_SUMMARY 本体（报告 MC-8 的要点：正文要能被读出来），
+# 所以夹具里给它一份"跑完了并且报了三个数"的日志。
+MOTION_NORMAL = NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n"
 
 # (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)
 #
@@ -75,6 +93,15 @@ EXPECT = {
         TRUNCATED, ["ui suite exit:", "没有跑完"], 0,
         [(r"\( sleep 240; kill -9 \"\$pid\" 2>/dev/null \) &", "( exit ) &"),
          (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
+    ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY"], 0, []),
+    # 看门狗收掉进程 ⇒ 必须走 "MOTION_NOT_RUN" 那一支并且退出码 0（报告型不挡发布）
+    ("motion", "truncated_log"): (TRUNCATED, ["motion suite exit:", "MOTION_NOT_RUN"], 0, []),
+    ("motion", "watchdog_already_exited"): (
+        TRUNCATED, ["motion suite exit:", "MOTION_NOT_RUN"], 0,
+        [(r"\( sleep 200; kill -9 \"\$pid\" 2>/dev/null \) &", "( exit ) &"),
+         (r"cp \S+ /tmp/motion\.log &", "( cp FAKE_LOG /tmp/motion.log; sleep 1 ) &")]),
+    # 结论行丢了 MOTION_SUMMARY 时（比如抽取失手）这一格要红：它保证"跑过"和"读出内容"是两件事
+    ("motion", "summary_missing_from_log"): (NORMAL, ["motion suite exit:", "无 MOTION_SUMMARY"], 0, []),
 }
 
 
