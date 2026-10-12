@@ -178,14 +178,26 @@ final class MotionFilmstripTests: XCTestCase {
     /// - 真过渡的"还在变"时间最少 `d − 2s`（首、末各可能错开一个采样）；
     /// - 一次跳变的只有 `s`。
     /// 要"真过渡必判绿、跳变必判红"就要 `d − 2s ≥ 0.4d` 且 `s < 0.4d` ⇒ **`s ≤ 0.3d` 时两条同时成立**。
-    /// 所以 `s > 0.3d` 是这把尺在事件这一段根本没有分辨率 ⇒ 报 `.clockTooCoarse`，
+    /// 所以 `s > 0.3d` 时改用"至少两帧在变"这一档（见下），`s > 0.5d` 才报 `.clockTooCoarse`，
     /// 既不判红也不判绿（把尺子的盲区写成产品缺陷，和写成"已交付"一样是假证据）。
     static func judgeMotion(elapsedMilliseconds: Double,
                            worstIntervalMilliseconds: Double,
-                           declaredDurationMilliseconds: Double) -> MotionVerdict {
+                           declaredDurationMilliseconds: Double,
+                           changedFrames: Int) -> MotionVerdict {
         guard declaredDurationMilliseconds > 0, worstIntervalMilliseconds > 0 else { return .clockTooCoarse }
-        guard worstIntervalMilliseconds <= 0.3 * declaredDurationMilliseconds else { return .clockTooCoarse }
-        return elapsedMilliseconds >= 0.4 * declaredDurationMilliseconds ? .transition : .jump
+        let duration = declaredDurationMilliseconds
+        if worstIntervalMilliseconds <= 0.3 * duration {
+            return elapsedMilliseconds >= 0.4 * duration ? .transition : .jump
+        }
+        if worstIntervalMilliseconds <= 0.5 * duration {
+            // 中间档（R8 的 CI 把这一档逼出来的）：一次跳变只占 1 帧，而这段过渡至少占 2 帧
+            // ⇒ **在这一点上帧数是够用的判别量**，不必因为时钟稍粗就放弃判定。
+            // runner 实测事件内 ~55ms 一帧、声明 160ms ⇒ 三个场景全掉进这里，
+            // 只有一档判据时 `judged` 从 3/3 掉到 0/3，而覆盖率闸门如实报红。
+            // 那一轮的选择是**把中间档判起来**，不是把闸门放松。
+            return changedFrames >= 2 ? .transition : .jump
+        }
+        return .clockTooCoarse
     }
 
     enum MotionVerdict {
@@ -361,7 +373,8 @@ final class MotionFilmstripTests: XCTestCase {
             XCTAssertEqual(worst, 45, accuracy: 1, "事件内最粗采样 = 45ms")
             XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: elapsed,
                                             worstIntervalMilliseconds: worst,
-                                            declaredDurationMilliseconds: 160), .transition,
+                                            declaredDurationMilliseconds: 160,
+                                            changedFrames: 3), .transition,
                            "\(name)：两种相位都必须判成「过渡在演」")
         }
 
@@ -372,27 +385,47 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(jumpElapsed, 45, accuracy: 1, "跳变的「变化段」就是一个采样的长度")
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: jumpElapsed,
                                         worstIntervalMilliseconds: jumpWorst,
-                                        declaredDurationMilliseconds: 160), .jump,
+                                        declaredDurationMilliseconds: 160,
+                                        changedFrames: 1), .jump,
                        "45ms 的变化段对 160ms 的声明 ⇒ 必须判成跳变，否则这条判据没有判别力")
         // 门槛之下：63ms 的变化段（160ms 声明、时钟 45ms）仍然算没演完。
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 63, worstIntervalMilliseconds: 45,
-                                        declaredDurationMilliseconds: 160), .jump)
+                                        declaredDurationMilliseconds: 160, changedFrames: 1), .jump)
         // 边界：s = 0.3d 时真过渡的最坏读数 d−2s 正好等于 0.4d ⇒ 判据在边界上仍然自洽
         //（"真过渡必过、跳变必红"这两个要求同时成立的那个点）。
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 64, worstIntervalMilliseconds: 48,
-                                        declaredDurationMilliseconds: 160), .transition)
+                                        declaredDurationMilliseconds: 160, changedFrames: 3), .transition)
         XCTAssertNotEqual(Self.judgeMotion(elapsedMilliseconds: 48, worstIntervalMilliseconds: 48,
-                                           declaredDurationMilliseconds: 160), .transition,
+                                           declaredDurationMilliseconds: 160, changedFrames: 1), .transition,
                          "跳变的最坏读数（=s）不许过线")
-        // 时钟太粗 ⇒ 无从判定，既不判红也不判绿。
+        // MARK: R8 —— 三档。CI 实测把这条逼出来的：runner 事件内 ~55ms 一帧，
+        // 三个场景全掉进中间档，`judged` 从 3/3 掉到 **0/3**，新加的覆盖率闸门如实报红。
+        // 中间档（0.3d < s ≤ 0.5d）：跳变 1 帧、过渡至少 2 帧 ⇒ 帧数在这里够用。
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, worstIntervalMilliseconds: 55,
+                                        declaredDurationMilliseconds: 160, changedFrames: 3), .transition,
+                       "CI 那档时钟必须仍然判得出东西，否则覆盖率闸门会长期红着")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 55, worstIntervalMilliseconds: 55,
+                                        declaredDurationMilliseconds: 160, changedFrames: 1), .jump,
+                       "中间档里的一帧跳变仍然要红")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, worstIntervalMilliseconds: 55,
+                                        declaredDurationMilliseconds: 160, changedFrames: 0), .jump,
+                       "变化帧数读成 0 却报绿 ⇒ 中间档没有地板")
+        // 细时钟档：只看时长，帧数不参与 ⇒ 相位翻脸抓不住它
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 135, worstIntervalMilliseconds: 45,
+                                        declaredDurationMilliseconds: 160, changedFrames: 2), .transition,
+                       "细时钟下 2 帧也判绿：这一档看的是时长不是帧数")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 45, worstIntervalMilliseconds: 45,
+                                        declaredDurationMilliseconds: 160, changedFrames: 2), .jump,
+                       "时长不够就红，哪怕帧数到了 2")
+        // 太粗档（s > 0.5d）⇒ 无从判定，既不判红也不判绿。
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 200, worstIntervalMilliseconds: 100,
-                                        declaredDurationMilliseconds: 160), .clockTooCoarse,
+                                        declaredDurationMilliseconds: 160, changedFrames: 3), .clockTooCoarse,
                        "事件那一段 100ms 一帧、整段过渡只有 160ms ⇒ 是尺子看不见，不是产品没动")
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 0,
-                                        declaredDurationMilliseconds: 160), .clockTooCoarse,
+                                        declaredDurationMilliseconds: 160, changedFrames: 3), .clockTooCoarse,
                        "时钟没测到 ⇒ 不能当成「无限细」往下判")
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 30,
-                                        declaredDurationMilliseconds: 0), .clockTooCoarse,
+                                        declaredDurationMilliseconds: 0, changedFrames: 3), .clockTooCoarse,
                        "没声明时长就没有门槛可言")
         // 整段没有一次可见变化 ⇒ 两个读数都必须 nil（调用方报 not-run，不许判绿）。
         let idleFractions: [Double] = [0.0, 0.001, 0.0, 0.001, 0.0, 0.0]
@@ -509,7 +542,8 @@ final class MotionFilmstripTests: XCTestCase {
             }
             switch Self.judgeMotion(elapsedMilliseconds: elapsed,
                                     worstIntervalMilliseconds: worstInRun,
-                                    declaredDurationMilliseconds: scenario.declaredDurationMilliseconds) {
+                                    declaredDurationMilliseconds: scenario.declaredDurationMilliseconds,
+                                    changedFrames: span) {
             case .clockTooCoarse:
                 notRun.append(scenario.name)
                 print("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "

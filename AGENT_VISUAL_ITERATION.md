@@ -504,3 +504,16 @@ R5 审计里设置窗口那 50 个位点，本轮动的是**已经核实过的**
 
 **连续五轮 ≥90 达成**：R4 90 → R5 91 → R6 92 → R7 93 → R8 93，且无新增 P0/P1 回归
 （已知的两条红是 `testSidebarListFocusRingAfterClick` 与帧间隔 p95，都是本轮之前就在账上的门控判据）。
+
+
+### R8b（同轮补丁）· 覆盖率闸门第一次跑就红，红的是真相
+
+R7 加的 `Motion coverage floor` 在 CI 上把 main 判红了：`judged=0/3`。
+根因不是脚本，是 **CI 抓帧在事件那一段 ~55–62ms 一帧**，超过 R5 判据要求的
+`s ≤ 0.3d = 48ms` ⇒ 三个场景全部 `.clockTooCoarse`，`MOTION_SUMMARY 3/3/3` 底下
+其实一条都没判。放松闸门 = 把判据改成能过，**不做**；改成三档判据
+（细档看时长、中间档看"帧数地板 2"、`s > 0.5d` 才报 not-run），
+本机 `judged` 1/3 → **2/3**，CI 0/3 → 2–3/3，闸门一格没松。
+M8 重跑仍 CAUGHT（`过渡帧数=1 变化段时长=43ms`），真值表补中间档三格。
+验证：632 tests / 24 skipped / 0 failures；动效套件 20 / 4 / 0；0 warning；82 帧 `CHANGED=0`；
+`scripts/tests` 72 passed。账见 **D-067**。

@@ -2247,3 +2247,33 @@ R7 的 M15（`contains("applyEmptyState()")` 被函数定义行白拿）之后�
 
 数字：632 tests / 24 skipped / 0 failures（+3）；0 warning；82 帧 `CHANGED=0`；
 `scripts/tests` 72 passed；变异 4/4 CAUGHT。视觉账见 **U-29**。
+
+
+## D-067 R8b：R7 的覆盖率闸门把 CI 判红了，红的是真相
+
+R7 的 `Motion coverage floor` 在 CI 上第一次跑就 **红**：
+`MOTION_RESOLVE_SUMMARY judged=0/3 not-run=notice-banner,detail-kind-change,empty-state`。
+不是脚本坏了 —— 三个场景在 runner 上**全都判不了**：
+CI 抓帧在事件那一段是 ~55–62ms 一帧，而 R5 的判据要求 `s ≤ 0.3d = 48ms` 才有分辨率，
+于是全部落到 `.clockTooCoarse`，`MOTION_SUMMARY` 明明写着 `3 / 3 / 3` 却没有一条被判定。
+（同一条日志里 `MOTION_RESOLVE_SUMMARY` 那行就是为这一刻准备的 —— 没有它，
+这一步会显示"动效判据全绿"，而实际上什么都没判。）
+
+**两条路摆着**：把闸门放松（`judged < 1` 才红），或者让中间那档也能判。
+第一条就是把判据改成能过，**不做**。选了第二条：
+
+三档判据（`judgeMotion` 现在多一个 `changedFrames` 参数）：
+- `s ≤ 0.3d` ⇒ 看**时长**：`elapsed ≥ 0.4d` 才算演（相位无关，最准，本机走这档）；
+- `0.3d < s ≤ 0.5d` ⇒ 看**帧数地板 2**：一次跳变只占 1 帧，而这段过渡至少占 2 帧，
+  所以在这一档帧数是**够用**的判别量（CI 走这档）；
+- `s > 0.5d` ⇒ 真的无从分辨 ⇒ `.clockTooCoarse`，报 not-run。
+
+推导写在函数注释里。效果：本机 `judged` 从 1/3 回到 **2/3**（`detail-kind-change` 转正），
+CI 从 0/3 回到 2–3/3，而**闸门一格都没放松**。
+判别力重测：产品级变异 **M8 仍然 CAUGHT**（摘掉侧栏空态驱动 ⇒
+`过渡帧数=1 变化段时长=43ms`，细档里 `43 < 64` ⇒ 红）；
+真值表补了中间档三格（`changedFrames=1` 必须红、`=0` 必须红、`=3` 必须绿）。
+
+**这一条值得单独记账的原因**：它证明这道闸门不是装饰。
+一个"从来不会红的闸"和一条 echo 没有区别 —— R7 加的闸第一跑就红，
+而红指向的是一个真实的覆盖空洞（旧判据在 CI 上一直在**假装**判定）。
