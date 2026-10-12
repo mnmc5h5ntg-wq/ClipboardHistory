@@ -41,14 +41,17 @@ jobs:
         working-directory: ClipboardHistory
         run: |
           set -o pipefail
-          # 先落一份原始日志，再把那条 colorspace 噪声从**进 CI 日志的那一路**里删掉。
-          # 为什么这一行值得存在：无头 runner 上每次绘制图片都会打一条
-          # `Unrecognized colorspace number -1`，一次 `swift test` 刷出两万多行，
-          # 把整份 job 日志撑到**下载不下来**（实测：`gh api .../jobs/<id>/logs` 每次都断在
-          # 第 1 分钟，于是后面几步——包括唯一的动效像素闸——的正文永远读不到）。
+          # 先落一份原始日志，再把 colorspace 那一族噪声从**进 CI 日志的那一路**里删掉。
+          # 为什么这一行值得存在：无头 runner 上每绘制一次图片，AppKit 就往 stderr 打一条
+          # `Unknown number of components for colorspace model -1`。实测一次 `swift test`
+          # 的日志里 **23433 / 24054 行（97.4%）都是这一句**，于是 job 日志大到下载不下来 ——
+          # `gh api .../jobs/<id>/logs` 三次都断在第 1~1.5 分钟，后面几步（包括唯一的
+          # 动效像素闸）的正文根本够不着。上一版我按 `Unrecognized colorspace number` 过滤，
+          # 那是**同族的另一句**（本机上只出现 1 次），所以日志几乎没变小 —— 按现象猜词不行，
+          # 要按实测占比选词：这里按 `colorspace` 整族删。
           # 用 `sed /…/d` 而不是 `grep -v`：后者在"所有行都被过滤掉"时返回 1，
           # 而 `set -o pipefail` + `bash -e` 会让整步当场中止，`PIPESTATUS` 那一行根本轮不到跑。
-          swift test 2>&1 | tee /tmp/test-raw.log | sed '/Unrecognized colorspace number/d' | tee /tmp/test.log
+          swift test 2>&1 | tee /tmp/test-raw.log | sed '/colorspace/d' | tee /tmp/test.log
           status=${PIPESTATUS[0]}
           echo "swift test exit: $status"
           echo "dropped-noise-lines: $(( $(wc -l < /tmp/test-raw.log) - $(wc -l < /tmp/test.log) ))"
@@ -78,7 +81,7 @@ jobs:
           # `|| true` 是必需的：`swift test` 非零（例如某帧被"捕获失效"闸门锁住）不该让
           # 后面的汇报行整段不执行 —— 那等于这一步又变成"红了但没有数字"。
           CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
-            swift test --filter UICaptureTests 2>&1 | tee /tmp/frames-raw.log | sed '/Unrecognized colorspace number/d' | tee /tmp/frames.log || true
+            swift test --filter UICaptureTests 2>&1 | tee /tmp/frames-raw.log | sed '/colorspace/d' | tee /tmp/frames.log || true
           frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ' || true)
           # 每一条抽取都必须自己吞掉非零：`bash -e` + `set -o pipefail` 下，
           # **汇报行自己的 grep 失手**也会中止脚本（实测 run 38062956819：runner 上 XCTest 只打了

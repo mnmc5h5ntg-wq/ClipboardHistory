@@ -41,12 +41,12 @@ SUBSTITUTIONS = {
         # 否则改了过滤器而自检还在测旧形状，噪声回归时没人会红。
         (r"CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \\\n\s*"
          r"swift test --filter UICaptureTests 2>&1 \| tee /tmp/frames-raw\.log"
-         r" \| sed '/Unrecognized colorspace number/d' \| tee /tmp/frames\.log",
+         r" \| sed '/colorspace/d' \| tee /tmp/frames\.log",
          # 整段管道一起替掉，但**把那段 sed 原样搬进夹具**：只替前半截会让
          # /tmp/frames.log 根本不生成（实测第一次就是这么红的），而"过滤器仍在链上"
          # 正是这次改动唯一需要被证明的事。
          "cp FAKE_LOG /tmp/frames-raw.log"
-         "; sed '/Unrecognized colorspace number/d' /tmp/frames-raw.log | tee /tmp/frames.log"),
+         "; sed '/colorspace/d' /tmp/frames-raw.log | tee /tmp/frames.log"),
     ],
     "onscreen": [
         (r"CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \\\n\s*"
