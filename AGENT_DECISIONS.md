@@ -2219,3 +2219,31 @@ R5 把过渡判据换成时长之后，本机 `judged` 从 2/3 掉到 1/3 ——
 数字：629 tests / 24 skipped / 0 failures（+6）；动效套件 20 / 4 / 0；0 warning；
 82 帧 `CHANGED=0`；`scripts/tests` 72 passed（CI 自检 18 形状）；变异 5/5 CAUGHT；
 `HistoryStore` 零改动。视觉账见 **U-28**。
+
+
+## D-066 R8：去重排序之后，"加了没生效"必须自己说清楚
+
+`CapturePolicy.encodeUserExcluded` 去重 + 排序 —— 这个决定本身是对的（存档不该长一堆重复项），
+但它的**后果**是设置页那台"添加"按钮有三种结局而界面一种都表达不出来：
+加进去了、本来就有、它属于系统默认排除项。第三种最坏 ——
+用户加 `com.apple.keychainaccess`，看到列表没变长，会得出"这功能没生效"，
+然后去做更危险的事（把整个采集暂停掉）。
+
+所以判定收进纯函数 `ExcludedAppListPolicy`：**六种结局各有话术，且没做成时不改存档、不清输入框**。
+`HistoryStore` 与 `CapturePolicy` 零改动（AGENTS.md：新特性先建 `*Policy`，Store 只留薄胶水）。
+与 R6 的 `ClearHistoryReceiptPolicy` 同一族：**做了什么要说，没做成更要说**。
+
+顺带把三处"突然出现、永不清空"的结果文案统一成 `ReceiptLine`（淡入 + × 收掉）。
+**自动消失刻意不做**，并写了一条反向判据（`M23`：装回自动收起会打红）挡住下一轮"顺手更贴心"。
+
+**同族第三课，这次是提前用上的**：R5 的 A7（`contains("content")` 被角色名 `.contentFade` 白拿）、
+R7 的 M15（`contains("applyEmptyState()")` 被函数定义行白拿）之后，
+本轮写名单行的过渡判据时**直接钉到 `ForEach(...)` 那一段里面**，
+没有用"整个文件含 `.transition(`"那种写法 —— 因为 `ReceiptLine` 自己也有一条，
+整文件写法必然放过它。`M21` 在钉住段里的版本上第一跑就 CAUGHT。
+**账要记准**：我没有跑过弱版本，所以不能写"弱版本被放过"；能说的是
+**同一个 needle 在文件里有两处命中时，整文件写法必然无效** —— 这条推论本身就是规矩：
+**源码守卫的命中面必须窄到"那一段、那一个位置"，并且每条都配一支"删掉它应当打红"的变异。**
+
+数字：632 tests / 24 skipped / 0 failures（+3）；0 warning；82 帧 `CHANGED=0`；
+`scripts/tests` 72 passed；变异 4/4 CAUGHT。视觉账见 **U-29**。

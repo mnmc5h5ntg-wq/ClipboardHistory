@@ -112,6 +112,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   新增 `Motion coverage floor`：跑完了、有结论行、而 `judged < 2/3` ⇒ 红。
   它自己由 `scripts/tests/test_ci_report_selftest.py` 四个形状钉住，其中一格期望退出码 1。
 
+- **「不记录这些 App 的复制」不再让人猜**（视觉迭代 R8 / D-066 / U-29）：
+  存档编码会去重 + 排序，所以"加进去了 / 本来就有 / 它属于系统默认排除项"三种结局
+  以前在界面上一种都看不出来（输入框清空、列表没长 ⇒ 读成"我加的那条去哪了"）。
+  现在判定收进纯函数 `ExcludedAppListPolicy`，六种结局各给一句话，
+  没做成时不改存档也不清输入框；名单行的增删有过渡（这里是普通 `VStack`，不是 `List`）。
+- **三处结果文案统一成 `ReceiptLine`**：淡入 + 一个 × 自己收掉。
+  **刻意不做自动消失** —— 导出路径、导入条数、排除增删都是"你刚做那件事的结果"，
+  1.1 秒后自己没掉等于把信息拿走；这条决定由一支反向变异（M23）钉住。
+
 ### Changed
 
 - **撤掉 QuickPick 与主窗口的呼出动画**（M3/M10 定稿）：热键 / 每天上百次的入口按规范

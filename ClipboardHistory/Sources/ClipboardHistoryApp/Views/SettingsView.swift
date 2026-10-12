@@ -72,6 +72,10 @@ struct SettingsView: View {
     @State private var newExcludedBundleID = ""
     @AppStorage(OCRPolicy.modeKey) private var ocrModeRaw = OCRPolicy.StorageMode.persisted.rawValue
     @State private var exportMessage: String?
+    /// 「按 App 排除」名单增删的回执（R8 / 审计 B-P2）。
+    /// `encodeUserExcluded` 会去重 + 排序，所以"加了没变"有三种不同原因，
+    /// 而以前**一种都看不出来**：输入框清空、列表没长，用户读到的是"我加的那条去哪了"。
+    @State private var exclusionReceipt: String?
     @State private var showExportAlert = false
     @ObservedObject private var contextPreferences: ContextPreferenceSettings
     @ObservedObject private var weightsStore: RecommendationWeightsStore
@@ -398,27 +402,39 @@ struct SettingsView: View {
                                 Text(id)
                                 Spacer()
                                 Button("移除") {
-                                    excludedBundleIDsRaw = CapturePolicy.encodeUserExcluded(
-                                        Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)).filter { $0 != id }
-                                    )
+                                    let result = ExcludedAppListPolicy.remove(id, from: excludedBundleIDsRaw)
+                                    excludedBundleIDsRaw = result.raw
+                                    exclusionReceipt = result.receipt
                                 }
                                 .buttonStyle(.borderless)
                             }
+                            // 行会真的消失：这里不是 `List`（`List` 的行过渡在 macOS 上
+                            // 四种写法都跑不出来，账本 M1 / D-055），是普通 `VStack`，
+                            // 所以过渡**能**演 —— 前提是别只挂一臂（R5 的 A2 那一族）。
+                            .transition(MotionCatalog.transition(for: .contentFade))
                         }
                         HStack {
                             TextField("com.example.app", text: $newExcludedBundleID)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(maxWidth: 260)
                             Button("添加") {
-                                let id = newExcludedBundleID.trimmingCharacters(in: .whitespacesAndNewlines)
-                                guard !id.isEmpty else { return }
-                                excludedBundleIDsRaw = CapturePolicy.encodeUserExcluded(
-                                    Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)) + [id]
-                                )
-                                newExcludedBundleID = ""
+                                let result = ExcludedAppListPolicy.add(newExcludedBundleID,
+                                                                      to: excludedBundleIDsRaw)
+                                excludedBundleIDsRaw = result.raw
+                                exclusionReceipt = result.receipt
+                                // 只有真的加进去才清空输入框：
+                                // 没加成的时候把词留着，用户可以照着回执改。
+                                if case .added = result.outcome { newExcludedBundleID = "" }
                             }
                         }
+                        if let exclusionReceipt {
+                            ReceiptLine(text: exclusionReceipt) { self.exclusionReceipt = nil }
+                        }
                     }
+                    // 名单变长/变短要有过程，且**两臂共用这一条驱动**（键是那份持久化字符串，
+                    // 它只在增删时变 ⇒ 不是恒真键，见 `MotionDriverTests`）。
+                    .animation(MotionCatalog.animation(for: .contentFade),
+                               value: excludedBundleIDsRaw)
 
                     Divider()
 
@@ -484,9 +500,7 @@ struct SettingsView: View {
                     .buttonStyle(.bordered)
 
                     if let message = exportMessage {
-                        Text(message)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        ReceiptLine(text: message) { self.exportMessage = nil }
                     }
                 }
             }
@@ -533,10 +547,7 @@ struct SettingsView: View {
                         .disabled(importHistoryAction == nil)
                 }
                 if let archiveMessage {
-                    Text(archiveMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
                 }
             }
 
@@ -767,5 +778,34 @@ private struct CompatibleSplitView<Sidebar: View, Detail: View>: NSViewRepresent
         if let detailNSView = splitView.arrangedSubviews.last as? NSHostingView<Detail> {
             detailNSView.rootView = detail()
         }
+    }
+}
+
+/// 一行可以**自己关掉**的结果文案（R8 / 审计 B-P4 的那半条）。
+///
+/// 审计的原话是"突然出现、永不清空"。两半分开处理：
+/// - "突然" ⇒ 淡入（走目录，reduce-motion 由 `MotionCatalog` 统一退化）；
+/// - "永不清空" ⇒ 给一个 × 让用户自己收掉。
+/// **刻意不做自动消失**：这三条都是"你刚做的那件事的结果"（导出路径、导入条数、排除增删），
+/// 1.1 秒后自己没掉等于把信息拿走 —— 复制成功那种**瞬时回执**才适合自动收回（见 R5 的 A4）。
+private struct ReceiptLine: View {
+    let text: String
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(text)
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(action: dismiss) {
+                Image(systemName: "xmark.circle")
+                    .font(.system(size: VisualGlyph.badge))
+            }
+            .buttonStyle(.borderless)
+            .helpLabel("收起这条提示")
+        }
+        .transition(MotionCatalog.transition(for: .contentFade))
     }
 }
