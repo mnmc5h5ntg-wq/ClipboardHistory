@@ -1746,7 +1746,7 @@ D-055 那轮交付之后用户的反馈是**"感觉新的版本没加什么动�
 
 | 条目 | 处置 | 一句话理由 |
 |---|---|---|
-| ① QuickPick 候选行的原生行动画 | **做，并量到** | `List` 那条路死了不等于"行不能动"：这个浮层本来就是 `NSTableView`。`insertRows/removeRows(at:withAnimation:.effectFade)`，输入时候选增减有"被抽走/补进来"，整块文字不再闪 |
+| ① QuickPick 候选行的原生行动画 | **做，量到（带前提：进程必须处于激活态，否则判据自己报 not-run）** | `List` 那条路死了不等于"行不能动"：这个浮层本来就是 `NSTableView`。`insertRows/removeRows(at:withAnimation:.effectFade)`，输入时候选增减有"被抽走/补进来"，整块文字不再闪 |
 | ② 侧栏行内收藏星 / 固定图标的符号过渡 | **做，但量不到** | 代码接上了（`replacesSymbol` + `bounceValue`），而这把尺两臂读数**完全相同**（1 帧 / 峰值 0.190）。没有据此删代码 —— 那是拿尺子的盲区当产品的结论；改成一条"如果哪天量到了就把这条判据改成真的"的边界测试 |
 | ③ 收藏 / 固定的 `replace` + `bounce` 叠加 | **改**（D-055 删过头） | MC-12 的原话给了两个选项，我选了"只留 replace"，于是 14+ 上"状态被改了"那一下弹性没了。正确形状是**先 replace 再叠 bounce**，两者不互斥；复制那颗**故意不给** bounce（每天上百次的动作） |
 | ④a 详情预览骨架扫光（M9） | **做，并量到** | spinner 说"我在等"，骨架说"内容马上来"。报告 §12.5 的三案里选了**能被量到的那一案**（见下面"三臂"） |
@@ -1756,11 +1756,20 @@ D-055 那轮交付之后用户的反馈是**"感觉新的版本没加什么动�
 
 ### 三件实测（这一批真正值钱的部分）
 
-**① 原生行动画：开 11 帧 vs 关 1 帧。** 同一张表、同一批数据，只差 `rowAnimationOptions` 那两个取值：
-`.effectFade` 那臂逐帧读数摊到 11 帧（峰值 0.042、采样≈9ms ⇒ 约 100ms 的可见过程），
-空效果集那臂一帧到位（峰值 0.050）。**峰值同量级、帧数差 11 倍** —— 这正是"过渡"与"跳变"的区分，
-也是 D-055 分带归因那条规矩第一次在一个**新表面**上给出正向读数。
-判据：`MotionFilmstripTests.testNativeRowAnimationIsVisibleToTheRuler`。
+**① 原生行动画：开 11 帧 vs 关 1 帧 —— 但这个前提必须写在判据里。**
+同一张表、同一批数据，只差 `rowAnimationOptions` 那两个取值：`.effectFade` 那臂摊到 11 帧
+（峰值 0.042、采样≈9ms ⇒ 约 100ms 的可见过程），空效果集那臂一帧到位（峰值 0.050）。
+**峰值同量级、帧数差 11 倍** —— 这正是"过渡"与"跳变"的区分。
+
+但这条判据随后**自己变得测不到了**，原因值得记：`NSTableView` 的行动画只在**激活的 App** 里跑。
+本机同一天里两种读数都出现过 —— 拿到激活态时 11 帧，拿不到时 1 帧，而**总变化量一模一样**
+（峰值仍是 0.042），也就是"看起来像动画根本没写"。裸 `swift test` 进程能不能激活是不稳定的
+（试过 `NSApp.setActivationPolicy(.regular)` + 重试 1.5 秒，仍然 `isActive == false`），
+CI 那台 runner 则拿到了（开 3 帧 / 关 1 帧，采样≈30ms）。
+处置不是把门槛调低，而是**把前提写进判据**：探针记下抓取那一卷时 `NSApp.isActive`，
+拿不到就打印 `MOTION_NOT_RUN=app-not-active` 并 skip —— 环境没给前提，不许读成"产品没动"，
+也不许读成"已通过"。产品里这个前提天然成立：浮层本来就是 `makeKeyAndOrderFront` + `NSApp.activate`（D-041）。
+判据：`testNativeRowAnimationIsVisibleToTheRuler`、`testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt`。
 
 **④a 的取证走了一次弯路，值得记下来。** 我先后三次读到"整窗峰值 0.0000"
 （`repeatForever` 版、`@StateObject` + `Timer.scheduledTimer` 版、以及现在这版在亮带只抬 5 个点时），
@@ -1830,7 +1839,7 @@ macOS 的 BSD grep 里 ERE 的 `]` 与 `\]` 都不可靠 —— `test[A-Za-z]+'\
 
 ### 数字与边界
 
-589 tests / 23 skipped / 0 failures；两个 triple 各 0 warning；82 帧 `CHANGED=0`
+588 tests / 22 skipped / 0 failures；两个 triple 各 0 warning；82 帧 `CHANGED=0`
 （其中 `detail-2-file-{light,dark}` 两帧是这次刻意改的加载态，基线随包更新）；
 26 条新判据 = 22 条纯值/源码守卫（11 条行级更新计划 + 8 条骨架 + 3 条目录与光晕门控）
 + 4 条像素判据（QuickPick 行动画两臂、产品形状两臂、骨架扫光两臂、尺子对照两臂）；

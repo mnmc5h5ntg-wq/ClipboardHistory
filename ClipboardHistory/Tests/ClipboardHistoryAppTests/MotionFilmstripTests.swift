@@ -39,9 +39,9 @@ import XCTest
 final class MotionFilmstripTests: XCTestCase {
     private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_MOTION"] == "1"
 
-    /// `requireObservableMotion` 的缓存。`nonisolated(unsafe)` 是因为它是个一次性布尔，
-    /// 而且只在主线程的测试里读写（整个类是 `@MainActor`）。
-    nonisolated(unsafe) static var motionIsObservable: Bool?
+    /// `requireObservableMotion` 的缓存（每一类位移各一个判定）。
+    /// `nonisolated(unsafe)` 是因为它只在主线程的测试里读写（整个类是 `@MainActor`）。
+    nonisolated(unsafe) static var observableCache: [MotionClass: Bool] = [:]
 
     private var outDir: URL {
         let url = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_MOTION_OUT"]
@@ -395,8 +395,10 @@ final class MotionFilmstripTests: XCTestCase {
         let instantSpan = Self.transitionFrameCount(instant)
         print("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
         print("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
-        // 数字先打，再决定"是产品没动还是这台机器看不见"。
-        try await requireObservableMotion()
+        // 数字先打，再决定"是产品没动还是这台机器没给前提"。问的是**布局那一臂**：
+        // runner 上行动画量得到（3 帧），拿渐变那一臂去问会把它一起 skip 掉。
+        try await requireObservableMotion(.layout)
+        try requireAppWasActive(probe.wasActive)
         XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
                              "带里什么都没变 ⇒ 我连表格在哪都没框到，两臂相同这条结论不成立（是探针坏了，不是动效坏了）")
         XCTAssertLessThanOrEqual(instantSpan, 1,
@@ -425,7 +427,8 @@ final class MotionFilmstripTests: XCTestCase {
         let movedSpan = Self.transitionFrameCount(moved)
         print("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow)))")
         print("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved)))")
-        try await requireObservableMotion()
+        try await requireObservableMotion(.layout)
+        try requireAppWasActive(probe.wasActive)
         XCTAssertGreaterThan(Self.peak(sameRow), Self.minimumVisibleChange,
                              "带里什么都没变 ⇒ 探针坏了，两臂结论都不成立")
         XCTAssertGreaterThanOrEqual(sameSpan, Self.minimumTransitionFrames,
@@ -460,7 +463,9 @@ final class MotionFilmstripTests: XCTestCase {
         let stopped = Self.deltas(probe.record(reduceMotion: true))
         print("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
         print("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
-        try await requireObservableMotion()
+        // 骨架扫光属于**渐变几何**那一类 —— 必须问同一类的对照臂，
+        // 否则 runner 看得见布局位移、看不见渐变位移，会把这条判成产品坏了（run 38259612264 就是这个形状）。
+        try await requireObservableMotion(.gradient)
         XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
                              "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
         XCTAssertGreaterThanOrEqual(Self.transitionFrameCount(running), Self.minimumTransitionFrames,
@@ -469,64 +474,69 @@ final class MotionFilmstripTests: XCTestCase {
                           "减弱动态那一档还在变 ⇒ 常驻动画没被门住（HIG 与 WCAG 2.3.3 要的就是这一条）")
     }
 
-    /// **这把尺的边界探针**：一个自己会数数的 SwiftUI 视图（`@State` + 定时器驱动，
-    /// 每 50ms 换一次文字并平移一个方块）。它该动，而且动的是一等公民属性（文字 + offset）。
-    ///
-    /// 它存在的理由：`testSkeletonSweepActuallySweeps` 读到"30 帧一帧不变"时，
-    /// 有两种完全不同的解释 —— ① 这把尺看不见离屏 root 视图上的 `@State` 更新（尺的锅）；
-    /// ② 扫光那条路没落地（产品的锅）。不先把 ① 排除掉，就不许把结论写进产品账本
-    /// （账本里记过一整族"拿探针的故障当被测系统的故障"）。
-    /// 两臂对照在这里反过来用：**已知该动的东西必须动**，否则尺子不合格。
-    func testTheRulerSeesAStateDrivenSwiftUIUpdate() throws {
-        try skipUnlessEnabledAndCapable()
-        let frames = StateTickProbe().record()
-        let fractions = Self.deltas(frames)
-        print("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
-        XCTAssertGreaterThan(Self.peak(fractions), Self.minimumVisibleChange,
-                             "连一个每 50ms 换文字 + 平移方块的视图都量不到 ⇒ 这把尺看不见离屏 root 视图上的 @State 更新，"
-                             + "所有'量不到'的结论都要改写成'测不了'，包括扫光那条")
-        // 第二臂：只动渐变端点。它读成什么，决定 `SkeletonPreviewView` 那句话该怎么写。
-        let gradient = StateTickProbe().record(gradient: true)
-        let gradientFractions = Self.deltas(gradient)
-        print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+    /// `NSTableView` 的行动画只在**激活的 App** 里跑（实测：同一份代码 active 时 11 对在变、
+    /// 非 active 时 1 对，而总变化量相同）。裸 `swift test` 进程拿不到激活态是不稳定的，
+    /// 所以这是一个**前提**而不是判据：拿不到就报 not-run。
+    /// 产品里这个前提天然成立 —— 浮层是 `makeKeyAndOrderFront` + `NSApp.activate`（D-041）。
+    private func requireAppWasActive(_ wasActive: Bool) throws {
+        if !wasActive { print("MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画") }
+        try XCTSkipUnless(wasActive,
+                          "MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，"
+                          + "AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动")
     }
 
-    /// **这台机器能不能观察到"一次状态变更被分摊到几帧"** —— 用一个已知该动的视图问一次，缓存下来。
+    /// **这把尺的边界探针**见下面 `testTheRulerSeesAStateDrivenSwiftUIUpdate`
+    /// 与 `requireObservableMotion(_:)`：两臂读数决定"量不到"该记在尺子上还是产品上。
+    ///
+    /// **这台机器能不能观察到某一类位移** —— 用一个已知该动的视图问一次，缓存下来。
     ///
     /// 为什么需要：CI 的无头 runner 不绘制 SwiftUI 内容（82 帧里那两帧 95% 空白是既有事实），
     /// 于是"读不到动"有两种可能 —— 产品没动，或者这台机器看不见动。**把后者判成前者，
     /// 就是拿探针的故障当被测系统的故障**（账本里记过整族）。
-    /// 所以新加的三条像素判据都先问这一句：问不出来就 `MOTION_NOT_RUN=` + skip，
-    /// 而不是红，也不是绿。数字仍然先打出来，日志里永远有读数可查。
-    private func requireObservableMotion() async throws {
-        if let cached = Self.motionIsObservable {
-            try XCTSkipIf(!cached, "MOTION_NOT_RUN=runner-cannot-observe-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
-            return
-        }
-        let control = Self.deltas(StateTickProbe().record())
-        let observable = Self.peak(control) > Self.minimumVisibleChange
-        Self.motionIsObservable = observable
-        if !observable {
-            print("MOTION_NOT_RUN=runner-cannot-observe-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control)))")
-        }
-        try XCTSkipIf(!observable, "MOTION_NOT_RUN=runner-cannot-observe-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
+    ///
+    /// 关键是**要问对那一类**。run 38259612264 第一次把两行读数打出来之后现场很清楚：
+    /// 同一台 runner 上「换文字 + 平移方块」读到 17 对在变（峰值 0.025），
+    /// 而「只动渐变端点」读到 **0 对、峰值 0.000** —— 也就是说它能看见布局型位移，
+    /// 看不见渐变几何的位移。所以骨架扫光必须问渐变那一臂（问不到就 skip），
+    /// 而 AppKit 行动画那两条要问布局那一臂（它在那台机器上确实量得到，不许被一起 skip 掉）。
+    /// 问不出来就 `MOTION_NOT_RUN=` + skip，而不是红，也不是绿；数字永远先打出来。
+    enum MotionClass {
+        case layout      // 换内容 / 平移：`TickCounterView`
+        case gradient    // 只动 `LinearGradient` 的端点：`GradientTickView`
     }
 
-    /// 对照臂本身：**已知该动的东西必须动**。
-    /// 它同时是上面那句 `requireObservableMotion` 的判据来源，所以它不 skip、只报数；
-    /// 但如果这台机器连它都看不见，那结论只能是"测不了"（skip），不是"产品全坏了"。
+    private func requireObservableMotion(_ klass: MotionClass) async throws {
+        let marker = klass == .layout ? "layout" : "gradient"
+        if let cached = Self.observableCache[klass] {
+            try XCTSkipIf(!cached, "MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
+            return
+        }
+        let frames = StateTickProbe().record(motionClass: klass)
+        let control = Self.deltas(frames)
+        let observable = Self.peak(control) > Self.minimumVisibleChange
+        Self.observableCache[klass] = observable
+        if !observable {
+            print("MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control))) 帧数=\(frames.count)")
+        }
+        try XCTSkipIf(!observable, "MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
+    }
+
+    /// 对照臂本身：**已知该动的东西必须动**，而且**两类各问一次**。
+    /// 它是 `requireObservableMotion(_:)` 的判据来源，所以它自己只在"连布局位移都看不见"时
+    /// 报 skip（那是环境），而不是红；渐变那一臂只报数 —— 它看不见是**事实**，不是失败。
     func testTheRulerSeesAStateDrivenSwiftUIUpdate() async throws {
         try skipUnlessEnabledAndCapable()
-        let frames = StateTickProbe().record()
+        let frames = StateTickProbe().record(motionClass: .layout)
         let fractions = Self.deltas(frames)
         print("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
-        let gradient = StateTickProbe().record(gradient: true)
+        let gradient = StateTickProbe().record(motionClass: .gradient)
         let gradientFractions = Self.deltas(gradient)
         print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
-        let observable = Self.peak(fractions) > Self.minimumVisibleChange
-        Self.motionIsObservable = observable
-        try XCTSkipUnless(observable,
-                          "MOTION_NOT_RUN=runner-cannot-observe-motion：每 50ms 换文字 + 平移方块都量不到 ⇒ 这把尺在这台机器上看不见 @State 驱动的位移")
+        let layoutObservable = Self.peak(fractions) > Self.minimumVisibleChange
+        Self.observableCache[.layout] = layoutObservable
+        Self.observableCache[.gradient] = Self.peak(gradientFractions) > Self.minimumVisibleChange
+        try XCTSkipUnless(layoutObservable,
+                          "MOTION_NOT_RUN=runner-cannot-observe-layout-motion：每 50ms 换文字 + 平移方块都量不到 ⇒ 这把尺在这台机器上看不见 @State 驱动的位移")
         XCTAssertGreaterThan(Self.transitionFrameCount(fractions), Self.minimumTransitionFrames,
                              "看得见变化但只分摊到一帧 ⇒ 这个视图的时钟没在跑，`requireObservableMotion` 会跟着失效")
     }
@@ -869,6 +879,14 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
     private var texts: [String] = []
     /// 最近一次抓取的时刻序列：判据说"分摊到几帧"，而"几帧"要换算成毫秒才说得出时长。
     private(set) var lastStamps: [TimeInterval] = []
+    /// **抓这一卷的时候，这个进程是不是激活的 App。**
+    /// `NSTableView` 的行动画只在激活的 App 里跑：实测同一份代码在
+    /// `NSApp.isActive == true` 时读到 11 对在变，`false` 时只有 1 对（总变化量一模一样，
+    /// 只是不再分摊到几帧）。而 `swift test` 起的裸进程**能不能拿到激活态是不稳定的**
+    /// —— 本机同一天里两种都出现过（CI 那台 runner 拿到过：开 3 帧 / 关 1 帧）。
+    /// 所以这条判据必须把前提写进判据本身：拿不到激活态就报 not-run，
+    /// 不许把"环境没给到前提"读成"产品没动"。
+    private(set) var wasActive = false
 
     /// 返回逐帧画面。`animation` 由调用方给**产品实际会传的那两个值**
     /// （`QuickPickController.rowAnimationOptions` 的两种输出），不是我另写的一份。
@@ -890,10 +908,18 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
         scroll.documentView = table
         scroll.hasVerticalScroller = false
         window.contentView = scroll
+        NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.45))
+        let activateDeadline = Date().addingTimeInterval(1.5)
+        while !NSApp.isActive, Date() < activateDeadline {
+            NSApp.activate(ignoringOtherApps: true)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        wasActive = NSApp.isActive
+        print("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
 
         let grabber = Grabber(view: scroll, limit: 24)
         let prerollDeadline = Date().addingTimeInterval(0.15)
@@ -941,10 +967,18 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
         scroll.documentView = table
         scroll.hasVerticalScroller = false
         window.contentView = scroll
+        NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.45))
+        let activateDeadline = Date().addingTimeInterval(1.5)
+        while !NSApp.isActive, Date() < activateDeadline {
+            NSApp.activate(ignoringOtherApps: true)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        wasActive = NSApp.isActive
+        print("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
         // 起点必须已经是选中第 0 行 —— 否则"写同一个选中"这一臂就不成立
         // （从"没选中"到"选中 0"本身就是一次真的选中变化）。
         table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -1063,15 +1097,16 @@ private struct TickCounterView: View {
 
 @MainActor
 private final class StateTickProbe {
-    func record() -> [CGImage] { record(gradient: false) }
+    func record() -> [CGImage] { record(motionClass: .layout) }
 
-    /// `gradient: true` 时换一张**只动渐变端点**的图 —— 用来分清"尺看不见 @State 更新"
-    /// 与"尺看不见渐变端点的移动"，这两句写错一句就会把产品判成死的（或反过来）。
-    func record(gradient: Bool) -> [CGImage] {
+    func record(motionClass: MotionFilmstripTests.MotionClass) -> [CGImage] {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: gradient ? AnyView(GradientTickView()) : AnyView(TickCounterView()))
+        let root: AnyView = motionClass == .layout
+            ? AnyView(TickCounterView())
+            : AnyView(GradientTickView())
+        let host = NSHostingView(rootView: root)
         window.contentView = host
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

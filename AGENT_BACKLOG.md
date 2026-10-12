@@ -595,12 +595,15 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"砍"。四条全部补上，
 决定与取证见 D-056 / U-21，人工验收见 `docs/MANUAL_TEST_v1.4.9_round3.md` 批次 9。
 
-**已实测**：589 tests / 23 skipped / 0 failures；两个 triple 各 0 warning；82 帧 `CHANGED=0`
+**已实测**：588 tests / 22 skipped / 0 failures；两个 triple 各 0 warning；82 帧 `CHANGED=0`
 （`detail-2-file-{light,dark}` 两帧是这次刻意改的加载态，基线已随包更新）；
 26 条新判据；16 支变异里 15 支红在该红的那条，第 16 支（M5）故意让它逃逸，据此删了一条死守卫。
-像素：QuickPick 行动画 开 11 帧 / 关 1 帧；产品形状（插完行紧接着写同一个选中）11 帧 / 选中真变了 1 帧；骨架扫 19 对在变 / 减弱动态 0 对；本机像素套件 13 条全绿。
+像素：QuickPick 行动画 开 11 帧 / 关 1 帧、产品形状（插完行紧接着写同一个选中）11 帧 / 选中真变了 1 帧 —— 这两条要求进程处于**激活**状态（AppKit 的规矩），拿不到时判据报 `MOTION_NOT_RUN=app-not-active` 并 skip，所以本机套件是 13 跑 / 11 过 / 2 not-run；骨架扫 23 对在变 / 减弱动态 0 对。
 
 **欠账（这一节新增的，都带复现命令）**：
+
+0. **① 的两条像素判据在本机是 not-run**：裸 `swift test` 进程拿不到 `NSApp.isActive`（试过 `setActivationPolicy(.regular)` + 1.5 秒重试仍是 false），而 `NSTableView` 非激活就不跑行动画。CI 那台 runner 能拿到。要让它**在本地也可复现**，得把探针跑在一个真能激活的宿主里（`.app` 包内起测试，或在允许激活的登录会话里跑）—— 在那之前本地报 not-run 是正确行为，**不要**为了让它变绿去降低门槛。
+
 
 1. **② 系统符号动效仍然量不到**（两臂同为 1 帧 / 峰值 0.190）。要么哪天换成自绘淡入让它可测，
    要么永远只靠人工 9.3 / 9.4。判据 `testSystemSymbolEffectsAreOutOfThisRulersReach` 会在
