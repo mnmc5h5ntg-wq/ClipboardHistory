@@ -195,6 +195,72 @@ final class Round3QuickPickTests: XCTestCase {
                       "安静不显示的那条回退路径不见了")
     }
 
+    // MARK: - 面板真的把候选画出来了（在屏判据，要环境变量才跑）
+
+    /// `show()` 之后那张表里**必须真的有条目**，打字之后必须收窄。
+    ///
+    /// 为什么单独一条：D-041 说"面板拿不到 key window"，那否掉的是**按键路由**，
+    /// 不是"面板建不建得起来、表里有没有行"。而行级更新计划（`QuickPickRowDiff`）
+    /// 一旦算错，表现恰恰是"表空了/行数对不上"——纯函数测试看不见（它只测计划），
+    /// 而 `testTypingThenDownThenEnterCommitsTheRightEntry` 也看不见（那里 `table` 是 nil，
+    /// `rebuildRows()` 直接早退）。这一条走的是**真面板 + 真 NSTableView**。
+    ///
+    /// 开关：`CLIPBOARD_HISTORY_UI_MOTION=1`（会真的开一个浮层窗口）。
+    func testPanelPopulatesItsTableOnShowAndNarrowsOnTyping() throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_MOTION"] == "1",
+                          "会开一个真浮层窗口并抢前台：设 CLIPBOARD_HISTORY_UI_MOTION=1 才跑")
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+        for index in 0..<5 {
+            // 走采集入口（`ClipboardIntake.Entry`），不是模型那份 `ClipboardEntry`：
+            // `store.add` 要的是前者，而这条判据要的就是"从产品入口进"。
+            store.add(ClipboardIntake.Entry(
+                content: .text("候选 \(index)：一段用来数行的文本"),
+                thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
+                timestamp: Date())
+        }
+        let controller = QuickPickController(historyStore: { store }, commit: { _ in })
+        controller.show()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        defer { controller.hide() }
+
+        let table = try XCTUnwrap(Self.findTable(ownedBy: controller),
+                                  "show() 之后找不到那张 NSTableView ⇒ 面板没建起来，这条判据要红")
+        XCTAssertEqual(table.numberOfRows, 5,
+                       "面板里的候选数不对：`rebuildRows()` 的插删计划或数据源回读出了问题")
+
+        controller.queryChanged("候选 3")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(table.numberOfRows, 1,
+                       "打字之后候选没收窄 ⇒ 行级更新计划算错了（AppKit 看到的行数与模型不一致时，表现就是空表）")
+        controller.queryChanged("候选")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertEqual(table.numberOfRows, 5, "删回去时候选必须重新长回来（这一步走的是 insertRows 分支）")
+    }
+
+    /// 在**所有窗口**里找那张由这个控制器当数据源的表。
+    /// 不去加一个"为了测试把 table 暴露出去"的产品 API：面板已经建出来了，遍历就能看到，
+    /// 而读自己造出来的东西不算侵入产品。
+    private static func findTable(ownedBy controller: QuickPickController) -> NSTableView? {
+        let target = controller as AnyObject
+        for window in NSApp.windows {
+            guard let content = window.contentView else { continue }
+            if let found = walk(content, target: target) { return found }
+        }
+        return nil
+    }
+
+    private static func walk(_ view: NSView, target: AnyObject) -> NSTableView? {
+        if let table = view as? NSTableView, (table.dataSource as AnyObject?) === target { return table }
+        for sub in view.subviews {
+            if let found = walk(sub, target: target) { return found }
+        }
+        return nil
+    }
+
     // MARK: - 接线守卫
 
     func testHotKeyAndMenuAreWired() throws {

@@ -61,6 +61,10 @@ staged_binary="${bundle}/Contents/MacOS/${binary_name}"
 fail() { printf '❌ %s\n' "$*" >&2; exit 1; }
 say() { printf '%s\n' "$*"; }
 sha_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
+# `proc_pidpath` 返回的是**解析过符号链接**的路径（macOS 上 /var → /private/var），
+# 而脚本里的 `installed` 是用户传进来的字面路径。两边都归一化之后再比，
+# 否则沙箱测试（路径在 /var/folders 下）会永远比不中 —— 表现就是"没在跑"。
+real_path() { python3 -c 'import os,sys; sys.stdout.write(os.path.realpath(sys.argv[1]))' "$1"; }
 
 # ---------- 0. 计划 ----------
 backup_root="${HOME}/Documents/Codex_Project0_backups"
@@ -124,23 +128,42 @@ say "新包 sha    = ${staged_sha:0:16}…"
 # ---------- 3. 退出正在跑的旧版（冒烟闸门的前置，见文件头第 1 条）----------
 # 只退"跑着的就是我要换的那一份"：按可执行文件路径认，不按进程名认。
 # 否则往 /tmp 装一份做验证时，会顺手把用户 /Applications 里那份杀掉。
+#
+# 路径必须用 `scripts/proc_path.py`（proc_pidpath）拿，**不能**用 `lsof`/`ps` 的输出：
+# App 名字是中文，那两个工具会把非 ASCII 转义成 `\346\227\266…`，于是比较永远不相等，
+# 脚本就会误判"没在跑"、跳过退出旧版，然后被第二实例守卫假报成冒烟失败
+# （2026-10-12 真就是这么失败的；判据见 scripts/tests/test_install_local.py）。
 running_pid_under() {
 	local want="$1" pid path
 	for pid in $(pgrep -x "$binary_name" 2>/dev/null || true); do
-		path="$(lsof -p "$pid" -Fn 2>/dev/null | awk '/^n/ {print substr($0,2)}' | grep -a "MacOS/${binary_name}$" | head -1 || true)"
-		[ -n "$path" ] && [ "${path%Contents/MacOS/$binary_name}" = "${want%/}" ] && { printf '%s\n' "$pid"; return 0; }
+		path="$(python3 "${repo_root}/scripts/proc_path.py" "$pid" 2>/dev/null || true)"
+		[ -n "$path" ] && [ "$path" = "$(real_path "$want")/Contents/MacOS/$binary_name" ] && { printf '%s\n' "$pid"; return 0; }
 	done
 	return 1
 }
-if running_pid_under "$installed" >/dev/null 2>&1; then
-	say "→ 优雅退出正在跑的 ${app_name}（让它把待写存档落盘）"
-	osascript -e "tell application \"${app_name}\" to quit" >/dev/null 2>&1 || true
-	for _ in $(seq 1 30); do
-		pgrep -x "$binary_name" >/dev/null 2>&1 || break
-		sleep 0.5
-	done
-	pgrep -x "$binary_name" >/dev/null 2>&1 && fail "旧版 15 秒内没退出（可能正忙或有未决对话框）；不去 kill -9，请手动退出后重试"
-	say "旧版已退出"
+old_pid="$(running_pid_under "$installed" || true)"
+if [ -n "$old_pid" ]; then
+	# 先无条件把"认出来了"打出来：这条判据坏过两次（lsof 转义、比较留尾斜杠），
+	# 两次的表现都是"没在跑"，而真正的后果在后面那步冒烟闸门里看不出来。
+	say "检测到要替换的实例 pid=${old_pid}"
+	if [ "$dest_dir" != "/Applications" ]; then
+		# 沙箱验证（`--dest /tmp/...`）**不给任何 App 发退出指令**。
+		# 原来这里不分沙箱，而 `osascript tell application "<名字>" to quit` 是
+		# **按名字全局**发指令的：2026-10-13 跑自检时，它把用户 /Applications 里那份真 App 退掉了。
+		# 不用 SIGTERM 代替是有原因的：存档落盘挂在 `applicationWillTerminate` 上
+		# （`ApplicationShell.swift:134` → `flushPendingPersistence`），SIGTERM 不触发它，
+		# 会把去抖窗口里还没写盘的记录丢掉 —— 一个以"别丢历史"为使命的 App 不能这么退。
+		say "目标不是 /Applications（沙箱验证）⇒ 不发退出指令，也不动用户那份实例"
+	else
+		say "→ 优雅退出正在跑的 ${app_name}（让它把待写存档落盘）"
+		osascript -e "tell application \"${app_name}\" to quit" >/dev/null 2>&1 || true
+		for _ in $(seq 1 30); do
+			kill -0 "$old_pid" 2>/dev/null || break
+			sleep 0.5
+		done
+		kill -0 "$old_pid" 2>/dev/null && fail "旧版 pid ${old_pid} 15 秒内没退出（可能正忙或有未决对话框）；不去 kill -9，请手动退出后重试"
+		say "旧版已退出"
+	fi
 else
 	say "要换的那一份没在跑，跳过退出"
 fi
@@ -193,9 +216,11 @@ done
 [ "$pid" != "$before_pid" ] || fail "pid 没变（$pid）—— 这就是'open 只激活了旧进程'那一类假装机"
 proc_start="$(ps -o lstart= -p "$pid" | xargs -I{} date -j -f '%a %b %e %T %Y' '{}' +%s 2>/dev/null || echo 0)"
 [ "$proc_start" -ge "$install_epoch" ] || fail "进程启动时刻($proc_start)早于安装时刻($install_epoch)：跑的不是刚装的这份"
-exe_path="$(lsof -p "$pid" -Fn 2>/dev/null | awk '/^n/ {print substr($0,2)}' | grep -a "MacOS/${binary_name}$" | head -1 || true)"
-[ -n "$exe_path" ] || fail "读不到进程的可执行文件路径"
-say "INSTALL_RUNNING_PID=${pid} 启动晚于安装，exe=${exe_path##*/} ✔"
+exe_path="$(python3 "${repo_root}/scripts/proc_path.py" "$pid" 2>/dev/null || true)"
+[ -n "$exe_path" ] || fail "读不到进程的可执行文件路径（proc_path.py 失败了，别用 lsof/ps 的输出兜底：CJK 路径会被转义）"
+[ "$exe_path" = "$(real_path "$installed")/Contents/MacOS/$binary_name" ] \
+	|| fail "跑着的这份不是刚装的那一份：exe=${exe_path}"
+say "INSTALL_RUNNING_PID=${pid} 启动晚于安装，exe 路径逐字对上 ${installed} ✔"
 
 # ---------- 8. 存档只读复核：条数不许变少 ----------
 if [ -f "$archive" ]; then

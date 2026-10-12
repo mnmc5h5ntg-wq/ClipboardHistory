@@ -1858,3 +1858,48 @@ macOS 的 BSD grep 里 ERE 的 `]` 与 `\]` 都不可靠 —— `test[A-Za-z]+'\
   现场：320pt 宽的侧栏里一行变成**两个 148pt 半宽的 `KeyViewProxy`**（x=12 与 x=160），
   而探针要求单个 200…290pt。这可能是无障碍结构真退化了（一行被读成两个停靠点），
   已把"当时看到了什么"写进失败消息，判据本身转 BACKLOG 单独查。
+
+## D-057 换装脚本自己咬了用户一口：沙箱自检把真 App 退掉了
+
+用户复确认"以后都按这个标准自动构建 + 替换正在跑的 App"（D-056 之后这条从"需要时做"变成**交付默认动作**）。
+今天就照这条做，结果 `scripts/install_local.sh` 连着假失败两次，挖出三个 bug —— 全部在脚本侧，产品一行没错。
+
+**① "要换的那一份没在跑"是假的。** 它用 `lsof -p <pid> -Fn` 取可执行路径去和
+`/Applications/时间剪史.app/...` 比，而这台机器上 App 名是中文：**lsof / ps 会把非 ASCII 转义成
+`\346\227\266…`**，比较永远不成立。后果是链式的：跳过退出旧版 ⇒ 冒烟闸门被第二实例守卫拦下 ⇒
+报"闸门没过"，而根因在八行之外的路径转义上。正解是 `scripts/proc_path.py`（ctypes 调 libproc 的
+`proc_pidpath`），返回**未转义字节**。
+
+**② 换成 proc_path 之后仍然认不出来。** 两个叠加的小坑：`proc_pidpath` 给的是 **realpath**
+（macOS 上 `/var` → `/private/var`），而裁剪式比较 `${path%Contents/MacOS/x}` 会**留下尾斜杠**。
+只在沙箱（`--dest /tmp/...`）里暴露 —— 真机 `/Applications` 恰好已经是解析过的路径，
+所以"手工跑对、自检红"。现在两边都过 `os.path.realpath` 再整串比。
+
+**③ 最严重的一条：自检把用户正在用的 App 退掉了。** 退出旧版用的是
+`osascript -e 'tell application "时间剪史" to quit'` —— 那是**按名字全局**发指令，
+和 `--dest` 指到哪里无关。跑沙箱自检的那一次，真 App 就是这么没的（时间线对得上：
+测试跑完 → 下一次安装报"没在跑"）。**修法不是改用 SIGTERM**：存档落盘挂在
+`applicationWillTerminate → flushPendingPersistence`（`ApplicationShell.swift:134`），
+SIGTERM 不触发它，会把去抖窗口里还没写盘的记录丢掉 —— 一个以"别丢历史"为使命的 App 不能这么退。
+改成：**目标不是 `/Applications` 就完全不发退出指令**，并且轮询只盯**那一个 pid**（原来盯的是
+"任何同名进程"，用户同时开着真 App 时那条等待必然超时）。
+
+判据：`test_it_really_notices_the_running_copy_under_a_cjk_path` —— 沙箱里造一个**真在跑的**实例
+（路径含中文、二进制名就是产品那个），要求脚本打"检测到要替换的实例 pid="且**不打**"优雅退出"。
+它先以红的面目出现（复现了 ②），修完才绿；这条测试本身就是 ①②③ 的复现器。
+夹具本身也踩了一个坑：复制 `/bin/sleep` 或 Xcode 的 python3 会被内核直接 SIGKILL/SIGABRT
+（Apple 签名卷绑定），必须用 clang 现编一个 `pause()` 小程序，而这台机器默认 SDK 链接期报
+`tapi error: malformed file`，于是"逐个 SDK 重试、全失败就打印原因后 skip"。
+
+**顺带补的一条产品判据**：`testPanelPopulatesItsTableOnShowAndNarrowsOnTyping`（在屏，要
+`CLIPBOARD_HISTORY_UI_MOTION=1`）。起因是我截图看到 QuickPick 面板里"没有候选"，怀疑
+`QuickPickRowDiff` 把表算空了。走真面板 + 真 `NSTableView` 数行数之后是**清白**的
+（show→5 行、输入"候选 3"→1 行、删回"候选"→5 行），截图那个黑块是非激活浮层被
+`screencapture` 抓出来的合成伪影。但这条判据留着：D-041 否掉的只是"按键能不能进面板"，
+**"面板建不建得起来、表里有没有行"从来没人测过** —— 纯函数测计划、隔面板测模型，
+两边都看不见"表是空的"这种失效。
+
+数字：589 tests / 23 skipped / 0 failures；`scripts/tests` 68 → 72 条（含一条 `--help` 守卫把我新写的脚本挡了一次——它当时不支持 `-h`，那条守卫是对的、我错）；0 warning。
+**已交付到本机**：`install_local.sh --yes` 跑通（`SMOKE_OK=1`、`INSTALL_SHA_MATCH=1`、
+新 pid 的 exe 逐字对上 `/Applications/时间剪史.app`、存档 92 → 92 条），旧包留在
+`~/Documents/Codex_Project0_backups/before-motion-batch9/`。
