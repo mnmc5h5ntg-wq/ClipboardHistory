@@ -71,11 +71,10 @@ enum MotionCatalog {
         }
     }
 
-    /// 位移量（pt）。超过 8pt 的位移动作在 150ms 里会变成"飞进来"，那是网页感。
-    static let slideOffset: CGFloat = 8
     /// 落点框的"吸住"缩放。量级参照 Carbon `contextual` 的退场 scale(0.96)：
     /// 这个体系里缩放是 4% 一档，不是 16%（第一版的 `emphasisScale = 1.16` 既没人消费、
-    /// 又完全不在量级上，报告 MC-5 一并删掉）。
+    /// 又完全不在量级上，报告 MC-5 一并删掉；`slideOffset` 同批删除 —— 滑入用的是
+    /// `.move(edge:)`，位移量由系统决定，那个 8 从来没人读）。
     static let dropTargetScale: CGFloat = 0.98
 
     /// 进场曲线：Emil 的强 ease-out。

@@ -166,6 +166,32 @@ final class MotionCatalogTests: XCTestCase {
         }
     }
 
+    /// 目录里也不留没人读的参数。`Role` 那一半由 `testEveryRoleHasAConsumer` 管，
+    /// 这条管常数：一个只有声明、没有任何地方读的 `static let`，就是"看着像有人用、
+    /// 其实没人用"的说法 —— 和被删掉的 `emphasisScale` / `slideOffset` 同一类（报告 MC-5）。
+    /// 读的人可以是产品代码，也可以是判据：`maximumDuration` 就是后者
+    /// （它是预算，由 `testEveryRoleStaysUnderTheCeiling` 执行），所以两边都算。
+    func testEveryCatalogConstantIsRead() throws {
+        let catalog = codeOnly(try productSource(named: "Utilities/MotionCatalog.swift"))
+        var text = ""
+        for directory in ["Views", "Managers", "Utilities", "Intelligence", "Models"] {
+            text += try productSources(in: directory).map(\.1).joined(separator: "\n")
+        }
+        let testsDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for name in try FileManager.default.contentsOfDirectory(atPath: testsDirectory.path) where name.hasSuffix(".swift") {
+            text += (try? String(contentsOf: testsDirectory.appendingPathComponent(name), encoding: .utf8)) ?? ""
+        }
+        for name in catalog.components(separatedBy: "\n").compactMap({ line -> String? in
+            let parts = line.trimmingCharacters(in: .whitespaces).split(separator: " ", omittingEmptySubsequences: true)
+            guard parts.count >= 3, parts[0] == "static", parts[1] == "let" else { return nil }
+            return String(parts[2].split(separator: ":").first ?? Substring(""))
+        }) {
+            let reads = text.components(separatedBy: name).count - 1
+            XCTAssertGreaterThanOrEqual(reads, 2,
+                                        "目录里的 `\(name)` 只有声明没有读取：要么接上，要么删掉")
+        }
+    }
+
     /// 胶片探针的 A/B 开关必须**默认开**。它是个全局可变量，产品路径不碰它 ——
     /// 万一有人图省事在启动时关掉它，所有动效会静默变成零时长，
     /// 而本文件那几条纯值断言照样全绿。
