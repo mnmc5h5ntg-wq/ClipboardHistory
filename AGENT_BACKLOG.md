@@ -634,3 +634,14 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
    两种可能没分清：无障碍结构真退化了（一行被读成两个停靠点），或者只是行内布局变了而
    探针的几何写死。**先按前者查**，因为如果是真的，那是 VoiceOver 用户每天撞的事。
    复现：`CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests/testSidebarListFocusRingAfterClick`。
+6. **动效胶片套件的判据在测采样率，不是在测动画**（R1 三臂交替实测，D-058）：同一台机器上
+   R1 树 → HEAD 树 → R1 树 跑出三套**互不相同**的红集合（3/3/3 全绿、2/3/2 两条红、3/3/3 但另一条红），
+   而 HEAD 比 R1 更差。其中 `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 的阳性对照自己读出
+   "连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率"。
+   这条**不是 R1 引入的**（ab7a759 已记下同一现象，并明确禁止"调到绿为止"）。
+   修法已在下一轮立项：把"过渡帧数 ≥3""after: 3 之后残余"这类**绝对帧数**判据换成
+   由"声明时长 ÷ 实测采样间隔"推出来的分辨率感知判据（地板 2 帧，一帧跳变仍然要红），
+   且必须带自己的变异对照（`animationsEnabled=false` 那一臂在任何采样率下都要红，不许变成 skip）。
+7. **两条本轮留下的观测缺口**（都不影响功能，影响的是"下一条判据能不能被相信"）：
+   ① `VideoPreview` 的播放控件没有任何夹具帧 ⇒ R1 给它补的分组合成**只有源码级证据**；
+   ② `testNoDeadSurfaceInViews` 只扫 `struct X: View`，`ViewModifier` / `ButtonStyle` 那类死包装还在视野外。

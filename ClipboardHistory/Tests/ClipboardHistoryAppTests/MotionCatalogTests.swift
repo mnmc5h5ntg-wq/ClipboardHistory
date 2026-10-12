@@ -350,6 +350,35 @@ final class MotionCatalogTests: XCTestCase {
                       "这些行还在自己写动画参数，应该走 MotionCatalog：\(offenders)")
     }
 
+    /// 目录之外到底还剩几处自己写曲线？这条把它们**数出来**，而不是留在注释里。
+    ///
+    /// 上面那条拦的是"就地写死"，而它**刻意放过** `FilterPillMotion`（滑块）与
+    /// `MultiFilePreviewLayout`（多文件展开）：参数是纯值、视图消费它、各自有守卫、都吃 reduce-motion。
+    /// 但"放过"只写在注释里就意味着每一轮都要重新数一遍 —— 上一轮的账本已经证明注释会过期。
+    /// 所以钉成**文件集合相等**：多一个例外要红；把老例外迁进目录也要红（那时把名字从白名单删掉，
+    /// 这是设计好的摩擦，不是误报）。
+    ///
+    /// 顺带记下这两处的性质，免得下一个人以为它们也"不过冲"：
+    /// `FilterPillMotion` 的 damping 0.72、`MultiFilePreviewLayout` 在 12/13 走
+    /// `interactiveSpring(dampingFraction: 0.88)` —— 两者都有过冲，是目录"一律不过冲"声明之外的**已知例外**。
+    func testMotionParametersOutsideTheCatalogAreWhitelisted() throws {
+        let needles = ["spring(response", "interactiveSpring", ".snappy(", "timingCurve"]
+        let whitelist = ["HistorySidebarView.swift", "DetailView.swift"]
+        var found: [String] = []
+        for directory in ["Views", "Managers"] {
+            for (name, source) in try productSources(in: directory) where name != "MotionCatalog.swift" {
+                let code = codeOnly(source)
+                if needles.contains(where: code.contains) { found.append(name) }
+            }
+        }
+        XCTAssertEqual(Set(found), Set(whitelist),
+                       "目录之外写曲线的文件集合变了。现在扫到 \(found)；白名单 \(whitelist)："
+                           + "新增例外要在 `testNoAdHocAnimationParametersOutsideTheCatalog` 那条注释里写清为什么，"
+                           + "迁移进目录则把名字从这里删掉")
+        XCTAssertEqual(found.count, whitelist.count,
+                       "同一个文件里出现第二处会被 Set 吃掉：条数要单独钉（\(found)）")
+    }
+
     /// 详情换页挂在**视图类型身份**上，不是 `entry.id`：文本→文本只换字（不演），
     /// 文本→图片是整块换掉（交叉淡入）。粒度必须和 `DetailView.preview(for:)` 的分支对齐，
     /// 所以"分支变了 ⇔ 类型变了"两个方向都要钉。

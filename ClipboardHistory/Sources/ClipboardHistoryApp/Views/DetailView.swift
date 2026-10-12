@@ -156,7 +156,7 @@ struct DetailView: View {
         // 数值由 `WindowChromeMetrics` 在每次重新摆放按钮时发布。
         .padding(.top, chrome.detailContentTopInset)
         .padding(.bottom, 10)
-        .background(.ultraThinMaterial)
+        .background(VisualMaterial.glass)
     }
 
     /// 这条记录到底有没有"渲染 / 原文"之分。
@@ -195,10 +195,10 @@ struct DetailView: View {
                     // （实测过：加了 2pt 纵向 padding 之后，22/82 帧因为几何移动而变）。
                     // 悬停底色因此贴着字形那一行 —— 它本来就是个安静的行内动作，不是按钮区。
                     .background {
-                        RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .fill(.primary.opacity(isHovered ? 0.07 : 0))
+                        VisualShape.rounded(VisualRadius.chip)
+                            .fill(.primary.opacity(isHovered ? VisualFill.hover : 0))
                     }
-                    .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    .contentShape(VisualShape.rounded(VisualRadius.chip))
             }
             .buttonStyle(.plain)
             .fixedSize()
@@ -419,7 +419,7 @@ private struct CollapsibleFilePreview<Content: View>: View {
                 content()
                     .frame(maxWidth: .infinity)
                     .frame(height: targetHeight, alignment: .top)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(VisualShape.rounded(VisualRadius.card))
                     .clipped()
                     .scaleEffect(
                         isExpanded ? 1 : MultiFilePreviewLayout.collapsedScale(
@@ -521,14 +521,15 @@ private struct MultiFileRow: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
             .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(.primary.opacity(isHovered ? 0.06 : 0))
+                VisualShape.rounded(VisualRadius.card)
+                    .fill(.primary.opacity(isHovered ? VisualFill.hover : 0))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(.primary.opacity(isHovered ? 0.07 : 0), lineWidth: 0.7)
+                VisualShape.rounded(VisualRadius.card)
+                    .strokeBorder(.primary.opacity(isHovered ? VisualTint.hoverStroke : 0),
+                                  lineWidth: VisualHairline.rule)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(VisualShape.rounded(VisualRadius.card))
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 20)

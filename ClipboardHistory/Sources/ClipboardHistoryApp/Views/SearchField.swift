@@ -31,12 +31,13 @@ struct SearchField: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(isActive ? 0.06 : 0.035))
+            VisualShape.rounded(VisualRadius.card)
+                .fill(Color.primary.opacity(isActive ? VisualFill.fieldActive : VisualFill.fieldIdle))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.primary.opacity(isActive ? 0.095 : 0.05), lineWidth: 0.5)
+            VisualShape.rounded(VisualRadius.card)
+                .stroke(Color.primary.opacity(isActive ? VisualTint.fieldActiveStroke : VisualTint.fieldIdleStroke),
+                        lineWidth: VisualHairline.edge)
         )
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)
         .animation(MotionCatalog.animation(for: .contentFade), value: text.isEmpty)

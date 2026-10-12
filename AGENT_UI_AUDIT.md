@@ -565,3 +565,37 @@ CI 82 帧全绿也一样。补法不是去截图（要屏幕录制授权，且�
 真正的原因是亮带只抬 5 个点，在像素上等于没动。所以这一节新增了一条硬判据：
 `testHighlightIsFarEnoughAboveTheBaseToBeSeen`（最小抬升 0.08 写进代码）。
 "没有变化"这个读数，要先证明**这一档变化推得动像素**，才有资格拿去说"它没跑"。
+
+## 第 5 轮 · U-22 视觉迭代 R1：几何与材质令牌（D-058）
+
+R0 审计的靶子是"同一件事说出好几种音量"。本轮把它们收成一个作者，并且**收口本身有判据**
+（`VisualTokenTests` 10 条 + `MotionCatalogTests` 1 条；10 支变异 10/10 红在该红的那条）。
+
+| 表面 | 之前（实测字面量） | 之后 | 像素证据 |
+|---|---|---|---|
+| 圆角 | 4 / 5 / 6 / 7 / 8 / 9 六种，其中 4 的四处**没有** `.continuous` | `chip 4 · control 6 · card 8 · panel 9`，轨道 = `control + 1`；唯一出口 `VisualShape.rounded` 永远 continuous | `row-*` 最大通道差 2–8、变化 206–894 像素（就是那几颗 16pt 方块的角） |
+| 缩略图描边 | 图片 0.16、符号 0.14 两档并排 | `VisualTint.chipStroke 0.15` | 同上，同一批帧 |
+| 缩略图投影 | 图片 0.08、符号 0.06 | `VisualShadow.flat`（0.08 · r1 · y0.5，**不**分组合成） | 同上 |
+| 发丝线 | 0.5 / 0.7 / 1.0 三种混用 | `edge / rule / divider` 各司其职，视图里出现 `lineWidth: 数字` 直接红 | 线宽数值一处未变 ⇒ 无像素变化（分类是按语义不是按数） |
+| 浮起玻璃 | 胶囊 0.10 **有**分组合成、视频控件 0.08 **没有** | `VisualShadow.raised` 把"要不要分组"绑进定义，调用方写不出来 | 胶囊帧不变；视频控件**无夹具帧 ⇒ 只有源码级证据**（记在遗留） |
+| 悬停底色 | 0.045（设置行）/ 0.06（多文件行）/ 0.07（Markdown 切换） | `VisualFill.hover 0.06` 一档；圆形符号按钮另给 `controlHover 0.10`（面积小要更实） | 静止态帧不含 hover ⇒ 无帧证据，转人工清单 |
+| 输入框 | 底色 0.035→0.06、描边 0.05→0.095 | `fieldIdle/fieldActive` + `fieldIdleStroke/fieldActiveStroke 0.05→0.10`（两档间隔都是 0.05） | `search-field-*` 最大通道差 **1**（0.095→0.10 的抗锯齿） |
+| 材质 | 4 处字面量（thick / ultraThin ×2 / ultraThick / quaternary） | `VisualMaterial.window / glass / sliderPill / track` | 值全部不变 ⇒ 无帧变化（等值重构） |
+
+**本轮真正"看得见"的两件事**：
+1. 加载那句"正在加载预览…"12pt → 13pt（自家规范 `StatePresentation.messageFontSize` 早就写着 13）。
+   `detail-2-file-*` 最大通道差 124–127，bbox (633,288)-(805,312) = **86×12.5pt 一行字** ⇒ 归因明确。
+2. 删掉两个死表面 `GlassCircleButton` / `HistoryRow`。它们的可见性恰恰在"没有像素变化"上：
+   `glass-pill-*` 两帧完全不变，证明删的是没人走的分支；`HistoryRow` 的注释理由（"留给夹具复用"）
+   被实测证伪 —— 产品与测试都没有一个调用点。
+
+**判据的新形状（本轮值得留法的两条）**：
+- **死表面检测**：`Views/` 里每个 `struct X: View` 必须有构造点。第一次跑就报出两个假阳性
+  （`ContentView`、`MenuBarRecommendationsView`），真因是我的扫描漏了 target 根目录 ——
+  于是补了一条"扫描集合里必须有 `App.swift`"。漏目录会让真死表面被算成活的，比误报更危险。
+- **强度次序是语义约束**：`hover < selected`、`fieldIdle ≤ fieldActive`、`chip < control < card < panel`。
+  数值可以改，次序不能反 —— 反了就是"瞬时态比持久态更显眼"这种可用性缺陷，而编译器不会管。
+
+**遗留（本轮不顺手做）**：`MultiFilePreviewLayout` 与 `FilterPillMotion` 两处目录外参数**有过冲**、
+`VideoPreview` 无帧夹具、`testNoDeadSurfaceInViews` 只覆盖 `: View`（`ViewModifier` / `ButtonStyle`
+那类死包装还没进视野）。动效套件的间歇红与本轮无关，证据与处置见 D-058 的三臂表。

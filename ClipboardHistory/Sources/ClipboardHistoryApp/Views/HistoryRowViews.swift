@@ -148,22 +148,13 @@ private struct RowPinnedBadge: View {
     }
 }
 
-/// 行内容的旧组合入口（行首视觉列 + 文本列）。侧栏现在直接用 `HistoryRowButton`，
-/// 这里保留给夹具与详情以外的调用点复用。
-struct HistoryRow: View {
-    let entry: HistoryStore.Entry
-
-    var body: some View {
-        HStack(spacing: 8) {
-            RowLeadingVisual(entry: entry)
-            RowTextColumn(entry: entry)
-        }
-    }
-}
-
 /// 行首的视觉列（缩略图优先，没有缩略图才画符号）。
 /// D-1 期间它曾叫"把手"并独占拖出入口 —— 那个设计被真机否掉了（`List` 会把行内 `.onDrag`
 /// 提升成整行拖拽源），现在拖出挂在整行上，见 `HistoryRowButton` 与账本 D-034。
+///
+/// 它以前外面还包着一层 `HistoryRow`（行首视觉列 + 文本列的"旧组合入口"），
+/// 注释写着"保留给夹具与详情以外的调用点复用"，而实测**产品与测试都没有一个调用点**：
+/// 那句理由是编的，层本身是死的（R1 删除，判据见 `VisualTokenTests.testNoDeadSurfaceInViews`）。
 private struct RowLeadingVisual: View {
     let entry: HistoryStore.Entry
 

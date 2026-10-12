@@ -125,7 +125,7 @@ struct SkeletonPreviewView: View {
         GeometryReader { proxy in
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(SkeletonMotion.barFractions.enumerated()), id: \.offset) { _, fraction in
-                    RoundedRectangle(cornerRadius: 4)
+                    VisualShape.rounded(VisualRadius.chip)
                         .fill(bandGradient)
                         .frame(width: max(1, proxy.size.width * fraction), height: 8)
                 }

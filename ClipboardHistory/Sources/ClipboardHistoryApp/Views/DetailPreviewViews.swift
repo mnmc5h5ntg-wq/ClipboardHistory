@@ -271,7 +271,7 @@ struct DetailFileView: View {
             SkeletonPreviewView()
                 .frame(height: 44)
             Text("正在加载预览…")
-                .font(.system(size: 12))
+                .font(.system(size: StatePresentation.messageFontSize))
                 .foregroundStyle(.secondary)
             Spacer()
         }
@@ -285,7 +285,7 @@ struct DetailFileView: View {
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
             Text(message)
-                .font(.system(size: 13))
+                .font(.system(size: StatePresentation.messageFontSize))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -314,7 +314,7 @@ struct DetailFileView: View {
                 .font(.system(size: 32))
                 .foregroundStyle(.secondary)
             Text("无法读取这段视频的分辨率信息")
-                .font(.system(size: 13))
+                .font(.system(size: StatePresentation.messageFontSize))
                 .foregroundStyle(.secondary)
             Button("在 Finder 中显示") {
                 NSWorkspace.shared.activateFileViewerSelecting([url])

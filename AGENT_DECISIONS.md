@@ -1903,3 +1903,75 @@ SIGTERM 不触发它，会把去抖窗口里还没写盘的记录丢掉 —— �
 **已交付到本机**：`install_local.sh --yes` 跑通（`SMOKE_OK=1`、`INSTALL_SHA_MATCH=1`、
 新 pid 的 exe 逐字对上 `/Applications/时间剪史.app`、存档 92 → 92 条），旧包留在
 `~/Documents/Codex_Project0_backups/before-motion-batch9/`。
+
+## D-058 视觉迭代 R1：几何与材质只有一个作者，顺带删掉两个"活着的死表面"
+
+用户开了新一轮长跑（目标：Apple 原生、流畅、华丽但克制、细节丰富；每轮出可编译代码 + 自评，
+连续五轮 ≥90 才停）。R0 审计数出来的是**参数各写各的**：圆角 6 种（4/5/6/7/8/9，其中 4 的四处漏了
+`.continuous`）、发丝线 3 种（0.5/0.7/1.0）、投影 4 处三个数、悬停底色 3 档（0.045/0.06/0.07）、
+材质 4 处字面量。这类不一致**不是审美分歧**：两颗缩略图并排时描边深浅不同、同一种"浮起的玻璃"
+在两处给出两个结果，用户说不出哪里不对但看得见。
+
+**决定：把这一族参数收进 `Utilities/VisualTokens.swift`，并且把"是作者"做成判据而不是共识。**
+理由与 `MotionCatalog` 完全同一族（D-055 的 M11）：只发一份表对不齐，因为视图迟早会漂；
+只有"视图里出现字面量就打红"才叫收口。四档圆角 `chip 4 / control 6 / card 8 / panel 9` +
+派生的 `track = control + 1`；`VisualShape.rounded(_:)` 是唯一的圆角矩形出口，永远 `.continuous`；
+投影两档 `flat`（不分组合成）与 `raised`（**必须**分组合成）。
+
+**`groupsFirst` 为什么绑进投影定义里**：视频控件那处写了 8pt/3pt 却漏了 `.compositingGroup()`，
+而材质是独立图层 ⇒ 不分组合成就每层各打一次阴影。这种漏法**不会报错、不会变红、只在像素上出现**，
+所以正确的修法不是补那一句，而是让"补不补"由令牌决定：调用方只写 `.visualShadow(VisualShadow.raised)`，
+分组与否在出口内部。于是"忘了写"从一种可能的错误变成一种写不出来的写法。
+
+**删掉两个死表面，以及它们各自拖着的一串死参数**：
+- `GlassCircleButton`：产品零调用点。它一死，`GlassIconControl` 的 `hasOwnSurface` / `showsBorder`
+  和 `GlassBorder.isHovered` 三个参数就**各自只剩一种取值** —— 那三个"永远为 false 的开关"比没有开关更坏，
+  读者会以为胶囊里的按钮会跟随悬停变描边（实测 `GlassPill` 一直写死 `isHovered: false`）。
+  一次删除清掉四层假象。代价与收益都要写下来：`glass-pill-*` 两帧**像素完全不变**，
+  证明删掉的确实是没人走的分支，而不是把功能悄悄关掉。
+- `HistoryRow`：注释写着"保留给夹具与详情以外的调用点复用"，实测**产品与测试都没有一个调用点**。
+  这是"注释里的事实"最坏的样子：它给下一个施工者一个不存在的复用理由。删。
+
+判据（`VisualTokenTests` 10 条 + `MotionCatalogTests` 1 条）：圆角/投影/线宽三个方向都禁字面量，
+每个令牌必须有产品代码读它（判据自己读不算消费者），`Views/` 里每个 `struct X: View` 必须有构造点，
+半径与状态强度的**次序**是语义约束（`chip < control < card < panel`、hover < selected），
+目录之外的动效参数从"注释里放过"改成"文件集合相等"。10 支变异体 10/10 红在该红的那条。
+
+**两次测量学上的自我更正，都值得记账**：
+
+1. **死表面那条判据第一次跑就报了两个假阳性**（`ContentView`、`MenuBarRecommendationsView`）。
+   它们不是死的，是**我的扫描集合漏了 target 根目录**（`App.swift` 不在 Views/Utilities/Managers 任何一层）。
+   修的时候顺手加了一条"扫描集合里必须有 App.swift"的断言 —— 漏目录这种故障会让所有"谁构造了它"的判据
+   静默变瞎，而它长得完全像"产品里有死代码"。**方向反过来更危险**：漏目录会让真死表面被算成活的。
+2. **变异对照第一轮 0 支有效**：`python3` 在这台机器上会给整棵子进程树注入
+   `SDKROOT=<CommandLineTools>/MacOSX.sdk`，而 `swift` 来自 Xcode ⇒ 每个变异体都以
+   `error: failed to build module 'Swift'` 告终，21MB 的 SDK 报错。分类器把十支全判成 `DID-NOT-RUN`
+   （不是红也不是绿）才没被读成"守卫失效"。修法是把 `SDKROOT` 从传给子进程的 env 里删掉，
+   并且**先跑一次"什么都不改、目标用例必须绿"的基线自证**，再开始注入。
+   这条与 D-055 那条"变异对照的'红'其实是加载报错"同一族：**对照件的运行环境要先自证**。
+
+**28 帧变化全部归因，不许用"预期内"三个字带过**：先在同一台机器上把树换成 HEAD 内容重采一份
+（只按单文件 cp 换/还，绝不用 `git checkout -- .`），再用 `scripts/frame_audit.py diff` 逐像素比，
+最后按 bbox 说话：`search-field-*` 最大通道差 **1**（激活描边 0.095→0.10）；
+`row-*` / `sidebar-*` / `content-*` 2–8（缩略图角改 continuous、描边 0.16/0.14→0.15、投影 0.06→0.08）；
+`detail-2-file-*` 最大差 **124–127**、bbox (633,288)-(805,312) = 86×12.5pt **一行字** ⇒
+就是本轮刻意修的那句"正在加载预览…"12pt → 13pt（`StatePresentation.messageFontSize`）。
+`glass-pill-*` 不在变化列表里。基线与改动同提交（`FRAME_BASELINE_UPDATED=82`，复跑 `CHANGED=0`）。
+
+**动效套件的 red 不是本轮造成的，证据是三臂交替**（同一台机器、同一轮负载区间）：
+
+| 臂 | 退出 | MOTION_SUMMARY | 红的用例 |
+|---|---|---|---|
+| R1 第一次 | 0 | notice-banner=3 detail-kind-change=3 empty-state=3 | 无 |
+| **HEAD** | 1 | **2**/3/**2** | `testSlidingRoleSettlesWithinItsBudget`、`testTransitionsAreActuallyRunning` |
+| R1 第二次 | 1 | 3/3/3 | `testDetailPreviewCrossfadesOnlyWhenTheKindChanges` |
+
+三臂给出的红集合互不相同、且 HEAD 比 R1 更差 ⇒ 判据在测**采样率**而不是测动画。
+其中一条失败本身就是尺子的自检：`testListRowsDoNotAnimateAndNothingClaimsTheyDo` 的阳性对照读成
+"连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率"。
+这正是 ab7a759 已经写下的那条结论。**本轮不动阈值**（那正是那条提交点名禁止的"调到绿为止"），
+改为把"动效判据与采样率解耦"立成下一轮独立主题，并要求它带自己的变异对照。
+
+数字：600 tests / 23 skipped / 0 failures（HEAD 同口径实测 589 个 `func test`，本轮 +11）；0 warning；
+82 帧 / 28 帧有变化并已归因；`HistoryStore` 零改动，`testHistoryStoreStaysThin` 仍绿。
+视觉账见 **U-22**，轮次记录见 **`AGENT_VISUAL_ITERATION.md`**。

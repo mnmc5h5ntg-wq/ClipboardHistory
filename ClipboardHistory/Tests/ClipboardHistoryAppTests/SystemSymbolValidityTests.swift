@@ -14,7 +14,7 @@ final class SystemSymbolValidityTests: XCTestCase {
     /// 取出源码里所有"会被当成 SF Symbol 名字"的字符串字面量，覆盖三种写法：
     /// ① `Image(systemName: "star")` ② 三元里的两个字面量 `Image(systemName: 条件 ? "a" : "b")`
     /// ③ 透传到 `Image(systemName:)` 的具名参数，如 `ThumbnailSymbol(systemName: "doc")`、
-    ///    `GlassCircleButton(symbol: "trash")`。
+    ///    `GlassPillButton(symbol: "trash", …)`。
     /// 只认字面量：`Image(systemName: 变量)` 静态扫不到，属预期（那种情况由调用点自己负责）。
     static func symbolLiterals(in source: String) -> [String] {
         var found: [String] = []
@@ -55,7 +55,7 @@ final class SystemSymbolValidityTests: XCTestCase {
         Image(systemName: "star")
         Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
         ThumbnailSymbol(systemName: "doc")
-        GlassCircleButton(symbol: "trash") { }
+        GlassPillButton(symbol: "trash", helpText: "删除", action: deleteAction)
         let icon = Image(systemName: "questionable")
         Image(systemName: dynamicName)
         """

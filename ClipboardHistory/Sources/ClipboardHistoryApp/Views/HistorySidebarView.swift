@@ -188,8 +188,10 @@ struct HistorySidebarView: View {
         }
         .overlay {
             if isDropTargeted {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(Color.accentColor.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                VisualShape.rounded(VisualRadius.panel)
+                    .strokeBorder(Color.accentColor.opacity(VisualTint.dropTargetStroke),
+                                  style: StrokeStyle(lineWidth: VisualStroke.highlight,
+                                                     dash: VisualStroke.highlightDash))
                     .allowsHitTesting(false)
                     // 落点框以前是"瞬间出现/瞬间消失"（审计 🟡）。
                     // 淡入 + 一点点缩放是必要的：鼠标悬在窗口边缘时它每帧都在进出，
@@ -200,8 +202,9 @@ struct HistorySidebarView: View {
                 // 减弱动态时整圈光都不画：它是一层模糊，而 HIG 的 reduce-motion 清单里明写了
                 // "avoid animating into and out of blurs"；虚线框本身仍然淡入，指向性没有丢。
                 if MotionCatalog.glows(for: .dropTarget) {
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(MotionCatalog.dropGlowOpacity), lineWidth: 3)
+                    VisualShape.rounded(VisualRadius.panel)
+                        .strokeBorder(Color.accentColor.opacity(MotionCatalog.dropGlowOpacity),
+                                      lineWidth: VisualStroke.glow)
                         .blur(radius: MotionCatalog.dropGlowRadius)
                         .allowsHitTesting(false)
                         .transition(MotionCatalog.transition(for: .contentFade))
@@ -326,8 +329,8 @@ private struct SegmentedFilterPicker: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(.quaternary)
+            VisualShape.rounded(VisualRadius.track)
+                .fill(VisualMaterial.track)
 
             slidingPill
 
@@ -342,15 +345,15 @@ private struct SegmentedFilterPicker: View {
             }
         }
         .frame(height: 26)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .clipShape(VisualShape.rounded(VisualRadius.track))
     }
 
     private var slidingPill: some View {
         GeometryReader { geo in
             let count = CGFloat(HistoryStore.Filter.allCases.count)
             let idx = CGFloat(HistoryStore.Filter.allCases.firstIndex(of: selection) ?? 0)
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(.ultraThickMaterial)
+            VisualShape.rounded(VisualRadius.control)
+                .fill(VisualMaterial.sliderPill)
                 .frame(width: geo.size.width / count - 2)
                 .padding(.vertical, 1)
                 .offset(x: idx * (geo.size.width / count) + 1)

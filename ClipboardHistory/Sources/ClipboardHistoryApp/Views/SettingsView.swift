@@ -650,8 +650,8 @@ private struct SettingsSidebarRow: View {
     @State private var isHovered = false
 
     private var backgroundOpacity: Double {
-        if isSelected { return 0.16 }
-        return isHovered ? 0.045 : 0
+        if isSelected { return VisualFill.selected }
+        return isHovered ? VisualFill.hover : 0
     }
 
     var body: some View {
@@ -671,11 +671,11 @@ private struct SettingsSidebarRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .contentShape(VisualShape.rounded(VisualRadius.panel))
         }
         .buttonStyle(.plain)
         .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            VisualShape.rounded(VisualRadius.panel)
                 .fill(isSelected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
         )
         .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
