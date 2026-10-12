@@ -587,3 +587,41 @@ D-3 给「通用」补两项而不是合并 —— 两条都按指定做完，�
 13. **`git checkout -- .` 不能当还原手段**：本轮一句它扫掉了 9 个未提交文件（作用域是当时所在目录）。
     凡是会改工作区的脚本，还原一律用事前逐文件 `cp` 备份；变异脚本还必须区分
     `CAUGHT / ESCAPED / DID-NOT-RUN`（补丁没打上时打印"结论无效"，不许输出绿或红）。
+
+## 快照 33（2026-10-12 晚，动效补做：M1 替代路径 / 骨架扫光 / 落点光晕 / 符号反馈）
+
+用户反馈"新版本没加什么动画"。重读报告之后确认是覆盖漏洞而非观感偏差：M1 的**替代路径**
+（QuickPick 是真 `NSTableView`）、M5 的**叠加档**（`replace` + `bounce`，MC-12 原话给的两个选项之一）、
+M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"砍"。四条全部补上，
+决定与取证见 D-056 / U-21，人工验收见 `docs/MANUAL_TEST_v1.4.9_round3.md` 批次 9。
+
+**已实测**：587 tests / 21 skipped / 0 failures；两个 triple 各 0 warning；82 帧 `CHANGED=0`
+（`detail-2-file-{light,dark}` 两帧是这次刻意改的加载态，基线已随包更新）；
+25 条新判据；16 支变异里 15 支红在该红的那条，第 16 支（M5）故意让它逃逸，据此删了一条死守卫。
+像素：QuickPick 行动画 开 11 帧 / 关 1 帧；骨架扫 19 对在变 / 减弱动态 0 对。
+
+**欠账（这一节新增的，都带复现命令）**：
+
+1. **② 系统符号动效仍然量不到**（两臂同为 1 帧 / 峰值 0.190）。要么哪天换成自绘淡入让它可测，
+   要么永远只靠人工 9.3 / 9.4。判据 `testSystemSymbolEffectsAreOutOfThisRulersReach` 会在
+   尺子重新看得见它的那天自己变红 —— 不要提前删。
+2. **④b 落点光晕没有任何像素证据**：真拖放需要鼠标 + 辅助功能授权（D-034 那一族）。
+   现在只有"参数在表里 + 侧栏确实读了它"两条守卫。
+3. **`reduce-transparency` 门没接**（本轮 ④c 主动撤下）。要做的是：把 7 处
+   `.ultraThinMaterial`（`ViewExtensions.swift:7,9`、`DetailView.swift:159`、
+   `HistorySidebarView.swift:353`、`GlassControls.swift:91,179`、`VideoPreview.swift:269`）
+   收敛成一份 `GlassSurface` 纯值表，再挂门控 —— 先决定"不透明时是什么底色"，
+   那是一个视觉判断 + 一次 82 帧基线重生成，别和动效混在一轮里。
+4. **帧间隔判据这次是红的，而且红得不是地方**：`FPS-LOADED p95=28.68ms` 超 20ms 上界，
+   但**同一次运行**里 `FPS-MOTION-OFF p95=27.67ms`（曲线全关）同样超，空载基线 16.67ms
+   ⇒ 责任在环境（当时 WindowServer 45% CPU、本机还有一份装好的旧包在跑 32%）。
+   复现：`CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests`。
+   待机器安静时复测一次；如果两臂仍然一起超，说明**判据的上界本身要重定**（20ms 是 60fps 的
+   理想值，而这条探针在真实桌面上跑），那属于"闸门设计"问题，不该由一次红来偷偷改掉。
+5. **一条比本轮更早的红**：`UIInteractionProbeTests/testSidebarListFocusRingAfterClick`
+   —— "找不到行代理"。在 `66b6314^` 的干净 worktree 里同样红，把 `HistoryRowViews.swift`
+   换成 HEAD 版本再测也红 ⇒ **不是本轮引入**。现场（已写进失败消息）：320pt 宽的侧栏里
+   一行变成**两个 148pt 半宽 `KeyViewProxy`**（x=12 与 x=160），探针要求单个 200…290pt。
+   两种可能没分清：无障碍结构真退化了（一行被读成两个停靠点），或者只是行内布局变了而
+   探针的几何写死。**先按前者查**，因为如果是真的，那是 VoiceOver 用户每天撞的事。
+   复现：`CLIPBOARD_HISTORY_UI_INTERACTION=1 swift test --filter UIInteractionProbeTests/testSidebarListFocusRingAfterClick`。

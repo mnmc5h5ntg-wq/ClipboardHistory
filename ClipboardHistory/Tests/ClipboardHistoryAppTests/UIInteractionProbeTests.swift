@@ -518,7 +518,20 @@ final class UIInteractionProbeTests: XCTestCase {
         }
         walk(host)
         guard let row = rowProxies.min(by: { $0.frame.minY < $1.frame.minY }) else {
-            XCTFail("找不到行代理，探针无法点击")
+            // 失败消息要自带"当时看到了什么"：这条探针红过一次，而"找不到行代理"那五个字
+            // 什么都没告诉我们 —— 是行没画出来，还是行的无障碍结构变了（一行变成两个代理）。
+            // 后者才是真问题，而只有把代理的帧打出来才分得开。
+            var seen: [String] = []
+            func dumpAll(_ view: NSView) {
+                let name = String(describing: type(of: view))
+                if name.contains("Proxy") || name.contains("ListTableRowView") { seen.append("\(name)@\(view.frame)") }
+                for sub in view.subviews { dumpAll(sub) }
+            }
+            dumpAll(host)
+            XCTFail("找不到行代理（要求 KeyViewProxy 宽 200…290、高 <40），"
+                    + "宿主 \(host.frame)、窗口内容区 \(window.contentLayoutRect)，"
+                    + "实际看到的行相关视图：\(seen.prefix(14))。"
+                    + "如果一行变成**两个**半宽代理，那是无障碍结构的问题，不是探针的几何没调对")
             return
         }
         let windowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)

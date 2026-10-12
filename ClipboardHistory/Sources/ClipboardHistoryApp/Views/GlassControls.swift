@@ -51,6 +51,9 @@ struct GlassPill: View {
                 helpText: FavoriteTogglePresentation.helpText(isFavorite: isFavorite),
                 foregroundStyle: isFavorite ? AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) : AnyShapeStyle(.primary),
                 replaceSymbol: true,
+                // 收藏是"状态被改了"，HIG 给 bounce 的语义就是 "an action occurred"；
+                // 它与 replace **同时挂**（见 `SymbolMotion`），不再是二选一。
+                bounceValue: isFavorite ? 1 : 0,
                 action: favoriteAction
             )
 
@@ -63,6 +66,7 @@ struct GlassPill: View {
                 helpText: PinTogglePresentation.helpText(isPinned: isPinned),
                 foregroundStyle: isPinned ? AnyShapeStyle(.primary) : AnyShapeStyle(.primary.opacity(0.78)),
                 replaceSymbol: true,
+                bounceValue: isPinned ? 1 : 0,
                 action: pinAction
             )
 
@@ -99,6 +103,9 @@ private struct GlassPillButton: View {
     /// 符号本身会变的按钮（收藏 / 固定 / 已复制）打开这一档：换符号时给一次系统过渡，
     /// 而不是"啪"地换成另一个图标。
     var replaceSymbol = false
+    /// "状态被改了"的弹一下（14+，且未开启减弱动态）。只有代表状态的图标才给；
+    /// 复制那颗**故意不传** —— 每天上百次的动作按频率闸门不该有弹跳。
+    var bounceValue: Int? = nil
     let action: () -> Void
     @State private var isHovered = false
 
@@ -113,6 +120,7 @@ private struct GlassPillButton: View {
                 showsBorder: false,
                 foregroundStyle: foregroundStyle,
                 replacesSymbol: replaceSymbol,
+                bounceValue: bounceValue
             )
         }
         .buttonStyle(.plain)
@@ -136,6 +144,7 @@ private struct GlassIconControl: View {
     /// 状态反馈（换符号的连续过渡 / 值变了弹一下）。默认关：
     /// 只有"图标代表一个状态"的那些按钮才开，纯动作按钮不该弹。
     var replacesSymbol = false
+    var bounceValue: Int? = nil
 
     var body: some View {
         content
@@ -160,7 +169,7 @@ private struct GlassIconControl: View {
             // 单色渲染让每个符号都按前景色满权重画，控件内部才统一。
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(foregroundStyle)
-            .symbolMotion(symbol: symbol, replacesSymbol: replacesSymbol)
+            .symbolMotion(symbol: symbol, replacesSymbol: replacesSymbol, bounceValue: bounceValue)
             .frame(width: size, height: size)
     }
 

@@ -88,6 +88,15 @@ private struct RowFavoriteButton: View {
             Image(systemName: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite))
                 .font(.system(size: 11, weight: .regular))
                 .foregroundStyle(tint)
+                // 行里这颗星**也会换符号**（star ↔ star.fill），而它就在用户点的那一行上：
+                // 上一轮只给详情浮层那颗胶囊接了过渡，行内这一处是漏的（M5 的原文是
+                // "收藏 / pin 切换"，不限一处）。
+                // ⚠️ 它在一个 `List` 行里 —— 行**位置**的过渡已实测跑不出来（D-055），
+                // 行**内部**的符号过渡能不能跑，由 `MotionFilmstripTests` 的星标带判据量，
+                // 不靠推测。
+                .symbolMotion(symbol: FavoriteTogglePresentation.symbolName(isFavorite: isFavorite),
+                              replacesSymbol: true,
+                              bounceValue: isFavorite ? 1 : 0)
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())
         }
@@ -127,11 +136,15 @@ private struct RowPinnedBadge: View {
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(Color.primary.opacity(0.78))
                     .accessibilityLabel("已固定")
+                    // 徽标是"从无到有"，所以给淡入而不是弹跳：槽位宽度恒定（见上面注释），
+                    // 淡入不会让任何一行横向抖。
+                    .transition(MotionCatalog.transition(for: .contentFade))
             } else {
                 Color.clear
             }
         }
         .frame(width: 12, height: 14)
+        .animation(MotionCatalog.animation(for: .contentFade), value: isPinned)
     }
 }
 

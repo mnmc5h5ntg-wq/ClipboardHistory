@@ -260,15 +260,23 @@ struct DetailFileView: View {
         }
     }
 
+    /// 加载态（动效审计 M9）：spinner 换成**骨架扫光**。
+    ///
+    /// 理由不是"扫光更时髦"：spinner 说的是"我在等"，骨架说的是"内容马上来"，
+    /// 同一段等待里后者把注意力放到即将出现的东西上（报告 §3 那行给的就是这个差别）。
+    /// 那一句人话留着 —— 报告 §5 红线 2 要的是"只在加载态挂上、离开就停"，
+    /// 而这块视图正是被 `.loading` 分支独占的，超时 8 秒后换成失败态，循环随之消失。
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.small)
+        VStack(spacing: 14) {
+            SkeletonPreviewView()
+                .frame(height: 44)
             Text("正在加载预览…")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func failureView(_ message: String) -> some View {

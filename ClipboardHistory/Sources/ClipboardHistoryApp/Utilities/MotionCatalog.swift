@@ -46,11 +46,27 @@ enum MotionCatalog {
         case emphasis      // 状态被改变的确认（收藏 / 固定 / 已复制）
         case dropTarget    // 拖入落点框
         case contentFade   // 内容换页（详情换类型、设置分类、菜单栏结果落地、空态）
+        /// 骨架扫光（M9）。**它是常驻循环，不是一次过渡** —— 见 `isAmbient`。
+        case skeletonSweep
     }
 
     /// 全局上限。任何一档超过它都要在这里改常数，改完 `testEveryRoleStaysUnderTheCeiling` 会红
     /// —— 而且它现在断言的是 `curve(for:)` 的秒数，也就是真正交给系统的那条曲线。
     static let maximumDuration: TimeInterval = 0.25
+
+    /// 这一档管的是"一次反馈/一次交接要多久"，**常驻循环不在它的语义范围内**。
+    ///
+    /// 把 250ms 上限套到扫光上，唯一的结果是逼出一个每秒闪四次的频闪 —— 那不是"快得像反馈"，
+    /// 那是前庭触发源。所以这里给它开一条**有自己判据**的例外，而不是把上限整体放宽：
+    /// 必须线性（`linearControlPoints`）、必须 ≥ 1s，并且全仓只准有**一个**常驻动画驱动、
+    /// `repeatForever` 一次都不许出现（两条都在 `MotionCatalogTests.testAmbientLoopIsSingleton`）。
+    /// 为什么是"一个驱动、零次 repeatForever"而不是"一处循环"：报告 §12.5 的首选案
+    /// （`.animation(value:)` + `repeatForever` 插值渐变端点）**没有被证明工作过**，
+    /// 取证过程与那三个 0.0000 的定性都记在 `SkeletonShimmer.swift` 文件头。
+    static func isAmbient(_ role: Role) -> Bool { role == .skeletonSweep }
+
+    /// 常驻循环的下限（比它快就成闪烁）。
+    static let minimumAmbientDuration: TimeInterval = 1.0
 
     /// 临界阻尼 = 不过冲。WWDC18「Designing Fluid Interfaces」：默认从 100% damping 开始调弹性，
     /// 只有**手势本身带惯性**时才给轻微过冲。这里的滑入都是程序触发的，不是手势跟手。
@@ -68,6 +84,7 @@ enum MotionCatalog {
         case .emphasis: return 0.16
         case .dropTarget: return 0.12
         case .contentFade: return 0.16
+        case .skeletonSweep: return 1.5
         }
     }
 
@@ -81,6 +98,9 @@ enum MotionCatalog {
     static let entranceControlPoints: [Double] = [0.23, 1, 0.32, 1]
     /// 退场曲线：Carbon exit productive。
     static let exitControlPoints: [Double] = [0.2, 0, 1, 0.9]
+    /// 匀速：`Animation.linear` 的等价控制点，只给常驻循环用。
+    /// 循环里带 ease 会被看成"每圈都在起步"，扫光这类匀速位移必须匀速。
+    static let linearControlPoints: [Double] = [0, 0, 1, 1]
 
     // MARK: - 形状（纯值，可断言）
 
@@ -97,6 +117,11 @@ enum MotionCatalog {
         var scales = false
         /// 退场档：曲线换成 exit 那一组控制点，且不带位移（走的时候不该再占一次注意力）。
         var isExit = false
+        /// 落点那一圈**发光**。和 `scales` 是两件事，所以是两个字段而不是一个布尔：
+        /// 缩放表达"让位"，光表达"松手就在这里"。减弱动态时两个都收，但收的理由不同 ——
+        /// 光这一条还额外撞 HIG 那句 "Avoid animating into and out of blurs"
+        /// （淡入一圈模糊本身就是"淡入淡出模糊"），所以它比缩放更该被关掉。
+        var glows = false
     }
 
     /// 减弱动态时的退化规则集中在这一个函数里：滑入 → 淡入；缩放 → 直接落位；时长一律不归零。
@@ -105,15 +130,30 @@ enum MotionCatalog {
         switch role {
         case .hover, .selection, .contentFade, .emphasis:
             break
+        case .skeletonSweep:
+            // 常驻循环不"滑"也不"缩"：它只把一条渐变带推过去。
+            // "减弱动态"时**整条带不画**（由 `SkeletonMotion` 决定），骨架本身留着 ——
+            // 留着才有"内容马上来"的暗示，只是不再扫。
+            break
         case .bannerIn:
             shape.slides = reduceMotion ? .none : .top
         case .bannerOut:
             shape.isExit = true
         case .dropTarget:
             shape.scales = !reduceMotion
+            shape.glows = !reduceMotion
         }
         return shape
     }
+
+    /// 落点那一圈要不要发光（视图侧的唯一入口，别在视图里自己判 `shape`）。
+    static func glows(for role: Role, reduceMotion: Bool = motionShouldBeReduced) -> Bool {
+        shape(for: role, reduceMotion: reduceMotion).glows
+    }
+
+    /// 落点光晕的模糊半径与不透明度。只给 `dropTarget` 那一圈用。
+    static let dropGlowRadius: CGFloat = 3
+    static let dropGlowOpacity: Double = 0.45
 
     // MARK: - 曲线（纯值，`Animation` 只能从这里来）
 
@@ -132,6 +172,10 @@ enum MotionCatalog {
     static func curve(for role: Role, reduceMotion: Bool) -> Curve {
         let shape = shape(for: role, reduceMotion: reduceMotion)
         let seconds = duration(for: role)
+        if isAmbient(role) {
+            // 常驻循环：匀速、不受 250ms 上限约束（见 `isAmbient` 的注释）。
+            return Curve(kind: .timingCurve(linearControlPoints), seconds: seconds)
+        }
         if shape.slides != .none {
             // 位移档用弹簧：response 直接取这一档的时长（MC-2 的病灶就是这里曾经写死 0.32）。
             return Curve(kind: .spring(damping: criticalDamping), seconds: seconds)

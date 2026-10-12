@@ -25,9 +25,59 @@ final class MotionCatalogTests: XCTestCase {
         for role in MotionCatalog.Role.allCases {
             let seconds = MotionCatalog.duration(for: role)
             XCTAssertGreaterThan(seconds, 0, "\(role.rawValue) 没有时长")
+            if MotionCatalog.isAmbient(role) {
+                XCTAssertGreaterThanOrEqual(seconds, MotionCatalog.minimumAmbientDuration,
+                                            "\(role.rawValue) 是常驻循环却只有 \(seconds)s：那不是扫光是频闪")
+                continue
+            }
             XCTAssertLessThanOrEqual(seconds, MotionCatalog.maximumDuration,
                                      "\(role.rawValue) 是 \(seconds)s，超过 \(MotionCatalog.maximumDuration)s 上限：那不是质感是延迟")
         }
+    }
+
+    /// 例外必须**只有一个入口**，否则"上限"就变成了一句可以随便绕过去的话。
+    ///
+    /// 这条断言的三个方向都是必须的：① 例外集合就是 `skeletonSweep` 那一档（别人想挤进来要红）；
+    /// ② 例外档必须是**匀速**（循环里带 ease 会被看成每圈都在起步）；
+    /// ③ 非例外档**不许**拿到匀速以外的东西？—— 不，那条反过来不成立（进场/退场本来就是控制点），
+    /// 所以这里只查"例外 ⇒ 匀速"，反过来不查，免得钉出一条不存在的契约。
+    func testAmbientExceptionIsExactlyOneRoleAndIsLinear() {
+        let ambient = MotionCatalog.Role.allCases.filter(MotionCatalog.isAmbient)
+        XCTAssertEqual(ambient, [.skeletonSweep],
+                       "常驻循环档现在不止 `skeletonSweep`：250ms 上限的例外被扩大了，得先看这份例外表对不对")
+        for role in ambient {
+            XCTAssertEqual(MotionCatalog.curve(for: role, reduceMotion: false).kind,
+                           .timingCurve(MotionCatalog.linearControlPoints),
+                           "\(role.rawValue) 不是匀速")
+            XCTAssertEqual(MotionCatalog.curve(for: role, reduceMotion: true).kind,
+                           .timingCurve(MotionCatalog.linearControlPoints),
+                           "减弱动态时这一档的**曲线**不变；停不停由 `SkeletonMotion.sweepIsRunning` 决定")
+        }
+    }
+
+    /// 常驻动画只有**一个驱动**，而且它不是渲染树那条路。
+    ///
+    /// 报告 §5 红线 2 的原话是"仓库现在一个 `repeatForever` 都没有，这是新增的第一条常驻动画风险"。
+    /// 两个方向都钉：
+    /// - `repeatForever` 出现 **0** 次 —— 那条路**没被量过**（`SkeletonShimmer.swift` 文件头记着
+    ///   取证过程中那三个 0.0000，以及其中一个其实是对比度造成的误判），
+    ///   所以本仓库的常驻动画一律走"每拍把相位写回视图状态"这条被量过的路；
+    /// - 那个时钟只有 `SkeletonShimmer.swift` 一个文件里有（标记用 `Timer.publish`：
+    ///   `HistoryStore` 里那两处 `Timer.scheduledTimer` 是采集轮询，不是动画，不该被这条管住）。
+    /// 第二条是单调量：再冒出一个常驻动画驱动，就得先在这里说明它为什么也该被允许。
+    func testAmbientLoopIsSingleton() throws {
+        var repeatForever: [String] = []
+        var sweepDrivers: [String] = []
+        for directory in ["Views", "Managers", "Utilities", "Intelligence", "Models"] {
+            for (name, source) in try productSources(in: directory) {
+                let code = codeOnly(source)
+                if code.contains("repeatForever") { repeatForever.append(name) }
+                if code.contains("Timer.publish") { sweepDrivers.append(name) }
+            }
+        }
+        XCTAssertTrue(repeatForever.isEmpty, "渲染树循环又出现了：\(repeatForever)")
+        XCTAssertEqual(sweepDrivers, ["SkeletonShimmer.swift"],
+                       "常驻动画驱动不止一处：\(sweepDrivers)")
     }
 
     /// 第一版的守卫只检查 `duration(for:)` 那张表，而 `animation(for:)` 在位移档里
@@ -40,8 +90,13 @@ final class MotionCatalogTests: XCTestCase {
                 let curve = MotionCatalog.curve(for: role, reduceMotion: reduceMotion)
                 XCTAssertEqual(curve.seconds, MotionCatalog.duration(for: role),
                                "\(role.rawValue)（reduce=\(reduceMotion)）的曲线自带时长：上限表管不到它")
-                XCTAssertLessThanOrEqual(curve.seconds, MotionCatalog.maximumDuration,
-                                         "\(role.rawValue) 真正交出去的是 \(curve.seconds)s，超上限")
+                if MotionCatalog.isAmbient(role) {
+                    XCTAssertGreaterThanOrEqual(curve.seconds, MotionCatalog.minimumAmbientDuration,
+                                                "\(role.rawValue) 真正交出去的是 \(curve.seconds)s，常驻循环不该比这更快")
+                } else {
+                    XCTAssertLessThanOrEqual(curve.seconds, MotionCatalog.maximumDuration,
+                                             "\(role.rawValue) 真正交出去的是 \(curve.seconds)s，超上限")
+                }
             }
         }
     }
@@ -199,6 +254,27 @@ final class MotionCatalogTests: XCTestCase {
         XCTAssertTrue(MotionCatalog.animationsEnabled, "探针开关被留在关闭状态：动效全没了，纯值判据却还是绿的")
     }
 
+    /// 落点光晕（M8 后半句）的门控与**唯一消费者**。
+    ///
+    /// 三个方向都要钉，少一个都会变成"参数在表里、界面上没有"：
+    /// ① 只有 `dropTarget` 会发光 —— 别的档悄悄加上 `glows` 就是往高频路径上加模糊；
+    /// ② 减弱动态时收掉（HIG 的 "avoid animating into and out of blurs"）；
+    /// ③ 侧栏确实读它（MC-12 那一族：纯值全对、没人调用）。
+    func testDropTargetGlowIsGatedAndWired() throws {
+        XCTAssertTrue(MotionCatalog.glows(for: .dropTarget, reduceMotion: false))
+        XCTAssertFalse(MotionCatalog.glows(for: .dropTarget, reduceMotion: true),
+                       "减弱动态时还在淡入一层模糊")
+        for role in MotionCatalog.Role.allCases where role != .dropTarget {
+            XCTAssertFalse(MotionCatalog.glows(for: role, reduceMotion: false),
+                           "\(role.rawValue) 也发光了：那一层模糊会往高频路径上扩散")
+        }
+        let sidebar = codeOnly(try productSource(named: "Views/HistorySidebarView.swift"))
+        XCTAssertTrue(sidebar.contains("MotionCatalog.glows(for: .dropTarget)"),
+                      "光晕没人读 ⇒ 它只是目录里的两个数")
+        XCTAssertTrue(sidebar.contains("MotionCatalog.dropGlowRadius"),
+                      "半径没走目录 ⇒ 视图里出现了自己写的模糊值")
+    }
+
     // MARK: - 降级开关（全源门，M16）
 
     /// 合成规则是**或**不是与：任一来源说要降就降。
@@ -315,8 +391,19 @@ final class MotionCatalogTests: XCTestCase {
         let glass = codeOnly(try productSource(named: "Views/GlassControls.swift"))
         XCTAssertEqual(glass.components(separatedBy: "replaceSymbol: true").count - 1, 3,
                        "收藏/固定/已复制这三颗会换符号的按钮，少一颗接上替换过渡就说明有一处回到了\'啪地换图标\'")
-        XCTAssertFalse(glass.contains("bounceValue"),
-                       "bounce 那条分支已经被证明永远走不到（MC-12）：它回来了，替换过渡就又会被挡住")
+        // MC-12 的教训不是"bounce 不该存在"，而是"两条效果不许写成互斥分支"。
+        // 所以这里钉的是**叠加**：bounce 回来了可以，但 `SymbolMotion` 里它必须与 replace 同时挂。
+        let motion = codeOnly(try productSource(named: "Views/MotionModifiers.swift"))
+        XCTAssertTrue(motion.contains("bounceValue"), "M5 要的\'弹一下\'回来了吗？没有的话是被顺手删了")
+        XCTAssertTrue(motion.contains("contentTransition(.symbolEffect(.replace))"),
+                      "符号替换过渡是\'换了图标\'这件事的唯一表达，不许为了弹跳把它让掉")
+        XCTAssertTrue(motion.contains("bouncing(content.contentTransition"),
+                      "bounce 与 replace 又变回互斥分支了（MC-12 的原病）：必须叠加，见 `SymbolMotion`")
+        let pill = codeOnly(try productSource(named: "Views/GlassControls.swift"))
+        XCTAssertTrue(pill.contains("bounceValue: isFavorite"), "收藏那颗要弹（状态被改了）")
+        XCTAssertTrue(pill.contains("bounceValue: isPinned"), "固定那颗要弹")
+        XCTAssertFalse(pill.contains("bounceValue: copyConfirmed"),
+                       "复制是每天上百次的动作，频率闸门判它不该弹（报告红线 0）")
     }
 
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。

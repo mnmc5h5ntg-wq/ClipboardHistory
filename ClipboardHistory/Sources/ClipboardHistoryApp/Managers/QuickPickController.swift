@@ -212,9 +212,52 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         table.scrollRowToVisible(model.index)
     }
 
+    /// 刷新候选列表。**刻意不再 `reloadData()` 一把梭**（动效审计 M1 的替代路径，报告 §12.4/§12.7）：
+    /// 整表刷新等于告诉 AppKit"每一行都是新的"，于是它什么都不能动画 —— 这正是
+    /// SwiftUI `List` 那条路走死之后，报告给的第二个方案：这个浮层本来就是真 `NSTableView`，
+    /// 用它的原生行动画（`.effectFade`，10.7 起，MiaoYan 同款），零依赖。
+    /// 输入时"候选变少 / 清空后重新匹配上"因此有了可读的"被抽走 / 补进来"，
+    /// 而不是整块文字闪一下。
     private func rebuildRows() {
-        rows = model.visible.map { Row(entry: $0, title: Self.rowTitle(for: $0)) }
-        table?.reloadData()
+        let next = model.visible.map { Row(entry: $0, title: Self.rowTitle(for: $0)) }
+        let plan = QuickPickRowDiff.plan(oldIDs: rows.map(\.entry.id), oldTitles: rows.map(\.title),
+                                         newIDs: next.map(\.entry.id), newTitles: next.map(\.title))
+        let previous = rows
+        rows = next
+        guard let table else { return }
+        guard !plan.isNoop else { return }
+        // 整体重排（刚复制的那条被顶到最前就是这种）原生行动画表达不了：退回整表刷新，
+        // 并在日志里留一句 —— 否则"我以为它在动"会变成下一条假账。
+        if plan.needsFullReload {
+            NSLog("QuickPick rebuild: 行序整体重排（\(previous.count)→\(next.count)），退回整表刷新，本次无行动画")
+            table.reloadData()
+            return
+        }
+        table.beginUpdates()
+        let animation = Self.rowAnimationOptions(reduceMotion: MotionCatalog.motionShouldBeReduced,
+                                                 animationsEnabled: MotionCatalog.animationsEnabled)
+        if !plan.removals.isEmpty { table.removeRows(at: plan.removals, withAnimation: animation) }
+        if !plan.insertions.isEmpty { table.insertRows(at: plan.insertions, withAnimation: animation) }
+        table.endUpdates()
+        // 原地刷新排在 `endUpdates()` **之后**。
+        // 理由不是"这样更好看"：批量更新里只有 insert/remove 有明确的新旧坐标系约定，
+        // `reloadData(forRowIndexes:)` 没有文档保证它在批次中间按哪一套下标解释 ——
+        // 而 `plan.reloads` 给的是**新**下标。表格落定之后再刷，读的就是新下标这件事本身。
+        // 错一位不会崩，只会安静地刷错行（不报错、不红，只有文案是旧的），所以不赌。
+        if !plan.reloads.isEmpty {
+            table.reloadData(forRowIndexes: plan.reloads, columnIndexes: IndexSet(integer: 0))
+        }
+    }
+
+    /// 减弱动态 ⇒ 传空效果集，**不是**"跳过这次更新"。
+    ///
+    /// `NSTableView` 收到 `[]` 仍然照常增删行、仍然会把下面的行挪上去，只是不叠那层淡入淡出 ——
+    /// 这正是目录要求的"替换而不是删除"（账本 U-20 第 3 条）。
+    /// 第二个参数是截图夹具的 A/B 档：这一层动效由 AppKit 执行、不吃 SwiftUI 的 `Animation`，
+    /// 所以"关掉它之后应当什么都不动"那条对照组必须由我们自己接进同一个总开关，
+    /// 否则量到动也说不清是不是我们的动。
+    static func rowAnimationOptions(reduceMotion: Bool, animationsEnabled: Bool) -> NSTableView.AnimationOptions {
+        (reduceMotion || !animationsEnabled) ? [] : .effectFade
     }
 
     /// 行文案：**预览在前，元信息在后**。用户在浮层里是靠认内容选条目的，

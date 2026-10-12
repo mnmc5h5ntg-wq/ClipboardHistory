@@ -195,6 +195,17 @@ struct HistorySidebarView: View {
                     // 淡入 + 一点点缩放是必要的：鼠标悬在窗口边缘时它每帧都在进出，
                     // 没有过渡就会闪。减弱动态时只剩淡入（`shape` 里那条规则）。
                     .transition(MotionCatalog.transition(for: .dropTarget))
+                // M8 的后半句："命中文件时列表轻微让位 + **描边发光**"。让位那一半是上面的缩放，
+                // 这一半才是"松手就在这里"的那句话 —— 虚线框只说"这里能放"，光说"现在正对着你"。
+                // 减弱动态时整圈光都不画：它是一层模糊，而 HIG 的 reduce-motion 清单里明写了
+                // "avoid animating into and out of blurs"；虚线框本身仍然淡入，指向性没有丢。
+                if MotionCatalog.glows(for: .dropTarget) {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(Color.accentColor.opacity(MotionCatalog.dropGlowOpacity), lineWidth: 3)
+                        .blur(radius: MotionCatalog.dropGlowRadius)
+                        .allowsHitTesting(false)
+                        .transition(MotionCatalog.transition(for: .contentFade))
+                }
             }
         }
         .animation(MotionCatalog.animation(for: .dropTarget), value: isDropTargeted)

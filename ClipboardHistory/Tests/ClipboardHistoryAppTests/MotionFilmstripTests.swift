@@ -79,6 +79,27 @@ final class MotionFilmstripTests: XCTestCase {
         return window.filter { $0 >= peak * stepFloorRatio }.count
     }
 
+    static func peak(_ fractions: [Double]) -> Double { fractions.max() ?? 0 }
+
+    /// 把窗口切成 cols×rows 的格子，打印"峰值那一格里每格的变化量"——用来回答
+    /// "到底哪里变了"，而不是靠猜像素坐标去框区域（猜错的结果是整条判据读到 0.000，
+    /// 看着像"没动"，其实是我没框到）。
+    static func changeGrid(_ frames: [CGImage], index: Int, cols: Int, rows: Int) -> String {
+        let bitmaps = frames.map(raster)
+        guard index + 1 < bitmaps.count else { return "无帧" }
+        var cells: [String] = []
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let band = CGRect(x: CGFloat(col) / CGFloat(cols), y: CGFloat(row) / CGFloat(rows),
+                                  width: 1 / CGFloat(cols), height: 1 / CGFloat(rows))
+                let v = changedFraction(bitmaps[index], bitmaps[index + 1], band: band)
+                cells.append(v > 0.25 ? "#" : v > 0.08 ? "+" : v > 0.015 ? "-" : ".")
+            }
+            cells.append("|")
+        }
+        return String(cells.joined())
+    }
+
     static func peakIndex(_ fractions: [Double]) -> Int {
         fractions.indices.max(by: { fractions[$0] < fractions[$1] }) ?? 0
     }
@@ -310,6 +331,130 @@ final class MotionFilmstripTests: XCTestCase {
                                  "横幅滑入要 \(settle) 帧才落定（≈\(settle * max(interval, 1))ms），远超声明的 150ms")
     }
 
+    /// 系统符号动效（`contentTransition(.symbolEffect(.replace))` / `symbolEffect(.bounce)`）
+    /// **不在这把尺的可测范围内** —— 这条测试的作用是把"测不到"钉成一个事实，而不是留一句
+    /// "我加了过渡所以它在动"。
+    ///
+    /// 实测（本机，同一份帧数据两臂对照）：把收藏星在**列表行里**切换，
+    /// 动画开与目录曲线归零**读数完全相同**（`0.190` 单帧，两臂过渡帧数都是 1）。
+    /// 这有两种解释，我分不开：① `List` 行内也不吃 SwiftUI 过渡（与 M1 同根因）；
+    /// ② 系统符号动效是 SF Symbols 自己的图层动画，`cacheDisplay` 抓的是模型树 ⇒ 抓不到。
+    /// ②的先例就在本文件头上写着（报告 §13.2 也实测过 `animationKeys` 恒空而像素确有斜坡），
+    /// 所以我**没有**据此把行内的 `symbolMotion` 摘掉 —— 那是拿尺子的盲区当产品的结论。
+    ///
+    /// 这里保留一条真正能判的断言：**如果**哪天这把尺看得见它了（比如换成自绘的淡入），
+    /// 那它必须两臂有别；否则就还是"未知"，不许写进"已交付"。
+    func testSystemSymbolEffectsAreOutOfThisRulersReach() throws {
+        try skipUnlessEnabledAndCapable()
+        let band = CGRect(x: 0.005, y: 0.26, width: 0.05, height: 0.12)   // 侧栏第 4 行的星标列
+        let scenario = Scenario.toggleFavoriteInRow()
+        let on = Self.deltas(record(scenario).frames, band: band)
+        MotionCatalog.animationsEnabled = false
+        let off = Self.deltas(record(scenario).frames, band: band)
+        MotionCatalog.animationsEnabled = true
+        print("MOTION_SYMBOL row-star 开 帧数=\(Self.transitionFrameCount(on)) 峰值=\(String(format: "%.3f", Self.peak(on)))")
+        print("MOTION_SYMBOL row-star 关 帧数=\(Self.transitionFrameCount(off)) 峰值=\(String(format: "%.3f", Self.peak(off)))")
+        XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
+                             "带里什么都没变 ⇒ 我连星标在哪都没框到，这条'测不到'的结论本身不成立")
+        XCTAssertEqual(Self.transitionFrameCount(on), Self.transitionFrameCount(off),
+                       "两臂现在有差别了 ⇒ 这把尺重新看得见系统符号动效，把这条改成真判据，"
+                       + "并把 `AGENT_UI_AUDIT` 里那条'量不到'的边界撤掉")
+    }
+
+    /// 这把尺看不看得见 **AppKit 自己的行动画**（`insertRows/removeRows(withAnimation:)`）——
+    /// 快速选择浮层（M1 的替代路径）动效的成败全押在它上面，所以先量尺子，再谈交付。
+    ///
+    /// 为什么不能用 SwiftUI 那套结论外推：`List` 的四种写法量出来都是一帧到位（D-055 / M1），
+    /// 而那条路的根因是"SwiftUI 的 `.transition` 在 NSTableView 后端上不执行"。
+    /// 这里走的是**同一张表的原生 API**（AppKit 自己插删行），是另一件事，必须单独量。
+    ///
+    /// 两臂由 `QuickPickController.rowAnimationOptions` 给 —— 也就是**产品实际传给 AppKit 的那两个值**，
+    /// 不是我在测试里另写的一份。这样"关掉之后什么都不动"这条对照，测的确实是产品开关。
+    ///
+    /// 判据的形状和 `testSystemSymbolEffectsAreOutOfThisRulersReach` 一样是**双向**的：
+    /// 两臂读数必须不同。如果相同 ⇒ 尺子看不见 AppKit 的图层动画（`cacheDisplay` 抓的是模型树），
+    /// 那 ① 就只能记成"源码已接、产物未量"，**不许**写进"已交付"。
+    func testNativeRowAnimationIsVisibleToTheRuler() throws {
+        try skipUnlessEnabledAndCapable()
+        let band = CGRect(x: 0.04, y: 0.10, width: 0.92, height: 0.78)   // 表格区，避开标题栏
+        let probe = TableProbe()
+
+        let animatedFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
+            reduceMotion: false, animationsEnabled: true))
+        let animated = Self.deltas(animatedFilm, band: band)
+        let animatedInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let instantFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
+            reduceMotion: true, animationsEnabled: true))
+        let instant = Self.deltas(instantFilm, band: band)
+        let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let animatedSpan = Self.transitionFrameCount(animated)
+        let instantSpan = Self.transitionFrameCount(instant)
+        print("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
+        print("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
+        XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
+                             "带里什么都没变 ⇒ 我连表格在哪都没框到，两臂相同这条结论不成立（是探针坏了，不是动效坏了）")
+        XCTAssertLessThanOrEqual(instantSpan, 1,
+                                 "关掉动画那一档本该是一帧到位，却量到 \(instantSpan) 帧在动 ⇒ 带里有别的动在跑（滚动条淡出？），两臂对照失效")
+        XCTAssertGreaterThanOrEqual(animatedSpan, Self.minimumTransitionFrames,
+                                    "开了 `.effectFade` 仍只读到 \(animatedSpan) 帧 ⇒ 这把尺看不见 AppKit 的行动画"
+                                    + "（`cacheDisplay` 抓的是模型树）。① 只能记成'源码已接、产物未量'，不许写进已交付")
+    }
+
+    // MARK: - 骨架扫光（M9）
+
+    /// 骨架扫光（M9）到底有没有在扫 —— 这条必须量，因为"我加了 `repeatForever`"
+    /// 和"我加了 `.transition`"是同一种话，而后者已经被证明过可以不落地（D-055 / MC-12）。
+    ///
+    /// 判据与别的场景**不一样**，因为常驻循环没有"落定"这回事：
+    /// - 该动的那一档：必须**连续**有好几对帧都在变（一条静止的灰杠只会有一对；
+    ///   一次到位的跳变也只有一对）；
+    /// - 减弱动态那一档：应当**几乎什么都不变**（峰值低于绝对地板）——
+    ///   这一臂反过来证明"上面那几对在变"确实是扫光，而不是这张图的噪声。
+    ///
+    /// **不带 band**：这张图里除了骨架什么都没有，"整窗"就是"这一件事"。
+    /// 别的场景必须分带，是因为那个窗口里同时有横幅、列表、详情在动；
+    /// 这里再框一块，框错的代价反而是把一条真的在扫的动画读成"没动" ——
+    /// 第一版就是这样（条带位置与分带的 y 翻转对不上，读到 0.000，
+    /// 差点把结论写成"这把尺看不见渐变"，见 `testTheRulerSeesAStateDrivenSwiftUIUpdate` 的对照臂）。
+    func testSkeletonSweepActuallySweeps() throws {
+        try skipUnlessEnabledAndCapable()
+        let probe = SkeletonProbe()
+        let runningFrames = probe.record(reduceMotion: false)
+        let running = Self.deltas(runningFrames)
+        let interval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let stopped = Self.deltas(probe.record(reduceMotion: true))
+        print("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
+        print("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
+        XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
+                             "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
+        XCTAssertGreaterThanOrEqual(Self.transitionFrameCount(running), Self.minimumTransitionFrames,
+                                    "只读到 \(Self.transitionFrameCount(running)) 对在变 ⇒ 那不是循环，是一次跳变")
+        XCTAssertLessThan(Self.peak(stopped), Self.minimumVisibleChange,
+                          "减弱动态那一档还在变 ⇒ 常驻动画没被门住（HIG 与 WCAG 2.3.3 要的就是这一条）")
+    }
+
+    /// **这把尺的边界探针**：一个自己会数数的 SwiftUI 视图（`@State` + 定时器驱动，
+    /// 每 50ms 换一次文字并平移一个方块）。它该动，而且动的是一等公民属性（文字 + offset）。
+    ///
+    /// 它存在的理由：`testSkeletonSweepActuallySweeps` 读到"30 帧一帧不变"时，
+    /// 有两种完全不同的解释 —— ① 这把尺看不见离屏 root 视图上的 `@State` 更新（尺的锅）；
+    /// ② 扫光那条路没落地（产品的锅）。不先把 ① 排除掉，就不许把结论写进产品账本
+    /// （账本里记过一整族"拿探针的故障当被测系统的故障"）。
+    /// 两臂对照在这里反过来用：**已知该动的东西必须动**，否则尺子不合格。
+    func testTheRulerSeesAStateDrivenSwiftUIUpdate() throws {
+        try skipUnlessEnabledAndCapable()
+        let frames = StateTickProbe().record()
+        let fractions = Self.deltas(frames)
+        print("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
+        XCTAssertGreaterThan(Self.peak(fractions), Self.minimumVisibleChange,
+                             "连一个每 50ms 换文字 + 平移方块的视图都量不到 ⇒ 这把尺看不见离屏 root 视图上的 @State 更新，"
+                             + "所有'量不到'的结论都要改写成'测不了'，包括扫光那条")
+        // 第二臂：只动渐变端点。它读成什么，决定 `SkeletonPreviewView` 那句话该怎么写。
+        let gradient = StateTickProbe().record(gradient: true)
+        let gradientFractions = Self.deltas(gradient)
+        print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+    }
+
     // MARK: - 场景
 
     private struct Scenario {
@@ -387,6 +532,13 @@ final class MotionFilmstripTests: XCTestCase {
         static func searchReflow() -> Scenario {
             Scenario(name: "search-reflow", size: NSSize(width: 380, height: 520)) { store in
                 store.perform(.updateSearch("记录 5"))
+            }
+        }
+
+        /// 在**列表里**点某一行的收藏星：只换那一格里的符号，不动位置、不动选中。
+        static func toggleFavoriteInRow() -> Scenario {
+            Scenario(name: "row-favorite-star", size: NSSize(width: 760, height: 560)) { store in
+                store.perform(.toggleFavorite(store.filteredEntries[3]))
             }
         }
 
@@ -623,6 +775,216 @@ private final class Grabber: NSObject {
             }
         }
         if ticks >= limit { finished = true }
+    }
+}
+
+// MARK: - AppKit 行动画探针
+
+/// 一张**真 `NSTableView`** 的抓帧夹具，只为回答一个问题：这把尺看不看得见 AppKit 自己的
+/// 行动画（`insertRows(at:withAnimation:)`）。
+///
+/// 为什么不复用产品的浮层：`QuickPickController.table` 是私有的，为了测试把面板暴露出去不划算；
+/// 而"产品的接线对不对"由 `QuickPickRowDiffTests.testRebuildRowsIsWiredToTheAnimatedAPI` 钉住。这里只测尺子的能力，
+/// 所以表头的**配置照抄产品**（view-based、rowHeight 34、同样的 cell 工厂）——
+/// 因为"淡入"这件事本身就依赖行是有视图的：cell-based 的表把内容画进 frame view，
+/// 没有可以逐行淡的图层，探针要是在那种形状上读到"看不见"，结论就归错了地方。
+@MainActor
+private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+    private var texts: [String] = []
+    /// 最近一次抓取的时刻序列：判据说"分摊到几帧"，而"几帧"要换算成毫秒才说得出时长。
+    private(set) var lastStamps: [TimeInterval] = []
+
+    /// 返回逐帧画面。`animation` 由调用方给**产品实际会传的那两个值**
+    /// （`QuickPickController.rowAnimationOptions` 的两种输出），不是我另写的一份。
+    func record(animation: NSTableView.AnimationOptions) -> [CGImage] {
+        // 每次都从同一批行开始：上一次抓取插进来的行会让两臂的**起点**不同，
+        // 而起点不同的对照量出来的差别，说不清是动画的还是布局的。
+        texts = (1...6).map { "探针记录 \($0)：一行用来观察淡入的文字" }
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 300),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let table = NSTableView()
+        table.addTableColumn(NSTableColumn(identifier: NSUserInterfaceItemIdentifier("probeColumn")))
+        table.headerView = nil
+        table.rowHeight = 34
+        table.backgroundColor = .clear
+        table.dataSource = self
+        table.delegate = self
+        let scroll = NSScrollView()
+        scroll.documentView = table
+        scroll.hasVerticalScroller = false
+        window.contentView = scroll
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.45))
+
+        let grabber = Grabber(view: scroll, limit: 24)
+        let prerollDeadline = Date().addingTimeInterval(0.15)
+        while grabber.ticks < 3, Date() < prerollDeadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
+            grabber.tick()
+        }
+        // 先改模型、再告诉表格插了哪一行：`insertRows` 当场就会回读 `numberOfRows` 和新行内容。
+        texts.insert("刚插进来的一行：它该淡入而不是把别人挤一下就算完", at: 2)
+        table.insertRows(at: IndexSet(integer: 2), withAnimation: animation)
+        let deadline = Date().addingTimeInterval(2.0)
+        while !grabber.finished, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
+            grabber.tick()
+        }
+        lastStamps = grabber.stamps
+        return grabber.frames
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int { texts.count }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        let identifier = NSUserInterfaceItemIdentifier("probeCell")
+        let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView) ?? {
+            let text = NSTextField(labelWithString: "")
+            text.lineBreakMode = .byTruncatingTail
+            text.font = .systemFont(ofSize: 13)
+            text.identifier = identifier
+            let created = NSTableCellView()
+            created.addSubview(text)
+            created.textField = text
+            text.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                text.leadingAnchor.constraint(equalTo: created.leadingAnchor, constant: 6),
+                text.trailingAnchor.constraint(equalTo: created.trailingAnchor, constant: -6),
+                text.centerYAnchor.constraint(equalTo: created.centerYAnchor),
+            ])
+            return created
+        }()
+        cell.textField?.stringValue = texts[row]
+        return cell
+    }
+}
+
+// MARK: - 骨架扫光探针
+
+/// 在离屏窗口里 host 一个 `SkeletonPreviewView`，连抓 30 帧。
+///
+/// 为什么不通过 `DetailFileView` 走：那条路要真去读一个文件的预览，`MediaLoader` 什么时候回来
+/// 由磁盘和 QuickLook 决定 —— 拿它做"这段里有没有连续变化"的判据，红绿会跟着机器状态漂。
+/// 这里量的是**这把尺能不能看见渐变位移**；"骨架接在加载分支上"那半条由
+/// `SkeletonMotionTests.testSkeletonIsWiredIntoTheDetailLoadingBranch` 钉住。
+@MainActor
+private final class SkeletonProbe {
+    private(set) var lastStamps: [TimeInterval] = []
+
+    func record(reduceMotion: Bool) -> [CGImage] {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: SkeletonPreviewView(reduceMotion: reduceMotion))
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        // 少等一点：`onAppear` 里起的就是这个循环，等久了只是多烧几帧，判据不变。
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+        // **抓够 2.5 秒，而不是抓够 30 帧。**
+        // 这一条是量出来之后才发现的：这张图很小，`cacheDisplay` 一拍只要 4ms，
+        // 于是"30 帧"只覆盖 120ms —— 而扫光一圈是 1.5 秒，120ms 里亮带只走 8%，
+        // 分摊到每对帧的变化面积远在噪声地板以下。第一版据此读到"峰值 0.000"，
+        // 差点把结论写成"这把尺看不见渐变动画"，而实际是**胶片太短**。
+        // 采样间隔仍然打印出来（`采样≈Nms`），但它只说明"每帧多久"，不说明"总共看了多久"。
+        let grabber = Grabber(view: host, limit: 400)
+        let deadline = Date().addingTimeInterval(2.5)
+        while !grabber.finished, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            grabber.tick()
+        }
+        lastStamps = grabber.stamps
+        return grabber.frames
+    }
+}
+
+// MARK: - 尺子边界对照：自己会动的 SwiftUI 视图
+
+/// 每 50ms 换一次数字、并把方块往右挪 12pt。动的是 `Text` 内容与 `.offset` ——
+/// 这两样都不依赖渐变、不依赖符号图层，是这把尺**最应该**看得见的东西。
+@MainActor
+private struct TickCounterView: View {
+    @State private var tick = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("tick \(tick)")
+                .font(.system(size: 44, weight: .bold))
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color.accentColor)
+                .frame(width: 60, height: 24)
+                .offset(x: CGFloat(tick % 12) * 12)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { _ in
+            tick += 1
+        }
+    }
+}
+
+@MainActor
+private final class StateTickProbe {
+    func record() -> [CGImage] { record(gradient: false) }
+
+    /// `gradient: true` 时换一张**只动渐变端点**的图 —— 用来分清"尺看不见 @State 更新"
+    /// 与"尺看不见渐变端点的移动"，这两句写错一句就会把产品判成死的（或反过来）。
+    func record(gradient: Bool) -> [CGImage] {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: gradient ? AnyView(GradientTickView()) : AnyView(TickCounterView()))
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+        let grabber = Grabber(view: host, limit: 400)
+        let deadline = Date().addingTimeInterval(2.0)
+        while !grabber.finished, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            grabber.tick()
+        }
+        return grabber.frames
+    }
+}
+
+/// 只动 `LinearGradient` 的两个端点，其它一切都不动。
+@MainActor
+private struct GradientTickView: View {
+    @State private var phase: CGFloat = 0
+
+    var body: some View {
+        skeleton(phase: phase)
+            .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { _ in
+                phase = SkeletonMotion.advance(phase, by: 0.05)
+            }
+    }
+
+    /// 与 `SkeletonPreviewView` **同一套画法**（GeometryReader + ForEach + 渐变填充），
+    /// 只有驱动方式不同：这里是视图自己的 `@State`。
+    /// 分成两个视图而不是只测一个，是为了把"驱动方式"和"画法"这两个嫌疑分开 ——
+    /// 否则读到不动时，仍然不知道该改时钟还是该改布局。
+    private func skeleton(phase: CGFloat) -> some View {
+        GeometryReader { proxy in
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(SkeletonMotion.barFractions.enumerated()), id: \.offset) { _, fraction in
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(LinearGradient(
+                            stops: [.init(color: .primary.opacity(0.06), location: 0),
+                                    .init(color: .primary.opacity(0.45), location: 0.5),
+                                    .init(color: .primary.opacity(0.06), location: 1)],
+                            startPoint: SkeletonMotion.unitPoints(phase: phase).start,
+                            endPoint: SkeletonMotion.unitPoints(phase: phase).end))
+                        .frame(width: max(1, proxy.size.width * fraction), height: 8)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
     }
 }
 
