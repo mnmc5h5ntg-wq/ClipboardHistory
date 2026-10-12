@@ -219,12 +219,23 @@ struct DetailFileView: View {
             switch previewState {
             case .loading:
                 loadingView
+                    .transition(MotionCatalog.transition(for: .contentFade))
             case .success(let preview):
                 previewView(preview)
+                    .transition(MotionCatalog.transition(for: .contentFade))
             case .failure(let message):
                 failureView(message)
+                    .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
+        // 三态之间软交接（R6 / 审计 B-P1-1）。以前这里**一条动画都没有**：
+        // 骨架"啪"地换成图片、8 秒后"啪"地换成警告。同一族"声明在、屏幕不在"，
+        // 而这一处比详情换类型更该演 —— 用户正盯着这块等它出结果。
+        //
+        // 键只取**阶段**（0/1/2），不取 `previewState`（`FilePreview` 不是 Equatable，
+        // 也压根不该整值比较：图片数据不同不该再演一次），也不取 `url`
+        // （换一条记录时阶段会 1→0→1，那是"又在加载"的证据，本身不需要额外过渡）。
+        .animation(MotionCatalog.animation(for: .contentFade), value: previewStage)
         .task(id: url) {
             await loadPreview()
         }
@@ -233,6 +244,15 @@ struct DetailFileView: View {
             loadingHandle = nil
             timeoutTask?.cancel()
             timeoutTask = nil
+        }
+    }
+
+    /// 预览处在哪个阶段：0 加载 / 1 成功 / 2 失败。上面那条按值动画的键。
+    private var previewStage: Int {
+        switch previewState {
+        case .loading: return 0
+        case .success: return 1
+        case .failure: return 2
         }
     }
 

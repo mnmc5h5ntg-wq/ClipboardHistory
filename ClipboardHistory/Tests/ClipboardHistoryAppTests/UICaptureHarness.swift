@@ -445,7 +445,7 @@ final class UICaptureTests: XCTestCase {
             contextPreferences: ContextPreferenceSettings(),
             weightsStore: store.weightsStore,
             feedbackStore: store.feedbackStore,
-            clearHistoryAction: {},
+            clearHistoryAction: { nil },
             initialCategory: initialCategory
         )
     }

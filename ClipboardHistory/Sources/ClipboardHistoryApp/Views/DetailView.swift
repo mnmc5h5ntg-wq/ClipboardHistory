@@ -531,9 +531,15 @@ private struct MultiFileRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                // 一个符号 + 旋转，而不是 `chevron.down` ↔ `chevron.right` 换名字（R6 / 审计 B-P2）。
+                // 换名字是**一帧硬换**，而它旁边的内容正在用 0.22s 展开 —— 箭头先落地、内容还在路上，
+                // 读起来就是"对不上"。旋转挂在**同一条**揭示曲线上，两者天然同步
+                // （`MultiFilePreviewLayout.animation` 自己已经管 reduce-motion）。
+                Image(systemName: "chevron.right")
                     .font(.system(size: VisualGlyph.badge, weight: .semibold))
                     .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .animation(MultiFilePreviewLayout.animation, value: isExpanded)
                     .frame(width: 12)
 
                 Image(systemName: symbol)

@@ -75,7 +75,13 @@ final class SettingsWindowController {
             weightsStore: weightsStore,
             feedbackStore: historyStore?.feedbackStore ?? RecommendationFeedbackStore(),
             clearHistoryAction: { [weak self] in
-                self?.historyStore?.perform(.clear)
+                guard let store = self?.historyStore else { return nil }
+                // 顺序是这条的全部价值：**先数再清**。清完再数，`entries` 只剩收藏，
+                // 回执会永远说"清空了 0 条"（R6 / 审计 B-P1-2，判据见
+                // `MotionDriverTests.testClearHistoryReceiptCountsTheRealRemoval`）。
+                let receipt = ClearHistoryReceiptPolicy.receipt(isFavorites: store.entries.map(\.isFavorite))
+                store.perform(.clear)
+                return receipt
             },
             exportHistoryAction: { [weak self] url in
                 guard let self, let store = self.historyStore else { return "历史记录不可用" }

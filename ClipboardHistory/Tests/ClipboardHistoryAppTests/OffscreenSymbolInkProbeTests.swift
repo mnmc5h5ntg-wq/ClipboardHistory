@@ -169,7 +169,7 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
             contextPreferences: ContextPreferenceSettings(),
             weightsStore: store.weightsStore,
             feedbackStore: store.feedbackStore,
-            clearHistoryAction: {},
+            clearHistoryAction: { nil },
             initialCategory: .general
         ))
         let frame = try rasterize(product, size: NSSize(width: 720, height: 540))

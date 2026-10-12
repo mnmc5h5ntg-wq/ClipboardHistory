@@ -59,6 +59,12 @@ struct SettingsView: View {
     }
     @State private var showClearHistoryConfirmation = false
     @State private var archiveMessage: String?
+    /// 「清空未收藏」之后的那一句"清掉了多少条"（R6 / 审计 B-P1-2）。
+    ///
+    /// 为什么不复用 `archiveMessage`：那条长在「导出与导入」那一节里（`SettingsView.swift:523`），
+    /// 用户按的是下面那颗红色按钮，回执却出现在**上面另一节**——那是"回执离动作有 40pt 远"，
+    /// 而这一句要回答的是"我刚刚那一下到底收到没有"。
+    @State private var clearReceipt: String?
     @AppStorage(CapturePolicy.userExcludedKey) private var excludedBundleIDsRaw = ""
     /// 富文本保真开关（§5 F-2）。默认关：打开等于每条文本记录多存 2 份表示，
     /// 存档体积翻几倍，而 RTF 里还常带着来源元数据。
@@ -69,7 +75,10 @@ struct SettingsView: View {
     @State private var showExportAlert = false
     @ObservedObject private var contextPreferences: ContextPreferenceSettings
     @ObservedObject private var weightsStore: RecommendationWeightsStore
-    private let clearHistoryAction: (() -> Void)?
+    /// 清空历史。返回**回执文案**（`nil` = 没有可清空的东西 / 注入方没给）。
+    /// 以前它是 `() -> Void`：按完确认之后红色按钮还在原位、还能再点，
+    /// 整个界面上没有任何一处说"清掉了 N 条"（R6 / 审计 B-P1-2）。
+    private let clearHistoryAction: (() -> String?)?
     /// 历史的导出 / 导入（第三轮审计 §5 F-5）。和 `clearHistoryAction` 一样由窗口控制器注入，
     /// 因为 `SettingsView` 在两个窗口里都会重建，不该直接持有 store。
     private let exportHistoryAction: ((URL) -> String?)?
@@ -86,7 +95,7 @@ struct SettingsView: View {
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore(),
         feedbackStore: RecommendationFeedbackStore = RecommendationFeedbackStore(),
-        clearHistoryAction: (() -> Void)? = nil,
+        clearHistoryAction: (() -> String?)? = nil,
         exportHistoryAction: ((URL) -> String?)? = nil,
         importHistoryAction: ((URL) -> String?)? = nil,
         initialCategory: SettingsCategory? = .shortcuts
@@ -181,7 +190,10 @@ struct SettingsView: View {
             .alert("清空未收藏记录", isPresented: $showClearHistoryConfirmation) {
                 Button("取消", role: .cancel) {}
                 Button("清空", role: .destructive) {
-                    clearHistoryAction?()
+                    clearReceipt = clearHistoryAction?()
+                    // 一次不可撤销的删除，回执最该给的是**看不见屏幕的人**：
+                    // 视觉侧那一句在按钮正下方淡入，语音侧走同一条文案（R6）。
+                    if let clearReceipt { VoiceOverReceipt.announce(clearReceipt) }
                 }
             } message: {
                 Text("收藏记录会保留，其余历史会被清空。")
@@ -530,24 +542,41 @@ struct SettingsView: View {
 
             Divider()
 
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("清空未收藏记录")
-                        .font(.subheadline)
-                    Text("收藏记录会保留。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("清空未收藏记录")
+                            .font(.subheadline)
+                        Text("收藏记录会保留。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-                Spacer()
+                    Spacer()
 
-                Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
-                    showClearHistoryConfirmation = true
+                    Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
+                        showClearHistoryConfirmation = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(clearHistoryAction == nil)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
-                .disabled(clearHistoryAction == nil)
+                if let clearReceipt {
+                    // 图标 + 一句数字。刻意不用绿色"成功"强调：这是一次**不可撤销的删除**，
+                    // 要的是"告诉你删了多少"，不是庆祝（第三轮 U-5 那句"状态语言统一"）。
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: VisualGlyph.badge))
+                        Text(clearReceipt)
+                            .font(.system(size: VisualFont.meta))
+                    }
+                    .foregroundStyle(.secondary)
+                    .transition(MotionCatalog.transition(for: .contentFade))
+                }
             }
+            // 键只取"有没有回执"这一个布尔：换文案（连续清两次）不该再演一次，
+            // 那读起来像在抢注意力；从无到有才需要被看见。
+            .animation(MotionCatalog.animation(for: .contentFade), value: clearReceipt == nil)
         }
     }
 
