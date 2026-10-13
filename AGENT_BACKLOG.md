@@ -1062,3 +1062,9 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
 生效外观是 `NSAppearanceNameVibrantDark`（内容区是 DarkAqua），`cacheDisplay` 不走 vibrancy 的
 窗口服务器合成，于是拍到的是合成前像素。产品侧**无需改动**；
 名单已改成由这条前提决定（两个方向都会红）。剩下的只有真机那两条（人工批次 37.1 / 37.2）。
+
+**R31（边界，不是待办）**：`CGWindowListCreateImage` 在本机 SDK 已标 unavailable，
+替代要录屏授权 + 真上屏 ⇒ **离屏测试进程里没有"走窗口服务器"的取图路径**。
+所以 BACKLOG 40（「清空」红不红）与 BACKLOG 45（vibrant 侧栏）剩下的唯一取证通道是**真机截屏**
+（人工批次 36.4 / 37.1 / 37.2）。以后有人提议"再搭一个捕获通道"，先引用
+`.scratch/motion-audit-2/spike_r31_composite_capture.md`。
