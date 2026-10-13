@@ -22,7 +22,7 @@
 | 帧基线 | 82 → 90（阶段一）→ 104（R28）→ **102**（R28c 撤下 runner 拍不出的宽臂帧） | `docs/frame_baseline.json` |
 | 变异对照 | M25–M32（阶段一 9 支）+ **M100–M131**（阶段二 32 支），全部 CAUGHT | `.scratch/motion-audit-2/mutate_*.py` |
 | 脚本测试 | 72 passed | `python3 -m unittest discover -s scripts/tests` |
-| CI | 本目标窗口内 **24 次 push、6 次红、5 个原因**（阶段一 / R20 / R21 / R27 / R28；R28 那一个原因烧掉了两次 push——产品提交与随后的报告提交，同一处 1100pt 参照臂）。R20+R21 由 `Round 21b` 追认修好（它的标题就是「CI 红在尺上，而尺量的是另一样东西」）；R27 由 R28 修（§5.6）；**R28 由 R28b 修 —— 红的正是那一轮新立的判据自己**（§5.8）。其余全绿 | `gh run list` |
+| CI | **收口提交 `d5c79da` 在 runner 上绿**（701 例 / 29 skip / 0 失败）。本目标窗口内约 30 次 push、**10 次红**，其中 **6 次红的是判据自己而不是产品**（R20、R21、R27、R28、R29、R29c）—— 每一次都在下一轮被追认并修好，`Round 21b` 这个提交标题就是「CI 红在尺上，而尺量的是另一样东西」 | `gh run list` |
 
 自评曲线（21 轮，均值 **91.5**）：
 91 · 90 · 92 · 93 · 94 · 95 · 96 · 93 · 95 · 91 · **86** · **89** · 91 · **87** · 90 · 92 · 91 · 92 · 91 · 92 · 90。
@@ -188,13 +188,12 @@ R19 推翻自己写的"根因"，R20 抓回 R19 引入的回归，R22 把"绿其
 |---|---|---|---|
 | BACKLOG 39 | 详情区三条左轴（20 / 54.5 / 95pt） | 设计决定，量不出来 | 先定"详情区有几列"，再让骨架承诺它替代的那一列 |
 | BACKLOG 40 | 「清空」在帧里不是红的（代码是 `.borderedProminent` + `.tint(.red)`） | 分不清"prominent 填充离屏不合成"还是"tint 没吃到"，**不许猜着修** | 人工批次 36.4，一次真机截屏即可判定 |
-| BACKLOG 42 | runner 上 **>750pt 的离屏帧**读 0 墨（900 与 1100 两档，根因未证明；"越过 2048px"这个解释已被 900pt 证伪） | 判据侧已改成只用 ≤750pt 的臂，并加了资格断言 | 定位实验：同一张帧在 750 / 900 / 1024 / 1100 各拍一次看断崖 |
-| BACKLOG 41 剩余一半 | 横幅正文那条判据（`bodyTextContrast`）还没挂方向诊断 | 它量的是彩色带上的深字，反相在那种底上读到什么**没量过**，不许顺手挂 | 先量再挂 |
-| BACKLOG 43 | runner 拍不出 `SettingsView` 那批帧（**与尺寸无关**，720 也空白）；两条判据记 NOT-RUN | 原因未证明；下一次 CI 的 `TEXT_INK_FRAME` 行会告诉我们"没画"还是"画成一块底色" | 按那两种结果分别决定：换取证通道 / 换判据对象 |
-| BACKLOG 34②③ | `VisualFont.meta` 说明段、菜单栏副标题逐处点名 | 尺与地板都在，缺的是逐处判"要读的还是装饰" | 用 R28 之后的相对参照做，别再用绝对值 |
+| BACKLOG 42 | 判据只能用比值/方向/单调性 —— 绝对像素数换平台就失效（已犯三次） | 规矩已写进 §5；`textInkMinDelta` 这类**闸门**仍是绝对值，但它是"分档"不是"判过没过" | 新判据一律相对量 |
+| BACKLOG 43 **已答**（R29c） | runner 上 `SettingsView` 那批帧 = **画了一块底色**：`hist=0/0/0/0/0/0/1/99%`、透明率 0%、`bpp=32 samples=4 bpr=宽×4`（与尺的假设一致）⇒ 既不是"没画"也不是"读错字节" | 为什么只有这一棵视图树在 macOS 15 的离屏路径上不画，**仍未证**；不再猜 | 换取证通道（真机截屏 / R19 那条 orderFront），两条依赖它的判据先记 NOT-RUN、本机实跑 |
+| 顺带量到 | **CI runner 是 @1x 截图**（`scale=1.0`，本机 `2.0`） | 这条把 R27 那次 CI 红的解释换了：不是"平台把 `secondaryLabelColor` 解析得更淡"，是半分辨率下细笔画进不了"最暗 2%"那一档 | 结论不受影响（R28 已改成同平台相对参照），但**账本里的原因已改写** |
 | 侧栏符号"字重是否同一套语言" | 反相伪影把描边厚度一起吃掉了 | 量不到 ⇒ 不下结论 | 需要一条能分辨外观的取证通道 |
+| BACKLOG 34②③ | `VisualFont.meta` 说明段、菜单栏副标题逐处点名 | 尺与地板都在，缺的是逐处判"要读的还是装饰" | 用 R28 之后的相对参照做，别再用绝对值 |
 | 人工批次 26.x–36.x | 悬停/浮层/焦点环/材质这些**帧拍不到**的状态 | 环境限制，不是没做 | 只有你能判；36.4、36.5 是本轮新加的两条 |
-| R28 的 CI | 尚未确认 | —— | 见下一节命令 |
 
 ---
 
@@ -203,13 +202,17 @@ R19 推翻自己写的"根因"，R20 抓回 R19 引入的回归，R22 把"绿其
 ```bash
 cd ~/Codex_Project0/ClipboardHistory && unset SDKROOT
 swift build 2>&1 | grep -c "warning:"          # 期望 0
-swift test 2>&1 | tail -3                       # 期望 699 tests / 27 skipped / 0 failures
+swift test 2>&1 | tail -3                       # 期望 701 tests / 27 skipped / 0 failures
 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests
-cd .. && python3 scripts/frame_baseline.py --against working compare /tmp/shots   # CHANGED=0
+cd .. && python3 scripts/frame_baseline.py --against working compare /tmp/shots   # CHANGED=0（102 帧）
 python3 -m unittest discover -s scripts/tests   # 72 passed
-python3 .scratch/motion-audit-2/mutate_r28_text_clip.py   # CAUGHT=7/7, RESTORE_CLEAN=yes
+python3 .scratch/motion-audit-2/mutate_r28_text_clip.py   # CAUGHT=9/9, RESTORE_CLEAN=yes
 make bundle && bash scripts/install_local.sh --yes --no-build
 ```
+
+**注意 §7 的第一行只在"这台机器"成立**：CI 的 runner 上同一批帧有 62/102 哈希不同（§5.11），
+所以"CI 绿"验证的是**编译 + 判据逻辑 + 不回归**，不是"界面被看着"。
+逐字节帧闸的正确用法是提交前在本机 `update` + `compare`。
 
 回滚粒度是干净的：阶段一 = 删 `daily-copy.json` + 撤那一个提交；
 每一轮动效/墨档都是独立提交，`git revert` 单轮即可，且**每轮的回滚路径在 D-0xx 里写明了哪条判据会红**。
@@ -222,9 +225,11 @@ make bundle && bash scripts/install_local.sh --yes --no-build
 包括采集路径零同步磁盘写与只追加账本。
 
 阶段二没有沿用 R1–R8 的任何结论：二十一轮里 **R21 给 `.tertiary` 开的免检被撤销**、
-**R19 的"根因"被推翻**、**R27 的地板被证明是本机数**、**R13 的悬停档被 R14 的尺抓出回归**。
+**R19 的"根因"被推翻**、**R27 的地板被证明是本机数**、**R13 的悬停档被 R14 的尺抓出回归**、
+**R28 的"宽度边界"被 R29 自己推翻**、**R29 的 NOT-RUN 守卫被证明永远不会触发**。
 产品侧的净变化集中在"状态要说话"和"层级不许靠压黑换可读"两件事上；
 另有七处明确判定为**不加动效**并写了理由。
 
 如果只留一句给下一趟工作：**先证明尺能分辨，再拿它判产品。**
-这一趟有两次差点把对的界面改错，都是因为数没有方向。
+这一趟有两次差点把对的界面改错，都是因为数没有方向；
+而最后带走的三条规矩是：**变异要打测量不要打断言、参照臂必须有地板与资格、判据只能用比值而不能用绝对像素。**
