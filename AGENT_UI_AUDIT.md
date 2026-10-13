@@ -867,3 +867,43 @@ M39 钉这条：连调用点一起把 `cellView` 改名 ⇒ 红。
 **静止态 90 帧逐字节不变**（`CHANGED=0`）是**正确**结果：底色只在 hover 时非零、弹簧只改时长。
 所以本轮的视觉复核不能靠帧。欠的两条（悬停态像素证据 / "0.20s 且不过冲"的手感）
 分别记 BACKLOG 24 与人工验收批次 21 —— 诚实说法是**参数已归位、手感未取证**。
+
+
+## 第 15 轮 · U-35 悬停那一档在全 App 都是死的（R13）（D-071）
+
+| 表面 | 之前 | 现在 | 证据 |
+|---|---|---|---|
+| **每一个**接了按压态的按钮（12 处）的悬停档 | `PressedStyle.makeBody` 里硬写 `isHovered: false`（`ButtonStyle.makeBody` 不能有 `@State`）⇒ `VisualFill.hover` 是一档**永远不可达**的死值 | 悬停由样式内部新增的 `PressedLabel` 视图持有（`@State` + `.onHover` + 进 `.hover` 那一档事务） | `testHoverArmIsReachableFromTheButtonStyle` + M54/M56 CAUGHT |
+| 侧栏五颗批量按钮（含**删除**） | `.buttonStyle(.borderless)` ⇒ 零按压、零悬停；暗黑里连图标本体都被压成灰，**看着像禁用** | `.pressedStyle(in:control, hoverLevel:controlHover)` | 帧基线两帧变化（见下面"像素"）+ 集合相等守卫 + M55 CAUGHT |
+| 排除名单「移除」／回执的 × | 同上两处 `.borderless`，其中「移除」是**破坏性**按钮 | 同一档 | 同上守卫 |
+| 那条"不许有按钮绕过按压"的守卫 | 只查 `.buttonStyle(.plain)` 一个拼写 ⇒ `.borderless` 从尺子底下走过去，**在全绿的套件里活了很久** | 一族四种拼写一起查（plain / borderless / link / accessoryBar） | 同一守卫，检测面加宽 |
+| 新参数 `hoverLevel` 的接缝 | 真值表测了纯函数、白名单测了调用点，中间"样式把参数转交给谁"没人钉 ⇒ **M58 全绿通过** | 取 `func makeBody` 的花括号配平区域判"转交点不许出现常量"+ 三处消费者计数 | `testStyleForwardsItsParametersInsteadOfResupplyingDefaults` + M58 补判据后 CAUGHT |
+
+**这一轮的性质**：R4 立"按压要有反馈"时，把 hover 那一档写进了令牌、写进了纯函数、写进了真值表，
+唯独没写进**能持有它的那一层**。所以它不是"少一点效果"，是**一整档设计值在运行时不存在**，
+而所有围绕它的判据都是绿的 —— 这一族（载荷绿、消费侧坏）在账本里出现过很多次，
+这一次是**我自己**在 R4 留下的。
+
+**像素（本轮的视觉复核）**：帧基线 `CHANGED=2`，两处都在
+`sidebar-multi-select-300x520-{dark,light}`。逐像素定位：变化区
+`bbox=(343,220)-(529,266)`（设备像素）＝"已选 3 条"那一行的四颗描线图标，
+亮色 `1185 px / 0.190% / 最大通道差 264`、暗色 `1181 px / 0.189% / 201`。
+判读：
+① **图标本体从灰提到满** —— 那是 `.borderless` 对 label 自己的处理，不是暗色对比度问题
+（两模式变化量几乎相同、位置逐像素一致、没有位移）；
+② 红色 `trash` **一个像素都没变**（它在 bbox 之外），因为它带显式 `foregroundStyle(.red)` ——
+恰好反证了"压暗是样式给的，不是这一行的排版给的"；
+③ 这五颗在多选条里**没有任何一处是 disabled**（全文件零 `.disabled(`），
+所以"压暗"没有任何信息量，只是把可用动作画成了不可用。
+**结论：改善，无回归**；已 `frame_baseline.py update`，`check --against working` = `CHANGED=0 MISSING=0 ADDED=0`。
+
+**顺带核了一条老账**：`check`（默认 `--against auto`）对 v1.4.8 快照报 `MISSING=2`
+（`glass-pill-120x200-*`）。查过不是夹具掉帧：那颗胶囊在 R1/R2 之间刻意从 200 高改成 232 高，
+新名字 `glass-pill-120x232-*` 在 `ADDED` 里成对出现。**"少了两帧"与"换了两帧"是两回事**，
+前者才要查。
+
+**本轮没解决、已记两条新的**：
+① 悬停档现在**可达**了，但仓库仍然**看不见**它（合成 hover 未通，BACKLOG 24 → R14 做）；
+② 由此暴露一个几何问题：`PressedStyle` 的底色铺在 **label 的包围盒**上，
+所以 16pt 图标的悬停药丸比系统工具栏的小一圈、且**命中区与药丸一样大**。
+没有 ① 就调 ② 等于闭眼改，所以顺序是先做证据通道。见 BACKLOG 25。

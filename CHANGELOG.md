@@ -135,6 +135,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **悬停那一档从"设计里有、运行时不存在"改成真的**（R13 / D-071 / U-35）：R4 立按压反馈时
+  把 `VisualFill.hover` 写进了令牌、写进了纯函数、写进了真值表，唯独没写进能持有它的那一层 ——
+  `ButtonStyle.makeBody` 不能有 `@State`，于是那里硬写着 `isHovered: false`，
+  **全 App 每一个按钮**的悬停档在运行时都不可达，而所有围绕它的判据都是绿的。
+  现在样式内部多了一个真的视图（`@State` + `.onHover` + 进 `.hover` 那一档事务）。
+- **三处 `.buttonStyle(.borderless)` 归队**：侧栏多选条的五颗批量按钮（含**删除**）、
+  排除名单的「移除」、回执行的 ×。它们以前既没有按压也没有悬停；
+  而 `.borderless` 还顺手把图标本体压成灰色，于是**可用的动作被画成了禁用的动作**
+  （帧基线两帧变化：`sidebar-multi-select` 明暗各一，变化区就是那四颗描线图标，
+  红色 `trash` 因带显式 `foregroundStyle` 一个像素没动 —— 恰好反证压暗来自样式）。
+  小控件这一档用新增的 `hoverLevel` 参数抬到 `VisualFill.controlHover`（0.10），
+  其余站点保持 0.06 不变（不顺手改全 App 的观感）。
+- **一条守卫的检测面加宽**：`testEveryNonMenuButtonHasPressFeedback` 原来只查 `.buttonStyle(.plain)`
+  一个拼写 —— `.borderless` 从尺子底下走过去，在全绿的套件里活了很久。现在一族四种拼写一起查
+  （plain / borderless / link / accessoryBar），白名单只剩菜单栏那一处。
+- **变异对照第一次 4/5**（M54–M58）：M58（样式内部转交时把 `hoverLevel` 换成默认档）全绿通过 ——
+  本轮新加的参数自己重演了本轮修的那条缺陷族。补
+  `testStyleForwardsItsParametersInsteadOfResupplyingDefaults`（取 `func makeBody` 的花括号配平区域，
+  判"四个入参原样转交 + 转交点不许出现常量 + 全仓恰好三处消费者"）后 **5/5 CAUGHT**，
+  区域助手另配一条真值用例。
+
 - **侧栏筛选胶囊不再"冲过头再弹回来"**（R12 / D-070 / U-34）：那颗胶囊以前自己写着
   `response 0.38 / damping 0.72` —— 0.38 越过动效目录的上限，0.72 是欠阻尼（必有过冲），
   而它是**点出来的**、不是手势跟手的位移。现在参数出自目录新增的 `.slider` 档

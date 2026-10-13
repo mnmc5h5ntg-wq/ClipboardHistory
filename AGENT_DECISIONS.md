@@ -2440,3 +2440,39 @@ macOS 12 全绿：只用 `Color.primary.opacity` / `VisualShape` / `.help` / `on
 - **已知未取证的两条**：悬停态没有像素证据（合成 hover 未打通，BACKLOG 24）；
   "0.20s 且不过冲"这件事尺子量不到（纯 transform，与 D-069 之后新记的"尺子可见面"那条限制同一族）。
   本轮的诚实说法是**参数已归位、手感未取证**。
+
+
+## D-071 悬停那一档从"设计里有、运行时不存在"改成真的（2026-10-13）
+
+- **背景**：R13 选题来自全新清单第 11、19 条。第 19 条是 `PressableStyle:53` 那个硬写的
+  `isHovered: false`；第 11 条是侧栏五颗批量按钮（含删除）用 `.buttonStyle(.borderless)`。
+  两条合起来才是本轮真正的缺陷：**R4 我自己留下的那一半**。
+- **决定 1：悬停状态归一个真的视图，不归 `ButtonStyle`。**
+  `ButtonStyle.makeBody` 不能有 `@State`，所以以前只能写死。现在 `PressedStyle.makeBody`
+  构造 `PressedLabel`（`@State isHovered` + `.onHover` + `.animation(_:value: isHovered)`）。
+  这不是"多一层"，是**这一档唯一可能的落地形状**。
+- **决定 2：三处 `.borderless` 归队，并给小控件抬一档悬停强度。**
+  `VisualFill.hover = 0.06` 铺在一整行上读得出来，铺在 20pt 图标上等于没有 ——
+  这是尺寸差不是口味差，所以新增 `hoverLevel` 参数、三处传 `controlHover`（0.10），
+  其余站点保持默认档（**不**顺手改全 App 的观感）。
+- **决定 3：加宽那条守卫的检测面。**
+  原来只查 `.buttonStyle(.plain)` 一个拼写。"按一个拼写查一族"与
+  "按名字查消费者会被前缀白拿"同族：检测面比缺陷面窄。现在一族四种拼写一起查，
+  白名单只剩菜单栏那一处（系统菜单自己的高亮就是反馈）。
+- **决定 4：M58 逃逸之后补的是**接缝**判据，不是把 M58 撤掉。**
+  第一版变异 **4/5**：把 `makeBody` 里的 `hoverLevel: hoverLevel` 换成
+  `hoverLevel: VisualFill.hover`，全绿。产品后果是"小控件抬一档"在运行时不成立。
+  补 `testStyleForwardsItsParametersInsteadOfResupplyingDefaults`：取 `func makeBody` 的
+  **花括号配平区域**（不是整文件 contains —— 默认值那一行本来就该出现 `VisualFill.`），
+  判"四个入参逐个原样转交 + 转交点不许出现常量 + 全仓恰好三处消费者"。补完 **5/5**。
+  区域助手自己也配了一条真值用例（`testRegionHelperIsATruthTable`）：
+  尺子不许是自由的，取不到时不许安静。
+- **翻案了什么**：没有推翻 R4 的设计（按压要缩放 + 底色），推翻的是 R4 交付的**完整性** ——
+  当时以为三档都落地了，实际只落地两档。
+- **兼容性 / 迁移**：无数据、无接口变化；`hoverLevel` 带默认值，旧调用点一字不改仍然编译。
+  静止态只有两帧变化（多选条那四颗图标提亮），已 `frame_baseline.py update` 在同一提交。
+- **回滚**：`PressedLabel` 删掉、`makeBody` 里恢复 `isHovered: false`、三处样式改回 `.borderless`
+  并把守卫的 needle 改回只查 `.plain` —— 四处即可，但会把一整档设计值重新变回死值。
+- **已知未取证**：悬停态**仍然没有像素证据**（合成 hover 未打通，BACKLOG 24 排到 R14）；
+  本轮诚实说法是**"这一档现在可达了，但还没被看见"**。
+  另记一条新的：悬停药丸的几何 = label 包围盒，比系统工具栏的小一圈（BACKLOG 25）。

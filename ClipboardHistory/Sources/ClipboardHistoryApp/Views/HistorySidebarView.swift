@@ -120,7 +120,11 @@ struct HistorySidebarView: View {
             .helpLabel("删除所选记录")
             .foregroundStyle(.red)
         }
-        .buttonStyle(.borderless)
+        // R13：这里以前是 `.buttonStyle(.borderless)` —— 全 App 唯一一处绕开 `PressedStyle`
+        // 的地方，于是这五颗（含**删除**）既没有按压也没有悬停反馈：点下去只有图标自己动一下，
+        // 而"我按到的是哪一颗"要等结果才知道。`.borderless` 不是"更素"，是把反馈拿掉了。
+        .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                      hoverLevel: VisualFill.controlHover)
     }
 
     private var headerTitle: String {

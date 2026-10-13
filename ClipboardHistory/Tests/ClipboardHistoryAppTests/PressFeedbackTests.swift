@@ -22,6 +22,18 @@ final class PressFeedbackTests: XCTestCase {
                        "减弱动态时缩放归零了，底色必须还在 —— 否则按下这件事完全没有表达")
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true), VisualFill.hover)
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: false), 0)
+        // R13：`hoverLevel` 是**新参数**，不测它等于"小控件抬一档"这句话只是注释。
+        XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
+                                                      hoverLevel: VisualFill.controlHover),
+                       VisualFill.controlHover)
+        XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: true, isHovered: true,
+                                                      hoverLevel: VisualFill.controlHover),
+                       VisualFill.pressed,
+                       "抬了悬停档之后，按下仍然要盖过悬停 —— 次序不能因为参数可变就翻")
+        XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: false,
+                                                      hoverLevel: VisualFill.controlHover), 0)
+        XCTAssertLessThan(VisualFill.controlHover, VisualFill.pressed,
+                          "小控件的悬停档也必须留在按下之下，否则整条 hover<press<selected 次序作废")
     }
 
     /// 强度次序是语义：hover < pressed < selected。反过来就是"瞬时态盖过持久态"。
@@ -77,7 +89,13 @@ final class PressFeedbackTests: XCTestCase {
         var found: [String] = []
         for (file, source) in try productSources(in: "Views") {
             let code = codeOnly(source)
-            for line in code.components(separatedBy: "\n") where line.contains(".buttonStyle(.plain)") {
+            // R13 把检测面从"只查 .plain"扩成"查所有拿掉反馈的样式"：
+            // 侧栏那五颗批量按钮（含删除）用的是 `.buttonStyle(.borderless)`，
+            // 这条守卫**扫不到它** —— 于是它在全绿的套件里活了很久。
+            // "按一个拼写查一族" 与 "按名字查消费者会被前缀白拿" 是同一族：检测面比缺陷面窄。
+            let noFeedback = [".buttonStyle(.plain)", ".buttonStyle(.borderless)",
+                              ".buttonStyle(.link)", ".buttonStyle(.accessoryBar)"]
+            for line in code.components(separatedBy: "\n") where noFeedback.contains(where: line.contains) {
                 found.append(file)
             }
         }
@@ -88,6 +106,117 @@ final class PressFeedbackTests: XCTestCase {
                        "菜单栏应当恰好两处（推荐项 + 收尾按钮）：\(found.sorted())")
     }
 
+    /// 悬停那一档必须**真的可达**。R13 抓到的一条：`PressedStyle.makeBody` 里硬写着
+    /// `isHovered: false`（因为 `ButtonStyle.makeBody` 不能有 `@State`），
+    /// 于是 `VisualFill.hover` 在全 App 每一个按钮上都是死档 ——
+    /// 而 `fillOpacity` 的真值表一直是绿的：**载荷绿、消费侧坏**。
+    /// 所以这条守卫问的不是"函数对不对"，是"调用点有没有把两个分支都喂到"。
+    func testHoverArmIsReachableFromTheButtonStyle() throws {
+        let style = codeOnly(try productSource(named: "Views/PressableStyle.swift"))
+        XCTAssertFalse(style.contains("isHovered: false"),
+                       "按压样式又把悬停写死成 false ⇒ hover 那一档再次变成永远不可达的死参数")
+        XCTAssertTrue(style.contains(".onHover"),
+                      "悬停要由样式内部一个能持有状态的视图来记，否则 `makeBody` 里没有 @State 可用")
+        XCTAssertTrue(style.contains("value: isHovered"),
+                      "悬停那一档要进 `.hover` 的事务，不然它是硬切")
+    }
+
+    /// 上一条管的是"样式内部有没有悬停这一半"，这一条管的是**接缝**：
+    /// 调用方给的 `hoverLevel` 有没有原样送到那个持有状态的视图手里。
+    ///
+    /// 为什么单独一条：`hoverLevel` 是 R13 新加的参数，真值表测了纯函数、白名单测了调用点，
+    /// 唯独中间这一步没人钉 —— 变异 M58（`makeBody` 里把 `hoverLevel: hoverLevel`
+    /// 换成 `hoverLevel: VisualFill.hover`）**全绿通过**，
+    /// 而它的产品后果是"小控件抬一档"这句话在运行时根本不成立。
+    /// 这一族叫**载荷绿、消费侧坏**，本轮它是被新参数自己重演了一遍。
+    ///
+    /// 判据形状用的是花括号配平的**区域**，不是整文件 `contains`：
+    /// 整文件里"哪里"出现 `VisualFill.` 不算数（默认值那一行本来就该有它），
+    /// 只有出现在转交点上才是重新供档。
+    func testStyleForwardsItsParametersInsteadOfResupplyingDefaults() throws {
+        let style = codeOnly(try productSource(named: "Views/PressableStyle.swift"))
+        let body = region(in: style, named: "func makeBody")
+        XCTAssertTrue(body.contains("PressedLabel("),
+                      "makeBody 不再构造那个能持有悬停状态的视图 ⇒ 上面两条判据全部退化成纸上的")
+        for input in ["fillShape: fillShape", "scales: scales",
+                      "reduceMotion: reduceMotion", "hoverLevel: hoverLevel"] {
+            XCTAssertTrue(body.contains(input),
+                          "转交点丢了 \(input) ⇒ 调用方给的这一档在运行时被结构体默认值顶掉")
+        }
+        XCTAssertFalse(body.contains("VisualFill."),
+                       "转交点出现常量 ⇒ 有人在接缝处重新供给默认档（M58 的形状）")
+
+        // 新参数若没有调用点读它，它就只是一个类型定义。"加了参数"与"有人用"是两件事
+        // （`feedback-counting-and-wording` 里那条"谁在读旧数字"的改口径审计同一族）。
+        var consumers = 0
+        for (file, source) in try productSources(in: "Views") {
+            _ = file
+            consumers += codeOnly(source)
+                .components(separatedBy: "hoverLevel: VisualFill.controlHover").count - 1
+        }
+        XCTAssertEqual(consumers, 3,
+                       "只有 \(consumers) 处小控件显式抬了悬停档：R13 收进来的是三处"
+                       + "（侧栏五颗批量按钮、排除名单的「移除」、回执的 ×）。"
+                       + "多一处要红（提醒把新位点判一遍），少一处也要红（等于把它退回 6% 那一档）")
+    }
+
+    /// 区域助手自己是**尺子**，所以它自己也要被量一次。
+    /// 少了这一条，"区域"可以随时退化成整文件而没人知道 —— 那正是它要解决的弱点。
+    func testRegionHelperIsATruthTable() throws {
+        let style = codeOnly(try productSource(named: "Views/PressableStyle.swift"))
+        let body = region(in: style, named: "func makeBody")
+        XCTAssertTrue(body.contains("PressedLabel("), "区域助手取不到 makeBody 的内容")
+        XCTAssertFalse(body.contains("var hoverLevel"),
+                       "区域把下一个成员也吞了 ⇒ 它其实是整文件，'按区域判'的判别力是假的")
+        let label = region(in: style, named: "var body: some View")
+        XCTAssertTrue(label.contains(".onHover"), "区域助手取不到 PressedLabel.body 的内容")
+        XCTAssertFalse(label.contains("func makeBody"), "同上：body 区域不许把 makeBody 也圈进来")
+        // 取不到的那一路：哨兵串必须**不含**任何真实 needle，否则"找不到文件里的成员"
+        // 会被读成"这里没有重新供档"—— 把红伪装成绿，仓库里记过不止一次。
+        let missing = "\u{0}REGION-NOT-FOUND\u{0}"
+        XCTAssertFalse(missing.contains("VisualFill."),
+                       "哨兵串若含 needle，'区域取不到'会让禁止重新供档那条断言全绿")
+    }
+
+    /// 取某个成员（`func` 或 `var`）的**函数体**：从声明行开始，按花括号配平到闭合。
+    /// 与 `DailyCopyHeatmapTests` 里那份同源同规矩（跨文件不共享：两边 needle 不同，
+    /// 抽公共层会让一条测试文件依赖另一条测试文件的私有实现）。
+    ///
+    /// 取不到 ⇒ **当场 XCTFail** 并返回一个不可能匹配任何 needle 的哨兵串，
+    /// 不许安静返回空串：空串会让下面所有 `XCTAssertFalse(contains:)` 全绿。
+    private func region(in code: String, named declaration: String) -> String {
+        let lines = code.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { $0.contains(declaration) }) else {
+            XCTFail("区域取不到：\(declaration) —— 守卫看不到被守卫的东西时必须红")
+            return "\u{0}REGION-NOT-FOUND\u{0}"
+        }
+        var depth = 0
+        var opened = false
+        var collected: [String] = []
+        for index in start..<lines.count {
+            let line = lines[index]
+            collected.append(line)
+            depth += line.filter { $0 == "{" }.count
+            if line.contains("{") { opened = true }
+            depth -= line.filter { $0 == "}" }.count
+            if opened, depth <= 0 { break }
+        }
+        return collected.joined(separator: "\n")
+    }
+
+    private func productSource(named relative: String) throws -> String {
+        let directory = String(relative.prefix { $0 != "/" })
+        let name = String(relative.dropFirst(directory.count + 1))
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let file = root.appendingPathComponent("Sources/ClipboardHistoryApp/" + directory + "/" + name)
+            if let text = try? String(contentsOf: file, encoding: .utf8) { return text }
+            root = root.deletingLastPathComponent()
+        }
+        XCTFail("找不到 \(relative) ⇒ 守卫看不到被守卫的东西时必须红")
+        return ""
+    }
+
     /// 接了按压态的调用点数量也要钉住：只查"文件里出现过 pressedStyle"的话，
     /// 把 9 处删到 1 处照样绿。
     func testPressFeedbackWiringCountDoesNotShrink() throws {
@@ -96,8 +225,10 @@ final class PressFeedbackTests: XCTestCase {
             _ = file
             sites += codeOnly(source).components(separatedBy: ".pressedStyle(in:").count - 1
         }
-        XCTAssertGreaterThanOrEqual(sites, 9,
-                                    "只有 \(sites) 处接了按压态：R4 落地时是 9 处。删一处就等于把那个按钮退回'按了没反应'")
+        XCTAssertGreaterThanOrEqual(sites, 12,
+                                    "只有 \(sites) 处接了按压态：R4 落地时 9 处，R13 把三处 `.borderless`"
+                                    + "（侧栏五颗批量按钮、排除名单的「移除」、回执的 ×）收进来之后是 12 处。"
+                                    + "删一处就等于把那个按钮退回'按了没反应'")
     }
 
     // MARK: - 渲染夹具

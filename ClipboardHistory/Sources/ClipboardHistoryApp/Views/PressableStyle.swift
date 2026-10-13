@@ -24,9 +24,15 @@ enum PressableAppearance {
     /// 纯函数：按下时的底色强度。没按但悬停时沿用 hover 那一档，两者都没有就是透明。
     /// 按下比 hover 重一档是**次序**上的必然：`hover < press`，就像 `hover < selected`
     /// （见 `VisualFill` 里那条判据）—— "正在按"比"鼠标在这儿"更近一步。
-    static func fillOpacity(isPressed: Bool, isHovered: Bool) -> Double {
+    ///
+    /// `hoverLevel` 有默认值，但**小控件要显式抬一档**（`VisualFill.controlHover`）：
+    /// 6% 铺在一整行上读得出来，铺在 20pt 的图标上等于没有 —— 那是尺寸差，不是口味差
+    /// （`VisualFill.controlHover` 自己那条注释说的就是同一件事）。
+    static func fillOpacity(isPressed: Bool,
+                            isHovered: Bool,
+                            hoverLevel: Double = VisualFill.hover) -> Double {
         if isPressed { return VisualFill.pressed }
-        return isHovered ? VisualFill.hover : 0
+        return isHovered ? hoverLevel : 0
     }
 }
 
@@ -42,25 +48,58 @@ struct PressedStyle<S: Shape>: ButtonStyle {
     /// 注入点：默认跟全源门。做成参数是因为**没有夹具的两种状态等于没有验收**
     /// （`DetailView` 的 `initialMarkdownMode` 是同一手法）。
     var reduceMotion: Bool = MotionCatalog.motionShouldBeReduced
+    /// 悬停那一档的强度（见 `PressableAppearance.fillOpacity`）。
+    var hoverLevel: Double = VisualFill.hover
 
     func makeBody(configuration: Configuration) -> some View {
+        PressedLabel(configuration: configuration,
+                     fillShape: fillShape,
+                     scales: scales,
+                     reduceMotion: reduceMotion,
+                     hoverLevel: hoverLevel)
+    }
+}
+
+/// 悬停这一半**必须**由一个能持有状态的东西来记。
+///
+/// 以前这里直接在 `makeBody` 里写 `isHovered: false` —— 因为 `ButtonStyle.makeBody`
+/// 里不能有 `@State`。后果不是"少一点效果"：`VisualFill.hover` 那一档
+/// 在**全 App 每一个按钮**上都不可达（R13 抓到的一条），
+/// 而 `PressableAppearance.fillOpacity` 的真值表一直是绿的 ——
+/// 纯函数两个分支都测过，调用点只喂一个分支，这一族叫"载荷绿、消费侧坏"。
+/// 所以把这半层做成一个真的视图，状态归它自己。
+private struct PressedLabel<S: Shape>: View {
+    let configuration: PressedStyle<S>.Configuration
+    let fillShape: S
+    let scales: Bool
+    let reduceMotion: Bool
+    let hoverLevel: Double
+    @State private var isHovered = false
+
+    var body: some View {
         configuration.label
             .scaleEffect(scales ? PressableAppearance.scale(isPressed: configuration.isPressed,
                                                            reduceMotion: reduceMotion)
                                 : 1.0)
             .overlay(
                 fillShape.fill(Color.primary.opacity(
-                    PressableAppearance.fillOpacity(isPressed: configuration.isPressed, isHovered: false)))
+                    PressableAppearance.fillOpacity(isPressed: configuration.isPressed,
+                                                   isHovered: isHovered,
+                                                   hoverLevel: hoverLevel)))
             )
             // 时长用 `.hover` 那一档（0.12s）：按下跟鼠标事件同频，比内容切换更快才不觉得黏。
             .animation(MotionCatalog.animation(for: .hover), value: configuration.isPressed)
+            .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+            .onHover { inside in isHovered = inside }
     }
 }
 
 extension View {
     /// 按压反馈的唯一入口。
-    func pressedStyle<S: Shape>(in shape: S, scales: Bool = true) -> some View {
-        buttonStyle(PressedStyle(fillShape: shape, scales: scales))
+    func pressedStyle<S: Shape>(in shape: S,
+                                scales: Bool = true,
+                                hoverLevel: Double = VisualFill.hover) -> some View {
+        buttonStyle(PressedStyle(fillShape: shape, scales: scales, hoverLevel: hoverLevel))
     }
 }
 

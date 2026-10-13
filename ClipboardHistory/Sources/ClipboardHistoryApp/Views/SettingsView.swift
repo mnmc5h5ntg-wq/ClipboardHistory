@@ -419,7 +419,11 @@ struct SettingsView: View {
                                     excludedBundleIDsRaw = result.raw
                                     exclusionReceipt = result.receipt
                                 }
-                                .buttonStyle(.borderless)
+                                // R13：`.borderless` 换成有按压/悬停的一档（同一轮把三处一起收，
+                                // 见 `PressableStyle` 里 `isHovered: false` 那条）。
+                                // 这是一颗**破坏性**按钮，"按到了"最不该省。
+                                .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                                              hoverLevel: VisualFill.controlHover)
                             }
                             // 行会真的消失：这里不是 `List`（`List` 的行过渡在 macOS 上
                             // 四种写法都跑不出来，账本 M1 / D-055），是普通 `VStack`，
@@ -906,7 +910,8 @@ private struct ReceiptLine: View {
                 Image(systemName: "xmark.circle")
                     .font(.system(size: VisualGlyph.badge))
             }
-            .buttonStyle(.borderless)
+            .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                          hoverLevel: VisualFill.controlHover)
             .helpLabel("收起这条提示")
         }
         .transition(MotionCatalog.transition(for: .contentFade))
