@@ -48,12 +48,16 @@ func luma(_ p: (r: Int, g: Int, b: Int)) -> Double {
 }
 
 /// 该像素相对"这一块的背景"的墨量（0…1）。背景取区域里出现次数最多的颜色。
-func modalColor(_ f: Frame, _ rect: CGRect) -> (r: Int, g: Int, b: Int) {
+/// R29d 修掉的一个**真 bug**：这里原来直接把 pt 当 px 用（没有 ×scale），
+/// 于是所有调用者报出来的 `bg` 都取自**目标区域左上角那块 1/4 尺寸的地方**。
+/// 后果很具体：量侧栏第 3 行时 `bg` 读到了第 1 行的选中胶囊 (216,232,248)，
+/// 于是"暗墨 / 亮墨"全部按错的参照分类 —— 我拿它下过一次结论，那条结论已撤回。
+func modalColor(_ f: Frame, _ rect: CGRect, scale: Int = 1) -> (r: Int, g: Int, b: Int) {
     var counts: [Int: Int] = [:]
-    let x0 = Int(rect.minX), y0 = Int(rect.minY)
-    let x1 = min(f.width, Int(rect.maxX)), y1 = min(f.height, Int(rect.maxY))
-    for y in y0..<y1 {
-        for x in x0..<x1 {
+    let x0 = max(0, Int(rect.minX) * scale), y0 = max(0, Int(rect.minY) * scale)
+    let x1 = min(f.width, Int(rect.maxX) * scale), y1 = min(f.height, Int(rect.maxY) * scale)
+    for y in y0..<max(y0, y1) {
+        for x in x0..<max(x0, x1) {
             let p = f[x, y]
             let key = ((p.r / 16) << 8) | ((p.g / 16) << 4) | (p.b / 16)
             counts[key, default: 0] += 1
@@ -70,7 +74,7 @@ func inkAt(_ f: Frame, _ bg: (r: Int, g: Int, b: Int), x: Int, y: Int, floorDelt
 }
 
 func rowProfile(_ f: Frame, rect: CGRect, scale: Int) {
-    let bg = modalColor(f, rect)
+    let bg = modalColor(f, rect, scale: scale)
     print("# bg = (\(bg.r),\(bg.g),\(bg.b))  region pt = \(rect)")
     let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
     let x0 = Int(rect.minX) * scale, x1 = min(f.width, Int(rect.maxX) * scale)
@@ -90,7 +94,7 @@ func rowProfile(_ f: Frame, rect: CGRect, scale: Int) {
 }
 
 func colProfile(_ f: Frame, rect: CGRect, scale: Int) {
-    let bg = modalColor(f, rect)
+    let bg = modalColor(f, rect, scale: scale)
     print("# bg = (\(bg.r),\(bg.g),\(bg.b))  region pt = \(rect)")
     let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
     let x0 = Int(rect.minX) * scale, x1 = min(f.width, Int(rect.maxX) * scale)
@@ -111,7 +115,7 @@ func colProfile(_ f: Frame, rect: CGRect, scale: Int) {
 
 /// 自动分带：把行墨曲线切成"有内容的行段"，再对每段报图标区 / 文字区。
 func bands(_ f: Frame, rect: CGRect, scale: Int, iconRect: CGRect) {
-    let bg = modalColor(f, rect)
+    let bg = modalColor(f, rect, scale: scale)
     let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
     let x0 = Int(rect.minX) * scale, x1 = min(f.width, Int(rect.maxX) * scale)
 
@@ -156,6 +160,10 @@ func bands(_ f: Frame, rect: CGRect, scale: Int, iconRect: CGRect) {
         var darkest = bg
         var darkestAll = bg
         var maxDeltaAll = 0
+        // R29c 收口：这一轮要判的是**镜像**（同一列图标，亮帧里消失的那几个在暗帧里必须回来）。
+        // `ink=` 与 `contrast=` 都分不出"画白了"和"没画"，只有方向能。
+        var brighter = 0
+        var darker = 0
         var minX = f.width, maxX = 0, minY = f.height, maxY = 0
         for y in iy0..<iy1 {
             for x in ix0..<ix1 {
@@ -165,6 +173,7 @@ func bands(_ f: Frame, rect: CGRect, scale: Int, iconRect: CGRect) {
                 if d > maxDeltaAll { maxDeltaAll = d; darkestAll = p }
                 if inkAt(f, bg, x: x, y: y, floorDelta: 24) {
                     iconInk += 1
+                    if luma(p) > luma(bg) { brighter += 1 } else if luma(p) < luma(bg) { darker += 1 }
                     if luma(p) < luma(darkest) { darkest = p }
                     inkLumaSum += luma(p)
                     minX = min(minX, x); maxX = max(maxX, x)
@@ -177,17 +186,20 @@ func bands(_ f: Frame, rect: CGRect, scale: Int, iconRect: CGRect) {
         var textInk = 0
         var textPixels = 0
         var textDarkest = bg
+        var textBrighter = 0
+        var textDarker = 0
         for y in iy0..<iy1 {
             for x in tx0..<x1 {
                 textPixels += 1
                 if inkAt(f, bg, x: x, y: y, floorDelta: 24) {
                     textInk += 1
                     let p = f[x, y]
+                    if luma(p) > luma(bg) { textBrighter += 1 } else if luma(p) < luma(bg) { textDarker += 1 }
                     if luma(p) < luma(textDarkest) { textDarkest = p }
                 }
             }
         }
-        print(String(format: "band %d  y=[%.1f,%.1f]  icon: ink=%.3f maxdelta=%3d contrast=%.2f box=%.1f..%.1f x %.1fx%.1fpt  text: ink=%.3f contrast=%.2f",
+        print(String(format: "band %d  y=[%.1f,%.1f]  icon: ink=%.3f maxdelta=%3d contrast=%.2f box=%.1f..%.1f x %.1fx%.1fpt side=%d/%d  text: ink=%.3f contrast=%.2f side=%d/%d",
                      index, startPt, endPt,
                      iconPixels > 0 ? Double(iconInk) / Double(iconPixels) : -1,
                      maxDeltaAll,
@@ -196,8 +208,10 @@ func bands(_ f: Frame, rect: CGRect, scale: Int, iconRect: CGRect) {
                      iconInk > 0 ? Double(maxX + 1) / Double(scale) : 0,
                      iconInk > 0 ? Double(maxX - minX + 1) / Double(scale) : 0,
                      iconInk > 0 ? Double(maxY - minY + 1) / Double(scale) : 0,
+                     brighter, darker,
                      textPixels > 0 ? Double(textInk) / Double(textPixels) : -1,
-                     contrast(textDarkest, bg)))
+                     contrast(textDarkest, bg),
+                     textBrighter, textDarker))
         i = j + 1
     }
 }
@@ -228,7 +242,7 @@ func crop(_ f: Frame, rect: CGRect, scale: Int, to path: String) {
 /// 把一块区域打成 ASCII 灰度图（每字符 = 1pt×1pt 里最"偏离背景"的那个像素）。
 /// 用途：区分"字形完整但整体被调淡"和"字形缺一半"—— 这两种在 ink 分数上可能一样。
 func dump(_ f: Frame, rect: CGRect, scale: Int) {
-    let bg = modalColor(f, rect)
+    let bg = modalColor(f, rect, scale: scale)
     print("# bg = (\(bg.r),\(bg.g),\(bg.b)) region pt = \(rect)")
     let ramp = Array(" .:-=+*#%@")
     let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
@@ -253,7 +267,7 @@ func dump(_ f: Frame, rect: CGRect, scale: Int) {
 /// 一块区域里"最亮 / 最暗"的像素各是多少（相对背景）。
 /// 用来分辨"淡灰"和"其实是白色"—— 两者在 ink 分数上完全一样，含义完全相反。
 func minMax(_ f: Frame, rect: CGRect, scale: Int) {
-    let bg = modalColor(f, rect)
+    let bg = modalColor(f, rect, scale: scale)
     let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
     let x0 = Int(rect.minX) * scale, x1 = min(f.width, Int(rect.maxX) * scale)
     var lightest = bg, darkest = bg
@@ -274,6 +288,32 @@ func minMax(_ f: Frame, rect: CGRect, scale: Int) {
                  darkest.r, darkest.g, darkest.b, darkestD, darkestAt))
 }
 
+/// R29d：一块区域里"比背景暗 t"和"比背景亮 t"的像素各在什么范围。
+/// 用途：证明**同一处文字**在亮帧里是暗墨、在暗帧里也是暗墨（= 它没跟着外观翻），
+/// 而不是靠肉眼看一张被反相伪影糊住的图。
+func inkBBox(_ f: Frame, rect: CGRect, scale: Int, threshold: Int) {
+    let bg = modalColor(f, rect, scale: scale)
+    let y0 = Int(rect.minY) * scale, y1 = min(f.height, Int(rect.maxY) * scale)
+    let x0 = Int(rect.minX) * scale, x1 = min(f.width, Int(rect.maxX) * scale)
+    var darkBox: CGRect?
+    var brightBox: CGRect?
+    var darkCount = 0, brightCount = 0
+    for y in y0..<y1 {
+        for x in x0..<x1 {
+            let p = f[x, y]
+            let dl = luma(p) - luma(bg)
+            let cell = CGRect(x: Double(x) / Double(scale), y: Double(y) / Double(scale), width: 1, height: 1)
+            if dl < -Double(threshold) { darkCount += 1; darkBox = darkBox.map { $0.union(cell) } ?? cell }
+            if dl > Double(threshold) { brightCount += 1; brightBox = brightBox.map { $0.union(cell) } ?? cell }
+        }
+    }
+    func box(_ r: CGRect?, _ n: Int) -> String {
+        guard let r, n > 0 else { return "无(0)" }
+        return String(format: "%.1f..%.1f x %.1f..%.1f (%d)", r.minX, r.maxX, r.minY, r.maxY, n)
+    }
+    print(String(format: "  bg=(%d,%d,%d)  暗墨 %@  亮墨 %@", bg.r, bg.g, bg.b, box(darkBox, darkCount), box(brightBox, brightCount)))
+}
+
 let args = CommandLine.arguments
 let mode = args.count > 1 ? args[1] : "bands"
 guard args.count >= 3, let f = load(args[2]) else {
@@ -292,5 +332,6 @@ case "cols": colProfile(f, rect: rect, scale: scale)
 case "crop": crop(f, rect: rect, scale: scale, to: args.last ?? "/tmp/crop.png")
 case "dump": dump(f, rect: rect, scale: scale)
 case "minmax": minMax(f, rect: rect, scale: scale)
+case "bbox": inkBBox(f, rect: rect, scale: scale, threshold: rest.count >= 7 ? Int(rest[6]) : 8)
 default: bands(f, rect: rect, scale: scale, iconRect: iconRect)
 }

@@ -1486,6 +1486,111 @@ final class UICaptureTests: XCTestCase {
         return (brighter, darker, tail.count)
     }
 
+    /// **全量**（不是尾墨）按侧计数：偏离背景超过 `gate` 的像素各落在哪一侧。
+    ///
+    /// 为什么 `inkTailSplit` 不够用（R29d）：尾墨只取"偏离最远的那 2%"，
+    /// 而一块**同时**压着选中行白字与未选中行黑字的侧栏列里，
+    /// 白字的偏离（≈200）会把黑字的偏离（≈24）全部挤出那 2% ——
+    /// 于是尾墨尺报"墨在期望侧 ✓"，而那五行字在帧里其实**一个字都看不见**。
+    /// 尾墨问"最强的那些像素在哪一侧"，这一把问"**看得见的字一共有几个、在哪一侧**"。
+    /// 同一块区域、同一个背景取法（8 级量化众数），两把尺的差别只在切多少像素。
+    static func inkSideCounts(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                              bytesPerRow: Int, rect: CGRect, scale: Double, gate: Int = 16)
+        -> (brighter: Int, darker: Int) {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (0, 0) }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        var histogram: [Int: Int] = [:]
+        for y in y0..<y1 {
+            for x in x0..<x1 { histogram[lumaAt(x, y) / 8, default: 0] += 1 }
+        }
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+        var brighter = 0, darker = 0
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let signed = lumaAt(x, y) - background
+                if signed > gate { brighter += 1 } else if signed < -gate { darker += 1 }
+            }
+        }
+        return (brighter, darker)
+    }
+
+    /// 哪些设置页帧的**暗档侧栏文字**落在背景的错误一侧（R29d / BACKLOG 45）。
+    ///
+    /// 这不是产品判据，是**尺的盲区名单** —— 与 R18 的 `materialBlindSpotFixtures` 同一族：
+    /// 名单外的帧冒出反侧墨 ⇒ 又多一处"看着拍到了、其实那几行字不可见"；
+    /// 名单里的帧不再冒 ⇒ 那一处能读了（或者有人动了上色），两种都必须真的去看那张帧。
+    /// 名单里的帧**不能**拿侧栏未选中行的可读性当证据。
+    static let darkSidebarTextBlindSpots: Set<String> = [
+        "settings-general", "settings-shortcuts", "settings-privacy",
+        "settings-recommendations", "settings-data", "settings-stats",
+        "settings-min", "settings-privacy-excluded", "settings-stats-populated",
+    ]
+
+    /// 侧栏那一列"文字应当出现的位置"（pt）。
+    /// 左边界从 40 起：图标列在 12–34，把图标框进来会让"符号的固定色"混进这条读数，
+    /// 那是 BACKLOG 41 那半条要单独判的事。右边界 142 = 侧栏宽 148 留 6pt 内边距。
+    static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)
+
+    /// 暗档设置页侧栏文字的可读性**要能被数出来**（R29d / U-52）。
+    ///
+    /// 这一条不判产品（产品那一列没被判定为缺陷 —— 十三臂复刻体全画对，机制未定，见 D-089）。
+    /// 它判的是"我们知道多少"：把"哪些帧的暗档侧栏文字不可信"钉成一份名单，
+    /// 名单变了就必须红一次、逼一次人去看，而不是让这件事留在某轮的散文里。
+    func testDarkSettingsSidebarTextIsACountedBlindSpot() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r29d-sidebar-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var wrongSide: Set<String> = []
+        var judged = 0
+        for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
+            let file = scratch.appendingPathComponent("\(fixture.name).png")
+            _ = try render(fixture, appearance: .darkAqua, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(fixture.name)：读不回刚拍的帧")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let counts = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                            bytesPerRow: rep.bytesPerRow,
+                                            rect: Self.settingsSidebarTextColumn, scale: scale)
+            // runner 上这一页整块画不出来（BACKLOG 43）⇒ 记 NOT-RUN，不算通过也不算盲区。
+            guard counts.brighter + counts.darker > 0 else {
+                print("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素")
+                continue
+            }
+            judged += 1
+            let inverted = Self.inkFailureIsInverted(brighter: counts.brighter, darker: counts.darker,
+                                                     darkAppearance: true)
+            if inverted { wrongSide.insert(fixture.name) }
+            print("TEXT_SIDE \(fixture.name) dark 亮侧=\(counts.brighter) 暗侧=\(counts.darker)"
+                  + " ⇒ " + (inverted ? "侧栏文字落在背景错误一侧（不可见）" : "墨在期望侧"))
+        }
+        let extra = wrongSide.subtracting(Self.darkSidebarTextBlindSpots)
+        let gone = Self.darkSidebarTextBlindSpots.subtracting(wrongSide)
+        XCTAssert(extra.isEmpty,
+                  "这些帧的暗档侧栏文字**第一次**落在错误一侧：\(extra.sorted()) ⇒ 又多了一处"
+                  + "离屏帧里不可见的文字。先定位是谁、为什么，再决定加名单还是修那一层；"
+                  + "不许为了绿把断言放宽")
+        XCTAssert(gone.isEmpty,
+                  "这些帧的暗档侧栏文字现在落在期望侧了：\(gone.sorted()) ⇒ 两种可能："
+                  + "①机制被修好了（BACKLOG 45 可以关，但必须先肉眼复审那张帧，别只缩名单）；"
+                  + "②尺瞎了（框没压住字 / 背景取错位置 —— R29d 刚犯过后者）。"
+                  + "两种都要真的去看那张帧")
+        XCTAssertGreaterThan(judged, 0,
+                             "一条都没判 ⇒ 这条守卫今天没有对象（所有帧都走了 NOT-RUN）。"
+                             + "记 NOT-RUN 是对的，但**全是** NOT-RUN 等于这条不存在")
+        print("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures（名单 \(Self.darkSidebarTextBlindSpots.count) 条）")
+    }
+
     /// 这个外观下，"正常的墨"应该在背景的哪一侧。
     static func inkIsOnTheExpectedSide(brighter: Int, darker: Int, darkAppearance: Bool) -> Bool {
         // 一侧占绝对多数才算"有方向"；各半（例如框里同时压着黑白两种元素）不下结论。

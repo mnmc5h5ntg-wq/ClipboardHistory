@@ -1227,3 +1227,27 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
   而是半分辨率下细笔画根本进不了"最暗 2%"那一档。修法（同平台相对参照）不变，**原因已改写**。
 - 我自己写的那条 NOT-RUN 守卫第一版**永远不会触发**（它判 `total == 0`，而 `total` 被
   `max(1, …)` 兜底）⇒ 记一条规矩：**跳过路径也要有正对照**，"看起来有记账"比没记账更危险。
+
+## R29d · 收口之后又跑的一轮：暗档侧栏文字是黑字黑底，而我先用眼睛"看错了"
+
+- 触发点是复核本身：我裁了 `settings-min-640x440-dark.png` 报"标签浅灰可读"。
+  像素相反 —— 那一列最亮只比底亮 4，最暗是 (0,0,0)。**肉眼那条通道读的是期望，不是文件**（BACKLOG 46）。
+- 量出来的事实（U-52）：九张 `settings-*` 暗档帧里，**未选中行**的标签与图标落在背景的错误一侧
+  （`settings-shortcuts` 亮侧=0 / 暗侧=2647），**选中那一行两档都对**（亮侧 851）。
+  亮档同一列全部正常 ⇒ 判别量是选中与否，不是页 / 帧宽 / 符号名。
+- 十五臂复刻体（`.scratch/motion-audit-2/sidebar_appearance_r29d.swift`）**一臂都没重现**：
+  绘制外观域 / orderFront / 嵌套 hosting+NSSplitView / 运行时翻外观 / 钉外观 / 显式 `.primary` /
+  `Button{Label}+.plain` / 以及"嵌套 hosting view 装一列 Button"那一格（O、P）—— 全画对
+  ⇒ 机制未定，**产品零改动**（D-089）。
+- 仓库侧新加一条会红的账：`testDarkSettingsSidebarTextIsACountedBlindSpot`
+  + `inkSideCounts`（整列按侧计数，尾墨尺在这里会漏 —— 白字把黑字挤出那 2%）。
+  两个方向都会红：名单外冒出反侧墨 / 名单里不再冒（R18 材质名单同一族）。
+  实测 `TEXT_SIDE_BLIND_SPOTS 9 of 9 settings fixtures`。
+- 修掉取证工具自己的 bug：`sidebar_icons_r28.swift` 的 `modalColor` 把 pt 当 px，
+  所有 `bg` 取自目标区域左上角 1/4 处 ⇒ 我据此下过的一条读数已作废并撤回。仓库判据无此问题（逐条核过）。
+- **数字**：0 warning；**702 例 / 25 skip / 0 失败**（+1 条守卫）；脚本 72 passed；
+  帧基线 102 / `CHANGED=0`（产品零改动，符合预期）；变异 **M132–M134 三支全 CAUGHT**、
+  `RESTORE_CLEAN=yes`（`/tmp/r29d-mutation.log`）。
+  25 条 skip 的构成：动效胶片 14 + 在屏交互探针 8 + 按压探针 1 + 实例守卫 1 + 浮层 1，
+  全是环境门控。**这个数字不能跨轮比**：上一轮账本写的是 27，但没留构成 ——
+  口径没记构成，差 2 条就查不动（BACKLOG 46 顺手补的一条）。

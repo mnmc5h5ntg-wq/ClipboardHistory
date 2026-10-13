@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R29d · 收口后的一轮：产品零改动，两条账）
+
+- **产品代码零改动**。本轮改的是两个 `.scratch` 取证工具与账本。
+- **量到一条新的帧盲区（U-52 / BACKLOG 45）**：暗档 `settings-*` 帧里，侧栏**未选中行**的标签与图标
+  落在背景的错误一侧 —— 黑字黑底。实测三张帧 × 两档：亮档 733 / 771 个暗墨（正常），
+  暗档同一位点是 587 / 668 个**暗**墨、0 个亮墨；而**选中的那一行两档都正常**（暗档 836 个亮墨）。
+  ⇒ 判别量是选中与否，不是页 / 帧宽 / 符号名。
+- **十五臂复刻体一支都没重现它**（`sidebar_appearance_r29d.swift`）：绘制外观域、orderFront 踢、
+  嵌套 `NSHostingView`+`NSSplitView`、运行时翻外观、给嵌套视图钉外观、显式 `AnyShapeStyle(.primary)`、
+  `Button{Label}+.plain`、以及这两半合起来那一格（嵌套 hosting view 装一列 Button）—— 全画对。**候选解药被否光的时候不改产品**（D-089）。
+- **肉眼复核报错过一次并已撤回**：我对着裁出来的暗档帧说"五个标签浅灰可读"，
+  像素是"该列最亮只比底亮 4"。目标要求每轮看画面 ⇒ 从此"看"必须配一个可数的读数（BACKLOG 46）。
+- **修掉取证工具自己的一个真 bug**：`sidebar_icons_r28.swift` 的 `modalColor` 把 pt 当 px 用，
+  于是所有 `bg` 读数取自目标区域左上角 1/4 处 —— 它曾让"第 3 行"读到第 1 行的胶囊。
+  仓库判据不受影响（逐条核过 `rect * scale`）。
+
 ### Added（R29 · 判墨的尺第一次有方向）
 
 - **`inkTailSplit` + `inkIsOnTheExpectedSide`**：取与 `inkContrast` 同一切法的尾墨（偏离背景最远的那 2%），
