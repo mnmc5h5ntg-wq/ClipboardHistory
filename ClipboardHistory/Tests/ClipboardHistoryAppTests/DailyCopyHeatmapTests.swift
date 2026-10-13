@@ -440,7 +440,148 @@ final class DailyCopyHeatmapTests: XCTestCase {
                       "没有未来分支 ⇒ 还没到的日子会被画成「那天没复制」")
     }
 
+    // MARK: - R9：动效必须"被供电"，不许只是声明
+
+    /// 阶段一自检抓到的两条，都在这里钉住（U-30 缺陷 2 + BACKLOG 15）：
+    /// ① 描边与页脚由同一个 `hovered` 驱动，而事务当时挂在**页脚的字符串**上 ——
+    ///    字符串不可插值，所以那条 `.animation` 一次也没演过，而真正可插值的描边在事务外；
+    /// ② 空态 ↔ 网格整块交换没有过渡。
+    ///
+    /// 写法上的要求（R5 A7 / R7 M15 / R8 M21 三课）：**按函数体取区域**，
+    /// 整文件 `contains` 会被同族的另一处命中白拿 —— 这个文件现在有 4 处 `.animation(`
+    /// 与 3 处 `.transition(`，任何"文件里有 withAnimation 就算过"的写法都没有判别力。
+    func testHeatmapMotionIsDrivenNotJustClaimed() throws {
+        let view = codeOnly(try productSource(named: "Views/DailyCopyHeatmapView.swift"))
+
+        // ① 悬停：变更点自己开事务。
+        let cell = region(in: view, named: "func cellView")
+        XCTAssertTrue(cell.contains("withAnimation(MotionCatalog.animation(for: .hover))"),
+                      "描边是 `hovered` 驱动的透明度，可插值；变更点不开事务 ⇒ 它硬生硬灭（阶段一那条假动画的成因）")
+        XCTAssertTrue(cell.contains("value: cell.bucket)"),
+                      "当天那格的深浅必须由 bucket 驱动：没有这一条，复制一下之后图上是硬切")
+        XCTAssertFalse(cell.contains("value: cell.count)"),
+                       "键不许用 count：同一档内 12→13 次画面**不该**动，拿 count 当键会让每次复制都白起一次事务")
+
+        // ② 页脚：那条"声明了但空转"的动画必须已经撤掉，而不是被挪到别处。
+        let footer = region(in: view, named: "var footer")
+        XCTAssertFalse(footer.contains(".animation("),
+                      "页脚换的是字符串，不可插值 ⇒ 这里挂 `.animation` 就是那条永远不演的假声明（撤掉它并写明理由，别留着当装饰）")
+        XCTAssertFalse(view.contains("value: hovered"),
+                       "以 `hovered` 为键的按值动画：字符串换了它也不会插值，留着只会让人以为这里有动效")
+
+        // ③ 空态 ↔ 网格：两臂都要有过渡，且容器上要有能驱动它们的键。
+        let body = region(in: view, named: "var body")
+        XCTAssertEqual(transitionCount(in: body), 2,
+                       "空态臂与网格块臂必须**两臂都有**过渡：只挂一臂是 R5 的 A2 那一族（'声明了但只演一半'）")
+        XCTAssertTrue(body.contains("value: counts.isEmpty)"),
+                      "两臂的过渡没有按值驱动 ⇒ 第一条复制那一下仍然是硬换")
+        // 汇总行是随 `counts.isEmpty` 一起出现/消失的那一条，它也得在事务里。
+        XCTAssertEqual(transitionCount(in: region(in: view, named: "var header")), 1,
+                       "有记录之后汇总行是硬蹦出来的：它和空态的消失是同一件事，该一起淡")
+    }
+
+    /// 汇总那一行的**可见性**是决定，不是排版：空屏不许同时说"共 0 次"和"还没有记录"。
+    func testHeatmapSummaryLineTruthTable() {
+        let summary = DailyCopyHeatPolicy.Summary(total: 1322, daysWithRecords: 126,
+                                                  averagePerDay: 7.4, busiestDayKey: "2025-11-17",
+                                                  busiestCount: 18, currentStreak: 126)
+        XCTAssertNil(DailyCopyHeatPolicy.summaryLine(for: summary, hasRecords: false),
+                     "没记录时这一行必须整条不出现 —— 零不是信息，'还没开始记'才是")
+        guard let line = DailyCopyHeatPolicy.summaryLine(for: summary, hasRecords: true) else {
+            return XCTFail("有记录时这一行必须出现")
+        }
+        XCTAssertTrue(line.contains("26 周"), "窗口周数要来自 `defaultWindowWeeks`，写死会让改窗口时漏改")
+        XCTAssertTrue(line.contains("1322 次") && line.contains("7.4 次") && line.contains("126 天"),
+                      "三个数少一个，这句话就退化成装饰")
+    }
+
+    /// 决定归作者：文案与可见性都在策略里，视图只负责画。
+    /// 反过来也钉住 —— 视图里不许再拼一份这句话，否则改策略时视图那份会静默留在原地。
+    func testHeatmapSummaryDecisionIsAuthoredByThePolicy() throws {
+        let view = codeOnly(try productSource(named: "Views/DailyCopyHeatmapView.swift"))
+        XCTAssertTrue(view.contains("DailyCopyHeatPolicy.summaryLine("),
+                      "视图没走策略 ⇒ 这条决定回到了排版里，真值表管不到它")
+        XCTAssertFalse(view.contains("周共"), "视图里不许再拼汇总文案（作者是 `DailyCopyHeatPolicy.summaryLine`）")
+    }
+
     // MARK: - 工具
+
+    /// 取某个成员（`func` 或 `var`）的**函数体**：从声明行开始，按花括号配平到闭合。
+    /// 为什么不用"行号区间"或"到下一个 MARK 为止"：那两种写法都会随排版漂移，
+    /// 而守卫一旦随排版漂移，它就变成了"今天恰好还在管"的那种东西。
+    ///
+    /// 取不到 ⇒ **当场 XCTFail** 并返回一个不可能匹配任何 needle 的哨兵串。
+    /// 这里不能"安静返回空串"：空串会让下面所有 `XCTAssertFalse(contains:)` 全绿，
+    /// 于是"把那个成员删了"被读成"修好了" —— 把红伪装成没跑，仓库里记过不止一次。
+    private func region(in code: String, named declaration: String) -> String {
+        let lines = code.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { $0.contains(declaration) }) else {
+            XCTFail("区域取不到：\(declaration) —— 守卫找不到被守卫的东西时必须红")
+            return "\u{0}REGION-NOT-FOUND\u{0}"
+        }
+        var depth = 0
+        var opened = false
+        var body: [String] = []
+        for index in start..<lines.count {
+            let line = lines[index]
+            body.append(line)
+            depth += line.filter { $0 == "{" }.count
+            if line.contains("{") { opened = true }
+            depth -= line.filter { $0 == "}" }.count
+            if opened, depth <= 0 { break }
+        }
+        return body.joined(separator: "\n")
+    }
+
+    private func transitionCount(in region: String) -> Int {
+        region.components(separatedBy: "\n").filter { $0.contains(".transition(") }.count
+    }
+
+    /// 区域助手自己是**尺子**，所以它自己也要被量一次：
+    /// 取到了不许把整份文件当区域（那等于把"整文件 contains"的弱点原封不动搬进来），
+    /// 也取不到时不许安静（上一段的理由）。
+    func testHeatmapRegionHelperIsATruthTable() throws {
+        let view = codeOnly(try productSource(named: "Views/DailyCopyHeatmapView.swift"))
+        let cell = region(in: view, named: "func cellView")
+        XCTAssertTrue(cell.contains("onHover"), "区域助手取不到 cellView 的内容")
+        XCTAssertFalse(cell.contains("private var footer"),
+                       "区域把下一个成员也吞了 ⇒ 它其实是整文件，'按区域判'的判别力是假的")
+        let footer = region(in: view, named: "var footer")
+        XCTAssertFalse(footer.contains("func cellView"), "同上：footer 区域不许把 cellView 也圈进来")
+        // 取不到的那一路：哨兵串必须**不含**任何真实 needle，否则"找不到"会被读成"这里没有动画声明"。
+        let missing = "\u{0}REGION-NOT-FOUND\u{0}"
+        XCTAssertFalse(missing.contains(".animation("),
+                       "哨兵串若含 needle，取不到区域会让按值动画的断言全绿")
+        XCTAssertEqual(transitionCount(in: missing), 0)
+    }
+
+    /// 「这张图怎么读」必须**跟着图一起出现**，而且必须写在观察账本的那一层里。
+    /// 两条各挡一种回归：摘掉闸门 ⇒ 空屏又在教人读一张不在这里的图；
+    /// 把说明搬回 `SettingsView.statsSection` ⇒ 它读的是开页快照，用户复制第一条之后说明永远不出现。
+    func testHeatmapReadingGuideFollowsTheChart() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        let occurrences = settings.components(separatedBy: "这张图怎么读").count - 1
+        XCTAssertEqual(occurrences, 1, "同一句标题出现两次 = 两份会各自漂移的文案（U-30 去重那条同一族）")
+
+        guard let sectionStart = settings.range(of: "private struct DailyCopyStatsSection")?.lowerBound,
+              let guideAt = settings.range(of: "这张图怎么读")?.lowerBound else {
+            return XCTFail("找不到 `DailyCopyStatsSection` 或那段说明 ⇒ 守卫看不到被守卫的东西")
+        }
+        XCTAssertGreaterThan(guideAt, sectionStart,
+                             "说明不在观察账本的那一层里 ⇒ 它的可见性条件不会随第一条复制更新")
+
+        // `SettingsView` 里有好几个 `var body`（主视图、`ReceiptLine`、这一段…），
+        // 所以先把**结构体本身**圈出来，再在里面找它自己的 body ——
+        // 直接按 `var body` 取会取到文件里第一个，那条判据就变成"恰好管着某个别的东西"。
+        let section = region(in: settings, named: "struct DailyCopyStatsSection")
+        let guideRegion = region(in: section, named: "var body")
+        XCTAssertTrue(guideRegion.contains("if !ledger.counts.isEmpty"),
+                      "没有闸门 ⇒ 空账本那一屏会同时说\"还没有记录\"和\"怎么读这张图\"")
+        XCTAssertTrue(guideRegion.contains("Divider()"),
+                      "分隔线要一起收进闸门里，否则空屏上会留一条悬空横线")
+    }
+
+    // MARK: - 工具（原有）
 
     private func codeOnly(_ source: String) -> String {
         source.components(separatedBy: "\n")

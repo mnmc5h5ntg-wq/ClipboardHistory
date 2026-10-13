@@ -2379,3 +2379,34 @@ macOS 12 全绿：只用 `Color.primary.opacity` / `VisualShape` / `.help` / `on
 （同一个令牌，两套外观），已用亮暗两帧夹具目视核对。
 帧基线 82 → **90**（三张新夹具：`heatmap-populated` / `heatmap-empty` / `settings-stats-populated`），
 `update` 与功能代码在**同一个 commit**（硬门那条纪律）。
+
+## D-069 CI 的 Swift 6.1.2 在全局惰性初始化器里 SIGSEGV，本机 6.2.1 不复现（2026-10-13）
+
+- **现象**：阶段一那次提交（`14d706f`）在 CI 的 **Build (must be warning-free)** 那一步 42 秒就红，
+  日志里不是告警也不是错误，是编译器自己塌了：
+  ```
+  error: emit-module command failed due to signal 11
+  3. While evaluating request ASTLoweringRequest(Lowering AST to SIL for module ClipboardHistoryApp)
+  9  SILGenFunction::emitPatternBinding(...)
+  10 SILGenFunction::emitLazyGlobalInitializer(...)
+  4  emitRawApply(...)
+  ```
+  本机 `swift build` / `swift test` 全绿（653 用例 0 failures、0 warning）——
+  本机是 **Swift 6.2.1**，runner 是 **6.1.2**（Xcode 16.4）。
+- **读栈得到的唯一线索**：崩在 `emitLazyGlobalInitializer`，也就是**全局/静态存储属性的初始化器**，
+  而且里面有一次 `apply`（函数/构造调用）。整模块 emit-module，日志不给文件名。
+- **决定**：把这一批新加的"初始化器里带构造调用"的全局都消掉，**不做二分**：
+  1. `DailyCopyHeatPolicy.Cell.placeholder`：`static let = Cell(...)` → `static var { Cell(...) }`；
+  2. `AppDelegate.sharedHistoryStore`：`= HistoryStore(dailyCopyLedger: DailyCopyLedger())`
+     → `= makeSharedHistoryStore()`，把嵌套的那层构造挪进一个 `@MainActor private static func`。
+     改完之后全局初始化器只剩一次 apply，**与崩溃之前那个提交（`HistoryStore()`）形状一致** ——
+     这是这条绕法唯一的依据，不是"定位到了 bug"。
+- **为什么不二分**：这是**编译器 bug，不是产品 bug**，产品语义两边完全等价
+  （一个补空位的小值、一个单例的构造顺序）。二分的代价是每次一发 CI + 一次全量验证，
+  而收益只是"注释里能写是哪个"。所以注释里明写"**嫌疑**，不是定位结论"。
+- **兼容性**：无 API 变化、无数据变化、无行为变化；`placeholder` 从存储属性变计算属性
+  对调用点（`column.append(.placeholder)`）逐字不变。
+- **回滚**：把两处改回去即可，代价 = CI 再红一次。
+- **顺带记一条**：`nonisolated static let retentionDays = 730` 没动 ——
+  字面量初始化器不产生 `apply`，与栈上那条路径无关。
+  如果哪天 6.1.2 上又崩在这里，这条假设就要被推翻重写（**这句话是给下一轮看的**）。

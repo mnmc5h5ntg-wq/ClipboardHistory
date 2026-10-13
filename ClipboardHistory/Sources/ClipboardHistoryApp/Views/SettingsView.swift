@@ -538,27 +538,11 @@ struct SettingsView: View {
                 // 拿不到账本时不许画一张全灰的图冒充"你这半年什么都没复制"。
                 StateLine(kind: .error, message: "统计不可用：没有拿到按日账本。")
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("这张图怎么读")
-                    .font(.subheadline)
-                Text("一列是一周，一行是一个星期几，右下角是今天。颜色深浅说的是那几天里你复制了多少次，"
-                     + "深浅按你自己这段时间的数据算 —— 所以它是「我这阵子忙不忙」的刻度，"
-                     + "不是「一天多少次」的刻度。鼠标停在任意一格上会写出那一天。")
-                    .font(.system(size: VisualFont.meta))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text("计数在复制发生的那一刻就记下了：删掉记录、清空历史都不会改写它，"
-                     + "所以它比历史列表本身长（保留两年）。暂停采集与被排除的 App 不计数。")
-                    .font(.system(size: VisualFont.meta))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 
+    /// 「这张图怎么读」那段说明**不在这里**：它挂在 `DailyCopyStatsSection` 里，
+    /// 因为只有那一层观察账本 ⇒ 见下面那段注释。
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("数据")
@@ -842,15 +826,50 @@ private struct DailyCopyStatsSection: View {
     @ObservedObject var ledger: DailyCopyLedger
 
     var body: some View {
-        // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
-        // 一个时刻有两个来源，跨午夜与注入时钟时都会分叉。
-        DailyCopyHeatmapView(counts: ledger.counts, today: ledger.today)
-        if let error = ledger.lastWriteError {
-            // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
-            // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
-            Text("统计写入失败：\(error)")
+        VStack(alignment: .leading, spacing: 16) {
+            // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
+            // 一个时刻有两个来源，跨午夜与注入时钟时都会分叉。
+            DailyCopyHeatmapView(counts: ledger.counts, today: ledger.today)
+            if let error = ledger.lastWriteError {
+                // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
+                // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
+                // （**这条什么时候真的上屏**是另一件事，见 BACKLOG 14：
+                //  它读的是一个跨队列的盒子，而盒子里的值没有发布通道。）
+                Text("统计写入失败：\(error)")
+                    .font(.system(size: VisualFont.meta))
+                    .foregroundStyle(.secondary)
+            }
+
+            // 「这张图怎么读」**跟着图一起出现**（R9，离屏帧实测）：空账本那一屏原来是
+            // "还没有可统计的记录 —— 复制几条之后这里会长出一张日历" + 分隔线 +
+            // 五行"一列是一周，一行是一个星期几…" —— 教用户读一张**不在这里**的图，
+            // 与阶段一那条"共 0 次"是同一族（两条互相矛盾的表达同时说话，U-30 缺陷 5）。
+            //
+            // 为什么写在这一层而不是 `SettingsView.statsSection`：**只有这一层观察账本**。
+            // 挂在 `SettingsView.body` 上读到的是"开页那一刻的快照条件"，
+            // 用户复制第一条之后它不会重算 ⇒ 图长出来了、说明却永远不出现（新的一种"变了但界面不说"）。
+            if !ledger.counts.isEmpty {
+                Divider()
+                readingGuide
+            }
+        }
+    }
+
+    private var readingGuide: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("这张图怎么读")
+                .font(.subheadline)
+            Text("一列是一周，一行是一个星期几，右下角是今天。颜色深浅说的是那几天里你复制了多少次，"
+                 + "深浅按你自己这段时间的数据算 —— 所以它是「我这阵子忙不忙」的刻度，"
+                 + "不是「一天多少次」的刻度。鼠标停在任意一格上会写出那一天。")
                 .font(.system(size: VisualFont.meta))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("计数在复制发生的那一刻就记下了：删掉记录、清空历史都不会改写它，"
+                 + "所以它比历史列表本身长（保留两年）。暂停采集与被排除的 App 不计数。")
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

@@ -97,7 +97,13 @@ enum DailyCopyHeatPolicy {
         let count: Int
         let bucket: Int
 
-        static let placeholder = Cell(dayKey: nil, date: nil, isFuture: false, count: 0, bucket: 0)
+        /// 计算属性而不是 `static let`：CI 的 Swift 6.1.2 在**全局惰性初始化器**里
+        /// 崩过一次（`emitLazyGlobalInitializer → emitRawApply`，SIGSEGV，本机 6.2.1 不复现）。
+        /// 那次崩溃的提交里"初始化器里带构造调用"的新全局只有这里与
+        /// `AppDelegate.sharedHistoryStore` 两处，**没有做二分**（编译器 bug 不是产品 bug，
+        /// 绕开即可；两处都改的成本比一次一次试低），所以这条注释说的是"嫌疑"，不是"定位结论"。
+        /// 顺带：一个每列补 7 个空位用的小值本来也不占什么，改成计算属性没有任何代价。
+        static var placeholder: Cell { Cell(dayKey: nil, date: nil, isFuture: false, count: 0, bucket: 0) }
     }
 
     struct Week: Equatable {
@@ -247,6 +253,21 @@ enum DailyCopyHeatPolicy {
             busiestCount: busiest?.count ?? 0,
             currentStreak: streak(counts: counts, today: today, calendar: calendar)
         )
+    }
+
+    /// 汇总那一行的**文案与可见性**（`nil` = 这一行不该出现）。
+    ///
+    /// 为什么"要不要显示"也放在策略里而不是视图里：这是阶段一帧里读出来的缺陷 ——
+    /// 空态那屏同时显示"最近 26 周共 0 次 · 日均 0.0 次 · 连续 0 天"和"还没有可统计的记录"，
+    /// 两条互相矛盾的表达同时说话（U-30 缺陷 5）。一个能用真值表判的决定
+    /// （有记录 ⇒ 三个数都在句子里；没记录 ⇒ 整句不出现）不该靠视图里的 `if` 记住。
+    static func summaryLine(for summary: Summary,
+                            windowWeeks: Int = defaultWindowWeeks,
+                            hasRecords: Bool) -> String? {
+        guard hasRecords else { return nil }
+        return "最近 \(windowWeeks) 周共 \(summary.total) 次 · "
+            + "日均 \(String(format: "%.1f", summary.averagePerDay)) 次 · "
+            + "连续 \(summary.currentStreak) 天"
     }
 
     /// 连续天数。**今天还没复制不算断**：从昨天往回数。

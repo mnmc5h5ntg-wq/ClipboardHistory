@@ -593,3 +593,57 @@ MainActor 隔离，跑到 `saveQueue` 上就 `dispatch_assert_queue` SIGTRAP，
 **一条计数噪声**：我 verify 脚本里 `grep -cE "error:"` 数出 110 条"错误"，
 逐条看全是 CoreData/AddressBook 的系统噪声（`com.apple.contactsd.persistence` 那一族）——
 计数命令自己没被证伪过，下一版脚本改成只数 XCTest 的失败行。
+
+---
+
+## Round 9 · 阶段二第 1 轮 · 热图自检（把声明的动效真正供电，撤掉空转的那条）
+
+选题来自阶段二开场那份全新清单（`.scratch/motion-audit-2/00-inventory.md`）里
+**我自己上一轮写的**三条：BACKLOG 15（hover 动画空转）、17（空态与零值汇总矛盾）、
+外加一条看帧才看得见的 17b（「这张图怎么读」在没有图的屏上教人读图）。
+本轮不碰 R1–R8 的任何结论 —— 那是 R10 以后的事。
+
+| 位点 | 之前（阶段一的自己） | 现在 | 判据 |
+|---|---|---|---|
+| 格子悬停描边 0↔0.55 | `.animation(.hover, value:)` 挂在**页脚字符串**上 ⇒ 描边硬生硬灭，那条动画一次也没演过 | 事务挪到**变更点**：`onHover { withAnimation(.hover) { hovered = … } }` | `testHeatmapMotionIsDrivenNotJustClaimed`（M33 CAUGHT） |
+| 当天那格深浅 | 复制一下 ⇒ 硬切 | `.animation(.contentFade, value: cell.bucket)`；**键是 bucket 不是 count**（同档内画面不该动） | 同上（M34 CAUGHT：换成 count 也打红） |
+| 页脚那行字 | 挂着一条永远不演的 `.animation` | **撤掉**并写明理由：字符串不可插值；要"换字有过程"只能 `.id().transition()`，而它在 12/13 上先空一帧（`MotionModifiers:37` 同一族），比硬换更糟 | M35 CAUGHT（把它装回来会红） |
+| 空态 ↔ 网格 | 整块硬换 | 两臂都挂 `.transition(.contentFade)`，容器按 `counts.isEmpty` 驱动 | M36（只留一臂）、M37（摘掉驱动键）双 CAUGHT |
+| 零值汇总行 | "共 0 次 · 日均 0.0 · 连续 0 天"与"还没有可统计的记录"同时说话 | 可见性决定进策略：`summaryLine(for:hasRecords:) -> String?`，空 ⇒ `nil` | 真值表 + M38 CAUGHT |
+| 「这张图怎么读」 | 没有图也照样出现（分隔线 + 五行读法） | 跟着图一起出现，且**写在观察账本的那一层**（`DailyCopyStatsSection`）——挂在 `SettingsView.body` 会拿到开页快照，用户复制第一条之后说明永远不出现 | `testHeatmapReadingGuideFollowsTheChart` + M41/M42 CAUGHT |
+
+**区域取法自己是判据的一部分**：这个文件现在有 4 处 `.animation(` 与 3 处 `.transition(`，
+任何"整个文件含 `withAnimation` 就算过"的写法都没有判别力。所以新写了一个
+按花括号配平取成员体的 `region(in:named:)`，并且**它自己也进了一次真值表**
+（取到的区域不许把下一个成员吞进去 = 它其实是整文件），
+取不到目标时**当场 `XCTFail`** 而不是返回空串 —— 空串会让区域内所有
+`XCTAssertFalse(contains:)` 全绿，把"成员被删了"读成"修好了"。
+M39 就是钉这一条的：把 `cellView` 连调用点一起改名 ⇒ 红。
+（**第一版 M39 只改了声明**，那一支编译不过，报的是 `DID-NOT-RUN=build-failed` ——
+既不是抓住也不是放过，是没跑。这一条记进变异脚本的注释。）
+
+**本轮最大的一条不是动效**：CI 在阶段一那次提交上 42 秒就红，红的是**编译器 SIGSEGV**
+（Swift 6.1.2 在 `emitLazyGlobalInitializer → emitRawApply`，本机 6.2.1 不复现）。
+绕法见 **D-069**：把这一批新加的"初始化器里带构造调用"的全局都消掉
+（`Cell.placeholder` 改计算属性、`sharedHistoryStore` 的嵌套构造挪进一个工厂函数）。
+**没有二分** —— 编译器 bug 不是产品 bug，两处语义完全等价，
+代价是注释只能说"嫌疑"不能说"定位"。
+
+**自评 91 / 100**（本轮新加的两条动画还**只有结构证据 + 静帧**，像素证据在 R9b：
+胶片套件的场景表要能挂非主窗口的根视图，那条改动单独一支，别和这轮混在一起）
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 18 / 20 | 全部走 `MotionCatalog` 与 `VisualHeat`，没有新样式；扣：空态图标仍与"日历"差半格语义（刻意不动，破坏统一状态语言不划算） |
+| 流畅度 | 18 / 20 | 描边/深浅/空↔网格三处进了事务；扣：还没有像素证据说它们真的摊到多帧 |
+| 层次与材质 | 14 / 15 | 说明段与图同进同出之后，这一屏只剩一种说法 |
+| 动效细节 | 13 / 15 | 撤掉一条假的、补三条真的；扣：键的选择（bucket vs count）只由结构判据钉住 |
+| 交互反馈 | 10 / 10 | 悬停、复制、空→有 三件事现在都有可见反馈 |
+| 可访问性 | 8 / 10 | 零值汇总不再对读屏重复说话；**写盘失败那条仍无发布通道**（BACKLOG 14，R10 头一条） |
+| 性能 | 15 / 15 | 无新计时器；126 格各挂一条按值动画，键是 Int 档号，同档内复制不起事务 |
+
+**验证**：0 warning；658 tests / 16 skipped / **0 failures**（+5）；
+动效套件 20 / 4 / 0，`judged=2/3`（未退）；帧基线 `update` 后 `CHANGED=0 MISSING=0 ADDED=0`，
+本轮**只有 4 张空态帧变了**（`heatmap-empty-{light,dark}`、`settings-stats-{light,dark}`），
+有数据的 8 张逐字节不变 ⇒ 重排没有动到布局；`scripts/tests` 72 passed；
+变异 M33–M42 共 **10 支全 CAUGHT**（第一次 9 支里 M39 是"没跑"，修成连调用点一起改名后红）。

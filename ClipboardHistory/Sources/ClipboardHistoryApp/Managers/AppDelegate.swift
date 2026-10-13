@@ -5,7 +5,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 每日复制统计的账本在这里建一次，由 `HistoryStore` 持有。
     /// 刻意**不**在 `HistoryStore.init` 里默认建一个：那样每一条不注入账本的测试
     /// 都会去读写用户 `~/Library/Application Support/时间剪史/daily-copy.json`。
-    static let sharedHistoryStore = HistoryStore(dailyCopyLedger: DailyCopyLedger())
+    ///
+    /// 中间这一层工厂不是装饰：CI 的 Swift 6.1.2 在**全局惰性初始化器**里套两层
+    /// actor 隔离构造时直接 SIGSEGV（`emitLazyGlobalInitializer → emitRawApply`，
+    /// run 38346616716；本机 6.2.1 不复现，所以也没法定位到具体哪一处 —— 见 D-069）。
+    /// 挪进函数体之后，全局初始化器只剩一次 apply，与崩溃之前那个提交
+    /// （`HistoryStore()`）的形状一致。
+    static let sharedHistoryStore = makeSharedHistoryStore()
+
+    @MainActor private static func makeSharedHistoryStore() -> HistoryStore {
+        HistoryStore(dailyCopyLedger: DailyCopyLedger())
+    }
 
     let historyStore: HistoryStore
 

@@ -41,25 +41,42 @@ struct DailyCopyHeatmapView: View {
                 // 空态必须说"为什么是空的"，而不是画一片灰格子。
                 // 一片灰格子读起来像"我这半年一次都没复制"，而事实是"这里还没开始记"。
                 StateLine(kind: .empty, message: "还没有可统计的记录 —— 复制几条之后这里会长出一张日历。")
+                    .transition(MotionCatalog.transition(for: .contentFade))
             } else {
-                gridSection
-                footer
+                VStack(alignment: .leading, spacing: 10) {
+                    gridSection
+                    footer
+                }
+                .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        // **第一条复制那一下**是这张图最该被看见的一次变化：空态整块换成日历。
+        // 键是 `counts.isEmpty` 而不是 `counts` —— 后者每次复制都换实例，
+        // 但"从空到有"只发生一次；用字典本身当键会让之后每一次计数都去驱动一次
+        // 空↔网格的交换（那个交换此时是空操作，但事务是真的，白付）。
+        // 两臂都挂 `.transition`：只挂一臂是 R5 的 A2 那一族（"声明了但只演一半"）。
+        .animation(MotionCatalog.animation(for: .contentFade), value: counts.isEmpty)
     }
 
     // MARK: - 头部
 
+    /// 标题 + 汇总行。
+    ///
+    /// 汇总行**只在有数据时出现**：阶段一的帧里它是"最近 26 周共 0 次 · 日均 0.0 次 · 连续 0 天"，
+    /// 压在"还没有可统计的记录"上面 —— 同一屏两条互相矛盾的表达，
+    /// 而且第二条（空态那句）才是用户需要知道的。零不是信息，"还没开始记"才是（U-30 缺陷 5）。
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("每日复制")
                 .font(.system(size: VisualFont.title, weight: .semibold))
-            Text("最近 \(DailyCopyHeatPolicy.defaultWindowWeeks) 周共 \(summary.total) 次 · "
-                 + "日均 \(String(format: "%.1f", summary.averagePerDay)) 次 · "
-                 + "连续 \(summary.currentStreak) 天")
-                .font(.system(size: VisualFont.meta))
-                .foregroundStyle(.secondary)
+            if let line = DailyCopyHeatPolicy.summaryLine(for: summary,
+                                                          hasRecords: !counts.isEmpty) {
+                Text(line)
+                    .font(.system(size: VisualFont.meta))
+                    .foregroundStyle(.secondary)
+                    .transition(MotionCatalog.transition(for: .contentFade))
+            }
         }
     }
 
@@ -147,6 +164,13 @@ struct DailyCopyHeatmapView: View {
                       ? Color.primary.opacity(VisualHeat.empty)
                       : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket)))
                 .frame(width: VisualHeat.cell, height: VisualHeat.cell)
+                // 当天那一格从浅到深是这张图**唯一一条实时通道**：用户复制一下，
+                // 右下角就该有反应。没有这一条的话它是硬切，读起来像"数字被换掉了"
+                // 而不是"我又多复制了一次"（阶段一自检 88 分扣在的就是这里，U-30）。
+                // 键取 `bucket` 而不是 `count`：深浅本来就是按档走的，
+                // 12 → 13 次若仍在同一档，画面**不该**动 —— 拿 count 当键会让每次复制
+                // 都起一次事务去插值一个不会变的值（白付，而且让"变了"这件事失去意义）。
+                .animation(MotionCatalog.animation(for: .contentFade), value: cell.bucket)
                 .overlay(
                     // 悬停那一圈只在悬停时出现：常驻描边会让 126 个格子同时开口说话，
                     // 而这张图的信息全在**深浅**上。
@@ -156,7 +180,12 @@ struct DailyCopyHeatmapView: View {
                 )
                 .contentShape(Rectangle())
                 .onHover { inside in
-                    hovered = inside ? cell : (hovered?.dayKey == cell.dayKey ? nil : hovered)
+                    // 事务挂在**变更点**上，而不是靠下游一条 `.animation(value:)`：
+                    // 描边（可插值的透明度）与页脚（字符串）由同一个 `hovered` 驱动，
+                    // 挂在这里两者一起进事务，而格子那一条才是真的被插值的那半。
+                    withAnimation(MotionCatalog.animation(for: .hover)) {
+                        hovered = inside ? cell : (hovered?.dayKey == cell.dayKey ? nil : hovered)
+                    }
                 }
                 .accessibilityElement()
                 // 走 `helpLabel` 而不是裸 `.help(`：仓库里有一条判据
@@ -181,13 +210,20 @@ struct DailyCopyHeatmapView: View {
 
             // 悬停详情。没悬停时退回"最忙的一天"——这一行不能空着，
             // 空着的时候它下面就是大片空白，读起来像界面坏了。
+            //
+            // 这一行**刻意没有动效**，而且阶段一这里原本有一条假的：
+            // `.animation(.hover, value: hovered?.dayKey ?? "")` 挂在一个 `Text` 上，
+            // 而它变的是**字符串内容** —— 字符串不可插值，所以那条声明一次也没演过（U-30 缺陷 2）。
+            // 要做"换字有过程"只能 `.id(text).transition(.opacity)` 那一套，
+            // 而它在 macOS 12/13 上会先空一帧再淡入（`MotionModifiers` 那条同一族），
+            // 比硬换更糟。tooltip 与无障碍标签已经把同一句话说第二遍了，
+            // 这一行换字是"读数变了"，不是"状态变了"——原生系统里状态栏读数也是硬换。
             Text(footerDetail)
                 .font(.system(size: VisualFont.meta))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .animation(MotionCatalog.animation(for: .hover), value: hovered?.dayKey ?? "")
         }
         .font(.system(size: VisualFont.meta))
         .foregroundStyle(.tertiary)
