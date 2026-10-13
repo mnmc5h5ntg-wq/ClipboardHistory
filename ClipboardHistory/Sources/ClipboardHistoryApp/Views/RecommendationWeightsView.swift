@@ -49,19 +49,6 @@ private struct WeightSliderRow: View {
     let factor: RecommendationWeights.Factor
     @Binding var value: Double
 
-    private var percentage: String {
-        let pct = Int((value * 100).rounded())
-        if pct == 100 { return "默认" }
-        if pct < 100 { return "\(pct)%" }
-        return "\(pct)%"
-    }
-
-    private var tintColor: Color {
-        if value > 1.0 { return .orange }
-        if value < 1.0 { return .secondary }
-        return .accentColor
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -71,7 +58,7 @@ private struct WeightSliderRow: View {
 
                 Spacer()
 
-                Text(percentage)
+                Text(WeightValuePresentation.percentageText(value: value))
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(tintColor)
             }
@@ -83,5 +70,50 @@ private struct WeightSliderRow: View {
 
             Slider(value: $value, in: 0...2.0, step: 0.05)
         }
+    }
+
+    /// 颜色只表达"这行动过没有"，**不表达数值大小**。
+    ///
+    /// 旧版是三档：`>1.0` 橙、`<1.0` 次级、`==1.0` 强调蓝。两件事都错：
+    /// ① 强调蓝在 macOS 里是"可点"的语言（链接 / 按钮），而这一格是只读文本 ——
+    ///    实测它的字形是 #007AFF，而同一页里真正那颗「恢复默认」按钮是中性白字 (223,223,223)，
+    ///    颜色把"能点"和"只能看"说反了；9 行全蓝时，这一页看起来像 9 个链接。
+    /// ② 橙色是警示色，而 200% 是一个完全合法、说明文字里就写着的取值。
+    /// 现在：没动过 = 次级（不抢视线），动过 = 主色（这是用户正在设的那个数）。
+    private var tintColor: Color {
+        switch WeightValuePresentation.tone(value: value) {
+        case .atDefault: return .secondary
+        case .raised, .lowered: return .primary
+        }
+    }
+}
+
+/// 权重数值的显示语言。**公开是为了让"文字与颜色出自同一个判断"这件事可测。**
+///
+/// 为什么要单独拎出来：旧版 `percentage` 里有一条
+/// `if pct < 100 { return "\(pct)%" }` 后面紧跟 `return "\(pct)%"` —— 两个分支返回同一个字符串，
+/// 说明"改过 / 没改过"这个判断本来就被写过两遍（文字一遍、颜色一遍），而其中一遍已经烂掉了。
+/// 现在文字和颜色都从 `Int((value * 100).rounded())` 这一个量出发，四舍五入的边界
+/// （0.999 → "100%" → 算"没动过"）只能有一种解释。
+enum WeightValuePresentation {
+    enum Tone: Equatable {
+        case atDefault
+        case raised
+        case lowered
+    }
+
+    static func percent(value: Double) -> Int {
+        Int((value * 100).rounded())
+    }
+
+    static func percentageText(value: Double) -> String {
+        let pct = percent(value: value)
+        return pct == 100 ? "默认" : "\(pct)%"
+    }
+
+    static func tone(value: Double) -> Tone {
+        let pct = percent(value: value)
+        if pct == 100 { return .atDefault }
+        return pct > 100 ? .raised : .lowered
     }
 }

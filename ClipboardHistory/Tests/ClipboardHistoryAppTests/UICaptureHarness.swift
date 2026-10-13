@@ -25,9 +25,129 @@ final class UICaptureTests: XCTestCase {
     /// （11pt 字号那轮 row 帧 3.3–13% 的差异里就有它）。固定之后，两帧的差异才只反映代码改动。
     static let referenceDate = Date(timeIntervalSince1970: 1_760_000_000)
 
+    /// "未被绘制"的判定阈值，**两个读者共用同一把尺**：
+    /// ①`testCaptureKeyViews` 里那条"有 N% 像素未被绘制即判捕获失效"的守卫；
+    /// ②`testQuickPickOverlayStillCannotBeCapturedOffscreen` 那条记录限制是否还在的判据。
+    ///
+    /// 为什么要是同一个常量：这两处其实在回答同一个问题（"这张帧到底画没画"）。
+    /// 各写一个数字的话，某天把守卫松到 0.98 而判据还留在 0.9 ——
+    /// 于是浮层那三张帧能被"拍出来"（不再触发守卫）却仍然全透明（判据也测不出它变没变），
+    /// 而看起来像"补帧成功"。同一个阈值意味着这两件事只能一起变。
+    static let transparentAlphaCeiling: UInt8 = 8
+
+    /// alpha 小于 `transparentAlphaCeiling` 的像素占比。按行扫，`bytesPerRow` 由调用方给
+    /// （位图缓存可能有 padding，硬写 `width * 4` 会读错行）。
+    static func transparentFraction(bytes: UnsafePointer<UInt8>,
+                                   width: Int, height: Int, bytesPerRow: Int) -> Double {
+        var clear = 0
+        var total = 0
+        var y = 0
+        while y < height {
+            let row = y * bytesPerRow
+            var x = 0
+            while x < width {
+                total += 1
+                if bytes[row + x * 4 + 3] < transparentAlphaCeiling { clear += 1 }
+                x += 1
+            }
+            y += 1
+        }
+        return Double(clear) / Double(max(total, 1))
+    }
+
+    /// 从位图缓存直接量。拿不到字节时返回 1.0 —— **按"整张没画"处理**，
+    /// 而不是 0.0（那会把"量不到"伪装成"画满了"，正是这一族最常见的假绿）。
+    static func transparentFraction(of rep: NSBitmapImageRep) -> Double {
+        guard let base = rep.bitmapData else { return 1.0 }
+        return transparentFraction(bytes: base,
+                                  width: rep.pixelsWide,
+                                  height: rep.pixelsHigh,
+                                  bytesPerRow: rep.bytesPerRow)
+    }
+
+    /// 已知"有一块材质在离屏窗口里画成纯黑"的夹具名单（R18 实测，逐帧量出来的，不是猜的）。
+    ///
+    /// 成因：系统 `List` 的**选中高亮**由 AppKit 画（账本 D-034 之后行自己不再画底色），
+    /// 而那块底色是材质；没上过屏的窗口没有可合成的背景层 ⇒ 拍出来是 #000 的圆角块，
+    /// 亮色暗色都一样。实测它**正好盖住被选中的那几行**：`sidebar-history`（1 行选中）
+    /// 黑带 66pt，`sidebar-multi-select`（3 行选中）168pt —— 高度随选中行数增长，不是随机噪声。
+    ///
+    /// 这份名单存在的理由：`FRAME_BASELINE_CHANGED=0` 在这些帧上**不等于**"选中态被看着"。
+    /// 选中是用户点名要审的状态之一，而它一直是量不到的 —— 先让它能被数出来，再想办法拍到。
+    static let materialBlindSpotFixtures: Set<String> = [
+        "content-with-history", "content-min", "content-wide", "content-with-notice",
+        "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
+    ]
+
+    /// 从帧文件名还原夹具名：`sidebar-history-300x520-dark.png` → `sidebar-history`。
+    static func fixtureName(fromFile file: String) -> String {
+        let base = (file as NSString).deletingPathExtension
+        guard let range = base.range(of: "-\\d+x\\d+-", options: .regularExpression) else { return base }
+        return String(base[..<range.lowerBound])
+    }
+
+    /// 一帧的量尺结果：**画没画出来** + **有没有一块材质在离屏下画成纯黑**。
+    struct CaptureMetrics {
+        let transparent: Double
+        /// 连续若干行里 ≥60% 像素是纯黑 ⇒ 认为这是一块**填充**（不是一行文字）。
+        /// 返回这条填充带的最大高度，单位 pt。
+        let blackBandPt: Double
+    }
+
+    /// 纯黑填充带的最大高度（pt）。
+    ///
+    /// 为什么要量它：系统 `List` 的**选中高亮**是一块材质，而材质在没上过屏的窗口里
+    /// 不可合成 —— 于是它画成一片纯黑（亮色、暗色都一样）。这类帧看着"有内容"，
+    /// 实际上选中态那一行是黑的：文字压在黑底上，颜色、对比度、圆角、内边距
+    /// **一个都没被量到**。以前这类事只能靠人眼在 96 张里翻，翻到算运气；
+    /// 现在每张帧都报一个数，名单钉在判据里（见 `testCaptureKeyViews`）。
+    ///
+    /// 判据用**绝对宽度**而不是"这一行有百分之六是黑的"：
+    /// 第一版用占比 60%，于是 `content-*` 那三张漏了 —— 选中块在 750pt 的帧里只占
+    /// 侧栏那 250pt（33%），整行占比过不了 60% 的线，一块明明存在的黑被读成了 0。
+    /// 改成"连续黑像素 ≥60pt"之后，块再窄也认得出来，而一行文字里最长的黑段
+    /// 只是一个字形的笔画（1–2pt），离 60pt 很远。
+    static func blackBandHeight(bytes: UnsafePointer<UInt8>,
+                                width: Int, height: Int, bytesPerRow: Int,
+                                backingScale: CGFloat,
+                                minRunPt: Double = 60) -> Double {
+        let minRun = max(Int(minRunPt * Double(backingScale)), 1)
+        var bestRun = 0
+        var run = 0
+        var y = 0
+        while y < height {
+            let row = y * bytesPerRow
+            var longest = 0
+            var current = 0
+            var x = 0
+            while x < width {
+                let o = row + x * 4
+                // 三个通道都 <8 且**不透明**：透明的黑是"没画"，由 `transparentFraction` 管。
+                if bytes[o] < 8, bytes[o + 1] < 8, bytes[o + 2] < 8, bytes[o + 3] > 240 {
+                    current += 1
+                    longest = max(longest, current)
+                } else {
+                    current = 0
+                }
+                x += 1
+            }
+            if longest >= minRun {
+                run += 1
+                bestRun = max(bestRun, run)
+            } else {
+                run = 0
+            }
+            y += 1
+        }
+        return Double(bestRun) / Double(max(backingScale, 0.001))
+    }
+
     private enum CaptureError: Error {
         case noBitmap
         case noPNG
+        /// R18：AppKit 夹具建不出视图。已经 XCTFail 过了，抛这个错只是为了**不再往下拍**
+        /// —— 继续拍会得到一张空窗，而它会被当成基线钉住。
+        case emptyAppKitFixture
     }
 
     private var outputDirectory: URL? {
@@ -39,11 +159,53 @@ final class UICaptureTests: XCTestCase {
         return url
     }
 
+    /// 快速选择浮层**今天拍不到**，而这条判据负责在它能拍到的那天报警。
+    ///
+    /// 实测过程（R18）：给夹具加了 AppKit 通路，控制器加了只读捕获入口，
+    /// 然后本文件那条"有 N% 像素未被绘制，判定为捕获失效"的守卫立刻把六张新帧全判死：
+    /// `transparent = 99.5% ~ 100.0%` —— 一张都没有内容。
+    /// 根因：浮层背景是 `NSVisualEffectView`（ vibrancy 材质），
+    /// 而**没上过屏的窗口没有可合成的背景层**，`cacheDisplay` 于是拍出一张全透明图。
+    ///
+    /// 所以这条判据断言的是"**这个限制还在**"：
+    /// 哪天它红了，说明浮层变得可以离屏拍（或者有人把材质改了）——
+    /// 那时要做的是把 `quickpick-list / -typed / -empty` 三张夹具加回去，
+    /// 而不是把这条测试删掉。
+    /// （形状与 `MotionFilmstripTests.testHeatmapFadeIsNotVisibleToThisRuler` 同一族：
+    ///  自我作废的判据，比一句"拍不到"的注释活得久。）
+    func testQuickPickOverlayStillCannotBeCapturedOffscreen() throws {
+        let store = makePopulatedStore()
+        let controller = QuickPickController(historyStore: { store }, commit: { _ in })
+        guard let built = controller.buildContentForCapture() else {
+            return XCTFail("捕获入口建不出浮层内容视图 ⇒ 这条判据失去了对象，必须红")
+        }
+        _ = NSApplication.shared
+        let previousAppearance = NSApplication.shared.appearance
+        NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
+        defer { NSApplication.shared.appearance = previousAppearance }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
+                              styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = built
+        window.layoutIfNeeded()
+        built.layoutSubtreeIfNeeded()
+        guard let rep = built.bitmapImageRepForCachingDisplay(in: built.bounds) else {
+            return XCTFail("建不出位图缓存 ⇒ 这条判据没有对象")
+        }
+        built.cacheDisplay(in: built.bounds, to: rep)
+        let transparent = Self.transparentFraction(of: rep)
+        print("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%")
+        XCTAssertGreaterThan(transparent, 0.9,
+                             "浮层现在能离屏拍出来了（transparent 只有 "
+                             + "\(String(format: "%.1f", transparent * 100))%）⇒ "
+                             + "把 quickpick-list / -typed / -empty 三张夹具加回去，别只改这条门槛")
+    }
+
     func testCaptureKeyViews() throws {
         guard let directory = outputDirectory else {
             throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染")
         }
-        var report: [(name: String, transparent: Double)] = []
+        var report: [(name: String, metrics: CaptureMetrics)] = []
         /// 夹具机械自己也要有一条判据：**谁种了默认值，谁必须还原**。
         /// 不还原的污染是静默的 —— 后面的帧照样画得出来，只是多了两行本来不在那一页的东西，
         /// 而基线会把那份污染当成"产品长这样"钉住（`--against working` 从此永远比不回来）。
@@ -62,7 +224,7 @@ final class UICaptureTests: XCTestCase {
                     previousSeed = (seed.key, UserDefaults.standard.string(forKey: seed.key))
                     UserDefaults.standard.set(seed.value, forKey: seed.key)
                 }
-                let transparent = try render(fixture, appearance: appearance, to: file)
+                let metrics = try render(fixture, appearance: appearance, to: file)
                 if let restored = previousSeed {
                     if let value = restored.value {
                         UserDefaults.standard.set(value, forKey: restored.key)
@@ -70,7 +232,7 @@ final class UICaptureTests: XCTestCase {
                         UserDefaults.standard.removeObject(forKey: restored.key)
                     }
                 }
-                report.append((file.lastPathComponent, transparent))
+                report.append((file.lastPathComponent, metrics))
             }
         }
 
@@ -81,12 +243,30 @@ final class UICaptureTests: XCTestCase {
 
         print("CAPTURED \(report.count) -> \(directory.path)")
         for item in report {
-            print("  \(item.name)  transparent=\(String(format: "%.1f", item.transparent * 100))%")
+            print("  \(item.name)  transparent=\(String(format: "%.1f", item.metrics.transparent * 100))%"
+                  + "  blackBandPt=\(String(format: "%.0f", item.metrics.blackBandPt))")
         }
 
-        for item in report where item.transparent > 0.95 {
-            XCTFail("\(item.name) 有 \(Int(item.transparent * 100))% 像素未被绘制，判定为捕获失效，不能作为视觉验收证据")
+        for item in report where item.metrics.transparent > 0.95 {
+            XCTFail("\(item.name) 有 \(Int(item.metrics.transparent * 100))% 像素未被绘制，判定为捕获失效，不能作为视觉验收证据")
         }
+
+        // **材质盲区要能被数出来**（R18）。
+        // 名单外的帧冒出黑带 ⇒ 又多了一处"看着拍到了、其实那块是黑的"，先红再说；
+        // 名单里的帧不再冒黑 ⇒ 那一处现在能拍了（或者有人把选中底色改回自绘了），
+        // 两种情况都必须**真的去看那张帧**，而不是把名单一行删掉了事。
+        let blind = Set(report.map { (Self.fixtureName(fromFile: $0.name), $0.metrics.blackBandPt) }
+                            .filter { $0.1 > 0 }
+                            .map { $0.0 })
+        let extra = blind.subtracting(Self.materialBlindSpotFixtures)
+        let gone = Self.materialBlindSpotFixtures.subtracting(blind)
+        XCTAssert(extra.isEmpty,
+                  "这些帧第一次出现纯黑填充带：\(extra.sorted()) ⇒ 有一处材质在离屏下画成了黑，"
+                  + "它的视觉状态从此量不到。先确认是谁、为什么黑，再决定是加进名单还是修掉黑的那一层")
+        XCTAssert(gone.isEmpty,
+                  "这些帧的黑带消失了：\(gone.sorted()) ⇒ 那一处现在能拍了，"
+                  + "把 `materialBlindSpotFixtures` 缩掉，并且肉眼审一遍新帧（别只改名单）")
+        print("MATERIAL_BLIND_SPOTS \(blind.count) of \(Set(report.map { Self.fixtureName(fromFile: $0.name) }).count) fixtures")
     }
 
     /// 夹具图片的字节**不能**随系统外观变。
@@ -147,13 +327,23 @@ final class UICaptureTests: XCTestCase {
         /// （R13 改它样式时正是"源码已接、产物未量"）。
         /// 还原是必须的：不还原的话同一次运行里 `settings-privacy` 那张也会被带脏。
         let seed: (key: String, value: String)?
+        /// R18：AppKit 表面的夹具入口（返回**根 NSView**，由同一条渲染路径拍）。
+        /// 给了它就不走 `build` —— 那个字段留一份 `EmptyView` 只为让两个 init 共用同一个结构体。
+        ///
+        /// 为什么要有这一条：快速选择浮层是 `QuickPickController` 自建的 `NSPanel` + `NSTableView`，
+        /// 而 96 张基线**一张都没有它** —— 于是关于这个浮层的每一句观感结论只能停在"胶片 + 人眼"。
+        /// 更要紧的是：`FRAME_BASELINE_CHANGED=0` 在这种表面上**不是**"没有视觉变化"，
+        /// 而是"这里根本没有帧"。这两件事必须能分开，所以补通路（账本 BACKLOG 30 / U-39）。
+        let appKit: (() -> NSView?)?
 
         init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil,
-             seed: (key: String, value: String)? = nil, _ build: @escaping () -> AnyView) {
+             seed: (key: String, value: String)? = nil,
+             appKit: (() -> NSView?)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
             self.settle = settle
             self.seed = seed
+            self.appKit = appKit
             self.build = build
         }
     }
@@ -256,6 +446,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-multi-select-min", NSSize(width: 250, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected), width: 250))
         })
+        // R18：这里原本要加三张浮层帧（`quickpick-list / -typed / -empty`）。
+        // **加不进去**，而且是本文件自己那条"未被绘制即判失效"的守卫抓出来的：
+        // 六张全报 `transparent=99.5%~100%` ⇒ 一张都没画出来。
+        // 原因见 `testQuickPickOverlayStillCannotBeCapturedOffscreen`（浮层背景是
+        // `NSVisualEffectView`，窗口没上过屏就没有内容可合成）。
+        // 所以那三张帧的活儿改由那条判据看着：**它红了，就说明可以补帧了。**
+
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
         })
@@ -398,11 +595,52 @@ final class UICaptureTests: XCTestCase {
         })
 
         let weightsStore = store.weightsStore
-        results.append(Fixture("weights", NSSize(width: 520, height: 560)) {
+        // R18：高度从 560 改成 880。
+        // 560 是**很久以前**内容还短的时候记下的数；现在这一页有 9 个因子行，
+        // 实测内容要 850pt（把同一份内容放进 1200pt 的框里、量墨迹最后一行得到的数）。
+        // `.frame(height: 560)` 是居中的 ⇒ 上下各裁 145pt：
+        // 标题「推荐权重客制化」、「恢复默认」那颗按钮、说明文字「0% = 禁用，100% = 默认…」
+        // 连同**第一行因子**全部在帧外，最后一行也被切了一半。
+        // 也就是说：这张帧从来没有拍到过它名字里那一页的头部，
+        // 而 `FRAME_BASELINE_CHANGED=0` 让人以为整页都被看着了。
+        // 这一条和上面"窗口被内容顶大"是同一族缺陷的两个方向：**夹具的尺寸是记的数，不是量的数**。
+        results.append(Fixture("weights", NSSize(width: 520, height: 880)) {
             AnyView(
                 RecommendationWeightsView(store: weightsStore)
                     .padding(20)
-                    .frame(width: 520, height: 560)
+                    .frame(width: 520, height: 880)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        // R18：新颜色梯子的**第二态**。
+        //
+        // 本轮把权重数值从"三档语义色"改成"动过 = 主色 / 没动过 = 次级色"，
+        // 而帧基线里这一页 9 行**全部**处于"没动过"—— 于是一个"只有动过才看得见"的改动，
+        // 在产物里根本没有对应的像素。与 R14 那两条"从未存在过的帧"同一族，
+        // 也是 `FRAME_BASELINE_CHANGED=0` 最擅长骗人的一种情形。
+        results.append(Fixture("weights-adjusted", NSSize(width: 520, height: 880)) {
+            // 种 → 建视图 → 立刻还原。规矩与 `Fixture.seed` 同一条：种过必须还原，
+            // 否则同一次运行里后面的帧会读到这一张的夹具值（而基线会把污染当成长相）。
+            let key = "RecommendationWeights.store"
+            let original = UserDefaults.standard.data(forKey: key)
+            let adjusted = RecommendationWeightsStore()
+            var weights = adjusted.weights
+            weights[.recency] = 1.6      // 抬高：以前会被涂成"警示橙"
+            weights[.favorite] = 0.4     // 压低：以前会被涂成"弱化灰"
+            adjusted.weights = weights
+            // 夹具前提：我存/还原的那个键**就是** store 自己读写的键。
+            // 键名哪天改了，这条会红 —— 而不是安静地把污染留给后面的帧。
+            XCTAssertEqual(RecommendationWeightsStore().weights[.recency], 1.6, accuracy: 0.001,
+                           "夹具写的键与 store 读的键不是同一个 ⇒ 种下的值还原不掉，后面的帧会被带脏")
+            if let original {
+                UserDefaults.standard.set(original, forKey: key)
+            } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+            return AnyView(
+                RecommendationWeightsView(store: adjusted)
+                    .padding(20)
+                    .frame(width: 520, height: 880)
                     .background(Color(nsColor: .windowBackgroundColor))
             )
         })
@@ -732,7 +970,7 @@ final class UICaptureTests: XCTestCase {
         _ fixture: Fixture,
         appearance: NSAppearance.Name,
         to file: URL
-    ) throws -> Double {
+    ) throws -> CaptureMetrics {
         let size = fixture.size
         // 放进真实（离屏）窗口：裸 NSHostingView 没有 window 时 SwiftUI 的
         // GeometryReader / maxWidth 会退化，整块内容被压到左下角。
@@ -754,11 +992,40 @@ final class UICaptureTests: XCTestCase {
         window.titlebarAppearsTransparent = true
         // 暗色必须同时注入 SwiftUI 的 colorScheme：只设 window.appearance 时
         // 子树仍可能按浅色解析（第一版捕获就把设置页拍成"半明半暗"的假帧）。
-        let themed = fixture.build().environment(\.colorScheme, appearance == .darkAqua ? .dark : .light)
-        let host = NSHostingView(rootView: themed)
+        // 两族夹具共用下面这一整条路径（同一个窗口、同一次 `cacheDisplay`、同一套 appearance 注入、
+        // 同一个"关 caret"静默），差别只在**根视图是谁** —— 新表面不该走一条没被审过的通路。
+        let host: NSView
+        if let buildAppKit = fixture.appKit {
+            guard let built = buildAppKit() else {
+                // 建不出视图必须**当场红**：安静地跳过的话，基线里会少一张没人注意的帧，
+                // 而"少了两帧"与"换了两帧"是两回事（R13 核老账时刚记过）。
+                XCTFail("AppKit 夹具没建出视图（\(file.lastPathComponent)）⇒ 宁可红，也不许拍一张空窗当浮层")
+                throw CaptureError.emptyAppKitFixture
+            }
+            host = built
+        } else {
+            let themed = fixture.build().environment(\.colorScheme, appearance == .darkAqua ? .dark : .light)
+            let hosting = NSHostingView(rootView: themed)
+            // R18：**不让内容反过来改窗口尺寸**。
+            // `NSHostingView` 在 macOS 13+ 默认带 `.idealSize` 的 sizingOptions，会把
+            // "内容的理想高度"写回窗口的 min/max content size —— 于是夹具声明的
+            // `NSSize(width:height:)` 只是**一个建议**。实测有 6 张帧的名字在撒谎：
+            //   content-with-notice-750x560 → 实际 750x1304（提示条把理想高度顶高了，窗口跟着长）
+            //   menubar-recommendations-320x320 → 实际 320x170（内容比框矮，窗口缩了）
+            //   menubar-empty-320x120 → 实际 320x86
+            // 最要紧的是第一条：那张帧的**职责**是"提示条插进 ContentView 会不会把布局挤坏"，
+            // 而窗口偷偷长到 1304 ⇒ 它从来没有挤过，问题被量尺自己绕开了。
+            if #available(macOS 13.0, *) {
+                hosting.sizingOptions = []
+            }
+            host = hosting
+        }
         host.frame = NSRect(origin: .zero, size: size)
         host.autoresizingMask = [.width, .height]
         window.contentView = host
+        // 12.x 没有 `sizingOptions`，用 min/max 把窗口钉在夹具给的尺寸上（同一件事的旧写法）。
+        window.contentMinSize = size
+        window.contentMaxSize = size
         window.setContentSize(size)
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
@@ -779,6 +1046,18 @@ final class UICaptureTests: XCTestCase {
         guard let contentView = window.contentView else {
             throw XCTSkip("窗口没有 contentView（\(file.lastPathComponent)）")
         }
+        // **帧的名字必须等于帧的尺寸**（R18）。
+        // 文件名里的 `WxH` 是审查者唯一的尺寸线索；窗口被内容偷偷改过之后，
+        // 这个名字就从"证据"变成了"猜测"。所以量一次，不符就红 ——
+        // 而不是"反正 sha 会变，有人会发现"（sha 变了只会让人以为界面改了）。
+        let honored = contentView.bounds.size
+        XCTAssertLessThan(abs(honored.width - size.width), 0.5,
+                          "\(fixture.name)：夹具要 \(Int(size.width))pt 宽，窗口实际 \(Int(honored.width))pt ⇒ "
+                          + "帧名与实际尺寸不符，这张帧不能证明它声称的那件事")
+        XCTAssertLessThan(abs(honored.height - size.height), 0.5,
+                          "\(fixture.name)：夹具要 \(Int(size.height))pt 高，窗口实际 \(Int(honored.height))pt ⇒ "
+                          + "内容把窗口顶大/缩小了，"
+                          + "例如「提示条会不会挤坏布局」这类判据会在一个从未被挤的窗口上判通过")
         let bounds = contentView.bounds
         // 不要手工改 rep.size：bitmapImageRepForCachingDisplay 已按 backing scale 建好尺寸，
         // 改它会让内容只画进 1/4 画面（我第一次拍到的"大片空白"就是这个假象）。
@@ -799,8 +1078,18 @@ final class UICaptureTests: XCTestCase {
         }
 
         let (data, transparent) = try flattenedPNG(from: rep, appearance: appearance)
+        let blackBand: Double
+        if let base = rep.bitmapData {
+            blackBand = Self.blackBandHeight(bytes: base,
+                                             width: rep.pixelsWide,
+                                             height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow,
+                                             backingScale: CGFloat(rep.pixelsWide) / max(size.width, 1))
+        } else {
+            blackBand = 0
+        }
         try data.write(to: file)
-        return transparent
+        return CaptureMetrics(transparent: transparent, blackBandPt: blackBand)
     }
 
     /// 递归关掉子树里所有文本视图的插入点（含 `NSTextField` 的 field editor）。
@@ -835,26 +1124,17 @@ final class UICaptureTests: XCTestCase {
                       bytesPerRow: width * 4, space: space, bitmapInfo: contextInfo)
         }
 
-        // 1) 探针：只画内容，空着的地方 alpha 仍是 0
+        // 1) 探针：只画内容，空着的地方 alpha 仍是 0。
+        //    计数交给 `Self.transparentFraction(bytes:...)` —— 与浮层那条判据同一把尺、
+        //    同一个阈值，不在这里留第二份内联循环（两份循环会各自漂）。
         var transparentFraction = 0.0
         if let probe = makeContext() {
             probe.draw(source, in: rect)
             if let base = probe.data {
-                let bytes = base.bindMemory(to: UInt8.self, capacity: width * height * 4)
-                var clear = 0
-                var total = 0
-                var y = 0
-                while y < height {
-                    var x = 0
-                    let row = y * width * 4
-                    while x < width {
-                        total += 1
-                        if bytes[row + x * 4 + 3] < 8 { clear += 1 }
-                        x += 1
-                    }
-                    y += 1
-                }
-                transparentFraction = Double(clear) / Double(max(total, 1))
+                transparentFraction = Self.transparentFraction(
+                    bytes: base.bindMemory(to: UInt8.self, capacity: width * height * 4),
+                    width: width, height: height, bytesPerRow: width * 4
+                )
             }
         }
 

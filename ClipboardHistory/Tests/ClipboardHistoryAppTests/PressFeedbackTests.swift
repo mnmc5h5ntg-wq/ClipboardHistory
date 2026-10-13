@@ -190,6 +190,61 @@ final class PressFeedbackTests: XCTestCase {
                        + "多一处要红（提醒把新位点判一遍），少一处也要红（等于把它退回 6% 那一档）")
     }
 
+    /// 只读数值不许说"可点"（R18 · 权重页那一列）。
+    ///
+    /// 缺陷是**看帧**看出来的：`weights-520x880-dark` 里 9 行因子的数值「默认」字形是
+    /// `#007AFF`（与系统强调色逐通道相同），而同一页里真正那颗「恢复默认」按钮是中性白字
+    /// `(223,223,223)`。macOS 里蓝色文字 = 链接/可点，于是这一页看起来有 9 个链接，
+    /// 点了哪一个都没反应；而唯一能点的那颗反而比它们安静。
+    /// 旧版还有第二条错：`>1.0` 涂橙 —— 把说明文字里写着的合法取值（200% = 双倍）画成警示色。
+    ///
+    /// 这里判的是**决定本身**（真值表）与**接线**（行必须用这个决定，不许自己再算一遍）。
+    /// 产物那一侧由 `weights` / `weights-adjusted` 两帧看着：只有一态的梯子等于没有梯子。
+    func testReadOnlyWeightValueDoesNotWearTheActionableColor() throws {
+        // ① 真值表：文字与色调必须出自同一个四舍五入后的整数百分比。
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 0.0), "0%")
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 0.4), "40%")
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 1.0), "默认")
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 1.6), "160%")
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 2.0), "200%")
+        XCTAssertEqual(WeightValuePresentation.tone(value: 0.4), .lowered)
+        XCTAssertEqual(WeightValuePresentation.tone(value: 1.0), .atDefault)
+        XCTAssertEqual(WeightValuePresentation.tone(value: 1.6), .raised)
+        // 边界：0.999 会被四舍五入成 100% ⇒ 文字说「默认」、色调也必须说"没动过"。
+        // 这两件事若各算各的，就会出现"写着默认、却按改过的颜色画"。
+        XCTAssertEqual(WeightValuePresentation.percent(value: 0.999), 100)
+        XCTAssertEqual(WeightValuePresentation.tone(value: 0.999), .atDefault)
+        XCTAssertEqual(WeightValuePresentation.percentageText(value: 0.999), "默认")
+
+        // ② 接线：行必须用上面那个决定，而且不许在行里再算一遍百分比。
+        //    锚点要先落到**行**上：这个文件里有两个 `var body: some View`
+        //    （外层那一页 + 单行），第一轮就是这么读到外层去、于是两条断言一起红
+        //    —— 与 R16 的 DetailView 守卫同一族错误（锚点过宽 = 区域形同虚设）。
+        let source = codeOnly(try productSource(named: "Views/RecommendationWeightsView.swift"))
+        guard let rowStart = source.range(of: "struct WeightSliderRow") else {
+            return XCTFail("找不到 WeightSliderRow ⇒ 守卫看不到被守卫的东西时必须红")
+        }
+        let rowSource = String(source[rowStart.lowerBound...])
+        XCTAssertTrue(rowSource.contains("tintColor"), "截取的那一段不是权重行")
+        let row = region(in: rowSource, named: "var body: some View")
+        XCTAssertTrue(row.contains("Slider(value:"), "区域取的不是权重行的 body")
+        XCTAssertTrue(row.contains("WeightValuePresentation.percentageText(value: value)"),
+                      "数值文字没走 `WeightValuePresentation` ⇒ 真值表测的就不是产物")
+        XCTAssertTrue(row.contains("foregroundStyle(tintColor)"),
+                      "颜色通道没接 ⇒ 色调判断只活在测试里")
+        XCTAssertFalse(row.contains("rounded()"),
+                       "行里自己又算了一遍百分比 ⇒ 文字与颜色可以各自漂")
+
+        // ③ 颜色映射：强调色与橙色都不许出现在这一列上。
+        let tint = region(in: rowSource, named: "private var tintColor: Color")
+        XCTAssertFalse(tint.contains(".accentColor"),
+                       "只读数值又用上强调色了：那是「可点」的语言，而这一格点不动")
+        XCTAssertFalse(tint.contains(".orange"),
+                       "200% 是合法取值，不该画成警示色")
+        XCTAssertTrue(tint.contains(".secondary") && tint.contains(".primary"),
+                      "两态必须分开：没动过 = 次级、动过 = 主色")
+    }
+
     /// 区域助手自己是**尺子**，所以它自己也要被量一次。
     /// 少了这一条，"区域"可以随时退化成整文件而没人知道 —— 那正是它要解决的弱点。
     func testRegionHelperIsATruthTable() throws {

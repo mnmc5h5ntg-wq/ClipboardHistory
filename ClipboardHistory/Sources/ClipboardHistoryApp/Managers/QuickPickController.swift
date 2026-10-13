@@ -67,6 +67,26 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         panel.makeFirstResponder(field)
     }
 
+    /// 只给离屏帧夹具用（`UICaptureTests`）：把面板建出来、按 `query` 填好行，
+    /// 但**不 `makeKeyAndOrderFront`、不 `activate`** —— 那两件事会抢走用户的前台，
+    /// 而捕获套件有一条硬边界：不许碰真窗口（与 `CLIPBOARD_HISTORY_DATA_DIR` 同一族理由）。
+    ///
+    /// 返回 `nil` 表示面板没建起来 ⇒ 夹具必须**当场红**，
+    /// 不许拿一张空白窗当"这就是浮层"（那种帧看着像证据，其实什么都没说）。
+    /// 与 `SettingsView.initialCategory` / `DetailView.initialMarkdownMode` 同一手法：
+    /// 产品路径一行都不改，只是把"拍得到"这件事变成可能。
+    func buildContentForCapture(query: String = "") -> NSView? {
+        let panel = ensurePanel()
+        refreshEntries()
+        model.reset()
+        if !query.isEmpty { model.setQuery(query) }
+        field?.stringValue = query
+        rebuildRows()
+        model.index = 0
+        selectCurrentRow()
+        return panel.contentView
+    }
+
     func hide() {
         panel?.orderOut(nil)
     }
