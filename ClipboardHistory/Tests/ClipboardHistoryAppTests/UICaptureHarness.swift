@@ -1765,6 +1765,229 @@ final class UICaptureTests: XCTestCase {
                       + "⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
     }
 
+    /// R34 诊断（**量行为，不判产品**）：菜单栏面板给不同宽度时，那一行**截不截**。
+    ///
+    /// 起因（U-56 / BACKLOG 47）：R33 看帧发现第一行的推荐理由**被硬切成半字** ——
+    /// 墨画到 `x=319.5`，而帧宽 320。而 `menuBarFrame` 里那个 `.frame(width: 320)`
+    /// 是**夹具**写的，产品侧 `MenuBarExtra` 的内容没有任何宽度约束（`App.swift:24`）。
+    /// 所以"面板多宽"这件事现在没人声明，而两种解释要分开：
+    /// ① 行会截断（`lineLimit(1)` 生效）⇒ 320 只是太窄，半字其实是省略号，改夹具宽度就行；
+    /// ② 行不截断、整块溢出被窗口裁 ⇒ 这是**产品**的布局缺陷，声明宽度也不会自己好。
+    /// 这一条把同一份数据摆在 320 / 400 / 520 / 720 四档宽度下各拍一张，
+    /// 打"最右一列有墨的 x"：跟着宽度走 = ①，钉在同一个值上 = ②。
+    func testMenuBarRowTruncationAcrossWidthsDiagnostic() throws {
+        guard #available(macOS 13, *) else {
+            throw XCTSkip("菜单栏夹具本来就要 macOS 13 ⇒ 这台机器上这条诊断没有对象")
+        }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r34-menubar-width-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let store = makePopulatedStore()
+        store.refreshPredictions()
+        waitUntil("菜单栏面板需要候选") { !store.predictionSuggestionEntries.isEmpty }
+        waitUntil("推荐刷新要收尾") { !store.isRefreshingPredictions }
+        let appDelegate = AppDelegate(historyStore: store)
+        for width in [320.0, 400.0, 520.0, 720.0] {
+            let fixture = Fixture("menubar-width-\(Int(width))", NSSize(width: width, height: 320)) {
+                AnyView(
+                    MenuBarRecommendationsView(historyStore: store, appDelegate: appDelegate)
+                        .padding(.vertical, 6)
+                        .frame(width: width, alignment: .topLeading)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                )
+            }
+            let file = scratch.appendingPathComponent("menubar-width-\(Int(width)).png")
+            _ = try render(fixture, appearance: .aqua, to: file) { host in
+                print("MENUBAR_FITTING 声明宽=\(Int(width)) hosting.fittingSize="
+                      + String(format: "%.1fx%.1f", host.fittingSize.width, host.fittingSize.height))
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
+            }
+            let scale = Double(rep.pixelsWide) / Double(width)
+            // **带只框住第一行推荐（y 156..172）**。第一版把 y 60..310 整段都框进来，
+            // 于是四档宽度量到的是同一个答案"墨顶到最后一列" —— 那把尺读到的是面板里
+            // 那两条**横贯全宽的 `Divider()`**，不是文字。同一族错误第三次出现：
+            // 尺报"有墨"之前，得先确认那一列的墨是**谁**画的（这里靠把带收窄到一行文字的高度）。
+            let rowBand = CGRect(x: 0, y: 156, width: width, height: 16)
+            let trailing = Self.trailingInkColumn(bytes: base, width: rep.pixelsWide,
+                                                  height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                  rect: rowBand, scale: scale, minDelta: 60)
+            let leading = Self.leadingInkColumn(bytes: base, width: rep.pixelsWide,
+                                                height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                rect: rowBand, scale: scale, minDelta: 60)
+            print(String(format: "MENUBAR_WIDTH 声明宽=%d 带=y156..172 最左墨=%@ 最右墨=%@ ⇒ 右边距=%@",
+                         Int(width),
+                         leading.map { String(format: "%.1f", $0) } ?? "无",
+                         trailing.map { String(format: "%.1f", $0) } ?? "无",
+                         trailing.map { String(format: "%.1f", width - $0) } ?? "无"))
+        }
+        throw XCTSkip("诊断用判据：它只回答「这一行在给定宽度下截不截」，用来定修法，不判产品 "
+                      + "⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
+    }
+
+    /// 菜单栏那三张帧**不是产品那个表面**（R34 / U-56 收回）。
+    ///
+    /// 事实来自产品自己的注释（`MenuBarRecommendationsView.swift` 里 R5 写下的那一段，
+    /// 账本 D-055 / M15 实测）：`MenuBarExtra` 没有设 `.menuBarExtraStyle(.window)`
+    /// ⇒ 默认风格 `.menu` ⇒ 这棵 SwiftUI 树被编译成**真的 `NSMenu` + `NSMenuItem.view`**。
+    /// 而夹具拍的是"同一棵树塞进一个离屏 `NSHostingView` 窗口"。两件事因此不是一件事：
+    /// 真菜单里 item view 不会溢出菜单自己的宽度（菜单会截），
+    /// 而复刻里那一行**溢出到帧边界** —— R34 实测：320 宽的帧里推荐理由的墨画到 `x=320.0`，
+    /// 最后一列还有 7.5pt 高的笔画（不是省略号那 2pt 的点）。
+    /// 于是 R33 由"看帧"得到的那句 **产品的理由被切成半字** 不成立：
+    /// 它量的是复刻的溢出，不是产品的截断。
+    ///
+    /// 这份名单就是把这件事钉成机器可读的一条规矩：
+    /// **`menubar-*` 这些帧可以判颜色档（档不依赖表面），不可以判宽度 / 截断 / 对齐 / 命中区。**
+    /// 名单与前提都由 `testMenuBarFramesAreReplicasOfTheMenuSurface` 现推 ——
+    /// 加一张新的 `menubar-` 帧而不声明它、或者产品换成 `.window` 风格，两种都会红。
+    static let menuSurfaceReplicaFixtures: Set<String> = [
+        "menubar-recommendations", "menubar-empty", "menubar-refreshing",
+    ]
+
+    /// 读一份产品源码（与 `Round3DetailTypographyTests` 同一套找法）。
+    /// 找不到文件**红**而不是跳过：一个会跳过的守卫和一个通过的守卫在报表里长得一样。
+    private func productSource(named relativePath: String) throws -> String {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = candidate.appendingPathComponent("Sources/ClipboardHistoryApp", isDirectory: true)
+                .appendingPathComponent(relativePath)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw NSError(domain: "UICaptureHarness", code: 2,
+                      userInfo: [NSLocalizedDescriptionKey: "找不到 Sources/ClipboardHistoryApp/\(relativePath)"])
+    }
+
+    /// R34 · 菜单栏帧的**资格**：它们是菜单表面的复刻，不是菜单本身。
+    ///
+    /// 三条一起：
+    /// ① 前提（源码）：产品里 `MenuBarExtra` 仍在，且没有 `.menuBarExtraStyle(.window)`；
+    /// ② 名单 ≡ 由前缀推导的那批夹具（新增不声明 ⇒ 红；删掉 ⇒ 红）；
+    /// ③ 证据（帧）：复刻里第一行的墨**顶到帧的最后一列** —— 这条既是"为什么不能判截断"的理由，
+    ///    也是这条规矩的活体：哪天复刻不再顶边，它红了，人要重新判"现在能不能拿它判截断"。
+    func testMenuBarFramesAreReplicasOfTheMenuSurface() throws {
+        let appSource = try productSource(named: "App.swift")
+            .components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        XCTAssertTrue(appSource.contains("MenuBarExtra("),
+                      "产品里已经没有 `MenuBarExtra(` 了，但 `menubar-*` 这批帧还在拍 ⇒ 这些帧在拍一个不存在的表面")
+        XCTAssertFalse(appSource.contains("menuBarExtraStyle(.window)"),
+                       "产品已经把菜单栏内容换成 `.window` 风格 ⇒ 这些帧**就是产品本身**了："
+                       + "把 `menuSurfaceReplicaFixtures` 缩掉，并且把宽度 / 截断 / 对齐这几条结论重新审一遍"
+                       + "（它们以前不是量不到产品，是量的是另一个表面）")
+
+        let derived = Set(fixtures(appearance: .aqua).map { $0.name }.filter { $0.hasPrefix("menubar-") })
+        XCTAssertEqual(derived, Self.menuSurfaceReplicaFixtures,
+                       "菜单栏帧的名单与夹具不一致：只出现在夹具里的是 \(derived.subtracting(Self.menuSurfaceReplicaFixtures).sorted())，"
+                       + "只出现在名单里的是 \(Self.menuSurfaceReplicaFixtures.subtracting(derived).sorted()) ⇒ "
+                       + "新加的 `menubar-` 帧必须先声明它是不是同一个盲区（这些帧不许拿来判宽度/截断），"
+                       + "撤掉的帧要把名单一起收掉")
+
+        guard let fixture = fixtures(appearance: .aqua)
+            .first(where: { $0.name == "menubar-recommendations" }) else {
+            return XCTFail("找不到 menubar-recommendations ⇒ 这条资格判据没有对象")
+        }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r34-menu-replica-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let file = scratch.appendingPathComponent("menubar-recommendations.png")
+        _ = try render(fixture, appearance: .aqua, to: file)
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              let base = rep.bitmapData else {
+            return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
+        }
+        let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+        // 带只框第一行推荐（y 156..172）：整段框进来会读到两条横贯全宽的 `Divider()`，
+        // 那会把"最右墨 = 帧边界"读成每条帧都成立（R34 第一次跑就是这么被骗过的）。
+        let rowBand = CGRect(x: 0, y: 156, width: fixture.size.width, height: 16)
+        guard let trailing = Self.trailingInkColumn(bytes: base, width: rep.pixelsWide,
+                                                    height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                    rect: rowBand, scale: scale, minDelta: 60) else {
+            return XCTFail("第一行推荐里读不到任何墨 ⇒ 复刻坏了或者带放错了（先量带，别改阈值）")
+        }
+        XCTAssertGreaterThanOrEqual(trailing, fixture.size.width - 1.0,
+                    "复刻里第一行的最右墨在 \(String(format: "%.1f", trailing))pt，而帧宽 "
+                    + "\(String(format: "%.0f", fixture.size.width))pt ⇒ 这一行**不再顶到帧边界**了。"
+                    + "两种可能：①有人给行加了右边距/宽度约束（那这些帧也许已经能判截断，"
+                    + "重新判一次并把 `menuSurfaceReplicaFixtures` 收掉）；"
+                    + "②布局又漂了（那先确认漂在哪）。两种都不许只把这条断言放宽。")
+        print("MENUBAR_REPLICA menubar-recommendations 第一行最右墨="
+              + String(format: "%.1f", trailing) + " / 帧宽 "
+              + String(format: "%.0f", fixture.size.width)
+              + " ⇒ 复刻顶到帧边界，产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐")
+    }
+
+    /// R34 · 判别臂自己的**真值表**：画不出来的那一列，必须被认成画不出来。
+    ///
+    /// 为什么必须有它：R33 那条判别臂第一次上 CI 就答错了题 —— 它问"整帧有没有墨"，
+    /// 而该问的是"探针所在那一列画没画出来"。runner 上设置页内容列是平涂（BACKLOG 43），
+    /// 帧的底色与侧栏却有墨 ⇒ 整帧那一问永远答"画得出来" ⇒ 三条设置页探针全部走进
+    /// "有墨却贴到空白"的红分支，**红的是判据自己**（run 38472213484）。
+    /// 这种错在本机看不出来：本机什么都画得出来，两条分支只走得到一条。
+    /// 所以这里造一张"这一列什么都没有"的帧当**正对照**，让那条分支非走不可。
+    ///
+    /// 两臂的断言强度刻意不同：
+    /// ① 空白帧 ⇒ 必须判"画不出来"（与机器无关，恒成立）；
+    /// ② 真设置页那一列 ⇒ 本机应当判"画得出来"；这一臂**在 runner 上本来就该是 false**，
+    ///    所以它只在成立时打读数，不成立时打 `DISCRIMINATOR_ARM_B_NOT_RUN` ——
+    ///    把 BACKLOG 43 那条已知事实判成缺陷，就是 R29d 犯过的那件事。
+    func testNotRunDiscriminatorTruthTable() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r34-discriminator-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let column = CGRect(x: 150, y: 0, width: 560, height: 540)
+
+        let blank = Fixture("blank-column-720x540", NSSize(width: 720, height: 540)) {
+            AnyView(Color(nsColor: .windowBackgroundColor).frame(width: 720, height: 540))
+        }
+        let blankFile = scratch.appendingPathComponent("blank.png")
+        _ = try render(blank, appearance: .aqua, to: blankFile)
+        guard let blankImage = NSImage(contentsOf: blankFile),
+              let blankRep = NSBitmapImageRep(data: blankImage.tiffRepresentation ?? Data()),
+              let blankBase = blankRep.bitmapData else {
+            return XCTFail("读不回空白对照帧")
+        }
+        let blankScale = Double(blankRep.pixelsWide) / Double(blank.size.width)
+        let blankInk = Self.textInkMass(bytes: blankBase, width: blankRep.pixelsWide,
+                                        height: blankRep.pixelsHigh, bytesPerRow: blankRep.bytesPerRow,
+                                        rect: column, scale: blankScale)
+        XCTAssertFalse(Self.columnIsDrawable(textInkPixels: blankInk.pixels),
+                    "一张只有平涂底的帧，判别臂却说\(blankInk.pixels) 个文字墨像素 ⇒ 那条 NOT-RUN 分支是死的。"
+                    + "它一死，凡是这台机器画不出来的页面都会被红成\"框贴到空白上\"（R33 在 CI 上正是这样）")
+        print("DISCRIMINATOR_ARM_A blank 文字墨=\(blankInk.pixels) ⇒ 判为\"画不出来\"（正对照成立）")
+
+        guard let real = fixtures(appearance: .aqua).first(where: { $0.name == "settings-general" }) else {
+            return XCTFail("找不到 settings-general ⇒ 反臂没有对象")
+        }
+        let realFile = scratch.appendingPathComponent("settings-general.png")
+        _ = try render(real, appearance: .aqua, to: realFile)
+        guard let realImage = NSImage(contentsOf: realFile),
+              let realRep = NSBitmapImageRep(data: realImage.tiffRepresentation ?? Data()),
+              let realBase = realRep.bitmapData else {
+            return XCTFail("读不回刚拍的真实帧")
+        }
+        let realScale = Double(realRep.pixelsWide) / Double(real.size.width)
+        let realInk = Self.textInkMass(bytes: realBase, width: realRep.pixelsWide,
+                                       height: realRep.pixelsHigh, bytesPerRow: realRep.bytesPerRow,
+                                       rect: column, scale: realScale)
+        if Self.columnIsDrawable(textInkPixels: realInk.pixels) {
+            print("DISCRIMINATOR_ARM_B settings-general 内容列文字墨=\(realInk.pixels) ⇒ 判为\"画得出来\"")
+        } else {
+            print("DISCRIMINATOR_ARM_B_NOT_RUN settings-general 内容列 0 个文字墨像素"
+                  + " ⇒ 这台机器画不出这一页（BACKLOG 43 的已知事实，不算缺陷）；"
+                  + "这条判据的设置页探针在这台机器上记为未运行")
+        }
+    }
+
     /// R33 · `rowTierProfile` 的**真值表**：同一张设置页帧里，
     /// 一行说明段与一行开关标签必须被分进**两堆**，而且分错方向要能量出来。
     ///
@@ -2362,21 +2585,22 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
                 }
                 let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
-                // **先判这台机器拍不拍得出这一页**（R33，与 R29d 的判别臂同一条规矩）：
-                // runner 上 `SettingsView` 是一块平涂底色（BACKLOG 43 实测），整帧读到 0 个偏离像素。
-                // 那种情况下逐条记 NOT-RUN 而不是红 —— 恒红的判据等于没有判据；
-                // 但「整帧有墨、这一带没墨」仍然必须红（那是框贴错了地方，不是机器不行）。
-                // 表里那 3 条 `settings-general` 探针就是为这条而存在的：写这段之前我把判别臂
-                // 加到了 `controlInkProbes` 那条测试里 —— 那张表一条设置页探针都没有，
-                // 于是它是一段**永远不可能触发的装饰**，而真正需要它的这里没有 ⇒ CI 第一轮必红。
-                let whole = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                               bytesPerRow: rep.bytesPerRow,
-                                               rect: CGRect(origin: .zero,
-                                                            size: NSSize(width: fixture.size.width,
-                                                                         height: fixture.size.height)),
-                                               scale: scale, gate: 8)
-                if whole.brighter + whole.darker == 0 {
-                    print("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) 整帧 0 个偏离像素")
+                // **先判这台机器拍不拍得出探针所在的那一列**（R33 立、R34 改对区域的一条规矩）。
+                // R33 第一版问的是"整帧有没有墨"，CI 第一轮就红了，而且**红得对**：
+                // runner 上 `SettingsView` 的内容列是一块平涂（BACKLOG 43），
+                // 可同一张帧的窗口底色与侧栏仍有墨 ⇒ 整帧那一问回答的是"这台机器会不会画图"，
+                // 而这条判据要问的是"**这一列**画没画出来"。两者差一层，结论就反过来。
+                // 于是判别区域改成**探针自己那一竖条**（同 x 范围、整高）：
+                // 列里一处文字墨都没有 ⇒ 机器拍不出这一页 ⇒ NOT-RUN；
+                // 列里有墨而这一带没有 ⇒ 框贴错了地方 ⇒ 照旧红（那是缺陷，不是环境问题）。
+                let column = CGRect(x: probe.rect.minX, y: 0,
+                                    width: probe.rect.width, height: fixture.size.height)
+                let columnInk = Self.textInkMass(bytes: base, width: rep.pixelsWide,
+                                                 height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                 rect: column, scale: scale)
+                if !Self.columnIsDrawable(textInkPixels: columnInk.pixels) {
+                    print("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) "
+                          + "探针所在列 \(column) 读到 0 个文字墨像素")
                     continue
                 }
                 judged += 1
@@ -2448,6 +2672,15 @@ final class UICaptureTests: XCTestCase {
 
     /// 一个像素算不算"字的笔画"。
     static func isTextInk(delta: Int) -> Bool { delta > textInkMinDelta }
+
+    /// 判别臂的唯一问题：**这一列到底画没画出来**。
+    ///
+    /// 单独收成一处，是为了让它能有一张真值表（`testNotRunDiscriminatorTruthTable`）：
+    /// R33 第一版把这一问写成了"整帧有没有墨"，CI 第一轮就红了 —— 而**红的是判据自己**：
+    /// runner 上设置页内容列是平涂，可帧的底色与侧栏仍有墨，整帧那一问永远答"画得出来"，
+    /// 于是三条设置页探针全部走进"有墨却贴到空白"的红分支。
+    /// 判据要问的区域**必须就是它自己要读的那块区域**（R34）。
+    static func columnIsDrawable(textInkPixels: Int) -> Bool { textInkPixels > 0 }
 
     /// 一块矩形里的文字墨：像素数 + 占这块矩形的比例。
     ///
@@ -2804,6 +3037,37 @@ final class UICaptureTests: XCTestCase {
             var ink = 0
             for y in y0..<y1 where abs(luma(x, y) - background) > minDelta { ink += 1 }
             if ink >= minInkPerColumn { return Double(x) / scale }
+        }
+        return nil
+    }
+
+    /// `leadingInkColumn` 的**右镜像**：一块矩形里最后一列有墨的 x（pt）。
+    ///
+    /// 为什么 R34 才加：左边界能判"对齐"，右边界能判的是**截断有没有留痕迹**。
+    /// 一行 `lineLimit(1)` 的文字如果被容器切掉，它会以"…"收尾；如果是整块被裁，
+    /// 那**最后一个字的笔画会正好停在帧的最后一列** —— 这两种"放不下"在像素上的区别
+    /// 只有右边界看得见（R33 在菜单栏面板上第一次撞到：理由的墨画到 x=319.5，而帧宽 320）。
+    /// 读法与 `leadingInkColumn` 完全一致（同一块底、同一个 `minDelta`、同一档每列最少墨数），
+    /// 所以两条可以拿同一张帧对账。
+    static func trailingInkColumn(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                  bytesPerRow: Int, rect: CGRect, scale: Double,
+                                  minDelta: Int = 40, minInkPerColumn: Int = 3) -> Double? {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return nil }
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return (Int(bytes[o]) * 299 + Int(bytes[o + 1]) * 587 + Int(bytes[o + 2]) * 114) / 1000
+        }
+        var histogram: [Int: Int] = [:]
+        for y in stride(from: y0, to: y1, by: 2) {
+            for x in stride(from: x0, to: x1, by: 2) { histogram[luma(x, y) / 4, default: 0] += 1 }
+        }
+        let background = (histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+        for x in stride(from: x1 - 1, through: x0, by: -1) {
+            var ink = 0
+            for y in y0..<y1 where abs(luma(x, y) - background) > minDelta { ink += 1 }
+            if ink >= minInkPerColumn { return Double(x + 1) / scale }
         }
         return nil
     }

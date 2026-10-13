@@ -1341,3 +1341,25 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   `INSTALL_RUNNING_PID=91740`（启动晚于安装，exe 路径逐字对上 `/Applications/时间剪史.app`）、
   `INSTALL_ENTRIES_BEFORE=103 → AFTER=103`、`INSTALL_RESULT=ok`、版本 1.4.8→1.4.8。
 - 旧包留在 `Documents/Codex_Project0_backups/before-local-20261014-053500`。
+
+## Round 34 · 菜单栏帧的资格（U-56 收回 / U-57 / D-093）
+
+- **产品零改动**（帧基线 `CHANGED=0`）⇒ 本机已装的 R33 包就是当前产品状态，不需要重装。
+- **U-56 收回**：R33 那句"产品的推荐理由被硬切成半字"量的不是产品。
+  `MenuBarExtra` 全仓没有 `.menuBarExtraStyle(.window)` ⇒ 默认 `.menu` ⇒ 内容编译成真 `NSMenu`，
+  而 `menubar-*` 帧拍的是离屏 `NSHostingView` 复刻；复刻里那一行在 320/400/520/720 四档下
+  **都顶到帧边界**（320.0 / 398.0 / 518.0 / 718.5）⇒ 顶边是复刻的性质。
+- **新规矩**：`menuSurfaceReplicaFixtures` + `testMenuBarFramesAreReplicasOfTheMenuSurface`
+  （前提现读 `App.swift` / 名单≡由 `menubar-` 前缀推导 / 证据是顶边读数）
+  ⇒ 这批帧**可判颜色档，不可判宽度、截断、对齐、命中区**。
+- **U-57（R33 的 CI 红，run 38472213484）**：NOT-RUN 判别臂问的是"整帧有墨吗"，
+  该问"探针所在那一竖条画出来了吗"。runner 上设置页内容列平涂而帧底色有墨 ⇒
+  整帧那一问永远答"画得出来" ⇒ 三条设置页探针被红成"框贴到空白"。
+  已改成 `columnIsDrawable(textInkPixels:)` + **正对照真值表**
+  （`testNotRunDiscriminatorTruthTable`：blank=0 判"画不出来"、真实页=31890 判"画得出来"）。
+  规矩：**判别臂要问的区域，必须就是这条判据自己要读的区域**。
+- **新尺**：`trailingInkColumn`（左边界判对齐，右边界才看得见截断留没留痕迹）。
+- **改口径先审计消费者**：`grep menubar- Tests/` 只有两条颜色档探针 + 一条帧名对账
+  ⇒ 没有几何判据建立在这批帧上，需要撤的只是账本里那句话。
+- **验证**：710 tests / 30 skipped / 0 failures、0 warning、脚本 72 OK、
+  变异 **M148–M151 四支全 CAUGHT**、`RESTORE_CLEAN=yes`。自评 **90 / 100**。

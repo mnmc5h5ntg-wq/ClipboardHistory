@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R34 · 菜单栏那三张帧量的不是产品；R33 的判别臂问错了问题）
+
+- **产品代码零改动**，帧基线 `CHANGED=0`。本轮改的是"哪些结论被允许建立在这批帧上"。
+- **U-56 收回**：R33 由看帧得到"产品的推荐理由被硬切成半字（墨到 `x=319.5`）"。
+  查清依据在产品自己的注释与源码里：`MenuBarExtra` 全仓没有 `.menuBarExtraStyle(.window)`
+  ⇒ 默认 `.menu` ⇒ 这棵 SwiftUI 树被编译成**真的 `NSMenu`**，而 `menubar-*` 帧拍的是
+  离屏 `NSHostingView` 复刻。复刻里那一行在 320 / 400 / 520 / 720 四档宽度下**都顶到帧边界**
+  （最右墨 320.0 / 398.0 / 518.0 / 718.5）⇒ "顶边"是复刻的性质（它没有右内边距），
+  不是产品的截断行为。**看帧看到的没错，错的是把复刻当成产品。**
+- **新规矩（机器可读）**：`menuSurfaceReplicaFixtures` + `testMenuBarFramesAreReplicasOfTheMenuSurface`
+  —— 三条一起：现读 `App.swift` 的前提、名单 ≡ 由 `menubar-` 前缀推导的夹具集、证据是顶边读数。
+  内容：**这批帧可以判颜色档，不可以判宽度 / 截断 / 对齐 / 命中区**；
+  产品哪天换成 `.window` 风格，第二条断言会红着提醒"这些帧现在就是产品本身了，把名单收掉并重新审"。
+- **修掉 R33 那条判别臂的问句（U-57）**：它问"整帧有没有墨"，而该问"**探针所在那一竖条**有没有文字墨"。
+  CI run 38472213484 因此红了，而且**红得对**：runner 上设置页内容列是平涂（BACKLOG 43），
+  可帧的底色与侧栏有墨 ⇒ 整帧那一问永远答"画得出来" ⇒ 三条设置页探针被红成"框贴到空白上"。
+  现在收成 `columnIsDrawable(textInkPixels:)` 并配一张**正对照真值表**
+  （`testNotRunDiscriminatorTruthTable`：空白帧必须被判"画不出来"，本机实测 blank=0 / 真实页=31890）——
+  这条分支在本机永远走不到，所以它必须有一张正对照，否则下一次还是 CI 替我发现。
+- **新尺**：`trailingInkColumn`（`leadingInkColumn` 的右镜像）。左边界判对齐，右边界才看得见"截断留没留痕迹"。
+- 变异 **M148–M151** 四支全 CAUGHT（前提 / 名单 / 证据 / 判别臂本身），`RESTORE_CLEAN=yes`；
+  M150 顺带量到加 12pt 右内边距后最右墨从 320.0 退到 308.0 ⇒ 这把新尺两个方向都动。
+- 全量 **710 tests / 30 skipped / 0 failures**、0 warning、脚本 72 OK。
+
 ### Changed（R33 · 说明段探针的"通过"原来是假的；通用页每段说明回到自己那颗开关下面）
 
 - **产品改动（U-55）**：「通用」页四颗开关各自的 `.secondary` 说明段与它解释的那一颗**编成一组**
