@@ -1088,3 +1088,25 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     **剩下的开放项只有一个，而且要真机**（人工批次 39.1）：那个菜单实际多宽？
     长记录的理由是"…"收尾还是被切？两种答案对应两种处置 ——
     前者=什么都不用做（帧的锅），后者=给面板声明宽度并补一条"墨不许顶到帧边界"的判据。
+
+48. **列表行行内 meta（复制时间）的档量不到（R35 / U-58 / D-094）**：那一列的生效外观是
+    `NSAppearanceNameVibrantLight`（暗档 `…VibrantDark`）⇒ `cacheDisplay` 拍到的是 vibrancy
+    **合成前**的像素，实测 `.primary` 行标题与 `.secondary` 的 meta 一样深（都是 (113,113,113)），
+    而设置页内容列同样 `.primary` 的标签是 (38,38,38)。
+    ⇒ 侧栏行内文字（标题 / 时间 / 来源）的**档与对比度**在离屏帧上不是产品的量。
+    需要：一条合成后的取图通道（R31 已证离屏没有 ⇒ 要么真机截屏，要么 R19 那条 orderFront 路线），
+    或者把这一列的判据搬到能画出来的表面上。
+    同一条盲区还覆盖 R21 的 `sidebar-multi-select/批量操作按钮` 读数（已登记在
+    `vibrantResolvedControlProbes`，不判产品）。
+
+49. **CI 的帧捕获步骤是 report-only，红了不拦（R35 查口径查出来的，U-59）**：
+    `.github/workflows/ci.yml` 里 `Offscreen frame capture (report-only)` 带
+    `continue-on-error: true` 且命令尾巴 `|| true`。runner 上现在有 4 条红被吞：
+    ① 材质盲区名单"黑带消失了"（runner 上 `MATERIAL_BLIND_SPOTS 0 of 51`，本机是 9 —— 那两条
+    名单是**机器相关**的，同一条守卫在一台机器上是另一台机器的假红）；
+    ② 正对照帧 `sidebar-history` 底行读到 0% 墨（List 内容在 runner 上画不出来，BACKLOG 43 同族）；
+    ③④ 两张 `settings-privacy-excluded` 被"捕获失效"闸门锁住（这条是闸门正常工作）。
+    ⇒ 要做的不是把 report-only 摘掉（第一次真跑就恒红会让人学会无视红色），
+    而是**红必须有名字**：把"这台机器画不出来的守卫"显式登记成 NOT-RUN（像 R34 的判别臂那样），
+    然后让工作流检查"未登记的红色条数 == 0"，非零就红。
+    这样 report-only 仍然不拦已知盲区，但**新出现的红再也藏不住**。

@@ -3254,3 +3254,29 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
   `testNotRunDiscriminatorTruthTable`（两臂）、`testCaptionTextStaysOnTheSecondaryTier`
   （换区域后的判别臂 + `judged ≥ 3`）。变异 M148–M151 四支。
 - **回滚**：`git revert` 本轮提交；产品代码本轮**零改动**，帧基线 `CHANGED=0`。
+
+### D-094 · R35：说明段点满 + 探针必须有"颜色域资格"，没有资格的位点撤出表外
+
+- **决定 1**：`captionInkProbes` 从 8 条补到 **16 条**，设置窗口 6 个分区各至少一处（快捷键 / 通用 /
+  隐私 3 处 / 数据 / 推荐 / 统计）+ 详情头部 meta。框全部从"说明档带"量出来，不照抄别处的 y。
+- **决定 2**：覆盖本身要有机器账 —— 分区清单从 `SettingsCategory.allCases` 推导，
+  新增分区而没有任何说明段判据 ⇒ 红。这是 R10"探针名单从产品推导"的推广。
+- **决定 3（本轮真正的产出）**：**探针必须有颜色域资格**。
+  一条"列表行 meta"的变异（把 `.secondary` 降到 `.tertiary`）**全绿通过**，查下去发现
+  侧栏那一列的生效外观是 `NSAppearanceNameVibrantLight` / `…VibrantDark` ——
+  也就是 R30 量过的同一个机制，只是当时把它记成了"暗档设置页侧栏"那一格。
+  实测：侧栏 `.primary` 行标题最深 (113,113,113)，与旁边 `.secondary` 的 meta **一样深**，
+  而设置页内容列同样 `.primary` 的标签是 (38,38,38)。
+  合成前的像素上"档"不是产品那个量 ⇒ 撤掉那条探针，并加
+  `testProbesDoNotSitOnVibrantColumns`：说明段表零容忍、控件表必须点名登记（现为 R21 那条），
+  名单由产物现推（多一条红、少一条也红）。
+- **决定 4**：**表里少一条胜过留一条假绿**。R21 在侧栏那颗按钮上的 3:1 读数从此记为
+  "不属于产品的证据"（既不判产品过、也不判产品不过），要真判它得先有合成后的取图通道（R31 的边界）。
+- **决定 5**：账本口径改一行 —— CI 的帧捕获步骤是 **report-only**，
+  "CI 上真的跑"只成立到"跑了"，不成立到"红了会拦"（runner 上现在有 4 条红被吞）。
+  这条记成 BACKLOG 49，下一轮处理（"红必须有名字"）。
+- **代价**：说明段测试自拍 16 帧 × 两档 + 资格判据再拍 40 次，两条测试各约 10–20 秒；
+  产品零改动、帧基线 `CHANGED=0`。
+- **谁守着**：`testCaptionTextStaysOnTheSecondaryTier`（地板 + 天花板 + `judged ≥ 3` + 覆盖规则）、
+  `testProbesDoNotSitOnVibrantColumns`、`testProbeVibrantEligibilityDiagnostic`（打印每条读数的域）。
+  变异 M152–M156 五支。

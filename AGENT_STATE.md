@@ -1363,3 +1363,26 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   ⇒ 没有几何判据建立在这批帧上，需要撤的只是账本里那句话。
 - **验证**：710 tests / 30 skipped / 0 failures、0 warning、脚本 72 OK、
   变异 **M148–M151 四支全 CAUGHT**、`RESTORE_CLEAN=yes`。自评 **90 / 100**。
+
+## Round 35 · 说明段全覆盖 + 探针的颜色域资格（BACKLOG 34② 收口 / U-58 / U-59 / D-094）
+
+- **产品零改动**，帧基线 `CHANGED=0`；`captionInkProbes` 8 → **16 条**，
+  设置窗口 6 个分区各至少一处 + 详情头部 meta，全部从"说明档带"量位置。
+  读数 16 × 两档 = 比值 **0.93–1.18**，地板 0.8 / 天花板 1.5 都留着余量。
+- **覆盖规则**（新）：分区清单从 `SettingsCategory.allCases` 推导 ⇒ 新增分区没人点名就红。
+- **一条 ESCAPED 的变异换出一条机制**（U-58）：M155 第一版（行内 meta 降到 `.tertiary`）全绿，
+  查下去是**侧栏那一列活在 `NSAppearanceNameVibrantLight` / `…VibrantDark` 里**，
+  拍到的是 vibrancy 合成前的像素：侧栏 `.primary` 行标题最深 113，与旁边 `.secondary` 一样深，
+  而设置页内容列同样 `.primary` 的标签是 38。⇒ 撤掉那条探针，位点记 BACKLOG 48。
+- **新判据 `testProbesDoNotSitOnVibrantColumns`**：40 条读数逐条问颜色域，
+  说明段表零容忍、控件表必须点名登记（R21 那条侧栏按钮从此不判产品）。
+- **口径修正（U-59 / BACKLOG 49）**：CI 的帧捕获步骤是 **report-only**
+  （`continue-on-error` + `|| true`），runner 上现有 4 条红被吞
+  （材质盲区名单在 runner 上是"黑带消失"、正对照帧底行 0% 墨、两张 `settings-privacy-excluded` 被捕获失效闸门锁住）。
+  ⇒ 账本里"CI 上真的跑"只成立到"跑了"。下一轮（R36）做"**红必须有名字**"：
+  已知画不出来的守卫登记成 NOT-RUN，工作流改判"未登记的红色 == 0"。
+- **R34 的 CI 结论**：run 38473962277 **success**，runner 日志里
+  `CAPTION_NOT_RUN × 3`、`CAPTION_JUDGED 5/8`、`DISCRIMINATOR_ARM_A ✓`、`ARM_B_NOT_RUN`
+  —— 那条本机永远走不到的分支第一次在真环境按预期走了一遍。
+- **验证**：712 tests / 31 skipped / 0 failures、0 warning、脚本 72 OK、
+  变异 M152–M156 五支全 CAUGHT、`RESTORE_CLEAN=yes`。自评 **89 / 100**（<90 ⇒ 继续）。

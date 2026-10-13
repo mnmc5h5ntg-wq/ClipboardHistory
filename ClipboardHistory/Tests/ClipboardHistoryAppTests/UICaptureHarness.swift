@@ -1722,6 +1722,33 @@ final class UICaptureTests: XCTestCase {
                       + "不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
     }
 
+    /// 放框诊断要扫的夹具（R35 点名剩余 `.secondary` 位点时用）。
+    static let captionPlacementDiagnosticFixtures: [String] = [
+        "settings-general", "settings-shortcuts", "settings-privacy", "settings-data",
+        "settings-recommendations",
+        "settings-stats-populated", "sidebar-history", "detail-0-text",
+        // 快速选择浮层**不在这里**：102 张基线里一张 `quickpick-*` 都没有（已记的账 BACKLOG 30 /
+        // U-39 / U-41 —— 那是 AppKit 自建的 NSPanel，R19 试过把 contentView 搬进别的窗口，
+        // 搬过去就塌成空壳）。列一个不存在的夹具名只会让这条诊断红成"找不到对象"，
+        // 那种红说的是我的清单，不是产品的表面。
+
+    ]
+
+    /// 每张夹具里"文字可能出现的区域"（pt）。
+    /// 设置页要跳过左侧那一列（R29d/R30：那一列在 vibrant 子树里解析颜色，暗档不可信），
+    /// 其余表面各给一块自己内容的包围盒 —— 区域不是审美选择，它决定"这一带算不算画出来了"。
+    static func rowProfileRect(for fixture: String) -> CGRect {
+        if fixture.hasPrefix("settings-") { return CGRect(x: 150, y: 20, width: 560, height: 500) }
+        switch fixture {
+        // 侧栏只量**文字列**（x 130 起）：x 40..100 那一列是类型图标，
+        // 它本身就是 `.secondary`（R21 判过），会把"说明档带"打成一堆假候选 ——
+        // R35 第一条 sidebar 探针就是这么放到了图标上（M155 逃过一次才暴露，见那条电池）。
+        case "sidebar-history": return CGRect(x: 130, y: 20, width: 170, height: 500)
+        case "detail-0-text": return CGRect(x: 0, y: 20, width: 720, height: 500)
+        default: return CGRect(x: 0, y: 0, width: 10_000, height: 10_000)
+        }
+    }
+
     /// R33 诊断（**放框用的，不判产品**）：设置页内容列里每一行是**哪种字**。
     ///
     /// 为什么需要它：`captionInkProbes` 里给通用页放的两个框，读数 13.76 = 参照的 3.67 倍，
@@ -1738,11 +1765,12 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
+            for name in Self.captionPlacementDiagnosticFixtures {
             guard let fixture = fixtures(appearance: appearance)
-                .first(where: { $0.name == "settings-general" }) else {
-                return XCTFail("找不到 settings-general ⇒ 这一带的行剖面没有对象")
+                .first(where: { $0.name == name }) else {
+                return XCTFail("找不到 \(name) ⇒ 这一带的行剖面没有对象")
             }
-            let file = scratch.appendingPathComponent("settings-general-\(tag).png")
+            let file = scratch.appendingPathComponent("\(name)-\(tag).png")
             _ = try render(fixture, appearance: appearance, to: file)
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
@@ -1750,15 +1778,15 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
             }
             let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let profileRect = Self.rowProfileRect(for: name)
             let rows = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                            bytesPerRow: rep.bytesPerRow,
-                                           rect: CGRect(x: 150, y: 20, width: 560, height: 500),
-                                           scale: scale)
-            print("ROWTIER settings-general \(tag)：有字行 \(rows.count) 行（x 150..710）")
-            for band in Self.textBands(rows: rows, scale: scale) {
-                let tier = band.title > band.caption ? "标题档" : "说明档"
-                print(String(format: "  带 y=%.1f..%.1f pt 最深偏离=%d %@ 说明=%d 标题=%d",
-                             band.startPt, band.endPt, band.maxDeviation, tier, band.caption, band.title))
+                                           rect: profileRect, scale: scale)
+            print("ROWTIER \(name) \(tag)：有字行 \(rows.count) 行（区域 x \(Int(profileRect.minX))..\(Int(profileRect.maxX))、y \(Int(profileRect.minY))..\(Int(profileRect.maxY))）")
+            for band in Self.textBands(rows: rows, scale: scale) where band.title == 0 && band.caption > 0 {
+                print(String(format: "  说明档带 y=%.1f..%.1f pt 最深偏离=%d 说明=%d",
+                             band.startPt, band.endPt, band.maxDeviation, band.caption))
+            }
             }
         }
         throw XCTSkip("诊断用判据：它只回答「这一行是标题档还是说明档」，用来放框，不判产品 "
@@ -1923,6 +1951,129 @@ final class UICaptureTests: XCTestCase {
               + String(format: "%.1f", trailing) + " / 帧宽 "
               + String(format: "%.0f", fixture.size.width)
               + " ⇒ 复刻顶到帧边界，产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐")
+    }
+
+    /// 已经知道"压在 vibrant 子树上"的**控件**探针（R35 逐条量出来的，不是推的）。
+    ///
+    /// 为什么还留着：这条读数不是没有值，是**值不属于产品** —— `cacheDisplay` 不做 vibrancy 合成，
+    /// 于是那一列的颜色是合成前的。它 14.56 / 12.43 的对比度比产品真机上高还是低，
+    /// 在有一条合成后的取图通道之前（R31 已证离屏没有）**无法知道**，所以只能记成盲区而不是缺陷。
+    /// 名单由 `testProbesDoNotSitOnVibrantColumns` 从产物现推：多一条会红，少一条也会红。
+    static let vibrantResolvedControlProbes: Set<String> = [
+        "sidebar-multi-select/批量操作按钮（侧栏工具排）",
+    ]
+
+    /// R35 · **探针的颜色域资格**：档与对比度只能判在"产品那个颜色域"里。
+    ///
+    /// 起因是 M155 逃过一次：我给 `sidebar-history` 的"列表行第二行 meta"放了一条说明段探针，
+    /// 把产品那行改成 `.tertiary` 之后判据全绿。顺着查到的不是框放错，而是**整帧颜色域不同**：
+    /// 侧栏那一列的 `.primary` 行标题最深 (113,113,113)，与旁边 `.secondary` 的 meta 一样深，
+    /// 而设置页内容列同样 `.primary` 的标签最深 (38,38,38)。R30 量过的 vibrant 机制
+    /// 当时只记在"暗档设置页侧栏"那一格上 —— 这一条把它推广成**逐条探针问一遍**：
+    /// 亮档也算，主窗口的侧栏也算。
+    ///
+    /// 两条规矩：
+    /// ① **说明段表里一条都不许压在 vibrant 子树上**（无例外 —— 档这个量在合成前不是产品那个量）；
+    /// ② 控件表里允许，但必须点名登记在 `vibrantResolvedControlProbes`，
+    ///    多一条红、少一条也红，并且红的时候要说清楚"这不是缺陷，是这条读数不属于产品"。
+    func testProbesDoNotSitOnVibrantColumns() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r35-probe-domain-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var captionViolations: [String] = []
+        var controlVibrant: Set<String> = []
+        var checked = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            for probe in Self.captionInkProbes {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == probe.fixture }) else {
+                    return XCTFail("找不到夹具 \(probe.fixture) ⇒ 资格判据没有对象")
+                }
+                checked += 1
+                var vibrant: String?
+                _ = try render(fixture, appearance: appearance,
+                               to: scratch.appendingPathComponent("\(probe.fixture).png")) { host in
+                    vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
+                }
+                if let vibrant {
+                    captionViolations.append("\(probe.fixture)/\(probe.what)（\(vibrant)）")
+                }
+            }
+            for probe in Self.controlInkProbes {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == probe.fixture }) else {
+                    return XCTFail("找不到夹具 \(probe.fixture) ⇒ 资格判据没有对象")
+                }
+                checked += 1
+                var vibrant: String?
+                _ = try render(fixture, appearance: appearance,
+                               to: scratch.appendingPathComponent("\(probe.fixture)-c.png")) { host in
+                    vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
+                }
+                if vibrant != nil { controlVibrant.insert("\(probe.fixture)/\(probe.what)") }
+            }
+        }
+        XCTAssert(checked >= 40, "只问了 \(checked) 条探针的颜色域 ⇒ 两张贴表的遍历本身坏了")
+        XCTAssert(captionViolations.isEmpty,
+                  "这些说明段探针压在 vibrant 子树上：\(captionViolations) ⇒ 拍到的是 vibrancy 合成**之前**"
+                  + "的像素，「档」这个量在那一列不是产品那个量（R35 实测：侧栏 `.primary` 行标题最深 113，"
+                  + "设置页内容列同样声明 `.primary` 的标签最深 38）。\n"
+                  + "处置只有两种，都不许是把判据放宽：①换一个不压在 vibrant 列上的位点；"
+                  + "②承认这条量不到，登记进 BACKLOG 48 并把它从表里撤掉（表里留一条假绿比少一条更糟）。")
+        XCTAssertEqual(controlVibrant, Self.vibrantResolvedControlProbes,
+                       "控件探针压在 vibrant 子树上的名单变了：现在量到 \(controlVibrant.sorted())，"
+                       + "登记的是 \(Self.vibrantResolvedControlProbes.sorted()) ⇒ "
+                       + "多出来的那条读数不属于产品（先登记再谈判不判）；"
+                       + "少掉的那条意味着那一列现在能拍了（或者有人动了容器）—— 两种都要真的去看那张帧")
+        print("PROBE_DOMAIN 问了 \(checked) 条读数：说明段 0 条压在 vibrant 上，"
+              + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
+    }
+
+    /// R35 诊断（**问产物，不判产品**）：每张探针框压着的子树，是不是在 vibrant 域里解析颜色。
+    ///
+    /// 起因是 M155 逃过一次：我把一条"列表行第二行 meta"的探针放进 `sidebar-history`，
+    /// 把产品的行标题改成 `.tertiary` 判据全绿。顺着查下去量到的不是"框放错了"，而是**整帧的颜色域不同**：
+    /// 同一句"这一带最深是多少"，设置页内容列的 `.primary` 标签量到 (38,38,38)（偏离 210），
+    /// 而侧栏行标题量到 (113,113,113)（偏离 135）—— 与它下面那行 `.secondary` 的 meta **一模一样深**。
+    /// R30 已经量过这个机制（`NSAppearanceNameVibrantDark` + `cacheDisplay` 不做 vibrancy 合成），
+    /// 但当时把它记成"暗档设置页侧栏"那一格；这一条要问的是**到底哪些探针框活在 vibrant 域里**，
+    /// 亮档算不算、主窗口的侧栏算不算。答案决定哪些"档 / 对比度"判据其实没有证据。
+    func testProbeVibrantEligibilityDiagnostic() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r35-eligibility-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var vibrantCount = 0
+        var total = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for probe in Self.captionInkProbes + Self.controlInkProbes {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == probe.fixture }) else { continue }
+                total += 1
+                var vibrant: String?
+                let file = scratch.appendingPathComponent("\(probe.fixture).png")
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
+                }
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { continue }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
+                                                         height: rep.pixelsHigh,
+                                                         bytesPerRow: rep.bytesPerRow,
+                                                         rect: probe.rect, scale: scale)
+                if vibrant != nil { vibrantCount += 1 }
+                print(String(format: "PROBE_ELIGIBILITY %@ %@ %@ 域=%@ ratio=%.2f ink=%.1f%%",
+                             tag, probe.fixture, String(probe.what.prefix(22)),
+                             vibrant ?? "非 vibrant", ratio, coverage * 100))
+            }
+        }
+        print("PROBE_ELIGIBILITY_SUM \(vibrantCount) of \(total) 条探针压在 vibrant 子树上")
+        throw XCTSkip("诊断用判据：它只回答「这条探针框压在哪个颜色域里」，用来定资格，不判产品 "
+                      + "⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
     }
 
     /// R34 · 判别臂自己的**真值表**：画不出来的那一列，必须被认成画不出来。
@@ -2503,6 +2654,32 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 150, y: 200, width: 560, height: 12)),
         InkProbe(fixture: "settings-general", what: "说明段「打开后从 Word、Pages…」（富文本的代价，两行）",
                  rect: CGRect(x: 150, y: 241, width: 560, height: 26)),
+          // R35 / BACKLOG 34②剩下的半条：**其余每个分区都点名一处**，加主窗口两处 meta。
+        // 框全部由 `testSettingsCaptionRowTierProfileDiagnostic` 的"说明档带"放（下面每条注释里
+        // 写着亮/暗两档各自量到的带），天花板负责在放错时把它打回 ——
+        // 一张只有地板的表会把"框套在标题上"判成通过（R33 就是这么错的，D-092）。
+        InkProbe(fixture: "settings-shortcuts", what: "快捷键页那一段说明（R28 修过它被截断，档也要钉住）",
+                 rect: CGRect(x: 150, y: 275, width: 560, height: 10)),
+        InkProbe(fixture: "settings-privacy", what: "说明段「启用后可提供更准确的推荐。」（上下文权限）",
+                 rect: CGRect(x: 150, y: 142, width: 560, height: 11)),
+        InkProbe(fixture: "settings-privacy", what: "说明段「过滤敏感内容（密钥、令牌、密码等）…」（推荐过滤开关）",
+                 rect: CGRect(x: 150, y: 304, width: 560, height: 11)),
+        InkProbe(fixture: "settings-privacy", what: "默认排除清单第一行「默认排除：com.…」",
+                 rect: CGRect(x: 150, y: 395, width: 560, height: 11)),
+        InkProbe(fixture: "settings-data", what: "数据页第一段说明（存档与导出，要读）",
+                 rect: CGRect(x: 150, y: 139, width: 560, height: 10)),
+        InkProbe(fixture: "settings-recommendations", what: "推荐页第一段说明（权重是干什么用的）",
+                 rect: CGRect(x: 150, y: 146, width: 560, height: 10)),
+        InkProbe(fixture: "settings-stats-populated", what: "统计页热图上头那句说明（有数据那一臂）",
+                 rect: CGRect(x: 150, y: 98, width: 560, height: 11)),
+        InkProbe(fixture: "detail-0-text", what: "详情头部 meta（时间 · 大小 · 来源）",
+                 rect: CGRect(x: 0, y: 36, width: 720, height: 12)),
+          // 列表行第二行 meta（复制时间）**不在这里** —— R35 量出来那一列压在
+        // `NSAppearanceNameVibrantLight` / `…VibrantDark` 子树上（`testProbesDoNotSitOnVibrantColumns`），
+        // 拍到的是 vibrancy 合成**之前**的像素：行标题与它下面那行 `.secondary` 的 meta
+        // 最深都是 (113,113,113)，而设置页内容列同样声明 `.primary` 的标签是 (38,38,38)。
+        // 也就是说这张帧上"档"这个量根本不是产品那个量 —— 放一条探针进来就是给自己造一条假绿。
+        // 这条位点改记为量不到（BACKLOG 48），要真判它得先有一条合成后的取图通道（R31 的边界）。
     ]
 
     /// **系统 `.secondary` 档在"这台机器 + 这个外观"下量到的对比度**（R28 新增的参照臂）。
@@ -2655,6 +2832,24 @@ final class UICaptureTests: XCTestCase {
                         + "它们要是也读不到墨，这条判据就没有内容，必须红着说这件事。")
             print("CAPTION_JUDGED \(tag) 判了 \(judged) 条 / 表里 \(Self.captionInkProbes.count) 条")
         }
+        // **覆盖要有机器账**（R35 / 与 R10「探针名单从产品推导」同一条规矩）：
+        // 这张表从 R27 的三处热图刻度长到今天的 17 处，全靠一轮一轮点名 ——
+        // 而"下一轮还点不点"目前没有约束。加这一条：**设置窗口每一个分区至少被点名一次**，
+        // 分区清单从 `SettingsCategory.allCases` 推导，不写死。
+        // 于是"新增一个分区而没给它任何说明段判据"会当场红，而不是变成一张没人注意的空白页。
+        let named = Set(Self.captionInkProbes.map { $0.fixture })
+        var missing: [String] = []
+        for category in SettingsCategory.allCases {
+            if !named.contains(where: { $0.hasPrefix("settings-\(category.rawValue)") }) {
+                missing.append(category.title)
+            }
+        }
+        XCTAssert(missing.isEmpty,
+                  "这些设置分区在说明段表里**一处都没有**：\(missing) ⇒ 这一页的 `.secondary` 文字"
+                  + "没有任何档判据看着。用 `testSettingsCaptionRowTierProfileDiagnostic` 点名它真实的带"
+                  + "（带要量出来，不许照抄别处的 y），再把探针加进 `captionInkProbes`。")
+        print("CAPTION_COVERAGE 设置分区 \(SettingsCategory.allCases.count) 个，全部至少点名一处"
+              + "（表里 \(Self.captionInkProbes.count) 条）")
     }
 
     // MARK: - R28 · "这一页一共画了多少字"（两臂对照）
