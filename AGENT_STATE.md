@@ -1264,3 +1264,19 @@ runner 上九张设置帧的侧栏列**全部读到 0 个偏离像素** ⇒ 名�
 内容区有墨而侧栏没判 ⇒ 红，并指名去核坐标；两列都 0 ⇒ 整条 XCTSkip（显式，不是静默）。
 M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺没压住字"这句话上（本机复验：
 `内容区读到了墨（308093 个偏离像素）… 是**尺没压住字**，不是环境问题`）。
+
+## Round 30 · 侧栏暗档黑字的机制：那一列在 `NSAppearanceNameVibrantDark` 里解析颜色
+
+- **换方法**：R29d 十五臂复刻体全画对 ⇒ 不再猜形状。给 `render` 加 `inspect:` 钩子
+  （默认空实现，调用点零改动），在"已布局、外观已注入、未开画"时打印产品的 AppKit 树。
+- **量到**：侧栏列的 `NSHostingView<...SidebarStyleContext>` 生效外观 = **VibrantDark**，
+  内容区 = DarkAqua。九张 `settings-*` 帧逐帧如此。产品代码零改动（D-090 / U-53）。
+- **没量到（写清是推论）**：vibrant 极性指望窗口服务器合成翻回来，而 `cacheDisplay` 不走合成
+  ⇒ 帧是"合成前"像素。真机正常与否仍是人工批次 37.1 / 37.2。
+- **名单改由前提决定**：`XCTAssertEqual(vibrantColumns, darkSidebarTextBlindSpots)` +
+  `wrongSide ⊆ vibrantColumns` ⇒ 给那一列钉 darkAqua 把帧调好看会当场红。
+- **本轮真实视觉审查按"先量后看"执行**：亮档 暗墨 18493 / 亮墨 0；
+  暗档 亮墨 15797 + 暗墨 2843。裁图两档均与数字一致（上一轮眼睛报错的那处，这次对上了）。
+- **数字**：0 warning；**703 例 / 26 skip / 0 失败**（+1 条永远记 skip 的诊断）；
+  帧基线 102 / `CHANGED=0`（产品零改动，符合预期）；脚本 72 passed；
+  变异 M132–M136 **5/5 CAUGHT**、`RESTORE_CLEAN=yes`（`/tmp/r30-mutation.log`）。

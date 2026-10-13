@@ -1129,3 +1129,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 剪贴板文本、图片和文件历史记录。
 - SwiftUI 主窗口界面。
 - DMG 打包流程。
+
+### Changed（R30 · 侧栏暗档黑字的机制量到了，盲区名单改由前提决定）
+
+- **产品代码零改动**。`render` 新增 `inspect:` 钩子（默认空实现），把"已布局、未开画"的
+  AppKit 树交给诊断：设置页侧栏列的 `NSHostingView` 生效外观是
+  **`NSAppearanceNameVibrantDark`**，内容区是 `DarkAqua` ⇒ 同一张帧里两种极性。
+- **盲区名单不再手钉**：`darkSidebarTextBlindSpots` 必须等于"侧栏在 vibrant 子树下"的帧集合，
+  且"读到反侧墨 ⇒ 必须也在 vibrant 子树里"。想给那一列钉外观把帧调好看，会当场红（U-53 / D-090）。
+- 新增一条**永远记 skip 的诊断**：`testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic`。
+- 变异 **M132–M136 五支全 CAUGHT**（含两支专打新前提：塞一条非 vibrant 帧 / 让 vibrant 探针失明）。

@@ -2086,3 +2086,44 @@ Button 承载文字（N）、以及**嵌套 hosting view + Button 那一格**（
 这条判别臂的存在理由与 R28 的"参照臂必须有资格"同族：**"没测到"必须能被证明不是"测不了"**。
 它同时让 M133（把尺的框缩到压不住字）从"安静跳过"变成"红" ——
 因为内容区仍然有墨，机器被证明拍得出这一页，而尺说什么都没有。
+
+---
+
+## 第 33 轮 · R30：不再猜形状，直接问产物 —— 侧栏那一列的生效外观是 `NSAppearanceNameVibrantDark`
+
+R29d 用十五臂复刻体没能重现"暗档侧栏黑字黑底"。本轮换了方法：
+**给 `render` 加一条 `inspect:` 钩子**（默认空实现，100 多条调用点一字不改），
+在"已布局、外观已注入、还没开画"那一刻把产品那棵 AppKit 树打出来：
+
+```
+#5 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>]
+    框=(0,0,720,540) 自带外观=nil 生效=NSAppearanceNameDarkAqua
+  #8 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<SidebarStyleContext>>>]
+    框=(0,0,148,540) 自带外观=nil 生效=NSAppearanceNameVibrantDark   ← 侧栏列
+#6 hosting [_NSCoreHostingView<RootView>]  框=(0,0,148,540) 生效=NSAppearanceNameVibrantDark
+```
+
+**量到的**：设置页侧栏列由 `NavigationSplitView` 放进 `NSVisualEffectView`，
+它的 `NSHostingView` 生效外观是 **VibrantDark**，而内容区是 DarkAqua。
+九张 `settings-*` 帧逐帧如此（守卫里打印 `侧栏子树外观=NSAppearanceNameVibrantDark`）。
+这一条把 R8/D-8、R28、R29d 三处"某些符号被画反了"的统一成一个原因。
+
+**推论（没直接量，写清楚）**：vibrant 文字极性本来就是反的，指望窗口服务器合成时翻回来；
+`cacheDisplay` 不走那一步 ⇒ 帧里是"合成前"的像素。真机是否正常仍是人工批次 37.1 / 37.2。
+
+### U-53：盲区名单改成**由前提决定**，于是"把帧调好看"这条路被机器堵住
+
+```
+XCTAssertEqual(vibrantColumns, darkSidebarTextBlindSpots)      // 名单 == "侧栏在 vibrant 子树里"的帧
+XCTAssert(wrongSide.isSubset(of: vibrantColumns))              // 反侧墨必须反侧在 vibrant 上
+```
+
+⇒ 有人若给那一列钉上 darkAqua（把帧调成"看起来对"），`vibrantColumns` 立刻缩水 ⇒ 红；
+而真机上这一下会把文字翻成真的错。这是 R29d"不许为过夹具改产品行为"的机器版。
+变异 **M135**（往名单塞一条非 vibrant 帧）与 **M136**（让 vibrant 探针读不到外观）都为此而设。
+
+### 本轮另加一条诊断（不判产品，永远记 skip）
+
+`testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic`：打印压在侧栏文字列上的视图、
+各自声明/生效的外观，以及 `NSTextField.textColor` 在 aqua 与 darkAqua 下各解析成什么 RGB。
+它存在的理由是**这一列下次再出怪事时，不必再花一轮重造复刻体**。

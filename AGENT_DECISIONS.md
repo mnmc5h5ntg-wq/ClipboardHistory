@@ -3166,3 +3166,30 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
   ② 第一次量的"第 3 行 3761 个亮墨"（`.scratch` 那把尺的 `modalColor` 把 pt 当 px，
   底取自目标区域左上角 1/4 处 ⇒ 读到了第 1 行的胶囊；尺已修，结论作废）。
   仓库判据不受 ② 影响：逐条核过，`rect * scale` 全都乘了。
+
+### D-090 · R30：暗档侧栏黑字黑底的机制量到了 —— 那一列在 `NSAppearanceNameVibrantDark` 里解析颜色
+
+- **怎么量到的**：不再在仓库外猜形状（十五臂全画对已经证明猜不出来）。给 `render` 加一条
+  `inspect:` 钩子（默认空实现，100 多条调用点一字不改），在"已布局、外观已注入、还没开画"
+  这一刻把产品那棵 AppKit 树打印出来：
+
+  ```
+  #5 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>]
+      框=(0,0,720,540) 自带外观=nil 生效=NSAppearanceNameDarkAqua
+    #8 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<SidebarStyleContext>>>]
+      框=(0,0,148,540) 自带外观=nil 生效=NSAppearanceNameVibrantDark   ← 就是它
+  ```
+
+- **结论（量到的部分）**：设置页的侧栏列由 `NavigationSplitView` 放进 `NSVisualEffectView`，
+  那一列的 `NSHostingView` 生效外观是 **VibrantDark**，不是 DarkAqua。
+  九张 `settings-*` 帧**全部**如此（守卫里逐帧打印）。内容区那一列是 DarkAqua ⇒ 它画对了。
+  这一条把 R28/R29d 所有"某些符号被画反"的描述统一成一个原因。
+- **推论（没直接量的部分，写清楚）**：vibrant 文字的极性是**故意反的**，指望窗口服务器
+  在合成时翻回来；而 `cacheDisplay` 不走那一步合成 ⇒ 拍到的是"合成前"的像素。
+  真机上这一列到底正不正常，仍然是人工批次 37.1/37.2 —— **这条推论不拿帧当证据**。
+- **因此把名单改成由前提决定**：`darkSidebarTextBlindSpots` 必须**等于**"侧栏子树是 vibrant"的那批帧
+  （`XCTAssertEqual(vibrantColumns, 名单)`），并且"读到反侧墨 ⇒ 必须也在 vibrant 子树里"。
+  两个方向都会红 ⇒ **想靠"给那一列钉上 darkAqua"把帧调好看，会当场红**：
+  钉了就不是 vibrant，名单与前提不再一致，而且真机会被这一下翻成错的。
+  这正是 R29d 那条"不许为过夹具改产品行为"的机器版。
+- **BACKLOG 45 由"机制未定"改为"机制已定，产品侧无需改"**；剩下的开放项只有 37.1/37.2（真机）。

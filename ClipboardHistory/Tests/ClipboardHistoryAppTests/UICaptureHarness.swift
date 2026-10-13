@@ -1544,9 +1544,95 @@ final class UICaptureTests: XCTestCase {
     /// 于是框其实没压住字，却报出一个像结论的数）。两种情况修法完全相反。
     static let settingsContentPane = CGRect(x: 160, y: 70, width: 400, height: 200)
 
-    /// 暗档设置页侧栏文字的可读性**要能被数出来**（R29d / U-52）。
+    /// R30 诊断（**不判产品，只问产物**）：暗档设置帧里侧栏那一列，到底是哪些视图在画。
+    ///
+    /// 为什么需要它：R29d 在仓库外搭了十五臂复刻体，**每一臂都画对**
+    /// （List 侧栏 / 嵌套 `NSHostingView`+`NSSplitView` / `Button{Label}+.plain` /
+    /// 显式 `.primary` / 运行时翻外观 / 给嵌套视图钉外观 …）。
+    /// 继续在外面猜形状就是浪费轮次 —— 这一条直接把产品那棵已布局、未开画的树打印出来：
+    /// 谁压在那一列上、它自己声明的外观是什么、它携带的颜色对象在两种外观下各解析成什么。
+    /// 判据在 `testDarkSettingsSidebarTextIsACountedBlindSpot`；这条只负责把机制往前推一步。
+    func testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r30-subtree-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        guard let fixture = fixtures(appearance: .darkAqua).first(where: { $0.name == "settings-general" }) else {
+            return XCTFail("找不到 settings-general ⇒ 这条诊断没有对象")
+        }
+        let column = Self.settingsSidebarTextColumn
+        var report: [String] = []
+        _ = try render(fixture, appearance: .darkAqua,
+                       to: scratch.appendingPathComponent("settings-general.png")) { host in
+            @MainActor func resolved(_ color: NSColor?) -> String {
+                guard let color else { return " 色=nil" }
+                func under(_ name: NSAppearance.Name) -> String {
+                    guard let appearance = NSAppearance(named: name) else { return "?" }
+                    var out = "?"
+                    appearance.performAsCurrentDrawingAppearance {
+                        guard let rgb = color.usingColorSpace(.deviceRGB) else { return }
+                        out = "\(Int(rgb.redComponent * 255)),"
+                            + "\(Int(rgb.greenComponent * 255)),\(Int(rgb.blueComponent * 255))"
+                    }
+                    return out
+                }
+                return " 色 aqua=(\(under(.aqua)))/dark=(\(under(.darkAqua)))"
+            }
+            @MainActor func walk(_ view: NSView, depth: Int) {
+                let frame = view.convert(view.bounds, to: nil)
+                let cls = String(describing: type(of: view))
+                let covers = frame.intersects(column)
+                let isHosting = cls.contains("Hosting")
+                let isText = view is NSTextField
+                let isButton = view is NSButton
+                let isImage = view is NSImageView
+                if (covers && (isText || isButton || isImage)) || (isHosting && depth > 0) {
+                    let tag = isText ? "文字" : isButton ? "按钮" : isImage ? "图像" : "hosting"
+                    report.append(String(format: "%@#%d %@ [%@] 框=(%.0f,%.0f,%.0f,%.0f) 自带外观=%@ 生效=%@",
+                                         String(repeating: "  ", count: min(depth, 10)), depth, tag, cls,
+                                         frame.minX, frame.minY, frame.width, frame.height,
+                                         view.appearance?.name.rawValue ?? "nil",
+                                         view.effectiveAppearance.name.rawValue)
+                        + (isText ? resolved((view as! NSTextField).textColor) : ""))
+                }
+                if depth < 18 { view.subviews.forEach { walk($0, depth: depth + 1) } }
+            }
+            walk(host, depth: 0)
+        }
+        print("SUBTREE settings-general dark：压在侧栏文字列上 / 嵌套的视图共 \(report.count) 个")
+        report.prefix(80).forEach { print("  \($0)") }
+        throw XCTSkip("诊断用判据：它只回答「这一列是谁画的、它携带的颜色在两种外观下各解析成什么」，"
+                      + "不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
+    }
+
     ///
     /// 这一条不判产品（产品那一列没被判定为缺陷 —— 十三臂复刻体全画对，机制未定，见 D-089）。
+    /// 它判的是"我们知道多少"：把"哪些帧的暗档侧栏文字不可信"钉成一份名单，
+    /// 名单变了就必须红一次、逼一次人去看，而不是让这件事留在某轮的散文里。
+    /// 侧栏那一列**实际**是在哪个外观下解析颜色的（R30 量出来的机制）。
+    ///
+    /// 返回值是子树里第一个"框压在 `column` 上、且 `effectiveAppearance` 是 Vibrant 系"的视图外观名；
+    /// 找不到 ⇒ nil。这一条不是判据，是**判据的前提**：
+    /// `testDarkSettingsSidebarTextIsACountedBlindSpot` 用它把"反侧墨"钉在"vibrant 子树"上，
+    /// 于是伪影的解释一旦失效（比如有人把侧栏换成非 vibrant 容器），守卫会红着说"解释过期了"。
+    static func vibrantAppearanceCovering(_ host: NSView, column: CGRect) -> String? {
+        var found: String?
+        func walk(_ view: NSView, depth: Int) {
+            guard found == nil, depth < 18 else { return }
+            let name = view.effectiveAppearance.name.rawValue
+            if name.contains("Vibrant"), view.convert(view.bounds, to: nil).intersects(column) {
+                found = name
+                return
+            }
+            view.subviews.forEach { walk($0, depth: depth + 1) }
+        }
+        walk(host, depth: 0)
+        return found
+    }
+
+    /// 暗档设置页侧栏文字的可读性**要能被数出来**（R29d / U-52）。
+    ///
+    /// 这一条不判产品（产品那一列没被判定为缺陷 —— 十五臂复刻体全画对，机制未定，见 D-089）。
     /// 它判的是"我们知道多少"：把"哪些帧的暗档侧栏文字不可信"钉成一份名单，
     /// 名单变了就必须红一次、逼一次人去看，而不是让这件事留在某轮的散文里。
     func testDarkSettingsSidebarTextIsACountedBlindSpot() throws {
@@ -1556,11 +1642,17 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         var wrongSide: Set<String> = []
+        var vibrantColumns: Set<String> = []
         var judged = 0
         var contentInkTotal = 0
         for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
             let file = scratch.appendingPathComponent("\(fixture.name).png")
-            _ = try render(fixture, appearance: .darkAqua, to: file)
+            var vibrant: String?
+            // R30：拍之前先记下"这一列到底在哪个外观里解析颜色" —— 这是下面那条
+            // **前提断言**的对象（伪影的解释，不是伪影本身）。
+            _ = try render(fixture, appearance: .darkAqua, to: file) { host in
+                vibrant = Self.vibrantAppearanceCovering(host, column: Self.settingsSidebarTextColumn)
+            }
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
                   let base = rep.bitmapData else {
@@ -1586,7 +1678,9 @@ final class UICaptureTests: XCTestCase {
             let inverted = Self.inkFailureIsInverted(brighter: counts.brighter, darker: counts.darker,
                                                      darkAppearance: true)
             if inverted { wrongSide.insert(fixture.name) }
+            if vibrant != nil { vibrantColumns.insert(fixture.name) }
             print("TEXT_SIDE \(fixture.name) dark 亮侧=\(counts.brighter) 暗侧=\(counts.darker)"
+                  + " 侧栏子树外观=" + (vibrant ?? "非 vibrant")
                   + " ⇒ " + (inverted ? "侧栏文字落在背景错误一侧（不可见）" : "墨在期望侧"))
         }
         if contentInkTotal == 0 {
@@ -1609,7 +1703,27 @@ final class UICaptureTests: XCTestCase {
                              "内容区读到了墨（\(contentInkTotal) 个偏离像素）⇒ 这台机器**拍得出**这一页，"
                              + "可侧栏那一列一条都没判 ⇒ 是**尺没压住字**，不是环境问题。"
                              + "回去核对 `settingsSidebarTextColumn` 的坐标与单位（R29d 的 pt/px 教训）")
-        print("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures（名单 \(Self.darkSidebarTextBlindSpots.count) 条）")
+        // **前提断言**（R30 / D-090）：反侧墨必须仍然反侧在"vibrant 子树"上。
+        // 机制：设置页的侧栏列由 `NavigationSplitView` 放进 `NSVisualEffectView`，
+        // 那一列的 `NSHostingView` 实测生效外观是 **`NSAppearanceNameVibrantDark`**（不是 DarkAqua）。
+        // vibrant 文字的极性是**故意反的** —— 它指望窗口服务器在合成时把它翻回来；
+        // 而 `cacheDisplay` 不走那一步合成，于是拍到的是"合成前"的像素：暗档里黑字黑底。
+        // ⇒ 这一列的暗档可读性**结构上量不到**，不是产品缺陷，也不是"暂时没修好的尺"。
+        // 所以：名单里的帧必须仍然落在 vibrant 子树上；反侧墨若出现在**非 vibrant** 的帧上，
+        // 那一次它就不是伪影，而是真缺陷 —— 必须红。
+        XCTAssert(wrongSide.isSubset(of: vibrantColumns),
+                  "这些帧读到了反侧墨，但它们的侧栏子树**不是** vibrant：\(wrongSide.subtracting(vibrantColumns).sorted())"
+                  + " ⇒ 合成前极性的解释覆盖不到它们，那一次黑字黑底是真的产品问题。先去看那张帧")
+        // 名单**由这条前提决定**，不是手钉的：侧栏列在 vibrant 子树里 ⇒ 它的暗档文字
+        // 结构上量不到 ⇒ 必须在名单里；不再是 vibrant ⇒ 必须离开名单并重新肉眼复审。
+        // 两个方向都会红，所以"把名单改一改让这条绿"这条路是走不通的。
+        XCTAssertEqual(vibrantColumns, Self.darkSidebarTextBlindSpots,
+                       "vibrant 子树实测是 \(vibrantColumns.sorted())，名单是 "
+                       + "\(Self.darkSidebarTextBlindSpots.sorted()) ⇒ 两者必须一致。"
+                       + "多了：那一列其实量得到，别把它记成盲区；"
+                       + "少了：那一列现在结构上量不到（合成前的极性），它的暗档可读性不能当证据")
+        print("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures"
+              + "（名单 \(Self.darkSidebarTextBlindSpots.count) 条；vibrant 子树 \(vibrantColumns.count) 条）")
     }
 
     /// 这个外观下，"正常的墨"应该在背景的哪一侧。
@@ -2817,7 +2931,14 @@ final class UICaptureTests: XCTestCase {
     private func render(
         _ fixture: Fixture,
         appearance: NSAppearance.Name,
-        to file: URL
+        to file: URL,
+        /// R30：**拍之前把已经装好、已经布局完的那棵 AppKit 树交出来看一眼**。
+        /// 存在的理由：R29d 在仓库外搭了十五臂复刻体（List 侧栏 / 嵌套 `NSHostingView`+`NSSplitView` /
+        /// `Button{Label}+.plain` / 显式 `.primary` / 运行时翻外观 …）**全部画对**，
+        /// 也就是说"侧栏暗档文字落在错误一侧"这件事只在产品那一整棵树里发生。
+        /// 继续在仓库外猜形状是浪费轮次 —— 改成直接问产物：这一列到底是**谁**画的。
+        /// 默认空实现 ⇒ 现有 100 多条调用点一字不改。
+        inspect: @MainActor (NSView) -> Void = { _ in }
     ) throws -> CaptureMetrics {
         let size = fixture.size
         // 放进真实（离屏）窗口：裸 NSHostingView 没有 window 时 SwiftUI 的
@@ -2930,6 +3051,9 @@ final class UICaptureTests: XCTestCase {
             window.display()
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
+
+        // R30 的诊断钩子：布局已完成、外观已注入、还没开画 —— 这一时刻的树就是帧里那些像素的作者。
+        inspect(host)
 
         guard let contentView = window.contentView else {
             throw XCTSkip("窗口没有 contentView（\(file.lastPathComponent)）")

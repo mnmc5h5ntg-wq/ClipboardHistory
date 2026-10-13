@@ -33,6 +33,17 @@ LIST_MUTANT = """    static let darkSidebarTextBlindSpots: Set<String> = [
 BOX_NEEDLE = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)"
 BOX_MUTANT = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 2, height: 4)"
 
+LIST2_NEEDLE = """        \"settings-min\", \"settings-privacy-excluded\", \"settings-stats-populated\",
+    ]"""
+LIST2_MUTANT = """        \"settings-min\", \"settings-privacy-excluded\", \"settings-stats-populated\",
+        \"content-empty\",
+    ]"""
+
+VIB_NEEDLE = """            let name = view.effectiveAppearance.name.rawValue
+            if name.contains("Vibrant"), view.convert(view.bounds, to: nil).intersects(column) {"""
+VIB_MUTANT = """            let name = ""
+            if name.contains("Vibrant"), view.convert(view.bounds, to: nil).intersects(column) {"""
+
 SWAP_NEEDLE = "if signed > gate { brighter += 1 } else if signed < -gate { darker += 1 }"
 SWAP_MUTANT = "if signed > gate { darker += 1 } else if signed < -gate { brighter += 1 }"
 
@@ -43,6 +54,11 @@ MUTATIONS = [
      "尺没压住字"),
     ("M134", "对调 inkSideCounts 的两侧计数", SWAP_NEEDLE, SWAP_MUTANT, GUARD,
      "现在落在期望侧了"),
+    # R30：名单改成由"侧栏子树是不是 vibrant"这条**前提**决定，于是动前提也要能红。
+    ("M135", "往名单里塞一条非 vibrant 的帧", LIST2_NEEDLE, LIST2_MUTANT, GUARD,
+     "两者必须一致"),
+    ("M136", "让 vibrant 探针永远读不到外观", VIB_NEEDLE, VIB_MUTANT, GUARD,
+     "两者必须一致"),
 ]
 
 BASE_ENV = {key: value for key, value in os.environ.items() if key != "SDKROOT"}

@@ -2108,3 +2108,68 @@ P 同上 + 给嵌套视图钉外观              nested.appearance=钉死 darkAq
 **验证**：0 warning；全量与基线见 `AGENT_STATE.md` R29d；脚本 72 passed；
 变异 **M132–M134 三支全 CAUGHT**（`/tmp/r29d-mutation.log`，`RESTORE_CLEAN=yes`），
 红得分别对：名单外冒出 / 一条都没判 / 对调计数后"这些帧现在落在期望侧了"。
+
+---
+
+## Round 30 · 不再猜形状，直接问产物：侧栏那一列的生效外观是 `NSAppearanceNameVibrantDark`（阶段二第 23 轮）
+
+### 开场（带着 R29d 的坐标与缺陷清单进来）
+
+| 位点 | R29d 留下的 | 本轮判定 |
+|---|---|---|
+| 暗档 `settings-*` 侧栏未选中行 | 文字落在背景错误一侧（亮侧=0 / 暗侧=2647），机制未定 | **机制量到了**：那一列的 `NSHostingView` 生效外观是 VibrantDark |
+| 图标列 | 每枚符号各自钉在一侧（通用/隐私/数据 恒白，推荐/统计 恒黑） | 同一个原因的另一面（vibrant 子树里解析语义色） |
+| 盲区名单 | 手钉的 9 条 | **改成由前提决定**：名单必须 == "侧栏在 vibrant 子树里"的帧集合 |
+| 十五臂复刻体 | 全部画对，但不知道为什么 | 它们都没有真正的 vibrant 材质层 ⇒ 猜形状这条路到此为止 |
+
+### 方法上的换路（本轮最该被记住的一条）
+
+R29d 在外面搭了十五种形状都没能重现，说明**再猜下去只是浪费轮次**。
+本轮给 `render` 加一条 `inspect:` 钩子（默认空实现 ⇒ 100 多条调用点一字不改），
+在"已布局、外观已注入、还没开画"那一刻直接打印产品那棵树：
+
+```
+#5 hosting [NSHostingView<...NavigationPaneModifier<ContainerStyleContext>>]  生效=NSAppearanceNameDarkAqua
+  #8 hosting [NSHostingView<...NavigationPaneModifier<SidebarStyleContext>>]  生效=NSAppearanceNameVibrantDark  ← 侧栏列
+#6 hosting [_NSCoreHostingView<RootView>]  生效=NSAppearanceNameVibrantDark
+```
+
+**量到的**：侧栏列被 `NavigationSplitView` 放进 `NSVisualEffectView`，它的宿主视图在
+VibrantDark 下解析语义色；内容区在 DarkAqua 下 ⇒ 同一张帧里两种极性。九张设置帧逐帧如此。
+**没量到、写清楚是推论的**：vibrant 文字极性本来就是反的，指望窗口服务器合成时翻回来，
+而 `cacheDisplay` 不走那一步 ⇒ 帧里是"合成前"的像素。真机是否正常仍然是人工批次 37.1 / 37.2。
+
+### 把解释变成机器的地基（U-53）
+
+```
+XCTAssertEqual(vibrantColumns, darkSidebarTextBlindSpots)   // 名单由前提决定，两个方向都会红
+XCTAssert(wrongSide.isSubset(of: vibrantColumns))           // 反侧墨若出现在非 vibrant 帧 ⇒ 那是真缺陷
+TEXT_SIDE_BLIND_SPOTS 9 of 9 settings fixtures（名单 9 条；vibrant 子树 9 条）
+```
+
+⇒ **"给那一列钉上 darkAqua 把帧调好看"这条路被机器堵死**：钉了就不是 vibrant，名单与前提立刻不一致。
+这是 R29d 那条"不许为过夹具改产品行为"的第一个机器版本。变异 **M132–M136 五支全 CAUGHT**。
+
+### 真实视觉审查（本轮起按"先量后看"）
+
+先量：`settings-general` 侧栏列 x8–142 / y96–250，阈值 8
+⇒ 亮档 暗墨 18493 / 亮墨 0；暗档 亮墨 15797（y 96–211）+ 暗墨 2843（y 135–243）。
+再看同一块裁图，**两档都与数字一致**：
+亮档里 快捷键/隐私/数据 三枚图标确实"看不见"（画成白），推荐/统计 正常，六行标签全部正常；
+暗档里 通用（选中）整行清晰，其余五行标签发黑难读，推荐/统计 两枚图标发黑，另三枚图标正常白。
+上一轮我在这里报错过一次（把暗档标签看成"浅灰可读"）—— 这次先有数、后有图，眼睛的结论与尺对上了。
+
+### 自评 90 / 100
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 17 / 20 | 产品零改动；扣 3：画面没有变好 |
+| 流畅度 | 13 / 20 | 无时序改动；扣 7 |
+| 层次与材质 | 14 / 15 | **材质边界第一次被量成名字**（VibrantDark vs DarkAqua）；扣 1：真机极性仍靠人 |
+| 动效细节 | 12 / 15 | 无新参数；扣 3 |
+| 交互反馈 | 9 / 10 | 扣 1：hover/浮层仍无帧可证 |
+| 可访问性 | 10 / 10 | 盲区从"手钉名单"升级为"前提决定名单"，且堵死了调帧这条路 |
+| 性能 | 15 / 15 | 判据自拍 9 帧 + 1 次树遍历；产品侧零成本（上限记满） |
+
+**验证**：0 warning；变异 M132–M136 五支全 CAUGHT、`RESTORE_CLEAN=yes`；
+全量与帧基线见 `AGENT_STATE.md` Round 30。
