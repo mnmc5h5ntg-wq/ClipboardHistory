@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R37 · 那把量了十四轮色差的尺改对了；改对之后它又红了两处）
+
+- **产品代码零改动**；帧基线 102 → **104**（新增一张"故意裁自己"的对照帧，亮暗各一）。
+- **`bottomInkFraction` 的参照点**从"整帧左上角那一个像素"改成**底行自身的每通道中位数**（U-60 / BACKLOG 50）。
+  三张合成图钉住它：角点不同 ⇒ 0%（旧实现读 100%）、半行压字 ⇒ 50%、
+  **整行同一深色块 ⇒ 0%（写下来的边界，不是事故）**。
+- **正对照从"找"改成"造"**：`row-clipped-control` = 同一颗 `HistoryRowButton` + 58pt 外框 + `.clipped()`，
+  实测底行 **10.8%（亮）/ 12.5%（暗）**，线取 5%。
+  两条线必须成对（mustFit 上限 2% **<** 正对照下限 5%），否则判据与它的正对照互相取消 —— 这条有断言也有变异。
+- **第二处同族问题**：这把尺读的是 `cacheDisplay` 的 raw rep，不是落盘那张 PNG ——
+  同一帧差 13 倍、方向还相反（`content-min` 3.4% vs 43.4%、`content-empty` 37.4% vs 0.1%），
+  因为 raw rep 里"没画"的像素是透明的、会抢走底行中位数。现在**判据读产物**；
+  `blackBandHeight` 继续读 raw rep（它要的正是 alpha）。
+- **U-61（流程 + 一条恒红的判据）**：R35 起 CI 就是红的（run 7d0a89b / 68027fc 都 failure），
+  红在 `testProbesDoNotSitOnVibrantColumns` —— runner 上 settings 族整体没画出来，
+  那棵树便答"内容列压在 vibrant 里"。这条判据现在带机器前提（整族空白 ⇒ `PROBE_DOMAIN_NOT_RUN`）
+  并有 `judged ≥ 20` 地板；同时立规矩："CI 绿"只允许写**读过的那一次**（BACKLOG 51）。
+- **新知识**：底行真的压着东西的帧有 18 张（`content-min` 43.4% 是选中行的药丸贴到帧底；
+  `settings-recommendations` 42.4%/19.9% 与 `settings-privacy` 27.2%/6.7% 确实把最后一行切成半截 ——
+  滚动区的正常行为，不进 `contentMustFit`，但**从此可数**）。mustFit 那十条一张都不在其中。
+- 测试 713 → **714**，0 失败、0 告警、脚本 83 全绿；变异 **M169–M174** 六支全 CAUGHT。
+
 ### Changed（R36 · CI 的红终于有名字了 —— 顺手把一把用了十四轮的尺问成了色差尺）
 
 - **产品代码零改动**（帧基线 `CHANGED=0 / 102`、`swift build` 0 告警）。这轮做的是**验收装置本身**：

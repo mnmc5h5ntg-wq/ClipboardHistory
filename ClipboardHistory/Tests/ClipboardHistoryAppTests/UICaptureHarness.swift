@@ -65,11 +65,17 @@ final class UICaptureTests: XCTestCase {
                                   bytesPerRow: rep.bytesPerRow)
     }
 
-    /// 正对照帧：一张**已知底边有墨**的帧（列表在帧底被切一半是它的正常行为）。
-    /// 存在的理由与 `materialBlindSpotFixtures` 同一族 —— 一把只在"该红的没红"上被检验的尺
-    /// 没有被检验过；R22 这条 `contentMustFit` 的十张对照全读 0.0%，
-    /// 所以必须有一张读得到墨的，否则"把阈值调到 100000"不会有任何测试红。
-    static let bottomEdgeInkCanary = "sidebar-history"
+    /// 正对照帧：一张**已知底边有墨**的帧 —— `row-clipped-control`，
+    /// 同一颗 `HistoryRowButton` 装进 58pt 的外框再 `.clipped()`，帧上看得见第二行日期被切成半截。
+    ///
+    /// 存在的理由与 `materialBlindSpotFixtures` 同一族：一把只在"该红的没红"上被检验的尺
+    /// 没有被检验过。R22 当时点的是 `sidebar-history`（"滚动区在帧底切一半是它的正常行为"），
+    /// R36 查出那张帧读到的 100% 其实是**色差**（尺的参照点是左上角那一个像素，U-60），
+    /// 于是这条判据从写下到 R37 之间**没有过有效的正对照**。
+    /// 换掉它还有第二条理由：`sidebar-history` 在 runner 上读 0% ——
+    /// 一张"要看这台机器脸色"的对照物不当对照物。
+    /// 本机实测：亮 **10.8%** / 暗 **12.5%**，线取 5%（`bottomEdgeControlMinFraction`）。
+    static let bottomEdgeInkCanary = "row-clipped-control"
 
     /// 已知"有一块材质在离屏窗口里画成纯黑"的夹具名单（R18 实测，逐帧量出来的，不是猜的）。
     ///
@@ -319,14 +325,10 @@ final class UICaptureTests: XCTestCase {
         let settingsFamilyIsBlank = capability.settingsFamilyIsBlank
         let settingsLowestBlank = capability.settingsLowestBlank
         let bandsSeenHere = capability.bandsSeenHere
-        let bottomEdgeInkMax = capability.bottomEdgeInkMax
-        let rulerSeesBottomEdge = capability.rulerSeesBottomEdge
         print("CAPTURE_CAPABILITY settings族整体空白=\(settingsFamilyIsBlank ? "是" : "否")"
               + "（族内最低未绘制 " + String(format: "%.1f", settingsLowestBlank * 100) + "% / "
               + "\(readings.filter { $0.family == "settings" }.count) 张）"
-              + " / 这一台见过黑带=\(bandsSeenHere ? "是" : "否")"
-              + " / 底行墨尺活着=\(rulerSeesBottomEdge ? "是" : "否")"
-              + "（全帧最大 " + String(format: "%.1f", bottomEdgeInkMax * 100) + "%）")
+              + " / 这一台见过黑带=\(bandsSeenHere ? "是" : "否")")
 
         print("CAPTURED \(report.count) -> \(directory.path)")
         for item in report {
@@ -339,53 +341,68 @@ final class UICaptureTests: XCTestCase {
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，
         // 于是"帧里少了三行"这件事在账本里躺了九轮。
+        //
+        // R37 换了参照点之后这条才**真的**在判裁切（以前它判的是色差，见 `bottomInkFraction`）。
+        // 读数含义也要说清：底行"有墨"= 那一行有像素不是底色，**被裁的字与压在边上的深色材质
+        // 都算**（`content-min` 读 43.4% 就是选中行那块黑药丸贴到了帧底）。所以这条只用于
+        // **不该被裁的组件帧**（mustFit 那十张），滚动区帧（settings / content / sidebar）不在其列。
         for item in report where mustFitNames.contains(Self.fixtureName(fromFile: item.name)) {
-            XCTAssertLessThan(item.metrics.bottomInkFraction, 0.02,
-                              "\(item.name) 的最底一行有 \(String(format: "%.1f", item.metrics.bottomInkFraction * 100))% 的墨"
+            XCTAssertLessThan(item.metrics.bottomInkFraction, InkFloor.fixtureBottomInkMaxFraction,
+                              "\\(item.name) 的最底一行有 \(String(format: "%.1f", item.metrics.bottomInkFraction * 100))% 的墨"
                               + " ⇒ 这张夹具正在裁自己的内容（被裁的元素一定压在底边上）。"
                               + "把 `Fixture` 的高度抬到放得下，而不是把这条断言关掉 —— "
                               + "被裁掉的那部分从来没有进过帧基线，也就从来没有被审过")
         }
         let judgedFit = mustFitNames.count
         print("CONTENT_FIT \(judgedFit) fixtures 判了底行墨（\(mustFitNames.sorted().joined(separator: ","))）")
-        // 点名的那张对照物：选它是因为它是**天生会被裁**的那一族（列表在帧底被切一半），
-        // 也就是说它的底行有墨不是缺陷，是滚动视图的正常行为 —— 正好当对照物。
-        let canaries = report.filter { Self.fixtureName(fromFile: $0.name) == Self.bottomEdgeInkCanary }
-        XCTAssertFalse(canaries.isEmpty, "正对照帧 \(Self.bottomEdgeInkCanary) 没被拍到 ⇒ 这把尺今天没被检验")
-        // **正对照**：一把只在"该红的时候没红"上被检验的尺，等于没被检验。
-        // 上面那十张读到的都是 0.0%（正确 —— 它们没被裁），所以必须有东西证明这把尺看得见墨。
+
+        // **正对照**（R37 / U-60）：一把只在"该红的时候没红"上被检验的尺，等于没被检验。
+        // 上面那十张读到的都是 0.0%，所以必须有**一张已知会被裁**的帧读得到墨，
+        // 否则"把阈值调到 100000"这种把尺弄瞎的改动不会有任何测试红。
         //
-        // 这一条以前写死成"`sidebar-history-300x520-light` 这一帧必须有墨"，于是它**同时判两件事**：
-        // 尺能不能看见底边 + 这一帧的底行在这台机器上是否与它左上角那个像素同色。runner 实测后一半不成立
-        // （本机 100.0% / runner 0.0%，而**同一帧的暗色版在两台机器上都是 100.0%**），
-        // 红被吞了九轮。为什么"同色"会变成读数的一部分，见 `bottomInkFraction` 上面新加的注释与
-        // BACKLOG 50（R37 的活）：那把尺现在量的其实是"底行 vs 左上角那一个像素"的色差。现在拆成两条：① 尺活着 = 全帧底行墨的最大值 > 线（两台机器都成立，
-        // 而"把阈值调到 100000"这种弄瞎尺的改动会让它红 —— 这条不依赖任何单张帧的排版）；
-        // ② 点名的那张对照帧只在**它这台机器上读得到墨**时继续当正对照。
-        if !rulerSeesBottomEdge {
-            XCTFail("全 \(report.count) 帧的底行墨最大只有 \(String(format: "%.1f", bottomEdgeInkMax * 100))%"
-                    + " ⇒ 这台机器上没有一帧压着底边，上面那 \(judgedFit) 条「夹具没裁自己的内容」的绿**全是空话**"
-                    + "（一把读不到东西的尺判什么都是绿的）。要么修捕获，要么这一步不许报绿 —— "
-                    + "注意这条刻意不登记成 NOT-RUN：它一成立，整个底边判据就没有意义了")
-        }
-        for item in canaries where rulerSeesBottomEdge {
-            if item.metrics.bottomInkFraction > 0 {
-                XCTAssertGreaterThan(item.metrics.bottomInkFraction, InkFloor.bottomEdgeInkAliveFraction,
-                                     "正对照帧 \(item.name) 的底行只读到 "
-                                     + String(format: "%.1f", item.metrics.bottomInkFraction * 100) + "% 的墨"
-                                     + " ⇒ 这把尺**瞎了**（它量不到任何压在底边上的内容），"
-                                     + "上面那十条'没被裁'的绿也就没有意义")
-            } else {
-                print("CONTENT_FIT_CANARY_NOT_RUN \(item.name) 在这台机器上读 0.0%，而尺本身是活的"
-                      + "（全帧最大 " + String(format: "%.1f", bottomEdgeInkMax * 100) + "%）"
-                      + " ⇒ 这一帧的底行与它的角点在这台机器上同色（BACKLOG 50：这把尺量的就是那个色差）"
-                      + "；这条点名的对照在这一台记为未运行")
-            }
+        // 以前这条点名的对照物是 `sidebar-history` —— R36 查出它读到的 100% 是**色差**不是墨
+        // （参照点是左上角那一个像素），也就是说这条判据十四年来没有过有效的正对照。
+        // 现在换成 `row-clipped-control`：同一颗 `HistoryRowButton`、外框压到 58pt 再 `.clipped()`，
+        // 帧上看得见第二行日期被切成半截。本机实测 **10.8%（亮）/ 12.5%（暗）**。
+        //
+        // 这条**不做成机器前提**（R36 那一版做了）：前提会把"这台机器上一个像素都读不到"
+        // 说成"机器不行"，而那恰恰是判据最该红的一次。
+        let canaries = report.filter { Self.fixtureName(fromFile: $0.name) == Self.bottomEdgeInkCanary }
+        XCTAssertFalse(canaries.isEmpty,
+                       "正对照帧 \(Self.bottomEdgeInkCanary) 没被拍到 ⇒ 这把尺今天没被检验")
+        for item in canaries {
+            XCTAssertGreaterThan(item.metrics.bottomInkFraction, InkFloor.bottomEdgeControlMinFraction,
+                                 "正对照帧 \(item.name) 的底行只读到 "
+                                 + String(format: "%.1f", item.metrics.bottomInkFraction * 100) + "% 的墨"
+                                 + "（线 " + String(format: "%.0f", InkFloor.bottomEdgeControlMinFraction * 100) + "%）"
+                                 + " ⇒ 这把尺**瞎了**：它量不到那张**已知被裁**的帧压在底边上的半截字，"
+                                 + "上面那 \(judgedFit) 条'没被裁'的绿也就没有意义。"
+                                 + "两种可能都要查：尺的参照点又被挪走了，或者那张对照帧不再被裁了"
+                                 + "（后者意味着 `clippedRowFrame` 失效，判据同样失去正对照）")
         }
         print("CONTENT_FIT_CANARY " + canaries.map { "\($0.name)=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
             .joined(separator: " ")
-            + "（尺活着=\(rulerSeesBottomEdge ? "是" : "否")，点名的对照"
-            + (canaries.contains { $0.metrics.bottomInkFraction > 0 } ? "在本机读得到墨" : "在本机读不到墨 ⇒ 已记 NOT_RUN") + "）")
+            + "（线 " + String(format: "%.0f", InkFloor.bottomEdgeControlMinFraction * 100) + "%，"
+            + "mustFit 那批的上限是 " + String(format: "%.0f", InkFloor.fixtureBottomInkMaxFraction * 100) + "%）")
+        // **第二把锁：这把尺读的是产物，不是 raw rep**（R37）。
+        // `content-min` 的底行是那块选中行的黑药丸（R18 名单里的一处），PNG 上读到 **43.4%**，
+        // 而 raw rep 上只读到 **3.4%** —— 差 13 倍，因为 raw rep 里"没画"的像素是透明的，
+        // 它们会把底行的中位数抢走。把 metrics 来源改回 raw rep，这一条会红。
+        let pillCarriers = report.filter { Self.fixtureName(fromFile: $0.name) == "content-min" }
+        XCTAssertFalse(pillCarriers.isEmpty, "对照帧 content-min 没被拍到 ⇒ 这把锁今天没上")
+        for item in pillCarriers {
+            XCTAssertGreaterThan(item.metrics.bottomInkFraction, 0.20,
+                                 "\(item.name) 的底行只读到 "
+                                 + String(format: "%.1f", item.metrics.bottomInkFraction * 100) + "%"
+                                 + " ⇒ 尺读的不是落盘那张图（PNG 上这块药丸占满底行左半边，43.4%）")
+        }
+
+        // 新知识（R37 才有）：哪些帧的底行**真的**压着东西。以前这条清单是假的（色差）。
+        let edgeCarriers = report.filter { $0.metrics.bottomInkFraction >= InkFloor.fixtureBottomInkMaxFraction }
+        print("BOTTOM_EDGE_INK \(edgeCarriers.count) 张帧的底行读到 ≥"
+              + String(format: "%.0f", InkFloor.fixtureBottomInkMaxFraction * 100) + "% 非底色像素："
+              + edgeCarriers.map { "\(Self.fixtureName(fromFile: $0.name))=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
+                .sorted().joined(separator: " "))
 
 
         for item in report where item.metrics.transparent > 0.95 {
@@ -466,13 +483,17 @@ final class UICaptureTests: XCTestCase {
            otherReading("detail", ink: 1.0),
            otherReading("row")]
 
-    /// 三条前提各自都要有一条"该反过来"的臂，否则这张表只是在抄读数。
+    /// 两条前提各自都要有一条"该反过来"的臂，否则这张表只是在抄读数。
+    ///
+    /// R37 起这里**只剩两条**前提：第三条（"底行墨这把尺活着"）被撤掉了 ——
+    /// 它当时是 `bottomInkFraction` 的色差假读数撑着的（U-60），而"这台机器上一帧都读不到墨"
+    /// 这件事的正确反应是**红**，不是登记成未运行。现在那件事由 `row-clipped-control`
+    /// 这张已知被裁的对照帧无条件判（见 `bottomEdgeInkCanary`），不在这张表里。
     func testCaptureCapabilityPremisesAreMachineVisible() {
         let local = CaptureCapability.measure(Self.localCapabilityReadings)
         XCTAssertFalse(local.settingsFamilyIsBlank,
                        "本机 settings 族最低那张只未绘制 20.8% ⇒ 这一族在本机是画得出来的")
         XCTAssertTrue(local.bandsSeenHere)
-        XCTAssertTrue(local.rulerSeesBottomEdge)
         XCTAssertEqual(0.208, local.settingsLowestBlank, accuracy: 0.0001)
 
         let runner = CaptureCapability.measure(Self.runnerCapabilityReadings)
@@ -481,8 +502,6 @@ final class UICaptureTests: XCTestCase {
                       + "「95% 未绘制」的红在这台机器上属于「整族画不出来」，登记成 CAPTURE_NOT_RUN")
         XCTAssertFalse(runner.bandsSeenHere,
                        "runner 上 102 帧一处黑带都没有，而名单上有 9 处 ⇒ 「黑带消失了」那个方向无从判起")
-        XCTAssertTrue(runner.rulerSeesBottomEdge,
-                      "尺在 runner 上是活的（detail 与 sidebar 暗色版都读到 100%）⇒ 底边判据照旧执行")
         XCTAssertEqual(0.906, runner.settingsLowestBlank, accuracy: 0.0001)
 
         // 反例臂①：**只有一张** settings 帧空白，兄弟帧都画得出来（本机那 17 行的真实读数 + 一张 99%）。
@@ -493,20 +512,71 @@ final class UICaptureTests: XCTestCase {
         XCTAssertFalse(oneBadFrame.settingsFamilyIsBlank,
                        "族里有画得出来的兄弟帧时，`settingsFamilyIsBlank` 必须为假 ⇒ 那张空白要红，不许登记")
 
-        // 反例臂②：底行墨在所有帧上都是 0（把尺弄瞎、或者整台机器什么都没画）。
-        let blindRuler = CaptureCapability.measure(
-            Self.localCapabilityReadings.map { Self.otherReading($0.family, transparent: $0.transparent, band: $0.blackBandPt) })
-        XCTAssertFalse(blindRuler.rulerSeesBottomEdge,
-                       "全帧底行墨 0 ⇒ 尺不活，上面那十条「夹具没裁自己」的绿必须是空的（要红）")
-
-        // 反例臂③：这一族只交出**一张**帧。一张不构成"整族"，不许当机器能力用。
+        // 反例臂②：这一族只交出**一张**帧。一张不构成"整族"，不许当机器能力用。
         let singleFrameFamily = CaptureCapability.measure(
             [Self.settingsReading(0.99), Self.otherReading("detail", ink: 1.0)])
         XCTAssertFalse(singleFrameFamily.settingsFamilyIsBlank,
                        "只有一张帧时不许宣告整族空白 —— 那正好是「捕获失效」最像「机器不行」的形状")
-        print("CAPABILITY_TRUTH_TABLE 5 臂（本机 / runner / 单帧空白 / 尺瞎 / 族只一张）："
-              + "local(blank=\(local.settingsFamilyIsBlank),band=\(local.bandsSeenHere),ink=\(local.rulerSeesBottomEdge)) "
-              + "runner(blank=\(runner.settingsFamilyIsBlank),band=\(runner.bandsSeenHere),ink=\(runner.rulerSeesBottomEdge))")
+        print("CAPABILITY_TRUTH_TABLE 4 臂（本机 / runner / 单帧空白 / 族只一张）："
+              + "local(blank=\(local.settingsFamilyIsBlank),band=\(local.bandsSeenHere)) "
+              + "runner(blank=\(runner.settingsFamilyIsBlank),band=\(runner.bandsSeenHere))")
+    }
+
+    /// 这把尺自己的真值表（R37 / U-60）：**合成图**，三张，各钉一个方向。
+    ///
+    /// 这不覆盖管线：它只判"参照点在哪"这一件事。管线级判据在 `testCaptureKeyViews` 里 ——
+    /// 那张 `row-clipped-control`（已知被裁，必须读得到墨）与 mustFit 那十条（必须读不到）。
+    /// 两边都要有：只有合成图，改坏渲染通道不会红；只有真帧，"参照点是角点"这种错就没人钉。
+    func testBottomInkRulerUsesTheRowOwnBackground() throws {
+        func bitmap(_ pixels: (Int, Int) -> (Int, Int, Int), width: Int = 100, height: Int = 40)
+            throws -> NSBitmapImageRep {
+            guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                                             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                             isPlanar: false, colorSpaceName: .deviceRGB,
+                                             bytesPerRow: width * 4, bitsPerPixel: 32),
+                  let base = rep.bitmapData else {
+                throw XCTSkip("建不出位图（这台机器给不了 bitmapData）")
+            }
+            for y in 0..<height {
+                for x in 0..<width {
+                    let rgb = pixels(x, y)
+                    let o = y * rep.bytesPerRow + x * 4
+                    base[o] = UInt8(rgb.0); base[o + 1] = UInt8(rgb.1)
+                    base[o + 2] = UInt8(rgb.2); base[o + 3] = 255
+                }
+            }
+            return rep
+        }
+        func ink(_ rep: NSBitmapImageRep) -> Double {
+            Self.bottomInkFraction(bytes: rep.bitmapData!, width: rep.pixelsWide,
+                                   height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow)
+        }
+        let grey = (240, 240, 240)
+        // ① 整帧都是底色，只有**左上角那一个像素**是白的：这就是 U-60 的形状。
+        //    旧实现（参照点 = `bytes[0]`）在这里读 100%（45 > 12 ⇒ 整行数成墨），
+        //    正确实现必须读 0 —— 这一张就是"参照点被挪回角点"的绊线。
+        let cornerOnly = try bitmap { x, y in (x == 0 && y == 0) ? (255, 255, 255) : grey }
+        XCTAssertEqual(ink(cornerOnly), 0.0, accuracy: 0.0001,
+                       "底行整行都是底色，只有角点不同 ⇒ 读到墨就说明参照点又变回'左上角那一个像素'了")
+        // ② 底行左半边压着半截字 ⇒ 读到 ~50%。
+        let halfInk = try bitmap { x, y in (y == 39 && x < 50) ? (20, 20, 20) : grey }
+        XCTAssertGreaterThan(ink(halfInk), 0.45, "半行被压住 ⇒ 这把尺必须读到")
+        XCTAssertLessThan(ink(halfInk), 0.55, "读到 100% 说明它把整行都数成了墨")
+        // ③ 底行**整行**是同一个深色块（全出血）：中位数就是它 ⇒ 读 0。
+        //    这是**写下来的边界**，不是缺陷：那种帧要的是另一条判据（"帧底不许是全出血填充"）。
+        let fullBleed = try bitmap { _, y in y == 39 ? (20, 20, 20) : grey }
+        XCTAssertEqual(ink(fullBleed), 0.0, accuracy: 0.0001,
+                       "整行同色时这把尺读 0 —— 已知边界，别把它当'没裁'的证据")
+        // 两条线必须是**一对**：mustFit 要求"读不到"，对照帧要求"读得到"。
+        // 上限一旦抬到不低于对照帧的下限，同一条读数就能同时满足两条 ⇒ 这两条判据互相取消了。
+        XCTAssertLessThan(InkFloor.fixtureBottomInkMaxFraction, InkFloor.bottomEdgeControlMinFraction,
+                          "mustFit 的上限（" + String(format: "%.2f", InkFloor.fixtureBottomInkMaxFraction)
+                          + "）必须**低于**正对照的下限（"
+                          + String(format: "%.2f", InkFloor.bottomEdgeControlMinFraction)
+                          + "）⇒ 否则放宽一条就等于同时满足两条，这把尺的正对照与判据互相取消")
+        print("BOTTOM_INK_TRUTH_TABLE 角点=\(String(format: "%.1f", ink(cornerOnly) * 100))%"
+              + " 半行=\(String(format: "%.1f", ink(halfInk) * 100))%"
+              + " 全出血=\(String(format: "%.1f", ink(fullBleed) * 100))%")
     }
 
     /// 夹具图片的字节**不能**随系统外观变。
@@ -735,6 +805,17 @@ final class UICaptureTests: XCTestCase {
                 )))
             })
         }
+
+        // **一把故意裁自己的行**（R37 / U-60）：同一颗 `HistoryRowButton`、同样 300pt 宽，
+        // 外框从 74pt 压到 58pt 并显式 `.clipped()`。它**不是产品证据，是尺的对照物**：
+        // `contentMustFit` 判的是"这十张帧的底行不许有墨"，而一条只在"该红的没红"上被检验的尺
+        // 等于没被检验。R22 当时挑的对照物（`sidebar-history`）后来被查出读的是色差不是墨（U-60）
+        // ⇒ 这条判据到本轮才第一次有一个真的正对照。
+        results.append(Fixture("row-clipped-control", NSSize(width: 300, height: 58)) {
+            AnyView(self.clippedRowFrame(HistoryRowButton(
+                entry: store.entries[0], copyAction: {}, favoriteAction: {}
+            )))
+        })
 
         // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
         // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
@@ -1107,6 +1188,21 @@ final class UICaptureTests: XCTestCase {
         view
             .frame(width: 300, height: 74, alignment: .leading)
             .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 行的**裁切对照**外框（R37 / U-60）：与 `rowFrame` 只差两件事 ——
+    /// 高度从 74pt 压到 58pt（比这颗行的自然高度矮），以及对齐用 `.topLeading` 后显式 `.clipped()`。
+    ///
+    /// 为什么必须写 `.clipped()`：`.frame(height:)` 只是"提议"高度，内容会按自己的理想尺寸排布后
+    /// **溢出**那个框；溢出的部分画不画进位图，取决于外层有没有裁 —— 那样"被裁"就不保证发生在像素上。
+    /// 对照物要的是"我确定这帧底行有半截字"，不是"应该会有的某帧"。
+    /// 对齐选 `.topLeading`：让溢出**全部落在底部**，这样底行读到的就是被切的第二行，
+    /// 而不是上下各切一半（那种情况下角点/边行的归因又会含糊一次）。
+    private func clippedRowFrame<V: View>(_ view: V) -> some View {
+        view
+            .frame(width: 300, height: 58, alignment: .topLeading)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipped()
     }
 
     /// 菜单栏面板的离屏外框。真实面板由系统给宽度和材质，这里只固定宽度并铺一层窗口底色，
@@ -1582,17 +1678,19 @@ final class UICaptureTests: XCTestCase {
         /// 那种情况仍然走 `XCTFail`，消息里写明"不是机器不行，是这一张不行"。
         static let captureFamilyBlankFraction: Double = 0.85
 
-        /// 底行墨这把尺"在这台机器上是活的"的线（压在帧底的墨占比，R36 / BACKLOG 49）。
+        /// 一张**已知会被裁**的对照帧（`row-clipped-control`）至少该读到的底行墨占比（R37 / U-60）。
         ///
-        /// 本机与 runner 都实测到**最大 100.0%**（detail 族、sidebar 暗色版），
-        /// 所以这条在两台机器上都成立；它拦住的是第三种情况：整台机器读不到任何压边的墨，
-        /// 于是"这十张夹具没裁自己"的十条绿**全是空话**。真到了那一步必须红，
-        /// 而不是登记成 NOT-RUN —— 因为那十条已经不能再被称为判据了。
-        ///
-        /// 提醒：这个"最大 100.0%"读的是 `bottomInkFraction`，而那把尺当前的参照点是角点
-        /// 不是底行自身（`bottomInkFraction` 上面那段"已知缺陷"）⇒ **这条是 R37 的绊线**：
-        /// 把尺改对之后，如果没有一张帧真的压着底边，这条会红着要求补一张真会被裁的对照帧。
-        static let bottomEdgeInkAliveFraction: Double = 0.5
+        /// 它是 `fixtureBottomInkMaxFraction` 那条线的**正对照**：同一把尺，
+        /// 一边必须读到 0，另一边必须读到东西 —— 否则"十条全绿"只是尺瞎了。
+        /// 0.05 的来历（本机实测）：对照帧亮档 **10.8%** / 暗档 **12.5%**，
+        /// 而 mustFit 那十张全部 **0.0%** ⇒ 线取在中点偏下，两侧各留 ≥2.5 倍余量。
+        /// 刻意**不再做成"这台机器画不画得出来"的前提**：R36 那一版把它做成前提，
+        /// 于是"没有任何一帧压着底边"会被读成"机器不行"，而那恰恰是判据该红的第一次。
+        static let bottomEdgeControlMinFraction: Double = 0.05
+
+        /// `contentMustFit` 那批夹具允许的底行墨上限（R22 / BACKLOG 32，R37 从字面量 0.02 提成命名）。
+        /// 与上面那条是一对：**同一把尺**，一边要求"读不到"，一边要求"读得到"。
+        static let fixtureBottomInkMaxFraction: Double = 0.02
 
         /// 动作按钮的字形中心与色带中心的容差。
         /// 修之前实测偏差 0pt（单行，碰巧对）/ **−6.5pt**（两行）/ **−14.5pt**（三行），
@@ -1619,6 +1717,9 @@ final class UICaptureTests: XCTestCase {
             let family: String
             let transparent: Double
             let blackBandPt: Double
+            /// 带着走是为了让诊断能复用同一批读数；**能力前提不看它** ——
+            /// R37 之后"尺活着"不再是一条机器前提，而是由 `row-clipped-control` 那张
+            /// 已知会被裁的对照帧**无条件**判（见 `bottomEdgeInkCanary`）。
             let bottomInkFraction: Double
         }
 
@@ -1627,21 +1728,15 @@ final class UICaptureTests: XCTestCase {
         let settingsFamilyIsBlank: Bool
         /// 这一台有没有出现过任何一处黑带（决定"名单里那一处消失了"这个方向能不能判）。
         let bandsSeenHere: Bool
-        /// 底行墨这把尺在这一台上是不是活的（全帧底行墨的最大值超过线）。
-        let rulerSeesBottomEdge: Bool
         let settingsLowestBlank: Double
-        let bottomEdgeInkMax: Double
 
         static func measure(_ readings: [Reading]) -> CaptureCapability {
             let settings = readings.filter { $0.family == "settings" }
-            let inks = readings.map { $0.bottomInkFraction }
             return CaptureCapability(
                 settingsFamilyIsBlank: settings.count >= 2
                     && settings.allSatisfy { $0.transparent > InkFloor.captureFamilyBlankFraction },
                 bandsSeenHere: readings.contains { $0.blackBandPt > 0 },
-                rulerSeesBottomEdge: (inks.max() ?? 0) > InkFloor.bottomEdgeInkAliveFraction,
-                settingsLowestBlank: settings.map { $0.transparent }.min() ?? 0,
-                bottomEdgeInkMax: inks.max() ?? 0)
+                settingsLowestBlank: settings.map { $0.transparent }.min() ?? 0)
         }
     }
 
@@ -2210,9 +2305,31 @@ final class UICaptureTests: XCTestCase {
             .appendingPathComponent("r35-probe-domain-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
+        var pendingCaption: [(probe: InkProbe, vibrant: String?)] = []
+        var pendingControl: [(probe: InkProbe, vibrant: String?)] = []
         var captionViolations: [String] = []
         var controlVibrant: Set<String> = []
         var checked = 0
+        var judged = 0
+        var notRun: [String] = []
+        // 这一族在这里画不画得出来，由**这台机器自己量**（`CaptureCapability` 的第二个消费者 ——
+        // 它不是为"捕获那一步"量身定做的借口机器）。
+        var capabilityReadings: [CaptureCapability.Reading] = []
+
+        func askVibrant(_ probe: InkProbe, _ fixture: Fixture, _ appearance: NSAppearance.Name,
+                        suffix: String) throws -> String? {
+            var vibrant: String?
+            let metrics = try render(fixture, appearance: appearance,
+                                     to: scratch.appendingPathComponent("\(probe.fixture)\(suffix).png")) { host in
+                vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
+            }
+            capabilityReadings.append(CaptureCapability.Reading(
+                family: fixture.name.components(separatedBy: "-").first ?? "",
+                transparent: metrics.transparent, blackBandPt: metrics.blackBandPt,
+                bottomInkFraction: metrics.bottomInkFraction))
+            return vibrant
+        }
+
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             for probe in Self.captionInkProbes {
                 guard let fixture = fixtures(appearance: appearance)
@@ -2220,14 +2337,7 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("找不到夹具 \(probe.fixture) ⇒ 资格判据没有对象")
                 }
                 checked += 1
-                var vibrant: String?
-                _ = try render(fixture, appearance: appearance,
-                               to: scratch.appendingPathComponent("\(probe.fixture).png")) { host in
-                    vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
-                }
-                if let vibrant {
-                    captionViolations.append("\(probe.fixture)/\(probe.what)（\(vibrant)）")
-                }
+                pendingCaption.append((probe, try askVibrant(probe, fixture, appearance, suffix: "")))
             }
             for probe in Self.controlInkProbes {
                 guard let fixture = fixtures(appearance: appearance)
@@ -2235,15 +2345,34 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("找不到夹具 \(probe.fixture) ⇒ 资格判据没有对象")
                 }
                 checked += 1
-                var vibrant: String?
-                _ = try render(fixture, appearance: appearance,
-                               to: scratch.appendingPathComponent("\(probe.fixture)-c.png")) { host in
-                    vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
-                }
-                if vibrant != nil { controlVibrant.insert("\(probe.fixture)/\(probe.what)") }
+                pendingControl.append((probe, try askVibrant(probe, fixture, appearance, suffix: "-c")))
             }
         }
+        // **为什么这里要放行**（run 38476332754 / 38481495523 实测：这一步在 runner 上恒红）：
+        // settings 族在这台机器上 18 张**全部**未绘制 90.6–95.9%，而那棵树仍然会回答
+        // "内容列压在 VibrantLight 里" —— 一个**没画出来的窗口**给出的容器答案是这台机器的窗口环境，
+        // 不是产品的层级结构（本机同一批夹具画得出来，答案是"没压在 vibrant 上"，那条才是判据的对象）。
+        // 所以这一族整体空白时，settings 探针的资格判据记为未运行；**其余夹具照判**。
+        let capability = CaptureCapability.measure(capabilityReadings)
+        func eligible(_ probe: InkProbe) -> Bool {
+            !(capability.settingsFamilyIsBlank && probe.fixture.hasPrefix("settings-"))
+        }
+        for (probe, vibrant) in pendingCaption {
+            guard let vibrant else { continue }
+            if eligible(probe) {
+                captionViolations.append("\(probe.fixture)/\(probe.what)（\(vibrant)）")
+            } else {
+                notRun.append("\(probe.fixture)/\(probe.what)（\(vibrant)）")
+            }
+        }
+        for (probe, vibrant) in pendingControl where eligible(probe) {
+            if vibrant != nil { controlVibrant.insert("\(probe.fixture)/\(probe.what)") }
+        }
+        judged = checked - notRun.count
         XCTAssert(checked >= 40, "只问了 \(checked) 条探针的颜色域 ⇒ 两张贴表的遍历本身坏了")
+        XCTAssert(judged >= 20,
+                  "只判成 \(judged) 条（放行 \(notRun.count) 条）⇒ 这条资格判据已经什么都不判了。"
+                  + "放行是**有条件的**（那一族在这台机器上整体画不出来），不是把判据关掉")
         XCTAssert(captionViolations.isEmpty,
                   "这些说明段探针压在 vibrant 子树上：\(captionViolations) ⇒ 拍到的是 vibrancy 合成**之前**"
                   + "的像素，「档」这个量在那一列不是产品那个量（R35 实测：侧栏 `.primary` 行标题最深 113，"
@@ -2255,8 +2384,16 @@ final class UICaptureTests: XCTestCase {
                        + "登记的是 \(Self.vibrantResolvedControlProbes.sorted()) ⇒ "
                        + "多出来的那条读数不属于产品（先登记再谈判不判）；"
                        + "少掉的那条意味着那一列现在能拍了（或者有人动了容器）—— 两种都要真的去看那张帧")
-        print("PROBE_DOMAIN 问了 \(checked) 条读数：说明段 0 条压在 vibrant 上，"
-              + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
+        if notRun.isEmpty {
+            print("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
+                  + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
+        } else {
+            print("PROBE_DOMAIN_NOT_RUN 放行 \(notRun.count) 条 —— 这一台 settings 族整体未绘制"
+                  + "（族内最低 " + String(format: "%.1f", capability.settingsLowestBlank * 100) + "%）"
+                  + " ⇒ 那棵树的答案是窗口环境，不是产品容器：" + notRun.joined(separator: " | "))
+            print("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
+                  + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
+        }
     }
 
     /// R35 诊断（**问产物，不判产品**）：每张探针框压着的子树，是不是在 vibrant 域里解析颜色。
@@ -4291,42 +4428,60 @@ final class UICaptureTests: XCTestCase {
                                              height: rep.pixelsHigh,
                                              bytesPerRow: rep.bytesPerRow,
                                              backingScale: CGFloat(rep.pixelsWide) / max(size.width, 1))
-            bottomInk = Self.bottomInkFraction(bytes: base,
-                                               width: rep.pixelsWide,
-                                               height: rep.pixelsHigh,
-                                               bytesPerRow: rep.bytesPerRow)
+        }
+        // **底行墨读的是落盘那张图，不是 raw rep**（R37）。
+        // 这不是风格选择：raw rep 里"没画"的像素是**透明**的，底行的中位数会被它们拿走，
+        // 于是同一帧两个来源能差一个数量级 —— 实测 `content-min-light` raw=3.4% / PNG=43.4%，
+        // `content-empty-light` raw=37.4% / PNG=0.1%（方向还相反）。
+        // 判据要判的是**产物**：帧基线存的是 PNG，人眼看的也是 PNG，
+        // `flattenedPNG` 已经把那批透明像素铺成了窗口底色。
+        // （`blackBandHeight` 继续读 raw rep —— 它要的正是 alpha，"透明的黑"是"没画"不是"画黑了"。）
+        // 写成一行可替换的形式，是为了让"来源换回 raw rep"成为一支**能注入**的变异（M171）：
+        // 判据要能被弄坏才叫判据，而"改坏它但没有任何测试会红"这一族已经抓过太多次。
+        let measured: NSBitmapImageRep = NSBitmapImageRep(data: data) ?? rep
+        if let fbase = measured.bitmapData {
+            bottomInk = Self.bottomInkFraction(bytes: fbase,
+                                               width: measured.pixelsWide,
+                                               height: measured.pixelsHigh,
+                                               bytesPerRow: measured.bytesPerRow)
         }
         try data.write(to: file)
         return CaptureMetrics(transparent: transparent, blackBandPt: blackBand,
                               bottomInkFraction: bottomInk)
     }
 
-    /// 最底一行里"偏离主色 >12"的像素占比（0…1）。
+    /// 最底一行里"偏离**这一行自己的底色** >12"的像素占比（0…1）。
     ///
-    /// 主色取左上角：这批夹具的底都是整块 `windowBackgroundColor`，
-    /// 而**被裁的元素一定会压在底边上**（半截字形、半截描边），底边留白则说明放得下。
+    /// **R37 改过参照点**（U-60 / BACKLOG 50）。以前它拿 `bytes[0]`（整帧左上角那一个像素）当底色，
+    /// 于是它读的不是"底行有没有墨"而是"底行与角点差多少色"：侧栏亮色帧的角点落在搜索框里（255,255,255），
+    /// 底行是窗口灰（240,240,240），差 45 > 12 ⇒ **整行被数成墨**（15 张帧报 100.0%，
+    /// 而按底行自身是 0.0%）；`settings-privacy-light` 反过来报 0.1% 而真实是 6.7%（漏报）。
+    /// 现在参照点是底行自身的**每通道中位数**。
+    ///
+    /// 两个刻意的选择：
+    /// ① **中位数而不是量化众数**：桶心是下边界，与真实像素最多可差 7×3=21 > 容差 12，
+    ///    会把一行干净的底色读成"100% 有墨" —— 那是我这把尺自己造的假阳性（R36 第一版工具就栽过）。
+    /// ② **已知边界**：如果整行被同一个元素**盖满**（全出血的填充、贴边的色带），
+    ///    中位数就是那个元素 ⇒ 读 0%。那种情况要的是另一条判据（"帧底不许是全出血填充"），
+    ///    不在这条的责任范围里，别把它当"没裁"的证据。
     /// 阈值 12 与 `filledBands` 同一条线 —— 两处各写一个数字的话，
     /// "松一档"会让一条判据先瞎（R18 那条"两处各写一个数"同族）。
-    ///
-    /// **已知缺陷，R37 / BACKLOG 50 的活**：参照点是"左上角那一个像素"，不是这一行自己的底色，
-    /// 于是它读的是"底行与角点差多少"而不是"底行有没有墨"。R36 用
-    /// `.scratch/motion-audit-2/bottomedge_r36.swift` 在 51 张帧上把两种参照各量了一遍：
-    ///   · 15 张报 **100.0% 墨**，而按底行自己的中位色只有 **0.0%** —— 两种参照差一整条判据：
-    ///     sidebar 的 favorites / history / multi-select / multi-select-min 四帧 × 亮暗（8 张，
-    ///     角点与底行差 30/45；侧栏亮色帧的角点落在搜索框里）+ detail 亮色 7 帧（差 21）。
-    ///     肉眼看 `sidebar-history-light` 的底 100pt：黑药丸在上、下面是一整块空的浅灰。
-    ///     （`sidebar-no-results` 不在内 —— 它的角点恰好与底行同色，说明这条尺判的是色差。）
-    ///   · `settings-privacy-light` 报 0.1%，按底行中位色是 **6.7%**（`-dark` 72.8% vs 27.2%）
-    ///     ⇒ 这一族是**漏报**，方向和上面相反。
-    ///   · `contentMustFit` 那 10 张两种参照都是 0.0% ⇒ 它们的绿是真的，只是**从来没有被一条有效的正对照检验过**
-    ///     （那条正对照读的正是 100.0% 那一批，见 `bottomEdgeInkCanary`）。
-    /// 现在**不改**它：`InkFloor.bottomEdgeInkAliveFraction` 那条前提会把"两种参照都读 0"变成红，
-    /// 所以把它换成正确的尺时，那条会先红着要求补一张**真的会被裁**的对照帧 —— 这是留好的绊线，不是遗留。
     static func bottomInkFraction(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
                                   bytesPerRow: Int) -> Double {
         guard width > 0, height > 0 else { return 0 }
-        let r0 = Int(bytes[0]), g0 = Int(bytes[1]), b0 = Int(bytes[2])
         let row = (height - 1) * bytesPerRow
+        func channel(_ offset: Int) -> Int {
+            var values = [Int]()
+            values.reserveCapacity(width)
+            var x = 0
+            while x < width {
+                values.append(Int(bytes[row + x * 4 + offset]))
+                x += 1
+            }
+            values.sort()
+            return values[values.count / 2]
+        }
+        let r0 = channel(0), g0 = channel(1), b0 = channel(2)
         var ink = 0
         var x = 0
         while x < width {

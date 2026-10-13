@@ -1,5 +1,5 @@
 {
-  "count": 102,
+  "count": 104,
   "frames": {
     "content-empty-750x560-dark.png": "a09e9950d6a641836ef4015b91b85252c1897a55b22938fbe6f673614946e91d",
     "content-empty-750x560-light.png": "6ef53e39f67397f7807907c53ac90fcf8aef4c198db987f3305b235f27cc3382",
@@ -51,6 +51,8 @@
     "notice-banner-560x170-light.png": "9904597535967a106164acd08d4bf818e76cb527df9dc19efe137340eea032b7",
     "receipt-line-430x56-dark.png": "8fae0e9a31c07d589265e487d60d1e43232a36aecfdc50e3158bebbf8a68e12f",
     "receipt-line-430x56-light.png": "6991b66647d767414ef16ffe772218c4ebbc9fea350dc8d0d8ae2dd2f6a6c8ff",
+    "row-clipped-control-300x58-dark.png": "15370117b18171e608290825e99130ff51f210906c433c08f84f008ba3b9acfc",
+    "row-clipped-control-300x58-light.png": "7191c02aebd8d47aa06d9a2411d308bed7d860e11f741aadfbe0878a6093cdc8",
     "row-favorite-off-300x74-dark.png": "3127f25dd01529ecd7c613f7f2cf6beccdd03dfff288950d15a82b9d0c1b82aa",
     "row-favorite-off-300x74-light.png": "04771ab7ee4d1a27149dae8648942b21030d2fa16b895edd5d791c9a71a97c7e",
     "row-favorite-on-300x74-dark.png": "2ad3211a036b28740333bcb873af3fab2bc590b58044124beb53af0f4e1baf8e",
