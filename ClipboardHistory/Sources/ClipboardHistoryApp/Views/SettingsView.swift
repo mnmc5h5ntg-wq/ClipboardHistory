@@ -673,7 +673,22 @@ private struct HotKeySettingsRow: View {
                     Text(settings.action.description)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        // R28：这里原来是 `.lineLimit(1)`。三行说明里前两行放得下，第三行放不下，
+                        // 于是**被截断的恰好是信息量最大的那一条**：`HotKeyAction.quickPick.description`
+                        // 后半句写的是"默认 ⌃⌥⇧V —— 刻意不是 ⌘⇧V（那是浏览器和编辑器里的粘贴并匹配样式，
+                        // 全局抢走会让它们失灵）"，而屏幕上只剩
+                        // "在任意应用里呼出浮层，打字筛选后回车直接粘回原应用。…"。
+                        // 那句话是审计 §5 F-3 的取舍说明，写进文案就是为了让人看见，结果一个字都没露。
+                        //
+                        // 三个选项里选了换行：
+                        // ① 缩短文案 —— 把要交代的理由删了来迁就一个布局常数，那是为过夹具改产品；
+                        // ② `.help()` 折进悬停提示 —— 说明文字的可发现性本来就靠"看得见"，
+                        //    而 R24/R27 刚立下的规矩正是"要读的信息不许藏得更深"；
+                        // ③ 换行 —— 与**同一个窗口里**其它说明段同一种语言：通用页那段
+                        //    "打开后从 Word、Pages…"（:330）本来就是三行，`.fixedSize` 让它长高。
+                        //    也就是说这个窗口里同一种文字原本有两套规矩，而被切掉的正好是没套用的是那一套。
+                        // 代价：第三行长高，三行不再等高。系统设置里等高从来不是规矩，读得完才是。
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

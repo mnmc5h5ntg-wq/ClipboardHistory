@@ -155,6 +155,37 @@ if args[1] == "probe" {
                      Double(seg.startPx) / scale, Double(seg.endPx) / scale,
                      seg.chroma, bg, ink, contrast(bg, ink), coverage * 100))
     }
+} else if args[1] == "cols" {
+    // R28：把一行带里每一列的颜色打出来，用来**自己找图例方格**（不手写 x）。
+    let y0 = max(0, ptToPx(box[1])), y1 = min(height, y0 + ptToPx(box[3]))
+    let x0 = max(0, ptToPx(box[0])), x1 = min(width, x0 + ptToPx(box[2]))
+    print("COLS \(args[2]) y=\(box[1])..\(box[1] + box[3])pt x=\(box[0])..\(box[0] + box[2])pt")
+    var run: (start: Int, rgb: (Int, Int, Int))? = nil
+    func flush(_ end: Int) {
+        guard let r = run else { return }
+        if (end - r.start) / Int(scale) >= 4 {
+            print(String(format: "  x=%.1f..%.1fpt  rgb(%d,%d,%d)",
+                         Double(r.start) / scale, Double(end) / scale, r.rgb.0, r.rgb.1, r.rgb.2))
+        }
+        run = nil
+    }
+    for x in stride(from: x0, to: x1, by: 2) {
+        var hist = [UInt: Int]()
+        for y in y0..<y1 {
+            let (r, g, b) = sample(x, y)
+            hist[(UInt(r) << 16) | (UInt(g) << 8) | UInt(b), default: 0] += 1
+        }
+        let top = hist.max { ($0.value, $0.key) < ($1.value, $1.key) }?.key ?? 0
+        let rgb = (Int(top >> 16), Int((top >> 8) & 0xFF), Int(top & 0xFF))
+        let colored = (max(rgb.0, rgb.1, rgb.2) - min(rgb.0, rgb.1, rgb.2)) > 12
+        if colored {
+            if let r = run, abs(r.rgb.0 - rgb.0) <= 6 && abs(r.rgb.2 - rgb.2) <= 6 { /* 同一段 */ }
+            else { flush(x); run = (x, rgb) }
+        } else {
+            flush(x)
+        }
+    }
+    flush(x1)
 } else if args[1] == "button" {
     // R25：在一条暖色带的**右侧**找那枚动作按钮，报它的上下沿与中心。
     // 为什么不用"中性灰"判：量出来按钮的填充是 (232,226,220) 这一类**暖灰**

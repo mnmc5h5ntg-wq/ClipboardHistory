@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R28）
+
+- **设置·快捷键页第三行的说明不再被截断**（R28 / U-50 / D-087）：`HotKeySettingsRow` 带着
+  `.lineLimit(1)`，三行说明里前两行放得下、第三行放不下，而被切掉的恰好是唯一那句需要解释的话：
+  「默认 ⌃⌥⇧V —— 刻意不是 ⌘⇧V（那是浏览器和编辑器里的"粘贴并匹配样式"，全局抢走会让它们失灵）」。
+  改成换行 + `.fixedSize`，与**同一个窗口里**通用页那段三行说明同一种语言。
+  代价：三行不再等高（第三行约 +26pt）—— 系统设置里等高从来不是规矩，读得完才是。
+- **帧基线里的「导出历史…」「导入历史…」不再是禁用态**（R28）：捕获夹具没传
+  `exportHistoryAction` / `importHistoryAction`，而视图里它们是 `.disabled(x == nil)` 的开关；
+  产品调用点永远注入 ⇒ 发出去的包里没有"这两颗是灰的"这个状态。
+  真正的危害是帧把禁用态钉成了标准：真接坏了也看不出来。
+
+### Added（R28）
+
+- **两臂对照的"文字必须画全"判据**：新夹具 `settings-shortcuts-wide`（1100×540）宽到不可能截断，
+  拿它当"这一页一共画了多少字"的参照；`textInkMass` 只数偏离背景 >60 的像素，
+  把录制框与药丸的**平涂底色**挡在外面（实测每块平涂约 14k 像素、整页文字约 17k，
+  用 R24 那档 24 会把信号静默稀释掉一半）。
+  判据 `testSettingsHelperTextIsNotClipped` + 七档真值表 `testTextInkGateTruthTable`。
+  修后比值 1.003（亮）/ 0.998（暗）；装回 `.lineLimit(1)` 掉到 **0.809 / 0.792**。
+- **夹具接缝对账守卫** `testCaptureFixtureInjectsEveryActionSeamTheProductInjects`：
+  名单从产品调用点 `SettingsView(` 那段推导，逐个要求在夹具里出现 ⇒ 以后新加接缝忘了跟会红。
+- **"反相墨"与"没画"第一次被分开数**：`OffscreenSymbolInkProbeTests.signedInk` 按亮/暗两侧分别计数。
+  实测亮色帧里 `command` / `hand.raised` / `folder` 三行是 `0.0000（亮960/暗0）` ——
+  像素全是 (255,255,255) 对背景 (248,248,248)，也就是**画成了白的**，不是没画。
+  新增两条断言：整列一个像素都没动过 ⇒ 红（符号名写错那一族）；亮色帧里偏暗一侧更多 ⇒ 红
+  （说明已经不是记下的那个伪影，得重新判）。**产品一行没改** —— 把 `.primary` 换成固定色是审计第二轮明文禁止的方向。
+- **说明文字的地板从绝对值改成相对参照**（修 R27 在 CI 上的红）：`InkFloor.captionTierTolerance = 0.8`
+  配 `secondaryReferenceContrast(...)` —— 同一台机器、同一外观现拍一份 10pt 的 `.secondary` 当参照。
+  绝对值只留 `secondaryReferenceFloor = 2.2` 一条松兜底，用途是"参照自己坏了"时让判据红。
+
 ### Fixed（R27）
 
 - **热图的月份 / 星期刻度与"少·多"图例不再是"看不见"的那一档**（R27 / U-49 / D-086）：

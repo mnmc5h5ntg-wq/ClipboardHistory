@@ -768,6 +768,16 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R28 · 快捷键页的**宽臂**。
+        //
+        // 它不是一个"要看的设计"，是一把尺：宽到任何一行说明都不可能截断，
+        // 于是"这一页一共画了多少字"有一个不依赖我自己判断的参照值。
+        // 判据 `testSettingsHelperTextIsNotClipped` 拿 720 那臂和它比墨量。
+        // 为什么不用 640（`settings-min`）当参照：那一臂只会**截得更狠**，
+        // 拿"更坏"当"标准"得到的是一条恒真的比较。
+        results.append(Fixture("settings-shortcuts-wide", NSSize(width: 1100, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts))
+        })
         results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store))
         })
@@ -980,6 +990,15 @@ final class UICaptureTests: XCTestCase {
                     .appendingPathComponent("capture-ledger-empty.json"),
                 debounceSeconds: 3600),
             clearHistoryAction: { nil },
+            // R28：这两根接缝产品侧（`SettingsWindowController:87,97`）**永远注入**，
+            // 而视图里它们是 `.disabled(exportHistoryAction == nil)` 的开关
+            // （`SettingsView.swift:584,586`）。夹具不传 ⇒ 「数据」页那两张帧里
+            // 导出/导入两颗**一直是禁用态**，而发出去的包里从来没有过这个状态。
+            // 后果不只是"帧不好看"：帧基线把禁用态钉成了标准 ⇒ 哪天真把这两颗接坏，
+            // 画面与基线**一模一样**，一条判据都不会红。判据见
+            // `testCaptureFixtureInjectsEveryActionSeamTheProductInjects`。
+            exportHistoryAction: { _ in nil },
+            importHistoryAction: { _ in nil },
             initialCategory: initialCategory
         )
     }
@@ -1317,17 +1336,40 @@ final class UICaptureTests: XCTestCase {
         /// 而 R24 修掉的那张组件帧是 **13pt 的窗口底色**。
         static let bandSeamPt: Double = 2.0
 
-        /// **说明文字**（刻度、图例、caption）对它自己的底：至少 3.5:1。
+        /// **一整页**的"这里确实有字"地板。
+        ///
+        /// 刻意比 `probeInkFraction`(3%) 低一个量级：那条的分母是一个控件盒，
+        /// 而 R28 这条的分母是整个内容列（快捷键页 ≈ 950×540pt）。
+        /// 全页文字加起来实测只占 0.8% —— 拿 3% 去钉一整页，
+        /// 量到的是"框太大了"，不是"没字"。它的用途只有一个：
+        /// **拦住"两臂都贴在空白上 ⇒ 0 ≥ 0 ⇒ 绿"** 那种恒真。
+        static let paneInkFraction: Double = 0.002
+
+        /// **说明文字**（刻度、图例、caption）必须在 `.secondary` 那一档：
+        /// 允许比"这台机器自己的 `.secondary`"淡 20% 以内。
         ///
         /// 这条刻意**不是** WCAG 的 4.5。4.5 是"要读完的句子"的线（横幅正文用那条，R24），
         /// 而系统的 `secondaryLabelColor` 在纯白上实测只有 **4.0** ——
         /// 拿 4.5 去钉全 App 的说明文字，等于要求每一段 caption 都压黑到比系统档还深，
         /// 那会把"标题—说明"这条层级压平，换来一个不像系统的东西。
-        /// 3.5 的含义是**梯子**：必须在 `.secondary`（4.0）那一档或以上，
-        /// 不许掉进 `.tertiary`（实测 **1.88 亮 / 2.27 暗**）。
         /// 触发它的正是热图那三处刻度：R21 把 `.tertiary` 判为"看不见"并只留给非控件，
         /// R27 重新判一遍 —— 那些数是给"能点的笔画"定的，而**要读的标签没有理由比能点的笔画更淡**。
-        static let captionInk: Double = 3.5
+        ///
+        /// **R28 把它从绝对值改成相对参照**：R27 写的是 `3.5`（本机 `.secondary` 实测 3.75–3.85），
+        /// 而 **CI 的 macos-15 runner 上同一条红了两处：星期刻度 2.85、图例 3.30**（run 38443414396）。
+        /// 那两处产品里用的就是 `.secondary` —— 也就是说绝对值里混进了
+        /// "这台机器怎么解析 `secondaryLabelColor`、怎么做字体平滑"，
+        /// 而判据要判的从来是"**有没有掉进 `.tertiary` 那一档**"。
+        /// 所以参照必须是同一台机器、同一外观现拍的那一份。
+        /// 0.8 的来历：本机 `.tertiary` 是 `.secondary` 的 **0.47 倍**（1.88 ÷ 4.0），
+        /// 中间留了一大段安全距离，而正常的换行与字重差异不会跨过 0.8。
+        static let captionTierTolerance: Double = 0.8
+
+        /// 参照臂自己的兜底地板：**只用来发现"渲染整体失效"**，不是产品线。
+        /// 取 2.2 的理由：本机 `.tertiary` 是 1.88、`.secondary` 是 4.0，
+        /// 而 CI runner 上 `.secondary` 一档最低读到过 2.85 ⇒ 2.2 两边都过，
+        /// 却仍然拦得住"整帧淡到几乎看不见"这种捕获事故。
+        static let secondaryReferenceFloor: Double = 2.2
 
         /// 动作按钮的字形中心与色带中心的容差。
         /// 修之前实测偏差 0pt（单行，碰巧对）/ **−6.5pt**（两行）/ **−14.5pt**（三行），
@@ -1490,7 +1532,51 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 12, y: 196, width: 25, height: 14)),
     ]
 
-    /// **要读的标签不许比能点的笔画更淡**（R27 / U-49 / D-086）。
+    /// **系统 `.secondary` 档在"这台机器 + 这个外观"下量到的对比度**（R28 新增的参照臂）。
+    ///
+    /// 为什么必须有它：R27 把地板写成绝对值 3.5，本机三处读到 3.75–3.85 全绿，
+    /// **CI 的 macos-15 runner 上同一条红了两处：星期刻度 2.85、图例 3.30**（run 38443414396）。
+    /// 那两处产品里用的就是 `.secondary`，也就是说这条尺量到的数里混进了
+    /// "这台机器的字体平滑/色板怎么解析 secondaryLabelColor"，而判据要判的从来不是那个，
+    /// 是"**有没有掉进 `.tertiary` 那一档**"。
+    /// 所以判据换成相对：同一台机器、同一外观、同样 10pt 的 `.secondary` 文字
+    /// 现拍一份当参照，说明文字不许比它淡过 `InkFloor.captionTierTolerance`。
+    /// 绝对值只留一条**很松**的兜底（`secondaryReferenceFloor`），用途是
+    /// "参照自己坏了"（渲染整体失效）时让这条判据红，而不是拿它当产品线。
+    func secondaryReferenceContrast(appearance: NSAppearance.Name, scratch: URL) throws -> Double {
+        let reference = Fixture("caption-reference", NSSize(width: 240, height: 26)) {
+            AnyView(
+                Text("收藏记录会保留暂停时不记录")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 240, height: 26)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        }
+        let file = scratch.appendingPathComponent("caption-reference.png")
+        _ = try render(reference, appearance: appearance, to: file)
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              let base = rep.bitmapData else {
+            throw XCTSkip("参照帧读不回来")
+        }
+        let scale = Double(rep.pixelsWide) / Double(reference.size.width)
+        // 量**整张**参照帧，不猜文字落在哪一行：这一份的唯一用途是给出"这台机器的 `.secondary`
+        // 有多深"，而框里除了这一行字什么都没有 ⇒ 不需要定位，也不需要墨占比地板之外的任何东西。
+        let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
+                                                 height: rep.pixelsHigh,
+                                                 bytesPerRow: rep.bytesPerRow,
+                                                 rect: CGRect(origin: .zero,
+                                                              size: NSSize(width: reference.size.width,
+                                                                           height: reference.size.height)),
+                                                 scale: scale)
+        XCTAssertGreaterThanOrEqual(coverage, InkFloor.bandInkFraction,
+                                    "参照帧的 `.secondary` 文字只有 "
+                                    + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 参照本身没画出来")
+        return ratio
+    }
+
+    /// **要读的标签不许比能点的笔画更淡**（R27 / U-49 / D-086；R28 把地板改成相对参照）。
     ///
     /// 修前三处全部读到 **1.88（亮）/ 2.27（暗）** —— 与 R21 判死的那两颗控件是同一组数，
     /// 而 R21 给它们开的免检理由是"那不是控件，是刻度文字"。这一轮把那条理由重新判了一遍：
@@ -1506,6 +1592,12 @@ final class UICaptureTests: XCTestCase {
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
+            let reference = try secondaryReferenceContrast(appearance: appearance, scratch: scratch)
+            XCTAssertGreaterThanOrEqual(reference, InkFloor.secondaryReferenceFloor,
+                        "这台机器上系统的 `.secondary` 只量到 "
+                        + String(format: "%.2f", reference) + "（\(tag)）⇒ 是渲染失效，不是产品淡了；"
+                        + "这条判据的参照坏了，先修捕获路径")
+            print("CAPTION_REF \(tag) .secondary 参照=" + String(format: "%.2f", reference))
             for probe in Self.captionInkProbes {
                 guard let fixture = fixtures(appearance: appearance)
                     .first(where: { $0.name == probe.fixture }) else {
@@ -1527,15 +1619,200 @@ final class UICaptureTests: XCTestCase {
                             "\(probe.fixture) 的「\(probe.what)」在框 \(probe.rect) 里只有 "
                             + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 框贴到空白上了"
                             + "（刻度搬走了就去量新位置，不许把地板调低）")
-                XCTAssertGreaterThanOrEqual(ratio, InkFloor.captionInk,
+                XCTAssertGreaterThanOrEqual(ratio, reference * InkFloor.captionTierTolerance,
                             "\(probe.fixture) 的「\(probe.what)」只有 "
-                            + String(format: "%.2f", ratio) + ":1（\(tag)，说明文字的地板 "
-                            + "\(InkFloor.captionInk)）。修前三处都是 1.88/2.27 —— 那是 `.tertiary`，"
-                            + "系统的 `.secondary` 是 4.0。**要读的标签不许比能点的笔画更淡**")
+                            + String(format: "%.2f", ratio) + ":1，而同一台机器、同一外观下 10pt 的 `.secondary` 参照是 "
+                            + String(format: "%.2f", reference) + ":1 ⇒ 它比系统说明文字那一档淡了 "
+                            + String(format: "%.0f%%", (1 - ratio / max(reference, 0.01)) * 100)
+                            + "（\(tag)）。修前三处都是 1.88/2.27 —— 那是 `.tertiary`。"
+                            + "**要读的标签不许比能点的笔画更淡**")
                 print("CAPTION_INK \(probe.fixture)/\(probe.what) \(tag) ratio="
-                      + String(format: "%.2f", ratio) + " ink="
+                      + String(format: "%.2f", ratio) + " 参照=" + String(format: "%.2f", reference)
+                      + " 比值=" + String(format: "%.2f", ratio / max(reference, 0.01)) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
             }
+        }
+    }
+
+    // MARK: - R28 · "这一页一共画了多少字"（两臂对照）
+
+    /// 文字墨的闸门：**偏离背景 >60** 才算一个字的笔画。
+    ///
+    /// 为什么不是 R24 那批用的 24：这一页除了字还有**平涂的控件底色**
+    /// （快捷键录制框 128×28 的灰、三颗「恢复默认」药丸的灰、GroupBox 那层更浅的灰）。
+    /// 它们的偏离量在 6 到 40 之间，而两种文字都远在 60 以上
+    /// （`.secondary` 的 11pt 说明 ≈ 109，`.primary` 的标题 ≈ 209）。
+    /// 用 24 的话三块平涂会把文字淹掉 —— 实测每块平涂约 14k 像素，
+    /// 而整页的说明文字一共约 17k：**信号会被稀释成一半，而稀释是静默的**。
+    /// 这一档不是口味：`testTextInkGateTruthTable` 逐条钉住"谁进得来、谁进不来"。
+    static let textInkMinDelta = 60
+
+    /// 一个像素算不算"字的笔画"。
+    static func isTextInk(delta: Int) -> Bool { delta > textInkMinDelta }
+
+    /// 一块矩形里的文字墨：像素数 + 占这块矩形的比例。
+    ///
+    /// 背景取这块矩形自己的众数（16 级量化，与 `noticeBands` 同一个写法），
+    /// 所以亮暗两臂不需要传不同的阈值。
+    static func textInkMass(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int, rect: CGRect, scale: Double) -> (pixels: Int, fraction: Double) {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (0, 0) }
+        var counts: [Int: Int] = [:]
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let o = y * bytesPerRow + x * 4
+                // 16 级量化，**括号必须写**：`a / 16 << 8` 在 Swift 里是 `a / (16 << 8)`
+                // （R24 就栽过一次，量出来一整帧"没有带"）。
+                let key = ((Int(bytes[o]) / 16) << 8) | ((Int(bytes[o + 1]) / 16) << 4) | (Int(bytes[o + 2]) / 16)
+                counts[key, default: 0] += 1
+            }
+        }
+        let best = counts.max { $0.value < $1.value }?.key ?? 0
+        let bg = ((best >> 8) * 16 + 8, ((best >> 4) & 15) * 16 + 8, (best & 15) * 16 + 8)
+        var pixels = 0
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let o = y * bytesPerRow + x * 4
+                let d = max(abs(Int(bytes[o]) - bg.0),
+                            max(abs(Int(bytes[o + 1]) - bg.1), abs(Int(bytes[o + 2]) - bg.2)))
+                if isTextInk(delta: d) { pixels += 1 }
+            }
+        }
+        return (pixels, Double(pixels) / Double(x1 - x0) / Double(y1 - y0))
+    }
+
+    /// **说明文字必须画全**（R28 / U-50 / D-087）。
+    ///
+    /// 缺陷：`HotKeySettingsRow` 的说明带着 `.lineLimit(1)`，而三行里被切掉的恰好是
+    /// 最长、也最有信息量的那一条 —— `HotKeyAction.quickPick.description` 后半句
+    /// 是"默认 ⌃⌥⇧V，刻意不是 ⌘⇧V（那是浏览器/编辑器的粘贴并匹配样式）"，
+    /// 屏幕上只剩"…直接粘回原应用。…"。写进文案的理由一个字都没露。
+    ///
+    /// 为什么不直接量"有没有省略号"：那是量字形，跨系统字体会漂。
+    /// 这里量的是**这一页一共画了多少字**，并且有一臂不可能是坏的：
+    /// 1100pt 宽的那一臂宽到没有任何一行会被截断 ⇒ 它就是"全文"的墨量参照。
+    /// 两臂的标题、三块录制框、三颗按钮**逐像素同构**（同样的字、同样的字号），
+    /// 只有说明文字会差 ⇒ 差多少就是少了多少字。
+    ///
+    /// 地板 0.97：允许 3% 的行末留白与抗锯齿差，不允许少半句话。
+    func testSettingsHelperTextIsNotClipped() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r28-clip-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            var masses: [String: Int] = [:]
+            var fractions: [String: Double] = [:]
+            for name in ["settings-shortcuts", "settings-shortcuts-wide"] {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    return XCTFail("找不到夹具 \(name) ⇒ 这条两臂对照没有对象")
+                }
+                if name == "settings-shortcuts-wide" {
+                    // 参照臂的**资格**也要判：它的全部价值在于"宽到不可能截断"。
+                    // 哪天有人把它改回 720，两臂就变成同一张图自比 ⇒ 恒真，而且不会有任何一条其它判据红。
+                    XCTAssertGreaterThan(fixture.size.width,
+                                         SettingsViewLayout.windowContentSize.width + 300,
+                                         "宽臂只有 \(fixture.size.width)pt ⇒ 它自己也可能被截断，不再是不动的参照")
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(name) 读不回来 ⇒ 捕获路径坏了")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                // 只量内容列：侧栏那一列的字不参与比较（它在两臂里一样，但它的**图标**是已知不可信的，
+                // 见 `OffscreenSymbolInkProbeTests` 的反相墨那条）。
+                let rect = CGRect(x: CGFloat(SettingsViewLayout.sidebarWidth), y: 0,
+                                  width: fixture.size.width - SettingsViewLayout.sidebarWidth,
+                                  height: fixture.size.height)
+                let (pixels, fraction) = Self.textInkMass(bytes: base, width: rep.pixelsWide,
+                                                          height: rep.pixelsHigh,
+                                                          bytesPerRow: rep.bytesPerRow,
+                                                          rect: rect, scale: scale)
+                masses[name] = pixels
+                fractions[name] = fraction
+            }
+            guard let narrow = masses["settings-shortcuts"], let wide = masses["settings-shortcuts-wide"],
+                  wide > 0 else {
+                return XCTFail("宽臂墨量为 0 ⇒ 参照那一臂本身没画东西，这条比较恒真")
+            }
+            // 参照臂必须**真的画了东西**：框贴到空白上时两臂都是 0，`0 >= 0` 会绿。
+            XCTAssertGreaterThanOrEqual(fractions["settings-shortcuts-wide"] ?? 0, InkFloor.paneInkFraction,
+                                        "宽臂内容列的墨只有 "
+                                        + String(format: "%.2f%%", (fractions["settings-shortcuts-wide"] ?? 0) * 100)
+                                        + " ⇒ 量错了地方，不是产品截断了字")
+            let ratio = Double(narrow) / Double(wide)
+            print("TEXT_INK \(tag) 720pt=\(narrow) 1100pt=\(wide) ratio=\(String(format: "%.3f", ratio))")
+            XCTAssertGreaterThanOrEqual(ratio, 0.97,
+                        "快捷键页在默认 720pt 宽度下画出的字比宽到不可能截断的那一臂少 "
+                        + String(format: "%.1f%%", (1 - ratio) * 100)
+                        + "（\(tag)，720=\(narrow) / 1100=\(wide)）⇒ 有说明文字被截断了。"
+                        + "修前实测 0.809（亮）/ 0.792（暗）—— 被切掉的正是「刻意不是 ⌘⇧V」那半句理由")
+        }
+    }
+
+    /// 真值表：`textInkMinDelta` 这一道闸门放谁进来。
+    ///
+    /// 每条都是**量出来的数**，不是编的：亮色背景 248 上
+    /// GroupBox 底 242 / 录制框底 222 / `.secondary` 说明文字 139 / `.primary` 标题 39。
+    /// 这一档一旦挪到 24（R24 那批用的值），第 ② 条会红 —— 那正是"平涂把信号淹掉"的形状。
+    func testTextInkGateTruthTable() throws {
+        XCTAssertEqual(Self.isTextInk(delta: 6), false, "GroupBox 底色不许算成字")
+        XCTAssertEqual(Self.isTextInk(delta: 26), false, "录制框/药丸的平涂底色不许算成字")
+        XCTAssertEqual(Self.isTextInk(delta: 60), false, "等于地板不算（闸门是严格大于）")
+        XCTAssertEqual(Self.isTextInk(delta: 109), true, ".secondary 的说明文字必须算成字")
+        XCTAssertEqual(Self.isTextInk(delta: 209), true, ".primary 的标题必须算成字")
+        // 暗色同一组：背景 30，平涂 55，次级文字 140，主文字 235。
+        XCTAssertEqual(Self.isTextInk(delta: 25), false, "暗色的控件平涂底色不许算成字")
+        XCTAssertEqual(Self.isTextInk(delta: 110), true, "暗色的说明文字必须算成字")
+    }
+
+    /// **夹具必须注入产品在注入的每一根 `*Action` 接缝**（R28）。
+    ///
+    /// 起因：`makeSettingsView` 没传 `exportHistoryAction` / `importHistoryAction`，
+    /// 而视图里它们是 `.disabled(x == nil)` 的开关 ⇒ 「数据」页那两张帧里
+    /// 导出/导入两颗**一直是禁用态**，产品里从来没有这个状态。
+    /// 于是帧基线把禁用态钉成了"标准"，真接坏了反而**画面一模一样、一条不红**。
+    ///
+    /// 名单从产品的调用点推导，不手抄（R21 那条"手抄名单漂了两次"的教训）：
+    /// 读 `SettingsWindowController` 里 `SettingsView(` 那一段的实参标签，
+    /// 取以 `Action` 结尾的那些，逐个要求在夹具里出现。
+    /// 以后产品再加一根接缝而夹具忘了跟，这条会红。
+    func testCaptureFixtureInjectsEveryActionSeamTheProductInjects() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // Tests/ClipboardHistoryAppTests
+            .deletingLastPathComponent()   // Tests
+            .deletingLastPathComponent()   // ClipboardHistory
+            .appendingPathComponent("Sources/ClipboardHistoryApp/Managers/SettingsWindowController.swift")
+        guard let controller = try? String(contentsOf: root, encoding: .utf8) else {
+            return XCTFail("读不到 \(root.lastPathComponent) ⇒ 这条守卫没有对象，等于恒真")
+        }
+        // 只看产品构造 SettingsView 的那一段，别把文件里其它闭包算进来。
+        guard let start = controller.range(of: "SettingsView(") else {
+            return XCTFail("产品里找不到 `SettingsView(` 的构造点 ⇒ 名单无从推导")
+        }
+        let call = controller[start.lowerBound...]
+        let labels = ["clearHistoryAction", "exportHistoryAction", "importHistoryAction"]
+            .filter { call.contains("\($0):") }
+        XCTAssertGreaterThanOrEqual(labels.count, 3,
+                    "从产品调用点只数出 \(labels.count) 根 `*Action` 接缝 "
+                    + "⇒ 要么构造点被搬走了，要么这段解析已经不对，两种情况这条守卫都不再有用")
+
+        let harness = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        guard let at = harness.range(of: "private func makeSettingsView") else {
+            return XCTFail("找不到夹具构造函数 ⇒ 这条守卫没有对象")
+        }
+        let fixtureCall = harness[at.lowerBound...]
+        for label in labels {
+            XCTAssertTrue(fixtureCall.contains("\(label):"),
+                          "产品注入的接缝「\(label)」夹具没注入 ⇒ 帧里那颗控件是**禁用态**，"
+                          + "而发出去的包里没有这个状态；帧基线会把禁用态钉成标准")
         }
     }
 

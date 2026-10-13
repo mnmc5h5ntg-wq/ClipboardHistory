@@ -14,6 +14,13 @@ import XCTest
 /// 所以 `settings-*` 帧的未选中行图标列不能用来判产品缺陷，也不能为了讨好这一帧把语义色换成固定色。
 /// 具体是哪一层（NavigationSplitView 侧栏样式？行内的模板色？）没有定论，这条探针负责在每次视觉审计时
 /// 把数字重新量一遍：如果哪天 `INK 结论` 变成"五个图标都画得出来"，本段与 `AGENT_UI_AUDIT` 都要改写。
+///
+/// **R28 把"0.0000"这个数读出了方向**（第 22 项重新判一遍时量到的，不是推断）：
+/// 亮色帧里 `command` / `hand.raised` / `folder` 那三列的像素是 **(255,255,255)**，背景 (248,248,248)
+/// —— 偏离只有 7，所以 `ink()` 报 0；暗色帧里换 `wand.and.stars` / `chart.bar` 两列变成 **(0,0,0)** 对 (24,24,24)。
+/// 每一枚符号的 RGB 在两张帧里**恒定、不随外观变**，而被选中的那枚（走 accent color）两帧都对。
+/// 所以这不是"没画"，是**画成了反的**：语义色在离屏管线上被解析到了另一套外观。
+/// 这条探针现在把两者分开数（`signedInk`）：反相放行，整列一个像素都没动过才红。
 @MainActor
 final class OffscreenSymbolInkProbeTests: XCTestCase {
     private struct Region { let x0: Int; let x1: Int }
@@ -119,6 +126,29 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
         }
         if let s = start { bands.append(s...(hasInk.count - 1)) }
         return bands
+    }
+
+    /// **带符号**的墨：分别数"比背景亮"和"比背景暗"的像素。
+    ///
+    /// 为什么 `ink()` 不够用（R28）：它只看"偏离背景多少"，于是
+    /// **"画成了白色的图标"和"什么都没画"在它眼里是同一个数 0.0000**。
+    /// 实测亮色帧里未选中那几枚符号的整列像素是 (255,255,255)，背景是 (248,248,248)
+    /// ⇒ 偏离 7 ⇒ `ink = 0`；而暗色帧里另外两枚是 (0,0,0) 对 (24,24,24) ⇒ 同样 0。
+    /// 两种故障的修法相反：前者是离屏管线的语义色解析反了（不能动产品），
+    /// 后者是符号名写错或这枚在目标系统上不存在（必须动产品）。
+    private func signedInk(_ frame: (width: Int, height: Int, luminances: [Int]),
+                           x: Region, yRange: ClosedRange<Int>,
+                           threshold: Int) -> (brighter: Int, darker: Int) {
+        let bg = background(frame.luminances)
+        var brighter = 0, darker = 0
+        for y in yRange {
+            for column in x.x0..<min(x.x1, frame.width) {
+                let delta = frame.luminances[y * frame.width + column] - bg
+                if delta > threshold { brighter += 1 }
+                if delta < -threshold { darker += 1 }
+            }
+        }
+        return (brighter, darker)
     }
 
     /// 与产品同构的一列 `Label`（List(.sidebar) 行内），颜色由参数决定。
@@ -230,10 +260,24 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
         let bands = rowBands(frame)
         var lines: [String] = []
         var collapsed = 0
+        var absent = 0
+        var wrongSide = 0
         for (index, category) in SettingsCategory.allCases.enumerated() where index < bands.count {
             let fraction = ink(frame, x: Self.iconColumn, yRange: bands[index])
             if fraction < 0.005 { collapsed += 1 }
-            lines.append("\(category.icon)=\(String(format: "%.4f", fraction))")
+            // R28：把"0 墨"拆成两种完全相反的故障。
+            // 阈值取 4（不是 32）：这一档只问"这块地方动不动过"，不问"动得够不够黑"。
+            let signed = signedInk(frame, x: Self.iconColumn, yRange: bands[index], threshold: 4)
+            if fraction < 0.005 && signed.brighter + signed.darker == 0 { absent += 1 }
+            // 这一臂是 `.aqua` ⇒ "画反了"只可能是**画成白的**。
+            // 如果哪天偏暗的那一侧反而更多，那已经不是这条注释描述的那个伪影了，
+            // 必须让它红到有人来改写这段（而不是继续拿"已知不可信"当挡箭牌）。
+            if fraction < 0.005 && signed.brighter + signed.darker > 0 && signed.darker >= signed.brighter {
+                wrongSide += 1
+            }
+            lines.append("\(category.icon)=\(String(format: "%.4f", fraction))"
+                         + (fraction < 0.005
+                            ? "（亮\(signed.brighter)/暗\(signed.darker)）" : ""))
         }
         print("INK 产品设置侧栏(语义色) \(lines.joined(separator: " "))")
         print(collapsed == 0
@@ -241,5 +285,21 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
               : "INK 结论 \(collapsed)/\(SettingsCategory.allCases.count) 行的图标列是 0.0000，"
                 + "而同一套管线里固定色的同款符号能画到 0.18 以上 ⇒ "
                 + "settings-* 帧的未选中行图标列不可信，不能据此判产品缺陷（也不能据此改产品颜色）")
+        // **这一条有牙**：`absent` 不是"淡"，是"整列一个像素都没动过"。
+        //
+        // 上面那段结论打印把这族故障统一叫"不可信"，而 R28 实测它是**反相**：
+        // 亮色帧里未选中的符号整列是 255（背景 248），暗色帧里另外几枚是 0（背景 24），
+        // 每一枚符号的颜色在两帧里**恒定不随外观变** —— 那是离屏管线的语义色解析，不是产品。
+        // "反相"要放行（不能为讨好帧把 `.primary` 换成固定色，审计第二轮就警告过），
+        // "整列空白"不能放行：那是符号名写错 / 这枚在目标系统上不存在，
+        // 而 `testEveryCategoryIconActuallyDrawsSomething` 量的是**复刻列**，量不到产品这一列。
+        XCTAssertEqual(absent, 0,
+                       "产品侧栏有 \(absent) 行的图标列连一个像素都没动过 ⇒ 这不是"
+                       + "已知的反相伪影（那种情况像素会全部偏向背景的一侧），"
+                       + "而是这枚符号真的没有进入画面：查符号名与目标系统可用性")
+        XCTAssertEqual(wrongSide, 0,
+                       "亮色帧里有 \(wrongSide) 行未选中符号偏**暗**的那一侧更多 ⇒ 它不是 R28 记下的"
+                       + "那个「语义色被解析成白色」的伪影，而是另一件事。"
+                       + "别把这条断言改成恒真：去读 `AGENT_UI_AUDIT` 第 22 项那段，重新判一遍再决定放行还是修产品")
     }
 }
