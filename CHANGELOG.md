@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R24）
+
+- **提示条正文在亮色模式下不达 WCAG AA**（R24 / U-46 / D-083）：
+  `StateLine` 的正文以前四个状态共用 `.secondary`。逐带量出来（三张横幅帧 × 两外观）
+  **亮色 3.82 / 3.85 / 3.90 / 3.92**（13pt 常规文字要 4.5），
+  而同一帧里那枚"知道了"按钮是 **12.28** ⇒ 一条横幅内"下一步"比"发生了什么"清楚 3.2 倍。
+  现在墨色按严重度分档：`.warning` / `.error` ⇒ `.primary`，`.loading` / `.empty` 留在 `.secondary`
+  （菜单栏"正在整理推荐…"与热图空态**不**升档 —— 把背景状态喊得比内容响就是喧宾夺主）。
+  **实测：亮色 3.82–3.92 → 12.98–13.94，暗色 5.26–5.58 → 10.48–11.54。**
+  行带尺归因：`content-with-history`、九张 `settings-*` 等 **rows=0**；
+  两张产品横幅帧**只有字母那一层**变了（`content-with-notice` 仅 y 64–93，
+  `content-with-two-notices` 仅 y 64–77 与 103–132）⇒ **零布局位移**。
+- **组件帧 `notice-banner` 不再替产品决定布局**（R24 / BACKLOG 36）：
+  它自己写了 `VStack(spacing: 12)`，而产品是 `spacing: 0` + 每条自带 `Divider()`。
+  量出来的差别：组件帧两条带之间 **13pt 无底色空缝**，产品帧 **1pt 发丝线**
+  ⇒ 那张帧一直在展示一个产品里不存在的布局。改齐之后两张帧互为对照，
+  并由同一条判据（带间缝 ≤ 2pt）钉住 —— 变异 M105（改夹具）与 M106（改产品）都红。
+
+### Added（R24）
+
+- **文字侧的对比度尺进了仓库**（R24 / BACKLOG 34 的第一处）：
+  `UICaptureHarness.noticeBands(bytes:…)` —— 逐行取众数颜色自己找带
+  （`R-B > 6` 算涂色、带内众数亮度变化 > 1 就断开），再在带内的**文字列**上量 WCAG 对比度。
+  **不写死 y 区间**：写死等于把"布局今天长什么样"钉进判据（R21 那两个贴空的框）。
+  正对照 `testNoticeBandFinderReadsBothEnds`：同一套自造几何只换字的颜色，
+  深墨读过（14.11）、浅墨必须读不过（1.32）。
+- **`testNoticeBodyTextStaysReadable`**：三张横幅帧 × 两外观，每条带判
+  ① 墨占比 ≥ 2%（框里真有字）② 对比 ≥ 4.5 ③ 与上一条带的空缝 ≤ 2pt
+  ④ 每张帧至少找到几条带。判据自己起离屏渲染，**不依赖 `CLIPBOARD_HISTORY_UI_SHOTS`** ⇒ CI 上真的跑。
+- **`StatePresentation.messageInk(for:)` + `messageInkStyle(for:)`**：
+  纯函数返回**档位枚举**而不是 `AnyShapeStyle`（后者不可比较 ⇒ 写不出真值表）。
+  真值表 `testSeverityStatesCarryTheirOwnTextInk` + 接线守卫
+  `testStateLineWiresTheInkTierInsteadOfPickingAColor`。
+  变异 **M104–M109** 六支全 CAUGHT（M108 红在对比度地板而不是墨地板，
+  于是"带里有墨"这条地板的适用边界被量出来了：BACKLOG 38）。
+
 ### Fixed（R23）
 
 - **提示条的底色不再涂到标题栏与红绿灯后面**（R23 / U-45 / D-082）：

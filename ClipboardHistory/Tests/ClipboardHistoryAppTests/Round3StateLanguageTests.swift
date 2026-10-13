@@ -39,8 +39,34 @@ final class Round3StateLanguageTests: XCTestCase {
                      "没有下一步时空态不许留一个空按钮位")
     }
 
-    func testEachStateHasItsOwnSymbol() {
-        let symbols = [StatePresentation.symbolName(for: .loading),
+    /// 严重度决定那句人话该不该被读到（R24 / U-46 / D-083）。
+    ///
+    /// 真值表只有四行，但它钉的是"以前四个状态共用一档墨"这件事。
+    /// 这一条**不覆盖管线**（判的是纯函数映射）；管线级判据在 `UICaptureTests` 的
+    /// `testNoticeBodyTextStaysReadable` —— 它量的是渲染出来的像素，也就是"档位真的换成了墨"。
+    /// 两层都要：R21 记过"数值断言证明不了来源"，而只测映射又会重演第二轮 N-1
+    /// （守卫绕过 adapter，几百条断言全绿、产品照崩）。
+    func testSeverityStatesCarryTheirOwnTextInk() {
+        XCTAssertEqual(StatePresentation.messageInk(for: .warning), .prominent,
+                       "警告正文不许退回 `.subdued`：亮色实测 3.85:1，不达 AA")
+        XCTAssertEqual(StatePresentation.messageInk(for: .error), .prominent,
+                       "错误正文是「你的数据出问题了」，它必须是这块面板里最先被读到的东西")
+        XCTAssertEqual(StatePresentation.messageInk(for: .loading), .subdued,
+                       "「正在整理推荐…」升档就是喧宾夺主 —— 菜单栏那行不是让人读的句子，是背景状态")
+        XCTAssertEqual(StatePresentation.messageInk(for: .empty), .subdued,
+                       "空态跟着升档会把「没有东西」喊得比内容还响")
+    }
+
+    /// 映射之外还要钉"接线"：`StateLine` 里那句 `Text` 必须走档位，不许再自己挑颜色。
+    func testStateLineWiresTheInkTierInsteadOfPickingAColor() throws {
+        let source = codeOnly(try productSource(named: "Utilities/StatePresentation.swift"))
+        XCTAssertTrue(source.contains("foregroundStyle(StatePresentation.messageInkStyle(for: kind))"),
+                      "StateLine 的正文没有走 `messageInkStyle` ⇒ 真值表成了摆设")
+        XCTAssertFalse(source.contains(".foregroundStyle(.secondary)"),
+                       "StateLine 里又出现了硬写的 `.secondary` ⇒ 四个状态重新共用一档墨")
+    }
+
+    func testEachStateHasItsOwnSymbol() {        let symbols = [StatePresentation.symbolName(for: .loading),
                        StatePresentation.symbolName(for: .warning),
                        StatePresentation.symbolName(for: .error)]
         XCTAssertEqual(Set(symbols).count, 3, "两个状态共用一个图标，就等于没区分它们")

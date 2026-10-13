@@ -35,6 +35,43 @@ enum StatePresentation {
 
     static let dismissActionTitle = "知道了"
 
+    /// 正文用哪一档墨（R24 / U-46）。
+    ///
+    /// 这条以前没有：**四个状态共用 `.secondary`**。量出来的后果是亮色模式下提示条正文
+    /// 只有 **3.82–3.92:1**（`notice-banner` 两条 3.90/3.85，真窗口里 3.92/3.82），
+    /// 而它自己那枚"知道了"是 **12.28:1** —— 同一条横幅里，"下一步"比"发生了什么"清楚三倍。
+    /// WCAG 对 13pt 常规文字的要求是 4.5:1，也就是说这句"你的数据出问题了"**不达 AA**。
+    ///
+    /// 为什么按 kind 分而不是按 surface 分：真正决定该不该抢眼的不是它画在哪，而是
+    /// **"这件事需不需要被读到"**。警告与错误的正文就是这件事本身 ⇒ `.prominent`；
+    /// 加载与空态是背景信息（"还在算"、"没东西"）⇒ 留在 `.subdued`，
+    /// 不给菜单栏那行"正在整理推荐…"和热图空态升档（那才是喧宾夺主）。
+    /// 暗色模式下 secondary 本来就有 5.26–5.58:1，升档后一起到 10:1 以上 —— 这条不是"修暗色"，
+    /// 是把"严重度"与"可读性"从同一个源头拿出来。
+    ///
+    /// 返回档位而不是返回 `AnyShapeStyle`：`AnyShapeStyle` 不可比较，真值表就没法写
+    /// （这一族的规矩见 `alignment(for:)` 返回 `HorizontalAlignment`）。
+    /// 接线那一层（谁真的把档位换成了墨）由像素判据守着：`testNoticeBodyTextStaysReadable`。
+    enum MessageInk: Equatable {
+        case prominent
+        case subdued
+    }
+
+    static func messageInk(for kind: Kind) -> MessageInk {
+        switch kind {
+        case .warning, .error: return .prominent
+        case .loading, .empty: return .subdued
+        }
+    }
+
+    /// 档位到墨的映射。只有这一处认识 `.primary` / `.secondary`，判据也只需要盯这一处。
+    static func messageInkStyle(for kind: Kind) -> AnyShapeStyle {
+        switch messageInk(for: kind) {
+        case .prominent: return AnyShapeStyle(.primary)
+        case .subdued: return AnyShapeStyle(.secondary)
+        }
+    }
+
     /// 对齐规则（纯函数，可断言）。
     ///
     /// 审计写的是"统一左对齐"，但**整块面板里的空态居中是 macOS 的既有语言**
@@ -116,7 +153,7 @@ struct StateLine: View {
 
             Text(message)
                 .font(.system(size: StatePresentation.messageFontSize))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(StatePresentation.messageInkStyle(for: kind))
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // 只允许纵向折行：横向 `fixedSize` 会把整块面板撑宽，
                 // 而状态文案恰恰是最长的那种（"拖入的 N 项不是本机文件，未加入历史"）。

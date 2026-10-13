@@ -1041,3 +1041,33 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
 - **R24 选题**：BACKLOG 36 —— 组件帧 `notice-banner` 还在用 `VStack(spacing: 12)` 摆两条横幅，
   而产品是 `spacing: 0` + 每条自带 `Divider` ⇒ 那张帧展示的是产品里不存在的布局；
   顺带把清单 15/16/17 里没判过的位点继续推。
+
+## R24 · 提示条的正文不再是灰的：文字侧第一次有尺（U-46 / D-083）—— 本轮有看得见的改善
+
+- **界面改动 2 个文件**：`StatePresentation`（新增 `messageInk(for:)` 档位 + `StateLine` 走档位）、
+  `UICaptureHarness`（组件帧 `notice-banner` 的 `VStack(spacing: 12)` → `0`）。
+- **量到的缺陷**：亮色下三张横幅帧的正文对比 **3.82–3.92**（13pt 常规要 4.5 ⇒ 不达 AA），
+  而同一帧那枚"知道了"是 **12.28** ⇒ 一条横幅里"下一步"比"发生了什么"清楚 3.2 倍。
+  根因不是颜色选错，是**"这件事需不需要被读到"从来没有进过规范**（四个状态共用 `.secondary`）。
+- **修完的账**：亮色 **12.98–13.94**、暗色 **10.48–11.54**；组件帧带间缝 **13pt → 1pt**（与产品同值）。
+  行带尺归因：产品两张帧**只有字母那层**变（`content-with-notice` 仅 y 64–93），
+  `content-with-history` 与九张 `settings-*` **rows=0** ⇒ 零布局位移。
+- **新判据**：`noticeBands`（自己找带，不写死坐标）+ `testNoticeBodyTextStaysReadable`
+  （四条地板：带内墨占比 / 对比 ≥4.5 / 带间缝 ≤2pt / 每张帧至少几条带）
+  + 正对照 `testNoticeBandFinderReadsBothEnds`（深墨 14.11 过、浅墨 1.32 必须不过）
+  + 真值表与接线两条。**判据不依赖 `CLIPBOARD_HISTORY_UI_SHOTS` ⇒ CI 上真的跑。**
+- **变异 M104–M109 六支全 CAUGHT**，`RESTORE_CLEAN=yes`。
+  M108 **红得与我预测的不同**（红在对比度地板而不是墨地板）⇒ 自家地板的适用边界被量出来了：
+  "带里有墨"挡不住"框里有别的控件"（BACKLOG 38 写清补法）。
+- **量尺自己犯的三件事**：① 移植时丢括号，Swift 的 `<<` 优先级高于 `/` ⇒ 尺瞎成"0 条带"，
+  是正对照逼出来的（原型跑通 ≠ 移植跑通）；② 判据里 `bands[0]` 越界把测试进程打死（signal 5）
+  ⇒ 崩溃是把红伪装成"环境问题"；③ 我按估值把组件帧 170→150，被上一轮自己写的 `contentMustFit` 打红
+  ⇒ 帧的高度只能量（实测内容 y41–160，高度保持 170）。
+- **数字**：0 warning；`692 tests / 27 skipped / 0 failures`（+4 条判据；两条 skip 是 env 门住的捕获/探针，与本轮无关）；
+  脚本 72 passed；帧基线 **100**（6 changed，同提交 update，compare 现 CHANGED=0）；自评 **92 / 100**
+  （… R21 91 / R22 87 / R23 90 / **R24 92**）。
+- **CI**：R23 那次红是** runner 没抢到**（`The job was not acquired by Runner of type hosted`），
+  不是判据红 —— 已 `gh run rerun` 重跑取真读数。
+- **R25 选题**：清单里未判过的位点继续推（16 扫光曲线、17 菜单栏图标语言、24 缩略图 pop-in、
+  25 视频进度条步进、26 `symbolEffect` 12/13 分叉、27 GlassPill 材质切换），
+  并做本轮新开的 **37**（多行横幅里动作按钮的垂直位置，判据雏形已有）。

@@ -874,9 +874,23 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: twoNoticeStore))
         })
+        // **组件帧必须摆成产品那一套**（R24 / BACKLOG 36）。
+        //
+        // 以前这里是 `VStack(spacing: 12)`，而产品（`ContentView`）是 `spacing: 0` + 每条横幅
+        // 自己带一条 `Divider()`。量出来的差别：组件帧两条带之间是 **13pt 的窗口底色**（86→99），
+        // 产品帧是 **1pt 的发丝线**（90→91）。也就是说这张帧一直在展示一个产品里不存在的布局，
+        // 而"两条横幅挨在一起长什么样"这个状态**从来没有被真的看过** —— 组件帧看起来有证据，
+        // 其实证据是夹具自己编的。现在两张帧互为对照：同一条判据（带间缝隙）在两边都必须读到同一个值。
+        //
+        // 高度**保持 170**，这一条是被自己的守卫逼出来的：我先按"内容 143pt"把它收到 150，
+        // `contentMustFit` 立刻打红（最底一行 95.7% 有墨 ⇒ 已经在裁内容）。量出来的事实是：
+        // 这张帧的第一条带并不从 y=12 开始，而是从 **y≈35** 开始，第二条带一直画到 **y≈166**，
+        // 也就是 170 的帧底下只剩 4pt 余量 —— 内容比"外框 padding + 两条带"高出 ~15pt，
+        // 组件窗口同样有它自己的顶部 inset（这轮只记读数，机制没去量它）。
+        // 写在这里是因为"帧比内容高"与"帧裁内容"是同一族谎，而这一族只能量，估一次错一次。
         results.append(Fixture("notice-banner", NSSize(width: 560, height: 170), contentMustFit: true) {
             AnyView(
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     NoticeBanner(message: "主存档无法读取，已从备份恢复 12 条记录；损坏原件保留为 history.corrupt-1.json。",
                                  tone: .warning, onDismiss: {})
                     NoticeBanner(message: pasteFailureText, tone: .error, onDismiss: {})
@@ -1267,6 +1281,19 @@ final class UICaptureTests: XCTestCase {
         /// 探针盒里"这块区域真的有墨"的地板：低于它说明框贴到了空白处，
         /// 那条判据就退化成恒真（R18 那条"自适应阈值等于没有阈值"同族）。
         static let probeInkFraction: Double = 0.03
+
+        /// **正文**对它自己的底：WCAG AA 对 13pt 常规文字的下限。
+        /// 与上面那条 3.0 不是一回事 —— 3.0 是"非文字 UI 部件的线"，
+        /// 而提示条那一行是要被人读完的句子。
+        static let bodyTextContrast: Double = 4.5
+
+        /// "这条带里真的有字"的地板。实测最疏的一条（产品里那句短警告）是 3.7%，
+        /// 而框套在空白上是 0% ⇒ 地板取 2%：拦得住"带找错了"，又不会把短文案判成缺陷。
+        static let bandInkFraction: Double = 0.02
+
+        /// 相邻两条横幅之间允许的空缝。产品实测 1pt（就是那条 `Divider()`）；
+        /// 而 R24 修掉的那张组件帧是 **13pt 的窗口底色**。
+        static let bandSeamPt: Double = 2.0
     }
 
     /// 一块帧上的一个**可点笔画**，用夹具内的 pt 坐标框出来。
@@ -1497,6 +1524,211 @@ final class UICaptureTests: XCTestCase {
                       + "chromeR-B=\(String(format: "%.1f", chromeTint))")
             }
         }
+    }
+
+    // MARK: - 横幅正文的对比度（R24 / BACKLOG 34 + 36）
+
+    /// 一条被涂了色的带（= 一条横幅）在帧里的位置，加上**它自己那段文字**的读数。
+    struct NoticeBand {
+        let startPt: Double
+        let endPt: Double
+        let chroma: Double
+        let ratio: Double
+        let inkFraction: Double
+    }
+
+    /// **自己找带、自己分段、自己量对比**的尺。
+    ///
+    /// 为什么不让判据写死 y 区间：写死等于把"布局今天长什么样"钉进判据 —— 布局一动，
+    /// 框就套到空白上，而它报回来的数仍然"像模像样"（R21 那两个贴空的框就是这么把
+    /// 一次假结论读成"清除 × 只有 1.9:1"的）。现在带在哪、有几条、缝多宽，全是量出来的。
+    ///
+    /// 分带规则：逐行取该行的**众数颜色** ⇒ R−B > 6 算"这一行被涂了暖色"；
+    /// 同一带内众数亮度变化 > 1 就断开（警告 12% 橙与错误 10% 红的底色差 3 个亮度级，
+    /// 正好能把挨着的两条分开 —— 产品帧实测 243 / 240）。
+    /// 文字列避开两端：左边 36pt 之后（图标占 14–30，那颗饱和的橙/红图标不是"正文"），
+    /// 右边留 95pt（那枚"知道了"是 `.primary` 的，混进来会把弱正文抬过线 —— 正是要防的"用错对照物"）。
+    static func noticeBands(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int, scale: Double) -> [NoticeBand] {
+        func rowModal(_ y: Int) -> (r: Int, g: Int, b: Int) {
+            var histogram: [Int: Int] = [:]
+            var x = 0
+            while x < width {
+                let o = y * bytesPerRow + x * 4
+                // 16 级量化：不量化的话抗锯齿会把每个颜色摊薄成"只出现一次"，众数就没意义了。
+                // **括号是必需的**：Swift 里 `<<` 的优先级高于 `/`，
+                // `Int(bytes[o]) / 16 << 8` 会被读成 `255 / (16 << 8)` = 0 ——
+                // 我第一次移植这版时没加括号，于是"整把尺永远找不到带"，
+                // 而它表现成"0 条带"而不是崩溃（正对照那条才把它逼出来）。
+                let key = ((Int(bytes[o]) / 16) << 8) | ((Int(bytes[o + 1]) / 16) << 4) | (Int(bytes[o + 2]) / 16)
+                histogram[key, default: 0] += 1
+                x += 1
+            }
+            let key = histogram.max { $0.value < $1.value }?.key ?? 0
+            return ((key >> 8) * 16 + 8, ((key >> 4) & 0xF) * 16 + 8, (key & 0xF) * 16 + 8)
+        }
+        func lumaOf(_ c: (r: Int, g: Int, b: Int)) -> Int {
+            Int((0.2126 * Double(c.r) + 0.7152 * Double(c.g) + 0.0722 * Double(c.b)).rounded())
+        }
+        let frameWidthPt = Double(width) / scale
+        var bands: [NoticeBand] = []
+        var start = -1
+        var anchorLuma = 0
+        var anchorChroma = 0.0
+        func close(_ end: Int) {
+            defer { start = -1 }
+            guard start >= 0 else { return }
+            let startPt = Double(start) / scale, endPt = Double(end) / scale
+            guard endPt - startPt >= 12 else { return }   // 发丝线与投影边缘不算一条带
+            let rect = CGRect(x: 36, y: startPt + 2,
+                              width: max(20, frameWidthPt - 95 - 36), height: endPt - startPt - 4)
+            let (ratio, inkFraction) = Self.inkContrast(bytes: bytes, width: width, height: height,
+                                                        bytesPerRow: bytesPerRow, rect: rect, scale: scale)
+            bands.append(NoticeBand(startPt: startPt, endPt: endPt, chroma: anchorChroma,
+                                    ratio: ratio, inkFraction: inkFraction))
+        }
+        for y in 0..<height {
+            let modal = rowModal(y)
+            let chroma = Double(modal.r - modal.b)
+            let l = lumaOf(modal)
+            if chroma > 6 {
+                if start < 0 { start = y; anchorLuma = l; anchorChroma = chroma }
+                else if abs(l - anchorLuma) > 1 { close(y); start = y; anchorLuma = l; anchorChroma = chroma }
+            } else if start >= 0 {
+                close(y)
+            }
+        }
+        if start >= 0 { close(height) }
+        return bands
+    }
+
+    /// 哪些帧要判"横幅正文读不读得出来"，以及每张帧**应该**有几条带。
+    /// 条数写在这里而不是"找到几条判几条"：两条同时在的那张帧如果只找到一条，
+    /// 说明其中一条的底色没了（或被并成一条），那是缺陷，不是"少判一条"。
+    static let noticeTextFixtures: [(name: String, minBands: Int)] = [
+        ("content-with-notice", 1),
+        ("content-with-two-notices", 2),
+        ("notice-banner", 2),
+    ]
+
+    /// **横幅正文必须比它自己那枚按钮更显眼，至少不能读不出来**（R24 / U-46 / D-083）。
+    ///
+    /// 修之前量到的（`/tmp/r24-shots`，逐带自动定位）：
+    /// 亮色 3.90 / 3.85（组件帧两条）、3.92 / 3.82（产品两张帧），
+    /// 而同一帧里那枚"知道了"是 **12.28** —— 同一条横幅内，"下一步"比"发生了什么"清楚三倍，
+    /// 并且 4.5:1 的 AA 线**没过**。暗色 5.26–5.58 本来就过，所以这不是"修暗色"，
+    /// 是把"这条文案有多重要"这件事从 `StatePresentation` 里补出来（见 `messageInk(for:)`）。
+    ///
+    /// 同一条判据顺手管住了 BACKLOG 36：带与带之间的**无底色空缝**必须 ≤ 2pt。
+    /// 组件帧以前写的是 `VStack(spacing: 12)`，量出来缝 13pt，而产品是 1pt 的发丝线 ——
+    /// 也就是说那张帧一直在展示一个产品里不存在的布局。
+    ///
+    /// 自己拍自己量（R20 立的规矩）：判据自己起进程拍帧，不读上一轮的 PNG。
+    func testNoticeBodyTextStaysReadable() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r24-notice-text-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for (name, minBands) in Self.noticeTextFixtures {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    return XCTFail("找不到夹具 \(name) ⇒ 这条判据没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(name)-judged-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let bands = Self.noticeBands(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow, scale: scale)
+                XCTAssertGreaterThanOrEqual(bands.count, minBands,
+                                            "\(name)（\(tag)）只找到 \(bands.count) 条色带，期望 ≥ \(minBands)"
+                                            + " ⇒ 要么某条横幅的底色没了，要么尺瞎了（先跑 `testNoticeBandFinderReadsBothEnds`）")
+                for (index, band) in bands.enumerated() {
+                    let where_ = "\(name)（\(tag)）第 \(index + 1) 条带 y \(String(format: "%.0f", band.startPt))–\(String(format: "%.0f", band.endPt))"
+                    XCTAssertGreaterThanOrEqual(band.inkFraction, InkFloor.bandInkFraction,
+                                                "\(where_) 文字列里只有 "
+                                                + String(format: "%.1f%%", band.inkFraction * 100) + " 的墨"
+                                                + " ⇒ 这条带里没有字，对比度判据对它没有意义（框找错了，不许调地板）")
+                    XCTAssertGreaterThanOrEqual(band.ratio, InkFloor.bodyTextContrast,
+                                                "\(where_) 正文对底色只有 "
+                                                + String(format: "%.2f", band.ratio) + ":1（地板 "
+                                                + "\(InkFloor.bodyTextContrast)，13pt 常规文字要过 WCAG AA）。"
+                                                + "以前这四个读数是 3.82–3.92，而同一帧的按钮是 12.28。"
+                                                + "墨色归 `StatePresentation.messageInk(for:)` 管")
+                    guard index > 0 else { continue }
+                    let seam = band.startPt - bands[index - 1].endPt
+                    XCTAssertLessThanOrEqual(seam, InkFloor.bandSeamPt,
+                                             "\(name)（\(tag)）两条横幅之间有 \(String(format: "%.1f", seam))pt "
+                                             + "**没有底色的空缝** ⇒ 有人往横幅之间塞了 spacing。"
+                                             + "产品的语言是 `VStack(spacing: 0)` + 每条自带一条 `Divider()`（实测缝 1pt）")
+                }
+                print("NOTICE_TEXT \(name) \(tag) bands=\(bands.count) "
+                      + bands.map { String(format: "y%.0f-%.0f ratio=%.2f ink=%.1f%%",
+                                           $0.startPt, $0.endPt, $0.ratio, $0.inkFraction * 100) }
+                      .joined(separator: " | "))
+            }
+        }
+    }
+
+    /// 新尺子的正对照：**同一套几何，好墨读过、坏墨必须读不过**。
+    ///
+    /// 一把只在缺陷上红的尺，与一把永远绿的尺一样没有信息量（R21 的探针表同一个理由）。
+    /// 这里不碰产品，只喂两块自造像素：唯一变量是"字的颜色"。
+    /// 这一条**不覆盖管线**（判的是纯函数），管线级判据是上面那条 `testNoticeBodyTextStaysReadable`。
+    func testNoticeBandFinderReadsBothEnds() {
+        let width = 400, height = 60, bytesPerRow = width * 4
+        func buffer(textInk: (Int, Int, Int)) -> [UInt8] {
+            var bytes = [UInt8](repeating: 0, count: height * bytesPerRow)
+            for y in 0..<height {
+                let tinted = y >= 10 && y < 40
+                for x in 0..<width {
+                    var (r, g, b) = tinted ? (255, 235, 230) : (255, 255, 255)
+                    // "文字"：x 40..<290 之间每 6px 一道 2px 竖笔，y 15..<35
+                    if tinted, x >= 40, x < 290, (x - 40) % 6 < 2, y >= 15, y < 35 {
+                        (r, g, b) = textInk
+                    }
+                    let o = y * bytesPerRow + x * 4
+                    bytes[o] = UInt8(r); bytes[o + 1] = UInt8(g); bytes[o + 2] = UInt8(b); bytes[o + 3] = 255
+                }
+            }
+            return bytes
+        }
+        let goodPixels = buffer(textInk: (30, 30, 30))
+        let weakPixels = buffer(textInk: (215, 205, 200))
+        func read(_ bytes: [UInt8]) -> [NoticeBand] {
+            bytes.withUnsafeBufferPointer { Self.noticeBands(bytes: $0.baseAddress!, width: width,
+                                                             height: height, bytesPerRow: bytesPerRow, scale: 1.0) }
+        }
+        let goodBands = read(goodPixels), weakBands = read(weakPixels)
+        XCTAssertEqual(goodBands.count, 1, "自造的这条带必须被找出来（否则上面那条判据是在对空帧打分）")
+        XCTAssertEqual(weakBands.count, 1, "同一套几何只换字的颜色，带还是得找到")
+        // 取不到就用 `guard let` + `XCTFail` 让这条**红**，不要 `goodBands[0]` —— 下标越界会直接把
+        // 整个测试进程打死（本轮实测：signal 5），后面的判据一条都不跑，
+        // 于是"尺瞎了"看起来像"套件被环境问题中断"。崩溃是把红伪装成没跑的一种。
+        guard let goodBand = goodBands.first, let weakBand = weakBands.first else {
+            XCTFail("尺没找到自造的带 ⇒ 对比度读数没有对象（bands good=\(goodBands.count) weak=\(weakBands.count)）")
+            return
+        }
+        for (label, band) in [("好墨", goodBand), ("坏墨", weakBand)] {
+            XCTAssertEqual(band.startPt, 10, accuracy: 1.5, "\(label)：带的位置量错了")
+            XCTAssertEqual(band.endPt, 40, accuracy: 1.5, "\(label)：带的下沿量错了")
+            XCTAssertGreaterThan(band.inkFraction, InkFloor.bandInkFraction,
+                                 "\(label)：墨地板拦不住 ⇒ 这块'带'里根本没读到字")
+        }
+        XCTAssertGreaterThan(goodBand.ratio, InkFloor.bodyTextContrast,
+                             "深墨对浅暖底必须过线，否则这把尺把好的也判成缺陷")
+        XCTAssertLessThan(weakBand.ratio, InkFloor.bodyTextContrast,
+                          "浅墨对浅暖底必须不过线（实测 " + String(format: "%.2f", weakBand.ratio)
+                          + "）⇒ 不过线的那一端量不出来，这条判据就只是复读产品当前值")
+        print("NOTICE_BAND_CONTROL good=\(String(format: "%.2f", goodBand.ratio)) "
+              + "weak=\(String(format: "%.2f", weakBand.ratio)) "
+              + "ink=\(String(format: "%.1f%%", goodBand.inkFraction * 100))")
     }
 
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
