@@ -1297,3 +1297,15 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **本轮犯的尺错**：正文带起在 y=110 切掉了首行 ⇒ 假轴 41.5；按 `rows` 剖面重放后正确。
   教训与 M140 一起入账（**锚点过窄会把排版读成缺陷**）。
 - **代价与退路**：宽窗口正文右侧留白变大；嫌空就抬 ch 上限，不许改回居中（D-091）。
+
+### R32 换装本机（产品几何变了，必须真装真跑）
+
+- `make bundle` → `✅ 时间剪史.app ready (ad-hoc signed, quarantine-free)`；
+  `install_local.sh --yes --no-build` → `INSTALL_SHA_MATCH=1`、
+  `INSTALL_RUNNING_PID=86576`（启动晚于安装，exe 路径逐字对上 `/Applications/时间剪史.app`）、
+  `INSTALL_ENTRIES_BEFORE=103 → AFTER=103`（真存档没动）、运行时冒烟 `SMOKE_OK=1`、`INSTALL_RESULT=ok`。
+- 旧包留在 `Documents/Codex_Project0_backups/before-local-20261014-045426`，退回命令脚本里已打印。
+- **一次工具性教训**：第一次跑 `make bundle` 时报 `No rule to make target` —— 我在
+  `ClipboardHistory/` 子目录里跑的（Makefile 在仓库根），而命令的退出码是 0
+  （管道尾巴 `tail` 的退出码）。**后台退出码 ≠ 子进程真跑过**这条又应验一次：
+  读输出、不读退出码。
