@@ -65,6 +65,12 @@ final class UICaptureTests: XCTestCase {
                                   bytesPerRow: rep.bytesPerRow)
     }
 
+    /// 正对照帧：一张**已知底边有墨**的帧（列表在帧底被切一半是它的正常行为）。
+    /// 存在的理由与 `materialBlindSpotFixtures` 同一族 —— 一把只在"该红的没红"上被检验的尺
+    /// 没有被检验过；R22 这条 `contentMustFit` 的十张对照全读 0.0%，
+    /// 所以必须有一张读得到墨的，否则"把阈值调到 100000"不会有任何测试红。
+    static let bottomEdgeInkCanary = "sidebar-history"
+
     /// 已知"有一块材质在离屏窗口里画成纯黑"的夹具名单（R18 实测，逐帧量出来的，不是猜的）。
     ///
     /// 成因：系统 `List` 的**选中高亮**由 AppKit 画（账本 D-034 之后行自己不再画底色），
@@ -76,6 +82,7 @@ final class UICaptureTests: XCTestCase {
     /// 选中是用户点名要审的状态之一，而它一直是量不到的 —— 先让它能被数出来，再想办法拍到。
     static let materialBlindSpotFixtures: Set<String> = [
         "content-with-history", "content-min", "content-wide", "content-with-notice",
+        "content-with-two-notices",
         "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
     ]
 
@@ -86,12 +93,20 @@ final class UICaptureTests: XCTestCase {
         return String(base[..<range.lowerBound])
     }
 
-    /// 一帧的量尺结果：**画没画出来** + **有没有一块材质在离屏下画成纯黑**。
+    /// 一帧的量尺结果：**画没画出来** + **有没有一块材质在离屏下画成纯黑**
+    /// + **最底一行有多少墨**（夹具裁内容的信号）。
     struct CaptureMetrics {
         let transparent: Double
         /// 连续若干行里 ≥60% 像素是纯黑 ⇒ 认为这是一块**填充**（不是一行文字）。
         /// 返回这条填充带的最大高度，单位 pt。
         let blackBandPt: Double
+        /// 最后一行里"偏离主色 >12"的像素占比。
+        ///
+        /// 为什么看**最后一行**：夹具把内容裁掉时，被切成半截的字形/边框一定压在底边上；
+        /// 而一张"内容刚好放得下"的帧，底边应该是留白。
+        /// 这条只给 `contentMustFit` 那批夹具用 —— 列表/滚动区那批**天生**会被裁，
+        /// 判它们等于把"滚动视图的正常行为"报成缺陷（这正是 R18 没敢立这条守卫的原因）。
+        let bottomInkFraction: Double
     }
 
     /// 纯黑填充带的最大高度（pt）。
@@ -236,6 +251,9 @@ final class UICaptureTests: XCTestCase {
             throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染")
         }
         var report: [(name: String, metrics: CaptureMetrics)] = []
+        /// 哪些夹具声明了"内容必须整块放得下"。**从夹具自己读**，不在判据里另抄一份名单
+        /// （两处各写一份的话，加一条夹具只会红一半 —— R18 那条"两处各写一个数"同族）。
+        var mustFitNames: Set<String> = []
         /// 夹具机械自己也要有一条判据：**谁种了默认值，谁必须还原**。
         /// 不还原的污染是静默的 —— 后面的帧照样画得出来，只是多了两行本来不在那一页的东西，
         /// 而基线会把那份污染当成"产品长这样"钉住（`--against working` 从此永远比不回来）。
@@ -255,6 +273,7 @@ final class UICaptureTests: XCTestCase {
                     UserDefaults.standard.set(seed.value, forKey: seed.key)
                 }
                 let metrics = try render(fixture, appearance: appearance, to: file)
+                if fixture.contentMustFit { mustFitNames.insert(fixture.name) }
                 if let restored = previousSeed {
                     if let value = restored.value {
                         UserDefaults.standard.set(value, forKey: restored.key)
@@ -274,8 +293,39 @@ final class UICaptureTests: XCTestCase {
         print("CAPTURED \(report.count) -> \(directory.path)")
         for item in report {
             print("  \(item.name)  transparent=\(String(format: "%.1f", item.metrics.transparent * 100))%"
-                  + "  blackBandPt=\(String(format: "%.0f", item.metrics.blackBandPt))")
+                  + "  blackBandPt=\(String(format: "%.0f", item.metrics.blackBandPt))"
+                  + "  bottomInk=\(String(format: "%.1f", item.metrics.bottomInkFraction * 100))%")
         }
+
+        // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
+        // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
+        // 以前把 `weights` 的框改小回去**不会有任何测试红**，
+        // 于是"帧里少了三行"这件事在账本里躺了九轮。
+        for item in report where mustFitNames.contains(Self.fixtureName(fromFile: item.name)) {
+            XCTAssertLessThan(item.metrics.bottomInkFraction, 0.02,
+                              "\(item.name) 的最底一行有 \(String(format: "%.1f", item.metrics.bottomInkFraction * 100))% 的墨"
+                              + " ⇒ 这张夹具正在裁自己的内容（被裁的元素一定压在底边上）。"
+                              + "把 `Fixture` 的高度抬到放得下，而不是把这条断言关掉 —— "
+                              + "被裁掉的那部分从来没有进过帧基线，也就从来没有被审过")
+        }
+        let judgedFit = mustFitNames.count
+        print("CONTENT_FIT \(judgedFit) fixtures 判了底行墨（\(mustFitNames.sorted().joined(separator: ","))）")
+        // **正对照**：一把只在"该红的时候没红"上被检验的尺，等于没被检验。
+        // 上面那十张读到的都是 0.0%（正确 —— 它们没被裁），所以必须另有一张**已知有墨**的帧，
+        // 否则"把阈值调到 100000"这种把尺弄瞎的改动不会有任何测试会红。
+        // 选它是因为它是**天生会被裁**的那一族（列表在帧底被切一半），
+        // 也就是说它的底行有墨不是缺陷，是滚动视图的正常行为 —— 正好当对照物。
+        let canaries = report.filter { Self.fixtureName(fromFile: $0.name) == Self.bottomEdgeInkCanary }
+        XCTAssertFalse(canaries.isEmpty, "正对照帧 \(Self.bottomEdgeInkCanary) 没被拍到 ⇒ 这把尺今天没被检验")
+        for item in canaries {
+            XCTAssertGreaterThan(item.metrics.bottomInkFraction, 0.5,
+                                 "正对照帧 \(item.name) 的底行只读到 "
+                                 + String(format: "%.1f", item.metrics.bottomInkFraction * 100) + "% 的墨"
+                                 + " ⇒ 这把尺**瞎了**（它量不到任何压在底边上的内容），"
+                                 + "上面那十条'没被裁'的绿也就没有意义")
+        }
+        print("CONTENT_FIT_CANARY " + canaries.map { "\($0.name)=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
+            .joined(separator: " "))
 
         for item in report where item.metrics.transparent > 0.95 {
             XCTFail("\(item.name) 有 \(Int(item.metrics.transparent * 100))% 像素未被绘制，判定为捕获失效，不能作为视觉验收证据")
@@ -366,14 +416,28 @@ final class UICaptureTests: XCTestCase {
         /// 更要紧的是：`FRAME_BASELINE_CHANGED=0` 在这种表面上**不是**"没有视觉变化"，
         /// 而是"这里根本没有帧"。这两件事必须能分开（账本 BACKLOG 30 / U-39 / U-41）。
         let appKit: (@MainActor () -> NSWindow?)?
+        /// 这张夹具的**内容必须整块放得下**（R22 / BACKLOG 32）。
+        ///
+        /// 为什么现在才立：这条守卫的代价是"会误报滚动区"，所以必须点名。
+        /// 而它要抓的事已经发生过两次，两次都是**靠人眼**：
+        /// R18 —— `weights` 用 560 高的框套 850 高的内容，标题与「恢复默认」按钮
+        /// 九轮以来从来不在帧里；R20 —— `search-field` 320×96 一直在裁自己的下半条。
+        /// 两次的共同点是**改小回去不会有任何测试红**（变异 M76 当年就是 ESCAPED）。
+        ///
+        /// 判法：帧的**最底一行**不该有墨（被裁的元素一定压在底边上）。
+        /// 列表 / 滚动区那批天生会被裁 ⇒ 它们**不进**这个名单，
+        /// 否则就是把"滚动视图的正常行为"报成缺陷。
+        let contentMustFit: Bool
 
         init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil,
              seed: (key: String, value: String)? = nil,
+             contentMustFit: Bool = false,
              appKit: (@MainActor () -> NSWindow?)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
             self.settle = settle
             self.seed = seed
+            self.contentMustFit = contentMustFit
             self.appKit = appKit
             self.build = build
         }
@@ -384,7 +448,8 @@ final class UICaptureTests: XCTestCase {
         /// 没有这个 helper，加一条浮层帧就要把整条夹具重抄一遍，
         /// 而重抄的那份迟早和原件漂开。
         func withAppKit(_ buildAppKit: @escaping @MainActor () -> NSWindow?) -> Fixture {
-            Fixture(name, size, settle: settle, seed: seed, appKit: buildAppKit, build)
+            Fixture(name, size, settle: settle, seed: seed, contentMustFit: contentMustFit,
+                    appKit: buildAppKit, build)
         }
     }
 
@@ -596,7 +661,7 @@ final class UICaptureTests: XCTestCase {
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
         })
 
-        results.append(Fixture("glass-pill", NSSize(width: 120, height: 232)) {
+        results.append(Fixture("glass-pill", NSSize(width: 120, height: 232), contentMustFit: true) {
             AnyView(
                 GlassPill(isFavorite: false, favoriteAction: {},
                           isPinned: false, pinAction: {},
@@ -607,7 +672,7 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
-        results.append(Fixture("glass-pill-states", NSSize(width: 120, height: 232)) {
+        results.append(Fixture("glass-pill-states", NSSize(width: 120, height: 232), contentMustFit: true) {
             AnyView(
                 GlassPill(isFavorite: true, favoriteAction: {},
                           isPinned: true, pinAction: {},
@@ -624,7 +689,7 @@ final class UICaptureTests: XCTestCase {
         // 下面那颗框被裁掉约 4.5pt，而 `testSearchFieldKeepsTheSameHeightInBothStates`
         // 报的是"两态不等高"。**这条判据先抓到的其实是夹具自己裁了内容** ——
         // 与 R18 那批"夹具尺寸是记的数"同一族，只是这次是新加的守卫把它逼出来的。
-        results.append(Fixture("search-field", NSSize(width: 320, height: 112)) {
+        results.append(Fixture("search-field", NSSize(width: 320, height: 112), contentMustFit: true) {
             AnyView(
                 VStack(spacing: 8) {
                     SearchField(text: .constant(""))
@@ -636,7 +701,7 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
-        results.append(Fixture("empty-state", NSSize(width: 320, height: 160)) {
+        results.append(Fixture("empty-state", NSSize(width: 320, height: 160), contentMustFit: true) {
             AnyView(
                 EmptyStateView(systemName: "doc.on.clipboard", title: "选择一条记录查看详情")
                     .frame(width: 320, height: 160)
@@ -654,7 +719,7 @@ final class UICaptureTests: XCTestCase {
         // 也就是说：这张帧从来没有拍到过它名字里那一页的头部，
         // 而 `FRAME_BASELINE_CHANGED=0` 让人以为整页都被看着了。
         // 这一条和上面"窗口被内容顶大"是同一族缺陷的两个方向：**夹具的尺寸是记的数，不是量的数**。
-        results.append(Fixture("weights", NSSize(width: 520, height: 880)) {
+        results.append(Fixture("weights", NSSize(width: 520, height: 880), contentMustFit: true) {
             AnyView(
                 RecommendationWeightsView(store: weightsStore)
                     .padding(20)
@@ -668,7 +733,7 @@ final class UICaptureTests: XCTestCase {
         // 而帧基线里这一页 9 行**全部**处于"没动过"—— 于是一个"只有动过才看得见"的改动，
         // 在产物里根本没有对应的像素。与 R14 那两条"从未存在过的帧"同一族，
         // 也是 `FRAME_BASELINE_CHANGED=0` 最擅长骗人的一种情形。
-        results.append(Fixture("weights-adjusted", NSSize(width: 520, height: 880)) {
+        results.append(Fixture("weights-adjusted", NSSize(width: 520, height: 880), contentMustFit: true) {
             // 种 → 建视图 → 立刻还原。规矩与 `Fixture.seed` 同一条：种过必须还原，
             // 否则同一次运行里后面的帧会读到这一张的夹具值（而基线会把污染当成长相）。
             let key = "RecommendationWeights.store"
@@ -717,7 +782,7 @@ final class UICaptureTests: XCTestCase {
         // 拍出来的星期标签是 "M W F S" —— 审查的人会以为产品写死了英文。
         heatCalendar.locale = Locale(identifier: "zh_CN")
         let heatCounts = Self.heatmapFixtureCounts(today: heatToday, calendar: heatCalendar)
-        results.append(Fixture("heatmap-populated", NSSize(width: 430, height: 250)) {
+        results.append(Fixture("heatmap-populated", NSSize(width: 430, height: 250), contentMustFit: true) {
             AnyView(
                 DailyCopyHeatmapView(counts: heatCounts, today: heatToday, calendar: heatCalendar)
                     .padding(16)
@@ -758,7 +823,7 @@ final class UICaptureTests: XCTestCase {
                                                                         "com.example.design"]))) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .privacy))
         })
-        results.append(Fixture("receipt-line", NSSize(width: 430, height: 56)) {
+        results.append(Fixture("receipt-line", NSSize(width: 430, height: 56), contentMustFit: true) {
             AnyView(
                 ReceiptLine(text: "已导出 94 条记录到 ~/Desktop/时间剪史-导出.json", dismiss: {})
                     .padding(.horizontal, 12)
@@ -779,7 +844,7 @@ final class UICaptureTests: XCTestCase {
                 initialCategory: .stats
             ))
         })
-        results.append(Fixture("heatmap-empty", NSSize(width: 430, height: 150)) {
+        results.append(Fixture("heatmap-empty", NSSize(width: 430, height: 150), contentMustFit: true) {
             AnyView(
                 DailyCopyHeatmapView(counts: [:], today: heatToday, calendar: heatCalendar)
                     .padding(16)
@@ -796,7 +861,20 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("content-with-notice", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: noticeStore))
         })
-        results.append(Fixture("notice-banner", NSSize(width: 560, height: 170)) {
+        // **两条横幅同时在**的那张帧（R22 / U-44）。
+        //
+        // 为什么以前没有：`content-with-notice` 只挂一条，而 `ContentView` 里五条横幅是
+        // 直接并排放进 `VStack(spacing: 0)` 的 —— 于是"两条挨在一起长什么样"**从来没有进过帧基线**。
+        // 更糟的是组件那张帧（`notice-banner`）自己写了 `VStack(spacing: 12)`，
+        // 也就是说**夹具替产品做了一个产品没做的决定**：帧里那 12pt 的缝在真窗口里不存在。
+        // 这一条是给"夹具不能替产品决定布局"立的证据，两条都走产品入口（粘贴失败 + 拖入非本机文件）。
+        let twoNoticeStore = makePopulatedStore()
+        twoNoticeStore.reportPasteFailure(pasteFailureText)
+        twoNoticeStore.addDroppedFiles(urls: [URL(string: "https://example.com/远程图.png")!])
+        results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: twoNoticeStore))
+        })
+        results.append(Fixture("notice-banner", NSSize(width: 560, height: 170), contentMustFit: true) {
             AnyView(
                 VStack(spacing: 12) {
                     NoticeBanner(message: "主存档无法读取，已从备份恢复 12 条记录；损坏原件保留为 history.corrupt-1.json。",
@@ -1509,18 +1587,45 @@ final class UICaptureTests: XCTestCase {
         }
 
         let (data, transparent) = try flattenedPNG(from: rep, appearance: appearance)
-        let blackBand: Double
+        var blackBand = 0.0
+        var bottomInk = 0.0
         if let base = rep.bitmapData {
             blackBand = Self.blackBandHeight(bytes: base,
                                              width: rep.pixelsWide,
                                              height: rep.pixelsHigh,
                                              bytesPerRow: rep.bytesPerRow,
                                              backingScale: CGFloat(rep.pixelsWide) / max(size.width, 1))
-        } else {
-            blackBand = 0
+            bottomInk = Self.bottomInkFraction(bytes: base,
+                                               width: rep.pixelsWide,
+                                               height: rep.pixelsHigh,
+                                               bytesPerRow: rep.bytesPerRow)
         }
         try data.write(to: file)
-        return CaptureMetrics(transparent: transparent, blackBandPt: blackBand)
+        return CaptureMetrics(transparent: transparent, blackBandPt: blackBand,
+                              bottomInkFraction: bottomInk)
+    }
+
+    /// 最底一行里"偏离主色 >12"的像素占比（0…1）。
+    ///
+    /// 主色取左上角：这批夹具的底都是整块 `windowBackgroundColor`，
+    /// 而**被裁的元素一定会压在底边上**（半截字形、半截描边），底边留白则说明放得下。
+    /// 阈值 12 与 `filledBands` 同一条线 —— 两处各写一个数字的话，
+    /// "松一档"会让一条判据先瞎（R18 那条"两处各写一个数"同族）。
+    static func bottomInkFraction(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                  bytesPerRow: Int) -> Double {
+        guard width > 0, height > 0 else { return 0 }
+        let r0 = Int(bytes[0]), g0 = Int(bytes[1]), b0 = Int(bytes[2])
+        let row = (height - 1) * bytesPerRow
+        var ink = 0
+        var x = 0
+        while x < width {
+            let o = row + x * 4
+            if abs(Int(bytes[o]) - r0) + abs(Int(bytes[o + 1]) - g0) + abs(Int(bytes[o + 2]) - b0) > 12 {
+                ink += 1
+            }
+            x += 1
+        }
+        return Double(ink) / Double(width)
     }
 
     /// 递归 `tile()` 子树里所有滚动视图。

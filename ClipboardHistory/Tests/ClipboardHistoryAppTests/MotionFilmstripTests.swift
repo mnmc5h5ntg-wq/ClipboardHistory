@@ -494,6 +494,32 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(span, 0, "什么都没发生却量到了过渡 ⇒ 尺子在把重绘噪声读成动画")
     }
 
+    /// **两臂都要有人判**（R22 / U-44）。
+    ///
+    /// 立这条的理由是 R16 那一族：`ContentView` 那五张横幅写的是
+    /// `asymmetricTransition(insertion: .bannerIn, removal: .bannerOut)`，
+    /// 而胶片清单里**只有插入那一臂** —— 于是"移除到底在不在演"四轮以来没有任何读数。
+    ///
+    /// 这条不判产品，判的是**判据自己有没有覆盖到**：名单少一臂就红。
+    /// （为什么不用"CI 的 `MOTION_SUMMARY` 里有两个键"来判：那是产物侧的形状，
+    /// 而今天本机四条场景里只有一条能分辨过程 —— 键在不在取决于时钟，不取决于清单。）
+    func testBothBannerArmsAreJudged() {
+        let scenarios = Scenario.all()
+        let names = scenarios.map { $0.name }
+        XCTAssert(names.contains("notice-banner"),
+                  "胶片清单里没有插入那一臂 ⇒ 横幅的进入从此没人判")
+        XCTAssert(names.contains("notice-banner-dismiss"),
+                  "胶片清单里没有**移除**那一臂 ⇒ `.bannerOut` 那 120ms 又回到没人看着的状态，"
+                  + "这一族 R16 记过（只有一臂在演的过渡等于没有过渡）")
+        // 撤走那一臂必须有起点：`prepare` 先把横幅摆上，否则量到的是"从没出现过"而不是"消失了"。
+        let dismiss = scenarios.first { $0.name == "notice-banner-dismiss" }
+        XCTAssertNotNil(dismiss?.prepare,
+                        "notice-banner-dismiss 没有 prepare ⇒ 起点是空态，那条卷量不到'消失'")
+        XCTAssertEqual(dismiss?.declaredDurationMilliseconds,
+                       MotionCatalog.duration(for: .bannerOut) * 1000,
+                       "撤走那一臂声明的时长不是 `.bannerOut` ⇒ 判据用来算分辨率的档会对错")
+    }
+
     func testTransitionsAreActuallyRunning() throws {
         try skipUnlessEnabledAndCapable()
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
@@ -525,8 +551,15 @@ final class MotionFilmstripTests: XCTestCase {
             }
             guard Self.premisePictureChanged(frames) else {
                 notRun.append(scenario.name)
-                print("MOTION_NOT_RUN=premise-not-visible \(scenario.name)：触发前后逐像素相同 ⇒ "
-                    + "这一卷里根本看不到「这次变更」，后面读到的几帧变化不能算在过渡头上")
+                // 报 not-run 时要说清**是哪一种** not-run。以前只说"逐像素相同"，
+                // 而这一条在本机今天就是这样红的（`notice-banner` 插入明明演了 3 帧，
+                // 首尾却相同）—— 分不清"变更发生在第一帧之前"与"演完又落回原样"，
+                // 下一轮就只能再猜一次。两个数都打出来：首尾差、卷内最大差。
+                let deltas = Self.deltas(frames)
+                print("MOTION_NOT_RUN=premise-not-visible \(scenario.name)：首尾两帧逐像素相同 ⇒ "
+                    + "这一卷里看不到「这次变更」，后面读到的几帧变化不能算在过渡头上。"
+                    + "卷内最大逐帧差=\(deltas.max().map { String(format: "%.3f", $0) } ?? "无") "
+                    + "过渡帧数=\(span)（>0 就说明变更演过了，只是没留在首尾对照里）")
                 continue
             }
             // 时钟自己也要进记录。`采样≈` 那一列是**整卷中位数**，它盖不住 burst：
@@ -1317,7 +1350,30 @@ final class MotionFilmstripTests: XCTestCase {
         /// 只列**该有过渡**的场景。不该有的那些（侧栏行、同类型换字）在
         /// `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 与
         /// `testDetailPreviewCrossfadesOnlyWhenTheKindChanges` 里反向钉着。
-        static func all() -> [Scenario] { [noticeBanner(), detailKindChange(), emptyState()] }
+        static func all() -> [Scenario] {
+            [noticeBanner(), noticeBannerDismiss(), detailKindChange(), emptyState()]
+        }
+
+        /// 提示条**撤走**那一臂（R22 / U-44）。
+        ///
+        /// 为什么单独立一条：`ContentView` 那五张横幅写的是
+        /// `asymmetricTransition(insertion: .bannerIn, removal: .bannerOut)`，
+        /// 而 `notice-banner` 那条只触发**插入** —— 于是"移除那一臂到底在不在演"
+        /// 四轮以来没有任何读数。这正是 R16 记过的那一族：
+        /// **只有一臂在演的过渡等于没有过渡**，而上一次发现它靠的是人眼。
+        ///
+        /// `prepare` 把横幅摆成"已经在"，`trigger` 才是要判的那一下 ——
+        /// 没有 prepare 的话起点就是空态，量到的会是"从没出现过"而不是"消失了"。
+        static func noticeBannerDismiss() -> Scenario {
+            Scenario(name: "notice-banner-dismiss", size: NSSize(width: 760, height: 560),
+                     prepare: { store in
+                         store.reportPasteFailure("系统未授权本 App 控制「System Events」，无法自动粘贴。")
+                     },
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerOut) * 1000) { store in
+                store.dismissPasteFailure()
+            }
+        }
+
         // `heatFirstRecord()` **不在这里** —— 它量到的是"一帧到位"，而关掉动画之后读数不变，
         // 也就是说这把尺看不见这条淡入（见 `testHeatmapFadeIsNotVisibleToThisRuler`）。
         // 把它放进 `all()` 等于让一条"量不到的东西"每天判产品一次红。

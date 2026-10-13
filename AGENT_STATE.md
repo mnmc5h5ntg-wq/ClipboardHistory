@@ -995,3 +995,28 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
 - **数字**：0 warning；`686 tests / 25 skipped / 0 failures`；脚本 72 passed；
   帧基线 98（6 changed，同提交 update）；变异 **M90–M96 七支全 CAUGHT**（含红得对不对的核对）。
 - **R22 选题不变**：清单 14 剩下的那一半（提示条插入的布局位移）+ BACKLOG 32（`contentMustFit`）。
+
+## R22 · 取证面一轮（U-44 / D-081）—— 没有界面改动，这是本轮的分数为什么是 87
+
+- **改了什么**：只有测试与夹具（`UICaptureHarness`、`MotionFilmstripTests`）。
+  **产品代码零改动 ⇒ 本机装的还是 R21b 那一份**（`make bundle` 的输出会逐字节相同，
+  所以本轮不重新换装，理由记在这里而不是默默跳过）。
+- **新增判据**：`Fixture.contentMustFit`（10 张自包含帧）+ 底行墨判据 + **正对照**
+  （`sidebar-history` 底行 100% 有墨）；`testBothBannerArmsAreJudged`（横幅两臂都要在清单里）；
+  `premise-not-visible` 现在报"卷内最大逐帧差 + 过渡帧数"。
+- **新增帧**：`content-with-two-notices`（亮暗两张，基线 98 → **100**）。
+  两条都走产品入口；组件帧 `notice-banner` 自己写的 `VStack(spacing: 12)` 是**夹具替产品做的决定**，
+  真窗口里没有那 12pt。
+- **本轮最值钱的一条**：变异电池第一版报 M97/M98/M99 三支 ESCAPED，
+  真相是**整批测试被跳过**（没设 `CLIPBOARD_HISTORY_UI_SHOTS`，skip 的退出码是 0），
+  预检也把跳过读成了绿。补上"只有 skipped ⇒ DID-NOT-RUN"与环境变量之后
+  **M97–M100 四支全 CAUGHT**，且每支红在该红的那条断言上。
+- **量出来但没修**：一条文字的警告横幅占 **88pt**，两行文字的错误横幅占 **50pt**。
+  两个候选解释（底色涂到透明标题栏后面 / 那其实是两条同色横幅）都还没判掉 ⇒ BACKLOG 35。
+  **不在读懂之前动产品**，所以本轮没有界面改善。
+- **数字**：0 warning；`687 tests / 25 skipped / 0 failures`；脚本 72 passed；
+  帧基线 **100**（同提交 update）；`MATERIAL_BLIND_SPOTS 9 of 50`；自评 **87 / 100**
+  （… R20 89 / R21 91 / **R22 87**）。
+- **R23 选题（硬指标：必须有看得见的改善）**：判掉并修掉 BACKLOG 35 那条 88pt；
+  顺带把 `notice-banner` 组件帧的 `spacing: 12` 改成与产品一致（0 + Divider），
+  让那张帧不再展示一个产品里不存在的布局。

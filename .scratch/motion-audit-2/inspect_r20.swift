@@ -123,6 +123,38 @@ if args[1] == "stats" {
     exit(0)
 }
 
+if args[1] == "column" {
+    // 沿一列往下，每 `step` pt 报一次 RGB 均值。
+    // 存在的理由（R22）：`stats` 只报亮度，而"窗口灰底 236"与"橙色 12% 的横幅底 240"
+    // **亮度差 4、色相差 24** —— 用亮度判这两块，会把安全区读成一条 100pt 高的横幅。
+    // 这正是账本里"只用亮度判两态可分辨是用错轴"的同族：**轴的分辨率必须配得上要分的表面**。
+    guard args.count >= 4 else { exit(2) }
+    let spec = args[3].split(separator: ",").compactMap { Double($0) }   // x, y0, y1, step(pt)
+    guard spec.count == 4 else { print("column 要 x,y0,y1,step 四个数（pt）"); exit(2) }
+    let rep = load(args[2])
+    let scale = args.count > 5 ? (Double(args[5]) ?? 2) : 2
+    let bpp = pxStride(rep), bpr = rep.bytesPerRow, base = rep.bitmapData!
+    let x = Int(spec[0] * scale)
+    var y = Int(spec[1] * scale)
+    let stop = Int(spec[2] * scale), step = Int(spec[3] * scale)
+    while y < min(stop, rep.pixelsHigh) {
+        var r = 0.0, g = 0.0, b = 0.0, n = 0
+        for row in y..<min(y + step, rep.pixelsHigh) {
+            for col in max(0, x - 20)..<min(x + 20, rep.pixelsWide) {
+                let o = row * bpr + col * bpp
+                r += Double(base[o]); g += Double(base[o + 1]); b += Double(base[o + 2]); n += 1
+            }
+        }
+        if n > 0 {
+            print(String(format: "y=%6.1fpt  rgb=(%.0f,%.0f,%.0f)  R-B=%+.0f",
+                         Double(y) / Double(scale), r / Double(n), g / Double(n), b / Double(n),
+                         (r - b) / Double(n)))
+        }
+        y += step
+    }
+    exit(0)
+}
+
 if args[1] == "crop" {
     guard args.count >= 5 else { exit(2) }
     let spec = args[4].split(separator: ",").compactMap { Int($0) }
