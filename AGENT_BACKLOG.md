@@ -687,25 +687,33 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
 
 ## 阶段一（每日复制热图）留下的账 · 2026-10-13
 
-14. **`lastWriteError` 没有发布通道**（`DailyCopyLedger:55` + `SettingsView:848`，R9 头一条）。
-    它是"计算属性读加锁盒子"——值不会丢（这是当初绕开 `main.async` 回写的理由，注释里写着），
-    但**没有任何东西为它 `objectWillChange`**：写盘失败后若用户不再复制，那一行不上屏；重启后永远 `nil`。
-    修法要保住"值不依赖通知"这一半：**通知只送"该重绘了"、不送值**，
-    所以它被丢掉只是晚显示而不是静默。判据必须写成"从产品入口看那一行出现在屏上"，
-    不是"盒子里有值"（后者现在就已经成立却什么都证明不了）。
+14. **已结案（R10）**：`lastWriteError` 曾经没有发布通道（`DailyCopyLedger` + `SettingsView:848`）。
+    它是"计算属性读加锁盒子"——值不会丢，但**没有任何东西为它 `objectWillChange`**：
+    写盘失败后若用户不再复制，那一行不上屏；重启后永远 `nil`。
+    现在是 `@Published` 镜像 + 一个**只送"该重绘"、不送值**的主队列回头看一眼：
+    盒子仍是唯一的值来源，所以通知被丢掉只是晚显示而不是静默（原来那半条性质保住了）；
+    `flushPendingSaves()` 也自己同步一次（退出路径上没有"下一次去抖到期"）。
+    判据 4 条：不再复制第二次也要看得见 / flush 要报 / 恢复要撤 / **没失败时不许多说话**。
+    见 U-32、批次 19。
 15. **已结案（R9）**：热图的 hover 动画当时是"声明了但空转"（`DailyCopyHeatmapView:190`）。
     `.animation(.hover, value: hovered?.dayKey ?? "")` 驱动的是不可插值的字符串替换；
     真正会变的格子描边 0↔0.55 与当天那格的深浅都不在事务里 ⇒ 硬生硬灭。
     现在：事务挂在 `onHover` 的变更点上，格子按 `bucket` 插值，页脚那条撤掉并写明"为什么不做"。
     判据 M33/M34/M35/M36/M37 五支钉住。见 U-31。
-16. **`OffscreenSymbolInkProbeTests.symbolNames` 是手抄的，而且已经漂了**（R9）。
-    名单是 `["command","gearshape","hand.raised","sparkles","folder"]` ——
-    `sparkles` 早就不是产品用的图标（推荐分类是 `wand.and.stars`），新增的 `chart.bar` 不在名单里。
-    一条"每次视觉审计重新量一遍"的探针，现在量的是**五个已经不存在的图标**。
-    修法：名单从 `SettingsCategory.allCases` 取，并加一条"探针名单 == 产品名单"的守卫。
+16. **已结案（R10）**：`OffscreenSymbolInkProbeTests.symbolNames` 曾是手抄的，而且已经漂了。
+    名单是 `["command","gearshape","hand.raised","sparkles","folder"]` —— `sparkles` 早就不是
+    产品用的图标（推荐分类是 `wand.and.stars`），新增的 `chart.bar` 不在名单里：
+    一条"每次视觉审计重新量一遍"的探针，量的是**五个已经不存在的图标**。
+    现在名单从 `SettingsCategory.allCases.map(\.icon)` 推导，并加了两条判据：
+    `testProbeCoversEveryCategoryIcon`（名单 == 产品）、
+    `testEveryCategoryIconActuallyDrawsSomething`（**逐枚**量墨水，抓"符号名写错 / 这枚在 macOS 12 上不存在"
+    —— 那种情况下 SwiftUI 不报错，只是什么都不画，整列墨水会被其余五枚抬着走）。
+    刻意**没有**加"源码里不许出现字面量名单"那条扫描：名单退回字面量后只要今天恰好相等它就绿，
+    而真正会红的是"产品改了它没跟着改" —— 那句话由上面这条覆盖判据负责，扫自己源码只会多一个自匹配坑。
     **顺带记一条判据纪律**：我看 `settings-stats-populated` 帧时把「统计」图标判成"实心柱混进描线那一列"
     （以为踩回 U-8），**这个判断是错的** —— 该探针表头写着未选中行图标列墨水 = 0.0000，
     那一帧只有选中行可见。判图标语言必须按墨水数字判，不能按这一帧的观感判。
+    R10 逐枚量出来的数字见下面第 22 条（它同时**否证**了我那个目测结论）。
 17. **已结案（R9）**：空态与零值汇总同时说话（`heatmap-empty-*` 帧）。
     现在"共 0 次 · 日均 0.0 · 连续 0 天"整行不出现（决定进策略：`summaryLine(for:hasRecords:) -> String?`），
     「这张图怎么读」也改成跟着图出现 —— 而且写在**观察账本那一层**：
@@ -717,6 +725,20 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     然后加一条 `heat-cell-deepens` 场景：从产品入口 `store.add(...)` 触发，
     量那一格包围盒里的"变化段时长 / 事件内最粗采样"，并配 `animationsEnabled=false` 的 A/B。
     **别用静帧代替这一步** —— 静帧只能证明"画出来了"，不能证明"分摊到几帧"。
+22. **新量出来的一条：设置侧栏六枚图标里「推荐」那枚细一半**（R10 逐枚墨水，固定黑、和产品同构的
+    `List(.sidebar)` + `.plain` Button + `.hierarchical` + 13pt）：
+    ```
+    INK 逐枚 chart.bar=0.0138 command=0.0143 folder=0.0124 gearshape=0.0130 hand.raised=0.0118 wand.and.stars=0.0052
+    ```
+    五枚挤在 0.0118–0.0143，`wand.and.stars` 只有 0.0052 —— **比同列最轻的那枚还轻 2.3 倍**。
+    两件事同时被这条数据确定：① 我上一轮目测的"`chart.bar` 是实心柱、混进描线那一列"**是错的**
+    （它是第二重的一枚，不是异类）；② 真正的异类是「推荐」，而它从 D-8 那一轮起就在，
+    只是当时整列一起量、看不出来。
+    **本轮刻意没改**：换符号（`wand.and.stars` → `sparkles` / `star.leadinghalf.filled` …）
+    是"图标语义 vs 视觉重量"的取舍，得连着"推荐这一页到底想说什么"一起判，
+    归到设置页那一轮（R11/R12 的选题池里）而不是顺手换掉。
+    阈值判据也**没有**现在加：拿今天的六个数反推一个"不得低于中位数 60%"的门槛，
+    等于把一次观测写成规律 —— 等真去改那一枚时再决定要不要钉。
 18. **`/tmp/verify_phase1.sh` 里 `grep -cE "error:"` 数出 110 条"错误"，全是 CoreData/AddressBook 噪声**
     （`com.apple.contactsd.persistence` 那一族）。**计数命令自己没被证伪过**（这一族记过很多次）。
     下一版只数 XCTest 的失败行，并把"噪声行"单独报成一个数而不是并进错误里。

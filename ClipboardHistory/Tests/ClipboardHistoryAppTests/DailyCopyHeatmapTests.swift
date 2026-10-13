@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import SwiftUI
 @testable import ClipboardHistoryApp
@@ -438,6 +439,94 @@ final class DailyCopyHeatmapTests: XCTestCase {
         // 未来格必须是「不画」，而不是画成 0。
         XCTAssertTrue(view.contains("cell.isFuture"),
                       "没有未来分支 ⇒ 还没到的日子会被画成「那天没复制」")
+    }
+
+    // MARK: - R10：写盘失败必须**自己**上屏（BACKLOG 14）
+
+    /// 阶段一那条 `lastWriteError` 是"计算属性读加锁盒子"：值不丢，但**没有东西为它发布** ⇒
+    /// 写盘失败之后如果用户不再复制，那一行永远不上屏；重启之后永远是 `nil`。
+    /// 也就是"防静默失败"只做成了一半。这条判据问的正是没做完的那一半：
+    /// **不再复制第二次**，失败也要看得见，而且要有发布出去的那一下。
+    func testWriteFailureBecomesVisibleWithoutAnotherCopy() throws {
+        let directory = temporaryDirectory
+        let blocker = directory.appendingPathComponent("blocked")
+        FileManager.default.createFile(atPath: blocker.path, contents: Data())
+        // `blocked` 是个**文件** ⇒ 它的下面建不出目录 ⇒ 写盘必失败（不需要权限技巧，跨机器成立）
+        let ledger = DailyCopyLedger(fileURL: blocker.appendingPathComponent("daily-copy.json"),
+                                     debounceSeconds: 0.05)
+        XCTAssertNil(ledger.lastWriteError)
+
+        var publishes = 0
+        let sink = ledger.objectWillChange.sink { _ in publishes += 1 }
+        ledger.recordCopy(at: ledger.today)
+        let afterCopy = publishes
+
+        pumpMain(seconds: 0.8)
+
+        XCTAssertNotNil(ledger.lastWriteError,
+                        "写盘失败没有上屏 ⇒ 又回到「只防了一半」的那版")
+        XCTAssertGreaterThan(publishes, afterCopy,
+                             "值变了但一次也没发布 ⇒ 观察它的设置页不会重绘，用户看不到这一行")
+        sink.cancel()   // 订阅必须活过 pump：提前解订阅会让上面那条只能靠运气绿
+    }
+
+    /// 退出路径上没有"下一次去抖到期"了，所以 flush 必须自己同步一次。
+    func testFlushReportsAFailedWrite() throws {
+        let directory = temporaryDirectory
+        let blocker = directory.appendingPathComponent("blocked2")
+        FileManager.default.createFile(atPath: blocker.path, contents: Data())
+        // 去抖设得比测试还长 ⇒ 这一条**只能**靠 flush 自己同步，不可能被去抖项顺手做到
+        let ledger = DailyCopyLedger(fileURL: blocker.appendingPathComponent("daily-copy.json"),
+                                     debounceSeconds: 60)
+        ledger.recordCopy(at: ledger.today)
+        XCTAssertNil(ledger.lastWriteError, "还没到截止点就报失败 ⇒ 那是假警报")
+        ledger.flushPendingSaves()
+        XCTAssertNotNil(ledger.lastWriteError,
+                        "flush 写失败之后仍然一言不发 ⇒ 退出时丢计数这件事没人知道")
+    }
+
+    /// 反向的那一半：**没失败的时候不许说话**。
+    /// `@Published` 是"每次赋值都发"，不看值相不相等 ⇒ 少了那句比较，
+    /// 每复制一条都会让设置页为一条并不存在的错误重排一次（比静默更吵的那种坏法）。
+    func testASuccessfulWriteDoesNotRepublish() throws {
+        let ledger = DailyCopyLedger(fileURL: temporaryDirectory.appendingPathComponent("ok/daily-copy.json"),
+                                     debounceSeconds: 0.05)
+        var publishes = 0
+        let sink = ledger.objectWillChange.sink { _ in publishes += 1 }
+        ledger.recordCopy(at: ledger.today)
+        let afterCopy = publishes
+        pumpMain(seconds: 0.8)
+        XCTAssertNil(ledger.lastWriteError)
+        XCTAssertEqual(publishes, afterCopy,
+                       "写成功也发了一次变更 ⇒ 那个「只在值变了才同步」的比较被拿掉了")
+        sink.cancel()
+    }
+
+    /// 恢复也要说话：路径变可写之后下一次成功写盘要把那行撤掉。
+    /// 不测这一半的话，"曾经失败过"会变成一条永久横幅，而那比静默失败更吵。
+    func testASuccessfulWriteClearsTheFailure() throws {
+        let directory = temporaryDirectory
+        let gate = directory.appendingPathComponent("gate")
+        FileManager.default.createFile(atPath: gate.path, contents: Data())
+        let ledger = DailyCopyLedger(fileURL: gate.appendingPathComponent("sub/daily-copy.json"),
+                                     debounceSeconds: 0.05)
+        ledger.recordCopy(at: ledger.today)
+        pumpMain(seconds: 0.8)
+        XCTAssertNotNil(ledger.lastWriteError, "前提：先让它真的失败一次")
+
+        try FileManager.default.removeItem(at: gate)   // 障碍清掉 ⇒ 同一条路径现在写得进去
+        ledger.recordCopy(at: ledger.today)
+        pumpMain(seconds: 0.8)
+        XCTAssertNil(ledger.lastWriteError, "已经恢复还在报失败 ⇒ 这条提示从此变成噪声")
+    }
+
+    /// 主队列的"看一眼"要靠 runloop 跑，`Thread.sleep` 会**堵死**主线程 ⇒ 那一格永远不响。
+    /// 这条 helper 本身就是判据的一部分：用错等待方式的测试会绿着什么都没测到。
+    private func pumpMain(seconds: TimeInterval) {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            RunLoop.main.run(mode: .default, before: deadline)
+        }
     }
 
     // MARK: - R9：动效必须"被供电"，不许只是声明

@@ -47,12 +47,30 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
     /// 这件事在跨午夜时不会各算各的。
     var today: Date { now() }
 
-    /// 上一次写盘失败的原因（`nil` = 没失败过）。
+    /// 上一次写盘失败的原因（`nil` = 没失败过 / 已经恢复）。
     ///
     /// 只在"存不下"时非空 —— 静默失败会让这张图悄悄停在几天前。
-    /// 刻意做成**计算属性读一个加锁的小盒子**，而不是让后台队列绕 `DispatchQueue.main.async`
-    /// 往 MainActor 属性回写：那一圈如果丢了，错误就静默了，正是这条要防的事。
-    var lastWriteError: String? { failureBox.message }
+    ///
+    /// **为什么是 `@Published` 而不是直接读盒子**（R10 / BACKLOG 14）：
+    /// 阶段一把它做成"计算属性读加锁盒子"，值确实不会丢（盒子在后台队列上被写），
+    /// 但**没有任何东西为它发布** ⇒ 写盘失败之后如果用户不再复制，那一行永远不上屏，
+    /// 重启之后更是永远 `nil`。也就是"防静默失败"这件事只做成了一半。
+    ///
+    /// 现在两条都保住：**值仍然只在盒子里**，这个 `@Published` 只是它的主线程镜像，
+    /// 由 `scheduleVisibilityCheck()` 在写盘截止点之后同步一次。
+    /// 那个通知如果被丢掉（主队列忙、进程要退），最坏结果只是**晚一格显示**，
+    /// 而不是静默 —— 这正是原来那条注释要保住的性质。
+    @Published private(set) var lastWriteError: String?
+
+    /// 写盘截止点之后"回头看一眼盒子"的那件事。
+    ///
+    /// 它必须跑在**主队列**上：闭包字面量写在 `@MainActor` 方法里会被推成 MainActor 隔离，
+    /// 丢到 `saveQueue` 上就是 `dispatch_assert_queue` SIGTRAP（D-068 第 4 条那次崩溃）。
+    private var pendingVisibilityCheck: DispatchWorkItem?
+
+    /// 通知比写盘截止点晚这么多再看：留出去抖项被排到队列后面的时间。
+    /// 不是"等够就一定写完"—— 值一直在盒子里，这一条只决定什么时候上屏。
+    private let visibilityGrace: TimeInterval = 0.15
 
     /// 保留多久。两年 = 104 周，够看"去年这时候忙不忙"，又让文件尺寸有界
     ///（一天一个键，最坏 730 条 ≈ 12KB）。
@@ -101,6 +119,8 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
     /// 把待写的东西**同步**落盘。退出路径必须调它：
     /// 去抖窗口里被 SIGTERM 打断会丢掉最后几秒的计数（这条在历史存档上栽过一次，见 D-004）。
     func flushPendingSaves() {
+        pendingVisibilityCheck?.cancel()
+        pendingVisibilityCheck = nil
         guard let snapshot = pendingSnapshot else { return }
         pendingSave?.cancel()
         pendingSave = nil
@@ -111,6 +131,9 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
         } catch {
             failureBox.message = error.localizedDescription
         }
+        // 退出路径上没有"下一次去抖到期"了，所以这里必须自己同步一次镜像 ——
+        // 否则那条失败只进了盒子，而屏幕上什么都不会说（D-068 第 8 条记的就是这个洞）。
+        syncWriteFailure()
     }
 
     private func scheduleSave() {
@@ -123,6 +146,25 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
         let workItem = Self.makeSaveWorkItem(snapshot: snapshot, url: fileURL, box: failureBox)
         pendingSave = workItem
         saveQueue.asyncAfter(deadline: .now() + debounceSeconds, execute: workItem)
+        scheduleVisibilityCheck()
+    }
+
+    /// 在写盘截止点之后回主线程看一眼盒子。见 `lastWriteError` 的注释。
+    private func scheduleVisibilityCheck() {
+        pendingVisibilityCheck?.cancel()
+        let item = DispatchWorkItem { [weak self] in self?.syncWriteFailure() }
+        pendingVisibilityCheck = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + debounceSeconds + visibilityGrace, execute: item)
+    }
+
+    /// 盒子 → `@Published` 镜像。**相同就不发变更** ——
+    /// 否则每复制一条都会让设置页为同一个（通常为空）的错误重排一次。
+    private func syncWriteFailure() {
+        pendingVisibilityCheck = nil
+        let message = failureBox.message
+        if message != lastWriteError {
+            lastWriteError = message
+        }
     }
 
     /// 去抖写盘的那个闭包，必须在**非隔离**的上下文里造出来。

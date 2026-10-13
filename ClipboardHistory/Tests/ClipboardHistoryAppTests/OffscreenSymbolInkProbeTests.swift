@@ -21,7 +21,17 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
     /// 一列图标 / 一列文字（2× 倍率下的像素坐标）。
     private static let iconColumn = Region(x0: 26, x1: 66)
     private static let textColumn = Region(x0: 78, x1: 170)
-    private static let symbolNames = ["command", "gearshape", "hand.raised", "sparkles", "folder"]
+    /// 探针要量的符号 = **产品侧栏现在真的在用那些**。
+    ///
+    /// 原来这里是一份手抄的字面量数组，于是它漂了两次都没人喊：
+    /// `sparkles` 早就不是推荐分类的图标（现在是 `wand.and.stars`），
+    /// 而新增的 `chart.bar` 根本不在名单里 ——
+    /// 一条"每次视觉审计都重新量一遍"的探针，量的是五个已经不存在的图标（BACKLOG 16 / U-31）。
+    /// 从枚举取之后它不可能再漂；下面 `testProbeCoversEveryCategory` 钉住这条推导关系。
+    ///
+    /// 计算属性而不是 `static let`：`static let = <带调用的初始化器>` 这个形状
+    /// 在 CI 的 Swift 6.1.2 上崩过一次（D-069），别在测试里再摆一份。
+    private static var symbolNames: [String] { SettingsCategory.allCases.map(\.icon) }
 
     private func rasterize(_ rootView: AnyView, size: NSSize) throws -> (width: Int, height: Int, luminances: [Int]) {
         _ = NSApplication.shared
@@ -114,10 +124,13 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
     /// 与产品同构的一列 `Label`（List(.sidebar) 行内），颜色由参数决定。
     /// `wrappedInButton` 对应产品里那层 `Button { Label(...) }.buttonStyle(.plain)` ——
     /// 实测边界就在这层上（见 `testSemanticColorResolutionInListRowIcons` 打印的三档对比）。
-    private func sidebarColumn(iconColor: AnyShapeStyle, wrappedInButton: Bool = false) -> AnyView {
-        AnyView(
+    private func sidebarColumn(iconColor: AnyShapeStyle,
+                               wrappedInButton: Bool = false,
+                               names: [String]? = nil) -> AnyView {
+        let symbols = names ?? Self.symbolNames
+        return AnyView(
             List {
-                ForEach(Self.symbolNames, id: \.self) { name in
+                ForEach(symbols, id: \.self) { name in
                     let label = Label(name, systemImage: name)
                         .foregroundStyle(iconColor)
                         .symbolRenderingMode(.hierarchical)
@@ -148,6 +161,47 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
         let strip = ink(frame, x: Self.iconColumn, yRange: 0...(frame.height - 1))
         print("INK 前提(固定色, Button 包装)：整列图标墨水=\(String(format: "%.4f", strip)) 文字行数=\(bands.count)")
         XCTAssertGreaterThan(strip, 0.01, "固定色都画不出来：这条管线不能用来判图标可见性")
+    }
+
+    /// 探针的名单必须**就是**产品在用的那份。
+    ///
+    /// 这条不测产品，测的是尺子的覆盖面 —— 上一版名单是手抄的，漂了两次（`sparkles` 早已换掉、
+    /// 新分类的 `chart.bar` 没进来）而探针一路全绿。现在名单从枚举推导，
+    /// 所以"覆盖全"这句话**必须**由一条会红的判据钉住：把推导改成字面量、
+    /// 或者以后有人给 `SettingsCategory` 加一档而名单没跟着长，都要红。
+    func testProbeCoversEveryCategoryIcon() throws {
+        let probe = Self.symbolNames
+        let product = SettingsCategory.allCases.map(\.icon)
+        XCTAssertEqual(probe, product,
+                       "探针量的符号与产品侧栏在用的不是一回事 ⇒ 这条尺子在量已经不存在的图标")
+        XCTAssertFalse(probe.isEmpty, "名单空了会让上面那条恒真")
+        // 刻意**没有**再写一条"源码里不许出现字面量名单"的扫描：
+        // 名单一旦退回字面量，只要它今天恰好等于产品，那条扫描会绿、而这条会红 ——
+        // 红的是"以后产品改了它没跟着改"，那正是漂的本身。扫自己源码还会踩自匹配
+        // （needle 写在断言消息里就会命中自己），收益为零。
+    }
+
+    /// 每一枚图标都得**真的画得出东西**（固定色那条前提之下）。
+    ///
+    /// 这条抓的不是审美，是"符号名写错 / 这枚在 macOS 12 上不存在"：
+    /// 那种情况下 SwiftUI 不报错，只是**什么都不画**，
+    /// 于是设置侧栏少一个图标而全仓 658 条用例一条都不会红。
+    /// 逐枚量而不只看整列：整列墨水 >0.01 会被其余五枚抬着走，一枚空白的没人喊。
+    func testEveryCategoryIconActuallyDrawsSomething() throws {
+        var readings: [String: Double] = [:]
+        for name in SettingsCategory.allCases.map(\.icon) {
+            let frame = try rasterize(
+                sidebarColumn(iconColor: AnyShapeStyle(Color.black), wrappedInButton: true, names: [name]),
+                size: NSSize(width: 360, height: 300))
+            readings[name] = ink(frame, x: Self.iconColumn, yRange: 0...(frame.height - 1))
+        }
+        print("INK 逐枚 " + readings.keys.sorted().map {
+            "\($0)=\(String(format: "%.4f", readings[$0] ?? 0))"
+        }.joined(separator: " "))
+        for (name, value) in readings {
+            XCTAssertGreaterThan(value, 0.002,
+                                 "「\(name)」在图标列里一个像素都没画出来 ⇒ 符号名写错，或这枚在目标系统上不存在")
+        }
     }
 
     /// 结论打印：量**产品自己的** `SettingsView`（语义色那条路径）里五个图标的墨水占比。
