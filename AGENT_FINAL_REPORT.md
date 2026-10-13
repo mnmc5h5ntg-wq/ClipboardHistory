@@ -5,7 +5,7 @@
 `INSTALL_RUNNING_PID=55520`、存档条数 100 → 100。
 
 一句话结论：**功能交付了，界面按系统的方式重做了一遍，而这一趟最贵的产出是"量尺自己的账"** ——
-二十三轮里有十轮的产出是「上一轮那把尺在骗人」，其中两次是它骗我要去改产品，而产品是对的；最后一轮（R29d）骗我的是**我自己的眼睛** —— 我看了一张暗档帧报「标签浅灰可读」，量出来那一列最亮只比底亮 4。
+二十五轮里有十二轮的产出是「上一轮那把尺在骗人」，其中两次是它骗我要去改产品，而产品是对的；最后一轮（R29d）骗我的是**我自己的眼睛** —— 我看了一张暗档帧报「标签浅灰可读」，量出来那一列最亮只比底亮 4。
 
 ---
 
@@ -14,18 +14,18 @@
 | 项 | 状态 | 证据 |
 |---|---|---|
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
-| 阶段二 23 轮审计（R9–R30） | 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 | `AGENT_VISUAL_ITERATION.md` Round 9–30 |
+| 阶段二 25 轮审计（R9–R32） | 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 | `AGENT_VISUAL_ITERATION.md` Round 9–32 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-53（23 条） | `AGENT_UI_AUDIT.md` 第 10–33 轮 |
-| 决定台账 | D-069 … D-090 | `AGENT_DECISIONS.md` |
-| 判据 | 653 → **702** 例（25 skip / 0 failures；skip 全是环境门控的在屏探针与胶片） | `swift test` |
+| 视觉台账 | U-31 … U-54（24 条） | `AGENT_UI_AUDIT.md` 第 10–34 轮 |
+| 决定台账 | D-069 … D-091 | `AGENT_DECISIONS.md` |
+| 判据 | 653 → **704** 例（26 skip / 0 failures；skip 全是环境门控的在屏探针与胶片） | `swift test` |
 | 帧基线 | 82 → 90（阶段一）→ 104（R28）→ **102**（R28c 撤下 runner 拍不出的宽臂帧） | `docs/frame_baseline.json` |
-| 变异对照 | M25–M32（阶段一 9 支）+ **M100–M136**（阶段二 37 支），全部 CAUGHT | `.scratch/motion-audit-2/mutate_*.py` |
+| 变异对照 | M25–M32（阶段一 9 支）+ **M100–M140**（阶段二 41 支），全部 CAUGHT | `.scratch/motion-audit-2/mutate_*.py` |
 | 脚本测试 | 72 passed | `python3 -m unittest discover -s scripts/tests` |
 | CI | **收口提交 `8c14c44` 在 runner 上绿**（701 例 / 29 skip / 0 失败）；R29d 之后又推了两次 —— 第一次**红在新守卫自己**（run 38461676256，见 §5.13），第二次带判别臂的版本是最终状态。本目标窗口内约 30 次 push、**10 次红**，其中 **7 次红的是判据自己而不是产品**（R20、R21、R27、R28、R29、R29c、R29d）—— 每一次都在下一轮被追认并修好，`Round 21b` 这个提交标题就是「CI 红在尺上，而尺量的是另一样东西」 | `gh run list` |
 
-自评曲线（23 轮，均值 **91.2**）：
-91 · 90 · 92 · 93 · 94 · 95 · 96 · 93 · 95 · 91 · **86** · **89** · 91 · **87** · 90 · 92 · 91 · 92 · 91 · 92 · 90 · **89** · 90。
+自评曲线（25 轮，均值 **91.3**）：
+91 · 90 · 92 · 93 · 94 · 95 · 96 · 93 · 95 · 91 · **86** · **89** · 91 · **87** · 90 · 92 · 91 · 92 · 91 · 92 · 90 · **89** · 90 · **89** · 94。
 低于 90 的四轮（R19 / R20 / R22 / R29d）都不是"没做完"，而是**当轮发现自己上一轮做错了**：
 R19 推翻自己写的"根因"，R20 抓回 R19 引入的回归，R22 把"绿其实是跳过"翻出来，
 R29d 撤回了**我自己肉眼看过的那张帧**（它报"可读"，像素是黑字黑底）。
@@ -208,6 +208,13 @@ R29d 撤回了**我自己肉眼看过的那张帧**（它报"可读"，像素是
     同一个 spike 的另外四行（两臂都"没有墨"）**不算结果** —— 那是它自己的树没落笔，
     按 DID-NOT-RUN 处理，没有据此下任何结论。
 
+16. **R32**：详情区那条"第三条左轴"不是设计决定，是**没先量**。一量就发现三处代码引用的是
+    同一个 `containerGutter`、同一个 `columnWidth()`，分叉全来自"可读列居中"那一句 ——
+    居中列的左缘 = (面板宽 − 列宽)/2，**随窗口连续漂移**，所以它永远等不上骨架的固定 gutter。
+    统一到 gutter 之后五块 spread 35.0pt → 0.5pt，加载落地不再右跳。
+    同轮还犯了一次尺错：判据的正文带起在 y=110，而首行占 106–113 ⇒ **带切掉首行**，
+    尺报出 41.5 这个假轴。教训：**锚点过窄与过宽是同一族**，带必须按 `rows` 剖面放（配 M140）。
+
 沉淀下来的规矩（都已进仓库，不靠记忆）：
 
 - 每把新尺**必须有正对照**，且正对照要能红；只在"该红的没红"上被检验过的尺，没有被检验过。
@@ -227,7 +234,7 @@ R29d 撤回了**我自己肉眼看过的那张帧**（它报"可读"，像素是
 
 | # | 内容 | 为什么没做 | 下一步 |
 |---|---|---|---|
-| BACKLOG 39 | 详情区三条左轴（20 / 54.5 / 95pt） | 设计决定，量不出来 | 先定"详情区有几列"，再让骨架承诺它替代的那一列 |
+| BACKLOG 39 **已收口**（R32） | 详情区左轴：骨架 20 与 meta/正文 54.5–55 是**两条**（95 是更宽面板里的同一个居中值） | 当时判它是"设计决定"，其实卡在**没先量**：一量就发现居中写法让左缘随面板漂移 | 已统一到 gutter（spread 35.0pt → 0.5pt），判据 + 两半源码守卫 + 变异 M137–M140；代价与退路写在 D-091 |
 | BACKLOG 40 | 「清空」在帧里不是红的（代码是 `.borderedProminent` + `.tint(.red)`） | 分不清"prominent 填充离屏不合成"还是"tint 没吃到"，**不许猜着修**。R31 已证：**没有第二条离屏捕获通道可搭**（`CGWindowListCreateImage` 在 macOS 15 SDK 标 unavailable） | 人工批次 36.4，一次真机截屏即可判定 |
 | BACKLOG 42 | 判据只能用比值/方向/单调性 —— 绝对像素数换平台就失效（已犯三次） | 规矩已写进 §5；`textInkMinDelta` 这类**闸门**仍是绝对值，但它是"分档"不是"判过没过" | 新判据一律相对量 |
 | BACKLOG 43 **已答**（R29c） | runner 上 `SettingsView` 那批帧 = **画了一块底色**：`hist=0/0/0/0/0/0/1/99%`、透明率 0%、`bpp=32 samples=4 bpr=宽×4`（与尺的假设一致）⇒ 既不是"没画"也不是"读错字节" | 为什么只有这一棵视图树在 macOS 15 的离屏路径上不画，**仍未证**；不再猜 | 换取证通道（真机截屏 / R19 那条 orderFront），两条依赖它的判据先记 NOT-RUN、本机实跑 |
@@ -245,12 +252,13 @@ R29d 撤回了**我自己肉眼看过的那张帧**（它报"可读"，像素是
 ```bash
 cd ~/Codex_Project0/ClipboardHistory && unset SDKROOT
 swift build 2>&1 | grep -c "warning:"          # 期望 0
-swift test 2>&1 | tail -3                       # 期望 703 tests / 26 skipped / 0 failures
+swift test 2>&1 | tail -3                       # 期望 704 tests / 26 skipped / 0 failures
 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests
 cd .. && python3 scripts/frame_baseline.py --against working compare /tmp/shots   # CHANGED=0（102 帧）
 python3 -m unittest discover -s scripts/tests   # 72 passed
 python3 .scratch/motion-audit-2/mutate_r28_text_clip.py   # CAUGHT=9/9, RESTORE_CLEAN=yes
 python3 .scratch/motion-audit-2/mutate_r29d_sidebar_text.py  # CAUGHT=5/5, RESTORE_CLEAN=yes
+python3 .scratch/motion-audit-2/mutate_r32_axis.py                # CAUGHT=4/4, RESTORE_CLEAN=yes
 make bundle && bash scripts/install_local.sh --yes --no-build
 ```
 

@@ -619,8 +619,12 @@ final class Round4MarkdownTests: XCTestCase {
                       "控件的动作没走 toggled()：标题与翻转方向会各说各话")
         XCTAssertTrue(detail.contains("helpLabel(MarkdownPreviewMode.controlHelp)"),
                       "控件只有视觉没有无障碍标签（R-54 那一族的规矩）")
-        XCTAssertTrue(detail.contains("maxWidth: DetailTypography.columnWidth()"),
-                      "渲染分支没接可读列（U-4 的行长问题会跟着回来）")
+        // R32：同 Round3 那条 —— 渲染分支走的是 `.detailReadableColumn()`，
+        // 上限在那一处定义里。这里判"渲染分支自己有没有接上"，用调用点计数而不是字符串存在性。
+        let renderedWired = detail.components(separatedBy: ".detailReadableColumn()").count - 1
+        XCTAssertGreaterThanOrEqual(renderedWired, 2,
+                      "详情区只接了 \(renderedWired) 处可读列 ⇒ 渲染分支或原文分支有一个不限宽了"
+                      + "（U-4 的行长问题会跟着回来，而且两种看法的左轴会不一样）")
     }
 
     func testFilePreviewRoutesMarkdownFilesToTheRenderer() throws {

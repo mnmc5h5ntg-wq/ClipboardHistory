@@ -169,9 +169,7 @@ struct DetailView: View {
         // U-4：两行居中 meta → 一条左对齐，并且和正文**共用同一个可读列**。
         // 居中元信息的问题不是"不好看"，是它把时间、大小这类次要信息抬到了和正文同一视觉层级，
         // 而读者要先判断"这两行属于谁"；来源 App 以前干脆没在详情里露出（B-2 已经把它持久化了）。
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
+        HStack(spacing: 8) {
                 Text(DetailTypography.metaText(
                     copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
                     size: entry.content.sizeDescription,
@@ -195,10 +193,7 @@ struct DetailView: View {
             // 左缘对齐靠的是"同一个列宽 + 同一个 gutter"，不是靠肉眼调 padding。
             // `columnWidth` 里的 gutter 与正文 `textContainerInset` 是同一个常数（见 DetailTypography）。
             .padding(.horizontal, DetailTypography.containerGutter)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(maxWidth: DetailTypography.columnWidth())
-            Spacer(minLength: 0)
-        }
+            .detailReadableColumn()
         // 顶部留白不是审美值，是**窗口装饰的实测几何**：这一行文字必须从交通灯带下方开始，
         // 否则侧栏一收起（详情列成了最左列）就会和关闭/最小化按钮叠在一起。
         // 数值由 `WindowChromeMetrics` 在每次重新摆放按钮时发布。
@@ -269,16 +264,14 @@ struct DetailView: View {
             if MarkdownRenderingAffordance.renders(text: text, in: markdownMode) {
                 ChineseSelectableAttributedTextView(source: text,
                                                     highlightQuery: historyStore.searchText)
-                    .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .center)
+                    .detailReadableColumn()
             } else {
                 ChineseSelectableTextView(
                     text: text,
                     font: DetailTypography.bodyFont,
                     highlightQuery: historyStore.searchText
                 )
-                .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
-                .frame(maxWidth: .infinity, alignment: .center)
+                .detailReadableColumn()
             }
         case .image(let stored):
             ImagePreviewView(nsImage: stored.nsImage)

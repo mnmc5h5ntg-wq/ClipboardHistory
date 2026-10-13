@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R32 · 详情区只留一条左轴，骨架承诺的那一列就是内容落地的那一列）
+
+- **产品改动（本轮唯一一次动画面几何）**：详情区的可读列不再随窗口居中，改为贴 `containerGutter`
+  起排、宽出来的留在右边；三处调用点（头部 meta、渲染正文、原文正文）统一走新增的
+  `View.detailReadableColumn()`。
+- **实测**：五块左轴（meta / 原文 / 渲染 / 退回原文 / 加载骨架）的 spread 从 **35.0pt → 0.5pt**，
+  亮暗两档各一遍。加载结束的一瞬间整块内容不再向右跳 35pt。
+- **新判据**：`testDetailAreaHasASingleLeftAxis`（每块必须贴 gutter ±2，且彼此差 ≤2pt）。
+- **两条源码守卫改强**：`Round3DetailTypographyTests` / `Round4MarkdownTests` 原来只查
+  DetailView 里有没有 `maxWidth: DetailTypography.columnWidth()` 这个字符串；上限搬进 helper 后
+  改成判两半 —— 调用点计数 ≥3 **且** helper 里仍有上限。
+- **代价（写进 D-091）**：宽窗口里正文右侧留白变大。退路是抬 ch 上限（68→78），不是改回居中。
+- 帧基线 16 张 detail/content 帧随本提交 `update`。变异 M137–M140 四支（含一支重犯"带切掉首行"）。
+
+
 ### Changed（R29d · 收口后的一轮：产品零改动，两条账）
 
 - **产品代码零改动**。本轮改的是两个 `.scratch` 取证工具与账本。

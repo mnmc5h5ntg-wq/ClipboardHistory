@@ -189,8 +189,16 @@ final class Round3DetailTypographyTests: XCTestCase {
         let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
         XCTAssertTrue(detail.contains("highlightQuery: historyStore.searchText"),
                       "详情正文没把当前搜索词交给高亮")
-        XCTAssertTrue(detail.contains("maxWidth: DetailTypography.columnWidth()"),
-                      "正文列宽没有限制（U-4 的行长问题仍在）")
+        // R32：可读列的**写法**收进了 `View.detailReadableColumn()`（左轴只在一处定义），
+        // 所以这里判两半：调用点确实接上了（≥3 处：头部 meta、渲染正文、原文正文），
+        // 以及那处定义仍然在限宽。去掉任何一半都会红 —— 比原来只查一个字符串更强。
+        let readableCalls = detail.components(separatedBy: ".detailReadableColumn()").count - 1
+        XCTAssertGreaterThanOrEqual(readableCalls, 3,
+                      "详情区只有 \(readableCalls) 处接了可读列（应 ≥3：头部 meta、渲染正文、原文正文）"
+                      + " ⇒ 有一块又回到不限宽/自己调 padding，左轴会重新分叉")
+        let extensions = codeOnly(try productSource(named: "Views/ViewExtensions.swift"))
+        XCTAssertTrue(extensions.contains("maxWidth: DetailTypography.columnWidth()"),
+                      "可读列的定义里没了列宽上限（U-4 的行长问题仍在）")
         XCTAssertFalse(detail.contains("VStack(alignment: .center"),
                        "meta 又变回两行居中了")
         XCTAssertTrue(detail.contains("lineLimit(1)"), "meta 允许换行了")

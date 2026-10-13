@@ -2906,6 +2906,91 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// 详情区**只有一条内容左轴**（R32 / BACKLOG 39 / U-54）。
+    ///
+    /// 改之前的实测（同一把尺、同一批帧）：头部 meta 与正文在 **54.5 / 55.5**，
+    /// 而它替代的加载骨架在 **20.5** —— 预览落地的一瞬间整块内容向右跳 35pt。
+    /// 原因不是谁调错了 padding，是"可读列居中"这个写法：居中列的左缘 =
+    /// (面板宽 − 列宽)/2，**随窗口宽度变**，所以它永远不可能等于一个固定的 gutter。
+    /// 现在三处调用点统一走 `View.detailReadableColumn()`（贴 gutter、宽出来的留在右边）。
+    ///
+    /// 这条判据要红得起来，靠的是它量的是**不同的东西**（R26 的 M116 教训）：
+    /// meta 行、正文首行、正文后续行、骨架条带、骨架那一句 —— 五块各自量一次，
+    /// 断言"彼此差 ≤2pt 且都贴着 gutter ±2"。把 gutter 去掉会让**五块一起**挪，
+    /// 那条 R26 已经证明"一起挪"必须由"贴着 gutter"这半边抓住，所以两个方向都留了断言。
+    func testDetailAreaHasASingleLeftAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r32-axis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        /// (夹具, 块名, 量哪一条 y 带)。y 带是从帧上**读出来的**，不是推的：
+        /// 改之前先量了一遍（meta 在 84–106、正文首行 110–150、渲染正文 150–300、骨架 84–150）。
+        /// **每一块都用"整块高度"而不是单行**：正文可能首行缩进（fixture 里就有），
+        /// 单行带会把缩进读成左轴 —— 第一版就红在了这里（读出 41.5，其实是首行两个空格）。
+        /// 取整块的最左强墨列，缩进只会让它偏右、不会偏左，所以那才是轴。
+        /// 带的上下沿也不是猜的：`rows` 剖面读出来 meta 那一行占 y=82.5…95，
+        /// 第一版把 meta 带写成 84..106、正文带写成 110 起 —— 于是正文带被**切掉了首行**，
+        /// 尺在 110 以下只找到第二行往后的强墨，报出 41.5 这个假轴（差 21pt）。
+        /// 教训同族：**锚点过窄会把排版读成缺陷**，带要按剖面放。
+        /// 刻意**不含** `detail-3-files`：那是"一列文件行"（图标 + 文字的行结构），
+        /// 它的左轴属于行列表那一族（侧栏同理），不是正文列。
+        let probes: [(String, String, CGRect)] = [
+            ("detail-0-text", "头部 meta", CGRect(x: 0, y: 80, width: 720, height: 18)),
+            ("detail-0-text", "正文（原文）", CGRect(x: 0, y: 100, width: 720, height: 400)),
+            ("detail-markdown-rendered", "正文（渲染）", CGRect(x: 0, y: 100, width: 720, height: 400)),
+            ("detail-markdown-source", "正文（退回原文）", CGRect(x: 0, y: 100, width: 720, height: 400)),
+            ("detail-loading", "骨架条带＋那一句", CGRect(x: 0, y: 80, width: 720, height: 80)),
+        ]
+        let gutter = Double(DetailTypography.containerGutter)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            var axes: [(String, Double)] = []
+            for fixtureName in Set(probes.map { $0.0 }).sorted() {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == fixtureName }) else {
+                    return XCTFail("找不到 \(fixtureName) ⇒ 这条判据失去了对象")
+                }
+                let file = scratch.appendingPathComponent("\(fixtureName)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("读不回 \(file.lastPathComponent)")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                for (name, block, rect) in probes where name == fixtureName {
+                    guard let axis = Self.leadingInkColumn(bytes: base, width: rep.pixelsWide,
+                                                           height: rep.pixelsHigh,
+                                                           bytesPerRow: rep.bytesPerRow,
+                                                           rect: rect, scale: scale) else {
+                        print("AXIS_NOT_RUN \(fixtureName)/\(block) \(tag)")
+                        continue
+                    }
+                    axes.append(("\(fixtureName)/\(block)", axis))
+                }
+            }
+            guard axes.count >= 3 else {
+                print("AXIS_NOT_RUN all \(tag) 只有 \(axes.count) 块量到")
+                throw XCTSkip("AXIS_NOT_RUN \(tag)：这台机器拍不出详情区 ⇒ 左轴契约记为未运行（BACKLOG 43 那一族）")
+            }
+            let values = axes.map { $0.1 }
+            let spread = (values.max() ?? 0) - (values.min() ?? 0)
+            for (block, axis) in axes {
+                XCTAssertLessThanOrEqual(abs(axis - gutter), 2.0,
+                    "\(block) 的左轴在 x=\(String(format: "%.1f", axis))，详情区 gutter 是 "
+                    + "\(String(format: "%.0f", gutter))pt（\(tag)）⇒ 那一块不在内容列上："
+                    + "居中写法会把它带回 (面板宽−列宽)/2，随窗口变")
+            }
+            XCTAssertLessThanOrEqual(spread, 2.0,
+                "详情区读出 \(axes.count) 块，左轴最宽差 \(String(format: "%.1f", spread))pt："
+                + axes.map { "\($0.0)=\(String(format: "%.1f", $0.1))" }.joined(separator: " ")
+                + "（\(tag)）⇒ 加载态与内容态不是同一条轴，预览落地会跳")
+            print("DETAIL_AXIS \(tag) 判了 \(axes.count) 块，spread=\(String(format: "%.1f", spread))pt "
+                  + "gutter=\(String(format: "%.0f", gutter))pt")
+        }
+    }
+
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
     ///
     /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，

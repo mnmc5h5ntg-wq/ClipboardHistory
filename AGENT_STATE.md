@@ -1280,3 +1280,20 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **数字**：0 warning；**703 例 / 26 skip / 0 失败**（+1 条永远记 skip 的诊断）；
   帧基线 102 / `CHANGED=0`（产品零改动，符合预期）；脚本 72 passed；
   变异 M132–M136 **5/5 CAUGHT**、`RESTORE_CLEAN=yes`（`/tmp/r30-mutation.log`）。
+
+## Round 31 · 边界轮：没有第二条离屏取图通道（材质/vibrant/prominent 三处盲区只能真机）
+
+- `CGWindowListCreateImage` 在 macOS 15 SDK 标 unavailable，替代要录屏授权 + 真上屏
+  ⇒ R30 的"帧是合成前像素"**无法靠再写捕获器解决**。已写进 BACKLOG 40 / 45 的下一步与 §5.15。
+- 同一支 spike 的四行读数按 **DID-NOT-RUN** 处理（对照组连底色都没画出来），没据此下结论。
+- 自评 89（边界轮）。下一轮回到产品：BACKLOG 39 详情区左轴契约。
+
+## Round 32 · 详情区左轴统一到 gutter（BACKLOG 39 收口 / U-54 / D-091）
+
+- **产品改动**：新增 `View.detailReadableColumn()`，头部 meta / 渲染正文 / 原文正文三处统一走它。
+  实测 spread **35.0pt → 0.5pt**（五块 × 亮暗两档，`DETAIL_AXIS` 行）。
+- **新判据**：`testDetailAreaHasASingleLeftAxis`（五块各自贴 gutter ±2 且彼此差 ≤2pt）。
+- **两条源码守卫改强**：从"DetailView 里有没有那个字符串"改成"调用点计数 ≥3 + helper 里仍有上限"。
+- **本轮犯的尺错**：正文带起在 y=110 切掉了首行 ⇒ 假轴 41.5；按 `rows` 剖面重放后正确。
+  教训与 M140 一起入账（**锚点过窄会把排版读成缺陷**）。
+- **代价与退路**：宽窗口正文右侧留白变大；嫌空就抬 ch 上限，不许改回居中（D-091）。
