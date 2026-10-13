@@ -428,7 +428,8 @@ struct SettingsView: View {
                                 // 见 `PressableStyle` 里 `isHovered: false` 那条）。
                                 // 这是一颗**破坏性**按钮，"按到了"最不该省。
                                 .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
-                                              hoverLevel: VisualFill.controlHover)
+                                              hoverLevel: VisualFill.controlHover,
+                                              labelPadding: 4)
                             }
                             // 行会真的消失：这里不是 `List`（`List` 的行过渡在 macOS 上
                             // 四种写法都跑不出来，账本 M1 / D-055），是普通 `VStack`，
@@ -923,7 +924,8 @@ struct ReceiptLine: View {
                     .font(.system(size: VisualGlyph.badge))
             }
             .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
-                          hoverLevel: VisualFill.controlHover)
+                          hoverLevel: VisualFill.controlHover,
+                          labelPadding: 4)
             .helpLabel("收起这条提示")
         }
         .transition(MotionCatalog.transition(for: .contentFade))

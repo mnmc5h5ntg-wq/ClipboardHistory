@@ -82,7 +82,12 @@ struct HistorySidebarView: View {
 
 
     private var bulkActionButtons: some View {
-        HStack(spacing: 8) {
+        // R15：间距从 8 收到 0，交给 `labelPadding` 出。
+        // 药丸每边 5pt ⇒ 相邻两颗的高亮正好挨着（系统工具栏就是这个形状），
+        // 而字形之间仍然是 10pt 的视觉距离（比原来的 8pt 略松一点，可接受）。
+        // 如果留着 spacing 8 再加 padding 5，两颗高亮之间会露出一条 18pt 的空隙，
+        // 读起来像"五个孤立的方块"而不是"一排工具"。
+        HStack(spacing: 0) {
             Button {
                 historyStore.perform(.favoriteSelection)
             } label: {
@@ -124,7 +129,8 @@ struct HistorySidebarView: View {
         // 的地方，于是这五颗（含**删除**）既没有按压也没有悬停反馈：点下去只有图标自己动一下，
         // 而"我按到的是哪一颗"要等结果才知道。`.borderless` 不是"更素"，是把反馈拿掉了。
         .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
-                      hoverLevel: VisualFill.controlHover)
+                      hoverLevel: VisualFill.controlHover,
+                      labelPadding: 5)
     }
 
     private var headerTitle: String {

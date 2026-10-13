@@ -126,6 +126,29 @@ final class PressFeedbackTests: XCTestCase {
                       "悬停要由样式内部一个能持有状态的视图来记，否则 `makeBody` 里没有 @State 可用")
         XCTAssertTrue(style.contains("value: isHovered"),
                       "悬停那一档要进 `.hover` 的事务，不然它是硬切")
+        // R15：`labelPadding` 走的是同一条路（样式字段 → 转交 → 真的挂上）。
+        // 少任何一环，"命中区跟着药丸一起长"这句话就是注释。
+        XCTAssertTrue(style.contains("labelPadding: labelPadding"),
+                      "样式把调用方给的 labelPadding 丢了 ⇒ 三处小控件的命中区又回到贴着笔画那一圈")
+        XCTAssertTrue(style.contains(".padding(labelPadding)"),
+                      "padding 挂上去了但挂的是常量 ⇒ 参数是装饰")
+    }
+
+    /// 药丸/命中区这一档必须**有人用**。R13 的教训：新参数没有消费者，
+    /// 它就只是一个类型定义（"加了"与"有人用"是两件事）。
+    func testSmallControlsAskForThePillPadding() throws {
+        var consumers = 0
+        for (file, source) in try productSources(in: "Views") {
+            // 声明这个参数的那个文件必须**先摘掉**：它自己就有五处 `labelPadding:`
+            // （字段、转交、`.padding(...)`、扩展的默认值与转交），
+            // 不摘的话这条"有没有消费者"会拿声明当消费 —— 与"扫自身源码的守卫要先把守卫自己摘掉"同族。
+            if file == "PressableStyle.swift" { continue }
+            consumers += codeOnly(source).components(separatedBy: "labelPadding:").count - 1
+        }
+        // 3 = 侧栏五颗批量按钮（一次调用管一排）+ 排除名单的「移除」+ 回执的 ×。
+        XCTAssertEqual(consumers, 3,
+                       "只有 \(consumers) 处小控件抬了药丸/命中区。少一处 = 那颗按钮退回'贴着笔画的一圈'；"
+                       + "多一处 = 新位点要重判（整行类按钮**不该**加，它有自己的内边距）")
     }
 
     /// 上一条管的是"样式内部有没有悬停这一半"，这一条管的是**接缝**：
@@ -259,26 +282,29 @@ final class PressFeedbackTests: XCTestCase {
     /// 46 设备像素 = 23pt；行 44pt），不是"随便一块平面"：同一档 6% 铺在一整行上读得出来、
     /// 铺在 22pt 上读不读得出来，正是这条要回答的（圆角占的面积比例也只有在真实尺寸上才对）。
     func testFillLaddersAreVisibleOnBothControlClasses() throws {
-        let ladders: [Ladder] = [
-            // 行：默认档。四档都是它可能依次经过的状态。
-            Ladder(name: "row", side: 44, steps: [("idle", 0), ("hover", VisualFill.hover),
-                                                  ("pressed", VisualFill.pressed),
-                                                  ("selected", VisualFill.selected)]),
-            // 小控件（R13 那三处）：`selected` 与它无关（图标按钮不会被选中），
-            // 但它**一定**会经过 idle→hover→pressed 这三步。
-            Ladder(name: "control", side: 22, steps: [("idle", 0),
-                                                      ("hover", VisualFill.controlHover),
-                                                      ("pressed", VisualFill.pressed)])
-        ]
+        let ladders = Self.makeLadders()
         for ladder in ladders {
             for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
                 let tag = appearance == .darkAqua ? "dark" : "light"
-                var previous = try renderFill(level: 0, appearance: appearance, side: ladder.side)
-                var previousName = ladder.steps[0].0
+                // 起点是**梯子自己的第一步**，不是"0"。
+                // 第一版写死 `level: 0` 再 `dropFirst()`，对行/控件没错（它们第一步就是 idle=0），
+                // 但输入框这辈子不是从 0 开始的（静止态就是 `fieldIdle`）——
+                // 于是那条梯子量的其实是"idle→fieldActive"，
+                // 而 `fieldIdle→fieldActive` 这一步**从来没被比过**：
+                // 变异 M66（把两档并成一档）因此**全绿通过**。尺子自己错了。
+                let firstStep = ladder.steps[0]
+                var previousName = firstStep.0
+                var previous = try renderFill(level: firstStep.1, appearance: appearance,
+                                              size: ladder.size)
+                var previousLevel = firstStep.1
                 for (name, level) in ladder.steps.dropFirst() {
-                    let current = try renderFill(level: level, appearance: appearance, side: ladder.side)
+                    let current = try renderFill(level: level, appearance: appearance, size: ladder.size)
                     let step = Self.meanChannelDelta(previous, current)
-                    print("FILL_STEP \(ladder.name)/\(tag) \(previousName)->\(name) "
+                    // 读数里带上**两档各自的令牌值**：R15 在这里栽过一次 ——
+                    // 改了令牌之后读数一模一样，而日志里看不出量的是哪两个数，
+                    // 只能靠再跑一遍去猜是不是用了旧二进制。
+                    print("FILL_STEP \(ladder.name)/\(tag) \(previousName)(\(String(format: "%.3f", previousLevel)))"
+                        + "->\(name)(\(String(format: "%.3f", level))) "
                         + "均值通道差=\(String(format: "%.2f", step))/255")
                     XCTAssertGreaterThanOrEqual(step, Self.perceptibleStep255,
                                                 "\(ladder.name)/\(tag)：从 \(previousName) 按到 \(name) 画面上只差 "
@@ -291,6 +317,7 @@ final class PressFeedbackTests: XCTestCase {
                                    "\(ladder.name)/\(tag)：\(name) 比上一档\(gotDarker ? "更暗" : "更亮")，方向反了")
                     previous = current
                     previousName = name
+                    previousLevel = level
                 }
             }
         }
@@ -303,10 +330,65 @@ final class PressFeedbackTests: XCTestCase {
     /// 跨控件比两档差多少，量的是一件不存在的事；
     /// 而"按下这颗图标时，它比悬停时看得出来吗"是**每一次点击都会发生**的事。
     /// （同族：同一个词在两个判据里含义不同，就别统一成一个布尔值。）
-    private struct Ladder {
+    struct Ladder {
         let name: String
-        let side: CGFloat
+        let size: NSSize
         let steps: [(String, Double)]
+
+        var tierNames: Set<String> { Set(steps.map { $0.0 }) }
+    }
+
+    /// 三条梯子 = 产品里三族"会换底色"的东西，各自**依次经过**的状态。
+    ///
+    /// 写成**一个函数**（不是 `static let`）：守卫与判据必须读同一份定义，
+    /// 否则"覆盖了哪些档"这句话会有两个答案（这一族记过：同一个词两个判据里含义不同）；
+    /// 而它**不能**是静态存储 —— 它的初始化器里有调用（`NSSize(width:height:)`、读令牌），
+    /// 那正是 CI 的 Swift 6.1.2 在 `emitLazyGlobalInitializer` 里 SIGSEGV 的那一族（账本 D-069）。
+    /// 本机 6.2.1 不复现，所以这条只能靠"根本不建那个全局"来躲。
+    ///
+    /// `field` 那条是 R15 补的：`fieldIdle 0.035 → fieldActive 0.06` 这一步从来没被量过，
+    /// 而它是输入框**唯一**的状态通道（搜索框不会 hover 变色，只会"激活/没激活"）。
+    static func makeLadders() -> [Ladder] {
+        [
+            Ladder(name: "row", size: NSSize(width: 44, height: 44),
+               steps: [("idle", 0), ("hover", VisualFill.hover),
+                       ("pressed", VisualFill.pressed), ("selected", VisualFill.selected)]),
+            // 第二步的名字写**令牌名**（controlHover）而不是状态名（hover）：
+            // 同一颗控件的"悬停"用的是另一档，如果两族都叫 hover，
+            // 下面那条集合相等守卫就会被白拿（"同一个词在两个判据里含义不同"那一族）。
+            Ladder(name: "control", size: NSSize(width: 22, height: 22),
+                   steps: [("idle", 0), ("controlHover", VisualFill.controlHover),
+                           ("pressed", VisualFill.pressed)]),
+            Ladder(name: "field", size: NSSize(width: 280, height: 28),
+                   steps: [("fieldIdle", VisualFill.fieldIdle),
+                           ("fieldActive", VisualFill.fieldActive)])
+        ]
+    }
+
+    /// 每个 `VisualFill` 档位都必须出现在某条梯子里 —— 集合相等，多一个少一个都红。
+    ///
+    /// 这条是 R13→R14 那一课的工程化：R13 抬了一档，只证明了"它比 0 看得出来"，
+    /// 没证明"它与相邻那一档还分得开"，于是修好悬停、弄没按压，全绿。
+    /// 规矩"改令牌必须跑完整梯子"要成立，就得有人盯着"哪些档根本没进梯子"——
+    /// 新加一档而没人量它，正是上一轮那种事故的下一个版本。
+    func testEveryVisualFillTierIsCoveredByALadder() throws {
+        let source = codeOnly(try productSource(named: "Utilities/VisualTokens.swift"))
+        let body = region(in: source, named: "enum VisualFill")
+        var declared: Set<String> = []
+        for line in body.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("static let"), trimmed.contains(": Double") else { continue }
+            guard let name = trimmed.components(separatedBy: "static let ").dropFirst().first?
+                .components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces) else { continue }
+            declared.insert(name)
+        }
+        // "idle" 不是令牌，是"什么都没叠"的那个状态；`0` 由 `Color.primary.opacity(0)` 表达。
+        let covered = Self.makeLadders().reduce(Set<String>()) { $0.union($1.tierNames) }
+            .subtracting(["idle"])
+        XCTAssertEqual(declared, covered,
+                       "VisualFill 里有档位没进梯子（只声明没被量）或梯子里有档位已被删掉。\n"
+                       + "令牌侧: \(declared.sorted())\n梯子侧: \(covered.sorted())\n"
+                       + "新加一档 ⇒ 同时加进它所属那一族的梯子，并看它**左右两个邻居**的台阶")
     }
 
     /// 一块平面底色上"看得出来"的地板（0–255 的均值通道差）。
@@ -324,7 +406,8 @@ final class PressFeedbackTests: XCTestCase {
     /// `PressableAppearance.fillOpacity(...)` 拿，所以这条判据覆盖的是
     /// **产品真正会画的那一层**，只是绕过了"谁把它翻成非零"那一半。
     private func renderFill(level: Double, appearance: NSAppearance.Name,
-                            side: CGFloat = 22, scale: CGFloat = 4) throws -> NSBitmapImageRep {
+                            size renderSize: NSSize = NSSize(width: 22, height: 22),
+                            scale: CGFloat = 4) throws -> NSBitmapImageRep {
         // `NSApp` 在这个套件里是 **nil**：它是 `NSApplication.shared` 被访问过之后才被赋的全局，
         // 而本文件其余判据从不碰 AppKit 外观。第一次实测就是 `Fatal error: Unexpectedly
         // found nil while implicitly unwrapping`（信号 5 = 崩溃，不是"没跑"）。
@@ -335,23 +418,24 @@ final class PressFeedbackTests: XCTestCase {
         defer { app.appearance = previousAppearance }
 
         let rep = NSBitmapImageRep(bitmapDataPlanes: nil,
-                                   pixelsWide: Int(side * scale), pixelsHigh: Int(side * scale),
+                                   pixelsWide: Int(renderSize.width * scale),
+                                   pixelsHigh: Int(renderSize.height * scale),
                                    bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
                                    isPlanar: false, colorSpaceName: .deviceRGB,
                                    bytesPerRow: 0, bitsPerPixel: 0)!
-        rep.size = NSSize(width: side, height: side)
+        rep.size = renderSize
         let root = AnyView(
             ZStack {
                 Color(nsColor: .windowBackgroundColor)
                 VisualShape.rounded(VisualRadius.control)
                     .fill(Color.primary.opacity(level))
             }
-            .frame(width: side, height: side)
+            .frame(width: renderSize.width, height: renderSize.height)
         )
         let host = NSHostingView(rootView: root)
-        host.frame = NSRect(x: 0, y: 0, width: side, height: side)
+        host.frame = NSRect(origin: .zero, size: renderSize)
         host.appearance = NSAppearance(named: appearance)
-        host.cacheDisplay(in: NSRect(x: 0, y: 0, width: side, height: side), to: rep)
+        host.cacheDisplay(in: NSRect(origin: .zero, size: renderSize), to: rep)
         return rep
     }
 

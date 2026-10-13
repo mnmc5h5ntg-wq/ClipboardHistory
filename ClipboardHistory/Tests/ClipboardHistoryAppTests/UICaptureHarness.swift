@@ -250,6 +250,12 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-multi-select", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected)))
         })
+        // R15：多选条的图标加了 `labelPadding`（药丸与命中区一起长），
+        // 整排宽了约 18pt。"最窄侧栏放得下"这句话不能靠算 ——
+        // `ContentView` 给侧栏的是 `minWidth: 250`，所以这张帧就是那条算式的判据。
+        results.append(Fixture("sidebar-multi-select-min", NSSize(width: 250, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected), width: 250))
+        })
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
         })
@@ -518,9 +524,13 @@ final class UICaptureTests: XCTestCase {
         return results
     }
 
-    private func sidebarFrame<V: View>(_ view: V) -> some View {
+    /// 侧栏夹具的外框。宽度是**参数**：
+    /// R15 第一版加窄帧时忘了这里，300 的框套在 250 的画布上 ⇒ 拍出来两边各裁掉 25pt，
+    /// 看起来像"产品在窄侧栏下溢出"，其实是夹具在撒谎（量出来的 extent 正好等于整幅宽）。
+    /// 一个把尺寸写死的外框，等于取消了"换个尺寸拍一张"这件事。
+    private func sidebarFrame<V: View>(_ view: V, width: CGFloat = 300) -> some View {
         view
-            .frame(width: 300, height: 520, alignment: .top)
+            .frame(width: width, height: 520, alignment: .top)
             .background(Color(nsColor: .windowBackgroundColor))
     }
 

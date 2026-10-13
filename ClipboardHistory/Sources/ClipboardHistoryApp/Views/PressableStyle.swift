@@ -50,13 +50,22 @@ struct PressedStyle<S: Shape>: ButtonStyle {
     var reduceMotion: Bool = MotionCatalog.motionShouldBeReduced
     /// 悬停那一档的强度（见 `PressableAppearance.fillOpacity`）。
     var hoverLevel: Double = VisualFill.hover
+    /// label 四周留多少给底色层（默认 0 = 药丸正好贴着内容）。
+    ///
+    /// R15 加的这一层。默认 0 是故意的：**这不是"更漂亮"，是命中区**——
+    /// 底色铺在 label 的包围盒上，所以一颗 16pt 图标的悬停药丸就是一圈紧贴笔画的方块，
+    /// 而系统工具栏那颗是"图标 + 每边约 5pt"，且**能点的地方和高亮一样大**。
+    /// 只在图标类站点抬（侧栏五颗批量按钮、排除名单的「移除」、回执 ×），
+    /// 其余站点（整行、文字按钮）本来就有自己的内边距，再抬就是改版式。
+    var labelPadding: CGFloat = 0
 
     func makeBody(configuration: Configuration) -> some View {
         PressedLabel(configuration: configuration,
                      fillShape: fillShape,
                      scales: scales,
                      reduceMotion: reduceMotion,
-                     hoverLevel: hoverLevel)
+                     hoverLevel: hoverLevel,
+                     labelPadding: labelPadding)
     }
 }
 
@@ -74,10 +83,15 @@ private struct PressedLabel<S: Shape>: View {
     let scales: Bool
     let reduceMotion: Bool
     let hoverLevel: Double
+    let labelPadding: CGFloat
     @State private var isHovered = false
 
     var body: some View {
         configuration.label
+            // 先加边再缩放：缩放是几何效果、不改布局，所以底色那一层（挂在后面）
+            // 始终是"未缩放的那一圈"，而它覆盖的是**内容 + 边**——
+            // 也就是高亮比字形大一圈，且这一圈同样点得动（padding 在 label 里，命中区跟着长）。
+            .padding(labelPadding)
             .scaleEffect(scales ? PressableAppearance.scale(isPressed: configuration.isPressed,
                                                            reduceMotion: reduceMotion)
                                 : 1.0)
@@ -98,8 +112,10 @@ extension View {
     /// 按压反馈的唯一入口。
     func pressedStyle<S: Shape>(in shape: S,
                                 scales: Bool = true,
-                                hoverLevel: Double = VisualFill.hover) -> some View {
-        buttonStyle(PressedStyle(fillShape: shape, scales: scales, hoverLevel: hoverLevel))
+                                hoverLevel: Double = VisualFill.hover,
+                                labelPadding: CGFloat = 0) -> some View {
+        buttonStyle(PressedStyle(fillShape: shape, scales: scales,
+                                 hoverLevel: hoverLevel, labelPadding: labelPadding))
     }
 }
 
