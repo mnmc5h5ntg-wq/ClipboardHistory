@@ -1386,3 +1386,30 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   —— 那条本机永远走不到的分支第一次在真环境按预期走了一遍。
 - **验证**：712 tests / 31 skipped / 0 failures、0 warning、脚本 72 OK、
   变异 M152–M156 五支全 CAUGHT、`RESTORE_CLEAN=yes`。自评 **89 / 100**（<90 ⇒ 继续）。
+
+---
+
+## Round 36 · CI 的红必须有名字（BACKLOG 49 收口 / U-59 收口 / U-60 开 / BACKLOG 50 开 / D-095）
+
+- **闸门落地**：新增 `scripts/ci_capture_gate.py` + 工作流硬门那一步。三条退出码规矩：
+  未登记的红 >0 ⇒ 红；日志里一条 `Test Case` 结论都没有 ⇒ 红（"没跑"不是通过）；
+  判出绿 < `--min-passed 15` ⇒ 红（整批退回 `XCTSkip` 也是一条红都没有）。
+  红有两个来源：`error: -[类 方法] :`（断言行）与 `Test Case … failed`（崩溃/超时只有结论行）。
+- **正对照是逐字日志**：`scripts/tests/fixtures/r36_runner_capture.log`（run 38473962277 那 257 行，
+  `gh api .../jobs/115559876687/logs` 取的）。它当场纠正三件事：那 4 条红属于 **1 个用例**
+  （`4 failures` 是断言数）；settings 族在 runner 上 18 张**全部** 90.6–95.9% 未绘制（本机 20.8–78.8%）；
+  runner 上**一处黑带都没有**（本机 9 处）⇒ "黑带消失了"那条守卫在那边恒红。
+  旧账 BACKLOG 43"List 族在 runner 画不出来"是错的，已就地改。
+- **机器能力前提拆成三条**（`CaptureCapability.measure` 纯函数 + 5 臂真值表，用两台机器各自的实测读数）：
+  `settingsFamilyIsBlank` / `bandsSeenHere` / `rulerSeesBottomEdge`，
+  反例臂：单帧空白、尺全 0、族只一张 —— 都不许被"整族画不出来"顺走。
+- **U-60（本轮真正的产出，看图看出来的）**：`bottomInkFraction` 的参照点是**左上角那一个像素**，
+  它读的是色差不是墨。51 张帧双参照：15 张假 100%（sidebar 四帧×亮暗 + detail 亮色七帧），
+  `settings-privacy-light` 反向漏报（0.1% vs 真实 6.7%）。黑区实测在 pt 371..436.5、下沿距帧底 83pt
+  ⇒ 那 100% 连"黑带被数成墨"都不是。⇒ R22 那条正对照从写下起就是假的，
+  `contentMustFit` 十条判据十四轮没有有效正对照。**本轮只改话术 + 记账 + 留绊线**，尺留给 R37。
+- **验证**：713 tests / 31 skipped / 0 failures、`swift build` 0 告警、脚本 72→83 全绿、
+  帧基线 `CHANGED=0 / 102`（产品零改动）、变异 M157–M168：11 CAUGHT + M168 本地无判别力（下一次 CI 判）、
+  `RESTORE_CLEAN=yes`。自评 **90 / 100**。
+- **仍未验证**：闸门在 runner 上第一次真跑是否绿（这正是这一步存在的理由；红了会指名是谁）。
+  人工批次 40（设置六页最底行 / 侧栏选中行真机 / 最小尺寸下的半行）+ 39.1–39.3 仍待用户。

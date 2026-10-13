@@ -2353,3 +2353,89 @@ vibrantAppearanceCovering(那一列)   NSAppearanceNameVibrantLight（暗档 …
 | 覆盖有没有机器账 | 没有 | 有（从产品枚举推导） |
 
 变异 **M152–M156** 五支全 CAUGHT（其中 M155 的第一版就是那支 ESCAPED 的，它换成了"把撤掉的探针加回来必须红"）。
+
+---
+
+## 第 38 轮 · R36：CI 那一步的红终于有名字了 —— 而"看图"把量底行的那把尺问成了一把色差尺（U-59 收口 / U-60 / BACKLOG 49 收口、50 开）（D-095）
+
+### 开场缺陷清单（坐标）
+
+| # | 位点 | 进轮时的账 | 本轮判定 |
+|---|---|---|---|
+| 1 | `.github/workflows/ci.yml` "Offscreen frame capture" | report-only，runner 上 4 条红被吞（BACKLOG 49） | 加**硬门** `Capture gate`：未登记的红=0 才绿，没跑=红，绿的数量低于门=红 |
+| 2 | `testCaptureKeyViews` 的三条机器前提 | 上一版写"某一族画不画得出来"一把尺管三件事 | 拆成三条，各自只看**它要判的那个量**，且全部从这一台的逐帧读数算 |
+| 3 | `bottomInkFraction` 的参照点 | R22 起就当它"量底行有没有墨" | **它量的是"底行 vs 左上角那一个像素"的色差**（U-60，下详）→ BACKLOG 50 / R37 |
+| 4 | 那 4 条被吞的红到底是哪 4 条 | 只记得"有 4 条" | 从 runner 逐字日志取回，钉成夹具 `scripts/tests/fixtures/r36_runner_capture.log` |
+
+### 先取证据，再动判据
+
+`gh api repos/:owner/:repo/actions/jobs/115559876687/logs` 拿回 run 38473962277 的 394KB 日志，
+切出这一步的 257 行（102 行逐帧表格 + 28 条用例结论 + 4 条断言行）存成夹具。三件事当场被这份证据纠正：
+
+1. **那 4 条红属于 1 个用例**。`Executed 28 tests, with 8 tests skipped and 4 failures` 里那个 4 是**断言**条数；
+   `Test Case … failed` 只有一行。闸门如果去读那行汇总，就会把 1 个红报成 4 个（口径写进单测，M 电池钉住）。
+2. **runner 上 settings 族 18 张全部未绘制 90.6–95.9%**，而本机同一批帧是 20.8–78.8% ⇒ "整族空白"是一台机器上量得出来的事实。
+3. **runner 上 102 帧一处黑带都没有**（本机 9 处）⇒ "黑带消失了"那条守卫在那边**恒红**，
+   而它红的原因是"名单是本机量的"，不是产品。
+
+于是三条前提（`CaptureCapability`，纯函数）：
+`settingsFamilyIsBlank`（族内**每一张**都 >85% 未绘制）、`bandsSeenHere`（这一台见过任何黑带）、
+`rulerSeesBottomEdge`（全帧底行墨最大值 >0.5）。反例臂三条：单帧空白 / 尺全 0 / 族只一张 —— 都不许放行。
+
+### U-60：看图看出来的（这一轮真正的产出）
+
+写"正对照帧在 runner 上读 0%"那句解释时，我按目标模式的规矩去**看那张帧**而不是只看数字：
+裁 `sidebar-history-300x520-light` 的底 100pt —— 黑药丸在上，下面是一整块**空的浅灰**。
+可判据说它"最底一行 100.0% 是墨"。两者不可能同时为真 —— 而且那块黑**不在底行上**：
+逐行扫出来黑区是 pt 371..436.5（66pt，与 `blackBandPt=66` 对得上），下沿距帧底还有 **83pt**，
+所以那 100% 连「黑带被数成了墨」这种解释都不成立。写了第三把尺（`.scratch/motion-audit-2/bottomedge_r36.swift`，
+两种参照各量一遍：`ref=topLeft` 是现在的实现，`ref=rowMedian` 是底行自己的底色），51 张帧扫完：
+
+```
+15 张  refTL=100.0%  refRow= 0.0%   cornerDev=21/30/45   ← sidebar 4 帧×亮暗 + detail 亮色 7 帧
+settings-privacy-light   refTL=  0.1%  refRow= 6.7%   ← 反方向：漏报
+settings-privacy-dark    refTL= 72.8%  refRow=27.2%
+contentMustFit 那 10 张  两种参照都是 0.0%              ← 它们的绿是真的
+```
+
+⇒ `bottomInkFraction` 的参照点是**左上角那一个像素**。侧栏亮色帧的角点落在搜索框里（白 255），
+底行是窗口灰（240），差 45 > 容差 12 ⇒ 整行数成墨。`sidebar-no-results` 不在名单里 ——
+它的角点恰好与底行同色，这就是"判的是色差"最干净的反证。
+后果：**R22 那条正对照从写下那天起就是假对照**（它读的正是假 100% 那一批），
+所以 `contentMustFit` 那十条判据十四轮里没有一条有效的正对照检验过。
+
+处置：本轮**不改尺**。理由写进代码：`InkFloor.bottomEdgeInkAliveFraction` 那条前提现在是绊线 ——
+把参照改成底行自身之后，如果没有一张帧真的压着底边，它会红着要求补一张**真会被裁**的对照帧；
+现在就改等于把"正对照不存在"这件事悄悄混过去。缺陷、读数、下一步一起记 BACKLOG 50（R37）。
+本轮改的是**话术**：那两条 NOT_RUN 消息不再说"这一族排版不同"，改说"这一帧底行与它的角点在这台机器上同色"。
+
+### 闸门本身（`scripts/ci_capture_gate.py`）
+
+红有两个来源，都要认：`error: -[类 方法] :`（断言行，自带名字）与 `Test Case … failed`（崩溃/超时只有结论行）。
+退出码三条规矩：① 有未登记的红 ⇒ 1；② 一条 `Test Case` 结论都没有 ⇒ 1（"没跑"不是通过）；
+③ 判出绿的数量 < `--min-passed` ⇒ 1（把像素判据整批改成 `throw XCTSkip` 也是一条红都没有 —— 那 8 条 skip 就在夹具里）。
+正则收紧到 ASCII 标识符：Python 的 `\w` 含中文，按 `\w+` 写的话**夹具自己的说明文字**会变成假红（M158 钉住）。
+
+`scripts/tests/test_ci_report_selftest.py` 现在也从**ci.yml 原文**里抽那一步来跑，四个形状各钉一种骗人方式：
+真日志 ⇒ 红、只有已登记的 NOT-RUN ⇒ 绿、20 条全 skip ⇒ 红、日志里没有用例 ⇒ 红。
+这条守卫第一次以"作者自己改坏了"的方式证明自己在岗：我改了捕获步骤的名字，它当场 `ValueError: substring not found`。
+
+工作流：捕获那一步保持 report-only（它的退出码只说"有东西红了"，而这一步要的是"红了的是谁"），
+新增一步 `Capture gate (unregistered reds must be zero)` 是**硬门**，`--min-passed 15`
+（那一次实测 19 passed / 8 skipped / 1 failed ⇒ 修完红预期 20 passed，门取 15 允许个别已登记的降级）。
+
+### 读数汇总
+
+| 量 | 修前 | 修后 |
+|---|---|---|
+| runner 上被吞的红 | 4 条断言行 / 1 个用例，报表绿 | 三条前提各自登记，闸门判"未登记的红=0" |
+| 机器能力前提 | 一把尺（"某族画不画得出来"）管三件事 | 三条独立前提 + 三条反例臂（`CAPABILITY_TRUTH_TABLE 5 臂`） |
+| 底行墨这把尺 | 当它量墨 | 已知它量色差（15 张假 100% / settings 漏报），R37 修 |
+| 正对照 | 假对照（读的是色差） | 记账 + 留绊线，不许悄悄换掉 |
+| 全量测试 | 712 | **713**（新增真值表一条），0 失败；`swift build` 0 告警；帧基线 `CHANGED=0 / 102` |
+
+变异 **M157–M168** 十二支：11 支 CAUGHT（含红在对的地方：断言消息逐字对上），
+M168（消费者侧把 `bandsSeenHere` 写死）**本地无判别力** —— 本机确实见过黑带，两条臂在这一台等价，
+它由下一次 CI 的日志判（那一步现在会指名）。两支一开始报 DID-NOT-RUN，查出来是**变异自己编译不过**
+（Swift 没有 `anySatisfy`；`True` 与 `# MUTANT` 也不是 Swift —— `#` 是宏调用），已改成合法写法并让电池
+把"编译不过"与"逃逸"分开记。

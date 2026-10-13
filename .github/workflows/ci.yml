@@ -68,11 +68,14 @@ jobs:
       # 拿它当硬门只会让人学会无视红色。稳定后再摘掉 continue-on-error。
       # 刻意拆成两步（而不是一个 `A|B` 的 filter）：挂住时日志要能指名是哪一类跑不动，
       # 否则"CI 的 UI 步骤红了"这句话对下一次判断没有任何用处。
-      # 第三轮审计 D-7：`UIInteractionProbeTests` / `UICaptureTests` 要环境变量才启用，
-      # 而它们恰恰是"焦点链、行手势、右键菜单、帧基线"的验收手段 —— 以前 CI 一次也没跑过。
-      # 两步都是报告型（`continue-on-error`）：第一次真跑就拿到了两条只有 CI 才有的事实
-      # （见下面注释里的两条实测结论），所以这一步的价值从第一次运行就体现出来了。
-      - name: Offscreen frame capture (report-only)
+      #
+      # R36（BACKLOG 49 / U-59）把"红色由谁判"换了个位置：**这一步仍然 report-only，
+      # 但红不再被吞** —— 它的红交给下一步 `Capture gate` 去判，而那一步是硬门。
+      # 为什么留 `continue-on-error` 在这而不是那里：`swift test` 的退出码只说"有东西红了"，
+      # 而这一步要的是"红了的是谁、有没有名字"。把两件事都压在一个退出码上，
+      # 就会退回"要么全吞、要么因为环境的原因红"那两种已经各栽过一次的状态。
+      # 台账：run 38473962277 里这一步有 **4 条断言行红**（属于 1 个用例），全部被吞。
+      - name: Offscreen frame capture (report-only, gated below)
         continue-on-error: true
         timeout-minutes: 8
         working-directory: ClipboardHistory
@@ -93,8 +96,24 @@ jobs:
           # 实测（run 38050990090）：macos-15 的 runner 上 `content-wide-1100x800` 亮暗两帧
           # 有 95% 像素未被绘制 —— 那是**捕获失效闸门**正常工作（它拒绝把空帧当验收证据），
           # 不是产品被判红。所以这里只把条数报出来，不当失败；真机上这两帧是好的。
+          # R36 补：这一族的逐帧读数现在同时是 `CaptureCapability` 三条前提的输入，
+          # "整族画不出来"由测试自己登记成 `CAPTURE_NOT_RUN`，不再靠这一行注释替它决定。
           test "${executed:-0}" -ge 1
           test "${frames:-0}" -ge 60
+
+      # R36 / BACKLOG 49 / U-59：**这一步是硬门**，判的是"有没有没被登记的红色"。
+      # 三条规矩：① 日志里一条 `Test Case` 结论都没有 ⇒ 红（挂死、崩溃、filter 打错，
+      # 以前这些都长得像"这一步绿了"）；② 任何 `error: -[类 方法]` 或 `failed` 结论 ⇒ 红，
+      # 指名是谁；③ 判出绿的用例数低于 15 ⇒ 红 —— 这是防另一种"红了没人看"：
+      # 把像素判据整批改成 `throw XCTSkip` 之后，① ② 都是绿的，而那一步其实已经什么都不判了
+      # （run 38473962277 实测：28 个用例里 8 个是 skipped，而报表上只有"绿"）。
+      # 15 的来历：那一次是 19 passed / 8 skipped / 1 failed；红修完 ⇒ 20 passed。
+      # 门取 15 而不是 20：允许个别的、已登记的降级，但不允许"整批退回 skip"。
+      # 已登记的 `*_NOT_RUN` 会被逐条打出来（有读数、有原因），它们不算红。
+      - name: Capture gate (unregistered reds must be zero)
+        timeout-minutes: 2
+        run: |
+          python3 scripts/ci_capture_gate.py /tmp/frames.log --min-passed 15
 
       - name: On-screen interaction probes (report-only)
         continue-on-error: true

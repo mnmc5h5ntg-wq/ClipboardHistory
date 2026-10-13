@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-"""CI 汇报行自检：把 ci.yml 里两个 report-only 步骤的 run 脚本**原文**抽出来，
-只把"被测命令"换成夹具，然后喂三种日志形状，断言**结论行必然打出来**。
+"""CI 汇报行自检：把 ci.yml 里几步的 run 脚本**原文**抽出来，
+只把"被测命令"换成夹具，然后喂几种日志形状，断言**结论行必然打出来**。
+
+R36 起它多了一类客户：`Capture gate` 那一步是**硬门**（没有 continue-on-error），
+四个形状各钉一种骗人方式 —— 真红被吞 / 已知盲区被当成红 / 整批退回 skip / 干脆没跑到用例。
+其中"真红"那一格喂的是 run 38473962277 的**逐字日志**（`fixtures/r36_runner_capture.log`），
+所以这里测的是"那道门会不会红在它该红的地方"，不是"它会不会红"。
+顺带：这一步第一次以"作者自己改坏了"的方式证明自己在岗 —— R36 改了捕获步骤的名字，
+`STEPS[...]` 那个 marker 立刻 `ValueError: substring not found`（改名要同时改这里，钉得住）。
 
 为什么要有这个文件（实测 run 38062956819）：那两步在 `bash -e` + `set -o pipefail` 下，
 **汇报行自己的** `grep -oE 'Executed [0-9]+ tests'` 失手了 —— runner 只打单数
@@ -28,11 +35,29 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 CI_DEFAULT = os.path.join(ROOT, ".github", "workflows", "ci.yml")
 
 STEPS = {
-    "offscreen": "Offscreen frame capture (report-only)",
+    "offscreen": "Offscreen frame capture (report-only, gated below)",
     "onscreen": "On-screen interaction probes (report-only)",
     "motion": "Motion filmstrip (report-only)",
     "motion_floor": "Motion coverage floor",
+    # R36：这一步是**硬门**（没有 continue-on-error）。它读上一步留下的 /tmp/frames.log，
+    # 所以要和 motion_floor 一样把夹具挂在"第一行抽取"上 —— 测的仍然是 ci.yml 里那一句本身。
+    "capture_gate": "Capture gate (unregistered reds must be zero)",
 }
+
+GATE_FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "fixtures", "r36_runner_capture.log")
+with open(GATE_FIXTURE, encoding="utf-8") as _handle:
+    REAL_RUNNER_LOG = _handle.read()
+
+
+def _passed_lines(n):
+    return "".join("Test Case '-[ClipboardHistoryAppTests.UICaptureTests test%02d]' passed (0.001 seconds).\n"
+                   % i for i in range(n))
+
+
+def _skipped_lines(n):
+    return "".join("Test Case '-[ClipboardHistoryAppTests.UICaptureTests test%02d]' skipped (0.001 seconds).\n"
+                   % i for i in range(n))
 
 # 被测命令 → 夹具。命中次数必须恰好 1，否则说明 ci.yml 改了写法、夹具已经失效。
 SUBSTITUTIONS = {
@@ -65,6 +90,13 @@ SUBSTITUTIONS = {
     "motion_floor": [
         (r"resolve=\$\(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion\.log",
          "cp FAKE_LOG /tmp/motion.log; resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log"),
+    ],
+    # R36 的硬门：它没有"被测命令"，只有"读上一步留下的日志再判"。
+    # 所以夹具挂在 `cp` 上，脚本路径换成绝对路径（自检的 cwd 不一定是仓库根）。
+    "capture_gate": [
+        (r"python3 scripts/ci_capture_gate\.py /tmp/frames\.log",
+         "cp FAKE_LOG /tmp/frames.log; python3 " + os.path.join(ROOT, "scripts", "ci_capture_gate.py")
+         + " /tmp/frames.log"),
     ],
 }
 
@@ -139,6 +171,21 @@ EXPECT = {
     ("motion_floor", "no_resolve_line"): (
         NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n",
         ["MOTION_FLOOR_SKIPPED=no-resolve-line"], 0, []),
+    # ---- R36：帧捕获那道硬门的四个形状。四个都要，因为这道门挡的是**四种不同的骗人方式**：
+    #      真红被吞 / 已知盲区被当成红 / 整批退回 skip / 干脆没跑到用例。
+    ("capture_gate", "real_runner_log"): (
+        REAL_RUNNER_LOG,
+        ["CAPTURE_GATE_RESULT=fail", "testCaptureKeyViews", "处置只有两种"], 1, []),
+    ("capture_gate", "registered_not_run_only"): (
+        _passed_lines(16) + "CAPTURE_NOT_RUN settings-x 95% 未绘制\n"
+        + "MATERIAL_BLIND_NOT_RUN 这一台一处黑带都没有\n",
+        ["CAPTURE_GATE_RESULT=ok", "CAPTURE_NOT_RUN"], 0, []),
+    ("capture_gate", "all_judgements_became_skips"): (
+        _skipped_lines(20) + "MATERIAL_BLIND_NOT_RUN 略\n",
+        ["skip 不是通过"], 1, []),
+    ("capture_gate", "log_without_any_case"): (
+        "Building for debugging...\nBuild complete! (0.09s)\n",
+        ["没跑不算通过"], 1, []),
 }
 
 

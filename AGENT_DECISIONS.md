@@ -3280,3 +3280,43 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
 - **谁守着**：`testCaptionTextStaysOnTheSecondaryTier`（地板 + 天花板 + `judged ≥ 3` + 覆盖规则）、
   `testProbesDoNotSitOnVibrantColumns`、`testProbeVibrantEligibilityDiagnostic`（打印每条读数的域）。
   变异 M152–M156 五支。
+
+---
+
+### D-095 · R36：CI 的红必须有名字；机器能力前提要"一条判据一个量"；看图把一把用了十四轮的尺问成了色差尺
+
+- **背景**：BACKLOG 49 / U-59。帧捕获那一步是 report-only，runner 上 4 条断言行红被吞了九轮。
+  进轮时我以为这 4 条"全都是这台机器画不出 List / SettingsView 那一族"（BACKLOG 43 的旧账）。
+- **决定 1**：**先取证据再动判据**。用 `gh api .../jobs/115559876687/logs` 取回那一步的逐字日志，
+  切出 257 行钉成 `scripts/tests/fixtures/r36_runner_capture.log`。三件事当场被纠正：
+  那 4 条红属于**1 个用例**（`Executed … 4 failures` 那个 4 是断言数，不是用例数）；
+  settings 族在 runner 上 18 张**全部**未绘制 90.6–95.9%（本机 20.8–78.8%）；
+  runner 上**一处黑带都没有**（本机 9 处）⇒ "黑带消失了"那条守卫在那边恒红。
+  旧账本里"List 族在 runner 画不出来"那句是**错的**（那一族未绘制 0.0%）。
+- **决定 2**：机器能力判据拆成**三条独立前提**（`CaptureCapability.measure`，纯函数），
+  每条只看它要判的那个量：`settingsFamilyIsBlank`（族内每一张都 >85%）、`bandsSeenHere`（见过任何黑带）、
+  `rulerSeesBottomEdge`（全帧底行墨最大 >0.5）。上一版是"某一族画不画得出来"一把尺管三件事 ——
+  那种写法既放过过不该放的，也红过不该红的。三条各有反例臂（单帧空白 / 尺全 0 / 族只一张），
+  真值表用**两台机器的实测读数**（`CAPABILITY_TRUTH_TABLE 5 臂`）。
+- **决定 3**：闸门只问一句"还有没有**没登记的**红"，三条退出码规矩：未登记的红 >0 ⇒ 红；
+  一条 `Test Case` 结论都没有 ⇒ 红（"没跑"不是通过）；判出绿的数量 < `--min-passed` ⇒ 红
+  （把像素判据整批改成 `throw XCTSkip` 也是一条红都没有 —— 夹具里那 8 条 skip 就是这个形状）。
+  捕获那一步保持 report-only，硬门放在**新增的那一步**上：
+  `swift test` 的退出码只说"有东西红了"，而这一步要的是"红了的是谁"。
+- **决定 4（本轮真正的产出，U-60）**：写"正对照在 runner 上读 0%"那句解释之前去**看那张帧** ——
+  裁出来底 100pt 是空的浅灰，可判据说那一行 100% 是墨。写第三把尺（`bottomedge_r36.swift`）
+  把 51 张帧按两种参照各扫一遍，结论：`bottomInkFraction` 的参照点是**左上角那一个像素**，
+  它读的是色差不是墨（15 张假 100%，settings 那几张反而**漏报** 0.1% vs 6.7%）。
+  ⇒ R22 那条正对照从写下那天起就是假对照，`contentMustFit` 十条判据十四轮没有有效正对照。
+- **决定 5**：**本轮不改那把尺**，只改话术 + 记账。理由：改对参照之后"没有任何一张帧真的压着底边"
+  ⇒ 正对照不是找到而是要**造**，把它和闸门混在一个提交里，下一次红就说不清是尺的错还是闸门的错。
+  留 `InkFloor.bottomEdgeInkAliveFraction` 当绊线：尺改对而对照没补，那条会先红。
+  两条 NOT_RUN 消息从"这一族排版不同"改成"这一帧底行与它的角点在这台机器上同色"——
+  **不许把没验证的机制解释留在会被人读成事实的位置上**。
+- **代价**：闸门脚本 + 11 条单测 + 37KB 夹具；能力真值表一条新用例（712→713）；
+  产品零改动、帧基线 `CHANGED=0 / 102`、`swift build` 0 告警。
+- **谁守着**：`scripts/tests/test_ci_capture_gate.py`（含"日志为空=没跑=红"与"中文注释不许变成假红"两支）、
+  `testCaptureCapabilityPremisesAreMachineVisible`、`Capture gate` 那一步本身。
+  变异 **M157–M168**：11 支 CAUGHT，M168（消费者侧 `bandsSeenHere` 写死）**本地无判别力**，
+  由下一次 CI 的日志判。两支一开始的 DID-NOT-RUN 是变异自己编译不过（Swift 没有 `anySatisfy`、
+  `True` / `# MUTANT` 不是 Swift）⇒ 电池现在把"编译不过"与"逃逸"分开记。

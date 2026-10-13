@@ -1099,14 +1099,49 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     同一条盲区还覆盖 R21 的 `sidebar-multi-select/批量操作按钮` 读数（已登记在
     `vibrantResolvedControlProbes`，不判产品）。
 
-49. **CI 的帧捕获步骤是 report-only，红了不拦（R35 查口径查出来的，U-59）**：
-    `.github/workflows/ci.yml` 里 `Offscreen frame capture (report-only)` 带
-    `continue-on-error: true` 且命令尾巴 `|| true`。runner 上现在有 4 条红被吞：
+49. **CI 的帧捕获步骤是 report-only，红了不拦（R35 查口径查出来的，U-59）—— R36 已收口**：
+    `.github/workflows/ci.yml` 里 `Offscreen frame capture` 那一步带 `continue-on-error: true`
+    且命令尾巴 `|| true`。runner 上那 4 条红（run 38473962277，逐字日志已钉成
+    `scripts/tests/fixtures/r36_runner_capture.log`）：
     ① 材质盲区名单"黑带消失了"（runner 上 `MATERIAL_BLIND_SPOTS 0 of 51`，本机是 9 —— 那两条
     名单是**机器相关**的，同一条守卫在一台机器上是另一台机器的假红）；
-    ② 正对照帧 `sidebar-history` 底行读到 0% 墨（List 内容在 runner 上画不出来，BACKLOG 43 同族）；
-    ③④ 两张 `settings-privacy-excluded` 被"捕获失效"闸门锁住（这条是闸门正常工作）。
-    ⇒ 要做的不是把 report-only 摘掉（第一次真跑就恒红会让人学会无视红色），
-    而是**红必须有名字**：把"这台机器画不出来的守卫"显式登记成 NOT-RUN（像 R34 的判别臂那样），
-    然后让工作流检查"未登记的红色条数 == 0"，非零就红。
-    这样 report-only 仍然不拦已知盲区，但**新出现的红再也藏不住**。
+    ② 正对照帧 `sidebar-history` 底行读到 0% 墨 —— **这条的归因写错了**：
+    不是"List 内容在 runner 上画不出来"（那一族在 runner 未绘制 0.0%，画得出来），
+    而是那把尺量的本来就是"底行 vs 左上角那一个像素"的色差（U-60 / 本条 50）。
+    ③④ 两张 `settings-privacy-excluded` 被"捕获失效"闸门锁住（这条是闸门正常工作：
+    runner 上 settings 族 18 张**全部**未绘制 90.6–95.9%，本机是 20.8–78.8%）。
+    ⇒ 收口方式就是当初写的那句"红必须有名字"：三条**机器可见前提**（`CaptureCapability`）
+    把判不了的那一**条**登记成 `*_NOT_RUN`（带读数与原因），新增的硬门
+    `Capture gate (unregistered reds must be zero)` 只问"还有没有没登记的红"，
+    外加"一条用例都没跑到=红"与"判出绿的数量 < 15=红"（skip 不是通过）。
+    **仍未验证的部分**：闸门在 runner 上第一次真跑会不会绿 —— 那要下一次 CI 的日志说话（见 50③）。
+
+50. **`bottomInkFraction` 量的不是"底行有没有墨"，而是"底行与左上角那个像素差多少"（R36 看图看出来的，U-60）**：
+    R22 写下 `contentMustFit`（"夹具不许裁自己的内容"）时，这把尺的参照点取的是**整帧的 (0,0) 那一个像素**，
+    容差 12。R36 用 `.scratch/motion-audit-2/bottomedge_r36.swift` 把 51 张帧按两种参照各扫一遍：
+
+    | 帧 | `ref=topLeft`（现在的实现） | `ref=rowMedian`（底行自己的底色） | 角点差 |
+    |---|---|---|---|
+    | sidebar favorites / history / multi-select / multi-select-min × 亮暗（8 张） | **100.0%** | **0.0%** | 30 / 45 |
+    | detail 亮色 7 张 | **100.0%** | **0.0%** | 21 |
+    | `sidebar-no-results` × 亮暗 | 0.0% | 0.0% | 0 ← 角点恰好同色，所以"没墨" |
+    | `settings-privacy-light` | 0.1% | **6.7%** | 12 ← 反方向：漏报 |
+    | `settings-privacy-dark` / `-recommendations-dark` | 72.8% / 72.8% | 27.2% / 42.4% | 27 |
+    | `contentMustFit` 那 10 张 | 0.0% | 0.0% | 0 ← 它们的绿是真的 |
+
+    触发点是**看图**：`sidebar-history-300x520-light` 的底 100pt 里黑药丸在上、下面是一整块空的浅灰
+    （那块黑的真实区间是 pt 371..436.5 = 66pt 高，**下沿距帧底还有 83pt** ⇒ 它不可能是那 100% 的来源），
+    而判据说那一行 100% 是墨 —— 两者不可能同时为真。侧栏亮色帧的角点落在搜索框里（白 255），
+    底行是窗口灰（240），差 45 > 12 ⇒ 整行数成墨。
+    ⇒ **后果**：那条正对照（`bottomEdgeInkCanary`）从写下那天起读的就是假 100%，
+    所以 `contentMustFit` 十条判据十四轮里**没有一条有效的正对照**。
+
+    下一轮（R37）要做：
+    ① 参照改成**底行自身**（每通道中位色；不要用量化桶心 —— 桶心与真实像素可差 7×3=21 > 12，
+       会把一行干净的底色读成 100% 墨，这是我第一版工具自己的假阳性，已改）；
+    ② 造一张**真的会被裁**的对照帧（现有 51 张里没有一张底行真有墨 ⇒ 正对照不是"找到"而是"要做"），
+       并让 `InkFloor.bottomEdgeInkAliveFraction` 那条绊线先红一次，确认它会红；
+    ③ 修完重跑 `Capture gate`：runner 上 `settings-*` 那两处 6.7% / 42.4% 的真实底行墨
+       会不会让 `contentMustFit` 新红 —— 那才是这批夹具第一次被这把尺真的判过；
+    ④ 变异电池 M166 的语义会变（它现在钉的是"尺瞎了也算活着"，改对之后要重新选注入点）。
+

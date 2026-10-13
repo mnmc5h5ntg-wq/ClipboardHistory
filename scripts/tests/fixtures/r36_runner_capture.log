@@ -1,0 +1,265 @@
+# R36 正对照夹具：run 38473962277 里 job 115559876687 的 "Offscreen frame capture (report-only)" 一步的**逐字日志片段**（行 2138..2398，时间戳前缀原样保留）。
+# 它的用处不是复现测试，而是钉住**门脚本能读懂真实日志**：4 条 `error: -[类 方法]` 断言行、1 条 `Test Case ... failed` 结论行、8 条 skipped、以及那行容易骗人的
+# `Executed 28 tests, with 8 tests skipped and 4 failures` —— 那个 4 是**断言**条数，不是失败用例数（真实只有 1 个用例红）。
+# 来源：`gh api repos/:owner/:repo/actions/jobs/115559876687/logs`（2026-10-13 取）。
+2026-10-13T21:58:18.9204800Z Test Suite 'Selected tests' started at 2026-10-13 21:57:33.114.
+2026-10-13T21:58:18.9216390Z Test Suite 'ClipboardHistoryPackageTests.xctest' started at 2026-10-13 21:57:33.116.
+2026-10-13T21:58:18.9217000Z Test Suite 'UICaptureTests' started at 2026-10-13 21:57:33.116.
+2026-10-13T21:58:18.9217800Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionableInkStaysAboveTheLegibilityFloor]' started.
+2026-10-13T21:58:18.9218460Z IOServiceMatchingfailed for: AppleM2ScalerParavirtDriver
+2026-10-13T21:58:18.9219120Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionableInkStaysAboveTheLegibilityFloor]' passed (2.117 seconds).
+2026-10-13T21:58:18.9219880Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionSpanRulerReadsBothEnds]' started.
+2026-10-13T21:58:18.9220680Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionSpanRulerReadsBothEnds]' passed (0.003 seconds).
+2026-10-13T21:58:18.9221400Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptionTextStaysOnTheSecondaryTier]' started.
+2026-10-13T21:58:18.9222390Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptionTextStaysOnTheSecondaryTier]' passed (9.402 seconds).
+2026-10-13T21:58:18.9354050Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureFixtureInjectsEveryActionSeamTheProductInjects]' started.
+2026-10-13T21:58:18.9355170Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureFixtureInjectsEveryActionSeamTheProductInjects]' passed (0.004 seconds).
+2026-10-13T21:58:18.9355990Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' started.
+2026-10-13T21:58:18.9379670Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:321: error: -[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews] : XCTAssertGreaterThan failed: ("0.0") is not greater than ("0.5") - 正对照帧 sidebar-history-300x520-light.png 的底行只读到 0.0% 的墨 ⇒ 这把尺**瞎了**（它量不到任何压在底边上的内容），上面那十条'没被裁'的绿也就没有意义
+2026-10-13T21:58:18.9390900Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:331: error: -[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews] : failed - settings-privacy-excluded-720x1040-light.png 有 95% 像素未被绘制，判定为捕获失效，不能作为视觉验收证据
+2026-10-13T21:58:18.9397720Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:331: error: -[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews] : failed - settings-privacy-excluded-720x1040-dark.png 有 95% 像素未被绘制，判定为捕获失效，不能作为视觉验收证据
+2026-10-13T21:58:18.9405280Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:346: error: -[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews] : XCTAssertTrue failed - 这些帧的黑带消失了：["content-min", "content-wide", "content-with-history", "content-with-notice", "content-with-two-notices", "sidebar-favorites", "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min"] ⇒ 那一处现在能拍了，把 `materialBlindSpotFixtures` 缩掉，并且肉眼审一遍新帧（别只改名单）
+2026-10-13T21:58:18.9410090Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' failed (22.256 seconds).
+2026-10-13T21:58:18.9412010Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testContrastRulerArithmetic]' started.
+2026-10-13T21:58:18.9417220Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testContrastRulerArithmetic]' passed (0.000 seconds).
+2026-10-13T21:58:18.9419400Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDarkSettingsSidebarTextIsACountedBlindSpot]' started.
+2026-10-13T21:58:18.9421970Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2265: -[ClipboardHistoryAppTests.UICaptureTests testDarkSettingsSidebarTextIsACountedBlindSpot] : Test skipped - TEXT_SIDE_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上 `SettingsView` 是一块平涂底色，侧栏与内容区都读到 0 个偏离像素 ⇒ 这条守卫记为未运行，不算通过也不算盲区
+2026-10-13T21:58:18.9423590Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDarkSettingsSidebarTextIsACountedBlindSpot]' skipped (3.921 seconds).
+2026-10-13T21:58:18.9424950Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDetailAreaHasASingleLeftAxis]' started.
+2026-10-13T21:58:18.9425720Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDetailAreaHasASingleLeftAxis]' passed (1.319 seconds).
+2026-10-13T21:58:18.9426480Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testFixtureImageBytesDoNotDependOnAmbientAppearance]' started.
+2026-10-13T21:58:18.9427370Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testFixtureImageBytesDoNotDependOnAmbientAppearance]' passed (0.005 seconds).
+2026-10-13T21:58:18.9428180Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionRulerReadsBothEnds]' started.
+2026-10-13T21:58:18.9429640Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2392: -[ClipboardHistoryAppTests.UICaptureTests testInkDirectionRulerReadsBothEnds] : Test skipped - INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个偏离像素）⇒ 两端对照记为未运行，不算通过（见 BACKLOG 43）
+2026-10-13T21:58:18.9430990Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionRulerReadsBothEnds]' skipped (0.306 seconds).
+2026-10-13T21:58:18.9431640Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionTruthTable]' started.
+2026-10-13T21:58:18.9432390Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionTruthTable]' passed (0.000 seconds).
+2026-10-13T21:58:18.9433100Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testLoadingBlockSharesTheDetailColumnsAxis]' started.
+2026-10-13T21:58:18.9433920Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testLoadingBlockSharesTheDetailColumnsAxis]' passed (1.262 seconds).
+2026-10-13T21:58:18.9435110Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarFramesAreReplicasOfTheMenuSurface]' started.
+2026-10-13T21:58:18.9435890Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarFramesAreReplicasOfTheMenuSurface]' passed (0.280 seconds).
+2026-10-13T21:58:18.9436770Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic]' started.
+2026-10-13T21:58:18.9438300Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1828: -[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic] : Test skipped - 诊断用判据：它只回答「这一行在给定宽度下截不截」，用来定修法，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+2026-10-13T21:58:18.9439800Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic]' skipped (0.214 seconds).
+2026-10-13T21:58:18.9440690Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeActionIsVerticallyCenteredInItsBand]' started.
+2026-10-13T21:58:18.9441510Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeActionIsVerticallyCenteredInItsBand]' passed (2.703 seconds).
+2026-10-13T21:58:18.9442360Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBandFinderReadsBothEnds]' started.
+2026-10-13T21:58:18.9443040Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBandFinderReadsBothEnds]' passed (0.076 seconds).
+2026-10-13T21:58:18.9443760Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBodyTextStaysReadable]' started.
+2026-10-13T21:58:18.9444410Z INK search-field/清除 ×（静置） light ratio=3.66 ink=15.9%
+2026-10-13T21:58:18.9445040Z INK detail-3-files/多文件行的展开箭头（整行唯一的可展开记号） light ratio=3.84 ink=12.2%
+2026-10-13T21:58:18.9445560Z INK glass-pill/药丸里的收藏星（`.secondary` 那一档的参照） light ratio=5.88 ink=5.0%
+2026-10-13T21:58:18.9446030Z INK sidebar-multi-select/批量操作按钮（侧栏工具排） light ratio=9.34 ink=17.8%
+2026-10-13T21:58:18.9446510Z INK search-field/清除 ×（静置） dark ratio=4.64 ink=16.1%
+2026-10-13T21:58:18.9446940Z INK detail-3-files/多文件行的展开箭头（整行唯一的可展开记号） dark ratio=4.88 ink=12.2%
+2026-10-13T21:58:18.9447460Z INK glass-pill/药丸里的收藏星（`.secondary` 那一档的参照） dark ratio=10.68 ink=5.5%
+2026-10-13T21:58:18.9447910Z INK sidebar-multi-select/批量操作按钮（侧栏工具排） dark ratio=7.67 ink=16.0%
+2026-10-13T21:58:18.9448670Z ACTION_SPAN_CONTROL centered=25.0 high=17.0 empty=nil
+2026-10-13T21:58:18.9449090Z CAPTION_REF light .secondary 参照=3.25
+2026-10-13T21:58:18.9449830Z CAPTION_INK heatmap-populated/月份刻度 9月/10月/11月…（读不出月份就读不出这张图） light ratio=3.58 参照=3.25 比值=1.10 ink=10.5%
+2026-10-13T21:58:18.9450590Z CAPTION_INK heatmap-populated/星期刻度 一/三/五/日 light ratio=2.85 参照=3.25 比值=0.88 ink=6.7%
+2026-10-13T21:58:18.9451240Z CAPTION_INK heatmap-populated/图例「少 / 多」（颜色深浅的唯一标尺） light ratio=3.30 参照=3.25 比值=1.01 ink=15.7%
+2026-10-13T21:58:18.9451910Z CAPTION_INK menubar-recommendations/副标题「猜你要粘贴」（这一列的标题） light ratio=3.84 参照=3.25 比值=1.18 ink=31.3%
+2026-10-13T21:58:18.9452850Z CAPTION_INK menubar-recommendations/行右端推荐理由（类型 · 当前 App · 常用） light ratio=3.84 参照=3.25 比值=1.18 ink=29.7%
+2026-10-13T21:58:18.9453730Z CAPTION_NOT_RUN settings-general/说明段「暂停时仍在推进…」（恢复后会不会补记旧内容） light 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9454360Z CAPTION_NOT_RUN settings-general/说明段「关闭后不再对新入库的图片…」（截图文字识别） light 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9455130Z CAPTION_NOT_RUN settings-general/说明段「打开后从 Word、Pages…」（富文本的代价，两行） light 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9455750Z CAPTION_JUDGED light 判了 5 条 / 表里 8 条
+2026-10-13T21:58:18.9456060Z CAPTION_REF dark .secondary 参照=4.82
+2026-10-13T21:58:18.9456580Z CAPTION_INK heatmap-populated/月份刻度 9月/10月/11月…（读不出月份就读不出这张图） dark ratio=4.94 参照=4.82 比值=1.02 ink=11.0%
+2026-10-13T21:58:18.9457150Z CAPTION_INK heatmap-populated/星期刻度 一/三/五/日 dark ratio=4.32 参照=4.82 比值=0.90 ink=7.1%
+2026-10-13T21:58:18.9457810Z CAPTION_INK heatmap-populated/图例「少 / 多」（颜色深浅的唯一标尺） dark ratio=4.70 参照=4.82 比值=0.98 ink=14.9%
+2026-10-13T21:58:18.9461470Z CAPTION_INK menubar-recommendations/副标题「猜你要粘贴」（这一列的标题） dark ratio=4.94 参照=4.82 比值=1.02 ink=32.5%
+2026-10-13T21:58:18.9463220Z CAPTION_INK menubar-recommendations/行右端推荐理由（类型 · 当前 App · 常用） dark ratio=4.94 参照=4.82 比值=1.02 ink=32.5%
+2026-10-13T21:58:18.9465820Z CAPTION_NOT_RUN settings-general/说明段「暂停时仍在推进…」（恢复后会不会补记旧内容） dark 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9467840Z CAPTION_NOT_RUN settings-general/说明段「关闭后不再对新入库的图片…」（截图文字识别） dark 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9469700Z CAPTION_NOT_RUN settings-general/说明段「打开后从 Word、Pages…」（富文本的代价，两行） dark 探针所在列 (150.0, 0.0, 560.0, 540.0) 读到 0 个文字墨像素
+2026-10-13T21:58:18.9471240Z CAPTION_JUDGED dark 判了 5 条 / 表里 8 条
+2026-10-13T21:58:18.9471890Z CAPTURED 102 -> /tmp/shots-ci
+2026-10-13T21:58:18.9473120Z   content-with-history-750x560-light.png  transparent=89.2%  blackBandPt=0  bottomInk=37.3%
+2026-10-13T21:58:18.9474460Z   content-min-600x440-light.png  transparent=82.9%  blackBandPt=0  bottomInk=46.7%
+2026-10-13T21:58:18.9476120Z   content-wide-1100x800-light.png  transparent=94.9%  blackBandPt=0  bottomInk=25.5%
+2026-10-13T21:58:18.9477890Z   content-empty-750x560-light.png  transparent=82.0%  blackBandPt=0  bottomInk=37.3%
+2026-10-13T21:58:18.9479280Z   content-no-results-750x560-light.png  transparent=80.0%  blackBandPt=0  bottomInk=37.3%
+2026-10-13T21:58:18.9482000Z   menubar-recommendations-320x320-light.png  transparent=56.2%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9483440Z   menubar-refreshing-320x120-light.png  transparent=55.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9484980Z   menubar-empty-320x120-light.png  transparent=55.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9486330Z   sidebar-history-300x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9487930Z   sidebar-multi-select-300x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9489620Z   sidebar-multi-select-min-250x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9491830Z   sidebar-favorites-300x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9493440Z   sidebar-no-results-300x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9494600Z   row-text-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9495930Z   row-image-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9497000Z   row-file-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9498070Z   row-files-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9499510Z   row-favorite-on-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9500840Z   row-favorite-off-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9502230Z   row-pinned-on-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9503570Z   row-pinned-off-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9505750Z   row-file-thumb-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9506570Z   detail-0-text-720x520-light.png  transparent=82.5%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9507240Z   detail-1-image-720x520-light.png  transparent=76.6%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9507720Z   detail-2-file-720x520-light.png  transparent=82.6%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9508270Z   detail-3-files-720x520-light.png  transparent=84.3%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9508960Z   detail-text-highlight-720x520-light.png  transparent=82.4%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9509560Z   detail-markdown-rendered-720x520-light.png  transparent=71.0%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9510280Z   detail-markdown-source-720x520-light.png  transparent=79.8%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9510840Z   glass-pill-120x232-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9511450Z   glass-pill-states-120x232-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9511910Z   search-field-320x112-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9512410Z   empty-state-320x160-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9513030Z   weights-520x880-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9513530Z   weights-adjusted-520x880-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9514170Z   settings-shortcuts-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9514720Z   settings-general-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9515290Z   settings-privacy-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9515940Z   settings-recommendations-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9516510Z   settings-data-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9517560Z   settings-stats-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9518010Z   settings-min-640x440-light.png  transparent=90.6%  blackBandPt=0  bottomInk=23.1%
+2026-10-13T21:58:18.9518800Z   heatmap-populated-430x250-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9519420Z   settings-privacy-excluded-720x1040-light.png  transparent=95.9%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9519910Z   receipt-line-430x56-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9520390Z   settings-stats-populated-720x540-light.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:18.9520980Z   heatmap-empty-430x150-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9521980Z   content-with-notice-750x560-light.png  transparent=80.1%  blackBandPt=0  bottomInk=37.3%
+2026-10-13T21:58:18.9522570Z   content-with-two-notices-750x560-light.png  transparent=73.9%  blackBandPt=0  bottomInk=37.3%
+2026-10-13T21:58:18.9523260Z   notice-banner-560x170-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9523810Z   detail-loading-720x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9524450Z   content-with-history-750x560-dark.png  transparent=89.2%  blackBandPt=0  bottomInk=44.8%
+2026-10-13T21:58:18.9525040Z   content-min-600x440-dark.png  transparent=82.9%  blackBandPt=0  bottomInk=56.0%
+2026-10-13T21:58:18.9525560Z   content-wide-1100x800-dark.png  transparent=94.9%  blackBandPt=0  bottomInk=30.5%
+2026-10-13T21:58:18.9526110Z   content-empty-750x560-dark.png  transparent=82.0%  blackBandPt=0  bottomInk=40.4%
+2026-10-13T21:58:18.9526800Z   content-no-results-750x560-dark.png  transparent=80.0%  blackBandPt=0  bottomInk=40.4%
+2026-10-13T21:58:18.9527450Z   menubar-recommendations-320x320-dark.png  transparent=56.2%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9527960Z   menubar-refreshing-320x120-dark.png  transparent=55.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9528540Z   menubar-empty-320x120-dark.png  transparent=55.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9529160Z   sidebar-history-300x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9529880Z   sidebar-multi-select-300x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9530460Z   sidebar-multi-select-min-250x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9531130Z   sidebar-favorites-300x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:18.9531760Z   sidebar-no-results-300x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9532310Z   row-text-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9532870Z   row-image-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9533350Z   row-file-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:18.9534040Z   row-files-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9281070Z   row-favorite-on-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9293060Z   row-favorite-off-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9321810Z   row-pinned-on-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9336450Z   row-pinned-off-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9348000Z   row-file-thumb-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9349950Z   detail-0-text-720x520-dark.png  transparent=82.3%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9350560Z   detail-1-image-720x520-dark.png  transparent=76.6%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9351070Z   detail-2-file-720x520-dark.png  transparent=82.6%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9352720Z   detail-3-files-720x520-dark.png  transparent=84.2%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9353260Z   detail-text-highlight-720x520-dark.png  transparent=82.3%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9353800Z   detail-markdown-rendered-720x520-dark.png  transparent=70.7%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9354630Z   detail-markdown-source-720x520-dark.png  transparent=79.3%  blackBandPt=0  bottomInk=100.0%
+2026-10-13T21:58:25.9355240Z   glass-pill-120x232-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9355760Z   glass-pill-states-120x232-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9359380Z   search-field-320x112-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9360730Z   empty-state-320x160-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9361960Z   weights-520x880-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9363260Z   weights-adjusted-520x880-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9364370Z   settings-shortcuts-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9365060Z   settings-general-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9365620Z   settings-privacy-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9366280Z   settings-recommendations-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9366980Z   settings-data-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9367500Z   settings-stats-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9367950Z   settings-min-640x440-dark.png  transparent=90.6%  blackBandPt=0  bottomInk=23.1%
+2026-10-13T21:58:25.9368540Z   heatmap-populated-430x250-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9369080Z   settings-privacy-excluded-720x1040-dark.png  transparent=95.9%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9369960Z   receipt-line-430x56-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9370540Z   settings-stats-populated-720x540-dark.png  transparent=92.2%  blackBandPt=0  bottomInk=20.6%
+2026-10-13T21:58:25.9371130Z   heatmap-empty-430x150-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9371650Z   content-with-notice-750x560-dark.png  transparent=80.1%  blackBandPt=0  bottomInk=44.8%
+2026-10-13T21:58:25.9372180Z   content-with-two-notices-750x560-dark.png  transparent=73.9%  blackBandPt=0  bottomInk=44.8%
+2026-10-13T21:58:25.9372770Z   notice-banner-560x170-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9373270Z   detail-loading-720x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+2026-10-13T21:58:25.9376750Z CONTENT_FIT 10 fixtures 判了底行墨（empty-state,glass-pill,glass-pill-states,heatmap-empty,heatmap-populated,notice-banner,receipt-line,search-field,weights,weights-adjusted）
+2026-10-13T21:58:25.9380280Z CONTENT_FIT_CANARY sidebar-history-300x520-light.png=0.0% sidebar-history-300x520-dark.png=100.0%
+2026-10-13T21:58:25.9382140Z MATERIAL_BLIND_SPOTS 0 of 51 fixtures
+2026-10-13T21:58:25.9382770Z TEXT_SIDE_NOT_RUN settings-shortcuts dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9384340Z TEXT_SIDE_NOT_RUN settings-general dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9385660Z TEXT_SIDE_NOT_RUN settings-privacy dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9387260Z TEXT_SIDE_NOT_RUN settings-recommendations dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9387810Z TEXT_SIDE_NOT_RUN settings-data dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9388260Z TEXT_SIDE_NOT_RUN settings-stats dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9388740Z TEXT_SIDE_NOT_RUN settings-min dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9390110Z TEXT_SIDE_NOT_RUN settings-privacy-excluded dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9390800Z TEXT_SIDE_NOT_RUN settings-stats-populated dark 侧栏列读到 0 个偏离像素（同帧内容区读到 0 个）
+2026-10-13T21:58:25.9391990Z TEXT_SIDE_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）
+2026-10-13T21:58:25.9393290Z DETAIL_AXIS light 判了 5 块，spread=1.0pt gutter=20pt
+2026-10-13T21:58:25.9396060Z DETAIL_AXIS dark 判了 5 块，spread=1.0pt gutter=20pt
+2026-10-13T21:58:25.9399110Z INK_SIDE 图标列 亮0/暗0 标题列 亮0/暗0
+2026-10-13T21:58:25.9399480Z INK_SIDE_NOT_RUN aqua
+2026-10-13T21:58:25.9399920Z LOADING_AXIS light bars=20.0 caption=21.0 gutter=20.0 detailHeader=-1.0 barRows=24 textRows=12
+2026-10-13T21:58:25.9406340Z LOADING_AXIS dark bars=20.0 caption=21.0 gutter=20.0 detailHeader=-1.0 barRows=24 textRows=12
+2026-10-13T21:58:25.9410090Z MENUBAR_REPLICA menubar-recommendations 第一行最右墨=320.0 / 帧宽 320 ⇒ 复刻顶到帧边界，产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐
+2026-10-13T21:58:25.9410950Z MENUBAR_FITTING 声明宽=320 hosting.fittingSize=0.0x0.0
+2026-10-13T21:58:25.9430720Z MENUBAR_WIDTH 声明宽=320 带=y156..172 最左墨=1.0 最右墨=320.0 ⇒ 右边距=0.0
+2026-10-13T21:58:25.9433020Z MENUBAR_FITTING 声明宽=400 hosting.fittingSize=0.0x0.0
+2026-10-13T21:58:25.9443590Z MENUBAR_WIDTH 声明宽=400 带=y156..172 最左墨=1.0 最右墨=387.0 ⇒ 右边距=13.0
+2026-10-13T21:58:25.9445300Z MENUBAR_FITTING 声明宽=520 hosting.fittingSize=0.0x0.0
+2026-10-13T21:58:25.9450970Z MENUBAR_WIDTH 声明宽=520 带=y156..172 最左墨=1.0 最右墨=507.0 ⇒ 右边距=13.0
+2026-10-13T21:58:25.9453090Z MENUBAR_FITTING 声明宽=720 hosting.fittingSize=0.0x0.0
+2026-10-13T21:58:25.9459470Z MENUBAR_WIDTH 声明宽=720 带=y156..172 最左墨=1.0 最右墨=717.0 ⇒ 右边距=3.0
+2026-10-13T21:58:25.9463470Z NOTICE_ACTION content-with-notice light band#1 center=77.0 action=79.0 offset=+2.0
+2026-10-13T21:58:25.9465040Z NOTICE_ACTION content-with-two-notices light band#1 center=69.0 action=71.0 offset=+2.0
+2026-10-13T21:58:25.9466690Z NOTICE_ACTION content-with-two-notices light band#2 center=112.0 action=114.0 offset=+2.0
+2026-10-13T21:58:25.9467280Z NOTICE_ACTION notice-banner light band#1 center=65.0 action=67.0 offset=+2.0
+2026-10-13T21:58:25.9467880Z NOTICE_ACTION notice-banner light band#2 center=124.0 action=126.0 offset=+2.0
+2026-10-13T21:58:25.9469700Z NOTICE_ACTION content-with-notice dark band#1 center=77.0 action=77.0 offset=+0.0
+2026-10-13T21:58:25.9471550Z NOTICE_ACTION content-with-two-notices dark band#1 center=69.0 action=69.0 offset=+0.0
+2026-10-13T21:58:25.9472250Z NOTICE_ACTION content-with-two-notices dark band#2 center=112.0 action=112.0 offset=+0.0
+2026-10-13T21:58:25.9472770Z NOTICE_ACTION notice-banner dark band#1 center=65.0 action=65.0 offset=+0.0
+2026-10-13T21:58:25.9473380Z NOTICE_ACTION notice-banner dark band#2 center=124.0 action=124.0 offset=+0.0
+2026-10-13T21:58:25.9473790Z NOTICE_BAND_CONTROL good=14.11 weak=1.32 ink=24.0%
+2026-10-13T21:58:25.9474300Z NOTICE_SIDE content-with-notice light 尾墨 亮0/暗569
+2026-10-13T21:58:25.9474760Z NOTICE_TEXT content-with-notice light bands=1 y52-102 ratio=11.60 ink=19.3%
+2026-10-13T21:58:25.9475190Z NOTICE_SIDE content-with-two-notices light 尾墨 亮0/暗371
+2026-10-13T21:58:25.9476280Z NOTICE_SIDE content-with-two-notices light 尾墨 亮0/暗569
+2026-10-13T21:58:25.9476760Z NOTICE_TEXT content-with-two-notices light bands=2 y52-86 ratio=11.29 ink=6.9% | y87-137 ratio=11.60 ink=19.3%
+2026-10-13T21:58:25.9477360Z NOTICE_SIDE notice-banner light 尾墨 亮0/暗394
+2026-10-13T21:58:25.9477700Z NOTICE_SIDE notice-banner light 尾墨 亮0/暗531
+2026-10-13T21:58:25.9478170Z NOTICE_TEXT notice-banner light bands=2 y40-90 ratio=12.51 ink=14.6% | y91-157 ratio=11.60 ink=20.6%
+2026-10-13T21:58:25.9478970Z NOTICE_SIDE content-with-notice dark 尾墨 亮569/暗0
+2026-10-13T21:58:25.9479740Z NOTICE_TEXT content-with-notice dark bands=1 y52-Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBodyTextStaysReadable]' passed (2.995 seconds).
+2026-10-13T21:58:25.9481630Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeTintDoesNotReachTheTitlebar]' started.
+2026-10-13T21:58:25.9482430Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeTintDoesNotReachTheTitlebar]' passed (1.101 seconds).
+2026-10-13T21:58:25.9483310Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNotRunDiscriminatorTruthTable]' started.
+2026-10-13T21:58:25.9484070Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNotRunDiscriminatorTruthTable]' passed (0.811 seconds).
+2026-10-13T21:58:25.9486160Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayCannotBeCapturedYet]' started.
+2026-10-13T21:58:25.9488070Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayCannotBeCapturedYet]' passed (0.323 seconds).
+2026-10-13T21:58:25.9488850Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testRowTierProfileSeparatesCaptionFromTitle]' started.
+2026-10-13T21:58:25.9494390Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2032: -[ClipboardHistoryAppTests.UICaptureTests testRowTierProfileSeparatesCaptionFromTitle] : Test skipped - ROWTIER_NOT_RUN light：这台机器拍不出设置页内容列（整列 0 个偏离像素，BACKLOG 43 实测过 runner 上就是这一块平涂）⇒ 这把尺的分档在这台机器上没验过。跳过而不是绿：这条判据的内容是「这一堆和那一堆被分开了」，机器画不出字时它没有内容。
+2026-10-13T21:58:25.9497350Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testRowTierProfileSeparatesCaptionFromTitle]' skipped (0.437 seconds).
+2026-10-13T21:58:25.9498210Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldFixtureShowsBothStates]' started.
+2026-10-13T21:58:25.9499030Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldFixtureShowsBothStates]' passed (0.296 seconds).
+2026-10-13T21:58:25.9499820Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldIdealHeightIsStateIndependent]' started.
+2026-10-13T21:58:25.9500570Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldIdealHeightIsStateIndependent]' passed (0.031 seconds).
+2026-10-13T21:58:25.9501410Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic]' started.
+2026-10-13T21:58:25.9502900Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1764: -[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic] : Test skipped - 诊断用判据：它只回答「这一行是标题档还是说明档」，用来放框，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+2026-10-13T21:58:25.9504300Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic]' skipped (0.965 seconds).
+2026-10-13T21:58:25.9542810Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionSitsCloserToItsOwnToggle]' started.
+2026-10-13T21:58:25.9544600Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2118: -[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionSitsCloserToItsOwnToggle] : Test skipped - CAPTION_HUG_NOT_RUN light：这一页只量到 0 带文字（其中说明档 0 带）⇒ 这台机器拍不出设置页（BACKLOG 43），归属这条记为未运行，不算通过
+2026-10-13T21:58:25.9545970Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionSitsCloserToItsOwnToggle]' skipped (0.505 seconds).
+2026-10-13T21:58:25.9547090Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsHelperTextIsNotClipped]' started.
+2026-10-13T21:58:25.9548630Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2799: -[ClipboardHistoryAppTests.UICaptureTests testSettingsHelperTextIsNotClipped] : Test skipped - TEXT_INK_NOT_RUN：本机/本平台无法渲染 settings-* 帧 ⇒ 对照判据记为未运行，不算通过（见 BACKLOG 43）
+2026-10-13T21:58:25.9549840Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsHelperTextIsNotClipped]' skipped (0.993 seconds).
+2026-10-13T21:58:25.9550600Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic]' started.
+2026-10-13T21:58:25.9552510Z /Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1721: -[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic] : Test skipped - 诊断用判据：它只回答「这一列是谁画的、它携带的颜色在两种外观下各解析成什么」，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+2026-10-13T21:58:25.9555460Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic]' skipped (0.237 seconds).
+2026-10-13T21:58:25.9557490Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testTextInkGateTruthTable]' started.
+2026-10-13T21:58:25.9559050Z Test Case '-[ClipboardHistoryAppTests.UICaptureTests testTextInkGateTruthTable]' passed (0.000 seconds).
+2026-10-13T21:58:25.9560420Z Test Suite 'UICaptureTests' failed at 2026-10-13 21:58:25.684.
+2026-10-13T21:58:25.9561560Z 	 Executed 28 tests, with 8 tests skipped and 4 failures (0 unexpected) in 52.566 (52.569) seconds
+2026-10-13T21:58:25.9562960Z Test Suite 'ClipboardHistoryPackageTests.xctest' failed at 2026-10-13 21:58:25.685.
+2026-10-13T21:58:25.9564550Z 	 Executed 28 tests, with 8 tests skipped and 4 failures (0 unexpected) in 52.566 (52.569) seconds
+2026-10-13T21:58:25.9565810Z Test Suite 'Selected tests' failed at 2026-10-13 21:58:25.685.
+2026-10-13T21:58:25.9566980Z 	 Executed 28 tests, with 8 tests skipped and 4 failures (0 unexpected) in 52.566 (52.571) seconds
+2026-10-13T21:58:25.9568280Z 102 ratio=8.44 ink=21.3%
+2026-10-13T21:58:25.9568810Z NOTICE_SIDE content-with-two-notices dark 尾墨 亮371/暗0
+2026-10-13T21:58:25.9569470Z NOTICE_SIDE content-with-two-notices dark 尾墨 亮569/暗0

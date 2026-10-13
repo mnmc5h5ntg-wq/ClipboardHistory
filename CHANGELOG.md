@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R36 · CI 的红终于有名字了 —— 顺手把一把用了十四轮的尺问成了色差尺）
+
+- **产品代码零改动**（帧基线 `CHANGED=0 / 102`、`swift build` 0 告警）。这轮做的是**验收装置本身**：
+  帧捕获那一步以前是 report-only，runner 上 4 条断言行红被吞了九轮（BACKLOG 49 / U-59）。
+- **新增硬门 `scripts/ci_capture_gate.py`**：红有两个来源（`error: -[类 方法] :` 与 `Test Case … failed`，
+  后者是崩溃/超时那种**只有结论行**的红），三条退出码规矩 —— 未登记的红 >0 红、
+  一条用例结论都没有红（"没跑"不是通过）、判出绿的数量 < `--min-passed` 红
+  （把像素判据整批改成 `throw XCTSkip` 也是一条红都没有）。
+  正对照是**逐字日志**：`scripts/tests/fixtures/r36_runner_capture.log`（run 38473962277 那 257 行）。
+- **机器能力前提拆成三条**（`CaptureCapability`，纯函数 + 5 臂真值表）：
+  settings 族是否**整族**空白（族内每张 >85% 未绘制；本机 20.8–78.8% vs runner 90.6–95.9%）、
+  这一台是否见过任何黑带（本机 9 处 vs runner 0 处）、底行墨这把尺是否活着（两台都 100%）。
+  上一版是"某一族画不画得出来"一把尺管三件事，那种写法既放过过不该放的也红过不该红的。
+- **U-60（看图看出来的）**：`bottomInkFraction` 的参照点是**左上角那一个像素**，
+  所以它读的是"底行与角点差多少"而不是"底行有没有墨"。51 张帧双参照扫描：15 张报 100.0%
+  而按底行自身只有 0.0%（sidebar 四帧 × 亮暗 + detail 亮色七帧），`settings-privacy-light`
+  反过来报 0.1% 而真实 6.7%（漏报）。⇒ R22 那条正对照从写下那天起就是**假对照**，
+  `contentMustFit` 十条判据十四轮没有有效正对照。本轮只改话术 + 记 BACKLOG 50，
+  尺留给 R37，并留 `InkFloor.bottomEdgeInkAliveFraction` 当绊线。
+- **旧账纠正**：BACKLOG 43 那句"List 族在 runner 上画不出来"是错的 —— 那一族在 runner 未绘制 0.0%，
+  真正整族空白的是 settings。49 已就地改写，并新增 50。
+- 测试 712 → **713**，脚本测试 72 → **83** 条，全绿。变异 **M157–M168** 十二支：11 CAUGHT，
+  M168 本地无判别力（本机确实见过黑带），由下一次 CI 的日志判。
+
 ### Changed（R35 · 说明段全覆盖：其余五个分区 + 详情/行内 meta，外加一条"覆盖要有机器账"）
 
 - **产品代码零改动**（帧基线 `CHANGED=0`）。这轮把 BACKLOG 34② 剩下的半条做完：
