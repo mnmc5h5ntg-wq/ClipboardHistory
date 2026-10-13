@@ -618,14 +618,20 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
-        results.append(Fixture("search-field", NSSize(width: 320, height: 96)) {
+        // 高度 96 → 112（R20）：96 是"两态各 31pt"那个年代记下来的数
+        // （12 + 31 + 8 + 31 + 12 = 94，刚好塞进 96）。
+        // 清除 × 的命中区抬到 22pt 之后两态各要 32pt，总高 96 正好顶满 ⇒
+        // 下面那颗框被裁掉约 4.5pt，而 `testSearchFieldKeepsTheSameHeightInBothStates`
+        // 报的是"两态不等高"。**这条判据先抓到的其实是夹具自己裁了内容** ——
+        // 与 R18 那批"夹具尺寸是记的数"同一族，只是这次是新加的守卫把它逼出来的。
+        results.append(Fixture("search-field", NSSize(width: 320, height: 112)) {
             AnyView(
                 VStack(spacing: 8) {
                     SearchField(text: .constant(""))
                     SearchField(text: .constant("搜索内容"))
                 }
                 .padding(12)
-                .frame(width: 320, height: 96)
+                .frame(width: 320, height: 112)
                 .background(Color(nsColor: .windowBackgroundColor))
             )
         })
@@ -1006,6 +1012,87 @@ final class UICaptureTests: XCTestCase {
             store.perform(.selectOnly(store.entries[index]))
         }
         return store
+    }
+
+    /// 判据自己拍的那张帧叫什么。它带着尺寸段，所以夹具改框时这里对不上就会红
+    /// （红的是"读不回来"，不是安静跳过）。
+    static let searchFieldFixtureSize = "320x112"
+
+    /// 搜索框的**两态必须等高**（R20）。
+    ///
+    /// 这一条是从"我自己这一轮改出来的回归"长出来的：给清除 × 加 4pt 命中区之后，
+    /// 有字的那颗框被顶高约 5pt，而空框反而矮了 4pt（实测 31→27 / 31→32）——
+    /// 也就是说**打字的时候搜索框自己会跳一下**。第一次的修法（收垂直内边距）
+    /// 只是把跳的方向换了，没把两态锁在一起。
+    ///
+    /// 为什么能从像素判：`search-field` 这张夹具本来就把"空"与"有字"两颗框放在同一帧里，
+    /// 所以不需要新夹具，量两条填充带的高度即可。
+    ///
+    /// **它自己拍自己量**（预检抓出来的顺序依赖）：第一版是去读 `testCaptureKeyViews`
+    /// 写在捕获目录里的 PNG，于是单独跑这一条就"读不到帧"而红 ——
+    /// 一条只能靠别的测试先跑过才成立的判据，等于没有判据。
+    func testSearchFieldKeepsTheSameHeightInBothStates() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r20-height-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == "search-field" }) else {
+                return XCTFail("找不到 search-field 夹具 ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("search-field-\(Self.searchFieldFixtureSize)-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+            }
+            let bands = Self.filledBands(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                         bytesPerRow: rep.bytesPerRow)
+            XCTAssertEqual(bands.count, 2,
+                           "帧里应该正好有两颗框（空 / 有字），实测 \(bands.count) 条：\(bands) ⇒ 夹具或布局变了")
+            let heights = bands.map { $1 - $0 }
+            XCTAssertLessThanOrEqual(abs(heights[0] - heights[1]), 2,
+                                     "两态高度差 \(abs(heights[0] - heights[1]))px（pt 级 = "
+                                     + "\(Double(abs(heights[0] - heights[1])) / 2.0)）⇒ 打字时搜索框会自己跳，"
+                                     + "定高者不是文本列")
+            print("SEARCH_FIELD_HEIGHTS \(tag) pt=\(Double(heights[0]) / 2.0), \(Double(heights[1]) / 2.0)")
+        }
+    }
+
+    /// 按行找"整行大部分像素都偏离主色"的连续带（用于量同一帧里两块控件的高度）。
+    static func filledBands(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int) -> [(Int, Int)] {
+        // 主色：取四个角的中位近似（这里用左上角即可，帧的四角都是窗口底色）
+        let r0 = Int(bytes[0]), g0 = Int(bytes[1]), b0 = Int(bytes[2])
+        var bands: [(Int, Int)] = []
+        var start = -1
+        var previous = -1
+        for y in 0..<height {
+            let row = y * bytesPerRow
+            var off = 0
+            var x = 0
+            while x < width {
+                let o = row + x * 4
+                if abs(Int(bytes[o]) - r0) + abs(Int(bytes[o + 1]) - g0) + abs(Int(bytes[o + 2]) - b0) > 12 {
+                    off += 1
+                }
+                x += 1
+            }
+            let filled = Double(off) / Double(max(width, 1)) > 0.5
+            if filled {
+                if start < 0 { start = y }
+                previous = y
+            } else if start >= 0, previous >= 0, y - previous > 6 {
+                bands.append((start, previous))
+                start = -1
+                previous = -1
+            }
+        }
+        if start >= 0 { bands.append((start, previous)) }
+        return bands
     }
 
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。

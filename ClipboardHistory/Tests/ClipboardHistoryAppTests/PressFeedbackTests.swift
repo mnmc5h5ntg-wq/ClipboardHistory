@@ -136,19 +136,42 @@ final class PressFeedbackTests: XCTestCase {
 
     /// 药丸/命中区这一档必须**有人用**。R13 的教训：新参数没有消费者，
     /// 它就只是一个类型定义（"加了"与"有人用"是两件事）。
+    ///
+    /// R20 顺手改了这两处，两处都是被自己的变异逼出来的：
+    /// ① 从"一个总数"改成"按文件点名"：总数只能告诉"变了"，点名能告诉**哪一处**变了 ——
+    ///    与本轮在 `hoverLevel` 那条上犯的同一个错对照着看，一个只报数的守卫最容易把"没做完"读成"做完了"。
+    /// ② 从"出现过 `labelPadding:` 字样"改成"**值必须大于 0**"：
+    ///    变异 M88 把清除 × 写成 `labelPadding: 0`，旧写法**全绿通过** —— 它在数字符串，不在数参数。
+    ///    `labelPadding: 0` 的意思就是"没有命中区"，而它是这条守卫眼里的"有"。
+    ///    这一族叫"按名字查消费者会被前缀白拿"。
     func testSmallControlsAskForThePillPadding() throws {
-        var consumers = 0
+        var expected: [String: Int] = [
+            // 侧栏五颗批量按钮（一次调用管一排）
+            "HistorySidebarView.swift": 1,
+            // 排除名单的「移除」+ 回执的 ×
+            "SettingsView.swift": 2,
+            // R20：清除 ×。它的 label 之前**只有字形那么大**（约 14pt，没有 frame），
+            // 是全 App 最小的一颗可点控件。
+            "SearchField.swift": 1,
+        ]
         for (file, source) in try productSources(in: "Views") {
             // 声明这个参数的那个文件必须**先摘掉**：它自己就有五处 `labelPadding:`
             // （字段、转交、`.padding(...)`、扩展的默认值与转交），
             // 不摘的话这条"有没有消费者"会拿声明当消费 —— 与"扫自身源码的守卫要先把守卫自己摘掉"同族。
             if file == "PressableStyle.swift" { continue }
-            consumers += codeOnly(source).components(separatedBy: "labelPadding:").count - 1
+            let hits = Self.callArguments(in: codeOnly(source), named: ".pressedStyle(")
+                .filter { (Self.number(after: "labelPadding:", in: $0) ?? 0) > 0 }
+                .count
+            if hits > 0 {
+                XCTAssertEqual(expected[file], hits,
+                               "\(file) 的 `labelPadding` 位点数是 \(hits)，账本记的是 \(expected[file] ?? 0)"
+                               + " ⇒ 有人加/删了一处小控件的命中区，重判它该不该有（整行类按钮不该加，它有自己的内边距）")
+                expected[file] = nil
+            }
         }
-        // 3 = 侧栏五颗批量按钮（一次调用管一排）+ 排除名单的「移除」+ 回执的 ×。
-        XCTAssertEqual(consumers, 3,
-                       "只有 \(consumers) 处小控件抬了药丸/命中区。少一处 = 那颗按钮退回'贴着笔画的一圈'；"
-                       + "多一处 = 新位点要重判（整行类按钮**不该**加，它有自己的内边距）")
+        XCTAssert(expected.isEmpty,
+                  "这些文件里的 `labelPadding` 位点不见了：\(expected.keys.sorted())"
+                  + " ⇒ 那颗按钮又退回'贴着笔画的一圈'，命中区也跟着缩回字形大小")
     }
 
     /// 上一条管的是"样式内部有没有悬停这一半"，这一条管的是**接缝**：
@@ -178,16 +201,101 @@ final class PressFeedbackTests: XCTestCase {
 
         // 新参数若没有调用点读它，它就只是一个类型定义。"加了参数"与"有人用"是两件事
         // （`feedback-counting-and-wording` 里那条"谁在读旧数字"的改口径审计同一族）。
+        //
+        // **R20 把这条从"数个数"改成了"按形状要求每一处都表态"。**
+        // 旧版写的是 `XCTAssertEqual(consumers, 3)`，于是它把"清扫只做了三处"这件事
+        // 钉成了"这就是完成态"：剩下五处圆形图标按钮（行首星标、清除 ×、播放、静音、
+        // 药丸四颗）一直用着给整行定的 0.06，而守卫全绿。
+        // **一条只数已完成部分的守卫，会把没做完的工作伪装成边界** —— 这是本轮最该记的一条。
+        var circular = 0
+        var silent: [String] = []
+        for (file, source) in try productSources(in: "Views") {
+            for arguments in Self.callArguments(in: codeOnly(source), named: ".pressedStyle(") {
+                guard arguments.contains("in: Circle()") else { continue }
+                circular += 1
+                if !arguments.contains("hoverLevel:") { silent.append(file) }
+            }
+        }
+        XCTAssertEqual(silent, [],
+                       "这些圆形图标按钮没有表态自己用哪一档悬停，于是它们拿的是给整行定的 0.06："
+                       + "\(silent)。圆形按钮都是小控件，要么写 `VisualFill.controlHover`，"
+                       + "要么像详情区药丸那样**自己已经画了一层**就写 `hoverLevel: 0`")
+        XCTAssertEqual(circular, 5,
+                       "圆形 `pressedStyle` 调用点从 5 处变成 \(circular) 处 ⇒ 新增/删除位点要重新判一遍档")
+
+        // 抬档这件事的"消费者计数"仍然留着，但它不再是唯一的网。
         var consumers = 0
         for (file, source) in try productSources(in: "Views") {
             _ = file
             consumers += codeOnly(source)
                 .components(separatedBy: "hoverLevel: VisualFill.controlHover").count - 1
         }
-        XCTAssertEqual(consumers, 3,
-                       "只有 \(consumers) 处小控件显式抬了悬停档：R13 收进来的是三处"
-                       + "（侧栏五颗批量按钮、排除名单的「移除」、回执的 ×）。"
+        XCTAssertEqual(consumers, 7,
+                       "显式抬到控件档的位点从 7 处变成 \(consumers) 处：R15 的三处（侧栏批量按钮、"
+                       + "「移除」、回执 ×）+ R20 的四处（行首星标、清除 ×、播放、静音）。"
                        + "多一处要红（提醒把新位点判一遍），少一处也要红（等于把它退回 6% 那一档）")
+    }
+
+    /// 按括号配平取出某个调用的**实参文本**（跨行也算）。
+    /// 存在的理由：`pressedStyle` 现在会写成三行，按行扫的判据会把它读成"没表态"。
+    static func callArguments(in code: String, named needle: String) -> [String] {
+        var results: [String] = []
+        var search = code[...]
+        while let range = search.range(of: needle) {
+            let open = range.upperBound
+            var depth = 1
+            var cursor = open
+            while cursor < code.endIndex, depth > 0 {
+                switch code[cursor] {
+                case "(": depth += 1
+                case ")": depth -= 1
+                default: break
+                }
+                if depth == 0 { break }
+                cursor = code.index(after: cursor)
+            }
+            guard depth == 0 else { break }
+            results.append(String(code[open..<cursor]))
+            search = code[code.index(after: cursor)...]
+        }
+        return results
+    }
+
+    /// 取出某个具名实参的**整数值**（没有这个实参就返回 nil）。
+    ///
+    /// 为什么要读值而不是数出现：变异 M88 把清除 × 写成 `labelPadding: 0`，旧写法**全绿通过**
+    /// —— 它在数字符串，不在数参数。而 `labelPadding: 0` 的意思就是"没有命中区"，
+    /// 恰恰是这条守卫要抓的那件事。与"按名字查消费者会被前缀白拿"同族。
+    static func number(after label: String, in arguments: String) -> Int? {
+        guard let range = arguments.range(of: label) else { return nil }
+        var digits = ""
+        for character in arguments[range.upperBound...] {
+            if character.isNumber {
+                digits.append(character)
+            } else if !digits.isEmpty {
+                break
+            } else if !character.isWhitespace && character != ":" {
+                break
+            }
+        }
+        return Int(digits)
+    }
+
+    /// 详情区药丸那四颗**只允许有一层悬停底色**（R20 抓到的是叠了两层）。
+    ///
+    /// `GlassIconControl` 自己在 44pt 的圆上画 `.primary.opacity(controlHover)`，
+    /// 而 `pressedStyle` 默认还要再叠一层 `VisualFill.hover`=0.06 ——
+    /// 两层相加悬停时约 0.14，**比全仓"控件"那一档高 1.75 倍**，
+    /// 而它是这一圈里唯一被画两层的表面。修法：那一处的 `hoverLevel` 必须是 0。
+    func testGlassPillPaintsExactlyOneHoverLayer() throws {
+        let code = codeOnly(try productSource(named: "Views/GlassControls.swift"))
+        XCTAssertTrue(code.contains(".fill(.primary.opacity(isHovered ? VisualFill.controlHover : 0))"),
+                      "药丸自己那一层悬停底色不在了 ⇒ 下面那条 `hoverLevel: 0` 就失去对象，"
+                      + "两件事必须一起改")
+        let calls = Self.callArguments(in: code, named: ".pressedStyle(")
+        XCTAssertEqual(calls.count, 1, "药丸文件里的 `pressedStyle` 调用点数量变了，重新判一遍叠层")
+        XCTAssertTrue(calls[0].contains("hoverLevel: 0"),
+                      "药丸的 `pressedStyle` 又自带悬停层了：它与 `GlassIconControl` 那层相加 ⇒ 0.14")
     }
 
     /// 只读数值不许说"可点"（R18 · 权重页那一列）。

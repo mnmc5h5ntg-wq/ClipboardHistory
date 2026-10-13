@@ -237,7 +237,11 @@ private struct VideoPlaybackControls: View {
                     // 12/13 那一臂是"身份变了 + 淡入"，它要事务才演得出来（R5 的 A3 同一课）。
                     .animation(MotionCatalog.animation(for: .contentFade), value: playback.isPlaying)
             }
-            .pressedStyle(in: Circle())
+            // 悬停档抬到控件那一档（R20）：这两颗是 22×22 的圆，默认的行档 0.06
+            // 铺在它们身上等于没有（`VisualFill.controlHover` 就是为这个尺寸量的）。
+            // 不加 `labelPadding`：22pt 的 frame 已经把 13pt 的字形围出来了，
+            // 再垫会把这条压在视频上的控制条整体加宽。
+            .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
             .helpLabel(playback.isPlaying ? "暂停" : "播放")
 
             Text(VideoPlaybackTimeFormatter.string(from: playback.currentTime))
@@ -270,7 +274,8 @@ private struct VideoPlaybackControls: View {
                                   replacesSymbol: true)
                     .animation(MotionCatalog.animation(for: .contentFade), value: playback.isMuted)
             }
-            .pressedStyle(in: Circle())
+            // 与上面那颗播放键同一档理由（R20）：这两颗是一对，不该一个亮一个暗。
+            .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
             .helpLabel(playback.isMuted ? "取消静音" : "静音")
         }
         .padding(.horizontal, 10)

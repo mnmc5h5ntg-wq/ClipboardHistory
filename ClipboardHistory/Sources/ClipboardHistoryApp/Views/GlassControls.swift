@@ -112,7 +112,15 @@ private struct GlassPillButton: View {
             )
         }
         // 按压态（R4）：这四颗是"状态被改了"的控件，点下去必须先有一下"收到了"。
-        .pressedStyle(in: Circle())
+        //
+        // **`hoverLevel: 0` 是刻意的**（R20 抓到的一处叠层）：这四颗的悬停底色本来就由
+        // `GlassIconControl` 自己画（`:168` 那一层 `.primary.opacity(controlHover)`，
+        // 画在 44pt 的圆上），而 `pressedStyle` 默认还要再叠一层 `VisualFill.hover`=0.06 ——
+        // 两层相加悬停时约 0.14，**比全仓"控件"那一档（0.08）高 1.75 倍**，
+        // 而它是这一圈里唯一被画两层的表面。
+        // 修法是把这一家的悬停交给"画它的那一处"，`pressedStyle` 只留按压那一档
+        // （`VisualFill.pressed` 走的是 `isPressed` 分支，不受这里影响）。
+        .pressedStyle(in: Circle(), hoverLevel: 0)
         .onHover { hovering in
             withAnimation(MotionCatalog.animation(for: .hover)) {
                 isHovered = hovering

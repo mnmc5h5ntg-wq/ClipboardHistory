@@ -6,7 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R20）
+
+- **每一颗圆形图标按钮的悬停强度重新判过**（R20 / U-42 / D-078）：`PressedStyle.hoverLevel`
+  的默认值是给**整行**定的 `VisualFill.hover`=0.06，而小控件上 6% 读不出来（铺在 20pt 图标上等于没有）。
+  行首星标、搜索框清除 ×、视频播放与静音四处从此显式抬到控件档 `controlHover`=0.08。
+  详情区那颗玻璃药丸相反 —— 它**叠了两层**：`GlassIconControl` 自己画一层 `controlHover`，
+  `pressedStyle` 又叠一层默认 0.06 ⇒ 悬停约 0.14，比"控件"那一档高 1.75 倍，
+  是这一圈里唯一被画两层的表面 ⇒ 那一处改成 `hoverLevel: 0`，只留自己那层。
+- **搜索框清除 × 的命中区从约 14pt 抬到约 22pt**（R20）：它的 label 之前只有字形那么大
+  （`xmark.circle.fill`，无 frame 无 padding），是全 App 最小的一颗可点控件，
+  而它管的还是"一键清空搜索"这种要快按的动作。`labelPadding: 4` 让底色药丸与命中区一起长。
+  行首星标与视频两颗**刻意不加** padding：它们的 label 已有 20/22pt 的 frame，
+  再垫会把整行文字列往右推 8pt —— 那是版式，不是反馈。
+
+### Fixed（R20）
+
+- **打字时搜索框自己跳一下**（R20，本轮自己引入又自己抓到）：加了 4pt 命中区之后，
+  这一行的定高者从文本列（17pt）换成了 × 那颗（22pt），于是空框 31pt、有字框 32pt。
+  第一次修（垂直内边距 7→5）只是把方向反过来，没修根因；真正的修法是让文本列自己声明 22pt，
+  两态都锁在 22 + 10 = 32pt。配套判据 `testSearchFieldKeepsTheSameHeightInBothStates`
+  把两态**真的量一遍**（`filledBands` 找填充带，断言带高差 ≤ 2px），
+  实测 `SEARCH_FIELD_HEIGHTS light pt=32.5, 33.0 / dark pt=32.0, 33.0`。
+- **`search-field` 夹具一直在裁自己的下半条**（R20）：320×96 的框套两态各 32pt + 间距 = 约 74pt 的内容，
+  加上边框与留白后 96 不够 —— 与 R18 那条 `weights` 裁头同族，但这次是**内容高度**从来没人核。
+  夹具抬到 320×112（帧基线 98 张，名字随之变成 `search-field-320x112-*`）。
+- **两条守卫现出原形**（R20，变异 M88 与预检各抓一条）：
+  ① `testSmallControlsAskForThePillPadding` 旧版数的是源码里出现过 `labelPadding:` 字样，
+  而 M88 写成 `labelPadding: 0`（意思正是"没有命中区"）**全绿通过** —— 它在数字符串，不在数参数。
+  现在读**值**（> 0 才算一处），并从"一个总数"改成"按文件点名的账本"。
+  ② `testStyleForwardsItsParametersInsteadOfResupplyingDefaults` 旧版 `XCTAssertEqual(consumers, 3)`
+  把"清扫只做了三处"钉成完成态，剩下五处圆形按钮退回 6% 而守卫全绿；
+  现在按**形状**要求每一处表态（凡 `in: Circle()` 必须写 `hoverLevel:`）。
+  ③ 高度那条判据第一版只读 `testCaptureKeyViews` 写好的 PNG，靠测试顺序才成立 —— 预检把它打回自渲染。
+
+### Added（R20）
+
+- **一把行带尺，用来把"哪些帧的哈希变了"翻译成"只有那一条动了"**（R20，仓库外
+  `.scratch/motion-audit-2/diff_frames_r20.swift` + `inspect_r20.swift shift|crop|stats`）：
+  逐档试纵向位移 k 并报告残余差异带。本轮读数：详情列 k=0 **0 行不同**（三处 `hoverLevel`
+  在静置态确实零像素差、也没画坏药丸），筛选段那一行与整列行 k=2px **0 行不同**（纯平移），
+  只有搜索框那 16 行是真变化。22 帧改动 = 框长高 1pt + 它下面整列平移 1pt。
+
 ### Fixed
+
 
 - **推翻 R18 自己写下的"浮层拍不到"根因**（R19 / U-41 / D-077）：那句"因为浮层背景是
   `NSVisualEffectView`，离屏没有可合成层"两半都错 —— 读 `QuickPickController.ensurePanel()`，

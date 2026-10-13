@@ -100,7 +100,13 @@ private struct RowFavoriteButton: View {
                 .frame(width: 20, height: 20)
                 .contentShape(Rectangle())
         }
-        .pressedStyle(in: Circle())
+        // 悬停档抬到"控件"那一档（R20）：这颗星是 20×20 的圆里装一个 11pt 的字形，
+        // 默认那一档（`VisualFill.hover`=0.06）是给"一整行"那种大面积定的，
+        // 铺在 20pt 圆上等于没有（`VisualFill.controlHover` 那条注释说的就是这件事，
+        // R15 只在三处落实了它 —— 判据数的是"三处"，所以剩下的位点一直不在视野里）。
+        // **不加 `labelPadding`**：它的 label 已经有 20×20 的 frame，高亮本来就比笔画大一圈；
+        // 再垫 4pt 会把整行的文字列往右推 8pt（侧栏宽度是定的），那是版式不是反馈。
+        .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
         .helpLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .accessibilityLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)
