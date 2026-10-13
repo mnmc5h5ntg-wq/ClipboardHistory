@@ -35,7 +35,16 @@ struct DetailView: View {
         // Group 不引入布局与尺寸变化。
         Group {
         if let entry = historyStore.selectedEntry {
+            // R16：这一臂以前**没有**过渡，而下面那条 `.animation` 管的是"有没有选中"这个布尔 ——
+            // 于是"空 ↔ 内容"只有半边在演，另一半是一帧硬切。
+            // 更糟的是方向：删掉最后一条时内容**瞬间消失**，空态再从全透明淡进来，
+            // 整块详情区空白约 160ms。那正是 D-055 砍掉 M4"整块淡入"的理由
+            //（"淡入只能从全透明开始 ⇒ 一帧空白"）—— 当初那条反对的恰好是这里剩下的这个形状。
+            // 两臂都挂同一档 ⇒ 才是真的交叉淡：旧的一直在，直到新的完全显形。
+            // 注意这**不是**把 M4 翻回来：M4 反对的是"换选（A→B）整块淡"，
+            // 那条仍然由下面按 `DetailPreviewKind` 供电的软交接管着（同类之间不演）。
             selectedEntryView(entry)
+                .transition(MotionCatalog.transition(for: .contentFade))
         } else {
             EmptyStateView(
                 systemName: "doc.on.clipboard",

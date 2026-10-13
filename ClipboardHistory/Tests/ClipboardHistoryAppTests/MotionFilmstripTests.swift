@@ -932,6 +932,51 @@ final class MotionFilmstripTests: XCTestCase {
                           "两条文本之间也在淡 ⇒ 每次方向键翻记录都演一遍，那是负债")
     }
 
+    /// 空态 ↔ 内容这一层到底演没演（R16）—— 先问尺子看不看得见，再问产品。
+    ///
+    /// 为什么不能直接断"过渡帧数 > 1"：R11 已经量过一件事 ——
+    /// `cacheDisplay` 抓的是**模型树**，纯 opacity 的交叉淡活在 presentation 层。
+    /// 而这一层两臂内容与位置都不同，理论上比热图那条更可见，所以**不能沿用 R11 的结论**，
+    /// 必须重做一次双向 A/B：开着动画与关着动画各抓一卷。
+    /// 两臂不同 ⇒ 尺子看得见，那就该把它当**硬判据**（本条会红，逼着升级）；
+    /// 两臂相同 ⇒ 只能记「源码已接、产物未量」，接线由 `MotionCatalogTests`
+    /// 那条"两臂必须成对"的结构守卫看着。
+    func testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind() throws {
+        try skipUnlessEnabledAndCapable()
+        let band = CGRect(x: 0.40, y: 0.12, width: 0.58, height: 0.76)   // 详情区，避开标题栏
+        let scenario = Scenario.detailEmptyToContent()
+        let saved = MotionCatalog.animationsEnabled
+        let onFilm = record(scenario)
+        MotionCatalog.animationsEnabled = false
+        let offFilm = record(scenario)
+        MotionCatalog.animationsEnabled = saved
+
+        // 两臂各写一条胶片带：这条判据读不出差别，那就**让人看见"读不出差别"**。
+        // 只看数字会把"尺子瞎"和"产品没动"混成一件事；把两卷并排放着，
+        // 人眼至少能确认"这两卷确实一样"，而不是猜探针是不是根本没抓到东西。
+        writeStrip("detail-empty-to-content-开", onFilm.motionFrames)
+        writeStrip("detail-empty-to-content-关", offFilm.motionFrames)
+
+        let on = Self.deltas(onFilm.motionFrames, band: band)
+        let off = Self.deltas(offFilm.motionFrames, band: band)
+        let onSpan = Self.transitionFrameCount(on)
+        let offSpan = Self.transitionFrameCount(off)
+        print("MOTION_DETAIL_AB empty-to-content 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on)))"
+            + " 冷闸=\(onFilm.clockIsWarm)  关 帧数=\(offSpan) 峰值=\(String(format: "%.3f", Self.peak(off)))"
+            + " 采样≈\(Self.sampleIntervalMilliseconds(onFilm.motionStamps))ms")
+        XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
+                             "两臂什么都没变 ⇒ 触发没让图长出来，这条 A/B 没有对照物（是探针坏了，不是动效坏了）")
+        XCTAssertTrue(onFilm.clockIsWarm && offFilm.clockIsWarm,
+                      "有一臂是在冷采样下抓的 ⇒ 两臂相同不能算尺子的极限，这条结论今天不成立")
+        if onSpan == offSpan, abs(Self.peak(on) - Self.peak(off)) < 0.02 {
+            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content："
+                + "开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」")
+        } else {
+            XCTFail("两臂读数不同 ⇒ 这把尺**看得见**这条交叉淡 ⇒ 把本条改成硬判据"
+                    + "（开着的过渡帧数必须大于关着的），别留一句免责")
+        }
+    }
+
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
     ///
     /// 以前它写的是"到位帧数 ≤6"，而 6 帧在 31ms 采样下是 186ms、在 90ms 采样下是 540ms ——
@@ -1319,6 +1364,37 @@ final class MotionFilmstripTests: XCTestCase {
         }
 
         /// 文本 → 文本：只换字，不该演。
+        /// 详情区"空 ↔ 内容"整块换人（R16）。
+        ///
+        /// 为什么单独一条：`detail-kind-change` 量的是**内容臂内部**预览换类型那一层；
+        /// 这一条量的是 `selectedEntry == nil` 那个布尔翻面 —— 那一层以前只有空臂挂了过渡，
+        /// 内容臂是一帧硬切（于是删掉最后一条时整块空白约 160ms）。
+        /// 判据与 `detailKindChange` 同一形状：**过渡中点**取残差，不在落定之后取。
+        static func detailEmptyToContent() -> Scenario {
+            Scenario(name: "detail-empty-to-content", size: NSSize(width: 760, height: 560),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     storeFactory: { Scenario.makeEmptyStore() }) { store in
+                store.add(ClipboardIntake.Entry(
+                    content: .text("动效取证：详情区从空态换成一条真记录 \"\(UUID().uuidString.prefix(6))\""),
+                    thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                    sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
+                    timestamp: Date())
+                guard let first = store.entries.first else { return }
+                store.perform(.selectOnly(first))
+            }
+        }
+
+        /// 一条记录都没有的 store ⇒ `selectedEntry == nil` ⇒ 详情区是空态。
+        /// 不复用 `makeStore()` 再删：删到最后那条走的是另一条代码路径，
+        /// 那会把"删除"这件事混进这条只管"空 ↔ 内容"的场景里。
+        @MainActor static func makeEmptyStore() -> HistoryStore {
+            HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+            )
+        }
+
         static func detailSameKind() -> Scenario {
             Scenario(name: "detail-same-kind", size: NSSize(width: 760, height: 560),
                      prepare: { store in store.perform(.selectOnly(plainTextEntries(store).first!)) }) { store in

@@ -456,6 +456,46 @@ final class MotionCatalogTests: XCTestCase {
 
     // MARK: - 夹具
 
+    /// 详情区"空 ↔ 内容"那一层：**两臂必须成对**挂过渡（R16）。
+    ///
+    /// 为什么这条结构守卫是本轮真正的判据：像素那一半今天判不了 ——
+    /// `MotionFilmstripTests.testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind`
+    /// 做了双向 A/B，`开 帧数=1 峰值=0.030 / 关 帧数=1 峰值=0.030`（冷采样闸已过），
+    /// 也就是这把尺看不见这条交叉淡（`cacheDisplay` 抓模型树，淡活在 presentation 层，
+    /// 与 R11 那条同一族）。所以接线由本条看着，观感由人工批次看着。
+    ///
+    /// 判"成对"而不是判"存在"：只数 `.transition` 出现次数的话，
+    /// 少掉一臂仍然是绿的 —— 而"只有一臂在演"恰恰就是本轮修的那个缺陷的形状。
+    func testDetailEmptyContentSwapHasTransitionsOnBothArms() throws {
+        let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
+        // 只看 `body` 那一段：内容臂自己里面还有一层预览过渡（`DetailPreviewKind` 那档），
+        // 混在一起数就把"两层各管一件事"读成一团字面量了。
+        // 锚点选"**那一次换人**"本身，不是 `var body: some View`：
+        // 这个文件里 `var body` 出现好几次（同文件还有别的视图），
+        // 用第一个 `var body` 当起点会把别人的 `.transition` 一起数进来
+        // —— 第一版就是这样读出 4 而不是 2 的（锚点过宽 = 判据在量整个文件）。
+        guard let bodyStart = detail.range(of: "if let entry = historyStore.selectedEntry"),
+              let swapEnd = detail.range(of: "private func selectedEntryView") else {
+            XCTFail("找不到详情区换人的锚点 ⇒ 守卫看不到被守卫的东西时必须红")
+            return
+        }
+        let swap = detail[bodyStart.lowerBound..<swapEnd.lowerBound]
+        // **按行数**，不是按子串出现次数：一行
+        // `.transition(MotionCatalog.transition(for: .contentFade))` 里
+        // ".transition(" 出现两次（一次是修饰符、一次是目录的函数名），
+        // 数子串会把两臂读成四臂 —— 第一版就是这样红的（红得对，但红在尺子上）。
+        let claims = swap.components(separatedBy: "\n")
+            .filter { $0.contains(".transition(") }.count
+        XCTAssertEqual(claims, 2,
+                       "空 ↔ 内容这一层只有 \(claims) 臂挂了过渡。只有一臂在演 = 另一臂一帧硬切；"
+                       + "而删掉最后一条时内容瞬间消失、空态再从透明淡进来 = 整块空白约 160ms"
+                       + "（D-055 反对 M4 用的正是这个理由）")
+        XCTAssertTrue(swap.contains("value: historyStore.selectedEntry == nil"),
+                      "两臂挂了过渡但容器不按这个布尔供电 ⇒ 过渡是死声明（仓库判据：不执行的声明比没有更坏）")
+        XCTAssertFalse(swap.contains("value: historyStore.selectedEntry?.id"),
+                       "供电键若换成「选中的是哪一条」，每次方向键翻记录都会整块淡一遍 —— 那是负债（D-055 M4）")
+    }
+
     private func productSource(named relative: String) throws -> String {
         let directory = String(relative.prefix { $0 != "/" })
         let name = String(relative.dropFirst(directory.count + 1))
