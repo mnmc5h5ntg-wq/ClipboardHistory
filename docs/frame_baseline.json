@@ -1,5 +1,5 @@
 {
-  "count": 90,
+  "count": 94,
   "frames": {
     "content-empty-750x560-dark.png": "b3b7492a3afb0e313b00dd0c9df0f677372908beba16b962c26f172446629aaf",
     "content-empty-750x560-light.png": "a7c53d3611451d7c094a9d2c9cdbd3df0ff5d0dfc2498b186e254ef1dd3e2f93",
@@ -45,6 +45,8 @@
     "menubar-refreshing-320x120-light.png": "67fd69434988342ad19d77b72277bdeed882cc53c66e4c1ca8d49ff185de1f97",
     "notice-banner-560x170-dark.png": "8b436fe8143118f53a54105ea37c6cbe3d3f9279eba81ae7fb5cda19f6b27538",
     "notice-banner-560x170-light.png": "17c48a70df0a9ecabe17105381ab1cfaec1a96b91506a1843542fe7dc6aece7e",
+    "receipt-line-430x56-dark.png": "461e8b5766fa5413bf9dc6ace0229b6396f4f5305311e8a2d73ba009016a183d",
+    "receipt-line-430x56-light.png": "2f28aaa58bac4d2106913be5fc8204311a9ace2470ae7370f2218f50f513e56b",
     "row-favorite-off-300x74-dark.png": "3127f25dd01529ecd7c613f7f2cf6beccdd03dfff288950d15a82b9d0c1b82aa",
     "row-favorite-off-300x74-light.png": "04771ab7ee4d1a27149dae8648942b21030d2fa16b895edd5d791c9a71a97c7e",
     "row-favorite-on-300x74-dark.png": "2ad3211a036b28740333bcb873af3fab2bc590b58044124beb53af0f4e1baf8e",
@@ -71,8 +73,10 @@
     "settings-general-720x540-light.png": "ecec1f7c36f535616acf9eea6bbaf88b057358791923255defcc53c5267e1f3d",
     "settings-min-640x440-dark.png": "1b79de51e303e484be0672db7a986fb8072306f9f317a8c42c199816d65bb5b7",
     "settings-min-640x440-light.png": "7ebf6852c4b8638fd74cd16e0b7cfcadd94f5261f321cbd7e5c2129fe8ffc79a",
-    "settings-privacy-720x540-dark.png": "fcad11350377f59bf25f71c60347fefdfb9d4eff0c4d7451cae325fdbef27124",
-    "settings-privacy-720x540-light.png": "351351ce8528cebb761d6bc49cec29b4093441f4a971a1b7351e44e64c684ac7",
+    "settings-privacy-720x540-dark.png": "38a231dadb042e2425bd4cd0cc1774ab5f7b2a37a517e9cfdbf8594328edece5",
+    "settings-privacy-720x540-light.png": "9295d3811d2f1e9174d3e2bc40cced21e622406edc066ceb1619f31834a930be",
+    "settings-privacy-excluded-720x1040-dark.png": "6d9670ba4ecc698e5c497b4160252ee8a8bfdd9ad33aba1709dc38f6141b945f",
+    "settings-privacy-excluded-720x1040-light.png": "d734c666f7e7063321a883ea1f753d8f252b9dab1b37328bd753320757ec3f6c",
     "settings-recommendations-720x540-dark.png": "018b193a08c1948bdc72fb3b249f666fa65a27d24b14f3b3a0e5a188aded2f92",
     "settings-recommendations-720x540-light.png": "ccc92cdf29f7c0b63b7f9de88a5b24932c8562d410686881db91cf80aef4b14a",
     "settings-shortcuts-720x540-dark.png": "664be884b6020422d0b06a6bd56411aee8b372f2621658cf441a9a1df58185d7",

@@ -927,3 +927,82 @@ M57（`fillOpacity` 收下 `hoverLevel` 不用）全部 CAUGHT；
 ② 「移除」与回执 × 这两处**从来没有对应的帧**（夹具里没有"用户加过排除 App""刚导出完"这两种状态），
 所以本轮在这两处的改动是**源码已接、产物未量**；
 ③ 药丸几何与命中区。①② 一起做（R14：证据通道 + 补两帧），③ 之后（R15）。
+
+---
+
+## Round 14 · 想做"让悬停可被取证"，三条路全断；断出来的那把尺第一件事就量出 R13 的回归
+
+选题是排期里的 R14（BACKLOG 24）：清单里约 15 处位点的唯一反馈是 hover，而仓库没有
+任何判据能证明"悬停时那层东西真的画出来了"。本轮先做 spike（三条路，见
+`.scratch/motion-audit-2/spike_hover_channel.md`，含复现命令与原始输出）：
+
+| 路 | 试了什么 | 实测 |
+|---|---|---|
+| ① 合成真指针 | `CGWarpMouseCursorPosition` + `CGEvent(mouseMoved).post(.cghidEventTap)`，窗口已 `activate` | 连**自建的** `NSTrackingArea` 都没收到 `mouseEntered:`（`appkit_enters=0`）⇒ 事件没进这个进程（无输入授权，`post` 不报错） |
+| ② 调 AppKit 入口 | 遍历视图树找到 tracking area 的 owner（就是 `NSHostingView`，mask=643 含 entered/exited），直接调 `mouseEntered(with:)` / `mouseMoved(with:)` | `.onHover` 闭包一次都没跑 ⇒ SwiftUI 不走这两个方法分发悬停 |
+| ③ 让窗口收事件 | `window.acceptsMouseMovedEvents=true` + `window.sendEvent(合成事件)` | `mouseMoved` 无反应；构造 `.mouseEntered` 类型的 `NSEvent` 直接崩在 `+[NSEvent mouseEventWithType:]` |
+
+**结论：在这套 SwiftPM 测试设施里，"鼠标移到控件上"不可取证。**
+本轮没有假装做成了，也没有因此把整件事退回"只能人眼"——
+而是把"悬停有没有效果"这句话**拆成两半分开记账**：
+**触发**（指针进包围盒）＝人眼（批次 23）；**表达**（那一档画在真实尺寸上看不看得出来）＝可量，做成判据。
+
+### 新判据上线抓到的第一条，是我自己上一轮引入的回归
+
+`testFillLaddersAreVisibleOnBothControlClasses`：用 `NSHostingView` + `cacheDisplay`
+画产品真正会画的那一层（`VisualShape.rounded(...).fill(Color.primary.opacity(level))`），
+按**均值通道差**逐档判。判"同一颗控件依次经过的状态"，不判"四档排成一条梯子"
+（一行这辈子不经过 `controlHover`，一颗 22pt 图标也不经过 `selected` —— 跨控件比两档差多少，
+量的是一件不存在的事）。
+
+```
+row/light      idle→hover 12.78  hover→pressed 12.78  pressed→selected 8.85
+row/dark       idle→hover 10.82  hover→pressed 11.80  pressed→selected 7.87
+control/light  idle→hover 20.52  hover→pressed  3.73   ← 地板是 4.00
+control/dark   idle→hover 17.73  hover→pressed  3.72   ←
+```
+
+R13 为了让 22pt 图标上的悬停看得出来，把那一档从 0.06 抬到 0.10，而按下是 0.12 ——
+**抬悬停这个动作本身把"按下去了"这句话抹掉了**。
+R13 的全部判据（真值表、白名单、集合相等、变异 5/5）都是绿的，
+因为它们量的是"令牌之间的关系"，没有一件量过"画在 22pt 上差多少"。
+改成 0.08（不是把按下抬到 0.14 —— 那会把 `pressed→selected` 压到 4 以下，同一种塌法换个位置）：
+`idle→hover 15.9/14.0`、`hover→pressed 8.4/7.5`，两边都过。
+
+### 两张"从来没有存在过的帧"
+
+`FRAME_BASELINE_CHANGED=2` 里从来没有设置页，因为「移除」与回执 × 只在交互之后才存在。
+现在有了：`settings-privacy-excluded-720x1040-{light,dark}`、`receipt-line-430x56-{light,dark}`，
+基线 90 → 94。过程中翻三次车，每一次都是"帧"抓的：
+1. **第一版 540 高拍不到那颗按钮** —— 用户自己加的排除项排在 10 行默认清单之后，在折叠线以下。
+   "这张帧存在"不等于"这个控件被拍到了"。（排序该不该反过来记 BACKLOG 27，不在动效轮顺手改。）
+2. **种子串手写 `"a,b"`，而分隔符是 `";"`** ⇒ 画面上是一整行 ID 加**一颗**「移除」。
+   产品没错，错的是夹具自带一份"长得像"的格式；现在由 `CapturePolicy.encodeUserExcluded` 生成。
+3. **顺手拍到一条真缺陷**：那句说明在屏幕上打印的是字面 `**你额外**` ——
+   设置页的 `Text` 不解析 Markdown。去掉强调而不是接渲染器（这一页别处都不加粗）。
+
+于是又给夹具机械自己加一条判据：**种过的默认值必须还原**（不还原的污染是静默的，
+而基线会把污染当成"产品长这样"永久钉住）。`ReceiptLine` 为此从 `private` 放开到 internal
+（与 R11 的 `DailyCopyStatsSection` 同手法：没有夹具的状态等于没有验收，而宿主替身测的是替身）。
+
+### 自评 95 / 100
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 18 / 20 | 悬停与按下重新分得开，这是"像不像系统控件"的实质内容；扣 2：药丸几何与命中区仍未动（BACKLOG 25，现在有条件了） |
+| 流畅度 | 16 / 20 | 本轮不动任何时序；修好台阶让"按下"重新成为一个可感的瞬间。扣 4：hover 的**过程**仍然没有帧证据 |
+| 层次与材质 | 15 / 15 | 四档底色在两类尺寸 × 两种外观下逐档实测，方向也判（亮色每档更暗、暗色每档更亮） |
+| 动效细节 | 15 / 15 | 判据形状（状态序列 vs 梯子）、轴选对（均值差 vs 占比）、夹具从产品推导、夹具自检 |
+| 交互反馈 | 10 / 10 | 抓到并修掉 R13 自己引入的一条真实回归 |
+| 可访问性 | 8 / 10 | 暗色台阶一起判；扣 2：触发不可取证（本轮的结论）+ 命中区仍是 16pt 图标本体 |
+| 性能 | 13 / 15 | 产品运行时零新增（改的是一个令牌常量与一个访问级别）；扣 2：判据每次扫 88×88 全像素，测试 +0.5s |
+
+**验证**：`swift build` 0 warning；全量（开在屏探针）`Executed 671 tests, with 16 skipped and 0 failures`；
+`MOTION_RESOLVE_SUMMARY judged=1/3`（R13 已记：这个数字负载敏感，不追）；
+脚本 72 passed；帧基线 94 张、`check --against working` = `CHANGED=0 MISSING=0 ADDED=0`；
+变异 **M59–M62 四支全 CAUGHT**（M59 打的正是 R13 那一步，M61 打判据自己的渲染夹具，
+M62 打夹具的还原）。
+
+**本轮欠的**：① 触发的像素证据（**结案为不可取证**，永久人眼，BACKLOG 24 → 28）；
+② 药丸几何（BACKLOG 25，R15）；③ BACKLOG 29 那条规矩还没做成守卫
+（"改任何 `VisualFill` 档位必须跑完整梯子"目前只在测试里，没有强制路径）。

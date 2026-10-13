@@ -44,15 +44,39 @@ final class UICaptureTests: XCTestCase {
             throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染")
         }
         var report: [(name: String, transparent: Double)] = []
+        /// 夹具机械自己也要有一条判据：**谁种了默认值，谁必须还原**。
+        /// 不还原的污染是静默的 —— 后面的帧照样画得出来，只是多了两行本来不在那一页的东西，
+        /// 而基线会把那份污染当成"产品长这样"钉住（`--against working` 从此永远比不回来）。
+        var originalSeeds: [String: String?] = [:]
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             for fixture in fixtures(appearance: appearance) {
                 let file = directory.appendingPathComponent(
                     "\(fixture.name)-\(Int(fixture.size.width))x\(Int(fixture.size.height))-\(tag).png"
                 )
+                var previousSeed: (key: String, value: String?)? = nil
+                if let seed = fixture.seed {
+                    if originalSeeds[seed.key] == nil {
+                        originalSeeds[seed.key] = UserDefaults.standard.string(forKey: seed.key)
+                    }
+                    previousSeed = (seed.key, UserDefaults.standard.string(forKey: seed.key))
+                    UserDefaults.standard.set(seed.value, forKey: seed.key)
+                }
                 let transparent = try render(fixture, appearance: appearance, to: file)
+                if let restored = previousSeed {
+                    if let value = restored.value {
+                        UserDefaults.standard.set(value, forKey: restored.key)
+                    } else {
+                        UserDefaults.standard.removeObject(forKey: restored.key)
+                    }
+                }
                 report.append((file.lastPathComponent, transparent))
             }
+        }
+
+        for (key, original) in originalSeeds {
+            XCTAssertEqual(UserDefaults.standard.string(forKey: key), original,
+                           "种子键 \(key) 拍完之后没还原 ⇒ 同一进程里后面的测试与下一轮帧都会读到上一张帧的夹具")
         }
 
         print("CAPTURED \(report.count) -> \(directory.path)")
@@ -115,11 +139,21 @@ final class UICaptureTests: XCTestCase {
         /// 不 settle 就只能拍到刷新途中的那一帧，而那一帧是不是最终态取决于机器快慢。
         let settle: (() -> Void)?
         let build: () -> AnyView
+        /// 按快门之前临时写进 `UserDefaults.standard` 的一个键，拍完立刻还原。
+        ///
+        /// 为什么要有这一层：`SettingsView` 里那几处 `@AppStorage` 状态（用户自己加的排除名单）
+        /// **没有别的注入点** —— 它不是参数、不是 store 字段，而离屏窗口又不建无障碍树，
+        /// 没法"点一下添加"。没有这一层，那一行与它右边那颗「移除」就永远进不了帧基线
+        /// （R13 改它样式时正是"源码已接、产物未量"）。
+        /// 还原是必须的：不还原的话同一次运行里 `settings-privacy` 那张也会被带脏。
+        let seed: (key: String, value: String)?
 
-        init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil, _ build: @escaping () -> AnyView) {
+        init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil,
+             seed: (key: String, value: String)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
             self.settle = settle
+            self.seed = seed
             self.build = build
         }
     }
@@ -407,6 +441,37 @@ final class UICaptureTests: XCTestCase {
                                               calendar: heatCalendar,
                                               debounceSeconds: 3600,
                                               now: { heatToday })
+        // R14 · 两张"从来没有存在过的帧"。
+        //
+        // ①「移除」这颗破坏性按钮只在**用户自己加过**排除 App 之后才存在；
+        // ② 回执行的 × 只在**刚导出 / 刚清空 / 刚改过排除名单**之后才存在。
+        // 90 帧夹具里这两种状态一个都没有，于是 R13 把这两处的样式从 `.borderless`
+        // 换成有按压/悬停的一档时，`FRAME_BASELINE_CHANGED` 里根本没有它们 ——
+        // 那叫"源码已接、产物未量"，账本里这一族已经记过太多次。
+        // 高度取 1040 而不是真实窗口的 540：**为的是把「移除」那颗拍进画面**。
+        // 用户自己加的排除项排在 10 行默认列表之后，540 高的那一帧里它在折叠线以下 ——
+        // 也就是说"这张帧存在"并不等于"这颗按钮被拍到了"（第一次审查就栽在这上面）。
+        // 排序本身要不要反过来（自己的列表在前、默认清单在后）记 BACKLOG 27，不在本轮改。
+        results.append(Fixture("settings-privacy-excluded", NSSize(width: 720, height: 1040),
+                               // 种子串**由产品自己的编码器生成**，不是手写的：
+                               // 第一版这里写的是 "a,b"，而分隔符其实是 ";" ——
+                               // 于是画面上出现一整行 `com.example.writer,com.example.design`
+                               // 加**一颗**「移除」。产品没错（它照格式解出来一个 ID），
+                               // 错的是夹具自带了一份"长得像"的格式。看帧的人会把这读成
+                               // "这行坏了"，而它其实是夹具坏了。
+                               seed: (CapturePolicy.userExcludedKey,
+                                      CapturePolicy.encodeUserExcluded(["com.example.writer",
+                                                                        "com.example.design"]))) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .privacy))
+        })
+        results.append(Fixture("receipt-line", NSSize(width: 430, height: 56)) {
+            AnyView(
+                ReceiptLine(text: "已导出 94 条记录到 ~/Desktop/时间剪史-导出.json", dismiss: {})
+                    .padding(.horizontal, 12)
+                    .frame(width: 430, height: 56, alignment: .leading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
         results.append(Fixture("settings-stats-populated", NSSize(width: 720, height: 540)) {
             AnyView(SettingsView(
                 showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),

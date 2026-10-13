@@ -401,7 +401,12 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("不记录这些 App 的复制")
                             .font(.subheadline)
-                        Text("默认已包含密码管理器与系统钥匙串。这里添加的是**你额外**要排除的；"
+                        // R14 的帧审查抓到的一条：这句里的 `**…**` 是**当字面量画出来的**
+                        // —— 设置页的 `Text` 走的是普通字符串，不解析 Markdown（详情区那条
+                        // Markdown 渲染管线是内容用的，不是 chrome 用的）。
+                        // 改法是把强调去掉而不是接上渲染器：这一页别的地方都不加粗，
+                        // 为一句话引入一条排版通道不值。
+                        Text("默认已包含密码管理器与系统钥匙串。这里添加的是你额外要排除的；"
                              + "排除只作用于自动采集 —— 你主动拖进历史的内容仍然会入库。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -895,7 +900,14 @@ struct DailyCopyStatsSection: View {
     }
 }
 
-private struct ReceiptLine: View {
+/// 一行回执 + 一颗收起的 ×。
+///
+/// internal 的唯一理由：帧夹具要宿主**产品自己的**这一行（R14）。它以前只由
+/// `exportMessage` / `archiveMessage` / `exclusionReceipt` 这些 `@State` 点亮，
+/// 而那三个状态在离屏渲染里没人能推 —— 于是这颗 × 与这行字**从来没有进过帧基线**，
+/// R13 改它样式时是"源码已接、产物未量"。与 `DailyCopyStatsSection`（R11）同一手法、同一理由：
+/// 没有夹具的状态等于没有验收，而宿主替身视图测的是替身。
+struct ReceiptLine: View {
     let text: String
     let dismiss: () -> Void
 

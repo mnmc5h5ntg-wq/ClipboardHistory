@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
 
@@ -7,6 +8,12 @@ import XCTest
 /// 不覆盖管线：本文件钉的是"按压的表达存在、可见、且真的接在按钮上"。
 /// 点击之后的**结果**（复制、收藏、筛选）由 `RowInteractionTests` / `PipelineAcceptanceTests` 管，
 /// 提示条与过渡的像素由 `MotionFilmstripTests` 管。
+///
+/// `@MainActor`：R14 起这个文件要真的画像素（`renderFill` 走 `NSHostingView` + `cacheDisplay`），
+/// 而 AppKit 的绘制入口全在主线程上 —— 不加这个标注，编译器会给出八条
+/// "main actor-isolated … can not be referenced from a nonisolated context"，
+/// 而 CI 是零告警的（与 `UICaptureTests` / `OffscreenSymbolInkProbeTests` 同一处理）。
+@MainActor
 final class PressFeedbackTests: XCTestCase {
 
     // MARK: - 表达本身：三态真值表
@@ -231,7 +238,154 @@ final class PressFeedbackTests: XCTestCase {
                                     + "删一处就等于把那个按钮退回'按了没反应'")
     }
 
+    // MARK: - 表达那一半：三档底色画出来到底看不看得出来
+
+    /// 悬停这一档**如果**被触发，画面上看不看得出来 —— 相邻两档逐一比 × 两种外观 × 控件真实尺寸。
+    ///
+    /// 为什么单独立这一条：R14 想做"合成 hover 取证"，三条路实测全部走不通
+    /// （数据与复现命令记在 `.scratch/motion-audit-2/spike_hover_channel.md`）：
+    /// ① `CGEvent(...).post(tap: .cghidEventTap)` 在无辅助功能授权的进程里被窗口服务器丢弃 ——
+    ///    连自建的 `NSTrackingArea` 都收不到 `mouseEntered:`（`appkit_enters=0`）；
+    /// ② 直接对 `NSHostingView` 调 `mouseEntered(with:)` / `mouseMoved(with:)`：
+    ///    SwiftUI 的 hover tracking area 的 owner 就是 hosting view 本身（mask=643，
+    ///    含 `mouseEnteredAndExited`），但两个入口都试过，`.onHover` 一次都没回调；
+    /// ③ `window.sendEvent(合成的 mouseEntered)` 直接崩在 `+[NSEvent mouseEventWithType:…]` 里。
+    ///
+    /// 所以这件事被拆成两半分开记账：**触发**那半只能人眼验（批次 22），
+    /// **表达**那半可以量 —— 也就是这条。不许因为一半量不了就把整件事写成"没做"，
+    /// 也不许反过来把能量到的这半当成"悬停已经验过了"。
+    ///
+    /// 量的是**控件自己那么大**（图标那颗 22pt：R13 像素 diff 实测侧栏那五颗的 label 包围盒
+    /// 46 设备像素 = 23pt；行 44pt），不是"随便一块平面"：同一档 6% 铺在一整行上读得出来、
+    /// 铺在 22pt 上读不读得出来，正是这条要回答的（圆角占的面积比例也只有在真实尺寸上才对）。
+    func testFillLaddersAreVisibleOnBothControlClasses() throws {
+        let ladders: [Ladder] = [
+            // 行：默认档。四档都是它可能依次经过的状态。
+            Ladder(name: "row", side: 44, steps: [("idle", 0), ("hover", VisualFill.hover),
+                                                  ("pressed", VisualFill.pressed),
+                                                  ("selected", VisualFill.selected)]),
+            // 小控件（R13 那三处）：`selected` 与它无关（图标按钮不会被选中），
+            // 但它**一定**会经过 idle→hover→pressed 这三步。
+            Ladder(name: "control", side: 22, steps: [("idle", 0),
+                                                      ("hover", VisualFill.controlHover),
+                                                      ("pressed", VisualFill.pressed)])
+        ]
+        for ladder in ladders {
+            for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
+                let tag = appearance == .darkAqua ? "dark" : "light"
+                var previous = try renderFill(level: 0, appearance: appearance, side: ladder.side)
+                var previousName = ladder.steps[0].0
+                for (name, level) in ladder.steps.dropFirst() {
+                    let current = try renderFill(level: level, appearance: appearance, side: ladder.side)
+                    let step = Self.meanChannelDelta(previous, current)
+                    print("FILL_STEP \(ladder.name)/\(tag) \(previousName)->\(name) "
+                        + "均值通道差=\(String(format: "%.2f", step))/255")
+                    XCTAssertGreaterThanOrEqual(step, Self.perceptibleStep255,
+                                                "\(ladder.name)/\(tag)：从 \(previousName) 按到 \(name) 画面上只差 "
+                                                + "\(String(format: "%.2f", step))/255，低于地板 ⇒ 令牌上是两档、"
+                                                + "屏幕上是同一档。要么把这一档拉开，要么承认它不存在并并掉")
+                    // 方向也要判：亮色下每一档更暗、暗色下每一档更亮。
+                    // 只判"差多少"会放过一档反向的错（比如某档误用 secondary 而不是 primary）。
+                    let gotDarker = Self.meanLuma(current) < Self.meanLuma(previous)
+                    XCTAssertEqual(gotDarker, appearance == .aqua,
+                                   "\(ladder.name)/\(tag)：\(name) 比上一档\(gotDarker ? "更暗" : "更亮")，方向反了")
+                    previous = current
+                    previousName = name
+                }
+            }
+        }
+    }
+
+    /// 一类控件的**状态序列**（不是四档排成的梯子）。
+    ///
+    /// 为什么按"同一颗控件依次经过的状态"判，而不是把四档排一排两两比较：
+    /// 一行这辈子不会经过 `controlHover`，一颗 22pt 图标也不会经过 `selected` ——
+    /// 跨控件比两档差多少，量的是一件不存在的事；
+    /// 而"按下这颗图标时，它比悬停时看得出来吗"是**每一次点击都会发生**的事。
+    /// （同族：同一个词在两个判据里含义不同，就别统一成一个布尔值。）
+    private struct Ladder {
+        let name: String
+        let side: CGFloat
+        let steps: [(String, Double)]
+    }
+
+    /// 一块平面底色上"看得出来"的地板（0–255 的均值通道差）。
+    ///
+    /// 取 4 ≈ 1.6%：大平面上恰可察觉的亮度台阶通常记在 1–3% 之间。取中间偏松的一侧，
+    /// 是为了让这条判据抓的是"两档其实是同一档"，不是抓"这一步比那一步小一点"（那是口味）。
+    static let perceptibleStep255: Double = 4
+
     // MARK: - 渲染夹具
+
+    /// 用 SwiftUI 自己画一遍产品的组合：窗口底色 + `Color.primary.opacity(level)` 的控件圆角。
+    ///
+    /// 刻意走 `NSHostingView` + `cacheDisplay`（与帧夹具同一套机器），而不是在 Core Graphics 里
+    /// 手搓一个"长得像"的圆角矩形 —— 后者测的是替身。`level` 由调用方从
+    /// `PressableAppearance.fillOpacity(...)` 拿，所以这条判据覆盖的是
+    /// **产品真正会画的那一层**，只是绕过了"谁把它翻成非零"那一半。
+    private func renderFill(level: Double, appearance: NSAppearance.Name,
+                            side: CGFloat = 22, scale: CGFloat = 4) throws -> NSBitmapImageRep {
+        // `NSApp` 在这个套件里是 **nil**：它是 `NSApplication.shared` 被访问过之后才被赋的全局，
+        // 而本文件其余判据从不碰 AppKit 外观。第一次实测就是 `Fatal error: Unexpectedly
+        // found nil while implicitly unwrapping`（信号 5 = 崩溃，不是"没跑"）。
+        // 与 `MotionFilmstripTests.recordFrames` 里那句 `_ = NSApplication.shared` 同一个理由。
+        let app = NSApplication.shared
+        let previousAppearance = app.appearance
+        app.appearance = NSAppearance(named: appearance)
+        defer { app.appearance = previousAppearance }
+
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil,
+                                   pixelsWide: Int(side * scale), pixelsHigh: Int(side * scale),
+                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                   isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 0, bitsPerPixel: 0)!
+        rep.size = NSSize(width: side, height: side)
+        let root = AnyView(
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                VisualShape.rounded(VisualRadius.control)
+                    .fill(Color.primary.opacity(level))
+            }
+            .frame(width: side, height: side)
+        )
+        let host = NSHostingView(rootView: root)
+        host.frame = NSRect(x: 0, y: 0, width: side, height: side)
+        host.appearance = NSAppearance(named: appearance)
+        host.cacheDisplay(in: NSRect(x: 0, y: 0, width: side, height: side), to: rep)
+        return rep
+    }
+
+    /// 两张图的均值通道差（0–255）。用**均值**而不是"变化像素占比"：
+    /// 一层均匀底色会把 100% 的像素都改变一点点，占比那条轴在这里恒等于 1，没有判别力
+    /// （账本里"只用亮度判两态可否分辨是用错轴"的镜像：这里要用台阶，不能用占比）。
+    private static func meanChannelDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {
+        let width = min(a.pixelsWide, b.pixelsWide)
+        let height = min(a.pixelsHigh, b.pixelsHigh)
+        guard width > 0, height > 0 else { return 0 }
+        var total = 0.0
+        for y in 0..<height {
+            for x in 0..<width {
+                guard let pa = a.colorAt(x: x, y: y), let pb = b.colorAt(x: x, y: y) else { continue }
+                total += abs(pa.redComponent - pb.redComponent)
+                    + abs(pa.greenComponent - pb.greenComponent)
+                    + abs(pa.blueComponent - pb.blueComponent)
+            }
+        }
+        return total / Double(width * height) / 3.0 * 255.0
+    }
+
+    private static func meanLuma(_ rep: NSBitmapImageRep) -> Double {
+        let width = rep.pixelsWide, height = rep.pixelsHigh
+        guard width > 0, height > 0 else { return 0 }
+        var total = 0.0
+        for y in 0..<height {
+            for x in 0..<width {
+                guard let p = rep.colorAt(x: x, y: y) else { continue }
+                total += 0.299 * p.redComponent + 0.587 * p.greenComponent + 0.114 * p.blueComponent
+            }
+        }
+        return total / Double(width * height) * 255.0
+    }
 
     /// 44pt 圆控件，按 `scale` / `fill` 画一次，返回位图。
     private func renderPill(scale: CGFloat, fill: Double) -> NSBitmapImageRep {
