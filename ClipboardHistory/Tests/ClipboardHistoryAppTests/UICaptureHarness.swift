@@ -1413,6 +1413,92 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// 一块矩形里"红减蓝"的均值 —— 分得出"中性灰/白"与"橙 12%/红 10%"的那根轴。
+    ///
+    /// 为什么不用亮度：标题栏后那条底色与它自己的底色在亮度上只差 4，
+    /// 而 R-B 差 26 对 0。**轴的分辨率必须配得上要分的表面**
+    /// （账本里"只用亮度判两态可分辨是用错轴"的同族）。
+    static func redMinusBlue(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                             bytesPerRow: Int, rect: CGRect, scale: Double) -> Double {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return 0 }
+        var total = 0.0
+        var count = 0
+        for y in y0..<y1 {
+            var x = x0
+            while x < x1 {
+                let o = y * bytesPerRow + x * 4
+                total += Double(bytes[o]) - Double(bytes[o + 2])
+                count += 1
+                x += 1
+            }
+        }
+        return count == 0 ? 0 : total / Double(count)
+    }
+
+    /// 哪些横幅帧要判"底色不许涂到标题栏后面"（R23）。
+    static let noticeChromeFixtures: [String] = ["content-with-notice", "content-with-two-notices"]
+
+    /// **提示条的底色不许越进窗口装饰那一条**（R23 / U-45 / D-082）。
+    ///
+    /// 缺陷是 R22 新增那张"两条横幅同时在"的帧里量出来的：
+    /// 一条文字的警告横幅占了 88pt，其中 y 0–52 **只有底色、没有内容** ——
+    /// 也就是颜色涂到了透明标题栏与红绿灯后面，而文字被安全区顶到 y≈60 才开始。
+    /// 根因是 SwiftUI 4 起 `.background(ShapeStyle)` 默认 `ignoresSafeAreaEdges: .all`。
+    /// 修完之后同一条带是 52–90（38pt），上面那条 0–48 是纯白。
+    ///
+    /// 这条判据**同时带正对照**：它先要求"横幅自己那条带确实是橙/红的"（R-B ≥ 8），
+    /// 否则一张空白帧也能让"顶部没色"这条绿着通过 —— 与 R22 那条 `contentMustFit`
+    /// 的正对照同一个理由。
+    ///
+    /// 自己拍自己量（R20 立的规矩）。
+    func testNoticeTintDoesNotReachTheTitlebar() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r23-chrome-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for name in Self.noticeChromeFixtures {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    return XCTFail("找不到夹具 \(name) ⇒ 这条判据没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(name)-judged-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                // 窗口装饰那一条：0–46pt（实测安全区 52pt，留 6pt 余量给边框抗锯齿）。
+                let chrome = CGRect(x: 40, y: 4, width: 300, height: 42)
+                // 横幅自己那一条：安全区之下、第一行文字之上（实测 56–86pt）。
+                let band = CGRect(x: 40, y: 56, width: 300, height: 30)
+                let bandTint = Self.redMinusBlue(bytes: base, width: rep.pixelsWide,
+                                                 height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                 rect: band, scale: scale)
+                let chromeTint = Self.redMinusBlue(bytes: base, width: rep.pixelsWide,
+                                                   height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                   rect: chrome, scale: scale)
+                // ① 正对照：横幅那条带必须有暖色，否则"顶上没色"这句话没有对照物。
+                XCTAssertGreaterThan(bandTint, 8,
+                                     "\(name)（\(tag)）在 y 56–86 只读到 R-B=\(String(format: "%.1f", bandTint))"
+                                     + " ⇒ 这里本该是警告/错误的底色。**尺读不到底色时，下面那条'标题栏没被涂'的绿没有意义**")
+                // ② 判据：装饰那一条必须是中性底。
+                XCTAssertLessThan(abs(chromeTint), 4,
+                                  "\(name)（\(tag)）的窗口装饰区（y 4–46）读到 R-B=\(String(format: "%.1f", chromeTint))"
+                                  + " ⇒ 提示条的底色涂到了标题栏/红绿灯后面（横幅自己那一条是 "
+                                  + String(format: "%.1f", bandTint) + "）。"
+                                  + "修法见 `NoticeBanner`：`.background(_, ignoresSafeAreaEdges: [])")
+                print("NOTICE_CHROME \(name) \(tag) bandR-B=\(String(format: "%.1f", bandTint)) "
+                      + "chromeR-B=\(String(format: "%.1f", chromeTint))")
+            }
+        }
+    }
+
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
     ///
     /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，

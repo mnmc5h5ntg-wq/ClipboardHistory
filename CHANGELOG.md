@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R23）
+
+- **提示条的底色不再涂到标题栏与红绿灯后面**（R23 / U-45 / D-082）：
+  `content-with-two-notices` 量出一条文字的警告横幅占 **88pt**、两行文字的错误横幅只占 50pt。
+  诊断（临时 `GeometryReader` 探针打出 `safeAreaTop=52`，再沿一列扫色度）证明
+  那 88pt 里 **y 0–52 只有底色、没有内容** —— 根因是 SwiftUI 4 起
+  `.background(ShapeStyle)` 默认 `ignoresSafeAreaEdges: .all`，
+  底色铺进安全区而文字被安全区顶下去 ⇒ 横幅看起来上半截是空的，并把工具栏染成警告色。
+  改成 `.background(style, ignoresSafeAreaEdges: [])`（macOS 13+；12 的默认行为本来就对，
+  所以按版本分叉，而不是写一个两边都凑合的负 padding）。
+  **实测：一条文字的横幅 88pt → 38pt，装饰区 R-B 从 +26 → 0.0，横幅自己那一条仍是 +24.9。**
+  行带尺归因：4 张帧变、每张**恰好** `0.0–52.0pt` 不同，以下逐像素相同 ⇒ **零布局位移**。
+
+### Added（R23）
+
+- **色度这根轴进了仓库**（R23）：`UICaptureHarness.redMinusBlue(bytes:…:rect:scale:)` ——
+  那两块表面亮度只差 4（243 vs 240），`R-B` 差 26 对 0；
+  **判据说"看不出区别"之前先问是不是轴用错了**。
+- **`testNoticeTintDoesNotReachTheTitlebar`**（R23）：装饰区 `|R-B| < 4`，
+  且**先**要求横幅自己那一条 `R-B > 8`（正对照）——
+  没有它，"把色度尺弄瞎"或"把采样框挪到空白处"都能让这条判据绿着通过。
+  变异 **M101**（去掉修复）、**M102**（弄瞎尺）、**M103**（挪框）三支全 CAUGHT，
+  各自红在该红的那条断言上。
+
 ### Added（R22）
 
 - **夹具不许裁自己的内容，从此可判**（R22 / U-44 / D-081 / BACKLOG 32 关掉）：
