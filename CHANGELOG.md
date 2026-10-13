@@ -135,6 +135,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **统计页「这张图怎么读」那块说明现在跟着图一起淡入**（R11 / U-33）：
+  以前只有图的两臂有过渡，说明块（分隔线 + 五行读法）是整块硬蹦出来的。
+  过渡与驱动键成对出现，由 `testStatsGuideTransitionIsPairedWithADriver` 钉住（M47/M48 CAUGHT）。
+- **动效胶片探针现在能拍非主窗口的界面，并且会等时钟热起来才触发**（R11）：
+  `Scenario` 长出 `root` / `storeFactory`（宿主是产品自己的 `DailyCopyStatsSection`，为此从
+  `private` 放开到 internal —— 探针自带一份"长得像"的视图就等于测替身）；
+  新窗口头两次 `cacheDisplay` 要 260–340ms 一帧，触发落在那段上时一次 160ms 的过程
+  只会被拍到两三个样本，所以加了冷采样闸门 `clockIsWarm`（≤120ms 才触发，最多预卷 6 帧）。
+- **一条被量出来的尺子边界**（R11 / BACKLOG 23）：双向 A/B 实测
+  `开 帧数=1 峰值=0.225 / 关 帧数=1 峰值=0.225` —— 把动效目录整个关掉读数不变，
+  说明 `cacheDisplay`（抓模型树）**看不见纯 opacity 的淡入**。
+  因此热图那条淡入的状态被定为「源码已接、产物未量」：不写进"已验证"，也不反过来说"产品没做"。
+  这同时改变了以前几轮 MOTION 数字的读法 —— 它只覆盖带布局位移的那类过渡。
+  `testHeatmapFadeIsNotVisibleToThisRuler` 是会自我作废的判据：尺子哪天看得见了它就红。
 - **热图自检（R9，阶段二第 1 轮）**：上一轮自己写的三条被抓出来并修掉 ——
   ① 悬停描边与"当天那格变深"原先挂在一条**永远不会演**的动画上
   （`.animation(.hover, value:)` 驱动的是页脚那个不可插值的字符串），

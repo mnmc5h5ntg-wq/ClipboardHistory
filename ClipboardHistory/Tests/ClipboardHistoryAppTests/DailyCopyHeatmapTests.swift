@@ -652,7 +652,11 @@ final class DailyCopyHeatmapTests: XCTestCase {
         let occurrences = settings.components(separatedBy: "这张图怎么读").count - 1
         XCTAssertEqual(occurrences, 1, "同一句标题出现两次 = 两份会各自漂移的文案（U-30 去重那条同一族）")
 
-        guard let sectionStart = settings.range(of: "private struct DailyCopyStatsSection")?.lowerBound,
+        // needle 里**不带访问修饰符**：R11 因为胶片探针要宿主这个视图，把它从 `private struct`
+        // 放开成 `struct` —— 那不是这条判据关心的事（它管的是"说明与图同源、同层"）。
+        // 把 `private` 写进 needle 等于让一条视觉判据去锁一个访问级别，
+        // 结果就是"产品没坏、守卫先红"。这种红也要记（它教的是 needle 的宽度）。
+        guard let sectionStart = settings.range(of: "struct DailyCopyStatsSection")?.lowerBound,
               let guideAt = settings.range(of: "这张图怎么读")?.lowerBound else {
             return XCTFail("找不到 `DailyCopyStatsSection` 或那段说明 ⇒ 守卫看不到被守卫的东西")
         }
@@ -668,6 +672,23 @@ final class DailyCopyHeatmapTests: XCTestCase {
                       "没有闸门 ⇒ 空账本那一屏会同时说\"还没有记录\"和\"怎么读这张图\"")
         XCTAssertTrue(guideRegion.contains("Divider()"),
                       "分隔线要一起收进闸门里，否则空屏上会留一条悬空横线")
+    }
+
+    /// 说明块（分隔线 + 「这张图怎么读」）的过渡与驱动键必须**成对**出现。
+    ///
+    /// 说清楚这条判据管到哪：它管的是**结构**（有过渡、有驱动、键不是恒真）。
+    /// 这条淡入到底演没演，胶片探针**量不到** ——
+    /// `MotionFilmstripTests/testHeatmapFadeIsNotVisibleToThisRuler` 实测
+    /// 开着目录与关掉目录两臂读数完全相同（帧数 1 / 峰值 0.225），
+    /// 因为 `cacheDisplay` 抓的是模型树，纯 opacity 淡入活在 presentation 层。
+    /// 所以这一条的状态是「源码已接、产物未量」，不许当成"已验证"，也不许当成"没做"。
+    func testStatsGuideTransitionIsPairedWithADriver() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        let body = region(in: region(in: settings, named: "struct DailyCopyStatsSection"), named: "var body")
+        XCTAssertTrue(body.contains(".transition(MotionCatalog.transition(for: .contentFade))"),
+                      "说明块没有过渡 ⇒ 它是整块硬蹦出来的（R9 抓到的那一族）")
+        XCTAssertTrue(body.contains("value: ledger.counts.isEmpty)"),
+                      "有过渡但没有驱动键 ⇒ 又是一条'代码里有、屏幕上没有'（R9 撤掉页脚那条的同一族）")
     }
 
     // MARK: - 工具（原有）

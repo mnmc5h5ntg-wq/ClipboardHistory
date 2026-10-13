@@ -824,3 +824,29 @@ M39 钉这条：连调用点一起把 `cellView` 改名 ⇒ 红。
 **指定那条用例 passed**。上一版脚本的基线跑的是从别的套件抄来的用例名，
 `--filter Suite/不存在的名字` 什么都选不到，而输出里的
 `Executed 0 tests ... 0 failures` **含** "0 failures" ⇒ 基线永远绿、注入照跑不误。
+
+## 第 13 轮 · U-33 热图淡入的可测性（R11）（D-069 之后新的一族）
+
+审的对象还是 R9 那条淡入。这轮**没有新面孔的界面缺陷**，有一条**尺子的边界**被量出来了，
+而它改变的是"以前所有轮的 MOTION 数字该怎么读"。
+
+| 事 | 之前 | 之后 | 读数 |
+|---|---|---|---|
+| 探针能拍什么 | 根视图写死 `ContentView` ⇒ 设置页/浮层里的东西**根本进不了真窗口判据** | `Scenario` 有 `root` / `storeFactory`，宿主是产品自己的 `DailyCopyStatsSection`（为此 `private` → internal） | 新场景 `heat-first-record` |
+| 触发时机 | 预卷固定 3 帧或 150ms，先到算哪个都行 —— 新窗口头两帧要 260–340ms，触发正好落在冷采样上 | 冷采样闸门 `clockIsWarm`（≤120ms 才触发，最多预卷 6 帧） | `冷闸=true` |
+| 说明块「这张图怎么读」 | 有 `.transition` 的图，**没有**过渡的说明块 ⇒ 分隔线 + 五行读法整块硬蹦 | 过渡与驱动键成对（`testStatsGuideTransitionIsPairedWithADriver`） | M47/M48 CAUGHT |
+
+**核心结论（双向 A/B）**：
+`MOTION_HEAT_FADE_A/B 开 帧数=1 峰值=0.225 关 帧数=1 峰值=0.225` ——
+把动效目录整个关掉再量，读数**不变** ⇒ 这把尺看不见纯 opacity 的淡入
+（`cacheDisplay` 抓模型树，淡入在 presentation 层）。
+所以这条淡入的状态被定为**「源码已接、产物未量」**：
+既不写进"已验证"，也不许反过来说"产品没做"。
+`testHeatmapFadeIsNotVisibleToThisRuler` 是**会自我作废**的判据 ——
+两臂哪天不同了它就红，逼着把场景放回 `Scenario.all()` 当真判据。
+
+**两条流程账**：
+1. 量不到的场景**不进** `all()`：否则产品天天为尺子的极限吃一次红。
+2. 我自己的守卫先红了一次且红得不对 —— needle 写的是 `private struct DailyCopyStatsSection`，
+   本轮把 `private` 去掉它就找不到目标。**产品没坏，是守卫把访问级别当成了被断言的性质。**
+   needle 改成 `struct DailyCopyStatsSection` 并把教训写进注释。

@@ -515,6 +515,14 @@ final class MotionFilmstripTests: XCTestCase {
             // 每个场景都进 MOTION_SUMMARY（哪怕这一条今天判不了）：CI 那一步与它的自测夹具
             // 都按"三个键都在"的形状读，少一个键会让下游把"没测"读成"测了且为 0"。
             rows.append((scenario.name, span))
+            guard film.clockIsWarm else {
+                notRun.append(scenario.name)
+                print("MOTION_NOT_RUN=clock-not-warm \(scenario.name)：触发那一刻采样还是冷的"
+                    + "（最后一格 >\(Int(Self.warmIntervalMilliseconds))ms）⇒ 一次 "
+                    + "\(Int(scenario.declaredDurationMilliseconds))ms 的过程最多被拍到两三个样本，"
+                    + "这把尺量不到「过程」这件事 —— 报没测到，不判产品没动")
+                continue
+            }
             guard Self.premisePictureChanged(frames) else {
                 notRun.append(scenario.name)
                 print("MOTION_NOT_RUN=premise-not-visible \(scenario.name)：触发前后逐像素相同 ⇒ "
@@ -563,6 +571,46 @@ final class MotionFilmstripTests: XCTestCase {
         print("MOTION_RESOLVE_SUMMARY judged=\(judged)/\(rows.count) not-run=\(notRun.isEmpty ? "-" : notRun.joined(separator: ","))")
         guard judged > 0 else {
             throw XCTSkip("MOTION_NOT_RUN=clock-too-coarse：\(notRun.count) 个场景全都分辨不了（采样比整段过渡还粗），这一条今天没有内容")
+        }
+    }
+
+    /// R11：热图那条"空态 ↔ 日历"的淡入，**这把尺看不见** —— 而这条测试钉的就是"看不见"这件事。
+    ///
+    /// 为什么要专门写一条"量不到"的判据：`heat-first-record` 第一次跑就把 main 判红了，
+    /// 读数 `0.004 / 0.027 / 0.220 / 0.000…`（一帧到位）。这很容易读成"产品没做动画"，
+    /// 而 `cacheDisplay` 抓的是**模型树** —— 纯 opacity 的交叉淡入只活在 presentation 层，
+    /// 同一个根因在 `MOTION_NATIVE`（AppKit 行动画）那条上已经踩过一次并写进账本。
+    ///
+    /// 所以这里做**双向 A/B**：目录开着与关掉必须读出**不同**的数字，否则"看得见"这句话没有对照物。
+    /// 两臂相同 ⇒ 只能记"源码已接、产物未量"：**既不许写进已交付，也不许反过来判产品没做**
+    /// （人眼判据在人工验收批次里）。哪天两臂不同了，这条会自己红 ——
+    /// 那是逼着把场景放回 `Scenario.all()` 当真判据，而不是留这条当免责。
+    func testHeatmapFadeIsNotVisibleToThisRuler() throws {
+        try skipUnlessEnabledAndCapable()
+        let saved = MotionCatalog.animationsEnabled
+        let onFilm = record(Scenario.heatFirstRecord())
+        MotionCatalog.animationsEnabled = false
+        let offFilm = record(Scenario.heatFirstRecord())
+        MotionCatalog.animationsEnabled = saved
+
+        let on = Self.deltas(onFilm.motionFrames)
+        let off = Self.deltas(offFilm.motionFrames)
+        let onSpan = Self.transitionFrameCount(on)
+        let offSpan = Self.transitionFrameCount(off)
+        print("MOTION_HEAT_FADE_A/B 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on))) 冷闸=\(onFilm.clockIsWarm)"
+            + "  关 帧数=\(offSpan) 峰值=\(String(format: "%.3f", Self.peak(off)))")
+        XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
+                             "两臂什么都没变 ⇒ 触发没让图长出来，这条 A/B 没有对照物（是探针坏了，不是动效坏了）")
+        // 冷闸必须**过**：拿一段还没热起来的采样去下"尺子看不见"的结论，
+        // 那是把探针的毛病写成产品的极限 —— 与"把没跑写成跑过"同一族，只是方向相反。
+        XCTAssertTrue(onFilm.clockIsWarm && offFilm.clockIsWarm,
+                      "有一臂是在冷采样下抓的 ⇒ 两臂相同不能算尺子的极限，这条结论今天不成立")
+        if onSpan == offSpan, abs(Self.peak(on) - Self.peak(off)) < 0.02 {
+            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
+                + "开关两臂读数相同 ⇒ 这把尺看不见纯 opacity 的淡入，这条只能记「源码已接、产物未量」")
+        } else {
+            XCTFail("两臂读数不同 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
+                    + "把 `heatFirstRecord()` 放回 `Scenario.all()` 当真判据，别留这条当免责")
         }
     }
 
@@ -1154,15 +1202,28 @@ final class MotionFilmstripTests: XCTestCase {
         /// 开窗**之前**先把界面摆到起点（比如"现在选中的是一条文本记录"）。
         /// 没有这一步就没法测"换类型才演"——因为夹具建完时的选中态是它自己决定的。
         let prepare: (@MainActor (HistoryStore) -> Void)?
+        /// 这个场景要拍的**根视图**。`nil` = 主窗口 `ContentView`。
+        ///
+        /// R11 加这一层，是为了让"设置页里的东西"也能被真窗口驱动。
+        /// 关键约束：根视图必须是**产品自己的**那个（`DailyCopyStatsSection` 为此从
+        /// `private` 放开到 internal）—— 探针一旦自带一份"长得像"的宿主视图，
+        /// 它测的就是替身而不是产品，那一族在仓库里记过（第二轮 N-1 的守卫绕开 adapter）。
+        let root: (@MainActor (HistoryStore) -> AnyView)?
+        /// 换一份 store。`nil` = `makeStore()`（15 条记录、**没有**按日账本）。
+        let storeFactory: (@MainActor () -> HistoryStore)?
 
         init(name: String, size: NSSize,
              prepare: (@MainActor (HistoryStore) -> Void)? = nil,
              declaredDurationMilliseconds: Double = 0,
+             root: (@MainActor (HistoryStore) -> AnyView)? = nil,
+             storeFactory: (@MainActor () -> HistoryStore)? = nil,
              _ trigger: @escaping @MainActor (HistoryStore) -> Void) {
             self.name = name
             self.size = size
             self.prepare = prepare
             self.declaredDurationMilliseconds = declaredDurationMilliseconds
+            self.root = root
+            self.storeFactory = storeFactory
             self.trigger = trigger
         }
 
@@ -1171,6 +1232,9 @@ final class MotionFilmstripTests: XCTestCase {
         /// `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 与
         /// `testDetailPreviewCrossfadesOnlyWhenTheKindChanges` 里反向钉着。
         static func all() -> [Scenario] { [noticeBanner(), detailKindChange(), emptyState()] }
+        // `heatFirstRecord()` **不在这里** —— 它量到的是"一帧到位"，而关掉动画之后读数不变，
+        // 也就是说这把尺看不见这条淡入（见 `testHeatmapFadeIsNotVisibleToThisRuler`）。
+        // 把它放进 `all()` 等于让一条"量不到的东西"每天判产品一次红。
 
         static func listInsertNewRecord() -> Scenario {
             Scenario(name: "list-insert-new-record", size: NSSize(width: 760, height: 560)) { store in
@@ -1197,6 +1261,52 @@ final class MotionFilmstripTests: XCTestCase {
                      declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerIn) * 1000) { store in
                 store.reportPasteFailure("系统未授权本 App 控制「System Events」，无法自动粘贴。")
             }
+        }
+
+        /// 空账本 → 第一条复制：整块日历该淡进来（R9 给两臂补的过渡 + `counts.isEmpty` 驱动）。
+        ///
+        /// 为什么是这一条而不是另外两条：R9 一共加了三条动画，
+        /// ① 悬停描边要真鼠标悬停（合成事件期间 `NSApp.currentEvent` 是 nil，那一族记过），
+        /// ② 单格加深只动 11pt ≈ 全帧的 0.1%，低于 `minimumVisibleChange`(0.005) ⇒ 尺子看不见，
+        /// ③ 只有"空↔网格"换掉的是约三成画面。
+        /// 所以这一条是**能证的**，另外两条继续只由结构判据看着 —— 别把它算成"三条都验过了"。
+        static func heatFirstRecord() -> Scenario {
+            Scenario(name: "heat-first-record", size: NSSize(width: 430, height: 250),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     root: { store in
+                         // 没有账本时画一个空视图：那会让前提检查报 `premise-not-visible`，
+                         // 也就是**如实报没测到**，而不是拿一张空白窗口冒充"这里没有过渡"。
+                         let section: AnyView = store.dailyCopyLedger
+                             .map { AnyView(DailyCopyStatsSection(ledger: $0)) } ?? AnyView(EmptyView())
+                         return AnyView(
+                             section
+                                 .padding(16)
+                                 .frame(width: 430, height: 250, alignment: .topLeading)
+                                 .background(Color(nsColor: .windowBackgroundColor))
+                         )
+                     },
+                     storeFactory: {
+                         let url = heatLedgerURL()
+                         // 上一次的残留会让账本**开局就有内容** ⇒ 空↔网格这次根本没有可演的变化，
+                         // 于是这条判据会静默变成"什么都没测"。先删干净，让起点真的是空。
+                         try? FileManager.default.removeItem(at: url)
+                         return HistoryStore(
+                             clipboardWriter: TestClipboardWriter(),
+                             // `load()` 返回 [] ⇒ 构造期的回填不会把账本填满（它只在有存档时间戳时才动）
+                             persistence: RecordingHistoryPersistence(),
+                             dailyCopyLedger: DailyCopyLedger(fileURL: url))
+                     }) { store in
+                store.add(ClipboardIntake.Entry(
+                    content: .text("动效取证：让热图从空态长出来的那一条 \(UUID().uuidString.prefix(6))"),
+                    thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                    sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
+                    timestamp: Date())
+            }
+        }
+
+        private static func heatLedgerURL() -> URL {
+            URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("heat-filmstrip-\(ProcessInfo.processInfo.processIdentifier).json")
         }
 
         /// 文本 → 图片：整块预览被换掉，该有一次软交接。
@@ -1266,10 +1376,16 @@ final class MotionFilmstripTests: XCTestCase {
         var motionStamps: [TimeInterval] {
             Array(stamps[min(max(triggerFrame - 1, 0), max(stamps.count - 1, 0))...])
         }
+
+        /// 触发那一刻采样是否已经热到能看过程。`false` ⇒ 这一卷只能报 not-run，
+        /// **不许**判产品"没有过渡"（R11 就是被这条救回来的：见 `recordFrames` 里那段实测）。
+        /// 带默认值的存储属性（不是计算属性）：`record()` 的其它调用点不传它，
+        /// 而那些场景不经过新的预卷循环时也不该被这条新闸门误伤。
+        var clockIsWarm: Bool = true
     }
 
     private func record(_ scenario: Scenario) -> Film {
-        let store = makeStore()
+        let store = scenario.storeFactory?() ?? makeStore()
         scenario.prepare?(store)
         return recordFrames(scenario, store: store)
     }
@@ -1278,7 +1394,7 @@ final class MotionFilmstripTests: XCTestCase {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: scenario.size.width, height: scenario.size.height),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: ContentView(historyStore: store))
+        let host = NSHostingView(rootView: scenario.root?(store) ?? AnyView(ContentView(historyStore: store)))
         window.contentView = host
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -1302,6 +1418,28 @@ final class MotionFilmstripTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }
+        // **等到时钟热起来再触发**（R11 实测加的这一层）。
+        //
+        // 新窗口的头两次 `cacheDisplay` 要 260–340ms 一帧（第一次绘制要填字形栅格化
+        // 与位图分配的冷缓存）。R11 的 `heat-first-record` 正好撞在这段上：
+        // 一次 160ms 的淡入只被拍到两个样本 —— 中间那一格变化量 0.027，
+        // 刚好落在"峰值 0.220 的 15%"这块地板（0.033）之下，于是被判成
+        // "6ms 一帧跳变"。**产品是对的，尺子的采样相位把它读错了。**
+        // 这不是把门槛调松（一个数字都没动），是把触发时机挪到尺子能看见过程的地方。
+        // 等不到就报 `clock-not-warm`：环境测不了 ≠ 产品没动。
+        // 预卷最多 6 帧：抓帧预算只有 30 帧，全花在预卷上就没有"过程"可看了。
+        while grabber.ticks < 6, Date() < prerollDeadline.addingTimeInterval(1.2) {
+            let previous = grabber.stamps.last
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
+            grabber.tick()
+            guard grabber.ticks >= 3, let previous, let now = grabber.stamps.last else { continue }
+            if (now - previous) * 1000 <= Self.warmIntervalMilliseconds { break }
+        }
+        let clockIsWarm: Bool = {
+            guard grabber.stamps.count >= 2 else { return false }
+            let last = grabber.stamps.count - 1
+            return (grabber.stamps[last] - grabber.stamps[last - 1]) * 1000 <= Self.warmIntervalMilliseconds
+        }()
         scenario.trigger(store)
         let triggerFrame = grabber.frames.count
         let deadline = Date().addingTimeInterval(3.0)
@@ -1309,8 +1447,17 @@ final class MotionFilmstripTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }
-        return Film(frames: grabber.frames, stamps: grabber.stamps, triggerFrame: triggerFrame)
+        return Film(frames: grabber.frames, stamps: grabber.stamps,
+                    triggerFrame: triggerFrame, clockIsWarm: clockIsWarm)
     }
+
+    /// "这一格采样热到能看过程"的上界（ms）。
+    ///
+    /// 取 120 而不是 50：本机热起来之后是 6–20ms，CI runner 事件内实测 55–62ms（R8b），
+    /// 设太紧会把 CI 整卷判成 not-run —— 那不是更准，是少一批读数。
+    /// 判据本身要求的是 `s ≤ 0.3d = 48ms` 才走细档，热不上但没热透的仍然会走中间档，
+    /// 所以这一层只挡"冷缓存那两三次"，不改变任何一档的门槛。
+    static let warmIntervalMilliseconds: Double = 120
 
     /// 逐对帧的变化像素占比（每 7 个像素采一个，控制耗时）。
     private static func deltas(_ frames: [CGImage], band: CGRect? = nil) -> [Double] {

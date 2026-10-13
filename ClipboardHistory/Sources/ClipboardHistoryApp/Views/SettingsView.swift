@@ -822,7 +822,11 @@ private struct CompatibleSplitView<Sidebar: View, Detail: View>: NSViewRepresent
 /// 为什么要这一层：`SettingsView` 不观察 `DailyCopyLedger`（它不是 store 的一部分），
 /// 直接把 `ledger.counts` 传下去会得到一张**开页时快照**的图 ——
 /// 用户边复制边看着设置页时它不动，那比不画更让人怀疑数据是假的。
-private struct DailyCopyStatsSection: View {
+/// 统计页那一块。**内部可见而不是 `private`**：胶片探针要在真窗口里驱动它
+/// （`MotionFilmstripTests` 的 `heat-first-record` 场景），
+/// 而探针一旦自己复制一份"长得很像"的宿主视图，它测的就是替身不是产品 ——
+/// 那一族在仓库里记过（第二轮 N-1 的守卫绕开 adapter 直调 engine）。
+struct DailyCopyStatsSection: View {
     @ObservedObject var ledger: DailyCopyLedger
 
     var body: some View {
@@ -833,8 +837,6 @@ private struct DailyCopyStatsSection: View {
             if let error = ledger.lastWriteError {
                 // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
                 // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
-                // （**这条什么时候真的上屏**是另一件事，见 BACKLOG 14：
-                //  它读的是一个跨队列的盒子，而盒子里的值没有发布通道。）
                 Text("统计写入失败：\(error)")
                     .font(.system(size: VisualFont.meta))
                     .foregroundStyle(.secondary)
@@ -849,10 +851,25 @@ private struct DailyCopyStatsSection: View {
             // 挂在 `SettingsView.body` 上读到的是"开页那一刻的快照条件"，
             // 用户复制第一条之后它不会重算 ⇒ 图长出来了、说明却永远不出现（新的一种"变了但界面不说"）。
             if !ledger.counts.isEmpty {
-                Divider()
-                readingGuide
+                VStack(alignment: .leading, spacing: 16) {
+                    Divider()
+                    readingGuide
+                }
+                .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
+        // 这一条驱动的是**本层那个 if**（说明块 + 分隔线），不是组件内部的两臂 ——
+        // 组件自己那条在 `DailyCopyHeatmapView.body` 里，各层驱动各层的子树，
+        // 参数都出自 `MotionCatalog`，所以"只有一个作者"这条仍然成立。
+        //
+        // R11 的实测结论写在这儿，别再被下一次审查误读成"这条没供电"：
+        // 胶片探针量到的是**一帧到位**（`heat-first-record`：0.004 / 0.027 / 0.220 / 0.000…），
+        // 但把 `animationsEnabled` 关掉再量是**同一个读数** ⇒ 这把尺看不见纯 opacity 的淡入淡出
+        // （`cacheDisplay` 抓的是模型树，与 `MOTION_NATIVE` 那条同一族根因）。
+        // 所以这条淡入目前的状态是**"源码已接、产物未量"**，不是"已验证"，也不是"没做"。
+        // 判据 `testHeatmapFadeIsNotVisibleToThisRuler` 会盯着这件事：
+        // 尺子哪天看得见了，它会红，逼着把场景放回真判据里。
+        .animation(MotionCatalog.animation(for: .contentFade), value: ledger.counts.isEmpty)
     }
 
     private var readingGuide: some View {
