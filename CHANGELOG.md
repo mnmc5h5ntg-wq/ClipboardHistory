@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R21b）
+
+- **CI 打红了这条判据自己**（R21b / D-080）：R20 新立的"搜索框两态等高"在无头 runner 上
+  读 **15.5 / 17.0pt**，本机读 **32.5 / 33.0pt** —— 差一倍不是噪声：这张框的填充
+  `VisualFill.fieldIdle`=0.035、描边 `VisualTint.fieldIdleStroke`=0.05，在 runner 那块纯白底上
+  都落不进像素阈值，于是"框"塌成"有墨的行"。**同一把尺在两台机器上量的不是同一件事**，
+  把"打字时框会不会跳"建在它上面，等于让 CI 的绿取决于底色。
+  等高从此判**布局**（`GeometryReader` 读两态实排高度，环境无关），
+  像素带高**降级为诊断打印**，那条测试改名 `testSearchFieldFixtureShowsBothStates`
+  并只留两条跨机器稳定的前提。
+- **那颗 × 一直比文本列高半 pt，R20 的"两态都锁在 32pt"其实没锁住**（R21b）：
+  新判据第一次跑就报 `empty=32.0 filled=32.5` —— `xmark.circle.fill` 在 12pt medium 下
+  **固有高度 14.5pt**，加 4pt 命中区就是 22.5pt。钉成 `.frame(14×14)` 之后两态都是 32.0，
+  容差从 1.5pt 收到 **0.2pt**；变异 **M96**（拆掉那个 frame ⇒ 漂 0.5pt）必须红 —— 它红了，
+  说明判据比缺陷本身更敏感。顺带这颗悬停药丸从 22.5×22 的椭圆变成 22×22 的正圆。
+- **`NSHostingView.fittingSize` 在本仓库作废**（R21b，写进规矩）：裸 hosting view 读回 0；
+  按 `render()` 那样现建离屏窗口去读会让测试进程 **SIGSEGV**；而 R19 已证明
+  "内容钉了高度时它是恒真的尺"。要布局尺寸就用 `GeometryReader` 写进引用盒子。
+- **一条前提断言救了一次场**（R21b）：`XCTAssertGreaterThan(box.empty, 10, "布局根本没跑起来")`
+  是照着"判据不许悄悄退化成恒真"加的，第一次跑就把 0.0 拦下 —— 没有它，
+  那条判据会因为"0.0 与 0.0 相等"而**绿着通过**。
+
 ### Fixed（R21）
 
 - **两处"能点的小笔画"从看不见抬到看得清**（R21 / U-43 / D-079）：搜索框清除 × 与多文件行的

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""R21 变异对照：这一轮的判据是**像素**，所以变异也要能改出像素来。
+"""R21/R21b 变异对照：这一轮的判据是**像素**，所以变异也要能改出像素来。
 
-五支：
+七支：
   M90 把清除 × 退回 `.tertiary`      ⇒ 帧探针必须红（这是本轮全部结论的地基：尺真的在读产品）
   M91 把展开箭头退回 `.tertiary`      ⇒ 源码点名账本必须红
   M92 把 × 的探针框挪到空白处          ⇒ 必须红在**墨地板**上，不是红在对比度上（红要对的理由）
@@ -29,6 +29,7 @@ BASE_ENV = {key: value for key, value in os.environ.items() if key != "SDKROOT"}
 PROBE = "UICaptureTests/testActionableInkStaysAboveTheLegibilityFloor"
 ARITH = "UICaptureTests/testContrastRulerArithmetic"
 LEDGER = "PressFeedbackTests/testTheFaintestInkTierIsReservedForNonControls"
+HEIGHT = "UICaptureTests/testSearchFieldIdealHeightIsStateIndependent"
 
 MUTATIONS = []
 
@@ -102,6 +103,23 @@ mutation(
 )
 
 
+# M95：文本列的 22pt 声明被改回 17pt（R20 那次真实回归的形状）。
+mutation(
+    "M95", "文本列退回 17pt（两态差 5pt）", "search",
+    [lambda s: sub(s, ".frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)",
+                   ".frame(maxWidth: .infinity, minHeight: 17, maxHeight: 17)", 1, "M95")],
+    HEIGHT, "定高者不是文本列",
+)
+
+# M96：把 × 的字形框拆掉 —— 它固有的 14.5pt 会让"有字"那一态漂 0.5pt。
+# 这一支是**判据锋利度的探针**：容差若还停在 1.5pt，它就会 ESCAPED（0.5 < 1.5）。
+mutation(
+    "M96", "× 的字形不再钉成 14×14（漂 0.5pt）", "search",
+    [lambda s: sub(s, "\n                        .frame(width: 14, height: 14)", "", 1, "M96")],
+    HEIGHT, "定高者不是文本列",
+)
+
+
 def run(test_filter):
     proc = subprocess.run(["swift", "test", "--filter", test_filter],
                           cwd=ROOT, capture_output=True, text=True, env=dict(BASE_ENV),
@@ -160,7 +178,7 @@ def main():
         results.append((mid, verdict, title, reason))
         print(f"{mid}: {verdict} {title} {reason}", flush=True)
 
-    print("\n=== R21 变异对照汇总 ===")
+    print("\n=== R21/R21b 变异对照汇总 ===")
     for mid, verdict, line, reason in results:
         mark = "OK " if verdict == "CAUGHT" and not reason.startswith("!!") else "!! "
         print(f"  {mid:5s} {verdict:12s} {mark}{line}  {reason}")

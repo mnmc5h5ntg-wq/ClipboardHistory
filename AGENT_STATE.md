@@ -978,3 +978,20 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
 - **R22 选题**：清单 14 剩下的那一半 —— 提示条插入/撤走时的**布局位移**
   （`content-with-notice` 现在尺寸是真的，"挤不挤"可测；reduce 下只改高度不改时序也要判），
   顺带做掉 BACKLOG 32（`contentMustFit`：本轮之前又一次靠人眼才发现夹具在裁自己）。
+
+## R21b · CI 打红的是判据自己（D-080）—— 像素尺换成了布局尺
+
+- **现象**：R21 推上去 CI 685 tests / 1 failure，红在 R20 新立的
+  `testSearchFieldKeepsTheSameHeightInBothStates`：本机 32.5/33.0pt，runner **15.5/17.0pt**。
+- **根因**：那张框太淡（填充 0.035、描边 0.05），在无头 runner 的白底上落不进像素阈值 ⇒
+  "框"塌成"有墨的行"。**同一把尺在两台机器上量的不是同一件事。**
+- **改法**：等高改判**布局**（`GeometryReader` 读实排高度，新判据
+  `testSearchFieldIdealHeightIsStateIndependent`）；像素那条降级为诊断并改名
+  `testSearchFieldFixtureShowsBothStates`（只核"夹具在、帧里有两条带"）。
+- **顺带修掉一个真缺陷**：新判据第一次跑就报 32.0 vs 32.5 —— `xmark.circle.fill` 固有高度 14.5pt，
+  R20 那句"两态都锁在 32pt"其实没锁住。钉 `.frame(14×14)` 后两态都是 32.0，容差 1.5pt → **0.2pt**。
+- **两条过程账**：`fittingSize` 在本仓库作废（裸 hosting 读 0；建离屏窗口读会 **SIGSEGV**；R19 已证恒真）；
+  前提断言 `> 10pt` 第一次跑就把 0.0 拦下 —— 没有它，这条判据会**绿着通过**。
+- **数字**：0 warning；`686 tests / 25 skipped / 0 failures`；脚本 72 passed；
+  帧基线 98（6 changed，同提交 update）；变异 **M90–M96 七支全 CAUGHT**（含红得对不对的核对）。
+- **R22 选题不变**：清单 14 剩下的那一半（提示条插入的布局位移）+ BACKLOG 32（`contentMustFit`）。

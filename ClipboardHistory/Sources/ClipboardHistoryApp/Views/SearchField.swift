@@ -26,6 +26,12 @@ struct SearchField: View {
                 Button(action: { text = "" }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: VisualFont.row, weight: .medium))
+                        // 把字形钉成 14×14（R21b）：不钉的话它的**固有高度是 14.5pt**
+                        // （SF Symbol 的字形度量，随 OS 变），于是"有字"那一态比空态高 0.5pt ——
+                        // 布局判据量出来就是 32.0 vs 32.5。钉死之后两态都锁在 32.0，
+                        // 而且这颗药丸从此是**正方形里内切出来的圆**（22×22），
+                        // 不再是一个 22.5×22 的椭圆。
+                        .frame(width: 14, height: 14)
                         // 静置走 `VisualInk.control`（R21）：这一颗以前用 `.tertiary`，
                         // 实测 **亮 1.86 / 暗 2.22**，低于判据地板 `InkFloor.controlInk`=3.0 ——
                         // 而它是可点的控件，不是注释。R20 把命中区从 14pt 抬到 22pt 之后这条更要紧：

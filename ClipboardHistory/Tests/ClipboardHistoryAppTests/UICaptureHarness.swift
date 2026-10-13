@@ -1018,20 +1018,20 @@ final class UICaptureTests: XCTestCase {
     /// （红的是"读不回来"，不是安静跳过）。
     static let searchFieldFixtureSize = "320x112"
 
-    /// 搜索框的**两态必须等高**（R20）。
+    /// `search-field` 这张夹具**确实把两颗框都画出来了**（R20 立、R21b 改判法）。
     ///
-    /// 这一条是从"我自己这一轮改出来的回归"长出来的：给清除 × 加 4pt 命中区之后，
-    /// 有字的那颗框被顶高约 5pt，而空框反而矮了 4pt（实测 31→27 / 31→32）——
-    /// 也就是说**打字的时候搜索框自己会跳一下**。第一次的修法（收垂直内边距）
-    /// 只是把跳的方向换了，没把两态锁在一起。
+    /// 这一条从"我自己改出来的回归"长出来：给清除 × 加 4pt 命中区之后，有字那颗框被顶高约 5pt、
+    /// 空框反而矮了 4pt（实测 31→27 / 31→32）⇒ **打字时搜索框自己跳**。
     ///
-    /// 为什么能从像素判：`search-field` 这张夹具本来就把"空"与"有字"两颗框放在同一帧里，
-    /// 所以不需要新夹具，量两条填充带的高度即可。
+    /// **等高这件事不在这里判**（R21b）：CI 打红过一次 —— 本机像素带高读 32.5/33.0，
+    /// 无头 runner 读 15.5/17.0，因为那儿的窗口底色让 3.5% 的框填充落不进"偏离 >12"，
+    /// 带子从"框"塌成"有墨的行"。**同一把尺在两台机器上量的不是同一件事**，
+    /// 把判据建在它上面就是让 CI 的绿取决于底色。等高改由
+    /// `testSearchFieldIdealHeightIsStateIndependent` 判布局事实（环境无关）。
+    /// 这里只留两条**跨机器稳定**的前提：夹具存在、帧里确实有两条带（否则"两态"根本没进画面）。
     ///
-    /// **它自己拍自己量**（预检抓出来的顺序依赖）：第一版是去读 `testCaptureKeyViews`
-    /// 写在捕获目录里的 PNG，于是单独跑这一条就"读不到帧"而红 ——
-    /// 一条只能靠别的测试先跑过才成立的判据，等于没有判据。
-    func testSearchFieldKeepsTheSameHeightInBothStates() throws {
+    /// 它仍然**自己拍自己量**（R20 预检立的规矩：不许读别的测试写好的 PNG）。
+    func testSearchFieldFixtureShowsBothStates() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r20-height-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -1054,12 +1054,93 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(bands.count, 2,
                            "帧里应该正好有两颗框（空 / 有字），实测 \(bands.count) 条：\(bands) ⇒ 夹具或布局变了")
             let heights = bands.map { $1 - $0 }
-            XCTAssertLessThanOrEqual(abs(heights[0] - heights[1]), 2,
-                                     "两态高度差 \(abs(heights[0] - heights[1]))px（pt 级 = "
-                                     + "\(Double(abs(heights[0] - heights[1])) / 2.0)）⇒ 打字时搜索框会自己跳，"
-                                     + "定高者不是文本列")
-            print("SEARCH_FIELD_HEIGHTS \(tag) pt=\(Double(heights[0]) / 2.0), \(Double(heights[1]) / 2.0)")
+            // **带高只打印，不判**（R21b，CI 打红的就是这一条）：
+            // 本机读 32.5 / 33.0，无头 runner 读 15.5 / 17.0 —— 同一把尺在两台机器上
+            // 量的**不是同一件事**（那儿的窗口底色不同 ⇒ 3.5% 的框填充落不进"偏离 >12"，
+            // 于是带子塌成"有墨的行"）。把判据建在它上面，等于让 CI 绿不绿取决于底色。
+            // 等高这条改成量**布局本身**（下面 `idealHeight`），它是环境无关的。
+            print("SEARCH_FIELD_BANDS \(tag) px=\(heights)（诊断用，判据在 idealHeight 那条）")
         }
+    }
+
+    /// 把视图**自己算出来的布局高度**写进一个盒子（R21b）。
+    ///
+    /// 为什么不用 `NSHostingView.fittingSize`：那条路我试过，两次都不行 ——
+    /// 裸 hosting view（无窗口）读回来是 0，而按 `render()` 那样现建一个离屏窗口去读
+    /// 会让测试进程 **SIGSEGV**。更重要的是：`fittingSize` 在 R19 已经被证明是
+    /// "内容钉了高度就恒真"的尺。
+    ///
+    /// 这条路判的是**布局事实**：`GeometryReader` 挂在 `.background` 上，
+    /// 拿到的就是 SwiftUI 给这个视图的实排尺寸，与底色、字体渲染、机器快慢都无关。
+    private struct HeightWriter: View {
+        let onMeasure: (CGFloat) -> Void
+
+        var body: some View {
+            GeometryReader { proxy in
+                Color.clear.onAppear { onMeasure(proxy.size.height) }
+            }
+        }
+    }
+
+    /// 搜索框两态的**布局高度**必须相等（R20 的回归，R21b 换成环境无关的判法）。
+    ///
+    /// 为什么换判法：CI 把原来那条像素带高判据打红过一次 ——
+    /// 本机读 32.5 / 33.0pt，无头 runner 读 **15.5 / 17.0pt**，差一倍。
+    /// 根因不是噪声：这张框的填充是 `VisualFill.fieldIdle`=0.035、描边是
+    /// `VisualTint.fieldIdleStroke`=0.05，在 runner 那块纯白底上**都低于任何可用的像素阈值**，
+    /// 于是"框"塌成"有墨的行"。**同一把尺在两台机器上量的不是同一件事**，
+    /// 把"打字时框会不会跳"建在它上面，就是让 CI 的绿取决于底色。
+    ///
+    /// 现在判的是布局：两态各自实排高度，容差 0.2pt。
+    /// 之所以敢收到这么紧：× 的字形与文本列**都钉死了**（14pt + 4pt 命中区 = 22pt，
+    /// 文本列声明 22pt），所以高度不再依赖 SF Symbol 的字形度量 —— 那正是本机与 CI 会分叉的地方。
+    /// 而这一族真实缺陷的量级是 5pt。
+    /// 变异 **M95** 就是把文本列的 22pt 改回 17pt —— 那条判据必须红。
+    @MainActor
+    func testSearchFieldIdealHeightIsStateIndependent() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r21b-height-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let box = HeightBox()
+            let fixture = Fixture("search-field-height-probe", NSSize(width: 320, height: 160)) {
+                AnyView(
+                    VStack(spacing: 8) {
+                        SearchField(text: .constant(""))
+                            .background(HeightWriter { box.empty = $0 })
+                        SearchField(text: .constant("搜索内容"))
+                            .background(HeightWriter { box.filled = $0 })
+                    }
+                    .padding(12)
+                    .frame(width: 320, height: 160)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                )
+            }
+            _ = try render(fixture, appearance: appearance,
+                           to: scratch.appendingPathComponent("probe-\(tag).png"))
+            XCTAssertGreaterThan(box.empty, 10,
+                                 "\(tag)：空框量到 \(box.empty)pt ⇒ 布局根本没跑起来，这条判据在判空气")
+            XCTAssertGreaterThan(box.filled, 10,
+                                 "\(tag)：有字框量到 \(box.filled)pt ⇒ 布局根本没跑起来")
+            // 容差 0.2pt，不是 1.5pt：两态的高度现在**只由钉死的数决定**
+            // （文本列声明 22pt；× 的字形被 `.frame(14×14)` 锁住，加 4pt 命中区正好 22pt），
+            // 所以任何不对称都是真回归 —— 连"去掉那个 14×14 之后漂的 0.5pt"都要红
+            // （变异 M96 干的就是这件事）。留 0.2 只给浮点，不给字形度量。
+            XCTAssertLessThanOrEqual(abs(box.empty - box.filled), 0.2,
+                                     "\(tag) 下空框 \(box.empty)pt、有字框 \(box.filled)pt"
+                                     + "（差 \(abs(box.empty - box.filled))pt）⇒ 打字时整颗搜索框会自己跳："
+                                     + "这一行的定高者不是文本列")
+            print("SEARCH_FIELD_IDEAL_HEIGHTS \(tag) empty=\(box.empty) filled=\(box.filled)")
+        }
+    }
+
+    /// `@MainActor` 的闭包只能捕获引用类型，所以用类盒子（不是可变状态设计，是语法约束）。
+    final class HeightBox {
+        var empty: CGFloat = 0
+        var filled: CGFloat = 0
     }
 
     /// 按行找"整行大部分像素都偏离主色"的连续带（用于量同一帧里两块控件的高度）。
@@ -1254,7 +1335,8 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
-    /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。    ///
+    /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
+    ///
     /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，
     /// 而 `QuickPickController` 正是它们。如果闭包里"现造一个控制器 → 返回面板 → 出作用域"，
     /// 控制器会被释放，表格的 dataSource 静默变成 nil ⇒ 0 行 ⇒ 帧仍然拍得出来，

@@ -1317,3 +1317,44 @@ R20 收尾时看着帧量出来的那条（清除 × 静置对比度 1.86/2.22�
   它们是刻度文字、不是可点的东西。要不要连刻度也抬档，等有一把**文字**对比度尺再判（BACKLOG 34）。
 - 行首星标与视频两颗仍写字面量 `.secondary`：它们与 `hoverLevel` 绑在一起，
   改档要连悬停档一起判，并入 `VisualInk` 会把"这一处用哪一档"问成"全 App 用哪一档"。
+### R21b：CI 把这条判据打红 —— 它量的不是同一件事
+
+R21 推上去之后 CI 红了（685 tests / 1 failure），红的正是本轮新立的那条
+`testSearchFieldKeepsTheSameHeightInBothStates`：
+
+```
+本机   SEARCH_FIELD_HEIGHTS light pt=32.5, 33.0
+CI     SEARCH_FIELD_HEIGHTS light pt=15.5, 17.0
+```
+
+**差一倍，不是噪声。** 根因是这张框本身太淡：填充 `VisualFill.fieldIdle`=0.035、
+描边 `VisualTint.fieldIdleStroke`=0.05 —— 在无头 runner 那块纯白底上，
+两者都落不进像素尺的"偏离 >12"，于是"框"塌成"有墨的行"。
+⇒ **同一把尺在两台机器上量的不是同一件事**，把"打字时框会不会跳"建在它上面，
+就是让 CI 的绿取决于底色。这不是"CI 太严"，是判据用错了轴。
+
+改法（两条一起）：
+
+1. **等高改成判布局**：`testSearchFieldIdealHeightIsStateIndependent` 用
+   `GeometryReader`（挂在 `.background` 上）读两态各自的**实排高度** —— 与底色、
+   抗锯齿、机器快慢无关。像素带高从判据**降级为诊断打印**，那条测试改名成
+   `testSearchFieldFixtureShowsBothStates`，只留两条跨机器稳定的前提（夹具存在、帧里有两条带）。
+2. **顺手把 0.5pt 的真缺陷修掉**：新判据第一次跑就报 `empty=32.0 filled=32.5` ——
+   `xmark.circle.fill` 在 12pt medium 下固有高度是 **14.5pt**，于是有字那一态一直比空态高半 pt
+   （R20 的"两态都锁在 32pt"其实没锁住）。给字形钉 `.frame(14×14)` 之后两态都是 32.0，
+   容差从 1.5pt 收到 **0.2pt**；变异 **M96**（把那个 frame 拆掉，漂 0.5pt）必须红 —— 它红了，
+   说明这条判据比缺陷本身更敏感。
+
+两条过程中的账：
+
+- **`fittingSize` 那条路走不通，而且死得很难看**：先按裸 `NSHostingView` 读 ⇒ 恒 0；
+  再按 `render()` 那样现建离屏窗口读 ⇒ 测试进程 **SIGSEGV**。
+  换成 `GeometryReader` 之后一次通过。记下来是因为这条路上还有"恒真"的前科（R19），
+  三件事叠起来足够写成结论：**这个仓库不要试图用 `fittingSize` 量布局**。
+- **前提断言救了一次**：`XCTAssertGreaterThan(box.empty, 10, "布局根本没跑起来")`
+  是照着"判据不许悄悄退化成恒真"加的，它第一次跑就把 0.0 拦下来了。
+  没有它，那条判据会绿着通过（0.0 与 0.0 相等）。
+
+**R21b 验证**：0 warning；`Executed 686 tests, 25 skipped, 0 failures`；脚本 72 passed；
+帧基线 98（6 changed：三张会画 × 的帧 × 亮暗，同提交 update）；
+变异 **M90–M96 七支全 CAUGHT**（每支都核对失败消息，`RESTORE_CLEAN=yes`）。
