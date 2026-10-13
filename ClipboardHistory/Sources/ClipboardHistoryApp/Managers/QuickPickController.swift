@@ -71,11 +71,17 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 但**不 `makeKeyAndOrderFront`、不 `activate`** —— 那两件事会抢走用户的前台，
     /// 而捕获套件有一条硬边界：不许碰真窗口（与 `CLIPBOARD_HISTORY_DATA_DIR` 同一族理由）。
     ///
+    /// 返回的是**面板本身**而不是它的 contentView。R19 实测到的原因：
+    /// 把 `contentView` 摘出来塞进另一个窗口，`NSStackView` 会塌成 24×49
+    /// （它自己的尺寸约束与"搬家后重新生成的换算约束"打架），于是
+    /// `NSScrollView` 拿到 0×0、`table.visibleRect` 是 0×0 —— 行有 5 条，一条都画不出来。
+    /// 那种帧看着像"浮层是空的"，其实像的是所有权被搬坏。拍**窗口**才拍得到产品真的那一块。
+    ///
     /// 返回 `nil` 表示面板没建起来 ⇒ 夹具必须**当场红**，
     /// 不许拿一张空白窗当"这就是浮层"（那种帧看着像证据，其实什么都没说）。
     /// 与 `SettingsView.initialCategory` / `DetailView.initialMarkdownMode` 同一手法：
     /// 产品路径一行都不改，只是把"拍得到"这件事变成可能。
-    func buildContentForCapture(query: String = "") -> NSView? {
+    func windowForCapture(query: String = "") -> NSWindow? {
         let panel = ensurePanel()
         refreshEntries()
         model.reset()
@@ -84,7 +90,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         rebuildRows()
         model.index = 0
         selectCurrentRow()
-        return panel.contentView
+        return panel
     }
 
     func hide() {

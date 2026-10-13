@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- **推翻 R18 自己写下的"浮层拍不到"根因**（R19 / U-41 / D-077）：那句"因为浮层背景是
+  `NSVisualEffectView`，离屏没有可合成层"两半都错 —— 读 `QuickPickController.ensurePanel()`，
+  浮层里**根本没有材质视图**（普通 contentView + `drawsBackground=false` 的滚动视图 +
+  `backgroundColor=.clear` 的表格）；而仓库外 spike 证明裸材质离屏**画得出来**
+  （`mid=(58,58,58,a=255)`）。真正的现象是产品的 `NSStackView` 在捕获环境里只有 24pt 宽
+  （真实 App 里撑满 420×300），于是滚动视图 0×0、`NSTableView.visibleRect` 0×0 ——
+  表格有 5 行，一行都画不出来。判据因此从"限制还在"改写成**三层**（症状 / 标题 / 原因），
+  第三条专门在原因过期时红。
+- **一条"症状断言抓不到病因"的记录**（R19）：变异 M82 把夹具里留住控制器的代码拿掉
+  （`NSTableView.dataSource` 是弱引用），`rows > 0` **没红** —— `numberOfRows` 报的还是上次
+  reload 的 5；红的是新加的接线断言 `table.dataSource is QuickPickController`。
+  以后写判据先问"接线断了这条读数还对不对"。
+
+### Added
+
+- **AppKit 夹具现在拍产品自己的窗口**（R19）：`Fixture.appKit` 从 `() -> NSView?` 改成
+  `() -> NSWindow?`，R18 那条"帧名必须等于帧的尺寸"的不变量从此核的是浮层真实的 420×300，
+  而不是夹具自己填的数。配套的 `QuickPickCapturePanel.builder` 把控制器关进闭包盒子保命
+  （弱 `dataSource` 陷阱）。捕获路径新增一次"真实显示周期"
+  （`orderFrontRegardless` 到屏幕外 + runloop + 递归 `tile()` + `display()`），
+  **只作用于 AppKit 夹具**：SwiftUI 那 96 帧逐帧核过 `transparent` 与 `blackBandPt` 不变。
+
+### Fixed（R18）
+
 - **权重页的只读数值不再穿"可点"的颜色**（R18 / U-40 / D-076）：那一列九个值（「默认」/「160%」）
   原来用系统强调色画 —— 实测字形是 `(0,122,255)`，与链接同色，而同一页真正那颗「恢复默认」
   按钮是中性白字。另外两档也错：`>1.0` 涂橙（把说明里明写的合法取值 200% 画成警示色）、

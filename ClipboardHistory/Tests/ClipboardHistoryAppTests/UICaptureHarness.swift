@@ -27,7 +27,7 @@ final class UICaptureTests: XCTestCase {
 
     /// "未被绘制"的判定阈值，**两个读者共用同一把尺**：
     /// ①`testCaptureKeyViews` 里那条"有 N% 像素未被绘制即判捕获失效"的守卫；
-    /// ②`testQuickPickOverlayStillCannotBeCapturedOffscreen` 那条记录限制是否还在的判据。
+    /// ②`testQuickPickOverlayCannotBeCapturedYet` 那条"浮层还拍不到"的判据。
     ///
     /// 为什么要是同一个常量：这两处其实在回答同一个问题（"这张帧到底画没画"）。
     /// 各写一个数字的话，某天把守卫松到 0.98 而判据还留在 0.9 ——
@@ -159,46 +159,76 @@ final class UICaptureTests: XCTestCase {
         return url
     }
 
-    /// 快速选择浮层**今天拍不到**，而这条判据负责在它能拍到的那天报警。
+    /// 浮层**还是**拍不到，但 R18 写下的那句原因是错的 —— 这条判据把原因钉成实测数字（R19 / U-41）。
     ///
-    /// 实测过程（R18）：给夹具加了 AppKit 通路，控制器加了只读捕获入口，
-    /// 然后本文件那条"有 N% 像素未被绘制，判定为捕获失效"的守卫立刻把六张新帧全判死：
-    /// `transparent = 99.5% ~ 100.0%` —— 一张都没有内容。
-    /// 根因：浮层背景是 `NSVisualEffectView`（ vibrancy 材质），
-    /// 而**没上过屏的窗口没有可合成的背景层**，`cacheDisplay` 于是拍出一张全透明图。
+    /// R18 记的根因是"浮层背景是 `NSVisualEffectView`，离屏没有可合成层"。两半都被推翻：
+    /// ① 读代码：`ensurePanel()` 里根本没有材质视图 —— 普通 contentView +
+    ///    `drawsBackground=false` 的滚动视图 + `backgroundColor=.clear` 的表格；
+    /// ② 做实验：裸 `NSVisualEffectView` 离屏**画得出来**（spike 读数 `mid=(58,58,58,a=255)`）。
+    /// 真正的现象（这一条是量出来的，不是猜的）：产品的 `NSStackView` 在捕获环境里
+    /// 是 **24×49**（真实 App 里它撑满 420×300），于是 `NSScrollView` 0×0、
+    /// `NSTableView.visibleRect` 0×0 —— 表格有 5 行，一行都画不出来。
     ///
-    /// 所以这条判据断言的是"**这个限制还在**"：
-    /// 哪天它红了，说明浮层变得可以离屏拍（或者有人把材质改了）——
-    /// 那时要做的是把 `quickpick-list / -typed / -empty` 三张夹具加回去，
-    /// 而不是把这条测试删掉。
-    /// （形状与 `MotionFilmstripTests.testHeatmapFadeIsNotVisibleToThisRuler` 同一族：
-    ///  自我作废的判据，比一句"拍不到"的注释活得久。）
-    func testQuickPickOverlayStillCannotBeCapturedOffscreen() throws {
+    /// 三层断言各管一件事，红得不一样的时候读的是不同的话：
+    ///   · `rows > 0` 守**所有权**：`NSTableView.dataSource` 是弱引用，控制器一旦被释放，
+    ///     行数静默掉成 0，而帧仍然"合法"（见 `QuickPickCapturePanel`）；
+    ///   · `transparent > 0.9` 是标题：还能不能拍。它红了就去补那三张夹具；
+    ///   · 补一条**原因**断言：拍不到时必须仍然是 stack 塌着导致的。
+    ///     哪天 stack 撑开了却还拍不到，这条会红着说"解释过期了，去查新的原因" ——
+    ///     而不是让一句已经作废的根因继续在账本里当结论用。
+    func testQuickPickOverlayCannotBeCapturedYet() throws {
         let store = makePopulatedStore()
-        let controller = QuickPickController(historyStore: { store }, commit: { _ in })
-        guard let built = controller.buildContentForCapture() else {
-            return XCTFail("捕获入口建不出浮层内容视图 ⇒ 这条判据失去了对象，必须红")
+        let build = QuickPickCapturePanel.builder(store: store, query: "")
+        guard let panel = build(), let content = panel.contentView else {
+            return XCTFail("捕获入口建不出浮层窗口 ⇒ 这条判据失去了对象，必须红")
         }
         _ = NSApplication.shared
         let previousAppearance = NSApplication.shared.appearance
         NSApplication.shared.appearance = NSAppearance(named: .darkAqua)
-        defer { NSApplication.shared.appearance = previousAppearance }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
-                              styleMask: [.titled, .fullSizeContentView], backing: .buffered, defer: false)
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.contentView = built
-        window.layoutIfNeeded()
-        built.layoutSubtreeIfNeeded()
-        guard let rep = built.bitmapImageRepForCachingDisplay(in: built.bounds) else {
+        defer {
+            NSApplication.shared.appearance = previousAppearance
+            panel.orderOut(nil)
+        }
+        content.appearance = NSAppearance(named: .darkAqua)
+        panel.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        Self.tileScrollViews(in: content)
+        panel.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        var rows = -1
+        var stackWidth: CGFloat = -1
+        var dataSourceIsController = false
+        func find(_ view: NSView) {
+            if let table = view as? NSTableView {
+                rows = max(rows, table.numberOfRows)
+                if table.dataSource is QuickPickController { dataSourceIsController = true }
+            }
+            if view is NSStackView { stackWidth = max(stackWidth, view.frame.width) }
+            view.subviews.forEach(find)
+        }
+        find(content)
+        guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
             return XCTFail("建不出位图缓存 ⇒ 这条判据没有对象")
         }
-        built.cacheDisplay(in: built.bounds, to: rep)
+        content.cacheDisplay(in: content.bounds, to: rep)
         let transparent = Self.transparentFraction(of: rep)
-        print("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%")
+        print("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%"
+              + " rows=\(rows) stackWidth=\(Int(stackWidth)) dataSourceIsController=\(dataSourceIsController)"
+              + " bounds=\(NSStringFromRect(content.bounds))")
+        XCTAssertGreaterThan(rows, 0,
+                             "浮层表格 0 行 ⇒ 十有八九是控制器被释放了（`NSTableView.dataSource` 是弱引用），"
+                             + "帧看起来仍然合法，其实拍的是一张空面板")
+        XCTAssertTrue(dataSourceIsController,
+                      "表格的数据源已经不是 `QuickPickController` ⇒ 拍到的行不是产品会画的那些行")
         XCTAssertGreaterThan(transparent, 0.9,
-                             "浮层现在能离屏拍出来了（transparent 只有 "
+                             "浮层现在拍得出来了（transparent="
                              + "\(String(format: "%.1f", transparent * 100))%）⇒ "
                              + "把 quickpick-list / -typed / -empty 三张夹具加回去，别只改这条门槛")
+        XCTAssertLessThan(stackWidth, 100,
+                          "拍不到，但 `NSStackView` 已经撑到 \(Int(stackWidth))pt ⇒ "
+                          + "账本里那条原因过期了。别把上面那条门槛放松，去查新的原因")
     }
 
     func testCaptureKeyViews() throws {
@@ -327,24 +357,34 @@ final class UICaptureTests: XCTestCase {
         /// （R13 改它样式时正是"源码已接、产物未量"）。
         /// 还原是必须的：不还原的话同一次运行里 `settings-privacy` 那张也会被带脏。
         let seed: (key: String, value: String)?
-        /// R18：AppKit 表面的夹具入口（返回**根 NSView**，由同一条渲染路径拍）。
-        /// 给了它就不走 `build` —— 那个字段留一份 `EmptyView` 只为让两个 init 共用同一个结构体。
+        /// R18 加通路、R19 才拍到位：AppKit 表面的夹具入口返回**产品自己的窗口**。
+        /// 返回 `NSView` 的第一版失败得很安静 —— 把浮层的 contentView 摘进另一个窗口之后，
+        /// `NSStackView` 塌成 24×49、滚动视图 0×0，帧仍然"拍得出来"，只是拍的是空壳。
         ///
         /// 为什么要有这一条：快速选择浮层是 `QuickPickController` 自建的 `NSPanel` + `NSTableView`，
         /// 而 96 张基线**一张都没有它** —— 于是关于这个浮层的每一句观感结论只能停在"胶片 + 人眼"。
         /// 更要紧的是：`FRAME_BASELINE_CHANGED=0` 在这种表面上**不是**"没有视觉变化"，
-        /// 而是"这里根本没有帧"。这两件事必须能分开，所以补通路（账本 BACKLOG 30 / U-39）。
-        let appKit: (() -> NSView?)?
+        /// 而是"这里根本没有帧"。这两件事必须能分开（账本 BACKLOG 30 / U-39 / U-41）。
+        let appKit: (@MainActor () -> NSWindow?)?
 
         init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil,
              seed: (key: String, value: String)? = nil,
-             appKit: (() -> NSView?)? = nil, _ build: @escaping () -> AnyView) {
+             appKit: (@MainActor () -> NSWindow?)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
             self.settle = settle
             self.seed = seed
             self.appKit = appKit
             self.build = build
+        }
+
+        /// 给一个已经建好的夹具补上 AppKit 入口（其余字段原样带走）。
+        /// 存在的理由：`appKit` 与 `build` 是同一个结构体里的两个入口，
+        /// 而 Swift 的成员式初始化器没有"只改一个字段"的写法 ——
+        /// 没有这个 helper，加一条浮层帧就要把整条夹具重抄一遍，
+        /// 而重抄的那份迟早和原件漂开。
+        func withAppKit(_ buildAppKit: @escaping @MainActor () -> NSWindow?) -> Fixture {
+            Fixture(name, size, settle: settle, seed: seed, appKit: buildAppKit, build)
         }
     }
 
@@ -446,12 +486,16 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-multi-select-min", NSSize(width: 250, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected), width: 250))
         })
-        // R18：这里原本要加三张浮层帧（`quickpick-list / -typed / -empty`）。
-        // **加不进去**，而且是本文件自己那条"未被绘制即判失效"的守卫抓出来的：
-        // 六张全报 `transparent=99.5%~100%` ⇒ 一张都没画出来。
-        // 原因见 `testQuickPickOverlayStillCannotBeCapturedOffscreen`（浮层背景是
-        // `NSVisualEffectView`，窗口没上过屏就没有内容可合成）。
-        // 所以那三张帧的活儿改由那条判据看着：**它红了，就说明可以补帧了。**
+        // R18 想加、当时判"加不进去"的三张浮层帧：R19 把那条根因**推翻**了，
+        // 但帧**仍然加不进去**，而且现在知道为什么了（`testQuickPickOverlayCannotBeCapturedYet`
+        // 里带着实测的视图树，不再是猜的）：
+        //   · 浮层里没有 `NSVisualEffectView`，裸材质离屏也画得出来 ⇒ R18 那句"材质不可合成"是错的；
+        //   · 真正的现象是产品的 `NSStackView` 在捕获环境里塌成 24×49
+        //     （真实 App 里它撑满 420×300），于是 `NSScrollView` 0×0、
+        //     `NSTableView.visibleRect` 0×0 —— 表格有 5 行，一行都画不出来。
+        // 两条候选路都没走：让面板 `makeKeyAndOrderFront` 会抢用户前台（测试套件的硬边界），
+        // 而从夹具侧把 stack 的 frame 按回去，等于**让帧去画夹具想要的布局** ——
+        // 那正是这两轮一直在抓的那类假证据。所以这三张继续缺席，判据盯着。
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -964,6 +1008,26 @@ final class UICaptureTests: XCTestCase {
         return store
     }
 
+    /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
+    ///
+    /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，
+    /// 而 `QuickPickController` 正是它们。如果闭包里"现造一个控制器 → 返回面板 → 出作用域"，
+    /// 控制器会被释放，表格的 dataSource 静默变成 nil ⇒ 0 行 ⇒ 帧仍然拍得出来，
+    /// 只是拍到一张空面板，而它名字写着"这就是浮层"。
+    /// 这一族的坑叫"载荷绿、消费侧坏"，这次坏的是所有权。
+    enum QuickPickCapturePanel {
+        static func builder(store: HistoryStore, query: String) -> @MainActor () -> NSWindow? {
+            var kept: QuickPickController?
+            return {
+                if kept == nil {
+                    kept = QuickPickController(historyStore: { store }, commit: { _ in })
+                }
+                guard let controller = kept else { return nil }
+                return controller.windowForCapture(query: query)
+            }
+        }
+    }
+
     // MARK: - 渲染
 
     private func render(
@@ -982,27 +1046,24 @@ final class UICaptureTests: XCTestCase {
         NSApp.appearance = NSAppearance(named: appearance)
         defer { NSApp.appearance = previousApplicationAppearance }
 
-        let window = NSWindow(
-            contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.appearance = NSAppearance(named: appearance)
-        window.titlebarAppearsTransparent = true
-        // 暗色必须同时注入 SwiftUI 的 colorScheme：只设 window.appearance 时
-        // 子树仍可能按浅色解析（第一版捕获就把设置页拍成"半明半暗"的假帧）。
-        // 两族夹具共用下面这一整条路径（同一个窗口、同一次 `cacheDisplay`、同一套 appearance 注入、
-        // 同一个"关 caret"静默），差别只在**根视图是谁** —— 新表面不该走一条没被审过的通路。
+        // 两族夹具的差别**只有"窗口是谁建的"**：
+        // SwiftUI 夹具由这里建一个离屏窗口；AppKit 夹具（浮层）拍的是**产品自己的那个窗口**。
+        // 这不是风格选择：R19 第一版把浮层的 `contentView` 摘出来搬进新窗口，
+        // 结果 `NSStackView` 塌成 24×49、`NSScrollView` 变成 0×0、
+        // `table.visibleRect` 是 0×0（行有 5 条，一条都画不出来）——
+        // 拍到的是一张被搬家弄坏的空面板，而它的名字写着"这就是浮层"。
+        let window: NSWindow
         let host: NSView
         if let buildAppKit = fixture.appKit {
-            guard let built = buildAppKit() else {
-                // 建不出视图必须**当场红**：安静地跳过的话，基线里会少一张没人注意的帧，
+            guard let product = buildAppKit(), let content = product.contentView else {
+                // 建不出窗口必须**当场红**：安静地跳过的话，基线里会少一张没人注意的帧，
                 // 而"少了两帧"与"换了两帧"是两回事（R13 核老账时刚记过）。
-                XCTFail("AppKit 夹具没建出视图（\(file.lastPathComponent)）⇒ 宁可红，也不许拍一张空窗当浮层")
+                XCTFail("AppKit 夹具没建出窗口（\(file.lastPathComponent)）⇒ 宁可红，也不许拍一张空窗当浮层")
                 throw CaptureError.emptyAppKitFixture
             }
-            host = built
+            window = product
+            host = content
+            window.appearance = NSAppearance(named: appearance)
         } else {
             let themed = fixture.build().environment(\.colorScheme, appearance == .darkAqua ? .dark : .light)
             let hosting = NSHostingView(rootView: themed)
@@ -1018,17 +1079,34 @@ final class UICaptureTests: XCTestCase {
             if #available(macOS 13.0, *) {
                 hosting.sizingOptions = []
             }
+            let created = NSWindow(
+                contentRect: NSRect(origin: .zero, size: size),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            created.appearance = NSAppearance(named: appearance)
+            created.titlebarAppearsTransparent = true
+            hosting.frame = NSRect(origin: .zero, size: size)
+            hosting.autoresizingMask = [.width, .height]
+            created.contentView = hosting
+            // 12.x 没有 `sizingOptions`，用 min/max 把窗口钉在夹具给的尺寸上（同一件事的旧写法）。
+            // 浮层那一路**不设 min/max**：那个尺寸是产品自己定的（420×300），
+            // 夹具只能核对它、不能改写它 —— 下面那条尺寸断言因此才有意义。
+            created.contentMinSize = size
+            created.contentMaxSize = size
+            created.setContentSize(size)
+            window = created
             host = hosting
         }
-        host.frame = NSRect(origin: .zero, size: size)
-        host.autoresizingMask = [.width, .height]
-        window.contentView = host
-        // 12.x 没有 `sizingOptions`，用 min/max 把窗口钉在夹具给的尺寸上（同一件事的旧写法）。
-        window.contentMinSize = size
-        window.contentMaxSize = size
-        window.setContentSize(size)
-        window.layoutIfNeeded()
-        host.layoutSubtreeIfNeeded()
+        // AppKit 夹具**不走强制约束布局**（R19 实测）：`layoutSubtreeIfNeeded()` 会把
+        // `NSStackView` 从"帧 + autoresizing 撑满 420×300"重排成"按内容拟合尺寸 24×49"，
+        // 于是滚动视图 0×0、表格 `visibleRect` 0×0 —— 行有 5 条，一条都画不出来。
+        // 真实 App 里这一步从来不做：面板靠 `makeKeyAndOrderFront` 走自己的显示周期。
+        if fixture.appKit == nil {
+            window.layoutIfNeeded()
+            host.layoutSubtreeIfNeeded()
+        }
 
         // 内容要等一次异步刷新才落定的夹具在这里 settle（会转 runloop）。
         // 放在"关 caret"之前：转完 runloop 可能装出新的 field editor，必须让后面的静默与重排照常生效。
@@ -1041,7 +1119,33 @@ final class UICaptureTests: XCTestCase {
         // 再递归把子树里所有 NSTextView 的插入点关掉。
         window.makeFirstResponder(nil)
         Self.silenceCarets(in: host)
-        host.layoutSubtreeIfNeeded()
+        if fixture.appKit == nil {
+            host.layoutSubtreeIfNeeded()
+        }
+
+        // R19：**只给 AppKit 夹具**补一次"真实显示周期"。
+        //
+        // 仓库外 spike（`.scratch/motion-audit-2/spike_r19_capture.md`）的读数：
+        // 同一棵 `NSScrollView > NSTableView` 树，窗口没上屏时 `cacheDisplay` 得到
+        // **0 个不透明像素**；orderFront 到屏幕外 + 转一圈 runloop + `tile()` 之后是 12291，
+        // 再选中一行是 61142（差的 4.9 万像素就是选中行那块填充）。
+        // 而 `NSScrollView` 不上屏时 `documentView.visibleRect` 是 0×0 ——
+        // 表格不是"画不出"，是**还没轮到它画**。
+        //
+        // 为什么只作用于 AppKit 夹具：先量过再决定范围。把这一套加在 SwiftUI 路径上跑一遍
+        // 96 帧，`transparent` 与 `blackBandPt` 逐帧不变（SwiftUI 的 List 自己会走布局），
+        // 既然没有收益就不给既有帧引入任何风险。
+        // 顺带这条实验也**否掉了 R18 写下的机制**：`List` 的选中黑块在上屏之后仍然是黑块，
+        // 因为要 key window 才有 emphasized 高亮，而测试进程 `isKeyWindow=false` ——
+        // 那是"拿不到前台"的限制，不是"材质不可合成"。
+        if fixture.appKit != nil {
+            window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+            window.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            Self.tileScrollViews(in: host)
+            window.display()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
 
         guard let contentView = window.contentView else {
             throw XCTSkip("窗口没有 contentView（\(file.lastPathComponent)）")
@@ -1090,6 +1194,18 @@ final class UICaptureTests: XCTestCase {
         }
         try data.write(to: file)
         return CaptureMetrics(transparent: transparent, blackBandPt: blackBand)
+    }
+
+    /// 递归 `tile()` 子树里所有滚动视图。
+    /// `NSScrollView` 的 `documentView` 只在 tile 之后才有有效的 `visibleRect`，
+    /// 而 `visibleRect` 为空 ⇒ `NSTableView` 一行都不准备 ⇒ `cacheDisplay` 画不出东西。
+    /// 这一步在真实 App 里由"窗口上一次屏"顺带做掉，所以只有离屏捕获需要补。
+    private static func tileScrollViews(in view: NSView) {
+        if let scroll = view as? NSScrollView {
+            scroll.tile()
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
+        view.subviews.forEach { tileScrollViews(in: $0) }
     }
 
     /// 递归关掉子树里所有文本视图的插入点（含 `NSTextField` 的 field editor）。

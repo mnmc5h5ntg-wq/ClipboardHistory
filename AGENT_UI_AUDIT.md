@@ -1118,3 +1118,68 @@ content-with-history / -min / -wide / -with-notice 66 / 44 / 66 / 66pt
 选中态怎么取证（离屏拍不到，要么把捕获窗口真的 orderFront 到屏幕外试一次，要么自绘选中 ——
 后者与 D-034 冲突，不许顺手做）；夹具高度**仍然**没有守卫（M76 故意打这一口，见下）；
 AppKit 表面进帧基线这件事**没做成**，只留下了那条自我作废的限制判据。
+
+---
+
+## 第 21 轮 · U-41 上一轮写下的"根因"是错的（R19）（D-077）
+
+R18 的账本里有一句：**"浮层背景是 `NSVisualEffectView`，没上过屏的窗口没有可合成层 ⇒ 一张都拍不出来"**。
+这一轮开头是照那句话去补帧，结果发现**那句话两半都是错的**。
+
+### 推翻它的两条证据
+
+| 说法 | 实测 |
+|---|---|
+| "浮层背景是 `NSVisualEffectView`" | 读 `QuickPickController.ensurePanel()`：里面**根本没有材质视图** —— 普通 contentView + `drawsBackground=false` 的 `NSScrollView` + `backgroundColor=.clear` 的 `NSTableView` |
+| "材质离屏不可合成" | 仓库外 spike：裸 `NSVisualEffectView(material:.sidebar)` 离屏 `cacheDisplay` 得到 `mid=(58,58,58,a=255)`，**不透明** |
+
+### 真正的现象（这次是量出来的）
+
+```
+CAPTURE_PROBE quickpick transparent=100.0% rows=5 stackWidth=24 dataSourceIsController=true bounds={{0,0},{420,300}}
+DUMP NSView {{0,0},{420,300}}
+DUMP   NSStackView {{0,0},{24,49}}          ← 真实 App 里它撑满 420×300
+DUMP     NSScrollView {{12,12},{0,0}}       ← 于是 0×0
+DUMP       NSTableView {{0,0},{132,180}} visibleRect={{0,0},{0,0}}   ← 行有 5 条，一行都画不出来
+```
+补上"真实显示周期"（`orderFrontRegardless` 到屏幕外 + 转 runloop + 递归 `tile()` + `display()`）之后**仍然如此**，
+所以拦路的不是上屏这一步，而是 `NSStackView` 在捕获环境里拿不到宽度。
+
+结论：**BACKLOG 30 继续开着**，但原因换了、且换成有数字的原因。
+两条候选路都不走：让面板 `makeKeyAndOrderFront` 会抢用户前台（测试套件硬边界）；
+从夹具侧把 stack 的 frame 按回去，等于**让帧去画夹具想要的布局** —— 那正是这两轮一直在抓的那类假证据。
+
+判据因此从"限制还在"改写成**三层**（红得不一样，读的话也不一样）：
+`rows>0` 管症状、`transparent>0.9` 管标题、`stackWidth<100` 管**原因**
+—— 哪天 stack 撑开了却还拍不到，第三条会红着说"解释过期了"，而不是让一句作废的根因继续当结论。
+
+### 本轮最值钱的一条：症状断言抓不到所有权丢失
+
+`M82` 把夹具里"留住控制器"那几行拿掉（`NSTableView.dataSource` 是弱引用）：
+**`rows > 0` 那条没红** —— `numberOfRows` 报的还是上次 reload 的 5。
+红的是新加的接线断言 `table.dataSource is QuickPickController`。
+也就是说：控制器没了、行数据还在缓存里、帧照样"合法"。
+这是"载荷绿、消费侧坏"的新变体 —— **症状会活过病因**，所以判据要写接线，不能只写症状。
+（M81/M82/M83/M84 四支变异，加上接线断言之后 4/4 CAUGHT。）
+
+### 顺手做对的一件事：夹具现在拍**产品自己的窗口**
+
+`Fixture.appKit` 从 `() -> NSView?` 改成 `() -> NSWindow?`。
+第一版把浮层的 `contentView` 摘出来搬进新窗口 —— 那条路我一度当成 stack 塌掉的原因（也是错的，
+不搬也塌），但返回窗口本身是对的：**尺寸断言从此核的是产品真实的 420×300**，
+而不是夹具自己设的数。
+
+### 真实视觉审查：详情区那颗玻璃药丸（三帧并排看过，判"不改"）
+
+| 量 | 亮色 | 暗色 |
+|---|---|---|
+| 药丸内部填充 vs 窗口底色 | Δ=21（约 7/通道） | **Δ=6（约 2/通道）** |
+| 左/右描边峰值 Δ | 117 / 108 | 81 / 75 |
+| 收藏 on | 橙色实心星 | 同 |
+| 固定 on | 白色实心 pin（无彩色） | 同 |
+
+暗色里"填充与底色几乎同色"看着像缺陷，实测**分离本来就不该由填充承担**：
+描边是 `Color.primary.opacity(0.20→0.07)` 的对角渐变（primary 自适应，暗色下是白），
+Δ 81/75 远过可辨线，再加 `VisualShadow.raised`。
+两种"on"用了两种编码（色相 vs 实心），但都读得出来 ⇒ **不改，理由记在这里**。
+（这一条是用户点名要的"每个元素都要判一次"里"判过但不改"那一半。）
