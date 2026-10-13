@@ -5,6 +5,15 @@ enum SettingsViewLayout {
     static let windowContentSize = CGSize(width: 720, height: 540)
     static let minimumWindowSize = CGSize(width: 640, height: 440)
     static let sidebarWidth: CGFloat = 148
+    /// 说明段与**它所解释的那一颗控件**之间的间距（R33 / U-55）。
+    ///
+    /// 3 而不是沿用组间的 8：8 之下"开关—它的说明"与"说明—下一颗开关"等距，
+    /// 归属只能靠读句子猜（通用页就是这么错的：讲 OCR 的那句被挂到了 RTF 开关下面）。
+    /// 3 是"明显是一组"与"两行字挤成一坨"之间的那一档：说明用的是 11pt `.caption`，
+    /// 它的行框自带降部留白，再往下收到 1–2 就看不出是两行了。
+    /// 判据不在这条常量上，在帧上：`testSettingsCaptionSitsCloserToItsOwnToggle`
+    /// 量的是"说明段离上面那颗开关比离下面那颗更近"。
+    static let captionGap: CGFloat = 3
     static let clearButtonTitle = "清空"
 }
 
@@ -311,33 +320,51 @@ struct SettingsView: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("开机启动", isOn: $launchAtLogin)
-                        .disabled(!loginItemSettings.isSupported)
+                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
+                        Toggle("开机启动", isOn: $launchAtLogin)
+                            .disabled(!loginItemSettings.isSupported)
+                        // 这条回执讲的是**开机启动**这一颗（`loginItemSettings` 的失败原因），
+                        // 原来它排在整组最后：中间隔着三个开关与两段说明，
+                        // 读起来像在解释上面那段富文本。R33 把它挪回自己那颗下面。
+                        // 帧里量不到（夹具下 `message == nil`），所以这条只进账本不进判据。
+                        if let message = loginItemSettings.message {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
                     // 下面两项是「通用」真正该管的**全局行为开关**（第三轮审计 D-3）：
                     // 这一页以前被 U-6 的去重删到只剩一个开关，整页 90% 空白 ——
                     // 修法不是再塞一个没用的东西，而是把"随时能一键停用/降敏感度"的两件事放这儿。
-                    Toggle("暂停记录剪贴板（暂时不想被记录时）", isOn: $recordingPaused)
-                    Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
-                    Toggle("保留富文本格式（RTF / HTML）", isOn: $preserveRichText)
-                    Text("打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
-                        + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
-                        + "导出与导入只带纯文本。")
-                        .font(.system(size: VisualFont.meta))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if let message = loginItemSettings.message {
-                        Text(message)
+                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
+                        Toggle("暂停记录剪贴板（暂时不想被记录时）", isOn: $recordingPaused)
+                        Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+
+                    // R33 / U-55：这两组原来写成"两个开关连着、两段说明连着"，
+                    // 于是屏上的阅读顺序变成
+                    // 「识别截图文字 → 保留富文本 → RTF 的代价 → 关闭后不再对新入库的图片做文字识别」，
+                    // 那句讲的是 **OCR** 的说明被挂到了 RTF 开关下面（亮暗两档帧里都看得很清楚）。
+                    // 改法是把说明段与它解释的那一颗开关编成一组，组内间距也比组间小 ——
+                    // 只重排不收紧间距的话，说明段与上下两颗开关**等距**，归属还是靠猜。
+                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
+                        Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
+                        Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
+                        Toggle("保留富文本格式（RTF / HTML）", isOn: $preserveRichText)
+                        Text("打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
+                            + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
+                            + "导出与导入只带纯文本。")
+                            .font(.system(size: VisualFont.meta))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -1309,3 +1309,35 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   `ClipboardHistory/` 子目录里跑的（Makefile 在仓库根），而命令的退出码是 0
   （管道尾巴 `tail` 的退出码）。**后台退出码 ≠ 子进程真跑过**这条又应验一次：
   读输出、不读退出码。
+
+## Round 33 · 说明段探针加天花板 + 通用页说明段归位（BACKLOG 34②③ / U-55 / U-56 / D-092）
+
+- **判据侧**：`captionInkProbes` 每条从"只有地板"变成**两侧都钉**（`captionTierCeiling = 1.5`）。
+  我上一轮放进去的两条设置页探针当场被它打回：**比值 3.67（亮）/ 1.89（暗）** —— 套的是标题与开关标签。
+  框重放后 8 条 × 两档全部 **0.95–1.03**（热图三条、菜单栏两条本来就贴参照 ⇒ 回审通过）。
+- **新尺**：`rowTierProfile`（说明档 / 标题档两堆）+ `textBands`（按行距并段）+
+  真值表 `testRowTierProfileSeparatesCaptionFromTitle`（钉顺序与间隙：120/121 对 206/185，阈值 150 在中间）。
+- **产品侧（U-55）**：通用页四组"开关 + 它的说明"，`SettingsViewLayout.captionGap = 3`，组间 8；
+  讲 OCR 的那句挪回自己那颗下面。实测上缝 **12.0 → 7.0**（暗 11.5 → 6.5），下缝不变 12.0 / 11.5。
+  判据 `testSettingsCaptionSitsCloserToItsOwnToggle`（三条 + 段数 ≥3 × 两档）。
+- **修掉自己上一轮埋的**：NOT-RUN 判别臂装在了没有设置页帧的那张表上（永不触发的装饰 + 日志名撒谎），
+  说明段测试反而没有 ⇒ CI 第一轮必红（R29d 同族第二次）。现在说明段测试有判别臂 **且** `judged ≥ 3`
+  —— **判别臂不许把判据变成恒绿**。
+- **U-56（新发现，未修，BACKLOG 47）**：菜单栏面板第一行的推荐理由被硬切成半字（墨到 `x=319.5` = 帧边界），
+  而产品没给 `MenuBarExtra` 任何宽度约束 ⇒ 要么真机面板比 320 宽（切的是夹具），要么产品真会切。
+  要先看真机（人工批次 39.1），R31 已定"离屏没有取图通道"。
+- **验证**：全量 **707 tests / 29 skipped / 0 failures**、**0 warning**；
+  帧基线 2 张（`settings-general` 亮/暗）随提交 `update`，复验 `CHANGED=0`；脚本 **72 OK**；
+  变异 **M141–M147 七支全 CAUGHT**、`RESTORE_CLEAN=yes`（逐支读失败消息；M145 第一版预期写错，
+  它实际红在①「这段说明不跟着任何开关」而不是段数，改预期后单跑复验）。
+- **前几轮的 CI 收口**：`ab76562` / `efbafa6` / `1a27d59` 三条 run 全部 **success**
+  （38466314575 / 38466675809 / 38466878342）—— 上一轮那个"watcher 退出时还在 in_progress"的悬账结掉。
+- 自评 **90 / 100**（七维度见 `AGENT_VISUAL_ITERATION.md` Round 33）。
+
+### R33 换装本机
+
+- `make bundle`（在仓库根）→ `✅ 时间剪史.app ready`、冒烟 `SMOKE_OK=1`；
+  `install_local.sh --yes --no-build` → `INSTALL_SHA_MATCH=1`、
+  `INSTALL_RUNNING_PID=91740`（启动晚于安装，exe 路径逐字对上 `/Applications/时间剪史.app`）、
+  `INSTALL_ENTRIES_BEFORE=103 → AFTER=103`、`INSTALL_RESULT=ok`、版本 1.4.8→1.4.8。
+- 旧包留在 `Documents/Codex_Project0_backups/before-local-20261014-053500`。

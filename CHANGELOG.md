@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R33 · 说明段探针的"通过"原来是假的；通用页每段说明回到自己那颗开关下面）
+
+- **产品改动（U-55）**：「通用」页四颗开关各自的 `.secondary` 说明段与它解释的那一颗**编成一组**
+  （新常量 `SettingsViewLayout.captionGap = 3`，组间保持 8），并把讲截图文字识别的那一句
+  从富文本说明之后挪回它自己的开关下面。修之前屏上的顺序是
+  「识别截图文字 → 保留富文本 → RTF 的代价 → 关闭后不再对新入库的图片做文字识别」，
+  也就是**讲 A 的说明挂在 B 下面**（亮暗两档帧里都看得很清楚）。
+  顺带把 `loginItemSettings.message` 那条回执挪回「开机启动」下面（夹具下它是 nil ⇒ 帧里量不到，只进账本）。
+- **实测（改前 → 改后）**：说明段与上面那颗开关的空缝 **12.0 → 7.0**（暗 11.5 → 6.5），
+  与下面那颗开关的空缝保持 **12.0 / 11.5** ⇒ 归属不再靠猜。
+  判据 `testSettingsCaptionSitsCloserToItsOwnToggle`：上面那一带必须有标题档的墨 + 上缝 ≤9pt + 上缝 < 下缝，
+  两档外观各判 3 段。
+- **一条一直存在的判据盲区被修掉（BACKLOG 34②③ / D-092）**：`captionInkProbes` 从 R27 起只有**地板**
+  （不许比 `.secondary` 淡），所以"框套到标题上"这种错法**反而更轻松通过**。
+  本轮加了**天花板** `captionTierCeiling = 1.5`：我上一轮放进去的两条设置页探针当场量到
+  **3.67（亮）/ 1.89（暗）倍参照** —— 它们套的是「通用」标题与开关标签。
+  框重放后 8 条 × 两档全部落在 **0.95–1.03**（热图三条、菜单栏两条本来就贴着参照，等于回审通过）。
+- **新尺 + 真值表**：`rowTierProfile`（把一块矩形里的笔画按"离背景多远"分说明档 / 标题档，
+  依据是抗锯齿拉不出比字本身更深的像素）与 `textBands`；
+  真值表 `testRowTierProfileSeparatesCaptionFromTitle` 钉的是**顺序与间隙**
+  （说明带最深 120/121、标题带 206/185、阈值 150 落在中间）。
+  诊断 `testSettingsCaptionRowTierProfileDiagnostic` 负责把带表打出来（放框用，永远记为未运行）。
+- **修掉上一轮自己埋的一条**：NOT-RUN 判别臂被装进了 `testActionableInkStaysAboveTheLegibilityFloor`
+  （那张表一条设置页探针都没有 ⇒ 永远不可能触发的装饰，且日志前缀写着 `CAPTION_NOT_RUN`），
+  而真正会永久红的说明段测试没有 ⇒ 与 R29d「守卫在 CI 第一轮红」同族第二次。发现方式是编译报错，不是审查。
+  现在说明段测试有判别臂 + `judged ≥ 3` 兜底（**判别臂不许把判据变成恒绿**）。
+- **新发现、未修（U-56 / BACKLOG 47）**：菜单栏面板第一行的推荐理由在帧上被**硬切成半字**
+  （墨画到 `x=319.5` = 帧的最后一列），而产品侧 `MenuBarExtra` 没有任何宽度约束 ⇒
+  要么真机面板比 320 宽（被切的是夹具），要么产品真的会切。要先看真机一眼（人工批次 39.1）。
+- 帧基线 2 张（`settings-general` 亮/暗）随本提交 `update`；全量 707 tests / 29 skipped / 0 failures、
+  0 warning、脚本 72 OK、已换装本机（PID 91740，SHA 对上）。
+- 变异 **M141–M147** 七支全 CAUGHT（两支打测量、三支打产品、一支打阈值、一支打判别臂本身），
+  `RESTORE_CLEAN=yes`。
+
 ### Changed（R32 · 详情区只留一条左轴，骨架承诺的那一列就是内容落地的那一列）
 
 - **产品改动（本轮唯一一次动画面几何）**：详情区的可读列不再随窗口居中，改为贴 `containerGutter`

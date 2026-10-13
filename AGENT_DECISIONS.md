@@ -3207,3 +3207,27 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
 - **回滚**：`git revert` 本轮提交即可；帧基线 16 张 detail/content 帧随提交一起更新。
 - **谁守着**：`testDetailAreaHasASingleLeftAxis`（五块 × 两档，spread ≤2pt 且贴 gutter ±2）
   + 两条源码守卫（调用点计数 ≥3、helper 里仍有上限）。变异 M137–M140 四支覆盖两半。
+
+### D-092 · R33：探针表的"通过"必须同时被两侧钉住；说明段与它的开关编成一组
+
+- **决定 1**：`captionInkProbes` 每条探针除地板（`captionTierTolerance` = 参照的 0.8 倍）之外
+  加**天花板** `captionTierCeiling` = 参照的 1.5 倍。它判的不是产品，是**探针的前提**：
+  这条框里必须是说明档的墨。套到标题上（实测 3.67 / 1.89 倍）会当场红，
+  而"产品把某段说明提到 `.primary`"也会红 —— 那种情况下正确处置是**删掉这条探针**
+  （它命名的是一个 `.secondary` 位点），不是抬天花板。
+- **决定 2**：放框用新尺 `rowTierProfile`（按"离背景多远"把笔画分两堆），不用普通行剖面。
+  理由：普通行剖面只说"这一行有墨"，说不出这行是标题还是说明 —— 我上一轮就是照着它把两个框
+  放到标题行上、还判成通过。阈值 150 由真值表钉在**两簇之间**（说明 120/121、标题 206/185）。
+- **决定 3**：通用页每颗开关与它的说明段编成一个 `VStack(spacing: SettingsViewLayout.captionGap=3)`，
+  组间保持 8。左轴与字号都不动，动的是**归属**。
+  为什么不是"只重排不收紧间距"：8pt 之下说明段与上下两颗开关**等距**（M144 量到 12.0 = 12.0），
+  归属还是要靠读句子猜；收紧到 3 之后是 7.0 vs 12.0。
+- **代价 / 退路**：通用页整列高度略降（说明段各上移 5pt），帧基线随之更新；
+  若真机觉得"说明段贴开关太近"，退路是把 `captionGap` 抬到 4–5（判据上限 9.0 仍留余量），
+  **而不是**把说明段搬回组外。
+- **谁守着**：`testSettingsCaptionSitsCloserToItsOwnToggle`（三条 + 段数 ≥3，两档外观）、
+  `testRowTierProfileSeparatesCaptionFromTitle`（尺的真值表）、
+  `testCaptionTextStaysOnTheSecondaryTier`（地板 + 天花板 + `judged ≥ 3`）。
+  变异 M141–M147 七支（两支打测量、三支打产品、一支打阈值、一支打判别臂本身）。
+- **没修的部分**：`loginItemSettings.message` 那条回执的位置（夹具下是 nil，帧里量不到）；
+  菜单栏面板宽度（U-56 / BACKLOG 47，要真机）。

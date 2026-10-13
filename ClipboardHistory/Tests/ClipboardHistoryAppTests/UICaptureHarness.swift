@@ -1360,11 +1360,55 @@ final class UICaptureTests: XCTestCase {
         /// 中间留了一大段安全距离，而正常的换行与字重差异不会跨过 0.8。
         static let captionTierTolerance: Double = 0.8
 
+        /// **同一条探针的另一侧**：说明段的墨不许**比 `.secondary` 更深**超过 1.5 倍。
+        ///
+        /// 这条不是产品要求，是**探针的前提**（R33）。来历：我往 `captionInkProbes` 里加了
+        /// 两条"通用页说明段"，读数 13.76（亮）/ 11.43（暗），也就是参照的
+        /// **3.67 倍 / 1.89 倍** —— 那不是"说明文字很浓"，是框套在 `.headline` 标题与开关标签上。
+        /// 而地板那条（"不许比参照淡"）对这种错法**完全是瞎的**：套错了反而更轻松通过。
+        /// 也就是说 R27 以来这张表里每一条"通过"，都只证明了"框里有足够深的墨"，
+        /// **没证明过"框里是说明段的墨"**。
+        /// 1.5 的来历：本机两簇实测 —— 真的说明段（热图刻度、菜单栏副标题与理由、
+        /// 通用页三段说明）比值 **1.00–1.03**；套到标题档的框 **1.89–3.67**。
+        /// 取中间值，两侧都留 ≥30% 余量。**刻意用相对参照而不是绝对偏离量**：
+        /// 与 `captionTierTolerance` 同一个理由 —— 绝对值里混着"这台机器怎么解析
+        /// `secondaryLabelColor`"，而参照就是同一台机器同一外观现拍的那一份。
+        ///
+        /// 触发它的正确反应写在消息里：**重放框，不是抬天花板**。
+        /// 如果产品真的把某段说明提到了 `.primary`，那条探针就该删 ——
+        /// 它命名的是一个 `.secondary` 位点，位点没了，命名也就没了。
+        static let captionTierCeiling: Double = 1.5
+
         /// 参照臂自己的兜底地板：**只用来发现"渲染整体失效"**，不是产品线。
         /// 取 2.2 的理由：本机 `.tertiary` 是 1.88、`.secondary` 是 4.0，
         /// 而 CI runner 上 `.secondary` 一档最低读到过 2.85 ⇒ 2.2 两边都过，
         /// 却仍然拦得住"整帧淡到几乎看不见"这种捕获事故。
         static let secondaryReferenceFloor: Double = 2.2
+
+        /// 说明段与它上面那颗开关之间允许的最大空缝（pt，R33 / U-55）。
+        ///
+        /// 判的是"归属"而不是"间距好不好看"。量的是**墨到墨**：产品里说明段与它的开关是 3pt
+        /// （`SettingsViewLayout.captionGap`），可两行的行框各自还带留白，
+        /// 所以帧上量到的是 **7.0（亮）/ 6.5（暗）**；而它与**下一颗**开关（组间 8pt）量到
+        /// **12.0 / 11.5**。"等距"那一侧不是推测而是量过的：变异 M144 把 `captionGap` 改回 8，
+        /// 帧上就报「上缝 12.0」—— 也就是 U-55 修之前那张帧的状态（上缝 = 下缝 = 12.0，归属靠猜）。
+
+        /// 9.0 就取在 7 与 12 之间：贴着实测那一侧留 2pt 余量，离"等距"那一侧也留 3pt。
+        /// 这条是**兜底**，主力是"上缝 < 下缝"那条 —— 只有最后一段说明（下面没有开关了）
+        /// 只能靠这条判。
+        static let captionHugMaxPt: Double = 9.0
+
+        /// 两带之间的空缝小于它才算**同一段说明的下一行**（pt，R33 / U-55）。
+        ///
+        /// 三个数都是量出来的，不是推的：
+        /// ① 同一段的两行之间 **3.0pt**（修之前那张帧：246.5 → 249.5）；
+        /// ② 两段**不同**的说明、分在不同组里 **11.5pt**（260.0 → 271.5，也是修之前那张帧）；
+        /// ③ 两段不同的说明被塞进**同一个 3pt 组**里 **6.5pt**（M145 那一支变异量到的：
+        ///    226.0 → 232.5 —— 11pt 与 10pt 两种字体的行框留白不同，所以"组内"不等于"同段"）。
+        /// 5.0 取在 ①与③ 之间。**这条余量薄（3.0 与 6.5 只差 3.5pt）**，
+        /// 所以它红了要重量一遍再动阈值，而不是抬阈值：
+        /// 抬到 7 以上，③ 那种"两段说明连着"的缺陷就会被尺并成一段而抹平（M145 正是走这条路红的）。
+        static let captionLineGapMaxPt: Double = 5.0
 
         /// 动作按钮的字形中心与色带中心的容差。
         /// 修之前实测偏差 0pt（单行，碰巧对）/ **−6.5pt**（两行）/ **−14.5pt**（三行），
@@ -1520,6 +1564,79 @@ final class UICaptureTests: XCTestCase {
         return (brighter, darker)
     }
 
+    /// **一行里的墨分两档**：说明档（离背景 ≤ `tierSplit`）与标题档（超过它）。
+    /// 返回按**像素行**排列的数组，只数偏离超过 `textInkMinDelta` 的笔画像素。
+    ///
+    /// 这一把尺回答的问题是「**这一行是哪种字**」，不是「这一行有没有字」。
+    /// 物理依据很硬：抗锯齿只会把笔画像素往**背景方向**拉，永远不会拉得比字本身更深，
+    /// 所以一行字的 `maxDeviation` 就是它那档颜色的指纹 ——
+    /// 同一页上 `.secondary` 的 11pt 说明 ≈109、`.headline` 标题 ≈209（R28 在本机量到的两个数，
+    /// 记在 `textInkMinDelta` 上面那段）。
+    ///
+    /// 为什么 R33 要新加它：说明段探针表里我按 `rows` 剖面放的两个框，读数 13.76 =
+    /// **参照的 3.67 倍** —— 那不是"说明文字很浓"，是框套到了标题上。
+    /// 只加"不许比参照深"的天花板还不够：**放框的时候**就得知道哪一行是说明段，
+    /// 否则一轮下来只是把同一个错法换个方向再犯一次。这一把就是"放框用的"，
+    /// 天花板那条是"守着的"。
+    static func rowTierProfile(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                               bytesPerRow: Int, rect: CGRect, scale: Double,
+                               tierSplit: Int = 150) -> [(yPx: Int, maxDeviation: Int,
+                               caption: Int, title: Int)] {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y0 < y1 else { return [] }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        var histogram: [Int: Int] = [:]
+        for y in y0..<y1 {
+            for x in x0..<x1 { histogram[lumaAt(x, y) / 8, default: 0] += 1 }
+        }
+        // 背景取**整块矩形**的众数（与 `inkSideCounts`、`textInkMass` 同一条取法）：
+        // 逐行取众数会让"字多的那一行"把自己的墨当成底，于是那一行的偏离量集体塌到 0。
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+        var rows: [(yPx: Int, maxDeviation: Int, caption: Int, title: Int)] = []
+        for y in y0..<y1 {
+            var maxDeviation = 0, caption = 0, title = 0
+            for x in x0..<x1 {
+                let deviation = abs(lumaAt(x, y) - background)
+                guard isTextInk(delta: deviation) else { continue }
+                maxDeviation = max(maxDeviation, deviation)
+                if deviation > tierSplit { title += 1 } else { caption += 1 }
+            }
+            if caption + title > 0 { rows.append((y, maxDeviation, caption, title)) }
+        }
+        return rows
+    }
+
+    /// 把 `rowTierProfile` 的逐行数据合并成**文字带**（一行字 / 一段多行说明的每一行）。
+    ///
+    /// `mergeGapPx` 默认 2px（@2x 下 1pt）：一行 CJK 文字中间也可能出现"整行没有墨"的那一像素
+    /// （比如两个字之间的空隙正好跨满一行），不合就会把一行读成两行。
+    /// 而**行与行之间**的空缝实测 3pt = 6px @2x ⇒ 2px 的容差不会把两段字并成一段，
+    /// 这一点是这条合并规则的**唯一目的**：带的边界要能用来量间距。
+    static func textBands(rows: [(yPx: Int, maxDeviation: Int, caption: Int, title: Int)],
+                          scale: Double, mergeGapPx: Int = 2)
+        -> [(startPt: Double, endPt: Double, maxDeviation: Int, caption: Int, title: Int)] {
+        var bands: [(startPt: Double, endPt: Double, maxDeviation: Int, caption: Int, title: Int)] = []
+        var group: [(yPx: Int, maxDeviation: Int, caption: Int, title: Int)] = []
+        func flush() {
+            guard let first = group.first, let last = group.last else { return }
+            bands.append((Double(first.yPx) / scale, Double(last.yPx + 1) / scale,
+                          group.map(\.maxDeviation).max() ?? 0,
+                          group.reduce(0) { $0 + $1.caption }, group.reduce(0) { $0 + $1.title }))
+            group = []
+        }
+        for row in rows {
+            if let last = group.last, row.yPx - last.yPx > mergeGapPx { flush() }
+            group.append(row)
+        }
+        flush()
+        return bands
+    }
+
     /// 哪些设置页帧的**暗档侧栏文字**落在背景的错误一侧（R29d / BACKLOG 45）。
     ///
     /// 这不是产品判据，是**尺的盲区名单** —— 与 R18 的 `materialBlindSpotFixtures` 同一族：
@@ -1603,6 +1720,243 @@ final class UICaptureTests: XCTestCase {
         report.prefix(80).forEach { print("  \($0)") }
         throw XCTSkip("诊断用判据：它只回答「这一列是谁画的、它携带的颜色在两种外观下各解析成什么」，"
                       + "不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
+    }
+
+    /// R33 诊断（**放框用的，不判产品**）：设置页内容列里每一行是**哪种字**。
+    ///
+    /// 为什么需要它：`captionInkProbes` 里给通用页放的两个框，读数 13.76 = 参照的 3.67 倍，
+    /// 也就是说框套在 `.headline` 标题上而不是说明段上 —— 而"框从 `rows` 剖面放"这句话
+    /// 本身就是错的：普通的行剖面只说"这一行有墨"，**说不出这一行是标题还是说明**，
+    /// 于是我照着它放的两个框都落在标题行上，还都判成了"通过"。
+    /// 这一条把 `rowTierProfile` 的行合并成带，逐带打出 `最深偏离 / 说明档像素 / 标题档像素`，
+    /// 于是"这里是一条 `.secondary` 说明段"变成量出来的，不是猜出来的。
+    /// 判据在 `testCaptionTextStaysOnTheSecondaryTier`（R33 起那里多了一条天花板）。
+    func testSettingsCaptionRowTierProfileDiagnostic() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r33-rowtier-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-general" }) else {
+                return XCTFail("找不到 settings-general ⇒ 这一带的行剖面没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-general-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let rows = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow,
+                                           rect: CGRect(x: 150, y: 20, width: 560, height: 500),
+                                           scale: scale)
+            print("ROWTIER settings-general \(tag)：有字行 \(rows.count) 行（x 150..710）")
+            for band in Self.textBands(rows: rows, scale: scale) {
+                let tier = band.title > band.caption ? "标题档" : "说明档"
+                print(String(format: "  带 y=%.1f..%.1f pt 最深偏离=%d %@ 说明=%d 标题=%d",
+                             band.startPt, band.endPt, band.maxDeviation, tier, band.caption, band.title))
+            }
+        }
+        throw XCTSkip("诊断用判据：它只回答「这一行是标题档还是说明档」，用来放框，不判产品 "
+                      + "⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
+    }
+
+    /// R33 · `rowTierProfile` 的**真值表**：同一张设置页帧里，
+    /// 一行说明段与一行开关标签必须被分进**两堆**，而且分错方向要能量出来。
+    ///
+    /// 为什么这条必须存在（不是"锦上添花的纯函数测试"）：R33 放框用的就是这把尺，
+    /// 而它现在**还没有任何判据** —— 只有诊断在打数，而诊断永远 skip。
+    /// 也就是说"这条带是说明档"这句话目前还是**我说它是什么就是什么**。
+    /// 这一条把它钉成量出来的：`tierSplit = 150` 落在两簇中间，
+    /// 这条真值表自己的框量到 说明档最深 120（亮）/ 121（暗）、标题档 206（亮）/ 185（暗），
+    /// 间隙 **86 / 64**；诊断那条用的矩形更宽（x 150..710、整列），
+    /// 背景众数不同 ⇒ 同一行字量出 128/193 —— **偏离量是"相对这块矩形的底"的，不是绝对的**，
+    /// 所以这里钉的是顺序与间隙，不是水平（写第一版时钉了水平，暗档假红一次，见下面的注释）。
+    /// 于是 split 挪到 140 或 170 都还在两簇之间，这条真值表同时就是那个稳健性。
+    func testRowTierProfileSeparatesCaptionFromTitle() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r33-tiertruth-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let pane = CGRect(x: 150, y: 20, width: 560, height: 500)
+        // 两带从帧上量（`testSettingsCaptionRowTierProfileDiagnostic` 打的带表）：
+        // 161..171 是「暂停时仍在推进…」那段 `.caption`；142..155 是它上面那颗开关「暂停记录剪贴板」的标签。
+        // （R33 里 U-55 把说明段编回各自开关那一组之后，这两带各往上挪了 5pt 与 12pt ——
+        //  带的位置不是常量，是从帧上量的，所以两处都要跟着改，改完由这条真值表重新钉住。）
+        let captionBand = CGRect(x: 150, y: 161, width: 560, height: 10)
+        let titleBand = CGRect(x: 150, y: 142, width: 560, height: 13)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-general" }) else {
+                return XCTFail("找不到 settings-general ⇒ 真值表没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-general-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let whole = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow, rect: pane, scale: scale, gate: 8)
+            guard whole.brighter + whole.darker > 0 else {
+                throw XCTSkip("ROWTIER_NOT_RUN \(tag)：这台机器拍不出设置页内容列（整列 0 个偏离像素，"
+                              + "BACKLOG 43 实测过 runner 上就是这一块平涂）"
+                              + "⇒ 这把尺的分档在这台机器上没验过。"
+                              + "跳过而不是绿：这条判据的内容是「这一堆和那一堆被分开了」，"
+                              + "机器画不出字时它没有内容。")
+            }
+            func summarize(_ rect: CGRect) -> (maxDeviation: Int, caption: Int, title: Int) {
+                let rows = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                               bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale)
+                return (rows.map(\.maxDeviation).max() ?? 0,
+                        rows.reduce(0) { $0 + $1.caption }, rows.reduce(0) { $0 + $1.title })
+            }
+            let caption = summarize(captionBand)
+            let title = summarize(titleBand)
+            XCTAssertGreaterThanOrEqual(caption.caption, 1_000,
+                        "\(tag)：说明段带里只读到 \(caption.caption) 个说明档像素 ⇒ 框没压住那段字"
+                        + "（去重打行剖面，别把地板调低）")
+            XCTAssertEqual(caption.title, 0,
+                        "\(tag)：说明段带（\(captionBand)）里冒出 \(caption.title) 个**标题档**像素 ⇒ "
+                        + "这一带混进了比说明段更深的一行（标题或开关标签被搬进来了），"
+                        + "于是这条带不再是「只有说明段」，探针的前提破了")
+            XCTAssertGreaterThan(title.title, title.caption,
+                        "\(tag)：开关标签带（\(titleBand)）本该是标题档，实测 说明=\(title.caption) "
+                        + "标题=\(title.title) ⇒ 尺把两堆分反了，或者那一行被改淡了（`.secondary` 化）。"
+                        + "两种都先别动阈值，去看那张帧")
+            // **阈值必须落在两簇之间**，而且是从**这张帧**量出来的一句话：
+            // 说明带最深 120（亮）/ 121（暗），标题带 206 / 185 ⇒ `tierSplit = 150` 在中间，
+            // 离说明簇 30 / 29，离标题簇 56 / 35。
+            // 刻意**不**写成"标题档 ≥ 190"那种绝对水平：第一版我就写了 190，暗档实测 185，
+            // 一条假红 —— 而那些数还会随框自己的背景众数漂（诊断打的 128/193 与这里的 121/185
+            // 不是同一张框：`rowTierProfile` 的背景取的是**这块矩形**的众数，
+            // 矩形不同，偏离量就不同）。能钉住的是**顺序与间隙**，不是水平。
+            XCTAssertLessThan(caption.maxDeviation, 150,
+                        "\(tag)：说明段带最深偏离 \(caption.maxDeviation) ≥ 150（`tierSplit`）⇒ "
+                        + "尺的档位边界落进了说明簇自己里面，说明档会被判成标题档")
+            XCTAssertGreaterThan(title.maxDeviation, 150,
+                        "\(tag)：标题档带最深偏离只有 \(title.maxDeviation) ≤ 150 ⇒ 边界落进了标题簇"
+                        + "里面（两簇可能已经并成一簇），这把尺失去判别力")
+            XCTAssertGreaterThanOrEqual(title.maxDeviation - caption.maxDeviation, 40,
+                        "\(tag)：两簇最深偏离只差 \(title.maxDeviation - caption.maxDeviation)"
+                        + "（本机 86 / 64）⇒ 间隙塌到不足 40，`tierSplit` 这个单点分档不再可靠，"
+                        + "别再拿它放框")
+            print("ROWTIER_TRUTH \(tag) 说明带 最深=\(caption.maxDeviation) 说明=\(caption.caption) 标题=\(caption.title)"
+                  + " / 标题带 最深=\(title.maxDeviation) 说明=\(title.caption) 标题=\(title.title)"
+                  + " 间隙=\(title.maxDeviation - caption.maxDeviation)")
+        }
+    }
+
+    /// R33 / U-55 · **每段说明必须贴着它解释的那一颗开关**（从帧上量，不读源码顺序）。
+    ///
+    /// 缺陷是**看帧**看到的：通用页原来写成"两个开关连着、两段说明连着"，
+    /// 屏上的顺序就成了「识别截图文字 → 保留富文本 → RTF 的代价 → 关闭后不再对新入库的图片做文字识别」——
+    /// 那句讲 **OCR** 的话挂在 RTF 开关下面（亮暗两档都是）。
+    /// 只重排还不够：组间与组内都是 8pt 时，说明段与上下两颗开关**等距**，归属仍然靠猜，
+    /// 所以同时把说明段的组内间距收到 `SettingsViewLayout.captionGap = 3`。
+    ///
+    /// 判据为什么长成这样（三条一起）：
+    /// ① 说明段**上面那一带必须是更深的一档**（开关或分区标题）—— 拦住"说明段飘到别处"；
+    /// ② 与上面那一带的空缝 ≤ `InkFloor.captionHugMaxPt` —— 拦住"等距"，也就是这条改动的实质；
+    /// ③ 若下面还有一颗开关，空缝必须**上面更近**—— 归属唯一化。
+    /// 最后 `judged ≥ 3`：这一页正好三段说明，一条都没判成就是尺坏了，不是产品过了。
+    func testSettingsCaptionSitsCloserToItsOwnToggle() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r33-caption-hug-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let pane = CGRect(x: 150, y: 20, width: 560, height: 500)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-general" }) else {
+                return XCTFail("找不到 settings-general ⇒ 归属判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-general-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("读不回刚拍的 \(file.lastPathComponent)")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let rows = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow, rect: pane, scale: scale)
+            let bands = Self.textBands(rows: rows, scale: scale)
+            let captions = bands.filter { $0.title == 0 && $0.caption > 0 }
+            guard bands.count >= 5, !captions.isEmpty else {
+                throw XCTSkip("CAPTION_HUG_NOT_RUN \(tag)：这一页只量到 \(bands.count) 带文字"
+                              + "（其中说明档 \(captions.count) 带）⇒ 这台机器拍不出设置页（BACKLOG 43），"
+                              + "归属这条记为未运行，不算通过")
+            }
+            // 把连续的说明档带并成"一段"。存的不是坐标而是**带表里的下标**
+            // （坐标相等比较是浮点陷阱，下标天然唯一）。
+            // **并段的判据是行距而不是"都是说明段"**：段内行距实测 3.0pt，
+            // 而两段**不同**的说明之间是 11.5pt（都从修之前那张帧上量的）。
+            // 这个区别就是这条判据能不能抓到 U-55：那个缺陷本身正是"两段说明连在一起"，
+            // 若把它们并成一段，判据会看见一段"上面贴着开关"的合格说明，于是缺陷被尺抹平。
+            var runs: [(first: Int, last: Int)] = []
+            var open: Int?
+            for (index, band) in bands.enumerated() {
+                let isCaption = band.title == 0 && band.caption > 0
+                if !isCaption {
+                    if let start = open { runs.append((start, index - 1)); open = nil }
+                    continue
+                }
+                if open != nil,
+                   band.startPt - bands[index - 1].endPt <= InkFloor.captionLineGapMaxPt {
+                    continue  // 同一段的下一行
+                }
+                if let start = open { runs.append((start, index - 1)) }
+                open = index
+            }
+            if let start = open { runs.append((start, bands.count - 1)) }
+            var judged = 0
+            for run in runs {
+                guard run.first > 0 else {
+                    XCTFail("带表里第一段就是说明段（\(bands.count) 带）⇒ 这一页开头不是分区标题，"
+                            + "要么尺把标题档读丢了，要么产品把说明段放到了整页最上面")
+                    continue
+                }
+                let firstBand = bands[run.first], lastBand = bands[run.last]
+                let above = bands[run.first - 1]
+                XCTAssertGreaterThan(above.title, 0,
+                            "「y=\(String(format: "%.1f", firstBand.startPt)) 那段说明」上面那一带"
+                            + "（\(String(format: "%.1f", above.startPt))..\(String(format: "%.1f", above.endPt))）"
+                            + "里没有标题档的墨 ⇒ 这段说明不跟着任何开关或分区标题，它是在解释谁？（\(tag)）")
+                let gapAbove = firstBand.startPt - above.endPt
+                XCTAssertLessThanOrEqual(gapAbove, InkFloor.captionHugMaxPt,
+                            "「y=\(String(format: "%.1f", firstBand.startPt)) 那段说明」离上面那颗开关 "
+                            + "\(String(format: "%.1f", gapAbove))pt（\(tag)，上限 "
+                            + "\(InkFloor.captionHugMaxPt)）⇒ 说明段与上下两颗开关差不多远，"
+                            + "读的人只能靠猜它属于谁。产品里这段与它的开关应当编成一组"
+                            + "（`SettingsViewLayout.captionGap`），组间才是 8pt")
+                let below = bands.dropFirst(run.last + 1).first { $0.title > 0 }
+                if let below {
+                    let gapBelow = below.startPt - lastBand.endPt
+                    XCTAssertLessThan(gapAbove, gapBelow,
+                                "这段说明离上面的开关 \(String(format: "%.1f", gapAbove))pt、"
+                                + "离下面的开关 \(String(format: "%.1f", gapBelow))pt ⇒ 它离**下一颗**更近，"
+                                + "会被读成下一颗的说明（U-55 就是这么错的）（\(tag)）")
+                    print(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=%.1f",
+                                 tag, firstBand.startPt, lastBand.endPt, gapAbove, gapBelow))
+                } else {
+                    print(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=无（最后一段）",
+                                 tag, firstBand.startPt, lastBand.endPt, gapAbove))
+                }
+                judged += 1
+            }
+            XCTAssertGreaterThanOrEqual(judged, 3,
+                        "\(tag)：通用页只判了 \(judged) 段说明（这一页有 3 段 `.secondary` 说明）⇒ "
+                        + "说明段没被量到，这条判据没有内容")
+        }
     }
 
     ///
@@ -1904,6 +2258,28 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 10, y: 90, width: 26, height: 90)),
         InkProbe(fixture: "heatmap-populated", what: "图例「少 / 多」（颜色深浅的唯一标尺）",
                  rect: CGRect(x: 12, y: 196, width: 25, height: 14)),
+        // R33 / BACKLOG 34③：菜单栏面板上那两段 11pt 的 `.secondary`。
+        // 带是从帧的 `rows` 剖面上放的（不是猜的）：标题 116–130、副标题 142–155、行右端 meta 186–202。
+        // 判"要读的"还是"装饰"写在账本里：副标题是这一列的**标题**（没有它，三条就是一堆莫名出现的记录），
+        // meta 是"为什么推荐这条"（类型 · 当前在哪个 App · 常用）—— 两者都要读，都没有理由比 `.secondary` 淡。
+        InkProbe(fixture: "menubar-recommendations", what: "副标题「猜你要粘贴」（这一列的标题）",
+                 rect: CGRect(x: 120, y: 141, width: 90, height: 15)),
+        InkProbe(fixture: "menubar-recommendations", what: "行右端推荐理由（类型 · 当前 App · 常用）",
+                 rect: CGRect(x: 200, y: 185, width: 118, height: 15)),
+          // R33 / BACKLOG 34②：通用页的三段 `.secondary` 说明（`.caption` 与 `VisualFont.meta`）。
+        // 这三条**改过两次位置**：第一次按普通 `rows` 剖面放，比值读到 3.67（亮）/ 1.89（暗）
+        // —— 那是套在「通用」标题与开关标签上（`InkFloor.captionTierCeiling` 上面那段）；
+        // 第二次是产品动了（U-55 把说明段编回各自开关那一组，整列往上收 5pt）。
+        // 现在按 `rowTierProfile` 放：带里 `标题档像素 = 0`，也就是这一带**只有**说明段的墨。
+        // 带边界从帧上量（`CAPTION_HUG` 那几行就是同一把尺打的：亮 161.0..170.5 /
+        // 201.5..211.0 / 241.5..266.0，暗 160.5..170.5 / 201.0..211.0 / 241.5..266.0），
+        // 框比带各留 0.5–1pt，两档外观共用一套坐标。
+        InkProbe(fixture: "settings-general", what: "说明段「暂停时仍在推进…」（恢复后会不会补记旧内容）",
+                 rect: CGRect(x: 150, y: 160, width: 560, height: 12)),
+        InkProbe(fixture: "settings-general", what: "说明段「关闭后不再对新入库的图片…」（截图文字识别）",
+                 rect: CGRect(x: 150, y: 200, width: 560, height: 12)),
+        InkProbe(fixture: "settings-general", what: "说明段「打开后从 Word、Pages…」（富文本的代价，两行）",
+                 rect: CGRect(x: 150, y: 241, width: 560, height: 26)),
     ]
 
     /// **系统 `.secondary` 档在"这台机器 + 这个外观"下量到的对比度**（R28 新增的参照臂）。
@@ -1966,6 +2342,7 @@ final class UICaptureTests: XCTestCase {
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
+            var judged = 0
             let reference = try secondaryReferenceContrast(appearance: appearance, scratch: scratch)
             XCTAssertGreaterThanOrEqual(reference, InkFloor.secondaryReferenceFloor,
                         "这台机器上系统的 `.secondary` 只量到 "
@@ -1985,6 +2362,24 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
                 }
                 let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                // **先判这台机器拍不拍得出这一页**（R33，与 R29d 的判别臂同一条规矩）：
+                // runner 上 `SettingsView` 是一块平涂底色（BACKLOG 43 实测），整帧读到 0 个偏离像素。
+                // 那种情况下逐条记 NOT-RUN 而不是红 —— 恒红的判据等于没有判据；
+                // 但「整帧有墨、这一带没墨」仍然必须红（那是框贴错了地方，不是机器不行）。
+                // 表里那 3 条 `settings-general` 探针就是为这条而存在的：写这段之前我把判别臂
+                // 加到了 `controlInkProbes` 那条测试里 —— 那张表一条设置页探针都没有，
+                // 于是它是一段**永远不可能触发的装饰**，而真正需要它的这里没有 ⇒ CI 第一轮必红。
+                let whole = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                               bytesPerRow: rep.bytesPerRow,
+                                               rect: CGRect(origin: .zero,
+                                                            size: NSSize(width: fixture.size.width,
+                                                                         height: fixture.size.height)),
+                                               scale: scale, gate: 8)
+                if whole.brighter + whole.darker == 0 {
+                    print("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) 整帧 0 个偏离像素")
+                    continue
+                }
+                judged += 1
                 let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
                                                          height: rep.pixelsHigh,
                                                          bytesPerRow: rep.bytesPerRow,
@@ -2009,7 +2404,32 @@ final class UICaptureTests: XCTestCase {
                       + String(format: "%.2f", ratio) + " 参照=" + String(format: "%.2f", reference)
                       + " 比值=" + String(format: "%.2f", ratio / max(reference, 0.01)) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
+                // **另一侧的闸门：这条框里必须是说明段的墨**（R33 / `captionTierCeiling`）。
+                // 没有这一条，这张表只能证明"框里有足够深的墨"，证明不了"框里是它自称的那段说明"：
+                // 上一轮我给通用页放的两个框套在标题上，比值 3.67 / 1.89，两条都"通过"。
+                XCTAssertLessThan(ratio, reference * InkFloor.captionTierCeiling,
+                            "\(probe.fixture) 的「\(probe.what)」读到 "
+                            + String(format: "%.2f", ratio) + ":1 = 这台机器 `.secondary` 参照（"
+                            + String(format: "%.2f", reference) + "）的 **"
+                            + String(format: "%.2f 倍", ratio / max(reference, 0.01)) + "**（\(tag)）"
+                            + " ⇒ 比说明档深这么多，只可能是框套到了标题/正文那一档上"
+                            + "（`.headline`、开关标签、或控件），不是它自称的那段 `.secondary` 说明。"
+                            + "**这条「通过」一直是假的**：地板判据看不见套错方向，只看得见过淡。"
+                            + "\n修法：跑 `testSettingsCaptionRowTierProfileDiagnostic` 重打行剖面，"
+                            + "把框放到「标题档像素 = 0」的那一带；"
+                            + "如果产品真的把这段说明提到了 `.primary`，那就**删掉这条探针**"
+                            + "（它命名的是一个 `.secondary` 位点），不许把 `captionTierCeiling` 抬上去。")
             }
+            // **NOT-RUN 不能把这条判据变成恒绿**（R29d 的教训：判别臂加完就忘了问"到底判了几条"）。
+            // 3 的来历：表里 8 条 × 2 档，热图那 3 条是**唯一有 CI 记录的**
+            // （run 38443414396 上读到 2.85 / 3.30 —— 也就是 runner 拍得出热图），
+            // 而设置页整页在 runner 上是平涂（BACKLOG 43）、菜单栏面板从未在 CI 上验过 ⇒
+            // 地板只钉在"这一轮确实量到了热图那三条说明段"，其余全部如实打在日志里。
+            XCTAssertGreaterThanOrEqual(judged, 3,
+                        "\(tag) 档 8 条说明段探针**一条都没判成**（judged=\(judged)）⇒ "
+                        + "是捕获路径坏了，不是产品都过了。热图那三条在任何机器上都拍得出来，"
+                        + "它们要是也读不到墨，这条判据就没有内容，必须红着说这件事。")
+            print("CAPTION_JUDGED \(tag) 判了 \(judged) 条 / 表里 \(Self.captionInkProbes.count) 条")
         }
     }
 
