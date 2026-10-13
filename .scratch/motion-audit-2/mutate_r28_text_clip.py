@@ -5,7 +5,7 @@
   M123 把 `.lineLimit(1)` 装回快捷键说明（= 修之前的产品） ⇒ 两臂对照必须红在"有说明文字被截断了"
   M124 把夹具里新接的 `exportHistoryAction` 摘掉            ⇒ 接缝守卫必须红在"产品注入的接缝夹具没注入"
   M125 把文字墨的闸门从 60 挪到 24（平涂会混进来）          ⇒ 真值表必须红在"平涂底色不许算成字"
-  M126 把宽臂从 1100pt 改回 720pt（参照失去资格）           ⇒ 必须红在"不再是不动的参照"，
+  M126 把宽臂从 900pt 改回 720pt（参照失去资格）           ⇒ 必须红在"不再是不动的参照"，
                                                                 不许红成"两臂自比 ⇒ 恒真绿"
   M127 把 `signedInk` 的阈值抬到 400（什么都数不到）        ⇒ 侧栏探针必须红在"连一个像素都没动过"，
                                                                 也就是那条新断言真的接在测量上
@@ -90,8 +90,8 @@ mutation(
 # M126：参照臂失去资格。这一支的价值是"它不许静默变绿"：
 # 两臂同宽 ⇒ ratio 恒等于 1 ⇒ 如果只留 M123 那条断言，这条变异会绿着过去。
 mutation(
-    "M126", "宽臂 1100pt → 720pt（参照失去资格）", "harness",
-    [lambda s: sub(s, 'Fixture("settings-shortcuts-wide", NSSize(width: 1100, height: 540))',
+    "M126", "宽臂 900pt → 720pt（参照失去资格）", "harness",
+    [lambda s: sub(s, 'Fixture("settings-shortcuts-wide", NSSize(width: 900, height: 540))',
                    'Fixture("settings-shortcuts-wide", NSSize(width: 720, height: 540))', 1, "M126")],
     CLIP, "不再是不动的参照",
 )

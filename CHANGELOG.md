@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R28b · CI 追认）
+
+- **两臂对照的参照臂从 1100pt 降到 900pt**：`c5db5ec` 在 macos-15 runner 上红在
+  本轮新立的那条判据自己 —— 参照臂整帧读出 0 墨（本机 23864）。
+  与 R3-D11 记的 `content-wide-1100x800`「95% 未绘制」同族，两条独立观察都落在
+  1100pt（@2x 越过 2048px）这一档；根因未证明，先记现象（BACKLOG 42）。
+  换宽度后本机 ratio 仍是 1.001 / 0.998，变异 M123 仍读到 0.809 / 0.792 ⇒ 牙口没变弱。
+  **"参照必须有墨"那条红原样保留** —— 它正是这次能发现参照坏了的原因。
+
 ### Fixed（R28）
 
 - **设置·快捷键页第三行的说明不再被截断**（R28 / U-50 / D-087）：`HotKeySettingsRow` 带着

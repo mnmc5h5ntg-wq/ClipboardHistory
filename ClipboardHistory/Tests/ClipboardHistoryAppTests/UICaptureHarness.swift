@@ -775,7 +775,15 @@ final class UICaptureTests: XCTestCase {
         // 判据 `testSettingsHelperTextIsNotClipped` 拿 720 那臂和它比墨量。
         // 为什么不用 640（`settings-min`）当参照：那一臂只会**截得更狠**，
         // 拿"更坏"当"标准"得到的是一条恒真的比较。
-        results.append(Fixture("settings-shortcuts-wide", NSSize(width: 1100, height: 540)) {
+        //
+        // **宽度为什么是 900 而不是 1100**：第一版写 1100，本机一切正常，
+        // **CI 的 macos-15 runner 上这一臂整帧读出 0 墨**（run 38449711539），
+        // 与账本 R3-D11 记的 `content-wide-1100x800`"95% 像素未被绘制"是同一族现象 ——
+        // 两条都在 1100pt（=2048px @2x 之上）这一档翻车。
+        // 根因（离屏表面对尺寸的上限？还是这个宽度下的布局？）本轮**没有证明**，
+        // 所以这里只记现象，并且把"参照臂必须有墨"那条红留着：
+        // 参照坏了必须响，不许悄悄退化成两臂自比的恒真。
+        results.append(Fixture("settings-shortcuts-wide", NSSize(width: 900, height: 540)) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts))
         })
         results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {
@@ -1715,7 +1723,7 @@ final class UICaptureTests: XCTestCase {
                     // 参照臂的**资格**也要判：它的全部价值在于"宽到不可能截断"。
                     // 哪天有人把它改回 720，两臂就变成同一张图自比 ⇒ 恒真，而且不会有任何一条其它判据红。
                     XCTAssertGreaterThan(fixture.size.width,
-                                         SettingsViewLayout.windowContentSize.width + 300,
+                                         SettingsViewLayout.windowContentSize.width + 100,
                                          "宽臂只有 \(fixture.size.width)pt ⇒ 它自己也可能被截断，不再是不动的参照")
                 }
                 let file = scratch.appendingPathComponent("\(name)-\(tag).png")
@@ -1748,7 +1756,7 @@ final class UICaptureTests: XCTestCase {
                                         + String(format: "%.2f%%", (fractions["settings-shortcuts-wide"] ?? 0) * 100)
                                         + " ⇒ 量错了地方，不是产品截断了字")
             let ratio = Double(narrow) / Double(wide)
-            print("TEXT_INK \(tag) 720pt=\(narrow) 1100pt=\(wide) ratio=\(String(format: "%.3f", ratio))")
+            print("TEXT_INK \(tag) 产品宽=\(narrow) 参照宽=\(wide) ratio=\(String(format: "%.3f", ratio))")
             XCTAssertGreaterThanOrEqual(ratio, 0.97,
                         "快捷键页在默认 720pt 宽度下画出的字比宽到不可能截断的那一臂少 "
                         + String(format: "%.1f%%", (1 - ratio) * 100)
