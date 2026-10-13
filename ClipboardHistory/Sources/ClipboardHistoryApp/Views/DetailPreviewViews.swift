@@ -196,6 +196,56 @@ enum PreviewLoadTimeoutPolicy {
     }
 }
 
+/// 详情区的**加载态**那一块（动效审计 M9 / R26）。
+///
+/// 为什么从 `DetailFileView.loadingView` 提成一个具名视图：这块表面**从来没有进过帧基线**
+/// —— 它是异步的，夹具要拍到它就得赌"拍的那一瞬间还没加载完"，
+/// 而按墙钟判的夹具每天会给出不同的答案（R22 记过"夹具自检不许判跑测试的那一刻"）。
+/// 提出来之后它可以被**确定地**画一次：`detail-loading` 那张帧从此长驻基线，
+/// 全 App 唯一那块常驻动效第一次有像素可审。
+///
+/// 理由不是"扫光更时髦"：spinner 说的是"我在等"，骨架说的是"内容马上来"，
+/// 同一段等待里后者把注意力放到即将出现的东西上（报告 §3 那行给的就是这个差别）。
+/// 那一句人话留着 —— 报告 §5 红线 2 要的是"只在加载态挂上、离开就停"，
+/// 而这块视图正是被 `.loading` 分支独占的，超时 8 秒后换成失败态，循环随之消失。
+struct DetailLoadingView: View {
+    /// 注入点（与 `SkeletonPreviewView.reduceMotion` 同一个理由）：**帧基线要的是可重复的像素**，
+    /// 而扫光的相位由墙钟驱动 —— 不钉住它，同一份代码两次拍出来的帧就不一样，
+    /// `frame_baseline` 的 sha 会每天自己变（R18 立的"帧名=帧的尺寸=帧的内容"从此守不住）。
+    /// 所以这张帧拍的是**减弱动态那一档**的样子：条带、宽度、间距、那一句人话全都在，
+    /// 唯一不在的是带子的位置 —— 而那正是 `testSkeletonSweepActuallySweeps` 用胶片去量的东西。
+    /// ⇒ 静止帧管"长什么样"，胶片管"动不动"，两条各判各的，不许互相冒充。
+    var reduceMotion: Bool = MotionCatalog.motionShouldBeReduced
+
+    var body: some View {
+        // **那一句人话与条带共用一条左轴**（R26 / U-48）。
+        //
+        // 以前这个 `VStack` 用的是默认的 `.center`：三根条带自己顶到左边缘，
+        // 而"正在加载预览…"落在整块面板的水平中线上 —— 同一块 74pt 高的面板里两条对齐轴，
+        // 句子读起来不像"这三根条带在说什么"，而像"这块区域有个状态要说"，
+        // 于是它的视线权重反而高于本该是主角的条带。骨架说的是"内容马上来"，
+        // 那一句就该贴在它指的那块内容上。
+        //
+        // 判据是像素：`detail-loading` 帧里条带的最左有墨列 与 句子的最左有墨列 必须同轴（≤2pt）。
+        VStack(alignment: .leading, spacing: 14) {
+            SkeletonPreviewView(reduceMotion: reduceMotion)
+                .frame(height: 44)
+            Text("正在加载预览…")
+                .font(.system(size: StatePresentation.messageFontSize))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        // 左右内缩取**详情栏那一条现成的轴**，不是新造一个数：
+        // `DetailTypography.containerGutter` 的注释写的就是同一件事
+        // —— "meta 行和正文不同左缘"这种缺陷在帧上一眼能看见、在代码里看不出来。
+        // 加载块是那块内容的替身，它必须站在同一列上（R26 / U-48，判据是像素：
+        // `detail-loading` 里条带与句子的最左有墨列，必须等于 `detail-2-file` 里头部的最左有墨列）。
+        .padding(.horizontal, DetailTypography.containerGutter)
+        .padding(.top, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
 struct DetailFileView: View {
     let url: URL
     let thumbnail: StoredImage?
@@ -218,7 +268,7 @@ struct DetailFileView: View {
         Group {
             switch previewState {
             case .loading:
-                loadingView
+                DetailLoadingView()
                     .transition(MotionCatalog.transition(for: .contentFade))
             case .success(let preview):
                 previewView(preview)
@@ -278,25 +328,6 @@ struct DetailFileView: View {
         case .fallback:
             fallbackView(preview)
         }
-    }
-
-    /// 加载态（动效审计 M9）：spinner 换成**骨架扫光**。
-    ///
-    /// 理由不是"扫光更时髦"：spinner 说的是"我在等"，骨架说的是"内容马上来"，
-    /// 同一段等待里后者把注意力放到即将出现的东西上（报告 §3 那行给的就是这个差别）。
-    /// 那一句人话留着 —— 报告 §5 红线 2 要的是"只在加载态挂上、离开就停"，
-    /// 而这块视图正是被 `.loading` 分支独占的，超时 8 秒后换成失败态，循环随之消失。
-    private var loadingView: some View {
-        VStack(spacing: 14) {
-            SkeletonPreviewView()
-                .frame(height: 44)
-            Text("正在加载预览…")
-                .font(.system(size: StatePresentation.messageFontSize))
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.top, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private func failureView(_ message: String) -> some View {

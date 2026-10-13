@@ -901,6 +901,28 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
+        // **加载态骨架屏第一次进基线**（R26 / U-48）。
+        //
+        // 为什么以前没有：这块表面是异步的。要拍到它，夹具得赌"拍的那一瞬间预览还没加载完"——
+        // 而按墙钟判的夹具每天给出不同的答案（R22 记过"夹具自检不许判跑测试的那一刻"），
+        // `MediaLoader.loadFilePreviewHandle` 又是一个静态入口、没有注入缝可以把它钉在加载态。
+        // 所以 R26 把产品 `.loading` 分支里那一块提成具名视图 `DetailLoadingView`，
+        // 于是它可以被**确定地**画一次。
+        //
+        // 这是一张**组件帧**：它画的是"加载块本身"，不是"嵌在 DetailView 头部与留白之后的样子"。
+        // 尺寸取详情区的名义尺寸 720×520，与 `detail-*` 那几张同框可比。
+        // 并且它拍的是 `reduceMotion: true` 那一档 —— 扫光的相位是墙钟驱动的，
+        // 不钉住的话这张帧每次 sha 都不同（判据分工写在 `DetailLoadingView` 的注释里）。
+        // 与 BACKLOG 36 那条教训的分工：外框尺寸是夹具的自由，**组件内部的摆法一律来自产品** ——
+        // 这里没有一行布局是夹具新写的，`DetailLoadingView` 里就是产品真画的那个 `VStack`。
+        results.append(Fixture("detail-loading", NSSize(width: 720, height: 520)) {
+            AnyView(
+                DetailLoadingView(reduceMotion: true)
+                    .frame(width: 720, height: 520)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+
         return results
     }
 
@@ -1542,8 +1564,43 @@ final class UICaptureTests: XCTestCase {
         let inkFraction: Double
         /// 动作按钮那三个字（"知道了"）的行的中心；没找到按钮就是 nil。
         let actionCenterPt: Double?
+        /// 判据实际量文字的那块矩形（夹具坐标，pt）。带着它是因为"文字必须从这一列的
+        /// 左起三分之一里开始"这条地板要用到它的宽度（R26 / BACKLOG 38）。
+        let textColumn: CGRect
+        /// `textColumn` 里最左的强墨列；整列没有墨就是 nil。
+        let textLeadingPt: Double?
 
         var centerPt: Double { (startPt + endPt) / 2 }
+    }
+
+    /// 一块矩形里**最左的有墨列**（夹具坐标，pt）。找不到返回 nil。
+    ///
+    /// `minDelta` 是这根尺的"什么算墨"：文字要用 40（强墨，避开抗锯齿），
+    /// 而骨架条带只有 6 —— 它的底与面板差 13 个亮度级，用 40 去量会得到"条带不存在"，
+    /// 那正是"把尺调瞎然后宣布没问题"（R24 的 M107 同一族）。
+    /// 一列至少要有 `minInkPerColumn` 个墨像素才算，避免一个坏点决定整条左轴。
+    static func leadingInkColumn(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                 bytesPerRow: Int, rect: CGRect, scale: Double,
+                                 minDelta: Int = 40, minInkPerColumn: Int = 3) -> Double? {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return nil }
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return (Int(bytes[o]) * 299 + Int(bytes[o + 1]) * 587 + Int(bytes[o + 2]) * 114) / 1000
+        }
+        // 底取整块矩形的众数亮度（不是逐行）：一条横幅/一块骨架只有一个底。
+        var histogram: [Int: Int] = [:]
+        for y in stride(from: y0, to: y1, by: 2) {
+            for x in stride(from: x0, to: x1, by: 2) { histogram[luma(x, y) / 4, default: 0] += 1 }
+        }
+        let background = (histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+        for x in x0..<x1 {
+            var ink = 0
+            for y in y0..<y1 where abs(luma(x, y) - background) > minDelta { ink += 1 }
+            if ink >= minInkPerColumn { return Double(x) / scale }
+        }
+        return nil
     }
 
     /// 一块矩形里"有墨的行"从第几行到第几行（夹具坐标系，pt）。
@@ -1632,6 +1689,8 @@ final class UICaptureTests: XCTestCase {
                               width: max(20, frameWidthPt - 95 - 36), height: endPt - startPt - 4)
             let (ratio, inkFraction) = Self.inkContrast(bytes: bytes, width: width, height: height,
                                                         bytesPerRow: bytesPerRow, rect: rect, scale: scale)
+            let textLeading = Self.leadingInkColumn(bytes: bytes, width: width, height: height,
+                                                    bytesPerRow: bytesPerRow, rect: rect, scale: scale)
             // 动作按钮那一块：**只取最右侧 50pt**（帧宽 −60 … −10）。
             // 第一版取的是右侧 95pt，结果在产品那张 750pt 宽的帧上量出 −4.2pt 的"偏上"，
             // 而同一套代码在 560pt 宽的组件帧上量出 +0.0 —— 差的不是布局，是**框里混进了正文**：
@@ -1645,7 +1704,8 @@ final class UICaptureTests: XCTestCase {
                                        bytesPerRow: bytesPerRow, rect: actionRect, scale: scale)
             bands.append(NoticeBand(startPt: startPt, endPt: endPt, chroma: anchorChroma,
                                     ratio: ratio, inkFraction: inkFraction,
-                                    actionCenterPt: span.map { ($0.startPt + $0.endPt) / 2 }))
+                                    actionCenterPt: span.map { ($0.startPt + $0.endPt) / 2 },
+                                    textColumn: rect, textLeadingPt: textLeading))
         }
         for y in 0..<height {
             let modal = rowModal(y)
@@ -1715,6 +1775,20 @@ final class UICaptureTests: XCTestCase {
                                                 "\(where_) 文字列里只有 "
                                                 + String(format: "%.1f%%", band.inkFraction * 100) + " 的墨"
                                                 + " ⇒ 这条带里没有字，对比度判据对它没有意义（框找错了，不许调地板）")
+                    // ①b **左锚定**（R26 / BACKLOG 38）：左对齐的正文必须在文字列的左起三分之一里开始。
+                    //     R24 的 M108 证伪过"带里有墨"这条地板 —— 框挪到按钮上时墨占比 10.9% 照样过，
+                    //     也就是说它只挡"框套在纯底色上"，挡不住"框里躺着别的控件"。这一条补的正是那道缝：
+                    //     消息整条不见了、只剩右边那颗按钮时，量到的墨仍然"够"，但它不在左边。
+                    XCTAssertLessThanOrEqual(band.textLeadingPt ?? .infinity,
+                                             band.textColumn.minX + band.textColumn.width / 3,
+                                             "\(where_) 最左的墨出现在 x="
+                                             + String(format: "%.1f", band.textLeadingPt ?? -1)
+                                             + "，而文字列从 "
+                                             + String(format: "%.1f", band.textColumn.minX)
+                                             + " 起、宽 "
+                                             + String(format: "%.1f", band.textColumn.width)
+                                             + " ⇒ 这一列里没有正文，量到的墨是别的东西（按钮/图标）。"
+                                             + "R24 的 M108 就是这一族：'带里有墨'挡不住'框里有按钮'")
                     XCTAssertGreaterThanOrEqual(band.ratio, InkFloor.bodyTextContrast,
                                                 "\(where_) 正文对底色只有 "
                                                 + String(format: "%.2f", band.ratio) + ":1（地板 "
@@ -1892,6 +1966,143 @@ final class UICaptureTests: XCTestCase {
                      "空矩形必须返回 nil，不能返回 0 —— 否则『按钮不见了』会读成『偏 0pt，完美居中』")
         print("ACTION_SPAN_CONTROL centered=" + String(format: "%.1f", (centered.startPt + centered.endPt) / 2)
               + " high=" + String(format: "%.1f", highCenter) + " empty=nil")
+    }
+
+    /// 加载态那一块的**左轴读数**：条带的最左列、那一句的最左列（都从像素里自己找）。
+    ///
+    /// 为什么按"弱墨 / 强墨"分行而不是写死 y 区间：条带与句子的对比度差一个量级
+    ///（条带 255 vs 242 = Δ13，句子 255 vs ~110 = Δ145），所以"这一行是条带还是字"
+    /// 可以判，不需要我把 y=24..68 钉进测试（钉了就又是 R24 那族"布局一动，框套空白"）。
+    static func skeletonAxisReadings(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                     bytesPerRow: Int, scale: Double)
+        -> (barLeading: Double?, textLeading: Double?, aboveBarLeading: Double?,
+            barRows: Int, textRows: Int) {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return (Int(bytes[o]) * 299 + Int(bytes[o + 1]) * 587 + Int(bytes[o + 2]) * 114) / 1000
+        }
+        var histogram: [Int: Int] = [:]
+        for y in stride(from: 0, to: height, by: 4) {
+            for x in stride(from: 0, to: width, by: 4) { histogram[luma(x, y) / 4, default: 0] += 1 }
+        }
+        let background = (histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+        var barRows: [Int] = [], textRows: [Int] = []
+        for y in 0..<height {
+            var weak = 0, strong = 0
+            for x in 0..<width {
+                let delta = abs(luma(x, y) - background)
+                if delta > 40 { strong += 1 } else if delta > 6 { weak += 1 }
+            }
+            if strong < 8 && weak > width / 8 { barRows.append(y) }
+            if strong >= 3 { textRows.append(y) }
+        }
+        func spanPt(_ rows: [Int]) -> (Int, Int)? {
+            guard let first = rows.min(), let last = rows.max(), last > first else { return nil }
+            return (first, last + 1)
+        }
+        var barLeading: Double? = nil
+        var textLeading: Double? = nil
+        // 条带**之上**的强墨行 = 详情头部那一行。它只是诊断读数（R26 的 BACKLOG 39 用它记账），
+        // 不当判据 —— 因为头部被可读列居中过，它的左轴是 55pt 而不是 gutter 的 20pt，
+        // 拿它当断言等于把"居中列"这个未定的设计问题钉成规矩。
+        var aboveBarLeading: Double? = nil
+        if let bars = spanPt(barRows) {
+            let above = textRows.filter { $0 < bars.0 }
+            if let block = spanPt(above) {
+                let rect = CGRect(x: 0, y: Double(block.0) / scale,
+                                  width: Double(width) / scale, height: Double(block.1 - block.0) / scale)
+                aboveBarLeading = Self.leadingInkColumn(bytes: bytes, width: width, height: height,
+                                                        bytesPerRow: bytesPerRow, rect: rect, scale: scale)
+            }
+        }
+        if let bars = spanPt(barRows) {
+            let rect = CGRect(x: 0, y: Double(bars.0) / scale,
+                              width: Double(width) / scale, height: Double(bars.1 - bars.0) / scale)
+            barLeading = Self.leadingInkColumn(bytes: bytes, width: width, height: height,
+                                               bytesPerRow: bytesPerRow, rect: rect, scale: scale,
+                                               minDelta: 6, minInkPerColumn: 4)
+        }
+        if let text = spanPt(textRows) {
+            let rect = CGRect(x: 0, y: Double(text.0) / scale,
+                              width: Double(width) / scale, height: Double(text.1 - text.0) / scale)
+            textLeading = Self.leadingInkColumn(bytes: bytes, width: width, height: height,
+                                                bytesPerRow: bytesPerRow, rect: rect, scale: scale)
+        }
+        return (barLeading, textLeading, aboveBarLeading, barRows.count, textRows.count)
+    }
+
+    /// **加载块必须站在详情栏那一条左轴上**（R26 / U-48 / D-085）。
+    ///
+    /// 这块表面以前从来没有进过帧基线（它是异步的，拍它等于赌时机），所以这三件事一次都没被看过：
+    /// ① 三根条带顶到面板左边缘（x=0），而它替代的内容（头部、正文）都在 `containerGutter` = 20pt 上；
+    /// ② 那一句"正在加载预览…"落在整块面板的水平中线上，与条带不同轴 —— 同一块面板两条对齐轴；
+    /// ③ 亮色下条带只有 Δ13 的可辨性（这是**故意的**，见下面的判断）。
+    ///
+    /// 判据把三个左轴都从像素里量出来，要求同轴：条带、句子、以及**它替代的那个头部**
+    /// （从 `detail-2-file` 量，不是我写的一个数）。
+    func testLoadingBlockSharesTheDetailColumnsAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r26-axis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func readings(_ name: String) throws -> (bar: Double?, text: Double?, above: Double?,
+                                                     barRows: Int, textRows: Int, scale: Double) {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    XCTFail("找不到夹具 \(name) ⇒ 这条判据没有对象"); return (nil, nil, nil, 0, 0, 2)
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    XCTFail("读不回 \(file.lastPathComponent)"); return (nil, nil, nil, 0, 0, 2)
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let got = Self.skeletonAxisReadings(bytes: base, width: rep.pixelsWide,
+                                                    height: rep.pixelsHigh,
+                                                    bytesPerRow: rep.bytesPerRow, scale: scale)
+                return (got.barLeading, got.textLeading, got.aboveBarLeading,
+                        got.barRows, got.textRows, scale)
+            }
+            let loading = try readings("detail-loading")
+            let detail = try readings("detail-2-file")
+
+            XCTAssertNotNil(loading.bar, "\(tag)：加载帧里没找到条带 ⇒ 尺没有对象（先查 skeleton 还在不在画）")
+            XCTAssertNotNil(loading.text, "\(tag)：加载帧里没找到那一句 ⇒ 它不在了，或者它和条带同对比度了")
+            XCTAssertNotNil(detail.text, "\(tag)：详情帧里没找到那一句 ⇒ 对照物消失，"
+                            + "说明 `detail-2-file` 里已经没有加载块了，这条判据的第二半要重看")
+
+            // ① 条带与句子同轴（块内）
+            if let bars = loading.bar, let text = loading.text {
+                XCTAssertLessThanOrEqual(abs(bars - text), 2.0,
+                    "加载块自己就两条左轴：条带起于 x=\(String(format: "%.1f", bars))，"
+                        + "而「正在加载预览…」起于 x=\(String(format: "%.1f", text))"
+                        + "（\(tag)）⇒ 句子读起来不像在说这三根条带")
+            }
+            // ② 加载块必须落在**产品自己的 gutter** 上，而不是顶到面板边缘。
+            //     这一条是 R26 的变异 M116 逼出来的：原来这里写的是"与 `detail-2-file` 的最左强墨同轴"，
+            //     而那张帧里最左的强墨**就是同一个加载块的句子**（骨架在 detail-2-file 里也在画）——
+            //     于是把 gutter 去掉，两边一起从 20 挪到 0，判据照样绿 ⇒ **M116 ESCAPED**。
+            //     教训：跨帧对照必须先证明两帧量的是**不同的东西**，否则那是自己跟自己比。
+            let gutter = Double(DetailTypography.containerGutter)
+            if let bars = loading.bar {
+                XCTAssertGreaterThanOrEqual(bars, gutter - 1,
+                    "加载块的左轴在 x=\(String(format: "%.1f", bars))，而详情栏的 gutter 是 "
+                        + "\(String(format: "%.0f", gutter))pt ⇒ 条带顶到了面板边缘，"
+                        + "预览落地的一瞬间整块内容要向右跳 \(String(format: "%.0f", gutter))pt")
+                XCTAssertLessThanOrEqual(bars, gutter + 1,
+                    "加载块的左轴在 x=\(String(format: "%.1f", bars))，比详情栏 gutter "
+                        + "\(String(format: "%.0f", gutter))pt 还靠右 ⇒ 骨架缩进了第二层，"
+                        + "它承诺的内容宽度比实际来的窄")
+            }
+            print("LOADING_AXIS \(tag) bars=\(String(format: "%.1f", loading.bar ?? -1)) "
+                  + "caption=\(String(format: "%.1f", loading.text ?? -1)) gutter=\(gutter) "
+                  + "detailHeader=\(String(format: "%.1f", detail.above ?? -1)) "
+                  + "barRows=\(loading.barRows) textRows=\(loading.textRows)")
+        }
     }
 
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。

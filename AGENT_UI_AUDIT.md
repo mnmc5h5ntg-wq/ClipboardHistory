@@ -1662,3 +1662,66 @@ notice-banner              light  band#1 center=67.0 action=67.0 offset=+0.0
 视觉上像"这一句的确认"，而下面两行没有归属；修后：按钮在整条带的正中，
 读起来是"这一条提示的确认"。单行横幅观感不变（本来就居中）——
 这正说明这条判据以前**没有任何东西在守**。
+
+---
+
+## 第 28 轮 · U-48 加载态从来没有进过帧基线；第一次拍到它就看到两条左轴（R26）（D-085）
+
+### 开场缺陷清单（`/tmp/r26-shots`，51 夹具 × 两外观 = 102 帧）
+
+| 位置 | 症状 | 严重度 |
+|---|---|---|
+| **整张表里没有一个加载态夹具** | 全 App 唯一的常驻动效（骨架扫光）从未被任何帧看过 | **高**（没看过 = 没审过） |
+| `detail-loading` 条带 x=0 | 顶到面板左边缘，而它替代的内容在 gutter=20 上 ⇒ 落地瞬间整块右跳 20pt | 中 |
+| `detail-loading` 那一句 x=**316.5** | 居中，与条带（20.0）两条轴 ⇒ 句子不像在说这三根条带 | 中 |
+| 条带对面板 Δ13（255 vs 242） | 看着"太淡" | **判为不改**（装饰性表面，AA 两根线都不适用；抬亮就抢正文） |
+| `detail-2-file` 头部 x=**54.5** | 头部被可读列居中过，与 gutter 不同轴 | 新开 BACKLOG 39（设计问题，不当判据） |
+
+### 做了什么（3 个代码文件）
+
+1. `DetailPreviewViews`：私有计算属性 `loadingView` → 具名视图 **`DetailLoadingView`**
+   （带 `reduceMotion` 注入点），`.loading` 分支画它。
+2. 同一文件：`VStack(alignment: .leading)` + `.padding(.horizontal, DetailTypography.containerGutter)`。
+3. `UICaptureHarness`：新夹具 `detail-loading`（720×520，两外观）+ `leadingInkColumn`
+   + `skeletonAxisReadings`（按"弱墨/强墨"自己分行，不写死 y）+ 判据；
+   顺带把 R24 欠的 **BACKLOG 38**（左锚定地板）补进横幅判据。
+4. `SkeletonMotionTests`：旧的接线守卫从"分支里有个 `loadingView`"升级成两条更硬的：
+   分支必须画那个**类型**，且 `detail-loading` 帧必须画**同一个类型**（帧与产品不许分家）。
+
+### 修完的读数
+
+```
+LOADING_AXIS light bars=20.0 caption=20.5 gutter=20.0 detailHeader=54.5 barRows=48 textRows=24
+LOADING_AXIS dark  bars=20.0 caption=20.5 gutter=20.0 detailHeader=54.5 barRows=48 textRows=24
+```
+
+行带尺归因：全 102 帧里只有 `detail-2-file` 两帧变，且**恰好**是条带与那一句的四段
+（84–92、102–110、120–128、144–156.5pt）⇒ 详情头部、药丸、其余 98 帧逐像素相同。
+
+### 变异对照 M114–M119（6/6 CAUGHT）
+
+| 变异 | 期望红在 | 实际 |
+|---|---|---|
+| M114 横幅文字列挪到 x=300（R24 的 M108 原样重放） | 左锚定地板 | CAUGHT `这一列里没有正文，量到的墨是别的东西` ⇒ **BACKLOG 38 那道缝补上了** |
+| M115 那一句退回居中 | 块内同轴 | CAUGHT `条带起于 x=20.0，而句子起于 x=316.5` |
+| M116 去掉 gutter | 块与 gutter 同轴 | **第一次 ESCAPED** ⇒ 判据重写后 CAUGHT `左轴在 x=0.0，而 gutter 是 20pt` |
+| M117 条带墨阈值 6→40（尺看不见弱对比） | 正对照 | CAUGHT `加载帧里没找到条带` |
+| M118 `leadingInkColumn` 从右往左扫 | 同轴 | CAUGHT（方向反了的尺报 604.5 vs 106.0） |
+| M119 夹具改画 `SkeletonPreviewView`（帧与产品分家） | 升级后的接线守卫 | CAUGHT `帧不再渲染 DetailLoadingView` |
+
+### 真实视觉审查
+
+第一次把加载态画出来看。修前：三根几乎看不见的灰条贴着窗口边，下面一句居中的"正在加载预览…"，
+整块像"两个互不相干的东西叠在一起"；修后：条带与句子同起一条左轴、与详情栏的 gutter 对齐，
+读起来是"这块内容正在长出来"。亮暗两外观一致。
+**这是本轮看得见的改善**，而且它属于那种"不拍出来就永远不会有人发现"的一类。
+
+### 顺手清掉的 / 未修
+
+- BACKLOG 38 关闭（左锚定地板已进判据，并由 M114 验过牙口）。
+- 新开 **39**：骨架的宽度与左轴该跟"可替换内容的哪一列"对齐 —— 实测头部 54.5、gutter 20、
+  可读列左缘 ~95，三者不是一套语言；这是设计问题，不当判据钉。
+- 清单 23（行内缩略图 placeholder→图片）判为**不加**：16pt 芯片在整窗帧里只占 0.06%，
+  低于胶片尺的可见地板 0.5%，而把 16pt 的换图做成淡入淡出，用户既看不见"淡"也看不见"蹦"；
+  要做的是**详情区大图**那一层，而那一层今天由 `previewStage` 的交叉淡管着（R6 已接，
+  判据 `testDetailPreviewCrossfadesOnlyWhenTheKindChanges`）。理由与数字一起记在这里，不算漏。

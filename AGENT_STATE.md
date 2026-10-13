@@ -1093,3 +1093,30 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
 - **R26 选题**：清单里未判过的位点（16 扫光曲线、17 菜单栏图标语言、24 缩略图 pop-in、
   25 视频进度条步进、26 `symbolEffect` 12/13 分叉、27 GlassPill 材质切换），
   以及 BACKLOG 38（带内文字列的左锚定地板 —— 上一轮 M108 量出来的那道拦不住的缝）。
+
+## R26 · 详情加载态第一次进帧基线：条带与那一句同一条左轴（U-48 / D-085）—— 本轮有看得见的改善
+
+- **界面改动 3 个文件**：`DetailPreviewViews`（`loadingView` → 具名 `DetailLoadingView` +
+  `.leading` 对齐 + `containerGutter` 内缩）、`UICaptureHarness`（新夹具与判据、BACKLOG 38 的左锚定地板）、
+  `SkeletonMotionTests`（接线守卫升级：帧与产品必须引用同一个类型）。
+- **本轮最大的发现不是缺陷而是空白**：51 个夹具里**没有一个**是加载态 ——
+  全 App 唯一的常驻动效从来没被帧看过。原因是它异步、拍它等于赌时机（墙钟依赖的夹具不许进仓库）。
+- **第一次拍到就量出两条轴**：条带 x=**0.0**（该在 gutter=20）、句子 x=**316.5**（居中）。
+  修后 20.0 / 20.5 / 令牌 20，亮暗一致。归因：全 102 帧只有 `detail-2-file` 变，
+  且恰好是条带与句子的四段（84–156.5pt）。
+- **判断（不改，交证据）**：条带对面板只有 Δ13（1.09:1）—— 装饰性表面，
+  AA 的 4.5 与 3.0 两根线都不适用；抬亮抢的是正文。行内 16pt 缩略图的换图也不加淡：
+  它在整窗帧里只占 0.06%，低于胶片尺 0.5% 的可见地板，"淡"和"蹦"用户都看不见。
+- **新判据**：`leadingInkColumn`（最左有墨列，条带要 `minDelta: 6` 才看得见）+
+  `skeletonAxisReadings`（按弱墨/强墨自己分行）+ `testLoadingBlockSharesTheDetailColumnsAxis`；
+  横幅判据补上**左锚定**（BACKLOG 38 关闭）。
+- **变异 M114–M119 六支全 CAUGHT**，`RESTORE_CLEAN=yes`。
+  **M116 第一次 ESCAPED**：跨帧对照的"另一帧"里最左的强墨就是同一个加载块自己
+  ⇒ 去掉 gutter 两边一起挪，判据照样绿。**跨帧对照必须先证明两帧量的是不同的东西。**
+  第二版改成"落在产品自己的 gutter 令牌上"后它红了。
+- **数字**：0 warning；`695 tests / 27 skipped / 0 failures`；脚本 72 passed；
+  帧基线 **102**（2 added + 2 changed，同提交 update，compare 现 CHANGED=0）；自评 **92 / 100**
+  （… R23 90 / R24 92 / R25 91 / **R26 92**）。
+- **R27 选题**：`MotionCatalog.skeletonSweep` 的 curve/transition 两支是死的（要么接上要么删）；
+  17 菜单栏图标语言；26 `symbolEffect` 12/13 分叉（`.id()` 强制重建 ⇒ 不可能交叉淡，
+  只有从透明淡入 = 一帧空白）；BACKLOG 30 / 31 / 34 剩余 / 39。

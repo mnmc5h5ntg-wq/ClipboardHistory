@@ -109,8 +109,19 @@ final class SkeletonMotionTests: XCTestCase {
             preview.components(separatedBy: "case .loading:").dropFirst().first?
                 .components(separatedBy: "case .").first,
             "找不到 `case .loading:` 分支：锚点失效")
-        XCTAssertTrue(loadingCase.contains("loadingView"),
-                      "加载分支没走 `loadingView` ⇒ 骨架接在哪没人知道")
+        // R26 把 `loadingView` 这个私有计算属性提成了具名视图 `DetailLoadingView`，
+        // 于是这条守卫从"分支里有个叫 loadingView 的东西"升级成两件更硬的事：
+        // ① 分支必须画那个**类型**；② 帧基线里那张 `detail-loading` 必须画**同一个类型**
+        //    —— 以前"帧长得像不像产品"只能靠人看，现在它由"两边引用同一个符号"钉住。
+        XCTAssertTrue(loadingCase.contains("DetailLoadingView("),
+                      "加载分支没走 `DetailLoadingView` ⇒ 骨架接在哪没人知道，"
+                          + "而 `detail-loading` 那张帧也就没人保证它画的是产品真用的那个视图")
+        let harnessURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("UICaptureHarness.swift")
+        let harness = try String(contentsOf: harnessURL, encoding: .utf8)
+        XCTAssertTrue(harness.contains("DetailLoadingView("),
+                      "`detail-loading` 帧不再渲染 `DetailLoadingView` ⇒ 帧与产品分家了："
+                          + "这张帧审的是夹具自己拼的东西，产品改成什么样都不会让它红")
         XCTAssertTrue(preview.contains("SkeletonPreviewView("),
                       "详情预览的加载态里根本没有骨架 ⇒ M9 只是注释里的事实")
         XCTAssertFalse(preview.contains("ProgressView()"),
