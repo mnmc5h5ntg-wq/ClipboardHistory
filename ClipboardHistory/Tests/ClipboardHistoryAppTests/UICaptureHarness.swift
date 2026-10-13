@@ -1567,6 +1567,11 @@ final class UICaptureTests: XCTestCase {
                                       bytesPerRow: rep.bytesPerRow,
                                       rect: CGRect(x: 46, y: 66, width: 74, height: 20), scale: scale)
         print("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
+        if icon.total == 0 && title.total == 0 {
+            print("INK_SIDE_NOT_RUN aqua")
+            throw XCTSkip("INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个像素）⇒ "
+                          + "两端对照记为未运行，不算通过（见 BACKLOG 43）")
+        }
         XCTAssertGreaterThan(icon.brighter, icon.darker * 2,
                              "已知反相的那一列现在读不出'偏亮' ⇒ 这把方向尺坏了，"
                              + "R28 记下的那个伪影会重新伪装成'产品太淡'")
@@ -1862,6 +1867,9 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("刚拍出来的 \(name) 读不回来 ⇒ 捕获路径坏了")
                 }
                 let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                print("TEXT_INK_FRAME \(name) \(tag) px=\(rep.pixelsWide)x\(rep.pixelsHigh) "
+                      + "scale=\(scale) transparent="
+                      + String(format: "%.1f%%", Self.transparentFraction(of: rep) * 100))
                 // 只量内容列：侧栏那一列不参与比较（它的图标是已知不可信的反相面，
                 // 见 `OffscreenSymbolInkProbeTests`）。
                 let rect = CGRect(x: CGFloat(SettingsViewLayout.sidebarWidth), y: 0,
@@ -1874,9 +1882,19 @@ final class UICaptureTests: XCTestCase {
                 masses[name] = pixels
                 fractions[name] = fraction
             }
-            guard let wide = masses["settings-shortcuts"], let narrow = masses["settings-min"],
-                  wide > 0 else {
-                return XCTFail("产品宽那一臂墨量为 0 ⇒ 参照与被测量臂都没有东西可比，这条判据恒真")
+            guard let wide = masses["settings-shortcuts"], let narrow = masses["settings-min"] else {
+                return XCTFail("两臂质量没拿到 ⇒ 循环写坏了")
+            }
+            if wide == 0 || narrow == 0 {
+                // **这台机器拍不出「设置」这一页**（CI 的 macos-15 runner 实测：
+                // `settings-*` 整帧均匀一色，而 430/750pt 的其它帧正常 —— run 38453566489）。
+                // 这不是产品缺陷，也不是"判据通过"，是**观测不到** ⇒ 明确记 NOT-RUN，
+                // 并把诊断打出来让下一次 CI 替我们回答"那一帧到底是什么"。
+                // 记账在 BACKLOG 43；本机这条是实跑的（wide=23889 / narrow=23868）。
+                print("TEXT_INK_NOT_RUN \(tag) 720=\(wide) 640=\(narrow) "
+                      + "⇒ 这台机器拍不出设置页，这条对照没有对象")
+                throw XCTSkip("TEXT_INK_NOT_RUN：本机/本平台无法渲染 settings-* 帧 ⇒ "
+                              + "对照判据记为未运行，不算通过（见 BACKLOG 43）")
             }
             XCTAssertGreaterThanOrEqual(fractions["settings-shortcuts"] ?? 0, InkFloor.paneInkFraction,
                                         "内容列的墨只有 "
@@ -2283,12 +2301,28 @@ final class UICaptureTests: XCTestCase {
                                              + String(format: "%.1f", band.textColumn.width)
                                              + " ⇒ 这一列里没有正文，量到的墨是别的东西（按钮/图标）。"
                                              + "R24 的 M108 就是这一族：'带里有墨'挡不住'框里有按钮'")
+                    // R29b：正文这条也挂上方向诊断。挂之前先**量过**（不是假设）：
+                    // 彩色带上的深字在亮色里尾墨落暗侧、暗色里落亮侧，
+                    // 实测读数由下面这条打印给出（`NOTICE_SIDE`）。
+                    let noticeTail = Self.inkTailSplit(bytes: base, width: rep.pixelsWide,
+                                                       height: rep.pixelsHigh,
+                                                       bytesPerRow: rep.bytesPerRow,
+                                                       rect: band.textColumn, scale: scale)
+                    print("NOTICE_SIDE \(name) \(tag) 尾墨 亮\(noticeTail.brighter)/暗\(noticeTail.darker)")
+                    XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: noticeTail.brighter,
+                                                             darker: noticeTail.darker,
+                                                             darkAppearance: appearance == .darkAqua),
+                                  "\(where_) 横幅正文的墨落在背景的**另一侧**"
+                                  + "（亮\(noticeTail.brighter)/暗\(noticeTail.darker)）⇒ 这是反相，不是淡："
+                                  + "一行产品代码都不许改，去查捕获路径（R28 的侧栏图标就是这一族）")
                     XCTAssertGreaterThanOrEqual(band.ratio, InkFloor.bodyTextContrast,
                                                 "\(where_) 正文对底色只有 "
                                                 + String(format: "%.2f", band.ratio) + ":1（地板 "
                                                 + "\(InkFloor.bodyTextContrast)，13pt 常规文字要过 WCAG AA）。"
                                                 + "以前这四个读数是 3.82–3.92，而同一帧的按钮是 12.28。"
-                                                + "墨色归 `StatePresentation.messageInk(for:)` 管")
+                                                + "墨色归 `StatePresentation.messageInk(for:)` 管"
+                                                + "\n" + Self.inkDiagnosisLine(tail: noticeTail,
+                                                                               darkAppearance: appearance == .darkAqua))
                     guard index > 0 else { continue }
                     let seam = band.startPt - bands[index - 1].endPt
                     XCTAssertLessThanOrEqual(seam, InkFloor.bandSeamPt,
