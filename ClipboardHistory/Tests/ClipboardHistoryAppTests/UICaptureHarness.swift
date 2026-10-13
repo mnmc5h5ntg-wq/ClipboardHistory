@@ -1537,6 +1537,13 @@ final class UICaptureTests: XCTestCase {
     /// 那是 BACKLOG 41 那半条要单独判的事。右边界 142 = 侧栏宽 148 留 6pt 内边距。
     static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)
 
+    /// **同一张帧的内容区**（x 160 起：侧栏宽 148 + 分栏线）。
+    /// 这一块的用途不是判产品，是**分辨"这台机器拍不出这一页"和"我这把尺瞎了"** ——
+    /// 前者 BACKLOG 43 已经实测过（runner 上 `SettingsView` 整页是一块平涂底色），
+    /// 后者是 R29d 刚在 `.scratch` 那把尺上犯过的错（`modalColor` 把 pt 当 px，
+    /// 于是框其实没压住字，却报出一个像结论的数）。两种情况修法完全相反。
+    static let settingsContentPane = CGRect(x: 160, y: 70, width: 400, height: 200)
+
     /// 暗档设置页侧栏文字的可读性**要能被数出来**（R29d / U-52）。
     ///
     /// 这一条不判产品（产品那一列没被判定为缺陷 —— 十三臂复刻体全画对，机制未定，见 D-089）。
@@ -1550,6 +1557,7 @@ final class UICaptureTests: XCTestCase {
 
         var wrongSide: Set<String> = []
         var judged = 0
+        var contentInkTotal = 0
         for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
             let file = scratch.appendingPathComponent("\(fixture.name).png")
             _ = try render(fixture, appearance: .darkAqua, to: file)
@@ -1559,12 +1567,19 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("\(fixture.name)：读不回刚拍的帧")
             }
             let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            // 先量内容区：它只回答"这台机器拍不拍得出这一页"，不回答产品好不好。
+            let content = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow,
+                                             rect: Self.settingsContentPane, scale: scale)
+            contentInkTotal += content.brighter + content.darker
             let counts = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                             bytesPerRow: rep.bytesPerRow,
                                             rect: Self.settingsSidebarTextColumn, scale: scale)
-            // runner 上这一页整块画不出来（BACKLOG 43）⇒ 记 NOT-RUN，不算通过也不算盲区。
+            // runner 上这一页整块画不出来（BACKLOG 43）⇒ 逐条记 NOT-RUN，最后由
+            // `contentInkTotal` 那条决定"是机器拍不出这一页"还是"我这把尺没压住字"。
             guard counts.brighter + counts.darker > 0 else {
-                print("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素")
+                print("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素"
+                      + "（同帧内容区读到 \(content.brighter + content.darker) 个）")
                 continue
             }
             judged += 1
@@ -1573,6 +1588,11 @@ final class UICaptureTests: XCTestCase {
             if inverted { wrongSide.insert(fixture.name) }
             print("TEXT_SIDE \(fixture.name) dark 亮侧=\(counts.brighter) 暗侧=\(counts.darker)"
                   + " ⇒ " + (inverted ? "侧栏文字落在背景错误一侧（不可见）" : "墨在期望侧"))
+        }
+        if contentInkTotal == 0 {
+            print("TEXT_SIDE_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
+            throw XCTSkip("TEXT_SIDE_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上 `SettingsView` 是一块平涂底色，"
+                          + "侧栏与内容区都读到 0 个偏离像素 ⇒ 这条守卫记为未运行，不算通过也不算盲区")
         }
         let extra = wrongSide.subtracting(Self.darkSidebarTextBlindSpots)
         let gone = Self.darkSidebarTextBlindSpots.subtracting(wrongSide)
@@ -1586,8 +1606,9 @@ final class UICaptureTests: XCTestCase {
                   + "②尺瞎了（框没压住字 / 背景取错位置 —— R29d 刚犯过后者）。"
                   + "两种都要真的去看那张帧")
         XCTAssertGreaterThan(judged, 0,
-                             "一条都没判 ⇒ 这条守卫今天没有对象（所有帧都走了 NOT-RUN）。"
-                             + "记 NOT-RUN 是对的，但**全是** NOT-RUN 等于这条不存在")
+                             "内容区读到了墨（\(contentInkTotal) 个偏离像素）⇒ 这台机器**拍得出**这一页，"
+                             + "可侧栏那一列一条都没判 ⇒ 是**尺没压住字**，不是环境问题。"
+                             + "回去核对 `settingsSidebarTextColumn` 的坐标与单位（R29d 的 pt/px 教训）")
         print("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures（名单 \(Self.darkSidebarTextBlindSpots.count) 条）")
     }
 

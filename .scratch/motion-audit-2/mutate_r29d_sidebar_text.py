@@ -40,7 +40,7 @@ MUTATIONS = [
     ("M132", "盲区名单里摘掉 settings-general", LIST_NEEDLE, LIST_MUTANT, GUARD,
      "落在错误一侧"),
     ("M133", "量尺的框缩到压不住任何字", BOX_NEEDLE, BOX_MUTANT, GUARD,
-     "今天没有对象"),
+     "尺没压住字"),
     ("M134", "对调 inkSideCounts 的两侧计数", SWAP_NEEDLE, SWAP_MUTANT, GUARD,
      "现在落在期望侧了"),
 ]
