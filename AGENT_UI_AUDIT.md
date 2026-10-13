@@ -997,3 +997,32 @@ M66（把两档并成一档）因此**全绿通过**。把起点改成"梯子自
 
 **静止态 96 帧逐字节不变**（`CHANGED=0`）是这一轮**应有**的结果：过渡只改变"换人的那 160ms"，
 不改变任何一个落定态。所以本轮的视觉复核不能靠帧差，只能靠：两臂端点帧（看了）+ A/B 两卷读数 + 人工批次 25。
+
+
+## 第 19 轮 · U-39 快速选择浮层：最高频的那次变化一直是整表硬刷新（R17）（D-075）
+
+| 表面 | 之前 | 现在 | 证据 |
+|---|---|---|---|
+| 复制一条**已存在**的记录 ⇒ 它被顶到最前 | `plan.needsFullReload=true` ⇒ `table.reloadData()`，六行全部重画、**没有移动可言** | `moves=[Move(from: 末行, to: 0)]` ⇒ `moveRow(at:to:)` 在隐式动画上下文里滑一次 | 真值表 + 接线守卫 + M70/M71/M72 CAUGHT |
+| "一行挪位"的识别 | 没有这个概念：只要保留行的相对顺序变了就一律硬刷新 | `singleMove`：**摘掉这一行之后两边逐位相等**才算；两个候选（`old[first]` 与 `new[first]`）都要试 | `testSingleMoveTruthTable` 九格 |
+| 多行同时跳 / 移动混着增删 | 硬刷新 | **仍然**硬刷新（不许硬凑成一串 `moveRow`） | `testOtherReorderShapesStillFallBackToFullReload` |
+| 减弱动态 / A-B 关掉时 | 不适用（没有移动这条路） | `allowsImplicitAnimation=false` ⇒ 行**照样挪位**，只是不滑 | 接线守卫断言那句赋值读的是 `!animation.isEmpty` |
+
+**三个被实现纠正的直觉**（写下来是因为它们都是"看起来显然"的那种错）：
+1. "两行互换要两次 move" ⇒ 一次就够（`[a,b]→[b,a]` 就是把第 0 行移到第 1 行）。
+2. "三行循环位移要两次 move" ⇒ 一次就够（`[a,b,c]→[c,a,b]` 就是把 `c` 提到最前）。
+3. "第一个不同的下标那里被挪动的就是左边那一行的元素" ⇒ **不一定**：
+   `[a,b,c,x]→[x,a,b,c]` 第一个不同的位置是 0，那里 `old[0]=a`，而真正在动的是 `x`。
+   只试一个候选会把本轮唯一要救的那个形状判成"表达不了"。
+
+**`FRAME_BASELINE_CHANGED=0` 在这一轮不是"没变化"，是"这个表面根本没有帧"**：
+`UICaptureTests` 的夹具只能宿主 SwiftUI 视图（`Fixture -> AnyView`），
+而快速选择浮层是 `QuickPickController` 自建的 `NSPanel` + `NSTableView`。
+所以 96 张基线里**没有一张**是浮层 —— 这个缺口记成 BACKLOG 30，
+它同时解释了为什么 §12 那批"AppKit 表面"的观感结论一直停在胶片与人眼。
+
+**胶片那一侧做了新的对照臂**（`testNativeRowMoveIsVisibleToTheRuler`）：
+两臂用产品实际会传的那两个值，前提是进程处于激活态。
+本机这一轮抓到的是 `visible=true key=false active=false` ⇒ 判据按规矩**报 not-run**
+（`MOTION_NOT_RUN=app-not-active`），**没有**拿它当"移动不会动"的证据，也没有硬凑一个绿。
+CI 那台 runner 历史上拿到过激活态（插行那臂读到 3 帧），所以这条判据在 CI 上有机会真判。

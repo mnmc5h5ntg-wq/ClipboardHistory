@@ -294,6 +294,21 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         table.beginUpdates()
         let animation = Self.rowAnimationOptions(reduceMotion: MotionCatalog.motionShouldBeReduced,
                                                  animationsEnabled: MotionCatalog.animationsEnabled)
+        // R17：`NSTableView.moveRow(at:to:)` 既没有 `withAnimation:` 参数，
+        // 这张表也**没有** `animationOptions` 那个属性（它是 `NSOutlineView` 的 —— 编译器当场告的）。
+        // 行移动动不动，靠的是**隐式动画上下文**：
+        // `allowsImplicitAnimation = false` 时行照样挪位，只是不再滑 ——
+        // 这正是目录要求的"替换而不是删除"（减弱动态时不能把位置变化这件事一起抹掉）。
+        // 单独一个批次：`moveRow` 的 `from` 是**旧**行号、`to` 是新行号，
+        // 与增删混在同一个批次里时坐标系怎么换算没有文档保证（见 `QuickPickRowDiff` 里那条"不赌"）。
+        if let move = plan.moves.first {
+            NSAnimationContext.runAnimationGroup { context in
+                context.allowsImplicitAnimation = !animation.isEmpty
+                table.beginUpdates()
+                table.moveRow(at: move.from, to: move.to)
+                table.endUpdates()
+            }
+        }
         if !plan.removals.isEmpty { table.removeRows(at: plan.removals, withAnimation: animation) }
         if !plan.insertions.isEmpty { table.insertRows(at: plan.insertions, withAnimation: animation) }
         table.endUpdates()

@@ -1097,6 +1097,47 @@ final class MotionFilmstripTests: XCTestCase {
                                     + "（`cacheDisplay` 抓的是模型树）。① 只能记成'源码已接、产物未量'，不许写进已交付")
     }
 
+    /// 行**移动**这把尺看不看得见（R17）。
+    ///
+    /// 为什么单独一条：`testNativeRowAnimationIsVisibleToTheRuler` 量的是插行，
+    /// 而 `moveRow(at:to:)` 是另一条 API —— 它没有 `withAnimation:`，
+    /// 动不动完全由 `NSAnimationContext.allowsImplicitAnimation` 决定。
+    /// 本轮把"刚复制的那条被顶到最前"从整表硬刷新改成一次 `moveRow`，
+    /// **前提就是它真的会动**；这条判据量的正是这个前提。
+    /// 两臂用产品实际会传的那两个值（`rowAnimationOptions` 的两种输出），不是我另写的。
+    func testNativeRowMoveIsVisibleToTheRuler() async throws {
+        try skipUnlessEnabledAndCapable()
+        let band = CGRect(x: 0.04, y: 0.10, width: 0.92, height: 0.78)   // 表格区，避开标题栏
+        let probe = TableProbe()
+        probe.appliesMoveInsteadOfInsert = true
+
+        let animatedFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
+            reduceMotion: false, animationsEnabled: true))
+        let animated = Self.deltas(animatedFilm, band: band)
+        let animatedInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let instantFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
+            reduceMotion: true, animationsEnabled: true))
+        let instant = Self.deltas(instantFilm, band: band)
+        let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let animatedSpan = Self.transitionFrameCount(animated)
+        let instantSpan = Self.transitionFrameCount(instant)
+        print("MOTION_NATIVE row-move 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated)))"
+            + " 采样≈\(animatedInterval)ms")
+        print("MOTION_NATIVE row-move 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant)))"
+            + " 采样≈\(instantInterval)ms")
+        try await requireObservableMotion(.layout)
+        try requireAppWasActive(probe.wasActive)
+        XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
+                             "带里什么都没变 ⇒ 连表格在哪都没框到，两臂对照失效（是探针坏了，不是移动没发生）")
+        XCTAssertLessThanOrEqual(instantSpan, 1,
+                                 "关掉隐式动画那一档本该一帧到位，却量到 \(instantSpan) 帧在动"
+                                 + " ⇒ 带里有别的动在跑，两臂对照失效")
+        XCTAssertGreaterThanOrEqual(animatedSpan, Self.minimumTransitionFrames,
+                                    "开了 `allowsImplicitAnimation` 仍只读到 \(animatedSpan) 帧"
+                                    + " ⇒ 这把尺看不见 `moveRow` 的滑动 ⇒ 本轮那次改动只能记"
+                                    + "「源码已接、产物未量」，不许写进已交付")
+    }
+
     /// **产品形状的行动画判据**：插完行之后紧跟的那两句（`selectRowIndexes` + `scrollRowToVisible`）
     /// 不能把刚起的行动画吃掉。
     ///
@@ -1746,6 +1787,13 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
     /// 不许把"环境没给到前提"读成"产品没动"。
     private(set) var wasActive = false
 
+    /// R17：把"触发那一下"从插一行换成**移一行**（末行提到最前）。
+    /// 复用同一套窗口 / 激活 / 预卷逻辑，只换那一行 —— 两臂共用同一个起点
+    /// （`texts` 每次都重置），所以读到的差别只可能来自移动本身。
+    /// 这里刻意照抄产品那一套：`moveRow` 没有 `withAnimation:`，
+    /// 动不动由 `NSAnimationContext.allowsImplicitAnimation` 决定（见 `QuickPickController`）。
+    var appliesMoveInsteadOfInsert = false
+
     /// 返回逐帧画面。`animation` 由调用方给**产品实际会传的那两个值**
     /// （`QuickPickController.rowAnimationOptions` 的两种输出），不是我另写的一份。
     func record(animation: NSTableView.AnimationOptions) -> [CGImage] {
@@ -1785,9 +1833,22 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }
-        // 先改模型、再告诉表格插了哪一行：`insertRows` 当场就会回读 `numberOfRows` 和新行内容。
-        texts.insert("刚插进来的一行：它该淡入而不是把别人挤一下就算完", at: 2)
-        table.insertRows(at: IndexSet(integer: 2), withAnimation: animation)
+        // 先改模型、再告诉表格动了哪一行：`insertRows` / `moveRow` 当场就会回读 `numberOfRows` 与新内容。
+        if appliesMoveInsteadOfInsert {
+            let from = texts.count - 1
+            let moved = texts.removeLast()
+            texts.insert(moved, at: 0)
+            texts = texts.map { "\($0)·已挪" }
+            NSAnimationContext.runAnimationGroup { context in
+                context.allowsImplicitAnimation = !animation.isEmpty
+                table.beginUpdates()
+                table.moveRow(at: from, to: 0)
+                table.endUpdates()
+            }
+        } else {
+            texts.insert("刚插进来的一行：它该淡入而不是把别人挤一下就算完", at: 2)
+            table.insertRows(at: IndexSet(integer: 2), withAnimation: animation)
+        }
         let deadline = Date().addingTimeInterval(2.0)
         while !grabber.finished, Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))

@@ -801,3 +801,17 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     没证明"与 pressed 还分得开"，于是修一个反馈弄没另一个，而当时所有判据全绿。
     这条应该在 R15 做成一条守卫：**任何 `VisualFill` 档位变动，都要跑一遍两类控件的完整梯子**
     （现在只有测试里有，没有"改了令牌必须跑它"的强制路径）。
+
+
+30. **帧夹具只会拍 SwiftUI，AppKit 表面一张帧都没有**（R17 发现，结构性缺口）：
+    `UICaptureTests` 的 `Fixture` 是 `() -> AnyView`，整个 96 张基线全部经由 `NSHostingView` 产出。
+    于是这些表面**从来没有**被静态复核过：
+    ① 快速选择浮层（`QuickPickController` 自建的 `NSPanel` + `NSTableView`，行是 `NSTableCellView`）；
+    ② 详情区的 `NSTextView` 富文本/Markdown 渲染层（SwiftUI 里只是一个 `NSViewRepresentable` 壳，
+       壳能拍到、里面的排版拍不到）；③ 视频预览的 `AVPlayerView` 表面；④ 菜单栏的原生 `NSMenu`。
+    这解释了为什么 R13/R14 里"某些控件没有帧"看起来是"状态不存在"，
+    而**更深一层的原因是那个表面根本进不了夹具**。
+    要做的是给 `Fixture` 加一条 AppKit 通路（`buildAppKit: () -> NSView`，
+    渲染时同样走 `cacheDisplay`），然后至少补三张：`quickpick-list`、`quickpick-empty`、
+    `quickpick-scrolled`。**在那之前，任何关于 QuickPick 观感的结论都只能是胶片 + 人眼**，
+    本轮（R17）就是这种情况，已在账本里如实记。

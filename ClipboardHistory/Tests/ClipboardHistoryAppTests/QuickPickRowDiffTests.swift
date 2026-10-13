@@ -28,8 +28,19 @@ final class QuickPickRowDiffTests: XCTestCase {
                                 file: StaticString = #filePath, line: UInt = #line) -> QuickPickRowDiff.Plan {
         let plan = QuickPickRowDiff.plan(oldIDs: oldIDs, oldTitles: titles(oldIDs),
                                          newIDs: newIDs, newTitles: titles(newIDs))
-        XCTAssertEqual(oldIDs.count - plan.removals.count + plan.insertions.count,
-                       newIDs.count, "行数算不回来 ⇒ 真喂给 AppKit 会抛异常", file: file, line: line)
+        // 不变量只在"走三步/移动"时成立：退回整表刷新时三步**被清空是设计**
+        // （控制器随后 `reloadData()`，没有坐标要加总），所以那条加总检查不适用。
+        // 第一版没写这个分支，于是"混着增删的重排"那条用例被辅助函数自己判红了
+        // —— 报的是"行数算不回来"，而真相是"这里根本不发增删"。
+        if !plan.needsFullReload {
+            XCTAssertEqual(oldIDs.count - plan.removals.count + plan.insertions.count,
+                           newIDs.count, "行数算不回来 ⇒ 真喂给 AppKit 会抛异常", file: file, line: line)
+        } else {
+            XCTAssertTrue(plan.removals.isEmpty && plan.insertions.isEmpty && plan.reloads.isEmpty
+                          && plan.moves.isEmpty,
+                          "退回整表刷新时必须清空四步，否则控制器会既 reloadData 又插删，行数算两遍",
+                          file: file, line: line)
+        }
         if plan.needsFullReload {
             XCTAssertTrue(plan.removals.isEmpty && plan.insertions.isEmpty && plan.reloads.isEmpty,
                           "退回整表刷新时必须清空三步，否则控制器会既 reloadData 又插删，行数算两遍",
@@ -66,12 +77,64 @@ final class QuickPickRowDiffTests: XCTestCase {
         XCTAssertFalse(plan.isNoop, "文案变了却不是 noop：`isNoop` 漏掉 reloads 就等于把该刷新的行吞掉")
     }
 
-    /// 刚复制的那条会被顶到最前 —— 保留行的**相对顺序**变了，
-    /// `.effectFade` 那套 API 表达不了"整体重排"，只能退回整表刷新，并且不许假装成功。
-    func testReorderOfKeptRowsFallsBackToFullReload() {
+    /// **翻案记录（R17）**：这条以前叫 `testReorderOfKeptRowsFallsBackToFullReload`，
+    /// 断言"[a,b]→[b,a] 必须退回整表刷新"，理由写的是"`.effectFade` 那套 API 表达不了整体重排"。
+    ///
+    /// 那句话对**多行同时跳**仍然成立（下面那条新用例继续钉着它），
+    /// 但把最高频的一种形状一起划进了"表达不了"：**恰好一行挪位** ——
+    /// 也就是"刚复制的那条被顶到最前"。`NSTableView.moveRow(at:to:)` 就是为它造的，
+    /// 而且它在 `allowsImplicitAnimation` 打开时**自己会动**。
+    /// 于是这个浮层里最常见的一次变化，一直是整表硬刷新。
+    ///
+    /// 翻案前先读了原文（D-055 / M1 的替代路径那一段）：当年砍的是
+    /// "SwiftUI `List` 拿不到行过渡"，与本条无关；本条是**同一个结论被用到了它没覆盖的形状上**。
+    func testSingleRowPromotionBecomesAMoveNotAHardReload() {
         let plan = executablePlan(oldIDs: [a, b], newIDs: [b, a])
-        XCTAssertTrue(plan.needsFullReload)
+        XCTAssertFalse(plan.needsFullReload, "两行互换就是「一行挪位」，不该再走整表硬刷新")
+        XCTAssertEqual(plan.moves, [QuickPickRowDiff.Move(from: 0, to: 1)])
         XCTAssertFalse(plan.isNoop, "重排不是'没变化'：控制器要是当成 noop，界面就留在旧顺序上")
+
+        // 真·顶到最前：第三条被复制到 [a,b,c,d] 之后变成 [d,a,b,c]
+        let promoted = executablePlan(oldIDs: [a, b, c, x], newIDs: [x, a, b, c])
+        XCTAssertEqual(promoted.moves, [QuickPickRowDiff.Move(from: 3, to: 0)],
+                       "末行（夹具里的 `x`）提到最前是这个浮层最高频的重排，必须是 move 不是 reload")
+        XCTAssertFalse(promoted.needsFullReload)
+    }
+
+    /// 仍然要退回整表刷新的那些形状 —— 这一条是上面那条翻案的**边界**，
+    /// 没有它，"能表达一行"会被读成"能表达任意重排"。
+    func testOtherReorderShapesStillFallBackToFullReload() {
+        // 中间两行互换：要两次 move，而两次 move 的坐标系换算没有文档保证
+        let twoSwaps = executablePlan(oldIDs: [a, b, c, x], newIDs: [c, b, a, x])
+        XCTAssertTrue(twoSwaps.needsFullReload, "多行同时跳不许硬凑成一串 moveRow")
+        XCTAssertTrue(twoSwaps.moves.isEmpty)
+
+        // 移动与增删**混在一起**：`moveRow` 的 `from` 该按删之前还是删之后解释，未知
+        let mixed = executablePlan(oldIDs: [a, b, c], newIDs: [c, b, a, x])
+        XCTAssertTrue(mixed.needsFullReload || mixed.moves.isEmpty,
+                      "混着增删的重排不许走 move 那一档")
+    }
+
+    /// `singleMove` 自己是纯函数，得有自己的真值表 ——
+    /// 否则上面两条只能通过 `plan(...)` 间接看到它，而它错的方式是"安静地给出一个错下标"。
+    func testSingleMoveTruthTable() {
+        func move(_ old: [UUID], _ new: [UUID]) -> QuickPickRowDiff.Move? {
+            QuickPickRowDiff.singleMove(from: old, to: new)
+        }
+        XCTAssertNil(move([a, b, c], [a, b, c]), "没动就不该给出移动")
+        XCTAssertEqual(move([a, b], [b, a]), QuickPickRowDiff.Move(from: 0, to: 1))
+        XCTAssertEqual(move([a, b, c, x], [x, a, b, c]), QuickPickRowDiff.Move(from: 3, to: 0))
+        XCTAssertEqual(move([a, b, c], [b, c, a]), QuickPickRowDiff.Move(from: 0, to: 2),
+                       "首行沉到最后也是一行挪位")
+        // 这条被实现纠正了直觉：**循环位移就是一次移动**（把末行提到最前）。
+        // 我一开始把它写成"需要两次 move ⇒ 应为 nil"，那是错的断言，不是对的代码。
+        XCTAssertEqual(move([a, b, c], [c, a, b]), QuickPickRowDiff.Move(from: 2, to: 0),
+                       "把末行提到最前 = 一次 moveRow，这正是'刚复制的那条被顶到最前'")
+        XCTAssertNil(move([a, b, c, x], [c, b, a, x]), "中间两行互换要两次 move ⇒ 不是一行挪位")
+        XCTAssertNil(move([a, b, c], [a, b]), "行数不同不是移动，是删除")
+        XCTAssertNil(move([a, b], [c, x]), "两行全换不是移动")
+        XCTAssertNil(move([], []), "空表没有可移动的行")
+        XCTAssertNil(move([a], [a]))
     }
 
     /// 删除与插入**同时**发生（打字时候选一边变少一边补进来），三步的坐标空间必须仍能对齐。
@@ -160,6 +223,13 @@ final class QuickPickRowDiffTests: XCTestCase {
         XCTAssertTrue(body.contains("animationsEnabled: MotionCatalog.animationsEnabled"),
                       "动画选项没接总开关 ⇒ 胶片夹具的两臂对照失效，量到的动无法归因给我们")
         XCTAssertTrue(body.contains("guard !plan.isNoop else { return }"), "没变化时不该惊动表格")
+        // R17：计划里有了 `moves`，还得有人真的去执行它 ——
+        // "纯函数全绿、调用点忘了传"这一族在本仓库出现过四次以上（`Plan.moves` 就是最新的一个诱饵）。
+        XCTAssertTrue(body.contains("table.moveRow(at: move.from, to: move.to)"),
+                      "计划算出了行移动，但没人执行 ⇒ 顶到最前仍然是一帧硬换（本轮修的就是它）")
+        XCTAssertTrue(body.contains("context.allowsImplicitAnimation = !animation.isEmpty"),
+                      "移动没接减弱动态/总开关闸门 ⇒ 关掉动画的那一臂照样滑，"
+                      + "胶片的 A/B 对照会把归因给错对象")
 
         // 整表刷新只准留在"重排"那一档：一旦有人把 beginUpdates 那段改回 `table.reloadData()`，
         // 原生行动画就又是零 —— 这正是 M1 原来的病。
