@@ -145,19 +145,34 @@ struct StateLine: View {
     var action: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: systemName ?? StatePresentation.symbolName(for: kind))
-                .font(.system(size: StatePresentation.symbolFontSize))
-                .foregroundStyle(StatePresentation.iconStyle(for: kind))
-                .accessibilityHidden(true)
+        // **图标与文字按基线成一组，动作按钮相对整组垂直居中**（R25 / U-47 / D-084）。
+        //
+        // 以前整行是 `HStack(alignment: .firstTextBaseline)`，于是两三行的横幅里那颗"知道了"
+        // 跟着**第一行**走。量出来的偏差（按钮字形那一行的中心 vs 色带中心）：
+        // 单行 0pt（碰巧对）、两行 **7.5pt**、三行 **14.5pt** —— 读起来像"这个动作只管第一句"，
+        // 而系统那类顶部提示条（邮件 / 备忘录 / 设置里的内联警告）动作位都是垂直居中的。
+        //
+        // 为什么不是整行改成 `.center`：那会把图标从文字的基线上摘下来，
+        // 12pt 的符号压在 13pt 正文旁边会"浮"半格（R3 定的"图标比正文小一档"就白定了）。
+        // 所以内层继续 baseline 对齐，只有动作位换一根对齐轴。
+        // `action` 这条路径今天只有 `NoticeBanner` 在用（菜单栏那行与热图空态都没有按钮），
+        // 所以这一改的影响面就是横幅本身。
+        HStack(spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: systemName ?? StatePresentation.symbolName(for: kind))
+                    .font(.system(size: StatePresentation.symbolFontSize))
+                    .foregroundStyle(StatePresentation.iconStyle(for: kind))
+                    .accessibilityHidden(true)
 
-            Text(message)
-                .font(.system(size: StatePresentation.messageFontSize))
-                .foregroundStyle(StatePresentation.messageInkStyle(for: kind))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                // 只允许纵向折行：横向 `fixedSize` 会把整块面板撑宽，
-                // 而状态文案恰恰是最长的那种（"拖入的 N 项不是本机文件，未加入历史"）。
-                .fixedSize(horizontal: false, vertical: true)
+                Text(message)
+                    .font(.system(size: StatePresentation.messageFontSize))
+                    .foregroundStyle(StatePresentation.messageInkStyle(for: kind))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // 只允许纵向折行：横向 `fixedSize` 会把整块面板撑宽，
+                    // 而状态文案恰恰是最长的那种（"拖入的 N 项不是本机文件，未加入历史"）。
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)

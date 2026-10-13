@@ -1294,6 +1294,11 @@ final class UICaptureTests: XCTestCase {
         /// 相邻两条横幅之间允许的空缝。产品实测 1pt（就是那条 `Divider()`）；
         /// 而 R24 修掉的那张组件帧是 **13pt 的窗口底色**。
         static let bandSeamPt: Double = 2.0
+
+        /// 动作按钮的字形中心与色带中心的容差。
+        /// 修之前实测偏差 0pt（单行，碰巧对）/ **−6.5pt**（两行）/ **−14.5pt**（三行），
+        /// 修之后 10 条带全部 **+0.0**。3pt 是"看得见不对"与"字的光学中心本来就比几何中心高一点"之间的折中。
+        static let actionCenterTolerancePt: Double = 3.0
     }
 
     /// 一块帧上的一个**可点笔画**，用夹具内的 pt 坐标框出来。
@@ -1535,6 +1540,49 @@ final class UICaptureTests: XCTestCase {
         let chroma: Double
         let ratio: Double
         let inkFraction: Double
+        /// 动作按钮那三个字（"知道了"）的行的中心；没找到按钮就是 nil。
+        let actionCenterPt: Double?
+
+        var centerPt: Double { (startPt + endPt) / 2 }
+    }
+
+    /// 一块矩形里"有墨的行"从第几行到第几行（夹具坐标系，pt）。
+    ///
+    /// 按行而不是按整体包围盒：动作位只有一个文字块，取"首末有墨行的中点"就是它的光学中心，
+    /// 而整体包围盒会被按钮的圆角底/阴影拉大 —— 那 2pt 的差别正好是这条判据的分辨率。
+    /// 一行至少要有 `minInkPerRow` 个墨像素才算有墨：抗锯齿的一两个点不算字。
+    static func inkRowSpan(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                           bytesPerRow: Int, rect: CGRect, scale: Double,
+                           minInkPerRow: Int = 3) -> (startPt: Double, endPt: Double)? {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0 + 4, y1 > y0 else { return nil }
+        var first = -1, last = -1
+        for y in y0..<y1 {
+            let row = y * bytesPerRow
+            var histogram: [Int: Int] = [:]
+            var x = x0
+            while x < x1 {
+                let o = row + x * 4
+                histogram[(Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2])) / 3, default: 0] += 1
+                x += 1
+            }
+            let background = histogram.max { $0.value < $1.value }?.key ?? 0
+            var ink = 0
+            x = x0
+            while x < x1 {
+                let o = row + x * 4
+                let luma = (Int(bytes[o]) + Int(bytes[o + 1]) + Int(bytes[o + 2])) / 3
+                if abs(luma - background) > 40 { ink += 1 }
+                x += 1
+            }
+            if ink >= minInkPerRow {
+                if first < 0 { first = y }
+                last = y
+            }
+        }
+        guard first >= 0, last > first else { return nil }
+        return (Double(first) / scale, Double(last + 1) / scale)
     }
 
     /// **自己找带、自己分段、自己量对比**的尺。
@@ -1584,8 +1632,20 @@ final class UICaptureTests: XCTestCase {
                               width: max(20, frameWidthPt - 95 - 36), height: endPt - startPt - 4)
             let (ratio, inkFraction) = Self.inkContrast(bytes: bytes, width: width, height: height,
                                                         bytesPerRow: bytesPerRow, rect: rect, scale: scale)
+            // 动作按钮那一块：**只取最右侧 50pt**（帧宽 −60 … −10）。
+            // 第一版取的是右侧 95pt，结果在产品那张 750pt 宽的帧上量出 −4.2pt 的"偏上"，
+            // 而同一套代码在 560pt 宽的组件帧上量出 +0.0 —— 差的不是布局，是**框里混进了正文**：
+            // 长句的第一行一直排到 x≈670，正好落进 655 起的那个数框里，
+            // 于是"首末有墨行"被正文的第一行抬上去了。⇒ 与 R24 的 M108 同一族：
+            // 数框的边界必须由"被量对象的实际位置"决定，不能由一个看起来够宽的常数决定。
+            let actionRect = CGRect(x: max(36, frameWidthPt - 60), y: startPt,
+                                    width: min(50, frameWidthPt - max(36, frameWidthPt - 60) - 10),
+                                    height: endPt - startPt)
+            let span = Self.inkRowSpan(bytes: bytes, width: width, height: height,
+                                       bytesPerRow: bytesPerRow, rect: actionRect, scale: scale)
             bands.append(NoticeBand(startPt: startPt, endPt: endPt, chroma: anchorChroma,
-                                    ratio: ratio, inkFraction: inkFraction))
+                                    ratio: ratio, inkFraction: inkFraction,
+                                    actionCenterPt: span.map { ($0.startPt + $0.endPt) / 2 }))
         }
         for y in 0..<height {
             let modal = rowModal(y)
@@ -1676,6 +1736,62 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// **动作按钮要垂直居中在它那条带里**（R25 / U-47 / D-084 / BACKLOG 37）。
+    ///
+    /// 修之前的实测偏差（字形行的中心 vs 带中心，两外观一致）：
+    /// 单行 **0pt**（碰巧对，所以这张帧从来没暴露过它）、两行 **−6.5pt**、三行 **−14.5pt**。
+    /// 这两个数是两条独立的尺互相核过的：CLI（`.scratch/motion-audit-2/ink_probe_r24.swift rows`）
+    /// 在修前的帧上读出 71.0/118.0 对带中心 77.5/132.5，仓库内判据在变异 M110 里读出 −6.5。
+    /// 根因是 `StateLine` 整行按 `.firstTextBaseline` 排，于是两三行正文时
+    /// 那颗"知道了"跟着**第一行**走 —— 读起来像"这个动作只管第一句"，
+    /// 而系统那类顶部提示条的动作位都是垂直居中的。
+    ///
+    /// 判据不写死按钮坐标：带的位置由 `noticeBands` 自己找，按钮的位置由 `inkRowSpan`
+    /// 在带的右侧 95pt 里自己找。⇒ 布局漂移时它会红在"没找到按钮"，而不是绿在"读到 0 偏差"。
+    func testNoticeActionIsVerticallyCenteredInItsBand() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r25-action-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for (name, _) in Self.noticeTextFixtures {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    return XCTFail("找不到夹具 \(name) ⇒ 这条判据没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(name)-action-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let bands = Self.noticeBands(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow, scale: scale)
+                XCTAssertFalse(bands.isEmpty, "\(name)（\(tag)）一条带都没找到 ⇒ 尺没有对象")
+                for (index, band) in bands.enumerated() {
+                    let where_ = "\(name)（\(tag)）第 \(index + 1) 条带 y \(String(format: "%.0f", band.startPt))–\(String(format: "%.0f", band.endPt))"
+                    guard let action = band.actionCenterPt else {
+                        XCTFail("\(where_) 在带的右侧没找到动作按钮的字形 ⇒ 要么按钮不在了，"
+                                + "要么它不在右侧 95pt 里（判据的位置假设需要重看）")
+                        continue
+                    }
+                    let offset = action - band.centerPt
+                    XCTAssertLessThanOrEqual(abs(offset), InkFloor.actionCenterTolerancePt,
+                                             "\(where_) 的动作按钮偏了 \(String(format: "%.1f", offset))pt"
+                                             + "（容差 \(InkFloor.actionCenterTolerancePt)）⇒ 它跟着第一行走，"
+                                             + "读起来像只管第一句话。修前实测：单行 0pt / 两行 −6.5pt / 三行 −14.5pt")
+                    print("NOTICE_ACTION \(name) \(tag) band#\(index + 1) center="
+                          + String(format: "%.1f", band.centerPt) + " action="
+                          + String(format: "%.1f", action) + " offset="
+                          + String(format: "%+.1f", offset))
+                }
+            }
+        }
+    }
+
     /// 新尺子的正对照：**同一套几何，好墨读过、坏墨必须读不过**。
     ///
     /// 一把只在缺陷上红的尺，与一把永远绿的尺一样没有信息量（R21 的探针表同一个理由）。
@@ -1729,6 +1845,53 @@ final class UICaptureTests: XCTestCase {
         print("NOTICE_BAND_CONTROL good=\(String(format: "%.2f", goodBand.ratio)) "
               + "weak=\(String(format: "%.2f", weakBand.ratio)) "
               + "ink=\(String(format: "%.1f%%", goodBand.inkFraction * 100))")
+    }
+
+    /// `inkRowSpan` 的正对照：**居中、偏上、什么都没有**三种几何必须读出三种结果。
+    ///
+    /// 第三条最容易漏：如果"没找到按钮"返回的是 0 而不是 nil，
+    /// 那么"按钮不见了"这种缺陷会读成"偏 0pt ⇒ 完美居中"，判据就反着骗人。
+    /// 这一条**不覆盖管线**（判的是纯函数），管线级判据是 `testNoticeActionIsVerticallyCenteredInItsBand`。
+    func testActionSpanRulerReadsBothEnds() {
+        let width = 400, height = 60, bytesPerRow = width * 4
+        func buffer(actionRows: ClosedRange<Int>?) -> [UInt8] {
+            var bytes = [UInt8](repeating: 255, count: height * bytesPerRow)
+            guard let rows = actionRows else { return bytes }
+            for y in rows {
+                for x in stride(from: 320, to: 380, by: 1) {
+                    // 一道"字"：每隔 4px 一根 2px 竖笔，保证每行都有足够的墨像素。
+                    guard (x - 320) % 4 < 2 else { continue }
+                    let o = y * bytesPerRow + x * 4
+                    bytes[o] = 20; bytes[o + 1] = 20; bytes[o + 2] = 20; bytes[o + 3] = 255
+                }
+            }
+            return bytes
+        }
+        func span(_ bytes: [UInt8]) -> (startPt: Double, endPt: Double)? {
+            bytes.withUnsafeBufferPointer {
+                Self.inkRowSpan(bytes: $0.baseAddress!, width: width, height: height,
+                                bytesPerRow: bytesPerRow,
+                                rect: CGRect(x: 305, y: 10, width: 87, height: 30), scale: 1.0)
+            }
+        }
+        let bandCenter = 25.0   // 自造的带是 y 10–40
+        guard let centered = span(buffer(actionRows: 20...29)) else {
+            return XCTFail("居中的动作块没被找到 ⇒ 这条判据的对象不存在")
+        }
+        guard let high = span(buffer(actionRows: 12...21)) else {
+            return XCTFail("偏上的动作块没被找到 ⇒ 尺只会读居中那一种")
+        }
+        XCTAssertEqual((centered.startPt + centered.endPt) / 2, bandCenter, accuracy: 1.5,
+                       "居中的块应读成居中（实测 " + String(format: "%.1f", centered.startPt)
+                       + "–" + String(format: "%.1f", centered.endPt) + "）")
+        let highCenter = (high.startPt + high.endPt) / 2
+        XCTAssertGreaterThan(abs(highCenter - bandCenter), InkFloor.actionCenterTolerancePt,
+                             "偏上 8pt 的块必须读出超过容差的偏差（实测 "
+                             + String(format: "%.1f", highCenter) + "）⇒ 读不出偏上，产品判据就是摆设")
+        XCTAssertNil(span(buffer(actionRows: nil)),
+                     "空矩形必须返回 nil，不能返回 0 —— 否则『按钮不见了』会读成『偏 0pt，完美居中』")
+        print("ACTION_SPAN_CONTROL centered=" + String(format: "%.1f", (centered.startPt + centered.endPt) / 2)
+              + " high=" + String(format: "%.1f", highCenter) + " empty=nil")
     }
 
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。

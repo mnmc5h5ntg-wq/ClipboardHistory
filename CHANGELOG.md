@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R25）
+
+- **多行提示条里的"知道了"不再跟着第一行走**（R25 / U-47 / D-084）：
+  `StateLine` 以前整行 `HStack(alignment: .firstTextBaseline)`，正文两三行时动作按钮被第一行的基线带走。
+  量出来的偏移（按钮字形行的中心 vs 色带中心）：单行 **0pt**（碰巧对）、两行 **−6.5pt**、三行 **−14.5pt**。
+  现在一行里给两根轴：内层继续 baseline 钉住图标与文字（R3 的语言），外层 `.center` 只让动作位居中。
+  **实测：修后 10 条带（3 张帧 × 两外观）偏移全部 +0.0。**
+  代价写清楚：**每条多行横幅矮了 1pt**（以前按钮下沿把行撑高 1pt），
+  所以单条横幅下面整列上移 1pt、两条则 2pt —— 本轮**不是**零布局位移。
+  影响面已 grep 确认：`action` 这条路径只有 `NoticeBanner` 在用，菜单栏那行与热图空态都没有按钮。
+
+### Added（R25）
+
+- **`inkRowSpan`：一块矩形里"有墨的行"从哪到哪**（R25）——按行取众数、每行至少 3 个墨像素才算有墨。
+  用它把"动作按钮在带里的垂直位置"变成可判定的量，而不是我目测。
+- **`testNoticeActionIsVerticallyCenteredInItsBand`**：每条带的 |按钮中心 − 带中心| ≤ 3pt，
+  找不到按钮时**红**（不许静默跳过）。判据自己起离屏渲染 ⇒ CI 上真的跑。
+- **正对照 `testActionSpanRulerReadsBothEnds`**：居中块读居中 / 偏上 8pt 的块必须读出超过容差 /
+  空块必须返回 `nil`。第三条是这一族最坏的错法：**兜底值会把"东西不见了"读成"完美"**。
+  变异 **M110–M113** 四支全 CAUGHT（M113 就是把兜底值塞回去，正对照红了）。
+
 ### Fixed（R24）
 
 - **提示条正文在亮色模式下不达 WCAG AA**（R24 / U-46 / D-083）：

@@ -155,6 +155,41 @@ if args[1] == "probe" {
                      Double(seg.startPx) / scale, Double(seg.endPx) / scale,
                      seg.chroma, bg, ink, contrast(bg, ink), coverage * 100))
     }
+} else if args[1] == "button" {
+    // R25：在一条暖色带的**右侧**找那枚动作按钮，报它的上下沿与中心。
+    // 为什么不用"中性灰"判：量出来按钮的填充是 (232,226,220) 这一类**暖灰**
+    //（`.bordered` 的半透明底把橙底吸进去了），色度轴分不开；
+    // 但亮度分得很开：带 244 vs 按钮 226（差 18）。⇒ 轴要按"哪根轴真的分得开"选（R23 立的规矩，反过来用）。
+    let x0 = max(0, ptToPx(box[0])), y0 = max(0, ptToPx(box[1]))
+    let x1 = min(width, x0 + ptToPx(box[2])), y1 = min(height, y0 + ptToPx(box[3]))
+    var rowLuma: [Int: Int] = [:]
+    for y in y0..<y1 {
+        var hist = [Int: Int]()
+        for x in x0..<x1 { hist[lumAt(x, y), default: 0] += 1 }
+        rowLuma[y] = hist.max { ($0.value, $0.key) < ($1.value, $1.key) }?.key ?? 0
+    }
+    var bandHist = [Int: Int]()
+    for (_, l) in rowLuma { bandHist[l / 4, default: 0] += 1 }
+    let band = (bandHist.max { ($0.value, $0.key) < ($1.value, $1.key) }?.key ?? 0) * 4 + 2
+    var best: (start: Int, end: Int)? = nil
+    var open = -1
+    func close(_ end: Int) {
+        guard open >= 0 else { return }
+        if best == nil || (end - open) > (best!.end - best!.start) { best = (open, end) }
+        open = -1
+    }
+    for y in y0..<y1 {
+        if abs(rowLuma[y]! - band) >= 8 { if open < 0 { open = y } } else { close(y) }
+    }
+    close(y1)
+    print("BUTTON \(args[2]) rect=\(args[3])pt 带亮度=\(band)")
+    if let b = best {
+        print(String(format: "  按钮 y=%.1f..%.1fpt 中心=%.1fpt 高=%.1fpt",
+                     Double(b.start) / scale, Double(b.end) / scale,
+                     (Double(b.start) + Double(b.end)) / 2 / scale, Double(b.end - b.start) / scale))
+    } else {
+        print("  没找到偏离带亮度的块 ⇒ 这块矩形里没有按钮")
+    }
 } else if args[1] == "bands" {
     // 按**色度**找色带：逐行取该行的众数 RGB，R−B 超过阈值算"这块被涂了色"。
     // 存在的理由：判据不该把我手写的 y 区间当真值 —— 布局一动，手写的框就套在空白上报假数据。
