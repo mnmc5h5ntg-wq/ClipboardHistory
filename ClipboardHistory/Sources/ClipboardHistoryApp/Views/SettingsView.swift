@@ -14,6 +14,9 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     case privacy
     case recommendations
     case data
+    /// 每日复制热图（新功能 / 阶段一）。放在最后：它是"回头看"的一页，
+    /// 不是任何人的第一次进入点。
+    case stats
 
     var id: String { rawValue }
 
@@ -24,6 +27,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .privacy: return "隐私"
         case .recommendations: return "推荐"
         case .data: return "数据"
+        case .stats: return "统计"
         }
     }
 
@@ -34,6 +38,9 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .privacy: return "hand.raised"
         case .recommendations: return "wand.and.stars"
         case .data: return "folder"
+        // 描线系（与其余五枚同一套语言，D-8 那条判据管的就是这个）：
+        // `chart.bar` 而不是 `chart.bar.fill`。
+        case .stats: return "chart.bar"
         }
     }
 }
@@ -82,6 +89,8 @@ struct SettingsView: View {
     /// 清空历史。返回**回执文案**（`nil` = 没有可清空的东西 / 注入方没给）。
     /// 以前它是 `() -> Void`：按完确认之后红色按钮还在原位、还能再点，
     /// 整个界面上没有任何一处说"清掉了 N 条"（R6 / 审计 B-P1-2）。
+    /// 每日复制统计的账本。`nil` = 不接（测试与离屏夹具的默认），此时那一页说"统计不可用"。
+    private let dailyCopyLedger: DailyCopyLedger?
     private let clearHistoryAction: (() -> String?)?
     /// 历史的导出 / 导入（第三轮审计 §5 F-5）。和 `clearHistoryAction` 一样由窗口控制器注入，
     /// 因为 `SettingsView` 在两个窗口里都会重建，不该直接持有 store。
@@ -99,6 +108,7 @@ struct SettingsView: View {
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         weightsStore: RecommendationWeightsStore = RecommendationWeightsStore(),
         feedbackStore: RecommendationFeedbackStore = RecommendationFeedbackStore(),
+        dailyCopyLedger: DailyCopyLedger? = nil,
         clearHistoryAction: (() -> String?)? = nil,
         exportHistoryAction: ((URL) -> String?)? = nil,
         importHistoryAction: ((URL) -> String?)? = nil,
@@ -114,6 +124,7 @@ struct SettingsView: View {
         self.importHistoryAction = importHistoryAction
         self.feedbackStore = feedbackStore
         self.clearHistoryAction = clearHistoryAction
+        self.dailyCopyLedger = dailyCopyLedger
         _showMainWindowShortcut = State(initialValue: showMainWindowHotKeySettings.shortcut)
         _repeatCopyShortcut = State(initialValue: repeatCopyHotKeySettings.shortcut)
         _quickPickShortcut = State(initialValue: quickPickHotKeySettings.shortcut)
@@ -245,6 +256,8 @@ struct SettingsView: View {
                         recommendationsSection
                     case .data:
                         dataSection
+                    case .stats:
+                        statsSection
                     case .none:
                         EmptyView()
                     }
@@ -513,6 +526,38 @@ struct SettingsView: View {
     }
 
     // MARK: - Data Section
+
+    /// 「统计」这一页（新功能 / 阶段一）。
+    private var statsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // 刻意**不再加一行分区标题**：卡片自己写着「每日复制」，
+            // 上面再顶一个「每日复制热图」就是同一屏两个标题（第一版离屏帧实测就是这样）。
+            if let dailyCopyLedger {
+                DailyCopyStatsSection(ledger: dailyCopyLedger)
+            } else {
+                // 拿不到账本时不许画一张全灰的图冒充"你这半年什么都没复制"。
+                StateLine(kind: .error, message: "统计不可用：没有拿到按日账本。")
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("这张图怎么读")
+                    .font(.subheadline)
+                Text("一列是一周，一行是一个星期几，右下角是今天。颜色深浅说的是那几天里你复制了多少次，"
+                     + "深浅按你自己这段时间的数据算 —— 所以它是「我这阵子忙不忙」的刻度，"
+                     + "不是「一天多少次」的刻度。鼠标停在任意一格上会写出那一天。")
+                    .font(.system(size: VisualFont.meta))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("计数在复制发生的那一刻就记下了：删掉记录、清空历史都不会改写它，"
+                     + "所以它比历史列表本身长（保留两年）。暂停采集与被排除的 App 不计数。")
+                    .font(.system(size: VisualFont.meta))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
 
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -788,6 +833,28 @@ private struct CompatibleSplitView<Sidebar: View, Detail: View>: NSViewRepresent
 /// - "永不清空" ⇒ 给一个 × 让用户自己收掉。
 /// **刻意不做自动消失**：这三条都是"你刚做的那件事的结果"（导出路径、导入条数、排除增删），
 /// 1.1 秒后自己没掉等于把信息拿走 —— 复制成功那种**瞬时回执**才适合自动收回（见 R5 的 A4）。
+/// 热图那一节单独观察账本。
+///
+/// 为什么要这一层：`SettingsView` 不观察 `DailyCopyLedger`（它不是 store 的一部分），
+/// 直接把 `ledger.counts` 传下去会得到一张**开页时快照**的图 ——
+/// 用户边复制边看着设置页时它不动，那比不画更让人怀疑数据是假的。
+private struct DailyCopyStatsSection: View {
+    @ObservedObject var ledger: DailyCopyLedger
+
+    var body: some View {
+        // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
+        // 一个时刻有两个来源，跨午夜与注入时钟时都会分叉。
+        DailyCopyHeatmapView(counts: ledger.counts, today: ledger.today)
+        if let error = ledger.lastWriteError {
+            // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
+            // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
+            Text("统计写入失败：\(error)")
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 private struct ReceiptLine: View {
     let text: String
     let dismiss: () -> Void

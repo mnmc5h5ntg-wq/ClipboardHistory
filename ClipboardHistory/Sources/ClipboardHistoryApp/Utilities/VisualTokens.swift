@@ -48,6 +48,55 @@ enum VisualRadius {
     /// 沿用现状、不抬到 10：这两处本来就一致，为了"凑整数"再改一次几何，
     /// 代价是全部帧基线重画，而换不到任何肉眼读得出的差别。
     static let panel: CGFloat = 9
+
+    /// 2pt：热图那一格 11pt 的小方块。
+    ///
+    /// 为什么比 `chip`(4) 还小：格子只有 11pt，4 的圆角会把相邻两格的"角"接在一起
+    ///（间距才 3pt），整行读成一串药丸而不是一张日历。2pt 是"角不再是尖的"与
+    /// "还是一块方砖"之间唯一站得住的位置。
+    static let heatCell: CGFloat = 2
+}
+
+// MARK: - 热图（每日复制统计）
+
+/// 每日复制热图的几何与色阶。
+///
+/// 单独一个枚举而不是散进 `VisualFill` / `VisualTint`：这五档强度**只在同一张图里互相比较**，
+/// 它们与"hover / pressed / selected"那条强度次序**不是同一个量**（那一条说的是"离你多近"，
+/// 这一条说的是"那天你干了多少"）。把两套混成一个布尔或一个数组，
+/// 下一次改 hover 就会顺手改掉统计图的刻度（同一个词在两个判据里含义不同那一族）。
+enum VisualHeat {
+    /// 11pt 见方：一列 7 格 = 77pt + 间距，`defaultWindowWeeks`（26 周）
+    /// ≈ 26×11 + 25×3 = 361pt，加星期标签列约 375pt ——
+    /// 设置页右栏在 720pt 窗口下放得下且不需要横向滚动。再小（9pt）格子会开始像噪点，
+    /// 再大（13pt）整张图会顶到窗口边缘，逼着缩短窗口。
+    /// （这条算式跟着窗口周数走：窗口从 18 周加宽到 26 周那次（视觉审查发现右栏半空）
+    /// 只改了 `DailyCopyHeatPolicy.defaultWindowWeeks`，注释漏改 —— 见 D-068。）
+    static let cell: CGFloat = 11
+
+    /// 3pt：格间距。必须是**奇数**且明显小于格宽：
+    /// 偶数 2pt 在 1x 屏上会被并成一条看不见的缝，格子会糊成一片实心矩形；
+    /// 4pt 则开始把"行"读成三条独立的横线（日历的星期行就散了）。
+    static let spacing: CGFloat = 3
+
+    /// 0.055：没有记录的那一格。**不能是 0**（透明）——
+    /// 那样"那天没复制"与"那天还没到来"就长得一样，而这两件事差得很远。
+    static let empty: Double = 0.055
+
+    /// 四档由浅到深。等比递增（×1.9 左右）而不是等差：
+    /// 等差会让前两档几乎分不开（0.15/0.30 在 11pt 的方块上是同一个灰度），
+    /// 而深浅在日历上是**唯一**的信息通道 —— 分不开就等于少两档。
+    static let ladder: [Double] = [0.18, 0.34, 0.56, 0.85]
+
+    /// 悬停那一圈的描边宽度。比 `VisualHairline.edge` 重一档：
+    /// 它要在**已经有色块**的表面上把自己读出来，发丝线在深色格子上会消失。
+    static let hoverStroke: CGFloat = 1
+
+    /// 强度 `bucket`（0…4）→ 强调色不透明度。
+    static func opacity(bucket: Int) -> Double {
+        guard bucket > 0 else { return empty }
+        return ladder[min(bucket, ladder.count) - 1]
+    }
 }
 
 enum VisualShape {

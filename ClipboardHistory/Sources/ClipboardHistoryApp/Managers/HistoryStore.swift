@@ -332,6 +332,9 @@ final class HistoryStore: ObservableObject {
     private var intake: ClipboardIntake
     private let clipboardWriter: ClipboardWriting
     private let persistence: HistoryPersisting
+    /// 每日复制条数的账本（新功能 / 阶段一）。可空 = 不记账 ——
+    /// 生产在 `AppDelegate` 里注入一个，测试不注入就**一个字节都不写盘**。
+    let dailyCopyLedger: DailyCopyLedger?
     private let retentionPolicy: HistoryRetentionPolicy
 
     var contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings()
@@ -349,12 +352,14 @@ final class HistoryStore: ObservableObject {
         intake: ClipboardIntake = ClipboardIntake(),
         clipboardWriter: ClipboardWriting = SystemClipboardWriter(),
         persistence: HistoryPersisting = FileHistoryPersistence(),
+        dailyCopyLedger: DailyCopyLedger? = nil,
         retentionPolicy: HistoryRetentionPolicy = .default,
         maxEntries: Int? = nil
     ) {
         self.intake = intake
         self.clipboardWriter = clipboardWriter
         self.persistence = persistence
+        self.dailyCopyLedger = dailyCopyLedger
         if let maxEntries {
             self.retentionPolicy = HistoryRetentionPolicy(maxEntries: maxEntries, maxAgeDays: retentionPolicy.maxAgeDays)
         } else {
@@ -362,6 +367,10 @@ final class HistoryStore: ObservableObject {
                 }
         let loadedEntries = persistence.load()
         let loadedRecoveryNotice = persistence.recoveryNotice
+        // 回填：账本空着时用历史存档的时间戳补一次。
+        // 上限 500 条意味着**补出来的只是最近那一段**，但"第一天打开是空的"
+        // 和"第一天打开有最近三个月"是两种完全不同的第一印象。
+        dailyCopyLedger?.backfillIfEmpty(from: loadedEntries.map(\.timestamp))
         let persistedEntries = EntryDeduplication.collapsingDuplicates(in: retainingByPolicy(loadedEntries, reason: "载入"))
         self.entries = persistedEntries
         self.selectedEntry = persistedEntries.first
@@ -521,6 +530,8 @@ final class HistoryStore: ObservableObject {
     func flushPendingPersistence() {
         flushPendingInitialPersist()
         persistence.flushPendingSaves()
+        // 去抖窗口里的计数必须跟着一起落盘：SIGTERM 打断的话会丢掉最后几秒的复制。
+        dailyCopyLedger?.flushPendingSaves()
     }
 
     /// 推荐反馈要的那份上下文快照。三处调用点原来各写一遍这五行参数，
@@ -668,6 +679,12 @@ final class HistoryStore: ObservableObject {
                                     excluded: CapturePolicy.effectiveExcludedBundleIDs(from: policyDefaults)) else {
             return
         }
+        // 记一笔"今天复制过"。位置在**通过采集策略之后、去重与晋升之前**：
+        // ① 暂停 / 被排除的 App 不能计数（那是"没发生"，不是"发生了没记"）；
+        // ② 同一条内容连着复制 5 次要算 5 次 —— 它确实复制了 5 次，
+        //    哪怕历史列表里只有一条。放上去之后，晋升与去重那两条早退就不会把事件吞掉。
+        dailyCopyLedger?.recordCopy(at: timestamp)
+
         if promoteExistingEntryIfNeeded(for: intakeEntry, timestamp: timestamp) {
             return
         }

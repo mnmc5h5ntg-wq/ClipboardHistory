@@ -379,6 +379,56 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store))
         })
 
+        // 每日复制热图（新功能 / 阶段一）：组件级两张 —— 有数据与没数据。
+        // 固定 `today` 与固定计数 ⇒ 这两张帧不随日期变。
+        let heatToday = Self.heatmapFixtureToday
+        var heatCalendar = Calendar(identifier: .gregorian)
+        heatCalendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
+        heatCalendar.firstWeekday = 2
+        // 夹具必须带中文 locale：不设置的话日历默认 en_US，
+        // 拍出来的星期标签是 "M W F S" —— 审查的人会以为产品写死了英文。
+        heatCalendar.locale = Locale(identifier: "zh_CN")
+        let heatCounts = Self.heatmapFixtureCounts(today: heatToday, calendar: heatCalendar)
+        results.append(Fixture("heatmap-populated", NSSize(width: 430, height: 250)) {
+            AnyView(
+                DailyCopyHeatmapView(counts: heatCounts, today: heatToday, calendar: heatCalendar)
+                    .padding(16)
+                    .frame(width: 430, height: 250, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        // 设置页里的**有数据**版本：组件帧看不出布局问题（分区标题、说明文字、
+        // 与侧栏的关系），所以这一张必须有。账本指向一个预先写好计数的临时文件 ——
+        // 捕获套件仍然不碰用户数据。
+        let populatedLedgerURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("capture-ledger-populated.json")
+        try? DailyCopyLedger.write(heatCounts, to: populatedLedgerURL)
+        let populatedLedger = DailyCopyLedger(fileURL: populatedLedgerURL,
+                                              calendar: heatCalendar,
+                                              debounceSeconds: 3600,
+                                              now: { heatToday })
+        results.append(Fixture("settings-stats-populated", NSSize(width: 720, height: 540)) {
+            AnyView(SettingsView(
+                showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+                repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
+                loginItemSettings: LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
+                contextPreferences: ContextPreferenceSettings(),
+                weightsStore: store.weightsStore,
+                feedbackStore: store.feedbackStore,
+                dailyCopyLedger: populatedLedger,
+                clearHistoryAction: { nil },
+                initialCategory: .stats
+            ))
+        })
+        results.append(Fixture("heatmap-empty", NSSize(width: 430, height: 150)) {
+            AnyView(
+                DailyCopyHeatmapView(counts: [:], today: heatToday, calendar: heatCalendar)
+                    .padding(16)
+                    .frame(width: 430, height: 150, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+
         // R-13/R-02 的提示条：既拍组件本身，也拍它插进 ContentView 之后
         // 会不会把 NavigationSplitView 的布局挤坏。
         let pasteFailureText = "系统未授权本 App 控制「System Events」，无法自动粘贴。请在「系统设置 → 隐私与安全性 → 自动化」里允许后重试；记录本身已复制到剪贴板，可手动粘贴。"
@@ -445,9 +495,42 @@ final class UICaptureTests: XCTestCase {
             contextPreferences: ContextPreferenceSettings(),
             weightsStore: store.weightsStore,
             feedbackStore: store.feedbackStore,
+            // 「统计」那一页要有账本才拍得出东西。指向**临时目录**里一个空账本：
+            // 捕获套件绝不许碰用户 `~/Library/Application Support/时间剪史/` 里的真数据
+            //（D-002 的边界，与 `CLIPBOARD_HISTORY_DATA_DIR` 同一个理由）。
+            dailyCopyLedger: DailyCopyLedger(
+                fileURL: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("capture-ledger-empty.json"),
+                debounceSeconds: 3600),
             clearHistoryAction: { nil },
             initialCategory: initialCategory
         )
+    }
+
+    /// 热图夹具的数据。`today` 固定 ⇒ 这张帧**永远长一样**。
+    ///
+    /// 为什么不让它跟着真实日期走：帧基线是逐字节比的，用"今天"当锚点的话
+    /// 这张图每天自己变形状，第二天就是一条与任何改动无关的红。
+    static func heatmapFixtureCounts(today: Date, calendar: Calendar) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for offset in 0..<126 {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
+            let weekday = calendar.component(.weekday, from: date)
+            let base = (weekday == 1 || weekday == 7) ? 1 : 6
+            counts[DailyCopyHeatPolicy.dayKey(for: date, calendar: calendar)] = base + (offset * 7) % 13
+        }
+        return counts
+    }
+
+    static var heatmapFixtureToday: Date {
+        var components = DateComponents()
+        components.year = 2026
+        components.month = 3
+        components.day = 12
+        components.hour = 12
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
+        return calendar.date(from: components) ?? Date()
     }
 
     private func rowKind(_ entry: ClipboardEntry) -> String {

@@ -74,6 +74,7 @@ final class SettingsWindowController {
             contextPreferences: contextPreferences,
             weightsStore: weightsStore,
             feedbackStore: historyStore?.feedbackStore ?? RecommendationFeedbackStore(),
+            dailyCopyLedger: historyStore?.dailyCopyLedger,
             clearHistoryAction: { [weak self] in
                 guard let store = self?.historyStore else { return nil }
                 // 顺序是这条的全部价值：**先数再清**。清完再数，`entries` 只剩收藏，

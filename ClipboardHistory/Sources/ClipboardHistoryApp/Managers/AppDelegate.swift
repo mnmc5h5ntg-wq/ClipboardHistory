@@ -2,7 +2,10 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    static let sharedHistoryStore = HistoryStore()
+    /// 每日复制统计的账本在这里建一次，由 `HistoryStore` 持有。
+    /// 刻意**不**在 `HistoryStore.init` 里默认建一个：那样每一条不注入账本的测试
+    /// 都会去读写用户 `~/Library/Application Support/时间剪史/daily-copy.json`。
+    static let sharedHistoryStore = HistoryStore(dailyCopyLedger: DailyCopyLedger())
 
     let historyStore: HistoryStore
 

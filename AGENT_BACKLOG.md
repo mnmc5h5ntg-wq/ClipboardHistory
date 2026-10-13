@@ -684,3 +684,36 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
 13. **AppKit 混合层的可达性播报仍欠**：QuickPick 空态、设置页回执都只有视觉表达。
     SwiftUI 侧有 `VoiceOverReceipt`（14+），AppKit 侧要 `NSAccessibility.post(notification:argument:)`
     （10.15+ 可用），是独立一轮，别夹在动效轮里顺手做。
+
+## 阶段一（每日复制热图）留下的账 · 2026-10-13
+
+14. **`lastWriteError` 没有发布通道**（`DailyCopyLedger:55` + `SettingsView:848`，R9 头一条）。
+    它是"计算属性读加锁盒子"——值不会丢（这是当初绕开 `main.async` 回写的理由，注释里写着），
+    但**没有任何东西为它 `objectWillChange`**：写盘失败后若用户不再复制，那一行不上屏；重启后永远 `nil`。
+    修法要保住"值不依赖通知"这一半：**通知只送"该重绘了"、不送值**，
+    所以它被丢掉只是晚显示而不是静默。判据必须写成"从产品入口看那一行出现在屏上"，
+    不是"盒子里有值"（后者现在就已经成立却什么都证明不了）。
+15. **热图的 hover 动画声明了但空转**（`DailyCopyHeatmapView:190`，R9）。
+    `.animation(.hover, value: hovered?.dayKey ?? "")` 驱动的是不可插值的字符串替换；
+    真正会变的格子描边 0↔0.55 与当天那格的深浅都不在事务里 ⇒ 硬生硬灭。
+    另：键用 `""` 不区分"未悬停"与"未定义格"。这是"代码里有、屏幕上没有"那一族的**我自己写的新例**。
+16. **`OffscreenSymbolInkProbeTests.symbolNames` 是手抄的，而且已经漂了**（R9）。
+    名单是 `["command","gearshape","hand.raised","sparkles","folder"]` ——
+    `sparkles` 早就不是产品用的图标（推荐分类是 `wand.and.stars`），新增的 `chart.bar` 不在名单里。
+    一条"每次视觉审计重新量一遍"的探针，现在量的是**五个已经不存在的图标**。
+    修法：名单从 `SettingsCategory.allCases` 取，并加一条"探针名单 == 产品名单"的守卫。
+    **顺带记一条判据纪律**：我看 `settings-stats-populated` 帧时把「统计」图标判成"实心柱混进描线那一列"
+    （以为踩回 U-8），**这个判断是错的** —— 该探针表头写着未选中行图标列墨水 = 0.0000，
+    那一帧只有选中行可见。判图标语言必须按墨水数字判，不能按这一帧的观感判。
+17. **空态与零值汇总同时说话**（`heatmap-empty-*` 帧，R9）。
+    "最近 26 周共 0 次 · 日均 0.0 次 · 连续 0 天"压在"还没有可统计的记录"上面 = 两条矛盾的表达。
+18. **`/tmp/verify_phase1.sh` 里 `grep -cE "error:"` 数出 110 条"错误"，全是 CoreData/AddressBook 噪声**
+    （`com.apple.contactsd.persistence` 那一族）。**计数命令自己没被证伪过**（这一族记过很多次）。
+    下一版只数 XCTest 的失败行，并把"噪声行"单独报成一个数而不是并进错误里。
+19. **阶段二的全量位点清单在 `.scratch/motion-audit-2/00-inventory.md`**：
+    两个只读代理并行产出，主窗口/QuickPick 89 行 + 设置/菜单栏约 90 行，
+    含 MotionCatalog 八档引用表（`.skeletonSweep` 的 curve/transition 与 `Shape.Slide.bottom/leading/trailing` 是死的）、
+    两套互相矛盾的 reduce 闸门、以及去重后的 20 条"最可能真缺陷"合并榜 + R9–R28 排期。
+    **它是选题池不是结论**：每一行都要在轮次里用渲染像素重判一次才算。
+20. **「连统计一起抹」是独立动作，本轮刻意没做**：导出/导入/清空历史/隐私擦除都不碰 `daily-copy.json`。
+    真要"抹掉统计"得单开一个入口并在 `AGENT_DECISIONS` 立案（它现在只被"保留 730 天"这一条管着）。

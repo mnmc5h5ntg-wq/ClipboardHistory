@@ -2291,3 +2291,91 @@ MOTION_RESOLVE_SUMMARY judged=2/3 not-run=notice-banner
 而门槛仍是 2/3 —— 没有为过闸门改判据。`notice-banner` 那一格是夹具问题
 （触发前后逐像素相同 ⇒ `premise-not-visible`），记在 BACKLOG，不算验到。
 main 上 R8 那次红（run 38319974826）由 R8b 转绿，两次的差异只有判据那一处。
+
+## D-068 阶段一：每日复制热图的数据源、写入时机与两处"看起来对、其实测不到"的夹具（2026-10-13）
+
+- **背景**：用户要在设置里看"每天复制了多少条"，形状是 GitHub 提交日历。
+  最省事的做法是遍历 `HistoryStore.entries` 现算 —— 这条路**不能走**，理由不是性能而是**事实会倒退**。
+
+### 1. 为什么不从 `entries` 现算，而单独落一份按日账
+
+- `entries` 有 **500 条上限**（保留策略）。从它现算 ⇒ 旧条目被淘汰后，
+  上个月那格会自己变浅、变灰、整列空掉。用户看到的是"我最近三个月的复制量在下降"，
+  而真相是"我的历史被裁了"。**那不是统计，是保留策略的投影。**
+- 决定：`DailyCopyLedger` 写一份**只追加**的 `daily-copy.json`（日键 → 条数），
+  保留 730 天（104 周，够看"去年这时候忙不忙"），一天一键最坏 ≈12KB，尺寸有界。
+- 兼容性：首次构造时若账本为空，用现有历史时间戳**回填一次**（`backfillIfEmpty`）——
+  所以老用户第一天打开就有一张有内容的图，而不是"从今天开始攒"。
+- 回滚：**删掉 `daily-copy.json` 即可**，历史存档一个字节都不动。
+  导出 / 导入 / 清空历史都不碰它（它是可再生的派生品，不是用户内容）；
+  "连统计一起抹"是另一个动作，记在 BACKLOG 没顺手做。
+
+### 2. 回填**不排写盘**：把 D-002 那条红线当判据而不是当口头规矩
+
+`HistoryStore.init` 会调 `backfillIfEmpty`。第一版它顺手调了 `scheduleSave()` ——
+那等于**构造期往用户的 Application Support 写文件**，
+正是 `HistoryPersistenceTests` 里"init 阶段绝不能写盘"那条红线的成因
+（第二个实例在单实例守卫之前覆盖存档）。
+改成：只改内存 + 把快照塞进 `pendingSnapshot`，落盘交给"下一次真复制"或退出时的 `flushPendingSaves()`。
+判据 `testBackfillDoesNotWriteDuringConstruction` ——
+**第一版是假的**：它用 `debounce: 60` 且从不等待，于是"排了写盘"和"没排"看起来一模一样（M31 ESCAPED）。
+改成 `debounce: 0.05` + `Thread.sleep(0.6)`，让"没写"这件事**必须**是被等出来的，
+"能等到才是判据，等不到的那条只是愿望"（M31 由 ESCAPED → CAUGHT）。
+
+### 3. 采集路径上零同步磁盘写（用户的硬要求）
+
+`recordCopy` 只做 `counts[key] += 1` + 排一个去抖写盘（`.utility` 队列、原子写）。
+判据 `testRecordCopyDoesNotTouchTheDiskOnTheCallingPath`（父目录不存在 ⇒ 若真同步写会当场抛）。
+退出路径仍**同步** flush：去抖窗口里被 SIGTERM 打断会丢最后几秒的计数（D-004 那一次）。
+
+### 4. 本机全量测试**崩过**：MainActor 推断把闭包钉在错的队列上
+
+`swift test` 在两个用例之间 SIGTRAP（`signal code 5`），日志里一句断言都没有。
+从 `~/Library/Logs/DiagnosticReports/xctest-*.ips` 读回栈：
+`dispatch_assert_queue ← closure #1 in DailyCopyLedger.scheduleSave()`。
+根因：`DispatchWorkItem { … }` 字面量写在 `@MainActor` 方法里就被推成 MainActor 隔离，
+Swift 在闭包入口插了 `dispatch_assert_queue`，而它实际跑在 `saveQueue` ⇒ **第一次去抖到期就崩**。
+修法：在 `nonisolated private static func makeSaveWorkItem(...)` 里造那个 work item。
+回归判据 `testDebouncedWriteFiresWithoutMainActorTrap`。
+**同时把分类器教了一遍**：崩溃不是"没跑"也不是"逃逸"，变异对照现在把
+`signal code 5` / SIGABRT 记成 `CAUGHT=crash`（否则"注入让它崩"会被读成通过）。
+
+### 5. `today` 只有一个来源，否则夹具全灰
+
+热图窗口是"从今天往前 N 周"。视图里若再取一次 `Date()`，注入时钟的夹具会得到
+**一格都不在窗口里**的图（实测：夹具计数在 3 月、视图今天 10 月 ⇒ 整张图全灰）。
+决定：`DailyCopyLedger.today` 是账本 `now()` 的暴露口，视图从它读"今天"。
+这条同时解决跨午夜时"账本与图各算各的"。
+
+### 6. 视觉审查（看渲染帧）改掉了四处代码读不出来的东西
+
+- 月标签**换行成两行**（`HStack` + 弹性空格那版）⇒ 换成 `ZStack` + `.offset(x:)` 按格宽算位置。
+- 星期标签是英文 `M T W` —— 因为夹具日历没设 locale ⇒ 固定夹具改 `zh_CN` + `firstWeekday = 2`（周一开头）。
+  这是**尺子的问题不是产品的问题**，但它骗了我一轮：代码里 `veryShortWeekdaySymbols` 完全正确。
+- 「每日复制热图」标题与分区标题「统计」重复 ⇒ 去掉一处重复大标题（同一个信息两层标题）。
+- 18 周时右栏**半空**（面板高度富余、图只占左半）⇒ `defaultWindowWeeks` 18 → 26，
+  `VisualHeat.cell` 的几何注释跟着改（注释按 18 周算而实现是 26 周 = 漂移，本轮补）。
+
+### 7. 有两条我自己写的判据前提是错的，改的是判据不是产品
+
+- 一条"桶数应该是平的"的断言遍历的是**数据里根本没有的日键** ⇒ 恒真。
+- 一条断言 `2026-03-05` 落在最后一列 —— 它落在**上一列**（周起点算错了）。
+两处都改判据并在注释里写下"这里曾经判错什么"。
+**不许为了让判据过而改产品行为**，这条在第 4 轮审计之后就立过案。
+
+### 8. 本轮**已知未做**的两条（阶段二 R9 的第一批活儿，不是遗漏）
+
+- `lastWriteError` 是"计算属性读加锁盒子"，**没有任何东西为它发布**：
+  写盘失败后如果用户不再复制，这一行不上屏；重启后永远是 `nil`。
+  值不会丢（盒子还在），但"说出来的时机"依赖别人先动。这是功能级缺陷，记 **U-30**。
+- 热图的 `.animation(.hover, value: hovered?.dayKey ?? "")` 驱动的是**不可插值的字符串替换**，
+  而格子描边 0↔0.55 的切换根本不在事务里 ⇒ 声明了但空转，悬停硬生硬灭。同一族（"代码里有、屏幕上没有"）。
+  另外 `""` 这个键不区分"未悬停"与"未定义格"。
+
+### 9. 兼容性与验证
+
+macOS 12 全绿：只用 `Color.primary.opacity` / `VisualShape` / `.help` / `onHover`，
+没有 `symbolEffect` 之类 14+ API；暗黑模式下强度梯度走 `Color.accentColor.opacity`
+（同一个令牌，两套外观），已用亮暗两帧夹具目视核对。
+帧基线 82 → **90**（三张新夹具：`heatmap-populated` / `heatmap-empty` / `settings-stats-populated`），
+`update` 与功能代码在**同一个 commit**（硬门那条纪律）。

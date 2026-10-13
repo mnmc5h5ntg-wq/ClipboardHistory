@@ -735,3 +735,39 @@ C 段是判定"刻意不加"的几族，D 段是取证能力边界。
 本轮按这条把名单行的过渡判据直接钉进 `ForEach(...)` 那一段
 （同一个文件里 `ReceiptLine` 也含 `.transition(`，整文件写法会放过它）—— 是 R5/R7 两课的用上了，
 不是新踩的坑。
+
+## 第 10 轮 · U-30 设置窗口 · 统计（每日复制热图）（D-068）
+
+新功能，不是一个动效点位：表面 = 设置侧栏新增「统计」分类（`chart.bar`），
+内容 = GitHub 提交日历形状的 26 周 × 7 格热图 + 汇总行 + 图例 + 悬停详情 + 空态。
+
+| 表面 | 之前 | 现在 | 证据 |
+|---|---|---|---|
+| 「每天复制了多少条」 | **整个产品没有这条信息**。从 `entries` 现算会被 500 条上限带着倒退 | 独立只追加账本 `daily-copy.json`（日键→条数，保留 730 天，损坏则**改名保原字节**），首次为空时从存档时间戳回填一次 | 真值表（日键/分桶/网格/月标签/连续天数/汇总/tooltip 七张）+ `testCorruptLedgerKeepsTheOriginalBytes` |
+| 采集路径 | — | `recordCopy` 只加内存计数 + 去抖异步写；**零同步磁盘写**；退出路径同步 flush | `testRecordCopyDoesNotTouchTheDiskOnTheCallingPath`、`testFlushDoesNotBlockForTheDebounceWindow`、`testStoreFlushAlsoFlushesTheLedger` |
+| 格子 | — | 11pt `VisualShape` 圆角方块 ×26 周，五档 `Color.accentColor.opacity`（0.055/0.18/0.34/0.56/0.85），未来格 `Color.clear` **不画灰格** | 亮/暗两帧 `heatmap-populated`（目视核对梯度可分）+ `testHeatmapReadsTheTokenAuthors` |
+| 悬停 | — | 每格原生 `.helpLabel`（"2026年3月12日 周四 · 复制 8 条"）+ 描边 0↔0.55 + 页脚详情回落最忙日 | 21 条用例含 tooltip 真值表；**描边插值见下面"已知未做"** |
+| 月标签 | `HStack` + 弹性空格 ⇒ **换行成两行**（看帧才发现） | `ZStack` + `.offset(x:)` 按格宽算位，间隔 <4 周的月份**刻意不标**（否则挤成一列糊字） | `heatmap-populated` / `settings-stats-populated` 改前后帧 |
+| 分区标题 | 「统计」+「每日复制热图」两层重复大标题 | 去掉一处（同一信息两层标题） | 同上帧目视 |
+| 18 周窗口 | 右栏**半空**（面板富余、图只占左半） | `defaultWindowWeeks` 18 → 26 | 同上帧目视；几何注释同步改，注释漂移记进 D-068 |
+
+### 本轮**已知未做**的两条（阶段二 R9 的第一批活儿，不是遗漏）
+
+1. **`lastWriteError` 没有发布通道**（`DailyCopyLedger:55` + `SettingsView:848`）。
+   它是"计算属性读加锁盒子"：值不会丢（这是当初绕开 `main.async` 回写的理由），
+   但**没有任何东西为它 `objectWillChange`** ⇒ 写盘失败后如果用户不再复制，那一行不上屏；
+   重启后永远是 `nil`。等于"静默失败"这条要防的事只防了一半。
+   判据要写成"从产品入口看回执出现在屏上"，而不是"盒子里有值"。
+2. **热图的 hover 动画是声明了但空转**（`DailyCopyHeatmapView:190`）。
+   `.animation(.hover, value: hovered?.dayKey ?? "")` 驱动的是**不可插值的字符串替换**（页脚 Text 换字），
+   而真正会变的两处 —— 格子描边 0↔0.55 与当天那格的深浅 —— 都不在任何事务里 ⇒ 硬生硬灭。
+   附带：键用 `""` 不区分"未悬停"与"未定义格"。这是"代码里有、屏幕上没有"那一族的又一例，
+   而且**是本轮我自己写的**。
+
+### 一条方法记录：夹具的 locale 是尺子的一部分
+
+星期标签渲成英文 `M T W` 时，代码里的 `calendar.veryShortWeekdaySymbols` 完全正确 ——
+错在夹具日历没设 locale。**看帧能发现读代码发现不了的缺陷，但发现的缺陷要先归对对象**：
+这一条改的是 `UICaptureHarness`，不是产品。同一轮里还有两条我自己写反的判据前提
+（遍历了数据里不存在的日键 ⇒ 恒真；把 `2026-03-05` 当成最后一列）——
+两处都改判据并在注释里写下"这里曾经判错什么"，**没有为了过判据改产品行为**。
