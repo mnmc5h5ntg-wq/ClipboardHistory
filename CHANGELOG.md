@@ -135,6 +135,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- **侧栏筛选胶囊不再"冲过头再弹回来"**（R12 / D-070 / U-34）：那颗胶囊以前自己写着
+  `response 0.38 / damping 0.72` —— 0.38 越过动效目录的上限，0.72 是欠阻尼（必有过冲），
+  而它是**点出来的**、不是手势跟手的位移。现在参数出自目录新增的 `.slider` 档
+  （0.20s、临界阻尼），目录白名单因此少了一格（`HistorySidebarView.swift` 不再在目录外写曲线）。
+- **同一个文件里两套「减弱动态」闸门合成一套**：以前这颗胶囊只读
+  `@Environment(\.accessibilityReduceMotion)`，而全仓其他地方读
+  `MotionCatalog.motionShouldBeReduced`（系统开关 ∪ VoiceOver）⇒ 开着 VoiceOver 的人
+  别处都降级、只有它还在弹。现在两处都取或。
+- **修掉一条"开了减弱动态 = 悬停零反馈"**：分段按钮以前**只有缩放**一种悬停表达，
+  而 reduce 会把缩放归 1.0。现在补一层 `VisualFill.controlHover` 底色，
+  它不受 reduce 影响（底色是信息，缩放才是物理隐喻）—— 这是"reduce 是替换不是删除"
+  这条规矩以前真正的空洞。
 - **统计页「这张图怎么读」那块说明现在跟着图一起淡入**（R11 / U-33）：
   以前只有图的两臂有过渡，说明块（分隔线 + 五行读法）是整块硬蹦出来的。
   过渡与驱动键成对出现，由 `testStatsGuideTransitionIsPairedWithADriver` 钉住（M47/M48 CAUGHT）。

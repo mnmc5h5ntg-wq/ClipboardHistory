@@ -701,3 +701,25 @@ MOTION_HEAT_FADE_A/B 开 帧数=1 峰值=0.225 冷闸=true  关 帧数=1 峰值=
   筛选滑块 0.38s / damping 0.72 越过目录自己的 ≤0.25s 与不过冲两条；
   同一个文件里两套 reduce 闸门（`@Environment(\.accessibilityReduceMotion)` 只认系统开关、不认 VoiceOver，
   且 `.linear(duration: 0)` 是**清零**而不是替换 —— 违反 R1 定的规矩）。
+
+## 状态 · R12 完成（2026-10-13 14:3x 本地）
+
+清的是**自己前几轮留下的两笔账**（全新清单第 6、7 条）：侧栏筛选胶囊
+`0.38s / damping 0.72` 越目录上限且必有过冲（它是点出来的，不是手势跟手）；
+它的 reduce 闸门只读系统开关、不认 VoiceOver；而这一段悬停**只有缩放一种表达** ⇒
+开了「减弱动态效果」= 悬停零反馈。
+现在：目录新增 `.slider`（0.20s、临界阻尼）、闸门取或、悬停补一层 `controlHover` 底色。
+**性质是清账不是发现** —— 目录注释当时就写着"这两处有过冲，是已知例外"，知道了没排上。
+账见 **D-070 / U-34**，人工验收批次 21。
+
+- **翻案**：`FilterPillMotionTests` 原有一条把"过冲是想要的"钉成了规矩；先读原文（R2-10 的
+  动机是"滑块不读 reduce 开关"，那半条仍成立并保留），只推翻"过冲"这半句，理由写在测试上方。
+- **设计好的摩擦**：目录白名单守卫立刻红了 —— `HistorySidebarView.swift` 不再在目录外写曲线，
+  名字已按提示删掉。顺带把 `Shape.Slide.leading` 这条死分支用起来。
+- **数字**：0 warning；667 tests / 16 skipped / 0 failures；动效套件 21 / 4 / 0、`judged=2/3` 未退；
+  帧基线 `CHANGED=0`（静止态逐字节不变是这一轮应有的结果）；`scripts/tests` 72 passed；
+  变异 **M50–M53 四支全 CAUGHT**（M51 故意打到另一个套件）。自评 **93 / 100**。
+- **欠**：悬停态无像素证据（BACKLOG 24）、"0.20s 且不过冲"尺子量不到（纯 transform，同 R11 那族）。
+- **R13 选题**：清单第 11 条 —— 侧栏五颗批量按钮（含删除）用 `.buttonStyle(.borderless)`，
+  零按压、零悬停，是全 App 唯一一处绕开 `PressableStyle` 的地方；
+  以及第 19 条 `PressableStyle:53` 那个硬写的 `isHovered: false` 让 `VisualFill.hover` 档全 App 不可达。

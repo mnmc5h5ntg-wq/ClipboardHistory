@@ -46,6 +46,12 @@ enum MotionCatalog {
         case emphasis      // 状态被改变的确认（收藏 / 固定 / 已复制）
         case dropTarget    // 拖入落点框
         case contentFade   // 内容换页（详情换类型、设置分类、菜单栏结果落地、空态）
+        /// 分段控件里那颗滑动的胶囊（R12）。**它以前不归目录管** ——
+        /// `FilterPillMotion` 自己写着 `response 0.38 / damping 0.72`：
+        /// 0.38 越过本目录的 `maximumDuration`，0.72 是欠阻尼、必有过冲。
+        /// 而 MC-1 那一轮把 `bannerIn` 的 0.86 改成临界阻尼时，注释里点名的"正确定义在
+        /// `FilterPillMotion`"恰恰就是这一处没改的 —— 修了规矩、漏了一个实例。
+        case slider
         /// 骨架扫光（M9）。**它是常驻循环，不是一次过渡** —— 见 `isAmbient`。
         case skeletonSweep
     }
@@ -84,6 +90,12 @@ enum MotionCatalog {
         case .emphasis: return 0.16
         case .dropTarget: return 0.12
         case .contentFade: return 0.16
+        // 0.20：比 `selection`(0.12) 慢一档、比上限(0.25) 快一档。
+        // 依据不是口味：这颗胶囊要走**约半个轨道宽**（两段制 ⇒ 一次约 60–90pt），
+        // 而 0.12 那一档是给"底色跟着鼠标"这种零位移反馈的。位移越长，时长越要跟上，
+        // 否则读起来像"它跳过去了"而不是"它移过去了"。上限仍然由
+        // `testEveryRoleStaysUnderTheCeiling` 统一管。
+        case .slider: return 0.20
         case .skeletonSweep: return 1.5
         }
     }
@@ -137,6 +149,11 @@ enum MotionCatalog {
             break
         case .bannerIn:
             shape.slides = reduceMotion ? .none : .top
+        case .slider:
+            // 横向位移档。`Slide.leading` 在这一版之前是**不可达**的
+            // （`shape(for:)` 只会产 `.none`/`.top`，胶片清单里记着这条死分支）——
+            // 胶囊走的是横轴，正好把它用起来。
+            shape.slides = reduceMotion ? .none : .leading
         case .bannerOut:
             shape.isExit = true
         case .dropTarget:

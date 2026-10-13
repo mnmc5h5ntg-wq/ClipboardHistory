@@ -779,3 +779,67 @@ MOTION_HEAT_FADE_A/B 开 帧数=1 峰值=0.225 冷闸=true  关 帧数=1 峰值=
 `scripts/tests` 72 passed；变异 **M47–M49 三支全 CAUGHT**
 （M49 打的是尺子自己的闸门：把 `warmIntervalMilliseconds` 设成永远达不到 ⇒
 "看不见"这条结论必须作废，不许拿一段冷采样去宣布尺子的极限）。
+
+**真机侧的一条独立证据**（R11 装完之后顺手读的，只读）：
+`~/Library/Application Support/时间剪史/daily-copy.json` 已经存在，
+`days=6 first=2026-06-12 last=2026-10-13 total=111`，而历史存档是 94 条。
+**111 > 94 是对的**，而且正是这张图存在的理由：账本记的是"复制发生过 111 次"，
+存档里只剩 94 条是因为去重与保留策略 —— 重复复制同一条内容**照样计数**。
+文件本身是在换装那一刻的优雅退出时被 flush 写出来的：
+构造期不写盘、退出期一定写 —— 两条在真机上都留下了痕迹。
+
+---
+
+## Round 12 · 筛选胶囊：一颗越权 0.38s 的弹簧，和一段"reduce 之后什么都不剩"的悬停
+
+选题来自全新清单的第 6、7 条（合并榜），两条都是**我自己前几轮改过、之后没人回来复查的**。
+
+| 位点 | 之前 | 现在 | 为什么 |
+|---|---|---|---|
+| 分段筛选的滑块 | `response 0.38 / damping 0.72` 写在视图侧策略里 | 参数出自目录新增的 `.slider` 档（0.20s），**临界阻尼 = 不过冲** | 0.38 越过目录 `maximumDuration`；0.72 欠阻尼 ⇒ 点一下"全部→收藏"，胶囊会**冲过头再弹回来**。MC-1 的规矩是"只有手势跟手的位移才给过冲"，而这颗是**点**出来的 |
+| reduce 闸门 | `@Environment(\.accessibilityReduceMotion)` —— 只认系统开关、不认 VoiceOver | `环境 ∪ MotionCatalog.motionShouldBeReduced`，两个视图都用 | 开着 VoiceOver 的人：全仓都降级了，只有这颗胶囊还在弹。同一文件两套闸门 = "减弱动态"在这一个文件里有两种含义 |
+| 段按钮悬停 | **只有缩放**一种表达 ⇒ 减弱动态时 `hoverScale` 归 1.0，**悬停完全无反馈** | 加一层 `VisualFill.controlHover` 底色，不受 reduce 影响；选中那一段不叠（下面就是胶囊） | "reduce 是替换不是删除"这条 R1 立的规矩，在悬停这件事上以前是**空的** |
+
+**一条值得单独记的考古**：目录里 `criticalDamping` 的注释写着"正确定义在 `FilterPillMotion`
+里已经写了"—— 而 `FilterPillMotion` 自己就是那个**没被改的实例**；
+白名单守卫的注释里也明写着"这两处都有过冲，是目录'一律不过冲'声明之外的**已知例外**"。
+也就是说这件事**不是没人知道，是知道了没排上**。所以本轮的实质不是发现，是清账。
+
+**判据被翻案的那一条**：`FilterPillMotionTests` 原来断言
+`XCTAssertLessThan(normal.damping, 1.0, "正常态保留轻微过冲")` —— 它把旧决定钉成了规矩。
+本轮翻过来（`testSlideMotionIsCriticallyDampedAndSourcedFromTheCatalog`），翻案理由写在测试上方，
+不藏在 diff 里。**翻案前先读了原文**：R2-10 的原始动机是"滑块以前不读 reduce 开关"，
+那条仍然成立（`isInstant` 分支保留），被推翻的只有"过冲是想要的"这半句。
+
+**目录白名单少了一格**：`testMotionParametersOutsideTheCatalogAreWhitelisted` 立刻红了 ——
+`HistorySidebarView.swift` 不再在目录之外写曲线。这条红是**设计好的摩擦**
+（把老例外迁进目录就要红一次），已按提示删名字并把"少了一个例外、为什么"写进注释。
+
+**顺带把一条死分支用起来**：`Shape.Slide.leading` 以前不可达（`shape(for:)` 只产 `.none`/`.top`），
+胶囊走横轴，`.slider` 这一档正好落在它上面。
+
+### 自评 93 / 100
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 19 / 20 | 系统分段控件本来就不弹回来；去掉过冲之后更像原生控件 |
+| 流畅度 | 18 / 20 | 0.20s 配 60–90pt 位移；扣：无像素证据（见下面"欠"） |
+| 层次与材质 | 14 / 15 | 悬停底色用 `VisualFill.controlHover`，与 44pt 圆按钮同一档 |
+| 动效细节 | 15 / 15 | 参数单作者、临界阻尼、reduce 有替换、死分支被用上 |
+| 交互反馈 | 10 / 10 | 修掉"减弱动态 ⇒ 悬停零反馈"这一条实质缺陷 |
+| 可访问性 | 10 / 10 | 闸门与全仓统一（系统开关 ∪ VoiceOver），WCAG 那条不再漏一处 |
+| 性能 | 7 / 15 | 每段按钮多一层 `Shape.fill`（静止 0 不透明度）；扣 8 分给"这条没被量过，而 90 帧逐字节相同只证明静止态没变" |
+
+**验证**：0 warning；667 tests / 16 skipped / 0 failures（+1 判据，另 2 条被翻案重写）；
+动效套件 21 / 4 skipped / 0 failures，`judged=2/3` 未退；
+帧基线 `check --against working` = `CHANGED=0 MISSING=0 ADDED=0`
+（悬停底色只在 hover 时非零、弹簧只改时长 ⇒ 静止态逐字节不变，这正是**应该**的结果）；
+`scripts/tests` 72 passed；变异 **M50–M53 四支全 CAUGHT**
+（M51 故意打到**另一个套件**：把曲线写回视图里，抓它的是目录那条"例外集合相等"，不是本模块的判据）。
+
+**本轮欠的两条**：
+① 悬停态**没有像素证据** —— 合成 hover 这条路仓库一直没打通（`NSApp.currentEvent` 为 nil 那一族），
+所以"底色真的画出来了"目前只有静态推导 + 人眼批次 21；单列 BACKLOG 24
+（做成了能一次解锁清单里约 15 处 hover-only 位点）。
+② "0.20s 且不过冲"**尺子量不到**：胶囊位移是纯 transform，与 R11 那条纯 opacity 同一族
+（`cacheDisplay` 抓模型树）。所以本轮的诚实说法是**参数已归位、手感未取证**。

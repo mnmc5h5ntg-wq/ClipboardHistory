@@ -295,22 +295,44 @@ enum FilterPillMotion {
     }
 
     static func slideMotion(reduceMotion: Bool) -> SlideMotion {
+        // 参数不再写死在这里（R12）。以前是 `response 0.38 / damping 0.72`：
+        // 0.38 越过目录的 `maximumDuration`，0.72 是欠阻尼 ⇒ 胶囊会**冲过头再弹回来**。
+        // 而目录里 `criticalDamping` 那条注释还点名说"正确定义在 `FilterPillMotion`"——
+        // MC-1 修的是规矩，这一处实例被漏掉了。修规矩的时候要把用旧值的地方一起扫掉，
+        // 否则注释会变成第二个谎言。
         reduceMotion
-            ? SlideMotion(isInstant: true, response: 0, damping: 1)
-            : SlideMotion(isInstant: false, response: 0.38, damping: 0.72)
+            ? SlideMotion(isInstant: true, response: 0, damping: MotionCatalog.criticalDamping)
+            : SlideMotion(isInstant: false,
+                          response: MotionCatalog.duration(for: .slider),
+                          damping: MotionCatalog.criticalDamping)
     }
 
+    /// 要不要"真的滑"。目录说这一档在减弱动态时**不滑**（`shape.slides == .none`），
+    /// 那就瞬移 —— 这里瞬移不是"把动效清零"，而是**位移本身就是这条动效的全部内容**：
+    /// 胶囊的位置就是"你选了哪一段"，把它淡入淡出并不能表达这件事。
+    /// （banner 那一档可以换成淡入，是因为它的信息在文字里，不在它从哪儿来。）
     static func slideAnimation(reduceMotion: Bool) -> Animation {
-        let motion = slideMotion(reduceMotion: reduceMotion)
-        return motion.isInstant
-            ? .linear(duration: 0)
-            : .spring(response: motion.response, dampingFraction: motion.damping)
+        guard MotionCatalog.shape(for: .slider, reduceMotion: reduceMotion).slides != .none else {
+            return .linear(duration: 0)
+        }
+        return MotionCatalog.animation(for: .slider, reduceMotion: reduceMotion)
     }
 
     /// hover 放大：减少动态时不放大（1.0 = 原尺寸）。
     static func hoverScale(isHovered: Bool, reduceMotion: Bool) -> CGFloat {
         guard isHovered, !reduceMotion else { return 1.0 }
         return 1.08
+    }
+
+    /// hover 底色。**这一档是"替换"那一半，不是装饰**（R12）：
+    /// 减弱动态时 `hoverScale` 归 1.0，而这一段以前**只剩缩放这一种悬停表达** ⇒
+    /// 开了「减弱动态效果」的用户把鼠标放上去，什么反馈都没有 ——
+    /// "reduce 是替换不是删除"这条规矩，在悬停这件事上以前是空的。
+    /// 底色不承担物理隐喻，所以它不受 reduce 影响：两臂都给同一个值。
+    static func hoverFill(isHovered: Bool, isSelected: Bool) -> Double {
+        // 选中的那一段下面就是那颗胶囊，再叠一层悬停底会糊成两块。
+        guard isHovered, !isSelected else { return 0 }
+        return VisualFill.controlHover
     }
 }
 
@@ -332,6 +354,13 @@ fileprivate extension View {
 private struct SegmentedFilterPicker: View {
     @Binding var selection: HistoryStore.Filter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// 两个来源**取或**（R12）。这一段以前只读系统开关，而全仓其他地方读的是
+    /// `MotionCatalog.motionShouldBeReduced`（系统开关 ∪ VoiceOver）⇒
+    /// 同一个人开着 VoiceOver 时，别处都降级了、只有这颗胶囊还在弹。
+    /// 环境那一份不能丢：它是**自动响应**的（中途改设置立刻生效），
+    /// 目录那一份要等视图重算 —— 两个都要才既全又活。
+    private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
 
     var body: some View {
         ZStack {
@@ -363,7 +392,7 @@ private struct SegmentedFilterPicker: View {
                 .frame(width: geo.size.width / count - 2)
                 .padding(.vertical, 1)
                 .offset(x: idx * (geo.size.width / count) + 1)
-                .animation(FilterPillMotion.slideAnimation(reduceMotion: reduceMotion), value: selection)
+                .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: selection)
         }
     }
 }
@@ -375,14 +404,24 @@ private struct FilterSegmentButton: View {
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// 同 `SegmentedFilterPicker.shouldReduce`：系统开关 ∪ VoiceOver。
+    private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
+
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: VisualFont.row, weight: isSelected ? .semibold : .regular))
-                .scaleEffect(FilterPillMotion.hoverScale(isHovered: isHovered, reduceMotion: reduceMotion))
+                .scaleEffect(FilterPillMotion.hoverScale(isHovered: isHovered, reduceMotion: shouldReduce))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 5)
                 .padding(.horizontal, 10)
+                .background(
+                    // 减弱动态时缩放归 1.0，这一层就是**唯一**的悬停表达 ——
+                    // 以前这一段只剩缩放一种说法，于是"开了减弱动态 = 悬停没有反馈"。
+                    VisualShape.rounded(VisualRadius.control)
+                        .fill(Color.primary.opacity(
+                            FilterPillMotion.hoverFill(isHovered: isHovered, isSelected: isSelected)))
+                )
                 .contentShape(Rectangle())
         }
         .pressedStyle(in: VisualShape.rounded(VisualRadius.control))

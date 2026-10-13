@@ -358,12 +358,17 @@ final class MotionCatalogTests: XCTestCase {
     /// 所以钉成**文件集合相等**：多一个例外要红；把老例外迁进目录也要红（那时把名字从白名单删掉，
     /// 这是设计好的摩擦，不是误报）。
     ///
-    /// 顺带记下这两处的性质，免得下一个人以为它们也"不过冲"：
-    /// `FilterPillMotion` 的 damping 0.72、`MultiFilePreviewLayout` 在 12/13 走
-    /// `interactiveSpring(dampingFraction: 0.88)` —— 两者都有过冲，是目录"一律不过冲"声明之外的**已知例外**。
+    /// 顺带记下这些例外的性质，免得下一个人以为它们也"不过冲"：
+    /// `MultiFilePreviewLayout` 在 12/13 走 `interactiveSpring(dampingFraction: 0.88)` —— 有过冲，
+    /// 是目录"一律不过冲"声明之外的已知例外（它是**手势**：点一下展开，跟手程度高于胶囊滑动）。
+    ///
+    /// **R12 少了一个例外**：`FilterPillMotion`（侧栏筛选胶囊）以前自己写
+    /// `response 0.38 / damping 0.72`，既越上限又过冲，而它是**点出来的**、不是手势跟手的 ⇒
+    /// 按 MC-1 那条它不该有弹性。现在参数出自目录的 `.slider` 档、临界阻尼，
+    /// 于是这个文件从白名单里出去了 —— 这条红是设计好的摩擦，不是误报。
     func testMotionParametersOutsideTheCatalogAreWhitelisted() throws {
         let needles = ["spring(response", "interactiveSpring", ".snappy(", "timingCurve"]
-        let whitelist = ["HistorySidebarView.swift", "DetailView.swift"]
+        let whitelist = ["DetailView.swift"]
         var found: [String] = []
         for directory in ["Views", "Managers"] {
             for (name, source) in try productSources(in: directory) where name != "MotionCatalog.swift" {
