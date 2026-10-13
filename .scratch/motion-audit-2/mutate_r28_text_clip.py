@@ -5,7 +5,7 @@
   M123 把 `.lineLimit(1)` 装回快捷键说明（= 修之前的产品） ⇒ 两臂对照必须红在"有说明文字被截断了"
   M124 把夹具里新接的 `exportHistoryAction` 摘掉            ⇒ 接缝守卫必须红在"产品注入的接缝夹具没注入"
   M125 把文字墨的闸门从 60 挪到 24（平涂会混进来）          ⇒ 真值表必须红在"平涂底色不许算成字"
-  M126 把宽臂从 900pt 改回 720pt（参照失去资格）           ⇒ 必须红在"不再是不动的参照"，
+  M126 把窄臂改成与产品臂同宽（两臂自比）           ⇒ 必须红在"不再是不动的参照"，
                                                                 不许红成"两臂自比 ⇒ 恒真绿"
   M127 把 `signedInk` 的阈值抬到 400（什么都数不到）        ⇒ 侧栏探针必须红在"连一个像素都没动过"，
                                                                 也就是那条新断言真的接在测量上
@@ -36,6 +36,8 @@ TRUTH = "UICaptureTests/testTextInkGateTruthTable"
 SEAM = "UICaptureTests/testCaptureFixtureInjectsEveryActionSeamTheProductInjects"
 PROBE = "OffscreenSymbolInkProbeTests/testProductSettingsSidebarIconInk"
 CAPTION = "UICaptureTests/testCaptionTextStaysOnTheSecondaryTier"
+DIRECTION = "UICaptureTests/testInkDirectionTruthTable"
+BOTHENDS = "UICaptureTests/testInkDirectionRulerReadsBothEnds"
 
 MUTATIONS = []
 
@@ -89,11 +91,14 @@ mutation(
 
 # M126：参照臂失去资格。这一支的价值是"它不许静默变绿"：
 # 两臂同宽 ⇒ ratio 恒等于 1 ⇒ 如果只留 M123 那条断言，这条变异会绿着过去。
+# M126（R28b 重写）：把窄臂改成与产品臂同宽 ⇒ 两臂自比，比值恒等于 1。
+# 这一支存在的理由与上一版一样：**它不该绿着过去**，而它只能被"资格断言"抓住，
+# 产品判据本身对它完全无感。
 mutation(
-    "M126", "宽臂 900pt → 720pt（参照失去资格）", "harness",
-    [lambda s: sub(s, 'Fixture("settings-shortcuts-wide", NSSize(width: 900, height: 540))',
-                   'Fixture("settings-shortcuts-wide", NSSize(width: 720, height: 540))', 1, "M126")],
-    CLIP, "不再是不动的参照",
+    "M126", "窄臂 640pt → 720pt（两臂自比）", "harness",
+    [lambda s: sub(s, 'results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {',
+                   'results.append(Fixture("settings-min", NSSize(width: 720, height: 440)) {', 1, "M126")],
+    CLIP, "两臂自比",
 )
 
 # M127：把"这块地方动不动过"的阈值抬到不可能达到 ⇒ 反相的那几行会被读成"整列空白"。
@@ -128,6 +133,33 @@ mutation(
 )
 
 
+# M130（R29）：把方向判定改成恒真 —— 两端对照必须红。
+# 这一支证明"能读出反相"不是运气：它必须真的接在 `inkTailSplit` 的读数上。
+mutation(
+    "M130", "方向判定恒真（永远说'没反相'）", "harness",
+    [lambda s: sub(s, "    static func inkIsOnTheExpectedSide(brighter: Int, darker: Int, darkAppearance: Bool) -> Bool {\n"
+                      "        // 一侧占绝对多数才算\"有方向\"；各半（例如框里同时压着黑白两种元素）不下结论。\n"
+                      "        guard brighter + darker > 0 else { return true }",
+                   "    static func inkIsOnTheExpectedSide(brighter: Int, darker: Int, darkAppearance: Bool) -> Bool {\n"
+                   "        guard brighter + darker > 0 else { return true }\n"
+                   "        if brighter + darker >= 0 { return true }  // MUTANT：恒真",
+                   1, "M130")],
+    DIRECTION, "亮色帧里墨全在亮侧 = 反相"
+)
+
+
+# M131（R29）：把**测量**换掉，而不是把断言改弱 ——
+# 第一版我写的是"把反相那一端的断言改成恒真"，结果它当然绿着过去：
+# 弱化一条断言不可能让这条测试自己变红，能变红的只有别的判据，而这里没有。
+# 所以这一支改成把 `inkTailSplit` 返回的两个数对调 —— 两端对照必须两头都红。
+mutation(
+    "M131", "inkTailSplit 把亮/暗两个计数对调", "harness",
+    [lambda s: sub(s, "        return (brighter, darker, tail.count)",
+                   "        return (darker, brighter, tail.count)  // MUTANT", 1, "M131")],
+    BOTHENDS, "已知反相的那一列现在读不出",
+)
+
+
 def run(test_filter):
     env = dict(BASE_ENV)
     env["CLIPBOARD_HISTORY_UI_SHOTS"] = SHOTS
@@ -147,9 +179,9 @@ def main():
     originals = {name: read(name) for name in FILES}
     digests = {path: open(path, "rb").read() for path in FILES.values()}
 
-    print("=== 预检（不注入任何变异，五条判据都必须绿）===", flush=True)
+    print("=== 预检（不注入任何变异，七条判据都必须绿）===", flush=True)
     ok = True
-    for test in (CLIP, TRUTH, SEAM, PROBE, CAPTION):
+    for test in (CLIP, TRUTH, SEAM, PROBE, CAPTION, DIRECTION, BOTHENDS):
         verdict, out = run(test)
         print(f"  {test:70s} {verdict}", flush=True)
         if verdict != "ESCAPED":

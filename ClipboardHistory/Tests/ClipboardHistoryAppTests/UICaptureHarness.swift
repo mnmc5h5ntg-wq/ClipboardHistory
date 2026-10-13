@@ -768,24 +768,11 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
-        // R28 · 快捷键页的**宽臂**。
-        //
-        // 它不是一个"要看的设计"，是一把尺：宽到任何一行说明都不可能截断，
-        // 于是"这一页一共画了多少字"有一个不依赖我自己判断的参照值。
-        // 判据 `testSettingsHelperTextIsNotClipped` 拿 720 那臂和它比墨量。
-        // 为什么不用 640（`settings-min`）当参照：那一臂只会**截得更狠**，
-        // 拿"更坏"当"标准"得到的是一条恒真的比较。
-        //
-        // **宽度为什么是 900 而不是 1100**：第一版写 1100，本机一切正常，
-        // **CI 的 macos-15 runner 上这一臂整帧读出 0 墨**（run 38449711539），
-        // 与账本 R3-D11 记的 `content-wide-1100x800`"95% 像素未被绘制"是同一族现象 ——
-        // 两条都在 1100pt（=2048px @2x 之上）这一档翻车。
-        // 根因（离屏表面对尺寸的上限？还是这个宽度下的布局？）本轮**没有证明**，
-        // 所以这里只记现象，并且把"参照臂必须有墨"那条红留着：
-        // 参照坏了必须响，不许悄悄退化成两臂自比的恒真。
-        results.append(Fixture("settings-shortcuts-wide", NSSize(width: 900, height: 540)) {
-            AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts))
-        })
+        // R28b 撤掉 `settings-shortcuts-wide`：它在本机一切正常，
+        // 但 **CI 的 macos-15 runner 上 900pt 与 1100pt 两档都整帧读出 0 墨**
+        // （run 38449711539 / 38451162726），而 ≤750pt 的 100 张帧从来没问题。
+        // 于是参照臂换成"更窄的那一臂"（`settings-min`，640pt）—— 见
+        // `testSettingsHelperTextIsNotClipped` 上面那段。
         results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store))
         })
@@ -1460,6 +1447,133 @@ final class UICaptureTests: XCTestCase {
         return max(la, lb) / min(la, lb)
     }
 
+    // MARK: - R29 · "太淡"还是"画反了"：对比度读数的方向
+
+    /// 一块区域的尾墨落在背景的哪一侧。
+    ///
+    /// 存在的理由（R28 的教训，BACKLOG 41）：`inkContrast` 只报"偏离背景多远"，
+    /// 于是**"画成白色的图标"（反相伪影）与"画得太淡的图标"（真缺陷）报的是同一个低值**。
+    /// R28 那次差点因此去把 `.primary` 换成固定色 —— 而那正是审计第二轮禁止的方向。
+    /// 这一把尺只回答一个问题：**这块区域的墨，出现在它该出现的那一侧了吗？**
+    static func inkTailSplit(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                             bytesPerRow: Int, rect: CGRect, scale: Double)
+        -> (brighter: Int, darker: Int, total: Int) {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (0, 0, 0) }
+        var luma: [Int] = []
+        luma.reserveCapacity((x1 - x0) * (y1 - y0))
+        for y in y0..<y1 {
+            let row = y * bytesPerRow
+            for x in x0..<x1 {
+                let o = row + x * 4
+                luma.append(Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                                 + 0.0722 * Double(bytes[o + 2])).rounded()))
+            }
+        }
+        var histogram: [Int: Int] = [:]
+        for value in luma { histogram[value / 8, default: 0] += 1 }
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+        // 与 `inkContrast` **同一切法**（偏离最远的那 2%）：两把尺量的必须是同一批像素，
+        // 否则"这一侧"这句话就不是对那个对比度读数的说明。
+        let deviation = luma.map { (abs($0 - background), $0 - background) }
+            .sorted { $0.0 > $1.0 }
+        let tail = deviation.prefix(max(1, luma.count / 50))
+        var brighter = 0, darker = 0
+        for (_, signed) in tail {
+            if signed > 0 { brighter += 1 } else if signed < 0 { darker += 1 }
+        }
+        return (brighter, darker, tail.count)
+    }
+
+    /// 这个外观下，"正常的墨"应该在背景的哪一侧。
+    static func inkIsOnTheExpectedSide(brighter: Int, darker: Int, darkAppearance: Bool) -> Bool {
+        // 一侧占绝对多数才算"有方向"；各半（例如框里同时压着黑白两种元素）不下结论。
+        guard brighter + darker > 0 else { return true }
+        let dominantIsBright = brighter > darker * 2
+        let dominantIsDark = darker > brighter * 2
+        if darkAppearance { return !dominantIsDark }
+        return !dominantIsBright
+    }
+
+    /// 一条没过地板的对比度读数，该报"产品淡"还是"这条帧不可信"。
+    /// 两句话的**修法完全相反**：前者改产品，后者一行都不许改。
+    static func inkFailureIsInverted(brighter: Int, darker: Int, darkAppearance: Bool) -> Bool {
+        !inkIsOnTheExpectedSide(brighter: brighter, darker: darker, darkAppearance: darkAppearance)
+    }
+
+    /// 给一条失败的对比度读数配的"方向诊断"。
+    ///
+    /// 这一行的全部价值是把两条相反的路分开写：
+    /// 反相 ⇒ **一行产品代码都不许改**，去查捕获路径；真淡 ⇒ 改墨档。
+    static func inkDiagnosisLine(tail: (brighter: Int, darker: Int, total: Int),
+                                 darkAppearance: Bool) -> String {
+        if inkFailureIsInverted(brighter: tail.brighter, darker: tail.darker,
+                                darkAppearance: darkAppearance) {
+            return "⚠ 这块区域的墨全落在背景的另一侧（亮\(tail.brighter) / 暗\(tail.darker)）⇒ "
+                + "**这是 R28 记下的反相伪影，不是产品淡**：一行产品代码都不许改，去查捕获路径。"
+        }
+        return "墨的方向正常（亮\(tail.brighter) / 暗\(tail.darker)）⇒ 这个低值是真的淡，可以据此改产品。"
+    }
+
+    /// 真值表：方向的判定必须跟着外观走，而且必须**只看多数侧**。
+    /// 每一行的数都是量出来的：亮色帧里未选中的侧栏符号整列 (255,255,255) 对 (248,248,248)，
+    /// 同一张帧里的标题是 (39,39,39)；暗色反过来。
+    func testInkDirectionTruthTable() {
+        // 亮色（aqua）：墨应当在暗侧。
+        XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: 3, darker: 900, darkAppearance: false),
+                      "亮色帧里墨在暗侧 = 正常")
+        XCTAssertFalse(Self.inkIsOnTheExpectedSide(brighter: 900, darker: 3, darkAppearance: false),
+                       "亮色帧里墨全在亮侧 = 反相，不许当成'太淡'去改产品")
+        // 暗色（darkAqua）：同一条规律方向反过来 —— 墨应当在亮侧。
+        XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: 900, darker: 3, darkAppearance: true),
+                      "暗色帧里墨在亮侧 = 正常")
+        XCTAssertFalse(Self.inkIsOnTheExpectedSide(brighter: 3, darker: 900, darkAppearance: true),
+                       "暗色帧里墨全在暗侧 = 反相")
+        // 两侧各半（框同时压着黑白两种元素）：不下结论，别把"混"读成"反"。
+        XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: 40, darker: 45, darkAppearance: false),
+                      "没有明显多数侧时不判反相 —— 否则任何混排框都会被误报")
+        // 空框：交给墨占比地板去拦，方向这条不抢话。
+        XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: 0, darker: 0, darkAppearance: false),
+                      "空框不是反相，是'框贴到空白'，那是另一条地板的职责")
+    }
+
+    /// **正对照来自一张真的坏帧**：`settings-general` 亮色里，
+    /// 未选中行的图标列是已知的反相面（R28：整列 255 对 248），
+    /// 而同一行右侧的标题是正常墨。同一把尺、同一张帧、两个相反的读数 ——
+    /// 一把只会说"过"的尺不能靠这种对照立起来，只有能同时读出"这侧/那侧"的才行。
+    func testInkDirectionRulerReadsBothEnds() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r29-direction-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        guard let fixture = fixtures(appearance: .aqua).first(where: { $0.name == "settings-general" }) else {
+            return XCTFail("找不到 settings-general ⇒ 这条正对照没有对象")
+        }
+        let file = scratch.appendingPathComponent("settings-general.png")
+        _ = try render(fixture, appearance: .aqua, to: file)
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              let base = rep.bitmapData else {
+            return XCTFail("读不回刚拍的帧")
+        }
+        let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+        // 第一行「快捷键」的图标列（x 15..37，y 66..86 —— R28 从帧上量的）。
+        let icon = Self.inkTailSplit(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                     bytesPerRow: rep.bytesPerRow,
+                                     rect: CGRect(x: 15, y: 66, width: 22, height: 20), scale: scale)
+        // 同一行的标题文字列（x 46..120）。
+        let title = Self.inkTailSplit(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                      bytesPerRow: rep.bytesPerRow,
+                                      rect: CGRect(x: 46, y: 66, width: 74, height: 20), scale: scale)
+        print("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
+        XCTAssertGreaterThan(icon.brighter, icon.darker * 2,
+                             "已知反相的那一列现在读不出'偏亮' ⇒ 这把方向尺坏了，"
+                             + "R28 记下的那个伪影会重新伪装成'产品太淡'")
+        XCTAssertGreaterThan(title.darker, title.brighter * 2,
+                             "同一张帧里正常墨的那一列读不出'偏暗' ⇒ 尺坏了（两端的差别没了）")
+    }
+
     /// 尺的算术本身要有判据：一把没人验算过的尺，报出来的数字没有意义。
     /// 这一条**不覆盖管线**（它判的是纯函数），管线级判据是下面那条 `testActionableInk...`。
     func testContrastRulerArithmetic() {
@@ -1518,10 +1632,14 @@ final class UICaptureTests: XCTestCase {
                             "\(probe.fixture) 的「\(probe.what)」在框 \(probe.rect) 里只有 "
                             + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 框贴到空白上了"
                             + "（元素搬走了就去量新位置，不许把地板调低）")
+                let tail = Self.inkTailSplit(bytes: base, width: rep.pixelsWide,
+                                             height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                             rect: probe.rect, scale: scale)
                 XCTAssertGreaterThanOrEqual(ratio, InkFloor.controlInk,
                             "\(probe.fixture) 的「\(probe.what)」静置对比度 "
                             + String(format: "%.2f", ratio) + "（\(tag)，地板 "
-                            + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有")
+                            + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有"
+                            + "\n" + Self.inkDiagnosisLine(tail: tail, darkAppearance: appearance == .darkAqua))
                 print("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
@@ -1627,13 +1745,18 @@ final class UICaptureTests: XCTestCase {
                             "\(probe.fixture) 的「\(probe.what)」在框 \(probe.rect) 里只有 "
                             + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 框贴到空白上了"
                             + "（刻度搬走了就去量新位置，不许把地板调低）")
+                let tail = Self.inkTailSplit(bytes: base, width: rep.pixelsWide,
+                                             height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                             rect: probe.rect, scale: scale)
                 XCTAssertGreaterThanOrEqual(ratio, reference * InkFloor.captionTierTolerance,
                             "\(probe.fixture) 的「\(probe.what)」只有 "
                             + String(format: "%.2f", ratio) + ":1，而同一台机器、同一外观下 10pt 的 `.secondary` 参照是 "
                             + String(format: "%.2f", reference) + ":1 ⇒ 它比系统说明文字那一档淡了 "
                             + String(format: "%.0f%%", (1 - ratio / max(reference, 0.01)) * 100)
                             + "（\(tag)）。修前三处都是 1.88/2.27 —— 那是 `.tertiary`。"
-                            + "**要读的标签不许比能点的笔画更淡**")
+                            + "**要读的标签不许比能点的笔画更淡**"
+                            // R29：同样是"低"，两种低法的修法相反 —— 先分清再动手。
+                            + "\n" + Self.inkDiagnosisLine(tail: tail, darkAppearance: appearance == .darkAqua))
                 print("CAPTION_INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " 参照=" + String(format: "%.2f", reference)
                       + " 比值=" + String(format: "%.2f", ratio / max(reference, 0.01)) + " ink="
@@ -1691,20 +1814,28 @@ final class UICaptureTests: XCTestCase {
         return (pixels, Double(pixels) / Double(x1 - x0) / Double(y1 - y0))
     }
 
-    /// **说明文字必须画全**（R28 / U-50 / D-087）。
+    /// **说明文字必须画全**（R28 / U-50 / D-087；R28b 把参照臂从"更宽"换成"更窄"）。
     ///
-    /// 缺陷：`HotKeySettingsRow` 的说明带着 `.lineLimit(1)`，而三行里被切掉的恰好是
+    /// 缺陷：`HotKeySettingsRow` 的说明带着 `.lineLimit(1)`，三行说明里被切掉的恰好是
     /// 最长、也最有信息量的那一条 —— `HotKeyAction.quickPick.description` 后半句
     /// 是"默认 ⌃⌥⇧V，刻意不是 ⌘⇧V（那是浏览器/编辑器的粘贴并匹配样式）"，
     /// 屏幕上只剩"…直接粘回原应用。…"。写进文案的理由一个字都没露。
     ///
-    /// 为什么不直接量"有没有省略号"：那是量字形，跨系统字体会漂。
-    /// 这里量的是**这一页一共画了多少字**，并且有一臂不可能是坏的：
-    /// 1100pt 宽的那一臂宽到没有任何一行会被截断 ⇒ 它就是"全文"的墨量参照。
-    /// 两臂的标题、三块录制框、三颗按钮**逐像素同构**（同样的字、同样的字号），
-    /// 只有说明文字会差 ⇒ 差多少就是少了多少字。
+    /// **为什么不是"拿一张不可能被截断的宽帧当参照"**：那是第一版，本机全绿，
+    /// 而 CI 的 macos-15 runner 上 1100pt 与 900pt 两档**整帧读出 0 墨**
+    /// （run 38449711539 / 38451162726）；仓库里 ≤750pt 的 100 张帧从来没有过这个问题
+    /// （R3-D11 记的 `content-wide-1100x800` 95% 未绘制是同一族）。
+    /// 我当时猜"越过 2048px 的离屏上限"，**900pt 那一档把它证伪了** —— 所以这里只记现象。
     ///
-    /// 地板 0.97：允许 3% 的行末留白与抗锯齿差，不允许少半句话。
+    /// 换成方向相反的对照：`settings-min`（640pt）与产品默认宽（720pt）都在 runner 拍得出来的那一档。
+    /// 说明文字要占的列宽随窗口走，所以
+    /// **只要有任何一行被截断，窄的那一臂一定比宽的那一臂少画字**；
+    /// 而两臂都画全时，同一批字换行位置不同、墨量相同 ⇒ 比值 1.0。
+    /// 地板 0.97：允许 3% 的行末留白与抗锯齿差。实测：修后 0.999 / 1.001，
+    /// 装回 `.lineLimit(1)`（变异 M123）掉到 0.925。
+    ///
+    /// 这条对照抓不住"两臂被截得一模一样"的那种坏（那需要一个真正不受宽度约束的参照），
+    /// 那句话写在 `AGENT_UI_AUDIT` 第 30 轮末尾，别让下一轮把它当成那个用。
     func testSettingsHelperTextIsNotClipped() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r28-clip-\(UUID().uuidString)", isDirectory: true)
@@ -1715,17 +1846,14 @@ final class UICaptureTests: XCTestCase {
             let tag = appearance == .darkAqua ? "dark" : "light"
             var masses: [String: Int] = [:]
             var fractions: [String: Double] = [:]
-            for name in ["settings-shortcuts", "settings-shortcuts-wide"] {
+            for name in ["settings-shortcuts", "settings-min"] {
                 guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
                     return XCTFail("找不到夹具 \(name) ⇒ 这条两臂对照没有对象")
                 }
-                if name == "settings-shortcuts-wide" {
-                    // 参照臂的**资格**也要判：它的全部价值在于"宽到不可能截断"。
-                    // 哪天有人把它改回 720，两臂就变成同一张图自比 ⇒ 恒真，而且不会有任何一条其它判据红。
-                    XCTAssertGreaterThan(fixture.size.width,
-                                         SettingsViewLayout.windowContentSize.width + 100,
-                                         "宽臂只有 \(fixture.size.width)pt ⇒ 它自己也可能被截断，不再是不动的参照")
-                }
+                // 两臂都必须落在 runner 拍得出来的那一档（R28b 实测 900pt 就已经读 0 墨）。
+                XCTAssertLessThanOrEqual(fixture.size.width, 750,
+                            "\(name) 宽 \(fixture.size.width)pt ⇒ 超出 CI runner 拍得出来的那一档，"
+                            + "这条对照会在 CI 上恒红（或在被放宽之后恒绿）")
                 let file = scratch.appendingPathComponent("\(name)-\(tag).png")
                 _ = try render(fixture, appearance: appearance, to: file)
                 guard let image = NSImage(contentsOf: file),
@@ -1734,8 +1862,8 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("刚拍出来的 \(name) 读不回来 ⇒ 捕获路径坏了")
                 }
                 let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
-                // 只量内容列：侧栏那一列的字不参与比较（它在两臂里一样，但它的**图标**是已知不可信的，
-                // 见 `OffscreenSymbolInkProbeTests` 的反相墨那条）。
+                // 只量内容列：侧栏那一列不参与比较（它的图标是已知不可信的反相面，
+                // 见 `OffscreenSymbolInkProbeTests`）。
                 let rect = CGRect(x: CGFloat(SettingsViewLayout.sidebarWidth), y: 0,
                                   width: fixture.size.width - SettingsViewLayout.sidebarWidth,
                                   height: fixture.size.height)
@@ -1746,22 +1874,31 @@ final class UICaptureTests: XCTestCase {
                 masses[name] = pixels
                 fractions[name] = fraction
             }
-            guard let narrow = masses["settings-shortcuts"], let wide = masses["settings-shortcuts-wide"],
+            guard let wide = masses["settings-shortcuts"], let narrow = masses["settings-min"],
                   wide > 0 else {
-                return XCTFail("宽臂墨量为 0 ⇒ 参照那一臂本身没画东西，这条比较恒真")
+                return XCTFail("产品宽那一臂墨量为 0 ⇒ 参照与被测量臂都没有东西可比，这条判据恒真")
             }
-            // 参照臂必须**真的画了东西**：框贴到空白上时两臂都是 0，`0 >= 0` 会绿。
-            XCTAssertGreaterThanOrEqual(fractions["settings-shortcuts-wide"] ?? 0, InkFloor.paneInkFraction,
-                                        "宽臂内容列的墨只有 "
-                                        + String(format: "%.2f%%", (fractions["settings-shortcuts-wide"] ?? 0) * 100)
+            XCTAssertGreaterThanOrEqual(fractions["settings-shortcuts"] ?? 0, InkFloor.paneInkFraction,
+                                        "内容列的墨只有 "
+                                        + String(format: "%.2f%%", (fractions["settings-shortcuts"] ?? 0) * 100)
                                         + " ⇒ 量错了地方，不是产品截断了字")
+            // **两臂必须真的差一截**：同一宽度自比 ⇒ 比值恒等于 1，而全仓没有第二条会红。
+            // 60pt 是"至少能多切掉两三个汉字"的下限（说明文字约 10.4pt/字）。
+            guard let wideFixture = fixtures(appearance: appearance).first(where: { $0.name == "settings-shortcuts" }),
+                  let narrowFixture = fixtures(appearance: appearance).first(where: { $0.name == "settings-min" }) else {
+                return XCTFail("两臂夹具缺一即判据无对象")
+            }
+            XCTAssertLessThanOrEqual(narrowFixture.size.width, wideFixture.size.width - 60,
+                        "窄臂 \(narrowFixture.size.width)pt 与产品臂 \(wideFixture.size.width)pt 差得不够 ⇒ "
+                        + "两臂自比，这条对照恒真")
             let ratio = Double(narrow) / Double(wide)
-            print("TEXT_INK \(tag) 产品宽=\(narrow) 参照宽=\(wide) ratio=\(String(format: "%.3f", ratio))")
+            print("TEXT_INK \(tag) 产品宽 720=\(wide) 窄臂 640=\(narrow) ratio=\(String(format: "%.3f", ratio))")
             XCTAssertGreaterThanOrEqual(ratio, 0.97,
-                        "快捷键页在默认 720pt 宽度下画出的字比宽到不可能截断的那一臂少 "
+                        "窗口从 720pt 收到 640pt 之后，这一页少画了 "
                         + String(format: "%.1f%%", (1 - ratio) * 100)
-                        + "（\(tag)，720=\(narrow) / 1100=\(wide)）⇒ 有说明文字被截断了。"
-                        + "修前实测 0.809（亮）/ 0.792（暗）—— 被切掉的正是「刻意不是 ⌘⇧V」那半句理由")
+                        + " 的字（\(tag)，720=\(wide) / 640=\(narrow)）⇒ 有说明文字被截断了。"
+                        + "（R28 装回 `.lineLimit(1)` 的变异实测 0.925）。"
+                        + "被切掉的正是「刻意不是 ⌘V」那半句理由")
         }
     }
 
