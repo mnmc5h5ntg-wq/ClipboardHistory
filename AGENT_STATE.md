@@ -1120,3 +1120,26 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
 - **R27 选题**：`MotionCatalog.skeletonSweep` 的 curve/transition 两支是死的（要么接上要么删）；
   17 菜单栏图标语言；26 `symbolEffect` 12/13 分叉（`.id()` 强制重建 ⇒ 不可能交叉淡，
   只有从透明淡入 = 一帧空白）；BACKLOG 30 / 31 / 34 剩余 / 39。
+
+## R27 · 要读的标签不许比能点的笔画更淡：`.tertiary` 清零（U-49 / D-086）—— 本轮有看得见的改善
+
+- **界面改动 1 个文件**：`DailyCopyHeatmapView` 三处刻度（月份 / 星期 / 图例"少·多"）
+  从 `.tertiary` 提到 `.secondary`。判据与账本改动在 `UICaptureHarness`、`PressFeedbackTests`。
+- **推翻的是上一轮的判断**：R21 把 `.tertiary` 判为"看不见"（控件实测 1.86–1.88）之后，
+  给热图刻度留了三处免检，理由是"那不是控件，是刻度文字"。本轮重新量：**1.88 亮 / 2.27 暗**，
+  与被判死的控件同一组数；而刻度恰恰是这张图里唯一被读的东西 ⇒ 免检不成立。
+- **修完的账**：亮 1.88 → **3.75–3.85**，暗 2.27 → **6.06**。
+  归因：102 帧只有两张热图帧 + 两张内嵌它的设置帧变，且全是文字行 ⇒ 格子几何零位移。
+- **口径（本轮最重要的决定）**：地板立成**梯子**不是及格线 —— `captionInk = 3.5`
+  （"必须在 secondary 那一档或以上"）。**不追 WCAG 4.5**：系统的 `secondaryLabelColor`
+  实测只有 4.0，用 4.5 钉 caption 会把"标题—说明"压平。正文 4.5（R24）与说明 3.5 分属两种角色。
+- **新判据**：`captionInkProbes`（三处 × 两外观，带墨占比地板）+
+  `testCaptionTextStaysOnTheSecondaryTier`；`.tertiary` 点名账本**清空**。
+- **变异 M120–M122 三支全 CAUGHT**，`RESTORE_CLEAN=yes`。
+  M120 第一次被电池自己拒注入（裸 needle 命中 5 次 ≠ 期望 1 次 ⇒ 变异会撒谎），
+  换成三根带上下文的 needle 才拿到真实的红 —— 这条流程本身是对的。
+- **数字**：0 warning；`696 tests / 27 skipped / 0 failures`；脚本 72 passed；
+  帧基线 102（4 changed，同提交 update）；自评 **91 / 100**
+  （… R24 92 / R25 91 / R26 92 / **R27 91**）。
+- **R28 选题**：`MotionCatalog.skeletonSweep` 的 curve/transition 两支是死的（接上或删），
+  以及清单 17 / 22 / 26 / 27 里挑一条做。**R28 是阶段二的第 20 轮**，之后转入最终报告收口。

@@ -1317,6 +1317,18 @@ final class UICaptureTests: XCTestCase {
         /// 而 R24 修掉的那张组件帧是 **13pt 的窗口底色**。
         static let bandSeamPt: Double = 2.0
 
+        /// **说明文字**（刻度、图例、caption）对它自己的底：至少 3.5:1。
+        ///
+        /// 这条刻意**不是** WCAG 的 4.5。4.5 是"要读完的句子"的线（横幅正文用那条，R24），
+        /// 而系统的 `secondaryLabelColor` 在纯白上实测只有 **4.0** ——
+        /// 拿 4.5 去钉全 App 的说明文字，等于要求每一段 caption 都压黑到比系统档还深，
+        /// 那会把"标题—说明"这条层级压平，换来一个不像系统的东西。
+        /// 3.5 的含义是**梯子**：必须在 `.secondary`（4.0）那一档或以上，
+        /// 不许掉进 `.tertiary`（实测 **1.88 亮 / 2.27 暗**）。
+        /// 触发它的正是热图那三处刻度：R21 把 `.tertiary` 判为"看不见"并只留给非控件，
+        /// R27 重新判一遍 —— 那些数是给"能点的笔画"定的，而**要读的标签没有理由比能点的笔画更淡**。
+        static let captionInk: Double = 3.5
+
         /// 动作按钮的字形中心与色带中心的容差。
         /// 修之前实测偏差 0pt（单行，碰巧对）/ **−6.5pt**（两行）/ **−14.5pt**（三行），
         /// 修之后 10 条带全部 **+0.0**。3pt 是"看得见不对"与"字的光学中心本来就比几何中心高一点"之间的折中。
@@ -1461,6 +1473,66 @@ final class UICaptureTests: XCTestCase {
                             + String(format: "%.2f", ratio) + "（\(tag)，地板 "
                             + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有")
                 print("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
+                      + String(format: "%.2f", ratio) + " ink="
+                      + String(format: "%.1f%%", coverage * 100))
+            }
+        }
+    }
+
+    /// 说明文字的探针表。框**从帧上量出来**（`.scratch/motion-audit-2/ink_probe_r24.swift probe`），
+    /// 每条都有墨占比地板兜底：布局一动，框贴到空白上会红在"框里没有字"，不会红成一个假对比度。
+    static let captionInkProbes: [InkProbe] = [
+        InkProbe(fixture: "heatmap-populated", what: "月份刻度 9月/10月/11月…（读不出月份就读不出这张图）",
+                 rect: CGRect(x: 40, y: 72, width: 380, height: 16)),
+        InkProbe(fixture: "heatmap-populated", what: "星期刻度 一/三/五/日",
+                 rect: CGRect(x: 10, y: 90, width: 26, height: 90)),
+        InkProbe(fixture: "heatmap-populated", what: "图例「少 / 多」（颜色深浅的唯一标尺）",
+                 rect: CGRect(x: 12, y: 196, width: 25, height: 14)),
+    ]
+
+    /// **要读的标签不许比能点的笔画更淡**（R27 / U-49 / D-086）。
+    ///
+    /// 修前三处全部读到 **1.88（亮）/ 2.27（暗）** —— 与 R21 判死的那两颗控件是同一组数，
+    /// 而 R21 给它们开的免检理由是"那不是控件，是刻度文字"。这一轮把那条理由重新判了一遍：
+    /// 没有月份与星期，这张网格读不出"哪一天"；没有"少/多"，颜色深浅没有标尺。
+    /// **刻度是这张图里唯一被读的东西**，它没有理由待在比控件更淡的一档。
+    ///
+    /// 自己拍自己量（R20 立的规矩），且不依赖 `CLIPBOARD_HISTORY_UI_SHOTS` ⇒ CI 上真的跑。
+    func testCaptionTextStaysOnTheSecondaryTier() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r27-caption-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for probe in Self.captionInkProbes {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == probe.fixture }) else {
+                    return XCTFail("找不到夹具 \(probe.fixture) ⇒ \(probe.what) 这条探针没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(probe.fixture)-caption-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
+                                                         height: rep.pixelsHigh,
+                                                         bytesPerRow: rep.bytesPerRow,
+                                                         rect: probe.rect, scale: scale)
+                XCTAssertGreaterThanOrEqual(coverage, InkFloor.probeInkFraction,
+                            "\(probe.fixture) 的「\(probe.what)」在框 \(probe.rect) 里只有 "
+                            + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 框贴到空白上了"
+                            + "（刻度搬走了就去量新位置，不许把地板调低）")
+                XCTAssertGreaterThanOrEqual(ratio, InkFloor.captionInk,
+                            "\(probe.fixture) 的「\(probe.what)」只有 "
+                            + String(format: "%.2f", ratio) + ":1（\(tag)，说明文字的地板 "
+                            + "\(InkFloor.captionInk)）。修前三处都是 1.88/2.27 —— 那是 `.tertiary`，"
+                            + "系统的 `.secondary` 是 4.0。**要读的标签不许比能点的笔画更淡**")
+                print("CAPTION_INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
             }

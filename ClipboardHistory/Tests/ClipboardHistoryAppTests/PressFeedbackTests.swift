@@ -293,9 +293,13 @@ final class PressFeedbackTests: XCTestCase {
     /// 必须先在这里登记，而登记要写清"它为什么不是可点的东西"。
     /// 与 R20 那条"按文件点名的账本"同一手法：总数只能报"变了"，点名才能报"哪一处"。
     func testTheFaintestInkTierIsReservedForNonControls() throws {
-        // 现在允许的全部三处，都在热图的**刻度文字**上（星期标签 / 月份标签 / 图例），
-        // 没有一处是可点的笔画。
-        var ledger: [String: Int] = ["DailyCopyHeatmapView.swift": 3]
+        // R27 之后这本账是**空的**：原来登记在册的三处（热图的月份 / 星期 / 图例）
+        // 被重新判了一遍 —— 它们量的数与被 R21 判死的那两颗控件一模一样（1.88 / 2.27），
+        // 唯一的区别是"那两颗能点，这三处要读"。要读的标签没有理由比能点的笔画更淡，
+        // 于是三处全部提到 `.secondary`（见 D-086）。
+        // 留这本空账的意义：**产品里任何一处想用这一档，都必须在这里点名并写清为什么**，
+        // 而不是"反正刻度可以"。
+        var ledger: [String: Int] = [:]
         for (file, source) in try productSources(in: "Views") {
             let hits = Self.countIdentifiers(named: "tertiary", in: codeOnly(source))
             if let expected = ledger[file] {

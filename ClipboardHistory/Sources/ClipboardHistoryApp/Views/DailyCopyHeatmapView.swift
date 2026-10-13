@@ -115,7 +115,14 @@ struct DailyCopyHeatmapView: View {
                 if let label = week.monthLabel {
                     Text(label)
                         .font(.system(size: VisualFont.meta))
-                        .foregroundStyle(.tertiary)
+                        // **刻度不是装饰**（R27 / U-49 / D-086）：这三处（月份 / 星期 / 图例"少·多"）
+                        // 以前都是 `.tertiary`，实测 **亮 1.88 : 1、暗 2.27 : 1** —— 与 R21 判为
+                        // "看不见"的那两颗控件（清除 × 1.86、展开箭头 1.88）是同一组数。
+                        // 区别只有一个：那两颗能点，这三处**要读**。没有月份与星期，
+                        // 这张网格根本读不出"哪一天"；没有"少/多"，颜色深浅没有标尺。
+                        // 所以它们必须在说明文字那一档（`.secondary`，实测 4.0），
+                        // 而不是最淡的一档。判据 `testCaptionTextStaysOnTheSecondaryTier`。
+                        .foregroundStyle(.secondary)
                         .fixedSize()
                         .offset(x: weekdayLabelWidth + CGFloat(index) * (VisualHeat.cell + VisualHeat.spacing))
                 }
@@ -130,7 +137,7 @@ struct DailyCopyHeatmapView: View {
             ForEach(0..<7, id: \.self) { row in
                 Text(rowLabel(row))
                     .font(.system(size: VisualFont.meta))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .frame(width: weekdayLabelWidth, height: VisualHeat.cell, alignment: .trailing)
             }
         }
@@ -226,7 +233,7 @@ struct DailyCopyHeatmapView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(size: VisualFont.meta))
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.secondary)
     }
 
     private var footerDetail: String {
