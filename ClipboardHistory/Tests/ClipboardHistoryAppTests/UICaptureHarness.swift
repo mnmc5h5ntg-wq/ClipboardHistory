@@ -1095,8 +1095,166 @@ final class UICaptureTests: XCTestCase {
         return bands
     }
 
-    /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
+    // MARK: - 笔画对比度探针（R21）
+
+    /// 判据自己的地板。它们**不在产品令牌文件里**：
+    /// `VisualTokens` 那条"只有声明没有消费者的令牌会打红"（R15 立的）在我把地板放进去时
+    /// 立刻红了三条，而它抓得对 —— 地板不是产品画的东西，产品侧该有的是"控件穿哪一档"
+    /// （`VisualInk`，两处真的在用它）。判据的参数就该住在判据旁边。
+    enum InkFloor {
+        /// 可点笔画对它自己的底：至少 3:1（WCAG 对非文字 UI 部件的线）。
+        static let controlInk: Double = 3.0
+
+        /// 探针盒里"这块区域真的有墨"的地板：低于它说明框贴到了空白处，
+        /// 那条判据就退化成恒真（R18 那条"自适应阈值等于没有阈值"同族）。
+        static let probeInkFraction: Double = 0.03
+    }
+
+    /// 一块帧上的一个**可点笔画**，用夹具内的 pt 坐标框出来。
+    struct InkProbe {
+        let fixture: String
+        let what: String
+        /// 夹具坐标系（pt，左上原点）。**必须是从帧上量出来的**，不是估的 ——
+        /// 本轮五个候选框里有两个贴在空白上（`receipt` 的 × 与行首星标），
+        /// 如果只报对比度，那两处会读到"背景 vs 背景 = 1.0"而红成一条假缺陷；
+        /// 有了 `inkFloor` 才会红成它真正的意思："框贴到空白了，去看元素搬到哪儿了"。
+        let rect: CGRect
+    }
+
+    /// 探针表。这张表**是起点不是全集**：加一处要先从帧上量出框（量法见
+    /// `.scratch/motion-audit-2/inspect_r20.swift crop|stats`），估的框会被墨地板打回。
     ///
+    /// 为什么表里既有已知过线的也有已知不过线的：一把只会被动在缺陷上的尺，
+    /// 与一把永远绿的尺一样没有信息量 —— 它必须能同时说"这里 4.3，过"和"这里 1.9，不过"。
+    static let controlInkProbes: [InkProbe] = [
+        InkProbe(fixture: "search-field", what: "清除 ×（静置）",
+                 rect: CGRect(x: 286, y: 80, width: 22, height: 22)),
+        InkProbe(fixture: "detail-3-files", what: "多文件行的展开箭头（整行唯一的可展开记号）",
+                 rect: CGRect(x: 29, y: 145, width: 14, height: 14)),
+        InkProbe(fixture: "glass-pill", what: "药丸里的收藏星（`.secondary` 那一档的参照）",
+                 rect: CGRect(x: 50, y: 38, width: 20, height: 20)),
+        InkProbe(fixture: "sidebar-multi-select", what: "批量操作按钮（侧栏工具排）",
+                 rect: CGRect(x: 200, y: 113, width: 20, height: 20)),
+    ]
+
+    /// 一块区域里"墨 vs 它自己的底"的 WCAG 对比度，以及这块里有多少墨。
+    ///
+    /// 三个设计决定：
+    /// - **背景取众数**而不是四角：探针框可能整块压在控件上，四角与它不同底；
+    /// - **字形取偏离最远的那 2%**而不是最值：一个抗锯齿亮点不该决定整颗按钮的可读性，
+    ///   而"最暗的那个像素"恰恰最容易是噪声（R19 记过"像素容差为 0 时抗锯齿会淹没分类器"）；
+    /// - 亮度用 WCAG 的 sRGB 线性化，不用"三通道总差" —— 后者在暗色下会系统性高估。
+    static func inkContrast(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int, rect: CGRect, scale: Double)
+        -> (ratio: Double, inkFraction: Double) {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (1.0, 0.0) }
+        var luma: [Int] = []
+        luma.reserveCapacity((x1 - x0) * (y1 - y0))
+        for y in y0..<y1 {
+            let row = y * bytesPerRow
+            var x = x0
+            while x < x1 {
+                let o = row + x * 4
+                luma.append(Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                                 + 0.0722 * Double(bytes[o + 2])).rounded()))
+                x += 1
+            }
+        }
+        // 众数按 8 级量化找：不量化的话，抗锯齿会把每个亮度值都摊薄成"只出现一次"。
+        var histogram: [Int: Int] = [:]
+        for value in luma { histogram[value / 8, default: 0] += 1 }
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+        let deviation = luma.map { (abs($0 - background), $0) }
+            .sorted { $0.0 > $1.0 }
+        let inkCount = max(1, luma.count / 50)
+        let ink = deviation.prefix(inkCount)
+        let inkLuma = ink.map { $0.1 }.reduce(0, +) / ink.count
+        let coverage = Double(luma.filter { abs($0 - background) > 16 }.count) / Double(luma.count)
+        return (Self.contrastRatio(inkLuma, background), coverage)
+    }
+
+    /// WCAG 2.x 的亮度比（1…21）。同色=1，纯黑/纯白=21。
+    static func contrastRatio(_ a: Int, _ b: Int) -> Double {
+        func channel(_ v: Int) -> Double {
+            let c = Double(v) / 255
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let la = channel(a) + 0.05, lb = channel(b) + 0.05
+        return max(la, lb) / min(la, lb)
+    }
+
+    /// 尺的算术本身要有判据：一把没人验算过的尺，报出来的数字没有意义。
+    /// 这一条**不覆盖管线**（它判的是纯函数），管线级判据是下面那条 `testActionableInk...`。
+    func testContrastRulerArithmetic() {
+        XCTAssertEqual(Self.contrastRatio(255, 0), 21.0, accuracy: 0.01, "黑白必须是 21:1")
+        XCTAssertEqual(Self.contrastRatio(128, 128), 1.0, accuracy: 0.001, "同色必须是 1:1")
+        // 中间档拿 WCAG 的公开算例核：#767676 对纯白是 4.54:1（网页正文的及格线就定在这）。
+        XCTAssertEqual(Self.contrastRatio(118, 255), 4.54, accuracy: 0.05)
+        // 单调性：**方向要跟着底走**。亮底上墨越暗越显眼，暗底上墨越亮越显眼。
+        // 这条一开始写反了（我在暗底那一支也写成"越暗越高"），是这把尺自己打红的：
+        // contrastRatio(180, 0)=10.13 而 contrastRatio(100, 0)=3.55 —— 黑底上"更亮"才是"更对比"。
+        // 记下来是因为这一族的错长得像笔误，实际是"把一句只对一半的话当成普适规律"。
+        XCTAssertGreaterThan(Self.contrastRatio(100, 255), Self.contrastRatio(180, 255),
+                             "亮底上：墨越暗，对比度越高")
+        XCTAssertGreaterThan(Self.contrastRatio(180, 0), Self.contrastRatio(100, 0),
+                             "暗底上：墨越亮，对比度越高（与上面同一条规律，方向跟着底走）")
+    }
+
+    /// **可点的笔画必须过可辨线**（R21 / U-43）。
+    ///
+    /// 缺陷是**看着帧**发现的：清除 × 静置 1.86（亮）/ 2.22（暗），而它旁边占位符文字是 9.42 ——
+    /// 同一帧、同一把尺、两个答案，说明尺没坏，是那两颗字用了给"注释"的颜色档。
+    /// 详情区多文件行那颗展开箭头是同一族：它是**整行唯一的"我能展开"记号**，
+    /// 却比旁边"这是什么类型"的图标更淡（1.88 / 2.27 vs 3.95 / 5.9）。
+    ///
+    /// 与 R20 那条命中区改动连起来读：**命中区抬大只解决点得中，不解决看得见**。
+    ///
+    /// 这条**自己拍自己量**（R20 预检立的规矩）：不许读 `testCaptureKeyViews` 写好的 PNG。
+    func testActionableInkStaysAboveTheLegibilityFloor() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r21-ink-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for probe in Self.controlInkProbes {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == probe.fixture }) else {
+                    return XCTFail("找不到夹具 \(probe.fixture) ⇒ \(probe.what) 这条探针没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(probe.fixture)-judged-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获路径坏了")
+                }
+                // 缩放比从**帧与夹具**算出来，不写死 2：夹具改尺寸时尺要跟着走，
+                // 而不是悄悄按 @2x 去读一张 @1x 的图（那会把每个框都放大一倍）。
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
+                                                         height: rep.pixelsHigh,
+                                                         bytesPerRow: rep.bytesPerRow,
+                                                         rect: probe.rect, scale: scale)
+                XCTAssertGreaterThanOrEqual(coverage, InkFloor.probeInkFraction,
+                            "\(probe.fixture) 的「\(probe.what)」在框 \(probe.rect) 里只有 "
+                            + String(format: "%.1f%%", coverage * 100) + " 的墨 ⇒ 框贴到空白上了"
+                            + "（元素搬走了就去量新位置，不许把地板调低）")
+                XCTAssertGreaterThanOrEqual(ratio, InkFloor.controlInk,
+                            "\(probe.fixture) 的「\(probe.what)」静置对比度 "
+                            + String(format: "%.2f", ratio) + "（\(tag)，地板 "
+                            + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有")
+                print("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
+                      + String(format: "%.2f", ratio) + " ink="
+                      + String(format: "%.1f%%", coverage * 100))
+            }
+        }
+    }
+
+    /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。    ///
     /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，
     /// 而 `QuickPickController` 正是它们。如果闭包里"现造一个控制器 → 返回面板 → 出作用域"，
     /// 控制器会被释放，表格的 dataSource 静默变成 nil ⇒ 0 行 ⇒ 帧仍然拍得出来，

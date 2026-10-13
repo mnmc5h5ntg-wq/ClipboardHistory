@@ -950,3 +950,31 @@ R20 必须交付看得见的改善，不再连续第二轮纯量尺。
   做一条跑在夹具帧上的判据（`inspect_r20.swift stats` 那套：众数=背景、2% 极值=字形、WCAG 比值），
   扫全部图标按钮并把不过线的改色（方向：静置 `.secondary`，悬停交给 R20 的底色药丸）。
   顺带做掉 BACKLOG 32（`contentMustFit`）：本轮又一次靠人眼才发现夹具在裁自己，那条守卫该有了。
+
+## R21 · 可辨线推广到控件（U-43 / D-079）—— 量出来的缺陷修了，还立了能推广的尺
+
+- **界面改动 3 个文件**：`VisualTokens`（新增 `VisualInk.control` / `controlTargeted` 两档画笔）、
+  `SearchField`（清除 × 静置从 `.tertiary` 抬到 `VisualInk.control`，指到 `.primary`）、
+  `DetailView`（多文件行展开箭头同一族）。
+- **实测账**：× 1.86/2.22 → **3.74/5.34**；箭头 1.88/2.27 → **3.85/6.06**；
+  两处参照位（药丸星 4.43/7.86、侧栏批量 14.56/12.43）未动 —— 尺要能同时说"过"与"不过"。
+- **新增判据**：`UICaptureHarness.inkContrast`（产物像素上的 WCAG 比值 + 墨占比）、
+  `testActionableInkStaysAboveTheLegibilityFloor`（4 处 × 2 外观，自己拍自己量）、
+  `testContrastRulerArithmetic`（21:1 / 1:1 / `#767676` 对纯白 4.54:1 / 两个方向的单调性）、
+  `testTheFaintestInkTierIsReservedForNonControls`（`.tertiary` 按文件点名，计数走标识符边界）。
+- **本轮最值钱的三条**：① 尺的真值表抓到作者把单调性写反（黑底上"更亮"才是"更对比"）；
+  ② 像素探针要自带"这块真的有墨"的地板 —— 估的五个框里两个贴在空白上；
+  ③ R15 的"死令牌"守卫把放错文件的常数抓了出来 ⇒ 地板住判据旁边（`InkFloor`），
+  产品侧只留真的被读的 `VisualInk`，没人读的 `smallText` 删掉。
+- **电池升级**：每支变异除 CAUGHT 之外还要在失败输出里找到期望文本（M92 必须红在墨地板那条）。
+  **M90–M94 五支全 CAUGHT**，预检 3/3 绿，`RESTORE_CLEAN=yes`。
+- **真实视觉审查**：行带尺读数 = 6 帧、三条 9pt 带（三颗箭头）+ 两条 12.5pt 带（那颗 ×），
+  **k=0 就对齐 ⇒ 零几何牵连**；暗色下逐张看过，层级是"内容 > 可点 > 说明"。
+- **排除一条假缺陷**：`MotionCatalog.asymmetricTransition` 已给两个方向各绑 `.animation`
+  ⇒ 清单 14 里"时长不对称没生效"那一半不成立，只剩"横幅会不会把内容顶下去"。
+- **数字**：0 warning；685 tests / 25 skipped / 0 failures；脚本 72 passed；
+  帧基线 **98 张**（6 changed，同提交 update）；自评 **91 / 100**
+  （R9 91 / R10 90 / R11 92 / R12 93 / R13 94 / R14 95 / R15 96 / R16 93 / R17 95 / R18 91 / R19 86 / R20 89 / **R21 91**）。
+- **R22 选题**：清单 14 剩下的那一半 —— 提示条插入/撤走时的**布局位移**
+  （`content-with-notice` 现在尺寸是真的，"挤不挤"可测；reduce 下只改高度不改时序也要判），
+  顺带做掉 BACKLOG 32（`contentMustFit`：本轮之前又一次靠人眼才发现夹具在裁自己）。

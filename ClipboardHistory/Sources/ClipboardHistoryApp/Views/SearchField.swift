@@ -26,7 +26,13 @@ struct SearchField: View {
                 Button(action: { text = "" }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: VisualFont.row, weight: .medium))
-                        .foregroundStyle(isHovered ? .secondary : .tertiary)
+                        // 静置走 `VisualInk.control`（R21）：这一颗以前用 `.tertiary`，
+                        // 实测 **亮 1.86 / 暗 2.22**，低于判据地板 `InkFloor.controlInk`=3.0 ——
+                        // 而它是可点的控件，不是注释。R20 把命中区从 14pt 抬到 22pt 之后这条更要紧：
+                        // **看不见的大目标仍然看不见**。
+                        // 悬停那一下交给 `controlTargeted` + 底色药丸（颜色说"这是控件"，
+                        // 药丸说"指针在这儿"），不再靠"从看不见变成勉强看得见"当反馈。
+                        .foregroundStyle(isHovered ? VisualInk.controlTargeted : VisualInk.control)
                 }
                 // 悬停药丸与命中区一起抬（R20）：这颗 × 的 label **只有字形那么大**
                 // （`xmark.circle.fill` 在 `VisualFont.row` 下约 14pt，没有 frame、没有 padding），

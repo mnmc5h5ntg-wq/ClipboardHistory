@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R21）
+
+- **两处"能点的小笔画"从看不见抬到看得清**（R21 / U-43 / D-079）：搜索框清除 × 与多文件行的
+  展开箭头原来都穿 `.tertiary`，实测静置对比度 **1.86 / 2.22** 与 **1.88 / 2.27**（亮 / 暗），
+  而非文字 UI 部件的地板是 3.0；同一帧里 `.secondary` 的图标是 3.95 / 5.9，正文 9.42。
+  ⇒ 在系统色板上 `.tertiary` 的真名字不是"次要"，是"**看不见**"。
+  现在静置走 `VisualInk.control`（`.secondary`）、指到走 `controlTargeted`（`.primary`），
+  实测抬到 **3.74 / 5.34** 与 **3.85 / 6.06**。R20 刚把 × 的命中区从 14pt 抬到 22pt ——
+  **看不见的大目标仍然看不见**，几何与可见性是两条独立判据。
+- **多文件行的层级反了**（R21）：那颗箭头是**整行唯一的"我可以展开"记号**，
+  却比旁边"这是什么类型"的图标更淡，同时还踩着 `VisualGlyph.badge` 的 10pt 下限 ——
+  两样都弱就叠成了"没有这个记号"。
+- **一条判据的单调性方向写反，被自己的尺打红**（R21）：我给对比度尺写真值表时写了
+  "墨越暗对比度越高"，在黑底那一支是反的（`contrastRatio(180,0)=10.13 > (100,0)=3.55`）。
+  现在两个方向分开断言，各配一句为什么。
+- **放错文件的常数被"死令牌"守卫抓出来**（R21）：`VisualContrast.controlInk / smallText /
+  probeInkFraction` 第一版写进 `VisualTokens`，全量测试立刻红三条 —— 它抓得对：
+  地板不是产品画出来的东西。判据参数搬到 `UICaptureHarness.InkFloor`，
+  产品侧只留真的被视图读的 `VisualInk`，而没有任何消费者的 `smallText` 直接删掉。
+
+### Added（R21）
+
+- **可辨线从文字推广到控件**（R21）：`UICaptureHarness.inkContrast` 在**产物像素**上量
+  "这块墨 vs 它自己的底"的 WCAG 比值（背景取 8 级量化的众数、字形取偏离最远的 2%），
+  配 `testActionableInkStaysAboveTheLegibilityFloor` 扫四处图标控件 × 两个外观，
+  外加 `testContrastRulerArithmetic` 钉住尺的算术（21:1 / 1:1 / `#767676` 对纯白 4.54:1）。
+- **每条像素判据都自带"这块真的有墨"的地板**（R21）：`InkFloor.probeInkFraction` ≥ 3%。
+  本轮五个**估出来的**候选框里有两个贴在空白上 —— 只判对比度时空白会读到 1.0 而红成假缺陷，
+  有了墨地板才会红成它真正的意思（"框贴到空白，去看元素搬到哪儿"）。框必须从帧上量。
+- **`.tertiary` 的按文件点名账本**（R21）：`testTheFaintestInkTierIsReservedForNonControls`
+  要求全 `Views` 里这一档只出现在登记过的地方（现在只剩热图的三处**刻度文字**，非控件），
+  新增位点必须先登记并写理由。计数按**标识符边界**，`.tertiaryLabelColor` 不会被白拿。
+- **变异电池开始核对"红得对不对"**（R21）：每支变异除 CAUGHT/ESCAPED 之外，
+  还要在失败输出里找得到期望文本（M92 必须红在墨地板那条上）。
+  "红了"与"红得对"是两件事 —— 与 R19 那条"症状会活过病因"同族。
+
 ### Changed（R20）
 
 - **每一颗圆形图标按钮的悬停强度重新判过**（R20 / U-42 / D-078）：`PressedStyle.hoverLevel`

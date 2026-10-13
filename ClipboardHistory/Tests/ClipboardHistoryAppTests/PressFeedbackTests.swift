@@ -281,6 +281,57 @@ final class PressFeedbackTests: XCTestCase {
         return Int(digits)
     }
 
+    /// `.tertiary` 这一档**只留给非控件的笔画**（R21 / U-43）。
+    ///
+    /// 触发它的是两处实测：搜索框清除 × 静置 **1.86（亮）/ 2.22（暗）**，
+    /// 多文件行那颗展开箭头 **1.88 / 2.27** —— 两者都是"能点的东西"，
+    /// 而地板是 `InkFloor.controlInk` = 3.0。同一帧旁边的 `.secondary` 图标是 3.95 / 5.9。
+    /// 也就是说 `.tertiary` 从来不是"次要"，它是"**看不见**"。
+    ///
+    /// 为什么还要一条源码判据（帧探针已经在了）：探针表只能覆盖**量过框的那几处**，
+    /// 新加一颗按钮不会碰到任何探针。这条按文件点名 ⇒ 想再往控件上用这一档，
+    /// 必须先在这里登记，而登记要写清"它为什么不是可点的东西"。
+    /// 与 R20 那条"按文件点名的账本"同一手法：总数只能报"变了"，点名才能报"哪一处"。
+    func testTheFaintestInkTierIsReservedForNonControls() throws {
+        // 现在允许的全部三处，都在热图的**刻度文字**上（星期标签 / 月份标签 / 图例），
+        // 没有一处是可点的笔画。
+        var ledger: [String: Int] = ["DailyCopyHeatmapView.swift": 3]
+        for (file, source) in try productSources(in: "Views") {
+            let hits = Self.countIdentifiers(named: "tertiary", in: codeOnly(source))
+            if let expected = ledger[file] {
+                XCTAssertEqual(expected, hits,
+                               "\(file) 里 `.tertiary` 从 \(expected) 处变成 \(hits) 处 ⇒ 重新判一遍："
+                               + "可点的笔画不许用这一档（实测 1.86–2.27，地板 3.0），"
+                               + "非控件的刻度文字要留就留在这里并写清为什么")
+                ledger[file] = nil
+            } else {
+                XCTAssertEqual(hits, 0,
+                               "\(file) 出现了 \(hits) 处 `.tertiary` 而账本里没有它 ⇒ "
+                               + "控件一律至少 `.secondary`；确实不是控件（纯装饰/刻度文字）"
+                               + "才登记进 `testTheFaintestInkTierIsReservedForNonControls` 的账本")
+            }
+        }
+        XCTAssert(ledger.isEmpty, "这些文件里的 `.tertiary` 不见了：\(ledger.keys.sorted())"
+                  + " ⇒ 那一档被撤干净了是好事，把账本条目一起删掉，别留一条会自己变红的旧账")
+    }
+
+    /// 数**标识符**而不是数字符串：`.tertiary` 不能被 `.tertiaryLabelColor` 白拿一次
+    /// （R20 的"按名字查消费者会被前缀白拿"同族）。
+    static func countIdentifiers(named name: String, in code: String) -> Int {
+        var count = 0
+        var search = code[...]
+        while let range = search.range(of: name) {
+            let before = range.lowerBound > code.startIndex
+                ? code[code.index(before: range.lowerBound)] : " "
+            let after = range.upperBound < code.endIndex
+                ? code[range.upperBound] : " "
+            let isWord: (Character) -> Bool = { $0.isLetter || $0.isNumber || $0 == "_" }
+            if !isWord(before), !isWord(after) { count += 1 }
+            search = code[range.upperBound...]
+        }
+        return count
+    }
+
     /// 详情区药丸那四颗**只允许有一层悬停底色**（R20 抓到的是叠了两层）。
     ///
     /// `GlassIconControl` 自己在 44pt 的圆上画 `.primary.opacity(controlHover)`，

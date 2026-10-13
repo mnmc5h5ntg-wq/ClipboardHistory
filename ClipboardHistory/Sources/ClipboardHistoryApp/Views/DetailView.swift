@@ -546,7 +546,12 @@ private struct MultiFileRow: View {
                 // （`MultiFilePreviewLayout.animation` 自己已经管 reduce-motion）。
                 Image(systemName: "chevron.right")
                     .font(.system(size: VisualGlyph.badge, weight: .semibold))
-                    .foregroundStyle(.tertiary)
+                    // 静置至少 `.secondary`（R21）：这一颗是**整行唯一的"我可以展开"的记号**，
+                    // 而 `.tertiary` 在详情区那块纯白底上实测 **亮 1.88 / 暗 2.27**（地板 3.0），
+                    // 同一行旁边那个 `.secondary` 的类型图标是 3.95 / 5.9 ——
+                    // 也就是说"能点"这件事一直比"这是什么类型"更弱，方向正好反了。
+                    // 它同时还踩着 `VisualGlyph.badge` 的 10pt 下限，两样都弱就叠成了"看不见"。
+                    .foregroundStyle(VisualInk.control)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .animation(MultiFilePreviewLayout.animation, value: isExpanded)
                     .frame(width: 12)
