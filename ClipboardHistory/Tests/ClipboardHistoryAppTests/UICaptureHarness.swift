@@ -1567,9 +1567,12 @@ final class UICaptureTests: XCTestCase {
                                       bytesPerRow: rep.bytesPerRow,
                                       rect: CGRect(x: 46, y: 66, width: 74, height: 20), scale: scale)
         print("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
-        if icon.total == 0 && title.total == 0 {
+        // 守卫要用"读到几个偏离像素"，不能用 `total` —— `total` 是尾墨切片的大小，
+        // 它被 `max(1, …)` 兜过底，**永远不可能等于 0**。第一版就写错在这里：
+        // CI 上这条 NOT-RUN 没生效，两条断言直接红（run 38454852737）。
+        if icon.brighter + icon.darker == 0 && title.brighter + title.darker == 0 {
             print("INK_SIDE_NOT_RUN aqua")
-            throw XCTSkip("INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个像素）⇒ "
+            throw XCTSkip("INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个偏离像素）⇒ "
                           + "两端对照记为未运行，不算通过（见 BACKLOG 43）")
         }
         XCTAssertGreaterThan(icon.brighter, icon.darker * 2,
@@ -1867,9 +1870,16 @@ final class UICaptureTests: XCTestCase {
                     return XCTFail("刚拍出来的 \(name) 读不回来 ⇒ 捕获路径坏了")
                 }
                 let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                // 这一行是 BACKLOG 43 的实验本体：三种可能（没画 / 画成一块底色 /
+                // 位图字节布局与尺的假设不符）各自会留下不同的指纹。
+                // CI 第一次的读数（run 38454852737）已经排掉一种：**px=720x540 scale=1.0**
+                // ⇒ runner 是 @1x 截图，本机是 @2x —— 这也顺带解释了 R27 那两处"低对比度"。
                 print("TEXT_INK_FRAME \(name) \(tag) px=\(rep.pixelsWide)x\(rep.pixelsHigh) "
-                      + "scale=\(scale) transparent="
-                      + String(format: "%.1f%%", Self.transparentFraction(of: rep) * 100))
+                      + "scale=\(scale) bpp=\(rep.bitsPerPixel) samples=\(rep.samplesPerPixel) "
+                      + "bpr=\(rep.bytesPerRow) transparent="
+                      + String(format: "%.1f%%", Self.transparentFraction(of: rep) * 100)
+                      + " " + Self.lumaHistogram(bytes: base, width: rep.pixelsWide,
+                                                height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow))
                 // 只量内容列：侧栏那一列不参与比较（它的图标是已知不可信的反相面，
                 // 见 `OffscreenSymbolInkProbeTests`）。
                 let rect = CGRect(x: CGFloat(SettingsViewLayout.sidebarWidth), y: 0,
@@ -1977,6 +1987,29 @@ final class UICaptureTests: XCTestCase {
                           "产品注入的接缝「\(label)」夹具没注入 ⇒ 帧里那颗控件是**禁用态**，"
                           + "而发出去的包里没有这个状态；帧基线会把禁用态钉成标准")
         }
+    }
+
+    /// 整帧的粗灰度直方图（8 档 × 百分比）。用途只有一个：
+    /// 分清"整帧一个颜色"（一档 100%）与"有内容但我的尺看不见"（多档分布）。
+    static func lumaHistogram(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                              bytesPerRow: Int) -> String {
+        var buckets = [Int](repeating: 0, count: 8)
+        var total = 0
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < width {
+                let o = y * bytesPerRow + x * 4
+                let l = (Int(bytes[o]) * 3 + Int(bytes[o + 1]) * 6 + Int(bytes[o + 2])) / 10
+                buckets[min(7, l / 32)] += 1
+                total += 1
+                x += 4   // 每 4 个像素采一个，够分辨"一块底色"了
+            }
+            y += 4
+        }
+        guard total > 0 else { return "hist=empty" }
+        return "hist=" + buckets.map { String(format: "%.0f", Double($0) * 100 / Double(total)) }
+                                 .joined(separator: "/") + "%"
     }
 
     /// 一块矩形里"红减蓝"的均值 —— 分得出"中性灰/白"与"橙 12%/红 10%"的那根轴。
