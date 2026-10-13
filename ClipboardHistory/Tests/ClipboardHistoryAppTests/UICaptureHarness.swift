@@ -384,18 +384,38 @@ final class UICaptureTests: XCTestCase {
             .joined(separator: " ")
             + "（线 " + String(format: "%.0f", InkFloor.bottomEdgeControlMinFraction * 100) + "%，"
             + "mustFit 那批的上限是 " + String(format: "%.0f", InkFloor.fixtureBottomInkMaxFraction * 100) + "%）")
-        // **第二把锁：这把尺读的是产物，不是 raw rep**（R37）。
-        // `content-min` 的底行是那块选中行的黑药丸（R18 名单里的一处），PNG 上读到 **43.4%**，
-        // 而 raw rep 上只读到 **3.4%** —— 差 13 倍，因为 raw rep 里"没画"的像素是透明的，
-        // 它们会把底行的中位数抢走。把 metrics 来源改回 raw rep，这一条会红。
-        let pillCarriers = report.filter { Self.fixtureName(fromFile: $0.name) == "content-min" }
-        XCTAssertFalse(pillCarriers.isEmpty, "对照帧 content-min 没被拍到 ⇒ 这把锁今天没上")
-        for item in pillCarriers {
-            XCTAssertGreaterThan(item.metrics.bottomInkFraction, 0.20,
-                                 "\(item.name) 的底行只读到 "
-                                 + String(format: "%.1f", item.metrics.bottomInkFraction * 100) + "%"
-                                 + " ⇒ 尺读的不是落盘那张图（PNG 上这块药丸占满底行左半边，43.4%）")
+        // **第二把锁：这把尺读的是产物，不是 raw rep**（R37 立的锁，R38 换成恒等式）。
+        //
+        // R37 那一版写的是"`content-min` 的底行至少读到 20%"，本机 43.4% 通过，
+        // 而 runner 上同一帧读到 **9.3%** ⇒ 红（run 38485603211，被闸门指名）。
+        // 那是**用一台机器的读数当另一台机器的地板** —— 正是这一族判据反复栽的那个形状，
+        // 而且这次是 R36 刚说完"别这么写"之后我自己写的。
+        //
+        // 换成恒等式：**判据用的读数 == 从写盘那个文件重算出来的读数**。
+        // 它在任何机器上都成立（两边同一台机器算），而谁把来源换回 raw rep，
+        // 两边就会差出 13 倍（本机 3.4% vs 43.4%）⇒ 锁照样咬得住，且不再依赖帧长什么样。
+        var identityChecked = 0
+        var identityDiffering: [String] = []
+        for item in report {
+            let url = directory.appendingPathComponent(item.name)
+            guard let bytes = try? Data(contentsOf: url),
+                  let disk = NSBitmapImageRep(data: bytes), let dbase = disk.bitmapData else {
+                XCTFail("\(item.name) 读不回字节 ⇒ 这条恒等式没被真的检验（帧没落盘？）")
+                continue
+            }
+            let fromDisk = Self.bottomInkFraction(bytes: dbase, width: disk.pixelsWide,
+                                                  height: disk.pixelsHigh, bytesPerRow: disk.bytesPerRow)
+            XCTAssertEqual(fromDisk, item.metrics.bottomInkFraction, accuracy: 0.0001,
+                           "\(item.name)：判据用的读数 "
+                           + String(format: "%.1f", item.metrics.bottomInkFraction * 100)
+                           + "% ≠ 从落盘文件重算的 " + String(format: "%.1f", fromDisk * 100)
+                           + "% ⇒ 尺读的不是产物（raw rep 里\"没画\"的像素是透明的，会抢走底行中位数）")
+            identityChecked += 1
+            if abs(fromDisk - item.metrics.bottomInkFraction) > 0.001 { identityDiffering.append(item.name) }
         }
+        XCTAssertGreaterThanOrEqual(identityChecked, 100,
+                                    "恒等式只对了 \(identityChecked) 张帧 ⇒ 遍历坏了，这条锁等于没上")
+        print("BOTTOM_INK_IDENTITY \(identityChecked) 张帧：判据读数 == 从 PNG 重算的那一份")
 
         // 新知识（R37 才有）：哪些帧的底行**真的**压着东西。以前这条清单是假的（色差）。
         let edgeCarriers = report.filter { $0.metrics.bottomInkFraction >= InkFloor.fixtureBottomInkMaxFraction }
@@ -2370,9 +2390,15 @@ final class UICaptureTests: XCTestCase {
         }
         judged = checked - notRun.count
         XCTAssert(checked >= 40, "只问了 \(checked) 条探针的颜色域 ⇒ 两张贴表的遍历本身坏了")
-        XCTAssert(judged >= 20,
-                  "只判成 \(judged) 条（放行 \(notRun.count) 条）⇒ 这条资格判据已经什么都不判了。"
-                  + "放行是**有条件的**（那一族在这台机器上整体画不出来），不是把判据关掉")
+        // 地板**从表推导**，不写死数字。runner 第一次真跑（run 38485603211）：40 条里放行 20、判成 20 ——
+        // 恰好压在写死的 20 上。那种"刚好过"的地板既拦不住未来（再多一族画不出来就悄悄归零），
+        // 也解释不了现在（20 是谁？）。现在：可判的必须**全部**判到，另加一条"对象不许被清空"的下限。
+        let mustJudge = (pendingCaption + pendingControl).filter { eligible($0.probe) }.count
+        XCTAssertEqual(judged, mustJudge,
+                       "非放行的那 \(mustJudge) 条必须全部真的判到 ⇒ 有 \(mustJudge - judged) 条被悄悄跳过")
+        XCTAssertGreaterThanOrEqual(mustJudge, 16,
+                                    "这台机器上只剩 \(mustJudge) 条可判的探针 ⇒ 这张资格判据的对象快被清空了；"
+                                    + "该问的是『还剩谁值得判』，而不是把地板调低")
         XCTAssert(captionViolations.isEmpty,
                   "这些说明段探针压在 vibrant 子树上：\(captionViolations) ⇒ 拍到的是 vibrancy 合成**之前**"
                   + "的像素，「档」这个量在那一列不是产品那个量（R35 实测：侧栏 `.primary` 行标题最深 113，"

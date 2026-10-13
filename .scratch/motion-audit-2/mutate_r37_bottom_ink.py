@@ -40,9 +40,11 @@ MUTATIONS = [
     ("M170", "参照点改回左上角那一个像素（U-60 原样）", CORNER_REF,
      "        let r0 = Int(bytes[0]), g0 = Int(bytes[1]), b0 = Int(bytes[2])  // MUTANT",
      "参照点又变回"),
+    # R38 起这条锁是**恒等式**（判据读数 == 从 PNG 重算的那一份），失败消息换了措辞；
+    # 本机 43.4% vs runner 9.3% 说明"至少读到 20%"那种地板是拿一台机器的读数量另一台。
     ("M171", "读数来源换回 raw rep（不是产物）", SOURCE_PNG,
      "        let measured: NSBitmapImageRep = rep  // MUTANT",
-     "尺读的不是落盘那张图"),
+     "尺读的不是产物"),
     ("M172", "一张 mustFit 夹具被压矮（真的裁到内容）", RECEIPT,
      RECEIPT.replace("height: 56", "height: 40"),
      "这张夹具正在裁自己的内容"),
