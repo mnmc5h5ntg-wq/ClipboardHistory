@@ -1,7 +1,7 @@
 import XCTest
 @testable import ClipboardHistoryApp
 
-/// 采集路径（用户按下 ⌘C 之后，`HistoryStore.add` 那条同步链）的两条判据（R49 / BACKLOG 73）。
+/// 采集路径（用户按下 ⌘C 之后，`HistoryStore.add` 那条同步链）的三条判据（R49 立 / R51 重做）。
 ///
 /// 为什么本轮要新增这个文件：R48 给热图那条淡入 A/B 补上 per-run 打印之后，
 /// 读到的是 `开A [345–612@0.226/粗260] 帧数=2 整卷中位=8ms` ——
@@ -10,9 +10,11 @@ import XCTest
 /// ② 探针自己那次同步 `cacheDisplay` 慢（本文件顶部 `MotionFilmstripTests` 的预卷注释里
 ///    就写着"新窗口的头两次 `cacheDisplay` 要 260–340ms 一帧"）。
 /// 上一轮我把这两种混在了一句"要查"里。**光靠计时分不开它们** —— 计时只能证明"有没有超时"，
-/// 证明不了"有没有写盘"。所以这里两条一起立：
-/// 一条**行为**判据（目录里有没有出现新写入的文件，与机器快慢无关），
-/// 一条**时长**判据（把"主线程在这条链上花了多少"变成一个可红的数）。
+/// 证明不了"有没有写盘"。所以这里三条一起立：
+/// 一条**行为**判据（把写队列堵起来：堵着就不许出现文件，放开就必须出现），
+/// 两条**时长**判据（小库与快满的库各一条 —— 这条链的成本随库大小增长，只测小库等于没测）。
+/// R51 的实测还给出一个不体面的边界：**时长判据抓不到行为判据抓到的那件事**
+/// （M249 把写盘真的搬回主线程，`add` 只涨到 2.54ms，仍然绿），所以三条不能互相替代。
 ///
 /// 不覆盖管线：不适用 —— 本文件全部从产品入口 `HistoryStore.add` 进入，
 /// 没有一条只调内部纯函数（`percentile` 那格是尺子自己的真值表，见它的注释）。
@@ -36,36 +38,72 @@ final class CapturePathWriteBudgetTests: XCTestCase {
 
     // MARK: - 判据一：采集路径上不许有同步磁盘写
 
-    /// 从产品入口复制一条内容，**盘上必须一个字节都没多**。
+    /// 从产品入口复制一条内容，**主线程那一次不许碰盘**。
     ///
-    /// 为什么用"目录里有没有新文件"而不是"耗时多少"：耗时判据在慢机器上恒红、
-    /// 在快机器上恒绿，而"同步写盘"这件事与快慢无关 —— 它是结构性的。
-    /// 目标里那句"采集路径上不许有同步磁盘写"要的是后者。
-    func testAddingACopyWritesNothingOnTheCapturePath() throws {
+    /// 这一条是 R49 写的、R51 重做的。R49 那版是"复制之后整个临时目录一个文件都不许多"，
+    /// 它在本机第一次全量跑就红了，而红得**不对**：多出来的那个文件是
+    /// `history.json.sb-11faeef9-PWSNBE` —— 原子写的临时文件，由**后台** `saveQueue` 创建。
+    /// 也就是说目录快照分不清"主线程同步写"与"后台正在写"，它测的是错的东西
+    /// （目标禁的是**同步**磁盘写，后台异步写正是设计要求的形状）。
+    ///
+    /// 现在的做法是把持久化的写队列**先堵起来**，再复制：
+    /// ① 写如果是排在队列后面的 ⇒ `add` 立刻返回，且被堵期间盘上没有 `history.json`；
+    /// ② 写如果发生在主线程 ⇒ 它绕不开这个堵，要么当场就出现文件（红），要么直接卡住（超时也是红）。
+    /// 放开闸门之后文件必须出现 —— 这一句是对照组：没有它，"没写盘"可以靠"根本没接上盘"来绿。
+    func testAddingACopyWritesNothingOnTheMainThread() throws {
+        let blocked = DispatchSemaphore(value: 0)
+        let queue = DispatchQueue(label: "r51.blocked-save-queue")
+        queue.async { blocked.wait() }          // 这个串行队列现在什么都干不了
         let ledgerURL = temporaryDirectory.appendingPathComponent("daily-copy.json")
+        let historyURL = temporaryDirectory.appendingPathComponent("history.json")
         let store = HistoryStore(
             clipboardWriter: TestClipboardWriter(),
-            persistence: FileHistoryPersistence(rootDirectory: temporaryDirectory),
+            persistence: FileHistoryPersistence(rootDirectory: temporaryDirectory, saveQueue: queue),
             dailyCopyLedger: DailyCopyLedger(fileURL: ledgerURL, debounceSeconds: 0.4))
 
-        let before = snapshot(of: temporaryDirectory)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: historyURL.path),
+                       "构造期就落了盘 ⇒ 这条判据的前提没了（init 不许写盘是 D-002 的边界）")
+        let start = DispatchTime.now()
         store.add(entry("采集路径不该同步写盘的那一条"), timestamp: Date())
-        let after = snapshot(of: temporaryDirectory)
+        let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
 
-        XCTAssertEqual(before, after,
-                       "按下 ⌘C 之后盘上多了东西 ⇒ 采集路径上有同步写盘：\(difference(before, after))")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: historyURL.path),
+                       "写队列还堵着，`history.json` 就已经出现 ⇒ 那次写发生在调用线程上，"
+                       + "不是排在后台队列里 ⇒ 目标里那句「采集路径上不许有同步磁盘写」不成立")
         XCTAssertFalse(FileManager.default.fileExists(atPath: ledgerURL.path),
-                       "账本在 `add` 返回之前就已经落盘 ⇒ 去抖没起作用（这条正是目标明令禁止的形状）")
+                       "账本在 `add` 返回之前就已经落盘 ⇒ 去抖没起作用")
+        print(String(format: "CAPTURE_PATH_BLOCKED add 用时=%.2fms 门槛=%.0fms",
+                     elapsed, Self.blockedQueueBudgetMilliseconds))
+        XCTAssertLessThan(elapsed, Self.blockedQueueBudgetMilliseconds,
+                          "队列被堵住时 `add` 仍只该做内存里的工作；实测 \(String(format: "%.2f", elapsed))ms "
+                          + "说明它在等一个它自己发起的写")
 
-        // 上面那两条必须**不是恒真**：去抖到期之后文件要真的出现，
-        // 否则"什么都没写"也可以靠"根本没接上盘"来绿（把红伪装成没跑的那一族）。
-        pumpMain(seconds: 1.2)
+        blocked.signal()                        // 放开闸门
+        let deadline = Date().addingTimeInterval(3.0)
+        while !FileManager.default.fileExists(atPath: historyURL.path), Date() < deadline {
+            pumpMain(seconds: 0.05)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: historyURL.path),
+                      "放开闸门之后存档仍然没出现 ⇒ 上面那两条「没写盘」是因为根本没接上盘，"
+                      + "不是因为有去抖。这条判据就成了一条恒真的空话")
+        // 账本走的是"去抖 + 后台队列"，所以它必须**晚一点**才出现；这里只要求它最终出现。
+        let ledgerDeadline = Date().addingTimeInterval(3.0)
+        while !FileManager.default.fileExists(atPath: ledgerURL.path), Date() < ledgerDeadline {
+            pumpMain(seconds: 0.05)
+        }
         XCTAssertTrue(FileManager.default.fileExists(atPath: ledgerURL.path),
-                      "等过去抖窗口账本仍然不存在 ⇒ 这条判据的对照组是空的，"
-                      + "上面那句「没写盘」是因为整条链路根本没接上，不是因为去抖")
-        let written = snapshot(of: temporaryDirectory)
-        XCTAssertNotEqual(before, written, "对照组里盘上仍然一个字节没多 ⇒ 上面那条断言永远绿，是假判据")
+                      "账本始终没落盘 ⇒ 计数只活在内存里，重启就丢（阶段一的可回溯性要求）")
     }
+
+    /// 队列被堵住时 `add` 允许花的时间（ms）。
+    /// 本机实测 `CAPTURE_PATH_BLOCKED add 用时=0.48 / 0.49 / 0.53ms` ⇒ 取 10ms（约 20 倍余量，与另两条同一把尺）。
+    ///
+    /// **这一条的分辨率必须写清楚，否则它会冒充成判据一**：变异 M249 把写盘真的搬回调用线程之后，
+    /// 这一条打印出来是 `用时=2.54ms` —— 仍然绿。也就是说在小库上"同步写一次盘"只值 2ms，
+    /// 任何按 ms 定的门槛都要么松到抓不住它、要么紧到在 CI 那台机器上恒红（R38 那条规矩）。
+    /// 真正在管"不许有同步磁盘写"的是上面那条**行为**判据（盘上有没有出现文件），
+    /// 这一条管的是另一件事：不写盘的时候这条链占住主线程多久。
+    static let blockedQueueBudgetMilliseconds: Double = 10
 
     // MARK: - 判据二：主线程在这条链上花的时间必须是个数
 
@@ -107,6 +145,83 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(samples.count, Self.minimumSampleCount,
                                     "样本掉到 \(Self.minimumSampleCount) 以下 ⇒ p95 不再是一个分位数")
     }
+
+    /// 存档**快满了**的时候，一次复制在主线程上花多少（R51）。
+    ///
+    /// 为什么必须单独一条：上面那 40 个样本是在"几条记录"的小库里测的，
+    /// 而这条链的主线程成本**随库大小增长**（同一次跑、同一台机器：小库 median 0.55ms
+    /// ⇒ 480 条时 2.47ms，差 4.5 倍）。500 条上限那一天才是这条链最贵的时候，
+    /// "不许有同步磁盘写"如果只测小库，等于没测。
+    ///
+    /// **但增长的构成不是我以为的那个**（M253 实测推翻了我先写的一句话）：
+    /// 我原本写"这条测的是 `saveSnapshot`（整库 JSON 编码 + 图片规划），因为它在调用线程上跑"。
+    /// 变异电池那一次把 `saveSnapshot` 真跑两遍，median 只从 2.43 涨到 2.93ms
+    /// ⇒ **整库快照只占约 0.5ms**，也就是 median 的五分之一。剩下那约 1.9ms 在别处
+    /// （索引 / 降采样 / 发布 / 视图 diff，本文件没有把它们分开量，那是 BACKLOG 76）。
+    /// 所以这条判据红了之后要做的第一件事是**分段量**，不是直接把 `saveSnapshot` 搬出主线程 ——
+    /// 搬了它也只能省下两成。
+    func testAddingACopyWithANearlyFullArchiveStaysInsideBudget() throws {
+        // ① 先造一个接近上限的存档（真写盘，之后重新加载它）。
+        let seeding = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: FileHistoryPersistence(rootDirectory: temporaryDirectory),
+            dailyCopyLedger: nil)
+        for index in 0..<Self.fullArchiveEntries {
+            seeding.add(entry("填满存档的第 \(index) 条：这条的存在只为了让快照变大"), timestamp: Date())
+        }
+        pumpMain(seconds: 0.4)
+
+        // ② 换一个"写队列被堵住"的持久化重新开一个库：此时主线程只剩快照要做。
+        let blocked = DispatchSemaphore(value: 0)
+        let queue = DispatchQueue(label: "r51.blocked-full-archive-queue")
+        queue.async { blocked.wait() }
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: FileHistoryPersistence(rootDirectory: temporaryDirectory, saveQueue: queue),
+            dailyCopyLedger: nil)
+        XCTAssertEqual(store.entries.count, seeding.entries.count,
+                       "重新加载没拿到同一份库 ⇒ 下面测的是空库，白测")
+        // 这一条钉的是**前提**：库真的接近上限。
+        // 地板是一个**独立**的绝对数，不是 `fullArchiveEntries - 20`：R51 第一版写的就是后者，
+        // 而那是自适应阈值 —— 把 `fullArchiveEntries` 改成 1，地板跟着变成 -19，
+        // 这条前提断言恒真，正好把"它要防的那次退化"放过去了（变异 M251 实测，见下）。
+        // 同一族在本仓库记过不止一次（`sampleCount` 与 `minimumSampleCount` 必须分开也是这件事）。
+        XCTAssertGreaterThanOrEqual(seeding.entries.count, Self.fullArchivePremiseFloor,
+                                    "造库没造满 ⇒ 下面那个数不是在测快满的库，是在测空库")
+
+        var samples: [Double] = []
+        for index in 0..<Self.sampleCount {
+            let start = DispatchTime.now()
+            store.add(entry("快满的库里再复制一条：第 \(index) 个样本"), timestamp: Date())
+            let end = DispatchTime.now()
+            samples.append(Double(end.uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000)
+        }
+        blocked.signal()
+        let median = Self.percentile(samples, 0.5)
+        let p95 = Self.percentile(samples, 0.95)
+        print(String(format: "CAPTURE_PATH_FULL_ARCHIVE n=%d 库=%d 条 median=%.2fms p95=%.2fms 门槛=%.0fms",
+                     samples.count, seeding.entries.count, median, p95, Self.fullArchiveBudgetMilliseconds))
+        XCTAssertGreaterThanOrEqual(samples.count, Self.minimumSampleCount)
+        XCTAssertLessThanOrEqual(median, Self.fullArchiveBudgetMilliseconds,
+                                 "快满的库里一次复制的中位耗时超过门槛 ⇒ 主线程这条链已经是可感成本。"
+                                 + "**先分段量是哪一段**（M253 实测：整库快照只占 median 的约 1/5），"
+                                 + "不要直接搬 `saveSnapshot` —— 那是把两成的问题解决成全部的问题")
+    }
+
+    /// 造库时塞多少条：故意留一点余量，别让降采样/上限把测试形状改掉。
+    static let fullArchiveEntries = 480
+    /// 前提地板：**独立于** `fullArchiveEntries` 的绝对数（400 = 500 上限的 80%）。
+    /// 为什么不能写成 `fullArchiveEntries - 20`：那样两个数就绑在一起动了，
+    /// 把造库数量改成 1 时地板也一起缩到 -19，这条断言永远绿 —— 恒真的前提等于没有前提。
+    /// 两个数分开之后，"造库变少"与"判据还在测快满的库"是两件事，前者会红。
+    static let fullArchivePremiseFloor = 400
+    /// 快满的库里一次复制的中位门槛（ms）。**从实测推导**：
+    /// 本机 2026-10-14 在 480 条的库上跑四次 `median=2.34 / 2.43 / 2.47 / 2.49ms`、
+    /// `p95=2.56 / 2.64 / 3.39 / 5.91ms` ⇒ 取 20ms（最差 median 的 8 倍、最差 p95 的 3.4 倍）。
+    /// p95 的散布比 median 大得多（2.6 到 5.9），所以余量按**最差**那一遍算，不按第一次看到的数。
+    /// 为什么余量比小库那条紧：这条测的是**随库大小增长的那一份**（同一次跑里小库 median 0.55ms），
+    /// 它才是"复制多了会不会开始卡"的先行指标；留太宽就等于不测。
+    static let fullArchiveBudgetMilliseconds: Double = 20
 
     /// 样本数。为什么不是 5：`p95` 在 n=5 上就是最大值（本仓库记过"p99 在 n=2"这一族）。
     static let sampleCount = 40
@@ -171,28 +286,6 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         // 0.5 分位在 n=4 上落在位置 1.5 ⇒ 必须插值，两端的下标取法都会偏。
         // 真值表第 ① 格钉的就是这个形状（25，既不是 20 也不是 30）。
         return sorted[lower] * (1 - fraction) + sorted[upper] * fraction
-    }
-
-    /// 目录快照：路径 → (尺寸, mtime)。用**内容指纹**而不是 mtime 单独一项，
-    /// 因为有些文件系统把 mtime 截到秒级，同一秒内的写会看不出来。
-    private func snapshot(of directory: URL) -> [String: String] {
-        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
-        guard let walked = FileManager.default.enumerator(at: directory,
-                                                          includingPropertiesForKeys: keys,
-                                                          options: []) else { return [:] }
-        var result: [String: String] = [:]
-        for case let url as URL in walked {
-            let values = try? url.resourceValues(forKeys: Set(keys))
-            let stamp = values?.contentModificationDate?.timeIntervalSince1970 ?? 0
-            result[url.path] = "\(values?.fileSize ?? -1)@\(String(format: "%.6f", stamp))"
-        }
-        return result
-    }
-
-    private func difference(_ before: [String: String], _ after: [String: String]) -> String {
-        let added = Set(after.keys).subtracting(before.keys).sorted()
-        let changed = after.keys.filter { before[$0] != nil && before[$0] != after[$0] }.sorted()
-        return "新增文件=\(added) 内容变了=\(changed)"
     }
 
     private func entry(_ text: String) -> ClipboardIntake.Entry {

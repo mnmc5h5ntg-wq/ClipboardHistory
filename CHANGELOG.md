@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R51：上一轮那条"同步写盘"判据测错了对象）
+- `CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread` 从"目录快照不许多文件"
+  改成"**把注入的写队列堵起来**"：堵着 ⇒ 盘上不许出现 `history.json` / `daily-copy.json`；
+  放开闸门 ⇒ 两个都必须出现（对照组）。
+  旧那条在全量跑与 CI（run 38538371464）上都红，而红得不对 —— 多出来的
+  `history.json.sb-11faeef9-PWSNBE` 是**后台** `saveQueue` 的原子写临时文件，
+  目标禁的是"**同步**磁盘写"，异步写正是设计要求的形状。
+- 新增 `testAddingACopyWithANearlyFullArchiveStaysInsideBudget`：480 条的库 + 堵住的队列，
+  测"主线程只剩这条链"时一次复制花多久（本机 median 2.34–2.49ms，门槛 20ms 按最差那一遍推导）。
+  旧的两条时长判据只测了几条记录的小库，而这条链的成本随库大小增长（0.55ms → 2.47ms）。
+- 前提断言的地板与造库数量脱钩（`fullArchivePremiseFloor = 400`）：
+  第一版写成 `fullArchiveEntries - 20` ⇒ 自适应阈值恒真，M251 才把它抓出来。
+- 注释与失败消息里那句"这条测的是整库快照"被 M253 推翻并改正：快照只占 median 的约 1/5，
+  红了之后要先分段量（BACKLOG 76），不要直接搬 `saveSnapshot`。
+- 删掉随旧判据一起失效的两个辅助函数。变异 M249–M252 四支全 CAUGHT，M253 按设计绿（灵敏度实测）。
+- 产品代码零改动，116 张帧逐字节不变。
+
 ### Fixed（R50：行移动那条判据先修探针，再让结论分三态）
 - `TableProbe` 的 move 臂在宣布一次 `moveRow` 之前把**六行文案全改了**（`·已挪`），
   而产品那条分支不 rename（`QuickPickController.rebuildRows` 的文案变化走 `plan.reloads`）。

@@ -1850,3 +1850,36 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   自评 **94 / 100**。**CI 待读：本轮的修法只有 runner 能验收**（本机进程无法激活 ⇒ 每次 skip）。
 - **下一步（R51）**：① 读 R50 的 CI，看 `MOTION_NATIVE_MOVE 判定=` 落在哪一格（三种可能各自怎么走，
   已写在 BACKLOG 75 里）；② BACKLOG 71（热图梯子相邻档可分辨性）；③ BACKLOG 72（其余调用点还在跨度上）。
+---
+
+## R51 · 那条判据红得不正确：它测的是后台写，不是主线程写（第 53 轮 / U-77 / D-110 / BACKLOG 76）
+
+- **靶**：R49 立的"采集路径不许同步写盘"判据在全量跑与 CI（run 38538371464）都红。
+  对账之后：**红得不对** —— 多出来的是 `history.json.sb-XXXX`，后台 `saveQueue` 的原子写临时文件。
+  目录快照分不清同步与异步 ⇒ 判据测错了对象（U-77）。
+- **修法**：注入的串行写队列**先堵起来**再 `store.add` ⇒ 堵着不许出现 `history.json` / `daily-copy.json`，
+  `blocked.signal()` 之后两个都必须出现（对照组）。没有对照组，"没写盘"能靠"没接上盘"来绿（M250 试了，红）。
+- **新增一条**：480 条的库 + 堵住的队列 ⇒ 主线程只剩这条链时一次复制多久。
+  四次实测 `median=2.34 / 2.43 / 2.47 / 2.49ms`、`p95=2.56 / 2.64 / 3.39 / 5.91ms` ⇒ 门槛 20ms（最差 median 的 8 倍）。
+  旧那两条只测了几条记录的小库，而这条链的成本随库大小增长（同一次跑 0.55 → 2.47ms）。
+- **两条判据互不覆盖（M249 实测）**：真把写搬回调用线程之后，行为判据红，
+  时长判据打印 `add 用时=2.54ms` **仍然绿** ⇒ 小库上同步写只值 2ms。这句话写进门槛注释，
+  防止下一个人以为时长那条也在管同步写。
+- **本轮自己错两处**：① 新加的前提断言写成 `fullArchiveEntries - 20` ⇒ 自适应阈值恒真，
+  设计 M251 时才发现（与 `sampleCount`/`minimumSampleCount` 同一族，上一轮刚记过一次）；
+  ② 注释里写"这条测的是整库快照"，M253 实测 median 只涨 0.5ms ⇒ 快照只占 1/5，
+  注释与失败消息都改了，分段量开成 **BACKLOG 76**。
+- **真实视觉审查**：零产品改动、116 帧逐字节不变。看的是暗档热图（`heatmap-cell-strip-still-90x140-dark.png`），
+  并用 `heat_ladder_preview.py` 把"分不出来"变成数：暗档最低两级 Δ=15 / 13、亮档 12 / 13，
+  全部低于 `perceptibleBand255 = 18` ⇒ BACKLOG 71 有数了，R52 去做判据（会改像素，帧基线要 update）。
+- **验证**：M249–M252 四支全 CAUGHT、M253 按设计绿；`swift build --build-tests` **0 告警**；
+  全量 **750 tests / 29 skipped / 0 failures**；离屏闸门 `passed=721 skipped=29 failed=0 NOT_RUN=0 红=0`；
+  116 帧 `CHANGED=0 MISSING=0 ADDED=0`；脚本 **101 全绿**。**不换装**。
+  **动效覆盖地板闸门本机没有输入**（motion 场景判据要 `CLIPBOARD_HISTORY_UI_MOTION=1` 才跑，
+  全量跑里是 skip）⇒ 本机那一门的 `MOTION_FLOOR_NO_RESOLVE` 是喂错日志，不是产品退化；真结论等 runner。
+  自评 **94 / 100**。
+- **R50 与 R51 合并验证**：全量那一遍跑在两轮的树上（R50 单独那个提交没有被全量扫过，CI 跑 tip）。
+- **下一步（R52）**：① **BACKLOG 71**（相邻档 Δ 判据 + 抬 `empty` 或抬第 1 级，改像素要 update 帧基线）；
+  ② 读 R50/R51 的 CI：`MOTION_NATIVE_MOVE 判定=` 落在哪一格、`MOTION_RESOLVE_SUMMARY` 的 not-run 名单；
+  ③ BACKLOG 72（其余调用点还在跨度上 —— 已有 `.scratch/motion-audit-2/answer_backlog_72.py`，
+  它自检复现了夹具的 135ms vs 45ms，缺的是带 `CLIPBOARD_HISTORY_UI_MOTION=1` 的真胶片日志）。
