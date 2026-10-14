@@ -2239,7 +2239,15 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   电池日志：`.scratch/motion-audit-2/r61_mutation_battery.log`。
 - **自评 96 / 100**：动了产品；原生感 −1（多一个 AppKit 桥）、性能 −1（多一次有界树解析），
   换来的是"详情区与列表重新指向同一条记录"。
-- **下一步（R62）**：① 读 R61 的 CI（R60 的已读：success、warnings 0、motion suite exit 0、116 帧、脚本 108 全绿）；
+- **R61 的 CI 已逐步读完（run 38603034761，整作业 success）**：`compile warnings: 0`；
+  Swift **772 / 44 skip / 0 failures**（本机是 39 skip ⇒ runner 多跳 5 条，就是那三条在屏探针 + 两条老探针）；
+  离屏捕获 **116 帧 / 捕获失效 0**、capture gate `passed=25 skipped=9 failed=0 有名字的红=0`；
+  motion **exit 0、42 例、judged=4/4**、floor `OK=4/4 REDS=0`；帧基线 vs working `MISSING=0 ADDED=0`（像素全等）；
+  脚本 **Ran 108 OK**。而**最要紧的一行是**：`ui suite exit: 137 executed: 0 已下结论的用例: 0` ——
+  在屏交互探针在 runner 上被 240s 看门狗收掉，**一条都没跑完** ⇒ 本轮那三条揭示判据在 CI 上不存在，
+  61 的回归在 CI 侧只有「真值表 + 两条源码守卫」兜着（它们不依赖 env，确实在 772 例里跑过）。
+  ⇒ 新开 BACKLOG 92 记这件事（不粉饰成「CI 覆盖了」）。
+- **下一步（R62）**：① BACKLOG 92（把在屏探针做成 runner 跑得完的形状，或在账本里明确它们是本机专属）；
   ② BACKLOG 91（给那条闸门找一条有分辨率的产品路径，否则把声明降级成注释）；
   ③ BACKLOG 90（滚回顶部后表格选中集多留一行）；④ BACKLOG 89（runner 那条红的夹具与
   `.spanUnresolved`）；③ BACKLOG 88（重叠：关掉动画那一臂与开着那一臂同帧号相减）；
