@@ -2978,6 +2978,20 @@ R39 换装之后没有立刻开新的一把尺，而是把上一轮的问法**�
 ⇒ 规矩要写成动作：**每一支变异的预期红消息必须从"这一次注入实际会让哪一行红"里读**，
 不许从"我改的是哪个功能"里推。下一轮把这条也钉进电池脚本（needle 与实际消息不符 ⇒ DID-NOT-RUN）。
 
+### CI 已读（run 38508965110 / job 115672825962，12m2s，15 步全 ✓）
+
+第 4 步 0 告警；第 5 步 `Executed 724 tests, with 36 tests skipped and 0 failures`；
+第 7 步闸门 `passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=8 ⇒ CAPTURE_GATE_RESULT=ok`；
+第 11 步 `Ran 83 tests`；第 13 步夹具集闸 `COMPARED=112 / CHANGED=112 / MISSING=0 / ADDED=0`；
+第 14 步对上一版发布 `CHANGED=62 / ADDED=50 / MISSING=6`（报告型）；第 15 步 `SMOKE_SAW_START=True / SMOKE_OK=1`。
+
+**`CHANGED=112` 这一格本轮才看懂**（它一直在打，以前没读）：`frame_baseline.py check` 也逐帧比 sha，
+而 runner 是 @1x、仓库基线是本机 @2x ⇒ **每一帧都"变了"**；这一门的退出码只由 `missing` 决定
+（脚本原话："多帧与变帧交给人判断，因为新功能本来就会加帧"）⇒ 它判的确实是"夹具集"，不是像素。
+⇒ 顺带解释了为什么 R41 本机 compare 读 `CHANGED=0` 而 CI 读 112：**同一把尺在两台机器上量的不是同一件事**，
+这一族已经是第四次遇到（R27 / R28 / R38 / 这次），只是这次落在一个我误读成"像素门"的步骤名上。
+NOT_RUN 第四次漂：40 → 5 → 26 → **8** ⇒ BACKLOG 57 继续攒数据点，仍不解释。
+
 ### 本轮超出 ≤4 文件的规矩（记账，不辩解）
 
 非台账文件 7 个：产品 4（`ClipboardWriteFailure` 新、`CopyThenPaste`、`HistoryStore`、`ApplicationShell`）

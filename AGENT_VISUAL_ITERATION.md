@@ -2717,4 +2717,10 @@ R39b 补了机器前提（`settingsDrawability` 四格真值表 + M183/M184 各�
 `passed=695 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`、帧基线 110 → **112**
 （同 commit update，改后 compare 读回 `CHANGED=0 / ADDED=0 / MISSING=0`）、脚本 83 全绿、
 `make_info_plist.sh` 8 键齐备、变异 M189–M193 五支全 CAUGHT（`未被抓到=0 红得不对=0 还原不干净=0`）。
-**CI 待读**（本轮尚未推送，不预先写"CI 绿"）。
+**CI 已读**：run **38508965110** 整作业 success（12m2s），15 步全 ✓ ——
+第 5 步 `Executed 724 tests, with 36 tests skipped and 0 failures`、第 7 步闸门
+`passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=8 ⇒ ok`、第 11 步 `Ran 83 tests`、
+第 13 步夹具集闸 `COMPARED=112 / MISSING=0 / ADDED=0`、第 15 步 `SMOKE_OK=1`。
+**顺带看懂了一个一直存在但从没读过的数字**：第 13 步在 runner 上打 `CHANGED=112`（本机同一条命令是 0）——
+`check` 也逐帧比 sha，而 runner @1x、基线 @2x ⇒ 每帧都"变了"，所以那一门的退出码**只由 missing 决定**。
+NOT_RUN 第四次漂：40 → 5 → 26 → **8**（BACKLOG 57 继续攒数据点）。
