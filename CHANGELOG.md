@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R49：目标里那条"采集路径不许同步写盘"第一次有了会红的判据）
+- 新增 `CapturePathWriteBudgetTests`（3 条判据，全部从产品入口 `HistoryStore.add` 进入）：
+  ① 复制之后临时目录**一个文件都不许多**（尺寸@mtime 快照），并带一条"去抖到期后文件必须出现"的
+  对照组 —— 不许靠"根本没接上盘"来绿；② `add` 占住主线程的中位与 p95 各一条门槛，
+  门槛从实测推导（本机 median 0.56–0.63ms / p95 1.28–1.46ms / max 3.08ms ⇒ 10ms 与 40ms）；
+  ③ 尺子自己的真值表 7 格（偶数取插值、两端、乱序、单样本、空表必须 NaN、n=5 时 p95 就是最大值）。
+- 这条要求此前 40 轮**没有任何判据在管**：把同步写盘塞回 `DailyCopyLedger.recordCopy`，
+  没有一条用例会红。现在会红（变异 M240 实测，红在"账本在 `add` 返回之前就已经落盘"）。
+- BACKLOG 73 结案：R48 那次 260ms 抓帧空档**不在产品的采集链上**（产品侧 0.6ms 中位），
+  它是探针自己对新生子树的首帧渲染（R11 记过同一量级）；旁证是开臂 `粗260` 而关臂 `粗6`。
+  剩下的产品侧问题另开 BACKLOG 74（淡入第一帧的真实成本）。
+- 变异 M240–M244 五支全 CAUGHT；M240 是**产品侧**变异（本轮第一次改 `Sources/` 做变异），还原干净。
+- 产品代码零改动（`Sources/` 与提交前逐字节相同），116 张帧不变。
+
+
 ### Fixed（R48：动效时长那把尺补了连续性，判定补了分辨率，一句旧结论被撤回）
 - `changedRunElapsedMilliseconds` 名叫 "run" 却**不要求连续** ⇒ 改名 `changedSpanElapsedMilliseconds`
   （行为不变），新增 `contiguousChangedRun`（取**含峰值**的那一段连续变化 + 段内最粗采样）。
