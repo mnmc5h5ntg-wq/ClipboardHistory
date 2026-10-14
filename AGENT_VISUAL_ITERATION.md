@@ -2630,4 +2630,6 @@ macOS 12 那条 AppleScript 路径**静默失败**（脚本没生效也不报错
 **CI 已读（两次）**：第一次 run 38494383404 第 5 步 `Swift tests` **红** —— 12 条全来自本轮那条新判据，
 runner 上设置页内容列是平涂 ⇒ 对比度 1.00 / 墨 0 / 差值 0（`ROWTIER settings-general-login-* dark：有字行 0 行`）。
 R39b 补了机器前提（`settingsDrawability` 四格真值表 + M183/M184 各咬一次）与 `judged + notRun == 2` 的覆盖账，
-本机读数一字未变（亮 13.76→1.82 / 暗 11.43→2.29）。第二次的逐步 conclusion 见 `AGENT_STATE.md`（U-61 的规矩）。
+本机读数一字未变（亮 13.76→1.82 / 暗 11.43→2.29）。
+第二次 run 38496845658 **整作业 success**：闸门 `passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=5 ⇒ ok`、帧基线夹具集闸 ✓、`SMOKE_OK=1`。
+**没搞清的一条**：同一闸门口径 R38 报 40、这轮报 5 —— 本轮只可能多出标记，不可能少 35 条 ⇒ 记 BACKLOG 57，先复现再解释（不许拿这两个数当同一把尺比）。

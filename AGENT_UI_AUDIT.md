@@ -2744,7 +2744,21 @@ R37（量级地板在 runner 上 9.3%）同一族，**第三次犯**。差别只
 
 ### 验证
 
-718 tests / 29 skipped / **0 failures**；`swift build` 0 告警；帧基线
+719 tests / 29 skipped / **0 failures**；`swift build` 0 告警；帧基线
 `CHANGED=0 / MISSING=0 / ADDED=4`（104 → **108**），基线在同一 commit 里 update；
 脚本 83 全绿；变异 **M177–M182** 六支全 CAUGHT、红得对 6/6、`RESTORE_CLEAN=yes`；
 `PROBE_DOMAIN 问了 44 条、判成 44 条`（+4 来自两条新探针 × 两档）。
+
+### R39b 的 CI 追认（逐步结论已读，不是转述）
+
+第一次 run 38494383404 红在第 5 步；R39b 推上去 run 38496845658 **整作业 success**（12m53s）：
+第 4 步 0 告警、第 5 步 Swift tests ✓、第 6 步帧捕获 ✓、
+第 7 步闸门 `CAPTURE_GATE_CASES passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=5 ⇒ CAPTURE_GATE_RESULT=ok`、
+第 13 步帧基线夹具集闸 ✓、第 15 步 `SMOKE_OK=1`。
+那条新判据在 runner 上 `passed (2.797s)` 与 `passed (3.572s)`：它与 R39 第一版读同一批帧、同一批矩形，
+第一版红、这版过 ⇒ 走的是 `noneDrawn` 那一支（判据里没有别的通过路径）。
+
+**同一条追认里留下一项没解释的口径**：闸门这轮报 `NOT_RUN=5`，而 R38 同一步报的是 40 ——
+本轮的改动只会**新增**标记（两条新探针 × 两档 + 未运行的两档），不可能少 35 条。
+两种解释都还没证（计数来源换了 / 某批 NOT-RUN 打印路径不再走到），所以记 BACKLOG 57：
+先复现再解释，在此之前这两个数字不许被当成同一把尺比较（U-62 的口径版）。
