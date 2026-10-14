@@ -63,7 +63,12 @@ final class HistoryStore: ObservableObject {
     @Published private(set) var filter: Filter = .all {
         didSet { invalidateFilteredCache() }
     }
-    @Published private(set) var clipboardWriteErrorMessage: String?
+    /// 一次写剪贴板失败的**完整事实**（R41 / D-100）：一句人话 + 这次失败有没有已经清空过剪贴板。
+    /// 存事实而不是存一句文本，是因为回执要说"你原来那点东西还在不在"，
+    /// 而那件事只有 `clearedPasteboard` 判得出来 —— 一句错误文本里带不出来（R40 就是这么说了假话）。
+    @Published private(set) var clipboardWriteFailure: ClipboardWriteFailure?
+    /// 界面上那一句。保留这个名字：详情区那颗按钮只问"成没成 / 说什么"，不该被迫理解整个事实。
+    var clipboardWriteErrorMessage: String? { clipboardWriteFailure?.message }
     /// 存档损坏时的恢复提示（备份回退 / 原件保全）。UI 层可据此显示一次性提示。
     @Published private(set) var historyRecoveryNotice: String?
     /// 自动粘贴失败时要让用户看见原因，而不是"点了没反应"（审计 R-13）。
@@ -979,11 +984,14 @@ final class HistoryStore: ObservableObject {
     private func writeToClipboard(_ entry: Entry) -> Bool {
         do {
             let changeCount = try clipboardWriter.write(entry.content, richText: entry.richText)
-            clipboardWriteErrorMessage = nil
+            clipboardWriteFailure = nil
             intake.markChangeCount(changeCount)
             return true
         } catch {
-            clipboardWriteErrorMessage = error.localizedDescription
+            // 分类而不是直出 `localizedDescription`：未分类错误会带着系统英文原文进界面
+            // （"The operation couldn't be completed. (NSOSStatusErrorDomain error -100.)"），
+            // 而回执还要负责说"你原来那点东西还在不在"。原文继续进日志。
+            clipboardWriteFailure = ClipboardWriteFailure.classify(error)
             LifecycleDebugLogger.log("HistoryStore clipboard write failed error=\(error)")
             return false
         }

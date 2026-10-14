@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R41 · 上一轮那句回执，恰好在三种最常见的失败里说了假话）
+
+- **发现的是自己上一轮交付的缺陷**：R40 的回执固定写着"剪贴板里仍是原来的内容，没有被替换"，
+  而 `ClipboardWriter.swift` 的真实顺序是 `:67` 校验 → `:71` `clearContents()` → `:78/:97/:99` 写入失败
+  ⇒ 四种已知失败里有**三种**发生在清空之后，用户原来的剪贴板内容那时**已经没了**。
+  照那句话去 ⌘V，粘出来的是空或上一条无关内容。另一半：`error.localizedDescription` 直出，
+  非本模块的错误会把 "The operation couldn't be completed. (NSOSStatusErrorDomain error -100.)" 搬进横幅。
+- 新增 `ClipboardWriteFailure { message, clearedPasteboard }` + `classify(_:)`：把"失败"从一句字符串
+  升成一个事实。`HistoryStore` 存这个值（`clipboardWriteErrorMessage` 退化成计算属性 ⇒ 消费者零改动），
+  `CopyThenPaste.decide` 按 `clearedPasteboard` 说两种话。未分类错误**保守**当作已清空
+  （猜错方向的代价不对称：说"还在"会让人去粘空内容，说"没了"只是多复制一次）。
+  系统原文改道 `LifecycleDebugLogger` —— 界面要下一步，日志要原文（BACKLOG 58 里那半问就此答掉）。
+- 判据：真值表 1（5 格，含未分类那格的方向 + "不许含 The operation"）+ 管线级两臂（回执随错误类型而不同）
+  + **两条既有契约测试被改掉**（它们钉的正是 `message == error.localizedDescription` 这个 BACKLOG 58 形状），
+  改后加一条 `XCTAssertNotEqual`，让"退回裸描述"本身会红。
+- 帧 **110 → 112**：新帧 `content-min-with-copy-failure-notice`（**600×440 = 产品最小窗口**，
+  取自 `App.swift:12` 与 `WindowConfigurator:94`，不是夹具自选宽度）。上一轮只在 750 上放过这句话，
+  而"文案变长"在 750 放得下不构成证据。读数：两行完整、`NOTICE_ACTION offset=+0.0`、
+  `ratio=12.98 / ink=24.5%`（亮）、暗档 `11.54 / 27.8%`。
+  顺带量到 `blackBandPt` 66 → 0 的机制（横幅把选中行整行顶出可视区）⇒ 记 **BACKLOG 61**，本轮不动产品。
+- 变异 **M189–M193** 五支全 CAUGHT；但第一遍 `红得不对=2` —— needle 我按 `decide` 的措辞猜，
+  实际红在 `classify` 的分支里（U-65 那一族**第三次**犯）。分开计数、读实际消息、重写预期后才全绿。
+- **BACKLOG 59 已逐行复核**（只核不修）：两处 catch 只写 debug 日志，且 `HistoryStore` 那 6 条回执通道里
+  **没有一条是存盘失败** ⇒ 这次没有现成通道可复用，先定形状再动。
+- 本机换装与 CI 结论见 `AGENT_UI_AUDIT.md` 第 43 轮。
+
 ### Fixed（R40 · 复制失败之后，那一下 ⌘V 粘的是别的东西）
 
 - **修的是一个"做了错的事"的缺陷，不是提示缺失**：浮层回车 / 菜单栏点一条走的是

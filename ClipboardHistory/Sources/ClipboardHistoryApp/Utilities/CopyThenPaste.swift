@@ -23,10 +23,23 @@ enum CopyThenPaste {
         case cancel(reason: String)
     }
 
-    /// - Parameter copyErrorMessage: 紧跟在复制之后读的 `HistoryStore.clipboardWriteErrorMessage`。
-    static func decide(copyErrorMessage: String?) -> Decision {
-        guard let copyErrorMessage else { return .pasteNow }
-        return .cancel(reason: "复制到剪贴板失败：\(copyErrorMessage)。"
-                       + "已取消自动粘贴 —— 剪贴板里仍是原来的内容，没有被替换。")
+    /// - Parameter failure: 紧跟在复制之后读的 `HistoryStore.clipboardWriteFailure`。
+    ///   `nil` = 这次成了（`writeToClipboard` 成功时会清成 nil）。
+    ///
+    /// R41 把参数从"一句错误文本"换成**整个失败事实**：回执要说的不只是"失败了"，
+    /// 还有"你原来那点东西还在不在"——而那是 `clearedPasteboard` 决定的，
+    /// 光拿一句错误文本回来是**判不出来**的（这正是 R40 那句"仍是原来的内容"会说谎的原因）。
+    static func decide(failure: ClipboardWriteFailure?) -> Decision {
+        guard let failure else { return .pasteNow }
+        let consequence: String
+        if failure.clearedPasteboard {
+            // 清空发生在写入失败**之前** ⇒ 旧内容确实没了。这句必须说，
+            // 否则用户下一步 ⌘V 会以为拿到的是刚才那条。
+            consequence = "已取消自动粘贴。注意：剪贴板里原来的内容在这次尝试里已经被清掉，"
+                        + "请重新复制一次再粘贴。"
+        } else {
+            consequence = "已取消自动粘贴 —— 剪贴板里仍是原来的内容，没有被替换。"
+        }
+        return .cancel(reason: "复制到剪贴板失败：\(failure.message)\(consequence)")
     }
 }

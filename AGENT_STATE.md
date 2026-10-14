@@ -1,6 +1,6 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-13 12:3x（本地）
+最后更新：2026-10-14 11:55（本地 · R41 / 第 43 轮收尾，CI 待读）
 
 ## 当前状态（2026-10-13 · 视觉与动效长跑 R1）
 
@@ -1528,3 +1528,42 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **下一步（R41）**：BACKLOG 58 —— 把 `SystemEventsPasteKey.reason(fromStderr:)` 那套
   "错误码 → 人话 + 下一步"的成例接到复制这条路上（真值表 + 原文留日志不留界面）；
   顺带复核 BACKLOG 59 那一条（保存失败到底哪几种可达）。
+
+---
+
+## R41 · 上一轮那句回执，在三种最常见的失败里说了假话（第 43 轮 / U-67 / D-100）
+
+- **本轮修的正是 R40 自己交付的东西**：`ClipboardWriter.swift` 的真实顺序是
+  `:67` 校验 → `:71` `clearContents()` → `:78/:97/:99` 写入失败 ⇒
+  四种已知失败里有**三种**发生在清空之后，而 R40 的回执固定说"剪贴板里仍是原来的内容，没有被替换"。
+  用户照这句话去 ⌘V，粘出来的是空或上一条无关内容。另一半：`localizedDescription` 直出，英文原文进横幅。
+- **修法**：`ClipboardWriteFailure { message, clearedPasteboard }` + `classify`（未分类**保守**当作已清空，
+  因为猜错方向的代价不对称）；`HistoryStore` 存这个值，`clipboardWriteErrorMessage` 退化成计算属性；
+  `decide` 按事实分两支说话；系统原文改道 `LifecycleDebugLogger`。**BACKLOG 58 收口**。
+- **两条既有契约测试被改掉**（它们钉的就是 `message == error.localizedDescription` 这个缺陷形状），
+  改后加 `XCTAssertNotEqual` ⇒ "退回裸描述"这件事本身会红。这是为改契约而改测试，不是为了变绿。
+- **帧 110 → 112**：补上 R40 缺的那一臂 —— `content-min-with-copy-failure-notice`（**600×440 = 产品最小窗口**，
+  数字取自 `App.swift:12` / `WindowConfigurator:94`）。两行完整、`NOTICE_ACTION offset=+0.0`、
+  亮 `ratio=12.98 ink=24.5%` / 暗 `11.54 / 27.8%`。
+  顺带量到 `blackBandPt` 66 → 0 的机制：**横幅把选中行整行顶出可视区，而详情区还在显示它**
+  ⇒ 新开 **BACKLOG 61**（本轮只登记读数，不动产品），且新帧**不进**材质盲区名单（登记前看了帧）。
+- **BACKLOG 59 已逐行复核（只核不修）**：两处 catch 只写 debug 日志，
+  `lastSaveError|saveFailure|didFailToSave|onSaveFailure` 在这两个文件 **0 命中**，
+  `HistoryStore` 那 6 条回执通道里**没有一条是存盘失败** ⇒ 这次没有现成通道可复用，先定形状再动。
+- **换装本机（11:53）**：`install_local.sh --yes --no-build` ⇒ `INSTALL_RESULT=ok`、
+  `INSTALL_SHA_MATCH=1`（`9a36a103…` → `a261a308…`）、旧 pid 20846 优雅退出、
+  `SMOKE_SAW_START=True / SMOKE_OK=1`、新 pid 26795、**存档 103 → 103 条**。旧包留在备份目录。
+- **验证**：724 tests / 29 skipped / 0 failures、`swift build` 0 告警、
+  闸门 `passed=695 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`、
+  基线同 commit update 后复跑 `CHANGED=0 / ADDED=0 / MISSING=0`、脚本 83 全绿、
+  变异 M189–M193 五支全 CAUGHT。自评 **91 / 100**。
+- **needle 第三次犯同一个错**（U-65 那一族）：M189/M193 的预期红消息按 `decide` 猜，实际红在 `classify`
+  ⇒ 第一遍 `红得不对=2`。⇒ 下一轮把"needle 与实际消息不符 ⇒ DID-NOT-RUN、不注入"钉进电池脚本。
+- **本轮超出 ≤4 文件**：非台账 7 个（产品 4 + 测试/夹具 3），原因是修复整条在生产者链上，拆开必红。
+  已在第 43 轮正文里记账，下一轮恢复。
+- **CI 待读**（不预先写"CI 绿"）。
+- **下一步（R42）**：**回到动效本体**。流畅度 13/20、动效细节 12/15 已连续三轮没动，
+  因为 R39–R41 都在修"它说不说话、说得对不对"。候选按优先级：
+  ① BACKLOG 53（`ReceiptLine` 的 `.contentFade` 没有 `withAnimation` 供电 —— 要么供电要么撤声明）；
+  ② BACKLOG 61（横幅插入后选中行的可见性，先判值不值得动）；
+  ③ 变异电池那条"needle 不符 ⇒ DID-NOT-RUN"的自检。

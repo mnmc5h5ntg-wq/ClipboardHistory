@@ -200,7 +200,7 @@ final class ApplicationShell {
         //     下面照样 activate 目标应用、照样注入 ⌘V，于是目标应用粘出来的是
         //     用户剪贴板里**原来**那条无关内容 —— 比"什么都没发生"糟，而且一句话都没说
         //     （`clipboardWriteErrorMessage` 全仓唯一的显示消费者是详情区那颗按钮）。
-        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.clipboardWriteErrorMessage) {
+        switch CopyThenPaste.decide(failure: historyStore?.clipboardWriteFailure) {
         case .pasteNow:
             break
         case .cancel(let reason):

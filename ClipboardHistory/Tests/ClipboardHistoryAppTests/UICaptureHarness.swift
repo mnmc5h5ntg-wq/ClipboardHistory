@@ -1359,8 +1359,12 @@ final class UICaptureTests: XCTestCase {
         // 读代码看不出换行与截断。
         // 文案不是夹具手写的，而是从产品那个生产者 `CopyThenPaste.decide` 取的：
         // 以后有人改措辞或把它拼长，这张帧自己会红，而不是等用户看到半句话。
+        // R41：喂给它的不再是**手写的字符串**，而是产品真的会抛的那个错误
+        // （`ClipboardWriteError.failedToWriteText`）—— 中间走 `classify` 与 `decide` 两层生产者。
+        // 于是这张帧画的是"产品在这种情况下真的会说什么"，而不是"我以为它会说什么"：
+        // 改措辞、改长度、改那句"原来的内容还在不在"，帧都会自己红。
         let copyFailureDecision = CopyThenPaste.decide(
-            copyErrorMessage: "The operation couldn’t be completed. (NSOSStatusErrorDomain error -100.)")
+            failure: ClipboardWriteFailure.classify(ClipboardWriteError.failedToWriteText))
         let copyFailureNotice: String
         if case .cancel(let reason) = copyFailureDecision {
             copyFailureNotice = reason
@@ -1373,6 +1377,16 @@ final class UICaptureTests: XCTestCase {
         copyFailureStore.reportPasteFailure(copyFailureNotice)
         results.append(Fixture("content-with-copy-failure-notice", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: copyFailureStore))
+        })
+        // R41：**同一句话摆到产品允许的最窄窗口上**（600×440 = `App.swift` 的 `minWidth`
+        // 与 `WindowConfigurator.window.minSize`，不是夹具自选的宽度）。
+        // 上一轮的姐姐帧是 750 宽，而这条回执的长度由**系统错误原文**决定 ——
+        // 在 750 上放得下不等于在 600 上放得下。缺这一臂的话，"文案变长"这件事
+        // 只会在用户把窗口拖到最窄时以"半句话 / 按钮被挤没"的形式被发现。
+        let copyFailureMinStore = makePopulatedStore()
+        copyFailureMinStore.reportPasteFailure(copyFailureNotice)
+        results.append(Fixture("content-min-with-copy-failure-notice", NSSize(width: 600, height: 440)) {
+            AnyView(ContentView(historyStore: copyFailureMinStore))
         })
         // **组件帧必须摆成产品那一套**（R24 / BACKLOG 36）。
         //
@@ -4064,6 +4078,9 @@ final class UICaptureTests: XCTestCase {
         ("content-with-notice", 1),
         ("content-with-two-notices", 2),
         ("content-with-copy-failure-notice", 1),
+        // R41：同一句话在最窄窗口那一臂。条数仍是 1（一条横幅），判的是
+        // "换行之后读不读得出来、按钮还在不在它该在的地方"。
+        ("content-min-with-copy-failure-notice", 1),
         ("notice-banner", 2),
     ]
 

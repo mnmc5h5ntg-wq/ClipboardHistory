@@ -212,7 +212,18 @@ final class HistoryStoreTests: XCTestCase {
         store.perform(.copy(store.entries[0]))
 
         XCTAssertEqual(writer.writtenContents, [.text("copy me")])
-        XCTAssertEqual(store.clipboardWriteErrorMessage, ClipboardWriteError.failedToWriteText.localizedDescription)
+        // R41：这里原来钉的是"界面上那句 == 错误的 localizedDescription"。
+        // 契约换了（D-100）：界面拿的是**分类后的回执**，原文只进日志。
+        // 三条一起钉：事实等于 classify 的输出（接线）、它承认清空过（语义）、
+        // 而且**不等于**裸的 errorDescription（否则这次改动等于没做）。
+        XCTAssertEqual(store.clipboardWriteFailure,
+                       ClipboardWriteFailure.classify(ClipboardWriteError.failedToWriteText),
+                       "store 存的必须是分类后的完整事实")
+        XCTAssertEqual(store.clipboardWriteFailure?.clearedPasteboard, true,
+                       "写入失败发生在 clearContents 之后 ⇒ 这条事实要带着「旧内容已经没了」出门")
+        XCTAssertNotEqual(store.clipboardWriteErrorMessage,
+                          ClipboardWriteError.failedToWriteText.localizedDescription,
+                          "回执还要说下一步与后果，裸错误描述不够（BACKLOG 58 就是这个形状）")
     }
 
     /// 原来这条叫 "...AreHiddenUntilToggled..."：开关 `showsPredictionSuggestions`
@@ -305,7 +316,9 @@ final class HistoryStoreTests: XCTestCase {
         XCTAssertEqual(store.entries.map(\.content), [.text("new"), .text("old")])
         XCTAssertEqual(store.selectedEntry?.content, .text("new"))
         XCTAssertEqual(persistence.savedEntriesSnapshots.count, saveCountBeforeCopy)
-        XCTAssertEqual(store.clipboardWriteErrorMessage, ClipboardWriteError.failedToWriteText.localizedDescription)
+        // 同上一条：钉的是"失败之后界面拿到分类后的回执"（R41 / D-100）。
+        XCTAssertEqual(store.clipboardWriteFailure?.clearedPasteboard, true)
+        XCTAssertNotNil(store.clipboardWriteErrorMessage)
     }
 
     func testPerformRepeatCopySelectedEntryCopiesSelectionAndMovesItToTop() {

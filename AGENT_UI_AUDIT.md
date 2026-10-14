@@ -2865,3 +2865,123 @@ R39 换装之后没有立刻开新的一把尺，而是把上一轮的问法**�
 帧基线 108 → **110**（`CHANGED=0 / ADDED=2`，同 commit update）；脚本 83 全绿；
 变异 **M185–M188** 四支全 CAUGHT、红得对 4/4、`RESTORE_CLEAN=yes`
 （M186 第一版"红得不对"，抓出的正是上面那条判据太弱 —— 已按 U-65 的规矩实测后才写预期）。
+
+---
+
+## 第 43 轮 · R41：上一轮那句回执，恰好在三成最常见的失败里**说了假话**（U-67 / D-100）
+
+### 开场缺陷清单（坐标）
+
+本轮不开新尺，先把上一轮**自己交付的那句话**当缺陷读一遍（BACKLOG 58）。
+`ClipboardWriter.swift` 里写剪贴板的顺序是量出来的，不是回忆的：
+
+| 行 | 发生什么 |
+|---|---|
+| `:67-68` | 校验文件存在 ⇒ 不存在就 `throw fileDoesNotExist`（**清空之前**） |
+| `:71` | `pasteboard.clearContents()` ← 从这一行起，用户原来的剪贴板内容**已经没了** |
+| `:78` / `:97` / `:99` | `failedToWriteText` / `failedToWriteImage` / `failedToWriteFileURL`（**清空之后**） |
+
+而 R40 的回执固定写着"已取消自动粘贴 —— 剪贴板里仍是原来的内容，没有被替换"。
+⇒ 四种已知失败里有三种，这句话是**假的**：用户照它去 ⌘V，粘出来的是空或者上一条无关内容。
+另一半同样不合格：那句前缀是 `error.localizedDescription` 直出，
+非本模块抛的错误会把 "The operation couldn't be completed. (NSOSStatusErrorDomain error -100.)" 搬进横幅。
+
+**这一条值得单独记的是形状**：上一轮的修复本身（把静默变成回执）是对的，
+但"报告失败"这个新出口没有对自己的**事实内容**负责 ⇒ 一个只用来报告缺陷的通道，自己成了第二个缺陷。
+
+### 修法：把"失败"从一句字符串升成一个事实
+
+新增 `Utilities/ClipboardWriteFailure.swift`：`{ message, clearedPasteboard }` + `classify(_:)`。
+`HistoryStore` 存的不再是裸描述而是这个值（`clipboardWriteErrorMessage` 退化成计算属性，
+所以既有消费者不用改）；`CopyThenPaste.decide(failure:)` 按 `clearedPasteboard` 说两种话：
+
+- 清过 ⇒ "…已取消自动粘贴。注意：剪贴板里原来的内容在这次尝试里已经被清掉，请重新复制一次再粘贴。"
+- 没清 ⇒ "…已取消自动粘贴 —— 剪贴板里仍是原来的内容，没有被替换。"
+
+未知错误按**保守方向**分类（当作已清空）：猜错的代价不对称 ——
+说"还在"而实际没了，用户会去粘一个空东西；说"没了"而实际还在，他只是重新复制一次。
+系统原文继续进 `LifecycleDebugLogger`（诊断要原文，界面要下一步），BACKLOG 58 里"要不要保留原文"这一问就此答掉。
+
+### 判据（1 条新真值表 + 3 条改判 + 2 条契约更新 + 1 张新帧，全从产品入口进）
+
+- `testClipboardWriteFailureClassificationTruthTable`：五种输入（四种已知 + 一种未知）逐格钉 `message` 与 `clearedPasteboard`，
+  并钉方向 —— 只钉"失败要说清楚"的话，把 `fileDoesNotExist` 那一格反过来也照样绿。
+- 管线级两臂：注入失败的 writer 走 `shell.copyAndPasteEntry`，断言横幅里的话**随错误类型而不同**
+  （`contains("已经被清掉")` / `contains("仍是原来的内容")` 各自只在正确的那臂成立）。
+- 系统原文不进界面这条**没有单开立一条用例**，它钉在真值表的第 ③ 格里：
+  喂一个 `NSError(domain: NSOSStatusErrorDomain, code: -100, …"The operation couldn't be completed.")`，
+  断言 `clearedPasteboard == true`（保守方向）**且** `message` 里不含 "The operation"。
+  ⇒ 想退回 `error.localizedDescription` 直出的话，红的是这张真值表，不是一条独立的文案测试。
+- 两条**既有契约**被本轮改掉（`HistoryStoreTests`）：它们原本钉 `clipboardWriteErrorMessage == error.localizedDescription` ——
+  那正是 BACKLOG 58 的形状。改成钉"存的是分类后的完整事实"，并加一条
+  `XCTAssertNotEqual(…, .failedToWriteText.localizedDescription)`，让"退回裸描述"这件事本身会红。
+  ⇒ 这是**为了改契约而改测试**，不是为了变绿：改前那条断言在旧实现下是绿的，在新实现下必红。
+
+### 真实视觉审查（含一张新帧）
+
+改的是文案，所以先看**已经改过的两张**（750×560，亮暗）：
+红底横幅、⚠ 图标、正文两行完整、"知道了"垂直居中（`NOTICE_ACTION … offset=+0.0`）、无截断；
+`NOTICE_TEXT … light y52-102 ratio=12.98 ink=18.7%` / `dark ratio=11.54 ink=21.1%`（地板 4.5 / 2%）。
+
+但"文案变长了"这件事，750 宽**不构成证据** —— 上一轮我只在 750 上放过它。
+本轮补一张 `content-min-with-copy-failure-notice`（**600×440**）：宽度不是夹具自选的，
+`App.swift:12` 的 `.frame(minWidth: 600…)` 与 `WindowConfigurator:94` 的 `window.minSize` 就是这个数，
+也就是产品允许的最窄窗口。读数（两档外观）：
+
+| 帧 | transparent | blackBandPt | bottomInk | NOTICE_TEXT | NOTICE_ACTION |
+|---|---|---|---|---|---|
+| `content-min`（无横幅） | 41.3% | 43 | **43.4%** | — | — |
+| `content-with-copy-failure-notice`（750） | 50.7% | 66 | 0.1% | 12.98 / 18.7% | +0.0 |
+| **新帧**（600×440 + 同一句话） | 40.6% | **0** | 0.1% | 12.98 / **24.5%** | +0.0 |
+
+- 亮暗各看一次全帧：两行完整、无半字、按钮垂直居中 ⇒ **这句话在最窄窗口放得下**，BACKLOG 58 收口。
+- 墨占比从 18.7% 涨到 24.5% 而带高仍是 50pt：同一句话挤进更窄的文字列，密度上升、行数不变。
+- `blackBandPt` 从 66 掉到 0 **不是**材质盲区被修好了：横幅把列表顶下去约 50pt，
+  那一行选中底色整行落到可视区之外（`content-min` 无横幅时它压在帧底，`bottomInk=43.4%` 就是同一块）。
+  所以新帧**不进** `materialBlindSpotFixtures`（登记前看了帧：画面里根本没有那块黑）。
+  顺带冒出一条新的观察，记 BACKLOG 61：**详情区还在显示那条记录，而它在列表里一行都看不见**。
+
+### 本轮查出、**没**在本轮修的
+
+- **BACKLOG 59 已逐行复核**（上一轮只标了"未核"，所以本轮只核不修）：
+  `HistoryStore.persist()`（:1066-1071）与 `FileHistoryPersistence.makeSaveWorkItem`（:465-479）两处 catch
+  **都只写 `LifecycleDebugLogger`**；`grep lastSaveError|saveFailure|didFailToSave|onSaveFailure` 在这两个文件里 **0 命中**，
+  而 `HistoryStore` 的 `@Published` 名单里有 `historyRecoveryNotice` / `pasteFailureNotice` / `clipboardWriteFailure` /
+  `droppedFilesNotice` / `transferNotice` / `retentionNotice` —— **没有一条是"存盘失败"**。
+  ⇒ 现象成立且**没有现成通道可复用**（与 D-099 那次不同，那次横幅通道已经存在）。下一轮按 BACKLOG 59 的原案做决定。
+- **BACKLOG 61（本轮新开）**：最小窗口 + 一条横幅 ⇒ 选中行整行落在可视区之外，详情区仍显示它。
+  要不要"横幅插入时把选中行滚进可视区"，先判它是不是真会伤到人，再动产品。
+
+### 换装本机（11:53）
+
+`scripts/install_local.sh --yes --no-build --label r41-receipt-truth` → `INSTALL_RESULT=ok`：
+已装 1.4.8 `9a36a103…` → 新包 `a261a308…`，`INSTALL_SHA_MATCH=1`（staged 与 installed 逐字节同一份）；
+检测到旧实例 pid 20846 ⇒ 优雅退出（待写存档落盘）→ **冒烟闸门排在退出之后**
+`SMOKE_SAW_START=True / SMOKE_SAW_SECOND_INSTANCE_ABORT=False / SMOKE_OK=1`（`SMOKE_EXIT_CODE=-15` 是脚本自己收的）；
+新 pid 26795、启动晚于安装、exe 路径逐字对上 `/Applications/时间剪史.app`；
+**存档条数 103 → 103**（一条没丢）；旧包留在 `~/Documents/Codex_Project0_backups/before-r41-receipt-truth`。
+
+⇒ 这条链路上"只有装上新包才看得见"的部分（真机上复制失败到底长什么样）**仍然没验成**：
+本机造不出"另一个过程锁住剪贴板"。人工批次 43.1 给的是近似做法。
+
+### 验证
+
+724 tests / 29 skipped / **0 failures**；`swift build` 0 告警；捕获闸门
+`passed=695 skipped=29 failed=0 有名字的红=0 NOT_RUN=0`；帧基线 110 → **112**
+（`CHANGED=2 / ADDED=2`，同 commit update，改完再 compare 读回 `CHANGED=0 / ADDED=0 / MISSING=0`）；
+脚本 83 全绿；`make_info_plist.sh` 8 键齐备；变异 **M189–M193** 五支全 CAUGHT、
+`未被抓到=0 红得不对=0 还原不干净=0`。
+
+**变异 needle 又犯了一次同一个错（第三次，U-65 那一族）**：M189/M193 的预期红消息
+我按 `CopyThenPaste.decide` 的措辞去猜，实际红在 `ClipboardWriteFailure.classify` 的分支里
+⇒ 第一遍 `红得不对=2`。分开计数、读实际失败消息、重写预期之后才全 CAUGHT。
+⇒ 规矩要写成动作：**每一支变异的预期红消息必须从"这一次注入实际会让哪一行红"里读**，
+不许从"我改的是哪个功能"里推。下一轮把这条也钉进电池脚本（needle 与实际消息不符 ⇒ DID-NOT-RUN）。
+
+### 本轮超出 ≤4 文件的规矩（记账，不辩解）
+
+非台账文件 7 个：产品 4（`ClipboardWriteFailure` 新、`CopyThenPaste`、`HistoryStore`、`ApplicationShell`）
++ 测试/夹具 3（`PasteFailureVisibilityTests`、`HistoryStoreTests`、`UICaptureHarness`）。
+原因是这一条修复整条都在**生产者链**上（classify → decide → store → shell），
+拆开发任一段都会让 CI 红或让契约测试钉住旧语义。
+下一轮起恢复 ≤4；如果又超，就在这一节里再写一次。
