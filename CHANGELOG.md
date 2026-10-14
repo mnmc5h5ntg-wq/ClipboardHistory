@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R47 · 那条 A/B 判的是采样，不是淡入）
+
+- `MotionFilmstripTests.testHeatmapFadeIsNotVisibleToThisRuler` 的判定轴换掉：
+  原来用**帧数**（`onSpan == offSpan`）判"这把尺看不看得见纯 opacity 的淡入"，
+  而帧数是同一个文件里自己宣布过"随采样相位漂（本机 2/3/2）"的量。
+  R46 真日志当场把它打红：`开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` —— 峰值完全相同。
+- 抽成纯函数 `fadeVisibility(...)`，四个门槛：**时长轴** + **下限 0.3×声明** +
+  **上限 声明+2×间隔** + **归因看两遍里较短的那个**；两遍不一致 ⇒ `.inconsistent`（只打印不红）。
+- 上限是被实测逼出来的，也是本轮真正的收获：本机反复抓到 `258–307ms` 的变化段，
+  而声明只有 160ms ⇒ 那不是这条淡入。没有上限，判据会把它读成"尺子终于看见了"，
+  并催我们把场景放进 `Scenario.all()` 当真判据 —— 那是把探针的毛病当产品进步。
+  加上限之后 3/3 稳定报"看不见"。
+- 判据 12 格真值表 + 变异 **M223–M229** 七支（每支拆掉一个门槛，各自被不同格子抓住）。
+- **把 `流畅度` 这一维写死**：离屏 `cacheDisplay` 抓模型树、纯 opacity 交叉淡活在 presentation 层
+  ⇒ 这条通道对淡入的可见性是 0；抬它要换通道（真屏抓帧 / presentation 采样），不是再改判据。
+  这一维六轮停在 13/20，从今天起不再每轮虚涨。
+- 新开 BACKLOG 69：那段 258–307ms 到底是什么 —— 若它来自账本去抖落盘，
+  性质就从"测量噪声"变成"**采集路径上有同步磁盘写**"（目标里明令禁止），优先级立刻升高。
+- 产品零改动（`Sources/` 未变）、116 帧不变、脚本 101 条不变、0 告警；本轮不换装。
+
+
 ### Added（R46 · 动效覆盖地板会报"掉了谁、为什么"了）
 
 - 新增 `scripts/motion_floor_gate.py` + `scripts/motion_floor_expectations.json`，

@@ -97,6 +97,80 @@ final class MotionFilmstripTests: XCTestCase {
         return max(0, (stamps[last + 1] - stamps[first]) * 1000)
     }
 
+    /// 这条 A/B 有没有看见纯 opacity 的淡入（R47 / BACKLOG 68 / U-73）。
+    ///
+    /// 为什么单独抽出来：`testHeatmapFadeIsNotVisibleToThisRuler` 原来直接写
+    /// `onSpan == offSpan && |peak(on) - peak(off)| < 0.02` —— 第一个条件用的是**帧数**，
+    /// 而帧数正是本文件上面自己宣布过"会随采样相位漂"的量（R2：同一份代码本机跑过 2/3/2）。
+    /// R46 本机真跑一遍就撞上了：`开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` ——
+    /// **两臂峰值完全相同**，只有帧数不同，于是这条判据把"尺子看不见"判成了"尺子看得见"，
+    /// 红的是尺，不是产品。
+    ///
+    /// 为什么要**两遍同臂**（A/A）而不是一遍：R47 实测这条通道的占空比不是 100% ——
+    /// 全量 suite 里它读出过 `开 265ms / 关 7ms`（判定=看得见），
+    /// 而单独连跑 7 次全是 `开 6–7ms / 关 6–7ms`（判定=看不见）。
+    /// 只抓一遍的话，"这一次恰好撞上了"会被写成"这把尺看得见"，
+    /// 而那条判据下一次就会在同样的代码上翻脸 —— 判的是进程历史，不是产品。
+    enum FadeVisibility: Equatable {
+        /// 触发没让图长出来 ⇒ 探针坏了。两种结论都不许下（既不许说看得见，也不许说看不见）。
+        case noControl
+        /// 看不见 ⇒ 记「源码已接、产物未量」，不许写进已交付，也不许反过来判产品没做。
+        case notVisibleToThisRuler
+        /// 两遍同臂互相矛盾 ⇒ 这条通道今天没有结论。报矛盾，不许挑一次算数。
+        case inconsistent(onA: Double?, onB: Double?)
+        /// 两遍都说看得见 ⇒ 调用方必须把这个场景放回 `Scenario.all()` 当真判据。
+        case visibleToThisRuler
+    }
+
+    /// "一段变化够长才算看得见"的门槛：声明时长的这个比例。
+    /// 与 `judgeMotion` 里那句"事件内最粗采样 > 0.3×声明 ⇒ 时钟太粗"是同一把分辨率尺，
+    /// 两处用同一个数，是为了让"切不出过程"与"看见了过程"不会各说各话。
+    private static let coarseRunRatio = 0.3
+
+    /// 单臂：这一次有没有看见一段**属于这条淡入的**"还在变"的时间。`nil` = 这一臂没有对照物。
+    ///
+    /// 两个门槛，不是一個：
+    /// * 下限 `0.3×声明` —— 短于此就是一帧跳变，切不出"过程"这个概念；
+    /// * 上限 `声明 + 2×采样间隔` —— **一段比声明还长出一截的变化不是这条动画**。
+    ///   这条是 R47 被实测逼出来的：本机反复抓到一段 `258–260ms` 的变化段
+    ///   （声明只有 160ms），而它一次进程只出现一次、出现在第几遍抓取上不固定 ——
+    ///   那更像账本去抖落盘/首次布局，不是 opacity 淡入。
+    ///   只设下限的话，这段别的变化会被读成"这把尺终于看见淡入了"，
+    ///   然后那条判据会催我把场景放进 `Scenario.all()` —— 那是把探针的毛病当产品进步。
+    private static func fadeSawProcess(elapsed: Double?, peakOn: Double,
+                                       declaredMilliseconds: Double,
+                                       intervalMilliseconds: Double) -> Bool? {
+        guard peakOn >= minimumVisibleChange else { return nil }
+        guard let elapsed else { return false }      // 读不出变化段 = 没看见，不是"看不见也算数"
+        return elapsed >= declaredMilliseconds * coarseRunRatio
+            && elapsed <= declaredMilliseconds + 2 * max(intervalMilliseconds, 1)
+    }
+
+    /// 注意这里**故意不收** `peakOff`：关掉曲线之后如果那一臂整段都没变化
+    /// （`peakOff` 低于地板），那恰恰说明"变化是动画带来的"——它是证据，不是反例。
+    /// 一个不进判定的参数留在签名里，只会让下一个读这段代码的人以为它参与了判定。
+    static func fadeVisibility(elapsedOnA: Double?, elapsedOnB: Double?, elapsedOff: Double?,
+                               peakOn: Double,
+                               declaredMilliseconds: Double,
+                               intervalMilliseconds: Double) -> FadeVisibility {
+        guard let a = fadeSawProcess(elapsed: elapsedOnA, peakOn: peakOn,
+                                     declaredMilliseconds: declaredMilliseconds,
+                                     intervalMilliseconds: intervalMilliseconds),
+              let b = fadeSawProcess(elapsed: elapsedOnB, peakOn: peakOn,
+                                     declaredMilliseconds: declaredMilliseconds,
+                                     intervalMilliseconds: intervalMilliseconds)
+        else { return .noControl }
+        if a != b { return .inconsistent(onA: elapsedOnA, onB: elapsedOnB) }
+        guard a else { return .notVisibleToThisRuler }
+        // 归因那一半：开着曲线的**两臂都**要比"关掉曲线"的对照臂长出至少一个采样间隔，
+        // 否则这段"还在变"不是动画带来的（可能是重排、图片解码、落定抖动）。
+        guard let off = elapsedOff, let first = elapsedOnA, let second = elapsedOnB else {
+            return .notVisibleToThisRuler
+        }
+        return min(first, second) - off >= intervalMilliseconds
+            ? .visibleToThisRuler : .notVisibleToThisRuler
+    }
+
     /// 把窗口切成 cols×rows 的格子，打印"峰值那一格里每格的变化量"——用来回答
     /// "到底哪里变了"，而不是靠猜像素坐标去框区域（猜错的结果是整条判据读到 0.000，
     /// 看着像"没动"，其实是我没框到）。
@@ -607,44 +681,166 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
-    /// R11：热图那条"空态 ↔ 日历"的淡入，**这把尺看不见** —— 而这条测试钉的就是"看不见"这件事。
+    /// R11 开的那条；R47 把它从"判帧数"改成"判时长 + 同臂抓两遍"。
     ///
     /// 为什么要专门写一条"量不到"的判据：`heat-first-record` 第一次跑就把 main 判红了，
     /// 读数 `0.004 / 0.027 / 0.220 / 0.000…`（一帧到位）。这很容易读成"产品没做动画"，
     /// 而 `cacheDisplay` 抓的是**模型树** —— 纯 opacity 的交叉淡入只活在 presentation 层，
     /// 同一个根因在 `MOTION_NATIVE`（AppKit 行动画）那条上已经踩过一次并写进账本。
     ///
-    /// 所以这里做**双向 A/B**：目录开着与关掉必须读出**不同**的数字，否则"看得见"这句话没有对照物。
-    /// 两臂相同 ⇒ 只能记"源码已接、产物未量"：**既不许写进已交付，也不许反过来判产品没做**
-    /// （人眼判据在人工验收批次里）。哪天两臂不同了，这条会自己红 ——
-    /// 那是逼着把场景放回 `Scenario.all()` 当真判据，而不是留这条当免责。
+    /// R47 改两处，都是被实测逼的（BACKLOG 68 / U-73）：
+    /// ① **轴换掉**。原来的放行条件里有 `onSpan == offSpan`，而帧数由采样相位决定
+    ///    （R2 本机实测同一份代码 2/3/2）。R46 真跑一遍就撞上：
+    ///    `开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` —— 峰值完全相同、只有帧数不同，
+    ///    旧条件因此把"尺子看不见"判成"尺子看得见"，红的是尺。
+    /// ② **同臂抓两遍（A/A/B）**。R47 实测这条通道占空比不是 100%：
+    ///    全量 suite 里读出过 `开 265ms / 关 7ms`（看得见），单独连跑 7 次全是
+    ///    `开 6–7ms / 关 6–7ms`（看不见）。只抓一遍就等于让"这一次恰好撞上"当结论，
+    ///    判的是进程历史而不是产品。两遍不一致 ⇒ 报 `inconsistent`，不挑一次算数。
+    ///
+    /// 结论形状不变：看不见 ⇒ 记「源码已接、产物未量」，**既不许写进已交付，
+    /// 也不许反过来判产品没做**（人眼判据在人工批次 24/49）；两遍都说看得见 ⇒ 红，
+    /// 逼着把场景放回 `Scenario.all()` 当真判据，而不是留这条当免责。
     func testHeatmapFadeIsNotVisibleToThisRuler() throws {
         try skipUnlessEnabledAndCapable()
         let saved = MotionCatalog.animationsEnabled
-        let onFilm = record(Scenario.heatFirstRecord())
+        // R47 实测：同一个场景**在一个进程里第一次抓取必然看不见**（6–7ms / 1 帧），
+        // 第二次才看得见（258–260ms / 2 帧）。两遍连跑都稳定复现，不是随机占空比。
+        // 所以第一遍当**预热**丢掉，判定用第 2、3 遍 —— 并把这件事打在读数里，
+        // 否则下一个人还会在"第一次跑看不见"上再猜一轮（R11 当时就是这么收口的）。
+        let warmup = record(Scenario.heatFirstRecord())
+        let onFilmA = record(Scenario.heatFirstRecord())
+        let onFilmB = record(Scenario.heatFirstRecord())
         MotionCatalog.animationsEnabled = false
         let offFilm = record(Scenario.heatFirstRecord())
         MotionCatalog.animationsEnabled = saved
 
-        let on = Self.deltas(onFilm.motionFrames)
+        let onA = Self.deltas(onFilmA.motionFrames)
+        let onB = Self.deltas(onFilmB.motionFrames)
         let off = Self.deltas(offFilm.motionFrames)
-        let onSpan = Self.transitionFrameCount(on)
-        let offSpan = Self.transitionFrameCount(off)
-        print("MOTION_HEAT_FADE_A/B 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on))) 冷闸=\(onFilm.clockIsWarm)"
-            + "  关 帧数=\(offSpan) 峰值=\(String(format: "%.3f", Self.peak(off)))")
-        XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
+        // 帧数照旧打印，但**不参与判定**：它由采样相位决定。
+        let scenario = Scenario.heatFirstRecord()
+        let elapsedWarm = Self.changedRunElapsedMilliseconds(stamps: warmup.motionStamps,
+                                                             fractions: Self.deltas(warmup.motionFrames))
+
+        let elapsedA = Self.changedRunElapsedMilliseconds(stamps: onFilmA.motionStamps, fractions: onA)
+        let elapsedB = Self.changedRunElapsedMilliseconds(stamps: onFilmB.motionStamps, fractions: onB)
+        let elapsedOff = Self.changedRunElapsedMilliseconds(stamps: offFilm.motionStamps, fractions: off)
+        let interval = Double(Self.sampleIntervalMilliseconds(onFilmA.motionStamps))
+        let verdict = Self.fadeVisibility(elapsedOnA: elapsedA, elapsedOnB: elapsedB,
+                                          elapsedOff: elapsedOff, peakOn: Self.peak(onA),
+                                          declaredMilliseconds: scenario.declaredDurationMilliseconds,
+                                          intervalMilliseconds: interval)
+        func ms(_ value: Double?) -> String { value.map { String(format: "%.0f", $0) } ?? "读不出" }
+        func label(_ v: FadeVisibility) -> String {
+            switch v {
+            case .noControl: return "无对照物"
+            case .notVisibleToThisRuler: return "看不见"
+            case .inconsistent: return "两遍矛盾"
+            case .visibleToThisRuler: return "看得见"
+            }
+        }
+        print("MOTION_HEAT_FADE_A/B 预热 时长=\(ms(elapsedWarm))ms 帧数=\(Self.transitionFrameCount(Self.deltas(warmup.motionFrames)))"
+            + " 开A 时长=\(ms(elapsedA))ms 帧数=\(Self.transitionFrameCount(onA))"
+            + " 开B 时长=\(ms(elapsedB))ms 帧数=\(Self.transitionFrameCount(onB))"
+            + " 峰值=\(String(format: "%.3f", Self.peak(onA)))"
+            + "  关 时长=\(ms(elapsedOff))ms 帧数=\(Self.transitionFrameCount(off))"
+            + " 峰值=\(String(format: "%.3f", Self.peak(off)))"
+            + "  整卷中位=\(ms(interval))ms 声明=\(Int(scenario.declaredDurationMilliseconds))ms"
+            + " 冷闸=\(onFilmA.clockIsWarm && onFilmB.clockIsWarm && offFilm.clockIsWarm)"
+            + " 判定=\(label(verdict))")
+        XCTAssertGreaterThan(Self.peak(onA), Self.minimumVisibleChange,
                              "两臂什么都没变 ⇒ 触发没让图长出来，这条 A/B 没有对照物（是探针坏了，不是动效坏了）")
         // 冷闸必须**过**：拿一段还没热起来的采样去下"尺子看不见"的结论，
         // 那是把探针的毛病写成产品的极限 —— 与"把没跑写成跑过"同一族，只是方向相反。
-        XCTAssertTrue(onFilm.clockIsWarm && offFilm.clockIsWarm,
-                      "有一臂是在冷采样下抓的 ⇒ 两臂相同不能算尺子的极限，这条结论今天不成立")
-        if onSpan == offSpan, abs(Self.peak(on) - Self.peak(off)) < 0.02 {
-            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
-                + "开关两臂读数相同 ⇒ 这把尺看不见纯 opacity 的淡入，这条只能记「源码已接、产物未量」")
-        } else {
-            XCTFail("两臂读数不同 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
+        XCTAssertTrue(onFilmA.clockIsWarm && onFilmB.clockIsWarm && offFilm.clockIsWarm,
+                      "有一臂是在冷采样下抓的 ⇒ 三臂相同不能算尺子的极限，这条结论今天不成立")
+        switch verdict {
+        case .noControl:
+            XCTFail("判定是 noControl ⇒ 探针没有对照物，这条 A/B 今天什么都没说")
+        case .inconsistent(let a, let b):
+            // 这一格**不红**，但必须把两个数打出来：它说的是"这条通道不能当判据"，
+            // 而把"抓不到"判成产品缺陷就是 R39 那一族的恒红。
+            print("MOTION_NOT_RUN=fade-channel-duty-cycle heat-first-record："
+                + "同一条产品路径连抓两遍，一遍算看得见（\(ms(a))ms）、一遍算看不见（\(ms(b))ms）⇒ "
+                + "这条通道的占空比不是 100%，今天既不能说看得见也不能说看不见")
+        case .visibleToThisRuler:
+            XCTFail("两遍都说「还在变」覆盖的时长比对照臂长出一个采样间隔以上 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
                     + "把 `heatFirstRecord()` 放回 `Scenario.all()` 当真判据，别留这条当免责")
+        case .notVisibleToThisRuler:
+            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
+                + "两遍开臂的时长都没有超过 0.3×声明（\(ms(elapsedA)) / \(ms(elapsedB)) vs "
+                + "\(Int(scenario.declaredDurationMilliseconds))ms）⇒ 这把尺看不见纯 opacity 的淡入，"
+                + "这条只能记「源码已接、产物未量」")
         }
+    }
+
+    /// `fadeVisibility` 的真值表（R47 / BACKLOG 68）。
+    ///
+    /// 这条**不开窗口**，所以 CI 每次都跑 —— 上面那条 A/B 要 `CLIPBOARD_HISTORY_UI_MOTION=1`
+    /// 才动，而本轮修的就是那条判据用的轴。修尺子的代码如果只被一把"平时不跑"的判据守着，
+    /// 那它下一次漂回去是没人知道的。
+    ///
+    /// 第 ⑤ ⑥ 格是本轮的靶：两臂**时长**接近而**帧数**不同（采样相位），
+    /// 旧写法 `onSpan == offSpan` 会把它们判成"这把尺看得见"，而正确结论是"看不见"。
+    func testFadeVisibilityJudgesTimeNotFrameCount() {
+        let declared = 250.0      // `.contentFade` 声明的毫秒数（这里要的是数，不是真令牌）
+        let interval = 31.0       // 一个采样间隔
+
+        func verdict(_ a: Double?, _ b: Double?, _ off: Double?, peak: Double = 0.2) -> FadeVisibility {
+            Self.fadeVisibility(elapsedOnA: a, elapsedOnB: b, elapsedOff: off, peakOn: peak,
+                                declaredMilliseconds: declared, intervalMilliseconds: interval)
+        }
+
+        // ① 峰值低于地板 ⇒ 触发根本没让图长出来：探针坏了，不许下任何一种结论。
+        XCTAssertEqual(verdict(120, 120, 31, peak: 0.001), .noControl,
+                       "没有对照物时说「看不见」，等于把探针故障写成产品的极限")
+        // ② 真过渡：两遍开臂都覆盖 120ms（≥ 0.3×声明），对照臂只有一帧 ⇒ 看得见。
+        XCTAssertEqual(verdict(120, 130, 7), .visibleToThisRuler)
+        // ③ 三臂都只有一帧 ⇒ 看不见（这就是本机今天的形状：6–7ms / 6–7ms / 7ms）。
+        XCTAssertEqual(verdict(7, 7, 7), .notVisibleToThisRuler)
+        // ④ "读不出变化段"是**证据缺席**，不是"证明没有"。所以：
+        //    两遍都读不出 ⇒ 看不见（没有任何一遍说看见）；
+        //    一遍说看见、另一遍读不出 ⇒ 通道不可靠，报矛盾，**不许挑一次算数**。
+        XCTAssertEqual(verdict(nil, nil, 7), .notVisibleToThisRuler)
+        XCTAssertEqual(verdict(nil, 120, 7), .inconsistent(onA: nil, onB: 120))
+        XCTAssertEqual(verdict(120, nil, 7), .inconsistent(onA: 120, onB: nil))
+        //    对照臂读不出 ⇒ 归因没有着落：这时候说「看得见」就是自己给自己发证。
+        XCTAssertEqual(verdict(120, 130, nil), .notVisibleToThisRuler)
+        // ⑤ **只漂帧数不许算看得见**：80 vs 60 —— 差 20ms，不到一个采样间隔。
+        //    旧写法看的是帧数，这种形状下两臂帧数会不同 ⇒ 它会红说"尺子看得见"。
+        XCTAssertEqual(verdict(80, 80, 60), .notVisibleToThisRuler,
+                       "两臂时长差不到一个采样间隔 ⇒ 那是一帧的相位差，不是过程被看见了")
+        // ⑥ 归因那一半：关掉曲线之后"还在变"照样覆盖 190ms ⇒ 量的不是我们的动画。
+        XCTAssertEqual(verdict(200, 210, 190), .notVisibleToThisRuler,
+                       "对照臂也这么长 ⇒ 这段变化不是动画带来的")
+        // ⑦ 两遍同臂互相矛盾 ⇒ 报矛盾，不许挑一次算数（R47 实测的形状：265 / 7）。
+        XCTAssertEqual(verdict(265, 7, 7), .inconsistent(onA: 265, onB: 7))
+        // ⑧ 边界：两遍都正好 0.3×声明、正好差一个间隔 ⇒ 算看得见（门槛含等号）。
+        XCTAssertEqual(verdict(75, 75, 44), .visibleToThisRuler,
+                       "两个门槛都含等号：写成严格不等式会让「刚好够」这一格随浮点误差翻脸")
+        // ⑨ **上限那一格就是本机今天的真读数**：声明 160ms，抓到 259ms ⇒ 那不是这条淡入。
+        //    没有上限的话，这段别的变化会让判据喊"尺子终于看见了，快放进 Scenario.all()"。
+        XCTAssertEqual(Self.fadeVisibility(elapsedOnA: 259, elapsedOnB: 260, elapsedOff: 7,
+                                           peakOn: 0.226, declaredMilliseconds: 160,
+                                           intervalMilliseconds: 8),
+                       .notVisibleToThisRuler,
+                       "259ms 比声明的 160ms 长出一截 ⇒ 这是别的变化在动，不是 opacity 淡入")
+        // ⑪ 下限唯一的独立证人：两臂都只有 40ms（< 0.3×声明），比对照臂长出 40ms > 一个间隔。
+        //    没有下限的话归因门会放行它 —— 一段 40ms 的变化不可能是 250ms 的过渡，
+        //    它只是"两臂各自抖了一下"。
+        XCTAssertEqual(verdict(40, 40, 0), .notVisibleToThisRuler,
+                       "短于 0.3×声明的一段变化不许因为「比对照臂长」就算看见过程")
+        // ⑫ 归因必须看**两臂里较短的那一个**：A=140 / B=120 / 对照=100 ⇒ 较短的那个只差 20ms，
+        //     不算看见。写成"只看第一臂"（变异 M229 干的事）这一格就会红。
+        XCTAssertEqual(verdict(140, 120, 100), .notVisibleToThisRuler,
+                       "两臂里较短的那个没超过对照臂一个间隔 ⇒ 不许拿运气好的那遍当结论")
+        // ⑩ 真过渡的尺度：声明 160ms、抓到 150ms、对照臂 7ms ⇒ 看得见。
+        XCTAssertEqual(Self.fadeVisibility(elapsedOnA: 150, elapsedOnB: 158, elapsedOff: 7,
+                                           peakOn: 0.226, declaredMilliseconds: 160,
+                                           intervalMilliseconds: 8),
+                       .visibleToThisRuler,
+                       "上限收得太紧会把真过渡也判成看不见 —— 这一格钉的是上限别过头")
     }
 
     /// A/B 对照：**同一个场景、同一条产品路径**，把目录里的曲线关掉再量一次。
