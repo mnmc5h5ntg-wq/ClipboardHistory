@@ -1252,18 +1252,51 @@ final class UICaptureTests: XCTestCase {
         // 每日复制热图（新功能 / 阶段一）：组件级两张 —— 有数据与没数据。
         // 固定 `today` 与固定计数 ⇒ 这两张帧不随日期变。
         let heatToday = Self.heatmapFixtureToday
-        var heatCalendar = Calendar(identifier: .gregorian)
-        heatCalendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
-        heatCalendar.firstWeekday = 2
-        // 夹具必须带中文 locale：不设置的话日历默认 en_US，
-        // 拍出来的星期标签是 "M W F S" —— 审查的人会以为产品写死了英文。
-        heatCalendar.locale = Locale(identifier: "zh_CN")
+        let heatCalendar = Self.heatmapFixtureCalendar()
         let heatCounts = Self.heatmapFixtureCounts(today: heatToday, calendar: heatCalendar)
         results.append(Fixture("heatmap-populated", NSSize(width: 430, height: 250), contentMustFit: true) {
             AnyView(
                 DailyCopyHeatmapView(counts: heatCounts, today: heatToday, calendar: heatCalendar)
                     .padding(16)
                     .frame(width: 430, height: 250, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        // R45 · 悬停那一圈**第一次有帧可看**（两张一组，只差一格）。
+        //
+        // 为什么单独拍一条带而不是在 `heatmap-populated` 上做：那一张走的是
+        // `DailyCopyHeatmapView`，而 `hovered` 是它的 `@State` —— 合成 hover 的三条路
+        // R14 实测全断（见 `HeatmapHoverEvidenceTests` 开头）。这条带绕不开同一个事实，
+        // 但它画的是**产品自己的格子视图** `DailyCopyHeatmapCell`（网格那条路就是它，
+        // 由 `testGridCellsRouteThroughTheProductCellView` 钉住），
+        // 深浅与日期都由 policy 现算 —— 夹具只挑"哪一格被悬停"，一个字都不替产品写。
+        // 两张唯一的差别就是那一圈墨：审查时能一眼看出"悬停长什么样"，
+        // 而 `HEAT_RING` 那 20 条读数回答的是"它到底有没有被画上去"。
+        // 取**最后**三列而不是前三列：夹具的计数从"今天"往回 126 天，而窗口是 26 周 = 182 天，
+        // 于是最老的那几列本来就是空的 —— 第一版用 `prefix(3)` 拍出来的 21 格全是空档灰，
+        // 那张帧什么都回答不了（"那一圈压在深蓝格上是什么样"正是本轮要看的东西）。
+        // 帧存在 ≠ 被摄对象在帧里，这一条在 R28c 与批次 22 上各栽过一次。
+        let heatCells = Self.heatmapHoverStripCells(counts: heatCounts, today: heatToday,
+                                                    calendar: heatCalendar)
+        results.append(Fixture("heatmap-cell-strip-still", NSSize(width: 90, height: 140),
+                               contentMustFit: true) {
+            AnyView(
+                Self.heatmapCellStrip(cells: heatCells, hoveredIndex: nil, calendar: heatCalendar)
+                    .padding(16)
+                    .frame(width: 90, height: 140, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        results.append(Fixture("heatmap-cell-strip-hover", NSSize(width: 90, height: 140),
+                               contentMustFit: true) {
+            AnyView(
+                // 悬停第 10 格（= 第 2 列第 4 行）：不在角上、也不是第一格，
+                // 这样那一圈与它上下左右的邻居同时进画面，"喧宾夺主"能直接被看见。
+                Self.heatmapCellStrip(cells: heatCells,
+                                      hoveredIndex: Self.heatmapHoverStripHoveredIndex,
+                                      calendar: heatCalendar)
+                    .padding(16)
+                    .frame(width: 90, height: 140, alignment: .topLeading)
                     .background(Color(nsColor: .windowBackgroundColor))
             )
         })
@@ -1551,6 +1584,20 @@ final class UICaptureTests: XCTestCase {
         return counts
     }
 
+    /// 夹具那套热图日历。**单独成一个函数**而不是在夹具里就地拼：
+    /// `HeatmapHoverEvidenceTests` 要用同一套设置去 policy 里挑格子，
+    /// 两处各拼一份的话"夹具看到的格子"与"判据看到的格子"会悄悄分叉。
+    ///
+    /// 必须带中文 locale：不设置的话日历默认 en_US，
+    /// 拍出来的星期标签是 "M W F S" —— 审查的人会以为产品写死了英文。
+    static func heatmapFixtureCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
+        calendar.firstWeekday = 2
+        calendar.locale = Locale(identifier: "zh_CN")
+        return calendar
+    }
+
     static var heatmapFixtureToday: Date {
         var components = DateComponents()
         components.year = 2026
@@ -1560,6 +1607,53 @@ final class UICaptureTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Shanghai") ?? .current
         return calendar.date(from: components) ?? Date()
+    }
+
+    /// 那条带里**被悬停**的那一格的下标（列优先：第 2 列第 4 行）。
+    ///
+    /// 一个数写在两处（两张夹具）与判据里，是为了让"被指着的那格"这件事
+    /// 只有一个作者；`HeatmapHoverEvidenceTests` 会判它必须是一格**画得出来**的格子
+    /// （指到未来格上，那一圈根本不存在，两张帧就会一模一样）。
+    static let heatmapHoverStripHoveredIndex = 10
+
+    /// R45 · 悬停取证那条带用哪些格子。
+    ///
+    /// 取**最后**三列而不是前三列：夹具的计数从"今天"往回 126 天，而窗口是 26 周 = 182 天，
+    /// 于是最老的那几列本来就是空的 —— 第一版用 `prefix(3)` 拍出来的 21 格全是空档灰，
+    /// 那张帧什么都回答不了（"那一圈压在深蓝格上是什么样"正是本轮要看的东西）。
+    /// **帧存在 ≠ 被摄对象在帧里**，这一条在 R28c 与批次 22 上各栽过一次。
+    /// 挑哪几列这件事本身由 `HeatmapHoverEvidenceTests` 的档位多样性守卫判。
+    static func heatmapHoverStripCells(counts: [String: Int], today: Date,
+                                       calendar: Calendar) -> [DailyCopyHeatPolicy.Cell] {
+        Array(DailyCopyHeatPolicy.weeks(counts: counts, endingOn: today, calendar: calendar)
+            .suffix(3).flatMap { $0.cells })
+    }
+
+    /// R45 · 悬停取证那条带：三列 × 七行真格子，其中一格被"悬停"。
+    ///
+    /// 画的是**产品自己的** `DailyCopyHeatmapCell`（网格那条路就是它），
+    /// `counts` 与分档全来自 policy 现算的格子；夹具唯一的决定是"哪一格是 hovered"。
+    /// `onHover` 传空函数：离线渲染里它本来就不会被调用，被调用也不该改任何东西。
+    @ViewBuilder
+    static func heatmapCellStrip(cells: [DailyCopyHeatPolicy.Cell],
+                                 hoveredIndex: Int?,
+                                 calendar: Calendar) -> some View {
+        VStack(spacing: VisualHeat.spacing) {
+            ForEach(0..<7, id: \.self) { row in
+                HStack(spacing: VisualHeat.spacing) {
+                    ForEach(0..<3, id: \.self) { column in
+                        let index = column * 7 + row
+                        if index < cells.count {
+                            DailyCopyHeatmapCell(cell: cells[index],
+                                                 isHovered: hoveredIndex == index,
+                                                 calendar: calendar) { _ in }
+                        } else {
+                            Color.clear.frame(width: VisualHeat.cell, height: VisualHeat.cell)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func rowKind(_ entry: ClipboardEntry) -> String {

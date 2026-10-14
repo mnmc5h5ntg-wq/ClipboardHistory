@@ -543,12 +543,17 @@ final class DailyCopyHeatmapTests: XCTestCase {
         let view = codeOnly(try productSource(named: "Views/DailyCopyHeatmapView.swift"))
 
         // ① 悬停：变更点自己开事务。
+        //    R45 之后"格子怎么画"搬进了 `DailyCopyHeatmapCell`，所以这里读**两个**区域：
+        //    事务仍在调用点（`cellView` 把 `hovered` 折成 `isHovered` 时开），
+        //    而按值动画跟着画法走。守卫跟着代码搬，不是把守卫放宽 ——
+        //    两条断言一条都没删，只是各自指回自己现在的主人。
         let cell = region(in: view, named: "func cellView")
         XCTAssertTrue(cell.contains("withAnimation(MotionCatalog.animation(for: .hover))"),
                       "描边是 `hovered` 驱动的透明度，可插值；变更点不开事务 ⇒ 它硬生硬灭（阶段一那条假动画的成因）")
-        XCTAssertTrue(cell.contains("value: cell.bucket)"),
+        let cellDrawing = region(in: view, named: "struct DailyCopyHeatmapCell")
+        XCTAssertTrue(cellDrawing.contains("value: cell.bucket)"),
                       "当天那格的深浅必须由 bucket 驱动：没有这一条，复制一下之后图上是硬切")
-        XCTAssertFalse(cell.contains("value: cell.count)"),
+        XCTAssertFalse(cellDrawing.contains("value: cell.count)"),
                        "键不许用 count：同一档内 12→13 次画面**不该**动，拿 count 当键会让每次复制都白起一次事务")
 
         // ② 页脚：那条"声明了但空转"的动画必须已经撤掉，而不是被挪到别处。
@@ -632,9 +637,25 @@ final class DailyCopyHeatmapTests: XCTestCase {
     func testHeatmapRegionHelperIsATruthTable() throws {
         let view = codeOnly(try productSource(named: "Views/DailyCopyHeatmapView.swift"))
         let cell = region(in: view, named: "func cellView")
-        XCTAssertTrue(cell.contains("onHover"), "区域助手取不到 cellView 的内容")
+        XCTAssertTrue(cell.contains("DailyCopyHeatmapCell("), "区域助手取不到 cellView 的内容")
         XCTAssertFalse(cell.contains("private var footer"),
                        "区域把下一个成员也吞了 ⇒ 它其实是整文件，'按区域判'的判别力是假的")
+        // R45 新增的一格：画法搬进 `DailyCopyHeatmapCell` 之后，
+        // `onHover` 与按值动画都在**那个结构体**里，而调用点区域里不该再有它们。
+        // 这一格管的是"守卫有没有跟着代码搬"：搬错了地方，上一条判据会红成"动画丢了"，
+        // 而实际只是指错了区域 —— 那是一次假红，比漏检更浪费轮次。
+        let cellDrawing = region(in: view, named: "struct DailyCopyHeatmapCell")
+        XCTAssertTrue(cellDrawing.contains("onHover"), "格子区域取不到画法 ⇒ R45 之后守卫指错了主人")
+        XCTAssertFalse(cell.contains("onHover"),
+                       "调用点区域里不该再有画法：若有，说明 `cellView` 自己又画了一份，两份会分叉")
+        // 同名成员的两个区域：文件里现在有两个 `var body`（视图的与单格的）。
+        // 区域助手取的是**第一个**，所以这里必须钉住取到的是哪一个 ——
+        // 取错了，③ 那三条按值/过渡断言量的就是单格而不是整块交换，而它看着是全绿的。
+        let body = region(in: view, named: "var body")
+        XCTAssertTrue(body.contains("value: counts.isEmpty)"),
+                      "`var body` 取到的必须是视图的 body（整块交换在那里）")
+        XCTAssertFalse(body.contains("strokeBorder"),
+                       "`var body` 取到的是单格而不是视图 ⇒ 同名成员让区域指错了主人")
         let footer = region(in: view, named: "var footer")
         XCTAssertFalse(footer.contains("func cellView"), "同上：footer 区域不许把 cellView 也圈进来")
         // 取不到的那一路：哨兵串必须**不含**任何真实 needle，否则"找不到"会被读成"这里没有动画声明"。

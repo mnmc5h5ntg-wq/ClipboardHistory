@@ -92,6 +92,18 @@ enum VisualHeat {
     /// 它要在**已经有色块**的表面上把自己读出来，发丝线在深色格子上会消失。
     static let hoverStroke: CGFloat = 1
 
+    /// 悬停那一圈的描边不透明度（R45 把它从调用点上的裸 0.55 提成一个有名字的数）。
+    ///
+    /// 0.55 这个值**在 R45 之前是一句没有对过账的断言**：上面那条注释说"发丝线在深色格子上会消失"，
+    /// 可这一圈从来没被画出来量过（`hovered` 是 `@State`，而合成 hover 的三条路 R14 实测全断）。
+    /// 现在它由 `HeatmapHoverEvidenceTests` 逐档量：五档深浅 × 亮暗两种外观，
+    /// 量的是**描边那一条带**与同一格未悬停时同一条带的差。
+    /// 非悬停必须是 **0**，不是 0.02 那种"几乎看不见"：常驻的淡描边会让 126 个格子
+    /// 同时开口说话，而这张图唯一的信息服务于深浅。
+    static func hoverRingOpacity(isHovered: Bool) -> Double {
+        isHovered ? 0.55 : 0
+    }
+
     /// 强度 `bucket`（0…4）→ 强调色不透明度。
     static func opacity(bucket: Int) -> Double {
         guard bucket > 0 else { return empty }

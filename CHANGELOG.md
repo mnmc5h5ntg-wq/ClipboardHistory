@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R45 · 热图悬停那一圈第一次有像素证据，画法抽成 `DailyCopyHeatmapCell`）
+
+- 新增 `HeatmapHoverEvidenceTests`（7 条判据）：描边带可见性（五档 × 亮暗 × 1×/2× = 20 读数）、
+  归因（带外必须不变，10 读数）、**不喧宾夺主**（悬停差 ÷ 数据全幅度 ≤ 1.0，10 读数）、
+  带选择器真值表 7 格、令牌真值表、源码路由守卫、夹具自检。
+- 产品侧只有一个搬运动作：单格画法从 `DailyCopyHeatmapView.cellView` 抽成
+  `DailyCopyHeatmapCell(cell:isHovered:calendar:onHover:)`，裸的 `0.55` 提成
+  `VisualHeat.hoverRingOpacity(isHovered:)`。**既有 112 张帧逐字节不变**（`CHANGED=0`）
+  ⇒ 这是一次可证的行为保持重构，不是改外观。
+- 帧基线 112 → **116**：新增 `heatmap-cell-strip-still` / `-hover`（90×140，亮暗各一）——
+  112 张里以前**没有一张**带悬停态，"悬停"这个状态在取证面上等于不存在。
+- 读数：描边带均值通道差 36.10–75.50/255（地板 18 = 最小读数的一半）；带外 0.00；
+  悬停/数据全幅度倍率 0.46–0.75。`VisualHeat.hoverStroke` 那句"发丝线在深色格子上会消失"
+  第一次有了读数支持：**1× 那一臂系统性比 2× 低 20–25%**，但最弱一臂仍是恰可察觉台阶的九倍。
+- 修掉本轮自己的两个尺子错误：① 描边带用"方框减角块"切掉了真描边 ⇒ 报假 ✗，改用圆角矩形 SDF；
+  ② 夹具取 `prefix(3)`（最老三列全是空档）⇒ 帧存在但被摄对象不在帧里，改 `suffix(3)` 并补夹具自检。
+- 重构把 R9 时代两条按 `func cellView` 取区域的源码守卫搬到了新的主人那里
+  （**一条断言都没放宽**），并给区域助手补了"同名成员取到哪一个"这一格。
+- 新开 BACKLOG 66（动效覆盖地板在 runner 上 4/4 → 3/4 而闸门仍绿 ⇒ 需要一个会红的形状）
+  与 67（悬停"触发"那一半仍只能人眼验，挂在批次 22/47.1）。
+- 验证：742 tests / 29 skipped / 0 failures、0 告警、闸门 `红=0 NOT_RUN=0`、脚本 83 全绿、
+  变异 M210–M215 六支全 CAUGHT。
+
+
 ### Added（R44 · 判据会读"派生键"了 —— 调用点级的动效守卫推广到 NoticeBanner）
 
 - 本轮**零产品改动**，改的是尺。R42 那条"调用点级"守卫要推广到 `NoticeBanner` 时被发现读不懂一种合法写法：

@@ -165,40 +165,18 @@ struct DailyCopyHeatmapView: View {
             // 而那天根本还没到 —— 这是这张图最容易撒的一个谎。
             Color.clear.frame(width: VisualHeat.cell, height: VisualHeat.cell)
         } else {
-            let isHovered = hovered?.dayKey == cell.dayKey
-            VisualShape.rounded(VisualRadius.heatCell)
-                .fill(cell.count == 0
-                      ? Color.primary.opacity(VisualHeat.empty)
-                      : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket)))
-                .frame(width: VisualHeat.cell, height: VisualHeat.cell)
-                // 当天那一格从浅到深是这张图**唯一一条实时通道**：用户复制一下，
-                // 右下角就该有反应。没有这一条的话它是硬切，读起来像"数字被换掉了"
-                // 而不是"我又多复制了一次"（阶段一自检 88 分扣在的就是这里，U-30）。
-                // 键取 `bucket` 而不是 `count`：深浅本来就是按档走的，
-                // 12 → 13 次若仍在同一档，画面**不该**动 —— 拿 count 当键会让每次复制
-                // 都起一次事务去插值一个不会变的值（白付，而且让"变了"这件事失去意义）。
-                .animation(MotionCatalog.animation(for: .contentFade), value: cell.bucket)
-                .overlay(
-                    // 悬停那一圈只在悬停时出现：常驻描边会让 126 个格子同时开口说话，
-                    // 而这张图的信息全在**深浅**上。
-                    VisualShape.rounded(VisualRadius.heatCell)
-                        .strokeBorder(Color.primary.opacity(isHovered ? 0.55 : 0),
-                                      lineWidth: VisualHeat.hoverStroke)
-                )
-                .contentShape(Rectangle())
-                .onHover { inside in
-                    // 事务挂在**变更点**上，而不是靠下游一条 `.animation(value:)`：
-                    // 描边（可插值的透明度）与页脚（字符串）由同一个 `hovered` 驱动，
-                    // 挂在这里两者一起进事务，而格子那一条才是真的被插值的那半。
-                    withAnimation(MotionCatalog.animation(for: .hover)) {
-                        hovered = inside ? cell : (hovered?.dayKey == cell.dayKey ? nil : hovered)
-                    }
+            DailyCopyHeatmapCell(
+                cell: cell,
+                isHovered: hovered?.dayKey == cell.dayKey,
+                calendar: calendar
+            ) { inside in
+                // 事务挂在**变更点**上，而不是靠下游一条 `.animation(value:)`：
+                // 描边（可插值的透明度）与页脚（字符串）由同一个 `hovered` 驱动，
+                // 挂在这里两者一起进事务，而格子那一条才是真的被插值的那半。
+                withAnimation(MotionCatalog.animation(for: .hover)) {
+                    hovered = inside ? cell : (hovered?.dayKey == cell.dayKey ? nil : hovered)
                 }
-                .accessibilityElement()
-                // 走 `helpLabel` 而不是裸 `.help(`：仓库里有一条判据
-                // （`AccessibilityLabelHygieneTests`）要求悬浮提示必须同时上无障碍标签，
-                // 否则 VoiceOver 用户只有鼠标悬停才拿得到这句话。它第一次跑就把这里抓出来了。
-                .helpLabel(DailyCopyHeatPolicy.tooltip(cell: cell, calendar: calendar))
+            }
         }
     }
 
@@ -246,6 +224,63 @@ struct DailyCopyHeatmapView: View {
         }
         let day = DailyCopyHeatPolicy.fullDayString(for: date, calendar: calendar)
         return "最忙的一天：\(day) · \(summary.busiestCount) 次"
+    }
+}
+
+/// 热图的一格（R45 从 `DailyCopyHeatmapView.cellView` 的 else 分支抽出来）。
+///
+/// 抽它的理由不是"文件长"，是**这件事以前只能靠注释**：
+/// `VisualHeat.hoverStroke` 那里写着"发丝线在深色格子上会消失，所以描边要重一档"，
+/// 而悬停那一圈**从来没有被画出来对过账** —— 因为 `hovered` 是宿主的 `@State`，
+/// 而 R14 实测三条"合成 hover"的路全断（CGEvent 被窗口服务器丢弃、
+/// 直接喂 `mouseEntered` 不回调、`sendEvent` 崩；数据在
+/// `.scratch/motion-audit-2/spike_hover_channel.md`，结论抄在
+/// `PressFeedbackTests` 那条梯子判据的开头）。
+/// 把"画法"收进一个以 `isHovered` 为入参的视图之后：
+/// **触发**那一半仍然只能人眼验（人工批次 22），**表达**这一半第一次可离线渲染、可逐档量、可看。
+///
+/// 产品走的还是同一条路 —— `cellView` 的 else 分支现在只是把 `hovered` 折成
+/// `isHovered` 再交给这里，`heatmap-populated` 那两张帧判的就是它
+/// （`HeatmapHoverEvidenceTests` 里有一条源码守卫钉住"网格确实经过这里"）。
+struct DailyCopyHeatmapCell: View {
+    let cell: DailyCopyHeatPolicy.Cell
+    let isHovered: Bool
+    /// tooltip 文案由 policy 现算，**不从外面传字符串**：
+    /// 传进来就等于允许调用方（包括夹具）替产品决定"这一格该说什么" ——
+    /// R43 那条"夹具不许手写回执文案"判据抓的是同一件事。
+    let calendar: Calendar
+    let onHover: (Bool) -> Void
+
+    var body: some View {
+        VisualShape.rounded(VisualRadius.heatCell)
+            .fill(cell.count == 0
+                  ? Color.primary.opacity(VisualHeat.empty)
+                  : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket)))
+            .frame(width: VisualHeat.cell, height: VisualHeat.cell)
+            // 当天那一格从浅到深是这张图**唯一一条实时通道**：用户复制一下，
+            // 右下角就该有反应。没有这一条的话它是硬切，读起来像"数字被换掉了"
+            // 而不是"我又多复制了一次"（阶段一自检 88 分扣在的就是这里，U-30）。
+            // 键取 `bucket` 而不是 `count`：深浅本来就是按档走的，
+            // 12 → 13 次若仍在同一档，画面**不该**动 —— 拿 count 当键会让每次复制
+            // 都起一次事务去插值一个不会变的值（白付，而且让"变了"这件事失去意义）。
+            .animation(MotionCatalog.animation(for: .contentFade), value: cell.bucket)
+            .overlay(
+                // 悬停那一圈只在悬停时出现：常驻描边会让 126 个格子同时开口说话，
+                // 而这张图的信息全在**深浅**上。
+                // 透明度走 `VisualHeat.hoverRingOpacity`：让"这一圈有多重"是一个有名字的数，
+                // 而不是调用点上一个裸的 0.55（R45：它第一次被逐档量之前，
+                // 这个 0.55 凭什么这么定，盘面上没有任何记录）。
+                VisualShape.rounded(VisualRadius.heatCell)
+                    .strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity(isHovered: isHovered)),
+                                  lineWidth: VisualHeat.hoverStroke)
+            )
+            .contentShape(Rectangle())
+            .onHover(perform: onHover)
+            .accessibilityElement()
+            // 走 `helpLabel` 而不是裸 `.help(`：仓库里有一条判据
+            // （`AccessibilityLabelHygieneTests`）要求悬浮提示必须同时上无障碍标签，
+            // 否则 VoiceOver 用户只有鼠标悬停才拿得到这句话。它第一次跑就把这里抓出来了。
+            .helpLabel(DailyCopyHeatPolicy.tooltip(cell: cell, calendar: calendar))
     }
 }
 

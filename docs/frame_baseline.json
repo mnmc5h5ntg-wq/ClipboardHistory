@@ -1,5 +1,5 @@
 {
-  "count": 112,
+  "count": 116,
   "frames": {
     "content-empty-750x560-dark.png": "a09e9950d6a641836ef4015b91b85252c1897a55b22938fbe6f673614946e91d",
     "content-empty-750x560-light.png": "6ef53e39f67397f7807907c53ac90fcf8aef4c198db987f3305b235f27cc3382",
@@ -41,6 +41,10 @@
     "glass-pill-120x232-light.png": "4cb264fd4ae1de5a97f0ffdef257a9b7b53c063d210545905d2e7e618af2192f",
     "glass-pill-states-120x232-dark.png": "6472533eb1c37dfead1a31f3b8d0112b465c4c7ed8460b02b19aa950765e17fd",
     "glass-pill-states-120x232-light.png": "11b25238ae1e2561312747b599bc89ab88c4b5d95fde50cbe4384de5d7a655cd",
+    "heatmap-cell-strip-hover-90x140-dark.png": "e469a8eefa6bd678c2e035b4c727aa1e013f1345ae01588f49acd8cfcfa93f16",
+    "heatmap-cell-strip-hover-90x140-light.png": "013b22a8159215ad72fb5b8f72171afa2b26d5b0f5127f81a56fc4c595af810a",
+    "heatmap-cell-strip-still-90x140-dark.png": "d0cd165e3602ef3073f585b98565042d788579695f1607776dc1a88503c3d0ef",
+    "heatmap-cell-strip-still-90x140-light.png": "887f01bdd7f55e56409024209baa0e43df2044d8ee3996cf5b420d4cc3efee9d",
     "heatmap-empty-430x150-dark.png": "b10563bda801c76d82461c60a43dcfa905ccbee0e77aff636bdd9db4fc438736",
     "heatmap-empty-430x150-light.png": "8f28294193e937322574a65497078d309d1b7730cbb9899a975264d977eefd55",
     "heatmap-populated-430x250-dark.png": "042aed6211ec318e811b71ba9884c1d0730aa8d5541a979ebd8e6124c479ef05",
