@@ -396,7 +396,13 @@ final class MotionFilmstripTests: XCTestCase {
     /// "到底哪里变了"，而不是靠猜像素坐标去框区域（猜错的结果是整条判据读到 0.000，
     /// 看着像"没动"，其实是我没框到）。
     static func changeGrid(_ frames: [CGImage], index: Int, cols: Int, rows: Int) -> String {
-        let bitmaps = frames.map(raster)
+        changeGrid(bitmaps: frames.map(raster), index: index, cols: cols, rows: rows)
+    }
+
+    /// 位图版才是真正干活的那个 —— 拆出来只为了**行序能被合成用例钉住**（BACKLOG 84）：
+    /// R58 之前它第 0 行打印的是窗口底部，而它只输出字符串、不参与任何断言，
+    /// 所以那半年里所有按**行**读过的网格都得重看一遍才敢引用。
+    private static func changeGrid(bitmaps: [Bitmap], index: Int, cols: Int, rows: Int) -> String {
         guard index + 1 < bitmaps.count else { return "无帧" }
         var cells: [String] = []
         for row in 0..<rows {
@@ -1461,9 +1467,32 @@ final class MotionFilmstripTests: XCTestCase {
         // 断言失败之后代码继续往下走，`seen[0]` 在空数组上越界，测试进程直接没了，
         // 于是"Test Case … failed"那行根本没打出来，电池只能报 BROKEN-MUTATION。
         // 红要能被读，崩溃不能（同一族：守卫里的 try! 把红伪装成没跑）。
+        // R60 改：这一格在 runner 上是**假红**。run 38586812301 原文：
+        //   `整卷只找到 0 帧里有那颗红色图标`（本机同一把尺是 5–6 帧）。
+        // 0 帧不是"过程太快没抓到"，是**那颗图标在这台机器上根本没被认出来**：
+        // runner 是 1x 缩放（带卷 760×48px），这颗 ~22px 高的实心红符号几乎没有纯色核心像素，
+        // `r>120, r-g>60, r-b>60` 一条都不满足 ⇒ 判色前提在这台机器上不成立。
+        // 所以它不能红：红会说成"产品没画图标"。也不能反过来当"没动画"的证据。
+        // 用 MOTION_TRACK_VOID 而不是 MOTION_NOT_RUN：后者是覆盖率闸门的输入，
+        // 而这一臂**确实被判到了**（`MOTION_SUMMARY` 里有它），作废的只是这条新测量。
+        // 顺手把诊断一起发出去（缩放、单帧最多几根红像素、扫过的 x 范围），
+        // 下一轮据此决定是放宽判色还是把窗口按 pt 表达 —— 不靠猜。
+        // 缩放不假设，从帧自己读出来：runner 的带卷是 760px 宽（1x），本机是 1520px（2x），
+        // 而那条扫描窗是**写死成像素**的 ⇒ 两边看的不是同一块内容（R60）。
+        let scale = Double(frames[0].width) / 760.0
+        let maxRedPixels = track.map { $0.pixels }.max() ?? 0
         guard seen.count >= 4 else {
-            XCTFail("整卷只找到 \(seen.count) 帧里有那颗红色图标 ⇒ 跟踪没有对象，"
-                    + "这条测量作废（多半是判色的阈值与这一版图标对不上，或图标在过程中出了框）")
+            emit("MOTION_TRACK_VOID dismiss 认得出图标的帧=\(seen.count)/\(frames.count) "
+                 + "单帧最多红像素=\(maxRedPixels) 缩放=\(String(format: "%.2f", scale))x "
+                 + "扫描窗=写死的 x∈[40,200)px（=\(Int(40 / scale))…\(Int(200 / scale))pt） "
+                 + "⇒ 这条测量在这台机器上作废（判色前提不成立），"
+                 + "既不许写进已交付，也不许反过来当\u{201c}产品没画图标/没动画\u{201d}的证据")
+            // 但**不许两边都不红**：2x 那台机器上这个前提是被实测撑住的（本机五遍 5–6 帧），
+            // 所以 2x 上认出 0 帧只能是跟踪被弄坏了 —— M303（把扫描窗清空）必须红在这一格。
+            XCTAssert(scale < 2.0,
+                "在 \(String(format: "%.2f", scale))x 这台机器上，五遍实测都能认出 5–6 帧图标；"
+                + "这一卷只认出 \(seen.count) 帧（单帧最多 \(maxRedPixels) 根红像素）⇒ "
+                + "是**跟踪坏了**（窗口/判色/带的位置），不是产品没画那颗图标")
             return
         }
         let ys = seen.map { $0.y }
@@ -1655,28 +1684,12 @@ final class MotionFilmstripTests: XCTestCase {
     /// 锚点（"缓冲区第 0 行 = 画面顶边"）来自上面那次实测，不是注释、不是 CG 的推理。
     func testBandRectMapsToTheEndItClaims() {
         let width = 70, height = 100
-        func pair(differingRows: ClosedRange<Int>? = nil,
-                  differingColumns: ClosedRange<Int>? = nil) -> (Bitmap, Bitmap) {
-            let a = [UInt8](repeating: 0, count: width * height * 4)
-            var b = [UInt8](repeating: 0, count: width * height * 4)
-            for y in 0..<height {
-                for x in 0..<width {
-                    let inRows = differingRows.map { $0.contains(y) } ?? true
-                    let inCols = differingColumns.map { $0.contains(x) } ?? true
-                    guard inRows && inCols else { continue }
-                    let p = (y * width + x) * 4
-                    b[p] = 200; b[p + 1] = 200; b[p + 2] = 200; b[p + 3] = 255
-                }
-            }
-            return (Bitmap(pixels: a, width: width, height: height),
-                    Bitmap(pixels: b, width: width, height: height))
-        }
         let top = CGRect(x: 0, y: 0, width: 1, height: 0.2)         // 画面**顶边**那 20%
         let bottom = CGRect(x: 0, y: 0.8, width: 1, height: 0.2)    // 画面**底边**那 20%
         let left = CGRect(x: 0, y: 0, width: 0.2, height: 1)
         let right = CGRect(x: 0.8, y: 0, width: 0.2, height: 1)
-        let head = pair(differingRows: 0...19)
-        let tail = pair(differingRows: 80...99)
+        let head = Self.syntheticPair(width: width, height: height, differingRows: 0..<20)
+        let tail = Self.syntheticPair(width: width, height: height, differingRows: 80..<100)
 
         // ⓪ 夹具自己先要能判红黑：差异不成立时后面每一格都无从解释（本仓库"探针不自检"那一族）。
         XCTAssertEqual(Self.changedFraction(head.0, head.1, band: nil),
@@ -1699,7 +1712,7 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertLessThanOrEqual(Self.changedFraction(tail.0, tail.1, band: top), 0.1,
             "底边的差异被 `band.minY=0` 读到了 ⇒ 顶部那条带量的其实是底部")
         // ③ 横轴不许"顺手也对"：它没有翻转，所以这一组同时钉住"别把 x 也翻一次"。
-        let west = pair(differingColumns: 0...13)
+        let west = Self.syntheticPair(width: width, height: height, differingColumns: 0..<14)
         XCTAssertGreaterThanOrEqual(Self.changedFraction(west.0, west.1, band: left), 0.9,
             "差异写在每行最左 20 列，而 band.minX=0 读不到 ⇒ 横轴被多翻了一次（它本来不该翻）")
         XCTAssertLessThanOrEqual(Self.changedFraction(west.0, west.1, band: right), 0.1,
@@ -1708,6 +1721,49 @@ final class MotionFilmstripTests: XCTestCase {
         //    于是"带退化成整幅"那种坏法（比如忘了裁剪）也会在这一格红。
         XCTAssertEqual(Self.changedFraction(head.0, head.1, band: nil), 0.2, accuracy: 0.02,
             "整幅读数不是 0.2 ⇒ 夹具的采样比例变了，上面那六格的地板要重算")
+    }
+
+    /// `changeGrid` 的第 0 行必须是**画面顶边**那一行（R60 / BACKLOG 84）。
+    ///
+    /// 为什么单独一条：R58 修映射之前它打印的行序是反的（第 0 行 = 窗口底部），而它
+    /// **只输出字符串、不参与任何断言** ⇒ 那半年里所有按**行**读过的网格（R2/R3 的诊断段）
+    /// 都得重看一遍才敢引用。修好了不等于钉住了，这一条就是那颗钉子。
+    /// 与 `testBandRectMapsToTheEndItClaims` 同一族：合成位图、差异只放一条边。
+    /// **不覆盖管线**：这条钉的是尺子的行序，不是产品像素；产品那一侧的对应判据是
+    /// `testAttributionGridSeesTheMotionTheRulerSees` 那一族（走真卷）。
+    func testChangeGridPrintsRowZeroAtTheTop() throws {
+        let width = 60, height = 120, cols = 3, rows = 4
+        let bandHeight = height / rows, bandWidth = width / cols
+        func grid(differingRows: Range<Int>? = nil,
+                  differingColumns: Range<Int>? = nil) -> [String] {
+            let pair = Self.syntheticPair(width: width, height: height,
+                                          differingRows: differingRows,
+                                          differingColumns: differingColumns)
+            let text = Self.changeGrid(bitmaps: [pair.0, pair.1], index: 0, cols: cols, rows: rows)
+            // 每行后面都跟一个 '|'，所以切完要丢掉末尾那段空串
+            let parts = text.split(separator: "|", omittingEmptySubsequences: false).dropLast()
+            XCTAssertEqual(parts.count, rows, "网格没切出 \(rows) 行：\(text)")
+            return parts.map(String.init)
+        }
+        func bright(_ line: String) -> Int { line.filter { $0 == "#" || $0 == "+" }.count }
+
+        let top = grid(differingRows: 0..<bandHeight)
+        XCTAssertEqual(bright(top[0]), cols, "差异在画面**顶边**，第 0 行必须整行亮：\(top)")
+        for r in 1..<rows {
+            XCTAssertEqual(bright(top[r]), 0, "第 \(r) 行不该亮（差异只在顶边）：\(top)")
+        }
+        let bottom = grid(differingRows: (height - bandHeight)..<height)
+        XCTAssertEqual(bright(bottom[rows - 1]), cols,
+            "差异在画面**底边**，最后一行才该亮 ⇒ 行序又反了：\(bottom)")
+        for r in 0..<(rows - 1) {
+            XCTAssertEqual(bright(bottom[r]), 0, "底边那一格漏到了第 \(r) 行：\(bottom)")
+        }
+        // 列序顺手一起钉：它和行序是同一处映射的两半，坏也只坏一半过。
+        let left = grid(differingColumns: 0..<bandWidth)
+        for r in 0..<rows {
+            XCTAssertEqual(bright(String(left[r].prefix(1))), 1, "第 \(r) 行的第 0 列该亮：\(left)")
+            XCTAssertEqual(bright(String(left[r].dropFirst())), 0, "第 \(r) 行的右侧两列不该亮：\(left)")
+        }
     }
 
     /// 带捕获的那几卷上，不许再套第二层归一化框（R58 / BACKLOG 80 的第二半）。
@@ -3667,6 +3723,27 @@ final class MotionFilmstripTests: XCTestCase {
             return Double(changed) / Double(max(sampled, 1))
         }
         return (diff(from: 0), diff(from: b.height - a.height))
+    }
+
+    /// 合成一对位图：`a` 全黑，`b` 只在指定行/列带里是亮的（200,200,200）。
+    /// 两条测试共用（R58 的方向真值表、R60 的网格行序），所以它必须是**静态**的：
+    /// 各自复制一份，就会有一份跟着实现变旧。
+    private static func syntheticPair(width: Int, height: Int,
+                                      differingRows: Range<Int>? = nil,
+                                      differingColumns: Range<Int>? = nil) -> (Bitmap, Bitmap) {
+        let a = [UInt8](repeating: 0, count: width * height * 4)
+        var b = [UInt8](repeating: 0, count: width * height * 4)
+        for y in 0..<height {
+            for x in 0..<width {
+                let inRows = differingRows.map { $0.contains(y) } ?? true
+                let inCols = differingColumns.map { $0.contains(x) } ?? true
+                guard inRows && inCols else { continue }
+                let p = (y * width + x) * 4
+                b[p] = 200; b[p + 1] = 200; b[p + 2] = 200; b[p + 3] = 255
+            }
+        }
+        return (Bitmap(pixels: a, width: width, height: height),
+                Bitmap(pixels: b, width: width, height: height))
     }
 
     private static func raster(_ image: CGImage) -> Bitmap {

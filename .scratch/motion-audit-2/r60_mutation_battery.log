@@ -1,0 +1,27 @@
+预检 OK MotionFilmstripTests.testChangeGridPrintsRowZeroAtTheTop
+预检 OK MotionFilmstripTests.testBandRectMapsToTheEndItClaims
+
+M308 网格行序翻回去（第 0 行 = 画面底部） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop'] 命中=['第 0 行必须整行亮', '最后一行才该亮'] 还原干净=True
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1729: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("0") is not equal to ("3") - 差
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1731: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 第
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1734: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("0") is not equal to ("3") - 差
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1737: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 底
+
+M309 合成夹具的与改成或（夹具自己不再不对称） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims', 'ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop'] 命中=['夹具', '不该亮'] 还原干净=True
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1683: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims] : XCTAssertLessThanOrEqual failed: ("1.0") is greater than 
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1689: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims] : XCTAssertLessThanOrEqual failed: ("1.0") is greater than 
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1695: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims] : XCTAssertLessThanOrEqual failed: ("1.0") is greater than 
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1699: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims] : XCTAssertEqualWithAccuracy failed: ("1.0") is not equal t
+
+M310 网格里每格都读整幅（band 退化成 nil） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop'] 命中=['不该亮'] 还原干净=True
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1731: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 第
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1731: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 第
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1731: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 第
+   MSG| /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1737: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop] : XCTAssertEqual failed: ("3") is not equal to ("0") - 底
+
+==== 汇总 ====
+  M308 | CAUGHT | yes | yes
+  M309 | CAUGHT | yes | yes
+  M310 | CAUGHT | yes | yes
+红得不对/未抓到=0  还原不干净=0
+还原后复跑（网格行序判据）：ESCAPED

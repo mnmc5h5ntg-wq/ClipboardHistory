@@ -60,7 +60,7 @@ MUTATIONS = [
     ("M303", "图标的跟踪区域空了（布局一改就跟丢）", TESTS, "swift",
      "                for x in 40..<200 where x < bitmap.width {",
      "                for x in 40..<40 where x < bitmap.width {   // MUTANT",
-     TRACK, ["跟踪没有对象"]),
+     TRACK, ["跟踪坏了"]),
     ("M304", "两栏框成同一块（详情区宽度 0）", TESTS, "swift",
      "        let detail = CGRect(x: 0.368, y: 0, width: 1 - 0.368, height: 1)",
      "        let detail = CGRect(x: 0.368, y: 0, width: 0, height: 1)   // MUTANT",

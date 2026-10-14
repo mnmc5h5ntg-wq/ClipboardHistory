@@ -5,7 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-## [Unreleased]
+### Fixed（R60：撤掉一条我自己写的假红 —— 判色前提在 1x 的机器上不成立）
+- `testBannerOutTracksWhetherItFadesOrSlides` 在 runner 上报"整卷只找到 0 帧里有那颗红色图标"
+  （run 38586812301；原文这次能从日志里读到，因为 R59 加了那条 `grep -E "error: -\["`）。
+  根因不是采样粗，是**前提**：那条扫描窗与判色阈值是在本机 2x 上量出来的（五遍都能认出 5–6 帧），
+  而 runner 是 1x —— 那颗 ~22px 高的实心红符号几乎没有纯色核心像素。
+  ⇒ 认不出图标时改发 `MOTION_TRACK_VOID`（附缩放、单帧最多红像素、扫描窗换算成 pt 的诊断）并**不红**；
+  2x 那台机器上前提仍被实测撑住，所以那里认出 0 帧**照旧必须红**（M303 换 needle 后重跑 CAUGHT）。
+  这是 R38 那条"两台机器的读数不能当另一台机器的地板"在新写的判据上重犯。
+- 更正一句写死的话：带捕获在 runner 上的采样**这次确实变细了**（带 间隔中位 19ms / 整窗 32ms），
+  R58 那次是 22ms / 22ms ⇒ 不能当常数，按"两次运行不一致"记。
+
+### Added（R60：把网格的行序钉住；把"重叠为什么量不出来"记账）
+- 新判据 `testChangeGridPrintsRowZeroAtTheTop`：`changeGrid` 拆成"位图版 + 薄壳"之后，
+  合成位图把差异分别放在顶边 / 底边 / 左边，要求只有对应那一行/那一列亮。
+  它补的是 R58 那半年缺的东西 —— 网格只输出字符串、不参与断言，所以行序反了没人知道（BACKLOG 84 结案）。
+- 合成夹具从 R58 那条测试里提成共用的 `syntheticPair`（各自一份就会有一份跟着实现变旧）。
+- 变异 **M308–M310 全 CAUGHT**（行序翻回去 / 夹具的 `&&` 改成 `||` / 网格里把 band 传成 nil），
+  `.scratch/motion-audit-2/r60_mutation_battery.log`。
+- BACKLOG 88（新开）：R59 唯一留下的那条看图结论"淡出中的横幅被搜索框盖住"，
+  本轮用三条**不依赖颜色**的轴（中灰计数 / 最长均匀段 / 水平直边）都没能复现，三条失败原因不同；
+  证据与探针都在 `.scratch/motion-audit-2/r60_evidence/` ⇒ 观察不撤也不升级成判据，
+  下一步换捕获方式（关掉动画那一臂与开着那一臂相减）。
+- BACKLOG 89（新开）：runner 上"提示条只演了 57ms ⇒ 一帧跳变"那条红，
+  57ms < 2×38ms（它自己报的事件内最粗采样）⇒ 那条"变化段"连两次采样都不到；
+  缺的是 `judgeMotion` 里一格 `.spanUnresolved`，本轮没改是因为要先补一格覆盖率闸门的夹具
+  （那条 not-run 会把 `must_judge=true` 的 `notice-banner` 翻成 UNDERCOVERED 红）。
+
+### Tests（R60：这一轮的验证数字）
+- 全量 **766 tests / 36 skipped / 0 failures**；motion 全量 **42 / 3 skip / 0 failures**；脚本 **107 全绿**；
+  清洁 `swift build --build-tests` **exit 0、0 告警**（R59 收紧的那道闸门第一次在 runner 上也报 0 ⇒ BACKLOG 87 结案）。
+- **产品零改动**：116 帧 vs working 基线 `CHANGED=0 / MISSING=0 / ADDED=0` ⇒ 不换装、不需要 `frame_baseline update`。
+
 
 ### Added（R59：中间态第一次看得清 —— 逐帧图按原始像素竖排，并钉住"这一叠不是一叠同一张"）
 - `writeStack`：带捕获那一卷（96px 高）以前和整窗卷共用 `writeStrip`（按 `width/2` 画）
