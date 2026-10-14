@@ -1,0 +1,8 @@
+A List(.sidebar)+scrollTo 初始 有表格=true 有滚动=true selectedRow=1 indexes=[Optional("1")] visible={{0, 0}, {320, 300}} document={{0, 0}, {320, 1972}} onChange=0 scrollTo=0
+A List(.sidebar)+scrollTo 改选中+0.25s 有表格=true 有滚动=true selectedRow=60 indexes=[Optional("60")] visible={{0, 1662}, {320, 300}} document={{0, 0}, {320, 1972}} onChange=1 scrollTo=1
+A List(.sidebar)+scrollTo 改选中+1.25s 有表格=true 有滚动=true selectedRow=60 indexes=[Optional("60")] visible={{0, 1662}, {320, 300}} document={{0, 0}, {320, 1972}} onChange=1 scrollTo=1
+A List(.sidebar)+scrollTo AppKit 直调滚动 有表格=true 有滚动=true selectedRow=60 indexes=[Optional("60")] visible={{0, 1672}, {320, 300}} document={{0, 0}, {320, 1972}} onChange=1 scrollTo=1
+C ScrollView+LazyVStack+scrollTo 初始 有表格=false 有滚动=true selectedRow=-999 indexes=[nil] visible={{0, 0}, {320, 300}} document={{0, 0}, {320, 976}} onChange=0 scrollTo=0
+C ScrollView+LazyVStack+scrollTo 改选中+0.25s 有表格=false 有滚动=true selectedRow=-999 indexes=[nil] visible={{0, 676}, {320, 300}} document={{0, 0}, {320, 976}} onChange=1 scrollTo=1
+C ScrollView+LazyVStack+scrollTo 改选中+1.25s 有表格=false 有滚动=true selectedRow=-999 indexes=[nil] visible={{0, 676}, {320, 300}} document={{0, 0}, {320, 976}} onChange=1 scrollTo=1
+C ScrollView+LazyVStack+scrollTo AppKit 直调滚动 有表格=false 有滚动=true selectedRow=-999 indexes=[nil] visible={{0, 676}, {320, 300}} document={{0, 0}, {320, 976}} onChange=1 scrollTo=1

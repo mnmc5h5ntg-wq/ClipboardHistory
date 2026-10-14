@@ -1,0 +1,27 @@
+M311 行号算不到就兜底成第 0 行
+    期望被抓：SelectedRowRevealTests/testRowIndexTruthTable
+    结果：CAUGHT（断言红：XCTAssertNil failed: "0" - 选中项不在可见顺序里时必须不滚：兜底成 0 等于用错的行号做一次真滚动）
+
+M312 去掉「已经在视口里就不滚」那道闸
+    期望被抓：臂1 后半句：选中看得见的行不许推动视口
+    结果：CAUGHT（断言红：XCTAssertEqualWithAccuracy failed: ("27.0") is not equal to ("0.0") +/- ("1.0") - 选中一条**已经看得见**的行也把视口推动了 ⇒ 这就是）
+
+M313 闸门改按行号判（而不是按选中 id）
+    期望被抓：臂5：选中项只是行号漂了，视口不许动（本轮实测：SURVIVED，见日志里的机制说明）
+    结果：SURVIVED ⇒ 那把尺没有分辨率（本轮 M313/M317 的原因见文件头注释与 BACKLOG 91）
+
+M317 闸门整个拆掉（每次重算都滚）
+    期望被抓：臂3 / 臂5（本轮实测：SwiftUI 不再调 updateNSView 时这一刀可能没人接 ⇒ 记进电池日志，不假称被抓）
+    结果：SURVIVED ⇒ 那把尺没有分辨率（本轮 M313/M317 的原因见文件头注释与 BACKLOG 91）
+
+M314 同步滚（撤掉推迟一个回合）
+    期望被抓：臂2：选中集合必须**只有**那一行（同步滚会留下 [2, 60]）
+    结果：CAUGHT（断言红：XCTAssertEqual failed: ("[2, 60]") is not equal to ("[60]") - 选中视口外那一行之后表格没有**只**选中它 ⇒ 要么揭示没发生（61 复发，先查 `Selec）
+
+M315 揭示器顺手把选中也写了（第二个作者）
+    期望被抓：SelectedRowRevealTests/testRevealerOnlyScrollsAndNeverSelects
+    结果：CAUGHT（断言红：XCTAssertFalse failed - 揭示器里出现了 selectRowIndexes ⇒ 它变成选中的第二个作者了（D-1 修法③）。本轮实测：把行滚进视口之后 SwiftUI 自己会把选中补上，这里不需要写）
+
+M316 把揭示器从侧栏摘掉
+    期望被抓：声明守卫 + 臂2（61 复发）
+    结果：CAUGHT（断言红：XCTAssertTrue failed - 侧栏没挂揭示器 ⇒ BACKLOG 61 又回到「选中一条列表里看不见的高亮」那个状态）

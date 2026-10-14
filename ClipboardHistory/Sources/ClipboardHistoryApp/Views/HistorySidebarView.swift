@@ -232,6 +232,20 @@ struct HistorySidebarView: View {
         // 键盘导航要留着，所以只关"效果"不关"可聚焦"。`focusEffectDisabled()` 是 macOS 14+，
         // 12/13 没有对应 API ⇒ 那两版上环会留着，是平台限制不是漏了。
         .sidebarFocusRingHidden()
+        // R61 / BACKLOG 61：把当前选中的那一行**滚进视口**。
+        // `List(selection:)` 不选中视口外的行（本轮在屏实测：store 有 1 条、表格 `selectedRowIndexes` 是空），
+        // 而只要那一行进了视口，SwiftUI 自己就把选中补回来 —— 所以这里只补"揭示"这一步，
+        // 不碰选中（作者仍然是 `List`，见 `SelectedRowRevealer` 正文与 D-1 修法③）。
+        // 为什么不用 SwiftUI 自己的 `ScrollViewReader`/`scrollTo`：在产品这棵树上它不滚
+        // （带/不带 anchor 都试过，胶水确实执行、id 也解析到了），
+        // `SelectedRowRevealTests.testSidebarDoesNotClaimTheSwiftUIScrollRoute` 钉住这条结论。
+        .background(
+            SelectedRowRevealer(
+                revealKey: (historyStore.selectedEntry?.id).map { AnyHashable($0) },
+                rowIndex: SelectionRevealPlan.rowIndex(
+                    of: historyStore.selectedEntry?.id,
+                    in: historyStore.filteredEntries.map(\.id)))
+        )
     }
 
     /// 选中集合：`List` 是唯一作者，store 只是落状态（D-1 修法③）。

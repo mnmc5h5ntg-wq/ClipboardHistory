@@ -1275,30 +1275,50 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     以及一条不可达的死代码（`refreshHistory` 没有任何入口）。
     ⇒ 规矩：**未核的条目不许直接当缺陷修**（R34 的 U-56 就是拿没复核的推断去改，方向改错）。
     每轮挑 1–2 条先复核再动，复核结论写回这份清单。
-61. **最小窗口 + 一条横幅 ⇒ 被选中的那一行整行落在可视区之外，而详情区仍在显示它（R41 量到，U-67 的副产物；R60 证明可达）**：
-    读数（同一份数据、同一处选中行）：`content-min`（600×440 无横幅）`blackBandPt=43 / bottomInk=43.4%`
+61. **【已修，R61】程序化选中一条视口外的行 ⇒ 列表里连高亮都没有，而详情区仍在讲它（R41 量到，U-67 的副产物）**：
+    现象读数（同一份数据、同一处选中行）：`content-min`（600×440 无横幅）`blackBandPt=43 / bottomInk=43.4%`
     ⇒ 选中行压在帧底、被裁一半；`content-min-with-copy-failure-notice`（600×440 + 一条 50pt 横幅）
     `blackBandPt=0 / bottomInk=0.1%` ⇒ 横幅把列表顶下去 50pt，那一行**整行**出了可视区。
-    两张帧里详情区显示的都是同一条记录（"ghp_AAA…"，`2025-10-09 16:38:20 复制 · 40 个字符 · 来自 终端`）。
-    ⇒ 现象：**界面在讲一条用户看不见的记录**。
-    **R60 把"是不是缺陷"这一半判掉了 —— 它不需要用户点什么就能发生**：
-    `HistoryStore.swift:382` 在载入时把选中设成 `persistedEntries.first`（启动即自动选中第一条），
-    而新记录是从**顶部**插入的 ⇒ 用户只要继续复制，被选中的那一行就一行一行往下走，
-    走到可视区之外时详情区仍然显示它。所以这不是"用户刚点过、那时它在屏上"的边角，
-    是**默认状态 + 正常使用**的必经路径。
-    剩下的问题是修法值不值得动：候选是"选中行变化 / 列表内容顶部插入时把它滚进可视区"
-    （SwiftUI 侧是 `ScrollViewReader.scrollTo(id)`，macOS 12 就有）。
-    这条会动列表滚动位置，属 R22 那一族（布局位移），而且**主列表今天完全没有 scroll-to-selection**
-    （只有 AppKit 那条快速选择浮层有 `scrollRowToVisible`，`QuickPickController.swift:253`）
-    ⇒ 下一轮先做 spike（把 `ScrollViewReader` 套进侧栏的 `List(selection:)` 会不会破坏侧栏样式/多选），
-    再决定动不动。
-    **动之前还有一件事要先证**（R60 记，别跳过）：`HistorySidebarView.swift:243` 那段注释写着
-    换到 `List(selection:)` 之后"滚动跟随"由系统负责 —— 如果那是真的，那两张帧里选中行出视口
-    就是**夹具/离屏通道**的产物（帧是 `NSHostingView` + `cacheDisplay` 拍的，滚动可能根本没跑），
-    而不是产品缺陷。所以修之前要先做一次 spike：在**在屏**的宿主视图里把选中设成一条靠后的记录，
-    直接问外层 `NSScrollView.documentVisibleRect` 包不包含那一行 —— 包含就是夹具骗人，
-    这条改成"给 `content-min` 那两张帧加一条'帧里的选中行必须可见'的前提判据 + 把现象归到通道"；
-    不包含才是产品该修（`ScrollViewReader.scrollTo`）。**不许跳过这一步直接加滚动。**
+    两张帧里详情区显示的都是同一条记录（"ghp_AAA…"）。⇒ 界面在讲一条用户看不见的记录。
+
+    **R61 把这条从头到尾量了一遍，并且先证伪了本条目上一版的两句判断**（用户逐字对台账，所以更正写在正文里）：
+    * 上一版（eeb16d0）说"启动选中第一条，新记录从顶部插入 ⇒ 被选中的那行会一行一行往下漂出视口"。**错。**
+      `HistoryStore.add` 末尾调 `reconcileSelection(preferredEntryID: 新条目.id)` ⇒ 选中项每次都被**换成新记录**，
+      它不漂。真正的问题是新记录的**落点**：`EntryOrdering.promotionIndex` = 开头那段固定项的长度。
+    * 上一版给的修法（`ScrollViewReader.scrollTo(id)`，"macOS 12 就有"）**在产品侧不成立**：
+      真的写进侧栏跑过，带 anchor、不带 anchor 各一次 —— 临时插桩 `GLUE_DEBUG` 证明胶水执行了、
+      id 也解析到了，表格一步没滚（`selectedRow` 仍 -1、`documentVisibleRect` 仍在 y=0）。
+      同一份形状在孤立 spike 里 0.25s 就从第 1 行滚到第 60 行；六臂 bisect
+      （focusEffectDisabled / onDrop+overlay+animation / VStack 在 reader 内 / Button 行 /
+      产品形状的行 / reader 在 if/else 分支里）全绿，找不到是哪一件按死的。⇒ 那三行已回滚，
+      并由 `SelectedRowRevealTests.testSidebarDoesNotClaimTheSwiftUIScrollRoute` 钉住"不许没重测就写回来"。
+
+    **可达性（R61 实测，不需要任何点击）**：夹具里固定 4 条 + 视口只装 2.6 行 ⇒
+    `INTAKE_READING 新记录落点=4 在屏=false store 选中它=true 表格选中集合=[]`
+    ⇒ 一次普通复制就把选中送到视口外，而表格的选中集合是**空**的（两条轴都量了：
+    `selectedRow` 是主选中行、`selectedRowIndexes` 才是集合 —— 只用前者是本轮第三次读错轴）。
+    默认窗口尺寸下门槛是"固定 ≥ 视口行数"（约 9 条），最小窗口下约 3 条。
+
+    **修法（R61 落地）**：`SelectedRowRevealer` —— 一个只调 `NSTableView.scrollRowToVisible` 的宿主视图，
+    挂在侧栏 `List` 的 `.background` 上。三条边界写死在代码里：
+    ① **只滚不选**（选中集的唯一作者仍是 `List(selection:)`，D-1 修法③；守卫 `testRevealerOnlyScrollsAndNeverSelects`
+       见到 `selectRowIndexes` 就打红）；② **已经在视口里就不动**（臂 1 后半句：否则用户点一行列表自己跳，
+       那是 R22 那一族的自伤）；③ **选中变了才滚、行号漂了不滚**（闸门按选中项 id 判：
+       删掉顶部一条无关记录会让选中项行号 60→59，id 与选中都没变，视口就不许动 ——
+       这一格由 `testRowIndexDriftDoesNotMoveTheViewport` 单独钉，M313 把闸门换成按行号判只在那里红）。
+    另外"推迟一个回合再滚"是实测逼出来的：同步滚会让**上一行的取消选中丢失**，
+    读到 `selectedRowIndexes=[2, 60]` 而 store 只有 1 条 ⇒ 列表亮两行、详情讲一条，是新分裂。
+    为什么"只滚"就够：同一轮臂 3 量到"把行滚进视口，SwiftUI 自己就把选中补上"（3/3 稳定，`[]` → `[60]`）。
+
+    判据：`SelectedRowRevealTests`（`rowIndex` 真值表 4 格 + 两条源码守卫）+
+    `UIInteractionProbeTests.testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`（四臂）+
+    `testIntakeBehindATallPinnedBlockRevealsTheNewRow`（采集路径，从 `store.add` 进）。
+    帧基线 `FRAME_BASELINE_CHANGED=0`（116 张全等）⇒ **离屏通道结构上看不到这次改动**：
+    静态帧里选中永远在第一行，揭示器正确地什么都不做。视觉复核改用探针取证的两张
+    `reveal-before/after-320x300-light.png`（after：列表滚到新记录、那一行带填充；
+    填充的**颜色**在这一通道里解析成黑块，属 R29/R30 那族材质盲区，只作位置取证、不作配色判据）。
+    变异对照 M311–M316 见 `.scratch/motion-audit-2/r61_mutation_battery.log`。
+
 62. **「导出反馈数据」同一件事有两条通道，而失败那条又是系统英文原文（R42 复核 BACKLOG 53 时看到）· 已收口（R43 / D-102）**：
     `SettingsView:172-179` 三个分支都写 `exportMessage` **并且** `showExportAlert = true`
     ⇒ 用户既看到模态弹窗、又看到行内 `ReceiptLine`，两条说的是同一句话（模态还会抢注意力）。
@@ -1807,6 +1827,34 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     第一次用到横幅带上。结案条件：那条 A/B 能给出"横幅还在的帧里，搜索框的上边 y < 横幅文字的下边 y"
     或者给出反证；两种结果都算结案，因为那时要么能写判据、要么能撤掉这个观察。
 
+
+91. **`SelectedRowRevealer` 的闸门（"选中变了才滚、行号漂了不滚"）目前没有读数**（R61 开 / 电池 M313、M317 双双 SURVIVED）：
+    两刀都落下了、测试全绿：
+    * M313 把闸门的键从选中 id 换成行号 ⇒ `testRowIndexDriftDoesNotMoveTheViewport` 照样绿
+      （读数：`行号 Optional(60)→Optional(59) id 没变=true originY=0.0`）。
+    * M317 把闸门整个拆掉 ⇒ 同样绿。
+    **机制**：SwiftUI 在 `updateNSView` 的输入没变时压根不再调用它 —— 删掉顶部一条无关记录、
+    收藏再撤掉这两次重算，都没有让宿主视图带着新行号再跑一次。于是"该滚 / 不该滚"这两套代码
+    在同一台机器上读不出差别 ⇒ 判据没有分辨率（不是产品坏了，是我这句话没法证伪）。
+    与 R42 那条"要么供电要么撤声明"同一族：本轮**先记账、不粉饰**，代码里那句注释暂时保留
+    （它是设计意图，不是已验证行为），下一轮二选一：
+    ① 找到一条真能让 `updateNSView` 带着"行号变了、id 没变"再跑一次的产品路径（候选：搜索框输入
+       使可见集合收缩、或固定项数量变化导致的重排），把它做成第六臂；
+    ② 或者把闸门换成"每次重算都滚但带可见判定"，让 M312 那条有分辨率的闸承担全部行为，
+       并删掉这句没有读数的声明。
+
+90. **把视口滚回顶部之后，表格的选中集里会多留一行（`selectedRowIndexes=[0, 60]` 而 store 只有 1 条）——R61 顺手量到，本轮不修**（新开 / U-91）：
+    读数（`UIInteractionProbeTests.testOffScreenProgrammaticSelectionIsRevealedAndNotJumped` 臂 3，
+    同一行还打了 `store 里条数=1`）：程序化选中第 60 行、揭示生效之后，手工把视口滚回顶部，
+    表格的选中集变成 `[0, 60]` —— 第 0 行被**并进**了选中集，而 store 仍然只有那一条。
+    ⇒ 用户看到的是「列表亮两行、详情讲一条」。
+    **我最初从这条读数推出过一句更重的话**（"批量动作会作用在用户没选过的记录上"），
+    它被同一行读数否掉了：分裂只在表格这一侧，`applyListSelection` 没有被这次变化调用，
+    store 侧的收藏/固定/删除仍按那一条走。写在这里是为了下次别再从读数多走一步。
+    本轮**不判红**：把它写成断言会让整个套件红，而红要留给 61 本身；
+    它现在是探针里一条显式登记的观察（注释里指名 BACKLOG 90）。
+    与 61 的关系：61 是"选中了却看不见"，这条是"看见了却多亮一行" —— 同一个作者问题
+    （`List(selection:)` 在行的物化/回收上会自己动选中集）的两半，修法要一起想。
 
 89. **runner 上那条"提示条只演了 57ms ⇒ 一帧跳变"的红，是判据缺一条"跨度自己够不够被分辨"的前提**（R60 开 / U-90）：
     run 38586812301（R59 的 CI，整作业 success 因为那一步 `continue-on-error`）里现在能读到原文了 ——

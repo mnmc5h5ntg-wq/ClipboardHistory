@@ -1,0 +1,16 @@
+A reader 在外 初始 表格=true 滚动=true selectedRow=1 originY=0.0 onChange=0 scrollTo=0
+A reader 在外 +0.3s 表格=true 滚动=true selectedRow=60 originY=1662.0 onChange=1 scrollTo=1
+A reader 在外 +1.5s 表格=true 滚动=true selectedRow=60 originY=1662.0 onChange=1 scrollTo=1
+A reader 在外 AppKit 直调 表格=true 滚动=true selectedRow=60 originY=1672.0 onChange=1 scrollTo=1
+I reader 在 if/else 里 初始 表格=true 滚动=true selectedRow=1 originY=0.0 onChange=0 scrollTo=0
+I reader 在 if/else 里 +0.3s 表格=true 滚动=true selectedRow=60 originY=1702.0 onChange=1 scrollTo=1
+I reader 在 if/else 里 +1.5s 表格=true 滚动=true selectedRow=60 originY=1702.0 onChange=1 scrollTo=1
+I reader 在 if/else 里 AppKit 直调 表格=true 滚动=true selectedRow=60 originY=1712.0 onChange=1 scrollTo=1
+J 产品形状的行 初始 表格=true 滚动=true selectedRow=1 originY=0.0 onChange=0 scrollTo=0
+J 产品形状的行 +0.3s 表格=true 滚动=true selectedRow=60 originY=1914.0 onChange=1 scrollTo=1
+J 产品形状的行 +1.5s 表格=true 滚动=true selectedRow=60 originY=1914.0 onChange=1 scrollTo=1
+J 产品形状的行 AppKit 直调 表格=true 滚动=true selectedRow=60 originY=1924.0 onChange=1 scrollTo=1
+K I+J 一起 初始 表格=true 滚动=true selectedRow=1 originY=0.0 onChange=0 scrollTo=0
+K I+J 一起 +0.3s 表格=true 滚动=true selectedRow=60 originY=1906.0 onChange=1 scrollTo=1
+K I+J 一起 +1.5s 表格=true 滚动=true selectedRow=60 originY=1906.0 onChange=1 scrollTo=1
+K I+J 一起 AppKit 直调 表格=true 滚动=true selectedRow=60 originY=1916.0 onChange=1 scrollTo=1

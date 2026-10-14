@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Fixed（R61：程序化选中一条视口外的行时，列表现在会自己滚过去 —— BACKLOG 61 结案）
+- 现象：`List(selection:)` **不会选中视口外的行**。store 里选中 1 条，而表格
+  `selectedRowIndexes` 是**空**的 ⇒ 详情区在讲一条列表里根本没有高亮的记录；即使把那一行滚进视口，
+  高亮也不会回来（要再走一次选中入口才亮）。
+- 可达路径**不需要点击**：`HistoryStore.add` 末尾 `reconcileSelection(preferredEntryID: 新条目)`
+  把选中给新记录，而新记录的落点是 `EntryOrdering.promotionIndex`（开头那段固定项的长度）
+  ⇒ 固定项比视口行数多时，一次普通复制就撞上。
+- 修法：新增 `SelectedRowRevealer`（挂在侧栏 `List` 的 `.background`），**只滚不选** ——
+  选中集的唯一作者仍是 `List(selection:)`（D-1 修法③）。三条边界各有一条会红的判据：
+  已经在视口里就不动、**选中变了才滚（行号漂了不滚）**、以及**推迟一个回合再滚**（同步滚会把上一行的取消选中丢掉，
+  实测读到 `selectedRowIndexes=[2,60]` 而 store 只有 1 条）。
+- 顺带证伪并回滚了两件上一轮我自己写下的话：① "被选中的那行会一路往下漂出视口"（不漂，每次都被换成新记录）；
+  ② 候选修法 `ScrollViewReader.scrollTo(id)`（在产品这棵树上不滚：胶水执行了、id 解析了、视口没动）。
+  ②由一条源码守卫钉住：不许在没有重测的情况下把 scrollTo 写回侧栏。
+- 判据：`SelectedRowRevealTests`（真值表 4 格 + 两条源码守卫）、
+  `UIInteractionProbeTests.testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`（四臂）、
+  `testIntakeBehindATallPinnedBlockRevealsTheNewRow`（从 `store.add` 进）；电池 M311–M316。
 ### Fixed（R60：撤掉一条我自己写的假红 —— 判色前提在 1x 的机器上不成立）
 - `testBannerOutTracksWhetherItFadesOrSlides` 在 runner 上报"整卷只找到 0 帧里有那颗红色图标"
   （run 38586812301；原文这次能从日志里读到，因为 R59 加了那条 `grep -E "error: -\["`）。

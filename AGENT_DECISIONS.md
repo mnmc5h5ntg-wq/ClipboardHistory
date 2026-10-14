@@ -3974,3 +3974,55 @@ R55 的归因把这件事钉成了数（`解释=98%`：一个采样间隔≈一�
 
 **代价**：三个探针脚本 + 两张放大裁剪图（`.scratch/motion-audit-2/r60_evidence/`，都是尺子的现场，产品零改动）；
 一条新判据 + 一支新电池（M308–M310 全 CAUGHT）；一条新的开放项（88）。
+
+---
+
+## D-120（R61）：修「看不见的高亮」只能补一步「揭示」，而且必须只滚不选、可见不动、选中变了才滚
+
+**背景**：BACKLOG 61 从 R41 挂到现在，上一轮（R60 / eeb16d0）我给它写了可达性论证和一个候选修法
+（`ScrollViewReader.scrollTo(id)`）。本轮按仓库的规矩先 spike 再动产品 —— 结果 spike 把**我的论证**
+和**我的修法**双双证伪，最后落地的第三版和两者都不一样。
+
+**四条读数（都在屏，`UIInteractionProbeTests`）**：
+1. `List(selection:)` 不选中视口外的行：store 里 1 条、表格 `selectedRowIndexes = []`（两条轴都量：
+   `selectedRow` 是**主选中行**，只用它判"有没有选中"是本轮第三次读错轴）。
+2. SwiftUI 的 `scrollTo` 在产品这棵树上**不滚**：带 anchor、不带 anchor 各一次，临时插桩
+   `GLUE_DEBUG` 证明胶水执行了、id 也解析到了，而 `documentVisibleRect` 仍在 y=0。
+   同一份形状在孤立 spike 里 0.25s 从第 1 行滚到第 60 行；六臂 bisect 全绿，找不到哪一件按死的它。
+3. **把那一行滚进视口，SwiftUI 自己就把选中补上**（3/3 稳定：`[]` → `[60]`，不需要再走一次选中入口）
+   ⇒ 缺的确实只有"揭示"这一步，而且不需要第二个作者。
+4. 采集路径不需要点击：固定 4 条 + 视口 2.6 行 ⇒ `add()` 把新记录落在第 4 行 = 视口外，
+   而选中集合是空的 ⇒ 61 是产品缺陷（**同时更正上一版那句"选中项会一路往下漂"—— 它不漂，
+   `reconcileSelection(preferredEntryID:)` 每次都把选中换成新记录，问题在新记录的落点**）。
+
+**决定**：新增 `SelectedRowRevealer`（`NSViewRepresentable` + 一个只调
+`NSTableView.scrollRowToVisible` 的宿主视图），挂在侧栏 `List` 的 `.background` 上。三条边界写死：
+① **只滚不选** —— 选中集的唯一作者仍是 `List(selection:)`（D-1 修法③），
+   守卫 `testRevealerOnlyScrollsAndNeverSelects` 见到 `selectRowIndexes` / `select(` / `selectedRow =` 就红；
+② **已经在视口里就不动** —— 否则用户点一行列表自己跳，那是 R22 那一族（布局位移）的自伤；
+③ **选中变了才滚，行号漂了不滚** —— 闸门按选中项的 id 判，不按行号判。
+   按行号判会被「行号漂移」误触发：删掉顶部一条无关记录，选中项从第 60 行漂到第 59 行，
+   id 与选中都没变，视口却跳了。这一条不是设计出来的，是 **M313 第一次活下来**逼出来的：
+   那道闸最初就按行号记，而探针里「重算但选中没变」那一格读不出差别
+   （SwiftUI 在 `rowIndex` 不变时压根不再调 `updateNSView`）⇒ 判据没有分辨率。
+   补了 `testRowIndexDriftDoesNotMoveTheViewport`（删顶一条 ⇒ 漂移）之后同一刀才有地方红。
+
+**第四条边界是被实测逼出来的**：先按①②同步滚，臂 2 读到 `selectedRowIndexes = [2, 60]` 而 store 只有
+1 条 —— 视口先动、SwiftUI 的选中后落地，于是**上一行的取消选中丢失**（它已被滚出视口、单元格回收），
+"列表亮两行、详情讲一条"是修法自己造出来的新分裂。改成**推迟一个回合**再滚之后：旧行还看得见时先撤它的
+选中，再把新行滚进来 ⇒ 集合恰好 `[60]`、0.10s 落定。
+
+**为什么不用别的三条路**（都想过，都有代价）：
+* `ScrollView + LazyVStack` 换掉 `List`：`scrollTo` 一定能用，但会丢掉 D-034 / D-1 花大力气换回来的
+  系统选中、shift/⌘ 扩选、方向键、VoiceOver 语义 —— 这条代价在 M1 的注释里已经记过一次，本轮不重复付。
+* AppKit 桥直接 `selectRowIndexes`：能亮，但就有了第二个选中作者，store 与表格会各说一套（本轮臂 2/3
+  读到的分裂正是这类形状的现场）。读数 3 证明**不需要**它。
+* 改 `EntryOrdering.promotionIndex`（让新记录永远插在第 0 行、固定项不再占顶）：能根治采集路径那一格，
+  但会改"置顶区"的用户可见语义 —— 那是另一个产品决定，不该由一个滚动缺陷顺带替它做。
+
+**代价**：一个新文件（`Views/SelectedRowRevealer.swift`）+ 侧栏 4 行胶水；两个新判据文件
+（`SelectedRowRevealTests` 真值表 4 格 + 两条源码守卫；探针四臂）；一支电池 M311–M316；
+116 帧 vs working **CHANGED=0** ⇒ 离屏通道结构上看不到这次改动（静态帧里选中永远在第一行，
+揭示器正确地什么都不做），视觉复核改用探针取证的两张 `reveal-before/after-320x300-light.png`。
+
+**可回滚性**：撤掉侧栏那 4 行 `.background` 就回到今天的形状，无数据、无 API、无存档影响。

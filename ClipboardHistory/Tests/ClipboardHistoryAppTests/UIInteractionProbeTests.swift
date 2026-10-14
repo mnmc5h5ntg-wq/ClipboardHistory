@@ -420,6 +420,358 @@ final class UIInteractionProbeTests: XCTestCase {
             + "isActive=\(NSApp.isActive) anchor=\(NSStringFromPoint(lastRow.body))")
     }
 
+    /// R61 / BACKLOG 61 的管线级验收：程序化选中一条**视口外**的行时，
+    /// 列表必须自己滚过去把它亮出来；而选中一条已经看得见的行时，**不许动视口**。
+    ///
+    /// 这条从产品入口进（`store.perform(.setSelection)`），在**在屏**窗口里读
+    /// `NSTableView.selectedRowIndexes` 与 `documentVisibleRect` —— 不是内部纯函数。
+    /// 纯函数那一半（行号怎么算）在 `SelectedRowRevealTests.testRowIndexTruthTable`。
+    ///
+    /// 四臂，顺序不能换：
+    ///   臂 1 近处 ⇒ 落点=2 且 **originY 纹丝不动**。后半句是 R22 那一族的自伤闸：
+    ///          "跟随选中"最省事的写法是无条件滚，那会把用户刚点的那一行也甩到中间去。
+    ///   臂 2 视口外 ⇒ 落点=最后一条、且它落在可视区里、且 originY 真的动了。
+    ///          originY 必须一起判：只判"选中了"会放过"表格本来就滚在那里"这种假绿。
+    ///   臂 3 用户自己滚开、再走一次**同一个**选中 ⇒ originY 保持不动。
+    ///          这条钉的是"行号变了才滚"，不是"每次重算都滚"。
+    ///   臂 4 通道前提（放在最前跑）：视口内落得上、行数够长、有 NSScrollView。
+    ///
+    /// 本轮在它之前先量死了一条**不能这样修**的路（读数都在这条的正文里）：
+    /// * SwiftUI 的 `ScrollViewReader` + `.id` + `scrollTo` 在产品这棵树上不滚。
+    ///   临时插桩 `GLUE_DEBUG` 证明胶水执行了、id 也解析到了，表格一步没动；
+    ///   同一份形状在孤立 spike 里 0.25s 就从第 1 行滚到第 60 行，
+    ///   六臂 bisect（focusEffectDisabled / onDrop+overlay+animation / VStack 在 reader 内 /
+    ///   Button 行 / 产品形状的行 / reader 在 if/else 里）全绿，找不到哪一件按死的它。
+    /// * 只用 `table.selectedRow` 判"有没有选中"是读错轴（它读**主选中行**），
+    ///   所以每条读数都同时打 `selectedRowIndexes`；本轮臂 2 的结论就靠这一轴才敢下。
+    /// * 更早那版探针的泵条件是"选中行变没变" —— `2 → -1` 也算变了，于是 0.2s 就收工，
+    ///   把"还没滚到位"和"永远不会滚到位"读成同一个数。现在按**期望那一行**泵并如实报"到没到"。
+    func testOffScreenProgrammaticSelectionIsRevealedAndNotJumped() throws {
+        try skipUnlessEnabled()
+        let store = syntheticStore()
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 260, y: 220, width: 320, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+
+        let table = try XCTUnwrap(Self.firstTable(in: host))
+        let count = table.numberOfRows
+        guard count > 6 else {
+            XCTFail("表格只有 \(count) 行 ⇒ 这一格没有「往视口外选」这件事可问（夹具的数据不够长）")
+            return
+        }
+        guard let view = table.enclosingScrollView else {
+            XCTFail("表格外面没有 NSScrollView ⇒ 探针量不到可视区，四条读数全部作废（夹具坏了，不是产品坏了）")
+            return
+        }
+        let rowHeight = max(1, table.rect(ofRow: 0).height)
+        func originY() -> CGFloat { view.documentVisibleRect.origin.y }
+        emit("REVEAL 行数=\(count) 可视高=\(String(format: "%.0f", view.documentVisibleRect.height)) "
+             + "行高=\(String(format: "%.0f", rowHeight)) 文档高="
+             + "\(String(format: "%.0f", view.documentView?.frame.height ?? -1)) "
+             + "⇒ 视口约装 \(String(format: "%.1f", view.documentVisibleRect.height / rowHeight)) 行")
+
+        /// 走产品入口把选中设成第 `index` 条，泵到**表格的选中集合正好是那一行**为止。
+        ///
+        /// 判集合，不判 `selectedRow`：后者读的是**主选中行**，本轮实测它会在揭示之后仍停在旧行上
+        /// （读数：`选中集合=[2, 60]` 而 `主选中行=2`）。同一族的轴错本轮已经犯过两次
+        /// （"有没有一行被选中"、"选中行变没变"），这是第三次 —— 所以两条轴都打出来，
+        /// 判据只认"我要的那一行在不在集合里、集合里有没有多余的行"。
+        /// `inside` 同理按**问的那一行**算，不按主选中行算。
+        func selectViaStore(_ index: Int, tag: String) -> (set: [Int], primary: Int, storeOK: Bool, inside: Bool, pumped: Double) {
+            let beforeRow = table.selectedRow
+            let wanted = store.filteredEntries[index].id
+            store.perform(.setSelection([wanted]))
+            var pumped = 0.0
+            while table.selectedRowIndexes != IndexSet(integer: index) && pumped < 2.0 {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+                pumped += 0.1
+            }
+            let set = Array(table.selectedRowIndexes.sorted())
+            let primary = table.selectedRow
+            let storeOK = store.selectedEntryIDs == [wanted]
+            let rect = table.rect(ofRow: index)
+            let inside = rect.height > 0 && view.documentVisibleRect.intersects(rect)
+            emit("REVEAL \(tag) 想选第\(index)条 之前主选中行=\(beforeRow) 主选中行=\(primary) "
+                 + "选中集合=\(set) 只有它=\(set == [index]) 该行在可视区=\(inside) "
+                 + "store 对不对=\(storeOK) originY=\(String(format: "%.1f", originY())) "
+                 + "泵了 \(String(format: "%.2f", pumped))s")
+            return (set, primary, storeOK, inside, pumped)
+        }
+
+        // 臂 4（先跑的前提）：视口内能落上，通道才是活的。
+        let near = selectViaStore(2, tag: "臂1 近处")
+        XCTAssertEqual(near.set, [2],
+                       "视口内的程序化选中都没落到表格 ⇒ 探针↔store↔表格这条通道是死的，"
+                         + "后面三条读数一概不算数（先修探针，别修产品）")
+        XCTAssertTrue(near.inside, "臂 1 想选的那一行本来就该在视口里 ⇒ 视口判定坏了，臂 2/3 都会误判")
+
+        // 臂 1 的后半句：已经可见 ⇒ 不许滚。
+        XCTAssertEqual(Double(originY()), 0, accuracy: 1.0,
+                       "选中一条**已经看得见**的行也把视口推动了 ⇒ 这就是 R22 那一族的自伤："
+                         + "用户点一下，列表自己跳。修法必须按「不在可视区才滚」判")
+
+        // 臂 2：缺陷本体 + 修法生效的证据。
+        let originBeforeFar = originY()
+        let far = selectViaStore(count - 1, tag: "臂2 视口外")
+        XCTAssertTrue(far.storeOK, "store 没落上 ⇒ 这条读的是探针不是产品")
+        XCTAssertEqual(far.set, [count - 1],
+                       "选中视口外那一行之后表格没有**只**选中它 ⇒ 要么揭示没发生（61 复发，"
+                         + "先查 `SelectedRowRevealer` 还挂没挂在侧栏上、找没找到表格），"
+                         + "要么上一行的选中没被撤掉（列表亮两行、详情讲一条 = 新的分裂，另立条目）")
+        XCTAssertTrue(far.inside, "那一行不在可视区 ⇒ 选中跟了、滚动没跟，61 的那个症状还在")
+        XCTAssertGreaterThan(originY(), originBeforeFar + 1,
+                             "选中一条视口外的行而视口一点没动 ⇒ 「落上了」只能是巧合（比如表格本来就滚在那儿），"
+                                 + "不能算修法生效")
+
+        // 臂 3：用户自己滚开之后，同一个选中不许把他拽回来。
+        view.contentView.scroll(to: NSPoint(x: 0, y: 0))
+        view.reflectScrolledClipView(view.contentView)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let originAfterUserScroll = originY()
+        // 臂 3 要判的是"选中没变、但视图重算了 ⇒ 不许动"。**不能用"再走一次同一个选中"来触发重算**：
+        // 那样 SwiftUI 读到的值没变，压根不会重画 ⇒ `updateNSView` 一次都没被调用，
+        // 于是"行号变了才滚"那道闸拆掉也照样绿 —— M313 第一版就是这么活下来的
+        // （判据没有分辨率，却长得像一条通过的判据）。
+        // 换一个**真的会重算、又不碰选中**的产品入口：给别的条目加/撤收藏。
+        let other = store.filteredEntries.first { $0.id != store.selectedEntry?.id }
+        XCTAssertNotNil(other, "夹具里没有第二条可点的条目 ⇒ 这一臂造不出『重算但选中没变』")
+        if let other {
+            store.perform(.toggleFavorite(other))
+            RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+            store.perform(.toggleFavorite(other))
+            RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+            emit("REVEAL 臂3 用户滚开后、选中没变而视图重算了两次（收藏+撤） originY="
+                 + "\(String(format: "%.1f", originY())) 选中集合=\(Array(table.selectedRowIndexes.sorted()))")
+            XCTAssertEqual(Double(originY()), Double(originAfterUserScroll), accuracy: 1.0,
+                           "选中没变、只是列表重算了一次，就把视口拽回选中行 ⇒ 「每次重算都滚」取代了"
+                             + "「选中变了才滚」：用户往下翻看时，任意一次收藏/撤收藏都会把他弹回去")
+        }
+
+        // 臂 3 顺手量到一件本轮没修的事（读数：表格 `选中集合=[0, 60]` 而 store 只有 1 条）：
+        // 手工把视口滚回顶部之后，`List` 会把**第一行也留在选中集里** ——
+        // 于是"列表亮两行、详情讲一条"。它不是"选中被回写进 store"（同一行读数里
+        // `store 里条数=1`，所以我最初那句"批量动作会作用在没选过的记录上"是**推过头了**，
+        // 已按读数改回来）：分裂只在表格这一侧，批量动作仍按 store 走。
+        // 另立 BACKLOG 90。本轮不修、也**不判红**：把这条判据写成断言会让整个套件红，
+        // 而红要留给 61 本身 —— 所以它是一条显式登记的观察，不是被藏起来的失败。
+        emit("REVEAL 臂3 观察（不判）：选中集合=\(Array(table.selectedRowIndexes.sorted())) "
+             + "store 里条数=\(store.selectedEntryIDs.count) ⇒ 集合被 List 回写进 store 了=\(store.selectedEntryIDs.count > 1) "
+             + "—— BACKLOG 90")
+    }
+
+    /// 臂 5 单独一条：**行号漂了不算"选中变了"**。
+    ///
+    /// 为什么必须单独一条：把它接在臂 3 后面，前提会被臂 3 那次手工滚动污染
+    /// （`List` 把第 0 行并进了选中集并回写 store ⇒ `selectedEntry` 已经不是第 60 行，
+    /// 行号漂移这件事就造不出来了 —— 第一次跑就是这么红的：`Optional(0)→Optional(0)`）。
+    ///
+    /// 这一臂给的是"闸门按什么键"的分辨率：把 `SelectedRowRevealer` 的闸门从"选中 id"
+    /// 改成"行号"（M313），只有这里会红 —— 因为删掉顶部一条无关记录时，
+    /// 选中项的 **id 没变、行号变了**，视口不该动。
+    func testRowIndexDriftDoesNotMoveTheViewport() throws {
+        try skipUnlessEnabled()
+        let store = syntheticStore()
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 260, y: 220, width: 320, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        let table = try XCTUnwrap(Self.firstTable(in: host))
+        guard let view = table.enclosingScrollView else {
+            XCTFail("没有 NSScrollView ⇒ 量不到可视区，这条不判")
+            return
+        }
+        let count = table.numberOfRows
+        guard count > 6 else {
+            XCTFail("表格只有 \(count) 行 ⇒ 造不出「删顶部一条、下面的行号漂移」")
+            return
+        }
+        func originY() -> CGFloat { view.documentVisibleRect.origin.y }
+
+        // 先让选中落在最后一条（这一步正该滚：臂 2 已经判过它滚得到）
+        let farID = store.filteredEntries[count - 1].id
+        store.perform(.setSelection([farID]))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        let originAfterReveal = originY()
+        let indexBefore = store.filteredEntries.firstIndex { $0.id == farID }
+        emit("DRIFT 选中最后一条之后 originY=\(String(format: "%.1f", originAfterReveal)) 行号=\(String(describing: indexBefore))")
+        XCTAssertTrue(originAfterReveal > 1, "揭示本身没发生 ⇒ 这一臂没有前提可言（先查臂 2 那条）")
+
+        // 回到顶部（模拟用户自己在往上翻），然后删掉**顶部那条无关记录**：
+        // 选中项 id 不变、行号 -1 ⇒ 视口必须保持不动。
+        view.contentView.scroll(to: .zero)
+        view.reflectScrolledClipView(view.contentView)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        let originAtTop = originY()
+        let topUnrelated = store.filteredEntries.first { $0.id != farID }
+        XCTAssertNotNil(topUnrelated, "夹具里没有第二条可删 ⇒ 这一臂造不出漂移")
+        if let topUnrelated {
+            store.perform(.delete(topUnrelated))
+            RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+            let indexAfter = store.filteredEntries.firstIndex { $0.id == farID }
+            emit("DRIFT 删掉顶部一条无关记录 ⇒ 行号 \(String(describing: indexBefore))→\(String(describing: indexAfter)) "
+                 + "store 仍选中它=\(store.selectedEntryIDs == [farID]) originY=\(String(format: "%.1f", originY())) "
+                 + "（回到顶部时是 \(String(format: "%.1f", originAtTop))）")
+            XCTAssertNotNil(indexAfter, "删完找不到那条了 ⇒ 前提没了，判据是空的（先修夹具）")
+            XCTAssertNotEqual(indexBefore, indexAfter,
+                              "这一臂没造出行号漂移 ⇒ 判据是空的（先修夹具，别改产品）")
+            XCTAssertEqual(Double(originY()), Double(originAtTop), accuracy: 1.0,
+                           "选中项只是**行号漂了**（id 没变、选中没变）视口却动了 ⇒ 闸门按行号判而不是按选中判："
+                             + "用户在读列表时删一条记录，就会被弹回选中行")
+        }
+    }
+
+    /// 这条缺陷需要用户点鼠标吗？R61 实测：**不需要**，采集入口自己就能把它送到视口外。
+    ///
+    /// 机制（读过代码、也量过）：`HistoryStore.add` 末尾调
+    /// `reconcileSelection(preferredEntryID: 新条目.id)` —— 新记录一进来就被选中；
+    /// 而它的落点是 `EntryOrdering.promotionIndex` = 开头那段固定项的长度。
+    /// 于是"前面固定了 K 条 + 视口只装得下 V 行（K > V）"这一格，新记录落在视口外，
+    /// 于是**一次普通复制**就触发选中-不可见，全程没有一次点击。
+    ///
+    /// 这条同时更正账本 eeb16d0 里的一句话：那里写的"被选中的那条会一路往下漂出视口"是**错的**
+    /// —— 选中项不会漂，它每次都被**换成新记录**；真正的问题是新记录的落点。
+    /// 用户逐字对台账，所以这句更正写进正文，而不是悄悄改掉。
+    func testIntakeBehindATallPinnedBlockRevealsTheNewRow() throws {
+        try skipUnlessEnabled()
+        let store = syntheticStore()
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 260, y: 220, width: 320, height: 300),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        let table = try XCTUnwrap(Self.firstTable(in: host))
+        guard let view = table.enclosingScrollView else {
+            XCTFail("没有 NSScrollView ⇒ 量不到可视区，这条不判")
+            return
+        }
+
+        let rowHeight = max(1, table.rect(ofRow: 0).height)
+        let visibleRows = Int(view.documentVisibleRect.height / rowHeight)
+        let pinCount = visibleRows + 2
+        guard pinCount >= 2, store.filteredEntries.count > pinCount + 2 else {
+            XCTFail("夹具不够长或视口太大（可见 \(visibleRows) 行、要固定 \(pinCount) 条、共 \(store.filteredEntries.count) 条）"
+                    + "⇒ 这一格没有「固定块顶开新记录」这件事可问")
+            return
+        }
+
+        // 把最前面 pinCount 条固定住 —— 走的都是产品入口。
+        let pinIDs = Set(store.filteredEntries.prefix(pinCount).map(\.id))
+        store.perform(.setSelection(pinIDs))
+        store.perform(.pinSelection(isPinned: true))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        let pinnedNow = store.filteredEntries.prefix(pinCount).filter(\.isPinned).count
+        emit("INTAKE_PIN 可见行=\(visibleRows) 固定了=\(pinnedNow)/\(pinCount) "
+             + "开头那段固定项长度=\(store.filteredEntries.prefix(while: \.isPinned).count)")
+        XCTAssertEqual(pinnedNow, pinCount,
+                       "固定没落到开头那段 ⇒ 插入位没被顶下去，这一臂的前提不成立，探针先修")
+
+        // 回到顶部，模拟"用户正在看最上面"。新记录会落在 pinCount 那一行 = 视口外。
+        view.contentView.scroll(to: NSPoint(x: 0, y: 0))
+        view.reflectScrolledClipView(view.contentView)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let originBefore = view.documentVisibleRect.origin.y
+        try capture(window: window, to: shotsURL("reveal-before-320x300-light.png"), dark: false)
+
+        let before = Set(store.entries.map(\.id))
+        store.add(ClipboardIntake.Entry(
+            content: .text("R61 新增的这一条：用来测「落在视口外」这件事"),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.TextEdit", sourceAppName: "TextEdit"),
+            timestamp: Date())
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        let added = store.entries.filter { !before.contains($0.id) }
+        guard let newEntry = added.first else {
+            XCTFail("采集没进列表 ⇒ 入口没走到，这条不判产品")
+            return
+        }
+        let landingIndex = store.filteredEntries.firstIndex { $0.id == newEntry.id }
+        let storeSelected = store.selectedEntryIDs == [newEntry.id]
+        let tableSet = Array(table.selectedRowIndexes.sorted())
+        let onScreen = landingIndex.map {
+            view.documentVisibleRect.intersects(table.rect(ofRow: $0)) && table.rect(ofRow: 0).height > 0
+        } ?? false
+        emit("INTAKE_READING 新记录落点=\(String(describing: landingIndex)) 在屏=\(onScreen) "
+             + "store 选中它=\(storeSelected) 表格选中集合=\(tableSet) "
+             + "originY \(String(format: "%.1f", originBefore))→\(String(format: "%.1f", view.documentVisibleRect.origin.y)) ⇒ "
+             + (!storeSelected
+                ? "采集入口这次没把选中给新记录 ⇒ 机制段读错了，回到 reconcileSelection 重读"
+                : ((landingIndex ?? 0) <= visibleRows
+                    ? "新记录本来就落在视口内 ⇒ 这一格没造出「固定块顶开」，夹具要调（窗口高度或固定数）"
+                    : (tableSet == landingIndex.map { [$0] } && onScreen
+                        ? "**无需点击**：一次普通复制之后，列表自己滚到新记录并把它亮出来 ⇒ 61 在这条路径上已修"
+                        : "新记录在视口外而列表没亮它（集合=\(tableSet) 在屏=\(onScreen)）⇒ 采集路径上 61 还在"))))
+        // 视觉取证：本轮的"真实视觉审查"就落在这一对帧上 —— 读数说列表滚过去了、
+        // 新记录带高亮，帧里必须看得见同一件事。两件事一并留档：
+        // 这**不是**帧基线的那 116 张（`FRAME_BASELINE_CHANGED=0`：静态帧里选中永远在第一行，
+        // 揭示器正确地什么都不做 ⇒ 离屏通道结构上看不到本轮的改动），
+        // 也别忘了 `cacheDisplay` 是离屏重绘，高亮由真实表格画，所以这对话只作取证、不进判据。
+        try capture(window: window, to: shotsURL("reveal-after-320x300-light.png"), dark: false)
+
+        XCTAssertTrue(storeSelected, "采集入口没把新记录设成选中 ⇒ 这条判的不是它声称的那件事")
+        XCTAssertEqual(tableSet, landingIndex.map { [$0] },
+                       "一次普通复制把选中送到视口外、列表没有跟上 ⇒ BACKLOG 61 在采集路径上复发")
+        XCTAssertTrue(onScreen, "表格说选中了但那一行不在可视区 ⇒ 高亮仍然看不见，症状没修掉")
+    }
+
+
+    /// 宿主里**所有**表格（不是第一个）：一屏里可能同时有侧栏列表和详情区里的表，
+    /// 只拿第一个会把"我拿错了表"当成"产品没响应"。
+    /// 产品源码（按相对路径），去掉 `//` 注释行。
+    ///
+    /// 为什么要 `codeOnly`：声明守卫如果连注释一起读，那"注释里写着滚动跟随"就会算成一次声明，
+    /// 于是守卫判的是文档而不是代码 —— 而这一族的缺陷恰恰是「代码里声明、屏幕上没有」。
+    private func codeOnly(_ source: String) -> String {
+        source.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
+
+    private func productSourceText(named relativePath: String) throws -> String {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = candidate.appendingPathComponent("Sources/ClipboardHistoryApp", isDirectory: true)
+                .appendingPathComponent(relativePath)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        // 刻意不 `throw XCTSkip`（同 `Round3DetailTypographyTests.productSource` 那条）：
+        // 守卫找不到被守卫的文件时应当**红**，而不是安静跳过 —— 会跳过的守卫和通过的守卫在报表里长得一样。
+        throw NSError(domain: "UIInteractionProbeTests", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey:
+                        "找不到 Sources/ClipboardHistoryApp/\(relativePath)：声明守卫会假绿，先修路径解析"])
+    }
+
+    private static func allTables(in view: NSView) -> [NSTableView] {
+        var found: [NSTableView] = []
+        if let table = view as? NSTableView { found.append(table) }
+        for sub in view.subviews { found.append(contentsOf: allTables(in: sub)) }
+        return found
+    }
+
     /// D-1 的验收本体：**从第 1 行按下、拖到第 4 行，选中集必须扩到 4 行**。
     ///
     /// 审计给的验收是"真机 2 分钟"。合成事件能做到的是把 down / dragged…/ up 三段真的投进
@@ -940,6 +1292,13 @@ final class UIInteractionProbeTests: XCTestCase {
             current = view.superview
         }
         return views.isEmpty ? "（命中为空）" : views.joined(separator: " ← ")
+    }
+
+    /// 探针的输出目录（与 `captureFocusFrames` 同一个环境变量，缺省时落到 /tmp）。
+    private func shotsURL(_ name: String) -> URL {
+        let dir = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"] ?? "/tmp/shots-probe"
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        return URL(fileURLWithPath: dir).appendingPathComponent(name)
     }
 
     private func capture(window: NSWindow, to file: URL, dark: Bool) throws {

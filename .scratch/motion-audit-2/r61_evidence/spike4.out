@@ -1,0 +1,18 @@
+A plain 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=300.0 docH=1972.0 onChange=0 scrollTo=0
+A plain +0.3s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+A plain +1.5s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+D +focusEffectDisabled 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=300.0 docH=1972.0 onChange=0 scrollTo=0
+D +focusEffectDisabled +0.3s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+D +focusEffectDisabled +1.5s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+E +onDrop/overlay/animation 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=300.0 docH=1972.0 onChange=0 scrollTo=0
+E +onDrop/overlay/animation +0.3s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+E +onDrop/overlay/animation +1.5s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+F +VStack/header 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=260.0 docH=1972.0 onChange=0 scrollTo=0
+F +VStack/header +0.3s 表格=true 滚动=true selectedRow=60 originY=1702.0 visibleH=260.0 docH=1972.0 onChange=1 scrollTo=1
+F +VStack/header +1.5s 表格=true 滚动=true selectedRow=60 originY=1702.0 visibleH=260.0 docH=1972.0 onChange=1 scrollTo=1
+G +Button 行 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=300.0 docH=1972.0 onChange=0 scrollTo=0
+G +Button 行 +0.3s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+G +Button 行 +1.5s 表格=true 滚动=true selectedRow=60 originY=1662.0 visibleH=300.0 docH=1972.0 onChange=1 scrollTo=1
+H 全家桶 初始 表格=true 滚动=true selectedRow=1 originY=0.0 visibleH=260.0 docH=1972.0 onChange=0 scrollTo=0
+H 全家桶 +0.3s 表格=true 滚动=true selectedRow=60 originY=1702.0 visibleH=260.0 docH=1972.0 onChange=1 scrollTo=1
+H 全家桶 +1.5s 表格=true 滚动=true selectedRow=60 originY=1702.0 visibleH=260.0 docH=1972.0 onChange=1 scrollTo=1
