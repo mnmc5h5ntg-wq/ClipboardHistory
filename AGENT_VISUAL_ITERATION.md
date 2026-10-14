@@ -2776,4 +2776,14 @@ NOT_RUN 第四次漂：40 → 5 → 26 → **8**（BACKLOG 57 继续攒数据点
 **验证**：726 tests / 29 skipped / 0 failures、`swift build` 0 告警、闸门
 `passed=697 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`、帧基线 `CHANGED=0`（本轮不改基线）、
 脚本 83 全绿、变异 M194–M198 五支全 CAUGHT（`未被抓到=0 红得不对=0 还原不干净=0`）。
-**CI 待读**。
+**CI 已读（run 38511570267 / job 115681039121，12m45s，15 步全 ✓）**：
+第 5 步 `Executed 726 tests, with 36 tests skipped and 0 failures`；第 7 步闸门
+`passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=8 ⇒ ok`（与 R41 那次逐字相同 ⇒ 本轮一条红都没新增）；
+第 11 步 `Ran 83 tests`；第 13 步夹具集闸 `COMPARED=112 / MISSING=0 / ADDED=0`；第 15 步 `SMOKE_OK=1`。
+
+**本轮唯一一条动效数字上的好消息在第 10 步**：
+`motion floor: executed=24  MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-` ⇒ `MOTION_FLOOR_OK=4/4`。
+覆盖率地板在 runner 上**四条全判到**，而本机同一把尺只判 1/3（抓帧时钟更粗，BACKLOG 里记着）。
+这不证明回执在淡 —— 那四条不是这一族的 —— 但它把"CI 上看不到动效"这句老话削掉了一半：
+**能被看见的那四件在跑**，而回执这一族量不到是**尺的通道问题**（淡入活在 presentation 层），不是没人跑。
+

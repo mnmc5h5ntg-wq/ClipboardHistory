@@ -1604,6 +1604,7 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **验证**：726 tests / 29 skipped / 0 failures、`swift build` 0 告警、闸门
   `passed=697 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`、脚本 83 全绿、
   变异 M194–M198 五支全 CAUGHT（`未被抓到=0 红得不对=0 还原不干净=0`）。自评 **92 / 100**。
-- **CI 待读**。
+- **CI 已读**：run 38511570267 **整作业 success**（12m45s，15 步全 ✓）—— 第 5 步 `Executed 726 tests / 36 skipped / 0 failures`、第 7 步闸门 `有名字的红=0 NOT_RUN=8 ⇒ ok`、第 13 步 `COMPARED=112 / MISSING=0 / ADDED=0`、第 15 步 `SMOKE_OK=1`。
+  **第 10 步是本轮唯一一条动效数字上的好消息**：`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-` ⇒ `MOTION_FLOOR_OK=4/4` —— 覆盖率地板在 runner 上四条全判到（本机同一把尺只判 1/3）。它不证明回执在淡，但它把「CI 上看不到动效」这句老话削掉了一半：能被看见的那四件在跑，回执这一族量不到是**尺的通道**问题（presentation 层），不是没人跑。
 - **下一步（R43）**：① BACKLOG 62 那片代码一次判完（回执留行内还是留模态 + 原文进日志）；
   ② 或 BACKLOG 61（选中行滚进可视区）先问用户接不接受；③ 电池脚本补"needle 只许来自 --measure"。
