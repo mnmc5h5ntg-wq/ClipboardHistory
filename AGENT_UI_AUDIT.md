@@ -3098,3 +3098,96 @@ NOT_RUN 第四次漂：40 → 5 → 26 → **8** ⇒ BACKLOG 57 继续攒数据�
 ⇒ `UICaptureTests.testCaptureKeyViews` 与 `OffscreenSymbolInkProbeTests.testProductSettingsSidebarIconInk`
 按环境门控自己跳过。记这一条是为了别把它当成 BACKLOG 57 那一族：**报数之前先确认两次运行条件相同**
 （与"计数命令自己没被证伪"同族）。
+---
+
+## 第 45 轮 · R43：导出/导入那三条回执 —— 一件事被说两遍，而失败那句又是英文（U-69 / D-102）
+
+### 开场缺陷清单（坐标）
+
+R42 复核 BACKLOG 53 时顺手看到的（当时只记成 BACKLOG 62）。本轮把它判完，
+而**判完发现不是一处是三处**：
+
+| 位点 | 修前 | 为什么是缺陷 |
+|---|---|---|
+| `SettingsView:172-179` 导出反馈 | 三个分支都写 `exportMessage`（行内）**并且** `showExportAlert = true`（模态） | 同一句话说两遍，其中一遍还是**打断式**的；而仓库其余三处回执（清空历史 / 导出导入存档 / 排除名单）都是行内 |
+| `SettingsView:177` 失败那一支 | `"导出失败：\(error.localizedDescription)"` | `ExportError` 不是 `LocalizedError` ⇒ 界面写的是 "The operation couldn't be completed. (…)" |
+| `SettingsWindowController:94` 导出存档 | `"导出失败：\(error.localizedDescription)"` | 同上 |
+| `SettingsWindowController:104` 导入存档 | `"导入失败：\(error.localizedDescription)"` | 同上 |
+
+⇒ **U-67 那一族根本没收口**：R41 只把"写剪贴板"那条路做了人话，界面上还剩三个出口在直出系统原文。
+本轮把这三个出口一起接进同一层措辞。
+
+### 修法：措辞集中成一个文件，通道只留一条
+
+新增 `Utilities/ReceiptWordings.swift`：`FeedbackExportReceipt`（成功 / 暂无 / 两种失败）
+与 `ArchiveTransferReceipt`（导出失败 / 导入失败）。三个 catch 全部改成
+「原文进 `LifecycleDebugLogger` + 界面用映射器」，模态那条 `.alert` 与 `@State showExportAlert` 删掉。
+
+为什么集中成一个文件：这一族**同时**被三个产品入口消费，而它们的坏法一模一样；
+分开放就会分家 —— R41 收了写剪贴板那一条，这一族当时就没人管。
+
+### 判据（7 条新，全 CI 每轮跑）
+
+- `testFeedbackExportReceiptTruthTable`（5 格）：成功说文件名 / **空数据不许被说成失败** /
+  写盘失败给下一步且**不含 payload** / 未分类也说"文件没有生成" / 每一格都不许含 `ErrorDomain` 与英文原文。
+- `testArchiveTransferReceiptTruthTable`：两句都含下一步、都不含原文，
+  外加一格**前提判据** —— "记录没有任何变化"这句是真的，因为 `importArchiveJSON` 的抛出点
+  在 `entries = ` 之前（`HistoryStore.swift:493-495`，判据直接比这两个位置）。
+  以后有人改成流式就地写入，这句会变成假话，而**红的就是这一格**。
+- `testExportFeedbackActionSpeaksThroughTheMapperOnce` / `testArchiveActionsSpeakThroughTheMapperAndLogTheRawError`：
+  读**产品源码里那两个真动作**（`exportFeedbackData` 里是 `NSSavePanel` + Finder，测试进程碰不得），
+  判"走映射器 + 不含 `localizedDescription` + 全文件不再有第二条通道 + 两个 catch 各有一条日志"。
+- `testEmptyDataStillGoesThroughTheMapperRatherThanASpecialCase`：动作里不许手抄那一句。
+- `testHarnessNeverHandWritesReceiptCopy` + `testHandWrittenReceiptScanIsATruthTable`（4 格）：
+  **本轮最意外的一条** —— `receipt-line` 那张帧从 R14 起画的是
+  `"已导出 94 条记录到 ~/Desktop/时间剪史-导出.json"`，而**全仓 grep 不到这句产品话**。
+  也就是说这张帧一直在给一个不存在的文案做保：产品怎么改它都不红。
+  这是 R24 那条"夹具只能呈现产品的决定"的又一次违反，只是这次违反的是**文案**而不是间距。
+
+### 真实视觉审查（含一张被自己的守卫当场打红的帧）
+
+换成产品自己那句话之后，`contentMustFit` 立刻红了两张：
+`receipt-line-430x56` 底行读到 **18.4%（亮）/ 20.2%（暗）** 的墨 ⇒ 56pt 放不下两行 ⇒
+**这张帧以前也在裁自己展示的内容**。抬到 **72pt** 之后 `bottomInk=0.0%`。
+⇒ 又一次印证 R22 那条：`contentMustFit` 这类"底行不许有墨"的闸门，价值不在它绿，
+在它**换内容就会红**。
+
+看帧（430×72，亮暗各一次）：正文两行完整、无半字、× 在第一行右端（`firstTextBaseline`），
+文字与 × 之间无重叠；亮档黑字 / 暗档白字，底色都是窗口灰。
+⇒ 组件帧合格。R25 那次把**横幅**的动作位改成垂直居中，`ReceiptLine` 这一族仍是顶对齐 ——
+一行回执与两行回执里 × 都跟着第一行；本轮**没动**它，因为 × 是"收起这一条"而不是"管整条的动作"，
+顶对齐在系统里也是常见写法。这条差异记进 BACKLOG 65，别让它变成"看起来一致但其实没判过"。
+
+### 本轮查出、**没**在本轮修的
+
+- **BACKLOG 64 的推广被一条真问题挡住了**：`ContentView` 那五条 `NoticeBanner` 的驱动是
+  一条**派生键** —— `:32` `.animation(bannerIn, value: noticeSignature)`，
+  而 `noticeSignature`（`:36-44`）把五条回执的存在性压成一个 bitmask。
+  ⇒ 按名字匹配的判据会把这五条**全部误报成没电**。推广的第一步不是换组件名，
+  是让判据会把派生键**展开**成它读的那几个状态。好消息：这五条确实有电（R22 用像素量过）。
+- **BACKLOG 65（新）**：`ReceiptLine` 的 × 是顶对齐，横幅的"知道了"是垂直居中（R25 / D-084）——
+  两族动作位语言不同，本轮判过、刻意不动；要统一得先说清"× 管整条还是管第一行"。
+
+### 换装本机（12:48）
+
+`install_local.sh --yes --no-build --label r43-receipt-wording` ⇒ `INSTALL_RESULT=ok`、
+`INSTALL_SHA_MATCH=1`（`0a752818…` → `a5c52cbe…`）、新 pid 34026、**存档 103 → 103 条**、
+`SMOKE_OK=1`。旧包留在 `before-r43-receipt-wording`。
+
+### 验证
+
+733 tests / 29 skipped / **0 failures**（+7 条判据）；`swift build` 0 告警；
+闸门 `passed=704 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`；
+帧基线 112 张（`receipt-line` 因改名 430x56 → 430x72：`MISSING=2 / ADDED=2`，同 commit update，
+改完复跑 `CHANGED=0 / MISSING=0 / ADDED=0`）；脚本 83 全绿；
+变异 **M199–M205** 七支全 CAUGHT、`未被抓到=0 红得不对=0 还原不干净=0`
+（needle 全部来自 `--measure` 那一遍打印的失败消息原文 —— R42 立的流程第一次真跑）。
+**CI 待读**。
+
+**footprint 记账（≤4 的规矩又差一点）**：非台账文件 5 个 —— 产品 3
+（`ReceiptWordings` 新、`SettingsView`、`SettingsWindowController`）+ 测试/夹具 2
+（`SettingsFailureReceiptTests` 新、`UICaptureHarness`）。
+比 R41 的 7 个好，但仍超 1：超的那一个还是**夹具**（`receipt-line` 换文案）。
+⇒ 记一条操作性的规矩：**改夹具文案的那一轮，不要再同时新增判据文件** ——
+本轮两条判据（夹具文案 + 其真值表）本可以放进已有的 `MotionDriverTests`，
+新建文件是我图整齐，代价是 footprint 又超。

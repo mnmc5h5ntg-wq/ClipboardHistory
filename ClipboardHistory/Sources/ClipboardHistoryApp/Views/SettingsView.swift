@@ -92,7 +92,9 @@ struct SettingsView: View {
     /// `encodeUserExcluded` 会去重 + 排序，所以"加了没变"有三种不同原因，
     /// 而以前**一种都看不出来**：输入框清空、列表没长，用户读到的是"我加的那条去哪了"。
     @State private var exclusionReceipt: String?
-    @State private var showExportAlert = false
+    // R43 / BACKLOG 62：这里原来还有一个 `@State private var showExportAlert = false`，
+    // 与下面那条 `.alert` 一起被删掉 —— 「导出反馈数据」的结果过去**同时**走模态与行内两条通道，
+    // 而仓库里其余三处回执（清空历史 / 导出导入存档 / 排除名单）都是行内。删的是**多出来的那一条**。
     @ObservedObject private var contextPreferences: ContextPreferenceSettings
     @ObservedObject private var weightsStore: RecommendationWeightsStore
     /// 清空历史。返回**回执文案**（`nil` = 没有可清空的东西 / 注入方没给）。
@@ -167,16 +169,20 @@ struct SettingsView: View {
 
     private func exportFeedbackData() {
         // 失败必须可见：旧实现写盘失败也返回 URL，界面照样显示"已导出"。
+        //
+        // R43 / BACKLOG 62：这一条回执原来**同时**走两条通道（行内 `ReceiptLine` + 模态 `.alert`），
+        // 而失败那一支是 `error.localizedDescription` 直出 —— `ExportError` 不是 `LocalizedError`，
+        // 于是界面会写 "The operation couldn't be completed. (…)"。那是 R41 的 U-67 在另一个出口上复现。
+        // 现在：措辞由 `FeedbackExportReceipt` 决定（纯函数、有真值表），原文进日志，
+        // **只说一次**（行内，与清空历史 / 导出导入存档 / 排除名单那三处同一套语言）。
         do {
             let url = try feedbackStore.exportToFile()
-            exportMessage = "已导出：\(url.lastPathComponent)"
+            exportMessage = FeedbackExportReceipt.success(fileName: url.lastPathComponent)
             NSWorkspace.shared.activateFileViewerSelecting([url])
-        } catch RecommendationFeedbackStore.ExportError.noData {
-            exportMessage = "暂无反馈数据可导出"
-        } catch {
-            exportMessage = "导出失败：\(error.localizedDescription)"
+        } catch let error {
+            LifecycleDebugLogger.log("SettingsView feedback export failed error=\(error)")
+            exportMessage = FeedbackExportReceipt.failure(error)
         }
-        showExportAlert = true
     }
 
     var body: some View {
@@ -571,11 +577,9 @@ struct SettingsView: View {
                 // 连续两次导出换文案不该再演一次，从无到有才需要被看见。
                 .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)
             }
-            .alert("导出反馈数据", isPresented: $showExportAlert) {
-                Button("好的", role: .cancel) {}
-            } message: {
-                Text(exportMessage ?? "")
-            }
+                // R43 / BACKLOG 62：这里原来是 `.alert("导出反馈数据", isPresented: $showExportAlert)`，
+                // 与上面那条行内 `ReceiptLine` 说同一句话 ⇒ 一次导出被说两遍，其中一遍还是模态打断。
+                // 删的是模态那一条，行内保留（与清空历史 / 导出导入存档 / 排除名单同一套语言）。
         }
     }
 

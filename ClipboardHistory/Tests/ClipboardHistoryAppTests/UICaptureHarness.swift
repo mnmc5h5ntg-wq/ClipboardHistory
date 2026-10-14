@@ -1300,11 +1300,22 @@ final class UICaptureTests: XCTestCase {
                                                                         "com.example.design"]))) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .privacy))
         })
-        results.append(Fixture("receipt-line", NSSize(width: 430, height: 56), contentMustFit: true) {
+        // 高度 56 → **72**：换成产品自己那句话之后 `contentMustFit` 当场打红
+        // （底行 18.4% / 20.2% 有墨 ⇒ 56pt 放不下两行）。这不是"把断言关掉"，是这张帧
+        // 一直在裁自己展示的内容 —— 被裁掉的那半行从来没有进过基线，也就从来没有被审过。
+        results.append(Fixture("receipt-line", NSSize(width: 430, height: 72), contentMustFit: true) {
             AnyView(
-                ReceiptLine(text: "已导出 94 条记录到 ~/Desktop/时间剪史-导出.json", dismiss: {})
+                // R43 / BACKLOG 62：**这句话以前是夹具手写的** ——
+                // 原来是 `"已导出 94 条记录到 ~/Desktop/时间剪史-导出.json"`，
+                // 而全仓 grep 不到这句产品话（产品说的是 `ArchiveTransfer.exportWarningText` 那一套
+                // 与本轮的 `FeedbackExportReceipt`）。这是 R24 那条规矩的又一次违反：
+                // 夹具替产品写了一句产品不会说的话，于是这张帧一直在给一个不存在的文案做保。
+                // 现在文案从生产者取：以后有人把回执改长、改措辞，这张帧自己会红。
+                ReceiptLine(text: FeedbackExportReceipt.failure(
+                                RecommendationFeedbackStore.ExportError.writingFailed("disk full")),
+                            dismiss: {})
                     .padding(.horizontal, 12)
-                    .frame(width: 430, height: 56, alignment: .leading)
+                    .frame(width: 430, height: 72, alignment: .leading)
                     .background(Color(nsColor: .windowBackgroundColor))
             )
         })

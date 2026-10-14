@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+
+### Fixed（R43 · 导出/导入那三条回执：一件事被说两遍，而失败那句又是英文）
+
+- **R41 那一族其实没收口**：界面上还有三个出口在把 `error.localizedDescription` 拼进回执
+  （`SettingsView:177` 导出反馈、`SettingsWindowController:94` 导出存档、`:104` 导入存档），
+  而这些错误类型都不是 `LocalizedError` ⇒ 用户看到的是
+  "The operation couldn't be completed. (…)"。本轮三个一起接进同一层措辞。
+- 新增 `Utilities/ReceiptWordings.swift`：`FeedbackExportReceipt` + `ArchiveTransferReceipt`
+  两个纯枚举。界面只说"发生了什么 + 下一步"，**原文一律进 `LifecycleDebugLogger`**（D-100 同一条分工）。
+- 「导出反馈数据」原来**同时**弹模态与发行内回执 ⇒ 删掉模态，只留行内
+  （仓库其余三处回执都是行内）。
+- 一句被写成判据的前提："导入失败……记录没有任何变化"是真的，因为 `importArchiveJSON`
+  的抛出点在 `entries` 被改之前 —— 判据直接比这两个位置，以后改成就地流式写入会先红。
+- **两条顺带查出的**：① `receipt-line` 那张帧从 R14 起画的是**产品没说过的一句话**
+  （全仓 grep 不到那句文案）⇒ 新增"夹具不许手写回执文案"的按族判据；
+  ② 换成真文案后 `contentMustFit` 当场红两张（底行 18.4% / 20.2% 有墨）
+  ⇒ 那张帧一直在裁自己，56 → **72pt** 才放得下。
+- 判据 +7（真值表 2 / 接线 3 / 夹具文案 2），变异 **M199–M205** 七支全 CAUGHT，
+  needle 全部从 `--measure` 的失败消息原文抄（R42 立的流程第一次真跑）。
+- 新开 BACKLOG 65（`ReceiptLine` 的 × 顶对齐 vs 横幅动作垂直居中，本轮判过、刻意不动）；
+  BACKLOG 64 的推广被一条真问题挡住：`NoticeBanner` 那五条的驱动是**派生键** `noticeSignature`，
+  按名字匹配会全部误报 ⇒ 先让判据会展开派生键。
+- 本机已换装：`INSTALL_RESULT=ok`、sha `a5c52cbe…`、`SMOKE_OK=1`、存档 103 → 103 条。
+- 验证：733 tests / 29 skipped / 0 failures、`swift build` 0 告警、闸门
+  `有名字的红=0 NOT_RUN=0`、脚本 83 全绿、帧基线 112（改名两张，同 commit update）。
+
+
 ### Fixed（R42 · 回到动效本体：三处回执的淡入，两句是死的、一句推不动）
 
 - **复核把原账改窄也改准**：BACKLOG 53 写的是"SettingsView 全文 0 个 `withAnimation` ⇒ 三处回执瞬间插入瞬间消失"，

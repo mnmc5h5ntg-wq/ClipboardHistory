@@ -91,7 +91,11 @@ final class SettingsWindowController {
                     try data.write(to: url, options: .atomic)
                     return ArchiveTransfer.exportWarningText(summary: summary)
                 } catch {
-                    return "导出失败：\(error.localizedDescription)"
+                    // R43 / BACKLOG 62：原文进日志，界面只说"发生了什么 + 下一步"。
+                    // 修前这句是 "导出失败：\(error.localizedDescription)" —— 与 R41 的 U-67 同一族，
+                    // 只是换了个出口（那次收了"写剪贴板"，这三个导出/导入出口没人管）。
+                    LifecycleDebugLogger.log("SettingsWindow archive export failed error=\(error)")
+                    return ArchiveTransferReceipt.exportFailed(error)
                 }
             },
             importHistoryAction: { [weak self] url in
@@ -101,7 +105,9 @@ final class SettingsWindowController {
                     return "导入完成：新增 \(summary.importedCount - summary.skippedDuplicateCount) 条，"
                         + "跳过重复 \(summary.skippedDuplicateCount) 条。"
                 } catch {
-                    return "导入失败：\(error.localizedDescription)"
+                    // 同 R43：措辞归 `ArchiveTransferReceipt`，原文归日志。
+                    LifecycleDebugLogger.log("SettingsWindow archive import failed error=\(error)")
+                    return ArchiveTransferReceipt.importFailed(error)
                 }
             }
         )

@@ -1,6 +1,6 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-14 12:23（本地 · R42 / 第 44 轮收尾，CI 待读）
+最后更新：2026-10-14 12:51（本地 · R43 / 第 45 轮收尾，CI 待读）
 
 ## 当前状态（2026-10-13 · 视觉与动效长跑 R1）
 
@@ -1608,3 +1608,31 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   **第 10 步是本轮唯一一条动效数字上的好消息**：`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-` ⇒ `MOTION_FLOOR_OK=4/4` —— 覆盖率地板在 runner 上四条全判到（本机同一把尺只判 1/3）。它不证明回执在淡，但它把「CI 上看不到动效」这句老话削掉了一半：能被看见的那四件在跑，回执这一族量不到是**尺的通道**问题（presentation 层），不是没人跑。
 - **下一步（R43）**：① BACKLOG 62 那片代码一次判完（回执留行内还是留模态 + 原文进日志）；
   ② 或 BACKLOG 61（选中行滚进可视区）先问用户接不接受；③ 电池脚本补"needle 只许来自 --measure"。
+
+
+---
+
+## R43 · 导出/导入那三条回执：一件事被说两遍，而失败那句又是英文（第 45 轮 / U-69 / D-102）
+
+- **复核把"一个出口"扩成三个**：`SettingsView:177`、`SettingsWindowController:94`、`:104`
+  全在把 `error.localizedDescription` 拼进界面，而这三条路上的错误类型都不是 `LocalizedError`
+  ⇒ **U-67 那一族 R41 根本没收口**，只是收了一条。
+- **修法**：新增 `Utilities/ReceiptWordings.swift`（`FeedbackExportReceipt` + `ArchiveTransferReceipt`），
+  三处 catch 改成「原文进日志 + 界面用映射器」；导出反馈那条**同时**存在的模态 `.alert` 与
+  `showExportAlert` 删掉（仓库其余三处回执都是行内）。
+- **两条"顺带"才是本轮最值钱的**：
+  ① `receipt-line` 那张帧从 R14 起画的是**产品根本没说过的一句话**（全仓 grep 无此文案）
+     ⇒ 新增夹具文案判据 `testHarnessNeverHandWritesReceiptCopy`；
+  ② 换成真文案之后 `contentMustFit` 当场红两张（底行 18.4% / 20.2% 有墨）
+     ⇒ 那张帧**一直在裁自己**，56 → 72pt 才放得下。
+- **BACKLOG 64 被一条真问题挡住**：`ContentView` 五条 `NoticeBanner` 的驱动是派生键
+  `noticeSignature`（bitmask）⇒ 按名字匹配的判据会把它们全部误报成没电。
+  推广之前要先让判据会把派生键展开成它读的那几个状态。新开 BACKLOG 65（× 顶对齐 vs 横幅动作居中）。
+- **验证**：733 tests / 29 skipped / 0 failures（+7）、`swift build` 0 告警、
+  闸门 `有名字的红=0 NOT_RUN=0`、帧基线 112（改名 `MISSING=2 / ADDED=2` 同 commit update，复跑全 0）、
+  脚本 83 全绿、变异 M199–M205 七支全 CAUGHT（needle 全部实测抄来 —— R42 立的流程第一次真跑）。
+- **换装本机（12:48）**：`INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`（`a5c52cbe…`）、
+  新 pid 34026、存档 103 → 103、`SMOKE_OK=1`。
+- **CI 待读**。
+- **下一步（R44）**：① BACKLOG 64 的派生键展开（做成了才能把调用点级守卫推广到 NoticeBanner / 热图）；
+  ② BACKLOG 59 的存盘失败通道形状（一次性横幅 vs 常驻只读标记）；③ BACKLOG 61 等人工批次 43.4 的回答。
