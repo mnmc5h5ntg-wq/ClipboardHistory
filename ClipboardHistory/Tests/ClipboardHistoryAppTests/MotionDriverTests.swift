@@ -64,6 +64,105 @@ final class MotionDriverTests: XCTestCase {
         XCTAssertTrue(Self.animationKeys(in: "v.animation(.default)").isEmpty)
     }
 
+    // MARK: - 驱动的**有无**（R42 / BACKLOG 53）
+
+    /// 产品里每一个 `ReceiptLine` 调用点的**门控条件**（"谁决定这条回执出现/消失"）。
+    ///
+    /// 写成名单而不是"找到几个判几个"，因为这一族要**两个方向都会红**：
+    /// 外面新冒出一个没登记的调用点会红（它可能根本没有驱动），
+    /// 名单里某个调用点消失了也会红（有人删了回执却忘了删这条账）。
+    static let receiptDriveExpectations: Set<String> = [
+        "let exclusionReceipt", "let message = exportMessage", "let archiveMessage",
+    ]
+
+    /// **`ReceiptLine` 自己挂着 `.transition(.contentFade)`，而 SwiftUI 的过渡只有在外层
+    /// 事务被动画化时才演** —— 所以"这里写了过渡"这句话本身不构成任何承诺。
+    ///
+    /// 这一条是 R42 复核 BACKLOG 53 量出来的，而复核把原账**改窄了**：
+    /// 原账写"SettingsView 全文 0 个 `withAnimation` ⇒ 回执瞬间插入瞬间消失"，
+    /// 那是按关键字数的，而这一族真正该问的是"这个调用点外面有没有一条 `.animation(value:)`"。
+    /// 逐点看到的形状是（行号是修前的）：
+    /// - `:659` 清空回执：键 `clearReceipt == nil` ⇒ **有驱动**（而且它不是 `ReceiptLine`，是自己写的 HStack）；
+    /// - `:489` 排除名单：键**只有** `excludedBundleIDsRaw` ⇒ 名单真变了才演，
+    ///   而"重复添加 / 输入不合法"这两种情况下名单没变，回执仍然是**瞬间弹出来**的；
+    /// - `:555` 导出反馈、`:619` 导出/导入历史：**父容器一条 `.animation` 都没有** ⇒ 那两句 `.transition` 是死的。
+    ///
+    /// 判据不许只判"文件里有 `.animation`"（那会被同一个文件里另一处的驱动白拿），
+    /// 也不许拿子串当命中（`exportMessage` 能被 `exportMessageDraft` 冒充）—— 见真值表第 ④ 格。
+    func testEveryReceiptLineCallSiteIsDriven() throws {
+        let source = try productSource(named: "Views/SettingsView.swift")
+        let code = Self.stripCommentLines(source)
+
+        let gates = Self.receiptGateConditions(in: code)
+        // 两边都排好序再比：`Set` 的打印顺序**每次进程都可能不同**，而这条断言的失败消息
+        // 同时是变异电池的 needle 来源 —— 拿一个顺序不稳定的字符串当 needle，
+        // 电池就会"红得不对"（R42 实测：M198 第一版就是这么判失败的）。
+        XCTAssertEqual(gates.sorted(), Self.receiptDriveExpectations.sorted(),
+                       "ReceiptLine 调用点的门控名单和产品不一致（实际读到 \(gates.sorted())）"
+                       + " ⇒ 要么新加了一个没登记的调用点（它可能根本没有驱动），"
+                       + "要么有人删了某条回执却忘了删这条账")
+
+        let keys = Self.animationKeys(in: code)
+        var undriven: [String] = []
+        for gate in gates where !Self.receiptGateIsDriven(gate, by: keys) {
+            undriven.append(gate)
+        }
+        XCTAssertTrue(undriven.isEmpty,
+                      "这些回执的门控状态没出现在任何一条 .animation 的键里：\(undriven.sorted())"
+                      + " ⇒ `ReceiptLine` 里那句 `.transition(.contentFade)` 是**死的**，"
+                      + "用户看到的是瞬间插入、瞬间消失。要么供电，要么把那句声明撤掉"
+                      + "（挂一臂不存在的过渡比不挂更坏：读代码的人会以为这里已经动了）")
+        print("RECEIPT_DRIVE 调用点 \(gates.count) 个，无驱动 \(undriven.count) 个，键总数=\(keys.count)")
+    }
+
+    /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
+    func testReceiptGateScanIsATruthTable() {
+        // ① `if let 局部 = 状态 {` ⇒ 门控里认的是**状态**；局部名当键是**假驱动**。
+        XCTAssertEqual(Self.receiptGateConditions(in: """
+            if let message = exportMessage {
+                ReceiptLine(text: message) { self.exportMessage = nil }
+            }
+            """), ["let message = exportMessage"])
+        XCTAssertFalse(Self.receiptGateIsDriven("let message = exportMessage", by: ["value: message == nil"]),
+                       "`message` 是解包出来的局部常量，它变了不代表回执出现 —— 认它等于认一个恒真的键")
+        XCTAssertTrue(Self.receiptGateIsDriven("let message = exportMessage",
+                                              by: ["value: exportMessage == nil"]))
+
+        // ② `if let 状态 {`（Swift 的缩写写法）。
+        XCTAssertEqual(Self.receiptGateConditions(in: """
+            if let archiveMessage {
+                ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
+            }
+            """), ["let archiveMessage"])
+
+        // ③ 非 `let` 的门控（一个布尔状态）也要认得出来 —— 只认 `if let` 的扫描器会**看不见**这一类调用点，
+        //    于是"新加了一条没驱动的回执"能安静通过。
+        XCTAssertEqual(Self.receiptGateConditions(in: """
+            if showExportAlert {
+                ReceiptLine(text: "x") {}
+            }
+            """), ["showExportAlert"])
+
+        // ④ 调用点上面没有 `if` ⇒ 抠不出来，于是它不进名单；主判据会因为"名单两边不等"而红，
+        //    而不是安静地少判一个。
+        XCTAssertTrue(Self.receiptGateConditions(in: "ReceiptLine(text: whatever) {}").isEmpty)
+
+        // ⑤ 标识符边界：前缀不许冒充。`exportMessageDraft` 含 `exportMessage` 这串字符，
+        //    但它不是那个状态 —— 拿 `contains` 判会恒绿。
+        XCTAssertTrue(Self.mentions("value: exportMessage == nil", identifier: "exportMessage"))
+        XCTAssertFalse(Self.mentions("value: exportMessageDraft == nil", identifier: "exportMessage"),
+                       "前缀命中不算驱动 ⇒ 这一格挡的是'名字像但推不动'")
+        XCTAssertTrue(Self.mentions("value: (excludedBundleIDsRaw, exclusionReceipt == nil)",
+                                    identifier: "exclusionReceipt"),
+                      "复合表达式里的成员必须认得出来 —— 产品**没有**这么写（Swift 的元组不 conform "
+                      + "Equatable，那样写直接编不过），这一格判的是扫描器对复合写法的耐受性")
+
+        // ⑥ 键里换了**别的**状态（编译得过、读起来也像"这里接了动画"）必须判成没驱动。
+        XCTAssertFalse(Self.receiptGateIsDriven("let archiveMessage",
+                                               by: ["value: exclusionReceipt == nil"]),
+                       "同一文件里另一处的驱动不许被白拿：那推的是别的回执")
+    }
+
     // MARK: - 清空历史那条回执（管线级）
 
     /// 回执里的数字必须等于**真的被删掉的那些**。
@@ -196,6 +295,80 @@ final class MotionDriverTests: XCTestCase {
         if key == "true" || key == "false" { return true }
         if Double(key) != nil { return true }
         if key.hasPrefix("\"") { return true }
+        return false
+    }
+
+    /// `ReceiptLine` 调用点**上面最近那条 `if`** 的条件文本（去掉 `if ` 与尾部的 `{`，压掉多余空白）。
+    /// 三种写法都认：`if let 状态 {`、`if let 局部 = 状态 {`、`if 布尔状态 {`。
+    /// 只认 `if let` 的扫描器会**看不见**第三类调用点 —— 那正是"新加一条没驱动的回执"能安静过去的洞。
+    /// 找不到 `if` ⇒ 不产出这一条，于是主判据红在"名单两边不等"，而不是少判一个。
+    static func receiptGateConditions(in source: String) -> [String] {
+        let lines = source.components(separatedBy: "\n")
+        var found: [String] = []
+        for (index, line) in lines.enumerated() where line.contains("ReceiptLine(") {
+            for back in stride(from: index - 1, through: max(0, index - 6), by: -1) {
+                let trimmed = lines[back].trimmingCharacters(in: .whitespaces)
+                guard trimmed.hasPrefix("if ") else { continue }
+                var condition = String(trimmed.dropFirst("if ".count))
+                while condition.hasSuffix("{") {
+                    condition = String(condition.dropLast()).trimmingCharacters(in: .whitespaces)
+                }
+                condition = condition.components(separatedBy: .whitespaces)
+                    .filter { !$0.isEmpty }.joined(separator: " ")
+                if !condition.isEmpty { found.append(condition) }
+                break
+            }
+        }
+        return found
+    }
+
+    /// 这条门控有没有被某条 `.animation` 的键推动。
+    static func receiptGateIsDriven(_ gate: String, by keys: [String]) -> Bool {
+        gateStateNames(gate).contains { name in keys.contains { mentions($0, identifier: name) } }
+    }
+
+    /// 门控条件里的**状态名**：`let 局部 = 状态` 只取等号右边（局部名是解包出来的常量，
+    /// 认它等于认一个恒真的键），其余按标识符切开并丢掉关键字与字面量。
+    static func gateStateNames(_ gate: String) -> [String] {
+        var text = gate
+        if text.hasPrefix("let ") { text = String(text.dropFirst("let ".count)) }
+        if let equals = text.range(of: "=") { text = String(text[equals.upperBound...]) }
+        let keywords: Set<String> = ["true", "false", "nil", "and", "or", "isEmpty"]
+        var names: [String] = []
+        var current = ""
+        for character in text + " " {
+            if character.isLetter || character.isNumber || character == "_" || character == "." {
+                current.append(character)
+            } else {
+                if !current.isEmpty { names.append(current) }
+                current = ""
+            }
+        }
+        return names.filter { name in
+            !keywords.contains(name) && !name.allSatisfy(\.isNumber) && !name.isEmpty
+        }.flatMap { name in
+            // `store.foo` 这种写法：整串与最后一段都算候选（键里出现哪一个都算被推动）。
+            name.contains(".") ? [name, String(name.split(separator: ".").last ?? "")] : [name]
+        }
+    }
+
+    /// 表达式里有没有**整词**出现的标识符。前缀命中不算：
+    /// `exportMessageDraft` 含 `exportMessage` 这串字符，但它不是那个状态 ——
+    /// 拿 `String.contains` 判"这条回执有没有被驱动"会恒绿（同一个坑见账本"按名字查消费者"）。
+    static func mentions(_ expression: String, identifier: String) -> Bool {
+        let haystack = Array(expression)
+        let needle = Array(identifier)
+        guard !needle.isEmpty, haystack.count >= needle.count else { return false }
+        func isWord(_ character: Character) -> Bool {
+            character.isLetter || character.isNumber || character == "_"
+        }
+        for start in 0...(haystack.count - needle.count) {
+            guard Array(haystack[start..<(start + needle.count)]) == needle else { continue }
+            let beforeIsBoundary = start == 0 || !isWord(haystack[start - 1])
+            let after = start + needle.count
+            let afterIsBoundary = after == haystack.count || !isWord(haystack[after])
+            if beforeIsBoundary && afterIsBoundary { return true }
+        }
         return false
     }
 

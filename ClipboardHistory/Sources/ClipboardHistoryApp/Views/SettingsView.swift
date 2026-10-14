@@ -488,6 +488,14 @@ struct SettingsView: View {
                     // 它只在增删时变 ⇒ 不是恒真键，见 `MotionDriverTests`）。
                     .animation(MotionCatalog.animation(for: .contentFade),
                                value: excludedBundleIDsRaw)
+                    // R42 / BACKLOG 53：**这条驱动原来推不到回执**。键只有那份字符串，
+                    // 于是"重复添加 / 输入不合法"这两种名单没变的情况下，`ReceiptLine` 里那句
+                    // `.transition(.contentFade)` 仍然不演 —— 回执是瞬间弹出来的。
+                    // 为什么是**再加一条**而不是把键换成元组：Swift 的元组不 conform `Equatable`
+                    // （`(String, Bool)` 直接编译失败，本轮实测），而为一个动画键新造一个结构体
+                    // 不值得 —— 两条 `.animation` 各看各的键，读起来也更接近"谁该被推动"。
+                    .animation(MotionCatalog.animation(for: .contentFade),
+                               value: exclusionReceipt == nil)
 
                     Divider()
 
@@ -556,6 +564,12 @@ struct SettingsView: View {
                         ReceiptLine(text: message) { self.exportMessage = nil }
                     }
                 }
+                // R42 / BACKLOG 53：**这一条回执以前没有驱动**。`ReceiptLine` 自己挂着
+                // `.transition(.contentFade)`（:976），而它的父容器一个 `.animation` 都没有 ⇒
+                // 那句声明等于零：回执是**瞬间**出现、**瞬间**消失的，读起来像界面闪了一下怪东西。
+                // 键取"有没有回执"这一个布尔，与 `clearReceipt` 那条同一套写法（见 :659 的注释）：
+                // 连续两次导出换文案不该再演一次，从无到有才需要被看见。
+                .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)
             }
             .alert("导出反馈数据", isPresented: $showExportAlert) {
                 Button("好的", role: .cancel) {}
@@ -619,6 +633,9 @@ struct SettingsView: View {
                     ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
                 }
             }
+            // R42 / BACKLOG 53：同上，这一条也没有驱动（导出/导入历史那两条回执）。
+            // 键同样是"有没有回执"，不是消息内容：连续两次导入换文案不该再演一次。
+            .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)
 
             Divider()
 
@@ -953,6 +970,14 @@ struct DailyCopyStatsSection: View {
 /// 而那三个状态在离屏渲染里没人能推 —— 于是这颗 × 与这行字**从来没有进过帧基线**，
 /// R13 改它样式时是"源码已接、产物未量"。与 `DailyCopyStatsSection`（R11）同一手法、同一理由：
 /// 没有夹具的状态等于没有验收，而宿主替身视图测的是替身。
+///
+/// **调用点的约定（R42 / D-101 / BACKLOG 63）**：这一行自己挂着 `.transition(.contentFade)`，
+/// 而 SwiftUI 只在**外层事务被动画化**时才演它 ⇒ 每个调用点的容器必须带一条
+/// `.animation(MotionCatalog.animation(for: .contentFade), value: <决定它出现/消失的那个状态> == nil)`。
+/// 这条由 `MotionDriverTests.testEveryReceiptLineCallSiteIsDriven` 按调用点判（不是按文件判 ——
+/// 本文件有 9 条动画键，文件级守卫抓不到这里任何一处死声明）。
+/// 已知边界：判据只认 `.animation(value:)` 这一族，**用 `withAnimation` 供电会被判成没电**；
+/// 要么补上那一种解析，要么把这条约定做成会红的判据 —— 见 BACKLOG 63，别把它当口头规矩。
 struct ReceiptLine: View {
     let text: String
     let dismiss: () -> Void

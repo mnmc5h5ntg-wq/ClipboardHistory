@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R42 · 回到动效本体：三处回执的淡入，两句是死的、一句推不动）
+
+- **复核把原账改窄也改准**：BACKLOG 53 写的是"SettingsView 全文 0 个 `withAnimation` ⇒ 三处回执瞬间插入瞬间消失"，
+  那是**按关键字数的**。逐调用点量完（`.transition` 只有在外层事务被动画化时才演）：
+  两处是**死声明**（导出反馈 `:555`、导出/导入历史 `:619` 的父容器一条 `.animation` 都没有）、
+  一处**缺半个键**（排除名单 `:489` 的键只有那份持久化字符串 ⇒ 名单没变的那两种情况推不动）、
+  一处**本来就有电**（清空回执 `:659`，而且它根本不是 `ReceiptLine`）。
+- 产品 +3 行：两处补 `.animation(contentFade, value: <门控> == nil)`，排除名单那处**再加一条**
+  键为 `exclusionReceipt == nil` 的驱动。元组键那条路被编译器否掉（Swift 的元组不 conform `Equatable`）。
+- **更值钱的一条是判据粒度**：仓库里本来就有同族守卫
+  （`testNoUnexecutedTransitionClaimsAcrossViews`），但它报的是"**整个文件**没有驱动"
+  —— 而 `SettingsView.swift` 有 9 条动画键 ⇒ 这些死声明在它底下永远隐身。
+  本轮把这一族降到"**调用点 + 门控状态名**"：新判据 `testEveryReceiptLineCallSiteIsDriven`
+  （名单两边都会红）+ 6 格真值表（含"`if let 局部 = 状态` 里认状态不认局部名"、
+  "非 `let` 的布尔门控也要认"、"键换成别的状态要判没电"、"前缀命中不算命中"）。
+  约定同时写进 `ReceiptLine` 定义处的注释，并把它的**已知边界**记成 BACKLOG 63（只认一种写法）。
+- 帧基线 **112 张逐字节不变**（`CHANGED=0`）—— 这一轮改的是中间态，所以这条数是"没改到稳态"的证据；
+  反过来它一变就说明该停下来查。淡入本身 `cacheDisplay` 量不到（活在 presentation 层），
+  胶片探针又进不了设置窗口 ⇒ 本轮如实标成"**源码已接 + 结构已判，产物未量**"，交人工批次 44.1 / 44.2。
+- 又新查出两条没修的：BACKLOG **62**（"导出反馈数据"同一件事既弹模态又发行内回执，
+  而失败那条又是 `localizedDescription` 直出 —— U-67 同一族、另一个出口）、
+  **63**（新判据只认 `.animation(value:)`，用 `withAnimation` 供电会被误报成没电）。
+- 变异 **M194–M198** 五支全 CAUGHT。第一遍 M198 `红得不对`：needle 抄的是 `XCTAssertEqual` 自动消息里
+  **`Set` 的打印**，而它的顺序每次进程可能不同 ⇒ 修法是把判据改成两边 `sorted()` 再比（消息从此稳定）。
+- 验证：726 tests / 29 skipped / 0 failures、`swift build` 0 告警、闸门
+  `有名字的红=0 NOT_RUN=0`、脚本 83 全绿。自评 **92 / 100**（`流畅度` 这一维本轮没资格涨分）。
+
 ### Fixed（R41 · 上一轮那句回执，恰好在三种最常见的失败里说了假话）
 
 - **发现的是自己上一轮交付的缺陷**：R40 的回执固定写着"剪贴板里仍是原来的内容，没有被替换"，

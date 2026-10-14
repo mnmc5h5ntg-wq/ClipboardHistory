@@ -2999,3 +2999,92 @@ NOT_RUN 第四次漂：40 → 5 → 26 → **8** ⇒ BACKLOG 57 继续攒数据�
 原因是这一条修复整条都在**生产者链**上（classify → decide → store → shell），
 拆开发任一段都会让 CI 红或让契约测试钉住旧语义。
 下一轮起恢复 ≤4；如果又超，就在这一节里再写一次。
+
+---
+
+## 第 44 轮 · R42：回到动效本体 —— 三处 `ReceiptLine` 的淡入，两句是死的、一句推不动（U-68 / D-101）
+
+### 开场缺陷清单（坐标）
+
+自评曲线里 `流畅度 13/20`、`动效细节 12/15` 连续三轮没动（R39/R40/R41 都在修"它说不说话、说得对不对"）。
+本轮按 BACKLOG 53 回到动效本体，而**复核把原账改窄了，也改准了**：
+
+原账写"SettingsView 全文 0 个 `withAnimation` ⇒ 回执瞬间插入瞬间消失"——那是**按关键字数的**。
+真正该问的是"这个调用点外面有没有一条 `.animation(value:)`"，逐点看到的是：
+
+| 位点（修前行号） | 形状 | 结论 |
+|---|---|---|
+| `:659` 清空未收藏 | 键 `clearReceipt == nil` | **有驱动**（而且它不是 `ReceiptLine`，是自己写的 HStack）⇒ 原账把它算成"没供电"是错的 |
+| `:489` 排除名单 | 键**只有** `excludedBundleIDsRaw` | 名单真变了才演；"重复添加 / 输入不合法"这两种名单没变的情况 ⇒ 回执**瞬间弹出** ⇒ 半条 |
+| `:555` 导出反馈 | 父容器 0 条 `.animation` | `.transition` 是**死的** |
+| `:619` 导出/导入历史 | 父容器 0 条 `.animation` | 同上 |
+
+⇒ 所以本轮不是"给三处供电"，是"给两处供电 + 一处补它缺的那半个键"。
+
+### 顺带查出的判据粒度问题（这条比产品改动更值钱）
+
+仓库里**已经有**一条同族守卫：`MotionFilmstripTests.testNoUnexecutedTransitionClaimsAcrossViews`，
+它报的消息是"这一处 `.transition` 声明，**整个文件**没有任何动画驱动"。
+而 `SettingsView.swift` 有 9 条 `.animation` 键 ⇒ 文件级判据**永远**抓不到这几处调用点。
+⇒ 尺没坏，是**粒度**错了：一个文件里只要有一处动画，同文件里所有死声明都能隐身。
+本轮把这一族从"文件"降到"调用点 + 门控状态名"（新判据 `testEveryReceiptLineCallSiteIsDriven`），
+旧的那条原样留着（它管的是"整个文件一个驱动都没有"那种更粗的坏法）。
+
+### 修法
+
+产品三行（`SettingsView.swift`）：导出反馈、导出/导入历史各补一条
+`.animation(MotionCatalog.animation(for: .contentFade), value: <状态> == nil)`；
+排除名单那处**再加一条**键为 `exclusionReceipt == nil` 的驱动。
+为什么是"再加一条"而不是把键换成元组：Swift 的元组**不 conform `Equatable`**
+（`value: (String, Bool)` 直接编不过，本轮实测），而为一个动画键造结构体不值。
+
+### 判据（2 条新，全 CI 每轮跑，不开窗口）
+
+- `testEveryReceiptLineCallSiteIsDriven`：门控名单**两边都会红** + 每个门控的状态名必须出现在某条 `.animation` 的键里。
+  读数：`RECEIPT_DRIVE 调用点 3 个，无驱动 0 个，键总数=9`。
+- `testReceiptGateScanIsATruthTable`：6 格。其中三格是本轮新学的：
+  ① `if let 局部 = 状态` 里认**状态**，把局部名当键是**假驱动**（`message` 是解包常量，认它等于认恒真键）；
+  ③ 非 `let` 的门控（`if showExportAlert`）也要认得出来 —— 只认 `if let` 的扫描器会**看不见**那一类调用点；
+  ⑥ 键里换了**别的**状态（编译得过、读起来也像"接了动画"）必须判成没驱动。
+  ⑤ 是那条老规矩的新实例：`exportMessage` 不许被 `exportMessageDraft` 前缀冒充 ⇒ 整词匹配。
+
+### 真实视觉审查（本轮的诚实答案：没有新画面可看）
+
+改的是**中间态**，所以能数的第一件事是先确认它**没**动到稳态：
+`frame_baseline.py --against working compare /tmp/r42-frames` ⇒ `COMPARED=112 / CHANGED=0 / ADDED=0 / MISSING=0`
+（逐帧 sha 不变）。这一条反过来也成立并且有用：**如果哪张帧变了，就说明我改到了稳态布局**，
+那才是需要停下来查的时刻。
+
+于是本轮"看画面"这一项只能交回真机（R11 立的规矩：源码已接 ≠ 产物已量）：
+淡入只在中间态存在，离屏 `cacheDisplay` 拍不到，胶片探针又进不了设置窗口（导出会弹 `NSSavePanel`）。
+⇒ 人工批次 **44.1 / 44.2**：添加一个已存在的 bundle id 看回执是不是"闪一下没有"、
+导出反馈数据看那句回执出现与消失有没有淡。分数按这个上限给（见自评的"流畅度"）。
+
+### 仪器自己又坏了一次（记下来，因为它差点让电池假绿）
+
+变异电池第一版把 needle 抄成了 `XCTAssertEqual` 自动消息里那段 **`Set` 的打印**——
+而 `Set` 的顺序每次进程都可能不同 ⇒ M198 `红得不对`。
+⇒ 修法不是换 needle，是把**判据**改成两边 `sorted()` 再比（消息从此稳定），
+并在脚本里把 needle 的来源限定为 `--measure` 那一遍打印的失败消息原文。
+这是"needle 只能实测不能推理"这条规矩带来的第二条新信息。
+
+### 换装本机（12:29）
+
+`install_local.sh --yes --no-build --label r42-receipt-fade` ⇒ `INSTALL_RESULT=ok`、
+`INSTALL_SHA_MATCH=1`（`a261a308…` → `0a752818…`）、旧实例优雅退出、
+`SMOKE_SAW_START=True / SMOKE_SAW_SECOND_INSTANCE_ABORT=False / SMOKE_OK=1`、
+新 pid 30561、**存档 103 → 103 条**；旧包留在 `before-r42-receipt-fade`。
+⇒ 装上新包才看得见的那部分（淡入到底在不在）交回人工批次 44.1–44.4。
+
+### 验证
+
+726 tests / 29 skipped / **0 failures**；`swift build` 0 告警；
+闸门 `passed=697 skipped=29 failed=0 有名字的红=0 NOT_RUN=0 ⇒ ok`；
+帧基线 112 张 `CHANGED=0`（本轮不改基线，这是判据不是巧合）；脚本 83 全绿；
+变异 **M194–M198** 五支全 CAUGHT、`未被抓到=0 红得不对=0 还原不干净=0`。
+**CI 待读**。
+
+**同一天 skip 从 29 变 31，这一次不是漂移**：第二次跑没带 `CLIPBOARD_HISTORY_UI_SHOTS`
+⇒ `UICaptureTests.testCaptureKeyViews` 与 `OffscreenSymbolInkProbeTests.testProductSettingsSidebarIconInk`
+按环境门控自己跳过。记这一条是为了别把它当成 BACKLOG 57 那一族：**报数之前先确认两次运行条件相同**
+（与"计数命令自己没被证伪"同族）。

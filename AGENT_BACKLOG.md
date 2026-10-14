@@ -1178,7 +1178,7 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
 
 
 
-53. **`ReceiptLine` 声明了 `.contentFade`，但 `SettingsView` 全文 0 个 `withAnimation` ⇒ 空转的动效声明（R39 查出，U-63）**：
+53. **`ReceiptLine` 声明了 `.contentFade`，但 `SettingsView` 全文 0 个 `withAnimation` ⇒ 空转的动效声明（R39 查出，U-63）· 已收口（R42 / D-101）**：
     `SettingsView.swift:973` 那行 `.transition(MotionCatalog.transition(for: .contentFade))`
     只在**周围有动画驱动**时才跑；而三处回执（`exportMessage` / `archiveMessage` / `exclusionReceipt`）
     全是裸 `@State` 赋值 ⇒ 今天它们**瞬间插入、瞬间消失**，声明等于零。
@@ -1190,6 +1190,15 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     这一次体验是真的要变（回执插入的布局位移 R22 量过），所以处置应当是**供电**而不是撤。
     下一步：给三处 setter 加 `withAnimation(MotionCatalog.animation(for: .contentFade))`，
     并把"淡入到底跑没跑"交给胶片探针 + 人工批次（不许只凭源码有 `withAnimation` 就算交付）。
+    **R42 收口，三处都改了形，且原账有三处不准（都记在这里）**：
+    ① "三处全是裸赋值 ⇒ 瞬间插入"不准 —— 清空回执那一处（`:659`）**本来就有驱动**，
+       而它根本不是 `ReceiptLine`；排除名单那一处有驱动，只是键缺了回执自己（名单没变的那两种情况推不动）。
+       真正的死声明只有两处（导出反馈 `:555`、导出/导入历史 `:619`）。
+    ② "全文 0 个 `withAnimation`"这句**数错了对象**：该问的是"这个调用点外面有没有一条 `.animation(value:)`"，
+       而这条问句同时暴露了旧守卫的粒度问题（见 D-101：文件级守卫抓不到一个有 9 条键的文件里的死声明）。
+    ③ 处置没按原案用 `withAnimation` 包 setter，而是给容器加 `.animation(value: <门控> == nil)` ——
+       理由：仓库里唯一那条**已经能演**的回执（清空）用的就是这一族，跟着它才能让新判据读得到键。
+       代价写进 BACKLOG 63：这条判据因此**只认一种写法**。
 54. **`.disabled` 把标签淡到 1.82:1（亮档），低于本仓库给次要文字定的地板 2.2 —— 今天不可达，所以记账不修（R39，U-63）**：
     实测：`开机启动` 标签 启用 13.76 → 禁用 **1.82**（0.13 倍），暗档 11.43 → **2.29**（0.20 倍），
     而暗档禁用后的"算字像素"直接读到 **0**（`textInkMinDelta = 60` 那道门过不去，肉眼仍读得清）。
@@ -1267,3 +1276,26 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     ⇒ 现象：**界面在讲一条用户看不见的记录**。是不是缺陷要判：真机上选中通常是用户刚点过的（那时它在屏上），
     只有"横幅后到 / 启动即自动选中一条靠后的记录"才会撞上。修法候选是"横幅插入时把选中行滚进可视区"，
     但这条会动列表滚动位置，属 R22 那一族（布局位移），**先判值不值得再动**。
+62. **「导出反馈数据」同一件事有两条通道，而失败那条又是系统英文原文（R42 复核 BACKLOG 53 时看到，未修）**：
+    `SettingsView:172-179` 三个分支都写 `exportMessage` **并且** `showExportAlert = true`
+    ⇒ 用户既看到模态弹窗、又看到行内 `ReceiptLine`，两条说的是同一句话（模态还会抢注意力）。
+    而失败那一支是 `exportMessage = "导出失败：\(error.localizedDescription)"`
+    ⇒ **U-67 同一族、另一个出口**：R41 只把"写剪贴板"那条路做了人话，这条路还在直出原文。
+    ⇒ 处置要先定一件事：这一族回执**留行内还是留模态**（仓库里其余三处都是行内）。
+    定了再动，不许两条都留着各改各的；原文按 D-100 的规矩进日志。
+    注意 BACKLOG 60 里"导出失败与'导出 N 条'两条横幅互相矛盾"是**同一片代码**，一并判。
+63. **R42 那条新判据只认一种驱动写法（`.animation(value:)`），用 `withAnimation` 供电会被误报成没电**：
+    判据读的是"门控状态名有没有出现在某条 `.animation` 的键里"，而 SwiftUI 里推动过渡的还有
+    `withAnimation { state = … }` 那一族（`DetailView`、`GlassControls`、`DailyCopyHeatmapView` 都在用）。
+    ⇒ 现在这是一条**约定**而不是事实。约定已写在 `ReceiptLine` 定义处的注释里（加调用点的人一定会看到组件名）。
+    下一轮二选一：① 把 `withAnimation` 那一族也解析进来（要处理大括号配对，成本不低）；
+    ② 把约定做成会红的判据（"回执门控不许用 `withAnimation` 供电"）。
+    **不许再留成口头规矩**（BACKLOG 60 那一族"规矩停在事后修"的老毛病）。
+64. **R42 那把"调用点级"的尺，现在只量了 `ReceiptLine` 一个组件（粒度修对了，覆盖面还没铺开）**：
+    仓库里"声明了 `.transition` 却可能没人供电"的形状不止它一个 —— 文件级守卫
+    （`testNoUnexecutedTransitionClaimsAcrossViews`）在**有驱动的文件**里一律看不见调用点级的死声明，
+    这正是 R42 在 `SettingsView.swift`（9 条键）里抓到三处的机制。
+    下一轮把同一把尺按组件参数化跑过剩下几个候选：`NoticeBanner`（`ContentView` 里五条并排，
+    插入位移 R22 量过，但"每条的键是谁"没按调用点判过）、`EmptyStateView`、
+    热图那两条 `contentFade` 分支（`DailyCopyHeatmapView:44/50/78`，同文件另有 `.animation` 键 ⇒ 同一族隐身条件）。
+    做法已经现成：`receiptGateConditions` + `receiptGateIsDriven` 换个组件名与门控形状就能复用。
