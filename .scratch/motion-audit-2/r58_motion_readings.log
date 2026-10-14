@@ -1,0 +1,70 @@
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.7ms 抓帧最慢=13.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=10.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=41.1ms 抓帧最慢=89.0ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=8.9ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=41.1ms 抓帧最慢=90.6ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_BAND dismiss 带：首尾差=0.884 整窗首尾差=0.222 位置同一性 带vs整窗头=0.000 带vs整窗尾=0.952 ｜ 带：抓帧中位=4.8ms 峰值=0.255 过渡帧数=11 间隔中位=10ms 帧=1520x96px ｜ 整窗：抓帧中位=41.1ms 峰值=0.178 过渡帧数=4 间隔中位=46ms 帧=1520x1346px ｜ 最慢一次抓帧 带=8.9ms 整窗=89.0ms
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=43.2ms 抓帧最慢=63.8ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=43.2ms 抓帧最慢=45.4ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL_AB empty-to-content 开 帧数=1 峰值=0.049 冷闸=true  关 帧数=1 峰值=0.049 采样≈49ms
+MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content：开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=45.6ms 抓帧最慢=65.9ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL kind-change 采样≈52ms 中点帧=1 带内过渡帧数=2 落定残余=0.997
+MOTION_GRAB detail-same-kind 帧数=30 抓帧中位=45.7ms 抓帧最慢=78.2ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_DETAIL same-kind 带内过渡帧数=0 落定残余=0.000
+MOTION_GRAB_AREA 全视图 面积=535800pt² 样本=9 中位=42.2ms 最慢=42.8ms
+MOTION_GRAB_AREA 横幅带 面积=91200pt² 样本=9 中位=8.7ms 最慢=8.9ms
+MOTION_GRAB_AREA 小块 面积=18000pt² 样本=9 中位=3.3ms 最慢=3.3ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.4ms 抓帧最慢=255.5ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=256.2ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=256.6ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=1.9ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_HEAT_RUNS 开A [339–607@0.231/粗260] 开B [344–611@0.231/粗261] 关 [330–337@0.231/粗6]  跨度A=267ms 跨度B=268ms 整卷中位=8ms
+MOTION_HEAT_FADE_A/B 预热 时长=7ms 帧数=1 开A 时长=267ms 帧数=2 开B 时长=268ms 帧数=2 峰值=0.231  关 时长=6ms 帧数=1 峰值=0.231  整卷中位=8ms 声明=160ms 冷闸=true 判定=钟太粗
+MOTION_NOT_RUN=clock-coarse-in-window heat-first-record：峰值那一段内部最粗的一次采样是 260 / 261ms，而这条过渡声明 160ms ⇒ 今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT） ｜A 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 256ms，而间隔 260ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答 ｜B 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 257ms，而间隔 261ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答
+MOTION_GRAB list-insert-new-record 帧数=30 抓帧中位=45.6ms 抓帧最慢=57.8ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_CUT list-insert-new-record 带内过渡帧数=1 落定残余=0.000 逐帧=[0.302 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=7.3ms 抓帧最慢=10.1ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_CUT_CONTROL notice-banner 采样≈12ms 中点帧=6 落定残余=0.688
+MOTION_SELFTEST_354B5B29
+MOTION_SELFTEST_354B5B29-2
+MOTION_NATIVE row-insert 开 帧数=1 峰值=0.046 采样≈9ms
+MOTION_NATIVE row-insert 关 帧数=1 峰值=0.054 采样≈9ms
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_NATIVE row-move 开 帧数=1 峰值=0.037 采样≈9ms
+MOTION_NATIVE row-move 关 帧数=1 峰值=0.037 采样≈9ms
+MOTION_NATIVE_MOVE 判定=瞬移 峰值容差=0.020（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）；这一行只说读数怎么读，产品结论要过下面两道 skip 才算
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SEQUENCE 选中没变 帧数=1 峰值=0.028
+MOTION_SEQUENCE 选中变了 帧数=1 峰值=0.234
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SHIMMER 扫 帧数=47 变化帧对=22 峰值=0.015 采样≈53ms
+MOTION_SHIMMER 停 变化帧对=0 峰值=0.000
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=21.8ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_SETTLE banner-in 到位帧=15 采样≈11ms ⇒ 实测落定≈165ms（声明 150ms；R58 起量的是整条带，不再套第二层框）
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=44.5ms 抓帧最慢=74.4ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=44.6ms 抓帧最慢=69.3ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_SYMBOL row-star 开 帧数=1 峰值=0.260
+MOTION_SYMBOL row-star 关 帧数=1 峰值=0.260
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=3.4ms 抓帧最慢=24.2ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AB notice-banner 曲线关闭 采样≈8ms 过渡帧数=1 逐帧=[0.000 0.880 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_CONTROL 计数方块 帧数=38 峰值=0.036 变化帧对=37
+MOTION_CONTROL 渐变端点 帧数=38 峰值=0.026 变化帧对=33
+MOTION_GRAB blank 帧数=30 抓帧中位=44.9ms 抓帧最慢=70.1ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_BLANK frames=30 峰值=0.0000 过渡帧数=0
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.4ms 抓帧最慢=9.3ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION notice-banner frames=27 声明=150ms 整卷中位=11ms 事件内最粗=17ms 变化段时长=190ms 过渡帧数=13 时刻ms=[17 17 14 13 13 13 15 12 13 13 13 12 10 11 11 10 10 10 10 9 9 8 9 9 9 9] 逐帧=[0.000 0.119 0.274 0.219 0.238 0.163 0.164 0.092 0.139 0.060 0.049 0.057 0.045 0.000 0.036 0.114 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION notice-banner-dismiss frames=27 声明=120ms 整卷中位=9ms 事件内最粗=14ms 变化段时长=184ms 过渡帧数=13 时刻ms=[8 13 12 12 13 14 13 14 13 12 9 8 8 8 8 8 8 8 9 9 8 9 9 9 9 9] 逐帧=[0.000 0.071 0.181 0.178 0.165 0.095 0.109 0.118 0.126 0.048 0.047 0.000 0.033 0.000 0.039 0.000 0.000 0.106 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=45.3ms 抓帧最慢=79.8ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=50ms 事件内最粗=60ms 变化段时长=173ms 过渡帧数=3 时刻ms=[52 60 60 50 50 50 50 50 50 50 51 51 50 51 49 50 50 50 50 50 50 50 50 50 54 52] 逐帧=[0.065 0.081 0.079 0.001 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB empty-state 帧数=30 抓帧中位=15.1ms 抓帧最慢=59.7ms 视图=380×552pt 像素=760×1104px 声明=160ms
+MOTION empty-state frames=27 声明=160ms 整卷中位=20ms 事件内最粗=41ms 变化段时长=106ms 过渡帧数=3 时刻ms=[24 41 41 40 35 20 20 20 20 20 20 20 20 20 19 20 19 20 20 20 20 20 20 20 20 20] 逐帧=[0.078 0.113 0.104 0.003 0.000 0.001 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_SUMMARY notice-banner=13 notice-banner-dismiss=13 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-
+
+### R58 修完分带方向之后同一批读数的位置：
+#  M295 之前（镜像错，R57 及更早）  MOTION_SETTLE banner-in 到位帧=11 实测落定≈121ms  ← 量的是窗口底部
+#  嵌套错（R57 之后、本轮之前）      到位帧=6  ≈66ms   ← 量的是带里 9.5pt 窄缝
+#  本轮（映射对 + 去掉嵌套框）        到位帧=15 ≈165ms  ← 整条带，见上面 MOTION_SETTLE 行
+#  侧栏第 4 行的星标列（BACKLOG 80 第二条跑偏的）：0.221 → 0.260，见 MOTION_SYMBOL 两行

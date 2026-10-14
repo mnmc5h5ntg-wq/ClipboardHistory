@@ -1042,6 +1042,58 @@ final class MotionFilmstripTests: XCTestCase {
         return body.joined(separator: "\n")
     }
 
+    /// 把源码里的每个 `func test…` 切成**它自己的函数体**。
+    ///
+    /// 切法：按 `\n    func test` 分段，每段截到**第一行正好是四个空格的 `}`** 为止
+    /// （SwiftUI 风格的缩进里，那一个花括号就是函数自己的收尾；嵌套的都比它深）。
+    /// 为什么不用花括号计数：字符串字面量里有不成对的 `{`（本文件就有 `"\u{0}…"`），
+    /// 数出来的 `cursor` 会跨过好几个用例 —— 实测第一版只切出 6 段，
+    /// 于是这条守卫既漏扫又报假红。**扫描器坏了的时候守卫是空跑，比红更需要防。**
+    static func testCaseBodies(in code: String) -> [(name: String, body: String)] {
+        var out: [(name: String, body: String)] = []
+        for chunk in code.components(separatedBy: "\n    func test").dropFirst() {
+            let lines = chunk.components(separatedBy: "\n")
+            guard let firstLine = lines.first else { continue }
+            let name = "test" + firstLine.prefix { $0.isLetter || $0.isNumber || $0 == "_" }
+            var body: [String] = ["func test" + firstLine]
+            for line in lines.dropFirst() {
+                if line == "    }" { break }
+                body.append(line)
+            }
+            out.append((String(name), body.joined(separator: "\n")))
+        }
+        return out
+    }
+
+    /// 在一个用例体里找"把归一化分带套到**带捕获那一卷**上"的现场，返回被这样用的胶片变量名。
+    ///
+    /// 为什么不是"这个函数里既出现了带捕获场景、又出现了 `band:`"：那样会假红。
+    /// `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 正是那种形状 —— 它的主判据用整窗那卷
+    /// （正常传 `band`），阳性对照用横幅那卷（**不传** `band`）。第一版守卫就是这么误报的，
+    /// 而假红的代价是有人去把一条本来正确的判据改松。
+    /// 所以这里做一点点数据流：场景变量 → 胶片变量 → 传了非 nil `band` 的调用点。
+    static func nestedBandFilms(in body: String, bandFactories: [String]) -> [String] {
+        let factories = bandFactories.joined(separator: "|")
+        func groups(_ pattern: String) -> [[String]] {
+            guard let re = try? NSRegularExpression(pattern: pattern) else { return [] }
+            let range = NSRange(body.startIndex..., in: body)
+            return re.matches(in: body, range: range).map { match in
+                (1..<match.numberOfRanges).compactMap { i in
+                    Range(match.range(at: i), in: body).map { String(body[$0]) }
+                }
+            }
+        }
+        // ① 哪些变量是"带捕获的场景"，哪些胶片直接来自它。
+        let bandScenarios = Set(groups("let (\\w+) = Scenario\\.(?:\(factories))\\(\\)").flatMap { $0 })
+        var bandFilms = Set(groups("let (\\w+) = record\\(Scenario\\.(?:\(factories))\\(\\)\\)").flatMap { $0 })
+        for pair in groups("let (\\w+) = record\\((\\w+)\\)") where pair.count == 2 {
+            if bandScenarios.contains(pair[1]) { bandFilms.insert(pair[0]) }
+        }
+        // ② 哪些调用点把非 nil 的 band 传给了某卷的帧。
+        let passed = groups("Self\\.\\w+\\((\\w+)\\.(?:motionFrames|frames)\\b[^)]*\\bband: (?!nil)").flatMap { $0 }
+        return passed.filter { bandFilms.contains($0) }
+    }
+
     /// 带捕获：**便宜必须是真的，而且不能把被测的动效裁掉**（R57 / BACKLOG 77 路 a）。
     ///
     /// 为什么这条判据存在，而不是直接改完就宣布快了：
@@ -1235,6 +1287,132 @@ final class MotionFilmstripTests: XCTestCase {
                 "登记表里 \(arm) 不是 must_judge=true ⇒ 带捕获白做："
                     + "判得到也没人要求它判到，掉回 not-run 时闸门不会红")
         }
+    }
+
+    /// 归一化分带矩形必须落在它**声称的那一头**（R58 / BACKLOG 80）。
+    ///
+    /// 为什么这条存在：R57 实测发现 `changedFraction(band:)` 把带**上下颠倒**了 ——
+    /// 那里的注释写着"缓冲区第 0 行是画面的底边"，而实测第 0 行是**顶边**：
+    /// 带那一帧与整窗那一帧的第 0–95 行逐像素相同（0.000）、与末尾 96 行差 0.954
+    /// （`.scratch/motion-audit-2/r57_motion_readings.log` 的 `MOTION_BAND` 行）。
+    /// 后果是这个文件里 7 处 `band:` 量的都是镜像位置，
+    /// 而**关于中线对称的那两条（详情区 y 0.12–0.88、列表中部 y 0.35–0.65）永远不会红** ——
+    /// 这是"量错地方"最坏的一种：尺子看起来在判，实际在判另一块，且没有任何一条判据会喊。
+    ///
+    /// 为什么用合成位图而不是真帧：真帧只能证明"某一处对不上"，
+    /// 合成位图能证明**四个方向**（上/下/左/整幅）各自的对应关系 ——
+    /// 颠倒这种错恰恰只在"另一头"才暴露，只测一头会把它放过去。
+    /// 锚点（"缓冲区第 0 行 = 画面顶边"）来自上面那次实测，不是注释、不是 CG 的推理。
+    func testBandRectMapsToTheEndItClaims() {
+        let width = 70, height = 100
+        func pair(differingRows: ClosedRange<Int>? = nil,
+                  differingColumns: ClosedRange<Int>? = nil) -> (Bitmap, Bitmap) {
+            var a = [UInt8](repeating: 0, count: width * height * 4)
+            var b = [UInt8](repeating: 0, count: width * height * 4)
+            for y in 0..<height {
+                for x in 0..<width {
+                    let inRows = differingRows.map { $0.contains(y) } ?? true
+                    let inCols = differingColumns.map { $0.contains(x) } ?? true
+                    guard inRows && inCols else { continue }
+                    let p = (y * width + x) * 4
+                    b[p] = 200; b[p + 1] = 200; b[p + 2] = 200; b[p + 3] = 255
+                }
+            }
+            return (Bitmap(pixels: a, width: width, height: height),
+                    Bitmap(pixels: b, width: width, height: height))
+        }
+        let top = CGRect(x: 0, y: 0, width: 1, height: 0.2)         // 画面**顶边**那 20%
+        let bottom = CGRect(x: 0, y: 0.8, width: 1, height: 0.2)    // 画面**底边**那 20%
+        let left = CGRect(x: 0, y: 0, width: 0.2, height: 1)
+        let right = CGRect(x: 0.8, y: 0, width: 0.2, height: 1)
+        let head = pair(differingRows: 0...19)
+        let tail = pair(differingRows: 80...99)
+
+        // ⓪ 夹具自己先要能判红黑：差异不成立时后面每一格都无从解释（本仓库"探针不自检"那一族）。
+        XCTAssertEqual(Self.changedFraction(head.0, head.1, band: nil),
+                       Self.changedFraction(tail.0, tail.1, band: nil), accuracy: 0.001,
+                       "两份合成位图在整幅上读出的变化占比不相等 ⇒ 夹具本身不对称，"
+                           + "下面的方向判据就分不清是映射坏了还是数据坏了")
+        XCTAssertGreaterThan(Self.changedFraction(head.0, head.1, band: nil), 0,
+                             "整幅都读不到差异 ⇒ 差异根本没写进位图，四条方向判据全是空的")
+
+        // ① 差异在画面顶边 ⇒ 只有"顶边那条带"看得见它。
+        XCTAssertGreaterThanOrEqual(Self.changedFraction(head.0, head.1, band: top), 0.9,
+            "差异写在缓冲区第 0–19 行（= 画面顶边，实测锚点），而 band.minY=0 读不到它 ⇒ "
+                + "映射又反了：`minY` 不是从顶边往下算的")
+        XCTAssertLessThanOrEqual(Self.changedFraction(head.0, head.1, band: bottom), 0.1,
+            "顶边的差异被 `band.minY=0.8` 读到了 ⇒ 它取的是画面的**上**面一条，"
+                + "与它自己名字说的相反（这正是 BACKLOG 80 记的那个形状）")
+        // ② 差异在画面底边 ⇒ 反过来。
+        XCTAssertGreaterThanOrEqual(Self.changedFraction(tail.0, tail.1, band: bottom), 0.9,
+            "差异写在缓冲区末尾 20 行（= 画面底边），而 band.minY=0.8 读不到它 ⇒ 映射反了")
+        XCTAssertLessThanOrEqual(Self.changedFraction(tail.0, tail.1, band: top), 0.1,
+            "底边的差异被 `band.minY=0` 读到了 ⇒ 顶部那条带量的其实是底部")
+        // ③ 横轴不许"顺手也对"：它没有翻转，所以这一组同时钉住"别把 x 也翻一次"。
+        let west = pair(differingColumns: 0...13)
+        XCTAssertGreaterThanOrEqual(Self.changedFraction(west.0, west.1, band: left), 0.9,
+            "差异写在每行最左 20 列，而 band.minX=0 读不到 ⇒ 横轴被多翻了一次（它本来不该翻）")
+        XCTAssertLessThanOrEqual(Self.changedFraction(west.0, west.1, band: right), 0.1,
+            "最左的差异被 band.minX=0.8 读到了 ⇒ 横轴也反了")
+        // ④ 整幅 = 各占 20%（15 行里采到 3 行）：这条把"分带"与"不分带"接上，
+        //    于是"带退化成整幅"那种坏法（比如忘了裁剪）也会在这一格红。
+        XCTAssertEqual(Self.changedFraction(head.0, head.1, band: nil), 0.2, accuracy: 0.02,
+            "整幅读数不是 0.2 ⇒ 夹具的采样比例变了，上面那六格的地板要重算")
+    }
+
+    /// 带捕获的那几卷上，不许再套第二层归一化框（R58 / BACKLOG 80 的第二半）。
+    ///
+    /// 为什么单独一条：`band:` 是**相对整幅帧**的归一化矩形。R57 把横幅两臂的整幅换成顶部那条带
+    /// 之后，同一句 `band = CGRect(x:0.05, y:0.02, width:0.90, height:0.20) // 横幅那一条`
+    /// 量的不再是"横幅那一条"，而是**带里再框一条 9.5pt 的窄缝**（连文字都不在里面）。
+    /// 实测后果：`MOTION_SETTLE banner-in` 从 帧 11 / ≈121ms 变成 帧 6 / ≈66ms，
+    /// 而**两条判据都还绿** —— 也就是说"换了捕获区域"会安静地改掉别人的测量对象。
+    /// 镜像（映射反了）与嵌套（框里再框）是同一族里的两种坏法，各需要一条判据；
+    /// 前者由 `testBandRectMapsToTheEndItClaims` 钉，这条钉后者。
+    ///
+    /// 不开能力闸门：它判的是源码里两件事是否同时出现，与产品像素无关（同 `testMotionReadingsUseTheFileChannel`）。
+    func testNoTestFramesABandInsideABandCapturedFilm() throws {
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        let bandFactories = ["noticeBanner", "noticeBannerDismiss"]
+        // ① 带捕获的现场必须**全在这份清单里**（新增一臂忘了进来 ⇒ 这条先红，
+        //    而不是让下面那半安静地少扫一个名字）。
+        //    needle 分两半拼，并且取到 `) { store in` 那一截：守卫自己那行
+        //    `text.contains("captureRect: Scenario.bannerBand")` 也含前半截，
+        //    不拆开就会把自己数成一个现场（R55 的 M276 就是这一族，规矩是"被搜的串不许原样
+        //    出现在搜它的那一行里"）。
+        let declarationNeedle = "captureRect: Scenario." + "bannerBand) { store in"
+        let sites = source.components(separatedBy: declarationNeedle).count - 1
+        XCTAssertEqual(sites, bandFactories.count,
+            "源码里有 \(sites) 处带捕获声明，清单里是 \(bandFactories.count) 个（\(bandFactories)）⇒ "
+                + "要么新加了一臂没进清单，要么有一臂被撤了没撤干净")
+
+        // ② 谓词必须**能说不**（R56 那一族）。两段合成样本都**拼出来**写：
+        //    如果它们以完整形态出现在源码里，第三段的扫描就会把守卫自己报成违规
+        //    （它扫的就是这个文件的文本）。
+        let factoryRef = "notice" + "Banner"
+        let violation = "let f = record(Scenario." + factoryRef + "())\n"
+            + "Self.deltas(f.motion" + "Frames, band: rect)\n"
+        let legitimate = "let f = record(Scenario." + "detailKindChange())\n"
+            + "Self.deltas(f.motion" + "Frames, band: rect)\n"
+        XCTAssertEqual(Self.nestedBandFilms(in: violation, bandFactories: bandFactories), ["f"],
+                       "谓词在一段明显的嵌套现场上什么都没报 ⇒ 下面那条扫描是装饰")
+        XCTAssertTrue(Self.nestedBandFilms(in: legitimate, bandFactories: bandFactories).isEmpty,
+                      "谓词在**没录带捕获那卷**的样本上也报嵌套 ⇒ 它判的是'有没有 band 矩形'，"
+                          + "不是'有没有嵌套'，会把整窗那几卷的正常分带全判成违规")
+
+        // ③ 逐个体扫。
+        let cases = Self.testCaseBodies(in: source)
+        XCTAssertGreaterThan(cases.count, 20,
+            "只切出 \(cases.count) 个用例体（这个文件有几十条判据）⇒ 扫描器自己坏了，"
+                + "而它坏了的时候这条守卫是**空跑**，比红更需要防")
+        let offenders = cases.compactMap { entry -> String? in
+            let hits = Self.nestedBandFilms(in: entry.body, bandFactories: bandFactories)
+            return hits.isEmpty ? nil : "\(entry.name)→\(hits.sorted().joined(separator: ","))"
+        }
+        XCTAssertTrue(offenders.isEmpty,
+            "这些用例把归一化分带套到了**带捕获那一卷**上：\(offenders.sorted()) ⇒ "
+                + "名字写着量 A，实际量的是 A 里的一条窄缝，而且不会红。"
+                + "带捕获那一卷的「整幅」就已经是那条带，要用 band: nil")
     }
 
     /// 判"带捕获够便宜"所需的**最小节省倍数**（整窗中位 ÷ 带中位）。
@@ -2236,18 +2414,24 @@ final class MotionFilmstripTests: XCTestCase {
     /// 第一版的病正在相反的方向：`duration(for:)` 写 0.15，而 `animation(for:)` 在位移档
     /// 里用写死的 `response: 0.32`，纯值守卫一声不响（报告场景 C：声明 150ms、实测 200ms）。
     /// 那一半已经由 `testCurveSecondsComeFromTheDurationTable` 钉住；这条钉的是产物。
+    ///
+    /// **R58 把这里的 `band` 去掉了，理由值得留在原地**：这一卷从 R57 起只拍顶部那条带
+    /// （1520×96px），于是"整幅"就已经是"横幅那一条"；再套一层归一化矩形
+    /// （`y 0.02–0.22`）量的是**带里再框一条 9.5pt 的窄缝**（横幅顶边那点底色，文字都不在里面）。
+    /// 同一卷的读数因此从"落定≈121ms/帧 11"变成"66ms/帧 6" —— 两个数都没让这条判据变红，
+    /// 也就是说**换了捕获区域之后，这条判据安静地量了别的东西**（BACKLOG 80 的第二半：
+    /// 镜像是一半，嵌套是另一半）。由 `testNoTestFramesABandInsideABandCapturedFilm` 钉住不再复发。
     func testSlidingRoleSettlesWithinItsBudget() throws {
         try skipUnlessEnabledAndCapable()
-        let band = CGRect(x: 0.05, y: 0.02, width: 0.90, height: 0.20)   // 横幅那一条
         let scenario = Scenario.noticeBanner()
         let film = record(scenario)
         let interval = Self.sampleIntervalMilliseconds(film.motionStamps)
-        guard Self.premisePictureChanged(film.motionFrames, band: band) else {
+        guard Self.premisePictureChanged(film.motionFrames, band: nil) else {
             emit("MOTION_NOT_RUN=premise-not-visible banner-in 带内触发前后逐像素相同 ⇒ 这次变更在画面里不存在")
             throw XCTSkip("MOTION_NOT_RUN=premise-not-visible：落定态与起始态相同，落定时长无从谈起")
         }
-        guard let settled = Self.settledAtFrame(film.motionFrames, band: band) else {
-            let steps = Self.deltas(film.motionFrames, band: band)
+        guard let settled = Self.settledAtFrame(film.motionFrames, band: nil) else {
+            let steps = Self.deltas(film.motionFrames, band: nil)
             emit("MOTION_NOT_RUN=no-visible-change banner-in 帧数=\(film.motionFrames.count) 采样≈\(interval)ms "
                 + "峰值相邻差=\(String(format: "%.4f", steps.max() ?? -1)) "
                 + "带内逐帧相邻差=\(steps.map { String(format: "%.3f", $0) })"
@@ -2257,7 +2441,7 @@ final class MotionFilmstripTests: XCTestCase {
         let duration = scenario.declaredDurationMilliseconds
         let settledMilliseconds = Double(settled) * Double(max(interval, 1))
         emit("MOTION_SETTLE banner-in 到位帧=\(settled) 采样≈\(interval)ms ⇒ 实测落定≈\(Int(settledMilliseconds))ms"
-            + "（声明 \(Int(duration))ms）")
+            + "（声明 \(Int(duration))ms；R58 起量的是整条带，不再套第二层框）")
         // "有过程"那一半只在时钟切得出至少 3 帧时才判：否则一次正确的过渡本来就会在两帧内到位。
         if Self.resolvableFrames(durationMilliseconds: duration, sampleMilliseconds: interval) >= 3 {
             XCTAssertGreaterThanOrEqual(settled, 2,
@@ -3151,9 +3335,15 @@ final class MotionFilmstripTests: XCTestCase {
     /// 两张位图在 `band` 里有多少采样像素不同。
     ///
     /// `band` 是**归一化**矩形（0…1），坐标按"屏幕视角"给：`minY` 从窗口**顶边**往下算。
-    /// 之所以要显式翻转：`CGBitmapContext` 的缓冲区第 0 行是它的**最低**一行，
-    /// 也就是画面的底边 —— 不翻的话"列表中部"会框到窗口上方，量到的东西和名字对不上，
-    /// 而这类错位不会让任何断言变红（它只是安静地量错地方）。
+    ///
+    /// 这一行 R58 修过一次，修的是**方向**：原来写的是
+    /// `yStart=(1-maxY)*h, yEnd=(1-minY)*h`，注释理由是"CGBitmapContext 的缓冲区第 0 行是底边"。
+    /// 那个理由**是错的**（R57 实测）：带那一帧与整窗那一帧的第 0–95 行逐像素相同（0.000）、
+    /// 与末尾 96 行差 0.954 ⇒ 这条通道里缓冲区第 0 行就是**画面顶边**，
+    /// 于是旧映射把"顶部一条"取成了"底部一条"，7 处调用量了五轮镜像位置（BACKLOG 80）。
+    /// 现在由 `testBandRectMapsToTheEndItClaims` 用合成位图把四个方向钉住 ——
+    /// 光改映射不够：那个函数在**关于中线对称**的矩形上永远看不出问题，
+    /// 而那正是旧代码里两条调用点（详情区、列表中部）的形状。
     /// `band = nil` 就是整窗。
     private static func changedFraction(_ a: Bitmap, _ b: Bitmap, band: CGRect?) -> Double {
         guard !a.pixels.isEmpty, a.pixels.count == b.pixels.count, a.width == b.width, a.height == b.height,
@@ -3162,8 +3352,8 @@ final class MotionFilmstripTests: XCTestCase {
         if let band {
             xStart = max(0, Int(band.minX * CGFloat(a.width)))
             xEnd = min(a.width, Int(band.maxX * CGFloat(a.width)))
-            yStart = max(0, Int((1 - band.maxY) * CGFloat(a.height)))
-            yEnd = min(a.height, Int((1 - band.minY) * CGFloat(a.height)))
+            yStart = max(0, Int(band.minY * CGFloat(a.height)))
+            yEnd = min(a.height, Int(band.maxY * CGFloat(a.height)))
         } else {
             xStart = 0; xEnd = a.width; yStart = 0; yEnd = a.height
         }

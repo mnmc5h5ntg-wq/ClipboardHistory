@@ -208,7 +208,14 @@ jobs:
           # 所以固定把两样东西打出来：① 各条判据自己的读数；② 红的那几条的名字。
           # `|| true` 是必需的：grep 没匹配就是 1，而 run 默认 `bash -e`（同一步里已经栽过三次）。
           echo "---- 动效读数 ----"
-          grep -E "MOTION_(SUMMARY|RESOLVE_SUMMARY|NATIVE|SHIMMER|SEQUENCE|CONTROL|CUT|DETAIL|AB|BLANK|SETTLE|SYMBOL)" /tmp/motion.log | head -24 || true
+          # R58 / BACKLOG 83：这里原来是一份**硬编码前缀白名单**
+          # （SUMMARY|RESOLVE_SUMMARY|NATIVE|SHIMMER|…）。它的问题是"每一轮新增的读数族都不在里面"：
+          # R55 的 MOTION_GRAB 与 R57 的 MOTION_BAND 都没进过这份列表，
+          # 于是 run 38570965657 里"runner 上带捕获到底成没成功"这件事**在日志里没有答案** ——
+          # 只有 `judged=4/4`，而 4/4 在带捕获之前也是 4/4（R56），两个形状分不开。
+          # 白名单会随每一轮变旧；"这一共打了多少行"不会。所以改成：先报计数，再全打。
+          echo "MOTION_LINES=$(grep -cE '^MOTION_' /tmp/motion.log || true)"
+          grep -E "^MOTION_" /tmp/motion.log | head -120 || true
           # R46：**not-run 的理由单独打，且不截断**。上面那个 `head -24` 是 R44 那次
           # "掉了一臂却查不到为什么"的直接成因 —— 理由行排在一大堆读数之后，被挤出了控制台，
           # 于是 run 38514753036 里 `not-run=notice-banner-dismiss` 在日志上找不到任何解释。

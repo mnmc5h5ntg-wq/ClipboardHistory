@@ -154,6 +154,14 @@ EXPECT = {
          (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
     ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY",
                                            "MOTION_RESOLVE_SUMMARY"], 0, []),
+    # R58 / BACKLOG 83：**没有任何白名单提到过的读数族**也必须出现在 CI 日志里。
+    # 这一格的理由很具体：R55 加了 MOTION_GRAB、R57 加了 MOTION_BAND，而那一步的摘录
+    # 用的是一份写死的前缀列表 ⇒ "runner 上带捕获到底成没成功"在 run 38570965657 的日志里查不到
+    # （只有 `judged=4/4`，而带捕获之前的 R56 也是 4/4 ⇒ 两个形状分不开）。
+    # 它同时是那条改动的**正对照**：把 grep 改回白名单，这一格立刻红。
+    ("motion", "family_not_in_any_list"): (
+        MOTION_NORMAL + "MOTION_BAND dismiss 带：位置同一性 带vs整窗头=0.000\n",
+        ["motion suite exit:", "MOTION_BAND", "MOTION_LINES=3"], 0, []),
     # 看门狗收掉进程 ⇒ 必须走 "MOTION_NOT_RUN" 那一支并且退出码 0（报告型不挡发布）
     ("motion", "truncated_log"): (TRUNCATED, ["motion suite exit:", "MOTION_NOT_RUN"], 0, []),
     ("motion", "watchdog_already_exited"): (

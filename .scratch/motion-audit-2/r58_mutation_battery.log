@@ -1,0 +1,25 @@
+预检 OK MotionFilmstripTests.testBandRectMapsToTheEndItClaims
+预检 OK MotionFilmstripTests.testNoTestFramesABandInsideABandCapturedFilm
+预检 OK ci_report_selftest
+
+M295 y 映射倒回去（本轮修掉的那个形状） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims'] 命中=['顶边'] 还原干净=True
+
+M296 x 映射也被倒回去 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims'] 命中=['最左'] 还原干净=True
+
+M297 带永远不生效（分带退化成整幅） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims'] 命中=['顶边'] 还原干净=True
+
+M298 把嵌套框重新套回带捕获那一卷 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm'] 命中=['窄缝'] 还原干净=True
+
+M299 CI 的读数摘录退回硬编码前缀白名单 ⇒ CAUGHT 红得对=True 红在 ['test_report_only_steps_always_print_their_numbers'] 命中=['family_not_in_any_list'] 还原干净=True
+
+M300 嵌套守卫的谓词永远返回空数组 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm'] 命中=['明显的嵌套现场上什么都没报'] 还原干净=True
+
+==== 汇总 ====
+  M295 | CAUGHT | yes | yes
+  M296 | CAUGHT | yes | yes
+  M297 | CAUGHT | yes | yes
+  M298 | CAUGHT | yes | yes
+  M299 | CAUGHT | yes | yes
+  M300 | CAUGHT | yes | yes
+红得不对/未抓到=0  还原不干净=0
+还原后复跑（分带真值表）：ESCAPED

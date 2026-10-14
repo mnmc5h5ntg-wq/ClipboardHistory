@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R58：那条分带尺是上下颠倒的 —— 改一行、写真值表、再查出"CI 看不见新读数"）
+- `changedFraction(band:)` 的归一化带**方向修对了**：它原来按 `yStart=(1-maxY)*h` 取值，
+  注释理由是"缓冲区第 0 行是画面底边"，而 R57 实测第 0 行是**画面顶边**
+  （带那一帧与整窗帧的第 0–95 行逐像素相同 0.000、与末尾 96 行差 0.954）。
+  ⇒ 此前这个文件里 7 处 `band:` 量的都是镜像位置（BACKLOG 80 结案）。
+- 新判据 `testBandRectMapsToTheEndItClaims`：合成位图把差异只放在上/下/左三处，
+  六格方向断言 + 一格"夹具自己不对称就红" + 一格"整幅=0.2"。
+  它在坏的映射上先红了四格，横轴与整幅那两格全绿 —— 红的形状本身就是诊断。
+  七个调用点逐个重算：两条**关于中线对称**的（详情区、列表中部）一直没跑偏、
+  也一直没能力发现这个 bug；`表格区` 上下各偏 0.02；实质跑偏的是
+  `// 横幅那一条` 与 `侧栏第 4 行的星标列`（后者读数 0.221 → 0.260）。
+- 本轮真正的发现是**第二层错**（R57 自己带进来的）：`// 横幅那一条` 从 R57 起传的已经是
+  **带捕获那一卷**，同一个矩形量的是"带里再框一条 9.5pt 的窄缝"。同一判据三个数：
+  镜像错 帧 11/≈121ms、嵌套错 帧 6/≈66ms、修完 帧 15/≈165ms，**三个都没让任何判据变红**。
+  ⇒ 新守卫 `testNoTestFramesABandInsideABandCapturedFilm`：带捕获那一卷上不许再传非 nil 的 `band:`；
+  `testSlidingRoleSettlesWithinItsBudget` 去掉那层嵌套框（那一卷的"整幅"就已经是那条带）。
+  守卫的第一版**假红**（谓词只看"函数里同时出现带捕获场景与 band 矩形"），
+  被 `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 顶回来 ⇒ 谓词改成一点点数据流。
+- `.github/workflows/ci.yml` 的动效读数摘录从**硬编码前缀白名单**改成
+  "先报 `MOTION_LINES=N`，再全打 `^MOTION_`"：R55 的 `MOTION_GRAB` 与 R57 的 `MOTION_BAND`
+  都没进过那份列表 ⇒ run 38570965657 里"runner 上带捕获成没成功"在日志中查不到
+  （只剩 `judged=4/4`，而带捕获之前的 R56 也是 4/4 ⇒ 两个形状分不开）。
+  CI 自检加一格 `family_not_in_any_list`（新 BACKLOG 83；M299 把白名单放回去就红）。
+- 新开两条：**BACKLOG 84**（分带归因网格的行序现在对了，但没有任何判据钉住它）、
+  并复核了历史结论：M1 那条"斜坡来自右侧详情区"是按**列**读的 ⇒ 不受影响。
+- 变异 M295–M300 六支全 CAUGHT（y 倒回去 / x 也倒回去 / 带永远不生效 / 把嵌套框套回去 /
+  CI 白名单放回去 / 守卫谓词空转）。
+- 全量 761 例 / 33 skip / 0 失败、`swift build` 0 告警、脚本 106 全绿、116 帧逐字节不变 ⇒
+  不需要 `frame_baseline update`、不换装。
+
 ### Added（R57：横幅那两臂第一次被判到，代价是先发现我的分带尺是上下颠倒的）
 - `Scenario` 多一个可选的 `captureRect`，`Grabber` 多一个 `rect`（默认 `nil` = 整窗，旧行为不变）：
   横幅两臂从整窗（1520×1346px）改拍**顶部那条带**（1520×96px，面积 1/14），仍然按 2× 拍。
