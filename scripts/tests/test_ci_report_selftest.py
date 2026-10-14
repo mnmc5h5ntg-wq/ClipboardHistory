@@ -217,11 +217,16 @@ EXPECT = {
         ["MOTION_FLOOR_FACTS", "MOTION_FLOOR_OK=4/4"], 0, []),
     # R44 的真实形状：掉了一臂，但理由登记过 ⇒ 放行，**且必须把这条打印出来**。
     # 旧版这一步在这里连"掉了谁"都不说，所以我是靠人肉对比 run 日志发现的。
-    ("motion_floor", "registered_drift_passes_but_prints"): (
+    # R57 换了期望：这条形状在 R52 的清单下是"放行 + 打印"（REDS=0），
+    # 而带捕获把成本降下来之后清单改回四臂必须判到 ⇒ 同一条日志现在是**一条红**。
+    # 留着这一格的意义正在这里：清单变严/变松时，它会逼着有人回来改期望，
+    # 而不是让"闸门今天到底要求几条"这件事只活在 JSON 里。
+    ("motion_floor", "registered_drift_is_red_after_the_tightening"): (
         NORMAL + FLOOR_SUMMARY + "\n"
         + "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms\n"
         + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss\n",
-        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner-dismiss", "MOTION_FLOOR_REDS=0"], 0, []),
+        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner-dismiss",
+         "MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_REDS=1"], 1, []),
     # 掉了同一臂，但这次没人说为什么 ⇒ 红。"没测到"可以接受，"没测到且说不清"不行。
     ("motion_floor", "drift_without_reason"): (
         NORMAL + FLOOR_SUMMARY + "\n"

@@ -1,0 +1,35 @@
+预检 OK MotionFilmstripTests.testBandCaptureIsCheaperAndStillSeesTheMotion
+预检 OK MotionFilmstripTests.testBandCaptureIsWiredIntoBothBannerArms
+预检 OK MotionFilmstripTests.testMotionReadingsUseTheFileChannel
+预检 OK motion_floor_gate
+
+M286 带挪回窗口底部（本轮真实犯过的那次） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion'] 命中=['同一头'] 还原干净=True
+
+M287 captureRect 变成装饰（永远抓整窗） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion'] 命中=['rect 被忽略了'] 还原干净=True
+
+M288 位置同一性把头尾对调 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion'] 命中=['同一头'] 还原干净=True
+
+M289 位置同一性两条都比同一头（另一条恒真） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion'] 命中=['两头一模一样'] 还原干净=True
+
+M290 MOTION_BAND 退回 print（不走文件通道） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['只走 stdout'] 还原干净=True
+
+M291 登记表把 notice-banner 放回放行 ⇒ CAUGHT 红得对=True 红在 ['testRegisteredDriftIsGreenButVisible', 'testRegistryIsStrictAgain', 'testRelaxedArmsMustCiteARunId'] 命中=['testRegistryIsStrictAgain'] 还原干净=True
+
+M292 闸门算出的地板是 0（must_judge 集合被清空） ⇒ CAUGHT 红得对=True 红在 [] 命中=['testFloorIsTheMustJudgeCountNotTwo'] 还原干净=True
+
+M293 撤掉 dismiss 那一臂的 captureRect（接线断在一臂上） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms'] 命中=['不再声明 captureRect'] 还原干净=True
+
+M294 登记表与守卫不同向（dismiss 臂偷偷放行） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms'] 命中=['不是 must_judge=true'] 还原干净=True
+
+==== 汇总 ====
+  M286 | CAUGHT | yes | yes
+  M287 | CAUGHT | yes | yes
+  M288 | CAUGHT | yes | yes
+  M289 | CAUGHT | yes | yes
+  M290 | CAUGHT | yes | yes
+  M291 | CAUGHT | yes | yes
+  M292 | CAUGHT | yes | yes
+  M293 | CAUGHT | yes | yes
+  M294 | CAUGHT | yes | yes
+红得不对/未抓到=0  还原不干净=0
+还原后复跑（带捕获 A/B）：ESCAPED

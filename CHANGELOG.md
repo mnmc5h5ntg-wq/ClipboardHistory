@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R57：横幅那两臂第一次被判到，代价是先发现我的分带尺是上下颠倒的）
+- `Scenario` 多一个可选的 `captureRect`，`Grabber` 多一个 `rect`（默认 `nil` = 整窗，旧行为不变）：
+  横幅两臂从整窗（1520×1346px）改拍**顶部那条带**（1520×96px，面积 1/14），仍然按 2× 拍。
+  本机三次连续跑实测：抓一帧中位 39.5–39.8ms → **4.4–4.6ms（≈9 倍）**，
+  整卷中位间隔 44–45ms → **9–10ms**，同一场景过渡帧数 3–4 → **10–11**，
+  `MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`（这一族以前在本机是 2/4）。
+  这结案的是 BACKLOG 77：那两臂量不到不是产品没演，是量尺太慢。
+- 新判据 `testBandCaptureIsCheaperAndStillSeesTheMotion`（带 vs 整窗，同进程交错跑，两臂各两遍）。
+  里面有一条**位置同一性**：带的那一帧必须与整窗那一帧的同一头逐像素相同（实测 0.000）、
+  与另一头明显不同（实测 0.954）。这条存在是因为本轮真的犯过：第一版带抓到了窗口底部，
+  而四条"有没有变化"的前提全部通过（横幅撤走后下面整块列表在位移，位移也是变化）。
+- 新守卫 `testBandCaptureIsWiredIntoBothBannerArms`：两臂都声明 `captureRect`、
+  `recordFrames` 真的把 rect 传进 `Grabber`、`tick()` 真的读它、登记表两臂都是 `must_judge=true`，
+  外加一条谓词正对照（没有 `captureRect` 的合成文本必须返回 false）。
+- 登记表 `motion_floor_expectations.json` 改回严格：横幅两臂 `must_judge=true`、`thin_warnings` 清空。
+  理由写在 note 里，并且**把代价也写进去**：runner 上还没有一次带捕获的读数，
+  CI 若红在 `UNDERCOVERED` 是闸门在说真话，不是这一改坏了。
+- 新开三条账：**BACKLOG 80**（`changedFraction(band:)` 的归一化带上下颠倒 ——
+  这个文件里 7 处 `band:` 调用点量的都是镜像位置，本轮绕开、下一轮专门修）、
+  **81**（带高 48pt 没有"必须盖住横幅"的判据）、**82**（离屏帧里半透明的横幅底合成到白底上，
+  按帧量横幅对比度量的不是产品看到的那一层）。
+- 变异 M286–M294 九支全 CAUGHT：M286 把带挪回本轮我犯过的那个位置、M287 `captureRect` 变装饰、
+  M288/M289 分别打位置同一性的两边、M290 新读数退回 print、M291/M292 放回放行与把地板算成 0、
+  M293/M294 分别断一臂的接线与登记表的方向。
+- 产品代码零改动，116 张帧逐字节不变 ⇒ 不需要 `frame_baseline update`、不换装。
+
 ### Added（R56：读数有了第二条通道，而它第一次跑就救回 54 行）
 - `MotionFilmstripTests` 的 44 处 `MOTION_*` 读数全部改走新的 `emit`：
   同时 `print` 与追加 `<outDir>/motion-readings.log`（第一次整份重写、之后追加、与胶片同目录）。

@@ -812,7 +812,7 @@ final class MotionFilmstripTests: XCTestCase {
             let gaps = stride(from: 1, to: film.motionStamps.count, by: 1).map {
                 Int(((film.motionStamps[$0] - film.motionStamps[$0 - 1]) * 1000).rounded())
             }
-            print("MOTION \(scenario.name) frames=\(frames.count) "
+            emit("MOTION \(scenario.name) frames=\(frames.count) "
                 + "声明=\(Int(scenario.declaredDurationMilliseconds))ms 整卷中位=\(interval)ms "
                 + "事件内最粗=\(worstInRun.map { String(format: "%.0f", $0) } ?? "无")ms "
                 + "变化段时长=\(elapsed.map { String(format: "%.0f", $0) } ?? "无")ms 过渡帧数=\(span) "
@@ -1042,6 +1042,226 @@ final class MotionFilmstripTests: XCTestCase {
         return body.joined(separator: "\n")
     }
 
+    /// 带捕获：**便宜必须是真的，而且不能把被测的动效裁掉**（R57 / BACKLOG 77 路 a）。
+    ///
+    /// 为什么这条判据存在，而不是直接改完就宣布快了：
+    /// "捕获区域变小 ⇒ 抓帧变快"这句在本仓库是**推出来的**（R55 的面积判据），
+    /// 而推出来的东西可以在实现里静默失效 —— 最省事的一种失效是
+    /// `rect` 根本没被 `bitmapImageRepForCachingDisplay` 采纳（帧还是整窗那么大），
+    /// 于是成本没降、判据也没变，而我在台账里写"已经收窄了"。
+    /// 所以第 ① 格先判**帧的尺寸真的变小了**，再判成本，最后判信号。
+    ///
+    /// 第 ③ 格是这条改动的**代价**：视野一小，"变化的比例"就变大（分母小了）。
+    /// 那不是错（本仓库 R2 之后一直在防的恰恰是"整窗像素把动效归因给错的元素"），
+    /// 但它必须是**已知**的：所以这里断言带上的峰值不低于整窗的峰值 ——
+    /// 也就是"横幅确实在这一条带里"，而不是我猜它在。
+    ///
+    /// 两臂各跑两遍并**交错**（带→整窗→带→整窗），比较各自**最好的一遍**：
+    /// 顺序跑会让后跑那一臂背上热漂移，读出来的"便宜"里混着时间。
+    func testBandCaptureIsCheaperAndStillSeesTheMotion() throws {
+        try skipUnlessEnabledAndCapable()
+        let scenario = Scenario.noticeBannerDismiss()
+        _ = record(scenario)                       // 预卷：新窗口的头一帧要 250ms 上下（R11）
+        let bandFirst = record(scenario)
+        let fullFirst = record(scenario, fullCapture: true)
+        let bandSecond = record(scenario)
+        let fullSecond = record(scenario, fullCapture: true)
+        let band = [bandFirst, bandSecond]
+        let full = [fullFirst, fullSecond]
+
+        func medianInterval(_ film: Film) -> Double {
+            let stamps = film.motionStamps
+            guard stamps.count >= 2 else { return .greatestFiniteMagnitude }
+            let gaps = stride(from: 1, to: stamps.count, by: 1).map { (stamps[$0] - stamps[$0 - 1]) * 1000 }
+            return Self.median(gaps)
+        }
+        func peak(_ film: Film) -> Double { Self.peak(Self.deltas(film.motionFrames)) }
+        func worstGrab(_ films: [Film]) -> Double {
+            films.map { $0.worstGrabMilliseconds }.min() ?? -1
+        }
+        func medianGrab(_ films: [Film]) -> Double {
+            Self.median(films.map { $0.medianGrabMilliseconds })
+        }
+        func motionFrames(_ film: Film) -> Int { Self.transitionFrameCount(Self.deltas(film.motionFrames)) }
+        // ① 捕获区域真的生效了吗：帧的像素高度必须变小（不是"我传了个 rect"）。
+        guard let bandHeight = bandFirst.frames.first?.height,
+              let fullHeight = fullFirst.frames.first?.height,
+              let bandWidth = bandFirst.frames.first?.width,
+              let fullWidth = fullFirst.frames.first?.width else {
+            XCTFail("任何一臂都没帧 ⇒ 这条 A/B 什么都没比（是探针坏了，不是产品没动）")
+            return
+        }
+        XCTAssertLessThan(bandHeight, fullHeight,
+            "带捕获出来的帧高 \(bandHeight)px 不小于整窗的 \(fullHeight)px ⇒ rect 被忽略了，"
+                + "`captureRect` 是个装饰，而台账里会写着\u{201C}已收窄\u{201D}")
+        XCTAssertEqual(bandWidth, fullWidth,
+            "带的宽度不该变（`bannerBand` 是整宽 × 48pt）⇒ 变了就是几何写错，不是收窄")
+        // ② 便宜必须是真的。整窗那一臂的抓帧成本 R55 实测 38.7–49.7ms，
+        //    面积判据在 1/5.9 面积上量到 ~1/4.8 ⇒ 这里要求**至少省一半**，
+        //    而不是要求"像拟合说的那样省 4 倍"（拟合是推算，判据只能判已测的形状）。
+        let bandMedian = medianGrab(band)
+        let fullMedian = medianGrab(full)
+        XCTAssertGreaterThan(bandMedian, 0, "带那一臂没量到抓帧成本 ⇒ 归因会是 unmeasured，这条对账没有内容")
+        XCTAssertLessThanOrEqual(bandMedian, fullMedian / Self.bandCaptureSavingFloor,
+            "带捕获中位 \(String(format: "%.1f", bandMedian))ms，整窗 \(String(format: "%.1f", fullMedian))ms，"
+                + "只省了 \(String(format: "%.2f", fullMedian / max(bandMedian, 0.001))) 倍 ⇒ "
+                + "BACKLOG 77 路 a 的前提（缩区域能把采样变细）在这台机器上不成立，"
+                + "该改的是那条建议而不是把地板调低")
+        // ③ 信号不能被裁掉 —— 但**不能用峰值比**（本轮在这里想错了一次，值得留在注释里）：
+        //    第一版写的是"带上的峰值 ≥ 整窗的峰值"，实测 0.079 < 0.201 就红了，
+        //    看着像"带没盖住横幅"。两个理由都跟"带没盖住"无关：
+        //      · 峰值是**相邻两帧**之间变化的像素占比。采样从 44ms 变细到 9ms 之后，
+        //        同一次淡出被切成 12 小步，每一步自然比 2 大步小 —— 拿它跨臂比是拿速率比信号。
+        //      · 整窗那 0.201 里还含**横幅消失后下面整块列表的位移**（R22 量过的布局塌陷），
+        //        那部分本来就不属于这条过渡，是污染而不是信号。
+        //    ⇒ 与速率无关的前提是"**首尾之差**"：起点横幅在、终点横幅没了，
+        //    带必须装得下这份差别。地板在下面那条 `XCTAssert` 里，由本行的实测决定。
+        let bandPeak = max(peak(bandFirst), peak(bandSecond))
+        let fullPeak = max(peak(fullFirst), peak(fullSecond))
+        func beforeAfter(_ film: Film) -> Double {
+            guard let first = film.motionFrames.first, let last = film.motionFrames.last,
+                  first !== last || film.motionFrames.count > 1 else { return -1 }
+            return Self.deltas([first, last]).first ?? -1
+        }
+        // ③′ **位置同一性**：带必须就是整窗顶部那一条，而不是"某个在变的地方"。
+        //     为什么这条存在：第一版的带子抓错了位置（`isFlipped`，见 `bannerBand` 的注释），
+        //     量到的是横幅消失后**下面列表的位移**，而"有变化"那几条前提一条都没拦住
+        //     （位移也是变化）。上一版这里用的是一条颜色判据（"带里必须有警告粉"），
+        //     它被实测推翻了：横幅那层底调在我给它写的阈值下只有 r−g≈12，
+        //     而阈值写的是 >18 ⇒ 恒红，量的既不是产品也不是几何，是一个我猜的数。
+        //     ⇒ 换成不需要猜数的形状：带上的首尾差必须与"整窗顶部同高一条带"的首尾差**相等**，
+        //     带一旦挪走（底部、中部、整宽变了）这两个数立刻分家（错带实测 0.069 对 0.885，差一个数量级）。
+        let bandSpan = max(beforeAfter(bandFirst), beforeAfter(bandSecond))
+        let fullSpan = max(beforeAfter(fullFirst), beforeAfter(fullSecond))
+        let (headDiff, tailDiff) = Self.bandHeadTailDiff(bandFirst.frames.first, fullFirst.frames.first)
+        XCTAssertGreaterThanOrEqual(headDiff, 0, "两臂读不到可比的帧 ⇒ 位置同一性没比成（是探针坏了）")
+        XCTAssertLessThanOrEqual(headDiff, Self.bandMustMatchFullHeadFraction,
+            "带的那一帧与整窗那一帧的**同一头 \(bandHeight) 行**有 \(String(format: "%.3f", headDiff)) 的像素不同 ⇒ "
+                + "`captureRect` 没照它声称的那个 rect 抓（rect 变了、缓存串了、或者抓帧器换了坐标系）。"
+                + "这时候带上的任何读数都不是「横幅那一条」的读数")
+        XCTAssertGreaterThanOrEqual(tailDiff, Self.bandMustDifferFromFullTailFraction,
+            "带的那一帧与整窗**另一头** \(bandHeight) 行只差 \(String(format: "%.3f", tailDiff))（要求 ≥ "
+                + "\(Self.bandMustDifferFromFullTailFraction)）⇒ 带落在哪一头都无所谓，因为两头一模一样，"
+                + "上面那条同一性判据就成了恒真的装饰（本仓库「自适应阈值恒真」那一族）")
+        XCTAssertGreaterThan(bandSpan, 0, "带那一卷读不出首尾差 ⇒ 一帧或零帧，这条对账没有内容")
+        XCTAssertGreaterThan(fullSpan, 0, "整窗那一卷读不出首尾差 ⇒ 同上")
+        XCTAssertGreaterThanOrEqual(bandPeak, Self.minimumVisibleChange,
+            "带上的峰值低于可见地板 ⇒ 这一卷里看不见任何变化，`premise-not-visible` 会把它记成没测到")
+        XCTAssertGreaterThanOrEqual(bandSpan, Self.bandMustHoldChangeFraction,
+            "带上的首尾差只有 \(String(format: "%.3f", bandSpan))（整窗 \(String(format: "%.3f", fullSpan))）⇒ "
+                + "横幅不在这一条带里，或者它已经挪走了。这时带上的任何判定都是在量一片别的东西，"
+                + "而 `Scenario.bannerBand` 那个 48pt 常数就是错的")
+        // ④ 收窄之后必须**更能看清过程**（这才是这一改动的目的）：过渡帧数不许变少。
+        XCTAssertGreaterThanOrEqual(max(motionFrames(bandFirst), motionFrames(bandSecond)),
+                                    max(motionFrames(fullFirst), motionFrames(fullSecond)),
+                                    "带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，"
+                                        + "这一臂仍然只能记 not-run，那这条路就白走了")
+        // ⑤ 采样必须真的变细（这才是要的目的：让那一臂从 clock-coarse 变成判得到）。
+        XCTAssertLessThanOrEqual(medianInterval(bandSecond), medianInterval(fullSecond),
+            "带捕获之后整卷中位间隔没有变细 ⇒ 省下的钱没进采样率，这一臂仍然判不了")
+        emit("MOTION_BAND dismiss 带：首尾差=\(String(format: "%.3f", bandSpan)) "
+              + "整窗首尾差=\(String(format: "%.3f", fullSpan)) "
+              + "位置同一性 带vs整窗头=\(String(format: "%.3f", headDiff)) "
+              + "带vs整窗尾=\(String(format: "%.3f", tailDiff)) ｜ "
+              + "带：抓帧中位=\(String(format: "%.1f", bandMedian))ms "
+              + "峰值=\(String(format: "%.3f", bandPeak)) 过渡帧数=\(max(motionFrames(bandFirst), motionFrames(bandSecond))) "
+              + "间隔中位=\(String(format: "%.0f", medianInterval(bandSecond)))ms 帧=\(bandWidth)x\(bandHeight)px ｜ "
+              + "整窗：抓帧中位=\(String(format: "%.1f", fullMedian))ms "
+              + "峰值=\(String(format: "%.3f", fullPeak)) 过渡帧数=\(max(motionFrames(fullFirst), motionFrames(fullSecond))) "
+              + "间隔中位=\(String(format: "%.0f", medianInterval(fullSecond)))ms 帧=\(fullWidth)x\(fullHeight)px ｜ "
+              + "最慢一次抓帧 带=\(String(format: "%.1f", worstGrab(band)))ms 整窗=\(String(format: "%.1f", worstGrab(full)))ms")
+        writeStrip("dismiss-带捕获", bandFirst.motionFrames)
+        writeStrip("dismiss-整窗", fullFirst.motionFrames)
+    }
+
+    /// 带捕获必须真的接在横幅**两臂**上（R57 / BACKLOG 77 结案的另一半）。
+    ///
+    /// 为什么 A/B 那条不够：`testBandCaptureIsCheaperAndStillSeesTheMotion` 判的是
+    /// "带这件事值不值"，而它读的是**自己当场构造的**场景。哪天有人把某一臂的
+    /// `captureRect:` 删了（或新加一臂忘了传），那条 A/B 仍然全绿 —— 它比的是"带 vs 整窗"，
+    /// 不是"这一臂用没用带"。于是"横幅两臂都判得到"会安静退回一臂，
+    /// 而覆盖地板要等下一次 not-run 才报（R44 那一族就是这么发现的）。
+    ///
+    /// 不开 `CLIPBOARD_HISTORY_UI_MOTION` 门：理由与 `testMotionReadingsUseTheFileChannel` 同 ——
+    /// 它管的是接线，而 CI 的全量运行正是唯一每次都跑得到接线的地方。
+    func testBandCaptureIsWiredIntoBothBannerArms() throws {
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        // 判据本身必须**能说不**（R56 那一族：一条"什么都找不到也算过"的扫描是装饰）。
+        // 所以把它写成可喂合成文本的闭包，正对照与真场景走同一个谓词。
+        func usesBand(_ text: String) -> Bool { text.contains("captureRect: Scenario.bannerBand") }
+        XCTAssertFalse(usesBand("Scenario(name: \"x\", size: s) { store in }"),
+                       "谓词在一段**没有** captureRect 的场景构造上返回了 true ⇒ 它恒真，"
+                           + "下面两条就只是把注释抄了一遍")
+        for name in ["static func noticeBanner()", "static func noticeBannerDismiss()"] {
+            let body = region(in: source, named: name)
+            XCTAssertTrue(usesBand(body),
+                "\(name) 不再声明 captureRect ⇒ 这一臂回到整窗捕获（实测抓一帧 39.5–39.8ms、"
+                    + "整卷中位间隔 44–45ms），而登记表已经写着 must_judge=true —— "
+                    + "回到 R52 那种「两台机器都判不到」的形状，只是这次会红在 UNDERCOVERED")
+        }
+        // 接线：rect 必须真的进抓帧器，而不是被算出来又扔掉。
+        let wiring = region(in: source, named: "private func recordFrames")
+        XCTAssertTrue(wiring.contains("rect: capture"),
+                      "`recordFrames` 算出了 capture 却没传给 `Grabber` ⇒ 带捕获是装饰，"
+                          + "而 A/B 那一臂的「便宜」会变成两边一样")
+        let tickBody = region(in: source, named: "func tick()")
+        XCTAssertTrue(tickBody.contains("rect ?? view.bounds"),
+                      "`Grabber.tick` 不再使用 rect ⇒ 上面那条传进去的参数没人读，"
+                          + "两臂量的都是整窗，A/B 的全部结论作废")
+        // 登记表与这条守卫必须同向：两臂都要求判到。
+        // 找文件用**往上走**而不是"数固定层数"：第一版这里写死两层，
+        // 于是算出来的是 `ClipboardHistory/scripts/…`，守卫红在"读不到"上
+        // —— 红是对的形状（找不到必须红），但理由是我自己数错了目录。
+        // 同一个形状 `productSource(named:)` 已经在用（有界上溯，找不到就红）。
+        var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        var registryURL: URL? = nil
+        for _ in 0..<6 {
+            let candidate = dir.appendingPathComponent("scripts/motion_floor_expectations.json")
+                .standardizedFileURL
+            if FileManager.default.fileExists(atPath: candidate.path) {
+                registryURL = candidate
+                break
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        guard let found = registryURL,
+              let registry = try? String(contentsOf: found, encoding: .utf8) else {
+            XCTFail("读不到 scripts/motion_floor_expectations.json ⇒ 这条守卫没比成就红：登记表不在，"
+                + "正是「带捕获接上了但没人要求判到」那种半修状态最可能的现场")
+            return
+        }
+        for arm in ["notice-banner", "notice-banner-dismiss"] {
+            XCTAssertTrue(registry.contains("\"\(arm)\": {\n      \"must_judge\": true"),
+                "登记表里 \(arm) 不是 must_judge=true ⇒ 带捕获白做："
+                    + "判得到也没人要求它判到，掉回 not-run 时闸门不会红")
+        }
+    }
+
+    /// 判"带捕获够便宜"所需的**最小节省倍数**（整窗中位 ÷ 带中位）。
+    ///
+    /// 取 2 而不是拟合出来的 4.8：这一格要抓的是"rect 没起作用/成本与面积无关"，
+    /// 不是抓机器抖动。真数在 `MOTION_BAND` 那行里，两遍各自多少都看得见。
+    static let bandCaptureSavingFloor: Double = 2
+
+    /// 带捕获必须**装得下**这次变更的最小首尾差（本机实测 0.883 / 0.885，两遍）。
+    ///
+    /// 为什么是绝对数而不是"整窗首尾差的某个比例"：整窗那个数（实测 0.222）里含
+    /// 横幅消失后**下面整块列表的位移**（R22 量过的布局塌陷），那部分不属于这条过渡。
+    /// 拿污染当分母，等于允许"带里什么都没有"通过。0.02 留了 40 多倍余量，
+    /// 它抓的是"带整条空着"（0.00x）这一类，而不是抓抖动。
+    static let bandMustHoldChangeFraction: Double = 0.02
+
+    /// 位置同一性（③′）的两条线，本机实测：带 vs 整窗头 96 行 = 0.000，
+    /// 带 vs 整窗尾 96 行 = 0.954（同一份缓冲区逐行比，不经过 `changedFraction` 的归一化映射）。
+    ///
+    /// 为什么是**这一对**而不是"带的首尾差 ≥ 某个数"：首尾差大不代表带在横幅上 ——
+    /// 横幅撤走之后下面整块列表在位移，位移也是变化（本轮第一次的带抓在窗口底部，
+    /// 首尾差照样 0.069，四条"有变化"的前提一条都没拦住）。
+    /// 能拦住的是"带就是整窗的那一头"：同一头必须逐像素相同、另一头必须明显不同，
+    /// 两条一起才既不许带跑掉、也不许整窗两头本来就一样（那会让第一条恒真）。
+    static let bandMustMatchFullHeadFraction: Double = 0.005
+    static let bandMustDifferFromFullTailFraction: Double = 0.5
+
     /// 抓成本归因的真值表（R55 / BACKLOG 77）。
     ///
     /// ①② 用的是**本机真读数**（`.scratch/motion-audit-2/r55_motion_local.log` 里
@@ -1182,19 +1402,25 @@ final class MotionFilmstripTests: XCTestCase {
         // ① 被搜的串不能原样出现在守卫自己的文本里（R55 的 M276 就栽过一次：
         //    守卫在自己的失败消息里读到了被搜的串，于是把真调用删掉它仍然绿）。
         let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
-        let needles = ["print" + "(\"MOTION_", "print" + "(String(format: \"MOTION_"]
-        // 正对照：先证明**这把尺看得见**它要抓的东西。
-        // 没有这一格，把 `needles` 换成空数组就能让整条扫描恒绿 ——
-        // 而"扫描列表空了"恰好是这条判据最省事的坏法（本仓库记过：自适应阈值恒真）。
-        let positiveControl = ["  " + "print" + "(\"MOTION_X 1\")",
-                               "  " + "print" + "(String(format: \"MOTION_Y %@\", a))",
-                               "  emit(\"MOTION_Z 1\")"]
-        let caught = positiveControl.filter { line in needles.contains { line.contains($0) } }
-        XCTAssertEqual(caught.count, 2,
-            "正对照只抓到 \(caught.count)/2 种写法 ⇒ 这条扫描本身是坏的，"
+        // 规则要写成**两半**（R57 改的）：一行里同时出现 `print(` 与「引号 + MOTION」就是游离读数。
+        // 为什么不用一串完整字面量去列举写法：R56 那版列了两种
+        // （`print("MOTION_` 与 `print(String(format: "MOTION_`），
+        // 而**每卷逐帧读数那一行写的是 `print("MOTION \(scenario.name) …`**（MOTION 后面是空格）——
+        // 它不在列表里，于是那条最重要的读数整整一天都没进文件通道，
+        // 而守卫一直绿。**发现它靠的是去数文件里有多少行，不是靠守卫报警。**
+        // ⇒ 一条靠"列举形式"的扫描，形式一多就会漏；改成"两个必要条件同时成立"。
+        let quote = "\""
+        let readingPrefix = "MOTION"
+        let positiveControl = ["  print(" + quote + readingPrefix + "_X 1)",
+                               "  print(String(format: " + quote + readingPrefix + "_Y %@\", a))",
+                               "  print(" + quote + readingPrefix + " \(name) frames=1)",
+                               "  emit(" + quote + readingPrefix + "_Z 1)"]
+        let caught = positiveControl.filter { $0.contains("print(") && $0.contains(quote + readingPrefix) }
+        XCTAssertEqual(caught.count, 3,
+            "正对照只抓到 \(caught.count)/3 种写法 ⇒ 这条扫描本身是坏的（第 4 条是 emit，必须**不**被抓到），"
                 + "下面那句\"没有游离读数\"因此什么都没说")
         let strays = source.components(separatedBy: "\n").filter { line in
-            needles.contains { line.contains($0) }
+            line.contains("print(") && line.contains(quote + readingPrefix)
         }
         XCTAssertTrue(strays.isEmpty,
             "有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
@@ -2395,12 +2621,22 @@ final class MotionFilmstripTests: XCTestCase {
         let root: (@MainActor (HistoryStore) -> AnyView)?
         /// 换一份 store。`nil` = `makeStore()`（15 条记录、**没有**按日账本）。
         let storeFactory: (@MainActor () -> HistoryStore)?
+        /// 只抓这一块区域（R57 / BACKLOG 77 路 a）。`nil` = 整个视图。
+        ///
+        /// 为什么要有这一层：R55 量到"事件段内最粗 Nms"里 ~91% 是抓帧器自己的像素成本，
+        /// 而 R55 的面积判据又量出成本随面积**子线性**走（端到端 12.3–13.0 倍 / 面积 29.8 倍）。
+        /// ⇒ 把捕获区域收到被测元素那一条带上，是唯一一条**今天就能做**的降采样成本的路。
+        /// 代价不是零：视野变小之后，"变化的比例"会变大（分母小了），
+        /// 所以用它必须同时被 `testBandCaptureIsCheaperAndStillSeesTheMotion` 钉住
+        /// "裁掉的那部分里没有被测的动效"。
+        let captureRect: (@MainActor (NSView) -> NSRect)?
 
         init(name: String, size: NSSize,
              prepare: (@MainActor (HistoryStore) -> Void)? = nil,
              declaredDurationMilliseconds: Double = 0,
              root: (@MainActor (HistoryStore) -> AnyView)? = nil,
              storeFactory: (@MainActor () -> HistoryStore)? = nil,
+             captureRect: (@MainActor (NSView) -> NSRect)? = nil,
              _ trigger: @escaping @MainActor (HistoryStore) -> Void) {
             self.name = name
             self.size = size
@@ -2408,7 +2644,31 @@ final class MotionFilmstripTests: XCTestCase {
             self.declaredDurationMilliseconds = declaredDurationMilliseconds
             self.root = root
             self.storeFactory = storeFactory
+            self.captureRect = captureRect
             self.trigger = trigger
+        }
+
+        /// 提示条那一条带（R57）。**顶部 48pt、整宽**。
+        ///
+        /// 48pt 不是猜的：把那一帧存成 PNG（`/tmp/r57e-motion/diag-band-first.png`，
+        /// 用 `/tmp/r57scan/scan.swift` 逐行扫）—— 从画面顶边数起第 0–75 行是横幅那条
+        /// （2x ⇒ 38pt）、76–77 行是分隔线、第 78 行起才是搜索框
+        /// ⇒ 48pt 装得下横幅还余 10pt，而面积只有整窗的 1/14（96 ÷ 1346）。
+        ///
+        /// 为什么要写 `isFlipped` 这一层（本轮栽过，值得留在注释里）：
+        /// 第一版按 AppKit 的"原点在左下"写成 `y = height - 48`，
+        /// 而 `NSHostingView` 是**翻转**的（y=0 在顶上）—— 于是那条带抓到了窗口的**底部**，
+        /// 而"带里必须装得下这次变更"那条前提**照样通过**：横幅消失之后下面整块列表在位移，
+        /// 位移也是变化。⇒ 拦得住这件事的不是"有没有变化"，而是
+        /// `testBandCaptureIsCheaperAndStillSeesTheMotion` 里那对**位置同一性**判据
+        /// （带必须逐像素等于整窗的那一头、且不等于另一头）。
+        /// 中间那一版在这里写过一条颜色判据（"带里必须有警告粉"），它被实测推翻了：
+        /// 横幅那层 `Color.orange.opacity(0.12)` 在预乘缓冲区里 r 只有 31，
+        /// 而我写的阈值是 r>60 且 r−g>18 ⇒ 恒红。判一个自己没量过的色号，不叫判据。
+        @MainActor static func bannerBand(view: NSView) -> NSRect {
+            let height = min(48, view.bounds.height)
+            let y = view.isFlipped ? 0 : max(0, view.bounds.height - height)
+            return NSRect(x: 0, y: y, width: view.bounds.width, height: height)
         }
 
         /// 实例方法而不是 `static let`：闭包不是 `Sendable`，静态存储会被 Swift 6 判成共享可变状态。
@@ -2434,7 +2694,12 @@ final class MotionFilmstripTests: XCTestCase {
                      prepare: { store in
                          store.reportPasteFailure("系统未授权本 App 控制「System Events」，无法自动粘贴。")
                      },
-                     declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerOut) * 1000) { store in
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerOut) * 1000,
+                     // R57：整窗那一臂抓一帧 39.5–39.8ms（R55 的归因：抓帧解释了 91% 的间隔），
+                     // 而这条过渡声明只有 120ms ⇒ 判不了。收到顶部那条带之后实测
+                     // 4.4–4.6ms 一帧、过渡帧数 10–11（`.scratch/motion-audit-2/r57_motion_readings.log`），
+                     // 登记表里这一臂已经改回 must_judge=true。
+                     captureRect: Scenario.bannerBand) { store in
                 store.dismissPasteFailure()
             }
         }
@@ -2465,7 +2730,13 @@ final class MotionFilmstripTests: XCTestCase {
             Scenario(name: "notice-banner", size: NSSize(width: 760, height: 560),
                      // 横幅插入走 .bannerIn（`ContentView.swift` 那句
                      // `.animation(MotionCatalog.animation(for: .bannerIn), value: noticeSignature)`）。
-                     declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerIn) * 1000) { store in
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .bannerIn) * 1000,
+                     // R57：整窗 1520×1346px 抓一帧实测 39.5–39.8ms（R55 也在 38.7–49.7 这个量级），
+                     // 而这条过渡声明只有 150ms ⇒ 采样粗细是被捕获面积决定的，不是产品。
+                     // 收到顶部那一条带（1520×96px，面积 1/14）之后同一卷 4.4–4.6ms、
+                     // 过渡帧数 10–13（`testBandCaptureIsCheaperAndStillSeesTheMotion` 当场对账，
+                     // `testBandCaptureIsWiredIntoBothBannerArms` 钉住"这一臂确实用了带"）。
+                     captureRect: Scenario.bannerBand) { store in
                 store.reportPasteFailure("系统未授权本 App 控制「System Events」，无法自动粘贴。")
             }
         }
@@ -2621,6 +2892,12 @@ final class MotionFilmstripTests: XCTestCase {
         /// 而那些场景不经过新的预卷循环时也不该被这条新闸门误伤。
         var clockIsWarm: Bool = true
 
+        /// 这一卷抓帧成本的**中位数**（ms）。−1 = 没量。
+        ///
+        /// 为什么与 `worst` 一起带出来（R57）：A/B 比的是"整条带的常态成本 vs 整窗的常态成本"，
+        /// 只看最慢那一次会被冷首帧主导（`heat-first-record` 就是中位 1.5ms / 最慢 255ms）。
+        var medianGrabMilliseconds: Double = -1
+
         /// 这一卷里**最慢的一次抓帧**花了多少毫秒（`cacheDisplay` 那一段）。
         ///
         /// 默认 −1 = "没量"（不是"抓帧不花钱"）：那些不经过 `recordFrames` 的夹具构造点
@@ -2712,13 +2989,17 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
-    private func record(_ scenario: Scenario) -> Film {
+    /// `fullCapture: true` 强制抓整窗（R57 的 A/B 要用：同一场景、同一进程，
+    /// 一条带与整窗各跑一遍）。默认 `false` = 用场景自己声明的捕获区域。
+    /// 为什么不是"改场景再跑"：那会让两臂的 store/prepare 也一起变，
+    /// 差值就不只属于"捕获区域"这一个变量（本仓库 A/B 的规矩：同一台机器同一段时间，只动一件事）。
+    private func record(_ scenario: Scenario, fullCapture: Bool = false) -> Film {
         let store = scenario.storeFactory?() ?? makeStore()
         scenario.prepare?(store)
-        return recordFrames(scenario, store: store)
+        return recordFrames(scenario, store: store, fullCapture: fullCapture)
     }
 
-    private func recordFrames(_ scenario: Scenario, store: HistoryStore) -> Film {
+    private func recordFrames(_ scenario: Scenario, store: HistoryStore, fullCapture: Bool = false) -> Film {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: scenario.size.width, height: scenario.size.height),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -2729,7 +3010,9 @@ final class MotionFilmstripTests: XCTestCase {
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.45))
 
-        let grabber = Grabber(view: host, limit: 30)
+        // R57 / BACKLOG 77 路 a：只抓被测元素那一条带。`fullCapture` 是 A/B 的另一臂。
+        let capture = fullCapture ? nil : scenario.captureRect?(host)
+        let grabber = Grabber(view: host, limit: 30, rect: capture)
 
         // 抓帧的时钟就是**这个自旋循环本身**：runloop 每醒一次抓一张。
         //
@@ -2788,6 +3071,7 @@ final class MotionFilmstripTests: XCTestCase {
                      Int(scenario.declaredDurationMilliseconds)))
         return Film(frames: grabber.frames, stamps: grabber.stamps,
                     triggerFrame: triggerFrame, clockIsWarm: clockIsWarm,
+                    medianGrabMilliseconds: grabber.medianGrabMilliseconds,
                     worstGrabMilliseconds: grabber.worstGrabMilliseconds)
     }
 
@@ -2812,6 +3096,43 @@ final class MotionFilmstripTests: XCTestCase {
         let pixels: [UInt8]
         let width: Int
         let height: Int
+    }
+
+    /// 带那一臂的一帧与整窗那一臂的同一帧，**逐行**比两个数：
+    /// 带的第 0…h 行 vs 整窗的**头** h 行、vs 整窗的**尾** h 行。
+    ///
+    /// 为什么不用 `changedFraction(band:)`：本轮实测发现那个归一化矩形是**上下颠倒**的
+    /// （`yStart = (1 - maxY) * h` 把"顶部一条"取成了"底部一条"），
+    /// 拿它当位置判据会把带量到窗口另一头去（实测：顶部带首尾差 0.884，那个函数算出来的"顶部"只有 0.071）。
+    /// 这条登记在 BACKLOG 80，修它要重算所有用过 `band:` 的旧结论，不在本轮范围内。
+    /// 这里只用**同一份缓冲区**直接比行，不经过那个映射，所以它不依赖任何朝向假设。
+    static func bandHeadTailDiff(_ band: CGImage?, _ full: CGImage?) -> (head: Double, tail: Double) {
+        guard let band, let full else { return (-1, -1) }
+        let a = raster(band), b = raster(full)
+        guard a.width == b.width, a.height > 0, b.height > a.height,
+              a.pixels.count == a.width * a.height * 4, b.pixels.count == b.width * b.height * 4 else {
+            return (-1, -1)
+        }
+        func diff(from offset: Int) -> Double {
+            var changed = 0, sampled = 0
+            var y = 0
+            while y < a.height {
+                var x = 0
+                while x < a.width {
+                    let p = (y * a.width + x) * 4
+                    let q = ((y + offset) * b.width + x) * 4
+                    let d = max(abs(Int(a.pixels[p]) - Int(b.pixels[q])),
+                                max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[q + 1])),
+                                    abs(Int(a.pixels[p + 2]) - Int(b.pixels[q + 2]))))
+                    if d > 8 { changed += 1 }
+                    sampled += 1
+                    x += 7
+                }
+                y += 7
+            }
+            return Double(changed) / Double(max(sampled, 1))
+        }
+        return (diff(from: 0), diff(from: b.height - a.height))
     }
 
     private static func raster(_ image: CGImage) -> Bitmap {
@@ -2972,22 +3293,29 @@ private final class Grabber: NSObject {
     var finished = false
     let limit: Int
     weak var view: NSView?
+    /// 只抓这一块（R57 / BACKLOG 77 路 a）。`nil` = 整个视图。
+    /// 默认 `nil` 而不是必填：那四处探针（扫光、对照臂…）量的是**整窗**的东西，
+    /// 强行给它们一个带等于把它们的视野偷换掉。
+    let rect: NSRect?
 
-    init(view: NSView, limit: Int) {
+    init(view: NSView, limit: Int, rect: NSRect? = nil) {
         self.view = view
         self.limit = limit
+        self.rect = rect
         super.init()
     }
 
     func tick() {
         ticks += 1
         let began = DispatchTime.now()
-        if let view,
-           let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
-            view.cacheDisplay(in: view.bounds, to: rep)
-            if let cg = rep.cgImage {
-                frames.append(cg)
-                stamps.append(ProcessInfo.processInfo.systemUptime)
+        if let view {
+            let target = rect ?? view.bounds
+            if let rep = view.bitmapImageRepForCachingDisplay(in: target) {
+                view.cacheDisplay(in: target, to: rep)
+                if let cg = rep.cgImage {
+                    frames.append(cg)
+                    stamps.append(ProcessInfo.processInfo.systemUptime)
+                }
             }
         }
         grabMilliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - began.uptimeNanoseconds) / 1_000_000)

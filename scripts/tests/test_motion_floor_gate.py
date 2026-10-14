@@ -101,12 +101,24 @@ class MotionFloorGateTests(unittest.TestCase):
         self.assertEqual([m for m, red in markers(facts) if red], [])
 
     def testRegisteredDriftIsGreenButVisible(self):
-        # R44 的真实形状：dismiss 掉了一臂，理由登记过 ⇒ 放行，但 FACTS 行要把它打出来。
+        """R44 那种形状在**合成清单**下仍然必须是"放行 + 打印"。
+
+        R57 之前这一格直接吃今天的清单（dismiss 登记成 must_judge=false）。
+        带捕获把成本降下来之后今天的清单收紧了（四臂全 true），
+        于是这一格开始红 —— 而它要判的事根本不是"今天的清单严不严"，
+        是"闸门支不支持'登记过的漂移就放行'这条规则"。
+        ⇒ 规则用合成清单测，今天的清单另有一格专门盯（`testRegistryIsStrictAgain`）。
+        """
+        relaxed = json.loads(json.dumps(EXPECTATIONS))
+        relaxed["arms"]["notice-banner-dismiss"]["must_judge"] = False
+        relaxed["thin_warnings"] = []
         text = log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss",
                    extra="MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms")
         facts = parse(text)
-        self.assertEqual([m for m, red in markers(facts) if red], [])
+        self.assertEqual([m for m, red in markers(facts, relaxed) if red], [])
         self.assertEqual(facts["judged"], 3)
+        # 同一条日志、今天的清单 ⇒ 必须红。这一句钉的是"红不红由清单决定，不由日志决定"。
+        self.assertIn("MOTION_FLOOR_UNDERCOVERED", [m for m, red in markers(facts) if red])
 
     def testNotRunWithoutAReasonLineIsRed(self):
         facts = parse(log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss"))
@@ -188,20 +200,23 @@ class MotionFloorGateTests(unittest.TestCase):
 
     # ---- 两份真日志：一份是"今天就是这样"，一份是"坏了要说为什么" ----
 
-    def testRealLocalLogIsGreenButThin(self):
-        """本机那份真日志：R52 之后它**不再红**，但必须打一行 THIN。
+    def testRealLocalLogIsRedUnderTheTightenedRegistry(self):
+        """本机那份真日志（R46 抓的，带捕获之前）今天**必须红，而且只红在地板上**。
 
-        红过的两处现在都在登记之内：`notice-banner` 的 `premise-not-visible`
-        与 `notice-banner-dismiss` 的 `clock-coarse-in-window`（理由与毫秒数抄在清单的 note 里），
-        而地板从 3 降到 2（`must_judge` 只剩 detail-kind-change 与 empty-state），judged=2 够。
-        **这一格不是把红改成绿就完事**：THIN 那一行必须出现，否则"横幅这一族今天一臂都没被看"
-        就没人知道 —— 红留给新形状，薄留给一行字。
+        形状换了三轮，这里把三轮都留下：
+          · R46–R51：`notice-banner` 的 `premise-not-visible` 不在允许列表里 ⇒ BAD_REASON + UNDERCOVERED；
+          · R52：把两臂登记成"可以判不到" ⇒ 同一份日志变成**绿 + THIN**；
+          · R57：`captureRect` 把抓一帧从 39.6ms 打到 4.5ms ⇒ 两臂今天判得到，清单改回必须判到，
+            于是这份**旧**日志重新变成红，且只红在 UNDERCOVERED（judged=2 < 地板 4）。
+        理由那两格不再红是因为理由都登记过 ⇒ 这一格同时钉住"红只该来自地板"，
+        而不是"清单一改就到处冒红"。
         """
         facts = parse(LOCAL_RUNNER_LOG)
-        marks = markers(facts)
-        self.assertEqual([m for m, red in marks if red], [],
-                         "本机真日志的红变了形状 ⇒ 登记又与实际脱节了：%s" % [m for m, r in marks if r])
-        self.assertIn("MOTION_FLOOR_THIN", [m for m, _ in marks])
+        reds = [m for m, red in markers(facts) if red]
+        self.assertEqual(reds, ["MOTION_FLOOR_UNDERCOVERED"],
+                         "本机真日志的红变了形状 ⇒ 要么清单又漂了，要么闸门判错了：%s" % reds)
+        self.assertEqual([m for m, _ in markers(facts) if m.startswith("MOTION_FLOOR_THIN")], [],
+                         "清单收紧之后 THIN 这一族已经没有入口了；它还在说明 thin_warnings 没清空")
 
     def testSilentRunnerLogRedsAndNamesTheSkips(self):
         """run 38543090198：整族一条读数都没打。红 + **必须把 skip 原因打出来**。
@@ -250,11 +265,20 @@ class MotionFloorGateTests(unittest.TestCase):
                             "%s 被放行却没写是哪次运行/哪份夹具逼的 ⇒ 登记成了口头承诺" % name)
 
     def testThinWarningNeedsARegisteredReasonForEachAbsentArm(self):
-        """THIN 只放行"理由在登记之内"的缺席；换一种坏法仍然要红（不许用 THIN 兜底）。"""
+        """THIN 只放行"理由在登记之内"的缺席；换一种坏法仍然要红（不许用 THIN 兜底）。
+
+        R57 之后今天的清单里没有 thin_warnings 条目了（四臂都必须判到），
+        所以这一格换成**合成清单**：规则要能被测，哪怕今天没人用它。
+        """
+        relaxed = json.loads(json.dumps(EXPECTATIONS))
+        for arm in ("notice-banner", "notice-banner-dismiss"):
+            relaxed["arms"][arm]["must_judge"] = False
+        relaxed["thin_warnings"] = [{"arms": ["notice-banner", "notice-banner-dismiss"],
+                                     "points_to": "BACKLOG 77", "note": "合成"}]
         text = log("MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,notice-banner-dismiss",
                    extra="MOTION_NOT_RUN=something-never-seen notice-banner：换了种坏法\n"
                          "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：x")
-        marks = markers(parse(text))
+        marks = markers(parse(text), relaxed)
         self.assertIn("MOTION_FLOOR_BAD_REASON", [m for m, red in marks if red])
         self.assertIn("MOTION_FLOOR_THIN", [m for m, _ in marks])
 
@@ -271,11 +295,30 @@ class MotionFloorGateTests(unittest.TestCase):
         self.assertTrue(any(spec["must_judge"] for spec in EXPECTATIONS["arms"].values()),
                         "一条 must_judge 都没有 ⇒ 地板是 0，这条闸门就是装饰")
 
+    def testRegistryIsStrictAgain(self):
+        """R57 把两臂的 must_judge 改回 true，这一格不许它悄悄滑回去。
+
+        为什么单独一格：R52 那次放宽是**有证据的**（两台机器都分辨不了），
+        而放宽的代价是地板从 4 降到 2 —— 一条只判到 2/4 的闸门，
+        与"今天到底验了几条"这句话一起变得没有分量。
+        今天修的是原因（捕获面积 ⇒ 成本），不是症状，所以清单必须跟着收紧。
+        哪天又要放宽，note 里得写新的 run 号/毫秒数（`testExpectationsCoverExactlyTheScenarioList`
+        那条"must_judge=false 必须登记允许的理由"仍然在守着）。
+        """
+        for arm in ("notice-banner", "notice-banner-dismiss"):
+            self.assertTrue(EXPECTATIONS["arms"][arm]["must_judge"],
+                            "%s 又被放宽了 ⇒ 地板会悄悄降到 2，而带捕获之后今天没有放宽的理由" % arm)
+        self.assertEqual(EXPECTATIONS["thin_warnings"], [],
+                         "thin_warnings 还留着条目 ⇒ 有一族'两个都不判到只警告'的口子没关")
+        self.assertEqual(len([a for a, s in EXPECTATIONS["arms"].items() if s["must_judge"]]), 4,
+                         "四臂全该必须判到")
+
     def testGateExitCodeFollowsTheReds(self):
         with tempfile.TemporaryDirectory() as folder:
             green = os.path.join(folder, "green.log")
             with io.open(green, "w", encoding="utf-8") as handle:
-                handle.write(LOCAL_RUNNER_LOG)      # R52 之后：本机真日志是"绿 + THIN"
+                # R57 之后"绿"必须是四臂全判到 —— 本机那份旧日志今天该红（见上）。
+                handle.write(log("MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-"))
             red = os.path.join(folder, "red.log")
             with io.open(red, "w", encoding="utf-8") as handle:
                 handle.write(RUNNER_SILENT_LOG)     # 整族没读数 ⇒ 红

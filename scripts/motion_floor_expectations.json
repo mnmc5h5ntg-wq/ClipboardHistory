@@ -8,21 +8,32 @@
     "清单外的臂 not-run ⇒ 红；理由不在登记里 ⇒ 红；not-run 却连一行 MOTION_NOT_RUN 都没有 ⇒ 红。",
     "**不登记帧数**：`MOTION_SUMMARY <arm>=<帧数>` 那个数由采样相位决定，",
     "R2 实测同一份代码本机跑过 2/3/2（原始记录在 MotionFilmstripTests.changedRunElapsedMilliseconds 开头）。",
-    "拿它当判据就是判采样，不是判产品。"
+    "拿它当判据就是判采样，不是判产品。",
+    "R57：两臂的 must_judge 从 R52 的 false 改回 true（带捕获把成本降下来了），thin_warnings 清空 —— 那条『两臂同时判不到只警告』的形状今天不再需要，留着它就等于把修好的洞留在那儿等人掉回去。"
   ],
-  "scenarios": ["notice-banner", "notice-banner-dismiss", "detail-kind-change", "empty-state"],
+  "scenarios": [
+    "notice-banner",
+    "notice-banner-dismiss",
+    "detail-kind-change",
+    "empty-state"
+  ],
   "arms": {
     "notice-banner": {
-      "must_judge": false,
+      "must_judge": true,
       "stale_if_judged": false,
-      "allowed_not_run_reasons": ["clock-coarse-in-window", "premise-not-visible"],
-      "note": "R46 登记时写的是 `must_judge=true`，理由是「runner 上 R42/R42b/R43/R44 四次全部判到」。R52 把这条改成放行，因为**这句话已经被实测推翻了两次**：run 38538371464（R49）`judged=2/4 not-run=notice-banner,notice-banner-dismiss`，理由 `clock-coarse-in-window`，事件段内最粗 76ms 而这条过渡声明 150ms（门槛 0.5×声明=75ms ⇒ 差 1ms 就落进判不到）；run 38543812477（R51 更正）`judged=3/4 not-run=notice-banner`，同一个理由。本机这一臂一直是 `premise-not-visible`（首尾逐像素相同，见 fixtures/r46_motion_local.log）。**登记的是测量，不是愿望**：这台机器今天分辨不了它，硬要它判到只会得到一条每天重复的红（R39 那一族）。代价写进 BACKLOG 77：这一族的覆盖现在只剩 dismiss 一条臂，两臂同时缺席时闸门会打 MOTION_FLOOR_THIN。"
+      "allowed_not_run_reasons": [
+        "clock-coarse-in-window",
+        "premise-not-visible"
+      ],
+      "note": "R46 登记 must_judge=true → R52 按实测改成放行（两台机器都分辨不了：runner 事件段最粗 73–76ms、本机 premise-not-visible）→ R57 又改回 true，因为放行它的那个原因被修掉了：`Scenario.captureRect` 把这一臂的捕获区域从整窗（1520×1346px）收到顶部那条带（1520×96px，面积 1/14），抓一帧的中位成本 39.5–39.8ms → 4.4–4.6ms（≈9 倍），整卷中位间隔 44–45ms → 9–10ms，本机三次连续跑全部 judged=4/4 not-run=-、这一臂 10–13 帧过渡（证据 .scratch/motion-audit-2/r57_motion_readings.log；带的位置由逐像素同一性钉住：带 vs 整窗头 96 行 = 0.000、vs 尾 = 0.954）。登记是测量不是愿望：测量变了，登记就得跟着变回去。**代价也写清楚**：runner 上还没有一次带捕获的读数 —— 若 CI 红在 UNDERCOVERED，那是闸门在说真话（R55 那次 NO_RESOLVE 就是同一族），下一步是把 runner 的读数抄进来或走 BACKLOG 77 路 b，而不是把这条改回放行。允许的理由仍留在表里，但 must_judge=true 之后它不再构成放行 —— 判不到就是 UNDERCOVERED。"
     },
     "notice-banner-dismiss": {
-      "must_judge": false,
+      "must_judge": true,
       "stale_if_judged": false,
-      "allowed_not_run_reasons": ["clock-coarse-in-window"],
-      "note": "会随采样漂：R42/R42b/R43 判到，R44 没判到（run 38514753036）。登记的这条理由是 R46 本机实测（/tmp/motion-local.log：事件内最粗 101ms 一帧、整段过渡声明 120ms，门槛 0.3×声明）。runner 上若换了别的理由，闸门会红在 BAD_REASON —— 那是想要的：把打印出来的理由抄进来，而不是把这条改成放行一切。既不要求它判到、也不因为判到而喊 stale，正是为了不制造恒红（R39 那一族）。"
+      "allowed_not_run_reasons": [
+        "clock-coarse-in-window"
+      ],
+      "note": "R46 true → R52 因『会随采样漂』改成放行 → R57 改回 true：带捕获之后本机三次跑这一臂都是 10–11 帧过渡、judged=4/4 not-run=-（同一份 A/B 里整窗捕获只有 3–4 帧，见 r57_motion_readings.log 的 MOTION_BAND 行）。clock-coarse-in-window 留在允许列表里只为了『换了别的理由要红在 BAD_REASON』，不再是为了放行。runner 上若又漂回去，那正是要红的时候 —— 今天它有便宜的修法了（BACKLOG 77 已结案）。"
     },
     "detail-kind-change": {
       "must_judge": true,
@@ -37,11 +48,5 @@
       "note": "R42/R44 都判到 ⇒ 要求判到。"
     }
   },
-  "thin_warnings": [
-    {
-      "arms": ["notice-banner", "notice-banner-dismiss"],
-      "points_to": "BACKLOG 77",
-      "note": "横幅这一族的两臂**同时**判不到时打一行 MOTION_FLOOR_THIN（不红）。为什么不红：两台机器今天都做不到 —— 声明 150/120ms，而事件段内最粗的一次采样实测 runner 73–76ms、本机 96–101ms，都粗过 0.5×声明这条分辨率线；拿它当硬门得到的是一条每天重复、且没有人能今天就修的红（R39 那一族）。为什么要打：不写下来，「横幅的进入与撤走没有被看过」就会变成没人知道的常态，而这条判据存在的全部理由就是 R16 那次『只有一臂在演的过渡等于没有过渡』。红仍然留给新形状：换了理由、清单外的臂、少了一臂的键。"
-    }
-  ]
+  "thin_warnings": []
 }
