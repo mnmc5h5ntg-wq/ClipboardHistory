@@ -196,6 +196,18 @@ final class ApplicationShell {
         // 1. 复制到剪贴板
         copyHistoryEntry(entry)
 
+        // 1b. **复制没成功就到此为止**（R40 / U-66）。修前这一步整个不存在：
+        //     下面照样 activate 目标应用、照样注入 ⌘V，于是目标应用粘出来的是
+        //     用户剪贴板里**原来**那条无关内容 —— 比"什么都没发生"糟，而且一句话都没说
+        //     （`clipboardWriteErrorMessage` 全仓唯一的显示消费者是详情区那颗按钮）。
+        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.clipboardWriteErrorMessage) {
+        case .pasteNow:
+            break
+        case .cancel(let reason):
+            reportPasteOutcome(reason)
+            return
+        }
+
         // 2. 用 Process+osascript 执行 ⌘V（CGEvent.postToPid 在 macOS 15 上被阻止）
         let previousApp = NSWorkspace.shared.runningApplications
             .first { $0.isActive && $0.bundleIdentifier != Bundle.main.bundleIdentifier }

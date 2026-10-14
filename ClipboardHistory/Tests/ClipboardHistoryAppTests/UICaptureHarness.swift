@@ -89,6 +89,11 @@ final class UICaptureTests: XCTestCase {
     static let materialBlindSpotFixtures: Set<String> = [
         "content-with-history", "content-min", "content-wide", "content-with-notice",
         "content-with-two-notices",
+        // R40 新加的这张走的是**同一个** `ContentView`，读数与两张姐姐帧逐字相同
+        // （亮暗都是 `transparent=50.7% blackBandPt=66 bottomInk=0.1%`，姐姐帧 46.3% / 66 / 0.1%）
+        // ⇒ 同一处离屏伪影（侧栏选中行画成一整块纯黑），不是新缺陷。加名单前先看了那张帧：
+        // 横幅本身完好（红底、两行、"知道了"垂直居中、无截断），黑的是左下侧栏那一行。
+        "content-with-copy-failure-notice",
         "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
     ]
 
@@ -1345,6 +1350,29 @@ final class UICaptureTests: XCTestCase {
         twoNoticeStore.addDroppedFiles(urls: [URL(string: "https://example.com/远程图.png")!])
         results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: twoNoticeStore))
+        })
+        // R40：**复制失败**那句回执必须放得下（U-66 / D-099）。
+        //
+        // 为什么要为一句新文案单开一张帧：这条链路的回执是**拼出来的**（"复制到剪贴板失败："
+        // + 系统错误原文 + 一句安抚），长度不由设计方控制 —— 系统错误描述可以是很长的一句英文。
+        // R28 已经为"说明文字被截断"红过一次，而那次的教训是：**只有帧能证明一句话放得下**，
+        // 读代码看不出换行与截断。
+        // 文案不是夹具手写的，而是从产品那个生产者 `CopyThenPaste.decide` 取的：
+        // 以后有人改措辞或把它拼长，这张帧自己会红，而不是等用户看到半句话。
+        let copyFailureDecision = CopyThenPaste.decide(
+            copyErrorMessage: "The operation couldn’t be completed. (NSOSStatusErrorDomain error -100.)")
+        let copyFailureNotice: String
+        if case .cancel(let reason) = copyFailureDecision {
+            copyFailureNotice = reason
+        } else {
+            // 走不到（这一臂必然给回执）。真走到了就是产品改语义而这条夹具会**显式**坏在画面里，
+            // 而不是悄悄拍到一张"看起来正常"的帧 —— 形状由 `testCopyThenPasteTruthTable` 判。
+            copyFailureNotice = "⟨CopyThenPaste 没给出回执 ⇒ 夹具坏了，见 testCopyThenPasteTruthTable⟩"
+        }
+        let copyFailureStore = makePopulatedStore()
+        copyFailureStore.reportPasteFailure(copyFailureNotice)
+        results.append(Fixture("content-with-copy-failure-notice", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: copyFailureStore))
         })
         // **组件帧必须摆成产品那一套**（R24 / BACKLOG 36）。
         //
@@ -4035,6 +4063,7 @@ final class UICaptureTests: XCTestCase {
     static let noticeTextFixtures: [(name: String, minBands: Int)] = [
         ("content-with-notice", 1),
         ("content-with-two-notices", 2),
+        ("content-with-copy-failure-notice", 1),
         ("notice-banner", 2),
     ]
 

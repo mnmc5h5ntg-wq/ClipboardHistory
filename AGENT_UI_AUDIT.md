@@ -2762,3 +2762,106 @@ R37（量级地板在 runner 上 9.3%）同一族，**第三次犯**。差别只
 本轮的改动只会**新增**标记（两条新探针 × 两档 + 未运行的两档），不可能少 35 条。
 两种解释都还没证（计数来源换了 / 某批 NOT-RUN 打印路径不再走到），所以记 BACKLOG 57：
 先复现再解释，在此之前这两个数字不许被当成同一把尺比较（U-62 的口径版）。
+
+---
+
+## 第 42 轮 · R40：复制失败之后，那一下 ⌘V 粘的是**别的东西**（U-66 / D-099）
+
+### 开场缺陷清单（坐标）
+
+R39 换装之后没有立刻开新的一把尺，而是把上一轮的问法**复用**了一遍：
+"用户做了动作，它失败了，界面说了什么？" 全仓过一遍，清单落在
+`.scratch/motion-audit-2/silent-failures-survey.md`（15 条，逐条标了"已修 / 已核 / 未核"，
+**未核的不许当缺陷修** —— R34 的 U-56 就是拿没复核的推断去改，方向改错了）。
+
+两条最高频的，本轮一起修：
+
+| 位点 | 用户动作 | 修前发生什么 |
+|---|---|---|
+| `HistoryStore.writeToClipboard` catch（:986） | 双击侧栏行 / 浮层回车 / 菜单栏点一条 / ⌘R 再次复制 | 失败只置 `clipboardWriteErrorMessage`，而**全仓唯一的显示消费者是详情区那颗按钮**（`DetailView:123`）⇒ 其余三条入口完全静默 |
+| `ApplicationShell.copyAndPasteEntry`（:195） | 浮层回车、菜单栏点一条（= 复制并自动粘贴） | 第一步的结果**没人看**：照样切前台、照样注入 ⌘V ⇒ 目标应用粘出来的是用户剪贴板里**原来**那条无关内容 |
+
+第二行是本轮真正的收获：**这不是"没提示"，是"做了错的事"**。
+用户以为粘的是刚选的那条，实际粘的是上一条无关内容 —— 而界面一句话都没有。
+
+### 修法：一道闸门 + 一句人话，走仓库里已有的那条通道
+
+新增 `Utilities/CopyThenPaste.swift`：`decide(copyErrorMessage:) -> .pasteNow | .cancel(reason:)`。
+`copyAndPasteEntry` 在复制之后、切前台之前咨询它，失败就直接 return（不 activate、不注入），
+并把回执走**已有**那条横幅通道（`reportPasteFailure` → `pasteFailureNotice` → `ContentView` 的 `NoticeBanner`）。
+没有新造控件、没有新造语言 —— 同一条链路上"目标应用已切换"那两种取消，本来就是这句写法（B-6 / R2-12）。
+
+为什么"nil 就是这次成了"要单独做成纯函数：它依赖 `writeToClipboard` 成功时把错误清成 nil 这个约定。
+约定不钉住的话，哪天有人删掉那行清理，这道闸门会**静默变成永远放行**。
+
+### 判据（4 条，全从产品入口进）
+
+- `testCopyFailureCancelsTheAutoPasteAndSaysSo`：**管线级** —— 注入失败的 `TestClipboardWriter`
+  + 计数的 `FakePasteKey`，调 `shell.copyAndPasteEntry(entry)`，跑过那两段延迟（0.1 + 0.15 秒）之后
+  断言 `key.calls == 0`（一次都没按）且横幅里出现那句回执，且回执**不含条目原文**（隐私）。
+- `testCopySuccessIsNotBlockedByTheNewGate`：另一臂，断言"走到了下一步"而不是"没报错"。
+  这一臂是变异 **M186 逼出来的**：第一版只断言"没被报成复制失败"，
+  而把闸门方向反过来的实现会在成功那一支直接 return —— 既没按键也没提示，
+  旧断言照样成立 ⇒ **正常路径整个被挡掉却全绿**。现在要求"要么真注入了，要么被目标复核取消"。
+- `testCopyThenPasteTruthTable`：两格都钉，且钉方向（只钉"失败要取消"的话，
+  `guard copyErrorMessage != nil` 这种反了的实现两格全过）。
+- `testCopyAndPastePathConsultsTheGate`：接线守卫（辅助）。**顺序**也判 —— 闸门必须在注入之前。
+
+### 真实视觉审查
+
+新帧 `content-with-copy-failure-notice`（750×560，亮暗两张，110 张基线）。
+文案**不是夹具手写的**，而是从产品那个生产者 `CopyThenPaste.decide` 取的 ——
+以后有人把它拼长，这张帧自己会红（R28 那次"说明文字被截断"就是这么漏掉的）。
+
+- 亮档看下来：红底横幅、⚠ 图标、正文两行完整、"知道了"垂直居中、没有截断 ⇒ 这条横幅本身合格。
+- 同一次捕获里这张帧报了 `blackBandPt=66`（纯黑带），第一次撞了 R18 那道材质盲区闸。
+  先看了帧、再对了两张姐姐帧的读数：`content-with-notice` 50.7%/66/0.1%、
+  `content-with-two-notices` 46.3%/66/0.1%、新帧 50.7%/66/0.1% ⇒ **同一处离屏伪影**
+  （侧栏选中行画成一整块纯黑），黑不在横幅上。按规矩登记进 `materialBlindSpotFixtures`，
+  没有为了让它绿而放宽那道闸。
+
+### 本轮查出、**没**在本轮修的（BACKLOG 58 / 59 / 60）
+
+- **58**：回执里直接嵌着系统错误原文 —— 帧上那句是
+  "复制到剪贴板失败：The operation couldn't be completed. (NSOSStatusErrorDomain error -100.)"。
+  中英混排、用户读不懂、也没告诉他下一步。仓库里**已有**成例：
+  `SystemEventsPasteKey.reason(fromStderr:)` 会把 `-1743` 映射成指向「自动化」授权页的人话。
+  下一轮把同样的映射接到复制这条路上。
+- **59**：`HistoryStore` 保存失败（:1058）与后台写盘（`HistoryPersistence:470`）仍然静默
+  —— 列表照旧显示，重启后整片回滚。普查里第 3 条，**未逐行复核**，所以先记账不动。
+- **60**：静默失败普查里其余 12 条（只读模式之后每次写盘被跳过、菜单栏"清空未收藏"没有回执、
+  导出失败与"导出 N 条"两条横幅互相矛盾、热图账本损坏时文案是假的、上下文权限开关显示与实际脱钩…）
+  全部标着"未核"，逐条复核后再决定修不修。
+
+新帧的读数（`testNoticeBodyTextStaysReadable`，单跑一次才拿到）：
+`NOTICE_TEXT content-with-copy-failure-notice light bands=1 y52-102 ratio=12.98 ink=14.9%`
+⇒ 一条带、正文对底色 12.98:1（地板 4.5）、带内墨占比 14.9%（地板 2%）——
+横幅本身是合格的，被登记的只有侧栏那一行。
+
+**顺带一条自己踩的仪器坑（记下来，因为它差点让我写下一条假账）**：
+我跑全量时写的是 `swift test 2>&1 > file`，这个重定向顺序是错的
+（`2>&1` 先把 stderr 接到**当时**的 stdout=终端，之后 stdout 才转向文件），
+于是 `NOTICE_TEXT` 这些打印一个都没进文件。我据此差点写下"新帧注册了但没被测到"。
+单跑一次（同样的命令形状、只跑这一条）才看到它其实判了 4 条帧、打印齐全。
+⇒ 规矩：**"读不到"要先证明读的方法成立**（同一把尺在已知值上打一次），
+这条在账本里已经是第四次用了（R36 的探针自检、R38 的 identity、R39 的裁剪分母、这次的重定向）。
+
+### 换装本机（10:26）与一条**自我否定**的自检
+
+`make bundle` 0 告警 → 装到 `/Applications/时间剪史.app`（md5 与新包一致 `bca24fa3…`）→
+`codesign --verify --deep --strict` 通过 → 冷启动冒烟 `SMOKE_OK=1`（退出码 -15，冒烟自己 terminate 的）→
+应用已运行（pid 20846）。
+
+**我试图用 `pbcopy` 验"采集没被我改坏"，两次都失败，而失败的是我的仪器不是产品**：
+`printf … | pbcopy` 之后 `history.json` 与 `daily-copy.json` 的 mtime 都没动，
+而紧接着的 `pbpaste` 回读是**空的** ⇒ 这个 agent shell 的 `pbcopy` 写不通向 GUI 会话的通用剪贴板。
+所以那两次"没采集"是假阴性，**不能**当结论；同时我另起的那个带临时目录的实例
+被第二实例守卫静默中止（`pgrep` 只剩一个进程），这正是 R39b 记的 BACKLOG 55 又演了一遍。
+⇒ 复制/粘贴这条链路的真机验证只能由用户做（人工批次 42.1 / 42.3），账本里不许写"已验采集"。
+
+### 验证
+
+723 tests / 29 skipped / **0 failures**；`swift build --build-tests` 0 告警；
+帧基线 108 → **110**（`CHANGED=0 / ADDED=2`，同 commit update）；脚本 83 全绿；
+变异 **M185–M188** 四支全 CAUGHT、红得对 4/4、`RESTORE_CLEAN=yes`
+（M186 第一版"红得不对"，抓出的正是上面那条判据太弱 —— 已按 U-65 的规矩实测后才写预期）。
