@@ -1292,6 +1292,13 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     （只有 AppKit 那条快速选择浮层有 `scrollRowToVisible`，`QuickPickController.swift:253`）
     ⇒ 下一轮先做 spike（把 `ScrollViewReader` 套进侧栏的 `List(selection:)` 会不会破坏侧栏样式/多选），
     再决定动不动。
+    **动之前还有一件事要先证**（R60 记，别跳过）：`HistorySidebarView.swift:243` 那段注释写着
+    换到 `List(selection:)` 之后"滚动跟随"由系统负责 —— 如果那是真的，那两张帧里选中行出视口
+    就是**夹具/离屏通道**的产物（帧是 `NSHostingView` + `cacheDisplay` 拍的，滚动可能根本没跑），
+    而不是产品缺陷。所以修之前要先做一次 spike：在**在屏**的宿主视图里把选中设成一条靠后的记录，
+    直接问外层 `NSScrollView.documentVisibleRect` 包不包含那一行 —— 包含就是夹具骗人，
+    这条改成"给 `content-min` 那两张帧加一条'帧里的选中行必须可见'的前提判据 + 把现象归到通道"；
+    不包含才是产品该修（`ScrollViewReader.scrollTo`）。**不许跳过这一步直接加滚动。**
 62. **「导出反馈数据」同一件事有两条通道，而失败那条又是系统英文原文（R42 复核 BACKLOG 53 时看到）· 已收口（R43 / D-102）**：
     `SettingsView:172-179` 三个分支都写 `exportMessage` **并且** `showExportAlert = true`
     ⇒ 用户既看到模态弹窗、又看到行内 `ReceiptLine`，两条说的是同一句话（模态还会抢注意力）。
