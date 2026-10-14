@@ -1177,3 +1177,40 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     **R38 已被 CI 追认**：run 38487277143 第 7 步 `CAPTURE_GATE_RESULT=ok 红=0`（闸门第一次真判）。
 
 
+
+53. **`ReceiptLine` 声明了 `.contentFade`，但 `SettingsView` 全文 0 个 `withAnimation` ⇒ 空转的动效声明（R39 查出，U-63）**：
+    `SettingsView.swift:973` 那行 `.transition(MotionCatalog.transition(for: .contentFade))`
+    只在**周围有动画驱动**时才跑；而三处回执（`exportMessage` / `archiveMessage` / `exclusionReceipt`）
+    全是裸 `@State` 赋值 ⇒ 今天它们**瞬间插入、瞬间消失**，声明等于零。
+    对照：`DetailView` 的同类状态走的是 `withAnimation(MotionCatalog.animation(for: .emphasis))` ——
+    成例在仓库里，只是这一页没做。
+    为什么本轮不修：这条改动的效果**离屏帧量不到**（中间态不在任何一张帧里），
+    而在屏胶片探针要真窗口 + 真点按钮（导出会弹 `NSSavePanel`），CI 上跑不了。
+    R9 的先例是"撤掉空转的那条"，但那次撤的是**产品里没有对应体验**的声明；
+    这一次体验是真的要变（回执插入的布局位移 R22 量过），所以处置应当是**供电**而不是撤。
+    下一步：给三处 setter 加 `withAnimation(MotionCatalog.animation(for: .contentFade))`，
+    并把"淡入到底跑没跑"交给胶片探针 + 人工批次（不许只凭源码有 `withAnimation` 就算交付）。
+54. **`.disabled` 把标签淡到 1.82:1（亮档），低于本仓库给次要文字定的地板 2.2 —— 今天不可达，所以记账不修（R39，U-63）**：
+    实测：`开机启动` 标签 启用 13.76 → 禁用 **1.82**（0.13 倍），暗档 11.43 → **2.29**（0.20 倍），
+    而暗档禁用后的"算字像素"直接读到 **0**（`textInkMinDelta = 60` 那道门过不去，肉眼仍读得清）。
+    今天这一支不可达：`SystemLoginItemManager.isSupported` 恒 `true`。
+    所以本轮只把它**量出来并写进断言消息**：如果哪天 `isSupported` 真的会返回 false
+    （比如给 macOS 12 加"没有自动化权限就判不支持"），**别用 `.disabled` 表达这个状态** ——
+    让那句回执去说明，标签保持可读。
+    同一轮还留下一条尺的读数：`TEXT_SIDE_BLIND_SPOTS` 现在是 **11 of 11** ——
+    设置族每一张帧的暗档侧栏文字都结构上量不到（合成前的 vibrancy 极性，D-090）。
+55. **守卫中止的那次启动在盘上什么都没留下 + 启动冒烟撞上它时报错原因（R39 换装时 A/B 实测，U-64）**：
+    A/B（同一份包、同一台机器，唯一变量是"还有没有另一个同 bundle 实例在跑"）：
+    有实例 ⇒ `SMOKE_OK=0 / 退出码 0`，日志里**既没有 `===== Lifecycle debug started =====`、
+    也没有 `applicationDidFinishLaunching called`、也没有守卫自己那句"本次启动取消"**，
+    只剩更晚的 `windowWillClose` / `applicationWillTerminate` 段；
+    没实例 ⇒ `SMOKE_OK=1 / 退出码 -15`，header 与启动标记都在第 1、2 行。
+    两半各修各的：
+    ① **产品侧**：`AppDelegate.swift:100` 那句早退日志**落不到盘上**（为什么它连同它之前的行一起丢 —— 机制未定位，
+       怀疑与 `LifecycleDebugLogger.reset()` 的 `sink.close()` + 紧接着的 `write()` 重开顺序有关）。
+       这条属于"早退路径要留带内部状态的日志"那一族：用户双击图标没反应时，盘上必须有一行字解释为什么。
+    ② **探针侧**：`scripts/launch_smoke.py` 在启动前应先 `InstanceGuard` 式地查一次冲突实例，
+       查到了就报 **NOT-RUN**（"这台机器上已有实例，冒烟没有对象"），而不是把探针环境问题
+       报成"启动失败"。判据本身（`evaluate`）也要能区分这两种。
+    复现命令：`open -a /Applications/时间剪史.app` 之后
+    `python3 scripts/launch_smoke.py /Applications/时间剪史.app --keep-logs`，再退出该实例跑同一条对照。

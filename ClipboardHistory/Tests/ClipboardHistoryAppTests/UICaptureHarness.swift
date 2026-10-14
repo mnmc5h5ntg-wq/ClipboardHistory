@@ -599,6 +599,126 @@ final class UICaptureTests: XCTestCase {
               + " 全出血=\(String(format: "%.1f", ink(fullBleed) * 100))%")
     }
 
+    /// 通用页那颗开关的三态：启用 / 禁用 / 失败回执（R39）。
+    ///
+    /// 目标里那句"全部状态（空/加载/错误/成功/选中/悬停/按下/聚焦/**禁用**）"，
+    /// 禁用是修前那 104 张帧里唯一一帧都没有的一档（本轮之后 108）—— 而它不是没有代码：`SettingsView:325` 有
+    /// `.disabled(!isSupported)`、`LoginItemSettings:104` 有那句"当前系统不支持…"、
+    /// 模型层三条单测都齐，视图层一个像素都没有。
+    ///
+    /// 这条判据问三件事，其中两件是**成对的**（都带负对照）：
+    /// ① 禁用必须看得见 —— 同一块标签矩形，禁用帧的最深偏离要明显比启用帧淡
+    ///    （看不见的禁用等于"能点但没反应"）；
+    /// ② 那句回执必须画得出来 —— 它那一块必须是**说明档**、不能是别的控件（标题档），
+    ///    并且比**没有回执的那张帧在同一块上多出一行说明档**；
+    /// ③ 回执那一行必须还在说明档 —— 交给 `captionInkProbes`（本轮登记两条新探针）。
+    ///
+    /// ②里那条跨帧对照为什么是"差值"而不是"没回执的帧读 0 墨"，见下面 ③ 处的记录。
+    ///
+    /// 所有读数都打出来：禁用后"到底有多淡"是要给人判断的，不是要藏在一个 ✓ 后面。
+    func testDisabledToggleAndFailureReceiptAreVisible() throws {
+        // 两个矩形都是从帧上量的（`testSettingsCaptionRowTierProfileDiagnostic` 这轮把两张新帧
+        // 也扫了）：标签带 y=117.5..129.0，它下面那句回执带 y=136.5..145.5。
+        let labelRect = CGRect(x: 150, y: 117.5, width: 200, height: 11.5)
+        let receiptRect = CGRect(x: 150, y: 136.0, width: 420, height: 10.0)
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r39-disabled-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        struct Reading {
+            let labelRatio: Double      // 标签的对比度（inkContrast，尾墨 2%）
+            let labelInk: Int           // 标签带里"算字"的像素数
+            let receiptInk: Int
+            let receiptCaption: Int     // 回执带里说明档那一档的像素数
+            let receiptTitle: Int       // 同一块里标题档的像素数（负对照要看它）
+        }
+        func read(_ name: String, _ appearance: NSAppearance.Name) throws -> Reading? {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                XCTFail("找不到夹具 \(name) ⇒ 禁用态判据失去对象"); return nil
+            }
+            let file = scratch.appendingPathComponent("\(name)-\(appearance.rawValue).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            // 读**落盘那张图**（R37 的教训：raw rep 里"没画"的像素是透明的，会把中位数抢走）
+            guard let bytes = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: bytes), let base = rep.bitmapData else {
+                XCTFail("\(file.lastPathComponent) 读不回字节"); return nil
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            func mass(_ rect: CGRect) -> Int {
+                Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                 bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
+            }
+            let profile = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                              bytesPerRow: rep.bytesPerRow, rect: receiptRect, scale: scale)
+            return Reading(
+                labelRatio: Self.inkContrast(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow, rect: labelRect, scale: scale).ratio,
+                labelInk: mass(labelRect),
+                receiptInk: mass(receiptRect),
+                receiptCaption: profile.reduce(0) { $0 + $1.caption },
+                receiptTitle: profile.reduce(0) { $0 + $1.title })
+        }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let plain = try read("settings-general", appearance),
+                  let unsupported = try read("settings-general-login-unsupported", appearance),
+                  let failed = try read("settings-general-login-failed", appearance) else {
+                print("DISABLED_STATE_NOT_RUN \(tag) 三张帧没齐 ⇒ 这一档在这一台无从判起")
+                continue
+            }
+            judged += 1
+            // ① **禁用必须看得见**：同一块标签矩形，禁用帧的对比度要明显比启用帧低。
+            //    为什么判对比度而不是"最深偏离"：暗档禁用后的标签淡到连 `isTextInk` 那道门都过不去
+            //    （本轮实测：暗档那一行的 profile 是空的）—— 那种情况下"最深偏离"根本没有值可比。
+            XCTAssertLessThanOrEqual(unsupported.labelRatio, plain.labelRatio * 0.70,
+                "\(tag)：禁用帧标签对比度 \(String(format: "%.2f", unsupported.labelRatio))，"
+                    + "启用帧 \(String(format: "%.2f", plain.labelRatio)) ⇒ 淡得不够。"
+                    + "看不出禁用的开关，用户会一直点它")
+            XCTAssertGreaterThan(unsupported.labelRatio, 1.20,
+                "\(tag)：禁用帧标签对比度只有 \(String(format: "%.2f", unsupported.labelRatio)) ⇒ 淡到与背景同色。"
+                    + "禁用不等于消失（HIG：被禁的东西仍要读得出是什么东西）—— "
+                    + "真到这一步的处置不是把线抬高，而是**别用 `.disabled` 表达这个状态**，"
+                    + "让那句回执去说明（回执本身是说明档，读数在下面一行）")
+            // ② **回执必须画得出来**（它藏在 `if let message` 后面，模型层三条单测全绿也救不了视图不显示）
+            for (name, reading) in [("settings-general-login-unsupported", unsupported),
+                                    ("settings-general-login-failed", failed)] {
+                XCTAssertGreaterThanOrEqual(reading.receiptInk, 500,
+                    "\(tag)：\(name) 的回执带只读到 \(reading.receiptInk) 个算字的像素 ⇒ 那句话没画出来")
+                XCTAssertEqual(reading.receiptTitle, 0,
+                    "\(tag)：\(name) 的回执带里读到 \(reading.receiptTitle) 个**标题档**像素 ⇒ "
+                        + "那块矩形上压着的不是回执，是别的控件（框放错，或者布局把下一行顶上来了）")
+            }
+            // ③ **负对照，相对版**：同一块矩形，有回执的帧要比没有回执的帧多出整整一行说明档。
+            //    第一版这里写的是"没有回执的那张帧读 0 墨"，本机 382 / 471 个像素直接把它推翻了：
+            //    通用页在插入那句回执时会把**下面一颗开关的标签**顶到别的位置，而没插入时那颗标签
+            //    正好压在 y=136 这一块上（同一块里还读到 971 / 1064 个**标题档**像素 ⇒ 那里住的是
+            //    标题，不是说明）。所以布局会随内容移动的矩形上，"跨帧比有没有墨"是错的问法，
+            //    正确的问法是"跨比**多出来的墨**"：回执没画 ⇒ 差值 0 ⇒ 红；
+            //    回执画了但透明/颜色与背景同 ⇒ 差值是负的 ⇒ 红。
+            for (name, reading) in [("settings-general-login-unsupported", unsupported),
+                                    ("settings-general-login-failed", failed)] {
+                XCTAssertGreaterThan(reading.receiptCaption, plain.receiptCaption + 500,
+                    "\(tag)：\(name) 的回执带说明档 \(reading.receiptCaption) 个像素，"
+                        + "没回执那张帧同一块 \(plain.receiptCaption) 个 ⇒ 只多出 "
+                        + "\(reading.receiptCaption - plain.receiptCaption) 个（要求 >500）。"
+                        + "这一行回执要么没画，要么淡到不成字")
+            }
+            print("DISABLED_STATE \(tag)：标签对比度 启用=\(String(format: "%.2f", plain.labelRatio)) "
+                  + "禁用=\(String(format: "%.2f", unsupported.labelRatio))（淡到 "
+                  + String(format: "%.2f", unsupported.labelRatio / max(plain.labelRatio, 0.01)) + " 倍）"
+                  + " 标签算字像素 启用=\(plain.labelInk) 禁用=\(unsupported.labelInk)"
+                  + "；回执带 墨(不支持/失败)=\(unsupported.receiptInk)/\(failed.receiptInk) "
+                  + "说明档=\(unsupported.receiptCaption)/\(failed.receiptCaption) "
+                  + "差值(+\(unsupported.receiptCaption - plain.receiptCaption)"
+                  + "/+\(failed.receiptCaption - plain.receiptCaption)) "
+                  + "无回执那帧同块(说明档/标题档)=\(plain.receiptCaption)/\(plain.receiptTitle)")
+        }
+        XCTAssertEqual(judged, 2, "两档外观各判一次，现在只判成 \(judged) 次 ⇒ 这条判据有一半在空转")
+    }
+
     /// 夹具图片的字节**不能**随系统外观变。
     ///
     /// 这条是给"帧基线能不能当证据"加的：本轮实测到开发机开着自动切换外观，
@@ -1038,6 +1158,32 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store))
         })
 
+        // **禁用态与失败回执**（R39）。目标里那句"全部状态（空/加载/错误/成功/选中/悬停/按下/聚焦/禁用）"，
+        // 只有**禁用**这一档在修前那 104 张帧里一个像素都没有（本轮之后 108）—— 而它不是没有代码：
+        // `SettingsView:325` 有 `.disabled(!loginItemSettings.isSupported)`，
+        // `LoginItemSettings:104` 有那句"当前系统不支持从应用内设置开机启动。"，
+        // `LoginItemSettingsTests` 三条都测过**模型层**，视图层从来没有一张帧。
+        // 更要紧的是第二张：macOS 12 走 AppleScript 那条路，而它**以前静默失败**
+        // （`executeAndReturnError` 的 error 被丢掉，脚本没生效也没人知道）⇒
+        // 用户看到的是"开关自己弹回去，一句话都没有"。R39 给它加了"写完读回"（D-098），
+        // 这张帧就是那句话第一次被画出来给人看。
+        let loginUnsupported = LoginItemSettings(
+            manager: FakeLoginItemManager(isSupported: false, isEnabled: false))
+        results.append(Fixture("settings-general-login-unsupported", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general, loginItem: loginUnsupported))
+        })
+        results.append(Fixture("settings-general-login-failed", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general, loginItem: {
+                let manager = FakeLoginItemManager(isSupported: true, isEnabled: false)
+                // 走**产品的失败路径**造这句回执，不直接伪造 `message`：
+                // 伪造会让帧证明"一个没人走过的状态长这样"，而这条路径正是本轮新加的读回检查。
+                manager.error = LoginItemSettings.Error.loginItemNotApplied
+                let settings = LoginItemSettings(manager: manager)
+                settings.setEnabled(true)
+                return settings
+            }()))
+        })
+
         // 每日复制热图（新功能 / 阶段一）：组件级两张 —— 有数据与没数据。
         // 固定 `today` 与固定计数 ⇒ 这两张帧不随日期变。
         let heatToday = Self.heatmapFixtureToday
@@ -1245,11 +1391,14 @@ final class UICaptureTests: XCTestCase {
         XCTFail("\(description)：\(timeout)s 内未成立，这一帧不能拍")
     }
 
-    private func makeSettingsView(store: HistoryStore, initialCategory: SettingsCategory? = .shortcuts) -> some View {
+    private func makeSettingsView(store: HistoryStore,
+                                  initialCategory: SettingsCategory? = .shortcuts,
+                                  loginItem: LoginItemSettings? = nil) -> some View {
         SettingsView(
             showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
             repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
-            loginItemSettings: LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
+            loginItemSettings: loginItem
+                ?? LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
             contextPreferences: ContextPreferenceSettings(),
             weightsStore: store.weightsStore,
             feedbackStore: store.feedbackStore,
@@ -1991,6 +2140,13 @@ final class UICaptureTests: XCTestCase {
         "settings-general", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
+        // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
+        // 先看了那张帧（`/tmp/r39-crops/r39-settings-general-login-unsupported-dark-sidebar.png`）：
+        // 暗档侧栏里"快捷键 / 隐私 / 推荐 / 数据 / 统计"五枚标签**黑字黑底看不见**，
+        // 而选中的"通用"是白字蓝底（强调色走固定色，不受 vibrancy 极性影响），图标也看得见。
+        // 与 R29d/R30 那张是同一个机制（D-090：合成前的极性），所以记为盲区而不是缺陷。
+        // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
+        "settings-general-login-unsupported", "settings-general-login-failed",
     ]
 
     /// 侧栏那一列"文字应当出现的位置"（pt）。
@@ -2071,6 +2227,8 @@ final class UICaptureTests: XCTestCase {
         "settings-general", "settings-shortcuts", "settings-privacy", "settings-data",
         "settings-recommendations",
         "settings-stats-populated", "sidebar-history", "detail-0-text",
+        // R39：禁用态与失败回执那两张 —— 放框要从帧上量，不照抄别处的 y
+        "settings-general-login-unsupported", "settings-general-login-failed",
         // 快速选择浮层**不在这里**：102 张基线里一张 `quickpick-*` 都没有（已记的账 BACKLOG 30 /
         // U-39 / U-41 —— 那是 AppKit 自建的 NSPanel，R19 试过把 contentView 搬进别的窗口，
         // 搬过去就塌成空壳）。列一个不存在的夹具名只会让这条诊断红成"找不到对象"，
@@ -3046,6 +3204,20 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 150, y: 200, width: 560, height: 12)),
         InkProbe(fixture: "settings-general", what: "说明段「打开后从 Word、Pages…」（富文本的代价，两行）",
                  rect: CGRect(x: 150, y: 241, width: 560, height: 26)),
+        // R39：那颗开关的**回执**（`loginItemSettings.message`）。它原来在帧里永远量不到
+        // —— 夹具不造 message，产品注释就写着"只进账本不进判据"（`SettingsView:329`）。
+        // 现在两张夹具把 message 造出来（不支持 / 写盘没生效），带是从这两张帧的
+        // `rowTierProfile` 量的：亮 136.5..145.5（不支持）/ 136.5..146.0（失败），
+        // 暗 136.0..145.5 / 136.0..146.0 ⇒ 框取 135.5..146.5，两档共用一套坐标。
+        // **这两条框只在有回执的那两张帧上成立**：`settings-general`（无 message）里
+        // 同一块 y 压着下一颗开关的标签（标题档 971 / 1064 个像素），所以判"没有回执"
+        // 不能照抄这块坐标 —— 见 `testDisabledToggleAndFailureReceiptAreVisible` 里那段差值对照。
+        InkProbe(fixture: "settings-general-login-unsupported",
+                 what: "回执「当前系统不支持从应用内设置开机启动。」",
+                 rect: CGRect(x: 150, y: 135.5, width: 560, height: 11)),
+        InkProbe(fixture: "settings-general-login-failed",
+                 what: "回执「开机启动开启失败，请稍后重试。」（macOS 12 上 AppleScript 静默失败）",
+                 rect: CGRect(x: 150, y: 135.5, width: 560, height: 11)),
           // R35 / BACKLOG 34②剩下的半条：**其余每个分区都点名一处**，加主窗口两处 meta。
         // 框全部由 `testSettingsCaptionRowTierProfileDiagnostic` 的"说明档带"放（下面每条注释里
         // 写着亮/暗两档各自量到的带），天花板负责在放错时把它打回 ——
@@ -3214,12 +3386,14 @@ final class UICaptureTests: XCTestCase {
                             + "（它命名的是一个 `.secondary` 位点），不许把 `captionTierCeiling` 抬上去。")
             }
             // **NOT-RUN 不能把这条判据变成恒绿**（R29d 的教训：判别臂加完就忘了问"到底判了几条"）。
-            // 3 的来历：表里 8 条 × 2 档，热图那 3 条是**唯一有 CI 记录的**
+            // 3 的来历：热图那 3 条是**唯一有 CI 记录的**
             // （run 38443414396 上读到 2.85 / 3.30 —— 也就是 runner 拍得出热图），
             // 而设置页整页在 runner 上是平涂（BACKLOG 43）、菜单栏面板从未在 CI 上验过 ⇒
             // 地板只钉在"这一轮确实量到了热图那三条说明段"，其余全部如实打在日志里。
+            // 表本身从写这条时的 8 条长到了今天的 18 条 —— 地板**没有**跟着涨，
+            // 因为它回答的是"CI 上最少判得成几条"，与表里登记了几条无关（R38：地板要能从哪台机器读出来）。
             XCTAssertGreaterThanOrEqual(judged, 3,
-                        "\(tag) 档 8 条说明段探针**一条都没判成**（judged=\(judged)）⇒ "
+                        "\(tag) 档 \(Self.captionInkProbes.count) 条说明段探针**一条都没判成**（judged=\(judged)）⇒ "
                         + "是捕获路径坏了，不是产品都过了。热图那三条在任何机器上都拍得出来，"
                         + "它们要是也读不到墨，这条判据就没有内容，必须红着说这件事。")
             print("CAPTION_JUDGED \(tag) 判了 \(judged) 条 / 表里 \(Self.captionInkProbes.count) 条")

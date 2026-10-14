@@ -39,7 +39,22 @@ struct SystemLoginItemManager: LoginItemManaging {
             } else {
                 Self.removeLoginItemViaAppleScript(appPath: appPath)
             }
+            // macOS 12 这条路上，"什么都没发生"是**常态而不是异常**：
+            // 自动化权限被拒时 `tell application "System Events"` 常常不抛错，只是脚本没生效
+            // （`executeAndReturnError` 的 error 字典被丢在这里第 71 行那个位置，历史上没人读它）。
+            // 于是用户看到的是：开关自己弹回去，一句话都没有。
+            // 所以**事后读回一次**，不一致就抛 —— 让 `LoginItemSettings` 那层去说那句话。
+            try Self.verifyApplied(enabled: enabled, readBack: Self.checkLoginItemExistsViaAppleScript)
         }
+    }
+
+    /// 把"写完读回"这一步单独拆出来，有两个理由：
+    /// ① 它是唯一能证明"这条路上成功是真的成功"的手段（AppleScript 的返回不可信）；
+    /// ② 这台开发机是 macOS 14+，`#available` 那一支**永远走不到** ——
+    ///    不拆成纯函数的话，这段逻辑就只能等一台 12 的机器来发现它错了（见账本里的"打桩成真值"规矩）。
+    static func verifyApplied(enabled: Bool, readBack: () -> Bool) throws {
+        let applied = readBack()
+        guard applied == enabled else { throw LoginItemSettings.Error.loginItemNotApplied }
     }
 
     private static func checkLoginItemExistsViaAppleScript() -> Bool {
@@ -87,6 +102,9 @@ struct SystemLoginItemManager: LoginItemManaging {
 final class LoginItemSettings: ObservableObject {
     enum Error: Swift.Error {
         case unsupportedSystem
+        /// macOS 12 的 AppleScript 路径：脚本没报错，但登录项**事后不在**（要嘛权限被拒，
+        /// 要嘛 System Events 根本没执行）。以前这种失败是**静默**的 —— 开关弹回去，没有回执。
+        case loginItemNotApplied
     }
 
     @Published private(set) var isEnabled: Bool

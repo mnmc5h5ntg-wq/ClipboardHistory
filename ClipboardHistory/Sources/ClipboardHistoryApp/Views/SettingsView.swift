@@ -326,7 +326,10 @@ struct SettingsView: View {
                         // 这条回执讲的是**开机启动**这一颗（`loginItemSettings` 的失败原因），
                         // 原来它排在整组最后：中间隔着三个开关与两段说明，
                         // 读起来像在解释上面那段富文本。R33 把它挪回自己那颗下面。
-                        // 帧里量不到（夹具下 `message == nil`），所以这条只进账本不进判据。
+                        // R39：这里原来写的是"帧里量不到（夹具下 `message == nil`）⇒ 只进账本不进判据"。
+                        // 现在两张夹具把 message 造出来了（`settings-general-login-unsupported` /
+                        // `-failed`），于是这条有像素判据：说明档探针两条 +
+                        // `testDisabledToggleAndFailureReceiptAreVisible` 的跨帧差值对照。
                         if let message = loginItemSettings.message {
                             Text(message)
                                 .font(.caption)

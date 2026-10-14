@@ -3373,3 +3373,31 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
 - **代价**：捕获测试 +1.5s（104 张 PNG 重读一遍）；测试条数不变（714）；产品零改动。
 - **谁守着**：`BOTTOM_INK_IDENTITY`、派生地板两条断言、变异 M175 / M176。
 - **仍未验证**：闸门这次能不能绿 —— 以下一次 CI 的日志为准（这条规矩本身是 U-61 换来的）。
+
+
+---
+
+### D-098 · R39：系统调用"没报错"不等于"生效" —— 写完必须读回，且比对要拆成这台机器测得到的纯函数
+
+- **背景**：macOS 12 上开机启动走 `NSAppleScript` 的 `tell application "System Events"`。
+  自动化权限被拒时它常常**不抛错**，只是没生效；修前那段代码连 `error` 字典都没读
+  （`executeAndReturnError(&error)` 之后 `error` 被丢弃）。用户看到的唯一现象是
+  "开关自己弹回去，一句话都没有"。
+- **决定**：动作之后**读回一次**真实状态，与请求不一致就抛 `loginItemNotApplied`，
+  让 `LoginItemSettings` 那层去说那句"开启失败，请稍后重试"。
+- **决定 2**：比对逻辑不留在 `setEnabled` 里，拆成
+  `SystemLoginItemManager.verifyApplied(enabled:readBack:)`。理由不是"整洁"：
+  这台开发机 macOS 14+，`#available(macOS 13, *)` 那一支**永远走不到**，
+  留在原地的话这段逻辑在这台机器上**一行都测不到** —— 只能等一台 12 的机器来发现它错。
+  拆出来之后四格真值表在本机全跑（含"该没的还在"那一格：只测一个方向的话，
+  把比较写成 `if !applied { throw }` 这种半只眼的实现不会红）。
+- **决定 3**：失败回执**必须画得出来**才算修完。模型层三条单测全绿也救不了
+  "视图里那句被 `if let` 挡住了" ⇒ 本轮补两张夹具（不支持 / 失败）与一条差值判据。
+- **代价**：`setEnabled` 多一次 AppleScript 读回（只在 macOS 12 那条路上，
+  macOS 13+ 走 `SMAppService` 的 status，本来就有权威状态）；帧基线 104 → 108。
+- **谁守着**：`testVerifyAppliedTruthTable`、`testSilentAppleScriptFailureSurfacesTheReceipt`、
+  `testCaptureFixtureActuallyProducesTheReceipt`、`testDisabledToggleAndFailureReceiptAreVisible`、
+  两条说明段探针；变异 M177 / M179 / M180。
+- **仍未验证**：真机 macOS 12 上那条路径 —— 这台机器与 CI runner 都是 14+，
+  本轮验证的是"读回不一致 ⇒ 抛 ⇒ 有回执"这条链的形状，不是 12 上的真实系统行为。
+  已写进人工批次 41.3。
