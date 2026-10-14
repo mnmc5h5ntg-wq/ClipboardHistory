@@ -78,16 +78,23 @@ final class MotionFilmstripTests: XCTestCase {
 
     static func peak(_ fractions: [Double]) -> Double { fractions.max() ?? 0 }
 
-    /// "画面还在变"覆盖了多长**时间**（ms），而不是几帧。
+    /// "画面还在变"覆盖了多长**时间**（ms），而不是几帧 —— 但注意：这是**首尾跨度**，不是连续的一段。
     ///
-    /// 为什么需要它：`transitionFrameCount` 数的是帧，而一帧多长由抓帧耗时决定。
+    /// 为什么是时间不是帧数（R2）：`transitionFrameCount` 数的是帧，而一帧多长由抓帧耗时决定。
     /// R2 把判据的**要求**换成了时间，但**读数**仍然是帧数，于是它跟着采样相位漂：
-    /// 本机实测同一份代码三次跑出 `2 / 3 / 2`（HEAD 上也给过 2）——
-    /// 同一段变更，采样恰好落在中间就读成 3 帧，落偏就读成 2 帧。
-    /// 一条"同一份代码会翻脸"的判据在判的是采样相位，不是产品。
-    /// 时间读数不看相位：第一个还在变的帧到最后一个还在变的帧之间隔了多少毫秒。
+    /// 本机实测同一份代码三次跑出 `2 / 3 / 2`（HEAD 上也给过 2）。
+    ///
+    /// 为什么改名（R48）：名字里的 "run" 是假的 —— 它取的是
+    /// 「第一个还在变的帧 → 最后一个还在变的帧之后一帧」，**不要求中间连续**。
+    /// 本机 R46/R47 抓到过 `时长=265ms 帧数=2 整卷中位=8ms`：两帧连续变化最多覆盖 8–16ms，
+    /// 265ms 只能来自"两波变化中间隔着一段静止"。所以那条读数说的"淡入演了 265ms"
+    /// 是**尺子的算法造出来的**，不是画面给的（BACKLOG 70）。
+    ///
+    /// 要"一段连续的过程"请用 `contiguousChangedRun`。这里保留跨度语义是有意的：
+    /// R2 那批夹具（含 `coarseSampling` 那种中间掉回 0.001 的形状）就是按跨度写的，
+    /// 而那个形状本身在真机上是否可能，需要逐条重问 —— 那是 BACKLOG 72，不在本轮顺手改。
     /// 返回 `nil` = 整段没有一次可见变化 ⇒ 无从判定，调用方必须报 not-run，不许判绿。
-    static func changedRunElapsedMilliseconds(stamps: [TimeInterval], fractions: [Double]) -> Double? {
+    static func changedSpanElapsedMilliseconds(stamps: [TimeInterval], fractions: [Double]) -> Double? {
         guard let peak = fractions.max(), peak >= minimumVisibleChange else { return nil }
         let moving = fractions.indices.filter { fractions[$0] >= peak * stepFloorRatio }
         guard let first = moving.first, let last = moving.last,
@@ -97,20 +104,83 @@ final class MotionFilmstripTests: XCTestCase {
         return max(0, (stamps[last + 1] - stamps[first]) * 1000)
     }
 
-    /// 这条 A/B 有没有看见纯 opacity 的淡入（R47 / BACKLOG 68 / U-73）。
+    /// 一段**连续**的变化（R48 / BACKLOG 70）。
+    struct ChangedRun: Equatable {
+        /// 这一段第一个变化帧的下标（`fractions[start]` = 该帧到下一帧的变化量）
+        let startFrame: Int
+        /// 这一段最后一个变化帧的下标；这一段时间覆盖 `stamps[startFrame] … stamps[endFrame + 1]`
+        let endFrame: Int
+        let peak: Double
+        let elapsedMilliseconds: Double
+        /// 这一段内部**最粗的一次采样间隔**（ms）。
+        /// R48 加这个字段是因为一条真读数：`时长=266ms 帧数=2 整卷中位=7ms` ——
+        /// 时长不是被"过程很长"撑出来的，是被段内**一次 260ms 的抓帧空档**撑出来的（整卷中位只有 8ms）。
+        /// 没有这一项，`elapsed` 与"声明 160ms"的比较就是在拿被卡住的钟量动画。
+        let worstIntervalMilliseconds: Double
+    }
+
+    /// 把整卷切成**连续**的变化段：相邻的 `fractions[i] ≥ 峰值 × stepFloorRatio` 才算同一段，
+    /// 中间掉下去一次就断成两段。
+    ///
+    /// 为什么需要它（而不是把上面那个函数直接改掉）：一条淡入的**时长**必须来自"它一直在演"的那一段。
+    /// 跨度算法会把「触发后 7ms 内演完 + 静止 250ms + 别的东西又动了一下」读成 258ms 的淡入，
+    /// 于是任何"时长在声明附近"的判据都会被一次无关的抖动喂成绿 —— 那是把探针的毛病当产品进步。
+    static func contiguousChangedRuns(stamps: [TimeInterval], fractions: [Double]) -> [ChangedRun] {
+        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return [] }
+        let floor = peak * stepFloorRatio
+        var runs: [ChangedRun] = []
+        var start: Int?
+        // 多走一格（`index == fractions.count` 时 `moving` 必为 false）当**收尾哨兵**，
+        // 这样"最后一段一直变到卷尾"也能被正常闭合，不用在循环外再抄一遍收尾逻辑。
+        for index in 0...fractions.count {
+            let moving = index < fractions.count && fractions[index] >= floor
+            if moving {
+                if start == nil { start = index }
+                continue
+            }
+            guard let from = start else { continue }
+            let through = index - 1
+            start = nil
+            // 越界就不记这一段：宁可少一段让调用方报 not-run，也不许拿一个算不出时长的段冒充读数。
+            guard from < stamps.count, through + 1 < stamps.count else { continue }
+            // 段内最粗的一次采样：`stamps[k] → stamps[k+1]`，k 从 from+1 到 through+1。
+            // 与 `worstIntervalInsideChangedRun` 同一个取法（用最大值不用中位数：
+            // 决定分辨率的是过程正在演的那一段里最稀的一次）。
+            var worst: Double = 0
+            for k in (from + 1)...(through + 1) {
+                worst = max(worst, (stamps[k] - stamps[k - 1]) * 1000)
+            }
+            runs.append(ChangedRun(
+                startFrame: from, endFrame: through,
+                peak: fractions[from...through].max() ?? 0,
+                elapsedMilliseconds: max(0, (stamps[through + 1] - stamps[from]) * 1000),
+                worstIntervalMilliseconds: worst))
+        }
+        return runs
+    }
+
+    /// **包含峰值**的那一段连续变化（R48）。
+    ///
+    /// 为什么是"含峰值"而不是"最长"：一卷里可能既有淡入又有一次晚到的抖动，
+    /// 抖动那一段可能因为采样稀而覆盖更久；判"这条过渡演了多久"必须看动画真正在演的那一段。
+    /// 返回 `nil` = 整卷没有可见变化 ⇒ 无从判定（调用方必须报 not-run，不许判绿）。
+    static func contiguousChangedRun(stamps: [TimeInterval], fractions: [Double]) -> ChangedRun? {
+        contiguousChangedRuns(stamps: stamps, fractions: fractions)
+            .max { $0.peak == $1.peak ? $0.elapsedMilliseconds < $1.elapsedMilliseconds : $0.peak < $1.peak }
+    }
+
+    /// 这条 A/B 有没有看见纯 opacity 的淡入（R47 / BACKLOG 68 / U-73，R48 补分辨率轴）。
     ///
     /// 为什么单独抽出来：`testHeatmapFadeIsNotVisibleToThisRuler` 原来直接写
     /// `onSpan == offSpan && |peak(on) - peak(off)| < 0.02` —— 第一个条件用的是**帧数**，
     /// 而帧数正是本文件上面自己宣布过"会随采样相位漂"的量（R2：同一份代码本机跑过 2/3/2）。
-    /// R46 本机真跑一遍就撞上了：`开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` ——
-    /// **两臂峰值完全相同**，只有帧数不同，于是这条判据把"尺子看不见"判成了"尺子看得见"，
-    /// 红的是尺，不是产品。
     ///
-    /// 为什么要**两遍同臂**（A/A）而不是一遍：R47 实测这条通道的占空比不是 100% ——
-    /// 全量 suite 里它读出过 `开 265ms / 关 7ms`（判定=看得见），
-    /// 而单独连跑 7 次全是 `开 6–7ms / 关 6–7ms`（判定=看不见）。
-    /// 只抓一遍的话，"这一次恰好撞上了"会被写成"这把尺看得见"，
-    /// 而那条判据下一次就会在同样的代码上翻脸 —— 判的是进程历史，不是产品。
+    /// **本轮撤回一句旧结论**：R11/R47 的台账把这条通道写成"对纯 opacity 淡入可见性 = 0"。
+    /// R48 给这条 A/B 第一次补上条带图（`heat-first-record-开A-strip.png`），
+    /// 第 3 帧是**半透明中间态**（空态那行字与整块日历叠在一起）⇒ 这条通道看得见这条淡入，
+    /// 只是不每次都抓得到：抓帧占空比决定它今天能不能看见。
+    /// 所以正确的形状是三态，不是两态：看见了 / 没看见 / **今天的钟粗到判不了**。
+    /// 把第三态并进第二态，就是本轮那条 266ms 读数干的事（它连"看不见"都没资格说）。
     enum FadeVisibility: Equatable {
         /// 触发没让图长出来 ⇒ 探针坏了。两种结论都不许下（既不许说看得见，也不许说看不见）。
         case noControl
@@ -118,6 +188,9 @@ final class MotionFilmstripTests: XCTestCase {
         case notVisibleToThisRuler
         /// 两遍同臂互相矛盾 ⇒ 这条通道今天没有结论。报矛盾，不许挑一次算数。
         case inconsistent(onA: Double?, onB: Double?)
+        /// 段内最粗的一次采样比声明还粗到判不了 ⇒ **今天既不能说看得见也不能说看不见**（R48）。
+        /// 与 `judgeMotion` 的 `.clockTooCoarse` 同一个意思：钟卡住的时长读数没有资格参与判定。
+        case clockTooCoarse(worstOnA: Double, worstOnB: Double)
         /// 两遍都说看得见 ⇒ 调用方必须把这个场景放回 `Scenario.all()` 当真判据。
         case visibleToThisRuler
     }
@@ -126,6 +199,11 @@ final class MotionFilmstripTests: XCTestCase {
     /// 与 `judgeMotion` 里那句"事件内最粗采样 > 0.3×声明 ⇒ 时钟太粗"是同一把分辨率尺，
     /// 两处用同一个数，是为了让"切不出过程"与"看见了过程"不会各说各话。
     private static let coarseRunRatio = 0.3
+
+    /// 段内最粗采样超过声明的这个比例 ⇒ 这条通道的钟粗到没法拿时长当判据。
+    /// 沿用 `judgeMotion` 中间档的上限（0.5）：那里 0.3–0.5 还能靠"至少两帧在变"判，
+    /// 而这条 A/B 的判据**只有时长一个量**，所以直接到 0.5 就放弃判定。
+    private static let unresolvableIntervalRatio = 0.5
 
     /// 单臂：这一次有没有看见一段**属于这条淡入的**"还在变"的时间。`nil` = 这一臂没有对照物。
     ///
@@ -152,7 +230,9 @@ final class MotionFilmstripTests: XCTestCase {
     static func fadeVisibility(elapsedOnA: Double?, elapsedOnB: Double?, elapsedOff: Double?,
                                peakOn: Double,
                                declaredMilliseconds: Double,
-                               intervalMilliseconds: Double) -> FadeVisibility {
+                               intervalMilliseconds: Double,
+                               worstOnA: Double = 0,
+                               worstOnB: Double = 0) -> FadeVisibility {
         guard let a = fadeSawProcess(elapsed: elapsedOnA, peakOn: peakOn,
                                      declaredMilliseconds: declaredMilliseconds,
                                      intervalMilliseconds: intervalMilliseconds),
@@ -160,6 +240,13 @@ final class MotionFilmstripTests: XCTestCase {
                                      declaredMilliseconds: declaredMilliseconds,
                                      intervalMilliseconds: intervalMilliseconds)
         else { return .noControl }
+        // 分辨率门放在一致性**之前**：钟卡住的时候两个时长读数没有可比的量纲，
+        // 拿它们比"矛不矛盾"是在给一个没测到的东西编结论。
+        // `worst == 0` = 调用方没测这一项（真值表里那些格子就是这种），不参与这道门。
+        if declaredMilliseconds > 0,
+           max(worstOnA, worstOnB) > declaredMilliseconds * unresolvableIntervalRatio {
+            return .clockTooCoarse(worstOnA: worstOnA, worstOnB: worstOnB)
+        }
         if a != b { return .inconsistent(onA: elapsedOnA, onB: elapsedOnB) }
         guard a else { return .notVisibleToThisRuler }
         // 归因那一半：开着曲线的**两臂都**要比"关掉曲线"的对照臂长出至少一个采样间隔，
@@ -441,7 +528,7 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(Self.transitionFrameCount(coarseSampling), 2,
                        "这两组读数是同一段 135ms 的淡入，只是采样相位不同")
         for (name, fractions) in [("细相位", fineSampling), ("粗相位", coarseSampling)] {
-            let elapsed = Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: fractions) ?? -1
+            let elapsed = Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: fractions) ?? -1
             XCTAssertEqual(elapsed, 135, accuracy: 1, "\(name)：时长读数不该跟着相位翻脸")
             let worst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: fractions) ?? -1
             XCTAssertEqual(worst, 45, accuracy: 1, "事件内最粗采样 = 45ms")
@@ -454,7 +541,7 @@ final class MotionFilmstripTests: XCTestCase {
 
         // 一帧跳变：变化段只剩一个采样 ⇒ 必须红（这条是上面那条绿的全部代价所在）。
         let jump: [Double] = [0.12, 0.0, 0.0, 0.0, 0.0, 0.0]
-        let jumpElapsed = Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: jump) ?? -1
+        let jumpElapsed = Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: jump) ?? -1
         let jumpWorst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: jump) ?? -1
         XCTAssertEqual(jumpElapsed, 45, accuracy: 1, "跳变的「变化段」就是一个采样的长度")
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: jumpElapsed,
@@ -503,7 +590,7 @@ final class MotionFilmstripTests: XCTestCase {
                        "没声明时长就没有门槛可言")
         // 整段没有一次可见变化 ⇒ 两个读数都必须 nil（调用方报 not-run，不许判绿）。
         let idleFractions: [Double] = [0.0, 0.001, 0.0, 0.001, 0.0, 0.0]
-        XCTAssertNil(Self.changedRunElapsedMilliseconds(stamps: stamps, fractions: idleFractions))
+        XCTAssertNil(Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: idleFractions))
         XCTAssertNil(Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: idleFractions))
 
         XCTAssertEqual(Self.midFlightPreRollFrames(durationMilliseconds: 150, sampleMilliseconds: 40), 1,
@@ -610,7 +697,7 @@ final class MotionFilmstripTests: XCTestCase {
             let interval = Self.sampleIntervalMilliseconds(film.motionStamps)
             let fractions = Self.deltas(frames)
             let span = Self.transitionFrameCount(fractions)
-            let elapsed = Self.changedRunElapsedMilliseconds(stamps: film.motionStamps, fractions: fractions)
+            let elapsed = Self.changedSpanElapsedMilliseconds(stamps: film.motionStamps, fractions: fractions)
             let worstInRun = Self.worstIntervalInsideChangedRun(stamps: film.motionStamps, fractions: fractions)
             // 每个场景都进 MOTION_SUMMARY（哪怕这一条今天判不了）：CI 那一步与它的自测夹具
             // 都按"三个键都在"的形状读，少一个键会让下游把"没测"读成"测了且为 0"。
@@ -704,10 +791,20 @@ final class MotionFilmstripTests: XCTestCase {
     func testHeatmapFadeIsNotVisibleToThisRuler() throws {
         try skipUnlessEnabledAndCapable()
         let saved = MotionCatalog.animationsEnabled
-        // R47 实测：同一个场景**在一个进程里第一次抓取必然看不见**（6–7ms / 1 帧），
-        // 第二次才看得见（258–260ms / 2 帧）。两遍连跑都稳定复现，不是随机占空比。
-        // 所以第一遍当**预热**丢掉，判定用第 2、3 遍 —— 并把这件事打在读数里，
-        // 否则下一个人还会在"第一次跑看不见"上再猜一轮（R11 当时就是这么收口的）。
+        // R47 实测：同一个场景**在一个进程里第一次抓取必然读不出东西**（6–7ms / 1 帧），
+        // 第二遍有时读出 258–266ms。所以第一遍当**预热**丢掉，判定用第 2、3 遍。
+        //
+        // R48 原本要给这件事一个解释，而且给错了：我写的是"265ms 配帧数=2、中位=8ms，
+        // 两帧连续最多 8–16ms ⇒ 那一定是跨度算法把两波并成一段"。**这条判断没被数据支持**：
+        // 给这条 A/B 补上 per-run 打印与条带图之后，真形状是
+        // `开A [345–612@0.226/粗260] 帧数=2 整卷中位=8ms` —— **一段连续的**变化，
+        // 只是段内有一次 **260ms 的抓帧空档**（首次布局整块日历时主线程被占住，抓帧器挤不进去）。
+        // 也就是说 266ms 不是"过程演了 266ms"，也不是"两波被并起来"，而是**钟在过程中间停了**。
+        // （本轮还犯过一次可笑的错：我在**还没读到 `worstIntervalMilliseconds` 之前**，
+        //  就往注释里写了"约 130ms"——那是拿 266 ÷ 2 估的。实测是 260ms，一次空档而不是两次。
+        //  同一条规矩的第三个面：注释里的数也只能从读数来。）
+        // 连续段那把尺仍然要（它管的是"不许把无关的两波算成一段"），
+        // 但它解释不了这条读数 —— 解释它的是段内最粗采样，于是本轮把那一轴接进判定。
         let warmup = record(Scenario.heatFirstRecord())
         let onFilmA = record(Scenario.heatFirstRecord())
         let onFilmB = record(Scenario.heatFirstRecord())
@@ -715,28 +812,63 @@ final class MotionFilmstripTests: XCTestCase {
         let offFilm = record(Scenario.heatFirstRecord())
         MotionCatalog.animationsEnabled = saved
 
+        // R48：这条 A/B 判了三轮"看不见"，却从来没留过一张画面给人对账。
+        // 本轮的靶正好是"读数与画面对不上"，所以三臂各出一张条带 ——
+        // 看图的人从此可以问"你说看不见，那这几帧到底长什么样"，而不必信我的一行日志。
+        writeStrip("heat-first-record-开A", onFilmA.motionFrames)
+        writeStrip("heat-first-record-开B", onFilmB.motionFrames)
+        writeStrip("heat-first-record-关", offFilm.motionFrames)
+
         let onA = Self.deltas(onFilmA.motionFrames)
         let onB = Self.deltas(onFilmB.motionFrames)
         let off = Self.deltas(offFilm.motionFrames)
         // 帧数照旧打印，但**不参与判定**：它由采样相位决定。
         let scenario = Scenario.heatFirstRecord()
-        let elapsedWarm = Self.changedRunElapsedMilliseconds(stamps: warmup.motionStamps,
-                                                             fractions: Self.deltas(warmup.motionFrames))
-
-        let elapsedA = Self.changedRunElapsedMilliseconds(stamps: onFilmA.motionStamps, fractions: onA)
-        let elapsedB = Self.changedRunElapsedMilliseconds(stamps: onFilmB.motionStamps, fractions: onB)
-        let elapsedOff = Self.changedRunElapsedMilliseconds(stamps: offFilm.motionStamps, fractions: off)
+        // R48：判定用**连续段**的时长，跨度只当对照一起打印。
+        // 两把尺的差就是本轮的靶 —— 一条淡入的时长必须来自"它一直在演"的那一段，
+        // 而跨度会把"演完 + 静止 + 别的东西又动了一下"算成一条更长的淡入。
+        let warmupFractions = Self.deltas(warmup.motionFrames)
+        let runWarm = Self.contiguousChangedRun(stamps: warmup.motionStamps, fractions: warmupFractions)
+        let runA = Self.contiguousChangedRun(stamps: onFilmA.motionStamps, fractions: onA)
+        let runB = Self.contiguousChangedRun(stamps: onFilmB.motionStamps, fractions: onB)
+        let runOff = Self.contiguousChangedRun(stamps: offFilm.motionStamps, fractions: off)
+        let elapsedWarm = runWarm?.elapsedMilliseconds
+        let elapsedA = runA?.elapsedMilliseconds
+        let elapsedB = runB?.elapsedMilliseconds
+        let elapsedOff = runOff?.elapsedMilliseconds
+        let spanA = Self.changedSpanElapsedMilliseconds(stamps: onFilmA.motionStamps, fractions: onA)
+        let spanB = Self.changedSpanElapsedMilliseconds(stamps: onFilmB.motionStamps, fractions: onB)
         let interval = Double(Self.sampleIntervalMilliseconds(onFilmA.motionStamps))
         let verdict = Self.fadeVisibility(elapsedOnA: elapsedA, elapsedOnB: elapsedB,
                                           elapsedOff: elapsedOff, peakOn: Self.peak(onA),
                                           declaredMilliseconds: scenario.declaredDurationMilliseconds,
-                                          intervalMilliseconds: interval)
+                                          intervalMilliseconds: interval,
+                                          worstOnA: runA?.worstIntervalMilliseconds ?? 0,
+                                          worstOnB: runB?.worstIntervalMilliseconds ?? 0)
         func ms(_ value: Double?) -> String { value.map { String(format: "%.0f", $0) } ?? "读不出" }
+        /// 把一卷切成"起–止@峰值/段内最粗"的清单（时刻**相对卷首**），用于事后对账：
+        /// 长读数到底是连续一段还是两波带空隙、时长是被过程撑出来还是被停顿撑出来，看这一行就知道。
+        /// 相对而不是绝对：`motionStamps` 是系统启动以来的秒数，直接乘 1000 会打出
+        /// `731797829–731797842` 这种没人能对账的数（R48 第一版就是这么红的）。
+        func runs(_ stamps: [TimeInterval], _ fractions: [Double]) -> String {
+            guard let zero = stamps.first else { return "无" }
+            let list = Self.contiguousChangedRuns(stamps: stamps, fractions: fractions).map {
+                String(format: "%.0f–%.0f@%.3f/粗%.0f",
+                       (stamps[$0.startFrame] - zero) * 1000,
+                       (stamps[min($0.endFrame + 1, stamps.count - 1)] - zero) * 1000,
+                       $0.peak, $0.worstIntervalMilliseconds)
+            }
+            return list.isEmpty ? "无" : list.joined(separator: ",")
+        }
+        print("MOTION_HEAT_RUNS 开A [\(runs(onFilmA.motionStamps, onA))] 开B [\(runs(onFilmB.motionStamps, onB))]"
+            + " 关 [\(runs(offFilm.motionStamps, off))]"
+            + "  跨度A=\(ms(spanA))ms 跨度B=\(ms(spanB))ms 整卷中位=\(ms(interval))ms")
         func label(_ v: FadeVisibility) -> String {
             switch v {
             case .noControl: return "无对照物"
             case .notVisibleToThisRuler: return "看不见"
             case .inconsistent: return "两遍矛盾"
+            case .clockTooCoarse: return "钟太粗"
             case .visibleToThisRuler: return "看得见"
             }
         }
@@ -764,15 +896,142 @@ final class MotionFilmstripTests: XCTestCase {
             print("MOTION_NOT_RUN=fade-channel-duty-cycle heat-first-record："
                 + "同一条产品路径连抓两遍，一遍算看得见（\(ms(a))ms）、一遍算看不见（\(ms(b))ms）⇒ "
                 + "这条通道的占空比不是 100%，今天既不能说看得见也不能说看不见")
+        case .clockTooCoarse(let worstA, let worstB):
+            // 这一格**不红**，而且它连"看不见"都不许说：钟在过程中间停过，
+            // 时长读数就没有资格参与判定（R48 的靶就是把这一格从"看不见"里分出来）。
+            print("MOTION_NOT_RUN=clock-coarse-in-window heat-first-record："
+                + "峰值那一段内部最粗的一次采样是 \(ms(worstA)) / \(ms(worstB))ms，"
+                + "而这条过渡声明 \(Int(scenario.declaredDurationMilliseconds))ms ⇒ "
+                + "今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT）")
         case .visibleToThisRuler:
             XCTFail("两遍都说「还在变」覆盖的时长比对照臂长出一个采样间隔以上 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
                     + "把 `heatFirstRecord()` 放回 `Scenario.all()` 当真判据，别留这条当免责")
         case .notVisibleToThisRuler:
             print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
-                + "两遍开臂的时长都没有超过 0.3×声明（\(ms(elapsedA)) / \(ms(elapsedB)) vs "
-                + "\(Int(scenario.declaredDurationMilliseconds))ms）⇒ 这把尺看不见纯 opacity 的淡入，"
-                + "这条只能记「源码已接、产物未量」")
+                + "两遍开臂的时长读数没有落进「≥0.3×声明 且 ≤声明+2×间隔」这条窗口"
+                + "（\(ms(elapsedA)) / \(ms(elapsedB)) vs 声明 \(Int(scenario.declaredDurationMilliseconds))ms，"
+                + "对照臂 \(ms(elapsedOff))ms）⇒ 今天这把尺没看见这条淡入，只能记「源码已接、产物未量」。"
+                + "**注意**：R48 已撤回「这条通道对淡入可见性=0」那句旧结论 —— "
+                + "条带图里出现过半透明中间态，所以这是**没抓到**，不是**看不见**")
         }
+    }
+
+    /// 按声明取一个成员的**函数体**（花括号配平），取不到 ⇒ 当场红。
+    ///
+    /// 为什么不用行号区间或"到下一个 MARK 为止"：那两种写法都随排版漂移，
+    /// 而守卫随排版漂移就变成"今天恰好还在管"的那种东西。
+    /// 取不到时**不许**安静返回空串：空串会让下面所有 `XCTAssertFalse(contains:)` 全绿，
+    /// 于是"把那个成员删了"被读成"修好了"（本仓库记过不止一次）。
+    private func region(in code: String, named declaration: String) -> String {
+        let lines = code.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { $0.contains(declaration) }) else {
+            XCTFail("区域取不到：\(declaration) —— 守卫找不到被守卫的东西时必须红")
+            return "\u{0}REGION-NOT-FOUND\u{0}"
+        }
+        var depth = 0
+        var opened = false
+        var body: [String] = []
+        for index in start..<lines.count {
+            let line = lines[index]
+            body.append(line)
+            depth += line.filter { $0 == "{" }.count
+            if line.contains("{") { opened = true }
+            depth -= line.filter { $0 == "}" }.count
+            if opened, depth <= 0 { break }
+        }
+        return body.joined(separator: "\n")
+    }
+
+    /// 那条 A/B 必须用**连续段**那把尺，不许悄悄换回跨度（R48 / BACKLOG 70 / U-74）。
+    ///
+    /// 为什么真值表不够：真值表钉的是 `contiguousChangedRun` 算得对，
+    /// 它钉不住**调用点** —— 把 `elapsedA` 换回 `changedSpanElapsedMilliseconds`，
+    /// 真值表仍然全绿，而那条 A/B 下一次又会把一次晚到的抖动读成 265ms 的淡入。
+    /// "测的轴与用的轴不是一根"这一族，R43/R44 的调用点级守卫是同一个来源。
+    func testFadeABReadsTheContiguousRulerNotTheSpan() throws {
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        XCTAssertFalse(source.isEmpty, "读不到本文件：这条守卫没有守卫对象")
+        let body = region(in: source, named: "func testHeatmapFadeIsNotVisibleToThisRuler")
+        XCTAssertTrue(body.contains("let verdict = Self.fadeVisibility("),
+                      "区域取到的不是那条 A/B ⇒ 下面的计数判据全是空的")
+        // 区域助手自己是尺，所以它自己也要被量一次（R45 的规矩）：
+        // 取多了（把下一个成员吞进来）与取不到都必须红。
+        XCTAssertFalse(body.contains("func testChangedRunMustBeContiguousNotFirstToLast"),
+                       "区域把下一个成员也吞了 ⇒ 它其实是整文件，'按区域判'的判别力是假的")
+
+        // 三臂**各自**都必须从连续段那把尺取值。
+        //
+        // 为什么不是"数区域里出现几次 `contiguousChangedRun(`"（本条的第一版就是这么写的）：
+        // 那个计数被变异 M237 当场证伪 —— 把 `elapsedB` 改成直接抄 `elapsedA`，
+        // 区域里仍然有 3 次调用（预热、开A、关），计数照样过。
+        // **一个没被证伪过的计数，判的是"这文件里出现过这个词"，不是"这条判据还成立"。**
+        let codeLines = body.components(separatedBy: "\n")
+        // 检查的是**段绑定**（runA/runB/runOff）而不是 elapsedA/B/Off：
+        // 后者现在只是 `runX?.elapsedMilliseconds` 的解包，真判据在段是哪来的。
+        for (name, source, elapsedName) in [("runA", "onFilmA.motionStamps", "elapsedA"),
+                                            ("runB", "onFilmB.motionStamps", "elapsedB"),
+                                            ("runOff", "offFilm.motionStamps", "elapsedOff")] {
+            guard let at = codeLines.firstIndex(where: { $0.contains("let \(name) =") }) else {
+                XCTFail("区域里找不到 `let \(name)` 这条赋值 ⇒ 判定的输入被搬走了，守卫必须红")
+                continue
+            }
+            // 语句边界按**括号配平**取，不取固定两行：
+            // 固定两行被变异 M237 当场证伪 —— 那条赋值被改成一行之后，
+            // 第二行就是**下一条**赋值，于是"含不含 contiguousChangedRun"判的其实是邻居。
+            var statement = codeLines[at]
+            var depth = statement.filter { $0 == "(" }.count - statement.filter { $0 == ")" }.count
+            var next = at + 1
+            // 括号不配平时**停在下一条 `let` 之前**：宁可少读一行让下面的边界断言红，
+            // 也不许一路吞到文件尾（那等于把整份文件当语句）。
+            while depth > 0, next < codeLines.count,
+                  !codeLines[next].trimmingCharacters(in: .whitespaces).hasPrefix("let ") {
+                statement += " " + codeLines[next]
+                depth += codeLines[next].filter { $0 == "(" }.count
+                depth -= codeLines[next].filter { $0 == ")" }.count
+                next += 1
+            }
+            XCTAssertEqual(statement.components(separatedBy: "let ").count - 1, 1,
+                           "语句边界取多了 ⇒ 这条守卫在读邻居的赋值：\(statement.trimmingCharacters(in: .whitespaces))")
+            XCTAssertTrue(statement.contains("contiguousChangedRun("),
+                          "`let \(name)` 不是从连续段那把尺来的：\(statement.trimmingCharacters(in: .whitespaces))")
+            XCTAssertTrue(statement.contains(source),
+                          "`let \(name)` 读的不是 \(source) ⇒ 那一臂被换掉了（抄别的臂也算换掉）")
+            // 判定用的时长必须**就是这一段的时长**：不许有人把它换成整卷跨度、帧数或峰值。
+            XCTAssertTrue(codeLines.contains { $0.contains("let \(elapsedName) =")
+                && $0.contains("\(name)?.elapsedMilliseconds") },
+                          "`\(elapsedName)` 不再是 `\(name)` 那一段的时长 ⇒ 判定输入被换轴了")
+        }
+        // 跨度那把尺在这个区域里**只许出现在打印里**（当对照给人看），不许出现在判定用的赋值里。
+        // 取"同一行既有 `let elapsed` 又调用跨度"这个合取，而不是"区域里含不含跨度"：
+        // 后者会把 `let spanA = …` 这种合规写法也判成违规，那等于逼下一个人删掉对照打印。
+        for line in body.components(separatedBy: "\n") where line.contains("changedSpanElapsedMilliseconds") {
+            XCTAssertFalse(line.contains("let elapsed"),
+                           "判定用的时长又改回跨度那把尺：\(line.trimmingCharacters(in: .whitespaces))")
+        }
+        // 判定调用必须把**分辨率**那一轴传进去（R48）。
+        // 不传的话函数里那道门永远不生效，而真值表里那三格照样全绿 ——
+        // **轴长在函数里不等于接在调用点上**（R43 那条"调用点级判据"是同一个坑）。
+        guard let callAt = codeLines.firstIndex(where: { $0.contains("= Self.fadeVisibility(") }) else {
+            XCTFail("区域里找不到 fadeVisibility 的调用点 ⇒ 分辨率轴无从检查")
+            return
+        }
+        var call = codeLines[callAt]
+        var callDepth = call.filter { $0 == "(" }.count - call.filter { $0 == ")" }.count
+        var cursor = callAt + 1
+        while callDepth > 0, cursor < codeLines.count {
+            call += " " + codeLines[cursor]
+            callDepth += codeLines[cursor].filter { $0 == "(" }.count
+            callDepth -= codeLines[cursor].filter { $0 == ")" }.count
+            cursor += 1
+        }
+        XCTAssertTrue(call.contains("worstOnA:"),
+                      "调用点没传段内最粗采样 ⇒ 分辨率那道门是死的：" + call)
+        XCTAssertTrue(call.contains("worstOnB:"),
+                      "调用点只传了一臂的最粗采样 ⇒ 另一臂卡钟时仍会进判定：" + call)
+        // 取不到的那一路：哨兵串不许含任何真实 needle，否则"找不到"会被读成"这里没有违规"。
+        let missing = "\u{0}REGION-NOT-FOUND\u{0}"
+        XCTAssertFalse(missing.contains("changedSpanElapsedMilliseconds"))
+        XCTAssertEqual(missing.components(separatedBy: "\n").filter { $0.contains("contiguousChangedRun(") }.count, 0)
     }
 
     /// `fadeVisibility` 的真值表（R47 / BACKLOG 68）。
@@ -787,9 +1046,11 @@ final class MotionFilmstripTests: XCTestCase {
         let declared = 250.0      // `.contentFade` 声明的毫秒数（这里要的是数，不是真令牌）
         let interval = 31.0       // 一个采样间隔
 
-        func verdict(_ a: Double?, _ b: Double?, _ off: Double?, peak: Double = 0.2) -> FadeVisibility {
+        func verdict(_ a: Double?, _ b: Double?, _ off: Double?, peak: Double = 0.2,
+                     worstOnA: Double = 0, worstOnB: Double = 0) -> FadeVisibility {
             Self.fadeVisibility(elapsedOnA: a, elapsedOnB: b, elapsedOff: off, peakOn: peak,
-                                declaredMilliseconds: declared, intervalMilliseconds: interval)
+                                declaredMilliseconds: declared, intervalMilliseconds: interval,
+                                worstOnA: worstOnA, worstOnB: worstOnB)
         }
 
         // ① 峰值低于地板 ⇒ 触发根本没让图长出来：探针坏了，不许下任何一种结论。
@@ -841,6 +1102,101 @@ final class MotionFilmstripTests: XCTestCase {
                                            intervalMilliseconds: 8),
                        .visibleToThisRuler,
                        "上限收得太紧会把真过渡也判成看不见 —— 这一格钉的是上限别过头")
+        // ⑬ **分辨率轴**（R48）：段内最粗采样 200ms 而声明只有 250ms 的 0.5 倍 ⇒ 判不了。
+        //     这一格来自本机真读数 `开A [345–612@0.226/粗260] 帧数=2 整卷中位=8ms`：
+        //     时长 266ms 不是"过程演了 266ms"，是钟在过程中间停了。
+        XCTAssertEqual(verdict(266, 266, 7, worstOnA: 200, worstOnB: 190),
+                       .clockTooCoarse(worstOnA: 200, worstOnB: 190),
+                       "钟卡住时的时长读数不许参与判定")
+        // ⑭ 粗钟**优先于**"看不见"：两臂时长都短（本来会被判成看不见），但段内最粗采样超限 ⇒
+        //     结论必须是"今天判不了"，不是"这条淡入看不见"。
+        //     这一格是本轮真正的产品结论所在：R11 那句"这条通道对淡入可见性=0"就是从这里撤回的。
+        XCTAssertEqual(verdict(7, 7, 7, worstOnA: 200, worstOnB: 200),
+                       .clockTooCoarse(worstOnA: 200, worstOnB: 200),
+                       "把判不了写成看不见，等于拿探针的占空比给产品定性")
+        // ⑮ 边界：最粗采样**正好** 0.5×声明 ⇒ 还在可判范围内（门槛取严格大于），
+        //     与 `judgeMotion` 中间档同一个含等号的写法。
+        XCTAssertEqual(verdict(150, 150, 31, worstOnA: 125, worstOnB: 125), .visibleToThisRuler,
+                       "写成 ≥ 会让这一格随浮点误差翻脸，且与 judgeMotion 的 0.5 档口径不一致")
+    }
+
+    /// 「变化段」必须真的**连续**（R48 / BACKLOG 70 / U-74）。
+    ///
+    /// 这一条不开窗口、CI 每次都跑，理由与上一条相同：修尺子的代码如果只被一把
+    /// "平时不跑"的判据守着，它下一次漂回去是没人知道的。
+    ///
+    /// 第 ② 格是**本机真读到过的形状**（`时长=265ms 帧数=2 整卷中位=8ms`）：
+    /// 两帧连续变化不可能覆盖 265ms，所以那不是淡入演了那么久，是跨度算法把一次晚到的抖动并了进来。
+    func testChangedRunMustBeContiguousNotFirstToLast() {
+        // 每 8ms 一帧，中间在 32ms→340ms 之间留一大段静止（就是本机那卷的形状）。
+        let stamps: [TimeInterval] = [0, 0.008, 0.016, 0.024, 0.032, 0.340, 0.348, 0.356]
+        let floorValue = 0.2 * 0.15          // `peak × stepFloorRatio`，下面几格都按这个地板摆
+
+        // ① 单波：连续段与首尾跨度**该相等** —— 这条钉的是"改法没把正常形状改坏"。
+        let single: [Double] = [0.2, 0.15, 0.1, 0.001, 0, 0, 0]
+        XCTAssertEqual(Self.contiguousChangedRun(stamps: stamps, fractions: single)?
+                       .elapsedMilliseconds ?? -1, 24, accuracy: 1,
+                       "0/1/2 三帧一直在变 ⇒ 覆盖 stamps[0]…stamps[3] = 24ms")
+        XCTAssertEqual(Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: single) ?? -1,
+                       24, accuracy: 1, "连续的时候两把尺必须给同一个数")
+
+        // ② **两波带空隙**（本机今天的真形状）：跨度把 348ms 说成"淡入演了 348ms"，
+        //    而连续段只认动画真在演的那 8ms。
+        let twoWaves: [Double] = [0.2, 0.001, 0.001, 0.001, 0.001, 0.05, 0]
+        let runElapsed = Self.contiguousChangedRun(stamps: stamps, fractions: twoWaves)?
+            .elapsedMilliseconds ?? -1
+        let spanElapsed = Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: twoWaves) ?? -1
+        XCTAssertEqual(runElapsed, 8, accuracy: 1, "峰值那一格只有它自己 ⇒ 一段 = 一个采样")
+        XCTAssertEqual(spanElapsed, 348, accuracy: 1, "跨度仍然会把第二波并进来（它没被改，只是不再进判定）")
+        XCTAssertLessThan(runElapsed, spanElapsed,
+                          "两把尺必须在这一格分道扬镳 —— 没分开就等于本轮什么都没改")
+
+        // ③ 峰值在**第二波**：该取第二波，不许拿"最早的那一段"当过渡。
+        let peakLate: [Double] = [0.05, 0.001, 0.001, 0.2, 0.1, 0, 0]
+        XCTAssertEqual(Self.contiguousChangedRun(stamps: stamps, fractions: peakLate)?
+                       .elapsedMilliseconds ?? -1, 316, accuracy: 1,
+                       "峰值那一段是 fractions[3…4] ⇒ 覆盖 stamps[3]=24ms 到 stamps[5]=340ms = 316ms；"
+                       + "取第一段就是把开头那一下抖当成过程")
+        XCTAssertEqual(Self.contiguousChangedRuns(stamps: stamps, fractions: peakLate).count, 2,
+                       "分段本身要能被数出来：这一卷是两段，不是一段 308ms 或一段 348ms")
+
+        // ④ **含峰值 ≠ 最长**：后头那三帧是别的东西在慢慢变，时长比淡入长得多，
+        //    但它不是这条淡入。取最长会把"环境里有个慢过程"算成动画演得久。
+        let longTailStamps: [TimeInterval] = [0, 0.008, 0.016, 0.024, 0.032, 0.040, 0.300, 0.360, 0.420]
+        let longTail: [Double] = [0.2, 0.001, 0.001, 0.001, 0.001, 0.05, 0.05, 0.05]
+        let chosen = Self.contiguousChangedRun(stamps: longTailStamps, fractions: longTail)
+        XCTAssertEqual(chosen?.elapsedMilliseconds ?? -1, 8, accuracy: 1,
+                       "380ms 那段峰值只有 0.05 ⇒ 不是淡入；含峰值的那段才是")
+        XCTAssertEqual(chosen?.peak ?? -1, 0.2, accuracy: 6, "选中的那段必须真的含峰值")
+
+        // ⑤ 整卷安静 ⇒ 一段都没有，两把尺都读不出（不许读成 0ms）。
+        let quiet: [Double] = [0.001, 0, 0, 0, 0, 0, 0]
+        XCTAssertTrue(Self.contiguousChangedRuns(stamps: stamps, fractions: quiet).isEmpty)
+        XCTAssertNil(Self.contiguousChangedRun(stamps: stamps, fractions: quiet))
+        XCTAssertNil(Self.changedSpanElapsedMilliseconds(stamps: stamps, fractions: quiet))
+
+        // ⑥ 地板**含等号**：正好等于 `峰值×0.15` 的那一帧算"还在变"。
+        let onFloor: [Double] = [0.2, floorValue, 0.001, 0, 0, 0, 0]
+        XCTAssertEqual(Self.contiguousChangedRun(stamps: stamps, fractions: onFloor)?
+                       .elapsedMilliseconds ?? -1, 16, accuracy: 1,
+                       "写成严格不等式会让这一格随浮点误差翻脸（与 R47 真值表第 ⑧ 格同一个道理）")
+
+        // ⑦ **最后一段一直变到卷尾**也必须被闭合：实现里靠的是收尾哨格，
+        //    没有它的话"变到最后一帧"会一段都不报 —— 少一段比多一段更难被发现。
+        let tailStamps: [TimeInterval] = [0, 0.008, 0.016, 0.024]
+        let tail: [Double] = [0.001, 0.1, 0.2]
+        XCTAssertEqual(Self.contiguousChangedRun(stamps: tailStamps, fractions: tail)?
+                       .elapsedMilliseconds ?? -1, 16, accuracy: 1)
+
+        // ⑧ R2 那批夹具的形状在这里被看清：`coarseSampling` 其实是**两波**，不是一段 135ms 的淡入。
+        //    本轮不改它（它喂的是别的判据），但把这件事记进 BACKLOG 72：
+        //    一个"中间掉回 0.001"的形状在真机上是否可能，需要逐条重问。
+        let r2Stamps: [TimeInterval] = [0.0, 0.045, 0.090, 0.135, 0.180, 0.225, 0.270]
+        let r2Coarse: [Double] = [0.11, 0.001, 0.10, 0.0, 0.0, 0.0]
+        XCTAssertEqual(Self.changedSpanElapsedMilliseconds(stamps: r2Stamps, fractions: r2Coarse) ?? -1,
+                       135, accuracy: 1, "R2 钉的是跨度 = 135ms（这条断言本轮**原样保留**）")
+        XCTAssertEqual(Self.contiguousChangedRuns(stamps: r2Stamps, fractions: r2Coarse).count, 2,
+                       "同一份数据在连续段这把尺下是两段 ⇒ 这就是 BACKLOG 72 的入口")
     }
 
     /// A/B 对照：**同一个场景、同一条产品路径**，把目录里的曲线关掉再量一次。

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R48：动效时长那把尺补了连续性，判定补了分辨率，一句旧结论被撤回）
+- `changedRunElapsedMilliseconds` 名叫 "run" 却**不要求连续** ⇒ 改名 `changedSpanElapsedMilliseconds`
+  （行为不变），新增 `contiguousChangedRun`（取**含峰值**的那一段连续变化 + 段内最粗采样）。
+- 那条淡入 A/B 的判定**缺分辨率轴**：`judgeMotion` 从 R2/R8 起就有"段内最粗采样 > 0.5×声明 ⇒ 判不了"
+  这一档，而 `fadeVisibility` 只比"时长 vs 声明"。现在它有三态：看得见 / 看不见 / **钟太粗**
+  （`MOTION_NOT_RUN=clock-coarse-in-window`，不红）。
+- **撤回一条写进台账的结论**：R11 起的"离屏 `cacheDisplay` 对纯 opacity 淡入可见性 = 0"是错的 ——
+  本轮第一次给这条 A/B 补上条带图，里面出现过**半透明中间态**。正确说法是"不每次都抓得到"，
+  所以 `notVisible` 分支的文案从"看不见"改成"今天没抓到"。
+- 那条 A/B 现在打印 per-run 形状（`MOTION_HEAT_RUNS … 起–止@峰值/粗…`，时刻相对卷首）
+  并为三臂各出一张条带图。
+- 产品代码零改动，116 张帧逐字节不变。
+- 新增判据：`fadeVisibility` 真值表 15 格（新增 3 格钉分辨率轴）+ `contiguousChangedRun` 8 格
+  + 调用点守卫 1 条（段来源、臂归属、时长轴、分辨率轴是否传入）。
+- 变异对照 M230–M239 十支；其中 M237 把本轮守卫的**前两版**都顶红（数词频、固定取两行），
+  M239 第一版是 **BROKEN-MUTATION**（`coarseRunRatio` 忘了写 `Self.`，编译不过）。
+
+
 ### Fixed（R47 · 那条 A/B 判的是采样，不是淡入）
 
 - `MotionFilmstripTests.testHeatmapFadeIsNotVisibleToThisRuler` 的判定轴换掉：
