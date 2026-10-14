@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   `did not throw`）⇒ 电池现在把"未被抓到"与"红得不对"分成两个计数，本轮第一版就靠它揪出这两支。
 - **记账两条不修的**：`SettingsView` 三处 `.disabled` 在产品里恒不可达（R28 已对账）⇒ 不补帧；
   `ReceiptLine` 声明的 `.contentFade` 没有任何 `withAnimation` 供电（这一页 0 个）⇒ BACKLOG 53。
+- **R39b（CI 追认的红）**：第一次推上去 CI 第 5 步就红 —— 12 条全部来自本轮新写的那条禁用态判据，
+  原因是 runner 上设置页内容列是一块平涂（BACKLOG 43）⇒ 那条判据在那里**永远读到 0 墨 / 对比度 1.00**。
+  没有放宽任何一条线，而是补上「这一台画不画得出这一页」这一问：三张全有墨才判、三张全无记 NOT-RUN、
+  **只画出一部分则红**（中间那一格两台机器都走不到 ⇒ 拆成纯函数 + 四格真值表 + 变异 M183 / M184）。
+  本机读数一字未变（718 → **719** 例，多的是那条真值表）。同一族第三次犯 ⇒ U-65 / BACKLOG 56。
 - **本机已换装**：`make bundle`（0 告警）→ 装到 `/Applications/时间剪史.app` → 冷启动冒烟 `SMOKE_OK=1`。A/B 顺手查出 **U-64 / BACKLOG 55**：另一个同 bundle 实例在跑时，守卫中止的那次启动在盘上一行日志都不留（连守卫自己那句"本次启动取消"都不见），而仓库的启动冒烟把这种探针环境问题报成"启动失败"。
 - **验证**：718 tests / 29 skipped / 0 failures、`swift build` 0 告警、
   帧基线 `CHANGED=0 / ADDED=4 / 108`、脚本 83 全绿、变异 M177–M182 六支全 CAUGHT（红得对 6/6）。

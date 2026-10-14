@@ -13,6 +13,11 @@
 
 M177/M182 是同一对：一个证明"回执不画会红"，一个证明"框贴错也会红"。
 少了 M182，M177 的红可能来自任何一块墨，而 M182 把红限定在"这一块"上。
+
+R39b 加的两支（CI 第一次跑就红在"runner 拍不出设置页"上，于是补了机器前提；
+机器前提本身是一张免检牌，所以它自己也要被咬两次）：
+  M183 「三张里只画出一部分」被折成环境问题      ⇒ 真值表那一格必须红
+  M184 机器前提恒成立（不管几张有墨都记未运行）  ⇒ "全有墨必须判"那一格必须红
 """
 import os
 import subprocess
@@ -26,6 +31,7 @@ SHOTS = "/tmp/r39-mut-shots"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 FILTER = ("UICaptureTests/(testDisabledToggleAndFailureReceiptAreVisible"
+          "|testSettingsDrawabilityTruthTable"
           "|testCaptionTextStaysOnTheSecondaryTier)|LoginItemSettingsTests")
 
 RECEIPT_BLOCK = """                        if let message = loginItemSettings.message {
@@ -41,6 +47,8 @@ FAILED_FIXTURE = 'results.append(Fixture("settings-general-login-failed", NSSize
 FAILED_PROBE = """        InkProbe(fixture: "settings-general-login-failed",
                  what: "回执「开机启动开启失败，请稍后重试。」（macOS 12 上 AppleScript 静默失败）",
                  rect: CGRect(x: 150, y: 135.5, width: 560, height: 11)),"""
+PARTIAL_ARM = "        return .partial(drawn)"
+NONE_ARM = "        if drawn == 0 { return .noneDrawn }"
 
 MUTATIONS = [
     ("M177", "产品：那句回执整段不画", VIEW, RECEIPT_BLOCK,
@@ -63,6 +71,14 @@ MUTATIONS = [
                  what: "回执「开机启动开启失败，请稍后重试。」（macOS 12 上 AppleScript 静默失败）",
                  rect: CGRect(x: 150, y: 400.0, width: 560, height: 11)),""",
      "框贴到空白上了"),
+    # R39b：CI 第一次跑就红在"这一台拍不出设置页"上 ⇒ 补了机器前提。机器前提本身是新的免检牌，
+    # 所以它自己也要有两支变异：一张坏帧被当成环境问题（M183）、以及"永远算环境问题"（M184）。
+    ("M183", "判据：把「只画出一部分」折成「环境问题」", HARNESS, PARTIAL_ARM,
+     "        return .noneDrawn  // MUTANT：某一帧坏了也被当成拍不出",
+     "只画出一部分不是环境问题"),
+    ("M184", "判据：机器前提恒成立（这条判据在这台机器上永不判）", HARNESS, NONE_ARM,
+     "        return .noneDrawn  // MUTANT：不管几张有墨都记未运行",
+     "机器前提就成了免检牌"),
 ]
 
 

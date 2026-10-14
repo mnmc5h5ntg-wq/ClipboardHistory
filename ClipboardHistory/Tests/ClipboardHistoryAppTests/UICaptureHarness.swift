@@ -615,6 +615,11 @@ final class UICaptureTests: XCTestCase {
     ///
     /// ②里那条跨帧对照为什么是"差值"而不是"没回执的帧读 0 墨"，见下面 ③ 处的记录。
     ///
+    /// **这一档有机器前提**（R39b 补，起因是 R39 第一版在 CI 上恒红）：三张帧都来自 `SettingsView`，
+    /// 而 runner 上这一族是一块平涂（BACKLOG 43）⇒ 那里每条读数天然是 0。判据先问
+    /// "这一列在这一台画没画出来"：三张全没画 ⇒ 显式记未运行（`DISABLED_STATE_NOT_RUN`，
+    /// 闸门会把它算进 NOT_RUN）；三张全画了 ⇒ 判；**只画出一部分 ⇒ 红**（那不是环境问题）。
+    ///
     /// 所有读数都打出来：禁用后"到底有多淡"是要给人判断的，不是要藏在一个 ✓ 后面。
     func testDisabledToggleAndFailureReceiptAreVisible() throws {
         // 两个矩形都是从帧上量的（`testSettingsCaptionRowTierProfileDiagnostic` 这轮把两张新帧
@@ -632,6 +637,7 @@ final class UICaptureTests: XCTestCase {
             let receiptInk: Int
             let receiptCaption: Int     // 回执带里说明档那一档的像素数
             let receiptTitle: Int       // 同一块里标题档的像素数（负对照要看它）
+            let contentInk: Int         // **整条内容列**的算字像素 —— 只回答"这一台拍不拍得出这一页"
         }
         func read(_ name: String, _ appearance: NSAppearance.Name) throws -> Reading? {
             guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
@@ -657,17 +663,46 @@ final class UICaptureTests: XCTestCase {
                 labelInk: mass(labelRect),
                 receiptInk: mass(receiptRect),
                 receiptCaption: profile.reduce(0) { $0 + $1.caption },
-                receiptTitle: profile.reduce(0) { $0 + $1.title })
+                receiptTitle: profile.reduce(0) { $0 + $1.title },
+                contentInk: mass(CGRect(x: 150, y: 20, width: 560, height: 500)))
         }
 
         var judged = 0
+        var notRun = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let plain = try read("settings-general", appearance),
                   let unsupported = try read("settings-general-login-unsupported", appearance),
                   let failed = try read("settings-general-login-failed", appearance) else {
                 print("DISABLED_STATE_NOT_RUN \(tag) 三张帧没齐 ⇒ 这一档在这一台无从判起")
+                notRun += 1
                 continue
+            }
+            // **机器前提（R39b，CI 第一次跑就红给它看了）**：runner 上 `SettingsView` 的内容列
+            // 是一块平涂（BACKLOG 43；本轮 CI 的 `ROWTIER settings-general-login-* dark：有字行 0 行`
+            // 就是同一件事），于是这里每一条读数都是 0 / 对比度 1.00 —— 那不是"禁用没淡"，
+            // 是"这一台拍不出这一页"。判据必须先问这一列画没画，再问画出来的东西对不对；
+            // 反过来把地板降到能容纳 0 读数，就等于把判据删掉（U-61 / U-62 同一族，第三次犯）。
+            //
+            // 三条帧问的是**同一个问题**，所以这里判的是**一致性**而不是量级：
+            // 0 张有墨 ⇒ 这一台拍不出这一页 ⇒ 如实记未运行；3 张有墨 ⇒ 判；
+            // **1 或 2 张** ⇒ 同一列不可能只画出一部分，那是某一帧坏了或框贴错了 —— 照旧红。
+            let drawable = Self.settingsDrawability(
+                [plain.contentInk, unsupported.contentInk, failed.contentInk])
+            switch drawable {
+            case .partial(let drawn):
+                return XCTFail("\(tag)：三张帧的同一条内容列里只有 \(drawn) 张读到墨"
+                               + "（\(plain.contentInk)/\(unsupported.contentInk)/\(failed.contentInk)）"
+                               + " ⇒ 这不是「这一台画不出这一页」（那要么三张全有、要么三张全无），"
+                               + "而是其中某一帧坏了或者我的框贴错了。先去看那一张帧")
+            case .noneDrawn:
+                print("DISABLED_STATE_NOT_RUN \(tag) 内容列读到 "
+                      + "\(plain.contentInk)/\(unsupported.contentInk)/\(failed.contentInk) 个算字像素"
+                      + " ⇒ 这一台拍不出设置页（BACKLOG 43），这一档记未运行，不算通过")
+                notRun += 1
+                continue
+            case .allDrawn:
+                break
             }
             judged += 1
             // ① **禁用必须看得见**：同一块标签矩形，禁用帧的对比度要明显比启用帧低。
@@ -716,7 +751,32 @@ final class UICaptureTests: XCTestCase {
                   + "/+\(failed.receiptCaption - plain.receiptCaption)) "
                   + "无回执那帧同块(说明档/标题档)=\(plain.receiptCaption)/\(plain.receiptTitle)")
         }
-        XCTAssertEqual(judged, 2, "两档外观各判一次，现在只判成 \(judged) 次 ⇒ 这条判据有一半在空转")
+        // 两档外观必须**各有一个交代**：判成了，或者显式记为未运行。
+        // 这条不要求"必须判成"—— 那正是 R39 第一版在 CI 上恒红的原因（runner 拍不出设置页）。
+        // 但它也不允许"悄悄少判一档"：`judged + notRun != 2` 只有两种来路（读不到帧、或者我改坏了循环），
+        // 两种都该红。未运行的条数由 `DISABLED_STATE_NOT_RUN` 打进日志，CI 闸门把它算进 NOT_RUN（不省略成"通过"）。
+        XCTAssertEqual(judged + notRun, 2,
+                       "两档外观应该有 2 个交代（判成或未运行），现在 judged=\(judged) notRun=\(notRun) "
+                       + "⇒ 这一档在这一台既没判成、也没被如实记账")
+        print("DISABLED_STATE_COVERAGE 判成 \(judged) 档、未运行 \(notRun) 档（共 2 档）")
+    }
+
+    /// 机器前提这把"折成决定"的尺本身要有真值表（R39b）。
+    ///
+    /// 为什么单独一条：真实环境里这一族**要么三张全有墨（本机）要么三张全无（runner）**，
+    /// 中间那一格（1 或 2 张）在两台机器上都走不到 —— 而它正是"环境问题"与"某一帧坏了"的分界。
+    /// 走不到的分支不打桩测一次，就等于没有那条分支（M183 把 `.partial` 折成 `.noneDrawn`
+    /// 就是这一格的红）。
+    func testSettingsDrawabilityTruthTable() {
+        XCTAssertEqual(Self.settingsDrawability([900, 1200, 700]), .allDrawn,
+                       "三张都有墨必须判 —— 这一格判不成，机器前提就成了免检牌")
+        XCTAssertEqual(Self.settingsDrawability([0, 0, 0]), .noneDrawn,
+                       "三张都没墨必须记未运行 —— 这是 runner 的真实形状")
+        XCTAssertEqual(Self.settingsDrawability([0, 1200, 700]), .partial(2),
+                       "只画出一部分不是环境问题：同一列要么全有要么全无，这一格必须红")
+        XCTAssertEqual(Self.settingsDrawability([900, 0, 0]), .partial(1),
+                       "只有一张有墨同样必须红（那是夹具坏了，不是机器不行）")
+        print("SETTINGS_DRAWABILITY_TRUTH_TABLE 全有=判 / 全无=未运行 / 1|2 张=红（四格全过）")
     }
 
     /// 夹具图片的字节**不能**随系统外观变。
@@ -3442,6 +3502,23 @@ final class UICaptureTests: XCTestCase {
     /// 于是三条设置页探针全部走进"有墨却贴到空白"的红分支。
     /// 判据要问的区域**必须就是它自己要读的那块区域**（R34）。
     static func columnIsDrawable(textInkPixels: Int) -> Bool { textInkPixels > 0 }
+
+    /// 三张同源帧的"内容列有没有墨"折成一个决定（R39b）。
+    ///
+    /// 为什么要写成纯函数：真实环境里这一族**要么三张全有墨（本机）要么三张全无（runner）**，
+    /// 而"只画出一部分"那一格永远走不到 —— 它恰恰是唯一能区分"环境问题"与"某一帧坏了"的那一格。
+    /// 不把它拆出来测一次，就等于这条分支没有验收（账本里"本地跑不到的分支要打桩成真值测一次"）。
+    enum SettingsDrawability: Equatable {
+        case allDrawn        // 判
+        case noneDrawn       // 显式记未运行
+        case partial(Int)    // 红：同一列不可能只画出一部分
+    }
+    static func settingsDrawability(_ inkPerFrame: [Int]) -> SettingsDrawability {
+        let drawn = inkPerFrame.filter { columnIsDrawable(textInkPixels: $0) }.count
+        if drawn == 0 { return .noneDrawn }
+        if drawn == inkPerFrame.count { return .allDrawn }
+        return .partial(drawn)
+    }
 
     /// 一块矩形里的文字墨：像素数 + 占这块矩形的比例。
     ///

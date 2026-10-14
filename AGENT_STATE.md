@@ -1481,6 +1481,16 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **验证**：718 tests / 29 skipped / 0 failures、0 告警、脚本 83 全绿、
   变异 M177–M182 六支全 CAUGHT、`RESTORE_CLEAN=yes`。自评 **91 / 100**。
 - **换装本机**：`make bundle` → 装到 `/Applications/时间剪史.app`（md5 与新包一致）→ 冷启动 `SMOKE_OK=1`。**顺带 A/B 查出新缺陷 U-64 / BACKLOG 55**：机器上已有同 bundle 实例时，守卫中止的那次启动在盘上**一行日志都不留**（header、启动标记、守卫自己那句"本次启动取消"全丢），而 `launch_smoke.py` 把这件事报成"启动失败"。两半各修各的，见 BACKLOG 55。
+- **R39b（同一轮的第二次提交）**：CI 第一次跑就红 —— run 38494383404 第 5 步 12 条红全部来自本轮新写的
+  `testDisabledToggleAndFailureReceiptAreVisible`：runner 上 `SettingsView` 内容列是平涂（BACKLOG 43），
+  于是那条判据在那里读到对比度 1.00 / 墨 0 / 差值 0，**从写出来那刻起就恒红**。
+  修法不是放宽线：补「这一台画不画得出这一页」这一问（`settingsDrawability`：三张全有 ⇒ 判；
+  三张全无 ⇒ 显式 `DISABLED_STATE_NOT_RUN`；只有 1–2 张 ⇒ 红），并把这条走不到的中间格拆成纯函数
+  打桩测一次（`testSettingsDrawabilityTruthTable` 四格 + 变异 M183 / M184）。
+  覆盖账从 `judged == 2` 换成 `judged + notRun == 2`。本机读数一字未变。
+  **这是同一族第三次犯**（R35 资格判据恒红、R37 量级地板 9.3%、R39 这条）⇒ U-65 / BACKLOG 56：
+  新写一条读像素的判据，落库前先回答「这一台画不出来时它输出什么」，且那个回答本身要能被咬。
+  自评从 91 下调到 **89**（曲线 32 轮，均值 91.0）。
 - **下一步（R40）**：BACKLOG 53 那条要么供电要么撤声明（先量一次"加了 `withAnimation` 之后
   帧序列到底有没有中间态"，量不到就写清"机器量不到"并交人工批次）；
   另把主窗口里剩下的"错误态"逐处点名（`copyFailed`、写盘失败、OCR 失败）看有没有第二处静默失败。
