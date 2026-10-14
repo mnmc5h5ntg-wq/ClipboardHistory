@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R56：读数有了第二条通道，而它第一次跑就救回 54 行）
+- `MotionFilmstripTests` 的 44 处 `MOTION_*` 读数全部改走新的 `emit`：
+  同时 `print` 与追加 `<outDir>/motion-readings.log`（第一次整份重写、之后追加、与胶片同目录）。
+  动机不是"多一份日志"：这条 stdout 通道已被观察到**整次失效**
+  （CI run 38543090198、本机 18:58 那次），而覆盖率地板与 R55 的归因都住在它上面。
+- `.github/workflows/ci.yml` 的 `Motion filmstrip` 把两条通道**取并集**并打
+  `MOTION_CHANNEL_UNIONED=1 stdout=N 文件=M`；两条都空时打 `MOTION_READINGS_FILE_ABSENT=1`
+  （下一步的 `NO_RESOLVE` 红从此有一个前因可查）。
+- **当场兑现**：加固后第一遍本机运行 stdout 只剩 2 行 `MOTION_*`，文件通道有 56 行。
+- 新守卫 `testMotionReadingsUseTheFileChannel`：正对照（两种 `print` 写法都必须被抓到）、
+  源码里不许有游离 `print("MOTION_`、marker 必须在文件里（先于"末尾两格"那一判——
+  只比末尾会让**上一遍的旧文件**把红写成假理由）、追加顺序、与胶片同目录。
+- CI 自检 `motion` 那一步从 4 个形状加到 9 个：整片丢、半丢（结论行只在文件里）、两条都空。
+- 变异 M277–M285 九支全 CAUGHT。其中 **M285 在提交前把一个设计错误顶了回去**：
+  第一版写成"以文件为准（换掉 stdout）"，而文件也可能只写了一半 ⇒ 已改成并集。
+- 机制仍未证实（丢的是子进程 stdout；stderr 与 FileManager 写盘不丢；三次 0/全/2 行）⇒
+  BACKLOG 79 的结案条件收窄成"查机制"。
+- 产品代码零改动，116 张帧逐字节不变 ⇒ 不需要 `frame_baseline update`。
+
 ### Added（R55：那条"最粗 97ms 一帧"第一次有了归因，而真读数把我第一版的分档打回来了）
 - `Grabber` 逐帧记 `cacheDisplay` 的毫秒数，`recordFrames` 打 `MOTION_GRAB … 抓帧中位/最慢 … 像素 …`，
   最慢值随 `Film` 一起带出（默认 −1 = "没量"，不是"抓帧不花钱"）。

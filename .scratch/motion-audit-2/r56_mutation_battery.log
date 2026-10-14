@@ -1,0 +1,33 @@
+预检 OK MotionFilmstripTests.testMotionReadingsUseTheFileChannel
+预检 OK ci_report_selftest
+
+M277 把一行读数退回 print ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['只走 stdout'] 还原干净=True
+
+M278 emit 只 print 不落盘 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['文件里没有这一遍的 marker'] 还原干净=True
+
+M279 每次都整份重写（不追加） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['不在末尾两格'] 还原干净=True
+
+M280 读数文件挪到别处 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['CI 那一步找不到它'] 还原干净=True
+
+M281 扫描列表清空 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel'] 命中=['正对照只抓到'] 还原干净=True
+
+M282 删掉 CI 的并集整段 ⇒ CAUGHT 红得对=True 红在 [] 命中=['夹具替换没有落地'] 还原干净=True
+
+M283 并集永远不触发（文件通道成了摆设） ⇒ CAUGHT 红得对=True 红在 ['motion/partial_stdout_loss_recovers_resolve', 'motion/stdout_lost_but_file_channel_recovers'] 命中=['stdout_lost_but_file_channel_recovers'] 还原干净=True
+
+M284 只喊用了文件、却不并回去 ⇒ CAUGHT 红得对=True 红在 ['motion/partial_stdout_loss_recovers_resolve', 'motion/stdout_lost_but_file_channel_recovers'] 命中=['stdout_lost_but_file_channel_recovers'] 还原干净=True
+
+M285 并集写成「文件覆盖 stdout」 ⇒ CAUGHT 红得对=True 红在 ['motion/partial_stdout_loss_recovers_resolve'] 命中=['partial_stdout_loss_recovers_resolve'] 还原干净=True
+
+==== 汇总 ====
+  M277 | CAUGHT | yes | yes
+  M278 | CAUGHT | yes | yes
+  M279 | CAUGHT | yes | yes
+  M280 | CAUGHT | yes | yes
+  M281 | CAUGHT | yes | yes
+  M282 | CAUGHT | yes | yes
+  M283 | CAUGHT | yes | yes
+  M284 | CAUGHT | yes | yes
+  M285 | CAUGHT | yes | yes
+红得不对/未抓到=0  还原不干净=0
+还原后复跑（Swift 守卫）：ESCAPED

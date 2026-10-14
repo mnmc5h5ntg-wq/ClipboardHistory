@@ -83,6 +83,13 @@ SUBSTITUTIONS = {
         (r"CLIPBOARD_HISTORY_UI_MOTION=1 CLIPBOARD_HISTORY_MOTION_OUT=/tmp/motion-ci \\\n\s*"
          r"swift test --filter MotionFilmstripTests > /tmp/motion\.log 2>&1 &",
          "cp FAKE_LOG /tmp/motion.log &"),
+        # R56 / BACKLOG 79：补读那一段找的是**真实 CI 的输出目录**。自检必须把它换到自己的
+        # 临时目录（`run_bash` 会把 /tmp/shots-ci 换掉），否则它读的是开发机上恰好存在的
+        # 一份旧读数 —— 那种夹具会在"本机跑过 motion suite"之后凭空变绿或变红。
+        (r"readings=/tmp/motion-ci/motion-readings\.log",
+         # `rm -f` 不是多余：这个临时目录**跨次运行复用**，上一格留下的读数文件会让
+         # "两条通道都空"那一格读到东西而凭空变绿（实测第一次就是这么红的）。
+         "rm -f /tmp/shots-ci/motion-readings.log; readings=/tmp/shots-ci/motion-readings.log"),
     ],
     # 这一步没有"被测命令"：它读上一步留下的 /tmp/motion.log。
     # R46（BACKLOG 66）之后那一步是一句 `python3 scripts/motion_floor_gate.py …`，
@@ -155,6 +162,37 @@ EXPECT = {
          (r"cp \S+ /tmp/motion\.log &", "( cp FAKE_LOG /tmp/motion.log; sleep 1 ) &")]),
     # 结论行丢了 MOTION_SUMMARY 时（比如抽取失手）这一格要红：它保证"跑过"和"读出内容"是两件事
     ("motion", "summary_missing_from_log"): (NORMAL, ["motion suite exit:", "无 MOTION_SUMMARY"], 0, []),
+    # R56 / BACKLOG 79 的正对照：**stdout 一条读数都没有，而文件通道有**。
+    # 这一步必须自己喊出 `MOTION_STDOUT_LOST=1` 并把结论行并进日志 ——
+    # 少了这一格，"补读"这段脚本就只是我声称存在的东西（它挡的是下一次 38543090198）。
+    ("motion", "stdout_lost_but_file_channel_recovers"): (
+        NORMAL,
+        ["motion suite exit:", "MOTION_CHANNEL_UNIONED=1", "MOTION_RESOLVE_SUMMARY judged=4/4"], 0,
+        [(r"readings=/tmp/shots-ci/motion-readings\.log",
+          "mkdir -p /tmp/shots-ci; printf 'MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
+          "detail-kind-change=3 empty-state=4\\nMOTION_RESOLVE_SUMMARY judged=4/4 not-run=-\\n' "
+          "> /tmp/shots-ci/motion-readings.log; readings=/tmp/shots-ci/motion-readings.log")]),
+    # 两条通道都空 ⇒ 不许静默：必须打出 `MOTION_READINGS_FILE_ABSENT=1`。
+    # 上面两格合起来钉的是**并集**这件事：
+    # `stdout_lost…` 那格是"整片丢"（stdout 0 行、文件 2 行），
+    # `partial…` 这格是"半丢"（stdout 只剩 SUMMARY，结论行只在文件里）——
+    # 真实观测到的正是第二种：结论行活着、理由行死了。
+    # 如果实现写成"文件覆盖 stdout"，这一格的 MOTION_SUMMARY 会被扔掉，
+    # 地板就会红在 MISSING_KEY 上 —— 那是把**修通道**做成**造新红**。
+    ("motion", "partial_stdout_loss_recovers_resolve"): (
+        NORMAL + "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
+                 "detail-kind-change=3 empty-state=4\n",
+        # 三条都要：`MOTION_SUMMARY` 必须**仍然在**（它只来自 stdout 那一半）。
+        # 只断言"结论行被补回来了"的话，把并集写成"文件覆盖 stdout"也能通过，
+        ["MOTION_CHANNEL_UNIONED=1 stdout=1 文件=1", "MOTION_RESOLVE_SUMMARY judged=4/4",
+         "MOTION_SUMMARY notice-banner=3"], 0,
+        [(r"readings=/tmp/shots-ci/motion-readings\.log",
+          "mkdir -p /tmp/shots-ci; printf 'MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-\\n' "
+          "> /tmp/shots-ci/motion-readings.log; readings=/tmp/shots-ci/motion-readings.log")]),
+    # 两条通道都空 ⇒ 不许静默：必须打出 `MOTION_READINGS_FILE_ABSENT=1`，
+    # 让下一步的 NO_RESOLVE 红有一个**前因**可查（R36 那条"红必须有名字"）。
+    ("motion", "both_channels_empty_is_named"): (
+        NORMAL, ["MOTION_READINGS_FILE_ABSENT=1", "无 MOTION_RESOLVE_SUMMARY"], 0, []),
     # R2 新增的形状：有 MOTION_SUMMARY 但没有"今天判了几条" ⇒ 结论行必须自己喊出来。
     # 少这一格，"判据悄悄退化成只判一条"在 CI 上是看不见的。
     ("motion", "resolve_missing_from_log"): (

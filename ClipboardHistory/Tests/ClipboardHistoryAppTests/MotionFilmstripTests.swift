@@ -43,11 +43,65 @@ final class MotionFilmstripTests: XCTestCase {
     /// `nonisolated(unsafe)` 是因为它只在主线程的测试里读写（整个类是 `@MainActor`）。
     nonisolated(unsafe) static var observableCache: [MotionClass: Bool] = [:]
 
-    private var outDir: URL {
+    /// 胶片与读数共用的输出目录（R56：两条证据通道必须住在同一个地方，见 `readingsURL`）。
+    private static var filmsDirectory: URL {
         let url = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_MOTION_OUT"]
             ?? "/tmp/motion-films", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private var outDir: URL { Self.filmsDirectory }
+
+    // MARK: - 读数的第二条通道（R56 / BACKLOG 79）
+
+    /// 读数的**第二条通道**：与胶片同一个目录里的一个文件。
+    ///
+    /// 为什么要有它：CI run 38543090198 与本机 2026-10-14 18:58 那一次是同一种坏法 ——
+    /// 测试全过、stderr 一切正常、**胶片 9 张写出来了**，而 `print` 的读数一行不剩。
+    /// 也就是说 **FileManager 那条路活着，stdout 那条死了**。
+    /// 而覆盖率地板、R55 的归因、`MOTION_SUMMARY` 的键集合，全都住在会死的那条上。
+    /// 所以读数从现在起**同时**进文件：这不是"多打一份日志"，是让"这一天的判据"
+    /// 不再依赖一条已知会整次消失的通道。
+    static var readingsURL: URL {
+        filmsDirectory.appendingPathComponent("motion-readings.log")
+    }
+
+    /// 每个进程第一次写要**整份重写**：上一遍的读数冒充这一遍，比没有读数更坏
+    /// （`MOTION_RESOLVE_SUMMARY judged=4/4` 会是从昨天带上来的）。
+    nonisolated(unsafe) static var readingsOpened = false
+
+    /// 实例侧的同名转发。Swift 不允许实例方法不加限定地调静态成员（编译期就挡），
+    /// 而 44 处读数散在两种语境里 —— 与其到处写 `Self.emit`，不如让两条语境共用一个名字。
+    private func emit(_ line: String) { Self.emit(line) }
+
+    /// 打一行读数，**并且**把它记进文件通道。所有 `MOTION_*` 行都必须走这里
+    /// （`testMotionReadingsUseTheFileChannel` 钉着这条规矩）。
+    static func emit(_ line: String) {
+        print(line)
+        guard let payload = (line + "\n").data(using: .utf8) else { return }
+        let url = readingsURL
+        do {
+            if !readingsOpened {
+                readingsOpened = true
+                try payload.write(to: url)
+                return
+            }
+            let handle = try FileHandle(forWritingTo: url)
+            handle.seekToEndOfFile()
+            handle.write(payload)
+            try? handle.close()
+        } catch {
+            // 文件通道坏了**不许**把判据变成红（那是拿环境问题判产品）。
+            // 但它必须被看见。这一行为什么故意不叫 `MOTION_*`：它不是一条读数，而是
+            // "文件通道坏了"这件事本身，且只能走 stdout。带上 MOTION_ 前缀就会被
+            // `testMotionReadingsUseTheFileChannel` 的扫描判成"有条读数没进文件"——
+            // 而那正是它要抓的形状，所以这条元信息**不能**借用读数的命名空间
+            // （否则任何人加一行 `print("MOTION_…")` 都能把那条扫描变成恒红，或者反过来
+            //  逼守卫开一个"例外名单"，例外名单就是这种规矩腐烂的地方）。
+            // 通道坏的真信号在下一步：文件里没有结论行，CI 会打 `MOTION_READINGS_FILE_ABSENT=1`。
+            print("READINGS_FILE_FAILED=\(type(of: error)) 路径=\(url.path)")
+        }
     }
 
     /// 判据：一次过渡 = **有好几帧都还在变**，而不是"某一帧变了很大一片"。
@@ -679,7 +733,7 @@ final class MotionFilmstripTests: XCTestCase {
         }
         let fractions = Self.deltas(frames)
         let span = Self.transitionFrameCount(fractions)
-        print("MOTION_BLANK frames=\(frames.count) 峰值=\(String(format: "%.4f", fractions.max() ?? 0)) 过渡帧数=\(span)")
+        emit("MOTION_BLANK frames=\(frames.count) 峰值=\(String(format: "%.4f", fractions.max() ?? 0)) 过渡帧数=\(span)")
         XCTAssertEqual(span, 0, "什么都没发生却量到了过渡 ⇒ 尺子在把重绘噪声读成动画")
     }
 
@@ -732,7 +786,7 @@ final class MotionFilmstripTests: XCTestCase {
             rows.append((scenario.name, span))
             guard film.clockIsWarm else {
                 notRun.append(scenario.name)
-                print("MOTION_NOT_RUN=clock-not-warm \(scenario.name)：触发那一刻采样还是冷的"
+                emit("MOTION_NOT_RUN=clock-not-warm \(scenario.name)：触发那一刻采样还是冷的"
                     + "（最后一格 >\(Int(Self.warmIntervalMilliseconds))ms）⇒ 一次 "
                     + "\(Int(scenario.declaredDurationMilliseconds))ms 的过程最多被拍到两三个样本，"
                     + "这把尺量不到「过程」这件事 —— 报没测到，不判产品没动")
@@ -745,7 +799,7 @@ final class MotionFilmstripTests: XCTestCase {
                 // 首尾却相同）—— 分不清"变更发生在第一帧之前"与"演完又落回原样"，
                 // 下一轮就只能再猜一次。两个数都打出来：首尾差、卷内最大差。
                 let deltas = Self.deltas(frames)
-                print("MOTION_NOT_RUN=premise-not-visible \(scenario.name)：首尾两帧逐像素相同 ⇒ "
+                emit("MOTION_NOT_RUN=premise-not-visible \(scenario.name)：首尾两帧逐像素相同 ⇒ "
                     + "这一卷里看不到「这次变更」，后面读到的几帧变化不能算在过渡头上。"
                     + "卷内最大逐帧差=\(deltas.max().map { String(format: "%.3f", $0) } ?? "无") "
                     + "过渡帧数=\(span)（>0 就说明变更演过了，只是没留在首尾对照里）")
@@ -767,7 +821,7 @@ final class MotionFilmstripTests: XCTestCase {
             writeStrip(scenario.name, frames)
             guard let elapsed, let worstInRun else {
                 notRun.append(scenario.name)
-                print("MOTION_NOT_RUN=no-changed-run \(scenario.name)：读不出「变化段」的时长 ⇒ 既不判红也不判绿")
+                emit("MOTION_NOT_RUN=no-changed-run \(scenario.name)：读不出「变化段」的时长 ⇒ 既不判红也不判绿")
                 continue
             }
             switch Self.judgeMotion(elapsedMilliseconds: elapsed,
@@ -776,7 +830,7 @@ final class MotionFilmstripTests: XCTestCase {
                                     changedFrames: span) {
             case .clockTooCoarse:
                 notRun.append(scenario.name)
-                print("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "
+                emit("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "
                     + "一帧、整段过渡只有 \(Int(scenario.declaredDurationMilliseconds))ms（门槛 0.3×声明）⇒ "
                     + "这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿"
                     + Self.grabAttributionLabel(worstIntervalMilliseconds: worstInRun,
@@ -791,8 +845,8 @@ final class MotionFilmstripTests: XCTestCase {
             }
         }
         // 形状固定：MOTION_SUMMARY 永远列出全部场景（CI 那一步与它的自测夹具都按这个形状读）。
-        print("MOTION_SUMMARY " + rows.map { "\($0.name)=\($0.span)" }.joined(separator: " "))
-        print("MOTION_RESOLVE_SUMMARY judged=\(judged)/\(rows.count) not-run=\(notRun.isEmpty ? "-" : notRun.joined(separator: ","))")
+        emit("MOTION_SUMMARY " + rows.map { "\($0.name)=\($0.span)" }.joined(separator: " "))
+        emit("MOTION_RESOLVE_SUMMARY judged=\(judged)/\(rows.count) not-run=\(notRun.isEmpty ? "-" : notRun.joined(separator: ","))")
         guard judged > 0 else {
             throw XCTSkip("MOTION_NOT_RUN=clock-too-coarse：\(notRun.count) 个场景全都分辨不了（采样比整段过渡还粗），这一条今天没有内容")
         }
@@ -890,7 +944,7 @@ final class MotionFilmstripTests: XCTestCase {
             }
             return list.isEmpty ? "无" : list.joined(separator: ",")
         }
-        print("MOTION_HEAT_RUNS 开A [\(runs(onFilmA.motionStamps, onA))] 开B [\(runs(onFilmB.motionStamps, onB))]"
+        emit("MOTION_HEAT_RUNS 开A [\(runs(onFilmA.motionStamps, onA))] 开B [\(runs(onFilmB.motionStamps, onB))]"
             + " 关 [\(runs(offFilm.motionStamps, off))]"
             + "  跨度A=\(ms(spanA))ms 跨度B=\(ms(spanB))ms 整卷中位=\(ms(interval))ms")
         func label(_ v: FadeVisibility) -> String {
@@ -902,7 +956,7 @@ final class MotionFilmstripTests: XCTestCase {
             case .visibleToThisRuler: return "看得见"
             }
         }
-        print("MOTION_HEAT_FADE_A/B 预热 时长=\(ms(elapsedWarm))ms 帧数=\(Self.transitionFrameCount(Self.deltas(warmup.motionFrames)))"
+        emit("MOTION_HEAT_FADE_A/B 预热 时长=\(ms(elapsedWarm))ms 帧数=\(Self.transitionFrameCount(Self.deltas(warmup.motionFrames)))"
             + " 开A 时长=\(ms(elapsedA))ms 帧数=\(Self.transitionFrameCount(onA))"
             + " 开B 时长=\(ms(elapsedB))ms 帧数=\(Self.transitionFrameCount(onB))"
             + " 峰值=\(String(format: "%.3f", Self.peak(onA)))"
@@ -923,13 +977,13 @@ final class MotionFilmstripTests: XCTestCase {
         case .inconsistent(let a, let b):
             // 这一格**不红**，但必须把两个数打出来：它说的是"这条通道不能当判据"，
             // 而把"抓不到"判成产品缺陷就是 R39 那一族的恒红。
-            print("MOTION_NOT_RUN=fade-channel-duty-cycle heat-first-record："
+            emit("MOTION_NOT_RUN=fade-channel-duty-cycle heat-first-record："
                 + "同一条产品路径连抓两遍，一遍算看得见（\(ms(a))ms）、一遍算看不见（\(ms(b))ms）⇒ "
                 + "这条通道的占空比不是 100%，今天既不能说看得见也不能说看不见")
         case .clockTooCoarse(let worstA, let worstB):
             // 这一格**不红**，而且它连"看不见"都不许说：钟在过程中间停过，
             // 时长读数就没有资格参与判定（R48 的靶就是把这一格从"看不见"里分出来）。
-            print("MOTION_NOT_RUN=clock-coarse-in-window heat-first-record："
+            emit("MOTION_NOT_RUN=clock-coarse-in-window heat-first-record："
                 + "峰值那一段内部最粗的一次采样是 \(ms(worstA)) / \(ms(worstB))ms，"
                 + "而这条过渡声明 \(Int(scenario.declaredDurationMilliseconds))ms ⇒ "
                 + "今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT）"
@@ -944,7 +998,7 @@ final class MotionFilmstripTests: XCTestCase {
             XCTFail("两遍都说「还在变」覆盖的时长比对照臂长出一个采样间隔以上 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
                     + "把 `heatFirstRecord()` 放回 `Scenario.all()` 当真判据，别留这条当免责")
         case .notVisibleToThisRuler:
-            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
+            emit("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay heat-first-record："
                 + "两遍开臂的时长读数没有落进「≥0.3×声明 且 ≤声明+2×间隔」这条窗口"
                 + "（\(ms(elapsedA)) / \(ms(elapsedB)) vs 声明 \(Int(scenario.declaredDurationMilliseconds))ms，"
                 + "对照臂 \(ms(elapsedOff))ms）⇒ 今天这把尺没看见这条淡入，只能记「源码已接、产物未量」。"
@@ -1114,6 +1168,67 @@ final class MotionFilmstripTests: XCTestCase {
                       "`Grabber.tick` 不再记录每次抓帧耗时 ⇒ 上面两条接的都是一个空数组")
     }
 
+    /// 读数必须有第二条通道，而且**所有**读数都得走它（R56 / BACKLOG 79 / U-82）。
+    ///
+    /// 为什么这条判据不开 `CLIPBOARD_HISTORY_UI_MOTION` 门：它管的是"证据能不能活下来"，
+    /// 而不是"产品动没动"。CI 上那些**没有**开 motion 门的全量运行，正好是这条判据唯一
+    /// 每次都能跑的地方 —— 一开闸门，它就变成只有本机才有的判据，而丢读数的正是 CI。
+    ///
+    /// 两半各管一种坏法：
+    /// ① 源码扫描：还留着 `print("MOTION_` 的那一行等于把那条读数留在会死的通道上；
+    /// ② 通道本身：`emit` 之后必须能在文件里读到，而且**后写的行必须在文件末尾**
+    ///    （只判"文件里有这行"抓不到"每次都整份重写"那种坏法 —— 那会只留下最后一行）。
+    func testMotionReadingsUseTheFileChannel() throws {
+        // ① 被搜的串不能原样出现在守卫自己的文本里（R55 的 M276 就栽过一次：
+        //    守卫在自己的失败消息里读到了被搜的串，于是把真调用删掉它仍然绿）。
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        let needles = ["print" + "(\"MOTION_", "print" + "(String(format: \"MOTION_"]
+        // 正对照：先证明**这把尺看得见**它要抓的东西。
+        // 没有这一格，把 `needles` 换成空数组就能让整条扫描恒绿 ——
+        // 而"扫描列表空了"恰好是这条判据最省事的坏法（本仓库记过：自适应阈值恒真）。
+        let positiveControl = ["  " + "print" + "(\"MOTION_X 1\")",
+                               "  " + "print" + "(String(format: \"MOTION_Y %@\", a))",
+                               "  emit(\"MOTION_Z 1\")"]
+        let caught = positiveControl.filter { line in needles.contains { line.contains($0) } }
+        XCTAssertEqual(caught.count, 2,
+            "正对照只抓到 \(caught.count)/2 种写法 ⇒ 这条扫描本身是坏的，"
+                + "下面那句\"没有游离读数\"因此什么都没说")
+        let strays = source.components(separatedBy: "\n").filter { line in
+            needles.contains { line.contains($0) }
+        }
+        XCTAssertTrue(strays.isEmpty,
+            "有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
+                + " ⇒ 通道丢一次的那天，这些读数一条都不剩（BACKLOG 79）。改走 `emit`")
+        // ② 通道本身。marker 带 uuid：同一台机器上并跑两遍时，读到别人的行也算通过的话，
+        //    这条判据就只是在读"有人写过这个文件"。
+        let marker = "MOTION_SELFTEST_\(UUID().uuidString.prefix(8))"
+        let second = marker + "-2"
+        emit(marker)
+        emit(second)
+        let text: String
+        do {
+            text = try String(contentsOf: Self.readingsURL, encoding: .utf8)
+        } catch {
+            XCTFail("文件通道没写出来（\(Self.readingsURL.path)）⇒ `emit` 只剩 print，BACKLOG 79 没修")
+            return
+        }
+        let lines = text.split(separator: "\n").map(String.init)
+        // 先判"这一遍的 marker 在不在里面"。顺序要紧：只判末尾两格的话，
+        // **上一遍留下的同名文件**也能让这一格红得让人以为是追加逻辑坏了
+        // （R56 电池第一次跑 M278 就是这个形状：红是对的，理由写错了）。
+        XCTAssertTrue(text.contains(marker),
+            "文件里没有这一遍的 marker ⇒ 要么没落盘，要么读到的是**上一遍**的旧文件"
+                + "（末尾现在是 \(lines.suffix(2))）")
+        XCTAssertEqual(Array(lines.suffix(2)), [marker, second],
+            "marker 在文件里，但**不在末尾两格** ⇒ 追加逻辑坏了（整份重写会吃掉前面的读数），"
+                + "或者写的顺序反了。末尾实际是：\(lines.suffix(2))")
+        // ③ 这条通道必须与胶片同目录：CI 那一步只知道一个 `CLIPBOARD_HISTORY_MOTION_OUT`，
+        //    落在别处等于没落。
+        XCTAssertEqual(Self.readingsURL.deletingLastPathComponent().path,
+                       Self.filmsDirectory.path,
+                       "读数文件不在胶片目录里 ⇒ CI 那一步找不到它，补不回来")
+    }
+
     /// 归因说"该缩小捕获区域"——**这句话本身必须是可证的**（R55 / BACKLOG 77 的前提）。
     ///
     /// 为什么单独立一条，而不是信"位图越大越慢"这种直觉：
@@ -1177,7 +1292,7 @@ final class MotionFilmstripTests: XCTestCase {
         }
         let medians = samples.map { Self.median($0) }
         for index in arms.indices {
-            print("MOTION_GRAB_AREA \(arms[index].name) 面积=\(String(format: "%.0f", Double(arms[index].rect.width * arms[index].rect.height)))pt²"
+            emit("MOTION_GRAB_AREA \(arms[index].name) 面积=\(String(format: "%.0f", Double(arms[index].rect.width * arms[index].rect.height)))pt²"
                   + " 样本=\(samples[index].count) 中位=\(String(format: "%.1f", medians[index]))ms"
                   + " 最慢=\(String(format: "%.1f", samples[index].max() ?? -1))ms")
         }
@@ -1193,7 +1308,7 @@ final class MotionFilmstripTests: XCTestCase {
         guard big >= Self.grabCostFloorMilliseconds else {
             // 打出来，不判红：这台机器上整帧抓完不到 5ms，面积差落在噪声里，
             // 此时「面积不影响成本」与「面积影响但看不出来」两种说法无法区分。
-            print("MOTION_GRAB_AREA_SKIP=below-noise-floor 全视图中位=\(String(format: "%.1f", big))ms"
+            emit("MOTION_GRAB_AREA_SKIP=below-noise-floor 全视图中位=\(String(format: "%.1f", big))ms"
                   + " 低于 \(Self.grabCostFloorMilliseconds)ms ⇒ 今天量不出面积效应，"
                   + "不许据此说 BACKLOG 77 的缩区域无效")
             return
@@ -1545,7 +1660,7 @@ final class MotionFilmstripTests: XCTestCase {
         }
         let fractions = Self.deltas(frames)
         let span = Self.transitionFrameCount(fractions)
-        print("MOTION_AB \(scenario.name) 曲线关闭 采样≈\(Self.sampleIntervalMilliseconds(film.motionStamps))ms 过渡帧数=\(span) "
+        emit("MOTION_AB \(scenario.name) 曲线关闭 采样≈\(Self.sampleIntervalMilliseconds(film.motionStamps))ms 过渡帧数=\(span) "
             + "逐帧=[\(fractions.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
         XCTAssertLessThan(span, Self.minimumTransitionFrames,
                           "关掉目录曲线之后仍然读到 \(span) 帧在动 ⇒ 判据量的不是我们的动画，上面的绿不可信")
@@ -1580,7 +1695,7 @@ final class MotionFilmstripTests: XCTestCase {
         // （三臂交替实测：同一份代码给出三套不同的红集合，BACKLOG 第 6 条）。
         let residual = Self.settleResidualRatio(film.motionFrames, after: 1, band: band)
         let fractions = Self.deltas(film.motionFrames, band: band)
-        print("MOTION_CUT \(scenario.name) 带内过渡帧数=\(Self.transitionFrameCount(fractions)) "
+        emit("MOTION_CUT \(scenario.name) 带内过渡帧数=\(Self.transitionFrameCount(fractions)) "
             + "落定残余=\(String(format: "%.3f", residual)) "
             + "逐帧=[\(fractions.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
         XCTAssertLessThan(residual, 0.15,
@@ -1594,13 +1709,13 @@ final class MotionFilmstripTests: XCTestCase {
         let interval = Self.sampleIntervalMilliseconds(fading.motionStamps)
         guard let mid = Self.midFlightPreRollFrames(durationMilliseconds: banner.declaredDurationMilliseconds,
                                                    sampleMilliseconds: interval) else {
-            print("MOTION_NOT_RUN=clock-too-coarse control=notice-banner 采样≈\(interval)ms "
+            emit("MOTION_NOT_RUN=clock-too-coarse control=notice-banner 采样≈\(interval)ms "
                 + "声明=\(Int(banner.declaredDurationMilliseconds))ms ⇒ 过渡的一半落在同一帧里")
             throw XCTSkip("MOTION_NOT_RUN=clock-too-coarse：阳性对照无从判定。它一缺席，"
                 + "上面那条「行没在动」就没有分辨率证据 ⇒ 报 skip 并说明，不报绿也不报红")
         }
         let fadingResidual = Self.settleResidualRatio(fading.motionFrames, after: mid)
-        print("MOTION_CUT_CONTROL notice-banner 采样≈\(interval)ms 中点帧=\(mid) "
+        emit("MOTION_CUT_CONTROL notice-banner 采样≈\(interval)ms 中点帧=\(mid) "
             + "落定残余=\(String(format: "%.3f", fadingResidual))")
         XCTAssertGreaterThan(fadingResidual, 0.15,
                              "连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率，上面那条绿是空的")
@@ -1816,13 +1931,13 @@ final class MotionFilmstripTests: XCTestCase {
         // 残差读成 0 ⇒ 判据把尺子的分辨率问题报成"过渡没接上"（本机三臂实测就是这样红的）。
         guard let mid = Self.midFlightPreRollFrames(durationMilliseconds: scenario.declaredDurationMilliseconds,
                                                    sampleMilliseconds: interval) else {
-            print("MOTION_NOT_RUN=clock-too-coarse detail-kind-change 采样≈\(interval)ms "
+            emit("MOTION_NOT_RUN=clock-too-coarse detail-kind-change 采样≈\(interval)ms "
                 + "声明=\(Int(scenario.declaredDurationMilliseconds))ms ⇒ 取不到过渡中点")
             throw XCTSkip("MOTION_NOT_RUN=clock-too-coarse：这一半无从判定，既不判红也不判绿")
         }
         let crossfade = Self.settleResidualRatio(kindChange.motionFrames, after: mid, band: band)
         let kindFractions = Self.deltas(kindChange.motionFrames, band: band)
-        print("MOTION_DETAIL kind-change 采样≈\(interval)ms 中点帧=\(mid) "
+        emit("MOTION_DETAIL kind-change 采样≈\(interval)ms 中点帧=\(mid) "
             + "带内过渡帧数=\(Self.transitionFrameCount(kindFractions)) "
             + "落定残余=\(String(format: "%.3f", crossfade))")
         XCTAssertGreaterThan(crossfade, 0.15,
@@ -1832,7 +1947,7 @@ final class MotionFilmstripTests: XCTestCase {
         let sameKind = record(Scenario.detailSameKind())
         let snap = Self.settleResidualRatio(sameKind.motionFrames, after: 1, band: band)
         let sameFractions = Self.deltas(sameKind.motionFrames, band: band)
-        print("MOTION_DETAIL same-kind 带内过渡帧数=\(Self.transitionFrameCount(sameFractions)) "
+        emit("MOTION_DETAIL same-kind 带内过渡帧数=\(Self.transitionFrameCount(sameFractions)) "
             + "落定残余=\(String(format: "%.3f", snap))")
         XCTAssertLessThan(snap, 0.15,
                           "两条文本之间也在淡 ⇒ 每次方向键翻记录都演一遍，那是负债")
@@ -1867,7 +1982,7 @@ final class MotionFilmstripTests: XCTestCase {
         let off = Self.deltas(offFilm.motionFrames, band: band)
         let onSpan = Self.transitionFrameCount(on)
         let offSpan = Self.transitionFrameCount(off)
-        print("MOTION_DETAIL_AB empty-to-content 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on)))"
+        emit("MOTION_DETAIL_AB empty-to-content 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on)))"
             + " 冷闸=\(onFilm.clockIsWarm)  关 帧数=\(offSpan) 峰值=\(String(format: "%.3f", Self.peak(off)))"
             + " 采样≈\(Self.sampleIntervalMilliseconds(onFilm.motionStamps))ms")
         XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
@@ -1875,7 +1990,7 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(onFilm.clockIsWarm && offFilm.clockIsWarm,
                       "有一臂是在冷采样下抓的 ⇒ 两臂相同不能算尺子的极限，这条结论今天不成立")
         if onSpan == offSpan, abs(Self.peak(on) - Self.peak(off)) < 0.02 {
-            print("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content："
+            emit("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content："
                 + "开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」")
         } else {
             XCTFail("两臂读数不同 ⇒ 这把尺**看得见**这条交叉淡 ⇒ 把本条改成硬判据"
@@ -1902,12 +2017,12 @@ final class MotionFilmstripTests: XCTestCase {
         let film = record(scenario)
         let interval = Self.sampleIntervalMilliseconds(film.motionStamps)
         guard Self.premisePictureChanged(film.motionFrames, band: band) else {
-            print("MOTION_NOT_RUN=premise-not-visible banner-in 带内触发前后逐像素相同 ⇒ 这次变更在画面里不存在")
+            emit("MOTION_NOT_RUN=premise-not-visible banner-in 带内触发前后逐像素相同 ⇒ 这次变更在画面里不存在")
             throw XCTSkip("MOTION_NOT_RUN=premise-not-visible：落定态与起始态相同，落定时长无从谈起")
         }
         guard let settled = Self.settledAtFrame(film.motionFrames, band: band) else {
             let steps = Self.deltas(film.motionFrames, band: band)
-            print("MOTION_NOT_RUN=no-visible-change banner-in 帧数=\(film.motionFrames.count) 采样≈\(interval)ms "
+            emit("MOTION_NOT_RUN=no-visible-change banner-in 帧数=\(film.motionFrames.count) 采样≈\(interval)ms "
                 + "峰值相邻差=\(String(format: "%.4f", steps.max() ?? -1)) "
                 + "带内逐帧相邻差=\(steps.map { String(format: "%.3f", $0) })"
                 + " ⇒ 这一带从头到尾没变过（没触发，或者没框到）")
@@ -1915,14 +2030,14 @@ final class MotionFilmstripTests: XCTestCase {
         }
         let duration = scenario.declaredDurationMilliseconds
         let settledMilliseconds = Double(settled) * Double(max(interval, 1))
-        print("MOTION_SETTLE banner-in 到位帧=\(settled) 采样≈\(interval)ms ⇒ 实测落定≈\(Int(settledMilliseconds))ms"
+        emit("MOTION_SETTLE banner-in 到位帧=\(settled) 采样≈\(interval)ms ⇒ 实测落定≈\(Int(settledMilliseconds))ms"
             + "（声明 \(Int(duration))ms）")
         // "有过程"那一半只在时钟切得出至少 3 帧时才判：否则一次正确的过渡本来就会在两帧内到位。
         if Self.resolvableFrames(durationMilliseconds: duration, sampleMilliseconds: interval) >= 3 {
             XCTAssertGreaterThanOrEqual(settled, 2,
                                         "触发后的第 \(settled) 帧就已经是最终态 ⇒ 这条位移档没有过程")
         } else {
-            print("MOTION_NOT_RUN=clock-too-coarse settle-process 采样≈\(interval)ms 声明=\(Int(duration))ms"
+            emit("MOTION_NOT_RUN=clock-too-coarse settle-process 采样≈\(interval)ms 声明=\(Int(duration))ms"
                 + " ⇒ 「有几帧在动」这一半无从判定（上限那一半照判）")
         }
         XCTAssertLessThanOrEqual(settledMilliseconds, duration * 2 + Double(interval),
@@ -1951,8 +2066,8 @@ final class MotionFilmstripTests: XCTestCase {
         MotionCatalog.animationsEnabled = false
         let off = Self.deltas(record(scenario).frames, band: band)
         MotionCatalog.animationsEnabled = true
-        print("MOTION_SYMBOL row-star 开 帧数=\(Self.transitionFrameCount(on)) 峰值=\(String(format: "%.3f", Self.peak(on)))")
-        print("MOTION_SYMBOL row-star 关 帧数=\(Self.transitionFrameCount(off)) 峰值=\(String(format: "%.3f", Self.peak(off)))")
+        emit("MOTION_SYMBOL row-star 开 帧数=\(Self.transitionFrameCount(on)) 峰值=\(String(format: "%.3f", Self.peak(on)))")
+        emit("MOTION_SYMBOL row-star 关 帧数=\(Self.transitionFrameCount(off)) 峰值=\(String(format: "%.3f", Self.peak(off)))")
         XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
                              "带里什么都没变 ⇒ 我连星标在哪都没框到，这条'测不到'的结论本身不成立")
         XCTAssertEqual(Self.transitionFrameCount(on), Self.transitionFrameCount(off),
@@ -1988,8 +2103,8 @@ final class MotionFilmstripTests: XCTestCase {
         let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
         let animatedSpan = Self.transitionFrameCount(animated)
         let instantSpan = Self.transitionFrameCount(instant)
-        print("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
-        print("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
+        emit("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
+        emit("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
         // 数字先打，再决定"是产品没动还是这台机器没给前提"。问的是**布局那一臂**：
         // runner 上行动画量得到（3 帧），拿渐变那一臂去问会把它一起 skip 掉。
         try await requireObservableMotion(.layout)
@@ -2027,9 +2142,9 @@ final class MotionFilmstripTests: XCTestCase {
         let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
         let animatedSpan = Self.transitionFrameCount(animated)
         let instantSpan = Self.transitionFrameCount(instant)
-        print("MOTION_NATIVE row-move 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated)))"
+        emit("MOTION_NATIVE row-move 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated)))"
             + " 采样≈\(animatedInterval)ms")
-        print("MOTION_NATIVE row-move 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant)))"
+        emit("MOTION_NATIVE row-move 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant)))"
             + " 采样≈\(instantInterval)ms")
         // R53：结论行**打在两道 skip 之前**。
         //
@@ -2048,7 +2163,7 @@ final class MotionFilmstripTests: XCTestCase {
             case .samplingMissed: return "采样错过"
             }
         }()
-        print("MOTION_NATIVE_MOVE 判定=\(verdictLabel) 峰值容差="
+        emit("MOTION_NATIVE_MOVE 判定=\(verdictLabel) 峰值容差="
             + String(format: "%.3f", Self.nativeMovePeakTolerance)
             + "（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）"
             + "；这一行只说读数怎么读，产品结论要过下面两道 skip 才算")
@@ -2072,7 +2187,7 @@ final class MotionFilmstripTests: XCTestCase {
                     + "而 `wasActive` 为真 ⇒ "
                     + "「通道瞎了」与「进程没激活」这两个解释都不成立（BACKLOG 75）")
         case .samplingMissed(let a, let ap, let i, let ip):
-            print("MOTION_NOT_RUN=native-move-sampling-missed row-move："
+            emit("MOTION_NOT_RUN=native-move-sampling-missed row-move："
                 + "两臂都只读到 \(a)/\(i) 帧，但峰值差 \(String(format: "%.3f", abs(ap - ip))) "
                 + "超过 \(String(format: "%.3f", Self.nativeMovePeakTolerance)) ⇒ "
                 + "说不清是没动还是采样错过，今天不判产品")
@@ -2138,8 +2253,8 @@ final class MotionFilmstripTests: XCTestCase {
         let moved = Self.deltas(probe.recordProductSequence(selectionChanges: true))
         let sameSpan = Self.transitionFrameCount(sameRow)
         let movedSpan = Self.transitionFrameCount(moved)
-        print("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow)))")
-        print("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved)))")
+        emit("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow)))")
+        emit("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved)))")
         try await requireObservableMotion(.layout)
         try requireAppWasActive(probe.wasActive)
         XCTAssertGreaterThan(Self.peak(sameRow), Self.minimumVisibleChange,
@@ -2174,8 +2289,8 @@ final class MotionFilmstripTests: XCTestCase {
         let running = Self.deltas(runningFrames)
         let interval = Self.sampleIntervalMilliseconds(probe.lastStamps)
         let stopped = Self.deltas(probe.record(reduceMotion: true))
-        print("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
-        print("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
+        emit("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
+        emit("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
         // 骨架扫光属于**渐变几何**那一类 —— 必须问同一类的对照臂，
         // 否则 runner 看得见布局位移、看不见渐变位移，会把这条判成产品坏了（run 38259612264 就是这个形状）。
         try await requireObservableMotion(.gradient)
@@ -2192,7 +2307,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// 所以这是一个**前提**而不是判据：拿不到就报 not-run。
     /// 产品里这个前提天然成立 —— 浮层是 `makeKeyAndOrderFront` + `NSApp.activate`（D-041）。
     private func requireAppWasActive(_ wasActive: Bool) throws {
-        if !wasActive { print("MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画") }
+        if !wasActive { emit("MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画") }
         try XCTSkipUnless(wasActive,
                           "MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，"
                           + "AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动")
@@ -2229,7 +2344,7 @@ final class MotionFilmstripTests: XCTestCase {
         let observable = Self.peak(control) > Self.minimumVisibleChange
         Self.observableCache[klass] = observable
         if !observable {
-            print("MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control))) 帧数=\(frames.count)")
+            emit("MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control))) 帧数=\(frames.count)")
         }
         try XCTSkipIf(!observable, "MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
     }
@@ -2241,10 +2356,10 @@ final class MotionFilmstripTests: XCTestCase {
         try skipUnlessEnabledAndCapable()
         let frames = StateTickProbe().record(motionClass: .layout)
         let fractions = Self.deltas(frames)
-        print("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
+        emit("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
         let gradient = StateTickProbe().record(motionClass: .gradient)
         let gradientFractions = Self.deltas(gradient)
-        print("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+        emit("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
         let layoutObservable = Self.peak(fractions) > Self.minimumVisibleChange
         Self.observableCache[.layout] = layoutObservable
         Self.observableCache[.gradient] = Self.peak(gradientFractions) > Self.minimumVisibleChange
@@ -2666,7 +2781,7 @@ final class MotionFilmstripTests: XCTestCase {
         // 若 N 是 runloop 没醒，那两条都白做（而 `clock-coarse-in-window` 只会一遍遍报"N 太大"）。
         // 这一行是**证据**，不是判据：它不决定红绿，决定的是 BACKLOG 77 那三条候选路该走哪条。
         let pixels = grabber.frames.first.map { "\($0.width)×\($0.height)px" } ?? "无帧"
-        print(String(format: "MOTION_GRAB %@ 帧数=%d 抓帧中位=%.1fms 抓帧最慢=%.1fms "
+        emit(String(format: "MOTION_GRAB %@ 帧数=%d 抓帧中位=%.1fms 抓帧最慢=%.1fms "
                      + "视图=%.0f×%.0fpt 像素=%@ 声明=%dms",
                      scenario.name, grabber.frames.count, grabber.medianGrabMilliseconds,
                      grabber.worstGrabMilliseconds, host.bounds.width, host.bounds.height, pixels,

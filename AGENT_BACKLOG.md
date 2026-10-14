@@ -1557,6 +1557,11 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     R52 已经把这一格变成**有名字的红**（`MOTION_FLOOR_SKIPS` 会把 skip 原因逐条打出来），
     结案条件：下一次 runner 运行里读那一行 —— 它要么直接给出原因，要么证明"连 skip 都没有"，
     那时 ③ 就是唯一剩下的解释，要单独查打印通道。
+    **R56 补的关键一块**：这条通道**加固过了**（读数同时进 `motion-readings.log`，CI 取并集），
+    所以"CI 上有没有读数"从此不再取决于 stdout。加固后第一遍本机就抓到
+    stdout 只剩 2 行而文件有 56 行 ⇒ 当初那次"整次没读数"如果重演，
+    地板拿到的仍是完整读数，`NO_RESOLVE` 那一支只在**两条通道都空**时才红。
+    机制仍未证实（见 BACKLOG 79 的结案条件）。
 
 79. **动效读数会整次消失：本机 1/3 复现，原因未证实**（R55 开 / U-82）：
     同一条命令（`CLIPBOARD_HISTORY_UI_MOTION=1 swift test --filter MotionFilmstripTests`）
@@ -1575,3 +1580,14 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     ② 查 SwiftPM 的 stdout 转发并在 CI 里改用 `--xctestlist`/直接跑 `.xctest`；
     ③ 给覆盖率地板加一条"stdout 空但 suite 跑完 ⇒ 红"（**已经有了**：`NO_RESOLVE`，
     所以这一格今天在 CI 上是会红的 —— 也就是说这条通道的故障**已被记账**，只是没被解释）。
+    **R56 已加固（机制仍未证实）**：44 处 `MOTION_*` 读数全部改走 `emit`
+    （stdout + `<outDir>/motion-readings.log`，第一次整份重写、之后追加），
+    CI 的 `Motion filmstrip` 那一步把两条通道**取并集**并打
+    `MOTION_CHANNEL_UNIONED=1 stdout=N 文件=M`。
+    兑现得比预期快：加固后第一遍本机就出现 **stdout 2 行 / 文件 56 行**
+    （活下来的正是 `MOTION_SUMMARY` 与结论行，死掉的是 54 行理由与逐卷读数）。
+    守卫 `testMotionReadingsUseTheFileChannel`（含正对照）+ 变异 M277–M285 九支全 CAUGHT。
+    **结案条件改窄成"查机制"**：现在能说的是"丢的是子进程 stdout，stderr 与 FileManager 写盘不丢，
+    且可部分发生（三次：0 / 全 / 2 行）"；还没能说的是为什么。
+    下一次再看到 `stdout=N 文件=M` 且 N≠M，就把两边的行做集合差，看丢的是不是**同一个前缀段**
+    —— 那能区分"缓冲没刷"与"两个写者抢同一个 fd"。
