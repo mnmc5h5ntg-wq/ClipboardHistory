@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+## [Unreleased]
+
+### Added（R59：中间态第一次看得清 —— 逐帧图按原始像素竖排，并钉住"这一叠不是一叠同一张"）
+- `writeStack`：带捕获那一卷（96px 高）以前和整窗卷共用 `writeStrip`（按 `width/2` 画）
+  ⇒ 横幅那条被缩成 38px 的一行色块，"要看的东西正好被缩掉了"。现在它按**原始像素**竖排
+  （十帧 1520×980，第 0 帧在最上面，帧间 2px 暗线），并新增判据
+  `testBannerFrameStacksAreReadableEvidence`：文件必须存在、宽高必须按原始像素算出来、
+  且**这一叠里至少有一对帧真的不同** —— 最后一句是关键：一叠同一张图也能写出正确尺寸的文件。
+- 两条新测量：`MOTION_COLUMN`（侧栏 x<280pt vs 详情区 x>280pt 的逐帧变化量与落定帧号）、
+  `MOTION_TRACK` + `MOTION_TRACK_BOX`（红色警告图标的质心、外框上下沿、像素数）。
+- CI 的动效那一步现在会把**红的理由**打出来：`grep -E "error: -\[" /tmp/motion.log | head -12`。
+  现场是 run 38576482491：`testTransitionsAreActuallyRunning` 红了 7.443s、`motion suite exit: 1`，
+  而日志里只有名字（自检 `red_test_prints_its_reason` 钉住它，M305 摘掉这句就打红）。
+
+### Fixed（R59：本轮把自己上一轮写进台账的两个"证据数"撤了）
+- ~~"撤走横幅时两栏以不同进度消失（侧栏 8–11 帧 / 详情区 13 帧）"~~：
+  `transitionFrameCount` 的门槛是**各自峰值**的 15% ⇒ 两块区域各归一化，峰值大（墨多）的那块
+  被一条更高的绝对线先判停。新增 `sharedMovingFloor`（两块峰值里较大者 × 同一个 15%）之后，
+  本机五遍两栏"最后一个还在变的帧号"**完全相同**（16/16、17/17、17/17、17/17、16/16）。
+  ⇒ 那条轴量的不是时间，是墨量。措辞改由 `columnSettlementVerdict` 从帧号生成，
+  并由合成真值表 `testSharedFloorColumnComparisonIsATruthTable` 钉住四种形状（M306/M307 有牙）。
+- ~~"图标质心从 42 漂到 29px ⇒ 横幅在被抬走"~~：图标淡到判色线以下时高饱和边缘先脱落，
+  剩下的像素聚在哪半边质心就往哪边漂 ⇒ 那条轴量的是**阈值在动**。
+  改成只看强帧（像素数 ≥ 首帧一半）并新增**外框上下沿**这条轴之后：强帧跨度 2.6/0/0/0/0px、
+  外框 4/5 遍一格没挪（[29,50]→[29,50]）⇒ "上移 6.5pt"作废。
+  也没写成"绝对没动"：第 1 遍下沿上移 4px，正落在脱落量级里，±2px 容差分不开"脱落"与"被裁"。
+  顺带**部分恢复** R22 那句"它是淡出，不是塌陷"——淡出这一半被外框证实了。
+- 留在的那件事实只有一条，且**没有判成缺陷**：第 5 帧起侧栏搜索框已经上移到横幅那一行、
+  画在还没淡完的横幅文字之上（字的下半是被**盖住**的，不是被裁的），详情区那半截尾巴还在原高度淡。
+  ⇒ 形状是**层叠**（`.bannerOut` 只给 `.opacity`、布局却已重排），要不要修等真屏幕（批次 59.1 / BACKLOG 85）。
+- 测试目标里那条 `warning: variable 'a' was never mutated`（R58 引入）修掉。
+- `scripts/motion_floor_expectations.json` 里 R57 那句"runner 侧还没有一次带捕获的读数"更正为实测：
+  带=抓帧中位 5.6ms / 间隔中位 22ms / 760x48px，整窗=14.1ms / 22ms / 760x588px
+  ⇒ **带在 runner 上买到的是时间不是分辨率**（两臂过渡帧数都是 3）。BACKLOG 83 结案。
+
+### Changed（R59：那条"构建 0 告警"以前不编译测试目标）
+- CI 的 `Build (must be warning-free)` 改成 `swift build --build-tests`，并在红的时候多打
+  `grep 'warning:' | head -12`（红了要能读是哪一条）。以前它只编译 `Sources/` ⇒
+  测试目标里的告警从来没进过这条闸门（R58 那条告警在 `swift test` 输出里明明白白，两次 CI 都是绿的）。
+  收紧前先量了清洁基线：`swift build --build-tests`（全新 scratch 目录）**exit 0、0 条告警**。
+  新守卫 `test_build_step_gates_the_test_target_too` 把 ci.yml 里那段真脚本抽出来跑两遍
+  （0 告警必须绿、1 告警必须红且能读到原文）。runner 的 Swift 6.1.2 会不会报出新告警：下一次 CI 见（BACKLOG 87）。
+- 动效那一步**仍然**是 `continue-on-error`：本轮只补了"理由要能读"，没改成有闸 ——
+  改成有闸需要一次"红的确实是产品而不是环境"的样本（BACKLOG 86）。
+- 判据失败**不许变成崩溃**：`testBannerOutTracksWhetherItFadesOrSlides` 里那条地板从
+  `XCTAssertGreaterThanOrEqual` 改成 `guard … else { XCTFail; return }` —— M303 第一遍跑出的是
+  BROKEN-MUTATION：断言红之后代码继续 `seen[0]`，空数组越界把测试进程带走，
+  "Test Case … failed" 那行根本没打出来。
+
 
 ### Fixed（R58：那条分带尺是上下颠倒的 —— 改一行、写真值表、再查出"CI 看不见新读数"）
 - `changedFraction(band:)` 的归一化带**方向修对了**：它原来按 `yStart=(1-maxY)*h` 取值，

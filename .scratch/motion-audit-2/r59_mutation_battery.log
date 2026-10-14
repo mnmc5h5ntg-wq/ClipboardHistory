@@ -1,0 +1,29 @@
+预检 OK MotionFilmstripTests.testBannerFrameStacksAreReadableEvidence
+预检 OK MotionFilmstripTests.testBannerOutTracksWhetherItFadesOrSlides
+预检 OK MotionFilmstripTests.testBannerDismissColumnAsymmetryIsMeasured
+预检 OK ci_report_selftest
+
+M301 writeStack 什么都不写 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence'] 命中=['逐帧图没写出来'] 还原干净=True
+
+M302 writeStack 也按 width/2 画 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence'] 命中=['又被缩过'] 还原干净=True
+
+M303 图标的跟踪区域空了（布局一改就跟丢） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBannerOutTracksWhetherItFadesOrSlides'] 命中=['跟踪没有对象'] 还原干净=True
+
+M304 两栏框成同一块（详情区宽度 0） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testBannerDismissColumnAsymmetryIsMeasured'] 命中=['详情区那一侧最大相邻差'] 还原干净=True
+
+M306 共享线塌成 0（回到本轮第一版那个 bug） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable'] 命中=['自认作废'] 还原干净=True
+
+M307 共享线改成按第一栏归一（又变成各量各的） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable'] 命中=['共享线必须由**较大**那个峰值导出'] 还原干净=True
+
+M305 CI 不打 XCTAssert 那句原文 ⇒ CAUGHT 红得对=True 红在 ['test_report_only_steps_always_print_their_numbers'] 命中=['red_test_prints_its_reason'] 还原干净=True
+
+==== 汇总 ====
+  M301 | CAUGHT | yes | yes
+  M302 | CAUGHT | yes | yes
+  M303 | CAUGHT | yes | yes
+  M304 | CAUGHT | yes | yes
+  M306 | CAUGHT | yes | yes
+  M307 | CAUGHT | yes | yes
+  M305 | CAUGHT | yes | yes
+红得不对/未抓到=0  还原不干净=0
+还原后复跑（逐帧图判据）：ESCAPED

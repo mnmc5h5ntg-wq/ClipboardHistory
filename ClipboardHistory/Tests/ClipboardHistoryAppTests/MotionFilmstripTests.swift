@@ -132,6 +132,58 @@ final class MotionFilmstripTests: XCTestCase {
 
     static func peak(_ fractions: [Double]) -> Double { fractions.max() ?? 0 }
 
+    /// 两块区域比"什么时候停"，必须用**同一条绝对线**（R59）。
+    ///
+    /// 为什么不是 `transitionFrameCount`：它的门槛是**各自峰值**的 `stepFloorRatio`，
+    /// 两块各自归一化 ⇒ 峰值大的那块被一条更高的绝对线先判停。
+    /// 本机实测的分栏卷：侧栏峰值 0.305 ⇒ 线 = 0.046；详情区峰值 0.237 ⇒ 线 = 0.036，
+    /// 于是**墨多的那一栏永远显得先落定**。拿它做分栏对比，量的是墨量，不是时间。
+    /// 这里用两块峰值里较大的那个 × 同一个比例 —— 一条线，套在两栏上。
+    static func sharedMovingFloor(_ regions: [[Double]]) -> Double {
+        (regions.map { peak($0) }.max() ?? 0) * stepFloorRatio
+    }
+
+    /// 同一条线下"最后一个还在变的帧号"；`nil` = 这一块在这条线下没有任何一次可见变化。
+    static func lastMovingFrame(_ fractions: [Double], floor: Double) -> Int? {
+        guard peak(fractions) >= minimumVisibleChange else { return nil }
+        // 第二道地板管的是**共享线自己塌到 0**：两栏全零时线也是 0，而 `0 >= 0`
+        // 会让每一帧都算"还在变"，"作废"那格反而报成"两栏都动到最后一帧"
+        // —— 真值表的 (c) 第一次就是这么红的。
+        return fractions.lastIndex { $0 >= max(floor, minimumVisibleChange) }
+    }
+
+    /// 分栏落定时刻那句话**由数字生成**，不由"我看图看到了什么"生成（R59）。
+    ///
+    /// 为什么单独一个纯函数：本轮的教训正是"读数写成了结论"（`差 2–5 帧 ⇒ 侧栏先落定`），
+    /// 而那 2–5 帧是各自峰值归一的产物。措辞进了函数，就能被真值表钉住
+    /// （见 `testSharedFloorColumnComparisonIsATruthTable`）。
+    /// **不覆盖管线**：这条合成的是**尺子的措辞**，产品那一条是
+    /// `testBannerDismissColumnAsymmetryIsMeasured`，它跑的是真卷。
+    static func columnSettlementVerdict(left: [Double], right: [Double]) -> String {
+        let floor = sharedMovingFloor([left, right])
+        let lastLeft = lastMovingFrame(left, floor: floor)
+        let lastRight = lastMovingFrame(right, floor: floor)
+        switch (lastLeft, lastRight) {
+        case (nil, nil):
+            return "两栏在这条线下都没有变化(线=\(String(format: "%.4f", floor))，"
+                + "峰值 \(String(format: "%.3f", peak(left))) / \(String(format: "%.3f", peak(right))))"
+                + " ⇒ 这条对比作废，不许据此说任何一栏先落定"
+        case (nil, let r?):
+            return "只有详情区在变(第\(r)帧)，侧栏一次都没有 ⇒ 分界线/框选算错了，对比作废"
+        case (let l?, nil):
+            return "只有侧栏在变(第\(l)帧)，详情区一次都没有 ⇒ 分界线/框选算错了，对比作废"
+        case (let l?, let r?):
+            let diff = r - l
+            if diff == 0 {
+                return "同一条绝对线下两栏在**同一帧**落定(第\(l)帧，线=\(String(format: "%.4f", floor)))"
+                    + " ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量"
+            }
+            return "同一条绝对线下差 \(abs(diff)) 帧（侧栏第\(l)帧 / 详情区第\(r)帧，"
+                + "线=\(String(format: "%.4f", floor))) ⇒ 时间轴上确实有先后，"
+                + "谁先谁后由帧号决定，不由看图的感觉决定"
+        }
+    }
+
     /// "画面还在变"覆盖了多长**时间**（ms），而不是几帧 —— 但注意：这是**首尾跨度**，不是连续的一段。
     ///
     /// 为什么是时间不是帧数（R2）：`transitionFrameCount` 数的是帧，而一帧多长由抓帧耗时决定。
@@ -1226,6 +1278,304 @@ final class MotionFilmstripTests: XCTestCase {
         writeStrip("dismiss-整窗", fullFirst.motionFrames)
     }
 
+    /// 逐帧堆叠图里两帧之间的分隔线宽度（R59）。写图与判图必须读同一个常数：
+    /// 各自写一个字面量，哪天改了一处，另一处就会红在「尺寸不对」上，而理由是假的。
+    static let stackGap: Int = 2
+
+    /// 图标质心的跨度算"在动"的分界（**原始像素**，本机 2x ⇒ ≈2pt）（R59）。
+    ///
+    /// 这条线是**尺子的**分类线，不是产品的判据，所以它进代码而不是留在文字里：
+    /// 本机五遍读到的跨度是 12.7 / 9.4 / 12.7 / 5.3 / 9.4px
+    /// （`.scratch/motion-audit-2/r59_motion_readings.log` 第 3 节），全在线上方 ⇒
+    /// 本轮没有一格结论挂在这条线下面，"它在动"不是这条线造出来的。
+    /// 反过来，若哪天读数掉到 3px，结论会翻成"原地淡出"，那时该先怀疑的是这条线。
+    static let trackMoveClassifierPixels: Double = 4
+
+    /// 外框上下沿"算不算挪了"的容差（原始像素，R59）。
+    ///
+    /// 这条线**本轮没有标定过**，写清楚是为了别让它冒充判据：它只决定"形状分类"那句话
+    /// 怎么措辞，没有任何一格结论挂在它上面。本机五遍的外框挪动量级是 0–4px，
+    /// 而**全帧质心**的漂移是 7.7–12.7px（那条不是位移，见 `testBannerOutTracksWhetherItFadesOrSlides`）
+    /// ⇒ 4px 这个量恰好卡在两者中间，所以这一格分不开的时候，读数会直接说"分不开"，
+    ///   不会替我挑一个好看的解释。
+    static let trackEdgeTolerancePixels: Int = 2
+
+    /// 横幅撤走时，左右两栏的**落定时刻**要有一个数（R59，只测不判）。
+    ///
+    /// 为什么这条存在：R59 第一次把带捕获那卷按原始像素堆成逐帧图
+    /// （`testBannerFrameStacksAreReadableEvidence`）之后，看图看见一个说不通的状态 ——
+    /// 第 4~5 帧（约 45–55ms）里，侧栏那一侧（x<280pt）的横幅文字被**横着切掉半截**、
+    /// 搜索框已经滑进横幅的位置；而详情区那一侧（x>280pt）同一行文字的尾巴与那颗"知道了"
+    /// 还在原来的高度上。`ContentView.swift:8` 里 `notices` 是**整幅**的一行（在 splitView 之上），
+    /// 一条整幅视图不该有两个 y。
+    ///
+    /// **本轮后半段把这条自己写的那个"时长差"证伪了**（第一次读数写进台账时它还是结论）：
+    /// 五遍的 `侧栏过渡帧数=8–11 / 详情区=13` 用的是 `transitionFrameCount`，
+    /// 而它的门槛是**各自峰值**的 15% —— 侧栏峰值 0.305 ⇒ 线 0.046，详情区 0.237 ⇒ 线 0.036。
+    /// 两条线不一样，比出来的"谁先停"就是**墨量差**，不是时间差。
+    /// 换成同一条绝对线（`sharedMovingFloor`）之后：本机五遍两栏**"最后一个还在变的帧号"完全相同**
+    /// （16/16、17/17、17/17、17/17、16/16，见 `r59_motion_readings.log` 第 3.1 节；
+    ///  那一帧两栏同时出现 ~0.10/~0.11 的抖动，是同一次回流，不是先后）。
+    /// ⇒ "侧栏先落定 2–5 帧"这句话作废。留下的只有**看图看见的那半截字**，
+    /// 它是一个形状/裁切问题，不是时长问题，仍然要真机才能判（批次 59.1、BACKLOG 85 已改写）。
+    ///
+    /// 判据形状：两条"必须成立"的前提（两栏都得真的在变）+ 一条"读数必须由数字生成"
+    /// 的措辞函数（`columnSettlementVerdict`，被合成真值表钉住）。仍然**不判产品**。
+    func testBannerDismissColumnAsymmetryIsMeasured() throws {
+        try skipUnlessEnabledAndCapable()
+        let scenario = Scenario.noticeBannerDismiss()
+        _ = record(scenario)
+        let film = record(scenario)
+        let frames = film.motionFrames
+        guard frames.count > 6 else {
+            XCTFail("只抓到 \(frames.count) 帧 ⇒ 这条测量没有过程可分栏（是采样，不是产品）")
+            return
+        }
+        // 侧栏 280pt / 窗口 760pt ⇒ 归一化分界线 0.368。两栏各取整条带的高度。
+        let sidebar = CGRect(x: 0, y: 0, width: 0.368, height: 1)
+        let detail = CGRect(x: 0.368, y: 0, width: 1 - 0.368, height: 1)
+        let left = Self.deltas(frames, band: sidebar)
+        let right = Self.deltas(frames, band: detail)
+        // 前提：两栏都必须**真的在变**，否则"两栏时长差多少"是两句空话。
+        XCTAssertGreaterThan(left.max() ?? 0, Self.minimumVisibleChange,
+            "侧栏那一侧在这卷里最大相邻差只有 \(String(format: "%.3f", left.max() ?? -1)) ⇒ 分界线算错了，"
+                + "或者这一卷根本没拍到横幅")
+        XCTAssertGreaterThan(right.max() ?? 0, Self.minimumVisibleChange,
+            "详情区那一侧最大相邻差只有 \(String(format: "%.3f", right.max() ?? -1)) ⇒ 同上")
+        let leftSettled = Self.transitionFrameCount(left)
+        let rightSettled = Self.transitionFrameCount(right)
+        let interval = Self.sampleIntervalMilliseconds(film.motionStamps)
+        let shared = Self.sharedMovingFloor([left, right])
+        let lastLeft = Self.lastMovingFrame(left, floor: shared) ?? -1
+        let lastRight = Self.lastMovingFrame(right, floor: shared) ?? -1
+        // 前提：同一条线下两栏都得**有**一个"最后还在变"的帧，否则下面的对比是空话。
+        XCTAssertGreaterThanOrEqual(lastLeft, 0,
+            "侧栏在共享线 \(String(format: "%.4f", shared)) 下一次变化都没有 ⇒ 这条对比作废")
+        XCTAssertGreaterThanOrEqual(lastRight, 0, "详情区同上")
+        emit("MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=\(leftSettled) 详情区=\(rightSettled) "
+             + "差=\(abs(leftSettled - rightSettled))帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） "
+             + "｜ 新轴(同一条绝对线 \(String(format: "%.4f", shared))，=两栏较大峰值×\(Self.stepFloorRatio)) "
+             + "最后还在变的帧号 侧栏=\(lastLeft) 详情区=\(lastRight) "
+             + "采样≈\(interval)ms ｜ 侧栏逐帧=[\(left.map { String(format: "%.3f", $0) }.joined(separator: " "))] "
+             + "｜ 详情区逐帧=[\(right.map { String(format: "%.3f", $0) }.joined(separator: " "))] "
+             + "⇒ \(Self.columnSettlementVerdict(left: left, right: right))")
+    }
+
+    /// `columnSettlementVerdict` 的真值表（R59，合成用例）。
+    ///
+    /// 为什么要有这一条：本轮那句"侧栏先落定 2–5 帧"就是从**没有真值表**的措辞里长出来的。
+    /// 把措辞变成函数之后，四种形状必须先在这里说清，才轮到真卷去跑。
+    /// **不覆盖管线**：这四组数组是人造的，它们钉的是尺子的措辞；
+    /// 产品那一条是 `testBannerDismissColumnAsymmetryIsMeasured`。
+    func testSharedFloorColumnComparisonIsATruthTable() throws {
+        // (a) 本轮真卷的形状：两栏在**同一帧**停，但各自峰值归一的旧尺子给不同帧数。
+        let aLeft: [Double] = [0.000, 0.305, 0.100, 0.040, 0.000]
+        let aRight: [Double] = [0.000, 0.237, 0.080, 0.040, 0.000]
+        XCTAssertEqual(Self.sharedMovingFloor([aLeft, aRight]), 0.305 * Self.stepFloorRatio,
+            "共享线必须由**较大**那个峰值导出，否则又变成各自归一")
+        XCTAssertNotEqual(Self.transitionFrameCount(aLeft), Self.transitionFrameCount(aRight),
+            "旧轴在这组上必须给两个数 —— 它给不出，就说明这组没复刻到真卷的形状（墨量差冒充时长差）")
+        XCTAssertTrue(Self.columnSettlementVerdict(left: aLeft, right: aRight).contains("同一帧"),
+            "两栏在同一帧停 ⇒ 措辞不许出现\u{201C}先落定\u{201D}这类时间差的说法")
+
+        // (b) 真的有时间差：详情区多演了一帧，而且那一帧在共享线之上。
+        let bRight: [Double] = [0.000, 0.237, 0.080, 0.100, 0.000]
+        let bVerdict = Self.columnSettlementVerdict(left: aLeft, right: bRight)
+        XCTAssertTrue(bVerdict.contains("差 1 帧"), "读数应说\u{201C}差 1 帧\u{201D}，实际：\(bVerdict)")
+
+        // (c) 两栏都平：不许生成任何\u{201C}谁先谁后\u{201D}。
+        let flat: [Double] = [0.000, 0.000, 0.000]
+        XCTAssertTrue(Self.columnSettlementVerdict(left: flat, right: flat).contains("作废"),
+            "整段没变化时这条对比必须自认作废")
+
+        // (d) 只有一栏在变 ⇒ 分界线算错了，同样不许冒充结论。
+        let dVerdict = Self.columnSettlementVerdict(left: aLeft, right: flat)
+        XCTAssertTrue(dVerdict.contains("分界线"), "只有一栏在变应报分界线/框选错，实际：\(dVerdict)")
+    }
+
+    /// 撤走那一下，横幅到底是**在原地淡出**还是**滑出去**（R59）。
+    ///
+    /// 为什么重新量一次：R22 当年写的是"帧 2 是原地的半透明 ⇒ 它是淡出，不是塌陷" ——
+    /// 那是**一帧中间态**给的结论（当时整卷只拍得到 1 格中间态）。R57 之后同一卷有 10–13 格，
+    /// 所以这句话现在要么被证实、要么被推翻，不该继续当既有事实引用。
+    ///
+    /// 量法：横幅左边那颗警告图标（`exclamationmark.arrow.circlepath`，实心红）是这一条带里
+    /// 唯一"高饱和红 + 位置已知"的东西。逐帧求它的**质心 y**（只看侧栏那一段宽度，
+    /// 免得被详情区的回流污染），再看它相对第一帧挪了多少、同时它的像素数怎么变。
+    /// ⇒ 质心基本不动而像素数在掉 = 原地淡出；质心往上跑 = 有位移。
+    ///
+    /// 本机五遍的实测（`.scratch/motion-audit-2/r59_motion_readings.log` 第 3.2 节）：
+    /// **全帧**质心跨度 11.0 / 9.4 / 9.4 / 7.7 / 12.7 px —— 第一遍读数出来时我把它写成了"图标在上移"，
+    /// 那是**这条尺自己在动**：图标淡到判色线以下时还活着的只剩一部分，质心必然朝那半边漂。
+    /// 所以本轮补了两条不靠"整卷都看得见它"的轴：强帧（像素数 ≥ 首帧一半）的质心跨度，
+    /// 以及强帧的**外框**上下沿（`MOTION_TRACK_BOX`）。五遍实测：
+    /// 强帧质心跨度 2.6 / 0 / 0 / 0 / 0 px（都在那条 4px 分类线以下），
+    /// 外框 **4/5 遍一格没挪**（首末都是 [29,50]），只有第 1 遍下沿上移 4px。
+    /// ⇒ 能说的只有：**原来那个"上移 6.5pt"作废**（它比外框能看到的任何数都大 3 倍以上）；
+    /// 但"绝对没动"也不许写成结论 —— 那 4px 正好落在"淡出时高饱和边缘先脱落"的量级里，
+    /// ±2px 的容差分不开"边缘脱落"与"一边被裁"。要分开得换一条不吃饱和度的轴
+    /// （跟几何轮廓走，而不是跟颜色走）—— 那是下一轮的活，不在本轮顺手加。
+    /// 顺带：**R22 那句"它是淡出，不是塌陷"在"淡出"这一半被证实**（当年只有一帧可看，结论对但没证据）。
+    /// 剩下的"横幅那半截字"是另一件事，归 BACKLOG 85；它的"时长差"那半边本轮也作废了
+    /// （见 `testBannerDismissColumnAsymmetryIsMeasured`）。这一条仍然**只测不判**产品好坏。
+    func testBannerOutTracksWhetherItFadesOrSlides() throws {
+        try skipUnlessEnabledAndCapable()
+        let scenario = Scenario.noticeBannerDismiss()
+        _ = record(scenario)
+        let film = record(scenario)
+        let frames = film.motionFrames
+        guard frames.count > 6 else {
+            XCTFail("只抓到 \(frames.count) 帧 ⇒ 没有过程可跟踪")
+            return
+        }
+        func iconBox(_ image: CGImage) -> (top: Int, bottom: Int, y: Double, pixels: Int) {
+            let bitmap = Self.raster(image)
+            guard bitmap.width > 0, bitmap.height > 0,
+                  bitmap.pixels.count == bitmap.width * bitmap.height * 4 else { return (-1, -1, -1, 0) }
+            var sum = 0.0, hit = 0, top = -1, bottom = -1
+            for y in 0..<bitmap.height {
+                // 只看侧栏那一段（图标在 x≈30–50pt ⇒ 60–100px），避开详情区的回流。
+                for x in 40..<200 where x < bitmap.width {
+                    let p = (y * bitmap.width + x) * 4
+                    let r = Int(bitmap.pixels[p]), g = Int(bitmap.pixels[p + 1]), b = Int(bitmap.pixels[p + 2])
+                    if r > 120, r - g > 60, r - b > 60 {
+                        sum += Double(y); hit += 1
+                        if top < 0 { top = y }
+                        bottom = y
+                    }
+                }
+            }
+            // 缓冲区第 0 行 = 画面顶边（R57 实测，见 `changedFraction` 的注释）。
+            // ⇒ 数值变小 = 在画面上**往上**走。
+            return (top, bottom, hit == 0 ? -1 : sum / Double(hit), hit)
+        }
+        let track = frames.map(iconBox)
+        let seen = track.filter { $0.pixels > 0 }
+        // 地板 4：本机连跑五遍，认得出那颗图标的帧数是 6 / 5 / 5 / 5 / 6（最小 5，地板留一格余量），
+        // 而整条卷只有 27 帧 —— 后面那 21~22 帧它已经淡到判色线以下。
+        // 同一批里"强帧"（像素数 ≥ 首帧一半）只有 4~5 帧：判"在不在动"用的就是那几帧。
+        // 为什么不是 1 或 2：一条只剩一帧可跟踪的"跟踪"，给出的跨度永远是 0，
+        // 而那正好长得像本轮想排除的那个结论（"原地不动"）。M303 打的就是这一格
+        // （把 x 区间清空 ⇒ `seen.count = 0`）。
+        // 用 guard 而不是 XCTAssert：M303 第一次跑就把这一格打成**崩溃**而不是红 ——
+        // 断言失败之后代码继续往下走，`seen[0]` 在空数组上越界，测试进程直接没了，
+        // 于是"Test Case … failed"那行根本没打出来，电池只能报 BROKEN-MUTATION。
+        // 红要能被读，崩溃不能（同一族：守卫里的 try! 把红伪装成没跑）。
+        guard seen.count >= 4 else {
+            XCTFail("整卷只找到 \(seen.count) 帧里有那颗红色图标 ⇒ 跟踪没有对象，"
+                    + "这条测量作废（多半是判色的阈值与这一版图标对不上，或图标在过程中出了框）")
+            return
+        }
+        let ys = seen.map { $0.y }
+        let spread = (ys.max() ?? 0) - (ys.min() ?? 0)
+        let firstPixels = seen.first?.pixels ?? 0
+        let lastPixels = seen.last?.pixels ?? 0
+        // 只看"强帧"（像素数不低于首帧一半）的**外框**，用来把三种形状分开：
+        // 淡出会让高饱和边缘先掉到判色线以下 ⇒ 框是从两头**往里**缩的，
+        // 拿最后一帧的框去比第一帧，就会把"淡"读成"裁"。强帧还够得着判色线，边缘没掉。
+        //   上下沿同向等量移动  ⇒ 整颗图标在平移（真的带位移）
+        //   上沿不动、下沿上移  ⇒ 下边被盖住/裁掉（内容往上顶到横幅上）
+        //   下沿不动、上沿上移  ⇒ 上边被裁
+        //   两头都往里           ⇒ 只是淡
+        let strong = seen.filter { $0.pixels * 2 >= firstPixels }
+        let ref = strong.first ?? seen[0]
+        let last = strong.last ?? seen[seen.count - 1]
+        let topShift = Double(last.top - ref.top)
+        let bottomShift = Double(last.bottom - ref.bottom)
+        let tol = Double(Self.trackEdgeTolerancePixels)
+        let shape: String
+        switch (abs(topShift) <= tol, abs(bottomShift) <= tol) {
+        case (true, true): shape = "外框没挪 ⇒ 只是淡"
+        case (false, false):
+            shape = abs(topShift - bottomShift) <= tol
+                ? "上下沿同向等量(差\(String(format: "%.0f", abs(topShift - bottomShift)))px) ⇒ 整颗图标在平移"
+                : "两头反向 ⇒ 框在变形（淡/裁混在一起），分不开"
+        case (true, false): shape = "上沿不动、下沿\(bottomShift < 0 ? "上移" : "下移")\(String(format: "%.0f", abs(bottomShift)))px ⇒ 一边被盖住/裁掉"
+        case (false, true): shape = "下沿不动、上沿\(topShift < 0 ? "上移" : "下移")\(String(format: "%.0f", abs(topShift)))px ⇒ 一边被裁"
+        }
+        emit("MOTION_TRACK_BOX dismiss 强帧数=\(strong.count) 外框 首=[\(ref.top),\(ref.bottom)] "
+             + "末=[\(last.top),\(last.bottom)] 上沿移=\(String(format: "%.0f", topShift))px "
+             + "下沿移=\(String(format: "%.0f", bottomShift))px（负=往上）"
+             + "｜ 容差±\(Self.trackEdgeTolerancePixels)px 是尺子的线 "
+             + "⇒ 形状分类：\(shape)")
+        // 结论必须带着**声明**一起读：`.bannerOut` 的形状只设 `isExit`、不设 `slides`
+        // （`MotionCatalog.shape(for:)`），所以"质心在动"绝不能被打印成"这一版是滑走"——
+        // 那是把**别的来源**（布局塌陷 / 带内被裁 / 捕获通道）的位移，记到了动画设计头上。
+        // 到底是哪一种，这条量的通道分不开 ⇒ 读数里只写"排除了什么"，不写解释。
+        let declared = MotionCatalog.shape(for: .bannerOut, reduceMotion: false).slides
+        let saysSlides = declared != .none
+        // **判"在不在动"用强帧的跨度，不用全帧的**：淡到后面判色线只吃得到图标的一部分，
+        // 质心会朝"还活着的那一半"漂 —— 本机五遍全帧跨度 7.7~12.7px，而强帧跨度只有
+        // 2.6/0/0/0/0px、外框 4/5 遍一格没挪。拿全帧跨度说"它在动"，说的其实是**阈值在动**。
+        // （这是本轮第二次把读数从尺子自己的产物上搬回画面：第一次是分栏那条。）
+        let strongYs = strong.map { $0.y }
+        let strongSpread = (strongYs.max() ?? 0) - (strongYs.min() ?? 0)
+        let moves = strongSpread > Self.trackMoveClassifierPixels
+        let classifier = "（分类线 \(String(format: "%.0f", Self.trackMoveClassifierPixels))px≈2pt："
+            + "这条线是**尺子**的分界，不是产品的判据）"
+        emit("MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=\(ys.map { String(format: "%.0f", $0) }) "
+             + "全帧跨度=\(String(format: "%.1f", spread))px（**别拿这条当位移**，见注释） "
+             + "｜ 强帧=\(strongYs.map { String(format: "%.0f", $0) }) 强帧跨度=\(String(format: "%.1f", strongSpread))px "
+             + "像素数 首=\(firstPixels) 末=\(lastPixels) "
+             + "帧数=\(track.count) 有图标帧=\(seen.count) 强帧数=\(strong.count) "
+             + "｜ .bannerOut 声明的位移档=\(String(describing: declared)) "
+             + "⇒ 观察\(moves ? "在动" : "不动")\(classifier)"
+             + "/声明\(saysSlides ? "带位移" : "不带位移")"
+             + "：" + (moves && !saysSlides
+                ? "只排除了一件事：这不是设计声明的滑走（`slides=.none`）。"
+                    + "上移从哪来（行高在塌 / 带内被裁 / 捕获通道产物）本轮的量分不开 ⇒ 不写解释，见 BACKLOG 85"
+                : (moves ? "设计与观察一致：声明了位移、也确实带位移"
+                    : "设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**")))
+        // 唯一敢判的一格：跨度必须落在"能读懂"的量级里 —— 超过半条带（>48px）说明
+        // 我跟丢了这个图标（判色阈值抓到了别的东西），那时这条读数没有意义，要红而不是静默。
+        XCTAssertLessThanOrEqual(spread, 48,
+            "图标质心的纵向跨度 \(String(format: "%.1f", spread))px 已经超过半条带 ⇒ 跟丢了的跟踪"
+                + "不能拿来回答\u{201C}淡出还是滑走\u{201D}（先修判色，再谈结论）")
+    }
+
+    /// 逐帧图必须**存在、按原始像素堆、且真的不是一叠同一张图**（R59）。
+    ///
+    /// 为什么单独一条：这一轮的"真实视觉审查"要看的就是这几张。带捕获那一卷只有 96px 高，
+    /// 而 `writeStrip` 按 `width/2` 画 ⇒ 横幅那条被压成 38px 的一行色块，
+    /// "看过中间态"这句话就没有承载物了。所以这里判三件事：文件在不在、
+    /// 尺寸是不是**原始像素**（不是除二）、以及这一叠里至少有一对帧真的不同
+    /// —— 最后那条是关键：一叠同一张图也能写出正确尺寸的文件。
+    func testBannerFrameStacksAreReadableEvidence() throws {
+        try skipUnlessEnabledAndCapable()
+        for scenario in [Scenario.noticeBanner(), Scenario.noticeBannerDismiss()] {
+            _ = record(scenario)                       // 预卷：头一帧要 250ms 上下（R11）
+            let film = record(scenario)
+            let frames = Array(film.motionFrames.prefix(10))
+            guard frames.count > 1, let first = frames.first else {
+                XCTFail("\(scenario.name) 只截到 \(frames.count) 帧 ⇒ 没有中间态可看，"
+                    + "这一轮的看图不成立（是采样不够细，不是产品没动）")
+                continue
+            }
+            let gaps = Self.stackGap
+            guard let url = writeStack("\(scenario.name)-逐帧", frames) else {
+                XCTFail("\(scenario.name) 的逐帧图没写出来 ⇒ 台账里那句「看过」是空的")
+                continue
+            }
+            guard let png = try? Data(contentsOf: url),
+                  let rep = NSBitmapImageRep(data: png) else {
+                XCTFail("写出来的 \(url.lastPathComponent) 读不回来 ⇒ 那张图谁也没法看")
+                continue
+            }
+            XCTAssertEqual(rep.pixelsWide, first.width,
+                "逐帧图宽 \(rep.pixelsWide)px，帧宽 \(first.width)px ⇒ 又被缩过，看图的人看到的是色块")
+            XCTAssertEqual(rep.pixelsHigh, (first.height + gaps) * frames.count,
+                "逐帧图高 \(rep.pixelsHigh)px，按 \(frames.count) 帧×(\(first.height)+\(gaps)) 应该是 "
+                    + "\((first.height + gaps) * frames.count)px ⇒ 少画了帧，而台账会按帧数说\u{201C}逐帧看过\u{201D}")
+            let adjacent = Self.deltas(frames)
+            XCTAssertGreaterThan(adjacent.max() ?? 0, Self.minimumVisibleChange,
+                "这一叠 \(frames.count) 帧里最大相邻差只有 \(String(format: "%.3f", adjacent.max() ?? -1)) ⇒ "
+                    + "文件在、尺寸对，但**十张是同一张**：那种图能骗过任何只看文件的审查")
+            emit("MOTION_REVIEW \(scenario.name) 逐帧图=\(url.lastPathComponent) 帧数=\(frames.count) "
+                 + "尺寸=\(rep.pixelsWide)x\(rep.pixelsHigh) 最大相邻差=\(String(format: "%.3f", adjacent.max() ?? -1)) "
+                 + "逐帧=[\(adjacent.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
+        }
+    }
+
     /// 带捕获必须真的接在横幅**两臂**上（R57 / BACKLOG 77 结案的另一半）。
     ///
     /// 为什么 A/B 那条不够：`testBandCaptureIsCheaperAndStillSeesTheMotion` 判的是
@@ -1307,7 +1657,7 @@ final class MotionFilmstripTests: XCTestCase {
         let width = 70, height = 100
         func pair(differingRows: ClosedRange<Int>? = nil,
                   differingColumns: ClosedRange<Int>? = nil) -> (Bitmap, Bitmap) {
-            var a = [UInt8](repeating: 0, count: width * height * 4)
+            let a = [UInt8](repeating: 0, count: width * height * 4)
             var b = [UInt8](repeating: 0, count: width * height * 4)
             for y in 0..<height {
                 for x in 0..<width {
@@ -3398,6 +3748,37 @@ final class MotionFilmstripTests: XCTestCase {
         guard let out = context.makeImage() else { return }
         let data = NSBitmapImageRep(cgImage: out).representation(using: .png, properties: [:])
         try? data?.write(to: outDir.appendingPathComponent("\(name)-strip.png"))
+    }
+
+    /// 竖着堆**原始像素尺寸**的几帧（R59）。给带捕获那一卷用。
+    ///
+    /// 为什么另写一个而不是复用 `writeStrip`：那个按 `width/2` 画，是为了把整窗（1520×1346px）
+    /// 压成能一眼扫完的六列。可带捕获那一卷本来就只有 96px 高 —— 再除二是 48px，
+    /// 而横幅那条只有 76px：**要看的中间态被缩到看不清**，"每轮都要真实看图"就变成看色块。
+    /// 所以带卷用原始尺寸竖排（1520×96 一帧，十帧 1520×960，仍然能看）。
+    @discardableResult
+    private func writeStack(_ name: String, _ frames: [CGImage]) -> URL? {
+        guard let first = frames.first, frames.count > 1 else { return nil }
+        let fw = first.width, fh = first.height
+        let gap = Self.stackGap
+        let canvas = CGRect(x: 0, y: 0, width: CGFloat(fw),
+                            height: CGFloat((fh + gap) * frames.count))
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(data: nil, width: Int(canvas.width), height: Int(canvas.height),
+                                      bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        context.setFillColor(CGColor(red: 0.05, green: 0.05, blue: 0.06, alpha: 1))
+        context.fill(canvas)
+        for (index, frame) in frames.enumerated() {
+            // 第 0 帧画在**最上面**：这条带是窗口顶部，倒过来排会让人以为动画是从下往上长的。
+            let rect = CGRect(x: 0, y: canvas.height - CGFloat(index + 1) * CGFloat(fh + gap),
+                              width: CGFloat(fw), height: CGFloat(fh))
+            context.draw(frame, in: rect)
+        }
+        guard let out = context.makeImage() else { return nil }
+        let url = outDir.appendingPathComponent("\(name)-stack.png")
+        guard let data = NSBitmapImageRep(cgImage: out).representation(using: .png, properties: [:]) else { return nil }
+        do { try data.write(to: url); return url } catch { return nil }
     }
 
     // MARK: - 夹具

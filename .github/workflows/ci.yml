@@ -30,11 +30,17 @@ jobs:
         working-directory: ClipboardHistory
         run: |
           set -o pipefail
-          swift build 2>&1 | tee /tmp/build.log
+          # R59 / BACKLOG 87：这里必须带 `--build-tests`。之前只 `swift build` ⇒ 编译的是
+          # `Sources/`，**测试目标里的告警从来没进过这条闸门**：R58 提交的那条
+          # `variable 'a' was never mutated` 在 `swift test` 的输出里明明白白，两次 CI 都是绿的。
+          # 台账与 AGENTS.md 写的都是"构建 0 告警"，读的人会以为整个包 0 告警。
+          swift build --build-tests 2>&1 | tee /tmp/build.log
           # 告警计数：干净构建应为 0。这里用 grep -c 而不是依赖退出码，
           # 因为 swift build 不会因为告警而失败。
           warnings=$(grep -c 'warning:' /tmp/build.log || true)
           echo "compile warnings: $warnings"
+          # 红了要能读（R59 同一课，见 BACKLOG 86）：只报一个数字的话，下一次还得重跑构建才知道是哪条。
+          grep 'warning:' /tmp/build.log | head -12 || true
           test "$warnings" = "0"
 
       - name: Swift tests (executed-count gate)
@@ -227,6 +233,12 @@ jobs:
           # `test[A-Za-z]+'\] failed` 对着真实那行返回 0 命中，而 `grep -F "]' failed"` 命中。
           # 这条判据本身由 scripts/tests/test_ci_report_selftest.py 的 motion/failing_test_names 形状钉住。
           grep -E "Test Case " /tmp/motion.log | grep -F "]' failed" | sed -E "s/.*Tests\.//; s/ \[/\n/g" | head -12 || true
+          # R59 / BACKLOG 86：**名字不够，还要那一句为什么**。
+          # run 38576482491 里 `testTransitionsAreActuallyRunning` 红了 7.4s（`motion suite exit: 1`），
+          # 而整步日志里只留下名字 —— XCTAssert 那句消息在 /tmp/motion.log 里，而那个文件不上传。
+          # 于是"runner 上为什么红"只能靠猜；而猜出来的修法在这一族里已经错过一次（R51 那条红得不正确）。
+          echo "---- 红的理由（XCTAssert 原文，最多 12 条） ----"
+          grep -E "error: -\[" /tmp/motion.log | head -12 || true
           if [ -z "$executed" ]; then
             echo "MOTION_NOT_RUN=runner-did-not-finish 看门狗在 200s 收掉了进程，这条判据在 CI 上记为未覆盖"
             exit 0

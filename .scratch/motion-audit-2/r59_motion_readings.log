@@ -1,0 +1,224 @@
+> R59 本机读数。**采集**：`.scratch/motion-audit-2/collect_r59_readings.sh`
+> （`env -u SDKROOT swift test`，本机 2x 缩放）；**汇总**：`.scratch/motion-audit-2/assemble_r59_readings.py`
+> —— 就是生成这份文件的那个脚本，它解析不到任何一条读数时会**报错退出**，不会写半张表。
+> 台账里每一句"本机五遍"的数都指回这里。
+>
+> 两条通道分开记，因为**本机这一轮它们给的不是同一份东西**：整条卷那一次，stdout 里以 `MOTION_`
+> 开头的读数行 **21** 条，文件通道 **73** 条 —— 差出去的那些只从文件通道回来。
+> R56 加第二条通道就是为了这个形状；本轮它第一次在本地真的把读数救回来
+> （在 runner 上是另一回事：R58 的 `MOTION_CHANNEL_UNIONED=1 stdout=61 文件=65`，那边是 stdout 更多）。
+
+## 1) 整条 `MotionFilmstripTests`
+
+```
+### 整条 MotionFilmstripTests（本机）exit=0
+--- stdout 通道里含 MOTION_ 子串的行：24
+--- stdout 通道里以 MOTION_ 开头的读数行：21
+--- 文件通道里的 MOTION_ 行数：73
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=11.5ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.4ms 抓帧最慢=10.8ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=38.0ms 抓帧最慢=86.8ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.1ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=38.3ms 抓帧最慢=85.1ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_BAND dismiss 带：首尾差=0.882 整窗首尾差=0.223 位置同一性 带vs整窗头=0.000 带vs整窗尾=0.954 ｜ 带：抓帧中位=4.3ms 峰值=0.261 过渡帧数=13 间隔中位=10ms 帧=1520x96px ｜ 整窗：抓帧中位=38.1ms 峰值=0.199 过渡帧数=2 间隔中位=44ms 帧=1520x1346px ｜ 最慢一次抓帧 带=8.2ms 整窗=85.1ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.5ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=11.5ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=9 详情区=13 差=4帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0431，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=17 详情区=17 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.224 0.287 0.186 0.195 0.119 0.046 0.115 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.164 0.160 0.149 0.156 0.112 0.047 0.134 0.060 0.050 0.043 0.000 0.046 0.000 0.000 0.000 0.111 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第17帧，线=0.0431) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.4ms 抓帧最慢=22.4ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=10.0ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.308 逐帧=[0.000 0.122 0.274 0.308 0.183 0.217 0.177 0.156 0.157]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.4ms 抓帧最慢=10.9ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.1ms 抓帧最慢=8.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.242 逐帧=[0.000 0.071 0.189 0.242 0.164 0.103 0.111 0.043 0.121]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.3ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=10.8ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "32"] 全帧跨度=9.4px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=41 帧数=27 有图标帧=5 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=42.4ms 抓帧最慢=62.4ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=42.6ms 抓帧最慢=46.4ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL_AB empty-to-content 开 帧数=1 峰值=0.049 冷闸=true  关 帧数=1 峰值=0.049 采样≈48ms
+MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content：开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=45.2ms 抓帧最慢=64.7ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL kind-change 采样≈51ms 中点帧=1 带内过渡帧数=2 落定残余=0.997
+MOTION_GRAB detail-same-kind 帧数=30 抓帧中位=45.3ms 抓帧最慢=56.6ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_DETAIL same-kind 带内过渡帧数=0 落定残余=0.000
+MOTION_GRAB_AREA 全视图 面积=535800pt² 样本=9 中位=42.1ms 最慢=43.3ms
+MOTION_GRAB_AREA 横幅带 面积=91200pt² 样本=9 中位=8.7ms 最慢=9.3ms
+MOTION_GRAB_AREA 小块 面积=18000pt² 样本=9 中位=3.2ms 最慢=3.3ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=255.0ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=256.1ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.5ms 抓帧最慢=257.5ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.7ms 抓帧最慢=2.6ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_HEAT_RUNS 开A [347–614@0.231/粗260] 开B [340–607@0.231/粗262] 关 [338–344@0.231/粗6]  跨度A=267ms 跨度B=268ms 整卷中位=8ms
+MOTION_HEAT_FADE_A/B 预热 时长=7ms 帧数=1 开A 时长=267ms 帧数=2 开B 时长=268ms 帧数=2 峰值=0.231  关 时长=6ms 帧数=1 峰值=0.231  整卷中位=8ms 声明=160ms 冷闸=true 判定=钟太粗
+MOTION_NOT_RUN=clock-coarse-in-window heat-first-record：峰值那一段内部最粗的一次采样是 260 / 262ms，而这条过渡声明 160ms ⇒ 今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT） ｜A 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 256ms，而间隔 260ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答 ｜B 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 258ms，而间隔 262ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答
+MOTION_GRAB list-insert-new-record 帧数=30 抓帧中位=45.7ms 抓帧最慢=57.6ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_CUT list-insert-new-record 带内过渡帧数=1 落定残余=0.000 逐帧=[0.301 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=9.9ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_CUT_CONTROL notice-banner 采样≈11ms 中点帧=6 落定残余=0.940
+MOTION_SELFTEST_12375528
+MOTION_SELFTEST_12375528-2
+MOTION_NATIVE row-insert 开 帧数=1 峰值=0.046 采样≈8ms
+MOTION_NATIVE row-insert 关 帧数=1 峰值=0.054 采样≈8ms
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_NATIVE row-move 开 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE row-move 关 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE_MOVE 判定=瞬移 峰值容差=0.020（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）；这一行只说读数怎么读，产品结论要过下面两道 skip 才算
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SEQUENCE 选中没变 帧数=1 峰值=0.028
+MOTION_SEQUENCE 选中变了 帧数=1 峰值=0.234
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SHIMMER 扫 帧数=48 变化帧对=22 峰值=0.015 采样≈53ms
+MOTION_SHIMMER 停 变化帧对=0 峰值=0.000
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.4ms 抓帧最慢=9.5ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_SETTLE banner-in 到位帧=16 采样≈11ms ⇒ 实测落定≈176ms（声明 150ms；R58 起量的是整条带，不再套第二层框）
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=46.2ms 抓帧最慢=60.1ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=44.7ms 抓帧最慢=75.7ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_SYMBOL row-star 开 帧数=1 峰值=0.260
+MOTION_SYMBOL row-star 关 帧数=1 峰值=0.260
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=3.1ms 抓帧最慢=15.1ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AB notice-banner 曲线关闭 采样≈8ms 过渡帧数=1 逐帧=[0.000 0.880 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_CONTROL 计数方块 帧数=39 峰值=0.036 变化帧对=38
+MOTION_CONTROL 渐变端点 帧数=39 峰值=0.022 变化帧对=36
+MOTION_GRAB blank 帧数=30 抓帧中位=45.6ms 抓帧最慢=67.7ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_BLANK frames=30 峰值=0.0000 过渡帧数=0
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=10.0ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.1ms 抓帧最慢=8.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=45.2ms 抓帧最慢=57.4ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_GRAB empty-state 帧数=30 抓帧中位=15.4ms 抓帧最慢=39.3ms 视图=380×552pt 像素=760×1104px 声明=160ms
+MOTION_SUMMARY notice-banner=12 notice-banner-dismiss=10 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:3056: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:3056: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:3056: -[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+	 Executed 41 tests, with 3 tests skipped and 0 failures (0 unexpected) in 88.397 (88.400) seconds
+```
+
+（skip 的那几条都是 `MOTION_NOT_RUN=app-not-active` —— AppKit 行动画只在激活进程里跑，判据自己把它登记成未覆盖，不是产品没动。）
+
+## 2) 本轮改写的那几条测量，连跑五遍（文件通道原文）
+
+### 第 1 遍 ｜ stdout 通道读数行=13 ｜ 文件通道=13
+
+```
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=8 详情区=13 差=5帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0445，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=16 详情区=16 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.296 0.205 0.184 0.124 0.115 0.034 0.112 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.235 0.152 0.151 0.091 0.115 0.053 0.134 0.064 0.050 0.043 0.000 0.048 0.000 0.000 0.115 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第16帧，线=0.0445) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=15.7ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.6ms 抓帧最慢=9.1ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.273 逐帧=[0.000 0.119 0.273 0.219 0.239 0.206 0.177 0.150 0.136]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.6ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.258 逐帧=[0.000 0.071 0.258 0.172 0.163 0.100 0.115 0.046 0.123]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.4ms 抓帧最慢=9.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.1ms 抓帧最慢=7.9ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=5 外框 首=[29,50] 末=[29,46] 上沿移=0px 下沿移=-4px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：上沿不动、下沿上移4px ⇒ 一边被盖住/裁掉
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "39", "31"] 全帧跨度=11.0px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42", "39"] 强帧跨度=2.6px 像素数 首=207 末=21 帧数=27 有图标帧=6 强帧数=5 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+```
+
+### 第 2 遍 ｜ stdout 通道读数行=13 ｜ 文件通道=13
+
+```
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=11.4ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=8 详情区=13 差=5帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0414，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=17 详情区=17 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.233 0.276 0.184 0.124 0.115 0.034 0.112 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.165 0.223 0.151 0.092 0.115 0.053 0.133 0.060 0.051 0.042 0.000 0.047 0.000 0.000 0.000 0.111 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第17帧，线=0.0414) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=22.1ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=7.0ms 抓帧最慢=24.2ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.388 逐帧=[0.000 0.193 0.388 0.226 0.186 0.217 0.177 0.150 0.126]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=8.7ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=9.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.189 逐帧=[0.000 0.071 0.186 0.181 0.163 0.097 0.189 0.044 0.127]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=9.4ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "32"] 全帧跨度=9.4px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=41 帧数=27 有图标帧=5 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+```
+
+### 第 3 遍 ｜ stdout 通道读数行=13 ｜ 文件通道=13
+
+```
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=9 详情区=13 差=4帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0430，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=17 详情区=17 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.224 0.287 0.185 0.195 0.119 0.046 0.115 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.164 0.159 0.149 0.157 0.114 0.047 0.136 0.063 0.051 0.045 0.000 0.048 0.000 0.000 0.000 0.110 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第17帧，线=0.0430) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=11.3ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=9.3ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.307 逐帧=[0.000 0.121 0.272 0.307 0.186 0.217 0.177 0.150 0.136]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=9.4ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.259 逐帧=[0.000 0.071 0.259 0.195 0.163 0.098 0.114 0.070 0.150]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=7.9ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "32"] 全帧跨度=9.4px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=41 帧数=27 有图标帧=5 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+```
+
+### 第 4 遍 ｜ stdout 通道读数行=13 ｜ 文件通道=13
+
+```
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=13.8ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.4ms 抓帧最慢=11.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=8 详情区=13 差=5帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0415，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=17 详情区=17 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.233 0.277 0.184 0.124 0.115 0.034 0.112 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.165 0.223 0.151 0.090 0.113 0.054 0.133 0.060 0.053 0.043 0.000 0.043 0.000 0.000 0.000 0.108 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第17帧，线=0.0415) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.7ms 抓帧最慢=20.7ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=11.8ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.278 逐帧=[0.000 0.190 0.278 0.240 0.259 0.123 0.162 0.150 0.129]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.205 逐帧=[0.000 0.071 0.186 0.205 0.162 0.169 0.114 0.045 0.127]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.3ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "34"] 全帧跨度=7.7px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=63 帧数=27 有图标帧=5 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+```
+
+### 第 5 遍 ｜ stdout 通道读数行=13 ｜ 文件通道=13
+
+```
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=8 详情区=13 差=5帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0417，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=16 详情区=16 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.227 0.278 0.184 0.124 0.115 0.034 0.112 0.037 0.021 0.022 0.000 0.023 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.164 0.223 0.153 0.092 0.113 0.052 0.130 0.063 0.037 0.041 0.000 0.046 0.000 0.000 0.110 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第16帧，线=0.0417) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=19.6ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.4ms 抓帧最慢=23.7ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.278 逐帧=[0.000 0.194 0.278 0.240 0.259 0.123 0.162 0.150 0.130]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.3ms 抓帧最慢=8.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.3ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.205 逐帧=[0.000 0.071 0.187 0.205 0.162 0.096 0.107 0.119 0.127]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=8.3ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.1ms 抓帧最慢=8.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "36", "29"] 全帧跨度=12.7px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=4 帧数=27 有图标帧=6 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+```
+
+
+## 3) 五遍的汇总（本轮两个结论都是从这两张表上翻的，不是从看图的感觉上）
+
+### 3.1 分栏：两条轴给两个答案（`MOTION_COLUMN`）
+
+| 遍 | 旧轴·各自峰值归一 侧栏/详情区 | 旧轴差(帧) | 共享线 | 新轴·最后还在变的帧号 侧栏/详情区 | 新轴差(帧) |
+|---|---|---|---|---|---|
+| 1 | 8 / 13 | 5 | 0.0445 | 16 / 16 | +0 |
+| 2 | 8 / 13 | 5 | 0.0414 | 17 / 17 | +0 |
+| 3 | 9 / 13 | 4 | 0.0430 | 17 / 17 | +0 |
+| 4 | 8 / 13 | 5 | 0.0415 | 17 / 17 | +0 |
+| 5 | 8 / 13 | 5 | 0.0417 | 16 / 16 | +0 |
+
+- 旧轴五遍都说侧栏先停（差 4–5 帧 ≈ 64–80 ms，采样 16 ms/帧），**新轴 5/5 遍两栏是同一帧落定**。
+- 原因写死在尺子里：`transitionFrameCount` 的门槛是**各自峰值**×15%，侧栏峰值大 ⇒ 线高 ⇒ 先判停。线不一样高，比出来的不是时间，是墨量。
+- ⇒ BACKLOG 85 里“两栏以不同进度消失”那半边**作废**；措辞现在由 `columnSettlementVerdict` 从帧号生成，被合成真值表 `testSharedFloorColumnComparisonIsATruthTable` 钉住。
+
+### 3.2 图标：全帧质心在漂，强帧外框几乎没动（`MOTION_TRACK` / `MOTION_TRACK_BOX`）
+
+| 遍 | 全帧质心跨度 px | 强帧质心跨度 px | 外框 首→末 | 上沿移 | 下沿移 | 有图标帧/强帧 | 分类 |
+|---|---|---|---|---|---|---|---|
+| 1 | 11.0 | 2.6 | [29,50]→[29,46] | 0 | -4 | 6/5 | 上沿不动、下沿上移4px ⇒ 一边被盖住/裁掉 |
+| 2 | 9.4 | 0.0 | [29,50]→[29,50] | 0 | 0 | 5/4 | 外框没挪 ⇒ 只是淡 |
+| 3 | 9.4 | 0.0 | [29,50]→[29,50] | 0 | 0 | 5/4 | 外框没挪 ⇒ 只是淡 |
+| 4 | 7.7 | 0.0 | [29,50]→[29,50] | 0 | 0 | 5/4 | 外框没挪 ⇒ 只是淡 |
+| 5 | 12.7 | 0.0 | [29,50]→[29,50] | 0 | 0 | 6/4 | 外框没挪 ⇒ 只是淡 |
+
+- 全帧质心跨度 [11.0, 9.4, 9.4, 7.7, 12.7] px —— 第一遍读数出来时我把它写成了“图标在上移”。
+- 强帧质心跨度 [2.6, 0.0, 0.0, 0.0, 0.0] px；外框上沿移 ['0'] px、下沿移 ['-4', '0'] px ⇒ 五遍里 **4/5 遍外框一格没挪**。
+- 两条轴的差别来自判色阈值：图标淡下去时高饱和的边缘先掉，剩下的像素聚在哪半边，质心就往哪边漂 ⇒ 那条轴量的其实是**阈值在动**（与“绝对帧数判据其实判的是采样率”同族）。
+- ⇒ 两条轴各自数一边：**强帧跨度 <4px 的有 5/5 遍**（判“没在动”那条轴），**外框一格没挪的有 4/5 遍**。
+  不一致的那遍是下沿上移 4px —— 它正好落在“淡出时高饱和边缘先脱落”的量级里，而 ±2px 这条容差分不开“边缘脱落”和“一边被裁”。
+  ⇒ 可以说的是：**原来那个“上移 6.5pt”作废**（比外框能看到的任何数都大），但“绝对没动”也不许写成结论（差 1 遍）。
+- 判“在不在动”用的是**强帧**跨度；分类线 4px（≈2pt）是尺子的线、不是产品的判据（见 `trackMoveClassifierPixels`）。`有图标帧` 与 `强帧数` 两列就是地板 4 与“只看强帧”这两件事的依据。

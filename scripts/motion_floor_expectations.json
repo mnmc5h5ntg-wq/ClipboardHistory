@@ -25,7 +25,7 @@
         "clock-coarse-in-window",
         "premise-not-visible"
       ],
-      "note": "R46 登记 must_judge=true → R52 按实测改成放行（两台机器都分辨不了：runner 事件段最粗 73–76ms、本机 premise-not-visible）→ R57 又改回 true，因为放行它的那个原因被修掉了：`Scenario.captureRect` 把这一臂的捕获区域从整窗（1520×1346px）收到顶部那条带（1520×96px，面积 1/14），抓一帧的中位成本 39.5–39.8ms → 4.4–4.6ms（≈9 倍），整卷中位间隔 44–45ms → 9–10ms，本机三次连续跑全部 judged=4/4 not-run=-、这一臂 10–13 帧过渡（证据 .scratch/motion-audit-2/r57_motion_readings.log；带的位置由逐像素同一性钉住：带 vs 整窗头 96 行 = 0.000、vs 尾 = 0.954）。登记是测量不是愿望：测量变了，登记就得跟着变回去。**代价也写清楚**：runner 上还没有一次带捕获的读数 —— 若 CI 红在 UNDERCOVERED，那是闸门在说真话（R55 那次 NO_RESOLVE 就是同一族），下一步是把 runner 的读数抄进来或走 BACKLOG 77 路 b，而不是把这条改回放行。允许的理由仍留在表里，但 must_judge=true 之后它不再构成放行 —— 判不到就是 UNDERCOVERED。"
+      "note": "R46 登记 must_judge=true → R52 按实测改成放行（两台机器都分辨不了：runner 事件段最粗 73–76ms、本机 premise-not-visible）→ R57 又改回 true，因为放行它的那个原因被修掉了：`Scenario.captureRect` 把这一臂的捕获区域从整窗（1520×1346px）收到顶部那条带（1520×96px，面积 1/14），抓一帧的中位成本 39.5–39.8ms → 4.4–4.6ms（≈9 倍），整卷中位间隔 44–45ms → 9–10ms，本机三次连续跑全部 judged=4/4 not-run=-、这一臂 10–13 帧过渡（证据 .scratch/motion-audit-2/r57_motion_readings.log；带的位置由逐像素同一性钉住：带 vs 整窗头 96 行 = 0.000、vs 尾 = 0.954）。登记是测量不是愿望：测量变了，登记就得跟着变回去。**runner 侧的带捕获读数在 R58 到位了**（`.scratch/motion-audit-2/ci_r58/motion_step_runner.md` 里的 MOTION_BAND 行：带=抓帧中位 5.6ms / 峰值 0.465 / 过渡帧数 3 / 间隔中位 22ms / 760x48px；整窗=抓帧中位 14.1ms / 峰值 0.201 / 过渡帧数 3 / 间隔中位 22ms / 760x588px）。⇒ 带在 runner 上把抓帧成本压掉约 2.5 倍（14.1→5.6ms），但**没换到更细的采样**：两臂的间隔中位都是 22ms，本机那对 44→9ms 的增益在 runner 上不存在，所以两臂的过渡帧数都是 3。这条带的收益在 runner 上是时间而不是分辨率 —— 它不足以把『判不到』修成『判到』，那一步要靠别的判据（BACKLOG 77 路 b：让判据本身不吃帧数）。允许的理由仍留在表里，但 must_judge=true 之后它不再构成放行 —— 判不到就是 UNDERCOVERED。"
     },
     "notice-banner-dismiss": {
       "must_judge": true,
@@ -33,7 +33,7 @@
       "allowed_not_run_reasons": [
         "clock-coarse-in-window"
       ],
-      "note": "R46 true → R52 因『会随采样漂』改成放行 → R57 改回 true：带捕获之后本机三次跑这一臂都是 10–11 帧过渡、judged=4/4 not-run=-（同一份 A/B 里整窗捕获只有 3–4 帧，见 r57_motion_readings.log 的 MOTION_BAND 行）。clock-coarse-in-window 留在允许列表里只为了『换了别的理由要红在 BAD_REASON』，不再是为了放行。runner 上若又漂回去，那正是要红的时候 —— 今天它有便宜的修法了（BACKLOG 77 已结案）。"
+      "note": "R46 true → R52 因『会随采样漂』改成放行 → R57 改回 true：带捕获之后本机三次跑这一臂都是 10–11 帧过渡、judged=4/4 not-run=-（同一份 A/B 里整窗捕获只有 3–4 帧，见 r57_motion_readings.log 的 MOTION_BAND 行）。clock-coarse-in-window 留在允许列表里只为了『换了别的理由要红在 BAD_REASON』，不再是为了放行。R58 的 runner 读数：带=760x48px、间隔中位 22ms、过渡帧数 3，整窗同（见 ci_r58 那份摘录）⇒ 这一臂在两台机器上都判到了，登记表说的『便宜修法』已经落成实测。runner 上若再漂回去，那正是要红的时候。"
     },
     "detail-kind-change": {
       "must_judge": true,

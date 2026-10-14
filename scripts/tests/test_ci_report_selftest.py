@@ -25,6 +25,7 @@ import os
 import re
 import signal
 import subprocess
+import tempfile
 import sys
 import textwrap
 import unittest
@@ -79,6 +80,8 @@ SUBSTITUTIONS = {
          r"swift test --filter UIInteractionProbeTests > /tmp/ui\.log 2>&1 &",
          "cp FAKE_LOG /tmp/ui.log &"),
     ],
+    # R59：告警闸门那一步的夹具（真命令要在自检里被替成 cp 假日志）。
+    "build": [],
     "motion": [
         (r"CLIPBOARD_HISTORY_UI_MOTION=1 CLIPBOARD_HISTORY_MOTION_OUT=/tmp/motion-ci \\\n\s*"
          r"swift test --filter MotionFilmstripTests > /tmp/motion\.log 2>&1 &",
@@ -154,6 +157,19 @@ EXPECT = {
          (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
     ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY",
                                            "MOTION_RESOLVE_SUMMARY"], 0, []),
+    # R59 / BACKLOG 86：红的那一支必须把**那一句为什么**一起打出来。
+    # 现场：run 38576482491 里 `testTransitionsAreActuallyRunning` 红了 7.4s（`motion suite exit: 1`），
+    # 而整步日志只有名字 —— XCTAssert 那句在 /tmp/motion.log 里，那个文件不上传。
+    # "runner 上为什么红"只能靠猜，而这一族猜错过一次（R51 那条红得不正确的判据）。
+    # 这一格同时是那条 grep 的正对照：把 `error: -[` 那两行删掉，"一帧跳变"就不会出现在输出里。
+    ("motion", "red_test_prints_its_reason"): (
+        MOTION_NORMAL
+        + "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests "
+          "testTransitionsAreActuallyRunning]' failed (7.443 seconds).\n"
+        + 'error: -[ClipboardHistoryAppTests.MotionFilmstripTests '
+          "testTransitionsAreActuallyRunning] : XCTAssertLessThanOrEqual failed: "
+          '(260) is greater than (75) - 这是一帧跳变，不是过渡\n',
+        ["testTransitionsAreActuallyRunning", "一帧跳变"], 0, []),
     # R58 / BACKLOG 83：**没有任何白名单提到过的读数族**也必须出现在 CI 日志里。
     # 这一格的理由很具体：R55 加了 MOTION_GRAB、R57 加了 MOTION_BAND，而那一步的摘录
     # 用的是一份写死的前缀列表 ⇒ "runner 上带捕获到底成没成功"在 run 38570965657 的日志里查不到
@@ -375,6 +391,40 @@ class CIReportSelfTest(unittest.TestCase):
     def test_report_only_steps_always_print_their_numbers(self):
         for failure in check(CI_DEFAULT):
             self.fail(failure)
+
+    def test_build_step_gates_the_test_target_too(self):
+        """R59 / BACKLOG 87：那条"构建 0 告警"以前只编译 `Sources/`。
+
+        现场：R58 提交的测试文件里有一条 `variable 'a' was never mutated`，
+        它在 `swift test` 的输出里明明白白，两次 CI 都是绿的 ——
+        因为那一步跑的是不带 `--build-tests` 的 `swift build`。
+        这条守卫同时钉三件事：① 命令编译测试目标；② 有告警必须打红；
+        ③ 打红时日志里能读到**是哪一条**（只报一个数字的话，下一次还得重跑构建才知道）。
+        """
+        with open(CI_DEFAULT, encoding="utf-8") as handle:
+            text = handle.read()
+        block = extract_run_block(text, "Build (must be warning-free)")
+        self.assertIn("swift build --build-tests", block,
+                      "告警闸门又退回成只编译 Sources/ 了 ⇒ 测试目标里的告警没人看（BACKLOG 87）")
+        subs = [(r"swift build --build-tests 2>&1 \| tee /tmp/build\.log",
+                 "cp FAKE_LOG /tmp/build.log")]
+        with tempfile.TemporaryDirectory() as shots:
+            for name, body, want_red in (
+                    ("干净", "Build complete! (9.9s)\n", False),
+                    ("有一条告警",
+                     "warning: variable 'a' was never mutated; consider changing to 'let' constant\n",
+                     True)):
+                fake = os.path.join(shots, "fake-%s.log" % name)
+                with open(fake, "w", encoding="utf-8") as handle:
+                    handle.write(body)
+                script = build_script(block, fake, "build", extra_subs=subs)
+                code, out = run_bash(script, shots)
+                if want_red:
+                    self.assertNotEqual(code, 0, "有告警必须把这一步打红：%s" % out)
+                    self.assertIn("never mutated", out,
+                                  "红了要能读是哪一条告警，不许只留一个数字：%s" % out)
+                else:
+                    self.assertEqual(code, 0, "0 告警不该红：%s" % out)
 
 
 def main():
