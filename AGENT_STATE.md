@@ -1520,6 +1520,11 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   变异 M185–M188 四支全 CAUGHT、`RESTORE_CLEAN=yes`。自评 **90 / 100**。
 - **新开三条**：BACKLOG 58（回执里嵌系统英文原文，读不懂）、59（保存失败静默，未复核）、
   60（普查其余 12 条全部"未核"，不许直接当缺陷修）。
+- **CI 已读（逐步结论）**：run 38501481700 **整作业 success**（12m52s），17 步全 ✓ ——
+  第 4 步 0 告警、第 5 步 `Executed 723 tests, 36 skipped, 0 failures`、第 7 步闸门
+  `CAPTURE_GATE_CASES passed=25 skipped=9 failed=0 有名字的红=0 NOT_RUN=26 ⇒ ok`、
+  第 13 步帧基线夹具集闸 `ADDED=0`（110 张对得上）、第 15 步 `SMOKE_OK=1`。
+  36 skipped（本机 29）= runner 上多 7 条环境门控的在屏探针/胶片。
 - **下一步（R41）**：BACKLOG 58 —— 把 `SystemEventsPasteKey.reason(fromStderr:)` 那套
   "错误码 → 人话 + 下一步"的成例接到复制这条路上（真值表 + 原文留日志不留界面）；
   顺带复核 BACKLOG 59 那一条（保存失败到底哪几种可达）。

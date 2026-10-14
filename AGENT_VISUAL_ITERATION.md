@@ -2672,4 +2672,4 @@ R39b 补了机器前提（`settingsDrawability` 四格真值表 + M183/M184 各�
 
 **验证**：723 tests / 29 skipped / 0 failures、0 告警、帧基线 `CHANGED=0 / ADDED=2 / 110`、
 脚本 83 全绿、变异 M185–M188 四支全 CAUGHT（红得对 4/4）、`RESTORE_CLEAN=yes`。
-**CI 待读**：推完必须读逐步 conclusion 才写结论（U-61）。
+**CI 已读**：run 38501481700 整作业 success（12m52s），17 步全 ✓；`Executed 723 tests, 36 skipped, 0 failures`；闸门 `有名字的红=0 NOT_RUN=26 ⇒ ok`；帧基线夹具集闸 `ADDED=0`；`SMOKE_OK=1`。
