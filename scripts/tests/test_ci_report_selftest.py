@@ -189,13 +189,19 @@ EXPECT = {
         NORMAL + FLOOR_SUMMARY + "\n"
         + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss\n",
         ["MOTION_FLOOR_REASONLESS"], 1, []),
-    # 地板本身：judged 低于"必须判到"的臂数（=3），而且旧版写死的 2 在这一格会放行。
+    # 地板本身。**R52 改过这一格的形状**，理由要写清楚：
+    # R52 之前清单里 `notice-banner` 是 must_judge（地板=3），所以"judged=2 且掉的是 detail-kind-change"
+    # 这一格能红在地板上。R52 把 notice-banner 改成放行之后地板降到 2，于是任何 must_judge 臂缺席
+    # 都会**先**撞 BAD_REASON（它没登记理由）⇒ 地板再也无法单独红。
+    # 这一格因此换成一个仍然只有地板能抓的形状：`judged=1` 却只登记了两条横幅臂缺席 ⇒
+    # detail-kind-change 与 empty-state 都该判到，结论行却说自己只判了 1 条 ——
+    # **judged 与 not-run 名单不自洽**（判据说谎）。R38 那条"锁要写成恒等式"说的就是这种红。
     ("motion_floor", "under_covered"): (
         NORMAL + FLOOR_SUMMARY + "\n"
         + "MOTION_NOT_RUN=premise-not-visible notice-banner：首尾相同\n"
-        + "MOTION_NOT_RUN=premise-not-visible detail-kind-change：首尾相同\n"
-        + "MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,detail-kind-change\n",
-        ["MOTION_FLOOR_UNDERCOVERED"], 1, []),
+        + "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms\n"
+        + "MOTION_RESOLVE_SUMMARY judged=1/4 not-run=notice-banner,notice-banner-dismiss\n",
+        ["MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_REDS=1"], 1, []),
     # 探针自己没跑完 ⇒ 不红（不能把探针故障算成产品缺陷），但必须打印。
     ("motion_floor", "suite_did_not_finish"): (
         TRUNCATED, ["MOTION_FLOOR_SKIPPED=suite-did-not-finish"], 0, []),

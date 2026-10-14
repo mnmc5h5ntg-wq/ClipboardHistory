@@ -1875,6 +1875,7 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   **这张表在同一轮里错过位**：脚本第一版按亮度排序认台阶，而 `empty` 是灰（`primary`）、四档是蓝（`accent`），
   两档外观亮度方向相反 ⇒ 次序排乱，先写进台账的"15 / 13"是错的（已改，脚本现在按像素数指纹配对、配不上就中止）。
   这是本轮**第三处**自己错：数从读数来了，但"哪个读数属于哪个台阶"没对账（同一族：整窗像素把效果归给错的元素）。
+  **（R52 又补一刀）**那张表的**轴**也用错了：亮度差 4 的那一步，B 通道差 30 ⇒ "分不开"这个结论作废，见第 54 轮。
 - **验证**：M249–M252 四支全 CAUGHT、M253 按设计绿；`swift build --build-tests` **0 告警**；
   全量 **750 tests / 29 skipped / 0 failures**；离屏闸门 `passed=721 skipped=29 failed=0 NOT_RUN=0 红=0`；
   116 帧 `CHANGED=0 MISSING=0 ADDED=0`；脚本 **101 全绿**。**不换装**。
@@ -1886,3 +1887,38 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   ② 读 R50/R51 的 CI：`MOTION_NATIVE_MOVE 判定=` 落在哪一格、`MOTION_RESOLVE_SUMMARY` 的 not-run 名单；
   ③ BACKLOG 72（其余调用点还在跨度上 —— 已有 `.scratch/motion-audit-2/answer_backlog_72.py`，
   它自检复现了夹具的 135ms vs 45ms，缺的是带 `CLIPBOARD_HISTORY_UI_MOTION=1` 的真胶片日志）。
+---
+
+## R52 · 覆盖率地板第一次在 runner 上红，红的是"我的登记旧了"（第 54 轮 / U-78 / D-111 / BACKLOG 77、78）
+
+- **靶**：R50/R51 推上去之后 CI 连红两次，都在 `Motion coverage floor`：
+  run 38543090198 `NO_RESOLVE`（整族零读数），run 38543812477
+  `BAD_REASON notice-banner 的理由是 clock-coarse-in-window，而登记过的是 无`。
+- **闸门说的是事实，旧的是登记**：R46 那句"runner 上四次全部判到"已被两次实测推翻
+  （最粗 76ms vs 声明 150ms；本机这一臂一直是 `premise-not-visible`）
+  ⇒ `notice-banner` 改成 `must_judge=false` + 放行那两个理由，note 写死 run 号与毫秒（D-111）。
+- **放宽必须留证据**：新增自测 `testRelaxedArmsMustCiteARunId` ——
+  任何 `must_judge=false` 的臂，note 里没有 run 号或夹具路径就红。没有出处的放宽 = 测试红。
+- **红必须有名字**：`NO_RESOLVE` 之后新增 `MOTION_FLOOR_SKIPS`，逐条打 `Test skipped - <原因>`。
+  CI 那一步只 grep `MOTION_NOT_RUN=`，而 XCTest 层 `XCTSkipUnless` 的中文原因不带这个前缀
+  ⇒ 整族缺席那种红以前**说不出为什么**。
+- **不红不等于不说**：新增 `MOTION_FLOOR_THIN`（非红）—— 横幅两臂同场缺席时打一行，指向 BACKLOG 77
+  （150/120ms 的过渡 vs 段内最粗 73–101ms 的每帧成本 ⇒ 两台机器今天都分辨不了）。
+  这是 R36（红必须有名字）与 R39（恒红的守卫会被人删）之间的折法。
+- **放宽的副作用被自测抓住，不是被我抓住**：地板 3→2 之后 `UNDERCOVERED` 再也无法单独红
+  （任何 must_judge 臂缺席都会先撞 `BAD_REASON`）——`test_ci_report_selftest` 的 `under_covered`
+  那一格当场失效。换成只有地板能抓的形状：`judged=1/4` 而 not-run 名单只登记两条横幅臂
+  ⇒ **`judged` 与名单不自洽**（判据说谎），并用 `REDS=1` 钉住"只有这一条红"。
+- **撤回一句用错轴的话**：R51 的"暗档 0 次 vs 1 次只差 4/255"是 Rec.709 **亮度**；
+  那一步实际是灰→蓝的**色相**翻转（B 通道 41→71，差 30）⇒ 结论作废，
+  BACKLOG 71 改成"先把判据的轴换对，再谈要不要改数值"。同一张表我在这轮里错过位两次
+  （一次归位、一次轴），都属于"只用亮度判两态 = 用错轴"那一族。
+- **验证**：脚本自测 **101 → 105**（`Ran 105 … OK`）、变异 **M254–M259 六支全 CAUGHT**
+  （`红得不对=0 还原不干净=0`，电池跑完自己复跑一遍确认全绿）、
+  闸门对本机真日志 `/tmp/r51-motion.log` ⇒ `THIN + OK=2/4 + REDS=0`、exit 0。
+  产品零改动、Swift 判据零改动、116 帧不变 ⇒ **不换装**、不需要 `frame_baseline update`。自评 **94 / 100**。
+- **CI 待读**：下一次运行看 `MOTION_FLOOR_SKIPS` 有没有把 38543090198 那次的原因说清楚
+  （BACKLOG 78 的结案条件），以及 `MOTION_NATIVE_MOVE 判定=` 是否终于出现（BACKLOG 75）。
+- **下一步（R53）**：① `MOTION_NATIVE_MOVE` 那行打印要挪到 `requireAppWasActive` **之前**
+  （现在两臂读数打了、结论行被 skip 挡在后面 ⇒ runner 跳过时永远看不到三态结论）；
+  ② BACKLOG 71 按色度轴重做判据；③ BACKLOG 72 的迁移（本机 3 卷已答"从没出现"，还欠 runner 卷）。

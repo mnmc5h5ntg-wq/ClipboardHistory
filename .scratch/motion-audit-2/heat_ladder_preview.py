@@ -71,16 +71,25 @@ def preview(paths):
     if len(per_file) > 1 and any(f != fingerprints[0] for f in fingerprints[1:]):
         raise SystemExit("HEAT_PREVIEW_MISMATCH：两帧认出的格子像素数不一致 ⇒ "
                          "它们在比的不是同一批台阶，下面的 Δ 全部作废\n  %s" % fingerprints)
-    for (path, (background, ordered)), fingerprint in zip(per_file, fingerprints):
+    for (path, (background, ordered)) in per_file:
         print("\n=== %s ===" % os.path.basename(path))
         print("背景 %s 亮度=%d 框=%s" % (background[1], background[0], background[2]))
-        previous = background[0]
+        previous_lum = background[0]
+        previous_color = background[1]
         for token, (count, lum, color, box) in zip(TOKENS, ordered):
-            print("  %-20s 像素=%5d 颜色=%s 亮度=%3d 框=%s  Δ(与上一档)=%+d"
-                  % (token, count, color, lum, box, lum - previous))
-            previous = lum
-        print("  相邻档 Δ（不含背景）：" + " / ".join(
-            "%+d" % (ordered[i][1] - ordered[i - 1][1]) for i in range(1, len(ordered))))
+            channels = [abs(int(color[i]) - int(previous_color[i])) for i in range(3)]
+            print("  %-20s 像素=%5d 颜色=%s 亮度=%3d  Δ亮度=%+d  Δ各通道=%s（最大 %d）"
+                  % (token, count, color, lum, lum - previous_lum, channels, max(channels)))
+            previous_lum = lum
+            previous_color = color
+        print("  相邻档：Δ亮度 / Δ最大通道")
+        previous_color = background[1]
+        previous_lum = background[0]
+        for count, lum, color, box in ordered:
+            channels = [abs(int(color[i]) - int(previous_color[i])) for i in range(3)]
+            print("    %+4d / %3d" % (lum - previous_lum, max(channels)))
+            previous_lum = lum
+            previous_color = color
 
 
 def main():

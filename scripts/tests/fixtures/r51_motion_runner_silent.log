@@ -1,0 +1,25 @@
+# 来源：GitHub Actions run 38543090198（R51 的 tip，2026-10-14 09:44 UTC），
+# step `Motion filmstrip (report-only)` + `Motion coverage floor`。
+#
+# **这份不是原始 motion.log 全文**（CI 没上传它），而是从那一步的 stdout **逐行抄回**：
+# 那一步打了 `motion suite exit: 0  executed: 28  胶片: 9  无 MOTION_SUMMARY
+# 无 MOTION_RESOLVE_SUMMARY`，而 `---- 动效读数 ----` 那一段是空的。
+# 下面 4 行 skip 是它 `grep MOTION_NOT_RUN=` 抓到的全部（逐字抄回，没有改写）。
+#
+# 它当正对照钉两件事：
+# ① 整族一条读数都没有时，闸门必须红（NO_RESOLVE）—— 旧版这一步在这里 exit 0；
+# ② 红必须**有名字**（R36）。而这一步的 grep 只认带 `MOTION_NOT_RUN=` 的行，
+#    XCTest 层 `XCTSkipUnless` 打的是中文句子（"动效胶片探针：设 … 才跑"），不带那个前缀
+#    ⇒ 真正解释"为什么整族没跑"的那一行，在 CI 日志里从来没被打出来过。
+#    R52 的修法：闸门自己在 NO_RESOLVE 时把 `Test skipped - <原因>` 逐条打出来。
+#
+# 注意：这份夹具**不能**证明那次到底是哪一条测试没跑 —— 原始日志没留，
+# 而我不抄没见过的东西。所以"场景判据被 skip 掉了"至今仍是**未证实的候选原因**，
+# 由下一次 run 的 MOTION_FLOOR_SKIPS 行来定（见 BACKLOG 78）。
+# 下面第一行只保留那一步真打出来的那个数（`executed: 28`）；
+# 秒数与 skip 计数它没打，所以这里不补 —— 闸门读的也只是 `Executed (\d+) tests?`。
+Executed 28 tests
+/Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1894: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+/Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1894: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+/Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1894: -[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+/Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1932: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps] : Test skipped - MOTION_NOT_RUN=runner-cannot-observe-gradient-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品

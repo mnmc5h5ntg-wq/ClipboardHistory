@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R52：覆盖率地板第一次在 runner 上红，红的是登记与实际不符）
+- `motion_floor_gate.py`：`NO_RESOLVE` 之后新增一行 `MOTION_FLOOR_SKIPS`，
+  把日志里 `Test Case … : Test skipped - <原因>` 逐条打出来。
+  以前 CI 那一步只 `grep MOTION_NOT_RUN=`，而 XCTest 层 `XCTSkipUnless` 的中文原因不带这个前缀
+  ⇒ run 38543090198 那种"整族一条读数都没有"的红**没有名字**（R36 的规矩断了）。
+- 登记表 `motion_floor_expectations.json`：`notice-banner` 从 `must_judge=true` 改成
+  放行 `clock-coarse-in-window` / `premise-not-visible`，note 里写死依据
+  （run 38538371464 最粗 76ms vs 声明 150ms；run 38543812477 同一理由；本机一直是 premise-not-visible）。
+  **登记是测量，不是愿望**（D-111），且新增自测要求任何放宽都必须留 run 号或夹具出处。
+- 新增 `MOTION_FLOOR_THIN`（**不红**）：横幅两臂同场缺席时打一行，指向 BACKLOG 77。
+- 新增 `thin_warnings` 段；`MOTION_FLOOR_OK` 从"只有一条结果都没有才打"改成"没有红就打"，
+  与 THIN/SKIPPED 共存。
+- 自测 101 → **105**：`under_covered` 那一格换成"`judged` 与 not-run 名单不自洽"的形状 ——
+  因为地板从 3 降到 2 之后，`UNDERCOVERED` 已无法单独红（任何 must_judge 臂缺席都会先撞 `BAD_REASON`）。
+  这一格失效是 `test_ci_report_selftest` 抓住的，不是我发现的。
+- 更正 R51 写进台账的热图台阶结论：那句"暗档 0 次 vs 1 次只差 4/255"用的是**亮度**轴，
+  而该步是灰→蓝的**色相**翻转（B 通道差 30）⇒ 结论撤回，BACKLOG 71 改判轴（R53）。
+- 产品代码零改动、Swift 判据零改动、116 帧逐字节不变。变异 M254–M259 六支全 CAUGHT。
+
 ### Fixed（R51：上一轮那条"同步写盘"判据测错了对象）
 - `CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread` 从"目录快照不许多文件"
   改成"**把注入的写队列堵起来**"：堵着 ⇒ 盘上不许出现 `history.json` / `daily-copy.json`；

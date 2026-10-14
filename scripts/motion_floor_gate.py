@@ -10,10 +10,15 @@
 而 `head -24` 把真正要紧的那行挤掉了（我是把三次 run 的日志拉下来人肉对比才发现的）。
 ⇒ "CI 绿" 与 "读数没退" 是两件事，而后者以前没有任何东西在守。
 
-判什么（每一条都会红，且各自红在不同形状上）：
+判什么（除最后一条 `THIN` 之外，每一条都会红，且各自红在不同形状上）：
   NO_RESOLVE      跑完了（`Executed N>0 tests`）却没有结论行 ⇒ 红。
                   原来这一步在这里 `exit 0`（"旧版判据没有这一行"）——
                   那是一张免检牌：本仓库现在每条都打这一行，缺了就是坏了。
+                  **R52 补的那一半**：这一格以前只说"没有读数"，不说为什么没有。
+                  run 38543090198 就是这样：整族一条 MOTION 都没打，而 CI 那一步的
+                  `grep MOTION_NOT_RUN=` 抓不到 XCTest 层的 skip 原因（`XCTSkipUnless` 打的是
+                  中文句子，不带 `MOTION_NOT_RUN=` 前缀）⇒ 红是红了，没人知道为什么。
+                  现在这里会把 `Test Case … skipped - <原因>` 逐条打出来（最多 4 条）。
   MISSING_KEY     `MOTION_SUMMARY` 的键集合 ≠ 清单里的场景全集 ⇒ 红。
                   `MotionFilmstripTests` 自己的注释就说过为什么：
                   "少一个键会让下游把『没测』读成『测了且为 0』"。
@@ -26,6 +31,13 @@
   STALE           登记为"今天判不了"（`must_judge=false`）的臂这次**判到了** ⇒ 红。
                   这是好消息，但清单必须跟着删一行，否则它会慢慢变成一堆免检牌
                   （BACKLOG 63 那一族："规矩不许停在口头/登记上"）。
+  THIN（**不红**） R52 新增：登记表里某一族臂（`thin_warnings`）这次**全部** not-run，
+                  而它们缺席的理由都在登记之内 ⇒ 不红，但必须打一行。
+                  为什么不红：这是两台机器今天都做不到的事（横幅那两臂声明 150/120ms，
+                  而事件段内最粗的一次采样实测 73–101ms，粗过 0.5×声明这条分辨率线），
+                  拿它当硬门就是 R39 那一族"恒红的守卫最后被人删掉"。
+                  为什么又要打：不写下来的话，"这一族今天完全没被看"会变成没人知道的常态。
+                  红的是**新形状**（换了理由 / 清单外的臂 / 少了一臂的键），不是这条已知事实。
 
 **明确不判的**：`MOTION_SUMMARY <arm>=<帧数>` 里的那个帧数。
 R2 已经把这件事证伪过一次 —— 同一份代码本机实测跑过 `2 / 3 / 2`，
@@ -49,6 +61,10 @@ RESOLVE = re.compile(r"MOTION_RESOLVE_SUMMARY\s+judged=(\d+)/(\d+)\s+not-run=(\S
 SUMMARY = re.compile(r"MOTION_SUMMARY\s+(.*)")
 NOT_RUN_LINE = re.compile(r"MOTION_NOT_RUN=([A-Za-z0-9._-]+)[ ：:]\s*([A-Za-z0-9._-]+)?")
 EXECUTED = re.compile(r"Executed (\d+) tests?")
+# XCTest 层的 skip：`…/MotionFilmstripTests.swift:2402: -[Class testFoo] : Test skipped - <原因>`。
+# 这一类原因**不带** `MOTION_NOT_RUN=` 前缀（`XCTSkipUnless` 打的是人话），
+# 所以 CI 那一步的 grep 抓不到它 —— 整族一条读数都没打的时候，这是唯一的线索。
+SKIP_LINE = re.compile(r"-\[[A-Za-z0-9_.]+ ([A-Za-z0-9_]+)\][^\n]*?: Test skipped - (.+)")
 
 
 def parse(text: str) -> dict:
@@ -86,12 +102,18 @@ def parse(text: str) -> dict:
             reasons.setdefault(match.group(2), set()).add(match.group(1))
 
     executed = [int(m.group(1)) for m in EXECUTED.finditer(text)]
+    skips = []
+    for line in text.splitlines():
+        match = SKIP_LINE.search(line)
+        if match and (match.group(1), match.group(2)) not in skips:
+            skips.append((match.group(1), match.group(2)))
     return {
         "judged": judged,
         "total": total,
         "not_run": not_run,
         "summary_arms": summary_arms,
         "reasons": reasons,
+        "skips": skips,
         "executed": executed[-1] if executed else 0,
     }
 
@@ -115,6 +137,20 @@ def verdicts(facts: dict, expectations: dict) -> list:
         out.append(("MOTION_FLOOR_NO_RESOLVE",
                     "跑完了却没有 MOTION_RESOLVE_SUMMARY ⇒ 这一族的读数今天不存在，"
                     "而旧版这一步在这里 exit 0（免检牌）", True))
+        # 红必须有名字（R36）：整族没读数时，唯一能解释它的是 XCTest 层的 skip 原因，
+        # 而那些行不带 `MOTION_NOT_RUN=`，CI 那一步的 grep 抓不到 ⇒ 以前这里只有一句"没有读数"。
+        skips = facts.get("skips") or []
+        if skips:
+            out.append(("MOTION_FLOOR_SKIPS",
+                        "被 XCTest 层 skip 掉的用例 %d 条（这些原因不带 MOTION_NOT_RUN=，"
+                        "CI 那一步的 grep 看不见）：%s"
+                        % (len(skips),
+                           " | ".join("%s：%s" % (name, reason[:90]) for name, reason in skips[:4])),
+                        False))
+        else:
+            out.append(("MOTION_FLOOR_SKIPS=none-found",
+                        "日志里连一行 `Test skipped - <原因>` 都没有 ⇒ 这一族不是被 skip，"
+                        "而是根本没执行到打结论行的那一步（看 suite 的退出码与看门狗）", False))
         return out
 
     missing = [name for name in scenarios if name not in facts["summary_arms"]]
@@ -157,6 +193,16 @@ def verdicts(facts: dict, expectations: dict) -> list:
                         "%s 登记为「永远判不了」，这次却判到了 ⇒ 这是好消息，"
                         "把清单里这一条删掉（留着它，清单就慢慢变成免检牌堆）" % arm, True))
 
+    for group in expectations.get("thin_warnings", []):
+        arms_in_group = [name for name in group.get("arms", [])]
+        if arms_in_group and all(name in facts["not_run"] for name in arms_in_group):
+            out.append(("MOTION_FLOOR_THIN",
+                        "%s 这一族这次**全部**判不到（缺席理由都在登记之内 ⇒ 不红）。"
+                        "今天两台机器都做不到这件事，所以红没有意义；但这一行必须打出来，"
+                        "否则「这一族没被看」会变成没人知道的常态。见 %s"
+                        % ("/".join(arms_in_group), group.get("points_to", "BACKLOG")),
+                        False))
+
     floor = len(must_judge)
     if facts["judged"] < floor:
         out.append(("MOTION_FLOOR_UNDERCOVERED",
@@ -194,7 +240,10 @@ def main(argv=None) -> int:
     for marker, message, is_red in results:
         print("%s %s" % (marker, message))
         reds += 1 if is_red else 0
-    if not results:
+    # `MOTION_FLOOR_OK` 以前只在"一条结果都没有"时打 —— 那等于说"有非红的提示（SKIPPED / THIN）
+    # 就没有 OK"。今天 runner 那种"全部在登记之内但这一族很薄"的运行，日志里应当同时
+    # 看得见 OK 与 THIN：绿是"没有新形状"，薄是"这一族今天没被看"，两句话都要说。
+    if reds == 0:
         print("MOTION_FLOOR_OK=%s/%s 全部臂都在登记之内" % (facts["judged"], facts["total"]))
     print("MOTION_FLOOR_REDS=%d" % reds)
     return 1 if reds else 0

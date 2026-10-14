@@ -21,8 +21,13 @@
 
 `LOCAL_RUNNER_LOG` 是**逐字真日志**（`fixtures/r46_motion_local.log`，
 本机 2026-10-14 06:09 跑 `CLIPBOARD_HISTORY_UI_MOTION=1 swift test --filter MotionFilmstripTests`）。
-它当正对照：这份日志必须红，而且红在该红的两处（本机 notice-banner 是 premise-not-visible、
-judged=2 低于地板 3）—— 一张只会绿的夹具证明不了任何事。
+`RUNNER_SILENT_LOG` 是 run 38543090198 那一次"整族一条读数都没打"的**重建件**
+（只抄那一步真打出来的行；原始 motion.log 没上传，所以它证明不了原因，见文件头）。
+
+**R52 改的是这两份夹具各自"该红成什么样"**：登记表里 `notice-banner` 从 `must_judge=true`
+改成放行 `clock-coarse-in-window` / `premise-not-visible` —— 不是为了让 CI 变绿，
+而是那句话已被实测推翻两次（run 38538371464 与 38543812477，理由与毫秒数都在登记里）。
+于是本机那份真日志从"红两处"变成"绿 + 一行 THIN"，正对照的角色交给 `RUNNER_SILENT_LOG`。
 """
 import io
 import json
@@ -40,6 +45,10 @@ HEADER_LINES = [line for line in FIXTURE.read_text(encoding="utf-8").splitlines(
                 if line.startswith("# ")]
 LOCAL_RUNNER_LOG = "\n".join(line for line in FIXTURE.read_text(encoding="utf-8").splitlines()
                              if not line.startswith("# "))
+
+SILENT_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r51_motion_runner_silent.log"
+RUNNER_SILENT_LOG = "\n".join(line for line in SILENT_FIXTURE.read_text(encoding="utf-8").splitlines()
+                              if not line.startswith("# "))
 
 EXPECTATIONS_PATH = Path(__file__).resolve().parents[2] / "scripts" / "motion_floor_expectations.json"
 EXPECTATIONS = json.loads(EXPECTATIONS_PATH.read_text(encoding="utf-8"))
@@ -116,12 +125,29 @@ class MotionFloorGateTests(unittest.TestCase):
         self.assertIn("MOTION_FLOOR_UNREGISTERED", [m for m, red in markers(facts) if red])
 
     def testFloorIsTheMustJudgeCountNotTwo(self):
-        # 旧版写死 `judged<2`。这里 judged=2 却掉了两条 must_judge ⇒ 必须红。
-        text = log("MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,detail-kind-change",
+        # 旧版写死 `judged<2`。这一格钉的是"地板从清单算"，不是"这条闸门永远红"：
+        # 同一份日志，清单里 must_judge 的臂数变了，UNDERCOVERED 就必须跟着消失。
+        text = log("MOTION_RESOLVE_SUMMARY judged=1/4 "
+                   "not-run=notice-banner,notice-banner-dismiss,detail-kind-change",
                    extra="MOTION_NOT_RUN=premise-not-visible notice-banner：x\n"
+                         "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：x\n"
                          "MOTION_NOT_RUN=premise-not-visible detail-kind-change：x")
         facts = parse(text)
-        self.assertIn("MOTION_FLOOR_UNDERCOVERED", [m for m, red in markers(facts) if red])
+        reds = [m for m, red in markers(facts) if red]
+        self.assertIn("MOTION_FLOOR_UNDERCOVERED", reds,
+                      "真清单的地板是 2（detail-kind-change + empty-state），judged=1 必须红")
+        self.assertIn("MOTION_FLOOR_BAD_REASON", reds,
+                      "detail-kind-change 没登记任何允许理由 ⇒ 这条红必须另外红，不与地板混成一团")
+        loose = json.loads(json.dumps(EXPECTATIONS))
+        for spec in loose["arms"].values():
+            spec["must_judge"] = False
+            spec["allowed_not_run_reasons"] = sorted(
+                set(spec["allowed_not_run_reasons"])
+                | {"premise-not-visible", "clock-coarse-in-window"})
+        self.assertNotIn("MOTION_FLOOR_UNDERCOVERED",
+                         [m for m, red in markers(facts, loose) if red],
+                         "地板算成 0 之后还红 ⇒ 那个 2 是写死的，不是从清单来的")
+
 
     def testMissingSummaryKeyIsRed(self):
         facts = parse(log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=-",
@@ -160,15 +186,77 @@ class MotionFloorGateTests(unittest.TestCase):
         # 同一份日志、没有 stale 标记 ⇒ 不红。这一格把"红"钉在登记上而不是钉在读数上。
         self.assertEqual([m for m, red in markers(facts) if red], [])
 
-    # ---- 真日志正对照 ----
+    # ---- 两份真日志：一份是"今天就是这样"，一份是"坏了要说为什么" ----
 
-    def testRealLocalLogIsRedOnExactlyTwoThings(self):
+    def testRealLocalLogIsGreenButThin(self):
+        """本机那份真日志：R52 之后它**不再红**，但必须打一行 THIN。
+
+        红过的两处现在都在登记之内：`notice-banner` 的 `premise-not-visible`
+        与 `notice-banner-dismiss` 的 `clock-coarse-in-window`（理由与毫秒数抄在清单的 note 里），
+        而地板从 3 降到 2（`must_judge` 只剩 detail-kind-change 与 empty-state），judged=2 够。
+        **这一格不是把红改成绿就完事**：THIN 那一行必须出现，否则"横幅这一族今天一臂都没被看"
+        就没人知道 —— 红留给新形状，薄留给一行字。
+        """
         facts = parse(LOCAL_RUNNER_LOG)
-        reds = [m for m, red in markers(facts) if red]
-        # 本机 notice-banner 是 premise-not-visible（登记里它是 must_judge、允许理由为空）；
-        # judged=2 低于地板 3。两件事都必须被这条闸门抓住。
-        self.assertEqual(reds, ["MOTION_FLOOR_BAD_REASON", "MOTION_FLOOR_UNDERCOVERED"],
-                         "真日志的红变了形状 ⇒ 要么登记错了，要么闸门判错了：%s" % reds)
+        marks = markers(facts)
+        self.assertEqual([m for m, red in marks if red], [],
+                         "本机真日志的红变了形状 ⇒ 登记又与实际脱节了：%s" % [m for m, r in marks if r])
+        self.assertIn("MOTION_FLOOR_THIN", [m for m, _ in marks])
+
+    def testSilentRunnerLogRedsAndNamesTheSkips(self):
+        """run 38543090198：整族一条读数都没打。红 + **必须把 skip 原因打出来**。
+
+        那一次的 CI 步骤只 grep `MOTION_NOT_RUN=`，而 XCTest 层 `XCTSkipUnless` 的中文原因
+        不带这个前缀 ⇒ 红是红了，没人知道为什么（R36 说的"红必须有名字"在这里没做到）。
+        """
+        facts = parse(RUNNER_SILENT_LOG)
+        self.assertIsNone(facts["judged"])
+        self.assertEqual(facts["executed"], 28)
+        self.assertEqual(len(facts["skips"]), 4,
+                         "夹具里 4 条 `Test skipped - …` 必须全被读到，一条都不许漏")
+        marks = markers(facts)
+        self.assertIn("MOTION_FLOOR_NO_RESOLVE", [m for m, red in marks if red])
+        named = [m for m, _ in marks if m.startswith("MOTION_FLOOR_SKIPS")]
+        self.assertEqual(len(named), 1, "NO_RESOLVE 必须紧跟一行 SKIPS，否则这条红没有名字")
+        message = dict((m, msg) for m, msg, _ in verdicts(facts, EXPECTATIONS))[named[0]]
+        self.assertIn("testNativeRowMoveIsVisibleToTheRuler", message)
+        self.assertIn("app-not-active", message)
+
+    def testSkipReasonWithoutTheMotionPrefixIsStillSurfaced(self):
+        """合成一格：原因里**不带** `MOTION_NOT_RUN=` 的那种 skip 也必须被捞出来。
+
+        这一格钉的是解析器不许只认自家前缀 —— CI 那一步的 grep 就是这么漏掉整族缺席的。
+        """
+        text = ("\t Executed 24 tests, with 1 test skipped and 0 failures (0 unexpected) in 70 seconds\n"
+                + SUMMARY + "\n"
+                + "MotionFilmstripTests.swift:2402: -[ClipboardHistoryAppTests"
+                  ".MotionFilmstripTests testTransitionsAreActuallyRunning] : Test skipped - "
+                  "动效胶片探针：设 CLIPBOARD_HISTORY_UI_MOTION=1 才跑（会抢前台并开窗）\n")
+        facts = parse(text)
+        self.assertIn("MOTION_FLOOR_SKIPS", [m for m, _ in markers(facts)])
+        self.assertEqual(facts["skips"][0][0], "testTransitionsAreActuallyRunning")
+
+    def testRelaxedArmsMustCiteARunId(self):
+        """放宽必须留证据：任何 `must_judge=false` 的臂，note 里要有一个 run 号或测量出处。
+
+        这一格防的是"为了让 CI 变绿而把登记改松" —— 那正是本仓库记过一整族的事
+        （为过夹具改判据 / 把红藏起来）。改登记可以，但每一次都要留下**哪一次运行**逼着改。
+        """
+        for name, spec in EXPECTATIONS["arms"].items():
+            if spec["must_judge"]:
+                continue
+            note = spec.get("note", "")
+            self.assertTrue(re.search(r"run \d{8,}", note) or "fixtures/" in note,
+                            "%s 被放行却没写是哪次运行/哪份夹具逼的 ⇒ 登记成了口头承诺" % name)
+
+    def testThinWarningNeedsARegisteredReasonForEachAbsentArm(self):
+        """THIN 只放行"理由在登记之内"的缺席；换一种坏法仍然要红（不许用 THIN 兜底）。"""
+        text = log("MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,notice-banner-dismiss",
+                   extra="MOTION_NOT_RUN=something-never-seen notice-banner：换了种坏法\n"
+                         "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：x")
+        marks = markers(parse(text))
+        self.assertIn("MOTION_FLOOR_BAD_REASON", [m for m, red in marks if red])
+        self.assertIn("MOTION_FLOOR_THIN", [m for m, _ in marks])
 
     # ---- 清单自己也要被量 ----
 
@@ -187,16 +275,20 @@ class MotionFloorGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             green = os.path.join(folder, "green.log")
             with io.open(green, "w", encoding="utf-8") as handle:
-                handle.write(log("MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-"))
+                handle.write(LOCAL_RUNNER_LOG)      # R52 之后：本机真日志是"绿 + THIN"
             red = os.path.join(folder, "red.log")
             with io.open(red, "w", encoding="utf-8") as handle:
-                handle.write(LOCAL_RUNNER_LOG)
+                handle.write(RUNNER_SILENT_LOG)     # 整族没读数 ⇒ 红
             for path, expected in ((green, 0), (red, 1)):
                 buffer = io.StringIO()
                 with redirect_stdout(buffer):
                     code = main([path, "--expectations", str(EXPECTATIONS_PATH)])
                 self.assertEqual(code, expected, buffer.getvalue())
                 self.assertIn("MOTION_FLOOR_FACTS", buffer.getvalue())
+                # 绿也要有 OK：以前 OK 只在"一条结果都没有"时打，
+                # 于是"有 THIN 的绿"在日志里长得像"什么都没判"。
+                self.assertIn("MOTION_FLOOR_OK" if expected == 0 else "MOTION_FLOOR_REDS=1",
+                              buffer.getvalue())
             missing = os.path.join(folder, "nope.log")
             buffer = io.StringIO()
             with redirect_stdout(buffer):

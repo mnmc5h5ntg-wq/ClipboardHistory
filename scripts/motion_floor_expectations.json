@@ -13,10 +13,10 @@
   "scenarios": ["notice-banner", "notice-banner-dismiss", "detail-kind-change", "empty-state"],
   "arms": {
     "notice-banner": {
-      "must_judge": true,
+      "must_judge": false,
       "stale_if_judged": false,
-      "allowed_not_run_reasons": [],
-      "note": "runner 上 R42/R42b/R43/R44 四次全部判到 ⇒ 要求它判到。本机不是：本机这一臂是 premise-not-visible（首尾逐像素相同），所以本表说的是 runner 的前提，不是本机的。"
+      "allowed_not_run_reasons": ["clock-coarse-in-window", "premise-not-visible"],
+      "note": "R46 登记时写的是 `must_judge=true`，理由是「runner 上 R42/R42b/R43/R44 四次全部判到」。R52 把这条改成放行，因为**这句话已经被实测推翻了两次**：run 38538371464（R49）`judged=2/4 not-run=notice-banner,notice-banner-dismiss`，理由 `clock-coarse-in-window`，事件段内最粗 76ms 而这条过渡声明 150ms（门槛 0.5×声明=75ms ⇒ 差 1ms 就落进判不到）；run 38543812477（R51 更正）`judged=3/4 not-run=notice-banner`，同一个理由。本机这一臂一直是 `premise-not-visible`（首尾逐像素相同，见 fixtures/r46_motion_local.log）。**登记的是测量，不是愿望**：这台机器今天分辨不了它，硬要它判到只会得到一条每天重复的红（R39 那一族）。代价写进 BACKLOG 77：这一族的覆盖现在只剩 dismiss 一条臂，两臂同时缺席时闸门会打 MOTION_FLOOR_THIN。"
     },
     "notice-banner-dismiss": {
       "must_judge": false,
@@ -36,5 +36,12 @@
       "allowed_not_run_reasons": [],
       "note": "R42/R44 都判到 ⇒ 要求判到。"
     }
-  }
+  },
+  "thin_warnings": [
+    {
+      "arms": ["notice-banner", "notice-banner-dismiss"],
+      "points_to": "BACKLOG 77",
+      "note": "横幅这一族的两臂**同时**判不到时打一行 MOTION_FLOOR_THIN（不红）。为什么不红：两台机器今天都做不到 —— 声明 150/120ms，而事件段内最粗的一次采样实测 runner 73–76ms、本机 96–101ms，都粗过 0.5×声明这条分辨率线；拿它当硬门得到的是一条每天重复、且没有人能今天就修的红（R39 那一族）。为什么要打：不写下来，「横幅的进入与撤走没有被看过」就会变成没人知道的常态，而这条判据存在的全部理由就是 R16 那次『只有一臂在演的过渡等于没有过渡』。红仍然留给新形状：换了理由、清单外的臂、少了一臂的键。"
+    }
+  ]
 }
