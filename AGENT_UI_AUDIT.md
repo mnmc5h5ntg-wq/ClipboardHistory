@@ -3813,3 +3813,52 @@ R53 的判据必须建在色度感知的距离上（或至少取通道最大值�
 - 产品代码零改动、Swift 判据零改动、116 帧不变 ⇒ **不换装**、不需要 `frame_baseline update`。
 - 自评 **94 / 100**。
 
+---
+
+## 第 55 轮 · R53：结论行挡在 skip 后面，等于每次跳过都把它删掉（BACKLOG 75、78 / U-79 / D-112）
+
+### 开场缺陷清单（坐标）
+
+| 位点 | 现状 | 缺陷 |
+|---|---|---|
+| `MotionFilmstripTests.testNativeRowMoveIsVisibleToTheRuler` 的打印顺序 | 两臂读数 `MOTION_NATIVE row-move 开/关` 打在 `requireObservableMotion` / `requireAppWasActive` **之前**，而 `MOTION_NATIVE_MOVE 判定=` 打在**之后** | runner 只要跳过这一臂，日志就只剩两臂读数、没有结论 —— 这正是 R50 想消灭的那种含糊，**而它是 R50 自己留下的**（run 38543090198 与 38543812477 两次实测：四行 `MOTION_NATIVE`，零行 `MOTION_NATIVE_MOVE`） |
+| `region(in:named:)`（R48 为守卫写的取区域助手） | `lines.firstIndex(where: { $0.contains(declaration) })` | **会命中守卫自己**：守卫要在源码里写下被守卫者的名字（`region(in: source, named: "func testXxx")`），于是区域变成守卫自己的函数体。本轮第一版就是这样：三条断言里有两条"通过"，因为它们在读守卫自己写的字面量 |
+| `testNativeRowMoveIsVisibleToTheRuler` 的可达性 | 本机每次 `app-not-active` ⇒ skip | 上一条的根因没变：这条判据只在 runner 偶尔激活时出结论 ⇒ 它的**证据形状**必须自己完整（读数 + 读法都在，闸门只管责任） |
+
+### 修法
+
+1. **读法与责任分开**：`nativeMoveVerdict(...)` 与 `MOTION_NATIVE_MOVE 判定=` 挪到两道 skip **之前**；
+   `XCTFail`（`.notAnimated` 那一格）留在**之后**。日志里从此每一卷都有结论，
+   而"能不能算在产品头上"仍然由闸门决定。打印尾部补一句
+   "这一行只说读数怎么读，产品结论要过下面两道 skip 才算"，防止下一个人把它当成判红。
+2. **顺序守卫**：新增 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`，三条断言：
+   结论行在（缺了就又回到"跳过的运行没有结论"）、闸门在（缺了会把非激活进程的读数算给产品）、
+   **顺序对**（结论在闸门前、`XCTFail` 在闸门后）。
+3. **把守卫自己摘掉**：`region()` 改成按**行首**匹配（trim 后 `hasPrefix`），
+   两个调用点都传的是 `func …` 声明，语义不变而自匹配消失。
+
+### 真实视觉审查
+
+本轮零产品改动、116 帧逐字节不变（`CHANGED=0 MISSING=0 ADDED=0`，见验证）。
+看的是**上一轮那两张热图帧的重新读法**（`heatmap-cell-strip-still-90x140-{dark,light}.png`）：
+按像素身份配对之后，暗档"空格子→第 1 档"那一步在**亮度**上只差 4，
+而在 **B 通道**上差 30（(41,41,41) → (31,47,71)）—— 灰 vs 蓝。
+⇒ R51 那句"0 次与 1 次分不开"是**用错轴**造出来的，已撤回（BACKLOG 71 现在的判据要求是"轴先换对"）。
+本轮没有新的可看画面；BACKLOG 71 的那一眼挂在人工批次 53.1，R54 会带着色度判据回来改像素。
+
+### 验证
+
+- 变异 **M260–M263 四支全 CAUGHT**（`红得不对/未抓到=0 还原不干净=0`，电池跑完自己复跑一遍=全绿）：
+  删掉结论行 / 删掉闸门 / **把 `region()` 换回 `contains`** / 把 `notAnimated` 的 `XCTFail` 换成 `print`，
+  四种坏法各自被抓住。第三支是本轮最要紧的一支：它证明"守卫命中守卫自己"这个 bug 有牙。
+- 电池自己的教训：**锚点数要在全跑之前先验一遍**。第一版 M261 的锚点（那两行 skip）在文件里出现 3 次，
+  跑到它才中止，前面两次三分半的构建白烧。
+- `swift build --build-tests` **编译 0 告警**；全量 **751 tests / 29 skipped / 0 failures**；
+  离屏闸门 `passed=722 skipped=29 failed=0 NOT_RUN=0 红=0`；116 帧不变；脚本 105 全绿。
+  全量日志里那 10 行 `warning:` 是系统 CoreData 的运行时噪声（AddressBook 的 `NSXPCStore`），
+  **不是编译告警** —— 这句话本轮实测过，不是推断。
+- **CI 待读**（run 38547820163 起）：下一次 runner 运行要看
+  ① `MOTION_NATIVE_MOVE 判定=` 是否终于出现（BACKLOG 75 的三格分支）；
+  ② 若整族又没读数，`MOTION_FLOOR_SKIPS` 有没有把原因说清楚（BACKLOG 78）。
+- 自评 **94 / 100**。
+

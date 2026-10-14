@@ -950,9 +950,18 @@ final class MotionFilmstripTests: XCTestCase {
     /// 而守卫随排版漂移就变成"今天恰好还在管"的那种东西。
     /// 取不到时**不许**安静返回空串：空串会让下面所有 `XCTAssertFalse(contains:)` 全绿，
     /// 于是"把那个成员删了"被读成"修好了"（本仓库记过不止一次）。
+    ///
+    /// 为什么按**行首**匹配而不是 `contains`（R53 实测逼出来的）：守卫自己也要在源码里
+    /// 写下被守卫者的名字（`region(in: source, named: "func testXxx")`），
+    /// 于是"谁包含这个名字"会先命中**守卫自己的那一行** —— 区域就成了守卫自己的函数体，
+    /// 里面当然没有 `XCTFail(`。R53 第一版就是这么红的：三条断言里两条"通过"是因为
+    /// 在被搜索的文本里读到了守卫自己写的字面量。扫自身源码的守卫，先把守卫自己摘掉。
     private func region(in code: String, named declaration: String) -> String {
         let lines = code.components(separatedBy: "\n")
-        guard let start = lines.firstIndex(where: { $0.contains(declaration) }) else {
+        let trimmedDeclaration = declaration.trimmingCharacters(in: .whitespaces)
+        guard let start = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix(trimmedDeclaration)
+        }) else {
             XCTFail("区域取不到：\(declaration) —— 守卫找不到被守卫的东西时必须红")
             return "\u{0}REGION-NOT-FOUND\u{0}"
         }
@@ -968,6 +977,37 @@ final class MotionFilmstripTests: XCTestCase {
             if opened, depth <= 0 { break }
         }
         return body.joined(separator: "\n")
+    }
+
+    /// `MOTION_NATIVE_MOVE 判定=` 必须打在两道 skip **之前**（R53 / BACKLOG 75）。
+    ///
+    /// 为什么这条要守卫，而不是"记得放对位置"：R50 加这行时我把它留在 `requireAppWasActive` 后面，
+    /// 于是 runner 每次跳过这一臂，日志就只剩"两臂读数有、结论行没有"——
+    /// 那正是 R50 想消灭的那种含糊（把一种读法当成另一种），而它自己又造了一个新的：
+    /// run 38543090198 与 38543812477 两次都打了四行 `MOTION_NATIVE`，
+    /// 而 `MOTION_NATIVE_MOVE 判定=` 一次都没出现。
+    /// 顺序是"这一臂被跳过时仍然留得下证据"的**唯一**条件，所以它必须会红。
+    func testNativeMoveVerdictPrintsBeforeTheSkipGuards() throws {
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        let body = region(in: source, named: "func testNativeRowMoveIsVisibleToTheRuler")
+        let printAt = body.range(of: "MOTION_NATIVE_MOVE 判定=")
+        let skipAt = body.range(of: "try requireAppWasActive(probe.wasActive)")
+        XCTAssertNotNil(printAt, "结论行没了 ⇒ runner 一跳过，这一臂就又没有任何结论（BACKLOG 75）")
+        XCTAssertNotNil(skipAt, "skip 那道闸没了 ⇒ 非激活进程里的读数会被当成产品结论")
+        if let printAt, let skipAt {
+            XCTAssertLessThan(printAt.lowerBound, skipAt.lowerBound,
+                              "结论行必须在 skip 之前打：它说的是**读数怎么读**，不是产品结论。"
+                              + "换回后面的顺序，runner 每次跳过都会让这一臂没有任何结论行")
+        }
+        // 反过来也要钉住：**判红**仍然在 skip 之后（否则非激活进程里的一次 skip
+        // 会被读成"产品瞬移"，那就是 U-76 的成因本身）。
+        // 找的是 `XCTFail(` 而不是失败消息里的中文：消息会随措辞改，而"这一格有人负责"这件事不会。
+        let failAt = body.range(of: "XCTFail(")
+        XCTAssertNotNil(failAt, "`notAnimated` 那一格的 XCTFail 没了 ⇒ 三态里最要紧的一格不再有人负责")
+        if let failAt, let skipAt {
+            XCTAssertGreaterThan(failAt.lowerBound, skipAt.lowerBound,
+                                 "判红必须留在 skip **之后**：读法可以提前打，责任不能提前担")
+        }
     }
 
     /// 那条 A/B 必须用**连续段**那把尺，不许悄悄换回跨度（R48 / BACKLOG 70 / U-74）。
@@ -1738,16 +1778,14 @@ final class MotionFilmstripTests: XCTestCase {
             + " 采样≈\(animatedInterval)ms")
         print("MOTION_NATIVE row-move 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant)))"
             + " 采样≈\(instantInterval)ms")
-        try await requireObservableMotion(.layout)
-        try requireAppWasActive(probe.wasActive)
-        XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
-                             "带里什么都没变 ⇒ 连表格在哪都没框到，两臂对照失效（是探针坏了，不是移动没发生）")
-        XCTAssertLessThanOrEqual(instantSpan, 1,
-                                 "关掉隐式动画那一档本该一帧到位，却量到 \(instantSpan) 帧在动"
-                                 + " ⇒ 带里有别的动在跑，两臂对照失效")
-        // R50：原来这里只有一句"帧数 ≥2 否则红"。runner 第一次跑到这条时给的是
-        // `开 帧数=1 峰值=0.047 / 关 帧数=1 峰值=0.047` —— 那句话**没说清**这是"瞬移"还是"错过"，
-        // 而这两种结论的性质不同（前者是产品少做了一段动画，后者是这台机器今天量不了）。
+        // R53：结论行**打在两道 skip 之前**。
+        //
+        // R50 加这条三态判据时，我把 `print` 留在了 `requireAppWasActive` 后面，于是
+        // "runner 跳过这一臂"与"runner 判出瞬移"在日志里长得一模一样：两臂读数打得出来，
+        // 结论行却永远不出现（run 38543090198 / 38543812477 两次都只留下四行 `MOTION_NATIVE`，
+        // 而 `MOTION_NATIVE_MOVE 判定=` 一次都没有）。
+        // 结论是**读数的一种读法**，不是产品结论；谁为它负责才需要那两道 skip。
+        // 所以：读法先打，判红与否在后面（下面那个 `switch` 一行没动）。
         let verdict = Self.nativeMoveVerdict(animatedSpan: animatedSpan, animatedPeak: Self.peak(animated),
                                              instantSpan: instantSpan, instantPeak: Self.peak(instant))
         let verdictLabel: String = {
@@ -1759,7 +1797,18 @@ final class MotionFilmstripTests: XCTestCase {
         }()
         print("MOTION_NATIVE_MOVE 判定=\(verdictLabel) 峰值容差="
             + String(format: "%.3f", Self.nativeMovePeakTolerance)
-            + "（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）")
+            + "（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）"
+            + "；这一行只说读数怎么读，产品结论要过下面两道 skip 才算")
+        try await requireObservableMotion(.layout)
+        try requireAppWasActive(probe.wasActive)
+        XCTAssertGreaterThan(Self.peak(animated), Self.minimumVisibleChange,
+                             "带里什么都没变 ⇒ 连表格在哪都没框到，两臂对照失效（是探针坏了，不是移动没发生）")
+        XCTAssertLessThanOrEqual(instantSpan, 1,
+                                 "关掉隐式动画那一档本该一帧到位，却量到 \(instantSpan) 帧在动"
+                                 + " ⇒ 带里有别的动在跑，两臂对照失效")
+        // R50：原来这里只有一句"帧数 ≥2 否则红"。runner 第一次跑到这条时给的是
+        // `开 帧数=1 峰值=0.047 / 关 帧数=1 峰值=0.047` —— 那句话**没说清**这是"瞬移"还是"错过"，
+        // 而这两种结论的性质不同（前者是产品少做了一段动画，后者是这台机器今天量不了）。
         switch verdict {
         case .animated:
             break

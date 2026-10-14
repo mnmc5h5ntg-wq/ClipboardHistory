@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R53：结论行挡在 skip 之后，等于每次跳过都把它删掉）
+- `testNativeRowMoveIsVisibleToTheRuler`：`nativeMoveVerdict` 与 `MOTION_NATIVE_MOVE 判定=`
+  挪到 `requireObservableMotion` / `requireAppWasActive` **之前**，`XCTFail` 留在之后。
+  以前 runner 一跳过这一臂，日志就只剩两臂读数、没有结论行
+  （run 38543090198 与 38543812477 两次实测），而那正是 R50 要消灭的含糊。
+- 新增顺序守卫 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`（结论行在、闸门在、顺序对）。
+- `region(in:named:)` 从 `contains` 改成按**行首**匹配：守卫必须在源码里写下被守卫者的名字，
+  `contains` 于是先命中**守卫自己那一行**，区域变成守卫自己的函数体 ——
+  本轮第一版就是这么红的，而且三条断言里有两条"通过"（它们在读守卫自己写的字面量）。
+- 撤回 R51 写进台账的那句"暗档 0 次 vs 1 次只差 4/255 ⇒ 分不开"：那是亮度轴，
+  该步实际是灰(`primary`)→蓝(`accent`)的色相翻转，B 通道差 30。`heat_ladder_preview.py`
+  现在同时打 Δ亮度与 Δ各通道最大差。
+- 产品代码零改动，116 张帧逐字节不变。变异 M260–M263 四支全 CAUGHT。
+
 ### Fixed（R52：覆盖率地板第一次在 runner 上红，红的是登记与实际不符）
 - `motion_floor_gate.py`：`NO_RESOLVE` 之后新增一行 `MOTION_FLOOR_SKIPS`，
   把日志里 `Test Case … : Test skipped - <原因>` 逐条打出来。
