@@ -1453,4 +1453,8 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
 - **验证**：714 tests / 29 skipped / 0 failures、`swift build --build-tests` 0 告警、
   帧基线 `CHANGED=0 / 104`、脚本 83 全绿、变异 M175 / M176 全 CAUGHT、`RESTORE_CLEAN=yes`。
   自评 **90 / 100**。
-- **待验证**：闸门这次是否绿 —— 以下一次 CI 的日志为准（U-61 立的规矩）。
+- **CI 已读**：闸门第一次真跑并**绿**：run 38487277143（job 115612…）整作业 `completed success`，第 7 步 `Capture gate` 打出 `CAPTURE_GATE_CASES passed=23 skipped=9 failed=0 有名字的红=0 NOT_RUN=40` ⇒ `CAPTURE_GATE_RESULT=ok 红=0`；第 5 步（主测试）也过了 —— 资格判据的机器前提在 runner 上成立（放行 20 条、判成 20 条，派生地板 `judged == 可判条数` 成立）。
+  这是 U-61 那条规矩第一次被执行：推完 → 读逐步 conclusion → 才写这句话。
+- **下一步（R39）**：目标里那句"全部状态"里，**禁用态**是唯一一帧都没有的一档 ——
+  产品里 4 处 `.disabled(...)`（SettingsView 325/611/613/639），先问"哪一处在真机上真的可达"，
+  可达的那几处补成对帧 + 两条判据（可辨、禁用后仍可读），不可达的那几处按"无作用就写明理由不加"处理。

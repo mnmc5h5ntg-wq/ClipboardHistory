@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **资格判据的地板从写死改成从表推导**：`judged ≥ 20` 在 runner 上是 **20/40 恰好压线**，
   再多一族画不出来就悄悄归零。现在要求"非放行的每一条都必须真的判到"，
   外加"可判对象 ≥ 16"（M176：把每条都放行 ⇒ 红在"对象快被清空了"）。
+- **CI 已读**：闸门第一次真跑并**绿**：run 38487277143（job 115612…）整作业 `completed success`，第 7 步 `Capture gate` 打出 `CAPTURE_GATE_CASES passed=23 skipped=9 failed=0 有名字的红=0 NOT_RUN=40` ⇒ `CAPTURE_GATE_RESULT=ok 红=0`；第 5 步（主测试）也过了 —— 资格判据的机器前提在 runner 上成立（放行 20 条、判成 20 条，派生地板 `judged == 可判条数` 成立）。（U-61 的规矩第一次被执行：推完 → 读逐步结论 → 才写这句话）。
 - 顺带把两台机器的 `BOTTOM_EDGE_INK` 清单各留一份（本机 18 张 / runner 30 张，
   差值全在 `content-*` 那一族）—— 记下来是因为"哪些帧底行压着东西"其实是**排版量**，
   不该被下一个人在另一台机器上当判据。

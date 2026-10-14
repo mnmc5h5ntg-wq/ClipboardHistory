@@ -2585,4 +2585,4 @@ M168 本地无判别力（由下一次 CI 判）、`RESTORE_CLEAN=yes`。
 
 **验证**：714 tests / 29 skipped / 0 failures、0 告警、帧基线 `CHANGED=0 / 104`、脚本 83 全绿；
 变异 M175 / M176 两支 CAUGHT（红得对）、`RESTORE_CLEAN=yes`。
-**待验证**：闸门这次是否绿 —— 以下一次 CI 的日志为准。
+**CI 已读**：闸门第一次真跑并**绿**：run 38487277143（job 115612…）整作业 `completed success`，第 7 步 `Capture gate` 打出 `CAPTURE_GATE_CASES passed=23 skipped=9 failed=0 有名字的红=0 NOT_RUN=40` ⇒ `CAPTURE_GATE_RESULT=ok 红=0`；第 5 步（主测试）也过了 —— 资格判据的机器前提在 runner 上成立（放行 20 条、判成 20 条，派生地板 `judged == 可判条数` 成立）。
