@@ -304,6 +304,205 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
 
     // MARK: - 地板
 
+    /// 相邻两档**必须分得开**（R54 / BACKLOG 71 / U-79 的后续）。
+    ///
+    /// 为什么这条要到 R54 才立：R45 量的是「悬停那一圈相对于整条数据范围响不响」，
+    /// 从来没有量过「第 1 档与空格子能不能分开」。而这张图上**深浅是唯一的信息通道**，
+    /// 相邻档分不开就等于那张日历少一档。
+    ///
+    /// **轴是这一条的全部难点，而且是本轮踩出来的**：
+    /// R51/R53 我先用 Rec.709 亮度量，得到"暗档 空→第 1 档 只差 4/255"，
+    /// 于是写下"0 次与 1 次分不开"。那是**用错轴**：`VisualHeat.empty` 走 `primary`（灰），
+    /// 四档数据走 `accent`（蓝），那一步差的是**色相**不是明度 ——
+    /// 同一对像素在 B 通道上差 30。⇒ 这里判的是**逐像素取三通道最大差**（`meanMaxChannelDelta`），
+    /// 并且把三条轴（最大通道 / 均值通道 / 亮度）一起打出来，让"用哪根轴"这件事在日志里可审计。
+    ///
+    /// 地板沿用本仓库那把 `perceptibleBand255 = 18`（R45 从 20 条真读数推导出来的"看得出来"线），
+    /// **不是新发明的数**。如果哪一档过不了，改的是产品的梯子或 `empty`（并同步 `frame_baseline update`），
+    /// 不是把地板调低 —— 那是"为过夹具改判据"。
+    func testAdjacentHeatLevelsAreSeparableOnTheRightAxis() throws {
+        var readings: [String] = []
+        for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for scale in [1, 2] {
+                // 每一档画一次，相邻两档再两两比 —— 20 次渲染换 4 对 × 2 外观 × 2 尺度 = 16 条读数。
+                let renders = try Self.levels.map {
+                    try renderCell(level: $0, hovered: false, appearance: appearance, scale: scale)
+                }
+                let size = renders[0].pixelsWide
+                let band = Self.fillBand(size: size, scale: scale)
+                XCTAssertFalse(band.isEmpty, "\(tag)/\(scale)x 的填充带是空的 ⇒ 这条判据没在量任何东西")
+                for i in 1..<Self.levels.count {
+                    let a = Self.levels[i - 1], b = Self.levels[i]
+                    let maxDelta = Self.meanMaxChannelDelta(renders[i - 1], renders[i], over: band, size: size)
+                    let meanDelta = Self.meanChannelDelta(renders[i - 1], renders[i], over: band, size: size)
+                    let lumaDelta = abs(Self.meanLuma(renders[i], over: band, size: size)
+                                        - Self.meanLuma(renders[i - 1], over: band, size: size))
+                    readings.append("HEAT_ADJACENT \(tag)/\(scale)x \(a.name)→\(b.name) "
+                                    + "像素\(band.count) 最大通道差=\(String(format: "%.2f", maxDelta)) "
+                                    + "均值通道差=\(String(format: "%.2f", meanDelta)) "
+                                    + "亮度差=\(String(format: "%.2f", lumaDelta)) "
+                                    + "令牌=\(String(format: "%.3f", a.opacity))→\(String(format: "%.3f", b.opacity))")
+                    XCTAssertGreaterThanOrEqual(maxDelta, Self.adjacentLevelFloor255,
+                        "\(tag)/\(scale)x 的 \(a.name)→\(b.name)：整格填充只变了 "
+                        + "\(String(format: "%.2f", maxDelta))/255（最大通道那一根），低于地板 "
+                        + "\(Self.adjacentLevelFloor255) ⇒ 这两档在屏幕上是一档，那张日历少一档。"
+                        + "改 `VisualHeat.ladder`/`empty` 并同步帧基线，不许把地板调低")
+                    // 地板必须钉在**最大通道**那一根上；这一格防的是"以后有人把判据换成亮度差"：
+                    // 暗档那一步亮度差只有 4，换过去就等于把这条判据删掉。
+                    XCTAssertGreaterThanOrEqual(maxDelta, meanDelta,
+                        "最大通道差不小于均值通道差是这把尺的定义；反了说明取错了轴")
+                }
+            }
+        }
+        readings.forEach { print($0) }
+        XCTAssertEqual(readings.count, 16,
+                       "读数必须是 4 对 × 2 外观 × 2 尺度 = 16 条，少一条就是有一对没被量")
+    }
+
+    /// 新尺子自己的真值表：`fillBand` 的归属，与"最大通道差"到底在量什么。
+    ///
+    /// 为什么单独立：上面那条判据的全部含义都在两件事上 ——
+    /// ① 量的是**格子内部**（不是描边带、不是窗口底色）；
+    /// ② 取的是**最大通道**而不是均值（灰→蓝那一步，均值会把 30 冲淡成 15）。
+    /// 这两件事任何一件错，判据都会变成"看着有数、其实在量别的东西"。
+    func testAdjacentLevelRulersAreATruthTable() throws {
+        // ① 真实几何：11pt 格 + 每边 4pt 留白，2x ⇒ 边长 38、格子占中间 22。
+        let scale = 2
+        let size = (Int(VisualHeat.cell) + 8) * scale
+        let inset = 4 * scale
+        let cellPx = size - inset * 2
+        let fill = Self.fillBand(size: size, scale: scale)
+        let ring = Self.ringBand(size: size, scale: scale)
+        XCTAssertFalse(fill.isEmpty, "填充带是空的 ⇒ 那条判据拿着 0 个像素算均值")
+        XCTAssertGreaterThan(fill.count, cellPx * cellPx / 3,
+                             "填充带不到格子的三分之一 ⇒ 它量的已经不是格子内部")
+        XCTAssertTrue(fill.isDisjoint(with: ring),
+                      "填充带与描边带重叠 ⇒ 悬停那一圈会混进相邻档的比较里")
+        // 两个带加起来要几乎等于整格（差额只允许是 SDF 边界那一圈容差里的像素）：
+        // 不然"两档差多少"与"那一圈响不响"量的会是两块互相渗透、且都没量全的地方。
+        XCTAssertGreaterThanOrEqual(fill.count + ring.count, cellPx * cellPx - 4 * cellPx,
+                                    "填充带 + 描边带漏了太多格子像素：\(fill.count)+\(ring.count) / \(cellPx * cellPx)")
+        // ② 填充带里每个点都在格子框内、且离边界超过一条描边（SDF 比 -stroke 更负）。
+        let half = Double(cellPx) / 2.0
+        let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
+        let radius = Double(Int(VisualRadius.heatCell) * scale)
+        let outside = fill.filter {
+            let x = Self.x(of: $0, size: size), y = Self.y(of: $0, size: size)
+            return !(x >= inset && x < inset + cellPx && y >= inset && y < inset + cellPx)
+        }
+        XCTAssertTrue(outside.isEmpty, "填充带跑到格子框外 ⇒ 那一片是窗口底色，与深浅无关")
+        let tooShallow = fill.filter {
+            let dx = Double(Self.x(of: $0, size: size) - inset) + 0.5 - half
+            let dy = Double(Self.y(of: $0, size: size) - inset) + 0.5 - half
+            return Self.roundedRectSDF(px: dx, py: dy, half: half, radius: radius) > -strokePx - 0.5
+        }
+        XCTAssertTrue(tooShallow.isEmpty, "填充带压到了描边上 ⇒ 两档之差会被那一圈的抗锯齿污染")
+        // ③ 轴：只有 B 通道差 30 的一对，**最大通道差=30**、均值通道差=10。
+        //    这一格就是本轮那次纠错的钉：拿均值或亮度判"灰 vs 蓝"会低 3 倍。
+        let gray = Self.flatRep(red: 41, green: 41, blue: 41, size: size)
+        let blueish = Self.flatRep(red: 41, green: 41, blue: 71, size: size)
+        let whole = Set(0..<(size * size))
+        XCTAssertEqual(Self.meanMaxChannelDelta(gray, blueish, over: whole, size: size),
+                       30, accuracy: 0.5, "最大通道差该读到 B 通道那 30")
+        XCTAssertEqual(Self.meanChannelDelta(gray, blueish, over: whole, size: size),
+                       10, accuracy: 0.5, "均值通道差会把 30 冲淡成 10 —— 这就是用错轴的样子")
+        // ④ 同一张图自己比自己 = 0（非 0 说明取像素时行列错位）。
+        XCTAssertEqual(Self.meanMaxChannelDelta(gray, gray, over: whole, size: size), 0, accuracy: 0.001)
+        // ⑤ 空带必须返回**负数**（让它一定过不了地板），不许返回 0（那会被读成"量过了，差为 0"）。
+        XCTAssertEqual(Self.meanMaxChannelDelta(gray, blueish, over: [], size: size), -1, accuracy: 0.001)
+        // ⑥ 1× 退化几何：填充带还得非空，否则那一整臂什么都没量。
+        XCTAssertFalse(Self.fillBand(size: Int(VisualHeat.cell) + 8, scale: 1).isEmpty,
+                       "1× 屏上填充带是空的 ⇒ 那一臂在拿 0 像素算均值")
+        XCTAssertTrue(Self.fillBand(size: 0, scale: 2).isEmpty)
+        XCTAssertTrue(Self.fillBand(size: 8, scale: 2).isEmpty,
+                      "留白吃掉整个边长 ⇒ 必须是空带，而不是把留白当格子")
+    }
+
+    /// 造一张纯色图当尺子的夹具（**直接写字节**）。
+    ///
+    /// 为什么不用 `setColor(_:atX:y:)`：R54 第一版用的就是它，两幅"不同色"的图量出来差是
+    /// **0.00** —— 那条 API 在整数格式的位图上不落地（而且它不报错）。
+    /// 尺子的夹具读到 0 时最容易被读成"没差别"，所以这里走 `bitmapData` 直写，
+    /// 格式与 `renderCell` 出来的那张（deviceRGB / 8bit / RGBA）保持一致。
+    static func flatRep(red: Int, green: Int, blue: Int, size: Int) -> NSBitmapImageRep {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+                                   bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                   isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 4 * size, bitsPerPixel: 32)!
+        guard let data = rep.bitmapData else {
+            XCTFail("造不出纯色位图 ⇒ 尺子的真值表没有夹具")
+            return rep
+        }
+        let bytesPerPixels = rep.bitsPerPixel / 8
+        let row = rep.bytesPerRow
+        for y in 0..<size {
+            for x in 0..<size {
+                let offset = y * row + x * bytesPerPixels
+                data[offset] = UInt8(red)
+                data[offset + 1] = UInt8(green)
+                data[offset + 2] = UInt8(blue)
+                data[offset + 3] = 255
+            }
+        }
+        return rep
+    }
+
+    /// 格子**内部**那一片（描边带以外、格子框以内）。
+    ///
+    /// 与 `ringBand` 共用同一套几何与同一个半像素容差：两个带必须严格互补地分掉格子里的像素，
+    /// 否则"悬停只改一圈"与"相邻两档差多少"量的会是两块互相渗透的地方。
+    static func fillBand(size: Int, scale: Int) -> Set<Int> {
+        guard size > 0, scale > 0 else { return [] }
+        let inset = 4 * scale
+        let cellPx = size - inset * 2
+        guard cellPx > 0 else { return [] }
+        let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
+        let radius = Double(Int(VisualRadius.heatCell) * scale)
+        let half = Double(cellPx) / 2.0
+        let allowance = 0.5
+        var band = Set<Int>()
+        for dy in 0..<cellPx {
+            for dx in 0..<cellPx {
+                let sdf = roundedRectSDF(px: Double(dx) + 0.5 - half,
+                                         py: Double(dy) + 0.5 - half,
+                                         half: half, radius: radius)
+                guard sdf < -strokePx - allowance else { continue }
+                band.insert((dy + inset) * size + (dx + inset))
+            }
+        }
+        return band
+    }
+
+    /// 逐像素取**三通道最大差**再对带内取均值。
+    ///
+    /// 为什么不用现成的 `meanChannelDelta`：它把三通道平均掉，于是"只有 B 通道变了 30"
+    /// 那种差（正是 `empty` 灰 vs `accent` 蓝那一步）会被冲淡成 10。
+    /// 人眼对色相差的敏感度不会替我做这个平均。
+    static func meanMaxChannelDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                                    over band: Set<Int>, size: Int) -> Double {
+        guard !band.isEmpty else { return -1 }   // 空带 = 没量 ⇒ 负数，让它一定过不了地板
+        var total = 0.0
+        for index in band { total += pixelMaxChannelDelta(a, b, index: index, size: size) }
+        return total / Double(band.count)
+    }
+
+    static func pixelMaxChannelDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                                     index: Int, size: Int) -> Double {
+        let point = (x(of: index, size: size), y(of: index, size: size))
+        guard let pa = a.colorAt(x: point.0, y: point.1),
+              let pb = b.colorAt(x: point.0, y: point.1) else { return 0 }
+        return max(abs(pa.redComponent - pb.redComponent),
+                   max(abs(pa.greenComponent - pb.greenComponent),
+                       abs(pa.blueComponent - pb.blueComponent))) * 255.0
+    }
+
+    /// 相邻两档的地板（0–255，**最大通道**那一根）。
+    ///
+    /// 沿用 R45 那把 `perceptibleBand255 = 18`，不新发明数：那条线是"看得出来"，
+    /// 与这里要判的是同一件事（只是轴换对了）。
+    static let adjacentLevelFloor255: Double = perceptibleBand255
+
     /// 带内「看得出来」的地板（0–255 均值通道差）。
     ///
     /// **不是拍的**：本轮第一遍实测 20 条 `HEAT_RING` 读数，最小的一条是

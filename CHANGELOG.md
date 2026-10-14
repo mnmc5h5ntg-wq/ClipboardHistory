@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R54：热图相邻档第一次有判据 —— 结论是"梯子没错，我的轴错了"）
+- 新增 `testAdjacentHeatLevelsAreSeparableOnTheRightAxis`：五档两两相邻（4 对）× 亮暗 × 1×/2×
+  = 16 条读数，量**格子内部**，距离取**逐像素三通道最大差**（`meanMaxChannelDelta`），
+  地板沿用 R45 的 `perceptibleBand255 = 18`。实测最小一条 `dark empty→bucket1 = 30.00` ⇒ **全部通过，
+  产品数值一个没改**（BACKLOG 71 结案）。
+- 撤回 R51 写进台账的"暗档 0 次 vs 1 次只差 4/255 ⇒ 分不开"：那是**亮度**轴；
+  `empty` 是灰（`primary`）、四档是蓝（`accent`），同一对在 B 通道上差 30、亮度上只差 2.16。
+  按旧结论去抬 `empty` 会把一张没病的图改响（撞"不喧宾夺主"）。
+- 新增 `fillBand`（与 `ringBand` 严格互补的格子内部）与其真值表 8 格；
+  其中一格把**坏掉的尺子夹具**抓了出来：`NSBitmapImageRep.setColor(_:atX:y:)` 在整数格式位图上
+  不落地且不报错，两幅"不同色"的图读出来差 0.00 ⇒ 改成直接写 `bitmapData`。
+- 实测补一条与 R45 相反的边界：**整格填充对尺度不敏感**（1× 与 2× 逐条相同），
+  R45 那句"1× 比 2× 低 20%–25%"只成立于 1pt 描边。
+- 变异 M264–M268 五支全 CAUGHT（M264 改产品令牌、M265 把轴换回均值 ⇒ 都会红）。
+- 产品代码零改动，116 张帧逐字节不变 ⇒ 不需要 `frame_baseline update`。
+
 ### Fixed（R53：结论行挡在 skip 之后，等于每次跳过都把它删掉）
 - `testNativeRowMoveIsVisibleToTheRuler`：`nativeMoveVerdict` 与 `MOTION_NATIVE_MOVE 判定=`
   挪到 `requireObservableMotion` / `requireAppWasActive` **之前**，`XCTFail` 留在之后。
