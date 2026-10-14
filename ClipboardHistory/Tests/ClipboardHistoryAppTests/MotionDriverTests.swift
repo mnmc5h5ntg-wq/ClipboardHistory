@@ -259,6 +259,159 @@ final class MotionDriverTests: XCTestCase {
                       "箭头的动画不是揭示那一条 ⇒ 又会各走各的")
     }
 
+    // MARK: - 派生键（R44 / BACKLOG 64）
+
+    /// `ContentView` 那五条 `NoticeBanner` 的驱动**不是**五个状态，而是一条派生键：
+    /// `:32` 的 `.animation(bannerIn, value: noticeSignature)`，
+    /// 而 `noticeSignature`（`:36-44`）把五条的存在性压成一个 bitmask。
+    /// ⇒ 上一轮那把"按名字匹配"的尺如果直接推广过去，会把**五条全部误报成没电**——
+    /// 而它们确实是有的电的（R22 用像素量过插入位移）。所以推广之前先补这一跳：
+    /// **键里出现的名字如果在同一个文件里有 computed property 定义，就把它 body 里点到的状态并进来**。
+    ///
+    /// 只展开一跳，且**只增不减**：展开失败不会让判据变绿，只会退回按名字匹配那条路。
+    /// 这一条是刻意的 —— 一个会"因为读不懂而放行"的守卫比一个会"读不懂而红"的更难查。
+    static func drivingStates(for keys: [String], in source: String) -> Set<String> {
+        var states: Set<String> = []
+        for key in keys {
+            let names = identifiers(in: key)
+            states.formUnion(names)
+            for name in names where !name.contains(".") {
+                // 只有裸名字才去找定义：`store.foo` 这种带点的不是本文件的计算属性。
+                if let body = computedPropertyBody(name, in: source) {
+                    states.formUnion(identifiers(in: body))
+                }
+            }
+        }
+        return states
+    }
+
+    /// `var <name>` 后面那对大括号里的内容（配平，跨行）。找不到返回 nil。
+    static func computedPropertyBody(_ name: String, in source: String) -> String? {
+        for needle in ["var \(name):", "var \(name) :"] {
+            guard let found = source.range(of: needle) else { continue }
+            guard let brace = source.range(of: "{", range: found.upperBound..<source.endIndex) else { continue }
+            var index = brace.upperBound
+            var depth = 1
+            var body = ""
+            while index < source.endIndex {
+                let character = source[index]
+                if character == "{" { depth += 1 }
+                else if character == "}" {
+                    depth -= 1
+                    if depth == 0 { return body }
+                }
+                body.append(character)
+                index = source.index(after: index)
+            }
+        }
+        return nil
+    }
+
+    /// 一段表达式里的**标识符**：整串点路径与它的最后一段都算
+    /// （键里写 `historyStore.transferNotice`，门控里可能只写 `transferNotice`，两边要能对上）。
+    static func identifiers(in expression: String) -> Set<String> {
+        var found: Set<String> = []
+        var current = ""
+        for character in expression + " " {
+            if character.isLetter || character.isNumber || character == "_" || character == "." {
+                current.append(character)
+            } else {
+                flushIdentifier(current, into: &found)
+                current = ""
+            }
+        }
+        return found
+    }
+
+    private static func flushIdentifier(_ token: String, into found: inout Set<String>) {
+        var name = token
+        while name.hasSuffix(".") { name.removeLast() }
+        guard !name.isEmpty else { return }
+        let keywords: Set<String> = ["true", "false", "nil", "and", "or", "Int", "String", "Bool", "var", "let", "return"]
+        guard !keywords.contains(name), !name.allSatisfy(\.isNumber) else { return }
+        found.insert(name)
+        if let last = name.split(separator: ".").last, last != Substring(name) {
+            found.insert(String(last))
+        }
+    }
+
+    /// 门控有没有被某条驱动推动（**展开派生键**之后的版本）。
+    static func receiptGateIsDriven(_ gate: String, by keys: [String], in source: String) -> Bool {
+        let states = drivingStates(for: keys, in: source)
+        return gateStateNames(gate).contains { states.contains($0) }
+    }
+
+    /// 上面那把尺自己的真值表：派生键必须被展开，而**读不懂时不许安静放行**。
+    func testDerivedKeyExpansionIsATruthTable() throws {
+        let bannerFile = """
+        var body: some View {
+            notices
+                .animation(MotionCatalog.animation(for: .bannerIn), value: noticeSignature)
+        }
+        private var noticeSignature: Int {
+            var bits = 0
+            if historyStore.transferNotice != nil { bits |= 2 }
+            if historyStore.pasteFailureNotice != nil { bits |= 8 }
+            return bits
+        }
+        """
+        // ① 派生键展开之后，门控里的状态名（含点路径的**最后一段**）必须认得出来。
+        let keys = Self.animationKeys(in: bannerFile)
+        XCTAssertEqual(keys, ["noticeSignature"], "先确认键抠对了，否则下面几格是在比空气")
+        XCTAssertTrue(Self.receiptGateIsDriven("let transfer = historyStore.transferNotice",
+                                              by: keys, in: bannerFile),
+                      "派生键没展开 ⇒ 五条真有电的横幅会被误报成没电（BACKLOG 64 的原始动机）")
+        XCTAssertTrue(Self.receiptGateIsDriven("let pasteFailure = historyStore.pasteFailureNotice",
+                                              by: keys, in: bannerFile))
+
+        // ② 没被签名读到的那条状态，**仍然**算没电 —— 展开不是"把所有东西都放行"。
+        XCTAssertFalse(Self.receiptGateIsDriven("let dropped = historyStore.droppedFilesNotice",
+                                               by: keys, in: bannerFile),
+                       "签名里没点它 ⇒ 它进出都不会触发这条动画，这正是该红的形状")
+
+        // ③ 读不懂（键指向一个本文件里不存在的属性）⇒ 退回按名字匹配，**不**变成恒绿。
+        XCTAssertFalse(Self.receiptGateIsDriven("let x = someState", by: ["ghostKey"], in: bannerFile),
+                       "找不到定义时如果放行，这条守卫就成了免检牌")
+
+        // ④ 直接状态（R42 那一族）不许被展开逻辑弄坏。
+        XCTAssertTrue(Self.receiptGateIsDriven("let archiveMessage",
+                                              by: ["archiveMessage == nil"], in: bannerFile))
+
+        // ⑤ 带点的键表达式不会被误当成"本文件的计算属性"去查定义；
+        //    展开只到"最后一段"，不拆出前缀（`store` 单独出现在状态集合里没有意义）。
+        XCTAssertEqual(Self.drivingStates(for: ["store.foo == nil"], in: bannerFile),
+                       Set(["store.foo", "foo"]))
+        print("DERIVED_KEY_EXPANSION 五格：展开认最后一段 / 没点到的仍算没电 / 读不懂不放行")
+    }
+
+    /// 推广：`NoticeBanner` 那五个调用点，每个都必须被某条驱动**真的**推到。
+    ///
+    /// 这一条是 R42 那把尺换到第二个组件上跑 —— 而它同时是 BACKLOG 64 的验收：
+    /// 如果派生键展开没做，这一条会**五条全红**（假阳性），所以它自己就是那件事的正对照。
+    func testNoticeBannerCallSitesArePoweredByTheirDerivedKey() throws {
+        let source = try productSource(named: "Views/ContentView.swift")
+        let code = Self.stripCommentLines(source)
+        let gates = Self.receiptGateConditions(in: code, callSite: "NoticeBanner(")
+        XCTAssertEqual(gates.sorted(), Self.noticeBannerGateExpectations.sorted(),
+                       "NoticeBanner 调用点的门控名单和产品不一致（实际读到 \(gates.sorted())）"
+                       + " ⇒ 要么新加了一条没人供电的横幅，要么有人删了一条而忘了删这条账")
+        let keys = Self.animationKeys(in: code)
+        let undriven = gates.filter { !Self.receiptGateIsDriven($0, by: keys, in: code) }
+        XCTAssertTrue(undriven.isEmpty,
+                      "这些横幅的门控状态没被任何一条驱动（含派生键展开）推到：\(undriven.sorted())"
+                      + " ⇒ `NoticeBanner` 外面那句 `.transition` 是死的")
+        print("BANNER_DRIVE 调用点 \(gates.count) 个、键 \(keys.count) 条、"
+              + "展开后状态 \(Self.drivingStates(for: keys, in: code).count) 个、无驱动 \(undriven.count) 个")
+    }
+
+    static let noticeBannerGateExpectations: Set<String> = [
+        "let recovery = historyStore.historyRecoveryNotice",
+        "let transfer = historyStore.transferNotice",
+        "let dropped = historyStore.droppedFilesNotice",
+        "let pasteFailure = historyStore.pasteFailureNotice",
+        "let retention = historyStore.retentionNotice",
+    ]
+
     // MARK: - 扫描器
 
     /// `.animation(...)` 调用里 `value:` 后面的表达式（含跨行、含嵌套括号）。
@@ -302,10 +455,10 @@ final class MotionDriverTests: XCTestCase {
     /// 三种写法都认：`if let 状态 {`、`if let 局部 = 状态 {`、`if 布尔状态 {`。
     /// 只认 `if let` 的扫描器会**看不见**第三类调用点 —— 那正是"新加一条没驱动的回执"能安静过去的洞。
     /// 找不到 `if` ⇒ 不产出这一条，于是主判据红在"名单两边不等"，而不是少判一个。
-    static func receiptGateConditions(in source: String) -> [String] {
+    static func receiptGateConditions(in source: String, callSite: String = "ReceiptLine(") -> [String] {
         let lines = source.components(separatedBy: "\n")
         var found: [String] = []
-        for (index, line) in lines.enumerated() where line.contains("ReceiptLine(") {
+        for (index, line) in lines.enumerated() where line.contains(callSite) {
             for back in stride(from: index - 1, through: max(0, index - 6), by: -1) {
                 let trimmed = lines[back].trimmingCharacters(in: .whitespaces)
                 guard trimmed.hasPrefix("if ") else { continue }

@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R44 · 判据会读"派生键"了 —— 调用点级的动效守卫推广到 NoticeBanner）
+
+- 本轮**零产品改动**，改的是尺。R42 那条"调用点级"守卫要推广到 `NoticeBanner` 时被发现读不懂一种合法写法：
+  `ContentView:32` 的驱动键是 `noticeSignature`，而它（`:36-44`）把五条回执的存在性压成一个 bitmask
+  ⇒ 按名字匹配会把**五条全误报成没电**，而那五条确实有电（R22 量过像素）。
+- 新增 `drivingStates(for:in:)`：键里的裸名字若在本文件有 computed property 定义，
+  就把 body 点到的标识符并进状态集合（点路径与最后一段都算）。**只展开一跳、只增不减**：
+  读不懂 ⇒ 退回按名字匹配，既不放行也不报错 ——
+  "读不懂就红"会逼人删守卫（R34 / R21b 那一族），"读不懂就放行"是免检牌（R39b 那一族）。
+- 剩下的假阴性风险由变异钉住：**M207** 从签名 body 里删掉一条 ⇒ 只有那一条红。
+- 判据 +2 条（`testNoticeBannerCallSitesArePoweredByTheirDerivedKey` + 派生键展开的 5 格真值表）
+  与 4 个纯函数；变异 M206–M209 四支全 CAUGHT（needle 全实测抄来，且落在排过序的数组上 ⇒ 顺序稳定）。
+- **BACKLOG 64 只做了一半**：热图那两处是 `if 布尔 { … } else { … }` 的**分支**形状，
+  现在的扫描器只认"组件调用点 + `if let`" ⇒ 这条继续开着，别当成推广完了。
+- 本轮**不换装**（没有任何"只有装上新包才看得见"的东西）；112 张帧逐字节不变。
+- 验证：735 tests / 29 skipped / 0 failures、`swift build` 0 告警、闸门 `红=0 NOT_RUN=0`、脚本 83 全绿。
+
+
 
 ### Fixed（R43 · 导出/导入那三条回执：一件事被说两遍，而失败那句又是英文）
 
