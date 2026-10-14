@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R46 · 动效覆盖地板会报"掉了谁、为什么"了）
+
+- 新增 `scripts/motion_floor_gate.py` + `scripts/motion_floor_expectations.json`，
+  `Motion coverage floor` 那一步从一段 shell（只问 `judged<2`）换成读登记表的脚本。
+  来历：R44 那次 `judged=4/4` 退到 `3/4`（`notice-banner-dismiss` not-run）**整步仍然绿**，
+  而我是人肉对比三次 run 的日志才发现的。
+- 八条规则：没有结论行 / 少一臂的键 / 多一臂 / 清单外的盲区 / not-run 没理由 /
+  理由没登记过 / 判不够地板 / 登记成"永远判不了"却判到了。
+  每条一支变异（M216–M222 全 CAUGHT），因为这道闸门是**判据的判据**。
+- 两条方向上的取舍写进 D-105：**红不红取决于登记，不取决于读数** ——
+  会随采样漂的臂判到不红、判不到也不红（否则恒红，守卫最后被人删）；
+  而"跑完了却没有结论行"从旧版的 `exit 0`（免检牌）改成红。
+- **不判帧数**：`MOTION_SUMMARY <arm>=<帧数>` 由采样相位决定（R2 实测 2/3/2）。
+- 登记表里的理由来自**本机真跑一遍**产出的日志，并把它原样收成正对照夹具
+  （`scripts/tests/fixtures/r46_motion_local.log`）：闸门跑这份真日志必须红，
+  且红的正是 `BAD_REASON` + `UNDERCOVERED` 两格。
+- `Motion filmstrip` 那一步把 `MOTION_NOT_RUN=` 单独打、不截断
+  （`head -24` 正是 R44 那次"not-run 查不到为什么"的成因）。
+- 脚本自测 83 → **101** 全绿。Swift 侧零改动 ⇒ 742/29/0 与 116 帧不变；本轮**不换装**。
+- 新开 BACKLOG 68：跑真日志时撞见热图淡入那条 A/B **用帧数当判据**，
+  而两臂峰值完全相同（0.226 / 0.226）⇒ 红的是尺，不是产品。R47 的靶。
+
+
 ### Added（R45 · 热图悬停那一圈第一次有像素证据，画法抽成 `DailyCopyHeatmapCell`）
 
 - 新增 `HeatmapHoverEvidenceTests`（7 条判据）：描边带可见性（五档 × 亮暗 × 1×/2× = 20 读数）、

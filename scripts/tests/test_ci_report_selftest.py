@@ -85,11 +85,15 @@ SUBSTITUTIONS = {
          "cp FAKE_LOG /tmp/motion.log &"),
     ],
     # 这一步没有"被测命令"：它读上一步留下的 /tmp/motion.log。
-    # 所以夹具挂在它的**第一行抽取**上 —— 先落一份日志再去读它，
-    # 这样测的仍然是 ci.yml 里那段判定逻辑本身，不是另抄一份。
+    # R46（BACKLOG 66）之后那一步是一句 `python3 scripts/motion_floor_gate.py …`，
+    # 所以夹具挂在它身上：先落一份日志，再用**绝对路径**跑脚本
+    # （自检的 cwd 不一定是仓库根，两个相对参数都得换掉 —— `capture_gate` 那一条就是这么做的）。
     "motion_floor": [
-        (r"resolve=\$\(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion\.log",
-         "cp FAKE_LOG /tmp/motion.log; resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log"),
+        (r"python3 scripts/motion_floor_gate\.py /tmp/motion\.log",
+         "cp FAKE_LOG /tmp/motion.log; python3 " + os.path.join(ROOT, "scripts", "motion_floor_gate.py")
+         + " /tmp/motion.log"),
+        (r"--expectations scripts/motion_floor_expectations\.json",
+         "--expectations " + os.path.join(ROOT, "scripts", "motion_floor_expectations.json")),
     ],
     # R36 的硬门：它没有"被测命令"，只有"读上一步留下的日志再判"。
     # 所以夹具挂在 `cp` 上，脚本路径换成绝对路径（自检的 cwd 不一定是仓库根）。
@@ -111,6 +115,12 @@ NORMAL = ("Test Suite 'All tests' passed\n"
 MOTION_NORMAL = (NORMAL
                  + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n"
                  + "MOTION_RESOLVE_SUMMARY judged=3/3 not-run=-\n")
+
+# R46：地板现在按**登记表**判，而表里是今天 `Scenario.all()` 的四臂。
+# 上面那份三臂日志留给"报告型那一步"用（它只 echo 读数，不查形状），
+# 地板那六格必须用这一份 —— 否则每一格都会先红在 MISSING_KEY 上，测的就不是它想测的事了。
+FLOOR_SUMMARY = ("MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
+                 "detail-kind-change=3 empty-state=4")
 
 # (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)
 #
@@ -158,19 +168,42 @@ EXPECT = {
         + "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]'"
           " failed (0.123 seconds).\n",
         ["motion suite exit:", "MOTION_NATIVE", "testSkeletonSweepActuallySweeps"], 0, []),
-    # ---- R7：覆盖率下限那一步。三条形状各钉一件事：够 ⇒ 0；不够 ⇒ **必须 1**；
-    #      没跑完 ⇒ 0（不能把探针故障算成产品缺陷）。少了第二格，这道闸就是一句 echo。
+    # ---- R7 开的首版地板（`judged<2`）只管"判够没判够"；R46（BACKLOG 66）之后这一步交给
+    #      `scripts/motion_floor_gate.py`，形状从"一个数"变成"谁在、谁不在、不在的理由登记过没有"。
+    #      下面六格各钉一种骗人方式，缺任何一格，那一族就能从闸门里漏过去。
+    #      注意这些日志都是**四臂形状**（今天的 `Scenario.all()`），
+    #      而 `MOTION_NORMAL` 是三条判据那一辈的 —— 拿它喂新的地板会红在 MISSING_KEY，
+    #      那不是这一格要判的事，所以这里各写各的。
     ("motion_floor", "enough_coverage"): (
-        MOTION_NORMAL, ["motion floor:", "MOTION_FLOOR_OK=3/3"], 0, []),
+        NORMAL + FLOOR_SUMMARY + "\nMOTION_RESOLVE_SUMMARY judged=4/4 not-run=-\n",
+        ["MOTION_FLOOR_FACTS", "MOTION_FLOOR_OK=4/4"], 0, []),
+    # R44 的真实形状：掉了一臂，但理由登记过 ⇒ 放行，**且必须把这条打印出来**。
+    # 旧版这一步在这里连"掉了谁"都不说，所以我是靠人肉对比 run 日志发现的。
+    ("motion_floor", "registered_drift_passes_but_prints"): (
+        NORMAL + FLOOR_SUMMARY + "\n"
+        + "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms\n"
+        + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss\n",
+        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner-dismiss", "MOTION_FLOOR_REDS=0"], 0, []),
+    # 掉了同一臂，但这次没人说为什么 ⇒ 红。"没测到"可以接受，"没测到且说不清"不行。
+    ("motion_floor", "drift_without_reason"): (
+        NORMAL + FLOOR_SUMMARY + "\n"
+        + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss\n",
+        ["MOTION_FLOOR_REASONLESS"], 1, []),
+    # 地板本身：judged 低于"必须判到"的臂数（=3），而且旧版写死的 2 在这一格会放行。
     ("motion_floor", "under_covered"): (
-        NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=2\n"
-        + "MOTION_RESOLVE_SUMMARY judged=1/3 not-run=notice-banner,detail-kind-change\n",
-        ["MOTION_UNDERCOVERED=1/3"], 1, []),
+        NORMAL + FLOOR_SUMMARY + "\n"
+        + "MOTION_NOT_RUN=premise-not-visible notice-banner：首尾相同\n"
+        + "MOTION_NOT_RUN=premise-not-visible detail-kind-change：首尾相同\n"
+        + "MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,detail-kind-change\n",
+        ["MOTION_FLOOR_UNDERCOVERED"], 1, []),
+    # 探针自己没跑完 ⇒ 不红（不能把探针故障算成产品缺陷），但必须打印。
     ("motion_floor", "suite_did_not_finish"): (
         TRUNCATED, ["MOTION_FLOOR_SKIPPED=suite-did-not-finish"], 0, []),
+    # R46 把这一格从 0 改成 1：旧版在这里 `exit 0`（"旧版判据没有这一行，由上一步负责喊"），
+    # 而本仓库每条判据都会打这一行 —— 缺了就是坏了，留成绿是一张免检牌。
     ("motion_floor", "no_resolve_line"): (
-        NORMAL + "MOTION_SUMMARY notice-banner=3 detail-kind-change=3 empty-state=4\n",
-        ["MOTION_FLOOR_SKIPPED=no-resolve-line"], 0, []),
+        NORMAL + FLOOR_SUMMARY + "\n",
+        ["MOTION_FLOOR_NO_RESOLVE"], 1, []),
     # ---- R36：帧捕获那道硬门的四个形状。四个都要，因为这道门挡的是**四种不同的骗人方式**：
     #      真红被吞 / 已知盲区被当成红 / 整批退回 skip / 干脆没跑到用例。
     ("capture_gate", "real_runner_log"): (

@@ -187,7 +187,13 @@ jobs:
           # 所以固定把两样东西打出来：① 各条判据自己的读数；② 红的那几条的名字。
           # `|| true` 是必需的：grep 没匹配就是 1，而 run 默认 `bash -e`（同一步里已经栽过三次）。
           echo "---- 动效读数 ----"
-          grep -E "MOTION_(SUMMARY|RESOLVE_SUMMARY|NATIVE|SHIMMER|SEQUENCE|CONTROL|CUT|DETAIL|AB|BLANK|SETTLE|SYMBOL|NOT_RUN)" /tmp/motion.log | head -24 || true
+          grep -E "MOTION_(SUMMARY|RESOLVE_SUMMARY|NATIVE|SHIMMER|SEQUENCE|CONTROL|CUT|DETAIL|AB|BLANK|SETTLE|SYMBOL)" /tmp/motion.log | head -24 || true
+          # R46：**not-run 的理由单独打，且不截断**。上面那个 `head -24` 是 R44 那次
+          # "掉了一臂却查不到为什么"的直接成因 —— 理由行排在一大堆读数之后，被挤出了控制台，
+          # 于是 run 38514753036 里 `not-run=notice-banner-dismiss` 在日志上找不到任何解释。
+          # 闸门（下一步）读的是文件，不受这里影响；这一步负责让人**看见**。
+          echo "---- not-run 的理由（全量，不截断） ----"
+          grep -E "MOTION_NOT_RUN=" /tmp/motion.log || true
           echo "---- 红的用例 ----"
           # 两级过滤而不是一个 ERE：macOS 的 BSD grep 里 `]`（以及 `\]`）在 ERE 中不可靠 ——
           # `test[A-Za-z]+'\] failed` 对着真实那行返回 0 命中，而 `grep -F "]' failed"` 命中。
@@ -202,29 +208,20 @@ jobs:
       # 覆盖率下限（R7 / BACKLOG 第 11 条）。上一步是**报告型**：红了也不挡发布，
       # 于是"今天只判了 1 条"和"判了 3 条"在 CI 上长得一模一样 —— 而 R5 把判据换成时长之后，
       # 本机确实掉到了 1/3。这句话必须有一个会红的地方来说，否则 `judged=n/m` 只是装饰。
-      # 三条前提缺一不可（`executed` 有值、结论行在、judged 读得出），
-      # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）。
+      #
+      # R46（BACKLOG 66）：这一步原来是一段 shell，只问 `judged<2 ⇒ 红`。
+      # run 38514753036 从 `judged=4/4 not-run=-` 退到 `judged=3/4 not-run=notice-banner-dismiss`
+      # 而整步仍然绿 —— **掉了一臂没人报**，我是把三次 run 的日志拉下来人肉对比才发现的。
+      # 现在判据搬进 `scripts/motion_floor_gate.py`：谁必须判到、谁可以判不到、
+      # 判不到的理由允许是哪几种，全部写在 `scripts/motion_floor_expectations.json` 里，
+      # 清单外的盲区 / 没有理由的 not-run / 换了新理由 / 少了一臂的键 都会红。
+      # 三条前提仍缺一不可（`executed` 有值、结论行在、judged 读得出），
+      # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）—— 这一条由脚本的单测钉住。
       - name: Motion coverage floor
         run: |
           set -o pipefail
-          resolve=$(grep -m1 'MOTION_RESOLVE_SUMMARY' /tmp/motion.log || true)
-          executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/motion.log | tail -1 | grep -oE '[0-9]+' || true)
-          judged=$(printf '%s' "$resolve" | grep -oE 'judged=[0-9]+' | grep -oE '[0-9]+' || true)
-          total=$(printf '%s' "$resolve" | grep -oE '/[0-9]+' | head -1 | grep -oE '[0-9]+' || true)
-          echo "motion floor: executed=${executed:-0}  ${resolve:-无 MOTION_RESOLVE_SUMMARY}"
-          if [ -z "$executed" ] || [ "$executed" = "0" ]; then
-            echo "MOTION_FLOOR_SKIPPED=suite-did-not-finish 不能把「没跑完」判成「验得不够」"
-            exit 0
-          fi
-          if [ -z "$resolve" ] || [ -z "$judged" ]; then
-            echo "MOTION_FLOOR_SKIPPED=no-resolve-line 旧版判据没有这一行，由上一步的报告负责喊"
-            exit 0
-          fi
-          if [ "$judged" -lt 2 ]; then
-            echo "MOTION_UNDERCOVERED=$judged/${total:-?} 门槛 2/3 ⇒ 动效判据今天几乎没判任何东西"
-            exit 1
-          fi
-          echo "MOTION_FLOOR_OK=$judged/${total:-?}"
+          python3 scripts/motion_floor_gate.py /tmp/motion.log \
+            --expectations scripts/motion_floor_expectations.json
 
       - name: Release script tests
         run: |

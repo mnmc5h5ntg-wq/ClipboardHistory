@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "R46 / BACKLOG 66：动效覆盖地板的登记表。`scripts/motion_floor_gate.py` 读它。",
+    "为什么要有这张表：CI 的 `Motion coverage floor` 原来只问 `judged<2 ⇒ 红`，",
+    "于是 run 38514753036（R44）从 `judged=4/4 not-run=-` 退到 `judged=3/4 not-run=notice-banner-dismiss`",
+    "整步仍然绿，而我是把三次 run 的日志拉下来人肉对比才发现的。",
+    "这张表把「谁必须判到、谁可以判不到、判不到的理由允许是哪几种」写成数据：",
+    "清单外的臂 not-run ⇒ 红；理由不在登记里 ⇒ 红；not-run 却连一行 MOTION_NOT_RUN 都没有 ⇒ 红。",
+    "**不登记帧数**：`MOTION_SUMMARY <arm>=<帧数>` 那个数由采样相位决定，",
+    "R2 实测同一份代码本机跑过 2/3/2（原始记录在 MotionFilmstripTests.changedRunElapsedMilliseconds 开头）。",
+    "拿它当判据就是判采样，不是判产品。"
+  ],
+  "scenarios": ["notice-banner", "notice-banner-dismiss", "detail-kind-change", "empty-state"],
+  "arms": {
+    "notice-banner": {
+      "must_judge": true,
+      "stale_if_judged": false,
+      "allowed_not_run_reasons": [],
+      "note": "runner 上 R42/R42b/R43/R44 四次全部判到 ⇒ 要求它判到。本机不是：本机这一臂是 premise-not-visible（首尾逐像素相同），所以本表说的是 runner 的前提，不是本机的。"
+    },
+    "notice-banner-dismiss": {
+      "must_judge": false,
+      "stale_if_judged": false,
+      "allowed_not_run_reasons": ["clock-coarse-in-window"],
+      "note": "会随采样漂：R42/R42b/R43 判到，R44 没判到（run 38514753036）。登记的这条理由是 R46 本机实测（/tmp/motion-local.log：事件内最粗 101ms 一帧、整段过渡声明 120ms，门槛 0.3×声明）。runner 上若换了别的理由，闸门会红在 BAD_REASON —— 那是想要的：把打印出来的理由抄进来，而不是把这条改成放行一切。既不要求它判到、也不因为判到而喊 stale，正是为了不制造恒红（R39 那一族）。"
+    },
+    "detail-kind-change": {
+      "must_judge": true,
+      "stale_if_judged": false,
+      "allowed_not_run_reasons": [],
+      "note": "R42/R44 都判到 ⇒ 要求判到。"
+    },
+    "empty-state": {
+      "must_judge": true,
+      "stale_if_judged": false,
+      "allowed_not_run_reasons": [],
+      "note": "R42/R44 都判到 ⇒ 要求判到。"
+    }
+  }
+}

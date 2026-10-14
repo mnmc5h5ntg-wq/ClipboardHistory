@@ -3558,3 +3558,30 @@ skip 的退出码是 0，预检把跳过读成了绿。同一轮新增的"两条
   ② tooltip 是系统绘制，帧里没有 ⇒ 它的内容只被 policy 的真值表管着；
   ③ 动效覆盖地板在 runner 上从 4/4 掉到 3/4（`notice-banner-dismiss` 只采到 2 帧），
      与本轮无关，新开 BACKLOG 66。
+---
+
+### D-105 · R46：一道守"别的判据有没有真跑到"的闸门，自己必须能被证伪
+
+- **背景**：`Motion coverage floor` 从 R7 起就是 `judged<2 ⇒ 红`。R45 读 CI 时发现
+  R44 那次 `judged` 从 4/4 退到 3/4（`notice-banner-dismiss` not-run），整步仍然绿。
+  "CI 绿"与"读数没退"是两件事，而后者以前没有任何东西在守。
+- **决定**：判据从 shell 搬进 `scripts/motion_floor_gate.py`，盲区搬进
+  `scripts/motion_floor_expectations.json`。八条规则各配一支变异（M216–M222）。
+- **决定 2（这条是本体）**：**红不红取决于登记，不取决于读数。**
+  会随采样漂的臂登记成 `must_judge=false` 且不带 `stale_if_judged` ⇒ 判到/判不到都不红；
+  登记成"永远判不了"的臂判到了 ⇒ 红（清单不许慢慢变成免检牌堆）。
+  两种极端都有先例：把漂的臂要求成必须判到 ⇒ 恒红（R39 那一族，守卫最后被人删）；
+  把清单写成"允许一切" ⇒ 免检牌（R44 之前那句 `no-resolve-line ⇒ exit 0` 就是这个形状）。
+- **决定 3**：登记的**理由**必须来自真跑一遍产出的日志（本机 `/tmp/motion-local.log`），
+  不许从"它大概是 clock 太粗吧"推出来。理由错了闸门会红在 `BAD_REASON` 并把真理由打出来 ——
+  可诊断的红，一次改一行就收口。
+- **决定 4**：登记表是 **runner 的前提表**，不是本机的。本机 notice-banner 判不到、runner 判得到，
+  两边读数不同是事实；写在表里，是为了下一台机器来的时候不致于把它当普适真理。
+- **代价**：CI 多一个 python 文件 + 一份 JSON；判据 18 条（含真日志正对照）；
+  产品零改动、帧零变化、本轮**不换装**。
+- **谁守着**：`scripts/tests/test_motion_floor_gate.py`（18 条）+
+  `test_ci_report_selftest` 里 `motion_floor` 的六个形状（够 / 漂了但登记过 / 漂了没理由 /
+  地板不够 / 没跑完 / 没有结论行）—— 最后两格把"旧版的两个 exit 0"分别钉成"一个仍 0、一个已 1"。
+- **仍未收口的部分**：① 新闸门在 runner 上的第一次结果待读（可能红在 `BAD_REASON`）；
+  ② 捕获那一族的 `NOT_RUN` 也在漂（R44=8 / R45=24），这道闸门管不到它（BACKLOG 57）；
+  ③ 热图淡入那条 A/B 用帧数当轴（BACKLOG 68，R47 的靶）。

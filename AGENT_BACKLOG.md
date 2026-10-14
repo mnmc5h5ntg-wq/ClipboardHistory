@@ -1242,6 +1242,13 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     ⇒ 下一步先做**复现**：本机跑一次 `--filter UICaptureTests` 带 `CLIPBOARD_HISTORY_UI_SHOTS`，
        把闸门喂进去，看 5 是不是本机也报这个数；再对 R38 的那次日志逐条点名 40 条各来自谁。
        在复现之前，账本里这两个数字**不许**被当成同一把尺比较（U-62 的口径版）。
+    **R46 又添两个数**（同一个计数器，两次 CI）：run 38514753036（R44）`NOT_RUN=8`、
+    run 38519597818（R45）`NOT_RUN=24`，而两次的 `Executed 735/742 tests, with 36 skipped` 几乎一样。
+    ⇒ 这条不再是「某两轮之间少 35 条」的孤例，而是**这个计数器每次都在动**：
+    40 → 5 → 8 → 24。四个数、同一把尺，中间没有改过打印路径的轮次占多数。
+    R46 的新闸门管的是动效那一族（它数的是**臂**，不是行数），管不到这里 —— 已明确记进 D-105。
+    下一轮做这件事的方法不变：**先复现再解释**，本机跑一次带 `CLIPBOARD_HISTORY_UI_SHOTS` 的
+    `--filter UICaptureTests` 把闸门喂进去，看本机报几；再对某一次 runner 日志逐条点名。
 58. **复制失败的回执里嵌着系统错误原文，用户读不懂（R40 看帧看出，U-66）· 已收口（R41 / D-100）**：
     帧上那句是"复制到剪贴板失败：The operation couldn't be completed. (NSOSStatusErrorDomain error -100.)。
     已取消自动粘贴 —— 剪贴板里仍是原来的内容，没有被替换。"
@@ -1325,7 +1332,7 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     需要人来判的一问：两行回执时，那个 × 让你觉得它只管第一行吗？（人工批次 45 里没问，
     因为本轮帧刚换文案 —— 下一轮若做 BACKLOG 64 的推广，顺手把这一问带进批次。）
 
-66. **动效覆盖地板在 runner 上从 4/4 掉到 3/4，而那一关还是绿的**（R45 读 CI 时看到）：
+66. **动效覆盖地板在 runner 上从 4/4 掉到 3/4，而那一关还是绿的**（R45 读 CI 时看到）**—— R46 已收口**：判据搬进 `scripts/motion_floor_gate.py` + 登记表 `scripts/motion_floor_expectations.json`，八条规则各配一支变异（M216–M222）。剩下的是**下一台机器**的问题：这张表说的是 runner 的前提，不是本机的。
     run 38514753036（R44）报 `MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss`、
     `MOTION_SUMMARY … notice-banner-dismiss=2`，而 R42/R42b/R43 三次都是 `4/4 not-run=-`。
     同一批代码、同一台 runner、没有产品改动 ⇒ 这是**采样漂移**（BACKLOG 57 那一族），
@@ -1339,3 +1346,13 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     而"鼠标真的划过去会不会出现那一圈"依赖 `.onHover` 被回调 —— 三条合成通道 R14 实测全断。
     现在这一半挂在人工批次 22 与 47.1 上。若哪天要做机器通道，先重读
     `.scratch/motion-audit-2/spike_hover_channel.md` 再动手，别把三条死路再走一遍。
+68. **热图淡入那条 A/B 用错了轴：它判"看得见"用的是帧数，而帧数会随采样相位漂**（R46 跑真日志时撞出来的）：
+    `MotionFilmstripTests.testHeatmapFadeIsNotVisibleToThisRuler` 的放行条件是
+    `onSpan == offSpan && |peak(on) - peak(off)| < 0.02`。本机真跑一遍的读数是
+    `开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` —— **两臂峰值完全相同**，只有帧数不同，
+    于是它走进 `XCTFail("两臂读数不同 ⇒ 这把尺现在看得见这条淡入")` 那一支。
+    而"帧数会漂"正是 R2 已经证伪过的事（同一份代码本机跑过 2/3/2，
+    原始记录写在 `changedRunElapsedMilliseconds` 开头）。
+    ⇒ 这条判据在拿一个自己宣布过不可靠的量做判据，红的是尺，不是产品。
+    下一轮（R47）：A/B 换成**时长轴**（两臂 `changedRunElapsedMilliseconds` 之差），
+    峰值差作第二证据；并把"只漂帧数不许算看得见"写成一条真值表 + 一支变异。

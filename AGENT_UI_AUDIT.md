@@ -3327,3 +3327,87 @@ computed property 定义，就把那个 body 里点到的标识符并进状态�
 帧基线 112 → **116**（同提交 `update`），既有 112 张 `CHANGED=0`；
 变异 **M210–M215** 六支全 CAUGHT、`未被抓到=0 红得不对=0 还原不干净=0`。
 换装本机：见 `AGENT_STATE.md` 的 sha。**CI 待读**。
+---
+
+## 第 48 轮 · R46：地板原来只问"判够 2 条没有"，现在问"掉了谁、为什么"（U-72 / D-105）
+
+### 开场缺陷清单（坐标）
+
+| 位点 | 现状 | 缺陷 |
+|---|---|---|
+| `ci.yml:207-227`（旧）| `if [ "$judged" -lt 2 ]; then exit 1` | 地板是一个**写死的常数**。R42 的 4/4 与 R44 的 3/4 都绿 |
+| run 38514753036（R44）| `judged=3/4 not-run=notice-banner-dismiss` | **一臂掉了，这一步仍然绿** —— 我是把三次 run 的日志拉下来人肉对比才发现的 |
+| `ci.yml:190`（旧）| `grep -E "MOTION_(…NOT_RUN)" /tmp/motion.log \| head -24` | 理由行排在一大堆读数之后被 `head -24` 挤出控制台 ⇒ 那次 not-run 在日志上**查不到为什么** |
+
+⇒ 这一轮没有产品改动，改的是"CI 能不能替我记住自己看不见什么"。
+
+### 修法：判据搬进 `scripts/motion_floor_gate.py`，盲区搬进 `scripts/motion_floor_expectations.json`
+
+规则：`NO_RESOLVE` / `MISSING_KEY` / `UNLISTED_SCENARIO` / `UNREGISTERED` / `REASONLESS` /
+`BAD_REASON` / `UNDERCOVERED` / `STALE`，每一条都配一支"关掉它就有用例过不掉"的变异（M216–M222）。
+两条是**方向**上的：
+
+- **旧版那张免检牌收掉了**：跑完了（`Executed N>0`）却没有 `MOTION_RESOLVE_SUMMARY` ⇒ 现在红。
+  旧版在这里 `exit 0`，理由是"旧版判据没有这一行" —— 那已经是历史，本仓库每条判据都打这一行，
+  缺了就是坏了。
+- **不许反向恒红**：会随采样漂的那一臂（`notice-banner-dismiss`：R42/R42b/R43 判到、
+  R44/R45 没判到）登记成 `must_judge=false`，且**不**带 `stale_if_judged` ⇒ 判到不红、判不到也不红。
+  给它 `stale_if_judged=true` 就变成"判不到红、判到也红"，恒红的守卫最后会被人删掉
+  （R39 那一族演过三次）。这一格由 `testFlakyArmBeingJudgedIsNotRed` +
+  `testStaleFlagIsWhatMakesJudgedRed` 钉住：**红不红取决于登记，不取决于读数**。
+
+**明确不判帧数。** `MOTION_SUMMARY <arm>=<帧数>` 那个数由采样相位决定 ——
+R2 实测同一份代码本机跑过 `2/3/2`（原始记录在 `changedRunElapsedMilliseconds` 开头）。
+这道闸门只判**形状**：谁在、谁不在、不在的理由登记过没有。
+
+### 登记表里的理由从哪来：自己产一份真日志
+
+runner 上 R44 那次的理由我**查不到**（被 `head -24` 截了）。与其猜一条登记进去，
+不如跑一遍真的：`CLIPBOARD_HISTORY_UI_MOTION=1 swift test --filter MotionFilmstripTests`
+⇒ `/tmp/motion-local.log`，逐字读数：
+
+```
+MOTION_NOT_RUN=premise-not-visible notice-banner：首尾两帧逐像素相同 …
+MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件那一段最粗 101ms 一帧、整段过渡只有 120ms
+MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner,notice-banner-dismiss
+```
+
+这份日志同时是**正对照夹具**（`scripts/tests/fixtures/r46_motion_local.log`）：
+新闸门跑它必须红，而且红在该红的两处 —— 真日志的夹具比合成日志值钱，因为它不由我编。
+
+```
+MOTION_FLOOR_FACTS judged=2/4 executed=24 not-run=notice-banner,notice-banner-dismiss …
+MOTION_FLOOR_BAD_REASON notice-banner 的理由是 premise-not-visible，而登记过的是 无 ⇒ …
+MOTION_FLOOR_UNDERCOVERED judged=2/4 低于地板 3（= 清单里 must_judge 的臂数）⇒ …
+MOTION_FLOOR_REDS=2   exit=1
+```
+
+本机 notice-banner 判不到（首尾相同），runner 判得到 ⇒ **登记表说的是 runner 的前提**，
+这句话写在表里，不留在脑子里（"判据依赖的环境前提要写进判据本身"）。
+
+### 顺手修掉的一处"报告看不见"
+
+`Motion filmstrip` 那一步现在把 `MOTION_NOT_RUN=` 的行**单独打、不截断**，其余读数仍走 `head -24`。
+闸门读的是文件，本来不受影响；这一步负责的是让人**看见**。
+
+### 本轮查出、没在本轮修的
+
+- **`NOT_RUN` 的数量在漂**：R44 的捕获闸门 `NOT_RUN=8`，R45 报 `NOT_RUN=24`，
+  而两次的 skip 用例数都是 36。BACKLOG 57 那一族（未解释的漂移），本轮没动它 ——
+  新闸门管的是动效那一族，不是捕获那一族。两个数已记进 BACKLOG 57。
+- **热图淡入那条 A/B 用错了轴**：跑真日志时 `testHeatmapFadeIsNotVisibleToThisRuler` 本机报红，
+  读数 `开 帧数=2 峰值=0.226 / 关 帧数=1 峰值=0.226` —— **两臂峰值完全相同**，只有帧数不同，
+  而帧数正是 R2 已经宣布"会随采样相位漂"的那个量。
+  ⇒ 这条判据在拿一个自己宣布过不可靠的量做判据，**红的是尺，不是产品**。
+  已开 BACKLOG 68，下一轮（R47）单独做：A/B 换成时长轴。
+
+### 验证
+
+脚本自测 83 → **101** 全绿（新增 `test_motion_floor_gate` 18 条，含真日志正对照）；
+变异 **M216–M222** 七支全 CAUGHT、`未被抓到=0 红得不对=0 还原不干净=0`；
+Swift 侧**零改动**（`git status` 里没有 `.swift` 文件）⇒ R45 那一遍的 742/29/0 与 116 帧仍然有效；
+本轮**不换装**，理由记账：没有任何"只有装上新包才看得见"的东西。
+R45 的 CI 已逐步骤读过：15 步全 ✓、`Executed 742 / 36 skipped / 0 failures`、闸门 `红=0`、
+`MOTION_FLOOR_OK=3/4`（旧闸门，正是要被换掉的那个）、`SMOKE_OK=1`。
+**R46 的 CI 待读** —— 新闸门第一次在 runner 上跑：若 `notice-banner-dismiss` 的理由与本机不同，
+它会红在 `BAD_REASON` 并把真理由打印出来（那是一次可诊断的红，改一行收口）。
