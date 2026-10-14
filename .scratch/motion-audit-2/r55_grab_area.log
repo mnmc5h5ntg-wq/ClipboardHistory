@@ -1,0 +1,11 @@
+# R55 面积-成本实测（本机 2026-10-14，CLIPBOARD_HISTORY_UI_MOTION=1 swift test --filter MotionFilmstripTests.testGrabCostScalesWithCapturedArea）
+# 同一个 760x673pt 的 ContentView 窗口，交错抓 9 轮，各档取中位。D-114 里那些数就来自这一份。
+  MOTION_GRAB_AREA 全视图 面积=535800pt² 样本=9 中位=41.7ms 最慢=44.6ms
+  MOTION_GRAB_AREA 横幅带 面积=91200pt² 样本=9 中位=8.7ms 最慢=10.4ms
+  MOTION_GRAB_AREA 小块 面积=18000pt² 样本=9 中位=3.4ms 最慢=4.5ms
+# 同一天第一遍（本机 18:51，同一条命令）：全视图 中位=38.9ms 最慢=39.4ms / 横幅带 中位=8.1ms 最慢=8.5ms / 小块 中位=3.1ms 最慢=3.3ms ⇒ 端到端 12.5 倍
+# 两遍的读数写在同一份里：判据里的 12.3/12.5 两个数都能在这里对回去。
+  MOTION_GRAB_AREA 全视图 面积=535800pt² 样本=9 中位=40.2ms 最慢=42.9ms
+  MOTION_GRAB_AREA 横幅带 面积=91200pt² 样本=9 中位=8.4ms 最慢=8.8ms
+  MOTION_GRAB_AREA 小块 面积=18000pt² 样本=9 中位=3.1ms 最慢=3.4ms
+# 第三遍（18:59，全量 motion suite 里跑的同一格）：40.2 / 8.4 / 3.1 ⇒ 端到端 13.0 倍。三遍的倍率范围 12.3–13.0。

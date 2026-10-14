@@ -778,7 +778,9 @@ final class MotionFilmstripTests: XCTestCase {
                 notRun.append(scenario.name)
                 print("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "
                     + "一帧、整段过渡只有 \(Int(scenario.declaredDurationMilliseconds))ms（门槛 0.3×声明）⇒ "
-                    + "这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿")
+                    + "这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿"
+                    + Self.grabAttributionLabel(worstIntervalMilliseconds: worstInRun,
+                                                worstGrabMilliseconds: film.worstGrabMilliseconds))
             case .jump:
                 judged += 1
                 XCTFail("\(scenario.name)：画面只变了 \(String(format: "%.0f", elapsed))ms 就停了，"
@@ -930,7 +932,14 @@ final class MotionFilmstripTests: XCTestCase {
             print("MOTION_NOT_RUN=clock-coarse-in-window heat-first-record："
                 + "峰值那一段内部最粗的一次采样是 \(ms(worstA)) / \(ms(worstB))ms，"
                 + "而这条过渡声明 \(Int(scenario.declaredDurationMilliseconds))ms ⇒ "
-                + "今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT）")
+                + "今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT）"
+                // R55：这一格是本机那 260ms 空档的现场，两臂各自归因一次。
+                // 只给一臂的话，"是抓帧还是主线程"这个问题就又变回靠一句注释回答了。
+                // 打在**同一行**：CI 那一步 grep 的是 `MOTION_NOT_RUN`，换行就等于把归因挤出可读范围。
+                + " ｜A 臂" + Self.grabAttributionLabel(worstIntervalMilliseconds: worstA,
+                                                        worstGrabMilliseconds: onFilmA.worstGrabMilliseconds)
+                + " ｜B 臂" + Self.grabAttributionLabel(worstIntervalMilliseconds: worstB,
+                                                         worstGrabMilliseconds: onFilmB.worstGrabMilliseconds))
         case .visibleToThisRuler:
             XCTFail("两遍都说「还在变」覆盖的时长比对照臂长出一个采样间隔以上 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
                     + "把 `heatFirstRecord()` 放回 `Scenario.all()` 当真判据，别留这条当免责")
@@ -979,7 +988,251 @@ final class MotionFilmstripTests: XCTestCase {
         return body.joined(separator: "\n")
     }
 
-    /// `MOTION_NATIVE_MOVE 判定=` 必须打在两道 skip **之前**（R53 / BACKLOG 75）。
+    /// 抓成本归因的真值表（R55 / BACKLOG 77）。
+    ///
+    /// ①② 用的是**本机真读数**（`.scratch/motion-audit-2/r55_motion_local.log` 里
+    /// `MOTION_GRAB` 与 `MOTION … 事件内最粗` 那两列），不是我编的数 ——
+    /// 这一族在本仓库记过：真值表里必须有一格是真读数，否则它只证明"我想要的形状"。
+    /// 而这一次"真读数那一格"恰好把设计改写了：第一版只有两档，
+    /// 真读数 97/87.9 落在余量外 1.1ms，被判成"不是抓帧器的锅"——那条建议是错的。
+    /// 没有这两格，这个错误会一直留在日志里当结论用。
+    func testGrabAttributionIsATruthTable() {
+        // ⓪ 两条线自己也必须是**能判红死的数**（本仓库"自适应阈值恒真"那一族）：
+        //     余量写成 0 ⇒ 每一次略长的间隔都掉出 probeBound；写成 1e9 ⇒ 全部算撑满。
+        //     比例线写成 0 ⇒ 一切都说"缩区域有用"；写成 1 ⇒ 一切都说"不是抓帧的锅"。
+        XCTAssertGreaterThan(GrabAttribution.allowanceMilliseconds, 0)
+        XCTAssertLessThanOrEqual(GrabAttribution.allowanceMilliseconds, 20,
+                                 "余量到 20ms 以上，那 `probe-grab-bound` 就把「间隔比抓帧多 15ms」也说成撑满了")
+        XCTAssertGreaterThan(GrabAttribution.dominatesRatio, 0)
+        XCTAssertLessThan(GrabAttribution.dominatesRatio, 1,
+                          "比例线取 1 意味着只有「完全等于抓帧」才算大头 —— 那是把上面那一档删掉")
+        // 归因值里带浮点，所以这里按"是哪一格 + 那两个数近似对不对"三件事判，
+        // 不用 `XCTAssertEqual(枚举, 枚举)`：97 − 87.9 在二进制里是 9.100000000000009，
+        // 拿它和字面量 9.1 判等会红得让人以为是逻辑错了（本仓库"像素容差为 0 时抗锯齿淹没分类器"同一族）。
+        func attribute(_ interval: Double, _ grab: Double) -> (String, Double, Double) {
+            switch Self.grabAttribution(worstIntervalMilliseconds: interval, worstGrabMilliseconds: grab) {
+            case .unknown: return ("unknown", .nan, .nan)
+            case .probeBound(let ratio, let over): return ("probeBound", ratio, over)
+            case .grabDominates(let ratio, let over): return ("grabDominates", ratio, over)
+            case .outsideTheGrab(let ratio, let over): return ("outsideTheGrab", ratio, over)
+            }
+        }
+        // ① 真读数：`notice-banner-dismiss` 事件段最粗 97ms，同卷抓帧最慢 87.9ms。
+        //    ⇒ 抓帧解释了 91%，但余量（8ms）没盖住 ⇒ 这一条既不是"完全由抓帧决定"，
+        //    更不是"与抓帧无关"。三档里它落在中间那一档，而这一档必须给出**能修**的建议。
+        XCTAssertEqual(attribute(97, 87.9).0, "grabDominates")
+        XCTAssertEqual(attribute(97, 87.9).1, 0.906, accuracy: 0.001)
+        XCTAssertEqual(attribute(97, 87.9).2, 9.1, accuracy: 0.01)
+        // ② 真读数：`heat-first-record` 峰值段最粗 260ms，同卷抓帧最慢 255.2ms
+        //    ⇒ 差 4.8ms，正好是一次等 runloop 的时间 ⇒ `probeBound`。
+        //    而它**中位只有 1.5ms** ⇒ 这不是常态像素成本，是新生子树第一帧被强制布局，
+        //    落在同一个调用里（R49 那 260ms 空档的机制，本轮从"主线程被占住"收窄成"这一帧的抓取调用里"）。
+        XCTAssertEqual(attribute(260, 255.2).0, "probeBound")
+        XCTAssertEqual(attribute(260, 255.2).2, 4.8, accuracy: 0.01)
+        // ③ 余量边界：差正好等于 8ms ⇒ 仍算撑满。写成 `<` 会在这一格翻脸。
+        XCTAssertEqual(attribute(100, 92).0, "probeBound")
+        XCTAssertEqual(attribute(100, 92).2, 8, accuracy: 0.0001)
+        // ④ 刚过界 0.1ms ⇒ 换一档。这一格钉的是"8 这条线真的在判东西"。
+        XCTAssertEqual(attribute(100.1, 92).0, "grabDominates")
+        XCTAssertEqual(attribute(100.1, 92).2, 8.1, accuracy: 0.01)
+        // ⑤ 比例边界：抓帧正好占一半 ⇒ 还算大头（`>=`）；少 0.1% ⇒ 换档。
+        //    这一格管的是"两条线是不是只有一条在动" —— 只有余量那条线的话，
+        //    `grabDominates` 就永远等于"余量外的一切"，比例这个词是空的。
+        XCTAssertEqual(attribute(100, 50).0, "grabDominates")
+        XCTAssertEqual(attribute(100, 49.9).0, "outsideTheGrab")
+        // ⑥ 没量过 ⇒ unknown，而且**不许**被读成"抓帧器的锅"或"不是抓帧器的锅"。
+        //    （不能用 `XCTAssertEqual(值, .nan)`：NaN 不等于自己，那一格会恒红。）
+        XCTAssertEqual(attribute(120, -1).0, "unknown")
+        XCTAssertTrue(attribute(120, -1).1.isNaN,
+                      "unknown 必须带「没有数」，而不是带 0 —— 0 会被下游读成「解释 0%」")
+        // ⑦ 间隔 ≤ 0 也是 unknown：除比例会出 inf，而 `解释=inf%` 打出去看着像读数。
+        XCTAssertEqual(attribute(0, 5).0, "unknown")
+        XCTAssertEqual(attribute(-10, 5).0, "unknown")
+        // ⑧ 抓帧只占一小截：120ms 的间隔里抓帧只 20ms ⇒ 剩下 100ms 说不清，
+        //    这时候去缩捕获区域就是"修不到地方的改动"。
+        XCTAssertEqual(attribute(120, 20).0, "outsideTheGrab")
+        XCTAssertEqual(attribute(120, 20).1, 20.0 / 120.0, accuracy: 0.0001)
+        XCTAssertEqual(attribute(120, 20).2, 100, accuracy: 0.0001)
+        // ⑨ 令牌必须是英文：这一行是 CI 那一步要 grep 的，中文短语会被连词切半。
+        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 260, worstGrabMilliseconds: 255.2)
+                        .contains("归因=probe-grab-bound"))
+        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+                        .contains("归因=grab-dominates"))
+        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 120, worstGrabMilliseconds: 20)
+                        .contains("归因=not-the-grab"))
+        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 120, worstGrabMilliseconds: -1)
+                        .contains("归因=grab-unmeasured"))
+        // ⑩ 比例要**打在日志里**：分档是我的判读，`解释=NN%` 才是能复核的数。
+        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+                        .contains("解释=91%"),
+                      "标签里没了比例 ⇒ 读日志的人只能信我的分档，没法自己看 87.9/97")
+        // ⑪ 归因不许改 not-run 的**令牌**：`clock-coarse-in-window` 是登记表里的理由，
+        //    换掉它会让覆盖率地板报 BAD_REASON（那是我们想要的"新形状"，不是本轮的意图）。
+        //    这一格钉的是：归因只能**追加**在结论后面，不能自己再打一个 `MOTION_NOT_RUN=` 前缀
+        //    —— 闸门每行只取第一个匹配，多打一个就会把真理由顶掉。
+        XCTAssertFalse(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+                        .contains("MOTION_NOT_RUN"),
+                       "归因串里出现了 not-run 的前缀 ⇒ 它会和理由行抢同一个解析位")
+    }
+
+    /// 归因必须真的接在**结论行**上，而不是只活在一个没人调的纯函数里（R55 的接线守卫）。
+    ///
+    /// 为什么这条比真值表更需要：上面那一格测的是 `grabAttribution` 这个函数，
+    /// 而产品日志里读到的那句话是**两个东西拼起来**的 ——
+    /// `Film.worstGrabMilliseconds` 有数 + 结论行把它打出去。
+    /// 这两处任何一处断掉，真值表全都还绿着，而日志会安静地变成
+    /// `归因=grab-unmeasured`（一个看起来像"今天没量到"、实际是"线没接上"的读数）。
+    /// 本仓库那一族叫"数值断言证明不了来源"：这里判的正是来源。
+    func testGrabAttributionIsWiredIntoTheCoarseNotRunLines() throws {
+        let source = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        // ① 两个粗钟 not-run 现场都得带上归因，且 A/B 那处是两臂各一次。
+        let expected: [(String, Int)] = [
+            ("func testTransitionsAreActuallyRunning", 1),
+            ("func testHeatmapFadeIsNotVisibleToThisRuler", 2),
+        ]
+        for (name, count) in expected {
+            let body = region(in: source, named: name)
+            XCTAssertTrue(body.contains("MOTION_NOT_RUN=clock-coarse-in-window"),
+                          "\(name) 里那行粗钟 not-run 不见了 ⇒ 被守卫的东西没了，这条守卫要先红而不是静默通过")
+            let wired = body.components(separatedBy: "Self.grabAttributionLabel(").count - 1
+            XCTAssertGreaterThanOrEqual(wired, count,
+                "\(name) 里那行 not-run 只接了 \(wired) 次归因，应有 \(count) 次 ⇒ "
+                    + "日志会报「最粗 Nms」而不说这 N 里有多少是抓帧，BACKLOG 77 又回到靠注释猜")
+        }
+        // ② `Film` 必须真的从抓帧器拿数：默认值是 −1，忘了传就永远 `grab-unmeasured`。
+        let wiring = region(in: source, named: "private func recordFrames")
+        XCTAssertTrue(wiring.contains("worstGrabMilliseconds: grabber.worstGrabMilliseconds"),
+                      "`recordFrames` 没把抓帧器的最慢值传进 Film ⇒ 归因恒为 unmeasured，"
+                          + "而每条 skip 行看着都像「今天没量到」，实际是线没接上")
+        // ③ 抓帧器自己得计时：不计时的那一版会给出恒 0，比例判据会把它读成"不是抓帧器的锅"。
+        //    这一格本轮先写错过一次，值得留进注释：第一版是 `source.contains("grabMilliseconds.append")`，
+        //    于是**守卫自己那一行**里就含被找的串 —— 把真调用删掉之后守卫仍然在自己的消息文本里
+        //    读到它，绿着放过了 M276。R53 已经为 `region()` 记过同一族（按行首匹配才不撞），
+        //    但那一族的完整说法是"**被搜的文本必须限定在被守卫的区域内**"，而不只是"锚点要按行首"。
+        let tickBody = region(in: source, named: "func tick()")
+        XCTAssertTrue(tickBody.contains("grabMilliseconds.append"),
+                      "`Grabber.tick` 不再记录每次抓帧耗时 ⇒ 上面两条接的都是一个空数组")
+    }
+
+    /// 归因说"该缩小捕获区域"——**这句话本身必须是可证的**（R55 / BACKLOG 77 的前提）。
+    ///
+    /// 为什么单独立一条，而不是信"位图越大越慢"这种直觉：
+    /// `probe-grab-bound` / `grab-dominates` 那两条建议的全部价值在于"缩区域真的能把采样变细"。
+    /// 如果 `cacheDisplay` 的成本其实由固定开销主导（分配、SwiftUI 重排、一次全视图合成），
+    /// 那缩区域省不下时间，BACKLOG 77 的路 a/b 就是**两条白花时间的路**，
+    /// 而我已经在日志里把它当成建议打出去了。直觉在这种地方靠不住：只能测。
+    ///
+    /// 本机测出来了（2026-10-14，数值见 `grabAreaCostRatioFloor` 那段）：面积差 29.8 倍只换来
+    /// 成本差 12.3–13.0 倍 ⇒ 建议成立但不是免费子弹，缩到一条横幅能把 41.7ms 打到 8.7ms，
+    /// 而 3ms 那一截地板无论怎么缩都在。
+    ///
+    /// 测法是**交错**跑三种区域（全 / 一条横幅 / 一小块），同一轮里轮流抓，各取中位：
+    /// 顺序跑的话，先跑的那一组会拿走冷缓存、后跑的那一组会被节流，
+    /// 读出来的"面积效应"里混着时间漂移 —— 这一族本仓库记过（A/B 要同一台机器同一段时间）。
+    /// 判定只用**两端**，中间那档打印出来供对账：三档全单调是一个比两个极端更强的主张，
+    /// 而它会被噪声轻易打破，把判据写成恒红没有意义。
+    func testGrabCostScalesWithCapturedArea() throws {
+        try skipUnlessEnabledAndCapable()
+        // 地板自己先过一遍：写成 1.0 就成了"任何比值都算面积有影响"的恒真判据，
+        // 而这条测的东西恰好就是"比值够不够大"。
+        XCTAssertGreaterThan(Self.grabAreaCostRatioFloor, 1.0,
+                             "地板 ≤1 ⇒ 这一格恒真：面积与成本毫无关系也能算「通过」")
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 760, height: 673),
+                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: ContentView(historyStore: makeStore()))
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        host.layoutSubtreeIfNeeded()
+        let bounds = host.bounds
+        guard bounds.width > 400, bounds.height > 400 else {
+            XCTFail("夹具只有 \(Int(bounds.width))×\(Int(bounds.height))pt ⇒ 三档区域分不开，"
+                    + "这条测量会在一个假视图上「证明」面积效应")
+            return
+        }
+        // 三档面积比按真尺寸算，不写死「1/28」这种数：写死一次，改了夹具尺寸就读错了档。
+        let arms: [(name: String, rect: NSRect)] = [
+            ("全视图", bounds),
+            ("横幅带", NSRect(x: 0, y: bounds.height - 120, width: bounds.width, height: 120)),
+            ("小块", NSRect(x: 0, y: bounds.height - 60, width: 300, height: 60)),
+        ]
+        let fullArea = Double(arms[0].rect.width * arms[0].rect.height)
+        let tinyArea = Double(arms[2].rect.width * arms[2].rect.height)
+        XCTAssertGreaterThan(fullArea / tinyArea, 8,
+                             "夹具的端到端面积比不到 8 ⇒ 就算成本真按面积走，也量不出差；这是夹具坏了")
+
+        var samples: [[Double]] = [[], [], []]
+        func grab(_ rect: NSRect) -> Double {
+            let began = DispatchTime.now()
+            if let rep = host.bitmapImageRepForCachingDisplay(in: rect) {
+                host.cacheDisplay(in: rect, to: rep)
+            }
+            return Double(DispatchTime.now().uptimeNanoseconds - began.uptimeNanoseconds) / 1_000_000
+        }
+        // 预卷：新窗口的头两次 `cacheDisplay` 要 260–340ms（R11 记过的那段冷缓存）。
+        // 让它进中位数就会把「面积效应」读成「首帧效应」。
+        for _ in 0..<4 { for arm in arms { _ = grab(arm.rect) } }
+        for _ in 0..<9 {
+            for index in arms.indices { samples[index].append(grab(arms[index].rect)) }
+        }
+        let medians = samples.map { Self.median($0) }
+        for index in arms.indices {
+            print("MOTION_GRAB_AREA \(arms[index].name) 面积=\(String(format: "%.0f", Double(arms[index].rect.width * arms[index].rect.height)))pt²"
+                  + " 样本=\(samples[index].count) 中位=\(String(format: "%.1f", medians[index]))ms"
+                  + " 最慢=\(String(format: "%.1f", samples[index].max() ?? -1))ms")
+        }
+        let big = medians[0]
+        let small = medians[2]
+        XCTAssertEqual(samples[0].count, 9, "每档必须够 9 个样本才谈中位数")
+        // 地板判之前先钉"确实抓到了东西"：`bitmapImageRepForCachingDisplay` 返回 nil 时
+        // 那一格只花了取时刻的钱 ≈0ms，接着会掉进下面的"这台机器太快"分支**绿着通过**。
+        // 「快机器」与「抓取根本没执行」在只比大小的判据里长得一模一样，这一格就是用来拆开它们的。
+        XCTAssertGreaterThan(big, 0.5,
+            "全视图抓一帧的中位是 \(String(format: "%.2f", big))ms ⇒ 抓取没真的执行（rep 为 nil 或视图是空的），"
+                + "这不是「机器快」，是夹具坏了")
+        guard big >= Self.grabCostFloorMilliseconds else {
+            // 打出来，不判红：这台机器上整帧抓完不到 5ms，面积差落在噪声里，
+            // 此时「面积不影响成本」与「面积影响但看不出来」两种说法无法区分。
+            print("MOTION_GRAB_AREA_SKIP=below-noise-floor 全视图中位=\(String(format: "%.1f", big))ms"
+                  + " 低于 \(Self.grabCostFloorMilliseconds)ms ⇒ 今天量不出面积效应，"
+                  + "不许据此说 BACKLOG 77 的缩区域无效")
+            return
+        }
+        XCTAssertGreaterThan(small, 0, "小块的中位是 0 ⇒ 这条测量什么都没量到，任何倍率都是除出来的假数")
+        XCTAssertGreaterThanOrEqual(big / small, Self.grabAreaCostRatioFloor,
+            "全视图抓一帧 \(String(format: "%.1f", big))ms，只比 \(String(format: "%.0f", tinyArea))pt² "
+                + "那一块的 \(String(format: "%.1f", small))ms 慢 \(String(format: "%.2f", big / small)) 倍"
+                + " ⇒ 成本由固定开销主导，缩小捕获区域省不下采样时间，"
+                + "而 `grabAttributionLabel` 的 `probe-grab-bound` / `grab-dominates` 两支正在把它当修法建议打出去："
+                + "要么改那两条建议，要么把抓帧换成按区域分配的写法")
+        // 中间那档只打印不判定（见上方注释）：三档全单调是比端到端更强的主张，
+        // 而它会被抖动轻易打破 —— 把判据写成恒红没有意义，读数留在日志里供对账。
+        XCTAssertGreaterThan(medians[1], 0, "横幅带的中位是 0 ⇒ 抓取压根没执行，那条打印行是空的")
+        window.orderOut(nil)
+    }
+
+    /// 判"面积效应存在"所需的最小倍率（全视图 / 小块）。
+    ///
+    /// 本机 2026-10-14 实测（`.scratch/motion-audit-2/r55_grab_area.log`，三遍分别是 12.5 / 12.3 / 13.0 倍）：
+    /// 全视图 535800pt² 中位 **41.7ms**、横幅带 91200pt² **8.7ms**、小块 18000pt² **3.4ms**
+    /// ⇒ 端到端 **12.3–13.0 倍**（三遍各自 12.5 / 12.3 / 13.0），而面积比是 29.8 倍 —— 成本是"固定开销（≈3ms 的分配与调用）
+    /// + 按面积那一项"，不是纯线性。这条子线性正是 BACKLOG 77 路 a/b 的性价比上限：
+    /// 缩到一条横幅能省掉 41.7 里的 33ms 上下，但省不掉那 3ms 的地板。
+    /// CI runner 没量过 ⇒ 地板取 1.5 而不是 12：这一格要抓的是"面积完全不影响成本"
+    /// （比值≈1，说明成本全是固定开销）那种失效，不是抓抖动。
+    static let grabAreaCostRatioFloor: Double = 1.5
+
+    /// 低于这个成本就不判（ms）：整帧只要 2ms 的机器上，面积差是噪声而不是信息。
+    static let grabCostFloorMilliseconds: Double = 5
+
+    /// 中位数（偶数个取中间两个的平均）。空数组返回 −1 = "没量"，**不是 0**。
+    static func median(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return -1 }
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        return sorted.count % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2.0
+    }
+
     ///
     /// 为什么这条要守卫，而不是"记得放对位置"：R50 加这行时我把它留在 `requireAppWasActive` 后面，
     /// 于是 runner 每次跳过这一臂，日志就只剩"两臂读数有、结论行没有"——
@@ -2252,6 +2505,96 @@ final class MotionFilmstripTests: XCTestCase {
         /// 带默认值的存储属性（不是计算属性）：`record()` 的其它调用点不传它，
         /// 而那些场景不经过新的预卷循环时也不该被这条新闸门误伤。
         var clockIsWarm: Bool = true
+
+        /// 这一卷里**最慢的一次抓帧**花了多少毫秒（`cacheDisplay` 那一段）。
+        ///
+        /// 默认 −1 = "没量"（不是"抓帧不花钱"）：那些不经过 `recordFrames` 的夹具构造点
+        /// 会拿到 −1，而 `grabAttribution` 对 −1 给的是 `unknown`，不是"归因于抓帧器"。
+        var worstGrabMilliseconds: Double = -1
+    }
+
+    // MARK: - 抓帧成本归因（R55 / BACKLOG 77）
+
+    /// "这一段为什么分辨不了"的**归因**：那 N 毫秒里有多少是抓帧器自己的像素成本。
+    ///
+    /// 为什么需要它：`clock-coarse-in-window` 从 R2 起就在报"最粗 Nms 一帧"，
+    /// 但 N 从来是一个**混合量** —— 里面既有 `cacheDisplay` 的像素成本，也有
+    /// runloop 没醒的时间与产品自己被强制同步布局的那一段。三种归因的修法完全不同：
+    /// 像素成本 ⇒ 缩捕获区域/降尺度真能把采样变细；runloop 没醒 ⇒ 那样做白费；
+    /// 强制布局 ⇒ 那是产品成本，缩区域只把它挪进另一个调用里。
+    ///
+    /// 本机 2026-10-14 那一次 `CLIPBOARD_HISTORY_UI_MOTION=1` 的真读数（`/tmp/r55_motion_local.log`）
+    /// 就是这一族必须分三档的原因：`notice-banner-dismiss` 的事件段最粗 **97ms**，
+    /// 而同卷抓帧最慢一次是 **87.9ms**。第一版这里只有两档（余量 8ms），它把这一条报成了
+    /// `not-the-grab ⇒ 先别动捕获尺寸` —— **建议是错的**：抓帧解释了这个间隔的 91%，
+    /// 缩区域正是主杠杆，那 9ms 只是没解释完的零头。两档的判法把"主要归因"和"完全归因"混成了一件。
+    /// 现在拆成三档，并把**解释比例**本身打进日志，让人能复核而不是信我的分档。
+    ///
+    /// ⚠ "抓帧那一调用里"不等于"探针的开销"：`cacheDisplay` 会强制布局与绘制，
+    /// 产品自己那一次冷启动的整块布局（R49 的 260ms 空档）就落在这同一个数里。
+    /// 所以 `probeBound` 说的是"这段时间花在抓这一帧的调用里"，
+    /// 而"缩区域省不省得下"要由 `testGrabCostScalesWithCapturedArea` 那条面积判据回答。
+    enum GrabAttribution: Equatable {
+        case unknown                                                   // 没量过，或间隔 ≤ 0（除不出来比例）
+        case probeBound(explainedRatio: Double, overshootMilliseconds: Double)     // 间隔≈抓帧+一次等待
+        case grabDominates(explainedRatio: Double, overshootMilliseconds: Double)  // 抓帧是大头，但还剩一截别的时间
+        case outsideTheGrab(explainedRatio: Double, overshootMilliseconds: Double) // 抓帧只占一小截
+
+        /// 判"间隔能不能被这一次抓帧 + 一次等待解释完"的余量（ms）。
+        ///
+        /// 由来：驱动抓帧的那个循环每圈最多等 4ms（`recordFrames` 里那句
+        /// `RunLoop.main.run(until: +0.004)`），再加一倍当抖动余量 ⇒ 8。
+        /// **不许把这条写成 0**：那样任何一次比抓帧略长的间隔都会掉出 `probeBound`，
+        /// 而间隔本来就含一次等待。
+        static let allowanceMilliseconds: Double = 8
+
+        /// "抓帧算不算大头"的比例线。取 0.5 而不是 0.8：
+        /// 这一档只回答"该先看哪里"，不回答"够不够" —— 具体还剩多少 ms 由日志里的数说。
+        static let dominatesRatio: Double = 0.5
+
+        static func classify(worstIntervalMilliseconds: Double,
+                             worstGrabMilliseconds: Double) -> GrabAttribution {
+            guard worstGrabMilliseconds >= 0, worstIntervalMilliseconds > 0 else { return .unknown }
+            let explained = worstGrabMilliseconds / worstIntervalMilliseconds
+            let overshoot = worstIntervalMilliseconds - worstGrabMilliseconds
+            if overshoot <= allowanceMilliseconds {
+                return .probeBound(explainedRatio: explained, overshootMilliseconds: overshoot)
+            }
+            return explained >= dominatesRatio
+                ? .grabDominates(explainedRatio: explained, overshootMilliseconds: overshoot)
+                : .outsideTheGrab(explainedRatio: explained, overshootMilliseconds: overshoot)
+        }
+    }
+
+    static func grabAttribution(worstIntervalMilliseconds: Double,
+                                worstGrabMilliseconds: Double) -> GrabAttribution {
+        GrabAttribution.classify(worstIntervalMilliseconds: worstIntervalMilliseconds,
+                                 worstGrabMilliseconds: worstGrabMilliseconds)
+    }
+
+    /// 归因怎么说进日志。**令牌必须是英文**（`probe-grab-bound` / `grab-dominates` / `not-the-grab` /
+    /// `grab-unmeasured`）：中文短语里的连词与括号会被下游的 grep 切成两半，而这一行是 CI 那一步要读的东西。
+    /// 比例也一起打出来：分档是我给的判读，而 `解释=NN%` 是可复核的数。
+    static func grabAttributionLabel(worstIntervalMilliseconds: Double,
+                                     worstGrabMilliseconds: Double) -> String {
+        func percent(_ ratio: Double) -> String { String(format: "%.0f%%", ratio * 100) }
+        func ms(_ value: Double) -> String { String(format: "%.0f", value) }
+        switch grabAttribution(worstIntervalMilliseconds: worstIntervalMilliseconds,
+                               worstGrabMilliseconds: worstGrabMilliseconds) {
+        case .unknown:
+            return " 归因=grab-unmeasured（这一卷没量抓帧成本，或间隔≤0 ⇒ 不许把间隔赖给抓帧器，也不许说不是它）"
+        case .probeBound(let explained, let over):
+            return " 归因=probe-grab-bound（解释=\(percent(explained))：这一卷最慢一次抓帧 \(ms(worstGrabMilliseconds))ms，"
+                + "而间隔 \(ms(worstIntervalMilliseconds))ms 只比它多 \(ms(over))ms ⇒ 差值就是一次等 runloop 的时间）"
+                + " ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答"
+        case .grabDominates(let explained, let over):
+            return " 归因=grab-dominates（解释=\(percent(explained))：抓帧 \(ms(worstGrabMilliseconds))ms 是大头，"
+                + "但还有 \(ms(over))ms 不是它） ⇒ 缩捕获区域是主杠杆，"
+                + "而剩下的 \(ms(over))ms 得另查（BACKLOG 76 那条分段时间轴）"
+        case .outsideTheGrab(let explained, let over):
+            return " 归因=not-the-grab（解释=\(percent(explained))：抓帧只 \(ms(worstGrabMilliseconds))ms，"
+                + "另有 \(ms(over))ms 与像素无关） ⇒ 先别动捕获尺寸，那是修不到地方的改动"
+        }
     }
 
     private func record(_ scenario: Scenario) -> Film {
@@ -2317,8 +2660,20 @@ final class MotionFilmstripTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }
+        // R55 / BACKLOG 77：把"这一卷为什么分辨不了"拆成两半 ——
+        // **抓帧器自己的像素成本**（`cacheDisplay` 那一段）与 **runloop 没醒的时间**。
+        // 不拆的后果不是难看，是修错东西：若 N 全是抓帧成本，该做的是缩小捕获区域或按 1× 拍；
+        // 若 N 是 runloop 没醒，那两条都白做（而 `clock-coarse-in-window` 只会一遍遍报"N 太大"）。
+        // 这一行是**证据**，不是判据：它不决定红绿，决定的是 BACKLOG 77 那三条候选路该走哪条。
+        let pixels = grabber.frames.first.map { "\($0.width)×\($0.height)px" } ?? "无帧"
+        print(String(format: "MOTION_GRAB %@ 帧数=%d 抓帧中位=%.1fms 抓帧最慢=%.1fms "
+                     + "视图=%.0f×%.0fpt 像素=%@ 声明=%dms",
+                     scenario.name, grabber.frames.count, grabber.medianGrabMilliseconds,
+                     grabber.worstGrabMilliseconds, host.bounds.width, host.bounds.height, pixels,
+                     Int(scenario.declaredDurationMilliseconds)))
         return Film(frames: grabber.frames, stamps: grabber.stamps,
-                    triggerFrame: triggerFrame, clockIsWarm: clockIsWarm)
+                    triggerFrame: triggerFrame, clockIsWarm: clockIsWarm,
+                    worstGrabMilliseconds: grabber.worstGrabMilliseconds)
     }
 
     /// "这一格采样热到能看过程"的上界（ms）。
@@ -2491,6 +2846,13 @@ private final class Grabber: NSObject {
     var frames: [CGImage] = []
     /// 每帧的时刻（`systemUptime`），用来报出有效采样间隔。
     var stamps: [TimeInterval] = []
+    /// 每一帧**抓帧本身**花了多少毫秒（`cacheDisplay` 那一段，不含等 runloop 的时间）。
+    ///
+    /// 为什么要有这一列（R55 / BACKLOG 77）：判据一直在报"事件段内最粗 Nms 一帧 ⇒ 今天分辨不了"，
+    /// 但 N 里有多少是**抓帧器自己**、有多少是"runloop 这段时间没醒"，从来没被分开过。
+    /// 不分开的后果不是难看，是**修错东西**：如果 N 全是 `cacheDisplay` 的像素成本，
+    /// 该做的是把捕获区域缩小或按 1× 拍；如果 N 是 runloop 没醒，那做什么都没用了。
+    var grabMilliseconds: [Double] = []
     var ticks = 0
     var finished = false
     let limit: Int
@@ -2504,6 +2866,7 @@ private final class Grabber: NSObject {
 
     func tick() {
         ticks += 1
+        let began = DispatchTime.now()
         if let view,
            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) {
             view.cacheDisplay(in: view.bounds, to: rep)
@@ -2512,8 +2875,16 @@ private final class Grabber: NSObject {
                 stamps.append(ProcessInfo.processInfo.systemUptime)
             }
         }
+        grabMilliseconds.append(Double(DispatchTime.now().uptimeNanoseconds - began.uptimeNanoseconds) / 1_000_000)
         if ticks >= limit { finished = true }
     }
+
+    /// 抓帧成本的中位数（ms）。空数组返回 −1：宁可读出"没量"，也不许把 0 当成"抓帧不花钱"。
+    /// 走 `MotionFilmstripTests.median`：面积那条判据（`testGrabCostScalesWithCapturedArea`）
+    /// 用的是同一个中位数实现，两份各写一遍迟早会算出两个"中位"。
+    var medianGrabMilliseconds: Double { MotionFilmstripTests.median(grabMilliseconds) }
+
+    var worstGrabMilliseconds: Double { grabMilliseconds.max() ?? -1 }
 }
 
 // MARK: - AppKit 行动画探针

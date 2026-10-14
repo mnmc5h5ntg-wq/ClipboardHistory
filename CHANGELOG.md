@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R55：那条"最粗 97ms 一帧"第一次有了归因，而真读数把我第一版的分档打回来了）
+- `Grabber` 逐帧记 `cacheDisplay` 的毫秒数，`recordFrames` 打 `MOTION_GRAB … 抓帧中位/最慢 … 像素 …`，
+  最慢值随 `Film` 一起带出（默认 −1 = "没量"，不是"抓帧不花钱"）。
+- 新增 `GrabAttribution` 四档（`probe-grab-bound` / `grab-dominates` / `not-the-grab` / `grab-unmeasured`），
+  粗钟 not-run 行追加 `归因=…（解释=NN%…）`；两处现场（横幅、热图淡入 A/B）都接上，同一行、英文令牌。
+- **两档版被本机真读数证伪后改成三档**：97ms 间隔 / 抓帧最慢 87.9ms —— 抓帧解释了 91%，而两档版把它报成
+  "不是抓帧的锅 ⇒ 先别动捕获尺寸"，那是**反向的建议**。
+- 新增 `testGrabCostScalesWithCapturedArea`：交错抓三档区域各 9 次取中位 ⇒
+  全视图 中位 **40.2ms**、横幅带 中位 **8.4ms**、小块 中位 **3.1ms**（端到端 12.3–13.0 倍 vs 面积 29.8 倍）⇒ 成本 = 固定开销 + 面积项，
+  "缩小捕获区域能省采样时间"这条建议**从此有判据**；早退分支前先断言"确实抓到了东西"（>0.5ms）。
+- 新增接线守卫 `testGrabAttributionIsWiredIntoTheCoarseNotRunLines`（三格：结论行、`Film` 拿数、`tick` 计时）。
+  它自己被抓过一次：`contains("grabMilliseconds.append")` 会命中**守卫自己的消息文本** ⇒ 改为按 `func tick()` 区域搜。
+- 变异 M269–M276 八支全 CAUGHT（第一遍 7/8，M276 逃逸一次，修完守卫再 CAUGHT）。
+- 一条新盲区记账（BACKLOG 79 / U-82）：同一条命令本机三遍里**有一遍 `print` 全丢**而 stderr 正常 ⇒
+  R55 的归因与覆盖率地板都住在这条通道上，修法候选已列（首选"读数同时写文件"）。
+- 产品代码零改动，116 张帧逐字节不变 ⇒ 不需要 `frame_baseline update`。
+
 ### Added（R54：热图相邻档第一次有判据 —— 结论是"梯子没错，我的轴错了"）
 - 新增 `testAdjacentHeatLevelsAreSeparableOnTheRightAxis`：五档两两相邻（4 对）× 亮暗 × 1×/2×
   = 16 条读数，量**格子内部**，距离取**逐像素三通道最大差**（`meanMaxChannelDelta`），

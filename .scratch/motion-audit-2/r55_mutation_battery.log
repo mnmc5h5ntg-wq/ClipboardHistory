@@ -1,0 +1,33 @@
+预检 OK testGrabAttributionIsATruthTable
+预检 OK testGrabAttributionIsWiredIntoTheCoarseNotRunLines
+预检 OK testGrabCostScalesWithCapturedArea
+
+M269 分档侧：余量边界从 <= 改成 < ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable'] 还原干净=True
+
+M270 分档侧：grabDominates 那一档删掉（两档版） ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable'] 还原干净=True
+
+M271 分档侧：间隔≤0 那道 guard 摘掉 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable'] 还原干净=True
+
+M272 接线侧：结论行里的归因换成空串 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines'] 还原干净=True
+
+M273 接线侧：Film 不接抓帧器的数 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines'] 还原干净=True
+
+M274 前提侧：面积测量不真的画 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea'] 还原干净=True
+
+M275 判据侧：面积地板从 1.5 改成 1.0 ⇒ CAUGHT 红得对=True 红在 ['ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea'] 还原干净=True
+
+M276 尺子侧：Grabber 不再记录每次抓帧耗时 ⇒ ESCAPED 红得对=False 红在 [] 还原干净=True
+
+==== 汇总 ====
+  M269 | CAUGHT | yes | yes
+  M270 | CAUGHT | yes | yes
+  M271 | CAUGHT | yes | yes
+  M272 | CAUGHT | yes | yes
+  M273 | CAUGHT | yes | yes
+  M274 | CAUGHT | yes | yes
+  M275 | CAUGHT | yes | yes
+  M276 | ESCAPED | NO | yes
+红得不对/未抓到=1  还原不干净=0
+还原后复跑（真值表）：ESCAPED
+R55_MUTATION_PROBLEM
+M276 第一版 ESCAPED（守卫在自己的消息文本里读到了被搜的串）；改成 region(in: "func tick()") 之后 CAUGHT — 8/8
