@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R50：行移动那条判据先修探针，再让结论分三态）
+- `TableProbe` 的 move 臂在宣布一次 `moveRow` 之前把**六行文案全改了**（`·已挪`），
+  而产品那条分支不 rename（`QuickPickController.rebuildRows` 的文案变化走 `plan.reloads`）。
+  ⇒ 两臂的像素差里混进了与动画无关的"文字变了"，那次红不能算在产品头上。删掉 rename。
+- `testNativeRowMoveIsVisibleToTheRuler` 的结论从两态改三态：
+  `动了 / 瞬移 / 采样错过`（新增纯函数 `nativeMoveVerdict`，真值表 7 格）。
+  以前只有一句"帧数 ≥2 否则红"，把 runner 那组 `开 1 帧 0.047 / 关 1 帧 0.047`
+  和"两帧数都是 1 但峰值差很远"混成同一种红 —— 而前者是产品侧候选缺陷，后者是今天量不了。
+- 新增日志 `MOTION_NATIVE_MOVE 判定=… 峰值容差=…`，把结论与判据用的数一起打出来。
+- **没有**把这条红改成 not-run：它有名字、有读数、有同一卷里 `row-insert` 的阳性对照。
+- 产品代码零改动，116 张帧逐字节不变。变异 M245–M248 四支全 CAUGHT。
+
+
 ### Added（R49：目标里那条"采集路径不许同步写盘"第一次有了会红的判据）
 - 新增 `CapturePathWriteBudgetTests`（3 条判据，全部从产品入口 `HistoryStore.add` 进入）：
   ① 复制之后临时目录**一个文件都不许多**（尺寸@mtime 快照），并带一条"去抖到期后文件必须出现"的

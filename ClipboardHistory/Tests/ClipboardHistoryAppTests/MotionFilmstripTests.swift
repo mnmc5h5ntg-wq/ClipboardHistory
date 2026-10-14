@@ -169,6 +169,34 @@ final class MotionFilmstripTests: XCTestCase {
             .max { $0.peak == $1.peak ? $0.elapsedMilliseconds < $1.elapsedMilliseconds : $0.peak < $1.peak }
     }
 
+    /// 原生行**移动**那一条 A/B 的结论（R50 / BACKLOG 75）。
+    enum NativeMoveVerdict: Equatable {
+        /// 开臂明显比对照臂多帧 ⇒ 移动在动。
+        case animated
+        /// 两臂形状一致（帧数与峰值都相同）⇒ 这一次移动是**瞬移**。
+        /// 这一格是产品侧的结论，红得起：同一卷里 `row-insert` 看得见，
+        /// 所以"通道瞎了"这个解释已经被排掉一半，另一半由 `wasActive` 排掉。
+        case notAnimated(animatedSpan: Int, animatedPeak: Double, instantSpan: Int, instantPeak: Double)
+        /// 帧数都是 1 但峰值不一样 ⇒ 说不清是没动还是采样错过，**不判产品**。
+        case samplingMissed(animatedSpan: Int, animatedPeak: Double, instantSpan: Int, instantPeak: Double)
+    }
+
+    /// 两臂峰值差多少以内算"形状一致"。与 `fadeVisibility` 那条 A/B 用的是同一个量级：
+    /// 峰值差小于这个数时，两卷看起来就是同一件事发生了一次。
+    static let nativeMovePeakTolerance: Double = 0.02
+
+    static func nativeMoveVerdict(animatedSpan: Int, animatedPeak: Double,
+                                  instantSpan: Int, instantPeak: Double,
+                                  minimumFrames: Int = 2) -> NativeMoveVerdict {
+        if animatedSpan >= minimumFrames { return .animated }
+        let sameShape = abs(animatedPeak - instantPeak) <= nativeMovePeakTolerance
+        return sameShape
+            ? .notAnimated(animatedSpan: animatedSpan, animatedPeak: animatedPeak,
+                           instantSpan: instantSpan, instantPeak: instantPeak)
+            : .samplingMissed(animatedSpan: animatedSpan, animatedPeak: animatedPeak,
+                              instantSpan: instantSpan, instantPeak: instantPeak)
+    }
+
     /// 这条 A/B 有没有看见纯 opacity 的淡入（R47 / BACKLOG 68 / U-73，R48 补分辨率轴）。
     ///
     /// 为什么单独抽出来：`testHeatmapFadeIsNotVisibleToThisRuler` 原来直接写
@@ -1717,10 +1745,78 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertLessThanOrEqual(instantSpan, 1,
                                  "关掉隐式动画那一档本该一帧到位，却量到 \(instantSpan) 帧在动"
                                  + " ⇒ 带里有别的动在跑，两臂对照失效")
-        XCTAssertGreaterThanOrEqual(animatedSpan, Self.minimumTransitionFrames,
-                                    "开了 `allowsImplicitAnimation` 仍只读到 \(animatedSpan) 帧"
-                                    + " ⇒ 这把尺看不见 `moveRow` 的滑动 ⇒ 本轮那次改动只能记"
-                                    + "「源码已接、产物未量」，不许写进已交付")
+        // R50：原来这里只有一句"帧数 ≥2 否则红"。runner 第一次跑到这条时给的是
+        // `开 帧数=1 峰值=0.047 / 关 帧数=1 峰值=0.047` —— 那句话**没说清**这是"瞬移"还是"错过"，
+        // 而这两种结论的性质不同（前者是产品少做了一段动画，后者是这台机器今天量不了）。
+        let verdict = Self.nativeMoveVerdict(animatedSpan: animatedSpan, animatedPeak: Self.peak(animated),
+                                             instantSpan: instantSpan, instantPeak: Self.peak(instant))
+        let verdictLabel: String = {
+            switch verdict {
+            case .animated: return "动了"
+            case .notAnimated: return "瞬移"
+            case .samplingMissed: return "采样错过"
+            }
+        }()
+        print("MOTION_NATIVE_MOVE 判定=\(verdictLabel) 峰值容差="
+            + String(format: "%.3f", Self.nativeMovePeakTolerance)
+            + "（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）")
+        switch verdict {
+        case .animated:
+            break
+        case .notAnimated(let a, let ap, let i, let ip):
+            XCTFail("两臂形状一致（开 \(a) 帧/峰值 \(String(format: "%.3f", ap))、"
+                    + "关 \(i) 帧/峰值 \(String(format: "%.3f", ip))）⇒ 这次 `moveRow` 是**瞬移**。"
+                    + "同一卷里 `MOTION_NATIVE row-insert` 的开臂是能看见多帧的，"
+                    + "而 `wasActive` 为真 ⇒ "
+                    + "「通道瞎了」与「进程没激活」这两个解释都不成立（BACKLOG 75）")
+        case .samplingMissed(let a, let ap, let i, let ip):
+            print("MOTION_NOT_RUN=native-move-sampling-missed row-move："
+                + "两臂都只读到 \(a)/\(i) 帧，但峰值差 \(String(format: "%.3f", abs(ap - ip))) "
+                + "超过 \(String(format: "%.3f", Self.nativeMovePeakTolerance)) ⇒ "
+                + "说不清是没动还是采样错过，今天不判产品")
+        }
+    }
+
+    /// `nativeMoveVerdict` 的真值表（R50 / BACKLOG 75）。
+    ///
+    /// 这条不开窗口、CI 每次都跑。理由与 R47 那条一样：**修尺子的代码如果只被一把
+    /// "平时不跑"的判据守着，它下一次漂回去是没人知道的** —— 而这条判据今天还从来没在
+    /// 本机跑过（本机进程无法激活），它的全部风险都在"读日志的人怎么解释 1 帧"。
+    func testNativeMoveVerdictSeparatesJumpFromMissedSampling() {
+        // ① 开臂多帧 ⇒ 动了（这是唯一能写"看得见"的形状）。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 4, animatedPeak: 0.052,
+                                              instantSpan: 1, instantPeak: 0.061), .animated)
+        // ② **runner 今天的真读数**：两臂帧数与峰值都一样 ⇒ 瞬移，不许被写成"量不到"。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 1, animatedPeak: 0.047,
+                                              instantSpan: 1, instantPeak: 0.047),
+                       .notAnimated(animatedSpan: 1, animatedPeak: 0.047,
+                                    instantSpan: 1, instantPeak: 0.047),
+                       "两臂一模一样还说'说不清'，等于把产品缺陷降级成噪声")
+        // ③ 帧数都是 1、峰值差得远 ⇒ 采样错过，**不判产品**。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 1, animatedPeak: 0.090,
+                                              instantSpan: 1, instantPeak: 0.047),
+                       .samplingMissed(animatedSpan: 1, animatedPeak: 0.090,
+                                       instantSpan: 1, instantPeak: 0.047))
+        // ④ 边界：峰值差**正好**等于容差 ⇒ 仍算形状一致（门槛含等号）。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 1, animatedPeak: 0.060,
+                                              instantSpan: 1, instantPeak: 0.040),
+                       .notAnimated(animatedSpan: 1, animatedPeak: 0.060,
+                                    instantSpan: 1, instantPeak: 0.040))
+        // ⑤ 边界：帧数正好等于最低要求 ⇒ 算动了（含等号，理由同上）。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 2, animatedPeak: 0.047,
+                                              instantSpan: 1, instantPeak: 0.047), .animated)
+        // ⑦ 峰值差必须取**绝对值**：开臂比对照臂"变得少"（0.030 vs 0.090）也是形状不一致，
+        //    写成有符号减法会让它被读成"一致"⇒ 判成瞬移，而它其实是"开臂动得比对照还小"，
+        //    那是探针或带选错了的信号，不是产品的结论。（变异 M248 就是去符号化这一格。）
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 1, animatedPeak: 0.030,
+                                              instantSpan: 1, instantPeak: 0.090),
+                       .samplingMissed(animatedSpan: 1, animatedPeak: 0.030,
+                                       instantSpan: 1, instantPeak: 0.090))
+        // ⑥ 对照臂自己抖了（3 帧）也不许把结论翻成"看得见"：判定只看开臂帧数与两臂形状。
+        XCTAssertEqual(Self.nativeMoveVerdict(animatedSpan: 1, animatedPeak: 0.047,
+                                              instantSpan: 3, instantPeak: 0.047),
+                       .notAnimated(animatedSpan: 1, animatedPeak: 0.047,
+                                    instantSpan: 3, instantPeak: 0.047))
     }
 
     /// **产品形状的行动画判据**：插完行之后紧跟的那两句（`selectRowIndexes` + `scrollRowToVisible`）
@@ -2446,7 +2542,14 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
             let from = texts.count - 1
             let moved = texts.removeLast()
             texts.insert(moved, at: 0)
-            texts = texts.map { "\($0)·已挪" }
+            // R50 之前这里还有一行 `texts = texts.map { "\($0)·已挪" }`，
+            // 也就是**宣布了一次移动，却把六行的文案都改了**。
+            // 那有两个后果：① 两臂的像素差里混进了"文字变了"而不是"位置变了"，
+            // 峰值被抬高，而抬高的那部分与动画无关；② 产品那条分支根本不 rename
+            // （`QuickPickController.rebuildRows` 的移动分支只 `moveRow`，文案变化走 `plan.reloads`）。
+            // 探针与产品的调用序列必须逐行可对照，否则"看不见动画"这个结论
+            // 可能只是"探针改了什么别的东西"。位置本身变了 ⇒ 每个下标上的内容就变了，
+            // 不需要 rename 也有像素可读。
             NSAnimationContext.runAnimationGroup { context in
                 context.allowsImplicitAnimation = !animation.isEmpty
                 table.beginUpdates()
