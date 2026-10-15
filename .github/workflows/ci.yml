@@ -157,6 +157,20 @@ jobs:
           # 跑完了才谈产品结论；退出码原样报出来，但不挡发布（报告型）。
           exit "$status"
 
+      # R62 / BACKLOG 92：上面那一步"整卷没跑完"是真的，但它顺手让**所有**在屏判据变成了免检牌。
+      # R61 修侧栏「跟随选中揭示」的三条行为判据就住在那一卷里 ⇒ 61 的回归在 CI 上一条都没跑，
+      # 而作业是绿的、那句解释也仍然成立。这一步把"缺席"变成逐条点名 + 一条必须登记的清单：
+      # 新加一条在屏判据而不回答"runner 跑得了吗、跑不了为什么"，这里就红。
+      # 与上面那步的区别是刻意的：探针本身是报告型（它不该挡发布），**登记**是硬门（它只判形状）。
+      - name: On-screen probe coverage floor
+        working-directory: .
+        run: |
+          set -o pipefail
+          python3 scripts/probe_coverage_gate.py /tmp/ui.log \
+            --expectations scripts/probe_coverage_expectations.json \
+            --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift \
+            | tee /tmp/probe-floor.log
+
       # 动效审计 MC-8：这道像素闸以前**只在作者本机跑过一次**，而测试文件的注释写着
       # "CI 也取过数" —— 那是注释替事实背书。这一步把它真的接上 CI。
       # 形状全部沿用上面两步踩过的坑：报告型（不挡发布）、自带看门狗（挂死必须留数字）、

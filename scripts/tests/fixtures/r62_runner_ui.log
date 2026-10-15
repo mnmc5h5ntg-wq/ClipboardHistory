@@ -1,0 +1,9 @@
+# run 38603034761 · 作业 build-and-test · 步骤「On-screen interaction probes (report-only)」
+# 逐字片段（只去掉 GitHub 回显脚本本身的行、job/step 两列与时间戳）。
+# 这一份当的是**正对照**：闸门必须对它报出「一条都没下结论」，
+# 并把缺席的在屏判据逐条点名 —— R61 那三条「跟随选中揭示」的行为判据就住在这一卷里。
+##[group]Run set -o pipefail
+##[endgroup]
+/Users/runner/work/_temp/77f4a0d8-4007-4079-ab0e-55fb13386f9c.sh: line 13:  6927 Killed: 9               CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1
+ui suite exit: 137  executed: 0  skipped: ?  已下结论的用例: 0
+没有跑完（看门狗在 240s 收掉了进程）：在屏探针在无头 runner 上不可用，记成 R3-D9 的已知边界

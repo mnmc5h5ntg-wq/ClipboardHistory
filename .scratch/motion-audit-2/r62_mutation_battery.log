@@ -1,0 +1,27 @@
+M318 删掉 UNLISTED 那条规则（新判据不登记也能过）
+    期望被抓：test_new_unregistered_case_is_red
+    结果：CAUGHT
+
+M319 删掉 STALE（免检牌可以一直攒着）
+    期望被抓：test_stale_registration_is_red
+    结果：CAUGHT
+
+M320 cannot 不再要求写 reason
+    期望被抓：test_cannot_without_reason_is_red
+    结果：CAUGHT
+
+M321 删掉 NOT_RUN（说能跑却没跑也不报）
+    期望被抓：test_registered_can_but_absent_is_red
+    结果：CAUGHT
+
+M322 删掉 NOW_RUNS（跑得了也不许改登记）
+    期望被抓：test_registered_cannot_but_concluded_is_red
+    结果：CAUGHT
+
+M323 读不到输入时返回 0（把「没跑成」当成通过）
+    期望被抓：test_missing_inputs_are_not_a_pass
+    结果：CAUGHT
+
+M324 源码扫描放宽到正文任意位置（会命中注释里的用例名）
+    期望被抓：test_source_scan_ignores_names_mentioned_in_prose
+    结果：CAUGHT

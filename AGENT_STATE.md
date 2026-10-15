@@ -1,6 +1,6 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-15 00:35（本地 · R61 / 第 63 轮收尾：BACKLOG 61 结案，产品侧新增「跟随选中揭示」。R60 的 CI 待读）
+最后更新：2026-10-15 11:07（本地 · R62 / 第 64 轮收尾：CI 侧新增在屏判据覆盖门；结案 91、92，新开 93。R61 的 CI 已逐步读完）
 
 ## 当前状态（2026-10-13 · 视觉与动效长跑 R1）
 
@@ -2252,3 +2252,28 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   ③ BACKLOG 90（滚回顶部后表格选中集多留一行）；④ BACKLOG 89（runner 那条红的夹具与
   `.spanUnresolved`）；③ BACKLOG 88（重叠：关掉动画那一臂与开着那一臂同帧号相减）；
   ④ BACKLOG 86（motion 步骤要不要有闸）；⑤ 81 / 82 / 72。
+
+
+## R62 · CI 那句「探针没跑完」是真的，但它让 11 条在屏判据一起免检（第 64 轮 / 结案 91、92 / 新开 93 / U-93、U-94 / D-121）
+
+- **开场读数**：R61 的 CI（run 38603034761，整作业 success）里有一行
+  `ui suite exit: 137  executed: 0  已下结论的用例: 0` ⇒ 61 的三条行为判据在 CI 上一条都没跑。
+  其余步骤逐条读过：`compile warnings: 0`、Swift **772 / 44 skip / 0 failures**、
+  离屏 **116 帧 / 捕获失效 0**、capture gate `passed=25 skipped=9 failed=0 有名字的红=0`、
+  motion **exit 0 / 42 例 / judged=4/4**、floor `OK=4/4 REDS=0`、脚本 `Ran 108 OK`。
+- **交的东西**：`scripts/probe_coverage_gate.py`（判形状，不判耗时）+
+  `scripts/probe_coverage_expectations.json`（11 条逐条登记）+ CI 新步骤
+  `On-screen probe coverage floor`（硬门）+ `scripts/tests/test_probe_coverage_gate.py`（12 条）
+  + 电池 `mutate_r62_gate.py`（M318–M324 **七刀全 CAUGHT**）。
+- **推翻自己上一轮的一条结论**：BACKLOG 91「闸门没有读数」是电池 filter 指错测试造的；
+  修好重跑 M313 / M317 ⇒ 都 CAUGHT，红在 `2125.0 ≠ 0.0`。产品结论不变，账本改了。
+- **两条新的工具规矩**（都落进脚本，不靠自觉）：每刀必须能证明「那一臂在被跑的那条测试里」
+  （基线缺一条判据的结论行 ⇒ 整套拒跑）；电池统一 `PYTHONDONTWRITEBYTECODE=1`
+  （M319 连跑 SURVIVED / 单跑 CAUGHT 是 `__pycache__` 撞车）。
+- **验证**：脚本 **120 全绿**（108 → 120）；116 帧 vs working **CHANGED=0**（本轮产品零改动）；
+  Swift 侧零改动，故不重跑全量、不换装。
+- **自评 93 / 100**（比 R61 低 3，有意）：连续两轮没碰产品与画面。价值在「让盲区可见 +
+  推翻自己一条错判」，但阶段二的主体没推进 ⇒ **R63 回到产品面**。
+- **下一步（R63）**：① 读 R62 的 CI（新步骤第一次在 runner 上跑，必须确认它不是恒红也不是恒绿）；
+  ② 产品/视觉面：BACKLOG 63/64/65/66 那一族位点逐个判「加动效有没有积极作用」，
+  顺带把 88（重叠那条轴，A/B 相减）做掉；③ BACKLOG 93（探针在 runner 上挂在哪一句）。

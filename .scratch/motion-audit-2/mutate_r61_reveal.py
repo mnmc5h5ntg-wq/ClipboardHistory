@@ -19,6 +19,23 @@ PKG = os.path.join(REPO, "ClipboardHistory")
 REVEALER = "ClipboardHistory/Sources/ClipboardHistoryApp/Views/SelectedRowRevealer.swift"
 SIDEBAR = "ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 SHOTS = "/tmp/r61_mutant_shots"
+# 第二版电池的 filter bug（这一条本身就是本轮的产出）：M313 / M317 想抓的是
+# 「行号漂了不许动」那一臂，而那一臂后来被拆进了独立测试
+# `testRowIndexDriftDoesNotMoveTheViewport`，filter 还指着老那条 ⇒ 两刀"存活"，
+# 我据此写下"SwiftUI 不再调 updateNSView ⇒ 判据没有分辨率"的机制结论，并开了 BACKLOG 91。
+# **那个结论是电池自己造的**：判据根本没被执行。⇒ 每刀的 filter 必须能证明
+# "它跑的那条测试里确有那一臂"（下面 `DRIFT_FILTER` 带两条，且脚本要求 executed>0）。
+# 每一刀"期望被抓"的那条判据，基线里必须能看到它的结论行。
+REQUIRED_CASES = [
+    "testRowIndexTruthTable",
+    "testRevealerOnlyScrollsAndNeverSelects",
+    "testSidebarDoesNotClaimTheSwiftUIScrollRoute",
+    "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped",
+    "testRowIndexDriftDoesNotMoveTheViewport",
+    "testIntakeBehindATallPinnedBlockRevealsTheNewRow",
+]
+
+DRIFT_FILTER = ("UIInteractionProbeTests/(testRowIndexDriftDoesNotMoveTheViewport|testOffScreenProgrammaticSelectionIsRevealedAndNotJumped)")
 
 # (编号, 说明, 文件, 原文, 变异后, 期望被哪条判据抓到, 跑哪个 filter)
 MUTATIONS = [
@@ -43,13 +60,13 @@ MUTATIONS = [
     ("M313", "闸门改按行号判（而不是按选中 id）", REVEALER,
      "        nsView.revealIfSelectionChanged(key: revealKey, row: rowIndex)",
      "        nsView.revealIfSelectionChanged(key: rowIndex.map { AnyHashable($0) }, row: rowIndex)",
-     "臂5：选中项只是行号漂了，视口不许动（本轮实测：SURVIVED，见日志里的机制说明）",
-     "UIInteractionProbeTests/testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"),
+     "臂5：选中项只是行号漂了，视口不许动",
+     DRIFT_FILTER),
     ("M317", "闸门整个拆掉（每次重算都滚）", REVEALER,
      "        if key == lastRevealedKey { return }\n",
      "",
-     "臂3 / 臂5（本轮实测：SwiftUI 不再调 updateNSView 时这一刀可能没人接 ⇒ 记进电池日志，不假称被抓）",
-     "UIInteractionProbeTests/testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"),
+     "臂3 / 臂5（漂移那一臂在独立测试里 ⇒ filter 必须带两条）",
+     DRIFT_FILTER),
     ("M314", "同步滚（撤掉推迟一个回合）", REVEALER,
      "        DispatchQueue.main.async { [weak self, weak table] in\n"
      "            guard let self, let table, self.lastRevealedKey == key else { return }\n"
@@ -102,6 +119,7 @@ def acquire_lock():
 
 
 def main():
+    only = [a for a in sys.argv[1:] if a.startswith("M")]
     os.makedirs(SHOTS, exist_ok=True)
     if not acquire_lock():
         return 3
@@ -111,16 +129,29 @@ def main():
     # （第一轮就栽过：判据本身在红，六刀全"被抓"，其实一刀没测）。
     env0 = {"CLIPBOARD_HISTORY_UI_INTERACTION": "1", "CLIPBOARD_HISTORY_UI_SHOTS": SHOTS}
     code0, out0 = run("env -u SDKROOT swift test --filter "
-                      "'SelectedRowRevealTests|UIInteractionProbeTests/testOffScreenProgrammaticSelection"
-                      "IsRevealedAndNotJumped|UIInteractionProbeTests/testIntakeBehindATallPinnedBlock"
-                      "RevealsTheNewRow'", env0)
+                      "'SelectedRowRevealTests|UIInteractionProbeTests/"
+                      "(testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"
+                      "|testRowIndexDriftDoesNotMoveTheViewport"
+                      "|testIntakeBehindATallPinnedBlockRevealsTheNewRow)'", env0)
     if code0 != 0:
         print("基线就是红的 ⇒ 这一整套对照不算数，先修判据本身")
         print("\n".join([l for l in out0.splitlines() if "error: -[" in l][:5]))
         return 2
-    print("基线绿（无变异，判据全部通过）⇒ 下面每一刀的红才有意义\n")
+    # 基线绿还不够：**每一刀想抓的那条判据必须真的在基线里下过结论**。
+    # 这一条是被自己的事故逼出来的：M313 / M317 第一版报"存活"，我据此写下
+    # "SwiftUI 不再调 updateNSView ⇒ 那条闸门没有分辨率"并开了 BACKLOG 91 ——
+    # 真相是漂移那一臂后来被拆进独立测试，而 filter 还指着老那条，**判据根本没被执行**。
+    # 判据没跑 ≠ 判据没牙；把这两件事混起来，就会把工具 bug 记成产品事实。
+    concluded = "\n".join([l for l in out0.splitlines() if "Test Case " in l])
+    missing = [c for c in REQUIRED_CASES if c not in concluded]
+    if missing:
+        print("基线里没有这些用例的结论 ⇒ 对应那一刀没经过判据，整套对照不算数：" + ", ".join(missing))
+        return 2
+    print(f"基线绿，且 {len(REQUIRED_CASES)} 条判据都下过结论 ⇒ 下面每一刀的红才有意义\n")
 
     for mid, note, path, old, new, judge, flt in MUTATIONS:
+        if only and mid not in only:
+            continue
         abs_path = os.path.join(REPO, path)
         src = open(abs_path, encoding="utf-8").read()
         # 还原必须**按内容**，不能用 `git checkout --`：新文件还没进版本库，

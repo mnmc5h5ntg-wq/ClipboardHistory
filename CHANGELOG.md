@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### CI（R62：在屏判据的「缺席」改成逐条点名的硬门 —— 结案 BACKLOG 92）
+- 之前：`On-screen interaction probes` 那一步在 runner 上被自带的 240s 看门狗收掉，
+  打一句「在屏探针在无头 runner 上不可用」就 `exit 0`。那句话是真的，
+  但它让这一卷里**全部 11 条在屏判据**一起免检 —— 包括 R61 刚为侧栏「跟随选中揭示」写的三条。
+  ⇒ 61 的回归在 CI 上一条判据都没跑，作业却是绿的。
+- 现在：新增 `scripts/probe_coverage_gate.py` + `scripts/probe_coverage_expectations.json`
+  与 CI 步骤 `On-screen probe coverage floor`（**硬门**）。它只判形状：
+  新加一条在屏判据而不登记「runner 跑得了吗、跑不了为什么」⇒ 红；登记过期 ⇒ 红；
+  说跑不了却跑到了 ⇒ 红（逼着改回来，免得攒免检牌）；日志里有断言红 ⇒ 指名报出来。
+  对真 CI 那份日志它绿，同时打 `PROBE_NOT_RUN 11/11 …` 逐条点名 —— 绿得有内容。
+- 判据：`scripts/tests/test_probe_coverage_gate.py` 12 条；变异电池 M318–M324 七刀全 CAUGHT。
+- 顺带结案 BACKLOG 91：R61 说那条闸门「没有读数」是**电池跑错测试**造出来的误判；
+  修好 filter 重跑，M313 / M317 都红在「行号漂了视口却动了」上 ⇒ 闸门确实有读数。
 ### Fixed（R61：程序化选中一条视口外的行时，列表现在会自己滚过去 —— BACKLOG 61 结案）
 - 现象：`List(selection:)` **不会选中视口外的行**。store 里选中 1 条，而表格
   `selectedRowIndexes` 是**空**的 ⇒ 详情区在讲一条列表里根本没有高亮的记录；即使把那一行滚进视口，

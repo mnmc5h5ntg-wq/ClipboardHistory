@@ -1,0 +1,53 @@
+{
+  "_comment": "在屏探针（UIInteractionProbeTests）的覆盖登记，配合 scripts/probe_coverage_gate.py 用。R62 / BACKLOG 92 的由来：R61 给侧栏「跟随选中揭示」写的三条行为判据全住在这卷里，而 CI 上一条都没跑完，CI 却仍是绿的 —— 因为那一步把整卷缺席写成了一句已知边界就 exit 0。现在每加一条在屏判据都必须在这里登记它今天跑不跑得了、以及跑不了的理由；登记过期（用例没了）或反过来（说跑不了却跑到了）都会红。",
+  "evidence": {
+    "run": "38603034761",
+    "reading": "ui suite exit: 137  executed: 0  已下结论的用例: 0"
+  },
+  "cases": {
+    "testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testFrameIntervalsUnderStateChanges": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testAccessibilityTreeCoverage": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testRowGesturesWorkInsideTheRealSidebarContainer": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testRowIndexDriftDoesNotMoveTheViewport": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testIntakeBehindATallPinnedBlockRevealsTheNewRow": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testDragSelectExpandsSelectionInsideTheRealList": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testSidebarListFocusRingAfterClick": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testRightClickMenusAppKitWouldShowAreChinese": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    },
+    "testMarkdownFilePreviewRendersInARealWindow": {
+      "runner": "cannot",
+      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+    }
+  }
+}
