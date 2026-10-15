@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Fixed（R65：浮层的行首图标不再由文案里的一个 📄 承担 —— 五行标签共用一条左轴 —— BACKLOG 94、97 结案）
+- 现象（R64 逐帧量出来的，不是推测）：同一个 `NSTableView` 里纯文本行的标签从 **34.5–35.0pt** 起，
+  带图标的文件行标签从 **56.5–57.5pt** 起 ⇒ 五行两种左轴、差 **22pt**。
+  而那 22pt 不是图标视图，是 `EntryPresentation.preview(for:)` 返回的 `"📄 …"` 里的**两个字符**。
+- 三处代价：① Apple Color Emoji 不吃 tint，与旁边 `.secondaryLabelColor` 的灰字不同极性；
+  ② 与全产品其余图标（SF Symbols）不是一套语言；③ 它进了**参与搜索匹配的字符串**
+  （`QuickPickModel.filtered` 拿整条 `shortPreview` 比），并且白吃两个字符的截断预算。
+- 修法：文案只说"是哪一条"（`report.pdf` / `a.pdf 等 3 个文件` / `多个文件`）；
+  浮层每行一枚 16pt 的 `NSImageView` 类型符号 —— `doc.text` / `photo` / `doc` / `doc.on.doc`，
+  与侧栏 `RowLeadingVisual` 一一对上（`photo` 沿用详情头已经在用的那个名字），
+  `.secondaryLabelColor`、`VisualGlyph.chipSymbol`、对读屏隐藏（文字已说清，再念符号名是噪音）。
+  标签左锚点从 `cell.leading+6` 改成 `symbol.trailing+6` ⇒ **左轴是这件事的副产品**，没有单独修。
+- 本轮先推翻了自己上一轮写的一句话：BACKLOG 94 原写"侧栏、浮层、详情共用同一条字符串"。
+  读调用点的结果：侧栏对 `.file`/`.files` 走 `FileNameText`/`MultiFileTitle`（不经过 `shortPreview`）、
+  详情走 `sizeDescription`、菜单栏走 `menuTitle` 自己拼 ⇒ **唯一可见的表面是浮层**。
+  "参与搜索匹配"是真的，所以这不是纯视觉改动，也因此配了真值表。
+- 判据 5 条：预览真值表（四种内容 + **没有按 emoji 呈现的标量**；`.text` 故意除外——那是用户的正文）、
+  emoji 那把尺的正对照（📄 必须抓到；`©`/`™`/`é`/`↵` 必须不抓 —— 用 `isEmojiPresentation` 而不是 `isEmoji`）、
+  四个符号名互不相同且**每个都画得出东西**（`NSImage(systemSymbolName:)` 对错名字返回 nil，
+  而 `NSImageView` 静默不画也不报错）+ 自带正对照、侧栏与浮层"同一套名字"的跨文件守卫、
+  浮层每行有图且共享一条左轴（读视图 `minX`，实测散布 **0.00pt**；夹具必须真有 ≥2 种类型）。
+- 帧：`quickpick-list` / `-typed` × 亮暗 = **4 张更新**（同提交 `update`），其余 **118 张逐字节不变**；
+  `quickpick-empty` 两张不变（没有行就没有列）。
+- 变异：M343–M349 **七刀全 CAUGHT**。M343 教了顺序 —— 不变量必须先判、逐字文案后判，
+  否则"把 📄 塞回去"那一刀会红在"文案不等于"上，电池证明的就变成"文案钉住了"而不是"尺有牙"。
+- 新开 **BACKLOG 99**：浮层那一行字号硬编码 13pt，而令牌 `VisualFont.row` 是 12 ——
+  本轮判为不动，但**这个判断没量过**（侧栏行高没测），所以记成待验证而不是"已排除"。
+- 同轮读到 R64 的 CI（run 38693365411）：`补回=65 行`、`NOT_RUN` 从 25 涨到 50 ⇒ **BACKLOG 96 结案**，
+  并开出 **98**（在屏探针那一步仍只有一条通道）。
+
 ### Tests（R64：判据自己写的结论可以整块从 stdout 消失而作业是绿的 —— 捕获卷补第二条通道，并把"缺通道"变成一条有名字的红 —— BACKLOG 96 交付）
 - **本轮零产品改动**（122 帧 `CHANGED=0`、`MISSING=0 ADDED=0`），改的是"验收证据本身会不会静默失踪"。
 - 读数（本机三遍真 artifact，逐行比对）：捕获卷 `capture-readings.log` 488 行里，

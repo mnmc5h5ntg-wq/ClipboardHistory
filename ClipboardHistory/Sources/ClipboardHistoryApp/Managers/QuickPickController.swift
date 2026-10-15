@@ -426,6 +426,26 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         return "\(pinned)\(preview.isEmpty ? "（空）" : preview)  ·  \(time)"
     }
 
+    /// 行首那一列的 SF Symbol 名（R65 / BACKLOG 94、97）。
+    ///
+    /// 为什么是一条纯函数：面板那一层的 `NSImageView` 只有 `NSTableView` 自己拿得到
+    /// （行是它复用的），而"符号名写错"这件事在屏幕上**不报错、只是那一格什么都不画** ——
+    /// 所以名字必须能在不启动表格的情况下被真值表判，而"画得出画不出"由 `rowSymbol` 那一格判。
+    ///
+    /// 名字与**侧栏** `RowLeadingVisual` 的符号分支一一对应（`doc.text` / `doc` / `doc.on.doc`）；
+    /// 图片那一支侧栏走真缩略图、没有符号兜底，这里给它 `photo` —— 那个名字已经在用了
+    /// （详情头的类型符号就是 `photo`），不是新造的一种语言。
+    /// 浮层刻意**不放缩略图**：行高 34pt、一行只说一件事，一张 16pt 的彩色缩略图会把
+    /// "我在找哪一条"变成"我在看哪张图"（判为不加，理由与读数记在账本 D-124）。
+    static func rowSymbolName(for content: ClipboardEntryContent) -> String {
+        switch content {
+        case .text: return "doc.text"
+        case .image: return "photo"
+        case .file: return "doc"
+        case .files: return "doc.on.doc"
+        }
+    }
+
     @objc private func commitTapped(_ sender: Any?) {
         if let entry = model.selection {
             hide()
@@ -444,19 +464,54 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             text.lineBreakMode = .byTruncatingTail
             text.font = .systemFont(ofSize: 13)
             text.identifier = identifier
+            // R65 / BACKLOG 94、97：行首那一列。存在的理由是**两件事一起**：
+            // ① 文件行原来靠文案里那个 📄 emoji 当图标（彩色 emoji 与 SF Symbol 不是一套语言，
+            //    还参与搜索匹配、白吃截断预算）；② 只有文件行有图标 ⇒ 五行里两种左轴
+            //    （实测纯文本行标签 34.5pt、文件行标签 56.5pt，差 22pt）。
+            //    每一行都给一枚类型符号，同时把左轴钉成一条。
+            let symbol = NSImageView()
+            symbol.imageScaling = .scaleProportionallyDown
+            symbol.contentTintColor = .secondaryLabelColor
+            // 类型符号只是图形线索：这一行的文字已经说清是文件/图片/多文件了，
+            // 再让读屏念一遍符号名就是噪音（与侧栏 `ThumbnailSymbol` 的 `.accessibilityHidden` 同一条理由）。
+            symbol.setAccessibilityElement(false)
+            symbol.translatesAutoresizingMaskIntoConstraints = false
             let cell = NSTableCellView()
+            cell.addSubview(symbol)
             cell.addSubview(text)
             cell.textField = text
+            cell.imageView = symbol
             text.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
-                text.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
+                symbol.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
+                symbol.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
+                symbol.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
+                symbol.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                text.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
                 text.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6),
                 text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
             return cell
         }()
+        let entry = rows[row].entry
         cell.textField?.stringValue = rows[row].title
+        cell.imageView?.image = Self.rowSymbol(for: entry.content)
         return cell
+    }
+
+    /// 那一列的边长（16pt，与侧栏 `ThumbnailSymbol` 的 `frame(width: 16, height: 16)` 同值）。
+    static let symbolSide: CGFloat = 16
+
+    /// 把模型给的名字变成一张真图。
+    ///
+    /// `NSImage(systemSymbolName:)` 对**写错的名字返回 nil**，而 `NSImageView` 拿着 nil
+    /// 什么都不画、也不报错 —— 所以这一格必须由判据来保证"名字能画出东西"
+    /// （`UICaptureTests` 那三条浮层判据逐行断言 `image != nil`）。
+    static func rowSymbol(for content: ClipboardEntryContent) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(pointSize: VisualGlyph.chipSymbol, weight: .medium)
+        return NSImage(systemSymbolName: Self.rowSymbolName(for: content),
+                       accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { true }

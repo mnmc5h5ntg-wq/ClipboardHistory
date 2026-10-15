@@ -421,6 +421,99 @@ final class UICaptureTests: XCTestCase {
                                     + "（阈值用表自己的 rowHeight，不写 34 这种字面量：那是产品定的，不是判据定的）")
     }
 
+    /// 行首那一列 + **一条**标签左轴（R65 / BACKLOG 94、97）。
+    ///
+    /// 立的理由是一串实测：改之前 `quickpick-list` 那张帧里，纯文本行的标签从 **34.5pt** 起、
+    /// 文件行的标签从 **56.5pt** 起（那 22pt 里装的是一个 📄 emoji —— 它写在文案里，不是视图），
+    /// 于是五行里有两种左轴。把 emoji 换成"每行一枚 SF Symbol"同时解决三件事：
+    /// 图标语言与侧栏一致、文案不再参与搜索匹配、左轴只剩一条。
+    ///
+    /// 三格各自承重，红的时候读的是不同的话：
+    ///   · 每一行 `imageView?.image != nil` —— 符号名写错时 `NSImage(systemSymbolName:)` 返回 nil，
+    ///     而 `NSImageView` 拿着 nil **什么都不画也不报错**，屏幕上只是那一格空了；
+    ///   · 所有标签 minX 相同（0.5pt 容差）—— 这才是"共享一条左轴"的可执行定义；
+    ///   · 夹具必须真有 ≥2 种类型（**正对照**）：全是文本时"左轴一致"会平凡为真，
+    ///     那一格红是在提醒我这条判据今天没有对象。
+    func testQuickPickRowsShareOneIconColumnAndOneLabelAxis() throws {
+        let store = makePopulatedStore()
+        let kinds = Set(store.entries.map { QuickPickController.rowSymbolName(for: $0.content) })
+        // `build` 必须留在局部变量上：控制器被那个闭包捕获，而 `NSTableView.dataSource` 是弱引用 ——
+        // 直接 `builder(...)()` 的话闭包当场释放，控制器跟着没了，表格只剩一张空面板
+        // （本轮第一次就是这么红的：报的是"找不到那张产品表格"，坏的是持有关系）。
+        let build = QuickPickCapturePanel.builder(store: store, query: "")
+        guard let panel = build(),
+              let content = panel.contentView else {
+            return XCTFail("捕获入口建不出浮层窗口 ⇒ 这条判据失去了对象，必须红")
+        }
+        _ = NSApplication.shared
+        let previousAppearance = NSApplication.shared.appearance
+        defer {
+            NSApplication.shared.appearance = previousAppearance
+            panel.orderOut(nil)
+        }
+        panel.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        Self.tileScrollViews(in: content)
+        panel.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        var productTable: NSTableView?
+        func find(_ view: NSView) {
+            if productTable == nil, let table = view as? NSTableView, table.dataSource is QuickPickController {
+                productTable = table
+            }
+            view.subviews.forEach(find)
+        }
+        find(content)
+        guard let table = productTable else {
+            return XCTFail("找不到那张产品表格 ⇒ 这条判据没有对象（数据源已经不是控制器，或行根本没建出来）")
+        }
+        let rowCount = table.numberOfRows
+        XCTAssertGreaterThan(rowCount, 1, "少于两行 ⇒ 「所有行共享一条左轴」这句话没有对象")
+        // 正对照：夹具里必须真的有几种不同的类型符号，否则"左轴一致"是平凡真。
+        XCTAssertGreaterThanOrEqual(kinds.count, 2,
+                                    "夹具里所有条目都是同一类型（\(kinds)）⇒ 这一格今天抓不到"
+                                    + "「只有部分行有图标」那种缺陷，判据空转")
+
+        var labelMinX: [CGFloat] = []
+        var symbolMinX: [CGFloat] = []
+        var symbolRightEdge: [CGFloat] = []
+        var rowsWithoutImage = 0
+        for row in 0..<rowCount {
+            guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? NSTableCellView else {
+                return XCTFail("第 \(row) 行拿不到 cell ⇒ 行不是产品那条 `viewFor` 画的，这条判据没在判产品")
+            }
+            if cell.imageView?.image == nil { rowsWithoutImage += 1 }
+            if let label = cell.textField, let frame = Self.frame(label, in: table) {
+                labelMinX.append(frame.minX)
+            }
+            if let symbol = cell.imageView, let frame = Self.frame(symbol, in: table) {
+                symbolMinX.append(frame.minX)
+                symbolRightEdge.append(frame.maxX)
+            }
+        }
+        let labelSpread = (labelMinX.max() ?? 0) - (labelMinX.min() ?? 0)
+        let symbolSpread = (symbolMinX.max() ?? 0) - (symbolMinX.min() ?? 0)
+        emit("QUICKPICK_ROW_AXIS rows=\(rowCount) 取到标签=\(labelMinX.count) 取到图标=\(symbolMinX.count) "
+              + "无图行=\(rowsWithoutImage) 标签左轴散布=\(String(format: "%.2f", labelSpread))pt "
+              + "图标列散布=\(String(format: "%.2f", symbolSpread))pt "
+              + "标签 minX=\(labelMinX.map { String(format: "%.1f", $0) }.joined(separator: ",")) "
+              + "类型符号=\(kinds.sorted().joined(separator: ","))")
+        XCTAssertEqual(rowsWithoutImage, 0,
+                       "\(rowsWithoutImage) 行的行首没有图 ⇒ 符号名在这台机器上画不出东西"
+                       + "（`NSImage(systemSymbolName:)` 对不存在的名字返回 nil，而 NSImageView 静默）")
+        XCTAssertEqual(labelMinX.count, rowCount, "有行拿不到 textField ⇒ 左轴这件事没被量全")
+        XCTAssertEqual(symbolMinX.count, rowCount, "有行拿不到 imageView ⇒ 那一列不是每行都有（BACKLOG 97 的形状）")
+        XCTAssertLessThan(labelSpread, 0.5,
+                          "标签左轴散布 \(String(format: "%.2f", labelSpread))pt ⇒ 又变成两套左轴了。"
+                          + "改前实测是 22pt（纯文本行 34.5pt、文件行 56.5pt），因为图标是塞在文案里的 emoji")
+        XCTAssertLessThan(symbolSpread, 0.5, "行首那一列自己都没对齐（散布 \(symbolSpread)pt）")
+        XCTAssertLessThan((symbolRightEdge.max() ?? 0) + 1, (labelMinX.min() ?? 0),
+                          "标签没有排在图标**右边**（图标最右 \((symbolRightEdge.max() ?? 0).description)"
+                          + " vs 标签最左 \((labelMinX.min() ?? 0).description)）⇒ 那一列不占位，会压住文字")
+    }
+
     /// `quickpick-typed` 这张帧**必须是在打字，不是空列表**（R63 / U-99）。
     ///
     /// 为什么单独立一条：第一版这张帧的查询词是我从本轮探针的夹具里抄的"记录 3"，

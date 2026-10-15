@@ -24,13 +24,21 @@ enum EntryPresentation {
             return String(collapsed.prefix(60)) + (headEnd < string.endIndex ? "…" : "")
         case .image(let image):
             return "图片 \(Int(image.nsImage.size.width))×\(Int(image.nsImage.size.height))"
+        // R65 / BACKLOG 94：这里以前写的是 `"📄 \(url.lastPathComponent)"`。三件事一起坏：
+        // ① 它是 Apple Color Emoji 的一张**彩色图**，而这一行文字旁边（侧栏的行首、详情头的
+        //    `photo` / `doc.text`）用的是 SF Symbol —— 同一个"这是文件"在一屏上说两种语言；
+        // ② 它在字符串里，于是**参与搜索匹配**：`QuickPickModel.filtered` 拿整条预览做
+        //    `localizedCaseInsensitiveContains`，打一个 📄 就能把文件行全筛出来（不是功能，是漏的口子）；
+        // ③ 它白吃两个字符的截断预算（预览上限 60 字，文件名因此早两个字被切掉）。
+        // 文件行的图标现在由**行首那一列**给（`QuickPickModel.rowSymbolName` + 浮层的 symbol 列），
+        // 文案只说"是哪一条"。
         case .file(let url):
-            return "📄 \(url.lastPathComponent)"
+            return url.lastPathComponent
         case .files(let urls):
             if let firstURL = urls.first {
-                return "📄 \(firstURL.lastPathComponent) 等 \(urls.count) 个文件"
+                return "\(firstURL.lastPathComponent) 等 \(urls.count) 个文件"
             }
-            return "📄 多个文件"
+            return "多个文件"
         }
     }
 

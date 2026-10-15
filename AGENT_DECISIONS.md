@@ -4164,3 +4164,52 @@ run 38687419144 到 **2/4**。⇒ 红绿灯看不见这件事，而"今天判了
 （动效卷 R11 已补，在屏探针那一步的 `ui.log` 没有 —— BACKLOG 93 还开着）；
 ② `--readings` 在 runner 上是第一次跑，`补回=k` 那个 k 今天只有本机的 316；
 ③ 逐帧看浮层又量出一条产品侧的排版缺陷（BACKLOG 97：标签左轴 35.0pt vs 56.5pt），本轮没动它。
+
+## D-124（R65）：图标是视图，不是文案里的一个字符
+
+**开场读数**（同一把尺、同一套坐标，帧按 2× 换算回 pt）：
+`quickpick-list-420x300-light.png` 里纯文本行的标签从 **34.5–35.0pt** 起，
+文件行的标签从 **56.5–57.5pt** 起，中间那 22pt 是一个 📄 —— 它不是图标视图，
+是 `EntryPresentation.preview(for:)` 返回的那句文案里的**两个字符**。
+
+**决定 1：先把 R63 写下的推广收回来。**
+94 的原话是"侧栏、浮层、详情共用同一条字符串"。读代码的结果：侧栏 `RowTextColumn` 对
+`.file` / `.files` 走 `FileNameText` / `MultiFileTitle`（**不经过** `shortPreview`），
+详情走 `sizeDescription`，菜单栏走 `menuTitle`（自己拼）⇒ **那个 emoji 唯一可见的表面是浮层**。
+"参与搜索匹配"是真的（`QuickPickModel.filtered` 拿整条 `shortPreview` 比）。
+⇒ 又一次"把一处现象推广到三个表面"（U-95 那一族）：**下一轮动手前先读调用点，不读注释**。
+
+**决定 2：图标搬到视图层，文案只说"是哪一条"。**
+`preview` 的三处 `"📄 …"` 去掉；浮层每行一枚 16pt 的 SF Symbol
+（`.text → doc.text`、`.image → photo`、`.file → doc`、`.files → doc.on.doc`），
+`.secondaryLabelColor`、`VisualGlyph.chipSymbol` 字号、`setAccessibilityElement(false)`
+（与侧栏 `ThumbnailSymbol` 的 `.accessibilityHidden` 同一条理由：文字已经说清了，再念一遍符号名是噪音）。
+名字与侧栏 `RowLeadingVisual` 一一对上；`photo` 不是新造的，详情头已经在用。
+**左轴（97）不是单独修的** —— 它是这件事的副产品：每行都有图标 ⇒ 标签只剩一条轴。
+（帧上标签左沿 56.0–57.0pt 那 1pt 的差是字形左侧空距；判据钉的是视图 `minX`，实测散布 **0.00pt**。
+钉像素第一列墨会把字形边距当成缺陷 —— R37 那一族。）
+
+**决定 3：两条"没有它也会静默"的判据必须存在。**
+① `NSImage(systemSymbolName:)` 对**不存在的名字返回 nil**，而 `NSImageView` 拿着 nil
+**什么都不画也不报错** ⇒ 符号名打错一个字母在测试里是全绿、在屏幕上是那一格空了。
+所以有一条判据逐种内容断言 `rowSymbol(for:) != nil && size.width > 0`，
+并且自带正对照（`XCTAssertNil(NSImage(systemSymbolName: "doc.textt"…))`）。
+② 侧栏是 SwiftUI、浮层是 AppKit，两边**没有任何共享常量**，所以"同一套图标语言"这件事
+必须由一条读源码的守卫钉住（M349 改侧栏的名字 ⇒ 那条守卫红）。
+
+**决定 4：emoji 那把尺判的是不变量，不是那三串文案。**
+`testProductWrittenPreviewsCarryNoEmojiGlyphs` 先判"没有按 emoji 呈现的标量"，
+再判逐字文案（顺序是电池教的：反过来的话 M343 那一刀会红在"文案不等于"上，
+证明的就变成"文案钉住了"而不是"那把尺有牙"）。
+用 `isEmojiPresentation` 而不是 `isEmoji`，实测 `©` / `™` / `é` / `↵` 都是 false ——
+误伤的判据会被人关掉。**`.text` 那一支故意不进这条规则**：那是用户自己的正文，本来就可以有 emoji。
+
+**看过、判为不动的两条**：① 浮层不放缩略图（行高 34pt、一行只说一件事，一张彩色缩略图会把
+"我在找哪一条"变成"我在看哪张图"）；② 浮层字号仍是 13pt 而令牌 `VisualFont.row` 是 12 ——
+**这条判断本轮没量过**（侧栏行高没测），所以它作为**待验证**记在 BACKLOG 99，不记成"已排除"。
+
+**代价与边界**：产品 2 个文件（`EntryPresentation.swift`、`QuickPickController.swift`）；
+判据 5 条（4 条在 `EntryPresentationTests`、1 条在捕获卷）；帧 4 张更新（`list`/`typed` × 亮暗），
+其余 **118 张逐字节不变**；电池 **M343–M349 七刀全 CAUGHT**。
+**没解决**：真屏幕上那一列的观感（BACKLOG 95 的通道问题还在，人工批次 65 已开）；
+浮层的字号/行高这套话（99）；浮层没有"滚动后选中在视口外"的那一档（R61 修的是主列表）。

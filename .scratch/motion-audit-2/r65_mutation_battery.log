@@ -1,0 +1,67 @@
+=== 基线（未变异）：五条判据必须先全绿 ===
+   testProductWrittenPreviewsCarryNoEmojiGlyphs   = green
+   testTheEmojiRulerActuallyCatchesAPageGlyph     = green
+   testQuickPickRowSymbolsAreDistinctAndActuallyD = green
+   testOverlaySymbolsAreTheSameNamesTheSidebarUse = green
+   testQuickPickRowsShareOneIconColumnAndOneLabel = green
+
+M343 把 📄 塞回文件那一句预览 ⇒ 必须红在『文案里没有 emoji』那一格（这就是改之前的产品）
+   落地确认（EntryPresentation.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 期望红在=testProductWrittenPreviewsCarryNoEmojiGl
+     红在这一格：XCTAssertFalse failed - 预览里出现了 emoji 图形（📄 report.pdf）⇒ 图标又搬回文案里了：它会参与搜索匹配（打一个图形符号就能筛出整类）、白吃截断预算，还和行首那列 SF Symbol 是两套语言
+     还有：XCTAssertEqual failed: ("📄 report.pdf") is not equal to ("report.pdf") - 这句文案就是浮层那一行的正文，必须逐字对得上
+   还原成功（按内容比对）
+
+M344 把 emoji 那把尺改坏（永远返回 false）⇒ 必须由**正对照那一格**判红，而不是安静地『四句都干净』
+   落地确认（EntryPresentationTests.swift）
+   清掉的旧读数文件：（本来就没有）
+   CAUGHT verdict=red 期望红在=testTheEmojiRulerActuallyCatchesAPageGly
+     红在这一格：XCTAssertTrue failed - 尺坏了：连 📄 都判不出是 emoji ⇒ 上面那条『没有 emoji』是空判据
+   还原成功（按内容比对）
+
+M345 把一个符号名改错一个字母 ⇒ 必须红在『每个名字都画得出东西』那一格（NSImage 对不存在的名字返回 nil，而 NSImageView 静默）
+   落地确认（QuickPickController.swift）
+   清掉的旧读数文件：（本来就没有）
+   CAUGHT verdict=red 期望红在=testQuickPickRowSymbolsAreDistinctAndAct
+     红在这一格：XCTAssertNotNil failed - `doc.textt` 画不出图 ⇒ 这个名字在这个系统上不存在（或拼错了）
+     还有：XCTAssertGreaterThan failed: ("0.0") is not greater than ("0.0") - `doc.textt` 画出了一张零宽的图
+   还原成功（按内容比对）
+
+M346 让文本行与文件行共用同一个符号名 ⇒ 必须红在『四个名字互不相同』那一格（那一列不携带信息，画了等于没画）
+   落地确认（QuickPickController.swift）
+   清掉的旧读数文件：（本来就没有）
+   CAUGHT verdict=red 期望红在=testQuickPickRowSymbolsAreDistinctAndAct
+     红在这一格：XCTAssertEqual failed: ("3") is not equal to ("4") - 四种内容共用一个符号名 ⇒ 那一列不携带任何信息，画了等于没画：["doc", "photo", "doc", "doc.on.doc"]
+   还原成功（按内容比对）
+
+M347 不再给行设置图 ⇒ 必须红在浮层那一格的『每行都有图』上（列在，但空的）
+   落地确认（QuickPickController.swift）
+   清掉的旧读数文件：（本来就没有）
+   CAUGHT verdict=red 期望红在=testQuickPickRowsShareOneIconColumnAndOn
+     红在这一格：XCTAssertEqual failed: ("5") is not equal to ("0") - 5 行的行首没有图 ⇒ 符号名在这台机器上画不出东西（`NSImage(systemSymbolName:)` 对不存在的名字返回 nil，而 NSIma
+   还原成功（按内容比对）
+
+M348 把标签的左锚点从『图标右边』改回『cell 左边』⇒ 必须红在『标签排在图标右边』那一格（这就是 emoji 时代的布局：文字从列首起，图标压住文字）
+   落地确认（QuickPickController.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 期望红在=testQuickPickRowsShareOneIconColumnAndOn
+     红在这一格：XCTAssertLessThan failed: ("39.5") is not less than ("20.0") - 标签没有排在图标**右边**（图标最右 38.5 vs 标签最左 20.0）⇒ 那一列不占位，会压住文字
+   还原成功（按内容比对）
+
+M349 改侧栏的符号名而不动浮层 ⇒ 必须红在『两边同一套名字』那一格（跨文件一致性守卫）
+   落地确认（HistoryRowViews.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 期望红在=testOverlaySymbolsAreTheSameNamesTheSide
+     红在这一格：XCTAssertTrue failed - 侧栏不再用 `doc.on.doc` 了，而浮层还在用 ⇒ 两边又变成两套语言（BACKLOG 94）
+   还原成功（按内容比对）
+
+=== 电池汇总 ===
+  M343: 'CAUGHT'
+  M344: 'CAUGHT'
+  M345: 'CAUGHT'
+  M346: 'CAUGHT'
+  M347: 'CAUGHT'
+  M348: 'CAUGHT'
+  M349: 'CAUGHT'
+  CAUGHT=7 非抓到=0 ⇒ 每一条都红在所指的格上
