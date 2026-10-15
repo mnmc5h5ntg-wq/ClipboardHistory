@@ -1,0 +1,57 @@
+=== 基线（未变异）：这一族用例必须全绿 ===
+   Ran=12 OK=True 红=[]
+
+M465 挂死集合算反（concluded 减 started）⇒ 把跑完的说成挂死、把挂死的说成没事
+   CAUGHT 只红在预期那几条：testDuplicateStartedLinesCountOnce, testHungCaseIsNamed, testNamedExitsZeroAndPrintsMarker, testQuietStillPrintsTheVerdict
+     FAIL: testNamedExitsZeroAndPrintsMarker (test_ui_probe_report.MainExitCodeTests)
+     FAIL: testQuietStillPrintsTheVerdict (test_ui_probe_report.MainExitCodeTests)
+     FAIL: testDuplicateStartedLinesCountOnce (test_ui_probe_report.TruthTableTests)
+   已还原（逐字节相同：True）
+
+M466 日志不完整（有结论没 started）从红改成放行 ⇒ started 差集被成块丢时照样报点名成功
+   CAUGHT 只红在预期那几条：testConcludedWithoutStartIsRed
+     FAIL: testConcludedWithoutStartIsRed (test_ui_probe_report.TruthTableTests)
+   已还原（逐字节相同：True）
+
+M467 不再区分『步骤摘要』与『原始日志』（拿错文件时自信地报产品结论）
+   CAUGHT 只红在预期那几条：testStepEchoIsNotTheRawLog, testUnnamedExitsOne
+     FAIL: testUnnamedExitsOne (test_ui_probe_report.MainExitCodeTests)
+     FAIL: testStepEchoIsNotTheRawLog (test_ui_probe_report.TruthTableTests)
+   已还原（逐字节相同：True）
+
+M468 空日志不再算仪器故障，直接往下走成『一条用例都没开始』
+   CAUGHT 只红在预期那几条：testEmptyLogIsInstrumentFailure
+     FAIL: testEmptyLogIsInstrumentFailure (test_ui_probe_report.TruthTableTests)
+   已还原（逐字节相同：True）
+
+M469 红不落到退出码（CI 那一步就再也拿不到『说不出』这件事）
+   CAUGHT 只红在预期那几条：testUnnamedExitsOne
+     FAIL: testUnnamedExitsOne (test_ui_probe_report.MainExitCodeTests)
+   已还原（逐字节相同：True）
+
+M470 重复的 started 不去重 ⇒ 同一条挂死被报两次，计数也不再可信
+   CAUGHT 只红在预期那几条：testDuplicateStartedLinesCountOnce
+     FAIL: testDuplicateStartedLinesCountOnce (test_ui_probe_report.TruthTableTests)
+   已还原（逐字节相同：True）
+
+M471 `--quiet` 连结论行一起吞 ⇒ 报告型那一步看起来『什么都没发生』
+   CAUGHT 只红在预期那几条：testQuietStillPrintsTheVerdict
+     FAIL: testQuietStillPrintsTheVerdict (test_ui_probe_report.MainExitCodeTests)
+   已还原（逐字节相同：True）
+
+M472 元层：往不冗余守卫读的那支闸门里塞一行真的含 started 的注释 ⇒ 守卫必须红
+   CAUGHT 只红在预期那几条：testGateAndReportAnswerDifferentQuestions
+     FAIL: testGateAndReportAnswerDifferentQuestions (test_ui_probe_report.NonRedundancyTests)
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M465   CAUGHT
+   M466   CAUGHT
+   M467   CAUGHT
+   M468   CAUGHT
+   M469   CAUGHT
+   M470   CAUGHT
+   M471   CAUGHT
+   M472   CAUGHT
+   抓到=8 逃掉=0 没跑成=0 未落地=0 与预期不符=0 量过=0
+BATTERY_EXIT=0

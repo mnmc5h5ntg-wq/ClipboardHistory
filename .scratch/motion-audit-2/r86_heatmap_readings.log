@@ -1,0 +1,6 @@
+HEATMAP_LEGEND_dark y=400 四档=31,47,71 30,62,107 26,81,156 12,108,220（从左到右：少→多）
+HEATMAP_EMPTY_dark 没有记录那一格=41,41,41 背景=30,30,30 ⇒ 与背景的差=11
+HEATMAP_EMPTY_IN_LEGEND_dark=no（图例四档里没有这一色 ⇒ "少"指的是最低一档**非零**）
+HEATMAP_LEGEND_light y=400 四档=215,232,255 180,210,255 130,180,255 59,142,255（从左到右：少→多）
+HEATMAP_EMPTY_light 没有记录那一格=243,243,243 背景=255,255,255 ⇒ 与背景的差=12
+HEATMAP_EMPTY_IN_LEGEND_light=no（图例四档里没有这一色 ⇒ "少"指的是最低一档**非零**）

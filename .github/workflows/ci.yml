@@ -182,6 +182,18 @@ jobs:
           skipped=$(grep -oE 'with [0-9]+ tests? skipped' /tmp/ui.log | tail -1 | grep -oE '[0-9]+' || true)
           done_count=$(grep -cE "Test Case .*(passed|failed|skipped)" /tmp/ui.log || true)
           echo "ui suite exit: $status  executed: ${executed:-0}  skipped: ${skipped:-?}  已下结论的用例: $done_count"
+          # R86 / BACKLOG 92 路 a：**没跑完也要说清是哪一条没跑完**。
+          # 上面那三行只到"整卷没结论"，而"哪一条正在跑时被收掉"这句话一直没人回答
+          # —— 于是这一步顺手把整卷变成了免检牌（R62 记过）。
+          # 这里不需要测试自己打点：`swift test` 的 `Test Case ... started.` 就是打点，
+          # 本机实测（50 秒 kill -9，退出码 137）这些行留在日志里，
+          # started 减去 concluded 正好点名那条（见 .scratch/motion-audit-2/r86_spike_partial_output.md）。
+          # 这一步是报告型 ⇒ 它自己不许静默：报告脚本没跑成时要打一行**有名字**的话，
+          # 不能被 `|| true` 吞成"什么都没发生"（那正是本条要修的病）。
+          # 路径带 `../`：这一步的 working-directory 是 ClipboardHistory，写错会静默失败 ——
+          # 所以下一步（working-directory=. 的硬门）会再跑一遍同一份日志，跑错路径在那里会红。
+          python3 ../scripts/ui_probe_report.py /tmp/ui.log \
+            || echo "UI_PROBE_REPORT_FAILED=1 报告脚本自己没跑成 ⇒ 『挂死在哪条』这句话今天没有依据，不许读成『探针已点名』"
           if [ -z "$executed" ]; then
             echo "没有跑完（看门狗在 240s 收掉了进程）：在屏探针在无头 runner 上不可用，记成 R3-D9 的已知边界"
             exit 0
@@ -202,6 +214,20 @@ jobs:
             --expectations scripts/probe_coverage_expectations.json \
             --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift \
             | tee /tmp/probe-floor.log
+          # R86 / BACKLOG 92 路 a 的**有牙那一半**：登记与"这次为什么没结论"都要过这一关。
+          # 与 `probe_coverage_gate.py` 的分工是刻意的、不冗余：
+          #   · 那一支判"源码里的 11 条有没有登记、这次哪几条没下结论"（**集合级**）；
+          #   · 这一支判"这一卷是**怎么**停的"（**因果级**：挂在哪一条 / 一条都没开始 / 跑完了）。
+          # 只有前者会漏成这样：11 条全登记着、全都没结论、闸门照样绿 —— 那正是 R62 到 R85 的形状。
+          # 报告给不出名字（日志不完整、started 行被成块丢掉）⇒ 红：不许把"我说不出"当成"没事"。
+          # `&& … || …` 而不是直接写命令：这一步是 `bash -e`，非零会当场中止，
+          # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
+          python3 scripts/ui_probe_report.py /tmp/ui.log | tee -a /tmp/probe-floor.log \
+            && report_status=0 || report_status=$?
+          if [ "${report_status:-0}" != "0" ]; then
+            echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"
+            exit 1
+          fi
 
       # 动效审计 MC-8：这道像素闸以前**只在作者本机跑过一次**，而测试文件的注释写着
       # "CI 也取过数" —— 那是注释替事实背书。这一步把它真的接上 CI。

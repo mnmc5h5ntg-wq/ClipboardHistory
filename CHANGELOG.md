@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### CI（R86）
+
+- 新增 `scripts/ui_probe_report.py`：在屏探针那一卷被看门狗收掉时**点名挂死的那条用例**
+  （`Test Case ... started` 与有结论行的差集）。七格真值表 + 退出码；
+  "说不出为什么停"的四种形状（日志不完整 / 喂的是步骤摘要 / 空日志 / 文件读不到）一律红。
+  CI 两步各用一次：报告型那一步打名字，`On-screen probe coverage floor` 那道硬门要求必须有名字。
+- 脚本自测 +12 格（现跑共 155 格）；变异电池 M465–M472（M465、M466、M467、M468、M469、M470、M471、M472）：8 刀 CAUGHT，没有逃掉的。
+
+### Docs（R86）
+
+- BACKLOG 92 与 93 更新（报告器已接，runner 上挂在哪一条等下一次 CI 的读数；预测已先登记）；
+  116 收窄（四遍测量不复现"差 7 条"，捕获那五条其实有名字，剩下的那半句改成交给 R87）。
+
 ### Tests（R85）
 
 - 覆盖地板新增 `loops` 那一层：常驻循环那一族（扫光的运动判据 + 位置判据）第一次进登记表。
