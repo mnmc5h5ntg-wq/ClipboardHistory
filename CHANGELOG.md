@@ -34,6 +34,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 新开：BACKLOG 94（行首 📄 emoji 与 SF Symbol 不是一套语言，且参与搜索匹配）、
   95（在屏像素通道在本机返回"尺寸正确的空图"）、96（本机 `swift test` 会丢一卷测试后半段的 stdout）。
 
+### Tests（R63 的 CI 追加：本轮新写的守卫在 runner 上判了一次假红，同轮改掉）
+- run 38683762166 里 `Capture gate` 红了一条，红的是本轮新写的 `sparseByDesignFixtures` 过期守卫：
+  `quickpick-empty` 本机未绘制 **97.9%**、runner **94.9%**，而门槛 **95.0%** ⇒
+  "这张这次没走豁免分支 ⇒ 名单过期"换一台机器就不成立（整族读数偏移 3pt：85.8→82.1、88.5→85.6）。
+  这正是账本 R38 那条"两台机器的读数不能当另一台机器的地板"，而它是在我写新守卫的同一小时里重犯的。
+- 修法不是放宽门槛：**换成同一次运行内部的兄弟比较**（空结果态必须比 5 行列表态更空 ——
+  本机 2.1% vs 14.2%、runner 5.1% vs 17.9%，两边都成立；"这一格有没有内容"不随 backing scale 漂），
+  并把正对照改成"名单里的帧无论这台机器判不判它稀都必过"。
+- "帧名与内容相符"从像素里拿出来，新写一条产品入口级判据
+  `testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList`（typed 必须 1 ≤ 行 < 全量；
+  实测 all=5 / typed=2 / empty=0）。Swift 测试 773 → **774**，`--build-tests` 0 告警。
+- 同轮第二件：那条守卫的第一版**当场 crash**（`Dictionary(uniqueKeysWithValues:)` 撞上
+  同名帧亮暗各一张 ⇒ `Duplicate values for key`），而我在那行上面刚写完"取更空的那一张来比"的注释。
+  **注释里写对的规则不等于代码里存在的规则。**
+
 ### CI（R62：在屏判据的「缺席」改成逐条点名的硬门 —— 结案 BACKLOG 92）
 - 之前：`On-screen interaction probes` 那一步在 runner 上被自带的 240s 看门狗收掉，
   打一句「在屏探针在无头 runner 上不可用」就 `exit 0`。那句话是真的，

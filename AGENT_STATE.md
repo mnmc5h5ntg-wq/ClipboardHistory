@@ -2307,3 +2307,13 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   新开 BACKLOG 94（📄 emoji 图标）、95（在屏像素通道返回"尺寸正确的空图"）、
   96（本机 `swift test` 丢一卷测试后半段的 stdout ⇒ 动效卷靠 R11 的文件通道活下来，捕获卷没有）。
   自评 **93 / 100**。人工验收新增**批次 63.1–63.4**（这一批是地基：我的像素判据全在离屏通道上）。
+- **R63 的 CI 已读（run 38683762166，job 红在一步）**：红的正是本轮新写的那条守卫 ——
+  `这些帧不再需要「天生就稀」的豁免了：["quickpick-empty"]`，而 runner 的读数是
+  本机 97.9% / runner 94.9% 对上门槛 95.0% ⇒ **假红**，成因与 R38 记过的那条完全相同
+  （一台机器的读数当了另一台的地板）。同轮已改成**同一次运行内的兄弟比较**
+  （empty 2.1% vs list 14.2%；runner 5.1% vs 17.9%）+ 正对照无条件生效
+  + 新写 `testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList`（all=5 / typed=2 / empty=0）。
+  其余步骤：`Build (must be warning-free)` ✓、`Swift tests` ✓、捕获步骤报 **122 帧 / 捕获失效 0**。
+  本机修后：`swift test` **774 / 39 skip / 0 failures**、`--build-tests` **0 告警**、122 帧 `CHANGED=0`。
+  另一件记进工具账：那条守卫第一版**当场 crash**（`Dictionary(uniqueKeysWithValues:)` 撞同名亮暗两张帧），
+  而我在那行上面刚写完"取更空的那一张"的注释 —— **注释里写对的规则不等于代码里存在的规则**。

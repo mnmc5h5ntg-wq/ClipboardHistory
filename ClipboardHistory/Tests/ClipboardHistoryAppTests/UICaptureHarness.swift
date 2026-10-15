@@ -107,14 +107,20 @@ final class UICaptureTests: XCTestCase {
     /// 只有最后一张过不了那条门槛 —— 拿 95% 判它"捕获失效"，是把尺子的假设当成了事实。
     ///
     /// 豁免不许变成"这类帧从此不看"，所以两条各自承重的东西跟着一起进来：
-    ///   · 名单里每一张仍要过一条**正对照**：`drawn > 0.5%`（门槛从读数来：
-    ///     empty 实测 2.13% / 2.26%，而"捕获真的坏了"是 0.0%）—— 稀可以，全空不行；
-    ///   · "该有的东西在不在"不由这里判，由两条产品入口级判据判：
-    ///     `testQuickPickOverlayFillsItsPanelAndCanBeCaptured`（行画得出来）与
-    ///     `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot`（那句话在、且落在那一格）。
-    /// 名单本身由下面那条 `stale` 守卫数住：哪张不再稀了，红着要求拿掉。
-    /// **这条守卫已经挣过一次工资**：`quickpick-typed` 第一版查询词命中 0 条（帧名 typed、内容 empty），
-    /// 换了真命中 2 条的词之后未绘制降到 88.5%，它立刻红着把那张从名单里赶了出去。
+    ///   · 名单里每一张**无论这台机器判不判它稀**，都要过一条正对照：`drawn > 0.5%`
+    ///     （门槛从两台机器的读数来：本机 2.1%、runner 5.1%，而"捕获真的坏了"是 0.0%）——
+    ///     稀可以，全空不行；
+    ///   · "名单过期"由一次运行**内部**的兄弟比较判：空结果态必须明显比 5 行的列表态更空。
+    ///     以前判的是"这张这次没走豁免分支 ⇒ 红"，而它在 runner 上是**假红**
+    ///     （`quickpick-empty` 本机未绘制 97.9%、runner 94.9%，门槛 95.0% ——
+    ///     同一张帧在一台机器上需要豁免、在另一台上不需要）。绝对数会随 backing scale
+    ///     与字体渲染漂移，"这一格有没有内容"不会（R38 那条规矩在我自己新写的守卫上重犯了一次）。
+    ///   · "帧名与内容相符"也不靠像素：`testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList`
+    ///     从产品入口直接数行（typed 必须 1 ≤ 行 < 全量）。第一版 `quickpick-typed`
+    ///     的查询词命中 0 条（帧名 typed、内容 empty）就是被"看图 + 这条兄弟比较"抓到的。
+    /// 而"该有的东西在不在"由两条产品入口级判据判：
+    /// `testQuickPickOverlayFillsItsPanelAndCanBeCaptured`（行画得出来）与
+    /// `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot`（那句话在、且落在那一格）。
     static let sparseByDesignFixtures: Set<String> = ["quickpick-empty"]
 
     /// 上面那份名单的正对照门槛。**只能从读数来**（见上面的实测数），不许拍脑袋。
@@ -310,6 +316,50 @@ final class UICaptureTests: XCTestCase {
                                     + "连两行都放不下。R63 塌的时候这里是 0×0：行有几条都画不出来，"
                                     + "而 stack 的 frame 看着仍然像回事。"
                                     + "（阈值用表自己的 rowHeight，不写 34 这种字面量：那是产品定的，不是判据定的）")
+    }
+
+    /// `quickpick-typed` 这张帧**必须是在打字，不是空列表**（R63 / U-99）。
+    ///
+    /// 为什么单独立一条：第一版这张帧的查询词是我从本轮探针的夹具里抄的"记录 3"，
+    /// 而 harness 这个 store 里根本没有那种文本 ⇒ 帧拍出来是「没有匹配「记录 3」的记录」——
+    /// **一张名字叫 typed、内容是 empty 的帧**。它是被"看图 + 一条兄弟比较"发现的，
+    /// 但那两条都不是每次都能兜住：看图靠人记得看，兄弟比较在 runner 上还会因为
+    /// 两台机器差 3pt 而假红（见 `sparseByDesignFixtures` 的注释）。
+    /// 所以这条从产品入口直接数行，与像素、与 backing scale 都无关。
+    func testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList() throws {
+        _ = NSApplication.shared
+        let store = makePopulatedStore()
+        func rowsFor(_ query: String) -> Int {
+            let build = QuickPickCapturePanel.builder(store: store, query: query)
+            guard let panel = build(), let content = panel.contentView else { return -1 }
+            panel.setFrameOrigin(NSPoint(x: -20008, y: -20008))
+            panel.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            var rows = -1
+            func find(_ view: NSView) {
+                if let table = view as? NSTableView, table.dataSource is QuickPickController {
+                    rows = max(rows, table.numberOfRows)
+                }
+                view.subviews.forEach(find)
+            }
+            find(content)
+            panel.orderOut(nil)
+            return rows
+        }
+        let all = rowsFor("")
+        // 与 `Fixture("quickpick-typed", …)` 里那个查询词**必须一致**：
+        // 改夹具的查询词而不改这里，这条判据就会去判一个今天没人看的状态。
+        let typed = rowsFor("访达")
+        let none = rowsFor("zzz 不存在")
+        print("QUICKPICK_FIXTURE_ROWS all=\(all) typed(访达)=\(typed) empty(zzz 不存在)=\(none)")
+        XCTAssertGreaterThan(all, 0, "全量那一档 0 行 ⇒ 这个 store 建不出候选，三条读数都没有对象")
+        XCTAssertGreaterThan(typed, 0,
+                             "「访达」在夹具 store 里命中 0 条 ⇒ `quickpick-typed` 那张帧拍的是空结果态，"
+                             + "而它的名字说它在打字。换一条真能命中的词（并同步改这条判据）")
+        XCTAssertLessThan(typed, all,
+                          "「访达」命中了全部 \(all) 条 ⇒ typed 与 list 两张帧是同一张，"
+                          + "过滤这件事仍然没有帧可看。换一条只命中一部分的词")
+        XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
     }
 
     /// 空结果那一句的**两条**契约（R63）：它得真的在画（不是停在淡入的起点），
@@ -635,29 +685,53 @@ final class UICaptureTests: XCTestCase {
                                      "\(item.name) 在「天生就稀」的名单里，但它一张都没画出来"
                                      + "（drawn=\(String(format: "%.2f", drawn * 100))%，门槛 "
                                      + "\(String(format: "%.1f", Self.sparseByDesignInkFloor * 100))% 来自本机实测的 "
-                                     + "typed 1.7% / empty 2.1%）⇒ 这不是稀，这是捕获坏了")
-                print("CAPTURE_SPARSE_BY_DESIGN \(item.name) drawn=\(String(format: "%.2f", drawn * 100))%"
-                      + "（浮层没有自绘背景 ⇒ 墨只有字与选中填充；门槛的正对照已过）")
+                                     + "empty 2.1% / runner 5.1%，而\"捕获真的坏了\"是 0.0%）⇒ 这不是稀，这是捕获坏了")
                 exemptedSparse.insert(name)
-                continue
             }
-            XCTFail("\(item.name) 有 \(Int(item.metrics.transparent * 100))% 像素未被绘制，"
-                    + "判定为捕获失效，不能作为视觉验收证据"
-                    + "（这一族的其他帧画得出来 ⇒ 不是机器不行，是这一张不行）")
+            if item.metrics.transparent > 0.95, !Self.sparseByDesignFixtures.contains(name) {
+                XCTFail("\(item.name) 有 \(Int(item.metrics.transparent * 100))% 像素未被绘制，"
+                        + "判定为捕获失效，不能作为视觉验收证据"
+                        + "（这一族的其他帧画得出来 ⇒ 不是机器不行，是这一张不行）")
+            }
         }
 
-        // 豁免不许攒着（与 `materialBlindSpotFixtures` 同一手法，R18 立的规矩）：
-        // 名单里那张这次**拍出来了且不稀** ⇒ 红着要求把它从名单里拿掉。
-        // 只在这张帧真的出现在本次报告里时才判 —— 无头 runner 上有的帧根本不落盘，
-        // 那种"名单里没有对应帧"是环境缺席，不是事实变了（先例：`MATERIAL_BLIND_NOT_RUN`）。
-        let presentNames = Set(report.map { Self.fixtureName(fromFile: $0.name) })
-        let stale = Self.sparseByDesignFixtures
-            .filter { presentNames.contains($0) && !exemptedSparse.contains($0) }
-            .sorted()
-        XCTAssert(stale.isEmpty,
-                  "这些帧不再需要「天生就稀」的豁免了：\(stale) ⇒ 把它们从 "
-                  + "`sparseByDesignFixtures` 里拿掉，并且肉眼审一遍新帧（别只改名单）")
-        print("SPARSE_EXEMPTION 生效 \(exemptedSparse.sorted()) 张，名单共 \(Self.sparseByDesignFixtures.count) 条")
+        // 名单不许攒着 —— 但**判"攒着"的尺必须两台机器都成立**（R38 那条：一台机器的读数
+        // 不能当另一台机器的地板）。R63 第一次上 runner 就是被这条自己写的新守卫判红的：
+        // `quickpick-empty` 本机未绘制 97.9%、runner 94.9%，而门槛是 95.0% ⇒
+        // 同一张帧在一台机器上"需要豁免"、在另一台上"不需要"，
+        // 于是"它这次没走豁免分支 ⇒ 名单过期"这句话在 runner 上是**假红**。
+        // 换成**同一次运行内的兄弟比较**：空结果态必须明显比 5 行的列表态更空。
+        // 这条与 backing scale、与字体渲染的粗细都无关，只与"这一格里有没有内容"有关。
+        // 同名帧亮暗各一张 ⇒ 先按夹具名归并，**取更空的那一张**（保守方向：宁可漏判过期，不可假红）。
+        // （`Dictionary(uniqueKeysWithValues:)` 在这里会当场 crash —— "Duplicate values for key"，
+        // 本机第一遍就是这么死的。归并必须显式写，不能假装一个名字只有一张帧。）
+        var drawnByName: [String: Double] = [:]
+        for item in report {
+            let name = Self.fixtureName(fromFile: item.name)
+            let drawn = 1 - item.metrics.transparent
+            if let existing = drawnByName[name] {
+                drawnByName[name] = min(existing, drawn)
+            } else {
+                drawnByName[name] = drawn
+            }
+        }
+        let sparseControl = ["quickpick-empty": "quickpick-list"]
+        for (entry, control) in sparseControl where Self.sparseByDesignFixtures.contains(entry) {
+            guard let entryDrawn = drawnByName[entry], let controlDrawn = drawnByName[control] else {
+                print("SPARSE_EXEMPTION_NOT_RUN \(entry)/\(control) 这台机器没拍出这两张帧 ⇒ 不判")
+                continue
+            }
+            XCTAssertLessThan(entryDrawn, controlDrawn - 0.03,
+                              "「天生就稀」的 \(entry) 这次只比 \(control) 少画 \(String(format: "%.1f", (controlDrawn - entryDrawn) * 100))%"
+                              + "（\(String(format: "%.1f", entryDrawn * 100))% vs \(String(format: "%.1f", controlDrawn * 100))%）⇒ "
+                              + "那一格大概已经有内容了，把 \(entry) 从 `sparseByDesignFixtures` 拿掉，并肉眼审一遍新帧。"
+                              + "注意这里**不写未绘制的绝对门槛**：本机 97.9% / runner 94.9% 差 3pt，"
+                              + "任何绝对数都会在某台机器上变成假红或免检牌（R38）")
+            print("SPARSE_EXEMPTION_OK \(entry) drawn=\(String(format: "%.1f", entryDrawn * 100))%"
+                  + " < \(control) drawn=\(String(format: "%.1f", controlDrawn * 100))% - 3pt")
+        }
+        print("SPARSE_EXEMPTION 本次真正走了豁免分支的帧 \(exemptedSparse.sorted())，名单共 \(Self.sparseByDesignFixtures.count) 条"
+              + "（走不走由这台机器的未绘制比例决定，**判过期不由它决定**）")
 
         // **材质盲区要能被数出来**（R18）。
         // 名单外的帧冒出黑带 ⇒ 又多了一处"看着拍到了、其实那块是黑的"，先红再说；
