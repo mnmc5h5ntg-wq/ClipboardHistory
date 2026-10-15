@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Docs（R73：那条"门"的假设被自己的读数杀掉了 —— 结案 BACKLOG 105 / U-127 / D-131）
+- 读 R70+R71 的 CI（run 38725116481）：runner 1× 上 `OVERLAY_HOVER_DOOR 药丸内缩@门1/2/4 = **2/2/2px**`、
+  `灰带@门1/4 = 4/5px` ⇒ **不是门**（把 `≥4/255` 降到 `≥1/255`，药丸读数一动没动）
+  ⇒ R69 写在注释里的那条机制假设作废。
+- 反过来看灰带：两档缩放都量得对（1× 理论 5.2 / 实测 4–5；2× 理论 12.0 / 实测 11）
+  ⇒ 坏的是**参照物那一侧的读数**（AppKit 那颗材质药丸的角在 1× 的离屏合成里被吃掉），不是产品也不是尺。
+- 判据的处置一个字没改（`pillInset ≥ 4` 才判这一轴 + `FRAME_CORNER_AXIS_NOT_RUN=1` 点名 + `fillInset ≥ 1` 抓方角），
+  改的是注释里那句话的**身份**：从"假设"换成"量过的结论"，并把被证伪的那条留在原地（划掉式记账，不删）。
+- 同一遍 CI 还确认 R68 那条新闸门按设计工作了：
+  `MOTION_FLOOR_SUITE_RED=1 … testListRowsDoNotAnimateAndNothingClaimsTheyDo：failed - 证人读不出这条淡入的过程，而它连自己都分辨不了`
+  ⇒ 证人不合格时**红着指名**，没有偷偷 skip。
+- BACKLOG **105 结案**：两条候选里"降门复量"这条已死，赎回 1× 那条轴只剩 **103**（换捕获对象）。
+- 全量 **788 / 38 skip / 0 failures**、`FRAME_BASELINE_COMPARED=124 CHANGED=0`、编译告警 0、脚本测试 139 OK。
+  **产品 0 个文件** ⇒ 本机仍是 R71 装的 `c03cf278d3a4dd98…`。
+
 ### Tests（R72：我上一轮给证人写的解释被这一轮的读数证伪 —— 结案 BACKLOG 104 / U-124…U-126 / D-130）
 - 读 R68+R69 的 CI（run 38723020548）三件事同时发生：
   ① 证人 `采样≈81ms`（R66 是 80ms）而面积已小 **12.6 倍** ⇒ **R68 那句"面积决定证人采得粗"是错的**，
