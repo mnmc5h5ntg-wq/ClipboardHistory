@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R87）
+
+- 扫光那一族的**定罪权**改了：`loopAdjudication` 新增 `travel` 入参（由 `travelEvidence` 从位置尺现算，
+  只看可用帧数与行程），coverage 说"没在动"而位置尺说"走过整幅"时改判
+  `notRunRulerBlind` —— 点名 `loop-coverage-contradicted-by-travel`，不红也不绿。
+  真值表 +3 格方向钉子（位置尺说没走过 / 没读数时仍然红；产品在动时行程不许翻案），
+  另加两条断言钉住"两支 not-run 的理由不许同名"。
+- 登记表 `loops` 那一节新增该理由；闸门自测 +2 格（登记过的矛盾不红、只差一个词的名字必须红）。
+  脚本自测现跑 155 格。
+- 变异电池 M473–M480（M473、M474、M475、M476、M477、M478、M479、M480）：8 刀 CAUGHT，没有逃掉的（M475 / M476 第一版 NOT-RUN 是变异文自己写了 `#` 注释、Swift 编译不过 —— 见台账 U-186）。
+
+### Docs（R87）
+
+- BACKLOG 119 更新（第四遍读数 + 处置改了但分布宽度仍未写成数据）；
+  93 更新（第一个读数推翻了一半预测，`started=0` 两种成因待分）；新开 **120**（位置判据仍被 coverage 关着）。
+  新开 **121**（脚本自测的地板是静态数，而 `-s scripts` 那种抄错的命令打印 `Ran 0 tests / OK` —— 台账八处命令标签本轮已改对）。
+
 ### CI（R86）
 
 - 新增 `scripts/ui_probe_report.py`：在屏探针那一卷被看门狗收掉时**点名挂死的那条用例**

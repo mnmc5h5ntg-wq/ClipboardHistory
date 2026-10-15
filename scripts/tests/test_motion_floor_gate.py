@@ -281,6 +281,25 @@ class MotionFloorGateTests(unittest.TestCase):
         self.assertFalse(any(red for m, red in red_named if m.startswith("MOTION_FLOOR_LOOP")),
                          "循环那一族自己不许把同一个产品红报两次：SUITE_RED 那一层已经有名字、有 XCTAssert 原文")
 
+        # R87：新那一种坏法（coverage 说"没在动"、位置尺说"亮带走完了整幅"）必须**登记过才不红**。
+        # 这一格同时钉两头：判据改了名字而登记表没改 ⇒ BAD_REASON 红；两边都改 ⇒ 一行看得见的未覆盖。
+        # 它读的是**真**的 `motion_floor_expectations.json`（上面几格也是），所以 JSON 里删掉那一行
+        # 会立刻红在这里 —— 这就是 M479 那一刀的牙。
+        contradicted = markers(parse(log(base, loops=[
+            "MOTION_SHIMMER_STATE 判定=notRunEnvironment 原因=loop-coverage-contradicted-by-travel",
+            "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-"])))
+        self.assertIn("MOTION_FLOOR_LOOP_NOT_JUDGED=skeleton-loop=loop-coverage-contradicted-by-travel",
+                      [m for m, _ in contradicted])
+        self.assertFalse(any(red for m, red in contradicted if m.startswith("MOTION_FLOOR_LOOP")),
+                         "登记过的『两把尺互相矛盾』不许红 —— 那是尺的账，不是产品的罪")
+        near_miss = markers(parse(log(base, loops=[
+            "MOTION_SHIMMER_STATE 判定=notRunEnvironment 原因=loop-coverage-contradicted-by-speed",
+            "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-"])))
+        self.assertIn("MOTION_FLOOR_LOOP_BAD_REASON=skeleton-loop", [m for m, _ in near_miss])
+        self.assertTrue(dict(near_miss)["MOTION_FLOOR_LOOP_BAD_REASON=skeleton-loop"],
+                        "只差一个词的名字不许自动放行：前缀匹配只放过**括号里**那半截细节，"
+                        "不放过括号外换了的那个词")
+
     def testRealLocalLogIsRedUnderTheTightenedRegistry(self):
         """本机那份真日志（R46 抓的，带捕获之前）今天**必须红，而且只红在地板 + 一条没名字的红上**。
 

@@ -670,13 +670,50 @@ final class MotionFilmstripTests: XCTestCase {
         /// 连高对比的粗节拍证人整卷都没拍到任何变化 ⇒ 证人自己坏了，必须红
         /// （否则上面那一支"环境"永远有人签字）。
         case witnessDead
+        /// R87：**coverage 这把尺说"没在动"，而位置那把尺在同一份卷子上量到亮带走过了整幅**。
+        /// 两者支撑的样本数差一个量级（runner 三遍、同一份产品代码：可用帧 11 / 12 / 12，
+        /// 而变化帧对只有 2 / 2 / 1），所以这一格**不许**判产品红，也不许判绿 ——
+        /// 它是"这把尺今天吃采样网格"，点名成一条有名字的未覆盖
+        /// （`loop-coverage-contradicted-by-travel`）。
+        case notRunRulerBlind
+    }
+
+    /// 亮带**走过多少 pt** —— 位置那把尺给的、不吃采样网格的运动证据（R87）。
+    ///
+    /// 为什么需要第三种证据：coverage 数的是"相邻帧对的差有没有跨过台阶"，
+    /// 而在一台 ~100ms 采样的机器上，2.5 秒一卷只有 22 对，亮带 30Hz 走完整幅时
+    /// **相邻两帧常常长得一样**（要走完一根条才跨一次台阶）⇒ 它的支撑是 1–2 个样本。
+    /// 位置尺问的是另一个问题："这一帧亮斑在第几列"，只要一根条上有可用帧就能答，
+    /// 于是同一卷上它有 11–12 个样本。三遍 runner 读数：
+    /// coverage 0.522 / 0.842 / **0.032**，而行程 109pt / 134pt / **134pt** ——
+    /// 前者能在同一份代码上翻 26 倍并把产品判红（run 38811457259），后者说"亮带一路走完了整幅"。
+    enum TravelEvidence: Equatable {
+        /// 亮带走过 `sweepTravelFloorPoints` ⇒ 它**在动**，这是位置证据。
+        case sweeping
+        /// 有足够可用帧、但亮带没走过（钉在一处）⇒ 这是"没在动"的位置证据，可以签字判红。
+        case notSweeping
+        /// 可用帧不够 ⇒ 这一格今天没有读数，不许拿它替谁签字。
+        case unreadable
+    }
+
+    /// 位置读数 → 行程证据。**只看帧数与行程两个量，不看 `verdict`**：
+    /// `.notJudged` 同时盖住"散布分不开"与"没走过"两种情况，
+    /// 拿它当"没在动"会把前者误判成后者（R84 真值表里那三格就是为此存在的）。
+    static func travelEvidence(_ reading: BandReading) -> TravelEvidence {
+        guard reading.framesUsed >= minimumBandFrames else { return .unreadable }
+        return reading.travelPoints >= sweepTravelFloorPoints ? .sweeping : .notSweeping
     }
 
     static func loopAdjudication(product: LoopVerdict,
                                  rateWitness: LoopVerdict,
-                                 coarseWitness: LoopVerdict) -> LoopAdjudication {
+                                 coarseWitness: LoopVerdict,
+                                 travel: TravelEvidence = .unreadable) -> LoopAdjudication {
         if product == .looping { return .ok }
         if coarseWitness == .notMoving { return .witnessDead }
+        // R87：先问"有没有一份**样本更多**的尺在说反话"。行程说亮带走完了整幅，
+        // 那 coverage 的低读数就是这把尺自己的分辨率问题 —— 判红等于让一把 1–2 样本的尺
+        // 去否决一把 11–12 样本的尺（BACKLOG 110 那一族：单样本统计会在判到/判不到之间翻脸）。
+        if travel == .sweeping { return .notRunRulerBlind }
         return rateWitness == .looping ? .productRed : .notRunEnvironment
     }
 
@@ -1776,8 +1813,59 @@ final class MotionFilmstripTests: XCTestCase {
                        "等节拍证人整卷没拍到东西时，不许判产品红：它瞎了不代表产品没动")
         XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping, coarseWitness: .notMoving), .witnessDead,
                        "连高对比、粗节拍那颗都没拍到任何变化时，不许走『环境看不见』那一支 —— 那是一张空支票（R68 那一族）")
+        // ⑧ R87：**位置尺的行程**能不能替产品说话。三格一起钉，因为"能不能签"取决于
+        //    它是哪一种"没在动"：走过整幅 / 有可用帧但没走过 / 根本没有可用帧。
+        //    这一族是读 R86 的 CI 读出来的（run 38811457259）：同一份产品代码、同一台机器类别，
+        //    coverage 三遍 0.522 / 0.842 / **0.032**，而行程三遍 109pt / 134pt / **134pt**。
+        //    第三遍它把产品判成了红，而位置尺在同一卷上有 12 个可用帧在说"亮带走完了整幅"。
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping,
+                                             coarseWitness: .looping, travel: .sweeping), .notRunRulerBlind,
+                       "位置尺在同一卷上量到亮带走过了整幅，而 coverage 只靠 1–2 个变化帧对撑着 ⇒ "
+                           + "这时判产品红就是让样本少的那把尺否决样本多的那把尺。"
+                           + "这一支既不红也不绿：它点名成一条有名字的未覆盖")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping,
+                                             coarseWitness: .looping, travel: .notSweeping), .productRed,
+                       "位置尺也说亮带**没走过**（有可用帧，行程不够）⇒ 红不许被悄悄放宽："
+                           + "两把尺一起说没在动时，『coverage 吃采样网格』这个借口就不成立了")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping,
+                                             coarseWitness: .looping, travel: .unreadable), .productRed,
+                       "位置尺今天没有读数（可用帧不够）⇒ 不许把它当成『它在动』的免检牌，"
+                           + "红仍然由等节拍那颗证人签 —— 新那一格只放行**有证据的**矛盾")
+        // 方向钉子（谓词不许恒真）：产品在动就是绿，`travel` 说什么都不能改判；
+        // 而"签字的人没来上班"（粗节拍那颗整卷没拍到东西）仍然优先于行程证据 ——
+        // 一把坏掉的尺量出"走过 134pt"不是证据。
+        XCTAssertEqual(Self.loopAdjudication(product: .looping, rateWitness: .notMoving,
+                                             coarseWitness: .notMoving, travel: .notSweeping), .ok,
+                       "产品自己一直在动时，行程那一格不许反过来把它判掉 ⇒ 新那一支只在 "
+                           + "`product != .looping` 时才有资格说话（绿不需要借口）")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping,
+                                             coarseWitness: .notMoving, travel: .sweeping), .witnessDead,
+                       "粗节拍那颗整卷什么都没拍到 ⇒ 先红在证人，而不是让行程替『尺没坏』背书")
+        // `travelEvidence` 自己的三格：它读的是**帧数与行程**，不是 `verdict`。
+        XCTAssertEqual(Self.travelEvidence(BandReading(verdict: .oneBand, reason: "对照", framesUsed: 12,
+                                                       travelPoints: 134)), .sweeping,
+                       "runner 那一卷的真实形状（可用帧 12、行程 134pt）必须读成 sweeping，"
+                           + "否则上面那三格全是纸上的")
+        XCTAssertEqual(Self.travelEvidence(BandReading(verdict: .notJudged, reason: "对照", framesUsed: 8,
+                                                       travelPoints: 4)), .notSweeping,
+                       "有可用帧却只走了 4pt ⇒ 这是『没在动』的位置证据，不许被 `.notJudged` 这个"
+                           + "笼统的判定吞成『没有读数』（那是另一种坏法，会白放行红）")
+        XCTAssertEqual(Self.travelEvidence(BandReading(verdict: .noFrames, reason: "对照", framesUsed: 2,
+                                                       travelPoints: 0)), .unreadable,
+                       "可用帧不够（<3）就没有行程证据 ⇒ 它不许替任何一方签字")
+
+        // ⑨ 两种 not-run **不许共用一个名字**（R87）：登记表的 `BAD_REASON` 那一格只比名字，
+        //    而"机器带不动那一档节拍"与"coverage 这把尺吃采样网格"是两种不同的坏法 ——
+        //    借名字等于让新那一种沿用旧那一格的免检牌，登记表从此看不出多了一种病。
+        XCTAssertNotEqual(Self.loopStateReason(.notRunEnvironment),
+                          Self.loopStateReason(.notRunRulerBlind),
+                          "两支 not-run 共用一个理由名 ⇒ 登记表分不清是哪一种坏法（U-162 的反面："
+                              + "同一个词在两个判据里含义不同就别统一成一个名字）")
+        XCTAssertEqual(Self.loopStateReason(.notRunRulerBlind), "loop-coverage-contradicted-by-travel",
+                       "这个名字已经写进 `motion_floor_expectations.json` 的 `loops` 那一节；"
+                           + "改了这里不改那里，CI 会红在 BAD_REASON —— 两条都改，或者都别改")
         emit("LOOP_TRUTH_TABLE 均匀=looping 跳变=oneShot 两档采样=同判定 空=notMoving 头尾=同 coverage "
-            + "时刻少一根/多一根=notMoving 处置=5 格 前提=静止卷仍有卷长（与结论尺的 0 不同）")
+            + "时刻少一根/多一根=notMoving 处置=8 格（含 R87 的行程三格） 前提=静止卷仍有卷长（与结论尺的 0 不同）")
     }
 
     /// R82：等节拍那颗证人**必须仍然等于产品那几颗数** —— 它写死在测试里（不能被被告牵着改），
@@ -4706,6 +4794,16 @@ final class MotionFilmstripTests: XCTestCase {
                 + "粗节拍证人 coverage=\(String(format: "%.3f", coarseWitness.coverage)) ⇒ "
                 + "这台机器今天带不动产品那一档节拍的常驻循环，"
                 + "这一条不能推成『产品的扫光没跑』，也不能推成『它跑了』（本机 2× 那一遍 coverage 0.98 才是判它的那台机器）")
+        case .notRunRulerBlind:
+            // 不红，也不许悄悄当绿：这是一朵**有名字的**未覆盖（登记表 `loops` 那一节读它）。
+            emit("MOTION_NOT_RUN=loop-coverage-contradicted-by-travel 产品 coverage="
+                + "\(String(format: "%.3f", shape.coverage))（\(shape.changingPairs)/\(shape.pairs) 对在变）、"
+                + "等节拍证人 coverage=\(String(format: "%.3f", rateWitness.coverage))、"
+                + "粗节拍证人 coverage=\(String(format: "%.3f", coarseWitness.coverage))，"
+                + "而**同一卷上位置那把尺量到亮带走过了整幅**（可用帧与行程在 MOTION_SHIMMER_BAND 那一行）⇒ "
+                + "两把尺对『亮带在不在走』给出相反答案时，签字的是样本多的那一个："
+                + "coverage 在这台机器上只有 1–2 个变化帧对撑着，而位置尺有 11–12 个可用帧。"
+                + "这一格既不判产品红、也不判绿 —— 它记的是 coverage 这把尺的分辨率账（BACKLOG 119 / 110）")
         case .witnessDead:
             XCTFail("连**高对比、粗节拍**那颗证人整卷都没拍到任何变化（峰值 \(String(format: "%.4f", coarseWitness.peak))）⇒ "
                     + "给『环境看不见』签字的那个人今天没来上班。这条必须红：否则 .notRunEnvironment 那一支"
@@ -5203,12 +5301,25 @@ final class MotionFilmstripTests: XCTestCase {
     /// 两条判据共用一个处置，是因为它们共用同一个前提：**这台机器今天看得见这一臂在动**。
     /// 写成一颗函数而不是各自算一遍，是为了不让"coverage 那条"与"位置那条"算出两个答案
     /// （R58 那一课：同一件事两份实现迟早分家）。
+    /// 产品那一卷的**行程证据**（R87）：位置尺在同一卷上有 11–12 个可用帧，
+    /// 而 coverage 只有 1–2 个变化帧对 —— 两个量对同一件事给出相反答案时，
+    /// 签字的必须是样本多的那一个（`loopAdjudication` 里那一格）。
+    /// 这里重算一遍位置尺是**有意的**：`shimmerFilm()` 是缓存的同一卷，
+    /// 而位置判据那条测试里算出的数与这里必须一模一样（两句话读同一卷，R84 立的规矩）。
+    static func shimmerTravel() -> TravelEvidence {
+        let film = shimmerFilm()
+        let measured = bandFrames(film.frames.map(Self.raster), viewWidthPoints: skeletonViewWidthPoints)
+        return travelEvidence(bandReading(frames: measured.accepted,
+                                          widths: barWidthPoints(viewWidthPoints: skeletonViewWidthPoints)))
+    }
+
     static func shimmerDisposition() -> LoopAdjudication {
         let film = shimmerFilm()
         return loopAdjudication(product: loopShape(fractions: deltas(film.frames),
                                                    stamps: film.stamps).verdict,
                                 rateWitness: loopWitness(.gradientAtProductRate).verdict,
-                                coarseWitness: loopWitness(.gradient).verdict)
+                                coarseWitness: loopWitness(.gradient).verdict,
+                                travel: shimmerTravel())
     }
 
     /// 状态行的两种取值。**名字要稳定**：`motion_floor_expectations.json` 的 `loops` 那一节
@@ -5217,7 +5328,7 @@ final class MotionFilmstripTests: XCTestCase {
         switch disposition {
         case .ok: return "ok"
         case .productRed: return "productRed"
-        case .notRunEnvironment: return "notRunEnvironment"
+        case .notRunEnvironment, .notRunRulerBlind: return "notRunEnvironment"
         case .witnessDead: return "witnessDead"
         }
     }
@@ -5236,6 +5347,10 @@ final class MotionFilmstripTests: XCTestCase {
         switch disposition {
         case .ok, .productRed: return "-"
         case .notRunEnvironment: return "loop-clock-not-sustainable-at-product-rate"
+        // R87：这一支的理由**不许**借用上面那个名字。"机器带不动那一档节拍"与
+        // "coverage 这把尺在这台机器上吃采样网格、而位置尺说亮带在走"是两种坏法；
+        // 并成一个名字，登记表就分不清哪一格该被修（`BAD_REASON` 那一格会红，是刻意的）。
+        case .notRunRulerBlind: return "loop-coverage-contradicted-by-travel"
         case .witnessDead: return "loop-witness-dead"
         }
     }

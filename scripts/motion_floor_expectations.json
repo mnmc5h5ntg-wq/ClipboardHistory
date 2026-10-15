@@ -77,9 +77,10 @@
       "allowed_not_judged": [
         "capability-gate",
         "loop-clock-not-sustainable-at-product-rate",
+        "loop-coverage-contradicted-by-travel",
         "loop-witness-dead"
       ],
-      "note": "R85 / BACKLOG 118：常驻循环那一族第一次进登记表。扫光不是四条场景臂之一，于是 R83 之后它的状态是『本机判、runner 点名 loop-clock-not-sustainable-at-product-rate』，而覆盖地板既不数它也不许它缺席 —— 它红的时候走 SUITE_RED，它整行消失的时候没人知道今天判没判。这一格的判据只有两条（118 原文）：点名在登记之内 ⇒ 不红但打一行有名字的未覆盖；整行缺席 ⇒ LOOP_SILENT 红。允许的理由三种：capability-gate（能力闸门 skip 掉了这条判据）、loop-clock-not-sustainable-at-product-rate（这台机器带不动那一档节拍的常驻循环，R82 的 CI 实测）、loop-witness-dead（连高对比那颗证人都没拍到东西在动 ⇒ 签字的人没来上班，这一支同时会让用例红）。R84 的 CI（run 38798408040）第一次在这一族读到 判定=ok（产品 coverage 0.522、证人 0.594，地板 0.50）⇒ 三遍 runner 读数 0.000 / 0.050 / 0.522 的跳变发生在**亮带画法换掉**之后，所以 119 那朵『处置翻面』现在有了第三种解释：旧的 fan-out 画法每拍扫过的面积太小，在 112ms 的采样网格 + 1× 像素上跨不过 8/255 那道地板。登记不改成 must_judge=true：0.522 只比地板高 0.022，一遍读数就把它钉成硬门是 R38 禁止的那种拿当日运气当地板。"
+      "note": "R85 / BACKLOG 118：常驻循环那一族第一次进登记表。扫光不是四条场景臂之一，于是 R83 之后它的状态是『本机判、runner 点名 loop-clock-not-sustainable-at-product-rate』，而覆盖地板既不数它也不许它缺席 —— 它红的时候走 SUITE_RED，它整行消失的时候没人知道今天判没判。这一格的判据只有两条（118 原文）：点名在登记之内 ⇒ 不红但打一行有名字的未覆盖；整行缺席 ⇒ LOOP_SILENT 红。允许的理由三种：capability-gate（能力闸门 skip 掉了这条判据）、loop-clock-not-sustainable-at-product-rate（这台机器带不动那一档节拍的常驻循环，R82 的 CI 实测）、loop-witness-dead（连高对比那颗证人都没拍到东西在动 ⇒ 签字的人没来上班，这一支同时会让用例红）。R84 的 CI（run 38798408040）第一次在这一族读到 判定=ok（产品 coverage 0.522、证人 0.594，地板 0.50）⇒ 三遍 runner 读数 0.000 / 0.050 / 0.522 的跳变发生在**亮带画法换掉**之后，所以 119 那朵『处置翻面』现在有了第三种解释：旧的 fan-out 画法每拍扫过的面积太小，在 112ms 的采样网格 + 1× 像素上跨不过 8/255 那道地板。登记不改成 must_judge=true：0.522 只比地板高 0.022，一遍读数就把它钉成硬门是 R38 禁止的那种拿当日运气当地板。R87 补第四遍读数与第四个理由（run 38811457259）：同一份产品代码，coverage 三遍 0.522 / 0.842 / **0.032**，而位置尺在同一卷上量到的行程是 109pt / 134pt / **134pt**（可用帧 11 / 12 / 12）。第三遍 coverage 把产品判成红，而样本多 6 倍的那把尺说亮带走完了整幅 ⇒ 新增 loop-coverage-contradicted-by-travel：两把尺对『亮带在不在走』给出相反答案时，签字的是样本多的那一个，coverage 那一格点名成有名字的未覆盖（既不红也不绿）。它**不**借用 loop-clock-not-sustainable-at-product-rate —— 那句话说的是机器带不动，而这里机器带得动，是这把尺吃采样网格（BACKLOG 110 那一族：单样本统计会在判到/判不到之间翻脸）。"
     },
     {
       "name": "skeleton-band-position",

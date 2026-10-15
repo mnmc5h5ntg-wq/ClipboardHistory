@@ -5282,7 +5282,7 @@ swift test（全量）                        Executed 795 tests, 38 skipped, 0 
 swift test --filter UICaptureTests        passed=42 skipped=4 failed=0
 ci_capture_gate.py --readings             CAPTURE_GATE_RESULT=ok 红=0  NOT_RUN=2（都是 RING 那一档）
 frame_baseline.py check --against working COMPARED=124 CHANGED=0 MISSING=0 ADDED=0
-python3 -m unittest discover -s scripts   exit 0（140 OK）
+python3 -m unittest discover -s scripts/tests   exit 0（140 OK）
 变异电池 M423–M433                        抓到=11 逃掉=0 没跑成=0 未落地=0
 curve_from_ledger.py                      PHASE2 n=73 rounds=9..80 mean=92.42（含新的标题审计）
 ```
@@ -5392,7 +5392,7 @@ swift build --build-tests                告警 0
 swift test（全量）                       Executed 796 tests, 38 skipped, 0 failures
 swift test --filter UICaptureTests       捕获闸门 CAPTURE_GATE_RESULT=ok 红=0 NOT_RUN=2（都是 RING）
 frame_baseline.py check --against working COMPARED=124 CHANGED=0 MISSING=0 ADDED=0
-python3 -m unittest discover -s scripts  exit 0
+python3 -m unittest discover -s scripts/tests  exit 0
 并发锤击 M434–M436                       3/3 CAUGHT（两刀以崩溃的形式、一刀以红）
 读数文件里 QUICKPICK_FOCUS_INK 行数      2（亮/暗各一，**没有一行被缝掉**）
 ```
@@ -5608,7 +5608,7 @@ swift test（全量）                       799 tests / 0 failures（40 skipped
 动效那一步                               MOTION_FLOOR_FACTS judged=4/4 executed=52 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=12 notice-banner-dismiss=11 红的用例=- 汇总行报红=0 MOTION_FLOOR_REDS=0MOTION_GATE_EXIT=0
 捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
 frame_baseline.py check --against working COMPARED=124 CHANGED=0 MISSING=0 ADDED=0（against working）
-python3 -m unittest discover -s scripts  Ran 140 tests in 7.023s OK PY_EXIT=0
+python3 -m unittest discover -s scripts/tests  Ran 140 tests in 7.023s OK PY_EXIT=0
 自评曲线                                 PHASE2 n=75、rounds=9..82、均值 92.45、最低 86、最高 96、GAPS=none、SCORES_BY_ROUND 79=93 80=93 81=93 82=94
 扫光那条第一次有的条带图                  .scratch/motion-audit-2/r82_skeleton_sweep_strip.png（24 帧 / 六列）
 全量 skipped（同一提交两遍 + 本轮，见 U-159）  38 / 45 / 40 —— 一个会抖的数，不许写成常量
@@ -5767,7 +5767,7 @@ swift test（全量）                       799 tests / 0 failures（40 skipped
 动效那一步                               MOTION_FLOOR_FACTS judged=4/4 executed=52 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=12 notice-banner-dismiss=12 红的用例=- 汇总行报红=0 MOTION_FLOOR_REDS=0CAPTURE_TEST_EXIT=0
 捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
 frame_baseline.py check --against working FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0PY_EXIT=0
-python3 -m unittest discover -s scripts  Ran 142 tests in 6.807s OK
+python3 -m unittest discover -s scripts/tests  Ran 142 tests in 6.807s OK
 ```
 
 本轮三卷的读数（本机 2×，全量那一遍）：
@@ -6011,7 +6011,7 @@ swift test（全量）                       801 tests / 0 failures（41 skipped
 捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
 frame_baseline.py check --against working FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
 frame_baseline.py update（同提交）之后复核 FRAME_BASELINE=FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
-python3 -m unittest discover -s scripts  Ran 142 tests in 6.581s OK
+python3 -m unittest discover -s scripts/tests  Ran 142 tests in 6.581s OK
 ```
 
 ### 帧基线那 4 张：哈希说"变了"，像素说"没变到看得见"（两句都要报）
@@ -6232,7 +6232,7 @@ swift test（全量）                       801 tests / 0 failures（41 skipped
 动效覆盖地板闸门（含 loops 那一层）        MOTION_FLOOR_FACTS judged=4/4 executed=54 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=10 notice-banner-dismiss=13 红的用例=- 汇总行报红=0 MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_REDS=0 MOTION_GATE_EXIT=0
 捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
 frame_baseline.py check --against working FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
-python3 -m unittest discover -s scripts  Ran 143 tests in 6.717s OK
+python3 -m unittest discover -s scripts/tests  Ran 143 tests in 6.717s OK
 ```
 
 ### 七维自评
@@ -6494,7 +6494,7 @@ swift test（全量）                       801 tests / 0 failures（41 skipped
 动效覆盖地板闸门（含 loops 那一层）        MOTION_FLOOR_FACTS judged=4/4 executed=54 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=13 notice-banner-dismiss=12 红的用例=- 汇总行报红=0 MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_REDS=0 MOTION_GATE_EXIT=0
 捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
 frame_baseline.py check --against working FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
-python3 -m unittest discover -s scripts  Ran 155 tests in 6.837s OK
+python3 -m unittest discover -s scripts/tests  Ran 155 tests in 6.837s OK
 ui_probe_report.py（真日志两格）          见上面那段
 ```
 
@@ -6523,3 +6523,210 @@ ui_probe_report.py（真日志两格）          见上面那段
 - BACKLOG **119**（第四个数据点，仍开着）：新画法两遍 coverage 跨度 0.32 ⇒ 要的是分布宽度。
 - **115**、**111**、108 余下、77 路 b、101 ②③、106；
   真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.1 / 72.2 / 73.1 / 73.2。
+
+## Round 87 · 两把尺矛盾时谁签字：coverage 不再能单独把扫光判红（修 main 那朵红 / 更新 119、93 / 新开 120 / U-183…U-186 / D-145）
+
+### 本轮开场的位点清单（0 个产品文件；3 个判据/登记表/自测文件）
+
+本轮的起点是 **main 红了**（R86 的 CI，run 38811457259，`Motion coverage floor` 那一步）。
+红得有名字，但名字说的是"产品没在跑"，而同一卷上另一把尺说亮带走完了整幅 ——
+被重新判断的是**定罪权该给谁**。
+
+| 位点 | 位置 | R86 留下的缺陷 | 本轮处置 |
+|---|---|---|---|
+| 扫光运动判据 | `MotionFilmstripTests.loopAdjudication` | coverage（1–2 个变化帧对）能单独判产品红 | 新增 `travel` 入参：位置尺说"走过整幅"时改判**有名字的未覆盖** |
+| 行程证据 | 同类新增 `travelEvidence(_:)` | 位置读数只用来判"是不是整组一条带"，没参与"在不在动" | 只看**可用帧数与行程**两个量，不看笼统的 `verdict` |
+| 登记表 | `scripts/motion_floor_expectations.json` | 没有这种坏法的名字 | 新增 `loop-coverage-contradicted-by-travel`，理由不许借用旧名字 |
+| 闸门自测 | `scripts/tests/test_motion_floor_gate.py` | 新名字两边不同步没人管 | +2 格：登记过的矛盾不红；只差一个词的名字必须红 |
+
+本轮动的非台账文件 **3 个**（约定 ≤4）。0 个产品文件 ——
+红不是产品的回归造成的（R84 之后产品一行没改），是判据的定罪权放错了地方。
+
+# R87 读 R86 的 CI（run 38811457259 · #235 · commit f18c52b · 21:38:55→21:53 · build-and-test = **failure**）
+
+失败的步骤是 **`Motion coverage floor`**（不是我本轮新接的那道 UI 硬门）。两件事同时发生：
+
+1. 常驻循环那一族在 runner 上**把产品判成了红**（第三遍），而位置尺在同一卷上说亮带走完了整幅；
+2. 在屏那一卷的停机**第一次有了名字** —— 而那个名字把 BACKLOG 93 的预测推翻了一半。
+
+## 1. coverage 与行程：同一份产品代码，两把尺给相反答案
+
+```
+MOTION_SHIMMER 扫 帧数=23 变化帧对=1 峰值=0.028 采样≈98ms coverage=0.032(地板 0.50) 记录时长=2324ms 判定=只动了一下
+MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12，与产品同数字) 帧对=25 在变=6 峰值=0.028 coverage=0.671 判定=一直在动
+MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45) 帧对=31 在变=23 峰值=0.040 coverage=1.000 判定=一直在动
+MOTION_SHIMMER_BAND 帧=23 比例=1pt≈1.00px 可用帧=12 丢掉=11 同帧绝对中心最大散布=1.0pt 归一化散布=0.450 行程=134.0pt 判定=整组一条带
+MOTION_SHIMMER_BAND_SAMPLE 可用帧首=[21.0, 21.0, 21.0] 末=[155.0, 155.0, 155.0]
+MOTION_SHIMMER_STATE 判定=productRed 原因=-
+MOTION_SHIMMER_BAND_STATE 判定=notRunEnvironment 原因=loop-not-capable
+MOTION_FLOOR_SUITE_RED=1 … 红的用例=testSkeletonSweepActuallySweeps
+MOTION_FLOOR_LOOP_RED_NAMED=skeleton-loop=productRed
+MOTION_FLOOR_LOOP_NOT_JUDGED=skeleton-band-position=loop-not-capable
+MOTION_FLOOR_REDS=1
+```
+
+**四遍读数并排（R84 换画法之后，产品代码一行没改；最后一行是本轮 R87 的全量验证那一遍）**：
+
+| run | 帧数 | 变化帧对 | coverage | 可用帧 | 行程 | 处置 |
+|---|---|---|---|---|---|---|
+| 38798408040 (R84) | 24 | 2 | 0.522 | 11 | 109.0pt | ok |
+| 38805382593 (R85) | 22 | 2 | 0.842 | 12 | 134.0pt | ok |
+| 38811457259 (R86) | 23 | **1** | **0.032** | 12 | **134.0pt** | **productRed（CI 红）** |
+| 本机 R87 验证那一遍 | 48 | 20 | 1.000 | 7 | 121.5pt | ok |
+
+⇒ coverage 的支撑是 **1–2 个变化帧对**（分母 22–24 对里只有 1–2 对在变），
+而行程的支撑是 runner 三遍的 **11–12 个可用帧**（本机那一遍 7 帧，也够），且它在两台机器、四遍里都落在 109–134pt。
+"亮带从 x=21pt 走到 x=155pt"是**位置**证据，它不依赖采样网格；
+coverage 依赖。⇒ 本轮把"两把尺矛盾时谁签字"写进判据（`loopAdjudication` 的 `travel` 入参）。
+
+## 2. 在屏那一卷：停机有了名字，而名字推翻了我上一轮登记的预测
+
+```
+UI_PROBE_PROGRESS started=0 concluded=0
+UI_PROBE_NO_CASE_STARTED=1 （进程在第一条用例开口之前就死了：看门狗收掉的是启动阶段，不是某条判据）
+UI_PROBE_NAMED=1
+PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 runner可跑=0 runner不可跑=11 本次下结论=0 红=0
+```
+
+R86 我在 BACKLOG 93 里**预先登记**了三种结果各意味着什么，其中一条是：
+"若报 `UI_PROBE_HUNG=testAccessibilityTreeCoverage` 就证实挂在字母序第一条用例内部"。
+实际报的是 `NO_CASE_STARTED` ⇒ 原文那条"挂在第一条用例内部"的推断**没有被证实**，
+它连"XCTest 有没有开始报用例"都没到。
+
+**但这一格不能就这么收**（这是本轮最该诚实的地方）：`started=0` 有两种成因，
+而这一份日志分不开它们：
+
+* ① 进程真的在第一条用例开口之前就死了（启动/会话层）；
+* ② 用例其实跑了，但 `swift test` 的 stdout 在 `kill -9` 时整块丢了
+  —— 这一族本仓库见过两次（R64 的捕获卷、R84 的动效卷），而 `> /tmp/ui.log 2>&1` 是重定向到文件，
+  块缓冲被 SIGKILL 掐掉是**默认行为**，本机那次 spike 只证明了"能留住"（13 行），
+  没证明"每次都留得住"。
+
+⇒ ②如果为真，那 `UI_PROBE_NO_CASE_STARTED=1` 就是一句关于产品的假话（它说的是"没开始"，
+而真相是"开始了我没看见"）。这一格交给 R88：在屏那一步同时看**产物通道**
+（`/tmp/shots-ci` 里有没有帧、探针有没有写 readings），
+有帧没日志 ⇒ ②；没帧没日志 ⇒ ①。这是 BACKLOG 93 剩下的那一步，也是它不结案的理由。
+
+## 3. 其余步骤（一次读完，免得下次靠记忆）
+
+* `Capture gate`：`passed=38 skipped=9 failed=0 有名字的红=0 NOT_RUN=54` ⇒ 捕获这一族照旧绿，
+  而那五条在 runner 上确实 skip（116 剩下的那半句仍然成立）。
+* `ui suite exit: 137 executed: 0 已下结论的用例: 0` ⇒ BACKLOG 92 的形状没变（它本来就没结案）。
+* 动效那一步 `motion suite exit: 1` —— 红的是判据本身，闸门把它翻译成了有名字的 `SUITE_RED`
+  + `LOOP_RED_NAMED`，这正是 R85 那层要的形状（红有名字、有人负责）。
+
+
+### 为什么 coverage 不能单独定罪（U-183）
+
+四遍读数，同一份产品代码（R84 换画法之后）：
+
+| run | 帧数 | 变化帧对 | coverage | 可用帧 | 行程 | 处置 |
+|---|---|---|---|---|---|---|
+| R84 38798408040 | 24 | 2 | 0.522 | 11 | 109.0pt | ok |
+| R85 38805382593 | 22 | 2 | 0.842 | 12 | 134.0pt | ok |
+| R86 38811457259 | 23 | **1** | **0.032** | 12 | **134.0pt** | **productRed（main 红）** |
+| 本机 R87 验证那一遍 | 48 | 20 | 1.000 | 7 | 121.5pt | ok |
+
+本机那一行的原文读数（上面五个数就是从这三行里读的，逐字贴在这里以便对账）：
+
+```
+MOTION_SHIMMER 扫 帧数=48 变化帧对=20 峰值=0.023 采样≈53ms coverage=1.000(地板 0.50) 记录时长=2493ms 判定=一直在动
+MOTION_SHIMMER_BAND 帧=48 比例=1pt≈2.00px 可用帧=7 丢掉=41 同帧绝对中心最大散布=0.0pt（地板：≤6.0 判一条带、≥40.0 判各扫各的） 归一化散布=0.413 行程=121.5pt（正对照地板 20.0） 判定=整组一条带 理由=每一帧三根条的亮斑都在同一条竖线上（最大差 0.0pt ≤ 6.0），且它一路走了 121.5pt
+MOTION_SHIMMER_BAND_SAMPLE 可用帧首=[33.0, 33.0, 33.0] 末=[142.5, 142.5, 142.5]
+```
+
+⇒ 两把尺问的是同一件事（"亮带在不在走"），但支撑它们的样本数差一个量级：
+coverage 在 runner 上只有 **1–2 个变化帧对**（分母 22–24 对），
+而位置尺在 runner 三遍上有 **11–12 个可用帧**（本机那一遍 7 帧），且它在两台机器、四遍里都落在 109–134pt。
+"亮带从 x=21pt 走到 x=155pt"是**位置**证据，不依赖采样网格；coverage 依赖 ——
+30Hz 的扫光在 ~100ms 的采样间隔下，相邻两帧常常长得一样，要走完一根条才跨一次台阶。
+
+⇒ 所以定罪权按**样本数**分配：`loopAdjudication` 现在先问"有没有一份样本更多的尺在说反话"，
+有 ⇒ 判 `notRunRulerBlind`（点名 `loop-coverage-contradicted-by-travel`，不红也不绿）。
+三格方向钉子钉住它没被放宽：位置尺也说没走过 → 仍然红；位置尺今天没读数 → 仍然红；
+产品在动 → 行程说什么都不改判绿；粗节拍证人整卷没拍到 → 仍然先红在证人。
+
+这一格是 BACKLOG **110**（"单样本统计会把一臂在判到/判不到之间翻脸"）在循环这一族的第三个实例，
+也是 **119** 开张时要的那件事的另一半：119 问"几遍读数才配定罪产品"，
+本轮的答案是"**一遍都不配，除非另一把样本更多的尺同意**"——
+跨遍状态在一次 CI 里拿不到，而同一卷上的第二把尺拿得到。
+
+### U-184 · 预先登记的预测被推翻时，要写"没证实"，不要顺手换一种解释
+
+R86 我把三种可能连同各自的含义**先登记**在 BACKLOG 93 里（这是那条的正确用法）。
+CI 报的是 `UI_PROBE_NO_CASE_STARTED=1` ⇒ "挂在字母序第一条用例内部"那句推断没有被证实。
+但这一格不能就这么收：`started=0` 有两种成因，而**这一份日志分不开它们** ——
+① 进程真的在第一条用例开口之前死了；② 用例其实跑了，但 stdout 在 `kill -9` 时整块丢了
+（这一族本仓库见过两次：R64 的捕获卷、R84 的动效卷；`> /tmp/ui.log 2>&1` 是重定向到文件，
+块缓冲被 SIGKILL 掐掉是默认行为。R86 的 spike 只证明了"能留住"，没证明"每次都留得住"）。
+⇒ ②为真时 `NO_CASE_STARTED` 就是一句关于产品的假话。
+分不开的办法本轮找到了：那一步同时看**产物通道**（`/tmp/shots-ci` 里有没有帧）——
+有帧没日志 ⇒ ②；没帧没日志 ⇒ ①。这一格交给 R88，也是 93 不结案的理由。
+
+### U-185 · 新坏法必须有新名字，而"两边同步"要有一条会红的守卫
+
+`notRunRulerBlind` 本可以沿用 `loop-clock-not-sustainable-at-product-rate` 蒙过 CI
+（闸门只比登记表里的名字）。那等于让新病借用旧病的免检牌：登记表从此看不出多了一种坏法。
+⇒ 新名字进表，并且自测里加两格：登记过的矛盾不红；**只差一个词**的名字
+（`loop-coverage-contradicted-by-speed`）必须红 —— 前缀匹配只放过括号里的细节，
+不放过括号外换掉的那个词。Swift 侧另有两条断言钉住"两支 not-run 的理由不许相同"。
+牙：M478（借用旧名字）、M479（表里删掉新理由）、M480（`BAD_REASON` 变哑）三刀各红在预期的那一格。
+
+### U-186 · 变异文里的注释语法会让一刀"没跑成"，而不是"没抓到"—— 两种病别混
+
+M475 / M476 第一版报 **NOT-RUN**：我在 Swift 行的末尾写了 `# R87 变异` 当注释，
+而 Swift 的注释是 `//` ⇒ 编译失败，判据根本没机会跑。
+这一族电池已经记过两次"编译错误被误读成判据没牙"（R83 的 M454 现场、R85 的锚点不匹配），
+本轮是第三次，只是这次方向反过来：**是变异文自己坏了**。
+⇒ 汇总行把 `没跑成` 与 `逃掉` 分开计数（这一版脚本一直是分开的，是我读日志时容易把它们混成"没牙"），
+而修法是改刀不是改判据。
+
+### 牙
+
+| M473 | 删掉『两把尺矛盾时不许定罪产品』那一支（coverage 又能单独判红） | **CAUGHT** |
+| M474 | 矛盾那一支从『有名字的未覆盖』改成『判绿』 | **CAUGHT** |
+| M475 | 行程证据不看可用帧数（一帧也算读过） | **CAUGHT** |
+| M476 | 行程地板失效（亮带钉在原地也算走过整幅） | **CAUGHT** |
+| M477 | 矛盾检查排到证人签字之前 | **CAUGHT** |
+| M478 | 新理由借用旧名字（登记表看不出多了一种坏法） | **CAUGHT** |
+| M479 | 登记表里删掉新理由（判据改了名字而表没跟着改） | **CAUGHT** |
+| M480 | 没登记的理由不红（BAD_REASON 那一格变哑） | **CAUGHT** |
+
+### 验证（本机，逐条实跑）
+
+```
+swift build --build-tests                告警 0
+swift test（全量）                       801 tests / 0 failures（41 skipped，swift test exit 0）
+动效覆盖地板闸门（含 loops 那一层）        MOTION_FLOOR_FACTS judged=4/4 executed=54 not-run=- summary=detail-kind-change=3 empty-state=4 notice-banner=12 notice-banner-dismiss=13 红的用例=- 汇总行报红=0 MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_REDS=0 MOTION_GATE_EXIT=0
+捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+frame_baseline.py check --against working FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
+python3 -m unittest discover -s scripts/tests  Ran 155 tests in 6.779s OK
+```
+
+> 上面这一格**原来是这么写的**：`discover -s scripts`。今天照抄它跑一遍，打印的是 `Ran 0 tests in 0.000s` + `OK` + 退出 0 —— 少一层目录的 discovery 什么都收不到，而它看起来完全像通过了。真正跑的那一步一直是 `-s scripts/tests`（`verify_r87.sh` 与 CI 的 `Release script tests` 都是），台账里这 8 处标签本轮一起改对（R80 / R81 / R82 / R83 / R84 / R85 / R86 / R87 这八轮的验证块，逐行按所属轮次对过）。CI 那一步不是完全没防：它有 `test "$executed" -ge 48`，所以 0 会红；但 **78 也过** —— 地板是个静态数，而现在的条数是 155。新开 BACKLOG 121。
+
+### 七维自评
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 20 / 20 | 零产品改动：本轮没脸加分，也没东西被扣 |
+| 流畅度 | 18 / 20 | 扫光在 runner 上到底跑没跑，今天仍然只有位置尺在说；coverage 那一格改成了"有名字的未覆盖" |
+| 层次与材质 | 15 / 15 | 本轮无画面产出 |
+| 动效细节 | 14 / 15 | 定罪权挪对了地方（样本多的尺签字），但"亮带该多宽多快"仍然只有 R84 那一档依据 |
+| 交互反馈 | 9 / 10 | 反馈本身没动 |
+| 可访问性 | 8 / 10 | 减弱动态那一臂仍然无条件判；真机批次 72 / 73 还没人看 |
+| 性能 | 14 / 15 | 全量 801 tests / 0 failures（41 skipped，swift test exit 0）；位置尺现在被算两遍（运动判据与位置判据各一次），成本是纯函数在 12 帧上，可忽略 |
+
+**97 / 100**，与 R86 持平：本轮修掉的是**一朵假红**，没有换来画面，也没有换来硬门。
+分数不涨是刻意的 —— 判据少说一次假话不该被记成产品变好了。
+
+### 仍未解决
+
+- BACKLOG **119**（本轮更新）：新处置让 coverage 不再单独定罪，但"这一族的读数分布有多宽"
+  仍然只有 4 个点（runner 三遍 0.522 / 0.842 / 0.032，加本机那一遍 —— 数字在上面那张表里）。
+- BACKLOG **92 / 93**：`NO_CASE_STARTED` 的两种成因没分开 ⇒ 交给 R88 那一步（看产物通道）。
+- BACKLOG **120**（本轮新开）：位置判据今天仍被 `loopCapable` 关着 ——
+  而它现在恰恰是**唯一有资格说话的那把尺**。谁该给谁签字，这件事本轮只改了一半。
+- BACKLOG **121**（本轮新开）：台账里那行 `discover -s scripts` 我照抄跑了一遍，打印 `Ran 0 tests / OK / 退出 0`。命令本身一直是对的（CI 与 verify 都是 `-s scripts/tests`），错的是台账那一格（八处本轮已改对）。CI 那道地板只挡 0（`-ge 48`），**少收一半文件照样绿** ⇒ 该不该把它改成"只准升不准降 + 点名少了哪几条"，留给下一轮。
+- **116** 剩下那半格（闸门不报它没找到的 `*_NOT_RUN`）、**115**、**111**、108 余下、77 路 b、
+  101 ②③、106；真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.1 / 72.2 / 73.1 / 73.2。

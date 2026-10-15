@@ -1,0 +1,55 @@
+=== 基线（未变异）：四格 Swift 判据 + 两格 python 用例都必须绿 ===
+   python={'testLoopStateLinesAreCountedNotGuessed': 'green', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'} swift={'testTheLoopShapeClassifierIsATruthTable': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+
+M473 删掉『两把尺矛盾时不许定罪产品』那一支（coverage 又能单独判红）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1820: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M474 矛盾那一支从『有名字的未覆盖』改成『判绿』⇒ 尺的账被写成产品验过了
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1821: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M475 行程证据不看可用帧数（一帧也算读过）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1853: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M476 行程地板失效（亮带钉在原地也算走过整幅）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1849: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M477 矛盾检查排到证人签字之前 ⇒ 一把坏掉的尺反过来替产品开脱
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1842: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M478 新理由借用旧名字（登记表看不出多了一种坏法）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1860: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1864: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATrut
+   已还原（逐字节相同：True）
+
+M479 登记表里删掉新理由（判据改了名字而表没跟着改）
+   CAUGHT 只红在预期那几条：{'testLoopStateLinesAreCountedNotGuessed': 'red', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'}
+     FAIL: testLoopStateLinesAreCountedNotGuessed (test_motion_floor_gate.MotionFloorGateTests)
+   已还原（逐字节相同：True）
+
+M480 没登记的理由不红（BAD_REASON 那一格变哑）
+   CAUGHT 只红在预期那几条：{'testLoopStateLinesAreCountedNotGuessed': 'red', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'}
+     FAIL: testLoopStateLinesAreCountedNotGuessed (test_motion_floor_gate.MotionFloorGateTests)
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M473   CAUGHT
+   M474   CAUGHT
+   M475   CAUGHT
+   M476   CAUGHT
+   M477   CAUGHT
+   M478   CAUGHT
+   M479   CAUGHT
+   M480   CAUGHT
+   抓到=8 逃掉=0 没跑成=0 未落地=0 与预期不符=0 量过=0
+BATTERY_EXIT=0
