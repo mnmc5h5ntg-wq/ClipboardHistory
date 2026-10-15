@@ -4688,3 +4688,35 @@ R64 早就量过 stdout 会**整块丢**，并为它建了第二条文件通道�
 **代价**：动效那一步多跑一卷 2.5s 的证人（每进程缓存一次）；判据文件里多一个类型。
 **被这一条杀掉的东西**：`XCTAssertGreaterThanOrEqual(transitionFrameCount(running), 3)`
 那条计数判据 —— 它在两档采样下会说两句不同的话，而"几对在变"从今天起只作为**读数**打印。
+
+### D-141 · 前提从时刻本身读，绝对地板听处置的话，红与"没跑"不许各判一次（R83 / U-160、U-161、U-162）
+
+**背景**：R82 的 CI（run 38781113064）上 `Motion coverage floor` 红，三条原文：
+
+```
+4500  XCTAssertEqualWithAccuracy ("0.0") is not equal to ("2500.0") +/- ("625.0")
+4532  XCTAssertGreaterThan ("0.0") is not greater than ("0.005")
+      MOTION_FLOOR_SUITE_NAMELESS_RED=1（汇总 2 次红、日志里 1 个用例名）
+```
+
+而那一遍的处置行是 `MOTION_NOT_RUN=loop-clock-not-sustainable-at-product-rate`
+（产品 coverage 0.000、等节拍证人 0.284、粗节拍证人 1.000）。
+⇒ 一句话：**处置已经说"这台机器判不了这一臂"，同一轮里还有三处在按别的话判它。**
+
+**决定**：
+1. 前提与结论分家。新增 `FilmPremise(frames:stamps:)`：配对 = `stamps.count == frames`，
+   卷长 = `stamps.last - stamps.first`，**都不看有没有运动**。
+   真值表第⑧格钉"静止一卷的 premise 报 1000ms 而结论尺报 0ms，两者必须不同"——
+   谁把前提接回结论尺，那一格就红。
+2. 绝对地板只在环境被证明有资格判这一臂时说话（`.ok / .productRed`）；
+   其余两支打一行 `MOTION_SHIMMER_PEAK_NOT_JUDGED 峰值=… 处置=…`。
+   **边界写死**：减弱动态那档"必须静止"永远判 —— 看不见运动伪造不出运动，
+   这一族的下一次扩大必须先推翻这句话。
+3. 闸门的比较两边同为失败**行数**（`failure_lines`），不是用例名个数；
+   两格回归测试一正一反，防止这次修法把 R64 那朵"成块丢"放走。
+4. 114 结案（第一支），并新开 118：一朵有名字的未覆盖如果不在登记表里，
+   "有人负责"就只剩一句话。
+
+**代价**：`MOTION_SHIMMER_PEAK_NOT_JUDGED` 是新增的一行读数，不红、也不进登记表（这正是 118）。
+**被这一条杀掉的东西**：`XCTAssertEqual(shape.recordedMilliseconds, …)` 那种"拿结论尺当前提"的写法，
+以及 `summary - len(named)` 那种单位不对齐的减法。

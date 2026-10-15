@@ -522,6 +522,44 @@ class MotionSuiteRedTests(unittest.TestCase):
         # 同一份数据里 SUITE_RED 仍然要在：两种红是不同的话，不许互相吞。
         self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks)
 
+    def testTwoAssertionsInOneCaseAreNotCalledNameless(self):
+        """R82 的 CI 现场：一条用例里两句 XCTAssert 一起红 ⇒ 汇总行 M=2、名字只有 1 个。
+
+        旧算法（`summary - len(named)`）会把这朵报成 `NAMELESS_RED=1`——"有一条红没有名字"，
+        而两条红都有名字，只是同一个用例名出现两次。这一格钉的是**比较的两边必须同为失败行数**；
+        它同时是防回归：谁把这里改回"名字数"，这一格就红。
+        """
+        text = "\n".join([
+            "\t Executed 42 tests, with 2 failures (2 unexpected) in 100.0 (100.0) seconds",
+            SUMMARY,
+            "MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-",
+            "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' failed (11.9 s).",
+            "error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]"
+            " : XCTAssertEqualWithAccuracy failed: (\"0.0\") - 卷长",
+            "error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]"
+            " : XCTAssertGreaterThan failed: (\"0.0\") - 峰值",
+        ])
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(parse(text), EXPECTATIONS))
+        self.assertNotIn("MOTION_FLOOR_SUITE_NAMELESS_RED=1", marks,
+                         "两条红都在同一条用例里、都有名字 ⇒ 不许报'没名字'")
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks,
+                      "用例级的红仍然要报：一条未登记的红用例就是红，与它内部错了几句无关")
+
+    def testLostFailureLinesStillAreCalledNameless(self):
+        """同一份夹具里再抽掉一行（stdout 成块丢的形状）⇒ NAMELESS 必须回来。"""
+        base = [
+            "\t Executed 42 tests, with 2 failures (2 unexpected) in 100.0 (100.0) seconds",
+            SUMMARY,
+            "MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-",
+            "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' failed (11.9 s).",
+            "error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]"
+            " : XCTAssertEqualWithAccuracy failed: (\"0.0\") - 卷长",
+        ]
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(parse("\n".join(base)), EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SUITE_NAMELESS_RED=1", marks,
+                      "汇总说红 2 次而日志里只剩 1 行失败 ⇒ 少的那一行没有名字，这一格就是为它建的")
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_NAMELESS_RED=1"][1])
+
     def testSuiteRedSurvivesTheMissingResolveLine(self):
         """判据自己崩了 = 既没结论行又红。旧版在"没结论行"处提前 return，红会被吃掉。"""
         text = "\n".join([line for line in self.lines if "MOTION_RESOLVE_SUMMARY" not in line])

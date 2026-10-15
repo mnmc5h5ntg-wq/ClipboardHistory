@@ -1,0 +1,35 @@
+=== 基线（未变异）：Swift 两条 + 闸门那格都必须绿 ===
+   swift={'testTheLoopShapeClassifierIsATruthTable': 'green', 'testSkeletonSweepActuallySweeps': 'green'} python={'testTwoAssertionsInOneCaseAreNotCalledNameless': 'green', 'testLostFailureLinesStillAreCalledNameless': 'green', 'testNamelessRedIsRed': 'green', 'testPartialNameLossIsStillRed': 'green'}
+
+M446 `paired` 干脆不看时刻条数（等式整条丢掉）⇒ 时刻少一根也算配对（U-155 的形状回来了）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1756: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertF
+   已还原（逐字节相同：True）
+
+M447 卷长少乘 1000（秒当成毫秒）⇒ 真值表第⑧格必须红
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4553: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps] : XCTAssertEqualWith
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1741: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertE
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1753: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertE
+   已还原（逐字节相同：True）
+
+M448 卷长钉子改回挂在**结论尺**的输出上（R82 第一版的形状）
+   LOCAL-NO-POWER 本地全绿（本地无判别力（本机有运动 ⇒ 两把尺同数）⇒ 由 CI 判）⇒ 这一刀的牙在 runner 上，已按实存活
+   已还原（逐字节相同：True）
+
+M449 峰值地板改回**不管处置**无条件判（R82 的 CI 上就是这么把环境说成产品的）
+   LOCAL-NO-POWER 本地全绿（本地无判别力（本机处置=.ok ⇒ 两条路径同结果）⇒ 由 CI 判）⇒ 这一刀的牙在 runner 上，已按实存活
+   已还原（逐字节相同：True）
+
+M450 闸门的 NAMELESS 比较退回拿**用例名个数**当可归因数 ⇒ 新那格回归测试必须红
+   CAUGHT 只红在预期那几条：{'testTwoAssertionsInOneCaseAreNotCalledNameless': 'red', 'testLostFailureLinesStillAreCalledNameless': 'green', 'testNamelessRedIsRed': 'green', 'testPartialNameLossIsStillRed': 'green'}
+     FAIL: testTwoAssertionsInOneCaseAreNotCalledNameless (test_motion_floor_gate.MotionSuiteRedTests)
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M446   CAUGHT
+   M447   CAUGHT
+   M448   LOCAL-NO-POWER
+   M449   LOCAL-NO-POWER
+   M450   CAUGHT
+   抓到=3 本地无判别力(按实存活)=2 逃掉=0 没跑成=0 未落地=0

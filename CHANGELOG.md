@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R83：上一轮那枚钉子挂错了对象 —— 前提从时刻本身读，绝对地板听处置的话；结案 114 / 新开 118 / U-160…U-163 / D-141）
+- 读 R82 的 CI：**114 落在预登记的第一支**（runner 带得动 20Hz、带不动产品那一档 30Hz），
+  等节拍证人 `coverage=0.284` 与粗节拍证人 `coverage=1.000` 并排就是分诊表本身。
+- 修掉上一轮我自己造的三处不干净：
+  ① 卷长钉子挂在 `LoopShape.recordedMilliseconds` 上（峰值 0 时被 guard 归零 ⇒ 把"看不见运动"
+  报成"探针坏了"）⇒ 新增 `FilmPremise(frames:stamps:)`，前提从时刻本身算，真值表钉"两把尺必须给不同数"；
+  ② 绝对峰值地板不管处置说话 ⇒ 只有 `.ok / .productRed` 时判，其余点名 `MOTION_SHIMMER_PEAK_NOT_JUDGED`
+  （减弱动态那档"必须静止"仍然无条件判）；
+  ③ 闸门 `NAMELESS_RED` 拿失败次数减用例名个数 ⇒ 两边同为失败行数，两格回归测试一正一反。
+- 117 从"看图觉得"变成有数字：`r83_band_fanout.py` 逐帧量三根条的亮斑中心，
+  同帧内绝对位置差最大 170pt、归一化差 0.003 ⇒ 亮带每根条各扫各的（改产品在下一轮）。
+- 新开 118：一朵有名字的未覆盖不在覆盖地板的登记表里 ⇒ 常驻循环那一族也要有一格登记。
+- 电池自己的 python 臂补第五种形状（U-164）：模块级导入失败时四条用例名都不出现，旧分类器读成"全绿"。
+- 牙：M446–M450 五刀 —— 三刀本地有牙（两刀红在真值表第⑧格、一刀红在新增那格 python 回归测试），
+  两刀**按实存活为"本地无判别力"**（把钉子挂回结论尺、地板不管处置，本机都不改变结果，牙在 runner）。
+
 ### Tests（R82：循环那条判据从"数帧对"换成 coverage，证人从一颗换成两颗并要同节拍；结案 113、110 的第一实例 / 新开 114–117 / U-155…U-159 / D-140）
 - `testSkeletonSweepActuallySweeps` 不再数"几对帧在变"，改读 **coverage**
   （变化覆盖了整卷时长的几成；时间之比 ⇒ 与采样密度无关，地板 0.5 不为哪台机器移动）。

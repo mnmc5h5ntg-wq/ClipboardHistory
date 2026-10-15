@@ -147,10 +147,19 @@ def parse(text: str) -> dict:
         if match and match.group(1) not in failures:
             failures.append(match.group(1))
     messages = {}
+    # 失败**行**数（R83）：`Executed N tests, with M failures` 里的 M 数的是**断言失败**，
+    # 而 `failures` 数的是**用例名**。一条用例里两句 XCTAssert 一起红（R82 的 CI 就是这样：
+    # `testSkeletonSweepActuallySweeps` 的卷长钉子与峰值地板各红一次）⇒ M=2、名字=1，
+    # 拿它们直接相减就会报一朵"有一条红没有名字"的假红 —— 而这一格存在的意义恰恰是
+    # "有红没名字"。所以比较的两边必须同为**行**：日志里每条失败断言各有一行 `error: -[…]`。
+    # 排除 `Test skipped` 那种同形状的行走（skip 不是 failure）。
+    failure_lines = 0
     for line in text.splitlines():
         match = ERROR_LINE.search(line)
-        if match:
-            messages.setdefault(match.group(1), match.group(2).strip())
+        if not match:
+            continue
+        failure_lines += 1
+        messages.setdefault(match.group(1), match.group(2).strip())
     # 取**最大值**而不是最后一条：`Executed` 那几行按 suite 各打一次，而 stdout 会成块丢 ——
     # 按"最后一条"读，丢掉尾巴那次会把 1 条红读成 0 条。取 max 之后，"丢行"只会让这一格
     # 与 `failures` 的数量不一致，而那种不一致本身就是 NAMELESS_RED 要报的东西。
@@ -164,6 +173,7 @@ def parse(text: str) -> dict:
         "skips": skips,
         "failures": failures,
         "failure_messages": messages,
+        "failure_lines": failure_lines,
         "summary_failures": summary_failures,
         "executed": executed[-1] if executed else 0,
     }
@@ -210,12 +220,14 @@ def suite_verdicts(facts: dict, expectations: dict) -> list:
                                  % (name, registry[name].get("registered_run", "?"),
                                     registry[name].get("points_to", "?"))
                                  for name in registered), False))
-    if summary > len(named):
-        out.append(("MOTION_FLOOR_SUITE_NAMELESS_RED=%d" % (summary - len(named)),
-                    "汇总行说这一卷红了 %d 次，日志里只找得到 %d 个名字 ⇒ 少掉的那几条**没有名字**。"
+    attributable = max(facts.get("failure_lines", 0), len(named))
+    if summary > attributable:
+        out.append(("MOTION_FLOOR_SUITE_NAMELESS_RED=%d" % (summary - attributable),
+                    "汇总行说这一卷红了 %d 次，日志里只找得到 %d 行失败（覆盖 %d 个用例名）⇒ 少掉的那几条**没有名字**。"
                     "这一格不许被删：它是 R36 那句话（只有退出码的红等于没有红）在动效这一族的形状，"
-                    "而它今天最可能的成因是 stdout 成块丢（R64）—— 那就是为什么结论必须同时进文件通道"
-                    % (summary, len(named)), True))
+                    "而它今天最可能的成因是 stdout 成块丢（R64）—— 那就是为什么结论必须同时进文件通道。"
+                    "比较的两边同为**失败行数**：一条用例里两句断言一起红不算'没名字'（R83）"
+                    % (summary, attributable, len(named)), True))
     stale = [name for name in sorted(registry) if name not in named]
     for name in stale:
         out.append(("MOTION_FLOOR_SUITE_STALE",

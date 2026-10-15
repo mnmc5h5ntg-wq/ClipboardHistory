@@ -610,6 +610,28 @@ final class MotionFilmstripTests: XCTestCase {
         static let minCoverage = 0.5
     }
 
+    /// 一卷胶片的**前提** —— 与"这一卷里有没有东西在动"完全无关的两件事：
+    /// 时刻与帧一对一（`GrabbedFilm` 之后理论上不该再失败，留着是因为它是 U-155 的墓碑），
+    /// 以及这卷**真的抓了这么久**。
+    ///
+    /// 为什么不复用 `LoopShape.recordedMilliseconds`（R82 的第一版就是那么写的，代价是一朵 CI 假红）：
+    /// 那个数在 guard 分支里被归零，而 guard 分支恰恰在"整卷什么都没变"的时候走 ——
+    /// runner 那一遍产品峰值 0.000 ⇒ `recordedMilliseconds=0` ⇒ "卷长不对"。
+    /// **卷长是录像的性质，不是运动的性质**：一条静止 2.5 秒的卷仍然是 2.5 秒。
+    /// 挂错对象的后果不是"多一行红"，是把一台机器的"看不见运动"改写成"探针坏了"，
+    /// 于是下一轮会有人去查探针（U-139 / U-155 同一族：结论尺的输出不能当它自己的前提）。
+    struct FilmPremise: Equatable {
+        let paired: Bool
+        let spanMilliseconds: Double
+    }
+
+    static func filmPremise(frames: Int, stamps: [TimeInterval]) -> FilmPremise {
+        let paired = stamps.count == frames && frames > 1
+        let span = stamps.count > 1
+            ? max(0, ((stamps.last ?? 0) - (stamps.first ?? 0)) * 1000) : 0
+        return FilmPremise(paired: paired, spanMilliseconds: span)
+    }
+
     enum LoopVerdict: Equatable {
         /// 整卷没拍到任何可见变化 ⇒ 无从判定（探针或通道的问题，不是产品的）。
         case notMoving
@@ -1711,6 +1733,27 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(extraStamp.verdict, .notMoving,
                        "时刻比帧对多一根也被放行 ⇒ 结构等式退回了『大概对得上』，"
                            + "而 U-155 那一族恰恰是两卷长度差不多的时候最不容易发现")
+        // ⑧ **前提尺与结论尺必须各量各的**（R83 修的那条假红，见 `FilmPremise`）：
+        //    一卷"整帧都没变"的胶片仍然有卷长。R82 把卷长挂在 `LoopShape.recordedMilliseconds` 上，
+        //    而那个数在峰值 0 时被 guard 归零 ⇒ runner 上"看不见运动"被改写成"探针坏了"。
+        let still = Self.filmPremise(frames: 21, stamps: stamps(every: 50, count: 21))
+        XCTAssertTrue(still.paired, "21 帧配 21 根时刻就是成对（时刻与帧是一对，不是帧对+1）")
+        XCTAssertEqual(still.spanMilliseconds, 1000, accuracy: 0.001,
+                       "整卷没动也必须报出 1000ms —— 卷长是录像的性质，不是运动的性质。"
+                           + "现在读到 \(still.spanMilliseconds)：说明前提又挂回结论尺的输出上了")
+        // 峰值 0 的那一卷：结论尺说"记录时长 0"，前提尺说"1000ms"。两个数**必须**不同，
+        // 这一格钉的就是"它们量的是两件事"。
+        let deadShape = Self.loopShape(fractions: [Double](repeating: 0.0, count: 20),
+                                       stamps: stamps(every: 50, count: 21))
+        XCTAssertEqual(deadShape.recordedMilliseconds, 0, accuracy: 0.001,
+                       "guard 分支把记录时长归零是**已知行为**（这一格是上面那条对照的另一半）")
+        XCTAssertNotEqual(still.spanMilliseconds, deadShape.recordedMilliseconds,
+                          "前提尺与结论尺给出同一个数 ⇒ 它们又变成同一把尺了，R82 那朵假红的形状会回来")
+        let shortFilm = Self.filmPremise(frames: 21, stamps: stamps(every: 25, count: 21))
+        XCTAssertEqual(shortFilm.spanMilliseconds, 500, accuracy: 0.001,
+                       "每帧 25ms 的卷只有半秒长 ⇒ 前提必须报出来（探针提前收卷的形状）")
+        let unpaired = Self.filmPremise(frames: 21, stamps: stamps(every: 50, count: 20))
+        XCTAssertFalse(unpaired.paired, "时刻少一根就是不配对（U-155 的墓碑）")
         // ⑦ 处置：产品形状 × **两颗**证人形状。等节拍那颗决定"产品红 / 环境不行"，
         //    粗节拍那颗只决定"签字的人来没来上班"。
         XCTAssertEqual(Self.loopAdjudication(product: .looping, rateWitness: .notMoving, coarseWitness: .notMoving), .ok,
@@ -1727,7 +1770,7 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping, coarseWitness: .notMoving), .witnessDead,
                        "连高对比、粗节拍那颗都没拍到任何变化时，不许走『环境看不见』那一支 —— 那是一张空支票（R68 那一族）")
         emit("LOOP_TRUTH_TABLE 均匀=looping 跳变=oneShot 两档采样=同判定 空=notMoving 头尾=同 coverage "
-            + "时刻少一根/多一根=notMoving 处置=5 格")
+            + "时刻少一根/多一根=notMoving 处置=5 格 前提=静止卷仍有卷长（与结论尺的 0 不同）")
     }
 
     /// R82：等节拍那颗证人**必须仍然等于产品那几颗数** —— 它写死在测试里（不能被被告牵着改），
@@ -4494,17 +4537,27 @@ final class MotionFilmstripTests: XCTestCase {
         writeStrip("skeleton-sweep", Array(runningFilm.frames.prefix(24)))
         emit("MOTION_SHIMMER_STRIP 前 24 帧排成条带（六列）⇒ 眼睛判的是『亮带一路扫过去』，"
             + "这把尺判的是 coverage，两者不许互相替")
-        // 这卷**真的抓了这么久**的钉子：coverage 是时间之比，卷长错了整个比就错了。
-        // 它**不**负责"时刻与读数同一卷"—— 那一半今天由类型保证（`GrabbedFilm`，U-155：
-        // M443 第一版把两卷的时刻互换，四条判据一条都没红，说明断言拦不住等长的两卷）。
-        XCTAssertEqual(shape.recordedMilliseconds, loopFilmSeconds * 1000, accuracy: loopFilmSeconds * 250,
-                       "产品那卷的记录时长不是 \(String(format: "%.0f", loopFilmSeconds * 1000))ms 而是 "
-                           + "\(String(format: "%.0f", shape.recordedMilliseconds))ms ⇒ 这些时刻不属于这卷帧对"
-                           + "（卷长 ≠ 抓帧时长 ⇒ 中间有别的东西占住了主线程，或探针提前收卷）。"
-                           + "coverage 是个时间之比，分母错了整个比就是假的，判定无论红绿都没有依据")
-        switch Self.loopAdjudication(product: shape.verdict,
-                                     rateWitness: rateWitness.verdict,
-                                     coarseWitness: coarseWitness.verdict) {
+        // 这卷**真的抓了这么久**的钉子。R82 的第一版把它挂在 `shape.recordedMilliseconds` 上，
+        // 而那个数在"整卷什么都没变"时被 guard 归零 ⇒ R82 的 CI 上 runner 读到峰值 0.000，
+        // 于是"这台机器看不见运动"被改写成"探针坏了"（一条假红，本轮修的就是它）。
+        // 前提是**录像的性质**，不是运动的性质：一条静止 2.5 秒的卷仍然是 2.5 秒 ⇒ 从时刻本身读。
+        let premise = Self.filmPremise(frames: runningFilm.frames.count, stamps: runningFilm.stamps)
+        emit("MOTION_SHIMMER_FILM 帧=\(runningFilm.frames.count) 时刻=\(runningFilm.stamps.count) "
+            + "配对=\(premise.paired ? "是" : "否") 卷长=\(String(format: "%.0f", premise.spanMilliseconds))ms"
+            + "（探针声明 \(String(format: "%.0f", loopFilmSeconds * 1000))ms）"
+            + " ｜ 结论尺报的记录时长=\(String(format: "%.0f", shape.recordedMilliseconds))ms"
+            + " —— 后者在峰值 0 时**必然**是 0，所以前提不许挂在它身上")
+        XCTAssertTrue(premise.paired,
+                      "这一卷的时刻条数与帧数不是一对 ⇒ 它吃的不是这一卷的时刻（U-155 那一族）。"
+                          + "帧=\(runningFilm.frames.count) 时刻=\(runningFilm.stamps.count)")
+        XCTAssertEqual(premise.spanMilliseconds, loopFilmSeconds * 1000, accuracy: loopFilmSeconds * 250,
+                       "这一卷只抓了 \(String(format: "%.0f", premise.spanMilliseconds))ms，而探针声明要抓 "
+                           + "\(String(format: "%.0f", loopFilmSeconds * 1000))ms ⇒ coverage 的分母不对，"
+                           + "判定无论红绿都没有依据（中间有别的东西占住了主线程，或探针提前收卷）")
+        let disposition = Self.loopAdjudication(product: shape.verdict,
+                                                rateWitness: rateWitness.verdict,
+                                                coarseWitness: coarseWitness.verdict)
+        switch disposition {
         case .ok:
             break
         case .productRed:
@@ -4526,11 +4579,24 @@ final class MotionFilmstripTests: XCTestCase {
                     + "从此是一张空支票（R68 的 M366 同一族）")
         }
         // 减弱动态那一档：必须**真的停住**（这一臂反过来证明上面读到的变化确实是扫光，不是噪声）。
+        // 这一条**不**随处置豁免：它要的是"静止"，而"这台机器看不见运动"永远不会伪造出运动来。
         XCTAssertLessThan(Self.peak(stopped), Self.minimumVisibleChange,
                           "减弱动态那一档还在变 ⇒ 常驻动画没被门住（HIG 与 WCAG 2.3.3 要的就是这一条）")
-        // 峰值地板留着：coverage 只在"看得见东西在动"的前提下才有意义。
-        XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
-                             "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
+        // 峰值地板：coverage 只在"看得见东西在动"的前提下才有意义，所以它问的是
+        // "**这台机器上**这一臂到底有没有东西在动"。R82 的 CI 让这一条红了一次：
+        // runner 上产品峰值 0.000、等节拍证人 coverage 0.284、粗节拍证人 1.000 ⇒
+        // 处置已经是"这台机器带不动那一档节拍的循环"，而这条地板不管处置，
+        // 于是同一件事被报两次，其中一次还把环境说成产品。
+        // ⇒ 绝对地板只在**环境已被证明有资格判这一臂**时说话（.ok / .productRed），
+        //   其余两支把它换成一行有名字的读数，红由上面那个 switch 负责，不重复判。
+        if disposition == .ok || disposition == .productRed {
+            XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
+                                 "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
+        } else {
+            emit("MOTION_SHIMMER_PEAK_NOT_JUDGED 峰值=\(String(format: "%.4f", Self.peak(running)))"
+                + " 地板=\(Self.minimumVisibleChange) 处置=\(disposition) ⇒ 这一臂今天不由绝对地板判："
+                + "同一件事上面已经处置过一次（红或点名 not-run），再判一次就是把环境问题改写成产品问题")
+        }
     }
 
     /// 两颗证人的卷子与产品那卷**同一个时长**（`loopFilmSeconds`，文件里那个全局常量）：
