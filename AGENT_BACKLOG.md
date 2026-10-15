@@ -2035,6 +2035,24 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     要做的不是新判据，是把 `CaptureReadings` 那一条通路复制给探针卷（`probe-readings.log`），
     再让 `probe_coverage_gate.py` 也吃并集。**在那之前，探针那一步的"0 条下结论"不能当结论用**。
 
+100. **动效那一步在 runner 上连着两遍是红的，而整份报表里没有一条红有名字**（R65 读 CI 时撞到 / 与 49、92 同族）：
+    `motion suite exit:` —— run 38687419144（R63 台账）= **0**，run 38693365411（R64）= **1**，
+    run 38696695788（R65）= **1**。红的是同一条自校验：
+    `MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo` 断言
+    `XCTAssertGreaterThan failed: ("0.0253") is not greater than ("0.15")`，消息写着
+    "连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率，上面那条绿是空的"。
+    也就是说**判据自己做对了**（它拒绝让一条没有分辨率的绿站着），但这一步是 report-only，
+    而 `motion_floor_gate.py` 的 `MOTION_FLOOR_REDS` 数的是**它自己那四臂的结论**
+    （源码里 `reds += 1 if is_red`，`is_red` 来自臂的判定），**不看测试有没有失败**
+    ⇒ 两遍都是 `MOTION_FLOOR_OK=4/4 REDS=0`，而作业里躺着一个 exit 1。
+    更坏的是 R64 那一遍：`motion suite exit: 1` 在，而那条 `error: -[…]` 断言行
+    **整条从 stdout 里没了**（逐字 `grep -c` = 0）—— 同一台机器、同一个通道问题，
+    这一遍（R65）它才恰好活着被我读到。⇒ **红必须有名字**这条规矩（R36）现在只覆盖捕获那一步。
+    下一轮做法（R66）：① 照 R36 的形状给动效那一步加一道硬门，扫 `error: -[类 方法]` 与
+    `Test Case … failed`，未登记的即红；② 这条自校验在 runner 上的正确形态不是红，
+    是**登记**：把"这一维度在这台机器上没有分辨率"打成 `MOTION_RESOLUTION_NOT_RUN`（带读数与原因），
+    并保留"本机必须仍然判红"的那一臂 —— 否则登记会变成新的免检牌（BACKLOG 49 的原话）。
+
 99. **浮层那一行的字号是硬编码的 13pt，而令牌 `VisualFont.row` 是 12pt**（R65 改那一列时顺手读到的）：
     `QuickPickController` 建 cell 时写 `text.font = .systemFont(ofSize: 13)`，
     而侧栏的行是 `.font(.system(size: VisualFont.row))` = 12。

@@ -4111,3 +4111,29 @@ runner 的读数解释了为什么这是**假红**：同一张帧本机未绘制
 **仍然没看到的**：那一列符号在真屏幕上的样子。浮层由全局热键呼出，
 而自动化通道把按键送不进一个刚弹出的面板（D-041），
 离屏帧能证明"每行有图、左轴 0.00pt"，证明不了"这列在用户眼里有没有信息量" ⇒ 人工批次 65。
+
+### R65 的 CI 追加（run 38696695788）：新判据在 runner 上活着，而我在别人的报表里读到一处**没有名字的红**
+
+整作业 success、18/18 步全绿。逐条读到的：
+`compile warnings: 0`；`swift test exit: 0`；
+本轮那条新守卫在 runner 上打出的正是本机那句 ——
+`QUICKPICK_ROW_AXIS rows=5 取到标签=5 取到图标=5 无图行=0 标签左轴散布=0.00pt 图标列散布=0.00pt
+标签 minX=42.0,42.0,42.0,42.0,42.0 类型符号=doc,doc.on.doc,doc.text,photo`；
+捕获那一步 `capture 文件通道：377 行读数`、`captured frames: 122 executed: 38 捕获失效 0`；
+闸门 `CAPTURE_GATE_CHANNELS stdout=1 readings=377 行 `**`补回=131 行`**、
+`CASES passed=29 skipped=9 failed=0 有名字的红=0 NOT_RUN=50`、`RESULT=ok`；
+`PROBE_COVERAGE_SUMMARY … 本次下结论=0 红=0`（93 原样开着）；
+`MOTION_FLOOR judged=4/4 executed=42 OK=4/4 REDS=0`；`FRAME_BASELINE` 对 working `MISSING=0 ADDED=0`。
+⇒ 上一轮立的 `--readings` 第二次在 runner 上跑，补回的量从 65 变成 **131** —— 这个数每次都不一样，
+**恰好证明它不能靠"上次没丢"来省**。
+
+**但这一遍读到一处我必须先记账再说别的**：`motion suite exit: 1` 已经**连着两遍**
+（R64 与 R65），而两遍的报表都写着 `MOTION_FLOOR_REDS=0`。
+原因在 `motion_floor_gate.py` 里：那个 `REDS` 数的是它自己四臂的结论，**不看测试有没有失败**，
+而那一步是 report-only ⇒ 一个真实的红在整份 CI 里没有名字。
+R64 那一遍更彻底：连 `error: -[…]` 那行都从 stdout 丢了，我这次才恰好读得到 ——
+红的是 `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 的**分辨率自校验**
+（`0.0253` 读不出横幅淡入的残余，它拒绝让一条没有分辨率的绿站着）。
+⇒ 判据做对了，**闸门漏了**：这正是 R36 我给捕获那一步修过的形状，我没铺到动效这一步。
+记 **BACKLOG 100 / U-107**，R66 第一件事就是补这道门（并把这条在 runner 上的形态改成带读数的登记，
+同时保留"本机必须仍然判红"那一臂）。
