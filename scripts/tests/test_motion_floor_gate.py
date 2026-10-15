@@ -57,8 +57,15 @@ SUMMARY = "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 detail-kind-ch
 EXECUTED = "\t Executed 24 tests, with 5 tests skipped and 0 failures (0 unexpected) in 76.171 seconds"
 
 
-def log(resolve: str, summary: str = SUMMARY, extra: str = "") -> str:
-    return "\n".join([EXECUTED, summary, resolve, extra])
+# R85 / BACKLOG 118：常驻循环那一族的两行状态。`log()` 默认带上它们，因为"一次完整的运行"
+# 今天必然包含这两行 —— 不带的那几格是**故意的**，它们就是 LOOP_SILENT 的用例。
+LOOP_LINES = ["MOTION_SHIMMER_STATE 判定=ok 原因=-",
+              "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-"]
+
+
+def log(resolve: str, summary: str = SUMMARY, extra: str = "", loops=None) -> str:
+    lines = [EXECUTED, summary, resolve, extra] + (LOOP_LINES if loops is None else list(loops))
+    return "\n".join(lines)
 
 
 def markers(facts: dict, expectations: dict = None) -> list:
@@ -226,6 +233,54 @@ class MotionFloorGateTests(unittest.TestCase):
 
     # ---- 两份真日志：一份是"今天就是这样"，一份是"坏了要说为什么" ----
 
+    def testLoopStateLinesAreCountedNotGuessed(self):
+        """R85 / BACKLOG 118：这一族的三格 —— 点名在登记之内不红、理由没登记红、整行缺席红。"""
+        base = "MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-"
+        silent = markers(parse(log(base, loops=[])))
+        marks = [m for m, _ in silent]
+        self.assertIn("MOTION_FLOOR_LOOP_SILENT=skeleton-loop", marks)
+        self.assertIn("MOTION_FLOOR_LOOP_SILENT=skeleton-band-position", marks,
+                      "两行状态各算一格：只报一条的话，位置判据整族消失会被循环那一行盖住")
+        self.assertTrue(all(red for m, red in silent if m.startswith("MOTION_FLOOR_LOOP")),
+                        "缺席必须是红 —— 不红的缺席就是没人报（R46 建这张表的原意）")
+        named = markers(parse(log(base, loops=["MOTION_SHIMMER_STATE 判定=notRunEnvironment "
+                                              "原因=loop-clock-not-sustainable-at-product-rate",
+                                              "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-"])))
+        key = "MOTION_FLOOR_LOOP_NOT_JUDGED=skeleton-loop=loop-clock-not-sustainable-at-product-rate"
+        self.assertIn(key, [m for m, _ in named])
+        self.assertFalse(dict(named)[key],
+                         "登记过的点名不许红，但它必须是一行**看得见**的未覆盖")
+        bad = markers(parse(log(base, loops=["MOTION_SHIMMER_STATE 判定=notRunEnvironment "
+                                            "原因=some-brand-new-excuse",
+                                            "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-"])))
+        self.assertIn("MOTION_FLOOR_LOOP_BAD_REASON=skeleton-loop", [m for m, _ in bad])
+        self.assertTrue(dict(bad)["MOTION_FLOOR_LOOP_BAD_REASON=skeleton-loop"],
+                        "换了一种坏法就是新缺陷：先写清它是什么再放行")
+        # 带后缀的名字（`band-witness-reads-nothing(没有可用帧)`）按括号前那半截匹配，
+        # 否则每换一种"读不出"都要红一次 BAD_REASON，那会逼人把后缀删掉 —— 后缀正是有用的一半。
+        suffixed = markers(parse(log(base, loops=["MOTION_SHIMMER_STATE 判定=ok 原因=-",
+                                                 "MOTION_SHIMMER_BAND_STATE 判定=notRunEnvironment "
+                                                 "原因=band-witness-reads-nothing(没有可用帧)"])))
+        self.assertIn("MOTION_FLOOR_LOOP_NOT_JUDGED=skeleton-band-position=band-witness-reads-nothing",
+                      [m for m, _ in suffixed])
+        self.assertFalse(any(red for m, red in suffixed if m.startswith("MOTION_FLOOR_LOOP")),
+                         "带后缀的登记名不该红：红的是**没登记过**的坏法，不是写了细节的坏法")
+        # skipped 那一支也要有名字（能力闸门 skip 掉判据时，最容易什么都不留下）
+        skipped = markers(parse(log(base, loops=["MOTION_SHIMMER_STATE 判定=skipped 原因=capability-gate",
+                                                "MOTION_SHIMMER_BAND_STATE 判定=skipped 原因=capability-gate"])))
+        self.assertFalse(any(red for m, red in skipped if m.startswith("MOTION_FLOOR_LOOP")),
+                         "被能力闸门 skip 是一朵有名字的未覆盖，不是判据坏了")
+        # 判到 ok：不红，但只打一行读数 —— "这一族验过了"不由闸门说，由判据自己说
+        judged = markers(parse(log(base)))
+        self.assertIn("MOTION_FLOOR_LOOP_JUDGED=skeleton-loop", [m for m, _ in judged])
+        self.assertFalse(any(red for m, red in judged if m.startswith("MOTION_FLOOR_LOOP")))
+        # productRed 这一支**不在这里红**：它的用例本身是红的，红由 suite 那一层报（同一件事只判一次）
+        red_named = markers(parse(log(base, loops=["MOTION_SHIMMER_STATE 判定=productRed 原因=-",
+                                                  "MOTION_SHIMMER_BAND_STATE 判定=productRed 原因=-"])))
+        self.assertIn("MOTION_FLOOR_LOOP_RED_NAMED=skeleton-loop=productRed", [m for m, _ in red_named])
+        self.assertFalse(any(red for m, red in red_named if m.startswith("MOTION_FLOOR_LOOP")),
+                         "循环那一族自己不许把同一个产品红报两次：SUITE_RED 那一层已经有名字、有 XCTAssert 原文")
+
     def testRealLocalLogIsRedUnderTheTightenedRegistry(self):
         """本机那份真日志（R46 抓的，带捕获之前）今天**必须红，而且只红在地板 + 一条没名字的红上**。
 
@@ -234,6 +289,10 @@ class MotionFloorGateTests(unittest.TestCase):
           · R52：把两臂登记成"可以判不到" ⇒ 同一份日志变成**绿 + THIN**；
           · R57：`captureRect` 把抓一帧从 39.6ms 打到 4.5ms ⇒ 两臂今天判得到，清单改回必须判到，
             于是这份**旧**日志重新变成红，且只红在 UNDERCOVERED（judged=2 < 地板 4）。
+          · R85：`loops` 那一层进来之后，这份**旧**日志再多红两格 LOOP_SILENT ——
+            它拍于状态行存在之前，所以"这一族今天一个字都没说"对它是一句真话。
+            这一格因此同时是那条规则的**正对照**（新日志里由
+            `testLoopStateLinesAreCountedNotGuessed` 造合成件判）。
           · R66：加了用例级判据之后，同一份日志还多红一格 NAMELESS_RED。
             原因要说清楚，别把它读成"R46 那次本机有条没人管的红"：那次的汇总行是
             `Executed 24 tests, with 5 tests skipped and 1 failure`（逐字留在夹具里），
@@ -247,7 +306,11 @@ class MotionFloorGateTests(unittest.TestCase):
         facts = parse(LOCAL_RUNNER_LOG)
         reds = [m for m, red in markers(facts) if red]
         self.assertEqual(sorted(reds),
-                         sorted(["MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_SUITE_NAMELESS_RED=1"]),
+                         sorted(["MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_SUITE_NAMELESS_RED=1",
+                                 # R85 / BACKLOG 118：这份 R46 的真日志早于状态行 ⇒ 它顺带成了
+                                 # LOOP_SILENT 的正对照（"这一族整行没说一句话"就是它这个样子）。
+                                 "MOTION_FLOOR_LOOP_SILENT=skeleton-loop",
+                                 "MOTION_FLOOR_LOOP_SILENT=skeleton-band-position"]),
                          "本机真日志的红变了形状 ⇒ 要么清单又漂了，要么闸门判错了：%s" % reds)
         self.assertEqual([m for m, _ in markers(facts) if m.startswith("MOTION_FLOOR_THIN")], [],
                          "清单收紧之后 THIN 这一族已经没有入口了；它还在说明 thin_warnings 没清空")
@@ -411,6 +474,9 @@ class MotionSuiteRedTests(unittest.TestCase):
         self.lines = [line for line in text.splitlines() if not line.startswith("# ")]
         self.assertTrue(any("error: -[" in line for line in self.lines),
                         "夹具里没有 XCTAssert 原文 ⇒ 这一层的'红的理由'无从测起")
+        # R85：这份 R66 的真夹具早于状态行 ⇒ 补上两行，让这一层继续只测它测的那件事
+        # （红有没有名字）。"状态行缺席"另有专门的用例，不在这里混进来。
+        self.lines = self.lines + LOOP_LINES
         self.facts = parse("\n".join(self.lines))
         # 夹具自己必须成立：臂一级**全绿**，这正是旧闸门放走它的原因。
         self.assertEqual(self.facts["judged"], 4)

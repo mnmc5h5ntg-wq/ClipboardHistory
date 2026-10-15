@@ -1,0 +1,26 @@
+BUILD_WARNINGS=0 BUILD_EXIT=0
+FULL_TEST=801 tests / 0 failures（41 skipped，swift test exit 0）
+MOTION_TEST_EXIT=0
+READ ^MOTION_SHIMMER :: MOTION_SHIMMER 扫 帧数=49 变化帧对=18 峰值=0.023 采样≈52ms coverage=0.979(地板 0.50) 记录时长=2498ms 判定=一直在动
+READ ^MOTION_SHIMMER_FILM :: MOTION_SHIMMER_FILM 帧=49 时刻=49 配对=是 卷长=2498ms（探针声明 2500ms） ｜ 结论尺报的记录时长=2498ms —— 后者在峰值 0 时**必然**是 0，所以前提不许挂在它身上
+READ ^MOTION_SHIMMER_WITNESS :: MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12，与产品同数字) 帧对=47 在变=20 峰值=0.023 coverage=1.000 判定=一直在动
+READ ^MOTION_SHIMMER_WITNESS :: MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45，只签字'看得见这种画法') 帧对=46 在变=34 峰值=0.035 coverage=1.000 判定=一直在动
+READ ^MOTION_SHIMMER_BAND_CONTROL :: MOTION_SHIMMER_BAND_CONTROL 整组一条带那卷判定=整组一条带 每根条各扫那卷判定=每根条各扫各的 （两份都是 8 灰阶抬升的亮斑，只有中心位置放法不同）
+READ ^MOTION_SHIMMER_BAND :: MOTION_SHIMMER_BAND 帧=49 比例=1pt≈2.00px 可用帧=8 丢掉=41 同帧绝对中心最大散布=0.0pt（地板：≤6.0 判一条带、≥40.0 判各扫各的） 归一化散布=0.448 行程=121.5pt（正对照地板 20.0） 判定=整组一条带 理由=每一帧三根条的亮斑都在同一条竖线上（最大差 0.0pt ≤ 6.0），且它一路走了 121.5pt
+READ ^MOTION_SHIMMER_BAND_WITNESS :: MOTION_SHIMMER_BAND_WITNESS 粗节拍那颗(抬 0.45、同一种画法、同一把尺) 可用帧=16 绝对散布=0.0pt 行程=136.5pt 判定=整组一条带 理由=每一帧三根条的亮斑都在同一条竖线上（最大差 0.0pt ≤ 6.0），且它一路走了 136.5pt
+READ ^BAND_TRUTH_TABLE :: BAND_TRUTH_TABLE 一条带=整组一条带 各扫各=每根条各扫各的 空=没有可用帧 静止=分不开 帧少=分不开 分不开=分不开 处置=ok/红/红/未跑(⑫)/未跑(⑬)/未跑(⑭⑮ loopCapable=false) 一条带归一化=0.374 各扫各归一化=0.026 绝对散布=2.0/93.0pt 行程=71.0/141.0pt ⇒ 15 格
+READ ^LOOP_WITNESS_MIRROR :: LOOP_WITNESS_MIRROR 节拍=33.3ms 每拍推进=0.0222 抬升=0.12 三项全等于产品 ⇒ 证人还在问同一句话
+READ ^MOTION_SHIMMER_STATE :: MOTION_SHIMMER_STATE 判定=ok 原因=-
+READ ^MOTION_SHIMMER_BAND_STATE :: MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-
+MOTION_CHANNEL_UNIONED=1 stdout=47 文件=102
+MOTION_FLOOR=MOTION_FLOOR_FACTS judged=4/4 executed=54 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=10 notice-banner-dismiss=13 红的用例=- 汇总行报红=0 MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）（这一族今天一共打了 2 行状态，按最后一条判） MOTION_FLOOR_REDS=0 MOTION_GATE_EXIT=0
+CAPTURE_TEST_EXIT=0
+CAPTURE_GATE_EXIT=0
+CAPTURE_GATE=CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+
+FRAME_BASELINE_EXIT=0
+FRAME_BASELINE=FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0
+PY_EXIT=0
+SCRIPT_TESTS=Ran 143 tests in 6.717s OK 
+CURVE_EXIT=0
+CURVE=GAPS=none PHASE2 n=77 rounds=9..84 mean=92.55 min=86 max=98 PHASE2 CURVE: 91 · 90 · 92 · 93 · 94 · 95 · 96 · 93 · 95 · 91 · 86 · 89 · 91 · 87 · 90 · 92 · 91 · 92 · 91 · 92 · 90 · 89 · 90 · 89 · 94 · 90 · 90 · 89 · 90 · 91 · 90 · 89 · 90 · 91 · 92 · 92 · 93 · 94 · 94 · 94 · 94 · 94 · 94 · 94 · 94 · 94 · 94 · 94 · 95 · 96 · 96 · 96 · 96 · 96 · 93 · 93 · 92 · 92 · 92 · 96 · 93 · 93 · 92 · 93 · 94 · 92 · 93 · 94 · 94 · 93 · 93 · 93 · 93 · 93 · 94 · 94 · 98 PHASE2_TO_46 n=39 mean=91.23 PHASE2_TO_47 n=40 mean=91.30

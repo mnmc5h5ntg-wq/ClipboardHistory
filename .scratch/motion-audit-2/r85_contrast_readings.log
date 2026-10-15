@@ -1,0 +1,3 @@
+SKELETON_CONTRAST_DARK=11.0/255（4.3%） 背景=30.0 条峰值=41.0 峰值行 y=80px=40pt 偏离行=48 帧=1440x1040
+SKELETON_CONTRAST_LIGHT=13.0/255（5.1%） 背景=255.0 条峰值=242.0 峰值行 y=80px=40pt 偏离行=48 帧=1440x1040
+BAND_STRIP skeleton-band-strip.png 整图=2520x880px ⇒ 6 列 × 4 行 = 24 格，每格 420x220px（条带把源帧缩过；本轮没有单独落盘源帧，所以不写源帧尺寸）

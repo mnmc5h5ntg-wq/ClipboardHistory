@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R85）
+
+- 覆盖地板新增 `loops` 那一层：常驻循环那一族（扫光的运动判据 + 位置判据）第一次进登记表。
+  判据的两条出口各打一行状态（`MOTION_SHIMMER_STATE` / `MOTION_SHIMMER_BAND_STATE`），
+  闸门只判两格 —— 状态行整行缺席 ⇒ `LOOP_SILENT` 红；点名理由没登记 ⇒ `BAD_REASON` 红；
+  点名在登记之内 ⇒ 不红，但打一行看得见的未覆盖。脚本自测 +1 格（现跑共 143 格）。
+- 变异电池 M458–M464（M458、M459、M460、M461、M462、M463、M464）：7 刀 CAUGHT，没有逃掉的（M461 / M462 第一版逃掉：守卫从"这个串出现过"
+  改成"两条出口各打一次"之后才有牙 —— 见台账 U-174）。
+
+### Docs（R85）
+
+- BACKLOG 118 结案；119 补一条新成因（画法让运动不可见 ⇒ 归因顺序改了）。
+
 ### Product（R84）
 
 - 详情预览加载态的骨架扫光：亮带从"每根条各扫各的"改成**一条光横穿整组**

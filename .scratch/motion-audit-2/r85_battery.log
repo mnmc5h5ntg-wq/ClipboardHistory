@@ -1,0 +1,49 @@
+=== 基线（未变异）：两条 python 用例 + 三条 Swift 判据都必须绿 ===
+   python={'testLoopStateLinesAreCountedNotGuessed': 'green', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'} swift={'testTheLoopWitnessStillMirrorsTheProductLoop': 'green', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+
+M458 状态行整行缺席时不红（把 LOOP_SILENT 变成一行废话）
+   CAUGHT 只红在预期那几条：{'testLoopStateLinesAreCountedNotGuessed': 'red', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'red'}
+     FAIL: testLoopStateLinesAreCountedNotGuessed (test_motion_floor_gate.MotionFloorGateTests)
+     FAIL: testRealLocalLogIsRedUnderTheTightenedRegistry (test_motion_floor_gate.MotionFloorGateTests)
+   已还原（逐字节相同：True）
+
+M459 登记过的点名也拦发布（登记表就从放行变成另一道恒红）
+   CAUGHT 只红在预期那几条：{'testLoopStateLinesAreCountedNotGuessed': 'red', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'}
+     FAIL: testLoopStateLinesAreCountedNotGuessed (test_motion_floor_gate.MotionFloorGateTests)
+   已还原（逐字节相同：True）
+
+M460 理由匹配不剥括号后缀（换一种读不出就冒红 ⇒ 逼人删掉有用的那半截）
+   CAUGHT 只红在预期那几条：{'testLoopStateLinesAreCountedNotGuessed': 'red', 'testRealLocalLogIsRedUnderTheTightenedRegistry': 'green'}
+     FAIL: testLoopStateLinesAreCountedNotGuessed (test_motion_floor_gate.MotionFloorGateTests)
+   已还原（逐字节相同：True）
+
+M461 位置判据不再打状态行（登记表那一族从此没有可读状态）
+   CAUGHT 只红在预期那几条：{'testTheLoopWitnessStillMirrorsTheProductLoop': 'red', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1842: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopWitnessStillMirrorsThe
+   已还原（逐字节相同：True）
+
+M462 循环判据不再打状态行（同上，另一条判据）
+   CAUGHT 只红在预期那几条：{'testTheLoopWitnessStillMirrorsTheProductLoop': 'red', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1838: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopWitnessStillMirrorsThe
+   已还原（逐字节相同：True）
+
+M463 位置判据在能力闸门那条出口不再打状态行（第一版逃掉的那条路）
+   CAUGHT 只红在预期那几条：{'testTheLoopWitnessStillMirrorsTheProductLoop': 'red', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1842: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopWitnessStillMirrorsThe
+   已还原（逐字节相同：True）
+
+M464 循环判据在能力闸门那条出口不再打状态行（同上，另一条判据）
+   CAUGHT 只红在预期那几条：{'testTheLoopWitnessStillMirrorsTheProductLoop': 'red', 'testSkeletonSweepIsOneBand': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1838: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopWitnessStillMirrorsThe
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M458   CAUGHT
+   M459   CAUGHT
+   M460   CAUGHT
+   M461   CAUGHT
+   M462   CAUGHT
+   M463   CAUGHT
+   M464   CAUGHT
+   抓到=7 逃掉=0 没跑成=0 未落地=0
+BATTERY_EXIT=0

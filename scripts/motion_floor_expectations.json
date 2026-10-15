@@ -9,7 +9,8 @@
     "**不登记帧数**：`MOTION_SUMMARY <arm>=<帧数>` 那个数由采样相位决定，",
     "R2 实测同一份代码本机跑过 2/3/2（原始记录在 MotionFilmstripTests.changedRunElapsedMilliseconds 开头）。",
     "拿它当判据就是判采样，不是判产品。",
-    "R57：两臂的 must_judge 从 R52 的 false 改回 true（带捕获把成本降下来了），thin_warnings 清空 —— 那条『两臂同时判不到只警告』的形状今天不再需要，留着它就等于把修好的洞留在那儿等人掉回去。"
+    "R57：两臂的 must_judge 从 R52 的 false 改回 true（带捕获把成本降下来了），thin_warnings 清空 —— 那条『两臂同时判不到只警告』的形状今天不再需要，留着它就等于把修好的洞留在那儿等人掉回去。",
+    "R85 / BACKLOG 118：新增 `loops` 一节 —— 常驻循环那一族（扫光的运动判据与位置判据）第一次进登记表。判据两格：点名在登记之内不红、状态行整行缺席红（LOOP_SILENT）。"
   ],
   "scenarios": [
     "notice-banner",
@@ -68,5 +69,27 @@
     "如果哪天这里多了条目，`MOTION_FLOOR_REGISTERED_REDS=n` 会在日志里把 n 打出来 ——",
     "「靠登记过的绿」必须数得出来（BACKLOG 49）。"
   ],
-  "suite_reds": []
+  "suite_reds": [],
+  "loops": [
+    {
+      "name": "skeleton-loop",
+      "state_line": "MOTION_SHIMMER_STATE",
+      "allowed_not_judged": [
+        "capability-gate",
+        "loop-clock-not-sustainable-at-product-rate",
+        "loop-witness-dead"
+      ],
+      "note": "R85 / BACKLOG 118：常驻循环那一族第一次进登记表。扫光不是四条场景臂之一，于是 R83 之后它的状态是『本机判、runner 点名 loop-clock-not-sustainable-at-product-rate』，而覆盖地板既不数它也不许它缺席 —— 它红的时候走 SUITE_RED，它整行消失的时候没人知道今天判没判。这一格的判据只有两条（118 原文）：点名在登记之内 ⇒ 不红但打一行有名字的未覆盖；整行缺席 ⇒ LOOP_SILENT 红。允许的理由三种：capability-gate（能力闸门 skip 掉了这条判据）、loop-clock-not-sustainable-at-product-rate（这台机器带不动那一档节拍的常驻循环，R82 的 CI 实测）、loop-witness-dead（连高对比那颗证人都没拍到东西在动 ⇒ 签字的人没来上班，这一支同时会让用例红）。R84 的 CI（run 38798408040）第一次在这一族读到 判定=ok（产品 coverage 0.522、证人 0.594，地板 0.50）⇒ 三遍 runner 读数 0.000 / 0.050 / 0.522 的跳变发生在**亮带画法换掉**之后，所以 119 那朵『处置翻面』现在有了第三种解释：旧的 fan-out 画法每拍扫过的面积太小，在 112ms 的采样网格 + 1× 像素上跨不过 8/255 那道地板。登记不改成 must_judge=true：0.522 只比地板高 0.022，一遍读数就把它钉成硬门是 R38 禁止的那种拿当日运气当地板。"
+    },
+    {
+      "name": "skeleton-band-position",
+      "state_line": "MOTION_SHIMMER_BAND_STATE",
+      "allowed_not_judged": [
+        "capability-gate",
+        "loop-not-capable",
+        "band-witness-reads-nothing"
+      ],
+      "note": "R85 / BACKLOG 118 的第二格（R84 新加的位置判据）。它不判运动，判『亮带是不是整组一条』，而它今天有两种**都不该定罪产品**的判不到：loop-not-capable（循环那一族在这台机器上还没被证明判得动，于是位置这一族闭嘴 —— U-172 那条方向性约束：会翻脸的读数只准收窄断言，不准定罪）、band-witness-reads-nothing（连高对比那颗证人都读不出亮带在哪儿）。名字后面括号里那颗尺的判定（例如 band-witness-reads-nothing(没有可用帧)）不参与匹配，闸门只比括号前那半截 ⇒ 换一种坏法照样红在 BAD_REASON。"
+    }
+  ]
 }

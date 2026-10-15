@@ -142,7 +142,14 @@ MOTION_NORMAL = (NORMAL
 # R46：地板现在按**登记表**判，而表里是今天 `Scenario.all()` 的四臂。
 # 上面那份三臂日志留给"报告型那一步"用（它只 echo 读数，不查形状），
 # 地板那六格必须用这一份 —— 否则每一格都会先红在 MISSING_KEY 上，测的就不是它想测的事了。
-FLOOR_SUMMARY = ("MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
+# R85 / BACKLOG 118：地板那一层的"一次完整运行"现在包含常驻循环的两行状态。
+# 挂在 FLOOR_SUMMARY 上而不是逐格改七个场景，是因为这七格测的都是"臂一级的形状"，
+# 循环那一族对它们全是背景条件 —— 背景条件缺了会让每一格多两朵 LOOP_SILENT 红，
+# 而"缺席要红"这件事由 scripts/tests/test_motion_floor_gate.py 的
+# `testLoopStateLinesAreCountedNotGuessed` 专门判（一处判一件事）。
+FLOOR_SUMMARY = ("MOTION_SHIMMER_STATE 判定=ok 原因=-\n"
+                 "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-\n"
+                 "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
                  "detail-kind-change=3 empty-state=4")
 
 # (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)

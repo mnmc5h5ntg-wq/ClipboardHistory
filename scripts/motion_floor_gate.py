@@ -165,6 +165,9 @@ def parse(text: str) -> dict:
     # 与 `failures` 的数量不一致，而那种不一致本身就是 NAMELESS_RED 要报的东西。
     summary_failures = max([int(m.group(1)) for m in SUMMARY_FAILURES.finditer(text)] or [0])
     return {
+        # R85 / BACKLOG 118：`loops` 那一层读的是**原文行**（状态行的名字里带中文与括号，
+        # 拆成结构化字段会把两种坏法压成同一种），所以这里把日志本体一起交出去。
+        "text": text,
         "judged": judged,
         "total": total,
         "not_run": not_run,
@@ -236,6 +239,60 @@ def suite_verdicts(facts: dict, expectations: dict) -> list:
     return out
 
 
+def loop_verdicts(text: str, expectations: dict) -> list:
+    """常驻循环那一族今天**说没说一句话**（R85 / BACKLOG 118）。
+
+    为什么这一族要单独一层：`arms` 那层按四条场景臂统计 judged/not-run，而骨架扫光不是场景臂 ——
+    它是 `testSkeletonSweepActuallySweeps` / `testSkeletonSweepIsOneBand` 自己的一卷。
+    R83 之后它当天的状态是"本机判、runner 点名"，而覆盖地板既不数它、也不许它缺席：
+    它红的时候闸门报红（走的是 SUITE_RED），它**整行消失**的时候没人知道今天判没判。
+    这正是 R46 建这张表要治的"掉了一臂没人报"，只是这一族不在表的形状里。
+
+    两格判据（118 原文要求的就是这两格）：
+      LOOP_SILENT（红）      注册过的状态行整行缺席 ⇒ 这一族今天一个字都没说。
+      LOOP_BAD_REASON（红）  说了"今天判不到"，而那个理由没登记过 ⇒ 换了一种坏法。
+    点名在登记之内 ⇒ 打一行不红的读数；判到了（`ok`）⇒ 同样打一行。
+    `productRed` / `witnessDead` 这两种状态**不在这里红**：它们对应的用例本身就是红的，
+    红由 SUITE_RED 那一层报（同一件事只判一次 —— R83 / U-162 那句话在这一层同样成立）。
+    """
+    out = []
+    for spec in expectations.get("loops", []):
+        line = spec.get("state_line")
+        if not line:
+            continue
+        allowed = set(spec.get("allowed_not_judged", []))
+        name = spec.get("name", line)
+        pattern = re.compile(re.escape(line) + r"\s+判定=(\S+)\s+原因=(\S*)")
+        seen = list(pattern.finditer(text))
+        if not seen:
+            out.append(("MOTION_FLOOR_LOOP_SILENT=%s" % name,
+                        "注册过的状态行 %s 整行没出现 ⇒ 常驻循环『%s』这一族今天既没说判到了、"
+                        "也没说判不到。缺席必须比误报更难通过：这一格是 R36 那句话"
+                        "（只有退出码的红等于没有红）在循环这一族的形状" % (line, name), True))
+            continue
+        state, reason = seen[-1].group(1), seen[-1].group(2)
+        base = reason.split("(")[0]        # `band-witness-reads-nothing(整组一条带)` 这类带后缀的名字
+        suffix = "（这一族今天一共打了 %d 行状态，按最后一条判）" % len(seen) if len(seen) > 1 else ""
+        if state in ("skipped", "notRunEnvironment"):
+            if base and base in allowed:
+                out.append(("MOTION_FLOOR_LOOP_NOT_JUDGED=%s=%s" % (name, base),
+                            "这一族今天判不到，理由是登记过的『%s』⇒ 不红，但它是一朵**有名字的未覆盖**，"
+                            "不许因为不红就当成验过了%s" % (base, suffix), False))
+            else:
+                out.append(("MOTION_FLOOR_LOOP_BAD_REASON=%s" % name,
+                            "这一族说今天判不到，而理由『%s』不在登记里（登记的是 %s）⇒ "
+                            "同一臂换了一种坏法就是新缺陷，要先写清它是什么再放行%s"
+                            % (base or "-", ",".join(sorted(allowed)) or "-", suffix), True))
+        elif state == "ok":
+            out.append(("MOTION_FLOOR_LOOP_JUDGED=%s" % name,
+                        "这一族今天判到了（状态 ok）%s" % suffix, False))
+        else:
+            out.append(("MOTION_FLOOR_LOOP_RED_NAMED=%s=%s" % (name, state),
+                        "这一族今天判出了一个红状态『%s』⇒ 它对应的用例是红的，"
+                        "红由 `suite_reds` 那一层报（这里只留名字，不重复判一次）%s" % (state, suffix), False))
+    return out
+
+
 def verdicts(facts: dict, expectations: dict) -> list:
     """返回 [(标记, 消息, 是否红)]。全绿时只有一条 OK。"""
     arms = expectations.get("arms", {})
@@ -275,6 +332,10 @@ def verdicts(facts: dict, expectations: dict) -> list:
                         "日志里连一行 `Test skipped - <原因>` 都没有 ⇒ 这一族不是被 skip，"
                         "而是根本没执行到打结论行的那一步（看 suite 的退出码与看门狗）", False))
         return out
+
+    # R85 / BACKLOG 118：常驻循环那一族。只在**有结论行**的路上判 ——
+    # 没有结论行时 `NO_RESOLVE` 已经说了"这一族今天没读数"，这里再红一次就是 R83 禁止的重复判。
+    out.extend(loop_verdicts(facts.get("text", ""), expectations))
 
     missing = [name for name in scenarios if name not in facts["summary_arms"]]
     if missing:

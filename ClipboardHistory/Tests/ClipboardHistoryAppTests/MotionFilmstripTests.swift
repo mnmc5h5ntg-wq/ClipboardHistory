@@ -1827,6 +1827,22 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(drawsOneShapeForTheGroup(region(in: witnessFile, named: "private func skeleton(phase:")),
                       "证人回落到每根条各自的形状，而产品是整组一个 ⇒ 两颗视图的绘制负载不再是同一件事："
                           + "产品红与环境带不动之间只剩的那一个差别又多了两个（形状个数、渐变落在谁的坐标系）")
+        // R85 / BACKLOG 118：那两行**状态行**是登记表唯一读的东西。它们被删掉时判据本身照样绿
+        // （没人断言自己打过字），红要等到闸门读到"这一族整行没说一句话"才出现 ——
+        // 而那已经是下一次 CI 的事了。所以这里就地钉住"两条判据各自还在打状态行"。
+        // 名字写在被抽取的那个函数里，守卫自己只出现函数名 ⇒ 不会命中守卫自己（R53 那一课）。
+        // 两条出口各自都要打一行：能力闸门 skip 那条，与真判完那条。
+        // 为什么数**次数**而不是数"有没有出现过"（M461 第一版就是这么逃掉的）：
+        // 只断言"函数体里出现过这个串"时，删掉正常路径那一行仍然绿 —— 剩下 skip 分支那一行
+        // 把断言喂饱了。而登记表要的恰恰是"判完的那条路也留了字"，所以这里要的是两行。
+        XCTAssertEqual(stateLineCount("MOTION_SHIMMER_STATE", in: witnessFile,
+                                      named: "func testSkeletonSweepActuallySweeps("), 2,
+                       "循环判据的两条出口（能力闸门 skip / 真判完）不再各自打一行状态 ⇒ "
+                           + "登记表那一族今天说没说过话，只剩闸门在下一轮才看得见")
+        XCTAssertEqual(stateLineCount("MOTION_SHIMMER_BAND_STATE", in: witnessFile,
+                                      named: "func testSkeletonSweepIsOneBand("), 2,
+                       "位置判据的两条出口不再各自打一行状态 ⇒ 同上，而且这一族是 R84 才进表的，"
+                           + "消失起来最容易无声")
     }
 
     /// R84：位置那把尺自己的真值表。它判的是"同一帧里三根条的亮斑在同一条竖线上吗"，
@@ -2240,6 +2256,12 @@ final class MotionFilmstripTests: XCTestCase {
                 + "**注意**：R48 已撤回「这条通道对淡入可见性=0」那句旧结论 —— "
                 + "条带图里出现过半透明中间态，所以这是**没抓到**，不是**看不见**")
         }
+    }
+
+    /// 某个成员体内出现了几次这个串。**先取区域再数**，所以守卫自己写下的字面量不算数
+    /// （R53 那一课：扫自身源码的守卫，先把守卫自己摘掉）。
+    private func stateLineCount(_ marker: String, in code: String, named declaration: String) -> Int {
+        region(in: code, named: declaration).components(separatedBy: marker).count - 1
     }
 
     /// 按声明取一个成员的**函数体**（花括号配平），取不到 ⇒ 当场红。
@@ -4605,7 +4627,13 @@ final class MotionFilmstripTests: XCTestCase {
     /// 处置：产品在跑 ⇒ 绿；等节拍证人在跑而产品没跑 ⇒ **红**；等节拍证人也没跑 ⇒ 点名 not-run；
     /// 连粗节拍证人整卷都没拍到东西 ⇒ 证人坏了，红（否则"环境"这一支永远有人签字）。
     func testSkeletonSweepActuallySweeps() async throws {
-        try skipUnlessEnabledAndCapable()
+        // 能力闸门 skip 之前先打一行状态（R85 / BACKLOG 118）：闸门那一步数的是"这一族今天
+        // 到底说没说一句话"，而 skip 恰好是最容易什么都不留下的那条路 —— 没有这一行，
+        // "被闸门挡在门外"与"判据坏了没打读数"在日志里长得一模一样。
+        do { try skipUnlessEnabledAndCapable() } catch {
+            emit("MOTION_SHIMMER_STATE 判定=skipped 原因=capability-gate")
+            throw error
+        }
         let probe = SkeletonProbe()
         // 一卷就是**一对**（帧 + 它们的时刻）。R82 之前这里写的是 `probe.lastStamps`，
         // 而后一卷会把它覆盖掉 —— 见 `GrabbedFilm` 的注释与 U-155。
@@ -4657,6 +4685,11 @@ final class MotionFilmstripTests: XCTestCase {
                            + "\(String(format: "%.0f", loopFilmSeconds * 1000))ms ⇒ coverage 的分母不对，"
                            + "判定无论红绿都没有依据（中间有别的东西占住了主线程，或探针提前收卷）")
         let disposition = Self.shimmerDisposition()
+        // 状态行排在**所有闸门与 XCTFail 之前**（R53 那一课：抛出去之后这行就是唯一的痕迹），
+        // 且它是 `motion_floor_gate.py` 的 `loops` 那一节唯一读的东西 —— 判据的结论可以随机器翻面，
+        // 但"今天说没说过这句话"不许翻面（BACKLOG 118）。
+        emit("MOTION_SHIMMER_STATE 判定=\(Self.loopStateLabel(disposition)) "
+            + "原因=\(Self.loopStateReason(disposition))")
         switch disposition {
         case .ok:
             break
@@ -4724,7 +4757,10 @@ final class MotionFilmstripTests: XCTestCase {
     ///    给过相反的两支（证人 coverage 0.284 ⇒ 点名环境，0.837 ⇒ 判产品红），
     ///    那一支自己不稳定，不能拿来当这一支的地板。
     func testSkeletonSweepIsOneBand() async throws {
-        try skipUnlessEnabledAndCapable()
+        do { try skipUnlessEnabledAndCapable() } catch {
+            emit("MOTION_SHIMMER_BAND_STATE 判定=skipped 原因=capability-gate")
+            throw error
+        }
         // ① 尺子自己的正对照（合成卷子，不依赖机器、不依赖产品）。
         let control = Self.bandRulerControl()
         emit("MOTION_SHIMMER_BAND_CONTROL 整组一条带那卷判定=\(control.oneBandVerdict.rawValue) "
@@ -4767,6 +4803,9 @@ final class MotionFilmstripTests: XCTestCase {
         let bandDisposition = Self.bandAdjudication(product: reading.verdict,
                                                     witness: witnessReading.verdict,
                                                     loopCapable: loopDisposition == .ok)
+        let bandReason = Self.bandStateReason(bandDisposition, loop: loopDisposition,
+                                              witness: witnessReading.verdict)
+        emit("MOTION_SHIMMER_BAND_STATE 判定=\(Self.bandStateLabel(bandDisposition)) 原因=\(bandReason)")
         switch bandDisposition {
         case .ok:
             break   // 产品判成整组一条带，而且这台机器有资格判这件事
@@ -5170,6 +5209,47 @@ final class MotionFilmstripTests: XCTestCase {
                                                    stamps: film.stamps).verdict,
                                 rateWitness: loopWitness(.gradientAtProductRate).verdict,
                                 coarseWitness: loopWitness(.gradient).verdict)
+    }
+
+    /// 状态行的两种取值。**名字要稳定**：`motion_floor_expectations.json` 的 `loops` 那一节
+    /// 按这些串登记"允许哪几种判不到"，改了名字就是换了一种坏法（`BAD_REASON` 那一格会红）。
+    static func loopStateLabel(_ disposition: LoopAdjudication) -> String {
+        switch disposition {
+        case .ok: return "ok"
+        case .productRed: return "productRed"
+        case .notRunEnvironment: return "notRunEnvironment"
+        case .witnessDead: return "witnessDead"
+        }
+    }
+
+    static func bandStateLabel(_ disposition: BandAdjudication) -> String {
+        switch disposition {
+        case .ok: return "ok"
+        case .productRed: return "productRed"
+        case .notRunEnvironment: return "notRunEnvironment"
+        }
+    }
+
+    /// 循环那一族的点名理由。两支 not-run 各有各的名字：把"证人坏了"与"环境带不动"并成
+    /// 一个名字，等于让最严重的那一种坏法（没人签字）借用较轻那一支的免检牌。
+    static func loopStateReason(_ disposition: LoopAdjudication) -> String {
+        switch disposition {
+        case .ok, .productRed: return "-"
+        case .notRunEnvironment: return "loop-clock-not-sustainable-at-product-rate"
+        case .witnessDead: return "loop-witness-dead"
+        }
+    }
+
+    /// 位置那一族的点名理由：同样是 not-run，但**是谁不让判**要分开写 ——
+    /// `loop-not-capable` 说的是"循环那一族今天判不动，所以这一族闭嘴"（U-172 那条方向性约束），
+    /// `band-witness-reads-nothing` 说的是"连高对比那颗证人都读不出亮带在哪儿"。
+    static func bandStateReason(_ disposition: BandAdjudication, loop: LoopAdjudication,
+                                witness: BandReading.Verdict) -> String {
+        switch disposition {
+        case .ok, .productRed: return "-"
+        case .notRunEnvironment:
+            return loop != .ok ? "loop-not-capable" : "band-witness-reads-nothing(\(witness.rawValue))"
+        }
     }
 
     /// 两颗证人的卷子与产品那卷**同一个时长**（`loopFilmSeconds`，文件里那个全局常量）：
