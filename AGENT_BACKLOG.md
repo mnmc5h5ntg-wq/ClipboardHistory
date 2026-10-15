@@ -2035,7 +2035,38 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     要做的不是新判据，是把 `CaptureReadings` 那一条通路复制给探针卷（`probe-readings.log`），
     再让 `probe_coverage_gate.py` 也吃并集。**在那之前，探针那一步的"0 条下结论"不能当结论用**。
 
+101. **`fade-clock-snaps-here` 是一条"整卷级"的未覆盖，而覆盖地板只数"臂级"的**（R66 开 / 与 49、92、100 同族）：
+    `motion_floor_gate.py` 的 UNREGISTERED / REASONLESS / BAD_REASON 三格读的都是
+    `MOTION_RESOLVE_SUMMARY judged=n/m not-run=<臂名>`，而 R66 新加的这条 skip 不属于任何一臂
+    （它整卷一条：`testListRowsDoNotAnimateAndNothingClaimsTheyDo` 被环境挡掉了）。
+    今天它的可见度只有两行：日志里的 `MOTION_FADE_CLOCK … 判定=拍成跳变` 与
+    `Test Case … skipped - MOTION_NOT_RUN=fade-clock-snaps-here …`，
+    而后者只在 `MOTION_RESOLVE_SUMMARY` 缺席时才会被 `MOTION_FLOOR_SKIPS` 打出来。
+    ⇒ 登记没有 run 号、没有计数、也没有"这条今天第几次缺席"的趋势 ——
+    BACKLOG 49 的原话就是这种形状：一条说得清理由的缺席，如果数不出来，慢慢就变成免检牌。
+    要做的：给闸门加一层 `suite_not_run`（理由白名单 + 每次运行都打计数），
+    并把 `MOTION_FADE_CLOCK` 的判定并进结论行（例如 `MOTION_RESOLUTION=能分辨/拍成跳变/探针坏了`），
+    让人一眼能看出"这一卷的淡入判据今天有没有牙"。
+
+102. **runner 上的现象看不到图：动效那一步的读数被 `head -120` 截掉，胶片又从不上传**（R66 读 CI 时撞到）：
+    R65 那一步自己打的 `MOTION_LINES=146`，而控制台只 `grep -E '^MOTION_' | head -120`
+    ⇒ **至少有 26 行从没进过日志**（`MOTION notice-banner frames=… 逐帧=[…]` 就不在控制台里，
+    而它在 `/tmp/r66_motion.log` 里每遍都有）。
+    注意这一格有两种成因、我没有分开：`head -120` 的截断，与 R64 那条"stdout 会成块丢"
+    （两处都会让同一行到不了日志，而 /tmp/motion.log 没上传，无法反查是哪一个）。
+    ⇒ 分开它们的前提恰恰是下面这半条：**把日志与胶片交出来**。
+
+    另一半：那一步在 `/tmp/motion-ci` 里写了 11 张 `*-strip.png`，作业结束就没了
+    （`grep upload-artifact .github/workflows/ci.yml` = 0 命中）⇒
+    "只有 runner 上才看得见的现象"没有图可看，而 R66 的整件事正是这一类：
+    我只能用数字推断"runner 把 150ms 的淡入拍成了跳变"，没法像本机那样逐帧看。
+    要做的：① 读数改成按族分块全打（或把上限抬到读数总数之上并显式记账"截了几行"）；
+    ② 把 `/tmp/motion-ci` 作为 artifact 上传（`if: always()`，只留 `*-strip.png`，
+    一轮约 2–3MB），并在日志里打一句"哪些胶片被上传了"。
+    两条都不改判据，改的是"红能不能被看见"这一层。
+
 100. **动效那一步在 runner 上连着两遍是红的，而整份报表里没有一条红有名字**（R65 读 CI 时撞到 / 与 49、92 同族）：
+
     `motion suite exit:` —— run 38687419144（R63 台账）= **0**，run 38693365411（R64）= **1**，
     run 38696695788（R65）= **1**。红的是同一条自校验：
     `MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo` 断言
@@ -2052,6 +2083,57 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     `Test Case … failed`，未登记的即红；② 这条自校验在 runner 上的正确形态不是红，
     是**登记**：把"这一维度在这台机器上没有分辨率"打成 `MOTION_RESOLUTION_NOT_RUN`（带读数与原因），
     并保留"本机必须仍然判红"的那一臂 —— 否则登记会变成新的免检牌（BACKLOG 49 的原话）。
+    → **R66 结案（两条都做了，但 ② 的形态被一次实测改掉）**。
+    **先把"到底是机器还是产品"这件事量清楚**，再谈登记：本轮把同一份判据在本机跑了一遍，
+    并顺手量了 runner 那一步留下的另外两条读数 ——
+    | 读数 | 本机（R66） | runner（run 38696695788） |
+    |---|---|---|
+    | `MOTION_CUT_CONTROL notice-banner` 落定残余 | **0.719 / 0.974**（同码两遍） | **0.025** |
+    | 同一条淡入的采样间隔 | ≈10ms | ≈21ms |
+    | `MOTION_SETTLE banner-in` 到位帧 ⇒ 实测落定 | 16 帧 ⇒ ≈160ms | 4 帧 ⇒ **≈76ms** |
+    | 声明时长（`MotionCatalog.bannerIn`） | 150ms | 150ms |
+    两台机器的采样只差 2 倍（21ms 采一条 150ms 的淡，本该有 ≈7 级可分），
+    而残余差 **29 倍**、实测落定差一倍 ⇒ "采样太粗"解释不了它。
+    于是原来的 ② 不能照写：把 `落定残余 <= 0.15` 直接登记成"这台机器没分辨率"，
+    等于让**被告自己作证** —— 哪天横幅的淡入真的退化成跳变，那条登记会替它说话。
+    **改法：请一个与被告无关、机制相同的证人**（`FadeClockProbe`）：
+    测试自己的夹具（白底 + 盖满视口的黑块，`if shown { Rectangle().transition(.opacity) }`
+    配 `withAnimation(.easeInOut(duration: 0.15))`，150ms 写在**测试里**而不是读 `MotionCatalog` ——
+    读产品的话，哪天有人把 `bannerIn` 改成 0.01s，证人跟着变短，就永远"能分辨"了），
+    逐帧读**平均亮度电平**（不是帧间差：差没有极性，数不出"中间态"），
+    判定三档：跨度 < 0.05 ⇒ 证人自己坏了（**判红**，不 skip）；
+    中间态 ≥ 2 帧 ⇒ 这台机器能分辨 ⇒ 产品读不出就是**红**；
+    中间态 < 2 帧而跨度够 ⇒ 环境看不见 ⇒ `MOTION_NOT_RUN=fade-clock-snaps-here`（带读数）+ skip。
+    本机实测：`MOTION_FADE_CLOCK 声明=150ms 跨度=1.000 中间态帧数=10 帧数=87 采样≈21ms 判定=能分辨`
+    —— 注意**证人在 21ms 的采样下给出了 10 级**，与 runner 那 21ms 同量级，
+    所以"runner 读不出"如果是同一件事造成的，下一次 CI 会把它登记成 `fade-clock-snaps-here`；
+    如果不是，那一步会红，而红现在**有名字**了。
+    **① 硬门**：`motion_floor_gate.py` 多了 `suite_verdicts()` 一层 ——
+    扫 `Test Case '-[类 方法]' failed` 与 `error: -[类 方法] : <XCTAssert 原文>`，
+    外加 `Executed N tests, with … K failures` 那个汇总数：
+    未登记的红 ⇒ `MOTION_FLOOR_SUITE_RED=n`（红，且把名字与断言原文一起打出来）；
+    汇总说红了而日志里名字不够 ⇒ `MOTION_FLOOR_SUITE_NAMELESS_RED=n`（红 —— 这才是"红必须有名字"
+    本身被钉住，R64 那条"stdout 会成块丢"随时能把名字吞掉）；
+    登记过的红 ⇒ 不挡发布但打 `MOTION_FLOOR_REGISTERED_REDS=n`（靠登记过的绿要数得出来）；
+    登记条目这次没复现 ⇒ `MOTION_FLOOR_SUITE_STALE`（不红，提醒删）。
+    这一层排在 `verdicts()` 里两处提前 return **之前** —— 判据自己崩的时候
+    常常既没结论行又红，旧形状会把红一起吃掉（`testSuiteRedSurvivesTheMissingResolveLine` 钉住）。
+    判据的判别力：正对照是**逐字从 runner 日志抄来的那一卷**
+    （`scripts/tests/fixtures/r66_motion_runner_red.log`：run 38696695788 那一步的
+    `---- 红的理由 ----` 小节把它原样打了出来），它的关键性质是**臂一级全在登记之内**
+    （`judged=4/4 not-run=-`）而这一卷红着 ⇒ `testArmLevelRulesAloneWouldHavePassedIt`
+    把用例级判据摘掉后必须全绿，那就是"两次 exit 1 绿过去"的最小复现。
+    登记表 `suite_reds` 今天**故意是空的**（`testRegistryIsEmptyOnPurposeAndEntriesNeedProvenance`）：
+    ② 的成因已经量清，正确处置是修判据而不是登记。
+    变异 M350–M361 十二刀**全部被抓**（`.scratch/motion-audit-2/r66_mutation_battery.log`），
+    其中 M356 就是那张新免检牌（证人能分辨时把"产品跳变"改成 skip）——
+    它必须由 `testTheControlJudgmentIsATruthTable` 抓到，而这要求那段决定是**纯函数**：
+    原来它长在只有走进 `residual <= floor` 才会执行的分支里，本机永远进不去
+    （残余 0.719/0.974），于是分支里三条判定在本机一条都没被执行过 ⇒ 抽成
+    `controlJudgment(residual:clock:)` + 六格真值表，红/绿/skip 的分界不再依赖某台机器恰好会 snap。
+    M354 是本轮**真踩过**的坑：`SUMMARY_FAILURES` 第一版漏了 `with `，于是恒读成 0，
+    而 NAMELESS 那一格恰好因为"名字数与 0 一致"不红 —— 三条用例一起红才发现，
+    补了 `testSummaryFailureLineIsParsedInBothShapes`（两种形状 + 多行取最大）。
 
 99. **浮层那一行的字号是硬编码的 13pt，而令牌 `VisualFont.row` 是 12pt**（R65 改那一列时顺手读到的）：
     `QuickPickController` 建 cell 时写 `text.font = .systemFont(ofSize: 13)`，

@@ -1,0 +1,138 @@
+=== 基线（未变异）：这些格子必须先全绿 ===
+   testRealRunnerRedIsRedAndNamed                             = green
+   testArmLevelRulesAloneWouldHavePassedIt                    = green
+   testSummaryFailureLineIsParsedInBothShapes                 = green
+   testRealLocalLogIsRedUnderTheTightenedRegistry             = green
+   testTheControlJudgmentIsATruthTable                        = green
+   testTheFadeClockClassifierIsATruthTable                    = green
+   testListRowsDoNotAnimateAndNothingClaimsTheyDo             = green
+
+M350 NAMELESS 那一格永远不触发 ⇒ 汇总说有 1 条红、日志里 0 个名字时闸门闭嘴
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testNamelessRedIsRed
+     红在这一格：（没有断言行：看下面这段尾巴）
+     AssertionError: 'MOTION_FLOOR_SUITE_NAMELESS_RED=1' not found in {}
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.001s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M351 未登记的红永远算 0 条 ⇒ runner 那两次 exit 1 会第三次绿过去
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testRealRunnerRedIsRedAndNamed
+     红在这一格：（没有断言行：看下面这段尾巴）
+     AssertionError: 'MOTION_FLOOR_SUITE_RED=1' not found in {}
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.000s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M352 把用例级判据从 verdicts 里摘掉 ⇒ 复现旧形状：臂级全绿而这一卷红着
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testSuiteRedSurvivesTheMissingResolveLine
+     红在这一格：（没有断言行：看下面这段尾巴）
+     AssertionError: 'MOTION_FLOOR_SUITE_RED=1' not found in {'MOTION_FLOOR_NO_RESOLVE': True, 'MOTION_FLOOR_SKIPS=none-found': False} : 两条红只剩一条 ⇒ 提前 return 又把用例级的红吞了
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.000s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M353 红用例的名字根本捞不上来（正则改成只认 passed）
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testParserFindsTheNameAndTheReason
+     红在这一格：（没有断言行：看下面这段尾巴）
+     + ['testListRowsDoNotAnimateAndNothingClaimsTheyDo']
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.000s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M354 复刻本轮真踩过的正则 bug：`Executed … with N failures` 少了 `with ` ⇒ 恒读成 0
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testSummaryFailureLineIsParsedInBothShapes
+     红在这一格：（没有断言行：看下面这段尾巴）
+     AssertionError: 0 != 1 : 	 Executed 42 tests, with 1 failure (1 unexpected) in 105.1 (105.1) seconds
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.000s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M355 登记过的红仍然挡发布（反向：判据过严也是缺陷）
+   落地确认（motion_floor_gate.py）
+   CAUGHT verdict=red 期望红在=testRegisteredRedIsVisibleButNotBlocking
+     红在这一格：（没有断言行：看下面这段尾巴）
+     AssertionError: 'MOTION_FLOOR_REGISTERED_REDS=1' not found in {}
+     
+     ----------------------------------------------------------------------
+     Ran 1 test in 0.000s
+     
+     FAILED (failures=1)
+   已还原（与原始逐字节相同：True）
+
+M356 证人能分辨时把'产品跳变'判成 skip ⇒ 这就是那张新免检牌
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheControlJudgmentIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2764: error: -[ClipboardHistoryAppTests.MotionFilmstripTests tes
+   已还原（与原始逐字节相同：True）
+
+M357 地板从 `>` 改成 `>=` ⇒ '刚好等于地板'的读数从红变成绿
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheControlJudgmentIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2772: error: -[ClipboardHistoryAppTests.MotionFilmstripTests tes
+   已还原（与原始逐字节相同：True）
+
+M358 把 -1（那一帧没读到像素）当成真电平 ⇒ '一半帧抓取失败'冒充'夹具动得很厉害'
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheFadeClockClassifierIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:716: error: -[ClipboardHistoryAppTests.MotionFilmstripTests test
+   已还原（与原始逐字节相同：True）
+
+M359 分类器永远说'能分辨' ⇒ 跳变与斜坡分不开，阳性对照的红就没人信
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheFadeClockClassifierIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:694: error: -[ClipboardHistoryAppTests.MotionFilmstripTests test
+   已还原（与原始逐字节相同：True）
+
+M360 分类器永远不说'探针坏了' ⇒ 证人是个摆设时没人发现
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheFadeClockClassifierIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:705: error: -[ClipboardHistoryAppTests.MotionFilmstripTests test
+   已还原（与原始逐字节相同：True）
+
+M361 端点也算中间态 ⇒ 一步跳变被读成'这台机器看得见过程'，于是那条红变成永远的红
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT verdict=red 期望红在=testTheFadeClockClassifierIsATruthTable
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:694: error: -[ClipboardHistoryAppTests.MotionFilmstripTests test
+   已还原（与原始逐字节相同：True）
+
+M362 撤掉提示条淡入的驱动（`.animation(MotionCatalog.animation(for: .bannerIn), …)` → `nil`）⇒ 产品真的跳变了：本机必须红在『这台机器看得见 150ms 的淡入…』那一句
+   落地确认（ContentView.swift）
+   CAUGHT verdict=red 期望红在=testListRowsDoNotAnimateAndNothingClaimsTheyDo
+     红在这一格：/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2710: error: -[ClipboardHistoryAppTests.MotionFilmstripTests tes
+   已还原（与原始逐字节相同：True）
+
+=== 汇总 ===
+   M350   CAUGHT
+   M351   CAUGHT
+   M352   CAUGHT
+   M353   CAUGHT
+   M354   CAUGHT
+   M355   CAUGHT
+   M356   CAUGHT
+   M357   CAUGHT
+   M358   CAUGHT
+   M359   CAUGHT
+   M360   CAUGHT
+   M361   CAUGHT
+   M362   CAUGHT
+   抓到=13 逃掉=0 没跑成=0 红在别处=0 未落地=0

@@ -201,19 +201,27 @@ class MotionFloorGateTests(unittest.TestCase):
     # ---- 两份真日志：一份是"今天就是这样"，一份是"坏了要说为什么" ----
 
     def testRealLocalLogIsRedUnderTheTightenedRegistry(self):
-        """本机那份真日志（R46 抓的，带捕获之前）今天**必须红，而且只红在地板上**。
+        """本机那份真日志（R46 抓的，带捕获之前）今天**必须红，而且只红在地板 + 一条没名字的红上**。
 
-        形状换了三轮，这里把三轮都留下：
+        形状换了四轮，这里把四轮都留下：
           · R46–R51：`notice-banner` 的 `premise-not-visible` 不在允许列表里 ⇒ BAD_REASON + UNDERCOVERED；
           · R52：把两臂登记成"可以判不到" ⇒ 同一份日志变成**绿 + THIN**；
           · R57：`captureRect` 把抓一帧从 39.6ms 打到 4.5ms ⇒ 两臂今天判得到，清单改回必须判到，
             于是这份**旧**日志重新变成红，且只红在 UNDERCOVERED（judged=2 < 地板 4）。
-        理由那两格不再红是因为理由都登记过 ⇒ 这一格同时钉住"红只该来自地板"，
+          · R66：加了用例级判据之后，同一份日志还多红一格 NAMELESS_RED。
+            原因要说清楚，别把它读成"R46 那次本机有条没人管的红"：那次的汇总行是
+            `Executed 24 tests, with 5 tests skipped and 1 failure`（逐字留在夹具里），
+            而夹具**只保留了 `MOTION_*` 与 `Executed` 两类行**（见它自己的文件头），
+            `Test Case … failed` 那行当年就没抄进来 ⇒ 闸门看到的是"说有 1 条红、日志里 0 个名字"，
+            而那正是 NAMELESS_RED 要拦的形状。规则为这份夹具让路（比如"名字数 0 就当没红"）
+            等于把 R36 那句话删掉，所以改的是这一格的期望，不是规则。
+        理由那两格不再红是因为理由都登记过 ⇒ 这一格同时钉住"红只该来自地板与名字缺席"，
         而不是"清单一改就到处冒红"。
         """
         facts = parse(LOCAL_RUNNER_LOG)
         reds = [m for m, red in markers(facts) if red]
-        self.assertEqual(reds, ["MOTION_FLOOR_UNDERCOVERED"],
+        self.assertEqual(sorted(reds),
+                         sorted(["MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_SUITE_NAMELESS_RED=1"]),
                          "本机真日志的红变了形状 ⇒ 要么清单又漂了，要么闸门判错了：%s" % reds)
         self.assertEqual([m for m, _ in markers(facts) if m.startswith("MOTION_FLOOR_THIN")], [],
                          "清单收紧之后 THIN 这一族已经没有入口了；它还在说明 thin_warnings 没清空")
@@ -347,6 +355,177 @@ class MotionFloorGateTests(unittest.TestCase):
             with redirect_stdout(buffer):
                 code = main([good, "--expectations", os.path.join(folder, "nope.json")])
             self.assertEqual(code, 2)
+
+
+class MotionSuiteRedTests(unittest.TestCase):
+    """R66 / BACKLOG 100：**这一卷有没有红用例**，与"读数形状对不对"是两层判据。
+
+    正对照是 runner 上真实红过两次的那一卷（`fixtures/r66_motion_runner_red.log`，
+    run 38696695788）。那份夹具的关键性质：它的**臂一级全在登记之内**（judged=4/4 not-run=-），
+    旧闸门因此报 `REDS=0`，而同一次 run 的 `motion suite exit: 1`。
+    ⇒ 任何一条"把它当绿"的用例都说明新规则没生效；任何一条"因为它臂级全绿就放过"的用例
+    说明这一层白加。
+    """
+
+    RED_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r66_motion_runner_red.log"
+
+    def setUp(self):
+        text = self.RED_FIXTURE.read_text(encoding="utf-8")
+        self.lines = [line for line in text.splitlines() if not line.startswith("# ")]
+        self.assertTrue(any("error: -[" in line for line in self.lines),
+                        "夹具里没有 XCTAssert 原文 ⇒ 这一层的'红的理由'无从测起")
+        self.facts = parse("\n".join(self.lines))
+        # 夹具自己必须成立：臂一级**全绿**，这正是旧闸门放走它的原因。
+        self.assertEqual(self.facts["judged"], 4)
+        self.assertEqual(self.facts["not_run"], set())
+        self.assertEqual(self.facts["executed"], 42)
+
+    def testParserFindsTheNameAndTheReason(self):
+        self.assertEqual(self.facts["failures"],
+                         ["testListRowsDoNotAnimateAndNothingClaimsTheyDo"])
+        self.assertEqual(self.facts["summary_failures"], 1)
+        message = self.facts["failure_messages"]["testListRowsDoNotAnimateAndNothingClaimsTheyDo"]
+        self.assertIn("XCTAssertGreaterThan failed", message)
+        self.assertIn("0.025316455696202535", message,
+                      "红的**理由**没被解析出来 ⇒ 只剩名字的话，下一次还是得靠猜（R59 那一课）")
+
+    def testRealRunnerRedIsRedAndNamed(self):
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks)
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_RED=1"][1])
+        message = marks["MOTION_FLOOR_SUITE_RED=1"][0]
+        self.assertIn("testListRowsDoNotAnimateAndNothingClaimsTheyDo", message)
+        self.assertIn("XCTAssertGreaterThan", message)
+        # 同时：臂一级不许因为它而多出别的红（两层的判据不能互相污染）。
+        self.assertNotIn("MOTION_FLOOR_UNDERCOVERED", marks)
+        self.assertNotIn("MOTION_FLOOR_NO_RESOLVE", marks)
+
+    def testSummaryFailureLineIsParsedInBothShapes(self):
+        """`Executed …` 那行的两种形状都得读得出红数。
+
+        这一格是本轮自己踩的坑变的：第一版正则漏了 `with `，于是 `summary_failures` 恒为 0，
+        而 NAMELESS_RED 那一格**恰好**因为"名字与 0 一致"而不红 —— 三条用例一起红了才发现。
+        没有这一格，正则再被谁改回去一次，还是只能靠三格连带来回。
+        """
+        shapes = [
+            ("\t Executed 42 tests, with 1 failure (1 unexpected) in 105.1 (105.1) seconds", 1),
+            ("\t Executed 24 tests, with 5 tests skipped and 0 failures (0 unexpected) in 76.1 s", 0),
+            ("\t Executed 3 tests, with 1 test skipped and 2 failures (2 unexpected) in 1.0 s", 2),
+            ("\t Executed 1 test, with 1 failure (1 unexpected) in 0.5 (0.5) seconds", 1),
+        ]
+        for line, expected in shapes:
+            self.assertEqual(parse(line)["summary_failures"], expected, line)
+        # 多行取最大：stdout 成块丢的时候"最后一条"可能是被截断的那条。
+        mixed = ("Executed 42 tests, with 0 failures (0 unexpected)\n"
+                 + "Executed 42 tests, with 3 failures (3 unexpected)\n")
+        self.assertEqual(parse(mixed)["summary_failures"], 3)
+
+    def testArmLevelRulesAloneWouldHavePassedIt(self):
+        """反向对照：把 `suite_verdicts` 摘掉，这份夹具就是**全绿**。
+
+        这一格是整件事的证据：它说明旧闸门判绿不是因为"红被别的规则挡住了"，
+        而是因为这一层根本不存在。少了它，`testRealRunnerRedIsRedAndNamed` 换成任何
+        一份带红的日志都能过，就没人知道"两次 exit 1 绿过去"这件事到底修没修。
+        """
+        without = dict(self.facts)
+        without["failures"] = []
+        without["summary_failures"] = 0
+        self.assertEqual([m for m, _, red in verdicts(without, EXPECTATIONS) if red], [],
+                         "摘掉用例级判据之后仍然有红 ⇒ 上面那格'旧闸门放走了它'是假的，"
+                         "这份夹具其实被臂一级抓住了")
+
+    def testRegisteredRedIsVisibleButNotBlocking(self):
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = [{
+            "test": "testListRowsDoNotAnimateAndNothingClaimsTheyDo",
+            "reason": "合成：登记过的机器差异",
+            "registered_run": "38696695788",
+            "points_to": "BACKLOG 100",
+        }]
+        marks = verdicts(self.facts, registry)
+        self.assertEqual([m for m, _, red in marks if red], [],
+                         "登记过之后还挡发布 ⇒ 登记就成了假动作，下一步就是有人删闸门")
+        printed = dict((m, msg) for m, msg, _ in marks)
+        self.assertIn("MOTION_FLOOR_REGISTERED_REDS=1", printed)
+        self.assertIn("38696695788", printed["MOTION_FLOOR_REGISTERED_REDS=1"],
+                      "登记条目里的 run 号必须被打印出来：没有出处的登记是一行随时可以编的借口")
+        self.assertIn("BACKLOG 100", printed["MOTION_FLOOR_REGISTERED_REDS=1"])
+
+    def testRegisteredRedThatStoppedFiringIsPrinted(self):
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = [{"test": "testSomethingLongFixed", "registered_run": "1",
+                                   "points_to": "BACKLOG 0"}]
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, registry))
+        self.assertIn("MOTION_FLOOR_SUITE_STALE", marks)
+        self.assertFalse(marks["MOTION_FLOOR_SUITE_STALE"][1],
+                         "不再复现的登记条目红一次没用 —— 只会逼人把整层闸门删掉（R39 那一族）")
+        self.assertIn("删掉", marks["MOTION_FLOOR_SUITE_STALE"][0])
+
+    def testNamelessRedIsRed(self):
+        """汇总行说有 1 条红，日志里一个名字都没有 ⇒ 红，且红在"没有名字"这件事上。"""
+        text = "\n".join([
+            "\t Executed 42 tests, with 1 failure (1 unexpected) in 100.0 (100.0) seconds",
+            SUMMARY,
+            "MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-",
+        ])
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(parse(text), EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SUITE_NAMELESS_RED=1", marks)
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_NAMELESS_RED=1"][1])
+
+    def testPartialNameLossIsStillRed(self):
+        """两条红只留下一个名字（stdout 成块丢的形状，R64）⇒ 少的那条必须被点名。"""
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, EXPECTATIONS))
+        self.assertNotIn("MOTION_FLOOR_SUITE_NAMELESS_RED=1", marks,
+                         "名字与汇总数一致时不许报'没名字'")
+        facts = dict(self.facts)
+        facts["summary_failures"] = 3
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(facts, EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SUITE_NAMELESS_RED=2", marks)
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_NAMELESS_RED=2"][1])
+        # 同一份数据里 SUITE_RED 仍然要在：两种红是不同的话，不许互相吞。
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks)
+
+    def testSuiteRedSurvivesTheMissingResolveLine(self):
+        """判据自己崩了 = 既没结论行又红。旧版在"没结论行"处提前 return，红会被吃掉。"""
+        text = "\n".join([line for line in self.lines if "MOTION_RESOLVE_SUMMARY" not in line])
+        marks = dict((m, red) for m, _, red in verdicts(parse(text), EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_NO_RESOLVE", marks)
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks,
+                      "两条红只剩一条 ⇒ 提前 return 又把用例级的红吞了")
+
+    def testCleanRunSaysSoAndWatchdogDoesNot(self):
+        clean = parse(log("MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-"))
+        marks = dict((m, red) for m, _, red in verdicts(clean, EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SUITE_CLEAN=0", marks)
+        self.assertFalse(marks["MOTION_FLOOR_SUITE_CLEAN=0"])
+        # 看门狗收掉进程：`Executed` 都没有 ⇒ 只许 SKIPPED，不许说"没有红"。
+        killed = parse("MOTION_SUMMARY notice-banner=2\nMOTION_RESOLVE_SUMMARY judged=4/4 not-run=-")
+        marks = dict((m, red) for m, _, red in verdicts(killed, EXPECTATIONS))
+        self.assertIn("MOTION_FLOOR_SKIPPED=suite-did-not-finish", marks)
+        self.assertNotIn("MOTION_FLOOR_SUITE_CLEAN=0", marks,
+                         "没跑完的一卷被说成'没有红用例' ⇒ 那是把缺席当证据（D-055 那一族）")
+
+    def testRegistryIsEmptyOnPurposeAndEntriesNeedProvenance(self):
+        """今天的 `suite_reds` 必须是空的，而且不许有人往里面塞没出处的条目。"""
+        self.assertEqual(EXPECTATIONS["suite_reds"], [],
+                         "登记表非空 ⇒ CI 的绿有一部分是登记来的。要么修判据，"
+                         "要么在账本里写清这条为什么今天只能登记（BACKLOG 49）")
+        for name in ("suite_reds", "arms", "scenarios", "thin_warnings"):
+            self.assertIn(name, EXPECTATIONS, "闸门读的键被改名了：%s" % name)
+
+    def testGateExitCodeIsOneOnTheRealRunnerRed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "r66.log")
+            with io.open(path, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(self.lines))
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                code = main([path, "--expectations", str(EXPECTATIONS_PATH)])
+            out = buffer.getvalue()
+            self.assertEqual(code, 1, out)
+            self.assertIn("红的用例=testListRowsDoNotAnimateAndNothingClaimsTheyDo", out,
+                          "FACTS 行必须把红用例打出来：只给一个退出码，下一次还是没人知道是哪条")
+            self.assertIn("MOTION_FLOOR_REDS=1", out)
 
 
 if __name__ == "__main__":

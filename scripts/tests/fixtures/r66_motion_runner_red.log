@@ -1,0 +1,24 @@
+# R66 / BACKLOG 100 的正对照夹具：runner 上真实红过两次的那一卷。
+#
+# 来源：GH Actions run 38696695788（commit 6999956，Round 65）job 116294811843
+# 的 `Motion filmstrip (report-only)` 那一步 —— 那一步的 `---- 红的理由 ----` 小节
+# 把这两行原样打了出来，所以 `Test Case … failed` 与 `error: -[…] : XCTAssert…`
+# 这两行是**逐字**从 runner 的日志里抄的（路径、行号 2530、0.025316455696202535 都是真的）。
+#
+# 两处不是逐字，必须写清楚，否则这份夹具会被当成"整份真日志"引用：
+#   ① `Executed 42 tests, with 1 failure (1 unexpected)` 这一行是**重建**的：
+#      runner 的 /tmp/motion.log 不上传，控制台只打了那一步自己 grep 出来的
+#      `executed: 42`（同一步的 `motion suite exit: 1`）。
+#      42 与 1 都有出处（42 = 那一步打的 executed；1 = 那一步只列出一个红的用例名），
+#      但整行的排版是 XCTest 的形状，不是抄来的。
+#   ② `MOTION_*` 那几行是从同一次 run 的读数里挑出来的三行，不是整卷（整卷 146 行，
+#      在 .scratch/motion-audit-2/ 里没有全量留存 —— 这一步的 `head -120` 也截过）。
+#      它们存在的唯一理由：让这份夹具同时喂得出 `judged=4/4`，
+#      从而证明"读数全在登记之内"与"这一卷有红用例"是**两件事** ——
+#      旧闸门只看前者，于是 run 38696695788 与 38698142859 两次 exit 1 都绿过去了。
+MOTION_CUT_CONTROL notice-banner 采样≈21ms 中点帧=3 落定残余=0.025
+MOTION_SUMMARY notice-banner=2 notice-banner-dismiss=4 detail-kind-change=4 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo]' failed (3.337 seconds).
+/Users/runner/work/ClipboardHistory/ClipboardHistory/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2530: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo] : XCTAssertGreaterThan failed: ("0.025316455696202535") is not greater than ("0.15") - 连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率，上面那条绿是空的
+	 Executed 42 tests, with 1 failure (1 unexpected) in 105.123 (105.125) seconds

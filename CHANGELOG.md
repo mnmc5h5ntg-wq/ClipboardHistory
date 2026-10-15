@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R66：动效那一步的红必须有名字，而"这台机器看不见淡入"得有个与被告无关的证人来签 —— 结案 BACKLOG 100 / 新开 101、102 / D-125）
+- 现场：`motion suite exit: 1` 连着两遍（run 38693365411 / 38696695788），而两遍的报表都写
+  `MOTION_FLOOR_OK=4/4 MOTION_FLOOR_REDS=0`。原因在 `motion_floor_gate.py`：那个 `REDS`
+  数的是它自己四臂的结论，**不看测试有没有失败**，而那一步是 report-only
+  ⇒ 一个真实的红在整份 CI 里没有名字（R36 我给捕获那一步修过的形状，没铺到动效）。
+- 先量再处置：同一条 150ms 的淡入，本机落定残余四遍 **0.554 / 0.719 / 0.729 / 0.974**、
+  runner **0.025**；采样 10–11ms vs 21ms；`MOTION_SETTLE banner-in` 16 帧 ⇒ ≈160ms vs
+  4 帧 ⇒ **≈76ms** ⇒ 采样只差 2 倍而残余差 22–39 倍 ⇒ **"runner 太粗"解释不了它**，
+  于是"在 runner 上登记成未覆盖"这个原方案被推翻：那是拿被告的证词给被告免检。
+- 证人：新增 `FadeClockProbe` + `FadeClockView`（白底 + 盖满视口的黑块，
+  `if shown { Rectangle().transition(.opacity) }` 配 `withAnimation(.easeInOut(duration: 0.15))`）。
+  机制与提示条相同、**时长写死在测试里而不读 `MotionCatalog`**（读产品 ⇒ 证人跟着被告变短）；
+  逐帧读**平均亮度电平**而不是帧间差（差没有极性，数不出"中间态"）。
+  三档：跨度 < 0.05 ⇒ 证人坏了**判红**（不 skip）；中间态 ≥ 2 ⇒ 机器能分辨 ⇒ 产品读不出就是红；
+  否则 ⇒ `MOTION_NOT_RUN=fade-clock-snaps-here`（带读数）+ skip。
+  本机 `MOTION_FADE_CLOCK 跨度=1.000 中间态帧数=8–11 帧数=87–91 采样≈21ms 判定=能分辨`。
+- 决定表纯函数化：`controlJudgment(residual:clock:)` + 六格真值表。
+  原来三条判定长在 `if residual <= floor` 里，而本机残余永远高于地板 ⇒ **从未被执行、从未被证伪**。
+- 闸门补一层 `suite_verdicts()`：`SUITE_RED=n`（未登记的红，带用例名与 XCTAssert 原文）/
+  `SUITE_NAMELESS_RED=n`（汇总说有红而名字不够 ⇒ "红必须有名字"本身被钉住）/
+  `REGISTERED_REDS=n`（登记过的不挡发布但数得出来，且必须打印 `registered_run`）/
+  `SUITE_STALE`（登记没复现，提醒删）。**排在 `verdicts()` 两处提前 return 之前** ——
+  判据崩的时候常常既没结论行又红。CI 那一步不必改：报告步仍 `continue-on-error`，
+  红由下一步 `Motion coverage floor`（无 continue-on-error）挡下。
+- 正/反对照：正对照是逐字从 runner 日志抄来的那一卷（`judged=4/4 not-run=-` 而这一条红着）；
+  反向对照把新层摘掉后必须**全绿** —— 那就是"两次 exit 1 绿过去"的最小复现。
+  登记表 `suite_reds` 今天故意空着，并有一格自测钉住它。
+- 数字：产品 **0 个文件**、122 张帧对 working 基线 `CHANGED=0 MISSING=0 ADDED=0`；
+  全量 **783 例 / 38 skip / 0 failures / 156.7s**；动效卷 45 例 exit 0；
+  脚本测试 127 → **139**；`--build-tests` 0 告警；电池 **M350–M362 十三刀全 CAUGHT**
+  （M362 动的是产品：撤掉淡入驱动 ⇒ 必须红在 `.productSnapped` 那一句，而不是被新登记吞掉）。
+- 没解决（新开两条）：**101** `fade-clock-snaps-here` 是"整卷级"的缺席而地板只数"臂级"的 ⇒ 没有 run 号也没有计数；
+  **102** runner 的读数被 `head -120` 截（`MOTION_LINES=146`）而 11 张胶片从不上传 ⇒ runner-only 的现象没有图可看。
+
 ### Fixed（R65：浮层的行首图标不再由文案里的一个 📄 承担 —— 五行标签共用一条左轴 —— BACKLOG 94、97 结案）
 - 现象（R64 逐帧量出来的，不是推测）：同一个 `NSTableView` 里纯文本行的标签从 **34.5–35.0pt** 起，
   带图标的文件行标签从 **56.5–57.5pt** 起 ⇒ 五行两种左轴、差 **22pt**。

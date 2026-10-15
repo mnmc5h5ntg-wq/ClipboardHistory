@@ -4505,3 +4505,32 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
   不记成"已排除"。
 - **R64 的 CI 也在本轮读到**（run 38693365411）：`补回=65 行`、`NOT_RUN` 从 25 涨到 50
   ⇒ **BACKLOG 96 结案**，同时开出 **98**（在屏探针那一步仍只有一条通道）。
+
+---
+
+## 第 68 轮 · R66：一条判据说"这台机器看不见"，得有个与被告无关的证人来签（结案 100 / 新开 101、102 / U-108…U-111 / D-125）
+
+- **开场读数**（同一次淡入，声明都是 150ms）：本机 `MOTION_CUT_CONTROL` 落定残余
+  **0.554 / 0.719 / 0.729 / 0.974**（四遍），runner **0.025**；采样 10–11ms vs 21ms；
+  `MOTION_SETTLE banner-in` 到位帧 16 ⇒ ≈160ms vs 4 ⇒ **≈76ms**。
+  ⇒ 采样只差 2 倍而残余差 22–39 倍 ⇒ **"runner 太粗"解释不了它**，
+  于是 BACKLOG 100 原来写的"在 runner 上登记成未覆盖"被本轮自己推翻：那是拿被告的证词给被告免检。
+- **证人**：`FadeClockProbe` —— 测试自己的夹具（白底 + 盖满视口的黑块，
+  `if shown { Rectangle().transition(.opacity) }` + `withAnimation(.easeInOut(duration: 0.15))`），
+  逐帧读**平均亮度电平**（帧间差没有极性，数不出"中间态"），150ms 写死在测试里不读 `MotionCatalog`。
+  本机 `MOTION_FADE_CLOCK 跨度=1.000 中间态帧数=8–11 帧数=87–91 采样≈21ms 判定=能分辨`。
+  三档：跨度 < 0.05 ⇒ **证人坏了判红**；中间态 ≥ 2 ⇒ 机器能分辨（产品读不出=红）；否则 ⇒ `fade-clock-snaps-here` + skip。
+- **决定表纯函数化**：`controlJudgment(residual:clock:)` + 六格真值表。
+  原来三条判定长在 `if residual <= floor` 里面，而本机永远进不去 ⇒ **从未被执行、从未被证伪**。
+- **闸门补一层** `suite_verdicts()`：`SUITE_RED` / `SUITE_NAMELESS_RED` / `REGISTERED_REDS` / `SUITE_STALE`，
+  排在 `verdicts()` 两处提前 return **之前**（判据崩的时候常常既没结论行又红）。
+  CI 不必改：报告步仍 `continue-on-error`，红由下一步的地板闸门挡（它没有 continue-on-error）。
+- **正/反对照**：正对照=逐字从 runner 日志抄的那一卷（`judged=4/4 not-run=-` 而这一条红着）；
+  反向对照把新判据摘掉后必须全绿 —— 那就是"两次 exit 1 绿过去"的最小复现。
+  登记表 `suite_reds` 今天**故意空着**，并有一格自测钉住"它非空就要红着解释"。
+- **本轮 0 个产品文件**：122 张帧对 working 基线 `CHANGED=0 MISSING=0 ADDED=0`；
+  全量 **783 例 / 38 skip / 0 failures / 156.7s**、动效卷 45 例 exit 0、脚本测试 **139**、`--build-tests` 0 告警；
+  电池 **M350–M362 十三刀全 CAUGHT**（M362 动的是产品：撤掉淡入驱动 ⇒ 必须红在 `.productSnapped` 那一句）。
+- **真实视觉审查**：新证据图 `fade-clock-strip.png`（91 帧）逐行看得见 4–6 级中间灰 ⇒
+  "这台机器能分辨淡入"是**看出来的**，不是从 `跨度=1.000` 反推的。
+  图还纠正了我一处预期：黑块铺满整个视口，所以我估的"跨度约 0.5"是错的（实测 1.000）。

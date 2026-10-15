@@ -42,6 +42,10 @@ final class MotionFilmstripTests: XCTestCase {
     /// `requireObservableMotion` 的缓存（每一类位移各一个判定）。
     /// `nonisolated(unsafe)` 是因为它只在主线程的测试里读写（整个类是 `@MainActor`）。
     nonisolated(unsafe) static var observableCache: [MotionClass: Bool] = [:]
+    /// 淡入时钟探针跑一次就缓存（R66）。与上面同一个理由：这是**环境属性**，
+    /// 不会在一卷测试跑到一半时变好；而它一次要 2 秒，让它跟着每条判据各跑一遍，
+    /// 就是拿"这条判据跑得完吗"去换"这条判据说得准吗"。
+    nonisolated(unsafe) static var fadeClockCache: FadeClockReading?
 
     /// 胶片与读数共用的输出目录（R56：两条证据通道必须住在同一个地方，见 `readingsURL`）。
     private static var filmsDirectory: URL {
@@ -534,6 +538,89 @@ final class MotionFilmstripTests: XCTestCase {
         return half >= 1 ? half : nil
     }
 
+    // MARK: - 淡入时钟探针（R66 / BACKLOG 100）
+
+    /// 一张帧的**平均亮度**（0…1：sRGB 三通道均值，每 7 个像素采一个）。
+    ///
+    /// 为什么量电平而不是量"两帧之差"：淡入探针要回答的是「这一帧上那层遮罩有多透明」，
+    /// 而 `changedFraction` 只说"这两帧不一样" —— 一步跳变和一条斜坡的头几帧在它眼里都是 0.9，
+    /// 分不出"有没有过程"。要数中间态就必须有个**带极性的量**，所以这里读电平。
+    /// 读不到像素返回 −1 而不是 0：把"没量到"写成 0，下游会当成"整帧全黑"
+    /// （`median` 的 −1 是同一族规矩）。
+    static func meanLevel(_ image: CGImage) -> Double {
+        let bitmap = raster(image)
+        guard bitmap.pixels.count >= 4 else { return -1 }
+        var sum = 0.0
+        var sampled = 0
+        var index = 0
+        while index + 2 < bitmap.pixels.count {
+            sum += (Double(bitmap.pixels[index]) + Double(bitmap.pixels[index + 1])
+                        + Double(bitmap.pixels[index + 2])) / 765.0
+            sampled += 1
+            index += 28     // 4 字节 × 7 像素
+        }
+        return sampled == 0 ? -1 : sum / Double(sampled)
+    }
+
+    enum FadeClockVerdict: Equatable {
+        /// 夹具自己就没动 —— 探针坏了，与产品和机器都无关，必须判红。
+        case probeDead
+        /// 这台机器+这条通道能把 150ms 的淡入切成多级 ⇒ 淡入判据在这里有分辨率。
+        case resolves
+        /// 夹具动了，但只读出头尾两级 ⇒ 这台机器今天看不见淡入的过程（环境，不是产品）。
+        case snaps
+    }
+
+    /// 淡入时钟的一次读数，连它自己的三条线。
+    ///
+    /// 三条线为什么住在这个类型里而不是 `MotionFilmstripTests` 的类级常量：嵌套类型**不继承**
+    /// 外层类的 `@MainActor`（Swift 6.1 在 CI 上直接编译不过 —— 一条"算个判定"的纯代码
+    /// 不该被要求在主线程上跑）。放在这儿，`verdict` 与它用的数就是同一个作用域，
+    /// 也没有"改了外层常量、这里还在用旧值"的可能。
+    struct FadeClockReading {
+        /// 探针"夹具到底动没动"的跨度地板。夹具是白底上盖满一块黑，实测跨度在 0.4 以上，
+        /// 而纯噪声在 0.01 以下 —— 中间没有可争的地带，所以这个数不需要标定得很准。
+        static let deadSpan: Double = 0.05
+        /// 两端各留这个比例的幅度**不算**中间态：太贴头的是"还没开始"，太贴尾的是"已经落定"。
+        static let endpointMargin: Double = 0.2
+        /// "这台机器看得见过程"的最小中间态帧数。
+        ///
+        /// 取 2 而不是复用 `minimumTransitionFrames`(3)：这条判据问的是**通道的分辨能力**。
+        /// 一次 150ms 的淡入在 60ms 的采样率下本来就只有两级可分，要 3 级就把"勉强能分辨"
+        /// 的机器判成"分辨不了" ⇒ 那等于凭空造出第二个 `clock-too-coarse`，把该红的说成没跑。
+        static let minimumIntermediateFrames = 2
+
+        let frames: Int
+        let span: Double
+        let intermediate: Int
+        let samplingMilliseconds: Int
+
+        var verdict: FadeClockVerdict {
+            if frames < 4 || span < Self.deadSpan { return .probeDead }
+            return intermediate >= Self.minimumIntermediateFrames ? .resolves : .snaps
+        }
+    }
+
+    /// 一条电平序列 → 淡入时钟读数。纯函数：合成数据就能钉住，不开窗口、CI 每轮都跑
+    /// （`testTheFadeClockClassifierIsATruthTable`）。
+    static func fadeClockReading(levels: [Double], samplingMilliseconds: Int) -> FadeClockReading {
+        // −1 = 那一帧没读到像素。它**必须**被滤掉而不是当成 0：
+        // 当成 0 会把跨度撑到 1.0，一次"抓取失败了一半"就能冒充"夹具动得很厉害"。
+        let readable = levels.filter { $0 >= 0 }
+        guard readable.count > 3, let lo = readable.min(), let hi = readable.max(), hi > lo else {
+            return FadeClockReading(frames: readable.count,
+                                    span: max(0, (readable.max() ?? 0) - (readable.min() ?? 0)),
+                                    intermediate: 0,
+                                    samplingMilliseconds: samplingMilliseconds)
+        }
+        let span = hi - lo
+        let low = lo + span * FadeClockReading.endpointMargin
+        let high = hi - span * FadeClockReading.endpointMargin
+        let intermediate = readable.filter { $0 >= low && $0 <= high }.count
+        return FadeClockReading(frames: readable.count, span: span, intermediate: intermediate,
+                                samplingMilliseconds: samplingMilliseconds)
+    }
+
     /// 从触发那帧起，画面**停止变化**是在第几帧（相邻帧差跌到峰值的 `stepFloorRatio` 以下，
     /// 并且一路待到底 —— 所以它读的是"最后一次还在动"之后那一帧）。
     ///
@@ -579,6 +666,57 @@ final class MotionFilmstripTests: XCTestCase {
                                     "分摊到几帧的变化必须读成过渡")
         XCTAssertEqual(Self.transitionFrameCount(idle), 0,
                        "全是噪声时相对门槛会把每帧都算成在动 —— 绝对地板就是拦这个的")
+    }
+
+    /// 淡入时钟分类器的**真值表**（R66 / BACKLOG 100）：斜坡 / 跳变 / 平的 / 噪声 / 读不到。
+    ///
+    /// 为什么这条必须存在而且不许只靠开窗口的那条：这台机器"能不能看见淡入的过程"这句话
+    /// 现在是 `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 的**免检凭据** —— 它一说是，
+    /// 那条判据就 skip 掉自己的阳性对照。一个只会说"是"的分类器等于把红撤了。
+    /// 所以它的判别力要在合成数据上钉死，不能等某个恰好还没动起来的界面来证明。
+    func testTheFadeClockClassifierIsATruthTable() {
+        let rising = Self.fadeClockReading(levels: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0],
+                                           samplingMilliseconds: 20)
+        XCTAssertEqual(rising.verdict, .resolves, "8 帧里 4 帧在两级之间，必须读成「这台机器看得见过程」")
+        XCTAssertGreaterThanOrEqual(rising.intermediate, FadeClockReading.minimumIntermediateFrames)
+        XCTAssertEqual(rising.span, 1.0, accuracy: 1e-9)
+
+        // 极性检查：反向斜坡必须给**同一个数**。
+        // 不钉这一条，分类器就可以偷偷把"变亮"当成"有过程"、把"变暗"当成"跳变"，
+        // 而淡出那一臂正好是变暗 —— 那是 R58 分带映射上下颠倒同一族的错（关于中线的不对称没人查）。
+        let falling = Self.fadeClockReading(levels: [1.0, 0.8, 0.6, 0.4, 0.2, 0, 0, 0],
+                                            samplingMilliseconds: 20)
+        XCTAssertEqual(falling.intermediate, rising.intermediate,
+                       "同一条斜坡倒过来读出的中间态帧数就变了 ⇒ 分类器在用极性而不是幅度")
+        XCTAssertEqual(falling.verdict, .resolves)
+
+        let stepUp = Self.fadeClockReading(levels: [0, 0, 0, 1, 1, 1, 0, 0], samplingMilliseconds: 20)
+        XCTAssertEqual(stepUp.verdict, .snaps, "一帧跳变必须读成「这台机器看不见过程」")
+        XCTAssertEqual(stepUp.intermediate, 0)
+        XCTAssertEqual(stepUp.span, 1.0, accuracy: 1e-9,
+                       "跨度仍然要是 1.0：它没动是「跳」，不是「坏」—— 判红与 skip 的分界就在这儿")
+        XCTAssertEqual(Self.fadeClockReading(levels: [1, 1, 1, 0, 0, 0, 1, 1], samplingMilliseconds: 20).verdict,
+                       .snaps, "反向跳变也一样")
+
+        // 判别力：同一跨度下，斜坡与跳变必须给出**不同**判定。少了这两行，
+        // "全都返回 .resolves" 和"全都返回 .snaps"都能通过上面那些断言的一半。
+        XCTAssertNotEqual(rising.verdict, stepUp.verdict, "分类器分不开斜坡与跳变 ⇒ 它没有资格给判据发放免检")
+
+        XCTAssertEqual(Self.fadeClockReading(levels: [0.5, 0.5, 0.5, 0.5, 0.5], samplingMilliseconds: 20).verdict,
+                       .probeDead, "夹具压根没动 ⇒ 是探针坏了，不许读成「这台机器看不见淡入」")
+        XCTAssertEqual(Self.fadeClockReading(levels: [0.500, 0.505, 0.495, 0.502, 0.498, 0.501],
+                                             samplingMilliseconds: 20).verdict, .probeDead,
+                       "纯噪声不能冒充「动了但只有一级」：跨度地板就是拦这个的")
+        XCTAssertEqual(Self.fadeClockReading(levels: [0, 1, 0], samplingMilliseconds: 20).verdict, .probeDead,
+                       "帧数不够时不许判机器 ⇒ 那是一次没抓到的抓取")
+
+        // −1（那一帧读不到像素）必须被滤掉。当成 0 用会把跨度撑满，
+        // 于是"一半帧抓取失败"能冒充"夹具动得很厉害"。
+        let halfUnreadable = Self.fadeClockReading(levels: [-1, -1, 0.5, 0.5, 0.5, 0.5], samplingMilliseconds: 20)
+        XCTAssertEqual(halfUnreadable.frames, 4)
+        XCTAssertEqual(halfUnreadable.span, 0, accuracy: 1e-9)
+        XCTAssertEqual(halfUnreadable.verdict, .probeDead, "读不到的帧被当成黑色参与了跨度 ⇒ 探针坏了会伪装成能判")
+        XCTAssertEqual(Self.fadeClockReading(levels: [-1, -1, -1, -1], samplingMilliseconds: 20).frames, 0)
     }
 
     /// 前提检查自己也要有判别力（合成帧，不开窗口）。
@@ -637,6 +775,27 @@ final class MotionFilmstripTests: XCTestCase {
             // 刻意不调 fill()：位图数据已经是想要的颜色，再 fill 会被默认填充色（黑）盖掉。
             return context.makeImage()!
         }
+    }
+
+    /// 证人自己要先上台：夹具必须真的动，读数必须每轮都在（R66 / BACKLOG 100）。
+    ///
+    /// 为什么单独立一条，而不是等阳性对照掉到 0.15 以下时顺带跑到：本机横幅的残余是 0.974，
+    /// 那条判据**永远不会**去问证人 ⇒ 证人一次都没被调用过，却被拿来给 runner 上的红免检。
+    /// 这条判据把它每轮都跑一遍：`span` 读不出来 ⇒ 红（夹具坏了、探针瞎了，是工具的问题，
+    /// 必须有人看见）；`verdict == .snaps` ⇒ 不红，那正是它的证词内容，红在"能分辨的那台机器"上。
+    func testTheFadeClockWitnessMovesAtAll() throws {
+        try skipUnlessEnabledAndCapable()
+        let clock = fadeClock()
+        XCTAssertNotEqual(clock.verdict, .probeDead,
+                          "淡入时钟的夹具自己没读出过程（跨度=\(String(format: "%.3f", clock.span)) "
+                              + "帧数=\(clock.frames)）⇒ 证人是个摆设：它一开口替机器说话，"
+                              + "说的其实是「我什么都没看见」。先修夹具，再谈阳性对照")
+        // 夹具的跨度必须**足够大**才算"真的动过"：0.05 那条线是"动没动"，不是"动得够不够"。
+        // 这里再钉一条下限，是因为白底盖黑理论上跨度接近 0.5；读出来是 0.06 那种"刚过线"，
+        // 说的是这层的遮罩没铺满、或者帧是空的 —— 那种证人同样不能替任何人说话。
+        XCTAssertGreaterThan(clock.span, 0.2,
+                             "夹具跨度只有 \(String(format: "%.3f", clock.span))，而白底盖满黑应该在 0.5 上下 ⇒ "
+                                 + "要么遮罩没铺满视口，要么这条通道抓到的是空帧")
     }
 
     /// 采样率感知那几个纯函数的**真值表**（R2 的核心）。
@@ -2527,9 +2686,124 @@ final class MotionFilmstripTests: XCTestCase {
         let fadingResidual = Self.settleResidualRatio(fading.motionFrames, after: mid)
         emit("MOTION_CUT_CONTROL notice-banner 采样≈\(interval)ms 中点帧=\(mid) "
             + "落定残余=\(String(format: "%.3f", fadingResidual))")
-        XCTAssertGreaterThan(fadingResidual, 0.15,
-                             "连横幅淡入都读不出残余 ⇒ 这把尺子在这个维度上没有分辨率，上面那条绿是空的")
+        // 这一支原来是一条**无条件**的 `XCTAssertGreaterThan(fadingResidual, 0.15)`。
+        // 它就是把 CI 的动效那一步弄红两次的东西（BACKLOG 100），而红当时没有名字：
+        // 那一步 `continue-on-error: true`，覆盖率地板只数自己那四臂 ⇒ `exit: 1` 与 `REDS=0` 同屏。
+        //   runner：采样≈21ms 中点帧=3 落定残余=0.025
+        //   本机：  采样≈10ms 中点帧=7 落定残余=0.974
+        // 同一条淡入在另一把尺下也一起变了：`MOTION_SETTLE banner-in` 在 runner 上是
+        // 到位帧=4 ⇒ 实测落定≈76ms，本机是 到位帧=16 ⇒ ≈160ms，而两边**声明都是 150ms**。
+        // ⇒ "读不出过程"的那个可能是这台机器的动画时钟，不一定是产品。
+        // 但"可能是机器"不能由可疑的那次测量自己宣布 —— 那正好是 BACKLOG 49 警告的免检牌。
+        // 所以请一个与被告无关、机制相同的证人（`FadeClockProbe`），证人没有分辨率时它自己
+        // 也得能被判红（`testTheFadeClockClassifierIsATruthTable` 钉着它的判别力）。
+        let clock = fadeClock()
+        func fmt(_ value: Double) -> String { String(format: "%.3f", value) }
+        switch Self.controlJudgment(residual: fadingResidual, clock: clock.verdict) {
+        case .green:
+            break
+        case .witnessIsDead:
+            XCTFail("淡入时钟探针的夹具自己读不出过程（跨度=\(fmt(clock.span)) 中间态帧数=\(clock.intermediate) "
+                + "帧数=\(clock.frames)），而产品横幅在同一条件下也读不出（落定残余=\(fmt(fadingResidual))）⇒ "
+                + "这两条现在没有一条能证明这把尺看得见淡入。判红而不 skip：坏的是探针，得有人去修它")
+        case .productSnapped:
+            XCTFail("这台机器**看得见** 150ms 的淡入（夹具中间态 \(clock.intermediate) 帧、跨度 \(fmt(clock.span))、"
+                + "采样≈\(clock.samplingMilliseconds)ms），产品横幅在同一条量法下却读不出残余"
+                + "（落定残余=\(fmt(fadingResidual)) 采样≈\(interval)ms 中点帧=\(mid)）⇒ "
+                + "这不是环境限制：上面那条「行没在动」仍然是空的绿，而横幅的淡入值得单独查一轮")
+        case .notRun:
+            emit("MOTION_NOT_RUN=fade-clock-snaps-here control=notice-banner "
+                + "夹具跨度=\(fmt(clock.span)) 中间态帧数=\(clock.intermediate) 帧数=\(clock.frames) "
+                + "采样≈\(clock.samplingMilliseconds)ms 而横幅落定残余=\(fmt(fadingResidual)) ⇒ "
+                + "这台机器把一条声明 150ms 的淡入拍成了跳变（证人自己动了，所以不是探针坏）")
+            throw XCTSkip("MOTION_NOT_RUN=fade-clock-snaps-here：阳性对照的证人在这台机器上同样看不见淡入的过程。"
+                + "它一缺席，上面那条「行没在动」就没有分辨率证据 ⇒ 与 clock-too-coarse 同一处置，"
+                + "不报绿也不报红。能分辨的那台机器（本机）上这条判据仍然会红，见 BACKLOG 100")
+        }
+    }
 
+    /// 阳性对照那一步的**决定**：读数 + 证人的判定 → 绿 / 两种红 / 无从判定。
+    ///
+    /// 为什么把它抽成纯函数（R66）：这一段今天决定"runner 上那条红算不算数"，
+    /// 而它原来长在只有窗口才跑得起来、且**只有走进 `residual <= floor` 那一支才会被执行**的代码里。
+    /// 本机横幅的残余是 0.719–0.974，永远不进那一支 ⇒ 分支里的三条判定在本机一条都没有被执行过，
+    /// 更没被证伪过（"只有真值表喂着的判据"与"只有某台机器才会走到的判据"是同一族风险）。
+    /// 抽出来之后六格真值表就能钉死它，不需要一台恰好会 snap 的机器。
+    /// （变异 M356–M361 的实测结果在 .scratch/motion-audit-2/r66_mutation_battery.log。）
+    enum ControlJudgment: Equatable {
+        case green
+        /// 判红：证人自己也没读出过程 ⇒ 是探针坏了。
+        case witnessIsDead
+        /// 判红：这台机器能分辨，产品横幅却没读出过程 ⇒ 不是环境问题。
+        case productSnapped
+        /// 报 skip：这台机器今天看不见 150ms 淡入的过程。
+        case notRun
+    }
+
+    static func controlJudgment(residual: Double, clock: FadeClockVerdict) -> ControlJudgment {
+        if residual > controlResidualFloor { return .green }
+        switch clock {
+        case .probeDead: return .witnessIsDead
+        case .resolves: return .productSnapped
+        case .snaps: return .notRun
+        }
+    }
+
+    /// 上面那张决定表的真值表（不开窗口，CI 每轮都跑）。
+    ///
+    /// 六个格子一个不少：`residual` 两档 × 证人三种判定。
+    /// 特别是"residual 高 + 证人死了"这一格必须**绿** —— 反过来（证人死了就一律红）
+    /// 会让 CI 在阳性对照已经没问题的情况下多一条假红，而假红的代价（R60 那次）
+    /// 是下一次真红没人信。
+    func testTheControlJudgmentIsATruthTable() {
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .resolves), .green)
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .snaps), .green,
+                       "读数已经证明有过程，就不该回头问证人")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .probeDead), .green,
+                       "同上：证人死没死都不改变'这次读出了过程'")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .resolves), .productSnapped,
+                       "这台机器能分辨而产品读不出 ⇒ 必须是红，不许被登记之外的任何东西吞掉")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .snaps), .notRun,
+                       "证人同样看不见 ⇒ 环境限制，报 skip；判红就是拿机器判产品")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .probeDead), .witnessIsDead,
+                       "读不出过程、证人也坏了 ⇒ 两条都没有分辨率，必须红着让人去修")
+        // 边界：正好等于地板不算"读出了过程"（`>` 而不是 `>=`，与它替掉的那条
+        // `XCTAssertGreaterThan` 同一条线，不许在重构时悄悄改判据）。
+        XCTAssertEqual(Self.controlJudgment(residual: Self.controlResidualFloor, clock: .resolves),
+                       .productSnapped, "把 `>` 改成 `>=` 会让'刚好等于地板'的读数从红变成绿")
+    }
+
+    /// 阳性对照"读出过渡了"的地板。
+    ///
+    /// 刻意**不与上面那条「行没在动」的 0.15 共用一个常量**：那个 0.15 说的是"带里不许有
+    /// 慢慢落定的过程"（产品的形状），这个 0.15 说的是"这把尺在这个维度上有分辨率"（尺子的形状）。
+    /// 两个含义共用一个数，就等于哪天调其中一个时把另一个也悄悄改了（同一族：
+    /// 「同一个词在两个判据里含义不同，就别统一成一个布尔值」）。
+    static let controlResidualFloor: Double = 0.15
+
+    /// 这台机器 + 这条捕获通道，能不能把一次声明 150ms 的透明度淡入切成几级？跑一次，缓存。
+    private func fadeClock() -> FadeClockReading {
+        if let cached = Self.fadeClockCache { return cached }
+        let run = FadeClockProbe().record()
+        let reading = Self.fadeClockReading(levels: run.levels,
+                                            samplingMilliseconds: run.samplingMilliseconds)
+        Self.fadeClockCache = reading
+        // 结论行在闸门之前（R53）：`.snaps` 那一支马上要抛 skip，抛出去之后这行读数
+        // 就是那次判定在这台机器上唯一的痕迹。
+        emit("MOTION_FADE_CLOCK 声明=\(Int(FadeClockView.declaredDurationMilliseconds))ms "
+            + "跨度=\(String(format: "%.3f", reading.span)) 中间态帧数=\(reading.intermediate) "
+            + "帧数=\(reading.frames) 采样≈\(reading.samplingMilliseconds)ms "
+            + "判定=\(Self.fadeClockLabel(reading.verdict))")
+        writeStrip("fade-clock", run.frames)
+        return reading
+    }
+
+    static func fadeClockLabel(_ verdict: FadeClockVerdict) -> String {
+        switch verdict {
+        case .probeDead: return "探针坏了"
+        case .resolves: return "能分辨"
+        case .snaps: return "拍成跳变"
+        }
     }
 
     /// 全 `Views/` 一族的"不许留不会执行的过渡声明"（R5 扩的族）。
@@ -4260,6 +4534,83 @@ private final class StateTickProbe {
             grabber.tick()
         }
         return grabber.frames
+    }
+}
+
+// MARK: - 淡入时钟的夹具与探针（R66 / BACKLOG 100）
+
+/// 白底 + 一块盖满视口的黑，用**插入/移除 + `.transition(.opacity)` + `withAnimation`**
+/// 反复淡入淡出 —— 与提示条出现时同一套机制。
+///
+/// 为什么需要一个测试自己的夹具，而不是直接拿产品横幅当证人（这是本轮的要点）：
+/// 产品横幅是**被告**。runner 上它读不出过程（`MOTION_CUT_CONTROL notice-banner … 落定残余=0.025`，
+/// run 38696695788 与 38698142859 那两步 `motion suite exit: 1` 就是它），本机读得出（0.974）。
+/// 要分清"这台机器今天看不见淡入的过程"和"产品的淡入坏了"，得有一个与被告无关、
+/// 而机制相同的证人。
+///
+/// 时长**写死在测试里**（150ms）而不读 `MotionCatalog`：读产品的话，哪天有人把 `bannerIn`
+/// 改成 0.01s，探针跟着一起变短，于是永远"能分辨" —— 证词被被告牵着走。
+/// 底色/遮罩用字面 `Color.white`/`Color.black` 而不是 `Color.primary` 一类语义色：
+/// 这条尺量的是电平，语义色会跟着系统外观翻面，把"暗黑模式"读成"淡入没做完"。
+@MainActor
+private struct FadeClockView: View {
+    static let declaredDurationMilliseconds: Double = 150
+    /// 每次翻转的间隔：比声明时长长，保证两头都有真正的静置帧可以当端点。
+    static let period: TimeInterval = 0.25
+
+    @State private var shown = false
+
+    var body: some View {
+        ZStack {
+            Color.white
+            if shown {
+                Rectangle()
+                    .fill(Color.black)
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.white)
+        .onReceive(Timer.publish(every: Self.period, on: .main, in: .common).autoconnect()) { _ in
+            withAnimation(.easeInOut(duration: Self.declaredDurationMilliseconds / 1000)) {
+                shown.toggle()
+            }
+        }
+    }
+}
+
+/// 抓一段 `FadeClockView`，逐帧报出平均亮度。
+@MainActor
+private final class FadeClockProbe {
+    struct Run {
+        let frames: [CGImage]
+        let levels: [Double]
+        let samplingMilliseconds: Int
+    }
+
+    func record() -> Run {
+        _ = NSApplication.shared
+        // 320×180：够小以便抓得快（R57 的那条"面积决定采样粗细"在这里同样成立），
+        // 又不至于小到让一条 150ms 的淡在两帧里就走完。
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 320, height: 180),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: FadeClockView())
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+        let grabber = Grabber(view: host, limit: 400)
+        let deadline = Date().addingTimeInterval(2.0)
+        while !grabber.finished, Date() < deadline {
+            // 0.02 而不是对照臂那个 0.05：这里要分辨的过程只有 150ms，
+            // 每 50ms 抓一次的话，斜坡最多落两帧，"这台机器能不能看见过程"就永远在阈值上抖。
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            grabber.tick()
+        }
+        let levels = grabber.frames.map { MotionFilmstripTests.meanLevel($0) }
+        return Run(frames: grabber.frames, levels: levels,
+                   samplingMilliseconds: MotionFilmstripTests.sampleIntervalMilliseconds(grabber.stamps))
     }
 }
 

@@ -4213,3 +4213,60 @@ run 38687419144 到 **2/4**。⇒ 红绿灯看不见这件事，而"今天判了
 其余 **118 张逐字节不变**；电池 **M343–M349 七刀全 CAUGHT**。
 **没解决**：真屏幕上那一列的观感（BACKLOG 95 的通道问题还在，人工批次 65 已开）；
 浮层的字号/行高这套话（99）；浮层没有"滚动后选中在视口外"的那一档（R61 修的是主列表）。
+
+## D-125（R66）：一条判据说"这台机器看不见"，得由一个与被告无关的证人来签
+
+**开场读数**（同一条淡入，两台机器，都是 150ms 的声明）：
+
+| 读数 | 本机（R66，四遍） | runner（run 38696695788） |
+|---|---|---|
+| `MOTION_CUT_CONTROL notice-banner` 落定残余 | **0.554 / 0.719 / 0.729 / 0.974** | **0.025** |
+| 采样间隔 | ≈10–11ms | ≈21ms |
+| `MOTION_SETTLE banner-in` 到位帧 ⇒ 实测落定 | 16 帧 ⇒ ≈160ms | 4 帧 ⇒ **≈76ms** |
+
+**决定 1：先量，再决定"登记"还是"修"。**
+BACKLOG 100 原来写的做法是"把这条自校验在 runner 上登记成 `MOTION_RESOLUTION_NOT_RUN`"。
+量完之后这条**不成立**：21ms 采一条 150ms 的淡本该有 ≈7 级可分，而残余差了 22–39 倍，
+"采样粗"解释不了 ⇒ 要么是这台机器的动画时钟根本不产中间态，要么是产品在那儿退化了。
+而这两种情况的处置**相反**（前者登记，后者修产品）。
+⇒ 登记不能由"可疑的那次测量"自己宣布（那是被告作证），也不能由我猜（U-95 那一族：
+没读数的解释不能当结论）。
+
+**决定 2：证人 = 测试自己的夹具，机制与产品相同、时长写在测试里。**
+`FadeClockProbe`：白底 + 盖满视口的黑块，`if shown { Rectangle().transition(.opacity) }`
+配 `withAnimation(.easeInOut(duration: 0.15))`，逐帧读**平均亮度电平**（不是帧间差 ——
+差没有极性，数不出"中间态"；`changedFraction` 眼里跳变和斜坡的头几帧都是 0.9）。
+150ms 写死在测试里而**不读 `MotionCatalog`**：读产品的话，哪天 `bannerIn` 改成 0.01s，
+证人跟着变短，就永远"能分辨"。本机实测 `跨度=1.000 中间态帧数=8–11 帧数=87–91 采样≈21ms 判定=能分辨`
+—— 与 runner 同一个采样量级却能分辨 ⇒ 证人本身不吃"采样粗细"这一账。
+三档判定：跨度 < 0.05 ⇒ **证人坏了判红**（不 skip：摆设证人必须被发现）；
+中间态 ≥ 2 ⇒ 机器能分辨 ⇒ 产品读不出就是**红**；中间态 < 2 而跨度够 ⇒ `MOTION_NOT_RUN=fade-clock-snaps-here` + skip。
+
+**决定 3：那段决定必须是纯函数，否则它没被判据碰过。**
+原来三条判定长在 `if residual <= floor` 里面，而本机残余 0.554–0.974 **永远进不去**
+⇒ 分支里的判定在本机一次都没执行过，更没被证伪过。
+抽成 `controlJudgment(residual:clock:)` + 六格真值表（`testTheControlJudgmentIsATruthTable`）。
+这一步不是洁癖：变异 M356（"证人能分辨时改成 skip"，正是那张新免检牌）只有纯函数化之后才会被抓。
+
+**决定 4：`motion_floor_gate.py` 加一层 `suite_verdicts()`，并且排在两处提前 return 之前。**
+扫 `Test Case '-[类 方法]' failed` + `error: -[类 方法] : <XCTAssert 原文>` + `Executed … K failures` 汇总数：
+未登记的红 ⇒ `MOTION_FLOOR_SUITE_RED=n`（带名字与断言原文）；
+汇总说红了而名字不够 ⇒ `MOTION_FLOOR_SUITE_NAMELESS_RED=n`（"红必须有名字"本身被钉住）；
+登记过的红 ⇒ 不挡发布但 `MOTION_FLOOR_REGISTERED_REDS=n` 数得出来；登记条目没复现 ⇒ `SUITE_STALE`（不红，提醒删）。
+放在提前 return **之前**是因为：判据自己崩的时候常常既没结论行又红，旧形状会把红吃掉。
+CI 那一步不必改：报告步仍 `continue-on-error`（一次采样抖动不该挡发版），
+红由这一步之后的 `Motion coverage floor`（无 continue-on-error）挡下。
+
+**正对照与反向对照**：正对照是**逐字从 runner 日志抄来的那一卷**
+（`scripts/tests/fixtures/r66_motion_runner_red.log`：`judged=4/4 not-run=-` 而这一条红着）；
+`testArmLevelRulesAloneWouldHavePassedIt` 把用例级判据摘掉后必须**全绿** ——
+那就是"两次 exit 1 绿过去"的最小复现。M362 动的是**产品**（撤掉 `.animation(...bannerIn)` 的驱动）：
+本机必须红在 `.productSnapped` 那一句（`MotionFilmstripTests.swift:2710`），
+而不是被新加的 `fade-clock-snaps-here` 顺手登记掉 ⇒ 这一格是"登记不是免检牌"的正面证据。
+
+**代价与边界**：产品 **0 个文件**（本轮不动产品，帧 122 张逐字节不变 ⇒ 本机装的那份仍是 R65 的 sha de899eb）；
+判据 4 条（Swift 3 条 + 决定表 1 条）+ 闸门 12 格自测（脚本测试 127 → **139**）；
+电池 **M350–M362 十三刀全 CAUGHT**（`.scratch/motion-audit-2/r66_mutation_battery.log`）。
+**没解决**：`fade-clock-snaps-here` 是"整卷级"的缺席，覆盖地板只数"臂级"的 ⇒ 它今天没有 run 号、没有计数（新开 101）；
+runner 的读数被 `head -120` 截、胶片从不上传 ⇒ runner-only 的现象仍然没有图可看（新开 102）；
+runner 到底属于哪一档（`能分辨` 还是 `拍成跳变`）由下一次 CI 自己回答，本轮只能保证：**答案无论哪种，红都有名字**。

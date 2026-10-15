@@ -48,5 +48,24 @@
       "note": "R42/R44 都判到 ⇒ 要求判到。"
     }
   },
-  "thin_warnings": []
+  "thin_warnings": [],
+  "_suite_reds": [
+    "R66 / BACKLOG 100 新增的登记表：`suite_reds` 登记的是**动效这一卷在 runner 上已知会红的用例**，",
+    "与上面那些臂一级的登记是两层不同的东西 —— 那些管「今天判了几条」，这条管「有没有红、红的有没有名字」。",
+    "为什么要有这一层：run 38696695788 与 38698142859 两次 `motion suite exit: 1`",
+    "（`testListRowsDoNotAnimateAndNothingClaimsTheyDo` 的阳性对照在 runner 上读不出淡入：",
+    "本机 落定残余=0.974 / runner 0.025），而那一步是 `continue-on-error: true` 的报告步，",
+    "闸门又只看读数形状 ⇒ 一次红两次，CI 结论仍然是绿的。",
+    "每一条形如：",
+    "  {\"test\": \"testXxx\", \"reason\": \"一句话说清为什么今天允许它红\",",
+    "   \"registered_run\": \"38696695788\", \"points_to\": \"BACKLOG 100\"}",
+    "`registered_run` 必须是**真的 run 号**（没有它，登记就成了一行随时可以编的借口），",
+    "`points_to` 必须指着一个还没关的条目（登记是欠账，不是决定）。",
+    "**这张表现在是空的，而且它应该一直是空的**：R66 把上面那条红的成因查清了",
+    "（淡入时钟探针 `FadeClockProbe`：本机 跨度=1.000 中间态帧数=10 ⇒ 证人能分辨，",
+    "而 runner 的读数由下一次 CI 自己回答），所以正确处置是修判据，不是登记。",
+    "如果哪天这里多了条目，`MOTION_FLOOR_REGISTERED_REDS=n` 会在日志里把 n 打出来 ——",
+    "「靠登记过的绿」必须数得出来（BACKLOG 49）。"
+  ],
+  "suite_reds": []
 }

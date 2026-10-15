@@ -38,6 +38,20 @@
                   拿它当硬门就是 R39 那一族"恒红的守卫最后被人删掉"。
                   为什么又要打：不写下来的话，"这一族今天完全没被看"会变成没人知道的常态。
                   红的是**新形状**（换了理由 / 清单外的臂 / 少了一臂的键），不是这条已知事实。
+  SUITE_RED（R66 新增，红） 这一卷有**红用例**而它没在 `suite_reds` 里登记过 ⇒ 红，
+                  并把用例名 + 它的 XCTAssert 原文一起打出来。
+                  这一条补的是本文件从头到尾的一个洞：上面所有规则只判读数形状，
+                  于是 run 38696695788 里 `motion suite exit: 1` 与 `MOTION_FLOOR_REDS=0`
+                  同屏出现两次，而 CI 的结论是绿的。
+  NAMELESS_RED（R66 新增，红） 汇总行说 `with N failures`（N>0）而日志里**一个名字都没有**
+                  ⇒ 红。这不是重复 SUITE_RED，它是 R36 那句话的另一种坏法：
+                  "只有退出码的红等于没有红"。少了这一格，"红被通道吞掉"会伪装成"没有红"。
+  SUITE_REGISTERED（**不红**） 红用例登记过 ⇒ 不挡发布，但把理由、登记时的 run 号、
+                  以及指向的 BACKLOG 条目打出来；`MOTION_FLOOR_REGISTERED_REDS=n` 单独计数，
+                  这样"靠登记过绿"这件事在日志里数得出来（BACKLOG 49：登记不许变成免检牌）。
+                  登记表里那条这次**没有**再红 ⇒ 打一行 `MOTION_FLOOR_SUITE_STALE`（不红）
+                  提醒删掉它。为什么不红：一条偶尔才红的判据被登记之后如果不再红就恒红，
+                  等于把登记变成反向的恒红 —— R46 在臂那一层已经为同样的形状让过一步。
 
 **明确不判的**：`MOTION_SUMMARY <arm>=<帧数>` 里的那个帧数。
 R2 已经把这件事证伪过一次 —— 同一份代码本机实测跑过 `2 / 3 / 2`，
@@ -65,6 +79,22 @@ EXECUTED = re.compile(r"Executed (\d+) tests?")
 # 这一类原因**不带** `MOTION_NOT_RUN=` 前缀（`XCTSkipUnless` 打的是人话），
 # 所以 CI 那一步的 grep 抓不到它 —— 整族一条读数都没打的时候，这是唯一的线索。
 SKIP_LINE = re.compile(r"-\[[A-Za-z0-9_.]+ ([A-Za-z0-9_]+)\][^\n]*?: Test skipped - (.+)")
+# ---- 用例级的红（R66 / BACKLOG 100）----------------------------------------------
+# 上面那些规则**全部只看读数形状**：谁在、谁不在、不在的理由登记过没有。它们从不看
+# "这一卷有没有红用例"。后果在 run 38696695788 / 38698142859 里是现场的：
+# 同一次 run 里 `motion suite exit: 1`（`testListRowsDoNotAnimateAndNothingClaimsTheyDo`
+# 的阳性对照在 runner 上读不出淡入）而 `MOTION_FLOOR_REDS=0` —— 一步红了两次，
+# 而唯一的闸门说"全绿"。这与 R36 之前捕获那一步的毛病是同一个：**红没有名字**。
+#
+# 为什么不能像捕获那一步一样直接把退出码交出去：动效那一步是 `continue-on-error: true`
+# 的报告步，它故意不参与发布判定（一次采样抖动不该挡住发版）。R66 不推翻这个选择，
+# 而是补上它缺的那一半：**红了要有名字，有名字才谈得上"这次算不算数"**。
+FAILED_CASE = re.compile(r"Test Case '-\[[A-Za-z0-9_.]+ ([A-Za-z0-9_]+)\]' failed")
+# `…/MotionFilmstripTests.swift:2530: error: -[Class testFoo] : XCTAssertGreaterThan failed: (…)`
+ERROR_LINE = re.compile(r"error: -\[[A-Za-z0-9_.]+ ([A-Za-z0-9_]+)\] : (.+)")
+# `Executed 42 tests, with 4 tests skipped and 1 failure (1 unexpected)`
+# 两种形状都要吃：`with N failures` 和 `with M tests skipped and N failures`。
+SUMMARY_FAILURES = re.compile(r"Executed \d+ tests?, with (?:\d+ tests? skipped and )?(\d+) failures?\b")
 
 
 def parse(text: str) -> dict:
@@ -107,6 +137,24 @@ def parse(text: str) -> dict:
         match = SKIP_LINE.search(line)
         if match and (match.group(1), match.group(2)) not in skips:
             skips.append((match.group(1), match.group(2)))
+    # 用例级的红（R66）。名字与理由**分开收集**是有原因的：`Test Case … failed` 与
+    # `error: -[Class foo] : XCTAssert…` 是两种行，而后者可能因为一次成块的 stdout 丢失而缺席
+    # （R64 实测：本机 `swift test` 会整段丢 print，位置可复现）。
+    # 所以这里任何一半缺席都不能让另一半闭嘴 —— 见 `suite_verdicts` 的 NAMELESS_RED 那一格。
+    failures = []
+    for line in text.splitlines():
+        match = FAILED_CASE.search(line)
+        if match and match.group(1) not in failures:
+            failures.append(match.group(1))
+    messages = {}
+    for line in text.splitlines():
+        match = ERROR_LINE.search(line)
+        if match:
+            messages.setdefault(match.group(1), match.group(2).strip())
+    # 取**最大值**而不是最后一条：`Executed` 那几行按 suite 各打一次，而 stdout 会成块丢 ——
+    # 按"最后一条"读，丢掉尾巴那次会把 1 条红读成 0 条。取 max 之后，"丢行"只会让这一格
+    # 与 `failures` 的数量不一致，而那种不一致本身就是 NAMELESS_RED 要报的东西。
+    summary_failures = max([int(m.group(1)) for m in SUMMARY_FAILURES.finditer(text)] or [0])
     return {
         "judged": judged,
         "total": total,
@@ -114,8 +162,66 @@ def parse(text: str) -> dict:
         "summary_arms": summary_arms,
         "reasons": reasons,
         "skips": skips,
+        "failures": failures,
+        "failure_messages": messages,
+        "summary_failures": summary_failures,
         "executed": executed[-1] if executed else 0,
     }
+
+
+def suite_verdicts(facts: dict, expectations: dict) -> list:
+    """这一卷有没有红用例、红的那条登记过没有（R66 / BACKLOG 100）。
+
+    单独成一个函数而不是塞进 `verdicts`：`verdicts` 有两处提前 `return`
+    （`executed==0` 与"没有结论行"），而红用例**恰恰常和"没有结论行"同时发生** ——
+    判据自己崩了才会既没读数又红。放在前面又会被那两处 return 吃掉，所以由调用方
+    在两个提前 return 之前先取走这一段。
+    """
+    registry = {}
+    for entry in expectations.get("suite_reds", []):
+        name = entry.get("test")
+        if name:
+            registry[name] = entry
+    named = facts["failures"]
+    messages = facts["failure_messages"]
+    summary = facts["summary_failures"]
+    out = []
+
+    if not named and summary == 0:
+        out.append(("MOTION_FLOOR_SUITE_CLEAN=0",
+                    "这一卷没有红用例（汇总行也没说有）", False))
+        return out
+
+    unregistered = [name for name in named if name not in registry]
+    registered = [name for name in named if name in registry]
+
+    def describe(name: str) -> str:
+        reason = messages.get(name)
+        return "%s：%s" % (name, reason[:180]) if reason else "%s：（这一条的 XCTAssert 原文没在日志里）" % name
+
+    if unregistered:
+        out.append(("MOTION_FLOOR_SUITE_RED=%d" % len(unregistered),
+                    "动效这一卷有未登记的红用例 ⇒ 红必须有名字，也要有人负责：%s"
+                    % " | ".join(describe(name) for name in unregistered), True))
+    if registered:
+        out.append(("MOTION_FLOOR_REGISTERED_REDS=%d" % len(registered),
+                    "这些红用例在 `suite_reds` 里登记过，不挡发布，但它们**仍然是红**：%s"
+                    % " | ".join("%s（登记于 run %s，见 %s）"
+                                 % (name, registry[name].get("registered_run", "?"),
+                                    registry[name].get("points_to", "?"))
+                                 for name in registered), False))
+    if summary > len(named):
+        out.append(("MOTION_FLOOR_SUITE_NAMELESS_RED=%d" % (summary - len(named)),
+                    "汇总行说这一卷红了 %d 次，日志里只找得到 %d 个名字 ⇒ 少掉的那几条**没有名字**。"
+                    "这一格不许被删：它是 R36 那句话（只有退出码的红等于没有红）在动效这一族的形状，"
+                    "而它今天最可能的成因是 stdout 成块丢（R64）—— 那就是为什么结论必须同时进文件通道"
+                    % (summary, len(named)), True))
+    stale = [name for name in sorted(registry) if name not in named]
+    for name in stale:
+        out.append(("MOTION_FLOOR_SUITE_STALE",
+                    "%s 登记在 `suite_reds` 里，这次**没有**再红 ⇒ 这是好消息，"
+                    "把登记表里这一条删掉（留着它，登记就慢慢变成免检牌堆）" % name, False))
+    return out
 
 
 def verdicts(facts: dict, expectations: dict) -> list:
@@ -132,6 +238,11 @@ def verdicts(facts: dict, expectations: dict) -> list:
                     "看门狗收掉了进程 ⇒ 不能把「没跑完」判成「验得不够」",
                     False))
         return out
+
+    # R66：用例级的红排在**所有提前 return 之前**。"没有结论行"与"有红用例"经常是同一件事
+    # 的两个症状（判据自己崩了），而旧版在这里 return 之后什么都不再说 ——
+    # 那正好把这一轮要修的那个洞又挖了一遍。
+    out.extend(suite_verdicts(facts, expectations))
 
     if facts["judged"] is None:
         out.append(("MOTION_FLOOR_NO_RESOLVE",
@@ -231,10 +342,13 @@ def main(argv=None) -> int:
         return 2
 
     facts = parse(text)
-    print("MOTION_FLOOR_FACTS judged=%s/%s executed=%d not-run=%s summary=%s"
+    print("MOTION_FLOOR_FACTS judged=%s/%s executed=%d not-run=%s summary=%s "
+          "红的用例=%s 汇总行报红=%d"
           % (facts["judged"], facts["total"], facts["executed"],
              ",".join(sorted(facts["not_run"])) or "-",
-             " ".join("%s=%d" % pair for pair in sorted(facts["summary_arms"].items()))))
+             " ".join("%s=%d" % pair for pair in sorted(facts["summary_arms"].items())),
+             ",".join(facts["failures"]) or "-",
+             facts["summary_failures"]))
     results = verdicts(facts, expectations)
     reds = 0
     for marker, message, is_red in results:
