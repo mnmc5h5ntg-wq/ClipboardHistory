@@ -1,0 +1,82 @@
+=== 基线（未变异）：两格判据都必须绿 ===
+   testOverlayHoverTintIsPaintedAndConfinedToItsRow           = green
+   testOverlayHoverFillSharesTheSelectionPillsOutline         = green
+   testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTh = green
+
+M363 让这一档永远不画（`showsHoverTint` 恒 false）⇒ 真值表与像素两格都必须红（这就是改之前产品的样子：浮层根本没有指针反馈）
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverTintIsPaintedAndConfinedToIt testOverlayHoverFillSharesTheSelectionPillsO testOverlayHoverPolicyIsATruthTableAndShares
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:668: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:670: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:668: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+M364 选中时也画（把 hover 叠到那颗蓝药丸上）⇒ 必须红在真值表那一格
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverPolicyIsATruthTableAndShares
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:695: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverPolicyIsATruthTableAndShares
+   已还原（逐字节相同：True）
+
+M365 把 alpha 从令牌上摘下来，写死 0.01 ⇒ 必须同时红在两格：真值表那格的令牌同一性 + 像素那格的抬升地板（0.01×255=2.6 < 7.65）
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverTintIsPaintedAndConfinedToIt testOverlayHoverFillSharesTheSelectionPillsO testOverlayHoverPolicyIsATruthTableAndShares
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:668: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:670: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:668: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+M366 把墨写成死白（不跟外观翻面）⇒ 亮档必须红在极性那一格
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverTintIsPaintedAndConfinedToIt
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:610: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverTintIsPaintedAndConfinedToIt
+   已还原（逐字节相同：True）
+
+M367 取消内缩（灰铺满整格，与选中药丸两种宽度）⇒ 必须红在宽度那一格
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverTintIsPaintedAndConfinedToIt testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:683: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+M368 `rebuildRows` 不再清悬停（打字时那层灰会留在错误的一行上）⇒ 像素判据抓不到（判据里没有真鼠标），必须由那条调用点守卫红
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverPolicyIsATruthTableAndShares
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:718: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverPolicyIsATruthTableAndShares
+   已还原（逐字节相同：True）
+
+M369 回到 R67 第一版：直角（半径 0）⇒ 必须红在轮廓那一格。这一刀是本轮的『真缺陷复现』：宽度判据（M367 那一格）对它是绿的，因为 42…797 与 44…795 只差 2px 在容差内 —— 只有逐行轮廓能看见方与圆的 11px 之差
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:683: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+M370 圆角太小（3pt，实测内缩跨度约 5px 而药丸 11px）⇒ 轮廓那一格必须红。这一刀钉住『不许把 6pt 那种差不多圆的数挑进来』：R67 第二版就是 6pt，它当时是红的
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:683: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+M371 圆角太大（14pt > 行高一半，圆成胶囊）⇒ 轮廓那一格必须红。只测『太小』会漏掉另一侧：判据是逐行绝对差，两侧都该有牙
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:683: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:680: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsO
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M363   CAUGHT
+   M364   CAUGHT
+   M365   CAUGHT
+   M366   CAUGHT
+   M367   CAUGHT
+   M368   CAUGHT
+   M369   CAUGHT
+   M370   CAUGHT
+   M371   CAUGHT
+   抓到=9 逃掉=0 没跑成=0 未落地=0

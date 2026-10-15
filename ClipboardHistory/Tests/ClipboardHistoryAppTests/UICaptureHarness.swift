@@ -514,6 +514,536 @@ final class UICaptureTests: XCTestCase {
                           + " vs 标签最左 \((labelMinX.min() ?? 0).description)）⇒ 那一列不占位，会压住文字")
     }
 
+    /// R67 · 浮层那一行的悬停档：**画了、画在该在的那一行、两档外观同一条通道**。
+    ///
+    /// 判的是 alpha，不是"合成后的亮度"。理由是被两次读数逼出来的，不是偏好：
+    /// 这条通道拍的是 `contentView`，而浮层的表格与滚动视图刻意不画底色
+    /// （`table.backgroundColor = .clear`、`scroll.drawsBackground = false`）⇒ 行底在帧里是**透明**的。
+    /// 于是同一层 6% 的墨，两档外观合成到中灰之后读出来是
+    /// **亮 −2.28/255、暗 +6.73/255**（本机实测），而 alpha 那一列读出来是
+    /// **亮 15.80→29.42（+13.62）、暗 17.84→31.34（+13.50）** ——
+    /// 差 0.12 个 alpha。也就是说"亮度"这把尺量的其实是**这一行原来有什么字**，
+    /// 而"alpha 抬了多少"量的才是产品写进去的那一层。
+    ///
+    /// 三条断言各自拦一种错：
+    ///   ① 抬升 ≥ 令牌推导线的一半 ⇒ 拦"没画 / 画得太轻"（改颜色成 `.clear`、把 alpha 调小都会红）；
+    ///   ② 只有被点亮那一行的 alpha 抬升 ⇒ 拦"画到别的行上"，同时它也是 BACKLOG 80
+    ///      那族 y 轴翻转的探测器（点亮第 3 行，翻错就落在第 4 行，两行相隔 34pt）；
+    ///   ③ 合成后的亮度**符号**：亮档必须变暗、暗档必须变亮 ⇒ 拦"用错极性的墨"
+    ///      （比如在亮色里画 6% 的白）。只判符号不判大小 —— 大小被上面那条通道限制污染了。
+    ///
+    /// **这一档"够不够响"不在这里判**：屏幕上那一层是画在实心窗口上的，
+    /// 而这条通道里没有那个底。0.06 这一档的"看得出来"是 R15 在侧栏同一条令牌上量过的
+    /// （`idle→hover 15.9 / 14.0`），浮层继承它；真屏幕上顺不顺眼记进人工批次 67。
+    /// 把"拍不到实底"这件事修掉（改拍 frame view，让窗口底真的进来）记 BACKLOG 103。
+    func testOverlayHoverTintIsPaintedAndConfinedToItsRow() throws {
+        let store = makePopulatedStore()
+        let hoveredRow = 3
+        // 期望抬升从令牌推：`VisualFill.hover` × 255 = 15.3 个 alpha。
+        // 线取它的一半（7.65）而不是它本身：带里本来就有字与图标是实心的（静置 alpha 实测 15.8–17.8），
+        // 那些像素的 alpha 不会再涨，所以"整带平均抬升"必然低于满值 —— 但绝不该低到一半以下。
+        let expectedRise = Double(VisualFill.hover) * 255.0
+        let floor = expectedRise / 2.0
+        for (label, appearance, expectedSign) in [("亮", NSAppearance.Name.aqua, -1.0),
+                                                  ("暗", NSAppearance.Name.darkAqua, 1.0)] {
+            let shot = try overlayPair(store: store, hoveredRow: hoveredRow, appearance: appearance)
+            let plain = shot.plain, hovered = shot.hovered
+            guard let band = shot.bands[hoveredRow] else {
+                return XCTFail("量不到第 \(hoveredRow) 行的矩形 ⇒ 「悬停画没画出来」这一条没有对象"
+                    + "（可读到的行矩形只有 \(shot.bands.keys.sorted().map(String.init).joined(separator: ","))）")
+            }
+            let expectedWord = expectedSign > 0 ? "变亮" : "变暗"
+            let rise = Self.meanAlpha(hovered, rect: band) - Self.meanAlpha(plain, rect: band)
+            let luminanceDelta = Self.meanLuminance(hovered, rect: band)
+                - Self.meanLuminance(plain, rect: band)
+            var others: [(Int, Double)] = []
+            for (row, rect) in shot.bands.sorted(by: { $0.key < $1.key }) where row != hoveredRow {
+                others.append((row, Self.meanAlpha(hovered, rect: rect) - Self.meanAlpha(plain, rect: rect)))
+            }
+            let loudestOther = others.max(by: { $0.1 < $1.1 }) ?? (-1, 0)
+            let neighborLift = others.first(where: { $0.0 == hoveredRow + 1 })?.1 ?? -999
+            emit("OVERLAY_HOVER \(label) 点亮行=\(hoveredRow) alpha 抬升=\(String(format: "%.2f", rise))/255 "
+                  + "线=\(String(format: "%.2f", floor))（令牌推 \(String(format: "%.2f", expectedRise)) 的一半） "
+                  + "亮度差=\(String(format: "%.2f", luminanceDelta))/255 期望符号=\(expectedWord) "
+                  + "邻行最大抬升=\(loudestOther.0):\(String(format: "%.2f", loudestOther.1)) "
+                  + "第4行抬升=\(String(format: "%.2f", neighborLift)) 带=\(NSStringFromRect(band)) "
+                  + "行数=\(shot.bands.count) alpha 静置=\(String(format: "%.2f", Self.meanAlpha(plain, rect: band)))")
+            XCTAssertGreaterThanOrEqual(rise, floor,
+                "\(label)档：点亮那一行的 alpha 只抬了 \(String(format: "%.2f", rise))/255，"
+                    + "而这一层墨自己写进去的是 \(String(format: "%.2f", expectedRise))（`VisualFill.hover` × 255）"
+                    + "的一半都不到 ⇒ 这一档要么没画，要么被谁调轻了")
+            XCTAssertLessThan(loudestOther.1, floor,
+                "\(label)档：第 \(loudestOther.0) 行（没被点亮）也抬了 \(String(format: "%.2f", loudestOther.1))/255 ⇒ "
+                    + "这层灰没有钉在它该在的那一格。两种成因都值得查：它画多了行，"
+                    + "或者行矩形的 y 朝向与缓冲区不一致（BACKLOG 80 那一族 —— 点亮第 3 行，翻错就落在第 4 行）")
+            // 宽度：这层灰必须与**选中药丸同宽**。
+            // 为什么线不能取自 `QuickPickController.hoverFillInset`（我第一版就是这么写的，
+            // 于是 M367 那一刀逃掉了）：拿被约束的那个常量去推期望值，改常量就等于同时改了判据 ——
+            // 尺子读的是被测物体自己的刻度。改成在同一张帧上量药丸：
+            // 选中那一行与一条静置行的 **alpha 差**就是药丸的横向范围（药丸是实的、行底是透的）。
+            func rows(_ rect: CGRect) -> Range<Int> {
+                Int(rect.minY.rounded())..<Int(rect.maxY.rounded())
+            }
+            // 药丸在第 0 行（`windowForCapture` 里 `model.index = 0`），静置的参照行取第 1 行。
+            guard let selectedBand = shot.bands[0], let idleBand = shot.bands[1] else {
+                return XCTFail("\(label)档：量不到选中行或静置行 ⇒ 宽度的参照物不存在")
+            }
+            let bandRows = rows(band)
+            let pillRows = rows(selectedBand)
+            let idleRows = rows(idleBand)
+            let pill = Self.alphaBandDelta(plain, pillRows, plain, idleRows,
+                                         x0: 0, x1: plain.pixelsWide, floor: 4)
+            let painted = Self.alphaBandDelta(plain, bandRows, hovered, bandRows,
+                                              x0: 0, x1: plain.pixelsWide, floor: 4)
+            emit("  药丸 x=\(pill.min)…\(pill.max) 灰带 x=\(painted.min)…\(painted.max) "
+                  + "左差=\(painted.min - pill.min)px 右差=\(painted.max - pill.max)px 帧宽=\(plain.pixelsWide)px")
+            XCTAssertGreaterThan(pill.max, pill.min,
+                "\(label)档：在同一张静置帧上量不到选中药丸的横向范围 ⇒ 这条宽度判据没有对象，"
+                    + "先查捕获通道（选中那一档在离屏窗口里是材质，R18 那一族）")
+            XCTAssertGreaterThan(painted.max, painted.min, "\(label)档：量不到灰带的横向范围")
+            XCTAssertLessThanOrEqual(abs(painted.min - pill.min), 4,
+                "\(label)档：灰带左沿 \(painted.min) 与药丸左沿 \(pill.min) 差 \(abs(painted.min - pill.min))px ⇒ "
+                    + "同一格里两种宽度，看着像两个东西在抢这一行")
+            XCTAssertLessThanOrEqual(abs(painted.max - pill.max), 4,
+                "\(label)档：灰带右沿 \(painted.max) 与药丸右沿 \(pill.max) 差 \(abs(painted.max - pill.max))px（同上）")
+
+            XCTAssertGreaterThan(luminanceDelta * expectedSign, 0,
+                "\(label)档：合成到中灰底上读到的亮度变化是 \(String(format: "%.2f", luminanceDelta))/255，"
+                    + "方向错了（这一档期望\(expectedWord) ⇒ 用的墨极性不对："
+                    + "`labelColor` 会跟着外观翻面，写死成白或黑就会在其中一档里看不见")
+        }
+    }
+
+    /// R67 · 那一层灰的**轮廓**必须与选中药丸逐行一致（不是"总宽度一致"）。
+    ///
+    /// 这一条是看了画面才有的，读数给不出来：上一判据量到"左差 0px / 右差 0px"就绿了，
+    /// 而 `quickpick-hover-*-light.png` 上那层灰是**直角、满高**的一块（逐行 x 范围恒为 42…797），
+    /// 同一张帧上的药丸是圆的（首行 55…784 → 中行 44…795，左沿内缩跨度 11px）。
+    /// 两档说的是同一件事（"鼠标 / 键盘在这一行"），形状不一致就等于两个人说话。
+    ///
+    /// 三条断言各自拦一种错：
+    ///   ① 参照物自己是圆的（药丸左沿内缩跨度 ≥ 4px）⇒ 拦"空判据"：
+    ///      如果哪天量到的药丸是方的，那"逐行一致"就自动成立，这条判据什么都不钉。
+    ///      与 `bottomEdgeInkCanary` 同一条理由 —— 正对照读的必须就是判据读的那个量。
+    ///   ② 逐行左沿 / 右沿之差 ≤ 2px ⇒ 拦"方角"（顶行差 11px）、拦"上下内缩不同"、拦"宽度又跑掉"。
+    ///   ③ 两条轮廓的行数差 ≤ 2 ⇒ 拦"灰带比行高"（画到邻行去）与"灰带被压扁"。
+    ///
+    /// 容差为什么是 2px 而不是 0：这条通道在两台机器上有 ±1pt 的系统性抖动（R38 那一课），
+    /// 而它要拦的是 11px 的方角。1pt 的差别（`hoverFillInset` 9 vs 10）不在这里判 ——
+    /// 那 1pt 由**帧基线**逐字节钉住（`quickpick-hover-*` 两张在 `docs/frame_baseline.json` 里），
+    /// 改回去会红的是那一条，不是这一条。
+    func testOverlayHoverFillSharesTheSelectionPillsOutline() throws {
+        let store = makePopulatedStore()
+        let hoveredRow = 3
+        for (label, appearance) in [("亮", NSAppearance.Name.aqua), ("暗", NSAppearance.Name.darkAqua)] {
+            let shot = try overlayPair(store: store, hoveredRow: hoveredRow, appearance: appearance)
+            let plain = shot.plain, hovered = shot.hovered
+            guard let band = shot.bands[hoveredRow],
+                  let selectedBand = shot.bands[0], let idleBand = shot.bands[1] else {
+                return XCTFail("\(label)档：量不到第 \(hoveredRow)/0/1 行的矩形 ⇒ 轮廓判据没有对象")
+            }
+            func rows(_ rect: CGRect) -> Range<Int> {
+                Int(rect.minY.rounded())..<Int(rect.maxY.rounded())
+            }
+            // 药丸 = 同一张静置帧上"选中行 vs 静置行"的逐行 alpha 差；
+            // 灰带 = 同一行上"点亮帧 vs 静置帧"的逐行 alpha 差。两把尺同一套语义，只是参照不同。
+            let pill = Self.alphaLiftProfile(plain, rows(selectedBand), plain, rows(idleBand),
+                                             x0: 0, x1: plain.pixelsWide, floor: 4)
+            let fill = Self.alphaLiftProfile(hovered, rows(band), plain, rows(band),
+                                             x0: 0, x1: plain.pixelsWide, floor: 4)
+            let pillInset = Self.profileLeftInsetSpread(pill)
+            let fillInset = Self.profileLeftInsetSpread(fill)
+            emit("OVERLAY_HOVER_OUTLINE \(label) 药丸行数=\(pill.count) 灰带行数=\(fill.count) "
+                  + "药丸左沿内缩=\(pillInset)px 灰带左沿内缩=\(fillInset)px "
+                  + "药丸首行=\(pill.first.map { "\($0.left)…\($0.right)" } ?? "-") "
+                  + "药丸中行=\(pill.count > 2 ? "\(pill[pill.count / 2].left)…\(pill[pill.count / 2].right)" : "-") "
+                  + "灰带首行=\(fill.first.map { "\($0.left)…\($0.right)" } ?? "-") "
+                  + "灰带中行=\(fill.count > 2 ? "\(fill[fill.count / 2].left)…\(fill[fill.count / 2].right)" : "-")")
+            XCTAssertGreaterThanOrEqual(pill.count, 8,
+                "\(label)档：只量到 \(pill.count) 行药丸轮廓 ⇒ 参照物不存在（材质在离屏窗口里没合成，R18 那一族），"
+                    + "这条判据不许在'量不到'的情况下当作通过")
+            XCTAssertGreaterThanOrEqual(pillInset, 4,
+                "\(label)档：药丸自己的左沿内缩只有 \(pillInset)px ⇒ 参照物在这一帧里是方的，"
+                    + "那么'逐行一致'就成了空判据（任何同样方的东西都能通过）。先查捕获通道再谈灰带的形状")
+            XCTAssertGreaterThanOrEqual(fill.count, 8,
+                "\(label)档：只量到 \(fill.count) 行灰带轮廓 ⇒ 那一层灰没画出来，判不了形状")
+            XCTAssertLessThanOrEqual(abs(fill.count - pill.count), 2,
+                "\(label)档：灰带 \(fill.count) 行而药丸 \(pill.count) 行 ⇒ 两块东西高度不同："
+                    + "灰要么比行高（画到邻行去了），要么被压扁了")
+            let common = min(pill.count, fill.count)
+            var worstLeft = 0, worstRight = 0, worstAt = -1
+            for t in 0..<common {
+                let dl = abs(fill[t].left - pill[t].left), dr = abs(fill[t].right - pill[t].right)
+                if max(dl, dr) > max(worstLeft, worstRight) { worstLeft = dl; worstRight = dr; worstAt = t }
+            }
+            emit("  逐行最大偏差 第\(worstAt)行 左=\(worstLeft)px 右=\(worstRight)px（线 2px）")
+            XCTAssertLessThanOrEqual(worstLeft, 2,
+                "\(label)档：灰带与药丸逐行左沿最大差 \(worstLeft)px（第 \(worstAt) 行）⇒ 形状不是一套话。"
+                    + "方角会在这里红：直角块的顶行与圆角药丸的顶行差一个半径（实测内缩跨度 11px）")
+            XCTAssertLessThanOrEqual(worstRight, 2,
+                "\(label)档：灰带与药丸逐行右沿最大差 \(worstRight)px（第 \(worstAt) 行）（同上）")
+        }
+    }
+
+    /// R67 · 悬停的语义（真值表）+ 令牌同一性 + 与侧栏同一枚令牌（跨文件守卫）。
+    func testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar() throws {
+        // 真值表：只有"悬停且未选中"才画灰。四格全钉，因为少一格就会有一种静默的错：
+        // 只测"该画的画了"，那么"选中时也画"（把蓝药丸压成灰蓝）不会红；
+        // 只测"不该画的不画"，那么"永远不画"也不会红 —— 后者正是改之前产品的样子。
+        XCTAssertTrue(QuickPickController.showsHoverTint(isSelected: false, isHovered: true),
+                      "悬停且未选中却不画灰 ⇒ 这个面板仍然没有指针反馈（R67 要修的就是这一格）")
+        XCTAssertFalse(QuickPickController.showsHoverTint(isSelected: true, isHovered: true),
+                       "选中时还叠一层灰 ⇒ hover(0.06) 会把 selected(0.16 的强调色) 压成灰蓝，"
+                           + "「哪一条是我选中的」要读第二眼")
+        XCTAssertFalse(QuickPickController.showsHoverTint(isSelected: true, isHovered: false),
+                       "没悬停却画灰 ⇒ 每一行都灰，等于没有这一档")
+        XCTAssertFalse(QuickPickController.showsHoverTint(isSelected: false, isHovered: false),
+                       "静置行不许有任何底色（否则整列都是灰底，选中反而不显眼）")
+
+        // 令牌同一性：浮层不许自己再定一个数。
+        XCTAssertEqual(QuickPickController.hoverFillAlpha, CGFloat(VisualFill.hover),
+                       "浮层那一档不再是 `VisualFill.hover` ⇒ 同一件「鼠标在这里」又要开始说两种音量")
+        XCTAssertLessThan(CGFloat(VisualFill.hover), CGFloat(VisualFill.selected),
+                          "hover ≥ selected ⇒ 次序反了：瞬时的悬停比会留下来的选中更响")
+        XCTAssertLessThan(CGFloat(VisualFill.selected), CGFloat(VisualFill.pressed) + 1,
+                          "`VisualFill` 自己的三档次序被改了（hover < pressed < selected 是语义）")
+
+        // 重排必须清掉旧的那一层（守卫的是**调用点**，不是函数存在）：
+        // `NSTableView` 会把 row view 挪去配另一行，而指针没动 ⇒ `mouseExited` 不会来 ⇒
+        // 那层灰会留在错误的一行上。删掉这一行调用不会让任何像素判据变红
+        // （判据里没有真鼠标），所以它必须由一条源码守卫钉住 —— 与 `NoticeBanner`
+        // 那一族"守卫读调用点"同一条理由。
+        let controllerSource = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
+        let rebuild = controllerSource.components(separatedBy: "func rebuildRows(").last ?? ""
+        XCTAssertTrue(rebuild.components(separatedBy: "\n    }").first?
+                        .contains("clearHover()") == true,
+                      "`rebuildRows` 不再清悬停了 ⇒ 打字时候选增减，那层灰会留在错误的一行上")
+
+        // 跨文件守卫：SwiftUI 侧那一族行悬停确实读的是同一枚令牌
+        // （`DetailView` 的两处 `.fill(.primary.opacity(isHovered ? VisualFill.hover : 0))`）。
+        // 这条守卫只读**产品**文件，不读测试自己 —— 否则它会因为本文件里也出现
+        // `VisualFill.hover` 而永远通过（R53 那一课：扫源码的守卫会命中守卫自己）。
+        let sidebar = Self.codeOnly(try productSource(named: "Views/DetailView.swift"))
+        XCTAssertTrue(sidebar.contains("VisualFill.hover"),
+                      "SwiftUI 侧的行悬停不再引用 `VisualFill.hover` ⇒ 浮层这条守卫就成了空守卫："
+                          + "两边可以各挑一个数而仍然全绿")
+    }
+
+    /// 诊断用：这条通道给的位图到底是**预乘**还是非预乘、opaque 与否。
+    /// 合成式选哪一条要看它（见 `meanLuminance` 的注释），所以它必须被读出来，不能被假设。
+    static func overlayAlphaInfo(plain: NSBitmapImageRep, hovered: NSBitmapImageRep) -> String {
+        "hasAlpha 静置=\(plain.hasAlpha) 点亮=\(hovered.hasAlpha) opaque 静置=\(plain.isOpaque) "
+            + "点亮=\(hovered.isOpaque) 每像素字节 静置=\(plain.samplesPerPixel)"
+    }
+
+    /// 把浮层拍成两张位图（静置 / 点亮第 `hoveredRow` 行），并给出**每一行在像素空间里的矩形**。
+    ///
+    /// 两张来自**同一个面板、同一个控制器**，中间只改 `rowHoveredForCapture` 一次：
+    /// 这样"除了悬停什么都没变"是构造出来的，而不是"两个面板碰巧画得一样"。
+    /// （R67 第一版是各建一个面板，结果亮色那一遍两帧逐像素相同、暗色那一遍正常 ——
+    /// 差异来自面板之间的建板/上屏时机，而不是产品。判据当时的红是对的，原因是我搭错了。）
+    ///
+    /// 行矩形从产品自己的 `table.rowHeight` 与表格在 contentView 里的位置推，
+    /// 判据里不写 34 / 420 这类字面量（数字只能从读数来）。
+    /// y 轴：这条通道的缓冲区第 0 行是**画面顶边**（R57 实测，BACKLOG 80 的原始证据），
+    /// 而 AppKit 视图坐标是左下角原点 ⇒ 这里显式翻转；翻错了会被"变化全在带内"那格抓住
+    /// （点亮第 3 行，翻错就落在第 4 行，两行相隔 34pt，判据会指名道姓）。
+    private func overlayPair(store: HistoryStore, hoveredRow: Int,
+                             appearance: NSAppearance.Name) throws
+            -> (plain: NSBitmapImageRep, hovered: NSBitmapImageRep, bands: [Int: CGRect], scale: Int) {
+        let build = QuickPickCapturePanel.builder(store: store, query: "")
+        guard let panel = build(), let content = panel.contentView else {
+            throw XCTSkip("捕获入口建不出浮层窗口 ⇒ 这一档今天无从判定（不是产品没画）")
+        }
+        _ = NSApplication.shared
+        let previousAppearance = NSApplication.shared.appearance
+        NSApplication.shared.appearance = NSAppearance(named: appearance)
+        defer {
+            NSApplication.shared.appearance = previousAppearance
+            panel.orderOut(nil)
+        }
+        content.appearance = NSAppearance(named: appearance)
+        panel.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        Self.tileScrollViews(in: content)
+        func shoot() -> NSBitmapImageRep {
+            panel.display()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
+                return NSBitmapImageRep()
+            }
+            content.cacheDisplay(in: content.bounds, to: rep)
+            return rep
+        }
+        let plain = shoot()
+        // 点亮：走的是产品那个属性，绘制分支与鼠标进来的完全同一条。
+        if let table = Self.productTable(in: content) {
+            (table.delegate as? QuickPickController)?.rowHoveredForCapture = hoveredRow
+        }
+        let hovered = shoot()
+
+        guard let table = Self.productTable(in: content) else { return (plain, hovered, [:], 1) }
+        let scale = max(1, plain.pixelsWide / max(Int(content.bounds.width), 1))
+        let contentHeight = content.bounds.height
+        var bands: [Int: CGRect] = [:]
+        for row in 0..<table.numberOfRows {
+            let rectInTable = table.rect(ofRow: row)
+            guard rectInTable.height > 0 else { continue }
+            let rectInContent = table.convert(rectInTable, to: nil)
+            let top = contentHeight - rectInContent.maxY
+            bands[row] = CGRect(x: rectInContent.minX * CGFloat(scale),
+                                y: top * CGFloat(scale),
+                                width: rectInContent.width * CGFloat(scale),
+                                height: rectInContent.height * CGFloat(scale))
+        }
+        return (plain, hovered, bands, scale)
+    }
+
+    /// 按**身份**认那张表：数据源是产品控制器的那一张（R65 那一课 —— 面板整棵树里不止一个表）。
+    private static func productTable(in root: NSView) -> NSTableView? {
+        var found: NSTableView?
+        func walk(_ view: NSView) {
+            if found != nil { return }
+            if let table = view as? NSTableView, table.dataSource is QuickPickController {
+                found = table
+            }
+            view.subviews.forEach(walk)
+        }
+        walk(root)
+        return found
+    }
+
+    /// 一块矩形里的平均 alpha（0–255）。**这条通道拍不到半透明层画在实底上的效果**
+    /// （浮层的表格刻意 `backgroundColor = .clear`，所以行底在帧里是透明的），
+    /// 但 alpha 是产品自己写进去的那个数 —— 它量的是"这一层画没画、画了多少"。
+    static func meanAlpha(_ rep: NSBitmapImageRep, rect: CGRect) -> Double {
+        guard let base = rep.bitmapData, rep.samplesPerPixel >= 4, rep.hasAlpha else { return -1 }
+        let spp = rep.samplesPerPixel, bytesPerRow = rep.bytesPerRow
+        let x0 = max(0, Int(rect.minX.rounded())), x1 = min(rep.pixelsWide, Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded())), y1 = min(rep.pixelsHigh, Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0 else { return -1 }
+        var sum = 0.0, count = 0
+        var y = y0
+        while y < y1 {
+            var x = x0
+            while x < x1 {
+                sum += Double(base[y * bytesPerRow + x * spp + 3])
+                count += 1
+                x += 1
+            }
+            y += 1
+        }
+        return count == 0 ? -1 : sum / Double(count)
+    }
+
+    /// 一块矩形里的平均亮度（0–255，三通道均值，**先按 alpha 合成到一块中灰底上**）。
+    ///
+    /// 为什么要合成：这条通道拍的是 `contentView`，而浮层的表格与滚动视图都刻意不画底色
+    /// （`table.backgroundColor = .clear`、`scroll.drawsBackground = false`）⇒
+    /// 亮色那一遍行底是**透明**的，6% 的黑画在透明黑上，RGB 一个数都不动（实测 0.00/255），
+    /// 而暗色那一遍行底是实的，6% 的白画上去动 13.50/255。
+    /// 两遍读的不是同一件事，除非先把两边都按**用户真正看到的方式**合成到一个不透明底上 ——
+    /// 屏幕上那个面板背后永远是实心的窗口，不是透明像素。
+    /// 拿不到 alpha 时（`hasAlpha == false`）合成就是原值，不影响暗色那一遍的读数。
+    static func meanLuminance(_ rep: NSBitmapImageRep, rect: CGRect, background: Double = 128) -> Double {
+        guard let base = rep.bitmapData else { return -1 }
+        let spp = rep.samplesPerPixel
+        let bytesPerRow = rep.bytesPerRow
+        let x0 = max(0, Int(rect.minX.rounded())), x1 = min(rep.pixelsWide, Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded())), y1 = min(rep.pixelsHigh, Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0, spp >= 4 else { return -1 }
+        var sum = 0.0, count = 0
+        var y = y0
+        while y < y1 {
+            var x = x0
+            while x < x1 {
+                let p = y * bytesPerRow + x * spp
+                sum += compositedChannel(base, p, background)
+                    + compositedChannel(base, p + 1, background)
+                    + compositedChannel(base, p + 2, background)
+                count += 3
+                x += 1
+            }
+            y += 1
+        }
+        return count == 0 ? -1 : sum / Double(count)
+    }
+
+    /// 一个通道值按它自己的 alpha 合成到实底上（`premultipliedLast`：字节已经是预乘的，
+    /// 所以合成式是 `值 + 底 × (1 − α)`，不是 `值 × α + 底 × (1 − α)`）。
+    private static func compositedChannel(_ base: UnsafeMutablePointer<UInt8>, _ p: Int,
+                                          _ background: Double) -> Double {
+        let alpha = Double(base[p + 3]) / 255.0
+        return Double(base[p]) + background * (1.0 - alpha)
+    }
+
+    /// 变化像素的 x 范围（像素空间）。用来判"这层灰有多宽"——
+    /// 它必须与选中那颗药丸同宽，而不是铺满整格（`hoverFillInset` 的注释里是量出来的出处）。
+    static func changedXRange(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                              clipping: CGRect, threshold: Int = 8,
+                              background: Double = 128) -> (min: Int, max: Int) {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4 else { return (-1, -1) }
+        var lo = Int.max, hi = -1
+        let x0 = max(0, Int(clipping.minX.rounded())), x1 = min(a.pixelsWide, Int(clipping.maxX.rounded()))
+        let y0 = max(0, Int(clipping.minY.rounded())), y1 = min(a.pixelsHigh, Int(clipping.maxY.rounded()))
+        var y = y0
+        while y < y1 {
+            var x = x0
+            while x < x1 {
+                let p = y * a.bytesPerRow + x * a.samplesPerPixel
+                let q = y * b.bytesPerRow + x * b.samplesPerPixel
+                let d = max(abs(Int(Self.compositedChannel(pa, p, background).rounded())
+                                - Int(Self.compositedChannel(pb, q, background).rounded())),
+                            max(abs(Int(Self.compositedChannel(pa, p + 1, background).rounded())
+                                    - Int(Self.compositedChannel(pb, q + 1, background).rounded())),
+                                abs(Int(Self.compositedChannel(pa, p + 2, background).rounded())
+                                    - Int(Self.compositedChannel(pb, q + 2, background).rounded()))))
+                if d > threshold { if x < lo { lo = x }; if x > hi { hi = x } }
+                x += 1
+            }
+            y += 1
+        }
+        return (lo == Int.max ? -1 : lo, hi)
+    }
+
+    /// 被点亮的像素的 x 范围，判据是 **alpha 抬升**超过 `alphaFloor`。
+    /// （亮度那一半在亮档上量不到，见调用点注释。）
+    static func paintedXRange(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                              clipping: CGRect, alphaFloor: Int) -> (min: Int, max: Int) {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4 else { return (-1, -1) }
+        let x0 = max(0, Int(clipping.minX.rounded())), x1 = min(a.pixelsWide, Int(clipping.maxX.rounded()))
+        let y0 = max(0, Int(clipping.minY.rounded())), y1 = min(a.pixelsHigh, Int(clipping.maxY.rounded()))
+        var lo = Int.max, hi = -1
+        var y = y0
+        while y < y1 {
+            var x = x0
+            while x < x1 {
+                let p = y * a.bytesPerRow + x * a.samplesPerPixel
+                let q = y * b.bytesPerRow + x * b.samplesPerPixel
+                if abs(Int(pb[q + 3]) - Int(pa[p + 3])) > alphaFloor {
+                    if x < lo { lo = x }
+                    if x > hi { hi = x }
+                }
+                x += 1
+            }
+            y += 1
+        }
+        return (lo == Int.max ? -1 : lo, hi)
+    }
+
+    /// 比两"条"水平带的 alpha，返回"每列各自带内的最大 alpha 之差 > `floor`"的 x 范围。
+    ///
+    /// 两种用法，共用一把尺：
+    ///   · **同一张帧、两条带**（选中行 vs 静置行）⇒ 量到的是那颗选中药丸的横向范围；
+    ///   · **同一条带、两张帧**（静置 vs 点亮）⇒ 量到的是那层灰的横向范围。
+    /// 为什么按列取**带内最大**而不是只取中间那条 y：药丸在行里是上下都留空的（圆角 + 内缩），
+    /// 取中间线会量到药丸以外的地方去 —— 实测同一张帧上"中间线"给出 71…654，
+    /// 而"带内最大"给出 42…795，后者才是药丸真正的边界（也与灰带的 42…797 对得上）。
+    static func alphaBandDelta(_ a: NSBitmapImageRep, _ aYs: Range<Int>,
+                               _ b: NSBitmapImageRep, _ bYs: Range<Int>,
+                               x0: Int, x1: Int, floor: Int) -> (min: Int, max: Int) {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4,
+              !aYs.isEmpty, !bYs.isEmpty else { return (-1, -1) }
+        let left = max(0, x0), right = min(min(a.pixelsWide, b.pixelsWide), x1)
+        let ay = aYs.map { max(0, min(a.pixelsHigh - 1, $0)) }
+        let by = bYs.map { max(0, min(b.pixelsHigh - 1, $0)) }
+        var lo = Int.max, hi = -1
+        var x = left
+        while x < right {
+            var maxA = 0, maxB = 0
+            for y in ay { maxA = max(maxA, Int(pa[y * a.bytesPerRow + x * a.samplesPerPixel + 3])) }
+            for y in by { maxB = max(maxB, Int(pb[y * b.bytesPerRow + x * b.samplesPerPixel + 3])) }
+            if abs(maxA - maxB) > floor {
+                if x < lo { lo = x }
+                if x > hi { hi = x }
+            }
+            x += 1
+        }
+        return (lo == Int.max ? -1 : lo, hi)
+    }
+
+    /// 逐行量"这一块墨的横向范围"：第 t 行取 `a` 带第 t 行与 `b` 带第 t 行的
+    /// **alpha 差 ≥ `floor`** 的最左 / 最右像素，只返回有墨的行。
+    ///
+    /// 与 `alphaBandDelta` 的分工：那把尺按列取"带内最大"，量到的是**总范围**；
+    /// 这把尺逐行给，量到的是**轮廓** —— 圆角、上下内缩这些东西只在逐行形状上看得见。
+    /// R67 为什么必须新加一把尺：宽度判据给出"左差 −2px / 右差 +2px"就绿了，
+    /// 而帧上那一层灰是**直角满高的矩形**、药丸是圆的（左沿内缩跨度 11px）。
+    /// 两条总范围相同的带可以有完全不同的轮廓 ⇒ 只看总范围的判据**结构上**看不见这一族错。
+    static func alphaLiftProfile(_ a: NSBitmapImageRep, _ aYs: Range<Int>,
+                                 _ b: NSBitmapImageRep, _ bYs: Range<Int>,
+                                 x0: Int, x1: Int, floor: Int) -> [(y: Int, left: Int, right: Int)] {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4,
+              aYs.count == bYs.count, !aYs.isEmpty else { return [] }
+        let left = max(0, x0), right = min(min(a.pixelsWide, b.pixelsWide), x1)
+        guard left < right else { return [] }
+        var out: [(y: Int, left: Int, right: Int)] = []
+        for t in 0..<aYs.count {
+            let ay = max(0, min(a.pixelsHigh - 1, aYs.lowerBound + t))
+            let by = max(0, min(b.pixelsHigh - 1, bYs.lowerBound + t))
+            var lo = -1, hi = -1
+            var x = left
+            while x < right {
+                let d = Int(pa[ay * a.bytesPerRow + x * a.samplesPerPixel + 3])
+                    - Int(pb[by * b.bytesPerRow + x * b.samplesPerPixel + 3])
+                if d >= floor {
+                    if lo < 0 { lo = x }
+                    hi = x
+                }
+                x += 1
+            }
+            if lo >= 0 { out.append((ay, lo, hi)) }
+        }
+        return out
+    }
+
+    /// 一条轮廓的"左沿内缩跨度"：所有行里最靠右的左沿 减 最靠左的左沿（px）。
+    /// 直角矩形给 0，圆角矩形给 ≈ 半径（药丸实测 11px）—— 这一把尺就是"圆没圆"的读数。
+    static func profileLeftInsetSpread(_ profile: [(y: Int, left: Int, right: Int)]) -> Int {
+        guard let lo = profile.map(\.left).min(), let hi = profile.map(\.left).max() else { return -1 }
+        return hi - lo
+    }
+
+    /// `clipping` 给定时只数矩形内的 —— 这一半就是"变化在不在它该在的那一格"。
+    /// 合成这件事的理由与 `meanLuminance` 同一条：不合成，亮色那一遍的透明底会把 6% 的灰
+    /// 读成"什么都没变"（RGB 都是 0），而暗色那一遍读得到 —— 一把跟着外观变性质的尺不能当判据。
+    static func changedPixelCount(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                                  clipping: CGRect? = nil, threshold: Int = 8,
+                                  background: Double = 128) -> Int {
+        guard a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh,
+              let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4 else { return -1 }
+        let width = a.pixelsWide, height = a.pixelsHigh
+        var changed = 0
+        var y = 0
+        while y < height {
+            var x = 0
+            while x < width {
+                if let rect = clipping, !rect.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5)) {
+                    x += 1
+                    continue
+                }
+                let p = y * a.bytesPerRow + x * a.samplesPerPixel
+                let q = y * b.bytesPerRow + x * b.samplesPerPixel
+                let d = max(abs(Int(Self.compositedChannel(pa, p, background).rounded())
+                                - Int(Self.compositedChannel(pb, q, background).rounded())),
+                            max(abs(Int(Self.compositedChannel(pa, p + 1, background).rounded())
+                                    - Int(Self.compositedChannel(pb, q + 1, background).rounded())),
+                                abs(Int(Self.compositedChannel(pa, p + 2, background).rounded())
+                                    - Int(Self.compositedChannel(pb, q + 2, background).rounded()))))
+                if d > threshold { changed += 1 }
+                x += 1
+            }
+            y += 1
+        }
+        return changed
+    }
+
     /// `quickpick-typed` 这张帧**必须是在打字，不是空列表**（R63 / U-99）。
     ///
     /// 为什么单独立一条：第一版这张帧的查询词是我从本轮探针的夹具里抄的"记录 3"，
@@ -1492,6 +2022,14 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-empty", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "zzz 不存在")))
+        // R67：悬停那一档第一次有帧可看。点的是**第 3 行**而不是第 0 行 ——
+        // `windowForCapture` 里 `model.index = 0` 让第 0 行是选中的，而选中时不画悬停灰
+        // （`showsHoverTint` 的次序：hover 0.06 < selected 0.16）。点第 0 行会拍出
+        // 一张"名字叫 hover、内容是没 hover"的帧 —— 与 R63 那张"名字叫 typed、
+        // 内容是 empty"的帧同一族错误，那次是靠看图才发现的，这次把行号写在这里。
+        results.append(Fixture("quickpick-hover", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", hoveredRow: 3)))
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -5168,14 +5706,19 @@ final class UICaptureTests: XCTestCase {
     /// 只是拍到一张空面板，而它名字写着"这就是浮层"。
     /// 这一族的坑叫"载荷绿、消费侧坏"，这次坏的是所有权。
     enum QuickPickCapturePanel {
-        static func builder(store: HistoryStore, query: String) -> @MainActor () -> NSWindow? {
+        /// `hoveredRow` 是给 R67 那两张悬停帧开的口子：离屏 `cacheDisplay` 送不进
+        /// `mouseEntered` / `mouseMoved`（BACKLOG 95 记的就是这条通道的边界），
+        /// 而产品侧走的是**与鼠标同一条赋值**（`QuickPickRowView.setHoveredForCapture`）。
+        /// 默认 `nil` ⇒ 其余浮层帧逐字节不变，这是它们能继续当基线的前提。
+        static func builder(store: HistoryStore, query: String,
+                            hoveredRow: Int? = nil) -> @MainActor () -> NSWindow? {
             var kept: QuickPickController?
             return {
                 if kept == nil {
                     kept = QuickPickController(historyStore: { store }, commit: { _ in })
                 }
                 guard let controller = kept else { return nil }
-                return controller.windowForCapture(query: query)
+                return controller.windowForCapture(query: query, hoveredRow: hoveredRow)
             }
         }
     }

@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Added（R67：快速选择浮层每一行第一次有指针反馈 —— 新开 BACKLOG 103、104 / U-112…U-116 / D-126）
+- 现场：浮层唯一的提交入口是**双击**（`table.doubleAction`，没有 `action`、没有 `NSTrackingArea`），
+  而呼出时鼠标停在哪是随机的 ⇒ 改之前用户看到的是一列不能碰的文字。
+  梯子里 `VisualFill.hover`(0.06) < `selected`(0.16) 本来就有这一档，侧栏与详情区早就在用 ——
+  浮层是**漏了一个位点**，不是"决定不做"。
+- 加的是**一档灰，不是一个动效**：`QuickPickRowView`（`NSTableRowView` 子类 + `NSTrackingArea`）
+  里插一层 `HoverFillView` 子视图，`.below` 压在 cell 下面 ⇒ 永远压不住文字；
+  颜色在 `draw` 里解析（不缓存 `cgColor`，R30 那一族）；**选中那一行不叠这层灰**。
+  为什么不用 `drawBackground(in:)`：R67 第一版那么写，结果 4 张已钉帧的选中药丸被改动
+  （覆写 `drawBackground` 会换掉 AppKit 那颗药丸的抗锯齿路径）⇒ 换成子视图后 `CHANGED=0`。
+- 形状是被判据教出来的，不是我挑的：`hoverFillInset` 9 → **10**（9pt 时灰带左右各宽 1pt，
+  旧的总宽度判据在 ±2px 容差内是**绿的** ⇒ 绿不等于对上），
+  圆角 直角 → 6pt → **`VisualRadius.card`(8pt)**（8pt 与药丸**逐行 0px 差**，
+  说明 AppKit 那颗药丸用的就是这一档；不新造 7.5pt 的令牌）。
+- 新增判据 `testOverlayHoverFillSharesTheSelectionPillsOutline` + 两把新尺
+  （`alphaLiftProfile` 逐行给左右沿、`profileLeftInsetSpread` 给"圆没圆"的读数）。
+  它存在的理由：**总范围相同的两块墨可以有完全不同的轮廓**，
+  而 R15 那把"按列取带内最大"的尺结构上看不见这一族错（不是阈值太松，是读数丢信息）。
+  参照物自己也被量一次（药丸内缩 ≥ 4px），否则参照物哪天变方，"逐行一致"会退化成空判据。
+- 真值表四格全钉（只测"该画的画了"抓不到"选中时也画"，只测"不该画的不画"抓不到"永远不画"，
+  而后者正是改之前的产品）+ 令牌同一性（`hoverFillAlpha == VisualFill.hover`）
+  + 两条跨文件守卫（`rebuildRows` 必须调 `clearHover()`；`DetailView` 必须仍引用同一枚令牌）。
+- 读数：alpha 抬升 **12.82/255**（亮）/ **12.70**（暗），线 7.65；
+  两档分得开 —— 选中药丸灰值 220 vs 悬停 240（亮）、70 vs 43（暗）；
+  逐行轮廓 灰带首行 55…784 / 中行 44…795 与药丸**完全相同**（亮暗两档都是）。
+- 帧基线 **124 张**（本轮新增 `quickpick-hover-*-light/dark` 两张，改产品那一刻 `CHANGED=2`，逐字对上后同提交 update）。
+- 变异 **M363–M371 九刀全 CAUGHT**（抓到=9 逃掉=0 没跑成=0 未落地=0）。
+  其中 **M369 就是本轮真实存在过的直角版**：它从 M363–M368 六刀下全部逃掉，
+  只有新轮廓判据抓得住 ⇒ 这一刀同时是"新尺有牙"与"旧尺不够"的双向证据。
+- 全量 **786 例 / 38 skip / 0 failures / 157.9s**；捕获卷 41 例 0 failures；脚本测试 139 OK；
+  编译告警 0（测试日志里那 10 行 `CoreData: warning:` 是运行时 XPC 噪声，与编译无关，分开记账）。
+- 换装本机：`INSTALL_RESULT=ok`，新包 sha `db4872e4a852b426…`，pid 21873，存档 105→105 未动，`SMOKE_OK=1`。
+- **没解决**：这一档"够不够响"没有机器判据（通道里没有窗口底 ⇒ BACKLOG **103**）；
+  真鼠标进出没被任何判据覆盖（自动化打不进面板 ⇒ 人工批次 **67**）；
+  那层灰没有淡入（本轮判为不做，理由见 U-115）；
+  以及读 R66 的 CI 时新开的 **104**：淡入时钟在 runner 上采样 80ms，
+  比它要作证的判据（35ms）还粗 ⇒ **证人比被告粗就没资格作证**，R68 去把证人搬到同一颗尺子上。
+
 ### Tests（R66：动效那一步的红必须有名字，而"这台机器看不见淡入"得有个与被告无关的证人来签 —— 结案 BACKLOG 100 / 新开 101、102 / D-125）
 - 现场：`motion suite exit: 1` 连着两遍（run 38693365411 / 38696695788），而两遍的报表都写
   `MOTION_FLOOR_OK=4/4 MOTION_FLOOR_REDS=0`。原因在 `motion_floor_gate.py`：那个 `REDS`

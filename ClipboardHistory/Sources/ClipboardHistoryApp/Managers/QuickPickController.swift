@@ -84,7 +84,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 不许拿一张空白窗当"这就是浮层"（那种帧看着像证据，其实什么都没说）。
     /// 与 `SettingsView.initialCategory` / `DetailView.initialMarkdownMode` 同一手法：
     /// 产品路径一行都不改，只是把"拍得到"这件事变成可能。
-    func windowForCapture(query: String = "") -> NSWindow? {
+    func windowForCapture(query: String = "", hoveredRow: Int? = nil) -> NSWindow? {
         let panel = ensurePanel()
         refreshEntries()
         model.reset()
@@ -93,7 +93,27 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         rebuildRows()
         model.index = 0
         selectCurrentRow()
+        rowHoveredForCapture = hoveredRow
         return panel
+    }
+
+    /// 离屏帧夹具用：告诉表格"第 N 行是悬停的"（R67）。
+    ///
+    /// 为什么要有它：`cacheDisplay` 这条通道送不进 `mouseEntered` / `mouseMoved`
+    /// （BACKLOG 95 记的就是这条通道的边界），而没有入口就等于"悬停那一帧"在帧基线里
+    /// 永远不存在 —— 那一档就成了"代码里有、产物里没有"的东西（R14 那一课）。
+    ///
+    /// 为什么存的是**行号**而不是去点亮某个 row view：row view 是表格在布局时才建的。
+    /// 本方法第一版写的是"`enumerateAvailableRowViews` 里挨个设 `hovered = true`"，
+    /// 而调用点在 `windowForCapture` 里 —— 那时一行 row view 都还不存在，遍历到 0 个，
+    /// 于是帧逐像素不变，判据红在"什么都没画出来"那一格上（红得对，但当时还不知道原因）。
+    /// 存行号、由 `drawBackground` 在画的时候问一次，就没有"什么时候点亮"这个时序问题，
+    /// 而且帧上那层灰与鼠标进来的那层灰是**同一段绘制代码**的产物。
+    var rowHoveredForCapture: Int? {
+        didSet {
+            guard rowHoveredForCapture != oldValue, let table else { return }
+            table.enumerateAvailableRowViews { rowView, _ in (rowView as? QuickPickRowView)?.refreshFromOutside() }
+        }
     }
 
     func hide() {
@@ -402,6 +422,15 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         if !plan.reloads.isEmpty {
             table.reloadData(forRowIndexes: plan.reloads, columnIndexes: IndexSet(integer: 0))
         }
+        // R67：行重排之后，"指针在这一格"这件事不再作数 —— 行视图会被挪去配另一行，
+        // 而指针没动 ⇒ `mouseExited` 不会来 ⇒ 那层灰会留在错误的一行上。
+        // 清掉，等下一次指针事件补回来（`mouseMoved` 在跟踪区里一直有）。
+        // 为什么不在这里"按指针位置重算"：那要读物理鼠标此刻在哪，
+        // 而帧基线拍的就是这个面板 ⇒ 测试那天手放在屏幕哪儿会写进已经钉住的帧。
+        // 实测过：加了那次重算之后 `quickpick-list` / `quickpick-typed` 四张帧变了。
+        table.enumerateAvailableRowViews { rowView, _ in
+            (rowView as? QuickPickRowView)?.clearHover()
+        }
     }
 
     /// 减弱动态 ⇒ 传空效果集，**不是**"跳过这次更新"。
@@ -516,11 +545,200 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool { true }
 
+    // MARK: - 悬停那一档（R67 / BACKLOG 95 那一族：浮层今天没有指针反馈）
+
+    /// 这一行的悬停底色该不该画。纯函数，真值表在捕获卷（`testOverlayHoverTintIsATruthTable`）。
+    ///
+    /// 为什么选中时不画：选中是比悬停**更重**的一档（`VisualFill.selected` 0.16 由强调色派生，
+    /// `VisualFill.hover` 0.06 只是 primary 的一层灰），而且它会留下来，悬停不会。
+    /// 在同一行上再叠一层灰，只会把那颗蓝药丸压成灰蓝 —— "哪一条是我选中的"要读第二眼，
+    /// 那是把反馈做成了负值。次序 hover < pressed < selected 是语义，不是巧合（`VisualTokens`）。
+    static func showsHoverTint(isSelected: Bool, isHovered: Bool) -> Bool {
+        isHovered && !isSelected
+    }
+
+    /// 悬停那一档用的墨：**与侧栏同一枚令牌**（`VisualFill.hover`），不是浮层自己再定一个数。
+    /// R0 之前那种"同一件『鼠标在这里』说出三种音量（0.045 / 0.06 / 0.07）"的分裂，
+    /// 就是靠"位点各自挑一个看着差不多的数"长出来的（守卫判据见捕获卷）。
+    static let hoverFillAlpha = CGFloat(VisualFill.hover)
+
+    /// 那一层灰左右各缩进多少。**10pt 是量出来的，不是挑的**：
+    /// 暗档 `quickpick-list-420x300-dark.png` 上选中那颗药丸的强边沿在 x=42px 与 x=795px
+    /// （2× 换算 = 21pt 与 397.5pt），而表格自己在面板里占 12…408pt ⇒ 药丸左右各内缩 ≈9pt。
+    /// 悬停的灰如果铺满整格（0…396pt），它就和选中不是一套话：
+    /// 同一格里两种宽度，看着像两个不同的东西在抢这一行。
+    ///
+    /// 9 → 10 是 R67 自己那一帧改的：9pt 拍出来灰带在 x=42…797px，药丸在 x=44…795px
+    /// ⇒ 灰带**左右各宽 1pt**。旧的宽度判据给的是 ±2px 容差，所以 9pt 当时是绿的 ——
+    /// 绿不等于对上，这一条是**看了画面**才知道的（逐行轮廓判据随后把中行读数钉成
+    /// `药丸中行=44…795 / 灰带中行=44…795`，差 0px）。
+    static let hoverFillInset: CGFloat = 10
+
+    /// 灰带的圆角。**这一档是被判据教出来的，不是我挑的**：
+    /// 第一版直角（逐行内缩跨度 0px）、第二版 6pt（量到 8px），两版都被
+    /// `testOverlayHoverFillSharesTheSelectionPillsOutline` 判红 ——
+    /// 药丸的实测内缩跨度是 **11px**（`药丸首行=55…784`，中行 `44…795`），
+    /// 而直角块的顶行与圆角药丸的顶行差的正好是一个半径。
+    ///
+    /// 为什么落在 `VisualRadius.card`(8pt)：8pt 画出来的内缩跨度实测 **11px，与药丸逐行完全相同**
+    /// （`药丸首行=55…784 / 灰带首行=55…784`、`药丸中行=44…795 / 灰带中行=44…795`，亮暗两档一样）；
+    /// 6pt 只有 8px（差 3px ⇒ 红）。**不为此新造一枚 7.5pt 的令牌**：
+    /// 这条通道只给得到整数 pt 的分辨率，而 `card` 的语义（"装内容的表面"）本来就盖住一行记录。
+    /// 换句话说：AppKit 那颗药丸自己用的就是 8pt 这一档，我们只是把自家的灰对齐到它。
+    ///
+    /// 为什么这里**不**用 `VisualRadius.panel`(9)（侧栏行的那一档）：
+    /// 这一格的对照物是**同一张表里 AppKit 自己那颗药丸**，不是另一个窗口里的 SwiftUI 行。
+    /// 用户在同一眼内比较的是"我指着的这条"与"我选中的那条"，两种曲率会读出两个东西；
+    /// 而侧栏那两行本来就同心（同一层 fill 换 alpha），9 在那里是对的。
+    /// 令牌梯子管的是"同一个概念不许有两种音量"，这里是两个概念（SwiftUI 行底 vs AppKit 药丸同形）。
+    static let hoverFillCornerRadius: CGFloat = VisualRadius.card
+
+    /// 每一行用自家的 row view：`NSTableRowView` 默认只画选中，而**双击提交**这个动作
+    /// 今天没有任何指针反馈（`table.doubleAction` 是唯一的双击入口，没有 `action`、没有 `NSTrackingArea`）。
+    /// 用户呼出浮层时鼠标停在哪里是随机的 ⇒ 他看见的是一列不能碰的文字。
+    ///
+    /// 这里每次调用都新建一个 row view：`NSTableView` 自己按标识缓存行视图，
+    /// 而浮层一屏最多 8 行、只在打字与方向键时重排 —— 每次重排新分配几个视图的成本
+    /// 远小于把复用状态管对的复杂度（复用带来的"灰条留在错误一行"见下面 `layout()`）。
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        QuickPickRowView()
+    }
+
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard let table else { return }
         let index = table.selectedRow
         if index >= 0 { model.index = index }
     }
+}
+
+/// 浮层的一行，多出来的只有一件事：**悬停那一档**（R67）。
+///
+/// 为什么画在 row view 里而不是给 cell 加一层 `layer.backgroundColor`：
+/// ① 选中那一档是 `NSTableRowView.drawBackground` 画的，我要在它**之后**补灰，
+///    才谈得上"选中比悬停重"这个次序；② `drawBackground` 每次都在视图自己的
+///    appearance 上下文里解析 `NSColor.labelColor`，而把动态色缓存成 `cgColor`
+///    会把它钉死在解析那一刻的外观上（R30 那一族：亮暗两档其中一档是错的）。
+final class QuickPickRowView: NSTableRowView {
+    private var tracking: NSTrackingArea?
+    private var hovered = false {
+        didSet { if hovered != oldValue { refreshFill() } }
+    }
+
+    /// 那一层灰本体。插在 cell 视图**下面**，所以它永远压不住文字。
+    private let fill = HoverFillView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        installFill()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        installFill()
+    }
+
+    private func installFill() {
+        fill.insets = QuickPickController.hoverFillInset
+        fill.cornerRadius = QuickPickController.hoverFillCornerRadius
+        fill.frame = bounds
+        fill.autoresizingMask = [.width, .height]
+        fill.isHidden = true
+        addSubview(fill, positioned: .below, relativeTo: nil)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero,
+                                  options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { hovered = true }
+
+    /// 指针在这一行里移动时重新确认一次。
+    ///
+    /// 为什么需要：行会因打字而重排，重排时这层灰被清掉（`clearHover`），
+    /// 而指针可能一直停在这一格里没离开过 —— 没有这一条，"鼠标在这儿"会在每次打字时消失，
+    /// 直到指针挪一下。有了它，下一次抖动就恢复。
+    override func mouseMoved(with event: NSEvent) { hovered = true }
+
+    override func mouseExited(with event: NSEvent) { hovered = false }
+
+    /// 行重排之后清掉。产品里下一次指针事件（`mouseMoved` / `mouseEntered`）会把它补回来。
+    ///
+    /// 为什么必须有：`NSTableView` 会把 row view 挪去配另一行，而指针没动 ⇒ `mouseExited`
+    /// 不会来 ⇒ 那条灰留在错误的一行上。
+    /// 为什么不在 `layout()` 里"按指针位置重算"（我第一版就是这么写的）：
+    /// 那条路会读 `window.mouseLocationOutsideOfEventStream`，也就是**物理鼠标此刻在哪**。
+    /// 帧基线里 AppKit 夹具拍的就是产品这个面板本身（R19 的结论：搬走会塌），
+    /// 于是"我这次跑测试时手放在屏幕上哪儿"会写进 `quickpick-list` 与 `quickpick-typed`
+    /// 两张已经钉住的帧 —— 实测确实变了 4 张。**一把跟着物理鼠标走的尺，
+    /// 拍出来的不是产品的样子，是那天桌面的样子**（R18 那一族：帧必须只跟着产品变）。
+    /// 现在这一档只由**事件**驱动：离屏捕获没有事件 ⇒ 永远不会自己亮起来，
+    /// 而取证通道走的是另一个入口（`rowHoveredForCapture`），两条互不污染。
+    func clearHover() { hovered = false }
+
+    /// 控制器从外面改了点亮的行号之后叫这个（`refreshFill` 是私有的）。
+    func refreshFromOutside() { refreshFill() }
+
+    override func layout() {
+        super.layout()
+        refreshFill()      // 选中/点亮状态与这层灰必须在每次布局后一致
+    }
+
+    /// 这一行现在算不算"被悬停"：鼠标进来的那一档，**或**取证通道点亮的那一档。
+    /// 两条都汇到同一个绘制分支，所以帧上那层灰与用户看到的那层灰是同一段代码的产物
+    /// （R14 那一课：`hovered` 若是视图私有状态，"悬停那一帧"在判据里存在、在产物里从未存在过）。
+    /// 点亮的是**行号**而不是视图对象，因为 row view 要等表格布局完才存在 ——
+    /// 见 `QuickPickController.rowHoveredForCapture` 那段注释里记的第一版失败。
+    private var isHoveredForDrawing: Bool {
+        if hovered { return true }
+        guard let table = enclosingScrollView?.documentView as? NSTableView,
+              let controller = table.delegate as? QuickPickController else { return false }
+        return controller.rowHoveredForCapture == table.row(for: self)
+    }
+
+    /// 点亮/熄灭那一层灰。**不覆盖 `drawBackground`** —— 见 `QuickPickRowView` 的类注释。
+    private func refreshFill() {
+        fill.isHidden = !QuickPickController.showsHoverTint(isSelected: isSelected,
+                                                            isHovered: isHoveredForDrawing)
+    }
+
+    override var isSelected: Bool {
+        didSet { refreshFill() }
+    }
+}
+
+/// "这一行正被指针指着"的那一层灰。
+///
+/// 为什么是一个小视图而不是 `NSTableRowView.drawBackground` 的覆盖（这一条是实测换掉的）：
+/// 覆盖那一版把**选中**那一档的圆角抗锯齿也改掉了 —— 4 张已钉住的浮层帧各差 30 行、
+/// 每行 2–12 个像素（眼睛逐张看过：看不出来；哈希看得出来），
+/// 而把 delegate 换成一个不覆盖任何东西的 `NSTableRowView()` 时，那 122 张帧逐字节不变。
+/// 也就是说红不是"换了行视图"造成的，是"接管了 `drawBackground`"造成的：
+/// AppKit 一旦不能把它的私有实现塞进这个方法，选中那一档就走了另一条绘制路。
+/// 选中那一档是 R19/R63 钉过的东西，不该被一次悬停顺手改掉 ⇒ 换成子视图。
+///
+/// 它也不做图层缓存：颜色在 `draw` 里解析，所以亮暗两档各自拿对自己的 `labelColor`
+/// （R30 那一族：把动态色缓存成 `cgColor` 会把它钉死在解析那一刻的外观上）。
+final class HoverFillView: NSView {
+    /// 左右各缩进这么多（与选中那颗药丸同宽，见 `QuickPickController.hoverFillInset`）。
+    var insets: CGFloat = 0
+    /// 圆角半径（与药丸同形，见 `QuickPickController.hoverFillCornerRadius`）。
+    var cornerRadius: CGFloat = 0
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.labelColor.withAlphaComponent(QuickPickController.hoverFillAlpha).setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: insets, dy: 0),
+                     xRadius: cornerRadius,
+                     yRadius: cornerRadius).fill()
+    }
+
+    /// 指针事件不许停在这一层上：跟踪区在 row view 自己身上。
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 /// 搜索框：把 ↑ ↓ ↩ ⎋ 交给浮层的判定，其余照常打字。
