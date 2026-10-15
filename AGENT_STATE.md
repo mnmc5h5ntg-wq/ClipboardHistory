@@ -2317,3 +2317,20 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   本机修后：`swift test` **774 / 39 skip / 0 failures**、`--build-tests` **0 告警**、122 帧 `CHANGED=0`。
   另一件记进工具账：那条守卫第一版**当场 crash**（`Dictionary(uniqueKeysWithValues:)` 撞同名亮暗两张帧），
   而我在那行上面刚写完"取更空的那一张"的注释 —— **注释里写对的规则不等于代码里存在的规则**。
+- **R63 的修后 CI 已逐步读完（run 38685562002，整作业 success，11m29s）**：
+  `compile warnings: 0`；Swift **774 executed / 44 skip / 0 failures**；
+  三条浮层判据**逐条 `Test Case … passed`**（`…FillsItsPanelAndCanBeCaptured`、
+  `…EmptyStateSentenceIsCommittedAndSitsInTheListSlot`、`…TypedFixtureShowsFilteredRowsNotAnEmptyList`）；
+  新守卫在 runner 上给的是
+  `SPARSE_EXEMPTION_OK quickpick-empty drawn=5.1% < quickpick-list drawn=17.9% - 3pt`，
+  同一行还记下 `本次真正走了豁免分支的帧 []` ⇒ **假红没了，而"这台机器根本不需要这条豁免"也被写下来了**；
+  `CAPTURE_GATE_RESULT=ok 红=0`、`PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 本次下结论=0 红=0`
+  （BACKLOG 93 原样开着）、`MOTION_FLOOR_FACTS judged=4/4 executed=42`（每档 4/3/2/3，已登记的采样噪声）、
+  `FRAME_BASELINE_AGAINST=working / COMPARED=122` 绿。整作业里唯一 exit 1 的是 report-only 的
+  "Frame baseline vs previous release"（对 v1.4.8 快照改了 62 帧 —— 新版本本来就该改像素）。
+  **BACKLOG 96 因此加重而不是收窄**：runner 上也有两条 print 整条不见了
+  （`CAPTURE_PROBE quickpick` 与本轮新写的 `QUICKPICK_FIXTURE_ROWS` 各 0 行），
+  而同一个类里 `QUICKPICK_EMPTY_SENTENCE` / `QUICKPICK_LONG_QUERY` / `BOTTOM_INK_IDENTITY` 都在 ⇒
+  丢的不是"函数后半段"，是**按条随机丢，两台机器都会**。
+  ⇒ 结论："`Test Case … passed` 那条 XCTest 结论"是唯一能证明判据跑过的东西；
+  自打印的读数必须走文件通道（R11 给动效卷做过的那一套），捕获卷还没做。

@@ -1968,5 +1968,16 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     换它之后同一道门是 `judged=4/4 REDS=0`。
     要做的是给捕获卷补同一条通道（或把结论行挪到该函数**前半段**，见 R53 那条
     "结论行要打在能力闸门之前"），否则 CI 上任何以 stdout 为唯一来源的捕获结论
-    都建立在这台机器"今天没丢"的运气上。**这一条还没验过 runner 上是否同样丢** ——
-    R63 的 CI 读数里如果 `SPARSE_EXEMPTION` 那类行没出现，就是同一种丢法。
+    都建立在这台机器"今天没丢"的运气上。
+    → **R63 的 CI 读数（run 38685562002）把这条从"本机现象"升级成"两台机器都会"**：
+    runner 上 `CAPTURE_PROBE quickpick` 与本轮新写的 `QUICKPICK_FIXTURE_ROWS` 各 **0 行**，
+    而同一个测试类里 `QUICKPICK_EMPTY_SENTENCE` / `QUICKPICK_LONG_QUERY` / `BOTTOM_INK_IDENTITY`
+    全都在。本机也有同一形状 —— 本轮十遍跑里三个标记各自到没到的计数（逐份 `grep -c` 数出来的）：
+    `r63_capture.log` 0/0/0、`capture2` 0/0/1、`capture3` 0/0/0、`capture5` 1/1/1、`capture6` 1/1/1、
+    `capture7` 0/0/0（那一遍是 crash 那遍）、`capture8` 2/1/1、`full` 1/1/1、`full2` 1/1/0、
+    `full3` 0/0/1（SPARSE / BOTTOM_INK_IDENTITY / CAPTURE_PROBE）。
+    ⇒ **上面那句"丢的是函数后半段"是我当时把机制说过头了**：真实形状是**按条随机丢**，
+    位置不是决定因素（这条现在只有"两台机器各丢过哪几条"这个级别的证据）。
+    两条结论：① 唯一能证明"这条判据跑过"的是 XCTest 自己那行 `Test Case … passed`
+    —— 本轮三条浮层判据在 runner 上都有这一行，所以判据确实跑了，这一点不需要靠读数证明；
+    ② 任何"读数只在 print 里"的判据都必须补文件通道，**动效卷 R11 已经做过一次，捕获卷照抄即可**。
