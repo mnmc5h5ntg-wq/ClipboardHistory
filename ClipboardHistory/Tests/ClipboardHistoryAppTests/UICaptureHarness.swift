@@ -1018,6 +1018,31 @@ final class UICaptureTests: XCTestCase {
         return hit
     }
 
+    /// 一块矩形里**有墨像素的包围盒**（x 方向，按 alpha 过地板算）。宽度 −1 = 一格墨都没有。
+    ///
+    /// 为什么 R79 要把存在性探针从"计数"换成"宽度"：R78 那道闸门在 runner 上没拦住
+    /// （run 38757049151 仍然是那四条红），说明占位区里 **有** ≥20 个有墨像素 ——
+    /// 因为那颗放大镜符号就住在带左边 10–24pt，它由 AppKit 画，而占位字那串可能根本不画。
+    /// 计数分不开"只有图标"与"图标 + 一串字"，**宽度可以**：
+    /// 图标自己 ≈14pt，本机实测占位字连图标是 x 12.0–98.5pt（86.5pt）。
+    /// 两个数之间差六倍，所以地板取 40pt 不是刀尖上的数（见调用点注释）。
+    static func alphaInkSpan(_ rep: NSBitmapImageRep, rect: CGRect, floor: Int = 8) -> (min: Int, max: Int) {
+        guard let base = rep.bitmapData, rep.samplesPerPixel >= 4, rep.hasAlpha else { return (-1, -1) }
+        let spp = rep.samplesPerPixel, bytesPerRow = rep.bytesPerRow
+        let x0 = max(0, Int(rect.minX.rounded())), x1 = min(rep.pixelsWide, Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded())), y1 = min(rep.pixelsHigh, Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0 else { return (-1, -1) }
+        var lo = Int.max, hi = -1
+        for y in y0..<y1 {
+            var p = y * bytesPerRow + x0 * spp
+            for x in x0..<x1 {
+                if Int(base[p + 3]) > floor { if x < lo { lo = x }; if x > hi { hi = x } }
+                p += spp
+            }
+        }
+        return (lo == Int.max ? -1 : lo, hi)
+    }
+
     /// 比两"条"水平带的 alpha，返回"每列各自带内的最大 alpha 之差 > `floor`"的 x 范围。
     ///
     /// 两种用法，共用一把尺：
@@ -1330,6 +1355,10 @@ final class UICaptureTests: XCTestCase {
     /// 仍然量不到的一件事（点名，不猜）：真机上那颗框**有没有**系统焦点环。
     /// 这条通道不带 key 窗口（`appActive=false 面板key=false`），所以③那个"框外 0 像素"
     /// 不能推成"产品没有环" ⇒ `QUICKPICK_FOCUS_RING_NOT_RUN=1`，人工批次 68.1。
+    /// 存在性闸门的地板（pt）：带内"有墨像素的 x 包围盒"至少这么宽，才算那串占位字画出来了。
+    /// 来历见调用点：图标自己 ≈14pt、图标 + 占位字实测 86.5pt，40pt 落在两者中间且两边都有倍数余量。
+    static let placeholderMinSpanPoints: Double = 40
+
     func testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing() throws {
         for (label, appearance) in [("亮", NSAppearance.Name.aqua),
                                     ("暗", NSAppearance.Name.darkAqua)] {
@@ -1412,9 +1441,27 @@ final class UICaptureTests: XCTestCase {
             let inkUnfocused = Self.alphaInkPixels(unfocused, rect: inkProbe)
             let inkFocused = Self.alphaInkPixels(focused, rect: inkProbe)
             let inkWholePanel = Self.alphaInkPixels(unfocused, rect: wholePanel)
-            // 20 是一道**很低的**地板：画出来的占位字是几千个像素，没画是 0 个，
-            // 中间没有可争的地带（R66 那条 `deadSpan=0.05` 取的是同一个道理）。
-            let placeholderDrawn = inkUnfocused >= 20
+            // **R79：决定闸门的是宽度的存在性，不是计数。** R78 用"占位区里 ≥20 个有墨像素"，
+            // 结果它在 runner 上没拦住（run 38757049151 仍是那四条红）—— 因为那颗放大镜
+            // 就住在带左边 10–24pt，AppKit 画得出它，而占位字那串可能画不出来。
+            // 计数分不开"只有图标"与"图标 + 一串字"，**包围盒宽度可以**：
+            //   图标自己 ≈14pt；本机实测"图标 + 占位字"是 x 12.0–98.5pt = 86.5pt。
+            // 地板取 40pt：两个数各差六倍与两倍多，不在刀尖上（R66 那条 `deadSpan=0.05` 同道理）。
+            let spanUnfocused = Self.alphaInkSpan(unfocused, rect: band)
+            let spanFocused = Self.alphaInkSpan(focused, rect: band)
+            let spanWidthPt = spanUnfocused.max < 0 ? -1.0
+                : Double(spanUnfocused.max - spanUnfocused.min + 1) / Double(scale)
+            // 第二根证人：**只有占位字能待的那一块**（x 从带左起 50pt 之后、上下各内缩 2pt）。
+            // 为什么宽度还不够：一圈 1px 的**描边**能把包围盒撑到整条 band 宽，
+            // 而它进不了这一块 —— 上下被内缩排掉，左边被 50pt 排掉。
+            // 两个条件取**合取**：图标一个人开不了门（宽度不够、这一块也是空的），
+            // 描边也开不了门（这一块是空的），只有那串字在的时候两个都成立。
+            let textOnlyRect = CGRect(x: band.minX + 50 * CGFloat(scale),
+                                      y: band.minY + 2 * CGFloat(scale),
+                                      width: band.width - 52 * CGFloat(scale),
+                                      height: band.height - 4 * CGFloat(scale))
+            let textOnlyInk = Self.alphaInkPixels(unfocused, rect: textOnlyRect)
+            let placeholderDrawn = spanWidthPt >= Self.placeholderMinSpanPoints && textOnlyInk >= 20
             emit("QUICKPICK_FOCUS \(label) appActive=\(NSApp.isActive) 面板key=\(panel.isKeyWindow) "
                 + "主=\(panel.isMainWindow) makeFirstResponder=\(accepted) "
                 + "建出来时就聚焦=\(builtInEditor != nil) 聚焦时响应者是编辑器=\(focusedResponder is NSText) "
@@ -1425,8 +1472,31 @@ final class UICaptureTests: XCTestCase {
                 + "不聚焦=\(String(format: "%.2f", alphaUnfocused)) "
                 + "差=\(String(format: "%.2f", alphaUnfocused - alphaFocused)) 亮度轴差=\(String(format: "%.2f", lumIn)) "
                 + "占位区有墨(不聚焦,左30%内缩3pt)=\(inkUnfocused) 有墨(聚焦)=\(inkFocused) 整窗有墨=\(inkWholePanel) "
-                + "⇒ 存在性尺说\(placeholderDrawn ? "这一格画了东西，像素那两条有对象" : "这一格今天没画东西，像素那两条没有对象")")
+                + "文字独占区有墨(不聚焦,x≥50pt 内缩2pt)=\(textOnlyInk) "
+                + "带内有墨包围盒(不聚焦)=\(spanUnfocused.min)…\(spanUnfocused.max)px "
+                + "宽=\(String(format: "%.1f", spanWidthPt))pt(聚焦 \(spanFocused.min)…\(spanFocused.max)) "
+                + "地板=\(String(format: "%.0f", Self.placeholderMinSpanPoints))pt "
+                + "⇒ 存在性尺说\(placeholderDrawn ? "这一格画了东西，像素那两条有对象" : "这一格今天没画那串字，像素那两条没有对象")")
             XCTAssertGreaterThanOrEqual(changedIn, 0, "\(label)档：尺读不出两张帧 ⇒ 无从判定，不许当通过")
+            // **闸门的判别力对照（R79）**：那颗放大镜自己住在带左边 10–24pt。
+            // 如果"只有图标"就能把宽度撑到地板以上，这道闸门等于没设 —— 而 R78 就是那样倒的
+            // （它数的是像素个数，图标一个人就过了）。所以这里单独量图标那一小块的包围盒，
+            // 要求它**过不了**闸门。占位字被画出来时这一格才有对象；没画出来时它仍然有对象
+            // （图标在不在与字在不在是两件事），所以不设 `placeholderDrawn` 前提。
+            let iconRect = CGRect(x: (inContent.minX + 3) * CGFloat(scale),
+                                  y: band.minY,
+                                  width: 17 * CGFloat(scale), height: band.height)
+            let iconSpan = Self.alphaInkSpan(unfocused, rect: iconRect)
+            let iconWidthPt = iconSpan.max < 0 ? 0.0
+                : Double(iconSpan.max - iconSpan.min + 1) / Double(scale)
+            emit("QUICKPICK_FOCUS_GATE \(label) 图标那一块宽=\(String(format: "%.1f", iconWidthPt))pt "
+                + "占位整条宽=\(String(format: "%.1f", spanWidthPt))pt 地板=\(String(format: "%.0f", Self.placeholderMinSpanPoints))pt "
+                + "⇒ 闸门\(placeholderDrawn ? "开（那串字画了）" : "关（只有图标那一小块）")")
+            XCTAssertLessThan(iconWidthPt, Self.placeholderMinSpanPoints,
+                "\(label)档：只框住放大镜那一小块，量出来的墨包围盒就有 \(String(format: "%.1f", iconWidthPt))pt "
+                    + "（地板 \(String(format: "%.0f", Self.placeholderMinSpanPoints))pt）⇒ 这道存在性闸门**分不开**"
+                    + "'只有图标'与'图标 + 一串字'，它就恒开，像素那两条又回到没人看着的状态。"
+                    + "换探针形状或换地板，别把断言删掉")
             // ① 焦点落进那颗框（行为，读的是产品对象，不是帧）。
             XCTAssertTrue(accepted,
                 "\(label)档：`makeFirstResponder(field)` 都没接受 ⇒ 那颗框不是可聚焦的响应者，"
@@ -1444,13 +1514,15 @@ final class UICaptureTests: XCTestCase {
             // 见 `PROBE_ELIGIBILITY … ink=0.0%` 那一批读数）。
             // 名字以 `_NOT_RUN` 结尾：`ci_capture_gate.py` 认这个后缀（R36/U-59）。
             if !placeholderDrawn {
-                emit("QUICKPICK_FOCUS_NOT_RUN=1 \(label)：占位符那一格今天在这条通道里没画出来"
-                    + "（格内 alpha 过 8/255 的像素只有 \(inkUnfocused)，整窗 \(inkWholePanel)）⇒ "
+                emit("QUICKPICK_FOCUS_NOT_RUN=1 \(label)：占位符那串字今天在这条通道里没画出来"
+                    + "（带内有墨包围盒只有 \(String(format: "%.1f", spanWidthPt))pt，"
+                    + "低于 \(String(format: "%.0f", Self.placeholderMinSpanPoints))pt 那道地板；"
+                    + "计数却有 \(inkUnfocused) 个像素 ⇒ 画得出的那一小块就是左边那颗放大镜，不是那串字）⇒ "
                     + "\"聚焦与不聚焦两张帧相同（这次读到 \(changedIn) 个变化像素）这一句，不能推成『焦点没有视觉后果』，"
                     + "它说的是这条通道今天看不见那串字。行为那两条（①响应者、④没关系统环）与源码守卫照判。")
                 XCTAssertLessThan(scale, 2,
-                    "\(label)档：2× 的捕获通道上占位符那一格只读到 \(inkUnfocused) 个有墨像素 ⇒ "
-                        + "本机这一格**必须**画得出来（R76 实测 1797 / 2354 个变化像素）。"
+                    "\(label)档：2× 的捕获通道上占位符那串字的包围盒只有 \(String(format: "%.1f", spanWidthPt))pt ⇒ "
+                        + "本机这一格**必须**画得出来（R76 实测 1797 / 2354 个变化像素、包围盒 86.5pt）。"
                         + "红在这里的含义是『捕获或产品今天坏了』，不是『这台机器看不见』——"
                         + "只有 1× 才允许缺席（R60：机器前提不同 ⇒ 处置不同，但都不许静默）")
                 continue

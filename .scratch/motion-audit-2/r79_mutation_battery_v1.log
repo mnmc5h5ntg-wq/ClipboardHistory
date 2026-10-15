@@ -1,0 +1,31 @@
+=== 基线（未变异）：两条判据都必须绿 ===
+   testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing = green
+   testEveryTwoStateRulerReadsBothAxes                            = green
+
+M419 把存在性的地板从 40pt 降到 10pt ⇒ 那颗放大镜一个人就能把门开掉，而这条判据看起来仍然'有存在性证人'
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那一条：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1484: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("17.0") is
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1484: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("17.0") is
+   已还原（逐字节相同：True）
+
+M420 把图标探针的矩形换成整条 band ⇒ 对照读的不是它要读的那个量（'正对照读判据自己那个量'那一课）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那一条：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1484: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("86.0") is
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1484: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("86.0") is
+   已还原（逐字节相同：True）
+
+M421 把 `alphaInkSpan` 的 alpha 地板从 8/255 抬到 250/255 ⇒ 什么都量不到，2× 上闸门会误判成'没画'而红 —— 钉的是这把新尺承重
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那一条：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1512: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1512: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M419   CAUGHT
+   M420   CAUGHT
+   M421   CAUGHT
+   抓到=3 逃掉=0 没跑成=0 未落地=0
+BATTERY_EXIT=0

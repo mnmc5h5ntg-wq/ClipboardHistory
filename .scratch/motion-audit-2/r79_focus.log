@@ -1,0 +1,4 @@
+QUICKPICK_FOCUS 亮 appActive=false 面板key=false 主=false makeFirstResponder=true 建出来时就聚焦=true 聚焦时响应者是编辑器=true 撤焦点后还是=false focusRingType=0 缩放=2× 带={{20, 24}, {800, 32}} 框内变化像素=1797 框外一圈变化像素=0 alpha 聚焦=6.77 不聚焦=10.71 差=3.93 亮度轴差=-0.66 占位区有墨(不聚焦,左30%内缩3pt)=1699 有墨(聚�
+QUICKPICK_FOCUS_GATE 亮 图标那一块宽=17.0pt 占位整条宽=86.5pt 地板=40pt ⇒ 闸门开（那串字画了）
+QUICKPICK_FOCUS_RING_NOT_RUN=1 亮：焦点环这一档在这条通道里读不到（框外 0 个变化像素，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+QUICKPICK_FOCUS 暗 appActive=false 面板key=false 主=false makeFirstResponder=true 建出来时就聚焦=true 聚焦时响应者是编辑器=true 撤焦点后还是=false focusRingType=0 缩放=2× 带={{20, 24}, {800, 32}} 框内变化像素=2354 框外一圈变化像素=0 alpha 聚焦=8.64 不聚焦=13.15 差=4.52 亮度轴差=2.25 占位区有墨(不聚焦,左30%内缩3pt)=1871 有墨(聚焦
