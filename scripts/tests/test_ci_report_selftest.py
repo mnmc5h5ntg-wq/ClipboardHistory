@@ -167,13 +167,19 @@ EXPECT = {
     # 兜不住 find 的那格：目录不存在时 `find | wc | tr` 在 pipefail 下也是非零
     ("offscreen", "missing_shots_dir"): (NORMAL, ["captured frames:"], None,
                                          [(r"/tmp/shots-ci", "/tmp/definitely-not-here-xyz")]),
-    ("onscreen", "singular_summary"): (SINGULAR, ["ui suite exit:"], 0, []),
+    # R88 起还要看到那两行新读数：它们是本轮唯一能分开"没开始"与"日志丢了"的东西。
+    ("onscreen", "singular_summary"): (SINGULAR, ["ui suite exit:",
+                                              "UI_PROBE_ORPHAN_XCTEST=",
+                                              "UI_PROBE_RUNNER_ALIVE="], 0, []),
     # 看门狗收掉进程就是这个形状：旧脚本在这里中止，"没有跑完"那条分支永远走不到
-    ("onscreen", "truncated_log"): (TRUNCATED, ["ui suite exit:", "没有跑完"], 0, []),
+    ("onscreen", "truncated_log"): (TRUNCATED, ["ui suite exit:", "没有跑完",
+                                          "UI_PROBE_ORPHAN_XCTEST=0"], 0, []),
     ("onscreen", "normal"): (NORMAL, ["ui suite exit:"], 0, []),
     ("onscreen", "watchdog_already_exited"): (
         TRUNCATED, ["ui suite exit:", "没有跑完"], 0,
-        [(r"\( sleep 240; kill -9 \"\$pid\" 2>/dev/null \) &", "( exit ) &"),
+        # R88：看门狗从一行变成了一段（收掉之前先量进程表 + 改成杀进程组）。
+        # 夹具的锚点跟着改成"整段子壳"，并且**必须命中**：命中 0 次就是 ci.yml 又改了写法。
+        [(r"\( sleep 240[\s\S]*?\) &", "( exit ) &"),
          (r"cp \S+ /tmp/ui\.log &", "( cp FAKE_LOG /tmp/ui.log; sleep 1 ) &")]),
     ("motion", "normal"): (MOTION_NORMAL, ["motion suite exit:", "MOTION_SUMMARY",
                                            "MOTION_RESOLVE_SUMMARY"], 0, []),

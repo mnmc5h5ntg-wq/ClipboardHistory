@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### CI（R88）
+
+- 在屏探针那一步的看门狗改成**杀进程组**（`set -m` + `kill -9 -- -$pid`），并在收掉之前先量一次
+  进程表写进 `/tmp/ui-runner-alive`。理由：`swift test` 是三层进程，R86–R87 只杀驱动进程，
+  跑用例的 `xctest` 被 reparent 后继续活着，而它的 stdout 一行都没落盘。
+- `On-screen probe coverage floor` 新增两格硬门：孤儿数（读落盘的 `/tmp/ui-orphans`，
+  跨步骤没有共享 shell 变量）非 0 ⇒ `PROBE_FLOOR_WATCHDOG_MISSED=1` 红；读不到 ⇒ `PROBE_FLOOR_ORPHAN_UNMEASURED=1` 红。
+
+### Scripts（R88）
+
+- `ui_probe_report.py` 的"零条 started 行"从**一句成因**改成**三格**：
+  进程表说活着 ⇒ `UI_PROBE_START_LINES_LOST`；说没起 ⇒ `UI_PROBE_NO_CASE_STARTED`；没量到 ⇒
+  `UI_PROBE_NO_START_LINE`（只报观察）。坏值不许猜。自测 +5 格（含三格互斥），脚本自测现跑 160 格。
+- 变异电池 M481–M488（M481、M482、M483、M484、M485、M486、M487、M488）：8 刀 CAUGHT，没有逃掉的（M484 / M485 第一版 ESCAPED 是我的刀留着原 token 前缀 —— 见台账 U-189）。
+
+### Docs（R88）
+
+- BACKLOG 93 更新（成因分开：是通道丢了；"哪一条"交 122）；119 更新（第五个点 0.690 +
+  D-145 在 runner 上仍未被检验）；新开 **122**（每条在屏判据自己的文件通道 + 等节拍证人的分布）。
+
 ### Tests（R87）
 
 - 扫光那一族的**定罪权**改了：`loopAdjudication` 新增 `travel` 入参（由 `travelEvidence` 从位置尺现算，

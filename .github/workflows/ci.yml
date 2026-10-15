@@ -159,13 +159,28 @@ jobs:
         working-directory: ClipboardHistory
         run: |
           set -o pipefail
+          # R88 / BACKLOG 93：`set -m` 让下面那个后台任务**自成进程组**（PGID == 它的 PID）。
+          # 为什么必须：`swift test` 是三层进程（`swift` → `swift-test` → `xctest`），
+          # 真正跑用例的是最里层那个 `xctest`。R86–R87 的看门狗 `kill -9 $pid` 收掉的是驱动进程，
+          # 而本机按 CI 原样重跑读到的是：**xctest 被 reparent 之后继续活着**
+          # （一次活了 5 分钟、占着 `.build` 锁、把后面两次运行全堵在
+          # "Another instance of SwiftPM is already running"），它的 stdout 一行都没落盘
+          # ⇒ 日志读起来正好就是"一条用例都没开始"。那句话因此是假话（台账 U-187）。
+          # 证据与跑法：`.scratch/motion-audit-2/r88_spike_partial_channel.md`。
+          set -m
           # 实测（同一 run）：这一类探针在 runner 上**会挂死**（8 分钟被 GitHub 掐掉，什么数字都不留）。
           # 挂死和"跑得很慢"必须区分开，而且不能靠 GitHub 的步骤超时来兜 —— 那样日志里连部分结果都没有。
-          # 所以自己带一个 240 秒的看门狗：到点按 PID 收掉，然后照常汇报"跑到哪儿了"。
+          # 所以自己带一个 240 秒的看门狗：到点按**进程组**收掉，然后照常汇报"跑到哪儿了"。
           CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
             swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1 &
           pid=$!
-          ( sleep 240; kill -9 "$pid" 2>/dev/null ) &
+          ( sleep 240
+            # 收掉之前先量一次进程表。这一行是"日志的沉默"与"用例确实没开始"之间**唯一**的分诊依据：
+            # 报告脚本不许再从日志自己猜这件事（R86 猜错过一次，R87 那句猜错的话被 CI 当真读了两遍）。
+            alive=$(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null | wc -l | tr -d ' ' || true)
+            echo "${alive:-0}" > /tmp/ui-runner-alive
+            kill -9 -"$pid" 2>/dev/null || true
+            kill -9 "$pid" 2>/dev/null || true ) &
           killer=$!
           # `&& ... || ...` 而不是 `wait "$pid"; status=$?`：
           # bash -e 下 `wait` 拿到 137 会**当场中止脚本**，后面的汇报行一行都不会跑
@@ -176,6 +191,15 @@ jobs:
           # 下面三行抽取和结论行一行都轮不到（实测 run 38064293655 就是这个形状：
           # 只有 `line 13: Killed: 9` 和 `exit code 1`，没有 `ui suite exit:`）。
           kill "$killer" 2>/dev/null || true
+          # 看门狗有没有真的够到最里层那个进程：还在跑 ⇒ 这一格的读数不可信（下一步会红）。
+          # 这一格是**钉子**不是判据：`set -m` 被删掉、或有人把 kill 改回单 PID，这里就报非零。
+          orphans=$(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null | wc -l | tr -d ' ' || true)
+          # 写盘而不是只 echo：下一步是**另一个 shell**（甚至可能几秒之后），
+          # 而孤儿的寿命不由我们决定 —— 本机对照里它在父壳退出后几秒就没了。
+          # 那一步再 pgrep 一次会读到 0，于是那道门**恒真**（本轮差点就这么交了）。
+          echo "${orphans:-0}" > /tmp/ui-orphans
+          echo "UI_PROBE_ORPHAN_XCTEST=${orphans:-?} （收掉之后仍在跑的 xctest 数量，必须是 0）"
+          echo "UI_PROBE_RUNNER_ALIVE=$(cat /tmp/ui-runner-alive 2>/dev/null || echo 未量到) （看门狗收掉那一刻它还在不在 —— 93 的分诊读数）"
           # 同上：抽取行必须自己 `|| true`，否则"没跑完"这条分支永远走不到（脚本在这行就中止了），
           # 而那恰好是这段代码存在的理由。单数 "Executed 1 test" 也要能匹配。
           executed=$(grep -oE 'Executed [0-9]+ tests?' /tmp/ui.log | tail -1 | grep -oE '[0-9]+' || true)
@@ -193,6 +217,7 @@ jobs:
           # 路径带 `../`：这一步的 working-directory 是 ClipboardHistory，写错会静默失败 ——
           # 所以下一步（working-directory=. 的硬门）会再跑一遍同一份日志，跑错路径在那里会红。
           python3 ../scripts/ui_probe_report.py /tmp/ui.log \
+            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" \
             || echo "UI_PROBE_REPORT_FAILED=1 报告脚本自己没跑成 ⇒ 『挂死在哪条』这句话今天没有依据，不许读成『探针已点名』"
           if [ -z "$executed" ]; then
             echo "没有跑完（看门狗在 240s 收掉了进程）：在屏探针在无头 runner 上不可用，记成 R3-D9 的已知边界"
@@ -222,10 +247,24 @@ jobs:
           # 报告给不出名字（日志不完整、started 行被成块丢掉）⇒ 红：不许把"我说不出"当成"没事"。
           # `&& … || …` 而不是直接写命令：这一步是 `bash -e`，非零会当场中止，
           # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
-          python3 scripts/ui_probe_report.py /tmp/ui.log | tee -a /tmp/probe-floor.log \
+          python3 scripts/ui_probe_report.py /tmp/ui.log \
+            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" | tee -a /tmp/probe-floor.log \
             && report_status=0 || report_status=$?
           if [ "${report_status:-0}" != "0" ]; then
             echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"
+            exit 1
+          fi
+          # R88：报告的名字只有在"看门狗真的收掉了跑用例的那个进程"时才可信。
+          # 上面那一步的 `set -m` + `kill -- -$pid` 就是为了让这句话成立；
+          # 谁把它改回单 PID 杀死（R86–R87 的形状），这里就红 —— 那正是"日志说谎而 CI 绿"的形状。
+          orphans=$(cat /tmp/ui-orphans 2>/dev/null || echo '?')
+          if [ "${orphans:-0}" = "?" ]; then
+            echo "PROBE_FLOOR_ORPHAN_UNMEASURED=1 上一步没把孤儿数写下来 ⇒ 这一格不许被读成『看门狗够到了』"
+            exit 1
+          fi
+          if [ "${orphans}" != "0" ]; then
+            echo "PROBE_FLOOR_WATCHDOG_MISSED=1 收掉之后仍有 ${orphans} 个 xctest 在跑" \
+                 "⇒ 『这一卷为什么没结论』那格读的是被杀死的驱动进程，不是跑用例的那个"
             exit 1
           fi
 

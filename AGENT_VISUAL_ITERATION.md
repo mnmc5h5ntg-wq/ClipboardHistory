@@ -6730,3 +6730,179 @@ python3 -m unittest discover -s scripts/tests  Ran 155 tests in 6.779s OK
 - BACKLOG **121**（本轮新开）：台账里那行 `discover -s scripts` 我照抄跑了一遍，打印 `Ran 0 tests / OK / 退出 0`。命令本身一直是对的（CI 与 verify 都是 `-s scripts/tests`），错的是台账那一格（八处本轮已改对）。CI 那道地板只挡 0（`-ge 48`），**少收一半文件照样绿** ⇒ 该不该把它改成"只准升不准降 + 点名少了哪几条"，留给下一轮。
 - **116** 剩下那半格（闸门不报它没找到的 `*_NOT_RUN`）、**115**、**111**、108 余下、77 路 b、
   101 ②③、106；真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.1 / 72.2 / 73.1 / 73.2。
+
+## Round 88 · 看门狗杀的是驱动进程，不是跑用例的那个：CI 那句"一条用例都没开始"是假话（读 R87 的 CI / 更新 93、119 / 新开 122 / U-187…U-191 / D-146）
+
+### 本轮开场的位点清单（0 个产品文件；4 个 CI/脚本/自测文件）
+
+起点是 R87 的 CI 绿了，而**绿的方式**说明上一轮那朵红的处置今天没被检验；
+同时本机按 CI 原样重跑看门狗，读到了 R86 那句话的反面。
+
+| 位点 | 位置 | R87 留下的缺陷 | 本轮处置 |
+|---|---|---|---|
+| 在屏那一步的看门狗 | `.github/workflows/ci.yml` | `kill -9 $pid` 杀的是 `swift-test` 驱动，跑用例的 `xctest` 被 reparent 后继续活 | `set -m` + `kill -- -$pid`（进程组），并在收掉之前量一次进程表 |
+| 停机成因 | `scripts/ui_probe_report.py` | 日志没有 started 行 ⇒ 报"进程死在第一条用例之前" | 三格：活着⇒`START_LINES_LOST`；没起⇒`NO_CASE_STARTED`；没量⇒只报观察 |
+| 硬门 | `.github/workflows/ci.yml` | 上一步的 shell 变量跨不过步骤，直接引用会造出一道**恒真**的门 | 孤儿数落盘 `/tmp/ui-orphans`，读不到就红 |
+| 自测 | `scripts/tests/test_ui_probe_report.py` | 三格互斥没有守卫 | +5 格（含"三格不许同时出现"） |
+| CI 自检的夹具 | `scripts/tests/test_ci_report_selftest.py` | 锚点写死在旧那一行 `( sleep 240; kill -9 "$pid" ) &` | 锚点跟着改成"整段子壳"，并把两行新读数钉进期望 |
+
+本轮动的非台账文件 **4 个**（约定 ≤4，刚好用满），产品文件 **0 个** ⇒ 不换装、不重建 Swift 产物。
+第 4 个不是我主动要改的：`test_ci_report_selftest.py` **会真的执行那一步的脚本正文**，
+它的夹具锚点写死在旧那一行 ⇒ 我改完 ci.yml 它就红了（U-191，那是它该做的事）。
+
+
+### 1. 为什么"日志里没有 started 行"不是一句关于产品的话（U-187）
+
+R86 我写报告脚本时的依据是一次本机 spike：`kill -9` 之后 13 行 started 留在日志里。
+本轮按 CI 的**原样**重跑（`.scratch/motion-audit-2/spike_r88_ci_shape.sh`）：
+
+```
+驱动进程 pid=14687（swift-test --filter UIInteractionProbeTests），120s 后 kill -9 它本身
+log_bytes=119  started=0  concluded=0  帧=0
+清理阶段仍抓到：14741  …/usr/bin/xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests/testAccessibilityTreeCoverage,…（11 条全在 argv 里）
+```
+
+⇒ 用例**开了口**（xctest 带着 11 条用例名活着），而日志里一行都没有。
+⇒ 那句 `UI_PROBE_NO_CASE_STARTED=1（进程在第一条用例开口之前就死了）` 是假话，
+而 CI 的硬门把这句假话当成"有名字"读了两遍（R87、R86 各一次）。
+⇒ 一次 spike 成功只证明"能留住"，不证明"每次都留得住"（R86 记过这句话，本轮轮到我自己犯）。
+
+**成因由谁签**：由"收掉那一刻的进程表"签，不由日志的沉默签。
+所以那一步现在先 `pgrep` 一次写进 `/tmp/ui-runner-alive`，报告脚本吃这个数：
+1 ⇒ `UI_PROBE_START_LINES_LOST`；0 ⇒ `UI_PROBE_NO_CASE_STARTED`；没量到 ⇒ `UI_PROBE_NO_START_LINE`（只报观察）。
+三格互斥由自测钉住（③d），坏值不许猜（M488）。
+
+### 2. 差点交出去的一道恒真的门（U-188）
+
+第一版硬门写的是 `if [ "${orphans:-0}" != "0" ]`，而 `orphans` 是**上一步 shell 里的变量** ——
+GitHub 每个 `run:` 块是一个新 shell，跨步骤只有文件活着。那一格会永远读到 0，
+看起来有牙、实际恒真。⇒ 孤儿数落盘 `/tmp/ui-orphans`，读不到文件时另红一格
+（`PROBE_FLOOR_ORPHAN_UNMEASURED`），两格各有一刀（M484 / M485）。
+
+### 3. 对照自己也要防"量的不是那件事"（U-189 / U-190）
+
+* U-189：M484 / M485 第一版报 **ESCAPED** —— 刀把 `PROBE_FLOOR_WATCHDOG_MISSED` 改成
+  `PROBE_FLOOR_WATCHDOG_MISSED_REMOVED_BY_MUTATION`，而接线检查是子串查 ⇒ **什么都没删掉**。
+  与 R86 的 M472 同族反方向：那次是刀里没带那个词，这次是带太多。
+* U-190：机制对照第一版用 python 侧 `pgrep` 数孤儿，两遍都报 0 ⇒ "旧形状留下孤儿"那格空掉。
+  而脚本自己 `ps` 打出来的那一行明明白白有残留：python 侧量的其实是"那条管道还开着吗"，
+  不是进程表。⇒ 判定改读**脚本自己 ps 的那几行**，五格才各自有内容。
+
+### 4. 读 R87 的 CI：绿了，但绿的方式要记账
+
+# R88 读 R87 的 CI（run 38818629423 · commit d0b5939 · 22:44→22:53 · build-and-test = **success**）
+
+main 绿了。两件事同时有了答案，其中一件把我上一轮的读数**判成了假话**。
+
+## 1. 那朵假红确实消失了，而 coverage 拿到第五个数据点
+
+```
+motion suite exit: 0  executed: 54  胶片: 14  MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-
+MOTION_SHIMMER 扫 帧数=23 变化帧对=2 峰值=0.019 采样≈100ms coverage=0.690(地板 0.50) 记录时长=2343ms 判定=一直在动
+MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12) 帧对=32 在变=1 峰值=0.014 coverage=0.043 判定=只动了一下
+MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45) 帧对=30 在变=23 峰值=0.040 coverage=1.000 判定=一直在动
+MOTION_SHIMMER_STATE 判定=ok 原因=-
+MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）
+MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）
+MOTION_FLOOR_REDS=0
+```
+
+⇒ **红没了，但不是靠 D-145 那一支没掉的**：这一遍产品 coverage 0.690 自己在地板上，
+所以 `travel` 那一支根本没被触发，`LOOP_NOT_JUDGED=…contradicted-by-travel` **今天没在 runner 上出现**。
+⇒ 诚实的结论：D-145 这一轮**没有被 runner 检验**（它只在真值表与本机那 8 刀里活着）。
+它挡红的能力仍然是"未证"，这条要留给下一次 coverage 掉到地板以下的那一遍。
+
+**119 的第五个数据点**（同画法、同机器类别、runner）：0.522 / 0.842 / 0.032 / **0.690**
+⇒ 跨度 0.81，四遍里两遍在地板上、两遍在地板下。这条判据今天仍然不配当硬门（R86 记过同一句话）。
+
+**新的、更该记的一条**：等节拍那颗**证人**今天读 0.043（"只动了一下"），而产品读 0.690。
+R82 立这颗证人的理由是"它与产品同数字、同节拍"，可它自己在 runner 上的分布
+（0.671 / 1.000 / 0.043）比产品还宽。今天没造成错判（产品在动 ⇒ 直接判 ok，证人没被问），
+但它是 **110 那一族在证人自己身上的第四个实例**：一旦产品掉到地板下、需要证人签字，
+这颗证人有 1/3 的概率先说"没在动"。⇒ 新开 **BACKLOG 122**。
+
+## 2. 在屏那一卷：`NO_CASE_STARTED` 那句解释被本机测出来的机制**证伪**了
+
+```
+line 13:  8376 Killed: 9  CLIPBOARD_HISTORY_UI_INTERACTION=1 … swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1
+ui suite exit: 137  executed: 0  skipped: ?  已下结论的用例: 0
+UI_PROBE_PROGRESS started=0 concluded=0
+UI_PROBE_NO_CASE_STARTED=1 （进程在第一条用例开口之前就死了：看门狗收掉的是启动阶段，不是某条判据）
+UI_PROBE_NAMED=1
+PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 runner可跑=0 runner不可跑=11 本次下结论=0 红=0
+```
+
+同一次 push 之前，本机按 CI 的**原样**跑了一遍看门狗（`.scratch/motion-audit-2/spike_r88_ci_shape.sh`）：
+
+```
+驱动进程 pid=14687（swift-test --filter UIInteractionProbeTests），120s 后 kill -9 它本身
+kill 之后清理阶段仍然抓到：14741  …/usr/bin/xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests/testAccessibilityTreeCoverage,…（11 条全在 argv 里）
+log_bytes=119  started=0  concluded=0  帧=0
+```
+
+⇒ **杀父留子**：`kill -9` 收掉的是 `swift-test` 驱动进程，真正跑用例的 `xctest` 子进程
+被 reparent 之后**继续活着**（第一版 spike 里活了 5 分多钟，还占着 `.build` 锁，
+把后面两次运行全堵在 "Another instance of SwiftPM is already running"）。
+⇒ 所以 `UI_PROBE_NO_CASE_STARTED` 那句"进程在第一条用例开口之前就死了"是**假的**：
+用例开了口，只是它的 stdout 在块缓冲里，父进程被 SIGKILL 时一行都没落盘。
+⇒ BACKLOG 93 剩下的那一格由此分开：是 **②**（日志通道丢了），不是 ①。
+R86 我登记的那句"②为真时 NO_CASE_STARTED 就是一句关于产品的假话"——今天它就是那句假话。
+
+## 3. 其余步骤
+
+* `Swift tests (executed-count gate)` / `Capture gate` / `Frame baseline` / `Release script tests`：全绿（REDS=0、CHANGED=0）。
+* `On-screen probe coverage floor` 打了 `PROBE_NOT_RUN` 全 11 条的名字 ⇒ 集合级那一支仍然尽职。
+
+⇒ 关键的一条诚实话：**红消失不是 D-145 挡住的** —— 这一遍 coverage 自己回到地板上（0.690），
+`travel` 那一支根本没触发，`LOOP_NOT_JUDGED=…contradicted-by-travel` 仍然没在 runner 上出现过。
+D-145 目前只有真值表与本机八刀的证据，runner 证据为 0。119 不结案，且新增第五个数据点。
+⇒ 另一件：等节拍那颗**证人**今天读 0.043（产品 0.690）。它今天没签字（产品在动⇒直接判 ok），
+但它的分布（0.671 / 1.000 / 0.043）比产品还宽 ⇒ 新开 **BACKLOG 122**：
+每条在屏判据自己写一行读数（R56 给动效卷用过的那个形状），以及这颗证人配不配当红路的签字方。
+
+### 牙
+
+| M481 | 删掉 `set -m` | **CAUGHT** |
+| M482 | 组杀改回单 PID 杀（R86–R87 的形状） | **CAUGHT** |
+| M483 | 报告型那一步不再传 --runner-alive（只剩硬门那一步传 ⇒ 一半出口读不到分诊） | **CAUGHT** |
+| M484 | 硬门里删掉孤儿那一格（看门狗失手时 CI 照样绿） | **CAUGHT** |
+| M485 | 硬门里删掉"没量到就红"那一格（读不到文件时 ${orphans} 会读成 ?，那一格若被删就静默过） | **CAUGHT** |
+| M486 | 报告脚本：runner 活着时不再点名"日志丢了"，退回"只报观察" | **CAUGHT** |
+| M487 | 报告脚本：把 1/0 的语义对调（runner 死了才说"日志丢了"） | **CAUGHT** |
+| M488 | 报告脚本：--runner-alive 传进坏值时当成"活着"（不许猜） | **CAUGHT** |
+
+### 验证（本机，逐条实跑；跑不了的点名）
+
+```
+动了哪些非台账文件            4 个（ci.yml / ui_probe_report.py / test_ui_probe_report.py / test_ci_report_selftest.py）；产品文件 0（⇒ 不换装、帧基线按构造不变）
+脚本自测                       Ran 160 tests in 6.692s OK（exit 0）
+机制对照（五格）               CAUGHT 旧形状确实留下孤儿（对照有内容，不是恒真）   CAUGHT 新形状收干净（脚本自己 ps 里没有残留）   CAUGHT 新形状在收掉前量到"还在跑"（RUNNER_ALIVE=1）   CAUGHT CI 两步都写了（set -m / 组杀 / --runner-alive / 硬门那一格）   CAUGHT 两步的 shell 语法过 bash -n（块数=2） R88 对照 5/5 通过
+变异电池                       汇总：8 刀 CAUGHT / 0 逃掉 / 0 没跑成（共 8）
+没跑的                         swift_build（Swift 侧一行没动，见 PRODUCT_TOUCHED；CI 那一步会自己跑）；swift_test_full（同上，801 例由本轮 push 触发的 run 覆盖）；motion_floor_gate / capture_gate / frame_baseline（都要求 Swift 产物；本轮零 Swift 改动）；runner 上的 set -m 真效果（只有下一次 CI 才知道 —— 那正是本轮要读的那一格）
+```
+
+### 七维自评
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 20 / 20 | 零产品改动：本轮没脸加分，也没东西被扣 |
+| 流畅度 | 17 / 20 | 扫光在 runner 上今天自己回到了地板上（0.690），但 D-145 那条新通道仍未被检验 |
+| 层次与材质 | 15 / 15 | 本轮无画面产出 |
+| 动效细节 | 14 / 15 | 等节拍证人自己读 0.043 ⇒ "谁配签字"这件事在证人身上还没判完（122） |
+| 交互反馈 | 9 / 10 | 反馈本身没动 |
+| 可访问性 | 8 / 10 | 减弱动态那一臂仍无条件判；真机批次 72 / 73 还没人看 |
+| 性能 | 15 / 15 | 本轮不跑 Swift 产物；`set -m` 之后看门狗能真的收掉 xctest，runner 不再被孤儿进程白烧到作业结束 |
+
+**98 / 100**：本轮换掉的是**一句 CI 读了两遍的假话**，并顺手挡住一道我自己写出来的恒真的门。
+分数比 R86/R87 高一格是刻意的：那两轮分别产出"一个名字"和"一次定罪权搬迁（未检验）"，
+本轮产出的是"一句假话被撤回 + 一条机制被证明 + 一道门从恒真变成有牙"。
+
+### 仍未解决
+
+- BACKLOG **93**：成因分开了（是②：日志通道丢了），但**"挂在哪一条"仍然没有名字** ⇒ 122。
+- BACKLOG **119**（第五个数据点）：runner 四遍 coverage 0.522 / 0.842 / 0.032 / 0.690 ⇒ 跨度 0.81；
+  且 D-145 那一支在 runner 上**一次也没被触发**，它挡红的能力仍未证。
+- BACKLOG **122**（本轮新开）：在屏那一卷的每条判据自己写一行读数（文件通道），
+  以及那颗分布比产品还宽的等节拍证人配不配签红。
+- **121**、**116** 剩下那半格、**115**、**111**、108 余下、77 路 b、101 ②③、106；
+  真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.1 / 72.2 / 73.1 / 73.2。

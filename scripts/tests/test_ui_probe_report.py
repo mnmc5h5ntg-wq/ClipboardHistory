@@ -65,12 +65,51 @@ class TruthTableTests(unittest.TestCase):
         self.assertNotIn("UI_PROBE_HUNG", out)
         self.assertIn("UI_PROBE_PROGRESS started=2 concluded=2", out)
 
-    def testNoCaseStartedInRawLog(self):
-        """③ 原始日志里一条 `Test Case` 都没有 ⇒ 进程级死法，这仍然算"有名字"。"""
+    def testNoStartLineWithoutProcessProbeIsObservationOnly(self):
+        """③a 原始日志里一条 `Test Case` 都没有，而**今天没量进程表** ⇒ 只许报观察。
+
+        R86–R87 在这一格写的是"进程在第一条用例开口之前就死了"。R88 本机按 CI 原样重跑
+        发现那是假话：`kill -9` 收掉 `swift-test` 之后 `xctest` 还活着在跑用例，
+        而它的 stdout 在块缓冲里一行都没落盘（见 r88_spike_partial_channel.md）。
+        ⇒ 日志的沉默不再是任何成因的名字。
+        """
         text = "Building for debugging...\nBuild complete! (3.12s)\n"
         out, named = report(text)
-        self.assertTrue(named, "③ 是本脚本要说清的一种形状，不许当成『我不知道』")
-        self.assertIn("UI_PROBE_NO_CASE_STARTED=1", "\n".join(out))
+        joined = "\n".join(out)
+        self.assertIn("UI_PROBE_NO_START_LINE=1", joined)
+        self.assertNotIn("UI_PROBE_NO_CASE_STARTED", joined,
+                         "没量到进程表就报『死在启动阶段』= 把 R88 刚证伪的那句话又写回去")
+        self.assertNotIn("UI_PROBE_START_LINES_LOST", joined)
+        self.assertTrue(named, "『日志里没有 started 行』本身就是这一步要说清的形状，不许红也不许装没事")
+
+    def testRunnerAliveTurnsSilenceIntoChannelLoss(self):
+        """③b 收掉那一刻 xctest 还活着 ⇒ 名字是"started 行整块丢了"，不是"没开始"。"""
+        text = "Building for debugging...\nBuild complete! (3.12s)\n"
+        joined = "\n".join(report(text, 1)[0])
+        self.assertIn("UI_PROBE_START_LINES_LOST=1", joined)
+        self.assertNotIn("UI_PROBE_NO_CASE_STARTED", joined,
+                         "用例在跑与用例没开始是两种相反的成因，同一份输出里不许同时出现")
+        self.assertNotIn("UI_PROBE_NO_START_LINE", joined)
+
+    def testRunnerDeadIsTheOnlyCaseThatMaySayNeverStarted(self):
+        """③c 收掉那一刻连 xctest 都没起来 ⇒ 这时"死在启动阶段"才有资格说。"""
+        text = "Building for debugging...\nBuild complete! (3.12s)\n"
+        joined = "\n".join(report(text, 0)[0])
+        self.assertIn("UI_PROBE_NO_CASE_STARTED=1", joined)
+        self.assertNotIn("UI_PROBE_START_LINES_LOST", joined)
+        self.assertTrue(report(text, 0)[1])
+
+    def testTheThreeCausesAreMutuallyExclusive(self):
+        """③d 三格互斥：同一份日志在 alive=1/0/没量 下各自只说一句话。
+
+        这一格防的是"以后有人为了让 CI 绿，把两句话并成一句"（R86 的 ② 就是这么混进 ① 的）。
+        """
+        text = "Building for debugging...\nBuild complete! (3.12s)\n"
+        marks = ("UI_PROBE_NO_START_LINE", "UI_PROBE_START_LINES_LOST", "UI_PROBE_NO_CASE_STARTED")
+        for alive in (None, 1, 0):
+            joined = "\n".join(report(text, alive)[0])
+            hit = [m for m in marks if m in joined]
+            self.assertEqual(len(hit), 1, "alive=%r 命中了 %s ⇒ 三格互相取消了" % (alive, hit))
 
     def testConcludedWithoutStartIsRed(self):
         """④ stdout 成块丢会把 started 丢掉而留下结论行 ⇒ 差集不可信，必须红。"""
@@ -108,15 +147,36 @@ class TruthTableTests(unittest.TestCase):
 
 
 class MainExitCodeTests(unittest.TestCase):
-    def run_main(self, text):
+    def run_main(self, text, extra=()):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "ui.log")
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(text)
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
-                code = main([path])
+                code = main([path] + list(extra))
             return code, buffer.getvalue()
+
+    def testRunnerAliveFlagReachesTheVerdict(self):
+        """CI 把"收掉那一刻进程表"传进来 ⇒ 命令行这一层也要走到那一格（不能只在纯函数里对）。"""
+        silence = "Building for debugging...\nBuild complete! (3.12s)\n"
+        code_alive, out_alive = self.run_main(silence, ["--runner-alive", "1"])
+        self.assertEqual(0, code_alive)
+        self.assertIn("UI_PROBE_START_LINES_LOST=1", out_alive)
+        code_dead, out_dead = self.run_main(silence, ["--runner-alive", "0"])
+        self.assertEqual(0, code_dead)
+        self.assertIn("UI_PROBE_NO_CASE_STARTED=1", out_dead)
+        self.assertNotIn("UI_PROBE_START_LINES_LOST", out_dead)
+
+    def testUnparsableRunnerAliveFallsBackToObservation(self):
+        """CI 那一格自己坏了（不是数字）⇒ 不许猜，退回"只报观察"，并且把坏法打出来。"""
+        silence = "Building for debugging...\nBuild complete! (3.12s)\n"
+        code, out = self.run_main(silence, ["--runner-alive", "n/a"])
+        self.assertEqual(0, code, "观察格仍然有名字 ⇒ 不红，但也不许升成因")
+        self.assertIn("UI_PROBE_RUNNER_ALIVE_UNPARSED", out)
+        self.assertIn("UI_PROBE_NO_START_LINE", out)
+        self.assertNotIn("UI_PROBE_START_LINES_LOST", out)
+        self.assertNotIn("UI_PROBE_NO_CASE_STARTED", out)
 
     def testNamedExitsZeroAndPrintsMarker(self):
         code, out = self.run_main(started("testAlpha"))
