@@ -1,0 +1,15 @@
+=== 基线（未变异）===
+   testBandCaptureIsCheaperAndStillSeesTheMotion = green
+
+M384 `captureRect` 变成空操作（两臂都抓整窗）⇒ 必须同时红在'帧高变小'与'严格更便宜'两格。这一刀是 R72 降线之后**唯一还需要成立的保证**：省倍数不再被门，那'带捕获'这件事靠什么守？靠的是几何与方向，两者都在这条 mutation 下塌
+   落地确认
+   CAUGHT 红在 testBandCaptureIsCheaperAndStillSeesTheMotion
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1389: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion] : XCTAssertLessT
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1436: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion] : XCTAssertGreat
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1441: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion] : XCTAssertGreat
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1459: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion] : XCTAssertLessT
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M384   CAUGHT
+   抓到=1 逃掉=0 没跑成=0 未落地=0

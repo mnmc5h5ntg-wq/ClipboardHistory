@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R72：我上一轮给证人写的解释被这一轮的读数证伪 —— 结案 BACKLOG 104 / U-124…U-126 / D-130）
+- 读 R68+R69 的 CI（run 38723020548）三件事同时发生：
+  ① 证人 `采样≈81ms`（R66 是 80ms）而面积已小 **12.6 倍** ⇒ **R68 那句"面积决定证人采得粗"是错的**，
+     真正的差是睡眠节拍（证人 `sleep 0.02` vs 判据那条 `record(_:)` 的 `0.004`）；
+  ② `MOTION_BAND` 带 26.0ms vs 整窗 44.4ms ⇒ 真实省了 **1.70×**，而那条判据的线写的是 2×（本机数）；
+  ③ R69 那条 `FRAME_CORNER_AXIS_NOT_RUN=1` 如约出现在 runner 日志里（亮暗各一条）⇒ 缺席是点名的，不是静默通过。
+- 改：证人换成与判据**同一个循环节拍**，并把成本与间隔**分成两个数**打（`MOTION_FADE_CLOCK_COST`）。
+  本机 `帧数=400 采样≈4ms 抓帧中位=0.1ms 中间态帧数=56 判定=能分辨`。
+- 改：`bandCaptureSavingFloor` 2 → 1，判据从"省多少倍"变成"**是否严格更便宜**"（相等即红）。
+  倍数仍然每轮打（`MOTION_BAND_SAVING`），但不再当门 —— 倍数是这台机器的成本结构，
+  而"rect 是装饰"那一族错本来就由几何两条拦（帧高必须变小、带宽必须不变）。
+- 牙的验证：**M384（两臂都抓整窗）⇒ 四格一起红**（抓到=1 逃掉=0）。
+  另一刀 M385（节拍改回 0.02）**本地无判别力**（两档都仍"合格"）⇒ 按 M168 的先例明写"由 runner 判"，不混进计数。
+- 全量 **788 例 / 38 skip / 0 failures / 157.7s**；`FRAME_BASELINE_COMPARED=124 CHANGED=0`；编译告警 0；脚本测试 139 OK。
+  **产品 0 个文件** ⇒ 屏幕上仍是 R71 装的 `c03cf278d3a4dd98…`。
+- **没解决**：①/②（notice-banner 那条红是产品还是环境）仍未回答 —— 这一轮只是让证人**有资格**回答它；
+  BACKLOG 105 的门假设也仍悬着（`OVERLAY_HOVER_DOOR` 在 runner 上的第一遍还没读）。
+
 ### Changed（R70+R71：把"门"变成被量的对象；浮层的字号回到梯子，守卫补上 AppKit 那半边网 —— 结案 BACKLOG 99 / 105 ① / U-121…U-123 / D-129）
 - **R71 产品**：浮层行标签 `13 → VisualFont.row`(12)、搜索框 `14 → VisualFont.body`(13)、空态那句 `13 → VisualFont.body`（同值）。
   依据不是"行高不同所以字号可以不同"（那是没读数的解释）：同一把尺量到 浮层行距 33–35pt（单行）

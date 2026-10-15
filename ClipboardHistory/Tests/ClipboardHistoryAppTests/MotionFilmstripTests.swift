@@ -1396,12 +1396,16 @@ final class MotionFilmstripTests: XCTestCase {
         //    而不是要求"像拟合说的那样省 4 倍"（拟合是推算，判据只能判已测的形状）。
         let bandMedian = medianGrab(band)
         let fullMedian = medianGrab(full)
+        emit("MOTION_BAND_SAVING 带中位=\(String(format: "%.2f", bandMedian))ms "
+            + "整窗中位=\(String(format: "%.2f", fullMedian))ms 省=\(String(format: "%.2f", fullMedian / max(bandMedian, 0.001)))× "
+            + "线=\(Self.bandCaptureSavingFloor)×（严格更便宜；倍数只报不判，R72）")
         XCTAssertGreaterThan(bandMedian, 0, "带那一臂没量到抓帧成本 ⇒ 归因会是 unmeasured，这条对账没有内容")
-        XCTAssertLessThanOrEqual(bandMedian, fullMedian / Self.bandCaptureSavingFloor,
-            "带捕获中位 \(String(format: "%.1f", bandMedian))ms，整窗 \(String(format: "%.1f", fullMedian))ms，"
-                + "只省了 \(String(format: "%.2f", fullMedian / max(bandMedian, 0.001))) 倍 ⇒ "
-                + "BACKLOG 77 路 a 的前提（缩区域能把采样变细）在这台机器上不成立，"
-                + "该改的是那条建议而不是把地板调低")
+        XCTAssertLessThan(bandMedian, fullMedian / Self.bandCaptureSavingFloor,
+            "带捕获中位 \(String(format: "%.1f", bandMedian))ms 不比整窗 \(String(format: "%.1f", fullMedian))ms 便宜 ⇒ "
+                + "`captureRect` 是空操作（两臂成本相同就是这一格的形状）。"
+                + "**这里只判方向，不判倍数**：runner 实测 1.70×（26.0 vs 44.4ms）而本机 4× 上下，"
+                + "倍数是这台机器的成本结构，不是 rect 有没有生效（R72 / 与 R38 同一条课）。"
+                + "该改的是那条建议而不是把地板调低 —— 地板现在停在'方向'这条机器无关的线上")
         // ③ 信号不能被裁掉 —— 但**不能用峰值比**（本轮在这里想错了一次，值得留在注释里）：
         //    第一版写的是"带上的峰值 ≥ 整窗的峰值"，实测 0.079 < 0.201 就红了，
         //    看着像"带没盖住横幅"。两个理由都跟"带没盖住"无关：
@@ -2006,11 +2010,20 @@ final class MotionFilmstripTests: XCTestCase {
                 + "带捕获那一卷的「整幅」就已经是那条带，要用 band: nil")
     }
 
-    /// 判"带捕获够便宜"所需的**最小节省倍数**（整窗中位 ÷ 带中位）。
+    /// 判"带捕获够便宜"所需的**最小节省倍数**（整窗中位 ÷ 带中位）。R72 从 2 改成 1。
     ///
-    /// 取 2 而不是拟合出来的 4.8：这一格要抓的是"rect 没起作用/成本与面积无关"，
-    /// 不是抓机器抖动。真数在 `MOTION_BAND` 那行里，两遍各自多少都看得见。
-    static let bandCaptureSavingFloor: Double = 2
+    /// 为什么改：那个 2 是**本机数**（R55 拟合说 4.8、判据退到 2 已经是一次让步），
+    /// 而 R68+R69 那一次 CI 给出了 runner 的实物：
+    /// `XCTAssertLessThanOrEqual failed: ("26.036") is greater than ("22.200")`
+    /// ⇒ 带 26.0ms、整窗 44.4ms ⇒ **省了 1.70 倍，真实存在，只是不到 2**。
+    /// 也就是说这一格在 runner 上量到的是"这台机器的成本结构"，不是"rect 有没有起作用"。
+    /// 与它同一条课的是 R38（两台机器的读数不能当另一台机器的地板）—— 这次栽的又是新判据。
+    ///
+    /// 改到 1 之后**牙没有变少**，因为"rect 是装饰"这一族错由三条更硬的断言拦：
+    /// 帧高必须变小、带宽必须等于整宽、首尾差必须装得下变更；再加上这一条"严格更便宜"
+    /// （相等就红 ⇒ `captureRect` 变成空操作时两臂成本相同 ⇒ 红）。
+    /// 倍数本身仍然每轮打出来（`MOTION_BAND`），趋势看得见 —— 只是不再拿一台机器的数当另一台的地板。
+    static let bandCaptureSavingFloor: Double = 1
 
     /// 带捕获必须**装得下**这次变更的最小首尾差（本机实测 0.883 / 0.885，两遍）。
     ///
@@ -2891,6 +2904,12 @@ final class MotionFilmstripTests: XCTestCase {
         let reading = Self.fadeClockReading(levels: run.levels,
                                             samplingMilliseconds: run.samplingMilliseconds)
         Self.fadeClockCache = reading
+        // 成本与间隔**分开**打（R72）：上一轮我把 81ms 说成"抓帧面积贵"，而那次 CI 证伪了它
+        // （面积小 12.6 倍，采样 80 → 81ms）。只有一个数的时候，人总会拿它当原因。
+        emit("MOTION_FADE_CLOCK_COST 帧数=\(run.frames.count) 采样≈\(run.samplingMilliseconds)ms "
+            + "抓帧中位=\(String(format: "%.1f", run.medianGrabMilliseconds))ms "
+            + "抓帧最慢=\(String(format: "%.1f", run.worstGrabMilliseconds))ms 面积=190x24pt "
+            + "⇒ 采样−中位 那一段是 runloop 没醒，不是 `cacheDisplay`")
         // 结论行在闸门之前（R53）：`.snaps` 那一支马上要抛 skip，抛出去之后这行读数
         // 就是那次判定在这台机器上唯一的痕迹。
         emit("MOTION_FADE_CLOCK 声明=\(Int(FadeClockView.declaredDurationMilliseconds))ms "
@@ -4689,19 +4708,22 @@ private final class FadeClockProbe {
         let frames: [CGImage]
         let levels: [Double]
         let samplingMilliseconds: Int
+        /// 一次 `cacheDisplay` 的中位 / 最慢耗时（ms）。R72 起跟着读数一起交出去：
+        /// 没有它，"采样 81ms" 这一句里有多少是抓帧、有多少是 runloop 没醒，永远分不开
+        /// （R55 那一族 —— 上一轮我就是拿一个数当成了原因）。
+        let medianGrabMilliseconds: Double
+        let worstGrabMilliseconds: Double
     }
 
     func record() -> Run {
         _ = NSApplication.shared
         // 窗口 320×180，但**只抓左上角 190×24 那一条**（R68 / BACKLOG 104）。
         //
-        // 为什么这件事是这一轮的正事：证人必须采得**不比它作证的判据粗**，否则它那句
-        // "我也看不见过程"说的只是它自己的分辨率。上一轮 runner 上的实物是
-        // 证人 ≈80ms / 判据 35ms —— 而那 80ms 里几乎全是抓帧成本：
-        // 判据抓的是 760×48pt 那条带（36,480pt²），证人抓的是整张 320×180pt（57,600pt²），
-        // **比被告还贵 1.6 倍**（R55/R57 那条"面积决定采样粗细"第一次咬到我自己）。
-        // 190×24 = 4,560pt² ⇒ 稳定是那条带的 **1/8**，与 backing scale 无关（两边同乘 scale²）：
-        // "证人合格"从此不靠运气，而是结构上就采得比判据细。
+        // 这一条保留，但**它当时的理由已被 R68+R69 那一次 CI 证伪**（诚实记账，不删）：
+        // 我当时写"证人比被告贵 1.6 倍 ⇒ 面积决定它采得粗"。实测：面积从 57,600pt² 降到 4,560pt²
+        // （12.6 倍）之后，runner 上证人采样 80ms ⇒ **81ms，一点没变细**。
+        // ⇒ 限制采样的不是面积，是循环的睡眠节拍与这台机器的 runloop（见下面那个 0.004）。
+        // 面积仍然要小（省时间、也保证证人不会比被告更贵），但它不是这一格的原因。
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 320, height: 180),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         let host = NSHostingView(rootView: FadeClockView())
@@ -4714,14 +4736,24 @@ private final class FadeClockProbe {
                               rect: NSRect(x: 0, y: 0, width: 190, height: 24))
         let deadline = Date().addingTimeInterval(2.0)
         while !grabber.finished, Date() < deadline {
-            // 0.02 而不是对照臂那个 0.05：这里要分辨的过程只有 150ms，
-            // 每 50ms 抓一次的话，斜坡最多落两帧，"这台机器能不能看见过程"就永远在阈值上抖。
-            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            // 0.004 —— **与它作证的那条判据同一个循环形状**（`record(_:)` 里就是 0.004，见 3996 行）。
+            // R68 我写的是 0.02，理由写着"这里要分辨的过程只有 150ms"；
+            // 而 R68+R69 那一次 CI 把我的解释证伪了：
+            //   面积 57,600pt² → 4,560pt²（小 12.6 倍），runner 采样 80ms → **81ms（一点没变细）**，
+            //   同一遍里判据自己 23ms。⇒ 限制证人的不是抓帧面积，是**它的睡眠节拍 + 这台机器的 runloop**，
+            //   而我唯一能控制的那一项就是节拍。判据用 0.004，证人也必须用 0.004，
+            //   否则"证人看不见"永远可能只是"证人睡得比判据久"（BACKLOG 104 的原始形状）。
+            RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
         }
         let levels = grabber.frames.map { MotionFilmstripTests.meanLevel($0) }
+        // 成本与间隔**分开带出来**（R72）：下一次 runner 的那一遍要能回答
+        // "81ms 里有多少是 `cacheDisplay`，有多少是 runloop 没醒" ——
+        // 上一轮我答错了（说成面积），因为只有一个数。打印仍归测试类（`emit` 在那边）。
         return Run(frames: grabber.frames, levels: levels,
-                   samplingMilliseconds: MotionFilmstripTests.sampleIntervalMilliseconds(grabber.stamps))
+                   samplingMilliseconds: MotionFilmstripTests.sampleIntervalMilliseconds(grabber.stamps),
+                   medianGrabMilliseconds: grabber.medianGrabMilliseconds,
+                   worstGrabMilliseconds: grabber.worstGrabMilliseconds)
     }
 }
 
