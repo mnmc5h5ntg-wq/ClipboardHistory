@@ -674,6 +674,352 @@ final class MotionFilmstripTests: XCTestCase {
         return changedFraction(raster(first), raster(last), band: band) >= minimumVisibleChange
     }
 
+    // MARK: - R77 / BACKLOG 107：两态相减的尺子必须读四通道
+
+    /// 针脚全部**拼出来**。这条守卫要扫的文件里就包括它自己所在的那个文件：
+    /// 把 `+ 2]` 原样写进源码，守卫就会在"定义自己针脚"的那一行上命中自己 ——
+    /// 那一族在本仓库栽过两次（R53 的 `region()`、R72 的名单扫描）。
+    private static let thirdChannelNeedles = ["+ " + "2]", "green" + "Component", "blue" + "Component"]
+    private static let fourthChannelNeedles = ["+ " + "3]", "alpha" + "Component"]
+    /// "两态"的判据：同一个偏移在**两份**取值之间做了减法。
+    /// 有这一条才把"读一张帧的电平/对比度"那些尺子（`meanLuma`、`inkContrast`、`lumaHistogram`…）
+    /// 排除在外 —— 它们量的是单帧，本来就没有"另一态"可减，要求它们读 alpha 是判错了对象。
+    private static let twoStateNeedles = [" - I" + "nt(", "- " + "pb.", "- " + "b."]
+    /// alpha 这根轴"**参与了判定**"的形状：同一个表达式里既写着它、又拿它跟地板比大小。
+    /// 只留一句 `let alphaDelta = abs(...)` 而不拿来判，是**读了不用**。
+    /// 这一格不是洁癖：M407 那一刀把 `if delta > 6 || alphaDelta > 6` 里的后半截删掉，
+    /// 而 `let alphaDelta` 那行还留着 ⇒ 只查"函数体里有没有出现过 + 3]"的守卫**照样绿**（实测 ESCAPED）。
+    /// 判据必须打在"用没用"上，不能打在"有没有"上。
+    private static let axisMarker = "alp" + "ha"
+    private static let comparisonMarker = " > "
+
+    /// 一把尺子的两根盲区，分开数（方向不同，代价也不同）：
+    /// · `luminanceOnly` = 读亮度、做两态减法，可 alpha 那根轴根本没进判定 ⇒ "暗墨在淡"会被读成"没动"（假绿）；
+    /// · `alphaOnly`      = 读 alpha、做两态减法，可亮度那根根本没读 ⇒ "颜色在变而不透明"会被读成"没动"
+    ///   （R76 那两条 `paintedXRange` / `alphaLiftProfile` 就是这个方向，它们是**故意**的，见豁免名单）。
+    /// 返回的名字前缀文件名的 `#`：两个文件各有一份 `rgbFraction`，不许互相顶包。
+    static func blindDeltaRulers(named file: String, code: String) -> (luminanceOnly: [String], alphaOnly: [String]) {
+        let lines = code.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .map { Self.strippingTrailingComment($0) }
+        var luminanceOnly: [String] = []
+        var alphaOnly: [String] = []
+        var index = 0
+        while index < lines.count {
+            guard let name = Self.memberFunctionName(lines[index]) else { index += 1; continue }
+            var body: [String] = []
+            var cursor = index + 1
+            while cursor < lines.count, lines[cursor] != "    }" {
+                body.append(lines[cursor])
+                cursor += 1
+            }
+            let text = body.joined(separator: "\n")
+            let readsThird = thirdChannelNeedles.contains { text.contains($0) }
+            let readsFourth = fourthChannelNeedles.contains { text.contains($0) }
+            let isTwoState = twoStateNeedles.contains { text.contains($0) }
+            // alpha 有没有进判定：只看"同一行里既有它、又跟地板比大小"的那几行（注释已经剥掉）。
+            let alphaInVerdict = body.contains { $0.contains(axisMarker) && $0.contains(comparisonMarker) }
+            if isTwoState, readsThird, !alphaInVerdict { luminanceOnly.append(file + "#" + name) }
+            if isTwoState, readsFourth, !readsThird { alphaOnly.append(file + "#" + name) }
+            index = cursor + 1
+        }
+        return (luminanceOnly, alphaOnly)
+    }
+
+    /// 去掉**行尾**注释（`… code // 说明`）。整行注释在上一层已经滤掉，而这一半才是 M407 那一刀钻过去的洞：
+    /// 变异行写成 `if delta > 6 { changed += 1 }  // R77 变异：又不读 alpha 了`，
+    /// 于是"同一行里既有 alpha 又有 `>`"被**注释**凑齐了 ⇒ 守卫把一把真的瞎掉的尺子判成"两根轴都读"。
+    /// 已知偏差：不识别字符串里的 `//`（URL 那样子会被截断），方向是**保守**的 ——
+    /// 少读文本只会让一条尺子更容易被判成盲区（多一个红），不会让盲区蒙混过关。
+    private static func strippingTrailingComment(_ line: String) -> String {
+        guard let slash = line.range(of: "//") else { return line }
+        return String(line[line.startIndex..<slash.lowerBound])
+    }
+
+    /// 给正对照用的合成尺子。
+    ///
+    /// 源码里**一个完整针脚都不许出现**：所有通道写法都从 `*ChannelNeedles` 里取，运行时才拼成形状。
+    /// 这不是形式 —— 上一版把这些字面量直接写进判据的函数体里，守卫扫自己那份文件时
+    /// 就把那条判据自己点成了盲区（M407 之后重写的那一版就是为了这个）。
+    static func syntheticRulerSource(readingAlpha: Bool) -> String {
+        let third = thirdChannelNeedles[0]
+        let fourth = fourthChannelNeedles[0]
+        let minus = twoStateNeedles[0]
+        var lines: [String] = [
+            "    static func ruler(_ a: Bitmap, _ b: Bitmap) -> Double {",
+            "        var changed = 0",
+            "        let rgb = abs(Int(a.pixels[p])" + minus + "Int(b.pixels[q]))",
+            "        let luma = abs(Int(a.pixels[p" + third + ")" + minus + "Int(b.pixels[q" + third + ")))",
+        ]
+        if readingAlpha {
+            lines.append("        let alpha = abs(Int(a.pixels[p" + fourth + ")" + minus + "Int(b.pixels[q" + fourth + ")))")
+            lines.append("        if rgb > 8 || luma > 8 || alpha > 8 { changed += 1 }")
+        } else {
+            lines.append("        if rgb > 8 || luma > 8 { changed += 1 }")
+        }
+        lines.append("        return Double(changed)")
+        lines.append("    }")
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// 认得出"这是一个 4 空格缩进的成员函数头"，并取出函数名。
+    /// 更深缩进的（函数里嵌的 `func diff(from:)`）不算新成员 —— 它属于外面那条的函数体，
+    /// 否则一条尺子会被拆成两截，针脚扫在错的那一截上。
+    private static func memberFunctionName(_ line: String) -> String? {
+        guard line.hasPrefix("    ") else { return nil }
+        let rest = String(line.dropFirst(4))
+        guard rest.contains("func ") else { return nil }
+        for prefix in ["func ", "private func ", "static func ", "private static func ",
+                       "static private func ", "nonisolated static func ", "final func "] where rest.hasPrefix(prefix) {
+            guard let open = rest.firstIndex(of: "(") else { return nil }
+            let head = rest[prefix.endIndex..<open]
+            return head.isEmpty ? nil : String(head)
+        }
+        return nil
+    }
+
+    /// 今天**允许**只读一根轴的两态尺子，按方向分名册，各自带一条"为什么可以"。
+    /// 放宽必须带理由（R75 那一课）：只有名字没有理由的名单等于把守卫撤了，只是撤得比较难看。
+    static func luminanceOnlyExemptions() -> [(qualifiedName: String, reason: String)] {
+        [
+            (qualifiedName: "PressFeedbackTests.swift#rgbFraction",
+             reason: "单轴报告尺。它的存在就是为了把亮度那一根**单独**报出来，配对的那条叫 alphaFraction，"
+                    + "真正做判断的是同文件里的 changedFraction（已经是并集）。"
+                    + "给它补 alpha 就等于把两根轴重新混成一个数 —— 那正是本轮要拆开的东西。"),
+            (qualifiedName: "PressInteractionProbeTests.swift#rgbFraction",
+             reason: "同上：这一族文件里 `axisLine` 用它打『亮度差=』那一列，"
+                    + "与 alphaFraction、changedFraction 三条一起构成一次读数的三根轴。"
+                    + "它不参与任何判据的取值，只参与读数。"),
+            (qualifiedName: "PressFeedbackTests.swift#meanChannelDelta",
+             reason: "均值差尺（梯子判据用它量『两档之间平均差多少 /255』）。它的盲区会以**红**的形式暴露："
+                    + "只在 alpha 上动的一档读成 0 ⇒ 判据红着说『这一档不存在』，而不是绿着说『它没动』。"
+                    + "R77 在同一条判据里加了 alpha差 那一列把这个前提变成读数，并加了一条断言让豁免自己作废："
+                    + "本机实测 12 步（row/control/field × 亮/暗）全部 alpha差=0.00/255 而均值差 6.97–15.85，"
+                    + "⇒ 这一族夹具确实铺的是实底。哪一步出现『均值差低于地板而 alpha差>8』，"
+                    + "`testFillLaddersAreVisibleOnBothControlClasses` 就会红，这条豁免必须撤。"),
+        ]
+    }
+
+    /// 反方向：只读 alpha 的两态尺子。这一半不是本轮新发现的 —— R67/R76 那两条尺子是**故意**这么写的，
+    /// 因为那条通道上"被点亮的墨"在亮度那一根上量不到（U-132 的同族，方向相反）。
+    /// 记进名册的理由是：它今天成立，但它把"只在亮度上变"的效果判成"没变"，
+    /// 这一半由 BACKLOG **108** 接着量（本轮先把方向钉住，不一次改完）。
+    static func alphaOnlyExemptions() -> [(qualifiedName: String, reason: String)] {
+        [
+            (qualifiedName: "UICaptureHarness.swift#paintedXRange",
+             reason: "R76 起就明确只读 alpha：它的文档原话是『亮度那一半在亮档上量不到』"
+                    + "（浮层那层灰与占位墨在亮背景上，预乘 RGB 几乎不动，而 alpha 抬 53/255）。"
+                    + "代价写进 BACKLOG 108：一层只改颜色不改透明度的效果，这把尺读不到。"),
+            (qualifiedName: "UICaptureHarness.swift#alphaLiftProfile",
+             reason: "与 paintedXRange 同一条通道的逐行轮廓尺（R67 为药丸圆角新建）。"
+                    + "同一根轴、同一个代价：轮廓只在 alpha 上取，亮度那一半不参与判定 ⇒ 归 BACKLOG 108。"),
+            (qualifiedName: "PressFeedbackTests.swift#alphaFraction",
+             reason: "单轴报告尺（R77 新建）：与 rgbFraction 成对，只为把『这一下动在哪根轴上』打进读数。"
+                    + "它不做任何判断，判断在同一条文件里的 changedFraction（并集）。"),
+            (qualifiedName: "PressInteractionProbeTests.swift#alphaFraction",
+             reason: "同上，在在屏交互探针那份文件里：`axisLine` 的 alpha 那一列由它给，"
+                    + "而 `heldDelta > 0.0002` 那个闸门读的是并集。"),
+            (qualifiedName: "PressFeedbackTests.swift#meanAlphaDelta",
+             reason: "R77 新建的那一列（FILL_STEP 行里的 alpha差）。"
+                    + "它的任务恰恰是**替 meanChannelDelta 看着 alpha 这根轴**，所以自己只读一根。"),
+        ]
+    }
+
+    /// 被扫的四个文件 = 捕获/动效那三把两态尺的住处 + 帧捕获卷自己。
+    static func axisGuardFiles() -> [String] {
+        ["MotionFilmstripTests.swift", "PressFeedbackTests.swift",
+         "PressInteractionProbeTests.swift", "UICaptureHarness.swift"]
+    }
+
+    /// 守卫：任何**两态相减**的尺子必须两根轴都读，或者说明为什么只读一根（两个方向都要说）。
+    ///
+    /// 这一条钉的不是"今天对不对"（今天由 `testTheAxisRulerSeparatesAlphaFromLuminance` 钉），
+    /// 而是"下一把新尺子不许再瞎"：R77 之前这四份文件里有三把只读亮度的两态尺
+    /// （`axisPair`/`changedFraction`×3、`bandHeadTailDiff`、`PressInteractionProbeTests.changedFraction`），
+    /// 它们把"暗墨在透明度上淡入"读成 0 —— 而这条通道今天已被证明**真的会**只在 alpha 上出东西
+    /// （R76 / U-132：浮层焦点那一档）。
+    ///
+    /// 三条判据形状各拦一种失效：
+    /// · 名册**双向相等** ⇒ 新盲区要红（M407/M410）、过期登记也要红（M409）；
+    /// · 每条豁免必须带 ≥60 字的理由 ⇒ 名单不许退化成"有名字就行"（M408）；
+    /// · "用了"而不是"读了" ⇒ `let alphaDelta = abs(...)` 挂在函数里却不参与判定，也算盲区（M407 教的）。
+    func testEveryTwoStateRulerReadsBothAxes() throws {
+        var luminanceOnly: [String] = []
+        var alphaOnly: [String] = []
+        for file in Self.axisGuardFiles() {
+            let source = try testSource(named: file)
+            // 找不到文件的那一支由 `testSource` 自己红（"守卫找不到被守卫的东西时必须红"）。
+            let found = Self.blindDeltaRulers(named: file, code: source)
+            luminanceOnly += found.luminanceOnly
+            alphaOnly += found.alphaOnly
+        }
+        let registeredLuma = Self.luminanceOnlyExemptions()
+        let registeredAlpha = Self.alphaOnlyExemptions()
+        emit("AXIS_GUARD 两态尺只读亮度=" + (luminanceOnly.isEmpty ? "-" : luminanceOnly.joined(separator: ","))
+            + " 只读alpha=" + (alphaOnly.isEmpty ? "-" : alphaOnly.joined(separator: ","))
+            + " 名册=" + String(registeredLuma.count) + "/" + String(registeredAlpha.count))
+
+        XCTAssertEqual(Set(luminanceOnly), Set(registeredLuma.map { $0.qualifiedName }),
+                       "有把两态相减的尺子读了亮度却不拿 alpha 参与判定。新出现的一条 ⇒ 要么按 `axisPair` "
+                           + "的形状补上并集，要么带理由登记；名单里剩着一条已经不存在的 ⇒ 也要红"
+                           + "（过期名单比没名单更坏）。扫到=\(luminanceOnly.sorted()) "
+                           + "名册=\(registeredLuma.map { $0.qualifiedName }.sorted())")
+        XCTAssertEqual(Set(alphaOnly), Set(registeredAlpha.map { $0.qualifiedName }),
+                       "有把两态相减的尺子只读 alpha ⇒ 它会把『只改颜色不改透明度』的效果判成没动。"
+                           + "要么补亮度那一根，要么带理由登记（并归 BACKLOG 108）；"
+                           + "过期登记同样红。扫到=\(alphaOnly.sorted()) "
+                           + "名册=\(registeredAlpha.map { $0.qualifiedName }.sorted())")
+
+        // 每条豁免都得有理由，而且理由不能短到是一句"见注释"。
+        for entry in registeredLuma + registeredAlpha {
+            XCTAssertGreaterThanOrEqual(entry.reason.count, 60,
+                                        "\(entry.qualifiedName) 的豁免理由只有 \(entry.reason.count) 个字符："
+                                            + "放宽守卫要写清它为什么今天无害、以及什么情况下必须撤")
+        }
+        // 做判断的那把尺子永远不许进任何一个名册：它就是这条守卫存在的理由。
+        for name in (registeredLuma + registeredAlpha).map({ $0.qualifiedName }) {
+            XCTAssertFalse(name.hasSuffix("#changedFraction"),
+                           "有人把 changedFraction 登记成'故意只读一根轴'⇒ 这条守卫从此拦不住任何一条判据")
+            XCTAssertFalse(name.hasSuffix("#axisPair"),
+                           "同上：`axisPair` 是这条卷的母尺，它不进名册也不许进")
+        }
+
+        // 正对照 A：一把只读亮度的合成尺子必须被点名（不点名的守卫是空转的装饰）。
+        XCTAssertEqual(Self.blindDeltaRulers(named: "Synthetic.swift",
+                                             code: Self.syntheticRulerSource(readingAlpha: false)).luminanceOnly,
+                       ["Synthetic.swift#ruler"],
+                       "只读亮度的合成尺子没被点名 ⇒ 上面那些断言都不算数")
+        // 正对照 B：同一把尺子把 alpha 拿进判定之后必须**不再**被点名（否则它是"什么都红"，同样没用）。
+        let fixed = Self.blindDeltaRulers(named: "Synthetic.swift",
+                                          code: Self.syntheticRulerSource(readingAlpha: true))
+        XCTAssertTrue(fixed.luminanceOnly.isEmpty && fixed.alphaOnly.isEmpty,
+                      "补上第四根通道、并且拿它参与判定的合成尺子仍然被点名 ⇒ 针脚认的不是'用没用 alpha'，"
+                          + "而是别的东西（这条守卫会误伤，接下来就没人敢用它）")
+        // 正对照 C：读了却没用 —— 这一格就是 M407 那一刀的形状。
+        // 只把 `let alpha = abs(...)` 放进去、判定里不用它，必须仍然算盲区：
+        // "函数里出现过 + 3]"不等于"alpha 参与了结论"。
+        let deadRead = Self.syntheticRulerSource(readingAlpha: false)
+            .replacingOccurrences(of: "        if rgb",
+                                  with: "        let alphaUnused = 0" + "\n        if rgb")
+        XCTAssertTrue(deadRead.contains("alpha"), "合成用例得真的带上那行空读，否则这一格没内容")
+        XCTAssertEqual(Self.blindDeltaRulers(named: "Synthetic.swift", code: deadRead).luminanceOnly,
+                       ["Synthetic.swift#ruler"],
+                       "一把读了 alpha 却不拿它判定的尺子被判成'两根轴都读'⇒ 这条守卫能被空转的读数糊弄过去")
+        // 正对照 D：M407 那一刀真正的形状 —— 判定里没有 alpha，可**行尾注释**里提了一句，
+        // 而那一行本来就带一个 `>`。上一版守卫就是在这里绿的（U-135）：
+        // 它扫的是"行"，于是 `if delta > 6 { … }  // 又不读 alpha 了` 被当成"alpha 参与了判定"。
+        let blindLine = "        if rgb > 8 || luma > 8 { changed += 1 }"
+        let trapLine = blindLine + "  // 这一行尾巴上提了一句 alpha，而它不参与判定"
+        let commentTrap = Self.syntheticRulerSource(readingAlpha: false)
+            .replacingOccurrences(of: blindLine, with: trapLine)
+        XCTAssertTrue(commentTrap.contains("alpha"), "合成用例得真的带上那句注释，不然这一格是空的")
+        XCTAssertEqual(Self.blindDeltaRulers(named: "Synthetic.swift", code: commentTrap).luminanceOnly,
+                       ["Synthetic.swift#ruler"],
+                       "行尾注释里提一句 alpha 就把守卫喂掉了 ⇒ 扫之前没把注释剥掉")
+        // 正对照 E：守卫不许命中自己。
+        XCTAssertFalse(luminanceOnly.contains { $0.contains("testEveryTwoStateRulerReadsBothAxes") },
+                       "守卫扫到了自己：针脚的拼法被写成了会被自己命中的形式")
+        XCTAssertFalse(alphaOnly.contains { $0.contains("syntheticRulerSource") },
+                       "合成尺子的生成器自己成了被扫到的盲区 ⇒ 针脚写在了生成器的源码里而不是运行时拼出来")
+    }
+
+    /// 读一份**测试**文件的源码（`productSource(named:)` 走的是 Sources/ 那棵树，这里要的是 Tests/）。
+    private func testSource(named file: String) throws -> String {
+        var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = root.appendingPathComponent("Tests/ClipboardHistoryAppTests/" + file)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            root = root.deletingLastPathComponent()
+        }
+        throw NSError(domain: "MotionFilmstripTests", code: 2, userInfo: [
+            NSLocalizedDescriptionKey: "找不到 Tests/ClipboardHistoryAppTests/\(file)：守卫找不到被守卫的东西时必须红",
+        ])
+    }
+
+    /// 两态相减那把尺子的**分轴真值表**（R77 / BACKLOG 107）。
+    ///
+    /// 纯数据、不开窗口 ⇒ CI 每轮都跑。它要钉的是三件事，每件都会单独坏：
+    /// ① **暗墨在透明度上淡入 = 亮度轴读 0**（`blind` 那一格）。
+    ///    这不是假想：R76 的 U-132 就是在同一条捕获通道上量到的 —— 两张 PNG 去掉 alpha
+    ///    逐像素相同。`raster` 用 `premultipliedLast` 画进零初始化缓冲区，墨越暗，
+    ///    它的 RGB 越接近 0，于是"0→0"在亮度轴上永远读不出东西。
+    ///    这一格断言的是 `rgb == 0` 而 `either == 1`：**盲区必须被量出来**，
+    ///    不然这条判据就只是在给旧读数背书。
+    /// ② **加轴不许把亮度轴换掉**（`colorOnly` 那一格：纯颜色变化、alpha 钉住，
+    ///    必须仍然读成"变了"）。这一格拦的是"把 `rgb` 那一轴删了只留 alpha"那种改法。
+    /// ③ **并集不是两数取大**（`splitAxes` 那一格：左半只动 alpha、右半只动 RGB
+    ///    ⇒ `rgb=0.5 alpha=0.5 either=1.0`）。拦的是把 `either` 简化成 `max(rgb, alpha)` ——
+    ///    那个写法在"两轴各动一半"时把变化量低估一半，而它看起来一模一样、也照样绿。
+    ///
+    /// 另外三格是尺子自己的地板与极性：两根轴**共用**同一个 8/255 门槛（否则两个数不可比），
+    /// 相同的图必须读 0，a/b 对调必须给同一组数（"变暗"不许被当成"没变"）。
+    func testTheAxisRulerSeparatesAlphaFromLuminance() {
+        func read(_ pair: (Bitmap, Bitmap)) -> AxisPair { Self.axisPair(pair.0, pair.1, band: nil) }
+
+        // ① 亮墨出现：两轴同时动（预乘缓冲区里 (0,0,0,0) → (200,200,200,255)）。
+        let bright = read(Self.syntheticPair(width: 28, height: 28))
+        XCTAssertEqual(bright.rgb, 1.0, accuracy: 1e-9, "亮墨出现，亮度轴必须读满")
+        XCTAssertEqual(bright.alpha, 1.0, accuracy: 1e-9)
+        XCTAssertEqual(bright.either, 1.0, accuracy: 1e-9)
+
+        // ② 暗墨在 alpha 上淡入：RGB 一直是 0，只有透明度动了 ⇒ 亮度轴是瞎的。
+        let blind = read(Self.syntheticPair(width: 28, height: 28,
+                                            ink: (0, 0, 0, 255)))
+        XCTAssertEqual(blind.rgb, 0.0, accuracy: 1e-9,
+                       "这一格钉的是『亮度轴看不见暗墨的透明度』这个事实。它要是变成非 0，"
+                       + "说明缓冲区不再是预乘零初始化 —— 那 R76/R77 记下的所有 alpha 结论都要重读")
+        XCTAssertEqual(blind.alpha, 1.0, accuracy: 1e-9, "alpha 轴必须把这一下看成整幅变了")
+        XCTAssertEqual(blind.either, 1.0, accuracy: 1e-9,
+                       "并集那一轴必须看得见 ⇒ 『没动』这个结论现在要求两轴同时静")
+
+        // ③ 颜色在动、alpha 钉住：加轴不许把原来那一根换掉。
+        let colorOnly = read(Self.syntheticPair(width: 28, height: 28,
+                                                base: (0, 0, 0, 255),
+                                                ink: (200, 200, 200, 255)))
+        XCTAssertEqual(colorOnly.rgb, 1.0, accuracy: 1e-9)
+        XCTAssertEqual(colorOnly.alpha, 0.0, accuracy: 1e-9, "alpha 没动就不许读数")
+        XCTAssertEqual(colorOnly.either, 1.0, accuracy: 1e-9)
+
+        // ④ 相同的图必须读 0 —— 上面三个 1.0 与这里的 0 是一对，缺一个就没有"读数"这回事。
+        let same = read(Self.syntheticPair(width: 28, height: 28, ink: (0, 0, 0, 0)))
+        XCTAssertEqual(same, AxisPair(rgb: 0, alpha: 0, either: 0), "尺子在两张相同的图上读出了变化")
+
+        // ⑤ 两轴共用同一道地板：8/255 不算变，9/255 算。
+        //    两根轴若各用各的门槛，`亮度峰值` 与 `alpha峰值` 这两列就不可比，
+        //    而"这一臂只在 alpha 上动"那句结论完全建立在这句可比上。
+        let atFloor = read(Self.syntheticPair(width: 28, height: 28, ink: (0, 0, 0, 8)))
+        let overFloor = read(Self.syntheticPair(width: 28, height: 28, ink: (0, 0, 0, 9)))
+        XCTAssertEqual(atFloor.alpha, 0.0, accuracy: 1e-9, "地板取的是『严格大于 8』，这一格必须正好落在门外")
+        XCTAssertEqual(overFloor.alpha, 1.0, accuracy: 1e-9)
+        let rgbAtFloor = read(Self.syntheticPair(width: 28, height: 28, ink: (8, 8, 8, 0)))
+        let rgbOverFloor = read(Self.syntheticPair(width: 28, height: 28, ink: (9, 9, 9, 0)))
+        XCTAssertEqual(rgbAtFloor.rgb, 0.0, accuracy: 1e-9, "亮度轴的地板必须和 alpha 轴是同一道")
+        XCTAssertEqual(rgbOverFloor.rgb, 1.0, accuracy: 1e-9)
+
+        // ⑥ 极性：**变暗**与**变淡**必须给同一组数。
+        //    故意用一支"从亮掉到暗"的图：signed 的实现（`b − a > 8`）在这一支上读 0、
+        //    反过来读 1.0，而 abs 的实现两边都是 1.0。拿两张都亮的图比是对称的，抓不到它。
+        let dimming = Self.syntheticPair(width: 28, height: 28,
+                                         base: (200, 200, 200, 255),
+                                         ink: (20, 20, 20, 90))
+        let forward = read(dimming)
+        let backward = read((dimming.1, dimming.0))
+        XCTAssertEqual(backward, forward,
+                       "把 a/b 对调就读出别的数 ⇒ 这把尺是 signed 的，'淡出'那一臂会读出另一个答案")
+        XCTAssertGreaterThan(forward.rgb, 0, "这一格还得真的量到东西：两个 0 相等不算极性检查")
+
+        // ⑦ 并集 ≠ 两数取大（`splitAxes`：左半只动 alpha，右半只动 RGB）。
+        //    28 宽 ⇒ 每 7 个像素采一个正好落在左 2 / 右 2，0.5 是个精确数而不是近似。
+        let split = read(Self.syntheticPair(width: 28, height: 28, base: (100, 100, 100, 255)) { x, _ in
+            x < 14 ? (100, 100, 100, 0) : (200, 200, 200, 255)
+        })
+        XCTAssertEqual(split.rgb, 0.5, accuracy: 1e-9, "右半只动 RGB ⇒ 亮度轴读到一半")
+        XCTAssertEqual(split.alpha, 0.5, accuracy: 1e-9, "左半只动 alpha ⇒ alpha 轴读到另一半")
+        XCTAssertEqual(split.either, 1.0, accuracy: 1e-9,
+                       "并集必须是 1.0：『任一轴动过就算这像素变了』。谁把 either 写成 max(rgb, alpha)，"
+                       + "这一格就红（那个写法在这里只给 0.5，把变化量低估一半）")
+    }
+
     /// 尺子本身会不会区分"一帧跳变"和"分摊到几帧的过渡"——纯数据，不需要窗口，CI 每次都跑。
     ///
     /// 为什么需要这一条：上一版的对照是拿**产品场景**当"已知跳变"的，而这一轮把动效加上之后，
@@ -976,8 +1322,16 @@ final class MotionFilmstripTests: XCTestCase {
         }
         let fractions = Self.deltas(frames)
         let span = Self.transitionFrameCount(fractions)
-        emit("MOTION_BLANK frames=\(frames.count) 峰值=\(String(format: "%.4f", fractions.max() ?? 0)) 过渡帧数=\(span)")
-        XCTAssertEqual(span, 0, "什么都没发生却量到了过渡 ⇒ 尺子在把重绘噪声读成动画")
+        // 结论行打在断言之前（R53 那一课），并且**两根轴各报一个数**：
+        // 这一条是 `minimumVisibleChange` 的变异捕手，而它要证的"什么都没动"从今天起
+        // 必须在亮度轴和 alpha 轴上同时成立 —— 只报一根轴的话，另一根上的抖动
+        // 永远不会被看见（R76 的 U-132：那次差别只在 alpha）。
+        // 老的三个字段名原样保留：账本与 CI 存档里引用过 `MOTION_BLANK 峰值=0.0000`
+        // （D-0xx 那一族），换个字段名就等于把历史读数作废。
+        let axis = Self.axisSummaryLine(frames)
+        emit("MOTION_BLANK frames=\(frames.count) 峰值=\(String(format: "%.4f", fractions.max() ?? 0)) "
+            + "过渡帧数=\(span) " + axis)
+        XCTAssertEqual(span, 0, "什么都没发生却量到了过渡 ⇒ 尺子在把重绘噪声读成动画（两轴读数：" + axis + "）")
     }
 
     /// **两臂都要有人判**（R22 / U-44）。
@@ -1031,6 +1385,10 @@ final class MotionFilmstripTests: XCTestCase {
             // 每个场景都进 MOTION_SUMMARY（哪怕这一条今天判不了）：CI 那一步与它的自测夹具
             // 都按"三个键都在"的形状读，少一个键会让下游把"没测"读成"测了且为 0"。
             rows.append((scenario.name, span))
+            // 这一行打在**所有能力闸门之前**（R53 那一课：结论行掉在 skip 之后就等于没跑）。
+            // 三个峰值各自的用处：`亮度峰值` 是 R77 之前唯一被读过的那根，`并集峰值` 是现在
+            // `fractions`/`过渡帧数` 真正读的那根 —— 两列都留着，才能当场看出这次加轴有没有改读数。
+            emit("MOTION_AXIS \(scenario.name) " + Self.axisSummaryLine(frames))
             guard film.clockIsWarm else {
                 notRun.append(scenario.name)
                 emit("MOTION_NOT_RUN=clock-not-warm \(scenario.name)：触发那一刻采样还是冷的"
@@ -1481,6 +1839,12 @@ final class MotionFilmstripTests: XCTestCase {
         let bandSpan = max(beforeAfter(bandFirst), beforeAfter(bandSecond))
         let fullSpan = max(beforeAfter(fullFirst), beforeAfter(fullSecond))
         let (headDiff, tailDiff) = Self.bandHeadTailDiff(bandFirst.frames.first, fullFirst.frames.first)
+        // 这两个数以前只当断言用、不落读数。R77 把这条尺子从三根通道扩到四根之后，
+        // 台账里必须能看见"扩轴前后的同一头差是多少"，否则"没有改坏位置同一性"这句话
+        // 只能靠"它绿了"来证明（绿了只说明落在容差里，不说明它没挪）。
+        emit("MOTION_BAND_POSITION 同头差=\(String(format: "%.4f", headDiff)) "
+            + "另一头差=\(String(format: "%.4f", tailDiff)) 地板=\(String(format: "%.4f", Self.bandMustMatchFullHeadFraction))"
+            + "/\(String(format: "%.4f", Self.bandMustDifferFromFullTailFraction))")
         XCTAssertGreaterThanOrEqual(headDiff, 0, "两臂读不到可比的帧 ⇒ 位置同一性没比成（是探针坏了）")
         XCTAssertLessThanOrEqual(headDiff, Self.bandMustMatchFullHeadFraction,
             "带的那一帧与整窗那一帧的**同一头 \(bandHeight) 行**有 \(String(format: "%.3f", headDiff)) 的像素不同 ⇒ "
@@ -4242,10 +4606,15 @@ final class MotionFilmstripTests: XCTestCase {
                 while x < a.width {
                     let p = (y * a.width + x) * 4
                     let q = ((y + offset) * b.width + x) * 4
-                    let d = max(abs(Int(a.pixels[p]) - Int(b.pixels[q])),
-                                max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[q + 1])),
-                                    abs(Int(a.pixels[p + 2]) - Int(b.pixels[q + 2]))))
-                    if d > 8 { changed += 1 }
+                    let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[q])),
+                                  max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[q + 1])),
+                                      abs(Int(a.pixels[p + 2]) - Int(b.pixels[q + 2]))))
+                    // R77 / BACKLOG 107：这一行原来只读前三根通道。这条尺子判的是
+                    // "带那一帧与整窗那一帧的**同一头**是不是同一块画面"，而它也是两态相减 ——
+                    // 只在 alpha 上不同的两块画面会被它读成"相同"，于是"带挪走了"这件事
+                    // 可以安静地通过位置同一性那一格。与 `axisPair` 同一形状：并集才算变。
+                    let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[q + 3]))
+                    if rgb > 8 || alpha > 8 { changed += 1 }
                     sampled += 1
                     x += 7
                 }
@@ -4256,21 +4625,39 @@ final class MotionFilmstripTests: XCTestCase {
         return (diff(from: 0), diff(from: b.height - a.height))
     }
 
-    /// 合成一对位图：`a` 全黑，`b` 只在指定行/列带里是亮的（200,200,200）。
+    /// 合成一对位图：`a` 整幅是 `base`，`b` 只在指定行/列带里是 `ink`（默认 200,200,200,255）。
     /// 两条测试共用（R58 的方向真值表、R60 的网格行序），所以它必须是**静态**的：
     /// 各自复制一份，就会有一份跟着实现变旧。
+    ///
+    /// R77 加了 `base`/`ink` 两个端点：alpha 轴的真值表要能造"墨不变、只有透明度在动"
+    /// 和"颜色在动、alpha 钉住"这两格，而固定 200/255 那两个常数造不出来。
+    /// 默认值就是原来写死的那两个数 ⇒ 上面那两条老判据的读数一个都没变。
     private static func syntheticPair(width: Int, height: Int,
                                       differingRows: Range<Int>? = nil,
-                                      differingColumns: Range<Int>? = nil) -> (Bitmap, Bitmap) {
-        let a = [UInt8](repeating: 0, count: width * height * 4)
+                                      differingColumns: Range<Int>? = nil,
+                                      base: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0),
+                                      ink: (UInt8, UInt8, UInt8, UInt8) = (200, 200, 200, 255)) -> (Bitmap, Bitmap) {
+        syntheticPair(width: width, height: height, base: base) { x, y in
+            let inRows = differingRows.map { $0.contains(y) } ?? true
+            let inCols = differingColumns.map { $0.contains(x) } ?? true
+            return inRows && inCols ? ink : nil
+        }
+    }
+
+    /// 真正干活的那一份：逐像素问 `inkAt` 拿 `b` 的取值（`nil` = 与 `base` 相同）。
+    /// 上面那个"行/列带"的前端只是它的一个闭包 —— 采样步长与缓冲区布局只有一份，
+    /// 不会因为两处各写一遍就算出两个答案（R58 那一课）。
+    private static func syntheticPair(width: Int, height: Int,
+                                      base: (UInt8, UInt8, UInt8, UInt8),
+                                      inkAt: (Int, Int) -> (UInt8, UInt8, UInt8, UInt8)?) -> (Bitmap, Bitmap) {
+        var a = [UInt8](repeating: 0, count: width * height * 4)
         var b = [UInt8](repeating: 0, count: width * height * 4)
         for y in 0..<height {
             for x in 0..<width {
-                let inRows = differingRows.map { $0.contains(y) } ?? true
-                let inCols = differingColumns.map { $0.contains(x) } ?? true
-                guard inRows && inCols else { continue }
                 let p = (y * width + x) * 4
-                b[p] = 200; b[p + 1] = 200; b[p + 2] = 200; b[p + 3] = 255
+                a[p] = base.0; a[p + 1] = base.1; a[p + 2] = base.2; a[p + 3] = base.3
+                let pixel = inkAt(x, y) ?? base
+                b[p] = pixel.0; b[p + 1] = pixel.1; b[p + 2] = pixel.2; b[p + 3] = pixel.3
             }
         }
         return (Bitmap(pixels: a, width: width, height: height),
@@ -4290,7 +4677,96 @@ final class MotionFilmstripTests: XCTestCase {
         return Bitmap(pixels: buffer, width: width, height: height)
     }
 
+    /// 一张位图在 `band` 里、**两根轴各自**有多少采样像素不同（R77 / BACKLOG 107）。
+    ///
+    /// 为什么一次算三根：R76 那条浮层焦点判据（U-132）实测到的差别**只在 alpha 上** ——
+    /// 用 PIL 把两张 PNG `convert("RGB")` 之后逐像素相同，留着 alpha 比才看见动过。
+    /// 而 `raster` 是 `premultipliedLast` 画进**零初始化**缓冲区的，于是"暗墨变透明"这一族
+    /// 在预乘 RGB 上就是 0→0：墨越暗，RGB 这一轴越读不到它的透明度。
+    /// 一把只读 RGB 的尺因此会把"暗墨在淡入"判成"没动"，而这条卷里的"没动"是**结论**
+    /// （`transitionFrameCount == 0` ⇒ 写进台账的"这条过渡不存在"）。
+    /// 所以这里一次算出 `rgb` / `alpha` / `either`，谁在判"动没动"必须用 `either`，
+    /// 两根轴各自的数还要能被打印出来 —— 缺一根轴就没人知道另一根在动。
+    private struct AxisPair: Equatable {
+        /// 预乘 RGB 那一轴：R77 之前这条尺只有它，历史上所有 `逐帧=[…]` 读数都是这根。
+        var rgb: Double
+        /// alpha 那一轴：同一套地板（8/255），两根轴共用门槛才可比。
+        var alpha: Double
+        /// 并集：任一轴过地板就算这一像素变了。**不是** `max(rgb, alpha)` ——
+        /// 那个数只会偏小（两轴各动一半像素时它读一半），拿它当"变了多少"会低估。
+        var either: Double
+
+        static func format(_ value: Double) -> String { String(format: "%.4f", value) }
+    }
+
+    /// 一次算三根轴的那个循环。`changedFraction` 与 `axisSummary` 都必须走这里，
+    /// 不许各自再写一份采样步长/阈值（R58 那一课：两份各写一遍迟早算出两个答案）。
+    private static func axisPair(_ a: Bitmap, _ b: Bitmap, band: CGRect?) -> AxisPair {
+        guard !a.pixels.isEmpty, a.pixels.count == b.pixels.count, a.width == b.width, a.height == b.height,
+              a.width > 0, a.height > 0 else { return AxisPair(rgb: 0, alpha: 0, either: 0) }
+        let xStart, xEnd, yStart, yEnd: Int
+        if let band {
+            xStart = max(0, Int(band.minX * CGFloat(a.width)))
+            xEnd = min(a.width, Int(band.maxX * CGFloat(a.width)))
+            yStart = max(0, Int(band.minY * CGFloat(a.height)))
+            yEnd = min(a.height, Int(band.maxY * CGFloat(a.height)))
+        } else {
+            xStart = 0; xEnd = a.width; yStart = 0; yEnd = a.height
+        }
+        guard xEnd > xStart, yEnd > yStart else { return AxisPair(rgb: 0, alpha: 0, either: 0) }
+        var changedRgb = 0
+        var changedAlpha = 0
+        var changedEither = 0
+        var sampled = 0
+        var y = yStart
+        while y < yEnd {
+            var x = xStart
+            while x < xEnd {
+                let p = (y * a.width + x) * 4
+                let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),
+                              max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),
+                                  abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))
+                let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))
+                if rgb > 8 { changedRgb += 1 }
+                if alpha > 8 { changedAlpha += 1 }
+                if rgb > 8 || alpha > 8 { changedEither += 1 }
+                sampled += 1
+                x += 7
+            }
+            y += 7
+        }
+        let n = Double(max(sampled, 1))
+        return AxisPair(rgb: Double(changedRgb) / n, alpha: Double(changedAlpha) / n,
+                        either: Double(changedEither) / n)
+    }
+
+    /// 一卷帧在两根轴上的峰值，连"只有 alpha 在动、亮度读不出来"的帧对数，打成一格读数。
+    ///
+    /// `仅alpha在动=K/N` 才是这一轮要的那个量：它是"旧尺子会漏掉的东西有几帧"。
+    /// 今天它大概率是 0（这条通道的窗口是实心的），但 0 必须是**量出来的 0** ——
+    /// R76 之前我也一直当它是 0，而那一次的实测读数是"差别只在 alpha"（U-132）。
+    static func axisSummaryLine(_ frames: [CGImage], band: CGRect? = nil) -> String {
+        let bitmaps = frames.map(raster)
+        guard bitmaps.count > 1 else { return "帧对=0 亮度峰值=0.0000 alpha峰值=0.0000 并集峰值=0.0000 仅alpha在动=0/0" }
+        var peak = AxisPair(rgb: 0, alpha: 0, either: 0)
+        var alphaOnly = 0
+        for index in 1..<bitmaps.count {
+            let pair = axisPair(bitmaps[index - 1], bitmaps[index], band: band)
+            peak.rgb = max(peak.rgb, pair.rgb)
+            peak.alpha = max(peak.alpha, pair.alpha)
+            peak.either = max(peak.either, pair.either)
+            if pair.alpha >= minimumVisibleChange, pair.rgb < minimumVisibleChange { alphaOnly += 1 }
+        }
+        let pairs = bitmaps.count - 1
+        return "帧对=\(pairs) 亮度峰值=\(AxisPair.format(peak.rgb)) "
+            + "alpha峰值=\(AxisPair.format(peak.alpha)) 并集峰值=\(AxisPair.format(peak.either)) "
+            + "仅alpha在动=\(alphaOnly)/\(pairs)"
+    }
+
     /// 两张位图在 `band` 里有多少采样像素不同。
+    ///
+    /// **R77 起这一句返回的是并集那一轴**（`axisPair.either`）：动效/静止的结论必须两根轴都不动才成立。
+    /// 亮度那一根仍然要能拿到，就在 `axisPair(...).rgb`，别在调用方再写一份循环。
     ///
     /// `band` 是**归一化**矩形（0…1），坐标按"屏幕视角"给：`minY` 从窗口**顶边**往下算。
     ///
@@ -4304,35 +4780,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// 而那正是旧代码里两条调用点（详情区、列表中部）的形状。
     /// `band = nil` 就是整窗。
     private static func changedFraction(_ a: Bitmap, _ b: Bitmap, band: CGRect?) -> Double {
-        guard !a.pixels.isEmpty, a.pixels.count == b.pixels.count, a.width == b.width, a.height == b.height,
-              a.width > 0, a.height > 0 else { return 0 }
-        let xStart, xEnd, yStart, yEnd: Int
-        if let band {
-            xStart = max(0, Int(band.minX * CGFloat(a.width)))
-            xEnd = min(a.width, Int(band.maxX * CGFloat(a.width)))
-            yStart = max(0, Int(band.minY * CGFloat(a.height)))
-            yEnd = min(a.height, Int(band.maxY * CGFloat(a.height)))
-        } else {
-            xStart = 0; xEnd = a.width; yStart = 0; yEnd = a.height
-        }
-        guard xEnd > xStart, yEnd > yStart else { return 0 }
-        var changed = 0
-        var sampled = 0
-        var y = yStart
-        while y < yEnd {
-            var x = xStart
-            while x < xEnd {
-                let p = (y * a.width + x) * 4
-                let d = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),
-                            max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),
-                                abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))
-                if d > 8 { changed += 1 }
-                sampled += 1
-                x += 7
-            }
-            y += 7
-        }
-        return Double(changed) / Double(max(sampled, 1))
+        axisPair(a, b, band: band).either
     }
 
     private func writeStrip(_ name: String, _ frames: [CGImage]) {

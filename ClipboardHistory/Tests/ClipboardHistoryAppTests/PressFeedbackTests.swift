@@ -60,16 +60,24 @@ final class PressFeedbackTests: XCTestCase {
     /// **绿着通过** —— 因为底色那一层还在变像素。一个把两件事混在一起的断言，
     /// 只能证明"这两幅图不一样"，证明不了"缩放本身有用"。缩放与底色各一条，
     /// 才各自打得住"把它调成恒等"的变异。
+    ///
+    /// R77 再加一根轴：`PRESS_AXIS` 那三行把每一次比较的**亮度差 / alpha差 / 并集差**都打出来。
+    /// 理由不是"多打点信息"，是这一族的夹具画的正是 `NSColor(white: 0, alpha: fill)` ——
+    /// 黑墨按透明度叠，理论上可以只在 alpha 上动；而旧尺子读那一下是 0，
+    /// 于是"减弱动态只剩底色"会被判成**空的**（判错产品，不是判错尺子）。
+    /// 今天这两根轴各读到多少，写在账本 R77 那一节，来源就是这三行。
     func testPressedAppearanceIsVisibleAt44PointsChannelByChannel() {
         let idle = renderPill(scale: 1.0, fill: 0)
 
         let scaled = renderPill(scale: PressableAppearance.scale(isPressed: true, reduceMotion: false), fill: 0)
         let scaledFraction = Self.changedFraction(idle, scaled)
+        print("PRESS_AXIS 缩放 " + Self.axisLine(idle, scaled))
         XCTAssertGreaterThan(scaledFraction, 0.005,
                              "只改缩放时读不出任何像素差（\(String(format: "%.4f", scaledFraction))）⇒ 0.97 这一档是装饰")
 
         let filled = renderPill(scale: 1.0, fill: VisualFill.pressed)
         let filledFraction = Self.changedFraction(idle, filled)
+        print("PRESS_AXIS 底色 " + Self.axisLine(idle, filled))
         XCTAssertGreaterThan(filledFraction, 0.02,
                              "只改底色时读不出变化 ⇒ 减弱动态那条退化（只剩底色）是空的")
 
@@ -77,6 +85,8 @@ final class PressFeedbackTests: XCTestCase {
                               fill: VisualFill.pressed)
         // 不是"合起来必须更大"（那是量级问题，不是设计问题），而是**两通道互不遮蔽**：
         // 在已缩放的图上再加底色要看得见，在已有底色的图上再缩放也要看得见。
+        print("PRESS_AXIS 缩放之上叠底色 " + Self.axisLine(both, scaled))
+        print("PRESS_AXIS 底色之上叠缩放 " + Self.axisLine(both, filled))
         XCTAssertGreaterThan(Self.changedFraction(both, scaled), 0.02,
                              "缩放之上再叠底色读不出来 ⇒ 两通道互相遮蔽，其中一条是白占位置")
         XCTAssertGreaterThan(Self.changedFraction(both, filled), 0,
@@ -518,12 +528,23 @@ final class PressFeedbackTests: XCTestCase {
                 for (name, level) in ladder.steps.dropFirst() {
                     let current = try renderFill(level: level, appearance: appearance, size: ladder.size)
                     let step = Self.meanChannelDelta(previous, current)
+                    // R77：`meanChannelDelta` 被登记成"允许只读三根通道"，登记的理由是"这一族夹具铺实底、
+                    // alpha 不会动"。下面这一行把那句理由变成**读数**，而再下面那条断言把它变成**会红的判据**：
+                    // 一旦有一档状态只活在透明度上（RGB 读 0 而 alpha 明显在动），豁免自己作废。
+                    let alphaStep = Self.meanAlphaDelta(previous, current)
                     // 读数里带上**两档各自的令牌值**：R15 在这里栽过一次 ——
                     // 改了令牌之后读数一模一样，而日志里看不出量的是哪两个数，
                     // 只能靠再跑一遍去猜是不是用了旧二进制。
                     print("FILL_STEP \(ladder.name)/\(tag) \(previousName)(\(String(format: "%.3f", previousLevel)))"
                         + "->\(name)(\(String(format: "%.3f", level))) "
-                        + "均值通道差=\(String(format: "%.2f", step))/255")
+                        + "均值通道差=\(String(format: "%.2f", step))/255 "
+                        + "alpha差=\(String(format: "%.2f", alphaStep))/255")
+                    XCTAssertFalse(step < Self.perceptibleStep255 && alphaStep > 8.0,
+                                   "\(ladder.name)/\(tag)：\(previousName)→\(name) 在亮度那一根上读 "
+                                       + "\(String(format: "%.2f", step))/255（低于可辨地板），"
+                                       + "而 alpha 那一根读 \(String(format: "%.2f", alphaStep))/255 ⇒ "
+                                       + "这一档只活在透明度上，而这条判据的尺子看不见它。"
+                                       + "`meanChannelDelta` 的豁免理由（夹具铺实底、alpha 不动）到此作废")
                     XCTAssertGreaterThanOrEqual(step, Self.perceptibleStep255,
                                                 "\(ladder.name)/\(tag)：从 \(previousName) 按到 \(name) 画面上只差 "
                                                 + "\(String(format: "%.2f", step))/255，低于地板 ⇒ 令牌上是两档、"
@@ -676,6 +697,26 @@ final class PressFeedbackTests: XCTestCase {
         return total / Double(width * height) / 3.0 * 255.0
     }
 
+    /// `meanChannelDelta` 的 alpha 那一根（R77）。
+    ///
+    /// 为什么要单独一条：`meanChannelDelta` 登记成"允许只读三根通道"，而那条豁免的前提是
+    /// "这一族夹具铺的是实底，alpha 不会动"。前提必须**被量**，不能写在注释里 ——
+    /// 这一列就是那条前提的读数：哪天出现 `均值通道差=0.00 alpha差=8.00`，
+    /// 说明有一档状态只活在透明度上，豁免立刻作废（判据得改）。
+    private static func meanAlphaDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {
+        let width = min(a.pixelsWide, b.pixelsWide)
+        let height = min(a.pixelsHigh, b.pixelsHigh)
+        guard width > 0, height > 0 else { return 0 }
+        var total = 0.0
+        for y in 0..<height {
+            for x in 0..<width {
+                guard let pa = a.colorAt(x: x, y: y), let pb = b.colorAt(x: x, y: y) else { continue }
+                total += abs(pa.alphaComponent - pb.alphaComponent)
+            }
+        }
+        return total / Double(width * height) * 255.0
+    }
+
     private static func meanLuma(_ rep: NSBitmapImageRep) -> Double {
         let width = rep.pixelsWide, height = rep.pixelsHigh
         guard width > 0, height > 0 else { return 0 }
@@ -713,7 +754,36 @@ final class PressFeedbackTests: XCTestCase {
         return rep
     }
 
+    /// 两态相减：RGB 或 alpha 任一通道过地板就算这一像素变了（R77 / BACKLOG 107）。
+    ///
+    /// alpha 这一路是新加的：夹具 `renderPill` 往 hasAlpha 的位图上画的是
+    /// `NSColor(white: 0, alpha: fill)` —— **黑墨按透明度叠**。黑墨在预乘表示里 RGB 恒为 0，
+    /// 所以"底色那一档"理论上可以只在 alpha 上动，而旧尺子会读 0 并让
+    /// `filledFraction > 0.02` 那条判红成"减弱动态只剩底色 = 空的"（判错产品）。
+    /// 这一格今天到底在哪根轴上，由下面那条判据打出来的 `PRESS_AXIS` 说了算，不由注释说。
+    ///
+    /// 三通道求和那道地板（0.02）原样保留：账本里 `按压缩放/底色` 那几个数是这根尺读的。
     private static func changedFraction(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {
+        let width = a.pixelsWide, height = a.pixelsHigh
+        guard width == b.pixelsWide, height == b.pixelsHigh else { return 0 }
+        var changed = 0
+        var total = 0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                total += 1
+                let pa = a.colorAt(x: x, y: y)!, pb = b.colorAt(x: x, y: y)!
+                let delta = abs(pa.redComponent - pb.redComponent)
+                    + abs(pa.greenComponent - pb.greenComponent)
+                    + abs(pa.blueComponent - pb.blueComponent)
+                let alphaDelta = abs(pa.alphaComponent - pb.alphaComponent)
+                if delta > 0.02 || alphaDelta > 0.02 { changed += 1 }
+            }
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// RGB 那一根单独的变化占比。
+    private static func rgbFraction(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {
         let width = a.pixelsWide, height = a.pixelsHigh
         guard width == b.pixelsWide, height == b.pixelsHigh else { return 0 }
         var changed = 0
@@ -729,6 +799,29 @@ final class PressFeedbackTests: XCTestCase {
             }
         }
         return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// alpha 那一根单独的变化占比。
+    private static func alphaFraction(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {
+        let width = a.pixelsWide, height = a.pixelsHigh
+        guard width == b.pixelsWide, height == b.pixelsHigh else { return 0 }
+        var changed = 0
+        var total = 0
+        for y in stride(from: 0, to: height, by: 2) {
+            for x in stride(from: 0, to: width, by: 2) {
+                total += 1
+                let pa = a.colorAt(x: x, y: y)!, pb = b.colorAt(x: x, y: y)!
+                if abs(pa.alphaComponent - pb.alphaComponent) > 0.02 { changed += 1 }
+            }
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// 三根轴一起打（R77 要求每条两态判据都打这一行）：
+    /// 只打并集分不出"这一下动在哪根轴上"，只打两根轴又没人知道判据实际读的是哪个数。
+    static func axisLine(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> String {
+        func p(_ v: Double) -> String { String(format: "%.4f", v) }
+        return "亮度差=\(p(rgbFraction(a, b))) alpha差=\(p(alphaFraction(a, b))) 并集差=\(p(changedFraction(a, b)))"
     }
 
     // MARK: - 夹具

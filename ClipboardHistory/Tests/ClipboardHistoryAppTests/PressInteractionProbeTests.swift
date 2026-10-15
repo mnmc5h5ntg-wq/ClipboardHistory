@@ -64,8 +64,12 @@ final class PressInteractionProbeTests: XCTestCase {
             let released = Self.bitmap(of: host)
             let heldDelta = Self.changedFraction(idle, held)
             let releasedDelta = Self.changedFraction(idle, released)
+            // 两轴分开打（R77）：`按住差` 是并集那一根（历史字段名，账本引用过），
+            // 后面三个数是"这一下到底动在哪根轴上"。少了后三列，一条只在 alpha 上的
+            // 按压反馈会被读成"0.0000 ⇒ 这条路量不到"，而那正是 U-132 的形状。
             print("PRESS_PROBE 第\(index + 1)颗 送达=\(delivery.count - before) 点=(\(Int(point.x)),\(Int(point.y))) "
-                + "按住差=\(String(format: "%.4f", heldDelta)) 松手后残余=\(String(format: "%.4f", releasedDelta))")
+                + "按住差=\(String(format: "%.4f", heldDelta)) 松手后残余=\(String(format: "%.4f", releasedDelta)) "
+                + "按住[" + Self.axisLine(idle, held) + "] 松手[" + Self.axisLine(idle, released) + "]")
             deliveries += delivery.count - before
             if heldDelta > best.held { best = (index, heldDelta, releasedDelta) }
         }
@@ -133,6 +137,16 @@ final class PressInteractionProbeTests: XCTestCase {
         return buffer
     }
 
+    /// 两态相减：任一通道动过地板就算这一像素变了（R77 / BACKLOG 107）。
+    ///
+    /// 为什么要把 alpha 加进来：`bitmap(of:)` 把 `cacheDisplay` 的位图 draw 进**零初始化的预乘缓冲区**，
+    /// 于是"暗墨变透明"这一族在 R/G/B 上就是 0→0 —— 与 MotionFilmstripTests 的 `raster` 同一个形状，
+    /// 而 R76 的 U-132 已经在这条通道上实物量到过（两张 PNG 去掉 alpha 逐像素相同）。
+    /// 这一族的失败形状是**假 not-run**：按住那颗按钮时若只有 alpha 在动，旧尺子读 0，
+    /// 于是走 `heldDelta > 0.0002` 那一支报"这条路量不到"，把"我没看见"写成"它没动"。
+    ///
+    /// 三条 RGB 通道的地板原样保留（历史读数 `PRESS_PROBE 按住差=…` 账本里引用过），
+    /// alpha 用的是同一道 6/255 —— 两轴共用门槛，那两个数才可比。
     @MainActor
     private static func changedFraction(_ a: [UInt8], _ b: [UInt8]) -> Double {
         guard !a.isEmpty, a.count == b.count else { return 0 }
@@ -144,9 +158,53 @@ final class PressInteractionProbeTests: XCTestCase {
             let delta = abs(Int(a[index]) - Int(b[index]))
                 + abs(Int(a[index + 1]) - Int(b[index + 1]))
                 + abs(Int(a[index + 2]) - Int(b[index + 2]))
-            if delta > 6 { changed += 1 }
+            let alphaDelta = abs(Int(a[index + 3]) - Int(b[index + 3]))
+            if delta > 6 || alphaDelta > 6 { changed += 1 }
             index += 4 * 7   // 每 7 个像素采一个，控制耗时
         }
         return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// alpha 那一通道单独的变化占比（R77）。
+    /// 只为把"这一档只在 alpha 上"这件事打进读数，不参与任何断言。
+    @MainActor
+    static func alphaFraction(_ a: [UInt8], _ b: [UInt8]) -> Double {
+        guard !a.isEmpty, a.count == b.count else { return 0 }
+        var changed = 0
+        var total = 0
+        var index = 0
+        while index + 3 < a.count {
+            total += 1
+            if abs(Int(a[index + 3]) - Int(b[index + 3])) > 6 { changed += 1 }
+            index += 4 * 7
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// RGB 那一通道单独的变化占比：地板与 `changedFraction` 里那条三通道求和是同一道。
+    /// 与上面那条一起就是 `R77` 要求每个两态判据打出来的"两根轴"。
+    @MainActor
+    static func rgbFraction(_ a: [UInt8], _ b: [UInt8]) -> Double {
+        guard !a.isEmpty, a.count == b.count else { return 0 }
+        var changed = 0
+        var total = 0
+        var index = 0
+        while index + 3 < a.count {
+            total += 1
+            let delta = abs(Int(a[index]) - Int(b[index]))
+                + abs(Int(a[index + 1]) - Int(b[index + 1]))
+                + abs(Int(a[index + 2]) - Int(b[index + 2]))
+            if delta > 6 { changed += 1 }
+            index += 4 * 7
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// 一行两轴读数：`亮度差=… alpha差=… 并集差=…`。
+    /// 三个数一起打，是因为只打并集就分不出"这一下到底在哪根轴上"（R76 那一档就是靠这个分出来的）。
+    @MainActor
+    static func axisLine(_ a: [UInt8], _ b: [UInt8]) -> String {
+        func p(_ v: Double) -> String { String(format: "%.4f", v) }
+        return "亮度差=\(p(rgbFraction(a, b))) alpha差=\(p(alphaFraction(a, b))) 并集差=\(p(changedFraction(a, b)))"
     }
 }

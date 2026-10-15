@@ -1,0 +1,83 @@
+=== 基线（未变异）：四条判据都必须绿 ===
+   testTheAxisRulerSeparatesAlphaFromLuminance                    = green
+   testEveryTwoStateRulerReadsBothAxes                            = green
+   testPressedAppearanceIsVisibleAt44PointsChannelByChannel       = green
+   testFillLaddersAreVisibleOnBothControlClasses                  = green
+
+M403 并集那一轴退化成『只看亮度』⇒ 就是 R77 之前的世界。真值表里『暗墨在 alpha 上淡入』那一格必须红
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:972: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.0") is n
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1018: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.5") is 
+   已还原（逐字节相同：True）
+
+M404 把并集写成 max(rgb, alpha)：看起来一模一样、多数场合也确实够用，但『两轴各动一半』时把变化量低估一半 ⇒ splitAxes 那一格专抓它
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1018: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.5") is 
+   已还原（逐字节相同：True）
+
+M405 alpha 的地板从 8 改成 30（比亮度那一根粗）⇒ 『两轴共用门槛』这句话作废，而读数里那两列就不再可比了。过地板那一格（9/255）必须红
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:993: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.0") is n
+   已还原（逐字节相同：True）
+
+M406 alpha 用 signed 差、不取绝对值 ⇒ 『变淡』与『变浓』读出两个数，而淡出那一臂正好是变淡。极性那一格必须红
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'red', 'testEveryTwoStateRulerReadsBothAxes': 'green', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1007: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqual failed: ("AxisPair(rgb: 1.0, al
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1017: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.0") is 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1018: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance] : XCTAssertEqualWithAccuracy failed: ("0.5") is 
+   已还原（逐字节相同：True）
+
+M407 把 `PressInteractionProbeTests.changedFraction` 改回只读三根通道（本轮修前的样子）⇒ 守卫必须点名这条未登记的盲区尺
+   落地确认（PressInteractionProbeTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:862: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["PressFeedbackTests.swift#rgb
+   已还原（逐字节相同：True）
+
+M408 把一条豁免的理由缩成『见注释』⇒ 名单还在、等式还成立，但放宽不再有代价（R75 那一课：没有理由的名单等于把守卫撤了）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:872: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertGreaterThanOrEqual failed: ("3") is less than 
+   已还原（逐字节相同：True）
+
+M409 名单里剩一条已经不存在的尺子 ⇒ 过期登记必须红。（这一刀与 M407 一起才把那条等式钉成**双向**：少一条红、多一条也得红）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:864: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["PressInteractionProbeTests.s
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:877: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertGreaterThanOrEqual failed: ("55") is less than
+   已还原（逐字节相同：True）
+
+M410 把 `bandHeadTailDiff`（本轮一起修掉的那把位置尺）改回只读三根通道⇒ 守卫必须抓到自己文件里的这一条：它不是历史遗留，是本轮新修的
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:862: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["MotionFilmstripTests.swift#b
+   已还原（逐字节相同：True）
+
+M411 元层一刀：把守卫里『alpha 有没有参与判定』放宽回『函数体里提过 alpha 就算』⇒ 正对照 C（读了不用那一格）必须红。这一刀钉的是**修法本身**有牙 —— M407 第一次跑就是 ESCAPED，靠的就是这条被放宽掉的判据
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:905: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("[]") is not equal to ("["Synth
+   已还原（逐字节相同：True）
+
+M412 第二刀的元层版：把『扫之前剥掉行尾注释』这一步撤掉⇒ 正对照 D（注释里提一句 alpha 那一格）必须红。M407 第二次 ESCAPED 就是从这儿走的：`if delta > 6 { … }  // 又不读 alpha 了` 同一行里凑齐了 alpha 与 `>`，守卫把瞎尺子判成好尺子
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testTheAxisRulerSeparatesAlphaFromLuminance': 'green', 'testEveryTwoStateRulerReadsBothAxes': 'red', 'testPressedAppearanceIsVisibleAt44PointsChannelByChannel': 'green', 'testFillLaddersAreVisibleOnBothControlClasses': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:916: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("[]") is not equal to ("["Synth
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M403   CAUGHT
+   M404   CAUGHT
+   M405   CAUGHT
+   M406   CAUGHT
+   M407   CAUGHT
+   M408   CAUGHT
+   M409   CAUGHT
+   M410   CAUGHT
+   M411   CAUGHT
+   M412   CAUGHT
+   抓到=10 逃掉=0 没跑成=0 未落地=0
+BATTERY_EXIT=0

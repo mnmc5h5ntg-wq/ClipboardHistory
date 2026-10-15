@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R77：两态相减的尺子原来只读一根轴 —— 结案 107 / 新开 108 / U-134…U-136 / D-135）
+- `axisPair` 一次算出 `亮度 / alpha / 并集`，`changedFraction`（动效卷、按压、在屏探针三处）与
+  `bandHeadTailDiff` 的语义从今天起是**并集** ⇒ "没动"这句话要求两根轴都不动。
+  理由不是假想：`raster` 是 `premultipliedLast` 画进零初始化缓冲区，**暗墨变透明在亮度轴上就是 0→0**，
+  而 R76 的 U-132 已经在这条通道上实物撞见过一次。
+- 本机对账（同一卷两轴一起打，`.scratch/motion-audit-2/r77_motion_local.log`）：四臂 + 空白全部
+  `仅alpha在动=0/N` ⇒ **加轴没翻掉任何一条结论**（`judged=4/4`、`MOTION_SUMMARY 12/13/3/3`
+  与 R75 的 `11/13/3/3` 同判，档位由时长 182/183ms 决定）；
+  而 alpha 峰值 0.2497 / 0.1848 / 0.0794 / 0.1063 与亮度同量级 ⇒ 这条通道带透明度，
+  "窗口是实心的"只在**落盘之后**成立（写出的 PNG alpha 实测全 255）。
+- 新判据两条：`testTheAxisRulerSeparatesAlphaFromLuminance`（八格真值表，含
+  "并集 ≠ 两数取大"那一格）与 `testEveryTwoStateRulerReadsBothAxes`
+  （扫四份文件，只读一根轴的两态尺必须带理由登记：只读亮度 3 条、只读 alpha 5 条，
+  `changedFraction`/`axisPair` 永远不许进名册）。
+- 电池 M403–M412 十刀全 CAUGHT，**其中 M407 前两版 ESCAPED**：守卫两次被"提到 alpha"喂饱 ——
+  一次是一行不参与判定的死读数，一次是行尾注释里那句"又不读 alpha 了"。
+  修法（判"用没用" + 扫前剥注释）各带一个正对照，并各挨一刀元层变异（M411 / M412）（U-135）。
+- 看图复核 `notice-banner-dismiss` 两卷：撤走是**滑出 + 高度塌缩**，中途文字被窗口边切成半行
+  ⇒ 判为机制的自然结果，观感那一问记人工批次 69.1。零产品改动，124 张帧逐字节不变。
+
 ### Tests（R76：焦点那一档不是没有视觉后果，是只活在 alpha 通道里 —— U-116 判完 / U-131…U-133 / D-134）
 - 新判据量"聚焦 vs 撤掉焦点"两态：框内变化像素 **1797（亮）/ 2354（暗）**、框外一圈 **0**，
   那一格平均 alpha 10.71⇒6.77、13.15⇒8.64，而**同一对在亮度轴上只有 -0.66 / +2.25**

@@ -1,0 +1,62 @@
++ cd /Users/wangziyi/Codex_Project0/ClipboardHistory
++ env -u SDKROOT swift test
++ echo FULL_EXIT=0
+FULL_EXIT=0
++ CLIPBOARD_HISTORY_UI_SHOTS=/tmp/r77_shots
++ env -u SDKROOT swift test --filter UICaptureTests
++ echo FRAMES_EXIT=0
+FRAMES_EXIT=0
++ cd /Users/wangziyi/Codex_Project0
++ sed /colorspace/d /tmp/r77_frames.log
++ python3 scripts/ci_capture_gate.py /tmp/r77_frames.filtered.log --min-passed 15 --readings /tmp/r77_shots/capture-readings.log
+CAPTURE_GATE_CHANNELS stdout=1 readings=507 行 补回=79 行（stdout 没有的读数）
+CAPTURE_GATE_CASES passed=40 skipped=4 failed=0 有名字的红=0 NOT_RUN=2
+  被 skip 的用例（skip 不是通过，它只是**不红**）：testMenuBarRowTruncationAcrossWidthsDiagnostic testProbeVibrantEligibilityDiagnostic testSettingsCaptionRowTierProfileDiagnostic testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic
+  已登记的标记：QUICKPICK_FOCUS_RING_NOT_RUN
+    QUICKPICK_FOCUS_RING_NOT_RUN=1 亮：焦点环这一档在这条通道里读不到（框外 0 个变化像素，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+    QUICKPICK_FOCUS_RING_NOT_RUN=1 暗：焦点环这一档在这条通道里读不到（框外 0 个变化像素，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
++ echo CAPTURE_GATE_EXIT=0
+CAPTURE_GATE_EXIT=0
++ python3 scripts/frame_baseline.py check /tmp/r77_shots --against working --allow-missing content-wide-1100x800-light.png --allow-missing content-wide-1100x800-dark.png
++ tail -5
+FRAME_BASELINE_AGAINST=working
+FRAME_BASELINE_COMPARED=124
+FRAME_BASELINE_CHANGED=0
+FRAME_BASELINE_MISSING=0
+FRAME_BASELINE_ADDED=0
++ echo BASELINE_CHECK_EXIT=0
+BASELINE_CHECK_EXIT=0
++ python3 scripts/frame_baseline.py compare /tmp/r77_shots
++ grep -E 'FRAME_BASELINE_|CHANGED|MISSING'
++ tail -6
+FRAME_BASELINE_AGAINST=v1.4.8
+FRAME_BASELINE_COMPARED=124
+FRAME_BASELINE_CHANGED=62
+FRAME_BASELINE_MISSING=6
+FRAME_BASELINE_ADDED=62
++ echo COMPARE_EXIT=0
+COMPARE_EXIT=0
++ PYTHONUTF8=1
++ python3 -m unittest discover -s scripts/tests
++ tail -4
+FRAME_BASELINE_CHANGED=0
+FRAME_BASELINE_MISSING=1
+FRAME_BASELINE_ADDED=0
+  missing  row-a.png  <- 夹具不再产出这一帧，必须查
++ echo SCRIPT_TESTS_EXIT=0
+SCRIPT_TESTS_EXIT=0
++ python3 scripts/motion_floor_gate.py /tmp/r77_motion_local1.log --expectations scripts/motion_floor_expectations.json
++ tail -6
+MOTION_FLOOR_FACTS judged=4/4 executed=48 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=12 notice-banner-dismiss=13 红的用例=- 汇总行报红=0
+MOTION_FLOOR_SUITE_CLEAN=0 这一卷没有红用例（汇总行也没说有）
+MOTION_FLOOR_OK=4/4 全部臂都在登记之内
+MOTION_FLOOR_REDS=0
++ echo MOTION_FLOOR_EXIT=0
+MOTION_FLOOR_EXIT=0
++ python3 scripts/probe_coverage_gate.py /tmp/r77_frames.log --expectations scripts/probe_coverage_expectations.json --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift
++ tail -4
+PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 runner可跑=0 runner不可跑=11 本次下结论=44 红=0
+  PROBE_NOT_RUN 11/11 条在屏判据这次没下结论：testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView testFrameIntervalsUnderStateChanges testAccessibilityTreeCoverage testRowGesturesWorkInsideTheRealSidebarContainer testOffScreenProgrammaticSelectionIsRevealedAndNotJumped testRowIndexDriftDoesNotMoveTheViewport testIntakeBehindATallPinnedBlockRevealsTheNewRow testDragSelectExpandsSelectionInsideTheRealList testSidebarListFocusRingAfterClick testRightClickMenusAppKitWouldShowAreChinese testMarkdownFilePreviewRendersInARealWindow
++ echo PROBE_FLOOR_EXIT=0
+PROBE_FLOOR_EXIT=0

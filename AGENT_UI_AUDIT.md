@@ -4722,3 +4722,25 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 新开 BACKLOG **107**（"只在 alpha 上"的效果对我其余按亮度写的守卫是普遍盲区）。
 - 全量 **791 / 38 skip / 0 failures / 158.7s**、`FRAME_BASELINE_COMPARED=124 CHANGED=0 MISSING=0 ADDED=0`、
   编译告警 0、脚本测试 140 OK。**产品 0 个文件** ⇒ 本机仍是 R71 装的 `c03cf278d3a4dd98…`。自评 94。
+
+
+## 第 79 轮 · R77：两态相减的尺子原来只读一根轴（结案 107 / 新开 108 / U-134…U-136 / D-135）
+
+一句话：把"动没动"这句话的判据从**一根轴**换成**两根轴**，并且把仍然只读一根的尺子全部点名。
+
+- 清点：捕获/动效那三把两态尺（`axisPair`/`changedFraction`×3、`bandHeadTailDiff`）R77 之前
+  全部只读 `max(ΔR,ΔG,ΔB)`；而 `raster` 是 `premultipliedLast` 画进零初始化缓冲区 ⇒
+  **暗墨变透明在亮度轴上就是 0→0**。R76 的 U-132 已经在这条通道上实物撞见过一次。
+- 改：`axisPair` 一次算 `rgb / alpha / either`（并集，不是取大），`changedFraction` 返回并集；
+  两把 `changedFraction`（按压、在屏探针）与 `bandHeadTailDiff` 同形状补上 alpha，各自沿用原有地板。
+- 量（本机，同一卷两轴一起打）：四臂 + 空白的 `仅alpha在动=0/N` ⇒ **今天没有一帧只在 alpha 上**，
+  加轴没翻任何结论（`judged=4/4`、`MOTION_SUMMARY 12/13/3/3` vs R75 的 `11/13/3/3`，
+  而档位由时长决定：182/183ms vs 187/183ms）；可 alpha 峰值本身有 0.25（与亮度同量级）⇒
+  这条通道带透明度，"实心"只是**落盘之后**的性质（PNG alpha 实测全 255）。
+- 钉：`testTheAxisRulerSeparatesAlphaFromLuminance` 八格真值表（含"并集 ≠ 取大"那一格），
+  `testEveryTwoStateRulerReadsBothAxes` 双向名册（只读亮度 3 条、只读 alpha 5 条，每条带理由），
+  外加两个正对照（读了不用 / 注释里提一句）—— 这两个对照各挨一刀元层变异（M411 / M412）。
+- 牙：M403–M412 十刀全 CAUGHT。**M407 前两版 ESCAPED**，两次都是守卫被"提到"喂饱（U-135）。
+- 看图：`notice-banner-dismiss` 那两卷确认撤走是**滑出 + 塌缩**、中途文字被窗口边切半行；
+  判为机制的自然结果，观感那一问记人工批次 69.1。
+- 零产品改动：124 张帧 `CHANGED=0 MISSING=0 ADDED=0`，793 例 / 40 skip / 0 failures，脚本 140 OK。
