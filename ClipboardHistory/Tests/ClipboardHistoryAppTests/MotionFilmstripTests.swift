@@ -775,7 +775,13 @@ final class MotionFilmstripTests: XCTestCase {
             let hasThreshold = text.contains(" > ") || text.contains(">= ")
             let isTwoState = takesTwoBitmaps(header: header) && hasThreshold
             // alpha 有没有进判定：只看"同一行里既有它、又跟地板比大小"的那几行（注释已经剥掉）。
-            let alphaInVerdict = body.contains { $0.contains(axisMarker) && $0.contains(comparisonMarker) }
+            // **"用了"而不是"读了"**：同一行里既有那一根轴、又跟别的东西比了大小。
+            // **大小写不敏感（R80）**：R80 新写的那把尺里那一行是 `if deltaAlpha > move`
+            // —— 轴的名字在驼峰中间，小写needle就看不见它，于是**真读了 alpha 的尺被判成盲区**。
+            // 这是 U-138（"检测器认写法不认形状"）的反方向版本：写法不该决定语义。
+            // 这一格由正对照 I 钉住（把 `alpha` 换成 `Alpha` 必须仍然算"用了"）。
+            let alphaInVerdict = body.contains { $0.lowercased().contains(axisMarker)
+                && $0.contains(comparisonMarker) }
             if isTwoState, readsThird, !alphaInVerdict { luminanceOnly.append(file + "#" + name) }
             if isTwoState, readsFourth, !readsThird { alphaOnly.append(file + "#" + name) }
             index = cursor + 1
@@ -1030,6 +1036,21 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(Self.takesTwoBitmaps(
             header: "    static func meanDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {"),
             "真的两态签名反而没被认出来 ⇒ 这一格与上面那格一起才说明数的是**参数个数**")
+        // 正对照 I（R80）：**轴的名字写在驼峰中间**也必须算"用了 alpha"。
+        // 这一格是 R80 自己被这条守卫点名的那次：新写的那把尺里参与判定的一行是
+        // `if deltaAlpha > move { move = deltaAlpha }` —— 语义上 alpha 进了结论，
+        // 字面上小写 needle 看不见它，于是守卫把**真读了两根轴的尺**判成盲区。
+        // U-138 说的是"检测器认写法不认形状"会**漏**；这是同一枚硬币的另一面：认写法也会**误伤**，
+        // 而误伤的后果比漏更糟 —— 下一个人会去改名而不是去读轴，守卫就变成拼写检查器。
+        let camel = Self.syntheticRulerSource(readingAlpha: true)
+            .replacingOccurrences(of: "let alpha = abs(", with: "let deltaAlpha = abs(")
+            .replacingOccurrences(of: "|| alpha > 8", with: "|| deltaAlpha > 8")
+        XCTAssertTrue(camel.contains("deltaAlpha >"), "合成用例没换上驼峰写法 ⇒ 这一格没内容")
+        XCTAssertFalse(camel.contains("alpha > 8"), "换写法没换干净：还留着全小写那一行，这一格就没测到东西")
+        let camelFound = Self.blindDeltaRulers(named: "Synthetic.swift", code: camel)
+        XCTAssertTrue(camelFound.luminanceOnly.isEmpty && camelFound.alphaOnly.isEmpty,
+                      "把 alpha 写成驼峰中间的一段（`deltaAlpha`）就被判成只读亮度 ⇒ 这条守卫认拼写不认语义，"
+                          + "它会把人教成改名而不是补轴。盲区=\(camelFound.luminanceOnly)")
     }
 
     /// 读一份**测试**文件的源码（`productSource(named:)` 走的是 Sources/ 那棵树，这里要的是 Tests/）。

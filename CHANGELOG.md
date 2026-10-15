@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R80：焦点那四条红是真的，而"红"说的是尺跟着像素网格变 —— 换尺 + 三条证人臂 / U-146…U-150 / D-138）
+- 读 R79 的 CI：runner 上存在性闸门**开**（`占位整条宽=87.0pt`）而两态差读 0 个像素，四条红原样在。
+  命中 BACKLOG 109 预登记的第二分支 ⇒ 按预登记的处置：查机制，**不抬地板**。
+- 焦点那条判据的像素尺换成**网格无关**的量：`搬动的墨 ≥40pt²` 且 `占那一格现有墨 ≥8%`
+  （`movedInkPointsSquared` / `inkPointsSquared`，逐像素取 alpha 与三条合成 RGB 的最大值 = 并集）。
+  旧尺 `变化像素 ≥500` 为什么不行，被合成为一条会红的判据：同一个物理变化 1× 数 2000 个、2× 数 8000 个。
+- 三条证人臂（同态重拍 = 噪声地板、撤 `placeholderString`、打进一个字）把"看不见"分成两支：
+  `行为不在这台机器上` 与 `这一格对这把尺失明`，各打 `QUICKPICK_FOCUS_AXIS_NOT_RUN` 并带读数；
+  2× 上两支都红。两支 1× 才走得到 ⇒ 处置提成纯函数 + 8 格合成真值表（`testFocusAxisDispositionIsATruthTable`）。
+- 三条更正：那颗放大镜**不存在**（臂 D 之后带内墨 0.0pt² + 帧上看图，U-146）；
+  R78 闸门注释说"④照判"而 `continue` 会跳过它（U-147，④已挪前）；
+  R77 那条轴守卫反过来**误伤**真读了 alpha 的驼峰写法 `deltaAlpha`（U-138 的反面，改成大小写不敏感 + 正对照 I）。
+- 新开 BACKLOG **112**（读数通道并发下把两行缝成一行 —— 本轮要的那条读数就是被它吃掉的）、
+  **111**（这条轴在 runner 上怎么赎回来）。人工批次 **71**（非 Retina 外接屏上焦点那一格变不变淡）。
 ### Tests（R79：R78 那道存在性闸门在 runner 上没拦住 —— 换成两根独立证人 / U-143…U-145 / D-137）
 - 读 R78 的 CI（run 38757049151）：焦点那四条红**原样还在** ⇒ R78 的"占位区 ≥20 个有墨像素"
   在 runner 上恒成立 —— 那颗**放大镜**住在搜索框左边 3–20pt，一个人就凑够 20 个像素（U-143）。

@@ -19,6 +19,8 @@ import sys
 # 第一版没写它，于是 `29d` 整条被漏掉 —— 它落在 Round 29 的区间里，
 # 而那一区间的第一个"自评 N / 100"是 Round 29 自己的，29d 的分数被静默吞掉。
 # 少一个读数不会报错，只会让均值跟着错（这正是文件顶部那段话讲的错）。
+# 松匹配只用来**审计那个正则本身**（R80）：尾轮守卫原来拿 HEAD 数标题，而 HEAD 正是它要审的那把尺 —— 我自己把 R80 的标题写成"## 第 80 轮（…）：…"（不带 `Round N ·`），于是那一轮被静默跳过，而尾轮守卫两边都用 HEAD，报的是"标题=79、曲线=79 ⇒ 没问题"。**拿被审的尺审自己，永远审不出东西。**
+LOOSE_HEAD = re.compile(r"^##+\s*(?:Round\s+\d+|第\s*\d+\s*轮)", re.MULTILINE)
 HEAD = re.compile(r"^##+\s*Round\s+(\d+)([a-z]?)(?:（[^）]*）)?\s*·", re.MULTILINE)
 # 第三种写法是 R61 起换的：结论行不再写"自评"两个字，只写 `**96 / 100**`。
 # 第一版这里只认带"自评"的两种，于是 61/62/63/64 四轮**被静默跳过**
@@ -51,6 +53,12 @@ def main():
     # （本轮就是靠这条才发现 61–64 四轮被跳过：`ROUNDS=58 last=60`，而账本里已经写到 Round 64）。
     text = io.open("AGENT_VISUAL_ITERATION.md", encoding="utf-8").read()
     heads = [m.group(1) + m.group(2) for m in HEAD.finditer(text)]
+    loose_heads = LOOSE_HEAD.findall(text)
+    if len(loose_heads) != len(heads):
+        print("CURVE_UNPARSED_HEADINGS 松匹配看到 %d 个轮次标题，HEAD 只认 %d 个 ⇒ "
+              "有轮的标题写法漂移，那一轮的分数不会进曲线（尺审不了自己，只能换一把尺对表）"
+              % (len(loose_heads), len(heads)))
+        return 1
     if not readings or heads[-1] != readings[-1][0]:
         print("CURVE_DROPS_TAIL 文件最后一个轮次标题是 %s，曲线里最后一条是 %s ⇒ 尺漏了尾轮"
               % (heads[-1], readings[-1][0] if readings else "（空）"))

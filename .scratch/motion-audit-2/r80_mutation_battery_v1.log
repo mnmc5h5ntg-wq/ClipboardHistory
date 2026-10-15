@@ -1,0 +1,99 @@
+=== 基线（未变异）：三条判据都必须绿 ===
+   testMovedInkRulerIsGridNormalizedAndReadsBothAxes              = green
+   testFocusAxisDispositionIsATruthTable                          = green
+   testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing = green
+
+M423 归一化从 ÷缩放² 改成 ÷缩放 ⇒ 这个量又开始跟着像素网格走（R38 那一课的正照）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'red', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1579: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("1568.6274509803923") is not equal
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1586: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("4000.0") is not equal to ("2000.0
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1611: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("784.3137254901961") is not equal 
+   已还原（逐字节相同：True）
+
+M424 并集里把 alpha 那一轴摘掉 ⇒ 只在透明度上动的墨读成没动（R77 那一族的形状）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'red', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1579: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("393.6947327950702") is not equal 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1611: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("196.8473663975386") is not equal 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1620: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertGreaterThan failed: ("0.0") is not greater than ("0.0") - 1×：
+   已还原（逐字节相同：True）
+
+M425 并集里把三条 RGB 轴摘掉、只留 alpha ⇒ 只改颜色的效果读成没动（BACKLOG 108 那一族）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'red', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1584: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("0.0") is not equal to ("2000.0") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1584: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("0.0") is not equal to ("2000.0") 
+   已还原（逐字节相同：True）
+
+M426 每像素噪声地板失效（什么都累加）⇒ ⑥ 那一格（每像素只差 1）抬起来
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'red', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1617: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("7.8431372549019605") is not equal
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1617: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("7.8431372549019605") is not equal
+   已还原（逐字节相同：True）
+
+M427 α=0 的夹紧摘掉 ⇒ 全透的 RGB 被算成搬动过的墨（④ 那一格的对象）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'red', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1592: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("2000.0") is not equal to ("0.0") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1592: error: -[ClipboardHistoryAppTests.UICaptureTests testMovedInkRulerIsGridNormalizedAndReadsBothAxes] : XCTAssertEqualWithAccuracy failed: ("2000.0") is not equal to ("0.0") 
+   已还原（逐字节相同：True）
+
+M428 焦点地板从 40pt² 抬到 200pt² ⇒ 本机 98.7/113.3 过不了（这条地板在承重）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1466: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqual failed: ("behaviorAbsentOnThisMachine") is not equal to ("judged") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1497: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertGreaterThan failed: ("200.0") is not greater than ("200.0") - 地板不随噪声抬高 ⇒ 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2004: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is not less than ("2") - 
+   已还原（逐字节相同：True）
+
+M429 占比地板从 0.08 抬到 0.5 ⇒ 本机 0.367/0.343 过不了（第二根轴也在承重）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1466: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqual failed: ("behaviorAbsentOnThisMachine") is not equal to ("judged") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2004: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is not less than ("2") - 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:2019: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterThanOrEqual failed: ("0.367252084959833")
+   已还原（逐字节相同：True）
+
+M430 处置函数无条件回 judged ⇒ 那两支 1× 出口从此没人钉（本轮最要害的一刀）
+   落地确认（UICaptureHarness.swift）
+   ESCAPED 红的不是预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'} 预期=['testFocusAxisDispositionIsATruthTable', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing']
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1473: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqual failed: ("judged") is not equal to ("behaviorAbsentOnThisMachine") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1477: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqual failed: ("judged") is not equal to ("channelBlindOnThisMachine") - 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1486: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertNotEqual failed: ("judged") is equal to ("judged") - 搬动量过线就判得出 ⇒ `focusMi
+   已还原（逐字节相同：True）
+
+M431 证人地板从 40pt² 抬到 100000 ⇒ 1× 上会把『这台机器不调淡』说成『通道失明』（逃命的出口）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1473: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqual failed: ("channelBlindOnThisMachine") is not equal to ("behaviorAbs
+   已还原（逐字节相同：True）
+
+M432 噪声系数从 10 改成 0 ⇒ 地板不再随这台机器的抖动抬高（R38 那句『地板从表推导』里的系数）
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1493: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertEqualWithAccuracy failed: ("40.0") is not equal to ("0.0") +/- ("0.001") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1497: error: -[ClipboardHistoryAppTests.UICaptureTests testFocusAxisDispositionIsATruthTable] : XCTAssertGreaterThan failed: ("40.0") is not greater than ("40.0") - 地板不随噪声抬高 ⇒ 一台
+   已还原（逐字节相同：True）
+
+M433 证人臂 D 撤掉占位符那一步没生效（拍了同一张帧）⇒ 臂作废必须有红，不能当成'读得出东西'
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那几条：{'testMovedInkRulerIsGridNormalizedAndReadsBothAxes': 'green', 'testFocusAxisDispositionIsATruthTable': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1986: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertTrue failed - 亮档：把 `placeholderString` 撤成空，那一格的墨
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1986: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertTrue failed - 暗档：把 `placeholderString` 撤成空，那一格的墨
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M423   CAUGHT
+   M424   CAUGHT
+   M425   CAUGHT
+   M426   CAUGHT
+   M427   CAUGHT
+   M428   CAUGHT
+   M429   CAUGHT
+   M430   ESCAPED
+   M431   CAUGHT
+   M432   CAUGHT
+   M433   CAUGHT
+   抓到=10 逃掉=1 没跑成=0 未落地=0

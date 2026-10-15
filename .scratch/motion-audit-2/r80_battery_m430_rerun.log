@@ -1,0 +1,4 @@
+M430 第二次运行（期望改成 [DISP] 之后，subset 单刀）
+CAUGHT 只红在预期那几条：INK=green DISP=red FOCUS=green
+汇总：抓到=1 逃掉=0 没跑成=0 未落地=0
+（第一次运行的 10/1 见 r80_mutation_battery_v1.log；U-149 记的就是这一刀的期望错）

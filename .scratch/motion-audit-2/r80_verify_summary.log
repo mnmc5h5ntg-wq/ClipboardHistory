@@ -1,0 +1,23 @@
+FULL_EXIT=0
+	 Executed 795 tests, with 38 tests skipped and 0 failures (0 unexpected) in 162.305 (162.348) seconds
+   1 testTransitionsAreActuallyRunning
+   1 testTheRulerSeesNothingWhenNothingChanges
+   1 testTheRulerSeesAStateDrivenSwiftUIUpdate
+   1 testTheRulerAttributesTheMotionToOurAnimation
+   1 testTheFadeClockWitnessMovesAtAll
+   1 testSystemSymbolEffectsAreOutOfThisRulersReach
+   1 testSlidingRoleSettlesWithinItsBudget
+   1 testSkeletonSweepActuallySweeps
+   1 testSidebarListFocusRingAfterClick
+   1 testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic
+   1 testSettingsCaptionRowTierProfileDiagnostic
+   1 testRowIndexDriftDoesNotMoveTheViewport
+FRAMES_EXIT=0
+CAPTURE_GATE_CHANNELS stdout=1 readings=513 行 补回=202 行（stdout 没有的读数）
+CAPTURE_GATE_CASES passed=42 skipped=4 failed=0 有名字的红=0 NOT_RUN=2
+  被 skip 的用例（skip 不是通过，它只是**不红**）：testMenuBarRowTruncationAcrossWidthsDiagnostic testProbeVibrantEligibilityDiagnostic testSettingsCaptionRowTierProfileDiagnostic testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic
+  已登记的标记：QUICKPICK_FOCUS_RING_NOT_RUN
+CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+CAPTURE_GATE_EXIT=0
+BASELINE_EXIT=0
+SCRIPT_EXIT=0

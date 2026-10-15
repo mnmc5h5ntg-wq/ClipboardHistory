@@ -1021,8 +1021,11 @@ final class UICaptureTests: XCTestCase {
     /// 一块矩形里**有墨像素的包围盒**（x 方向，按 alpha 过地板算）。宽度 −1 = 一格墨都没有。
     ///
     /// 为什么 R79 要把存在性探针从"计数"换成"宽度"：R78 那道闸门在 runner 上没拦住
-    /// （run 38757049151 仍然是那四条红），说明占位区里 **有** ≥20 个有墨像素 ——
-    /// 因为那颗放大镜符号就住在带左边 10–24pt，它由 AppKit 画，而占位字那串可能根本不画。
+    /// （run 38757049151 仍然是那四条红），说明占位区里 **有** ≥20 个过地板的像素 ——
+    /// **R80 更正这条的机制**（臂 D 实测：`placeholderString` 撤成空之后那一格墨面积 0.0pt²）：
+    /// 那颗"放大镜"**不存在** —— 产品这颗框是 `isBordered=false`、`drawsBackground=false`
+    /// 的纯 `NSTextField`，那一格里的墨**全部**是那串占位字。真正骗过计数的是**那串字的开头几个字**：
+    /// 画 2 个字与画 8 个字在"有没有 ≥20 个像素"上是同一个答案，而**宽度**分得开（前缀 ≈17pt、整串 86.5pt）。
     /// 计数分不开"只有图标"与"图标 + 一串字"，**宽度可以**：
     /// 图标自己 ≈14pt，本机实测占位字连图标是 x 12.0–98.5pt（86.5pt）。
     /// 两个数之间差六倍，所以地板取 40pt 不是刀尖上的数（见调用点注释）。
@@ -1041,6 +1044,93 @@ final class UICaptureTests: XCTestCase {
             }
         }
         return (lo == Int.max ? -1 : lo, hi)
+    }
+
+    /// 一块矩形里**搬动过的墨**有多少 pt²（R80 / BACKLOG 109）。
+    ///
+    /// 逐像素取「alpha 之差」与「三条 RGB 各自合成到中性灰之后之差」的**最大值**（并集，
+    /// 与 R77 的 `axisPair` 同一条语义），只把过 `noiseFloor` 的像素累加，
+    /// 最后 ÷255 得"多少个全不透明像素被动过"、再 ÷ `scale²` 换成 **pt²**。
+    ///
+    /// 为什么现有的 `changedPixelCount` 不够（R79 的 CI 读出来的）：那把尺数的是
+    /// **"过 8/255 的像素个数"**，它对**像素网格**敏感 —— 本机 2× 那一串占位字给 1797 个，
+    /// runner 1× 给 **0 个**（同一条 1px 宽的笔画在 1× 上只剩几个像素，每个都不过线）。
+    /// 于是"这台机器的网格太粗"与"这一格今天什么都没动"在同一根尺上长得一样 ——
+    /// 正是 R38 那一课（两台机器的读数不能当另一台机器的地板）在**尺的形状**上的版本。
+    /// 这把尺累加的是"动了多少"，同一条字在 1× 与 2× 上给出**同一个 pt²**：
+    /// 采样密一点不多不少，墨的物理面积没变。
+    ///
+    /// `noiseFloor` 是这把尺自己的每像素地板（/255）。它不许靠猜：调用点用
+    /// **同一态重拍一张**（臂 R）量出这台机器上的噪声，`max(地板, 10×噪声)` 才是判据地板。
+    static func movedInkPointsSquared(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                                      rect: CGRect, scale: Int,
+                                      noiseFloor: Double = 2, background: Double = 128) -> Double {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4,
+              a.hasAlpha, b.hasAlpha, scale >= 1 else { return -1 }
+        let x0 = max(0, Int(rect.minX.rounded()))
+        let x1 = min(min(a.pixelsWide, b.pixelsWide), Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded()))
+        let y1 = min(min(a.pixelsHigh, b.pixelsHigh), Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0 else { return -1 }
+        var sum = 0.0
+        for y in y0..<y1 {
+            var p = y * a.bytesPerRow + x0 * a.samplesPerPixel
+            var q = y * b.bytesPerRow + x0 * b.samplesPerPixel
+            for _ in x0..<x1 {
+                let alphaA = Double(pa[p + 3]), alphaB = Double(pb[q + 3])
+                // **α=0 就当没画**：预乘缓冲里这种像素的 RGB 必须是 0，可通道不一定每次都讲规矩
+                // （R18 那一族：捕获通道的性质不会跟你商量）。不夹紧的话，一块"全透但 RGB 不同"
+                // 的像素会被算成搬动过的墨 ⇒ 假视觉后果；④ 那一格钉的就是这一行。
+                let inkA0 = alphaA == 0 ? 0.0 : Double(pa[p])
+                let inkA1 = alphaA == 0 ? 0.0 : Double(pa[p + 1])
+                let inkA2 = alphaA == 0 ? 0.0 : Double(pa[p + 2])
+                let inkB0 = alphaB == 0 ? 0.0 : Double(pb[q])
+                let inkB1 = alphaB == 0 ? 0.0 : Double(pb[q + 1])
+                let inkB2 = alphaB == 0 ? 0.0 : Double(pb[q + 2])
+                let weightA = background * (1.0 - alphaA / 255.0)
+                let weightB = background * (1.0 - alphaB / 255.0)
+                let deltaAlpha = abs(alphaA - alphaB)
+                let deltaRed = abs(inkA0 + weightA - (inkB0 + weightB))
+                let deltaGreen = abs(inkA1 + weightA - (inkB1 + weightB))
+                let deltaBlue = abs(inkA2 + weightA - (inkB2 + weightB))
+                // 并集：谁动得多用谁。**写成逐条比大小而不是 `max(max(...))`** 有两个理由：
+                // 一是这条轴真的进判定（R77 的守卫认写法不认形状，一条 `let alphaDelta` 摆在那儿
+                // 却不参与比较的尺，它现在会判成"只读亮度"—— 那一族的账本号是 M407）；
+                // 二是读这段的人能一眼看出四根轴都参加了。
+                var move = deltaRed
+                if deltaGreen > move { move = deltaGreen }
+                if deltaBlue > move { move = deltaBlue }
+                if deltaAlpha > move { move = deltaAlpha }
+                if move > noiseFloor { sum += move }
+                p += a.samplesPerPixel
+                q += b.samplesPerPixel
+            }
+        }
+        return sum / 255.0 / Double(scale * scale)
+    }
+
+    /// 一块矩形里**画着的墨**有多少 pt²（R80；单帧尺，不读第二张 ⇒ 不进两态尺的名册）。
+    ///
+    /// 它是 `meanAlpha × 面积` 的另一副面孔，但两件事不一样：均值跟着**矩形大小**变
+    /// （同一串字放在 800×32 与 200×32 的框里给出两个数），而 pt² 是那一格里墨的物理面积，
+    /// 与框怎么选无关。焦点那一条判据要的正是后者 —— 它要说的是"这串字调淡了几成"，
+    /// 分母必须是这一格自己的墨，而不是一条可以被换一块矩形就重新归一的均值。
+    static func inkPointsSquared(_ rep: NSBitmapImageRep, rect: CGRect, scale: Int) -> Double {
+        guard let base = rep.bitmapData, rep.samplesPerPixel >= 4, rep.hasAlpha, scale >= 1 else { return -1 }
+        let spp = rep.samplesPerPixel, bytesPerRow = rep.bytesPerRow
+        let x0 = max(0, Int(rect.minX.rounded())), x1 = min(rep.pixelsWide, Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded())), y1 = min(rep.pixelsHigh, Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0 else { return -1 }
+        var sum = 0.0
+        for y in y0..<y1 {
+            var p = y * bytesPerRow + x0 * spp
+            for _ in x0..<x1 {
+                sum += Double(base[p + 3])
+                p += spp
+            }
+        }
+        return sum / 255.0 / Double(scale * scale)
     }
 
     /// 比两"条"水平带的 alpha，返回"每列各自带内的最大 alpha 之差 > `floor`"的 x 范围。
@@ -1323,6 +1413,234 @@ final class UICaptureTests: XCTestCase {
                           + "上面几条源码守卫一起退化成噪声计数器")
     }
 
+    /// 焦点那条轴的**处置**（R80）：把"这台机器判不了"这件事从一个 `if` 里提成一个**可测的函数**。
+    ///
+    /// 为什么要提成函数：这一整条判据只有 2× 那一台机器会走"正常"那一支，
+    /// 1× 上的两支在本机**永远不会被执行** —— 一个本机跑不到的分支就是没有红钉着的分支，
+    /// 而它恰恰是"能不能把一条轴说成没跑"的那道门（账本里"机器前提把该红的说成没跑"那一族）。
+    /// 提出来之后它可以被合成数字直接打：三种处置各一格，改错一个 `>=` 就会红。
+    enum FocusAxisDisposition: Equatable {
+        /// 焦点这一档看得见在让位 ⇒ 照正常那几条判。
+        case judged
+        /// 同一把尺在同一格读得出别的成因在搬动，而聚焦不动 ⇒ 这台机器的 AppKit 不调淡占位符。
+        case behaviorAbsentOnThisMachine
+        /// 连"撤掉整串占位字"都读不出搬动 ⇒ 这一格对这把尺整体失明，判不判都是空的。
+        case channelBlindOnThisMachine
+    }
+
+    /// 判据地板 = `max(常数地板, 噪声倍数 × 这台机器上同态重拍的噪声)`（R80，R38 的形状）。
+    /// 单独提成函数是为了它能被**合成数字**打：本机噪声实测 0.0pt² ⇒ 那一条乘在这里永远乘出 0，
+    /// 没有这一格，`focusNoiseMargin` 就是一个没有红的常数（账本里"地板从表推导"那一族的下半场：
+    /// 推导出来了，但没人钉着推导的那一步）。
+    static func focusFloorPointsSquared(noisePt2: Double) -> Double {
+        max(focusMinMovedPointsSquared, focusNoiseMargin * noisePt2)
+    }
+
+    /// 处置 = 三个读数之间的关系，**不看它是哪台机器**（scale 由调用点单独决定放行还是红）。
+    /// 两条地板分开给：`floorPt2` 是判据地板（含噪声余量），`competenceFloorPt2` 是证人地板 ——
+    /// 它们不许合成一个数（R77 那一课：同一个词在两个判据里含义不同就别统一）。
+    static func focusDisposition(focusMovedPt2: Double, floorPt2: Double,
+                                 dimFraction: Double, minDimFraction: Double,
+                                 competencePt2: Double, competenceFloorPt2: Double) -> FocusAxisDisposition {
+        if focusMovedPt2 >= floorPt2 && dimFraction >= minDimFraction { return .judged }
+        return competencePt2 >= competenceFloorPt2
+            ? .behaviorAbsentOnThisMachine : .channelBlindOnThisMachine
+    }
+
+    /// R80 · 那把尺的**处置**三支各钉一格。
+    ///
+    /// 这三格是本轮唯一能给 1× 那两支作证的東西：本机永远走"judged"，
+    /// 所以那两支在这台机器上**没有任何一条红**会跟着它们坏 —— 不单独钉就等于没写。
+    func testFocusAxisDispositionIsATruthTable() throws {
+        // 这几格**引用常量本身**，不引用我手抄的数 —— 否则抬高某道地板会只红在判据上，
+        // 而"这条轴能不能被说成没跑"那扇门（在 1× 上）永远没有红钉着（R78 的 M415 同一课）。
+        let floor = Self.focusMinMovedPointsSquared
+        let competenceFloor = Self.competenceMinMovedPointsSquared
+        let minFraction = Self.focusMinDimFraction
+        func disposition(focus: Double, fraction: Double, competence: Double) -> FocusAxisDisposition {
+            Self.focusDisposition(focusMovedPt2: focus, floorPt2: floor, dimFraction: fraction,
+                                  minDimFraction: minFraction, competencePt2: competence,
+                                  competenceFloorPt2: competenceFloor)
+        }
+        // 格①：本机那一遍的真实读数（亮档 98.7pt² / 占比 0.367 / 证人臂 268.7）⇒ judged
+        XCTAssertEqual(disposition(focus: 98.7, fraction: 0.367, competence: 268.7), .judged,
+                       "本机实测那一组数被判成'判不了' ⇒ 这条轴的正常那一支从此没人走")
+        // 格②：runner 预计那一组（搬动 1.3、占比 0.014）而证人臂读得出东西 ⇒ 尺不瞎
+        // 这里的 268.7 是**本机实测的证人臂读数**（`QUICKPICK_FOCUS_INK` 亮档那一列），
+        // 不是随手写的数：这一格钉的正是"证人地板**现在这个大小**能不能让实测的证人过关"，
+        // 所以它必须引用测量、不能引用常数 —— 写成 `competenceFloor + 49` 的话，
+        // 有人把地板抬到十万也照样绿（M431 第一次就是这么逃的，本轮自己抓到）。
+        XCTAssertEqual(disposition(focus: 1.3, fraction: 0.014, competence: 268.7),
+                       .behaviorAbsentOnThisMachine,
+                       "证人臂明明读得出别的成因在搬动，却把这一档说成'通道失明' ⇒ 这条缺席是在替产品开脱")
+        // 格③：搬动与证人**都**读不出 ⇒ 只有这一支才允许说"这一格对这把尺看不见"
+        XCTAssertEqual(disposition(focus: 1.3, fraction: 0.014, competence: competenceFloor - 0.1),
+                       .channelBlindOnThisMachine,
+                       "两条证人臂都过不了地板却仍被判成'这台机器不调淡' ⇒ 那是拿'行为没有'冒充'通道看不见'，"
+                           + "反过来说就是：把一条本该红的轴说成没跑")
+        // 格④：边界 —— 正好等于两道地板的不许算不过（`>=` 被写成 `>` 这一格就红）
+        XCTAssertEqual(disposition(focus: floor, fraction: minFraction, competence: competenceFloor),
+                       .judged,
+                       "正好等于地板的必须算过 ⇒ 边界那一档被写成 `>` 之后，读数恰好在地板上的机器会说'看不见'")
+        // 格⑤：占比单独承重 —— 搬动量够、占比不够 ⇒ 不许 judged（那是一条轴没在干活）
+        XCTAssertNotEqual(disposition(focus: floor + 1, fraction: minFraction - 0.01,
+                                      competence: competenceFloor), .judged,
+                          "搬动量过线就判得出 ⇒ `focusMinDimFraction` 那一道没人钉，"
+                              + "整格墨变淡到一半也能被读成'焦点在让位'")
+        // 地板推导那一半：本机噪声是 0 ⇒ 乘法在这里永远乘出 0，必须用合成数字钉住它
+        XCTAssertEqual(Self.focusFloorPointsSquared(noisePt2: 0), floor, accuracy: 0.001,
+                       "噪声为 0 时地板应该回到常数地板")
+        XCTAssertEqual(Self.focusFloorPointsSquared(noisePt2: floor), floor * Self.focusNoiseMargin,
+                       accuracy: 0.001,
+                       "噪声等于地板时判据地板必须抬高 `focusNoiseMargin` 倍 —— 这一条不许靠注释，"
+                           + "它钉的是『地板从这一台机器的噪声推导』那句话里的那个系数")
+        XCTAssertGreaterThan(Self.focusFloorPointsSquared(noisePt2: 5),
+                             Self.focusFloorPointsSquared(noisePt2: 1),
+                             "地板不随噪声抬高 ⇒ 一台抖动大的机器会把噪声当成'焦点搬动了'")
+        emit("FOCUS_DISPOSITION_TRUTH_TABLE judged/behaviorAbsent/channelBlind/边界/占比=5 格 "
+            + "+ 地板随噪声=3 格 ⇒ 地板=\(floor)pt² 证人=\(competenceFloor)pt² 占比=\(minFraction)")
+    }
+
+    ///
+    /// 为什么必须**合成夹具**而不是拿帧来判：本轮要钉的性质是"同一个物理变化在 1× 与 2×
+    /// 上给出同一个数"，而这条只能靠**构造**出来 —— 我手上没有第二台机器，
+    /// runner 的那一遍读数要等 CI（R70 那一课的对称：能被自己造出来的性质不等 CI）。
+    /// 夹具是**直接写字节**的（`flatRep` 那一族的原因同样成立：`setColor(_:atX:y:)`
+    /// 在整数格式位图上不落地、而且不报错，而尺子的夹具读到 0 最容易被读成"没差别"）。
+    ///
+    /// 夹具的形状：一张 **100×20pt** 的图，两帧各自**整张一块均匀的墨**（⑤ 那格单独把
+    /// 第二帧的右半改成另一个 alpha）。期望值全是解析数：
+    ///   面积 = 100×20 = 2000pt²；每像素动 Δ ⇒ 搬动 = 2000×Δ÷255。
+    ///   ② Δalpha=100 ⇒ **784.31**；③ 黑翻蓝（Δ蓝=255，alpha 不变）⇒ **2000.00**；
+    ///   ⑤ 右半 1000pt² 动 100 ⇒ 左读 **0**、右读 **392.16**；
+    ///   ⑥ Δ=1 ⇒ **0**（地板下）；⑦ Δ=3 ⇒ **23.53**（地板上）；
+    ///   ⑨ 单帧 alpha=200 整张 ⇒ **1568.63**；⑧ 旧尺数像素 ⇒ **2000×缩放²**。
+    ///
+    /// 九个格子各拦一种错：
+    ///   ① `same` —— 自己减自己 = 0（拦"尺恒开"）。
+    ///   ② `alphaDim` —— 只在 alpha 上动的一整块墨：**两档缩放必须给出同一个 pt²**。
+    ///      这一格是整轮的性质所在（R38：地板不能跟着像素网格变）。
+    ///   ③ `colorOnly` —— 全不透明、只在蓝通道上动 ⇒ 必须读得出（R77 并集语义的另一半；
+    ///      一把只读 alpha 的尺在这里给 0，那一族的后果在 BACKLOG 108）。
+    ///   ④ `invisible` —— α 恒 0 而 RGB 不同（预乘格式里的非法态，故意造出来）⇒ 必须读成 0，
+    ///      这条钉的是尺子里那句"α=0 就当没画"的夹紧：通道哪天换了非预乘格式，
+    ///      不夹紧就会把"根本没画"的像素算成搬动过的墨（R77 那族假阳性的镜像）。
+    ///   ⑤ `position` —— 变化只在右半 ⇒ 量左半那块矩形必须读 0（位置同一性，不是"有没有变化"）。
+    ///   ⑥⑦ `underFloor` / `overFloor` —— 每像素差 1 与差 3：**成对**给出，
+    ///      这样 `noiseFloor` 不是一句注释而是一道有两边的门（只给一边就能被抵消）。
+    ///   ⑧ **本轮换尺的理由本身**：同一件物理变化在旧那把尺上按 `缩放²` 变
+    ///      （2000 个像素 vs 8000 个）。那道 `≥500 个像素` 的地板在两台机器上量的不是同一件事
+    ///      ⇒ R76 那句"本机 1797 / runner 0"里最多 3/4 是网格，剩下那 1/4 才是交给 CI 去分的问题。
+    ///   ⑨ `inkPointsSquared` —— 单帧墨面积在两种网格下同一个 pt²（占比那条判据的分母）。
+    func testMovedInkRulerIsGridNormalizedAndReadsBothAxes() throws {
+        // 一帧一块均匀的墨：`from*` 是第一帧、`to*` 是第二帧（**不是**同一帧的左右两半 ——
+        // 第一版我把参数写成 left/right，然后把整张一涂的夹具当成"左半有墨"来算期望值，
+        // ②③⑦⑧⑨ 五格集体差了两倍；这一格留在这里当反面教材，因为它是"参数名替事实说话"）。
+        func makeRep(scale: Int, alpha: Int, blue: Int) -> NSBitmapImageRep {
+            let w = 100 * scale, h = 20 * scale
+            let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                                       bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                       isPlanar: false, colorSpaceName: .deviceRGB,
+                                       bytesPerRow: 4 * w, bitsPerPixel: 32)!
+            guard let data = rep.bitmapData else {
+                XCTFail("造不出夹具位图 ⇒ 这把尺的真值表没有对象")
+                return rep
+            }
+            for y in 0..<h {
+                for x in 0..<w {
+                    let o = y * rep.bytesPerRow + x * 4
+                    // 整块都写成同样的字节：**不给抗锯齿**，这几格要的是"整块墨"的形状。
+                    data[o] = 0
+                    data[o + 1] = 0
+                    data[o + 2] = UInt8(blue)
+                    data[o + 3] = UInt8(alpha)
+                }
+            }
+            return rep
+        }
+        func flatPair(scale: Int, fromAlpha: Int, toAlpha: Int,
+                      toBlue: Int = 0) -> (NSBitmapImageRep, NSBitmapImageRep) {
+            (makeRep(scale: scale, alpha: fromAlpha, blue: 0),
+             makeRep(scale: scale, alpha: toAlpha, blue: toBlue))
+        }
+        var readings: [String] = []
+        for scale in [1, 2] {
+            let w = 100 * scale, h = 20 * scale
+            let wholeRect = CGRect(x: 0, y: 0, width: w, height: h)
+            func moved(_ pair: (NSBitmapImageRep, NSBitmapImageRep), _ rect: CGRect) -> Double {
+                Self.movedInkPointsSquared(pair.0, pair.1, rect: rect, scale: scale)
+            }
+            // ①
+            XCTAssertEqual(moved(flatPair(scale: scale, fromAlpha: 200, toAlpha: 200), wholeRect),
+                           0, accuracy: 0.001, "\(scale)×：自己减自己必须读 0")
+            // ②
+            let dim = flatPair(scale: scale, fromAlpha: 200, toAlpha: 100)
+            let movedDim = moved(dim, wholeRect)
+            XCTAssertEqual(movedDim, 784.31, accuracy: 1.0,
+                "\(scale)×：2000pt² 的墨从 alpha 200 掉到 100，搬动量必须 ≈784.31pt² "
+                    + "（实测 \(String(format: "%.2f", movedDim))）⇒ 这个数一旦跟着缩放走，"
+                    + "判据地板就又是『一台机器的读数当另一台的地板』（R38）")
+            // ③ 只在蓝通道上动、alpha 拉满：一把只读 alpha 的尺在这里给 0
+            let color = flatPair(scale: scale, fromAlpha: 255, toAlpha: 255, toBlue: 255)
+            let movedColor = moved(color, wholeRect)
+            XCTAssertEqual(movedColor, 2000.0, accuracy: 1.0,
+                "\(scale)×：全不透明的黑翻成蓝，搬动量必须 ≈2000pt²（实测 \(String(format: "%.2f", movedColor))）"
+                    + "⇒ 读到 0 就是这把尺**只认 alpha**，那一族的后果写在 BACKLOG 108")
+            // ④ alpha 恒 0 而 RGB 不同 ⇒ 合成到底上是同一块 ⇒ 必须 0
+            let ghost = flatPair(scale: scale, fromAlpha: 0, toAlpha: 0, toBlue: 255)
+            let movedGhost = moved(ghost, wholeRect)
+            XCTAssertEqual(movedGhost, 0, accuracy: 0.001,
+                "\(scale)×：两帧都是全透的（alpha=0），RGB 再怎么不同也**没画** ⇒ 必须读 0，"
+                    + "否则这把尺会把『看不见』的东西算成视觉后果")
+            // ⑤ 变化只在右半 ⇒ 量左半那块矩形必须读 0（位置同一性）
+            let right = flatPair(scale: scale, fromAlpha: 200, toAlpha: 200)
+            if let data = right.1.bitmapData {
+                for y in 0..<h {
+                    for x in (50 * scale)..<w {
+                        data[y * (4 * w) + x * 4 + 3] = 100
+                    }
+                }
+            }
+            let leftHalf = CGRect(x: 0, y: 0, width: 50 * scale, height: h)
+            let rightHalf = CGRect(x: 50 * scale, y: 0, width: 50 * scale, height: h)
+            let movedLeft = moved(right, leftHalf)
+            let movedRight = moved(right, rightHalf)
+            XCTAssertEqual(movedLeft, 0, accuracy: 0.001,
+                "\(scale)×：变化明明在右半，量左半却读出 \(String(format: "%.2f", movedLeft))pt² ⇒ "
+                    + "矩形没起作用，这把尺会把『动在别处』当成『动在这一格』")
+            XCTAssertEqual(movedRight, 392.16, accuracy: 1.0,
+                "\(scale)×：右半那 1000pt² 的墨掉一半，应该 ≈392.16pt²（实测 \(String(format: "%.2f", movedRight))）")
+            // ⑥⑦ 噪声地板两边各一格：每像素差 1（<2，必须不算）与差 3（>2，必须算）
+            let movedUnder = moved(flatPair(scale: scale, fromAlpha: 200, toAlpha: 199), wholeRect)
+            let overPair = flatPair(scale: scale, fromAlpha: 200, toAlpha: 197)
+            let movedOver = moved(overPair, wholeRect)
+            XCTAssertEqual(movedUnder, 0, accuracy: 0.001,
+                "\(scale)×：每像素只差 1/255 必须被 `noiseFloor` 挡掉（实测 \(movedUnder)）⇒ "
+                    + "地板没有下边这一格，它就等于不存在")
+            XCTAssertGreaterThan(movedOver, 0,
+                "\(scale)×：每像素差 3/255 必须过 `noiseFloor` —— 地板只有一边就是一道能被抵消的门")
+            XCTAssertEqual(movedOver, 23.53, accuracy: 0.5,
+                "\(scale)×：2000pt² 每像素动 3/255 ⇒ ≈23.53pt²（实测 \(String(format: "%.2f", movedOver))）")
+            // ⑨ 单帧墨面积（占比那条判据的分母）
+            let ink = Self.inkPointsSquared(dim.0, rect: wholeRect, scale: scale)
+            XCTAssertEqual(ink, 1568.63, accuracy: 1.0,
+                "\(scale)×：整张 2000pt²、alpha=200 的墨，面积必须 ≈1568.63pt² "
+                    + "（实测 \(String(format: "%.2f", ink))）⇒ 它是占比那条判据的分母，"
+                    + "分母跟着网格走，整条判据就跟着网格走")
+            // ⑧ **本轮换尺的理由**：同一件物理变化在旧尺上按 缩放² 变。
+            let changed = Self.changedPixelCount(dim.0, dim.1, clipping: wholeRect)
+            XCTAssertEqual(Double(changed), Double(2000 * scale * scale), accuracy: Double(scale * scale),
+                "\(scale)×：旧那把尺在同一个物理变化上数到 \(changed) 个像素 —— 它**应该**按 缩放² 变，"
+                    + "这一格钉的是『换尺的理由』这件事本身：那道 `≥500 个像素` 的地板在 1× 与 2× 上"
+                    + "量的不是同一件事（本机 1797 / runner 0 那句里最多 3/4 是网格）")
+            readings.append("\(scale)×:②搬动=\(String(format: "%.2f", movedDim)) "
+                + "③并集=\(String(format: "%.2f", movedColor)) ④全透=\(String(format: "%.2f", movedGhost)) "
+                + "⑤左/右=\(String(format: "%.2f", movedLeft))/\(String(format: "%.2f", movedRight)) "
+                + "⑥⑦地板下/上=\(String(format: "%.2f", movedUnder))/\(String(format: "%.2f", movedOver)) "
+                + "⑨面积=\(String(format: "%.2f", ink)) ⑧旧尺像素=\(changed)")
+        }
+        emit("CAPTURE_INK_RULER_TRUTH_TABLE " + readings.joined(separator: " | "))
+    }
     /// R76 / U-116：浮层搜索框的**焦点那一档** —— 它不是"没有视觉后果"，是"只活在 alpha 通道里"。
     ///
     /// 这条判据本来要写的是"焦点态在帧里看不见 ⇒ 只能真机判"。量出来不是那么回事，
@@ -1353,11 +1671,47 @@ final class UICaptureTests: XCTestCase {
     /// 只是打字要用户多点一下那颗框）。
     ///
     /// 仍然量不到的一件事（点名，不猜）：真机上那颗框**有没有**系统焦点环。
+    ///
+    /// **R80 换了②③那两条的尺**（BACKLOG 109 的答案、D-138）：从"数过地板的像素个数"
+    /// 换成"搬动了多少 **pt²** 的墨 + 占那一格现有墨的**比例**"，并同时拍下三条证人臂
+    /// （同态重拍的噪声 / 撤掉 `placeholderString` / 打进一个字）。换尺是被 R79 的 CI 逼的：
+    /// 那一遍 runner 上存在性闸门**开**（`占位整条宽=87.0pt`）而两态差读 0 个像素，
+    /// 于是"焦点没有视觉后果"与"这台机器的网格太粗"又长回了同一句话。
+    /// 合成夹具那一轮的真值表（`CAPTURE_INK_RULER_TRUTH_TABLE`）钉住新旧两把尺的分别是
+    /// **4 倍**（2000 个像素 vs 8000 个，同一个物理变化）—— 那道 `≥500 个像素` 的地板
+    /// 在两台机器上量的从来不是同一件事。④ 那条（不许关掉系统环）本轮**挪到像素判据之前**，
+    /// 因为 R78 那道闸门会 `continue`，而它的注释写着"④照判"—— 注释在替代码撒谎（U-139 那一族）。
+    ///
     /// 这条通道不带 key 窗口（`appActive=false 面板key=false`），所以③那个"框外 0 像素"
     /// 不能推成"产品没有环" ⇒ `QUICKPICK_FOCUS_RING_NOT_RUN=1`，人工批次 68.1。
     /// 存在性闸门的地板（pt）：带内"有墨像素的 x 包围盒"至少这么宽，才算那串占位字画出来了。
     /// 来历见调用点：图标自己 ≈14pt、图标 + 占位字实测 86.5pt，40pt 落在两者中间且两边都有倍数余量。
     static let placeholderMinSpanPoints: Double = 40
+
+    /// 焦点"让位"那条判据的地板（R80），三条一起用：
+    ///   · `focusMinMovedPointsSquared` —— 搬动的墨至少这么多 **pt²**；
+    ///   · `focusNoiseMargin` —— 或者至少是**这一台机器上同态重拍噪声**的这么多倍（臂 R）；
+    ///   · `focusMinDimFraction` —— 且不少于那一格里现有墨的这个**占比**。
+    /// 来历（本机 2× 那一遍 `QUICKPICK_FOCUS_INK` 打的数，亮 / 暗）：
+    ///   焦点搬动 **98.7 / 113.3pt²**、那一格现有墨 **268.7 / 330.1pt²**、占比 **0.367 / 0.343**、
+    ///   同态重拍噪声 **0.0 / 0.0pt²**、证人臂撤占位字 **268.7 / 330.0pt²**、打进字 **236.7 / 283.9pt²**。
+    /// ⇒ 40pt² 是实测焦点搬动量的约 1/2.5～1/3，8% 是实测占比的约 1/4.5；而 runner 那一侧按 R79 读到的
+    ///   均值差换算约 **1.3pt²**（0.05×6400÷255）—— 在地板下面 30 倍。这道地板**不是**为 runner 调的
+    ///   （R38：不许拿一台机器的读数当另一台的地板），它两边都留了倍数余量；
+    ///   runner 过不了的时候由**证人臂**决定那是『尺在这一格瞎了』还是『这台机器不调淡』。
+    /// 为什么不沿用 R76 那两个数（`变化像素 ≥ 500`、`alpha 均值掉 ≥ 2.0`）：
+    /// 它们量的都是**同一件事在某一像素网格上的投影**。runner 1× 与本机 2× 读出
+    /// 0 与 1797（同一个 3/4 是网格），而"均值掉 2.0"那道地板在带均值 10.71 与 3.55 的两台机器上
+    /// 也不是一个难度（R38 那一课，只是这次是我自己新写的判据中招）。
+    /// pt² 与占比都是**网格无关**的量 ⇒ 同一道地板在两台机器上说的是同一句话。
+    static let focusMinMovedPointsSquared: Double = 40
+    static let focusNoiseMargin: Double = 10
+    static let focusMinDimFraction: Double = 0.08
+    /// 证人臂（撤占位符 / 打进字）至少要搬动这么多 pt²，才算"这把尺在这一格看得见东西"。
+    /// 它决定 `QUICKPICK_FOCUS_AXIS_NOT_RUN` 那句是"尺瞎了"还是"这台机器不调淡"——
+    /// 两种成因的处置不同，所以这条地板不能与上面那条合用一个数（R77 的教训：
+    /// 同一个词在两个判据里含义不同就别统一成一个布尔值）。本机实测这条臂 268.7 / 330.0pt²。
+    static let competenceMinMovedPointsSquared: Double = 40
 
     func testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing() throws {
         for (label, appearance) in [("亮", NSAppearance.Name.aqua),
@@ -1405,6 +1759,31 @@ final class UICaptureTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.15))
             let blankResponder = panel.firstResponder
             let unfocused = shoot()
+            // ===== R80 的三条证人臂（BACKLOG 109 的第二分支：独占区有墨而两态差为 0）=====
+            // runner（run 38760347161）把这一格判成"焦点没有视觉后果"，而本机判成"有 394pt² 的墨在动"。
+            // 只靠这两张帧永远分不开那两句话，所以这里在同一颗框上再加三个状态，
+            // **全部用同一把尺**（R68：证人必须与它作证的判据读同一个量）量"那一格里搬动了多少墨"：
+            //   臂 R `againUnfocused` —— **不改变任何状态**再拍一张。它给的是这台机器上这把尺的
+            //     噪声地板：同一态两张帧之差读出来多少，判据地板就必须高于它（R38：地板从表推导，不猜）。
+            //   臂 D `noPlaceholder` —— `placeholderString = ""`。这一格里那串字**必须**消失，
+            //     它是"这条通道在 1× 上能不能表达这一格的墨变化"的直接证人：
+            //     D 读得出东西而 B 读不出 ⇒ 尺不瞎，是"聚焦不调淡"这件事在这台机器上不成立。
+            //   臂 C `hasText` —— `stringValue = "搜"`（AppKit 在有字时不画占位符）。
+            //     与 D 不同的失效面：D 撤的是**属性**（AppKit 的占位符绘制分支整条不走），
+            //     C 走的是**另一条绘制路径**（字符串本身）。两条都空 = 这一格对这把尺失明；
+            //     只有一条空 = 那条臂作废，读数仍然要发出来。
+            // 这三张帧都不落盘（`shoot()` 只返回 rep），所以帧基线那 124 张不受影响。
+            let againUnfocused = shoot()
+            let placeholderWas = field.placeholderString
+            field.placeholderString = ""
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            let noPlaceholder = shoot()
+            field.placeholderString = placeholderWas
+            let textWas = field.stringValue
+            field.stringValue = "搜"
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+            let hasText = shoot()
+            field.stringValue = textWas
             let scale = max(1, focused.pixelsWide / max(Int(content.bounds.width), 1))
             let inContent = field.convert(field.bounds, to: nil)
             let band = CGRect(x: inContent.minX * CGFloat(scale),
@@ -1430,11 +1809,15 @@ final class UICaptureTests: XCTestCase {
             // 所以这里另量一个不依赖两态相减的数：占位符那一格里 alpha 过地板的像素数。
             let wholePanel = CGRect(x: 0, y: 0, width: unfocused.pixelsWide, height: unfocused.pixelsHigh)
             // 存在性那一格量的**不是整条 band**，而是"占位字该在的那一块"：
-            // 左边 30% 宽、四周再内缩 3pt。两个理由都是被读数逼出来的 ——
-            // ① 整条 band 里混得进那颗框的**描边**（一圈 1px 的矩形在 1× 上就有 ~830 个像素，
-            //    远超任何计数地板），那样闸门会在"字没画、边框画了"的时候错误地放行判据；
-            // ② 占位字的实测包围盒是 x 12.0–98.5pt（band 宽 400pt）⇒ 左 30% 把它整个包住，
-            //    而内缩 3pt 把描边排除在外。本机实测这一格 1967 / 2208 个有墨像素（亮 / 暗）。
+            // 左边 30% 宽、四周再内缩 3pt。**R80 对过账**：这一格里画着的墨**全是那串占位字**
+            // （臂 D 把 `placeholderString` 撤成空，带墨面积从 268.7 / 330.1pt² 掉到 **0.0pt²**，
+            //  亮 / 暗）—— 产品这颗框是 `isBordered=false` + `drawsBackground=false`，
+            // 所以"描边混进来"与"图标混进来"那两条理由在**这个控件**上都不成立，
+            // 内缩 3pt 与左 30% 是**防御性**形状（将来谁给它加了边框或图标，这两个数就真的有对象）。
+            // 真正被读数用过的理由只有一条：② 占位字的实测包围盒是 x 12.5–98.5pt（band 宽 400pt）
+            // ⇒ 左 30% 把它整个包住。本机这一格有墨像素 **1699 / 1871**（亮 / 暗，
+            // 就是 `QUICKPICK_FOCUS` 行里 `占位区有墨(不聚焦,左30%内缩3pt)` 那一列；
+            // 这条注释之前写的 1967 / 2208 是探针形状改掉之后的旧数，U-139 那一族）。
             let inset = 3.0 * CGFloat(scale)
             let inkProbe = CGRect(x: band.minX + inset, y: band.minY + inset,
                                   width: band.width * 0.3 - inset, height: band.height - 2 * inset)
@@ -1442,11 +1825,13 @@ final class UICaptureTests: XCTestCase {
             let inkFocused = Self.alphaInkPixels(focused, rect: inkProbe)
             let inkWholePanel = Self.alphaInkPixels(unfocused, rect: wholePanel)
             // **R79：决定闸门的是宽度的存在性，不是计数。** R78 用"占位区里 ≥20 个有墨像素"，
-            // 结果它在 runner 上没拦住（run 38757049151 仍是那四条红）—— 因为那颗放大镜
-            // 就住在带左边 10–24pt，AppKit 画得出它，而占位字那串可能画不出来。
-            // 计数分不开"只有图标"与"图标 + 一串字"，**包围盒宽度可以**：
-            //   图标自己 ≈14pt；本机实测"图标 + 占位字"是 x 12.0–98.5pt = 86.5pt。
-            // 地板取 40pt：两个数各差六倍与两倍多，不在刀尖上（R66 那条 `deadSpan=0.05` 同道理）。
+            // 结果它在 runner 上没拦住（run 38757049151 仍是那四条红）——
+            // **R80 把机制查清了**（臂 D：那一格里的墨全是那串占位字，图标与描边都不存在），
+            // 所以 R79 注释里"那颗放大镜 AppKit 画得出它"那句作废（U-146）。真正的原因是：
+            // **过地板的像素数分不开"画了开头两个字"与"画了整串字"** —— 前缀就够 20 个。
+            // 计数与宽度的分别正在这里：
+            //   开头那一片 ≈17pt；本机实测整串是 x 12.5–98.5pt = 86.5pt。
+            // 地板取 40pt：两个数差五倍，不在刀尖上（R66 那条 `deadSpan=0.05` 同道理）。
             let spanUnfocused = Self.alphaInkSpan(unfocused, rect: band)
             let spanFocused = Self.alphaInkSpan(focused, rect: band)
             let spanWidthPt = spanUnfocused.max < 0 ? -1.0
@@ -1478,24 +1863,27 @@ final class UICaptureTests: XCTestCase {
                 + "地板=\(String(format: "%.0f", Self.placeholderMinSpanPoints))pt "
                 + "⇒ 存在性尺说\(placeholderDrawn ? "这一格画了东西，像素那两条有对象" : "这一格今天没画那串字，像素那两条没有对象")")
             XCTAssertGreaterThanOrEqual(changedIn, 0, "\(label)档：尺读不出两张帧 ⇒ 无从判定，不许当通过")
-            // **闸门的判别力对照（R79）**：那颗放大镜自己住在带左边 10–24pt。
-            // 如果"只有图标"就能把宽度撑到地板以上，这道闸门等于没设 —— 而 R78 就是那样倒的
-            // （它数的是像素个数，图标一个人就过了）。所以这里单独量图标那一小块的包围盒，
-            // 要求它**过不了**闸门。占位字被画出来时这一格才有对象；没画出来时它仍然有对象
-            // （图标在不在与字在不在是两件事），所以不设 `placeholderDrawn` 前提。
-            let iconRect = CGRect(x: (inContent.minX + 3) * CGFloat(scale),
-                                  y: band.minY,
-                                  width: 17 * CGFloat(scale), height: band.height)
-            let iconSpan = Self.alphaInkSpan(unfocused, rect: iconRect)
-            let iconWidthPt = iconSpan.max < 0 ? 0.0
-                : Double(iconSpan.max - iconSpan.min + 1) / Double(scale)
-            emit("QUICKPICK_FOCUS_GATE \(label) 图标那一块宽=\(String(format: "%.1f", iconWidthPt))pt "
+            // **闸门的判别力对照（R79，R80 更正了它的机制）**：这一格里没有放大镜、也没有描边
+            // （臂 D 撤掉 `placeholderString` 之后带墨面积 = 0.0pt²），所以这里框住的是
+            // **那串字的开头一小片**。R79 的注释把它说成"那颗放大镜 AppKit 画得出来"，
+            // 那句话是**编的**（U-146），而它当时能过是因为"一小片字"和"一颗图标"在这把尺上读数一样。
+            // 如果这一小片就能把宽度撑到地板以上，这道闸门等于没设 —— 而 R78 就是那样倒的
+            // （它数的是像素个数，开头那一片一个人就过了）。所以这里单独量这一小片的包围盒，
+            // 要求它**过不了**闸门。整串字画出来时这一格才有对象；没画出来时这一小片仍然有对象
+            // （开头在不在与整串在不在是两件事），所以不设 `placeholderDrawn` 前提。
+            let prefixRect = CGRect(x: (inContent.minX + 3) * CGFloat(scale),
+                                    y: band.minY,
+                                    width: 17 * CGFloat(scale), height: band.height)
+            let prefixSpan = Self.alphaInkSpan(unfocused, rect: prefixRect)
+            let prefixWidthPt = prefixSpan.max < 0 ? 0.0
+                : Double(prefixSpan.max - prefixSpan.min + 1) / Double(scale)
+            emit("QUICKPICK_FOCUS_GATE \(label) 开头那一小片宽=\(String(format: "%.1f", prefixWidthPt))pt "
                 + "占位整条宽=\(String(format: "%.1f", spanWidthPt))pt 地板=\(String(format: "%.0f", Self.placeholderMinSpanPoints))pt "
-                + "⇒ 闸门\(placeholderDrawn ? "开（那串字画了）" : "关（只有图标那一小块）")")
-            XCTAssertLessThan(iconWidthPt, Self.placeholderMinSpanPoints,
-                "\(label)档：只框住放大镜那一小块，量出来的墨包围盒就有 \(String(format: "%.1f", iconWidthPt))pt "
+                + "⇒ 闸门\(placeholderDrawn ? "开（那串字画全了）" : "关（只有开头那一小片）")")
+            XCTAssertLessThan(prefixWidthPt, Self.placeholderMinSpanPoints,
+                "\(label)档：只框住那串字的开头一小片，量出来的墨包围盒就有 \(String(format: "%.1f", prefixWidthPt))pt "
                     + "（地板 \(String(format: "%.0f", Self.placeholderMinSpanPoints))pt）⇒ 这道存在性闸门**分不开**"
-                    + "'只有图标'与'图标 + 一串字'，它就恒开，像素那两条又回到没人看着的状态。"
+                    + "'只有开头几个字'与'整串字'，它就恒开，像素那几条又回到没人看着的状态。"
                     + "换探针形状或换地板，别把断言删掉")
             // ① 焦点落进那颗框（行为，读的是产品对象，不是帧）。
             XCTAssertTrue(accepted,
@@ -1508,47 +1896,10 @@ final class UICaptureTests: XCTestCase {
             XCTAssertFalse(blankResponder is NSText,
                 "\(label)档：`makeFirstResponder(nil)` 之后窗口响应者**还是**字段编辑器 ⇒ 撤不掉焦点，"
                     + "于是下面那几条断言量的是同一张帧减自己（假绿的教科书形状，U-131）")
-            // **存在性闸门（R78）**：像素那两条只在"这一格真的画了东西"时判。
-            // 处置按机器分开（R60 那一课）：2× 上没画 ⇒ **红**（那是捕获或产品坏了，必须有人去查），
-            // 1× 上没画 ⇒ 点名 not-run（runner 不画 SwiftUI/AppKit 文本是已知通道性质，
-            // 见 `PROBE_ELIGIBILITY … ink=0.0%` 那一批读数）。
-            // 名字以 `_NOT_RUN` 结尾：`ci_capture_gate.py` 认这个后缀（R36/U-59）。
-            if !placeholderDrawn {
-                emit("QUICKPICK_FOCUS_NOT_RUN=1 \(label)：占位符那串字今天在这条通道里没画出来"
-                    + "（带内有墨包围盒只有 \(String(format: "%.1f", spanWidthPt))pt，"
-                    + "低于 \(String(format: "%.0f", Self.placeholderMinSpanPoints))pt 那道地板；"
-                    + "计数却有 \(inkUnfocused) 个像素 ⇒ 画得出的那一小块就是左边那颗放大镜，不是那串字）⇒ "
-                    + "\"聚焦与不聚焦两张帧相同（这次读到 \(changedIn) 个变化像素）这一句，不能推成『焦点没有视觉后果』，"
-                    + "它说的是这条通道今天看不见那串字。行为那两条（①响应者、④没关系统环）与源码守卫照判。")
-                XCTAssertLessThan(scale, 2,
-                    "\(label)档：2× 的捕获通道上占位符那串字的包围盒只有 \(String(format: "%.1f", spanWidthPt))pt ⇒ "
-                        + "本机这一格**必须**画得出来（R76 实测 1797 / 2354 个变化像素、包围盒 86.5pt）。"
-                        + "红在这里的含义是『捕获或产品今天坏了』，不是『这台机器看不见』——"
-                        + "只有 1× 才允许缺席（R60：机器前提不同 ⇒ 处置不同，但都不许静默）")
-                continue
-            }
-            // ② 焦点必须有视觉后果，而且方向是"让位"（占位符退后），不是"变响"。
-            XCTAssertGreaterThanOrEqual(changedIn, 500,
-                "\(label)档：聚焦与不聚焦两张帧在框内只差了 \(changedIn) 个像素 ⇒ "
-                    + "焦点这一档变成看不见了。今天它是那一串占位字退后（本机实测 1797 / 2354 个变化像素、"
-                    + "整格平均 alpha 掉 3.93 / 4.52）；两种成因都值得查：占位符被换成实色（那就该重判音量），"
-                    + "或者 AppKit 不再为聚焦的框调淡占位符（那焦点就只剩光标了）")
-            // 地板 2.0 是从**实测**推的，不是猜的：整带均值差今天 3.93（亮）/ 4.52（暗），
-            // 取最小值的一半再往下 —— 第一版我写的是 4.0（拿"占位符那一格 53/255 × 面积比"估的 8.6 折半），
-            // 结果差 0.06 红了一次：估的面积比不对（占位符只占那一小截，整带被 800px 宽稀释）。
-            XCTAssertLessThanOrEqual(alphaFocused, alphaUnfocused - 2.0,
-                "\(label)档：聚焦之后那一格的 alpha 反而不比不聚焦时低（聚焦=\(String(format: "%.2f", alphaFocused)) "
-                    + "不聚焦=\(String(format: "%.2f", alphaUnfocused))）⇒ 焦点反馈的方向变了："
-                    + "今天是'占位符退后给光标让位'，'聚焦把那一格叫得更响'是另一种设计，该重判")
-            // ③ 后果必须留在框内：这一格是量过之后决定**不加**自定义焦点环的。
-            XCTAssertEqual(changedHalo - changedIn, 0,
-                "\(label)档：框外那一圈多了 \(changedHalo - changedIn) 个变化像素 ⇒ 焦点开始往框外画东西了"
-                    + "（多半是自定义环/描边，或系统环真的开始画）。这一格是 R76 量过才决定不加的："
-                    + "红在这里的含义是'该重判'，不是'把那段绘制删掉'")
-            emit("QUICKPICK_FOCUS_RING_NOT_RUN=1 \(label)：焦点环这一档在这条通道里读不到"
-                + "（框外 0 个变化像素，而 `面板key=\(panel.isKeyWindow) appActive=\(NSApp.isActive)`）"
-                + "⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'")
-            // ④ 值守卫：不许关掉系统环。
+            // ④ 值守卫：不许关掉系统环。**R80 把这一条挪到像素那几条之前**：
+            // R78 那道存在性闸门（还有本轮那两条 `_NOT_RUN` 出口）都 `continue`，
+            // 而它的注释写着"行为那几条照判"—— 注释在替代码撒谎，那一族的账本号是 U-139。
+            // 挪上来之后，任何一条缺席出口都仍然判得到这里。
             // **这个枚举的坑（R76 实测）**：raw 0 才是"系统自己决定"，而 Swift 里 `.none` 的 raw 是 **1**
             // （`.automatic` 这个成员在本 SDK 根本不存在，写 `== .automatic` 编译不过）。
             // 一个人按名字猜，就会把这条守卫写成"等于 .none"—— 那正好把"系统环被关掉"当成通过。
@@ -1558,6 +1909,136 @@ final class UICaptureTests: XCTestCase {
                     + "\(field.focusRingType.rawValue)，而 `.none` 的 raw 是 1）"
                     + " ⇒ 焦点环在这条通道里本来就读不到（③那条缺席），关掉它这件事**永远不会被任何一张帧发现**，"
                     + "所以这条值守卫是唯一防线")
+            // **存在性闸门（R78）**：像素那两条只在"这一格真的画了东西"时判。
+            // 处置按机器分开（R60 那一课）：2× 上没画 ⇒ **红**（那是捕获或产品坏了，必须有人去查），
+            // 1× 上没画 ⇒ 点名 not-run（runner 不画 SwiftUI/AppKit 文本是已知通道性质，
+            // 见 `PROBE_ELIGIBILITY … ink=0.0%` 那一批读数）。
+            // 名字以 `_NOT_RUN` 结尾：`ci_capture_gate.py` 认这个后缀（R36/U-59）。
+            if !placeholderDrawn {
+                emit("QUICKPICK_FOCUS_NOT_RUN=1 \(label)：占位符那串字今天在这条通道里没画出来"
+                    + "（带内有墨包围盒只有 \(String(format: "%.1f", spanWidthPt))pt，"
+                    + "低于 \(String(format: "%.0f", Self.placeholderMinSpanPoints))pt 那道地板；"
+                    + "计数却有 \(inkUnfocused) 个像素 ⇒ 那一格里画得出的只有开头一小片，不是整串字）⇒ "
+                    + "\"聚焦与不聚焦两张帧相同（这次读到 \(changedIn) 个变化像素）这一句，不能推成『焦点没有视觉后果』，"
+                    + "它说的是这条通道今天看不见那串字。行为那两条（①响应者、④没关系统环）与源码守卫照判。")
+                XCTAssertLessThan(scale, 2,
+                    "\(label)档：2× 的捕获通道上占位符那串字的包围盒只有 \(String(format: "%.1f", spanWidthPt))pt ⇒ "
+                        + "本机这一格**必须**画得出来（R76 实测 1797 / 2354 个变化像素、包围盒 86.5pt）。"
+                        + "红在这里的含义是『捕获或产品今天坏了』，不是『这台机器看不见』——"
+                        + "只有 1× 才允许缺席（R60：机器前提不同 ⇒ 处置不同，但都不许静默）")
+                continue
+            }
+            // ② 焦点必须有视觉后果，而**这条判据读的是"搬动了多少墨"（pt²），不是像素个数**（R80）。
+            //
+            // 换尺的理由是 R79 的 CI 读出来的，不是审美：runner 那一遍（run 38760347161）
+            // 存在性闸门**开**（`QUICKPICK_FOCUS_GATE … 占位整条宽=87.0pt … 闸门开`），
+            // 而 `框内变化像素=0`、alpha 3.55⇒3.50 —— 命中 BACKLOG 109 预登记的第二个分支：
+            // "独占区非 0 而两态差仍是 0 ⇒ 那四条红是真的，要查的是产品/通道，不许再抬地板"。
+            // 查出来的结论是：**那把尺本身跟着像素网格变**。`changedPixelCount` 数的是
+            // "过 8/255 的像素个数"，本机 2× 同一条字给 1797 个、runner 1× 给 0 个，
+            // 而这两个数之间的差别有 **3/4 是网格**（同样多的墨摊在 4 倍数量的像素上）。
+            // 所以地板从"个数"换成"pt² 的墨"：它是同一串字在两台机器上**唯一共同的分母**。
+            // 三条证人臂（R/D/C，见上面注释）读的是同一把尺，于是"看不见"必须分成两种：
+            //   尺在这一格整体失明（证人臂也读不出东西）／ 尺看得见而聚焦不调淡（证人臂读得出）。
+            // 两种都不许静默，也都**不许在 2× 上放行** —— 本机是判这条轴的那台机器。
+            let noisePt2 = Self.movedInkPointsSquared(unfocused, againUnfocused, rect: band, scale: scale)
+            let focusPt2 = Self.movedInkPointsSquared(unfocused, focused, rect: band, scale: scale)
+            let armPlaceholderPt2 = Self.movedInkPointsSquared(unfocused, noPlaceholder,
+                                                               rect: band, scale: scale)
+            let armTextPt2 = Self.movedInkPointsSquared(unfocused, hasText, rect: band, scale: scale)
+            let haloPt2 = Self.movedInkPointsSquared(unfocused, focused, rect: halo, scale: scale)
+            let bandInkPt2 = Self.inkPointsSquared(unfocused, rect: band, scale: scale)
+            let inkNoPlaceholderPt2 = Self.inkPointsSquared(noPlaceholder, rect: band, scale: scale)
+            let dimFraction = bandInkPt2 > 0 ? focusPt2 / bandInkPt2 : -1
+            let competencePt2 = max(armPlaceholderPt2, armTextPt2)
+            // 地板的一半来自**这台机器自己的噪声**（臂 R）：同一态两张帧之差读出来多少，
+            // 判据地板就不能低于它的 `focusNoiseMargin` 倍（R38：地板从表推导，不猜常数）。
+            let focusFloorPt2 = Self.focusFloorPointsSquared(noisePt2: noisePt2)
+            let ringPt2 = haloPt2 - focusPt2
+            // 处置由**纯函数**给（`focusDisposition`）：那两支 1× 出口在本机永远走不到，
+            // 没有单独的真值表它们就是"没有红钉着的分支"（`testFocusAxisDispositionIsATruthTable`）。
+            let disposition = Self.focusDisposition(focusMovedPt2: focusPt2, floorPt2: focusFloorPt2,
+                                                    dimFraction: dimFraction,
+                                                    minDimFraction: Self.focusMinDimFraction,
+                                                    competencePt2: competencePt2,
+                                                    competenceFloorPt2: Self.competenceMinMovedPointsSquared)
+            let focusJudged = disposition == .judged
+            let channelSeesThatBand = disposition != .channelBlindOnThisMachine
+            emit("QUICKPICK_FOCUS_INK \(label) 缩放=\(scale)× 带墨面积=\(String(format: "%.1f", bandInkPt2))pt² "
+                + "焦点搬动=\(String(format: "%.1f", focusPt2))pt²(地板 \(String(format: "%.1f", focusFloorPt2))"
+                + "=max(\(String(format: "%.0f", Self.focusMinMovedPointsSquared)), "
+                + "\(String(format: "%.0f", Self.focusNoiseMargin))×噪声) 占比=\(String(format: "%.3f", dimFraction))"
+                + "(地板 \(String(format: "%.2f", Self.focusMinDimFraction))) "
+                + "噪声(同态重拍)=\(String(format: "%.1f", noisePt2))pt² "
+                + "证人臂撤占位字=\(String(format: "%.1f", armPlaceholderPt2))pt² "
+                + "证人臂打进字=\(String(format: "%.1f", armTextPt2))pt² "
+                + "撤占位字之后带墨面积=\(String(format: "%.1f", inkNoPlaceholderPt2))pt² "
+                + "框外那一圈=\(String(format: "%.1f", ringPt2))pt² "
+                + "旧尺像素个数=\(changedIn)（R79 的 runner 那一遍这一列是 0） "
+                + "⇒ \(focusJudged ? "焦点这一档看得见在让位" : (channelSeesThatBand ? "尺在这一格看得见别的东西在动，而聚焦不动" : "这一格对这把尺整体失明（证人臂也读不出）"))")
+            // 证人臂自己也得有对象：撤掉 `placeholderString` 之后那一格的墨**必须少一半以上**。
+            // 少了这一格，"臂读不出东西"这句话就可能是**臂没生效**（比如占位符由产品自己画、
+            // 改属性撤不掉），而不是"通道看不见" —— 那两种成因的处置完全不同。
+            let armDemptiesTheBand = bandInkPt2 <= 0 || inkNoPlaceholderPt2 <= bandInkPt2 * 0.5
+            XCTAssertGreaterThanOrEqual(armPlaceholderPt2, 0,
+                "\(label)档：证人臂 D 读不出两张帧 ⇒ 这条轴的证据链断了（不是产品红，是尺红）")
+            XCTAssertTrue(armDemptiesTheBand,
+                "\(label)档：把 `placeholderString` 撤成空，那一格的墨面积只从 "
+                    + "\(String(format: "%.1f", bandInkPt2))pt² 变成 "
+                    + "\(String(format: "%.1f", inkNoPlaceholderPt2))pt² ⇒ 臂 D 没生效："
+                    + "这一格里的墨不是 AppKit 那串占位字（那就是 R79 的包围盒归因错了），"
+                    + "要重查这一格里到底画了什么，不许直接引用证人臂的读数")
+            if !focusJudged {
+                emit("QUICKPICK_FOCUS_AXIS_NOT_RUN=1 \(label)：焦点那一档的墨移动在这一台机器上读到 "
+                    + "\(String(format: "%.1f", focusPt2))pt²，地板 \(String(format: "%.1f", focusFloorPt2))pt²"
+                    + "（缩放=\(scale)×，同态噪声 \(String(format: "%.1f", noisePt2))pt²）。"
+                    + (channelSeesThatBand
+                        ? "同一把尺在同一格里读得出别的成因：撤占位字搬动 \(String(format: "%.1f", armPlaceholderPt2))pt²、"
+                          + "打进字 \(String(format: "%.1f", armTextPt2))pt² ⇒ **尺不瞎**，"
+                          + "是这台机器的 AppKit 不为非 key 窗口调淡占位符（`面板key=\(panel.isKeyWindow) appActive=\(NSApp.isActive)`），"
+                          + "这一条不能推成『焦点没有视觉后果』也不能推成『产品没有焦点反馈』"
+                        : "两条证人臂也只读出 \(String(format: "%.1f", competencePt2))pt² ⇒ **这一格对这把尺整体失明**，"
+                          + "焦点那一条根本没有对象，判不判都是空的")
+                    + " 行为那几条（①响应者、④没关系统环）与源码守卫照判 —— 它们在这一格里不依赖像素。")
+                // **2× 上这一句必须红**：本机是判这条轴的机器，它读不到就是捕获或产品坏了。
+                XCTAssertLessThan(scale, 2,
+                    "\(label)档：本机 2× 上焦点那一档只搬动 \(String(format: "%.1f", focusPt2))pt² "
+                        + "（地板 \(String(format: "%.1f", focusFloorPt2))pt²、占比 "
+                        + "\(String(format: "%.3f", dimFraction))），而同一格里撤掉占位字能读出 "
+                        + "\(String(format: "%.1f", armPlaceholderPt2))pt² ⇒ "
+                        + "'聚焦不调淡占位符'这件事在**判这条轴的那台机器**上成立了，必须有人去查："
+                        + "要么产品/AppKit 变了（那焦点就只剩光标），要么捕获通道变了（那 124 张帧一起要重看）")
+                if scale < 2 { continue }
+            }
+            XCTAssertGreaterThanOrEqual(focusPt2, focusFloorPt2,
+                "\(label)档：聚焦与不聚焦两张帧之间只搬动了 \(String(format: "%.1f", focusPt2))pt² 的墨，"
+                    + "地板 \(String(format: "%.1f", focusFloorPt2))pt² ⇒ 焦点这一档变成看不见了。"
+                    + "今天它是那一串占位字退后（本机实测 98.7 / 113.3pt²、"
+                    + "旧那把像素个数尺 1797 / 2354 个）；两种成因都值得查：占位符被换成实色（那就该重判音量），"
+                    + "或者 AppKit 不再为聚焦的框调淡占位符（那焦点就只剩光标了）")
+            XCTAssertGreaterThanOrEqual(dimFraction, Self.focusMinDimFraction,
+                "\(label)档：焦点搬动的墨只占那一格里现有墨的 \(String(format: "%.3f", dimFraction))"
+                    + "（地板 \(String(format: "%.2f", Self.focusMinDimFraction))）⇒ 占比这一根轴管的是"
+                    + "'这一格的墨有没有明显少掉'，它与绝对量各自拦一种错：整格墨变少而聚焦仍然调淡同一比例，"
+                    + "绝对量会掉到地板以下但占比不会；墨面积涨了而绝对量够，占比会掉下来")
+            XCTAssertLessThanOrEqual(alphaFocused, alphaUnfocused,
+                "\(label)档：聚焦之后那一格的 alpha 反而不比不聚焦时低（聚焦=\(String(format: "%.2f", alphaFocused)) "
+                    + "不聚焦=\(String(format: "%.2f", alphaUnfocused))）⇒ 焦点反馈的**方向**变了："
+                    + "今天是'占位符退后给光标让位'，'聚焦把那一格叫得更响'是另一种设计，该重判。"
+                    + "R80 把原来那条『绝对掉 2.0』的地板拆到这里：那个数跟着墨的绝对水平走，"
+                    + "本机带均值 10.71 而 runner 3.55 ⇒ 同一道地板在两台机器上不是一个难度")
+            // ③ 后果必须留在框内：这一格是量过之后决定**不加**自定义焦点环的。
+            XCTAssertLessThanOrEqual(ringPt2, focusFloorPt2,
+                "\(label)档：框外那一圈搬动了 \(String(format: "%.1f", ringPt2))pt² 的墨（地板 "
+                    + "\(String(format: "%.1f", focusFloorPt2))pt²）⇒ 焦点开始往框外画东西了"
+                    + "（多半是自定义环/描边，或系统环真的开始画）。这一格是 R76 量过才决定不加的："
+                    + "红在这里的含义是'该重判'，不是'把那段绘制删掉'。"
+                    + "旧的像素个数那一列（框外 \(changedHalo - changedIn) 个）仍然发在 QUICKPICK_FOCUS 行里，"
+                    + "但它不再做判断：那一圈只有 8pt 宽，1× 上一条描边就几个像素，判不了")
+            emit("QUICKPICK_FOCUS_RING_NOT_RUN=1 \(label)：焦点环这一档在这条通道里读不到"
+                + "（框外那一圈 \(String(format: "%.1f", ringPt2))pt²，而 `面板key=\(panel.isKeyWindow) "
+                + "appActive=\(NSApp.isActive)`）"
+                + "⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'")
         }
         // 产品入口那条赋值必须还在（①②③全都不会红的那一族回归，只有这条守卫抓得到）。
         let source = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
