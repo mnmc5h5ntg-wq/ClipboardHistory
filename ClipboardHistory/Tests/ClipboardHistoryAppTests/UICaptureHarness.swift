@@ -97,6 +97,29 @@ final class UICaptureTests: XCTestCase {
         "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
     ]
 
+    /// 「这张帧天生就是稀的」名单（R63）—— 与上面那份同一族：**尺的假设名单**，不是缺陷名单。
+    ///
+    /// 为什么 `transparent > 0.95` 那条门槛在浮层上不成立：那条门槛假设"帧的底子是画满的，
+    /// 所以 95% 未绘制 ⇒ 捕获坏了"。而快速选择浮层**没有自绘背景**
+    /// （`drawsBackground=false` 的滚动视图 + `backgroundColor=.clear` 的表格 + 面板底色由窗口自己填，
+    /// `cacheDisplay` 只画子树），于是一张完全正确的浮层帧里，墨就只有那些字和那一块选中填充：
+    /// 本机实测 5 行 ⇒ 未绘制 85.8%，2 行 ⇒ 88.5%，0 行 + 一句话 ⇒ 97.9%。
+    /// 只有最后一张过不了那条门槛 —— 拿 95% 判它"捕获失效"，是把尺子的假设当成了事实。
+    ///
+    /// 豁免不许变成"这类帧从此不看"，所以两条各自承重的东西跟着一起进来：
+    ///   · 名单里每一张仍要过一条**正对照**：`drawn > 0.5%`（门槛从读数来：
+    ///     empty 实测 2.13% / 2.26%，而"捕获真的坏了"是 0.0%）—— 稀可以，全空不行；
+    ///   · "该有的东西在不在"不由这里判，由两条产品入口级判据判：
+    ///     `testQuickPickOverlayFillsItsPanelAndCanBeCaptured`（行画得出来）与
+    ///     `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot`（那句话在、且落在那一格）。
+    /// 名单本身由下面那条 `stale` 守卫数住：哪张不再稀了，红着要求拿掉。
+    /// **这条守卫已经挣过一次工资**：`quickpick-typed` 第一版查询词命中 0 条（帧名 typed、内容 empty），
+    /// 换了真命中 2 条的词之后未绘制降到 88.5%，它立刻红着把那张从名单里赶了出去。
+    static let sparseByDesignFixtures: Set<String> = ["quickpick-empty"]
+
+    /// 上面那份名单的正对照门槛。**只能从读数来**（见上面的实测数），不许拍脑袋。
+    static let sparseByDesignInkFloor: Double = 0.005
+
     /// 从帧文件名还原夹具名：`sidebar-history-300x520-dark.png` → `sidebar-history`。
     static func fixtureName(fromFile file: String) -> String {
         let base = (file as NSString).deletingPathExtension
@@ -185,24 +208,22 @@ final class UICaptureTests: XCTestCase {
         return url
     }
 
-    /// 浮层**还是**拍不到，但 R18 写下的那句原因是错的 —— 这条判据把原因钉成实测数字（R19 / U-41）。
-    ///
-    /// R18 记的根因是"浮层背景是 `NSVisualEffectView`，离屏没有可合成层"。两半都被推翻：
-    /// ① 读代码：`ensurePanel()` 里根本没有材质视图 —— 普通 contentView +
-    ///    `drawsBackground=false` 的滚动视图 + `backgroundColor=.clear` 的表格；
-    /// ② 做实验：裸 `NSVisualEffectView` 离屏**画得出来**（spike 读数 `mid=(58,58,58,a=255)`）。
-    /// 真正的现象（这一条是量出来的，不是猜的）：产品的 `NSStackView` 在捕获环境里
-    /// 是 **24×49**（真实 App 里它撑满 420×300），于是 `NSScrollView` 0×0、
-    /// `NSTableView.visibleRect` 0×0 —— 表格有 5 行，一行都画不出来。
-    ///
-    /// 三层断言各管一件事，红得不一样的时候读的是不同的话：
-    ///   · `rows > 0` 守**所有权**：`NSTableView.dataSource` 是弱引用，控制器一旦被释放，
-    ///     行数静默掉成 0，而帧仍然"合法"（见 `QuickPickCapturePanel`）；
-    ///   · `transparent > 0.9` 是标题：还能不能拍。它红了就去补那三张夹具；
-    ///   · 补一条**原因**断言：拍不到时必须仍然是 stack 塌着导致的。
-    ///     哪天 stack 撑开了却还拍不到，这条会红着说"解释过期了，去查新的原因" ——
-    ///     而不是让一句已经作废的根因继续在账本里当结论用。
-    func testQuickPickOverlayCannotBeCapturedYet() throws {
+    /// R19 立的是"浮层还拍不到"，R63 把它**翻过来**：那条判据钉的现象（stack 塌）其实是产品缺陷，
+    /// 而它给出的原因（"stack 在捕获环境里塌，真实 App 里撑满 420×300"）是错的 ——
+    /// 两条路都塌，因为产品只给了 `frame` + `autoresizingMask`，而 `NSStackView` 生下来
+    /// `translatesAutoresizingMaskIntoConstraints == false`，那两行因此都是空操作。
+    /// 修完之后这条判据改钉**契约**，五件事各自承重，红的时候读的是不同的话：
+    ///   · `rows > 0` + `dataSourceIsController` 守**所有权**：`NSTableView.dataSource` 是弱引用，
+    ///     控制器一旦被释放，行数静默掉成 0，而帧仍然"合法"（见 `QuickPickCapturePanel`）；
+    ///   · **内容必须占满面板**（两条轴都量）：R63 那个缺陷的全部表现就是这一条，
+    ///     塌的时候 stack 宽/高只有面板的 5.7% / 16%，而面板上四分之三是空白；
+    ///   · 那张表的 `visibleRect` 至少容得下两行候选：这是"行画不画得出来"的直接量 ——
+    ///     塌的时候它是 0×0，而 `frame` 看着仍然像回事；
+    ///   · `transparent < 0.9`：还能不能拍。它现在该绿；红了说明**捕获通道**又坏了，
+    ///     而"stack 塌了"不再是可引用的解释（那条已经修掉了），必须去查新的原因；
+    ///   · 判据里不写 420 / 300 这类字面量：约定是"内容占满面板"，不是"面板 420 宽"。
+    ///     面板尺寸哪天改，这条判据不需要跟着改。
+    func testQuickPickOverlayFillsItsPanelAndCanBeCaptured() throws {
         let store = makePopulatedStore()
         let build = QuickPickCapturePanel.builder(store: store, query: "")
         guard let panel = build(), let content = panel.contentView else {
@@ -224,14 +245,26 @@ final class UICaptureTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
 
         var rows = -1
-        var stackWidth: CGFloat = -1
+        var rowHeight: CGFloat = -1
+        var stackFrame: CGRect?
+        var tableVisible: CGRect?
         var dataSourceIsController = false
         func find(_ view: NSView) {
             if let table = view as? NSTableView {
-                rows = max(rows, table.numberOfRows)
-                if table.dataSource is QuickPickController { dataSourceIsController = true }
+                if table.dataSource is QuickPickController {
+                    dataSourceIsController = true
+                    rows = max(rows, table.numberOfRows)
+                    tableVisible = table.visibleRect
+                    rowHeight = table.rowHeight
+                }
             }
-            if view is NSStackView { stackWidth = max(stackWidth, view.frame.width) }
+            // 按**身份**认 stack：子树里含有"数据源是产品的表"的那个 NSStackView。
+            // R62 那版探针在这里用 `max(宽度)` + "最后一个赢"混着读，于是三条读数
+            // 可能来自不同的 stack —— 面板整棵树里不止一个 NSStackView。
+            if let stack = view as? NSStackView,
+               Self.containsProductTable(stack) {
+                stackFrame = stack.frame
+            }
             view.subviews.forEach(find)
         }
         find(content)
@@ -241,20 +274,173 @@ final class UICaptureTests: XCTestCase {
         content.cacheDisplay(in: content.bounds, to: rep)
         let transparent = Self.transparentFraction(of: rep)
         print("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%"
-              + " rows=\(rows) stackWidth=\(Int(stackWidth)) dataSourceIsController=\(dataSourceIsController)"
+              + " rows=\(rows) stack=\(stackFrame.map { NSStringFromRect($0) } ?? "nil") "
+              + "tableVisible=\(tableVisible.map { NSStringFromRect($0) } ?? "nil") "
+              + "dataSourceIsController=\(dataSourceIsController)"
               + " bounds=\(NSStringFromRect(content.bounds))")
         XCTAssertGreaterThan(rows, 0,
                              "浮层表格 0 行 ⇒ 十有八九是控制器被释放了（`NSTableView.dataSource` 是弱引用），"
                              + "帧看起来仍然合法，其实拍的是一张空面板")
         XCTAssertTrue(dataSourceIsController,
                       "表格的数据源已经不是 `QuickPickController` ⇒ 拍到的行不是产品会画的那些行")
-        XCTAssertGreaterThan(transparent, 0.9,
-                             "浮层现在拍得出来了（transparent="
-                             + "\(String(format: "%.1f", transparent * 100))%）⇒ "
-                             + "把 quickpick-list / -typed / -empty 三张夹具加回去，别只改这条门槛")
-        XCTAssertLessThan(stackWidth, 100,
-                          "拍不到，但 `NSStackView` 已经撑到 \(Int(stackWidth))pt ⇒ "
-                          + "账本里那条原因过期了。别把上面那条门槛放松，去查新的原因")
+        XCTAssertLessThan(transparent, 0.9,
+                          "浮层又拍不到了（transparent="
+                          + "\(String(format: "%.1f", transparent * 100))%）。注意：R63 之后"
+                          + "「stack 塌了」不再是可引用的解释（那条已经修掉，见下面两条），"
+                          + "所以这是**捕获通道**坏了 —— 去查新的原因，别把这条门槛放松")
+        guard let stack = stackFrame else {
+            return XCTFail("找不到那个「装着产品表格的 NSStackView」⇒ 浮层的布局结构已经不是判据认识的那个形状")
+        }
+        let ratioW = stack.width / content.bounds.width
+        let ratioH = stack.height / content.bounds.height
+        XCTAssertGreaterThan(ratioW, 0.85,
+                             "浮层内容只占面板宽度的 \(String(format: "%.0f", ratioW * 100))%"
+                             + "（stack=\(NSStringFromRect(stack)) 面板=\(NSStringFromRect(content.bounds))）⇒ "
+                             + "这就是 R63 那个缺陷：用户按下 ⌃⌥⇧V 看到的是一小块内容 + 大片空白。"
+                             + "尺寸的拥有者必须显式写出来（贴边约束），`frame` + `autoresizingMask` 在 NSStackView 上是空操作")
+        XCTAssertGreaterThan(ratioH, 0.85,
+                             "浮层内容只占面板高度的 \(String(format: "%.0f", ratioH * 100))%"
+                             + "（stack=\(NSStringFromRect(stack))）⇒ 同一族缺陷的另一条轴：垂直方向也一样，"
+                             + "滚动视图会被压成 0 高")
+        guard let visible = tableVisible else {
+            return XCTFail("量不到那张表的 visibleRect ⇒ 「行画不画得出来」这一条没有对象")
+        }
+        XCTAssertGreaterThanOrEqual(visible.height, 2 * rowHeight,
+                                    "表格的可视区只有 \(Int(visible.height))pt 高，而一行候选是 \(Int(rowHeight))pt ⇒ "
+                                    + "连两行都放不下。R63 塌的时候这里是 0×0：行有几条都画不出来，"
+                                    + "而 stack 的 frame 看着仍然像回事。"
+                                    + "（阈值用表自己的 rowHeight，不写 34 这种字面量：那是产品定的，不是判据定的）")
+    }
+
+    /// 空结果那一句的**两条**契约（R63）：它得真的在画（不是停在淡入的起点），
+    /// 以及它得落在列表那一格（紧跟搜索框），不许掉在面板最底下。
+    ///
+    /// 为什么要分开两条：
+    /// · `alphaValue` —— `applyEmptyState` 走 `animator()`，而非图层的 view 上这条**不提交模型值**
+    ///   （spike 四臂：无图层两臂设完读到 0.000、转 2.1s 仍是 0.000 且完成回调从不跑；
+    ///   图层化那一臂立刻读到 1.000）。也就是说"用户看不看得见这句话"被压在"动画跑没跑完"上。
+    ///   这条断言不许它再回到那种形状。淡入本身仍然是"源码已接、产物未量"（账本 D-055）。
+    /// · 位置 —— 这一条由**看帧**得出：R7 当年把句子放在表格下面，理由是实现便利；
+    ///   第一次把这个浮层拍出来看到的是搜索框下面 227pt 空白、句子在面板最底下。
+    ///   坐标约定实测过（AppKit y 向上：搜索框在 y 大的一侧），所以判据写的是
+    ///   "句子顶边到搜索框底边的间隙 ≤ 24pt"，而不是"句子在 y=??"。
+    func testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot() throws {
+        let store = makePopulatedStore()
+        let build = QuickPickCapturePanel.builder(store: store, query: "zzz 不存在")
+        guard let panel = build(), let content = panel.contentView else {
+            return XCTFail("捕获入口建不出浮层窗口 ⇒ 这条判据失去了对象，必须红")
+        }
+        _ = NSApplication.shared
+        defer { panel.orderOut(nil) }
+        panel.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        Self.tileScrollViews(in: content)
+        panel.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+
+        var field: NSTextField?
+        var sentence: NSTextField?
+        func find(_ view: NSView) {
+            if let tf = view as? NSTextField {
+                if tf is QuickPickSearchField { field = tf }
+                else if !tf.stringValue.isEmpty { sentence = tf }
+            }
+            view.subviews.forEach(find)
+        }
+        find(content)
+        guard let sentence else {
+            return XCTFail("浮层里没有「没有匹配…」那句话 ⇒ 空结果态什么都没有说（审计 B-P2 那一族回归）")
+        }
+        XCTAssertFalse(sentence.isHidden, "那句话被藏起来了 ⇒ 空结果时浮层是一片空白")
+        XCTAssertEqual(sentence.alphaValue, 1, accuracy: 0.001,
+                       "那句话的模型值是 \(sentence.alphaValue) ⇒ 它的可见性被压在「淡入动画跑完」上。"
+                       + "实测：非图层的 view 上 `animator().alphaValue` 不提交模型值（spike 臂1/臂2 停在 0.000），"
+                       + "所以这条路径在没有真实显示周期的地方就是「字在、看不见」。淡入是装饰，看得见才是契约")
+        guard let field else { return XCTFail("找不到搜索框 ⇒ 「紧跟搜索框」这一条没有对象") }
+        // 两个 frame 都换算到**同一个**祖先（content）再比 —— 不假设嵌套层数，
+        // 也不拿 stack 局部坐标和 window 坐标相减（那种数看着像读数，其实是错的）。
+        guard let fieldRect = Self.frame(field, in: content),
+              let sentenceRect = Self.frame(sentence, in: content) else {
+            return XCTFail("换算不到同一坐标系 ⇒ 「句子紧跟搜索框」这条判据没有对象")
+        }
+        // AppKit 的 y 向上：搜索框在**上面**，所以它的 `minY` 就是它的底边。
+        let gap = fieldRect.minY - sentenceRect.maxY
+        print("QUICKPICK_EMPTY_SENTENCE fieldBottom=\(String(format: "%.1f", fieldRect.minY)) "
+              + "sentenceTop=\(String(format: "%.1f", sentenceRect.maxY)) gap=\(String(format: "%.1f", gap))")
+        XCTAssertLessThanOrEqual(gap, 24,
+                                "那句话与搜索框之间空了 \(Int(gap))pt ⇒ 它又掉回面板最底下了。"
+                                + "用户刚打完字，眼睛就在列表区那一行；解释必须落在那一格（R63 挪的位置）")
+        XCTAssertGreaterThan(gap, -4,
+                             "那句话压到搜索框上面去了（gap=\(Int(gap))）⇒ 两行叠在一起，读不成一句")
+        // 第三条：**横向居中**。它自己写着 `alignment = .center`，但那句"居中"只在它自己的框里成立 ——
+        // 框不居中，字就不居中。这一条是变异 M332 替我审出来的：第一版判据只量竖向的"紧跟搜索框"，
+        // 于是"撤掉那句话的等宽约束"这一刀**绿着回来**（它退回字宽，位置那条完全没感觉）。
+        let sentenceMidX = sentenceRect.midX
+        let panelMidX = content.bounds.midX
+        XCTAssertLessThan(abs(sentenceMidX - panelMidX), 3,
+                          "那句话的中心在 x=\(String(format: "%.1f", sentenceMidX))，面板中心在 "
+                          + "\(String(format: "%.1f", panelMidX)) ⇒ 差 \(String(format: "%.1f", abs(sentenceMidX - panelMidX)))pt。"
+                          + "它的框不再等宽于面板时，`alignment = .center` 只是在一条偏掉的带子里居中")
+
+        // 第二档：**长查询词**。上面那条短查询的句子比面板窄，所以"框被撑到面板外"这件事
+        // 它看不见 —— 而 `lineBreakMode = .byTruncatingTail` 只在自己的框里截，
+        // 框一旦比面板宽，两端就被面板硬切，省略号根本没机会出现。
+        // 这一档是"那句话的等宽约束到底有没有作者"的答案：M332 单独撤它时判据全绿
+        // （短查询下默认对齐也居中），只有这一档能把它判红。
+        let longQuery = String(repeating: "很长的搜索词", count: 8)
+        let longBuild = QuickPickCapturePanel.builder(store: makePopulatedStore(), query: longQuery)
+        guard let longPanel = longBuild(), let longContent = longPanel.contentView else {
+            return XCTFail("长查询词那一档建不出浮层 ⇒ 这条判据没有对象")
+        }
+        defer { longPanel.orderOut(nil) }
+        longPanel.setFrameOrigin(NSPoint(x: -20006, y: -20006))
+        longPanel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        Self.tileScrollViews(in: longContent)
+        longPanel.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        var longSentence: NSTextField?
+        func findLong(_ view: NSView) {
+            if let tf = view as? NSTextField, !(tf is QuickPickSearchField), !tf.stringValue.isEmpty {
+                longSentence = tf
+            }
+            view.subviews.forEach(findLong)
+        }
+        findLong(longContent)
+        guard let longLabel = longSentence else {
+            return XCTFail("长查询词那一档没找到那句话 ⇒ 空结果态在长查询下根本没说话")
+        }
+        guard let longRect = Self.frame(longLabel, in: longContent) else {
+            return XCTFail("长查询那一档换算不到 content 坐标系 ⇒ 判据没有对象")
+        }
+        print("QUICKPICK_LONG_QUERY 句子 frame=\(NSStringFromRect(longRect)) "
+              + "面板=\(NSStringFromRect(longContent.bounds)) 文本长度=\(longLabel.stringValue.count)")
+        // **面板不许因为内容变宽**。这一条不是"防回归"，它防的是本轮自己改出来的东西：
+        // 把 stack 钉到面板上之后，"内容要多宽"第一次传到了窗口 ——
+        // 修之前实测面板被顶到 899pt（`contentResizeIncrements` 救不了，那是 Auto Layout 在推 frame）。
+        // 判据写成"两个状态的面板同宽"而不是"面板等于 420"：面板尺寸是产品定的，
+        // 而"它不随查询词长度变化"才是这条判据真正守的约定。
+        XCTAssertEqual(longContent.bounds.width, content.bounds.width, accuracy: 0.5,
+                       "长查询词把浮层面板从 \(Int(content.bounds.width))pt 顶到了 "
+                       + "\(Int(longContent.bounds.width))pt ⇒ 这个浮层的设计前提是「固定尺寸、呼出即输入」，"
+                       + "而句子的长度是用户决定的。谁在决定面板宽度，这里就露出来了")
+        XCTAssertGreaterThanOrEqual(longRect.minX, longContent.bounds.minX,
+                                    "那句话的左边伸出面板 \(Int(longContent.bounds.minX - longRect.minX))pt ⇒ "
+                                    + "它被面板硬切而不是被省略号截断。它的等宽约束是这一条的承重墙")
+        XCTAssertLessThanOrEqual(longRect.maxX, longContent.bounds.maxX,
+                                 "那句话的右边伸出面板 \(Int(longRect.maxX - longContent.bounds.maxX))pt ⇒ "
+                                 + "同一族：用户读到的是被切掉一半的字，而不是「换个词或按 Esc 清空」")
+        XCTAssertLessThan(abs(longRect.midX - longContent.bounds.midX), 3,
+                          "长查询下那句话的中心偏了 \(String(format: "%.1f", abs(longRect.midX - longContent.bounds.midX)))pt")
+        // 截断必须**真的发生**：不截断而只是"面板变宽"的话，上面四条可以一起绿。
+        // 这里不用 `NSCell.truncatedStr`（那是方法不是属性，且要自己算 textRange）——
+        // "实际宽度 < 固有宽度"就是"它被压过"的充分证据，而 `.byTruncatingTail` 只在被压时出省略号。
+        XCTAssertTrue(longRect.width < longLabel.intrinsicContentSize.width,
+                      "句子实际宽 \(Int(longRect.width))pt，而它的固有宽度是 "
+                      + "\(Int(longLabel.intrinsicContentSize.width))pt ⇒ 它没有被压过。"
+                      + "那说明这一档要么在靠面板变宽让位（上面那条同宽判据该红），"
+                      + "要么根本没截出省略号 —— 两种都等于这一档什么都没判")
     }
 
     func testCaptureKeyViews() throws {
@@ -430,8 +616,10 @@ final class UICaptureTests: XCTestCase {
                 .sorted().joined(separator: " "))
 
 
+        var exemptedSparse = Set<String>()
         for item in report where item.metrics.transparent > 0.95 {
-            let family = Self.fixtureName(fromFile: item.name).components(separatedBy: "-").first ?? ""
+            let name = Self.fixtureName(fromFile: item.name)
+            let family = name.components(separatedBy: "-").first ?? ""
             let knownIncapable = (family == "settings" && settingsFamilyIsBlank)
             if knownIncapable {
                 print("CAPTURE_NOT_RUN \(item.name) \(Int(item.metrics.transparent * 100))% 未绘制"
@@ -440,10 +628,36 @@ final class UICaptureTests: XCTestCase {
                       + String(format: "%.1f", settingsLowestBlank * 100) + "%）⇒ 记为未运行")
                 continue
             }
+            if Self.sparseByDesignFixtures.contains(name) {
+                // 稀可以，全空不行：这条正对照是这份豁免的承重部分（见名单注释）。
+                let drawn = 1 - item.metrics.transparent
+                XCTAssertGreaterThan(drawn, Self.sparseByDesignInkFloor,
+                                     "\(item.name) 在「天生就稀」的名单里，但它一张都没画出来"
+                                     + "（drawn=\(String(format: "%.2f", drawn * 100))%，门槛 "
+                                     + "\(String(format: "%.1f", Self.sparseByDesignInkFloor * 100))% 来自本机实测的 "
+                                     + "typed 1.7% / empty 2.1%）⇒ 这不是稀，这是捕获坏了")
+                print("CAPTURE_SPARSE_BY_DESIGN \(item.name) drawn=\(String(format: "%.2f", drawn * 100))%"
+                      + "（浮层没有自绘背景 ⇒ 墨只有字与选中填充；门槛的正对照已过）")
+                exemptedSparse.insert(name)
+                continue
+            }
             XCTFail("\(item.name) 有 \(Int(item.metrics.transparent * 100))% 像素未被绘制，"
                     + "判定为捕获失效，不能作为视觉验收证据"
                     + "（这一族的其他帧画得出来 ⇒ 不是机器不行，是这一张不行）")
         }
+
+        // 豁免不许攒着（与 `materialBlindSpotFixtures` 同一手法，R18 立的规矩）：
+        // 名单里那张这次**拍出来了且不稀** ⇒ 红着要求把它从名单里拿掉。
+        // 只在这张帧真的出现在本次报告里时才判 —— 无头 runner 上有的帧根本不落盘，
+        // 那种"名单里没有对应帧"是环境缺席，不是事实变了（先例：`MATERIAL_BLIND_NOT_RUN`）。
+        let presentNames = Set(report.map { Self.fixtureName(fromFile: $0.name) })
+        let stale = Self.sparseByDesignFixtures
+            .filter { presentNames.contains($0) && !exemptedSparse.contains($0) }
+            .sorted()
+        XCTAssert(stale.isEmpty,
+                  "这些帧不再需要「天生就稀」的豁免了：\(stale) ⇒ 把它们从 "
+                  + "`sparseByDesignFixtures` 里拿掉，并且肉眼审一遍新帧（别只改名单）")
+        print("SPARSE_EXEMPTION 生效 \(exemptedSparse.sorted()) 张，名单共 \(Self.sparseByDesignFixtures.count) 条")
 
         // **材质盲区要能被数出来**（R18）。
         // 名单外的帧冒出黑带 ⇒ 又多了一处"看着拍到了、其实那块是黑的"，先红再说；
@@ -986,16 +1200,28 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-multi-select-min", NSSize(width: 250, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected), width: 250))
         })
-        // R18 想加、当时判"加不进去"的三张浮层帧：R19 把那条根因**推翻**了，
-        // 但帧**仍然加不进去**，而且现在知道为什么了（`testQuickPickOverlayCannotBeCapturedYet`
-        // 里带着实测的视图树，不再是猜的）：
-        //   · 浮层里没有 `NSVisualEffectView`，裸材质离屏也画得出来 ⇒ R18 那句"材质不可合成"是错的；
-        //   · 真正的现象是产品的 `NSStackView` 在捕获环境里塌成 24×49
-        //     （真实 App 里它撑满 420×300），于是 `NSScrollView` 0×0、
-        //     `NSTableView.visibleRect` 0×0 —— 表格有 5 行，一行都画不出来。
-        // 两条候选路都没走：让面板 `makeKeyAndOrderFront` 会抢用户前台（测试套件的硬边界），
-        // 而从夹具侧把 stack 的 frame 按回去，等于**让帧去画夹具想要的布局** ——
-        // 那正是这两轮一直在抓的那类假证据。所以这三张继续缺席，判据盯着。
+        // R63：R18 想加、R19 判"加不进去"的三张浮层帧，**现在加进去了**。
+        // R19 那句根因是错的（它说 stack 在捕获环境里塌，而"真实 App 里它撑满 420×300"）：
+        // 实测两条路都塌 —— `NSStackView` 生下来 `translatesAutoresizingMaskIntoConstraints == false`，
+        // 而产品只给了 `frame` + `autoresizingMask`，那两行因此都是空操作，
+        // 于是 stack 24×49、`NSScrollView` 0×0、`visibleRect` 0×0（同一探针、同一夹具、只换那一个文件）。
+        // 修好之后：stack 420×300、滚动视图 396×251、8 行里第一行选中，`cacheDisplay` 从
+        // `drawn=0.0%` 变成 `drawn=19.3%`（判据 `testQuickPickOverlayFillsItsPanelAndCanBeCaptured`）。
+        // 这三张用的是 `QuickPickCapturePanel`（把控制器关在闭包里保命：表格的 dataSource 是弱引用）。
+        results.append(Fixture("quickpick-list", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "")))
+        // 查询词"访达"**不是随手编的**：它命中 `makePopulatedStore()` 里那两条来源为访达的条目
+        // （`.file` 与 `.files` 各一条），所以这张帧判的是"过滤之后还剩几条、剩下的怎么画"。
+        // 第一版我写的是 "记录 3"（从本轮探针的夹具里抄来的），而 harness 这个 store 里
+        // 根本没有那种文本 ⇒ 帧拍出来是"没有匹配「记录 3」的记录" —— 一张名字叫 typed
+        // 而内容是 empty 的帧。教训与账本里那条同一族：**夹具要照抄调用方的真实口味**。
+        results.append(Fixture("quickpick-typed", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "访达")))
+        results.append(Fixture("quickpick-empty", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "zzz 不存在")))
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -4762,14 +4988,17 @@ final class UICaptureTests: XCTestCase {
             window = created
             host = hosting
         }
-        // AppKit 夹具**不走强制约束布局**（R19 实测）：`layoutSubtreeIfNeeded()` 会把
-        // `NSStackView` 从"帧 + autoresizing 撑满 420×300"重排成"按内容拟合尺寸 24×49"，
-        // 于是滚动视图 0×0、表格 `visibleRect` 0×0 —— 行有 5 条，一条都画不出来。
-        // 真实 App 里这一步从来不做：面板靠 `makeKeyAndOrderFront` 走自己的显示周期。
-        if fixture.appKit == nil {
-            window.layoutIfNeeded()
-            host.layoutSubtreeIfNeeded()
-        }
+        // R63：这里**以前**有一条豁免 —— "AppKit 夹具不走强制约束布局（R19 实测）：
+        // `layoutSubtreeIfNeeded()` 会把 NSStackView 从『帧 + autoresizing 撑满 420×300』
+        // 重排成『按内容拟合尺寸 24×49』"。那条解释是错的，而豁免是照着它写的：
+        // 塌不是这一步造成的 —— 产品自己那两条 `frame` + `autoresizingMask` 在 `NSStackView`
+        // 上本来就是空操作（最小对象图 spike：`.scratch/motion-audit-2/r63_spike_stack.swift`，
+        // 建出来 `translatesAutoresizingMaskIntoConstraints` 就是 0），两条路都塌。
+        // 产品改成贴边约束之后，强制布局得到的就是同一个 420×300 ——
+        // 于是没有理由再让浮层走另一条布局路。
+        // 少一条豁免，就少一个"夹具与产品不同形"的地方（BACKLOG 36 那一族）。
+        window.layoutIfNeeded()
+        host.layoutSubtreeIfNeeded()
 
         // 内容要等一次异步刷新才落定的夹具在这里 settle（会转 runloop）。
         // 放在"关 caret"之前：转完 runloop 可能装出新的 field editor，必须让后面的静默与重排照常生效。
@@ -4785,6 +5014,8 @@ final class UICaptureTests: XCTestCase {
         if fixture.appKit == nil {
             host.layoutSubtreeIfNeeded()
         }
+        // AppKit 夹具这里不再补一次强制布局：下面"真实显示周期"那一档里
+        // `orderFrontRegardless` + `tile()` + `display()` 本来就会把布局推到底（R63）。
 
         // R19：**只给 AppKit 夹具**补一次"真实显示周期"。
         //
@@ -4932,6 +5163,27 @@ final class UICaptureTests: XCTestCase {
             scroll.reflectScrolledClipView(scroll.contentView)
         }
         view.subviews.forEach { tileScrollViews(in: $0) }
+    }
+
+    /// 这棵子树里有没有"数据源是产品控制器"的那张表。
+    /// 存在的理由：浮层整棵树里不止一个 `NSStackView`，而 R62 那版探针用
+    /// `max(宽度)` 配"最后一个赢"混着读，三条读数可能来自不同的 stack ——
+    /// 判据要认的是**那一个** stack，所以按身份认，不按尺寸认。
+    static func containsProductTable(_ root: NSView) -> Bool {
+        if let table = root as? NSTableView, table.dataSource is QuickPickController { return true }
+        return root.subviews.contains { containsProductTable($0) }
+    }
+
+    /// 把 `view.frame` 换算到祖先 `ancestor` 的坐标系（一次 `convert(_:from:)`，不假设层数）。
+    /// 不是 `view` 的后代时返回 `nil` —— 宁可不判，也不许拿两个不同坐标系的数相减。
+    static func frame(_ view: NSView, in ancestor: NSView) -> CGRect? {
+        guard let parent = view.superview else { return view === ancestor ? .zero : nil }
+        var hop: NSView? = parent
+        while let current = hop {
+            if current === ancestor { return ancestor.convert(view.frame, from: parent) }
+            hop = current.superview
+        }
+        return nil
     }
 
     /// 递归关掉子树里所有文本视图的插入点（含 `NSTextField` 的 field editor）。

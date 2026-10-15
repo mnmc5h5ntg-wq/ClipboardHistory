@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Fixed（R63：快速选择浮层从来就是塌的 —— 内容只占面板左下角一小块 —— 现在它占满，并且第一次有了帧 —— BACKLOG 30-① 结案）
+- 现象（本轮第一次量到，不是推测）：⌃⌥⇧V 呼出的浮层里，产品的 `NSStackView` 实测
+  `{{0,0},{24,49}}`，`NSScrollView` `0×0`，`NSTableView.visibleRect` `0×0` —— 表里有 8 条，
+  **一条都画不出来**，而面板是 420×300。用户看到的是左下角一小块 + 四分之三的空白。
+- 根因：`ensurePanel()` 用 `stack.frame = content.bounds` + `autoresizingMask = [.width, .height]`
+  来定尺寸，而 `NSStackView(views:)` 生下来 `translatesAutoresizingMaskIntoConstraints == false`
+  （最小对象图 spike 读数）⇒ **那两行是空操作**，Auto Layout 只能按 fittingSize 给它。
+  R19 记的原因（"只在**捕获环境**里塌，真实 App 里撑满 420×300"）被本轮证伪：
+  产品路 `show()` 与捕获路 `windowForCapture` 读到同一个塌法。
+- 修法：尺寸所有权写成四条贴边约束（内缩只写在常量里，`edgeInsets` 归零）。
+  修后 `stack 396×276`、`NSScrollView 396×251`、`visibleRect 396×251`、
+  `cacheDisplay` 从 `drawn=0.0%` 变成 `19.3%`（竖向 10 档 `4 39 62 14 14 15 15 14 10 5`）。
+- 空结果那句话两处改：① 它是**淡入**的，而非图层的 view 上 `animator().alphaValue`
+  **不提交模型值**（四臂 spike：无图层两臂设完读到 0.000，转 2.1s 仍是 0.000，
+  完成回调从不跑）⇒ 加 `wantsLayer`，模型值恒等于终值，淡入只是装饰；
+  ② 它原来在列表**下面**，第一次看到帧才发现是"搜索框下 227pt 空白 + 句子在面板最底"
+  ⇒ 挪到列表那一格（gap 243pt → 8.0pt）。
+- 本轮自己改出来、又被自己判据当场抓住的回归：钉住 stack 之后"内容要多宽"第一次传到窗口，
+  一条 40 字查询词把面板从 420 顶到 **899** ⇒ 降句子/搜索框的抗压缩优先级，面板回到 420 并截出省略号。
+- 夹具：`quickpick-list / -typed / -empty` × 亮暗 = **6 张**，帧基线 116 → **122**（同提交 `update`）。
+- 判据：R19 那条"还拍不到"翻成契约（行、所有权、两条轴的占满比例、可视区 ≥ 2 行、能不能拍），
+  另加空结果态一条（在、没藏、`alpha==1`、紧跟搜索框 ≤24pt、横向居中 <3pt、长查询那档面板不许变宽）。
+  撤掉一条基于假解释的夹具豁免（"AppKit 夹具不走强制布局"）。
+- 变异：M325–M329 + M335 六刀全 CAUGHT；**M330/M331/M333/M334/M336 五刀绿着回来**
+  ⇒ 那五处代码（三个子视图的等宽约束、hugging 那行）今天没有作者，本轮**删掉**，
+  删后 `list`/`typed` 四张帧逐字节不变。
+- 新开：BACKLOG 94（行首 📄 emoji 与 SF Symbol 不是一套语言，且参与搜索匹配）、
+  95（在屏像素通道在本机返回"尺寸正确的空图"）、96（本机 `swift test` 会丢一卷测试后半段的 stdout）。
+
 ### CI（R62：在屏判据的「缺席」改成逐条点名的硬门 —— 结案 BACKLOG 92）
 - 之前：`On-screen interaction probes` 那一步在 runner 上被自带的 240s 看门狗收掉，
   打一句「在屏探针在无头 runner 上不可用」就 `exit 0`。那句话是真的，

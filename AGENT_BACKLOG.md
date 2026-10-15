@@ -821,6 +821,12 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     `NSTableView.visibleRect` 0×0 ⇒ 5 行画不出一行。**这条继续开着**，下一步要答的是
     "让 stack 拿到宽度该由谁做"：产品侧（它本来就打算撑满，是 autoresizing 在离屏没生效）、
     还是夹具侧（那就得接受帧画的是夹具想要的布局 —— 目前判为不可接受）。
+    → **R63 把 ① 结掉**：答案是"产品侧"，而且不是"离屏没生效"—— `NSStackView` 生下来
+    `translatesAutoresizingMaskIntoConstraints == false`，那两行**在真机上同样是空操作**
+    （最小对象图 spike + 两条路各量一次）。修完补进基线三张 × 亮暗 = 6 张：
+    `quickpick-list / -typed / -empty`，116 → **122 帧**。
+    **②③④ 仍然开着**（详情区 `NSTextView` 的排版、`AVPlayerView`、原生 `NSMenu`）——
+    这一轮证明的是"AppKit 表面进得了夹具"，不是"那三个表面已经能看"。
     判据现在是三层（症状 / 标题 / 原因），见 `testQuickPickOverlayCannotBeCapturedYet`。
 
 31. **选中态在离屏帧里是一块纯黑，只数得出来、看不见**（R18 发现，与 30 同一机制）：
@@ -1926,3 +1932,41 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     （同 R36 那条：挂死和跑得很慢必须区分开），拿到名字之后再决定是修探针还是永久登记为不能跑。
     为什么值得做：只要这一卷在 runner 上跑不动，**所有在屏行为判据都只在一个人身上生效**，
     而 R61 那类「选中/滚动」的回归恰恰只有真实表格能判。
+
+94. **浮层与侧栏的行首用 📄 emoji 当文件图标**（R63 看 `quickpick-typed-420x300-light.png` 时看到）：
+    来源是 `EntryPresentation.preview(for:)` 里 `"📄 \(url.lastPathComponent)"` ——
+    也就是**侧栏、浮层、详情**共用同一条字符串。三个问题：
+    ① Apple Color Emoji **不吃 tint**，暗档里它保持自己的颜色，与旁边 `.secondaryLabelColor` 的
+       灰字不同极性（这一条本轮只看了帧，没量对比度）；
+    ② 与全产品其余图标（SF Symbols）不是同一套语言 —— 同一族问题 R2-8 已经为设置侧栏记过一次；
+    ③ 它进了**参与搜索匹配的字符串**（`QuickPickModel.filtered` 与侧栏都拿 `shortPreview` 比），
+       所以"📄 "这两个字符是搜索语义的一部分，改它不是纯视觉改动。
+    下一轮做法：先量暗/亮两档下这一格的对比度与基线（帧已经有了），再把图标改成
+    `NSImageView` + `NSImage(named: NSImage.Name("doc"))`/SF Symbol 的**结构**（不进字符串），
+    同时给"改字符串会影响搜索"补一条真值表。**本轮不动**：这是跨三个表面的呈现层决定，
+    塞进 R63 会让这一轮的改动面失控。
+
+95. **在屏像素通道在这台机器上是"尺寸正确但全空"**（R63 实测）：
+    `CGWindowListCreateImage(.null, [.optionIncludingWindow], windowID, [.bestResolution])`
+    返回 932×692 的图（= 420×300 @2x + 投影），但**每一个像素都是透明的**
+    （`alpha ≤ 0.02` 占 100%）。同一件事在 `screencapture -x -R…` 上表现为
+    "could not create image from rect"。⇒ 这个通道的读数**不能**当判据，
+    而且它比返回 `nil` 更危险：`nil` 会被读成"没跑"，而一张尺寸正确的空图会被读成"屏上是好的"。
+    本轮的处置：所有像素判据一律走 `cacheDisplay`（与 122 张基线同一条通道），
+    并把这条写进探针的注释里。要真正拿到"用户屏幕上那一张"，需要
+    给测试宿主开 Screen Recording 权限，或换 ScreenCaptureKit（macOS 12.3+，
+    但要 entitlement / 用户授权，且会引入新依赖）—— 与 BACKLOG 93 同族（都是"这一类事实
+    今天只能通过一条没人管着的通道拿"），但对象不同：93 是探针挂死，这条是截图通道空转。
+
+96. **本机 `swift test` 会丢一卷测试后半段的 stdout**（R63 撞到两次）：
+    `testCaptureKeyViews` 的 `CAPTURED 122 -> …`（第 454 行）到了日志里，
+    而同一个函数后半段的 `BOTTOM_INK_IDENTITY`、`SPARSE_EXEMPTION` 三条**一条都没到**；
+    `MotionFilmstripTests` 更明显：stdout 只剩 4 条 `MOTION_NOT_RUN`，
+    `MOTION_RESOLVE_SUMMARY` 整个不见，于是 `motion_floor_gate.py` 判
+    `MOTION_FLOOR_NO_RESOLVE` + `REDS=1` —— **一次假红**，指错了方向。
+    动效那一卷靠 R11 立的**文件通道**（`<MOTION_OUT>/motion-readings.log`）活了下来：
+    换它之后同一道门是 `judged=4/4 REDS=0`。
+    要做的是给捕获卷补同一条通道（或把结论行挪到该函数**前半段**，见 R53 那条
+    "结论行要打在能力闸门之前"），否则 CI 上任何以 stdout 为唯一来源的捕获结论
+    都建立在这台机器"今天没丢"的运气上。**这一条还没验过 runner 上是否同样丢** ——
+    R63 的 CI 读数里如果 `SPARSE_EXEMPTION` 那类行没出现，就是同一种丢法。

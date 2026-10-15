@@ -1,0 +1,36 @@
+=== 基线（未变异）必须先全绿 ===
+   baseline QuickPickOverlayFillsItsPane=green QuickPickEmptyStateSentenceI=green
+
+M325 把贴边约束换成 R63 之前那个尺寸形状（24×49 落在 420×300 里）⇒ 两条轴 + 能不能拍 都该红
+   CAUGHT 期望红的=QuickPickOverlayFillsItsPanelAndCa 实测=red  其余={'testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot': 'red'}
+   还原成功（按内容比对）
+
+M326 只撤竖向两条贴边约束（横向留着）⇒ 只有高度那条轴该红
+   CAUGHT 期望红的=QuickPickOverlayFillsItsPanelAndCa 实测=red  其余={'testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot': 'green'}
+   还原成功（按内容比对）
+
+M327 只撤横向两条贴边约束（竖向留着）⇒ 只有宽度那条轴该红
+   CAUGHT 期望红的=QuickPickOverlayFillsItsPanelAndCa 实测=red  其余={'testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot': 'red'}
+   还原成功（按内容比对）
+
+M328 撤掉 `empty.wantsLayer = true` ⇒ 那句话的模型值回到动画手里
+   CAUGHT 期望红的=QuickPickEmptyStateSentenceIsCommi 实测=red  其余={'testQuickPickOverlayFillsItsPanelAndCanBeCaptured': 'green'}
+   还原成功（按内容比对）
+
+M329 把那句话挪回列表**下面**（R7 的老位置）⇒ 竖向位置那条该红
+   CAUGHT 期望红的=QuickPickEmptyStateSentenceIsCommi 实测=red  其余={'testQuickPickOverlayFillsItsPanelAndCanBeCaptured': 'green'}
+   还原成功（按内容比对）
+
+M334 撤掉那句「没有匹配…」的等宽约束 ⇒ 长查询那一档该红（它退回 879pt 的固有宽度）
+   ESCAPED 期望红的=QuickPickEmptyStateSentenceIsCommi 实测=green  其余={'testQuickPickOverlayFillsItsPanelAndCanBeCaptured': 'green'}
+   还原成功（按内容比对）
+
+M335 撤掉句子的抗压缩降级 ⇒ 面板被顶宽（本轮真实抓到过的缺陷：420 → 899）
+   CAUGHT 期望红的=QuickPickEmptyStateSentenceIsCommi 实测=red  其余={'testQuickPickOverlayFillsItsPanelAndCanBeCaptured': 'green'}
+   还原成功（按内容比对）
+
+M336 撤掉搜索框的抗压缩降级 ⇒ 判「这一行到底有没有作者」（用户能往框里打任意长的词）
+   ESCAPED 期望红的=QuickPickEmptyStateSentenceIsCommi 实测=green  其余={'testQuickPickOverlayFillsItsPanelAndCanBeCaptured': 'green'}
+   还原成功（按内容比对）
+
+电池结束。日志请自行留存：本脚本只往 stdout 打，重定向进 .scratch/motion-audit-2/r63_mutation_battery.log

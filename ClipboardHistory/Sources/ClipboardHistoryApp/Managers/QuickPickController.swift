@@ -71,11 +71,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 但**不 `makeKeyAndOrderFront`、不 `activate`** —— 那两件事会抢走用户的前台，
     /// 而捕获套件有一条硬边界：不许碰真窗口（与 `CLIPBOARD_HISTORY_DATA_DIR` 同一族理由）。
     ///
-    /// 返回的是**面板本身**而不是它的 contentView。R19 实测到的原因：
-    /// 把 `contentView` 摘出来塞进另一个窗口，`NSStackView` 会塌成 24×49
-    /// （它自己的尺寸约束与"搬家后重新生成的换算约束"打架），于是
-    /// `NSScrollView` 拿到 0×0、`table.visibleRect` 是 0×0 —— 行有 5 条，一条都画不出来。
-    /// 那种帧看着像"浮层是空的"，其实像的是所有权被搬坏。拍**窗口**才拍得到产品真的那一块。
+    /// 返回的是**面板本身**而不是它的 contentView —— 这一点仍然成立，但 R19 给的原因作废了。
+    /// R19 写的是"把 `contentView` 摘出来塞进另一个窗口，`NSStackView` 会塌成 24×49
+    /// （它自己的尺寸约束与搬家后重新生成的换算约束打架）"。R63 实测：
+    /// **不搬家也塌**，同一条探针量到 24×49 与 `NSScrollView` 0×0，
+    /// 根因在 `ensurePanel()` 里（`NSStackView` 生下来 `translatesAutoresizingMaskIntoConstraints == false`，
+    /// 所以产品当时那两行 `frame` + `autoresizingMask` 是空操作）。
+    /// 现在拍窗口仍然比拍 contentView 好：窗口才有标题栏区域的真实合成，
+    /// 而"搬家会不会弄坏布局"已经不是理由 —— 布局坏了要能被判据抓到，不是被绕开。
     ///
     /// 返回 `nil` 表示面板没建起来 ⇒ 夹具必须**当场红**，
     /// 不许拿一张空白窗当"这就是浮层"（那种帧看着像证据，其实什么都没说）。
@@ -213,24 +216,77 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             // 拿不到容器就安静地不显示，比崩掉更可用（下面调用方按 isVisible 决定 toggle 方向）。
             return panel
         }
-        // 空结果那一句放在表格**下面**而不是盖在上面：面板固定 420×300，
-        // 盖上去要自己算居中，而 stack 已经管好了间距与宽度。
+        // 空结果那一句。位置在 stack 里排**在列表前面**（R63 改的，理由见下面 `stack` 那段注释）。
         let empty = NSTextField(labelWithString: "")
         empty.font = .systemFont(ofSize: 13)
         empty.textColor = .secondaryLabelColor
         empty.alignment = .center
         empty.lineBreakMode = .byTruncatingTail
         empty.isHidden = true
+        // R63：这句话是**淡入**的（`applyEmptyState` 走 `animator().alphaValue`），
+        // 而非图层 (`layer-backing` 关) 的 `NSView` 上，`animator()` **不提交模型值**：
+        // spike 四臂实测 —— 臂1/臂2（产品形状，无图层）设完之后读到 `alpha=0.000`，
+        // 转 2.1 秒仍然是 0.000、连 `completionHandler` 都没跑；
+        // 臂3/臂4（`wantsLayer = true` 或先落终值）立刻读到 `alpha=1.000`。
+        // 也就是说"用户能不能看见这句话"被压在"动画有没有真的跑完"上面 ——
+        // 淡入是装饰，看得见才是契约。开图层之后：模型值恒为终值，呈现值仍然从 0 淡上去。
+        // 副作用已经查过：图层化会影响在 vibrant 容器里解析动态颜色（账本 R30 那一族），
+        // 而这个面板没有材质视图（`ensurePanel` 里是普通 contentView），所以这里不受影响；
+        // 真把帧拍出来之后亮暗两档的这句话都还是要过对比度判据。
+        empty.wantsLayer = true
 
-        let stack = NSStackView(views: [field, scroll, empty])
+        let stack = NSStackView(views: [field, empty, scroll])
+        // R63 把这句话从"表格下面"挪到"表格上面"。**改的是我自己钉过的决定**（R7 的原文：
+        // "空结果那一句放在表格下面而不是盖在上面：盖上去要自己算居中，而 stack 已经管好了间距与宽度"），
+        // 所以理由要留在这里：那三条理由是**实现便利**，不是观感判断；而这一轮第一次把这个浮层拍出来
+        // （`/tmp/r63_evidence/v3/probe-quickpick-empty.png`）看到的是
+        // 搜索框下面 227pt 的空白，那一句在面板最底下 —— 用户刚打完字，眼睛就在列表区那一行，
+        // 结果"没有匹配"这句话在 250pt 之外。挪到列表位置（`detachesHiddenViews` 让它在有候选时
+        // 整条从布局里消失）之后不需要自己算居中，也不会有跳动：它出现的那一格就是刚才那列表的位置。
         // 隐藏时必须真的从布局里拿掉，否则那句话会占着一行高度把表格挤短。
         stack.detachesHiddenViews = true
         stack.orientation = .vertical
         stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-        stack.frame = content.bounds
-        stack.autoresizingMask = [.width, .height]
+        // R63 修的缺陷。原来这两行是：
+        //     stack.frame = content.bounds
+        //     stack.autoresizingMask = [.width, .height]
+        // 而**它们都是空操作**：`NSStackView` 生下来 `translatesAutoresizingMaskIntoConstraints == false`
+        // （最小对象图 spike 读数 A0：建出来就是 0），autoresizing 那条通道根本没接管；
+        // 外部又一条位置约束都没有 ⇒ Auto Layout 只能按 fittingSize 给它尺寸。
+        // 实测（同一条探针、同一个夹具、只换这一个文件）：
+        //     修前 stack 24×49、`NSScrollView` 0×0、`NSTableView.visibleRect` 0×0（8 行，一行都画不出来）
+        //     修后 stack 420×300、`NSScrollView` 396×251、`visibleRect` 396×251
+        // 面板是 420×300 —— 用户按下 ⌃⌥⇧V 看到的是**左下角一小块 + 四分之三的空白**。
+        // 所以尺寸的"所有权"必须写出来：贴住 contentView 四条边。
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        // 内缩不在 `edgeInsets` 里表达（那会与"子视图贴 stack 边"再叠一层，差出 2pt），
+        // 而是写成 stack 自己贴边的那四个常量 —— 一条轴只有一个地方能改它。
+        stack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         content.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
+            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
+            // 就这四条，一条都不多写。本轮曾经给三个子视图各写"等宽 = 面板减内缩"
+            // （六行）+ 两行 hugging/抗压缩，然后被变异对照逐条审：
+            //   M330 撤滚动视图那两条 → 绿   M331 撤搜索框那两条 → 绿
+            //   M333 撤 hugging 那一行 → 绿   M334 撤句子那两条 → 绿
+            //   M336 撤搜索框抗压缩 → 绿
+            // 删掉之后重拍 6 张帧，`list` / `typed` 四张**逐字节不变** ⇒ 它们确实是空转
+            // （`NSStackView` 的默认对齐本来就把没有固有宽度的视图拉满、把有固有宽度的居中）。
+            // 只有下面那一行**有作者**：M335 撤掉它，长查询那一档立刻红（面板 420 → 899）。
+        ])
+        // R63 自己改出来、又被自己判据当场抓住的一个回归：把 stack 钉到面板上之后，
+        // "内容要多宽"第一次**传到了窗口** —— 一条 40 字的查询词让那句"没有匹配…"
+        // 的固有宽度变成 879pt，于是面板从 420 被顶到 899
+        // （实测 `QUICKPICK_LONG_QUERY 面板={{0,0},{899,300}}`）。
+        // 修之前那条通道根本不存在（stack 连外部约束都没有），所以这是本轮引入的。
+        // 降**抗压缩**而不是加宽度约束：那句话本来就有 `.byTruncatingTail`，
+        // 只要允许它被压，它就会在面板宽度内截成省略号 —— 而"固定尺寸、呼出即输入"
+        // 是这个浮层的设计前提（见类注释）。判据是
+        // `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 的长查询那一档。
+        empty.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         self.panel = panel
         self.field = field

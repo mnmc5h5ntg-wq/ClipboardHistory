@@ -1,5 +1,5 @@
 {
-  "count": 116,
+  "count": 122,
   "frames": {
     "content-empty-750x560-dark.png": "a09e9950d6a641836ef4015b91b85252c1897a55b22938fbe6f673614946e91d",
     "content-empty-750x560-light.png": "6ef53e39f67397f7807907c53ac90fcf8aef4c198db987f3305b235f27cc3382",
@@ -57,6 +57,12 @@
     "menubar-refreshing-320x120-light.png": "67fd69434988342ad19d77b72277bdeed882cc53c66e4c1ca8d49ff185de1f97",
     "notice-banner-560x170-dark.png": "376d3a84fcb77ae64b48ec7689b3f0280d035fffb4b6a82cfd48f56f483e7d54",
     "notice-banner-560x170-light.png": "9904597535967a106164acd08d4bf818e76cb527df9dc19efe137340eea032b7",
+    "quickpick-empty-420x300-dark.png": "7902bbda66575ba637d33498a4832efb463d9cdcf93de169ab5ce41e0cc57966",
+    "quickpick-empty-420x300-light.png": "30029f0b7b97798b49bbe197a11acf8210f59595f8356f37d68079e06b20ad91",
+    "quickpick-list-420x300-dark.png": "09c9f381f47f76e238e48e2f62e3fe030fdc657ad11b46a81b40922a0605a1cc",
+    "quickpick-list-420x300-light.png": "ad6e82a9cf9dccbf3caa60bd09751af977bcce6ed6f77eee6b36f5fd24b72715",
+    "quickpick-typed-420x300-dark.png": "ed386f7f7ab85b857c4cbc214f2271bb2e22287631d65f61e53d47e79cb796fb",
+    "quickpick-typed-420x300-light.png": "751d436c3b9f6d43dec2c121b1e7a19735dccc0a31e07267f9b5c5a99dfa7aa1",
     "receipt-line-430x72-dark.png": "a1439cae9c665cb3807133a874239efb2abaf10a7e73bf71b8d0268671d8c0be",
     "receipt-line-430x72-light.png": "22098329d5c4b91502ab619554b827be7ab37ab6f2fc9d325efa6b8464dd3d06",
     "row-clipped-control-300x58-dark.png": "15370117b18171e608290825e99130ff51f210906c433c08f84f008ba3b9acfc",
