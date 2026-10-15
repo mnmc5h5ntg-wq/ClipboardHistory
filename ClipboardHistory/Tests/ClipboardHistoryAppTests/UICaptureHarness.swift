@@ -653,8 +653,23 @@ final class UICaptureTests: XCTestCase {
                                              x0: 0, x1: plain.pixelsWide, floor: 4)
             let pillInset = Self.profileLeftInsetSpread(pill)
             let fillInset = Self.profileLeftInsetSpread(fill)
+            // 这条通道在 **1× 上量不到圆角**（R69 读 R67 的 CI 才知道的，本机这一条一直是绿的）：
+            //   本机 2×：药丸内缩 11px、灰带内缩 11px、逐行差 0px；
+            //   runner 1×：药丸内缩 **2px**、灰带内缩 **5px**、首行逐行差 **3px** ⇒ 判红。
+            // 两端的**中行完全一致**（本机 44…795 / runner 22…382），差只出现在首末那几行 ——
+            // 那里一个像素就是一整个 pt，材质边缘的抗锯齿覆盖率又不是线性的 ⇒
+            // 1× 上"方还是圆"这一轴**没有分辨率**，把 2× 的读数当它的地板就是 R38 那一课重犯
+            // （这次栽的是我上一轮刚写的判据 —— 记 U-117）。
+            // 处置沿用 R60 那条"按机器分开前提"：这一轴在 1× 上不许判红、也不许装作判过
+            // ⇒ 发 `FRAME_CORNER_AXIS_NOT_RUN=1` 点名（名字必须**以 `_NOT_RUN` 结尾**：
+            // `ci_capture_gate.py` 的那条正则要的是 `\\b[A-Z][A-Z0-9_]*_NOT_RUN\\b`，
+            // 自造一个 `_BLIND` 后缀它就整条看不见 ⇒ 缺席又回到"只有注释替它决定"的老形状（R36/U-59））；2× 上照旧红。
+            // 而**方角在两台机器上都还会红**，靠的是下面那条不依赖参照物的 `fillInset ≥ 1`：
+            // 直角块的首行与中行同宽 ⇒ 内缩跨度恒为 0，1× 也量得出"没有内缩"。
+            let cornerAxisResolvable = pillInset >= 4
             emit("OVERLAY_HOVER_OUTLINE \(label) 药丸行数=\(pill.count) 灰带行数=\(fill.count) "
                   + "药丸左沿内缩=\(pillInset)px 灰带左沿内缩=\(fillInset)px "
+                  + "缩放=\(shot.scale)× 圆角这一轴=\(cornerAxisResolvable ? "可判" : "无分辨率") "
                   + "药丸首行=\(pill.first.map { "\($0.left)…\($0.right)" } ?? "-") "
                   + "药丸中行=\(pill.count > 2 ? "\(pill[pill.count / 2].left)…\(pill[pill.count / 2].right)" : "-") "
                   + "灰带首行=\(fill.first.map { "\($0.left)…\($0.right)" } ?? "-") "
@@ -662,24 +677,40 @@ final class UICaptureTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(pill.count, 8,
                 "\(label)档：只量到 \(pill.count) 行药丸轮廓 ⇒ 参照物不存在（材质在离屏窗口里没合成，R18 那一族），"
                     + "这条判据不许在'量不到'的情况下当作通过")
-            XCTAssertGreaterThanOrEqual(pillInset, 4,
-                "\(label)档：药丸自己的左沿内缩只有 \(pillInset)px ⇒ 参照物在这一帧里是方的，"
-                    + "那么'逐行一致'就成了空判据（任何同样方的东西都能通过）。先查捕获通道再谈灰带的形状")
             XCTAssertGreaterThanOrEqual(fill.count, 8,
                 "\(label)档：只量到 \(fill.count) 行灰带轮廓 ⇒ 那一层灰没画出来，判不了形状")
             XCTAssertLessThanOrEqual(abs(fill.count - pill.count), 2,
                 "\(label)档：灰带 \(fill.count) 行而药丸 \(pill.count) 行 ⇒ 两块东西高度不同："
                     + "灰要么比行高（画到邻行去了），要么被压扁了")
+            // —— 两台机器都有牙的那一条：灰带自己必须是圆的（直角 ⇒ 内缩跨度恒 0）。
+            XCTAssertGreaterThanOrEqual(fillInset, 1,
+                "\(label)档：灰带自己的左沿内缩跨度是 \(fillInset)px ⇒ 它是**直角**的。"
+                    + "这一条不依赖参照物，所以 1× 上也照样红（R67 第一版就是这一形状）")
+            if cornerAxisResolvable {
+                XCTAssertGreaterThanOrEqual(pillInset, 4,
+                    "\(label)档：走到这里说明线判为可判，而药丸内缩只有 \(pillInset)px —— 自相矛盾，查尺")
+                XCTAssertLessThanOrEqual(abs(fillInset - pillInset), 2,
+                    "\(label)档：灰带内缩 \(fillInset)px 与药丸 \(pillInset)px 差 \(abs(fillInset - pillInset))px ⇒ "
+                        + "两档曲率不是一套话（6pt 那一版差 3px，就是这一格抓的）")
+            } else {
+                emit("FRAME_CORNER_AXIS_NOT_RUN=1 \(label) 缩放=\(shot.scale)× "
+                      + "药丸内缩=\(pillInset)px（< 4px）⇒ 这台机器的通道量不出参照物的圆角，"
+                      + "'与药丸同曲率'这一轴今天**没判**（不是判过且通过）。"
+                      + "仍判的是：灰带自己是圆的、中行宽度一致、高度一致（见上一条断言）")
+            }
             let common = min(pill.count, fill.count)
+            // 首末各去掉 `scale` 行：1× 上那一行就是一个 pt 的量化误差（runner 的 3px 差就在这里），
+            // 2× 上只去掉最外面两行 —— 方角会一路吃进带内 6pt（本机 12px），中间行照样红。
+            let margin = max(1, shot.scale)
             var worstLeft = 0, worstRight = 0, worstAt = -1
-            for t in 0..<common {
+            for t in margin..<max(margin, common - margin) {
                 let dl = abs(fill[t].left - pill[t].left), dr = abs(fill[t].right - pill[t].right)
                 if max(dl, dr) > max(worstLeft, worstRight) { worstLeft = dl; worstRight = dr; worstAt = t }
             }
-            emit("  逐行最大偏差 第\(worstAt)行 左=\(worstLeft)px 右=\(worstRight)px（线 2px）")
+            emit("  逐行最大偏差（去掉首末各 \(margin) 行）第\(worstAt)行 左=\(worstLeft)px 右=\(worstRight)px（线 2px）")
             XCTAssertLessThanOrEqual(worstLeft, 2,
                 "\(label)档：灰带与药丸逐行左沿最大差 \(worstLeft)px（第 \(worstAt) 行）⇒ 形状不是一套话。"
-                    + "方角会在这里红：直角块的顶行与圆角药丸的顶行差一个半径（实测内缩跨度 11px）")
+                    + "方角会在这里红：直角块从顶行起就与圆角药丸一行差一个半径（本机实测 11px）")
             XCTAssertLessThanOrEqual(worstRight, 2,
                 "\(label)档：灰带与药丸逐行右沿最大差 \(worstRight)px（第 \(worstAt) 行）（同上）")
         }

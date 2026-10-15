@@ -1,0 +1,54 @@
+=== 基线（未变异）：三条真值表判据都必须绿 ===
+   testTheControlJudgmentIsATruthTable                      = green
+   testTheFadeClockWitnessQualificationIsATruthTable        = green
+   testTheFadeClockClassifierIsATruthTable                  = green
+
+M372 退回 BACKLOG 104 的原始缺陷形状：`.snaps` 无条件 ⇒ `.notRun`（证人合不合格这一轴被删掉 ⇒ '我没看清'又能给'它没动'签字）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheControlJudgmentIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2835: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertEqual
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2844: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertNotEq
+   已还原（逐字节相同：True）
+
+M373 把合格线放到'只要能切 1 段'（`>= minimumIntermediateFrames + 1` ⇒ `>= 1`）⇒ runner 那一档的 80ms 会变成'合格'，skip 重新变成免检牌
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheFadeClockWitnessQualificationIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2863: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable] : 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2865: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable] : 
+   已还原（逐字节相同：True）
+
+M374 把合格线挪低一格（`+ 1` 去掉）⇒ 51ms 那一格必须红（边界）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheFadeClockWitnessQualificationIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2863: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable] : 
+   已还原（逐字节相同：True）
+
+M375 把'能分辨'的证人判成环境（`.resolves ⇒ .notRun`）⇒ 这是 R66 的 M356 同一张免检牌换了个格子
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheControlJudgmentIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2820: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertEqual
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2830: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertEqual
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2838: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertEqual
+   已还原（逐字节相同：True）
+
+M376 把 `residual > floor` 改成 `>=`（悄悄改判据的边界）⇒ 恰好等于地板那一格必须从红变绿 ⇒ 决定表必须红
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheControlJudgmentIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2830: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable] : XCTAssertEqual
+   已还原（逐字节相同：True）
+
+M377 让证人永远不合格（把合格线抬到 100 段）⇒ 必须红在**合格线那张真值表**（决定表吃的是已经算好的布尔值，它抓不到这一刀 —— 这正是两条表都要在的理由）。反向的一刀：只测'不合格要红'会漏掉'永远不合格'也是一种免检（它把 skip 换成红，看起来更严，其实把这台机器上唯一能得出的结论钉死了）。写法注意：变异文**不能包含原文**，否则电池的回读检查会判'没落地'（M377 第一版就踩了这个）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在：testTheFadeClockWitnessQualificationIsATruthTable
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2859: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable] : 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2861: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable] : 
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M372   CAUGHT
+   M373   CAUGHT
+   M374   CAUGHT
+   M375   CAUGHT
+   M376   CAUGHT
+   M377   CAUGHT
+   抓到=6 逃掉=0 没跑成=0 未落地=0

@@ -467,7 +467,12 @@ final class MotionFilmstripTests: XCTestCase {
     /// 这段过渡在这把尺下**最多**能被切成几帧。
     /// 抓帧是同步 `cacheDisplay`，间隔由抓取耗时决定：本机实测在 31–90ms 之间漂，
     /// 而声明的过渡只有 150–160ms —— 所以"过渡帧数 ≥3"这种写法量的其实是抓帧耗时。
-    static func resolvableFrames(durationMilliseconds: Double, sampleMilliseconds: Int) -> Int {
+    ///
+    /// `nonisolated`（R68）：这是一条纯算术判据，而 `FadeClockReading.qualifies` 也要用它。
+    /// 嵌套类型**不继承**外层类的 `@MainActor`（Swift 6.1 在 CI 上直接编译不过），
+    /// 于是"要么把公式抄第二份、要么让它能被子域调用"二选一 —— 抄第二份迟早会算出两个"可分段数"
+    /// （R57 那条"两份各写一遍迟早会算出两个中位"同一课），所以改的是隔离，不是复制。
+    nonisolated static func resolvableFrames(durationMilliseconds: Double, sampleMilliseconds: Int) -> Int {
         guard sampleMilliseconds > 0, durationMilliseconds > 0 else { return 0 }
         return Int(durationMilliseconds / Double(sampleMilliseconds))
     }
@@ -598,6 +603,27 @@ final class MotionFilmstripTests: XCTestCase {
         var verdict: FadeClockVerdict {
             if frames < 4 || span < Self.deadSpan { return .probeDead }
             return intermediate >= Self.minimumIntermediateFrames ? .resolves : .snaps
+        }
+
+        /// 这个证人**有没有资格**给"这台机器看不见"这句话签字（R68 / BACKLOG 104）。
+        ///
+        /// 判据只有一条：**证人自己得能把自己那条淡入切成可数的中间态**。
+        /// 理由不是形式，是 R66 那次 CI 的实物：runner 上证人采样 ≈80ms、
+        /// 而它要作证的 `testTransitionsAreActuallyRunning` 用"事件内最粗 35ms"。
+        /// 一条 150ms 的淡入在 80ms 间隔上本来就只有 1 段可分 ⇒ `中间态帧数=0` 是**证人的分辨率**，
+        /// 不是产品的跳变。拿它去 skip，等于把"我没看清"写成"它没动" ——
+        /// 与 R66 的 M356 同一个形状，只是这次方向相反（M356 是"能分辨时不许 skip"）。
+        ///
+        /// 为什么线取"段数 ≥ `minimumIntermediateFrames` + 1"而不是"证人采样 ≤ 判据采样"：
+        /// 后者我第一版就是这么写的，本机当场读到 `证人≈20ms 判据≈11ms ⇒ 不合格` ——
+        /// 那是**把两根不同的尺硬比大小**：判据那 11ms 里含它自己夹具的成本，
+        /// 与"证人能不能分辨一条淡入"没有关系（同一族：R47 那条"判据别拿帧数当时长用"）。
+        /// 现在这条线全部由证人自己的量推导：声明时长 ÷ 采样 = 可分数段，
+        /// 而"要几段才叫能分辨"用的就是它自己那条 `minimumIntermediateFrames`。
+        func qualifies(declaredDurationMilliseconds: Int) -> Bool {
+            MotionFilmstripTests.resolvableFrames(
+                durationMilliseconds: Double(declaredDurationMilliseconds),
+                sampleMilliseconds: samplingMilliseconds) >= Self.minimumIntermediateFrames + 1
         }
     }
 
@@ -2699,13 +2725,32 @@ final class MotionFilmstripTests: XCTestCase {
         // 也得能被判红（`testTheFadeClockClassifierIsATruthTable` 钉着它的判别力）。
         let clock = fadeClock()
         func fmt(_ value: Double) -> String { String(format: "%.3f", value) }
-        switch Self.controlJudgment(residual: fadingResidual, clock: clock.verdict) {
+        // R68 / BACKLOG 104：证人能不能给"这台机器看不见"签字，取决于它**自己那条淡入分不分得开**。
+        // 上一轮 runner 上的实物是证人 ≈80ms ⇒ 150ms 在它那里只有 1 段可分，
+        // 于是"证人也看不见过程"说的只是证人自己的分辨率，不是产品的跳变。
+        let declared = Int(FadeClockView.declaredDurationMilliseconds)
+        let segments = Self.resolvableFrames(durationMilliseconds: Double(declared),
+                                             sampleMilliseconds: clock.samplingMilliseconds)
+        let qualifies = clock.qualifies(declaredDurationMilliseconds: declared)
+        emit("MOTION_WITNESS notice-banner 证人采样≈\(clock.samplingMilliseconds)ms 声明=\(declared)ms "
+            + "可分数段=\(segments) 合格=\(qualifies ? "是" : "否") 判定=\(Self.fadeClockLabel(clock.verdict)) "
+            + "（判据自身采样≈\(interval)ms）")
+        switch Self.controlJudgment(residual: fadingResidual, clock: clock.verdict,
+                                    witnessQualifies: qualifies) {
         case .green:
             break
         case .witnessIsDead:
             XCTFail("淡入时钟探针的夹具自己读不出过程（跨度=\(fmt(clock.span)) 中间态帧数=\(clock.intermediate) "
                 + "帧数=\(clock.frames)），而产品横幅在同一条件下也读不出（落定残余=\(fmt(fadingResidual))）⇒ "
                 + "这两条现在没有一条能证明这把尺看得见淡入。判红而不 skip：坏的是探针，得有人去修它")
+        case .witnessCannotAdjudicate:
+            XCTFail("证人读不出这条淡入的过程，而它**连自己都分辨不了**"
+                + "（证人≈\(clock.samplingMilliseconds)ms、声明 \(declared)ms ⇒ 只切得出 \(segments) 段，"
+                + "少于『中间态 + 1』那三段的地板）⇒ 它没资格作证："
+                + "一条 150ms 的过程在 80ms 的采样上本来就会塌成一帧，"
+                + "所以'证人也是跳变'说的只是证人自己的分辨率，不能拿来解释产品这条读不出残余的横幅。"
+                + "红着，去把证人降成本 / 加密采样（BACKLOG 104）；"
+                + "把 skip 当解药等于把'我没看清'写成'它没动'")
         case .productSnapped:
             XCTFail("这台机器**看得见** 150ms 的淡入（夹具中间态 \(clock.intermediate) 帧、跨度 \(fmt(clock.span))、"
                 + "采样≈\(clock.samplingMilliseconds)ms），产品横幅在同一条量法下却读不出残余"
@@ -2736,41 +2781,99 @@ final class MotionFilmstripTests: XCTestCase {
         case witnessIsDead
         /// 判红：这台机器能分辨，产品横幅却没读出过程 ⇒ 不是环境问题。
         case productSnapped
-        /// 报 skip：这台机器今天看不见 150ms 淡入的过程。
+        /// 判红（R68）：证人读不出过程，但它采得比判据还粗 ⇒ **它没资格作证**，红不许被换成 skip。
+        case witnessCannotAdjudicate
+        /// 报 skip：这台机器今天看不见 150ms 淡入的过程，而且证人采得不比判据粗。
         case notRun
     }
 
-    static func controlJudgment(residual: Double, clock: FadeClockVerdict) -> ControlJudgment {
+    /// 决定表多了一根轴（R68 / BACKLOG 104）：证人的**采样率**。
+    ///
+    /// 原来 `.snaps` 直接 ⇒ `.notRun`，这一步偷偷假定了"证人读不出 = 这台机器读不出"。
+    /// 那个假定在 runner 上被自己的读数证伪了：证人采样 ≈80ms，判据采样 35ms，
+    /// 而 150ms 的淡入在 80ms 间隔上本来就只剩 1–2 帧 ⇒ 证人的 `中间态帧数=0` 说的是证人自己。
+    /// ⇒ skip 现在需要**两个**条件：证人看不见过程 **且** 证人采得不比判据粗。
+    /// 少了后面那半条，"我没看清"就能给"它没动"签字（与 M356 同族，方向相反）。
+    static func controlJudgment(residual: Double, clock: FadeClockVerdict,
+                                witnessQualifies: Bool) -> ControlJudgment {
         if residual > controlResidualFloor { return .green }
         switch clock {
         case .probeDead: return .witnessIsDead
         case .resolves: return .productSnapped
-        case .snaps: return .notRun
+        case .snaps: return witnessQualifies ? .notRun : .witnessCannotAdjudicate
         }
     }
 
     /// 上面那张决定表的真值表（不开窗口，CI 每轮都跑）。
     ///
-    /// 六个格子一个不少：`residual` 两档 × 证人三种判定。
+    /// R68 起是**八格**：`residual` 两档 × 证人三种判定 ×（在 `.snaps` 那一档上）证人合不合格两档。
     /// 特别是"residual 高 + 证人死了"这一格必须**绿** —— 反过来（证人死了就一律红）
     /// 会让 CI 在阳性对照已经没问题的情况下多一条假红，而假红的代价（R60 那次）
     /// 是下一次真红没人信。
     func testTheControlJudgmentIsATruthTable() {
-        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .resolves), .green)
-        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .snaps), .green,
+        let qualified = true
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .resolves, witnessQualifies: qualified), .green)
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .snaps, witnessQualifies: qualified), .green,
                        "读数已经证明有过程，就不该回头问证人")
-        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .probeDead), .green,
+        XCTAssertEqual(Self.controlJudgment(residual: 0.974, clock: .probeDead, witnessQualifies: qualified), .green,
                        "同上：证人死没死都不改变'这次读出了过程'")
-        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .resolves), .productSnapped,
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .resolves, witnessQualifies: qualified),
+                       .productSnapped,
                        "这台机器能分辨而产品读不出 ⇒ 必须是红，不许被登记之外的任何东西吞掉")
-        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .snaps), .notRun,
-                       "证人同样看不见 ⇒ 环境限制，报 skip；判红就是拿机器判产品")
-        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .probeDead), .witnessIsDead,
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .snaps, witnessQualifies: true), .notRun,
+                       "证人同样看不见、且采得不比判据粗 ⇒ 环境限制，报 skip；判红就是拿机器判产品")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .probeDead, witnessQualifies: qualified),
+                       .witnessIsDead,
                        "读不出过程、证人也坏了 ⇒ 两条都没有分辨率，必须红着让人去修")
         // 边界：正好等于地板不算"读出了过程"（`>` 而不是 `>=`，与它替掉的那条
         // `XCTAssertGreaterThan` 同一条线，不许在重构时悄悄改判据）。
-        XCTAssertEqual(Self.controlJudgment(residual: Self.controlResidualFloor, clock: .resolves),
+        XCTAssertEqual(Self.controlJudgment(residual: Self.controlResidualFloor, clock: .resolves,
+                                            witnessQualifies: qualified),
                        .productSnapped, "把 `>` 改成 `>=` 会让'刚好等于地板'的读数从红变成绿")
+
+        // —— R68 新增的那一根轴：证人合不合格（采样率）。两格都必须与上面不同。
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .snaps, witnessQualifies: false),
+                       .witnessCannotAdjudicate,
+                       "证人采得比判据粗时 `.snaps` 不许落到 skip —— 那等于让'我没看清'给'它没动'签字")
+        XCTAssertEqual(Self.controlJudgment(residual: 0.025, clock: .resolves, witnessQualifies: false),
+                       .productSnapped,
+                       "证人能分辨 ⇒ 判据是红还是绿与它采得多粗无关（不合格只影响 skip 那一支）")
+        // 这一格是本轮真正要钉的东西：同一个 `(residual, clock)` 对，
+        // 只改证人采样率就必须给出**不同**的处置。少了这条断言，
+        // 有人把 `witnessQualifies` 参数删掉、退回 `.snaps ⇒ .notRun` 也照样全绿。
+        XCTAssertNotEqual(Self.controlJudgment(residual: 0.025, clock: .snaps, witnessQualifies: true),
+                          Self.controlJudgment(residual: 0.025, clock: .snaps, witnessQualifies: false),
+                          "`witnessQualifies` 这一根轴没有改变任何输出 ⇒ 它等于没写（BACKLOG 104 的原始形状）")
+    }
+
+    /// `qualifies(declaredDurationMilliseconds:)` 自己的真值表：合格线由**证人自己的量**推导
+    /// （`声明 ÷ 采样 ≥ minimumIntermediateFrames + 1`），不是挑的一个毫秒数。
+    ///
+    /// 为什么单独一条：上面那张表吃的是已经算好的布尔值，
+    /// 于是"把 `>=` 写成 `>`"或者"把线挪到 100ms"都不会被它抓到 —— 那是本体的两条边界。
+    func testTheFadeClockWitnessQualificationIsATruthTable() {
+        func reading(_ sampling: Int) -> FadeClockReading {
+            FadeClockReading(frames: 30, span: 1.0, intermediate: 0, samplingMilliseconds: sampling)
+        }
+        // 声明 150ms、要 2 级中间态 ⇒ 至少要能切成 3 段 ⇒ 采样 ≤ 50ms。
+        XCTAssertTrue(reading(20).qualifies(declaredDurationMilliseconds: 150),
+                      "本机实测那一档（证人≈20ms）必须合格，否则阳性对照在这台机器上永远只能报红")
+        XCTAssertTrue(reading(50).qualifies(declaredDurationMilliseconds: 150),
+                      "边界：正好 3 段算合格（`>=`，与 `minimumIntermediateFrames` 那条同一条线）")
+        XCTAssertFalse(reading(51).qualifies(declaredDurationMilliseconds: 150),
+                       "边界：3 段差一点点就不算 —— 这条线一挪，skip 的门槛就跟着变")
+        XCTAssertFalse(reading(80).qualifies(declaredDurationMilliseconds: 150),
+                       "runner 那一遍的实测形状（证人≈80ms ⇒ 150/80 只有 1 段）⇒ 必须不合格，"
+                           + "否则 skip 就是免检牌（BACKLOG 104 的原始缺陷）")
+        XCTAssertFalse(reading(0).qualifies(declaredDurationMilliseconds: 150),
+                       "读不出采样率 ⇒ 什么都不知道，不许给任何结论签字")
+        XCTAssertFalse(reading(-1).qualifies(declaredDurationMilliseconds: 150),
+                       "同上（`sampleIntervalMilliseconds` 空数组返回 −1）")
+        XCTAssertFalse(reading(20).qualifies(declaredDurationMilliseconds: 0),
+                       "声明时长读不出来 ⇒ 没有'能不能分辨'这回事")
+        // 判定本身不受这根轴影响：证人"看不见过程"这个读数与它够不够细是两件事。
+        XCTAssertEqual(reading(80).verdict, .snaps)
+        XCTAssertEqual(reading(35).verdict, .snaps)
     }
 
     /// 阳性对照"读出过渡了"的地板。
@@ -4590,8 +4693,15 @@ private final class FadeClockProbe {
 
     func record() -> Run {
         _ = NSApplication.shared
-        // 320×180：够小以便抓得快（R57 的那条"面积决定采样粗细"在这里同样成立），
-        // 又不至于小到让一条 150ms 的淡在两帧里就走完。
+        // 窗口 320×180，但**只抓左上角 190×24 那一条**（R68 / BACKLOG 104）。
+        //
+        // 为什么这件事是这一轮的正事：证人必须采得**不比它作证的判据粗**，否则它那句
+        // "我也看不见过程"说的只是它自己的分辨率。上一轮 runner 上的实物是
+        // 证人 ≈80ms / 判据 35ms —— 而那 80ms 里几乎全是抓帧成本：
+        // 判据抓的是 760×48pt 那条带（36,480pt²），证人抓的是整张 320×180pt（57,600pt²），
+        // **比被告还贵 1.6 倍**（R55/R57 那条"面积决定采样粗细"第一次咬到我自己）。
+        // 190×24 = 4,560pt² ⇒ 稳定是那条带的 **1/8**，与 backing scale 无关（两边同乘 scale²）：
+        // "证人合格"从此不靠运气，而是结构上就采得比判据细。
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 320, height: 180),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         let host = NSHostingView(rootView: FadeClockView())
@@ -4600,7 +4710,8 @@ private final class FadeClockProbe {
         NSApp.activate(ignoringOtherApps: true)
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.25))
-        let grabber = Grabber(view: host, limit: 400)
+        let grabber = Grabber(view: host, limit: 400,
+                              rect: NSRect(x: 0, y: 0, width: 190, height: 24))
         let deadline = Date().addingTimeInterval(2.0)
         while !grabber.finished, Date() < deadline {
             // 0.02 而不是对照臂那个 0.05：这里要分辨的过程只有 150ms，

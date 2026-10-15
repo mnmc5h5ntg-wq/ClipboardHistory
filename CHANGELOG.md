@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R68+R69：证人与判据的地板都要建立在通道不变的量上 —— 结案 104 第一半 / 新开 105 / U-117…U-120 / D-127、D-128）
+- **R68 · 淡入时钟不能比它作证的判据粗**：决定表 `controlJudgment` 多一根轴 `witnessQualifies`，
+  新格 `.witnessCannotAdjudicate` ⇒ 证人不合格时 `.snaps` **不许落到 skip**，红着指名去修证人。
+  合格线只依赖证人自己的量：`可分数段 = 声明 ÷ 采样 ≥ minimumIntermediateFrames + 1`
+  （本机 150/20=7 ⇒ 合格；runner 150/80=1 ⇒ 不合格）。
+- 证人搬小：抓帧区域 320×180pt（57,600pt²）⇒ **190×24pt（4,560pt²）**，
+  判据那条带是 760×48pt ⇒ 证人从此是被告的 1/8，结构上不可能更贵
+  （R55/R57 那条"面积决定采样粗细"第一次咬到我自己请来的证人）。
+- 本轮推翻的是我自己写的第一版：那条合格线我写成"证人采样 ≤ 判据采样"，
+  本机当场读到 `20ms vs 11ms ⇒ 不合格` —— 两根尺各自含自己夹具的成本，硬比大小没有意义（U-117）。
+- **R69 · R67 那条轮廓判据在 1× 上是假红**：runner 的 CI 红在
+  `testOverlayHoverFillSharesTheSelectionPillsOutline`，两台机器换算成 pt 之后
+  药丸内缩 5.5pt(2×) vs **2pt(1×)**、灰带 5.5pt vs 5pt、逐行最大偏差 0px vs 3px，
+  而**中行两边各自完全一致** ⇒ 不稳的是参照物（材质角在 1× 上过不了 `≥4/255` 那道门），不是产品。
+- 处置是**按机器分开前提**而不是放宽线（R60 那一课）：线一个数没动，
+  `pillInset < 4px` ⇒ 发 `FRAME_CORNER_AXIS_NOT_RUN=1` 点名"这一轴今天没判"；
+  保留三条两台机器都有牙的断言（`fillInset ≥ 1` 抓直角、逐行左右沿 ≤2px、行数一致），
+  逐行比对去掉首末各 `scale` 行。marker 名字必须以 `_NOT_RUN` 结尾，否则捕获闸门看不见它。
+- **放宽之后电池必须仍然全抓**（本轮的验收，不是附注）：R67 那九刀重跑 **9/9 CAUGHT**
+  （M369 直角、M370 6pt、M371 14pt 全部仍红），R68 六刀 **6/6 CAUGHT**
+  （M377 第一版因"变异文包含原文子串"被回读检查判为没落地 ⇒ 改 `+ 99`）。
+- 全量 **787 例 / 38 skip / 0 failures / 158.4s**；`FRAME_BASELINE_COMPARED=124 CHANGED=0`；
+  编译告警 0；脚本测试 139 OK。**产品 0 个文件** ⇒ 屏幕上仍是 R67 装的那份 `db4872e4a852b426…`。
+- **没解决**：1× 上"与系统同曲率"这一轴今天没判（BACKLOG **105** 给了两条赎回路径：降门复量 / 按 103 换捕获对象）；
+  R68 那半条（runner 答①还是②）仍未回答 —— R67 那一遍在到达动效步之前就红了。
+
 ### Added（R67：快速选择浮层每一行第一次有指针反馈 —— 新开 BACKLOG 103、104 / U-112…U-116 / D-126）
 - 现场：浮层唯一的提交入口是**双击**（`table.doubleAction`，没有 `action`、没有 `NSTrackingArea`），
   而呼出时鼠标停在哪是随机的 ⇒ 改之前用户看到的是一列不能碰的文字。
