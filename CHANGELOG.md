@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R78：焦点那条判据在 runner 上看不见那串字 —— "没画"与"没有"从此分开 / U-137…U-141 / D-136）
+- **修的是上一轮留在 main 上的红**：R76 的 run 38743276799 与 R77 的 38751643297 都是 `4 failures`，
+  四条全在焦点那条判据上（runner `框内变化像素=0`、`alpha 差 0.05`；本机 1797 / 3.93）。
+  根因不是阈值：那条判据只读两态之差，而"产品没有焦点后果"与"这条通道今天没画那串字"
+  在只读差值的尺子上长得一模一样。
+- 新尺 `alphaInkPixels(rep, rect, floor:)`：一块矩形里 alpha 过地板的像素数，**不依赖两态相减**。
+  探针取占位字该在的那一块（band 左 30%、四周内缩 3pt —— 整条 band 混得进那颗框的描边）。
+  本机实测 1699 / 1871 个有墨像素，整窗 69048 / 71021。
+- 处置按机器分开（R60 那一课）：2× 上"没画" ⇒ **红**；1× 上"没画" ⇒ 点名
+  `QUICKPICK_FOCUS_NOT_RUN=1` 并只跳过像素那两条 —— 行为两条与产品源码守卫在任何机器上都照判。
+  闸门有牙：M417（恒"没画"）与 M418（地板抬到 250）都让本机红。
+- 守卫自己两个洞补上：① 名册里那条 `paintedXRange` 是**零调用点的死尺** ⇒ 删掉 +
+  新增"每条登记必须有人调"（M416 证明只有这一格抓得到）；② "两态"的识别从减法针脚换成
+  **签名形状** ⇒ 抓回 R77 漏掉的 `alphaBandDelta`；换检测器时踩到 `NSBitmapImageRep`
+  含子串 `Bitmap` 的双计（会把单参电平尺误判成两态尺）⇒ 长写法先从串里挖掉（M413 钉住）。
+- 对账：R76 注释里"1901 / 2144 个变化像素"其实是**有墨像素**，"alpha 143.6 ⇒ 90.9"是第一版
+  另一块矩形的数 ⇒ 注释改成引用判据自己那一行读数（U-140）。
+- 电池 M413–M418 六刀全 CAUGHT。零产品改动，124 张帧逐字节不变，全量 793 例 / 40 skip / 0 failures。
+
 ### Tests（R77：两态相减的尺子原来只读一根轴 —— 结案 107 / 新开 108 / U-134…U-136 / D-135）
 - `axisPair` 一次算出 `亮度 / alpha / 并集`，`changedFraction`（动效卷、按压、在屏探针三处）与
   `bandHeadTailDiff` 的语义从今天起是**并集** ⇒ "没动"这句话要求两根轴都不动。

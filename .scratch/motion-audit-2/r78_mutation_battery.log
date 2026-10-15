@@ -1,0 +1,54 @@
+=== 基线（未变异）：两条判据都必须绿 ===
+   testEveryTwoStateRulerReadsBothAxes                            = green
+   testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing = green
+
+M413 撤掉『长写法先从串里挖掉』那一步 ⇒ `NSBitmapImageRep` 被同时数成长写法与 `Bitmap`，只收一张图的水平尺（`meanAlpha` / `meanLuma`）冒充两态尺。R78 第一版真的这么错过
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:929: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["PressFeedbackTests.swift#mea
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:934: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["PressFeedbackTests.swift#mea
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1024: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertFalse failed - 单张图的电平尺被数成两态尺 ⇒ 长写法没先从串里挖掉
+   已还原（逐字节相同：True）
+
+M414 撤掉折行签名的累加（签名只取第一行）⇒ 两行写成的 `alphaBandDelta` 不再被认成两态尺。这一格钉的是正对照 G：名册不能随**排版**变化而漏条目
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:934: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("["PressFeedbackTests.swift#mea
+   已还原（逐字节相同：True）
+
+M415 `callSites` 不把声明那一次扣掉 ⇒ 一把只有声明的死尺也被数成'有人用'。这一格钉的是正对照 F（调用点计数器自己必须分得清声明与使用）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1012: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("2") is not equal to ("0") - 只
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1014: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertEqual failed: ("3") is not equal to ("1") - 加
+   已还原（逐字节相同：True）
+
+M416 注入一把**零调用点**的死尺，并把它登记进名册 ⇒ 名册等式仍然成立（扫得到、也登记了），只有'每条登记必须有人调'那一格会红。这就是 R77 真实存在过的状态（`paintedXRange`）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'red', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:967: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes] : XCTAssertTrue failed - 豁免名册里有一条尺子今天没有任何调用点 ⇒ 要么把死尺删掉（R6
+   已还原（逐字节相同：True）
+
+M417 存在性闸门恒说'这一格没画'⇒ 本机 2× 必须红（'永远 NOT_RUN'不能免费）。这一格拦的是最省事的那种修法：把判据降级成 skip 就当作修好了
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1451: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1451: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+   已还原（逐字节相同：True）
+
+M418 把存在性尺的地板从 8/255 抬到 250/250 ⇒ 它什么都读不到 ⇒ 闸门在 2× 上误判成'没画'而红。钉的是那把新尺子**承重**：它不是给日志多加一列
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在预期那一条：{'testEveryTwoStateRulerReadsBothAxes': 'green', 'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1451: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1451: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan failed: ("2") is no
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M413   CAUGHT
+   M414   CAUGHT
+   M415   CAUGHT
+   M416   CAUGHT
+   M417   CAUGHT
+   M418   CAUGHT
+   抓到=6 逃掉=0 没跑成=0 未落地=0
+BATTERY_EXIT=0

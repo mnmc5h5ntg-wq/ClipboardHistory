@@ -1,0 +1,6 @@
+# R78 全量跑摘要（完整日志 326MB，留在 /tmp/r78_full.log，不入库：PROBE_ELIGIBILITY 那一批 dump 把它撑爆了，而 326MB 的 blob 会让 push 整次失败）
+# 命令：env -u SDKROOT swift test（ClipboardHistory/）
+  Test Suite 'All tests' started at 2026-10-15 22:50:24.780.
+  	 Executed 793 tests, with 40 tests skipped and 0 failures (0 unexpected) in 156.339 (156.383) seconds
+  Test Suite 'All tests' passed at 2026-10-15 22:53:01.164.
+  	 Executed 793 tests, with 40 tests skipped and 0 failures (0 unexpected) in 156.339 (156.384) seconds

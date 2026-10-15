@@ -681,10 +681,54 @@ final class MotionFilmstripTests: XCTestCase {
     /// 那一族在本仓库栽过两次（R53 的 `region()`、R72 的名单扫描）。
     private static let thirdChannelNeedles = ["+ " + "2]", "green" + "Component", "blue" + "Component"]
     private static let fourthChannelNeedles = ["+ " + "3]", "alpha" + "Component"]
-    /// "两态"的判据：同一个偏移在**两份**取值之间做了减法。
-    /// 有这一条才把"读一张帧的电平/对比度"那些尺子（`meanLuma`、`inkContrast`、`lumaHistogram`…）
-    /// 排除在外 —— 它们量的是单帧，本来就没有"另一态"可减，要求它们读 alpha 是判错了对象。
-    private static let twoStateNeedles = [" - I" + "nt(", "- " + "pb.", "- " + "b."]
+    /// "两态"的判据（R78 换掉了写法）：**签名里收两份位图**，而不是"函数体里出现过某种减法写法"。
+    ///
+    /// 为什么换：R77 那一版扫的是减法针脚（`) - Int(`、`- pb.`），于是它**漏掉了
+    /// `UICaptureHarness.alphaBandDelta`** —— 那把尺先把两态各自约成"每列带内最大 alpha"，
+    /// 再写 `abs(maxA - maxB) > floor`，减法长得不一样，但它判的确实是两态。
+    /// 名册少一条 = "两态相减必须读两根轴"这句话对那条判据根本不成立（U-138）。
+    /// 签名是**形状**，写法是**风格**：风格会为了可读性改写，形状不会。
+    private static let bitmapParameterTypes = ["NSBitmapImageRep", "Bitmap", "[UInt8]", "CGImage"]
+
+    /// 参数表里出现两份位图 ⇒ 这是一条两态尺子。
+    static func takesTwoBitmaps(header: String) -> Bool {
+        guard let open = header.firstIndex(of: "(") else { return false }
+        var depth = 0
+        var close = header.endIndex
+        var cursor = open
+        while cursor < header.endIndex {
+            let character = header[cursor]
+            if character == "(" { depth += 1 }
+            else if character == ")" {
+                depth -= 1
+                if depth == 0 { close = cursor; break }
+            }
+            cursor = header.index(after: cursor)
+        }
+        let parameters = String(header[header.index(after: open)..<close])
+        // 先数长写法，再把它从串里挖掉，才数短写法 ——
+        // 否则 `NSBitmapImageRep` 会被同时数成 "NSBitmapImageRep" **和** "Bitmap"，
+        // 一个只收一张图的函数（`meanAlpha(_ rep: NSBitmapImageRep, rect:)`）就冒充两态尺。
+        // 这一格是实测撞出来的：第一版这么写，`meanAlpha` 与 `meanLuma` 双双被点成盲区尺。
+        let longForm = bitmapParameterTypes[0]
+        let longCount = countOccurrences(parameters, longForm)
+        let withoutLong = parameters.replacingOccurrences(of: longForm, with: " ")
+        var seen = longCount
+        for type in bitmapParameterTypes.dropFirst() { seen += countOccurrences(withoutLong, type) }
+        return seen >= 2
+    }
+
+    /// 数一个短串在长串里出现几次（不重叠计数）。
+    static func countOccurrences(_ haystack: String, _ needle: String) -> Int {
+        guard !needle.isEmpty else { return 0 }
+        var count = 0
+        var search = haystack.startIndex
+        while let range = haystack.range(of: needle, range: search..<haystack.endIndex) {
+            count += 1
+            search = range.upperBound
+        }
+        return count
+    }
     /// alpha 这根轴"**参与了判定**"的形状：同一个表达式里既写着它、又拿它跟地板比大小。
     /// 只留一句 `let alphaDelta = abs(...)` 而不拿来判，是**读了不用**。
     /// 这一格不是洁癖：M407 那一刀把 `if delta > 6 || alphaDelta > 6` 里的后半截删掉，
@@ -707,8 +751,17 @@ final class MotionFilmstripTests: XCTestCase {
         var index = 0
         while index < lines.count {
             guard let name = Self.memberFunctionName(lines[index]) else { index += 1; continue }
+            // 签名可以折行（`alphaBandDelta` 那一条就是两行）：一路收到出现 `{` 为止，
+            // 否则参数表被截在第一行上，"收了两份位图"这条形状判据会对折行的签名失效 ——
+            // 而"对折行的签名失效"正是那种永远没人发现的失效：它只在**排版**改变时才坏。
+            var headerEnd = index
+            var header = lines[index]
+            while !header.contains("{"), headerEnd + 1 < lines.count, headerEnd - index < 8 {
+                headerEnd += 1
+                header += "\n" + lines[headerEnd]
+            }
             var body: [String] = []
-            var cursor = index + 1
+            var cursor = headerEnd + 1
             while cursor < lines.count, lines[cursor] != "    }" {
                 body.append(lines[cursor])
                 cursor += 1
@@ -716,7 +769,11 @@ final class MotionFilmstripTests: XCTestCase {
             let text = body.joined(separator: "\n")
             let readsThird = thirdChannelNeedles.contains { text.contains($0) }
             let readsFourth = fourthChannelNeedles.contains { text.contains($0) }
-            let isTwoState = twoStateNeedles.contains { text.contains($0) }
+            // 两态尺子 = 签名收两份位图 **且** 函数体里真的有一道地板比较。
+            // 后一半是拦误伤的：`syntheticPair` 也收两份位图、也碰 `p + 2]`，
+            // 但它是**造图的**，不判任何东西 ⇒ 没有阈值（第一版没有这一半，它就被点成了盲区）。
+            let hasThreshold = text.contains(" > ") || text.contains(">= ")
+            let isTwoState = takesTwoBitmaps(header: header) && hasThreshold
             // alpha 有没有进判定：只看"同一行里既有它、又跟地板比大小"的那几行（注释已经剥掉）。
             let alphaInVerdict = body.contains { $0.contains(axisMarker) && $0.contains(comparisonMarker) }
             if isTwoState, readsThird, !alphaInVerdict { luminanceOnly.append(file + "#" + name) }
@@ -724,6 +781,15 @@ final class MotionFilmstripTests: XCTestCase {
             index = cursor + 1
         }
         return (luminanceOnly, alphaOnly)
+    }
+
+    /// 一把尺子被**调用**了几次（声明那一处不算）。
+    /// 名册里每一条都必须 ≥1：登记一把没人用的尺子，等于给一条已经不存在的判据发豁免
+    /// （R78 实测：`paintedXRange` 零调用点，而 R77 的名册不但收了它，还在理由里替它编了调用者）。
+    static func callSites(named ruler: String, in code: String) -> Int {
+        let occurrences = countOccurrences(code, ruler + "(")
+        let declarations = countOccurrences(code, "func " + ruler + "(")
+        return max(0, occurrences - declarations)
     }
 
     /// 去掉**行尾**注释（`… code // 说明`）。整行注释在上一层已经滤掉，而这一半才是 M407 那一刀钻过去的洞：
@@ -744,15 +810,14 @@ final class MotionFilmstripTests: XCTestCase {
     static func syntheticRulerSource(readingAlpha: Bool) -> String {
         let third = thirdChannelNeedles[0]
         let fourth = fourthChannelNeedles[0]
-        let minus = twoStateNeedles[0]
         var lines: [String] = [
             "    static func ruler(_ a: Bitmap, _ b: Bitmap) -> Double {",
             "        var changed = 0",
-            "        let rgb = abs(Int(a.pixels[p])" + minus + "Int(b.pixels[q]))",
-            "        let luma = abs(Int(a.pixels[p" + third + ")" + minus + "Int(b.pixels[q" + third + ")))",
+            "        let rgb = abs(Int(a.pixels[p]) - Int(b.pixels[q]))",
+            "        let luma = abs(Int(a.pixels[p" + third + ") - Int(b.pixels[q" + third + ")))",
         ]
         if readingAlpha {
-            lines.append("        let alpha = abs(Int(a.pixels[p" + fourth + ")" + minus + "Int(b.pixels[q" + fourth + ")))")
+            lines.append("        let alpha = abs(Int(a.pixels[p" + fourth + ") - Int(b.pixels[q" + fourth + ")))")
             lines.append("        if rgb > 8 || luma > 8 || alpha > 8 { changed += 1 }")
         } else {
             lines.append("        if rgb > 8 || luma > 8 { changed += 1 }")
@@ -806,12 +871,15 @@ final class MotionFilmstripTests: XCTestCase {
     /// 这一半由 BACKLOG **108** 接着量（本轮先把方向钉住，不一次改完）。
     static func alphaOnlyExemptions() -> [(qualifiedName: String, reason: String)] {
         [
-            (qualifiedName: "UICaptureHarness.swift#paintedXRange",
-             reason: "R76 起就明确只读 alpha：它的文档原话是『亮度那一半在亮档上量不到』"
-                    + "（浮层那层灰与占位墨在亮背景上，预乘 RGB 几乎不动，而 alpha 抬 53/255）。"
-                    + "代价写进 BACKLOG 108：一层只改颜色不改透明度的效果，这把尺读不到。"),
+            (qualifiedName: "UICaptureHarness.swift#alphaBandDelta",
+             reason: "R67 为『灰带必须与选中药丸同宽』新建：按列取带内最大 alpha 之差。"
+                    + "R78 才被抓进名册 —— R77 那版把『两态』扫成减法针脚，而它写的是 "
+                    + "abs(maxA - maxB) > floor，写法不一样就漏了（U-138：检测器认写法不认形状）。"
+                    + "它只读 alpha 是有理由的：那层墨在亮度那一根上量不到（U-132 同族），"
+                    + "代价是『只改颜色不改透明度』的效果它读成没变 ⇒ 归 BACKLOG 108。"),
             (qualifiedName: "UICaptureHarness.swift#alphaLiftProfile",
-             reason: "与 paintedXRange 同一条通道的逐行轮廓尺（R67 为药丸圆角新建）。"
+             reason: "与 alphaBandDelta 同一条通道的逐行轮廓尺（R67 为药丸圆角新建）："
+                    + "那把尺给总范围、这把给轮廓，圆角与上下内缩只在逐行形状上看得见。"
                     + "同一根轴、同一个代价：轮廓只在 alpha 上取，亮度那一半不参与判定 ⇒ 归 BACKLOG 108。"),
             (qualifiedName: "PressFeedbackTests.swift#alphaFraction",
              reason: "单轴报告尺（R77 新建）：与 rgbFraction 成对，只为把『这一下动在哪根轴上』打进读数。"
@@ -846,8 +914,10 @@ final class MotionFilmstripTests: XCTestCase {
     func testEveryTwoStateRulerReadsBothAxes() throws {
         var luminanceOnly: [String] = []
         var alphaOnly: [String] = []
+        var scanned: [(file: String, code: String)] = []
         for file in Self.axisGuardFiles() {
             let source = try testSource(named: file)
+            scanned.append((file, source))
             // 找不到文件的那一支由 `testSource` 自己红（"守卫找不到被守卫的东西时必须红"）。
             let found = Self.blindDeltaRulers(named: file, code: source)
             luminanceOnly += found.luminanceOnly
@@ -869,6 +939,22 @@ final class MotionFilmstripTests: XCTestCase {
                            + "要么补亮度那一根，要么带理由登记（并归 BACKLOG 108）；"
                            + "过期登记同样红。扫到=\(alphaOnly.sorted()) "
                            + "名册=\(registeredAlpha.map { $0.qualifiedName }.sorted())")
+
+        // R78 / U-137：名册里每一条尺子必须**真的有人调**。
+        // 为什么这一格非有不可：R77 收进名册的 `paintedXRange` 全仓零调用点（只有它自己的声明），
+        // 而我的理由里还写着"R67/R76 那两条判据用它…" —— 一条死尺占着豁免位，
+        // 等于让"全部盲区都数过了"这句话变成假的，而且比漏登记更难看，因为它看起来是数过的。
+        var deadRulers: [String] = []
+        for entry in registeredLuma + registeredAlpha {
+            let ruler = String(entry.qualifiedName.split(separator: "#").last ?? "")
+            let calls = scanned.reduce(0) { $0 + Self.callSites(named: ruler, in: $1.code) }
+            if calls == 0 { deadRulers.append(entry.qualifiedName) }
+        }
+        emit("AXIS_GUARD 名册里零调用点的尺=" + (deadRulers.isEmpty ? "-" : deadRulers.joined(separator: ",")))
+        XCTAssertTrue(deadRulers.isEmpty,
+                      "豁免名册里有一条尺子今天没有任何调用点 ⇒ 要么把死尺删掉（R63 那一课："
+                          + "'代码没有作者'的处置是删代码，不是补判据），要么把它接回一条真判据。"
+                          + "零调用点的豁免位会让'盲区都数过了'这句话变成假的。死尺=\(deadRulers.sorted())")
 
         // 每条豁免都得有理由，而且理由不能短到是一句"见注释"。
         for entry in registeredLuma + registeredAlpha {
@@ -921,6 +1007,29 @@ final class MotionFilmstripTests: XCTestCase {
                        "守卫扫到了自己：针脚的拼法被写成了会被自己命中的形式")
         XCTAssertFalse(alphaOnly.contains { $0.contains("syntheticRulerSource") },
                        "合成尺子的生成器自己成了被扫到的盲区 ⇒ 针脚写在了生成器的源码里而不是运行时拼出来")
+        // 正对照 F：调用点计数器自己必须分得清"声明"与"使用"（U-137 那一格的全部依据就是它）。
+        let declaredOnly = Self.syntheticRulerSource(readingAlpha: true)
+        XCTAssertEqual(Self.callSites(named: "ruler", in: declaredOnly), 0,
+                       "只有声明、没有调用却被数成'有人用'⇒ 上面那条死尺判据是空转的")
+        XCTAssertEqual(Self.callSites(named: "ruler", in: declaredOnly + "        let x = ruler(a, b)\n"), 1,
+                       "加了一次真实调用却仍数 0 ⇒ 那条判据会把每条活尺都报成死尺")
+        // 正对照 G：折行的签名也必须被认成两态尺（R78 换检测器就是因为 `alphaBandDelta` 折了两行）。
+        let wrappedHeader = "    static func wrapped(_ a: Bitmap, _ aRows: Range<Int>,\n"
+            + "                               _ b: Bitmap, _ bRows: Range<Int>, floor: Int) -> Int {\n"
+            + "        var hit = 0\n"
+            + "        if abs(Int(pa) - Int(pb)) > floor { hit += 1 }\n"
+            + "        return hit\n    }\n"
+        XCTAssertTrue(Self.takesTwoBitmaps(header: wrappedHeader),
+                      "折行的签名没被认成两态尺 ⇒ 名册会随**排版**变化而漏条目（R77 就是这么漏掉 alphaBandDelta 的）")
+        // 正对照 H：只收**一张**图的电平尺不许被认成两态尺。这一格是 R78 自己踩的坑：
+        // `NSBitmapImageRep` 里含子串 `Bitmap`，长写法不先挖掉就会把单参函数数成两态
+        // （第一版因此把 `meanAlpha` / `meanLuma` 双双点成盲区尺 —— 误伤会让下一个人关掉这条守卫）。
+        XCTAssertFalse(Self.takesTwoBitmaps(
+            header: "    static func meanAlpha(_ rep: NSBitmapImageRep, rect: CGRect) -> Double {"),
+            "单张图的电平尺被数成两态尺 ⇒ 长写法没先从串里挖掉")
+        XCTAssertTrue(Self.takesTwoBitmaps(
+            header: "    static func meanDelta(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Double {"),
+            "真的两态签名反而没被认出来 ⇒ 这一格与上面那格一起才说明数的是**参数个数**")
     }
 
     /// 读一份**测试**文件的源码（`productSource(named:)` 走的是 Sources/ 那棵树，这里要的是 Tests/）。

@@ -1,0 +1,213 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.27s)
+Test Suite 'Selected tests' started at 2026-10-15 22:55:17.818.
+Test Suite 'ClipboardHistoryPackageTests.xctest' started at 2026-10-15 22:55:17.819.
+Test Suite 'MotionFilmstripTests' started at 2026-10-15 22:55:17.819.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion]' passed (11.161 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms]' passed (0.026 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims]' passed (0.006 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerDismissColumnAsymmetryIsMeasured]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerDismissColumnAsymmetryIsMeasured]' passed (1.952 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence]' passed (3.718 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerOutTracksWhetherItFadesOrSlides]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerOutTracksWhetherItFadesOrSlides]' passed (1.917 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBothBannerArmsAreJudged]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBothBannerArmsAreJudged]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangedRunMustBeContiguousNotFirstToLast]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangedRunMustBeContiguousNotFirstToLast]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop]' passed (0.006 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind]' passed (5.174 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailPreviewCrossfadesOnlyWhenTheKindChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailPreviewCrossfadesOnlyWhenTheKindChanges]' passed (6.159 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes]' passed (0.526 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeABReadsTheContiguousRulerNotTheSpan]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeABReadsTheContiguousRulerNotTheSpan]' passed (0.025 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeVisibilityJudgesTimeNotFrameCount]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeVisibilityJudgesTimeNotFrameCount]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines]' passed (0.038 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea]' passed (1.500 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testHeatmapFadeIsNotVisibleToThisRuler]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testHeatmapFadeIsNotVisibleToThisRuler]' passed (5.630 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo]' passed (5.956 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionCriteriaDoNotUseAbsoluteFramePrerolls]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionCriteriaDoNotUseAbsoluteFramePrerolls]' passed (0.030 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionFramesAnchorsAtTheTriggerNotAtTheWindow]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionFramesAnchorsAtTheTriggerNotAtTheWindow]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel]' passed (0.018 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictPrintsBeforeTheSkipGuards]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictPrintsBeforeTheSkipGuards]' passed (0.014 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictSeparatesJumpFromMissedSampling]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictSeparatesJumpFromMissedSampling]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler]' skipped (6.990 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler]' skipped (4.632 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm]' passed (0.023 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTransitionIsClaimedOnListRows]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTransitionIsClaimedOnListRows]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoUnexecutedTransitionClaimsAcrossViews]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoUnexecutedTransitionClaimsAcrossViews]' passed (0.013 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testPremiseCheckSeesAChangeAndItsAbsence]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testPremiseCheckSeesAChangeAndItsAbsence]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testResolutionHelpersAreATruthTableNotAStory]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testResolutionHelpersAreATruthTableNotAStory]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt]' skipped (12.033 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSettledAtFrameReadsSyntheticRampsAndSteps]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSettledAtFrameReadsSyntheticRampsAndSteps]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' passed (8.380 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSlidingRoleSettlesWithinItsBudget]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSlidingRoleSettlesWithinItsBudget]' passed (0.908 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSystemSymbolEffectsAreOutOfThisRulersReach]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSystemSymbolEffectsAreOutOfThisRulersReach]' passed (4.971 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockClassifierIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockClassifierIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessMovesAtAll]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessMovesAtAll]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerAttributesTheMotionToOurAnimation]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerAttributesTheMotionToOurAnimation]' passed (0.831 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerDistinguishesAStepFromARamp]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerDistinguishesAStepFromARamp]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesAStateDrivenSwiftUIUpdate]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesAStateDrivenSwiftUIUpdate]' passed (4.864 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesNothingWhenNothingChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesNothingWhenNothingChanges]' passed (2.886 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionClaimScanIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionClaimScanIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionsAreActuallyRunning]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionsAreActuallyRunning]' passed (6.811 seconds).
+Test Suite 'MotionFilmstripTests' passed at 2026-10-15 22:56:55.029.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 97.207 (97.210) seconds
+Test Suite 'ClipboardHistoryPackageTests.xctest' passed at 2026-10-15 22:56:55.029.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 97.207 (97.210) seconds
+Test Suite 'Selected tests' passed at 2026-10-15 22:56:55.029.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 97.207 (97.211) seconds
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=5.3ms 抓帧最慢=9.7ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=8.5ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=42.2ms 抓帧最慢=91.2ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=9.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=46.1ms 抓帧最慢=94.1ms 视图=760×673pt 像素=1520×1346px 声明=120ms
+MOTION_BAND_SAVING 带中位=4.81ms 整窗中位=44.16ms 省=9.18× 线=1.0×（严格更便宜；倍数只报不判，R72）
+MOTION_BAND_POSITION 同头差=0.0000 另一头差=0.9551 地板=0.0050/0.5000
+MOTION_BAND dismiss 带：首尾差=0.886 整窗首尾差=0.226 位置同一性 带vs整窗头=0.000 带vs整窗尾=0.955 ｜ 带：抓帧中位=4.8ms 峰值=0.267 过渡帧数=11 间隔中位=10ms 帧=1520x96px ｜ 整窗：抓帧中位=44.2ms 峰值=0.180 过渡帧数=3 间隔中位=51ms 帧=1520x1346px ｜ 最慢一次抓帧 带=8.5ms 整窗=91.2ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=5.0ms 抓帧最慢=9.6ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=9.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_COLUMN dismiss 分栏 ｜ 旧轴(各自峰值归一) 侧栏=8 详情区=11 差=3帧 ⇒ **这条轴的差是墨量，不是时间**（见函数注释） ｜ 新轴(同一条绝对线 0.0421，=两栏较大峰值×0.15) 最后还在变的帧号 侧栏=13 详情区=13 采样≈10ms ｜ 侧栏逐帧=[0.000 0.071 0.221 0.280 0.184 0.196 0.046 0.120 0.035 0.022 0.023 0.000 0.000 0.098 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ｜ 详情区逐帧=[0.000 0.071 0.163 0.225 0.152 0.188 0.046 0.132 0.058 0.042 0.046 0.000 0.000 0.108 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000] ⇒ 同一条绝对线下两栏在**同一帧**落定(第13帧，线=0.0421) ⇒ 观察到的不是时长差；各自的峰值归一尺子会给出不同的帧数，那是墨量
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=7.2ms 抓帧最慢=10.5ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=7.0ms 抓帧最慢=25.4ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_REVIEW notice-banner 逐帧图=notice-banner-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.400 逐帧=[0.000 0.119 0.400 0.241 0.362 0.163 0.155 0.035 0.059]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.9ms 抓帧最慢=9.4ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.9ms 抓帧最慢=9.2ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_REVIEW notice-banner-dismiss 逐帧图=notice-banner-dismiss-逐帧-stack.png 帧数=10 尺寸=1520x980 最大相邻差=0.246 逐帧=[0.000 0.071 0.180 0.246 0.163 0.190 0.045 0.125 0.043]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.8ms 抓帧最慢=9.6ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=5.1ms 抓帧最慢=9.1ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_TRACK_BOX dismiss 强帧数=4 外框 首=[29,50] 末=[29,50] 上沿移=0px 下沿移=0px（负=往上）｜ 容差±2px 是尺子的线 ⇒ 形状分类：外框没挪 ⇒ 只是淡
+MOTION_TRACK dismiss 图标质心y(px,2x) 全帧=["42", "42", "42", "42", "31"] 全帧跨度=11.0px（**别拿这条当位移**，见注释） ｜ 强帧=["42", "42", "42", "42"] 强帧跨度=0.0px 像素数 首=207 末=21 帧数=27 有图标帧=5 强帧数=4 ｜ .bannerOut 声明的位移档=none ⇒ 观察不动（分类线 4px≈2pt：这条线是**尺子**的分界，不是产品的判据）/声明不带位移：设计与观察一致：图标的外框不动、像素在掉 ⇒ **原地淡出**
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=45.4ms 抓帧最慢=70.0ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_GRAB detail-empty-to-content 帧数=30 抓帧中位=45.4ms 抓帧最慢=47.1ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL_AB empty-to-content 开 帧数=1 峰值=0.052 冷闸=true  关 帧数=1 峰值=0.052 采样≈50ms
+MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content：开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=49.4ms 抓帧最慢=60.6ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_DETAIL kind-change 采样≈54ms 中点帧=1 带内过渡帧数=2 落定残余=0.998
+MOTION_GRAB detail-same-kind 帧数=30 抓帧中位=55.9ms 抓帧最慢=67.5ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_DETAIL same-kind 带内过渡帧数=0 落定残余=0.000
+AXIS_GUARD 两态尺只读亮度=PressFeedbackTests.swift#meanChannelDelta,PressFeedbackTests.swift#rgbFraction,PressInteractionProbeTests.swift#rgbFraction 只读alpha=PressFeedbackTests.swift#meanAlphaDelta,PressFeedbackTests.swift#alphaFraction,PressInteractionProbeTests.swift#alphaFraction,UICaptureHarness.swift#alphaBandDelta,UICaptureHarness.swift#alphaLiftProfile 名册=3/5
+AXIS_GUARD 名册里零调用点的尺=-
+MOTION_GRAB_AREA 全视图 面积=535800pt² 样本=9 中位=67.0ms 最慢=80.5ms
+MOTION_GRAB_AREA 横幅带 面积=91200pt² 样本=9 中位=13.7ms 最慢=16.5ms
+MOTION_GRAB_AREA 小块 面积=18000pt² 样本=9 中位=5.6ms 最慢=6.6ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.4ms 抓帧最慢=280.3ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.4ms 抓帧最慢=264.2ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.4ms 抓帧最慢=263.5ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_GRAB heat-first-record 帧数=30 抓帧中位=1.4ms 抓帧最慢=1.8ms 视图=430×250pt 像素=860×500px 声明=160ms
+MOTION_HEAT_RUNS 开A [336–611@0.232/粗269] 开B [337–611@0.232/粗268] 关 [336–342@0.232/粗6]  跨度A=275ms 跨度B=274ms 整卷中位=6ms
+MOTION_HEAT_FADE_A/B 预热 时长=6ms 帧数=1 开A 时长=275ms 帧数=2 开B 时长=274ms 帧数=2 峰值=0.232  关 时长=6ms 帧数=1 峰值=0.232  整卷中位=6ms 声明=160ms 冷闸=true 判定=钟太粗
+MOTION_NOT_RUN=clock-coarse-in-window heat-first-record：峰值那一段内部最粗的一次采样是 269 / 268ms，而这条过渡声明 160ms ⇒ 今天的钟粗到既不能说看得见也不能说看不见（条带图见 CLIPBOARD_HISTORY_MOTION_OUT） ｜A 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 264ms，而间隔 269ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答 ｜B 臂 归因=probe-grab-bound（解释=98%：这一卷最慢一次抓帧 264ms，而间隔 268ms 只比它多 4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答
+MOTION_GRAB list-insert-new-record 帧数=30 抓帧中位=49.4ms 抓帧最慢=60.6ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_CUT list-insert-new-record 带内过渡帧数=1 落定残余=0.000 逐帧=[0.302 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=7.1ms 抓帧最慢=10.8ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_CUT_CONTROL notice-banner 采样≈11ms 中点帧=6 落定残余=0.644
+MOTION_FADE_CLOCK_COST 帧数=400 采样≈4ms 抓帧中位=0.1ms 抓帧最慢=2.0ms 面积=190x24pt ⇒ 采样−中位 那一段是 runloop 没醒，不是 `cacheDisplay`
+MOTION_FADE_CLOCK 声明=150ms 跨度=1.000 中间态帧数=53 帧数=400 采样≈4ms 判定=能分辨
+MOTION_WITNESS notice-banner 证人采样≈4ms 声明=150ms 可分数段=37 合格=是 判定=能分辨 （判据自身采样≈11ms）
+MOTION_SELFTEST_7D1F164A
+MOTION_SELFTEST_7D1F164A-2
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_NATIVE row-insert 开 帧数=10 峰值=0.046 采样≈8ms
+MOTION_NATIVE row-insert 关 帧数=1 峰值=0.054 采样≈8ms
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_NATIVE row-move 开 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE row-move 关 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE_MOVE 判定=瞬移 峰值容差=0.020（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）；这一行只说读数怎么读，产品结论要过下面两道 skip 才算
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_SEQUENCE 选中没变 帧数=11 峰值=0.028
+MOTION_SEQUENCE 选中变了 帧数=1 峰值=0.234
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SHIMMER 扫 帧数=48 变化帧对=23 峰值=0.015 采样≈53ms
+MOTION_SHIMMER 停 变化帧对=0 峰值=0.000
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.6ms 抓帧最慢=22.8ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_SETTLE banner-in 到位帧=15 采样≈11ms ⇒ 实测落定≈165ms（声明 150ms；R58 起量的是整条带，不再套第二层框）
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=45.7ms 抓帧最慢=82.7ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=45.6ms 抓帧最慢=82.1ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_SYMBOL row-star 开 帧数=1 峰值=0.260
+MOTION_SYMBOL row-star 关 帧数=1 峰值=0.260
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=3.2ms 抓帧最慢=23.7ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AB notice-banner 曲线关闭 采样≈8ms 过渡帧数=1 逐帧=[0.000 0.879 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_CONTROL 计数方块 帧数=38 峰值=0.036 变化帧对=37
+MOTION_CONTROL 渐变端点 帧数=39 峰值=0.026 变化帧对=34
+MOTION_GRAB blank 帧数=30 抓帧中位=45.9ms 抓帧最慢=82.8ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_BLANK frames=30 峰值=0.0000 过渡帧数=0 帧对=29 亮度峰值=0.0000 alpha峰值=0.0000 并集峰值=0.0000 仅alpha在动=0/29
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.5ms 抓帧最慢=25.8ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AXIS notice-banner 帧对=26 亮度峰值=0.2769 alpha峰值=0.2533 并集峰值=0.2769 仅alpha在动=0/26
+MOTION notice-banner frames=27 声明=150ms 整卷中位=14ms 事件内最粗=20ms 变化段时长=192ms 过渡帧数=11 时刻ms=[21 20 15 16 16 15 15 14 14 17 17 16 16 11 10 9 8 9 9 9 9 9 9 9 9 8] 逐帧=[0.000 0.195 0.277 0.240 0.260 0.172 0.092 0.144 0.044 0.053 0.060 0.028 0.115 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=5.2ms 抓帧最慢=10.0ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_AXIS notice-banner-dismiss 帧对=26 亮度峰值=0.1815 alpha峰值=0.1782 并集峰值=0.1822 仅alpha在动=0/26
+MOTION notice-banner-dismiss frames=27 声明=120ms 整卷中位=10ms 事件内最粗=18ms 变化段时长=190ms 过渡帧数=11 时刻ms=[7 14 11 17 17 17 16 18 16 13 9 9 9 9 12 10 9 10 10 10 10 9 10 9 10 10] 逐帧=[0.000 0.071 0.175 0.182 0.165 0.174 0.114 0.125 0.060 0.034 0.000 0.040 0.000 0.000 0.106 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=46.1ms 抓帧最慢=57.1ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_AXIS detail-kind-change 帧对=26 亮度峰值=0.0811 alpha峰值=0.0794 并集峰值=0.0811 仅alpha在动=0/26
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=51ms 事件内最粗=81ms 变化段时长=200ms 过渡帧数=3 时刻ms=[55 81 65 51 51 51 51 51 51 51 51 50 51 51 51 50 51 50 50 51 50 51 51 51 51 50] 逐帧=[0.064 0.081 0.079 0.001 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_NOT_RUN=clock-coarse-in-window detail-kind-change：事件那一段最粗 81ms 一帧、整段过渡只有 160ms（门槛 0.3×声明）⇒ 这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿 归因=grab-dominates（解释=71%：抓帧 57ms 是大头，但还有 24ms 不是它） ⇒ 缩捕获区域是主杠杆，而剩下的 24ms 得另查（BACKLOG 76 那条分段时间轴）
+MOTION_GRAB empty-state 帧数=30 抓帧中位=15.4ms 抓帧最慢=60.3ms 视图=380×552pt 像素=760×1104px 声明=160ms
+MOTION_AXIS empty-state 帧对=26 亮度峰值=0.1157 alpha峰值=0.1063 并集峰值=0.1157 仅alpha在动=0/26
+MOTION empty-state frames=27 声明=160ms 整卷中位=20ms 事件内最粗=45ms 变化段时长=115ms 过渡帧数=3 时刻ms=[26 45 45 45 39 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20] 逐帧=[0.108 0.116 0.109 0.003 0.002 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_SUMMARY notice-banner=11 notice-banner-dismiss=11 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=3/4 not-run=detail-kind-change
+◇ Test run started.
+↳ Testing Library Version: 1400
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

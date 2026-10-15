@@ -1,0 +1,15 @@
+# R78 的分辨率判据翻脸证据（三遍本机读数并排，BACKLOG 110 / U-142）
+=== /tmp/r77_motion_local1.log
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=51ms 事件内最粗=61ms 变化段时长=172ms 过渡帧数=3 时刻ms=[51 61 60 49 51 50 50 50 52 50 52 50 50 51 50 50 50 51 51 54 51 51 53 52 52 53] 逐帧=[0.064 0.081 0.079 0.001 0.000 0.000 0.
+MOTION_SUMMARY notice-banner=12 notice-banner-dismiss=13 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-
+=== /tmp/r78_motion.log
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=51ms 事件内最粗=81ms 变化段时长=200ms 过渡帧数=3 时刻ms=[55 81 65 51 51 51 51 51 51 51 51 50 51 51 51 50 51 50 50 51 50 51 51 51 51 50] 逐帧=[0.064 0.081 0.079 0.001 0.000 0.000 0.
+MOTION_NOT_RUN=clock-coarse-in-window detail-kind-change：事件那一段最粗 81ms 一帧、整段过渡只有 160ms（门槛 0.3×声明）⇒ 这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿 归因=grab-d
+MOTION_SUMMARY notice-banner=11 notice-banner-dismiss=11 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=3/4 not-run=detail-kind-change
+=== /tmp/r78_motion2.log
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=50ms 事件内最粗=81ms 变化段时长=201ms 过渡帧数=3 时刻ms=[54 81 66 51 51 50 50 51 51 50 51 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50] 逐帧=[0.064 0.081 0.079 0.001 0.000 0.000 0.
+MOTION_NOT_RUN=clock-coarse-in-window detail-kind-change：事件那一段最粗 81ms 一帧、整段过渡只有 160ms（门槛 0.3×声明）⇒ 这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿 归因=probe-
+MOTION_SUMMARY notice-banner=12 notice-banner-dismiss=9 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=3/4 not-run=detail-kind-change

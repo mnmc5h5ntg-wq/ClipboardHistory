@@ -988,30 +988,34 @@ final class UICaptureTests: XCTestCase {
         return (lo == Int.max ? -1 : lo, hi)
     }
 
-    /// 被点亮的像素的 x 范围，判据是 **alpha 抬升**超过 `alphaFloor`。
-    /// （亮度那一半在亮档上量不到，见调用点注释。）
-    static func paintedXRange(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
-                              clipping: CGRect, alphaFloor: Int) -> (min: Int, max: Int) {
-        guard let pa = a.bitmapData, let pb = b.bitmapData,
-              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4 else { return (-1, -1) }
-        let x0 = max(0, Int(clipping.minX.rounded())), x1 = min(a.pixelsWide, Int(clipping.maxX.rounded()))
-        let y0 = max(0, Int(clipping.minY.rounded())), y1 = min(a.pixelsHigh, Int(clipping.maxY.rounded()))
-        var lo = Int.max, hi = -1
-        var y = y0
-        while y < y1 {
-            var x = x0
-            while x < x1 {
-                let p = y * a.bytesPerRow + x * a.samplesPerPixel
-                let q = y * b.bytesPerRow + x * b.samplesPerPixel
-                if abs(Int(pb[q + 3]) - Int(pa[p + 3])) > alphaFloor {
-                    if x < lo { lo = x }
-                    if x > hi { hi = x }
-                }
-                x += 1
+    // R78 删掉了这里原本的 `paintedXRange`：它零调用点（全仓只有它自己的声明），
+    // 而 R77 的双向名册把它收了进去、理由里还替它写了调用者 —— 一条死尺占着一个豁免位，
+    // 比没登记更坏：它让"名册已经数过全部盲区"这句话变成假的（U-137）。
+    // 需要"被点亮像素的 x 范围"时用的是下面那把 `alphaBandDelta`（R67 起就在判据里）。
+
+    /// 一块矩形里有多少像素的 **alpha 过地板**（R78）。
+    ///
+    /// 这条尺子的用途只有一个：**问"这一格里到底画没画东西"**，不问"两态差没差"。
+    /// R76 那条焦点判据在 runner 上红了（run 38743276799：框内变化像素 0、alpha 差 0.05），
+    /// 而它在本机是 1797 / 3.93 —— 两句"焦点有视觉后果"与"这条通道今天没画那串字"
+    /// 在只读差值的尺子长得**一模一样**。要分开它们，就必须有一个不依赖两态相减的存在性量。
+    /// 地板取 8/255 与全仓那几把差值尺同一条；调用方给的判据是"计数 ≥ 一道很低的地板"，
+    /// 因为画出来的占位字是几千个像素、没画是 0 个，中间没有可争的地带。
+    static func alphaInkPixels(_ rep: NSBitmapImageRep, rect: CGRect, floor: Int = 8) -> Int {
+        guard let base = rep.bitmapData, rep.samplesPerPixel >= 4, rep.hasAlpha else { return -1 }
+        let spp = rep.samplesPerPixel, bytesPerRow = rep.bytesPerRow
+        let x0 = max(0, Int(rect.minX.rounded())), x1 = min(rep.pixelsWide, Int(rect.maxX.rounded()))
+        let y0 = max(0, Int(rect.minY.rounded())), y1 = min(rep.pixelsHigh, Int(rect.maxY.rounded()))
+        guard x1 > x0, y1 > y0 else { return -1 }
+        var hit = 0
+        for y in y0..<y1 {
+            var p = y * bytesPerRow + x0 * spp
+            for _ in x0..<x1 {
+                if Int(base[p + 3]) > floor { hit += 1 }
+                p += spp
             }
-            y += 1
         }
-        return (lo == Int.max ? -1 : lo, hi)
+        return hit
     }
 
     /// 比两"条"水平带的 alpha，返回"每列各自带内的最大 alpha 之差 > `floor`"的 x 范围。
@@ -1300,9 +1304,16 @@ final class UICaptureTests: XCTestCase {
     /// 而且中间我自己错了一次（U-131）：第一版拿"建出来时"与"`makeFirstResponder` 之后"相减，
     /// 而实测那颗框**建出来的那一刻就已经聚焦**（AppKit 把 key view 选成了它）
     /// ⇒ 两张帧同一个状态，那个"0 个变化像素"什么都没证明。
-    /// 换成"聚焦 vs 撤掉焦点"两态之后，差是真的，而且很大：
-    ///   亮档 1901 个像素、暗档 2144 个，包围盒 x 12.0–98.5pt / y 顶下 14–26pt
-    ///   = 正好那一串占位字"搜索历史记录…"，alpha 从 143.6 ⇒ 90.9（亮）、156.5 ⇒ 102.9（暗）。
+    /// 换成"聚焦 vs 撤掉焦点"两态之后，差是真的，而且很大（**下面这几个数就是这条判据自己打出来的
+    /// 那一行 `QUICKPICK_FOCUS`，R78 对过账**：本机 2×，亮档 / 暗档）：
+    ///   框内变化像素 1797 / 2354，框外那一圈 0 / 0；
+    ///   那一格平均 alpha 10.71 ⇒ 6.77（亮）、13.15 ⇒ 8.64（暗），差 3.93 / 4.52；
+    ///   占位区（左 30%、内缩 3pt）有墨像素 1699 / 1871，整窗 69048 / 71021。
+    /// R76 的注释在这里写过一组别的数（"1901 / 2144 个像素"与"alpha 143.6 ⇒ 90.9"），
+    /// 而那两个数在这条判据的读数里根本不存在 —— 1901/2144 其实是**有墨像素**（R78 新加的那一列
+    /// 量出来正好是它们），被当成"变化像素"抄进了注释；143.6/90.9 是第一版拿另一块矩形量的。
+    /// 记在这里是因为这就是"注释替事实背书"的代价：R77 的台账照抄了注释，
+    /// 而判据自己打的读数才是唯一该被引的那一份（U-139）。
     /// 但**同一对在亮度轴上只有 -0.66 / +2.25（/255）** ⇒ 只看亮度的尺会判成"焦点没有后果"。
     /// 于是这一格的四条断言各钉一样，少一条就有一族回归没人管：
     ///   ① 焦点确实落进那颗框（读产品对象：窗口响应者是字段编辑器，不是帧）；
@@ -1384,6 +1395,26 @@ final class UICaptureTests: XCTestCase {
             let lumIn = Self.meanLuminance(unfocused, rect: band) - Self.meanLuminance(focused, rect: band)
             let alphaUnfocused = Self.meanAlpha(unfocused, rect: band)
             let alphaFocused = Self.meanAlpha(focused, rect: band)
+            // **存在性尺（R78）**：这一格里画没画东西，与"两态差没差"是两个问题。
+            // runner 那一遍（run 38743276799）报的是 `框内变化像素=0`、`alpha 差 0.05`，
+            // 本机是 1797 / 3.93 —— 只读差值的尺子分不开"焦点没有后果"与"那串字今天没画"。
+            // 所以这里另量一个不依赖两态相减的数：占位符那一格里 alpha 过地板的像素数。
+            let wholePanel = CGRect(x: 0, y: 0, width: unfocused.pixelsWide, height: unfocused.pixelsHigh)
+            // 存在性那一格量的**不是整条 band**，而是"占位字该在的那一块"：
+            // 左边 30% 宽、四周再内缩 3pt。两个理由都是被读数逼出来的 ——
+            // ① 整条 band 里混得进那颗框的**描边**（一圈 1px 的矩形在 1× 上就有 ~830 个像素，
+            //    远超任何计数地板），那样闸门会在"字没画、边框画了"的时候错误地放行判据；
+            // ② 占位字的实测包围盒是 x 12.0–98.5pt（band 宽 400pt）⇒ 左 30% 把它整个包住，
+            //    而内缩 3pt 把描边排除在外。本机实测这一格 1967 / 2208 个有墨像素（亮 / 暗）。
+            let inset = 3.0 * CGFloat(scale)
+            let inkProbe = CGRect(x: band.minX + inset, y: band.minY + inset,
+                                  width: band.width * 0.3 - inset, height: band.height - 2 * inset)
+            let inkUnfocused = Self.alphaInkPixels(unfocused, rect: inkProbe)
+            let inkFocused = Self.alphaInkPixels(focused, rect: inkProbe)
+            let inkWholePanel = Self.alphaInkPixels(unfocused, rect: wholePanel)
+            // 20 是一道**很低的**地板：画出来的占位字是几千个像素，没画是 0 个，
+            // 中间没有可争的地带（R66 那条 `deadSpan=0.05` 取的是同一个道理）。
+            let placeholderDrawn = inkUnfocused >= 20
             emit("QUICKPICK_FOCUS \(label) appActive=\(NSApp.isActive) 面板key=\(panel.isKeyWindow) "
                 + "主=\(panel.isMainWindow) makeFirstResponder=\(accepted) "
                 + "建出来时就聚焦=\(builtInEditor != nil) 聚焦时响应者是编辑器=\(focusedResponder is NSText) "
@@ -1392,7 +1423,9 @@ final class UICaptureTests: XCTestCase {
                 + "框内变化像素=\(changedIn) 框外一圈变化像素=\(changedHalo - changedIn) "
                 + "alpha 聚焦=\(String(format: "%.2f", alphaFocused)) "
                 + "不聚焦=\(String(format: "%.2f", alphaUnfocused)) "
-                + "差=\(String(format: "%.2f", alphaUnfocused - alphaFocused)) 亮度轴差=\(String(format: "%.2f", lumIn))")
+                + "差=\(String(format: "%.2f", alphaUnfocused - alphaFocused)) 亮度轴差=\(String(format: "%.2f", lumIn)) "
+                + "占位区有墨(不聚焦,左30%内缩3pt)=\(inkUnfocused) 有墨(聚焦)=\(inkFocused) 整窗有墨=\(inkWholePanel) "
+                + "⇒ 存在性尺说\(placeholderDrawn ? "这一格画了东西，像素那两条有对象" : "这一格今天没画东西，像素那两条没有对象")")
             XCTAssertGreaterThanOrEqual(changedIn, 0, "\(label)档：尺读不出两张帧 ⇒ 无从判定，不许当通过")
             // ① 焦点落进那颗框（行为，读的是产品对象，不是帧）。
             XCTAssertTrue(accepted,
@@ -1405,11 +1438,28 @@ final class UICaptureTests: XCTestCase {
             XCTAssertFalse(blankResponder is NSText,
                 "\(label)档：`makeFirstResponder(nil)` 之后窗口响应者**还是**字段编辑器 ⇒ 撤不掉焦点，"
                     + "于是下面那几条断言量的是同一张帧减自己（假绿的教科书形状，U-131）")
+            // **存在性闸门（R78）**：像素那两条只在"这一格真的画了东西"时判。
+            // 处置按机器分开（R60 那一课）：2× 上没画 ⇒ **红**（那是捕获或产品坏了，必须有人去查），
+            // 1× 上没画 ⇒ 点名 not-run（runner 不画 SwiftUI/AppKit 文本是已知通道性质，
+            // 见 `PROBE_ELIGIBILITY … ink=0.0%` 那一批读数）。
+            // 名字以 `_NOT_RUN` 结尾：`ci_capture_gate.py` 认这个后缀（R36/U-59）。
+            if !placeholderDrawn {
+                emit("QUICKPICK_FOCUS_NOT_RUN=1 \(label)：占位符那一格今天在这条通道里没画出来"
+                    + "（格内 alpha 过 8/255 的像素只有 \(inkUnfocused)，整窗 \(inkWholePanel)）⇒ "
+                    + "\"聚焦与不聚焦两张帧相同（这次读到 \(changedIn) 个变化像素）这一句，不能推成『焦点没有视觉后果』，"
+                    + "它说的是这条通道今天看不见那串字。行为那两条（①响应者、④没关系统环）与源码守卫照判。")
+                XCTAssertLessThan(scale, 2,
+                    "\(label)档：2× 的捕获通道上占位符那一格只读到 \(inkUnfocused) 个有墨像素 ⇒ "
+                        + "本机这一格**必须**画得出来（R76 实测 1797 / 2354 个变化像素）。"
+                        + "红在这里的含义是『捕获或产品今天坏了』，不是『这台机器看不见』——"
+                        + "只有 1× 才允许缺席（R60：机器前提不同 ⇒ 处置不同，但都不许静默）")
+                continue
+            }
             // ② 焦点必须有视觉后果，而且方向是"让位"（占位符退后），不是"变响"。
             XCTAssertGreaterThanOrEqual(changedIn, 500,
                 "\(label)档：聚焦与不聚焦两张帧在框内只差了 \(changedIn) 个像素 ⇒ "
-                    + "焦点这一档变成看不见了。今天它是那一串占位字退后（实测 1901 / 2144 个像素、"
-                    + "alpha 掉 50 上下）；两种成因都值得查：占位符被换成实色（那就该重判音量），"
+                    + "焦点这一档变成看不见了。今天它是那一串占位字退后（本机实测 1797 / 2354 个变化像素、"
+                    + "整格平均 alpha 掉 3.93 / 4.52）；两种成因都值得查：占位符被换成实色（那就该重判音量），"
                     + "或者 AppKit 不再为聚焦的框调淡占位符（那焦点就只剩光标了）")
             // 地板 2.0 是从**实测**推的，不是猜的：整带均值差今天 3.93（亮）/ 4.52（暗），
             // 取最小值的一半再往下 —— 第一版我写的是 4.0（拿"占位符那一格 53/255 × 面积比"估的 8.6 折半），

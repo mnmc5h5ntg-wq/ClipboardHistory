@@ -1,0 +1,167 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.17s)
+Test Suite 'Selected tests' started at 2026-10-15 22:58:11.576.
+Test Suite 'ClipboardHistoryPackageTests.xctest' started at 2026-10-15 22:58:11.576.
+Test Suite 'MotionFilmstripTests' started at 2026-10-15 22:58:11.576.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsCheaperAndStillSeesTheMotion]' passed (9.787 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms]' passed (0.020 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBandRectMapsToTheEndItClaims]' passed (0.005 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerDismissColumnAsymmetryIsMeasured]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerDismissColumnAsymmetryIsMeasured]' passed (1.846 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerFrameStacksAreReadableEvidence]' passed (3.619 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerOutTracksWhetherItFadesOrSlides]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBannerOutTracksWhetherItFadesOrSlides]' passed (1.860 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBothBannerArmsAreJudged]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testBothBannerArmsAreJudged]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangedRunMustBeContiguousNotFirstToLast]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangedRunMustBeContiguousNotFirstToLast]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testChangeGridPrintsRowZeroAtTheTop]' passed (0.005 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind]' passed (4.942 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailPreviewCrossfadesOnlyWhenTheKindChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testDetailPreviewCrossfadesOnlyWhenTheKindChanges]' passed (5.400 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testEveryTwoStateRulerReadsBothAxes]' passed (0.296 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeABReadsTheContiguousRulerNotTheSpan]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeABReadsTheContiguousRulerNotTheSpan]' passed (0.014 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeVisibilityJudgesTimeNotFrameCount]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFadeVisibilityJudgesTimeNotFrameCount]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabAttributionIsWiredIntoTheCoarseNotRunLines]' passed (0.020 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testGrabCostScalesWithCapturedArea]' passed (0.795 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testHeatmapFadeIsNotVisibleToThisRuler]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testHeatmapFadeIsNotVisibleToThisRuler]' passed (5.576 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testListRowsDoNotAnimateAndNothingClaimsTheyDo]' passed (5.783 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionCriteriaDoNotUseAbsoluteFramePrerolls]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionCriteriaDoNotUseAbsoluteFramePrerolls]' passed (0.028 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionFramesAnchorsAtTheTriggerNotAtTheWindow]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionFramesAnchorsAtTheTriggerNotAtTheWindow]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testMotionReadingsUseTheFileChannel]' passed (0.017 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictPrintsBeforeTheSkipGuards]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictPrintsBeforeTheSkipGuards]' passed (0.013 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictSeparatesJumpFromMissedSampling]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeMoveVerdictSeparatesJumpFromMissedSampling]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowAnimationIsVisibleToTheRuler]' skipped (7.027 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNativeRowMoveIsVisibleToTheRuler]' skipped (4.609 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTestFramesABandInsideABandCapturedFilm]' passed (0.023 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTransitionIsClaimedOnListRows]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoTransitionIsClaimedOnListRows]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoUnexecutedTransitionClaimsAcrossViews]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testNoUnexecutedTransitionClaimsAcrossViews]' passed (0.012 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testPremiseCheckSeesAChangeAndItsAbsence]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testPremiseCheckSeesAChangeAndItsAbsence]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testResolutionHelpersAreATruthTableNotAStory]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testResolutionHelpersAreATruthTableNotAStory]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4131: -[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt] : Test skipped - MOTION_NOT_RUN=app-not-active：这一卷是在非激活进程里抓的，AppKit 本来就不跑行动画 ⇒ 不能据此判产品没动
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt]' skipped (11.932 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSettledAtFrameReadsSyntheticRampsAndSteps]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSettledAtFrameReadsSyntheticRampsAndSteps]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSharedFloorColumnComparisonIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps]' passed (8.383 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSlidingRoleSettlesWithinItsBudget]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSlidingRoleSettlesWithinItsBudget]' passed (0.908 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSystemSymbolEffectsAreOutOfThisRulersReach]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSystemSymbolEffectsAreOutOfThisRulersReach]' passed (4.945 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheAxisRulerSeparatesAlphaFromLuminance]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheControlJudgmentIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockClassifierIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockClassifierIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessMovesAtAll]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessMovesAtAll]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheFadeClockWitnessQualificationIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerAttributesTheMotionToOurAnimation]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerAttributesTheMotionToOurAnimation]' passed (0.824 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerDistinguishesAStepFromARamp]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerDistinguishesAStepFromARamp]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesAStateDrivenSwiftUIUpdate]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesAStateDrivenSwiftUIUpdate]' passed (4.814 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesNothingWhenNothingChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTheRulerSeesNothingWhenNothingChanges]' passed (2.881 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionClaimScanIsATruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionClaimScanIsATruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionsAreActuallyRunning]' started.
+Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testTransitionsAreActuallyRunning]' passed (6.808 seconds).
+Test Suite 'MotionFilmstripTests' passed at 2026-10-15 22:59:44.777.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 93.198 (93.200) seconds
+Test Suite 'ClipboardHistoryPackageTests.xctest' passed at 2026-10-15 22:59:44.777.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 93.198 (93.201) seconds
+Test Suite 'Selected tests' passed at 2026-10-15 22:59:44.777.
+	 Executed 49 tests, with 3 tests skipped and 0 failures (0 unexpected) in 93.198 (93.201) seconds
+MOTION_FADE_CLOCK 声明=150ms 跨度=1.000 中间态帧数=53 帧数=400 采样≈4ms 判定=能分辨
+MOTION_WITNESS notice-banner 证人采样≈4ms 声明=150ms 可分数段=37 合格=是 判定=能分辨 （判据自身采样≈12ms）
+MOTION_SELFTEST_BC13CF1D
+MOTION_SELFTEST_BC13CF1D-2
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_NATIVE row-insert 开 帧数=10 峰值=0.046 采样≈8ms
+MOTION_NATIVE row-insert 关 帧数=1 峰值=0.054 采样≈9ms
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_NATIVE row-move 开 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE row-move 关 帧数=1 峰值=0.037 采样≈8ms
+MOTION_NATIVE_MOVE 判定=瞬移 峰值容差=0.020（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）；这一行只说读数怎么读，产品结论要过下面两道 skip 才算
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+NATIVE_PROBE_STATE visible=true key=false active=false
+NATIVE_PROBE_STATE visible=true key=false active=false
+MOTION_SEQUENCE 选中没变 帧数=11 峰值=0.028
+MOTION_SEQUENCE 选中变了 帧数=1 峰值=0.234
+MOTION_NOT_RUN=app-not-active：NSTableView 不在激活的 App 里不跑行动画
+MOTION_SHIMMER 扫 帧数=48 变化帧对=23 峰值=0.015 采样≈53ms
+MOTION_SHIMMER 停 变化帧对=0 峰值=0.000
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.9ms 抓帧最慢=10.0ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_SETTLE banner-in 到位帧=14 采样≈12ms ⇒ 实测落定≈168ms（声明 150ms；R58 起量的是整条带，不再套第二层框）
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=45.6ms 抓帧最慢=57.4ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_GRAB row-favorite-star 帧数=30 抓帧中位=45.6ms 抓帧最慢=77.0ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_SYMBOL row-star 开 帧数=1 峰值=0.260
+MOTION_SYMBOL row-star 关 帧数=1 峰值=0.260
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=3.2ms 抓帧最慢=23.9ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AB notice-banner 曲线关闭 采样≈8ms 过渡帧数=1 逐帧=[0.000 0.879 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_CONTROL 计数方块 帧数=38 峰值=0.036 变化帧对=37
+MOTION_CONTROL 渐变端点 帧数=38 峰值=0.026 变化帧对=33
+MOTION_GRAB blank 帧数=30 抓帧中位=45.8ms 抓帧最慢=81.1ms 视图=760×592pt 像素=1520×1184px 声明=0ms
+MOTION_BLANK frames=30 峰值=0.0000 过渡帧数=0 帧对=29 亮度峰值=0.0000 alpha峰值=0.0000 并集峰值=0.0000 仅alpha在动=0/29
+MOTION_GRAB notice-banner 帧数=30 抓帧中位=6.6ms 抓帧最慢=23.0ms 视图=760×673pt 像素=1520×96px 声明=150ms
+MOTION_AXIS notice-banner 帧对=26 亮度峰值=0.2769 alpha峰值=0.2533 并集峰值=0.2769 仅alpha在动=0/26
+MOTION notice-banner frames=27 声明=150ms 整卷中位=11ms 事件内最粗=20ms 变化段时长=195ms 过渡帧数=12 时刻ms=[22 20 15 16 16 13 16 11 13 12 14 11 11 13 17 10 10 9 9 9 9 9 9 9 9 9] 逐帧=[0.000 0.195 0.277 0.240 0.260 0.168 0.141 0.163 0.130 0.050 0.045 0.050 0.023 0.036 0.113 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB notice-banner-dismiss 帧数=30 抓帧中位=4.2ms 抓帧最慢=9.8ms 视图=760×673pt 像素=1520×96px 声明=120ms
+MOTION_AXIS notice-banner-dismiss 帧对=26 亮度峰值=0.3070 alpha峰值=0.2942 并集峰值=0.3070 仅alpha在动=0/26
+MOTION notice-banner-dismiss frames=27 声明=120ms 整卷中位=8ms 事件内最粗=20ms 变化段时长=190ms 过渡帧数=9 时刻ms=[17 20 13 20 12 18 19 14 13 10 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 9] 逐帧=[0.000 0.071 0.179 0.307 0.094 0.103 0.125 0.122 0.052 0.030 0.000 0.039 0.000 0.000 0.000 0.105 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_GRAB detail-kind-change 帧数=30 抓帧中位=45.9ms 抓帧最慢=84.5ms 视图=760×592pt 像素=1520×1184px 声明=160ms
+MOTION_AXIS detail-kind-change 帧对=26 亮度峰值=0.0810 alpha峰值=0.0794 并集峰值=0.0810 仅alpha在动=0/26
+MOTION detail-kind-change frames=27 声明=160ms 整卷中位=50ms 事件内最粗=81ms 变化段时长=201ms 过渡帧数=3 时刻ms=[54 81 66 51 51 50 50 51 51 50 51 50 50 50 50 50 50 50 50 50 50 50 50 50 50 50] 逐帧=[0.064 0.081 0.079 0.001 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_NOT_RUN=clock-coarse-in-window detail-kind-change：事件那一段最粗 81ms 一帧、整段过渡只有 160ms（门槛 0.3×声明）⇒ 这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿 归因=probe-grab-bound（解释=105%：这一卷最慢一次抓帧 84ms，而间隔 81ms 只比它多 -4ms ⇒ 差值就是一次等 runloop 的时间） ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答
+MOTION_GRAB empty-state 帧数=30 抓帧中位=15.4ms 抓帧最慢=59.9ms 视图=380×552pt 像素=760×1104px 声明=160ms
+MOTION_AXIS empty-state 帧对=26 亮度峰值=0.1157 alpha峰值=0.1063 并集峰值=0.1157 仅alpha在动=0/26
+MOTION empty-state frames=27 声明=160ms 整卷中位=20ms 事件内最粗=45ms 变化段时长=114ms 过渡帧数=3 时刻ms=[25 45 45 45 39 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20] 逐帧=[0.108 0.116 0.109 0.003 0.000 0.001 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000 0.000]
+MOTION_SUMMARY notice-banner=12 notice-banner-dismiss=9 detail-kind-change=3 empty-state=3
+MOTION_RESOLVE_SUMMARY judged=3/4 not-run=detail-kind-change
+◇ Test run started.
+↳ Testing Library Version: 1400
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

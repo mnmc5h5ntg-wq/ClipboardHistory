@@ -1,0 +1,539 @@
+[0/1] Planning build
+Building for debugging...
+[0/4] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.18s)
+Test Suite 'Selected tests' started at 2026-10-15 22:53:02.616.
+Test Suite 'ClipboardHistoryPackageTests.xctest' started at 2026-10-15 22:53:02.617.
+Test Suite 'UICaptureTests' started at 2026-10-15 22:53:02.617.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionableInkStaysAboveTheLegibilityFloor]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionableInkStaysAboveTheLegibilityFloor]' passed (2.176 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionSpanRulerReadsBothEnds]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testActionSpanRulerReadsBothEnds]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testBottomInkRulerUsesTheRowOwnBackground]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testBottomInkRulerUsesTheRowOwnBackground]' passed (0.001 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptionTextStaysOnTheSecondaryTier]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptionTextStaysOnTheSecondaryTier]' passed (24.305 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureCapabilityPremisesAreMachineVisible]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureCapabilityPremisesAreMachineVisible]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureFixtureInjectsEveryActionSeamTheProductInjects]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureFixtureInjectsEveryActionSeamTheProductInjects]' passed (0.004 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' started.
+INK search-field/清除 ×（静置） light ratio=3.74 ink=15.6%
+INK detail-3-files/多文件行的展开箭头（整行唯一的可展开记号） light ratio=3.85 ink=9.6%
+INK glass-pill/药丸里的收藏星（`.secondary` 那一档的参照） light ratio=4.43 ink=6.6%
+INK sidebar-multi-select/批量操作按钮（侧栏工具排） light ratio=14.56 ink=9.3%
+INK search-field/清除 ×（静置） dark ratio=5.34 ink=15.5%
+INK detail-3-files/多文件行的展开箭头（整行唯一的可展开记号） dark ratio=6.06 ink=10.1%
+INK glass-pill/药丸里的收藏星（`.secondary` 那一档的参照） dark ratio=7.86 ink=5.4%
+INK sidebar-multi-select/批量操作按钮（侧栏工具排） dark ratio=12.43 ink=9.3%
+ACTION_SPAN_CONTROL centered=25.0 high=17.0 empty=nil
+BOTTOM_INK_TRUTH_TABLE 角点=0.0% 半行=50.0% 全出血=0.0%
+CAPTION_REF light .secondary 参照=3.75
+CAPTION_INK heatmap-populated/月份刻度 9月/10月/11月…（读不出月份就读不出这张图） light ratio=3.85 参照=3.75 比值=1.03 ink=7.8%
+CAPTION_INK heatmap-populated/星期刻度 一/三/五/日 light ratio=3.75 参照=3.75 比值=1.00 ink=4.0%
+CAPTION_INK heatmap-populated/图例「少 / 多」（颜色深浅的唯一标尺） light ratio=3.85 参照=3.75 比值=1.03 ink=14.1%
+CAPTION_INK menubar-recommendations/副标题「猜你要粘贴」（这一列的标题） light ratio=3.85 参照=3.75 比值=1.03 ink=26.1%
+CAPTION_INK menubar-recommendations/行右端推荐理由（类型 · 当前 App · 常用） light ratio=3.85 参照=3.75 比值=1.03 ink=20.3%
+CAPTION_INK settings-general/说明段「暂停时仍在推进…」（恢复后会不会补记旧内容） light ratio=3.80 参照=3.75 比值=1.01 ink=29.9%
+CAPTION_INK settings-general/说明段「关闭后不再对新入库的图片…」（截图文字识别） light ratio=3.80 参照=3.75 比值=1.01 ink=19.9%
+CAPTION_INK settings-general/说明段「打开后从 Word、Pages…」（富文本的代价，两行） light ratio=3.80 参照=3.75 比值=1.01 ink=23.1%
+CAPTION_INK settings-general-login-unsupported/回执「当前系统不支持从应用内设置开机启动。」 light ratio=3.80 参照=3.75 比值=1.01 ink=11.9%
+CAPTION_INK settings-general-login-failed/回执「开机启动开启失败，请稍后重试。」（macOS 12 上 AppleScript 静默失败） light ratio=3.80 参照=3.75 比值=1.01 ink=9.6%
+CAPTION_INK settings-shortcuts/快捷键页那一段说明（R28 修过它被截断，档也要钉住） light ratio=3.80 参照=3.75 比值=1.01 ink=14.0%
+CAPTION_INK settings-privacy/说明段「启用后可提供更准确的推荐。」（上下文权限） light ratio=3.80 参照=3.75 比值=1.01 ink=9.3%
+CAPTION_INK settings-privacy/说明段「过滤敏感内容（密钥、令牌、密码等）…」（推荐过滤开关） light ratio=3.80 参照=3.75 比值=1.01 ink=15.5%
+CAPTION_INK settings-privacy/默认排除清单第一行「默认排除：com.…」 light ratio=3.80 参照=3.75 比值=1.01 ink=10.9%
+CAPTION_INK settings-data/数据页第一段说明（存档与导出，要读） light ratio=3.80 参照=3.75 比值=1.01 ink=16.2%
+CAPTION_INK settings-recommendations/推荐页第一段说明（权重是干什么用的） light ratio=3.85 参照=3.75 比值=1.03 ink=21.6%
+CAPTION_INK settings-stats-populated/统计页热图上头那句说明（有数据那一臂） light ratio=3.85 参照=3.75 比值=1.03 ink=13.2%
+CAPTION_INK detail-0-text/详情头部 meta（时间 · 大小 · 来源） light ratio=4.24 参照=3.75 比值=1.13 ink=10.7%
+CAPTION_JUDGED light 判了 18 条 / 表里 18 条
+CAPTION_REF dark .secondary 参照=6.06
+CAPTION_INK heatmap-populated/月份刻度 9月/10月/11月…（读不出月份就读不出这张图） dark ratio=6.06 参照=6.06 比值=1.00 ink=9.4%
+CAPTION_INK heatmap-populated/星期刻度 一/三/五/日 dark ratio=6.06 参照=6.06 比值=1.00 ink=5.1%
+CAPTION_INK heatmap-populated/图例「少 / 多」（颜色深浅的唯一标尺） dark ratio=6.06 参照=6.06 比值=1.00 ink=15.4%
+CAPTION_INK menubar-recommendations/副标题「猜你要粘贴」（这一列的标题） dark ratio=6.06 参照=6.06 比值=1.00 ink=29.9%
+CAPTION_INK menubar-recommendations/行右端推荐理由（类型 · 当前 App · 常用） dark ratio=6.06 参照=6.06 比值=1.00 ink=24.4%
+CAPTION_INK settings-general/说明段「暂停时仍在推进…」（恢复后会不会补记旧内容） dark ratio=5.72 参照=6.06 比值=0.95 ink=36.5%
+CAPTION_INK settings-general/说明段「关闭后不再对新入库的图片…」（截图文字识别） dark ratio=5.72 参照=6.06 比值=0.95 ink=23.9%
+CAPTION_INK settings-general/说明段「打开后从 Word、Pages…」（富文本的代价，两行） dark ratio=5.72 参照=6.06 比值=0.95 ink=27.2%
+CAPTION_INK settings-general-login-unsupported/回执「当前系统不支持从应用内设置开机启动。」 dark ratio=5.72 参照=6.06 比值=0.95 ink=14.5%
+CAPTION_INK settings-general-login-failed/回执「开机启动开启失败，请稍后重试。」（macOS 12 上 AppleScript 静默失败） dark ratio=5.72 参照=6.06 比值=0.95 ink=11.8%
+CAPTION_INK settings-shortcuts/快捷键页那一段说明（R28 修过它被截断，档也要钉住） dark ratio=5.72 参照=6.06 比值=0.95 ink=16.6%
+CAPTION_INK settings-privacy/说明段「启用后可提供更准确的推荐。」（上下文权限） dark ratio=5.72 参照=6.06 比值=0.95 ink=11.1%
+CAPTION_INK settings-privacy/说明段「过滤敏感内容（密钥、令牌、密码等）…」（推荐过滤开关） dark ratio=5.72 参照=6.06 比值=0.95 ink=19.0%
+CAPTION_INK settings-privacy/默认排除清单第一行「默认排除：com.…」 dark ratio=5.72 参照=6.06 比值=0.95 ink=13.0%
+CAPTION_INK settings-data/数据页第一段说明（存档与导出，要读） dark ratio=5.72 参照=6.06 比值=0.95 ink=19.0%
+CAPTION_INK settings-recommendations/推荐页第一段说明（权重是干什么用的） dark ratio=6.06 参照=6.06 比值=1.00 ink=25.9%
+CAPTION_INK settings-stats-populated/统计页热图上头那句说明（有数据那一臂） dark ratio=6.06 参照=6.06 比值=1.00 ink=15.8%
+CAPTION_INK detail-0-text/详情头部 meta（时间 · 大小 · 来源） dark ratio=5.91 参照=6.06 比值=0.98 ink=12.0%
+CAPTION_JUDGED dark 判了 18 条 / 表里 18 条
+CAPTION_COVERAGE 设置分区 6 个，全部至少点名一处（表里 18 条）
+CAPABILITY_TRUTH_TABLE 4 臂（本机 / runner / 单帧空白 / 族只一张）：local(blank=false,band=true) runner(blank=true,band=false)
+CAPTURE_CAPABILITY settings族整体空白=否（族内最低未绘制 20.8% / 22 张） / 这一台见过黑带=是
+CAPTURED 124 -> /tmp/r78_shots
+  content-with-history-750x560-light.png  transparent=52.9%  blackBandPt=66  bottomInk=0.1%
+  content-min-600x440-light.png  transparent=41.3%  blackBandPt=43  bottomInk=43.4%
+  content-wide-1100x800-light.png  transparent=67.5%  blackBandPt=66  bottomInk=0.0%
+  content-empty-750x560-light.png  transparent=62.1%  blackBandPt=0  bottomInk=0.1%
+  content-no-results-750x560-light.png  transparent=62.1%  blackBandPt=0  bottomInk=0.1%
+  menubar-recommendations-320x320-light.png  transparent=56.9%  blackBandPt=0  bottomInk=0.0%
+  menubar-refreshing-320x120-light.png  transparent=55.8%  blackBandPt=0  bottomInk=0.0%
+  menubar-empty-320x120-light.png  transparent=55.8%  blackBandPt=0  bottomInk=0.0%
+  sidebar-history-300x520-light.png  transparent=0.0%  blackBandPt=66  bottomInk=0.0%
+  sidebar-multi-select-300x520-light.png  transparent=0.0%  blackBandPt=168  bottomInk=0.0%
+  sidebar-multi-select-min-250x520-light.png  transparent=0.0%  blackBandPt=168  bottomInk=0.0%
+  quickpick-list-420x300-light.png  transparent=86.3%  blackBandPt=0  bottomInk=0.0%
+  quickpick-typed-420x300-light.png  transparent=88.7%  blackBandPt=0  bottomInk=0.0%
+  quickpick-empty-420x300-light.png  transparent=98.0%  blackBandPt=0  bottomInk=0.0%
+  quickpick-hover-420x300-light.png  transparent=77.0%  blackBandPt=0  bottomInk=0.0%
+  sidebar-favorites-300x520-light.png  transparent=0.0%  blackBandPt=66  bottomInk=0.0%
+  sidebar-no-results-300x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-text-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-image-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-file-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-files-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-clipped-control-300x58-light.png  transparent=27.6%  blackBandPt=0  bottomInk=10.8%
+  row-favorite-on-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-favorite-off-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-pinned-on-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-pinned-off-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-file-thumb-300x74-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  detail-0-text-720x520-light.png  transparent=84.6%  blackBandPt=0  bottomInk=0.0%
+  detail-1-image-720x520-light.png  transparent=76.6%  blackBandPt=0  bottomInk=0.0%
+  detail-2-file-720x520-light.png  transparent=82.7%  blackBandPt=0  bottomInk=0.0%
+  detail-3-files-720x520-light.png  transparent=84.5%  blackBandPt=0  bottomInk=0.0%
+  detail-text-highlight-720x520-light.png  transparent=84.5%  blackBandPt=0  bottomInk=0.0%
+  detail-markdown-rendered-720x520-light.png  transparent=73.2%  blackBandPt=0  bottomInk=0.0%
+  detail-markdown-source-720x520-light.png  transparent=82.5%  blackBandPt=0  bottomInk=0.0%
+  glass-pill-120x232-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  glass-pill-states-120x232-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  search-field-320x112-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  empty-state-320x160-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  weights-520x880-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  weights-adjusted-520x880-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  settings-shortcuts-720x540-light.png  transparent=54.4%  blackBandPt=0  bottomInk=0.1%
+  settings-general-720x540-light.png  transparent=56.4%  blackBandPt=0  bottomInk=0.1%
+  settings-privacy-720x540-light.png  transparent=20.8%  blackBandPt=0  bottomInk=6.7%
+  settings-recommendations-720x540-light.png  transparent=28.6%  blackBandPt=0  bottomInk=19.9%
+  settings-data-720x540-light.png  transparent=69.7%  blackBandPt=0  bottomInk=0.1%
+  settings-stats-720x540-light.png  transparent=78.8%  blackBandPt=0  bottomInk=0.1%
+  settings-min-640x440-light.png  transparent=43.5%  blackBandPt=0  bottomInk=0.1%
+  settings-general-login-unsupported-720x540-light.png  transparent=54.2%  blackBandPt=0  bottomInk=0.1%
+  settings-general-login-failed-720x540-light.png  transparent=54.2%  blackBandPt=0  bottomInk=0.1%
+  heatmap-populated-430x250-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  heatmap-cell-strip-still-90x140-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  heatmap-cell-strip-hover-90x140-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  settings-privacy-excluded-720x1040-light.png  transparent=23.1%  blackBandPt=0  bottomInk=0.1%
+  receipt-line-430x72-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  settings-stats-populated-720x540-light.png  transparent=70.8%  blackBandPt=0  bottomInk=0.1%
+  heatmap-empty-430x150-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  content-with-notice-750x560-light.png  transparent=50.7%  blackBandPt=66  bottomInk=0.1%
+  content-with-two-notices-750x560-light.png  transparent=46.4%  blackBandPt=66  bottomInk=0.1%
+  content-with-copy-failure-notice-750x560-light.png  transparent=50.7%  blackBandPt=66  bottomInk=0.1%
+  content-min-with-copy-failure-notice-600x440-light.png  transparent=40.7%  blackBandPt=0  bottomInk=0.1%
+  notice-banner-560x170-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  detail-loading-720x520-light.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  content-with-history-750x560-dark.png  transparent=52.9%  blackBandPt=66  bottomInk=0.1%
+  content-min-600x440-dark.png  transparent=41.3%  blackBandPt=43  bottomInk=43.4%
+  content-wide-1100x800-dark.png  transparent=67.5%  blackBandPt=66  bottomInk=0.0%
+  content-empty-750x560-dark.png  transparent=62.1%  blackBandPt=0  bottomInk=0.1%
+  content-no-results-750x560-dark.png  transparent=62.1%  blackBandPt=0  bottomInk=0.1%
+  menubar-recommendations-320x320-dark.png  transparent=56.9%  blackBandPt=0  bottomInk=0.0%
+  menubar-refreshing-320x120-dark.png  transparent=55.8%  blackBandPt=0  bottomInk=0.0%
+  menubar-empty-320x120-dark.png  transparent=55.8%  blackBandPt=0  bottomInk=0.0%
+  sidebar-history-300x520-dark.png  transparent=0.0%  blackBandPt=29  bottomInk=0.0%
+  sidebar-multi-select-300x520-dark.png  transparent=0.0%  blackBandPt=130  bottomInk=0.0%
+  sidebar-multi-select-min-250x520-dark.png  transparent=0.0%  blackBandPt=96  bottomInk=0.0%
+  quickpick-list-420x300-dark.png  transparent=85.9%  blackBandPt=0  bottomInk=0.0%
+  quickpick-typed-420x300-dark.png  transparent=88.6%  blackBandPt=0  bottomInk=0.0%
+  quickpick-empty-420x300-dark.png  transparent=97.8%  blackBandPt=0  bottomInk=0.0%
+  quickpick-hover-420x300-dark.png  transparent=76.7%  blackBandPt=0  bottomInk=0.0%
+  sidebar-favorites-300x520-dark.png  transparent=0.0%  blackBandPt=28  bottomInk=0.0%
+  sidebar-no-results-300x520-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-text-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-image-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-file-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-files-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  row-clipped-control-300x58-dark.png  transparent=27.6%  blackBandPt=0  bottomInk=12.5%
+  row-favorite-on-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-favorite-off-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-pinned-on-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-pinned-off-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=2.5%
+  row-file-thumb-300x74-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  detail-0-text-720x520-dark.png  transparent=84.5%  blackBandPt=0  bottomInk=0.0%
+  detail-1-image-720x520-dark.png  transparent=76.6%  blackBandPt=0  bottomInk=0.0%
+  detail-2-file-720x520-dark.png  transparent=82.7%  blackBandPt=0  bottomInk=0.0%
+  detail-3-files-720x520-dark.png  transparent=84.4%  blackBandPt=0  bottomInk=0.0%
+  detail-text-highlight-720x520-dark.png  transparent=84.5%  blackBandPt=0  bottomInk=0.0%
+  detail-markdown-rendered-720x520-dark.png  transparent=73.0%  blackBandPt=0  bottomInk=0.0%
+  detail-markdown-source-720x520-dark.png  transparent=82.2%  blackBandPt=0  bottomInk=0.0%
+  glass-pill-120x232-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  glass-pill-states-120x232-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  search-field-320x112-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  empty-state-320x160-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  weights-520x880-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  weights-adjusted-520x880-dark.png  transparent=0.0%  blackBandPt=0  bottomInk=0.0%
+  settings-shortcuts-720x540-dark.png  transparent=54.4%  blackBandPt=0  bottomInk=0.1%
+  settings-general-720x540-dark.png  transparent=56.4%  blackBandPt=0  bottomInk=0.1%
+  settings-privacy-720x540-dark.png  transparent=20.8%  blackBandPt=0  bottomInk=27.2%
+  settings-recommendations-720x540-dark.png  transparent=28.5%  blackBandPt=0  bottomInk=42.4%
+  settings-data-720x540-dark.png  transparent=69.6%  blackBandPt=0  bottomInk=0.1%
+  settings-stats-720x540-dark.png  transparent=78.7%  blackBandPt=0  bottomInk=0.1%
+  settings-min-640x440-dark.png  transparent=43.5%  blackBandPt=0  bottomInk=0.1%
+  settings-general-login-unsupported-720x540-dark.png  transparent=54.2%  blackBandPt=0  bottomInk=0.1%
+  settings-general-login-failed-720x540-dark.png  transparent=54.2%  blackBandPt=0  bottomInk=0.1%
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' passed (15.620 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureReadingsUseTheFileChannel]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureReadingsUseTheFileChannel]' passed (0.032 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testContrastRulerArithmetic]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testContrastRulerArithmetic]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDarkSettingsSidebarTextIsACountedBlindSpot]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDarkSettingsSidebarTextIsACountedBlindSpot]' passed (3.271 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDetailAreaHasASingleLeftAxis]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDetailAreaHasASingleLeftAxis]' passed (2.465 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDisabledToggleAndFailureReceiptAreVisible]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testDisabledToggleAndFailureReceiptAreVisible]' passed (3.609 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testFixtureImageBytesDoNotDependOnAmbientAppearance]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testFixtureImageBytesDoNotDependOnAmbientAppearance]' passed (0.006 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionRulerReadsBothEnds]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionRulerReadsBothEnds]' passed (0.316 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionTruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testInkDirectionTruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testLoadingBlockSharesTheDetailColumnsAxis]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testLoadingBlockSharesTheDetailColumnsAxis]' passed (1.706 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarFramesAreReplicasOfTheMenuSurface]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarFramesAreReplicasOfTheMenuSurface]' passed (0.466 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:4105: -[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic] : Test skipped - 诊断用判据：它只回答「这一行在给定宽度下截不截」，用来定修法，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testMenuBarRowTruncationAcrossWidthsDiagnostic]' skipped (0.217 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeActionIsVerticallyCenteredInItsBand]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeActionIsVerticallyCenteredInItsBand]' passed (5.505 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBandFinderReadsBothEnds]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBandFinderReadsBothEnds]' passed (0.025 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBodyTextStaysReadable]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeBodyTextStaysReadable]' passed (6.879 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeTintDoesNotReachTheTitlebar]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNoticeTintDoesNotReachTheTitlebar]' passed (1.410 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNotRunDiscriminatorTruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testNotRunDiscriminatorTruthTable]' passed (0.949 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsOutline]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverFillSharesTheSelectionPillsOutline]' passed (0.697 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora]' passed (0.482 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar]' passed (0.003 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverTintIsPaintedAndConfinedToItsRow]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverTintIsPaintedAndConfinedToItsRow]' passed (0.731 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing]' passed (1.429 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testProbesDoNotSitOnVibrantColumns]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testProbesDoNotSitOnVibrantColumns]' passed (17.344 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testProbeVibrantEligibilityDiagnostic]' started.
+27
+NOTICE_TEXT notice-banner light bands=2 y42-92 ratio=13.94 ink=11.7% | y93-159 ratio=13.94 ink=17.4%
+NOTICE_SIDE content-with-notice dark 尾墨 亮2277/暗0
+NOTICE_TEXT content-with-notice dark bands=1 y52-102 ratio=11.54 ink=17.5%
+NOTICE_SIDE content-with-two-notices dark 尾墨 亮1683/暗0
+NOTICE_SIDE content-with-two-notices dark 尾墨 亮2277/暗0
+NOTICE_TEXT content-with-two-notices dark bands=2 y52-90 ratio=10.48 ink=5.3% | y91-141 ratio=11.54 ink=17.5%
+NOTICE_SIDE content-with-copy-failure-notice dark 尾墨 亮2277/暗0
+NOTICE_TEXT content-with-copy-failure-notice dark bands=1 y52-102 ratio=11.54 ink=21.1%
+NOTICE_SIDE content-min-with-copy-failure-notice dark 尾墨 亮1725/暗0
+NOTICE_TEXT content-min-with-copy-failure-notice dark bands=1 y52-102 ratio=11.54 ink=27.8%
+NOTICE_SIDE notice-banner dark 尾墨 亮1578/暗0
+NOTICE_SIDE notice-banner dark 尾墨 亮2127/暗0
+NOTICE_TEXT notice-banner dark bands=2 y42-92 ratio=10.48 ink=13.1% | y93-159 ratio=11.54 ink=19.3%
+NOTICE_CHROME content-with-notice light bandR-B=16.3 chromeR-B=0.0
+NOTICE_CHROME content-with-two-notices light bandR-B=24.2 chromeR-B=0.0
+NOTICE_CHROME content-with-notice dark bandR-B=15.6 chromeR-B=0.0
+NOTICE_CHROME content-with-two-notices dark bandR-B=22.9 chromeR-B=0.0
+DISCRIMINATOR_ARM_A blank 文字墨=0 ⇒ 判为"画不出来"（正对照成立）
+DISCRIMINATOR_ARM_B settings-general 内容列文字墨=31890 ⇒ 判为"画得出来"
+OVERLAY_HOVER_DOOR 亮 缩放=2× 药丸内缩@门1/2/4=10/11/11px 灰带内缩@门1/4=11/11px ⇒ 假设『材质角过不了门』在两族读数上必须一起回升，只有一族回升就是别的原因
+OVERLAY_HOVER_OUTLINE 亮 药丸行数=68 灰带行数=68 药丸左沿内缩=11px 灰带左沿内缩=11px 缩放=2× 圆角这一轴=可判 药丸首行=55…784 药丸中行=44…795 灰带首行=55…784 灰带中行=44…795
+  逐行最大偏差（去掉首末各 2 行）第2行 左=1px 右=1px（线 2px）
+OVERLAY_HOVER_DOOR 暗 缩放=2× 药丸内缩@门1/2/4=10/11/11px 灰带内缩@门1/4=11/11px ⇒ 假设『材质角过不了门』在两族读数上必须一起回升，只有一族回升就是别的原因
+OVERLAY_HOVER_OUTLINE 暗 药丸行数=68 灰带行数=68 药丸左沿内缩=11px 灰带左沿内缩=11px 缩放=2× 圆角这一轴=可判 药丸首行=55…784 药丸中行=44…795 灰带首行=55…784 灰带中行=44…795
+  逐行最大偏差（去掉首末各 2 行）第2行 左=1px 右=1px（线 2px）
+OVERLAY_HOVER_REFLOW 帧夹具 前缀数=6 整列变了=1 次 指针那格换了=1 次 最终行数=1 ｜嵌套前缀语料 前缀数=8 整列变了=7 次 指针那格换了=6 次 最终行数=1（指针=第 2 行，那一行没了也算换）
+OVERLAY_HOVER 亮 点亮行=3 alpha 抬升=12.96/255 线=7.65（令牌推 15.30 的一半） 亮度差=-2.17/255 期望符号=变暗 邻行最大抬升=0:0.00 第4行抬升=0.00 带={{24, 296}, {1056, 68}} 行数=5 alpha 静置=13.58
+  药丸 x=44…795 灰带 x=44…795 左差=0px 右差=0px 帧宽=840px
+OVERLAY_HOVER 暗 点亮行=3 alpha 抬升=12.83/255 线=7.65（令牌推 15.30 的一半） 亮度差=6.39/255 期望符号=变亮 邻行最大抬升=0:0.00 第4行抬升=0.00 带={{24, 296}, {1056, 68}} 行数=5 alpha 静置=15.70
+  药丸 x=44…795 灰带 x=44…795 左差=0px 右差=0px 帧宽=840px
+QUICKPICK_FOCUS 亮 appActive=false 面板key=false 主=false makeFirstResponder=true 建出来时就聚焦=true 聚焦时响应者是编辑器=true 撤焦点后还是=false focusRingType=0 缩放=2× 带={{20, 24}, {800, 32}} 框内变化像素=1797 框外一圈变化像素=0 alpha 聚焦=6.77 不聚焦=10.71 差=3.93 亮度轴差=-0.66 占位区有墨(不聚焦,左30%内缩3pt)=1699 有墨(聚焦)=1660 整窗有墨=69048 ⇒ 存在性尺说这一格画了东西，像素那两条有对象
+QUICKPICK_FOCUS_RING_NOT_RUN=1 亮：焦点环这一档在这条通道里读不到（框外 0 个变化像素，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+QUICKPICK_FOCUS 暗 appActive=false 面板key=false 主=false makeFirstResponder=true 建出来时就聚焦=true 聚焦时响应者是编辑器=true 撤焦点后还是=false focusRingType=0 缩放=2× 带={{20, 24}, {800, 32}} 框内变化像素=2354 框外一圈变化像素=0 alpha 聚焦=8.64 不聚焦=13.15 差=4.52 亮度轴差=2.25 占位区有墨(不聚焦,左30%内缩3pt)=1871 有墨(聚焦)=1823 整窗有墨=71021 ⇒ 存在性尺说这一格画了东西，像素那两条有对象
+QUICKPICK_FOCUS_RING_NOT_RUN=1 暗：焦点环这一档在这条通道里读不到（框外 0 个变化像素，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+PROBE_DOMAIN 问了 44 条、判成 44 条：说明段 0 条压在 vibrant 上，控件 1 条已登记（["sidebar-multi-select/批量操作按钮（侧栏工具排）"]）
+PROBE_ELIGIBILITY light heatmap-populated 月份刻度 9月/10月/11月…（读不出月份 域=非 vibrant ratio=3.85 ink=7.8%
+PROBE_ELIGIBILITY light heatmap-populated 星期刻度 一/三/五/日 域=非 vibrant ratio=3.75 ink=4.0%
+PROBE_ELIGIBILITY light heatmap-populated 图例「少 / 多」（颜色深浅的唯一标尺） 域=非 vibrant ratio=3.85 ink=14.1%
+PROBE_ELIGIBILITY light menubar-recommendations 副标题「猜你要粘贴」（这一列的标题） 域=非 vibrant ratio=3.85 ink=26.1%
+PROBE_ELIGIBILITY light menubar-recommendations 行右端推荐理由（类型 · 当前 App ·  域=非 vibrant ratio=3.85 ink=20.3%
+PROBE_ELIGIBILITY light settings-general 说明段「暂停时仍在推进…」（恢复后会不会补记 域=非 vibrant ratio=3.80 ink=29.9%
+PROBE_ELIGIBILITY light settings-general 说明段「关闭后不再对新入库的图片…」（截图文 域=非 vibrant ratio=3.80 ink=19.9%
+PROBE_ELIGIBILITY light settings-general 说明段「打开后从 Word、Pages…」（ 域=非 vibrant ratio=3.80 ink=23.1%
+PROBE_ELIGIBILITY light settings-general-login-unsupported 回执「当前系统不支持从应用内设置开机启动。」 域=非 vibrant ratio=3.80 ink=11.9%
+PROBE_ELIGIBILITY light settings-general-login-failed 回执「开机启动开启失败，请稍后重试。」（ma 域=非 vibrant ratio=3.80 ink=9.6%
+PROBE_ELIGIBILITY light settings-shortcuts 快捷键页那一段说明（R28 修过它被截断，档 域=非 vibrant ratio=3.80 ink=14.0%
+PROBE_ELIGIBILITY light settings-privacy 说明段「启用后可提供更准确的推荐。」（上下文 域=非 vibrant ratio=3.80 ink=9.3%
+PROBE_ELIGIBILITY light settings-privacy 说明段「过滤敏感内容（密钥、令牌、密码等）… 域=非 vibrant ratio=3.80 ink=15.5%
+PROBE_ELIGIBILITY light settings-privacy 默认排除清单第一行「默认排除：com.…」 域=非 vibrant ratio=3.80 ink=10.9%
+PROBE_ELIGIBILITY light settings-data 数据页第一段说明（存档与导出，要读） 域=非 vibrant ratio=3.80 ink=16.2%
+PROBE_ELIGIBILITY light settings-recommendations 推荐页第一段说明（权重是干什么用的） 域=非 vibrant ratio=3.85 ink=21.6%
+PROBE_ELIGIBILITY light settings-stats-populated 统计页热图上头那句说明（有数据那一臂） 域=非 vibrant ratio=3.85 ink=13.2%
+PROBE_ELIGIBILITY light detail-0-text 详情头部 meta（时间 · 大小 · 来源 域=非 vibrant ratio=4.24 ink=10.7%
+PROBE_ELIGIBILITY light search-field 清除 ×（静置） 域=非 vibrant ratio=3.74 ink=15.6%
+PROBE_ELIGIBILITY light detail-3-files 多文件行的展开箭头（整行唯一的可展开记号） 域=非 vibrant ratio=3.85 ink=9.6%
+PROBE_ELIGIBILITY light glass-pill 药丸里的收藏星（`.secondary` 那 域=非 vibrant ratio=4.43 ink=6.6%
+PROBE_ELIGIBILITY light sidebar-multi-select 批量操作按钮（侧栏工具排） 域=NSAppearanceNameVibrantLight ratio=14.56 ink=9.3%
+PROBE_ELIGIBILITY dark heatmap-populated 月份刻度 9月/10月/11月…（读不出月份 域=非 vibrant ratio=6.06 ink=9.4%
+PROBE_ELIGIBILITY dark heatmap-populated 星期刻度 一//Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:4372: -[ClipboardHistoryAppTests.UICaptureTests testProbeVibrantEligibilityDiagnostic] : Test skipped - 诊断用判据：它只回答「这条探针框压在哪个颜色域里」，用来定资格，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testProbeVibrantEligibilityDiagnostic]' skipped (20.100 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot]' passed (0.570 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayFillsItsPanelAndCanBeCaptured]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayFillsItsPanelAndCanBeCaptured]' passed (0.300 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickRowsShareOneIconColumnAndOneLabelAxis]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickRowsShareOneIconColumnAndOneLabelAxis]' passed (0.284 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypedFixtureShowsFilteredRowsNotAnEmptyList]' passed (0.368 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypographyComesFromTheLadder]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypographyComesFromTheLadder]' passed (0.235 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testRowTierProfileSeparatesCaptionFromTitle]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testRowTierProfileSeparatesCaptionFromTitle]' passed (1.211 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldFixtureShowsBothStates]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldFixtureShowsBothStates]' passed (0.457 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldIdealHeightIsStateIndependent]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSearchFieldIdealHeightIsStateIndependent]' passed (0.057 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:4041: -[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic] : Test skipped - 诊断用判据：它只回答「这一行是标题档还是说明档」，用来放框，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionRowTierProfileDiagnostic]' skipped (14.821 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionSitsCloserToItsOwnToggle]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCaptionSitsCloserToItsOwnToggle]' passed (1.445 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsDrawabilityTruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsDrawabilityTruthTable]' passed (0.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsHelperTextIsNotClipped]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsHelperTextIsNotClipped]' passed (3.606 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic]' started.
+/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:3968: -[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic] : Test skipped - 诊断用判据：它只回答「这一列是谁画的、它携带的颜色在两种外观下各解析成什么」，不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic]' skipped (0.384 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testTextInkGateTruthTable]' started.
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testTextInkGateTruthTable]' passed (0.000 seconds).
+Test Suite 'UICaptureTests' passed at 2026-10-15 22:55:16.109.
+	 Executed 44 tests, with 4 tests skipped and 0 failures (0 unexpected) in 133.488 (133.492) seconds
+Test Suite 'ClipboardHistoryPackageTests.xctest' passed at 2026-10-15 22:55:16.109.
+	 Executed 44 tests, with 4 tests skipped and 0 failures (0 unexpected) in 133.488 (133.492) seconds
+Test Suite 'Selected tests' passed at 2026-10-15 22:55:16.109.
+	 Executed 44 tests, with 4 tests skipped and 0 failures (0 unexpected) in 133.488 (133.492) seconds
+三/五/日 域=非 vibrant ratio=6.06 ink=5.1%
+PROBE_ELIGIBILITY dark heatmap-populated 图例「少 / 多」（颜色深浅的唯一标尺） 域=非 vibrant ratio=6.06 ink=15.4%
+PROBE_ELIGIBILITY dark menubar-recommendations 副标题「猜你要粘贴」（这一列的标题） 域=非 vibrant ratio=6.06 ink=29.9%
+PROBE_ELIGIBILITY dark menubar-recommendations 行右端推荐理由（类型 · 当前 App ·  域=非 vibrant ratio=6.06 ink=24.4%
+PROBE_ELIGIBILITY dark settings-general 说明段「暂停时仍在推进…」（恢复后会不会补记 域=非 vibrant ratio=5.72 ink=36.5%
+PROBE_ELIGIBILITY dark settings-general 说明段「关闭后不再对新入库的图片…」（截图文 域=非 vibrant ratio=5.72 ink=23.9%
+PROBE_ELIGIBILITY dark settings-general 说明段「打开后从 Word、Pages…」（ 域=非 vibrant ratio=5.72 ink=27.2%
+PROBE_ELIGIBILITY dark settings-general-login-unsupported 回执「当前系统不支持从应用内设置开机启动。」 域=非 vibrant ratio=5.72 ink=14.5%
+PROBE_ELIGIBILITY dark settings-general-login-failed 回执「开机启动开启失败，请稍后重试。」（ma 域=非 vibrant ratio=5.72 ink=11.8%
+PROBE_ELIGIBILITY dark settings-shortcuts 快捷键页那一段说明（R28 修过它被截断，档 域=非 vibrant ratio=5.72 ink=16.6%
+PROBE_ELIGIBILITY dark settings-privacy 说明段「启用后可提供更准确的推荐。」（上下文 域=非 vibrant ratio=5.72 ink=11.1%
+PROBE_ELIGIBILITY dark settings-privacy 说明段「过滤敏感内容（密钥、令牌、密码等）… 域=非 vibrant ratio=5.72 ink=19.0%
+PROBE_ELIGIBILITY dark settings-privacy 默认排除清单第一行「默认排除：com.…」 域=非 vibrant ratio=5.72 ink=13.0%
+PROBE_ELIGIBILITY dark settings-data 数据页第一段说明（存档与导出，要读） 域=非 vibrant ratio=5.72 ink=19.0%
+PROBE_ELIGIBILITY dark settings-recommendations 推荐页第一段说明（权重是干什么用的） 域=非 vibrant ratio=6.06 ink=25.9%
+PROBE_ELIGIBILITY dark settings-stats-populated 统计页热图上头那句说明（有数据那一臂） 域=非 vibrant ratio=6.06 ink=15.8%
+PROBE_ELIGIBILITY dark detail-0-text 详情头部 meta（时间 · 大小 · 来源 域=非 vibrant ratio=5.91 ink=12.0%
+PROBE_ELIGIBILITY dark search-field 清除 ×（静置） 域=非 vibrant ratio=5.34 ink=15.5%
+PROBE_ELIGIBILITY dark detail-3-files 多文件行的展开箭头（整行唯一的可展开记号） 域=非 vibrant ratio=6.06 ink=10.1%
+PROBE_ELIGIBILITY dark glass-pill 药丸里的收藏星（`.secondary` 那 域=非 vibrant ratio=7.86 ink=5.4%
+PROBE_ELIGIBILITY dark sidebar-multi-select 批量操作按钮（侧栏工具排） 域=NSAppearanceNameVibrantDark ratio=12.43 ink=9.3%
+PROBE_ELIGIBILITY_SUM 2 of 44 条探针压在 vibrant 子树上
+QUICKPICK_EMPTY_SENTENCE fieldBottom=272.0 sentenceTop=264.0 gap=8.0
+QUICKPICK_LONG_QUERY 句子 frame={{10, 248}, {400, 16}} 面板={{0, 0}, {420, 300}} 文本长度=71
+CAPTURE_PROBE quickpick transparent=85.9% rows=5 stack={{12, 12}, {396, 276}} tableVisible={{0, 0}, {396, 252}} dataSourceIsController=true bounds={{0, 0}, {420, 300}}
+QUICKPICK_ROW_AXIS rows=5 取到标签=5 取到图标=5 无图行=0 标签左轴散布=0.00pt 图标列散布=0.00pt 标签 minX=42.0,42.0,42.0,42.0,42.0 类型符号=doc,doc.on.doc,doc.text,photo
+QUICKPICK_FIXTURE_ROWS all=5 typed(访达)=2 empty(zzz 不存在)=0
+QUICKPICK_TYPE 行数=5 行标签字号=[12, 12, 12, 12, 12] 期望=12 搜索框字号=13 期望=13
+ROWTIER_TRUTH light 说明带 最深=120 说明=5910 标题=0 / 标题带 最深=206 说明=1341 标题=2822 间隙=86
+ROWTIER_TRUTH dark 说明带 最深=121 说明=7396 标题=0 / 标题带 最深=185 说明=1453 标题=3111 间隙=64
+SEARCH_FIELD_BANDS light px=[65, 65]（诊断用，判据在 idealHeight 那条）
+SEARCH_FIELD_BANDS dark px=[64, 65]（诊断用，判据在 idealHeight 那条）
+SEARCH_FIELD_IDEAL_HEIGHTS light empty=32.0 filled=32.0
+SEARCH_FIELD_IDEAL_HEIGHTS dark empty=32.0 filled=32.0
+ROWTIER settings-general light：有字行 203 行（区域 x 150..710、y 20..520）
+  说明档带 y=161.0..170.5 pt 最深偏离=128 说明=6293
+  说明档带 y=201.5..211.0 pt 最深偏离=128 说明=4068
+  说明档带 y=241.5..252.5 pt 最深偏离=128 说明=6721
+  说明档带 y=255.5..266.0 pt 最深偏离=128 说明=3790
+ROWTIER settings-shortcuts light：有字行 226 行（区域 x 150..710、y 20..520）
+  说明档带 y=275.0..284.5 pt 最深偏离=128 说明=2280
+ROWTIER settings-privacy light：有字行 398 行（区域 x 150..710、y 20..520）
+  说明档带 y=143.0..152.0 pt 最深偏离=120 说明=1712
+  说明档带 y=305.0..314.5 pt 最深偏离=120 说明=2791
+  说明档带 y=363.0..372.0 pt 最深偏离=120 说明=5902
+  说明档带 y=376.0..385.0 pt 最深偏离=120 说明=1179
+  说明档带 y=395.0..405.0 pt 最深偏离=120 说明=2007
+  说明档带 y=414.0..424.0 pt 最深偏离=120 说明=1892
+  说明档带 y=433.0..443.0 pt 最深偏离=120 说明=1769
+  说明档带 y=452.0..462.0 pt 最深偏离=120 说明=1829
+  说明档带 y=471.0..481.0 pt 最深偏离=120 说明=1493
+  说明档带 y=490.0..500.0 pt 最深偏离=120 说明=1684
+  说明档带 y=509.0..519.0 pt 最深偏离=120 说明=1577
+ROWTIER settings-data light：有字行 196 行（区域 x 150..710、y 20..520）
+  说明档带 y=139.0..148.5 pt 最深偏离=128 说明=2694
+  说明档带 y=212.0..221.5 pt 最深偏离=124 说明=5839
+  说明档带 y=225.0..234.0 pt 最深偏离=124 说明=427
+ROWTIER settings-recommendations light：有字行 241 行（区域 x 150..710、y 20..520）
+  说明档带 y=146.0..155.5 pt 最深偏离=116 说明=3372
+  说明档带 y=200.0..209.0 pt 最深偏离=120 说明=1579
+  说明档带 y=220.0..220.5 pt 最深偏离=61 说明=1
+  说明档带 y=229.5..230.5 pt 最深偏离=61 说明=160
+  说明档带 y=284.0..293.0 pt 最深偏离=120 说明=1397
+  说明档带 y=304.0..304.5 pt 最深偏离=61 说明=1
+  说明档带 y=313.5..314.5 pt 最深偏离=61 说明=160
+  说明档带 y=368.0..378.0 pt 最深偏离=120 说明=1676
+  说明档带 y=388.0..388.5 pt 最深偏离=61 说明=1
+  说明档带 y=397.5..398.5 pt 最深偏离=61 说明=160
+  说明档带 y=452.0..462.0 pt 最深偏离=120 说明=1958
+  说明档带 y=472.0..472.5 pt 最深偏离=61 说明=1
+  说明档带 y=481.5..482.5 pt 最深偏离=61 说明=160
+ROWTIER settings-stats-populated light：有字行 364 行（区域 x 150..710、y 20..520）
+  说明档带 y=98.0..108.0 pt 最深偏离=124 说明=2414
+  说明档带 y=122.5..132.0 pt 最深偏离=124 说明=1569
+  说明档带 y=136.0..147.0 pt 最深偏离=124 说明=6134
+  说明档带 y=150.0..161.0 pt 最深偏离=124 说明=5624
+  说明档带 y=164.0..175.0 pt 最深偏离=124 说明=6185
+  说明档带 y=178.0..189.0 pt 最深偏离=124 说明=5616
+  说明档带 y=192.0..203.0 pt 最深偏离=124 说明=5755
+  说明档带 y=206.0..217.0 pt 最深偏离=81 说明=2784
+  说明档带 y=220.0..231.0 pt 最深偏离=124 说明=2904
+  说明档带 y=243.0..253.0 pt 最深偏离=124 说明=2721
+  说明档带 y=310.0..320.5 pt 最深偏离=124 说明=6122
+  说明档带 y=324.0..334.5 pt 最深偏离=124 说明=6251
+  说明档带 y=338.0..348.0 pt 最深偏离=124 说明=902
+  说明档带 y=358.0..368.5 pt 最深偏离=124 说明=6442
+  说明档带 y=372.0..383.0 pt 最深偏离=124 说明=2329
+ROWTIER sidebar-history light：有字行 362 行（区域 x 130..300、y 20..520）
+  说明档带 y=117.0..129.0 pt 最深偏离=116 说明=715
+  说明档带 y=164.5..175.5 pt 最深偏离=131 说明=2420
+  说明档带 y=179.0..190.0 pt 最深偏离=131 说明=2338
+  说明档带 y=196.5..206.0 pt 最深偏离=131 说明=438
+  说明档带 y=231.0..240.0 pt 最深偏离=131 说明=520
+  说明档带 y=247.5..257.0 pt 最深偏离=131 说明=420
+  说明档带 y=281.5..293.0 pt 最深偏离=131 说明=702
+  说明档带 y=298.5..308.0 pt 最深偏离=131 说明=454
+  说明档带 y=332.0..343.0 pt 最深偏离=131 说明=1029
+  说明档带 y=349.5..359.0 pt 最深偏离=131 说明=434
+ROWTIER detail-0-text light：有字行 242 行（区域 x 0..720、y 20..520）
+  说明档带 y=37.0..47.0 pt 最深偏离=131 说明=2801
+  说明档带 y=381.5..402.5 pt 最深偏离=139 说明=400
+ROWTIER settings-general-login-unsupported light：有字行 220 行（区域 x 150..710、y 20..520）
+  说明档带 y=117.5..129.0 pt 最深偏离=69 说明=538
+  说明档带 y=136.5..145.5 pt 最深偏离=128 说明=2298
+  说明档带 y=177.0..186.5 pt 最深偏离=128 说明=6293
+  说明档带 y=217.5..227.0 pt 最深偏离=128 说明=4068
+  说明档带 y=257.5..268.5 pt 最深偏离=128 说明=6721
+  说明档带 y=271.5..282.0 pt 最深偏离=128 说明=3790
+ROWTIER settings-general-login-failed light：有字行 222 行（区域 x 150..710、y 20..520）
+  说明档带 y=136.5..146.0 pt 最深偏离=128 说明=1941
+  说明档带 y=177.0..186.5 pt 最深偏离=128 说明=6293
+  说明档带 y=217.5..227.0 pt 最深偏离=128 说明=4068
+  说明档带 y=257.5..268.5 pt 最深偏离=128 说明=6721
+  说明档带 y=271.5..282.0 pt 最深偏离=128 说明=3790
+ROWTIER settings-general dark：有字行 209 行（区域 x 150..710、y 20..520）
+  说明档带 y=160.5..170.5 pt 最深偏离=129 说明=7804
+  说明档带 y=201.0..211.0 pt 最深偏离=129 说明=5177
+  说明档带 y=241.5..252.5 pt 最深偏离=129 说明=8097
+  说明档带 y=255.5..266.0 pt 最深偏离=129 说明=4610
+ROWTIER settings-shortcuts dark：有字行 232 行（区域 x 150..710、y 20..520）
+  说明档带 y=274.5..284.5 pt 最深偏离=129 说明=2915
+ROWTIER settings-privacy dark：有字行 408 行（区域 x 150..710、y 20..520）
+  说明档带 y=142.5..152.0 pt 最深偏离=121 说明=2109
+  说明档带 y=304.5..314.5 pt 最深偏离=121 说明=3506
+  说明档带 y=362.5..372.0 pt 最深偏离=121 说明=7498
+  说明档带 y=375.5..385.0 pt 最深偏离=121 说明=1529
+  说明档带 y=395.0..405.0 pt 最深偏离=121 说明=2516
+  说明档带 y=414.0..424.0 pt 最深偏离=121 说明=2387
+  说明档带 y=433.0..443.0 pt 最深偏离=121 说明=2248
+  说明档带 y=452.0..462.0 pt 最深偏离=121 说明=2307
+  说明档带 y=471.0..481.0 pt 最深偏离=121 说明=1867
+  说明档带 y=490.0..500.0 pt 最深偏离=121 说明=2137
+  说明档带 y=509.0..519.0 pt 最深偏离=121 说明=1987
+ROWTIER settings-data dark：有字行 201 行（区域 x 150..710、y 20..520）
+  说明档带 y=138.5..148.5 pt 最深偏离=129 说明=3440
+  说明档带 y=211.5..221.5 pt 最深偏离=126 说明=7432
+  说明档带 y=224.5..234.0 pt 最深偏离=126 说明=565
+ROWTIER settings-recommendations dark：有字行 364 行（区域 x 150..710、y 20..520）
+  说明档带 y=145.5..155.5 pt 最深偏离=118 说明=4356
+  说明档带 y=199.5..209.0 pt 最深偏离=121 说明=1979
+  说明档带 y=283.5..293.0 pt 最深偏离=121 说明=1731
+  说明档带 y=367.5..378.0 pt 最深偏离=121 说明=2013
+  说明档带 y=451.5..462.0 pt 最深偏离=121 说明=2467
+ROWTIER settings-stats-populated dark：有字行 339 行（区域 x 150..710、y 20..520）
+  说明档带 y=98.0..108.0 pt 最深偏离=126 说明=2967
+  说明档带 y=122.5..132.0 pt 最深偏离=126 说明=1798
+  说明档带 y=136.0..147.0 pt 最深偏离=126 说明=3688
+  说明档带 y=150.0..161.0 pt 最深偏离=66 说明=3192
+  说明档带 y=164.0..175.0 pt 最深偏离=126 说明=3308
+  说明档带 y=178.0..189.0 pt 最深偏离=66 说明=2736
+  说明档带 y=192.0..203.0 pt 最深偏离=126 说明=2881
+  说明档带 y=221.0..230.5 pt 最深偏离=126 说明=148
+  说明档带 y=243.0..253.0 pt 最深偏离=126 说明=2942
+  说明档带 y=310.0..320.5 pt 最深偏离=126 说明=7348
+  说明档带 y=324.0..334.5 pt 最深偏离=126 说明=7701
+  说明档带 y=338.0..348.0 pt 最深偏离=126 说明=1085
+  说明档带 y=358.0..368.5 pt 最深偏离=126 说明=7840
+  说明档带 y=372.0..383.0 pt 最深偏离=126 说明=2926
+ROWTIER sidebar-history dark：有字行 282 行（区域 x 130..300、y 20..520）
+  说明档带 y=117.0..128.5 pt 最深偏离=110 说明=777
+  说明档带 y=164.0..175.0 pt 最深偏离=120 说明=2672
+  说明档带 y=179.0..190.0 pt 最深偏离=120 说明=2562
+  说明档带 y=196.5..206.0 pt 最深偏离=120 说明=476
+  说明档带 y=231.0..240.0 pt 最深偏离=120 说明=541
+  说明档带 y=247.5..257.0 pt 最深偏离=120 说明=451
+  说明档带 y=281.5..293.0 pt 最深偏离=120 说明=797
+  说明档带 y=298.5..308.0 pt 最深偏离=120 说明=494
+  说明档带 y=332.0..343.0 pt 最深偏离=120 说明=1144
+  说明档带 y=349.5..359.0 pt 最深偏离=120 说明=480
+  说明档带 y=384.5..393.0 pt 最深偏离=80 说明=1557
+  说明档带 y=399.5..408.0 pt 最深偏离=80 说明=1101
+  说明档带 y=415.5..425.0 pt 最深偏离=80 说明=357
+ROWTIER detail-0-text dark：有字行 241 行（区域 x 0..720、y 20..520）
+  说明档带 y=37.0..47.0 pt 最深偏离=124 说明=3179
+ROWTIER settings-general-login-unsupported dark：有字行 226 行（区域 x 150..710、y 20..520）
+  说明档带 y=117.5..129.0 pt 最深偏离=63 说明=564
+  说明档带 y=136.0..145.5 pt 最深偏离=129 说明=2819
+  说明档带 y=176.5..186.5 pt 最深偏离=129 说明=7804
+  说明档带 y=217.0..227.0 pt 最深偏离=129 说明=5177
+  说明档带 y=257.5..268.5 pt 最深偏离=129 说明=8097
+  说明档带 y=271.5..282.0 pt 最深偏离=129 说明=4610
+ROWTIER settings-general-login-failed dark：有字行 229 行（区域 x 150..710、y 20..520）
+  说明档带 y=136.0..146.0 pt 最深偏离=129 说明=2299
+  说明档带 y=176.5..186.5 pt 最深偏离=129 说明=7804
+  说明档带 y=217.0..227.0 pt 最深偏离=129 说明=5177
+  说明档带 y=257.5..268.5 pt 最深偏离=129 说明=8097
+  说明档带 y=271.5..282.0 pt 最深偏离=129 说明=4610
+CAPTION_HUG settings-general light 说明段 y=161.0..170.5 上缝=7.0 下缝=12.0
+CAPTION_HUG settings-general light 说明段 y=201.5..211.0 上缝=7.0 下缝=12.0
+CAPTION_HUG settings-general light 说明段 y=241.5..266.0 上缝=5.5 下缝=无（最后一段）
+CAPTION_HUG settings-general dark 说明段 y=160.5..170.5 上缝=6.5 下缝=11.5
+CAPTION_HUG settings-general dark 说明段 y=201.0..211.0 上缝=6.5 下缝=11.5
+CAPTION_HUG settings-general dark 说明段 y=241.5..266.0 上缝=5.5 下缝=无（最后一段）
+SETTINGS_DRAWABILITY_TRUTH_TABLE 全有=判 / 全无=未运行 / 1|2 张=红（四格全过）
+TEXT_INK_FRAME settings-shortcuts light px=1440x1080 scale=2.0 bpp=32 samples=4 bpr=5760 transparent=0.0% hist=0/0/0/1/0/0/1/97%
+TEXT_INK_FRAME settings-min light px=1280x880 scale=2.0 bpp=32 samples=4 bpr=5120 transparent=0.0% hist=0/0/0/1/1/0/1/97%
+TEXT_INK light 产品宽 720=23889 窄臂 640=23868 ratio=0.999
+TEXT_INK_FRAME settings-shortcuts dark px=1440x1080 scale=2.0 bpp=32 samples=4 bpr=5760 transparent=0.0% hist=74/24/0/0/1/0/0/0%
+TEXT_INK_FRAME settings-min dark px=1280x880 scale=2.0 bpp=32 samples=4 bpr=5120 transparent=0.0% hist=65/32/0/1/1/0/0/0%
+TEXT_INK dark 产品宽 720=29882 窄臂 640=29897 ratio=1.001
+SUBTREE settings-general dark：压在侧栏文字列上 / 嵌套的视图共 5 个
+            #5 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>] 框=(0,0,720,540) 自带外观=nil 生效=NSAppearanceNameDarkAqua
+                #7 hosting [HostingScrollView] 框=(0,0,720,540) 自带外观=nil 生效=NSAppearanceNameDarkAqua
+                  #8 hosting [HostingClipView] 框=(0,0,720,540) 自带外观=nil 生效=NSAppearanceNameDarkAqua
+                  #8 hosting [NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<SidebarStyleContext>>>] 框=(0,0,148,540) 自带外观=nil 生效=NSAppearanceNameVibrantDark
+              #6 hosting [_NSCoreHostingView<RootView>] 框=(0,0,148,540) 自带外观=nil 生效=NSAppearanceNameVibrantDark
+◇ Test run started.
+↳ Testing Library Version: 1400
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.
