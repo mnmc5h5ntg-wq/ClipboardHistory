@@ -1,0 +1,57 @@
+=== 基线（未变异）：三条都必须绿 ===
+   swift={'testSkeletonSweepIsOneBand': 'green', 'testTheBandPositionRulerTruthTable': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+
+M451 产品改回『每根条一个形状、渐变按条宽归一化』（= BACKLOG 117 那个缺陷本身）
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'red', 'testTheBandPositionRulerTruthTable': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4774: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepIsOneBand] : failed - 骨架的亮带今天不是『一条光穿
+   已还原（逐字节相同：True）
+
+M452 条端内边距 10pt → 0pt ⇒ 贴在条端的假峰重新进散布
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'red', 'testTheBandPositionRulerTruthTable': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4774: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepIsOneBand] : failed - 骨架的亮带今天不是『一条光穿
+   已还原（逐字节相同：True）
+
+M453 行程地板 20pt → 0pt ⇒ 正对照失效（静止画面也读成一条带）
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'green', 'testTheBandPositionRulerTruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1852: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1854: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertTrue f
+   已还原（逐字节相同：True）
+
+M454 幅度地板 4 灰阶 → 0（单拆这一格）
+   LOCAL-NO-POWER 本地全绿（幅度地板被条端内边距那一格吸收 ⇒ 由 M454b（两格同拆）证明这句话本身可证伪）
+   已还原（逐字节相同：True）
+
+M454b 幅度地板与条端内边距**一起**拆 ⇒ 检验『两格里至少一格必须有牙』这句话
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'red', 'testTheBandPositionRulerTruthTable': 'green', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4774: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepIsOneBand] : failed - 骨架的亮带今天不是『一条光穿
+   已还原（逐字节相同：True）
+
+M455 证人『有资格签』改成恒真 ⇒ 没人看见亮带时也敢判产品红
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'green', 'testTheBandPositionRulerTruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1885: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1887: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+   已还原（逐字节相同：True）
+
+M456 一条带的天花板 6pt → 50pt ⇒ 两个地板互相取消
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'green', 'testTheBandPositionRulerTruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1861: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1864: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertLessTh
+   已还原（逐字节相同：True）
+
+M457 位置判据忽略循环那一族的处置（`loopCapable` 不再收窄断言）⇒ 一个会翻脸的读数可以定罪产品
+   CAUGHT 只红在预期那几条：{'testSkeletonSweepIsOneBand': 'green', 'testTheBandPositionRulerTruthTable': 'red', 'testSkeletonSweepActuallySweeps': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1892: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1895: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheBandPositionRulerTruthTable] : XCTAssertEqual 
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M451   CAUGHT
+   M452   CAUGHT
+   M453   CAUGHT
+   M454   LOCAL-NO-POWER
+   M454b  CAUGHT
+   M455   CAUGHT
+   M456   CAUGHT
+   M457   CAUGHT
+   抓到=7 本地无独立判别力(按实存活)=1 逃掉=0 没跑成=0 未落地=0
+BATTERY_EXIT=0

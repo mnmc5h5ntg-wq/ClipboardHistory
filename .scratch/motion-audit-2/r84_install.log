@@ -1,0 +1,26 @@
+目标        = /Applications/时间剪史.app
+新包        = /Users/wangziyi/Codex_Project0/时间剪史.app
+备份        = /Users/wangziyi/Documents/Codex_Project0_backups/before-r84-skeleton-band
+模式        = 真换装
+已装版本    = 1.4.8  sha=c03cf278d3a4dd98…
+存档条数    = 105（只读，脚本不写它）
+→ make bundle
+新包 sha    = 4aa88f2ef5c3e758…
+检测到要替换的实例 pid=29503
+→ 优雅退出正在跑的 时间剪史（让它把待写存档落盘）
+旧版已退出
+→ 运行时冒烟闸门（临时数据目录，不碰真存档）
+   SMOKE_SAW_START=True
+   SMOKE_SAW_SECOND_INSTANCE_ABORT=False
+   SMOKE_SAW_TERMINATE=False
+   SMOKE_EXIT_CODE=-15
+   SMOKE_OK=1
+旧包已移入  = /Users/wangziyi/Documents/Codex_Project0_backups/before-r84-skeleton-band
+staged    = 4aa88f2ef5c3e758…
+installed = 4aa88f2ef5c3e758…
+INSTALL_SHA_MATCH=1
+INSTALL_RUNNING_PID=88048 启动晚于安装，exe 路径逐字对上 /Applications/时间剪史.app ✔
+INSTALL_ENTRIES_BEFORE=105  INSTALL_ENTRIES_AFTER=105
+INSTALL_RESULT=ok  版本=1.4.8→1.4.8
+旧包留在：/Users/wangziyi/Documents/Codex_Project0_backups/before-r84-skeleton-band（要退回：rm -rf '/Applications/时间剪史.app' && mv '/Users/wangziyi/Documents/Codex_Project0_backups/before-r84-skeleton-band/时间剪史.app' '/Applications/时间剪史.app' && open '/Applications/时间剪史.app'）
+INSTALL_EXIT=0

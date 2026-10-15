@@ -39,13 +39,33 @@ enum SkeletonMotion {
     /// 前者留下、后者去掉，正好是 HIG 与 Emil 那句 "fewer and gentler, not zero" 的分工。
     static func sweepIsRunning(reduceMotion: Bool) -> Bool { !reduceMotion }
 
-    /// 亮带宽度（占整条的比例）。沿用 markiv/SwiftUI-Shimmer 的 `bandSize 0.3`：
-    /// 再宽就没有"扫"的方向感，再窄会看成频闪。
+    /// 亮带宽度。**R84 起这是"占整组宽度的比例"**，不是占单根条的：
+    /// 亮带现在画在容器坐标系里（见 `SkeletonBarsShape` 的理由），所以同一个数在
+    /// 420pt 的详情区上是 126pt 宽的一条光，而不是每根条各自 30%。
+    /// 沿用 markiv/SwiftUI-Shimmer 的 `bandSize 0.3`：再宽就没有"扫"的方向感，再窄会看成频闪。
     static let bandSize: CGFloat = 0.3
 
     /// 三根条的相对宽度：短 — 长 — 中，读起来像"一行标题 + 两行正文"，
     /// 而不是三根一样的杠（一样的杠会被读成"这里有个进度条"）。
     static let barFractions: [CGFloat] = [0.42, 0.86, 0.64]
+
+    /// 单根条带的高度与条间距。
+    ///
+    /// 这两个数从视图里的两个魔法数提成令牌，是 R84 那条判据的**前提**：判据现在要
+    /// 在同一套几何下去像素里找那三根条（`MotionFilmstripTests.testSkeletonSweepIsOneBand`）。
+    /// 留在视图里就等于让判据猜产品的布局 —— 猜对了也是空的。
+    static let barHeight: CGFloat = 8
+    static let barSpacing: CGFloat = 10
+
+    /// 第 `index` 根条在 `rect`（整组被给出的矩形）里的位置。
+    ///
+    /// 顶部起算、左边贴 `rect.minX`：与 R26 钉住的那条"骨架条带与下面那句说明同一条左轴"
+    /// 是同一件事 —— 换成一整个 `Shape` 之后左轴仍然只有一条。
+    static func barRect(index: Int, fraction: CGFloat, in rect: CGRect) -> CGRect {
+        CGRect(x: rect.minX,
+               y: rect.minY + CGFloat(index) * (barHeight + barSpacing),
+               width: max(1, rect.width * fraction), height: barHeight)
+    }
 
     /// 定时器节奏。30Hz 而不是 60Hz：一圈 1.5 秒只要 45 步就看不出台阶，
     /// 而每拍都是一次小面积重绘 —— 省下来的那一半不是洁癖，是给 500 条列表留的余量。
@@ -90,6 +110,10 @@ enum SkeletonMotion {
 
     /// 亮带的两个端点。`phase` 只影响**位置**，不影响形状 ——
     /// 形状（三个 stop）是固定的，这也是为什么 Timer 每拍只需要改一个数。
+    ///
+    /// 这两个端点落在**谁**的坐标系里是会被画出来的：填在整组的形状上就是整组一条带，
+    /// 填在单根条上就是每根条各一条（R84 之前是后者，见 `SkeletonBarsShape`）。
+    /// 这一句不是注释：`MotionFilmstripTests.testSkeletonSweepIsOneBand` 用像素判它。
     static func unitPoints(phase: CGFloat) -> (start: UnitPoint, end: UnitPoint) {
         let x = bandStart(forPhase: phase)
         return (UnitPoint(x: x, y: 0.5), UnitPoint(x: x + bandSize, y: 0.5))
@@ -119,22 +143,22 @@ struct SkeletonPreviewView: View {
         }
     }
 
-    /// 三根条带。抽出来是因为两个分支要画**同一张图** ——
+    /// 三根条带，**一个形状、一条亮带**。抽出来是因为两个分支要画**同一张图** ——
     /// 差别只在于有没有那条时钟，而不是"减弱动态时画个别的"。
+    ///
+    /// 这里以前是 `GeometryReader + VStack { ForEach }`，每根条自己 `.fill(渐变)`
+    /// 再 `.frame(width: 条宽)`：渐变的 `UnitPoint` 相对的是**那一根条**的矩形，
+    /// 于是三根条各有一条亮带，同时扫过各自的条。R84 换成整组一个形状，
+    /// 渐变因此落在容器坐标系里 —— 判据与量出来的数字见 `SkeletonBarsShape`。
     private var bars: some View {
-        GeometryReader { proxy in
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(SkeletonMotion.barFractions.enumerated()), id: \.offset) { _, fraction in
-                    VisualShape.rounded(VisualRadius.chip)
-                        .fill(bandGradient)
-                        .frame(width: max(1, proxy.size.width * fraction), height: 8)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
+        SkeletonBarsShape()
+            .fill(bandGradient)
     }
 
     /// 底色 → 亮色 → 底色。三个 stop 固定不动，动的只有整条渐变的位置。
+    ///
+    /// 亮带在整组之外时两端都 clamp 回底色 ⇒ 减弱动态那一档、以及每圈头尾那一段，
+    /// 画面上就是三根静止的灰条（这也是为什么静态帧基线预期不变）。
     private var bandGradient: LinearGradient {
         let points = SkeletonMotion.unitPoints(phase: phase)
         return LinearGradient(
@@ -148,4 +172,32 @@ struct SkeletonPreviewView: View {
 
     private var base: Color { Color.primary.opacity(SkeletonMotion.baseOpacity) }
     private var highlight: Color { Color.primary.opacity(SkeletonMotion.highlightOpacity) }
+}
+
+/// 三根条带的**轮廓**：一个 `Shape`，里面三个 `VisualShape.rounded(.chip)`。
+///
+/// 为什么值得单独一个类型（R84 / BACKLOG 117）：`LinearGradient` 的 `UnitPoint`
+/// 是相对"这个形状被给出的那个矩形"的。原来每根条是一个独立的 `RoundedRectangle`
+/// 加 `.frame(width: proxy.size.width * fraction)` ⇒ 三根条就是三套单位空间，
+/// 同一个 `phase` 在三根条上是三个**绝对**位置（176 / 361 / 269pt 宽 ⇒ 中心在 88 / 181 / 134pt）。
+/// `MotionFilmstripTests` 用像素把这件事量了出来（`.scratch/motion-audit-2/r83_band_fanout.py`
+/// 是同一道题的第一版手量）：同一帧里三根条的亮斑绝对中心最大差 **170pt**，
+/// 归一化中心最大只差 **0.003** ⇒ 画面上是"三条各扫各的亮带"，不是"一条光穿过一组条"。
+///
+/// 为什么这是缺陷而不是风格偏好：骨架扫光的全部表达力在于**给整组一个共同的方向和节奏**，
+/// 读起来是"这一块内容正在加载"；三条各自闪动读起来是三个独立的东西在闪，
+/// 信息量更低而注意力开销更大（报告 §5 红线 1：不抢用户的注意力）。
+///
+/// 修法只有一件事：让形状与填充都覆盖整组，轮廓自己描述三根条。
+/// 代价写清楚：三根条不再由 `VStack` 排，纵向布局变成这个 `path(in:)` 的算术
+/// ⇒ 由 `SkeletonMotion.barRect(index:fraction:in:)` 那两个令牌与像素判据一起钉住。
+struct SkeletonBarsShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        for (index, fraction) in SkeletonMotion.barFractions.enumerated() {
+            path.addPath(VisualShape.rounded(VisualRadius.chip)
+                .path(in: SkeletonMotion.barRect(index: index, fraction: fraction, in: rect)))
+        }
+        return path
+    }
 }

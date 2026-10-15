@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Product（R84）
+
+- 详情预览加载态的骨架扫光：亮带从"每根条各扫各的"改成**一条光横穿整组**
+  （渐变从单根条的坐标系抬到整组的坐标系）。同一帧内三根条亮斑中心的绝对差
+  从 169pt 变成 0pt，减弱动态那一档仍然完全静止；静置画面不变（124 张帧基线逐张复核）。
+
+### Tests（R84）
+
+- 新增 `testSkeletonSweepIsOneBand`：位置判据（合成正对照两份 + 真片行程正对照 +
+  由"同一把尺读高对比证人"签的处置），真值表 13 格；`SkeletonMotion.barHeight/barSpacing/barRect`
+  三个令牌 + `SkeletonBarsShape`；产品那一卷胶片改为缓存复用（运动与位置两句读同一卷）。
+- 变异电池 M451–M457 共八刀：七刀 CAUGHT，一刀按实存活为"本地无独立判别力"（M454 的牙被 M454b 两格同拆检验 —— "至少一格有牙"这句话本身可证伪）。
+
 ### Tests（R83：上一轮那枚钉子挂错了对象 —— 前提从时刻本身读，绝对地板听处置的话；结案 114 / 新开 118 / U-160…U-163 / D-141）
 - 读 R82 的 CI：**114 落在预登记的第一支**（runner 带得动 20Hz、带不动产品那一档 30Hz），
   等节拍证人 `coverage=0.284` 与粗节拍证人 `coverage=1.000` 并排就是分诊表本身。

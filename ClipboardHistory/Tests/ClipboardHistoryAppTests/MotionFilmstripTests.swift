@@ -51,6 +51,13 @@ final class MotionFilmstripTests: XCTestCase {
     /// R82 把它拆成**两颗证人**（`coarse` = 每 50ms 一拍、高对比；`rateMatched` = 与产品同一档
     /// 节拍、同一组对比度），因为这两颗问的是两句不同的话，见 `loopAdjudication` 的注释。
     nonisolated(unsafe) static var loopWitnessCache: [MotionClass: LoopShape] = [:]
+    /// 骨架扫光**产品自己那一卷**（R84）。缓存的理由与上面两颗证人同一句话，但这一条更硬：
+    /// "亮带在不在跑"（coverage）与"亮带是不是整组一条"（位置）现在读的是**同一卷胶片** ——
+    /// 各抓各的话，两句话来自两次不同的采样相位，互相既不能印证也不能互相拆台。
+    fileprivate nonisolated(unsafe) static var shimmerFilmCache: GrabbedFilm?
+    /// 粗节拍那颗证人用**位置那把尺**读出来的判定（R84）。与上面两颗 `LoopShape` 分开缓存，
+    /// 因为它们回答的是两句不同的话（"有没有在变" vs "看不看得见一条亮带在哪儿"）。
+    fileprivate nonisolated(unsafe) static var bandWitnessCache: BandReading?
 
     nonisolated(unsafe) static var fadeClockCache: FadeClockReading?
 
@@ -1803,6 +1810,99 @@ final class MotionFilmstripTests: XCTestCase {
         emit("LOOP_WITNESS_MIRROR 节拍=\(String(format: "%.1f", witness.tickSeconds * 1000))ms "
             + "每拍推进=\(String(format: "%.4f", Double(witness.stepPerTick))) "
             + "抬升=\(String(format: "%.2f", witness.highlightLift)) 三项全等于产品 ⇒ 证人还在问同一句话")
+        // R84：上面三颗数钉的是"同一档节拍与同一组对比度"，钉不住**同一套画法**。
+        // `.productRed` 那句推论写的是"只差视图归谁这一个差别"，而"画法"也是差别之一：
+        // 产品换成整组一个形状、证人留在每根条一个形状，那两颗就不再是同一个负载。
+        // 这一条没法从像素反推（证人不是被量的对象），所以它是源码级守卫 —— 与
+        // `SkeletonMotionTests` 那几条接线守卫同一族，也因此必须自带"谓词不许恒真"那格。
+        let product = codeOnly(try productSource(named: "Views/SkeletonShimmer.swift"))
+        let witnessFile = codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        let drawsOneShapeForTheGroup: (String) -> Bool = { $0.contains("SkeletonBarsShape()") }
+        XCTAssertFalse(drawsOneShapeForTheGroup("RoundedRectangle(cornerRadius: 4).fill(gradient)"),
+                       "谓词在一句**没有**整组形状的代码上返回了 true ⇒ 它恒真，"
+                           + "下面两条守卫就是把注释抄了一遍")
+        XCTAssertTrue(drawsOneShapeForTheGroup(product),
+                      "产品的骨架不再是整组一个形状 ⇒ 上面那颗证人在镜像一种产品已经不采用的画法，"
+                          + "`.productRed` 那句『只剩视图归谁这一个差别』作废（改产品就同时改证人，两边都要动）")
+        XCTAssertTrue(drawsOneShapeForTheGroup(region(in: witnessFile, named: "private func skeleton(phase:")),
+                      "证人回落到每根条各自的形状，而产品是整组一个 ⇒ 两颗视图的绘制负载不再是同一件事："
+                          + "产品红与环境带不动之间只剩的那一个差别又多了两个（形状个数、渐变落在谁的坐标系）")
+    }
+
+    /// R84：位置那把尺自己的真值表。它判的是"同一帧里三根条的亮斑在同一条竖线上吗"，
+    /// 而这句话有四种**都不该判成"整组一条带"**的形状：没有可用帧、亮带根本没走、
+    /// 可用帧太少、两个地板之间分不开。少一格，那一格就成了空支票。
+    func testTheBandPositionRulerTruthTable() throws {
+        let widths = Self.barWidthPoints(viewWidthPoints: 420)
+        XCTAssertEqual(widths.count, 3, "条宽是从 `SkeletonMotion.barFractions` 推的，不是这里写的三个数")
+        // ① 整组一条带：每帧三根条同绝对中心，而且它一路扫过去。
+        XCTAssertEqual(Self.bandReading(frames: [[100, 100, 100], [130, 131, 129], [60, 60, 61]],
+                                       widths: widths).verdict, .oneBand,
+                       "同绝对中心、有行程的卷子必须判成整组一条带")
+        // ② 每根条各扫各的：中心与条宽成正比（R83 手量到的就是这一种，绝对差 170pt）。
+        XCTAssertEqual(Self.bandReading(frames: [[88, 181, 134], [50, 110, 75], [20, 40, 30]],
+                                       widths: widths).verdict, .fanOut,
+                       "中心按条宽各自放大的卷子必须判成各扫各的 —— 这一格是这条判据的反对照")
+        // ③ 没有可用帧 ⇒ 不许猜成任何一种画法。
+        XCTAssertEqual(Self.bandReading(frames: [], widths: widths).verdict, .noFrames,
+                       "0 帧可用时说『整组一条带』或『各扫各的』都是凭空的结论")
+        // ④ 正对照失败：三根条的峰值帧帧相同（静止画面也能读成"散布 0pt"）。
+        let frozen = Self.bandReading(frames: [[100, 100, 100], [101, 101, 100], [100, 101, 101]],
+                                      widths: widths)
+        XCTAssertEqual(frozen.verdict, .notJudged,
+                       "亮带一步没走 ⇒ 那是没在动，不是『一条带』。这一格拦住的是『散布小就算过』")
+        XCTAssertTrue(frozen.reason.contains("正对照"), "④ 的理由必须点名正对照失败，不许和⑤混成一句")
+        // ⑤ 可用帧太少。
+        let tooFew = Self.bandReading(frames: [[100, 100, 100], [150, 150, 150]], widths: widths)
+        XCTAssertEqual(tooFew.verdict, .notJudged, "两帧撑不起『一路扫过去』这句话")
+        XCTAssertTrue(tooFew.reason.contains("帧"), "⑤ 的理由要说清缺的是帧数")
+        // ⑥ 落在两个地板之间 ⇒ 分不开（比"判错"更诚实的红）。
+        let middle = Self.bandReading(frames: [[100, 108, 116], [60, 68, 76], [80, 88, 96]], widths: widths)
+        XCTAssertEqual(middle.verdict, .notJudged,
+                       "绝对散布 16pt 既不超过一条带的天花板，也不到各扫各的下限 ⇒ 必须说分不开")
+        // ⑦ 两个地板不许互相取消：天花板必须明显低于下限，否则上面⑥那一格会被判成其中之一。
+        XCTAssertLessThan(Self.oneBandCeilingPoints, Self.fanOutFloorPoints,
+                          "地板调到能互相覆盖，这把尺就什么都能判")
+        // ⑧ 两把尺必须**反向**：修好之后"绝对"该一致、"归一化"该分家；修之前正好相反。
+        //    这一格钉的是"我判的是哪一种画法"，不是"我读到了几个数"。
+        let oneBandReading = Self.bandReading(frames: [[100, 100, 100], [130, 131, 129], [60, 60, 61]],
+                                              widths: widths)
+        let fanOutReading = Self.bandReading(frames: [[88, 181, 134], [50, 110, 75], [20, 40, 30]],
+                                            widths: widths)
+        XCTAssertGreaterThan(oneBandReading.normalizedSpread, fanOutReading.normalizedSpread,
+                             "整组一条带那份的归一化散布必须**大**（同一列在三种条宽上是三个比例）——"
+                                 + "如果它比各扫各那份还小，说明两把尺读反了，或者位置放法根本不是这两种之一")
+        XCTAssertLessThan(fanOutReading.normalizedSpread, 0.05,
+                          "各扫各那份的归一化散布必须接近 0（R83 实测 0.003）⇒ 它才是『每根条自己的单位空间』")
+        // ⑨–⑫ 处置那一层：谁能签"这台机器判不了位置"。这四格防的是同一件事 ——
+        //     把"环境读不出"与"产品读得出"混成一句话，R82/R83 的 CI 已经为这句话翻过一次面。
+        XCTAssertEqual(Self.bandAdjudication(product: .oneBand, witness: .oneBand), .ok,
+                       "⑨ 证人读得出、产品判成一条带 ⇒ 判绿")
+        XCTAssertEqual(Self.bandAdjudication(product: .fanOut, witness: .oneBand), .productRed,
+                       "⑩ 同一台机器上高对比那颗读得出亮带位置，而产品读成各扫各的 ⇒ 红在产品")
+        XCTAssertEqual(Self.bandAdjudication(product: .noFrames, witness: .oneBand), .productRed,
+                       "⑪ 证人读得出而产品一帧都拍不出 ⇒ 那也是产品的账，不许当成环境问题放行")
+        XCTAssertEqual(Self.bandAdjudication(product: .oneBand, witness: .noFrames), .notRunEnvironment,
+                       "⑫ 连证人都读不出可用帧时，产品那句『整组一条带』不许当真 —— 没人看见过亮带")
+        XCTAssertEqual(Self.bandAdjudication(product: .notJudged, witness: .notJudged), .notRunEnvironment,
+                       "⑬ 证人落在『分不开』也不许签字：可判决只有两种画法，其余都是没人看见")
+        // ⑭⑮ 循环那一族的处置**只能收窄、不能放大指控**（BACKLOG 119 的形状）：
+        //      R82/R83 的 CI 证明那一支会在两轮之间翻面，所以它 false 的时候位置这一族一律不判，
+        //      哪怕证人读得出、哪怕产品读成分家 —— 定罪要由一个稳定的读数来签。
+        XCTAssertEqual(Self.bandAdjudication(product: .oneBand, witness: .oneBand, loopCapable: false),
+                       .notRunEnvironment,
+                       "⑭ 循环判不动的时候，位置那句好消息也不许当真（否则同一件事两台机器两个结论）")
+        XCTAssertEqual(Self.bandAdjudication(product: .fanOut, witness: .oneBand, loopCapable: false),
+                       .notRunEnvironment,
+                       "⑮ 同一个方向的另一支：循环判不动时连『红』都不许判 —— 只能不说，不能反过来定罪")
+        emit("BAND_TRUTH_TABLE 一条带=\(oneBandReading.verdict.rawValue) 各扫各=\(fanOutReading.verdict.rawValue) "
+            + "空=\(Self.bandReading(frames: [], widths: widths).verdict.rawValue) "
+            + "静止=\(frozen.verdict.rawValue) 帧少=\(tooFew.verdict.rawValue) 分不开=\(middle.verdict.rawValue) "
+            + "处置=ok/红/红/未跑(⑫)/未跑(⑬)/未跑(⑭⑮ loopCapable=false) "
+            + "一条带归一化=\(String(format: "%.3f", oneBandReading.normalizedSpread)) "
+            + "各扫各归一化=\(String(format: "%.3f", fanOutReading.normalizedSpread)) "
+            + "绝对散布=\(String(format: "%.1f", oneBandReading.maxSpreadPoints))/\(String(format: "%.1f", fanOutReading.maxSpreadPoints))pt "
+            + "行程=\(String(format: "%.1f", oneBandReading.travelPoints))/\(String(format: "%.1f", fanOutReading.travelPoints))pt ⇒ 15 格")
     }
 
     /// R82 / BACKLOG 110：分辨率那条闸门改吃 **P75**，一个离群样本不许翻掉它。
@@ -4509,7 +4609,9 @@ final class MotionFilmstripTests: XCTestCase {
         let probe = SkeletonProbe()
         // 一卷就是**一对**（帧 + 它们的时刻）。R82 之前这里写的是 `probe.lastStamps`，
         // 而后一卷会把它覆盖掉 —— 见 `GrabbedFilm` 的注释与 U-155。
-        let runningFilm = probe.record(reduceMotion: false)
+        // R84：产品这一卷进了缓存，因为"亮带在不在跑"（这一条）与"亮带是不是整组一条"
+        // （`testSkeletonSweepIsOneBand`）必须读**同一卷**，各抓各的就不互相印证了。
+        let runningFilm = Self.shimmerFilm()
         let stoppedFilm = probe.record(reduceMotion: true)
         let running = Self.deltas(runningFilm.frames)
         let interval = Self.sampleIntervalMilliseconds(runningFilm.stamps)
@@ -4554,9 +4656,7 @@ final class MotionFilmstripTests: XCTestCase {
                        "这一卷只抓了 \(String(format: "%.0f", premise.spanMilliseconds))ms，而探针声明要抓 "
                            + "\(String(format: "%.0f", loopFilmSeconds * 1000))ms ⇒ coverage 的分母不对，"
                            + "判定无论红绿都没有依据（中间有别的东西占住了主线程，或探针提前收卷）")
-        let disposition = Self.loopAdjudication(product: shape.verdict,
-                                                rateWitness: rateWitness.verdict,
-                                                coarseWitness: coarseWitness.verdict)
+        let disposition = Self.shimmerDisposition()
         switch disposition {
         case .ok:
             break
@@ -4599,8 +4699,480 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    // MARK: - R84 / BACKLOG 117：亮带是整组一条，还是每根条各一条
+
+    /// 骨架的亮带**是不是一条光穿过整组条带** —— 这一条判的是**位置**，不是运动。
+    ///
+    /// 为什么值得一条独立判据（R83 看图看出来的，`BACKLOG 117`）：原来每根条各自
+    /// `RoundedRectangle().fill(渐变).frame(width: 条宽)`，而 `LinearGradient` 的 `UnitPoint`
+    /// 按**被填充那个形状**的边界归一化 ⇒ 同一个相位在 176 / 361 / 269pt 三根条上是三个
+    /// 绝对位置。画面上那是三条各扫各的亮带，不是一条光扫过一组 —— 而"一条光扫过一组"
+    /// 才是这条扫光的全部表达力（整组一个方向、一个节奏，读起来是"这块内容在加载"）。
+    /// R83 用 `.scratch/motion-audit-2/r83_band_fanout.py` 手量的：同一帧内三根条的亮斑
+    /// **绝对**中心最大差 170pt、**归一化**中心最大只差 0.003。本轮把渐变抬到容器层，
+    /// 并把那道手量换成会红的判据。
+    ///
+    /// 三个闸门，少一个这句话就站不住（顺序也是这个顺序）：
+    /// ① **尺子自己的正对照**：两份合成卷子 —— 一份整组一条带、一份每根条各一条带 ——
+    ///    这一格分不开的话，下面那句"产品是整组一条带"就是一张空支票（R68 的 M366 同一族）。
+    /// ② **真片上的正对照**：可用帧里亮带必须真的走过一段行程（`sweepTravelFloorPoints`）。
+    ///    没有这一条，"三根条的峰值都停在同一列"（静止画面、噪声、或者根本没拍到）也会读成
+    ///    散布 0pt，而 0pt 恰好是"整组一条带"的读数 —— 内存里那句"有没有变化拦不住带在错地方"
+    ///    的反面：位置一致也拦不住根本没在扫。
+    /// ③ **谁能签"这台机器判不了位置"**：不签给 coverage 那个处置，签给**同一把尺**去读高对比那颗
+    ///    证人（`bandAdjudication`）。理由写在调用点：R82 与 R83 的 CI 在**同一个产品代码**上
+    ///    给过相反的两支（证人 coverage 0.284 ⇒ 点名环境，0.837 ⇒ 判产品红），
+    ///    那一支自己不稳定，不能拿来当这一支的地板。
+    func testSkeletonSweepIsOneBand() async throws {
+        try skipUnlessEnabledAndCapable()
+        // ① 尺子自己的正对照（合成卷子，不依赖机器、不依赖产品）。
+        let control = Self.bandRulerControl()
+        emit("MOTION_SHIMMER_BAND_CONTROL 整组一条带那卷判定=\(control.oneBandVerdict.rawValue) "
+            + "每根条各扫那卷判定=\(control.fanOutVerdict.rawValue) "
+            + "（两份都是 8 灰阶抬升的亮斑，只有中心位置放法不同）")
+        XCTAssertEqual(control.oneBandVerdict, BandReading.Verdict.oneBand,
+                       "把『整组一条带』那份合成卷子读成了 \(control.oneBandVerdict.rawValue)"
+                           + " ⇒ 这把尺看不见它本该看见的东西，下面那句产品判定不作数")
+        XCTAssertEqual(control.fanOutVerdict, BandReading.Verdict.fanOut,
+                       "把『每根条各扫各的』那份卷子读成了 \(control.fanOutVerdict.rawValue)"
+                           + " ⇒ 这把尺分不开这两种画法，那它也就没资格说产品是哪一种")
+
+        // ② 产品那卷：与运动判据**同一卷**（`shimmerFilm` 缓存），两句话必须互相印证。
+        let film = Self.shimmerFilm()
+        let scale = Self.bandScale(of: film.frames.first, viewWidthPoints: skeletonViewWidthPoints)
+        let measured = Self.bandFrames(film.frames.map(Self.raster), viewWidthPoints: skeletonViewWidthPoints)
+        let reading = Self.bandReading(frames: measured.accepted,
+                                       widths: Self.barWidthPoints(viewWidthPoints: skeletonViewWidthPoints))
+        emit("MOTION_SHIMMER_BAND 帧=\(film.frames.count) 比例=1pt≈\(String(format: "%.2f", scale))px "
+            + "可用帧=\(reading.framesUsed) 丢掉=\(measured.rejected) "
+            + "同帧绝对中心最大散布=\(String(format: "%.1f", reading.maxSpreadPoints))pt"
+            + "（地板：≤\(Self.oneBandCeilingPoints) 判一条带、≥\(Self.fanOutFloorPoints) 判各扫各的） "
+            + "归一化散布=\(String(format: "%.3f", reading.normalizedSpread)) "
+            + "行程=\(String(format: "%.1f", reading.travelPoints))pt（正对照地板 \(Self.sweepTravelFloorPoints)） "
+            + "判定=\(reading.verdict.rawValue) 理由=\(reading.reason)")
+        emit("MOTION_SHIMMER_BAND_SAMPLE \(reading.sampleLine)")
+        writeStrip("skeleton-band", Array(film.frames.prefix(24)))
+        // ③ 位置这把尺的"这台机器有没有资格判"，**不能**由 coverage 那个处置签：
+        //    R83 的 CI 刚证明那一支自己会翻面（同一个产品代码、同一类机器，R82 读 0.284 ⇒ 点名环境，
+        //    R83 读 0.837 ⇒ 判产品红）。所以这里换一颗只问位置、不问节拍的证人：
+        //    高对比那颗（抬 0.45）与产品**同一种画法、同一个几何**，它问的是最弱那一题 ——
+        //    "这台机器在这张图上看不出一条亮带的位置吗"。连它都读不出可用帧，产品那 0.12 抬升
+        //    的位置就无从判起；它读得出而产品读不出，红就落在产品。
+        let witnessReading = Self.bandWitnessReading()
+        emit("MOTION_SHIMMER_BAND_WITNESS 粗节拍那颗(抬 0.45、同一种画法、同一把尺) "
+            + "可用帧=\(witnessReading.framesUsed) 绝对散布=\(String(format: "%.1f", witnessReading.maxSpreadPoints))pt "
+            + "行程=\(String(format: "%.1f", witnessReading.travelPoints))pt 判定=\(witnessReading.verdict.rawValue) "
+            + "理由=\(witnessReading.reason)")
+        let loopDisposition = Self.shimmerDisposition()
+        let bandDisposition = Self.bandAdjudication(product: reading.verdict,
+                                                    witness: witnessReading.verdict,
+                                                    loopCapable: loopDisposition == .ok)
+        switch bandDisposition {
+        case .ok:
+            break   // 产品判成整组一条带，而且这台机器有资格判这件事
+        case .productRed:
+            XCTFail("骨架的亮带今天不是『一条光穿过整组』（判定=\(reading.verdict.rawValue)："
+                               + reading.reason + "）。R84 把渐变填在整组的形状上（`SkeletonBarsShape`）"
+                               + "就是为了让三根条共用一个亮带中心；现在同一帧里三根条的亮斑绝对中心差 "
+                               + String(format: "%.1f", reading.maxSpreadPoints) + "pt ⇒ 要么渐变又回到了单根条的"
+                               + "单位空间（`unitPoints` 被用在条宽上），要么三根条不再是同一个形状里的三根。"
+                               + "而同一台机器上那颗**只有对比度更高**的证人用同一把尺读得出亮带位置"
+                               + "（" + witnessReading.verdict.rawValue + "），而 coverage 那一族的处置也是 .ok"
+                               + "（这台机器判得动产品自己那一档节拍）⇒ 这条红不是环境问题")
+        case .notRunEnvironment:
+            emit("MOTION_SHIMMER_BAND_NOT_JUDGED 产品判定=\(reading.verdict.rawValue) "
+                + "证人判定=\(witnessReading.verdict.rawValue) 证人可用帧=\(witnessReading.framesUsed) "
+                + "循环处置=\(loopDisposition) ⇒ 今天不判位置：要么连高对比那颗证人都拍不出可用的亮带位置，"
+                + "要么 coverage 那一族在这台机器上还没被证明判得动产品那一档节拍"
+                + "（BACKLOG 119：那个处置自己会在两轮之间翻面 ⇒ 它只能收窄断言，不许放大指控）。"
+                + "这一格既不能说亮带在整组里扫过去，也不能说它没有。（与峰值地板同落在 118 那个洞里）")
+        }
+    }
+
+    // MARK: 位置判据的那把尺（纯函数 + 像素测量，都在上面那条判据里用）
+
+    /// 整组一条带的判定上限：同一帧里三根条的亮斑绝对中心差 ≤ 这个数 ⇒ 判"一条带"。
+    /// 6pt = 两根条的峰值落在同一个亮带台阶上时允许的最大量化误差（1px @2× = 0.5pt，
+    /// 加上渐变本身在半格宽内是平的）。它必须**明显小于** `fanOutFloorPoints`：
+    /// 两个地板能互相取消的话，这把尺就什么都能判（内存里那条"阈值要成对"）。
+    static let oneBandCeilingPoints: Double = 6
+    /// 每根条各扫各的判定下限：≥ 40pt ⇒ 判"各扫各的"。
+    /// 实测那一卷的数差是 170pt（R83），而三根条两两之间的条宽差最小那对是 88pt
+    /// ⇒ 40pt 既不贴天花板也不贴地板：落在 6…40 之间就是**分不开**，判据老实说分不开。
+    static let fanOutFloorPoints: Double = 40
+    /// 正对照：可用帧里亮带至少要走这么远。0 行程的"散布 0pt"是静止画面，不是对称。
+    static let sweepTravelFloorPoints: Double = 20
+    /// 少于这么多可用帧就不判：一帧只能说明"这一瞬间三根条亮在同一条竖线上"，
+    /// 而这句话要在好几帧上都成立才叫"一条带扫过去"。
+    static let minimumBandFrames: Int = 3
+    /// 亮斑相对本条自身中位数的最小偏离（灰阶，两根轴里更强的那根）。
+    /// 实测：亮带扫到那根条时峰谷差 23–26，没扫到时 ≈2 ⇒ 门槛 4 不在刀尖上。
+    /// 这一格的意义是把"亮带不在这根条里"的那一帧**丢掉并数出来** —— 那种帧的剖面
+    /// 是一条单调斜坡，"最偏离中位数的那一列"会退化成条端（R83 手量时踩过的同一个坑）。
+    /// **它今天没有独立的牙，这一句是读数而不是礼貌**：变异 M454（只把这格调到 0）本地全绿，
+    /// 而 M454b（这一格与下面那格**一起**调到 0）红 ⇒ 今天真正拦住假峰的是条端内边距那一格
+    /// （M452 单独拆它就红），这一格是纵深防御。至于"为什么单拆没牙"，本轮**没有量**：
+    /// 说得通的机制是无噪声渲染下"条内没有亮带"的剖面是常数、argmax 落在第 0 列，
+    /// 于是先被内边距拦住 —— 但那只是解释，不是一条读数，所以记在这里而不是写成结论。
+    /// 留着它的条件也写在这里：哪天渲染通道带上噪声（换捕获后端、加抖动），
+    /// 常数剖面不再成立，这一格可能变成唯一还拦得住假中点的那一格。
+    static let bandAmplitudeFloor: Double = 4
+    /// 峰值离本条两端必须至少这么远（点），否则亮带被这条切掉了，读到的不是中心。
+    ///
+    /// **10pt 是量出来的，不是猜的**：第一版写 4pt，本机那一卷 45 帧里 15 帧可用，
+    /// 而最后一帧读出 `[33.0 → 171.5, 191.0, 191.0]`：短条（176pt）在亮带中心已经走出它右端时，
+    /// 条内剖面变成单调上升，argmax 贴在右端**里面一点点** —— 圆角让最外那一两列变暗，
+    /// 于是 4pt 的门槛恰好拦不住它（差 0.9pt 漏过去），整帧被这一个假数拉到 19.5pt ⇒ "分不开"。
+    /// 门槛要大于"圆角 + 一个台阶"能伪装出来的那段距离：亮带半宽是 63pt ⇒ 10pt 既拦得住这种
+    /// 贴边假峰，也还没吃掉真正在条内的那些中心（可用帧 15 → 仍然够）。
+    static let bandInteriorMarginPoints: Double = 10
+
+    /// 一帧的测量结果 + 判定。纯函数：`frames` 是**已通过前提**的那些帧，
+    /// 每帧三根条各自的亮斑绝对中心（点）。
+    struct BandReading: Equatable {
+        enum Verdict: String {
+            case oneBand = "整组一条带"
+            case fanOut = "每根条各扫各的"
+            case notJudged = "分不开"
+            case noFrames = "没有可用帧"
+        }
+        let verdict: Verdict
+        let reason: String
+        let framesUsed: Int
+        /// 同一帧内三根条绝对中心之差的最大值（点）。取**最大**而不是平均：
+        /// 有一帧分家就不是整组一条带。
+        let maxSpreadPoints: Double
+        /// 同一帧内归一化中心（÷各自条宽）之差的最大值。这一格今天只用来打读数：
+        /// 修之前它 ≈0、绝对散布 170pt，修之后应该反过来 —— 两个数一起才说清是哪一种画法。
+        let normalizedSpread: Double
+        /// 亮带在可用帧里走过的距离（点）：正对照。
+        let travelPoints: Double
+        let sampleLine: String
+
+        /// 真值表用的构造器（判定由 `bandReading(frames:widths:)` 算，这里只填数）。
+        init(verdict: Verdict, reason: String, framesUsed: Int = 0, maxSpreadPoints: Double = 0,
+             normalizedSpread: Double = 0, travelPoints: Double = 0, sampleLine: String = "-") {
+            self.verdict = verdict
+            self.reason = reason
+            self.framesUsed = framesUsed
+            self.maxSpreadPoints = maxSpreadPoints
+            self.normalizedSpread = normalizedSpread
+            self.travelPoints = travelPoints
+            self.sampleLine = sampleLine
+        }
+    }
+
+    /// 判定本身。地板全部是参数（默认取上面那些常量），为的是真值表能写出"落在两个地板之间"那一格，
+    /// 而不是只能构造恰好越线的输入。
+    static func bandReading(frames: [[Double]], widths: [Double],
+                            oneBandCeiling: Double = oneBandCeilingPoints,
+                            fanOutFloor: Double = fanOutFloorPoints,
+                            travelFloor: Double = sweepTravelFloorPoints,
+                            minimumFrames: Int = minimumBandFrames) -> BandReading {
+        func format(_ value: Double) -> String { String(format: "%.1f", value) }
+        guard !frames.isEmpty else {
+            return BandReading(verdict: .noFrames,
+                               reason: "没有任何一帧同时满足『三根条都拍到亮斑』与『峰值不在条端』"
+                                    + " ⇒ 要么这台机器没扫过光，要么条不在 `SkeletonMotion.barRect` 说的那三行上")
+        }
+        let spreads = frames.map { ($0.max() ?? 0) - ($0.min() ?? 0) }
+        let maxSpread = spreads.max() ?? 0
+        let norms = frames.map { frame in
+            let scaled = zip(frame, widths).map { $0.0 / max($0.1, 0.0001) }
+            return (scaled.max() ?? 0) - (scaled.min() ?? 0)
+        }
+        let maxNorm = norms.max() ?? 0
+        // 行程：逐根条看它自己跨帧走过多远，取最强的那根。
+        var travel = 0.0
+        if frames.count > 1 {
+            for column in 0..<(frames.map(\.count).min() ?? 0) {
+                let values = frames.compactMap { $0.count > column ? $0[column] : nil }
+                travel = max(travel, (values.max() ?? 0) - (values.min() ?? 0))
+            }
+        }
+        let sample = "可用帧首=[\(frames[0].map(format).joined(separator: ", "))] "
+            + "末=[\(frames[frames.count - 1].map(format).joined(separator: ", "))]"
+        let counted = BandReading(verdict: .notJudged, reason: "", framesUsed: frames.count,
+                                  maxSpreadPoints: maxSpread, normalizedSpread: maxNorm,
+                                  travelPoints: travel, sampleLine: sample)
+        if frames.count < minimumFrames {
+            return BandReading(verdict: .notJudged,
+                               reason: "只有 \(frames.count) 帧可用，地板是 \(minimumFrames) 帧："
+                                    + "一帧上的『同一条竖线』说明不了『一路扫过去』",
+                               framesUsed: counted.framesUsed, maxSpreadPoints: maxSpread,
+                               normalizedSpread: maxNorm, travelPoints: travel, sampleLine: sample)
+        }
+        if travel < travelFloor {
+            return BandReading(verdict: .notJudged,
+                               reason: "正对照失败：亮带在这 \(frames.count) 帧里只走了 \(format(travel))pt，"
+                                    + "地板 \(format(travelFloor))pt ⇒ 散布再小也不是『一条带扫过去』，那是没在动",
+                               framesUsed: counted.framesUsed, maxSpreadPoints: maxSpread,
+                               normalizedSpread: maxNorm, travelPoints: travel, sampleLine: sample)
+        }
+        if maxSpread <= oneBandCeiling {
+            return BandReading(verdict: .oneBand,
+                               reason: "每一帧三根条的亮斑都在同一条竖线上（最大差 \(format(maxSpread))pt ≤ "
+                                    + "\(format(oneBandCeiling))），且它一路走了 \(format(travel))pt",
+                               framesUsed: counted.framesUsed, maxSpreadPoints: maxSpread,
+                               normalizedSpread: maxNorm, travelPoints: travel, sampleLine: sample)
+        }
+        if maxSpread >= fanOutFloor {
+            return BandReading(verdict: .fanOut,
+                               reason: "同一帧里三根条的亮斑绝对中心差到 \(format(maxSpread))pt ≥ "
+                                    + "\(format(fanOutFloor)) ⇒ 那是三条各自单位空间里的亮带",
+                               framesUsed: counted.framesUsed, maxSpreadPoints: maxSpread,
+                               normalizedSpread: maxNorm, travelPoints: travel, sampleLine: sample)
+        }
+        return BandReading(verdict: .notJudged,
+                           reason: "绝对散布 \(format(maxSpread))pt 落在两个地板之间（≤\(format(oneBandCeiling)) 才判一条带、"
+                                + "≥\(format(fanOutFloor)) 才判各扫各的）⇒ 这把尺今天分不开这两种画法",
+                           framesUsed: counted.framesUsed, maxSpreadPoints: maxSpread,
+                           normalizedSpread: maxNorm, travelPoints: travel, sampleLine: sample)
+    }
+
+    /// 三根条各自的宽度（点）—— 归一化那一格用的分母。
+    static func barWidthPoints(viewWidthPoints: Double) -> [Double] {
+        SkeletonMotion.barFractions.map { Double($0) * viewWidthPoints }
+    }
+
+    /// 点 → 像素的比例，从帧本身读（不假设 2×：外接屏与 runner 都是 1×）。
+    static func bandScale(of frame: CGImage?, viewWidthPoints: Double) -> Double {
+        guard let frame, viewWidthPoints > 0 else { return 0 }
+        return Double(frame.width) / viewWidthPoints
+    }
+
+    /// 一卷位图 → 通过前提的那些帧（每帧三根条的亮斑绝对中心）+ 被丢掉的帧数。
+    /// 丢掉必须**数出来**：一帧都不剩和全是噪声是两种病，而 `bandReading` 只看前者。
+    private static func bandFrames(_ bitmaps: [Bitmap], viewWidthPoints: Double) -> (accepted: [[Double]], rejected: Int) {
+        var accepted: [[Double]] = []
+        var rejected = 0
+        for bitmap in bitmaps {
+            if let peaks = bandFramePeaks(bitmap, viewWidthPoints: viewWidthPoints) {
+                accepted.append(peaks)
+            } else {
+                rejected += 1
+            }
+        }
+        return (accepted, rejected)
+    }
+
+    /// 一帧里三根条各自的亮斑中心。任何一根不合格就整帧作废（宁缺毋滥：
+    /// 少一根条的"散布"量的就不是那道扫光了）。
+    private static func bandFramePeaks(_ bitmap: Bitmap, viewWidthPoints: Double) -> [Double]? {
+        let peaks = barPeaks(bitmap, viewWidthPoints: viewWidthPoints)
+        guard peaks.count == SkeletonMotion.barFractions.count else { return nil }
+        guard peaks.allSatisfy({ $0.interior && $0.deviation >= bandAmplitudeFloor }) else { return nil }
+        return peaks.map(\.peakPoints)
+    }
+
+    struct BarPeak: Equatable {
+        let peakPoints: Double
+        let deviation: Double
+        let interior: Bool
+    }
+
+    /// 三根条各自的亮斑（`SkeletonMotion.barRect` 说的那三行）。
+    private static func barPeaks(_ bitmap: Bitmap, viewWidthPoints: Double) -> [BarPeak] {
+        let scale = Double(bitmap.width) / viewWidthPoints
+        guard scale >= 1, bitmap.height > 0 else { return [] }
+        let group = CGRect(x: 0, y: 0, width: viewWidthPoints, height: groupHeightPoints)
+        return SkeletonMotion.barFractions.enumerated().compactMap { index, fraction in
+            guard let peak = barPeak(bitmap,
+                                     rect: SkeletonMotion.barRect(index: index, fraction: fraction, in: group),
+                                     scale: scale) else { return nil }
+            return peak
+        }
+    }
+
+    /// 一根条：沿 x 求列均值，取**离本条自身中位数最远**的那一列当亮斑中心。
+    ///
+    /// 为什么是中位数而不是最大值：`Color.primary` 在浅色外观下是**黑**的，条带比窗口背景暗，
+    /// 亮带则是"更暗"；在深色外观下整个反过来。用"离本条自身的多数派偏离最远"就不必赌方向，
+    /// 而这道题要问的本来就不是"哪边亮"，是"亮斑在不在同一列"。
+    /// 为什么两根轴都要算：R77 量过"暗墨变透明这一族在预乘 RGB 上就是 0→0"，
+    /// 一把只读 RGB 的尺在浅色外观下会看不见这里的亮带 —— 那会把"各扫各的"读成"没有可用帧"，
+    /// 也就是把一条会红的判据悄悄变成一条不判的判据。
+    private static func barPeak(_ bitmap: Bitmap, rect: CGRect, scale: Double) -> BarPeak? {
+        // `rect` 是**点**（`SkeletonMotion.barRect` 在视图坐标系里算的），位图下标是**像素**
+        // ⇒ 这里必须乘 `scale`。第一版漏乘了：条被当成只有实际一半宽去采样，
+        // 于是整组一条带那种卷子的峰值永远贴在采样窗的右端 ⇒ `interior` 全部失败 ⇒
+        // 45 帧全被丢掉、两条合成对照也一起读成"分不开"（三条红同一个根因，本轮实测）。
+        let x0 = Int((rect.minX * scale).rounded()), x1 = Int((rect.maxX * scale).rounded())
+        let y0 = Int((rect.minY * scale).rounded()), y1 = Int((rect.maxY * scale).rounded())
+        guard x1 > x0, y1 > y0, x1 <= bitmap.width, y1 <= bitmap.height else { return nil }
+        var rgb: [Double] = []
+        var alpha: [Double] = []
+        for x in x0..<x1 {
+            var sums = (r: 0.0, g: 0.0, b: 0.0, a: 0.0)
+            var count = 0
+            var y = y0
+            while y < y1 {
+                let p = (y * bitmap.width + x) * 4
+                guard p + 3 < bitmap.pixels.count else { break }
+                sums.r += Double(bitmap.pixels[p]); sums.g += Double(bitmap.pixels[p + 1])
+                sums.b += Double(bitmap.pixels[p + 2]); sums.a += Double(bitmap.pixels[p + 3])
+                count += 1
+                y += 1
+            }
+            guard count > 0 else { return nil }
+            rgb.append((sums.r + sums.g + sums.b) / (3.0 * Double(count)))
+            alpha.append(sums.a / Double(count))
+        }
+        guard let peak = outlierPeak(rgb: rgb, alpha: alpha) else { return nil }
+        let margin = bandInteriorMarginPoints * scale
+        return BarPeak(peakPoints: rect.minX + Double(peak.index) / scale,
+                       deviation: peak.deviation,
+                       interior: Double(peak.index) >= margin
+                           && Double(peak.index) <= Double(rgb.count - 1) - margin)
+    }
+
+    /// 两条轴各找一次"离中位数最远"，返回偏离更强的那根。
+    /// 幅度用灰阶、两轴共用同一个地板（`bandAmplitudeFloor`）—— 共用门槛才可比（R77 同一句话）。
+    private static func outlierPeak(rgb: [Double], alpha: [Double]) -> (index: Int, deviation: Double)? {
+        guard rgb.count == alpha.count, rgb.count >= 8 else { return nil }
+        var best: (index: Int, deviation: Double)?
+        for values in [rgb, alpha] {
+            let sorted = values.sorted()
+            let median = sorted[sorted.count / 2]
+            guard let winner = values.enumerated().max(by: {
+                abs($0.element - median) < abs($1.element - median)
+            }) else { continue }
+            let deviation = abs(winner.element - median)
+            if best == nil || deviation > best!.deviation {
+                best = (winner.offset, deviation)
+            }
+        }
+        return best
+    }
+
+    /// 位置这把尺的处置：谁来签"这台机器今天判不了位置"。
+    enum BandAdjudication: Equatable {
+        /// 证人读得出亮带位置，产品也判成了整组一条带 ⇒ 判绿。
+        case ok
+        /// 证人读得出，而产品读不出/判成分家 ⇒ **产品红**（两颗之间只剩对比度这一个差别）。
+        case productRed
+        /// 连高对比那颗证人都拍不出可用的亮带位置 ⇒ 这台机器判不了这件事 ⇒ 点名，不判产品。
+        case notRunEnvironment
+    }
+
+    /// 证人"有资格签"= 它自己读出了一个**可判决**的画法（两种之一），而不是 0 可用帧、
+    /// 正对照失败或落在两个地板之间。把"分不开"也算成有资格的话，产品那一句"红"就又是空支票。
+    static func bandWitnessIsAdmissible(_ verdict: BandReading.Verdict) -> Bool {
+        verdict == .oneBand || verdict == .fanOut
+    }
+
+    /// `loopCapable` = coverage 那一族今天在这台机器上判得动产品自己那一档节拍（处置是 `.ok`）。
+    ///
+    /// 为什么这一格只能**收窄**断言、不能放大指控（R84 / BACKLOG 119 的实测教训）：
+    /// R82 与 R83 的 CI 在同一份产品代码上给过相反的两支（等节拍证人 coverage 0.284 ⇒ 点名环境，
+    /// 0.837 ⇒ 判产品红）。一个自己会在两轮之间翻脸的读数，如果拿来**定罪**产品，
+    /// 下一轮就会红着说一件它上一轮否认过的事；而拿来**免罪**（不说）则任何一轮都安全。
+    /// ⇒ 所以 `loopCapable == false` 时这一族一律不判，哪怕证人这边读得出。
+    /// 本机那一遍的处置是 `.ok`（产品 coverage 0.976-1.000），所以这一格在本机不改变任何结论，
+    /// 它拦的是 runner 上那朵假红。
+    static func bandAdjudication(product: BandReading.Verdict,
+                                 witness: BandReading.Verdict,
+                                 loopCapable: Bool = true) -> BandAdjudication {
+        guard loopCapable else { return .notRunEnvironment }
+        guard bandWitnessIsAdmissible(witness) else { return .notRunEnvironment }
+        return product == .oneBand ? .ok : .productRed
+    }
+
+    /// 粗节拍那颗证人用**同一把尺**读出来的位置判定（每进程一次，一次 2.5 秒）。
+    /// 为什么不复用 `loopWitness(.gradient)` 那个 LoopShape：那颗尺读的是"有没有在变"，
+    /// 而这一格要的是"看不看得见一条亮带在哪儿"。两句话在 runner 上会分家
+    /// （R82 与 R83 的 coverage 处置正好翻过一次面），所以签字的人必须被问对那一题。
+    static func bandWitnessReading() -> BandReading {
+        if let cached = bandWitnessCache { return cached }
+        let film = StateTickProbe().record(motionClass: .gradient, seconds: loopFilmSeconds)
+        let reading = bandReading(frames: bandFrames(film.frames.map(raster),
+                                                     viewWidthPoints: skeletonViewWidthPoints).accepted,
+                                  widths: barWidthPoints(viewWidthPoints: skeletonViewWidthPoints))
+        bandWitnessCache = reading
+        return reading
+    }
+
+    /// 尺子自己的正对照：两份合成卷子，只有亮斑中心的**放法**不同。
+    /// 整组一条带那份 ⇒ 必须判 `oneBand`；每根条各扫各那份 ⇒ 必须判 `fanOut`。
+    /// 两份都放同一档抬升（8 灰阶）与同一条行程，所以"分不开"不可能是对比度造成的。
+    static func bandRulerControl() -> (oneBandVerdict: BandReading.Verdict,
+                                       fanOutVerdict: BandReading.Verdict) {
+        let scale = 2.0
+        let widths = Self.barWidthPoints(viewWidthPoints: skeletonViewWidthPoints)
+        // 亮带中心从 20pt 走到 150pt：三根条都装得下这段（最短那根 176pt），
+        // 而"各扫各的"那卷在同样三个相位上的绝对中心差到 90pt 以上。
+        let centers: [Double] = [20, 60, 100, 150]
+        let oneBand = Self.bandFrames(centers.map { center in
+            Self.syntheticSkeletonFrame(peakPoints: [center, center, center], scale: scale)
+        }, viewWidthPoints: skeletonViewWidthPoints)
+        let fanOut = Self.bandFrames(centers.map { center in
+            // 同一个相位在每根条自己的单位空间里 ⇒ 绝对中心 = 比例 × 条宽。
+            let fraction = (center - 20) / 130.0 * 0.8 + 0.1
+            return Self.syntheticSkeletonFrame(peakPoints: widths.map { $0 * fraction }, scale: scale)
+        }, viewWidthPoints: skeletonViewWidthPoints)
+        return (Self.bandReading(frames: oneBand.accepted, widths: widths).verdict,
+                Self.bandReading(frames: fanOut.accepted, widths: widths).verdict)
+    }
+
+    /// 合成一张骨架位图：三根条 + 每根条里一个可指定绝对位置的亮斑（白墨、按 alpha 计）。
+    /// 只用来当尺子的正对照，不进任何产品判定。
+    private static func syntheticSkeletonFrame(peakPoints: [Double], scale: Double,
+                                       viewWidthPoints: Double = skeletonViewWidthPoints) -> Bitmap {
+        let width = max(1, Int(viewWidthPoints * scale))
+        let height = max(1, Int(groupHeightPoints * scale))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let bandHalf = SkeletonMotion.bandSize * viewWidthPoints / 2
+        let lift = SkeletonMotion.highlightOpacity - SkeletonMotion.baseOpacity
+        for (index, fraction) in SkeletonMotion.barFractions.enumerated() {
+            let rect = SkeletonMotion.barRect(index: index, fraction: fraction,
+                                              in: CGRect(x: 0, y: 0, width: viewWidthPoints,
+                                                         height: groupHeightPoints))
+            let peak = index < peakPoints.count ? peakPoints[index] : viewWidthPoints / 2
+            let x0 = Int((rect.minX * scale).rounded()), x1 = Int((rect.maxX * scale).rounded())
+            let y0 = Int((rect.minY * scale).rounded()), y1 = Int((rect.maxY * scale).rounded())
+            guard x1 > x0, y1 > y0, x1 <= width, y1 <= height else { continue }
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let points = Double(x) / scale
+                    // 三角亮斑：中心在最亮，半个带宽处回到底色（与产品那条三段渐变同形）。
+                    let falloff = max(0, 1 - abs(points - peak) / max(bandHalf, 0.0001))
+                    let ink = min(0.98, SkeletonMotion.baseOpacity + lift * falloff)
+                    let value = UInt8((ink * 255).rounded())
+                    let p = (y * width + x) * 4
+                    pixels[p] = value; pixels[p + 1] = value; pixels[p + 2] = value; pixels[p + 3] = value
+                }
+            }
+        }
+        return Bitmap(pixels: pixels, width: width, height: height)
+    }
+
+    /// 三根条占的总高度（点）：判据按它决定合成图要多高，也按它检查真片容不容得下整组。
+    static var groupHeightPoints: Double {
+        Double(SkeletonMotion.barFractions.count) * Double(SkeletonMotion.barHeight)
+            + Double(SkeletonMotion.barFractions.count - 1) * Double(SkeletonMotion.barSpacing)
+    }
+
+    /// 产品那一卷只抓一次（R84）：运动判据与位置判据必须读同一卷。
+    fileprivate static func shimmerFilm() -> GrabbedFilm {
+        if let cached = shimmerFilmCache { return cached }
+        let film = SkeletonProbe().record(reduceMotion: false)
+        shimmerFilmCache = film
+        return film
+    }
+
+    /// 那一卷的处置（产品在跑 / 产品红 / 环境带不动 / 证人坏了）。
+    /// 两条判据共用一个处置，是因为它们共用同一个前提：**这台机器今天看得见这一臂在动**。
+    /// 写成一颗函数而不是各自算一遍，是为了不让"coverage 那条"与"位置那条"算出两个答案
+    /// （R58 那一课：同一件事两份实现迟早分家）。
+    static func shimmerDisposition() -> LoopAdjudication {
+        let film = shimmerFilm()
+        return loopAdjudication(product: loopShape(fractions: deltas(film.frames),
+                                                   stamps: film.stamps).verdict,
+                                rateWitness: loopWitness(.gradientAtProductRate).verdict,
+                                coarseWitness: loopWitness(.gradient).verdict)
+    }
+
     /// 两颗证人的卷子与产品那卷**同一个时长**（`loopFilmSeconds`，文件里那个全局常量）：
-    /// 窗口不同长的话，"带不动循环"与"带不动 2.0 秒内的循环"是两句话。
     private static func loopWitness(_ klass: MotionClass) -> LoopShape {
         if let cached = loopWitnessCache[klass] { return cached }
         let film = StateTickProbe().record(motionClass: klass, seconds: loopFilmSeconds)
@@ -5791,6 +6363,11 @@ private let loopFilmSeconds: TimeInterval = 2.5
 
 // MARK: - 骨架扫光探针
 
+/// 骨架探针那张视图的**点宽**（R84）。
+/// 位置判据要说"三根条的亮斑在同一条竖线上"，而"竖线"的单位是点 ⇒ 像素必须按这个宽度换算。
+/// 它同时是探针开窗的宽度与判据的换算基数，所以只能有一处定义：写两份迟早分家（R58 同一课）。
+private let skeletonViewWidthPoints: Double = 420
+
 /// 在离屏窗口里 host 一个 `SkeletonPreviewView`，连抓 30 帧。
 ///
 /// 为什么不通过 `DetailFileView` 走：那条路要真去读一个文件的预览，`MediaLoader` 什么时候回来
@@ -5801,7 +6378,8 @@ private let loopFilmSeconds: TimeInterval = 2.5
 private final class SkeletonProbe {
     func record(reduceMotion: Bool) -> GrabbedFilm {
         _ = NSApplication.shared
-        let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
+        let window = NSWindow(contentRect: NSRect(x: 140, y: 140,
+                                                  width: CGFloat(skeletonViewWidthPoints), height: 220),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         let host = NSHostingView(rootView: SkeletonPreviewView(reduceMotion: reduceMotion))
         window.contentView = host
@@ -6023,29 +6601,22 @@ private struct GradientTickView: View {
                          highlightOpacity: 0.18)
     }
 
-    /// 与 `SkeletonPreviewView` **同一套画法**（GeometryReader + ForEach + 渐变填充），
+    /// 与 `SkeletonPreviewView` **同一套画法**（整组一个形状 + 一条容器坐标系的渐变填充），
     /// 只有驱动方式不同：这里是视图自己的 `@State`。
     /// 分成两个视图而不是只测一个，是为了把"驱动方式"和"画法"这两个嫌疑分开 ——
     /// 否则读到不动时，仍然不知道该改时钟还是该改布局。
+    ///
+    /// R84：产品从"每根条一个 `RoundedRectangle`"换成整组一个 `SkeletonBarsShape`，这里跟着换。
+    /// 这句话不是注释体的礼貌 —— 它要是不同步，`.productRed` 那一支的推论（"只差视图归谁这一个差别"）
+    /// 当场失效。四个数字由 `testTheLoopWitnessStillMirrorsTheProductLoop` 钉住，
+    /// **画法**由同一条里的源码守卫钉住：证人不是被量的对象，没法从像素反推它画的是什么。
     private func skeleton(phase: CGFloat) -> some View {
-        GeometryReader { proxy in
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(SkeletonMotion.barFractions.enumerated()), id: \.offset) { _, fraction in
-                    // 与产品同一颗形状出口（`VisualShape.rounded` 而不是裸 `RoundedRectangle(cornerRadius:)`：
-                    // 后者默认 `.circular`，产品用的是 `.continuous`）。证人要能说"画法相同"，
-                    // 就不能在角上先差一个曲率。
-                    VisualShape.rounded(VisualRadius.chip)
-                        .fill(LinearGradient(
-                            stops: [.init(color: .primary.opacity(baseOpacity), location: 0),
-                                    .init(color: .primary.opacity(highlightOpacity), location: 0.5),
-                                    .init(color: .primary.opacity(baseOpacity), location: 1)],
-                            startPoint: SkeletonMotion.unitPoints(phase: phase).start,
-                            endPoint: SkeletonMotion.unitPoints(phase: phase).end))
-                        .frame(width: max(1, proxy.size.width * fraction), height: 8)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
+        SkeletonBarsShape().fill(LinearGradient(
+            stops: [.init(color: .primary.opacity(baseOpacity), location: 0),
+                    .init(color: .primary.opacity(highlightOpacity), location: 0.5),
+                    .init(color: .primary.opacity(baseOpacity), location: 1)],
+            startPoint: SkeletonMotion.unitPoints(phase: phase).start,
+            endPoint: SkeletonMotion.unitPoints(phase: phase).end))
     }
 }
 
