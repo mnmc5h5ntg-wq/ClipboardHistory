@@ -45,6 +45,13 @@ final class MotionFilmstripTests: XCTestCase {
     /// 淡入时钟探针跑一次就缓存（R66）。与上面同一个理由：这是**环境属性**，
     /// 不会在一卷测试跑到一半时变好；而它一次要 2 秒，让它跟着每条判据各跑一遍，
     /// 就是拿"这条判据跑得完吗"去换"这条判据说得准吗"。
+    /// 循环证人（同一种画法 + 同一种时钟，由测试自己驱动）的一卷形状，**每进程一次**。
+    /// 与 `fadeClockCache` 同一个理由：同一台机器上每条臂问的是同一句话，问两遍会给出两个答案。
+    ///
+    /// R82 把它拆成**两颗证人**（`coarse` = 每 50ms 一拍、高对比；`rateMatched` = 与产品同一档
+    /// 节拍、同一组对比度），因为这两颗问的是两句不同的话，见 `loopAdjudication` 的注释。
+    nonisolated(unsafe) static var loopWitnessCache: [MotionClass: LoopShape] = [:]
+
     nonisolated(unsafe) static var fadeClockCache: FadeClockReading?
 
     /// 胶片与读数共用的输出目录（R56：两条证据通道必须住在同一个地方，见 `readingsURL`）。
@@ -489,17 +496,24 @@ final class MotionFilmstripTests: XCTestCase {
     /// - 一次跳变的只有 `s`。
     /// 要"真过渡必判绿、跳变必判红"就要 `d − 2s ≥ 0.4d` 且 `s < 0.4d` ⇒ **`s ≤ 0.3d` 时两条同时成立**。
     /// 所以 `s > 0.3d` 时改用"至少两帧在变"这一档（见下），`s > 0.5d` 才报 `.clockTooCoarse`，
+    ///
+    /// **R82 / BACKLOG 110：`clockIntervalMilliseconds` 现在必须是事件那一段的稳健统计量（P75），
+    /// 不再是"最粗那一次"。** 那条线原来站在一个单样本上，于是同一份代码、同一台机器，
+    /// 事件内最粗 61ms 与 81ms 的两遍读数会一个判、一个 not-run（线是 0.5×160=80ms），
+    /// 而中位数一直是 50–51ms —— **判的是采样相位，不是产品**。
+    /// 最粗那一次仍然打出来当读数（一次真实的抓帧停顿就该在那里露头，R48 的 260ms 就是），
+    /// 只是不再单独决定判定。
     /// 既不判红也不判绿（把尺子的盲区写成产品缺陷，和写成"已交付"一样是假证据）。
     static func judgeMotion(elapsedMilliseconds: Double,
-                           worstIntervalMilliseconds: Double,
+                           clockIntervalMilliseconds: Double,
                            declaredDurationMilliseconds: Double,
                            changedFrames: Int) -> MotionVerdict {
-        guard declaredDurationMilliseconds > 0, worstIntervalMilliseconds > 0 else { return .clockTooCoarse }
+        guard declaredDurationMilliseconds > 0, clockIntervalMilliseconds > 0 else { return .clockTooCoarse }
         let duration = declaredDurationMilliseconds
-        if worstIntervalMilliseconds <= 0.3 * duration {
+        if clockIntervalMilliseconds <= 0.3 * duration {
             return elapsedMilliseconds >= 0.4 * duration ? .transition : .jump
         }
-        if worstIntervalMilliseconds <= 0.5 * duration {
+        if clockIntervalMilliseconds <= 0.5 * duration {
             // 中间档（R8 的 CI 把这一档逼出来的）：一次跳变只占 1 帧，而这段过渡至少占 2 帧
             // ⇒ **在这一点上帧数是够用的判别量**，不必因为时钟稍粗就放弃判定。
             // runner 实测事件内 ~55ms 一帧、声明 160ms ⇒ 三个场景全掉进这里，
@@ -519,20 +533,148 @@ final class MotionFilmstripTests: XCTestCase {
         case clockTooCoarse
     }
 
-    /// 事件那一段（第一个还在变的帧 → 最后一个还在变的帧之后一帧）**最粗的一次采样间隔**（ms）。
-    /// 用最大值而不是中位数：中位数会被"落定之后连拍的一堆快帧"拉低，
-    /// 而决定分辨率的是过渡正在演的那一段里最稀的一次。
-    /// 返回 `nil` = 整段没有可见变化 ⇒ 无从判定。
-    static func worstIntervalInsideChangedRun(stamps: [TimeInterval], fractions: [Double]) -> Double? {
-        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return nil }
+    /// 事件那一段（第一个还在变的帧 → 最后一个还在变的帧之后一帧）里**每一次采样的间隔**（ms）。
+    ///
+    /// R82 / BACKLOG 110：这里原来只往外交一个**最大值**，而判据拿它当"这把尺切不切得出过程"。
+    /// 一个单样本统计做闸门，就会把一臂在"判到 / 判不到"之间翻脸 —— 本机实测三遍
+    /// （`.scratch/motion-audit-2/r78_motion_flip.log`）：`detail-kind-change` 的
+    /// 事件内最粗在 **61ms 与 81ms 之间跳**，而那条线是 `0.5×声明 = 80ms` ⇒
+    /// 同一份代码、同一台机器，一臂红一臂 not-run，而中位数一直是 50–51ms。
+    /// 现在把整段交出去，由调用方取**分位数**；最大值仍然打出来当读数（它是有用的：
+    /// 一次真实的停顿会在那里露头），只是不再单独决定判定。
+    /// 返回 `[]` = 整段没有可见变化 ⇒ 无从判定。
+    static func intervalsInsideChangedRun(stamps: [TimeInterval], fractions: [Double]) -> [Double] {
+        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return [] }
         let moving = fractions.indices.filter { fractions[$0] >= peak * stepFloorRatio }
-        guard let first = moving.first, let last = moving.last, last + 1 < stamps.count else { return nil }
-        var worst: Double = 0
+        guard let first = moving.first, let last = moving.last, last + 1 < stamps.count else { return [] }
+        var gaps: [Double] = []
         for index in (first + 1)...(last + 1) {
-            worst = max(worst, (stamps[index] - stamps[index - 1]) * 1000)
+            gaps.append((stamps[index] - stamps[index - 1]) * 1000)
         }
-        return worst
+        return gaps
     }
+
+    /// 一段采样间隔的**分位数**（0…1）。取法刻意保守：`index = round(q × (n−1))`，
+    /// 样本少于 2 个时返回最大值（那时无所谓分位数，只有一个数）。
+    static func percentileMilliseconds(_ gaps: [Double], _ q: Double) -> Double {
+        guard !gaps.isEmpty else { return -1 }
+        let sorted = gaps.sorted()
+        if sorted.count == 1 { return sorted[0] }
+        let index = min(sorted.count - 1, max(0, Int((q * Double(sorted.count - 1)).rounded())))
+        return sorted[index]
+    }
+
+    /// 事件那一段里**最粗的一次采样**（ms）—— 保留成读数，不再当判据的闸门（见上）。
+    static func worstIntervalInsideChangedRun(stamps: [TimeInterval], fractions: [Double]) -> Double? {
+        let gaps = intervalsInsideChangedRun(stamps: stamps, fractions: fractions)
+        return gaps.isEmpty ? nil : gaps.max()
+    }
+
+    // MARK: - 常驻循环的形状（R82 / BACKLOG 113）
+
+    /// 一卷"该一直在动"的读数（骨架扫光那一族）。
+    ///
+    /// 为什么需要它（而不是继续用 `transitionFrameCount ≥ 3`）：那条判据数的是**帧对个数**，
+    /// 而个数跟着采样密度走 —— R80 的 CI 上 runner 读到 `变化帧对=2 / 帧数=23 / 采样≈115ms`，
+    /// 本机是 `23 / 48 / 53ms`，**峰值两边都是 0.015**。也就是说个数这一列量的是"这台机器
+    /// 多久拍一张"，不是"这条循环有没有在跑"。R47 对淡入做过同一件事（把帧数换成时长轴），
+    /// 这一条是那次的下半场。
+    ///
+    /// `coverage` 是**时间**之比，因此与帧数无关：
+    /// 从第一个还在变的帧对，到最后一个还在变的帧对，覆盖了整卷时长的几成。
+    /// 一条真循环 ⇒ 从头到尾都在变 ⇒ coverage ≈ 1；
+    /// 一次跳变（或"时钟整卷只醒了两回"）⇒ coverage ≈ 一个采样 ÷ 整卷 ≈ 4%。
+    /// 中间不需要知道一圈多长、也不需要知道多久一拍。
+    struct LoopShape: Equatable {
+        let pairs: Int
+        let changingPairs: Int
+        let peak: Double
+        let coverage: Double
+        let recordedMilliseconds: Double
+
+        var verdict: LoopVerdict {
+            if peak < Self.minPeak { return .notMoving }
+            return coverage >= Self.minCoverage ? .looping : .oneShot
+        }
+
+        /// "这一卷到底拍没拍到东西在动"的绝对地板。**它必须等于 `MotionFilmstripTests.minimumVisibleChange`** ——
+        /// 为什么住在结构体里而不是直接引用那条常量：嵌套类型**不继承**外层类的 `@MainActor`
+        /// （`FadeClockReading` 的注释记着同一件事），而两个数一旦能各自漂移，
+        /// "峰值够高但 coverage 不够"与"峰值不够"这两支就会互相冒名。
+        /// 这一条由 `testTheLoopShapeClassifierIsATruthTable` 里的相等断言钉住（不许只写在注释里）。
+        static let minPeak: Double = 0.005
+
+        /// "一直在动"的地板。取 0.5 而不是更高：本机实测 coverage 是 **0.98**，
+        /// 而一次跳变在 22 帧对上是 **0.05** —— 中间有二十倍的空间，0.5 不在刀尖上。
+        /// 它**不许**为了哪台机器过线而移动（R80 对焦点那条轴立的同一条规矩）。
+        static let minCoverage = 0.5
+    }
+
+    enum LoopVerdict: Equatable {
+        /// 整卷没拍到任何可见变化 ⇒ 无从判定（探针或通道的问题，不是产品的）。
+        case notMoving
+        /// 变化覆盖了整卷的一半以上 ⇒ 它在一直演。
+        case looping
+        /// 只在少数几个帧对上变过 ⇒ 一次跳变 / 时钟没在跑。
+        case oneShot
+    }
+
+    /// 处置读的是**两颗证人 × 产品形状**（R82 现场补的那一半）。
+    ///
+    /// 为什么一颗不够：`GradientTickView` 原来只有一档 —— 每 50ms 一拍、亮带抬到 0.45。
+    /// 拿它当唯一证人，`.productRed` 那句就说大了：产品那一档是 **30Hz、抬 0.12**，
+    /// "这台机器带得动一个 20Hz 循环"并不蕴含"带得动 30Hz 的这一档"（R68 立的是
+    /// **证人必须与判据问同一句话**，这里问的是"这台机器带不带得动产品那一档节拍的常驻循环"）。
+    /// 所以：
+    /// * `coarse`（20Hz、高对比）只守**最硬的那一支** —— 连这种画法、这种对比度都一拍都拍不到，
+    ///   说明尺或通道坏了，谁都不能签字（`witnessDead`，红）。它在 R81 的 CI 上是能跑的：
+    ///   `MOTION_CONTROL 渐变端点 帧数=21 峰值=0.029 变化帧对=13`。
+    /// * `rateMatched`（30Hz、0.06/0.18，与产品同数字）决定 **产品红 vs 环境不行** 那一分界。
+    enum LoopAdjudication: Equatable {
+        /// 产品在动 ⇒ 判绿。
+        case ok
+        /// 与产品**同一档节拍、同一组对比度**的证人在一直动，而产品那份没动 ⇒ **产品红**。
+        /// 两颗之间只剩"视图归谁"这一个差别，推给环境没有依据了。
+        case productRed
+        /// 等节拍证人也没能一直动 ⇒ 这台机器今天带不动产品那一档的常驻循环 ⇒ 点名 not-run，不判产品。
+        case notRunEnvironment
+        /// 连高对比的粗节拍证人整卷都没拍到任何变化 ⇒ 证人自己坏了，必须红
+        /// （否则上面那一支"环境"永远有人签字）。
+        case witnessDead
+    }
+
+    static func loopAdjudication(product: LoopVerdict,
+                                 rateWitness: LoopVerdict,
+                                 coarseWitness: LoopVerdict) -> LoopAdjudication {
+        if product == .looping { return .ok }
+        if coarseWitness == .notMoving { return .witnessDead }
+        return rateWitness == .looping ? .productRed : .notRunEnvironment
+    }
+
+    /// 一列帧对差 + 时刻 → 循环形状。纯函数：合成数据就能钉（`testTheLoopShapeClassifierIsATruthTable`）。
+    static func loopShape(fractions: [Double], stamps: [TimeInterval]) -> LoopShape {
+        // 先取到局部量再进 guard：`peak` 如果只在 `guard let` 之后绑定，
+        // 那 else 分支里写 `peak` 会**命中同名的静态方法** `peak(_:)`（Swift 允许把方法当值传，
+        // 于是编译期报的是"参数类型不匹配"，而人看到的是一行没写错的字）—— R82 现场踩的。
+        let maximum = fractions.max() ?? 0
+        guard maximum > 0, fractions.count > 1, stamps.count == fractions.count + 1 else {
+            // 峰值这里**返回 0**，不返回 `maximum`：前提出错（时刻与读数对不上、只有一帧、整卷空白）
+            // 时 coverage 是 0，而如果峰值仍然报出真实值，`verdict` 就会把"尺没法算"说成
+            // "只动了一下"（`.oneShot`）—— 那是把尺自己的故障冒充成产品的行为，
+            // 处置上会从"点名 not-run"错翻成"判产品红"或反之。返回 0 ⇒ `.notMoving` = 没量到。
+            return LoopShape(pairs: max(0, fractions.count), changingPairs: 0, peak: 0,
+                             coverage: 0, recordedMilliseconds: 0)
+        }
+        let floor = maximum * stepFloorRatio
+        let moving = fractions.indices.filter { fractions[$0] >= floor }
+        let first = moving.first ?? 0, last = moving.last ?? 0
+        let total = (stamps[fractions.count] - stamps[0]) * 1000
+        let covered = total > 0 ? max(0, (stamps[last + 1] - stamps[first]) * 1000) / total : 0
+        return LoopShape(pairs: fractions.count, changingPairs: moving.count, peak: maximum,
+                         coverage: covered, recordedMilliseconds: total)
+    }
+
+
 
     /// "过渡的中点"对应的帧号 —— 给"必须还差得远"这类**阳性对照**用。
     /// `nil` = 连过渡的一半都落在同一帧里 ⇒ 无从判定。
@@ -1334,7 +1476,7 @@ final class MotionFilmstripTests: XCTestCase {
             let worst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: fractions) ?? -1
             XCTAssertEqual(worst, 45, accuracy: 1, "事件内最粗采样 = 45ms")
             XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: elapsed,
-                                            worstIntervalMilliseconds: worst,
+                                            clockIntervalMilliseconds: worst,
                                             declaredDurationMilliseconds: 160,
                                             changedFrames: 3), .transition,
                            "\(name)：两种相位都必须判成「过渡在演」")
@@ -1346,47 +1488,47 @@ final class MotionFilmstripTests: XCTestCase {
         let jumpWorst = Self.worstIntervalInsideChangedRun(stamps: stamps, fractions: jump) ?? -1
         XCTAssertEqual(jumpElapsed, 45, accuracy: 1, "跳变的「变化段」就是一个采样的长度")
         XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: jumpElapsed,
-                                        worstIntervalMilliseconds: jumpWorst,
+                                        clockIntervalMilliseconds: jumpWorst,
                                         declaredDurationMilliseconds: 160,
                                         changedFrames: 1), .jump,
                        "45ms 的变化段对 160ms 的声明 ⇒ 必须判成跳变，否则这条判据没有判别力")
         // 门槛之下：63ms 的变化段（160ms 声明、时钟 45ms）仍然算没演完。
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 63, worstIntervalMilliseconds: 45,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 63, clockIntervalMilliseconds: 45,
                                         declaredDurationMilliseconds: 160, changedFrames: 1), .jump)
         // 边界：s = 0.3d 时真过渡的最坏读数 d−2s 正好等于 0.4d ⇒ 判据在边界上仍然自洽
         //（"真过渡必过、跳变必红"这两个要求同时成立的那个点）。
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 64, worstIntervalMilliseconds: 48,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 64, clockIntervalMilliseconds: 48,
                                         declaredDurationMilliseconds: 160, changedFrames: 3), .transition)
-        XCTAssertNotEqual(Self.judgeMotion(elapsedMilliseconds: 48, worstIntervalMilliseconds: 48,
+        XCTAssertNotEqual(Self.judgeMotion(elapsedMilliseconds: 48, clockIntervalMilliseconds: 48,
                                            declaredDurationMilliseconds: 160, changedFrames: 1), .transition,
                          "跳变的最坏读数（=s）不许过线")
         // MARK: R8 —— 三档。CI 实测把这条逼出来的：runner 事件内 ~55ms 一帧，
         // 三个场景全掉进中间档，`judged` 从 3/3 掉到 **0/3**，新加的覆盖率闸门如实报红。
         // 中间档（0.3d < s ≤ 0.5d）：跳变 1 帧、过渡至少 2 帧 ⇒ 帧数在这里够用。
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, worstIntervalMilliseconds: 55,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, clockIntervalMilliseconds: 55,
                                         declaredDurationMilliseconds: 160, changedFrames: 3), .transition,
                        "CI 那档时钟必须仍然判得出东西，否则覆盖率闸门会长期红着")
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 55, worstIntervalMilliseconds: 55,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 55, clockIntervalMilliseconds: 55,
                                         declaredDurationMilliseconds: 160, changedFrames: 1), .jump,
                        "中间档里的一帧跳变仍然要红")
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, worstIntervalMilliseconds: 55,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 110, clockIntervalMilliseconds: 55,
                                         declaredDurationMilliseconds: 160, changedFrames: 0), .jump,
                        "变化帧数读成 0 却报绿 ⇒ 中间档没有地板")
         // 细时钟档：只看时长，帧数不参与 ⇒ 相位翻脸抓不住它
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 135, worstIntervalMilliseconds: 45,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 135, clockIntervalMilliseconds: 45,
                                         declaredDurationMilliseconds: 160, changedFrames: 2), .transition,
                        "细时钟下 2 帧也判绿：这一档看的是时长不是帧数")
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 45, worstIntervalMilliseconds: 45,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 45, clockIntervalMilliseconds: 45,
                                         declaredDurationMilliseconds: 160, changedFrames: 2), .jump,
                        "时长不够就红，哪怕帧数到了 2")
         // 太粗档（s > 0.5d）⇒ 无从判定，既不判红也不判绿。
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 200, worstIntervalMilliseconds: 100,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 200, clockIntervalMilliseconds: 100,
                                         declaredDurationMilliseconds: 160, changedFrames: 3), .clockTooCoarse,
                        "事件那一段 100ms 一帧、整段过渡只有 160ms ⇒ 是尺子看不见，不是产品没动")
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 0,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, clockIntervalMilliseconds: 0,
                                         declaredDurationMilliseconds: 160, changedFrames: 3), .clockTooCoarse,
                        "时钟没测到 ⇒ 不能当成「无限细」往下判")
-        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, worstIntervalMilliseconds: 30,
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 999, clockIntervalMilliseconds: 30,
                                         declaredDurationMilliseconds: 0, changedFrames: 3), .clockTooCoarse,
                        "没声明时长就没有门槛可言")
         // 整段没有一次可见变化 ⇒ 两个读数都必须 nil（调用方报 not-run，不许判绿）。
@@ -1490,6 +1632,168 @@ final class MotionFilmstripTests: XCTestCase {
                        "撤走那一臂声明的时长不是 `.bannerOut` ⇒ 判据用来算分辨率的档会对错")
     }
 
+    /// R82 / BACKLOG 113：循环那条判据的形状尺（`loopShape`）与三支处置的真值表。
+    ///
+    /// 这一整格是**合成数据**，不开窗口 ⇒ CI 每轮都跑。它要钉的正是"真实那一臂今天判成什么"
+    /// 之外的那件事：判据的形状不许跟着采样密度翻脸（R80 的 runner 与本机就是两组这样的数）。
+    func testTheLoopShapeClassifierIsATruthTable() throws {
+        // 漂移钉子：结构体里那条地板与外层那条必须是同一个数（见 `LoopShape.minPeak` 的注释）。
+        XCTAssertEqual(LoopShape.minPeak, Self.minimumVisibleChange,
+                       "循环尺的峰值地板与全卷那条地板分家了 ⇒ 两支处置会互相冒名："
+                           + "『没拍到变化』与『拍到但没一直动』的界线只能有一处")
+        func stamps(every ms: Double, count: Int) -> [TimeInterval] {
+            (0..<count).map { index in TimeInterval(Double(index) * ms / 1000.0) }
+        }
+        // ① 均匀在变 ⇒ looping，coverage ≈ 1
+        let loop = Self.loopShape(fractions: [Double](repeating: 0.02, count: 20),
+                                  stamps: stamps(every: 50, count: 21))
+        XCTAssertEqual(loop.verdict, .looping)
+        XCTAssertGreaterThan(loop.coverage, 0.9, "整卷都在变，coverage 应该接近 1")
+        // ② 只有一个帧对在变 ⇒ oneShot
+        var jump = [Double](repeating: 0.0, count: 20)
+        jump[5] = 0.02
+        let jumped = Self.loopShape(fractions: jump, stamps: stamps(every: 50, count: 21))
+        XCTAssertEqual(jumped.changingPairs, 1)
+        XCTAssertEqual(jumped.verdict, .oneShot,
+                       "一次跳变的 coverage 就是一个采样 ÷ 整卷 ≈ \(String(format: "%.3f", jumped.coverage)) ⇒ 不许算循环")
+        XCTAssertLessThan(jumped.coverage, 0.2)
+        // ③ **同一段物理循环、两种采样密度 ⇒ 判定必须一样，而旧那把"数帧对"的尺必须给出两个数**
+        //    这一格是整轮的性质所在：它钉的不是"今天对不对"，是"这把尺跟不跟着网格走"。
+        let fine = Self.loopShape(fractions: [Double](repeating: 0.02, count: 20),
+                                  stamps: stamps(every: 50, count: 21))
+        let coarseFractions = [Double](repeating: 0.02, count: 9)
+        let coarse = Self.loopShape(fractions: coarseFractions, stamps: stamps(every: 115, count: 10))
+        XCTAssertEqual(fine.verdict, coarse.verdict,
+                       "50ms 与 115ms 两种采样下，同一种『一直在变』被判成了两样 ⇒ 判据吃的还是帧数")
+        // 第一版这里写的是"coverage 允许差一点"（`abs(差) > 0`），那是句废话断言：
+        // 两档采样下两个数**都正好是 1.0**，于是它红在自己的空转上。
+        // 换成真正要钉的性质：**coverage 是时间之比，因此与帧数无关**。
+        XCTAssertEqual(fine.coverage, coarse.coverage, accuracy: 0.05,
+                       "同一种『一直在变』在 50ms 与 115ms 两种采样下 coverage 差开了 ⇒ 这个量还是跟着网格走")
+        XCTAssertNotEqual(Self.transitionFrameCount([Double](repeating: 0.02, count: 20)),
+                          Self.transitionFrameCount(coarseFractions),
+                          "旧那把尺在两档采样上必须给出**不同**的个数 —— 这一格钉的是『换尺的理由』本身："
+                              + "R80 的 CI 上本机 23 对、runner 2 对，而两边峰值都是 0.015")
+        // ④ 整卷没拍到任何东西 ⇒ notMoving（既不是产品没循环，也不是环境，是"没量到"）
+        let dead = Self.loopShape(fractions: [Double](repeating: 0.0, count: 20),
+                                  stamps: stamps(every: 50, count: 21))
+        XCTAssertEqual(dead.verdict, .notMoving)
+        // ⑤ 两头各留一段静止：coverage 的分母是**整卷**，不是"变化段的长度"
+        var head = [Double](repeating: 0.0, count: 20)
+        for index in 0..<3 { head[index] = 0.02 }
+        var tail = [Double](repeating: 0.0, count: 20)
+        for index in 17..<20 { tail[index] = 0.02 }
+        let headShape = Self.loopShape(fractions: head, stamps: stamps(every: 50, count: 21))
+        let tailShape = Self.loopShape(fractions: tail, stamps: stamps(every: 50, count: 21))
+        XCTAssertEqual(headShape.coverage, tailShape.coverage, accuracy: 0.02,
+                       "同样三对在变，摆在卷首与卷尾读出两个 coverage ⇒ 分母不是整卷时长（那是位置偏差，不是形状）")
+        XCTAssertLessThan(headShape.coverage, LoopShape.minCoverage,
+                          "只演了开头三对就该判『没一直动』；它现在 coverage=\(String(format: "%.3f", headShape.coverage))")
+        // ⑥ 处置的三支 + 证人坏掉那一支
+        // ⑥ **时刻与读数对不上**（本轮自己犯过的错，见 U-155：探针把时刻存在自己身上，
+        //    后一卷覆盖前一卷）⇒ 整卷算"没量到"，不许算"只动了一下"。
+        //    这一格钉两件事：①`stamps.count == fractions.count + 1` 这条**结构等式**
+        //    （少一根算不出，多一根就是别卷的）；②处置方向 —— "没量到"点名 not-run，
+        //    "只动了一下"判产品红，两者不能靠一个残缺的形状互相冒名。
+        let mismatched = Self.loopShape(fractions: [Double](repeating: 0.02, count: 20),
+                                        stamps: stamps(every: 50, count: 20))
+        XCTAssertEqual(mismatched.verdict, .notMoving,
+                       "少一根时刻就算不出 coverage，此时若仍然把峰值报出去，判定会写成 `.oneShot` ⇒ "
+                           + "尺自己的前提故障被冒充成『产品只动了一下』。这一格现在读到 "
+                           + "coverage=\(String(format: "%.3f", mismatched.coverage)) 峰值=\(String(format: "%.4f", mismatched.peak))")
+        XCTAssertEqual(Self.loopAdjudication(product: mismatched.verdict, rateWitness: .looping,
+                                             coarseWitness: .looping), .productRed,
+                       "形状尺红的方向也要有对照：前提故障被判成 `notMoving` 之后，"
+                           + "产品这一侧仍然是红（不是被赦免）—— 这一格钉的是『它没有悄悄变绿』")
+        //    等式是双向的：**多一根**时刻同样算"没量到"（那多半是别的一卷的尾巴）。
+        let extraStamp = Self.loopShape(fractions: [Double](repeating: 0.02, count: 20),
+                                        stamps: stamps(every: 50, count: 22))
+        XCTAssertEqual(extraStamp.verdict, .notMoving,
+                       "时刻比帧对多一根也被放行 ⇒ 结构等式退回了『大概对得上』，"
+                           + "而 U-155 那一族恰恰是两卷长度差不多的时候最不容易发现")
+        // ⑦ 处置：产品形状 × **两颗**证人形状。等节拍那颗决定"产品红 / 环境不行"，
+        //    粗节拍那颗只决定"签字的人来没来上班"。
+        XCTAssertEqual(Self.loopAdjudication(product: .looping, rateWitness: .notMoving, coarseWitness: .notMoving), .ok,
+                       "产品在动就是绿，不需要证人签字（绿不需要借口）")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping, coarseWitness: .looping), .productRed,
+                       "与产品同节拍、同对比度、同画法的证人能一直动，而产品那份没动 ⇒ 这句是产品的责任，不许推给环境")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .oneShot, coarseWitness: .looping), .notRunEnvironment,
+                       "等节拍证人也只能动一下 ⇒ 这台机器今天带不动那一档节拍的常驻循环，判产品没有依据")
+        // 这一格是 R82 把单颗证人换成两颗时**唯一新增**的性质：
+        // 等节拍那颗整卷没拍到东西（比如产品的对比度掉到看不见，把证人一起带走了），
+        // 也不许翻成 `.productRed` —— 那是拿证人的瞎判产品的罪。粗节拍那颗还在上班，所以也不算空支票。
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .notMoving, coarseWitness: .looping), .notRunEnvironment,
+                       "等节拍证人整卷没拍到东西时，不许判产品红：它瞎了不代表产品没动")
+        XCTAssertEqual(Self.loopAdjudication(product: .oneShot, rateWitness: .looping, coarseWitness: .notMoving), .witnessDead,
+                       "连高对比、粗节拍那颗都没拍到任何变化时，不许走『环境看不见』那一支 —— 那是一张空支票（R68 那一族）")
+        emit("LOOP_TRUTH_TABLE 均匀=looping 跳变=oneShot 两档采样=同判定 空=notMoving 头尾=同 coverage "
+            + "时刻少一根/多一根=notMoving 处置=5 格")
+    }
+
+    /// R82：等节拍那颗证人**必须仍然等于产品那几颗数** —— 它写死在测试里（不能被被告牵着改），
+    /// 而它的合法性又完全来自"等于产品"。这两件事只能靠一条会红的钉子缝合。
+    ///
+    /// 这一条不判产品，判的是"证人还有没有资格替产品签字"：产品改了节拍或对比度而证人没跟上，
+    /// `.productRed` 那句就退回成"有一台 20Hz 的机器带得动循环"那种弱证词。
+    func testTheLoopWitnessStillMirrorsTheProductLoop() throws {
+        let witness = GradientTickView.productRate()
+        let productStep = SkeletonMotion.fraction(
+            secondsPerCycle: MotionCatalog.duration(for: .skeletonSweep))
+        XCTAssertNotNil(productStep, "产品的 `fraction(secondsPerCycle:)` 返回 nil ⇒ 扫光那条时钟根本没接上，"
+                        + "证人无从镜像，先修产品")
+        XCTAssertEqual(witness.tickSeconds, SkeletonMotion.tickInterval, accuracy: 1e-12,
+                       "证人的节拍与产品分家了（证人 \(witness.tickSeconds)s / 产品 \(SkeletonMotion.tickInterval)s）⇒ "
+                           + "它证的是『这台机器带得动 N Hz』而不是『带得动产品那一档』，`.productRed` 这句就说过头了。"
+                           + "要么改证人跟上产品，要么把产品改回这一档 —— 不许只改这条断言的期望值")
+        XCTAssertEqual(Double(witness.stepPerTick), Double(productStep ?? 0), accuracy: 1e-12,
+                       "证人每拍推进量与产品分家 ⇒ 两台机器读到的『一直在动』不再是同一件事："
+                           + "推进量决定每个采样间隔里亮带走多远，那正是 coverage 的分母吃的东西")
+        XCTAssertEqual(witness.highlightLift,
+                       SkeletonMotion.highlightOpacity - SkeletonMotion.baseOpacity, accuracy: 1e-12,
+                       "证人的亮带抬升与产品分家 ⇒ 对比度不同的两颗视图不能互相当反证："
+                           + "产品那一份抬 0.12（0.06→0.18），R81 之前那颗证人抬 0.39（0.06→0.45），"
+                           + "而同一台 runner 上产品 2 对在变、那颗证人 13 对在变 —— 抬升差 3 倍正是嫌疑之一")
+        // 抬升本身还得过产品自己那条地板，否则镜像过来的是个"本来就看不见"的证人。
+        XCTAssertGreaterThanOrEqual(witness.highlightLift, SkeletonMotion.minimumHighlightLift,
+                                    "镜像过来的抬升低于产品自己声明的最小可见抬升 ⇒ 这颗证人天生就瞎，"
+                                        + "它签字的『环境看不见』那一支等于没人签")
+        emit("LOOP_WITNESS_MIRROR 节拍=\(String(format: "%.1f", witness.tickSeconds * 1000))ms "
+            + "每拍推进=\(String(format: "%.4f", Double(witness.stepPerTick))) "
+            + "抬升=\(String(format: "%.2f", witness.highlightLift)) 三项全等于产品 ⇒ 证人还在问同一句话")
+    }
+
+    /// R82 / BACKLOG 110：分辨率那条闸门改吃 **P75**，一个离群样本不许翻掉它。
+    func testTheClockGateUsesARobustStatisticNotTheSingleWorstSample() throws {
+        // 本机三遍实测：`detail-kind-change` 的事件内最粗在 61ms 与 81ms 之间跳，
+        // 而那条线是 0.5×声明(160ms)=80ms ⇒ 同一份代码在同一台机器上一臂红、一臂 not-run。
+        let cleanRun: [Double] = [50, 51, 52, 53]
+        let outlierRun: [Double] = [50, 51, 52, 81]
+        XCTAssertEqual(Self.percentileMilliseconds(cleanRun, 0.75), 52, accuracy: 0.01)
+        XCTAssertEqual(Self.percentileMilliseconds(outlierRun, 0.75), 52, accuracy: 0.01,
+                       "多了一个 81ms 的离群样本，P75 不该跟着跳 ⇒ 它才配当闸门")
+        XCTAssertGreaterThan(outlierRun.max()!, cleanRun.max()!,
+                             "而最大值确实会跳 —— 这一格钉的是『旧闸门为什么会翻脸』")
+        // 同一个 elapsed / 同一个声明，两种采样历史必须给同一个判定
+        let declared = 160.0
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 198,
+                                        clockIntervalMilliseconds: Self.percentileMilliseconds(cleanRun, 0.75),
+                                        declaredDurationMilliseconds: declared, changedFrames: 3),
+                       Self.judgeMotion(elapsedMilliseconds: 198,
+                                        clockIntervalMilliseconds: Self.percentileMilliseconds(outlierRun, 0.75),
+                                        declaredDurationMilliseconds: declared, changedFrames: 3),
+                       "一次 81ms 的抓帧停顿就把这一臂从『判得出』推到『这台机器看不见』⇒ 判的是时钟，不是产品")
+        // 边界仍然成对：P75 真变粗了就必须报 clockTooCoarse（不许把闸门偷偷放宽）
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 198, clockIntervalMilliseconds: 81,
+                                        declaredDurationMilliseconds: declared, changedFrames: 3),
+                       .clockTooCoarse, "81ms > 0.5×160ms ⇒ 仍然该报『切不出过程』，这条线没被移动")
+        XCTAssertEqual(Self.judgeMotion(elapsedMilliseconds: 198, clockIntervalMilliseconds: 80,
+                                        declaredDurationMilliseconds: declared, changedFrames: 3), .transition,
+                       "正好等于 0.5×声明 的必须还在中间档里判得出（`<=` 被写成 `<` 就红在这里）")
+        XCTAssertEqual(Self.percentileMilliseconds([], 0.75), -1, "空样本必须读 −1（没量到不等于 0ms）")
+        XCTAssertEqual(Self.percentileMilliseconds([44], 0.75), 44, "只有一个样本时它就是答案")
+        emit("CLOCK_GATE_P75 干净=[50 51 52 53] 离群=[50 51 52 81] 两个 P75 相同而最大值差 28ms")
+    }
+
     func testTransitionsAreActuallyRunning() throws {
         try skipUnlessEnabledAndCapable()
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
@@ -1511,7 +1815,14 @@ final class MotionFilmstripTests: XCTestCase {
             let fractions = Self.deltas(frames)
             let span = Self.transitionFrameCount(fractions)
             let elapsed = Self.changedSpanElapsedMilliseconds(stamps: film.motionStamps, fractions: fractions)
-            let worstInRun = Self.worstIntervalInsideChangedRun(stamps: film.motionStamps, fractions: fractions)
+            // R82 / BACKLOG 110：这一段交**两个**统计量 —— 最粗那一次只当读数，
+            // 决定"这把尺切不切得出过程"的换成 **P75**。理由不是审美，是三次本机读数：
+            // `detail-kind-change` 的事件内最粗在 61ms 与 81ms 之间跳，而那条线是 0.5×160=80ms
+            // ⇒ 同一份代码在同一台机器上一臂红、一臂 not-run，而中位数一直是 50–51ms。
+            // 一个单样本统计当闸门，判的就是采样相位，不是产品。
+            let runGaps = Self.intervalsInsideChangedRun(stamps: film.motionStamps, fractions: fractions)
+            let worstInRun = runGaps.max()
+            let clockInRun = runGaps.isEmpty ? -1 : Self.percentileMilliseconds(runGaps, 0.75)
             // 每个场景都进 MOTION_SUMMARY（哪怕这一条今天判不了）：CI 那一步与它的自测夹具
             // 都按"三个键都在"的形状读，少一个键会让下游把"没测"读成"测了且为 0"。
             rows.append((scenario.name, span))
@@ -1550,25 +1861,27 @@ final class MotionFilmstripTests: XCTestCase {
             emit("MOTION \(scenario.name) frames=\(frames.count) "
                 + "声明=\(Int(scenario.declaredDurationMilliseconds))ms 整卷中位=\(interval)ms "
                 + "事件内最粗=\(worstInRun.map { String(format: "%.0f", $0) } ?? "无")ms "
+                + "事件内P75=\(clockInRun < 0 ? "无" : String(format: "%.0f", clockInRun))ms "
                 + "变化段时长=\(elapsed.map { String(format: "%.0f", $0) } ?? "无")ms 过渡帧数=\(span) "
                 + "时刻ms=[\(gaps.map(String.init).joined(separator: " "))] "
                 + "逐帧=[\(fractions.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
             writeStrip(scenario.name, frames)
-            guard let elapsed, let worstInRun else {
+            guard let elapsed, let worstInRun, clockInRun > 0 else {
                 notRun.append(scenario.name)
                 emit("MOTION_NOT_RUN=no-changed-run \(scenario.name)：读不出「变化段」的时长 ⇒ 既不判红也不判绿")
                 continue
             }
             switch Self.judgeMotion(elapsedMilliseconds: elapsed,
-                                    worstIntervalMilliseconds: worstInRun,
+                                    clockIntervalMilliseconds: clockInRun,
                                     declaredDurationMilliseconds: scenario.declaredDurationMilliseconds,
                                     changedFrames: span) {
             case .clockTooCoarse:
                 notRun.append(scenario.name)
-                emit("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段最粗 \(String(format: "%.0f", worstInRun))ms "
-                    + "一帧、整段过渡只有 \(Int(scenario.declaredDurationMilliseconds))ms（门槛 0.3×声明）⇒ "
+                emit("MOTION_NOT_RUN=clock-coarse-in-window \(scenario.name)：事件那一段 P75 采样 "
+                    + "\(String(format: "%.0f", clockInRun))ms（最粗那一次 \(String(format: "%.0f", worstInRun))ms）、"
+                    + "整段过渡只有 \(Int(scenario.declaredDurationMilliseconds))ms（门槛 0.3×声明）⇒ "
                     + "这把尺在过渡正在演的那一段切不出「过程」这个概念，既不判红也不判绿"
-                    + Self.grabAttributionLabel(worstIntervalMilliseconds: worstInRun,
+                    + Self.grabAttributionLabel(clockIntervalMilliseconds: worstInRun,
                                                 worstGrabMilliseconds: film.worstGrabMilliseconds))
             case .jump:
                 // R75 / BACKLOG 104 的答案在这一格。一条 `.jump` 是**产品断言**，而它站在一条时长读数上；
@@ -1663,7 +1976,7 @@ final class MotionFilmstripTests: XCTestCase {
         // `开A [345–612@0.226/粗260] 帧数=2 整卷中位=8ms` —— **一段连续的**变化，
         // 只是段内有一次 **260ms 的抓帧空档**（首次布局整块日历时主线程被占住，抓帧器挤不进去）。
         // 也就是说 266ms 不是"过程演了 266ms"，也不是"两波被并起来"，而是**钟在过程中间停了**。
-        // （本轮还犯过一次可笑的错：我在**还没读到 `worstIntervalMilliseconds` 之前**，
+        // （本轮还犯过一次可笑的错：我在**还没读到 `clockIntervalMilliseconds` 之前**，
         //  就往注释里写了"约 130ms"——那是拿 266 ÷ 2 估的。实测是 260ms，一次空档而不是两次。
         //  同一条规矩的第三个面：注释里的数也只能从读数来。）
         // 连续段那把尺仍然要（它管的是"不许把无关的两波算成一段"），
@@ -1769,9 +2082,9 @@ final class MotionFilmstripTests: XCTestCase {
                 // R55：这一格是本机那 260ms 空档的现场，两臂各自归因一次。
                 // 只给一臂的话，"是抓帧还是主线程"这个问题就又变回靠一句注释回答了。
                 // 打在**同一行**：CI 那一步 grep 的是 `MOTION_NOT_RUN`，换行就等于把归因挤出可读范围。
-                + " ｜A 臂" + Self.grabAttributionLabel(worstIntervalMilliseconds: worstA,
+                + " ｜A 臂" + Self.grabAttributionLabel(clockIntervalMilliseconds: worstA,
                                                         worstGrabMilliseconds: onFilmA.worstGrabMilliseconds)
-                + " ｜B 臂" + Self.grabAttributionLabel(worstIntervalMilliseconds: worstB,
+                + " ｜B 臂" + Self.grabAttributionLabel(clockIntervalMilliseconds: worstB,
                                                          worstGrabMilliseconds: onFilmB.worstGrabMilliseconds))
         case .visibleToThisRuler:
             XCTFail("两遍都说「还在变」覆盖的时长比对照臂长出一个采样间隔以上 ⇒ 这把尺现在**看得见**这条淡入 ⇒ "
@@ -2637,7 +2950,7 @@ final class MotionFilmstripTests: XCTestCase {
         // 不用 `XCTAssertEqual(枚举, 枚举)`：97 − 87.9 在二进制里是 9.100000000000009，
         // 拿它和字面量 9.1 判等会红得让人以为是逻辑错了（本仓库"像素容差为 0 时抗锯齿淹没分类器"同一族）。
         func attribute(_ interval: Double, _ grab: Double) -> (String, Double, Double) {
-            switch Self.grabAttribution(worstIntervalMilliseconds: interval, worstGrabMilliseconds: grab) {
+            switch Self.grabAttribution(clockIntervalMilliseconds: interval, worstGrabMilliseconds: grab) {
             case .unknown: return ("unknown", .nan, .nan)
             case .probeBound(let ratio, let over): return ("probeBound", ratio, over)
             case .grabDominates(let ratio, let over): return ("grabDominates", ratio, over)
@@ -2681,23 +2994,23 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(attribute(120, 20).1, 20.0 / 120.0, accuracy: 0.0001)
         XCTAssertEqual(attribute(120, 20).2, 100, accuracy: 0.0001)
         // ⑨ 令牌必须是英文：这一行是 CI 那一步要 grep 的，中文短语会被连词切半。
-        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 260, worstGrabMilliseconds: 255.2)
+        XCTAssertTrue(Self.grabAttributionLabel(clockIntervalMilliseconds: 260, worstGrabMilliseconds: 255.2)
                         .contains("归因=probe-grab-bound"))
-        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+        XCTAssertTrue(Self.grabAttributionLabel(clockIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
                         .contains("归因=grab-dominates"))
-        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 120, worstGrabMilliseconds: 20)
+        XCTAssertTrue(Self.grabAttributionLabel(clockIntervalMilliseconds: 120, worstGrabMilliseconds: 20)
                         .contains("归因=not-the-grab"))
-        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 120, worstGrabMilliseconds: -1)
+        XCTAssertTrue(Self.grabAttributionLabel(clockIntervalMilliseconds: 120, worstGrabMilliseconds: -1)
                         .contains("归因=grab-unmeasured"))
         // ⑩ 比例要**打在日志里**：分档是我的判读，`解释=NN%` 才是能复核的数。
-        XCTAssertTrue(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+        XCTAssertTrue(Self.grabAttributionLabel(clockIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
                         .contains("解释=91%"),
                       "标签里没了比例 ⇒ 读日志的人只能信我的分档，没法自己看 87.9/97")
         // ⑪ 归因不许改 not-run 的**令牌**：`clock-coarse-in-window` 是登记表里的理由，
         //    换掉它会让覆盖率地板报 BAD_REASON（那是我们想要的"新形状"，不是本轮的意图）。
         //    这一格钉的是：归因只能**追加**在结论后面，不能自己再打一个 `MOTION_NOT_RUN=` 前缀
         //    —— 闸门每行只取第一个匹配，多打一个就会把真理由顶掉。
-        XCTAssertFalse(Self.grabAttributionLabel(worstIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
+        XCTAssertFalse(Self.grabAttributionLabel(clockIntervalMilliseconds: 97, worstGrabMilliseconds: 87.9)
                         .contains("MOTION_NOT_RUN"),
                        "归因串里出现了 not-run 的前缀 ⇒ 它会和理由行抢同一个解析位")
     }
@@ -4123,24 +4436,119 @@ final class MotionFilmstripTests: XCTestCase {
     /// 这里再框一块，框错的代价反而是把一条真的在扫的动画读成"没动" ——
     /// 第一版就是这样（条带位置与分带的 y 翻转对不上，读到 0.000，
     /// 差点把结论写成"这把尺看不见渐变"，见 `testTheRulerSeesAStateDrivenSwiftUIUpdate` 的对照臂）。
+    /// R82 / BACKLOG 113：这条判据不再数帧对。
+    ///
+    /// 换掉的理由是 R80 的 CI 读数，不是审美：runner 那一遍 `变化帧对=2 / 帧数=23 / 采样≈115ms`，
+    /// 本机是 `23 / 48 / 53ms`，而**两边峰值都是 0.015**。
+    /// 也就是说"几对在变"这一列量的是这台机器多久拍一张，不是这条循环有没有在跑 ——
+    /// 与 R47 把淡入从帧数换成时长轴是同一件事的下半场（BACKLOG 110 说的"判据不许押在采样上"，
+    /// 那一族在这里的形状是"押在帧数上"）。
+    ///
+    /// 现在的判据读 **coverage**（变化覆盖了整卷时长的几成，时间之比 ⇒ 与帧数无关），
+    /// 并且带**两颗同画法证人**（`GradientTickView` 的两个参数档），因为 R81 的 CI 把一颗打回了：
+    /// 那一遍 runner 上产品读 `变化帧对=2 / 帧数=27 / 峰值=0.015`，而唯一那颗证人（20Hz、亮带抬 0.39）
+    /// 读 `帧数=21 峰值=0.029 变化帧对=13` —— 如果就这么判 `.productRed`，那句说过头了：
+    /// 两颗之间差着**节拍**（20Hz vs 产品 30Hz）和**对比度**（抬 0.39 vs 抬 0.12），
+    /// "这台机器带得动 20Hz 的高对比循环"并不蕴含"带得动产品那一档"。
+    /// 所以 R68 那条"证人必须与判据问同一句话"在这里落成一个具体的数：**等节拍**。
+    ///
+    /// * 等节拍证人（30Hz、抬 0.12，四个数由 `testTheLoopWitnessStillMirrorsTheProductLoop` 钉住等于产品）
+    ///   决定"产品红 vs 环境不行"那一分界。
+    /// * 粗节拍证人（20Hz、抬 0.45）只守最硬那支：它都没拍到任何变化 ⇒ 签字的人没来上班 ⇒ 红。
+    ///
+    /// `requireObservableMotion(.gradient)` 问的是弱一题（"看不看得见一次渐变变化"），
+    /// 那一题 runner 是"看得见"，所以它放行了判据，却拦不住一条**因为采样节拍**而红的判据。
+    ///
+    /// 处置：产品在跑 ⇒ 绿；等节拍证人在跑而产品没跑 ⇒ **红**；等节拍证人也没跑 ⇒ 点名 not-run；
+    /// 连粗节拍证人整卷都没拍到东西 ⇒ 证人坏了，红（否则"环境"这一支永远有人签字）。
     func testSkeletonSweepActuallySweeps() async throws {
         try skipUnlessEnabledAndCapable()
         let probe = SkeletonProbe()
-        let runningFrames = probe.record(reduceMotion: false)
-        let running = Self.deltas(runningFrames)
-        let interval = Self.sampleIntervalMilliseconds(probe.lastStamps)
-        let stopped = Self.deltas(probe.record(reduceMotion: true))
-        emit("MOTION_SHIMMER 扫 帧数=\(runningFrames.count) 变化帧对=\(Self.transitionFrameCount(running)) 峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms")
-        emit("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) 峰值=\(String(format: "%.3f", Self.peak(stopped)))")
-        // 骨架扫光属于**渐变几何**那一类 —— 必须问同一类的对照臂，
-        // 否则 runner 看得见布局位移、看不见渐变位移，会把这条判成产品坏了（run 38259612264 就是这个形状）。
-        try await requireObservableMotion(.gradient)
-        XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
-                             "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
-        XCTAssertGreaterThanOrEqual(Self.transitionFrameCount(running), Self.minimumTransitionFrames,
-                                    "只读到 \(Self.transitionFrameCount(running)) 对在变 ⇒ 那不是循环，是一次跳变")
+        // 一卷就是**一对**（帧 + 它们的时刻）。R82 之前这里写的是 `probe.lastStamps`，
+        // 而后一卷会把它覆盖掉 —— 见 `GrabbedFilm` 的注释与 U-155。
+        let runningFilm = probe.record(reduceMotion: false)
+        let stoppedFilm = probe.record(reduceMotion: true)
+        let running = Self.deltas(runningFilm.frames)
+        let interval = Self.sampleIntervalMilliseconds(runningFilm.stamps)
+        let stopped = Self.deltas(stoppedFilm.frames)
+        let shape = Self.loopShape(fractions: running, stamps: runningFilm.stamps)
+        let stoppedShape = Self.loopShape(fractions: stopped, stamps: stoppedFilm.stamps)
+        let rateWitness = Self.loopWitness(.gradientAtProductRate)
+        let coarseWitness = Self.loopWitness(.gradient)
+        // 结论行在所有闸门之前（R53 那一课：抛出去之后这行就是唯一的痕迹）。
+        emit("MOTION_SHIMMER 扫 帧数=\(runningFilm.frames.count) 变化帧对=\(Self.transitionFrameCount(running)) "
+            + "峰值=\(String(format: "%.3f", Self.peak(running))) 采样≈\(interval)ms "
+            + "coverage=\(String(format: "%.3f", shape.coverage))(地板 \(String(format: "%.2f", LoopShape.minCoverage))) "
+            + "记录时长=\(String(format: "%.0f", shape.recordedMilliseconds))ms 判定=\(Self.loopLabel(shape.verdict))")
+        emit("MOTION_SHIMMER 停 变化帧对=\(Self.transitionFrameCount(stopped)) "
+            + "峰值=\(String(format: "%.3f", Self.peak(stopped))) "
+            + "coverage=\(String(format: "%.3f", stoppedShape.coverage))")
+        emit("MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12，与产品同数字) 帧对=\(rateWitness.pairs) "
+            + "在变=\(rateWitness.changingPairs) 峰值=\(String(format: "%.3f", rateWitness.peak)) "
+            + "coverage=\(String(format: "%.3f", rateWitness.coverage)) 判定=\(Self.loopLabel(rateWitness.verdict))")
+        emit("MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45，只签字'看得见这种画法') 帧对=\(coarseWitness.pairs) "
+            + "在变=\(coarseWitness.changingPairs) 峰值=\(String(format: "%.3f", coarseWitness.peak)) "
+            + "coverage=\(String(format: "%.3f", coarseWitness.coverage)) 判定=\(Self.loopLabel(coarseWitness.verdict))")
+        // 本轮的真实看图：这条扫光**第一次有条带图可看**（以前只有数字与帧数）。
+        // 放在所有闸门之前 —— 判据红了也要留下一张能看的。
+        writeStrip("skeleton-sweep", Array(runningFilm.frames.prefix(24)))
+        emit("MOTION_SHIMMER_STRIP 前 24 帧排成条带（六列）⇒ 眼睛判的是『亮带一路扫过去』，"
+            + "这把尺判的是 coverage，两者不许互相替")
+        // 这卷**真的抓了这么久**的钉子：coverage 是时间之比，卷长错了整个比就错了。
+        // 它**不**负责"时刻与读数同一卷"—— 那一半今天由类型保证（`GrabbedFilm`，U-155：
+        // M443 第一版把两卷的时刻互换，四条判据一条都没红，说明断言拦不住等长的两卷）。
+        XCTAssertEqual(shape.recordedMilliseconds, loopFilmSeconds * 1000, accuracy: loopFilmSeconds * 250,
+                       "产品那卷的记录时长不是 \(String(format: "%.0f", loopFilmSeconds * 1000))ms 而是 "
+                           + "\(String(format: "%.0f", shape.recordedMilliseconds))ms ⇒ 这些时刻不属于这卷帧对"
+                           + "（卷长 ≠ 抓帧时长 ⇒ 中间有别的东西占住了主线程，或探针提前收卷）。"
+                           + "coverage 是个时间之比，分母错了整个比就是假的，判定无论红绿都没有依据")
+        switch Self.loopAdjudication(product: shape.verdict,
+                                     rateWitness: rateWitness.verdict,
+                                     coarseWitness: coarseWitness.verdict) {
+        case .ok:
+            break
+        case .productRed:
+            XCTFail("骨架扫光只覆盖了整卷 \(String(format: "%.3f", shape.coverage)) 的时间（\(shape.changingPairs)/\(shape.pairs) 对在变），"
+                    + "而**同一颗形状出口、同一条三段渐变、同一档节拍、同一档推进量、同一档对比度、同一种 `Timer.publish` 驱动**，"
+                    + "只差『视图归产品还是归测试』的那一颗证人今天覆盖了 "
+                    + "\(String(format: "%.3f", rateWitness.coverage)) ⇒ 这台机器带得动产品那一档节拍的常驻循环，"
+                    + "是产品这一份没在跑：查 `SkeletonPreviewView` 那条 `Timer.publish`"
+                    + "（`SkeletonMotion.tickInterval`）与 `MotionCatalog.duration(for: .skeletonSweep)` 的接线")
+        case .notRunEnvironment:
+            emit("MOTION_NOT_RUN=loop-clock-not-sustainable-at-product-rate 产品 coverage=\(String(format: "%.3f", shape.coverage))、"
+                + "等节拍证人 coverage=\(String(format: "%.3f", rateWitness.coverage))（30Hz / 抬升 0.12 / 同一种画法）、"
+                + "粗节拍证人 coverage=\(String(format: "%.3f", coarseWitness.coverage)) ⇒ "
+                + "这台机器今天带不动产品那一档节拍的常驻循环，"
+                + "这一条不能推成『产品的扫光没跑』，也不能推成『它跑了』（本机 2× 那一遍 coverage 0.98 才是判它的那台机器）")
+        case .witnessDead:
+            XCTFail("连**高对比、粗节拍**那颗证人整卷都没拍到任何变化（峰值 \(String(format: "%.4f", coarseWitness.peak))）⇒ "
+                    + "给『环境看不见』签字的那个人今天没来上班。这条必须红：否则 .notRunEnvironment 那一支"
+                    + "从此是一张空支票（R68 的 M366 同一族）")
+        }
+        // 减弱动态那一档：必须**真的停住**（这一臂反过来证明上面读到的变化确实是扫光，不是噪声）。
         XCTAssertLessThan(Self.peak(stopped), Self.minimumVisibleChange,
                           "减弱动态那一档还在变 ⇒ 常驻动画没被门住（HIG 与 WCAG 2.3.3 要的就是这一条）")
+        // 峰值地板留着：coverage 只在"看得见东西在动"的前提下才有意义。
+        XCTAssertGreaterThan(Self.peak(running), Self.minimumVisibleChange,
+                             "该扫的那一档什么都没变 ⇒ 扫光没落地（先看上面那行的帧数与尺寸，0 帧和 0 变化是两种病）")
+    }
+
+    /// 两颗证人的卷子与产品那卷**同一个时长**（`loopFilmSeconds`，文件里那个全局常量）：
+    /// 窗口不同长的话，"带不动循环"与"带不动 2.0 秒内的循环"是两句话。
+    private static func loopWitness(_ klass: MotionClass) -> LoopShape {
+        if let cached = loopWitnessCache[klass] { return cached }
+        let film = StateTickProbe().record(motionClass: klass, seconds: loopFilmSeconds)
+        let shape = loopShape(fractions: deltas(film.frames), stamps: film.stamps)
+        loopWitnessCache[klass] = shape
+        return shape
+    }
+
+    static func loopLabel(_ verdict: LoopVerdict) -> String {
+        switch verdict {
+        case .notMoving: return "没拍到变化"
+        case .looping: return "一直在动"
+        case .oneShot: return "只动了一下"
+        }
     }
 
     /// `NSTableView` 的行动画只在**激活的 App** 里跑（实测：同一份代码 active 时 11 对在变、
@@ -4171,21 +4579,35 @@ final class MotionFilmstripTests: XCTestCase {
     /// 问不出来就 `MOTION_NOT_RUN=` + skip，而不是红，也不是绿；数字永远先打出来。
     enum MotionClass {
         case layout      // 换内容 / 平移：`TickCounterView`
-        case gradient    // 只动 `LinearGradient` 的端点：`GradientTickView`
+        case gradient    // 只动 `LinearGradient` 的端点：`GradientTickView`（20Hz、高对比那一档）
+        /// 与骨架扫光**同一档节拍、同一组对比度**的那一颗（R82 / BACKLOG 113）。
+        /// 它存在的唯一理由：证人必须与它作证的判据问同一句话（R68），
+        /// 而那句里有"多少赫兹"这一项。
+        case gradientAtProductRate
+
+        /// 读数与 `MOTION_NOT_RUN=` 的名字都从这里取，别再手写三元表达式
+        /// （加一个 case 而忘了改三元，编译器不会响，名字会串到别的臂上）。
+        var marker: String {
+            switch self {
+            case .layout: return "layout"
+            case .gradient: return "gradient"
+            case .gradientAtProductRate: return "gradient-at-product-rate"
+            }
+        }
     }
 
     private func requireObservableMotion(_ klass: MotionClass) async throws {
-        let marker = klass == .layout ? "layout" : "gradient"
+        let marker = klass.marker
         if let cached = Self.observableCache[klass] {
             try XCTSkipIf(!cached, "MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
             return
         }
-        let frames = StateTickProbe().record(motionClass: klass)
-        let control = Self.deltas(frames)
+        let film = StateTickProbe().record(motionClass: klass)
+        let control = Self.deltas(film.frames)
         let observable = Self.peak(control) > Self.minimumVisibleChange
         Self.observableCache[klass] = observable
         if !observable {
-            emit("MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control))) 帧数=\(frames.count)")
+            emit("MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion 对照臂峰值=\(String(format: "%.4f", Self.peak(control))) 帧数=\(film.frames.count)")
         }
         try XCTSkipIf(!observable, "MOTION_NOT_RUN=runner-cannot-observe-\(marker)-motion：对照臂读不到任何位移 ⇒ 环境测不了，不判产品")
     }
@@ -4195,12 +4617,12 @@ final class MotionFilmstripTests: XCTestCase {
     /// 报 skip（那是环境），而不是红；渐变那一臂只报数 —— 它看不见是**事实**，不是失败。
     func testTheRulerSeesAStateDrivenSwiftUIUpdate() async throws {
         try skipUnlessEnabledAndCapable()
-        let frames = StateTickProbe().record(motionClass: .layout)
-        let fractions = Self.deltas(frames)
-        emit("MOTION_CONTROL 计数方块 帧数=\(frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
+        let film = StateTickProbe().record(motionClass: .layout)
+        let fractions = Self.deltas(film.frames)
+        emit("MOTION_CONTROL 计数方块 帧数=\(film.frames.count) 峰值=\(String(format: "%.3f", Self.peak(fractions))) 变化帧对=\(Self.transitionFrameCount(fractions))")
         let gradient = StateTickProbe().record(motionClass: .gradient)
-        let gradientFractions = Self.deltas(gradient)
-        emit("MOTION_CONTROL 渐变端点 帧数=\(gradient.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
+        let gradientFractions = Self.deltas(gradient.frames)
+        emit("MOTION_CONTROL 渐变端点 帧数=\(gradient.frames.count) 峰值=\(String(format: "%.3f", Self.peak(gradientFractions))) 变化帧对=\(Self.transitionFrameCount(gradientFractions))")
         let layoutObservable = Self.peak(fractions) > Self.minimumVisibleChange
         Self.observableCache[.layout] = layoutObservable
         Self.observableCache[.gradient] = Self.peak(gradientFractions) > Self.minimumVisibleChange
@@ -4559,11 +4981,11 @@ final class MotionFilmstripTests: XCTestCase {
         /// 这一档只回答"该先看哪里"，不回答"够不够" —— 具体还剩多少 ms 由日志里的数说。
         static let dominatesRatio: Double = 0.5
 
-        static func classify(worstIntervalMilliseconds: Double,
+        static func classify(clockIntervalMilliseconds: Double,
                              worstGrabMilliseconds: Double) -> GrabAttribution {
-            guard worstGrabMilliseconds >= 0, worstIntervalMilliseconds > 0 else { return .unknown }
-            let explained = worstGrabMilliseconds / worstIntervalMilliseconds
-            let overshoot = worstIntervalMilliseconds - worstGrabMilliseconds
+            guard worstGrabMilliseconds >= 0, clockIntervalMilliseconds > 0 else { return .unknown }
+            let explained = worstGrabMilliseconds / clockIntervalMilliseconds
+            let overshoot = clockIntervalMilliseconds - worstGrabMilliseconds
             if overshoot <= allowanceMilliseconds {
                 return .probeBound(explainedRatio: explained, overshootMilliseconds: overshoot)
             }
@@ -4573,26 +4995,26 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
-    static func grabAttribution(worstIntervalMilliseconds: Double,
+    static func grabAttribution(clockIntervalMilliseconds: Double,
                                 worstGrabMilliseconds: Double) -> GrabAttribution {
-        GrabAttribution.classify(worstIntervalMilliseconds: worstIntervalMilliseconds,
+        GrabAttribution.classify(clockIntervalMilliseconds: clockIntervalMilliseconds,
                                  worstGrabMilliseconds: worstGrabMilliseconds)
     }
 
     /// 归因怎么说进日志。**令牌必须是英文**（`probe-grab-bound` / `grab-dominates` / `not-the-grab` /
     /// `grab-unmeasured`）：中文短语里的连词与括号会被下游的 grep 切成两半，而这一行是 CI 那一步要读的东西。
     /// 比例也一起打出来：分档是我给的判读，而 `解释=NN%` 是可复核的数。
-    static func grabAttributionLabel(worstIntervalMilliseconds: Double,
+    static func grabAttributionLabel(clockIntervalMilliseconds: Double,
                                      worstGrabMilliseconds: Double) -> String {
         func percent(_ ratio: Double) -> String { String(format: "%.0f%%", ratio * 100) }
         func ms(_ value: Double) -> String { String(format: "%.0f", value) }
-        switch grabAttribution(worstIntervalMilliseconds: worstIntervalMilliseconds,
+        switch grabAttribution(clockIntervalMilliseconds: clockIntervalMilliseconds,
                                worstGrabMilliseconds: worstGrabMilliseconds) {
         case .unknown:
             return " 归因=grab-unmeasured（这一卷没量抓帧成本，或间隔≤0 ⇒ 不许把间隔赖给抓帧器，也不许说不是它）"
         case .probeBound(let explained, let over):
             return " 归因=probe-grab-bound（解释=\(percent(explained))：这一卷最慢一次抓帧 \(ms(worstGrabMilliseconds))ms，"
-                + "而间隔 \(ms(worstIntervalMilliseconds))ms 只比它多 \(ms(over))ms ⇒ 差值就是一次等 runloop 的时间）"
+                + "而间隔 \(ms(clockIntervalMilliseconds))ms 只比它多 \(ms(over))ms ⇒ 差值就是一次等 runloop 的时间）"
                 + " ⇒ 采样粗细由抓这一帧的调用决定；缩不省时间要由面积判据回答"
         case .grabDominates(let explained, let over):
             return " 归因=grab-dominates（解释=\(percent(explained))：抓帧 \(ms(worstGrabMilliseconds))ms 是大头，"
@@ -5280,6 +5702,27 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
     }
 }
 
+// MARK: - 一卷胶片：帧 + 它们的时刻（R82 / U-155）
+
+/// 一卷胶片**连同它的抓帧时刻**一起返回。
+///
+/// 为什么不让探针把 `lastStamps` 存在自己身上（原来就是这个形状）：两卷连拍时后一卷会覆盖
+/// 前一卷的时刻，于是"拿后一卷的时刻算前一卷的形状"这句话**写得出来**，而且写错的时候读起来
+/// 完全合理 —— R82 现场：产品那卷的形状吃了静止那卷的时刻，本机读到 coverage=0.000
+/// （两卷碰巧不等长），而等长时它读到 0.979，**断言一条都不红**
+/// （M443 第一版：把这句话改回 `probe.lastStamps`，四条判据全绿 ⇒ U-155）。
+/// 绑成一对之后，错的那句话在类型上拼不出来。
+/// （这个文件里**早就有**这个形状：主场景探针的 `Film(frames:stamps:triggerFrame:)`
+///   与淡入探针的 `FadeClockProbe.Run` —— 只有这两个手写探针把时刻存在了探针身上。）
+private struct GrabbedFilm {
+    let frames: [CGImage]
+    let stamps: [TimeInterval]
+}
+
+/// 常驻循环那三卷的**共同**抓帧时长（产品一卷 + 两颗证人各一卷，R82）。
+/// 只有一条性质要保证：**被判的那一段和当反证的那两段必须一样长**。
+private let loopFilmSeconds: TimeInterval = 2.5
+
 // MARK: - 骨架扫光探针
 
 /// 在离屏窗口里 host 一个 `SkeletonPreviewView`，连抓 30 帧。
@@ -5290,9 +5733,7 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
 /// `SkeletonMotionTests.testSkeletonIsWiredIntoTheDetailLoadingBranch` 钉住。
 @MainActor
 private final class SkeletonProbe {
-    private(set) var lastStamps: [TimeInterval] = []
-
-    func record(reduceMotion: Bool) -> [CGImage] {
+    func record(reduceMotion: Bool) -> GrabbedFilm {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -5310,13 +5751,14 @@ private final class SkeletonProbe {
         // 差点把结论写成"这把尺看不见渐变动画"，而实际是**胶片太短**。
         // 采样间隔仍然打印出来（`采样≈Nms`），但它只说明"每帧多久"，不说明"总共看了多久"。
         let grabber = Grabber(view: host, limit: 400)
-        let deadline = Date().addingTimeInterval(2.5)
+        // 与两颗证人**同一个时长**（`loopFilmSeconds`）：产品 2.5 秒、证人 2.0 秒的话，
+        // "这台机器带不动循环"就只覆盖了被判的那一段的一部分。
+        let deadline = Date().addingTimeInterval(loopFilmSeconds)
         while !grabber.finished, Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
             grabber.tick()
         }
-        lastStamps = grabber.stamps
-        return grabber.frames
+        return GrabbedFilm(frames: grabber.frames, stamps: grabber.stamps)
     }
 }
 
@@ -5347,15 +5789,23 @@ private struct TickCounterView: View {
 
 @MainActor
 private final class StateTickProbe {
-    func record() -> [CGImage] { record(motionClass: .layout) }
 
-    func record(motionClass: MotionFilmstripTests.MotionClass) -> [CGImage] {
+    func record() -> GrabbedFilm { record(motionClass: .layout) }
+
+    /// `seconds` = 抓够多久。**证人必须与产品那卷同长**（R82）：产品那卷是 2.5s，
+    /// 证人只抓 2.0s 的话，"这台机器带不动循环"就成了"2.0 秒之内带不动"，
+    /// 而产品被判的那一段比这更长 —— 窗口不一致的两条曲线不能互相当反证。
+    func record(motionClass: MotionFilmstripTests.MotionClass,
+                seconds: TimeInterval = 2.0) -> GrabbedFilm {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: 420, height: 220),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        let root: AnyView = motionClass == .layout
-            ? AnyView(TickCounterView())
-            : AnyView(GradientTickView())
+        let root: AnyView
+        switch motionClass {
+        case .layout: root = AnyView(TickCounterView())
+        case .gradient: root = AnyView(GradientTickView())
+        case .gradientAtProductRate: root = AnyView(GradientTickView.productRate())
+        }
         let host = NSHostingView(rootView: root)
         window.contentView = host
         window.makeKeyAndOrderFront(nil)
@@ -5363,12 +5813,12 @@ private final class StateTickProbe {
         defer { window.orderOut(nil) }
         RunLoop.main.run(until: Date().addingTimeInterval(0.25))
         let grabber = Grabber(view: host, limit: 400)
-        let deadline = Date().addingTimeInterval(2.0)
+        let deadline = Date().addingTimeInterval(seconds)
         while !grabber.finished, Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
             grabber.tick()
         }
-        return grabber.frames
+        return GrabbedFilm(frames: grabber.frames, stamps: grabber.stamps)
     }
 }
 
@@ -5471,15 +5921,40 @@ private final class FadeClockProbe {
 }
 
 /// 只动 `LinearGradient` 的两个端点，其它一切都不动。
+///
+/// 四个可调的量（节拍、每拍推进量、底色、亮带）都开成参数，是因为 R82 需要用这颗视图问**两句**
+/// 不同的话：默认那一档问"这台机器看不看得见这种画法的变化"，
+/// `productRate()` 那一档问"这台机器带不带得动**产品那一档节拍与那一档对比度**的常驻循环"。
+/// 默认值就是原来写死的那几个数 ⇒ 老调用点（`requireObservableMotion`、`MOTION_CONTROL`）读数不变。
 @MainActor
 private struct GradientTickView: View {
+    var tickSeconds: TimeInterval = 0.05
+    var stepPerTick: CGFloat = 0.05
+    var baseOpacity: Double = 0.06
+    var highlightOpacity: Double = 0.45
+
+    /// 亮带相对底色的抬升 —— 决定"这把尺看不看得见它"的就是这个量。
+    var highlightLift: Double { highlightOpacity - baseOpacity }
+
     @State private var phase: CGFloat = 0
 
     var body: some View {
         skeleton(phase: phase)
-            .onReceive(Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()) { _ in
-                phase = SkeletonMotion.advance(phase, by: 0.05)
+            .onReceive(Timer.publish(every: tickSeconds, on: .main, in: .common).autoconnect()) { _ in
+                phase = SkeletonMotion.advance(phase, by: stepPerTick)
             }
+    }
+
+    /// 与骨架扫光**同数字**的那一颗证人。四个数都写死在这里、不读 `SkeletonMotion` /
+    /// `MotionCatalog`，理由与 `FadeClockView` 把 150ms 写死是同一条：读产品的常量的话，
+    /// 哪天产品把亮带抬升调到看不见，证人跟着一起瞎，于是"环境看不见"那一支永远有人签字。
+    /// 写死的代价是**会漂移** ⇒ 由 `testTheLoopWitnessStillMirrorsTheProductLoop` 钉住
+    /// "这几颗数还等于产品那几颗"（漂移是红的，不是一行注释）。
+    static func productRate() -> GradientTickView {
+        GradientTickView(tickSeconds: 1.0 / 30.0,
+                         stepPerTick: (1.0 / 30.0) / 1.5,
+                         baseOpacity: 0.06,
+                         highlightOpacity: 0.18)
     }
 
     /// 与 `SkeletonPreviewView` **同一套画法**（GeometryReader + ForEach + 渐变填充），
@@ -5490,11 +5965,14 @@ private struct GradientTickView: View {
         GeometryReader { proxy in
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(SkeletonMotion.barFractions.enumerated()), id: \.offset) { _, fraction in
-                    RoundedRectangle(cornerRadius: 4)
+                    // 与产品同一颗形状出口（`VisualShape.rounded` 而不是裸 `RoundedRectangle(cornerRadius:)`：
+                    // 后者默认 `.circular`，产品用的是 `.continuous`）。证人要能说"画法相同"，
+                    // 就不能在角上先差一个曲率。
+                    VisualShape.rounded(VisualRadius.chip)
                         .fill(LinearGradient(
-                            stops: [.init(color: .primary.opacity(0.06), location: 0),
-                                    .init(color: .primary.opacity(0.45), location: 0.5),
-                                    .init(color: .primary.opacity(0.06), location: 1)],
+                            stops: [.init(color: .primary.opacity(baseOpacity), location: 0),
+                                    .init(color: .primary.opacity(highlightOpacity), location: 0.5),
+                                    .init(color: .primary.opacity(baseOpacity), location: 1)],
                             startPoint: SkeletonMotion.unitPoints(phase: phase).start,
                             endPoint: SkeletonMotion.unitPoints(phase: phase).end))
                         .frame(width: max(1, proxy.size.width * fraction), height: 8)

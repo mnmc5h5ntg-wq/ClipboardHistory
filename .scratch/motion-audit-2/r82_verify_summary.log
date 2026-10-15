@@ -1,0 +1,17 @@
+BUILD_WARNINGS=0
+BUILD_EXIT=0
+FULL_TEST=799 tests / 0 failures（40 skipped，145.4s，swift test exit 0）
+SKIPPED=40（上一轮记的是 38，见 Round 82 的"skipped 从 38→40"那一格）
+SHIM_READING=MOTION_SHIMMER 扫 帧数=47 变化帧对=23 峰值=0.015 采样≈54ms coverage=1.000(地板 0.50) 记录时长=2450ms 判定=一直在动
+RATE_WITNESS_READING=MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12，与产品同数字) 帧对=47 在变=23 峰值=0.015 coverage=1.000 判定=一直在动
+COARSE_WITNESS_READING=MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45，只签字'看得见这种画法') 帧对=46 在变=42 峰值=0.026 coverage=1.000 判定=一直在动
+MIRROR_READING=LOOP_WITNESS_MIRROR 节拍=33.3ms 每拍推进=0.0222 抬升=0.12 三项全等于产品 ⇒ 证人还在问同一句话
+MOTION_TEST_EXIT=0
+MOTION_FLOOR=MOTION_FLOOR_FACTS judged=4/4 executed=52 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=12 notice-banner-dismiss=11 红的用例=- 汇总行报红=0 MOTION_FLOOR_REDS=0MOTION_GATE_EXIT=0
+CAPTURE_TEST_EXIT=0
+CAPTURE_GATE=CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+CAPTURE_GATE_EXIT=0
+FRAME_BASELINE=COMPARED=124 CHANGED=0 MISSING=0 ADDED=0（against working）
+FRAME_BASELINE_EXIT=0
+SCRIPT_TESTS=Ran 140 tests in 7.023s OK PY_EXIT=0
+CURVE=PHASE2 n=75、rounds=9..82、均值 92.45、最低 86、最高 96、GAPS=none、SCORES_BY_ROUND 79=93 80=93 81=93 82=94

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R82：循环那条判据从"数帧对"换成 coverage，证人从一颗换成两颗并要同节拍；结案 113、110 的第一实例 / 新开 114–117 / U-155…U-159 / D-140）
+- `testSkeletonSweepActuallySweeps` 不再数"几对帧在变"，改读 **coverage**
+  （变化覆盖了整卷时长的几成；时间之比 ⇒ 与采样密度无关，地板 0.5 不为哪台机器移动）。
+- 证人从一颗变**两颗**：新增 `GradientTickView.productRate()`（30Hz、每拍 (1/30)/1.5、0.06→0.18、
+  同一颗 `VisualShape.rounded`）决定"产品红 / 环境不行"；原来那颗 20Hz 高对比的降级为
+  只守"证人坏没坏"。起因是 R81 的 CI：产品 `变化帧对=2`、那颗证人 `13`，但它问的根本不是同一句话。
+- 新判据 `testTheLoopWitnessStillMirrorsTheProductLoop`：证人那四个数**仍等于产品**（写死在测试里，
+  漂移就红）；新判据 `testTheLoopShapeClassifierIsATruthTable`：七格合成真值表，含
+  "50ms 与 115ms 两档采样同判定"与"时刻少一根/多一根都算没量到"。
+- 分辨率那条闸门（BACKLOG 110 的第一个实例）改吃**事件内 P75**而不是"最粗那一次"：
+  本机实测 `[50 51 52 53]` 与 `[50 51 52 81]` 的 P75 相同而最大值差 28ms，
+  而旧闸门就是被这 28ms 从"判到"推到"判不到"的。
+- `SkeletonProbe` / `StateTickProbe` 改成返回 `GrabbedFilm(frames:stamps:)`（U-155：
+  两卷连拍时 `probe.lastStamps` 会被后一卷覆盖，而 M443 第一版把它改回去**四条判据全绿** ⇒
+  断言拦不住等长的两卷，只能让错的话拼不出来）。
+- 电池自己的分类器补第四类（U-158）：跑到一半进程死掉的用例不再被归成『没跑』。
+- 牙：M437–M445 九刀，抓到 9（无遗漏）。
+
 ### Tests（R81：读数通道一整行一次 write + 并发锤击判据；109 的答案回来了；扫光那一位开始判红 / 结案 109、112 / 新开 113 / U-151、U-152 / D-139）
 - `CaptureReadings.emit` 的两条腿改成原子的：stdout 一次 `write(整行+换行)`（不再用 `print`，
   它把内容与换行分两次写 —— 那就是缝点），文件通道整段进 `NSLock`，`opened` 换成按 URL 记的 `openedURLs`。

@@ -5418,3 +5418,226 @@ python3 -m unittest discover -s scripts  exit 0
 - BACKLOG **110**：同一族病的第一个实例（`detail-kind-change` 押在最粗那一次采样上）。
 - BACKLOG **111**：焦点那条轴在 runner 上的赎回（唯一路径是换捕获对象 / 真机非 Retina）。
 - BACKLOG 108 剩下的、77 路 b、101 的②③、106；真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1。
+
+## Round 82 · 单颗证人被上一遍 CI 打回：证人必须与它作证的判据**同节拍**（结案 113、110 的第一实例 / 新开 114–117 / U-155…U-159 / D-140）
+
+### 本轮开场的位点清单（按契约带坐标；本轮 0 个产品文件）
+
+本轮重新判断的那一位是**加载态骨架屏的那条扫光**，位置与尺寸沿用已入账的读数：
+详情预览区 `.loading` 分支里那三根 `SkeletonMotion.barFractions = [0.42, 0.86, 0.64]` 的条带，
+每根高 8pt、圆角 `VisualRadius.chip` = 4pt，亮带 `bandSize` 0.3 从 x=−0.3 扫到 x=1.0（单位是条带宽），
+一圈 `MotionCatalog.duration(for: .skeletonSweep)` = 1.5s、每拍 `SkeletonMotion.tickInterval` = 1/30s。
+帧基线里它对应 `detail-loading` 那几张（本轮 COMPARED=124 CHANGED=0 MISSING=0 ADDED=0（against working） ⇒ 静置画面一个像素没动）。
+"这条该不该有动效"的判断没变（M9 那条感知等待的理由仍然成立，抬升 0.12 也仍然在
+`minimumHighlightLift` = 0.08 之上）；**本轮动的是判它的那把尺**。
+
+### 读 R81 的 CI（run 38770024897，12m38s）：唯一那朵红就是 113 说的那朵，而它带了新信息
+
+失败步骤只有一个：`Motion coverage floor`，
+`MOTION_FLOOR_FACTS judged=4/4 executed=49 not-run=- 红的用例=testSkeletonSweepActuallySweeps`、
+`MOTION_FLOOR_SUITE_RED=1 … ("2") is less than ("3")` —— 与 R80 同一朵，没有新增红；
+R80 那四条焦点红在 1× 上不再红（`QUICKPICK_FOCUS_INK 亮 缩放=1× 带墨面积=89.2pt² 焦点搬动=0.0pt²(地板 40.0…)
+证人臂撤占位字=88.9pt²` 原样打出来了 ⇒ R81 的处置生效）。**捕获那一步今天全绿**。
+
+真正的收获是那一遍同时打出的两行对照（原文）：
+
+```
+runner  MOTION_SHIMMER 扫 帧数=27 变化帧对=2 峰值=0.015 采样≈86ms
+runner  MOTION_CONTROL 渐变端点 帧数=21 峰值=0.029 变化帧对=13
+runner  MOTION_CONTROL 计数方块 帧数=19 峰值=0.029 变化帧对=17
+```
+
+⇒ 如果照 R81 的计划直接换成"一颗证人"，这一遍 CI 会判成 `.productRed`（证人在动、产品没动）。
+但那条推论**说过头了**：那颗证人是 20Hz、亮带抬 0.45，而产品是 30Hz、抬 0.12 ——
+"这台机器带得动一个 20Hz 高对比循环"并不蕴含"带得动产品那一档"。
+R68 立的是"证人必须与判据问同一句话"，那句话里有一个具体的赫兹数和一个具体的抬升。
+
+### 修法一（判据形状）：数帧对 → coverage
+
+`LoopShape(pairs, changingPairs, peak, coverage, recordedMilliseconds)` +
+`loopShape(fractions:stamps:)`，判据读 **coverage**（首尾两个"还在变"的帧对之间的时间 ÷ 整卷时长）
+⇒ 与帧数无关。`minCoverage = 0.5`：本机三遍真值 **0.955 / 0.977 / 1.000**，一次跳变在 20 帧对上是 **0.05**，
+中间十倍空间，0.5 不在刀尖上；地板**不许**为哪台机器过线而移动（110 立的规矩）。
+合成真值表 `testTheLoopShapeClassifierIsATruthTable` 里最关键的是第③格：
+同一种"一直在变"在 50ms 与 115ms 两档采样下**必须同判定、同 coverage**，
+而旧那把"数帧对"的尺在两档上必须给出**不同**的个数 —— 这一格钉的就是换尺的理由本身。
+
+### 修法二（证人）：一颗 → 两颗，等节拍那颗决定红与不红
+
+* `GradientTickView` 开成四个参数（节拍 / 每拍推进量 / 底色 / 亮带），默认值 = 原来写死的那几个数
+  ⇒ 老调用点（`requireObservableMotion`、`MOTION_CONTROL`）读数不变；
+* `GradientTickView.productRate()`：30Hz、每拍 (1/30)/1.5、0.06→0.18、同一颗 `VisualShape.rounded(VisualRadius.chip)`。
+  四个数**写死在测试里**（读产品常量的话，产品哪天把抬升调到看不见，证人跟着一起瞎 ⇒
+  "环境看不见"那一支永远有人签字，与 `FadeClockView` 把 150ms 写死是同一条理由）；
+  代价由一条新的会红的钉子兜住：`testTheLoopWitnessStillMirrorsTheProductLoop`
+  断言这四个数**仍等于** `SkeletonMotion` / `MotionCatalog` 的那几个（漂移 = 红，不是注释）。
+* 处置 `loopAdjudication(product:rateWitness:coarseWitness:)`：产品在跑 ⇒ 绿；
+  等节拍在跑而产品没跑 ⇒ **产品红**；等节拍也没跑 ⇒ `MOTION_NOT_RUN=loop-clock-not-sustainable-at-product-rate`；
+  连粗节拍那颗都整卷没拍到 ⇒ **证人坏**，红（空支票守卫，M439 钉它）。
+
+本机三卷（同一次跑，2×）：
+
+```
+MOTION_SHIMMER 扫 帧数=47 变化帧对=23 峰值=0.015 采样≈54ms coverage=1.000(地板 0.50) 记录时长=2450ms 判定=一直在动
+MOTION_SHIMMER_WITNESS 等节拍证人(30Hz 抬升 0.12，与产品同数字) 帧对=47 在变=23 峰值=0.015 coverage=1.000 判定=一直在动
+MOTION_SHIMMER_WITNESS 粗节拍证人(20Hz 抬升 0.45，只签字'看得见这种画法') 帧对=46 在变=42 峰值=0.026 coverage=1.000 判定=一直在动
+LOOP_WITNESS_MIRROR 节拍=33.3ms 每拍推进=0.0222 抬升=0.12 三项全等于产品 ⇒ 证人还在问同一句话
+```
+
+**这一组数里最有用的是等节拍那颗与产品的接近程度**：产品 23/47 对在变、等节拍证人 23/47 对（本机另两遍是 20 vs 21、19 vs 19 —— 最多差一对），
+峰值都是 0.015 —— 把节拍与抬升对齐之后，"归属不同"这件事在本机上几乎不产生差别。
+所以 runner 上那 2 对 vs 13 对的悬殊，很可能大部分是**参数差**而不是产品差，
+下一遍 CI 会给出答案（BACKLOG 114）。
+
+### U-155 · 探针把时刻存在自己身上，两卷连拍就会串卷 —— 而**任何断言都拦不住等长的两卷**
+
+第一版的判据写成了：
+
+```swift
+let runningFrames = probe.record(reduceMotion: false)   // 第一卷
+let stopped = deltas(probe.record(reduceMotion: true))   // 第二卷，顺手覆盖了 probe.lastStamps
+let shape = loopShape(fractions: running, stamps: probe.lastStamps)  // ← 用第二卷的时刻算第一卷
+```
+
+本机第一次跑出来是 `coverage=0.000 记录时长=0ms`（两卷碰巧不等长 ⇒ 掉进 guard），
+我把它当"探针坏了"来读；而**把它改对的中间那一版**读出来是 `coverage=0.979` ——
+数字合理、判据绿、台账上就可以写"本机 0.98"。真正的证据是变异刀：
+**M443 第一版把那句话原样改回 `probe.lastStamps`，四条判据全绿**
+（`.scratch/motion-audit-2/r82_mutation_battery_v1.log`）。
+⇒ 教训不是"记得当场取走"（我确实写了 `let runningStamps = probe.lastStamps`，
+    但那只是把错误挪到了一个断言拦不住的距离上），
+   而是**让错的那句话在类型上拼不出来**：探针改成返回 `GrabbedFilm(frames:stamps:)`，
+   `lastStamps` 从这两个探针上删掉。
+这个文件里其实**早就有**这个形状 —— 主场景探针的 `Film(frames:stamps:triggerFrame:)`
+与淡入探针的 `FadeClockProbe.Run`；只有我上一轮新加的两个手写探针把时刻存在了对象身上。
+**同族前科**：D-139 里"共享布尔 `opened` 让临时文件的第一行以为已经开过卷"是同一件事
+（对象的 global 状态把调用方骗了），只不过那次的后果是崩，这次是**安静地给出一个像样的错数**。
+TableProbe 还留着同款 `lastStamps`（它的调用点都是当场读）⇒ 记成 BACKLOG **115**。
+
+### U-156 · 形状尺的 guard 把峰值原样报出去 ⇒ 前提故障冒充成"只动了一下"，处置方向跟着翻
+
+`loopShape` 的 guard 分支（时刻与帧对数不匹配 / 只有一帧 / 整卷空白）原来返回 `peak: maximum`。
+那一刻 `coverage = 0` 而 `peak = 0.02` ⇒ `verdict = .oneShot` ⇒
+"尺没法算"被说成"产品只动了一下"，正好是 `.productRed` 那句话。
+改成返回 `peak: 0` ⇒ `.notMoving` ⇒ 点名"没量到"。真值表第⑥格钉形状、
+并额外钉一条**方向对照**：`notMoving` 的产品配上活的证人仍然必须红（它没有悄悄变绿）。
+M444 就是这一刀。
+
+### U-157 · 结构等式要双向，`>` 不是 `==`
+
+同一根 guard 里的 `stamps.count > fractions.count` 只拦"少一根"，不拦"多一根"
+（多一根意味着这列时刻来自另一卷更长的胶片 —— 正是 U-155 的形状）。
+换成 `stamps.count == fractions.count + 1`，真值表里两格（少一根 / 多一根）各钉一边，
+M443 换成这一刀 ⇒ 等式挪一格，本机每一卷真胶片都算"没量到" ⇒ 两条判据同时红。
+
+### U-158 · 电池的分类器：崩掉的用例与没轮到的用例，不能都算『没跑』，也不能都算『红』
+
+M443 把结构等式挪一格之后，真值表里那一格走进 `loopShape` 的分支去取 `stamps[last + 1]`，
+越界 ⇒ `Fatal error` ⇒ 整个测试进程带走。于是那一条用例**既没有 `failed` 行也没有 `passed` 行**，
+旧分类器把它归成 `absent`（=『这条没跑』），而排在它前面的 SHIM 确实红了 ⇒
+电池报的是 **`ESCAPED 红的不是预期那几条`**。真相是这一刀抓得**最狠**：它把判据崩掉了，不是放过去了。
+⇒ 分类器现在认两种新形状，而区分它们的依据必须是**这条用例自己开过口**：
+`crashed` = 日志里有它的 `error: -[…方法]` 行却没有结论行（算红）；
+`absent` = 从头到尾没提过它 ⇒ **没轮到**（不算红）。
+`swift test` 不打 `started` 行，所以『整份日志里有崩溃痕迹』不能当归因依据 ——
+用它会把排在崩掉那条**后面的每一条**都签字成红，那是 U-151 的镜像方向
+（那次把崩解读成没跑，这次差点把没跑读成崩）。
+**分类器只认它见过的形状**，而每一种新形状都必须带着自己的证据被命名。
+
+### 真实看图：这条扫光**第一次**有条带图可看，而它立刻暴露了一件数字看不见的事
+
+判据只读到"覆盖率 0.977、峰值 0.015"，看不出**亮带长在哪儿**。所以本轮给这条判据补了
+`writeStrip("skeleton-sweep", …)`（放在所有闸门之前 ⇒ 红了也留一张能看的），
+产物 `.scratch/motion-audit-2/r82_skeleton_sweep_strip.png`（24 帧 / 六列 / 4 行，按阅读顺序）。
+
+看下来的结论分两半：
+
+* **好消息，而且与数字一致**：亮带从每根条的左边进、右边出，第四行又从左边重新进来 ⇒
+  `advance` 的绕回真的在演（不是"扫到一半卡住再弹回去"那一族），抬升 0.12 在这个尺寸上
+  读起来是"有东西在动"而不是"闪"，克制程度符合"不喧宾夺主"。
+* **数字看不见的那一半**：三根条上的亮带**不在同一条竖线上**。机制是可推出来的，不用猜 ——
+  `SkeletonMotion.unitPoints(phase:)` 给的是 `UnitPoint`，而它被用在**每根条自己的**
+  `LinearGradient` 上，`UnitPoint` 是按被填充形状的边界归一化的 ⇒
+  同一相位下亮带在三根条上的绝对位置按宽度 0.42 / 0.86 / 0.64 **各自放大**，
+  于是它更像"三根条各扫各的"，而不是"一块光从整组骨架上扫过去"。
+  系统里的原生骨架（以及 GitHub 那类提交热图的呼吸感）是后者：一条带穿过整组，
+  读起来才像"同一个光源"。
+  ⇒ 新开 **BACKLOG 117**：先量三根条上亮斑中心的 x（逐帧、带正对照"同一根条两个相位必须不同"），
+  再判要不要把渐变挪到**容器**上（那会改到静置画面 ⇒ 124 张帧要同提交 update）。
+  本轮**不动产品**：这条是看图看出来的新缺陷，按规矩先量再改（也不许为了它今天改帧基线）。
+
+### U-159 · 同一份代码的**全量卷里，skip 的条数在两次跑之间自己动了**（7 条的幅度，本轮量出来）
+
+| 遍 | 原文 |
+|---|---|
+| R81 第一遍（`.scratch/motion-audit-2/r81_verify_summary.log`） | `Executed 796 tests, with 38 tests skipped and 0 failures … in 161.868s` |
+| R81 另一遍（`/tmp/r81_full.log`，同一提交、同一台机器） | `Executed 796 tests, with 45 tests skipped and 0 failures … in 154.9s` |
+| R82（`/tmp/r82/full.log`） | `Executed 799 tests, with 40 tests skipped and 0 failures … in 145.4s` |
+
+⇒ **同一个提交里就有 38 与 45 两个数**（不是记账口径不同：两行的格式一模一样，时长不同 ⇒ 是两次跑）。
+R82 的 40 = 799 − 3 条新判据之外还差着同样的抖动。`comm` 出来的差集落在五条 `UICaptureTests`
+（`testSettingsHelperTextIsNotClipped`、`testInkDirectionRulerReadsBothEnds`、
+`testRowTierProfileSeparatesCaptionFromTitle`、`testSettingsCaptionSitsCloserToItsOwnToggle`、
+`testDarkSettingsSidebarTextIsACountedBlindSpot`）—— 同一份代码、同一台机器，
+一会儿 skip 一会儿跑，而台账把它们都记成"过了"。
+⇒ 记成 **BACKLOG 116**：这五条的 skip 判据必须把"为什么今天没跑"打成一行**有名字的读数**
+（像捕获卷那族 `*_NOT_RUN` 一样），否则"这一轮多判了五条"和"上一轮少判了五条"
+这两种相反的解释在台账上长得一样 —— 而**判据有没有跑**本身就是需要被审计的量。
+本轮不给原因：第一版怀疑是变异电池的临时目录串了，读源码后不成立
+（这五条各用 `temporaryDirectory/r28-clip-<UUID>`，互不共享）。**没量出来就别写。**
+（顺带纠正我自己：R81 台账里那句"796 例 / 38 skip"引的是其中一遍，
+它不是错的，但它被当成了"这一轮的固定属性"—— 一个会抖的数被写成了常量，U-139 同一族。）
+
+### 牙
+
+| M437 | coverage 地板从 0.5 降到 0.02 | **CAUGHT** |
+| M438 | coverage 的分母从『整卷时长』换成『变化段时长』 | **CAUGHT** |
+| M439 | 粗节拍证人整卷没拍到任何变化时改走『环境看不见』那一支 | **CAUGHT** |
+| M440 | 把结构体里那条峰值地板挪离全卷那条（两个数分家） | **CAUGHT** |
+| M441 | 分辨率闸门改回『最粗那一次』（把分位数取成 1.0） | **CAUGHT** |
+| M442 | 产品没在动也返回 .ok | **CAUGHT** |
+| M443 | 把 `stamps.count == 帧对 + 1` 这条结构等式挪成 `== 帧对` | **CAUGHT** |
+| M444 | guard 分支把峰值原样报出去（不返回 0） | **CAUGHT** |
+| M445 | 等节拍证人的节拍偷偷改回 0.05（与产品的 1/30 分家） | **CAUGHT** |
+
+### 验证（本机，逐条实跑）
+
+```
+swift build --build-tests                告警 0
+swift test（全量）                       799 tests / 0 failures（40 skipped，145.4s，swift test exit 0） / skipped 40（上一轮记的是 38，见 Round 82 的"skipped 从 38→40"那一格）
+动效那一步                               MOTION_FLOOR_FACTS judged=4/4 executed=52 not-run=- summary=detail-kind-change=3 empty-state=3 notice-banner=12 notice-banner-dismiss=11 红的用例=- 汇总行报红=0 MOTION_FLOOR_REDS=0MOTION_GATE_EXIT=0
+捕获闸门                                 CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+frame_baseline.py check --against working COMPARED=124 CHANGED=0 MISSING=0 ADDED=0（against working）
+python3 -m unittest discover -s scripts  Ran 140 tests in 7.023s OK PY_EXIT=0
+自评曲线                                 PHASE2 n=75、rounds=9..82、均值 92.45、最低 86、最高 96、GAPS=none、SCORES_BY_ROUND 79=93 80=93 81=93 82=94
+扫光那条第一次有的条带图                  .scratch/motion-audit-2/r82_skeleton_sweep_strip.png（24 帧 / 六列）
+全量 skipped（同一提交两遍 + 本轮，见 U-159）  38 / 45 / 40 —— 一个会抖的数，不许写成常量
+```
+
+### 七维自评
+
+| 维度 | 得分 | 说明 |
+|---|---|---|
+| 原生感 | 19 / 20 | 零产品改动；扫光的抬升 0.12 与 4pt continuous 圆角都仍在系统语言里，本轮没脸加分也没被扣分 |
+| 流畅度 | 18 / 20 | main 上那朵红换了个来源：不再是"判据吃采样"，而是"这一档节拍的循环在 runner 上带不带得动"（114，等 CI 读数）；本机 coverage 0.955–1.000 |
+| 层次与材质 | 15 / 15 | COMPARED=124 CHANGED=0 MISSING=0 ADDED=0（against working） |
+| 动效细节 | 13 / 15 | 循环那条判据从"数帧对"换成时间之比 + 两颗证人；证人漂移有钉子 |
+| 交互反馈 | 9 / 10 | 反馈本身没变 |
+| 可访问性 | 8 / 10 | 减弱动态那一档仍然有判据（峰值 0.000），但真机复核仍欠（批次 72） |
+| 性能 | 14 / 15 | 全量 799 tests / 0 failures（40 skipped，145.4s，swift test exit 0）；证人每进程一次，多出来的那一卷 2.5s 只在扫光那一条上付 |
+
+**94 / 100**。比 R81 的一分来自"main 上那朵红的来源从我的尺换成了可判定的问题"，
+扣的六分写在上面三行里：114 还没有答案，115/116 是本轮量出来但没修的账，
+117 是看图看出来的新缺陷（按"先量再改"排到下一轮），批次 72 还没人看。
+
+### 仍未解决
+
+- BACKLOG **114**（本轮开）：runner 那一遍到底带不带得动 30Hz 那一档常驻循环 ——
+  等节拍证人与产品那两行 coverage 给答案；若是"带不动" ⇒ `loop-clock-not-sustainable-at-product-rate`
+  是一朵**有名字的未覆盖**；若是"带得动而产品没跑" ⇒ 那是第一条真红，回去查接线。
+- BACKLOG **115**（本轮开）：`TableProbe` 仍然把抓帧时刻存在对象身上（同款 U-155 风险）。
+- BACKLOG **116**（本轮开）：同一提交的全量卷里 skip 条数自己动了 7 条（38 / 45 / 40 三个数），
+  而那五条 `UICaptureTests` 没有一行"为什么今天没跑"的读数 ⇒ 判据有没有跑，今天没人审计。
+- BACKLOG **117**（本轮看图开出）：骨架扫光的亮带在每根条上**各扫各的**，
+  不是一块光穿过整组骨架（`UnitPoint` 落在每根条自己的渐变上）。先量亮斑中心，再判要不要改容器层。
+- BACKLOG 111、110 剩下的两格、108 余下、77 路 b、101 ②③、106；真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / **72.1 / 72.2**。

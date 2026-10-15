@@ -1,0 +1,72 @@
+=== 基线（未变异）：四条都必须绿（扫光那一条在本机是绿）===
+   {'testTheLoopShapeClassifierIsATruthTable': 'green', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+
+M437 coverage 地板从 0.5 降到 0.02 ⇒ 一次跳变也算『一直在动』（这条判据从此恒绿）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1657: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1690: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertLessThan fa
+   已还原（逐字节相同：True）
+
+M438 coverage 的分母从『整卷时长』换成『变化段时长』⇒ 它恒等于 1.0，而『一直在动』与『只动了一下』的分别正在分母上
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1657: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1659: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertLessThan fa
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1690: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertLessThan fa
+   已还原（逐字节相同：True）
+
+M439 粗节拍证人整卷没拍到任何变化时改走『环境看不见』那一支 ⇒ 那是一张空支票（谁都可以说看不见，因为签字的人自己没上班）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1727: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+   已还原（逐字节相同：True）
+
+M440 把结构体里那条峰值地板挪离全卷那条（两个数分家）⇒ 漂移钉子必须红
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4519: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps] : failed - 连**高对比、粗节拍**那颗证人整卷都
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1641: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1650: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+   已还原（逐字节相同：True）
+
+M441 分辨率闸门改回『最粗那一次』（把分位数取成 1.0）⇒ P75 那一格必须红（这一刀钉的是 BACKLOG 110 的修法在承重，不是新写的装饰）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'green', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'red', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1771: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheClockGateUsesARobustStatisticNotTheSingleWorstSample] : 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1772: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheClockGateUsesARobustStatisticNotTheSingleWorstSample] : 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1778: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheClockGateUsesARobustStatisticNotTheSingleWorstSample] : 
+   已还原（逐字节相同：True）
+
+M442 产品没在动也返回 .ok ⇒ 真值表里那四格必须红（恒过的判据）
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1704: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1718: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1720: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+   已还原（逐字节相同：True）
+
+M443 把 `stamps.count == 帧对 + 1` 这条结构等式挪成 `== 帧对` ⇒ 今天每一卷真胶片都会被判成『没量到』：真值表第①格与扫光那一条都必须红
+   ESCAPED 红的不是预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'absent', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'red', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'absent'} 预期=['testTheLoopShapeClassifierIsATruthTable', 'testSkeletonSweepActuallySweeps']
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4495: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps] : XCTAssertEqualWithAccuracy f
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:4519: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testSkeletonSweepActuallySweeps] : failed - 连**高对比、粗节拍**那颗证人整卷都
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1650: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+   已还原（逐字节相同：True）
+
+M444 guard 分支把峰值原样报出去（不返回 0）⇒ 前提故障会被冒充成『只动了一下』，真值表第⑥格必须红
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'red', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1700: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1711: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopShapeClassifierIsATruthTable] : XCTAssertEqual faile
+   已还原（逐字节相同：True）
+
+M445 等节拍证人的节拍偷偷改回 0.05（与产品的 1/30 分家）⇒ MIRROR 那条钉子必须红
+   CAUGHT 只红在预期那几条：{'testTheLoopShapeClassifierIsATruthTable': 'green', 'testTheClockGateUsesARobustStatisticNotTheSingleWorstSample': 'green', 'testSkeletonSweepActuallySweeps': 'green', 'testTheLoopWitnessStillMirrorsTheProductLoop': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1744: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheLoopWitnessStillMirrorsTheProductLoop] : XCTAssertEqualW
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M437   CAUGHT
+   M438   CAUGHT
+   M439   CAUGHT
+   M440   CAUGHT
+   M441   CAUGHT
+   M442   CAUGHT
+   M443   ESCAPED
+   M444   CAUGHT
+   M445   CAUGHT
+   抓到=8 逃掉=1 没跑成=0 未落地=0
+exit=1
