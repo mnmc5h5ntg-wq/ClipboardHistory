@@ -2334,3 +2334,38 @@ M133（把尺的框缩到压不住字）在新结构下仍然红，且红在"尺
   丢的不是"函数后半段"，是**按条随机丢，两台机器都会**。
   ⇒ 结论："`Test Case … passed` 那条 XCTest 结论"是唯一能证明判据跑过的东西；
   自打印的读数必须走文件通道（R11 给动效卷做过的那一套），捕获卷还没做。
+
+## R64（第 66 轮账本 / D-123 / BACKLOG 96 交付面 + 新开 97）：判据的结论必须有第二条通道
+
+- **上面 R63 那句"按条随机丢"本轮被自己的测量推翻**：真实形状是**连续大块丢**。
+  本机三遍真 artifact 逐行比对：`--filter` 两遍各丢 **324/488 行**（同一块，下标 164–487，
+  = 316 条不同的行），全量 `2>&1 | tee` 那一遍丢 **238/488 行**（3 块：0–48、142–217、296–408）；
+  切点在**行中间**（`…bottomI` 直接接 `Test Case …`）；五条判据自写的 marker 三遍全丢，
+  而 37 / 775 条 `Test Case … passed` 一条没少、作业 0 退出。
+  runner 只算现场：run 38683762166 捕获那一步浮层 marker **0/4**，run 38687419144 **2/4**。
+- **交的东西**：`CaptureReadings.swift`（新，第一次整份重写 + 之后追加）、
+  捕获卷 **69 处** `print(` → `emit(`、守卫 `testCaptureReadingsUseTheFileChannel`
+  （绝对规则：那个文件剥注释后 `print` = 0）、`ci_capture_gate.py --readings`
+  （并集 + **缺通道是一条有名字的红**）。并集从 workflow 的 awk 挪进 python，
+  workflow 只留"通道在不在"的汇报行 + 一条**接线断言**（删掉 `--readings` 会被自检抓住）。
+- **验证**：`--build-tests` **0 告警**；`--filter UICaptureTests` 37 例 / 4 skip / **0 failures**、
+  122 帧；全量 `swift test` **775 条结论行 / 0 条红**、122 帧 vs working
+  `COMPARED=122 CHANGED=0 MISSING=0 ADDED=0`；脚本自测 **120 → 127** 全绿；
+  闸门拿真 artifact 跑：`补回=316 行`，同一份日志不给 `--readings` 仍是 0（正对照）。
+  电池 **M337–M342 六刀全 CAUGHT**（`.scratch/motion-audit-2/r64_mutation_battery2.log`）。
+- **本轮自己坏掉的三件工具**（都记进 D-123）：正对照拿 needle 拼（M338 抓到）；
+  上一遍留下的读数文件让"落盘坏了"那一刀逃过（M341 第一版）；
+  电池汇总比对了带尾随空格的字符串 ⇒ **六刀全抓到却写"非抓到=6"**。
+- **产品零改动**，但逐帧看浮层量出一条真缺陷 ⇒ **BACKLOG 97**：
+  纯文本行标签 34.5–35.0pt vs 文件行标签 56.5–57.5pt（图标占 36.0–50.0pt）⇒ 差 **22pt 两种左轴**。
+  同批好消息：选中不产生位移（0.5pt 是字形边距）、空态那句居中误差 0.75pt。
+  我自己那把 `|亮度差|>8` 的粗尺读出的"药丸左右不对称"与 R63 那把有正对照的尺冲突 ⇒ **不采信**。
+- **R63 台账那次 CI（run 38687419144）已逐步读完**：整作业 success、18/18 步全绿；
+  `CAPTURE_GATE_CASES passed=27 skipped=9 failed=0 有名字的红=0 NOT_RUN=25` + `RESULT=ok`；
+  `PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 runner可跑=0 本次下结论=0 红=0`（93 原样开着）；
+  `MOTION_FLOOR_FACTS judged=4/4 executed=42 REDS=0`；`executed cases: 774`；
+  捕获那一步 `captured frames: 122 executed: 36 捕获失效帧: 0`；
+  `FRAME_BASELINE` 对 working `MISSING=0 ADDED=0`、对上一版发布 `CHANGED=62`（report-only）；
+  三条浮层判据在 runner 上**逐条 `passed`**。
+- **下一步（R65）**：回到产品面 —— BACKLOG 94 与 97 是同一个决定（先定图标语言，再定左轴），
+  后面排着 63/64/65/66 那一族与 88；96 的验收等 R64 的 CI 把 `补回=k>0` 打出来。

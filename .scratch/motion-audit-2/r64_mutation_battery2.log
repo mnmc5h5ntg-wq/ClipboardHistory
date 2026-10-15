@@ -1,0 +1,49 @@
+=== 基线（未变异）必须先绿 ===
+   清掉的旧读数文件：
+   baseline = green
+
+M337 把一处读数从 emit 改回游离的 stdout 调用 ⇒ ① 必须扫到它
+   落地确认（UICaptureHarness.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 红在这一格：XCTAssertTrue failed - 捕获卷里有 1 行读数只走 stdout：["print(\"CAPTURE_CAPABILITY settings族整体空白=\\(settin"] ⇒ 通道丢一次的那天，这些读数一条都不剩（
+   还原成功（按内容比对）
+
+M338 把扫描用的串改坏（多一个空格）⇒ 必须由**正对照那一格**判红，而不是安静地『零条游离』。这一刀验的是 ② 不再拿 needle 拼对照
+   落地确认（UICaptureHarness.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 红在这一格：XCTAssertEqual failed: ("0") is not equal to ("3") - 正对照只抓到 0/3 种写法 ⇒ 用来扫的串和被扫的真串已经不是同一个（这一格红 = needle 被改坏的样子，而不是『这条卷很干净
+   还原成功（按内容比对）
+
+M339 把 codeOnly 的行注释剥离改坏 ⇒ ① 会读到守卫自己注释里的那串字符 ⇒ 必须红。这一刀证明『剥注释』是**载荷**，不是装饰
+   落地确认（UICaptureHarness.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 红在这一格：XCTAssertTrue failed - 捕获卷里有 2 行读数只走 stdout：["/// \"以前这里是 `print(...)`\"这种句子 —— 不剥注释的话，守卫会把**解释自", "//    （R56 那版守卫就是因为只
+   还原成功（按内容比对）
+
+M340 通道只 print、不落盘 ⇒ ④ marker 那一格必须红（这就是 BACKLOG 96 没修的状态）
+   落地确认（CaptureReadings.swift）
+   清掉的旧读数文件：/tmp/capture-readings/capture-readings.log
+   CAUGHT verdict=red 红在这一格：failed - 文件通道没写出来（/tmp/capture-readings/capture-readings.log）⇒ `emit` 只剩 print，BACKLOG 96 没修
+   还原成功（按内容比对）
+
+M341 去掉『第一次整份重写』⇒ 第一次写变成对**已存在**的文件 append。读数文件已先删掉，所以这一刀必须红在 ④（旧版本里它逃过，因为旧文件还在）
+   落地确认（CaptureReadings.swift）
+   清掉的旧读数文件：
+   CAUGHT verdict=red 红在这一格：failed - 文件通道没写出来（/tmp/capture-readings/capture-readings.log）⇒ `emit` 只剩 print，BACKLOG 96 没修
+   还原成功（按内容比对）
+
+M342 把 readingsURL 换成一个必然写不进去的目录 ⇒ 通道坏时判据必须**红**而不是崩，也不许悄悄变成绿（这一格测 do/catch 的处置）
+   落地确认（CaptureReadings.swift）
+   清掉的旧读数文件：
+   CAUGHT verdict=red 红在这一格：failed - 文件通道没写出来（/r64-nope-root/cannot-create-here/capture-readings.log）⇒ `emit` 只剩 print，BACKLOG 96 没修
+   还原成功（按内容比对）
+
+=== 电池汇总 ===
+  M337: 'CAUGHT'
+  M338: 'CAUGHT'
+  M339: 'CAUGHT'
+  M340: 'CAUGHT'
+  M341: 'CAUGHT'
+  M342: 'CAUGHT'
+  CAUGHT=6 非抓到=0 ⇒ 每一条都红在所指的格上
+电池结束。

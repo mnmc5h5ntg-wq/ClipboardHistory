@@ -20,7 +20,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.ci_capture_gate import analyse, main
+from scripts.ci_capture_gate import analyse, main, union_lines
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r36_runner_capture.log"
 RUNNER_FIXTURE = FIXTURE.read_text(encoding="utf-8")
@@ -194,6 +194,104 @@ class CaptureGateExitCodeTests(unittest.TestCase):
         self.assertEqual(["ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews"],
                          result["red_cases"], "但用例名必须进来")
         self.assertEqual(result["red_cases"], result["crashed"])
+
+
+class ReadingsChannelUnionTests(unittest.TestCase):
+    """第二条读数通道的并集（R64 / BACKLOG 96）。
+
+    下面这几份日志**全是合成的**（真 runner 日志只有上面那批用的 `RUNNER_FIXTURE` 一份）。
+    它们证明的是"并集这一步有没有牙"，不证明真 CI 已经长成那个形状 —— 那要等下一次
+    runner 的日志（同一句话在 R36 也写过，见 BACKLOG 49 的验收）。
+
+    形状是 R63 在两台机器上量到的那一种：**用例判了、结论行也在、而判据自己写的那条读数没了**。
+    只读 stdout 的闸门在这种时候会绿。
+    """
+
+    STDOUT = """
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayFillsItsPanelAndCanBeCaptured]' started.
+CAPTURE_SELFTEST_11aa22bb
+CAPTURE_NOT_RUN settings-stats-720x1040-dark.png 93% 未绘制 ⇒ 记为未运行
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testQuickPickOverlayFillsItsPanelAndCanBeCaptured]' passed (1.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' passed (1.000 seconds).
+"""
+    # 那一条断言行 stdout 没打出来（真机丢的就是这种），文件通道里留着。
+    READINGS = """
+CAPTURE_SELFTEST_11aa22bb
+/Users/x/UICaptureHarness.swift:321: error: -[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews] : XCTAssertGreaterThan failed: ("0.0") is not equal to ("2125.0")
+QUICKPICK_FIXTURE_ROWS all=5 typed(访达)=2 empty(zzz 不存在)=0
+CAPTURE_NOT_RUN settings-stats-720x1040-dark.png 93% 未绘制 ⇒ 记为未运行
+"""
+
+    def write(self, text, suffix=".log"):
+        handle, path = tempfile.mkstemp(suffix=suffix)
+        os.close(handle)
+        with open(path, "w", encoding="utf-8") as writer:
+            writer.write(text)
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def test_stdout_alone_would_call_this_green(self):
+        """正对照：**不给** `--readings` 时这份 stdout 必须是 0。
+
+        这一臂是整组的前提 —— 如果只读 stdout 已经能红，那"并集有牙"就什么都没证明。
+        """
+        code, out = run_main(self.write(self.STDOUT))
+        self.assertEqual(0, code, out)
+
+    def test_the_readings_channel_is_what_makes_a_lost_red_visible(self):
+        code, out = run_main(self.write(self.STDOUT), "--readings", self.write(self.READINGS))
+        self.assertEqual(1, code, out)
+        self.assertIn("testCaptureKeyViews", out)
+        # 补回 2 行：断言行 + `QUICKPICK_FIXTURE_ROWS`（第三行 `CAPTURE_SELFTEST_11aa22bb`
+        # 和 `CAPTURE_NOT_RUN …` 那行两边都有，精确整行比对把它们去掉了）。
+        self.assertIn("补回=2", out, out)
+        self.assertIn("只在文件通道里", out, "红是从第二条通道补回来的，这句话必须说出来")
+
+    def test_the_union_is_an_exact_line_match_not_a_marker_match(self):
+        """同一句读数**数字变了**就是另一条结论，不许被"按 marker 去重"吃掉。
+
+        第一版并集我差点写成"按 marker 名去重"，那样 stdout 里只要有过
+        `QUICKPICK_FIXTURE_ROWS` 这几个字，文件里那条不同数字的就会被丢掉。
+        """
+        stdout = "QUICKPICK_FIXTURE_ROWS all=5 typed(访达)=2 empty(zzz 不存在)=0\n"
+        readings = ("QUICKPICK_FIXTURE_ROWS all=5 typed(访达)=2 empty(zzz 不存在)=0\n"
+                    "QUICKPICK_FIXTURE_ROWS all=5 typed(访达)=3 empty(zzz 不存在)=0\n")
+        recovered = union_lines(stdout, readings)
+        self.assertEqual(1, len(recovered), recovered)
+        self.assertIn("typed(访达)=3", recovered[0])
+
+    def test_repeated_lines_are_recovered_once(self):
+        """文件内部重复、以及与 stdout 重复，都不许把 `NOT_RUN=` 的条数撑虚。"""
+        readings = (
+            "CAPTURE_NOT_RUN settings-stats-720x1040-dark.png 93% 未绘制 ⇒ 记为未运行\n"
+            "CAPTURE_NOT_RUN settings-stats-720x1040-dark.png 93% 未绘制 ⇒ 记为未运行\n"
+            "SPARSE_EXEMPTION_OK quickpick-empty drawn=5.1% < quickpick-list drawn=17.9% - 3pt\n")
+        code, out = run_main(self.write(self.STDOUT), "--readings", self.write(readings))
+        self.assertEqual(0, code, out)
+        self.assertIn("补回=1", out, out)
+        self.assertIn("NOT_RUN=1", out, out)
+
+    def test_a_missing_readings_file_is_a_named_red(self):
+        path = self.write(self.STDOUT)
+        code, out = run_main(path, "--readings", "/nonexistent/capture-readings.log")
+        self.assertEqual(1, code, out)
+        self.assertIn("第二条读数通道", out)
+        self.assertIn("缺文件", out)
+        # 结论行必须打在**这条红之前**（R53 / BACKLOG 75 同一句话）：
+        # 通道坏了的时候，"这次判了多少"仍然是现场最有用的数。
+        self.assertLess(out.index("CAPTURE_GATE_CASES"), out.index("CAPTURE_GATE_RESULT"), out)
+
+    def test_an_empty_readings_file_is_a_red_too(self):
+        """文件在但一行读数都没有 ⇒ `emit` 从没被调用过，等于还是只有一条腿。"""
+        code, out = run_main(self.write(self.STDOUT), "--readings", self.write("\n\n   \n"))
+        self.assertEqual(1, code, out)
+        self.assertIn("存在但一行读数都没有", out)
+
+    def test_no_channel_line_when_the_flag_is_not_given(self):
+        """不给 `--readings` 的旧调用不许多打一行（本地直接 `python3 … log` 的用法要保持原样）。"""
+        code, out = run_main(self.write(CLEAN_LOG))
+        self.assertEqual(0, code, out)
+        self.assertNotIn("CAPTURE_GATE_CHANNELS", out)
 
 
 if __name__ == "__main__":

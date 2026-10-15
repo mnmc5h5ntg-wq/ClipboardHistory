@@ -91,6 +91,36 @@ jobs:
           # 后面的汇报行整段不执行 —— 那等于这一步又变成"红了但没有数字"。
           CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
             swift test --filter UICaptureTests 2>&1 | tee /tmp/frames-raw.log | sed '/colorspace/d' | tee /tmp/frames.log || true
+          # R64 / BACKLOG 96：这一步**只报**第二条通道在不在，不做并集 ——
+          # 并集挪进闸门自己（`--readings`），因为那才是能被单测判红的地方；
+          # shell 里的 awk 没有一份自测能替它证明"补回的行数是对的"。
+          # 为什么必须两条通道 —— 本机三遍（与 GitHub 无关，同一批代码、同一台机器）逐行比对出来的：
+          #   捕获卷单独一遍（`swift test --filter UICaptureTests`，stdout 重定向到文件）：
+          #     文件通道 488 行读数，stdout 只有前 164 行，**后面 324 行整块消失**（66.4%），
+          #     切点落在**行中间**（stdout 停在 `…bottomI`，下一行直接是 `Test Case …`）；
+          #     被切掉的这块合计 28,644 字节（只算读数行，实际更大）。
+          #   全量一遍（`swift test`，`2>&1 | tee`，也就是这一步在 CI 里的形状）：
+          #     同样 488 行里 stdout 丢了 **238 行（48.8%）**，而且是 **3 个连续大块**
+          #     （读数下标 0–48、142–217、296–408）。
+          #   同一形状再跑一遍（第二、三遍都是 `--filter UICaptureTests`）：丢的是**同一块**
+          #     —— 两遍都是下标 164–487、324 行 ⇒ 在这个命令形状上它是**可复现的**，
+          #     不是"这次运气差"。所以"这次没丢"更不能当理由。
+          #     （324 行实例 = 316 条不同的行，闸门报的 `补回=316` 是去重后的数。）
+          #   两遍里 5 条判据自写的结论 marker（`CAPTURE_PROBE quickpick`、`QUICKPICK_FIXTURE_ROWS`、
+          #     `QUICKPICK_EMPTY_SENTENCE`、`QUICKPICK_LONG_QUERY`、`CAPTURE_READINGS_SELFTEST`）**全丢**，
+          #     而 37 / 775 条用例的 `passed|skipped` 结论行一条没少，作业 0 退出。
+          #   ⇒ 形状是"连续大块丢"，不是"每条各自有概率丢"（R63 的账本里那句"按条随机"是我加的解释，
+          #     本轮量出来不对，已在 BACKLOG 96 更正；结论不受影响：**丢的是判据自己写的结论**）。
+          #   闸门拿第一遍那两份真文件跑一次：`补回=316 行`（去重后），不给 `--readings` 它仍然是绿的。
+          # runner 上另两份只是现场证据（GitHub 那份日志本身也可能截，所以不算机制）：
+          #   run 38683762166 的捕获那一步 4 个浮层 marker 到 0/4，run 38687419144 到 2/4。
+          readings=/tmp/shots-ci/capture-readings.log
+          if [ -f "$readings" ]; then
+            echo "capture 文件通道：$(wc -l < "$readings" | tr -d ' ') 行读数 @ $readings"
+          else
+            # 故意不 exit 1：这一步是 report-only，红由闸门判。但缺失必须有名字。
+            echo "CAPTURE_READINGS_FILE=missing 文件通道没落盘 ⇒ 这一步的读数只剩 stdout 这一条腿"
+          fi
           frames=$(find /tmp/shots-ci -name '*.png' 2>/dev/null | wc -l | tr -d ' ' || true)
           # 每一条抽取都必须自己吞掉非零：`bash -e` + `set -o pipefail` 下，
           # **汇报行自己的 grep 失手**也会中止脚本（实测 run 38062956819：runner 上 XCTest 只打了
@@ -108,18 +138,20 @@ jobs:
           test "${frames:-0}" -ge 60
 
       # R36 / BACKLOG 49 / U-59：**这一步是硬门**，判的是"有没有没被登记的红色"。
-      # 三条规矩：① 日志里一条 `Test Case` 结论都没有 ⇒ 红（挂死、崩溃、filter 打错，
+      # 四条规矩：① 日志里一条 `Test Case` 结论都没有 ⇒ 红（挂死、崩溃、filter 打错，
       # 以前这些都长得像"这一步绿了"）；② 任何 `error: -[类 方法]` 或 `failed` 结论 ⇒ 红，
       # 指名是谁；③ 判出绿的用例数低于 15 ⇒ 红 —— 这是防另一种"红了没人看"：
       # 把像素判据整批改成 `throw XCTSkip` 之后，① ② 都是绿的，而那一步其实已经什么都不判了
       # （run 38473962277 实测：28 个用例里 8 个是 skipped，而报表上只有"绿"）。
       # 15 的来历：那一次是 19 passed / 8 skipped / 1 failed；红修完 ⇒ 20 passed。
       # 门取 15 而不是 20：允许个别的、已登记的降级，但不允许"整批退回 skip"。
+      # ④ R64 / BACKLOG 96：给了 `--readings` 而那份文件缺或空 ⇒ 红。
       # 已登记的 `*_NOT_RUN` 会被逐条打出来（有读数、有原因），它们不算红。
       - name: Capture gate (unregistered reds must be zero)
         timeout-minutes: 2
         run: |
-          python3 scripts/ci_capture_gate.py /tmp/frames.log --min-passed 15
+          python3 scripts/ci_capture_gate.py /tmp/frames.log --min-passed 15 \
+            --readings /tmp/shots-ci/capture-readings.log
 
       - name: On-screen interaction probes (report-only)
         continue-on-error: true

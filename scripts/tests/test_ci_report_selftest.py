@@ -109,8 +109,21 @@ SUBSTITUTIONS = {
     # 所以夹具挂在 `cp` 上，脚本路径换成绝对路径（自检的 cwd 不一定是仓库根）。
     "capture_gate": [
         (r"python3 scripts/ci_capture_gate\.py /tmp/frames\.log",
-         "cp FAKE_LOG /tmp/frames.log; python3 " + os.path.join(ROOT, "scripts", "ci_capture_gate.py")
-         + " /tmp/frames.log"),
+         # R64 / BACKLOG 96：这道门现在**要求**第二条读数通道，所以自检必须自己造一份，
+         # 而且要先把上一格留下的删掉 —— 这个临时目录跨格复用，残留的读数文件会让
+         # "通道缺文件"那一格凭空变绿（R56 的 motion 那一格是同一个坑，见上面那条 `rm -f`）。
+         # 造的内容就是从同一份假日志里抄读数行 ⇒ "并集补回 0 行"是这里的默认形状，
+         # 而"补回 k>0"与"缺文件必须红"由 scripts/tests/test_ci_capture_gate.py 逐条判。
+         "cp FAKE_LOG /tmp/frames.log; "
+         "mkdir -p /tmp/shots-ci; rm -f /tmp/shots-ci/capture-readings.log; "
+         "grep -E '^(CAPTURE_|MATERIAL_BLIND|SPARSE_|TEXT_SIDE|INK_SIDE|DISABLED_STATE|PROBE_DOMAIN"
+         "|DISCRIMINATOR_ARM)' /tmp/frames.log > /tmp/shots-ci/capture-readings.log || true; "
+         "python3 " + os.path.join(ROOT, "scripts", "ci_capture_gate.py") + " /tmp/frames.log"),
+        # 这一条替换是**接线断言**：命中不了 ⇒ ci.yml 里那道门不再带 `--readings`，
+        # 也就是 BACKLOG 96 的修法被悄悄撤掉了 —— 那种撤掉不会让上面任何一格变红，
+        # 只会让"这次只剩一条腿"重新变成看不出来的事。
+        (r"--readings /tmp/shots-ci/capture-readings\.log",
+         "--readings /tmp/shots-ci/capture-readings.log"),
     ],
 }
 

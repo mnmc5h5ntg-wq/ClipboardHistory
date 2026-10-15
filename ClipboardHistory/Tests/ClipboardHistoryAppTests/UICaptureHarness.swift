@@ -205,13 +205,116 @@ final class UICaptureTests: XCTestCase {
         case emptyAppKitFixture
     }
 
-    private var outputDirectory: URL? {
-        guard let path = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"], !path.isEmpty else {
+    // MARK: - 读数的第二条通道（R64 / BACKLOG 96）
+
+    /// 静态语境与实例语境各一个名字（与动效卷 `MotionFilmstripTests` 同一形状）：
+    /// Swift 不允许实例方法不加限定地调静态成员，而这一卷里 69 处读数散在两种语境中 ——
+    /// 与其到处写 `CaptureReadings.emit`，不如让两条语境共用一个名字。
+    /// 真正的通道在 `CaptureReadings.swift`：**这个文件里一行 `print` 都不许有**，
+    /// 由 `testCaptureReadingsUseTheFileChannel` 钉住。
+    static func emit(_ line: String) { CaptureReadings.emit(line) }
+
+    /// 把 `//` 注释与 `/* … */` 块注释去掉，只留代码。
+    /// 存在的理由：守卫扫的是"有没有游离的调用"，而这一卷的注释里满是
+    /// "以前这里是 `print(...)`"这种句子 —— 不剥注释的话，守卫会把**解释自己**判成违规，
+    /// 于是下一次有人为了变绿去删注释（R55 的 M276 就是这条家族：守卫读到自己的文本）。
+    static func codeOnly(_ source: String) -> String {
+        var out: [String] = []
+        var inBlock = false
+        for line in source.components(separatedBy: "\n") {
+            var trimmed = line
+            if inBlock {
+                if let end = trimmed.range(of: "*/") {
+                    trimmed = String(trimmed[end.upperBound...])
+                    inBlock = false
+                } else {
+                    continue
+                }
+            }
+            while let start = trimmed.range(of: "/*"), let end = trimmed.range(of: "*/"), start.lowerBound < end.upperBound {
+                let head = String(trimmed[..<start.lowerBound])
+                let tail = String(trimmed[end.upperBound...])
+                trimmed = head + tail
+            }
+            if let range = trimmed.range(of: "//") {
+                trimmed = String(trimmed[..<range.lowerBound])
+            }
+            out.append(trimmed)
+        }
+        return out.joined(separator: "\n")
+    }
+
+    private func emit(_ line: String) { Self.emit(line) }
+
+    private var outputDirectory: URL? {        guard let path = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"], !path.isEmpty else {
             return nil
         }
         let url = URL(fileURLWithPath: path, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    /// 捕获卷的读数必须**两条通道都有**（R64 / BACKLOG 96）。
+    ///
+    /// 立的理由不是"想统一风格"：R63/R64 量到 `swift test` 的 stdout **会成块丢** ——
+    /// 本轮同一批代码两遍，捕获卷 488 行读数里 stdout 分别少了 324 行与 238 行，
+    /// 少的都是连续大块（切点落在行中间），五条判据自写的 marker 两遍全丢，
+    /// 而 37 / 775 条用例的结论行一条没少、作业 0 退出。
+    /// 也就是说"今天判了什么"这件事，
+    /// 可以整块消失而报表仍然是绿的。
+    ///
+    /// 扫描规则故意写成**绝对**的："这个文件里 `print` 的出现次数 = 0"。
+    /// 不给"通道实现自己那一行"开白名单 —— 白名单就是下一次绕过去的入口
+    /// （R55 的 M276：守卫在自己的失败消息里读到了被搜的串，于是把真调用删掉它仍然绿）。
+    /// 通道实现因此单独住在 `CaptureReadings.swift`。
+    func testCaptureReadingsUseTheFileChannel() throws {
+        // ① 被搜的串不能原样出现在守卫自己的文本里：拼出来。
+        let printCall = "pr" + "int("
+        let source = UICaptureTests.codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
+        let strays = source.components(separatedBy: "\n").filter { $0.contains(printCall) }
+        XCTAssertTrue(strays.isEmpty,
+                      "捕获卷里有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
+                      + " ⇒ 通道丢一次的那天，这些读数一条都不剩（BACKLOG 96）。改走 `emit`")
+
+        // ② 正对照：扫描本身得抓得住三种真实写法，并且**不**抓 `emit`。
+        //    没有这一步，"零条游离"这句话可能只是扫描坏了的别名
+        //    （R56 那版守卫就是因为只列举了两种写法，漏掉了 `print("MOTION \(name) …` 那一整族）。
+        //
+        //    三种写法必须**自带**被搜的串，不能拿 `printCall` 拼出来。
+        //    R64 的变异对照量到了这件事（M338）：用 needle 拼正对照，等于拿尺子上的刻度去验这把尺 ——
+        //    把 needle 改错成多一个空格，对照仍然 3/3，而 ① 那条扫描已经一条游离都抓不到了。
+        //    这里的 `p` 写成 `\u{0070}`：运行时串里是真的那三个字母加左括号，
+        //    源码文本里不是（否则 ① 会把对照自己判成违规，正是 R55 M276 那一族）。
+        let forms = ["  \u{0070}rint(\"CAPTURE_X 1)",
+                     "  \u{0070}rint(String(format: \"CAPTURE_Y %@\", a))",
+                     "  \u{0070}rint(\"CAPTURE \(name) frames=1)"]
+        let caught = forms.filter { $0.contains(printCall) }
+        XCTAssertEqual(caught.count, 3,
+                       "正对照只抓到 \(caught.count)/3 种写法 ⇒ 用来扫的串和被扫的真串已经不是同一个"
+                       + "（这一格红 = needle 被改坏的样子，而不是『这条卷很干净』）")
+        XCTAssertFalse("  emit(\"CAPTURE_Z 1)".contains(printCall),
+                       "扫描把 `emit` 也算成游离 ⇒ 它会逼着人把 emit 改名，判据就空转了")
+
+        // ③ 通道本身。marker 带 uuid：读到**上一遍**留下的同名文件也算通过的话，
+        //    这一格就只是在证明"有人写过这个文件"。
+        let marker = "CAPTURE_SELFTEST_\(UUID().uuidString.prefix(8))"
+        let second = marker + "-2"
+        emit(marker)
+        emit(second)
+        let text: String
+        do {
+            text = try String(contentsOf: CaptureReadings.readingsURL, encoding: .utf8)
+        } catch {
+            return XCTFail("文件通道没写出来（\(CaptureReadings.readingsURL.path)）⇒ `emit` 只剩 print，BACKLOG 96 没修")
+        }
+        XCTAssertTrue(text.contains(marker), "文件里没有这一遍的 marker ⇒ 要么没落盘，要么读到的是旧文件")
+        XCTAssertTrue(text.contains(second), "第二条 marker 没落盘 ⇒ 追加逻辑坏了（第一次写用了 `write(to:)`，之后必须走 FileHandle）")
+        let firstIndex = text.range(of: marker)!.lowerBound
+        let secondIndex = text.range(of: second)!.lowerBound
+        XCTAssertLessThan(firstIndex, secondIndex, "两条 marker 在文件里的顺序反了 ⇒ 读回来的不是写入的那一份")
+        let lines = text.split(separator: "\n").map(String.init)
+        XCTAssertGreaterThanOrEqual(lines.count, 2, "文件通道里只有 \(lines.count) 行 ⇒ 这一卷的读数根本没进来")
+        emit("CAPTURE_READINGS_SELFTEST 文件通道 \(lines.count) 行 @ \(CaptureReadings.readingsURL.path)")
     }
 
     /// R19 立的是"浮层还拍不到"，R63 把它**翻过来**：那条判据钉的现象（stack 塌）其实是产品缺陷，
@@ -279,7 +382,7 @@ final class UICaptureTests: XCTestCase {
         }
         content.cacheDisplay(in: content.bounds, to: rep)
         let transparent = Self.transparentFraction(of: rep)
-        print("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%"
+        emit("CAPTURE_PROBE quickpick transparent=\(String(format: "%.1f", transparent * 100))%"
               + " rows=\(rows) stack=\(stackFrame.map { NSStringFromRect($0) } ?? "nil") "
               + "tableVisible=\(tableVisible.map { NSStringFromRect($0) } ?? "nil") "
               + "dataSourceIsController=\(dataSourceIsController)"
@@ -351,7 +454,7 @@ final class UICaptureTests: XCTestCase {
         // 改夹具的查询词而不改这里，这条判据就会去判一个今天没人看的状态。
         let typed = rowsFor("访达")
         let none = rowsFor("zzz 不存在")
-        print("QUICKPICK_FIXTURE_ROWS all=\(all) typed(访达)=\(typed) empty(zzz 不存在)=\(none)")
+        emit("QUICKPICK_FIXTURE_ROWS all=\(all) typed(访达)=\(typed) empty(zzz 不存在)=\(none)")
         XCTAssertGreaterThan(all, 0, "全量那一档 0 行 ⇒ 这个 store 建不出候选，三条读数都没有对象")
         XCTAssertGreaterThan(typed, 0,
                              "「访达」在夹具 store 里命中 0 条 ⇒ `quickpick-typed` 那张帧拍的是空结果态，"
@@ -416,7 +519,7 @@ final class UICaptureTests: XCTestCase {
         }
         // AppKit 的 y 向上：搜索框在**上面**，所以它的 `minY` 就是它的底边。
         let gap = fieldRect.minY - sentenceRect.maxY
-        print("QUICKPICK_EMPTY_SENTENCE fieldBottom=\(String(format: "%.1f", fieldRect.minY)) "
+        emit("QUICKPICK_EMPTY_SENTENCE fieldBottom=\(String(format: "%.1f", fieldRect.minY)) "
               + "sentenceTop=\(String(format: "%.1f", sentenceRect.maxY)) gap=\(String(format: "%.1f", gap))")
         XCTAssertLessThanOrEqual(gap, 24,
                                 "那句话与搜索框之间空了 \(Int(gap))pt ⇒ 它又掉回面板最底下了。"
@@ -464,7 +567,7 @@ final class UICaptureTests: XCTestCase {
         guard let longRect = Self.frame(longLabel, in: longContent) else {
             return XCTFail("长查询那一档换算不到 content 坐标系 ⇒ 判据没有对象")
         }
-        print("QUICKPICK_LONG_QUERY 句子 frame=\(NSStringFromRect(longRect)) "
+        emit("QUICKPICK_LONG_QUERY 句子 frame=\(NSStringFromRect(longRect)) "
               + "面板=\(NSStringFromRect(longContent.bounds)) 文本长度=\(longLabel.stringValue.count)")
         // **面板不许因为内容变宽**。这一条不是"防回归"，它防的是本轮自己改出来的东西：
         // 把 stack 钉到面板上之后，"内容要多宽"第一次传到了窗口 ——
@@ -566,14 +669,14 @@ final class UICaptureTests: XCTestCase {
         let settingsFamilyIsBlank = capability.settingsFamilyIsBlank
         let settingsLowestBlank = capability.settingsLowestBlank
         let bandsSeenHere = capability.bandsSeenHere
-        print("CAPTURE_CAPABILITY settings族整体空白=\(settingsFamilyIsBlank ? "是" : "否")"
+        emit("CAPTURE_CAPABILITY settings族整体空白=\(settingsFamilyIsBlank ? "是" : "否")"
               + "（族内最低未绘制 " + String(format: "%.1f", settingsLowestBlank * 100) + "% / "
               + "\(readings.filter { $0.family == "settings" }.count) 张）"
               + " / 这一台见过黑带=\(bandsSeenHere ? "是" : "否")")
 
-        print("CAPTURED \(report.count) -> \(directory.path)")
+        emit("CAPTURED \(report.count) -> \(directory.path)")
         for item in report {
-            print("  \(item.name)  transparent=\(String(format: "%.1f", item.metrics.transparent * 100))%"
+            emit("  \(item.name)  transparent=\(String(format: "%.1f", item.metrics.transparent * 100))%"
                   + "  blackBandPt=\(String(format: "%.0f", item.metrics.blackBandPt))"
                   + "  bottomInk=\(String(format: "%.1f", item.metrics.bottomInkFraction * 100))%")
         }
@@ -595,7 +698,7 @@ final class UICaptureTests: XCTestCase {
                               + "被裁掉的那部分从来没有进过帧基线，也就从来没有被审过")
         }
         let judgedFit = mustFitNames.count
-        print("CONTENT_FIT \(judgedFit) fixtures 判了底行墨（\(mustFitNames.sorted().joined(separator: ","))）")
+        emit("CONTENT_FIT \(judgedFit) fixtures 判了底行墨（\(mustFitNames.sorted().joined(separator: ","))）")
 
         // **正对照**（R37 / U-60）：一把只在"该红的时候没红"上被检验的尺，等于没被检验。
         // 上面那十张读到的都是 0.0%，所以必须有**一张已知会被裁**的帧读得到墨，
@@ -621,7 +724,7 @@ final class UICaptureTests: XCTestCase {
                                  + "两种可能都要查：尺的参照点又被挪走了，或者那张对照帧不再被裁了"
                                  + "（后者意味着 `clippedRowFrame` 失效，判据同样失去正对照）")
         }
-        print("CONTENT_FIT_CANARY " + canaries.map { "\($0.name)=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
+        emit("CONTENT_FIT_CANARY " + canaries.map { "\($0.name)=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
             .joined(separator: " ")
             + "（线 " + String(format: "%.0f", InkFloor.bottomEdgeControlMinFraction * 100) + "%，"
             + "mustFit 那批的上限是 " + String(format: "%.0f", InkFloor.fixtureBottomInkMaxFraction * 100) + "%）")
@@ -656,11 +759,11 @@ final class UICaptureTests: XCTestCase {
         }
         XCTAssertGreaterThanOrEqual(identityChecked, 100,
                                     "恒等式只对了 \(identityChecked) 张帧 ⇒ 遍历坏了，这条锁等于没上")
-        print("BOTTOM_INK_IDENTITY \(identityChecked) 张帧：判据读数 == 从 PNG 重算的那一份")
+        emit("BOTTOM_INK_IDENTITY \(identityChecked) 张帧：判据读数 == 从 PNG 重算的那一份")
 
         // 新知识（R37 才有）：哪些帧的底行**真的**压着东西。以前这条清单是假的（色差）。
         let edgeCarriers = report.filter { $0.metrics.bottomInkFraction >= InkFloor.fixtureBottomInkMaxFraction }
-        print("BOTTOM_EDGE_INK \(edgeCarriers.count) 张帧的底行读到 ≥"
+        emit("BOTTOM_EDGE_INK \(edgeCarriers.count) 张帧的底行读到 ≥"
               + String(format: "%.0f", InkFloor.fixtureBottomInkMaxFraction * 100) + "% 非底色像素："
               + edgeCarriers.map { "\(Self.fixtureName(fromFile: $0.name))=\(String(format: "%.1f", $0.metrics.bottomInkFraction * 100))%" }
                 .sorted().joined(separator: " "))
@@ -672,7 +775,7 @@ final class UICaptureTests: XCTestCase {
             let family = name.components(separatedBy: "-").first ?? ""
             let knownIncapable = (family == "settings" && settingsFamilyIsBlank)
             if knownIncapable {
-                print("CAPTURE_NOT_RUN \(item.name) \(Int(item.metrics.transparent * 100))% 未绘制"
+                emit("CAPTURE_NOT_RUN \(item.name) \(Int(item.metrics.transparent * 100))% 未绘制"
                       + "，而 settings 族在这台机器上**每一张**都超过 "
                       + String(format: "%.0f", InkFloor.captureFamilyBlankFraction * 100) + "%（族内最低 "
                       + String(format: "%.1f", settingsLowestBlank * 100) + "%）⇒ 记为未运行")
@@ -718,7 +821,7 @@ final class UICaptureTests: XCTestCase {
         let sparseControl = ["quickpick-empty": "quickpick-list"]
         for (entry, control) in sparseControl where Self.sparseByDesignFixtures.contains(entry) {
             guard let entryDrawn = drawnByName[entry], let controlDrawn = drawnByName[control] else {
-                print("SPARSE_EXEMPTION_NOT_RUN \(entry)/\(control) 这台机器没拍出这两张帧 ⇒ 不判")
+                emit("SPARSE_EXEMPTION_NOT_RUN \(entry)/\(control) 这台机器没拍出这两张帧 ⇒ 不判")
                 continue
             }
             XCTAssertLessThan(entryDrawn, controlDrawn - 0.03,
@@ -727,10 +830,10 @@ final class UICaptureTests: XCTestCase {
                               + "那一格大概已经有内容了，把 \(entry) 从 `sparseByDesignFixtures` 拿掉，并肉眼审一遍新帧。"
                               + "注意这里**不写未绘制的绝对门槛**：本机 97.9% / runner 94.9% 差 3pt，"
                               + "任何绝对数都会在某台机器上变成假红或免检牌（R38）")
-            print("SPARSE_EXEMPTION_OK \(entry) drawn=\(String(format: "%.1f", entryDrawn * 100))%"
+            emit("SPARSE_EXEMPTION_OK \(entry) drawn=\(String(format: "%.1f", entryDrawn * 100))%"
                   + " < \(control) drawn=\(String(format: "%.1f", controlDrawn * 100))% - 3pt")
         }
-        print("SPARSE_EXEMPTION 本次真正走了豁免分支的帧 \(exemptedSparse.sorted())，名单共 \(Self.sparseByDesignFixtures.count) 条"
+        emit("SPARSE_EXEMPTION 本次真正走了豁免分支的帧 \(exemptedSparse.sorted())，名单共 \(Self.sparseByDesignFixtures.count) 条"
               + "（走不走由这台机器的未绘制比例决定，**判过期不由它决定**）")
 
         // **材质盲区要能被数出来**（R18）。
@@ -754,11 +857,11 @@ final class UICaptureTests: XCTestCase {
             // ⇒ "黑带消失了"那条守卫在 CI 上恒红（并被 report-only 吞掉）。
             // 名单是本机量出来的**事实**，拿到没见过黑带的机器上判"事实变了"不是判据，是错觉。
             // 只关这一个方向：`extra`（第一次冒黑）在上面，任何机器上都照样红 —— 它自己带证据。
-            print("MATERIAL_BLIND_NOT_RUN 这台机器 102 帧里一处黑带都没有，而名单上有 "
+            emit("MATERIAL_BLIND_NOT_RUN 这台机器 102 帧里一处黑带都没有，而名单上有 "
                   + "\(Self.materialBlindSpotFixtures.count) 处 ⇒ 「黑带消失了」这一方向无从判起"
                   + "（名单是本机量出来的）；「第一次冒黑」那一方向仍然开着")
         }
-        print("MATERIAL_BLIND_SPOTS \(blind.count) of \(Set(report.map { Self.fixtureName(fromFile: $0.name) }).count) fixtures")
+        emit("MATERIAL_BLIND_SPOTS \(blind.count) of \(Set(report.map { Self.fixtureName(fromFile: $0.name) }).count) fixtures")
     }
 
     /// settings 族的一行读数（其余两条前提只看族外，这里给个"没裁到底"的正常值）。
@@ -830,7 +933,7 @@ final class UICaptureTests: XCTestCase {
             [Self.settingsReading(0.99), Self.otherReading("detail", ink: 1.0)])
         XCTAssertFalse(singleFrameFamily.settingsFamilyIsBlank,
                        "只有一张帧时不许宣告整族空白 —— 那正好是「捕获失效」最像「机器不行」的形状")
-        print("CAPABILITY_TRUTH_TABLE 4 臂（本机 / runner / 单帧空白 / 族只一张）："
+        emit("CAPABILITY_TRUTH_TABLE 4 臂（本机 / runner / 单帧空白 / 族只一张）："
               + "local(blank=\(local.settingsFamilyIsBlank),band=\(local.bandsSeenHere)) "
               + "runner(blank=\(runner.settingsFamilyIsBlank),band=\(runner.bandsSeenHere))")
     }
@@ -887,7 +990,7 @@ final class UICaptureTests: XCTestCase {
                           + "）必须**低于**正对照的下限（"
                           + String(format: "%.2f", InkFloor.bottomEdgeControlMinFraction)
                           + "）⇒ 否则放宽一条就等于同时满足两条，这把尺的正对照与判据互相取消")
-        print("BOTTOM_INK_TRUTH_TABLE 角点=\(String(format: "%.1f", ink(cornerOnly) * 100))%"
+        emit("BOTTOM_INK_TRUTH_TABLE 角点=\(String(format: "%.1f", ink(cornerOnly) * 100))%"
               + " 半行=\(String(format: "%.1f", ink(halfInk) * 100))%"
               + " 全出血=\(String(format: "%.1f", ink(fullBleed) * 100))%")
     }
@@ -967,7 +1070,7 @@ final class UICaptureTests: XCTestCase {
             guard let plain = try read("settings-general", appearance),
                   let unsupported = try read("settings-general-login-unsupported", appearance),
                   let failed = try read("settings-general-login-failed", appearance) else {
-                print("DISABLED_STATE_NOT_RUN \(tag) 三张帧没齐 ⇒ 这一档在这一台无从判起")
+                emit("DISABLED_STATE_NOT_RUN \(tag) 三张帧没齐 ⇒ 这一档在这一台无从判起")
                 notRun += 1
                 continue
             }
@@ -989,7 +1092,7 @@ final class UICaptureTests: XCTestCase {
                                + " ⇒ 这不是「这一台画不出这一页」（那要么三张全有、要么三张全无），"
                                + "而是其中某一帧坏了或者我的框贴错了。先去看那一张帧")
             case .noneDrawn:
-                print("DISABLED_STATE_NOT_RUN \(tag) 内容列读到 "
+                emit("DISABLED_STATE_NOT_RUN \(tag) 内容列读到 "
                       + "\(plain.contentInk)/\(unsupported.contentInk)/\(failed.contentInk) 个算字像素"
                       + " ⇒ 这一台拍不出设置页（BACKLOG 43），这一档记未运行，不算通过")
                 notRun += 1
@@ -1034,7 +1137,7 @@ final class UICaptureTests: XCTestCase {
                         + "\(reading.receiptCaption - plain.receiptCaption) 个（要求 >500）。"
                         + "这一行回执要么没画，要么淡到不成字")
             }
-            print("DISABLED_STATE \(tag)：标签对比度 启用=\(String(format: "%.2f", plain.labelRatio)) "
+            emit("DISABLED_STATE \(tag)：标签对比度 启用=\(String(format: "%.2f", plain.labelRatio)) "
                   + "禁用=\(String(format: "%.2f", unsupported.labelRatio))（淡到 "
                   + String(format: "%.2f", unsupported.labelRatio / max(plain.labelRatio, 0.01)) + " 倍）"
                   + " 标签算字像素 启用=\(plain.labelInk) 禁用=\(unsupported.labelInk)"
@@ -1051,7 +1154,7 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged + notRun, 2,
                        "两档外观应该有 2 个交代（判成或未运行），现在 judged=\(judged) notRun=\(notRun) "
                        + "⇒ 这一档在这一台既没判成、也没被如实记账")
-        print("DISABLED_STATE_COVERAGE 判成 \(judged) 档、未运行 \(notRun) 档（共 2 档）")
+        emit("DISABLED_STATE_COVERAGE 判成 \(judged) 档、未运行 \(notRun) 档（共 2 档）")
     }
 
     /// 机器前提这把"折成决定"的尺本身要有真值表（R39b）。
@@ -1069,7 +1172,7 @@ final class UICaptureTests: XCTestCase {
                        "只画出一部分不是环境问题：同一列要么全有要么全无，这一格必须红")
         XCTAssertEqual(Self.settingsDrawability([900, 0, 0]), .partial(1),
                        "只有一张有墨同样必须红（那是夹具坏了，不是机器不行）")
-        print("SETTINGS_DRAWABILITY_TRUTH_TABLE 全有=判 / 全无=未运行 / 1|2 张=红（四格全过）")
+        emit("SETTINGS_DRAWABILITY_TRUTH_TABLE 全有=判 / 全无=未运行 / 1|2 张=红（四格全过）")
     }
 
     /// 夹具图片的字节**不能**随系统外观变。
@@ -2119,7 +2222,7 @@ final class UICaptureTests: XCTestCase {
             // 量的**不是同一件事**（那儿的窗口底色不同 ⇒ 3.5% 的框填充落不进"偏离 >12"，
             // 于是带子塌成"有墨的行"）。把判据建在它上面，等于让 CI 绿不绿取决于底色。
             // 等高这条改成量**布局本身**（下面 `idealHeight`），它是环境无关的。
-            print("SEARCH_FIELD_BANDS \(tag) px=\(heights)（诊断用，判据在 idealHeight 那条）")
+            emit("SEARCH_FIELD_BANDS \(tag) px=\(heights)（诊断用，判据在 idealHeight 那条）")
         }
     }
 
@@ -2193,7 +2296,7 @@ final class UICaptureTests: XCTestCase {
                                      "\(tag) 下空框 \(box.empty)pt、有字框 \(box.filled)pt"
                                      + "（差 \(abs(box.empty - box.filled))pt）⇒ 打字时整颗搜索框会自己跳："
                                      + "这一行的定高者不是文本列")
-            print("SEARCH_FIELD_IDEAL_HEIGHTS \(tag) empty=\(box.empty) filled=\(box.filled)")
+            emit("SEARCH_FIELD_IDEAL_HEIGHTS \(tag) empty=\(box.empty) filled=\(box.filled)")
         }
     }
 
@@ -2723,8 +2826,8 @@ final class UICaptureTests: XCTestCase {
             }
             walk(host, depth: 0)
         }
-        print("SUBTREE settings-general dark：压在侧栏文字列上 / 嵌套的视图共 \(report.count) 个")
-        report.prefix(80).forEach { print("  \($0)") }
+        emit("SUBTREE settings-general dark：压在侧栏文字列上 / 嵌套的视图共 \(report.count) 个")
+        report.prefix(80).forEach { emit("  \($0)") }
         throw XCTSkip("诊断用判据：它只回答「这一列是谁画的、它携带的颜色在两种外观下各解析成什么」，"
                       + "不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
     }
@@ -2791,9 +2894,9 @@ final class UICaptureTests: XCTestCase {
             let rows = Self.rowTierProfile(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                            bytesPerRow: rep.bytesPerRow,
                                            rect: profileRect, scale: scale)
-            print("ROWTIER \(name) \(tag)：有字行 \(rows.count) 行（区域 x \(Int(profileRect.minX))..\(Int(profileRect.maxX))、y \(Int(profileRect.minY))..\(Int(profileRect.maxY))）")
+            emit("ROWTIER \(name) \(tag)：有字行 \(rows.count) 行（区域 x \(Int(profileRect.minX))..\(Int(profileRect.maxX))、y \(Int(profileRect.minY))..\(Int(profileRect.maxY))）")
             for band in Self.textBands(rows: rows, scale: scale) where band.title == 0 && band.caption > 0 {
-                print(String(format: "  说明档带 y=%.1f..%.1f pt 最深偏离=%d 说明=%d",
+                emit(String(format: "  说明档带 y=%.1f..%.1f pt 最深偏离=%d 说明=%d",
                              band.startPt, band.endPt, band.maxDeviation, band.caption))
             }
             }
@@ -2836,7 +2939,7 @@ final class UICaptureTests: XCTestCase {
             }
             let file = scratch.appendingPathComponent("menubar-width-\(Int(width)).png")
             _ = try render(fixture, appearance: .aqua, to: file) { host in
-                print("MENUBAR_FITTING 声明宽=\(Int(width)) hosting.fittingSize="
+                emit("MENUBAR_FITTING 声明宽=\(Int(width)) hosting.fittingSize="
                       + String(format: "%.1fx%.1f", host.fittingSize.width, host.fittingSize.height))
             }
             guard let image = NSImage(contentsOf: file),
@@ -2856,7 +2959,7 @@ final class UICaptureTests: XCTestCase {
             let leading = Self.leadingInkColumn(bytes: base, width: rep.pixelsWide,
                                                 height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
                                                 rect: rowBand, scale: scale, minDelta: 60)
-            print(String(format: "MENUBAR_WIDTH 声明宽=%d 带=y156..172 最左墨=%@ 最右墨=%@ ⇒ 右边距=%@",
+            emit(String(format: "MENUBAR_WIDTH 声明宽=%d 带=y156..172 最左墨=%@ 最右墨=%@ ⇒ 右边距=%@",
                          Int(width),
                          leading.map { String(format: "%.1f", $0) } ?? "无",
                          trailing.map { String(format: "%.1f", $0) } ?? "无",
@@ -2956,7 +3059,7 @@ final class UICaptureTests: XCTestCase {
                     + "两种可能：①有人给行加了右边距/宽度约束（那这些帧也许已经能判截断，"
                     + "重新判一次并把 `menuSurfaceReplicaFixtures` 收掉）；"
                     + "②布局又漂了（那先确认漂在哪）。两种都不许只把这条断言放宽。")
-        print("MENUBAR_REPLICA menubar-recommendations 第一行最右墨="
+        emit("MENUBAR_REPLICA menubar-recommendations 第一行最右墨="
               + String(format: "%.1f", trailing) + " / 帧宽 "
               + String(format: "%.0f", fixture.size.width)
               + " ⇒ 复刻顶到帧边界，产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐")
@@ -3076,13 +3179,13 @@ final class UICaptureTests: XCTestCase {
                        + "多出来的那条读数不属于产品（先登记再谈判不判）；"
                        + "少掉的那条意味着那一列现在能拍了（或者有人动了容器）—— 两种都要真的去看那张帧")
         if notRun.isEmpty {
-            print("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
+            emit("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
                   + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
         } else {
-            print("PROBE_DOMAIN_NOT_RUN 放行 \(notRun.count) 条 —— 这一台 settings 族整体未绘制"
+            emit("PROBE_DOMAIN_NOT_RUN 放行 \(notRun.count) 条 —— 这一台 settings 族整体未绘制"
                   + "（族内最低 " + String(format: "%.1f", capability.settingsLowestBlank * 100) + "%）"
                   + " ⇒ 那棵树的答案是窗口环境，不是产品容器：" + notRun.joined(separator: " | "))
-            print("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
+            emit("PROBE_DOMAIN 问了 \(checked) 条、判成 \(judged) 条：说明段 0 条压在 vibrant 上，"
                   + "控件 \(controlVibrant.count) 条已登记（\(controlVibrant.sorted())）")
         }
     }
@@ -3123,12 +3226,12 @@ final class UICaptureTests: XCTestCase {
                                                          bytesPerRow: rep.bytesPerRow,
                                                          rect: probe.rect, scale: scale)
                 if vibrant != nil { vibrantCount += 1 }
-                print(String(format: "PROBE_ELIGIBILITY %@ %@ %@ 域=%@ ratio=%.2f ink=%.1f%%",
+                emit(String(format: "PROBE_ELIGIBILITY %@ %@ %@ 域=%@ ratio=%.2f ink=%.1f%%",
                              tag, probe.fixture, String(probe.what.prefix(22)),
                              vibrant ?? "非 vibrant", ratio, coverage * 100))
             }
         }
-        print("PROBE_ELIGIBILITY_SUM \(vibrantCount) of \(total) 条探针压在 vibrant 子树上")
+        emit("PROBE_ELIGIBILITY_SUM \(vibrantCount) of \(total) 条探针压在 vibrant 子树上")
         throw XCTSkip("诊断用判据：它只回答「这条探针框压在哪个颜色域里」，用来定资格，不判产品 "
                       + "⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45）")
     }
@@ -3171,7 +3274,7 @@ final class UICaptureTests: XCTestCase {
         XCTAssertFalse(Self.columnIsDrawable(textInkPixels: blankInk.pixels),
                     "一张只有平涂底的帧，判别臂却说\(blankInk.pixels) 个文字墨像素 ⇒ 那条 NOT-RUN 分支是死的。"
                     + "它一死，凡是这台机器画不出来的页面都会被红成\"框贴到空白上\"（R33 在 CI 上正是这样）")
-        print("DISCRIMINATOR_ARM_A blank 文字墨=\(blankInk.pixels) ⇒ 判为\"画不出来\"（正对照成立）")
+        emit("DISCRIMINATOR_ARM_A blank 文字墨=\(blankInk.pixels) ⇒ 判为\"画不出来\"（正对照成立）")
 
         guard let real = fixtures(appearance: .aqua).first(where: { $0.name == "settings-general" }) else {
             return XCTFail("找不到 settings-general ⇒ 反臂没有对象")
@@ -3188,9 +3291,9 @@ final class UICaptureTests: XCTestCase {
                                        height: realRep.pixelsHigh, bytesPerRow: realRep.bytesPerRow,
                                        rect: column, scale: realScale)
         if Self.columnIsDrawable(textInkPixels: realInk.pixels) {
-            print("DISCRIMINATOR_ARM_B settings-general 内容列文字墨=\(realInk.pixels) ⇒ 判为\"画得出来\"")
+            emit("DISCRIMINATOR_ARM_B settings-general 内容列文字墨=\(realInk.pixels) ⇒ 判为\"画得出来\"")
         } else {
-            print("DISCRIMINATOR_ARM_B_NOT_RUN settings-general 内容列 0 个文字墨像素"
+            emit("DISCRIMINATOR_ARM_B_NOT_RUN settings-general 内容列 0 个文字墨像素"
                   + " ⇒ 这台机器画不出这一页（BACKLOG 43 的已知事实，不算缺陷）；"
                   + "这条判据的设置页探针在这台机器上记为未运行")
         }
@@ -3279,7 +3382,7 @@ final class UICaptureTests: XCTestCase {
                         "\(tag)：两簇最深偏离只差 \(title.maxDeviation - caption.maxDeviation)"
                         + "（本机 86 / 64）⇒ 间隙塌到不足 40，`tierSplit` 这个单点分档不再可靠，"
                         + "别再拿它放框")
-            print("ROWTIER_TRUTH \(tag) 说明带 最深=\(caption.maxDeviation) 说明=\(caption.caption) 标题=\(caption.title)"
+            emit("ROWTIER_TRUTH \(tag) 说明带 最深=\(caption.maxDeviation) 说明=\(caption.caption) 标题=\(caption.title)"
                   + " / 标题带 最深=\(title.maxDeviation) 说明=\(title.caption) 标题=\(title.title)"
                   + " 间隙=\(title.maxDeviation - caption.maxDeviation)")
         }
@@ -3376,10 +3479,10 @@ final class UICaptureTests: XCTestCase {
                                 "这段说明离上面的开关 \(String(format: "%.1f", gapAbove))pt、"
                                 + "离下面的开关 \(String(format: "%.1f", gapBelow))pt ⇒ 它离**下一颗**更近，"
                                 + "会被读成下一颗的说明（U-55 就是这么错的）（\(tag)）")
-                    print(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=%.1f",
+                    emit(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=%.1f",
                                  tag, firstBand.startPt, lastBand.endPt, gapAbove, gapBelow))
                 } else {
-                    print(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=无（最后一段）",
+                    emit(String(format: "CAPTION_HUG settings-general %@ 说明段 y=%.1f..%.1f 上缝=%.1f 下缝=无（最后一段）",
                                  tag, firstBand.startPt, lastBand.endPt, gapAbove))
                 }
                 judged += 1
@@ -3455,7 +3558,7 @@ final class UICaptureTests: XCTestCase {
             // runner 上这一页整块画不出来（BACKLOG 43）⇒ 逐条记 NOT-RUN，最后由
             // `contentInkTotal` 那条决定"是机器拍不出这一页"还是"我这把尺没压住字"。
             guard counts.brighter + counts.darker > 0 else {
-                print("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素"
+                emit("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素"
                       + "（同帧内容区读到 \(content.brighter + content.darker) 个）")
                 continue
             }
@@ -3464,12 +3567,12 @@ final class UICaptureTests: XCTestCase {
                                                      darkAppearance: true)
             if inverted { wrongSide.insert(fixture.name) }
             if vibrant != nil { vibrantColumns.insert(fixture.name) }
-            print("TEXT_SIDE \(fixture.name) dark 亮侧=\(counts.brighter) 暗侧=\(counts.darker)"
+            emit("TEXT_SIDE \(fixture.name) dark 亮侧=\(counts.brighter) 暗侧=\(counts.darker)"
                   + " 侧栏子树外观=" + (vibrant ?? "非 vibrant")
                   + " ⇒ " + (inverted ? "侧栏文字落在背景错误一侧（不可见）" : "墨在期望侧"))
         }
         if contentInkTotal == 0 {
-            print("TEXT_SIDE_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
+            emit("TEXT_SIDE_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
             throw XCTSkip("TEXT_SIDE_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上 `SettingsView` 是一块平涂底色，"
                           + "侧栏与内容区都读到 0 个偏离像素 ⇒ 这条守卫记为未运行，不算通过也不算盲区")
         }
@@ -3507,7 +3610,7 @@ final class UICaptureTests: XCTestCase {
                        + "\(Self.darkSidebarTextBlindSpots.sorted()) ⇒ 两者必须一致。"
                        + "多了：那一列其实量得到，别把它记成盲区；"
                        + "少了：那一列现在结构上量不到（合成前的极性），它的暗档可读性不能当证据")
-        print("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures"
+        emit("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures"
               + "（名单 \(Self.darkSidebarTextBlindSpots.count) 条；vibrant 子树 \(vibrantColumns.count) 条）")
     }
 
@@ -3591,12 +3694,12 @@ final class UICaptureTests: XCTestCase {
         let title = Self.inkTailSplit(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                       bytesPerRow: rep.bytesPerRow,
                                       rect: CGRect(x: 46, y: 66, width: 74, height: 20), scale: scale)
-        print("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
+        emit("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
         // 守卫要用"读到几个偏离像素"，不能用 `total` —— `total` 是尾墨切片的大小，
         // 它被 `max(1, …)` 兜过底，**永远不可能等于 0**。第一版就写错在这里：
         // CI 上这条 NOT-RUN 没生效，两条断言直接红（run 38454852737）。
         if icon.brighter + icon.darker == 0 && title.brighter + title.darker == 0 {
-            print("INK_SIDE_NOT_RUN aqua")
+            emit("INK_SIDE_NOT_RUN aqua")
             throw XCTSkip("INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个偏离像素）⇒ "
                           + "两端对照记为未运行，不算通过（见 BACKLOG 43）")
         }
@@ -3673,7 +3776,7 @@ final class UICaptureTests: XCTestCase {
                             + String(format: "%.2f", ratio) + "（\(tag)，地板 "
                             + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有"
                             + "\n" + Self.inkDiagnosisLine(tail: tail, darkAppearance: appearance == .darkAqua))
-                print("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
+                emit("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
             }
@@ -3819,7 +3922,7 @@ final class UICaptureTests: XCTestCase {
                         "这台机器上系统的 `.secondary` 只量到 "
                         + String(format: "%.2f", reference) + "（\(tag)）⇒ 是渲染失效，不是产品淡了；"
                         + "这条判据的参照坏了，先修捕获路径")
-            print("CAPTION_REF \(tag) .secondary 参照=" + String(format: "%.2f", reference))
+            emit("CAPTION_REF \(tag) .secondary 参照=" + String(format: "%.2f", reference))
             for probe in Self.captionInkProbes {
                 guard let fixture = fixtures(appearance: appearance)
                     .first(where: { $0.name == probe.fixture }) else {
@@ -3847,7 +3950,7 @@ final class UICaptureTests: XCTestCase {
                                                  height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
                                                  rect: column, scale: scale)
                 if !Self.columnIsDrawable(textInkPixels: columnInk.pixels) {
-                    print("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) "
+                    emit("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) "
                           + "探针所在列 \(column) 读到 0 个文字墨像素")
                     continue
                 }
@@ -3872,7 +3975,7 @@ final class UICaptureTests: XCTestCase {
                             + "**要读的标签不许比能点的笔画更淡**"
                             // R29：同样是"低"，两种低法的修法相反 —— 先分清再动手。
                             + "\n" + Self.inkDiagnosisLine(tail: tail, darkAppearance: appearance == .darkAqua))
-                print("CAPTION_INK \(probe.fixture)/\(probe.what) \(tag) ratio="
+                emit("CAPTION_INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " 参照=" + String(format: "%.2f", reference)
                       + " 比值=" + String(format: "%.2f", ratio / max(reference, 0.01)) + " ink="
                       + String(format: "%.1f%%", coverage * 100))
@@ -3903,7 +4006,7 @@ final class UICaptureTests: XCTestCase {
                         "\(tag) 档 \(Self.captionInkProbes.count) 条说明段探针**一条都没判成**（judged=\(judged)）⇒ "
                         + "是捕获路径坏了，不是产品都过了。热图那三条在任何机器上都拍得出来，"
                         + "它们要是也读不到墨，这条判据就没有内容，必须红着说这件事。")
-            print("CAPTION_JUDGED \(tag) 判了 \(judged) 条 / 表里 \(Self.captionInkProbes.count) 条")
+            emit("CAPTION_JUDGED \(tag) 判了 \(judged) 条 / 表里 \(Self.captionInkProbes.count) 条")
         }
         // **覆盖要有机器账**（R35 / 与 R10「探针名单从产品推导」同一条规矩）：
         // 这张表从 R27 的三处热图刻度长到今天的 17 处，全靠一轮一轮点名 ——
@@ -3921,7 +4024,7 @@ final class UICaptureTests: XCTestCase {
                   "这些设置分区在说明段表里**一处都没有**：\(missing) ⇒ 这一页的 `.secondary` 文字"
                   + "没有任何档判据看着。用 `testSettingsCaptionRowTierProfileDiagnostic` 点名它真实的带"
                   + "（带要量出来，不许照抄别处的 y），再把探针加进 `captionInkProbes`。")
-        print("CAPTION_COVERAGE 设置分区 \(SettingsCategory.allCases.count) 个，全部至少点名一处"
+        emit("CAPTION_COVERAGE 设置分区 \(SettingsCategory.allCases.count) 个，全部至少点名一处"
               + "（表里 \(Self.captionInkProbes.count) 条）")
     }
 
@@ -4052,7 +4155,7 @@ final class UICaptureTests: XCTestCase {
                 // 位图字节布局与尺的假设不符）各自会留下不同的指纹。
                 // CI 第一次的读数（run 38454852737）已经排掉一种：**px=720x540 scale=1.0**
                 // ⇒ runner 是 @1x 截图，本机是 @2x —— 这也顺带解释了 R27 那两处"低对比度"。
-                print("TEXT_INK_FRAME \(name) \(tag) px=\(rep.pixelsWide)x\(rep.pixelsHigh) "
+                emit("TEXT_INK_FRAME \(name) \(tag) px=\(rep.pixelsWide)x\(rep.pixelsHigh) "
                       + "scale=\(scale) bpp=\(rep.bitsPerPixel) samples=\(rep.samplesPerPixel) "
                       + "bpr=\(rep.bytesPerRow) transparent="
                       + String(format: "%.1f%%", Self.transparentFraction(of: rep) * 100)
@@ -4079,7 +4182,7 @@ final class UICaptureTests: XCTestCase {
                 // 这不是产品缺陷，也不是"判据通过"，是**观测不到** ⇒ 明确记 NOT-RUN，
                 // 并把诊断打出来让下一次 CI 替我们回答"那一帧到底是什么"。
                 // 记账在 BACKLOG 43；本机这条是实跑的（wide=23889 / narrow=23868）。
-                print("TEXT_INK_NOT_RUN \(tag) 720=\(wide) 640=\(narrow) "
+                emit("TEXT_INK_NOT_RUN \(tag) 720=\(wide) 640=\(narrow) "
                       + "⇒ 这台机器拍不出设置页，这条对照没有对象")
                 throw XCTSkip("TEXT_INK_NOT_RUN：本机/本平台无法渲染 settings-* 帧 ⇒ "
                               + "对照判据记为未运行，不算通过（见 BACKLOG 43）")
@@ -4098,7 +4201,7 @@ final class UICaptureTests: XCTestCase {
                         "窄臂 \(narrowFixture.size.width)pt 与产品臂 \(wideFixture.size.width)pt 差得不够 ⇒ "
                         + "两臂自比，这条对照恒真")
             let ratio = Double(narrow) / Double(wide)
-            print("TEXT_INK \(tag) 产品宽 720=\(wide) 窄臂 640=\(narrow) ratio=\(String(format: "%.3f", ratio))")
+            emit("TEXT_INK \(tag) 产品宽 720=\(wide) 窄臂 640=\(narrow) ratio=\(String(format: "%.3f", ratio))")
             XCTAssertGreaterThanOrEqual(ratio, 0.97,
                         "窗口从 720pt 收到 640pt 之后，这一页少画了 "
                         + String(format: "%.1f%%", (1 - ratio) * 100)
@@ -4270,7 +4373,7 @@ final class UICaptureTests: XCTestCase {
                                   + " ⇒ 提示条的底色涂到了标题栏/红绿灯后面（横幅自己那一条是 "
                                   + String(format: "%.1f", bandTint) + "）。"
                                   + "修法见 `NoticeBanner`：`.background(_, ignoresSafeAreaEdges: [])")
-                print("NOTICE_CHROME \(name) \(tag) bandR-B=\(String(format: "%.1f", bandTint)) "
+                emit("NOTICE_CHROME \(name) \(tag) bandR-B=\(String(format: "%.1f", bandTint)) "
                       + "chromeR-B=\(String(format: "%.1f", chromeTint))")
             }
         }
@@ -4554,7 +4657,7 @@ final class UICaptureTests: XCTestCase {
                                                        height: rep.pixelsHigh,
                                                        bytesPerRow: rep.bytesPerRow,
                                                        rect: band.textColumn, scale: scale)
-                    print("NOTICE_SIDE \(name) \(tag) 尾墨 亮\(noticeTail.brighter)/暗\(noticeTail.darker)")
+                    emit("NOTICE_SIDE \(name) \(tag) 尾墨 亮\(noticeTail.brighter)/暗\(noticeTail.darker)")
                     XCTAssertTrue(Self.inkIsOnTheExpectedSide(brighter: noticeTail.brighter,
                                                              darker: noticeTail.darker,
                                                              darkAppearance: appearance == .darkAqua),
@@ -4576,7 +4679,7 @@ final class UICaptureTests: XCTestCase {
                                              + "**没有底色的空缝** ⇒ 有人往横幅之间塞了 spacing。"
                                              + "产品的语言是 `VStack(spacing: 0)` + 每条自带一条 `Divider()`（实测缝 1pt）")
                 }
-                print("NOTICE_TEXT \(name) \(tag) bands=\(bands.count) "
+                emit("NOTICE_TEXT \(name) \(tag) bands=\(bands.count) "
                       + bands.map { String(format: "y%.0f-%.0f ratio=%.2f ink=%.1f%%",
                                            $0.startPt, $0.endPt, $0.ratio, $0.inkFraction * 100) }
                       .joined(separator: " | "))
@@ -4631,7 +4734,7 @@ final class UICaptureTests: XCTestCase {
                                              "\(where_) 的动作按钮偏了 \(String(format: "%.1f", offset))pt"
                                              + "（容差 \(InkFloor.actionCenterTolerancePt)）⇒ 它跟着第一行走，"
                                              + "读起来像只管第一句话。修前实测：单行 0pt / 两行 −6.5pt / 三行 −14.5pt")
-                    print("NOTICE_ACTION \(name) \(tag) band#\(index + 1) center="
+                    emit("NOTICE_ACTION \(name) \(tag) band#\(index + 1) center="
                           + String(format: "%.1f", band.centerPt) + " action="
                           + String(format: "%.1f", action) + " offset="
                           + String(format: "%+.1f", offset))
@@ -4690,7 +4793,7 @@ final class UICaptureTests: XCTestCase {
         XCTAssertLessThan(weakBand.ratio, InkFloor.bodyTextContrast,
                           "浅墨对浅暖底必须不过线（实测 " + String(format: "%.2f", weakBand.ratio)
                           + "）⇒ 不过线的那一端量不出来，这条判据就只是复读产品当前值")
-        print("NOTICE_BAND_CONTROL good=\(String(format: "%.2f", goodBand.ratio)) "
+        emit("NOTICE_BAND_CONTROL good=\(String(format: "%.2f", goodBand.ratio)) "
               + "weak=\(String(format: "%.2f", weakBand.ratio)) "
               + "ink=\(String(format: "%.1f%%", goodBand.inkFraction * 100))")
     }
@@ -4738,7 +4841,7 @@ final class UICaptureTests: XCTestCase {
                              + String(format: "%.1f", highCenter) + "）⇒ 读不出偏上，产品判据就是摆设")
         XCTAssertNil(span(buffer(actionRows: nil)),
                      "空矩形必须返回 nil，不能返回 0 —— 否则『按钮不见了』会读成『偏 0pt，完美居中』")
-        print("ACTION_SPAN_CONTROL centered=" + String(format: "%.1f", (centered.startPt + centered.endPt) / 2)
+        emit("ACTION_SPAN_CONTROL centered=" + String(format: "%.1f", (centered.startPt + centered.endPt) / 2)
               + " high=" + String(format: "%.1f", highCenter) + " empty=nil")
     }
 
@@ -4872,7 +4975,7 @@ final class UICaptureTests: XCTestCase {
                         + "\(String(format: "%.0f", gutter))pt 还靠右 ⇒ 骨架缩进了第二层，"
                         + "它承诺的内容宽度比实际来的窄")
             }
-            print("LOADING_AXIS \(tag) bars=\(String(format: "%.1f", loading.bar ?? -1)) "
+            emit("LOADING_AXIS \(tag) bars=\(String(format: "%.1f", loading.bar ?? -1)) "
                   + "caption=\(String(format: "%.1f", loading.text ?? -1)) gutter=\(gutter) "
                   + "detailHeader=\(String(format: "%.1f", detail.above ?? -1)) "
                   + "barRows=\(loading.barRows) textRows=\(loading.textRows)")
@@ -4937,14 +5040,14 @@ final class UICaptureTests: XCTestCase {
                                                            height: rep.pixelsHigh,
                                                            bytesPerRow: rep.bytesPerRow,
                                                            rect: rect, scale: scale) else {
-                        print("AXIS_NOT_RUN \(fixtureName)/\(block) \(tag)")
+                        emit("AXIS_NOT_RUN \(fixtureName)/\(block) \(tag)")
                         continue
                     }
                     axes.append(("\(fixtureName)/\(block)", axis))
                 }
             }
             guard axes.count >= 3 else {
-                print("AXIS_NOT_RUN all \(tag) 只有 \(axes.count) 块量到")
+                emit("AXIS_NOT_RUN all \(tag) 只有 \(axes.count) 块量到")
                 throw XCTSkip("AXIS_NOT_RUN \(tag)：这台机器拍不出详情区 ⇒ 左轴契约记为未运行（BACKLOG 43 那一族）")
             }
             let values = axes.map { $0.1 }
@@ -4959,7 +5062,7 @@ final class UICaptureTests: XCTestCase {
                 "详情区读出 \(axes.count) 块，左轴最宽差 \(String(format: "%.1f", spread))pt："
                 + axes.map { "\($0.0)=\(String(format: "%.1f", $0.1))" }.joined(separator: " ")
                 + "（\(tag)）⇒ 加载态与内容态不是同一条轴，预览落地会跳")
-            print("DETAIL_AXIS \(tag) 判了 \(axes.count) 块，spread=\(String(format: "%.1f", spread))pt "
+            emit("DETAIL_AXIS \(tag) 判了 \(axes.count) 块，spread=\(String(format: "%.1f", spread))pt "
                   + "gutter=\(String(format: "%.0f", gutter))pt")
         }
     }

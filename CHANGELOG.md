@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R64：判据自己写的结论可以整块从 stdout 消失而作业是绿的 —— 捕获卷补第二条通道，并把"缺通道"变成一条有名字的红 —— BACKLOG 96 交付）
+- **本轮零产品改动**（122 帧 `CHANGED=0`、`MISSING=0 ADDED=0`），改的是"验收证据本身会不会静默失踪"。
+- 读数（本机三遍真 artifact，逐行比对）：捕获卷 `capture-readings.log` 488 行里，
+  stdout 少了 **324 行**（`--filter` 两遍，都是下标 164–487 那**同一块**）与 **238 行**
+  （全量 `2>&1 | tee` 那一遍，**3 块**）。切点落在**行中间**
+  （stdout 停在 `…bottomI`，下一行直接是 `Test Case …`）。
+  五条判据自写的 marker 三遍**全丢**，而 37 / 775 条 `Test Case … passed` 一条没少、作业 0 退出。
+- **更正 R63 写下的机制**：账本里那句"按条随机丢"是我加的解释，本轮量出来是**连续大块、位置可复现**。
+  账本留原文并标注更正，而**代码注释、`--help` 文本、失败消息里的旧说法全部改掉**。
+- 交付：`CaptureReadings.swift`（`emit` = print **并且**落盘；第一次整份重写、之后 `FileHandle` 追加；
+  通道自己坏了只走 stderr，不把判据变红）；捕获卷 **69 处** `print(` → `emit(`；
+  守卫 `testCaptureReadingsUseTheFileChannel`（规则绝对：那个文件剥掉注释后 `print` = 0，
+  所以通道实现单独住一个文件 —— 白名单就是下一次绕过去的入口）。
+- 闸门：`ci_capture_gate.py --readings <文件>` —— 判的是**两条通道的并集**，
+  并且"给了参数而文件缺/空"= 一条有名字的红。并集从 ci.yml 的 awk **挪进 python**：
+  那段 shell 没有任何自测能证明"补回的行数是对的"，而它坏了的表现恰好是"什么都没补"。
+  自检 120 → **127**，含一条**接线断言**（以后谁把 `--readings` 从 workflow 里删掉会当场红）。
+- 真 artifact 上跑：`补回=316 行`（324 行实例 = 316 条不同的行），
+  **同一份日志不给 `--readings` 仍然是 0** ⇒ 这条并集不是装饰，它单独就能把红找回来。
+- 变异 **M337–M342 六刀全 CAUGHT**。其中 **M338 抓到的是本轮我自己写的第一版正对照**
+  （拿 needle 拼对照 ⇒ needle 坏了对照仍然 3/3），另两把是电池自己骗人：
+  上一遍留下的读数文件让"落盘坏了"那一刀逃过（M341 第一版）、
+  汇总比对了带尾随空格的字符串导致**六刀全抓到却写"非抓到=6"**。
+- 新开 **BACKLOG 97**：本轮逐帧看浮层量出来的排版缺陷 —— 纯文本行标签 34.5–35.0pt
+  vs 文件行标签 56.5–57.5pt（图标占 36.0–50.0pt）⇒ 差 **22pt 两种左轴**。与 94 同一族，
+  本轮判为不动产品（预算在通道上，且 ①/② 的选法取决于 94 的图标语言结论）。
+
 ### Fixed（R63：快速选择浮层从来就是塌的 —— 内容只占面板左下角一小块 —— 现在它占满，并且第一次有了帧 —— BACKLOG 30-① 结案）
 - 现象（本轮第一次量到，不是推测）：⌃⌥⇧V 呼出的浮层里，产品的 `NSStackView` 实测
   `{{0,0},{24,49}}`，`NSScrollView` `0×0`，`NSTableView.visibleRect` `0×0` —— 表里有 8 条，
