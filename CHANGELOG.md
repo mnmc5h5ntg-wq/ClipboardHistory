@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R76：焦点那一档不是没有视觉后果，是只活在 alpha 通道里 —— U-116 判完 / U-131…U-133 / D-134）
+- 新判据量"聚焦 vs 撤掉焦点"两态：框内变化像素 **1797（亮）/ 2354（暗）**、框外一圈 **0**，
+  那一格平均 alpha 10.71⇒6.77、13.15⇒8.64，而**同一对在亮度轴上只有 -0.66 / +2.25**
+  ⇒ 焦点反馈存在（占位符"搜索历史记录…"退后），但只在 alpha 上（U-132）。
+- 决定：**不加**自定义焦点视觉。三条理由都有读数 —— 已有让位式反馈；
+  焦点位置不歧义（浮层唯一可聚焦文本输入，`show()` 打开即聚焦，源码守卫钉住那句赋值）；
+  再加一圈会与 R67 的悬停灰、选中药丸抢同一格的音量预算。
+  代价记明：真机上有没有系统环、退后够不够明显，这条通道结构上看不到（面板不带 key）⇒ 人工批次 68。
+- 本轮两次错在自己新写的判据里，都当场修并记账：
+  第一版两态取"建出来时"与"请焦点之后"，而那颗框**建出来就聚焦** ⇒ 等于一张帧减自己，
+  那个"0 像素"绿得完全正常（U-131）⇒ 换成正面两态 + 一条"撤焦点必须真的撤掉"的正对照；
+  `NSFocusRingType.none.rawValue == 1` 而 0 才是"系统决定"（本 SDK 没有 `.automatic`）
+  ⇒ 按名字猜会把"环被关掉"写成通过（U-133）。
+- 牙：M398–M402 五刀全 CAUGHT。M398（产品侧关环）**只有④红、③照旧绿**
+  ⇒ "这条通道看不见环"由一刀证明，④不是装饰是唯一防线；M399（删 `show()` 里的赋值）
+  四条判据全绿、只有源码守卫红 ⇒ 这一族回归在帧里没有影子。
+- 读 R75 的 CI（run 38735395615，绿）：证人接线如约生效 ——
+  `MOTION_NOT_RUN=witness-snaps-here notice-banner`、`judged=3/4`、`MOTION_FLOOR_OK=3/4`、`exit 0`；
+  同一遍里 `FRAME_BASELINE_CHANGED=124` 是 runner 1× 与工作基线 2× 的已知差（那一步只判帧名齐不齐）
+  ⇒ "CI 绿"不等于"像素没变"，像素那一半由本机这一遍判（`CHANGED=0`）。
+- 新开 BACKLOG **107**（"只在 alpha 上"的效果对亮度轴守卫是普遍盲区）。
+- 全量 **791 / 38 skip / 0 failures**、`FRAME_BASELINE_COMPARED=124 CHANGED=0 MISSING=0 ADDED=0`、
+  编译告警 0、脚本测试 140 OK。**产品 0 个文件** ⇒ 本机仍是 R71 装的 `c03cf278d3a4dd98…`。
+
 ### Tests（R75：那条反复出现的红，是判据拿两帧的采样间隔当了时长 —— 结案 BACKLOG 104 / U-129、U-130 / D-133）
 - 读三遍 runner 日志（38726667469 / 38726991211 / 38730788527）：`notice-banner` 三遍都是 **2 帧**，
   时长 32 / ≥60 / 36ms ⇒ 红、绿、红；而淡入时钟证人三遍同一句

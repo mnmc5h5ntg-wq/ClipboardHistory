@@ -1294,6 +1294,165 @@ final class UICaptureTests: XCTestCase {
                           + "上面几条源码守卫一起退化成噪声计数器")
     }
 
+    /// R76 / U-116：浮层搜索框的**焦点那一档** —— 它不是"没有视觉后果"，是"只活在 alpha 通道里"。
+    ///
+    /// 这条判据本来要写的是"焦点态在帧里看不见 ⇒ 只能真机判"。量出来不是那么回事，
+    /// 而且中间我自己错了一次（U-131）：第一版拿"建出来时"与"`makeFirstResponder` 之后"相减，
+    /// 而实测那颗框**建出来的那一刻就已经聚焦**（AppKit 把 key view 选成了它）
+    /// ⇒ 两张帧同一个状态，那个"0 个变化像素"什么都没证明。
+    /// 换成"聚焦 vs 撤掉焦点"两态之后，差是真的，而且很大：
+    ///   亮档 1901 个像素、暗档 2144 个，包围盒 x 12.0–98.5pt / y 顶下 14–26pt
+    ///   = 正好那一串占位字"搜索历史记录…"，alpha 从 143.6 ⇒ 90.9（亮）、156.5 ⇒ 102.9（暗）。
+    /// 但**同一对在亮度轴上只有 -0.66 / +2.25（/255）** ⇒ 只看亮度的尺会判成"焦点没有后果"。
+    /// 于是这一格的四条断言各钉一样，少一条就有一族回归没人管：
+    ///   ① 焦点确实落进那颗框（读产品对象：窗口响应者是字段编辑器，不是帧）；
+    ///   ② 焦点**有**视觉后果，且方向是"让位"（那一格 alpha 必须降）—— 不是"变响"；
+    ///   ③ 后果必须留在框内（框外那一圈 0 个像素）⇒ "不加自定义焦点环"这一格是量过的决定，
+    ///      将来谁让焦点往框外画东西，这条会红，含义是"该重判"，不是"把绘制删掉"；
+    ///   ④ 系统环不许被关掉（`focusRingType` 必须是 0 = 系统自己决定）。
+    ///      **这格的坑**：raw 0 才是"系统决定"，而 Swift 里 `.none` 的 raw 是 **1**，
+    ///      按名字猜会写成"等于 .none"，那正好把"环被关掉"当成通过（U-133）。
+    /// 外加一条源码守卫：产品 `show()` 的函数体里必须同时有 `makeKeyAndOrderFront` 与
+    /// `makeFirstResponder(field)` —— 少了后者的话①②③④全都不会红（浮层照样能用，
+    /// 只是打字要用户多点一下那颗框）。
+    ///
+    /// 仍然量不到的一件事（点名，不猜）：真机上那颗框**有没有**系统焦点环。
+    /// 这条通道不带 key 窗口（`appActive=false 面板key=false`），所以③那个"框外 0 像素"
+    /// 不能推成"产品没有环" ⇒ `QUICKPICK_FOCUS_RING_NOT_RUN=1`，人工批次 68.1。
+    func testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing() throws {
+        for (label, appearance) in [("亮", NSAppearance.Name.aqua),
+                                    ("暗", NSAppearance.Name.darkAqua)] {
+            let build = QuickPickCapturePanel.builder(store: makePopulatedStore(), query: "")
+            guard let panel = build(), let content = panel.contentView else {
+                throw XCTSkip("捕获入口建不出浮层窗口 ⇒ 这一档今天无从判定（不是产品没做）")
+            }
+            _ = NSApplication.shared
+            let previousAppearance = NSApplication.shared.appearance
+            NSApplication.shared.appearance = NSAppearance(named: appearance)
+            content.appearance = NSAppearance(named: appearance)
+            panel.setFrameOrigin(NSPoint(x: -20011, y: -20011))
+            panel.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            Self.tileScrollViews(in: content)
+            defer {
+                NSApplication.shared.appearance = previousAppearance
+                panel.orderOut(nil)
+            }
+            guard let field = Self.firstView(ofType: QuickPickSearchField.self, in: content) else {
+                return XCTFail("浮层树里找不到那颗 `QuickPickSearchField` ⇒ 这条判据没有对象")
+            }
+            func shoot() -> NSBitmapImageRep {
+                panel.display()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+                guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
+                    return NSBitmapImageRep()
+                }
+                content.cacheDisplay(in: content.bounds, to: rep)
+                return rep
+            }
+            // 两态对照：**"焦点这一档有没有像素"只能拿"聚焦"与"不聚焦"两张帧相减。**
+            // 这一条第一版写错了，而错得很有代表性：我拿的是"建出来时"与"`makeFirstResponder` 之后"，
+            // 实测建出来的那一刻那颗框**就已经**带着字段编辑器（AppKit 把 key view 选成了它）
+            // ⇒ 两张帧是同一个状态，那个"0 个变化像素"什么也没证明。
+            // 这就是"正对照读的不是判据读的那个量"那一族（U-131），本轮自己撞在自己新写的判据上。
+            let builtInEditor = field.currentEditor()
+            let accepted = panel.makeFirstResponder(field)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+            let focusedResponder = panel.firstResponder
+            let focused = shoot()
+            // 反面那一态：把焦点从那颗框上拿走。两态必须**真的**不同，否则下面的相减是空转。
+            panel.makeFirstResponder(nil)
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+            let blankResponder = panel.firstResponder
+            let unfocused = shoot()
+            let scale = max(1, focused.pixelsWide / max(Int(content.bounds.width), 1))
+            let inContent = field.convert(field.bounds, to: nil)
+            let band = CGRect(x: inContent.minX * CGFloat(scale),
+                              y: (content.bounds.height - inContent.maxY) * CGFloat(scale),
+                              width: inContent.width * CGFloat(scale),
+                              height: inContent.height * CGFloat(scale))
+            // 焦点环画在框**外面**（约 3–4pt），所以只看框那一格会把"环"看成"没有变化"。
+            let halo = band.insetBy(dx: -8 * CGFloat(scale), dy: -8 * CGFloat(scale))
+            let changedIn = Self.changedPixelCount(focused, unfocused, clipping: band)
+            let changedHalo = Self.changedPixelCount(focused, unfocused, clipping: halo)
+            // **两把尺一起打：亮度轴与 alpha 轴。** 实测（R76，本机 2×，亮/暗两档）：
+            //   亮度轴整带差 = -0.66 / +2.25（/255）⇒ 只看亮度会得出"焦点没有视觉后果"的假结论；
+            //   alpha 轴：占位符那一格 143.6 ⇒ 90.9（亮）、156.5 ⇒ 102.9（暗），
+            //            变化像素 1901 / 2144，包围盒正好是那一串占位字（x 12.0–98.5pt、y 顶下 14–26pt）。
+            // ⇒ 焦点这一档**有**视觉后果（占位符退后给光标让位），但它只活在 alpha 通道里。
+            //    判据必须走 alpha —— 与"灰 vs 蓝别用亮度轴"同族（U-132）。
+            let lumIn = Self.meanLuminance(unfocused, rect: band) - Self.meanLuminance(focused, rect: band)
+            let alphaUnfocused = Self.meanAlpha(unfocused, rect: band)
+            let alphaFocused = Self.meanAlpha(focused, rect: band)
+            emit("QUICKPICK_FOCUS \(label) appActive=\(NSApp.isActive) 面板key=\(panel.isKeyWindow) "
+                + "主=\(panel.isMainWindow) makeFirstResponder=\(accepted) "
+                + "建出来时就聚焦=\(builtInEditor != nil) 聚焦时响应者是编辑器=\(focusedResponder is NSText) "
+                + "撤焦点后还是=\(blankResponder is NSText) "
+                + "focusRingType=\(field.focusRingType.rawValue) 缩放=\(scale)× 带=\(NSStringFromRect(band)) "
+                + "框内变化像素=\(changedIn) 框外一圈变化像素=\(changedHalo - changedIn) "
+                + "alpha 聚焦=\(String(format: "%.2f", alphaFocused)) "
+                + "不聚焦=\(String(format: "%.2f", alphaUnfocused)) "
+                + "差=\(String(format: "%.2f", alphaUnfocused - alphaFocused)) 亮度轴差=\(String(format: "%.2f", lumIn))")
+            XCTAssertGreaterThanOrEqual(changedIn, 0, "\(label)档：尺读不出两张帧 ⇒ 无从判定，不许当通过")
+            // ① 焦点落进那颗框（行为，读的是产品对象，不是帧）。
+            XCTAssertTrue(accepted,
+                "\(label)档：`makeFirstResponder(field)` 都没接受 ⇒ 那颗框不是可聚焦的响应者，"
+                    + "浮层打开时打字会落空（产品 `show()` 靠的就是这一步）")
+            XCTAssertTrue(focusedResponder is NSText,
+                "\(label)档：接受了焦点却没有把字段编辑器装成窗口的响应者 ⇒ 焦点在别处，"
+                    + "那颗框收不到打字")
+            // 正对照：两态必须不同。少了这一格，②③那几条像素断言可以靠"自己减自己"永远绿。
+            XCTAssertFalse(blankResponder is NSText,
+                "\(label)档：`makeFirstResponder(nil)` 之后窗口响应者**还是**字段编辑器 ⇒ 撤不掉焦点，"
+                    + "于是下面那几条断言量的是同一张帧减自己（假绿的教科书形状，U-131）")
+            // ② 焦点必须有视觉后果，而且方向是"让位"（占位符退后），不是"变响"。
+            XCTAssertGreaterThanOrEqual(changedIn, 500,
+                "\(label)档：聚焦与不聚焦两张帧在框内只差了 \(changedIn) 个像素 ⇒ "
+                    + "焦点这一档变成看不见了。今天它是那一串占位字退后（实测 1901 / 2144 个像素、"
+                    + "alpha 掉 50 上下）；两种成因都值得查：占位符被换成实色（那就该重判音量），"
+                    + "或者 AppKit 不再为聚焦的框调淡占位符（那焦点就只剩光标了）")
+            // 地板 2.0 是从**实测**推的，不是猜的：整带均值差今天 3.93（亮）/ 4.52（暗），
+            // 取最小值的一半再往下 —— 第一版我写的是 4.0（拿"占位符那一格 53/255 × 面积比"估的 8.6 折半），
+            // 结果差 0.06 红了一次：估的面积比不对（占位符只占那一小截，整带被 800px 宽稀释）。
+            XCTAssertLessThanOrEqual(alphaFocused, alphaUnfocused - 2.0,
+                "\(label)档：聚焦之后那一格的 alpha 反而不比不聚焦时低（聚焦=\(String(format: "%.2f", alphaFocused)) "
+                    + "不聚焦=\(String(format: "%.2f", alphaUnfocused))）⇒ 焦点反馈的方向变了："
+                    + "今天是'占位符退后给光标让位'，'聚焦把那一格叫得更响'是另一种设计，该重判")
+            // ③ 后果必须留在框内：这一格是量过之后决定**不加**自定义焦点环的。
+            XCTAssertEqual(changedHalo - changedIn, 0,
+                "\(label)档：框外那一圈多了 \(changedHalo - changedIn) 个变化像素 ⇒ 焦点开始往框外画东西了"
+                    + "（多半是自定义环/描边，或系统环真的开始画）。这一格是 R76 量过才决定不加的："
+                    + "红在这里的含义是'该重判'，不是'把那段绘制删掉'")
+            emit("QUICKPICK_FOCUS_RING_NOT_RUN=1 \(label)：焦点环这一档在这条通道里读不到"
+                + "（框外 0 个变化像素，而 `面板key=\(panel.isKeyWindow) appActive=\(NSApp.isActive)`）"
+                + "⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'")
+            // ④ 值守卫：不许关掉系统环。
+            // **这个枚举的坑（R76 实测）**：raw 0 才是"系统自己决定"，而 Swift 里 `.none` 的 raw 是 **1**
+            // （`.automatic` 这个成员在本 SDK 根本不存在，写 `== .automatic` 编译不过）。
+            // 一个人按名字猜，就会把这条守卫写成"等于 .none"—— 那正好把"系统环被关掉"当成通过。
+            let automatic = NSFocusRingType(rawValue: 0)
+            XCTAssertEqual(field.focusRingType, automatic,
+                "\(label)档：那颗框的 `focusRingType` 不再是 0（= 系统自己决定；读到 "
+                    + "\(field.focusRingType.rawValue)，而 `.none` 的 raw 是 1）"
+                    + " ⇒ 焦点环在这条通道里本来就读不到（③那条缺席），关掉它这件事**永远不会被任何一张帧发现**，"
+                    + "所以这条值守卫是唯一防线")
+        }
+        // 产品入口那条赋值必须还在（①②③全都不会红的那一族回归，只有这条守卫抓得到）。
+        let source = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
+        let body = Self.functionBody(named: "func show()", in: source)
+        XCTAssertFalse(body.isEmpty,
+                       "扫不到 `show()` 的函数体 ⇒ 下面两条守卫是空转的（正对照）")
+        XCTAssertTrue(body.contains("makeKeyAndOrderFront"),
+                      "`show()` 不再把面板变成 key ⇒ 焦点环与打字都可能落空，"
+                          + "而①②③三条读的是夹具那条路径，看不见这件事")
+        XCTAssertTrue(body.contains("makeFirstResponder(field)"),
+                      "`show()` 不再把焦点交给那颗框 ⇒ 浮层打开后要先点一下才能打字。"
+                          + "这一族在帧里、在①②里都没有影子（夹具故意不抢前台），只有这条守卫抓得到")
+        XCTAssertTrue(Self.functionBody(named: "func definitelyNotInThisFile()", in: source).isEmpty,
+                      "不存在的函数名也扫得出东西 ⇒ 截取器'永远看得见'，上面两条一起退化成噪声计数器")
+    }
+
+
     /// R71 / BACKLOG 99：浮层那一行的字号，与"同一条记录的标题"在别处的字号，必须是同一档。
     ///
     /// 这条从**产品入口**进（DoD 第 1 条）：建出真的浮层面板，读真的 `NSTextField.font`，

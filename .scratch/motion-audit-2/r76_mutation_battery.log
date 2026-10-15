@@ -1,0 +1,52 @@
+=== 基线（未变异）：六条判据都必须绿 ===
+   testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing = green
+   testOverlayHoverTintIsPaintedAndConfinedToItsRow               = green
+   testOverlayHoverFillSharesTheSelectionPillsOutline             = green
+   testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSid = green
+   testQuickPickTypographyComesFromTheLadder                      = green
+   testTextSizesComeFromTheScale                                  = green
+
+M398 产品侧：把那颗框的系统焦点环关掉（`focusRingType = .none`）⇒ 只有④该红，而③必须**照旧绿** —— 这一刀顺手证明了'这条通道看不见环'，所以④不是冗余装饰，它是唯一防线。（这一刀前两版都 NOT-APPLIED，都是被'变异文包含原文'那条规矩拦下的：
+             纯插入型的刀（在原行后面加一行）永远包含原行本身 ⇒ 必须顺手把原行改个写法，             这里给原行尾上加了句注释。R74/R75 记过的那族自缚，本轮撞了两次才绕开）
+   落地确认（QuickPickController.swift）
+   CAUGHT 只红在焦点那条判据：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green', 'testQuickPickTypographyComesFromTheLadder': 'green', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1434: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertEqual fa
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1434: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertEqual fa
+   已还原（逐字节相同：True）
+
+M399 产品侧：把 `show()` 里那句 `makeFirstResponder(field)` 删掉⇒ 只有源码守卫该红（①②③④全绿，因为夹具那条路径自己会聚焦）⇒ 钉的是'产品不聚焦'这一族回归在帧与行为判据里都没有影子，只有这条守卫抓得到
+   落地确认（QuickPickController.swift）
+   CAUGHT 只红在焦点那条判据：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green', 'testQuickPickTypographyComesFromTheLadder': 'green', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1448: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertTrue fai
+   已还原（逐字节相同：True）
+
+M400 判据侧：拿 `focused` 减它自己（**本轮真实犯过的那一次**，U-131）⇒ ②该红：'两态必须不同'那格正对照仍然绿（响应者确实被换掉了），所以这一刀证明光有响应者对照不够，像素那格必须自己站着
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在焦点那条判据：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green', 'testQuickPickTypographyComesFromTheLadder': 'green', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1409: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1417: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1409: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+   已还原（逐字节相同：True）
+
+M401 判据侧：把量尺那条带挪到列表区（y 写死 300）⇒ ②该红：焦点的视觉后果不在那儿 ⇒ 读数不是'任何地方都能找到 500 个像素'
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在焦点那条判据：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green', 'testQuickPickTypographyComesFromTheLadder': 'green', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1409: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1417: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertLessThan
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1409: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+   已还原（逐字节相同：True）
+
+M402 判据侧：把方向断言翻过来（要求聚焦那一格反而更**响**）⇒ 该红：'焦点让占位符退后'与'焦点把框叫响'是两种设计，这一格钉的是前者
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 只红在焦点那条判据：{'testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green', 'testQuickPickTypographyComesFromTheLadder': 'green', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1417: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1417: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing] : XCTAssertGreaterT
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M398   CAUGHT
+   M399   CAUGHT
+   M400   CAUGHT
+   M401   CAUGHT
+   M402   CAUGHT
+   抓到=5 逃掉=0 没跑成=0 未落地=0
