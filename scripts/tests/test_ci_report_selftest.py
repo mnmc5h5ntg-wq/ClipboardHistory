@@ -254,16 +254,26 @@ EXPECT = {
         ["MOTION_FLOOR_FACTS", "MOTION_FLOOR_OK=4/4"], 0, []),
     # R44 的真实形状：掉了一臂，但理由登记过 ⇒ 放行，**且必须把这条打印出来**。
     # 旧版这一步在这里连"掉了谁"都不说，所以我是靠人肉对比 run 日志发现的。
-    # R57 换了期望：这条形状在 R52 的清单下是"放行 + 打印"（REDS=0），
-    # 而带捕获把成本降下来之后清单改回四臂必须判到 ⇒ 同一条日志现在是**一条红**。
+    # 这一格跟着清单改过两次期望：R57 收紧到四臂必须判到 ⇒ 同一条日志是红；
+    # R75 按实测把 `notice-banner` 一臂放回放行（地板 4⇒3）⇒ **仍要求判到的那三臂少一条还是红**，
+    # 所以这里换成"掉的是 dismiss 且 judged 掉到地板以下"，红仍然只可能来自地板。
     # 留着这一格的意义正在这里：清单变严/变松时，它会逼着有人回来改期望，
     # 而不是让"闸门今天到底要求几条"这件事只活在 JSON 里。
-    ("motion_floor", "registered_drift_is_red_after_the_tightening"): (
+    ("motion_floor", "drift_on_a_required_arm_is_red_while_floor_is_three"): (
         NORMAL + FLOOR_SUMMARY + "\n"
         + "MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms\n"
-        + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss\n",
-        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner-dismiss",
+        + "MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner-dismiss\n",
+        ["MOTION_FLOOR_FACTS judged=2/4", "not-run=notice-banner-dismiss",
          "MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_REDS=1"], 1, []),
+    # R75 的新形状：`notice-banner` 判不到，理由是"证人合格且自己也 snap" ⇒ **不挡发布，但要点名**。
+    # 这一格钉的是这次放宽的两半：只放行不点名，就是 BACKLOG 49 说的免检牌；
+    # 只点名不放行，runner 那一臂就会变成恒红（R39 那一族：恒红的守卫最后被人删掉）。
+    ("motion_floor", "witness_snaps_here_is_named_uncoverage"): (
+        NORMAL + FLOOR_SUMMARY + "\n"
+        + "MOTION_NOT_RUN=witness-snaps-here notice-banner：证人采样≈32ms 可分数段=4 合格=是 判定=拍成跳变\n"
+        + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner\n",
+        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner",
+         "MOTION_FLOOR_OK=3/4", "MOTION_FLOOR_REDS=0"], 0, []),
     # 掉了同一臂，但这次没人说为什么 ⇒ 红。"没测到"可以接受，"没测到且说不清"不行。
     ("motion_floor", "drift_without_reason"): (
         NORMAL + FLOOR_SUMMARY + "\n"

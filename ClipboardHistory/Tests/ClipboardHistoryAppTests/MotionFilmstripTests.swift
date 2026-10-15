@@ -1011,6 +1011,10 @@ final class MotionFilmstripTests: XCTestCase {
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
         var judged = 0
         var notRun: [String] = []
+        // 证人**按需请一次**：拍一条已知 150ms 的淡入要 75 帧 ≈ 2.4s（runner 上更多），
+        // 而这一卷只有真读成跳变的那一臂需要它。缓存成卷级的一份，是因为同一台机器上
+        // 每条臂问的本来是同一句话 —— 问两遍会给出两个答案，那才是新的抖动源。
+        var witness: FadeClockReading?
 
         for scenario in Scenario.all() {
             let film = record(scenario)
@@ -1079,10 +1083,54 @@ final class MotionFilmstripTests: XCTestCase {
                     + Self.grabAttributionLabel(worstIntervalMilliseconds: worstInRun,
                                                 worstGrabMilliseconds: film.worstGrabMilliseconds))
             case .jump:
-                judged += 1
-                XCTFail("\(scenario.name)：画面只变了 \(String(format: "%.0f", elapsed))ms 就停了，"
-                    + "而声明的过渡是 \(Int(scenario.declaredDurationMilliseconds))ms（事件内最粗采样 "
-                    + "\(String(format: "%.0f", worstInRun))ms）⇒ 这是一帧跳变，不是过渡")
+                // R75 / BACKLOG 104 的答案在这一格。一条 `.jump` 是**产品断言**，而它站在一条时长读数上；
+                // 变化段只有两帧时，那个"时长"就是一次采样间隔 —— 同一条淡入时钟在 runner 上
+                // 两遍给出 32ms（红）与 ≥60ms（绿），`MOTION_SUMMARY notice-banner=2` 两边一样
+                // ⇒ 判的是采样相位，不是产品（run 38726667469 vs 38726991211，R74 读）。
+                // 谁有资格说"这台机器的通道带不动一条 150ms 的淡入"？只有证人 —— 而 R72 把节拍
+                // 换成 0.004 之后它**第一次有资格**：`证人采样≈32ms 可分数段=4 合格=是 判定=拍成跳变`，
+                // 两遍都一样。所以这一格从今天起先问证人，再决定是红还是 not-run。
+                // **只有红这一支问证人**：绿不需要借口（看见了一段够长的变化，那是正面证据），
+                // 而"没看见"必须先确认这台机器看不看得见 —— 缺席的证据不是缺席的证据。
+                if witness == nil { witness = fadeClock() }
+                let clock = witness!
+                let fadeDeclared = Int(FadeClockView.declaredDurationMilliseconds)
+                let segments = Self.resolvableFrames(durationMilliseconds: Double(fadeDeclared),
+                                                     sampleMilliseconds: clock.samplingMilliseconds)
+                let qualifies = clock.qualifies(declaredDurationMilliseconds: fadeDeclared)
+                emit("MOTION_JUMP_WITNESS \(scenario.name) 证人采样≈\(clock.samplingMilliseconds)ms "
+                    + "声明=\(fadeDeclared)ms 可分数段=\(segments) 合格=\(qualifies ? "是" : "否") "
+                    + "判定=\(Self.fadeClockLabel(clock.verdict))（本臂 变化段=\(span) 帧 "
+                    + "时长=\(String(format: "%.0f", elapsed))ms 事件内最粗=\(String(format: "%.0f", worstInRun))ms "
+                    + "声明=\(Int(scenario.declaredDurationMilliseconds))ms）")
+                switch Self.jumpAdjudication(clock: clock.verdict, witnessQualifies: qualifies) {
+                case .productRed:
+                    judged += 1
+                    XCTFail("\(scenario.name)：画面只变了 \(String(format: "%.0f", elapsed))ms 就停了，"
+                        + "而声明的过渡是 \(Int(scenario.declaredDurationMilliseconds))ms（事件内最粗采样 "
+                        + "\(String(format: "%.0f", worstInRun))ms）⇒ 这是一帧跳变，不是过渡。"
+                        + "而证人今天说这台机器**看得见** \(fadeDeclared)ms 的淡入"
+                        + "（采样≈\(clock.samplingMilliseconds)ms、中间态 \(clock.intermediate) 帧）⇒ 这句不是环境的借口")
+                case .notRunChannel:
+                    notRun.append(scenario.name)
+                    emit("MOTION_NOT_RUN=witness-snaps-here \(scenario.name)：本臂只变了 "
+                        + "\(String(format: "%.0f", elapsed))ms（\(span) 帧），可这台机器把一条**已知** "
+                        + "\(fadeDeclared)ms 的淡入也拍成跳变（证人采样≈\(clock.samplingMilliseconds)ms、"
+                        + "可分数段=\(segments)、合格=是）⇒ 两帧的『时长』就是一次采样间隔，"
+                        + "既不能判产品跳变，也不能判它演了（BACKLOG 77 路 b：让判据不吃帧数，才是解药）")
+                case .witnessUnqualified:
+                    judged += 1
+                    XCTFail("\(scenario.name)：本臂读成一帧跳变，而证人采得不够细，给不了『这台机器看不见』"
+                        + "这个签字（证人≈\(clock.samplingMilliseconds)ms、声明 \(fadeDeclared)ms "
+                        + "⇒ 只切得出 \(segments) 段，少于『中间态 + 1』那三段的地板）。"
+                        + "红着，去把证人降成本 / 加密采样（BACKLOG 104 就是这一格）；"
+                        + "把 skip 当解药等于把『我没看清』写成『它没动』")
+                case .witnessDead:
+                    judged += 1
+                    XCTFail("淡入时钟证人自己读不出那条已知淡入的过程（跨度=\(String(format: "%.3f", clock.span)) "
+                        + "中间态帧数=\(clock.intermediate) 帧数=\(clock.frames)），而产品这一臂也读不出 ⇒ "
+                        + "两条没有一条能证明这把尺看得见淡入。判红而不 skip：坏的是证人，得有人去修它")
+                }
             case .transition:
                 judged += 1
             }
@@ -1816,8 +1864,9 @@ final class MotionFilmstripTests: XCTestCase {
             let body = region(in: source, named: name)
             XCTAssertTrue(usesBand(body),
                 "\(name) 不再声明 captureRect ⇒ 这一臂回到整窗捕获（实测抓一帧 39.5–39.8ms、"
-                    + "整卷中位间隔 44–45ms），而登记表已经写着 must_judge=true —— "
-                    + "回到 R52 那种「两台机器都判不到」的形状，只是这次会红在 UNDERCOVERED")
+                    + "整卷中位间隔 44–45ms），而登记表仍然要求 dismiss 那一臂判到"
+                    + "（notice-banner 从 R75 起按实测放行，理由 witness-snaps-here 带 run 号，见下面那格）"
+                    + "⇒ 回到 R52 那种「两台机器都判不到」的形状，只是这次会红在 UNDERCOVERED")
         }
         // 接线：rect 必须真的进抓帧器，而不是被算出来又扔掉。
         let wiring = region(in: source, named: "private func recordFrames")
@@ -1828,7 +1877,9 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(tickBody.contains("rect ?? view.bounds"),
                       "`Grabber.tick` 不再使用 rect ⇒ 上面那条传进去的参数没人读，"
                           + "两臂量的都是整窗，A/B 的全部结论作废")
-        // 登记表与这条守卫必须同向：两臂都要求判到。
+        // 登记表与这条守卫必须同向。R75 之后不再要求"两臂都 must_judge=true"，
+        // 而是要求一件更准的事：**放宽必须带着证据写在同一份文件里**（登记的理由 + 一个 run 号），
+        // 否则这条守卫就是在替一次悄悄发生的降级背书。
         // 找文件用**往上走**而不是"数固定层数"：第一版这里写死两层，
         // 于是算出来的是 `ClipboardHistory/scripts/…`，守卫红在"读不到"上
         // —— 红是对的形状（找不到必须红），但理由是我自己数错了目录。
@@ -1850,10 +1901,36 @@ final class MotionFilmstripTests: XCTestCase {
                 + "正是「带捕获接上了但没人要求判到」那种半修状态最可能的现场")
             return
         }
-        for arm in ["notice-banner", "notice-banner-dismiss"] {
-            XCTAssertTrue(registry.contains("\"\(arm)\": {\n      \"must_judge\": true"),
-                "登记表里 \(arm) 不是 must_judge=true ⇒ 带捕获白做："
-                    + "判得到也没人要求它判到，掉回 not-run 时闸门不会红")
+        func registryBlock(_ arm: String) -> String {
+            guard let start = registry.range(of: "\"\(arm)\": {") else { return "" }
+            let rest = String(registry[start.upperBound...])
+            guard let end = rest.range(of: "\n    },") else { return rest }
+            return String(rest[rest.startIndex..<end.lowerBound])
+        }
+        let dismissBlock = registryBlock("notice-banner-dismiss")
+        XCTAssertFalse(dismissBlock.isEmpty, "扫不到 notice-banner-dismiss 的登记块 ⇒ 下面两条是空转的")
+        XCTAssertTrue(dismissBlock.contains("\"must_judge\": true"),
+                      "登记表里 notice-banner-dismiss 不是 must_judge=true ⇒ 带捕获白做："
+                          + "判得到也没人要求它判到，掉回 not-run 时闸门不会红")
+        let bannerBlock = registryBlock("notice-banner")
+        XCTAssertFalse(bannerBlock.isEmpty, "扫不到 notice-banner 的登记块 ⇒ 上面那格是空转的")
+        if bannerBlock.contains("\"must_judge\": false") {
+            // R75 的形状：这一臂允许判不到，但**必须**把放行所依据的理由与 run 号写在这同一格里。
+            // 理由要在 `allowed_not_run_reasons` 那个**数组里**找，不能整块 `contains` ——
+            // M395 实测：把数组里那一项删掉之后，这一臂的 note 仍然写着
+            // `MOTION_NOT_RUN=witness-snaps-here notice-banner`（那是在**解释**这条放宽），
+            // 于是整块 contains 的写法被说明文字喂饱、当场逃掉。
+            // 与 R55 的 M276、R79 的"守卫命中自己写下的名字"同族：**守卫读的是字段，不是散文。**
+            let reasons = bannerBlock.components(separatedBy: "\"allowed_not_run_reasons\": [")
+                .last?.components(separatedBy: "]").first ?? ""
+            XCTAssertFalse(reasons.isEmpty,
+                           "扫不到 notice-banner 的 allowed_not_run_reasons ⇒ 下面那条是空转的（正对照）")
+            XCTAssertTrue(reasons.contains("\"witness-snaps-here\""),
+                          "notice-banner 被放宽成 must_judge=false，却没在理由数组里登记放行它的理由 ⇒ "
+                              + "闸门那边会把它当 UNREGISTERED 红掉，这条放宽是空的（登记要能落地）")
+            XCTAssertNotNil(bannerBlock.range(of: #"38\d{8}"#, options: .regularExpression),
+                            "notice-banner 的放宽没带 run 号 ⇒ 「登记是测量」这句话就退化成一句愿望："
+                                + "没有 run 号，下一个人无法去把那条读数再看一遍（BACKLOG 49）")
         }
     }
 
@@ -2815,6 +2892,64 @@ final class MotionFilmstripTests: XCTestCase {
         case .resolves: return .productSnapped
         case .snaps: return witnessQualifies ? .notRun : .witnessCannotAdjudicate
         }
+    }
+
+    /// R75 / BACKLOG 104 的答案：**四臂那条 `.jump` 红**也要过证人这一关（原来只有阳性对照那一条问证人）。
+    ///
+    /// 为什么这是同一个洞的另一半：`testTransitionsAreActuallyRunning` 的 `.jump` 判的是
+    /// "变化段时长 < 0.4×声明"，而一条只拍到两帧的变化段，它的"时长"**就是一次采样间隔**。
+    /// runner 上两遍的实物（R74 读，同一份判据代码）：
+    ///   run 38726667469 ⇒ `notice-banner=2 帧、时长=32ms、事件内最粗=18ms` ⇒ `.jump` ⇒ **红**
+    ///   run 38726991211 ⇒ `notice-banner=2 帧、时长≥60ms` ⇒ `.transition` ⇒ **绿**
+    /// 而证人两遍给的是同一句话：`采样≈32ms 可分数段=4 合格=是 判定=拍成跳变`
+    /// ⇒ 这台机器的通道带不动一条**已知** 150ms 的淡入。既然阳性对照与产品臂读的是同一条通道，
+    /// 那"产品跳变"这句就不能在证人自己 snap 的机器上成立 —— 那是把"我没看清"写成"它没动"。
+    ///
+    /// 与 `controlJudgment` 的**不对称是刻意的**：只有"读成跳变"这一支需要问证人。
+    /// 读到一段够长的变化是正面证据，不需要借口；缺席的证据才要先确认这台机器本来看得见它。
+    enum JumpAdjudication: Equatable {
+        /// 这台机器看得见那条已知淡入 ⇒ 产品这一臂读成跳变就是产品的事，判红。
+        case productRed
+        /// 证人（且它合格）在这台机器上把已知淡入也拍成跳变 ⇒ 通道问题，报 not-run。
+        case notRunChannel
+        /// 证人 snap 了，但它采得不够细 ⇒ 它没资格给"通道看不见"签字 ⇒ 仍然判红（R68 同一条理由）。
+        case witnessUnqualified
+        /// 证人连自己都读不出 ⇒ 探针坏了，判红并指名探针（不许拿一个坏证人去赦免一条红）。
+        case witnessDead
+    }
+
+    static func jumpAdjudication(clock: FadeClockVerdict, witnessQualifies: Bool) -> JumpAdjudication {
+        switch clock {
+        case .resolves: return .productRed
+        case .probeDead: return .witnessDead
+        case .snaps: return witnessQualifies ? .notRunChannel : .witnessUnqualified
+        }
+    }
+
+    /// `jumpAdjudication` 的真值表（不开窗口，CI 每轮都跑）。
+    ///
+    /// 四格里有两格**必须是红**（`witnessUnqualified`、`witnessDead`）：这一轮加的是"证人可以赦免"，
+    /// 而一条只会赦免的表等于把红换成 skip —— 那正是 BACKLOG 49 警告的免检牌。
+    /// 所以这一族断言钉的是"赦免只有一个形状"，不是"能赦免"。
+    func testTheJumpAdjudicationIsATruthTable() {
+        XCTAssertEqual(Self.jumpAdjudication(clock: .resolves, witnessQualifies: true), .productRed,
+                       "这台机器明明看得见已知淡入，产品臂读成跳变就必须判产品")
+        XCTAssertEqual(Self.jumpAdjudication(clock: .resolves, witnessQualifies: false), .productRed,
+                       "证人合不合格与『它看得见』这一格无关：判定已经是 resolves")
+        XCTAssertEqual(Self.jumpAdjudication(clock: .snaps, witnessQualifies: true), .notRunChannel,
+                       "证人合格且 snap ⇒ 这才是『这台机器带不动』，不许继续判产品跳变")
+        XCTAssertEqual(Self.jumpAdjudication(clock: .snaps, witnessQualifies: false), .witnessUnqualified,
+                       "证人采得比它作证的过渡还粗，就没资格给『看不见』签字（R68 那一课）")
+        XCTAssertEqual(Self.jumpAdjudication(clock: .probeDead, witnessQualifies: true), .witnessDead,
+                       "证人自己读不出过程 ⇒ 红在探针上，不许拿一个坏证人去赦免一条红")
+        XCTAssertEqual(Self.jumpAdjudication(clock: .probeDead, witnessQualifies: false), .witnessDead,
+                       "探针坏这一格与采样率无关：合格位不该改变输出")
+        XCTAssertNotEqual(Self.jumpAdjudication(clock: .snaps, witnessQualifies: true),
+                          Self.jumpAdjudication(clock: .snaps, witnessQualifies: false),
+                          "`witnessQualifies` 这根轴没改变输出 ⇒ 它等于没写（与 M377 同一族）")
+        XCTAssertNotEqual(Self.jumpAdjudication(clock: .resolves, witnessQualifies: true),
+                          Self.jumpAdjudication(clock: .snaps, witnessQualifies: true),
+                          "证人的**判定**没参与决定 ⇒ 这条表只是在读合格位")
     }
 
     /// 上面那张决定表的真值表（不开窗口，CI 每轮都跑）。

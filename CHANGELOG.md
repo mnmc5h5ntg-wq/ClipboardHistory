@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R75：那条反复出现的红，是判据拿两帧的采样间隔当了时长 —— 结案 BACKLOG 104 / U-129、U-130 / D-133）
+- 读三遍 runner 日志（38726667469 / 38726991211 / 38730788527）：`notice-banner` 三遍都是 **2 帧**，
+  时长 32 / ≥60 / 36ms ⇒ 红、绿、红；而淡入时钟证人三遍同一句
+  `采样≈32ms 可分数段=4 合格=是 判定=拍成跳变（中间态帧数=0）`
+  ⇒ **104 的①**：那 80ms 里抓帧只占 0.4–0.5ms，其余是节拍（R68 那句"面积决定分辨率"作废）；
+  **104 的②**：红既不是产品也不是含糊的"环境"，是判据把一次采样间隔当成了过渡时长。
+- 修：新增纯函数 `jumpAdjudication` 把证人接到四臂判据的 `.jump` 那一支
+  （赦免只有一个形状：证人**合格且自己 snap**；证人死了或不合格仍然红），
+  八格真值表 `testTheJumpAdjudicationIsATruthTable`。
+  **不对称是刻意的**：绿是正面证据不需要借口，缺席的证据才要先确认这台机器看得看得见。
+- 登记表按实测走：`notice-banner` 的 `must_judge` true⇒false（地板 4⇒**3**，带两个 run 号），
+  另外三臂一条不放；`notice-banner-dismiss` 的带捕获要求照旧。
+- R57 那条 Swift 守卫从"两臂都必须 true"改成**"放宽必须带理由与 run 号"**，
+  并且理由从 `allowed_not_run_reasons` **数组里**读 —— M395 实测：整块 `contains`
+  会被同一臂 note 里的解释文字喂饱（放宽的守卫被放宽条目自己养活，U-130）。
+- 牙：M392–M397 五刀全 CAUGHT（抓到=5 逃掉=0）；另有一刀（删掉真判据里的证人问话）
+  **本地无判别力**，由 runner 判，不计入计数。
+- 跨机验证：R74 的 `OVERLAY_HOVER_REFLOW` 在 runner 上给出与本机**逐字相同**的读数（6/1/1、8/7/6）
+  ⇒ 重排频率不吃机器，R74 那条决定在两台上都成立。
+- 看图：本机 27 格胶片里横幅逐格变实（11–12 格到底）⇒ 本轮不是把红改成不判。
+- 全量 **790 / 38 skip / 0 failures**、动效卷 **47 例 / 3 skip / judged=4/4**、
+  `FRAME_BASELINE_COMPARED=124 CHANGED=0`、编译告警 0、脚本测试 **140** OK。
+  **产品 0 个文件** ⇒ 本机仍是 R71 装的 `c03cf278d3a4dd98…`。
+
 ### Tests（R74：浮层淡入那一格判完了，而 R67 的理由死在第一个语料上 —— U-115 判过 / U-128 / D-132）
 - 新判据走产品真路径（`queryChanged` 一个前缀一个前缀地喂）量"打字时候选列表动多勤"，
   两个语料分开打：`帧夹具 前缀数=6 整列变了=1 次 指针那格换了=1 次`、

@@ -1,0 +1,45 @@
+=== 基线（未变异）：Swift 两格与 python 那一格都必须绿 ===
+   testBandCaptureIsWiredIntoBothBannerArms                   = green
+   testTheJumpAdjudicationIsATruthTable                       = green
+   testRegistryIsStrictAgain                                  = green
+
+M392 让 `jumpAdjudication` **永远放行**（不管证人说什么都给 notRunChannel）⇒ 真值表必须红：一条只会赦免的表等于把红换成 skip（BACKLOG 49 的免检牌）
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在的正好是期望那 1 条：{'testBandCaptureIsWiredIntoBothBannerArms': 'green', 'testTheJumpAdjudicationIsATruthTable': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2935: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertEqual failed: ("notRunCh
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2937: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertEqual failed: ("notRunCh
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2941: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertEqual failed: ("notRunCh
+   已还原（逐字节相同：True）
+
+M393 让 `jumpAdjudication` **永远不放行**（证人说什么都是产品红）⇒ 真值表必须红：这一格钉的是『赦免恰好有一个形状』，反过来说明本轮不是为了让 runner 绿才加的证人
+   落地确认（MotionFilmstripTests.swift）
+   CAUGHT 红在的正好是期望那 1 条：{'testBandCaptureIsWiredIntoBothBannerArms': 'green', 'testTheJumpAdjudicationIsATruthTable': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2939: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertEqual failed: ("productR
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2941: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertEqual failed: ("productR
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:2947: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testTheJumpAdjudicationIsATruthTable] : XCTAssertNotEqual failed: ("produ
+   已还原（逐字节相同：True）
+
+M395 把登记表里那条放行理由删掉（`witness-snaps-here` 从 allowed_not_run_reasons 消失）⇒ 两半都必须红：Swift 那半条『放宽必须登记理由』、python 那半条『地板=3 且理由在案』
+   落地确认（motion_floor_expectations.json）
+   CAUGHT 红在的正好是期望那 2 条：{'testBandCaptureIsWiredIntoBothBannerArms': 'red', 'testTheJumpAdjudicationIsATruthTable': 'green', 'py:test_motion_floor_gate.MotionFloorGateTests.testRegistryIsStrictAgain': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1928: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms] : XCTAssertTrue failed - notice
+   已还原（逐字节相同：True）
+
+M396 把 note 里的两个 run 号抹掉（放宽还在，证据没了）⇒ Swift 那半条必须红：没有 run 号的放宽就是随口一说
+   落地确认（motion_floor_expectations.json）
+   CAUGHT 红在的正好是期望那 1 条：{'testBandCaptureIsWiredIntoBothBannerArms': 'red', 'testTheJumpAdjudicationIsATruthTable': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:1931: error: -[ClipboardHistoryAppTests.MotionFilmstripTests testBandCaptureIsWiredIntoBothBannerArms] : XCTAssertNotNil failed - noti
+   已还原（逐字节相同：True）
+
+M397 把 notice-banner 的 must_judge 改回 true（清单变严，读数没变）⇒ python 那格必须红：地板不再是 3 ⇒ 有人动清单却没回来改期望
+   落地确认（motion_floor_expectations.json）
+   CAUGHT 红在的正好是期望那 1 条：{'py:test_motion_floor_gate.MotionFloorGateTests.testRegistryIsStrictAgain': 'red'}
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M392   CAUGHT
+   M393   CAUGHT
+   M395   CAUGHT
+   M396   CAUGHT
+   M397   CAUGHT
+   抓到=5 逃掉=0 没跑成=0 未落地=0

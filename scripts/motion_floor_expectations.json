@@ -19,13 +19,14 @@
   ],
   "arms": {
     "notice-banner": {
-      "must_judge": true,
+      "must_judge": false,
       "stale_if_judged": false,
       "allowed_not_run_reasons": [
         "clock-coarse-in-window",
-        "premise-not-visible"
+        "premise-not-visible",
+        "witness-snaps-here"
       ],
-      "note": "R46 登记 must_judge=true → R52 按实测改成放行（两台机器都分辨不了：runner 事件段最粗 73–76ms、本机 premise-not-visible）→ R57 又改回 true，因为放行它的那个原因被修掉了：`Scenario.captureRect` 把这一臂的捕获区域从整窗（1520×1346px）收到顶部那条带（1520×96px，面积 1/14），抓一帧的中位成本 39.5–39.8ms → 4.4–4.6ms（≈9 倍），整卷中位间隔 44–45ms → 9–10ms，本机三次连续跑全部 judged=4/4 not-run=-、这一臂 10–13 帧过渡（证据 .scratch/motion-audit-2/r57_motion_readings.log；带的位置由逐像素同一性钉住：带 vs 整窗头 96 行 = 0.000、vs 尾 = 0.954）。登记是测量不是愿望：测量变了，登记就得跟着变回去。**runner 侧的带捕获读数在 R58 到位了**（`.scratch/motion-audit-2/ci_r58/motion_step_runner.md` 里的 MOTION_BAND 行：带=抓帧中位 5.6ms / 峰值 0.465 / 过渡帧数 3 / 间隔中位 22ms / 760x48px；整窗=抓帧中位 14.1ms / 峰值 0.201 / 过渡帧数 3 / 间隔中位 22ms / 760x588px）。⇒ 带在 runner 上把抓帧成本压掉约 2.5 倍（14.1→5.6ms），但**没换到更细的采样**：两臂的间隔中位都是 22ms，本机那对 44→9ms 的增益在 runner 上不存在，所以两臂的过渡帧数都是 3。这条带的收益在 runner 上是时间而不是分辨率 —— 它不足以把『判不到』修成『判到』，那一步要靠别的判据（BACKLOG 77 路 b：让判据本身不吃帧数）。允许的理由仍留在表里，但 must_judge=true 之后它不再构成放行 —— 判不到就是 UNDERCOVERED。"
+      "note": "R46 登记 must_judge=true → R52 按实测改成放行（两台机器都分辨不了：runner 事件段最粗 73–76ms、本机 premise-not-visible）→ R57 又改回 true，因为放行它的那个原因被修掉了：`Scenario.captureRect` 把这一臂的捕获区域从整窗（1520×1346px）收到顶部那条带（1520×96px，面积 1/14），抓一帧的中位成本 39.5–39.8ms → 4.4–4.6ms（≈9 倍），整卷中位间隔 44–45ms → 9–10ms，本机三次连续跑全部 judged=4/4 not-run=-、这一臂 10–13 帧过渡（证据 .scratch/motion-audit-2/r57_motion_readings.log；带的位置由逐像素同一性钉住：带 vs 整窗头 96 行 = 0.000、vs 尾 = 0.954）。登记是测量不是愿望：测量变了，登记就得跟着变回去。**runner 侧的带捕获读数在 R58 到位了**（`.scratch/motion-audit-2/ci_r58/motion_step_runner.md` 里的 MOTION_BAND 行：带=抓帧中位 5.6ms / 峰值 0.465 / 过渡帧数 3 / 间隔中位 22ms / 760x48px；整窗=抓帧中位 14.1ms / 峰值 0.201 / 过渡帧数 3 / 间隔中位 22ms / 760x588px）。⇒ 带在 runner 上把抓帧成本压掉约 2.5 倍（14.1→5.6ms），但**没换到更细的采样**：两臂的间隔中位都是 22ms，本机那对 44→9ms 的增益在 runner 上不存在，所以两臂的过渡帧数都是 3。这条带的收益在 runner 上是时间而不是分辨率 —— 它不足以把『判不到』修成『判到』，那一步要靠别的判据（BACKLOG 77 路 b：让判据本身不吃帧数）。允许的理由仍留在表里，但 must_judge=true 之后它不再构成放行 —— 判不到就是 UNDERCOVERED。**R75 又把它改回 false，带 run 号**：读 run 38726667469（R72）与 38726991211（R73）——同一份判据代码，runner 两遍都是 `MOTION_SUMMARY notice-banner=2`，而一遍红（时长=32ms、事件内最粗=18ms）一遍绿（时长≥60ms）；证人两遍同一句话 `采样≈32ms 可分数段=4 合格=是 判定=拍成跳变`。⇒ 两帧的变化段里『时长』就是一次采样间隔，这条判据在 runner 上**结构上判不了这一臂**，与产品无关。R75 于是把证人接到 `.jump` 那一支（`jumpAdjudication`），这一臂在 runner 上变成`MOTION_NOT_RUN=witness-snaps-here notice-banner` —— 那是一条**有名字的未覆盖**，不是放行：本机仍然判（证人 `采样≈4ms 可分数段=37 判定=能分辨`、这一臂 9 帧过渡），而把它修成『能判』的那条路是 BACKLOG 77 路 b（让判据不吃帧数），证人今天正好是它的验收工具。"
     },
     "notice-banner-dismiss": {
       "must_judge": true,

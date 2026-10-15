@@ -104,10 +104,10 @@ class MotionFloorGateTests(unittest.TestCase):
         """R44 那种形状在**合成清单**下仍然必须是"放行 + 打印"。
 
         R57 之前这一格直接吃今天的清单（dismiss 登记成 must_judge=false）。
-        带捕获把成本降下来之后今天的清单收紧了（四臂全 true），
-        于是这一格开始红 —— 而它要判的事根本不是"今天的清单严不严"，
-        是"闸门支不支持'登记过的漂移就放行'这条规则"。
-        ⇒ 规则用合成清单测，今天的清单另有一格专门盯（`testRegistryIsStrictAgain`）。
+        带捕获把成本降下来之后今天的清单收紧过（四臂全 true），
+        而 R75 又按实测把 `notice-banner` 放回 false（带 run 号，见 `testRegistryIsStrictAgain`）
+        ⇒ 今天的地板是 3，不是 4 也不是 2。这一格要判的事仍然只是
+        "闸门支不支持'登记过的漂移就放行'这条规则"，所以规则用合成清单测。
         """
         relaxed = json.loads(json.dumps(EXPECTATIONS))
         relaxed["arms"]["notice-banner-dismiss"]["must_judge"] = False
@@ -117,8 +117,34 @@ class MotionFloorGateTests(unittest.TestCase):
         facts = parse(text)
         self.assertEqual([m for m, red in markers(facts, relaxed) if red], [])
         self.assertEqual(facts["judged"], 3)
-        # 同一条日志、今天的清单 ⇒ 必须红。这一句钉的是"红不红由清单决定，不由日志决定"。
-        self.assertIn("MOTION_FLOOR_UNDERCOVERED", [m for m, red in markers(facts) if red])
+        # 同一条形状放到**今天的**清单上：少掉的是仍要求判到的 dismiss，
+        # 且 judged 掉到地板（3）以下 ⇒ 必须红。这一句钉的是"红不红由清单决定，不由日志决定"。
+        deeper = parse(log("MOTION_RESOLVE_SUMMARY judged=2/4 not-run=notice-banner-dismiss",
+                           extra="MOTION_NOT_RUN=clock-coarse-in-window notice-banner-dismiss：事件段最粗 101ms"))
+        self.assertIn("MOTION_FLOOR_UNDERCOVERED", [m for m, red in markers(deeper) if red],
+                      "judged=2 低于今天的地板 3 却不红 ⇒ 地板又被谁悄悄搬走了")
+
+    def testWitnessSnapsHereOnTheBannerArmIsRegisteredUncoverage(self):
+        """R75：`notice-banner` 判不到且理由是 `witness-snaps-here` ⇒ **不红，但必须打印出来**。
+
+        这一格盯的是两件事，缺一件这次的放宽就变成免检牌：
+        ① 它不再算 UNDERCOVERED（地板按实测降到 3，runner 那一臂从此有名字地缺席）；
+        ② 缺席本身仍然在 `MOTION_FLOOR_FACTS` 里点名 —— 一条没人打印的放行与没有这条规则同罪。
+        反面（换了别的理由）由 `testNewReasonForAKnownArmIsRed` 守着，
+        而"证人明明看得见却报这条"的矛盾今天由判据自己守（`jumpAdjudication` 只在证人 snap 时才放行），
+        闸门层的那道冗余检查记在 BACKLOG 107。
+        """
+        text = log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner",
+                   extra="MOTION_NOT_RUN=witness-snaps-here notice-banner：证人采样≈32ms 可分数段=4 合格=是 判定=拍成跳变")
+        facts = parse(text)
+        reds = [m for m, red in markers(facts) if red]
+        self.assertEqual(reds, [], "登记过的 witness-snaps-here 仍然红 ⇒ 这条放行等于没登记")
+        self.assertIn("notice-banner", facts["not_run"])
+        self.assertEqual(facts["judged"], 3)
+        # 少了那行理由 ⇒ 仍然要红在 REASONLESS 上（"没测到"可以，"没测到且说不清"不行）。
+        speechless = parse(log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner"))
+        self.assertIn("MOTION_FLOOR_REASONLESS", [m for m, red in markers(speechless) if red],
+                      "缺席却没带一行理由就放行 ⇒ 这就是 BACKLOG 49 说的那种免检牌")
 
     def testNotRunWithoutAReasonLineIsRed(self):
         facts = parse(log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner-dismiss"))
@@ -304,22 +330,33 @@ class MotionFloorGateTests(unittest.TestCase):
                         "一条 must_judge 都没有 ⇒ 地板是 0，这条闸门就是装饰")
 
     def testRegistryIsStrictAgain(self):
-        """R57 把两臂的 must_judge 改回 true，这一格不许它悄悄滑回去。
+        """R57 把两臂收紧到 true，R75 按**新的实测**把 `notice-banner` 放回 false —— 这一格盯的是"只准放宽这一臂、且必须留证据"。
 
         为什么单独一格：R52 那次放宽是**有证据的**（两台机器都分辨不了），
         而放宽的代价是地板从 4 降到 2 —— 一条只判到 2/4 的闸门，
         与"今天到底验了几条"这句话一起变得没有分量。
-        今天修的是原因（捕获面积 ⇒ 成本），不是症状，所以清单必须跟着收紧。
-        哪天又要放宽，note 里得写新的 run 号/毫秒数（`testExpectationsCoverExactlyTheScenarioList`
-        那条"must_judge=false 必须登记允许的理由"仍然在守着）。
+        R75 的放宽同样带证据（run 38726667469 与 38726991211：同一份判据代码，
+        runner 两遍都是 `notice-banner=2 帧`，一遍红一遍绿，而证人两遍都 `合格=是 判定=拍成跳变`），
+        而且只降一格：地板 4 ⇒ **3**，另外三臂仍然一条都不许少。
+        所以这一格现在盯四件事：① 别的臂没跟着被放宽；② 地板没掉到 3 以下；
+        ③ 被放宽那一臂的 note 里**必须有 run 号**（没有 run 号的放宽就是随口一说）；
+        ④ 它必须登记了放行所依据的那个理由。
         """
-        for arm in ("notice-banner", "notice-banner-dismiss"):
+        for arm in ("notice-banner-dismiss", "detail-kind-change", "empty-state"):
             self.assertTrue(EXPECTATIONS["arms"][arm]["must_judge"],
-                            "%s 又被放宽了 ⇒ 地板会悄悄降到 2，而带捕获之后今天没有放宽的理由" % arm)
+                            "%s 被放宽了 ⇒ R75 只准动 notice-banner 一臂" % arm)
+        required = [a for a, s in EXPECTATIONS["arms"].items() if s["must_judge"]]
+        self.assertEqual(len(required), 3,
+                         "地板不是 3 ⇒ 有人动清单却没动这一格（放宽要么留 run 号要么回来）")
+        banner = EXPECTATIONS["arms"]["notice-banner"]
+        self.assertFalse(banner["must_judge"],
+                         "notice-banner 又变回 must_judge 了？那可以，但先把 runner 那两遍红/绿的读数反驳掉")
+        self.assertIn("witness-snaps-here", banner["allowed_not_run_reasons"],
+                      "放宽所依据的理由没登记 ⇒ 闸门会把它当 UNREGISTERED 红掉，这条放宽是空的")
+        self.assertRegex(banner.get("note", ""), r"38\d{8}",
+                        "note 里没有 run 号 ⇒ 这次放宽没有证据（BACKLOG 49：登记不许变成免检牌）")
         self.assertEqual(EXPECTATIONS["thin_warnings"], [],
                          "thin_warnings 还留着条目 ⇒ 有一族'两个都不判到只警告'的口子没关")
-        self.assertEqual(len([a for a, s in EXPECTATIONS["arms"].items() if s["must_judge"]]), 4,
-                         "四臂全该必须判到")
 
     def testGateExitCodeFollowsTheReds(self):
         with tempfile.TemporaryDirectory() as folder:
