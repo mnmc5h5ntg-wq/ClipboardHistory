@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R81：读数通道一整行一次 write + 并发锤击判据；109 的答案回来了；扫光那一位开始判红 / 结案 109、112 / 新开 113 / U-151、U-152 / D-139）
+- `CaptureReadings.emit` 的两条腿改成原子的：stdout 一次 `write(整行+换行)`（不再用 `print`，
+  它把内容与换行分两次写 —— 那就是缝点），文件通道整段进 `NSLock`，`opened` 换成按 URL 记的 `openedURLs`。
+  起因是 R79 那遍 CI 里决定 BACKLOG 109 的那条读数被**缝进**了另一条判据的行。
+- 新判据 `testConcurrentReadingsNeitherSpliceNorDropALine`（8 线程 × 60 条 900B 长行）：
+  行数、**行首与行尾的 (t,i) 必须相等**、每个 (t,i) 恰好一次 —— 三条各拦一种坏法，主断言是位置同一性。
+  牙：M434/M435 拿掉锁 ⇒ **3/3 遍 SIGSEGV**（比"读数变脏"更狠），M436 让整份重写每次都走 ⇒ 3/3 遍红。
+- BACKLOG **109 结案**：runner 那一遍落在预登记的**第二支** —— 焦点搬动 0.0pt²，
+  而同一把尺在同一格里读出撤占位字 88.9/112.3pt²、打进字 113.4/143.2pt² ⇒ 尺不瞎，
+  是这台机器的 AppKit 不为非 key 窗口调淡占位符；上一轮"最多 3/4 是网格"那句被量掉了。
+- BACKLOG **113 开**：`testSkeletonSweepActuallySweeps` 在 R80 的 CI 上红（变化帧对 2 < 3）。
+  并排三次 runner 读数证明这朵红是 **R77 把轴修好之后的成果**（R73/R75 峰值 0.000 ⇒ 那时 not-run 免检），
+  要修的是判据形状：帧对计数跟着采样网格走，换成时间跨度 / 不连续段数（与 110 同族）。
+- 电池自己的分类器补第三类（U-151）：崩溃不再被归成"编译没过"。
+
 ### Tests（R80：焦点那四条红是真的，而"红"说的是尺跟着像素网格变 —— 换尺 + 三条证人臂 / U-146…U-150 / D-138）
 - 读 R79 的 CI：runner 上存在性闸门**开**（`占位整条宽=87.0pt`）而两态差读 0 个像素，四条红原样在。
   命中 BACKLOG 109 预登记的第二分支 ⇒ 按预登记的处置：查机制，**不抬地板**。

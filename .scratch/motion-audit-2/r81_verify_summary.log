@@ -1,0 +1,16 @@
+WARN_COUNT=0
+FULL_EXIT=0
+	 Executed 796 tests, with 38 tests skipped and 0 failures (0 unexpected) in 161.868 (161.913) seconds
+FRAMES_EXIT=0
+CAPTURE_GATE_CHANNELS stdout=1 readings=514 行 补回=0 行（stdout 没有的读数）
+CAPTURE_GATE_CASES passed=43 skipped=4 failed=0 有名字的红=0 NOT_RUN=2
+  被 skip 的用例（skip 不是通过，它只是**不红**）：testMenuBarRowTruncationAcrossWidthsDiagnostic testProbeVibrantEligibilityDiagnostic testSettingsCaptionRowTierProfileDiagnostic testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic
+  已登记的标记：QUICKPICK_FOCUS_RING_NOT_RUN
+    QUICKPICK_FOCUS_RING_NOT_RUN=1 亮：焦点环这一档在这条通道里读不到（框外那一圈 0.0pt²，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+    QUICKPICK_FOCUS_RING_NOT_RUN=1 暗：焦点环这一档在这条通道里读不到（框外那一圈 0.0pt²，而 `面板key=false appActive=false`）⇒ 真机上有没有系统环只能你看（人工批次 68.1），不许把这条缺席写成'产品没有焦点环'
+CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）
+CAPTURE_GATE_EXIT=0
+BASELINE_EXIT=0
+  missing  row-a.png  <- 夹具不再产出这一帧，必须查
+SCRIPT_EXIT=0
+QUICKPICK_FOCUS_INK 行数（读数文件里）=2（亮/暗各一，没有一行被缝掉）

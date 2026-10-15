@@ -334,6 +334,67 @@ final class UICaptureTests: XCTestCase {
         emit("CAPTURE_READINGS_SELFTEST 文件通道 \(lines.count) 行 @ \(CaptureReadings.readingsURL.path)")
     }
 
+    /// R81 / BACKLOG 112：并发写读数**不许缝行、不许少行**。
+    ///
+    /// 这一格不是预防性的洁癖 —— 它有一个具体的受害者：R79 那一遍 CI 里
+    /// `QUICKPICK_FOCUS 暗 …` 那一行被缝进了 `MENUBAR_FITTING …` 的肚子里
+    /// （日志里那一行前半属于另一条判据、后半属于我，而 `MENUBAR_FITTING` 自己的结论没了），
+    /// 而它正是"焦点那条轴在 runner 上能不能判"那一个问题（BACKLOG 109）要的答案。
+    /// 上一轮我只能改用**红的行号**反证闸门开没开 —— 那是拿推理补一条被毁掉的证据。
+    ///
+    /// 三条断言各拦一种坏法（都在**同一把尺**上：整行回读）：
+    ///   ① 行数 = 线程数 × 每线程条数 ⇒ 拦"整卷被后写的抹掉"（`openedURLs` 那一步原来没有锁）；
+    ///   ② 每行的**行首 (t,i) 与行尾 (t,i) 必须相等** ⇒ 拦缝行：
+    ///      两行缝在一起，一定会出现"头是 3/17、尾是 5/2"这种对不上的行 ——
+    ///      这一条是整格的要害：**只看"有没有变化"抓不到缝行，只看位置同一性才抓得到**
+    ///      （与 R76 那条"缩区域之后必须量位置同一性"同一条教训）；
+    ///   ③ 每个 (t,i) 恰好出现一次 ⇒ 拦"覆盖"（两个线程 seek 到同一个偏移，后写的把前写的盖掉）。
+    ///
+    /// **这一格测不到的**（照实说）：`emit` 的 **stdout** 那一条腿。进程内没法把自己 print 出去的东西
+    /// 再读回来，而 CI 上被毁掉的正是 stdout 那一份 —— 它只能由"闸门读文件通道"这条设计本身兜住
+    /// （文件通道现在是原子的，stdout 丢了就从文件补回）。
+    func testConcurrentReadingsNeitherSpliceNorDropALine() throws {
+        let threads = 8, perThread = 60
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("capture-hammer-\(UUID().uuidString.prefix(8)).log")
+        // 一行 900 多个字节：短行即使被交错也看不出形状，长行才复现得出 CI 上那种切法。
+        let pad = String(repeating: "x", count: 900)
+        DispatchQueue.concurrentPerform(iterations: threads) { t in
+            for i in 0..<perThread {
+                CaptureReadings.appendForced("CAPTURE_HAMMER t=\(t) i=\(i) \(pad) END t=\(t) i=\(i)", to: url)
+            }
+        }
+        let written = threads * perThread
+        let lines = (try String(contentsOf: url, encoding: .utf8))
+            .split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        XCTAssertEqual(lines.count, written,
+                       "锤了 \(written) 行只读回 \(lines.count) 行 ⇒ 有读数**没了**（整卷被后写的那一份抹掉，"
+                           + "或两个线程 seek 到同一个偏移互相覆盖）—— 那种丢法没有任何一条判据会红")
+        var mismatched: [String] = []
+        var pairs = Set<String>()
+        for line in lines {
+            let tokens = line.split(separator: " ").map(String.init)
+            let head = tokens.count > 2 ? tokens[1] + "/" + tokens[2] : "-"
+            let tail = tokens.count > 6 ? tokens[tokens.count - 2] + "/" + tokens[tokens.count - 1] : "-"
+            guard tokens.count == 7, tokens[0] == "CAPTURE_HAMMER",
+                  tokens[3] == pad, head == tail else {
+                mismatched.append("头=\(head) 尾=\(tail) 词数=\(tokens.count) 长度=\(line.count)")
+                continue
+            }
+            pairs.insert(head)
+        }
+        XCTAssertTrue(mismatched.isEmpty,
+                      "有 \(mismatched.count) 行的**行首与行尾不是同一个 (t,i)** ⇒ 两行被缝成一行："
+                          + "\(mismatched.prefix(3)) —— 这正是 R79 毁掉 `QUICKPICK_FOCUS 暗` 的那个形状，"
+                          + "而它毁掉的是**决定 BACKLOG 109 的那一条读数**")
+        XCTAssertEqual(pairs.count, written,
+                       "\(written) 行里只有 \(pairs.count) 个不同的 (t,i) ⇒ 有行被**整行覆盖**"
+                           + "（缝行会留下对不上的头尾，覆盖不会 ⇒ 这一格与上面那格各拦一种）")
+        emit("CAPTURE_HAMMER 结果=线程 \(threads) × 每线程 \(perThread) = \(written) 行，"
+            + "整行回读全部头尾一致（临时文件，不进读数卷）")
+        try? FileManager.default.removeItem(at: url)
+    }
+
     /// R19 立的是"浮层还拍不到"，R63 把它**翻过来**：那条判据钉的现象（stack 塌）其实是产品缺陷，
     /// 而它给出的原因（"stack 在捕获环境里塌，真实 App 里撑满 420×300"）是错的 ——
     /// 两条路都塌，因为产品只给了 `frame` + `autoresizingMask`，而 `NSStackView` 生下来

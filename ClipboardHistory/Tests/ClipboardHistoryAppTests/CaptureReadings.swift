@@ -32,34 +32,75 @@ enum CaptureReadings {
         return url.appendingPathComponent("capture-readings.log")
     }
 
-    /// 每个进程第一次写要**整份重写**：上一遍的读数冒充这一遍，比没有读数更坏
+    /// 每个进程对**每一份**读数文件第一次写要整份重写：上一遍的读数冒充这一遍，比没有读数更坏
     /// （`SPARSE_EXEMPTION_OK` 会是从昨天带上来的）。这条与动效卷同一句话。
-    nonisolated(unsafe) static var opened = false
+    /// **按 URL 记**而不是记一个布尔：并发判据要拿一份临时文件去锤同一段代码，
+    /// 共享布尔会让"临时文件的第一行"以为已经开过卷，于是去 open 一份不存在的文件。
+    /// **只能在 `lock` 里读写**（R81 / BACKLOG 112）：它原来没有锁，两个线程可以同时看到"没开过"，
+    /// 于是两边都做整份重写 —— 后写的那一份把前一份**整卷抹掉**。
+    nonisolated(unsafe) private static var openedURLs = Set<URL>()
 
-    /// 通道自己坏了不许把判据变红（那是拿环境问题判产品），但必须**被看见**。
-    /// 这一行为什么故意不叫 `CAPTURE_*`：它不是一条读数，而是"文件通道坏了"这件事本身，
-    /// 且只能走 stdout；带上前缀就会被守卫的扫描判成"有条读数没进文件"。
-    private static func channelBroken(_ error: Error) {
-        FileHandle.standardError.write(("CAPTURE_READINGS_CHANNEL_BROKEN \(error.localizedDescription)\n").data(using: .utf8)!)
-    }
+    /// 一把进程内的锁。为什么必须它：SwiftPM 从 Swift 6 起**并行**跑用例，
+    /// 而 R79 的 CI 日志里抓到过实锤 —— 我的 `QUICKPICK_FOCUS 暗 …` 那一行被**缝进了另一条判据的行**：
+    /// `MENUBAR_FITTING 声明宽=320 hosting.fittingSize=0.08px 宽=87.0pt(聚焦 12…98) …`
+    /// 前半是别人的、后半是我的，而 MENUBAR_FITTING 自己的结论被吃掉。
+    /// 坏在两个地方：`print(line)` 把"内容"与"换行"分两次 write（两个线程可以在两次之间插进来），
+    /// 文件通道的 `seekToEndOfFile()` + `write()` 也不是一个原子动作（两个线程可以 seek 到同一个偏移）。
+    /// ⇒ 现在**一整行一次 write**，两条腿都在锁里。
+    private static let lock = NSLock()
 
-    /// 打一行读数，**并且**把它记进文件通道。
+    /// 一条读数写两遍：stdout（给人看现场）与文件（给闸门兜底）。**两条腿都必须整行原子。**
     static func emit(_ line: String) {
-        print(line)
-        let payload = (line + "\n").data(using: .utf8) ?? Data()
+        writeStdoutLine(line)
         let url = readingsURL
+        lock.lock()
+        defer { lock.unlock() }
         do {
-            if !opened {
-                opened = true
-                try payload.write(to: url)
-                return
-            }
-            let handle = try FileHandle(forWritingTo: url)
-            handle.seekToEndOfFile()
-            handle.write(payload)
-            try? handle.close()
+            try appendLocked(line, to: url)
         } catch {
             channelBroken(error)
         }
+    }
+
+    /// stdout 那一条腿：一次 `write` 一整行（含换行）。
+    /// 为什么不再用 `print`：`print` 走 stdio，会把它拆成"串"与"换行"两次写 ——
+    /// 那正是 R79 那两条读数缝在一起的缝。
+    private static func writeStdoutLine(_ line: String) {
+        guard let payload = (line + "\n").data(using: .utf8) else { return }
+        FileHandle.standardOutput.write(payload)
+    }
+
+    /// 文件那一条腿的**实现**（调用方必须已经持锁）。单独抽出来是为了并发判据能拿一个
+    /// **临时文件**去锤它 —— 否则锤击测试自己会往真正的读数卷里灌上千行垃圾，
+    /// 而那条卷正是闸门要读的东西（"测试把被测对象弄脏了"那一族）。
+    static func appendLocked(_ line: String, to url: URL) throws {
+        let payload = (line + "\n").data(using: .utf8) ?? Data()
+        if !openedURLs.contains(url) {
+            openedURLs.insert(url)
+            try payload.write(to: url)
+            return
+        }
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        handle.seekToEndOfFile()
+        handle.write(payload)
+    }
+
+    /// 并发锤击判据用的入口：**带锁**写一行到指定文件（与 `emit` 的文件那一条腿同一段代码）。
+    static func appendForced(_ line: String, to url: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        do {
+            try appendLocked(line, to: url)
+        } catch {
+            channelBroken(error)
+        }
+    }
+
+    /// 通道自己坏了不许把判据变红（那是拿环境问题判产品），但必须**被看见**。
+    /// 这一行为什么故意不叫 `CAPTURE_*`：它不是一条读数，而是"文件通道坏了"这件事本身，
+    /// 且只能走 stderr；带上前缀就会被守卫的扫描判成"有条读数没进文件"。
+    private static func channelBroken(_ error: Error) {
+        FileHandle.standardError.write(("CAPTURE_READINGS_CHANNEL_BROKEN \(error.localizedDescription)\n").data(using: .utf8)!)
     }
 }

@@ -1,0 +1,31 @@
+=== 基线（带锁）：3 遍都必须绿 ===
+   基线红=0/3 崩溃=0/3
+
+M434 把 `appendForced` 的锁拿掉（回到 R79 之前那个形状）
+   已还原（逐字节相同：True）
+     error: Exited with unexpected signal code 11
+     error: Exited with unexpected signal code 11
+     error: Exited with unexpected signal code 11
+   CAUGHT 红 0/3 遍、崩溃 3/3 遍（崩溃=没有锁时两个线程同时改同一个 Set / FileHandle，进程直接段错误 —— 这一刀比预想的更狠，但**必须由判据自己说出口**）
+
+M435 同一刀再跑一遍（并发缺陷的复现率本身要被量出来）
+   已还原（逐字节相同：True）
+     error: Exited with unexpected signal code 11
+     error: Exited with unexpected signal code 11
+     error: Exited with unexpected signal code 11
+   CAUGHT 红 0/3 遍、崩溃 3/3 遍（崩溃=没有锁时两个线程同时改同一个 Set / FileHandle，进程直接段错误 —— 这一刀比预想的更狠，但**必须由判据自己说出口**）
+
+M436 『第一次写要整份重写』这条分支每次都走 ⇒ 每一行都把整卷抹掉（追加逻辑作废）
+   已还原（逐字节相同：True）
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:370: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:390: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:370: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:390: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:370: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:390: error: -[ClipboardHistoryAppTests.UICaptureTests testConcurrentReadingsNeitherSpliceNorDropALine] : XCTAssertEqua
+   CAUGHT 红 3/3 遍、崩溃 0/3 遍（崩溃=没有锁时两个线程同时改同一个 Set / FileHandle，进程直接段错误 —— 这一刀比预想的更狠，但**必须由判据自己说出口**）
+
+=== 汇总 ===
+   M434   CAUGHT
+   M435   CAUGHT
+   M436   CAUGHT
