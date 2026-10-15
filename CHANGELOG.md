@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Tests（R74：浮层淡入那一格判完了，而 R67 的理由死在第一个语料上 —— U-115 判过 / U-128 / D-132）
+- 新判据走产品真路径（`queryChanged` 一个前缀一个前缀地喂）量"打字时候选列表动多勤"，
+  两个语料分开打：`帧夹具 前缀数=6 整列变了=1 次 指针那格换了=1 次`、
+  `嵌套前缀语料 前缀数=8 整列变了=7 次 指针那格换了=6 次`
+  ⇒ **R67 写在报告里的那句"重排发生在每个候选字上"在帧夹具上不成立（1/6）**，
+  原因是那个夹具只剩一条命中，不是产品不动。
+- 决定**不变**（悬停不加淡入），理由换成两条：指针那一格在真实形状上 8 个前缀换 6 次记录；
+  机制上 `rebuildRows` 每个前缀拆一次灰、补回来的唯一入口是 `mouseMoved`。
+  两个语料各带一条**反向**断言（正面必须一直重排、反面必须一直不重排），
+  防止"挑一个能证明自己的夹具"（U-128）。
+- 两条读同一机制的守卫（R67 真值表那条 + 本轮机制那条）合并成一把尺 `Self.functionBody`，
+  配齐正 / 反 / 右边界三格对照；失败消息里明写"这一条红的含义是决定该重判，不是产品坏了"。
+- 牙：M386–M391 六刀全 CAUGHT。其中 M387（撤掉拆灰、只留重画）**像素判据全绿**
+  ⇒ 机制守卫与像素判据不冗余；M387 第一版被"只红一条"的期望误判成 ESCAPED ⇒ 改期望表，不改网。
+- 看图 + 跨通道核对：落盘 PNG 上灰带 x 44…795、y 296…363（68px），与判据在内存 rep 上读的逐字相同
+  （亮暗两档都是）⇒ 判据看的图就是基线钉住的那张。
+- 全量 **789 / 38 skip / 0 failures**、`FRAME_BASELINE_COMPARED=124 CHANGED=0 MISSING=0 ADDED=0`、
+  编译告警 0、脚本测试 139 OK。**产品 0 个文件** ⇒ 本机仍是 R71 装的 `c03cf278d3a4dd98…`，本轮不重装。
+- 新开 BACKLOG **106**（重排读数来自手工语料，真实存档在盘上）。
+
 ### Docs（R73：那条"门"的假设被自己的读数杀掉了 —— 结案 BACKLOG 105 / U-127 / D-131）
 - 读 R70+R71 的 CI（run 38725116481）：runner 1× 上 `OVERLAY_HOVER_DOOR 药丸内缩@门1/2/4 = **2/2/2px**`、
   `灰带@门1/4 = 4/5px` ⇒ **不是门**（把 `≥4/255` 降到 `≥1/255`，药丸读数一动没动）

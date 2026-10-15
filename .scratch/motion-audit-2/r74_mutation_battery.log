@@ -1,0 +1,52 @@
+=== 基线（未变异）：四条判据都必须绿 ===
+   testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora      = green
+   testOverlayHoverTintIsPaintedAndConfinedToItsRow                 = green
+   testOverlayHoverFillSharesTheSelectionPillsOutline               = green
+   testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSideb = green
+
+M386 给悬停那一段**真的加上一条动画**（`mouseMoved` 走 `NSAnimationContext`）⇒ 只有结论守卫该红，三条像素/几何判据必须照旧绿（它们量的不是过渡）
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在的正好是期望那 1 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1266: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertFalse faile
+   已还原（逐字节相同：True）
+
+M387 把「重排时拆掉那层灰」换成「重排时只重画」——**机制被撤，函数还在**⇒ 读这个机制的**两条**守卫（淡入那条 + R67 的真值表那条）都必须红，而像素判据全绿：离屏捕获从不走 `hovered`（BACKLOG 95 的通道边界）。这一刀一开始记的是 ESCAPED，因为电池要求「只红一条」—— 那是我的期望写错了，不是网写错了：两条守卫确实判同一件事，于是 R74 把它们改成**共用 `Self.functionBody`**（一处坏），并把这一刀的期望改成「两条一起红」。留这一格在日志里是因为它顺手证了另一件事：这两条守卫**不是冗余**——有一条真会漏的改动只有源码守卫抓得到，像素判据对它完全无感
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在的正好是期望那 2 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'red'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1278: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertTrue failed
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:798: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar] : XCTAssertTrue 
+   已还原（逐字节相同：True）
+
+M388 把嵌套前缀语料改成**不嵌套**的（每条开头都换字）⇒ 「每个字都往下切一层」这个观察没了⇒ 两条读数断言（整列 7/8、指针那格 6/8）必须一起红：读数不是硬编码的常数
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 红在的正好是期望那 1 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1243: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertGreaterThan
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1251: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertGreaterThan
+   已还原（逐字节相同：True）
+
+M389 把**反面语料**那条对照指到嵌套语料上（`visual` → `nested`）⇒ 必须红：两个语料不是可互换的，帧夹具那个「只剩一条命中所以不重排」是真的反面
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 红在的正好是期望那 1 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1248: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertLessThan fa
+   已还原（逐字节相同：True）
+
+M390 让扫描器在**没找到签名**时返回整份源码（而不是空串）⇒ 负对照必须红。没有这一格，`contains(clearHover)` 会在函数改名之后仍然绿 —— 那是「永远看得见」的守卫
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 红在的正好是期望那 1 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1293: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertTrue failed
+   已还原（逐字节相同：True）
+
+M391 让扫描器**不截方法结尾**（把签名之后的整个文件后半都当成方法体）⇒ 右边界对照必须红：它说明 `contains(clearHover)` 量的不再是这一个函数，而是这个文件
+   落地确认（UICaptureHarness.swift）
+   CAUGHT 红在的正好是期望那 1 条，其余照旧绿：{'testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora': 'red', 'testOverlayHoverTintIsPaintedAndConfinedToItsRow': 'green', 'testOverlayHoverFillSharesTheSelectionPillsOutline': 'green', 'testOverlayHoverPolicyIsATruthTableAndSharesItsTokenWithTheSidebar': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1288: error: -[ClipboardHistoryAppTests.UICaptureTests testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora] : XCTAssertFalse faile
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M386   CAUGHT
+   M387   CAUGHT
+   M388   CAUGHT
+   M389   CAUGHT
+   M390   CAUGHT
+   M391   CAUGHT
+   抓到=6 逃掉=0 没跑成=0 未落地=0

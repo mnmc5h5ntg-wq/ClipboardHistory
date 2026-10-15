@@ -246,6 +246,23 @@ final class UICaptureTests: XCTestCase {
 
     private func emit(_ line: String) { Self.emit(line) }
 
+    /// 取一条方法签名之后的**方法体**（到第一处「换行 + 四空格 + }」为止）。
+    ///
+    /// 为什么要有它：源码级守卫只会 `contains`，而整文件 `contains` 分不清
+    /// "这个调用在这个方法里" 与 "这个调用在别处" —— 把 `clearHover` 从 `rebuildRows`
+    /// 挪进别的函数，我那句"打字时那层灰每次都被拆掉"就断了，而整文件仍然绿。
+    ///
+    /// 结尾判定用缩进而不是括号配平：这个文件里的方法都是 4 空格缩进、方法体 8 空格，
+    /// 所以第一处「四空格的 }」就是本方法的结尾。**换文件要重新验这个前提**，
+    /// 前提不成立时它返回空串或截短 —— 所以调用点必须带正对照（扫不到就红），
+    /// 不许静默返回整份源码让守卫"永远看得见"。
+    static func functionBody(named signature: String, in source: String) -> String {
+        guard let start = source.range(of: signature) else { return "" }
+        let rest = String(source[start.upperBound...])
+        guard let end = rest.range(of: "\n    }") else { return "" }
+        return String(rest[rest.startIndex..<end.lowerBound])
+    }
+
     private var outputDirectory: URL? {        guard let path = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"], !path.isEmpty else {
             return nil
         }
@@ -772,10 +789,14 @@ final class UICaptureTests: XCTestCase {
         // 那层灰会留在错误的一行上。删掉这一行调用不会让任何像素判据变红
         // （判据里没有真鼠标），所以它必须由一条源码守卫钉住 —— 与 `NoticeBanner`
         // 那一族"守卫读调用点"同一条理由。
+        //
+        // R74：截取换成 `Self.functionBody` 而不是这一格自己 `components(separatedBy:)`。
+        // 理由是**漂移**：淡入那条判据（`testOverlayHoverHasNoFade…`）守的是同一个机制，
+        // 两处各写一份截取规则，就会有一处先瞎（M386 实测过：这一刀同时红在两条守卫上，
+        // 说明它们判的确实是同一件事 —— 那它们就必须共用同一把尺，只剩一个地方会坏）。
         let controllerSource = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
-        let rebuild = controllerSource.components(separatedBy: "func rebuildRows(").last ?? ""
-        XCTAssertTrue(rebuild.components(separatedBy: "\n    }").first?
-                        .contains("clearHover()") == true,
+        XCTAssertTrue(Self.functionBody(named: "private func rebuildRows()", in: controllerSource)
+                        .contains("clearHover()"),
                       "`rebuildRows` 不再清悬停了 ⇒ 打字时候选增减，那层灰会留在错误的一行上")
 
         // 跨文件守卫：SwiftUI 侧那一族行悬停确实读的是同一枚令牌
@@ -1145,6 +1166,132 @@ final class UICaptureTests: XCTestCase {
                           "「访达」命中了全部 \(all) 条 ⇒ typed 与 list 两张帧是同一张，"
                           + "过滤这件事仍然没有帧可看。换一条只命中一部分的词")
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
+    }
+
+    /// R74 / U-115：浮层那一档悬停**不加淡入** —— 这条决定从今天起有读数，不是"我觉得"。
+    ///
+    /// 判的问题：给那层灰配一条 100ms 的淡入，用户打字时看到的是"过渡走完然后停住"，
+    /// 还是"一直在打断重来"？后者 ⇒ 不加（淡入会把一次静置的描色变成呼吸）；
+    /// 前者 ⇒ 我给 R67 的那句理由是错的，该加就得加。
+    ///
+    /// 量法走产品真路径：`queryChanged(_:)` 一个前缀一个前缀地喂，数两件**分开的**事：
+    ///   ① 整列变了几个前缀（候选集往下切一层）；
+    ///   ② 指针那一格（固定第 2 行）换了几次记录，含"那一行没了"。
+    /// 分开打是因为它们证的不是同一件事：**整列动 ≠ 指针那一格动**，
+    /// 而淡入的害处只在"指针那一格一直在换人"时才成立。断言用**比例**不用绝对次数：
+    /// 打字速度、查询长度都不该由测试替产品决定。
+    ///
+    /// **两个语料都要量，因为第一个把我为 R67 写的那句理由证伪了**（U-128）：帧夹具那 5 条里
+    /// "这是一段用于"只命中 1 条 ⇒ 6 个前缀列表只变 1 次 ⇒ "打字时整列一直在动"在这个语料上
+    /// **不成立**。它不成立不是因为产品不动，是因为**这个夹具只剩一条命中** —— 一个只剩一条
+    /// 结果的搜索框本来就不该重排。于是补上"同一条内容被反复复制"那一族真实形状（长度递增的
+    /// 嵌套前缀），那才是浮层打字时的日常：每多打一个字，候选集往下切一层。
+    ///
+    /// 所以这一条的结论是**按语料限定**的，不是"任何情况下都不该加"：在嵌套语料上淡入的害处量得到，
+    /// 在只命中一条的语料上量不到。写成限定式而不是全称式，是因为 U-115 要区分的正是
+    /// "做过决定"与"没做过决定"，而第三种错更贵：**只在自己的夹具上成立的理由**（看着像证据）。
+    func testOverlayHoverHasNoFadeAndTheReasonIsMeasuredOnTwoCorpora() throws {
+        func reflow(store: HistoryStore, query: String) -> (prefixes: Int, changed: Int, churn: Int, rows: Int) {
+            let build = QuickPickCapturePanel.builder(store: store, query: "")
+            guard let panel = build(), let content = panel.contentView else { return (-1, -1, -1, -1) }
+            panel.setFrameOrigin(NSPoint(x: -20009, y: -20009))
+            panel.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            defer { panel.orderOut(nil) }
+            guard let table = Self.productTable(in: content),
+                  let controller = table.delegate as? QuickPickController else { return (-2, -2, -2, -2) }
+            func visibleTitles() -> [String] {
+                table.layoutSubtreeIfNeeded()
+                return (0..<table.numberOfRows).compactMap { row in
+                    (table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSTableCellView)?
+                        .textField?.stringValue
+                }
+            }
+            var prefixes: [String] = []
+            var growing = ""
+            for character in query { growing.append(character); prefixes.append(growing) }
+            // 指针那一格固定在第 2 行：打字时鼠标通常是停着的，而 `mouseMoved` 是唯一能把那层灰
+            // 补回来的入口 ⇒ "这一格此刻是谁"只由列表自己决定，不由测试决定。
+            // 用空串而不是 nil 当"那一行没了"：让它和"换了别的记录"在同一个轴上可比。
+            let pointerRow = 2
+            var previous = visibleTitles()
+            var atPointer = pointerRow < previous.count ? previous[pointerRow] : ""
+            var changed = 0
+            var churn = 0
+            for prefix in prefixes {
+                controller.queryChanged(prefix)
+                let now = visibleTitles()
+                if now != previous { changed += 1 }
+                previous = now
+                let nowPointer = pointerRow < now.count ? now[pointerRow] : ""
+                if nowPointer != atPointer { churn += 1 }
+                atPointer = nowPointer
+            }
+            return (prefixes.count, changed, churn, previous.count)
+        }
+        // 两个语料的分工写在上面那段文档里：帧夹具那条证伪了 R67 的理由（U-128），
+        // 嵌套前缀那条才是浮层打字时的日常。
+        let visualFixtureQuery = "这是一段用于"
+        let query = "一二三四五六七八"
+        let visual = reflow(store: makePopulatedStore(), query: visualFixtureQuery)
+        let nested = reflow(store: makeNestedPrefixStore(), query: query)
+        emit("OVERLAY_HOVER_REFLOW 帧夹具 前缀数=\(visual.prefixes) 整列变了=\(visual.changed) 次 "
+            + "指针那格换了=\(visual.churn) 次 最终行数=\(visual.rows) "
+            + "｜嵌套前缀语料 前缀数=\(nested.prefixes) 整列变了=\(nested.changed) 次 "
+            + "指针那格换了=\(nested.churn) 次 最终行数=\(nested.rows)（指针=第 2 行，那一行没了也算换）")
+        XCTAssertGreaterThanOrEqual(nested.prefixes, 3, "查询太短 ⇒ 这条判据没有对象")
+        XCTAssertGreaterThanOrEqual(nested.changed, nested.prefixes - 1,
+            "嵌套前缀语料里 \(nested.prefixes) 个前缀只让列表变了 \(nested.changed) 次 ⇒ "
+                + "\"打字时整列一直在动\"这个理由不成立：淡入大部分时间能走完，"
+                + "那不给悬停加过渡就只是没做，而不是做过决定（U-115 要的就是这个区分）。"
+                + "注意 R67 当时写的就是这句话，而它在**帧夹具那个只命中一条的语料**上是错的（U-128）")
+        XCTAssertLessThan(visual.changed, visual.prefixes - 1,
+            "帧夹具那个语料什么时候变成\"每个字都重排\"了，上面那条对照就失去意义了 —— "
+                + "它存在的理由就是\"一个只剩一条命中的搜索框不重排\"")
+        XCTAssertGreaterThanOrEqual(nested.churn, nested.prefixes / 2,
+            "整列变了 \(nested.changed) 次，但指针那一格（第 2 行）只换了 \(nested.churn) 次记录 ⇒ "
+                + "那层灰基本一直停在同一条记录上，淡入走一次就能停住 —— 于是「淡入会变成呼吸」"
+                + "这个**唯一的害处**就不成立了，这一格该重判（多半该加）。"
+                + "两个数分开断言是因为它们证的不是同一件事：整列动 ≠ 指针那一格动")
+        XCTAssertLessThan(visual.churn, visual.prefixes / 2,
+            "帧夹具那一格换了 \(visual.churn) 次记录，快到每个前缀一次 ⇒ 这个语料被改成了嵌套形状，"
+                + "它就不再是**反面语料**了：两个语料的对照塌成一个，"
+                + "上面那条「整列一直在动」又变回只在一种形状上成立（U-128 那一课）")
+        // 决定钉在源码上：这一族"声明了过渡但没人驱动"与"该动的没动"是同一枚硬币的两面，
+        // 而这里我们**主动选择不动** ⇒ 必须有一条守卫，否则下一次有人顺手加 `.animation`
+        // 或 `animator()` 时，没人知道这一格是量过才决定不加的。
+        let rowSource = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
+        let hoverPart = rowSource.components(separatedBy: "final class QuickPickRowView").last ?? ""
+        for forbidden in ["animator(", "NSAnimationContext", "animate(with:"] {
+            XCTAssertFalse(hoverPart.contains(forbidden),
+                "悬停那一档开始出现 `\(forbidden)` 了 ⇒ 这一格的决定是 R74 量过才做的"
+                    + "（嵌套前缀语料里 \(nested.prefixes) 个前缀有 \(nested.changed) 次让整列重排、"
+                    + "\(nested.churn) 次让指针那一格换人），"
+                    + "要改这个决定请先重新量一遍，而不是顺手加一条动画")
+        }
+        // 第二条守卫钉的是**理由的机制**，不是结论：这一格不加淡入，靠的是「行重排会把那层灰拆掉，
+        // 而把它补回来的唯一入口是指针事件」。哪天 `rebuildRows` 不再拆了（改成按指针位置重算、
+        // 或把 hover 收进模型），我这套论证就过期 —— 那种红**不代表产品坏了**，
+        // 代表「这一格该重判（也许真该加淡入）」。写清这一点是因为上一条守卫最容易被误修：
+        // 看到红就顺手把 `clearHover` 加回去，等于用测试替产品保住一句已经不再成立的理由。
+        let rebuild = Self.functionBody(named: "private func rebuildRows()", in: rowSource)
+        XCTAssertTrue(rebuild.contains("clearHover"),
+            "`rebuildRows` 里已经不叫 `clearHover` 了 ⇒ 「打字时那层灰会被拆掉、淡入每次都被打断」失去机制支撑"
+                + "（实测：\(nested.prefixes) 个前缀让指针那一格换 \(nested.churn) 次人）。"
+                + "这一条红的含义是「决定该重判」，不是「产品坏了」")
+        // 扫描器自己的正/反对照（R71/M382 那一族的规矩：只测「该红的没红」不够，
+        // 得证明这条网真的在网，而且网不住的时候会说「网住了」）。
+        XCTAssertFalse(rebuild.isEmpty,
+                       "扫不到 `rebuildRows` 的函数体 ⇒ 上面那条守卫是空转的（永远绿）")
+        XCTAssertTrue(rebuild.contains("enumerateAvailableRowViews"),
+                      "扫到的 `rebuildRows` 体里没有 `enumerateAvailableRowViews` ⇒ 截取的范围不对"
+                          + "（多半在方法体之前就断了），那条守卫量的不是这个函数")
+        XCTAssertFalse(rebuild.contains("final class QuickPickRowView"),
+                       "从 `rebuildRows` 往后截到了类声明 ⇒ 截取器没在方法结尾断开，把文件后半当成了方法体 —— "
+                           + "那 `contains(clearHover)` 判的就不再是这一个函数（这一条是截取器的**右边界**对照）")
+        XCTAssertTrue(Self.functionBody(named: "private func definitelyNotInThisFile()", in: rowSource).isEmpty,
+                      "一个不存在的函数名也能扫出东西 ⇒ 这个截取器「永远看得见」，"
+                          + "上面几条源码守卫一起退化成噪声计数器")
     }
 
     /// R71 / BACKLOG 99：浮层那一行的字号，与"同一条记录的标题"在别处的字号，必须是同一档。
@@ -2894,6 +3041,29 @@ final class UICaptureTests: XCTestCase {
     /// internal 是刻意的：`detail-text-highlight` 这类夹具的**前提**需要被另一套用例断言
     /// （夹具里到底有没有那条含"视觉验收"的正文、设了搜索词之后选中项有没有换人）。
     /// 前提不成立时帧是白的或量的不是命中 —— 那种帧看着像证据，其实什么都没说。
+    /// R74 / U-115：**"同一条内容被反复复制"那一族真实形状**的语料 —— 文本是长度递增的嵌套前缀
+    /// （"一"、"一二"、…、"一二三四五六七八"）。
+    ///
+    /// 为什么单独建一个而不复用帧夹具那份：帧夹具那 5 条里"这是一段用于"只命中 1 条，
+    /// 用它量"打字时候选集会不会一直变"会得出**与产品无关**的答案（只剩一条命中的搜索框本来就不重排）。
+    /// 这一份才是浮层打字时的日常：每多打一个字，候选集往下切一层。
+    func makeNestedPrefixStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        let stems = ["一", "一二", "一二三", "一二三四", "一二三四五", "一二三四五六", "一二三四五六七", "一二三四五六七八"]
+        for (offset, stem) in stems.enumerated() {
+            store.add(ClipboardIntake.Entry(
+                content: .text(stem + " 的复制内容 " + String(repeating: "尾", count: offset)),
+                thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+            ), timestamp: Self.referenceDate.addingTimeInterval(-Double(offset) * 30))
+        }
+        return store
+    }
+
     func makePopulatedStore(selectingIndex index: Int? = nil) -> HistoryStore {
         let store = HistoryStore(
             clipboardWriter: TestClipboardWriter(),
