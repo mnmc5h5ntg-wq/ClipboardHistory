@@ -1,0 +1,44 @@
+=== 基线（未变异）：两条判据都必须绿 ===
+   testQuickPickTypographyComesFromTheLadder            = green
+   testTextSizesComeFromTheScale                        = green
+
+M378 把行标签字号退回本轮改之前的样子：就地写 13 ⇒ 守卫与产品路径判据**两条都必须红**（守卫红是因为它又是字面量，判据红是因为它不是 `row` 那一档）
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testQuickPickTypographyComesFromTheLadder testTextSizesComeFromTheScale
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1184: error: -[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypographyComesFromTheLadder] : XCTAssertEqual fai
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/VisualTokenTests.swift:172: error: -[ClipboardHistoryAppTests.VisualTokenTests testTextSizesComeFromTheScale] : XCTAssertTrue failed - 这些行还在就
+   已还原（逐字节相同：True）
+
+M379 把搜索框字号退回 14（比主窗口那颗响一档）⇒ 两条都必须红
+   落地确认（QuickPickController.swift）
+   CAUGHT 红在：testQuickPickTypographyComesFromTheLadder testTextSizesComeFromTheScale
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1188: error: -[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypographyComesFromTheLadder] : XCTAssertEqual fai
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/VisualTokenTests.swift:172: error: -[ClipboardHistoryAppTests.VisualTokenTests testTextSizesComeFromTheScale] : XCTAssertTrue failed - 这些行还在就
+   已还原（逐字节相同：True）
+
+M381 把行标签换成**另一档合法令牌** `VisualFont.body` ⇒ 守卫必须**不红**（它仍是令牌），产品路径判据必须红 ⇒ 这一刀钉住两条判据的分工：守卫管字面量，判据管档位
+   落地确认（QuickPickController.swift）
+   CAUGHT 只红在产品路径判据，守卫照旧绿（分工成立）：{'testQuickPickTypographyComesFromTheLadder': 'red', 'testTextSizesComeFromTheScale': 'green'}
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift:1184: error: -[ClipboardHistoryAppTests.UICaptureTests testQuickPickTypographyComesFromTheLadder] : XCTAssertEqual fai
+   已还原（逐字节相同：True）
+
+M382 把守卫那半边新网拆掉（共享名单里删掉 `.systemFont(ofSize:` 这一条）⇒ 正对照必须红：它再也看不见 AppKit 那半边的字面量。**这一刀第一版逃掉了**：那时守卫读自己那份数组、正对照读另一份，删一半什么都不会红 ⇒ 修法是两边共用 `Self.fontLiteralPatterns`（R57 那一课，我犯在十分钟前）
+   落地确认（VisualTokenTests.swift）
+   CAUGHT 红在：testTextSizesComeFromTheScale
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/VisualTokenTests.swift:179: error: -[ClipboardHistoryAppTests.VisualTokenTests testTextSizesComeFromTheScale] : XCTAssertEqual failed: ("0") 
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/VisualTokenTests.swift:183: error: -[ClipboardHistoryAppTests.VisualTokenTests testTextSizesComeFromTheScale] : XCTAssertEqual failed: ("nil"
+   已还原（逐字节相同：True）
+
+M383 把正对照的喂法换错（给『AppKit 半边』那一格喂一段 SwiftUI 形状的代码）⇒ 该红的没红 ⇒ 说明那条断言其实什么都没测（它只是在读一段永远匹配不上的文本）
+   落地确认（VisualTokenTests.swift）
+   CAUGHT 红在：testTextSizesComeFromTheScale
+     /Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/VisualTokenTests.swift:183: error: -[ClipboardHistoryAppTests.VisualTokenTests testTextSizesComeFromTheScale] : XCTAssertEqual failed: ("Opti
+   已还原（逐字节相同：True）
+
+=== 汇总 ===
+   M378   CAUGHT
+   M379   CAUGHT
+   M381   CAUGHT
+   M382   CAUGHT
+   M383   CAUGHT
+   抓到=5 逃掉=0 没跑成=0 未落地=0

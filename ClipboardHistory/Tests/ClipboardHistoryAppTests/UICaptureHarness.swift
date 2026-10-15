@@ -667,6 +667,25 @@ final class UICaptureTests: XCTestCase {
             // 而**方角在两台机器上都还会红**，靠的是下面那条不依赖参照物的 `fillInset ≥ 1`：
             // 直角块的首行与中行同宽 ⇒ 内缩跨度恒为 0，1× 也量得出"没有内缩"。
             let cornerAxisResolvable = pillInset >= 4
+            // **把"门"本身变成被量的对象**（R70 / BACKLOG 105 ①）：
+            // "1× 量不出药丸圆角"的机制假设是"材质角上的 alpha 不是覆盖率的线性函数 ⇒ 过不了 `≥4/255`"。
+            // 假设没证实过，而它决定这条轴能不能在 runner 上赎回来 ⇒ 同一次捕获里对参照物
+            // 用三道门各量一遍。**线一个数没动**（下面仍按 `pillInset ≥ 4` 决定判不判），
+            // 多出来的只是读数：如果 1× 上"门=1"把内缩拉回 ≈5px，那是门的问题；
+            // 三道门都给 2px，那是通道的性质，只能走 BACKLOG 103（换捕获对象）。
+            let pillInsetAtDoor1 = Self.profileLeftInsetSpread(
+                Self.alphaLiftProfile(plain, rows(selectedBand), plain, rows(idleBand),
+                                      x0: 0, x1: plain.pixelsWide, floor: 1))
+            let pillInsetAtDoor2 = Self.profileLeftInsetSpread(
+                Self.alphaLiftProfile(plain, rows(selectedBand), plain, rows(idleBand),
+                                      x0: 0, x1: plain.pixelsWide, floor: 2))
+            let fillInsetAtDoor1 = Self.profileLeftInsetSpread(
+                Self.alphaLiftProfile(hovered, rows(band), plain, rows(band),
+                                      x0: 0, x1: plain.pixelsWide, floor: 1))
+            emit("OVERLAY_HOVER_DOOR \(label) 缩放=\(shot.scale)× 药丸内缩@门1/2/4="
+                  + "\(pillInsetAtDoor1)/\(pillInsetAtDoor2)/\(pillInset)px "
+                  + "灰带内缩@门1/4=\(fillInsetAtDoor1)/\(fillInset)px "
+                  + "⇒ 假设『材质角过不了门』在两族读数上必须一起回升，只有一族回升就是别的原因")
             emit("OVERLAY_HOVER_OUTLINE \(label) 药丸行数=\(pill.count) 灰带行数=\(fill.count) "
                   + "药丸左沿内缩=\(pillInset)px 灰带左沿内缩=\(fillInset)px "
                   + "缩放=\(shot.scale)× 圆角这一轴=\(cornerAxisResolvable ? "可判" : "无分辨率") "
@@ -1117,6 +1136,74 @@ final class UICaptureTests: XCTestCase {
                           "「访达」命中了全部 \(all) 条 ⇒ typed 与 list 两张帧是同一张，"
                           + "过滤这件事仍然没有帧可看。换一条只命中一部分的词")
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
+    }
+
+    /// R71 / BACKLOG 99：浮层那一行的字号，与"同一条记录的标题"在别处的字号，必须是同一档。
+    ///
+    /// 这条从**产品入口**进（DoD 第 1 条）：建出真的浮层面板，读真的 `NSTextField.font`，
+    /// 而不是读源码里的一个数。三处断言各自拦一种错：
+    ///   · 行标签 == `VisualFont.row` ⇒ 拦"浮层自己再定一档"（改之前它是就地写的 13，
+    ///     而侧栏 / 行视图 / 搜索建议那五处全是 12 ⇒ 同一个对象在两处响一档）；
+    ///   · 搜索框 == `VisualFont.body` ⇒ 拦"浮层比主窗口那颗搜索框更响"（原来是就地写的 14，
+    ///     主窗口是 13 —— 浮层的职责是"快"，不是"大"）；
+    ///   · 五行必须**同档** ⇒ 拦"某一行的字号被别处覆盖掉"（那种错在帧上几乎看不出来，
+    ///     因为差只有 1pt；但它是"两处各写一个数"的下一步）。
+    ///
+    /// 为什么这里**不**去帧上量墨高来跨表面对齐：同一把尺量到的行距是
+    /// 浮层 33–35pt（单行）vs 侧栏 38–47pt（双行），两者不可比；
+    /// 而墨高跟着字形内容走（有没有 `g/y/9` 差一截），拿它当判据就是拿噪声当契约。
+    /// 跨表面的同一性由**令牌**保证，这一条就是保证它真的到了产品对象上。
+    func testQuickPickTypographyComesFromTheLadder() throws {
+        _ = NSApplication.shared
+        let store = makePopulatedStore()
+        let build = QuickPickCapturePanel.builder(store: store, query: "", hoveredRow: nil)
+        guard let panel = build(), let content = panel.contentView else {
+            throw XCTSkip("捕获入口建不出浮层窗口 ⇒ 这一档今天无从判定（不是产品没做）")
+        }
+        panel.setFrameOrigin(NSPoint(x: -20007, y: -20007))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        defer { panel.orderOut(nil) }
+        guard let table = Self.productTable(in: content) else {
+            return XCTFail("帧根里找不到那颗产品表格 ⇒ 这条判据没有对象")
+        }
+        var labelSizes: [CGFloat] = []
+        for row in 0..<table.numberOfRows {
+            guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: true) else { continue }
+            if let field = (cell as? NSTableCellView)?.textField ?? Self.firstTextField(in: cell) {
+                labelSizes.append(field.font?.pointSize ?? -1)
+            }
+        }
+        let fieldSizes = Set(labelSizes)
+        let searchSize = (Self.firstView(ofType: QuickPickSearchField.self, in: content))?.font?.pointSize ?? -1
+        let sizesAsInts = labelSizes.map { Int($0.rounded()) }
+        emit("QUICKPICK_TYPE 行数=\(labelSizes.count) 行标签字号=\(sizesAsInts) "
+            + "期望=\(Int(VisualFont.row)) 搜索框字号=\(Int(searchSize.rounded())) 期望=\(Int(VisualFont.body))")
+        XCTAssertGreaterThanOrEqual(labelSizes.count, 3,
+                                    "只读到 \(labelSizes.count) 个行标签 ⇒ 这条判据没有对象（表格没建出来？）")
+        XCTAssertEqual(fieldSizes, [CGFloat(VisualFont.row)],
+                       "浮层行标签的字号不再是 `VisualFont.row`(\(Int(VisualFont.row))) —— 读到 \(labelSizes)。"
+                           + "同一条记录的标题在侧栏 / 行视图 / 搜索建议那五处都是这一档，"
+                           + "浮层是第六处，它没有理由自己响一档（BACKLOG 99）")
+        XCTAssertEqual(searchSize, CGFloat(VisualFont.body),
+                       "浮层搜索框是 \(Int(searchSize))pt，而主窗口那颗搜索框是 `VisualFont.body`(\(Int(VisualFont.body)))pt "
+                           + "⇒ 同一个控件在两个表面响一档。浮层的职责是快，不是大")
+    }
+
+    /// 视图树里第一个 `NSTextField`（深度优先）。
+    private static func firstTextField(in root: NSView) -> NSTextField? {
+        firstView(ofType: NSTextField.self, in: root)
+    }
+
+    /// 视图树里第一个指定类型的视图（深度优先）。
+    /// 用类型而不是"位置"来找搜索框：`content.subviews` 的顺序由 AppKit 决定，
+    /// 拿顺序当身份，下一次布局改动就会把判据指向别的东西（R53 那一族"守卫命中守卫自己"的近亲）。
+    private static func firstView<T: NSView>(ofType type: T.Type, in root: NSView) -> T? {
+        for sub in root.subviews {
+            if let match = sub as? T { return match }
+            if let found = firstView(ofType: type, in: sub) { return found }
+        }
+        return nil
     }
 
     /// 空结果那一句的**两条**契约（R63）：它得真的在画（不是停在淡入的起点），

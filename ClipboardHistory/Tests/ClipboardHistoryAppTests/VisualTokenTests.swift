@@ -145,15 +145,25 @@ final class VisualTokenTests: XCTestCase {
     func testTextSizesComeFromTheScale() throws {
         var offenders: [String] = []
         var tokenised = 0
-        for (file, source) in try productSources(in: "Views") {
-            for line in codeOnly(source).components(separatedBy: "\n") {
-                guard let range = line.range(of: ".font(.system(size: ") else { continue }
-                let rest = line[range.upperBound...]
-                if let first = rest.first, first.isNumber {
-                    offenders.append("\(file): \(line.trimmingCharacters(in: .whitespaces))")
-                } else if rest.hasPrefix("VisualFont.") || rest.hasPrefix("VisualGlyph.")
-                    || rest.hasPrefix("StatePresentation.") || rest.hasPrefix("DetailTypography.") {
-                    tokenised += 1
+        // R71 / BACKLOG 99：这条守卫原来**只扫 SwiftUI 那一半**（`.font(.system(size:`，只在 `Views/`），
+        // 于是 AppKit 那一半整个不在网里 —— 浮层（`Managers/QuickPickController.swift`）的
+        // `NSFont.systemFont(ofSize: 13)` 就这样带着一个 13 活了六轮，而它说的是与侧栏同一件事
+        // （一条历史记录的主标题），侧栏那四处全是 `VisualFont.row`(12)。
+        // **按族查消费者**（R3 那一课）：这里的"族"是两个 UI 栈，不是两个目录。
+        let patterns = Self.fontLiteralPatterns
+        for dir in ["Views", "Managers"] {
+            for (file, source) in try productSources(in: dir) {
+                for line in codeOnly(source).components(separatedBy: "\n") {
+                    for pattern in patterns {
+                        guard let range = line.range(of: pattern) else { continue }
+                        let rest = line[range.upperBound...]
+                        if let first = rest.first, first.isNumber {
+                            offenders.append("\(file): \(line.trimmingCharacters(in: .whitespaces))")
+                        } else if rest.hasPrefix("VisualFont.") || rest.hasPrefix("VisualGlyph.")
+                            || rest.hasPrefix("StatePresentation.") || rest.hasPrefix("DetailTypography.") {
+                            tokenised += 1
+                        }
+                    }
                 }
             }
         }
@@ -161,6 +171,40 @@ final class VisualTokenTests: XCTestCase {
                                     "只有 \(tokenised) 处在读字号刻度：R3 落地时是 35 处，掉了说明扫描瞎了")
         XCTAssertTrue(offenders.isEmpty,
                       "这些行还在就地写字号：\n" + offenders.joined(separator: "\n"))
+        // 守卫自己也要有正对照：AppKit 那一半**确实被扫到了**（R71 之前这条守卫对它是空转的）。
+        // 拿一段假源码喂同一个扫描器，它必须报出那一条 —— 与 `testScanHelpersDoNotFallForSubstringCollisions`
+        // 同一条理由：只测"该红的没红"不够，得测"新加的那一半网真的在网"。
+        let appKitOnly = "        text.font = .systemFont(ofSize: 13)\n"
+        let appKitHits = Self.fontLiteralOffenders(in: appKitOnly)
+        XCTAssertEqual(appKitHits.count, 1,
+                       "扫描器看不见 AppKit 那半边 ⇒ 这条守卫对浮层是空转的。喂进去的是 "
+                           + appKitOnly.trimmingCharacters(in: .whitespacesAndNewlines)
+                           + "，读到 \(appKitHits.count) 条")
+        XCTAssertEqual(appKitHits.first, "text.font = .systemFont(ofSize: 13)",
+                       "扫到了别的东西 ⇒ 报出来的不是被喂的那一行")
+        XCTAssertTrue(Self.fontLiteralOffenders(in: "        text.font = .systemFont(ofSize: VisualFont.row)\n").isEmpty,
+                      "把令牌写成字面量的反面（令牌被认成违规）会让守卫变成噪声")
+    }
+
+    /// 字号字面量的**两种写法**，一份名单（R71）。
+    ///
+    /// 为什么必须是 `static let` 而不是两处各写一遍：M382 那一刀（从守卫的数组里删掉
+    /// `.systemFont(ofSize:` 这半边）第一版**逃掉了** —— 因为守卫读自己那份、
+    /// 正对照读另一份，删掉一份的另一半网什么都不会红。
+    /// 这正是 R57 那条"两份各写一遍迟早会算出两个中位"的同一课，只是这次我犯在十分钟前。
+    static let fontLiteralPatterns = [".font(.system(size: ", ".systemFont(ofSize: "]
+
+    /// 给一条源码行做"就地写字号"判定（上面那条守卫的扫描核，单独抽出来才能被正对照喂到）。
+    static func fontLiteralOffenders(in source: String) -> [String] {
+        var hits: [String] = []
+        for line in source.components(separatedBy: "\n") {
+            for pattern in Self.fontLiteralPatterns {
+                guard let range = line.range(of: pattern) else { continue }
+                let rest = line[range.upperBound...]
+                if let first = rest.first, first.isNumber { hits.append(line.trimmingCharacters(in: .whitespaces)) }
+            }
+        }
+        return hits
     }
 
     /// 字号刻度自身的次序：正文级不许出现"次要信息比标题响"。

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### Changed（R70+R71：把"门"变成被量的对象；浮层的字号回到梯子，守卫补上 AppKit 那半边网 —— 结案 BACKLOG 99 / 105 ① / U-121…U-123 / D-129）
+- **R71 产品**：浮层行标签 `13 → VisualFont.row`(12)、搜索框 `14 → VisualFont.body`(13)、空态那句 `13 → VisualFont.body`（同值）。
+  依据不是"行高不同所以字号可以不同"（那是没读数的解释）：同一把尺量到 浮层行距 33–35pt（单行）
+  vs 侧栏 38–47pt（双行），**两者不可比**；真正的依据是同一条记录的标题在别处五处全是 `row`，浮层是唯一那一处 13。
+- 另外把 `MenuBarController` 四处、`ChineseTextContextMenu` 一处的字面量换成**同值**令牌（11⇒`meta`、13⇒`body`）
+  ⇒ 那几张帧 `CHANGED=0`，"一个像素都没动"由基线证明而不是由我说。
+- **守卫扩了半边网**：`testTextSizesComeFromTheScale` 从 R3 起只扫 `.font(.system(size:` 且只扫 `Views/`
+  ⇒ AppKit 那一整个栈不在网里，浮层那个 13 就这么活了六轮。现在两个模式 × 两个目录，并带一条喂假源码的正对照。
+- 新判据 `testQuickPickTypographyComesFromTheLadder` 从**产品入口**读真的 `NSTextField.font`（DoD 第 1 条）：
+  行标签 == row、搜索框 == body、五行同档。读数 `行数=5 行标签字号=[12,12,12,12,12] 搜索框字号=13`。
+  两条判据的分工由 M381 钉住：换成另一档合法令牌 ⇒ 守卫不红、判据必须红。
+- 帧上净变化：行标签墨高 12.0/12.0/11.5/12.0pt ⇒ **11.0/11.5/10.5/11.5pt**（与侧栏 10.5–12.5pt 同带），
+  而**同一行截断点右移一个词**（"包含足够长度…" ⇒ "包含足够长度以便…"）—— 小一档换来更多信息。
+- **R70**：轮廓判据里对**参照物**用三道门（1/2/4）各量一遍内缩跨度（`OVERLAY_HOVER_DOOR`），线一个数没动。
+  本机 2× 读数 `药丸@门1/2/4 = 10/11/11px` ⇒ 门在 2× 上几乎不影响 ⇒ "1× 量不出圆角"是门还是通道，只能由 runner 回答。
+- 全量 **788 例 / 38 skip / 0 failures / 158.3s**；`FRAME_BASELINE_COMPARED=124 CHANGED=0`
+  （改产品那一刻 `CHANGED=8` = 四张 quickpick 帧 × 亮暗）；编译告警 0；脚本测试 139 OK。
+- 电池 **M378 / M379 / M381 / M382 / M383 五刀全 CAUGHT**。其中两刀先抓到我自己：
+  正对照第一版写成 `Array.contains("13")`（整元素相等 ⇒ 永远不可能通过）；
+  **M382 第一版逃掉** —— 守卫与正对照各读一份数组，删一半什么都不会红 ⇒ 共用 `Self.fontLiteralPatterns`
+  （R57 那一课，我犯在十分钟前）。
+- 换装本机：`INSTALL_RESULT=ok`，新包 sha `c03cf278d3a4dd98…`，pid 29503，存档 105→105，`SMOKE_OK=1`。
+- **没解决**：浮层搜索框的焦点态仍未量（U-116 原样在）；1× 那条圆角轴仍等 runner 回答（BACKLOG 105）。
+
 ### Tests（R68+R69：证人与判据的地板都要建立在通道不变的量上 —— 结案 104 第一半 / 新开 105 / U-117…U-120 / D-127、D-128）
 - **R68 · 淡入时钟不能比它作证的判据粗**：决定表 `controlJudgment` 多一根轴 `witnessQualifies`，
   新格 `.witnessCannotAdjudicate` ⇒ 证人不合格时 `.snaps` **不许落到 skip**，红着指名去修证人。

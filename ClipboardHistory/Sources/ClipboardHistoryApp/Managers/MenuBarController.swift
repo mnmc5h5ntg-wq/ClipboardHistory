@@ -80,7 +80,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 string: "猜你要粘贴",
                 // 10pt + tertiary 低于 HIG 对菜单文字的下限，且菜单里本该最多用到 .secondary
                 // （审计第二轮 1.2 / R2-13）。与 macOS 13 的 MenuBarRecommendationsView 保持同一套字号。
-                attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold),
+                attributes: [.font: NSFont.systemFont(ofSize: VisualFont.meta, weight: .semibold),
                              .foregroundColor: NSColor.secondaryLabelColor]
             )
             menu.addItem(headerItem)
@@ -94,11 +94,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 )
                 item.representedObject = entry.id
                 let title = NSMutableAttributedString(string: EntryPresentation.menuLabel(for: entry), attributes: [
-                    .font: NSFont.systemFont(ofSize: 13)
+                    .font: NSFont.systemFont(ofSize: VisualFont.body)
                 ])
                 if !reason.isEmpty {
                     title.append(NSAttributedString(string: "\n\(reason)", attributes: [
-                        .font: NSFont.systemFont(ofSize: 11),
+                        .font: NSFont.systemFont(ofSize: VisualFont.meta),
                         .foregroundColor: NSColor.secondaryLabelColor
                     ]))
                 }
@@ -130,7 +130,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             emptyItem.isEnabled = false
             emptyItem.attributedTitle = NSAttributedString(
                 string: placeholder,
-                attributes: [.font: NSFont.systemFont(ofSize: 11),
+                attributes: [.font: NSFont.systemFont(ofSize: VisualFont.meta),
                              .foregroundColor: NSColor.secondaryLabelColor]
             )
             menu.addItem(emptyItem)

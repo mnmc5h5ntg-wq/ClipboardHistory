@@ -206,7 +206,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             return self.handle(keyEvent: event) != .passThrough
         }
         field.placeholderString = "搜索历史记录…"
-        field.font = .systemFont(ofSize: 14)
+        // R71 / BACKLOG 99：这里原来是字面量 14，而主窗口那颗搜索框
+        // （`SearchField.swift:14`）用的是 `VisualFont.body`(13) ⇒ **同一个控件在两个表面响一档**。
+        // 浮层没有理由比主窗口更响：它是"快"，不是"大"。
+        field.font = .systemFont(ofSize: VisualFont.body)
         field.isBordered = false
         field.drawsBackground = false
         field.delegate = self
@@ -238,7 +241,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         }
         // 空结果那一句。位置在 stack 里排**在列表前面**（R63 改的，理由见下面 `stack` 那段注释）。
         let empty = NSTextField(labelWithString: "")
-        empty.font = .systemFont(ofSize: 13)
+        // 状态文案那一档由 `StatePresentation.messageFontSize` 定过一次（= `VisualFont.body`），
+        // 这里原来是重抄的一个 13 ⇒ 两处各写一个数就是"三处对齐"散掉的老路（R3 那一族）。
+        empty.font = .systemFont(ofSize: VisualFont.body)
         empty.textColor = .secondaryLabelColor
         empty.alignment = .center
         empty.lineBreakMode = .byTruncatingTail
@@ -491,7 +496,13 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView) ?? {
             let text = NSTextField(labelWithString: "")
             text.lineBreakMode = .byTruncatingTail
-            text.font = .systemFont(ofSize: 13)
+            // R71 / BACKLOG 99：行标签原来是字面量 13，而**同一条记录的标题**在
+            // 侧栏（`HistorySidebarView:437`）、行视图（`HistoryRowViews` 四处）、
+            // 搜索建议（`SearchField:28`）全都用 `VisualFont.row`(12) ⇒ 浮层是唯一那一处 13。
+            // 判这条的依据不是"行高不同所以字号可以不同"（那是没读数的解释）：
+            // 帧上按同一把尺量到的行距是 浮层 33–35pt（单行）vs 侧栏 38–47pt（双行），
+            // 两者**根本不可比** ⇒ 决定用的是"同一个对象在同一条梯子上只能有一档"。
+            text.font = .systemFont(ofSize: VisualFont.row)
             text.identifier = identifier
             // R65 / BACKLOG 94、97：行首那一列。存在的理由是**两件事一起**：
             // ① 文件行原来靠文案里那个 📄 emoji 当图标（彩色 emoji 与 SF Symbol 不是一套语言，
