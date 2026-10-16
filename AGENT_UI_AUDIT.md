@@ -4768,6 +4768,40 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 零产品改动：124 张帧 `CHANGED=0 MISSING=0 ADDED=0`，全量 793 例 / 40 skip / 0 failures。
 
 
+## 第 98 轮 · R96：判据的对象从"一张卡片"扩到"每张卡片"，它当场抓到上一轮留下的孤儿；runner 那份栈被证明是**我读不懂**（结案 137 / 新开 139、140 / U-227…U-231 / D-154）
+
+- 读 R95 推送的 run **38876999489**（job 116894329916，`bf6b921`）：**success**。
+  覆盖率闸门与上一轮完全一致（`本次下结论=6 红=0`、`PROBE_ORDER 露面=7/11 未闭口=1 前缀=1`、
+  `PROBE_QUEUED` 同一批四条）⇒ R95 的登记刷新没有制造新的红。
+  **132 的第一格真的有产物了**：`UI_PROBE_SAMPLE_EXIT=0`、
+  `UI_PROBE_SAMPLE 主线程采样=306 主导路径占比=100% 最深帧=读不到`、`UI_PROBE_HUNG_KIND=blocked@unknown`。
+- 那两行是**假话**，本轮已撤（U-231）：`nodes` 为空时旧写法把占比兜底成 `1.0` ⇒ "我读不懂这份文件"
+  被打印成"它挂在某个我们不认识的帧上"，而且带着一个具体的百分比。现在 `nodes` 为空 ⇒ **不判**，
+  并新增 `UI_PROBE_SAMPLE_UNPARSED=1` 与 `UI_PROBE_SAMPLE_SHAPE 缩进N 数字开头=yes/no 长度=M`
+  —— **只打形状不打帧名**（日志里不许出现用户的剪贴板内容，而诊断"我的正则读不到什么"不需要帧名）。
+  下一次 CI 的那行 SHAPE 才是 132 的答案的入口（三种形状对应三种下一步，写在 `r96_ci_readings.md`）。
+- **137 结案**，但修法不是"给旧尺补一份并列夹具"：判定不再从"挑一条最深路径"读数，
+  改成"有多少采样停在等待帧上"（`_waiting_leaves`：等待帧套等待帧只算最内层那一次；
+  并列时把**两个族连同各自采样数**都打出来，判 `blocked@ambiguous`）。
+  旧尺在并列时只能报一个族，而那个族是我挑的，不是栈说的。
+  变异表重做：M525 的锚点随代码消失而**退役**（留着只会以"needle 命中 0 次"假装在册），
+  M527 由 M534 替代，新增 M533（嵌套重复计数）、M535（分母被换）、M536（去掉"读不懂"那一格）。
+- 把 `testSettingsCardVerticalRhythmIsOneNumber` 的对象从"那一张卡片"扩到
+  "**每一张 settings 卡片**"，它当场抓到上一轮留在「数据」页的一处孤儿
+  （三段里只有第一段有 `.padding(.vertical, 4)`）：`settings-data 边距=18.0/14.0、内侧=18.0/14.5/17.5/14.0`
+  ⇒ 删掉那一格（U-227）。**上一轮我给它写的那句理由被自己的读数推翻**：
+  我说它"讲的是另一件事"，其实它讲的就是同一件事（行与分隔线之间的距离），却只有一段有。
+- 看图那一腿：设置「隐私」分区逐元素重判（`r96_privacy_visual.py`，尺借 R92/R95 那一支）。
+  勾选框两态可辨（勾上时框自己的填充换了一档：亮 223→213 变深、暗 58→67 变浅；
+  对勾那颗的墨 46/47 颗 vs 未勾 12–20/13–20 颗）⇒ 不加动效（U-228）；
+  但**五颗框的色度全是 0** —— 系统的勾选态该是强调色，而源码里这五颗都是裸 `Toggle`
+  （`SettingsView.swift` 里没有任何自定义 `toggleStyle`）⇒ 灰不是产品选的色，
+  开成 **139** 走真机，不改产品、不拿帧当证据。默认排除那一列判过不改（U-229）。仪器自己错两次（U-230）。
+
+- 验证（`r96_verify.log`，`VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124（日志那格写的是 125：目录里除 PNG 还有一份 capture-readings.log）；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；三张变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（卡片=2 框=10 自检=2 失败自检=0）。产品文件 1 个（`SettingsView.swift`）⇒ **换装**。
+- **下一轮第一件事**：读 R96 的 CI —— `UI_PROBE_SAMPLE_SHAPE` 那一行（三种形状三种下一步），
+  以及 `UI_PROBE_SAMPLE_TIED=` / 等待终端那两行是否终于给出了族。
+
 ## 第 97 轮 · R95：设置卡片里原来同时存在三种留白；看门狗动手之前先把栈拍下来了（结案 135 / 新开 137、138 / U-223…U-226 / D-153）
 
 - 读 R94 推送的 run **38864545930**（job 116854254258，`82fbd1f`）：结论 **success**。上一轮预先登记的

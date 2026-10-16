@@ -1,0 +1,25 @@
+Sampling process 60112 for 2 seconds with 3 milliseconds of run time between samples
+Sample analysis of process 60112 written to file /tmp/x.sample.txt
+
+Analysis of sampling xctest (pid 60112) every 3 milliseconds
+Process:         xctest [60112]
+Path:            /Users/runner/xctest
+Call graph:
+    600 Thread_99   DispatchQueue_1: com.apple.main-thread  (serial)
+      600 start (in dyld) + 6688 [0x1]
+        600 main (in xctest) + 100 [0x2]
+          600 -[NSApplication run] (in AppKit) + 20 [0x3]
+            600 _CFRunLoopRunSpecific (in CoreFoundation) + 30 [0x4]
+              300 -[NSMenu popUpMenuIgnoringMouseEvents] (in AppKit) + 40 [0x5]
+                300 TrackMouse (in AppKit) + 50 [0x6]
+              300 mach_msg2_trap (in libsystem_kernel.dylib) + 60 [0x7]
+    600 Thread_100   com.apple.NSURLSession-work (concurrent)
+      600 start (in dyld) + 1 [0x8]
+
+Total number in stack (recursive counted multiple, when >=5):
+
+Sort by top of stack, same collapsed (when >= 5):
+        TrackMouse (in AppKit)        300
+        mach_msg2_trap  (in libsystem_kernel.dylib)        300
+
+Binary Images:

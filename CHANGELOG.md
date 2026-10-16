@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R96）
+
+- 删掉设置「数据」卡片里那格**孤儿**内边距：三段小节里只有第一段带 `.padding(.vertical, 4)`，
+  于是同一张卡片里同时有 18.0 与 14.5 两种留白（`边距=18.0/14.0、内侧=18.0/14.5/17.5/14.0`）。
+  这是上一轮统一五张卡片时**特意留下**的一格，留下的那句理由（"卡片内部讲的是另一件事"）
+  被扩了对象的判据当场推翻：它讲的就是同一件事。改后 `边距=14.0/14.0`、内侧三档 14.0/14.5/17.5
+  （17.5 那一段是 `.rounded` 按钮 bezel 底下不画墨的 3.5pt，判据容差因此按实测从 3.0 放到 4.5，
+  出处写在断言旁边）。`settings-data` 两张帧随本提交 `update`。
+
+### 判据与工具（R96）
+
+- **BACKLOG 137 结案**：`analyse_sample()` 的判定来源换掉 —— 不再从"挑一条最深路径"读数，
+  改成"有多少采样停在等待帧上"（`_waiting_leaves`：等待帧套等待帧只算最内层那一次；
+  并列时两个族连同各自采样数一起打出来 ⇒ `blocked@ambiguous` + `UI_PROBE_SAMPLE_TIED=…`）。
+  新夹具 `sample_tied_branches.txt`；变异表重做：M525 的锚点随代码消失而**退役**、
+  M527 由 M534 替代、新增 M533（嵌套重复计数）/ M535（分母被换）/ M536（去掉"读不懂"那一格）
+  ⇒ `n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0`。
+- **撤掉一句假话**（BACKLOG 132 的第一份 runner 栈）：run 38876999489 里
+  `主导路径占比=100% 最深帧=读不到` + `blocked@unknown` 是 `nodes` 为空时被兜底成 1.0 造出来的
+  ⇒ 现在读不懂就是**未量到**，并打印 `UI_PROBE_SAMPLE_UNPARSED=1` 与
+  `UI_PROBE_SAMPLE_SHAPE 缩进N 数字开头=yes/no 长度=M`（只打形状不打帧名：
+  日志里不许出现用户的剪贴板内容，而诊断"正则读不到什么"不需要帧名）。两格占比的兜底 1.0 → 0.0。
+- 节奏判据的对象从一张卡片扩到**每一张** `settings-*` 卡片，`cardRhythm` 多返回一格 `declined`
+  （顶到带上沿 / 底到带下沿（这一页比窗口高）/ 卡片里没有一行被判成墨）⇒
+  "没量到"的三种原因不再与"确实没有分隔线"共用一条读数；同时补一条"读到墨却一条都没判 ⇒ 红"。
+  三张被窗口切断的卡片现在明说 `CARD_RHYTHM_DECLINED … 原因=卡片底到扫描带下沿`，
+  这一格开成 **BACKLOG 140**（配高夹具）。
+- 看图那一腿：设置「隐私」分区逐元素重判（`r96_privacy_visual.py`）。
+  勾选框两态可辨（勾上时框自己的填充换一档 223→213 / 58→67，且对勾 46/47 颗 vs 未勾 12–20/13–20 颗）⇒ 不加动效；
+  五颗框 `chroma=0`（勾选态不是强调蓝）而源码里全是裸 `Toggle` ⇒ 灰不是产品选的色，
+  开成 **BACKLOG 139** 走真机（人工批次 75.1），本轮不改产品。
+  默认排除那一列（19 段文字、左轴众数 177.5pt、行距中位 10.5pt、对比 2.94/5.31）判过不改。
+
 ### 产品（R95）
 
 - 设置窗口五张卡片（`快捷键 / 通用 / 隐私 / 推荐 / 数据`）的**竖向留白统一成同一档**：

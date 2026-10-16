@@ -651,7 +651,12 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 4)
+                    // R96：这一格 `.padding(.vertical, 4)` 被删掉了 —— 它是**三段里只有第一段有**的
+                    // 一份内边距，于是同一张卡片里出现 18.0 与 14.5 两种留白
+                    // （`testSettingsCardVerticalRhythmIsOneNumber` 把对象从一张卡扩到每张卡之后
+                    // 第一次照出来的一条红：`settings-data 边距=18.0/14.0、内侧=18.0/14.5/17.5/14.0`）。
+                    // 上一轮我把它当"卡片内部讲的是另一件事"留下了，那句话现在被自己的读数推翻：
+                    // 它讲的就是同一件事（行与分隔线之间的距离），却只有一段有。
 
                     Divider()
 

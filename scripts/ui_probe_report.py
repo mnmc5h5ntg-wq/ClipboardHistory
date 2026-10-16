@@ -244,6 +244,14 @@ NODE = re.compile(r"^(\s+)(\d+)\s+(.*)$", re.M)   # ← 少了 re.M 时 `^` 只�
 # 教训同 R90：新尺先在真产物上跑一遍，再拿合成件补它跑不到的形状。
 
 
+def blocking_family(sym):
+    """这一帧自己属不属于"停着不动"的那几族。不属于就 `unknown`（= 它在干活）。"""
+    for name, toks in BLOCKING:
+        if any(t in sym for t in toks):
+            return name
+    return "unknown"
+
+
 def _dominant_path(nodes):
     """nodes = [(缩进, 采样数, 帧名)]（同一线程块内，按文件顺序）。返回 (叶子帧, 叶子采样数)。
 
@@ -252,6 +260,9 @@ def _dominant_path(nodes):
     count 等于 total，第一版就会退回"最后一个节点"并仍然报 100% —— 把**慢**读成**挂**。
     第一版还有个方向相反的错误：占比拿 `Sort by top of stack` 那段算，而那是**跨线程**汇总，
     一条只有主线程挂住的栈会因为别的线程也停在 mach_msg 上被判成"散开"。
+
+    R96 起它只负责"主导路径占比"那一格**展示**；判定不再走它（走 `_waiting_leaves`）。
+    原因见那里的文档串：并列的时候"挑一条最深路径"本身就是替栈做决定。
     """
     if not nodes:
         return "", 0
@@ -274,8 +285,43 @@ def _dominant_path(nodes):
     return leaf, count
 
 
+def _waiting_leaves(nodes):
+    """返回 [(等待终端帧, 采样数)]：主线程里"停在等待帧上、且下面再没有等待帧"的那些终端。
+
+    为什么不是"最外层那个等待帧的子树整体算一份"（我第一反应就是这么写的）：等待帧常常**套着**
+    别的等待帧（`_BlockUntilNextEventMatchingListInMode` 里是 `ReceiveEvents`，再里面是
+    `_tryCatchDragUntilMouseUp`），套几层就把同一批采样数几遍；而反过来只取最外层，
+    在**并列**的时候就会替栈挑一个答案 —— 600 个采样里 300 停在菜单跟踪、300 停在 `mach_msg2_trap`，
+    最外层只有一个 `_CFRunLoopRunSpecific`，只报它就是"挂在菜单上"这句没有依据的话
+    （BACKLOG 137 点名的正是这一格：变异 M527 把"取最后一个孩子"改成"取第一个"，
+    旧尺子照样绿，因为它只打印一条路径，而那条路径本来就是被挑出来的）。
+
+    终端的定义是递归的：一个等待帧，如果它的子树里还有等待帧，就不算终端（那些更深的算）。
+    这样每个采样恰好落在一个终端上，`sum(count)` 就是"停在等待上的采样数"。
+    """
+    out = []
+    n = len(nodes)
+
+    def walk(i):
+        indent, count, sym = nodes[i]
+        k = i + 1
+        inner = []
+        while k < n and nodes[k][0] > indent:
+            k, got = walk(k)
+            inner.extend(got)
+        if blocking_family(sym) != "unknown" and not inner:
+            return k, [(sym, count)]
+        return k, inner
+
+    i = 0
+    while i < n:
+        i, got = walk(i)
+        out.extend(got)
+    return out
+
+
 def analyse_sample(text):
-    """返回 (读数行, 判定)。判定 ∈ {blocked@<族>, progressing, 未量到}。"""
+    """返回 (读数行, 判定)。判定 ∈ {blocked@<族>, blocked@ambiguous, progressing, 未量到}。"""
     if not text or "Call graph:" not in text:
         return (["UI_PROBE_SAMPLE_UNAVAILABLE=1 这份 sample 里没有 `Call graph:` ⇒ "
                  "132 那句「它到底是挂还是慢」今天仍**没有依据**，不许被读成「它只是慢」"]), "未量到"
@@ -288,31 +334,61 @@ def analyse_sample(text):
     stop = re.search(r"^\s*\d+\s+Thread_\d+", block, re.M)
     block = block[:stop.start()] if stop else block
     nodes = [(len(n.group(1)), int(n.group(2)), n.group(3)) for n in NODE.finditer(block)]
+    if not nodes:
+        # R96 在 runner 上真的撞到了这一格：`sample` 退出码 0、有 `Call graph:`、
+        # 主线程那一行也读到了 306 个采样，**但那一段里一个节点都没匹配上**。
+        # 旧写法在这里会把占比兜底成 1.0 ⇒ 打出 `blocked@unknown`，
+        # 而"unknown + 100%"读起来像"它挂在某个我们不认识的帧上"——
+        # 那句话没有任何依据：真实情况是我读不懂这份文件。
+        # 所以：不判，并且把**形状**打出来（缩进宽度、有没有以数字开头、NODE 是否命中）。
+        # 只打形状不打内容，是因为台账有一条硬规矩：日志里不许出现用户的剪贴板内容，
+        # 而栈帧名理论上会带上被处理的字符串——诊断"我的正则读不到什么"不需要看帧名。
+        shape = []
+        for line in block.splitlines()[:8]:
+            if not line.strip():
+                continue
+            stripped = line.lstrip(' ')
+            shape.append('缩进%d 数字开头=%s 长度=%d' % (
+                len(line) - len(stripped), 'yes' if re.match(r'^\d+\s', stripped) else 'no',
+                len(line)))
+        return (["UI_PROBE_SAMPLE_UNPARSED=1 主线程采样=%d 但那一段里 NODE 命中 0 个 ⇒ "
+                 "132 那句「它到底是挂还是慢」今天仍**没有依据**（读不懂文件 ≠ 它挂在未知帧上）"
+                 % total,
+                 "UI_PROBE_SAMPLE_SHAPE 前若干行=%s"
+                 % (' | '.join(shape) or '整段为空')], "未量到")
     leaf, leaf_count = _dominant_path(nodes)
-    frames = " ".join(sym for _, _, sym in nodes)
-    share = (float(leaf_count) / total) if (total and nodes) else 1.0
+    dom_share = (float(leaf_count) / total) if total else 0.0
+    terminals = _waiting_leaves(nodes)
+    waited = sum(c for _, c in terminals)
+    wait_share = (float(waited) / total) if total else 0.0
+    fams = sorted(set(blocking_family(sym) for sym, _ in terminals))
 
-    def fam(haystack):
-        for name, toks in BLOCKING:
-            if any(t in haystack for t in toks):
-                return name
-        return "unknown"
-
-    # 族要**先看叶子，再看路径**。第一版一次循环里两个都查，于是 `_BlockUntilNextEventMatchingListInMode`
-    # （它同时出现在 cordrag 与 runloop-wait 两族的名单里）把一条 `-[NSMenu popUp…]` 的栈
-    # 判成了 `coredrag` —— 名字读起来像真的，因为那条等待链上确实有 CoreDrag 的那个符号。
-    # 挂在哪一件事上，是由**最深那一帧**说的，不是由"路上经过过谁"说的。
-    family = fam(leaf)
-    if family == "unknown":
-        family = fam(frames)
-    verdict = ("blocked@%s" % family) if share >= 0.9 else "progressing"
-    lines = ["UI_PROBE_SAMPLE 主线程采样=%d 主导路径占比=%.0f%% 最深帧=%s"
-             % (total, share * 100.0, leaf[:110] or "读不到")]
-    if verdict == "progressing":
-        lines.append("UI_PROBE_HUNG_KIND=progressing ⇒ 这份栈里它在往前走：**不是挂死，是慢**"
-                     "（132 要修的是看门狗与耗时归因，不是探针）")
+    # 判定走**等待占比**，不走主导路径占比。这两格在"一条链挂到底"的栈里是同一个数，
+    # 分岔的时候才分开：主导路径占比会因为"孩子各拿一部分"掉到 50%，
+    # 而那些孩子**全都是等待帧** —— 那仍然是挂，只是这份栈说不清挂在哪一件事上。
+    # 用旧的那一格判，就会把"挂在两件事上"读成"它在往前走"（方向反了的第二种形状）。
+    lines = ["UI_PROBE_SAMPLE 主线程采样=%d 等待帧占比=%.0f%% 主导路径占比=%.0f%% 等待终端=%d 个"
+             % (total, wait_share * 100.0, dom_share * 100.0, len(terminals))]
+    if terminals:
+        lines.append("UI_PROBE_SAMPLE_WAITING=" + " ‖ ".join(
+            "%s(%d)" % (sym[:70], count) for sym, count in terminals))
+    if wait_share >= 0.9 and len(fams) == 1:
+        verdict = "blocked@%s" % fams[0]
+        lines.append("UI_PROBE_HUNG_KIND=%s ⇒ %.0f%% 的采样都停在同一族的等待帧上（132 分诊：挂）"
+                     % (verdict, wait_share * 100.0))
+    elif wait_share >= 0.9:
+        verdict = "blocked@ambiguous"
+        lines.append("UI_PROBE_SAMPLE_TIED=%d 个族分不开：%s ⇒ **挂**是判出来了，"
+                     "挂在**哪一件**上这份栈没给答案。不许只挑其中一个写成结论（137）"
+                     % (len(fams), "、".join("%s=%d" % (f, sum(c for sym, c in terminals
+                                                            if blocking_family(sym) == f))
+                                             for f in fams)))
+        lines.append("UI_PROBE_HUNG_KIND=%s ⇒ 132 分诊：挂，但族未定" % verdict)
     else:
-        lines.append("UI_PROBE_HUNG_KIND=blocked@%s ⇒ 采样几乎全落在同一个等待帧上（132 分诊：挂）" % family)
+        verdict = "progressing"
+        lines.append("UI_PROBE_HUNG_KIND=progressing ⇒ 只有 %.0f%% 的采样停在等待帧上，"
+                     "其余在干活：**不是挂死，是慢**（132 要修的是看门狗与耗时归因，不是探针）"
+                     % (wait_share * 100.0))
     return lines, verdict
 
 

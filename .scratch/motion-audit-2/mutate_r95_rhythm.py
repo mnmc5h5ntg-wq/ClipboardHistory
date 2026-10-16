@@ -44,11 +44,11 @@ MUTATIONS = [
     ("M530", "把 .line 的宽度门槛抬到 99%（尺读不到分隔线）", HARNESS,
      "else if line >= (x1 - x0) * 8 / 10 { kinds.append(.line) }",
      "else if line >= (x1 - x0) * 99 / 100 { kinds.append(.line) }",
-     RHYTHM, "实测 0 条"),
+     RHYTHM, "尺瞎了"),
     ("M531", "把页面底容差从 3 放宽到 40（卡片内的行被当成卡片外）", HARNESS,
      "if abs(modal - pageLuma) <= 3 && abs(modal - fill) > 3 {",
      "if abs(modal - pageLuma) <= 40 && abs(modal - fill) > 3 {",
-     RHYTHM, "尺没压住卡片"),
+     RHYTHM, "带子越界"),
 ]
 
 BASE_ENV = {key: value for key, value in os.environ.items() if key != "SDKROOT"}

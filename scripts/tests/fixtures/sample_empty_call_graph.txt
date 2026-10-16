@@ -1,0 +1,14 @@
+Sampling process 5686 for 2 seconds with 3 milliseconds of run time between samples
+Sample analysis of process 5686 written to file /tmp/x.sample.txt
+
+Analysis of sampling xctest (pid 5686) every 3 milliseconds
+Process:         xctest [5686]
+Path:            /Users/runner/hostedtoolcache/swift/5.10.1/x64/usr/bin/xctest
+Call graph:
+    306 Thread_1234   DispatchQueue_1: com.apple.main-thread  (serial)
+
+Total number in stack (recursive counted multiple, when >=5):
+
+Sort by top of stack, same collapsed (when >= 5):
+
+Binary Images:

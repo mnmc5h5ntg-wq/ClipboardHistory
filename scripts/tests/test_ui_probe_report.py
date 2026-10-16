@@ -466,7 +466,69 @@ class SampleTriageTests(unittest.TestCase):
         lines, verdict = analyse_sample(sample("sample_real_sleep"))
         self.assertEqual("blocked@sleep-wait", verdict, lines)
         self.assertIn("主线程采样=534", lines[0])
-        self.assertIn("__semwait_signal", lines[0], "最深帧读错了 ⇒ 下降逻辑没走到底")
+        # R96 起最深帧不在第一行了（第一行只有两个占比与终端计数）。
+        # 断言因此改成"整段读数里必须有它"—— 换行不是丢检查，但**必须仍然点着那一格**：
+        # 这条是这份尺唯一一处"真产物"正对照，它一旦只判 verdict，就再没人管我读的是不是那棵树。
+        self.assertIn("__semwait_signal", "\n".join(lines), "最深帧读错了 ⇒ 下降逻辑没走到底")
+        self.assertIn("等待终端=1 个", lines[0])
+
+    def test_empty_main_thread_block_is_not_read_as_an_unknown_hang(self):
+        """R96 在 runner 上真的撞到的那一格：`sample` 退出码 0、有 `Call graph:`、
+        主线程行也读到了 306 个采样，**但那一段里一个节点都没有**。
+
+        旧写法把占比兜底成 1.0 ⇒ 打出 `blocked@unknown`，读起来像"它挂在某个我们不认识的帧上"。
+        那是把"我读不懂这份文件"说成了一条产品级结论 —— 现在它必须报**未量到**，
+        并且把形状（缩进宽度 / 是否以数字开头）打出来，好让下一次能定位是谁的锅。
+        形状里不许出现帧名：台账有一条硬规矩，日志不许带用户的剪贴板内容。
+        """
+        lines, verdict = analyse_sample(sample("sample_empty_call_graph"))
+        self.assertEqual("未量到", verdict, lines)
+        text = "\n".join(lines)
+        self.assertIn("UI_PROBE_SAMPLE_UNPARSED=1", text)
+        self.assertIn("主线程采样=306", text)
+        self.assertIn("UI_PROBE_SAMPLE_SHAPE", text, "不判还不够，得留下能定位形状的东西")
+        self.assertNotIn("blocked", text, "读不懂文件的时候不许出现任何『挂』的字样")
+        self.assertNotIn("xctest", text, "形状读数里不该出现帧名或进程名（只打缩进与是否数字开头）")
+
+    def test_tied_branches_say_ambiguous_and_name_both_families(self):
+        """BACKLOG 137：并列的时候**不许替栈挑一个答案**。
+
+        这份夹具是 600 个采样里 300 停在 `TrackMouse`、300 停在 `mach_msg2_trap`，
+        两者都在 `_CFRunLoopRunSpecific` 下面。旧尺子在这里会：主导路径占比=50% ⇒ 判成
+        "progressing"（把挂在两件事上读成在往前走），而打印出来的那一帧由"取第一个还是最后一个
+        孩子"决定 —— 变异 M527 就是这么逃掉的。现在两格分开：等待占比 100% ⇒ 挂；
+        族有两个 ⇒ `blocked@ambiguous` 且两个族与各自采样数都要出现在读数里。
+        """
+        lines, verdict = analyse_sample(sample("sample_tied_branches"))
+        self.assertEqual("blocked@ambiguous", verdict, lines)
+        text = "\n".join(lines)
+        self.assertIn("等待帧占比=100%", text)
+        self.assertIn("主导路径占比=50%", text, "两格必须同时打出来：它们分岔的那一刻才是信息")
+        self.assertIn("menu-tracking=300", text)
+        self.assertIn("runloop-wait=300", text)
+        for line in lines:
+            self.assertNotIn("UI_PROBE_HUNG_KIND=blocked@menu-tracking", line,
+                             "并列时把任何一族单独写成结论，就是替栈做了决定")
+
+    def test_nested_blocking_frames_are_counted_once(self):
+        """等待帧套等待帧（`_BlockUntilNextEvent…` → `ReceiveEvents` → `_tryCatchDrag…`）
+        只算最外层那一次：四帧链上的 611 个采样必须还是 611，不是 2444。
+        占比一旦能超过 100%，"挂 vs 慢"这条线就没有意义了。
+        """
+        lines, verdict = analyse_sample(sample("sample_core_drag_hang"))
+        self.assertEqual("blocked@coredrag", verdict, lines)
+        self.assertIn("等待终端=1 个", lines[0], lines)
+        self.assertIn("等待帧占比=100%", lines[0], "重复计数会把占比推到 100% 以上")
+
+    def test_progressing_line_carries_its_own_number(self):
+        """判成"慢"的时候，那行必须带着**是多少**（33%），不许只写"它在往前走"。
+        处置是"把看门狗调大并去量慢在哪一段"，而 33% 与 89% 是两种完全不同的下一步。
+        """
+        lines, verdict = analyse_sample(sample("sample_spread_slow"))
+        self.assertEqual("progressing", verdict, lines)
+        text = "\n".join(lines)
+        self.assertIn("只有 33% 的采样停在等待帧上", text)
+        self.assertIn("等待终端=1 个", lines[0])
 
     def test_two_different_hangs_get_two_different_families(self):
         """CoreDrag 与 NSMenu 必须分开 —— 这条是修 bug 的回归格。

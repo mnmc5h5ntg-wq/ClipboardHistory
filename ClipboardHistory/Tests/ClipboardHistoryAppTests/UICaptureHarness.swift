@@ -4490,7 +4490,7 @@ final class UICaptureTests: XCTestCase {
     /// 所以判据必须是"这几个数是不是同一个数"，而不是"这个数够不够大" ——
     /// 后者会被"整体都很挤"骗过去，前者不会。
     static func cardRhythm(rows: [CardRowKind], scale: Double)
-        -> (edges: [Double], gaps: [Double], dividers: Int) {
+        -> (edges: [Double], gaps: [Double], dividers: Int, declined: String) {
         var runs: [(Int, Int)] = []
         var start = -1
         for (i, kind) in rows.enumerated() {
@@ -4502,13 +4502,24 @@ final class UICaptureTests: XCTestCase {
             }
         }
         if start >= 0 { runs.append((start, rows.count - 1)) }
-        guard let card = runs.max(by: { $0.1 - $0.0 < $1.1 - $1.0 }), card.0 > 0,
-              card.1 < rows.count - 1 else { return ([], [], 0) }
+        guard let card = runs.max(by: { $0.1 - $0.0 < $1.1 - $1.0 }) else {
+            return ([], [], 0, "整带没有卡片（全是页面底）")
+        }
+        // 「为什么没量到」必须被分开返回，而不是让调用处去猜。
+        // 第一版只回三个数，于是 `settings-privacy` 那两张（卡片比窗口高、被底边切掉）
+        // 与"这张卡片真的没有分隔线"落在同一条读数上 —— 我把前者印成了后者，
+        // 而那是一句没有依据的话（R87：没量到的成因不许登记成量到的结论）。
+        if card.0 == 0 { return ([], [], 0, "卡片顶到扫描带上沿 ⇒ 上留白没有对象") }
+        if card.1 >= rows.count - 1 {
+            return ([], [], 0, "卡片底到扫描带下沿 ⇒ 这一页比窗口高，被切断了")
+        }
         // 卡片必须**整块**落在扫描带里：顶到带上沿 = 上面那条 `card.0 > 0` 不成立，
         // 那时"上留白"没有对象，宁可返回空让调用处报"尺没压住卡片"。
         let slice = Array(rows[card.0...card.1])
         guard let firstInk = slice.firstIndex(of: .ink),
-              let lastInk = slice.lastIndex(of: .ink) else { return ([], [], 0) }
+              let lastInk = slice.lastIndex(of: .ink) else {
+            return ([], [], 0, "卡片里没有一行被判成墨 ⇒ 尺没压住字")
+        }
         let unit = 1.0 / max(scale, 1)
         var gaps: [Double] = []
         var dividers = 0
@@ -4528,7 +4539,7 @@ final class UICaptureTests: XCTestCase {
             i = j + 1
         }
         return ([Double(firstInk) * unit, Double(slice.count - 1 - lastInk) * unit],
-                gaps, dividers)
+                gaps, dividers, "")
     }
 
     /// **一行里的墨分两档**：说明档（离背景 ≤ `tierSplit`）与标题档（超过它）。
@@ -5512,13 +5523,24 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
         var judged = 0
+        // 「看得见墨却一条都没判」与「这台机器拍不出这一页」必须分开（R96：把判据从一张卡片
+        // 扩到每一张之后，`dividers >= 2 ⇒ continue` 那一格给了尺一个**安静的逃法** ——
+        // 它看不见线的时候就不再判任何东西，而「不判」在报表上与环境受限长得一模一样。
+        // 这一格把那条路堵掉：只要有任何一张卡片读到了墨，就必须至少判成一次。
+        var sawInk = false
+        // R96 把对象从"那一张卡片"扩到"每一张有分隔线的卡片"：R95 的修法一次动了五张卡片，
+        // 而判据只压在 `settings-shortcuts` 上 ⇒ 另外四张改没改对，今天没人看着。
+        // "有分隔线"是这条判据的**前提**（没有内侧那一档，就没有可比的数），
+        // 所以名单由读数决定而不是我手抄：读到 ≥2 条分隔线的才进来，一条都没读到的记 NOT-RUN。
         for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
                                   (NSAppearance.Name.darkAqua, "dark")] {
-            guard let fixture = fixtures(appearance: appearance)
-                    .first(where: { $0.name == "settings-shortcuts" }) else {
-                return XCTFail("找不到 settings-shortcuts ⇒ 这条判据没有对象")
+            let candidates = fixtures(appearance: appearance)
+                .filter { $0.name.hasPrefix("settings-") && $0.name != "settings-min" }
+            guard !candidates.isEmpty else {
+                return XCTFail("\(tag)：一张 settings 夹具都没有 ⇒ 这条判据没有对象")
             }
-            let file = scratch.appendingPathComponent("settings-shortcuts-\(tag).png")
+            for fixture in candidates {
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
             _ = try render(fixture, appearance: appearance, to: file)
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
@@ -5535,33 +5557,61 @@ final class UICaptureTests: XCTestCase {
                                          bytesPerRow: rep.bytesPerRow, rect: band, scale: scale,
                                          pageLuma: pageLuma)
             let inkRows = rows.filter { $0 == .ink }.count
-            let (edges, gaps, dividers) = Self.cardRhythm(rows: rows, scale: scale)
+            let (edges, gaps, dividers, declined) = Self.cardRhythm(rows: rows, scale: scale)
             let fmt = { (values: [Double]) in
                 values.map { String(format: "%.1f", $0) }.joined(separator: "/")
             }
-            emit("CARD_RHYTHM settings-shortcuts \(tag) 页底=\(pageLuma) 墨行=\(inkRows)"
-                 + " 分隔线=\(dividers) 边距=\(fmt(edges)) 内侧=\(fmt(gaps))")
+            emit("CARD_RHYTHM \(fixture.name) \(tag) 页底=\(pageLuma) 墨行=\(inkRows)"
+                 + " 分隔线=\(dividers) 边距=\(fmt(edges)) 内侧=\(fmt(gaps))"
+                 + (declined.isEmpty ? "" : " 未判原因=\(declined)"))
             guard inkRows > 0 else {
-                emit("CARD_RHYTHM_NOT_RUN settings-shortcuts \(tag)（整带零墨 ⇒ 这台机器拍不出这一页）")
+                emit("CARD_RHYTHM_NOT_RUN \(fixture.name) \(tag)（整带零墨 ⇒ 这台机器拍不出这一页）")
+                continue
+            }
+            sawInk = true
+            guard declined.isEmpty else {
+                emit("CARD_RHYTHM_DECLINED \(fixture.name) \(tag) 原因=\(declined) ⇒ 不判（不是通过）")
+                continue
+            }
+            guard dividers >= 2 else {
+                emit("CARD_RHYTHM_NO_DIVIDER \(fixture.name) \(tag) 分隔线=\(dividers) ⇒ "
+                     + "这张卡片确实没有『内侧那一档』——这一带的墨读到了、卡片边界也读到了，"
+                     + "只是那两条横线一条都不算（与上面那条『带子越界』的断言是两种情形，"
+                     + "措辞刻意不共用词，否则变异表按文本认红会认错）"
+                     + " ⇒ 不判（不是通过）")
                 continue
             }
             XCTAssertFalse(edges.isEmpty || gaps.isEmpty,
-                           "\(tag)：这一带有 \(inkRows) 行墨，却读不出卡片边距或分隔线两侧留白 ⇒ "
+                           "\(fixture.name) \(tag)：这一带有 \(inkRows) 行墨，却读不出卡片边距或分隔线两侧留白 ⇒ "
                            + "是**尺没压住卡片**（带子越界 / 众数取错位置），不是产品没问题")
-            XCTAssertGreaterThanOrEqual(dividers, 2,
-                                        "settings-shortcuts 这张卡片上有两条分隔线（三行），实测 \(dividers) 条"
-                                        + " ⇒ 要么夹具换了，要么 `.line` 那一档的门槛把线读丢了")
+            if fixture.name == "settings-shortcuts" {
+                XCTAssertGreaterThanOrEqual(dividers, 2,
+                                            "settings-shortcuts 这张卡片上有两条分隔线（三行），实测 \(dividers) 条"
+                                            + " ⇒ 要么夹具换了，要么 `.line` 那一档的门槛把线读丢了")
+            }
             let all = edges + gaps
             let spread = all.max()! - all.min()!
-            XCTAssertLessThanOrEqual(spread, 3.0,
-                                     "同一张卡片里最大的留白 \(String(format: "%.1f", all.max()!))pt、"
+            // 容差 4.5 不是拍的：**3.5pt 是从这张帧自己量出来的** —— `settings-data` 里
+            // 同一张卡片、同样 12pt 布局间距，接在文字行后面的是 14.0/14.5，
+            // 接在 `.rounded` 按钮行后面的是 17.5 ⇒ 按钮的 bezel 底下有 3.5pt 不画墨的边，
+            // 而这把尺量的是**墨到墨**，不是布局到布局。再加 1pt 余量（光栅 0.5 + 抗锯齿）。
+            // 为什么不是"把按钮行排除掉"：那等于给尺加一层"什么算行"的判断，
+            // 而这一层判断本身没人验（R92 那条"漏检和没有检出一模一样"）。
+            // R95 那个缺陷的极差是 8.5pt，M528 撤修复之后是 7.5pt ⇒ 4.5 这条线仍然咬得住。
+            XCTAssertLessThanOrEqual(spread, 4.5,
+                                     "\(fixture.name) \(tag)：同一张卡片里最大的留白 \(String(format: "%.1f", all.max()!))pt、"
                                      + "最小的 \(String(format: "%.1f", all.min()!))pt（边距 \(fmt(edges))、"
                                      + "内侧 \(fmt(gaps))）⇒ 卡片四边与分隔线两侧必须是同一档；"
-                                     + "差这么多就是首末行没有内边距，最后一行贴着卡片底")
+                                     + "差这么多就是首末行没有内边距，最后一行贴着卡片底"
+                                     + "（超过 3.5pt 的那一部分不能拿『按钮 bezel 不画墨』解释）")
             judged += 1
+            }
         }
+        XCTAssertFalse(sawInk && judged == 0,
+                       "有卡片读到了墨，却一条都没判 ⇒ **尺瞎了**（分隔线那一档读不到、"
+                       + "或 declined 被误报），不是这台机器拍不出。不许让它安静地 skip 掉")
         if judged == 0 {
-            throw XCTSkip("CARD_RHYTHM_NOT_RUN：两档都拍不出 settings-shortcuts ⇒ 竖向节奏记为未运行"
+            throw XCTSkip("CARD_RHYTHM_NOT_RUN：两档所有 settings 帧都读到零墨 ⇒ 竖向节奏记为未运行"
                           + "（BACKLOG 43 同族），不算通过")
         }
     }
@@ -5604,8 +5654,19 @@ final class UICaptureTests: XCTestCase {
         // ③ 卡片顶到带上沿 ⇒ 没有"上留白"这个对象
         let clipped = rows([(.card, 2), (.ink, 10), (.card, 14), (.line, 1), (.card, 14),
                             (.ink, 10), (.card, 2), (.outside, 4)])
-        XCTAssertTrue(Self.cardRhythm(rows: clipped, scale: 1).edges.isEmpty,
+        let c = Self.cardRhythm(rows: clipped, scale: 1)
+        XCTAssertTrue(c.edges.isEmpty,
                       "卡片贴着带上沿时不许报边距：那会把「尺没对齐」读成「产品的留白是 0」")
+        XCTAssertEqual("卡片顶到扫描带上沿 ⇒ 上留白没有对象", c.declined,
+                       "拒绝给数还不够，还得说清是哪一种拒绝")
+        // 卡片**底**贴住扫描带下沿（合成件：上面留 4 行页面底，卡片一直铺到最后一行）。
+        // 第一版我把这行写成"30 个 .card 打头"，于是它先撞上"顶到上沿"那一格，
+        // 断言红 —— 红得对，但红的是我的合成件而不是尺：两种"没量到"必须各测各的。
+        let bottomed = Array(repeating: CardRowKind.outside, count: 4)
+            + Array(repeating: .card, count: 12) + [.ink] + Array(repeating: .card, count: 13)
+        let d2 = Self.cardRhythm(rows: bottomed, scale: 1)
+        XCTAssertTrue(d2.declined.contains("卡片底到扫描带下沿"), d2.declined)
+        XCTAssertTrue(d2.edges.isEmpty)
         // ④ 全空（这台机器拍不出这一页）⇒ 也不许报数
         XCTAssertTrue(Self.cardRhythm(rows: Array(repeating: .outside, count: 40), scale: 2)
                       .edges.isEmpty)
