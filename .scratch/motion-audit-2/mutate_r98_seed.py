@@ -58,7 +58,10 @@ MUTATIONS = [
      "            if let last = merged.last, run.top - last.bottom - 1 < 0 {",
      SEED, "一颗按钮被自己的降部切开"),
     ("M546", "先筛高度、后合并（钉的是顺序，不是数值）",
-     "        return merged.filter { $0.bottom - $0.top + 1 >= minRunHeight }.count",
+     # R99 换锚点：R99 把 `inkRunCount` 拆成 `inkRuns`（交位置）+ `.count`，
+     # 旧锚点那行（结尾带 `.count`）已经不在文件里 ⇒ 命中 0 次 = DID-NOT-RUN（pass-1 实测）。
+     # 牙没变：钉的还是"先筛高度、后合并"这个**顺序**，只是钉在 `inkRuns` 的返回行上。
+     "        return merged.filter { $0.bottom - $0.top + 1 >= minRunHeight }",
      "        let pre = runs.filter { $0.bottom - $0.top + 1 >= minRunHeight }\n"
      "        var again: [(top: Int, bottom: Int)] = []\n"
      "        for run in pre {\n"
@@ -68,7 +71,7 @@ MUTATIONS = [
      "                again.append(run)\n"
      "            }\n"
      "        }\n"
-     "        return again.count",
+     "        return again",
      SEED, "两段都不够高、但合并后够"),
     ("M547", "render 拍完不还原（只借不占那一格失去证人）",
      "                if let back = seededOriginal {\n"

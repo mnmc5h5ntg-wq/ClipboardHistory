@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R99）
+
+- **设置「推荐」那一屏的两段内容收进卡片**（`RecommendationWeightsView.swift`、`SettingsView.swift`，
+  **只动容器**：按钮、回执通道、`.animation` 键、`restoreDefaults()` 一行没改）：
+  ① 「推荐权重客制化」那一行（含「恢复默认」）与它下面那句说明，从卡片外搬进第一张 `GroupBox` 的开头，
+  字号 `.headline → .subheadline` 并入其余卡片内小标题那一档；
+  ② 「推荐反馈数据」+「导出反馈数据」那一块，从"卡片外一条裸 `Divider()` + 两段裸内容"收成第二张卡片
+  （与「隐私」那一屏的两张卡片同套）。
+  缺陷是量出来的：判据新增的两格名单给出"改前两档 × 十屏 —— 上方九屏各 1 段、推荐屏 **3** 段；
+  下方推荐屏 tall 档 **2** 段、其余 0 段"，改后上方 20 格全 `=1`、下方 16 格全 `=0`。
+  为什么算缺陷：另外四屏（快捷键 / 隐私 / 数据 / 通用）的小标题、说明、动作按钮全在卡片里面，
+  而 R92 给「数据」屏删掉的就是这个形状，登记话写在源码注释里（"向多数靠拢，只动容器"）。
+  两条只有看图才抓得到：新卡片会按内容缩成 250pt 宽（⇒ 卡片尺读不到材质，"没有第二张卡片"与
+  "卡片太窄"共用一个读数），以及标题与按钮同行时那颗 22pt 的按钮把标题往下推 4pt
+  （⇒ 边距 18.5 对 12.5、极差 6.0 > 4.5 判红；改抄 `清空未收藏记录` 那段"标题+说明在左块、按钮 trailing 居中"）。
+
+### 判据与工具（R99）
+
+- **新尺第一版坏在自己的坐标约定上**（`UICaptureHarness.swift`）：`CARD_ABOVE` 把 `cardRowKinds`
+  交回来的**带内相对行号**直接当**位图绝对行**喂进 `columnInk` ⇒ 量的窗口是 0..45.5pt 而不是
+  60..106pt，九屏全报"卡片顶之上没有墨"，而分区标题一直画在 78.5..90.5pt；位置也被 `toPt`
+  多加一次 60pt（真墨 78.5..90.5 标成 138.5..150.5）。换算提成有真值表的纯函数
+  `absoluteRows(bandMinY:scale:count:/bandRange:)`（`testBandRowToAbsoluteRowIsATruthTable` 六条，
+  第 ② 条就是这个错本身的形状）+ 调用处恒等式（窗口下沿换算回 pt 必须等于尺自己报的卡片顶）。
+- **两种 x 范围各自钉成读数**：`CARD_ABOVE` 现在同时打 `详情区墨带/段`（卡片自己的 155..715pt）
+  与 `侧栏墨带/段`（0..155pt），段的位置与计数出自同一颗尺（`inkRuns` 交出位置，`inkRunCount` 只是它的 `.count`）。
+  上一轮被隔离的那把 python 尺在"标题在哪一行"这一格报对了 —— 隔离一把尺不等于它每个读数都错，
+  但它"每一屏都有标题在卡片外"那句也不可信：它在整幅宽度上找墨，读到的是侧栏的行。
+- **名单判据的形状**：上方恰好 1 段 / 下方 0 段，两个方向各有成因（0 段 ⇒ 尺瞎了；>1 ⇒ 产品把
+  本该在卡片里的内容挂在外面），失败文本把这一点写死；名单只收"这一页真读到了墨"的夹具，
+  卡片贴到窗口底的那几屏**不进下方名单**（没有对象 ≠ 通过）。
+- **CI 的探针那一步现在报得出"红在哪一句"**（`scripts/probe_coverage_gate.py`，BACKLOG 145）：
+  `ASSERTION_RED` 以前取到 `XCTAssert\w+` 就停，把同一行里的数值与判据那句理由丢掉 ⇒
+  run `38898253512` 里那条红只能读到"它红了"。现在结论行带原文（截 300 字），
+  `test_probe_coverage_gate.py` 钉"数值与理由都必须在"。同一个教训 R59 在 motion 那一步记过，这一支漏了。
+- 变异表新增一张 `r99` 四刀（`n=4 caught=4 mismatch=0 not_run=0`）：M552（丢偏移 ⇒ 名单与真值表**两本账**）、
+  M553（把尺弄瞎 ⇒ 名单必须红，那是它的非恒真证明）、M554（**还原臂**：两个产品文件整体换回
+  `git show HEAD:` 那一版 ⇒ 上方 3 段、下方 2 段同时红）、M555（撤 `maxWidth` ⇒ 下方 2 段红）。
+- 帧基线：128 张比对，8 张变更（4 张 `settings-recommendations*` + 4 张 `weights*` 组件帧），缺 0、新增 0。
+- **改产品顺手改坏了两张变异表的锚点**（U-262）：标题那块搬进 `GroupBox` 之后
+  `mutate_r98_card.py` 的 M550/M551 两行缩进变了，`inkRunCount` 拆成 `inkRuns` + `.count` 之后
+  `mutate_r98_seed.py` 的 M546 那行结尾不在文件里 ⇒ 三刀全 `DID-NOT-RUN`（臂哑了不是通过）。
+  按 R98 给 M530 换锚点的老办法换到新那一行，注释写明"为什么换、牙没变"，并等表跑完再动那个文件
+  （U-263：本轮有一次在电池跑着的时候编辑被注入文件，`RESTORE_CLEAN=NO` 如实报了脏 —— 那一格报对了）。
+
 ### 产品（R98）
 
 - **「推荐」分区那张滑块卡片的留白统一成设置窗口的那一档**（`RecommendationWeightsView.swift`）：

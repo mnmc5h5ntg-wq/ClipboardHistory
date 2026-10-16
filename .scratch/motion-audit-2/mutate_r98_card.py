@@ -34,12 +34,14 @@ CALLSITES = "UICaptureTests/testEverySettingsCardAppliesTheSharedEdgeInset"
 # (编号, 标题, 锚点, 变异后, 跑哪支, 期望红在哪句话, 是否还要跑第二支)
 MUTATIONS = [
     ("M550", "把「推荐」那行的行距改回 16（内侧那一档又比四边大 4pt）",
-     "                VStack(spacing: 12) {",
-     "                VStack(spacing: 16) {",
+     # R99 换锚点：标题那一块搬进卡片之后，这行的缩进深了一级（16 空格 → 12 空格），
+     # 旧锚点命中 0 次 ⇒ DID-NOT-RUN（R99 pass-1 实测：两张表四刀全哑）。
+     "            VStack(spacing: 12) {",
+     "            VStack(spacing: 16) {",
      RHYTHM, "同一张卡片里最大的留白", CALLSITES),
     ("M551", "把共享留白换回 `.padding(.vertical, 0)`（四边贴到卡片边上）",
-     "                .settingsCardInset()",
-     "                .padding(.vertical, 0)",
+     "            .settingsCardInset()",
+     "            .padding(.vertical, 0)",
      RHYTHM, "同一张卡片里最大的留白", CALLSITES),
 ]
 

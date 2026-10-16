@@ -578,28 +578,43 @@ struct SettingsView: View {
 
             RecommendationWeightsView(store: weightsStore)
 
-            Divider()
+            // R99 / BACKLOG 142：这一段以前是"卡片外一条裸 `Divider()` + 标题 + 按钮"，
+            // 与上面那张卡片之间没有任何容器关系 —— 同一句"这些是并列的段落"在这一屏
+            // 用了两种语言说（卡片里的段落有材质、卡片外的没有）。
+            // 实测出处：`testSettingsCardVerticalRhythmIsOneNumber` 的 `CARD_BELOW` 那一格，
+            // 推荐屏 1040 那一档读到卡片之下 2 段墨（885.0..895.0pt 标题、911.5..923.5pt 按钮），
+            // 而其余九屏两档全是 0 段 ⇒ 这不是"另一种合法排版"，是这一屏独有的形状。
+            // 收成第二张卡片，与「隐私」那一屏的两张卡片同一套（`settings-privacy-tall`
+            // 实测卡片段=2）。**只动容器**：按钮、回执通道、动画键一行没改。
+            GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("推荐反馈数据")
+                        .font(.subheadline)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("推荐反馈数据")
-                    .font(.subheadline)
+                    HStack {
+                        Button("导出反馈数据") {
+                            exportFeedbackData()
+                        }
+                        .buttonStyle(.bordered)
 
-                HStack {
-                    Button("导出反馈数据") {
-                        exportFeedbackData()
+                        if let message = exportMessage {
+                            ReceiptLine(text: message) { self.exportMessage = nil }
+                        }
                     }
-                    .buttonStyle(.bordered)
-
-                    if let message = exportMessage {
-                        ReceiptLine(text: message) { self.exportMessage = nil }
-                    }
+                    // R42 / BACKLOG 53：**这一条回执以前没有驱动**。`ReceiptLine` 自己挂着
+                    // `.transition(.contentFade)`（:976），而它的父容器一个 `.animation` 都没有 ⇒
+                    // 那句声明等于零：回执是**瞬间**出现、**瞬间**消失的，读起来像界面闪了一下怪东西。
+                    // 键取"有没有回执"这一个布尔，与 `clearReceipt` 那条同一套写法（见 :659 的注释）：
+                    // 连续两次导出换文案不该再演一次，从无到有才需要被看见。
+                    .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)
                 }
-                // R42 / BACKLOG 53：**这一条回执以前没有驱动**。`ReceiptLine` 自己挂着
-                // `.transition(.contentFade)`（:976），而它的父容器一个 `.animation` 都没有 ⇒
-                // 那句声明等于零：回执是**瞬间**出现、**瞬间**消失的，读起来像界面闪了一下怪东西。
-                // 键取"有没有回执"这一个布尔，与 `clearReceipt` 那条同一套写法（见 :659 的注释）：
-                // 连续两次导出换文案不该再演一次，从无到有才需要被看见。
-                .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // 上面那一格 `.frame(maxWidth: .infinity)` 是必须的，不是排版洁癖：
+                // 不加它，`GroupBox` 会按内容收缩，这张卡片在 720pt 宽的窗口里只画出
+                // **250pt 宽的一小块**（本轮 1040 那一档的帧实测就是这样，一眼看得见）。
+                // 而卡片尺要求的"横贯过去的一段卡片材质"也就读不到了 ⇒ 它会安静地
+                // 变成"这张卡片不存在"，第二屏外的裸内容照样漏网。
+                .settingsCardInset()
             }
                 // R43 / BACKLOG 62：这里原来是 `.alert("导出反馈数据", isPresented: $showExportAlert)`，
                 // 与上面那条行内 `ReceiptLine` 说同一句话 ⇒ 一次导出被说两遍，其中一遍还是模态打断。

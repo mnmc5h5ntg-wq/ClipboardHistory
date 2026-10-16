@@ -60,7 +60,7 @@ CONCLUDED = re.compile(r"Test Case '-\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\]' (pa
 # `execution_order()` 的文档串里 —— 一句话版本：名册里"排在某条之后"这种话以前只能推断，
 # 有了执行序它才变成读数。
 ANY_CASE_LINE = re.compile(r"Test Case '-\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\]' (started\.|passed|failed|skipped)")
-ASSERTION_RED = re.compile(r"error: -\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\] : (XCTAssert\w+)")
+ASSERTION_RED = re.compile(r"error: -\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\] : (XCTAssert\w+)([^\n]*)")
 
 
 def source_cases(text):
@@ -134,8 +134,17 @@ def analyse(source_names, expectations, log_text):
             reds.append(f"NOW_RUNS {name}：登记说 runner 跑不了，而这次它下结论了"
                         f"（{concluded[name]}）⇒ 把登记改成 can")
 
-    for name, kind in ASSERTION_RED.findall(log_text)[:8]:
-        reds.append(f"FAILED {name}：{kind} 在这份日志里打红了 ⇒ 红要能被读，也要有人负责")
+    for name, kind, message in ASSERTION_RED.findall(log_text)[:8]:
+        # R99 / BACKLOG 145：**名字不够，还要那一句为什么**（同一行里就有，是这颗正则丢掉的）。
+        # run 38898253512（R98 的 CI）这一步打的是
+        #   FAILED testFrameIntervalsUnderStateChanges：XCTAssertLessThanOrEqual 在这份日志里打红了
+        # 而"哪个数、超过哪条线、判据自己写的那句理由"就在**同一行**里 ——
+        # `error: -[... testX] : XCTAssertLessThanOrEqual failed: ("6.0") is greater than ("4.5") - …`。
+        # 于是"runner 上到底为什么红"只能靠猜，而这一族里靠猜出来的修法已经错过一次（R51）。
+        # 同一个教训 R59 在 motion 那一步记过一次（`红的理由（XCTAssert 原文…）`），这一支漏了。
+        detail = message.strip()[:300]
+        reds.append("FAILED %s：%s %s" % (name, kind,
+                                          detail if detail else "在这份日志里打红了"))
 
     can = sum(1 for e in expectations.values() if e.get("runner") == "can")
     order, appeared, interleaved = execution_order(log_text)

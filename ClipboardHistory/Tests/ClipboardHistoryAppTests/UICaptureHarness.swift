@@ -4539,6 +4539,15 @@ final class UICaptureTests: XCTestCase {
     /// 反过来写会把同一颗按钮数成 0 段（两段都不够高），于是"两条种子行没画出来"
     /// 与"这台机器画不出字"在报表上长得一模一样 —— 那正是本轮要抓的事，不能给它一个安静的逃法。
     static func inkRunCount(column: [Bool], minRunHeight: Int, mergeGap: Int) -> Int {
+        return inkRuns(column: column, minRunHeight: minRunHeight, mergeGap: mergeGap).count
+    }
+
+    /// `inkRunCount` 的同一颗尺，只是把**段的位置**也交出来（R99 / BACKLOG 142）。
+    ///
+    /// 为什么要位置：只有"几段"这一个数的时候，"上方墨带=0"和"上方墨带=1"都没有对象可以
+    /// 核对 —— 我看不到那一段在哪、有多高，就没法判断它是分区标题、说明段，还是侧栏串进来的墨。
+    /// 计数与位置必须由同一段代码给出，否则"数"和"位置"是两颗尺（BACKLOG 104 那一族）。
+    static func inkRuns(column: [Bool], minRunHeight: Int, mergeGap: Int) -> [(top: Int, bottom: Int)] {
         var runs: [(top: Int, bottom: Int)] = []
         var start: Int? = nil
         for (i, inked) in column.enumerated() {
@@ -4558,7 +4567,27 @@ final class UICaptureTests: XCTestCase {
                 merged.append(run)
             }
         }
-        return merged.filter { $0.bottom - $0.top + 1 >= minRunHeight }.count
+        return merged.filter { $0.bottom - $0.top + 1 >= minRunHeight }
+    }
+
+    /// 坐标约定：把**带内相对行号**换成**位图绝对行号**。
+    ///
+    /// 为什么单独有一格（R99 / BACKLOG 142）：`cardRowKinds` 交回来的 `segments[].top`
+    /// 是"距离扫描带上沿 `band.minY` 第几行"，而 `columnInk` 吃的是位图的绝对行。
+    /// 我第一次把两者直接对接时忘了这个差别，于是量出来的窗口是"绝对行 0..<first.top"
+    /// = **0..45.5pt**，而它自认为在量 60..106pt ⇒ 九屏全报"卡片顶之上没有墨"，
+    /// 而分区标题明明就画在 78.5..90.5pt（那张被隔离的 python 尺这一格报对了）。
+    /// 一个"两种坐标约定"的接口不能靠我脑子里记得 —— 真值表在 `testBandRowToAbsoluteRowIsATruthTable`。
+    static func absoluteRows(bandMinY: Double, scale: Double, count: Int) -> Range<Int> {
+        return absoluteRows(bandMinY: bandMinY, scale: scale, bandRange: 0..<count)
+    }
+
+    /// 同一颗换算的区间版：卡片**之下**那段窗口要从 `last.bottom + 1` 起算，
+    /// 而它同样是"带内相对行号"（`rows` / `segments` 的坐标系）。
+    static func absoluteRows(bandMinY: Double, scale: Double,
+                             bandRange: Range<Int>) -> Range<Int> {
+        let top = max(0, Int(bandMinY * scale))
+        return (top + bandRange.lowerBound)..<(top + bandRange.upperBound)
     }
 
     /// 进料：从位图里抽一条**纵向窄带**的逐行墨向量（`inkRunCount` 的纯函数不吃位图）。
@@ -5689,6 +5718,11 @@ final class UICaptureTests: XCTestCase {
         // 前者会连卡片段都读不出来（没有材质），后者会读出**满带的卡片段却零墨** ——
         // 这两种情况在 `judged == 0` 这一格上长得一模一样，而只有一种该 skip。
         var sawSegment = false
+        // R99：卡片**之上** / 卡片**之下**各有几段墨（逐夹具，两档各一格，键带 tag）。
+        // 只收"这一页真读到了墨"的夹具：读不到墨的页两格都会报 0，而那个 0 是仪器的读数
+        // 不是产品的事实 —— 让它进名单就等于把"没跑"记成"通过"（BACKLOG 43 那一族）。
+        var aboveRoster: [String: Int] = [:]
+        var belowRoster: [String: Int] = [:]
         // R96 把对象从"那一张卡片"扩到"每一张有分隔线的卡片"：R95 的修法一次动了五张卡片，
         // 而判据只压在 `settings-shortcuts` 上 ⇒ 另外四张改没改对，今天没人看着。
         // "有分隔线"是这条判据的**前提**（没有内侧那一档，就没有可比的数），
@@ -5741,9 +5775,90 @@ final class UICaptureTests: XCTestCase {
                 values.map { String(format: "%.1f", $0) }.joined(separator: "/")
             }
             let toPt = { (index: Int) in String(format: "%.1f", band.minY + Double(index) / scale) }
-            // `填充=` 这一格是 R97 加读数分歧时补的：Swift 这把尺与一份独立的 python 复算
-            // 在 `settings-privacy-excluded` 的段边界上不一致，而"它把哪一档当成卡片填充"
-            // 正是唯一能解释分歧的量 —— 之前它从没被打出来过，只能猜。
+            // R99 / BACKLOG 142：**"卡片顶之上有什么"要用同一颗尺问**。
+            // R98 为这件事另写过一把 python 尺，三条自检全不过（卡片顶差 14pt、亮暗互差 7pt、
+            // 把热图切成 11 段"卡片"）⇒ 那把尺被隔离成"默认拒绝出表"（U-251）。
+            // 这一格不再另起炉灶：直接拿节奏判据已经算好的 `rows`（`.ink` 是它自己判的）
+            // 与 `segments.first.top`，数卡片顶之上还有几段墨。
+            // 本轮先**只报数**：新尺要先在真产物上跑一遍，看清分布再钉断言（U-166 那一族）。
+            if let first = segments.first {
+                // **参照点必须换**：`rows` 里那一档 `.ink` 的语义是"卡片材质上有墨"，
+                // 而卡片**之上**的那些行本来就长在页面底上 ⇒ 它们永远判不成 `.ink`
+                // （第一版就是这么量的，于是十屏全报"上方墨带=0" —— 一个恒为 0 的读数）。
+                // 所以这一格用 `columnInk` 以**页面底**为参照重算，门槛与卡片那侧同数
+                // （gate 60 / minInk 8），只是零点从 `fill` 换成 `pageLuma`。
+                let cardX = Int(band.minX * scale)..<Int(band.maxX * scale)
+                // `first.top` 是**带内相对行号**，而 `columnInk` 吃**位图绝对行** ⇒ 必须过
+                // `absoluteRows`。这一步不是形式：我第一次把两者直接对接，量出来的窗口是
+                // "绝对行 0..<first.top" = 0..45.5pt，而它自认为在量 60..106pt，
+                // 于是九屏全报"卡片顶之上没有墨"，而分区标题明明画在 78.5..90.5pt
+                // （那张 python 尺这一格反而报对了 —— 它一直在扫绝对行）。
+                let aboveWindow = Self.absoluteRows(bandMinY: band.minY, scale: scale,
+                                                    count: first.top)
+                // **恒等式**（不是同义反复）：窗口下沿换算回 pt 必须等于尺自己报的卡片顶。
+                // 两边由两条不同的式子算出来 —— `absoluteRows` 一旦丢掉 `band.minY` 那一档，
+                // 左边少 60pt 而右边不变 ⇒ 这一格立刻红（变异臂 M552 就是丢它）。
+                XCTAssertEqual(Double(aboveWindow.upperBound) / scale,
+                               band.minY + Double(first.top) / scale, accuracy: 0.001,
+                               "卡片顶之上的窗口下沿必须正好落在卡片顶（窗口=\(aboveWindow)"
+                               + " 而卡片顶=\(toPt(first.top))pt）⇒ 两套坐标系又在打架")
+                let aboveVec = Self.columnInk(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                              xRange: cardX, yRange: aboveWindow,
+                                              fill: pageLuma, gate: 60, minInk: 8)
+                let above = Self.inkRuns(column: aboveVec, minRunHeight: 4,
+                                         mergeGap: Int(8 * scale))
+                // 侧栏那一列（卡片 x 范围以左）用**同一颗尺**再量一遍。
+                // 为什么要这一格：R98 那把被隔离的 python 尺在"整幅宽度"上找墨，
+                // 于是把侧栏的行读成了"每一屏卡片顶之上都有一段分区标题"（十屏读数一模一样
+                // ⇒ 那是侧栏，不是标题）。这一格把"卡片范围外的那片墨在侧栏"这句话
+                // 变成**读数**，不是我的解释。
+                let sidebar = Self.inkRuns(column: Self.columnInk(
+                                                bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                xRange: 0..<Int(band.minX * scale),
+                                                yRange: aboveWindow,
+                                                fill: pageLuma, gate: 60, minInk: 8),
+                                           minRunHeight: 4, mergeGap: Int(8 * scale))
+                // 段的位置必须**和计数出自同一颗尺**：只有"几段"这个数的时候，
+                // 我看不到那一段在哪、多高，就没资格说它是标题还是说明段。
+                // 段的位置要带**偏移**：`inkRuns` 交回来的是它吃的那条向量的下标，
+                // 而卡片之下那条向量是从 `last.bottom + 1` 才起算的。
+                // 不带偏移会打印出 91.0..101.0pt 这种"卡片底下 60pt 处有墨"的假位置
+                //（本轮第一次跑就是这样，是读数错，不是产品错）。
+                let spans = { (runs: [(top: Int, bottom: Int)], offset: Int) in
+                    runs.isEmpty ? "无" : runs.map {
+                        "\(toPt(offset + $0.top))..\(toPt(offset + $0.bottom + 1))"
+                            + "/\($0.bottom - $0.top + 1)px"
+                    }.joined(separator: ",")
+                }
+                emit("CARD_ABOVE \(fixture.name) \(tag) 卡片顶=\(toPt(first.top))"
+                     + " 窗口=\(toPt(0))..\(toPt(first.top))"
+                     + " 详情区墨带=\(above.count) 详情区段=\(spans(above, 0))"
+                     + " 侧栏墨带=\(sidebar.count) 侧栏段=\(spans(sidebar, 0))"
+                     + " 详情区墨行=\(aboveVec.filter { $0 }.count) 卡片段数=\(segments.count)")
+                // **对称的那一半**：卡片之下到窗口底之间还有几段墨。
+                // 只看上面会漏掉同一个缺陷的另一半 —— 推荐那一屏在卡片**下面**还压着
+                // 一条裸分隔线 + 「推荐反馈数据」标题 + 一颗按钮（R92 在「数据」那一屏
+                // 删掉的就是这个形状），而它只在 1040 那一档才进得了画面。
+                let last = segments[segments.count - 1]
+                let clippedByWindow = last.bottom >= rows.count - 1
+                let belowWindow = Self.absoluteRows(bandMinY: band.minY, scale: scale,
+                                                    bandRange: (last.bottom + 1)..<rows.count)
+                let belowVec = Self.columnInk(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                              xRange: cardX, yRange: belowWindow,
+                                              fill: pageLuma, gate: 60, minInk: 8)
+                let below = Self.inkRuns(column: belowVec, minRunHeight: 4,
+                                         mergeGap: Int(8 * scale))
+                emit("CARD_BELOW \(fixture.name) \(tag) 卡片底=\(toPt(last.bottom + 1))"
+                     + " 窗口=\(toPt(last.bottom + 1))..\(toPt(rows.count))"
+                     + " 墨带=\(below.count) 段=\(spans(below, last.bottom + 1))"
+                     + (clippedByWindow ? " 卡片贴窗口底⇒这一格没有对象，不进名单" : ""))
+                if inkRows > 0 {
+                    aboveRoster["\(fixture.name) \(tag)"] = above.count
+                    if !clippedByWindow {
+                        belowRoster["\(fixture.name) \(tag)"] = below.count
+                    }
+                }
+            }
             emit("CARD_BAND \(fixture.name) \(tag) 页底=\(pageLuma) 填充=\(fill)"
                  + " 墨行=\(inkRows) 卡片段=\(segments.count) 窗口高=\(Int(fixture.size.height))"
                  + " 带子=\(Int(band.minY))..\(Int(band.maxY))"
@@ -5837,6 +5952,48 @@ final class UICaptureTests: XCTestCase {
                 judged += 1
             }
             }
+        }
+        // R99：把"卡片顶之上"的分布原样打出来，好让下一格的断言有出处可查。
+        emit("CARD_ABOVE_SUMMARY " + aboveRoster.keys.sorted().map {
+            "\($0)=\(aboveRoster[$0]!)"
+        }.joined(separator: " "))
+        emit("CARD_BELOW_SUMMARY " + belowRoster.keys.sorted().map {
+            "\($0)=\(belowRoster[$0]!)"
+        }.joined(separator: " "))
+        // R99 / BACKLOG 142：**每一屏在卡片之外只准剩一格墨 —— 分区标题**。
+        // 名单不是手抄的，是上面两条 SUMMARY 的实测分布（改产品**之前**）：
+        //   上方：九屏各 1 段（78.5..90.5pt，就是分区标题那一行），唯独推荐屏 3 段 ——
+        //        多出来的 112.5..124.5pt 是「推荐权重客制化」+「恢复默认」那一行，
+        //        146.0..155.0pt 是那句说明；
+        //   下方：推荐屏 1040 那一档 2 段（裸分隔线之下的「推荐反馈数据」标题 + 按钮），
+        //        其余各屏 0 段。
+        // 这两段内容在另外四屏都长在**卡片内部**（`SettingsView` 数据那一屏的
+        // `VStack(spacing: 8){标题; 说明}` + `Divider()`，R92 就是照这个形状把「数据」
+        // 屏的两段裸内容收进卡片的）。所以这不是"另一种合法排版"，是同一扇窗口里
+        // 用两种语言说同一句话 —— 而这一次它有读数，不再是我看代码看出来的印象。
+        XCTAssertFalse(aboveRoster.isEmpty,
+                       "没有一屏进得了「卡片外几段墨」的名单 ⇒ 这条判据没有对象"
+                       + "（两档 settings 帧要么读不到卡片、要么读不到墨），不许当成通过")
+        XCTAssertGreaterThanOrEqual(aboveRoster.count, 8,
+                                    "名单只有 \(aboveRoster.count) 格（两档各 10 屏）"
+                                    + " ⇒ 大半页面没被量到，这一轮的「全绿」不作数")
+        for key in aboveRoster.keys.sorted() {
+            XCTAssertEqual(1, aboveRoster[key]!,
+                           "\(key)：卡片顶之上读到 \(aboveRoster[key]!) 段墨，而这一扇窗口的规矩是"
+                           + "只剩分区标题那 1 段。两个方向各有成因："
+                           + "读到 0 段 ⇒ 这把尺瞎了（分区标题一定画在卡片之上，"
+                           + "R99 第一版把带内相对行号当绝对行用就是这个读数）；"
+                           + "读到 2 段以上 ⇒ 产品把本该在卡片里的内容挂在外面"
+                           + "（推荐屏多出来那两段是二级标题+按钮、说明段）。"
+                           + "两种都不许靠改这条的期望数收场（段的位置在 CARD_ABOVE 那几行）")
+        }
+        for key in belowRoster.keys.sorted() {
+            XCTAssertEqual(0, belowRoster[key]!,
+                           "\(key)：最后一张卡片之下、窗口底之上还读到 \(belowRoster[key]!) 段墨"
+                           + " ⇒ 卡片外面还压着裸内容（推荐屏那条 `Divider()` + "
+                           + "「推荐反馈数据」标题 + 按钮就是这个形状）。"
+                           + "上面「卡片之上必须恰好 1 段」这一格同时是这条的**正对照**："
+                           + "尺瞎了的时候上面那格会先红，不会让这里假绿")
         }
         XCTAssertFalse(sawSegment && !sawInk,
                        "两档 settings 帧读到了卡片段，却一条墨都没判 ⇒ **墨那一档瞎了**"
@@ -6027,6 +6184,43 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(1, Self.inkRunCount(
             column: rows([(true, 5), (false, 1), (true, 5)]), minRunHeight: 4, mergeGap: 2),
                        "空 1 行 < mergeGap ⇒ 合并")
+        // R99：`inkRuns` 交出的是**位置**，`inkRunCount` 只是它的 `.count`。
+        // 位置必须与计数同源，否则"几段"和"那一段在哪"是两颗尺（BACKLOG 104 那一族）。
+        let positioned = Self.inkRuns(
+            column: rows([(false, 20), (true, 17), (false, 43), (true, 17), (false, 20)]),
+            minRunHeight: 4, mergeGap: 16)
+        XCTAssertEqual(2, positioned.count)
+        XCTAssertEqual("20..36,80..96",
+                       positioned.map { "\($0.top)..\($0.bottom)" }.joined(separator: ","),
+                       "段的位置必须就是那两段墨的首尾行（不是外框、不是中心）")
+    }
+
+    /// 带内相对行 → 位图绝对行的换算（R99 / BACKLOG 142）。
+    ///
+    /// **不覆盖管线**：这条判的是纯函数；它守的那个管线级读数在
+    /// `testSettingsCardVerticalRhythmIsOneNumber` 里的 `CARD_ABOVE` 那一格。
+    /// 真值表里第 ② 条就是本轮真犯过的错（把相对行号直接当绝对行喂进去）：
+    /// 那样量出来的窗口是 0..45.5pt，而它自认为在量 60..106pt，
+    /// 报出来的"卡片顶之上没有墨"是**仪器读数**，不是产品事实。
+    func testBandRowToAbsoluteRowIsATruthTable() {
+        // ① 本机实测的那一档：带子从 60pt 起、2x 屏、卡片顶在带内第 92 行（=106pt）。
+        XCTAssertEqual(120..<212, Self.absoluteRows(bandMinY: 60, scale: 2, count: 92))
+        // ② 忘了偏移会量到哪：这一格就是本轮那个 bug 的形状。
+        XCTAssertNotEqual(0..<92, Self.absoluteRows(bandMinY: 60, scale: 2, count: 92),
+                          "窗口从 0 起 ⇒ 量的其实是窗口最上面那 46pt（带子外面）")
+        // ③ 带子贴顶（minY=0）⇒ 两种坐标重合，换算必须退化成恒等。
+        XCTAssertEqual(0..<92, Self.absoluteRows(bandMinY: 0, scale: 2, count: 92))
+        // ④ 1x 屏：行数=pt，偏移也跟着变（不是"永远乘 2"）。
+        XCTAssertEqual(60..<152, Self.absoluteRows(bandMinY: 60, scale: 1, count: 92))
+        // ⑤ 零行 ⇒ 空区间，不越界（`first.top == 0` 时卡片顶就是带上沿）。
+        XCTAssertEqual(120..<120, Self.absoluteRows(bandMinY: 60, scale: 2, count: 0))
+        // ⑥ 负数带沿（不可能出现，但 clamp 必须在那儿）⇒ 从 0 起，不给越界读。
+        XCTAssertEqual(0..<10, Self.absoluteRows(bandMinY: -50, scale: 2, count: 10))
+        // ⑦ 区间版（卡片**之下**那一格用）：起点不是带上沿时，偏移要一起进去。
+        XCTAssertEqual(212..<960, Self.absoluteRows(bandMinY: 60, scale: 2, bandRange: 92..<840))
+        // ⑧ 区间版与"从 0 起"的那一格必须给出同一个窗口（两条式子不许各说一套）。
+        XCTAssertEqual(Self.absoluteRows(bandMinY: 60, scale: 2, count: 92),
+                       Self.absoluteRows(bandMinY: 60, scale: 2, bandRange: 0..<92))
     }
 
     /// 节奏这把尺的算术要有真值表（**不覆盖管线**：它判的是纯函数；

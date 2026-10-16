@@ -3,24 +3,55 @@ import SwiftUI
 struct RecommendationWeightsView: View {
     @ObservedObject var store: RecommendationWeightsStore
 
+    /// R99 / BACKLOG 142：二级标题那一行与说明段**搬进卡片**（只动容器，一行行为都没改）。
+    ///
+    /// 缺陷是量出来的，不是看代码看出来的。`testSettingsCardVerticalRhythmIsOneNumber`
+    /// 新增的那格"卡片之外还剩几段墨"在两档 × 十屏上给出：
+    ///   上方 —— 九屏各 **1** 段（78.5..90.5pt，就是分区标题那一行），
+    ///          唯独这一屏 **3** 段：多出来 112.5..124.5pt（「推荐权重客制化」+「恢复默认」）
+    ///          与 146.0..155.0pt（那句说明）；
+    ///   下方 —— 其余各屏 0 段，这一屏 1040 那一档 2 段（885.0..895.0、911.5..923.5）。
+    /// 也就是说：同一扇设置窗口里，"这一段属于那一组"这句话有**两种说法** ——
+    /// 「数据」「隐私」「快捷键」把小标题、说明、动作按钮都放在 `GroupBox` 里面
+    ///（见 `SettingsView` 的 `历史记录存储` / `清空未收藏记录` 那两段：
+    /// `VStack(spacing: 8){标题; 说明}` + 卡片内 `Divider()`），
+    /// 而这一屏把它们挂在卡片外面。R92 当年给「数据」屏做的就是同一件事：
+    /// "向多数靠拢，只动容器"。
+    ///
+    /// 字号跟着改成 `.subheadline`：搬进卡片之后它就是卡片内的小标题，
+    /// 与「历史记录存储」「导出与导入」同一档；留着 `.headline` 会让卡片里外出现两种标题。
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("推荐权重客制化")
-                    .font(.headline)
+        GroupBox {
+            VStack(spacing: 12) {
+                // 形状抄「数据」那一屏的 `清空未收藏记录` 那一段：
+                // `HStack(alignment: .center){ VStack{标题; 说明}; Spacer(); 按钮 }`。
+                // 为什么不是"标题与按钮同一行、说明在下一行"（本轮第一版就是这么写的）：
+                // 那样这一行最高的元素是那颗 22pt 的按钮，标题被往下推 4pt ⇒
+                // 卡片顶到第一行墨 18.5pt，而卡片底那侧 12.5pt，极差 6.0 被
+                // `testSettingsCardVerticalRhythmIsOneNumber` 的 4.5pt 判红。
+                // 标题+说明一起放进左侧那块之后，文字块本身比按钮高，
+                // 行的顶就是标题的墨顶 ⇒ 边距回到 14.0（实测两档都是 14.0：亮 14.0/12.5、暗 14.0/12.0），
+                // 与其余五张卡片同一档。
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("推荐权重客制化")
+                            .font(.subheadline)
 
-                Spacer()
+                        Text("调整各因子对推荐排序的影响力。0% = 禁用，100% = 默认，200% = 双倍。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
-                Button("恢复默认") {
-                    store.restoreDefaults()
+                    Spacer()
+
+                    Button("恢复默认") {
+                        store.restoreDefaults()
+                    }
                 }
-            }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text("调整各因子对推荐排序的影响力。0% = 禁用，100% = 默认，200% = 双倍。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Divider()
 
-            GroupBox {
                 // R98 / BACKLOG 140 的高夹具第一次把这张卡片的**底边**拍进画面，于是量出：
                 // `边距=11.5/9.5` 而 `内侧=16.5/18.0/16.5/18.5/…`（亮暗两档同一组数）——
                 // 首末两行贴卡片边，比它们彼此之间紧 5~9pt。这正是 R95 在「快捷键」那张上修的
@@ -32,26 +63,24 @@ struct RecommendationWeightsView: View {
                 //（快捷键 14.0/14.5、隐私 13.5/14.5、数据 14.0/14.5），
                 // 而不是给这一张单独配一个"能对上 16"的边缘值 —— 同一个设置窗口里
                 // "这几行属于同一组"只准有一种说法。
-                VStack(spacing: 12) {
-                    ForEach(RecommendationWeights.Factor.allCases, id: \.self) { factor in
-                        WeightSliderRow(
-                            factor: factor,
-                            value: Binding(
-                                get: { store.weights[factor] },
-                                set: { newValue in
-                                    var w = store.weights
-                                    w[factor] = newValue
-                                    store.weights = w
-                                }
-                            )
+                ForEach(RecommendationWeights.Factor.allCases, id: \.self) { factor in
+                    WeightSliderRow(
+                        factor: factor,
+                        value: Binding(
+                            get: { store.weights[factor] },
+                            set: { newValue in
+                                var w = store.weights
+                                w[factor] = newValue
+                                store.weights = w
+                            }
                         )
-                        if factor != RecommendationWeights.Factor.allCases.last {
-                            Divider()
-                        }
+                    )
+                    if factor != RecommendationWeights.Factor.allCases.last {
+                        Divider()
                     }
                 }
-                .settingsCardInset()
             }
+            .settingsCardInset()
         }
     }
 }

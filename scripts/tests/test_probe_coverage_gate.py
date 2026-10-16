@@ -207,6 +207,25 @@ class ProbeCoverageGateTest(unittest.TestCase):
         self.assertIn("FAILED", codes(reds))
         self.assertTrue(any("testAlpha" in r for r in reds), "红必须说得出是哪条判据")
 
+    def test_assertion_red_carries_the_message_not_only_the_name(self):
+        """R99 / BACKLOG 145：名字不够，还要那一句为什么 —— 而且它就在同一行里。
+
+        run 38898253512（R98 的 CI）这一步只打了
+        `FAILED testFrameIntervalsUnderStateChanges：XCTAssertLessThanOrEqual 在这份日志里打红了`，
+        于是"runner 上到底红了什么数"没有任何地方能读 —— 只能猜，而这一族里
+        猜出来的修法已经错过一次（R51 那条红得不正确）。
+        这一条钉的是：那一行的**后半段**必须出现在结论里。
+        """
+        log = ("error: -[M.T testAlpha] : XCTAssertLessThanOrEqual failed: "
+               "(\"6.0\") is greater than (\"4.5\") - 同一张卡片里最大的留白 18.5pt\n")
+        reds = reds_for(log=log, expectations={"testAlpha": {"runner": "can"}})
+        line = [r for r in reds if r.startswith("FAILED")]
+        self.assertEqual(1, len(line), "红的结论行必须只有一条，且带名字")
+        self.assertIn('("6.0") is greater than ("4.5")', line[0],
+                      "数值那一半必须在 ⇒ 少了它就只剩『它红了』这句话")
+        self.assertIn("同一张卡片里最大的留白", line[0],
+                      "判据自己写的那句理由也必须在（那才是修法的方向）")
+
     def test_source_scan_ignores_names_mentioned_in_prose(self):
         """守卫不许命中自己，也不许命中注释里提到的用例名（R53 那一族）。"""
         text = """
