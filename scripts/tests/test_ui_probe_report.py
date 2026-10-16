@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.ui_probe_report import PULSE, main, report
+from scripts.ui_probe_report import PULSE, _dominant_path, analyse_sample, main, report
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r62_runner_ui.log"
 RUNNER_ECHO = FIXTURE.read_text(encoding="utf-8")
@@ -448,3 +448,165 @@ class PulseWiringTests(unittest.TestCase):
         readings = self.READINGS_RE.findall(gate)
         self.assertEqual([cap + "/capture-readings.log"], readings,
                          "闸门读的读数文件必须落在**捕获卷自己**那个目录下：%s" % readings)
+
+
+def sample(name):
+    """读一份 `sample` 夹具。`sample_real_sleep.txt` 是**本机真产物**（拿 sleep 当靶子），
+    其余四份是合成的 —— 因为 CoreDrag 那条挂死在进程内造不出来（R91 已证），
+    而"慢"那一格要的是散开的树。两种来源在断言里不混用：真产物那格只判"读得动且读到什么"。
+    """
+    return (Path(__file__).resolve().parent / "fixtures" / (name + ".txt")).read_text(encoding="utf-8")
+
+
+class SampleTriageTests(unittest.TestCase):
+    """R95 / BACKLOG 132：那份栈到底说"挂"还是说"慢"。"""
+
+    def test_real_sample_from_this_machine_is_parsed(self):
+        """正对照（真产物）：新尺第一遍必须在本机真的 `sample` 输出上读到东西。"""
+        lines, verdict = analyse_sample(sample("sample_real_sleep"))
+        self.assertEqual("blocked@sleep-wait", verdict, lines)
+        self.assertIn("主线程采样=534", lines[0])
+        self.assertIn("__semwait_signal", lines[0], "最深帧读错了 ⇒ 下降逻辑没走到底")
+
+    def test_two_different_hangs_get_two_different_families(self):
+        """CoreDrag 与 NSMenu 必须分开 —— 这条是修 bug 的回归格。
+
+        第一版一次循环里"叶子与路径"两个都查，于是 `_BlockUntilNextEventMatchingListInMode`
+        （两族名单里都有它）把一条 `-[NSMenu popUp…]` 判成了 `coredrag`：
+        名字听起来对，因为那条链上确实经过 CoreDrag 的那个符号。**挂在哪件事上由最深那一帧说。**
+        """
+        self.assertEqual("blocked@coredrag", analyse_sample(sample("sample_core_drag_hang"))[1])
+        self.assertEqual("blocked@menu-tracking", analyse_sample(sample("sample_menu_tracking_hang"))[1])
+
+    def test_a_spread_stack_is_slow_not_hung(self):
+        """散开的树必须判 progressing：132 要分的正是这两种，处置完全不同。"""
+        lines, verdict = analyse_sample(sample("sample_spread_slow"))
+        self.assertEqual("progressing", verdict, lines)
+        self.assertIn("主导路径占比=17%", lines[0], lines)
+
+    def test_truncated_sample_is_not_read_as_slow(self):
+        """`sample` 自己没跑成 ⇒ 只能报"未量到"，不许把 132 读成任何一种。"""
+        lines, verdict = analyse_sample(sample("sample_truncated"))
+        self.assertEqual("未量到", verdict)
+        self.assertTrue(any("UI_PROBE_SAMPLE_UNAVAILABLE" in l for l in lines), lines)
+
+    def test_sample_without_main_thread_is_not_judged(self):
+        # 靶子的文字里**不许**出现 "main-thread" 这个子串：`THREADED` 找的是
+        # `Thread_\d+.*main-thread`，第一版写成 "(no main-thread here)" 反而被匹配上了，
+        # 于是这一格测的是"有没有主线程"，读到的却是"有主线程但树是空的"。
+        lines, verdict = analyse_sample("Call graph:\n    10 Thread_1   另一个线程，不是主线程\n")
+        self.assertEqual("未量到", verdict)
+        self.assertTrue(any("NO_MAIN_THREAD" in l for l in lines), lines)
+
+    def test_dominant_path_truth_table(self):
+        """`_dominant_path` 自己的真值表：它决定占比，而占比决定"挂还是慢"。"""
+        chain = [(4, 100, "a"), (6, 100, "b"), (8, 100, "c")]
+        self.assertEqual(("c", 100), _dominant_path(chain))
+        split = [(4, 60, "a"), (6, 60, "a1"), (4, 40, "b")]
+        self.assertEqual(("a1", 60), _dominant_path(split), "同层要取采样数最大的那个孩子")
+        self.assertEqual(("", 0), _dominant_path([]))
+        self.assertEqual(("only", 7), _dominant_path([(4, 7, "only")]))
+
+    def test_main_prints_the_kind_only_when_the_channel_is_wired(self):
+        """没接线时不许出现读数行 —— 否则"这一格没跑"与"这一格跑了没问题"长得一样。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, "ui.log")
+            with open(log, "w", encoding="utf-8") as handle:
+                handle.write("Test Case '-[M.T testA]' started.\n"
+                             "Test Case '-[M.T testA]' passed (1.000 seconds).\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main([log])
+            self.assertNotIn("UI_PROBE_SAMPLE", out.getvalue())
+            sfile = os.path.join(tmp, "s.txt")
+            with open(sfile, "w", encoding="utf-8") as handle:
+                handle.write(sample("sample_core_drag_hang"))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main([log, "--sample", sfile])
+            text = out.getvalue()
+        self.assertIn("UI_PROBE_HUNG_KIND=blocked@coredrag", text)
+
+    def test_missing_sample_file_says_unreadable_not_empty(self):
+        """路径写错与"没有栈"要分开：前者是仪器坏了（同 R90 的 pulse 那一格）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, "ui.log")
+            with open(log, "w", encoding="utf-8") as handle:
+                handle.write("Test Case '-[M.T testA]' started.\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main([log, "--sample", os.path.join(tmp, "nope.txt")])
+        text = out.getvalue()
+        self.assertIn("UI_PROBE_SAMPLE_UNREADABLE", text)
+        self.assertIn("UI_PROBE_SAMPLE_UNAVAILABLE", text,
+                      "读不到文件之后还要明说这一格没有依据，不许只留一行错误就过去")
+
+
+class SampleWiringTests(unittest.TestCase):
+    """R95 / BACKLOG 132：那份栈**接没接上**要能被跑出来（同 PulseWiringTests 的理由）。
+
+    真值表全在 `SampleTriageTests` 里，它们读的是我自己造的字符串夹具 ——
+    所以"CI 里根本没拍这份栈"这件事，只有读 `ci.yml` 正文才看得见。
+    """
+
+    REPO = Path(__file__).resolve().parents[2]
+    CI = REPO / ".github" / "workflows" / "ci.yml"
+    STEP = "On-screen interaction probes (report-only)"
+    FLOOR = "On-screen probe coverage floor"
+
+    def step_body(self, name):
+        ci = self.CI.read_text(encoding="utf-8")
+        at = ci.index("- name: " + name)
+        nxt = ci.find("\n      - name: ", at)
+        return ci[at:nxt if nxt > 0 else len(ci)]
+
+    def test_both_report_calls_carry_the_sample_channel(self):
+        """两条 report 调用都要带 `--sample`。
+
+        只带在报告型那一步是不够的：硬门那一步（floor）才是"红有名字"的地方，
+        而 R88 之后闸门排在最后 —— 通道只接一半，读数就永远出现在不判红的那一步。
+        """
+        for step in (self.STEP, self.FLOOR):
+            body = self.step_body(step)
+            self.assertIn("--sample /tmp/ui-sample.txt", body,
+                          "%s 这一步的 report 调用没接 --sample ⇒ 132 那份栈今天没人读" % step)
+
+    def test_sample_is_taken_before_the_kill(self):
+        body = self.step_body(self.STEP)
+        self.assertIn('sample "$victim"', body, "没拍栈 ⇒ 132 仍然只能靠外推")
+        self.assertLess(body.index('sample "$victim"'), body.index('kill -9 -"$pid"'),
+                        "拍栈排在 kill 之后 ⇒ 进程已经没了，这份栈永远是空的（而且空得像没挂）")
+
+    def test_sample_exit_code_survives_bash_e(self):
+        """`rc=0; … || rc=$?` 而不是 `… || true`：后者会把退出码那一格吞掉。"""
+        body = self.step_body(self.STEP)
+        self.assertIn('|| rc=$?', body, "sample 的退出码没被留住 ⇒ 它坏了与它没跑长得一样")
+        at = body.index('sample "$victim"')
+        self.assertNotIn('|| true', body[at:at + 160],
+                         "sample 后面直接 `|| true` ⇒ `bash -e` 下失败会静默，退出码那一格写不出来")
+
+    def test_no_backticks_inside_double_quoted_echo(self):
+        """读数行里不许有反引号：`echo "…\`sample\`…"` 会**执行**它（本轮差点踩了这格）。
+
+        这一步的正文会被 `scripts/tests/test_ci_report_selftest.py` 真的跑起来，
+        所以这类错不是"难看"，是"多跑一条命令 + 一行被污染的读数"。
+        """
+        body = self.step_body(self.STEP)
+        bad = [ln for ln in body.splitlines()
+               if ln.strip().startswith('echo "') and '`' in ln]
+        self.assertEqual([], bad, "echo 的双引号串里有反引号 ⇒ 它会被当命令执行：%s" % bad[:2])
+
+    def test_step_bodies_still_parse_as_bash(self):
+        """改完 CI 正文要还能过 `bash -n`（这一格是 R88 那支"真跑步骤正文"的自检的轻量版）。"""
+        import subprocess
+        import tempfile
+        for step in (self.STEP, self.FLOOR):
+            body = self.step_body(step)
+            script = body.split("run: |", 1)[1]
+            lines = [ln[10:] if ln.startswith(" " * 10) else ln for ln in script.splitlines()]
+            with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False, encoding="utf-8") as handle:
+                handle.write("#!/bin/bash\n" + "\n".join(lines) + "\n")
+                path = handle.name
+            proc = subprocess.run(["bash", "-n", path], capture_output=True, text=True)
+            os.unlink(path)
+            self.assertEqual(0, proc.returncode, "%s 的正文语法坏了：%s" % (step, proc.stderr[:200]))

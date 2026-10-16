@@ -4768,6 +4768,41 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 零产品改动：124 张帧 `CHANGED=0 MISSING=0 ADDED=0`，全量 793 例 / 40 skip / 0 failures。
 
 
+## 第 97 轮 · R95：设置卡片里原来同时存在三种留白；看门狗动手之前先把栈拍下来了（结案 135 / 新开 137、138 / U-223…U-226 / D-153）
+
+- 读 R94 推送的 run **38864545930**（job 116854254258，`82fbd1f`）：结论 **success**。上一轮预先登记的
+  预测逐字兑现 —— `PROBE_COVERAGE_SUMMARY 源码用例=11 登记=11 runner可跑=6 runner不可跑=5
+  本次下结论=6 红=0`、`PROBE_ORDER 露面=7/11 未闭口=1 前缀=1`、
+  `PROBE_QUEUED 4/11 条一次都没轮到：testRowGesturesWorkInsideTheRealSidebarContainer
+  testRowIndexDriftDoesNotMoveTheViewport testSidebarListFocusRingAfterClick
+  testRowProxyCensusAsksTheConsequenceNotTheShape`。⇒ 六条 `can` 是真的，红全部来自那次翻转本身。
+- 登记刷新（`.scratch/motion-audit-2/roster_r95.py`，只改成因不翻身份）：四条 `cannot` 的成因
+  从"排在 X 之后"（我上一轮从字母序推的）换成 `PROBE_QUEUED` 逐条点名的读数；
+  其中 `testRowProxyCensusAsksTheConsequenceNotTheShape` 那句旧成因（"不在 `8e6ed15` 的源码里"）
+  **已被这次的 `源码用例=11` 推翻** ⇒ 改成"排队没到"。挂住那条补三格同向读数
+  （`UI_PROBE_HUNG=…` + `UI_PROBE_HUNG_CHANNEL=pulse` + `UI_PROBE_RUNNER_ALIVE=1`）。名册仍是
+  `cases=11 can=6 cannot=5`。
+- **132 的第一格（挂 or 慢）落了工具**：CI 的看门狗在 `kill` 之前先 `sample <xctest-pid> 2 5`
+  写 `/tmp/ui-sample.txt`，`ui_probe_report.py` 新增 `analyse_sample()` —— 判"挂 vs 慢"看的是
+  **主线程里落在同一条主导路径上的采样占比**，且族**先看叶子再看路径**。五份 sample 夹具
+  （CoreDrag 挂 / 菜单跟踪挂 / 真在睡 / 散开的慢 / 截断的）+ 七条真值表 + 一份本机 `sleep` 靶子的
+  真实形状。变异 `MUTATE_TABLE n=5 caught=4 intended_escaped=1 mismatch=0`（那 1 格是 M527
+  并列取哪个孩子，没有夹具覆盖 ⇒ 开成 **137**）。**runner 上那份栈还没读** ⇒ 132 仍开，下一轮第一件事。
+- **135 结案**：执行序改成"结论一旦下过就粘住"，并新增 `PROBE_ORDER_INTERLEAVED` 只报不判；
+  交错夹具（A started、A passed、A started、B passed）现在被断言。M521 从"预期绿的洞"变成
+  `n=7 caught=7 intended_escaped=0`。
+- 看图那一腿：设置「快捷键」分区第一次逐元素量（`r95_shortcuts_visual.py`，尺借 R92 那一支）。
+  一个缺陷改了（U-223），三条判过不改（U-224、U-225），仪器自己错两次（U-226）。
+- 验证（`r95_verify.log`，`VERIFY_OK=1`）：构建 0 告警；全量 `Executed 805 tests, with 41 tests skipped
+  and 0 failures（153.173s）`；在屏那一卷 `Executed 11 tests, with 2 tests skipped and 0 failures（21.953s）`；
+  帧 `COMPARED=124 CHANGED=0 MISSING=0 ADDED=0`（**改前**那次是 `CHANGED=16`，全是 `settings-*`，
+  没有一张非设置帧被牵连 ⇒ 同提交 `update`）；脚本 `Ran 205 tests OK`；台账编号守卫 4 条 OK；
+  三张变异表 `n=4 caught=4` / `n=7 caught=7` / `n=5 caught=4 intended_escaped=1`。
+  产品文件 1 个 ⇒ **本轮换装**：`INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、存档 105→105。
+- 两处自己的错，都由仓库里的东西抓出来：CHANGELOG 被我插成两节 `## [Unreleased]`
+  （`test_changelog_shape` 当场红，正是 R59 那形状）；变异 harness 把"顺带看第二条守卫"排在还原之后，
+  于是打印过一句假话（"漏补一处却没被调用点守卫抓到"）—— 移进 `try` 之后 M529 两条守卫都 CAUGHT。
+
 ## 第 96 轮 · R94：名册按读数翻了六条，"为什么没结论"升成读数；菜单栏六帧第一次逐元素判（结案 134 / 新开 135、136 / U-218…U-222 / D-152）
 
 - 读 run 38857388449（`8e6ed15`）：`本次下结论=6 红=6`，六行 `NOW_RUNS <名字>（passed|skipped）`，

@@ -218,6 +218,104 @@ def report(text, runner_alive=None, pulse_text=None):
     return lines, True
 
 
+# ---------------------------------------------------------------------------
+# R95 / BACKLOG 132：把"它是挂住还是只是慢"从一句话变成一份栈
+# ---------------------------------------------------------------------------
+# `sample <pid>` 的真实形状是**本机实测来的**（`/tmp/sample_probe_shape.txt`，
+# 拿 `sleep` 当靶子）：`Call graph:` 下面是嵌套的调用树，每个节点前面是"落在这条路径上的采样数"，
+# 线程行的形状是 `    534 Thread_21774250   DispatchQueue_1: com.apple.main-thread  (serial)`；
+# 末尾那段 `Sort by top of stack, same collapsed (when >= 5):` **不拿来用**：它是跨线程汇总，
+# 拿它算占比会把"只有主线程挂住"读成"散开"（见 `_dominant_path` 的文档串）。
+# 为什么判"挂 vs 慢"要看**占比**而不是看有没有栈：一份 2 秒的栈里，如果 100% 的采样都落在同一个
+# 等待帧上，那是挂；如果栈顶散在几处，那它是在往前走，只是慢 —— 这两种的处置完全不同
+# （前者要修探针，后者要把看门狗调大并去量慢在哪一段）。
+BLOCKING = (
+    ("coredrag", ("_tryCatchDragUntilMouseUp", "CoreDragStartDraggingAsync",
+                  "_BlockUntilNextEventMatchingListInMode")),
+    ("menu-tracking", ("TrackMouse", "popUpContextMenu", "-[NSMenu", "menuNeedsUpdate")),
+    ("runloop-wait", ("_BlockUntilNextEventMatchingListInMode", "CFRunLoopRunSpecific",
+                      "mach_msg2_trap", "kevent")),
+    ("sleep-wait", ("__semwait_signal", "__psynch_", "nanosleep", "wait4", "__workq_kernreturn")),
+)
+THREADED = re.compile(r"^\s*(\d+)\s+Thread_\d+.*main-thread", re.M)
+NODE = re.compile(r"^(\s+)(\d+)\s+(.*)$", re.M)   # ← 少了 re.M 时 `^` 只认字符串开头：
+# 第一版就是这样，于是"最深帧"永远读不到、族永远是 unknown，而**占比那一格仍然对**
+# —— 一把一半坏一半好的尺最容易骗过人（它给的那个数看着是合理的）。
+# 教训同 R90：新尺先在真产物上跑一遍，再拿合成件补它跑不到的形状。
+
+
+def _dominant_path(nodes):
+    """nodes = [(缩进, 采样数, 帧名)]（同一线程块内，按文件顺序）。返回 (叶子帧, 叶子采样数)。
+
+    沿"每层采样数最大的那个孩子"一路走到底。为什么不能"取最后一个 count==total 的节点"
+    （第一版的写法）：栈散开恰恰表现为**某一层的孩子各拿一部分**，那种时候没有任何孩子的
+    count 等于 total，第一版就会退回"最后一个节点"并仍然报 100% —— 把**慢**读成**挂**。
+    第一版还有个方向相反的错误：占比拿 `Sort by top of stack` 那段算，而那是**跨线程**汇总，
+    一条只有主线程挂住的栈会因为别的线程也停在 mach_msg 上被判成"散开"。
+    """
+    if not nodes:
+        return "", 0
+    leaf, count = nodes[0][2], nodes[0][1]
+    while nodes:
+        indent = nodes[0][0]
+        level = [(i, n) for i, n in enumerate(nodes) if n[0] == indent]
+        if not level:
+            break
+        best_i, best = max(level, key=lambda kv: kv[1][1])
+        leaf, count = best[2], best[1]
+        sub = []
+        for n in nodes[best_i + 1:]:
+            if n[0] <= indent:
+                break
+            sub.append(n)
+        if not sub:
+            break
+        nodes = sub
+    return leaf, count
+
+
+def analyse_sample(text):
+    """返回 (读数行, 判定)。判定 ∈ {blocked@<族>, progressing, 未量到}。"""
+    if not text or "Call graph:" not in text:
+        return (["UI_PROBE_SAMPLE_UNAVAILABLE=1 这份 sample 里没有 `Call graph:` ⇒ "
+                 "132 那句「它到底是挂还是慢」今天仍**没有依据**，不许被读成「它只是慢」"]), "未量到"
+    m = THREADED.search(text)
+    if not m:
+        return (["UI_PROBE_SAMPLE_NO_MAIN_THREAD=1 有 `Call graph:` 却找不到主线程那一行 ⇒ "
+                 "这份栈不是我们要的那份（靶子换了？），不判"]), "未量到"
+    total = int(m.group(1))
+    block = text[m.end():]
+    stop = re.search(r"^\s*\d+\s+Thread_\d+", block, re.M)
+    block = block[:stop.start()] if stop else block
+    nodes = [(len(n.group(1)), int(n.group(2)), n.group(3)) for n in NODE.finditer(block)]
+    leaf, leaf_count = _dominant_path(nodes)
+    frames = " ".join(sym for _, _, sym in nodes)
+    share = (float(leaf_count) / total) if (total and nodes) else 1.0
+
+    def fam(haystack):
+        for name, toks in BLOCKING:
+            if any(t in haystack for t in toks):
+                return name
+        return "unknown"
+
+    # 族要**先看叶子，再看路径**。第一版一次循环里两个都查，于是 `_BlockUntilNextEventMatchingListInMode`
+    # （它同时出现在 cordrag 与 runloop-wait 两族的名单里）把一条 `-[NSMenu popUp…]` 的栈
+    # 判成了 `coredrag` —— 名字读起来像真的，因为那条等待链上确实有 CoreDrag 的那个符号。
+    # 挂在哪一件事上，是由**最深那一帧**说的，不是由"路上经过过谁"说的。
+    family = fam(leaf)
+    if family == "unknown":
+        family = fam(frames)
+    verdict = ("blocked@%s" % family) if share >= 0.9 else "progressing"
+    lines = ["UI_PROBE_SAMPLE 主线程采样=%d 主导路径占比=%.0f%% 最深帧=%s"
+             % (total, share * 100.0, leaf[:110] or "读不到")]
+    if verdict == "progressing":
+        lines.append("UI_PROBE_HUNG_KIND=progressing ⇒ 这份栈里它在往前走：**不是挂死，是慢**"
+                     "（132 要修的是看门狗与耗时归因，不是探针）")
+    else:
+        lines.append("UI_PROBE_HUNG_KIND=blocked@%s ⇒ 采样几乎全落在同一个等待帧上（132 分诊：挂）" % family)
+    return lines, verdict
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="给被看门狗收掉的在屏探针卷点出挂死的那条用例")
     parser.add_argument("log", help="`swift test --filter UIInteractionProbeTests` 的日志文件")
@@ -229,6 +327,10 @@ def main(argv=None):
                         help="每条用例在 setUpWithError 里写的心跳文件（BACKLOG 122）。"
                              "不传=这条通道没接线；传了而文件读不到=按空内容处理，"
                              "由 `--runner-alive` 决定那是不是通道坏了")
+    parser.add_argument("--sample", default=None,
+                        help="R95 / BACKLOG 132：看门狗收掉之前对那条 xctest 做的 `sample` 文本。"
+                             "不传=这条通道没接线；传了而文件读不到/没有 `Call graph:`=报"
+                             "『未量到』，不许把 132 那句「挂还是慢」读成任何一种")
     args = parser.parse_args(argv)
 
     alive = None
@@ -266,6 +368,17 @@ def main(argv=None):
         if args.quiet and line.startswith("UI_PROBE_PROGRESS"):
             continue
         print(line)
+    if args.sample is not None:
+        sample_text = None
+        try:
+            with open(args.sample, encoding="utf-8", errors="replace") as handle:
+                sample_text = handle.read()
+        except IOError as error:
+            print("UI_PROBE_SAMPLE_UNREADABLE=%s（%s）⇒ 这一格不许被读成『采样通道正常』"
+                  % (args.sample, error))
+            sample_text = ""
+        for line in analyse_sample(sample_text)[0]:
+            print(line)
     print("UI_PROBE_NAMED=%d" % (1 if named else 0))
     return 0 if named else 1
 

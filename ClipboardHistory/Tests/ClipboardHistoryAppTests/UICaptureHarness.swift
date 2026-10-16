@@ -4418,6 +4418,119 @@ final class UICaptureTests: XCTestCase {
         return (brighter, darker)
     }
 
+    // MARK: - 卡片竖向节奏（R95 / 设置「快捷键」分区逐元素重判）
+
+    /// 内容列里**一行**的身份：卡片外的页面底、卡片自己的填充、卡片上的墨、卡片里的分隔线。
+    enum CardRowKind: Equatable {
+        case outside, card, ink, line
+    }
+
+    /// 把内容列逐行分类。参照是**整块卡片那一个稳定的填充色**（取带子里第一个"不是页面底"的行的众数），
+    /// 不是抄来的色号，也不是"这一行自己的众数"（后者在分隔线上会翻车，见下面那段）。
+    ///
+    /// `pageLuma` 由调用方按**当前外观**给，而不是让尺自己取扫描带的第一行：
+    /// 取第一行看着更"自适应"，但它会把"卡片顶到了窗口边"这一种故障读成"整带都在卡片里"，
+    /// 于是节奏照样算得出、只是全错。故障改由 `cardRhythm` 的 `card.0 > 0` 那条前提挡。
+    ///
+    /// 两档门槛的出处：`inkGate=60` 落在"分隔线"与"任何一种墨"之间 ——
+    /// 仓库尺 `rowTierProfile` 那条注释里有两个本机量过的数（说明档离底 ≈109、标题档 ≈209），
+    /// 而分隔线是"整行都浅一度"的那一档，比它们都低一个量级；60 不在两者之间就会把线读成墨、
+    /// 或把说明读成线。`lineGate=6` 的下界由**亮档卡片对页面底只有 8** 定：
+    /// 再松就把卡片外的那两条页面带算进"整行的线"，再紧就漏线。
+    /// （这两格都不是"最优阈值"，是"两个已量到的档之间的那一段"—— R18 那条"自适应阈值等于没有阈值"。）
+    static func cardRowKinds(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                             bytesPerRow: Int, rect: CGRect, scale: Double,
+                             pageLuma: Int, inkGate: Int = 60, lineGate: Int = 6)
+        -> [CardRowKind] {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return [] }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        // 第一遍：每行的众数。第二遍才分类 —— 因为**参照必须是整块卡片稳定的那一个填充色**，
+        // 不能是"这一行自己的众数"。第一版就是那么写的，于是分隔线那一行的众数=线本身，
+        // 线与自己的偏离是 0 ⇒ 一条线都检不出来（读数 `分隔线=0`，而边距那一栏照样给得出 14.5，
+        // 一把一半好一半坏的尺 —— R95 里第三次撞上这一课）。
+        var modals: [Int] = []
+        modals.reserveCapacity(y1 - y0)
+        for y in y0..<y1 {
+            var histogram: [Int: Int] = [:]
+            for x in x0..<x1 { histogram[lumaAt(x, y) / 8, default: 0] += 1 }
+            modals.append(histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0)
+        }
+        guard let fill = modals.first(where: { abs($0 - pageLuma) > 3 }) else {
+            return Array(repeating: .outside, count: y1 - y0)
+        }
+        var kinds: [CardRowKind] = []
+        for (row, modal) in modals.enumerated() {
+            let y = y0 + row
+            if abs(modal - pageLuma) <= 3 && abs(modal - fill) > 3 {
+                kinds.append(.outside)
+                continue
+            }
+            var ink = 0, line = 0
+            for x in x0..<x1 {
+                let dev = abs(lumaAt(x, y) - fill)
+                if dev >= inkGate { ink += 1 } else if dev >= lineGate && dev < lineGate * 8 { line += 1 }
+            }
+            if ink >= 8 { kinds.append(.ink) }
+            else if line >= (x1 - x0) * 8 / 10 { kinds.append(.line) }
+            else { kinds.append(.card) }
+        }
+        return kinds
+    }
+
+    /// 纯函数：从逐行分类里读出「卡片四边的留白」与「分隔线两侧的留白」（pt）。
+    ///
+    /// 缺陷形状是这一族里最不容易靠眼睛抓到的：卡片**自己**没错，每一行也都没错，
+    /// 错的是同一张卡片里存在两种留白（内侧 14.5pt、边缘 6.5pt）。
+    /// 所以判据必须是"这几个数是不是同一个数"，而不是"这个数够不够大" ——
+    /// 后者会被"整体都很挤"骗过去，前者不会。
+    static func cardRhythm(rows: [CardRowKind], scale: Double)
+        -> (edges: [Double], gaps: [Double], dividers: Int) {
+        var runs: [(Int, Int)] = []
+        var start = -1
+        for (i, kind) in rows.enumerated() {
+            if kind != .outside {
+                if start < 0 { start = i }
+            } else if start >= 0 {
+                runs.append((start, i - 1))
+                start = -1
+            }
+        }
+        if start >= 0 { runs.append((start, rows.count - 1)) }
+        guard let card = runs.max(by: { $0.1 - $0.0 < $1.1 - $1.0 }), card.0 > 0,
+              card.1 < rows.count - 1 else { return ([], [], 0) }
+        // 卡片必须**整块**落在扫描带里：顶到带上沿 = 上面那条 `card.0 > 0` 不成立，
+        // 那时"上留白"没有对象，宁可返回空让调用处报"尺没压住卡片"。
+        let slice = Array(rows[card.0...card.1])
+        guard let firstInk = slice.firstIndex(of: .ink),
+              let lastInk = slice.lastIndex(of: .ink) else { return ([], [], 0) }
+        let unit = 1.0 / max(scale, 1)
+        var gaps: [Double] = []
+        var dividers = 0
+        var i = 0
+        while i < slice.count {
+            guard slice[i] == .line else { i += 1; continue }
+            var j = i
+            while j + 1 < slice.count, slice[j + 1] == .line { j += 1 }
+            dividers += 1
+            var up = i - 1
+            while up >= 0, slice[up] != .ink { up -= 1 }
+            var down = j + 1
+            while down < slice.count, slice[down] != .ink { down += 1 }
+            // 留白数的是**空行**：从上一行墨到这一行线之间，中间那几条不带墨的行。
+            if up >= 0 { gaps.append(Double(i - up - 1) * unit) }
+            if down < slice.count { gaps.append(Double(down - j - 1) * unit) }
+            i = j + 1
+        }
+        return ([Double(firstInk) * unit, Double(slice.count - 1 - lastInk) * unit],
+                gaps, dividers)
+    }
+
     /// **一行里的墨分两档**：说明档（离背景 ≤ `tierSplit`）与标题档（超过它）。
     /// 返回按**像素行**排列的数组，只数偏离超过 `textInkMinDelta` 的笔画像素。
     ///
@@ -5363,6 +5476,156 @@ final class UICaptureTests: XCTestCase {
                        + "少了：那一列现在结构上量不到（合成前的极性），它的暗档可读性不能当证据")
         emit("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures"
               + "（名单 \(Self.darkSidebarTextBlindSpots.count) 条；vibrant 子树 \(vibrantColumns.count) 条）")
+    }
+
+    /// 一小块区域的**众数亮度**（8 级量化），用来取"这一块的底色是多少"。
+    /// 像素坐标，不是 pt —— 与 `meanLuminance` 同一套约定，两套混用是 R29d 那课的原价。
+    static func modalLuma(bytes: UnsafePointer<UInt8>, bytesPerRow: Int,
+                          xRange: Range<Int>, yRange: Range<Int>) -> Int {
+        var histogram: [Int: Int] = [:]
+        for y in yRange {
+            for x in xRange {
+                let o = y * bytesPerRow + x * 4
+                let value = Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                                 + 0.0722 * Double(bytes[o + 2])).rounded())
+                histogram[value / 8, default: 0] += 1
+            }
+        }
+        return histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? -1
+    }
+
+    /// **同一张卡片里只准有一种留白**（R95 / 设置「快捷键」分区逐元素重判）。
+    ///
+    /// 缺陷是量出来的：改之前 `settings-shortcuts` 这张卡片，分隔线两侧各 14.5 / 15.0pt，
+    /// 而卡片自己的上下边缘只有 7.5 / 6.5pt（亮暗两档同一组数）。最后一行是四行说明的那一行，
+    /// 它的末行离卡片底 6.5pt —— 读起来像"卡片装不下内容"。
+    /// 根因在容器：`GroupBox { VStack(spacing: 12) { 行; Divider(); 行 } }` 里那 12pt
+    /// 只长在**孩子之间**，首末行什么也没拿到。
+    ///
+    /// 判据为什么是"这几个数是不是同一个数"而不是"这个数够不够大"：
+    /// 后者会被"整体都很挤"骗过去（把 14.5 也改成 7 就绿了），前者不会。
+    ///
+    /// 这台机器拍不出设置页时记 NOT-RUN（BACKLOG 43 那一族），**不算通过也不算盲区**。
+    func testSettingsCardVerticalRhythmIsOneNumber() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r95-rhythm-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
+                                  (NSAppearance.Name.darkAqua, "dark")] {
+            guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == "settings-shortcuts" }) else {
+                return XCTFail("找不到 settings-shortcuts ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-shortcuts-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：读不回刚拍的帧")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            // 页面底从**窗口最上面那一条**取（那里不可能有卡片：夹具高度 540pt，卡片在 106pt 起）。
+            let pageLuma = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: Int(150 * scale)..<Int(710 * scale),
+                                          yRange: Int(4 * scale)..<Int(12 * scale))
+            let band = CGRect(x: 155, y: 60, width: 560, height: 440)
+            let rows = Self.cardRowKinds(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                         bytesPerRow: rep.bytesPerRow, rect: band, scale: scale,
+                                         pageLuma: pageLuma)
+            let inkRows = rows.filter { $0 == .ink }.count
+            let (edges, gaps, dividers) = Self.cardRhythm(rows: rows, scale: scale)
+            let fmt = { (values: [Double]) in
+                values.map { String(format: "%.1f", $0) }.joined(separator: "/")
+            }
+            emit("CARD_RHYTHM settings-shortcuts \(tag) 页底=\(pageLuma) 墨行=\(inkRows)"
+                 + " 分隔线=\(dividers) 边距=\(fmt(edges)) 内侧=\(fmt(gaps))")
+            guard inkRows > 0 else {
+                emit("CARD_RHYTHM_NOT_RUN settings-shortcuts \(tag)（整带零墨 ⇒ 这台机器拍不出这一页）")
+                continue
+            }
+            XCTAssertFalse(edges.isEmpty || gaps.isEmpty,
+                           "\(tag)：这一带有 \(inkRows) 行墨，却读不出卡片边距或分隔线两侧留白 ⇒ "
+                           + "是**尺没压住卡片**（带子越界 / 众数取错位置），不是产品没问题")
+            XCTAssertGreaterThanOrEqual(dividers, 2,
+                                        "settings-shortcuts 这张卡片上有两条分隔线（三行），实测 \(dividers) 条"
+                                        + " ⇒ 要么夹具换了，要么 `.line` 那一档的门槛把线读丢了")
+            let all = edges + gaps
+            let spread = all.max()! - all.min()!
+            XCTAssertLessThanOrEqual(spread, 3.0,
+                                     "同一张卡片里最大的留白 \(String(format: "%.1f", all.max()!))pt、"
+                                     + "最小的 \(String(format: "%.1f", all.min()!))pt（边距 \(fmt(edges))、"
+                                     + "内侧 \(fmt(gaps))）⇒ 卡片四边与分隔线两侧必须是同一档；"
+                                     + "差这么多就是首末行没有内边距，最后一行贴着卡片底")
+            judged += 1
+        }
+        if judged == 0 {
+            throw XCTSkip("CARD_RHYTHM_NOT_RUN：两档都拍不出 settings-shortcuts ⇒ 竖向节奏记为未运行"
+                          + "（BACKLOG 43 同族），不算通过")
+        }
+    }
+
+    /// 节奏这把尺的算术要有真值表（**不覆盖管线**：它判的是纯函数；
+    /// 管线级判据是上面那条 `testSettingsCardVerticalRhythmIsOneNumber`）。
+    ///
+    /// 三条合成行序列，各挡一种"看着对、其实答不了问题"的写法：
+    /// ① 均匀 ⇒ 绿；② 边缘挤 ⇒ 红（本轮那个缺陷的形状）；③ 卡片顶到带子上沿 ⇒
+    /// **不许给数**（宁可空，也不能把"没有上留白"读成"上留白=0"再判成缺陷）。
+    func testCardRhythmArithmeticIsATruthTable() {
+        func rows(_ spec: [(CardRowKind, Int)]) -> [CardRowKind] {
+            spec.flatMap { kind, count in Array(repeating: kind, count: count) }
+        }
+        // 数组没有 `accuracy` 那一条重载，逐元素比（一次写错不会让整条断言静默少判）。
+        func same(_ got: [Double], _ want: [Double], _ why: String,
+                  file: StaticString = #filePath, line: UInt = #line) {
+            XCTAssertEqual(got.count, want.count, "\(why)：读了 \(got.count) 个数，期望 \(want.count) 个",
+                           file: file, line: line)
+            guard got.count == want.count else { return }
+            for (i, value) in got.enumerated() {
+                XCTAssertEqual(value, want[i], accuracy: 0.001, "\(why)：第 \(i) 个", file: file, line: line)
+            }
+        }
+        // ① 边 14 / 内侧 14 ⇒ 同一档
+        let even = rows([(.outside, 4), (.card, 14), (.ink, 10), (.card, 14), (.line, 1),
+                         (.card, 14), (.ink, 10), (.card, 14), (.outside, 4)])
+        let a = Self.cardRhythm(rows: even, scale: 1)
+        XCTAssertEqual(a.dividers, 1)
+        same(a.edges, [14, 14], "均匀那张卡片：四边")
+        same(a.gaps, [14, 14], "均匀那张卡片：分隔线两侧")
+        // ② 边 2 / 内侧 14 ⇒ 本轮那个缺陷
+        let tight = rows([(.outside, 4), (.card, 2), (.ink, 10), (.card, 14), (.line, 1),
+                          (.card, 14), (.ink, 10), (.card, 2), (.outside, 4)])
+        let b = Self.cardRhythm(rows: tight, scale: 1)
+        same(b.edges, [2, 2], "边距没补那张：四边")
+        same(b.gaps, [14, 14], "边距没补那张：分隔线两侧")
+        XCTAssertGreaterThan((b.edges + b.gaps).max()! - (b.edges + b.gaps).min()!, 3.0,
+                             "这条合成件必须**能被**管线判据判红，否则那条断言是恒真的")
+        // ③ 卡片顶到带上沿 ⇒ 没有"上留白"这个对象
+        let clipped = rows([(.card, 2), (.ink, 10), (.card, 14), (.line, 1), (.card, 14),
+                            (.ink, 10), (.card, 2), (.outside, 4)])
+        XCTAssertTrue(Self.cardRhythm(rows: clipped, scale: 1).edges.isEmpty,
+                      "卡片贴着带上沿时不许报边距：那会把「尺没对齐」读成「产品的留白是 0」")
+        // ④ 全空（这台机器拍不出这一页）⇒ 也不许报数
+        XCTAssertTrue(Self.cardRhythm(rows: Array(repeating: .outside, count: 40), scale: 2)
+                      .edges.isEmpty)
+    }
+
+    /// 每张卡片都得补那份留白：`GroupBox` 的个数必须等于 `settingsCardInset()` 的个数。
+    ///
+    /// 为什么源码层也要一条：帧判据只压在 `settings-shortcuts` 一张上（别的卡片里
+    /// 不一定有分隔线，"内侧那一档"没有对象）。新增一张卡片忘了补，帧上不会红 ——
+    /// 这一条会。它数的是**调用点**，不是常量出现次数，所以卡片内部那处
+    /// `.padding(.vertical, 4)`（讲的是另一件事）不会被算进来。
+    func testEverySettingsCardAppliesTheSharedEdgeInset() throws {
+        let source = Self.codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        let cards = source.components(separatedBy: "GroupBox {").count - 1
+        let insets = source.components(separatedBy: ".settingsCardInset()").count - 1
+        XCTAssertGreaterThan(cards, 0, "源码里一张 GroupBox 都没找到 ⇒ 这条守卫的对象没了")
+        XCTAssertEqual(cards, insets,
+                       "设置页有 \(cards) 张卡片，却只有 \(insets) 处补了上下留白 ⇒ "
+                       + "至少一张卡片的首末行会贴到卡片边上（R95 那个缺陷的形状）。"
+                       + "新卡片请写 `.settingsCardInset()`，别再手抄一个数")
     }
 
     /// 这个外观下，"正常的墨"应该在背景的哪一侧。

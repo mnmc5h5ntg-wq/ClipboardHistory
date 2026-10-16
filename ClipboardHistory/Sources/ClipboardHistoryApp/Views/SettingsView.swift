@@ -14,7 +14,30 @@ enum SettingsViewLayout {
     /// 判据不在这条常量上，在帧上：`testSettingsCaptionSitsCloserToItsOwnToggle`
     /// 量的是"说明段离上面那颗开关比离下面那颗更近"。
     static let captionGap: CGFloat = 3
+    /// 卡片内容**上下**各补的留白（R95 / U-2xx）。
+    ///
+    /// 缺陷是量出来的，不是看出来的：`GroupBox { VStack(spacing: 12) { 行; Divider(); 行 } }`
+    /// 里那 12pt 只长在**孩子之间**，于是同一张卡片有两种留白 ——
+    /// 分隔线两侧各 14.5 / 15.0pt，而卡片自己的上下边缘只有 7.5 / 6.5pt（帧上逐行量的，
+    /// 亮暗两档同一组数）。最后一行是四行说明的那一行时，它的末行离卡片底只有 6.5pt，
+    /// 读起来像"卡片装不下内容"。
+    ///
+    /// 7 不是抄来的常数：目标是让卡片四边的留白等于它自己内部已经有的那一档（14.5pt），
+    /// 而 GroupBox 自带 ~7pt ⇒ 再补 7 落在 14.5 / 13.5，与内侧那一档差 ≤1pt。
+    /// 判据在帧上：`testSettingsCardVerticalRhythmIsOneNumber`。
+    static let cardEdgeInset: CGFloat = 7
     static let clearButtonTitle = "清空"
+}
+
+extension View {
+    /// 给一张卡片的内容补上**上下**留白，让卡片四边的留白与它自己分隔线两侧的留白是同一档。
+    ///
+    /// 为什么是一条扩展而不是五处 `.padding(.vertical, 7)`：这条判据要能被源码守卫数出来
+    /// ——「有几张卡片」与「有几处补了留白」必须相等，而 `padding(.vertical, 7)` 这个词
+    /// 在文件里还长在别的地方（卡片内部的小节就有一处），数它会数错。
+    func settingsCardInset() -> some View {
+        padding(.vertical, SettingsViewLayout.cardEdgeInset)
+    }
 }
 
 enum SettingsCategory: String, CaseIterable, Identifiable {
@@ -313,6 +336,7 @@ struct SettingsView: View {
                         shortcut: $quickPickShortcut
                     )
                 }
+                .settingsCardInset()
             }
         }
     }
@@ -377,7 +401,7 @@ struct SettingsView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 4)
+                .settingsCardInset()
             }
             // 清空历史只在「数据」页出现一次：同一个破坏性按钮在两个分类里
             // 各放一份，用户无法判断是不是两件事，两份实现还会各自漂移。
@@ -522,7 +546,7 @@ struct SettingsView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 4)
+                .settingsCardInset()
             }
 
             // 这些文案早就写好了（`HistoryPrivacyCopy`，还有单测守着不重复、不为空），
@@ -540,7 +564,7 @@ struct SettingsView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 4)
+                .settingsCardInset()
             }
         }
     }
@@ -691,6 +715,7 @@ struct SettingsView: View {
                     .animation(MotionCatalog.animation(for: .contentFade), value: clearReceipt == nil)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .settingsCardInset()
             }
         }
     }

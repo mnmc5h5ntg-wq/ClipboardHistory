@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R95）
+
+- 设置窗口五张卡片（`快捷键 / 通用 / 隐私 / 推荐 / 数据`）的**竖向留白统一成同一档**：
+  原来 `GroupBox { VStack(spacing: 12) { 行; Divider(); 行 } }` 里那 12pt 只长在孩子之间，
+  于是同一张卡片有两种规矩 —— 分隔线两侧各 14.5 / 15.0pt，而卡片自己的上下边缘只有 7.5 / 6.5pt
+  （亮暗两档同一组数）；`快捷键` 页最后一行是四行说明那一行，末行离卡片底 6.5pt，读起来像卡片装不下内容。
+  同一窗口里还并存三种写法（三张卡片 `.padding(.vertical, 4)`、两张完全没有）。
+  现在走 `SettingsViewLayout.cardEdgeInset = 7` + `View.settingsCardInset()` 一处定义，
+  改后实测 `边距=14.5/14.0`、`内侧=14.0/14.5/14.0/14.5`（极差 0.5pt）。卡片各长高 14pt，
+  控件几何只平移（录制器 116 → 122pt），填充 / 墨 / 对比度逐项与改前相同。
+  判据 `testSettingsCardVerticalRhythmIsOneNumber`（两档、帧上量、拍不出记 NOT-RUN）
+  + 真值表四条 + 调用点守卫；变异 M528–M531 四刀全 CAUGHT。帧基线 16 张随本提交 `update`。
+
+### 判据与工具（R95）
+
+- **BACKLOG 132 的第一格落了工具**：CI 看门狗在 `kill` 之前先 `sample <xctest-pid> 2 5`
+  写 `/tmp/ui-sample.txt`（`pgrep -f` 点名，找不到写 `none`，退出码另记一格），
+  `ui_probe_report.py` 新增 `analyse_sample()`：判"挂 vs 慢"看**主线程里落在同一条主导路径上的采样占比**，
+  族**先看叶子再看路径**（`_BlockUntilNextEventMatchingListInMode` 同时属于两族，按路径判会把
+  `-[NSMenu popUp…]` 说成 CoreDrag）。三条不判的前提各一格：无 `Call graph:`、
+  有它却找不到主线程那一行、占比只从主线程那块算（`Sort by top of stack` 是跨线程的）。
+  五份 sample 夹具 + 七条真值表 + 变异 M523–M527（`n=5 caught=4 intended_escaped=1`，
+  那一格是并列未覆盖 ⇒ 新开 **137**）。**runner 上那份栈要等下一次 CI** ⇒ 132 仍开。
+- **BACKLOG 135 结案**：`execution_order()` 的结论改成粘住（下过 passed/failed/skipped 不再被
+  后到的 `started.` 抹掉），交错本身升成只报不判的 `PROBE_ORDER_INTERLEAVED`；补一份真的交错日志夹具。
+  M521 从"预期绿的洞"变 CAUGHT ⇒ `n=7 caught=7 intended_escaped=0`。
+- 登记刷新（只改成因、不翻身份）：四条 `cannot` 的成因换成 run 38864545930 的 `PROBE_QUEUED` 逐条点名；
+  `testRowProxyCensusAsksTheConsequenceNotTheShape` 那句旧成因（"不在 `8e6ed15` 的源码里"）
+  已被那次 `源码用例=11` 推翻 ⇒ 改成"排队没到"。挂住那条补 `UI_PROBE_HUNG_CHANNEL=pulse` 与
+  `UI_PROBE_RUNNER_ALIVE=1` 两格同向读数。名册仍是 `cases=11 can=6 cannot=5`。
+- 新开 **138**：卡片横向内边距 5.5pt（左右对称、与分隔线 5.0pt 同轴）与系统分组卡的 16–20pt 有差距，
+  但抬它会缩正文可用宽度、与 R28 的截断判据耦合 ⇒ 先量再决定，不在本轮顺手改。
+
 ### 判据与工具（R94，零产品改动）
 
 - `scripts/probe_coverage_expectations.json`：六条按 run 38857388449 的 `NOW_RUNS` 逐条翻成 `can`

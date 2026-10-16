@@ -37,7 +37,8 @@ MODULES = ['scripts.tests.test_probe_coverage_gate', 'scripts.tests.test_ui_prob
 PRINT_OPEN = 'f"未闭口={reading[' + "'open_not_closed'" + ']} "'
 QUEUED_FIELD = '        "queued": queued,'
 DICT_ANCHOR = '    reading = {\n'
-TALLY = '        if kind != "started.":\n            concluded[name] = True'
+TALLY = ('        if kind != "started.":\n            concluded[name] = True\n'
+         '        elif concluded[name]:')
 QUEUE_IF = '    if reading["queued"]:'
 PREFIX_FULL = ('prefix = None if not order else '
                '(first_hole is None or all(not appeared[n] for n in order[first_hole:]))')
@@ -96,8 +97,13 @@ MUTATIONS = [
                                                      '        "queued": absent_hack,', "M519"), 'RED'),
     ("M520", "空洞的真话冒充结论", lambda t: sub_once(t, PREFIX_HEAD,
                                                     'prefix = True if not order else', "M520"), 'RED'),
+    # M521 在 R94 是**故意留着绿**的那一刀（没有判据覆盖 ⇒ 开成 BACKLOG 135）。
+    # R95 补了 `InterleavedLogTests` 之后，同一个坏法必须变 RED：这一行的期望从 GREEN 改成 RED，
+    # 就是 135 结案的证据。锚点也跟着代码形状改了（现在那里是 if/elif 两段）。
     ("M521", "结论之后再见到 started 就把状态改回未结论（交错日志会说谎）",
-     lambda t: sub_once(t, TALLY, '        concluded[name] = (kind != "started.")', "M521"), 'GREEN'),
+     lambda t: sub_once(t, TALLY,
+                        '        concluded[name] = (kind != "started.")\n        if False:',
+                        "M521"), 'RED'),
     ("M522", "这一支自己打印 PROBE_HUNG（复制因果级的名字）",
      lambda t: sub_once(t, QUEUE_IF, '    print("  PROBE_HUNG=none")\n' + QUEUE_IF, "M522"), 'RED'),
 ]

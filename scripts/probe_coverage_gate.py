@@ -80,7 +80,7 @@ def concluded_cases(log_text):
 
 
 def execution_order(log_text):
-    """返回 (第一次露面的顺序, {名字: 是否下过结论})。
+    """返回 (第一次露面的顺序, {名字: 是否下过结论}, [结论之后又出现 started 的名字])。
 
     为什么需要顺序（R94 / BACKLOG 134）：缺席有**两种完全不同的成因**——
       ① 跑到它了，但它被看门狗收掉 / 永不返回 ⇒ 那是产品或探针的毛病；
@@ -93,13 +93,20 @@ def execution_order(log_text):
     """
     order = []
     concluded = {}
+    interleaved = []
     for name, kind in ANY_CASE_LINE.findall(log_text):
         if name not in concluded:
             order.append(name)
             concluded[name] = False
         if kind != "started.":
             concluded[name] = True
-    return order, concluded
+        elif concluded[name]:
+            # 结论之后又见到一次 `started.` ⇒ 这份日志**不止一个写入者**（或同一例被跑了第二遍）。
+            # 第一版让这条把状态改回"未结论"，于是 `未闭口` 凭空 +1 —— 而那正是登记的依据
+            # （M521 那一刀当时是**故意留着绿**的，因为它没有判据覆盖 ⇒ BACKLOG 135）。
+            # 现在两件事分开：结论是**粘的**（下过就算下过），交错本身打成一条有名字的读数。
+            interleaved.append(name)
+    return order, concluded, sorted(set(interleaved))
 
 
 def analyse(source_names, expectations, log_text):
@@ -131,7 +138,7 @@ def analyse(source_names, expectations, log_text):
         reds.append(f"FAILED {name}：{kind} 在这份日志里打红了 ⇒ 红要能被读，也要有人负责")
 
     can = sum(1 for e in expectations.values() if e.get("runner") == "can")
-    order, appeared = execution_order(log_text)
+    order, appeared, interleaved = execution_order(log_text)
     # 缺席分两种，但**这一支只点"一次都没轮到"的名字**：
     # 「跑到它了却没闭口」那条的名字归 `ui_probe_report.py`（它有 stdout + 心跳两条通道可以互相签字，
     # `UI_PROBE_CHANNELS_AGREE`），这一支只有一条日志，抢那个名字就会造出第二颗尺子
@@ -153,6 +160,7 @@ def analyse(source_names, expectations, log_text):
         "absent": [n for n in source_names if n not in concluded],
         "appeared": len(order),
         "open_not_closed": open_not_closed,
+        "interleaved": interleaved,
         "queued": queued,
         "prefix": prefix,
     }
@@ -196,6 +204,11 @@ def main(argv=None):
     print(f"  PROBE_ORDER 露面={reading['appeared']}/{reading['source_cases']} "
           f"未闭口={reading['open_not_closed']} "
           f"前缀={'无从判定' if reading['prefix'] is None else (1 if reading['prefix'] else 0)}")
+    if reading["interleaved"]:
+        print("  PROBE_ORDER_INTERLEAVED %d 条在**下过结论之后**又出现 started：%s"
+              % (len(reading["interleaved"]), " ".join(reading["interleaved"]))
+              + " ⇒ 这份日志不止一个写入者（或同一例被跑了两遍）。结论按粘的处理（下过就算下过），"
+                "但 `未闭口` 这一格今天不可信 —— 132 的分诊要先解决写入者是谁")
     if reading["queued"]:
         print(f"  PROBE_QUEUED {len(reading['queued'])}/{reading['source_cases']} 条一次都没轮到："
               + " ".join(reading["queued"][:12]) + (" …" if len(reading["queued"]) > 12 else ""))

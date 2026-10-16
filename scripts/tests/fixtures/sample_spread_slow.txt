@@ -1,0 +1,18 @@
+Analysis of sampling xctest (pid 60112) every 3 milliseconds
+Call graph:
+    611 Thread_99   DispatchQueue_1: com.apple.main-thread  (serial)
+      210 -[XCTestCase invokeTest] (in XCTest) + 10 [0x2]
+        105 -[NSView layout] (in AppKit) + 20 [0x3]
+          105 -[NSCollectionView layout] (in AppKit) + 30 [0x4]
+        105 -[NSTextField drawRect:] (in AppKit) + 20 [0x5]
+      201 -[XCTestCase invokeTest] (in XCTest) + 40 [0x6]
+        201 _objc_msgSend (in libobjc.A.dylib) + 50 [0x7]
+      200 -[XCTestCase invokeTest] (in XCTest) + 60 [0x8]
+        200 mach_msg2_trap  (in libsystem_kernel.dylib) + 70 [0x9]
+
+Sort by top of stack, same collapsed (when >= 5):
+        -[NSCollectionView layout] (in AppKit)        105
+        _objc_msgSend  (in libobjc.A.dylib)        201
+        mach_msg2_trap  (in libsystem_kernel.dylib)        200
+
+Binary Images:

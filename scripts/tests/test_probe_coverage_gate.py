@@ -117,7 +117,7 @@ class ProbeCoverageGateTest(unittest.TestCase):
         log = ("Test Case '-[M.T testZulu]' passed (1.000 seconds).\n"
                "Test Case '-[M.T testAlpha]' started.\n"
                "Test Case '-[M.T testMike]' passed (1.000 seconds).\n")
-        order, appeared = execution_order(log)
+        order, appeared, _interleaved = execution_order(log)
         self.assertEqual(["testZulu", "testAlpha", "testMike"], order, "顺序被排序了 ⇒ 量的不是执行序")
         self.assertEqual({"testZulu": True, "testAlpha": False, "testMike": True}, appeared)
         _, reds = analyse(order, {"testZulu": {"runner": "can"},
@@ -130,7 +130,7 @@ class ProbeCoverageGateTest(unittest.TestCase):
 
     def test_execution_order_with_nothing_appearing_is_not_a_vacuous_pass(self):
         """一条都没露面 ⇒ 「前缀」这个问题没有对象，读数必须是"无从判定"而不是 1。"""
-        order, appeared = execution_order("Build complete! (12.3s)\n")
+        order, appeared, _interleaved = execution_order("Build complete! (12.3s)\n")
         self.assertEqual(([], {}), (order, appeared))
         reading, _ = analyse(["testAlpha"], {"testAlpha": {"runner": "cannot", "reason": "r"}}, "")
         self.assertIsNone(reading["prefix"], "空日志把前缀读成 True ⇒ 空洞的真话会冒充结论")
@@ -235,3 +235,45 @@ class ProbeCoverageGateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InterleavedLogTests(unittest.TestCase):
+    """BACKLOG 135（R94 的 M521 那一格）：一份日志里出现第二个写入者时会发生什么。
+
+    来历：`/tmp/ui.log` 是 `swift test > … 2>&1` 的共享通道，R80b 那次是两行被缝成一行，
+    这一次要防的是"同一例的 started 出现在它的结论之后"。第一版的写法把状态改回"未结论"，
+    于是 `未闭口` 凭空 +1 —— 而登记里的成因那句话现在**依据的就是这个数**。
+    现在的处置：结论是粘的，交错本身打成一条有名字的读数（不判红：它是关于日志的，不是关于产品的）。
+    """
+
+    LOG = ("Test Case '-[M.T testA]' started.\n"
+           "Test Case '-[M.T testA]' passed (1.000 seconds).\n"
+           "Test Case '-[M.T testA]' started.\n"
+           "Test Case '-[M.T testB]' started.\n")
+
+    def test_conclusion_is_sticky_and_the_interleave_is_named(self):
+        order, appeared, interleaved = execution_order(self.LOG)
+        self.assertEqual(["testA", "testB"], order)
+        self.assertTrue(appeared["testA"], "结论被后来的 started 抹掉了 ⇒ 未闭口会凭空多一条")
+        self.assertEqual(["testA"], interleaved)
+
+    def test_open_count_is_not_inflated_and_the_reading_is_printed(self):
+        expectations = {"testA": {"runner": "can"},
+                        "testB": {"runner": "cannot", "reason": "r"}}
+        reading, reds = analyse(["testA", "testB"], expectations, self.LOG)
+        self.assertEqual(1, reading["open_not_closed"], "testB 才是唯一没闭口的那条")
+        self.assertEqual(["testA"], reading["interleaved"])
+        self.assertEqual([], reds, "交错是**关于日志**的诊断，不该变成产品红")
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "ui.log")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(self.LOG)
+            exp = os.path.join(tmp, "exp.json")
+            with open(exp, "w", encoding="utf-8") as handle:
+                json.dump({"cases": expectations}, handle)
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = main([path, "--expectations", exp, "--source", str(SOURCE)])
+        self.assertIn(code, (0, 1), "退出码只许是绿或红，2 意味着有一份输入没被读到")
+        text = out.getvalue()
+        self.assertIn("PROBE_ORDER_INTERLEAVED 1 条", text, text)

@@ -147,6 +147,20 @@ jobs:
             # 报告脚本不许再从日志自己猜这件事（R86 猜错过一次，R87 那句猜错的话被 CI 当真读了两遍）。
             alive=$(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null | wc -l | tr -d ' ' || true)
             echo "${alive:-0}" > /tmp/ui-runner-alive
+            # R95 / BACKLOG 132：收掉之前给那条 xctest 拍一份栈（`sample`），于是
+            # "它是挂住了还是只是慢"这句话第一次有了依据，而不是靠"本机 2 秒跑完"外推。
+            # 为什么必须在 kill 之前：进程没了就拍不到栈；为什么写盘而不是 echo：
+            # `sample` 的输出上百行，进步骤正文会淹没旁边那几条读数，而下一步（硬门）要读同一个文件。
+            # `rc=0; … || rc=$?` 而不是 `… || true`：`bash -e` 下裸的 `sample` 失败会当场中止这个子壳，
+            # 于是退出码那一格永远写不出来 —— 那正是"仪器坏了"与"没挂"长得一样的形状。
+            victim=$(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null | head -1 || true)
+            if [ -n "$victim" ]; then
+              rc=0
+              sample "$victim" 2 5 > /tmp/ui-sample.txt 2>/tmp/ui-sample.err || rc=$?
+              echo "$rc" > /tmp/ui-sample-exit
+            else
+              echo none > /tmp/ui-sample-exit
+            fi
             kill -9 -"$pid" 2>/dev/null || true
             kill -9 "$pid" 2>/dev/null || true ) &
           killer=$!
@@ -200,7 +214,9 @@ jobs:
           python3 ../scripts/ui_probe_report.py /tmp/ui.log \
             --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" \
             --pulse /tmp/probe-pulse.log \
+            --sample /tmp/ui-sample.txt \
             || echo "UI_PROBE_REPORT_FAILED=1 报告脚本自己没跑成 ⇒ 『挂死在哪条』这句话今天没有依据，不许读成『探针已点名』"
+          echo "UI_PROBE_SAMPLE_EXIT=$(cat /tmp/ui-sample-exit 2>/dev/null || echo 未量到) （sample 那一步自己的退出码；none=收掉那一刻没找到 xctest）"
           if [ -z "$executed" ]; then
             echo "没有跑完（看门狗在 240s 收掉了进程）：在屏探针在无头 runner 上不可用，记成 R3-D9 的已知边界"
             exit 0
@@ -450,7 +466,8 @@ jobs:
           # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
           python3 scripts/ui_probe_report.py /tmp/ui.log \
             --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" \
-            --pulse /tmp/probe-pulse.log | tee -a /tmp/probe-floor.log \
+            --pulse /tmp/probe-pulse.log \
+            --sample /tmp/ui-sample.txt | tee -a /tmp/probe-floor.log \
             && report_status=0 || report_status=$?
           if [ "${report_status:-0}" != "0" ]; then
             echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"
