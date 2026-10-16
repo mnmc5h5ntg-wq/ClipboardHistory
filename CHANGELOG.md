@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 测试（R91）
+
+- 删掉 `UIInteractionProbeTests.testDragSelectExpandsSelectionInsideTheRealList` 与
+  `MouseSynthesizer.drag`：它测的拖选手势在 D-034 就被决定不做，而它把整卷在屏判据挡在门外 ——
+  合成 `.leftMouseDragged` 一进 `window.sendEvent` 就进 `NSCoreDragManager _dragUntilMouseUp`
+  的模态循环（等窗口服务器的真 mouseUp，抬起排在下游），本机 3/3 次 180 秒收不掉、有结论 0。
+  ⇒ 修完第一次跑到 `心跳=10 executed=10 passed=7 skipped=2 failed=1`。
+- 帧间隔判据加**通道证人**：`CADisplayLink` 空转拿不到 tick 就报 `FRAME_CHANNEL baseline_n=…` 并 skip
+  （这台机器现在显示器睡着 ⇒ 0 个样本不配判产品掉帧，也不配判通过）。地板一条没放宽。
+- 新增机制级守卫 `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession`
+  （扫事件类型 `(.leftMouseDragged`，并要求 `DRAG-LIMIT` / `FRAME_CHANNEL` / 解释块三样都在）。
+- `scripts/probe_coverage_expectations.json` 删掉那条 STALE 登记（是 `probe_coverage_gate` 自己报的）。
+
+### 仪器（R91，仓库外）
+
+- `r91_focus_visual.py`（焦点环/选中带在捕获帧里的可见性）、`mutate_r91_zombie.py`（M505–M509：4 CAUGHT / 1 逃掉（M509，故意）/ 0 没跑成）、
+  `verify_r91.sh`（在屏卷按 CI 原样跑并断言"必须跑到 10 条结论"）。
+
+### Docs（R91）
+
+- BACKLOG **125 结案**（合成拖拽在进程内做不到：撤 + 读数 + 守卫）；93 本机侧结案；
+  92 更新（登记里那句 runner 成因写错，但改口要等下一次 CI）；126 加两格数据点
+  （选中态黑带跨两条离屏路径、焦点环零墨；真机那一腿 NOT-RUN）；新开 **127**
+  （一行两个半宽 `KeyViewProxy`，第一次跑完就红，本轮只点名不定性）。
+
 ### CI（R90）
 
 - 在屏探针的读数文件与捕获卷**分家**（`CLIPBOARD_HISTORY_UI_SHOTS` 换成 `/tmp/shots-probe`）：

@@ -4768,6 +4768,30 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 零产品改动：124 张帧 `CHANGED=0 MISSING=0 ADDED=0`，全量 793 例 / 40 skip / 0 failures。
 
 
+## 第 93 轮 · R91：五轮追的"CI 上一条判据都没跑完"，成因是一条我以为删掉了、其实没删的探针（结案 125 / 新开 127 / U-206…U-210）
+
+- **U-206 台账里的"已完成"断言必须能被机器复查**：D-034 写着"原来那条拖选探针删除并在原位置留了一段解释"——
+  解释在，函数也在。`git log --all -S "func testDragSelect…"` 只有 9d7b5ca 一次增、零次删。
+  ⇒ 一句"已删除 X"以前只能靠人记得；本轮起它由 `probe_coverage_gate` 的 STALE 格管着
+  （清单里有、源码里没有 ⇒ 红），而**这次红是我删完之后它才报的**——门不替我决定，但它把我漏的摆出来。
+- **U-207 "我以为压到阈值内就安全"不是证据**：第一版修法把拖动改成 2pt 微移，栈一模一样、
+  会话照样起来（`_tryCatchDragUntilMouseUp`）。⇒ 改法的第一版也要重跑一遍，能编译不等于成立。
+- **U-208 电池必须把"断言红"与"编译坏"分开**：Swift 卷退出非 0 有两种成因；第一版 M505 写的是
+  `_ = NSEvent.EventType(.leftMouseDragged)`，编译器不认 ⇒ 那会被读成"抓到了"，其实是刀坏了。
+  ⇒ 现在只有"跑起来了且是那条守卫失败"算 CAUGHT，编译错误一律 NOT-RUN。
+  同一轮又踩了一次老账：`python3 … | tail` 之后拿到的 `$?` 是 `tail` 的（U-200 那一族）。
+- **U-209 0 个样本既不能判产品，也不能判"通过"**：`testFrameIntervalsUnderStateChanges` 第一次跑到就红
+  （n=0），而真因是这台机器显示器睡着（`screencapture` 全黑、`UserIsActive 0`）⇒
+  `CADisplayLink` 不发 tick。⇒ 判据先看**采样通道活没活**（`FRAME_CHANNEL baseline_n=…`），
+  没活就报"没跑"并 skip；地板一条没放宽。
+- **U-210 扫描区域必须由被测量自己报**：交叉检查第一版用"整列最暗的 6 行"，量到的是窗口外的黑底
+  ⇒ 那三个数作废。正确做法是用探针自己打印的 `ListTableRowView` 矩形。
+  同一族第三次：R88 列常量错位一整列、R90 参照点被标污染、R91 量到窗外。
+- 牙 M505–M509：4 CAUGHT / 1 逃掉（M509，故意）/ 0 没跑成（M509 故意逃：守卫若退回"扫函数名"就会被改名绕过 ⇒ 钉的是事件类型 `(.leftMouseDragged`）。
+  在屏那一卷第一次跑到结论：`心跳=10 executed=10 passed=7 skipped=2 failed=1`；全量 Executed 801 tests, with 40 tests skipped and 0 failures (0 unexpected) in 144.711 (144.753) seconds| Executed 801 tests, with 40 tests skipped and 0 failures (0 unexpected) in 144.711 (144.754) seconds|；124 张帧对账 `CHANGED=0`；非台账文件 3 个、产品 0 个。
+  新开 **127**（一行两个半宽 `KeyViewProxy`，本轮只点名不定性）；126 加两格数据点
+  （选中态黑带跨两条离屏路径、焦点环零墨）；125 **结案**。
+
 ## 第 92 轮 · R90：心跳通道落地，但那条设计前提被自己的测量推翻了（结案 122 / 新开 125、126 / U-200…U-205）
 
 - **U-200 退出码与尺的身份都要当场核对**：`swift test … | tail -40` 之后拿到的 `SWIFT_TEST_EXIT=0`

@@ -210,6 +210,49 @@ final class SidebarListSelectionTests: XCTestCase {
                        "行里出现了多于一个 Button —— 选中只能由 List 负责")
     }
 
+    /// D-034 那个决定**只管住了产品，没管住探针卷**：`testDragSelectExpandsSelectionInsideTheRealList`
+    /// 在拖选手势被删之后又多活了 6 天（R91 用 `git log --all -S "func testDragSelect…"` 证的：
+    /// 一次增、零次删，而 D-034 的正文写着"删除并在原位置留了一段解释"）。
+    /// 它现在的实际作用不是"判错产品"，而是**把整卷在屏判据挡在门外**：
+    /// `window.sendEvent(.leftMouseDragged)` 会进
+    /// `NSCoreDragManager _tryCatchDragUntilMouseUp → _dragUntilMouseUp →
+    /// CoreDragStartDraggingAsync → _BlockUntilNextEventMatchingListInMode`（R91 的 `sample` 栈），
+    /// 而"抬起"那一行代码排在它的**下游** ⇒ 进程内无解。
+    /// **连 2pt（阈值内）的微移都一样**：R91 先按"压到阈值内就安全"改了探针，实测栈完全相同、
+    /// 会话照样起来 ⇒ 那条自以为安全的修法被自己的测量撤掉了。
+    /// ⇒ 这条守卫钉的是"探针卷不许再发一颗拖拽事件"。它扫的是**事件类型**而不是函数名
+    ///   （函数名会被改名绕过），并且扫之前先滤注释行 —— 探针文件里那几句解释**必须**留着，
+    ///   不滤就会红在自己人的话上（"锚点撞上注释"那一族的第三次）。
+    func testProbeSuiteNeverSynthesizesADragSession() throws {
+        let raw = try testSource(named: "UIInteractionProbeTests.swift")
+        let probe = codeOnly(raw)
+        XCTAssertTrue(raw.contains("testDragSelectExpandsSelectionInsideTheRealList"),
+                      "探针文件里那段'为什么删掉拖选探针'的解释不见了 ⇒ 这条守卫失去依据，"
+                      + "而下一次有人想把探针加回来时没人拦得住")
+        XCTAssertTrue(raw.contains("DRAG-LIMIT"),
+                      "限制本身没被读数化：撤掉合成拖拽必须留下一行可 grep 的 DRAG-LIMIT，"
+                      + "否则下一轮只能靠人记得这里为什么少一条判据")
+        XCTAssertTrue(raw.contains("FRAME_CHANNEL"),
+                      "帧采样通道那颗证人没了：CADisplayLink 在显示器睡着/无头会话上一帧都不发，"
+                      + "没有 FRAME_CHANNEL 这一行，0 个样本会被读成一次产品掉帧的红（R91 本机就是这形状）")
+        XCTAssertFalse(probe.contains("(.leftMouseDragged"),
+                       "在屏探针卷里又发出了拖拽事件：它一进 sendEvent 就把整卷卡死在 CoreDrag 的"
+                       + "模态循环里（抬起排在阻塞点下游，进程内无解）。行拖选/拖出请走人工验收")
+        XCTAssertFalse(probe.contains(".drag(from:"),
+                       "探针卷里又出现了合成拖拽的调用点 ⇒ 见上一条同一机制")
+    }
+
+    private func testSource(named fileName: String) throws -> String {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<4 {
+            let url = candidate.appendingPathComponent("ClipboardHistoryAppTests", isDirectory: true)
+                .appendingPathComponent(fileName)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw XCTSkip("找不到 Tests/ClipboardHistoryAppTests/\(fileName) ⇒ 这条守卫没在量任何东西")
+    }
+
     private func sidebarSource() throws -> String {
         try productSource(named: "Views/HistorySidebarView.swift")
     }

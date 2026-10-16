@@ -4850,3 +4850,26 @@ R64 早就量过 stdout 会**整块丢**，并为它建了第二条文件通道�
 - 不许的处置：把心跳退回 stderr（本轮已量掉）；为了过 `Capture gate` 把捕获卷的读数改成
   追加而不重写（那是拿产品行为讨好夹具）；拿"本轮 7 个非台账文件"当下一轮的默认值；
   或者把 125 与 126 混成一条"探针不稳定"—— 一条是挂死机制，一条是捕获通道可信度。
+
+### D-149（R91）合成拖拽在 `window.sendEvent` 这条路径上做不到；限制要打成读数并被守卫钉住
+
+- 背景：从 R86 追到 R90 的"CI 上在屏那一卷 `executed: 0`"，本机三遍复现同一形状
+  （180 秒被掐、心跳 2 条、有结论 0 条），`sample` 给出栈：
+  `sendEvent → _NSGestureEnvironment → NSCoreDragManager _tryCatchDragUntilMouseUp →
+  _dragUntilMouseUp → CoreDragStartDraggingAsync → _BlockUntilNextEventMatchingListInMode`。
+  CoreDrag 等的是**窗口服务器**的真 mouseUp，而探针把 mouseUp 排在 `sendEvent` 的下游 ⇒ 进程内无解。
+  而这条探针测的手势 D-034 六天前就决定不做（用户真机反馈：`List` 会把行内任何 `.onDrag`
+  提升成整行拖拽源，拖选与拖出不能共存，取舍是保拖出）。
+- 决定：① 删掉 `testDragSelectExpandsSelectionInsideTheRealList` 与 `MouseSynthesizer.drag`
+  （工具留着就会被复用），原位置留解释块；② OBSERVE 那一条里的合成拖拽撤掉，改成一行
+  `DRAG-LIMIT` 读数 —— 限制必须可 grep，不许只写在注释里；③ 新增机制级守卫
+  `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession`：扫**事件类型**
+  `(.leftMouseDragged`（改名绕不过），并要求 `DRAG-LIMIT`、`FRAME_CHANNEL`、解释块三样都在；
+  ④ 帧采样判据加通道证人：空转拿不到 tick ⇒ 报 `FRAME_CHANNEL baseline_n=0` 并 skip，
+  地板（n>60 / p95≤20 / worst≤120）一条不放宽；⑤ 覆盖登记里那一行由门自己报 STALE 之后删。
+- 为什么"删测试"这次不是绕开检查：这条判据断言的行为是产品**决定不做**的（D-034 且有静态守卫
+  `testNoCompetingDragSelectGestureRemains` 钉着），它永远不可能通过；它留在树上的净效果是
+  把其余 10 条在屏判据挡在门外。删它 = 恢复 10 条判据，同时把那条决定换成更硬的机制级守卫。
+- 不许的处置：为了 CI 绿去改 `testSidebarListFocusRingAfterClick` 的几何期望（那是 127，未定性）；
+  拿本机"10 条结论"去替覆盖登记里"runner 上跑不了"那十行改口（下一次 CI 的读数才配）；
+  或者把 `DRAG-LIMIT` 撤掉当作限制不存在 —— 那样下一轮又会长出第二条挂死的探针。

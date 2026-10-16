@@ -276,6 +276,19 @@ final class UIInteractionProbeTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.6))
         let baseline = meter.stats()
 
+        // **采样通道必须先证明自己活着，才有资格判产品。**`CADisplayLink` 在显示器睡着
+        // 或无头会话上一帧都不发 ⇒ `deltas` 空 ⇒ `loaded.n == 0`，而 0 会被下面那条
+        // "帧样本太少，结论无效"读成一次产品红。R91 本机就是这个形状：这一条第一次跑到
+        // （以前整卷被拖选探针挡在门外，它从没结论过），读到 n=0，而同一台机器
+        // `screencapture` 返回全黑、`pmset` 报 `UserIsActive 0` ⇒ 坏的是仪器，不是产品。
+        // ⇒ 空转那 0.6 秒就是证人：它一颗 tick 都没拿到 ⇒ 报"没跑"并 skip（有名字的未覆盖），
+        //   而不是拿 0 个样本去判 60fps。
+        emit("FRAME_CHANNEL baseline_n=\(baseline.n) screen=\(NSScreen.main == nil ? "nil" : "有")")
+        try XCTSkipIf(baseline.n == 0,
+                      "CADisplayLink 在 0.6s 空转里一帧都没发 ⇒ 这台机器现在没有可采的显示刷新"
+                    + "（显示器睡着/无头会话）。这一格是**没跑**，不是产品掉帧；"
+                    + "不许靠放宽下面那条地板来「通过」它")
+
         var phase = 0
         let deadline = Date().addingTimeInterval(3.2)
         var nextStep = Date()
@@ -462,7 +475,18 @@ final class UIInteractionProbeTests: XCTestCase {
         mouse.click(at: lastRow.body)
         mouse.click(at: lastRow.body, clickCount: 2)
         mouse.click(at: lastRow.leading)
-        mouse.drag(from: firstRow.body, through: [rows[1].body, rows[2].body], to: rows[3].body)
+        // 这里**原来**是一次合成拖动，R91 把它撤掉了，而且是**量出来撤的**：
+        // `window.sendEvent(.leftMouseDragged)` 会进
+        // `NSCoreDragManager _tryCatchDragUntilMouseUp → _dragUntilMouseUp →
+        //  CoreDragStartDraggingAsync → _BlockUntilNextEventMatchingListInMode`（`sample` 的栈），
+        // 而"抬起"那一行排在这次的**下游** ⇒ 进程内没有解。
+        // 我原本以为把位移压到 2pt（阈值内）就能绕开 —— 实测**不行**：栈一模一样，
+        // 会话照样起来（`_tryCatchDrag…` 这个名字本身就说明它在"抢"这次拖动）。
+        // ⇒ 合成拖拽在这条路径上做不到，整条撤掉，并把限制打成一行可 grep 的读数，
+        //   由 `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession` 钉住
+        //   （它扫的是事件类型 `.leftMouseDragged`，机制级，不靠"有没有那个函数名"）。
+        emit("DRAG-LIMIT 合成拖拽不可行：任何 .leftMouseDragged 都会让 sendEvent 进 CoreDrag 模态循环"
+             + "（R91 实测，含 2pt 阈值内的微移）⇒ 行拖选/拖出的行为验收改由人工，见 D-034 与手工清单第 2 节")
         emit("OBSERVE 点/双击/星标/拖选之后：选中变化=\(store.selectedEntry?.id != selectedBefore) "
             + "选中数=\(store.selectedCount) 收藏+\(store.entries.filter(\.isFavorite).count - favoriteBefore) "
             + "复制+\(writer.writtenContents.count - writesBefore) lastClick=\(NSStringFromPoint(mouse.lastClickPoint))")
@@ -825,66 +849,22 @@ final class UIInteractionProbeTests: XCTestCase {
         return found
     }
 
-    /// D-1 的验收本体：**从第 1 行按下、拖到第 4 行，选中集必须扩到 4 行**。
-    ///
-    /// 审计给的验收是"真机 2 分钟"。合成事件能做到的是把 down / dragged…/ up 三段真的投进
-    /// 那扇在屏窗口的真实列表里，再看 store 的选中集合 —— 这与"整行挂 onDrag 时拖选失效"
-    /// 是可区分的形状：争用发生时选中集只会停在按下那一行。
-    /// 行 y 坐标**取自每行的星标代理**（每行恰好一个 20×20），不靠"行高应该是多少"猜 ——
-    /// 这一族探针已经两次因为按猜的几何点而误报产品缺陷。
-    func testDragSelectExpandsSelectionInsideTheRealList() throws {
-        try skipUnlessEnabled()
-        let store = HistoryStore(
-            clipboardWriter: TestClipboardWriter(),
-            persistence: RecordingHistoryPersistence(),
-            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
-        )
-        for index in 0..<8 {
-            store.add(ClipboardIntake.Entry(
-                content: .text("拖选探针第 \(index) 条记录"), thumbnail: nil,
-                sourceUTIs: ["public.utf8-plain-text"]
-            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
-        }
-        _ = NSApplication.shared
-        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
-                              styleMask: [.titled], backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
-        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
-        host.autoresizingMask = [.width, .height]
-        window.contentView = host
-        window.makeKeyAndOrderFront(nil)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        defer { window.orderOut(nil) }
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-
-        let mouse = MouseSynthesizer(window: window)
-        let rows = try sidebarRowPoints(in: host, count: 4)
-        let table = try XCTUnwrap(Self.firstTable(in: host))
-        emit("DRAGSELECT 行矩形=\(rows.count) 首行 body=\(NSStringFromPoint(rows[0].body))")
-
-        let before = store.selectedCount
-        mouse.drag(from: rows[0].body, through: [rows[1].body, rows[2].body], to: rows[3].body)
-        emit("DRAGSELECT 拖之后选中=\(store.selectedCount) clickedRow=\(table.clickedRow) "
-            + "selectedRows=\(table.selectedRowIndexes)")
-
-        // 判据是**有条件的**：表格收到了这一下（clickedRow 不是 -1）才谈产品；
-        // 没收到就是合成事件的限制，不许拿它判缺陷，也不许悄悄 skip 到看不见 ——
-        // 限制本身要打印出来并写进手工清单。
-        if table.clickedRow < 0 && store.selectedCount == before {
-            emit("DRAGSELECT-LIMIT 合成拖动没有送到 NSTableView（clickedRow=-1），"
-                 + "这条验收改由人工：真机在含 5 条文本的列表里从第 1 行按下拖到第 4 行，选中集应扩到 4 行")
-            throw XCTSkip("合成鼠标事件驱动不了表格行选中（本轮实测），见 D-033 与手工清单第 2 节")
-        }
-        XCTAssertGreaterThanOrEqual(store.selectedCount, 4,
-                                   "从第 1 行按下拖到第 4 行，选中集只扩到 \(store.selectedCount) 行 —— "
-                                   + "这正是 D-1 的形状：拖出会话在阈值处抢走了这次拖动")
-    }
-    // D-1 原本在这里有一条拖选探针（从第 1 行按下拖到第 4 行，断言选中集扩到 4 行）。
-    // 它随账本 D-034 一起删除：真机验证 `List` 会把行内任何 `.onDrag` 提升成整行拖拽源，
-    // 于是拖选与拖出在系统列表里不能共存，取舍是保留拖出、放弃拖选，
-    // 所以这个手势在产品里已经不存在了 —— 留一条永远点不出效果的探针就是留一个假闸门。
-    // 它当初也没真的门住过什么：合成事件驱动不了表格（见上一条探针里的 OBSERVE 行）。
+    // 这里**曾经**有一条 `testDragSelectExpandsSelectionInsideTheRealList`（从第 1 行按下拖到第 4 行，
+    // 断言选中集扩到 4 行）。R91 把它删掉，两条理由都是量出来的：
+    // ① 它测的手势在产品里**不存在** —— D-034（用户真机反馈后决定）保留整行拖出、放弃拖选，
+    //   并且明写"原来那条拖选探针删除并在原位置留了一段解释"。**那句话与代码矛盾**：
+    //   `git log --all -S "func testDragSelect…"` 只有 9d7b5ca 一次增、零次删 ⇒ 它从没被删过，
+    //   台账与代码在这里对不上 6 天（2026-10-10 → 10-16，R91 才发现）。
+    // ② 它是**在屏那一卷一条结论都出不来的直接成因**：`MouseSynthesizer.drag` 把 mouseUp
+    //   排在 `window.sendEvent(.leftMouseDragged)` **之后**，而这一次 sendEvent 会进
+    //   `NSCoreDragManager _dragUntilMouseUp` 的模态循环 —— 等的是窗口服务器的一颗真 mouseUp。
+    //   也就是"结束会话的那一行代码在会话阻塞点的下游"，进程内无解
+    //   （R90 的 `sample` 栈 + R91 本机 3/3 次都停在同一条用例：心跳 2 条、有结论 0 条，见
+    //   `.scratch/motion-audit-2/r91_findings_zombie_probe.md`）。
+    // ⇒ 删它不是"删测试绕开检查"：这条探针永远不可能通过（产品没有这个手势），
+    //   而它挡住的是**其余 10 条**在屏判据。D-034 那个决定改由
+    //   `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession` 钉住：
+    //   以后谁再往探针卷里塞合成拖拽就会红，红话里写着为什么。
 
     func testSidebarListFocusRingAfterClick() throws {
         try skipUnlessEnabled()
@@ -1272,21 +1252,6 @@ final class UIInteractionProbeTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.08))
         }
 
-        /// 按下 → 依次经过 via → 在终点抬起：一整段拖动共用一个 eventNumber。
-        func drag(from start: NSPoint, through via: [NSPoint], to end: NSPoint) {
-            session += 1
-            let number = session
-            send(.leftMouseDown, at: start, clicks: 1, number: number)
-            RunLoop.main.run(until: Date().addingTimeInterval(0.03))
-            for point in via {
-                send(.leftMouseDragged, at: point, clicks: 1, number: number)
-                RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-            }
-            send(.leftMouseDragged, at: end, clicks: 1, number: number)
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-            send(.leftMouseUp, at: end, clicks: 1, number: number)
-            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-        }
 
         private func send(_ type: NSEvent.EventType, at point: NSPoint, clicks: Int, number: Int) {
             guard let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],

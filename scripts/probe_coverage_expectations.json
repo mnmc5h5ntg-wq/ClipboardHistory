@@ -1,5 +1,6 @@
 {
   "_comment": "在屏探针（UIInteractionProbeTests）的覆盖登记，配合 scripts/probe_coverage_gate.py 用。R62 / BACKLOG 92 的由来：R61 给侧栏「跟随选中揭示」写的三条行为判据全住在这卷里，而 CI 上一条都没跑完，CI 却仍是绿的 —— 因为那一步把整卷缺席写成了一句已知边界就 exit 0。现在每加一条在屏判据都必须在这里登记它今天跑不跑得了、以及跑不了的理由；登记过期（用例没了）或反过来（说跑不了却跑到了）都会红。",
+  "_r91": "R91 删掉了 `testDragSelectExpandsSelectionInsideTheRealList` 这条登记 —— 不是绕过检查：它测的拖选手势在 D-034 就被决定不做（而 D-034 写着\"这条探针已删除\"，`git log --all -S` 证明它从没被删，见 U-206），并且它就是\"CI 上 executed:0\"追了五轮的那个成因（合成 .leftMouseDragged 一进 sendEvent 就进 CoreDrag 模态循环，抬起排在下游，本机 3/3 挂死）。删掉之后本机第一次跑到 10 条结论（心跳 10 / passed 7 / skipped 2 / failed 1）。⇒ 注意：其余登记的 reason 里那句\"无头 runner 上整卷在第一条结论之前就被收掉\"**成因写错了**，真正的成因是这条僵尸探针；但\"runner 上今天能不能跑到\"仍然是下一次 CI 的读数，不许拿本机结果替它改登记（probe_coverage_gate 会在\"说跑不了却跑到了\"时红，那时再逐条重登记）。",
   "evidence": {
     "run": "38603034761",
     "reading": "ui suite exit: 137  executed: 0  已下结论的用例: 0"
@@ -30,10 +31,6 @@
       "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
     },
     "testIntakeBehindATallPinnedBlockRevealsTheNewRow": {
-      "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
-    },
-    "testDragSelectExpandsSelectionInsideTheRealList": {
       "runner": "cannot",
       "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
     },
