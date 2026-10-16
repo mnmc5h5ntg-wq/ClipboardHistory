@@ -585,6 +585,24 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// `药丸中行=44…795 / 灰带中行=44…795`，差 0px）。
     static let hoverFillInset: CGFloat = 10
 
+    /// 搜索框的字站在**列表自己的那一列**里（BACKLOG 148 / R104 的产品改动）。
+    ///
+    /// 改之前实测（`quickpick-list-420x300` 亮/暗、`quickpick-typed-420x300` 暗，2×）：
+    /// 同一张 420pt 面板里从上到下三条左轴是 **搜索文字 12.5pt → 药丸 22.0pt → 行内图标 35.5~37.5pt**
+    /// ⇒ 占位语「搜索历史记录…」比它正下方那一列的**可见边**往左突出 9.5pt，
+    /// 那一行字像贴在面板毛边上，不站在列表自己的列里。暗档打了字之后更难看：
+    /// 选中那两三个字的高亮框直接压在面板边上（本轮逐张看帧看到的）。
+    ///
+    /// 为什么取 `hoverFillInset` 而不是再定一个数：**这一格里"列表的列"就是那颗药丸的左沿**，
+    /// 而药丸的左沿 = 表格前缘 12pt + 这个 10pt。两处各写一个常数，就是"同一件事有两个地方能改它"
+    /// （R3 那一族）。改完之后判据读的是**帧上药丸自己的左沿**，不是这两个常数 ——
+    /// M367 那一课：拿被约束的常量推期望值，改常量等于同时改了判据。
+    ///
+    /// 为什么不反过来（把整列内容左移到 12.5）：那 10pt 是系统给行选中/悬停留的内缩，
+    /// 想抹掉它要 `table.style = .plain`，而那是 macOS 13+ 的 API ⇒ 12 上抹不掉，
+    /// 同一扇浮层会在两个系统版本上给出两条轴 —— 比现在这一条更坏。
+    static let searchFieldLeadingInset: CGFloat = hoverFillInset
+
     /// 灰带的圆角。**这一档是被判据教出来的，不是我挑的**：
     /// 第一版直角（逐行内缩跨度 0px）、第二版 6pt（量到 8px），两版都被
     /// `testOverlayHoverFillSharesTheSelectionPillsOutline` 判红 ——
@@ -758,9 +776,49 @@ final class HoverFillView: NSView {
 final class QuickPickSearchField: NSTextField {
     var forwarding: ((NSEvent) -> Bool)?
 
+    /// 文本左内缩走 cell，不走约束：这颗字段是 `NSStackView` 的 arranged subview，
+    /// 它的前缘已经被 stack 以 required 优先级钉死，再加一条 leading 只会与它打架
+    /// （R63 那一族的实测形态就是"面板只剩一角"）。
+    override class var cellClass: AnyClass? {
+        get { QuickPickSearchFieldCell.self }
+        set { }
+    }
+
     override func keyDown(with event: NSEvent) {
         if forwarding?(event) == true { return }
         super.keyDown(with: event)
+    }
+}
+
+/// 只干一件事：把文本矩形往右推 `QuickPickController.searchFieldLeadingInset`，
+/// 让占位语与打出来的字都站在列表自己的那一列里（BACKLOG 148）。
+///
+/// 为什么只碰 `drawingRect` / `edit` / `select` 而不碰 `titleRect`：
+/// `NSCell.drawingRect(forBounds:)` 的超类实现本身会去问 `titleRect`，
+/// 两处都加一次内缩就会**被加两遍**（这一格不是推理，是写完立刻用帧上的读数验的 ——
+/// 判据 `QUICKPICK_SEARCH_AXIS` 读的是药丸自己的左沿，不是这两个常数）。
+final class QuickPickSearchFieldCell: NSTextFieldCell {
+    private func insetted(_ rect: NSRect) -> NSRect {
+        let inset = QuickPickController.searchFieldLeadingInset
+        guard inset > 0, rect.width > inset else { return rect }
+        return NSRect(x: rect.minX + inset, y: rect.minY,
+                      width: rect.width - inset, height: rect.height)
+    }
+
+    override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        insetted(super.drawingRect(forBounds: rect))
+    }
+
+    override func edit(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
+                       delegate: Any?, event: NSEvent?) {
+        super.edit(withFrame: insetted(rect), in: controlView, editor: textObj,
+                   delegate: delegate, event: event)
+    }
+
+    override func select(withFrame rect: NSRect, in controlView: NSView, editor textObj: NSText,
+                         delegate: Any?, start selStart: Int, length selLength: Int) {
+        super.select(withFrame: insetted(rect), in: controlView, editor: textObj,
+                     delegate: delegate, start: selStart, length: selLength)
     }
 }
 

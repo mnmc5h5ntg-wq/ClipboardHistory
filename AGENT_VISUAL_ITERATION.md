@@ -9461,3 +9461,111 @@ CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=有 卡片段=1 墨行=24 �
 3. **155**（runner 上运动地板 `32.19 > 23.48`）：先问成因再动手 —— 把两个臂的**绝对**间隔与机器信息打进行内读数。
 4. **156**（`cardRun` 在页底/卡片只差 8 灰阶的机器上是抛硬币）：三条候选都写了，都不许在没实测之前动产品。
 5. 真机那一侧（批次 26.x–81.2、126/130/136/139/149、148①）本轮仍然一格没动 —— 它需要用户，不需要我。
+
+## Round 104 · 浮层那条左轴终于站进列表里（结案 148），而 150 拿到的答案是"臂 2 在那台机器上根本没有对象"（新开 157 / U-314…U-318 / D-169 / 变异表 r104 四刀 M577–M580）
+
+### 1. 开场清单（本轮对象：快速选择浮层从上到下每一条左轴；数字来自判据与逐像素复算）
+
+| 对象（pt 坐标，面板 420×300） | 改前 | 改后（本机两档一致） |
+|---|---|---|
+| 搜索那一行的第一个墨列 y≈12..30 | **12.5** | **22.5**（与药丸差 1px） |
+| 选中药丸（第 0 行）左沿 y≈44..78 | 22.0 | 22.0（没动，它是参照物） |
+| 行内图标那一列 | 35.5~37.5 | 35.5~37.5（没动） |
+| 行标签 minX（视图树） | 42.0（相对表格） | 42.0（没动） |
+
+开场缺陷清单：① 148 那条 9.5pt 错位（本轮修）；② 150 等 runner 读数（本轮读到，转成 157）；
+③ 155 那条"runner 上稳定红"的说法要按实降级为偶发（本轮更正）；④ 真机那几格（批次 26.x–81.2、126/130/136/139/149、148①）本轮仍不动。
+
+### 2. 读 R103 的 CI：证人修好之后，150 第一次有答案，而答案不是我们猜的那三种里的任何一种
+六行读数与判法在 `.scratch/motion-audit-2/r103_ci_readings_v2.md`。三句话：
+① 臂 1 与臂 0 两档逐字同读数 ⇒ **`ScrollView` 不吃材质**；
+② 臂 2 两档 `墨像素=0 最大偏离=0/2` ⇒ **那一条带子里什么都没画**，所以"分栏吃掉材质"没被证明也没被否；
+③ 被告 24 格照旧无材质 ⇒ 范围收窄到"真侧栏那一列 / `Settings` 场景 / 窗口样式"，
+   而唯一覆盖它们的臂 2 现在被 **157** 卡住（一次 CI 就能分清三种成因的实验已写在 157 里）。
+剩下两朵红带着成因数字，是对的，不许放宽。步骤 16 这一遍没红 ⇒ 155 的口径按实降级（U-317）。
+
+### 3. 148：轴取哪一条，是一个判断；取完之后所有数都要能钉住
+选 **药丸的左沿**，不选行边界：行边界在这张帧上不可见，而"那一列"是用户看得见的那个东西。
+反向方案（整列左移到 12.5）需要 `table.style = .plain`，那是 macOS 13+ ⇒ 12 上抹不掉，
+同一扇浮层会在两个系统版本给出两条轴，比现在更坏（这一条是**决定不做什么**的出处）。
+实现落在一个常数上，且那个常数与药丸同源（`hoverFillInset`）——两处各写一个数就是"同一件事有两个地方能改它"。
+**判据不许读那个常数**（M367 那一课）：它读的是同一张帧上药丸自己的左沿，
+所以 M577 撤掉常数时它红在 19px，而不是跟着常数一起安静地绿。
+
+### 4. 看图那一腿（本轮有产品像素改动，逐张看了改前/改后）
+- `quickpick-typed-420x300-dark.png` 改前：「访达」的选中高亮框**压在面板左边**，与下面那一列断开；
+  改后：字站进药丸那一列，整块读起来是"列表的标题行"。148 那句"像贴在毛边上"由画面判掉。
+- `quickpick-list-420x300-light.png`：占位语与药丸左沿对齐后，浮层只剩一条左轴（图标那一列是列内的第二档，合理）。
+- `cardprobe-split-groupbox-720x140-dark.png`（参照臂）：本机材质清楚可见 ⇒ 与 runner 的"整带空白"形成对照，
+  这一对差异就是 157 要问的东西 —— 不是产品差异，是**那台机器上这棵视图有没有被画出来**。
+
+### 5. 判据为什么必须换通道（本轮最贵的一格方法账）
+第一版照 R67 走 live rep ⇒ 搜索那一行**一个 alpha ≥ 0.5 的像素都没有**，等式的另一边不存在（U-314）。
+换到落盘 PNG 之后字与灰带同时都在。同一扇浮层在两条通道上有两种事实：
+live rep 有 alpha（能分清"那层灰抬了多少"），PNG 有合成后的字与色（能分清"谁与谁同轴"）。
+**用哪条取决于判据问的事落在哪个量上，不取决于上一判据用了哪条。** 规矩进 D-169。
+
+### 6. 本轮自己坏的
+- **U-316**：用下一节的函数签名行当 old_string 做"插入" ⇒ 那条既有测试的签名被吃掉。
+  改完立刻 grep 函数名才发现（同一族在 R100 吃掉的是 `## Round 99` 标题行）。
+  固定动作：**锚点行必须原样出现在 new_string 里**。
+- **U-315**：真值表第 ⑥ 格我写了"参照色给错 ⇒ 读不到"，实测尺子给的是 `(left: 0, top: 0, bottom: 满高)`
+  —— 一个看起来完全正常的数。期望要量出来，不能想出来（与 U-309 同族，第二次）。
+- **U-317 / U-318** 各一格：一次样本不能说成"稳定"；`材质=无` 没有 `最大偏离` 陪着就差点被读成答案。
+
+### 7. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 93 | 浮层那条轴现在与系统给行选中的内缩同档（22.0pt = 12 + 10），没有借外部常数；改的是自己那一列，不是去仿别家 |
+| 层级与秩序 | 92 | 搜索行从"贴在面板毛边"变成列表的标题行；浮层从三条左轴收成一条主轴 + 列内一档 |
+| 动效恰当 | 91 | 零动效改动；也不借这一改硬塞 hover/淡入（浮层是热键入口，M3 那条定稿仍然成立） |
+| 状态完备 | 91 | 四态 × 两档共 8 张帧全部换哈希并重新钉住；空态那句居中文字经核对没被挪轴（stack 对称内缩，中心不变） |
+| 细节打磨 | 92 | 0.5pt 的字形余距被说出来而不是藏进容差；两道地板各配一刀反向牙；参照物有正对照 |
+| 克制 | 94 | 产品一个常数 + 一个 cell 子类；判据一个文件；明确写了"为什么不做反向方案" |
+| 一致性 | 85 | 三条同名族复发/新犯：把既有测试签名行吃掉（U-316，与 U-278 同族）、真值表期望靠想（U-315，与 U-309 同族）、一次样本说成稳定（U-317）。做对的一格：150 的分支没有靠猜，是证人带着成因数把它否掉的 |
+
+**均分 91.1**（最低 85 = 一致性；其余全过 90）。
+
+### 8. 验证（13 格，数字全部由 `ledger_rows.py` 从 `r104_verify.log` 解析）
+
+| 格子 | 读数 |
+|---|---|
+| 构建 | `BUILD_EXIT=0 BUILD_WARNING_LINES=0` |
+| 全量测试 | `TEST_EXIT=0 最后一行汇总: 	 Executed 818 tests, with 41 tests skipped and 0 failures (0 unexpected) in 181.337 (181.382) seconds` |
+| 在屏那一卷 | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.466 (15.468) seconds` |
+| 捕获卷 | `CAPTURE_EXIT=0 帧数=134 目录内文件=135` |
+| 帧基线 | `FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=134 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0` |
+| 脚本电池 | `PY_EXIT=0 Ran 218 tests in 11.809s OK` |
+| 变异表 | `MUT_EXIT=0 跑了=13 期望=13 表=r95_rhythm r94_order r96_triage r97_card r98_seed r98_card r99 r100 r100b r101 r102 r103 r104 | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r99(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r100(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r100b(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r101(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r102(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r103(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r104(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0` |
+| 台账编号守卫 | `LEDGER_EXIT=0 Ran 9 tests in 0.033s OK` |
+| 曲线仪器 | `VIS_EXIT=0 ROUNDS=105  first=1  last=104 CURVE_DERIVED=95,96,97` |
+| 断言包含对账 | `CONTAIN_EXIT=0 0` |
+| 摘要缺值 | `SUMMARY_MISSING=0` |
+| 总结论 | `VERIFY_OK=1` |
+| 本轮读数（7 行，原样搬运） | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.466 (15.468) seconds`；`CARD_PROBE_ARM cardprobe-groupbox-default light 材质=有 卡片段=1 墨行=24 墨像素=1582 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt`；`CARD_PROBE_ARM cardprobe-scroll-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1457 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt` |
+
+ROWS_TOTAL=13 ROWS_MISSING=0
+=== 本轮读数全量（贴进 §8 下面那一节，别改数字） ===
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.466 (15.468) seconds
+CARD_PROBE_ARM cardprobe-groupbox-default light 材质=有 卡片段=1 墨行=24 墨像素=1582 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1457 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-split-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1272 最大偏离=206 参考条墨行=0 带子=170..720pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-groupbox-default dark 材质=有 卡片段=1 墨行=24 墨像素=1777 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1618 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1425 最大偏离=185 参考条墨行=0 带子=170..720pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+
+
+**这一格的读法**（三行）：
+
+- 派生数字是算出来的：TABLES=13  合计刀数=59  caught=59  intended_escaped=0  mismatch=0  not_run=0（R103 是 55 刀 ⇒ 本轮 +4 = M577–M580；`mismatch=0 not_run=0`，且第一遍的 `VERIFY_OK=0` 红在 `BUILD_WARNING_LINES=2` —— 两条 warning 是本轮新判据里一个没用上的 `let store`，删掉之后重跑整卷才绿，**没有把告警数放宽**（U-319）。）
+- 帧基线这一行是本轮**有**产品改动的凭据：`COMPARED=134 CHANGED=0` 说的是「重新拍一遍与已提交基线一致」，而基线本身在本轮换了 8 条哈希（4 态 × 两档 quickpick），所以这两句要一起读：换的是那 8 条，其余 126 条逐字节未动。
+- ROUNDS 行：VIS_EXIT=0 ROUNDS=105  first=1  last=104 CURVE_DERIVED=95,96,97 （曲线仪器把 Round 104 收进去了 ⇒ `last=104`；本轮自评 91.1）。
+
+### 9. 下一轮（R105）的入口
+1. **157**：臂 2 在 runner 上为什么整带空白 —— 两行新读数（详情列的视图树包围盒 + 整窗带子的 `墨行/最大偏离`），一次 CI 分三种成因。
+2. **150**：等 157 之后再回到"哪一层容器吃掉材质"；范围已收窄到 真侧栏 / `Settings` 场景 / 窗口样式。
+3. **155**：先要一次"同一版重跑两遍"的分布，再谈成因（本轮已把它从"稳定红"更正为偶发）。
+4. 浮层剩余位点：搜索框**没有可见的框**（改完之后那一行只是浮在面板上的字）—— 要不要给一条底/描边，
+   是 148 结案后自然长出来的下一格，需要真机 key 窗口那一格（焦点环）一起判，先记进 149 那族。
+5. 真机那一侧仍然欠着（批次 26.x–81.2 与本轮新增的 82）。

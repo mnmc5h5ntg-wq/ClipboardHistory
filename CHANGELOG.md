@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R104）
+
+- **快速选择浮层：搜索那一行的字挪进列表自己那一列**（BACKLOG 148 结案）。
+  改之前本机实测：占位语「搜索历史记录…」的第一个墨列在 **12.5pt**，而它正下方那颗选中药丸的左沿在
+  **22.0pt** ⇒ 那一行字比整列的可见边往左突出 9.5pt，像贴在面板毛边上（暗档打了字之后，
+  选中那两三个字的高亮框直接压在面板边上 —— 这是逐张看帧看到的）。
+  改之后两档一致：`药丸左沿=22.0pt 搜索第一列墨=22.5pt 差=1px`（那 0.5pt 是字形左余距）。
+  实现是一个常数：`QuickPickController.searchFieldLeadingInset = hoverFillInset`（与药丸同源），
+  落在新的 `QuickPickSearchFieldCell` 的 `drawingRect` / `edit` / `select` 上。
+  **为什么走 cell 不走约束**：那颗字段是 `NSStackView` 的 arranged subview，前缘已被 required 优先级钉死
+  （R63 那一族的实测形态就是"面板只剩一角"）。
+  **为什么不反过来把整列左移到 12.5**：那 10pt 是系统给行选中的内缩，要抹掉得用
+  `table.style = .plain`（macOS 13+）⇒ 12 上抹不掉，同一扇浮层会在两个系统版本给出两条轴，比现在更坏。
+- **帧**：8 张 quickpick 帧换哈希（`-empty` / `-hover` / `-list` / `-typed` × 亮暗），其余 126 张逐字节不变；
+  `update` 与判据同提交。
+
+### 判据与工具（R104）
+
+- **新像素判据** `testQuickPickSearchLineSharesTheRowsColumn`：等式两边都是**同一张帧上的可见物**
+  （药丸左沿 vs 搜索行的第一个墨列），参照物不是面板边、也不是那个被约束的常数（M367 那一课）。
+  三条断言各拦一种错：参照物存在、参照物真的是那颗内缩过的药丸（15…30pt 的正对照）、等式本身 ≤2px。
+  **为什么走落盘 PNG 而不是 R67 那条 alpha 通道**：实测那条通道上搜索那一行**一个 alpha ≥ 0.5 的像素都没有**
+  ⇒ 等式的另一边不存在（U-314 / D-169）。
+- **两颗新尺**（纯函数 + 六格真值表 `testOverlayPillAndStripRulersReadStructure`）：
+  `overlayPill`（结构判据：连续、宽度 ≥ 帧宽 55%、与页底差 ≥ 12 灰阶；左沿取中位数；读不到返回 **nil 不是 0**）、
+  `firstInkColumnInStrip`（沿用 R24 的 `isTextInk` 与"离背景足够远"，`minPixels=2` 挡抗锯齿）。
+  两道地板各有反方向的牙：M578（宽度地板 0.55→0.05 ⇒ 真值表红）、M579（差 12→4 ⇒ 真值表红）。
+  12 这一档的出处就是 R100 那把 python 尺的翻车点：它用"与填充差 ≥40"，于是亮档那对 35 灰阶**整档读不到**。
+- **变异表 `mutate_r104.py` 四刀 M577–M580，实测 `n=4 caught=4 mismatch=0 not_run=0`**：
+  M577 撤产品常数 ⇒ 等式红在 19px（同时证明判据读的不是那个常数）；
+  M580 把参照物换成常量 0 ⇒ 正对照那一格红（拦"参照点选错=假绿"）。
+- **读 R103 的 CI（run `38967377231`，failure）**：证人修好后 150 第一次拿到硬答案 ——
+  `ScrollView` 不吃材质（臂 1 与臂 0 两档逐字同读数），而臂 2 在 runner 上**整条带子一个像素都不离底**
+  （`墨像素=0 最大偏离=0/2`）⇒ 那台机器上臂 2 没有对象，不是"容器吃掉材质"。新开 **157**，
+  150 的容器这一支改写成"等 157"；155 从"runner 上稳定红"更正为**偶发**（那一遍步骤 16 没红）。
+  全文读数 `.scratch/motion-audit-2/r103_ci_readings_v2.md`；规矩进 **D-169**。
+
 ### 产品（R103）
 
 - **零改动**（一个像素都没有）。本轮所有动作都在判据侧：修 `CARD_PROBE_ARM` 那道证人。

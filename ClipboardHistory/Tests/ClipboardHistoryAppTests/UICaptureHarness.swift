@@ -512,7 +512,170 @@ final class UICaptureTests: XCTestCase {
     ///   · 所有标签 minX 相同（0.5pt 容差）—— 这才是"共享一条左轴"的可执行定义；
     ///   · 夹具必须真有 ≥2 种类型（**正对照**）：全是文本时"左轴一致"会平凡为真，
     ///     那一格红是在提醒我这条判据今天没有对象。
+    /// R104 · BACKLOG 148：搜索那一行的**第一个墨列**必须站在列表自己那一列里。
+    ///
+    /// 参照物是同一张帧上那颗选中药丸的左沿（`overlayPill`，量的就是画面上那条灰带的边），
+    /// **不是面板边，也不是产品里那个 `searchFieldLeadingInset` 常数** ——
+    /// M367 那一课：拿被约束的常量去推期望值，改常量等于同时改了判据。
+    ///
+    /// 为什么走**落盘的 PNG**而不是 R67 那条 alpha 通道：这一格的另一边是**字**。
+    /// 实测（本机第一版判据，走 `overlayPair` 那个 live rep）：搜索那一条带里
+    /// **一个 alpha ≥ 0.5 的像素都没有** ⇒ 那条通道上字不落地（面板本身透明），
+    /// 于是"第一个墨列"无从谈起。PNG 那一条是合成过背景的，字与灰带都在。
+    /// 这一格记进 U-314：**换判据的一边之前，先确认另一边活在哪条通道上。**
+    ///
+    /// 三条断言各自拦一种错：
+    ///   ① 参照物自己要有对象（读不到药丸就红）；
+    ///   ② 搜索那一行必须有墨（读不到就红）—— 这是 D-168 那条规矩的正向用法：
+    ///      等式的任何一边不存在，这条判据就什么都不判，不许把它记成通过；
+    ///   ③ 两边之差 ≤ 2px（= 1pt）。容差不放大到 ±2pt：R67 记过"±2px 容差把 9pt 与 10pt
+    ///      的差当成对上"，而这条要拦的是改之前实测的 19px。
+    func testQuickPickSearchLineSharesTheRowsColumn() throws {
+        // 这里**不**自己建 store：走的是 `fixtures(appearance:)` 里那张 `quickpick-list` 夹具，
+        // 它自带 store ⇒ 判据读的就是进帧基线的那一张图（同一颗尺、同一份对象）。
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r104-axis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let fixture = fixtures.first(where: { $0.name == "quickpick-list" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-list` 夹具 ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：读不回刚拍的帧")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            guard let pill = Self.overlayPill(bytes: base, width: rep.pixelsWide,
+                                              height: rep.pixelsHigh,
+                                              bytesPerRow: rep.bytesPerRow,
+                                              pageLuma: page) else {
+                return XCTFail("\(tag)：这张帧上读不到选中药丸（页底档=\(page)）⇒ 参照物不存在，"
+                    + "先查捕获通道，不要把等式放宽")
+            }
+            // 搜索那一行 = 药丸**之上**那一条带（留 2px 不吃进药丸的圆角上沿）。
+            let stripBottom = max(0, pill.top - 2)
+            guard stripBottom > 4 else {
+                return XCTFail("\(tag)：药丸顶在 \(pill.top)px，它上面没有带子可扫 ⇒ 布局不对")
+            }
+            guard let search = Self.firstInkColumnInStrip(bytes: base, width: rep.pixelsWide,
+                                                          bytesPerRow: rep.bytesPerRow,
+                                                          yRange: 0..<stripBottom,
+                                                          background: page) else {
+                return XCTFail("\(tag)：搜索那一条带（y=0..\(stripBottom)px）里一个墨像素都没有"
+                    + "⇒ 等式的另一边不存在，这条判据什么都没判。先查占位语画没画，不要来放宽这条")
+            }
+            let pillPt = Double(pill.left) / scale
+            let searchPt = Double(search) / scale
+            emit("QUICKPICK_SEARCH_AXIS \(tag) 药丸左沿=\(String(format: "%.1f", pillPt))pt"
+                 + " 搜索第一列墨=\(String(format: "%.1f", searchPt))pt"
+                 + " 差=\(search - pill.left)px 药丸顶=\(pill.top)px 带子 y=0..\(stripBottom)px"
+                 + " 页底档=\(page) 倍率=\(String(format: "%.1f", scale))x 帧宽=\(rep.pixelsWide)px")
+            // ① 参照物必须真的是那颗内缩过的药丸，不是行边界、也不是图标那一列。
+            XCTAssertGreaterThan(pillPt, 15.0,
+                "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt。本机实测药丸左沿 22.0pt；"
+                + "≈12pt 说明量到的是**行边界**（药丸没画），那时等式会退化成『12 与 12 相等』的假绿")
+            XCTAssertLessThan(pillPt, 30.0,
+                "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt ⇒ 那已经不是药丸的左沿"
+                + "（更像行内图标那一列 35.5pt），参照点错了等式就不成立")
+            // ③ 等式本身。
+            XCTAssertLessThanOrEqual(abs(search - pill.left), 2,
+                "\(tag)：搜索那一行的第一个墨列在 \(search)px（\(String(format: "%.1f", searchPt))pt），"
+                + "而同一张帧上药丸的左沿在 \(pill.left)px（\(String(format: "%.1f", pillPt))pt）"
+                + "⇒ 差 \(abs(search - pill.left))px。改之前实测差 19px（12.5pt 对 22.0pt）："
+                + "占位语比它正下方那一列的可见边往左突出，那一行字像贴在面板毛边上")
+        }
+    }
+
+    /// 药丸尺与"第一条墨列"尺的**真值表**（R104）：五格合成件，各钉一道地板。
+    ///
+    /// 为什么必须有它（R92 那一课）：`overlayPill` 要读真帧的字节，而"漏检"与"这里本来就没有
+    /// 药丸"在真帧读数上**一模一样**。没有合成件的话，②那一格（读不到 ⇒ nil）永远无法被证明。
+    func testOverlayPillAndStripRulersReadStructure() {
+        let width = 840, height = 200, stride4 = 840 * 4
+        func buffer(_ page: Int) -> [UInt8] {
+            var b = [UInt8](repeating: 0, count: width * height * 4)
+            for i in Swift.stride(from: 0, to: b.count, by: 4) {
+                b[i] = UInt8(page); b[i + 1] = UInt8(page); b[i + 2] = UInt8(page); b[i + 3] = 255
+            }
+            return b
+        }
+        func paint(_ b: inout [UInt8], _ x: Int, _ y: Int, _ w: Int, _ h: Int, _ value: Int) {
+            for row in y..<min(height, y + h) {
+                for col in x..<min(width, x + w) {
+                    let o = row * stride4 + col * 4
+                    b[o] = UInt8(value); b[o + 1] = UInt8(value); b[o + 2] = UInt8(value)
+                }
+            }
+        }
+        func pill(_ b: [UInt8], page: Int) -> (left: Int, top: Int, bottom: Int)? {
+            var copy = b
+            return copy.withUnsafeMutableBufferPointer { raw in
+                Self.overlayPill(bytes: raw.baseAddress!, width: width, height: height,
+                                 bytesPerRow: stride4, pageLuma: page)
+            }
+        }
+        func firstInk(_ b: [UInt8], range: Range<Int>, page: Int) -> Int? {
+            var copy = b
+            return copy.withUnsafeMutableBufferPointer { raw in
+                Self.firstInkColumnInStrip(bytes: raw.baseAddress!, width: width,
+                                           bytesPerRow: stride4, yRange: range, background: page)
+            }
+        }
+        // ① 正对照：亮档药丸的真实几何（44…795、行 100 起、60 行高）+ 第 25 列起的字
+        var good = buffer(255)
+        paint(&good, 44, 100, 751, 60, 220)
+        paint(&good, 25, 20, 40, 12, 60)
+        XCTAssertEqual(44, pill(good, page: 255)?.left, "药丸左沿必须读在 44px（= 22.0pt @2x）")
+        XCTAssertEqual(100, pill(good, page: 255)?.top, "药丸顶读在带子的第一行")
+        XCTAssertEqual(159, pill(good, page: 255)?.bottom)
+        XCTAssertEqual(25, firstInk(good, range: 0..<98, page: 255), "搜索那一行的第一条墨列")
+        // ② 纯色帧 ⇒ 两把尺都读不到（**不许把"读不到"报成 0**：0 会被读成"贴着边"）
+        let flat = buffer(255)
+        XCTAssertNil(pill(flat, page: 255), "没有带子 ⇒ nil")
+        XCTAssertNil(firstInk(flat, range: 0..<98, page: 255), "没有字 ⇒ nil")
+        // ③ 带子太窄（30% 帧宽）⇒ 不算药丸（钉 55% 那道地板：行内图标/文字都是短段）
+        var narrow = buffer(255)
+        paint(&narrow, 44, 100, 252, 60, 220)
+        XCTAssertNil(pill(narrow, page: 255), "30% 宽的一段不是药丸")
+        // ④ 与页底只差 8 灰阶 ⇒ 不算药丸（钉 `minDelta` 那道地板）。
+        //    这一格就是 R100 那把 python 尺翻车的地方：它用"与填充差 ≥40"，
+        //    于是亮档那对 35 灰阶的差**整档读不到**（悬崖不是平台）。12 这一档必须有反方向的牙。
+        var faint = buffer(255)
+        paint(&faint, 44, 100, 751, 60, 247)
+        XCTAssertNil(pill(faint, page: 255), "差 8 灰阶不算药丸（地板之下宁可说读不到）")
+        var just = buffer(255)
+        paint(&just, 44, 100, 751, 60, 243)      // 差 12 ⇒ 正好踩线，要算
+        XCTAssertEqual(44, pill(just, page: 255)?.left, "12 是闭区间的下沿")
+        // ⑤ 只有一列里一个像素过门限 ⇒ 那是抗锯齿，不是笔画（钉 minPixels=2）
+        var single = buffer(255)
+        paint(&single, 25, 20, 1, 1, 60)
+        XCTAssertNil(firstInk(single, range: 0..<98, page: 255), "单像素不算一列墨")
+        // ⑥ 参照色给错档时不许"顺手对上"：把背景当 255 而帧其实是 30 的暗档
+        var darkish = buffer(30)
+        paint(&darkish, 44, 100, 751, 60, 70)
+        paint(&darkish, 25, 20, 40, 12, 235)
+        XCTAssertEqual(44, pill(darkish, page: 30)?.left, "暗档同一把尺（差 40）也要读得出药丸")
+        XCTAssertEqual(25, firstInk(darkish, range: 0..<98, page: 30), "暗档的字在同一个列")
+        // ⑥b **参照色给错档时，这把尺不是"读不到"，而是"整帧都是带子"**（左沿 0、顶 0、底=满高）。
+        //    这一格本来我写的是 `XCTAssertNil` —— 那是**我以为的尺的行为**，不是尺的行为（U-315）。
+        //    实情记在这里，因为它正是判据里那条正对照（药丸左沿必须落在 15…30pt）存在的理由：
+        //    参照色错了，尺会自信地给出一个 0，而 0 看起来像"药丸贴着面板边"，不像"我瞎了"。
+        let wrongReference = pill(darkish, page: 255)
+        XCTAssertEqual(0, wrongReference?.left, "页底档给错 ⇒ 整帧都算带子，左沿读成 0（不是 nil）")
+        XCTAssertEqual(0, wrongReference?.top)
+        XCTAssertEqual(height - 1, wrongReference?.bottom)
+    }
+
     func testQuickPickRowsShareOneIconColumnAndOneLabelAxis() throws {
+
         let store = makePopulatedStore()
         let kinds = Set(store.entries.map { QuickPickController.rowSymbolName(for: $0.content) })
         // `build` 必须留在局部变量上：控制器被那个闭包捕获，而 `NSTableView.dataSource` 是弱引用 ——
@@ -4933,6 +5096,76 @@ final class UICaptureTests: XCTestCase {
             if rowHasTextInk(inkPixels: count, minPixels: minPixelsPerRow) { rows += 1 }
         }
         return (rows, pixels, maxDelta)
+    }
+
+    /// 纯函数：一张浮层帧里**选中药丸**的位置（左沿 / 顶 / 底，px）；读不到返回 nil，**不返回 0**
+    /// （0 会被读成"药丸贴着边"，那是把"仪器读不到"报成一个具体的产品值 —— R100 那一族）。
+    ///
+    /// 判据是**结构**，不是色号：一行里有一段连续、宽度 ≥ 帧宽 55%、且与页底差 ≥ 12 灰阶的带子，
+    /// 才算这一行落在药丸上；左沿取这些行的**中位数**（圆角让首末几行往里缩，取平均会被它们拉偏）。
+    ///
+    /// 为什么不能写一个绝对色号：本机亮档药丸是 (220,220,220) 对页底 (255,255,255) ⇒ 差 35，
+    /// 暗档是 (70,70,70) 对 (30,30,30) ⇒ 差 40。R100 那把 python 尺用的是"与填充差 ≥40"，
+    /// 于是它在**亮档整档读不到这一带**（门限落在一对悬崖上，BACKLOG 148 的 R102 追记 ①）。
+    /// 12 这一档取在"两档都量到的最小差 35"与噪声之间；"宽度 ≥55%"把行内图标、文字这些短段全挡掉。
+    static func overlayPill(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int, pageLuma: Int,
+                            minDelta: Int = 12, minWidthShare: Double = 0.55)
+        -> (left: Int, top: Int, bottom: Int)? {
+        guard width > 0, height > 0, minWidthShare > 0, minWidthShare <= 1 else { return nil }
+        let minWidth = Int(Double(width) * minWidthShare)
+        guard minWidth > 0 else { return nil }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        var lefts: [Int] = []
+        var top = -1, bottom = -1
+        for y in 0..<height {
+            var run = 0, best = 0, bestStart = 0, start = 0
+            for x in 0..<width {
+                if abs(lumaAt(x, y) - pageLuma) >= minDelta {
+                    if run == 0 { start = x }
+                    run += 1
+                    if run > best { best = run; bestStart = start }
+                } else {
+                    run = 0
+                }
+            }
+            guard best >= minWidth else { continue }
+            lefts.append(bestStart)
+            if top < 0 { top = y }
+            bottom = y
+        }
+        guard !lefts.isEmpty else { return nil }
+        lefts.sort()
+        return (lefts[lefts.count / 2], top, bottom)
+    }
+
+    /// 纯函数：一条横向带子里**第一个有字的列**在哪一列（px）；一条都没有 ⇒ nil。
+    ///
+    /// "有字"沿用 `isTextInk`（R24 本机量的那道 60）与 `textInkPixels` 同一个参照式：
+    /// 离背景足够远。这里背景就是整帧的页底档 —— 浮层没有"卡片"那一层，
+    /// 所以不需要 R103 那个"离两个背景都远"的形状（那一格是为材质层准备的）。
+    /// `minPixels` 取 2：单列一个像素过门限是抗锯齿，两个才算笔画。
+    static func firstInkColumnInStrip(bytes: UnsafePointer<UInt8>, width: Int,
+                                      bytesPerRow: Int, yRange: Range<Int>,
+                                      background: Int, minPixels: Int = 2) -> Int? {
+        guard width > 0, !yRange.isEmpty, minPixels > 0 else { return nil }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        for x in 0..<width {
+            var inked = 0
+            for y in yRange where Self.isTextInk(delta: abs(lumaAt(x, y) - background)) {
+                inked += 1
+                if inked >= minPixels { return x }
+            }
+        }
+        return nil
     }
 
     /// 纯函数：从**一张卡片**的逐行分类里读出「卡片四边的留白」与「分隔线两侧的留白」（pt）。
