@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### CI（R89）
+
+- 在屏探针的看门狗补第二刀：残留的 `xctest` 由**父壳在 `wait` 之后**照它自己的 pgid 收掉
+  （`xctest` 自己 `setpgid` 成另一个组的组长，R88 的 `kill -- -$pid` 够不到它 —— runner 实测残留 1）。
+- 四道硬门（`Swift tests (executed-count gate)` / `Capture gate` / `On-screen probe coverage floor` /
+  `Motion coverage floor`）全部挪到所有产证据步骤之后，各自 `if: always()`。
+  理由：R88 那道门红了之后 GitHub skip 掉七个步骤，**仪器的红吃掉了产品的证据**。
+
+### 仪器（R89，仓库外）
+
+- `r89_watchdog_shape.py`：三形状对照（只杀 pid / 只杀驱动组 / 父壳再收一次）+ 逐门查 `if: always()`
+  + 位置判据（循环必须在 `wait` 之后、孤儿计数必须在循环之后）。
+- `mutate_r89_watchdog.py`：M489–M496（M489、M490、M491、M492、M493、M494、M495、M496）：8 刀 CAUGHT，没有逃掉的；电池基线先跑、按内容还原、刀异常记 NOT-RUN。
+
+### Docs（R89）
+
+- BACKLOG 92 更新（本机 90 秒能跑完 vs runner 240 秒收不掉，那条差还没有名字）；
+  93 更新（runner 上确认成因是②；做法交给 122）；119 更新（本轮第六点被 skip，按欠账记）；
+  122 补做法（stderr 心跳 + `setUpWithError` 的 `self.description`）。
+
 ### CI（R88）
 
 - 在屏探针那一步的看门狗改成**杀进程组**（`set -m` + `kill -9 -- -$pid`），并在收掉之前先量一次

@@ -43,44 +43,6 @@ jobs:
           grep 'warning:' /tmp/build.log | head -12 || true
           test "$warnings" = "0"
 
-      - name: Swift tests (executed-count gate)
-        working-directory: ClipboardHistory
-        run: |
-          set -o pipefail
-          # 先落一份原始日志，再把 colorspace 那一族噪声从**进 CI 日志的那一路**里删掉。
-          # 为什么这一行值得存在：无头 runner 上每绘制一次图片，AppKit 就往 stderr 打一条
-          # `Unknown number of components for colorspace model -1`。实测一次 `swift test`
-          # 的日志里 **23433 / 24054 行（97.4%）都是这一句**，于是 job 日志大到下载不下来 ——
-          # `gh api .../jobs/<id>/logs` 三次都断在第 1~1.5 分钟，后面几步（包括唯一的
-          # 动效像素闸）的正文根本够不着。上一版我按 `Unrecognized colorspace number` 过滤，
-          # 那是**同族的另一句**（本机上只出现 1 次），所以日志几乎没变小 —— 按现象猜词不行，
-          # 要按实测占比选词：这里按 `colorspace` 整族删。
-          # 用 `sed /…/d` 而不是 `grep -v`：后者在"所有行都被过滤掉"时返回 1，
-          # 而 `set -o pipefail` + `bash -e` 会让整步当场中止，`PIPESTATUS` 那一行根本轮不到跑。
-          swift test 2>&1 | tee /tmp/test-raw.log | sed '/colorspace/d' | tee /tmp/test.log
-          status=${PIPESTATUS[0]}
-          echo "swift test exit: $status"
-          echo "dropped-noise-lines: $(( $(wc -l < /tmp/test-raw.log) - $(wc -l < /tmp/test.log) ))"
-          test "$status" = "0"
-          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/test.log | tail -1 | grep -oE '[0-9]+')
-          echo "executed cases: $executed"
-          test -n "$executed"
-          # 只准涨不准跌：数字掉下来意味着有用例不再被执行（被删、被 skip、编译没链进去）
-          test "$executed" -ge 200 || { echo "执行到的用例数 $executed 低于下限 200"; exit 1; }
-
-      # 第三轮审计 D-7：`UIInteractionProbeTests` / `UICaptureTests` 要环境变量才启用，
-      # 而它们恰恰是"焦点链、行手势、右键菜单、帧基线"的验收手段 —— 以前 CI 一次也没跑过。
-      # 先以"允许失败 + 记录数字"起步：无头 runner 上在屏窗口的稳定性未证明，
-      # 拿它当硬门只会让人学会无视红色。稳定后再摘掉 continue-on-error。
-      # 刻意拆成两步（而不是一个 `A|B` 的 filter）：挂住时日志要能指名是哪一类跑不动，
-      # 否则"CI 的 UI 步骤红了"这句话对下一次判断没有任何用处。
-      #
-      # R36（BACKLOG 49 / U-59）把"红色由谁判"换了个位置：**这一步仍然 report-only，
-      # 但红不再被吞** —— 它的红交给下一步 `Capture gate` 去判，而那一步是硬门。
-      # 为什么留 `continue-on-error` 在这而不是那里：`swift test` 的退出码只说"有东西红了"，
-      # 而这一步要的是"红了的是谁、有没有名字"。把两件事都压在一个退出码上，
-      # 就会退回"要么全吞、要么因为环境的原因红"那两种已经各栽过一次的状态。
-      # 台账：run 38473962277 里这一步有 **4 条断言行红**（属于 1 个用例），全部被吞。
       - name: Offscreen frame capture (report-only, gated below)
         continue-on-error: true
         timeout-minutes: 8
@@ -147,12 +109,6 @@ jobs:
       # 门取 15 而不是 20：允许个别的、已登记的降级，但不允许"整批退回 skip"。
       # ④ R64 / BACKLOG 96：给了 `--readings` 而那份文件缺或空 ⇒ 红。
       # 已登记的 `*_NOT_RUN` 会被逐条打出来（有读数、有原因），它们不算红。
-      - name: Capture gate (unregistered reds must be zero)
-        timeout-minutes: 2
-        run: |
-          python3 scripts/ci_capture_gate.py /tmp/frames.log --min-passed 15 \
-            --readings /tmp/shots-ci/capture-readings.log
-
       - name: On-screen interaction probes (report-only)
         continue-on-error: true
         timeout-minutes: 8
@@ -191,6 +147,19 @@ jobs:
           # 下面三行抽取和结论行一行都轮不到（实测 run 38064293655 就是这个形状：
           # 只有 `line 13: Killed: 9` 和 `exit code 1`，没有 `ui suite exit:`）。
           kill "$killer" 2>/dev/null || true
+          # R89 第二刀：**在父壳里**收残留的孩子，而不是塞进上面那个 killer 子壳。
+          # 为什么位置要紧（本机对照抓出来的，见 r89_watchdog_shape.py 的"R89 形状"那一格）：
+          # `wait "$pid"` 在驱动一死就返回，父壳接着 `kill "$killer"` —— 如果那段循环还在子壳里跑，
+          # 它会被这一句**中途掐掉**（对照里读到的就是 `Terminated: 15` + 残留 1 个 xctest）。
+          # ⇒ 子壳只负责掐驱动；孩子的组由父壳在 wait 之后收，顺序是确定的。
+          # 机制本身：xctest 自己 setpgid 成了另一个组的组长（swift-test pid/pgid=24524，
+          #   xctest pid/pgid=24581），所以 R88 的 `kill -- -24524` 够不到它 ——
+          #   runner 上就是这么红的（PROBE_FLOOR_WATCHDOG_MISSED=1 收掉之后仍有 1 个 xctest 在跑）。
+          for child in $(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null || true); do
+            cpgid=$(ps -o pgid= -p "$child" 2>/dev/null | tr -d ' ' || true)
+            if [ -n "$cpgid" ]; then kill -9 -"$cpgid" 2>/dev/null || true; fi
+          done
+          sleep 1
           # 看门狗有没有真的够到最里层那个进程：还在跑 ⇒ 这一格的读数不可信（下一步会红）。
           # 这一格是**钉子**不是判据：`set -m` 被删掉、或有人把 kill 改回单 PID，这里就报非零。
           orphans=$(pgrep -f "xctest -XCTest ClipboardHistoryAppTests.UIInteractionProbeTests" 2>/dev/null | wc -l | tr -d ' ' || true)
@@ -231,53 +200,6 @@ jobs:
       # 而作业是绿的、那句解释也仍然成立。这一步把"缺席"变成逐条点名 + 一条必须登记的清单：
       # 新加一条在屏判据而不回答"runner 跑得了吗、跑不了为什么"，这里就红。
       # 与上面那步的区别是刻意的：探针本身是报告型（它不该挡发布），**登记**是硬门（它只判形状）。
-      - name: On-screen probe coverage floor
-        working-directory: .
-        run: |
-          set -o pipefail
-          python3 scripts/probe_coverage_gate.py /tmp/ui.log \
-            --expectations scripts/probe_coverage_expectations.json \
-            --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift \
-            | tee /tmp/probe-floor.log
-          # R86 / BACKLOG 92 路 a 的**有牙那一半**：登记与"这次为什么没结论"都要过这一关。
-          # 与 `probe_coverage_gate.py` 的分工是刻意的、不冗余：
-          #   · 那一支判"源码里的 11 条有没有登记、这次哪几条没下结论"（**集合级**）；
-          #   · 这一支判"这一卷是**怎么**停的"（**因果级**：挂在哪一条 / 一条都没开始 / 跑完了）。
-          # 只有前者会漏成这样：11 条全登记着、全都没结论、闸门照样绿 —— 那正是 R62 到 R85 的形状。
-          # 报告给不出名字（日志不完整、started 行被成块丢掉）⇒ 红：不许把"我说不出"当成"没事"。
-          # `&& … || …` 而不是直接写命令：这一步是 `bash -e`，非零会当场中止，
-          # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
-          python3 scripts/ui_probe_report.py /tmp/ui.log \
-            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" | tee -a /tmp/probe-floor.log \
-            && report_status=0 || report_status=$?
-          if [ "${report_status:-0}" != "0" ]; then
-            echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"
-            exit 1
-          fi
-          # R88：报告的名字只有在"看门狗真的收掉了跑用例的那个进程"时才可信。
-          # 上面那一步的 `set -m` + `kill -- -$pid` 就是为了让这句话成立；
-          # 谁把它改回单 PID 杀死（R86–R87 的形状），这里就红 —— 那正是"日志说谎而 CI 绿"的形状。
-          orphans=$(cat /tmp/ui-orphans 2>/dev/null || echo '?')
-          if [ "${orphans:-0}" = "?" ]; then
-            echo "PROBE_FLOOR_ORPHAN_UNMEASURED=1 上一步没把孤儿数写下来 ⇒ 这一格不许被读成『看门狗够到了』"
-            exit 1
-          fi
-          if [ "${orphans}" != "0" ]; then
-            echo "PROBE_FLOOR_WATCHDOG_MISSED=1 收掉之后仍有 ${orphans} 个 xctest 在跑" \
-                 "⇒ 『这一卷为什么没结论』那格读的是被杀死的驱动进程，不是跑用例的那个"
-            exit 1
-          fi
-
-      # 动效审计 MC-8：这道像素闸以前**只在作者本机跑过一次**，而测试文件的注释写着
-      # "CI 也取过数" —— 那是注释替事实背书。这一步把它真的接上 CI。
-      # 形状全部沿用上面两步踩过的坑：报告型（不挡发布）、自带看门狗（挂死必须留数字）、
-      # 每条抽取行自己吞掉非零（`bash -e` + `pipefail` 下汇报行失手会把整步中止）。
-      #
-      # 为什么不是硬门：无头 runner 上 SwiftUI 内容根本不被绘制（上面实测 95% 空白），
-      # 像素判据在那里必然拿不到帧。**环境给不出证据 ≠ 产品没有动效**，
-      # 所以这一版先把"有人跑、有数字、退出码被报出来"落下来；
-      # 抓帧驱动已经从 CADisplayLink 换成自旋时钟（不依赖屏幕在刷新），
-      # runner 上能不能真的出帧，以这一步第一次运行的日志为准，不预设。
       - name: Motion filmstrip (report-only)
         continue-on-error: true
         timeout-minutes: 6
@@ -368,12 +290,6 @@ jobs:
       # 清单外的盲区 / 没有理由的 not-run / 换了新理由 / 少了一臂的键 都会红。
       # 三条前提仍缺一不可（`executed` 有值、结论行在、judged 读得出），
       # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）—— 这一条由脚本的单测钉住。
-      - name: Motion coverage floor
-        run: |
-          set -o pipefail
-          python3 scripts/motion_floor_gate.py /tmp/motion.log \
-            --expectations scripts/motion_floor_expectations.json
-
       - name: Release script tests
         run: |
           python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
@@ -447,3 +363,113 @@ jobs:
           python3 scripts/launch_smoke.py "时间剪史.app" --timeout 30 | tee /tmp/smoke.log || status=$?
           grep -E "SMOKE_" /tmp/smoke.log
           exit "$status"
+
+      # R89 / 结构性的一条：硬门全部挪到**所有产证据的步骤之后**，并各自 `if: always()`。
+      # 为什么：R88 把 `On-screen probe coverage floor` 留在原位，它红了之后 GitHub 把后面
+      # **九个步骤全 skip 掉**（动效卷、动效地板、脚本自测、Info.plist、两张帧基线、启动冒烟）
+      # ⇒ "仪器的一朵红"吃掉了"产品该拿的证据"。R36/R66 定的规矩是红必须有名字，
+      #   这一条补的是它的对偶：**红不许把别的判据变成没跑**。
+      # `if: always()` 让它们在作业已经红的时候仍然跑，而它们自己非零仍然把作业判红。
+      - name: Swift tests (executed-count gate)
+        if: always()
+        working-directory: ClipboardHistory
+        run: |
+          set -o pipefail
+          # 先落一份原始日志，再把 colorspace 那一族噪声从**进 CI 日志的那一路**里删掉。
+          # 为什么这一行值得存在：无头 runner 上每绘制一次图片，AppKit 就往 stderr 打一条
+          # `Unknown number of components for colorspace model -1`。实测一次 `swift test`
+          # 的日志里 **23433 / 24054 行（97.4%）都是这一句**，于是 job 日志大到下载不下来 ——
+          # `gh api .../jobs/<id>/logs` 三次都断在第 1~1.5 分钟，后面几步（包括唯一的
+          # 动效像素闸）的正文根本够不着。上一版我按 `Unrecognized colorspace number` 过滤，
+          # 那是**同族的另一句**（本机上只出现 1 次），所以日志几乎没变小 —— 按现象猜词不行，
+          # 要按实测占比选词：这里按 `colorspace` 整族删。
+          # 用 `sed /…/d` 而不是 `grep -v`：后者在"所有行都被过滤掉"时返回 1，
+          # 而 `set -o pipefail` + `bash -e` 会让整步当场中止，`PIPESTATUS` 那一行根本轮不到跑。
+          swift test 2>&1 | tee /tmp/test-raw.log | sed '/colorspace/d' | tee /tmp/test.log
+          status=${PIPESTATUS[0]}
+          echo "swift test exit: $status"
+          echo "dropped-noise-lines: $(( $(wc -l < /tmp/test-raw.log) - $(wc -l < /tmp/test.log) ))"
+          test "$status" = "0"
+          executed=$(grep -oE 'Executed [0-9]+ tests' /tmp/test.log | tail -1 | grep -oE '[0-9]+')
+          echo "executed cases: $executed"
+          test -n "$executed"
+          # 只准涨不准跌：数字掉下来意味着有用例不再被执行（被删、被 skip、编译没链进去）
+          test "$executed" -ge 200 || { echo "执行到的用例数 $executed 低于下限 200"; exit 1; }
+
+      # 第三轮审计 D-7：`UIInteractionProbeTests` / `UICaptureTests` 要环境变量才启用，
+      # 而它们恰恰是"焦点链、行手势、右键菜单、帧基线"的验收手段 —— 以前 CI 一次也没跑过。
+      # 先以"允许失败 + 记录数字"起步：无头 runner 上在屏窗口的稳定性未证明，
+      # 拿它当硬门只会让人学会无视红色。稳定后再摘掉 continue-on-error。
+      # 刻意拆成两步（而不是一个 `A|B` 的 filter）：挂住时日志要能指名是哪一类跑不动，
+      # 否则"CI 的 UI 步骤红了"这句话对下一次判断没有任何用处。
+      #
+      # R36（BACKLOG 49 / U-59）把"红色由谁判"换了个位置：**这一步仍然 report-only，
+      # 但红不再被吞** —— 它的红交给下一步 `Capture gate` 去判，而那一步是硬门。
+      # 为什么留 `continue-on-error` 在这而不是那里：`swift test` 的退出码只说"有东西红了"，
+      # 而这一步要的是"红了的是谁、有没有名字"。把两件事都压在一个退出码上，
+      # 就会退回"要么全吞、要么因为环境的原因红"那两种已经各栽过一次的状态。
+      # 台账：run 38473962277 里这一步有 **4 条断言行红**（属于 1 个用例），全部被吞。
+
+      - name: Capture gate (unregistered reds must be zero)
+        if: always()
+        timeout-minutes: 2
+        run: |
+          python3 scripts/ci_capture_gate.py /tmp/frames.log --min-passed 15 \
+            --readings /tmp/shots-ci/capture-readings.log
+
+
+      - name: On-screen probe coverage floor
+        if: always()
+        working-directory: .
+        run: |
+          set -o pipefail
+          python3 scripts/probe_coverage_gate.py /tmp/ui.log \
+            --expectations scripts/probe_coverage_expectations.json \
+            --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift \
+            | tee /tmp/probe-floor.log
+          # R86 / BACKLOG 92 路 a 的**有牙那一半**：登记与"这次为什么没结论"都要过这一关。
+          # 与 `probe_coverage_gate.py` 的分工是刻意的、不冗余：
+          #   · 那一支判"源码里的 11 条有没有登记、这次哪几条没下结论"（**集合级**）；
+          #   · 这一支判"这一卷是**怎么**停的"（**因果级**：挂在哪一条 / 一条都没开始 / 跑完了）。
+          # 只有前者会漏成这样：11 条全登记着、全都没结论、闸门照样绿 —— 那正是 R62 到 R85 的形状。
+          # 报告给不出名字（日志不完整、started 行被成块丢掉）⇒ 红：不许把"我说不出"当成"没事"。
+          # `&& … || …` 而不是直接写命令：这一步是 `bash -e`，非零会当场中止，
+          # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
+          python3 scripts/ui_probe_report.py /tmp/ui.log \
+            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" | tee -a /tmp/probe-floor.log \
+            && report_status=0 || report_status=$?
+          if [ "${report_status:-0}" != "0" ]; then
+            echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"
+            exit 1
+          fi
+          # R88：报告的名字只有在"看门狗真的收掉了跑用例的那个进程"时才可信。
+          # 上面那一步的 `set -m` + `kill -- -$pid` 就是为了让这句话成立；
+          # 谁把它改回单 PID 杀死（R86–R87 的形状），这里就红 —— 那正是"日志说谎而 CI 绿"的形状。
+          orphans=$(cat /tmp/ui-orphans 2>/dev/null || echo '?')
+          if [ "${orphans:-0}" = "?" ]; then
+            echo "PROBE_FLOOR_ORPHAN_UNMEASURED=1 上一步没把孤儿数写下来 ⇒ 这一格不许被读成『看门狗够到了』"
+            exit 1
+          fi
+          if [ "${orphans}" != "0" ]; then
+            echo "PROBE_FLOOR_WATCHDOG_MISSED=1 收掉之后仍有 ${orphans} 个 xctest 在跑" \
+                 "⇒ 『这一卷为什么没结论』那格读的是被杀死的驱动进程，不是跑用例的那个"
+            exit 1
+          fi
+
+      # 动效审计 MC-8：这道像素闸以前**只在作者本机跑过一次**，而测试文件的注释写着
+      # "CI 也取过数" —— 那是注释替事实背书。这一步把它真的接上 CI。
+      # 形状全部沿用上面两步踩过的坑：报告型（不挡发布）、自带看门狗（挂死必须留数字）、
+      # 每条抽取行自己吞掉非零（`bash -e` + `pipefail` 下汇报行失手会把整步中止）。
+      #
+      # 为什么不是硬门：无头 runner 上 SwiftUI 内容根本不被绘制（上面实测 95% 空白），
+      # 像素判据在那里必然拿不到帧。**环境给不出证据 ≠ 产品没有动效**，
+      # 所以这一版先把"有人跑、有数字、退出码被报出来"落下来；
+      # 抓帧驱动已经从 CADisplayLink 换成自旋时钟（不依赖屏幕在刷新），
+      # runner 上能不能真的出帧，以这一步第一次运行的日志为准，不预设。
+
+      - name: Motion coverage floor
+        if: always()
+        run: |
+          set -o pipefail
+          python3 scripts/motion_floor_gate.py /tmp/motion.log \
+            --expectations scripts/motion_floor_expectations.json
