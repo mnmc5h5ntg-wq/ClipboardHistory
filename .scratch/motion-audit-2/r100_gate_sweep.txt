@@ -1,0 +1,46 @@
+=== LIGHT (fill=247) ===
+pane                                 g12    g16    g24    g32    g48    g64   
+cardprobe-groupbox-default           5.5    5.5    5.5    5.5    5.5    5.5   
+settings-shortcuts                   5.0    5.0    5.0    5.0    5.5    5.5   
+settings-general                     5.0    5.0    5.0    5.0    5.5    5.5   
+settings-general-login-unsupported   5.0    5.0    5.0    5.0    5.5    5.5   
+settings-general-login-failed        5.0    5.0    5.0    5.0    5.5    5.5   
+settings-privacy                     5.0    5.0    5.0    5.0    5.5    5.5   
+settings-data                        5.0    5.0    5.0    5.0    5.0    5.5   
+settings-recommendations             5.0    5.0    5.0    5.0    5.0    5.5   
+=== DARK (fill=37) ===
+pane                                 g12    g16    g24    g32    g48    g64   
+cardprobe-groupbox-default           5.5    5.5    5.5    5.5    5.5    5.5   
+settings-shortcuts                   5.0    5.0    5.0    5.0    5.0    5.0   
+settings-general                     5.0    5.0    5.0    5.0    5.0    5.5   
+settings-general-login-unsupported   5.0    5.0    5.0    5.0    5.0    5.5   
+settings-general-login-failed        5.0    5.0    5.0    5.0    5.0    5.5   
+settings-privacy                     5.0    5.0    5.0    5.0    5.0    5.0   
+settings-data                        5.0    5.0    5.0    5.0    5.0    5.0   
+settings-recommendations             5.0    5.0    5.0    5.0    5.0    5.0   
+--- LIGHT ---
+cardprobe-groupbox-default-720x140-light.png   bezelL=  24.0 bezelR= 695.5 first=  29.5 last= 105.0  insetL=  5.5  insetR=590.5
+settings-shortcuts-720x540-light.png           bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 677.5  insetL=  5.5  insetR= 18.0
+settings-general-720x540-light.png             bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 685.5  insetL=  5.5  insetR= 10.0
+settings-privacy-720x540-light.png             bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 657.0  insetL=  5.5  insetR= 38.5
+settings-data-720x540-light.png                bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 687.0  insetL=  5.5  insetR=  8.5
+settings-recommendations-720x540-light.png     bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 689.5  insetL=  5.5  insetR=  6.0
+--- DARK ---
+cardprobe-groupbox-default-720x140-dark.png    bezelL=  24.0 bezelR= 695.5 first=  29.5 last= 105.0  insetL=  5.5  insetR=590.5
+settings-shortcuts-720x540-dark.png            bezelL= 172.0 bezelR= 695.5 first= 177.0 last= 678.0  insetL=  5.0  insetR= 17.5
+settings-general-720x540-dark.png              bezelL= 172.0 bezelR= 695.5 first= 177.5 last= 686.0  insetL=  5.5  insetR=  9.5
+settings-privacy-720x540-dark.png              bezelL= 172.0 bezelR= 695.5 first= 177.0 last= 657.0  insetL=  5.0  insetR= 38.5
+settings-data-720x540-dark.png                 bezelL= 172.0 bezelR= 695.5 first= 177.0 last= 687.0  insetL=  5.0  insetR=  8.5
+settings-recommendations-720x540-dark.png      bezelL= 172.0 bezelR= 695.5 first= 177.0 last= 690.0  insetL=  5.0  insetR=  5.5
+--- gate=20 ---
+settings-shortcuts-720x540-light.png           insetR=  5.0  x= 690.5  rows=163.0..221.5 (card y=106.0..304.5) lumas=[223]
+settings-general-720x540-light.png             insetR=  9.5  x= 686.0  rows=245.0..253.5 (card y=106.0..282.0) lumas=[191, 192, 213]
+settings-privacy-720x540-light.png             insetR=  5.0  x= 690.5  rows=264.5..331.5 (card y=106.0..539.5) lumas=[223]
+settings-data-720x540-light.png                insetR=  5.0  x= 690.5  rows=165.0..270.5 (card y=106.0..324.5) lumas=[223]
+settings-recommendations-720x540-light.png     insetR=  5.0  x= 690.5  rows=165.0..525.0 (card y=106.0..539.5) lumas=[223, 225]
+--- gate=8 ---
+settings-shortcuts-720x540-light.png           insetR=  0.5  x= 695.0  rows=107.5..303.0 (card y=106.0..304.5) lumas=[255]
+settings-general-720x540-light.png             insetR=  0.5  x= 695.0  rows=107.5..280.5 (card y=106.0..282.0) lumas=[255]
+settings-privacy-720x540-light.png             insetR=  0.5  x= 695.0  rows=107.5..113.0 (card y=106.0..539.5) lumas=[255]
+settings-data-720x540-light.png                insetR=  0.5  x= 695.0  rows=107.5..323.0 (card y=106.0..324.5) lumas=[255]
+settings-recommendations-720x540-light.png     insetR=  0.5  x= 695.0  rows=107.5..113.0 (card y=106.0..539.5) lumas=[255]

@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R100）
+
+- **一行没改，而且这是量出来的**：BACKLOG 138（"卡片横向内缩只有 5.5pt，macOS 通常 16–20pt"）
+  本轮结案为**不是缺陷**。新夹具 `cardprobe-groupbox-default` 是一个什么都不加的 `GroupBox { Text }`
+  （自己声明 `.padding(24)`），量出来系统自己那一档就是 **5.5pt**（亮暗同数），
+  产品六张卡片 5.0~5.5pt，差在一像素之内；`.settingsCardInset()` 只加纵向留白，横向一像素没加。
+  右沿同法 5.0pt ⇒ 左右对称。那句"16–20pt"是没有出处的印象，按它改会让这扇窗口更不像系统。
+
+### 判据与工具（R100）
+
+- **卡片水平内缩第一次有判据，且它钉的是"与系统同档"而不是"≥某个数"**
+  （`testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox`）：
+  等式（每格与系统参照差 ≤1pt，20 格全过）+ **绝对锚点**（参照左沿必须落在夹具声明的 24pt 上）。
+  锚点不是装饰：变异 M559 第一版（把墨门限 60→4，让边框冒充墨）**没让等式红** ——
+  参照与被告同偏，差还是 0。相对判据对"整把尺一起偏"免疫，而本轮真犯过的圆角错恰好是这一族。
+  四刀 M556–M559 全 CAUGHT（产品加 12pt 横向留白 ⇒ 20 格红 17.0pt；墨带还原成顶带 ⇒ 5 格红 26.5pt；
+  撤参照 ⇒ 对照缺席红；材质带压回卡片顶 ⇒ 锚点红 38.0pt）。
+- **新尺第一版坏在同一条带子问了两件事**（`columnFlags`）：材质与墨共用"卡片顶往下 26pt"那条带子 ⇒
+  ① 材质被**圆角**骗（探针那张只有 26pt 高，带子里外都是角，左沿读晚 7.5pt 正好落在字上，
+  报出"内缩 0.0pt"这个没有的产品数值）；② 墨被**带子**骗（`settings-general` 报 26.0pt，
+  因为带子只盖住第一行、那一行的墨是复选框**后面**的标签；其余四屏第一行是小标题 ⇒ 5.5pt。
+  同一扇窗口里"卡片内缩"被量成两个差 20 倍的数，而产品一行都没错）。
+  现在材质问**卡片纵向中点**那一行（直边）、墨问**整张卡片内沿**（"最贴左边的墨"才是"内缩"的意思）。
+  横向那两格纯函数配真值表 `testHorizontalEdgeRulerIsATruthTable`（读不到必须返回 nil，不许返回 0）。
+- **CI 那台机器看不见卡片材质，这件事从"永久红"改成"响着的 skip"**（BACKLOG 147）：
+  run `38913173905` 的 `CARD_BAND` 二十格全是 `填充=-1 卡片段=0 scale=1.0`（页底 light=236/dark=52，
+  本机 255/247、30/37）⇒ R95–R100 整族卡片判据在 runner 上从来没有对象。
+  R99 把名单地板写成常量 8，于是它在 runner 上永久红。现在地板从**上游那一关**推导
+  （`min(8, 读到材质的格数)`，材质格数由 `cardRowKinds` 的 `fill >= 0` 数出来 ——
+  从名单自己推是恒真式，M553 那种"把尺弄瞎"的刀咬不住），材质为 0 时 `throw XCTSkip` 并带上两机的数。
+  新增读数 `CARD_ABOVE_CAPABILITY`、`CARD_INSET_CAPABILITY`。
+- **给下一次 run 装的成因通道**（BACKLOG 147 / D-163，收尾这一格是为了让 147 不再"下一轮再猜"）：
+  `cardRowKinds` 多返回一格 `modals`，两把尺在 `fill < 0` 时打
+  `CARD_FILL_CANDIDATES <夹具> <档> 页底=… 前三=(色号:行数) … 门槛=…`。
+  证人吃的是**判据自己那个数组**（不是调用方重扫一遍带子），渲染也是唯一一颗 `fillCandidatesLine`
+  —— 纵向与横向两处共用，"两台机器打的是同一句话"这个前提才不是靠我记得。
+  三种形状（门限 / 通道 / 判据没走到）在那一次 run 里就能压成一种；判据：真值表六格 + 变异 M562。
+  **本机已经用它正过一次**：`settings-stats` 两档前三名全等于页底（light 252:960 / dark 28:960），
+  而那一屏源码里本来就没有 `GroupBox` ⇒ 147 里"统计缺 4 格"与"runner 缺 20 格"是两种不同的缺，
+  从前只能论证，现在是读数（BACKLOG 131 的产品判断不受影响，仍然排队）。
+- **真机状态菜单第一次有了自己的几何读数**（BACKLOG 149 的开道）：AX 读到位移与尺寸
+  `pos=1073,34 size=207x294`、15 项（逐字对账过名字，正文一律不打印）。
+  **复刻体那 320pt 的差是真的**，但这一条不许当缺陷用：帧基线里的菜单帧本来就是复刻体，
+  `menuSurfaceReplicaFixtures` + `testMenuBarFramesAreReplicasOfTheMenuSurface`
+  已经声明这类帧不许判宽度/截断/对齐/命中区。R101 要补的是**对面那个数**：
+  那处注释今天只有复刻体自己（R34 的"墨画到 x=320.0"），没有真机那一边。
+  通道的边界也记进 149：NSMenu 跟踪期间拿不到逐项几何，`click at` 打不进这类窗口。
+- **R99 的红第一次能被读**（BACKLOG 145 的 runner 验收）：那一步现在打出
+  `XCTAssertFalse failed - 没有一屏进得了「卡片外几段墨」的名单 ⇒ 这条判据没有对象…`
+  与 `("0") is less than ("8") - 名单只有 0 格` —— 名字、断言类型、数、判据自己写的理由四样都在。
+  顺带：146 等的那条帧间隔红这次没有出现 ⇒ 它随 run 波动，不随 R99 的改动出现，146 不结案。
+- 门限扫参（`.scratch/motion-audit-2/r100_gate_sweep.txt`）：12/16/24/32/48/64 六档 × 八屏 × 两档，
+  每一档都读 5.0/5.5 ⇒ 这条数不是挑出来的；同时暴露"亮档控件边框 luma=223 在门限 60 下不算墨"
+  （与 139 那条"勾选框色度为 0"同族），所以右沿那一格改用门限 20。
+- **一条只印不拦的读数等于没报**（`.scratch/motion-audit-2/curve_from_ledger.py`、D-162）：仪器一直会打 `GAPS=[99]` 但 `exit` 仍是 0 —— 本轮我把台账里 `## Round 99 · …` 整行吃掉（编辑工具的 old_string 只填了上一节标题 ⇒ 插入变替换），这一格认出来了却没拦住任何东西。现在 `missing` 非空 ⇒ 打 `CURVE_GAP` 并 `return 1`，结论行仍全部打在闸门之前。同一份合成样本做 before/after 证明有牙：HEAD 那一版 `OLD_EXIT=0`、本轮这一版 `NEW_EXIT=1`。自测 `scripts/tests/test_curve_gaps.py` 三条：正对照（连续轮次必须放过）、断档必须非 0、**真台账今天必须 `GAPS=none`**。
+- 验证电池从七张变异表抬到**八张**（`TABLE_COUNT=8` 写死，少跑一张与某张非零同样算红）。
+
+- **还原臂的参照点会自己走**（`.scratch/motion-audit-2/mutate_r99.py`）：八张表第一次跑完时
+  `MUT_EXIT=1`，红在 R99 那张的 `M554: ESCAPED` —— 它是"把两个产品文件整体换回
+  `git show HEAD:` 那一版"的还原臂，而 R99 一提交，`HEAD` 就是**已经修好**的那一版，
+  于是这一支还原了个空。判据没坏，坏的是参照点：`HEAD` 每轮前进，而"本轮改之前"是一个历史位置。
+  修法是把基准钉死成 commit（`3a05933` = R98 那一版）；重跑 `M554: CAUGHT 上方 3 段=True 下方 2 段=True`、
+  `n=4 caught=4 mismatch=0 not_run=0`。与"改产品把 needle 挪走"（那一族红在 `DID-NOT-RUN`）同族但更阴：
+  这一族红在 `ESCAPED`，看起来像"判据真的没牙"。
+- **真机观测通道本轮中途打开**（新开 BACKLOG 149）：起因是在屏那一卷里
+  `testFrameIntervalsUnderStateChanges` 从上一轮的 skipped 变成本轮 passed（同一台机器、产品零改动），
+  它的 skip 条件是 `baseline.n == 0`（显示器睡着）⇒ 顺手试 `screencapture`：99.7% 非黑。
+  真做掉的：AX 走状态菜单开设置窗口（按标题匹配、**只比较不打印**，那个菜单里有用户剪贴板原文）、
+  `AXRaise` 之后**只截设置窗口那块区域**、看完立刻关掉窗口把会话还原。
+  看图得到：真机暗档侧栏选中是强调蓝（离屏帧是浅蓝底深字，与 130 的假设同向，**但这是肉眼看的不算量**——
+  我拿一把 /tmp 手搓尺去量化它，坐标约定没实测，读出灰底色度 3~4，那个数不作证）。
+  量到的两条是真的：真机暗档卡片对页面底差 **16** 而离屏帧只有 **7** ⇒ **离屏通道压缩材质对比度**
+  （直接喂给 147）；`click at` 打到侧栏行坐标，AX 返回了那个 group 但**分区没换**（两张截图 md5 相同）
+  ⇒ 139 与 130 那颗红的仍欠一次换分区，做法写在 149。
+
 ### 产品（R99）
 
 - **设置「推荐」那一屏的两段内容收进卡片**（`RecommendationWeightsView.swift`、`SettingsView.swift`，

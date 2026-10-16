@@ -3351,6 +3351,18 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R100 / BACKLOG 138 的**系统参照**：一个不加任何水平内边距的 `GroupBox`。
+        // 为什么要有它：138 那句"macOS 自己的分组卡通常 16–20pt"没有出处（是印象，不是读数），
+        // 而这一扇窗口里七张卡片的水平内缩全部来自 GroupBox 的默认值 ⇒ 唯一合法的对照
+        // 是**在同一台机器、同一档外观下**把系统那个值量出来，而不是去借一个别处的常数。
+        results.append(Fixture("cardprobe-groupbox-default",
+                               NSSize(width: 720, height: 140)) {
+            AnyView(GroupBox {
+                Text("系统默认内缩")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(24))
+        })
         // R28b 撤掉 `settings-shortcuts-wide`：它在本机一切正常，
         // 但 **CI 的 macos-15 runner 上 900pt 与 1100pt 两档都整帧读出 0 墨**
         // （run 38449711539 / 38451162726），而 ≤750pt 的 100 张帧从来没问题。
@@ -4470,6 +4482,46 @@ final class UICaptureTests: XCTestCase {
         return best.key
     }
 
+    /// 纯函数：把**逐行众数**按"这个档占多少行"排出前三名，连同各自的行数一起交出去。
+    ///
+    /// 这一格是为 BACKLOG 147 专门开的**成因通道**，不是第二把尺：本机读不到 runner 的像素
+    /// （workflow 里没有 `upload-artifact` 步骤，`.scratch/motion-audit-2/r100_ci_readings.md`
+    /// §④ 逐字核过），所以"那一台机器上 `GroupBox` 到底画没画出一层材质"这件事
+    /// **只能由判据自己打印**才能被回答。三种形状靠这一行压成一种：
+    /// 前三名里有一项 ≠ 页底且行数够 ⇒ 材质在、只是差 ≤3 被 `cardFill` 的门限挡掉（门限问题）；
+    /// 前三名全是页底 ⇒ 那台机器根本没画材质（通道问题）；
+    /// 这一行压根没打出来 ⇒ 判据在那台机器上没走到这一步（先修"为什么没走到"）。
+    ///
+    /// **它吃的是 `cardFill` 吃的那同一个数组**（`cardRowKinds` 把第一遍的 `modals` 原样交回来），
+    /// 不是自己重扫一遍带子。这不是省算力：BACKLOG 104 那一族教过 —— 证人一旦与判据不同颗尺子，
+    /// 它作的证就只对新尺成立，而新尺没有自己的判据。
+    ///
+    /// 排序必须是**全序**（与 `cardFill` 同一族理由：Swift 的字典遍历顺序不保证，
+    /// 只按行数比的话同一帧两遍可能给出不同的前三名 ⇒ 读数通道自己不稳定）。
+    static func fillCandidates(modals: [Int], top: Int = 3) -> [(luma: Int, rows: Int)] {
+        var counts: [Int: Int] = [:]
+        for modal in modals { counts[modal, default: 0] += 1 }
+        let ranked = counts.keys.sorted { lhs, rhs in
+            let l = counts[lhs] ?? 0, r = counts[rhs] ?? 0
+            if l != r { return l > r }
+            return lhs < rhs
+        }
+        return ranked.prefix(max(0, top)).map { ($0, counts[$0] ?? 0) }
+    }
+
+    /// 纯函数：把上面那前三名渲染成**一行文本**（BACKLOG 147 诊断通道的正文）。
+    ///
+    /// 为什么要单独拆出来，而不是在两把尺里各写一遍 `map/joined`：纵向节奏与横向内缩这两把尺
+    /// 都要打这一行，而它唯一的价值就是"两台机器打的是同一句话"—— 手写两份迟早漂开，
+    /// 漂开之后我在 CI 上读到的 `(236:471)` 与本机读到的 `页底 236 占 471 行`
+    /// 就成了两个不能对的东西（R68 那一族：证人与判据不同颗尺子）。
+    static func fillCandidatesLine(pageLuma: Int, modals: [Int], top: Int = 3) -> String {
+        let ranked = fillCandidates(modals: modals, top: top)
+        let body = ranked.isEmpty ? "无"
+            : ranked.map { "(\($0.luma):\($0.rows))" }.joined(separator: " ")
+        return "页底=\(pageLuma) 前三=\(body) 门槛=abs(档-页底)>3且行数/倍率>=20pt"
+    }
+
     /// 把内容列逐行分类。参照是**整块卡片那一个稳定的填充色**（由 `cardFill` 按"这个档占多少行"选，
     /// 不是抄来的色号，也不是"这一行自己的众数"—— 后者在分隔线上会翻车，见下面那段）。
     ///
@@ -4486,10 +4538,10 @@ final class UICaptureTests: XCTestCase {
     static func cardRowKinds(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
                              bytesPerRow: Int, rect: CGRect, scale: Double,
                              pageLuma: Int, inkGate: Int = 60, lineGate: Int = 6)
-        -> (kinds: [CardRowKind], fill: Int) {
+        -> (kinds: [CardRowKind], fill: Int, modals: [Int]) {
         let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
         let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
-        guard x1 > x0, y1 > y0 else { return ([], -1) }
+        guard x1 > x0, y1 > y0 else { return ([], -1, []) }
         func lumaAt(_ x: Int, _ y: Int) -> Int {
             let o = y * bytesPerRow + x * 4
             return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
@@ -4509,7 +4561,9 @@ final class UICaptureTests: XCTestCase {
         guard let fill = cardFill(modals: modals, pageLuma: pageLuma, scale: scale) else {
             // 这一带**根本没有卡片**（而不是"有一张卡片但读不到字"）—— R97 之前这一格会往下走，
             // 于是「统计」那一屏被安上一张 1pt 的假卡片，报出来的是"尺没压住字"。
-            return (Array(repeating: .outside, count: y1 - y0), -1)
+            // `modals` 照样交出去（BACKLOG 147）：调用方要拿**同一个数组**打前三名，
+            // 自己重扫一遍就不是这颗尺子见过的东西了。
+            return (Array(repeating: .outside, count: y1 - y0), -1, modals)
         }
         var kinds: [CardRowKind] = []
         for (row, _) in modals.enumerated() {
@@ -4529,7 +4583,7 @@ final class UICaptureTests: XCTestCase {
             kinds.append(Self.cardRowKind(cardRun: best, ink: ink, line: line,
                                           width: x1 - x0))
         }
-        return (kinds, fill)
+        return (kinds, fill, modals)
     }
 
     /// 纯函数：一条**逐行布尔**（"这一行在那条窄带里有没有墨"）里数出几段墨带。
@@ -4588,6 +4642,92 @@ final class UICaptureTests: XCTestCase {
                              bandRange: Range<Int>) -> Range<Int> {
         let top = max(0, Int(bandMinY * scale))
         return (top + bandRange.lowerBound)..<(top + bandRange.upperBound)
+    }
+
+    /// 纯函数：一条**逐列布尔**里找"第一段连续够长的真"的起点（R100 / BACKLOG 138）。
+    ///
+    /// 这是纵向那把尺的**横过来**的版本，语义刻意不同：这里问的不是"有几段"，
+    /// 而是"第一段从哪里开始"——卡片左沿就是"从这里往右一路都是卡片材质"的那一列。
+    /// 为什么必须有真值表：`firstTrue` 与"够长"这两格在本轮之前各错过一次
+    ///（一条 1pt 的分隔线、一颗按钮都曾当上"卡片"，见 `cardFill` 的文档串），
+    /// 而"没找到"必须返回 nil 而不是 0 —— 0 会被读成"内缩 = 0pt"，
+    /// 那是把"仪器读不到"报成一个具体的产品值（R99 的 python 手搓尺就报出过 −172pt）。
+    static func firstSpanStart(columns: [Bool], minRun: Int) -> Int? {
+        guard minRun > 0, !columns.isEmpty else { return nil }
+        var run = 0
+        for (x, on) in columns.enumerated() {
+            if on {
+                run += 1
+                if run >= minRun { return x - run + 1 }
+            } else {
+                run = 0
+            }
+        }
+        return nil
+    }
+
+    /// 纯函数：`from` 之后第一处墨在哪一列；找不到返回 nil（**不返回 0**）。
+    static func firstInkColumn(columns: [Bool], from: Int) -> Int? {
+        var x = max(0, from)
+        while x < columns.count {
+            if columns[x] { return x }
+            x += 1
+        }
+        return nil
+    }
+
+    /// 进料：把一段**横向**扫描切成两条例向量："这一列还是卡片材质吗"与"这一列有没有碰到墨"。
+    ///
+    /// 两格的定义不对称是有意的：材质要**一整列基本都是**（≥80% 的采样点"更像卡片而不是页面"），
+    /// 否则一条分隔线、一行文字的下沿都会冒充"卡片的左半";
+    /// 而墨只要**有一个采样点**偏离填充色够多就算 —— 问"最左边那笔字在哪"的时候，
+    /// 一个字形的左上角就该被算进来。
+    ///
+    /// **两条问的是两条不同的 y 带，这是 R100 修掉的那一格**：
+    /// 原来两边共用同一条"卡片顶往下 26pt"的带子，于是
+    /// ① 材质那一侧被**圆角**骗：探针那张卡片只有 26pt 高，带子里外都是角，
+    ///    读出来的左沿比真左沿晚 7.5pt，正好落在字上 ⇒ "内缩 0.0pt"（一个凭空造出来的产品数值）；
+    /// ② 墨那一侧被**带子**骗：`settings-general` 读成 26.0pt，因为带子只盖住第一行，
+    ///    而那一行的墨是复选框**后面**的标签；其余四屏第一行是小标题，读成 5.5pt。
+    ///    同一扇设置窗口里"卡片内缩"被量成了两个差 20 倍的数，而产品那一侧一行都没错。
+    /// 现在：材质问**卡片纵向中点**那一行（那里是直边，圆角够不着），
+    /// 墨问**整张卡片的内沿**（"最贴左边的墨"才是"内缩"这个词的意思，与它在第几行无关）。
+    ///
+    /// **"像卡片"必须是相对判据，不是"离填充色差多少"**（R100 第一次跑就栽在这里）：
+    /// 本机卡片填充 244、页面底 252，只差一个色档 ⇒ 用绝对容差 12 会把**页面底**判成材质，
+    /// 于是每一屏的"卡片左沿"都读成 0pt、"内缩"读成 40.5pt（那其实是侧栏文字的左边缘）。
+    /// 纵向那把尺早就用 `abs(luma-fill) < abs(luma-pageLuma)` 说这句话（R97 / D-155），
+    /// 横向这一把第一次写成了绝对容差 —— **同一族错法换了个轴又犯一次**，
+    /// 而它没有让任何断言变红：报出来的数格式完全正确、看起来很像读数。
+    static func columnFlags(bytes: UnsafePointer<UInt8>, bytesPerRow: Int,
+                            xRange: Range<Int>, materialYRange: Range<Int>,
+                            inkYRange: Range<Int>,
+                            fill: Int, pageLuma: Int, inkGate: Int)
+        -> (material: [Bool], ink: [Bool]) {
+        var material: [Bool] = []
+        var ink: [Bool] = []
+        material.reserveCapacity(xRange.count)
+        ink.reserveCapacity(xRange.count)
+        for x in xRange {
+            var cardish = 0, seen = 0
+            for y in materialYRange {
+                let p = y * bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[p]) + 0.7152 * Double(bytes[p + 1])
+                                + 0.0722 * Double(bytes[p + 2])).rounded())
+                seen += 1
+                if abs(luma - fill) < abs(luma - pageLuma) { cardish += 1 }
+            }
+            var inked = 0
+            for y in inkYRange {
+                let p = y * bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[p]) + 0.7152 * Double(bytes[p + 1])
+                                + 0.0722 * Double(bytes[p + 2])).rounded())
+                if abs(luma - fill) >= inkGate { inked += 1 }
+            }
+            material.append(seen > 0 && cardish * 10 >= seen * 8)
+            ink.append(inked >= 1)
+        }
+        return (material, ink)
     }
 
     /// 进料：从位图里抽一条**纵向窄带**的逐行墨向量（`inkRunCount` 的纯函数不吃位图）。
@@ -5723,6 +5863,17 @@ final class UICaptureTests: XCTestCase {
         // 不是产品的事实 —— 让它进名单就等于把"没跑"记成"通过"（BACKLOG 43 那一族）。
         var aboveRoster: [String: Int] = [:]
         var belowRoster: [String: Int] = [:]
+        // R100 / BACKLOG 146：**"这台机器看得见卡片材质吗"必须是一个独立的量**。
+        // CI 的 macos-15 runner 上 `CARD_BAND` 二十格全是 `填充=-1 卡片段=0 scale=1.0`
+        //（页底 light=236 / dark=52）—— 那里的 `GroupBox` 填充落在页面底 ±3 以内，
+        // `cardFill` 的第一关（`abs(modal - pageLuma) > 3`）就没有一行过关。
+        // 于是 R99 新加的"名单不许为空"在 runner 上红了：那是**仪器没有对象**，不是产品有缺陷。
+        // 名单地板必须从**上游那一关**（有没有读到材质）推导，不能从名单自己推导 ——
+        // 用名单长度给名单设地板是恒真式，M553（抬段高地板把尺弄瞎）那种刀就咬不住了。
+        // 本机：材质 20 格 / 墨 20 格 / 名单 20 格；runner：材质 0 格 ⇒ 地板 0，
+        // 但"材质 0"这件事必须以 skip 的形式**响**，不许静默通过。
+        var materialCells = 0
+        var settingsCells = 0
         // R96 把对象从"那一张卡片"扩到"每一张有分隔线的卡片"：R95 的修法一次动了五张卡片，
         // 而判据只压在 `settings-shortcuts` 上 ⇒ 另外四张改没改对，今天没人看着。
         // "有分隔线"是这条判据的**前提**（没有内侧那一档，就没有可比的数），
@@ -5757,7 +5908,7 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(band.maxY, fixture.size.height, accuracy: 0.001,
                            "扫描带必须扫到窗口底（这一档窗口高 \(fixture.size.height)pt、带子下沿 "
                            + "\(band.maxY)pt）⇒ 否则『卡片底到带子下沿』那句话没有资格被读成『被窗口切断』")
-            let (rows, fill) = Self.cardRowKinds(bytes: base, width: rep.pixelsWide,
+            let (rows, fill, modals) = Self.cardRowKinds(bytes: base, width: rep.pixelsWide,
                                                  height: rep.pixelsHigh,
                                                  bytesPerRow: rep.bytesPerRow, rect: band,
                                                  scale: scale, pageLuma: pageLuma)
@@ -5771,6 +5922,18 @@ final class UICaptureTests: XCTestCase {
             // 否则"满带材质、零墨"会在 `inkRows == 0 ⇒ continue` 那一步先把证人吃掉
             //（M542 第一次跑就是这样：它没红，而是安静地 skip 掉了）。
             if !segments.isEmpty { sawSegment = true }
+            settingsCells += 1
+            if fill >= 0 { materialCells += 1 }
+            // BACKLOG 147 的**成因通道**（R100）：runner 的 PNG 拿不回来，所以"那一台上材质到底是多少"
+            // 只能由判据自己打印。只在 `fill < 0` 那一格打 —— 有三种形状，而"填充=-1"只排除了零种：
+            // 前三名里有 ≠ 页底且行数够的档 ⇒ 材质在、差 ≤3 被门限挡掉（门限问题）；
+            // 前三名全是页底 ⇒ 那台机器没画出材质层（通道问题，这一族要登记成"只有本机能判"）；
+            // 这一行压根没出现 ⇒ 判据没走到那一步（先修"为什么没走到"）。
+            // 打在这而不是打在 `inkRows == 0 ⇒ continue` 之后：那条出口会把证人先吃掉（M542 那一族）。
+            if fill < 0 {
+                emit("CARD_FILL_CANDIDATES \(fixture.name) \(tag) "
+                     + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
+            }
             let fmt = { (values: [Double]) in
                 values.map { String(format: "%.1f", $0) }.joined(separator: "/")
             }
@@ -5971,12 +6134,26 @@ final class UICaptureTests: XCTestCase {
         // `VStack(spacing: 8){标题; 说明}` + `Divider()`，R92 就是照这个形状把「数据」
         // 屏的两段裸内容收进卡片的）。所以这不是"另一种合法排版"，是同一扇窗口里
         // 用两种语言说同一句话 —— 而这一次它有读数，不再是我看代码看出来的印象。
+        emit("CARD_ABOVE_CAPABILITY settings格=\(settingsCells) 有材质=\(materialCells)"
+             + " 进名单=\(aboveRoster.count)（地板=min(8, 有材质) —— 从**上游那一关**推，不从名单推）")
+        // R100 / BACKLOG 146：CI 的 runner 上二十格全是 `填充=-1`（那里的 `GroupBox` 填充
+        // 落在页面底 ±3 以内 ⇒ `cardFill` 第一关就没有一行过关）。
+        // R99 让这件事变成一条红 —— 那是**这条判据第一次在 runner 上说话**，
+        // 而它说的是"我没有对象"。两种收场都不许：静默通过（把没跑记成通过），
+        // 永久红（把机器前提记成产品缺陷，之后真缺陷会被这条淹掉）。
+        // 所以：以 skip 的形式**响** —— 跳过会被执行数闸门数进 `skipped=`，看得见、有名字。
+        if materialCells == 0 {
+            throw XCTSkip("这台机器拍不出任何卡片材质：\(settingsCells) 格 settings 全报 填充=-1"
+                              + " ⇒ 「卡片外几段墨」这条判据没有对象（不是通过，也不是产品缺陷）。"
+                              + "本机同一批帧读到 \(aboveRoster.count) 格；差异在 runner 的半透明材质"
+                              + "不合成（页底 light=236/dark=52，卡片填充在 ±3 内）。见 BACKLOG 147。")
+        }
         XCTAssertFalse(aboveRoster.isEmpty,
-                       "没有一屏进得了「卡片外几段墨」的名单 ⇒ 这条判据没有对象"
-                       + "（两档 settings 帧要么读不到卡片、要么读不到墨），不许当成通过")
-        XCTAssertGreaterThanOrEqual(aboveRoster.count, 8,
-                                    "名单只有 \(aboveRoster.count) 格（两档各 10 屏）"
-                                    + " ⇒ 大半页面没被量到，这一轮的「全绿」不作数")
+                       "本机看得见 \(materialCells) 格卡片材质，却没有一屏进得了「卡片外几段墨」的名单"
+                       + " ⇒ 尺瞎了（两档 settings 帧读到了卡片却读不到墨），不许当成通过")
+        XCTAssertGreaterThanOrEqual(aboveRoster.count, min(8, materialCells),
+                                    "名单只有 \(aboveRoster.count) 格，而本机读到 \(materialCells) 格材质"
+                                    + " ⇒ 有对象却没被量到（大半页面漏了），这一轮的「全绿」不作数")
         for key in aboveRoster.keys.sorted() {
             XCTAssertEqual(1, aboveRoster[key]!,
                            "\(key)：卡片顶之上读到 \(aboveRoster[key]!) 段墨，而这一扇窗口的规矩是"
@@ -6223,6 +6400,219 @@ final class UICaptureTests: XCTestCase {
                        Self.absoluteRows(bandMinY: 60, scale: 2, bandRange: 0..<92))
     }
 
+    /// 横向那两格纯函数的真值表（R100 / BACKLOG 138）。
+    ///
+    /// **不覆盖管线**：管线级判据是下面那条 `testSettingsCardHorizontalInset...`。
+    /// 这里钉的是两件事：① "够长"这一格（一条 1pt 的分隔线、一颗按钮都不许冒充卡片左沿，
+    /// 那是 R97 那一族的横向版本）；② **读不到必须返回 nil，不许返回 0** ——
+    /// 0 会被下游读成"内缩 = 0pt"，那是把仪器的失败报成一个产品数值
+    ///（R99 手搓的那把 python 尺就是把它报成了 −172pt）。
+    func testHorizontalEdgeRulerIsATruthTable() {
+        func cols(_ spec: [(Bool, Int)]) -> [Bool] {
+            spec.flatMap { v, n in Array(repeating: v, count: n) }
+        }
+        XCTAssertEqual(4, Self.firstSpanStart(columns: cols([(false, 4), (true, 6)]), minRun: 5))
+        XCTAssertNil(Self.firstSpanStart(columns: cols([(false, 4), (true, 4)]), minRun: 5),
+                     "只有 4 列连续材质 ⇒ 不够长，宁缺不假")
+        XCTAssertNil(Self.firstSpanStart(columns: cols([(true, 3), (false, 1), (true, 3)]), minRun: 5),
+                     "被断开的小段不许拼成一条左沿")
+        XCTAssertNil(Self.firstSpanStart(columns: cols([(false, 6)]), minRun: 5), "全假 ⇒ nil")
+        XCTAssertNil(Self.firstSpanStart(columns: [], minRun: 5), "空向量 ⇒ nil（不是 0）")
+        XCTAssertEqual(0, Self.firstSpanStart(columns: cols([(true, 5)]), minRun: 5))
+        // ⑨ 调用点这一轮把 `minRun` 从 40pt 降到 2pt（卡片左沿到第一个字形只有 5.5pt，
+        // 40pt 会**跳过**真正的边）。降下来之后"单列真"必须不算数，否则一个抗锯齿亮点
+        // 就能当上左沿，而 5.5pt 那个读数会变成 0.5pt —— 一个更像缺陷的假数。
+        XCTAssertNil(Self.firstSpanStart(columns: cols([(false, 3), (true, 1), (false, 6)]), minRun: 2),
+                     "单列真不算左沿（minRun=2 的那一格）")
+        XCTAssertEqual(5, Self.firstSpanStart(
+            columns: cols([(false, 3), (true, 1), (false, 1), (true, 4)]), minRun: 2),
+                       "被单列假断开的后一段才是左沿")
+        XCTAssertEqual(7, Self.firstInkColumn(columns: cols([(false, 7), (true, 2)]), from: 0))
+        XCTAssertNil(Self.firstInkColumn(columns: cols([(false, 9)]), from: 0), "没有墨 ⇒ nil")
+        XCTAssertEqual(9, Self.firstInkColumn(columns: cols([(true, 3), (false, 6), (true, 2)]),
+                                              from: 4),
+                       "from 之前那三列墨不许被算进来（卡片左沿以左是页面底）")
+        XCTAssertNil(Self.firstInkColumn(columns: cols([(true, 2)]), from: 5), "from 越界 ⇒ nil")
+    }
+
+    /// 卡片里的字离卡片左沿有多远，**与系统 `GroupBox` 自己那一档对账**（R100 / BACKLOG 138）。
+    ///
+    /// 它要回答的是 138 那句"横向内边距只有 5.5pt，而 macOS 通常 16–20pt"里
+    /// 唯一没有出处的那一半：**"macOS 通常"是多少**。
+    /// 量法刻意不用那个数：同一台机器、同一档外观，先量一个什么都不加的 `GroupBox`
+    ///（`cardprobe-groupbox-default`）拿到系统自己那一档，再量真实卡片，比差。
+    ///
+    /// **答案：138 不是缺陷，那条"16–20pt"是没有出处的印象。** 系统自己那一档 = 5.5pt
+    ///（亮暗两档同一个数），产品六张卡片 = 5.0~5.5pt，差在一像素之内；
+    /// 而 `.settingsCardInset()` 只加**纵向**留白（`SettingsView.swift:38`），
+    /// 横向一个像素都没加 —— 这个 5.5 完全是系统给的。
+    /// 右沿同法量得 5.0pt（`r100_right.py`），左右对称。
+    /// 所以按"16pt"去改会让这扇窗口**更不**像系统，与目标里那条"优先系统 API / 原生材质"反着走。
+    /// 判据因此钉成"与系统参照同档"而不是"≥某个数"：它拦的是**以后有人给卡片加横向内边距**
+    /// 或改掉 `GroupBox` 默认样式，而不是拦一个凭印象定的地板。
+    func testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r100-inset-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var control: [String: Double] = [:]
+        // 参照那一格**左沿**的绝对读数（pt）：夹具自己声明 `.padding(24)` ⇒ 左沿必须在 24pt。
+        // 为什么等式之外还要这一格绝对锚点：M559 那一刀（把墨门限从 60 降到 4）证明
+        // **相对判据对"整把尺一起偏"是免疫的** —— 参照与被告同偏，差还是 0，判据照样绿。
+        // 而本轮修掉的圆角错法恰好就是"整把尺一起偏"（左沿读晚 7.5pt）。
+        // 锚点压在**夹具自己声明的那个数**上，不是压在一个借来的常数上。
+        var probeBezel: [String: Double] = [:]
+        var measured: [String: Double] = [:]
+        var declined: [String] = []
+        // 与纵向那一格同一个上游信号（BACKLOG 147）：runner 上 `GroupBox` 的填充落在
+        // 页面底 ±3 以内 ⇒ `cardFill` 返回 nil ⇒ 这把尺**没有对象**。
+        // 地板从"有没有读到材质"推，不从"量到了几格"推（后者是恒真式）。
+        var cells = 0
+        var materialCells = 0
+        for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
+                                  (NSAppearance.Name.darkAqua, "dark")] {
+            for fixture in fixtures(appearance: appearance) {
+                let isProbe = fixture.name == "cardprobe-groupbox-default"
+                let isSettings = fixture.name.hasPrefix("settings-") && fixture.name != "settings-min"
+                guard isProbe || isSettings else { continue }
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("\(tag)：读不回刚拍的帧")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let pageLuma = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                              xRange: Int(150 * scale)..<Int(710 * scale),
+                                              yRange: Int(4 * scale)..<Int(12 * scale))
+                // **两边同一条尺**：探针与卡片都走 `cardRowKinds` + `cardSegments` 找自己的
+                // 材质顶与填充色。探针那一档如果改走"我知道它画在哪"的特殊路径，
+                // 它就又不与被告同一颗尺子了（BACKLOG 104），而 R99 已经证明特殊路径会自己长出新 bug。
+                let band = isProbe ? CGRect(x: 24, y: 24, width: 672, height: 100)
+                                   : CGRect(x: 155, y: 60, width: 560,
+                                            height: fixture.size.height - 60)
+                let (rows, fill, modals) = Self.cardRowKinds(bytes: base, width: rep.pixelsWide,
+                                                     height: rep.pixelsHigh,
+                                                     bytesPerRow: rep.bytesPerRow,
+                                                     rect: band, scale: scale,
+                                                     pageLuma: pageLuma)
+                cells += 1
+                if fill >= 0 { materialCells += 1 }
+                // 与纵向那一格**同一句打印**（`fillCandidatesLine` 是纯函数，两处共用）：
+                // 横向这把尺是本轮新写的，它和纵向那把在 runner 上必须报同一种形状，
+                // 否则"两把尺问同一件事而结论相反"就又得靠猜（R87 那一族的分配规则）。
+                if fill < 0 {
+                    emit("CARD_FILL_CANDIDATES \(fixture.name) \(tag) "
+                         + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
+                }
+                guard fill >= 0, let first = Self.cardSegments(rows: rows, scale: scale).first else {
+                    declined.append("\(fixture.name) \(tag)=这一带读不到卡片")
+                    continue
+                }
+                let cardTopPx = Int(band.minY * scale) + first.top
+                let cardBottomPx = Int(band.minY * scale) + first.bottom + 1
+                // 材质问中点那一行（直边），墨问整张卡片内沿（避开上下边框那 1px）。
+                let mid = (cardTopPx + cardBottomPx) / 2
+                let xStart = Int(band.minX * scale)
+                let flags = Self.columnFlags(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                             xRange: xStart..<rep.pixelsWide,
+                                             materialYRange: (mid - 1)..<(mid + 2),
+                                             inkYRange: (cardTopPx + 3)..<(cardBottomPx - 3),
+                                             fill: fill, pageLuma: pageLuma, inkGate: 60)
+                // `minRun` 取 2pt：只要"连续两列是材质"就算左沿。为什么不是原来那 40pt：
+                // 卡片左沿到第一个字形之间只有 5.5pt，任何比它大的 run 都会跳过真正的边，
+                // 而圆角那一族假边已经被"中点那一行"排掉了，不需要用长度兜底。
+                guard let leftRaw = Self.firstSpanStart(columns: flags.material,
+                                                        minRun: Int(2 * scale)) else {
+                    declined.append("\(fixture.name) \(tag)=读不到卡片左沿")
+                    continue
+                }
+                let left = xStart + leftRaw
+                guard let inkRaw = Self.firstInkColumn(columns: flags.ink, from: leftRaw) else {
+                    declined.append("\(fixture.name) \(tag)=左沿以右读不到墨")
+                    continue
+                }
+                let ink = xStart + inkRaw
+                let inset = Double(ink - left) / scale
+                if isProbe {
+                    control[tag] = inset
+                    probeBezel[tag] = Double(left) / scale
+                } else {
+                    measured["\(fixture.name) \(tag)"] = inset
+                }
+                let leftPt = String(format: "%.1f", Double(left) / scale)
+                let inkPt = String(format: "%.1f", Double(ink) / scale)
+                let insetPt = String(format: "%.1f", inset)
+                let topPt = String(format: "%.1f", Double(cardTopPx) / scale)
+                emit("CARD_INSET \(fixture.name) \(tag) 卡片顶=\(topPt)pt"
+                     + " 卡片底=\(String(format: "%.1f", Double(cardBottomPx) / scale))pt"
+                     + " 材质行=\(mid - 1)..\(mid + 2)px"
+                     + " 卡片左沿=\(leftPt)pt 第一处墨=\(inkPt)pt 内缩=\(insetPt)pt")
+            }
+        }
+        let controlText = control.keys.sorted().map {
+            "\($0)=\(String(format: "%.1f", control[$0]!))pt"
+        }.joined(separator: " ")
+        emit("CARD_INSET_SUMMARY 系统参照 \(controlText) 卡片数=\(measured.count) 未判=\(declined.count)")
+        emit("CARD_INSET_ALL " + measured.keys.sorted().map {
+            "\($0)=\(String(format: "%.1f", measured[$0]!))"
+        }.joined(separator: " "))
+        if !declined.isEmpty { emit("CARD_INSET_DECLINED " + declined.joined(separator: " ")) }
+        emit("CARD_INSET_CAPABILITY 候选=\(cells) 有材质=\(materialCells) 量到=\(measured.count)"
+             + " 未判=\(declined.count)")
+        // 同一台机器的同一件事（BACKLOG 147）：runner 上一格材质都读不到 ⇒ 这条判据没有对象。
+        // 不许静默通过，也不许把它当产品缺陷永久红 —— 以 skip 的形式响。
+        if materialCells == 0 {
+            throw XCTSkip("这台机器拍不出任何卡片材质：\(cells) 格候选全报「读不到卡片」"
+                              + " ⇒ 横向内缩这条判据没有对象。本机读到 \(measured.count) 格。"
+                              + "与纵向那格同一族，见 BACKLOG 147。")
+        }
+        // 这一格先只钉"这把尺至少量到了东西"：参照与卡片都必须有读数，否则无从判起。
+        XCTAssertFalse(control.isEmpty, "系统参照一张都没量出来 ⇒ 这条判据没有对照，不许报干净")
+        XCTAssertGreaterThanOrEqual(measured.count, min(16, materialCells),
+                                    "本机读到 \(materialCells) 格材质却只量到 \(measured.count) 格内缩"
+                                    + " ⇒ 有对象没量到（地板从材质那一关推，不从名单推）")
+        XCTAssertEqual(2, control.count, "系统参照必须亮暗两档各一条（借来的常数没有这个性质）")
+        // **绝对锚点**（M559 那一刀教出来的）：参照那一格的左沿必须落在夹具自己声明的
+        // `.padding(24)` 上。等式判据看不见"整把尺一起偏"，这一格看得见。
+        // 容差 1pt = 两像素，给抗锯齿与 2x 量化留的。
+        for tag in ["light", "dark"] {
+            guard let bezel = probeBezel[tag] else { continue }
+            XCTAssertEqual(24.0, bezel, accuracy: 1.0,
+                           "参照夹具声明的是 `.padding(24)`，尺却把卡片左沿读在 "
+                               + "\(String(format: "%.1f", bezel))pt ⇒ 仪器自己错位了"
+                               + "（圆角那一族：材质带压在卡片顶时读的是弧线不是直边，"
+                               + "本轮修之前实测读成 31.5pt）。等式那一格对这种错法免疫，这一格不免疫。")
+        }
+        // 未判名单必须**小**：它原来装着 5 格，其中两格（`login-unsupported` 暗档、
+        // `login-failed`）是"禁用态读不到墨"—— 那是上一段那条 26pt 带子的错，
+        // 不是产品的错（换成整张卡片内沿后它们量出了 5.0pt）。
+        // 剩下三格是「统计」：那一屏**没有卡片**（热图网格不是 `GroupBox`，R97 / D-155），
+        // 所以"读不到卡片"是正确答案，但它必须是**被数出来**的正确答案，不能是沉默。
+        XCTAssertLessThanOrEqual(declined.count, 6,
+                                 "未判 \(declined.count) 格：\(declined.joined(separator: " "))")
+        // **等式，不是阈值**：BACKLOG 138 那句"macOS 通常 16–20pt"从来没有出处，
+        // 而本轮量出来的系统自己那一档是 5.5pt（亮暗两档同一个数，且 12..64 的墨门限都给出
+        // 同一个数 —— 见 `.scratch/motion-audit-2/r100_gate_sweep.txt`）。
+        // 所以判据写成"与系统参照同档"，而不是"≥16"：后者会把产品推得**更不原生**，
+        // 而那正是这条目标（优先系统 API / 原生材质）的反方向。
+        // 1.0pt 的容差是给抗锯齿留的：卡片左沿与第一个字形各自有 ±0.5pt 的量化误差。
+        for (key, inset) in measured.keys.sorted().map({ ($0, measured[$0]!) }) {
+            let tag = key.hasSuffix("dark") ? "dark" : "light"
+            guard let want = control[tag] else {
+                XCTFail("\(key)：参照缺席（\(tag) 档没量到）⇒ 这一格没有资格报干净")
+                continue
+            }
+            XCTAssertEqual(inset, want, accuracy: 1.0,
+                           "\(key) 的卡片内缩 \(String(format: "%.1f", inset))pt"
+                               + " 与系统 `GroupBox` 自己那一档 \(String(format: "%.1f", want))pt"
+                               + " 差超过 1pt。要么产品改掉了系统默认内缩（这扇窗口里六张卡片"
+                               + "必须同一档），要么这把尺又瞎了（R99/R100 连着两轮都是后者）——"
+                               + "先读 CARD_INSET 那几行的『卡片左沿/第一处墨』再决定改哪一边。")
+        }
+    }
+
     /// 节奏这把尺的算术要有真值表（**不覆盖管线**：它判的是纯函数；
     /// 管线级判据是上面那条 `testSettingsCardVerticalRhythmIsOneNumber`）。
     ///
@@ -6368,6 +6758,66 @@ final class UICaptureTests: XCTestCase {
                        + "（Swift 的字典遍历顺序不保证，比较器少一个键就是同一帧两遍两个答案）")
         // ⑤ 全是页面底 ⇒ 没有卡片
         XCTAssertNil(Self.cardFill(modals: Array(repeating: page, count: 300), pageLuma: page, scale: 2))
+    }
+
+    /// BACKLOG 147 那条诊断通道的真值表：`cardFill` 说「没有卡片」的那一格，
+    /// `fillCandidates` 必须能把「为什么没有」分开说。
+    ///
+    /// 这一条整段是**为 CI 那一台机器写的**（本机两种形状都能直接从帧里看出来，不需要它）：
+    /// workflow 没有 `upload-artifact`，runner 的 PNG 拿不回来，所以「那一台上材质是多少」
+    /// 只能靠判据自己打印。而一条会被打印的读数如果没有真值表，它就能安静地恒为「无」
+    /// 而不被发觉 —— D-162 那一格说的正是这件事。
+    ///
+    /// **正对照的写法**：①/② 两格都把同一个数组同时交给**判据**（`cardFill`）和**证人**
+    ///（`fillCandidates`），要求判据恒为 nil、证人恒为前三名 —— 这才叫"这一行确实能分开三种形状"。
+    /// 只测证人自己的话，证人说什么都有可能绿（R68 那一族）。
+    func testFillCandidatesSeparatesNoMaterialFromMaterialTooCloseToPage() {
+        let page = 236
+        // ① **门限问题**的形状：材质在（差 3，被 `abs(modal-页底)>3` 挡掉），行数也够（120/2=60pt ≥ 20）。
+        //   ⇒ 判据给 nil，而证人必须把 (239:120) 摆在第二名。这两句同时成立才是 147 的第一行。
+        var nearMiss = Array(repeating: page, count: 471)
+        nearMiss.append(contentsOf: Array(repeating: 239, count: 120))
+        XCTAssertNil(Self.cardFill(modals: nearMiss, pageLuma: page, scale: 2),
+                     "① 的前提：这一档差 3，正被判据的门限挡掉 ⇒ 判据必须给 nil")
+        let seen = Self.fillCandidates(modals: nearMiss)
+        XCTAssertEqual([236, 239], seen.map { $0.luma },
+                       "① 前三名必须**含页底那一档**（不是只报「离页底够远」的那些）："
+                       + "否则「前三名全是页底」和「材质在但太近」这两种形状在这行读数里长得一样")
+        XCTAssertEqual([471, 120], seen.map { $0.rows },
+                       "① 行数要跟着打：147 的第一行判据是「行数/倍率 ≥20pt」，只角色号就判不了")
+        // ② **通道问题**的形状：整带只有页底 ⇒ 那台机器根本没画材质。
+        let flat = Array(repeating: page, count: 300)
+        XCTAssertNil(Self.cardFill(modals: flat, pageLuma: page, scale: 2))
+        let flatRanked = Self.fillCandidates(modals: flat)
+        XCTAssertEqual([page], flatRanked.map { $0.luma },
+                       "② 与①的区别只能靠这一格读出：前三名全等于页底 ⇒ 不是门限，是那条通道本身没画")
+        XCTAssertEqual([300], flatRanked.map { $0.rows }, "② 行数也要对上，否则这一行的两个数没有意义")
+        // ③ 名次按**行数**，不是按色号（变异臂 M562 动的就是这一格）：
+        //   色号最大的那一档（239）只有 4 行 ⇒ 只能排第三；按色号排的写法会给出 (239, 236, 12)。
+        var ranked = Array(repeating: page, count: 471)
+        ranked.append(contentsOf: Array(repeating: 239, count: 4))
+        ranked.append(contentsOf: Array(repeating: 12, count: 6))
+        XCTAssertEqual([236, 12, 239], Self.fillCandidates(modals: ranked).map { $0.luma },
+                       "③ 前三名是「占多少行」的排名；按色号排会把一条 1pt 的分隔线顶到最前面"
+                       + "（R96/R97 那条真病根就是「第一行离页底最远的档」被当成了卡片）")
+        // ④ 行数并列 ⇒ 按色号升（比较器必须是全序，否则同一帧两遍两个前三名）。
+        //   输入故意取**不是回文**的那个数组：第一次我用 [80,200,200,80]，它的 reverse 和自身逐元素相同
+        //   ⇒ 那一条"输入顺序不影响这一行"是在拿同一个数组和自己比，恒真（R88 那一族：对照要真的有两态）。
+        let tied = [200, 80, 200, 80]
+        XCTAssertEqual([80, 200], Self.fillCandidates(modals: tied).map { $0.luma },
+                       "④ 两档各 2 行时必须给唯一答案（按色号升）")
+        XCTAssertEqual(Self.fillCandidatesLine(pageLuma: page, modals: tied, top: 2),
+                       Self.fillCandidatesLine(pageLuma: page, modals: Array(tied.reversed()), top: 2),
+                       "④ 输入顺序不影响这一行：CI 上读到的一行必须与那一遍的遍历顺序无关")
+        // ⑤ 档数不足前三名 ⇒ 有几档报几档，不许凑数也不许报错
+        XCTAssertEqual(2, Self.fillCandidates(modals: [10, 10, 20], top: 3).count,
+                       "⑤ 只有两档时打两档；「前三」是个上限，不是必须凑满的格式")
+        // ⑥ 空数组 ⇒ 「无」，**不是空串**：空串在日志里与"那一行压根没打出来"读起来一样，
+        //   而那正是 147 的第三种形状（判据没走到这一步）。这一格是三种形状之间的分隔线本身。
+        XCTAssertEqual("页底=\(page) 前三=无 门槛=abs(档-页底)>3且行数/倍率>=20pt",
+                       Self.fillCandidatesLine(pageLuma: page, modals: []),
+                       "⑥ 没有档的时候必须写出「无」，否则第三种形状（没走到）与第二种（全是页底）"
+                       + "在 CI 上无法区分")
     }
 
     /// 每张卡片都得补那份留白：`GroupBox` 的个数必须等于 `settingsCardInset()` 的个数。

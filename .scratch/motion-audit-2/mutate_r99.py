@@ -73,8 +73,16 @@ def run(test_filter, timeout=2400):
     return ("CAUGHT" if proc.returncode != 0 else "ESCAPED"), out, ""
 
 
+# **还原臂的基准必须是钉死的 commit，不能是 `HEAD`**（R100 的电池抓出来的，U-277）：
+# 这一支的本意是"把两个产品文件换回**本轮改之前**那一版"，而"改之前"在写它的那天恰好等于 `HEAD`。
+# R99 一提交，`HEAD` 就前进到**已经修好**的那一版 ⇒ 还原臂还原了个空，
+# 于是它在 R100 的电池里以 `M554: ESCAPED` 的形式露出来 —— 不是判据没牙，是**参照点会自己走**。
+# 3a05933 = R98 那一版（本轮改动之前），从此这一支与 `HEAD` 无关，永远还原到同一个状态。
+PRE_FIX_COMMIT = "3a05933"
+
+
 def git_show(path):
-    proc = subprocess.run(["git", "show", "HEAD:ClipboardHistory/" + path],
+    proc = subprocess.run(["git", "show", PRE_FIX_COMMIT + ":ClipboardHistory/" + path],
                           cwd="/Users/wangziyi/Codex_Project0", capture_output=True,
                           text=True)
     if proc.returncode != 0:

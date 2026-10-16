@@ -117,6 +117,18 @@ def main():
         sub = [s for r, s in phase2 if int(re.match(r"\d+", r).group(0)) <= cut]
         print("PHASE2_TO_%s n=%d mean=%.2f" % (cut, len(sub), sum(sub) / float(len(sub))))
     print("SCORES_BY_ROUND " + " ".join("%s=%d" % (r, s) for r, s in readings[-4:]))
+    # **中间断档也要挡**（R100 / U-278 补的这一格）：上面那行 `GAPS=[99]` 原来只是**印出来**。
+    # 本轮我往台账里插新章节时，编辑工具的 old_string 只填了上一节的标题行，
+    # 于是"插入"变成"替换"，`## Round 99 · …` 整行被吃掉 —— 曲线照样打 `last=100`、
+    # 均值照样算得出（少一轮而已），而 `exit` 是 0。
+    # 尾轮守卫挡不住它（尾轮确实在），只有断档检查看得见，可它当时没有牙。
+    # 这正是本文件顶部那段话讲的错，只不过这次坏在**报出来了却不负责**。
+    # 结论行仍然全部打在闸门**之前**（R53 那条规矩）：先让这一遍的读数全部落地，再决定红不红。
+    if missing:
+        print("CURVE_GAP 曲线中间断了 %s ⇒ 少一轮不报错、只会让均值跟着错"
+              "（出处：R100 的台账编辑吃掉了 Round 99 的标题行）" % missing)
+        return 1
+    return 0
 
 
 sys.exit(main())
