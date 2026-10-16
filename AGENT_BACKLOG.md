@@ -1940,6 +1940,10 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     R89 把看门狗修到真的能收掉 xctest（D-147），但这条差本身要等下一次 CI 的
     `UI_PROBE_RUNNER_ALIVE` / `UI_PROBE_ORPHAN_XCTEST` 两格才算有读数。
 
+    → **R90 的读数**：`UI_PROBE_ORPHAN_XCTEST=0`（R88 三条 run 连着是 1）⇒ R89 的收杀够到了；
+    `skipped 步骤数 = 0`（R88 是 7）⇒ 四道硬门挪位置生效，仪器的红不再吃掉产品的证据。
+    92 剩下的那一问仍然是：**本机 90 秒能跑完 vs runner 240 秒收不掉**，这一格还没有名字。
+
 93. **在屏探针在无头 runner 上到底挂在哪一句**（R62 开 / 92 的另一半）：
     R62 的覆盖门让「11 条判据今天只有作者本机跑过」这件事可见了，但没让它消失。
     已知事实：runner 上 `swift test --filter UIInteractionProbeTests` 在 240s 内**一条用例都没下结论**
@@ -1997,6 +2001,16 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     那时原文列的三条候选原因要整条重排；若报 `UI_PROBE_ALL_CONCLUDED=1`，
     说明 92/93 的前提（runner 上跑不动）已经不成立，那两条一起结案。
     三种结果都是答案，而这一格的价值就在于它**不许**留成『大概是无头会话的问题』。
+
+    → **R90：这一格第一次有名字，而且是两个独立证人同意的**。
+    ① 产品自己发的心跳（`probe-pulse.log`，`setUpWithError` 每条用例一行）点名
+    `testDragSelectExpandsSelectionInsideTheRealList`：开了口、没有结论；
+    ② `sample` 采到的栈：`MouseSynthesizer.drag → NSWindow sendEvent: → _NSGFGestureEnvironment
+    → NSCoreDragManager _dragUntilMouseUp → CoreDragStartDraggingAsync
+    → _BlockUntilNextEventMatchingListInMode → mach_msg`（0% CPU，在睡，不是在转）。
+    ⇒ 机制：**CoreDrag 的模态循环在等一个不会来的 mouseUp**，本机可复现，不是 runner 专属。
+    ⇒ 一条措辞更正：R89 说"93 的成因在 runner 上被确认"，确认的是**通道为什么丢日志**，
+    不是**为什么挂死**。修法（加看门狗 vs 绕开 `sendEvent` 直接调手势逻辑）开成 **BACKLOG 125**。
 
 94. **浮层与侧栏的行首用 📄 emoji 当文件图标**（R63 看 `quickpick-typed-420x300-light.png` 时看到）：
     来源是 `EntryPresentation.preview(for:)` 里 `"📄 \(url.lastPathComponent)"` ——
@@ -2764,6 +2778,18 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     ③ 取不到名字时心跳要自己说"取不到"，不许静默写一条没名字的行；
     ④ 整行一次 write（R81 那一课：内容与换行分两次写会被并发缝在一起）。
 
+    → **R90 结案**，但**通道与 R89 定的不一样**：先量再动手，结果量掉了自己写的前提 ——
+    `swift test` 下 fd1/fd2 都指向 SwiftPM 驱动的管道，驱动被 SIGKILL 时 stdout 与 stderr
+    **一起丢**（`spike_r90_channel_diag.sh`），所以"stderr 那条腿活得过 SIGKILL"是假的。
+    实际落地：心跳写**自己 open 的文件**（`CLIPBOARD_HISTORY_PROBE_PULSE` → `probe-pulse.log`，
+    复用 `CaptureReadings` 的锁与整行原子写），`ui_probe_report.py --pulse` 把它与 stdout
+    的 started/concluded 做**双通道对照**：一致才点名（`UI_PROBE_CHANNELS_AGREE=1`），
+    不一致就退回"只报观察不报成因"（`UI_PROBE_CHANNELS_CONTRADICT`）。
+    正对照用的是产品写出的原件（`scripts/tests/fixtures/r90_pulse_real.log`），不是我造的字符串。
+    牙 M497–M504 共八刀全 CAUGHT；其中「心跳改成 print（走 stdout ⇒ 驱动那层的缓冲，被 kill -9 就没了）」与「`PULSE_EMPTY` 那一格从红改成绿（通道坏了却宣布有名字）」两刀管的就是通道本身
+    （一刀把心跳退回 print ⇒ 它又变成会被驱动吞掉的装饰；一刀把 `PULSE_EMPTY` 改成绿 ⇒
+    通道坏了却宣布"有名字"）。
+
 123. **（R88 开 → R88 当场撤回）设置侧栏暗档那五行"黑字黑底"不是新发现，是 D-090 / D-094 / R39 已经量过并守卫住的通道盲区**：
 
     我开了这条的依据：`settings-data-720x540-dark.png` 侧栏未选中五行标签峰值 30、背景 28（对比度 ≈1.07:1），
@@ -2806,3 +2832,43 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     所以"版本号相同"完全不能当"包相同"的证据），`INSTALL_SHA_MATCH=1`、`INSTALL_RUNNING_PID=34203`
     （启动晚于安装、exe 路径逐字对上 `/Applications/时间剪史.app`）、存档 105→105、`SMOKE_OK=1`。
     第②步（升成 `scripts/` 里的判据 + 自测 + CI 报告型一步）仍然开着，交下一轮。
+
+    R90 **没做第②步**：本轮非台账文件已到 7 个（约定 ≤4），再叠一步会让"哪一处让 CI 变了"分不清
+    （见 D-148 与本轮正文 §5）。这条欠账继续挂着，不许被读成"已经升成判据了"。
+125. **拖选探针挂在 CoreDrag 的模态循环里：现在能点名，还没修**（R90 开 / 与 92、93、122 同族）：
+
+    R90 把 122 做完之后，93 第一次有了名字 —— 心跳点名
+    `testDragSelectExpandsSelectionInsideTheRealList`，`sample` 的栈独立同意机制：
+    `NSCoreDragManager _dragUntilMouseUp → CoreDragStartDraggingAsync →
+    _BlockUntilNextEventMatchingListInMode → mach_msg`（0% CPU 在睡）。
+    ⇒ 这是**合成 mouseDown 之后系统进了拖拽模态循环，而合成的 mouseUp 永远送不进去**。
+    本机可复现（不是 runner 专属），所以它不是"CI 慢"，是这条探针的结构问题。
+    ⇒ 两条路，都要先 spike 再动仓库：
+    ① 给这条探针自己加一层超时：到点就 `NSApp.stopModal`/直接结束拖拽会话，并**主动打一行
+    "我掐掉了自己"** —— 宁可少一条判据，也不要一条会挂死的判据；
+    ② 绕开 `sendEvent`：直接调手势/选择逻辑（`List` 的 selection 变更那条），
+    代价是它不再经过真实事件路径 ⇒ 判据资格要重谈（与 104"证人必须与判据同一颗尺子"同族）。
+    ⇒ 不许的处置：把这条探针删掉（那是删测试绕开检查）；或者把它标成"已知会挂"就完事 ——
+    看门狗现在能收尸、报告器能点名，但**收尸不等于修好**。
+126. **离屏捕获对侧栏语义色图标的解析在同一列里不一致；暗档侧栏逐行读数只有一份**（R90 开 / 与 96、116、123 同族）：
+
+    R90 重做设置「统计」这一屏的看图时，第一次用**双边**尺量到两件事：
+
+    ```
+    亮档侧栏：标签 最远 251/255（六行都可读）
+    亮档图标：快捷键/通用/隐私/数据 ≥8/255 的像素 **0 颗**，最远 4/255，极值色号纯白 (255,255,255)
+              推荐 ≥40 的 143 颗，极值纯黑 (0,0,0)      ← 同一列里两种解析结果
+    ```
+
+    ⇒ 与 `SettingsView.swift:808–815` 里 R30 记下的那条（`OffscreenSymbolInkProbeTests`
+    量到未选中行墨水比 0.0000，换成固定 `Color.black` 能到 0.175–0.402）是**同一族**：
+    离屏管线解析语义色。**但不是同一份读数**：R30 那份是"未选中四行全 0"，
+    今天这张帧是"四枚 0、`wand.and.stars` 那一枚纯黑" ⇒ 解析结果取决于**符号本身**。
+    ⇒ 三步：① **同一屏拿真机窗口截图（`screencapture`）与离屏帧对一次** ——
+    这件事这台机器就能做，以前被挂在"等用户真机"那一栏是记账错误；
+    ② 若真机可见 ⇒ 把"离屏帧不判图标可辨性"写成一格**声明**（与 `menuSurfaceReplicaFixtures` 同形状），
+    而不是每次看图时靠人记得；③ 若真机也不可见 ⇒ 那是产品缺陷，改着色路径。
+    ⇒ 顺带一条仪器欠账：本轮新写的 `r90_stats_visual.py` 在**暗档**上
+    `COLUMN_SEGMENTS=1 ⇒ NOT-RUN`（分隔线只有 ~10/255，门槛降到 8 之后 vibrancy 噪声把两列连成一段）。
+    修法是把列位置从**同主题亮档帧**推，或改用行投影切列。在那之前，暗档侧栏逐行读数只有 R88 那一份，
+    而那一份的**列身份**已被本轮证明错位（见 U-203）。

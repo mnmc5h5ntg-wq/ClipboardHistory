@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.ui_probe_report import main, report
+from scripts.ui_probe_report import PULSE, main, report
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r62_runner_ui.log"
 RUNNER_ECHO = FIXTURE.read_text(encoding="utf-8")
@@ -229,3 +229,191 @@ class NonRedundancyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class PulseChannelTests(unittest.TestCase):
+    """R90 / BACKLOG 122 · 第二条通道：每条用例在 setUpWithError 里写到自己文件上的一行心跳。
+
+    这一族存在的理由是一条被实测推翻的假设：R89 我以为 stderr（`FileHandle.write` = write(2)）
+    天然活得过 SIGKILL。R90 把它真的接上之后量到的是 —— 进程活着、已经跑进第二条用例的方法体，
+    `ui.log` 仍是 119 字节、`heartbeat=0`（`swift test … > ui.log 2>&1` 里 fd2 指向的是 SwiftPM
+    驱动的**管道**，驱动被杀时它那块缓冲一起丢）。⇒ 只能自己开文件写。
+    """
+
+    REAL_PULSE = (Path(__file__).resolve().parent / "fixtures" / "r90_pulse_real.log").read_text(
+        encoding="utf-8")
+
+    def testRealProductPulseLineIsParsed(self):
+        """正对照：正则读的是**产品今天真写出来的那两行**，不是我照着格式编的串。
+
+        夹具 `r90_pulse_real.log` 是 `spike_r90_pulse.sh` 在本机跑出来的原文件（逐字节拷进来）。
+        没有这一格，其余各格都只是在验"我看得懂我自己写的字"。
+        """
+        names = [m.group(1) for m in PULSE.finditer(self.REAL_PULSE)]
+        self.assertEqual(["testAccessibilityTreeCoverage",
+                          "testDragSelectExpandsSelectionInsideTheRealList"], names,
+                         "解析不出产品自己写的那两行 ⇒ 通道接上了也没人读它")
+
+    def testPulseNamesEveryCaseThatOpenedWithoutConclusion(self):
+        """R88 的形状（日志只有 build 那 119 字节、started=0）+ 心跳有内容 ⇒ 第一次能点名。
+
+        两条都报，不是只报最后那条：这一份日志里**两条都没有结论**，
+        而 `UI_PROBE_HUNG` 的语义就是"开了口没结论"。只报最后一条会把
+        "第一条的结论也丢了"这件事说成"第一条正常结束"。（我第一版期望写的是只报一条，
+        那是我心里把这条标记当成了"挂死的那条" —— 语义由代码定，不由我的直觉定。）
+        """
+        lines, named = report("[0/1] Planning build\nBuild complete! (0.16s)\n", 1, self.REAL_PULSE)
+        text = "\n".join(lines)
+        self.assertTrue(named, "心跳点出来了还不许说『没有名字』：" + text)
+        self.assertEqual(1, text.count("UI_PROBE_HUNG=testAccessibilityTreeCoverage"))
+        self.assertEqual(1, text.count("UI_PROBE_HUNG=testDragSelectExpandsSelectionInsideTheRealList"))
+        self.assertIn("UI_PROBE_HUNG_CHANNEL=pulse", text)
+        self.assertIn("UI_PROBE_CHANNELS pulse=2 started=0 concluded=0", text)
+        self.assertNotIn("UI_PROBE_LOG_EMPTY", text, "日志里有 build 行，它不是空文件")
+
+    def testPulseWinsWhenBothChannelsAgree(self):
+        log = started("testAlpha") + started("testBeta") + concluded("testAlpha") + "\n"
+        pulse = "PROBE_PULSE testAlpha\nPROBE_PULSE testBeta\n"
+        lines, named = report(log, 1, pulse)
+        text = "\n".join(lines)
+        self.assertTrue(named)
+        self.assertIn("UI_PROBE_HUNG=testBeta", text)
+        self.assertIn("UI_PROBE_HUNG_CHANNEL=pulse", text)
+        self.assertIn("UI_PROBE_CHANNELS_AGREE=1", text)
+        self.assertEqual(1, text.count("UI_PROBE_HUNG=testBeta"))
+
+    def testContradictingChannelsAreRedNotCherryPicked(self):
+        """两条通道各点一条不同的 ⇒ 至少一条不可信。这一格不许挑一个信，也不许静默优先。"""
+        log = started("testAlpha") + "\n"
+        pulse = "PROBE_PULSE testBeta\n"
+        lines, named = report(log, 1, pulse)
+        text = "\n".join(lines)
+        self.assertFalse(named, "通道互相矛盾时给名字=替一条说谎的通道签字：" + text)
+        self.assertIn("UI_PROBE_CHANNELS_CONTRADICT", text)
+        self.assertIn("UI_PROBE_HUNG_LOG=testAlpha", text, "日志那条仍要打出来，但要换个标记")
+
+    def testEmptyPulseWhileRunnerAliveIsABrokenChannel(self):
+        """接了心跳通道、进程还活着、却一条心跳都没有 ⇒ 是**通道坏了**，不是"用例没开始"。"""
+        lines, named = report("[0/1] Planning build\n", 1, "")
+        text = "\n".join(lines)
+        self.assertFalse(named, "心跳空着就退回旧通道，等于让装饰替结论签字：" + text)
+        self.assertIn("UI_PROBE_PULSE_EMPTY=1", text)
+
+    def testUnwiredPulseKeepsTheOldVerdict(self):
+        """`--pulse` 没传（本地手跑、老日志）⇒ 维持 R88 那一格，不许假装心跳通道在。"""
+        lines, named = report("[0/1] Planning build\n", 1, None)
+        text = "\n".join(lines)
+        self.assertTrue(named)
+        self.assertIn("UI_PROBE_START_LINES_LOST=1", text)
+        self.assertIn("BACKLOG 122", text, "没接线时那句『还缺心跳』要留在原地，别被新代码抹掉")
+        self.assertNotIn("UI_PROBE_PULSE_EMPTY", text)
+
+    def testCliPassesThePulseFileThrough(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "ui.log"
+            log.write_text("[0/1] Planning build\n", encoding="utf-8")
+            pulse = Path(tmp) / "probe-pulse.log"
+            pulse.write_text(self.REAL_PULSE, encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = main([str(log), "--runner-alive", "1", "--pulse", str(pulse)])
+            text = out.getvalue()
+        self.assertEqual(0, code)
+        self.assertIn("UI_PROBE_HUNG=testDragSelectExpandsSelectionInsideTheRealList", text)
+
+    def testCliMissingPulseFileIsAnnouncedNotSwallowed(self):
+        """路径没对上与 setUp 没跑到长得一样 ⇒ "我读不到"必须自己说出口。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "ui.log"
+            log.write_text("[0/1] Planning build\n", encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = main([str(log), "--runner-alive", "1",
+                             "--pulse", str(Path(tmp) / "definitely-absent.log")])
+            text = out.getvalue()
+        self.assertEqual(1, code, "读不到心跳文件而进程又活着 ⇒ 通道坏了，这一卷没有名字")
+        self.assertIn("UI_PROBE_PULSE_UNREADABLE", text)
+        self.assertIn("UI_PROBE_PULSE_EMPTY=1", text)
+
+
+class PulseWiringTests(unittest.TestCase):
+    """心跳这条通道**接没接上**要能被跑出来，不能只被我记得。
+
+    R84 那一格（BACKLOG 124）刚教过：凡是"每一轮都要做"的事，没有可 grep 的证据行 +
+    会红的对账，它就会静默地不做。心跳同理 —— 删掉 `setUpWithError` 里那一行，
+    其余 25 格真值表照样全绿（它们读的是我自己造的字符串夹具）。
+    """
+
+    REPO = Path(__file__).resolve().parents[2]
+    PROBE = REPO / "ClipboardHistory" / "Tests" / "ClipboardHistoryAppTests" / "UIInteractionProbeTests.swift"
+    CI = REPO / ".github" / "workflows" / "ci.yml"
+
+    EMIT_LINE = "        CaptureReadings.emit(\"PROBE_PULSE \\(pulseStamp)\", to: Self.pulseURL)\n"
+    SETUP_HEAD = "    override func setUpWithError() throws {\n"
+
+    def testEmitLineIsTheFirstStatementOfSetUp(self):
+        text = self.PROBE.read_text(encoding="utf-8")
+        self.assertEqual(1, text.count(self.SETUP_HEAD),
+                         "setUpWithError 的定义行不是恰好一处 ⇒ 位置判据没有对象")
+        at = text.index(self.SETUP_HEAD)
+        body = text[at:at + 400]
+        self.assertIn(self.EMIT_LINE, body,
+                      "心跳不在 setUpWithError 里 ⇒ 它不会每例必到（BACKLOG 122 的整条理由）")
+        self.assertLess(body.index(self.EMIT_LINE), body.index("try super.setUpWithError()"),
+                        "心跳排在 super 之后 ⇒ 一旦 super 里出问题这一行就不写了，通道会静默变窄")
+
+    def testPulseUsesTheFileChannelNotStdoutOrStderr(self):
+        """`emit` 那一条腿换成 stdout/stderr 都会让通道在 SIGKILL 下消失（R90 实测的那件事）。"""
+        text = self.PROBE.read_text(encoding="utf-8")
+        at = text.index(self.SETUP_HEAD)
+        body = text[at:at + 400]
+        self.assertIn("CaptureReadings.emit(", body)
+        for banned in ("print(", "FileHandle.standardError", "standardOutput"):
+            self.assertNotIn(banned, body,
+                             "心跳走了 %s ⇒ 那是驱动那层的缓冲，被 kill -9 时整块丢（本轮的起因）" % banned)
+
+    def testPulseFileIsNotTheCaptureSuitesFile(self):
+        """两条卷共用一份读数文件会互相整份重写 —— 这一格钉的是"心跳有自己的文件名"。"""
+        text = self.PROBE.read_text(encoding="utf-8")
+        self.assertIn('"probe-pulse.log"', text,
+                      "心跳文件名不是自己的 ⇒ 会和捕获卷的 capture-readings.log 撞，"
+                      "第一次写就把别人那卷整份抹掉")
+        self.assertNotIn('appendingPathComponent("capture-readings.log")', text)
+
+    def testCiWiresThePulseIntoBothReportCalls(self):
+        ci = self.CI.read_text(encoding="utf-8")
+        self.assertEqual(2, ci.count("--pulse /tmp/probe-pulse.log"),
+                         "报告器两处调用里有一处没接 --pulse ⇒ 那一处的名字仍然只来自会被丢的通道")
+        self.assertIn("CLIPBOARD_HISTORY_PROBE_PULSE=/tmp", ci,
+                      "CI 没给心跳目录 ⇒ 探针会退回默认路径，而闸门读的是 /tmp 那个文件")
+
+    SHOTS_RE = __import__("re").compile(r"CLIPBOARD_HISTORY_UI_SHOTS=(/\S+)")
+    READINGS_RE = __import__("re").compile(r"--readings (\S+)")
+
+    def testCaptureAndProbeSuitesDoNotShareTheReadingsFile(self):
+        """R90 的那朵新红：两步共用一个 shots 目录 ⇒ 后一步第一次写把前一步的读数整份换掉。
+
+        `CaptureReadings` 的"每个进程第一次写要整份重写"是对的（上一遍的读数冒充这一遍比没读数更坏），
+        错的是把两份**同一次运行里不同卷**的读数放进同一个文件。R89 之前捕获闸门紧跟捕获步骤，
+        这个共用从来没人看见；把闸门挪到证据之后（U-193 的修法）它就红了。
+        """
+        ci = self.CI.read_text(encoding="utf-8")
+        # 只看在屏那一卷与捕获那一卷各自的 env 行（按步骤切块，避免跨步骤 grep 造出假矛盾）
+        def step_body(name):
+            at = ci.index("- name: " + name)
+            nxt = ci.find("\n      - name: ", at)
+            return ci[at:nxt if nxt > 0 else len(ci)]
+
+        capture = step_body("Offscreen frame capture (report-only, gated below)")
+        onscreen = step_body("On-screen interaction probes (report-only)")
+        cap_dirs = set(self.SHOTS_RE.findall(capture))
+        probe_dirs = set(self.SHOTS_RE.findall(onscreen))
+        self.assertEqual(1, len(cap_dirs), "捕获卷的 shots 目录不止一个 ⇒ 这条判据没有对象")
+        self.assertEqual(1, len(probe_dirs), "在屏卷的 shots 目录不止一个 ⇒ 同上")
+        cap, probe = cap_dirs.pop(), probe_dirs.pop()
+        self.assertNotEqual(cap, probe,
+                            "两卷共用 %s ⇒ 在屏卷第一次写会把捕获卷的 capture-readings.log 整份换掉，"
+                            "而捕获闸门现在跑在它们之后" % cap)
+        gate = step_body("Capture gate (unregistered reds must be zero)")
+        readings = self.READINGS_RE.findall(gate)
+        self.assertEqual([cap + "/capture-readings.log"], readings,
+                         "闸门读的读数文件必须落在**捕获卷自己**那个目录下：%s" % readings)

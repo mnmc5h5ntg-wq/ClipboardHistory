@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### CI（R90）
+
+- 在屏探针的读数文件与捕获卷**分家**（`CLIPBOARD_HISTORY_UI_SHOTS` 换成 `/tmp/shots-probe`）：
+  两卷共用一份 `capture-readings.log` 时，"第一写整份重写"会把另一卷整份抹掉，
+  `Capture gate` 因此读到 `passed=0 NOT_RUN=49`。
+- 探针新增**每条用例一行心跳**：`CLIPBOARD_HISTORY_PROBE_PULSE` → `probe-pulse.log`，
+  由 `UIInteractionProbeTests.setUpWithError()` 发；CI 两次调用报告器都带 `--pulse`。
+
+### 判据与仪器（R90）
+
+- `scripts/ui_probe_report.py`：新增第二通道（`PULSE` 正则 + `--pulse`）。两条通道**一致**才点名
+  （`UI_PROBE_CHANNELS_AGREE=1`），不一致报 `UI_PROBE_CHANNELS_CONTRADICT` 并退回"只报观察不报成因"；
+  心跳文件读不到时打 `UI_PROBE_PULSE_UNREADABLE=`（仪器坏了必须红，不许静默绿）。
+- `scripts/tests/test_ui_probe_report.py`：`PulseChannelTests`（含用产品原件做正对照）+
+  `PulseWiringTests`（按步骤切片查接线与目录归属，跨步骤 grep 不算）。
+- `scripts/tests/fixtures/r90_pulse_real.log`：产品自己写出的心跳原件，判据直接读它。
+- `.scratch/motion-audit-2/`：`r90_stats_visual.py`（双边侧栏尺 + 按结构推列 + 四档阈值 +
+  格式串 arity 自检）、`mutate_r90_pulse.py`（M497–M504（M497、M498、M499、M500、M501、M502、M503、M504）：8 刀 CAUGHT，没有逃掉的）、三支 spike（心跳 / 通道诊断 / 脉搏接线）。
+
+### Docs（R90）
+
+- BACKLOG **122 结案**（心跳落地，通道从 stderr 改成自己 open 的文件 —— 原前提被测量推翻）；
+  93 更新（第一次有名字，两个独立证人同意）；92 更新（`ORPHAN_XCTEST=0`、skipped 0）；
+  124 更新（第②步仍欠）；新开 **125**（拖选探针挂在 CoreDrag 模态循环）与
+  **126**（离屏捕获对侧栏语义色图标解析不一致 + 暗档逐行读数只有一份）。
+
 ### CI（R89）
 
 - 在屏探针的看门狗补第二刀：残留的 `xctest` 由**父壳在 `wait` 之后**照它自己的 pgid 收掉

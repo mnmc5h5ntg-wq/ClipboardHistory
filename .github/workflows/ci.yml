@@ -127,7 +127,19 @@ jobs:
           # 实测（同一 run）：这一类探针在 runner 上**会挂死**（8 分钟被 GitHub 掐掉，什么数字都不留）。
           # 挂死和"跑得很慢"必须区分开，而且不能靠 GitHub 的步骤超时来兜 —— 那样日志里连部分结果都没有。
           # 所以自己带一个 240 秒的看门狗：到点按**进程组**收掉，然后照常汇报"跑到哪儿了"。
-          CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \
+          # R90 / BACKLOG 122：`CLIPBOARD_HISTORY_PROBE_PULSE` 是每条用例开头那行心跳的文件目录。
+          # 为什么不走 stderr（R89 我以为可以）：fd2 在 `> /tmp/ui.log 2>&1` 下指向的是 SwiftPM 驱动
+          # 的**管道**，驱动被 SIGKILL 时那块缓冲一起丢 —— 本机实测 119 字节、heartbeat=0。
+          # 目录用 /tmp 而不是 shots 目录：`CaptureReadings` 的默认文件与捕获卷同名，
+          # 共用会让在屏卷第一次写把捕获卷的读数整份重写掉。
+          # R90：在屏那一卷的 shots 目录**不能**与捕获卷共用。`CaptureReadings` 的读数文件名是按
+          # `CLIPBOARD_HISTORY_UI_SHOTS` 推导的，而它有一条自己的规矩：每个进程对每份文件第一次写要
+          # **整份重写**（上一遍的读数冒充这一遍，比没有读数更坏）。
+          # R89 把捕获闸门挪到所有产证据步骤之后（U-193 的修法）之后，这一卷的第一次写就把捕获卷那份
+          # 读数换成了自己的 ⇒ 闸门读到 `passed=0 NOT_RUN=49`（run 38838819089 的那朵红）。
+          # ⇒ 顺序修对了：证据先落地、红有名字；但它让一个原来"看不见"的共用文件变成了看得见的红。
+          CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-probe \
+            CLIPBOARD_HISTORY_PROBE_PULSE=/tmp \
             swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1 &
           pid=$!
           ( sleep 240
@@ -187,6 +199,7 @@ jobs:
           # 所以下一步（working-directory=. 的硬门）会再跑一遍同一份日志，跑错路径在那里会红。
           python3 ../scripts/ui_probe_report.py /tmp/ui.log \
             --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" \
+            --pulse /tmp/probe-pulse.log \
             || echo "UI_PROBE_REPORT_FAILED=1 报告脚本自己没跑成 ⇒ 『挂死在哪条』这句话今天没有依据，不许读成『探针已点名』"
           if [ -z "$executed" ]; then
             echo "没有跑完（看门狗在 240s 收掉了进程）：在屏探针在无头 runner 上不可用，记成 R3-D9 的已知边界"
@@ -436,7 +449,8 @@ jobs:
           # `&& … || …` 而不是直接写命令：这一步是 `bash -e`，非零会当场中止，
           # 后面那句解释就永远打不出来（上面那步踩过两次，注释里记着 run 号）。
           python3 scripts/ui_probe_report.py /tmp/ui.log \
-            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" | tee -a /tmp/probe-floor.log \
+            --runner-alive "$(cat /tmp/ui-runner-alive 2>/dev/null || echo '?')" \
+            --pulse /tmp/probe-pulse.log | tee -a /tmp/probe-floor.log \
             && report_status=0 || report_status=$?
           if [ "${report_status:-0}" != "0" ]; then
             echo "PROBE_FLOOR_STOP_UNNAMED=1 在屏那一卷停了，而报告给不出它是怎么停的（退出码 ${report_status}）"

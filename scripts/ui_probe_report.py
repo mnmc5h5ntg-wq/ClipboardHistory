@@ -19,7 +19,9 @@ BACKLOG 92 要的就是这一步：**没跑完也要说清是哪一条没跑完*
 ⇒ 日志的沉默**不能**单独推出"用例没开始"。所以本脚本多了一个入参 `--runner-alive`：
 成因由 CI 在收掉那一刻量的进程表决定，而不是由日志的缺席决定。
 
-输出（每行一条，全大写标记，便于 CI 与台账 grep）：
+输出（每行一条，全大写标记，便于 CI 与台账 grep）。**这份清单是契约**：新增一格就要写进来，
+而写进来就要有自己的测试格与自己的变异刀 —— 上一版这里停在 R88 的三格，R90 新加的那五格
+如果不补进来，"注释里的那份输出格式"就又是一份替事实背书的旧账。
 
     UI_PROBE_PROGRESS started=N concluded=M
     UI_PROBE_HUNG=<用例名>              每条"开了口没结论"的用例一行（通常 0 或 1 条）
@@ -28,6 +30,16 @@ BACKLOG 92 要的就是这一步：**没跑完也要说清是哪一条没跑完*
     UI_PROBE_NO_CASE_STARTED=1          连 xctest 都没起来 ⇒ 真死在启动阶段
     UI_PROBE_NO_START_LINE=1            只报观察：日志里没有 started 行，而今天没量到进程表
     UI_PROBE_NAMED=0|1                  这次停机**有没有名字**（0 = 只可能出现在脚本自己坏了）
+
+R90 / BACKLOG 122 加的第二条通道（每条用例在 `setUpWithError()` 里写到自己文件上的一行心跳）：
+
+    UI_PROBE_CHANNELS pulse=P started=N concluded=M     两条通道各给了多少证据
+    UI_PROBE_HUNG_CHANNEL=pulse|started                 点出来的名字是哪条通道给的
+    UI_PROBE_CHANNELS_AGREE=1                           两条点的是同一批（心跳不是孤证）
+    UI_PROBE_CHANNELS_CONTRADICT pulse=… started=…      各点一条不同的 ⇒ 红，不许挑一个信
+    UI_PROBE_PULSE_EMPTY=1                              接了通道、进程又活着，却一条都没有 ⇒ 通道坏了
+    UI_PROBE_PULSE_UNREADABLE=<路径>                    --pulse 指错了文件（与"没有心跳"分开记）
+    UI_PROBE_HUNG_LOG=<用例名>                          矛盾时把日志那条也打出来，换个标记
 
 退出码：0 = 给出了名字（跑完了、挂在哪条说清了、或一条都没开始也说清了）；
 1 = **给不出名字**，只有两种形状会走到这里，而它们都不是"探针坏了"，是"这份日志没资格说这句话"：
@@ -48,6 +60,11 @@ import sys
 # XCTest 的两类行。`started` 与 `passed|failed|skipped` 的行名格式一致，只是结尾不同。
 CASE = re.compile(r"Test Case '-\[[^\]]*?\b([A-Za-z0-9_]+)\]' (started|passed|failed|skipped)")
 
+# R90 / BACKLOG 122 · 每条用例在 `setUpWithError()` 里写到自己文件上的心跳。
+# 名字与 `CASE` 同一个命名空间（都是 `-[Module.Class testName]` 里抠出来的 `testName`），
+# 所以两条通道可以对账；对不上时 `UI_PROBE_CHANNELS_CONTRADICT` 会红，而不是挑一个信。
+PULSE = re.compile(r"^PROBE_PULSE ([A-Za-z0-9_]+)[ \t]*$", re.M)
+
 # 崩溃/中止的旁证：有这些行时"没结论"是进程级的死法，不是某条用例的死法。
 CRASH = ("Fatal error", "Precondition failure", "signal code ", "Killed", "error: Exited with unexpected signal")
 
@@ -57,7 +74,7 @@ CRASH = ("Fatal error", "Precondition failure", "signal code ", "Killed", "error
 ECHO_MARKERS = re.compile(r"ui suite exit:|##\[group\]|没有跑完（看门狗")
 
 
-def report(text, runner_alive=None):
+def report(text, runner_alive=None, pulse_text=None):
     """返回 (行列表, 是否给出了名字)。
 
     `runner_alive`：CI 那一步在**收掉进程的那一刻**量到的"跑用例的 xctest 还在不在"
@@ -71,11 +88,35 @@ def report(text, runner_alive=None):
     而 R88 按 CI 原样重跑（`.scratch/motion-audit-2/spike_r88_ci_shape.sh`）读到的是
     `log_bytes=119 started=0` 而 xctest 活着 ⇒ 那句话不成立，它是第②种成因。
     """
+    # R90 / BACKLOG 122 · 第二条通道：每条用例在 `setUpWithError()` 里往**自己的文件**写一行心跳。
+    # 为什么不用 stderr（R89 我以为是）：`swift test … > ui.log 2>&1` 里 fd2 指向的是 SwiftPM 驱动的
+    # 管道，驱动被 SIGKILL 时它那块缓冲一起丢 —— 本机实测：进程活着、已跑进第二条用例的方法体，
+    # `ui.log` 仍是 119 字节（`.scratch/motion-audit-2/r90_findings_drag_hang_and_channel.md`）。
+    # 放在最前面算：日志整块丢的时候（R88 的形状）它是**唯一**还有内容的通道，
+    # 那时连"日志是空的"这一句都要让位给心跳点出来的名字。
+    pulse = []
+    if pulse_text:
+        for match in PULSE.finditer(pulse_text):
+            if match.group(1) not in pulse:
+                pulse.append(match.group(1))
     if not text.strip():
+        if pulse:
+            # 日志一个字没有，而心跳有 ⇒ 通道丢了但用例确实开了口，而且知道是哪一条。
+            # 这一格不许再报 `LOG_EMPTY` 那种"我没有它的输出"：我现在有它的输出，只是不在那份文件里。
+            lines = ["UI_PROBE_PROGRESS started=0 concluded=0",
+                     "UI_PROBE_CHANNELS pulse=%d started=0 concluded=0" % len(pulse),
+                     "UI_PROBE_LOG_EMPTY=1 日志是空的（驱动那层被 SIGKILL，块缓冲整块丢）"]
+            for name in pulse:
+                lines.append("UI_PROBE_HUNG=%s" % name)
+            lines.append("UI_PROBE_HUNG_CHANNEL=pulse")
+            lines.append("UI_PROBE_START_LINES_LOST=1 "
+                         "（日志空而心跳有 ⇒ 成因是通道丢，不是『一条用例都没开始』）")
+            return lines, True
         # 空文件与"进程一条用例都没开始"在日志里长得一模一样，但成因不同：
         # 前者是**仪器**没把东西写下来（重定向没建成、路径写错、被 truncate 过）。
         # 把仪器故障报成一句关于产品的结论，是这一族最贵的错（R64 那一课）。
         return (["UI_PROBE_LOG_EMPTY=1 日志是空的 ⇒ 这不是『探针没跑』，是『我没有它的输出』"], False)
+
     started, concluded = [], {}
     for match in CASE.finditer(text):
         name, state = match.group(1), match.group(2)
@@ -88,8 +129,38 @@ def report(text, runner_alive=None):
     lines = ["UI_PROBE_PROGRESS started=%d concluded=%d" % (len(started), len(concluded))]
     # 只报"开了口却没有结论"的那些，并保持在日志里的先后顺序
     hung = [n for n in started if n not in concluded]
-    for name in hung:
+    pulse_hung = [n for n in pulse if n not in concluded]
+    lines.append("UI_PROBE_CHANNELS pulse=%d started=%d concluded=%d"
+                 % (len(pulse), len(started), len(concluded)))
+
+    # 两条通道各点一条不同的"没结论" ⇒ 至少一条在说谎。这一格不许挑一个信：
+    # 心跳在 setUp 第一行、started 在 XCTest 自己那里，两者对不上说明**其中一条通道被截断或串行**，
+    # 而那正是这一族最贵的错（把仪器的不一致当成产品的答案）。
+    if pulse_hung and hung and set(pulse_hung) != set(hung):
+        lines.append("UI_PROBE_CHANNELS_CONTRADICT pulse=%s started=%s "
+                     "（两条通道各自点出不同的那条 ⇒ 至少一条不可信，这一格不许挑一个信）"
+                     % (",".join(pulse_hung), ",".join(hung)))
+        for name in pulse_hung:
+            lines.append("UI_PROBE_HUNG=%s" % name)
+        for name in hung:
+            lines.append("UI_PROBE_HUNG_LOG=%s" % name)
+        return lines, False
+
+    # 优先用心跳那条：它是**产品自己写的行**，而 started 那行要经过驱动的管道（会被整块带走）。
+    names, channel = (pulse_hung, "pulse") if pulse_hung else (hung, "started")
+    for name in names:
         lines.append("UI_PROBE_HUNG=%s" % name)
+    if names:
+        lines.append("UI_PROBE_HUNG_CHANNEL=%s" % channel)
+    if pulse_hung and hung and set(pulse_hung) == set(hung):
+        lines.append("UI_PROBE_CHANNELS_AGREE=1 （两条通道点的是同一批 ⇒ 心跳那条不是孤证）")
+    # 接了心跳通道却一条都没有，而进程收掉时还活着 ⇒ 不是"用例没开始"，是**这条通道自己坏了**。
+    # 这一格必须红：否则"我加了心跳"会变成一条没人验过的装饰（R88 那一族的反面）。
+    if pulse_text is not None and not pulse and runner_alive == 1:
+        lines.append("UI_PROBE_PULSE_EMPTY=1 心跳文件在、收掉那一刻 xctest 还活着，却一条心跳都没有 ⇒ "
+                     "通道坏了（路径没对上、写盘失败、或 setUp 之前就没跑起来）。"
+                     "这一格不许被读成『用例一条都没开始』，也不许退回 started 那条通道当结论")
+        return lines, False
 
     # 反方向的不自洽：有结论却没见过它开始。真日志里这是可能的 —— stdout 成块丢（R64 那一族）
     # 会把 started 行丢掉而留下结论行。那时"挂死在哪条"这句话就没有依据，必须红而不是猜。
@@ -126,10 +197,15 @@ def report(text, runner_alive=None):
     # R88：到这里只剩"原始日志、零条 started 行"这一种形状，而它有两种成因。
     # 日志自己分不开 ⇒ 用 CI 在收掉那一刻量到的 `runner_alive` 分开（见 report 的 docstring）。
     if runner_alive == 1:
+        # R90：这条通道接上之后，"没名字"这一句多半不再成立 —— 但它不许被删掉，
+        # 因为心跳没接上的机器（本地手跑、老日志）仍然会走到这里，那时它就是实话。
+        tail = ("『挂在哪一条』由心跳那条通道点出来了（上面的 UI_PROBE_HUNG / UI_PROBE_HUNG_CHANNEL=pulse）"
+                if pulse_hung else
+                "『挂在哪一条』仍然没有名字 —— 那需要每条用例自己写一行（BACKLOG 122，"
+                "而它**不**能走 stderr：见 report() 里 R90 那段）")
         lines.append("UI_PROBE_START_LINES_LOST=1 "
-                     "（收掉的那一刻 xctest 还活着 ⇒ 用例确实开了口，是 stdout 的块缓冲被 SIGKILL 整块带走。"
-                     "这一格取代 R86–R87 那句 `NO_CASE_STARTED`：那句当时是假话。"
-                     "『挂在哪一条』仍然没有名字 —— 那需要每条用例自己写一行（BACKLOG 122））")
+                     "（收掉的那一刻 xctest 还活着 ⇒ 用例确实开了口，是驱动那层的缓冲被 SIGKILL 整块带走。"
+                     "这一格取代 R86–R87 那句 `NO_CASE_STARTED`：那句当时是假话。%s）" % tail)
         return lines, True
     if runner_alive == 0:
         lines.append("UI_PROBE_NO_CASE_STARTED=1 "
@@ -149,6 +225,10 @@ def main(argv=None):
     parser.add_argument("--runner-alive", default=None,
                         help="收掉进程那一刻 xctest 的数量（CI 量的：1=用例在跑⇒日志丢了；"
                              "0=没起来⇒真没开始；不传=只报观察不报成因）")
+    parser.add_argument("--pulse", default=None,
+                        help="每条用例在 setUpWithError 里写的心跳文件（BACKLOG 122）。"
+                             "不传=这条通道没接线；传了而文件读不到=按空内容处理，"
+                             "由 `--runner-alive` 决定那是不是通道坏了")
     args = parser.parse_args(argv)
 
     alive = None
@@ -168,7 +248,20 @@ def main(argv=None):
         print("UI_PROBE_LOG_UNREADABLE=%s（%s）⇒ 这一格不许被读成『探针没事』" % (args.log, error))
         return 1
 
-    lines, named = report(text, alive)
+    pulse_text = None
+    if args.pulse is not None:
+        try:
+            with open(args.pulse, encoding="utf-8", errors="replace") as handle:
+                pulse_text = handle.read()
+        except IOError as error:
+            # 心跳文件读不到**不是**"没有心跳"：路径没对上与 setUp 没跑到长得一样，
+            # 但只有后者是关于产品的。这里按空内容走，让 PULSE_EMPTY 那一格去判，
+            # 同时把"我读不到"这件事本身打出来（它不许被静默吞掉）。
+            print("UI_PROBE_PULSE_UNREADABLE=%s（%s）⇒ 这一格不许被读成『心跳通道正常』"
+                  % (args.pulse, error))
+            pulse_text = ""
+
+    lines, named = report(text, alive, pulse_text)
     for line in lines:
         if args.quiet and line.startswith("UI_PROBE_PROGRESS"):
             continue

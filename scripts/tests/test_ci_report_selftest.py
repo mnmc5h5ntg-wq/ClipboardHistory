@@ -76,8 +76,12 @@ SUBSTITUTIONS = {
          "; sed '/colorspace/d' /tmp/frames-raw.log | tee /tmp/frames.log"),
     ],
     "onscreen": [
-        (r"CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci \\\n\s*"
-         r"swift test --filter UIInteractionProbeTests > /tmp/ui\.log 2>&1 &",
+        # 环境变量那一串允许**任意多行续行**：R90 加了 `CLIPBOARD_HISTORY_PROBE_PULSE=/tmp`，
+        # 而上一版这里写死了"env 行紧跟 swift test"⇒ 自检当场红在锚点上（这正是它存在的意义：
+        # 步骤正文一改，夹具替换没落地就会红，而不是静默地"没执行到真命令"）。
+        (r"CLIPBOARD_HISTORY_UI_INTERACTION=1[^\n]*\n"
+         r"(?:\s*[A-Z_]+=\S*[^\n]*\\\n)*"
+         r"\s*swift test --filter UIInteractionProbeTests > /tmp/ui\.log 2>&1 &",
          "cp FAKE_LOG /tmp/ui.log &"),
     ],
     # R59：告警闸门那一步的夹具（真命令要在自检里被替成 cp 假日志）。

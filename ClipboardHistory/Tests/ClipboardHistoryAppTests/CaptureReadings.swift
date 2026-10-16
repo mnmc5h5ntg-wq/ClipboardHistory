@@ -62,6 +62,25 @@ enum CaptureReadings {
         }
     }
 
+    /// 同一套两条腿，但写到**指定**文件。
+    ///
+    /// 为什么要这个重载而不是让调用方共用 `emit(_:)`：`readingsURL` 是按
+    /// `CLIPBOARD_HISTORY_UI_SHOTS` 推导的，而 CI 的捕获卷与在屏卷用的是同一个目录 ——
+    /// 在屏卷第一次写会按"整份重写"的规矩把**捕获卷那份读数**抹掉（那条规矩本身是对的：
+    /// 上一遍的读数冒充这一遍，比没有读数更坏）。
+    /// 为什么要复用这一套而不是另写一份：锁、整行一次 write、第一次整份重写这三件事
+    /// 每一份读数通道都需要，抄一遍就会漏一条（R79 那两条读数缝在一起就是这么来的）。
+    static func emit(_ line: String, to url: URL) {
+        writeStdoutLine(line)
+        lock.lock()
+        defer { lock.unlock() }
+        do {
+            try appendLocked(line, to: url)
+        } catch {
+            channelBroken(error)
+        }
+    }
+
     /// stdout 那一条腿：一次 `write` 一整行（含换行）。
     /// 为什么不再用 `print`：`print` 走 stdio，会把它拆成"串"与"换行"两次写 ——
     /// 那正是 R79 那两条读数缝在一起的缝。

@@ -22,6 +22,59 @@ import XCTest
 final class UIInteractionProbeTests: XCTestCase {
     private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_INTERACTION"] == "1"
 
+    /// R90 / BACKLOG 122 · **每条判据开头一行心跳**，写文件而不是写 stderr。
+    ///
+    /// 为什么要它：`swift test` 的 `Test Case … started.` 走的是驱动的管道，被看门狗 `kill -9`
+    /// 收掉时整块丢失（R88 实测 119 字节；R89 本机 50 秒那一遍同样是 `started=0`）。
+    /// 于是 CI 只能报"这一卷没结论"，报不出"没结论时正在跑哪一条" —— 那正是 92/93 卡着的那一问。
+    ///
+    /// 为什么**不是** stderr（R89 我自己写下的假设，本轮被实测推翻）：
+    /// `FileHandle.standardError.write` 确实不经 stdio 缓冲，但 `swift test … > ui.log 2>&1`
+    /// 里 fd2 指向的是**SwiftPM 驱动的管道**，不是那个文件；驱动被 SIGKILL 时它自己的缓冲一起丢。
+    /// 实测：心跳加进 `setUpWithError` 之后，取样表 40/60/80/100/120 秒全是 `heartbeat=0`，
+    /// 而 `sample` 抓到主线程已经在第二条用例的方法体里 ⇒ 至少两次 setUp 跑过，行却不在日志里。
+    /// ⇒ 要活得过收杀，只能自己 `open()` 文件写。见 `.scratch/motion-audit-2/r90_findings_drag_hang_and_channel.md`。
+    ///
+    /// 为什么挂在 `setUpWithError` 而不是 11 条用例里各手写一行：新增判据不会漏
+    /// （R10 立的规矩是"名单从产品推导"，手写 11 行等于把名单交给我每次记得改）。
+    override func setUpWithError() throws {
+        CaptureReadings.emit("PROBE_PULSE \(pulseStamp)", to: Self.pulseURL)
+        try super.setUpWithError()
+    }
+
+    /// 心跳文件。路径由 CI 显式给（`CLIPBOARD_HISTORY_PROBE_PULSE`），没给就退回 shots 目录，
+    /// 但**永远用自己的文件名**：`CaptureReadings.readingsURL` 与捕获卷同目录同名，
+    /// 共用会把捕获卷那份读数整份重写掉（见那个重载的注释）。
+    ///
+    /// `nonisolated`：`setUpWithError` 继承自 XCTest，而它**不是** main-actor 隔离的 ——
+    /// 不加就会在 main-actor 的类里造出两条"从非隔离上下文引用 main-actor 成员"的告警，
+    /// 而这个仓库的构建门槛是 0 告警（CI 的 `Build (must be warning-free)` 那一步）。
+    /// 这里没有共享可变状态：URL 是纯函数式推出来的，写入由 `CaptureReadings` 自己的锁管。
+    private nonisolated static var pulseURL: URL {
+        let dir = URL(fileURLWithPath: pulseDirectory, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("probe-pulse.log")
+    }
+
+    private nonisolated static var pulseDirectory: String {
+        let configured = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_PROBE_PULSE"] ?? ""
+        if !configured.isEmpty { return configured }
+        let shots = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"] ?? ""
+        return shots.isEmpty ? "/tmp/probe-pulse" : shots
+    }
+
+    /// 心跳的内容：**类名 + 用例名**，不带任何用户剪贴板内容（探针一律只用合成存档）。
+    /// `self.description` 形如 `-[ClipboardHistoryAppTests.UIInteractionProbeTests testFoo]`，
+    /// 与 XCTest 自己那行 `Test Case '-[… testFoo]' started.` 同一个命名空间 ⇒ 报告器可以对账。
+    private nonisolated var pulseStamp: String { Self.pulseName(description) }
+
+    private nonisolated static func pulseName(_ description: String) -> String {
+        guard let open = description.lastIndex(of: " "),
+              let close = description.lastIndex(of: "]") else { return description }
+        let head = description[description.index(after: open)..<close]
+        return String(head)
+    }
+
     private func skipUnlessEnabled() throws {
         try XCTSkipUnless(Self.isEnabled,
                           "在屏交互探针：设 CLIPBOARD_HISTORY_UI_INTERACTION=1 才跑（会抢前台并开窗）")
