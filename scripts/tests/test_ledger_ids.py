@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""台账编号一致性守卫（R94 开）。
+"""台账编号一致性守卫（R94 开，R102 加"重复编号"两格）。
 
 为什么会有这支：R94 要往 `AGENT_DECISIONS.md` 追加 D-152 时，先 grep 了一下现有编号，
 发现最后一条是 **D-150（R92）** —— 而 R93 的两处轮次标题里都写着"D-151"：
@@ -99,6 +99,128 @@ class LedgerIdTests(unittest.TestCase):
         """守卫不许命中正文里的引用（R53 那一族：region() 先命中守卫自己写的名字）。"""
         sample = "正文里提到 D-034 与 D-999，但它们不是定义行\n### D-034（R7）标题\n"
         self.assertEqual(["D-034"], [m.group(1) for m in DEC_DEF.finditer(sample)])
+
+
+# ---------- R102 加的两格：重复编号 ----------
+# 为什么现在才加：R102 收尾时我把 BACKLOG 151 的"结案"写成**新追加一条 151**，
+# 于是同一个号有两份正文（一份说"待查"，一份说"已结案"）。
+# 本文件原本只查 D 编号（①③两条），所以这件事**没有任何守卫会红** ——
+# 我是靠 `grep -n "^15[0-3]\."` 数出来的。守卫的覆盖面比它声称的窄，这本身就是缺陷。
+BACKLOG = REPO / "AGENT_BACKLOG.md"
+ITEM = re.compile(r"^(\d{3})\. ", re.M)   # 只数这一代的三位号（早期快照用的是"快照 N"那种形状）
+U_DEF = re.compile(r"^- \*\*U-(\d{3})", re.M)
+# 轮次标题里声明的区间：`U-290…U-299`（省略号是 U+2026，不是三个点）。
+U_RANGE = re.compile(r"U-(\d{3})…U-(\d{3})")
+
+
+def newest_section(text):
+    """取**编号最大**的那一节，不取"文件里第一个"那一节。
+
+    为什么：`AGENT_UI_AUDIT.md` 的排序**不是单一方向** —— 前一半是升序（第 3 轮往后写），
+    近来的这一段是降序（最新一轮在上面）。第一版这里写成"取第一个 `## 第 N 轮` 块"，
+    于是拿到的是**第 3 轮**（它当然没有 `- **U-xxx` 那种定义行）⇒ 正对照报"样本不够"，
+    而真台账那一格报"标题里没有区间"。与 R100 的 U-278 同族（两份台账排序方向相反），
+    只是这次相反的是**同一份文件的两段**。
+    """
+    best, best_n = None, -1
+    for part in re.split(r"(?m)^(?=## )", text):
+        m = re.match(r"## 第 (\d+) 轮", part)
+        if m and int(m.group(1)) > best_n:
+            best, best_n = part, int(m.group(1))
+    if best is None:
+        raise AssertionError("找不到任何 `## 第 N 轮` 标题 ⇒ 这份账的形状变了，先改这一格")
+    return best
+
+
+def missing_in_declared_u_range(section):
+    """标题声明的 U 区间里，哪些号在那一节中**没有**定义行。没有区间 ⇒ None（形状变了）。"""
+    heading = section.splitlines()[0]
+    m = U_RANGE.search(heading)
+    if not m:
+        return None
+    lo, hi = int(m.group(1)), int(m.group(2))
+    defined = set(U_DEF.findall(section))
+    return ["U-%03d" % n for n in range(lo, hi + 1) if "%03d" % n not in defined]
+
+
+
+def backlog_items(text=None):
+    if text is None:
+        text = BACKLOG.read_text(encoding="utf-8")
+    return ITEM.findall(text)
+
+
+def u_ids(text=None):
+    if text is None:
+        text = (REPO / "AGENT_UI_AUDIT.md").read_text(encoding="utf-8")
+    return U_DEF.findall(text)
+
+
+class DuplicateIdTests(unittest.TestCase):
+    def test_backlog_item_numbers_are_unique(self):
+        nums = backlog_items()
+        # 地板是**量出来的**（今天实测 53 条三位号条目），不是我估的：
+        # 这两份账只会更长，所以掉了就意味着形状变了，守卫该红。
+        self.assertGreater(len(nums), 40, "只数到 %d 条 ⇒ 正则与这份账的形状不一致（今天实测 53）" % len(nums))
+        dup = sorted({n for n in nums if nums.count(n) > 1}, key=int)
+        self.assertEqual([], dup,
+                         "BACKLOG 里这些编号出现了不止一次：%s ⇒ 同一号两份正文，读者不知道哪份作数" % dup)
+
+    def test_ui_audit_ids_are_unique(self):
+        ids = u_ids()
+        # 今天实测 56 条。**为什么这么少**：`U-xxx` 只有在"一条一个要点"的新写法里才是
+        # 行首加粗的定义（`- **U-284：…**`），更早的轮次把 U 写在句中或表里
+        # ⇒ 这一格**只覆盖新-era 的定义**，不是"全部 U 都查过"。写清边界，
+        # 免得它被当成全量守卫（R102 / U-294：这一格的覆盖面是量出来的，不是猜的）。
+        self.assertGreater(len(ids), 40, "只数到 %d 条 U ⇒ 正则与这份账的形状不一致（今天实测 56）" % len(ids))
+        dup = sorted({i for i in ids if ids.count(i) > 1})
+        self.assertEqual([], dup, "AGENT_UI_AUDIT.md 里这些 U 编号被定义了两次：%s" % dup)
+
+    def test_the_duplicate_guard_is_not_vacuous(self):
+        """正对照：把一条**确实存在**的 BACKLOG 编号改成与另一条重复，①必须只抓到那一个号。"""
+        nums = backlog_items()
+        victim, other = nums[-1], nums[-5]
+        text = BACKLOG.read_text(encoding="utf-8")
+        forged = re.sub(r"^" + other + r"\. ", victim + ". ", text, count=1, flags=re.M)
+        self.assertNotEqual(text, forged, "造重复失败 ⇒ 条目行的形状与正则不一致")
+        after = backlog_items(forged)
+        self.assertEqual([victim], sorted({n for n in after if after.count(n) > 1}),
+                         "造出一个重复号之后守卫没只抓到它 ⇒ 它不是在判'编号唯一'")
+
+
+class NewestRoundIdRangeTests(unittest.TestCase):
+    """最新那一轮的标题说"这一轮有 U-290…U-299"，那这十个号**每一个**都要在那一节里有正文。
+
+    为什么现在补这一格（R102 / U-299 之后又犯了第三次同一族）：这一轮我三次用
+    "把上一行的标题行当 `old_string`"的方式编辑台账，于是"插入"变成"替换"，
+    被吃掉的那一行**正是编号的定义行**（`## Round 99` 一次、`- **U-295：…` 一次、
+    CHANGELOG 的 154 那一格一次）。前两次分别靠"曲线仪器报 GAPS"和"我手工按编号列一遍"抓到的，
+    第三次是我自己看见的 —— 三把都是人肉，而这一族的形状其实完全可以机器判：
+    **标题声明的区间与正文里的定义集合必须吻合**。
+    覆盖面边界（与 U-294 同一句话）：只查**最新一节**，因为更早的轮次把 U 写在句中、
+    或标题里用的是别的写法 ⇒ 拿老账套这条会撞上一堵假正例的墙（第一版就报了 83 条"缺失"）。
+    """
+
+    def test_declared_range_is_fully_defined(self):
+        text = (REPO / "AGENT_UI_AUDIT.md").read_text(encoding="utf-8")
+        sec = newest_section(text)
+        missing = missing_in_declared_u_range(sec)
+        self.assertIsNotNone(missing, "最新一轮的标题里没有 `U-xxx…U-yyy` 这种区间 ⇒ 形状变了，先改这一格")
+        self.assertEqual([], sorted(missing),
+                         "标题声明了区间，但这些号在那一节里**没有定义行**：%s"
+                         " ⇒ 十有八九是编辑时把标题行当 old_string 吃掉了" % missing)
+
+    def test_the_range_guard_is_not_vacuous(self):
+        """正对照：从最新一节里**删掉一条真实的定义行**，这一格必须只报那一个号。"""
+        text = (REPO / "AGENT_UI_AUDIT.md").read_text(encoding="utf-8")
+        sec = newest_section(text)
+        ids = U_DEF.findall(sec)          # 捕获组只有三位数字，如 "299"
+        self.assertGreaterEqual(len(ids), 3, "最新一节只有 %d 条定义 ⇒ 样本不够，正对照无意义" % len(ids))
+        victim = ids[-1]
+        forged = re.sub(r"(?m)^- \*\*U-%s：.*$\n?" % re.escape(victim), "", sec, count=1)
+        self.assertNotEqual(sec, forged, "删不掉那条定义 ⇒ 正则与这份账的形状不一致")
+        self.assertEqual(["U-%s" % victim], sorted(missing_in_declared_u_range(forged)),
+                         "删了一条定义而守卫没只抓到它 ⇒ 它不是在判'区间与定义吻合'")
 
 
 if __name__ == "__main__":

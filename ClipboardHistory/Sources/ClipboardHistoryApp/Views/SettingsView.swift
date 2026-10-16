@@ -829,7 +829,14 @@ private struct HotKeySettingsRow: View {
 
 // MARK: - Unified Settings Sidebar (matches main window hover style)
 
-private struct SettingsSidebarView: View {
+/// 设置窗口左列。
+///
+/// **R102 起从 `private` 放开到 internal**，唯一原因是判据那边要能拿它搭**与产品同一棵容器树**的
+/// 参照臂（BACKLOG 150：runner 上"这扇窗口的卡片没有材质层"，而裸 `GroupBox` 有 ⇒ 成因在容器；
+/// 要把容器一层一层加回去二分，就必须用真的那一层，不能用一个长得像的替身）。
+/// 这不是产品 API 的扩张：`internal` 只在 `ClipboardHistoryApp` 模块与其测试目标里可见，
+/// 对 app 的外部使用者没有任何变化。
+struct SettingsSidebarView: View {
     @Binding var selectedCategory: SettingsCategory?
 
     var body: some View {

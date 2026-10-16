@@ -3363,6 +3363,48 @@ final class UICaptureTests: XCTestCase {
             }
             .padding(24))
         })
+        // R102 / BACKLOG 150 的**容器梯子**：147 结案说"runner 上这扇设置窗口的卡片没有材质层"，
+        // 而同一份日志里裸 `GroupBox` 的参照**有** ⇒ 成因在容器，不在 `GroupBox`。
+        // **先把上一版写错的地方纠正过来**：150 里那句"装进 `Form` 再跑一次"问错了对象 ——
+        // 这扇设置窗口**根本没有 `Form`**（`SettingsView.settingsContent` 是
+        // `NavigationSplitView { 侧栏 } detail: { ScrollView { VStack { 分区 } } }`）。
+        // 所以实验不是"加一个 Form"，而是**把产品真正用到的容器一层一层加回去**，看哪一层吃掉材质：
+        //   臂 0 `cardprobe-groupbox-default`  裸 `GroupBox` + `.padding(24)`        已知：本机两档都有材质
+        //   臂 1 `cardprobe-scroll-groupbox`   再多一层 `ScrollView`                 只加滚动容器
+        //   臂 2 `cardprobe-split-groupbox`    再加真的 `NavigationSplitView` + 真侧栏  与产品同一棵树
+        // 每一臂都在**同一台机器、同一次 run**里由同一颗尺量（`cardRowKinds` + `cardSegments`），
+        // 结论由 `CARD_PROBE_ARM` 那几行交出：
+        //   臂 1 就没材质 ⇒ 滚动容器是成因；臂 1 有、臂 2 没有 ⇒ 分栏/侧栏是成因；
+        //   三臂全有 ⇒ 150 的"容器"这一支被否，嫌疑回到 `Settings` 场景本身（另开一条）。
+        results.append(Fixture("cardprobe-scroll-groupbox",
+                               NSSize(width: 720, height: 140)) {
+            AnyView(ScrollView {
+                GroupBox {
+                    Text("滚动容器里")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(24)
+            })
+        })
+        if #available(macOS 13.0, *) {
+            results.append(Fixture("cardprobe-split-groupbox",
+                                   NSSize(width: 720, height: 140)) {
+                AnyView(NavigationSplitView {
+                    SettingsSidebarView(selectedCategory: .constant(.general))
+                        .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
+                                                        ideal: SettingsViewLayout.sidebarWidth,
+                                                        max: 180)
+                } detail: {
+                    ScrollView {
+                        GroupBox {
+                            Text("分栏详情里")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(24)
+                    }
+                })
+            })
+        }
         // R28b 撤掉 `settings-shortcuts-wide`：它在本机一切正常，
         // 但 **CI 的 macos-15 runner 上 900pt 与 1100pt 两档都整帧读出 0 墨**
         // （run 38449711539 / 38451162726），而 ≤750pt 的 100 张帧从来没问题。
@@ -5159,6 +5201,15 @@ final class UICaptureTests: XCTestCase {
     /// **`menubar-*` 这些帧可以判颜色档（档不依赖表面），不可以判宽度 / 截断 / 对齐 / 命中区。**
     /// 名单与前提都由 `testMenuBarFramesAreReplicasOfTheMenuSurface` 现推 ——
     /// 加一张新的 `menubar-` 帧而不声明它、或者产品换成 `.window` 风格，两种都会红。
+    /// R102 / BACKLOG 150 的容器梯子：每一臂的扫描带（pt）。
+    /// 臂 0 与臂 1 的卡片都从 `.padding(24)` 起；臂 2 在详情列里，侧栏占掉 148pt ⇒ 带子从 150 起。
+    /// 这三条**必须与夹具声明同步维护**：带子没盖住卡片 = 报"读不到卡片"，而那不是容器的结论。
+    static let cardprobeBands: [String: CGRect] = [
+        "cardprobe-groupbox-default": CGRect(x: 24, y: 24, width: 672, height: 100),
+        "cardprobe-scroll-groupbox": CGRect(x: 24, y: 24, width: 672, height: 100),
+        "cardprobe-split-groupbox": CGRect(x: 150, y: 24, width: 570, height: 100),
+    ]
+
     static let menuSurfaceReplicaFixtures: Set<String> = [
         "menubar-recommendations", "menubar-empty", "menubar-refreshing",
     ]
@@ -5874,6 +5925,11 @@ final class UICaptureTests: XCTestCase {
         // 但"材质 0"这件事必须以 skip 的形式**响**，不许静默通过。
         var materialCells = 0
         var settingsCells = 0
+        // R102 / 读 R101 的 CI（run 38945656003）：「统计有几张卡片」这条断言在 runner 上红了四朵，
+        // 红因不是产品，是**那一台读不到被告的材质层**（147 那一族）。它必须先被记成「没有对象」，
+        // 再决定响成 skip 还是红 —— 不能像 R101 那样直接断言。
+        var statsCells = 0
+        var statsDeclined: [String] = []
         // R96 把对象从"那一张卡片"扩到"每一张有分隔线的卡片"：R95 的修法一次动了五张卡片，
         // 而判据只压在 `settings-shortcuts` 上 ⇒ 另外四张改没改对，今天没人看着。
         // "有分隔线"是这条判据的**前提**（没有内侧那一档，就没有可比的数），
@@ -6040,10 +6096,19 @@ final class UICaptureTests: XCTestCase {
             // 这一格因此换成产品事实：这一带**恰好一张**卡片。多出来的那一张只可能是
             // 卡片内部那条 `Divider()` 或热图底色块被认成卡片，仍然是同一个 bug 的形状。
             if fixture.name.hasPrefix("settings-stats") {
-                XCTAssertEqual(1, segments.count,
-                               "\(fixture.name) \(tag)：这一屏现在有一张 `GroupBox`（R101 / 131）⇒ "
-                               + "尺却认出 \(segments.count) 张（0 = 材质又读不到了，看这一行的 填充 与 "
-                               + "`CARD_FILL_CANDIDATES`；≥2 = 卡片内那条 1pt 分隔线或热图底色块又当上了卡片）")
+                statsCells += 1
+                if fill < 0 {
+                    // **这一格没有对象**：这台机器在这一带根本读不到第二层。
+                    // 记下来，交给循环之后那道闸门统一处置（skip），不在这里红。
+                    statsDeclined.append("\(fixture.name) \(tag)=填充=-1")
+                    emit("CARD_STATS_DECLINED \(fixture.name) \(tag) 原因=读不到被告材质"
+                         + " ⇒ 「这一屏恰好一张卡片」这一格不判（不是通过）")
+                } else {
+                    XCTAssertEqual(1, segments.count,
+                                   "\(fixture.name) \(tag)：这一屏现在有一张 `GroupBox`（R101 / 131）⇒ "
+                                   + "尺却认出 \(segments.count) 张（≥2 = 卡片内那条 1pt 分隔线或热图底色块"
+                                   + "又当上了卡片；0 而填充>=0 则是分段那一关坏了，不是机器看不见）")
+                }
             }
             if inkRows == 0 {
                 emit("CARD_RHYTHM_NOT_RUN \(fixture.name) \(tag)（整带零墨 ⇒ 这台机器拍不出这一页）")
@@ -6173,6 +6238,15 @@ final class UICaptureTests: XCTestCase {
                               + "本机同一批帧读到 \(aboveRoster.count) 格；差异在 runner 的半透明材质"
                               + "不合成（页底 light=236/dark=52，卡片填充在 ±3 内）。见 BACKLOG 147。")
         }
+        emit("CARD_STATS_CAPABILITY 统计格候选=\(statsCells) 有对象=\(statsCells - statsDeclined.count)"
+             + " 未判=\(statsDeclined.count)（未判名单只在**这台机器读得到材质**时才要求为空）")
+        // skip 在上面那道 `materialCells == 0` 里已经响过了；能走到这一行说明
+        // **本机读得到材质** ⇒ 那时「统计」这一屏不许有任何未判。
+        // 没有这一格，①那条降级就成了万能挡箭牌：任何读不到都能自称机器前提。
+        XCTAssertTrue(statsDeclined.isEmpty,
+                      "本机读到 \(materialCells) 格材质，「统计」却有 \(statsDeclined.count) 格没进卡片计数："
+                      + statsDeclined.joined(separator: " ")
+                      + " ⇒ 同一台机器别处看得见，那就不是「机器看不见」，去看分段与填充那一关")
         XCTAssertFalse(aboveRoster.isEmpty,
                        "本机看得见 \(materialCells) 格卡片材质，却没有一屏进得了「卡片外几段墨」的名单"
                        + " ⇒ 尺瞎了（两档 settings 帧读到了卡片却读不到墨），不许当成通过")
@@ -6488,6 +6562,8 @@ final class UICaptureTests: XCTestCase {
         // 锚点压在**夹具自己声明的那个数**上，不是压在一个借来的常数上。
         var probeBezel: [String: Double] = [:]
         var measured: [String: Double] = [:]
+        // 臂 1 / 臂 2 的内缩与左沿：只打印、不参与等式（等式的那一侧必须是臂 0）。
+        var armInsets: [String: Double] = [:]
         var declined: [String] = []
         // 与纵向那一格同一个上游信号（BACKLOG 147）：runner 上 `GroupBox` 的填充落在
         // 页面底 ±3 以内 ⇒ `cardFill` 返回 nil ⇒ 这把尺**没有对象**。
@@ -6502,7 +6578,11 @@ final class UICaptureTests: XCTestCase {
         for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
                                   (NSAppearance.Name.darkAqua, "dark")] {
             for fixture in fixtures(appearance: appearance) {
-                let isProbe = fixture.name == "cardprobe-groupbox-default"
+                // R102：参照不再是一臂而是**一梯子**（BACKLOG 150），所以角色按前缀认；
+                // 但**等式的锚只有一格** —— 臂 0 自己声明 `.padding(24)`，
+                // 另外两臂的左沿正是本轮要问的问题，拿它当锚就是拿结论当前提。
+                let isProbe = fixture.name.hasPrefix("cardprobe-")
+                let isAnchorProbe = fixture.name == "cardprobe-groupbox-default"
                 let isSettings = fixture.name.hasPrefix("settings-") && fixture.name != "settings-min"
                 guard isProbe || isSettings else { continue }
                 let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
@@ -6519,15 +6599,36 @@ final class UICaptureTests: XCTestCase {
                 // **两边同一条尺**：探针与卡片都走 `cardRowKinds` + `cardSegments` 找自己的
                 // 材质顶与填充色。探针那一档如果改走"我知道它画在哪"的特殊路径，
                 // 它就又不与被告同一颗尺子了（BACKLOG 104），而 R99 已经证明特殊路径会自己长出新 bug。
-                let band = isProbe ? CGRect(x: 24, y: 24, width: 672, height: 100)
-                                   : CGRect(x: 155, y: 60, width: 560,
-                                            height: fixture.size.height - 60)
+                // 每一臂的带子由**这一臂自己声明**：臂 2 的卡片长在详情列里（侧栏 148pt 之后），
+                // 拿臂 0 的带子去扫它，"读不到卡片"就只是带子没盖住，而不是容器没画材质。
+                let band = isProbe
+                    ? (Self.cardprobeBands[fixture.name] ?? CGRect(x: 24, y: 24, width: 672, height: 100))
+                    : CGRect(x: 155, y: 60, width: 560, height: fixture.size.height - 60)
                 let (rows, fill, modals) = Self.cardRowKinds(bytes: base, width: rep.pixelsWide,
                                                      height: rep.pixelsHigh,
                                                      bytesPerRow: rep.bytesPerRow,
                                                      rect: band, scale: scale,
                                                      pageLuma: pageLuma)
                 cells += 1
+                if isProbe {
+                    // `CARD_PROBE_ARM`：150 这一整轮的答案由这几行交出 —— runner 上
+                    // 没有 PNG 可下载（CI 不上传构件），所以**一臂一行的读数**必须自带
+                    // "有没有第二层""找到几段""页底与前三名"，否则下一次还是要靠猜。
+                    let segs = fill >= 0 ? Self.cardSegments(rows: rows, scale: scale).count : -1
+                    // **墨行是这一臂的"带子盖住了内容"的证人**：文字与材质是两条独立的通道，
+                    // 材质可以被容器吃掉（那正是 150 要问的），文字不会被。
+                    // 所以 `墨行=0` 只有一种解释：**扫描带没盖住这一臂的卡片** ——
+                    // 那时"材质=无"是仪器的形状，不是容器的答案。两种必须分得开，
+                    // 否则这条实验会把"我框错了"读成"容器杀死了材质"（R68 / BACKLOG 104 那一族）。
+                    let inkRows = rows.filter { $0 == .ink }.count
+                    XCTAssertGreaterThan(inkRows, 0,
+                                         "参照臂 \(fixture.name) \(tag) 在带子 \(Int(band.minX))..\(Int(band.maxX))pt × \(Int(band.minY))..\(Int(band.maxY))pt 里读到 0 行墨"
+                                         + " ⇒ 这一臂的扫描带没盖住它自己的内容，它的「材质=无」不能当结论。"
+                                         + "改带子（`cardprobeBands`），不要改这条断言。")
+                    emit("CARD_PROBE_ARM \(fixture.name) \(tag) 材质=\(fill >= 0 ? "有" : "无")"
+                         + " 卡片段=\(segs) 墨行=\(inkRows) 带子=\(Int(band.minX))..\(Int(band.maxX))pt"
+                         + " " + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
+                }
                 if fill >= 0 {
                     materialCells += 1
                     // R101 / 读 R100 的 CI（run 38927822527）：这一格把**被告**与**参照**分开数。
@@ -6546,8 +6647,20 @@ final class UICaptureTests: XCTestCase {
                     emit("CARD_FILL_CANDIDATES \(fixture.name) \(tag) "
                          + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
                 }
-                guard fill >= 0, let first = Self.cardSegments(rows: rows, scale: scale).first else {
-                    declined.append("\(fixture.name) \(tag)=这一带读不到卡片")
+                // **两种成因必须分开报**（R102 / BACKLOG 150 的前置）：
+                // ① `fill < 0` —— 这一带**根本没有第二层**（runner 上那 24 格被告就是这个形状）；
+                // ② `fill >= 0` 但 `cardSegments` 找不到段 —— **有材质却没量到卡片**。
+                // 上一版两种共用一句「这一带读不到卡片」，于是 runner 那一台报的
+                // `有材质=2 而 未判=25` 里，那两格印出来的原因恰好是**假的那一句**（150 的诚实记账）。
+                // 角色也带上：`参照` 那一格是仪器，`被告` 那一格才是产品 ——
+                // 没有角色就分不清"147 的通道问题"与"150 要查的容器问题"各是谁。
+                let role = isProbe ? "参照" : "被告"
+                guard fill >= 0 else {
+                    declined.append("\(fixture.name) \(tag)[\(role)]=这一带没有第二层（fill=-1）")
+                    continue
+                }
+                guard let first = Self.cardSegments(rows: rows, scale: scale).first else {
+                    declined.append("\(fixture.name) \(tag)[\(role)]=有材质但找不到卡片段（fill=\(fill)）")
                     continue
                 }
                 let cardTopPx = Int(band.minY * scale) + first.top
@@ -6565,19 +6678,21 @@ final class UICaptureTests: XCTestCase {
                 // 而圆角那一族假边已经被"中点那一行"排掉了，不需要用长度兜底。
                 guard let leftRaw = Self.firstSpanStart(columns: flags.material,
                                                         minRun: Int(2 * scale)) else {
-                    declined.append("\(fixture.name) \(tag)=读不到卡片左沿")
+                    declined.append("\(fixture.name) \(tag)[\(role)]=读不到卡片左沿")
                     continue
                 }
                 let left = xStart + leftRaw
                 guard let inkRaw = Self.firstInkColumn(columns: flags.ink, from: leftRaw) else {
-                    declined.append("\(fixture.name) \(tag)=左沿以右读不到墨")
+                    declined.append("\(fixture.name) \(tag)[\(role)]=左沿以右读不到墨")
                     continue
                 }
                 let ink = xStart + inkRaw
                 let inset = Double(ink - left) / scale
-                if isProbe {
+                if isAnchorProbe {
                     control[tag] = inset
                     probeBezel[tag] = Double(left) / scale
+                } else if isProbe {
+                    armInsets["\(fixture.name) \(tag)"] = inset
                 } else {
                     measured["\(fixture.name) \(tag)"] = inset
                 }
@@ -6590,6 +6705,20 @@ final class UICaptureTests: XCTestCase {
                      + " 材质行=\(mid - 1)..\(mid + 2)px"
                      + " 卡片左沿=\(leftPt)pt 第一处墨=\(inkPt)pt 内缩=\(insetPt)pt")
             }
+        }
+        for key in armInsets.keys.sorted() {
+            emit("CARD_PROBE_ARM_INSET \(key) 内缩=\(String(format: "%.1f", armInsets[key]!))pt")
+        }
+        do {
+            var expected: Set<String> = ["cardprobe-groupbox-default", "cardprobe-scroll-groupbox"]
+            if #available(macOS 13.0, *) { expected.insert("cardprobe-split-groupbox") }
+            let declared = Set(fixtures(appearance: .aqua).map { $0.name }
+                                 .filter { $0.hasPrefix("cardprobe-") })
+            XCTAssertEqual(declared, expected,
+                           "容器梯子的臂与名单不一致：只在夹具里的是 \(declared.subtracting(expected).sorted())，"
+                           + "只在名单里的是 \(expected.subtracting(declared).sorted())"
+                           + " ⇒ 加一臂必须同时给它带子与读数（150 的答案靠读数，不靠图）；"
+                           + "撤一臂要把 150 的对应分支一起收掉")
         }
         let controlText = control.keys.sorted().map {
             "\($0)=\(String(format: "%.1f", control[$0]!))pt"

@@ -15,7 +15,10 @@
   M552 尺：`absoluteRows` 丢掉 `bandMinY` 那一档 ⇒ 名单红 **且** 真值表红
   M553 尺：把段高地板抬到 400px（= 让这把尺瞎掉）⇒ 名单必须红
            —— 这一刀是名单那条判据的**非恒真证明**：尺瞎了不许报"干净"
-  M554 产品：两个产品文件还原成 HEAD 那一版（= 本轮改之前）⇒ 上方 3 段红、下方 2 段红
+  M554 产品：两个产品文件还原成 `3a05933`（R98 那一版 = 本轮改之前；**不是 `HEAD`**，见 U-277）
+           ⇒ 上方 3 段红、下方 2 段红。R102 起这一支还原之后还要过一次**可见性桥**
+           （把 `private struct SettingsSidebarView` 接回 `internal`，否则今天的测试目标编译不过，
+           这一刀就退化成"仪器跑不起来"而不是"判据有没有牙"）—— 理由与两条自检在 `arm_revert` 的文档串里。
   M555 产品：第二张卡片丢掉 `.frame(maxWidth: .infinity)` ⇒ 卡片按内容缩成 250pt 宽，
              尺读不到它的材质 ⇒ 下方 2 段红（本轮是**看帧**抓到的，不是看代码）
 
@@ -100,19 +103,47 @@ def write(path, text):
         handle.write(text)
 
 
+# 「可见性桥」：还原回来的那一版里 `SettingsSidebarView` 还是 `private`，
+# 而今天的测试目标引用了它（R102 的臂 2 夹具）⇒ 不接这一行，测试目标编译不过，
+# 这一支就变成"仪器跑不起来"而不是"判据有没有牙"。理由与自检写在 `arm_revert` 的文档串里。
+VISIBILITY_BRIDGE = ("private struct SettingsSidebarView", "struct SettingsSidebarView")
+
+
+def bridge_visibility(text):
+    old, new = VISIBILITY_BRIDGE
+    n = text.count(old)
+    if n != 1:
+        raise RuntimeError("可见性桥没接上：needle 命中 %d 次（期望恰好 1）⇒ 这一支没有对象，不是通过" % n)
+    return text.replace(old, new)
+
+
 def arm_revert(results):
-    """M554：把两个产品文件**整体**还原成 HEAD 那一版（= 本轮改之前的产品）。
+    """M554：把两个产品文件**整体**还原成 `3a05933` 那一版（= R99 改之前的产品）。
 
     为什么不用手搓 needle：本轮产品改动是"把两段内容搬进容器"，
-    任何一行局部替换都造不出"内容在卡片外"这个形状；而 `git show HEAD:` 给的就是
+    任何一行局部替换都造不出"内容在卡片外"这个形状；而 `git show <钉死的 commit>:` 给的就是
     那一个状态本身 —— 还原臂比仿制臂少一层"我猜的变异长得像不像真缺陷"。
+
+    **R102 加的「可见性桥」**（U-299）：R102 让捕获夹具 `cardprobe-split-groupbox` 用**真的**
+    `SettingsSidebarView`（`UICaptureHarness.swift:3393`），而 `3a05933` 那一版它是 `private`
+    （`git show 3a05933:…SettingsView.swift` 第 817 行）⇒ 整体还原之后**测试目标根本编译不过**，
+    这一支在 R102 的电池里报成 `DID-NOT-RUN`（不是判据没牙，是仪器跑不起来）。
+    所以还原之后只把那一行的可见性接回来 —— **牙不变**：这一支要问的是
+    "两段内容搬回卡片外，那两条判据会不会红"，与 `private` / `internal` 无关。
+    桥本身带两条自检：needle 必须**恰好命中一次**（命中 0 或多次 ⇒ 抛错 ⇒ 记 DID-NOT-RUN，
+    绝不记成通过），以及"还原必须真的改变字节"（工作树已等于基准时这一支没有对象）。
     """
     snapshots = {p: read(p) for p in PRODUCT}
     try:
         for p in PRODUCT:
-            write(p, git_show(p))
+            text = git_show(p)
+            if text == snapshots[p]:
+                raise RuntimeError("还原臂没有对象：%s 的工作树已等于 %s" % (p, PRE_FIX_COMMIT))
+            if p.endswith("SettingsView.swift"):
+                text = bridge_visibility(text)
+            write(p, text)
     except RuntimeError as err:
-        results.append(("M554", "DID-NOT-RUN", "还原成 HEAD 那一版", str(err)[:150]))
+        results.append(("M554", "DID-NOT-RUN", "还原成 %s 那一版" % PRE_FIX_COMMIT, str(err)[:150]))
         for p, text in snapshots.items():
             write(p, text)
         return
