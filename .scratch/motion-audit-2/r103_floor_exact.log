@@ -1,0 +1,12 @@
+cardprobe-groupbox-default light 2x 非零且<20 的行: [8] | 其中 <6 的行数=0 | 全部非零行的最小值=8
+cardprobe-groupbox-default light 1x 非零且<20 的行: [11] | 其中 <6 的行数=0 | 全部非零行的最小值=11
+cardprobe-groupbox-default dark 2x 非零且<20 的行: [4, 10] | 其中 <6 的行数=1 | 全部非零行的最小值=4
+cardprobe-groupbox-default dark 1x 非零且<20 的行: [18] | 其中 <6 的行数=0 | 全部非零行的最小值=18
+cardprobe-scroll-groupbox  light 2x 非零且<20 的行: [9, 13] | 其中 <6 的行数=0 | 全部非零行的最小值=9
+cardprobe-scroll-groupbox  light 1x 非零且<20 的行: [5, 17] | 其中 <6 的行数=1 | 全部非零行的最小值=5
+cardprobe-scroll-groupbox  dark 2x 非零且<20 的行: [4, 14] | 其中 <6 的行数=1 | 全部非零行的最小值=4
+cardprobe-scroll-groupbox  dark 1x 非零且<20 的行: [] | 其中 <6 的行数=0 | 全部非零行的最小值=无(>=20)
+cardprobe-split-groupbox   light 2x 非零且<20 的行: [15, 19] | 其中 <6 的行数=0 | 全部非零行的最小值=15
+cardprobe-split-groupbox   light 1x 非零且<20 的行: [9, 17] | 其中 <6 的行数=0 | 全部非零行的最小值=9
+cardprobe-split-groupbox   dark 2x 非零且<20 的行: [14] | 其中 <6 的行数=0 | 全部非零行的最小值=14
+cardprobe-split-groupbox   dark 1x 非零且<20 的行: [19] | 其中 <6 的行数=0 | 全部非零行的最小值=19

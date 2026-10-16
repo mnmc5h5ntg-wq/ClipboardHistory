@@ -1,0 +1,39 @@
+== 1) 构建（必须 0 告警）
+BUILD_EXIT=0 BUILD_WARNING_LINES=0
+== 2) 全量 swift test
+TEST_EXIT=0 最后一行汇总: 	 Executed 816 tests, with 41 tests skipped and 0 failures (0 unexpected) in 178.920 (178.962) seconds
+== 3) 在屏那一卷（本机，带 CLIPBOARD_HISTORY_UI_INTERACTION=1）
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.473 (15.475) seconds
+== 4) 重新拍一遍帧（R103 没加夹具 ⇒ 帧数应仍为 134，基线必须逐字不变）
+CAPTURE_EXIT=0 帧数=134 目录内文件=135
+CARD_ABOVE_SUMMARY settings-data dark=1 settings-data light=1 settings-general dark=1 settings-general light=1 settings-general-login-failed dark=1 settings-general-login-failed light=1 settings-general-login-unsupported dark=1 settings-general-login-unsupported light=1 settings-privacy dark=1 settings-privacy light=1 settings-privacy-excluded dark=1 settings-privacy-excluded light=1 settings-privacy-tall dark=1 settings-privacy-tall light=1 settings-recommendations dark=1 settings-recommendations light=1 settings-recommendations-tall dark=1 settings-recommendations-tall light=1 settings-shortcuts dark=1 settings-shortcuts light=1 settings-stats dark=1 settings-stats light=1 settings-stats-populated dark=1 settings-stats-populated light=1
+CARD_BELOW_SUMMARY settings-data dark=0 settings-data light=0 settings-general dark=0 settings-general light=0 settings-general-login-failed dark=0 settings-general-login-failed light=0 settings-general-login-unsupported dark=0 settings-general-login-unsupported light=0 settings-privacy-excluded dark=0 settings-privacy-excluded light=0 settings-privacy-tall dark=0 settings-privacy-tall light=0 settings-recommendations-tall dark=0 settings-recommendations-tall light=0 settings-shortcuts dark=0 settings-shortcuts light=0 settings-stats dark=0 settings-stats light=0 settings-stats-populated dark=0 settings-stats-populated light=0
+CARD_ABOVE_CAPABILITY settings格=24 有材质=24 进名单=24（地板=min(8, 有材质) —— 从**上游那一关**推，不从名单推）
+CARD_INSET_SUMMARY 系统参照 dark=5.5pt light=5.0pt 卡片数=24 未判=0
+CARD_INSET_ALL settings-data dark=5.0 settings-data light=5.5 settings-general dark=5.5 settings-general light=5.5 settings-general-login-failed dark=5.5 settings-general-login-failed light=5.5 settings-general-login-unsupported dark=5.5 settings-general-login-unsupported light=5.5 settings-privacy dark=5.0 settings-privacy light=5.5 settings-privacy-excluded dark=5.0 settings-privacy-excluded light=5.5 settings-privacy-tall dark=5.0 settings-privacy-tall light=5.5 settings-recommendations dark=5.0 settings-recommendations light=5.5 settings-recommendations-tall dark=5.0 settings-recommendations-tall light=5.5 settings-shortcuts dark=5.0 settings-shortcuts light=5.5 settings-stats dark=6.5 settings-stats light=6.5 settings-stats-populated dark=5.5 settings-stats-populated light=5.5
+CARD_INSET_CAPABILITY 候选=30 有材质=30（被告=24 参照=6） 量到=24 未判=0
+CARD_PROBE_ARM cardprobe-groupbox-default light 材质=有 卡片段=1 墨行=24 墨像素=1582 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1457 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-split-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1272 最大偏离=206 参考条墨行=0 带子=170..720pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-groupbox-default dark 材质=有 卡片段=1 墨行=24 墨像素=1777 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1618 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1425 最大偏离=185 参考条墨行=0 带子=170..720pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox light 内缩=5.0pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox light 内缩=5.0pt
+CARD_STATS_CAPABILITY 统计格候选=4 有对象=4 未判=0（未判名单只在**这台机器读得到材质**时才要求为空）
+FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=134 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0 
+== 5) 脚本电池
+PY_EXIT=0 Ran 218 tests in 11.314s OK 
+== 6) 十二张变异表（本轮 r103 四刀；欠的十一张照跑）
+MUT_EXIT=0 跑了=12 期望=12 表=r95_rhythm r94_order r96_triage r97_card r98_seed r98_card r99 r100 r100b r101 r102 r103 | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r99(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r100(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r100b(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r101(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r102(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r103(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0
+== 7) 台账编号守卫
+LEDGER_EXIT=0 Ran 9 tests in 0.025s OK 
+== 8) 曲线仪器（七维自评的读数通道，尺腿不判产品）
+VIS_EXIT=0 ROUNDS=104  first=1  last=103 CURVE_DERIVED=95,96,97 
+== 9) 断言/读数包含对账（R101 的 U-289 ⇒ 工具已落盘，R103 让它进门）
+CONTAIN_EXIT=0 0 
+== 10) 摘要缺值算红
+SUMMARY_MISSING=0
+VERIFY_OK=1

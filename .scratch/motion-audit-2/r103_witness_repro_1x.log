@@ -1,0 +1,14 @@
+=== 本机：2x 原帧
+cardprobe-groupbox-default   light scale=2.0 page=252 fill=244 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=206 | 新:页面条=0
+cardprobe-groupbox-default   dark scale=2.0 page= 28 fill= 36 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=185 | 新:页面条=0
+cardprobe-scroll-groupbox    light scale=2.0 page=252 fill=244 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=206 | 新:页面条=0
+cardprobe-scroll-groupbox    dark scale=2.0 page= 28 fill= 36 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=185 | 新:页面条=0
+cardprobe-split-groupbox     light scale=2.0 page=252 fill=244 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=206 | 新:页面条=0
+cardprobe-split-groupbox     dark scale=2.0 page= 28 fill= 36 旧:墨行=24 段=1 | 新:墨行=24 最大偏离=185 | 新:页面条=0
+=== 模拟 runner：1x（2x2 抽 1）
+cardprobe-groupbox-default   light scale=1.0 page=252 fill=244 旧:墨行=12 段=1 | 新:墨行=12 最大偏离=206 | 新:页面条=0
+cardprobe-groupbox-default   dark scale=1.0 page= 28 fill= 36 旧:墨行=12 段=1 | 新:墨行=12 最大偏离=185 | 新:页面条=0
+cardprobe-scroll-groupbox    light scale=1.0 page=252 fill=244 旧:墨行=11 段=1 | 新:墨行=11 最大偏离=206 | 新:页面条=0
+cardprobe-scroll-groupbox    dark scale=1.0 page= 28 fill= 36 旧:墨行=12 段=1 | 新:墨行=12 最大偏离=185 | 新:页面条=0
+cardprobe-split-groupbox     light scale=1.0 page=252 fill=244 旧:墨行=12 段=1 | 新:墨行=12 最大偏离=206 | 新:页面条=0
+cardprobe-split-groupbox     dark scale=1.0 page= 28 fill= 36 旧:墨行=12 段=1 | 新:墨行=12 最大偏离=185 | 新:页面条=0

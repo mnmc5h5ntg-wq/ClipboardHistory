@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""从验证电池的日志里**解析**出台账 §8 那十二行，而不是手抄。
+"""从验证电池的日志里**解析**出台账 §8 那十几行，而不是手抄。
 
 为什么要有它（R99 / U-264 那一族的根治）：§8 那一格历史上错过三次 ——
 ① 手抄抄成了上一轮的数（R99 报告里停在"796 例 / 112 帧 / M509"）；
@@ -13,7 +13,7 @@
 
 用法：
   PYTHONUTF8=1 python3 .scratch/motion-audit-2/ledger_rows.py <verify.log> [--pass 2]
-退出码：0=十二格全有值；1=有格子缺值（打印缺哪几格）；2=用法错。
+退出码：0=每一格都有值；1=有格子缺值（打印缺哪几格）；2=用法错。
 """
 import re
 import sys
@@ -31,12 +31,16 @@ ROWS = [
     ("变异表", r"^MUT_EXIT=\d+ .*"),
     ("台账编号守卫", r"^LEDGER_EXIT=\d+ .*"),
     ("曲线仪器", r"^VIS_EXIT=\d+ .*"),
+    # R103：断言/读数包含对账进了电池（`CONTAIN_EXIT`）⇒ §8 也要能解析它，
+    # 否则这一格的值只能靠我手抄，而"手抄"正是这个脚本存在的理由（U-264 那一族）。
+    ("断言包含对账", r"^CONTAIN_EXIT=\d+ .*"),
     ("摘要缺值", r"^SUMMARY_MISSING=\d+"),
     ("总结论", r"^VERIFY_OK=\d+"),
 ]
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
-READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)=")
+READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
+                   r"|^CARD_PROBE_ARM ")   # R103：证人那一行是空格分隔的读数，不是 key=
 
 
 def grab(text, pattern):
@@ -68,7 +72,8 @@ def main():
     readings = [l for l in text.splitlines() if READINGS.match(l)]
     out.append("| 本轮读数（%d 行，原样搬运） | %s |"
                % (len(readings), "；".join("`%s`" % r for r in readings[:3]) if readings else "!! 没有"))
-    print("### 8. 验证（十二格，数字全部由 `ledger_rows.py` 从 `%s` 解析%s）" % (log.name, pass_label))
+    print("### 8. 验证（%d 格，数字全部由 `ledger_rows.py` 从 `%s` 解析%s）"
+          % (len(ROWS) + 1, log.name, pass_label))
     print()
     print("| 格子 | 读数 |")
     print("|---|---|")

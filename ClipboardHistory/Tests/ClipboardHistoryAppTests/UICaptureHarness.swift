@@ -4838,6 +4838,103 @@ final class UICaptureTests: XCTestCase {
         return .card
     }
 
+    // MARK: - 存在性墨证人（R103 / BACKLOG 150 的那道证人重做）
+
+    /// 纯函数：一个像素离**两个背景里更近的那一个**有多远（R103）。
+    ///
+    /// `fill < 0` 是 `cardFill` 宣布「这一带没有卡片」的那一档 ⇒ 那时只剩页面底一个参照。
+    /// 这一格不是将就，它正是 R102 那四朵红的病根：上一版证人吃的是 `cardRowKinds` 的逐行身份，
+    /// 而 `fill < 0` 时那个数组**整带都是 `.outside`**，`.ink` 一格也不可能出现
+    /// ⇒ 证人在「判据说没有材质」的那一臂里**结构上必然**报 0。
+    /// 反过来说：它只能给「有材质」那一侧作证，而那一侧本来就不需要作证；
+    /// 真正需要作证的「`材质=无` 能不能当结论」那一侧，它永远回答「不能」。
+    /// R102 的 CI 因此把亮档臂 2 与暗档三臂一起读成红 —— 红的含义是**证人的形状错了**，不是容器。
+    static func inkDelta(luma: Int, fill: Int, pageLuma: Int) -> Int {
+        let page = abs(luma - pageLuma)
+        guard fill >= 0 else { return page }
+        return min(page, abs(luma - fill))
+    }
+
+    /// 纯函数：一行里有多少个像素算「字的笔画」，门限沿用 `isTextInk`（R24 本机量的那一道：
+    /// GroupBox 底 6 与平涂 26 不算字，说明档 109 与标题档 209 算字）。
+    /// **本轮不新写一道没量过的色号门限**（账本里那条「不许给没量过的色号写阈值」）。
+    static func textInkPixels(rowLumas: [Int], fill: Int, pageLuma: Int) -> Int {
+        var count = 0
+        for luma in rowLumas where isTextInk(delta: inkDelta(luma: luma, fill: fill,
+                                                             pageLuma: pageLuma)) {
+            count += 1
+        }
+        return count
+    }
+
+    /// 纯函数：**一行**的逐像素亮度 → 这一行画了字（存在性判据，方向无关）。
+    ///
+    /// 地板 6 的出处（本机实测，`.scratch/motion-audit-2/r103_floor_exact.log`）：
+    /// 六臂 × 两档外观 × 两个尺度（2x 原帧、以及 2x2 抽成 1x 模拟 runner 那一台）里，
+    /// 页面底那条参考带的每行墨像素数**恒为 0**，而扫描带里的字行普遍 ≥9（12 组读数里只有 3 组
+    /// 出现过 <6 的非零行，值是 4、4、5 —— 那是字形上下沿那一行，只有几个像素过得了门限）。
+    /// ⇒ 6 落在「参考带的 0」与「真字行的 9+」之间；被它挡掉的只有字形的最外一圈，
+    /// 而证人问的是**这一臂有没有内容**（有一行就算），少算边缘那一行不影响这个问句。
+    /// 之所以宁可离上沿近一点：1x 那一档是最坏情况，而真 1x 渲染（不是我这台抽样的近似）
+    /// 的细笔画可能比抽样的还少几个像素。两个方向各有一格真值表钉着（第 ⑤⑥⑦ 条）。
+    /// （**这一格被更正过一次**：第一版这里写的是「非零行最小 9（1x）/ 15（2x）」，
+    /// 那是从一张**只打前 6 档的直方图**里读的 —— 低频的小计数被截掉了。
+    /// 出处不能是直方图的头部，得是把最小非零值直接数出来的那一份，见 U-304。）
+    ///
+    /// **地板这一处比较是唯一定义**（两个重载共用它）：进料那一侧数出像素数之后调这一格，
+    /// 免得「这一行算不算有字」在同文件里有两份写法（R68 那一族的同文件版本）。
+    static func rowHasTextInk(inkPixels: Int, minPixels: Int = 6) -> Bool {
+        // 地板非正 ⇒ 这条判据自己失效（任何一行都算有字），那就不叫证人。
+        minPixels > 0 && inkPixels >= minPixels
+    }
+
+    static func rowHasTextInk(rowLumas: [Int], fill: Int, pageLuma: Int,
+                              minPixels: Int = 6) -> Bool {
+        rowHasTextInk(inkPixels: textInkPixels(rowLumas: rowLumas, fill: fill,
+                                               pageLuma: pageLuma),
+                      minPixels: minPixels)
+    }
+
+    /// 进料 + 计数：一块矩形里有**几行**画了字，连同两个成因读数一起交出去（R103 的证人）。
+    ///
+    /// 为什么证人必须自己扫字节，而不是复用 `cardRowKinds` 交回来的 `rows`：
+    /// 证人要证的正是「材质那条通道坏没坏」。它若吃判据的中间量，判据的中间量一坏它就跟着坏，
+    /// 而**跟着坏的证人只在判据对的时候亮** —— 那等于没有证人。
+    /// 这一格与 BACKLOG 104（R68「证人必须与判据同一颗尺子」）是**同一条规矩的反方向**：
+    /// 那次错在证人与判据不同颗尺子，作的证只对新尺成立；这次错在证人吃判据的中间量，
+    /// 于是它对「判据说没有」的那一臂永远无能为力。**同一颗尺子只适用于两者问同一件事的时候**；
+    /// 文字与材质本来就是两件事，所以这里要的是字节层面的独立。
+    ///
+    /// `maxDelta` 与 `pixels` 不是装饰：runner 上没有 PNG 可下载，下一次读到 `墨行=0` 时，
+    /// 只有 `最大偏离` 能分清「那一台机器压根没画字」（最大偏离也小）与
+    /// 「画了字而我的地板太高」（最大偏离大而行数 0）—— 两种收场要修的东西完全不同（D-167 那一族）。
+    static func textInkWitness(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                               bytesPerRow: Int, rect: CGRect, scale: Double,
+                               fill: Int, pageLuma: Int, minPixelsPerRow: Int = 6)
+        -> (rows: Int, pixels: Int, maxDelta: Int) {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (0, 0, 0) }
+        var rows = 0, pixels = 0, maxDelta = 0
+        for y in y0..<y1 {
+            var row: [Int] = []
+            row.reserveCapacity(x1 - x0)
+            for x in x0..<x1 {
+                let o = y * bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                                + 0.0722 * Double(bytes[o + 2])).rounded())
+                maxDelta = max(maxDelta, inkDelta(luma: luma, fill: fill, pageLuma: pageLuma))
+                row.append(luma)
+            }
+            // 走 `textInkPixels` 而不是就地写第二个判断式：行数与像素数必须出自同一颗尺，
+            // 否则「这一行算不算有字」在两处会有两种答案（BACKLOG 104 那一族，这次是同文件版本）。
+            let count = textInkPixels(rowLumas: row, fill: fill, pageLuma: pageLuma)
+            pixels += count
+            if rowHasTextInk(inkPixels: count, minPixels: minPixelsPerRow) { rows += 1 }
+        }
+        return (rows, pixels, maxDelta)
+    }
+
     /// 纯函数：从**一张卡片**的逐行分类里读出「卡片四边的留白」与「分隔线两侧的留白」（pt）。
     ///
     /// 缺陷形状是这一族里最不容易靠眼睛抓到的：卡片**自己**没错，每一行也都没错，
@@ -5202,12 +5299,22 @@ final class UICaptureTests: XCTestCase {
     /// 名单与前提都由 `testMenuBarFramesAreReplicasOfTheMenuSurface` 现推 ——
     /// 加一张新的 `menubar-` 帧而不声明它、或者产品换成 `.window` 风格，两种都会红。
     /// R102 / BACKLOG 150 的容器梯子：每一臂的扫描带（pt）。
-    /// 臂 0 与臂 1 的卡片都从 `.padding(24)` 起；臂 2 在详情列里，侧栏占掉 148pt ⇒ 带子从 150 起。
+    /// 臂 0 与臂 1 的卡片都从 `.padding(24)` 起。
+    ///
+    /// **臂 2 的带子左沿在 R103 从 150 挪到 170**（本机逐张看帧量出来的，见 Round 103 §4）：
+    /// 侧栏那一列占 148pt，而列里的东西并不止到 148 —— 选中那颗蓝胶囊实测画到 141pt、
+    /// 列的右缘在 145pt 附近 ⇒ 旧值 150 只留了 **2pt** 余量。
+    /// 这一格坏起来很难看：证人问的是"这一臂的带子里有没有**卡片的内容**"，
+    /// 而 2pt 的余量在另一台机器上（1x、不同抖动、不同字体栅格）可能整条被侧栏占掉
+    /// ⇒ 侧栏的字会给"卡片没有材质"作证，那正是 D-167 装证人要防的那种假答案。
+    /// 新值 170 的两侧都有量：离侧栏右缘 25pt（145→170），离卡片左沿 2.5pt（170→172.5，
+    /// 卡片左沿与产品卡片的 172.0pt 同一档）⇒ 带子仍然盖住整张卡片，`firstSpanStart` 量到的
+    /// 还是真的那一条直边（本机复测：臂 2 的 `内缩` 亮 5.0 / 暗 5.5 与挪之前逐字相同）。
     /// 这三条**必须与夹具声明同步维护**：带子没盖住卡片 = 报"读不到卡片"，而那不是容器的结论。
     static let cardprobeBands: [String: CGRect] = [
         "cardprobe-groupbox-default": CGRect(x: 24, y: 24, width: 672, height: 100),
         "cardprobe-scroll-groupbox": CGRect(x: 24, y: 24, width: 672, height: 100),
-        "cardprobe-split-groupbox": CGRect(x: 150, y: 24, width: 570, height: 100),
+        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 100),
     ]
 
     static let menuSurfaceReplicaFixtures: Set<String> = [
@@ -6615,18 +6722,45 @@ final class UICaptureTests: XCTestCase {
                     // 没有 PNG 可下载（CI 不上传构件），所以**一臂一行的读数**必须自带
                     // "有没有第二层""找到几段""页底与前三名"，否则下一次还是要靠猜。
                     let segs = fill >= 0 ? Self.cardSegments(rows: rows, scale: scale).count : -1
-                    // **墨行是这一臂的"带子盖住了内容"的证人**：文字与材质是两条独立的通道，
+                    // **墨行是这一臂的「带子盖住了内容」的证人**：文字与材质是两条独立的通道，
                     // 材质可以被容器吃掉（那正是 150 要问的），文字不会被。
                     // 所以 `墨行=0` 只有一种解释：**扫描带没盖住这一臂的卡片** ——
-                    // 那时"材质=无"是仪器的形状，不是容器的答案。两种必须分得开，
-                    // 否则这条实验会把"我框错了"读成"容器杀死了材质"（R68 / BACKLOG 104 那一族）。
-                    let inkRows = rows.filter { $0 == .ink }.count
-                    XCTAssertGreaterThan(inkRows, 0,
+                    // 那时「材质=无」是仪器的形状，不是容器的答案。两种必须分得开，
+                    // 否则这条实验会把「我框错了」读成「容器杀死了材质」（R68 / BACKLOG 104 那一族）。
+                    //
+                    // R103 换成 `textInkWitness`：上一版这里写的是 `rows.filter { $0 == .ink }`，
+                    // 而 `rows` 是**材质那条通道**的中间量（`fill<0` 时整带都是 `.outside`，
+                    // `.ink` 一个也不可能有）⇒ 证人在最需要它作证的那一臂（判据说没有材质）里必然报 0。
+                    // R102 的 CI 上亮档臂 2 与暗档三臂就是被这个形状读成四朵红的（BACKLOG 150 追记）。
+                    let witness = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                      height: rep.pixelsHigh,
+                                                      bytesPerRow: rep.bytesPerRow, rect: band,
+                                                      scale: scale, fill: fill, pageLuma: pageLuma)
+                    XCTAssertGreaterThan(witness.rows, 0,
                                          "参照臂 \(fixture.name) \(tag) 在带子 \(Int(band.minX))..\(Int(band.maxX))pt × \(Int(band.minY))..\(Int(band.maxY))pt 里读到 0 行墨"
+                                         + "（证人自己扫字节，与材质那条通道无关；这一带里像素离两个背景的最大偏离是 "
+                                         + "\(witness.maxDelta)，门限 60）"
                                          + " ⇒ 这一臂的扫描带没盖住它自己的内容，它的「材质=无」不能当结论。"
                                          + "改带子（`cardprobeBands`），不要改这条断言。")
+                    // **反方向那一半的牙**（R103）：同一条尺在页面底那条参考带上必须一个像素都不认。
+                    // 只配「带子里必须有字」这一头，另一头可以随便松 —— 证人松到恒真时它照样绿，
+                    // 而恒真的证人比缺席的证人更坏（它会把「我框错了」洗成「这是答案」）。
+                    // 参考带就是 `pageLuma` 的取数区（x150..710 × y4..12pt）：它要是被读出了字，
+                    // 那坏的不是这一格，是整把尺的页底参照。
+                    let strip = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                    height: rep.pixelsHigh,
+                                                    bytesPerRow: rep.bytesPerRow,
+                                                    rect: CGRect(x: 150, y: 4, width: 560, height: 8),
+                                                    scale: scale, fill: fill, pageLuma: pageLuma)
+                    XCTAssertEqual(strip.rows, 0,
+                                   "页面底那条参考带被证人读出了 \(strip.rows) 行字"
+                                   + "（它自己数出的最大偏离=\(strip.maxDelta)，门限 60）"
+                                   + " ⇒ 要么证人太敏感（地板失效），要么 `pageLuma` 取的这一条本来就不干净；"
+                                   + "两种都先修仪器，不要来改这条断言的 0。")
                     emit("CARD_PROBE_ARM \(fixture.name) \(tag) 材质=\(fill >= 0 ? "有" : "无")"
-                         + " 卡片段=\(segs) 墨行=\(inkRows) 带子=\(Int(band.minX))..\(Int(band.maxX))pt"
+                         + " 卡片段=\(segs) 墨行=\(witness.rows) 墨像素=\(witness.pixels)"
+                         + " 最大偏离=\(witness.maxDelta) 参考条墨行=\(strip.rows)"
+                         + " 带子=\(Int(band.minX))..\(Int(band.maxX))pt"
                          + " " + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
                 }
                 if fill >= 0 {
@@ -6908,6 +7042,73 @@ final class UICaptureTests: XCTestCase {
                        "335/1120 = 29.9% ⇒ 差一点点也不算卡片里")
         XCTAssertEqual(.card, Self.cardRowKind(cardRun: 336, ink: 0, line: 0, width: width),
                        "336/1120 = 30.0% ⇒ 正好踩线要算卡片里（地板是闭区间，别让它两头都开放）")
+    }
+
+    /// 存在性墨证人的真值表（R103 / 把 R102 那四朵「暗档 墨行=0」的假红查到底之后的产物）。
+    ///
+    /// 每一格的数都来自本机量，不来自印象：
+    /// 页底与卡片填充 亮 252/244、暗 28/36（`/tmp/r102_shots` 那六张参照臂帧）；
+    /// 标题档与说明档 亮 39/139、暗 235/140（R24 的 `testTextInkGateTruthTable` 那一批）；
+    /// 平涂控件 亮 222、暗 55（同一格）；分隔线 亮 220、暗 84（R102 的 `前三` 读数里那一档 2 行）。
+    func testTextInkWitnessIsAnExistenceJudgeWithPairedFloors() {
+        let lightPage = 252, lightFill = 244
+        let darkPage = 28, darkFill = 36
+        func flat(_ value: Int, _ n: Int = 40) -> [Int] { Array(repeating: value, count: n) }
+        // ① 页底整行 / ② 卡片填充整行 ⇒ 证人都必须闭嘴（这是地板的下沿）
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(lightPage), fill: lightFill,
+                                          pageLuma: lightPage), "页底整行不许算字")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(darkPage), fill: darkFill,
+                                          pageLuma: darkPage), "暗档页底整行不许算字")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(lightFill), fill: lightFill,
+                                          pageLuma: lightPage), "卡片填充不许算字")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(darkFill), fill: darkFill,
+                                          pageLuma: darkPage), "暗档卡片填充不许算字")
+        // ③ 平涂控件与分隔线：R102 那把旧尺最容易在这里翻（它们都在带子里、都不是页底）
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(222), fill: lightFill, pageLuma: lightPage),
+                       "亮档录制框/药丸的平涂底（离两个背景各 22/30）不许算字")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(55), fill: darkFill, pageLuma: darkPage),
+                       "暗档控件平涂底（离两个背景各 19/27）不许算字")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(220), fill: lightFill, pageLuma: lightPage),
+                       "亮档分隔线那一档（24/32）不许算字 ⇒ 否则一条线就能给一臂作证")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(84), fill: darkFill, pageLuma: darkPage),
+                       "暗档分隔线那一档（48/56）不许算字（这一档在 R102 的 `前三` 里就有 2 行）")
+        // ④ 标题与说明两档，两档外观各自都要算字（方向无关这件事就是这一格）
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: flat(39), fill: lightFill, pageLuma: lightPage),
+                      "亮档标题（离两个背景 205/213）必须算字")
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: flat(139), fill: lightFill, pageLuma: lightPage),
+                      "亮档说明档（105/113）必须算字 —— 它是 `.secondary`，不是噪声")
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: flat(235), fill: darkFill, pageLuma: darkPage),
+                      "暗档标题（199/207）必须算字")
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: flat(140), fill: darkFill, pageLuma: darkPage),
+                      "暗档说明档（104/112）必须算字")
+        // ⑤ 一行里只有几个这样的像素（抗锯齿亮点）⇒ 不算（地板的上沿那一侧由 ⑥⑦ 钉）
+        var sparse = flat(darkFill, 40)
+        for i in 0..<5 { sparse[i] = 235 }
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: sparse, fill: darkFill, pageLuma: darkPage),
+                       "5 个墨像素不算一行有字")
+        // ⑥/⑦ 地板成对：6 个就算，5 个就不算（同一条规则的两边各钉一格，见 R38「阈值要成对」）
+        var six = flat(darkFill, 40)
+        for i in 0..<6 { six[i] = 235 }
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: six, fill: darkFill, pageLuma: darkPage),
+                      "6 个正好踩地板 ⇒ 算（地板是闭区间）")
+        // ⑧ **本轮真正修掉的那一格**：`fill = -1`（判据宣布这一带没有卡片）时证人仍然要有牙。
+        //    上一版吃 `cardRowKinds` 的逐行身份，而 fill<0 时整带都是 `.outside` ⇒ 永远读不到墨，
+        //    于是它对「材质=无」那一臂永远只能报 0 —— 恰恰是那一臂最需要有人作证。
+        XCTAssertTrue(Self.rowHasTextInk(rowLumas: six, fill: -1, pageLuma: darkPage),
+                     "没有卡片填充可参照时，字仍然离页底足够远 ⇒ 证人必须照样亮")
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: flat(darkPage), fill: -1, pageLuma: darkPage),
+                       "同一种缺参照的形状下，页底仍然不许算字（负对照不许跟着失效）")
+        // ⑨ 地板非正 ⇒ 这条判据自己失效，不能当证人（M573 那一刀钉的就是这一格）
+        XCTAssertFalse(Self.rowHasTextInk(rowLumas: sparse, fill: darkFill, pageLuma: darkPage,
+                                          minPixels: 0),
+                       "minPixels=0 时任何一行都算有字 ⇒ 恒真的证人不叫证人，判据自己拒收")
+        // ⑩ 逐像素距离那一格单独钉：`fill` 缺席时只剩页底一个参照，而不是拿 -1 去比距离。
+        //     （写反成 `abs(luma - fill)` 的话，页底像素会得到 |28-(-1)|=29 这种**假的高偏离**，
+        //     于是整带每一行都成为墨 —— 一版看起来完全正常的恒真证人。）
+        XCTAssertEqual(0, Self.inkDelta(luma: darkPage, fill: -1, pageLuma: darkPage),
+                       "没有卡片时参照只能是页底：页底像素的偏离是 0，不是 |28-(-1)|=29")
+        XCTAssertEqual(0, Self.inkDelta(luma: darkFill, fill: darkFill, pageLuma: darkPage),
+                       "有卡片时取两个参照里更近的那个 ⇒ 卡片自身的偏离是 0")
     }
 
     /// 「一段 = 一张卡片」的真值表（R97）：一个扫描带里可以纵向放好几张卡片。

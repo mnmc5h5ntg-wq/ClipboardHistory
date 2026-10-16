@@ -26,6 +26,9 @@ PASSED / CAUGHT / SKIPPED / DID-NOT-RUN 四个词，"按设计逃掉"在它嘴�
        按实登记，与 M454 / M509 同一族 —— **不为了让它看起来有牙去编一条断言**。
        这一刀只改一处措辞（不是把两处都合并），因为要测的就是"措辞本身有没有被任何东西读"。
 
+R103 追记（改 needle 而不是改期望）：M568 的原文那一行跟着臂 2 的带子从 150/570 挪到了 170/550
+（证人不能由侧栏作证，见 `cardprobeBands` 的文档串）。变异文 660/60 不变：它仍然在卡片里、
+但那里没有字 —— 这一刀要红的是「带子里没有内容」，不是「带子跑到了卡片外」。
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r102.py [M568 ...]
 退出码：0 = 每一臂都拿到**它自己那一条**期望的 verdict，且还原干净。
 """
@@ -43,7 +46,7 @@ V_RHYTHM = "UICaptureTests/testSettingsCardVerticalRhythmIsOneNumber"
 # (编号, 说明, 文件, needle, 替换, 目标测试, 期望 verdict)
 ARMS = [
     ("M568", "参照臂的扫描带挪出卡片 ⇒ 「墨行>0」必须红（仪器错位不许冒充容器结论）", HARNESS,
-     '        "cardprobe-split-groupbox": CGRect(x: 150, y: 24, width: 570, height: 100),',
+     '        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 100),',
      '        "cardprobe-split-groupbox": CGRect(x: 660, y: 24, width: 60, height: 100),',
      H_INSET, "CAUGHT"),
     ("M569", "名册里删掉一臂（夹具还在）⇒ 名册守卫必须红", HARNESS,

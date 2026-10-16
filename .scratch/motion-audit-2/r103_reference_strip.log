@@ -1,0 +1,6 @@
+cardprobe-groupbox-default light  A带子x@y4..12=0(max  3)  B现状=0(max  3)  C挪进卡片y30..38=0(max  3)  D卡片下y60=0(max  3)
+cardprobe-groupbox-default dark  A带子x@y4..12=0(max  2)  B现状=0(max  2)  C挪进卡片y30..38=0(max  2)  D卡片下y60=0(max  2)
+cardprobe-scroll-groupbox  light  A带子x@y4..12=0(max  3)  B现状=0(max  3)  C挪进卡片y30..38=0(max  3)  D卡片下y60=9(max206)
+cardprobe-scroll-groupbox  dark  A带子x@y4..12=0(max  2)  B现状=0(max  2)  C挪进卡片y30..38=0(max  2)  D卡片下y60=9(max185)
+cardprobe-split-groupbox   light  A带子x@y4..12=0(max  3)  B现状=0(max  3)  C挪进卡片y30..38=0(max  3)  D卡片下y60=5(max206)
+cardprobe-split-groupbox   dark  A带子x@y4..12=0(max  2)  B现状=0(max  2)  C挪进卡片y30..38=0(max  2)  D卡片下y60=5(max185)

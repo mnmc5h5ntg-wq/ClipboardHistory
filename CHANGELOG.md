@@ -5,7 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-### 产品（R102）
+### 产品（R103）
+
+- **零改动**（一个像素都没有）。本轮所有动作都在判据侧：修 `CARD_PROBE_ARM` 那道证人。
+  凭据：`git diff --stat` 本轮只有 `ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift`
+  与台账/`.scratch` 工具；帧基线 `docs/frame_baseline.json` 不在改动列表里 ⇒ 134 张帧逐字未变。
+
+### 判据与工具（R103）
+
+- **墨证人重做（`UICaptureHarness.swift`，测试专用文件）**：R102 那版写的是
+  `rows.filter { $0 == .ink }.count`，而 `rows` 是**材质**那条通道的分类结果 —— `cardFill` 一宣布
+  `fill = -1`（这一带没有卡片）就整带交回 `.outside`，于是证人在"判据回答没有材质"的那一臂里
+  **结构上必然**报 0。它只能给不需要作证的一侧作证，而对 150 唯一想要的那一格答复永远闭嘴。
+  现在换成**存在性判据 + 自己扫字节**：`inkDelta`（离两个背景里更近的那个；缺卡片参照时只剩页底）、
+  `textInkPixels`、`rowHasTextInk(inkPixels:minPixels:)`（地板的**唯一**定义处，进料侧只喂料）、
+  `textInkWitness`（交出 行数 / 像素数 / 最大偏离）。墨的门限沿用 R24 已量的 `isTextInk`（60），
+  **本轮没有为没量过的色号新写门限**；地板 6 的出处是 `.scratch/motion-audit-2/r103_floor_exact.log`
+  （参考带恒 0，字行普遍 ≥9，另有 4/4/5 三组是字形上下沿）。
+- **地板的另一半**：同一条尺在页面底那条参考带（`x150..710 × y4..12pt`）上再走一遍并断言 `参考条墨行=0`。
+  只配"带子里必须有字"的话，证人松到恒真时它照样绿，而恒真的证人会把仪器错位洗成答复。
+- **读数通道加三格**（runner 上没有 PNG 可下载，读数就是唯一证据）：
+  `CARD_PROBE_ARM … 墨行=N 墨像素=N 最大偏离=N 参考条墨行=0`。
+  下一次若仍读到 `墨行=0`，`最大偏离` 能分清"那台机器没画字"与"我的地板太高"。
+- **真值表**：`testTextInkWitnessIsAnExistenceJudgeWithPairedFloors` 十条，含本轮真正的看点 ——
+  第 ⑧ 条钉"`fill = -1` 时证人仍然要有牙"，第 ⑩ 条钉"缺参照时不许拿 -1 去比距离"
+  （写反了会得到 |28−(−1)|=29 这种假的高偏离 ⇒ 又一版恒真证人）。
+- **变异表 `mutate_r103.py`**：M573 地板恒真 / M574 参照写反 / M575 参考带挪进内容 /
+  M576 调用点退回吃 `rows`。实测 `n=4 caught=4 mismatch=0 not_run=0`，
+  其中 **M576 按实登记为逃掉**（本机六臂都有材质，两版读数一样 ⇒ 这一刀的牙在 runner 上）。
+- **验证电池 `verify_r103.sh`**：变异表从 11 张抬到 12 张（`TABLE_COUNT` 写死），
+  并把 R102 落盘的**断言/读数包含对账**升成电池里的一格（`CONTAIN_EXIT`）——
+  U-289 那一族"少一条断言而 `swift test` 全绿"的守卫工具此前只是我记得才跑。
+- **新开 BACKLOG 155**（runner 上运动地板那条红 `32.19 > 23.48`，与本轮无关、单独问它为什么）
+  与 **156**（`材质=有 卡片段=0` 那对读数说：`cardRun` 那颗逐像素"更像谁"的判据在
+  页底/卡片只差 8 灰阶的机器上是抛硬币）。**D-168** 收口这一族的规矩。
 
 - **一处可见性改动，零像素改动**：`SettingsSidebarView` 从 `private` 放开到 `internal`
   （`SettingsView.swift`）。理由不是"想用它"，是 BACKLOG 150 那台实验需要**真的那一层侧栏**做参照臂 ——
