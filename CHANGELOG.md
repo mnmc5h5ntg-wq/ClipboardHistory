@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R98）
+
+- **「推荐」分区那张滑块卡片的留白统一成设置窗口的那一档**（`RecommendationWeightsView.swift`）：
+  行距 16 → 12，卡片上下那份孤儿 `.padding(.vertical, 4)` 换成共享的 `.settingsCardInset()`。
+  缺陷是量出来的，不是看出来的：R98 新加的 1040 高夹具第一次把这张卡片的**底边**拍进画面，
+  于是读到 `边距=11.5/9.5` 对 `内侧=16.5/18.0` —— 首末两行贴卡片边，比它们彼此之间紧 5~9pt。
+  改后 `边距=14.5/12.5` 对 `内侧=12.5/14.0`（亮暗两档同一组数），与其余五张卡片同档。
+  它逃过 R95 那一次统一的原因记在判据侧最后一条。
+
+### 判据与工具（R98）
+
+- **撤掉 BACKLOG 141 的机制**（那条"两条读图通道给出不同卡片边界"是错的）。
+  本轮把第二条通道接进来做对照，量到 `CARD_CHANNEL_SUMMARY 不一致=0`：同一张帧走
+  `NSImage → TIFF → NSBitmapImageRep` 与直接解 PNG，settings 族 20 帧**逐段一致**，
+  连页底与填充都同数。真正不一致的是**两张不同的文件** ——
+  `CARD_BYTES settings-privacy-excluded 本用例=319980 捕获卷=333059 字节数不同`，
+  而它是全仓唯一声明了 `seed:` 的夹具；逐行指纹把分歧起点钉在 566.0pt，
+  正是种子里那两行「移除」该在的位置（交付帧 870.5..936.0pt 有 54 行墨，判据帧 0 行）。
+- **根因与修法**：`Fixture.seed` 的"种 + 还原"以前只写在 `testCaptureKeyViews` 一处，
+  其余二十多个 `render` 调用点（全是"判据自己重渲染一张帧再量像素"那些）把它当不存在
+  ⇒ **判据量的不是它名字里那张帧**，而帧基线钉的是有种的那一张。
+  种子现在搬进 `render(...)` 这个唯一咽喉；`CARD_BYTES` 复测——那一次运行打出的亮档 10 对全部 `字节数相同`（暗档只逐条看了有种子的那一对），
+  `settings-privacy-excluded` 的卡片段第一次与独立复算相同（`段1 y=106.0..765.5pt`）。
+- **新立三条判据**：`testSeededFixtureRendersTheSeededPage`（拍之前故意把那个键种成**别的条数**
+  ⇒ 只有用了夹具自己种子的实现能给出期望条数；整页零墨记未运行；拍完必须还原）、
+  `testInkRunCountArithmeticIsATruthTable`（数墨带的算术：先合并后筛高，边界 `<` 不是 `<=`）、
+  `testSeedIsAppliedOnlyInsideRender`（调用点守卫：全文件只准有一处把种子写进 UserDefaults）。
+  变异 M543–M549 `n=7 caught=7 mismatch=0 not_run=0`。
+- **BACKLOG 140 结案**：`settings-privacy-tall` / `settings-recommendations-tall`（720×1040，
+  亮暗各一张）进基线，**124 → 128 帧**。540 档那两张照旧报 `CARD_RHYTHM_DECLINED` ——
+  没有为了绿放宽 declined 那一格，只是旁边多了能判的那两张。
+- **BACKLOG 143（新开 / 已修）**：数卡片的源码守卫以前只扫 `Views/SettingsView.swift`，
+  而「推荐」那张卡片长在 `Views/RecommendationWeightsView.swift` 里 ⇒ R95 那次"五处一起补留白"
+  根本没把它算进名单，它带着孤儿 padding 活了四轮。守卫改成**枚举 Views 目录**并点名缺在哪个文件。
+  证人 M550（只改行距 ⇒ 只许节奏判据红）与 M551（撤共享留白 ⇒ 两条都要红），`n=2 caught=2`。
+- **R97 的 CI 已读**：run 38891183309 `build-and-test` **success**（本轮开场读的那一次）。
+- **电池与曲线自己坏了两处**（工具，非产品）：
+  ① `verify_r98.sh` 第 6 步用了 `${tag^^}`（bash 4 语法），而本机是 bash 3.2.57 ⇒
+     六张变异表只跑了第一张，而摘要照样打出 `MUT_EXIT=0`。改成不用 bash 4 语法，
+     并且**"少一张表"与"某张表非零"一样算红**、结论行必须贴出六张表各自的 `MUTATE_TABLE` 原文。
+  ② `curve_from_ledger.py` 不认 R93 起的 `**均分 91.3**` ⇒ 六轮被静默跳过（尾轮守卫把它拦下来了）。
+     现在认两种写法，且**没有结论行时从七维表自己算**（要求正好 7 行），并新增 `CURVE_DERIVED=…`
+     把"推导值"与"原文值"分开打出来。顺带发现 Round 93 / 94 两节当时漏写了七维表，已按那两轮
+     自己的读数补上并标注"R98 补记" ⇒ `GAPS=none`、`PHASE2 n=91 rounds=9..98 mean=92.86`。
+
+
 ### 产品（R97）
 
 - **无改动**。本轮全部工作在判据侧；124 张帧重拍之后与基线逐字节相同（`CHANGED=0`）。

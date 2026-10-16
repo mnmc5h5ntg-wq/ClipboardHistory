@@ -5056,3 +5056,62 @@ R90 据此得出"runner 上在屏判据一条都没跑完"，R91 追到一条僵
 `testSettingsCardVerticalRhythmIsOneNumber`（含"统计页必须 0 段"那条由源码推的断言）；
 变异 `n=5 caught=5 mismatch=0`（M537–M541，每张地板一刀、扫描带一刀、填充一刀）。
 
+
+### D-156（R98）"两条通道读数不一致"要先问是不是同一张图；种子的应用只能有一个咽喉
+
+**背景**：R97 记下一条分歧（BACKLOG 141）——同一张 `settings-privacy-excluded`，
+判据（`NSImage → tiffRepresentation → NSBitmapImageRep`）给卡片段 106.0..**705.5**pt，
+而直接读 PNG 的独立复算给 106.0..**765.5**pt，于是归因给"重编码换了色彩空间"。
+本轮按它写的做法接上第二条读图通道做对照，量出来的第一件事就是**这条归因不成立**。
+
+**读数**（本机，2026-10-16）：
+```
+CARD_CHANNEL_SUMMARY 不一致=0 解不了PNG=0        # 20 帧逐段一致，连页底/填充都同数
+CARD_BYTES settings-privacy-excluded light 本用例=319980 捕获卷=333059 字节数不同
+（settings 族其余 9 对：字节数相同；同一支用例连跑两次 md5 相同 ⇒ 不是抖动）
+逐行指纹：分歧从 566.0pt 起；870.5..936.0pt 交付帧 54 行墨 / 判据帧 0 行
+右边缘窄带 x 684..706pt：交付帧 2 段「移除」/ 判据帧 0 段
+```
+`settings-privacy-excluded` 是全仓**唯一**声明了 `seed:` 的夹具。差的那 60pt 就是种子里那两行。
+
+**决定**：
+1. **撤掉 141 的机制**，不改读图通道（尺的零点没漂，漂的是被量的那张图）。
+2. 把 `Fixture.seed` 的"种 + 还原"从 `testCaptureKeyViews` 搬进 `render(...)` ——
+   那是所有拍帧路的唯一必经点。调用方各自种 = 25 份迟早会漂开的副本。
+3. 新立 `testSeededFixtureRendersTheSeededPage`：拍之前把那个键**故意种成别的条数**，
+   于是只有"`render` 用了夹具自己的种子"能给出期望条数；整页零墨记未运行（不算通过）；
+   拍完之后那个键必须还是我种进去的那一条（还原由这条钉，不靠调用方记得做）。
+4. 新立 `testSeedIsAppliedOnlyInsideRender`（调用点守卫）：全文件里"把种子写进 UserDefaults"
+   这句只准出现一次。上一条判据量的是**帧**，这一条判的是**写法** ——
+   缺陷的形状是"副本先漂开"，而它在"帧还没不同"的那一刻是没人看见的。
+5. 数墨带那把尺的 `mergeGap` 取 8pt 而不是 2px：本机量到一颗按钮的字在竖直方向本来就不连续
+   （行内空隙 8px、两颗之间 43px）。取 2px 会把两行读成 4 段 —— 尺会把"画出来了"报成"画多了"。
+
+**理由**：这一族的错法不是"读图读错了"，是**拿一个没验过的前提当结论**——"两边读的是同一张图"
+这句话在 R97 写下来的时候没有任何读数支撑，而它一倒，整条 141 的修法（换通道 + 重标定十几支
+判据的阈值）就是白跑一轮。所以本轮真正的产出不是那个 bug 的修复，是**对照的形状**：
+先证明两个通道读的是同一张图，再去比较两个通道。
+
+**兼容性/迁移**：产品文件 1 个改动（`RecommendationWeightsView.swift` 的留白档，见下面第 6 条），
+判据侧 `render` 多了一条前置/后置动作（对所有既有调用点是**行为等价**的：帧逐字节没变，
+124 张里唯一变的是本轮主动改产品的那 4 张）。夹具 124 → 128 帧。
+**回滚**：`git revert` 本轮提交；种子搬进 `render` 是纯判据侧改动，回滚不会留下半套。
+**谁守着**：`testSeededFixtureRendersTheSeededPage`、`testInkRunCountArithmeticIsATruthTable`、
+`testSeedIsAppliedOnlyInsideRender`；变异 M543–M549（`n=7 caught=7 mismatch=0 not_run=0`）。
+
+### D-157（R98）高夹具第一次拍到「推荐」那张卡片的底边，量出的缺陷当场修
+
+**读数**：`settings-recommendations-tall light 段1 y=171.0..853.5pt 分隔线=8`
+改前 `边距=11.5/9.5` 对 `内侧=16.5/18.0/…`；改后 `边距=14.5/12.5` 对 `内侧=12.5/14.0/…`（亮暗同族）。
+
+**决定**：`VStack(spacing: 16 → 12)` + 孤儿 `.padding(.vertical, 4)` 换成共享的 `.settingsCardInset()`。
+不给这一张单独配一个"能对上 16"的边缘值 —— 同一个设置窗口里"这几行属于同一组"只准有一种说法
+（其余五张：快捷键 14.0/14.5、隐私 13.5/14.5、数据 14.0/14.5）。
+
+**为什么它逃过 R95 那一次**：数卡片的源码守卫从 R95 起只扫 `Views/SettingsView.swift`，
+而这张卡片长在 `Views/RecommendationWeightsView.swift`；同时它比窗口高，帧判据对它一直是
+`CARD_RHYTHM_DECLINED`（140）。**两条盲区叠起来 = 四轮的漏网**。守卫的修法（改成枚举 Views 目录）
+记在 BACKLOG 143：按文件划的守卫永远追不上按组件长的东西。
+**谁守着**：`testSettingsCardVerticalRhythmIsOneNumber` + `testEverySettingsCardAppliesTheSharedEdgeInset`；
+变异 M550（只改行距 ⇒ 只许节奏红、调用点守卫必须绿）与 M551（撤共享留白 ⇒ 两条都要红且点名文件），
+`n=2 caught=2 mismatch=0`。

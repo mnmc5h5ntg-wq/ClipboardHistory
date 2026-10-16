@@ -1,5 +1,5 @@
 {
-  "count": 124,
+  "count": 128,
   "frames": {
     "content-empty-750x560-dark.png": "a09e9950d6a641836ef4015b91b85252c1897a55b22938fbe6f673614946e91d",
     "content-empty-750x560-light.png": "6ef53e39f67397f7807907c53ac90fcf8aef4c198db987f3305b235f27cc3382",
@@ -103,8 +103,12 @@
     "settings-privacy-720x540-light.png": "0f54823327bf3becd6bee37ac412b5104c775252506dd186838fbe3870147812",
     "settings-privacy-excluded-720x1040-dark.png": "0612276ce88ee5c772590b70bf2cb3f0b6e58ff6cdb87bb2d50b8699a2d4bbb6",
     "settings-privacy-excluded-720x1040-light.png": "5f265fe7a4a6b59fe5d8fb966a62002a5a8e07f26ee813ab417678f06a66f765",
-    "settings-recommendations-720x540-dark.png": "e1c6eddf1c73d8a6229348935b2e6d687139d4e05bdd49ae9cca5d3cdd93001c",
-    "settings-recommendations-720x540-light.png": "821b8814cd151024efafefc731cf099bd954ab78f28ebfe4a34eef47a33df5d9",
+    "settings-privacy-tall-720x1040-dark.png": "b69c12db91f05e2841da580cdf27c3c1bd3eba87ab4048213a3a2a589aee27a9",
+    "settings-privacy-tall-720x1040-light.png": "a6f92cb5df4dd6cd207bfb98f6ec9c76df623bebd7a4fe98e48088cacf8ca4f6",
+    "settings-recommendations-720x540-dark.png": "f379ef74bcc02482dc574fcc6dd0662d698f55e452cf1b524381888e1dec11ed",
+    "settings-recommendations-720x540-light.png": "a1094215ac2e77453bb90b00f5674ed30ceaaf8e74a092633b07686c9f83dc37",
+    "settings-recommendations-tall-720x1040-dark.png": "3cd6fdcc34168e971292f5b5202d853f010ce50a7b19aa7b8ade98575d8173c0",
+    "settings-recommendations-tall-720x1040-light.png": "a4891d30f4ede85e5f88c022f5a35de60da1892c1c35b3243b245255f1450f4f",
     "settings-shortcuts-720x540-dark.png": "c0ad433b65cfe84558aeac8ad03b1ca8b13236691f55b83da93396323198e1cd",
     "settings-shortcuts-720x540-light.png": "34566e27b970411f044f1eabfa023edb0a6caa22fb16fd7a3b934e3b7ac6a2f8",
     "settings-stats-720x540-dark.png": "d7019793a1106bf12065be2088bfaab1721cd902e4c42dc325a706cbe3f55aeb",
@@ -121,10 +125,10 @@
     "sidebar-multi-select-min-250x520-light.png": "65636ffec6ea2dfe3a519c7cb37198c57d386fd6b033f69e4e0c7825731ff320",
     "sidebar-no-results-300x520-dark.png": "4256eb622d176224127f0a054d6d9a84d54fae2176c7b4f08619de68c8231cba",
     "sidebar-no-results-300x520-light.png": "d3b1e8fa2597d5cfd1c7d6da281b19f2737af7ccd00d0140bf9b68c56ff29d6e",
-    "weights-520x880-dark.png": "150ee20a1567f9d34eb0a04fdd3c0f5da3100cfd766f03a1014a00c39bc590dc",
-    "weights-520x880-light.png": "216e825cd8170d89894424851d2066c8bf69a41fdb5f889d72ae764eaa88c287",
-    "weights-adjusted-520x880-dark.png": "8f81f00cdcdcefb243a3cb58086b8289b15424e00a1404af8d8f3b33d038d6bd",
-    "weights-adjusted-520x880-light.png": "de6508ace8bc7c3c2a844b2844930a8a085ecc183f794beb2f03c968f5cda441"
+    "weights-520x880-dark.png": "5b6d808718b95508f2f823aa0c9dfbe4556aebbd99cf47800ecca47f2339df77",
+    "weights-520x880-light.png": "cc916315fb67c3e6c78e227f4efd2e1d96c60da49abd0968614864d0dd4916b2",
+    "weights-adjusted-520x880-dark.png": "258a0186f3c9a862db3696595b6ff3433309f422c2c61acd36199d2357b4c40c",
+    "weights-adjusted-520x880-light.png": "8638e104e7f07cc8017d0b8b2f526181e1ed2eb05d5aa568e23d58e3db4d9734"
   },
   "note": "离屏帧的 sha256 基线。改了界面就在同一个 commit 里跑 update；CI 的 compare 步骤靠它回答“上一版比这一版哪些帧变了”。",
   "schema": 1

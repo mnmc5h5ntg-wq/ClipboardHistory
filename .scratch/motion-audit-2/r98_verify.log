@@ -1,0 +1,23 @@
+== 1) 构建（必须 0 告警）
+BUILD_EXIT=0 BUILD_WARNING_LINES=0
+== 2) 全量 swift test
+TEST_EXIT=0 最后一行汇总: 	 Executed 811 tests, with 41 tests skipped and 0 failures (0 unexpected) in 160.854 (160.897) seconds
+== 3) 在屏那一卷（本机，带 CLIPBOARD_HISTORY_UI_INTERACTION=1）
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.764 (21.766) seconds
+== 3.5) 重新拍一遍帧（本轮产品改了「推荐」那张卡片 ⇒ 帧必须与基线一致）
+CAPTURE_EXIT=0 帧数=128 目录内文件=129
+SEED_GUARD settings-privacy-excluded light 期望=2 右边缘墨带=2 整页墨带=34 填充=244
+SEED_GUARD settings-privacy-excluded dark 期望=2 右边缘墨带=2 整页墨带=34 填充=36
+SEED_GUARD_LINES=2
+FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=128 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0 
+== 5) 脚本电池
+PY_EXIT=0 Ran 209 tests in 11.823s OK 
+== 6) 六张变异表（本轮两张：种子通道 7 刀 + 产品腿 2 刀；欠的四张照跑）
+MUT_EXIT=0r95_rhythm r94_order r96_triage r97_card r98_seed r98_card | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0
+== 7) 台账编号守卫
+LEDGER_EXIT=0 Ran 4 tests in 0.014s OK 
+== 8) 看图仪器（卡片边界与『什么算一张卡片』，尺腿不判产品）
+VIS_EXIT=0 候选块=9 自检=1 失败自检=0
+== 9) 摘要缺值算红
+SUMMARY_MISSING=0
+VERIFY_OK=1

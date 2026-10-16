@@ -21,7 +21,18 @@ struct RecommendationWeightsView: View {
                 .foregroundStyle(.secondary)
 
             GroupBox {
-                VStack(spacing: 16) {
+                // R98 / BACKLOG 140 的高夹具第一次把这张卡片的**底边**拍进画面，于是量出：
+                // `边距=11.5/9.5` 而 `内侧=16.5/18.0/16.5/18.5/…`（亮暗两档同一组数）——
+                // 首末两行贴卡片边，比它们彼此之间紧 5~9pt。这正是 R95 在「快捷键」那张上修的
+                // 同一个形状，只是当时没人看得见：
+                // ① 节奏判据的扫描带写死在 540 那一档（R97 修）；
+                // ② 数卡片的源码守卫只扫 `SettingsView.swift`，而这张卡片长在**另一个文件**里，
+                //    所以 R95 那次"五处一起补"根本没把它算进名单（本轮开 143 修守卫的覆盖面）。
+                // 留白取 `spacing: 12` + 共享的 `.settingsCardInset()`：与其余五张卡片同一档
+                //（快捷键 14.0/14.5、隐私 13.5/14.5、数据 14.0/14.5），
+                // 而不是给这一张单独配一个"能对上 16"的边缘值 —— 同一个设置窗口里
+                // "这几行属于同一组"只准有一种说法。
+                VStack(spacing: 12) {
                     ForEach(RecommendationWeights.Factor.allCases, id: \.self) { factor in
                         WeightSliderRow(
                             factor: factor,
@@ -39,7 +50,7 @@ struct RecommendationWeightsView: View {
                         }
                     }
                 }
-                .padding(.vertical, 4)
+                .settingsCardInset()
             }
         }
     }

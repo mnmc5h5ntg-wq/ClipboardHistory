@@ -2334,23 +2334,14 @@ final class UICaptureTests: XCTestCase {
                 let file = directory.appendingPathComponent(
                     "\(fixture.name)-\(Int(fixture.size.width))x\(Int(fixture.size.height))-\(tag).png"
                 )
-                var previousSeed: (key: String, value: String?)? = nil
-                if let seed = fixture.seed {
-                    if originalSeeds[seed.key] == nil {
-                        originalSeeds[seed.key] = UserDefaults.standard.string(forKey: seed.key)
-                    }
-                    previousSeed = (seed.key, UserDefaults.standard.string(forKey: seed.key))
-                    UserDefaults.standard.set(seed.value, forKey: seed.key)
+                /// R98：这里**不再种、也不再还原** —— 那两件事搬进了 `render`（见那里的注释）。
+                /// 留下来的只有"记一下种之前是什么"，因为最后那条断言要拿它对照：
+                /// 现在它判的是 `render` 有没有还原，而不是"调用方有没有记得还原"。
+                if let seed = fixture.seed, !originalSeeds.keys.contains(seed.key) {
+                    originalSeeds[seed.key] = UserDefaults.standard.string(forKey: seed.key)
                 }
                 let metrics = try render(fixture, appearance: appearance, to: file)
                 if fixture.contentMustFit { mustFitNames.insert(fixture.name) }
-                if let restored = previousSeed {
-                    if let value = restored.value {
-                        UserDefaults.standard.set(value, forKey: restored.key)
-                    } else {
-                        UserDefaults.standard.removeObject(forKey: restored.key)
-                    }
-                }
                 report.append((file.lastPathComponent, metrics))
             }
         }
@@ -3342,6 +3333,21 @@ final class UICaptureTests: XCTestCase {
         // 所以用 initialCategory 注入，而不是靠"点一下"。
         for category in SettingsCategory.allCases {
             results.append(Fixture("settings-\(category.rawValue)", NSSize(width: 720, height: 540)) {
+                AnyView(self.makeSettingsView(store: store, initialCategory: category))
+            })
+        }
+        // BACKLOG 140 ①：**隐私**与**推荐**各再拍一档 1040 高的。
+        //
+        // 为什么是这两屏、为什么非补不可：竖向节奏那把尺现在扫到窗口底，
+        // 于是这两档报出"卡片底 == 带子下沿 == 540"（`CARD_RHYTHM settings-privacy light 段1/1
+        // y=106.0..539.5pt`、`settings-recommendations light 段1/1 y=171.0..539.5pt`）——
+        // 那句话的意思不是"卡片刚好装满"，是**下半截从来没有一张帧看过**。
+        // 其余几屏在同一档都自己收了底（快捷键 304.5、数据 324.5、通用 282.0），不需要高夹具。
+        // 高度取 1040 而不是新试一个数：`settings-privacy-excluded` 已经在这档上跑了十几轮，
+        // 本机与 runner 的行为都是已知的（R28b 撤的是**宽度** 900/1100，与这一档无关）。
+        for category in [SettingsCategory.privacy, .recommendations] {
+            results.append(Fixture("settings-\(category.rawValue)-tall",
+                                   NSSize(width: 720, height: 1040)) {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
@@ -4526,6 +4532,55 @@ final class UICaptureTests: XCTestCase {
         return (kinds, fill)
     }
 
+    /// 纯函数：一条**逐行布尔**（"这一行在那条窄带里有没有墨"）里数出几段墨带。
+    ///
+    /// 先合并、后按高度筛 —— 顺序是这条判据的语义，真值表第 ④ 条钉的就是它：
+    /// 一颗按钮的字有降部（本机：「移除」那一段在 2x 下被降部切开过），
+    /// 反过来写会把同一颗按钮数成 0 段（两段都不够高），于是"两条种子行没画出来"
+    /// 与"这台机器画不出字"在报表上长得一模一样 —— 那正是本轮要抓的事，不能给它一个安静的逃法。
+    static func inkRunCount(column: [Bool], minRunHeight: Int, mergeGap: Int) -> Int {
+        var runs: [(top: Int, bottom: Int)] = []
+        var start: Int? = nil
+        for (i, inked) in column.enumerated() {
+            if inked {
+                if start == nil { start = i }
+            } else if let head = start {
+                runs.append((head, i - 1))
+                start = nil
+            }
+        }
+        if let head = start { runs.append((head, column.count - 1)) }
+        var merged: [(top: Int, bottom: Int)] = []
+        for run in runs {
+            if let last = merged.last, run.top - last.bottom - 1 < mergeGap {
+                merged[merged.count - 1] = (last.top, run.bottom)
+            } else {
+                merged.append(run)
+            }
+        }
+        return merged.filter { $0.bottom - $0.top + 1 >= minRunHeight }.count
+    }
+
+    /// 进料：从位图里抽一条**纵向窄带**的逐行墨向量（`inkRunCount` 的纯函数不吃位图）。
+    static func columnInk(bytes: UnsafePointer<UInt8>, bytesPerRow: Int,
+                          xRange: Range<Int>, yRange: Range<Int>,
+                          fill: Int, gate: Int, minInk: Int) -> [Bool] {
+        var out: [Bool] = []
+        out.reserveCapacity(yRange.count)
+        for y in yRange {
+            var inked = 0
+            let o = y * bytesPerRow
+            for x in xRange {
+                let p = o + x * 4
+                let luma = Int((0.2126 * Double(bytes[p]) + 0.7152 * Double(bytes[p + 1])
+                                + 0.0722 * Double(bytes[p + 2])).rounded())
+                if abs(luma - fill) >= gate { inked += 1 }
+            }
+            out.append(inked >= minInk)
+        }
+        return out
+    }
+
     /// 纯函数：把逐行分类切成**一段一段的卡片**（连续"有卡片材质"的行）。
     ///
     /// 为什么必须有这一格：一个扫描带里可以纵向放**好几张**卡片
@@ -4700,6 +4755,13 @@ final class UICaptureTests: XCTestCase {
         // 与 R29d/R30 那张是同一个机制（D-090：合成前的极性），所以记为盲区而不是缺陷。
         // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
         "settings-general-login-unsupported", "settings-general-login-failed",
+        // R98 新增的两张高夹具（BACKLOG 140 结案那一半）也进名单 —— 同样不是"顺手补名单"：
+        // 先看了那张帧（`/tmp/r98_tall_dark_sidebar.png`，`settings-privacy-tall` 暗档侧栏那一列），
+        // 「快捷键 / 通用 / 推荐 / 数据 / 统计」五枚标签黑字黑底几乎看不见，
+        // 而选中的「隐私」是白字蓝底药丸（强调色走固定色，不受 vibrancy 极性影响）——
+        // 与 R29d/R30 同一机制（D-090：合成前的极性），所以记为盲区而不是缺陷。
+        // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
+        "settings-privacy-tall", "settings-recommendations-tall",
     ]
 
     /// 侧栏那一列"文字应当出现的位置"（pt）。
@@ -4944,6 +5006,30 @@ final class UICaptureTests: XCTestCase {
         }
         throw NSError(domain: "UICaptureHarness", code: 2,
                       userInfo: [NSLocalizedDescriptionKey: "找不到 Sources/ClipboardHistoryApp/\(relativePath)"])
+    }
+
+    /// R98 / BACKLOG 143：把"扫某一个文件"换成"扫 Views 目录下的每一个文件"。
+    ///
+    /// 存在的理由：按文件划的守卫追不上按组件长的东西 —— 卡片可以长在任何一个文件里，
+    /// 而名单要有人记得改。目录枚举没有这个洞：新增文件自动进名单。
+    /// 返回 `(文件名, 源码)`，按文件名排序（报表要能在两次运行之间逐字对齐）。
+    private func productViewSources() throws -> [(name: String, text: String)] {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let dir = candidate.appendingPathComponent("Sources/ClipboardHistoryApp/Views", isDirectory: true)
+            let urls = (try? FileManager.default.contentsOfDirectory(at: dir,
+                                                                    includingPropertiesForKeys: nil)) ?? []
+            let swifts = urls.filter { $0.pathExtension == "swift" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            if !swifts.isEmpty {
+                return swifts.compactMap { url in
+                    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                    return (url.lastPathComponent, text)
+                }
+            }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw NSError(domain: "UICaptureHarness", code: 3,
+                      userInfo: [NSLocalizedDescriptionKey: "找不到 Sources/ClipboardHistoryApp/Views 目录"])
     }
 
     /// R34 · 菜单栏帧的**资格**：它们是菜单表面的复刻，不是菜单本身。
@@ -5599,6 +5685,9 @@ final class UICaptureTests: XCTestCase {
         // R97：还要区分"这台机器拍不出这一页"与"墨那一档读不到"。
         // 前者会连卡片段都读不出来（没有材质），后者会读出**满带的卡片段却零墨** ——
         // 这两种情况在 `judged == 0` 这一格上长得一模一样，而只有一种该 skip。
+        // R97：还要区分"这台机器拍不出这一页"与"墨那一档读不到"。
+        // 前者会连卡片段都读不出来（没有材质），后者会读出**满带的卡片段却零墨** ——
+        // 这两种情况在 `judged == 0` 这一格上长得一模一样，而只有一种该 skip。
         var sawSegment = false
         // R96 把对象从"那一张卡片"扩到"每一张有分隔线的卡片"：R95 的修法一次动了五张卡片，
         // 而判据只压在 `settings-shortcuts` 上 ⇒ 另外四张改没改对，今天没人看着。
@@ -5762,6 +5851,184 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// 判据自己重渲染的那张帧，**必须就是交付的那一页**（R98 / BACKLOG 141）。
+    ///
+    /// 缺陷是量出来的，不是想到的。R97 记下的那句"两条读图通道给出不同的卡片边界"被 R98
+    /// 自己的对照**证伪**了：同一张帧走 TIFF 回路与直接解 PNG，settings 族 20 帧逐段一致
+    ///（`CARD_CHANNEL_SUMMARY 不一致=0`）。真正的分歧是**两张不同的图** ——
+    /// 判据 `render` 的那张与捕获卷交付的那张逐字节不同（319980 B vs 333059 B，
+    /// 其余 9 对逐字节相同），而它是全仓**唯一**声明了 `seed:` 的夹具；
+    /// 逐行指纹把分歧起点钉在 **566.0pt**，那里正是种子的两行「移除」该在的位置，
+    /// 870.5..936.0pt 交付帧 54 行墨 / 判据帧 0 行（`.scratch/motion-audit-2/r98_seed_divergence.py`）。
+    /// 根因：种子的"种 + 还原"只写在 `testCaptureKeyViews` 一处，其余二十多个 `render`
+    /// 调用点把 `fixture.seed` 当不存在 ⇒ **判据量的不是它名字里那张帧**，
+    /// 而帧基线钉的是有种的那一张，两边的读数从此永远对不上。
+    ///
+    /// 三条判据各挡一种假绿：
+    /// ① 拍之前把那个键**故意种成别的条数** ⇒ 只有"`render` 用了夹具自己的种子"能给出期望条数。
+    ///    忽略种子的那一版会画出我种的这一条（1 行 vs 期望 2 行）⇒ 红。M543 走的就是这条路。
+    /// ② 整页一条墨都没有 ⇒ 这台机器拍不出这一页，记未运行（BACKLOG 43 同族），不许算通过。
+    ///    这一条必须在①之前判，否则 runner 上"空白页"会把①红成一条**假的产品缺陷**。
+    /// ③ 拍完之后那个键必须还是我种进去的那一条 ⇒ `render` 只借不占；
+    ///    还原由这条钉住，而不是靠调用方记得做（上一版的写法正是"调用方忘了就没人管"）。
+    func testSeededFixtureRendersTheSeededPage() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r98-seed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
+                                  (NSAppearance.Name.darkAqua, "dark")] {
+            let seeded = fixtures(appearance: appearance).filter { $0.seed != nil }
+            XCTAssertFalse(seeded.isEmpty,
+                           "\(tag)：一条声明了 `seed:` 的夹具都没有 ⇒ 这条判据没有对象。"
+                           + "删掉最后一条种子夹具是可以的，但必须连这条判据一起删 —— "
+                           + "留着它全绿，等于替『种子通道又没人验了』做担保")
+            for fixture in seeded {
+                guard let seed = fixture.seed else { continue }
+                guard seed.key == CapturePolicy.userExcludedKey else {
+                    emit("SEED_GUARD_NA \(fixture.name) \(tag) 键=\(seed.key)"
+                         + "（这个键没有『条数 → 右边缘墨带』的映射 ⇒ 这一条没判，不算通过）")
+                    continue
+                }
+                let expected = CapturePolicy.decodeUserExcluded(seed.value).count
+                // ① 的哨兵：条数必须与夹具自己声明的不同，否则"忽略种子"也能给出期望条数。
+                let sentinel = CapturePolicy.encodeUserExcluded(
+                    expected == 1 ? ["com.example.sentinel.a", "com.example.sentinel.b"]
+                                  : ["com.example.sentinel.a"])
+                XCTAssertNotEqual(CapturePolicy.decodeUserExcluded(sentinel).count, expected,
+                                  "哨兵与夹具声明的条数相同 ⇒ 这一条判据恒真，先修它")
+                let original = UserDefaults.standard.string(forKey: seed.key)
+                UserDefaults.standard.set(sentinel, forKey: seed.key)
+                defer {
+                    if let back = original {
+                        UserDefaults.standard.set(back, forKey: seed.key)
+                    } else {
+                        UserDefaults.standard.removeObject(forKey: seed.key)
+                    }
+                }
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                XCTAssertEqual(UserDefaults.standard.string(forKey: seed.key), sentinel,
+                               "\(fixture.name) \(tag)：`render` 拍完之后没有把 \(seed.key) 还原成"
+                               + "它进来时看到的那一条 ⇒ 同一次运行里后面的帧会被这张夹具带脏"
+                               + "（R98 把种子搬进 `render` 之后，这一条才是『搬进去的那一半有没有还原』）")
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("\(fixture.name) \(tag)：读不回刚拍的帧")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let full = Int(177 * scale)..<Int(706 * scale)
+                let fill = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: Int(684 * scale)..<Int(706 * scale),
+                                          yRange: Int(120 * scale)..<Int(960 * scale))
+                // ② 先判"这一页到底画没画"：整幅卡片区一条墨带都没有 ⇒ 这台机器的通道问题，
+                // 不是产品没画种子行。（与①用**同一颗尺**：同一个 fill、同一个 gate，
+                // 否则就是证人用自己的尺给别人的判据作证 —— BACKLOG 104 那一族。）
+                let wholePage = Self.columnInk(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                               xRange: full, yRange: Int(120 * scale)..<Int(960 * scale),
+                                               fill: fill, gate: 60, minInk: 4)
+                let rightEdge = Self.columnInk(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                               xRange: Int(684 * scale)..<Int(706 * scale),
+                                               yRange: Int(120 * scale)..<Int(960 * scale),
+                                               fill: fill, gate: 60, minInk: 2)
+                let drawn = Self.inkRunCount(column: wholePage, minRunHeight: 2, mergeGap: 2)
+                // `mergeGap` 用**行距的一档**而不是 1：本机逐行量过「移除」那两颗按钮 ——
+                // 一颗按钮的字在竖直方向本来就不连续（行内空隙 8px = 4pt），
+                // 而行与行之间空 43px = 21.5pt。取 8pt 落在这两个数中间（5.4 倍空档），
+                // 于是"一颗按钮"数成一段、"两颗按钮"数成两段。
+                // 为什么不能取 2px：那样每颗字被自己的降部切成两段，两行读出 4 段 ——
+                // 尺会把"种子画出来了"报成"画多了"，而这条判据要的恰恰是能被信任的计数。
+                let found = Self.inkRunCount(column: rightEdge, minRunHeight: 4,
+                                             mergeGap: Int(8 * scale))
+                emit("SEED_GUARD \(fixture.name) \(tag) 期望=\(expected) 右边缘墨带=\(found)"
+                     + " 整页墨带=\(drawn) 填充=\(fill)")
+                guard drawn > 0 else {
+                    emit("SEED_GUARD_NOT_RUN \(fixture.name) \(tag)（整页零墨 ⇒ 这台机器拍不出这一页，"
+                         + "不算通过也不算盲区）")
+                    continue
+                }
+                judged += 1
+                XCTAssertEqual(found, expected,
+                               "\(fixture.name) \(tag)：右边缘那一列读到 \(found) 段墨，而夹具声明的种子有 "
+                               + "\(expected) 条 ⇒ 判据量的**不是**交付的那一页。"
+                               + "`render` 有没有应用 `fixture.seed` 是这里唯一的解释路径"
+                               + "（R98：上一版它没有，于是这张帧比交付帧少 60pt 的两行，"
+                               + "而两版帧的字节数差 13079 B）")
+            }
+        }
+        if judged == 0 {
+            throw XCTSkip("SEED_GUARD_NOT_RUN：两档所有种子夹具都画不出墨 ⇒ 种子通道记为未运行"
+                          + "（BACKLOG 43 同族），不算通过")
+        }
+    }
+
+    /// 种子**只准在 `render` 里种一次**（R98 / 调用点级守卫，与 R43/R44 那一族同一条规矩）。
+    ///
+    /// 为什么光有上一条判据不够：上一条量的是"这一张帧有没有种子"，而本轮那个缺陷的形状是
+    /// "种子的应用散落在调用方" —— 那件事可以在**不改变任何一张帧**的情况下重新长出来
+    ///（下一个加种子夹具的人在自己的测试里种一次，就又多了一份迟早会漂开的副本）。
+    /// 所以这一条判的是**写法**：全文件里"把 `fixture.seed` 写进 UserDefaults"这句只能出现一次。
+    ///
+    /// 锚点用拼接构造，不写全串：这条守卫扫的是**它自己所在的那个文件**，
+    /// 字面量一出现就是 2 次命中，守卫会红在自己的源码上（R53 的 `region()` 刚犯过这一条）。
+    func testSeedIsAppliedOnlyInsideRender() throws {
+        let text = try String(contentsOfFile: #filePath, encoding: .utf8)
+        let code = Self.codeOnly(text)
+        let setter = "UserDefaults.standard.set(seed.value" + ", forKey: seed.key)"
+        let writes = code.components(separatedBy: setter).count - 1
+        XCTAssertEqual(1, writes,
+                       "把夹具种子写进 UserDefaults 这句出现了 \(writes) 次，期望 1 次（只准在 `render` 里）。"
+                       + "多于一次 ⇒ 某条测试自己种了一份：`render` 已经会种，"
+                       + "自己再种的那份要么被 `render` 覆盖、要么在拍完之后没还原 —— "
+                       + "两种都会让判据量的不是交付的那一页（R98 / BACKLOG 141 就是这个形状）")
+    }
+
+    /// 数墨带那把尺的算术要有真值表（**不覆盖管线**：它判的是纯函数；
+    /// 管线级判据是上面那条 `testSeededFixtureRendersTheSeededPage`）。
+    ///
+    /// 合成分布照抄本机量出来的那一组数（亮档 `settings-privacy-excluded`，2x）：
+    /// 一颗「移除」的字在窄带里占 17 行，**自己中间空 8 行**（降部），
+    /// 两颗之间空 43 行。`mergeGap=16` 落在这两个数中间。
+    /// 四条各挡一种"看着对、其实答不了问题"：
+    /// ① 空 / 全 false ⇒ 0 段（尺不许把"没有"读成"有一段"）；
+    /// ② 两颗真按钮（间隔 43 行 ≥ mergeGap）⇒ 2 段；
+    /// ③ 一颗被降部切开（行内空 8 行 < mergeGap）⇒ **必须还是 1 段** —— 这一条钉的是合并本身：
+    ///    不合并就是 2 段，于是"种子只画了一条"与"画了两条"这把尺读出来一样；
+    /// ④ 两段都不够高、合并后够高 ⇒ 1 段 —— 这一条钉的是**先合并、后筛高**的顺序：
+    ///    反过来说先筛高会数成 0，而 0 与"两条种子行整条没画出来"在报表上长得一模一样，
+    ///    那正是本轮要抓的事，不能给它一个安静的逃法。
+    /// ⑤⑥ 边界：间隔正好等于 mergeGap ⇒ 不合并（`<` 不是 `<=`）。
+    func testInkRunCountArithmeticIsATruthTable() {
+        func rows(_ spec: [(Bool, Int)]) -> [Bool] {
+            spec.flatMap { value, count in Array(repeating: value, count: count) }
+        }
+        XCTAssertEqual(0, Self.inkRunCount(column: [], minRunHeight: 4, mergeGap: 16), "空输入")
+        XCTAssertEqual(0, Self.inkRunCount(column: rows([(false, 120)]), minRunHeight: 4, mergeGap: 16),
+                       "整列都没有墨")
+        XCTAssertEqual(2, Self.inkRunCount(
+            column: rows([(false, 20), (true, 17), (false, 43), (true, 17), (false, 20)]),
+            minRunHeight: 4, mergeGap: 16), "两颗按钮（本机 17 行高、间隔 43 行）")
+        XCTAssertEqual(1, Self.inkRunCount(
+            column: rows([(false, 20), (true, 9), (false, 8), (true, 8), (false, 20)]),
+            minRunHeight: 4, mergeGap: 16), "一颗按钮被自己的降部切开 ⇒ 仍算一颗")
+        XCTAssertEqual(1, Self.inkRunCount(
+            column: rows([(true, 3), (false, 1), (true, 3)]), minRunHeight: 4, mergeGap: 2),
+                       "两段都不够高、但合并后够 ⇒ 1 段（先合并后筛高；反序数成 0）")
+        XCTAssertEqual(0, Self.inkRunCount(
+            column: rows([(false, 5), (true, 3), (false, 5)]), minRunHeight: 4, mergeGap: 2),
+                       "3 行的孤立墨点不算一颗按钮")
+        // 边界：间隔**正好等于** mergeGap ⇒ 不合并（`<` 而不是 `<=`）。
+        // 这一格必须有，否则"把两颗数成一颗"与"把一颗数成两颗"这条尺都答不了问题。
+        XCTAssertEqual(2, Self.inkRunCount(
+            column: rows([(true, 5), (false, 2), (true, 5)]), minRunHeight: 4, mergeGap: 2),
+                       "空 2 行 = mergeGap ⇒ 不合并")
+        XCTAssertEqual(1, Self.inkRunCount(
+            column: rows([(true, 5), (false, 1), (true, 5)]), minRunHeight: 4, mergeGap: 2),
+                       "空 1 行 < mergeGap ⇒ 合并")
+    }
+
     /// 节奏这把尺的算术要有真值表（**不覆盖管线**：它判的是纯函数；
     /// 管线级判据是上面那条 `testSettingsCardVerticalRhythmIsOneNumber`）。
     ///
@@ -5917,15 +6184,33 @@ final class UICaptureTests: XCTestCase {
     /// `CARD_RHYTHM_DECLINED`。新增一张卡片忘了补留白，帧上不会红 —— 这一条会。
     /// 它数的是**调用点**，不是常量出现次数，所以卡片内部那处
     /// `.padding(.vertical, 4)`（R96 已删，见那一轮的 D-154）不会被算进来。
+    ///
+    /// R98 / BACKLOG 143：**扫描范围从"一个文件"改成"Views 目录下的每一个文件"**。
+    /// 上一版只扫 `Views/SettingsView.swift`，而「推荐」那张卡片长在
+    /// `Views/RecommendationWeightsView.swift` 里 ⇒ R95 那次"五处一起补"根本没把它算进名单，
+    /// 它带着一个孤儿 `.padding(.vertical, 4)` 一直活到今天（本轮高夹具才量出来：
+    /// `边距=11.5/9.5` 对 `内侧=16.5/18.0`）。
+    /// 教训不是"那个文件也要扫"，是**按文件划的守卫永远追不上按组件长的东西** ——
+    /// 所以这里改成枚举目录：新增一个 Views 文件不需要有人记得把它加进名单。
     func testEverySettingsCardAppliesTheSharedEdgeInset() throws {
-        let source = Self.codeOnly(try productSource(named: "Views/SettingsView.swift"))
-        let cards = source.components(separatedBy: "GroupBox {").count - 1
-        let insets = source.components(separatedBy: ".settingsCardInset()").count - 1
+        let files = try productViewSources()
+        XCTAssertFalse(files.isEmpty, "Views 目录下一个源文件都没有 ⇒ 这条守卫的对象没了")
+        var cards = 0, insets = 0
+        var offenders: [String] = []
+        for (name, text) in files {
+            let code = Self.codeOnly(text)
+            let here = code.components(separatedBy: "GroupBox {").count - 1
+            let there = code.components(separatedBy: ".settingsCardInset()").count - 1
+            cards += here
+            insets += there
+            if here > there { offenders.append("\(name)：\(here) 张卡片 / \(there) 处留白") }
+        }
         XCTAssertGreaterThan(cards, 0, "源码里一张 GroupBox 都没找到 ⇒ 这条守卫的对象没了")
         XCTAssertEqual(cards, insets,
                        "设置页有 \(cards) 张卡片，却只有 \(insets) 处补了上下留白 ⇒ "
                        + "至少一张卡片的首末行会贴到卡片边上（R95 那个缺陷的形状）。"
-                       + "新卡片请写 `.settingsCardInset()`，别再手抄一个数")
+                       + "新卡片请写 `.settingsCardInset()`，别再手抄一个数"
+                       + (offenders.isEmpty ? "" : "  ⇒  缺在：" + offenders.joined(separator: "；")))
     }
 
     /// 这个外观下，"正常的墨"应该在背景的哪一侧。
@@ -7421,6 +7706,38 @@ final class UICaptureTests: XCTestCase {
         inspect: @MainActor (NSView) -> Void = { _ in }
     ) throws -> CaptureMetrics {
         let size = fixture.size
+        // R98 / BACKLOG 141：**种子必须在 `render` 里种，不能在调用方种**。
+        //
+        // 上一版这件事只有 `testCaptureKeyViews` 一处做（拍之前 `set`、拍完立刻还原），而其余
+        // 二十多个 `render` 调用点 —— 全是"判据自己重渲染一张帧再量像素"的那些 —— 直接把
+        // `fixture.seed` 当不存在。后果不是"少了一行字"，是**判据量的不是它名字里那张帧**：
+        // 本机逐字节对过 settings 族 10 对帧，只有 `settings-privacy-excluded` 两版不同
+        //（判据卷 319980 B / 交付卷 333059 B），而它是全仓**唯一**声明了种子的夹具；
+        // 分歧从 **566.0pt** 开始，正好是那两行「移除」该在的位置，
+        // 870.5..936.0pt 交付帧有 54 行墨、判据帧 0 行（`r98_seed_divergence.py`）。
+        // R97 把这件事记成"两条读图通道给出不同边界"，R98 的对照证明那个机制是错的
+        //（同一张帧 TIFF 回路与直接解 PNG 逐段一致，`CARD_CHANNEL_SUMMARY 不一致=0`）——
+        // 真相是两张**不同的图**，而"两条通道"这个假设从没被验过。
+        //
+        // 放在这里而不是放在调用方，是因为只有这一处是**所有**拍帧路的必经点：
+        // 调用方各自种 = 25 份迟早会漂开的副本。还原仍然由调用方的那条"谁种了默认值谁必须还原"
+        // 断言兜住（`originalSeeds`），这一格只是不再依赖调用方记得做。
+        var seededKey: String? = nil
+        var seededOriginal: String? = nil
+        if let seed = fixture.seed {
+            seededKey = seed.key
+            seededOriginal = UserDefaults.standard.string(forKey: seed.key)
+            UserDefaults.standard.set(seed.value, forKey: seed.key)
+        }
+        defer {
+            if let key = seededKey {
+                if let back = seededOriginal {
+                    UserDefaults.standard.set(back, forKey: key)
+                } else {
+                    UserDefaults.standard.removeObject(forKey: key)
+                }
+            }
+        }
         // 放进真实（离屏）窗口：裸 NSHostingView 没有 window 时 SwiftUI 的
         // GeometryReader / maxWidth 会退化，整块内容被压到左下角。
         _ = NSApplication.shared
