@@ -23,6 +23,7 @@ R36 起它多了一类客户：`Capture gate` 那一步是**硬门**（没有 co
 
 import os
 import re
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -91,10 +92,12 @@ SUBSTITUTIONS = {
          r"swift test --filter MotionFilmstripTests > /tmp/motion\.log 2>&1 &",
          "cp FAKE_LOG /tmp/motion.log &"),
         # R56 / BACKLOG 79：补读那一段找的是**真实 CI 的输出目录**。自检必须把它换到自己的
-        # 临时目录（`run_bash` 会把 /tmp/shots-ci 换掉），否则它读的是开发机上恰好存在的
+        # 临时目录（R92 起 `run_bash` 把**所有** `/tmp…` 都换掉，不再只换 `/tmp/shots-ci`），
+        # 否则它读的是开发机上恰好存在的
         # 一份旧读数 —— 那种夹具会在"本机跑过 motion suite"之后凭空变绿或变红。
         (r"readings=/tmp/motion-ci/motion-readings\.log",
-         # `rm -f` 不是多余：这个临时目录**跨次运行复用**，上一格留下的读数文件会让
+         # `rm -f` 不是多余：这个临时目录在**同一遍里跨格复用**（R92 / M514 之后每遍一个新目录，
+         # 但同一遍里上一格留下的读数文件仍然会让
          # "两条通道都空"那一格读到东西而凭空变绿（实测第一次就是这么红的）。
          "rm -f /tmp/shots-ci/motion-readings.log; readings=/tmp/shots-ci/motion-readings.log"),
     ],
@@ -362,6 +365,49 @@ def build_script(block, fake_log, key, extra_subs=()):
     return script
 
 
+# ── R92 / BACKLOG 128：夹具**一律**不许往共享的 /tmp 里写 ─────────────────────────
+# 现场（run 38838819089 与 38846896495，2/2 复现，不是骰子）：`a68a08f`（R89）为了"闸门一红
+# 就吃掉后面七步的证据"，把 `Capture gate` 与 `On-screen probe coverage floor` 挪到作业末尾
+# 加 `if: always()`。位置本身是对的，错的是这里以前只把 **`/tmp/shots-ci`** 换进临时目录：
+#   SUBSTITUTIONS 造出来的命令是字面量 `cp FAKE_LOG /tmp/frames.log`、`/tmp/ui.log`、
+#   `/tmp/motion.log` ⇒ 它们写进了**这个作业自己的 /tmp**，把闸门要读的三份真日志覆盖了。
+# 于是 `CAPTURE_GATE_RESULT=fail …这一步没跑到用例` 与 `UI_PROBE_CHANNELS … started=probeA`
+# 读的都是最后一格的假日志（`probeA` 就是 `TRUNCATED` 夹具里的用例名），而同一次 run 里
+# 捕获那一步自己打的是 `Executed 47 tests … 0 failures`、在屏那一步打的是 `exit: 137`。
+# 本机实测：先往 /tmp/frames.log 写 `REAL-MARKER`，跑一遍自检，文件变成
+# `Test Case '-[p probeA]' started.`，marker 一行不剩。
+# 为什么这里用**通配**而不是补一份路径清单：清单正是这次的成因 —— 加一条新的 `/tmp/x.log`
+# 不需要改这个自检，于是"漏一条"是默认结局，而通配只在路径形状整个换掉时才会漏。
+# 两道边界都必需（**R92 自己踩出来的**）：
+#   · 后顾 `(?![A-Za-z0-9_.+-])`：少了它，`tempfile` 给的
+#     `/var/folders/…/T/tmpab1x/fake.log` 会被当成 `/tmp` 换掉一段，实测变成
+#     `cp: <shots>/_sdnt8zy/fake-干净.log: No such file or directory`；
+#   · 前瞻 `(?<![A-Za-z0-9_./-])`：`/private/tmp/x` 这种"前缀还有东西"的路径**不换**，
+#     因为只换后半截会把一条真路径改坏。它由上面那条静态扫描兜住 —— 那一步会红着说
+#     "有一条 /tmp 路径我没敢动"，而不是静默地留着共享写入。
+TMP_PATH = re.compile(r"(?<![A-Za-z0-9_.\-/])/tmp(?:/[A-Za-z0-9_.+:\-]+)*(?![A-Za-z0-9_.\-])")
+
+
+def sandbox_path(path, shots_dir):
+    """把一个 ci.yml 里的绝对 `/tmp/…` 路径映射到这一格的临时目录。
+
+    `/tmp/shots-ci/capture-readings.log` → `<shots>/shots-ci_capture-readings.log`：
+    嵌套的那一层压平进文件名，是为了让**同一个临时目录**同时装下目录类与文件类路径，
+    而不用给每条路径再造子目录（`find <shots>/shots-ci -name '*.png'` 那一路仍然成立，
+    因为 `/tmp/shots-ci` 本身映射成一个真子目录）。
+    """
+    if path == "/tmp":
+        return shots_dir
+    if not path.startswith("/tmp/"):
+        raise AssertionError("sandbox_path 只处理 /tmp 下面的路径：%s" % path)
+    return os.path.join(shots_dir, path[len("/tmp/"):].replace("/", "_"))
+
+
+def prepare(script, shots_dir):
+    """把整段脚本里所有 `/tmp…` 换成这一格的临时目录（`run_bash` 唯一的入口）。"""
+    return TMP_PATH.sub(lambda match: sandbox_path(match.group(0), shots_dir), script)
+
+
 def run_bash(script, shots_dir):
     """跑一步的脚本正文，返回 (退出码, 输出)。
 
@@ -370,7 +416,7 @@ def run_bash(script, shots_dir):
     于是 `communicate()` 一直等 EOF —— 实测这个自检自己被吊死在 300 秒超时上。
     真实 runner 不挂是因为它一直在读管道。顺手用独立会话把整组进程收干净，别攒孤儿 sleep。
     """
-    prepared = script.replace("/tmp/shots-ci", shots_dir)
+    prepared = prepare(script, shots_dir)
     out_path = os.path.join(shots_dir, "bash_out.txt")
     with open(out_path, "w", encoding="utf-8") as handle:
         proc = subprocess.Popen(["bash", "-e", "-c", prepared],
@@ -396,31 +442,40 @@ def check(ci_path):
     with open(ci_path, encoding="utf-8") as handle:
         text = handle.read()
 
-    shots = os.path.join(os.environ.get("TMPDIR", "/tmp"), "ci_selftest_shots")
-    os.makedirs(shots, exist_ok=True)
+    # R92 / M514 量出来的第二件事：这个目录以前是 `$TMPDIR/ci_selftest_shots` 且**跨次运行复用**，
+    # 于是上一遍留下的 61 张 PNG 会替这一遍作证 —— 把落点改回临时目录根（`frames_dir = shots`）
+    # 那一刀本来应当红在 `test frames -ge 60` 上，实际却整批绿，因为
+    # `find <shots>/shots-ci` 数到的是**上一次**跑留在那儿的那些png。
+    # 现在每遍一个空目录、跑完删掉；同一遍里各格仍然共用它（下面两格靠的就是这个）。
+    shots = tempfile.mkdtemp(prefix="ci_selftest_shots-")
+    frames_dir = sandbox_path("/tmp/shots-ci", shots)
+    os.makedirs(frames_dir, exist_ok=True)
     for i in range(61):                     # 让 `test frames -ge 60` 这一闸真被跨过
-        open(os.path.join(shots, "f%02d.png" % i), "wb").close()
+        open(os.path.join(frames_dir, "f%02d.png" % i), "wb").close()
 
     failures = []
-    for (key, case), (log_body, snippets, expected_code, extra_subs) in sorted(EXPECT.items()):
-        fake = os.path.join(shots, "log_%s_%s.txt" % (key, case))
-        with open(fake, "w", encoding="utf-8") as handle:
-            handle.write(log_body)
-        script = build_script(extract_run_block(text, STEPS[key]), fake, key, extra_subs)
-        try:
-            code, out = run_bash(script, shots)
-        except subprocess.TimeoutExpired:
-            failures.append("%s/%s 超时" % (key, case))
-            continue
-        missing = [s for s in snippets if s not in out]
-        bad_code = expected_code is not None and code != expected_code
-        print("%-9s %-17s exit=%-3s %s" % (key, case, code,
-                                           "FAIL" if missing or bad_code else "OK"))
-        if missing:
-            failures.append("%s/%s: 结论行缺失 %s（退出码 %s）" % (key, case, missing, code))
-            print("---- 实际输出尾部 ----\n" + out.strip()[-500:])
-        if bad_code:
-            failures.append("%s/%s: 期望退出码 %d，实际 %d" % (key, case, expected_code, code))
+    try:
+        for (key, case), (log_body, snippets, expected_code, extra_subs) in sorted(EXPECT.items()):
+            fake = os.path.join(shots, "log_%s_%s.txt" % (key, case))
+            with open(fake, "w", encoding="utf-8") as handle:
+                handle.write(log_body)
+            script = build_script(extract_run_block(text, STEPS[key]), fake, key, extra_subs)
+            try:
+                code, out = run_bash(script, shots)
+            except subprocess.TimeoutExpired:
+                failures.append("%s/%s 超时" % (key, case))
+                continue
+            missing = [s for s in snippets if s not in out]
+            bad_code = expected_code is not None and code != expected_code
+            print("%-9s %-17s exit=%-3s %s" % (key, case, code,
+                                               "FAIL" if missing or bad_code else "OK"))
+            if missing:
+                failures.append("%s/%s: 结论行缺失 %s（退出码 %s）" % (key, case, missing, code))
+                print("---- 实际输出尾部 ----\n" + out.strip()[-500:])
+            if bad_code:
+                failures.append("%s/%s: 期望退出码 %d，实际 %d" % (key, case, expected_code, code))
+    finally:
+        shutil.rmtree(shots, ignore_errors=True)
     return failures
 
 
@@ -431,6 +486,110 @@ class CIReportSelfTest(unittest.TestCase):
     def test_report_only_steps_always_print_their_numbers(self):
         for failure in check(CI_DEFAULT):
             self.fail(failure)
+
+    # ---- R92 / BACKLOG 128：夹具不许覆盖共享 /tmp（那两道最终闸门读的就是它）--------
+    SHARED_LOGS = ("/tmp/frames.log", "/tmp/ui.log", "/tmp/motion.log", "/tmp/build.log")
+
+    def test_sandbox_path_maps_every_tmp_shape_this_job_uses(self):
+        """真值表：`ci.yml` 里现在出现的每一种 `/tmp` 形状，映射结果逐条钉住。
+
+        为什么单独一条而不是只测 `prepare`：`prepare` 的正则是"通配"的，
+        通配最容易悄悄漏掉的就是**它自己没见过的形状**（裸 `/tmp`、嵌套两层的目录、
+        带连字符的名字）。这一格是把形状列出来，漏一种就红在名字上。
+        """
+        self.assertEqual(sandbox_path("/tmp", "S"), "S")
+        self.assertEqual(sandbox_path("/tmp/shots-ci", "S"), os.path.join("S", "shots-ci"))
+        self.assertEqual(sandbox_path("/tmp/frames.log", "S"), os.path.join("S", "frames.log"))
+        self.assertEqual(sandbox_path("/tmp/shots-ci/capture-readings.log", "S"),
+                         os.path.join("S", "shots-ci_capture-readings.log"))
+        # 一句话里两处：都要换，且不能互相吞
+        self.assertEqual(prepare("a /tmp/ui.log b /tmp/shots-ci/x.log", "S"),
+                         "a " + os.path.join("S", "ui.log") + " b " + os.path.join("S", "shots-ci_x.log"))
+        # 环境变量那一行是**裸** /tmp（R90 的心跳目录就是这么给的）
+        self.assertEqual(prepare("CLIPBOARD_HISTORY_PROBE_PULSE=/tmp \\", "S"),
+                         "CLIPBOARD_HISTORY_PROBE_PULSE=" + "S" + " \\")
+        # 这两条是 R92 当场踩出来的两个边界：`tempfile` 的目录名以 `tmp` 开头，
+        # 早先那版正则会把它的前半截换掉，实测变成
+        # `cp: <shots>/_sdnt8zy/fake-干净.log: No such file or directory`（0 告警那一格凭空变红）。
+        self.assertEqual(prepare("cp /var/folders/47/T/tmpab1x/fake-干净.log /tmp/frames.log", "S"),
+                         "cp /var/folders/47/T/tmpab1x/fake-干净.log " + os.path.join("S", "frames.log"))
+        # 尾部那一半：一个**以 tmp 开头**的名字（`/tmpbackup/x`）不是 `/tmp` 下面的一条路径。
+        # 这条不是装饰 —— M511 那把刀（去掉尾部边界）在只有上一条时**逃掉了**，
+        # 因为 `/T/tmpab1x` 已经被前向边界挡住了，尾部边界管的是"前面没有斜杠"那一类。
+        self.assertEqual(prepare("cp /tmpbackup/x /tmp/frames.log", "S"),
+                         "cp /tmpbackup/x " + os.path.join("S", "frames.log"))
+        self.assertEqual(prepare("OUT=/tmpwork; echo hi", "S"), "OUT=/tmpwork; echo hi")
+        # 前缀还有东西的路径**不换**（只换后半截会把一条真路径改坏）；
+        # 它由 test_cell_commands_never_address_the_shared_tmp 那条扫描负责喊红。
+        self.assertEqual(prepare("cat /private/tmp/frames.log", "S"), "cat /private/tmp/frames.log")
+        with self.assertRaises(AssertionError):
+            sandbox_path("/var/tmp/x", "S")
+
+    def test_cell_commands_never_address_the_shared_tmp(self):
+        """接线断言：每一格**真正交给 bash 的那段脚本**里不许还剩 `/tmp`。
+
+        只测 `prepare` 本身不够 —— 这次坏的是"忘了调它"那一层。所以这里从 ci.yml 重新
+        走一遍 `build_script` + `prepare`，逐格扫。注释行放过（它们是给人读的路径名，
+        不会被 bash 执行）；非注释行里出现 `/tmp` 就是又一处共享写入。
+        """
+        with open(CI_DEFAULT, encoding="utf-8") as handle:
+            text = handle.read()
+        offenders = []
+        cells = [(key, case, extra) for (key, case), (_b, _s, _c, extra) in EXPECT.items()]
+        cells.append(("build", "gates_tests", [(r"swift build --build-tests 2>&1 \| tee /tmp/build\.log",
+                                                "cp FAKE_LOG /tmp/build.log")]))
+        for (key, case, extra) in cells:
+            block = extract_run_block(text, STEPS.get(key, "Build (must be warning-free)"))
+            prepared = prepare(build_script(block, "/sandbox/fake.log", key, extra), "/sandbox")
+            for line in prepared.splitlines():
+                if line.lstrip().startswith("#") or "/tmp" not in line:
+                    continue
+                offenders.append("%s/%s：%s" % (key, case, line.strip()[:120]))
+        self.assertFalse(offenders, "夹具命令还在往共享 /tmp 写（闸门会读到假日志）：\n" + "\n".join(offenders[:6]))
+
+    def test_selftest_does_not_clobber_the_logs_the_final_gates_read(self):
+        """行为证人（这条才是 R92 的**正对照**）：跑一格真夹具，共享 /tmp 里那四份日志
+        的 mtime/大小必须一模一样，而沙箱里必须**确实**多了那一份假日志。
+
+        为什么不能只用上面那条静态扫描：把 `run_bash` 改回
+        `script.replace("/tmp/shots-ci", shots_dir)` 时，静态扫描仍然绿 ——
+        因为它测的是 `prepare`，而那正是被绕开的那一步。这一半测的是"它到底有没有被调到"。
+        成对写：只断言"真文件没动"会有一种假绿（命令根本没写成，哪儿都没有），
+        所以必须同时断言沙箱里出现了 `frames.log`。
+        """
+        with open(CI_DEFAULT, encoding="utf-8") as handle:
+            text = handle.read()
+        before = {}
+        for path in self.SHARED_LOGS:
+            try:
+                handle_stat = os.stat(path)
+                before[path] = (handle_stat.st_mtime_ns, handle_stat.st_size)
+            except OSError:
+                before[path] = None
+        block = extract_run_block(text, STEPS["capture_gate"])
+        with tempfile.TemporaryDirectory() as shots:
+            # 夹具本体必须是真的能 `cp` 到的文件：早先这里传了一个不存在的假路径，
+            # `bash -e` 在第一步 `cp` 就中止 ⇒ 沙箱里什么都没写 ⇒ 下面那句"真文件没被动过"
+            # 变成空话。这条测试存在的意义正是拒绝那种假绿，所以它自己先得不是假绿。
+            fake = os.path.join(shots, "fake-capture.log")
+            with open(fake, "w", encoding="utf-8") as handle:
+                handle.write("Building for debugging...\n")
+            script = build_script(block, fake, "capture_gate", [])
+            run_bash(script, shots)
+            self.assertTrue(os.path.exists(os.path.join(shots, "frames.log")),
+                            "沙箱里没有 frames.log ⇒ 这一格压根没执行写入，"
+                            "下面那句『共享 /tmp 没被动过』是空话（假绿）")
+        after = {}
+        for path in self.SHARED_LOGS:
+            try:
+                handle_stat = os.stat(path)
+                after[path] = (handle_stat.st_mtime_ns, handle_stat.st_size)
+            except OSError:
+                after[path] = None
+        moved = [p for p in self.SHARED_LOGS if before[p] != after[p]]
+        self.assertFalse(moved,
+                         "自检把作业共享 /tmp 里的日志覆盖了：%s ⇒ 挪到末尾的那两道闸门读的是假日志"
+                         % moved)
 
     def test_build_step_gates_the_test_target_too(self):
         """R59 / BACKLOG 87：那条"构建 0 告警"以前只编译 `Sources/`。

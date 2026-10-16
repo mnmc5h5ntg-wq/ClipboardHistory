@@ -130,6 +130,8 @@ def main(argv=None) -> int:
     if error:
         print(f"CAPTURE_GATE_RESULT=fail 日志读不到：{error}", flush=True)
         return 1
+    log_lines = len(text.splitlines())
+    log_bytes = len(text.encode("utf-8"))
 
     # 第二条读数通道（R64 / BACKLOG 96）：**并集**，不是替换。
     # 只读 stdout 的闸门会把"今天判了什么"交给一次骰子 —— R63 本机十遍里同一个类的三条读数
@@ -139,6 +141,7 @@ def main(argv=None) -> int:
     readings_lines = []
     readings_error = None
     readings_count = 0
+    readings_text = ""
     if args.readings:
         readings_text, readings_error = read_log(args.readings)
         if readings_error is None:
@@ -154,6 +157,11 @@ def main(argv=None) -> int:
         state = "缺文件" if readings_error else ("空" if readings_count == 0 else f"{readings_count} 行")
         print(f"CAPTURE_GATE_CHANNELS stdout=1 readings={state} "
               f"补回={len(readings_lines)} 行（stdout 没有的读数）", flush=True)
+        # R92：把**这一格读到了多大的东西**印出来。理由不是美观：这两次 run 里
+        # 那句"这一步没跑到用例"是假的，而要看穿它只能去翻作业日志里另一步的 `Executed 47` ——
+        # 一个闸门说得出"我读到的日志只有 27 字节"，它的红就自己带上了一半诊断。
+        print(f"CAPTURE_GATE_INPUT 日志通道={log_lines} 行/{log_bytes} 字节 @ {args.log}"
+              f"（读数通道另计 {len(readings_lines)} 行）", flush=True)
     print(f"CAPTURE_GATE_CASES passed={result['passed']} skipped={result['skipped']} "
           f"failed={len(result['failed_cases'])} 有名字的红={len(result['red_cases'])} "
           f"NOT_RUN={len(result['not_run'])}", flush=True)
@@ -167,8 +175,42 @@ def main(argv=None) -> int:
 
     if not result["ran_cases"]:
         # 这一步"跑了但一个用例都没下结论"是最坏的一种：报表上它是绿的。
-        print("CAPTURE_GATE_RESULT=fail 日志里没有任何 `Test Case ... passed|failed|skipped` 行"
-              " ⇒ 这一步没跑到用例（挂死、崩溃、或 filter 打错）。**没跑不算通过**", flush=True)
+        #
+        # R92 / BACKLOG 128：**但"没结论行"有三种完全不同的成因，以前这里只说其中一种**，
+        # 而那一种在这两次 run 里都是错的。现场（run 38838819089 / 38846896495）：
+        # 这句话打印的同时，同一次 run 的捕获那一步自己打的是
+        # `Executed 47 tests, with 9 tests skipped and 0 failures`、`captured frames: 124` ——
+        # 真的跑完了。成因是 `scripts/tests/test_ci_report_selftest.py` 的夹具把
+        # `cp FAKE_LOG /tmp/frames.log` 写进了作业共享的 /tmp，把这里要读的日志覆盖了
+        # （`started=probeA` 那个"用例名"就是夹具里的名字）。三种成因的处置不一样，
+        # 所以说"没跑到用例"之前必须先看看第二条通道怎么讲：
+        #   ① 读数通道里有**这一份文件自己的**同源证人（`CAPTURE_READINGS_SELFTEST … @ <同一路径>`）
+        #      ⇒ 这一步确实跑到过用例，是日志通道整块丢/被覆盖 —— 处置是查通道，不是查产品；
+        #   ② 读数通道有行，但没有同源证人 ⇒ 那份读数可能来自别的步骤/别的一次运行，
+        #      不能拿它证明"跑到过"，也不能拿它证明"没跑到" —— 只能说不分可信；
+        #   ③ 读数通道也空/缺文件 ⇒ 才是原来那句"这一步没跑到用例"。
+        # 三支**全都保持红**：这一格的规矩是"读不到结论就不许当通过"，本轮动的只是**成因**，
+        # 不是标准（软化警报是另一类错，见 U-101 那一族）。
+        same_source = args.readings and any(
+            line.startswith("CAPTURE_READINGS_SELFTEST") and args.readings in line
+            for line in readings_text.splitlines())
+        if same_source:
+            print(f"CAPTURE_GATE_RESULT=fail CAPTURE_LOG_CHANNEL_LOST_CONCLUSIONS=1 "
+                  f"日志通道里没有任何 `Test Case ... passed|failed|skipped` 行，"
+                  f"而读数通道有 {readings_count} 行、且里面有指认这份文件自己的同源证人"
+                  f"（`CAPTURE_READINGS_SELFTEST … @ {args.readings}`）"
+                  f" ⇒ 这一步**跑到过**用例：坏的是日志通道（整块丢或被别的步骤覆盖），"
+                  f"不是产品。**仍然红**：结论读不到就不算通过。"
+                  f"先查有没有第二个写 `/tmp/frames.log` 的人，再查 `swift test` 的缓冲", flush=True)
+        elif readings_count > 0:
+            print(f"CAPTURE_GATE_RESULT=fail CAPTURE_READINGS_FOREIGN_SOURCE=1 "
+                  f"日志通道没有结论行，读数通道有 {readings_count} 行却**没有**指向 "
+                  f"`{args.readings}` 的同源证人 ⇒ 那 {readings_count} 行可能是别的步骤/别一次运行留下的，"
+                  f"既不能证明这一步跑到过，也不能证明它没跑到。**没读到结论就不算通过**", flush=True)
+        else:
+            print("CAPTURE_GATE_RESULT=fail 日志里没有任何 `Test Case ... passed|failed|skipped` 行"
+                  "，读数通道也是空的 ⇒ 这一步没跑到用例（挂死、崩溃、或 filter 打错）。**没跑不算通过**",
+                  flush=True)
         return 1
     if result["red_cases"]:
         print(f"CAPTURE_GATE_RESULT=fail 有 {len(result['red_cases'])} 个用例红了（红有名字，这正是这一步存在的理由）：",

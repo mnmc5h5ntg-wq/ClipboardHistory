@@ -294,5 +294,108 @@ CAPTURE_NOT_RUN settings-stats-720x1040-dark.png 93% 未绘制 ⇒ 记为未运�
         self.assertNotIn("CAPTURE_GATE_CHANNELS", out)
 
 
+class CauseLineHasToMatchItsEvidenceTests(unittest.TestCase):
+    """R92 / BACKLOG 128：同样"没有结论行"的三种成因，必须给出三句不同的话。
+
+    现场不是合成出来的（run 38838819089 与 38846896495，2/2）：这道门印的是
+    `这一步没跑到用例（挂死、崩溃、或 filter 打错）`，而同一次 run 里捕获那一步自己打的是
+    `Executed 47 tests, with 9 tests skipped and 0 failures` + `captured frames: 124`。
+    真的跑完了 —— 是它要读的那份 `/tmp/frames.log` 被**自检夹具**覆盖了
+    （`cp FAKE_LOG /tmp/frames.log` 写进了作业共享的 /tmp，而闸门被挪到了自检之后）。
+    所以这一格钉的不是"要红"（三支全都红，标准一个字没动），而是
+    **"红的时候那句话必须有证据"**：把"读不到结论"说成"没跑到用例"，
+    下一次就会有人去查产品/查 filter，而该查的是通道 —— 这条路我走了两轮。
+
+    同源证人为什么必须是指认**这一份文件**的：读数通道只要落在同一个 `/tmp` 里，
+    就可能属于别的步骤（R89 那朵红恰恰就是共享目录）。`CAPTURE_READINGS_SELFTEST … @ <路径>`
+    是捕获卷自己写的，路径一致才谈得上"这一步跑到过"。
+    """
+
+    NO_CASES = "Building for debugging...\nBuild complete! (0.09s)\n"
+
+    def new_path(self):
+        handle, path = tempfile.mkstemp(suffix=".log")
+        os.close(handle)
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def write(self, text):
+        return self.write_at(self.new_path(), text)
+
+    def write_at(self, path, text):
+        with open(path, "w", encoding="utf-8") as writer:
+            writer.write(text)
+        return path
+
+    def test_readings_witness_from_this_suite_blames_the_channel_not_the_step(self):
+        readings = self.new_path()
+        self.write_at(readings, "CAPTURE_READINGS_SELFTEST 文件通道 404 行 @ %s\n"
+                                "TEXT_SIDE light 侧栏列读到 0 个偏离像素\n" % readings)
+        code, out = run_main(self.write(self.NO_CASES), "--readings", readings)
+        self.assertEqual(1, code, out)
+        self.assertIn("CAPTURE_LOG_CHANNEL_LOST_CONCLUSIONS=1", out)
+        self.assertNotIn("这一步没跑到用例", out, out)
+
+    def test_readings_without_a_same_source_witness_cannot_clear_the_step(self):
+        """读数有 404 行，但那份证人指认的是**另一个路径** ⇒ 不许把它当"这一步跑到过"。"""
+        readings = self.new_path()
+        self.write_at(readings, "CAPTURE_READINGS_SELFTEST 文件通道 404 行 @ /tmp/别的步骤/readings.log\n"
+                                "TEXT_SIDE light 侧栏列读到 0 个偏离像素\n")
+        code, out = run_main(self.write(self.NO_CASES), "--readings", readings)
+        self.assertEqual(1, code, out)
+        self.assertIn("CAPTURE_READINGS_FOREIGN_SOURCE=1", out)
+        self.assertNotIn("CAPTURE_LOG_CHANNEL_LOST_CONCLUSIONS", out)
+
+    def test_both_channels_empty_is_the_original_cause(self):
+        readings = self.new_path()
+        self.write_at(readings, "")
+        code, out = run_main(self.write(self.NO_CASES), "--readings", readings)
+        self.assertEqual(1, code, out)
+        self.assertIn("没跑不算通过", out)
+        self.assertNotIn("CAPTURE_LOG_CHANNEL_LOST_CONCLUSIONS", out)
+        self.assertNotIn("CAPTURE_READINGS_FOREIGN_SOURCE", out)
+
+    def test_the_input_size_line_names_how_much_the_gate_actually_read(self):
+        """R92：红的时候要说得出"我读到的日志有多大"。
+
+        这两次假红之所以要看第二眼才穿帮，就是因为闸门只报了"没有结论行"而没报
+        "我手上这份日志一共才几行"。这一格同时钉住旧契约：不给 `--readings` 就不许多打。
+        """
+        readings = self.new_path()
+        self.write_at(readings, "CAPTURE_NOT_RUN settings-x 95% 未绘制\n")
+        body = "Building for debugging...\n"
+        code, out = run_main(self.write(body), "--readings", readings)
+        self.assertEqual(1, code, out)
+        input_line = [l for l in out.splitlines() if l.startswith("CAPTURE_GATE_INPUT")]
+        self.assertEqual(1, len(input_line), out)
+        # 数字**算出来**再比，不写死：这一格要钉的是"报的字节数等于真读到的那份"，
+        # 手抄一个常量只会把"数错了"和"报错了"混成一朵红（U-200 那一族的第三种形状）。
+        self.assertIn("日志通道=1 行/%d 字节" % len(body.encode("utf-8")), input_line[0])
+        code2, out2 = run_main(self.write(self.NO_CASES))
+        self.assertEqual(1, code2, out2)
+        self.assertNotIn("CAPTURE_GATE_INPUT", out2,
+                         "不给 --readings 的旧调用不许多打一行（和 CAPTURE_GATE_CHANNELS 同一契约）")
+
+    def test_the_three_cause_lines_are_three_different_sentences(self):
+        """正对照的对照：三支如果印出同一句话，上面三格的断言就会有一格红。
+
+        这条把它写成**显式的两两不同**，是为了让"有人为了省事把分支合并成一句"
+        这件事红在名字上，而不是红在某一句 `assertNotIn` 的偶然措辞上。
+        """
+        seen = {}
+        for label, body in (
+                ("同源", "CAPTURE_READINGS_SELFTEST 文件通道 404 行 @ {path}\n"),
+                ("异源", "CAPTURE_READINGS_SELFTEST 文件通道 404 行 @ /other/place.log\n"),
+                ("空", "")):
+            readings = self.new_path()
+            self.write_at(readings, body.replace("{path}", readings))
+            code, out = run_main(self.write(self.NO_CASES), "--readings", readings)
+            self.assertEqual(1, code, "%s 这一支必须仍然是红：%s" % (label, out))
+            line = [l for l in out.splitlines() if l.startswith("CAPTURE_GATE_RESULT=fail")]
+            self.assertEqual(1, len(line), "%s 这一支该只有一句结论：%s" % (label, out))
+            seen[label] = line[0]
+        self.assertEqual(3, len(set(seen.values())), seen)
+
+
 if __name__ == "__main__":
     unittest.main()

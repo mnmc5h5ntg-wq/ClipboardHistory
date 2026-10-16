@@ -606,78 +606,92 @@ struct SettingsView: View {
             Text("数据")
                 .font(.headline)
 
+            // R92 / 分组语言对账（本机量出来的，见 .scratch/motion-audit-2/r92_data_readings.log）：
+            // 同一个设置窗口里五种分区用了四套分组语法 ——
+            //   通用 1 张卡片 / 卡片外 0 条线 / 卡片内 0 条线
+            //   快捷键 1 张卡片 / 外 0 / 内 2（156pt、214pt）
+            //   隐私 1 张卡片 / 外 0 / 内 3（45pt、262pt、328pt）
+            //   统计 0 张卡片 / 外 1（271pt）
+            //   **数据 1 张卡片 / 外 2（173pt、282pt）/ 内 0**  ← 本轮改的就是这一行
+            // "卡片外面还有一条压在背景上的分隔线"只有这一屏有，而它那张卡片只圈住了
+            // 两段说明文字（106..158pt），另外两段整段裸在外面 ⇒ 同一句"这三段是并列的"
+            // 在这一屏用了两种语言说。向多数（快捷键 / 隐私那套 `GroupBox + VStack(spacing:12)
+            // + 内部 Divider()`）靠拢。**只动容器**：三段自己的动画键、回执通道、禁用逻辑一行没改。
             GroupBox {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("历史记录存储")
-                        .font(.subheadline)
-                    Text("剪贴板历史保存在本地，不会上传到任何服务器。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 4)
-            }
-
-            Divider()
-
-            // MARK: 导出 / 导入（第三轮审计 §5 F-5：以前用户没有任何方式把历史带走）
-            VStack(alignment: .leading, spacing: 8) {
-                Text("导出与导入")
-                    .font(.subheadline)
-                Text("导出的是自包含 JSON：默认不含图片，内容是完整的剪贴板原文（可能含账号、验证码、私人对话），请当作敏感文件保管。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("导出历史…") { exportHistory() }
-                        .disabled(exportHistoryAction == nil)
-                    Button("导入历史…") { importHistory() }
-                        .disabled(importHistoryAction == nil)
-                }
-                if let archiveMessage {
-                    ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
-                }
-            }
-            // R42 / BACKLOG 53：同上，这一条也没有驱动（导出/导入历史那两条回执）。
-            // 键同样是"有没有回执"，不是消息内容：连续两次导入换文案不该再演一次。
-            .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("清空未收藏记录")
+                VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("历史记录存储")
                             .font(.subheadline)
-                        Text("收藏记录会保留。")
+                        Text("剪贴板历史保存在本地，不会上传到任何服务器。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
 
-                    Spacer()
+                    Divider()
 
-                    Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
-                        showClearHistoryConfirmation = true
+                    // MARK: 导出 / 导入（第三轮审计 §5 F-5：以前用户没有任何方式把历史带走）
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("导出与导入")
+                            .font(.subheadline)
+                        Text("导出的是自包含 JSON：默认不含图片，内容是完整的剪贴板原文（可能含账号、验证码、私人对话），请当作敏感文件保管。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 10) {
+                            Button("导出历史…") { exportHistory() }
+                                .disabled(exportHistoryAction == nil)
+                            Button("导入历史…") { importHistory() }
+                                .disabled(importHistoryAction == nil)
+                        }
+                        if let archiveMessage {
+                            ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .disabled(clearHistoryAction == nil)
-                }
-                if let clearReceipt {
-                    // 图标 + 一句数字。刻意不用绿色"成功"强调：这是一次**不可撤销的删除**，
-                    // 要的是"告诉你删了多少"，不是庆祝（第三轮 U-5 那句"状态语言统一"）。
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle")
-                            .font(.system(size: VisualGlyph.badge))
-                        Text(clearReceipt)
-                            .font(.system(size: VisualFont.meta))
+                    // R42 / BACKLOG 53：同上，这一条也没有驱动（导出/导入历史那两条回执）。
+                    // 键同样是"有没有回执"，不是消息内容：连续两次导入换文案不该再演一次。
+                    .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .center, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("清空未收藏记录")
+                                    .font(.subheadline)
+                                Text("收藏记录会保留。")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
+                                showClearHistoryConfirmation = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                            .disabled(clearHistoryAction == nil)
+                        }
+                        if let clearReceipt {
+                            // 图标 + 一句数字。刻意不用绿色"成功"强调：这是一次**不可撤销的删除**，
+                            // 要的是"告诉你删了多少"，不是庆祝（第三轮 U-5 那句"状态语言统一"）。
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.system(size: VisualGlyph.badge))
+                                Text(clearReceipt)
+                                    .font(.system(size: VisualFont.meta))
+                            }
+                            .foregroundStyle(.secondary)
+                            .transition(MotionCatalog.transition(for: .contentFade))
+                        }
                     }
-                    .foregroundStyle(.secondary)
-                    .transition(MotionCatalog.transition(for: .contentFade))
+                    // 键只取"有没有回执"这一个布尔：换文案（连续清两次）不该再演一次，
+                    // 那读起来像在抢注意力；从无到有才需要被看见。
+                    .animation(MotionCatalog.animation(for: .contentFade), value: clearReceipt == nil)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            // 键只取"有没有回执"这一个布尔：换文案（连续清两次）不该再演一次，
-            // 那读起来像在抢注意力；从无到有才需要被看见。
-            .animation(MotionCatalog.animation(for: .contentFade), value: clearReceipt == nil)
         }
     }
 

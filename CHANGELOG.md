@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R92）
+
+- 设置窗口「数据」分区的分组语言向多数对齐：三段（历史记录存储 / 导出与导入 / 清空未收藏记录）
+  全部进同一张 `GroupBox`，两条原本压在页面底色上的 `Divider()` 挪进卡片内部。
+  本机读数：卡片 (172,106)..(696,158) → (172,106)..(696,318)，外部线 2 条 → 0 条，
+  内部线 0 条 → 2 条（166pt、271pt），说明段对比 3.59 → 3.64（与通用页 3.74 同档）。
+  段内动画键、两条回执通道、三颗按钮的禁用逻辑一行未动。
+- 帧基线 `docs/frame_baseline.json` 同提交更新（124 张，CHANGED=2 即这两帧）。
+
+### CI 与判据（R92）
+
+- `scripts/tests/test_ci_report_selftest.py`：`run_bash` 改走 `prepare()`，把**所有** `/tmp…`
+  路径映射进每格临时目录（以前只换 `/tmp/shots-ci`，于是 `cp FAKE_LOG /tmp/frames.log`
+  覆盖了作业末尾那两道闸门要读的日志）；临时目录改成每遍一个空目录。
+- 同文件新增三条守卫：`/tmp` 形状真值表、逐格"生成的命令里不许还有 /tmp"扫描、
+  以及"跑一格真夹具之后共享 /tmp 那四份日志不许变"的行为证人。
+- `scripts/ci_capture_gate.py`：`没有结论行` 从一句成因改成三支（同源证人 / 异源 / 两边都空），
+  全部仍然红；新增 `CAPTURE_GATE_INPUT` 自报读到了多少行多少字节。
+- `scripts/tests/test_ci_capture_gate.py`：新增 5 格（三支各一、三句必须互不相同、输入规模行）。
+
+### Docs（R92）
+
+- `AGENT_BACKLOG.md`：新开 128（夹具覆盖共享 /tmp，本机已修、runner 待读）、
+  129（跨步骤证据搬去 per-job `$RUNNER_TEMP`）、130（真机 key 窗口里 accent 那一档）、
+  131（统计页那套分组要不要并入）；92 补一条"两次假红的真成因"。
+- `AGENT_DECISIONS.md`：D-150。`AGENT_VISUAL_ITERATION.md`：Round 92（含 U-211…U-215 与逐元素清单）。
+- 仓库外：`r92_data_visual.py` + 改前/改后两份读数、`r92_visual_review_data.md`、
+  `mutate_r92_clobber.py`（6 刀）、`verify_r92.sh`、`r91_ci_readings.md`（R90 那次 CI 的完整读数）。
+
 ### 测试（R91）
 
 - 删掉 `UIInteractionProbeTests.testDragSelectExpandsSelectionInsideTheRealList` 与
