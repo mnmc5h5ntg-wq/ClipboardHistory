@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据与工具（R94，零产品改动）
+
+- `scripts/probe_coverage_expectations.json`：六条按 run 38857388449 的 `NOW_RUNS` 逐条翻成 `can`
+  （`skipped` 与 `passed` 分开写，skip 不产出产品判断）；五条 `cannot` 的成因分三种
+  （挂住的那条 / 排在它之后的三条 / R93 才登记、不在 `8e6ed15` 源码里的那条）。BACKLOG 134 结案。
+- `scripts/probe_coverage_gate.py`：新增 `execution_order()` 与两行**只报不判**的读数
+  `PROBE_ORDER 露面=…/未闭口=…/前缀=…`、`PROBE_QUEUED <名字>`；"一条都没露面"时前缀报
+  `无从判定` 而不是 1。"挂住的是谁"这个名字仍归 `ui_probe_report.py`（两支闸门共用原始通道不等于共用判定）。
+- `scripts/tests/test_probe_coverage_gate.py`：r62 那份真日志的正对照从"该绿"改成"该红且逐条点名"
+  （名册翻了身份之后这才是正确契约），并新增执行序三格（尺不许按字母序排、空日志不许报空洞的真话、
+  前缀断了不许判红）与"读数必须被打印出来"一格。
+- `scripts/tests/fixtures/r94_runner_ui.log`：新夹具，头部写清 provenance
+  （名字/判定/顺序/计数逐字读来，只有秒数是补的，而秒数正是闸门明写"不判"的那一项）。
+- `scripts/tests/test_ui_probe_report.py`：R86 那条 `NonRedundancyTests` 从"文本里不许出现 started"
+  改成"不许复制判定"（只扫 `print(` 行的字面串 + 红清单里不许出现诊断词），并加反方向一格。
+- `scripts/tests/test_ledger_ids.py`（新）：轮次标题引用的每个 `D-xxx` 必须在 `AGENT_DECISIONS.md`
+  有正文、编号不许空号。它第一次跑就抓到 R93 欠的 D-151（两处标题引用了它，正文从没写过）。
+- 仓库外：`roster_r94.py`（名册翻转可重放）、`mutate_r94_order.py`（M516…M522，跑在临时树上）、
+  `r94_menubar_visual.py` + `r94_menubar_review.md`（菜单栏六帧逐元素）、`verify_r94.sh`、
+  `r94_ci_readings.md`（run 38857388449 的逐字读数）。
+
 ### 判据（R93）
 
 - 在屏探针卷新增诊断判据 `testRowProxyCensusAsksTheConsequenceNotTheShape`：

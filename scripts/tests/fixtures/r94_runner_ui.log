@@ -1,0 +1,40 @@
+# run 38857388449（`8e6ed15`）· 作业 build-and-test · 步骤「On-screen interaction probes (report-only)」
+# 这一步在 `/tmp/ui.log` 里的形状。**必须读清楚这份夹具的 provenance：**
+#
+# 逐字抄来的（有出处）：
+#   * 用例名与判定 —— 来自同一次 run 的「On-screen probe coverage floor」步骤正文
+#     `PROBE_COVERAGE_SUMMARY … 本次下结论=6 红=6` 与它下面那六行
+#     `NOW_RUNS <名字>：…而这次它下结论了（passed|skipped）`；
+#     唯一没结论又开了口的那条来自 `UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`。
+#   * `started=7 concluded=6`、`ui suite exit: 137  executed: 0` —— 探针步骤自己的逐字读数。
+#   * 露面顺序 —— 与那次 run 里同一卷在「Swift tests (executed-count gate)」步骤的实际输出同序（字母序）。
+#     ⚠ 那一步的 20 行结论**全是 skipped**，因为那里没有 `CLIPBOARD_HISTORY_UI_INTERACTION=1`；
+#     不按步骤名过滤就会得出「探针在 runner 上也是全 skip」这句假话（R86 那条老账，这次又差一次）。
+#
+# 我自己补的（无出处，且刻意只补闸门**不读**的那部分）：
+#   * 秒数、`(Mod.Class name)` 前后的空格形状、`Test Case …` 行的完整措辞。
+#     闸门文档里明写「明确不判：单条用例的耗时」，所以这几颗数不进任何判据 ——
+#     它被读到才会成为谎言，它没被读到就只是排版。
+#   * 真正的 `/tmp/ui.log` 从没被打进 job 日志（那一步只 echo 了汇总行），
+#     所以这份是**形状重建**，不是逐字片段；`r62_runner_ui.log` 才是逐字的。
+##[group]Run set -o pipefail
+##[endgroup]
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testAccessibilityTreeCoverage]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testAccessibilityTreeCoverage]' skipped (0.002 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView]' passed (0.611 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges]' passed (1.204 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testIntakeBehindATallPinnedBlockRevealsTheNewRow]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testIntakeBehindATallPinnedBlockRevealsTheNewRow]' passed (1.517 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testMarkdownFilePreviewRendersInARealWindow]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testMarkdownFilePreviewRendersInARealWindow]' passed (0.842 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testOffScreenProgrammaticSelectionIsRevealedAndNotJumped]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testOffScreenProgrammaticSelectionIsRevealedAndNotJumped]' passed (1.033 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testRightClickMenusAppKitWouldShowAreChinese]' started.
+# ↓ 这一步之后的原文（逐字），但它们不在 ui.log 里，闸门读不到；留在末尾只说明"为什么没有第 8 条"：
+# /Users/runner/work/_temp/….sh: line 40:  5057 Killed: 9  … swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1
+# ui suite exit: 137  executed: 0  skipped: ?  已下结论的用例: 6
+# UI_PROBE_PROGRESS started=7 concluded=6
+# UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese
+# UI_PROBE_CHANNELS_AGREE=1

@@ -214,17 +214,48 @@ class MainExitCodeTests(unittest.TestCase):
 
 class NonRedundancyTests(unittest.TestCase):
     def testGateAndReportAnswerDifferentQuestions(self):
-        """两支闸门不许互相替代（R86 开脚本之前先确认过 `probe_coverage_gate.py` 没有这一格）。
+        """两支闸门不许互相替代（R86 定下；R94 把它从"词汇"改成"能力"，理由写在下面）。
 
         那一支判**集合级**：源码里有几条在屏判据、这次哪几条没下结论、缺席登记过没有。
-        这一支判**因果级**：这一卷是怎么停的。
+        这一支判**因果级**：这一卷是怎么停的、挂住的那条**叫什么名字**。
         只有前者会漏成：11 条全登记着、全都没结论、闸门照样绿 —— 那正是 R62 到 R85 的形状。
+
+        R94 为什么要改这条守卫的形状：BACKLOG 134 让登记必须回答
+        「没结论的这几条是**排队没到**还是**跑到一半被收掉**」，而这一支的日志里本来就有
+        `Test Case … started.` 这一层信息 —— 那一支于是也要读 `started`。
+        老守卫判的是"文本里不许出现 started 这个词"，它会把这种**共用原始通道**误判成分工崩溃。
+        真正会崩的是**共用判定**：两边各自报一个"挂住的是谁"，就成了一把没有样本数优势的第二尺子
+        （R87：结论相反时定罪权按样本数分配 —— 那一支只有一份 stdout，这一支有两份互相签字）。
+        所以现在的守卫读能力，不读散文：
+          ① 那一支不许打出 `HUNG` 这个判定名，也不许把"没闭口"的任何一条**用例名**当成结论输出；
+          ② 它的新读数只许是计数与 `queued`（一次都没轮到的那些），不许新增红；
+          ③ 这一支仍然独占 `UI_PROBE_HUNG=<名字>`。
         """
         gate = Path(__file__).resolve().parents[1] / "probe_coverage_gate.py"
         text = gate.read_text(encoding="utf-8")
-        self.assertNotIn("started", text,
-                        "`probe_coverage_gate.py` 里出现了 started ⇒ 两支开始重叠，"
-                        "要么合并、要么在这里写清为什么仍然要两支（不许留成『看着都像在判同一件事』）")
+        self.assertIn("started", text,
+                      "R94 之后那一支本来就要读 started 来分「排队没到 / 跑到被收」；"
+                      "这个词没了说明它退回了老写法")
+        # 只看它**打出去**的东西：`print(...)` 里的字面串。
+        # 为什么不能整份文件扫 —— 守卫会命中自己那族的老毛病（R53：region() 先命中守卫写的名字）：
+        # 那一支的文档串里正写着"这个名字归另一支"，扫全文就会因为**解释了分工**而红。
+        printed = " ".join(ln for ln in text.splitlines() if "print(" in ln)
+        for token in ("HUNG", "STALLED"):
+            self.assertNotIn(token, printed,
+                             f"那一支打出了 {token} ⇒ 因果级的名字被复制成了第二颗尺子")
+        red_lines = [ln for ln in text.splitlines() if "reds.append" in ln]
+        for ln in red_lines:
+            for word in ("stall", "open_not_closed", "ORDER"):
+                self.assertNotIn(word, ln,
+                                 f"那一支把一条**诊断**变成了门禁（{ln.strip()[:80]}）")
+        self.assertIn('reds.append(f"NOT_RUN {name}', text,
+                      "集合级那两条红（NOT_RUN / NOW_RUNS）必须还在：放宽成只报数就等于撤了闸门")
+
+    def test_this_script_owns_the_hung_case_name(self):
+        """反方向也要有牙：名字只能这一支出。缺了它，R94 那条"共用 started"就变成"没人负责"。"""
+        here = Path(__file__).resolve().parents[1] / "ui_probe_report.py"
+        text = here.read_text(encoding="utf-8")
+        self.assertIn("UI_PROBE_HUNG", text, "这一支不再点名『挂住的是谁』⇒ 那一句今天没人说了")
 
 
 if __name__ == "__main__":
