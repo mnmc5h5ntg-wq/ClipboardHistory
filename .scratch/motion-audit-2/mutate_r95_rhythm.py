@@ -41,14 +41,23 @@ MUTATIONS = [
                     )
                 }""",
      RHYTHM, "必须是同一档"),
+    # M530 的锚点在 R97 换了形状：那一格从 `cardRowKinds` 里搬进了纯函数 `cardRowKind`
+    # （`if line * 10 >= width * lineShareTenths`）。**刀还是同一刀**（把线的宽度门槛抬到读不到），
+    # 只是必须跟着代码走 —— 上一版留旧锚点，它"needle 命中 0 次"，于是这一格安静地没了证人。
     ("M530", "把 .line 的宽度门槛抬到 99%（尺读不到分隔线）", HARNESS,
-     "else if line >= (x1 - x0) * 8 / 10 { kinds.append(.line) }",
-     "else if line >= (x1 - x0) * 99 / 100 { kinds.append(.line) }",
+     "        if line * 10 >= width * lineShareTenths { return .line }",
+     "        if line * 10 >= width * 99 { return .line }",
      RHYTHM, "尺瞎了"),
-    ("M531", "把页面底容差从 3 放宽到 40（卡片内的行被当成卡片外）", HARNESS,
-     "if abs(modal - pageLuma) <= 3 && abs(modal - fill) > 3 {",
-     "if abs(modal - pageLuma) <= 40 && abs(modal - fill) > 3 {",
-     RHYTHM, "带子越界"),
+    # M531 **退役**（R97）：它的锚点是"这一行的众数离页面底 ≤3 就算卡片外"，
+    # 而那一条判据在 R97 被整体换掉了（换成"最长一段连续卡片材质占带宽的比例"，见 `cardRowKind`），
+    # 于是它连注入的对象都没有了。它想守的那个失败模式**没有消失**，
+    # 换到了 `mutate_r97_card.py` 的 M538/M539 两刀上（地板撤 0 / 抬 60%）⇒ 那里有证人。
+    # 留旧锚点的后果就是这一格"needle 命中 0 次"而表上看不出来 —— 所以退役要写在这里，
+    # 而不是从列表里安静地删一行。
+    ("M542", "把墨的门槛抬到读不到（inkMin 8 ⇒ 9999：满带卡片段却零墨）", HARNESS,
+     "                            outsideTenths: Int = 3, inkMin: Int = 8,",
+     "                            outsideTenths: Int = 3, inkMin: Int = 9999,",
+     RHYTHM, "墨那一档瞎了"),
 ]
 
 BASE_ENV = {key: value for key, value in os.environ.items() if key != "SDKROOT"}

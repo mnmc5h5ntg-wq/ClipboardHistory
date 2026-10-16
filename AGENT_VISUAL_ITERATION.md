@@ -7967,11 +7967,94 @@ runner 的第一份栈（run 38876999489）读出来是
 
 ### 7. 验证
 
-- 验证（`r96_verify.log`，`VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124（日志那格写的是 125：目录里除 PNG 还有一份 capture-readings.log）；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；三张变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（卡片=2 框=10 自检=2 失败自检=0）。产品文件 1 个（`SettingsView.swift`）⇒ **换装**。
+- 验证（第一遍 `r96_verify_pass1.log`；同一份电池在**台账落盘之后**又跑了一遍 ⇒ `r96_verify.log`，
+  两遍除"帧数"那一格外逐格相同 —— 那一格从第二遍起只数 PNG，
+  124 张而不是把 `capture-readings.log` 也算进去的 125。两遍都是 `VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124（日志那格写的是 125：目录里除 PNG 还有一份 capture-readings.log）；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；三张变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（卡片=2 框=10 自检=2 失败自检=0）。产品文件 1 个（`SettingsView.swift`）⇒ **换装**。
 
 ### 8. 下一轮第一件事
 
 读 R96 的 CI 里 `UI_PROBE_SAMPLE_SHAPE` 那一行 —— 三种形状（整段为空 / 数字开头=no / 数字开头=yes）
 各自的下一步已经写在 `r96_ci_readings.md` 末尾。然后：140（给两张比窗口高的卡片配一张高夹具）、
 133（浮层夹具"赋值不选中"那条通道，重算 R76 那格的墨移动量）。
+
+## Round 97 · 卡片那把尺重做：它之前把一条 1pt 的分隔线、一颗按钮、两张卡片都当成"一张卡片"（结案 132 / 更新 140 / 新开 141、142 / U-232…U-239 / D-155）
+
+### 1. 开场清单（设置「推荐」+「隐私·排除名单」两张帧，逐元素，带坐标）
+
+| 元素 | 框 / 读数（亮档） | 判定 |
+|---|---|---|
+| 「推荐」页 卡片 | y=**171.0**..539.5pt（被窗口截断） | 分隔线 4 条、内侧 16.5/18.0/16.5/18.5/… ⇒ 两档同形；下半截没人看 = 140 剩那一半 |
+| 「恢复默认」按钮 | y=106..129.5pt 一带，最长连续卡片材质 152/1120 = **14%** | 曾被判成一张"卡片"并量出 `边距 6.5/5.5、内侧 0.0/0.0` ⇒ 假红，改判据（U-234） |
+| 「隐私」页 卡片（1040 档） | y=106.0..705.5pt（判据）/ ..765.5pt（独立复算） | 段边界两条通道不一致 ⇒ 开 **141**（U-236） |
+| 「数据与保留」卡片（1040 档） | y=720.0..875.5pt（判据） | 边距 14.0/14.0 ⇒ 与其余卡片同档 |
+| 「统计」页 | 0 个卡片段（热图那些行的众数**全等于页面底**） | 源码里没有 `GroupBox` ⇒ 正确读数；钉成断言（U-232） |
+| 「统计」页那条 `Divider()` | y=271.0 起 2px、那一行 94% 的像素在 228 档 | 它曾被当成"卡片填充" ⇒ `cardFill` 的地板 20pt（U-233） |
+
+### 2. 判过不改的（带理由）
+
+- **「推荐」页的标题行与那颗按钮在卡片外**：不改，开成 **BACKLOG 142**。
+  这条是分段之后才看得见的（之前整带被当一张卡片，"卡片从 171pt 才开始"这件事根本没进过读数）。
+  并进去会同时动到滚动高度与那颗按钮的命中区，而这一屏的下半截在 540 档仍被窗口截断（140）
+  —— 两件事一起做就说不清哪条起了作用，所以按 141 → 140 → 142 的顺序排。
+- **「统计」页 0 卡片 ≠ 缺陷**（BACKLOG 131 仍开着）：本轮把"这一屏没有 GroupBox"钉成断言，
+  但**没有**顺手给它加一张卡片 —— 加不加要连热图自身的视觉重量一起判（它已经是一块有底色的区域），
+  那是 131 里写的那次独立判断，不是"上一屏改了所以这屏也改"。
+- **推荐页内侧留白 16.5/18.0 与别的卡片 14.0/14.5 不同档**：不改。这一屏的卡片里是
+  `VStack(spacing: 12)` + 滑块行，滑块的 bezel 不画墨（R96 量过按钮 bezel 是 3.5pt），
+  所以墨到墨的距离本来就比文字行大；判据的容差 4.5 覆盖的是**同一张卡片内部**的一致性，
+  跨卡片比绝对值不是这条判据的对象（R95 立它时就是这个边界）。
+
+### 3. 三处判据缺陷，都改了（U-232…U-236）
+
+1. `cardFill`：填充从"第一行离页面底 >3"改成"这个档在整带里占 ≥20pt 的行"。
+   实测分布：真卡片 176.5–217.0pt、那条线 1.0pt ⇒ 地板离两边都远。
+2. `cardRowKind`（新纯函数）：一行的身份由**最长一段连续卡片材质**占带宽的比例决定，
+   实测 14% / 46% / 94% 三档 ⇒ 地板 30%。这一格同时解决"按钮冒充卡片"和"输入框把卡片切断"。
+3. `cardSegments`（新纯函数）+ 判据循环改成**先分段再逐段判**：一个带子里可以纵向放好几张卡片。
+4. 扫描带跟着夹具尺寸走，并加恒等式 `带子下沿 == 窗口高`；"这一页比窗口高，被切断了"
+   这句话从纯函数搬到调用处 —— 纯函数没见过窗口尺寸，没资格替它说。
+
+### 4. 仪器自己错一次（U-237）
+
+我先假设"热图那块有底色的区域被尺当成卡片"，写了 `r97_stats_visual.py` 去量。
+正对照（真卡片必须"稳定 + 跨带"）当场不绿，而热图那一屏**一个候选块都没有** ——
+假设是错的：热图那些行的众数全都等于页面底（格子只占一行宽度的两三成）。
+真凶是那条 1pt 的 `Divider()`。如果我只看"读数对不对得上我的假设"，就会把这条假说写进台账。
+
+### 5. 变异表跟着代码搬家（U-239）
+
+R97 的重构把 R95 那张表的两刀变成了"needle 命中 0 次"：M530 与 M531 的锚点都在旧的那几行里。
+电池当场报了 `not_run=2` —— 这一种红比漏检更值得记：**表还在跑、还在打数字，而其中两格已经没有证人**。
+
+- M530（把 `.line` 的宽度门槛抬到读不到）**换锚点继续存在**：那一格搬进了 `cardRowKind`，
+  刀还是同一刀。
+- M531（把页面底容差从 3 放宽到 40）**退役**：它的锚点整条判据被换掉了。
+  但它要守的失败模式没消失 —— 换到本表 M538/M539 两刀上（材质地板撤 0 / 抬 60%），
+  退役记录写在文件里而不是从列表里安静删一行。
+- 新增 M542（`inkMin` 抬到读不到：满带卡片段却零墨）。它第一次跑**没红，而是被 skip 了** ——
+  因为 `sawSegment` 记在 `inkRows == 0 ⇒ continue` 之后，证人先被吃掉。
+  修好位置之后它 CAUGHT，而这一刀换来的不是多一个号，是一条**新判据**：
+  "有卡片段却整卷零墨"从此不许落进那条合法的 `XCTSkip`。
+
+### 6. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 90 | 本轮零产品改动；卡片节奏现在**逐张**判，两张卡片的 14.0/14.0 与其余同档 |
+| 层级与秩序 | 90 | 「统计」页 0 卡片这件事从"读数含糊"变成一条由源码推的断言（131 仍开着，判过没改） |
+| 动效恰当 | 91 | 零动效改动；本轮没有新的"要不要加"的判断，所以不加分 |
+| 可读性 | 90 | 说明档那一条本轮没重测（R33/R35 的覆盖判据守着），不重复记分 |
+| 状态完备 | 86 | 勾选态颜色仍未定案（139 等真机）；推荐页下半截仍没有判据看着（140 剩那一半） |
+| 克制 | 95 | 全部改动都在判据侧；产品文件 0 个；一条假红被撤而不是被放宽盖掉 |
+| 可验证性 | 93 | 三格新纯函数各带真值表；变异表 `n=5 caught=5 mismatch=0`；两条通道交叉复算并把不一致开成 141 |
+| **总评** | **90.7** | ≥90 ⇒ 本轮收口；141 是本轮新开的、下一轮第一件事 |
+
+### 6. 验证
+
+- 验证（`r97_verify.log`，`VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 808 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；**四张**变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 卡片:MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（候选块=9 自检=1 失败自检=0）。产品文件 0 个 ⇒ **不需要换装**（本轮只动判据与工具）。
+
+### 7. 下一轮第一件事
+
+141：把判据的读图路径换成直接解 PNG，配一张**每一支像素判据**的 before/after 表
+（十几支判据的阈值都在这条通道上标过定）。之后回到产品面欠账：133、131、139、140 剩那一半。
 

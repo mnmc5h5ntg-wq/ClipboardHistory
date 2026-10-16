@@ -1,18 +1,18 @@
 == 1) 构建（必须 0 告警）
 BUILD_EXIT=0 BUILD_WARNING_LINES=0
 == 2) 全量 swift test
-TEST_EXIT=0 最后一行汇总: 	 Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected) in 154.431 (154.476) seconds
+TEST_EXIT=0 最后一行汇总: 	 Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected) in 154.457 (154.499) seconds
 == 3) 在屏那一卷（本机，带 CLIPBOARD_HISTORY_UI_INTERACTION=1）
-PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.843 (21.845) seconds
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.789 (21.791) seconds
 == 3.5) 先重新拍一遍帧（本轮又动了产品：数据卡片里那格孤儿 padding 被删）
-CAPTURE_EXIT=0 帧数=125
+CAPTURE_EXIT=0 帧数=124 目录内文件=125
 FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0 
 == 5) 脚本电池
-PY_EXIT=0 Ran 209 tests in 11.324s OK 
+PY_EXIT=0 Ran 209 tests in 11.277s OK 
 == 6) 三张变异表（本轮：节奏四刀 + 上一轮欠的两张 Python 表）
 MUT_EXIT=0（节奏=0 序=0 分诊=0）节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0
 == 7) 台账编号守卫
-LEDGER_EXIT=0 Ran 4 tests in 0.013s OK 
+LEDGER_EXIT=0 Ran 4 tests in 0.014s OK 
 == 8) 看图仪器（设置「隐私」逐元素，尺腿不判产品）
 VIS_EXIT=0 卡片=2 框=10 自检=2 失败自检=0
 == 9) 摘要缺值算红

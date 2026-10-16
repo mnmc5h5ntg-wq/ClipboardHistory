@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品（R97）
+
+- **无改动**。本轮全部工作在判据侧；124 张帧重拍之后与基线逐字节相同（`CHANGED=0`）。
+
+### 判据与工具（R97）
+
+- **BACKLOG 132 结案**：run 38884429809 里 `主线程采样=314 等待帧占比=100% 等待终端=1 个`
+  + `UI_PROBE_SAMPLE_WAITING=mach_msg2_trap…(314)` + `UI_PROBE_HUNG_KIND=blocked@runloop-wait`
+  ⇒ 那条在 runner 上吃满 240 秒的探针是**挂**，不是慢。R96 准备的"三种形状各一条下一步"一条没用上
+  （它只在读不懂时才打），但正是那一格让这次的"读到了"可信。
+- **卡片那把尺重做**（三条读数各推翻一次判定）：
+  ① `cardFill` —— 填充不再取"第一行离页面底 >3"，改取"这个档在整带里占 ≥20pt 的行"
+  （实测真卡片 176.5–217.0pt、那条 1pt 的 `Divider()` 是 1.0pt）；
+  ② 新增 `cardRowKind` —— 一行的身份由**最长一段连续卡片材质**占带宽的比例决定，
+  地板 30%（实测按钮 14% / 输入框行 46% / 普通行 94%）；
+  ③ 新增 `cardSegments` + 判据**先分段再逐段判**（一个带子里可以纵向放好几张卡片）。
+  撤掉三条 `边距=14.5/8.0` 那条**假红**的根因，`settings-privacy-excluded` 第一次被逐张判出
+  段1 14.5/14.0、段2 14.0/14.0。
+- **BACKLOG 140 的真病根**：扫描带写死 `height: 440`（照 720×540 那一档定的），
+  1040 那一档"卡片到不了底"是带子短，尺却报"这一页比窗口高"。改成带子跟着夹具尺寸走
+  + 恒等式 `带子下沿 == 窗口高`；那句解释从纯函数搬到调用处。140 **不结案**
+  （`settings-privacy` / `settings-recommendations` 在 540 档仍被窗口截断，高夹具那一半照做）。
+- **新开 BACKLOG 141**：判据读的是 `NSImage → tiffRepresentation → NSBitmapImageRep`，
+  色彩空间实测 `NSCalibratedRGBColorSpace` ≠ PNG 落盘那个空间；同一张帧两条通道给出不同的卡片边界
+  （Swift 段1 底 705.5pt / 直接读 PNG 复算 765.5pt）⇒ 本轮高夹具上的"通过"记成**暂定**。
+- 看图那一腿：`r97_stats_visual.py` 的正对照否掉了它自己带来的假设
+  （"热图底色被当成卡片"是错的：那些行的众数全等于页面底），真凶是那条 1pt 的分隔线。
+- 分段之后新看见的一条产品事实开成 **BACKLOG 142**：「推荐」页的卡片从 y=171.0pt 才开始，
+  标题行与「恢复默认」那颗按钮（106..129.5pt）压在页面底色上 ⇒ 同一句"这几行属于同一组"
+  在设置窗口里有三种说法（其余屏标题在卡片内 / 统计页整屏没有卡片）。本轮不改，顺序 141→140→142。
+- 新表 `mutate_r97_card.py`：M537–M541 五刀全 CAUGHT、`mismatch=0`；
+  R95 那张表跟着代码搬家：M530 换锚点续用、M531 **退役**（失败模式改由 M538/M539 守）、
+  新增 M542（`inkMin` 抬到读不到）⇒ `n=4 caught=4 not_run=0`；
+  它第一次跑是被 skip 而不是红，于是多了一条新判据"有卡片段却整卷零墨 ⇒ 红，不许 skip"；
+  同时修了 harness 自己两格（"红得不对"时把实际红在哪句打出来、mismatch 必须影响退出码）。
+
 ### 产品（R96）
 
 - 删掉设置「数据」卡片里那格**孤儿**内边距：三段小节里只有第一段带 `.padding(.vertical, 4)`，

@@ -4768,6 +4768,51 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 零产品改动：124 张帧 `CHANGED=0 MISSING=0 ADDED=0`，全量 793 例 / 40 skip / 0 failures。
 
 
+## 第 99 轮 · R97：卡片那把尺被重做了一遍——它之前把一条 1pt 的分隔线、一颗按钮、两张卡片都当成"一张卡片"（结案 132 / 更新 140 / 新开 141、142 / U-232…U-239 / D-155）
+
+- 读 R96 推送的 run **38884429809**（`278415e`）：**success**。
+  **132 结案**：`UI_PROBE_SAMPLE 主线程采样=314 等待帧占比=100% 主导路径占比=100% 等待终端=1 个`
+  + `UI_PROBE_SAMPLE_WAITING=mach_msg2_trap…(314)` + `UI_PROBE_HUNG_KIND=blocked@runloop-wait`
+  ⇒ 那条在 runner 上吃满 240 秒的探针是**挂**（主线程整个停在等事件），不是慢。
+  上一轮欠的 `UI_PROBE_SAMPLE_SHAPE` 没出现 —— 它只在读不懂时才打，这一次 314 行全解析出来了。
+  覆盖率闸门逐格同于上一轮（`本次下结论=6 红=0`、`PROBE_ORDER 露面=7/11 未闭口=1 前缀=1`）。
+- 然后回到产品面：把 R95/R96 那把"卡片竖向节奏"的尺**重做**。三条读数各自推翻一次判定：
+  ① `settings-privacy-excluded` 亮档报 `边距=14.5/8.0` ⇒ 一条**假红**：独立复算（直接读 PNG）
+     给的是 14.0，而判据把卡片段截在 566.5pt（真卡片底在 935.5pt）。根因是"这一行的众数离页面底 ≤3
+     就算卡片外"，而卡片材质与页面底在这台机器上只差**一个色档**（244 vs 252，档宽 8）
+     ⇒ 解码路径上几个单位的偏移就能翻（U-232、U-233）。
+  ② 修完 ① 之后又红一次：`settings-recommendations` 报出一张 y=106..129.5 的"卡片"，
+     量出 `边距 6.5/5.5、内侧 0.0/0.0` —— 那是**「恢复默认」那颗按钮**（76pt 宽，横不过带子）。
+     判据换成"这一行里最长一段连续卡片材质占带宽的比例"，实测三档 14%（按钮）/ 46%（输入框行）
+     / 94%（普通行）⇒ 地板取 30%（U-234）。
+  ③ 再修完 ②：一个扫描带里其实有**两张**卡片（「隐私」那张与「数据与保留」那张），
+     而判据把整带当一张量 ⇒ 新增 `cardSegments` 先分段、再逐段判（U-235）。
+- **BACKLOG 140 的真病根不是"缺高夹具"，是扫描带写死了 440pt**（照 720×540 那一档定的），
+  于是 1040 那一档的卡片"到不了底"是**我的带子**造成的，尺却报"这一页比窗口高，被切断了"。
+  改成带子跟着夹具尺寸走，并加一条恒等式（`带子下沿 == 窗口高`）钉住 —— 变异 M540 就是撤这条，必红（U-236）。
+- 一条**没修完、必须记账**的事（开成 **141**）：判据读的是 `NSImage → tiffRepresentation → NSBitmapImageRep`，
+  实测那份位图的色彩空间是 `NSCalibratedRGBColorSpace`，而落盘的 PNG 不是。
+  同一张帧两边给出不同的卡片边界（Swift 段1 底 705.5pt / python 复算 765.5pt，顶边与段2 高度一致）
+  ⇒ 本轮那些"14.5/14.0 通过"的读数在高夹具上要记成**暂定**：判据自洽，但它量的那张图不是交付的那张图。
+- 分段之后第一次看得见的一条**产品面**事实（开成 **142**）：「推荐」页的卡片其实从 y=171.0pt 才开始，
+  而"推荐权重客制化"那行标题与「恢复默认」那颗按钮（y=106..129.5）**压在页面底色上**，在卡片外 ——
+  其余几屏是"标题与内容一起进卡片"。同一句"这几行属于同一组"在同一个窗口里有三种说法。
+  本轮不改：并进去会同时动到滚动高度与那颗按钮的命中区，而这一屏下半截在 540 档仍被窗口截断（140），
+  两件事一起做就说不清哪条起了作用 ⇒ 顺序排成 141 → 140 → 142。
+- 变异表跟着代码搬家（U-239）：R97 的重构让 R95 那张表的 M530/M531 两格"needle 命中 0 次"，
+  电池当场报 `not_run=2` —— 表还在打数字而其中两格已经没有证人。M530 换锚点续用，
+  M531 退役并把它的失败模式指到新表的 M538/M539；新增的 M542 第一次跑**被 skip 而不是红**
+  （`sawSegment` 记在 `inkRows == 0 ⇒ continue` 之后，证人先被吃掉），修好位置之后它换来的
+  是一条新判据："有卡片段却整卷零墨"不许再落进那条合法的 `XCTSkip`。
+- 看图那一腿：`r97_stats_visual.py` 先假设"热图那块底色被当成卡片"，**正对照当场否掉了自己的假设**
+  —— 热图那些行的众数全都等于页面底，一个候选块都没有；真凶是那条 1pt 的 `Divider()`（U-237）。
+  「统计」这一屏现在有一条由源码推出来的断言：它没有 `GroupBox` ⇒ 判据必须报"这一带一张卡片都没有"。
+
+- 验证（`r97_verify.log`，`VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 808 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；**四张**变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 卡片:MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（候选块=9 自检=1 失败自检=0）。产品文件 0 个 ⇒ **不需要换装**（本轮只动判据与工具）。
+- **下一轮第一件事**：141（像素通道：让判据直接读 PNG 字节，配一张 before/after 表，
+  因为仓库里十几支像素判据的阈值都是在这条通道上标定的）；然后回到欠了的产品面清单
+  （133 浮层"赋值不选中"、131 统计页要不要卡片、139 勾选态颜色真机、140 剩下那一半高夹具）。
+
 ## 第 98 轮 · R96：判据的对象从"一张卡片"扩到"每张卡片"，它当场抓到上一轮留下的孤儿；runner 那份栈被证明是**我读不懂**（结案 137 / 新开 139、140 / U-227…U-231 / D-154）
 
 - 读 R95 推送的 run **38876999489**（job 116894329916，`bf6b921`）：**success**。
@@ -4798,7 +4843,9 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
   （`SettingsView.swift` 里没有任何自定义 `toggleStyle`）⇒ 灰不是产品选的色，
   开成 **139** 走真机，不改产品、不拿帧当证据。默认排除那一列判过不改（U-229）。仪器自己错两次（U-230）。
 
-- 验证（`r96_verify.log`，`VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124（日志那格写的是 125：目录里除 PNG 还有一份 capture-readings.log）；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；三张变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（卡片=2 框=10 自检=2 失败自检=0）。产品文件 1 个（`SettingsView.swift`）⇒ **换装**。
+- 验证（第一遍 `r96_verify_pass1.log`；同一份电池在**台账落盘之后**又跑了一遍 ⇒ `r96_verify.log`，
+  两遍除"帧数"那一格外逐格相同 —— 那一格从第二遍起只数 PNG，
+  124 张而不是把 `capture-readings.log` 也算进去的 125。两遍都是 `VERIFY_OK=1`、`SUMMARY_MISSING=0`）：构建 `BUILD_EXIT=0 BUILD_WARNING_LINES=0`；全量 swift test `TEST_EXIT=0`（Executed 805 tests, with 41 tests skipped and 0 failures (0 unexpected)）；在屏那一卷 `PROBE_EXIT=0`（Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected)）；重新拍帧 `CAPTURE_EXIT=0`、帧数=124（日志那格写的是 125：目录里除 PNG 还有一份 capture-readings.log）；帧基线 `FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=124 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0`；脚本电池 Ran 209 tests OK；三张变异表 节奏:MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 序:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 分诊:MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0；台账编号守卫 Ran 4 tests OK；看图仪器 `VIS_EXIT=0`（卡片=2 框=10 自检=2 失败自检=0）。产品文件 1 个（`SettingsView.swift`）⇒ **换装**。
 - **下一轮第一件事**：读 R96 的 CI —— `UI_PROBE_SAMPLE_SHAPE` 那一行（三种形状三种下一步），
   以及 `UI_PROBE_SAMPLE_TIED=` / 等待终端那两行是否终于给出了族。
 
