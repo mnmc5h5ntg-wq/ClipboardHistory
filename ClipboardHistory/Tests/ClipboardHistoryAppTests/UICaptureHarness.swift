@@ -6031,16 +6031,19 @@ final class UICaptureTests: XCTestCase {
                  + " bitsPerPixel=\(rep.bitsPerPixel) hasAlpha=\(rep.hasAlpha)"
                  + " planar=\(rep.isPlanar) samples=\(rep.samplesPerPixel)"
                  + " 色彩空间=\(rep.colorSpaceName.rawValue)")
-            // 「统计」这一屏的**源码里没有 `GroupBox`**（`SettingsView.statsSection` 直接放
-            // `DailyCopyStatsSection`；扫源码那一腿由 `testEverySettingsCardAppliesTheSharedEdgeInset`
-            // 看着），所以它的正确读数是"这一带一张卡片都没有"。
-            // R96 那两条读数把它说成了"有一张卡片但读不到字"（一条 1pt 的 `Divider()` 当上了填充）：
-            // 这一格把那句话钉成断言 —— `cardFill` 的地板或 `cardish` 那一格被撤，它立刻红。
+            // R101 / BACKLOG 131 之前这一格钉的是**反面**：「统计」那一屏源码里没有 `GroupBox`，
+            // 所以它的正确读数是"这一带一张卡片都没有"，而 R96 那两条读数把它说成
+            // "有一张卡片但读不到字"（一条 1pt 的 `Divider()` 当上了填充）。
+            // 现在这一屏有了卡片 ⇒ 那条"不许把分隔线认成卡片"的证人**搬去了纯函数那一格**
+            //（`testCardFillNeedsAStableBandNotTheFirstDifferingRow` 第 ① 条：只有一条 1pt 线的
+            // `modals` 必须返回 nil）—— 它比帧级证人更强：不依赖这台机器拍不拍得出材质。
+            // 这一格因此换成产品事实：这一带**恰好一张**卡片。多出来的那一张只可能是
+            // 卡片内部那条 `Divider()` 或热图底色块被认成卡片，仍然是同一个 bug 的形状。
             if fixture.name.hasPrefix("settings-stats") {
-                XCTAssertEqual(0, segments.count,
-                               "\(fixture.name) \(tag)：这一屏没有 GroupBox ⇒ 尺却认出了 "
-                               + "\(segments.count) 张卡片（多半是那条 1pt 的分隔线或热图的底色块，"
-                               + "见 `cardFill` 的文档串）")
+                XCTAssertEqual(1, segments.count,
+                               "\(fixture.name) \(tag)：这一屏现在有一张 `GroupBox`（R101 / 131）⇒ "
+                               + "尺却认出 \(segments.count) 张（0 = 材质又读不到了，看这一行的 填充 与 "
+                               + "`CARD_FILL_CANDIDATES`；≥2 = 卡片内那条 1pt 分隔线或热图底色块又当上了卡片）")
             }
             if inkRows == 0 {
                 emit("CARD_RHYTHM_NOT_RUN \(fixture.name) \(tag)（整带零墨 ⇒ 这台机器拍不出这一页）")
@@ -6077,6 +6080,28 @@ final class UICaptureTests: XCTestCase {
                     emit("CARD_RHYTHM_DECLINED \(fixture.name) \(tag) 段\(index + 1)"
                          + " 原因=\(declined) ⇒ 不判（不是通过）")
                     continue
+                }
+                // **上下留白不许掉回"没补共享留白"那一档**（R101 新加，出处是本轮我自己犯的那个错）。
+                // 我第一版给「统计」补卡片时把 `.settingsCardInset()` 挂到了 `GroupBox` **外面**，
+                // 材质里面只剩 GroupBox 默认那一档 ⇒ 尺当场量出 `settings-stats-populated 边距=7.0/7.0`，
+                // 而其余卡片是 12.5~14.5。**那一版没有任何断言会红**（这一屏只有 1 条分隔线，
+                // 下面那道 `dividers >= 2` 让它走 declined）⇒ 这个错可以静默上线。
+                //
+                // 为什么只钉下界、不钉上界（第一版我写了 12…16，被真产物当场驳回）：
+                // "卡片边到第一处墨"跨卡片**不是同一个量** —— 首行是开关、是图标、还是两行说明，
+                // 都会把它推高（实测合法值一路到 17.5 与 33.0：`recommendations-tall 段2 下=17.5`、
+                // `general-login-unsupported 段1 上=33.0`）。给它写一个上界就是拿一把
+                // 跨种类的尺去要一个数（R100 的 D-160 与"同种元素才互相抵消侧边距"同一课），
+                // 所以那条上界今天删掉，理由留在这里，别下一次又补回来。
+                //
+                // 10.0pt 这个下界是量出来的，不是最优阈值：bug 那一档是 7.0（= 没补留白），
+                // 全 suite 合法最小值是 12.5 ⇒ 10 离两边都有 2.5pt 以上。
+                for (which, edge) in [("上", edges.first ?? 0.0), ("下", edges.last ?? 0.0)] {
+                    XCTAssertGreaterThanOrEqual(edge, 10.0,
+                        "\(fixture.name) \(tag) 段\(index + 1) 的\(which)留白 \(String(format: "%.1f", edge))pt"
+                        + " 低于 10.0pt ⇒ 这张卡片的上下留白掉回「没补 `.settingsCardInset()`」那一档"
+                        + "（实测：补了的是 12.5~14.5，挂到材质外面去的是 7.0）。"
+                        + "最常见的原因就是那 7pt 被挂到了 `GroupBox` 外面，见 Round 101 §3。")
                 }
                 guard dividers >= 2 else {
                     emit("CARD_RHYTHM_NO_DIVIDER \(fixture.name) \(tag) 段\(index + 1)"
@@ -6469,6 +6494,11 @@ final class UICaptureTests: XCTestCase {
         // 地板从"有没有读到材质"推，不从"量到了几格"推（后者是恒真式）。
         var cells = 0
         var materialCells = 0
+        // R101：`materialCells` 拆成两半 —— 参照（`cardprobe-*`）与被告（`settings-*`）。
+        // 两者的"有没有材质"在 runner 上是**两个不同的事实**（参照亮档有、被告全无），
+        // 混成一个数就会让"没有对象"与"没有对照"共用一个闸门（见调用点那段注释）。
+        var controlMaterial = 0
+        var defendantMaterial = 0
         for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
                                   (NSAppearance.Name.darkAqua, "dark")] {
             for fixture in fixtures(appearance: appearance) {
@@ -6498,7 +6528,17 @@ final class UICaptureTests: XCTestCase {
                                                      rect: band, scale: scale,
                                                      pageLuma: pageLuma)
                 cells += 1
-                if fill >= 0 { materialCells += 1 }
+                if fill >= 0 {
+                    materialCells += 1
+                    // R101 / 读 R100 的 CI（run 38927822527）：这一格把**被告**与**参照**分开数。
+                    // 上一版只数一个 `materialCells`，而 runner 上它是 2 —— 那两格全是参照
+                    //（`cardprobe-groupbox-default` 亮档量出了 6.0pt 内缩），被告 24 格全报
+                    // "读不到卡片"。于是 `measured.count >= min(16, materialCells)` 变成
+                    // "0 ≥ 2" ⇒ 红，而 skip 那一格（`materialCells == 0`）没响 ——
+                    // **闸门与地板吃了不同的量，闸门就白装**（D-161 只修了一半：
+                    // 它把地板从上游推，却没问"上游那一格里哪些是被告"）。
+                    if isProbe { controlMaterial += 1 } else { defendantMaterial += 1 }
+                }
                 // 与纵向那一格**同一句打印**（`fillCandidatesLine` 是纯函数，两处共用）：
                 // 横向这把尺是本轮新写的，它和纵向那把在 runner 上必须报同一种形状，
                 // 否则"两把尺问同一件事而结论相反"就又得靠猜（R87 那一族的分配规则）。
@@ -6559,24 +6599,13 @@ final class UICaptureTests: XCTestCase {
             "\($0)=\(String(format: "%.1f", measured[$0]!))"
         }.joined(separator: " "))
         if !declined.isEmpty { emit("CARD_INSET_DECLINED " + declined.joined(separator: " ")) }
-        emit("CARD_INSET_CAPABILITY 候选=\(cells) 有材质=\(materialCells) 量到=\(measured.count)"
-             + " 未判=\(declined.count)")
-        // 同一台机器的同一件事（BACKLOG 147）：runner 上一格材质都读不到 ⇒ 这条判据没有对象。
-        // 不许静默通过，也不许把它当产品缺陷永久红 —— 以 skip 的形式响。
-        if materialCells == 0 {
-            throw XCTSkip("这台机器拍不出任何卡片材质：\(cells) 格候选全报「读不到卡片」"
-                              + " ⇒ 横向内缩这条判据没有对象。本机读到 \(measured.count) 格。"
-                              + "与纵向那格同一族，见 BACKLOG 147。")
-        }
-        // 这一格先只钉"这把尺至少量到了东西"：参照与卡片都必须有读数，否则无从判起。
-        XCTAssertFalse(control.isEmpty, "系统参照一张都没量出来 ⇒ 这条判据没有对照，不许报干净")
-        XCTAssertGreaterThanOrEqual(measured.count, min(16, materialCells),
-                                    "本机读到 \(materialCells) 格材质却只量到 \(measured.count) 格内缩"
-                                    + " ⇒ 有对象没量到（地板从材质那一关推，不从名单推）")
-        XCTAssertEqual(2, control.count, "系统参照必须亮暗两档各一条（借来的常数没有这个性质）")
+        emit("CARD_INSET_CAPABILITY 候选=\(cells) 有材质=\(materialCells)"
+             + "（被告=\(defendantMaterial) 参照=\(controlMaterial)）"
+             + " 量到=\(measured.count) 未判=\(declined.count)")
         // **绝对锚点**（M559 那一刀教出来的）：参照那一格的左沿必须落在夹具自己声明的
         // `.padding(24)` 上。等式判据看不见"整把尺一起偏"，这一格看得见。
-        // 容差 1pt = 两像素，给抗锯齿与 2x 量化留的。
+        // 它排在所有闸门**之前**：这一格要判的是"仪器有没有错位"，与"这台机器画不画得出材质"无关，
+        // 也不该被后者的 skip 吃掉。容差 1pt = 两像素，给抗锯齿与 2x 量化留的。
         for tag in ["light", "dark"] {
             guard let bezel = probeBezel[tag] else { continue }
             XCTAssertEqual(24.0, bezel, accuracy: 1.0,
@@ -6585,12 +6614,40 @@ final class UICaptureTests: XCTestCase {
                                + "（圆角那一族：材质带压在卡片顶时读的是弧线不是直边，"
                                + "本轮修之前实测读成 31.5pt）。等式那一格对这种错法免疫，这一格不免疫。")
         }
+        // 两件事分开判（R101 / 读 R100 的 CI 学到的那一格）：
+        // ① **对照缺席**：参照一格都没量出来，而被告却有材质 ⇒ 等式没有对面，不许报干净。
+        //    M558（把 `isProbe` 关掉）红在这一格 —— 它撤的是对照，不是对象。
+        if controlMaterial == 0 && defendantMaterial > 0 {
+            XCTFail("系统参照一张都没量出来，而 \(defendantMaterial) 格被告卡片有材质"
+                    + " ⇒ 这条判据没有对照，不许报干净（借来的常数没有这个性质）")
+        }
+        // ② **没有对象**：被告格里一格材质都读不到 ⇒ 这台机器看不见这扇窗口的卡片，等式无从判起。
+        //    runner 就是这个形状（24 格全报"读不到卡片"，而参照亮档量得出 6.0pt）⇒ 响成 skip，
+        //    不是永久红（R99 那条常量地板 8 的伤），也不是静默通过（BACKLOG 43 那一族）。
+        if defendantMaterial == 0 {
+            throw XCTSkip("这台机器拍不出**被告**的卡片材质：\(cells) 格候选里被告全报「读不到卡片」"
+                              + "（参照有 \(controlMaterial) 格量到了 ⇒ 不是尺瞎，是这扇窗口的材质层"
+                              + "在这台机器上不显）。横向内缩这条判据没有对象，见 BACKLOG 147。")
+        }
+        // ③ **参照必须亮暗两档各一条**（这一条 R100 的 CI 上红过，红在 `("2") is not equal to ("1")`；
+        //    R101 重写角色分账时我把它**整条弄丢了** —— 不是决定撤掉，是编辑掉的，
+        //    由收尾那次「HEAD 的每一行是否都还在」的多重集包含检查抓回来，见 U-289）。
+        //    它现在排在 skip **之后**：runner 那一台被告没有材质 ⇒ 等式本来就不判，
+        //    在那里红一条"参照只亮了一档"说的仍不是产品（R100 那三朵红的原样）。
+        //    放在本机这一侧才有意义：本机两档都拍得出参照，缺哪一档都是夹具或渲染坏了。
+        XCTAssertEqual(control.count, 2,
+                       "系统参照必须亮暗两档各一条（借来的常数没有这个性质）"
+                       + " ⇒ 现在只有 \(control.keys.sorted())：夹具少亮一档，等式就是拿一档去比两档")
+        // 这一格先只钉"这把尺至少量到了东西"：地板从**被告那一关**推，不从名单推。
+        XCTAssertGreaterThanOrEqual(measured.count, min(16, defendantMaterial),
+                                    "被告读到 \(defendantMaterial) 格材质却只量到 \(measured.count) 格内缩"
+                                    + " ⇒ 有对象没量到（地板从材质那一关推，不从名单推）")
         // 未判名单必须**小**：它原来装着 5 格，其中两格（`login-unsupported` 暗档、
         // `login-failed`）是"禁用态读不到墨"—— 那是上一段那条 26pt 带子的错，
         // 不是产品的错（换成整张卡片内沿后它们量出了 5.0pt）。
-        // 剩下三格是「统计」：那一屏**没有卡片**（热图网格不是 `GroupBox`，R97 / D-155），
-        // 所以"读不到卡片"是正确答案，但它必须是**被数出来**的正确答案，不能是沉默。
-        XCTAssertLessThanOrEqual(declined.count, 6,
+        // R101 起「统计」两档也有卡片了（BACKLOG 131 结案），所以这一格从 6 收紧到 4：
+        // 剩下的应当只有"卡片贴到窗口底"那一族。
+        XCTAssertLessThanOrEqual(declined.count, 4,
                                  "未判 \(declined.count) 格：\(declined.joined(separator: " "))")
         // **等式，不是阈值**：BACKLOG 138 那句"macOS 通常 16–20pt"从来没有出处，
         // 而本轮量出来的系统自己那一档是 5.5pt（亮暗两档同一个数，且 12..64 的墨门限都给出
@@ -6598,10 +6655,36 @@ final class UICaptureTests: XCTestCase {
         // 所以判据写成"与系统参照同档"，而不是"≥16"：后者会把产品推得**更不原生**，
         // 而那正是这条目标（优先系统 API / 原生材质）的反方向。
         // 1.0pt 的容差是给抗锯齿留的：卡片左沿与第一个字形各自有 ±0.5pt 的量化误差。
+        //
+        // **首墨是图标的那一格不能套这条等式**（R101 新撞出来的，量出来的数在下面的串里）：
+        // 这把尺问的是"卡片左沿到第一处墨"，而空态那一臂的第一处墨是 `StateLine` 的托盘符号。
+        // 同一张 `GroupBox`、同一份前导留白，图标那一列的**字形侧边距**比文字多约 1pt
+        //（实测：亮 6.5 对文字参照 5.0 = +1.5；暗 6.5 对 5.5 = +1.0），
+        // 而它旁边那一臂（`settings-stats-populated`，首墨是文字）量到 5.5 = 与参照同档。
+        // 处理方式**不是**放宽等式的容差（那会把其余 23 格一起放宽），也不是把它塞进未判名单
+        //（那是把一条能判的格记成"没判"）—— 换成给这一格一条**有界的**替代判据：
+        // 图标 bearing 必须落在 [+0.5, +2.0]。产品如果真改了前导留白，这一格照样会红；
+        // 而如果这一屏哪天首墨变成文字，`>= +0.5` 也会红，逼下一次把名册改掉。
+        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]
         for (key, inset) in measured.keys.sorted().map({ ($0, measured[$0]!) }) {
             let tag = key.hasSuffix("dark") ? "dark" : "light"
             guard let want = control[tag] else {
                 XCTFail("\(key)：参照缺席（\(tag) 档没量到）⇒ 这一格没有资格报干净")
+                continue
+            }
+            if iconFirstCells.contains(key) {
+                let delta = inset - want
+                XCTAssertGreaterThanOrEqual(delta, 0.5,
+                                            "\(key) 的首墨是空态图标，量到 \(inset)pt 对文字参照 "
+                                            + "\(want)pt = \(String(format: "%+.1f", delta))pt，"
+                                            + "低于 +0.5 ⇒ 图标的侧边距没理由比文字还小：先怀疑这把尺"
+                                            + "（或者这一屏的首墨已经变成文字了 —— 那就把这一格从名册里删掉）")
+                XCTAssertLessThanOrEqual(delta, 2.0,
+                                         "\(key) 的首墨是空态图标，量到 \(inset)pt 对文字参照 "
+                                         + "\(want)pt = \(String(format: "%+.1f", delta))pt，高于 +2.0"
+                                         + " ⇒ 这一屏的前导留白与其余卡片不是同一档（本轮 131 刚把它们对齐）")
+                emit("CARD_INSET_ICON_FIRST \(key) 内缩=\(String(format: "%.1f", inset))"
+                     + " 文字参照=\(String(format: "%.1f", want)) 侧边距=\(String(format: "%+.1f", delta))")
                 continue
             }
             XCTAssertEqual(inset, want, accuracy: 1.0,
@@ -7030,11 +7113,16 @@ final class UICaptureTests: XCTestCase {
     /// 每条都有墨占比地板兜底：布局一动，框贴到空白上会红在"框里没有字"，不会红成一个假对比度。
     static let captionInkProbes: [InkProbe] = [
         InkProbe(fixture: "heatmap-populated", what: "月份刻度 9月/10月/11月…（读不出月份就读不出这张图）",
-                 rect: CGRect(x: 40, y: 72, width: 380, height: 16)),
+                 // R101 / BACKLOG 131：整列**上移 20pt** —— 「每日复制」这行标题从组件里搬到了
+                 // 卡片之上（`DailyCopyHeatmapView.header` 现在只剩汇总行）。
+                 // 逐带对过（亮档，同一把带子：旧 34.5..47.5 是标题、54..64 汇总、78.5..88 月份、
+                 // 199..209 图例；新 34..44 汇总、58.5..68 月份、179..189 图例 ⇒ 除标题那一带消失之外
+                 // 每一带都 -20.0pt，位移是量出来的不是推的）。
+                 rect: CGRect(x: 40, y: 52.5, width: 380, height: 16)),
         InkProbe(fixture: "heatmap-populated", what: "星期刻度 一/三/五/日",
-                 rect: CGRect(x: 10, y: 90, width: 26, height: 90)),
+                 rect: CGRect(x: 10, y: 70, width: 26, height: 90)),
         InkProbe(fixture: "heatmap-populated", what: "图例「少 / 多」（颜色深浅的唯一标尺）",
-                 rect: CGRect(x: 12, y: 196, width: 25, height: 14)),
+                 rect: CGRect(x: 12, y: 176, width: 25, height: 14)),
         // R33 / BACKLOG 34③：菜单栏面板上那两段 11pt 的 `.secondary`。
         // 带是从帧的 `rows` 剖面上放的（不是猜的）：标题 116–130、副标题 142–155、行右端 meta 186–202。
         // 判"要读的"还是"装饰"写在账本里：副标题是这一列的**标题**（没有它，三条就是一堆莫名出现的记录），
@@ -7088,7 +7176,10 @@ final class UICaptureTests: XCTestCase {
         InkProbe(fixture: "settings-recommendations", what: "推荐页第一段说明（权重是干什么用的）",
                  rect: CGRect(x: 150, y: 146, width: 560, height: 10)),
         InkProbe(fixture: "settings-stats-populated", what: "统计页热图上头那句说明（有数据那一臂）",
-                 rect: CGRect(x: 150, y: 98, width: 560, height: 11)),
+                 // R101 / BACKLOG 131：这一屏补了卡片 ⇒ 汇总行**下移 25pt**（旧带 98.0..108.0，
+                 // 新带 123.0..133.0），而分区标题那一带**逐像素没动**（两版都是 78.5..91.5）——
+                 // 这正好是这次改动的形状：标题留在卡片之上，卡片自己的上沿与内缩把其余内容顶下去 25pt。
+                 rect: CGRect(x: 150, y: 122.5, width: 560, height: 12)),
         InkProbe(fixture: "detail-0-text", what: "详情头部 meta（时间 · 大小 · 来源）",
                  rect: CGRect(x: 0, y: 36, width: 720, height: 12)),
           // 列表行第二行 meta（复制时间）**不在这里** —— R35 量出来那一列压在

@@ -624,17 +624,17 @@ struct SettingsView: View {
 
     // MARK: - Data Section
 
-    /// 「统计」这一页（新功能 / 阶段一）。
+    /// 「统计」这一页（新功能 / 阶段一；R101 起这一屏也守"卡片"那套语言，见 BACKLOG 131）。
+    @ViewBuilder
     private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // 刻意**不再加一行分区标题**：卡片自己写着「每日复制」，
-            // 上面再顶一个「每日复制热图」就是同一屏两个标题（第一版离屏帧实测就是这样）。
-            if let dailyCopyLedger {
-                DailyCopyStatsSection(ledger: dailyCopyLedger)
-            } else {
-                // 拿不到账本时不许画一张全灰的图冒充"你这半年什么都没复制"。
-                StateLine(kind: .error, message: "统计不可用：没有拿到按日账本。")
-            }
+        // 分区标题与卡片**都由 `DailyCopyStatsSection` 自己摆**：胶片探针驱动的就是那一层
+        // （`MotionFilmstripTests` 的 `heat-first-record`），标题如果留在这一侧，
+        // 探针看到的就是一副没有头的骨架 —— 那一族在仓库里记过（第二轮 N-1 的守卫绕开 adapter）。
+        if let dailyCopyLedger {
+            DailyCopyStatsSection(ledger: dailyCopyLedger)
+        } else {
+            // 拿不到账本时不许画一张全灰的图冒充"你这半年什么都没复制"。
+            StateLine(kind: .error, message: "统计不可用：没有拿到按日账本。")
         }
     }
 
@@ -966,31 +966,54 @@ struct DailyCopyStatsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
-            // 一个时刻有两个来源，跨午夜与注入时钟时都会分叉。
-            DailyCopyHeatmapView(counts: ledger.counts, today: ledger.today)
-            if let error = ledger.lastWriteError {
-                // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
-                // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
-                Text("统计写入失败：\(error)")
-                    .font(.system(size: VisualFont.meta))
-                    .foregroundStyle(.secondary)
-            }
+            // R101 / BACKLOG 131：这一屏以前是整扇设置窗口里**唯一没有卡片**的一屏 ——
+            // 通用 / 快捷键 / 隐私 / 数据 都是"分区标题裸在页面上 + 内容在 `GroupBox` 里"，
+            // 而只有这一屏把热图、图例、说明段整块铺在页面底上，中间那条 `Divider()`
+            // 压在背景上（R92 逐屏量过：统计 0 张卡片 / 外 1 条线）。
+            // **为什么这条值得单独改**：那三条卡片判据（竖向节奏 R95、卡片外几段墨 R99、
+            // 横向内缩 R100）的前提都是"这一屏有卡片材质"，没有卡片的屏对它们是
+            // `CARD_RHYTHM_DECLINED` —— 于是"这一屏不受这扇窗口的规矩管"这件事**读不出来**，
+            // 它一直"通过"。补上卡片之后它第一次被同一颗尺子量到。
+            // 标题为什么在**卡片之上**而不是卡片里面：见 `DailyCopyHeatmapView.header` 的注释
+            // （整块包进卡片那一版会让这一屏变成全窗口唯一"标题在卡片内"的一屏，
+            // 而它自己那条 `CARD_ABOVE` 红当场把这件事报了回来）。
+            Text("每日复制")
+                .font(.system(size: VisualFont.title, weight: .semibold))
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
+                    // 一个时刻有两个来源，跨午夜与注入时钟时都会分叉。
+                    DailyCopyHeatmapView(counts: ledger.counts, today: ledger.today)
+                    if let error = ledger.lastWriteError {
+                        // 写盘失败只影响"下次打开还在不在"，不影响这一屏 —— 但必须说出来，
+                        // 否则它会悄悄停在几天前，而那正是统计类界面最坏的坏法。
+                        Text("统计写入失败：\(error)")
+                            .font(.system(size: VisualFont.meta))
+                            .foregroundStyle(.secondary)
+                    }
 
-            // 「这张图怎么读」**跟着图一起出现**（R9，离屏帧实测）：空账本那一屏原来是
-            // "还没有可统计的记录 —— 复制几条之后这里会长出一张日历" + 分隔线 +
-            // 五行"一列是一周，一行是一个星期几…" —— 教用户读一张**不在这里**的图，
-            // 与阶段一那条"共 0 次"是同一族（两条互相矛盾的表达同时说话，U-30 缺陷 5）。
-            //
-            // 为什么写在这一层而不是 `SettingsView.statsSection`：**只有这一层观察账本**。
-            // 挂在 `SettingsView.body` 上读到的是"开页那一刻的快照条件"，
-            // 用户复制第一条之后它不会重算 ⇒ 图长出来了、说明却永远不出现（新的一种"变了但界面不说"）。
-            if !ledger.counts.isEmpty {
-                VStack(alignment: .leading, spacing: 16) {
-                    Divider()
-                    readingGuide
+                    // 「这张图怎么读」**跟着图一起出现**（R9，离屏帧实测）：空账本那一屏原来是
+                    // "还没有可统计的记录 —— 复制几条之后这里会长出一张日历" + 分隔线 +
+                    // 五行"一列是一周，一行是一个星期几…" —— 教用户读一张**不在这里**的图，
+                    // 与阶段一那条"共 0 次"是同一族（两条互相矛盾的表达同时说话，U-30 缺陷 5）。
+                    //
+                    // 为什么写在这一层而不是 `SettingsView.statsSection`：**只有这一层观察账本**。
+                    // 挂在 `SettingsView.body` 上读到的是"开页那一刻的快照条件"，
+                    // 用户复制第一条之后它不会重算 ⇒ 图长出来了、说明却永远不出现（新的一种"变了但界面不说"）。
+                    if !ledger.counts.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Divider()
+                            readingGuide
+                        }
+                        .transition(MotionCatalog.transition(for: .contentFade))
+                    }
                 }
-                .transition(MotionCatalog.transition(for: .contentFade))
+                // 留白必须落在**材质之内**：`.settingsCardInset()` 是 `padding(.vertical, 7)`，
+                // 挂在 `GroupBox` 外面就等于给卡片外面加了一段空隙，而材质自己那 7pt 一分没多。
+                // 这不是风格问题 —— 节奏尺当场量出来了：挂外面这一版 `边距=7.0/7.0`，
+                // 而其余五张卡片都是 `14.5/14.0`（= GroupBox 自带的 7 + 这 7）。
+                // 与 `RecommendationWeightsView` / 快捷键 / 隐私 那五处同一写法。
+                .settingsCardInset()
             }
         }
         // 这一条驱动的是**本层那个 if**（说明块 + 分隔线），不是组件内部的两臂 ——

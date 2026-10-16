@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R100 补的第二张变异表：能力闸门与诊断通道都要有牙（M560 / M561 / M562）。
+"""R100 补的第二张变异表：能力闸门与诊断通道都要有牙（M561 / M562）。
+
+**M560 已于 R101 退役**（不是删了就完，这里写下它为什么不再存在）：
+R101 把横向判据里 M560 钉的那一行 —— `if fill >= 0 { materialCells += 1 }` —— 换成了
+按角色分账的 `if isProbe { controlMaterial += 1 } else { defendantMaterial += 1 }`
+（读 R100 的 CI run 38927822527 发现参照与被告混成一个数会让 skip 闸门在 runner 上不响）。
+needle 因此命中 0 次 ⇒ `MUTATE_TABLE n=3 caught=2 not_run=1` ⇒ 电池 `MUT_EXIT=1`。
+**这一格没有白丢**：它要钉的那句话（"这台机器拍不出被告的卡片材质 ⇒ 必须 skip，
+不许把『没跑』重新记成『通过』"）由 `mutate_r101.py` 的 **M564** 接手，
+而且接手的那一条比原句更准 —— M564 只归零**被告**，M565 归零**参照**必须红，
+两个方向各有一刀，R100 那一格的混账形状本身也被钉住了。
+电池按设计响了：DID-NOT-RUN 不算通过（R94 立的规矩），所以我没有把它当"少一刀而已"混过去。
 
 为什么单独一张表、而且**每臂的期望不一样**：
 
-M560 / M561（期望 = SKIP，不是红也不是绿）
+M561（期望 = SKIP，不是红也不是绿）
   R100 把「这台机器看不见卡片材质」从永久红改成 `throw XCTSkip`。
   skip 是一种**看起来像通过**的收场 —— 报表上它只多一个 `skipped=` 计数。
   所以「没对象时要响」这句话本身必须能被证伪：
   **把能力信号强行归零，判据必须变成 skipped；如果它还是 passed，那 skip 那一格就是假的
   （等于把「没跑」重新记成「通过」，正是 BACKLOG 43 那一族）。**
-    M560 横向判据：`materialCells` 强行归零 ⇒ 必须 skip
-    M561 竖向判据：同样归零 ⇒ 必须 skip
+    M561 竖向判据：能力信号强行归零 ⇒ 必须 skip
 
 M562（期望 = CAUGHT）
   本轮新加的 `CARD_FILL_CANDIDATES`（BACKLOG 147 的成因通道）是一条**会被打印**的读数，
@@ -27,9 +37,9 @@ M562（期望 = CAUGHT）
   所以 147 的这条通道在**本机**只有真值表这一层保护；它真正的验收发生在下一次 CI run
   读到这一行的那一刻（见 AGENT_BACKLOG.md 147 与 `.scratch/motion-audit-2/r100_ci_readings.md` §④）。
 
-反向对照（证明 skip 不是无条件发生的）：预检不注入 ⇒ M560/M561 的目标必须 passed。
+反向对照（证明 skip 不是无条件发生的）：预检不注入 ⇒ M561/M562 的目标必须 passed。
 
-跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r100b.py [M560 ...]
+跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r100b.py [M561 ...]
 退出码：0 = 每一臂都拿到**它自己那一条**期望的 verdict，且还原干净。
 """
 import os
@@ -40,19 +50,15 @@ ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 HARNESS = "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-H_INSET = "UICaptureTests/testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox"
 V_RHYTHM = "UICaptureTests/testSettingsCardVerticalRhythmIsOneNumber"
 T_TABLE = "UICaptureTests/testFillCandidatesSeparatesNoMaterialFromMaterialTooCloseToPage"
 
 # (编号, 说明, 文件, needle, 替换, 目标测试, 期望 verdict)
-# **needle 不能靠缩进区分这两格**：12 空格那一串是 16 空格那一串的**子串**，
-# 所以"浅缩进"那一支永远命中 2 次 ⇒ DID-NOT-RUN（本轮第一次跑就是这样，脚本拒绝注入是对的）。
+# **needle 不能靠缩进区分**：12 空格那一串是 16 空格那一串的**子串**，
+# 所以"浅缩进"那一支永远命中 2 次 ⇒ DID-NOT-RUN（R100 第一次跑就是这样，脚本拒绝注入是对的）。
 # 区分要靠**上一行**（`cells += 1` 对 `settingsCells += 1`），这两格的上一行本来就不同。
+# M560 退役后这一列只剩竖向那一格，`settingsCells += 1` 那一条仍然是唯一的。
 ARMS = [
-    ("M560", "横向判据：能力信号强行归零 ⇒ 必须 skip（不许 passed、不许红）", HARNESS,
-     "                cells += 1\n                if fill >= 0 { materialCells += 1 }",
-     "                cells += 1\n                if fill >= 0 { materialCells += 1 }\n                materialCells = 0",
-     H_INSET, "SKIPPED"),
     ("M561", "竖向判据：能力信号强行归零 ⇒ 必须 skip（不许 passed、不许红）", HARNESS,
      "            settingsCells += 1\n            if fill >= 0 { materialCells += 1 }",
      "            settingsCells += 1\n            if fill >= 0 { materialCells += 1 }\n            materialCells = 0",
@@ -63,7 +69,7 @@ ARMS = [
      T_TABLE, "CAUGHT"),
 ]
 
-PREFLIGHT = [(H_INSET, "PASSED"), (V_RHYTHM, "PASSED"), (T_TABLE, "PASSED")]
+PREFLIGHT = [(V_RHYTHM, "PASSED"), (T_TABLE, "PASSED")]
 
 
 def run(test_filter, timeout=2400):
@@ -108,7 +114,7 @@ def main():
     originals = {p: read(p) for p in paths}
     snapshots = {p: open(os.path.join(ROOT, p), "rb").read() for p in paths}
 
-    print("=== 预检（不注入：三处都必须是 passed）===", flush=True)
+    print("=== 预检（不注入：两处都必须是 passed）===", flush=True)
     ok = True
     for test, want in PREFLIGHT:
         verdict, out, note = run(test)

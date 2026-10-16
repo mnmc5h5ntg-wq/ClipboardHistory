@@ -35,14 +35,17 @@ struct DailyCopyHeatmapView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            header
-
             if counts.isEmpty {
                 // 空态必须说"为什么是空的"，而不是画一片灰格子。
                 // 一片灰格子读起来像"我这半年一次都没复制"，而事实是"这里还没开始记"。
                 StateLine(kind: .empty, message: "还没有可统计的记录 —— 复制几条之后这里会长出一张日历。")
                     .transition(MotionCatalog.transition(for: .contentFade))
             } else {
+                // 汇总行**只在这臂存在**（见 `header` 的注释），所以它被搬进 `else` 里：
+                // 空态那一臂如果还留着 `header`，那是一格零高度的占位，
+                // 而外层 `VStack(spacing: 10)` 照样会为它付 10pt —— 卡片里就会多出一条
+                // 看不见的顶部留白（R101 之前标题在这一格里，那 10pt 是有主的）。
+                header
                 VStack(alignment: .leading, spacing: 10) {
                     gridSection
                     footer
@@ -61,15 +64,18 @@ struct DailyCopyHeatmapView: View {
 
     // MARK: - 头部
 
-    /// 标题 + 汇总行。
+    /// 汇总行（**标题不在这儿了** —— R101 / BACKLOG 131）。
+    ///
+    /// 「每日复制」搬到了 `DailyCopyStatsSection`，作为**卡片之上**的分区标题：这扇窗口其余四屏
+    /// （通用 / 快捷键 / 隐私 / 数据）的语法都是"标题裸在页面上 + 内容在 `GroupBox` 里"，
+    /// 而这条语法由判据 `CARD_ABOVE`（卡片顶之上恰好 1 段墨）钉着。标题留在组件里的那一版
+    /// 会把这一屏变成全窗口唯一"标题在卡片内"的一屏 —— 那一版的红与帧都记在 Round 101 §2。
     ///
     /// 汇总行**只在有数据时出现**：阶段一的帧里它是"最近 26 周共 0 次 · 日均 0.0 次 · 连续 0 天"，
     /// 压在"还没有可统计的记录"上面 —— 同一屏两条互相矛盾的表达，
     /// 而且第二条（空态那句）才是用户需要知道的。零不是信息，"还没开始记"才是（U-30 缺陷 5）。
     private var header: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("每日复制")
-                .font(.system(size: VisualFont.title, weight: .semibold))
+        Group {
             if let line = DailyCopyHeatPolicy.summaryLine(for: summary,
                                                           hasRecords: !counts.isEmpty) {
                 Text(line)
