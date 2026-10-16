@@ -7616,3 +7616,70 @@ UI_PROBE_CHANNELS_AGREE=1 （两条通道点的是同一批 ⇒ 心跳那条不�
   那 6 行的内容本轮没按步骤名逐条读 —— U-178）。
 - **124** 第②步、**127** 的正对照、**126**/119/121/116/115/111/108/77b/101/106；
   真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.1 / 72.2 / 73.1 / 73.2。
+
+## Round 93 · 那朵"有名字的红"被正对照判掉了：KeyViewProxy 不是行代理（结案 127 / 新开 133、134 / 更新 132 / U-216…U-217 / D-151）
+
+### 1. 头条：127 的两种成因里是 ②，而判它的办法是**先造一把会打数的尺**
+
+R91 收尾时我写下"main 带着一朵有名字的红，是有意的"。这一轮它被**证据**判掉，不是被静音：
+
+```
+ROW_PROXY_CENSUS 侧栏@窗口320pt 宿主=320pt 代理=2 行=1 首行各代理宽=[148+148]
+ROW_PROXY_CENSUS 侧栏@窗口250pt 宿主=250pt 代理=2 行=1 首行各代理宽=[113+113]
+ROW_PROXY_LISTROWS 行视图=11 个，前 3 个={{0, 10}, {320, 66}} {{0, 76}, {320, 51}} {{0, 127}, {320, 66}}
+ROW_PROXY[0] frame={{12,50.5},{148,25}} acceptsFirstResponder=false next=KeyViewProxy@{{160,50.5},{148,25}} 父链=KeyViewProxy ← NSHostingView
+ROW_PROXY_CONTRAST 浮层(NSTableView) 代理=0 行=0 每行代理数=
+```
+
+三条事实：11 行的树里只有 **2 个** `KeyViewProxy`（行是 `ListTableRowView`，11 个、整行宽 320pt）；
+两个都 `acceptsFirstResponder=false`；半宽**跟着宿主缩放**（320→148+148、250→113+113）且父视图是
+`NSHostingView`。⇒ 那是 SwiftUI 宿主级的 key-view 代理，**不是行代理**；
+"Tab 一行停两次 / VoiceOver 一行读两段"这件事没有发生。
+
+修法按 127 自己立的规矩：不许把 `宽 200…290` 放宽成"148 也行"（那是拿判据讨好现状），
+而是改成点**真正的行视图** —— 这条判据要的从来是"用户点一行"。
+改后 `testSidebarListFocusRingAfterClick` = `passed (0.738 seconds)`，
+整卷 `Executed 11 tests, with 3 tests skipped and 0 failures`。
+
+### 2. U-216 / U-217（我自己错掉、被读数纠正的两条）
+
+- **U-216**：正对照第一版只走 `nextKeyView` 链，读到"链里两个代理都在同一行"就准备写
+  "Tab 在同一行停两次"。`acceptsFirstResponder=false` 一起打出来之后才知道
+  **在链上 ≠ 会被停在上面**（链是视图自己声明的下一站，停不停由 responder 判定决定）。
+  ⇒ 读数现在同时打这两个字段；"后果"要由能拒绝的那一栏签。
+- **U-217**：名册的 `can/cannot` 我没有按字典序翻。R91 的 CI 只数出"六条有结论"，
+  **名字**在被 SIGKILL 带走的那块缓冲里；把"应该是这六条"登记成事实，就是 R87 明令禁止的
+  "没量过的推断"。⇒ 本轮只把 11 条 reason 改成实测成因（六条跑到、第七条开口没闭口），
+  翻转等 R92 的 CI 逐条印出名字之后做（134）。翻错会被 `NOW_RUNS`/`NOT_RUN` 挡回来。
+
+### 3. 真实看图：快速选择浮层（逐元素，带坐标）
+
+正文在 `.scratch/motion-audit-2/r93_visual_review_quickpick.md`。本轮产品文件 **0 个**
+⇒ 复用的是 R92 那次捕获的帧（先量产品=0 才有资格复用）。三条结论：
+- 选中行胶囊 (22,46)..(398,80)pt、填充亮 220 / 暗 70、对比 12.56 / 8.36 ⇒ 达标，**不加描边不加动效**；
+- 面板下方约 180pt 空白**不缩**：每次输入都改面板尺寸就是抖动，这是刻意的"不动"；
+- 搜索框那层灰底是**夹具全选高亮**（`field.stringValue = query` 的副作用），不是产品样式
+  ⇒ 新开 **133**：它可能一直在污染 R76 那条"焦点把占位符调淡"的墨移动量读数。
+
+### 4. 牙
+
+本轮没有新的会红判据（改的是"一把没校准的尺"→"真正的行视图"，加的是**只打数不判产品**的诊断），
+所以电池没跑；取而代之的是两条自证：
+① 诊断判据自带分组真值表（差 1pt 必须并、差 25pt 必须分）—— 分组写反会正好抹掉要看的东西；
+② 名册改动由 `probe_coverage_gate.py` 自己判（`REASONLESS`/`STALE`/`NOW_RUNS`/`NOT_RUN`），
+   脚本 `roster_r93.py` 落盘后 `python3 -m unittest discover -s scripts/tests` 181 条全绿。
+
+### 5. 验证（本机，逐条实跑）
+
+- 非台账文件：ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift, scripts/probe_coverage_expectations.json（产品 0 个 ⇒ 不换装，帧按构造不变）
+- 在屏那一卷：`Executed 11 tests, with 3 tests skipped and 0 failures`，其中 3 条 skip = 无障碍诊断 + `FRAME_CHANNEL` 这台机器 0 帧 + 本轮新加的诊断判据
+- 名册：`cases=11`，其中 `can=0`（本轮只改成因，没翻身份 ⇒ 134）
+
+### 6. 仍未解决
+
+- **134**：R92 的 CI（`9c10569`）逐条印出结论名之后翻 `can`。
+- **132**：`testRightClickMenus…` 在 runner 上开口没闭口（本机 2.016 秒跑完）⇒ 下一轮 `sample`。
+- **133**：浮层夹具的全选高亮，以及它是否污染过 R76 那格。
+- **130**：真机 key 窗口下的 accent（红与蓝）那一档。
+- **128** 的 runner 那一半、**129**、**126**、**124** 第②步、**121**、**116** 剩下那半格、
+  **115**、**111**、108 余下、77 路 b、101 ②③、106；真机 68.1 / 68.2 / 69.1 / 70.1 / 71.1 / 72.x / 73.x。

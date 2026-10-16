@@ -2949,6 +2949,17 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
       或者把这条探针删掉 —— 它现在**能跑出结论**，正是 R91 之前所有在屏判据缺的那种东西。
     ⇒ 本轮推上去之后 main 带着这朵红，是有意的：修僵尸探针的意义就是让红能说话。
 
+    → **R93 结案，判的是 ②（判据的期望写错），而且是被正对照判掉的**：
+    新加的诊断判据 `testRowProxyCensusAsksTheConsequenceNotTheShape` 打出
+    `ROW_PROXY_CENSUS 侧栏@窗口320pt 宿主=320pt 代理=2 行=1 首行各代理宽=[148+148]`、`ROW_PROXY_CENSUS 侧栏@窗口250pt 宿主=250pt 代理=2 行=1 首行各代理宽=[113+113]`、`ROW_PROXY_LISTROWS 行视图=11 个，前 3 个={{0, 10}, {320, 66}} {{0, 76}, {320, 51}} {{0, 127}, {320, 66}}`、`ROW_PROXY_CONTRAST 浮层(NSTableView) 代理=0 行=0 每行代理数=`
+    ⇒ 11 行的树里只有 2 个 `KeyViewProxy`（行是 `ListTableRowView`，11 个、整行宽），
+    两个都 `acceptsFirstResponder=false`，半宽还跟着宿主缩放 ⇒ 它们不是行代理，
+    "Tab 一行停两次"没有发生。修法按 127 自己写的规矩来：**没有**把 200…290 放宽成"148 也行"，
+    而是改成点真正的行视图 ⇒ `testSidebarListFocusRingAfterClick` 从红变
+    `passed (0.738 seconds)`，整卷 `Executed 11 tests, with 3 tests skipped and 0 failures`。
+    顺带一条我自己的错（U-216）：第一版只走 `nextKeyView` 链，差点据此说"同一行被停两次" ——
+    **在链上 ≠ 会被停在上面**，现在读数同时打 `acceptsFirstResponder`。
+
 128. **自检夹具覆盖了作业共享 `/tmp`，两道最终闸门连着两次读的是假日志**（R92 开 / 与 92、96、122、125 同族）：
     现象、复现、修法都在 Round 92 正文与 D-150。本机这一半已结：`prepare()` 通配映射 + 三条守卫 +
     闸门三支成因，`HERMETIC_MARKERS_SURVIVED=4/4`，电池 5 CAUGHT / 1 如期 ESCAPED。
@@ -2989,3 +3000,20 @@ M9 的**扫光**、M8 的**后半句**（命中发光）被我一起判成了"�
     **本轮只做到点名**：没在 runner 上 `sample`，所以不写"和 CoreDrag 同一族"。
     R93 的第一格：在 runner 上给这条加一次 `sample`（或把它单独 `--filter` 出来跑一遍），
     分清"挂死"与"慢"；如果是慢，要量的是慢在哪一段，而不是把 240 秒的看门狗放宽。
+
+133. **浮层帧里搜索框带着一层"全选高亮"的灰底，可能污染过 R76 那格的墨移动量**（R93 开 / 与 95、108、116 同族）：
+    夹具走 `field?.stringValue = query` 赋值 ⇒ `quickpick-typed` 与 `quickpick-empty` 两张帧里
+    查询文字外面有一层 rgb(220,220,220)（暗档 70,70,70）的底，块尺寸 26x16pt / 64x16pt。
+    两个后果：① 浮层搜索框的**静置外观**在这条通道里没有帧可看；
+    ② R76 那条 `testOverlaySearchFieldFocusRecedesThePlaceholderAndDrawsNoRing` 比的是"焦点那一档
+    墨移动了多少 pt²"，而一层灰底会同时改变"有墨"的定义 ⇒ 那格的读数可能混着两种成因。
+    本轮**没有**动它：要先给夹具一条"赋值但不选中"的路径（`currentEditor.selectedRange = NSMaxRange…`
+    或改走 `setQuery`），再重跑那格的地板与正对照。不许直接把地板调低。
+
+134. **在屏名册的 `can/cannot` 还欠一次翻转，等 R92 的 CI 逐条印出结论名**（R93 开 / 与 92、128、132 同族）：
+    run 38852286519 只数出"六条有结论"，名字随被 SIGKILL 带走的 stdout 缓冲一起丢了。
+    按字典序猜是哪六条 = 登记没量过的推断（R87 那一课），所以 R93 只改了成因、没翻身份。
+    R92 推送的 `9c10569` 第一次带上"闸门读自己那份日志"的修法 ⇒ 那一步会逐条印出结论名。
+    验收：翻完之后 `probe_coverage_gate.py` 不许报 `NOW_RUNS` 或 `NOT_RUN`；
+    如果它报了，说明翻错，按它点名的那条改回去 —— 这两格存在的理由就是这个。
+

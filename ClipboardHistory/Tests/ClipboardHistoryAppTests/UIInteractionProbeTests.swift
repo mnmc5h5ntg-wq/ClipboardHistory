@@ -893,19 +893,27 @@ final class UIInteractionProbeTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
 
         // 点一行（走的是真实点击路径，和双击时容器拿到焦点是同一件事）。
-        var rowProxies: [NSView] = []
-        func walk(_ view: NSView) {
-            if String(describing: type(of: view)) == "KeyViewProxy",
-               view.frame.width > 200, view.frame.width < 290, view.frame.minX > 30, view.frame.height < 40 {
-                rowProxies.append(view)
-            }
-            for sub in view.subviews { walk(sub) }
+        //
+        // R93 / BACKLOG 127 的正对照之后重写 here：以前这里找的是 `KeyViewProxy` 且要求
+        // 宽 200…290 —— 那个期望写在"这条判据从没跑出过结论"的情况下，而 R93 量到的是：
+        // 一棵 11 行的侧栏树里**只有 2 个** `KeyViewProxy`，都在第一行的 y 带内、各占半宽
+        // （宿主 320 → 148+148；宿主 250 → 113+113），父视图直接是 `NSHostingView`，
+        // 而且两个都 `acceptsFirstResponder=false`。
+        // ⇒ 它们**不是行代理**：行是 `ListTableRowView`（11 个、整行宽）。
+        //    拿一个"恰好落在第一行里的 SwiftUI 宿主级 key-view 代理"当行，是把尺的身份搞错了。
+        //    所以修法不是把 200…290 放宽成"148 也行"（127 里明写不许：那是拿判据讨好现状），
+        //    而是改成点**真正的行视图** —— 这条判据要的是"用户点一行"，与代理无关。
+        var rowViews: [NSView] = []
+        func collectRows(_ view: NSView) {
+            if String(describing: type(of: view)).contains("ListTableRowView") { rowViews.append(view) }
+            for sub in view.subviews { collectRows(sub) }
         }
-        walk(host)
-        guard let row = rowProxies.min(by: { $0.frame.minY < $1.frame.minY }) else {
-            // 失败消息要自带"当时看到了什么"：这条探针红过一次，而"找不到行代理"那五个字
-            // 什么都没告诉我们 —— 是行没画出来，还是行的无障碍结构变了（一行变成两个代理）。
-            // 后者才是真问题，而只有把代理的帧打出来才分得开。
+        collectRows(host)
+        let viewport = host.bounds
+        let clickable = rowViews.filter {
+            $0.frame.width > 200 && $0.frame.height < 90 && viewport.intersects($0.frame)
+        }
+        guard let row = clickable.min(by: { $0.frame.minY < $1.frame.minY }) else {
             var seen: [String] = []
             func dumpAll(_ view: NSView) {
                 let name = String(describing: type(of: view))
@@ -913,10 +921,11 @@ final class UIInteractionProbeTests: XCTestCase {
                 for sub in view.subviews { dumpAll(sub) }
             }
             dumpAll(host)
-            XCTFail("找不到行代理（要求 KeyViewProxy 宽 200…290、高 <40），"
+            XCTFail("找不到可点的行（要求 ListTableRowView 宽 >200、高 <90、与视口相交），"
                     + "宿主 \(host.frame)、窗口内容区 \(window.contentLayoutRect)，"
                     + "实际看到的行相关视图：\(seen.prefix(14))。"
-                    + "如果一行变成**两个**半宽代理，那是无障碍结构的问题，不是探针的几何没调对")
+                    + "行视图整批消失 = 产品的列表实现变了（这条要跟着改）；"
+                    + "还在但几何不满足 = 视口/布局的问题，先看上面那些矩形")
             return
         }
         let windowPoint = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
@@ -957,6 +966,143 @@ final class UIInteractionProbeTests: XCTestCase {
         XCTAssertTrue(listSizedRings.isEmpty,
                       "列表容器上还挂着一圈覆盖整块列表的焦点环（用户要移除的蓝框）。"
                       + "如果这是在 macOS 13 及更早跑出来的：`focusEffectDisabled()` 需要 macOS 14+，那属于平台限制而不是回归。")
+    }
+
+    /// R93 / BACKLOG 127 的正对照：同一颗尺量"一行有几个可焦点代理"，
+    /// 而且**问后果，不问形状** —— Tab 沿真实 key-view 环走一遍，看同一行被停几次。
+    ///
+    /// 为什么这条只打读数、永远记为未运行（BACKLOG 45 那一族）：它回答的是
+    /// "SwiftUI `List` 的一行在这台机器的 AppKit 树里长几个代理、这些代理进不进 key-view 环"，
+    /// 那是**形状与后果的事实**，不是对产品的判决。判决（127 的 ① 还是 ②）拿它当证据，
+    /// 而不是把它当判据 —— 一条会替两种结论都投赞成票的判据没有资格当判据。
+    /// 结论行一律打在 `XCTSkip` **之前**（R53 那一课：先让人读到数，再宣布它不判产品）。
+    func testRowProxyCensusAsksTheConsequenceNotTheShape() throws {
+        try skipUnlessEnabled()
+        // 先钉分组这把尺（不变量先于取值，R64 的规矩）。两个方向都要各自能被证伪：
+        //   · 差 1pt 必须并成一组 —— 否则"一行两个代理"会被读成"两行各一个"，正好抹掉要看的东西；
+        //   · 差 25pt 必须分开 —— 否则整块列表会被读成一行，"每行几个代理"就永远是 1。
+        let sameRow = Self.groupProxies([NSRect(x: 12, y: 50, width: 148, height: 25),
+                                         NSRect(x: 160, y: 51, width: 148, height: 25)])
+        XCTAssertEqual(sameRow.count, 1, "minY 只差 1pt 的两个代理没被算成同一行 ⇒ 分组会把一行读成两行")
+        let twoRows = Self.groupProxies([NSRect(x: 12, y: 50, width: 148, height: 25),
+                                         NSRect(x: 12, y: 75, width: 148, height: 25)])
+        XCTAssertEqual(twoRows.count, 2, "相隔 25pt 的两行被并成了一行 ⇒ 分组会把整块列表读成一行")
+        emit("ROW_PROXY_TRUTHTABLE 同行(差1pt)=\(sameRow.count)组 两行(差25pt)=\(twoRows.count)组 阈值=2pt")
+
+        // 两个宽度各量一遍：如果"两个半宽"是 SwiftUI 的固有形状，它应当**跟着宿主宽度缩放**；
+        // 如果只有一个宽度出现另一半，那更像这一处视图自己的事。（这一条只排除"抄错的常量"这一种解释。）
+        for width: CGFloat in [320, 250] {
+            let store = syntheticStore()
+            let window = NSWindow(contentRect: NSRect(x: 240, y: 200,
+                                                      width: width, height: 460),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+            host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+            window.contentView = host
+            window.makeKeyAndOrderFront(nil)
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            defer { window.orderOut(nil) }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+            var proxies: [NSView] = []
+            func walk(_ view: NSView) {
+                if String(describing: type(of: view)) == "KeyViewProxy" { proxies.append(view) }
+                for sub in view.subviews { walk(sub) }
+            }
+            walk(host)
+            let groups = Self.groupProxies(proxies.map { $0.frame })
+            let widths = groups.first.map { $0.map { String(Int($0.width)) }.sorted().joined(separator: "+") } ?? "-"
+            emit("ROW_PROXY_CENSUS 侧栏@窗口\(Int(width))pt 宿主=\(Int(host.frame.width))pt "
+                 + "代理=\(proxies.count) 行=\(groups.count) 首行各代理宽=[\(widths)]")
+            // 只报"两个半宽"不够定性：它们到底是**同一行的左右两半**（SwiftUI 把一行拆成两个
+            // 可焦点块），还是"表格自己的代理 + 行的代理"叠在同一 y 上（那是两回事，修法也不同）。
+            // 所以把每个代理的父链与行视图的矩形一起打出来 —— 定性要能指着结构读。
+            for (index, proxy) in proxies.enumerated() {
+                var chain: [String] = []
+                var ancestor: NSView? = proxy
+                while let current = ancestor {
+                    let name = String(describing: type(of: current))
+                    if name.contains("Proxy") || name.contains("Row") || name.contains("Table")
+                        || name.contains("List") || name.contains("Hosting") {
+                        chain.append("\(name)@\(NSStringFromRect(current.frame))")
+                    }
+                    ancestor = current.superview
+                }
+                emit("ROW_PROXY[\(index)] frame=\(NSStringFromRect(proxy.frame)) "
+                     + "acceptsFirstResponder=\(proxy.acceptsFirstResponder) "
+                     + "next=\(proxy.nextKeyView.map { String(describing: type(of: $0)) + "@" + NSStringFromRect($0.frame) } ?? "nil") "
+                     + "父链=\(chain.joined(separator: " ← "))")
+            }
+            var rowViews: [String] = []
+            func collectRows(_ view: NSView) {
+                if String(describing: type(of: view)).contains("ListTableRowView") {
+                    rowViews.append(NSStringFromRect(view.frame))
+                }
+                for sub in view.subviews { collectRows(sub) }
+            }
+            collectRows(host)
+            emit("ROW_PROXY_LISTROWS 行视图=\(rowViews.count) 个，前 3 个=\(rowViews.prefix(3).joined(separator: " "))")
+
+            // 后果：从最上面那个代理出发沿**真实 key-view 环**走，最多 60 步，看同一行被停几次。
+            // 这才是用户拿到的东西：链里同一行出现两次 = Tab 一行停两次 = VoiceOver 一行读两段。
+            guard let first = proxies.min(by: { $0.frame.minY < $1.frame.minY }) else {
+                emit("TAB_STOPS_NOT_RUN=NO_PROXY 这台机器这棵树里一个 KeyViewProxy 都没有 ⇒ 这一格没量到")
+                continue
+            }
+            var seen = Set<ObjectIdentifier>()
+            var stops: [NSRect] = []
+            var cursor: NSView? = first
+            for _ in 0..<60 {
+                guard let current = cursor else { break }
+                if seen.contains(ObjectIdentifier(current)) { break }
+                seen.insert(ObjectIdentifier(current))
+                if String(describing: type(of: current)) == "KeyViewProxy" { stops.append(current.frame) }
+                cursor = current.nextKeyView
+            }
+            let stopGroups = Self.groupProxies(stops)
+            emit("TAB_STOPS_FROM_TOP_ROW 走了\(seen.count)步 链里代理=\(stops.count) "
+                 + "覆盖\(stopGroups.count)行 同一行最多被停=\(stopGroups.map { $0.count }.max() ?? 0)次")
+        }
+
+        // 浮层是**另一种实现**（AppKit `NSTableView`，不是 SwiftUI `List`）⇒ 它只能当对照，
+        // 不能当控制："浮层一行一个代理"证明不了"SwiftUI List 一行也该只有一个"。
+        let overlayStore = syntheticStore()
+        let controller = QuickPickController(historyStore: { overlayStore }, commit: { _ in })
+        if let panel = controller.windowForCapture(query: ""), let content = panel.contentView {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            var overlayProxies: [NSView] = []
+            func walkOverlay(_ view: NSView) {
+                if String(describing: type(of: view)) == "KeyViewProxy" { overlayProxies.append(view) }
+                for sub in view.subviews { walkOverlay(sub) }
+            }
+            walkOverlay(content)
+            let groups = Self.groupProxies(overlayProxies.map { $0.frame })
+            emit("ROW_PROXY_CONTRAST 浮层(NSTableView) 代理=\(overlayProxies.count) 行=\(groups.count) "
+                 + "每行代理数=\(groups.map { String($0.count) }.sorted().joined(separator: " "))")
+        } else {
+            emit("ROW_PROXY_CONTRAST_NOT_RUN=QUICKPICK_WINDOW_NIL 浮层没建出窗口 ⇒ 这一格没量到，不是「没问题」")
+        }
+
+        throw XCTSkip("诊断用判据：它只回答「一行几个可焦点代理、Tab 在同一行停几次」，"
+                    + "不判产品 ⇒ 永远记为未运行，避免被当成一条通过的验收（BACKLOG 45 同一族）。"
+                    + "127 的定性（产品缺陷 vs 判据期望写错）由上面那几行读数做。")
+    }
+
+    /// 按 `minY` 把代理分组成"行"：相差 < 2pt 算同一行。
+    /// 单独抽成纯函数是为了让它**先于取值**被真值表判掉（R64 的规矩）——
+    /// 分组写反的话，"每行几个代理"这个数会正好把要看的东西抹掉。
+    private static func groupProxies(_ frames: [NSRect]) -> [[NSRect]] {
+        var rows: [[NSRect]] = []
+        for frame in frames.sorted(by: { $0.minY < $1.minY }) {
+            if var last = rows.last, let head = last.first, abs(frame.minY - head.minY) < 2 {
+                last.append(frame)
+                rows[rows.count - 1] = last
+            } else {
+                rows.append([frame])
+            }
+        }
+        return rows
     }
 
     // MARK: - 右键菜单（issue #13）

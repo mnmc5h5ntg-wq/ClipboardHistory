@@ -2,49 +2,54 @@
   "_comment": "在屏探针（UIInteractionProbeTests）的覆盖登记，配合 scripts/probe_coverage_gate.py 用。R62 / BACKLOG 92 的由来：R61 给侧栏「跟随选中揭示」写的三条行为判据全住在这卷里，而 CI 上一条都没跑完，CI 却仍是绿的 —— 因为那一步把整卷缺席写成了一句已知边界就 exit 0。现在每加一条在屏判据都必须在这里登记它今天跑不跑得了、以及跑不了的理由；登记过期（用例没了）或反过来（说跑不了却跑到了）都会红。",
   "_r91": "R91 删掉了 `testDragSelectExpandsSelectionInsideTheRealList` 这条登记 —— 不是绕过检查：它测的拖选手势在 D-034 就被决定不做（而 D-034 写着\"这条探针已删除\"，`git log --all -S` 证明它从没被删，见 U-206），并且它就是\"CI 上 executed:0\"追了五轮的那个成因（合成 .leftMouseDragged 一进 sendEvent 就进 CoreDrag 模态循环，抬起排在下游，本机 3/3 挂死）。删掉之后本机第一次跑到 10 条结论（心跳 10 / passed 7 / skipped 2 / failed 1）。⇒ 注意：其余登记的 reason 里那句\"无头 runner 上整卷在第一条结论之前就被收掉\"**成因写错了**，真正的成因是这条僵尸探针；但\"runner 上今天能不能跑到\"仍然是下一次 CI 的读数，不许拿本机结果替它改登记（probe_coverage_gate 会在\"说跑不了却跑到了\"时红，那时再逐条重登记）。",
   "evidence": {
-    "run": "38603034761",
-    "reading": "ui suite exit: 137  executed: 0  已下结论的用例: 0"
+    "run": "38852286519",
+    "reading": "ui suite exit: 137  executed: 0  已下结论的用例: 6 | UI_PROBE_PROGRESS started=7 concluded=6 | UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese | UI_PROBE_CHANNELS_AGREE=1"
   },
   "cases": {
     "testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testFrameIntervalsUnderStateChanges": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testAccessibilityTreeCoverage": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testRowGesturesWorkInsideTheRealSidebarContainer": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testRowIndexDriftDoesNotMoveTheViewport": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testIntakeBehindATallPinnedBlockRevealsTheNewRow": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testSidebarListFocusRingAfterClick": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
     },
     "testRightClickMenusAppKitWouldShowAreChinese": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条自己就是那具「第二具僵尸」：本机 R93 实测整卷 11 条 15.351 秒里它跑得完 ⇒ 不是恒挂，是在这台 runner 上要么挂要么慢到吃满看门狗 ⇒ BACKLOG 132 第一格（在 runner 上 `sample` 它）。"
     },
     "testMarkdownFilePreviewRendersInARealWindow": {
       "runner": "cannot",
-      "reason": "无头 runner 上整卷在第一条结论之前就被步骤自带的 240s 看门狗收掉：run 38603034761 的读数是 `ui suite exit: 137  executed: 0  已下结论的用例: 0`。⇒ 这条判据今天只有作者本机跑过；产品结论要引用它时必须带上这一点。"
+      "reason": "R93 更正成因（旧写法「整卷在第一条结论之前就被收掉」是错的）：run 38852286519（`83439f8`，删掉僵尸拖选探针之后）在屏那一步自己打的是 `ui suite exit: 137  已下结论的用例: 6`、`UI_PROBE_PROGRESS started=7 concluded=6`、`UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese`、`UI_PROBE_CHANNELS_AGREE=1`。⇒ 这一卷**能**在 runner 上跑到结论（六条），但走到 `testRightClickMenus…` 就开口没闭口，240s 看门狗收掉 ⇒ 排在它后面的用例今天到不了。 本条排在它之后 ⇒ 今天到不了它，不是它自己跑不动。"
+    },
+    "testRowProxyCensusAsksTheConsequenceNotTheShape": {
+      "runner": "cannot",
+      "reason": "R93 新加的诊断判据（BACKLOG 127 的正对照）。登记 cannot 的理由不是「它跑不动」，而是「runner 上今天到不了它」：它排在 `testRightClickMenus…` 之后，而那条在 run 38852286519 里开口没闭口（132）。本机 R93 实测它跑完并打出 `ROW_PROXY_CENSUS 侧栏@窗口320pt 代理=2 行=1 首行各代理宽=[148+148]`、`@250pt → [113+113]`、两个都 `acceptsFirstResponder=false`、`ROW_PROXY_LISTROWS 行视图=11 个` ⇒ 127 的定性由它给出：是**判据的期望写错**（把宿主级的 key-view 代理当成了行），不是产品的无障碍结构坏。132 修好之后这条要改成 can。"
     }
-  }
+  },
+  "_r93": "R93：十条 reason 从「整卷在第一条结论之前就被收掉」改成上面那句实测成因，并登记新加的 `testRowProxyCensusAsksTheConsequenceNotTheShape`。**为什么六条明明在 runner 上下过结论、这里仍登记 cannot**：那六条的**名字**今天还没读到（`已下结论的用例: 6` 只数了行，名字随被 SIGKILL 带走的那块 stdout 缓冲一起没了），而按字典序去猜是哪六条属于「没量过的推断」——R87 那一课的规矩是「预先登记的预测被推翻只写没证实」。R92 推送的 CI（`9c10569`）第一次带着「闸门读真日志」的修法，那一步会逐条印出结论名 ⇒ 下一轮按它把该翻 can 的翻掉；翻错会被 NOW_RUNS / NOT_RUN 挡回来，这正是留那两格的意义。"
 }

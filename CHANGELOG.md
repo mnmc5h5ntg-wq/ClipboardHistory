@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据（R93）
+
+- 在屏探针卷新增诊断判据 `testRowProxyCensusAsksTheConsequenceNotTheShape`：
+  数一棵侧栏树里有几个 `KeyViewProxy`、它们进不进 responder、行视图有几个，
+  并拿浮层（`NSTableView`，另一种实现）作对照。永远记为未运行（只回答形状与后果，不判产品）。
+- `testSidebarListFocusRingAfterClick` 的"点一行"改到真正的 `ListTableRowView` 上：
+  原来的期望（`KeyViewProxy` 宽 200…290）写在从没跑出过结论的情况下，R93 量到
+  11 行的树里只有 2 个宿主级代理、且都 `acceptsFirstResponder=false` ⇒ 期望的身份搞错了。
+  这条判据由红转绿（BACKLOG 127 结案）。
+- `scripts/probe_coverage_expectations.json`：11 条 reason 改成 run 38852286519 的实测成因
+  （六条跑到结论、第七条 `testRightClickMenus…` 开口没闭口 ⇒ 排在它后面的到不了），
+  并登记新加的那条；`can/cannot` 的翻转留给下一次 CI（BACKLOG 134）。
+- 仓库外：`roster_r93.py`（名册改动可重放）、`r93_visual_review_quickpick.md`（逐元素 + 坐标）。
+
 ### 产品（R92）
 
 - 设置窗口「数据」分区的分组语言向多数对齐：三段（历史记录存储 / 导出与导入 / 清空未收藏记录）
