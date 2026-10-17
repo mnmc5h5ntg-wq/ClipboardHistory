@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 真机那一层第一次成为可重跑的脚本：暗档侧栏图标有硬件证据，亮档那一半被"生效证明"拦下（R123 / 172 追记 / U-411…U-413 / D-185 · 产品 0 改动）
+
+- 新增 `scripts/real_screen_sidebar_icons.py`：走**产品自己的入口**（状态菜单里的「设置」）打开窗口，
+  `screencapture -R` 只截那一扇（不会出现主窗口的剪贴板内容），在图标列里按 2pt 步进自动找行带，
+  与同一行文字列对照。退出码三档：0 可辨 / 1 **没跑**（辅助功能未授权、窗口开不出、截图全黑、没装 PIL）
+  / 2 有行带读不到墨 —— "没跑"与"真机也看不见"必须分得开（R91 那一格就是被这个混掉的）。
+- 第一次跑（本机 · 暗档 · 装的是 R122 那一版）：六条行带全部有墨（41–84 个偏离像素，最大偏离 184），
+  `REALSCREEN_VERDICT=ok` ⇒ R122 那句"六枚图标与标签同亮"不再只有离屏帧作证。
+- 亮档仍未验：给 App 域写 `AppleInterfaceStyle = Light` + 重启之后读数与暗档**逐字相同**
+  （这台 macOS 不采纳按 App 强制浅色）。拦住这次误读的是同一行里的 `背景亮度=38 ⇒ 外观=dark`
+  ⇒ 规矩进 D-185②：**改外部设置的实验必须自带生效证明**。外部位已 `defaults delete` 还原。
+- 交付默认动作补齐：`scripts/install_local.sh --yes` 三次 `INSTALL_RESULT=ok` / `SMOKE_OK=1`，
+  本机现在跑的就是 R122 那一版（U-410 那笔欠账清掉）。
+- 抽出 `parse_bounds` / `appearance_of` 并配 5 条单测（`scripts/tests/test_real_screen_probe.py`）
+  ⇒ 脚本电池 239 → **244 OK**；`REALSCREEN_NOT_RUN window_bounds（375, ,, 101, ...）` 这一格
+  钉的就是第一版把分隔符当契约的错法（U-411）。
 ### 设置侧栏图标：暗档 22 行「黑底黑图标」修掉，亮档那一半判成通道盲区（R122 / 新开 172 / U-408…U-410 / D-184 · 产品 1 行）
 
 - 产品：`SettingsSidebarRow` 的 `.symbolRenderingMode(.hierarchical)` → `.monochrome`。
