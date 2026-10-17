@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 155 的第二个同版对与热图暗档的一个疑点（R113 · 产品 0 改动）
+
+- 同一 commit `1e6869b` 连跑两次捕获 ⇒ `DOUBLE_RUN 配对=115 全等=115 有差=0 最大绝对差 0`；
+  与 R110 那对合起来是 **2 对 / 230 组配对 / 0 漂移**。两跑各 136 张帧对基线均 `CHANGED=0`。
+- 看图腿复核热图两屏：亮档可以留；暗档发现分区图标明显比标签暗（与 R30 的 VibrantDark 机制同形），
+  但**手搓尺量法不合格**（坐标是猜的，量到 0 偏离=框没盖住字形）⇒ 开 **BACKLOG 167**，
+  第一步写明"把量法搬回仓库那颗尺、先只报数不判"。新记 U-374（手搓尺把框错伪装成没画）、
+  U-375（形容词先于读数）。
 ### 动效那一卷的红第一次有账（R112 · 工具轮，产品 0 改动）
 
 - `scripts/ci_capture_gate.py` 加 `--class-prefix`（按类名最后一段切，可重复）、`--label`（结论行按卷打）、
