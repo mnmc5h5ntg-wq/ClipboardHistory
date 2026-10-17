@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   （暗档 1.40:1 高于亮档 1.08:1，「几乎同色」的方向是反的）；179 撤回并改名；新开 181–185。
 - **BACKLOG 184 当场结案**：清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 地板降五」不会红。
   新增出口 `FLOOR_WENT_BACK`（基准压在 `git show HEAD:` 那一版上），临时落刀实测旧判据绿、新出口红，还原后 ok。
+- **U-487**：我为了抓假绿写的门 `grep -Eq '^OK$'` 自己造了一朵假红 —— runner 上有 skip 时 unittest 打的是
+  `OK (skipped=1)`，本机 0 skip 所以看不见。放宽成 `^OK( |$)`，两向各用合成样本验过（skip 通过 / FAILED 仍被拒）。
+- **BACKLOG 186 第二跑到**：同一句 `NOT_RUN testOffScreenProgrammaticSelectionIsRevealedAndNotJumped` 连着两跑原样重复
+  ⇒ 不是换班，是稳定挂死；下一步改登记（`runner=cannot` + reason）而不是等第三跑。
 - **读自己那一跑的 CI（run 39052480365）翻出三件事**：① 我新写的那条产品入口判据在 runner 上红
   （`128 < 141`，"左右边占总量 5%" 是**本机读数**推出来的门限）⇒ 换成跟环的几何走的对边比 + 单边绝对地板 80（U-486）；
   ② 脚本电池里那格红在 `No module named pytest`（runner 没装 pytest），报出来的话却是"样张那一卷自己没通过"

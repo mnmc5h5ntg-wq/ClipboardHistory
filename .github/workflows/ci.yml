@@ -331,7 +331,10 @@ jobs:
           echo "suite exit: $status"
           tail -6 /tmp/py.log
           [ "$status" -eq 0 ] || exit 1
-          grep -Eq '^OK$' /tmp/py.log || { echo "PYTHON_SUMMARY_MISSING=1 没有汇总行 OK"; exit 1; }
+          # `^OK$` 是我在 R143 part 2 亲手写窄的：unittest 有 skip 时打的是 `OK (skipped=1)`，
+          # 本机 0 skip 所以绿，runner 上至少 1 条 skip ⇒ 这一步红在**闸门自己**身上（不是产品）。
+          # 放宽成「行首是 OK」，同时下面那格仍然拒 `FAILED`，所以既不会漏红也不会假红。
+          grep -Eq '^OK( |$)' /tmp/py.log || { echo "PYTHON_SUMMARY_MISSING=1 没有汇总行 OK（或 OK (skipped=…)）"; exit 1; }
           grep -Eq '^FAILED' /tmp/py.log && { echo "PYTHON_SUMMARY_FAILED=1 汇总行是 FAILED"; exit 1; }
           executed=$(grep -oE 'Ran [0-9]+ tests?' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
           echo "python cases: $executed"
