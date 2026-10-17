@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 能力闸门改吃侧栏自己：runner 上"盲区名单不成立"这条真信息不再被 skip 掩盖（R120 / 新开 171 / U-402…U-404 · 产品 0 改动）
+
+- 证据（R118 的 CI，run 39023798233）：`TEXT_SIDE settings-general dark 亮侧=1503 暗侧=0 ⇒ 墨在期望侧`
+  与同跑的 `TEXT_SIDE_NOT_RUN all（内容区也读到 0 个偏离像素）` + skip 并存
+  ⇒ 决定"要不要检查名单"的矩形（内容区）与判据量的对象（侧栏）不同源，
+  于是"名单是机器相关的"这条事实一直没资格变红。
+- 改动：闸门改成 `sidebarInkTotal == 0`（侧栏自己的墨），内容区降级成附注；
+  新增读数 `TEXT_SIDE_CAPABILITY 侧栏偏离=… 内容区偏离=… 判了 n/m ⇒ 闸门与判据同源（D-166）`。
+- 刀 M614（内容区矩形挪到帧内空白 ⇒ 测试必须**仍然跑**，旧写法会 skip）实测 PASSED；
+  M615（侧栏 x 带挪进实测无内容的分栏阴影 148..160 ⇒ 必须**自己报未运行**）实测 SKIPPED。
+  两臂都拿到自己的期望；`RESTORE_CLEAN=yes`。⇒ 表数 **24**、刀数 **94**、caught **93**。
+- 新开 **BACKLOG 171**：`darkSidebarTextBlindSpots` 需要按机器声明适用范围。
+  闸门放开之后 runner 那台会让 `gone` 红（名单里的帧现在落在期望侧）—— 那是**对的**，
+  红下来之后再决定名单是否按 `HostInfo`/scale 分键；本轮不预先放宽任何断言。
+- 三条自坏：U-402 闸门与判据不同源（D-166 在闸门层复发）、U-403 刀的"空白带"是以为的而非量出来的、
+  U-404 往大函数里插代码连着两次插错（同名变量命中另一个测试 + 留了重复声明）。
+- 验证：全量 **827** / 41 skip / 0 failures；捕获 67 / 4 skip / 0 failures；帧 136 张 `CHANGED=0`；脚本电池 239。
 ### 150 定性：帧太矮把内容裁掉了，不是容器吃材质；166 按登记的判据把动效闸门升成硬门（R119 / U-398…U-400 · 产品 0 改动）
 
 - 证据链：runner 的树侧证人 `CARD_PROBE_DETAIL_TREE cardprobe-split-groupbox … 嵌套hosting=4 列内视图数=7`

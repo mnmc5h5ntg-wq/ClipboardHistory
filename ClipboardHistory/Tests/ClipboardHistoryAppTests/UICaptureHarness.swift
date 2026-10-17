@@ -7099,6 +7099,8 @@ final class UICaptureTests: XCTestCase {
         var vibrantColumns: Set<String> = []
         var judged = 0
         var contentInkTotal = 0
+        var sidebarInkTotal = 0
+        var attempted = 0
         for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
             let file = scratch.appendingPathComponent("\(fixture.name).png")
             var vibrant: String?
@@ -7134,12 +7136,14 @@ final class UICaptureTests: XCTestCase {
                  + " 首行y=\(rosterRowBands.isEmpty ? "-" : String(format: "%.0f", rosterRowBands[0].minY))")
             // runner 上这一页整块画不出来（BACKLOG 43）⇒ 逐条记 NOT-RUN，最后由
             // `contentInkTotal` 那条决定"是机器拍不出这一页"还是"我这把尺没压住字"。
+            attempted += 1
             guard counts.brighter + counts.darker > 0 else {
                 emit("TEXT_SIDE_NOT_RUN \(fixture.name) dark 侧栏列读到 0 个偏离像素"
                       + "（同帧内容区读到 \(content.brighter + content.darker) 个）")
                 continue
             }
             judged += 1
+            sidebarInkTotal += counts.brighter + counts.darker
             let inverted = Self.inkFailureIsInverted(brighter: counts.brighter, darker: counts.darker,
                                                      darkAppearance: true)
             if inverted { wrongSide.insert(fixture.name) }
@@ -7148,10 +7152,15 @@ final class UICaptureTests: XCTestCase {
                   + " 侧栏子树外观=" + (vibrant ?? "非 vibrant")
                   + " ⇒ " + (inverted ? "侧栏文字落在背景错误一侧（不可见）" : "墨在期望侧"))
         }
-        if contentInkTotal == 0 {
-            emit("TEXT_SIDE_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
-            throw XCTSkip("TEXT_SIDE_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上 `SettingsView` 是一块平涂底色，"
-                          + "侧栏与内容区都读到 0 个偏离像素 ⇒ 这条守卫记为未运行，不算通过也不算盲区")
+        // 闸门吃**被量物体自己那一条带**（D-166）。runner 的实测把旧写法的后果演了一遍：
+        // 侧栏那一列在那台机器上读到 `亮侧=1503 暗侧=0`（有墨、且在期望侧），
+        // 而内容区读到 0 墨 ⇒ 旧的 `contentInkTotal == 0` 让整条守卫 skip，
+        // 于是"暗档盲区名单在这台机器上不成立"这条真信息被 skip 掩盖（BACKLOG 171）。
+        if sidebarInkTotal == 0 {
+            emit("TEXT_SIDE_NOT_RUN all（侧栏列在 \(attempted) 个夹具上读到 0 个偏离像素；"
+                 + "同批内容区偏离=\(contentInkTotal)）")
+            throw XCTSkip("TEXT_SIDE_NOT_RUN：侧栏那一列本身没有墨 ⇒ 这条守卫记为未运行，"
+                          + "不算通过也不算盲区（内容区那个数只用来分'这台机器拍不出这一页'与'尺没压住字'）")
         }
         let extra = wrongSide.subtracting(Self.darkSidebarTextBlindSpots)
         let gone = Self.darkSidebarTextBlindSpots.subtracting(wrongSide)
@@ -7165,9 +7174,11 @@ final class UICaptureTests: XCTestCase {
                   + "②尺瞎了（框没压住字 / 背景取错位置 —— R29d 刚犯过后者）。"
                   + "两种都要真的去看那张帧")
         XCTAssertGreaterThan(judged, 0,
-                             "内容区读到了墨（\(contentInkTotal) 个偏离像素）⇒ 这台机器**拍得出**这一页，"
-                             + "可侧栏那一列一条都没判 ⇒ 是**尺没压住字**，不是环境问题。"
-                             + "回去核对 `settingsSidebarTextColumn` 的坐标与单位（R29d 的 pt/px 教训）")
+                             "侧栏列总共读到 \(sidebarInkTotal) 个偏离像素 ⇒ 这台机器**拍得出**这一列，"
+                             + "可一条都没判 ⇒ 是**尺没压住字**，不是环境问题。"
+                             + "回去核对 `sidebarTextBands` 的 x 带与单位（R29d 的 pt/px 教训）")
+        emit("TEXT_SIDE_CAPABILITY 侧栏偏离=\(sidebarInkTotal) 内容区偏离=\(contentInkTotal)"
+             + " 判了 \(judged)/\(attempted) 个夹具 ⇒ 闸门与判据同源（D-166）")
         // **前提断言**（R30 / D-090）：反侧墨必须仍然反侧在"vibrant 子树"上。
         // 机制：设置页的侧栏列由 `NavigationSplitView` 放进 `NSVisualEffectView`，
         // 那一列的 `NSHostingView` 实测生效外观是 **`NSAppearanceNameVibrantDark`**（不是 DarkAqua）。
