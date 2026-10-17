@@ -5,12 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 167 开单与撤回发生在同一轮（R114 · 产品 0 改动）
+
+- 撤回用的是**仓库里那颗尺的口径**（`inkSideCounts`：与该列众数背景比、偏离 >16 记一侧）加
+  **台账推出来的坐标**（`settingsSidebarTextColumn = x:40 y:96 w:102 h:154` ⇒ 图标列取 `x 8..40pt`、同一 y 段），
+  帧是本轮新拍的 `settings-stats-populated-720x540-{light,dark}`。
+- 读数：亮档图标列背景 250 / 暗侧 3966（极值 250）/ 亮侧 0；暗档图标列背景 27 / **亮侧 1391**（极值 228）/ 暗侧 42
+  ⇒ **图标在两档都落在期望侧**，R113 那句"暗档图标明显比标签暗"被自己的读数否掉。
+- 同一把尺量文字列：暗档亮侧 677 / **暗侧 2151** —— 确实反侧，但那是**已记账的盲区**
+  （`darkSidebarTextBlindSpots` 名单第 9 张就是这一帧，D-090 的合成前极性），不是新缺陷。
+- 开单前我没 grep 决策台账，而 R39 的注释当时就写着"图标也看得见" ⇒ 这一单本不该开，记 **U-377**；
+  条目不删，留成「开单前查重」的反例。一致性自评 87 → 84（均分由 `curve_from_ledger.py` 重算）。
 ### 155 的第二个同版对与热图暗档的一个疑点（R113 · 产品 0 改动）
 
 - 同一 commit `1e6869b` 连跑两次捕获 ⇒ `DOUBLE_RUN 配对=115 全等=115 有差=0 最大绝对差 0`；
   与 R110 那对合起来是 **2 对 / 230 组配对 / 0 漂移**。两跑各 136 张帧对基线均 `CHANGED=0`。
 - 看图腿复核热图两屏：亮档可以留；暗档发现分区图标明显比标签暗（与 R30 的 VibrantDark 机制同形），
-  但**手搓尺量法不合格**（坐标是猜的，量到 0 偏离=框没盖住字形）⇒ 开 **BACKLOG 167**，
+  但**手搓尺量法不合格**（坐标是猜的，量到 0 偏离=框没盖住字形）⇒ 开 **BACKLOG 167**（下一轮 R114 用量合格的那把尺**撤回**，见上一节），
   第一步写明"把量法搬回仓库那颗尺、先只报数不判"。新记 U-374（手搓尺把框错伪装成没画）、
   U-375（形容词先于读数）。
 ### 动效那一卷的红第一次有账（R112 · 工具轮，产品 0 改动）
