@@ -4829,6 +4829,20 @@ XCTAssertFalse failed - 刷新已经落地，这张菜单里那句「正在整�
 
 ### 6. §8 本轮读数（由 `ledger_rows.py` 搬运）
 
+### 6b. 读 R110 的 CI（run `39013515969`，failure）——两条新通道第一次在 runner 上签字
+
+- **素材那一格（164）**：`MENUBAR_GLYPH symbol=clipboard 倍率=4 边=72px 墨像素=891 包围盒px=10..60×7..67 墨占=0.17 与参考=相同 模板=true`
+  ⇒ **逐像素那一格在 runner 上也过**（`与参考=相同`），而且**墨包围盒与本机逐字相同**（`10..60×7..67`）；
+  墨像素本机 892 / runner **891** ⇒ 这是本仓库第一条「同一颗尺、同一份素材」的**跨机器成对读数**，
+  跨度 1 像素（0.11%）。它同时反证了 R110 那格地板的量法：地板若照抄 892 就会在 runner 上假红，
+  而它压的是实测的一半（400）⇒ 换机器不重写数（D-172 的形状，第一次量到"素材读数也会跨机器抖 1 像素"）。
+- **166 的第三个数据点**：`ci_red_stability` 拿 `39008599904`（R109）与这一跑对账 ⇒
+  `BOTH_RED testSettingsCardHorizontalInset…`（157 那朵证人，三跑都在）、
+  `ONLY_A testFrameIntervalsUnderStateChanges`（R109 红、这一跑绿）⇒
+  连续三跑三种样子（R108 只有 bandCapture / R109 只有 frameIntervals / R110 **两朵都没有**），
+  而捕获闸门三跑都报 `passed=53 skipped=11 failed=1 有名字的红=1`。
+  ⇒ 166 的结论加强：runner 上那两条动效地板**单跑不配给产品定罪**，也不配给素材定罪。
+
 ### 7. 下一轮入口
 
 ① 读 R110/R111 的 CI（R110 那跑要验 `statusitem-glyph` 两张新帧在 runner 上不成问题、以及 166 那条换班是否再现）；
