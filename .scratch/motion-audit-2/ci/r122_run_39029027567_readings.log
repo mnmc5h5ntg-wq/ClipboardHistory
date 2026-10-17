@@ -1,0 +1,8 @@
+CARD_PROBE_ARM_VERDICT cardprobe-split-groupbox dark 整帧墨行=60 详情列墨行=0 带子墨行=0 ⇒ 不可判(整帧有墨而详情列0墨=这台机器没画这一列)
+CARD_PROBE_ARM_VERDICT cardprobe-split-groupbox light 整帧墨行=70 详情列墨行=0 带子墨行=0 ⇒ 不可判(整帧有墨而详情列0墨=这台机器没画这一列)
+CARD_PROBE_CAPABILITY 参照臂=6 可判=4 框错红=0 不可判=2（拆：详情列0墨/整帧0墨，逐臂见 CARD_PROBE_ARM_VERDICT）
+MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=67（NOT_RUN 切不了片，这一格是整份的数）
+MOTION_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上） scope=MotionFilmstrip,UIInteraction
+MOTION_GATE_SCOPE 前缀=MotionFilmstrip UIInteraction 有名字的红=0 用例=66
+SIDEBAR_ICON_COVERAGE 能力=不可判(内容区 0 墨) 产品行数=6 行带总数=156
+TEXT_SIDE_CAPABILITY 侧栏偏离=19470 内容区偏离=0 判了 13/13 个夹具 ⇒ 闸门与判据同源（D-166）

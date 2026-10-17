@@ -6126,6 +6126,64 @@ final class UICaptureTests: XCTestCase {
         "settings-privacy-tall", "settings-recommendations-tall",
     ]
 
+    /// 盲区名单**按机器分键**（R124 / BACKLOG 171）。
+    ///
+    /// 为什么要分键：这份名单从 R29d 起被当"全局权威"用，而它量的其实是
+    /// **vibrant 子树 + `cacheDisplay` 不走合成**这一台机器的行为。本机反侧、runner 不反侧
+    /// （R120 的 CI：`TEXT_SIDE_CAPABILITY 侧栏偏离=19470 … 判了 13/13` 之后
+    /// `gone` 那朵红落地），两台都是真的离屏捕获 —— 那么"名单"就必须说清是哪台的名单。
+    /// 键只准用**量出来的**事实（架构 / 系统版本 / 帧倍率），不许手挑一个看起来像的名字：
+    /// R118 已经证明绝对坐标是机器相关的，而倍率与系统版本正是那两类差异的来源。
+    static func sidebarRosterMachineKey(scale: Double) -> String {
+        #if arch(arm64)
+        let arch = "arm64"
+        #elseif arch(x86_64)
+        let arch = "x86_64"
+        #else
+        let arch = "other"
+        #endif
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        let scaleText = scale >= 1.75 ? "2x" : (scale <= 1.25 ? "1x" : "other")
+        return "\(arch)/macOS \(v.majorVersion).\(v.minorVersion)/\(scaleText)"
+    }
+
+    /// 每台机器一行。**没登记的那台必须红**：如果"不在表里"能安静通过，
+    /// 那么任何一台新机器跑这条判据都会白拿一个绿（这才是 171 真正要拦的事）。
+    /// 值 = 那一台上实测反侧的夹具；空集也是一条**声明**（"这台机器不反侧"），
+    /// 它同样要被 `gone`/`extra` 两格钉住 —— 所以加一行之前必须真的去看那张帧。
+    static let darkSidebarTextBlindSpotsByMachine: [String: Set<String>] = [
+        // 本机（Retina 2x）：R29d / R30 / R39 / R98 一路看帧登记的 13 张。
+        "arm64/macOS 27.0/2x": darkSidebarTextBlindSpots,
+    ]
+
+    /// 名单与本机实测的四种关系，各有不同的修法（D-183 的形状：不许共用一个词）。
+    enum SidebarRosterVerdict: Equatable {
+        case unkeyed                 // 这台机器的位没登记 ⇒ 红（去看一眼，再决定登记哪一行）
+        case clean                   // 与本机那一行完全一致
+        case extra(Set<String>)      // 新盲区 ⇒ 红
+        case gone(Set<String>)       // 登记过的帧不再反侧 ⇒ 红（机制修好了，或者尺瞎了）
+    }
+
+    static func sidebarRosterVerdict(registered: Set<String>?, measured: Set<String>)
+        -> SidebarRosterVerdict {
+        guard let registered = registered else { return .unkeyed }
+        let extra = measured.subtracting(registered)
+        if !extra.isEmpty { return .extra(extra) }
+        let gone = registered.subtracting(measured)
+        if !gone.isEmpty { return .gone(gone) }
+        return .clean
+    }
+
+    /// 四种结局各一个词，且结论行要打在闸门之前（U-391 那一族）。
+    static func rosterVerdictText(_ verdict: SidebarRosterVerdict) -> String {
+        switch verdict {
+        case .unkeyed: return "红(这台机器的位没登记)"
+        case .clean: return "一致"
+        case .extra(let s): return "红(新盲区\(s.count)张)"
+        case .gone(let s): return "红(登记过的\(s.count)张不再反侧)"
+        }
+    }
+
     /// 侧栏那一列"文字应当出现的位置"（pt）。
     /// 左边界从 40 起：图标列在 12–34，把图标框进来会让"符号的固定色"混进这条读数，
     /// 那是 BACKLOG 41 那半条要单独判的事。右边界 142 = 侧栏宽 148 留 6pt 内边距。
@@ -7153,6 +7211,9 @@ final class UICaptureTests: XCTestCase {
         var contentInkTotal = 0
         var sidebarInkTotal = 0
         var attempted = 0
+        // 盲区名单的键要用**量出来**的倍率，不是 `mainScreen` 的：CI 那台没有主屏，
+        // 而这一跑真正扫的就是这些帧（D-183①：证人必须与被判的东西同源）。
+        var measuredScaleMax: Double = 0
         for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
             let file = scratch.appendingPathComponent("\(fixture.name).png")
             var vibrant: String?
@@ -7169,6 +7230,7 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("\(fixture.name)：读不回刚拍的帧")
             }
             let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            measuredScaleMax = max(measuredScaleMax, scale)
             // 先量内容区：它只回答"这台机器拍不拍得出这一页"，不回答产品好不好。
             let content = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                              bytesPerRow: rep.bytesPerRow,
@@ -7214,17 +7276,33 @@ final class UICaptureTests: XCTestCase {
             throw XCTSkip("TEXT_SIDE_NOT_RUN：侧栏那一列本身没有墨 ⇒ 这条守卫记为未运行，"
                           + "不算通过也不算盲区（内容区那个数只用来分'这台机器拍不出这一页'与'尺没压住字'）")
         }
-        let extra = wrongSide.subtracting(Self.darkSidebarTextBlindSpots)
-        let gone = Self.darkSidebarTextBlindSpots.subtracting(wrongSide)
-        XCTAssert(extra.isEmpty,
-                  "这些帧的暗档侧栏文字**第一次**落在错误一侧：\(extra.sorted()) ⇒ 又多了一处"
-                  + "离屏帧里不可见的文字。先定位是谁、为什么，再决定加名单还是修那一层；"
-                  + "不许为了绿把断言放宽")
-        XCTAssert(gone.isEmpty,
-                  "这些帧的暗档侧栏文字现在落在期望侧了：\(gone.sorted()) ⇒ 两种可能："
-                  + "①机制被修好了（BACKLOG 45 可以关，但必须先肉眼复审那张帧，别只缩名单）；"
-                  + "②尺瞎了（框没压住字 / 背景取错位置 —— R29d 刚犯过后者）。"
-                  + "两种都要真的去看那张帧")
+        // R124 / BACKLOG 171：名单**按机器分键**之后，"这台机器的位没登记"是一种独立的、
+        // 必须红的结局 —— 如果不在表里能安静通过，任何一台新机器跑这条判据都会白拿一个绿，
+        // 而 runner 那一台恰恰是这轮才发现"它的位从来没被登记过"（R120 那朵 `gone` 红的真身）。
+        let rosterKey = Self.sidebarRosterMachineKey(scale: measuredScaleMax)
+        let rosterVerdict = Self.sidebarRosterVerdict(
+            registered: Self.darkSidebarTextBlindSpotsByMachine[rosterKey], measured: wrongSide)
+        emit("TEXT_SIDE_ROSTER_KEY \(rosterKey) 本机登记=\(Self.darkSidebarTextBlindSpotsByMachine[rosterKey]?.count ?? -1)"
+             + " 实测反侧=\(wrongSide.count) 判了 \(judged)/\(attempted) 个夹具"
+             + " ⇒ \(Self.rosterVerdictText(rosterVerdict))")
+        switch rosterVerdict {
+        case .unkeyed:
+            XCTFail("TEXT_SIDE_ROSTER_UNKEYED \(rosterKey)：这台机器的盲区位没登记"
+                    + "（实测反侧 \(wrongSide.count) 张：\(wrongSide.sorted().prefix(4))…）"
+                    + " ⇒ 不许为了让它绿就复制另一台那一行：先去看那张帧（这台机器上暗档侧栏到底看不看得见），"
+                    + "再把这一台自己的集合写进 `darkSidebarTextBlindSpotsByMachine`（空集也是一条声明）。"
+                    + "R124 / BACKLOG 171。")
+        case .extra(let extra):
+            XCTFail("TEXT_SIDE_ROSTER_EXTRA \(rosterKey)：这些帧的暗档侧栏文字**第一次**落在错误一侧："
+                    + "\(extra.sorted()) ⇒ 又多了一处离屏帧里不可见的文字。"
+                    + "先定位是谁、为什么，再决定加名单还是修那一层；不许为了绿把断言放宽")
+        case .gone(let gone):
+            XCTFail("TEXT_SIDE_ROSTER_GONE \(rosterKey)：这些帧的暗档侧栏文字现在落在期望侧了：\(gone.sorted())"
+                    + " ⇒ 两种可能：①机制被修好了（BACKLOG 45 可以关，但必须先肉眼复审那张帧，别只缩名单）；"
+                    + "②尺瞎了（框没压住字 / 背景取错位置 —— R29d 刚犯过后者）。两种都要真的去看那张帧")
+        case .clean:
+            break
+        }
         XCTAssertGreaterThan(judged, 0,
                              "侧栏列总共读到 \(sidebarInkTotal) 个偏离像素 ⇒ 这台机器**拍得出**这一列，"
                              + "可一条都没判 ⇒ 是**尺没压住字**，不是环境问题。"
@@ -8177,6 +8255,41 @@ final class UICaptureTests: XCTestCase {
         // 四种出口必须各有不同的词：两个结局共用一个词，读数就分不开它们（这轮的新病的形状）。
         let words = Set(table.map { Self.verdictText($0.expect) })
         XCTAssertEqual(words.count, 4, "四种结局只打出 \(words.count) 个不同的词：\(words.sorted())")
+    }
+
+    /// R124 / BACKLOG 171：盲区位名单按机器分键之后，四种关系先写真值表。
+    /// 为什么必须在真值表里钉"未登记"那一格：如果 `registered == nil` 能和 `.clean` 走同一个出口，
+    /// 那么任何一台新机器跑这条判据都会白拿一个绿 —— 而 runner 那一台正是这轮才被发现
+    /// "它的位从来没被登记过"（R120 那朵 `gone` 红的真身）。
+    func testSidebarRosterVerdictIsATruthTable() {
+        let a = "settings-general", b = "settings-min"
+        let table: [(registered: Set<String>?, measured: Set<String>,
+                     expect: SidebarRosterVerdict, why: String)] = [
+            ([a, b], [a, b], .clean, "登记与实测完全一致：这一台的盲区还是那几处"),
+            ([a], [a, b], .extra([b]), "多出一处没登记的盲区 ⇒ 红（先定位是谁）"),
+            ([a, b], [a], .gone([b]), "登记过的那处不再反侧 ⇒ 红（机制修好了或尺瞎了，两种都要看帧）"),
+            ([a, b], [], .gone([a, b]), "一台完全不反侧的机器复用别人的行 ⇒ 红，不许读成「全绿」"),
+            (nil, [], .unkeyed, "没登记的那台：空集也不许通过"),
+            (nil, [a], .unkeyed, "没登记的那台：有盲区也不许顺手借用别台的行"),
+            ([], [], .clean, "登记成空集是一条**声明**（这台不反侧），它同样被 gone/extra 钉住"),
+            ([], [a], .extra([a]), "登记成空集之后又冒出反侧 ⇒ 红")
+        ]
+        for row in table {
+            let got = Self.sidebarRosterVerdict(registered: row.registered, measured: row.measured)
+            XCTAssertEqual(got, row.expect,
+                           "登记=\(row.registered.map { $0.sorted().description } ?? "nil")"
+                               + " 实测=\(row.measured.sorted()) 期望 \(Self.rosterVerdictText(row.expect))"
+                               + " 实得 \(Self.rosterVerdictText(got)) —— 这一格讲的是：\(row.why)")
+        }
+        // 四种结局必须各有不同的词：两个结局共用一个词，读数就分不开它们（D-183）。
+        let words = Set(table.map { Self.rosterVerdictText($0.expect) })
+        XCTAssertEqual(words.count, 5,
+                       "四种关系（外加 extra/gone 的计数形状）只打出 \(words.count) 个不同的词：\(words.sorted())")
+        // 键本身必须由**量出来**的事实组成：倍率是其中一格，不许写死成"我记得本机是 2x"。
+        let k1 = Self.sidebarRosterMachineKey(scale: 2.0)
+        let k2 = Self.sidebarRosterMachineKey(scale: 1.0)
+        XCTAssertNotEqual(k1, k2, "键里没带倍率 ⇒ 一台 Retina 与一台非 Retina 会共用同一行盲区名单")
+        XCTAssertTrue(k1.contains("macOS"), "键里没带系统版本：\(k1)")
     }
 
     func testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox() throws {

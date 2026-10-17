@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 盲区名单按机器分键：不在表里的那台必须红（R124 / 171 结案 / U-414…U-416 / D-186 · 产品 0 改动）
+
+- R122 的 CI（run 39029027567）只剩一朵红，正是 R120 预言的那朵：
+  「这些帧的暗档侧栏文字现在落在期望侧了：[13 张]」⇒ `darkSidebarTextBlindSpots` 不是错，
+  是**它从来只属于一台机器**（本机 vibrant 列在合成前反侧，runner 不反侧）。
+- 改法不是把红按下去：`darkSidebarTextBlindSpotsByMachine` 一行一台，键只由**量出来**的事实组成
+  （架构 / macOS 主次版本 / 帧倍率，倍率取这一跑真正扫的那些帧而不是 `mainScreen`）；
+  `sidebarRosterVerdict` 给四种关系（未登记 / 一致 / 新盲区 / 登记过的不再反侧）+ 8 行真值表。
+- 本机那一行由本轮打印出来的键填：`TEXT_SIDE_ROSTER_KEY arm64/macOS 27.0/2x 本机登记=13 实测反侧=13 ⇒ 一致`。
+  **runner 那一行故意留空** —— 它下一跑会红成 `TEXT_SIDE_ROSTER_UNKEYED <它的键>`，
+  再由那一跑自己印的键填第二行（D-186③：不许拿猜测当键，猜错就是一条永不命中的死行）。
+- 同跑另外两格按预期：新装的 `SIDEBAR_ICON_INVERTED` 在 runner 上**没有假红**（能力闸门）；
+  150 的四种出口与 R121 那一跑逐字一致（`参照臂=6 可判=4 框错红=0 不可判=2`）。
+- 变异第 27 张 `mutate_r124.py`：M624 键里丢掉倍率 / M625 未登记改成"当成一致" / M626 撤掉新盲区那一格 ⇒ 三刀全部 CAUGHT。
+- 自坏三条：U-414 结论行被自己的转义打回原文（数字都打、只有那个词没打 ⇒ 每次新加 emit 都要看它自己的输出）；
+  U-415 静态成员漏 `Self.` 与一个没用上的变量（0 告警那道门挡下，U-396 那一族第三次）；
+  U-416 先按记忆写键再跑 —— 这次是 `.unkeyed` 那一格兜住了我，不是我会猜。
 ### 真机那一层第一次成为可重跑的脚本：暗档侧栏图标有硬件证据，亮档那一半被"生效证明"拦下（R123 / 172 追记 / U-411…U-413 / D-185 · 产品 0 改动）
 
 - 新增 `scripts/real_screen_sidebar_icons.py`：走**产品自己的入口**（状态菜单里的「设置」）打开窗口，
