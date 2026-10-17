@@ -24,10 +24,12 @@ def production_labels():
     """生产那一侧用过的标签 = workflow 里显式的 `--label` ∪ 闸门自己的默认值。"""
     labels = set()
     for path in glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml")):
-        text = io.open(path, encoding="utf-8").read()
+        with io.open(path, encoding="utf-8") as handle:
+            text = handle.read()
         for match in re.finditer(r'ci_capture_gate\.py.*--label\s+([A-Za-z_][A-Za-z0-9_]*)', text):
             labels.add(match.group(1))
-    gate = io.open(os.path.join(ROOT, "scripts", "ci_capture_gate.py"), encoding="utf-8").read()
+    with io.open(os.path.join(ROOT, "scripts", "ci_capture_gate.py"), encoding="utf-8") as handle:
+        gate = handle.read()
     for match in re.finditer(r'add_argument\("--label",\s*default="([A-Z]+)"', gate):
         labels.add(match.group(1))
     return labels

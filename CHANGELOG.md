@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 169 结案：台账矩形换成实测行带，并加一条会红的对账（R116 / U-388…U-390 · 产品 0 改动）
+
+- `settingsSidebarTextColumn` 从 `y 96 h 154`（**五行时代**的坐标）换成 `y 60 h 192` = 视图树给的六行；
+  两条图标列矩形同步。新增 `testSettingsSidebarRosterRectCoversEveryRow`：
+  矩形上下界与树给行带各差 ≤1pt ⇒ `SIDEBAR_ROSTER_RECT 台账=60..252 树给=60..252 上界差=0.0pt 下界差=0.5pt`。
+  这一条补的是 U-383 那一族：**读数全绿而量的已经不是同一块东西**。
+- 刀 M610（矩形改回旧值 ⇒ 红）与 M611（树少给一行 ⇒ 数量与下界差一起红）—— 两个方向都有牙。
+- 改尺之后**读数确实动了**：`TEXT_SIDE settings-general dark` 暗侧 2130 → 2990（第一行标签的墨现在进来了），
+  亮侧 851 不变，而 `TEXT_SIDE_BLIND_SPOTS` 仍是 13 of 13 ⇒ 记 U-390：名单没变不等于读数没变。
+- **170 更正**：`OffscreenSymbolInkProbeTests` 的注释里 R28 就写着「每一枚符号的颜色在两帧里恒定不随外观变」
+  与「不能据此判产品缺陷（也不能据此改产品颜色）」⇒ 本轮那张按符号的表只是把旧结论变成常驻仪器，
+  不是新发现（U-388：同一族错第三次，这次连测试文件注释都没 grep）。
+  U-389 记的是**没犯成**的一次：我差点把 `.hierarchical` 换成 `.monochrome` 去讨好那一帧。
+- **runner 的第一份逐行读数是零信息的那一种**：156 行全部「有墨、零反侧」，同跑却报 `内容区 0 墨 ⇒ 整页拍不出`
+  （skip 在下一行）⇒ 本轮把**能力位写进读数行本身**（`SIDEBAR_ICON_COVERAGE 能力=可判 …`），
+  170 的「等 CI 第二份读数」作废（U-391）。
+- 验证：全量 **827** 例 / 41 skip / 0 failures（+1 = 新对账守卫）；捕获 67 例、逐用例比对 R115 无判定翻转、
+  新增那条 passed；帧 136 张 `CHANGED=0`；变异第 22 张表 2 刀全 CAUGHT、`RESTORE_CLEAN=yes`。
 ### 逐行仪器把 167 的结论打折，并结案 168（R115 / U-382…U-386 / D-182 · 产品 0 改动）
 
 - 撤 167 用的那套量法搬进 `UICaptureHarness` 真身：行带从**已布局的视图树**取（`_FocusRingView`），

@@ -6124,7 +6124,12 @@ final class UICaptureTests: XCTestCase {
     /// 侧栏那一列"文字应当出现的位置"（pt）。
     /// 左边界从 40 起：图标列在 12–34，把图标框进来会让"符号的固定色"混进这条读数，
     /// 那是 BACKLOG 41 那半条要单独判的事。右边界 142 = 侧栏宽 148 留 6pt 内边距。
-    static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)
+    /// **R116 把 y 带换成实测行带**（六行 `_FocusRingView` = y 60..252，每行 32pt）。
+    /// 原来这里写的是 `y 96 h 154`（96..250）—— 那是**五行时代**的坐标，阶段一加「统计」之后
+    /// 它只盖住 5/6 行，而它喂的 `TEXT_SIDE` 与暗档盲区名单一路全绿（BACKLOG 169 / U-383）。
+    /// 现在这条矩形与树给的行带由 `testSettingsSidebarRosterRectCoversEveryRow` 钉在一起：
+    /// 布局再变而这里没跟着改，红的是这条守卫。
+    static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)
 
     /// **同一张帧的内容区**（x 160 起：侧栏宽 148 + 分栏线）。
     /// 这一块的用途不是判产品，是**分辨"这台机器拍不出这一页"和"我这把尺瞎了"** ——
@@ -6138,8 +6143,8 @@ final class UICaptureTests: XCTestCase {
     /// `settingsSidebarIconColumn` 是把上面注释里「图标列在 12–34」这句话照抄成矩形。
     /// **两条注释的 y 都是 96..250，而本轮实测行带是 y 60..252** ⇒ 老的列级矩形少盖第一行
     /// （BACKLOG 169：`settingsSidebarTextColumn` 与它喂的 `TEXT_SIDE`／盲区名单都受影响）。
-    static let settingsSidebarIconColumn = CGRect(x: 12, y: 96, width: 22, height: 154)
-    static let settingsSidebarIconColumnWide = CGRect(x: 8, y: 96, width: 32, height: 154)
+    static let settingsSidebarIconColumn = CGRect(x: 12, y: 60, width: 22, height: 192)
+    static let settingsSidebarIconColumnWide = CGRect(x: 8, y: 60, width: 32, height: 192)
 
     /// 侧栏**每一行**的矩形（顶向下 pt），从已布局的视图树里拿，不是把列高除出行数。
     ///
@@ -7109,6 +7114,40 @@ final class UICaptureTests: XCTestCase {
               + "（名单 \(Self.darkSidebarTextBlindSpots.count) 条；vibrant 子树 \(vibrantColumns.count) 条）")
     }
 
+    /// 列级矩形与视图树行带的**对账**（R116 / BACKLOG 169 的钉子）。
+    ///
+    /// 为什么单独一条：`TEXT_SIDE` 那条守卫钉的是 vibrant 前提，行带那条钉的是数量，
+    /// 于是"矩形悄悄过期"这一族没有任何东西会红（U-383 的原价）。
+    /// 这条把 `settingsSidebarTextColumn` 的 y 带钉在树给的行带上：
+    /// 上下界各差 1pt 以内、行数 ≥ 2（否则它就是在拿一块空带子自证）。
+    func testSettingsSidebarRosterRectCoversEveryRow() throws {
+        guard let fixture = fixtures(appearance: .darkAqua).first(where: { $0.name == "settings-general" }) else {
+            return XCTFail("找不到 settings-general ⇒ 这条对账没有对象")
+        }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r116-roster-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var rows: [CGRect] = []
+        _ = try render(fixture, appearance: .darkAqua,
+                       to: scratch.appendingPathComponent("settings-general.png")) { host in
+            rows = Self.sidebarRowRects(in: host, column: Self.settingsSidebarIconColumn)
+        }
+        let rect = Self.settingsSidebarTextColumn
+        XCTAssertGreaterThanOrEqual(rows.count, 2, "树只给出 \(rows.count) 个行带 ⇒ 对账没有意义，先看容器名")
+        let top = rows.map { $0.minY }.min() ?? 0
+        let bottom = rows.map { $0.maxY }.max() ?? 0
+        emit("SIDEBAR_ROSTER_RECT 台账=\(Int(rect.minY))..\(Int(rect.maxY))"
+             + " 树给=\(Int(top))..\(Int(bottom)) 行数=\(rows.count)"
+             + " 上界差=\(String(format: "%.1f", abs(rect.minY - top)))pt"
+             + " 下界差=\(String(format: "%.1f", abs(rect.maxY - bottom)))pt")
+        XCTAssertLessThanOrEqual(abs(rect.minY - top), 1.0,
+                                 "台账矩形的上界比树给的第一行晚 \(String(format: "%.1f", top - rect.minY))pt ⇒ 它盖不住第一行。"
+                                 + "R115 之前这里就是五行时代的 y 96（BACKLOG 169）：改这里，别改这条断言。")
+        XCTAssertLessThanOrEqual(abs(rect.maxY - bottom), 1.0,
+                                 "台账矩形的下界比树给的最后一行早 \(String(format: "%.1f", bottom - rect.maxY))pt ⇒ 最后一行不在尺子里。")
+    }
+
     /// 侧栏图标**逐行**的墨落在哪一侧（R115：把 167 撤回用的那套量法搬进仓库这颗尺真身）。
     ///
     /// **本轮只报数、不判产品** —— 167 的第一步就是这么写的，而 D-181 规定
@@ -7219,18 +7258,22 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
-        emit("SIDEBAR_ICON_COVERAGE 产品行数=\(expectedRows) 行带总数=\(rowsTotal)"
+        // 能力位必须写进这两行本身：runner 上整页是平涂底色（BACKLOG 43），
+        // 那时"每行都有墨、零反侧"是噪声对着称的产物，不是健康证明。
+        // 只把 skip 打在后面一行 ⇒ 单 grep COVERAGE 的人会拿到一张假的好消息（U-391）。
+        let capability = contentInkTotal == 0 ? "能力=不可判(内容区 0 墨)" : "能力=可判"
+        emit("SIDEBAR_ICON_COVERAGE \(capability) 产品行数=\(expectedRows) 行带总数=\(rowsTotal)"
              + " | light 有墨行=\(inked["light"] ?? 0) 无墨行=\(blank["light"] ?? 0) 反侧行=\(inverted["light"] ?? 0)"
              + " | dark 有墨行=\(inked["dark"] ?? 0) 无墨行=\(blank["dark"] ?? 0) 反侧行=\(inverted["dark"] ?? 0)"
              + "（本轮只报数：地板等两台机器各落一次再定）")
         for symbol in bySymbol.keys.sorted() {
             let cell = bySymbol[symbol]!
-            emit("SIDEBAR_ICON_BY_SYMBOL 符号=\(symbol)"
+            emit("SIDEBAR_ICON_BY_SYMBOL \(capability) 符号=\(symbol)"
                  + " | light 期望=\(cell["light 期望侧"] ?? 0) 反侧=\(cell["light 反侧"] ?? 0) 无墨=\(cell["light 无墨"] ?? 0)"
                  + " | dark 期望=\(cell["dark 期望侧"] ?? 0) 反侧=\(cell["dark 反侧"] ?? 0) 无墨=\(cell["dark 无墨"] ?? 0)"
                  + "（每档最多 \(expectedRows) 行 × \(pairs["light"] ?? 0) 个夹具）")
         }
-        emit("SIDEBAR_ICON_ROSTER_DRIFT 行带起点比台账矩形（y \(Int(Self.settingsSidebarTextColumn.minY))）更早的行数=\(rowsAboveRosterMinY)/\(rowsTotal)"
+        emit("SIDEBAR_ICON_ROSTER_DRIFT \(capability) 行带起点比台账矩形（y \(Int(Self.settingsSidebarTextColumn.minY))）更早的行数=\(rowsAboveRosterMinY)/\(rowsTotal)"
              + " ⇒ 老的列级矩形（含 `settingsSidebarTextColumn` 与它喂的 TEXT_SIDE／盲区名单）盖不全这些行，BACKLOG 169")
         XCTAssertEqual(pairs["light"], pairs["dark"],
                        "亮档判了 \(pairs["light"] ?? 0) 个设置夹具、暗档判了 \(pairs["dark"] ?? 0) 个 ⇒ 同一份名单该两边等量，"

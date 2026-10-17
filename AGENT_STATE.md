@@ -1,20 +1,40 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-17 17:07（本地 · R115 / 第 117 轮收尾：**逐行仪器把 167 的结论打折** —— light 43/78 行无墨、dark 22/78 行反侧；顺带量出 169（台账矩形少盖一行）并结案 168（闸门结论行的归属）/ U-382…U-386 / D-182 · 产品 0 改动）
+最后更新：2026-10-17 17:27（本地 · R116 / 第 118 轮收尾：**169 结案 —— 台账矩形换成实测行带，并第一次有东西盯着"尺量的还是不是同一块东西"**（U-388…U-390 / 产品 0 改动 / 变异第 22 张表 M610–M611 全 CAUGHT））
 
-**U-380 那笔债还上了**：撤 167 用的量法搬进 `UICaptureHarness` 真身 —— 行带从**已布局的视图树**取（每行的 `_FocusRingView`），行数钉在产品 `SettingsCategory.allCases`（6）上，图标墨的横向范围由 `iconInkSpan` 从帧自报（不抄「图标列在 12–34」那句注释）。2 档 × 13 个设置夹具 × 6 行 = **156 行**逐行读数落在 `capture-readings.log` 里 ⇒ 可重跑、可 grep，不再是"我抄下来的四个数"。
+**改了什么**：`settingsSidebarTextColumn` 从 `y 96 h 154`（五行时代的坐标，阶段一加「统计」之后就少盖第一行）换成 `y 60 h 192` = 视图树给的六行；两条图标列矩形同步。新增 `testSettingsSidebarRosterRectCoversEveryRow` 把矩形上下界钉在树给行带上（各 ≤1pt），读数 `SIDEBAR_ROSTER_RECT 台账=60..252 树给=60..252 上界差=0.0pt 下界差=0.5pt`。M610（矩形改回旧值 ⇒ 红）与 M611（树少给一行 ⇒ 数量与下界差一起红）两刀证明这条守卫两个方向都有牙 —— 它补的正是 U-383 那一族：**读数是绿的，量的可能已经不是同一块东西**。
 
-**读数说了什么**：`SIDEBAR_ICON_COVERAGE light 有墨行=35 无墨行=43 反侧行=0 | dark 有墨行=78 无墨行=0 反侧行=22`。按符号聚合（`SIDEBAR_ICON_BY_SYMBOL`）后不是"暗档整体偏暗"，而是**同一列里 `.primary` 的解析按符号固定成某一种极性**：`command`/`gearshape`/`hand.raised`/`folder` 固定成白（亮档不出墨、只有当选中行因药丸出墨；dark 全 13 正常），`wand.and.stars`/`chart.bar` 固定成黑（亮档全 13 正常；**dark 11/13 反侧**）。⇒ 上一轮那句「图标在两档都落在期望侧」**只在列级成立**：列级把"有些行根本没有墨"抹平成"整列都在期望侧"。撤单本身仍有效（撤的是"暗档图标比标签暗"那一格），行级另开 **170**（先只报数；等 CI 第二份读数 + 真机批次 86.1 判它是不是只在离屏管线里）。
+**改尺之后必须一起报的那格（U-390）**：`TEXT_SIDE settings-general dark` 暗侧 2130 → **2990**（第一行标签的墨现在进来了），亮侧 851 不变；而 `TEXT_SIDE_BLIND_SPOTS 13 of 13` 一个字没动 ⇒ **名单没变不等于读数没变**。我一开始只对了名单等式，是逐用例对读数才发现的。
 
-**顺带量出来的两件**：**169 开（未修）** —— `settingsSidebarTextColumn` 写 y 96..250，实测六行行带是 y 60..252 ⇒ 它喂的 `TEXT_SIDE` 与暗档盲区名单从阶段一加「统计」那行起只覆盖 5/6 行（仪器报 `SIDEBAR_ICON_ROSTER_DRIFT …更早的行数=52/156`）；不改的理由写在单子里（一改 13 个夹具名单整体位移，要先真看帧）。**168 结案** —— runner 第一份 `MOTION_GATE_*` 里真步（`passed=34 skipped=32 failed=0`）与样张夹具（`passed=1 skipped=0 failed=1`）**同形并存**：`--label` 只决定标记叫什么，不决定谁在打它，而样张的 `_run` 不吞 stdout ⇒ 166 的升硬门名单本来可以被夹具冒充。修法是标签换 `SAMPLE` + `_run` 单层重定向 + `scripts/tests/test_gate_marker_hygiene.py` 三条**判产物**的守卫。
+**170 被更正**：本轮开的那张"按符号分裂"表，机制其实 R28 就量过 —— `OffscreenSymbolInkProbeTests` 第 18 行与产品臂注释里写着「每一枚符号的颜色在两帧里**恒定不随外观变**」「不能据此判产品缺陷（也不能据此改产品颜色）」。⇒ 170 只剩两件新的：逐符号名册 + 常驻仪器；不欠第二份读数，欠的只有真机批次 86.1。**U-388**：同一族错第三次（R114 是"开单前没 grep 决定台账"，这次连自己写的测试文件注释都没查）⇒ 查重范围要写成"决定台账 + 判据文件注释 + BACKLOG 正文"三处。**U-389**（记的是没犯成）：本轮我一度想把 `.symbolRenderingMode(.hierarchical)` 换成 `.monochrome` 让六枚符号统一出墨 —— 那正是台账明令禁止的"为讨好这一帧改产品"，是**已记的规矩**挡住的，不是我想出来的。
 
-**行号 = 枚举顺序不是猜的**：选中行的药丸签名在 `settings-general` 落在 row=1、`settings-privacy` 落在 row=2、`settings-data` 落在 row=4，与 `allCases` 一致 ⇒ 按符号聚合的表可信。**本轮现场坏的**：U-382（我拿去做查重的台账注释自己是一条没量过的断言）、U-383（仪器坐标会因产品改动过期而不报警）、U-384（我给图标列写矩形时把邻居的 y 抄了过来，被"行数=枚举数"那条守卫挡住）、U-385（尺的接缝当墨：不外缩 2pt 时 `command` 读到 x=39..39 / 10 个像素判成有墨；以及嵌套 `redirect_stdout` 让外层拿到空串、5 条样张一起红）、U-386（新增结论行标记时只验"打得出"、没验"谁在打"）。规矩进 **D-182**。
+**看图腿（本轮真看了四张帧：`settings-general` 与 `settings-stats-populated` × 两档，侧栏 x 0..148pt × y 56..256pt 裁切 3× 放大）**：暗档 `command`/`gearshape`/`hand.raised`/`folder` 白（可见）、`wand.and.stars`/`chart.bar` 近黑（几乎不可见）、未选中标签全黑字黑底、选中行蓝药丸两者都可见；亮档完全互补。与 R115 的逐行读数**逐格对上** ⇒ 那把尺量的确实是眼睛看到的东西，也说明 170 的现象早就在帧里。
 
-**验证（按实记）**：全量测试 `Executed 826 tests, with 41 tests skipped and 0 failures`（825 → 826 = 本轮新增那条逐行仪器）；捕获卷 `Executed 66 tests, with 4 skipped, 0 failures`；帧 `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`；脚本电池 `239 passed`（236 → 239）；曲线由仪器重算 `SCORES_BY_ROUND 112=91 113=90 114=89 115=90`；`ledger_rows.py --must-include SIDEBAR_ICON_COVERAGE` ⇒ `缺=0`（新读数进了白名单，不是孤儿行）；产品 0 改动（`git status --short ClipboardHistory/Sources` 计数 0）。变异表 M606–M609：见本轮 BACKLOG 168/170 与 AGENT_UI_AUDIT 第 117 轮；变异表第 21 张 `mutate_r115.py` 四刀 M606–M609：`MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0`、`RESTORE_CLEAN=yes`（M609 那刀的牙咬在「样张那一卷自己没过」那一格，不是「stdout 出现生产标记」那一格 —— 两格分开记，见 U-387）。
+**验证（按实记）**：全量 `Executed 827 tests, with 41 skipped and 0 failures`（826 → 827 = 新对账守卫）；捕获卷逐用例与 R115 对比 **无判定翻转**、新增那条 passed（67 例）；帧 136 张 `CHANGED=0 MISSING=0 ADDED=0`（只动尺，不动产品与夹具）；脚本电池 239 passed（本轮未加脚本用例）；曲线由仪器重算 `SCORES_BY_ROUND 113=90 114=89 115=90 116=90`；变异 `MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0`、`RESTORE_CLEAN=yes`；`ledger_rows --must-include SIDEBAR_ROSTER_RECT` 缺=0（新读数进了 §8 白名单）；产品 0 改动（`git diff --stat ClipboardHistory/Sources` 空）。
 
-**下一轮（R116）的入口**：① 170 的第二份读数（CI）与"这是不是只在离屏管线里"；② 169 把两条列级矩形换成行带 + 重算名单（先看帧）；③ 166 升硬门仍欠同一 commit 两跑名单一致；④ 150 让臂 2 的详情在 runner 上有内容（R112 那朵红的证人消息已经指出：`cardprobe-split-groupbox dark` 在带子 170..720pt × 24..284pt 读到 0 行墨、最大偏离 2 而门限 60 ⇒ 参照臂没盖住自己的内容，改带子、不改断言）。
+**runner 的第一份逐行读数（读 R115 的 CI 时拿到）**：`light 有墨行=78 无墨行=0 反侧行=0 | dark 有墨行=78 无墨行=0 反侧行=0`、六枚符号全 `期望=13`，而同跑紧接 `SIDEBAR_ICON_NOT_RUN all（内容区 0 墨）` + skip ⇒ 那串「零反侧」是噪声对称的产物，不是证据。因此把「等 CI 落第二份读数再判」划掉：BACKLOG 43 没解之前 CI 交不出样本。本轮已把能力位写进读数行本身（`能力=可判` / `能力=不可判(内容区 0 墨)`），见 U-391。 同跑的 `MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=82` 与 R112 那跑同形（名单一致但仍是**不同 commit** ⇒ 166 的升硬门还是不签）。
 
-**仍然只有用户能做的**：批次 26.x–83.1、84.1、85.1、85.2，**新加 86.1**（两种外观下看设置侧栏六枚图标是否都在）。
+**下一轮（R117）的入口**：① 读 R116 的 CI（新能力位与新对账守卫在 runner 上怎么说）；② **150** 修参照臂带子（`cardprobe-split-groupbox dark` 在 170..720pt × 24..284pt 读到 0 行墨、最大偏离 2 而门限 60 ⇒ 改带子不改断言）；③ 把逐符号名册并进 `darkSidebarTextBlindSpots` 那一层的对账（现在它只报，不进名单等式）；④ 170 只等真机批次 86.1。
+
+**仍然只有用户能做的**：批次 26.x–83.1、84.1、85.1、85.2、86.1。
+
+> 上一轮（R115 / 第 117 轮收尾）原文开头：
+> 最后更新：2026-10-17 17:07（本地 · R115 / 第 117 轮收尾：**逐行仪器把 167 的结论打折** —— light 43/78 行无墨、dark 22/78 行反侧；顺带量出 169（台账矩形少盖一行）并结案 168（闸门结论行的归属）/ U-382…U-386 / D-182 · 产品 0 改动）
+> 
+> **U-380 那笔债还上了**：撤 167 用的量法搬进 `UICaptureHarness` 真身 —— 行带从**已布局的视图树**取（每行的 `_FocusRingView`），行数钉在产品 `SettingsCategory.allCases`（6）上，图标墨的横向范围由 `iconInkSpan` 从帧自报（不抄「图标列在 12–34」那句注释）。2 档 × 13 个设置夹具 × 6 行 = **156 行**逐行读数落在 `capture-readings.log` 里 ⇒ 可重跑、可 grep，不再是"我抄下来的四个数"。
+> 
+> **读数说了什么**：`SIDEBAR_ICON_COVERAGE light 有墨行=35 无墨行=43 反侧行=0 | dark 有墨行=78 无墨行=0 反侧行=22`。按符号聚合（`SIDEBAR_ICON_BY_SYMBOL`）后不是"暗档整体偏暗"，而是**同一列里 `.primary` 的解析按符号固定成某一种极性**：`command`/`gearshape`/`hand.raised`/`folder` 固定成白（亮档不出墨、只有当选中行因药丸出墨；dark 全 13 正常），`wand.and.stars`/`chart.bar` 固定成黑（亮档全 13 正常；**dark 11/13 反侧**）。⇒ 上一轮那句「图标在两档都落在期望侧」**只在列级成立**：列级把"有些行根本没有墨"抹平成"整列都在期望侧"。撤单本身仍有效（撤的是"暗档图标比标签暗"那一格），行级另开 **170**（先只报数；等 CI 第二份读数 + 真机批次 86.1 判它是不是只在离屏管线里）。
+> 
+> **顺带量出来的两件**：**169 开（未修）** —— `settingsSidebarTextColumn` 写 y 96..250，实测六行行带是 y 60..252 ⇒ 它喂的 `TEXT_SIDE` 与暗档盲区名单从阶段一加「统计」那行起只覆盖 5/6 行（仪器报 `SIDEBAR_ICON_ROSTER_DRIFT …更早的行数=52/156`）；不改的理由写在单子里（一改 13 个夹具名单整体位移，要先真看帧）。**168 结案** —— runner 第一份 `MOTION_GATE_*` 里真步（`passed=34 skipped=32 failed=0`）与样张夹具（`passed=1 skipped=0 failed=1`）**同形并存**：`--label` 只决定标记叫什么，不决定谁在打它，而样张的 `_run` 不吞 stdout ⇒ 166 的升硬门名单本来可以被夹具冒充。修法是标签换 `SAMPLE` + `_run` 单层重定向 + `scripts/tests/test_gate_marker_hygiene.py` 三条**判产物**的守卫。
+> 
+> **行号 = 枚举顺序不是猜的**：选中行的药丸签名在 `settings-general` 落在 row=1、`settings-privacy` 落在 row=2、`settings-data` 落在 row=4，与 `allCases` 一致 ⇒ 按符号聚合的表可信。**本轮现场坏的**：U-382（我拿去做查重的台账注释自己是一条没量过的断言）、U-383（仪器坐标会因产品改动过期而不报警）、U-384（我给图标列写矩形时把邻居的 y 抄了过来，被"行数=枚举数"那条守卫挡住）、U-385（尺的接缝当墨：不外缩 2pt 时 `command` 读到 x=39..39 / 10 个像素判成有墨；以及嵌套 `redirect_stdout` 让外层拿到空串、5 条样张一起红）、U-386（新增结论行标记时只验"打得出"、没验"谁在打"）。规矩进 **D-182**。
+> 
+> **验证（按实记）**：全量测试 `Executed 826 tests, with 41 tests skipped and 0 failures`（825 → 826 = 本轮新增那条逐行仪器）；捕获卷 `Executed 66 tests, with 4 skipped, 0 failures`；帧 `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`；脚本电池 `239 passed`（236 → 239）；曲线由仪器重算 `SCORES_BY_ROUND 112=91 113=90 114=89 115=90`；`ledger_rows.py --must-include SIDEBAR_ICON_COVERAGE` ⇒ `缺=0`（新读数进了白名单，不是孤儿行）；产品 0 改动（`git status --short ClipboardHistory/Sources` 计数 0）。变异表 M606–M609：见本轮 BACKLOG 168/170 与 AGENT_UI_AUDIT 第 117 轮；变异表第 21 张 `mutate_r115.py` 四刀 M606–M609：`MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0`、`RESTORE_CLEAN=yes`（M609 那刀的牙咬在「样张那一卷自己没过」那一格，不是「stdout 出现生产标记」那一格 —— 两格分开记，见 U-387）。
+> 
+> **下一轮（R116）的入口**：① 170 的第二份读数（CI）与"这是不是只在离屏管线里"；② 169 把两条列级矩形换成行带 + 重算名单（先看帧）；③ 166 升硬门仍欠同一 commit 两跑名单一致；④ 150 让臂 2 的详情在 runner 上有内容（R112 那朵红的证人消息已经指出：`cardprobe-split-groupbox dark` 在带子 170..720pt × 24..284pt 读到 0 行墨、最大偏离 2 而门限 60 ⇒ 参照臂没盖住自己的内容，改带子、不改断言）。
+> 
+> **仍然只有用户能做的**：批次 26.x–83.1、84.1、85.1、85.2，**新加 86.1**（两种外观下看设置侧栏六枚图标是否都在）。
+> 
 
 > 上一轮（R114 / 第 116 轮收尾）原文开头：
 > 最后更新：2026-10-17 16:38（本地 · R114 / 第 116 轮收尾：**167 在同一轮里被自己撤掉 —— 图标两档都落在期望侧，可撤回的读数自己却不可复现**（U-378…U-380 / 产品 0 改动 / CHANGELOG 补写 + Round 114 拆出来单立一节））
