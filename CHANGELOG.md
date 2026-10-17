@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-## [Unreleased]
+### 理由的前提与菜单栏表面（R109）
+
+- **菜单栏那句"这里不可能有动画"的前提写进了代码**：`App.swift` 显式 `.menuBarExtraStyle(.menu)`
+  （以前依赖 SwiftUI 默认值），并加源码守卫 `testMenuBarSurfaceIdentityIsDeclaredNotInherited`
+  三格（显式 `.menu` / 挂在 `MenuBarExtra(` 段内 / 整块在 `#available(macOS 13, *)` 内）。
+  规矩进 **D-178**：理由所依赖的配置要写成声明，守卫要读前提而不是读后果。
+- **菜单栏逐元素重判（阶段二里最薄的一路）判完，结论全是"不加"**，每条给理由；
+  同时把版本事实写进台账（U-348）：`MenuBarExtra` 在 macOS 12 上不存在，
+  那台机器上用户看到的是 AppKit 的 `MenuBarController` ⇒ "菜单栏已重判"从今天起带版本限定。
+- **162 的仪器**：新读数 `CARD_PROBE_COLUMNS`（每列 x 段 / 顶向下 y 段 / 该列自己的众数页底 / 墨行 / 墨像素 / 最大偏离），
+  含推导列 `详情(外列−侧栏)`（本机 `x=148.0..720.0`）；配尺自检"带子必须与详情列有交集"（M596 钉）。
+  五格判法（含"以上都不是"那一格）预先登记在 BACKLOG 162。
+- **U-343 修措辞**：`CARD_PROBE_WHOLE_FILL` 不再同时打 `整窗材质=有` 与 `整窗填充行y=-1.0..-1.0pt`，
+  改成 `整窗填充候选档=N 整窗卡片行数=k 整窗卡片行y=…`（两个量本来就不同源）。
+- **U-350**：上面那次改措辞让 `mutate_r107` 的 M588 针命中 0 次 —— 这一次由**第 0 步**的静态预检抓到
+  （`bad=1` → refit → `bad=0` 才开电池），D-175 上一轮才立、本轮第一次省下那 25 分钟。
+- **U-352（本轮自己写坏台账的那一格）**：R108 往 `CHANGELOG.md` 插新节时，替换串里已经带着
+  `## [Unreleased]` 标题，于是文件顶部出现了**两行同样的标题**，而且没有任何守卫抓到
+  （`test_ledger_ids` 不看 CHANGELOG）。本轮修掉重复行，并补一条守卫：
+  "Unreleased 标题必须恰好出现一次" ⇒ 脚本用例 221 → 223（两条：标题唯一 + 正对照）。
+- 变异表 `mutate_r109.py` 四刀 M594–M597（三刀 CAUGHT、M597 按实登记为本机无判别力）⇒ 表数 17 → **18**、刀数 72 → **76**。
+- 产品侧 1 行（声明默认值，预期 0 像素变化，由帧基线 `CHANGED=0` 证）⇒ 换装本机。
 ### 判据与尺（R108）
 
 - **BACKLOG 160 结案**：新判据 `testSelectionFillUnderInactiveWindowIsPerSurface` 把"非 key ⇒ 选中一律画成灰"

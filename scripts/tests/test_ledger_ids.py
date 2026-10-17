@@ -188,6 +188,27 @@ class DuplicateIdTests(unittest.TestCase):
                          "造出一个重复号之后守卫没只抓到它 ⇒ 它不是在判'编号唯一'")
 
 
+class ChangelogShapeTests(unittest.TestCase):
+    """R109 / U-352：`CHANGELOG.md` 的 `[Unreleased]` 标题必须**恰好一个**。
+
+    起因是本轮自己写坏过一次：R108 往文件里插新节时，替换串里已经带着
+    `## [Unreleased]` 标题，于是文件顶部出现两行同样的标题 —— 而这一族的守卫
+    过去只看 `AGENT_*` 台账的编号，不看 CHANGELOG 的形状，所以它一路绿着进了提交。
+    """
+
+    def test_unreleased_heading_is_unique(self):
+        text = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+        hits = [ln for ln in text.splitlines() if ln.strip() == "## [Unreleased]"]
+        self.assertEqual(1, len(hits),
+                         "`## [Unreleased]` 出现了 %d 次（插入新节时替换串自带标题就会这样）" % len(hits))
+
+    def test_the_guard_itself_has_a_tooth(self):
+        """正对照：多插一行标题，上面那条必须只抓到这一格。"""
+        text = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+        broken = text.replace("## [Unreleased]", "## [Unreleased]\n## [Unreleased]", 1)
+        hits = [ln for ln in broken.splitlines() if ln.strip() == "## [Unreleased]"]
+        self.assertEqual(2, len(hits), "正对照本身坏了：拼不出两行标题，守卫就是恒真的")
+
 class NewestRoundIdRangeTests(unittest.TestCase):
     """最新那一轮的标题说"这一轮有 U-290…U-299"，那这十个号**每一个**都要在那一节里有正文。
 

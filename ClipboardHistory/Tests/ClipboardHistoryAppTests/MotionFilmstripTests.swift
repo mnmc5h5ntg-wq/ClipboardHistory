@@ -4151,6 +4151,35 @@ final class MotionFilmstripTests: XCTestCase {
                       "侧栏空态的过渡不在 EmptyStateView 这一段里 —— 挂在 Spacer 上等于没挂")
     }
 
+    /// R109 / BACKLOG 163：菜单栏那一行"不可能有动画"的理由，今天必须**写在代码里**而不是写在注释里。
+    ///
+    /// 起因是本轮逐元素重判菜单栏时读到的事实：`MenuBarRecommendationsView.swift:27` 说
+    /// "内容会被编译成真的 `NSMenu`（账本 D-055 / M15 实测）"，而 `App.swift` 里
+    /// **从来没有出现过 `.menuBarExtraStyle`** —— 那句话依赖的是 SwiftUI 的默认值。
+    /// 默认值会被人改，而旁边那条守卫数的是"这个文件里有没有 `animation(`"，
+    /// 于是"理由失效"与"守卫变绿"可以同时成立（R74 那一族：只在自家夹具上成立的理由比没做决定更贵）。
+    ///
+    /// 三格各钉一句话：① 样式被**显式**设成 `.menu`；② 它挂在 `MenuBarExtra(` 那一段里
+    /// （不是文件里随便哪一行，否则挪个位置照样绿）；③ 整个 `MenuBarExtra` 在
+    /// `if #available(macOS 13, *)` 里 ⇒ 在支持底线 macOS 12 上这棵表面**不存在**，
+    /// 那时用户看到的菜单是 `MenuBarController` 那棵 AppKit 的 —— 菜单栏的动效判断因此要按版本分开。
+    func testMenuBarSurfaceIdentityIsDeclaredNotInherited() throws {
+        let app = codeOnly(try productSource(named: "App.swift"))
+        XCTAssertTrue(app.contains("MenuBarExtra("),
+                      "App.swift 里找不到 MenuBarExtra ⇒ 这条守卫失去对象，先查表面是不是被挪走了")
+        let after = app.components(separatedBy: "MenuBarExtra(").dropFirst().first ?? ""
+        let block = String(after.prefix(1600))
+        XCTAssertTrue(block.contains(".menuBarExtraStyle(.menu)"),
+                      "菜单栏表面的样式不是**显式声明**的 `.menu`（今天它在 "
+                          + "MenuBarRecommendationsView 的注释里被当成事实引用）⇒ 要么显式声明，要么把那句理由改掉")
+        XCTAssertFalse(block.contains(".menuBarExtraStyle(.window)"),
+                       "菜单栏被换成 `.window` 了：那时 SwiftUI 的过渡**会**执行，"
+                           + "而 `MenuBarRecommendationsView` 里那句「不会执行」与它的守卫都还绿着")
+        let before = app.components(separatedBy: "MenuBarExtra(").first ?? ""
+        XCTAssertTrue(before.contains("if #available(macOS 13, *)"),
+                      "MenuBarExtra 不再被 macOS 13 的可用性门挡住 ⇒ 台账里「12 上没有这棵表面」那句要重写")
+    }
+
     /// 上面那条扫描器的**真值表**：两边都要钉住，一条只测"抓得住"的守卫会在下一次改排除项时失去刹车。
     ///
     /// 为什么单独一条：变异 M6 实测过 —— 往一个没有任何动画的文件里塞回

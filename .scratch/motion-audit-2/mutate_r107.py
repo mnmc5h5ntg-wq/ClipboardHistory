@@ -31,7 +31,8 @@ BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 AXIS = "UICaptureTests/testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox"
 
 # (编号, 说明, 文件, needle, 替换, 目标测试, 期望 verdict)
-WHOLE_EMIT = '                    emit("CARD_PROBE_WHOLE_FILL \\(fixture.name) \\(tag) 整窗材质=\(wholeFill >= 0 ? "有" : "无")"'
+# R109 追记（改 needle 而不是改期望，D-175 的规矩）：R109 因 U-343 把这一行打印的措辞改了（`整窗材质=有/无` → `整窗填充候选档=<数>`），M588 的 needle 当场失效；这一次是**在跑电池之前**由第 0 步的静态预检抓到的（bad=1），而不是第 25 分钟。
+WHOLE_EMIT = '                    emit("CARD_PROBE_WHOLE_FILL \\(fixture.name) \\(tag) 整窗填充候选档=\\(wholeFill)"'
 ARMS = [
     ("M588", "摘掉整窗填充那一行打印 ⇒ 本机无判别力（牙在 runner，人读那几行）", HARNESS,
      WHOLE_EMIT,

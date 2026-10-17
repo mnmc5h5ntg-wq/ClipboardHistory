@@ -818,6 +818,51 @@ final class UICaptureTests: XCTestCase {
                     + "\(declined.joined(separator: " "))")
     }
 
+    /// R109 / BACKLOG 162：分栏**每一列**的数值矩形（顶向下，pt）+ 类名。
+    ///
+    /// 为什么要有它：157 的 CI 答案说臂 2 在 runner 上"整窗有墨（70 行）、带子里 0 墨"，
+    /// 而这一句同时兼容两种事实 —— ① 详情那一列**根本没被实例化**，② 详情画了但带子又放错了。
+    /// 两种的处置相反（① 夹具忠实性，② 尺），分开它们只需要一行"每一列自己有多少墨"的读数。
+    static func splitColumnRects(in host: NSView) -> [(name: String, rect: CGRect)] {
+        var out: [(String, CGRect)] = []
+        func name(_ v: NSView) -> String { String(describing: type(of: v)) }
+        func walk(_ view: NSView) {
+            let isSplit = view is NSSplitView || name(view).contains("SplitView")
+            if isSplit {
+                for sub in view.subviews where name(sub).contains("_NSSplitViewItemViewWrapper") {
+                    if let r = Self.topDownRect(of: sub, in: host)?.rect, r.width > 2, r.height > 2 {
+                        out.append((name(sub), r))
+                    }
+                }
+            }
+            view.subviews.forEach { walk($0) }
+        }
+        walk(host)
+        // 外层与内层分栏会给出互相包含的列；按 x 与宽去重，留下彼此不同的那些。
+        var kept: [(String, CGRect)] = []
+        for item in out.sorted(by: { $0.1.width < $1.1.width }) {
+            if kept.contains(where: { abs($0.1.minX - item.1.minX) < 1 && abs($0.1.width - item.1.width) < 1 }) {
+                continue
+            }
+            kept.append(item)
+        }
+        // 162 要问的是"侧栏**右边**那一格里有没有东西"，而视图树只给出两块 wrapper：
+        // 一块 0..148（侧栏）、一块 0..720（整个内容，详情没有自己单独的 wrapper）。
+        // 所以详情那一格必须**推**出来：外列减去侧列。不推的话这行读数只会重复侧栏与整窗，
+        // 而 runner 上那一跑仍然分不开"详情没实例化"与"带子放错"。
+        if kept.count >= 2 {
+            let sorted = kept.sorted { $0.1.minX < $1.1.minX }
+            let sidebar = sorted[0].1
+            let outer = sorted.last!.1
+            let x0 = max(outer.minX, sidebar.maxX)
+            if outer.maxX - x0 > 2 {
+                kept.append(("详情(外列−侧栏)", CGRect(x: x0, y: outer.minY,
+                                                       width: outer.maxX - x0, height: outer.height)))
+            }
+        }
+        return kept.sorted { $0.1.minX < $1.1.minX }
+    }
+
     /// 标题栏在与某一 x 带相交的那一段里**最低**的那条边（pt，顶向下），找不到就 nil。
     ///
     /// 为什么判据要它（R108）：页底被排除之后，"最彩的一行"完全可能是**红绿灯**那一行，
@@ -7675,9 +7720,11 @@ final class UICaptureTests: XCTestCase {
                 let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
                 // R107 / 157 的实验 (a)：拍之前把**这一臂自己的视图树**留下（`inspect:` 与帧同源）。
                 var geometry: [String] = []
+                var columns: [(name: String, rect: CGRect)] = []
                 var splitOverflow = 0.0
                 _ = try render(fixture, appearance: appearance, to: file) { host in
                     geometry = Self.columnBoxes(in: host)
+                    columns = Self.splitColumnRects(in: host)
                     splitOverflow = Self.splitContentOverflow(in: host)
                 }
                 guard let image = NSImage(contentsOf: file),
@@ -7772,6 +7819,41 @@ final class UICaptureTests: XCTestCase {
                          + " 帧=\(rep.pixelsWide)x\(rep.pixelsHigh)px 倍率=\(String(format: "%.1f", scale))x")
                     emit("CARD_PROBE_GEOMETRY \(fixture.name) \(tag) "
                          + (geometry.isEmpty ? "视图树没打出列" : geometry.joined(separator: " ")))
+                    // R109 / 162：**每一列自己有多少墨**，按列各自的众数当背景量。
+                    // 这一行就是为了让 runner 那一跑能一句话分开"详情没实例化"与"带子又放错"。
+                    var columnLines: [String] = []
+                    for (i, column) in columns.enumerated() {
+                        let cBand = Self.clampBand(column.rect, scale: scale,
+                                                   pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh)
+                        let cPage = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                   xRange: cBand.x, yRange: cBand.y)
+                        let cInk = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                       height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                                       rect: column.rect, scale: scale,
+                                                       fill: cPage, pageLuma: cPage)
+                        columnLines.append("列\(i):\(column.name)"
+                            + "[x=\(String(format: "%.1f", column.rect.minX))..\(String(format: "%.1f", column.rect.maxX))"
+                            + " 顶向下y=\(String(format: "%.1f", column.rect.minY))..\(String(format: "%.1f", column.rect.maxY))]"
+                            + " 页底=\(cPage) 墨行=\(cInk.rows) 墨像素=\(cInk.pixels) 最大偏离=\(cInk.maxDelta)")
+                    }
+                    emit("CARD_PROBE_COLUMNS \(fixture.name) \(tag) "
+                         + (columnLines.isEmpty ? "视图树没打出列" : columnLines.joined(separator: " ")))
+                    // 尺自检（D-174③ 的形状）：**带子必须与详情那一列有交集**。
+                    // 它不判产品，只判"我扫的是不是我想扫的那一块" —— 红的时候说的是仪器坏了。
+                    // 为什么不是"带子必须包含整列"：本轮实测带子是 x=170..720 而详情列是 148..720，
+                    // 那 22pt 是分栏阴影（`_NSSplitViewShadowView` 148..160）+ 分隔线，
+                    // 里面本来就没有内容；要求包含会把一条正确的带子判成红。
+                    if let detail = columns.first(where: { $0.name.contains("详情") }) {
+                        let overlap = min(band.maxX, detail.rect.maxX) - max(band.minX, detail.rect.minX)
+                        XCTAssertGreaterThan(overlap, 0,
+                            "\(fixture.name) \(tag)：带子 x=\(String(format: "%.1f", band.minX))"
+                                + "..\(String(format: "%.1f", band.maxX))pt 与详情列"
+                                + " x=\(String(format: "%.1f", detail.rect.minX)).."
+                                + "\(String(format: "%.1f", detail.rect.maxX))pt 的交集是 "
+                                + "\(String(format: "%.1f", overlap))pt ⇒ 带子整个放到了别的东西上，"
+                                + "这一臂的「材质=无」不能当容器结论（157 / 162 的第三种坏法）。"
+                                + "改 `cardprobeBands`，不要改这条断言。")
+                    }
                     // 整窗那一遍**同时问材质**：(a) 行墨与 (b) 视图树包围盒只说明"有东西"，
                     // 而 150 问的是"那层填充还在不在"。所以整窗也要给出
                     // `材质=有/无` 与**填充行落在哪一段 y**（顶向下，pt）——
@@ -7794,8 +7876,15 @@ final class UICaptureTests: XCTestCase {
                             }
                         }
                     }
-                    emit("CARD_PROBE_WHOLE_FILL \(fixture.name) \(tag) 整窗材质=\(wholeFill >= 0 ? "有" : "无")"
-                         + " 整窗填充行y=\(String(format: "%.1f", fillTop))..\(String(format: "%.1f", fillBottom))pt"
+                    // U-343（本轮改措辞）：以前这行同时打 `整窗材质=有` 与 `整窗填充行y=-1.0..-1.0pt`，
+                    // 看着自相矛盾。两个量其实来自同一次 `cardRowKinds` 的**两个不同返回**：
+                    // `wholeFill` 是"候选填充档的个数"（≥0 就报"有"），而 y 段要真有被分类成卡片的**行**才有值。
+                    // 于是"有个候选档但没有成行的卡片"这一格会打成 有 / -1 —— 不是矛盾，是措辞把两件事说成了一件。
+                    // 现在把两个量分开命名并各带自己的数，读的人不会再要求它们互相蕴含。
+                    let cardRowCount = wholeRows.filter { $0 == CardRowKind.card }.count
+                    emit("CARD_PROBE_WHOLE_FILL \(fixture.name) \(tag) 整窗填充候选档=\(wholeFill)"
+                         + " 整窗卡片行数=\(cardRowCount)"
+                         + " 整窗卡片行y=\(String(format: "%.1f", fillTop))..\(String(format: "%.1f", fillBottom))pt"
                          + " 带子y=\(String(format: "%.1f", band.minY))..\(String(format: "%.1f", band.maxY))pt"
                          + " 带子材质=\(fill >= 0 ? "有" : "无")"
                          + " 分栏内容溢出=\(String(format: "%.1f", splitOverflow))pt")
