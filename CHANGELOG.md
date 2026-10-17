@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 查一个缺号，查出 BACKLOG 172 的条目号已经被吃掉（R138 / U-456…U-458 · 产品 0 改动）
+
+- 172 是整个目标里**唯一等用户**的那条账，而它在 `AGENT_BACKLOG.md` 里已经不成其为条目：
+  前缀「172. **R122 开：亮档侧栏图标」被某次插入吃掉（本仓库记过这个形状：编辑台账「插入」实为替换）
+  ⇒ 已按 13:11 那次 grep 的原文逐字补回；在此之前 CHANGELOG / 最终报告 / STATE 里所有「BACKLOG 172」都悬空，而没有任何判据发现过。
+- 引用检查扩到正文台账：`test_prose_references_to_backlog_items_resolve_too`。
+  M654（把前缀再吃掉一次）红在这条上，并逐条点名 `CHANGELOG.md → BACKLOG 172`、`AGENT_FINAL_REPORT.md → BACKLOG 172`。
+- U-457：一把尺第一次伸进散文，必须配「名册太小就算红」（认出条目数 > 100），否则正则一退化它就恒真。
+- U-458：补好后仍缺 `107 / 156 / 161` —— **不定论**（孤儿行找不到；抽查的三个历史版本也没有，而那三版是我挑的、不是全历史）。
+- 本轮另记一笔自己的错：第一次提交里 CHANGELOG 这一条**没落上**（锚点命中 0 次，其余四处落了），
+  也就是说"半批已写"（U-452）在我写完它的下一秒又发生了一次 —— 这次是行号定位救的场。
+- 脚本自检 280 OK；刀数 131 / caught 130；未动 Swift 源码 ⇒ 全量与帧基线沿用；清账表未动（60 行 / 未清账 102）。
+
+
 ### 给"生成器坏了而闸门报 ok"补上自动守卫（R137 / U-453…U-455 · 产品 0 改动）
 
 - 新自检 `scripts/tests/test_ledger_generator_output.py`（4 条）：把生成器复制进临时目录跑一遍，要求 exit 0、
