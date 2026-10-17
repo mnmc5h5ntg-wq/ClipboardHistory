@@ -1,5 +1,5 @@
 {
-  "count": 134,
+  "count": 136,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -131,6 +131,8 @@
     "sidebar-multi-select-min-250x520-light.png": "65636ffec6ea2dfe3a519c7cb37198c57d386fd6b033f69e4e0c7825731ff320",
     "sidebar-no-results-300x520-dark.png": "4256eb622d176224127f0a054d6d9a84d54fae2176c7b4f08619de68c8231cba",
     "sidebar-no-results-300x520-light.png": "d3b1e8fa2597d5cfd1c7d6da281b19f2737af7ccd00d0140bf9b68c56ff29d6e",
+    "statusitem-glyph-160x90-dark.png": "136a265ebde28535ae30cdb40530ee0c8ad553f82fab4a53a9bb0da04b11d1f0",
+    "statusitem-glyph-160x90-light.png": "e8aa8fb157c096a239b5a149c2512529a51285f87b7c303fca577994ff423158",
     "weights-520x880-dark.png": "8f58fa4642c32ee3c8040e1f8abf3d15d7b6ece1d0d6ddf8a08dffe3fbf9095c",
     "weights-520x880-light.png": "74fe7255962875a88bdbd5e109afa0c42af6660b08dbb02f3bdac2b28056c9a3",
     "weights-adjusted-520x880-dark.png": "d55a38036042116117c18ca5e3830b694265b5ad81e2f92e567c27ff14cff555",

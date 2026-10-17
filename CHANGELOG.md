@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 菜单栏图标的身份（R110）
+
+- **macOS 12 那颗状态项图标换成系统符号，并与 13+ 引用同一个名字**：新增
+  `MenuBarController.statusSymbolName`（`clipboard`），`App.swift` 的 `MenuBarExtra` 与 12 的
+  `makeStatusBarIcon()` 都引用它；手画那颗降级为"取不到符号时的兜底"（默认路径不画）。新增判据：
+  逐像素（产品 vs 我独立按同一 symbolName 做的参考）+ 几何 18×18 + 模板位 + 墨量地板（实测 892 / 0.17）
+  + 源码"字面量只许出现一次"。新增两张特写帧 `statusitem-glyph-160x90-{light,dark}`（基线 134 → 136）。
+- **155 拿到第一个答案**：`double_run_spread.py` 对同一份构建（commit `ef04639`）的两次捕获做逐读数对账
+  ⇒ 115 组配对**全部逐字相同**（最大绝对差 0）；反向牙拿两份不同尺的日志比对，报出 18 行「只在一遍」。
+- 新开 BACKLOG 164（素材身份，本轮修）、165（12 的菜单会挂着「正在整理推荐…」，只记账不动产品）。
 ### 理由的前提与菜单栏表面（R109）
 
 - **菜单栏那句"这里不可能有动画"的前提写进了代码**：`App.swift` 显式 `.menuBarExtraStyle(.menu)`

@@ -159,4 +159,125 @@ final class MenuBarPopulationTests: XCTestCase {
         XCTAssertTrue(titles.contains("暂无推荐"), "空库且没有刷新在飞时应说\"暂无推荐\"。实际：\(titles)")
         XCTAssertFalse(titles.contains("正在整理推荐…"), "没有刷新在飞时不该假装在算")
     }
+
+    // MARK: - R110 / BACKLOG 164：菜单栏那颗图标的**身份**
+
+    /// 把一张 `NSImage` 画进位图并返回 (PNG 字节, 墨统计)。
+    ///
+    /// 墨 = alpha ≥ 0.5 的像素；模板图在这里按原样（黑）绘制，两臂同一颗尺。
+    private func rasterize(_ image: NSImage, side: Int) -> (data: Data, ink: Int, box: (minX: Int, minY: Int, maxX: Int, maxY: Int))? {
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: side, pixelsHigh: side,
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                         isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(x: 0, y: 0, width: side, height: side))
+        NSGraphicsContext.restoreGraphicsState()
+        guard let bytes = rep.bitmapData else { return nil }
+        let spp = rep.samplesPerPixel
+        var ink = 0
+        var minX = side, minY = side, maxX = -1, maxY = -1
+        for py in 0..<side {
+            for px in 0..<side {
+                let alpha = bytes[py * rep.bytesPerRow + px * spp + (spp - 1)]
+                if alpha >= 128 {
+                    ink += 1
+                    minX = min(minX, px); maxX = max(maxX, px)
+                    minY = min(minY, py); maxY = max(maxY, py)
+                }
+            }
+        }
+        let png = rep.representation(using: .png, properties: [:]) ?? Data()
+        return (png, ink, (minX, minY, maxX, maxY))
+    }
+
+    /// ①**运行时**：12 那棵分支交出去的图，必须逐像素等于「自己按同一个 symbolName
+    /// 做出来的系统符号」，而且不是那段手画的兜底 —— 这一条是"换素材"唯一的产物级证据。
+    /// ②**几何**：它仍占 18×18 那一格、仍是模板图（染色交给系统）。
+    /// ③**读数**：墨像素与包围盒进台账，不许只留一句「已经换成 SF Symbol」。
+    func testStatusBarGlyphIsTheSystemSymbolNotTheDrawnFallback() throws {
+        let controller = MenuBarController()
+        let product = controller.makeStatusBarIcon()
+        let side = 72  // 18pt × 4
+
+        XCTAssertEqual(product.size, NSSize(width: 18, height: 18),
+                       "状态项图标换了占位那一格：这一轮只许换素材，几何要能单独归因（BACKLOG 164）")
+        XCTAssertTrue(product.isTemplate,
+                      "模板位丢了 ⇒ 暗色菜单栏里它会是一块黑，而不是随系统染色的白")
+
+        let reference = try XCTUnwrap(
+            NSImage(systemSymbolName: MenuBarController.statusSymbolName,
+                    accessibilityDescription: "时间剪史"),
+            "`\(MenuBarController.statusSymbolName)` 在这台机器上取不到系统符号 ⇒ 产品会走手画兜底，两棵表面必然不同形")
+        reference.isTemplate = true
+        reference.size = NSSize(width: 18, height: 18)
+
+        guard let a = rasterize(product, side: side),
+              let b = rasterize(reference, side: side) else {
+            return XCTFail("画不出位图 ⇒ 这一格没有对象，不判（不是通过）")
+        }
+        XCTAssertGreaterThan(a.ink, 0, "交出去的图一个墨像素都没有 ⇒ 菜单栏会是一块空白")
+        XCTAssertEqual(a.data.count, b.data.count, "PNG 字节数就不同：先看图再看断言")
+        XCTAssertEqual(a.data, b.data,
+                       "产品那颗图标与「同一个 symbolName 的系统符号」逐像素不同 ⇒ 它走的是手画兜底（或 symbolName 又分叉了）")
+        // 反向牙（不是恒真式）：参考符号**不该**是空的 —— 两条臂都空时上面那句相等是假的。
+        XCTAssertGreaterThan(b.ink, 0, "参考臂自己就没有墨 ⇒ 两条臂都空，① 的相等是假的")
+        // 几何那一格（阈值来自本轮实测，不是先写数再找理由）：
+        // 本机 72px（=18pt×4）这一格里墨包围盒 `10..60 × 7..67`、墨像素 892、墨占 0.17。
+        // ⇒ 留白地板 2px（实测最小那一侧 4px）、墨量地板 400（实测 892，一半的余量）。
+        // 顶到边 ⇒ 18×18 的占位把笔画裁了；墨量掉下来 ⇒ 换成了一条头发丝或一个空白格。
+        let margin = 2
+        XCTAssertGreaterThanOrEqual(a.box.minX, margin, "墨贴左边（minX=\(a.box.minX)）⇒ 图标在 18pt 那一格里出框")
+        XCTAssertGreaterThanOrEqual(a.box.minY, margin, "墨贴下边（minY=\(a.box.minY)）⇒ 同上")
+        XCTAssertLessThanOrEqual(a.box.maxX, side - 1 - margin, "墨贴右边（maxX=\(a.box.maxX)）⇒ 同上")
+        XCTAssertLessThanOrEqual(a.box.maxY, side - 1 - margin, "墨贴上边（maxY=\(a.box.maxY)）⇒ 同上")
+        XCTAssertGreaterThanOrEqual(a.ink, 400,
+            "4× 这一格只有 \(a.ink) 个墨像素（本机实测 892）⇒ 素材掉成头发丝或半空，菜单栏里会看不清")
+        XCTAssertEqual(a.box.maxX - a.box.minX + 1, b.box.maxX - b.box.minX + 1,
+                       "墨宽在两臂之间不一致：像素级相等已经先红，这一条是给报表看的分带")
+        CaptureReadings.emit("MENUBAR_GLYPH symbol=\(MenuBarController.statusSymbolName) 倍率=4 边=\(side)px "
+                             + "墨像素=\(a.ink) 包围盒px=\(a.box.minX)..\(a.box.maxX)×\(a.box.minY)..\(a.box.maxY) "
+                             + "墨占=\(String(format: "%.2f", Double(a.ink) / Double(side * side))) "
+                             + "与参考=相同 模板=\(product.isTemplate)")
+    }
+
+    /// 源码那一格：symbolName **只许出现一次**（在 `MenuBarController` 的声明里），
+    /// 两个调用点都引用常量。写死字面量就是"两棵表面各画各的"的下一次开端。
+    func testBothSurfacesReferenceTheOneSymbolName() throws {
+        let app = codeOnly(try productSource(named: "App.swift"))
+        let controllerSource = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
+        XCTAssertTrue(app.contains("systemImage: MenuBarController.statusSymbolName"),
+                      "13+ 的 `MenuBarExtra` 没引用那颗常量 ⇒ 两棵表面的图标又能各写各的了（BACKLOG 164）")
+        XCTAssertFalse(app.contains("systemImage: \""),
+                       "App.swift 里又出现了写字面量的 `systemImage: \"…\"` ⇒ 请引用 `MenuBarController.statusSymbolName`")
+        XCTAssertTrue(controllerSource.contains("static let statusSymbolName"),
+                      "`MenuBarController.statusSymbolName` 不见了 ⇒ 那条「两个调用点共用一个名字」的结构没了")
+        XCTAssertTrue(controllerSource.contains("NSImage(systemSymbolName: Self.statusSymbolName"),
+                      "12 那棵分支不再按常量取系统符号 ⇒ 它又回到手画那颗了")
+        let literals = (app + controllerSource).components(separatedBy: "\"\(MenuBarController.statusSymbolName)\"").count - 1
+        XCTAssertEqual(literals, 1,
+                       "symbolName 的字面量在两份产品源码里出现 \(literals) 次（只许 1 次，在声明处）"
+                       + " ⇒ 多于一次就是有人又把名字写死在调用点上")
+    }
+
+    /// 读一份产品源码（与 `UICaptureHarness` 同一套找法）；找不到就红，不许跳过。
+    private func productSource(named relativePath: String) throws -> String {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let url = candidate.appendingPathComponent("Sources/ClipboardHistoryApp", isDirectory: true)
+                .appendingPathComponent(relativePath)
+            if let text = try? String(contentsOf: url, encoding: .utf8) { return text }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw NSError(domain: "MenuBarPopulationTests", code: 2,
+                      userInfo: [NSLocalizedDescriptionKey: "找不到 Sources/ClipboardHistoryApp/\(relativePath)"])
+    }
+
+    /// 去掉整行注释：守卫读的是**代码**，不是文档里的一句话。
+    private func codeOnly(_ source: String) -> String {
+        source.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+    }
 }

@@ -21,7 +21,10 @@ struct ClipboardHistoryApp: App {
         }
 
         if #available(macOS 13, *) {
-            MenuBarExtra("时间剪史", systemImage: "clipboard") {
+            // R110：符号名从 `MenuBarController.statusSymbolName` 引用，不在这里写字面量
+            // —— 12 上那颗图标由 AppKit 自己画（`NSImage(systemSymbolName:)`），
+            // 两处各写各的就会变成"同一个入口在两台机器上长得不一样"（BACKLOG 164）。
+            MenuBarExtra("时间剪史", systemImage: MenuBarController.statusSymbolName) {
                 MenuBarRecommendationsView(historyStore: historyStore, appDelegate: appDelegate)
                 Divider()
                 ForEach(AppCommandCatalog.menuBarCommands.filter { $0 != .quit }, id: \.self) { command in

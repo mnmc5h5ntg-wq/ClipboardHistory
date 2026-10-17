@@ -4,6 +4,18 @@ import AppKit
 final class MenuBarController: NSObject, NSMenuDelegate {
     typealias CommandHandler = (AppCommand) -> Void
 
+    /// 菜单栏那颗图标在**两棵表面上必须是同一个符号**（R110 / BACKLOG 164）。
+    ///
+    /// macOS 13+ 走 `MenuBarExtra(_, systemImage:)`，12 走下面 `makeStatusBarIcon()`
+    /// 里的 `NSImage(systemSymbolName:)`。以前 13+ 用 SF Symbol `clipboard`、
+    /// 12 用一段手写 `NSBezierPath`（body 10×13.5、clip 5.6×2.8、三条 1.6pt 的线），
+    /// 于是"同一个入口在两台机器上长得不一样"，而且 12 上那颗**不是系统素材**
+    /// —— 与相邻菜单栏图标的笔画粗细/圆角/视觉重心都对不上。
+    /// 名字只在这里写一次，两个调用点都引用它；一致性由
+    /// `MotionFilmstripTests.testMenuBarGlyphIsOneSymbolAcrossBothSurfaces` 钉
+    /// （源码两格 + 运行时逐像素那一格）。
+    static let statusSymbolName = "clipboard"
+
     private var statusItem: NSStatusItem?
     private var commandHandler: CommandHandler?
     private var pasteHandler: ((HistoryStore.Entry) -> Void)?
@@ -184,7 +196,29 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    private func makeStatusBarIcon() -> NSImage {
+    /// 状态项那张图。**不是 private**：macOS 12 那棵分支在本机（13+）永远不会执行，
+    /// 帧要拍到这颗图标只能由夹具直接来要这张图 —— 与 `populate` 同一条先例
+    /// （审计第二轮 09-08：拿不到的表面不是"不能判"，是要给判据留一个入口）。
+    /// 这张图**不经过** `NSStatusItem`，所以材质、圆角、点击高亮仍然拍不到，
+    /// 拍得到的是素材本身（笔画、留白、是否出框）。
+    func makeStatusBarIcon() -> NSImage {
+        // 首选系统符号：与 13+ 的 `MenuBarExtra` 同一个 symbolName ⇒ 同一个素材、
+        // 同一套笔画权重（与相邻菜单栏图标对齐），模板渲染由系统按明暗档染色。
+        if let symbol = NSImage(systemSymbolName: Self.statusSymbolName,
+                               accessibilityDescription: "时间剪史") {
+            symbol.isTemplate = true
+            // 沿用这棵树一直占的那一格 18×18：改尺寸会把"换素材"变成"改几何"，
+            // 两件事要能分开归因（帧里的墨包围盒会替我盯着有没有出框）。
+            symbol.size = NSSize(width: 18, height: 18)
+            return symbol
+        }
+        // 只有系统符号拿不到时才走（deployment target 是 12，SF Symbols 在 11+ 就有；
+        // 这一支是"别把菜单栏留空"的兜底，不是第二条设计）。
+        return Self.drawnFallbackIcon()
+    }
+
+    /// 兜底那颗手画的剪贴板。**默认路径不画它**（上面拿到符号就直接返回）。
+    private static func drawnFallbackIcon() -> NSImage {
         let size = NSSize(width: 18, height: 18)
         let image = NSImage(size: size, flipped: false) { rect in
             NSColor.black.setStroke()

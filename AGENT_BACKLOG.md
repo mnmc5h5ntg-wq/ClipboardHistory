@@ -4017,3 +4017,75 @@ runner：`SELECTION_KEYSTATE_CAPABILITY 候选=2 有对象=2 未判=0`、
 **顺带一条版本事实进台账**（U-348）：`MenuBarExtra` 在 macOS 12 上**不存在**，
 12 上用户看到的菜单是 AppKit 那棵 `MenuBarController` ⇒ 三张 `menubar-*` 帧对面的是 13+ 那一棵，
 "菜单栏已逐元素重判"这句话从今天起必须带版本限定（本机 `sw_vers` = 27.0，所以用户那一棵是 `MenuBarExtra`）。
+
+**164. 菜单栏那颗图标在两棵表面上是两副身体（12 手画、13 系统符号）**（R110 开 / 与 D-178、R34 那族同源，**素材身份账**）：
+`MenuBarExtra(_, systemImage: "clipboard")` 与 `MenuBarController.makeStatusBarIcon()` 的手画 `NSBezierPath`
+没有任何一条线连着。本轮已按 D-179 收成 `MenuBarController.statusSymbolName` 一个常量 + 逐像素判据 +
+源码"字面量只许一次" + 两张特写帧（`statusitem-glyph-160x90-{light,dark}`），变异表 r110 四刀全 CAUGHT 之后结案。
+**还欠的一格**：12 上真菜单栏里那颗的基线/材质只有真机能看（批次 85），本机分支不执行（U-359）。
+判法（先登记再动手）：真机上若与相邻系统图标明显偏大/偏小或垂直不居中 ⇒ 改 `NSStatusItem` 的占位而不是换素材，
+并且把 18×18 那一格单独重测。
+
+**165. macOS 12 的菜单会一直挂着「正在整理推荐…」**（R110 开 / 与 164 同形：**两棵表面行为不对等**）：
+证据（读代码，非推测）：`populate` 只在 `makeMenu()`（`MenuBarController.swift:66`）与 `menuWillOpen`（`:73`）被调用；
+这个文件里没有 `objectWillChange` / 通知订阅；`HistoryStore.refreshPredictions()`（`HistoryStore.swift:199`）
+先置 `isRefreshingPredictions = true` 再派后台任务 ⇒ 打开菜单那一刻填的是"正在算"，算完**没有人重填**。
+13 的 `MenuBarRecommendationsView` 观察 store，自动更新，所以这一格只有 12 有。
+候选修法：① 实现 `menuNeedsUpdate:`（每次要显示前重填，系统菜单的标准做法）；② 订阅刷新收尾后
+`populate`（菜单开着时会当场变）。**预登记判法**（跑一次再选）：
+① 若"菜单没关、后台结果落地"这一格能读到菜单里出现候选行 ⇒ ②可行且必须；
+② 若只有"重新打开菜单才更新" ⇒ ①就够，②不做（不要在菜单里塞常驻订阅）；
+③ 两种都做不到（通道不允许）⇒ 把"正在整理推荐…"这句改成**只在打开时算一次**的诚实文案，并记为按实不做。
+
+### R110 追记：162 拿到答案（①，不是②）/ 新开 166（runner 的动效红不可复现，而闸门没覆盖它）
+
+**162 结案（读 R109 的 CI `39008599904`）**：本轮装的 `CARD_PROBE_COLUMNS` 第一次在 runner 上打出逐列读数 ——
+臂 2 `cardprobe-split-groupbox`：列0（侧栏 wrapper `x=0.0..148.0`）`墨行=70/71 墨像素=1420/1662 最大偏离=165/211`，
+而**详情那一列自己就有 wrapper**（`列1 x=151.0..720.0`，与本机"详情没有自己的 wrapper"不同，推导列 列2 与它同段），
+它的读数是 `墨行=0 墨像素=0 最大偏离=0（亮）/2（暗）`。带子 `170..720` 落在 151..720 **之内**、
+尺自检"带子必须与详情列有交集"**没有红** ⇒ 按 162 开跑前写死的两格，命中 **①：详情在 runner 上没被实例化**，
+不是 ②（带子放错）。**所以 150 那台实验在 CI 上的堵点换了名字**：不是尺、不是带子，
+是夹具的 detail 内容在那台机器上不出现 ⇒ 下一步是"让臂 2 的详情在 runner 上保证有内容"（selection 落点或显式给 detail），
+而不是再动带子。**本条不许写成 150 已推进**：150 仍然开着，只是它的堵点第一次有了名字。
+
+**166. runner 上的动效红在两次运行之间换了一朵，而捕获闸门看不见它**（R110 开 / 与 155、R55/R57 那族同源，**机器侧可复现性账**）：
+`39005449295`（R108）的去重后红是 `testBandCaptureIsCheaperAndStillSeesTheMotion`（26.84 > 23.88）+ 157 那两朵证人；
+`39008599904`（R109，**产品只差一行声明**）的红的却是 `testFrameIntervalsUnderStateChanges`
+（最差帧 196.77 > 120ms、p95 42.43 > 20ms）+ 同样那两朵证人 —— **bandCapture 那一跑绿了**。
+同一台 runner、同一份尺、相邻两次跑，动效那两朵红**互相换班** ⇒ 这一族的地板在 runner 上是噪声主导的。
+另一格事实：两次 `CAPTURE_GATE_CASES` 都是 `passed=53 skipped=11 failed=1 有名字的红=1` ⇒
+那句"唯一的红是 157"只覆盖**捕获那一卷**，动效那一卷的红不在它的账里（R109 的账本恰好就是这么写的，见 STATE 的 R109 段）。
+**四次相邻跑的基线（本轮补查，U-361）**：`38994712442`（R106）`FAILED testFrameIntervals=0 / FAILED testBandCapture=0`；
+`39002273057`（R107）同样 0/0；`39005449295`（R108）bandCapture 红；`39008599904`（R109）frameIntervals 红。
+⇒ "换了一朵"这件事要带上限：**这一族从 R108 那跑才开始出现红**，而 R108 与 R109 之间产品只差一行声明、
+尺那边多了逐列扫描（R109 的 `CARD_PROBE_COLUMNS` 要在整窗字节上多扫两列）。
+**分不清的两件事就分开记账**：既可能是 runner 噪声从 R108 起变高，也可能是我 R109 新加的扫描把那一卷拖慢
+（`p95 42.4ms` 这种量级对整卷负载是敏感的）。能分开的办法就一条：**同一 commit 在 CI 上连跑两次**（155 的 runner 版），
+若红在两跑之间换班 ⇒ 噪声；若 frameIntervals 每次都红而 bandCapture 每次都不红 ⇒ 是我加的扫描，
+那时该做的是把逐列扫描挪出被测卷的计时窗口，而不是放宽门限。
+
+**仪器已落（本轮）**：`scripts/ci_red_stability.py` 把两次跑的红**归约成身份**（用例名，抽不到名字时用消息指纹）
+再分三格（两跑都红 / 只在一跑 / 形状换了），有换班就退 1。拿两份真日志对账的结果就是这一条：
+`RED_STABILITY A=r108_ci.log 红=2 B=r109_ci.log 红=2`
+`BOTH_RED testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox 形状=XCTAssertGreaterThan`
+`ONLY_A testBandCaptureIsCheaperAndStillSeesTheMotion 形状=XCTAssertLessThanOrEqual`
+`ONLY_B testFrameIntervalsUnderStateChanges 形状=XCTAssertLessThanOrEqual`
+`RED_STABILITY 两跑都红=1 只在一跑=2 形状换=0 换班=1` ⇒ **157 那朵证人两跑都在（可当真），动效那两朵各只出现一次（不能当真）**。
+配套真值表 7 格（正对照 / 换班牙 / 裸 XCTFail 形状 / 形状换 / 读不到≠干净 / `--help` 退 0 /
+无名红不许塞进同一个桶 = U-364）。
+
+候选修法（先登记再动）：① 让动效那一卷也有"有名字的红"能力行，把 `testFrameIntervals*` / `testBandCapture*` 纳入同一份闸门账；
+② 在 CI 上把这两条判据改成**同版两跑取交集**（与 155 的形状一致），只把两跑都红的算红；
+③ 承认这两条判据在 runner 上不成立并登记成有名字的未覆盖（本机仍然判）。**不许做**的是放宽门限。
+
+### 批次 85（R110 开 · 只有真机能做的两格，都不需要额外工具）
+
+**85.1 状态项那颗图标的基线与材质**（164 的机器级那一格 / U-359）：本轮把 12 上那颗换成系统符号 `clipboard`，
+但 12 那棵分支在本机（13+）不执行 ⇒ 我验的是**工厂交出的那张图**（逐像素 + 帧），不是真菜单栏里那颗。
+请在装了 R110 之后那版包的机器上看一眼：菜单栏里那颗剪贴板与左邻右舍比，**垂直基线是否居中、大小是否同一档、
+暗色菜单栏里是不是白墨**。若偏高/偏小 ⇒ 改的是 `NSStatusItem` 的占位（18×18 那一格），不是换素材 ——
+164 里预登记的判法就是这一条。
+
+**85.2 12 上打开菜单会不会一直挂着「正在整理推荐…」**（165）：macOS 12 的机器上，冷启动后**第一次**点菜单栏图标，
+看那一行是不是"正在整理推荐…"，然后**不要关菜单**等 2~3 秒：候选行会不会自己出现？
+（会 ⇒ 165 选②订阅刷新收尾重填；不会 ⇒ 选①`menuNeedsUpdate:` 或按实登记）本机是 13+，这一格只能由真机答。

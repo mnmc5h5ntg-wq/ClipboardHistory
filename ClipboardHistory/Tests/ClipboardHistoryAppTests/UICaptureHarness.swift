@@ -3769,6 +3769,32 @@ final class UICaptureTests: XCTestCase {
             })
         }
 
+        // R110 / BACKLOG 164：macOS 12 那棵状态项图标的**素材本身**。
+        // 12 的分支在本机（13+）永远不会执行，而 `MenuBarExtra` 的图标是系统画的，
+        // 所以我让夹具**直接问产品工厂要那张图**（`makeStatusBarIcon()` 为此放宽成 internal，
+        // 与 `populate` 同一条先例）。
+        // 拍得到：笔画粗细、留白、是否出框、明暗两档的染色（模板图随前景色走）。
+        // **拍不到**：`NSStatusItem` 的材质、点击高亮、以及真菜单栏里的基线对齐
+        // —— 那三样只有真机能看，登记成批次 85。
+        // 名字刻意不是 `menubar-` 前缀：`menuSurfaceReplicaFixtures` 那份名单说的是
+        // 「菜单表面的复刻，不许拿来判宽度/截断」，这张是**素材特写**，不是复刻。
+        results.append(Fixture("statusitem-glyph", NSSize(width: 160, height: 90)) {
+            let glyph = MenuBarController().makeStatusBarIcon()
+            return AnyView(
+                HStack(alignment: .center, spacing: 18) {
+                    Image(nsImage: glyph)
+                        .renderingMode(.template)
+                        .resizable()
+                        .frame(width: 72, height: 72)
+                    Image(nsImage: glyph)
+                        .renderingMode(.template)
+                        .frame(width: 18, height: 18)
+                }
+                .padding(9)
+                .frame(width: 160, height: 90, alignment: .leading)
+            )
+        })
+
         // 侧栏脱离分栏器单独拍：实测 NavigationSplitView 的 sidebar 列在离屏
         // cacheDisplay 下不跟随强制暗色（同一帧里详情列是白字、侧栏列是黑字），
         // 所以 content-* 帧只能用来核对几何与布局，颜色验收看 sidebar-*。

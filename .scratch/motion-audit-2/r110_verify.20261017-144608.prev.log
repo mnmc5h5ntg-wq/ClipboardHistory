@@ -1,0 +1,5 @@
+== 0) 变异针自检（U-338：原来在第 6 步，即构建+全量测试+在屏探针+拍帧+脚本电池之后）
+PRECHECK_EXIT=0 NEEDLE_PRECHECK tables=19 covered=17 arms=67 bad=0 
+== 1) 构建（必须 0 告警）
+BUILD_EXIT=0 BUILD_WARNING_LINES=0
+== 2) 全量 swift test
