@@ -4297,3 +4297,16 @@ settings-general-login-unsupported, settings-min, settings-privacy, …]」。
     `SIDEBAR_ICON_BLIND_SPOT` 登记行 —— 写成会红就会诱使下一轮拿固定色去填它，那才是真把颜色写死。
     下一步（R123）：装包到真机，用 `screencapture` 量亮档侧栏图标列的墨，与标签文字同列对照；
     真机若也淡，就把 `.monochrome` 撤回去并给多色符号单独配 `.palette`。
+
+**150 追记 4（R122 读到 R121 的 CI：四种出口在 runner 上按预期落地）**
+
+run 39027921504 正文（已解析进 `ci/r121_run_39027921504_readings.log`）：
+`CARD_PROBE_ARM_VERDICT cardprobe-split-groupbox light 整帧墨行=70 详情列墨行=0 带子墨行=0 ⇒ 不可判(整帧有墨而详情列0墨=这台机器没画这一列)`
+（暗档同形，整帧 59）+ `CARD_PROBE_CAPABILITY 参照臂=6 可判=4 框错红=0 不可判=2`
++ 另两臂四格 `⇒ 可判(带子里有内容)`。**捕获卷不再因这条变红**，那一跑只剩
+`testDarkSettingsSidebarTextIsACountedBlindSpot` 一朵红（171 的 `gone`），与登记一致。
+⇒ 150 的定性有了一台机器之外的第二份证据，且"不可判"是**带名字的**两格，不是 skip。
+
+**171 追记 2（同一跑）**：`MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0` / `MOTION_GATE_RESULT=ok`
+⇒ 动效那一卷干净；捕获卷那朵 `gone` 仍在，名单分键（键来自 `HostInfo`/系统版本/帧倍率）排 R123。
+

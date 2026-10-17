@@ -1,0 +1,20 @@
+CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=无 卡片段=-1 墨行=0 墨像素=0 最大偏离=2 参考条墨行=0 带子=170..720pt 页底=52 前三=(52:600) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM cardprobe-split-groupbox light 材质=无 卡片段=-1 墨行=0 墨像素=0 最大偏离=0 参考条墨行=0 带子=170..720pt 页底=236 前三=(236:600) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_ARM_VERDICT cardprobe-groupbox-default dark 整帧墨行=12 详情列墨行=12 带子墨行=12 ⇒ 可判(带子里有内容)
+CARD_PROBE_ARM_VERDICT cardprobe-groupbox-default light 整帧墨行=12 详情列墨行=12 带子墨行=12 ⇒ 可判(带子里有内容)
+CARD_PROBE_ARM_VERDICT cardprobe-scroll-groupbox dark 整帧墨行=12 详情列墨行=12 带子墨行=12 ⇒ 可判(带子里有内容)
+CARD_PROBE_ARM_VERDICT cardprobe-scroll-groupbox light 整帧墨行=11 详情列墨行=11 带子墨行=11 ⇒ 可判(带子里有内容)
+CARD_PROBE_ARM_VERDICT cardprobe-split-groupbox dark 整帧墨行=59 详情列墨行=0 带子墨行=0 ⇒ 不可判(整帧有墨而详情列0墨=这台机器没画这一列)
+CARD_PROBE_ARM_VERDICT cardprobe-split-groupbox light 整帧墨行=70 详情列墨行=0 带子墨行=0 ⇒ 不可判(整帧有墨而详情列0墨=这台机器没画这一列)
+CARD_PROBE_CAPABILITY 参照臂=6 可判=4 框错红=0 不可判=2（拆：详情列0墨/整帧0墨，逐臂见 CARD_PROBE_ARM_VERDICT）
+CARD_PROBE_COLUMNS cardprobe-split-groupbox dark 列0:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..600.0] 页底=52 墨行=59 墨像素=1239 最大偏离=179 列1:_NSSplitViewItemViewWrapper[x=151.0..720.0 顶向下y=0.0..600.0]
+CARD_PROBE_COLUMNS cardprobe-split-groupbox light 列0:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..600.0] 页底=236 墨行=70 墨像素=1420 最大偏离=165 列1:_NSSplitViewItemViewWrapper[x=151.0..720.0 顶向下y=0.0..600.
+CARD_PROBE_DETAIL_TREE cardprobe-split-groupbox dark 详情列文字视图=0 图像视图=0 嵌套hosting=4 列内视图数=7 样本=NSVibrantSplitDividerView[146,0 7x600] ; _NSSplitViewCollapsedInteractionsView[705,0 15x600] ; _NSSplitView
+CARD_PROBE_DETAIL_TREE cardprobe-split-groupbox light 详情列文字视图=0 图像视图=0 嵌套hosting=4 列内视图数=7 样本=NSVibrantSplitDividerView[146,0 7x600] ; _NSSplitViewCollapsedInteractionsView[705,0 15x600] ; _NSSplitVie
+CARD_PROBE_WHOLE cardprobe-split-groupbox dark 整窗墨行=59 整窗墨像素=1239 整窗最大偏离=179 带子墨行=0 带子最大偏离=2 帧=720x600px 倍率=1.0x
+CARD_PROBE_WHOLE cardprobe-split-groupbox light 整窗墨行=70 整窗墨像素=1420 整窗最大偏离=165 带子墨行=0 带子最大偏离=0 帧=720x600px 倍率=1.0x
+MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=67（NOT_RUN 切不了片，这一格是整份的数）
+MOTION_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上） scope=MotionFilmstrip,UIInteraction
+MOTION_GATE_SCOPE 前缀=MotionFilmstrip UIInteraction 有名字的红=0 用例=66
+SIDEBAR_ICON_COVERAGE 能力=不可判(内容区 0 墨) 产品行数=6 行带总数=156
+TEXT_SIDE_CAPABILITY 侧栏偏离=19470 内容区偏离=0 判了 13/13 个夹具 ⇒ 闸门与判据同源（D-166）
