@@ -576,9 +576,17 @@ final class UICaptureTests: XCTestCase {
                                             height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
                                             rect: stripRect, scale: scale,
                                             fill: page, pageLuma: page)
+            // R106 / 158 的答案：地板从**这一条带自己有多强**推出来，不再抄本机的 60。
+            // runner 实测（run `38984669003`）：`最大偏离=58`（亮）/ `49`（暗）而门限 60 ⇒
+            // 占位语**画了**，只是那台机器的面板底更暗（页底 236/52 对本机 252/28），
+            // 对比度落在全局地板之下 —— 那是①"没画"被误读成②"我的尺太高"的那一格（158 三成因里的②）。
+            // 20 这一档不是新的绝对地板，而是"这条带里到底有没有任何东西"的下界：
+            // 带里最大偏离 < 20 ⇒ 真的什么都没画 ⇒ 不判（点名），而不是判红。
+            let bandFloor = max(20, strip.maxDelta / 2)
             let search = Self.firstInkColumnInStrip(bytes: base, width: rep.pixelsWide,
                                                     bytesPerRow: rep.bytesPerRow,
-                                                    yRange: 0..<stripBottom, background: page)
+                                                    yRange: 0..<stripBottom, background: page,
+                                                    deltaFloor: bandFloor)
             let pillPt = Double(pill.left) / scale
             let searchText = search.map { String(format: "%.1f", Double($0) / scale) + "pt" } ?? "没有"
             let diffText = search.map { "\($0 - pill.left)px" } ?? "-"
@@ -586,11 +594,12 @@ final class UICaptureTests: XCTestCase {
             emit("QUICKPICK_SEARCH_AXIS \(tag) 药丸左沿=\(String(format: "%.1f", pillPt))pt"
                  + " 搜索第一列墨=\(searchText) 差=\(diffText)"
                  + " 带子 y=0..\(stripBottom)px 带内墨行=\(strip.rows) 墨像素=\(strip.pixels)"
-                 + " 最大偏离=\(strip.maxDelta)（门限 \(Self.textInkMinDelta)）"
+                 + " 最大偏离=\(strip.maxDelta)（全局门限 \(Self.textInkMinDelta)，本条带用 \(bandFloor)）"
                  + " 页底档=\(page) 倍率=\(String(format: "%.1f", scale))x 帧宽=\(rep.pixelsWide)px")
-            guard strip.rows > 0, let ink = search else {
+            guard strip.maxDelta >= 20, let ink = search else {
                 declined.append("\(tag)[原因=搜索那一行读不到字：带内墨行=\(strip.rows)、"
-                                + "墨像素=\(strip.pixels)、最大偏离=\(strip.maxDelta) 而门限是 \(Self.textInkMinDelta)]")
+                                + "墨像素=\(strip.pixels)、最大偏离=\(strip.maxDelta)，"
+                                + "而这一档用的地板是 \(bandFloor)（带里最大偏离的一半，下界 20）]")
                 continue
             }
             judged += 1
@@ -621,6 +630,156 @@ final class UICaptureTests: XCTestCase {
         XCTAssertTrue(declined.isEmpty,
                       "这台机器**画得出**占位语（有对象=\(judged)），却有一档读不到 ⇒ 坏的是尺或那一档的通道，"
                       + "必须点名：\(declined.joined(separator: " "))")
+    }
+
+    /// R106 · BACKLOG 159 结案：`quickpick-typed` 那张帧上不许有**用户看不到的选中底**。
+    ///
+    /// 这一条先当探针跑过一遍、拿到机制，再变成判据（机制没证实之前写断言就是猜，D-163 那一族）。
+    /// 读数走 `render(...)` 的 `inspect:` 钩子 ⇒ 看的就是**画出那张帧的同一棵树**（R30 立的这个钩子），
+    /// 不是另建一棵。
+    ///
+    /// 两格断言各拦一种坏法，**不是冗余**：
+    ///   ① 机制那一侧 —— 字段选中区间的长度必须为 0（拦"通道又给字段装了个全选"这件事本身）；
+    ///   ② 像素那一侧 —— 顶部带子里不许有"只有灰、零个墨"且**比最宽那行墨还宽**的行
+    ///     （拦"哪天这块填充换个来源画出来"，比如字段自己 `drawsBackground` —— 那时①仍然绿）。
+    /// ②读的是**两个宽度的比**而不是灰像素绝对数：本机 2x 对 runner 1x，绝对量会跟着倍率走（R38）。
+    /// 实测（本机 2x）：改之前 `纯灰行最宽=52px` 对 `最宽墨行=37px` ⇒ 红；
+    /// 修之后 `1px` 对 `33px`（亮）、`0px` 对 `35px`（暗）⇒ 绿，余量是 33 倍而不是 1 像素。
+    ///
+    /// 隐私：只打**长度、类名、坐标**，一个字的内容都不打（帧与日志里不许出现用户剪贴板内容）。
+    func testOverlayTypedFrameCarriesNoPhantomSelectionFill() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r106-band-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var sawField = 0, judged = 0
+        var declined: [String] = []
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let fixture = fixtures.first(where: { $0.name == "quickpick-typed" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-typed` 夹具 ⇒ 这条读数没有对象")
+            }
+            var state = "\(tag) 字段=没找到"
+            var hasEditor = false, selectionLength = -1, stringLength = -1
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                guard let f = Self.firstOverlayTextField(in: host) else { return }
+                sawField += 1
+                // 先把每一项算成**普通量**再拼字符串：这一族的长插值会让类型检查超时（本机实测）。
+                let editor = f.currentEditor() as? NSTextView
+                let selected = editor?.selectedRange ?? NSRange(location: -1, length: -1)
+                let length = f.stringValue.utf16.count
+                let selIsWholeString = selected.length == length
+                let responder = host.window?.firstResponder
+                let responderName = responder.map { String(describing: type(of: $0)) } ?? "无"
+                let responderIsEditor = responder != nil && responder === editor
+                let isKey = host.window?.isKeyWindow ?? false
+                let highlighted = f.isHighlighted
+                let bezled = f.isBezeled
+                let draws = f.drawsBackground
+                hasEditor = editor != nil
+                selectionLength = selected.length
+                stringLength = length
+                state = "\(tag) 字段类名=\(type(of: f)) 串长=\(length)"
+                    + " 有editor=\(hasEditor)"
+                    + " editor选中=(\(selected.location),\(selected.length))"
+                    + " 选中覆盖整串=\(selIsWholeString)"
+                    + " firstResponder=\(responderName)"
+                    + " firstResponder就是editor=\(responderIsEditor)"
+                    + " 窗口是key=\(isKey)"
+                    + " 字段高亮=\(highlighted)"
+                    + " 有边框=\(bezled) 画底色=\(draws)"
+            }
+            emit("QUICKPICK_FIELD_STATE \(state)")
+            // 像素那一侧：同一张帧上那块灰到底占多少像素 —— 修完之后这个数必须归零，
+            // 而字（墨档）不许跟着一起没。
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let bytes = rep.bitmapData else {
+                return XCTFail("\(tag)：读不回刚拍的帧 ⇒ 像素那一侧没有对象")
+            }
+            let page = Self.modalLuma(bytes: bytes, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            // `modalLuma` 给的是 Int，而下面每一项都是 Double：混着写会让类型检查炸掉
+            // （本机实测：`unable to type-check this expression in reasonable time`）。先换算成普通量。
+            let pageLuma = Double(page)
+            var greyRows = 0, greyPixels = 0, widest = 0, widestX = "", inkRows = 0, greyNoInkRows = 0
+            var widestGreyNoInk = 0, widestInk = 0
+            for y in 0..<min(rep.pixelsHigh, Int(CGFloat(40) * Double(rep.pixelsWide) / fixture.size.width)) {
+                var g = 0, first = -1, last = -1, ink = 0
+                for x in 0..<rep.pixelsWide {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let a = bytes[Int(i) + 3]
+                    guard a > 250 else { continue }
+                    let r = bytes[Int(i)], gg = bytes[Int(i) + 1], b = bytes[Int(i) + 2]
+                    let luma = 0.299 * Double(r) + 0.587 * Double(gg) + 0.114 * Double(b)
+                    let delta = abs(luma - pageLuma)
+                    if delta >= 8 && delta <= 45 {
+                        g += 1
+                        if first < 0 { first = x }
+                        last = x
+                    } else if delta > 60 {
+                        ink += 1
+                    }
+                }
+                if g > 0 { greyRows += 1; greyPixels += g }
+                // **那一块填充的形状签名**：一行里只有"灰"、一个墨像素都没有。
+                // 字本身的抗锯齿永远与墨同一行，所以"纯灰行"只能是**画在字后面的东西**
+                // （色块比字高，上下各露几行）—— 这条与倍率、与两台机器的底色都无关，
+                // 而"灰像素总数"那种绝对量有（R38 那一课：别拿一台机器的读数当另一台的地板）。
+                if g > 0 && ink == 0 {
+                    greyNoInkRows += 1
+                    widestGreyNoInk = max(widestGreyNoInk, g)
+                }
+                widestInk = max(widestInk, ink)
+                if g > widest {
+                    widest = g
+                    widestX = "x=\(first)..\(last)"
+                }
+                if ink > 0 { inkRows += 1 }
+            }
+            emit("QUICKPICK_GREY_BAND \(tag) 灰档行数=\(greyRows) 灰档像素=\(greyPixels) "
+                 + "最宽一行=\(widest)px \(widestX) 纯灰行无墨=\(greyNoInkRows) "
+                 + "纯灰行最宽=\(widestGreyNoInk)px 最宽墨行=\(widestInk)px 墨档行数=\(inkRows) 页底档=\(page) "
+                 + "带子=顶部40pt 门限=8..45灰阶")
+            // —— 收场按 D-170：能力读数排在闸门与 skip 之前，未判要带成因数字。
+            guard hasEditor else {
+                declined.append("\(tag)[原因=这台机器上那枚字段没有 field editor ⇒ "
+                                + "『整串被选中』这一族现象在捕获通道里不存在，两条判据都没有对象]")
+                continue
+            }
+            judged += 1
+            // ① 机制那一侧：从**画出这张帧的同一棵树**读，选中区间必须长度 0。
+            XCTAssertEqual(selectionLength, 0,
+                "\(tag)：字段的选中区间长度是 \(selectionLength)（串长 \(stringLength)）⇒ "
+                    + "查询整条被选中，而离屏窗口不是 key（本机读数 `窗口是key=false`），"
+                    + "于是选中底画成**灰** —— 真实用户逐字敲，从来没有这一刻（BACKLOG 159）。")
+            // ② 像素那一侧：不许有"只有灰、没有墨"的行。字必须在（否则抹掉一切就能通过）。
+            XCTAssertGreaterThan(inkRows, 0,
+                "\(tag)：顶部那一条带里一个墨像素都没有 ⇒ 查询没画出来，这条判据失去对象，"
+                    + "先查捕获通道（与 BACKLOG 158 同一族），不要来放宽这里。")
+            // 判据读的是**两个宽度的比**，不是灰像素的绝对数：倍率与底色在两台机器上都不一样（R38），
+            // 而"填充比字宽"这件事在任何倍率下都成立 —— 改之前本机是 52px 对 37px，1x 下会等比缩。
+            XCTAssertLessThanOrEqual(widestGreyNoInk, widestInk,
+                "\(tag)：有一条**只有灰、零个墨**的行宽 \(widestGreyNoInk)px，比最宽的那行墨（\(widestInk)px）还宽 ⇒ "
+                    + "字后面有一块比字还宽的填充。改之前本机实测 32 行 / 1115 像素 / 纯灰行最宽 52px "
+                    + "对最宽墨行 37px —— 那就是 BACKLOG 159 的灰块（整条查询被选中，而窗口不是 key 所以底是灰的）。"
+                    + "残余的几像素是字形抗锯齿，它永远不可能比自己的那行墨更宽。")
+        }
+        emit("QUICKPICK_PHANTOM_CAPABILITY 候选=2 有对象=\(judged) 未判=\(declined.count)"
+             + "（未判名单只在**这台机器装得出 field editor** 时才要求为空）")
+        if !declined.isEmpty { emit("QUICKPICK_PHANTOM_DECLINED " + declined.joined(separator: " ")) }
+        XCTAssertEqual(sawField, 2,
+            "两档里读到搜索字段的档数=\(sawField)（期望 2）⇒ 视图树里根本没有 NSTextField，"
+                + "上面那些读数是在猜，159 的机制也就无从判起")
+        if judged == 0 {
+            throw XCTSkip("这台机器上那枚字段没有 field editor（\(declined.joined(separator: " "))）"
+                          + " ⇒ 『幻影选中底』这一族没有对象，**不判（不是通过）**")
+        }
+        XCTAssertTrue(declined.isEmpty,
+                      "这台机器**装得出** editor（有对象=\(judged)），却有一档没判 ⇒ 坏的是尺或那一档的通道："
+                    + "\(declined.joined(separator: " "))")
     }
 
     /// 药丸尺与"第一条墨列"尺的**真值表**（R104）：五格合成件，各钉一道地板。
@@ -701,6 +860,39 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(0, wrongReference?.left, "页底档给错 ⇒ 整帧都算带子，左沿读成 0（不是 nil）")
         XCTAssertEqual(0, wrongReference?.top)
         XCTAssertEqual(height - 1, wrongReference?.bottom)
+
+        // ⑦ R106 / BACKLOG 158 那一格：同一枚字，**对比度低的那台机器**上尺必须还认得它。
+        //    合成件照 runner 的档来画：页底 236、字 178 ⇒ 偏离 58（< 全局地板 60），
+        //    而本机那一档是页底 252 / 字 128 ⇒ 偏离 124。两块的**列位置相同**（x=25）。
+        //    期望两句话：全局地板下低对比那块读不到（nil）—— 这就是 158 在 runner 上的现场；
+        //    而 `deltaFloor` 给到该带自己的一半（29）时，两块必须给出**同一个列**。
+        var lowContrast = buffer(236)
+        paint(&lowContrast, 25, 20, 2, 60, 178)
+        var highContrast = buffer(252)
+        paint(&highContrast, 25, 20, 2, 60, 128)
+        XCTAssertNil(firstInk(lowContrast, range: 0..<98, page: 236),
+            "低对比那块（偏离 58）在全局地板 60 下**应该**读不到 —— 这一格钉的就是 158 在 runner 上的形状；"
+                + "如果它哪天读得到了，说明全局地板被改低了，那要去看别的判据有没有跟着失去判别力")
+        var lowWithFloor: Int?
+        var highWithFloor: Int?
+        do {
+            var copy = lowContrast
+            lowWithFloor = copy.withUnsafeMutableBufferPointer { raw in
+                Self.firstInkColumnInStrip(bytes: raw.baseAddress!, width: width,
+                                           bytesPerRow: stride4, yRange: 0..<98,
+                                           background: 236, deltaFloor: 29)
+            }
+            var copy2 = highContrast
+            highWithFloor = copy2.withUnsafeMutableBufferPointer { raw in
+                Self.firstInkColumnInStrip(bytes: raw.baseAddress!, width: width,
+                                           bytesPerRow: stride4, yRange: 0..<98,
+                                           background: 252, deltaFloor: 62)
+            }
+        }
+        XCTAssertEqual(25, lowWithFloor ?? -1,
+            "把地板换成「这一条带自己的一半」之后，低对比那台也必须读到同一列（runner 那一档的出路）")
+        XCTAssertEqual(lowWithFloor, highWithFloor,
+            "两档对比度差一倍，读到的**列**必须相同 —— 这条判据量的是位置，不是强弱")
     }
 
     func testQuickPickRowsShareOneIconColumnAndOneLabelAxis() throws {
@@ -5180,16 +5372,26 @@ final class UICaptureTests: XCTestCase {
     /// `minPixels` 取 2：单列一个像素过门限是抗锯齿，两个才算笔画。
     static func firstInkColumnInStrip(bytes: UnsafePointer<UInt8>, width: Int,
                                       bytesPerRow: Int, yRange: Range<Int>,
-                                      background: Int, minPixels: Int = 2) -> Int? {
+                                      background: Int, minPixels: Int = 2,
+                                      deltaFloor: Int? = nil) -> Int? {
         guard width > 0, !yRange.isEmpty, minPixels > 0 else { return nil }
         func lumaAt(_ x: Int, _ y: Int) -> Int {
             let o = y * bytesPerRow + x * 4
             return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
                         + 0.0722 * Double(bytes[o + 2])).rounded())
         }
+        // `deltaFloor` 是给**跨机器**那一格开的口子（R106 / BACKLOG 158 的答案）：
+        // 全局的 `isTextInk` 地板 60 是在本机量的（R24），而 runner 上同一枚占位语对面板底的
+        // 最大偏离只有 **58（亮）/ 49（暗）** —— 不是没画，是那台机器的底色档不同（页底 236/52 对本机 252/28）。
+        // 所以"这一条带里有没有字"这种**存在性**问题，地板必须由**这一条带自己有多强**推出来，
+        // 不能从一台机器的调色盘里抄（R38：两台机器的读数不能当另一台机器的地板）。
+        func isInk(_ delta: Int) -> Bool {
+            guard let floor = deltaFloor else { return Self.isTextInk(delta: delta) }
+            return delta >= floor
+        }
         for x in 0..<width {
             var inked = 0
-            for y in yRange where Self.isTextInk(delta: abs(lumaAt(x, y) - background)) {
+            for y in yRange where isInk(abs(lumaAt(x, y) - background)) {
                 inked += 1
                 if inked >= minPixels { return x }
             }
@@ -9181,6 +9383,11 @@ final class UICaptureTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
 
+        // R106 / BACKLOG 159：把**用户根本看不到的选中区间**从帧里抹掉（与 `silenceCarets` 同一族）。
+        // 放在这里而不是放在产品里：这一格是"上屏那一下字段自动全选"造成的通道现象，
+        // 产品路径 `show()` 赋的是空串、用户逐字敲，从来没有这一刻（读数见 `QUICKPICK_FIELD_STATE`）。
+        Self.collapsePhantomSelections(in: host)
+
         // R30 的诊断钩子：布局已完成、外观已注入、还没开画 —— 这一时刻的树就是帧里那些像素的作者。
         inspect(host)
 
@@ -9330,8 +9537,7 @@ final class UICaptureTests: XCTestCase {
     /// 只 `makeFirstResponder(nil)` 不够：SwiftUI 包着的 `NSTextField` 可能已经装好了 field editor，
     /// 而闪烁由定时器驱动，两次拍摄落在闪/不闪的两拍上就会出现整条竖线的差异。
     /// 注意 `shouldDrawInsertionPoint` 是只读的，所以用"把插入点画成透明"这一条路径。
-    private static func silenceCarets(in view: NSView) {
-        if let textView = view as? NSTextView {
+    private static func silenceCarets(in view: NSView) {        if let textView = view as? NSTextView {
             textView.insertionPointColor = .clear
             textView.needsDisplay = true
         }
@@ -9340,6 +9546,47 @@ final class UICaptureTests: XCTestCase {
             editor.needsDisplay = true
         }
         view.subviews.forEach { silenceCarets(in: $0) }
+    }
+
+    /// R106 / BACKLOG 159 的读数用：按**身份**在树里找浮层那一枚搜索字段。
+    ///
+    /// 为什么不就地写一个递归 `func find`（我第一版就是这么写的）：它落在 `inspect:` 那个
+    /// `@MainActor` 闭包里，Swift 不会把局部函数也判成 MainActor ⇒
+    /// `subviews` 直接告警（本机实测，"构建 0 告警"这一格当场红）。
+    /// 静态函数与 `silenceCarets` 同一条隔离，就没有这一档。
+    static func firstOverlayTextField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField { return field }
+        for sub in view.subviews {
+            if let field = firstOverlayTextField(in: sub) { return field }
+        }
+        return nil
+    }
+
+    /// R106 / BACKLOG 159：把**真实使用里不成立的选中区间**从帧里抹掉。
+    ///
+    /// 成因（本机读出来的，不是猜的）：捕获入口为了把查询摆上去必须程序化赋值，
+    /// 窗口上屏那一下又会给那枚字段装一个 field editor，而字段成为第一响应者时**默认全选**；
+    /// 离屏窗口不是 key（130 记过）⇒ 选中底画成**灰**而不是强调色，
+    /// 于是 `quickpick-typed` / `-empty` 两张帧上出现一块 32 行 / 1115 像素的色块，
+    /// 并且从 R63 起被帧基线钉成"正确答案"。
+    /// 真实用户是逐字敲进去的，从来没有这一刻 ⇒ 与 `silenceCarets` 同一条规矩：
+    /// **闪烁的、瞬时的、产品路径上不成立的状态不许进基线**。
+    static func collapsePhantomSelections(in view: NSView) {
+        if let text = view as? NSText {
+            let end = (text.string as NSString).length
+            if text.selectedRange.length != 0 || text.selectedRange.location != end {
+                text.selectedRange = NSRange(location: end, length: 0)
+            }
+        }
+        // field editor 不一定挂在被遍历的那棵子树上（它是宿主视图的兄弟级子视图），
+        // 所以除了走子树，再按**身份**问一次字段自己。
+        if let field = view as? NSTextField, let editor = field.currentEditor() {
+            let end = (editor.string as NSString).length
+            if editor.selectedRange.length != 0 || editor.selectedRange.location != end {
+                editor.selectedRange = NSRange(location: end, length: 0)
+            }
+        }
+        view.subviews.forEach { collapsePhantomSelections(in: $0) }
     }
 
     /// 量出"没被画出来的像素"比例，并把帧铺到真实窗口底色上。

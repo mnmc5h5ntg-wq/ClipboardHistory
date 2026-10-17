@@ -9711,3 +9711,118 @@ ROWS_TOTAL=13 ROWS_MISSING=0
 3. **157**：臂 2 那两行新读数（详情列视图树包围盒 + 整窗带子）仍然欠着，一次 CI 分三种成因。
 4. **155**：先要一次"同一版重跑两遍"的分布，再谈成因。
 5. 真机那一侧仍然欠着（批次 26.x–82.2 与本轮新增的 83.1）。
+## Round 106 · 158 与 159 同一天拿到答案：一个坏在尺的常数上，一个坏在通道的瞬时态上（结案 158、159 / U-327…U-331 / D-172、D-173 / 变异表 r106 四刀 M584–M587）
+
+### 1. 开场清单（本轮对象：浮层顶部那一条带里每一个画得出来的东西；面板 420×300，2× ⇒ pt=px/2）
+
+| 对象（pt 坐标） | 开场读数 | 这一格本轮判什么 |
+|---|---|---|
+| 占位语墨 x=22.0..108.5，y=14.5..26.0 | 第一列墨 22.5pt，与药丸差 1px（本机） | 158：runner 上"读不到"到底是没画还是尺太高 |
+| 选中药丸左沿 y=46.0 起 | 22.0pt | 参照物，不动 |
+| 药丸之上那条带 y=0..90px | 带内墨行 24、最大偏离 124/126（本机）；**runner 58/49** | 存在性地板由谁定（D-172） |
+| typed 态查询底下的灰块 x=22.0..47.5（宽 25.5pt） | 32 行 / 1115 像素 / 纯灰行最宽 52px 对最宽墨行 37px | 159：它是谁画的、该不该在 |
+| empty 态灰块宽 63.5pt | 同上形状、同一 y | 同一块东西，两态都在 |
+| 面板顶→墨顶 14.5pt；墨底→药丸顶 20.0pt | 全宽 0 墨 | D-171 已判：不加框（本轮复核没翻案） |
+
+开场缺陷清单：① 158（runner 上占位语"一个像素都不落地"）；② 159（灰底机制未证实）；
+③ 157（臂 2 在 runner 上整带空白）；④ 155（同版重跑两遍的分布）；⑤ 真机批次 26.x–83.1。
+
+### 2. 读 R105 的 CI（run `38984669003`）：158 的答案就在上一轮装好的那行读数里
+`最大偏离=58（亮）/ 49（暗）` 落在 R105 §9 预言的"②门限跨机器不成立"那一档（①/③ 会让它 ≤ 几）。
+⇒ **占位语画了**，是本机量的全局常数 60 在那台机器上不成立（页底 236/52 对本机 252/28）。
+上一轮那句"CI 绿这句话在 158 判清之前对浮层这一格不成立"现在可以收口成一句更准的话：
+**不是浮层画不出字，是我的尺在另一台机器上看不见字。**
+
+### 3. 修法为什么是"相对地板 + 绝对下界"，而不是把 60 改小（D-172）
+`bandFloor = max(20, 这一条带的最大偏离 / 2)`；带里最大偏离 < 20 ⇒ 真的什么都没画 ⇒ **不判并点名**。
+全局常数一行不改（别的判据会跟着失去判别力），并且放宽自带反向牙：
+真值表第 ⑦ 格钉住"低对比合成件（页底 236 / 字 178 ⇒ 偏离 58）在全局地板下**必须**读不到"。
+本机两档在新地板下读数不变（`差=1px`，bandFloor 62/63）——**这句话只覆盖本机**，
+runner 那一格要下一次 CI 的 `本条带用 29` 才算结案。
+
+### 4. 看图那一腿 → 机制读数 → 修在通道（D-173）
+`inspect:` 四行读数把 159 的三种候选分掉：`有editor=true 选中=(0,2) 覆盖整串=true firstResponder就是editor=true
+窗口是key=false 字段高亮=false 画底色=false` ⇒ 是①（字段成为第一响应者时默认全选），
+②③被后两个 false 否掉。
+**修在捕获通道**：`render` 拍之前 `collapsePhantomSelections(in:)`，与 `silenceCarets` 同族 ——
+闪烁的、瞬时的、产品路径上不成立的状态不许进基线。产品 0 行改动（`git diff --name-only | grep Sources/` = 0）。
+新判据两格断言各承重：①机制（选中区间长度必须为 0）②像素（纯灰行不许比最宽墨行还宽）。
+M585 证明两格**不许互相顶班**：摘掉抹除 + 摘掉机制那一格，仍然红在像素那一格（52 > 36）。
+修后读数：亮 `1 行 / 71 像素 / 纯灰行最宽 1px 对最宽墨行 33px`，暗 `0 行 / 101 像素 / 0px 对 35px`；
+四张帧（typed/empty × 两档）换哈希，其余 130 张逐字节不变。
+
+### 5. 真机那一格没有被我顺手结掉
+批次 83.1 仍然欠着：那一格问的是**产品**（用户打完字查询串会不会整条带底色），
+而我修的是**通道**（离屏窗口不是 key 时全选底是灰的）。两件事不能互顶 ——
+所以 159 的结案范围写清楚：**帧基线里的假象已清，真机那一问照旧欠**。
+
+### 6. 本轮自己坏的
+- **U-327**：摘断言的刀必须留一句能编译的话 —— 第一版 M585 整行删断言，剩下 4 行消息悬空
+  ⇒ 语法错 ⇒ DID-NOT-RUN（刀坏不是判据没牙，U-186 那一族复发）。换成同参数自等之后拿到 CAUGHT。
+- **U-328**：CJK 串里那对 ASCII 双引号又出现了一次（新写的真值表消息），写完立刻按已知陷阱换成「」。
+- **U-329**：上一轮给三种成因排的第一名，实测是第二名 —— 排序会诱导下一轮先去做贵的那件事。
+- **U-330**：第一版把修复写在 `windowForCapture` 里是**空操作**（那时 editor 还没装上），
+  前后两次读数逐字相同才暴露它 —— 同一份读数是最便宜的"改了没生效"探测器。
+- **U-333**：包含对账那把尺扫的是"断言之后 4000 字符"，会越过右括号读到后面语句的消息 ⇒ 本轮插入新判据之后它报 `LOST=1`（而 `git diff` 一条删除都没有）。修成按调用自己的括号深度扫描，三条自测全过（修假阳性同时证明牙还在）。
+- **U-332**：改判据那一行会静默作废上一轮为同一行装的变异针（R106 换掉 `strip.rows > 0` ⇒ M581/M582 命中 0 次，pass-1 红在 `bad=2 / not_run=2`）。抓到它的正是 R103 装的针自检 —— 它今天管的是「前任的针还在不在」。
+- **U-331**（做对的一格）：新地板的绝对下界不叫地板，叫"这条带里到底有没有任何东西"的下界，
+  读不到时不判而不是判红。
+
+### 7. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 93 | 帧现在画的与用户在系统里看到的一致（原生字段在 key 窗口里是强调色选中、非 key 才灰）；没有为过判据而仿造 |
+| 层级与秩序 | 91 | 浮层顶部那条带里现在只剩"字"这一层；左轴等式在两台机器上都有了能判的形状 |
+| 动效恰当 | 90 | 零动效改动，也没借"那一行看着空"加任何东西（D-171 的结论本轮复核没翻案） |
+| 状态完备 | 93 | typed/empty 两态第一次忠实；四态帧名与内容对得上，且这条对得上是**可数的**（4 换 / 130 不变） |
+| 细节打磨 | 93 | 相对地板 + 下界 + 反向牙 + 两格独立牙；四刀里两刀按实登记为逃掉 |
+| 克制 | 94 | 产品 0 行；全局常数 0 改；两处"不判而不是判红"；159 的结案范围写小了不写大 |
+| 一致性 | 87 | 四条族：刀坏（U-327，U-186 复发）、ASCII 引号（U-328，**本轮在记录它的那份脚本里又踩一次**）、空操作修复（U-330）、改判据把前任的变异针作废（U-332，pass-1 因此红）；一条新账：成因排序会诱导下一步（U-329）。做对的两格：机制没证实前不动手（D-173 的①），真机那一格不顺手结掉 |
+
+**均分 91.6**（最低 87 = 一致性；其余全过 90）。
+
+### 8. 验证（13 格，数字全部由 `ledger_rows.py` 从 `r106_verify.log` 解析（**这一份是 pass-3**））
+
+| 格子 | 读数 |
+|---|---|
+| 构建 | `BUILD_EXIT=0 BUILD_WARNING_LINES=0` |
+| 全量测试 | `TEST_EXIT=0 最后一行汇总: 	 Executed 819 tests, with 41 tests skipped and 0 failures (0 unexpected) in 181.675 (181.721) seconds` |
+| 在屏那一卷 | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.499 (15.501) seconds` |
+| 捕获卷 | `CAPTURE_EXIT=0 帧数=134 目录内文件=135` |
+| 帧基线 | `FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=134 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0` |
+| 脚本电池 | `PY_EXIT=0 Ran 221 tests in 11.574s OK` |
+| 变异表 | `MUT_EXIT=0 跑了=15 期望=15 表=r95_rhythm r94_order r96_triage r97_card r98_seed r98_card r99 r100 r100b r101 r102 r103 r104 r105 r106 | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r99(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r100(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r100b(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r101(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r102(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r103(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r104(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r105(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r106(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0` |
+| 台账编号守卫 | `LEDGER_EXIT=0 Ran 9 tests in 0.025s OK` |
+| 曲线仪器 | `VIS_EXIT=0 ROUNDS=107  first=1  last=106 CURVE_DERIVED=95,96,97` |
+| 断言包含对账 | `CONTAIN_EXIT=0 0` |
+| 摘要缺值 | `SUMMARY_MISSING=0` |
+| 总结论 | `VERIFY_OK=1` |
+| 本轮读数（15 行，原样搬运） | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.499 (15.501) seconds`；`QUICKPICK_FIELD_STATE light 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false`；`QUICKPICK_GREY_BAND light 灰档行数=20 灰档像素=71 最宽一行=13px x=53..72 纯灰行无墨=1 纯灰行最宽=1px 最宽墨行=33px 墨档行数=24 页底档=252 带子=顶部40pt 门限=8..45灰阶` |
+
+ROWS_TOTAL=13 ROWS_MISSING=0
+
+**这一格的读法**（三行）：
+
+- 派生数字是算出来的：TABLES=15  合计刀数=66  caught=66  mismatch=0 not_run=0
+  （R105 是 62 刀 ⇒ 本轮 +4 = M584–M587；`0 NEEDLE_PRECHECK tables=15 covered=13 arms=53 bad=0` —— 两张不在静态覆盖里的是 `r94_order`、`r96_triage`，
+  它们的替换是 lambda，静态判不了只能真跑。）
+- **pass-1 与 pass-2 都是红的，两朵红都在我自己**：pass-1 `MUT_EXIT=1 / PRECHECK_EXIT=1 bad=2` ——
+  本轮改判据那一行（D-172）把 **R105 的 M581/M582 两支针静默作废**（U-332，已 refit 并单跑 `n=3 caught=3`）；
+  pass-2 `CONTAIN_EXIT=1` —— 包含对账那把尺扫"断言之后 4000 字符"会越过右括号，
+  于是**只是插入**新判据就被报成"丢了一条断言"（U-333，`git diff` 里 0 条删除行；修完三条自测全过）。
+  两份日志都留着（`r106_verify.20261017-085149.prev.log` 等），不是删掉重跑当没事。
+- ROUNDS 行：`VIS_EXIT=0 ROUNDS=107 first=1 last=106`（曲线仪器把 Round 106 收进去 ⇒ `last=106`；本轮自评 91.6）。
+  帧基线这一行是**本轮唯一的产品侧证据**：`COMPARED=134 CHANGED=0`，而基线本身在本轮换掉 4 条哈希
+  （`quickpick-{typed,empty}` × 两档）⇒ 两句要一起读：换的是那 4 条，其余 130 条逐字节未动。
+
+### 9. 下一轮（R107）的入口
+1. **读本轮这次 CI**：158 的 runner 侧结案只看一行 —— `QUICKPICK_SEARCH_AXIS … 本条带用 29` 后面
+   必须是"搜索第一列墨=22.xpt 差=Npx"，不能还是"没有"；同时看 157 那两行新读数有没有被本轮带上（没带上就还是欠）。
+2. **157 终于要动手**：臂 2 的两行新读数（详情列视图树包围盒 + 整窗带子）一次 CI 分三种成因 ——
+   这是那三朵按名登记的红的唯一出路，也是 150 那一支的堵点。
+3. **155**：一次"同一版重跑两遍"的分布（本轮已经有一次天然样本：`QUICKPICK_AXIS_*` 在两个步骤各打一遍）。
+4. 浮层剩余位点：搜索行的**焦点态**（批次 82.2）与图标列那一档（R104 之后没再看过）；
+   以及本轮新开的读数 —— 灰块没了之后，`纯灰行最宽=1px` 那 1 个像素是什么（抗锯齿还是残留），
+   下一轮顺手量掉，别让它变成新的"看着像没问题"。
+5. 真机那一侧仍然欠着（批次 26.x–82.2 与 83.1）。

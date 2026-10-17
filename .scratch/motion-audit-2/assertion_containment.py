@@ -62,13 +62,47 @@ def normalize(s):
     return INTERP.sub(r"\\(…)", s)
 
 
+def first_string_in_call(text, start):
+    """从 `XCTAssert…(` 之后扫**这一次调用自己的括号范围**，取第一个字符串字面量。
+
+    为什么要有它（R106 / U-333）：上一版是 `text[m.end():m.end()+4000]` 里找第一个引号 ——
+    那会**越过调用的右括号**读到后面别的语句的消息里。后果不是漏判而是**假丢失**：
+    本轮在文件中间插入一个新判据之后，两条本来就没有消息的 `XCTAssertEqual`
+    的 key 从"找不到那张产品表格"变成了别的字符串，闸门报 `CONTAINMENT_LOST=1`、
+    整卷 `VERIFY_OK=0`，而被删掉的东西**一个都没有**（`git diff` 里 0 条删除行）。
+    一把会把"我加了代码"读成"我丢了断言"的尺，下一轮就会被想去放宽它的人拿掉。
+    """
+    depth = 1
+    i = start
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == "\"":
+            j = i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                    continue
+                if text[j] == "\"":
+                    break
+                j += 1
+            return text[i + 1:j]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return None
+        i += 1
+    return None
+
+
 def extract(text):
     """返回 (断言 key 的多重集, 读数 TAG 的多重集)。"""
     a = Counter()
     for m in ASSERT_HEAD.finditer(text):
-        tail = text[m.end():m.end() + 4000]
-        s = FIRST_STRING.search(tail)
-        a[(m.group(1), normalize(s.group(1))[:KEY_LEN] if s else "<无消息>")] += 1
+        body = first_string_in_call(text, m.end())
+        a[(m.group(1), normalize(body)[:KEY_LEN] if body else "<无消息>")] += 1
     e = Counter()
     for m in EMIT_TAG.finditer(text):
         e[m.group(1)] += 1

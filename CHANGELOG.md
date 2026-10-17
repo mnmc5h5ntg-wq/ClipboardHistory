@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据与捕获通道（R106）
+
+- **BACKLOG 159 结案：浮层那两张"名字叫 typed / empty"的帧不再画着一块用户看不到的灰色选中底。**
+  机制由 `QUICKPICK_FIELD_STATE` 读数定死（`有editor=true editor选中=(0,2) 选中覆盖整串=true
+  firstResponder就是editor=true 窗口是key=false`）⇒ 字段成为第一响应者时默认全选，
+  而离屏窗口不是 key，所以选中底是**灰**的。修在捕获通道（`collapsePhantomSelections`，
+  与 `silenceCarets` 同族），**产品代码 0 行改动**（`git diff --name-only | grep Sources/` 计数 0）。
+  修后灰块：`32 行 / 1115 像素 / 纯灰行最宽 52px` → `1 行 / 71 像素 / 1px`（亮）、
+  `0 行 / 101 像素 / 0px`（暗）；新判据 `testOverlayTypedFrameCarriesNoPhantomSelectionFill`
+  两格断言各承重（机制 + "纯灰行不许比最宽墨行还宽"），能力行 `QUICKPICK_PHANTOM_CAPABILITY 候选=2 有对象=2 未判=0`。
+  4 张帧换哈希（typed/empty × 两档），其余 130 张逐字节不变。
+- **BACKLOG 158 结案（本机侧）：存在性地板改成由这一条带自己推出**（D-172）。
+  runner 那两行 `最大偏离=58 / 49（门限 60）` 落在 R105 预言的"②"那一档 ⇒
+  占位语**画了**，是本机量的全局常数 60 在那台机器上不成立（页底 236/52 对 252/28）。
+  `firstInkColumnInStrip` 新增 `deltaFloor`，判据用 `max(20, 带里最大偏离 / 2)`；
+  真值表加第 ⑦ 格（低对比合成件：全局地板下**必须**读不到、相对地板下必须读到同一列）。
+  本机两档读数不变（`差=1px`）。**runner 侧的确认还欠一次 CI**，这一格不许提前写成两台机器都绿。
+- 变异表 `mutate_r106.py` 四刀：M584 摘掉抹除调用 ⇒ **CAUGHT**、M585 同一摘除 + 摘掉机制那一格 ⇒
+  **仍 CAUGHT 在像素那一格**（两格不许互相顶班）、M586 摘掉未判打印 ⇒ 本机 **PASSED（按实登记）**、
+  M587 把这一档地板钉回全局 60 ⇒ 本机 **PASSED（按实登记，牙在 runner）**。
+  实测 `n=4 caught=4 mismatch=0 not_run=0`、`RESTORE_CLEAN=yes`。表数 14 → **15**、刀数 62 → **66**。
+- 新工具：`r105_overlay_search_look.py`（看图那一腿的逐行剖面，R105 用它翻出 159）、
+  `r106_overlay_search_look` 的读数进 `QUICKPICK_GREY_BAND`。
+
 ### 判据与工具（R105）
 
 - **浮层左轴那条判据补上"没有对象"的收场**（读 R104 的 CI 学到的，run `38975204376`）：

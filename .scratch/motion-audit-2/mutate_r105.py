@@ -29,7 +29,9 @@ BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 AXIS = "UICaptureTests/testQuickPickSearchLineSharesTheRowsColumn"
 
 # (编号, 说明, 文件, needle, 替换, 目标测试, 期望 verdict)
-GUARD = "            guard strip.rows > 0, let ink = search else {"
+# R106 追：这一支的针跟着 D-172 改了形状（`strip.rows > 0` → `strip.maxDelta >= 20`）。
+# 不改这里就会静默 not_run=2 —— 本轮 pass-1 正是被 `mutate_needle_precheck.py` 的 bad=2 抓出来的（U-332）。
+GUARD = "            guard strip.maxDelta >= 20, let ink = search else {"
 SIM = ('            if true {   // M581：在本机模拟 runner 那一台（搜索带读不到字）\n'
        '                declined.append("\\(tag)[M581 模拟：带内墨行被强行归零]")\n'
        '                continue\n'
