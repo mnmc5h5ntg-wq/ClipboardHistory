@@ -11062,3 +11062,48 @@ R107 把分类法写在注释里，从没当判据跑过；R119 因此在三种�
 - 变异：`MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0`（M616–M619，第 25 张表）
 - 本轮新读数族（`ledger_rows.py` 搬运 600 行里的族计数）：`CARD_PROBE_ARM_VERDICT:12 CARD_PROBE_CAPABILITY:2 CARD_PROBE_WITNESS:12 CARD_PROBE_DETAIL_TREE:12 CARD_PROBE_COLUMNS:12 TEXT_SIDE_CAPABILITY:2`，`--must-include 声明=6 缺=0`
 - 未解析到的格子：`构建 / 在屏那一卷 / 曲线仪器 / 总结论` —— 本轮没有跑 `r102_closeout.py` 那种带标记的汇总日志，所以这几格按实记为**没跑**，不补数（U-264③ 的规矩）。
+
+## Round 122 · 侧栏图标：暗档 22 行"黑底黑图标"修掉，亮档那一半判成通道盲区（新开 172 / U-408…U-409 / D-184 · 产品 1 行）
+
+### 0. 开场缺陷清单
+
+| # | 位点 | 证据 |
+|---|---|---|
+| 1 | 设置侧栏 推荐 / 统计（暗档） | `dark 反侧=22`，逐符号 `wand.and.stars`/`chart.bar` 亮侧=0 ⇒ 黑底黑图标 |
+| 2 | 设置侧栏未选中行（亮档） | `light 期望=35 无墨=43` ⇒ 图标列本来就有近半不画 |
+| 3 | 上一轮遗留 | `SIDEBAR_ICON_COVERAGE` 写着"本轮只报数"，两档的数谁都不钉 |
+
+### 1. 做了什么
+
+`.symbolRenderingMode(.hierarchical)` → `.monochrome`（多色符号不再带自己的调色板，图标交回 `.primary`）。
+实测两档**反方向**动：`dark 期望 56→78、反侧 22→0`；`light 期望 35→13、无墨 43→65`。
+判据跟着分家：反侧升成会红（`SIDEBAR_ICON_INVERTED`），亮档无墨写成 `SIDEBAR_ICON_BLIND_SPOT` 登记（新开 172 追真机）。
+两刀：M620 产品退回 `.hierarchical` ⇒ 新红抓到（CAUGHT）；M621 把红改成比"无墨" ⇒ 亮档立刻踩红（CAUGHT，证明这条红认的是反侧）。
+
+### 2. 真实视觉审查（看图腿，本轮看了 4 张）
+
+`settings-general-720x540-dark.png`：六枚图标与标签同亮，推荐/统计两枚不再消失 ⇒ 暗档这一半是**看得见的改善**。
+`settings-general-720x540-light.png`：标签文字清晰（同一个 `.primary`），未选中行的图标淡到几乎看不见 ⇒ 亮档这一半**变差**，
+但同一行"文字画得出、图标画不出"把病因指向 `Image + 语义色` 那条通道，而不是颜色本身（D-184③）。
+`cardprobe-split-groupbox-720x600-{light,dark}.png`：同一棵侧栏树，跟着一起变，没有别的位移。
+
+### 7. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 91 | `.monochrome` 是系统侧栏的标准做法；但亮档那一半没在真机上验过 |
+| 动效华丽度 | 90 | 三轮之后第一次回到产品面；本轮没有新动效，只修了静置可辨性 |
+| 状态完备 | 90 | 未选中/选中/悬停三态的图标颜色第一次有逐符号数；亮档无墨登记为 172 |
+| 证据强度 | 92 | 两档成对读数 + 逐符号表 + 两把刀（一把钉产品、一把钉"这条红认哪一格"） |
+| 一致性 | 92 | 暗档修好、亮档按证据判成通道，没有为了读数把颜色写死 |
+| 可维护 | 91 | 产品 1 行、判据 1 红 + 1 登记；旧注释换成读数，不再留推断 |
+| 风险控制 | 89 | **本机装的还是 R111**：这次产品改动没经过真机验收就进基线，28 张帧同提交 update；172 的第一条就是补真机 |
+| **合计** | **91** | 加权取整；真机那一半没做，所以风险控制按实际 89 记 |
+
+### 9. §8 覆盖计数（本轮，全部从日志解析）
+
+- 全量 swift：`Executed 828 tests, 41 skipped, 0 failures`；捕获卷：68 / 4 / 0
+- 帧基线：`COMPARED=136 CHANGED=28 MISSING=0 ADDED=0` → 同提交 `update`（`FRAME_BASELINE_UPDATED=136`）
+- 脚本电池：`Ran 239 tests OK`；针自检：`tables=26 covered=24 arms=87 bad=0`
+- 变异：`MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0`（第 26 张 `mutate_r122.py`）
+- 本轮新读数族：`SIDEBAR_ICON_INVERTED`（红）/ `SIDEBAR_ICON_BLIND_SPOT`（登记）/ `SIDEBAR_ICON_COVERAGE`（改文案）

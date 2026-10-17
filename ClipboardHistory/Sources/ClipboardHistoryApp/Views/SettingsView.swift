@@ -871,14 +871,20 @@ private struct SettingsSidebarRow: View {
                 // 不显式上色的话，未选中行的 SF Symbol 会按系统弱化色渲染，
                 // 在浅色主题下几乎看不见（离屏渲染验收时发现的真实缺陷）
                 .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
-                // 这里**刻意保持** `.hierarchical`。审计第二轮 1.9 说侧栏图标"outline 与 filled 混用、
-                // 未选中的比选中的轻"，看起来像缺陷；本轮把这件事量成了数字（`OffscreenSymbolInkProbeTests`）：
-                // 在这一帧里未选中四行的图标列墨水是 0.0000，而把同一个图标的颜色换成固定的 `Color.black`
-                // 就能画到 0.175–0.402 —— 也就是说不可见来自**离屏管线对语义色的解析**，不是产品。
-                // 结论：既不能按这帧判缺陷，也不能为了讨好这一帧把 `.primary` 换成固定色
-                // （那会在真实深浅色切换时把颜色写死）。哪一层导致的没有定论，探针每次视觉审计会重量一遍。
-                // 以前这里写的是"真机不可能长这样"的推断，现在换成测量。
-                .symbolRenderingMode(.hierarchical)
+                // R122：这里从 `.hierarchical` 换成 `.monochrome`，理由不是审美，是逐行读数。
+                // 上一轮装好的永久仪器（`SIDEBAR_ICON_ROW` / `SIDEBAR_ICON_BY_SYMBOL`）在同一批帧上量到：
+                //   dark 有墨行=78 无墨行=0 **反侧行=22**，而反侧的两枚恰好是 `wand.and.stars`（推荐）
+                //   与 `chart.bar`（统计）—— 同一条 `.primary`、同一档外观、同一列里，
+                //   四枚符号解析成亮墨（271–353 px），这两枚解析成 0 亮墨。
+                // ⇒ 上面那段注释里"不可见来自离屏管线对语义色的解析，不是产品"这条结论**被这组数推翻了一半**：
+                //   如果坏的是"语义色解析"，六枚符号应该一起坏；按符号分开的只能是符号自己的调色板。
+                //   `wand.and.stars` / `chart.bar` 正是六枚里仅有的两枚**多色符号**，`.hierarchical`
+                //   会保留符号自带的多色调色板（那套色里没有"随深浅色翻转"的语义色），`.monochrome` 才把
+                //   整枚符号交回 `.primary`。所以改的是**渲染模式**，不是颜色 —— 原来那条"不许把 .primary
+                //   换成固定色"的顾虑仍然成立，这一行也没有换颜色。
+                // 判据与验收：`SIDEBAR_ICON_COVERAGE` 的 `反侧行` 必须归 0（本轮同时把它从"只报数"升成会红），
+                // 并且要看帧 —— 只有离屏读数说"归 0"是不够的，见 AGENT_UI_AUDIT 第 124 轮。
+                .symbolRenderingMode(.monochrome)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)

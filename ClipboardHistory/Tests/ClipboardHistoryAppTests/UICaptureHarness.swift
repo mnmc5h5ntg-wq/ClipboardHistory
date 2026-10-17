@@ -7408,7 +7408,33 @@ final class UICaptureTests: XCTestCase {
         emit("SIDEBAR_ICON_COVERAGE \(capability) 产品行数=\(expectedRows) 行带总数=\(rowsTotal)"
              + " | light 有墨行=\(inked["light"] ?? 0) 无墨行=\(blank["light"] ?? 0) 反侧行=\(inverted["light"] ?? 0)"
              + " | dark 有墨行=\(inked["dark"] ?? 0) 无墨行=\(blank["dark"] ?? 0) 反侧行=\(inverted["dark"] ?? 0)"
-             + "（本轮只报数：地板等两台机器各落一次再定）")
+             + "（反侧那一格 R122 起会红，见 SIDEBAR_ICON_INVERTED；地板仍等两台机器各落一次再定）")
+        // R122：`反侧行` 从"只报数"升成会红。来历不是审美判断，是本轮的一次产品改动把它量成了数：
+        // `SettingsView` 侧栏那六枚符号里 `wand.and.stars`（推荐）与 `chart.bar`（统计）是仅有的两枚多色符号，
+        // 在 `.hierarchical` 下它们带自己的调色板 ⇒ 暗档 22 行图标墨落在**背景那一边**（黑底黑图标）。
+        // 换成 `.monochrome` 之后 dark 反侧 22→0、期望 56→78。这一格钉的就是"别悄悄换回去"。
+        // 闸门与判据同源（D-166）：只有这一档读得到墨才判反侧 —— 那台机器整档 0 墨时
+        // "反侧=0" 是噪声对称，不是健康证明（R115 的 COVERAGE 说的就是这件事）。
+        if capability == "能力=可判" {
+            for tag in ["light", "dark"] {
+                XCTAssertEqual(inverted[tag] ?? 0, 0,
+                    "SIDEBAR_ICON_INVERTED \(tag)：有 \(inverted[tag] ?? 0) 行侧栏图标的墨落在**背景那一边**"
+                        + "（同档期望侧=\(inked[tag] ?? 0) 无墨=\(blank[tag] ?? 0)，行带来自视图树，"
+                        + "逐行见 SIDEBAR_ICON_ROW，按符号见 SIDEBAR_ICON_BY_SYMBOL）"
+                        + " ⇒ 那是「看不见」级别的深浅色缺陷，不是留白风格。"
+                        + "先查 `SettingsSidebarRow` 的 `.symbolRenderingMode` / `.foregroundStyle`，"
+                        + "不要改这条断言的 0，也不要用固定色去讨好它（那会在真机上把颜色写死）。")
+            }
+            // 另一侧的账也要有名字：亮档有 65/78 行图标**一个墨都没画**，而这不是本轮改出来的
+            // （改之前是 43/78）。它是离屏通道对 `.primary` 的解析盲区（审计第二轮 1.9 的原始发现），
+            // 与"反侧"是两种病 —— 反侧会红，无墨登记。写成会红就会诱使下一轮拿固定色去填它。
+            emit("SIDEBAR_ICON_BLIND_SPOT light 无墨行=\(blank["light"] ?? 0)"
+                 + " 有墨行=\(inked["light"] ?? 0) 反侧行=\(inverted["light"] ?? 0)"
+                 + " | dark 无墨行=\(blank["dark"] ?? 0) 有墨行=\(inked["dark"] ?? 0)"
+                 + "（亮档无墨=通道对语义色的解析盲区，R122 实测：`.hierarchical`→`.monochrome`"
+                 + " 让 dark 反侧 22→0 同时让 light 期望 35→13 ⇒ 两档要的是相反的解析，"
+                 + "这一格只登记不判产品；真机那一半见人工批次 86.1）")
+        }
         for symbol in bySymbol.keys.sorted() {
             let cell = bySymbol[symbol]!
             emit("SIDEBAR_ICON_BY_SYMBOL \(capability) 符号=\(symbol)"

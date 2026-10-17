@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 设置侧栏图标：暗档 22 行「黑底黑图标」修掉，亮档那一半判成通道盲区（R122 / 新开 172 / U-408…U-409 / D-184 · 产品 1 行）
+
+- 产品：`SettingsSidebarRow` 的 `.symbolRenderingMode(.hierarchical)` → `.monochrome`。
+  六枚侧栏符号里 `wand.and.stars`（推荐）与 `chart.bar`（统计）是仅有的两枚**多色符号**，
+  `.hierarchical` 会保留符号自带的多色调色板，于是暗档有 22 行图标墨落在背景那一边（黑底黑图标）。
+- 实测两档反方向动：`dark 期望 56→78、反侧 22→0`；`light 期望 35→13、无墨 43→65`。
+  看帧两边都确认（`settings-general-720x540-{dark,light}.png`）。
+- 判据分家：`反侧行` 从"只报数"升成会红 `SIDEBAR_ICON_INVERTED`（闸门与判据同源 D-166，整档 0 墨不判）；
+  亮档无墨写成 `SIDEBAR_ICON_BLIND_SPOT` 登记行 —— 给它配红等于诱使下一轮拿固定色去填（BACKLOG 172 追真机）。
+- 更正一条沿用了六轮的结论（U-408）：审计第二轮 1.9 的"不可见来自离屏管线对语义色的解析，不是产品"
+  只对了一半 —— 逐符号表显示暗档那 22 行是符号自带的多色板，产品可改；亮档那一半才是通道。
+- 帧基线 28 张变更（13 个设置夹具 × 两档 + 参照臂 2 张），同提交 `update`，`COMPARED=136 MISSING=0 ADDED=0`。
+- 变异第 26 张 `mutate_r122.py`：M620 产品退回 `.hierarchical` ⇒ 新红抓到；M621 把红改成比"无墨" ⇒ 亮档立刻踩红
+  （这一刀钉的是"这条红认的到底是哪一格"）。两刀全 CAUGHT ⇒ 刀数 98 → 100，caught 97 → 99。
+- **未做**：真机验收（本机装的仍是 R111），所以 `.monochrome` 在亮档到底是产品淡还是通道淡，只到读数与看图那一层。
 ### 150 结案：runner 上「设置卡没有材质」是详情那一列整列没画，不是带子、不是帧高、不是容器（R121 / U-405…U-407 / D-183 · 产品 0 改动）
 
 - 证据（R119 的 CI，run 39024922502）：`CARD_PROBE_ARM cardprobe-split-groupbox light 材质=无 墨行=0 最大偏离=0`
