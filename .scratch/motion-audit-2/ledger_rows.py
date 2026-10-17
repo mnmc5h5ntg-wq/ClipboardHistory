@@ -43,7 +43,7 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_")   # R103：证人那一行是空格分隔的读数，不是 key=
                    # R105：浮层左轴那三行（`QUICKPICK_SEARCH_AXIS` / `_AXIS_CAPABILITY` / `_AXIS_DECLINED`）
                    #   同样是空格分隔 ⇒ 走第二个分支。R104 的 §8 把它们漏在了搬运之外
                    #   （那一轮 §8 的"本轮读数"只有 `CARD_*`），本轮补上 —— 判据的结论行必须与它的
@@ -53,6 +53,9 @@ READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]
                    #   还有 R102 就在的 `CARD_PROBE_ARM_INSET`）在 §8 里**一行都没出现** ——
                    #   而这一轮的结论恰恰建立在它们上面。放宽到"整族前缀 + 空格"，
                    #   并加 `--must-include`：本轮声明哪几族是它的判据读数，缺任何一族就非 0 退出。
+                   #   R108：`--must-include` 第一次被真正用上就红了 —— 声明了 SELECTION_* 三族而搬运里
+                   #   一行都没有（`READINGS_MUST_INCLUDE 声明=4 缺=3`）⇒ 白名单补上 `^SELECTION_`。
+                   #   这一格是 D-176 的**非恒真证明**：声明与搬运是两件事，漏了会被机器抓住。
                    #   为什么不做成"所有大写行都搬"：`PROBE_ELIGIBILITY` 一类有几十行，
                    #   全搬会把 §8 冲成噪声；声明式让**每一轮自己**回答"我这轮的读数是哪几族"。
 

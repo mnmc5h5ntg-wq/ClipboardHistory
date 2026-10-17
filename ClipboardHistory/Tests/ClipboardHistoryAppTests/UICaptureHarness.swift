@@ -706,8 +706,15 @@ final class UICaptureTests: XCTestCase {
             let pageLuma = Double(page)
             var greyRows = 0, greyPixels = 0, widest = 0, widestX = "", inkRows = 0, greyNoInkRows = 0
             var widestGreyNoInk = 0, widestInk = 0
+            // R108：R106 修完之后本机还剩 **1 个纯灰像素**，这一格只问一件事 —— 它在不在字形的足迹里。
+            // 只测不判（判法写进 BACKLOG 161：`落在其x内=false` ⇒ 那不是抗锯齿，要回来开修；
+            // `=true` ⇒ 结案成"字形自己的边"）。两台机器都要打这一行，下一跑 CI 给对面那个数。
+            var greyOnlyY = -1, greyOnlyFirst = -1, greyOnlyLast = -1
+            var inkRowYs: [Int] = []
+            var inkRowFirst: [Int] = []
+            var inkRowLast: [Int] = []
             for y in 0..<min(rep.pixelsHigh, Int(CGFloat(40) * Double(rep.pixelsWide) / fixture.size.width)) {
-                var g = 0, first = -1, last = -1, ink = 0
+                var g = 0, first = -1, last = -1, ink = 0, inkFirst = -1, inkLast = -1
                 for x in 0..<rep.pixelsWide {
                     let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
                     let a = bytes[Int(i) + 3]
@@ -721,6 +728,8 @@ final class UICaptureTests: XCTestCase {
                         last = x
                     } else if delta > 60 {
                         ink += 1
+                        if inkFirst < 0 { inkFirst = x }
+                        inkLast = x
                     }
                 }
                 if g > 0 { greyRows += 1; greyPixels += g }
@@ -731,18 +740,45 @@ final class UICaptureTests: XCTestCase {
                 if g > 0 && ink == 0 {
                     greyNoInkRows += 1
                     widestGreyNoInk = max(widestGreyNoInk, g)
+                    if greyOnlyY < 0 {
+                        greyOnlyY = y
+                        greyOnlyFirst = first
+                        greyOnlyLast = last
+                    }
                 }
                 widestInk = max(widestInk, ink)
                 if g > widest {
                     widest = g
                     widestX = "x=\(first)..\(last)"
                 }
-                if ink > 0 { inkRows += 1 }
+                if ink > 0 {
+                    inkRows += 1
+                    inkRowYs.append(y)
+                    inkRowFirst.append(inkFirst)
+                    inkRowLast.append(inkLast)
+                }
+            }
+            // R108：那 1 个纯灰像素**落在谁的字形足迹里**（判法写在 BACKLOG 161，本轮只测不判）。
+            var residualGrey = "这一档没有纯灰行"
+            if greyOnlyY >= 0 {
+                var nearY = -1, nearFirst = 0, nearLast = 0, bestGap = Int.max
+                for k in 0..<inkRowYs.count {
+                    let gap = abs(inkRowYs[k] - greyOnlyY)
+                    if gap < bestGap {
+                        bestGap = gap
+                        nearY = inkRowYs[k]
+                        nearFirst = inkRowFirst[k]
+                        nearLast = inkRowLast[k]
+                    }
+                }
+                let inside = nearFirst >= 0 && greyOnlyFirst >= nearFirst && greyOnlyLast <= nearLast
+                residualGrey = "纯灰行 y=\(greyOnlyY)px x=\(greyOnlyFirst)..\(greyOnlyLast) "
+                    + "最近墨行 y=\(nearY)px(差\(bestGap)px) x=\(nearFirst)..\(nearLast) 落在其x内=\(inside)"
             }
             emit("QUICKPICK_GREY_BAND \(tag) 灰档行数=\(greyRows) 灰档像素=\(greyPixels) "
                  + "最宽一行=\(widest)px \(widestX) 纯灰行无墨=\(greyNoInkRows) "
                  + "纯灰行最宽=\(widestGreyNoInk)px 最宽墨行=\(widestInk)px 墨档行数=\(inkRows) 页底档=\(page) "
-                 + "带子=顶部40pt 门限=8..45灰阶")
+                 + "带子=顶部40pt 门限=8..45灰阶 残余灰=\(residualGrey)")
             // —— 收场按 D-170：能力读数排在闸门与 skip 之前，未判要带成因数字。
             guard hasEditor else {
                 declined.append("\(tag)[原因=这台机器上那枚字段没有 field editor ⇒ "
@@ -780,6 +816,245 @@ final class UICaptureTests: XCTestCase {
         XCTAssertTrue(declined.isEmpty,
                       "这台机器**装得出** editor（有对象=\(judged)），却有一档没判 ⇒ 坏的是尺或那一档的通道："
                     + "\(declined.joined(separator: " "))")
+    }
+
+    /// 标题栏在与某一 x 带相交的那一段里**最低**的那条边（pt，顶向下），找不到就 nil。
+    ///
+    /// 为什么判据要它（R108）：页底被排除之后，"最彩的一行"完全可能是**红绿灯**那一行，
+    /// 而不是侧栏选中那一行 —— 那就是假绿的一种标准形状（读数对、对象错）。
+    /// 所以列表那一臂的扫描带从"标题栏下沿"开始，纵向位置由被测的视图树自己说，
+    /// 不是我按 28pt 猜的常数（装饰高度是**机器相关**的，R107 刚为此栽过一次）。
+    static func titlebarBottom(in host: NSView, xRange: Range<CGFloat>) -> CGFloat? {
+        var bottom: CGFloat?
+        func walk(_ view: NSView) {
+            if String(describing: type(of: view)).contains("NSTitlebarBackgroundView"),
+               let r = Self.topDownRect(of: view, in: host)?.rect,
+               r.minX < xRange.upperBound, r.maxX > xRange.lowerBound {
+                if bottom == nil || r.maxY > bottom! { bottom = r.maxY }
+            }
+            view.subviews.forEach { walk($0) }
+        }
+        walk(host)
+        return bottom
+    }
+
+    /// 把 `view` 自己的 bounds 换成**顶向下**的矩形（pt，host 坐标系），并带上 host 是否 flipped。
+    ///
+    /// 为什么单独有它（本轮实测出来的坑）：`columnBoxes` 那串的"顶向下"用的是
+    /// `rootHeight - maxY`，那是**非 flipped** 视图的换算；而 SwiftUI 的 `NSHostingView` 是 flipped 的
+    /// ⇒ 同一个数在两种 host 上方向相反。本轮的现场证据：`cardprobe-split-groupbox` 的
+    /// `NSTitlebarBackgroundView`（高 52、x 正好在 148pt 的侧栏边界上断开）被打成
+    /// `顶向下y=248.0..300.0`，而帧里标题栏明明在最上面（选中胶囊在 92..124pt，正好落在它下面）。
+    /// U-305 那一课的形状：**关于中线对称的量永远不会暴露镜像错** —— 所以判据不自己猜方向，
+    /// 交给这颗尺，并且每条被扫的带都要能通过"带里必须有墨"这一格证人，否则就是带放错了。
+    static func topDownRect(of view: NSView, in host: NSView) -> (rect: CGRect, flipped: Bool)? {
+        let f = view.convert(view.bounds, to: host)
+        guard f.width > 1, f.height > 1 else { return nil }
+        if host.isFlipped { return (f, true) }
+        let h = host.bounds.height
+        return (CGRect(x: f.minX, y: h - f.maxY, width: f.width, height: f.height), false)
+    }
+
+    /// 把顶向下矩形夹到帧的像素范围里（越界不是错误，是"这东西有一半不在帧内"—— 由调用方读数报出去）。
+    static func clampBand(_ r: CGRect, scale: Double, pixelsWide: Int, pixelsHigh: Int)
+        -> (x: Range<Int>, y: Range<Int>, clipped: Bool) {
+        let rawX0 = Int((r.minX * scale).rounded(.down))
+        let rawX1 = Int((r.maxX * scale).rounded(.up))
+        let rawY0 = Int((r.minY * scale).rounded(.down))
+        let rawY1 = Int((r.maxY * scale).rounded(.up))
+        let x0 = max(0, min(rawX0, max(0, pixelsWide - 1)))
+        let x1 = max(x0 + 1, min(rawX1, pixelsWide))
+        let y0 = max(0, min(rawY0, max(0, pixelsHigh - 1)))
+        let y1 = max(y0 + 1, min(rawY1, pixelsHigh))
+        let clipped = rawX0 < 0 || rawX1 > pixelsWide || rawY0 < 0 || rawY1 > pixelsHigh
+        return (x0..<x1, y0..<y1, clipped)
+    }
+
+    /// R108 / BACKLOG 160：**"非 key ⇒ 选中一律画成灰"这句今天被拆成两半**。
+    /// 同一棵离屏窗口（两臂都是 `窗口是key=false`、同一个 `windowForCapture`）里：
+    ///   臂 S = SwiftUI `List(selection:)` 的侧栏选中行 ⇒ 量得**有彩度**（本机 亮 34 / 暗 36）；
+    ///   臂 F = `NSTextField` 的 field editor 选中区 ⇒ 量得**无彩度**
+    ///        （R106 记的是 亮 `220,220,220` / 暗 `70,70,70`，色度 0）。
+    /// 臂 F **刻意把整串选中装回去**，这一臂问的是通道不是产品：产品路径 `show()` 赋空串、
+    /// 用户逐字敲，从来没有"整串被选中"这一刻（那正是 R106 / 159 从帧里抹掉的东西）。
+    /// 之所以还要装回来：159 修的是"帧里有用户看不到的东西"，而 160 要问的是
+    /// "这一刻真的出现时，那一族控件画什么颜色" —— 把对象抹掉之后问不了，所以按臂分开记账。
+    ///
+    /// 为什么值得单独一条判据：我上一轮解释 159 时把"非 key ⇒ 灰"当成**全局**事实用了，
+    /// 而它只在字段那一侧成立。130 / 148① / 批次 82.2 问的"活动与非活动之间那颗蓝会不会变"
+    /// 按全局规则问就是一次问六个表面，按本判据问就是**按表面**各问各的。
+    ///
+    /// 判据走**色度轴**（`max(r,g,b) - min(r,g,b)`），不是亮度轴 —— R38 那一课：
+    /// 暗档 `rgb(70,70,70)` 与 `rgb(28,43,64)` 亮度只差约 27，用亮度判必然读成"差不多"，
+    /// 而色度是 0 对 36。两道门限**成对**（各 8，一侧 `>` 一侧 `≤`），
+    /// 8 来自本机分布而不是印象：色度最大的那一行众数占该行的 0.77，而抗锯齿行的色度都在个位数。
+    /// 小面积彩点由"众数必须占该行的三成"筛掉 —— 红绿灯只有几十像素宽，
+    /// 它所在那一行的众数还是页底（本轮实测：色度扫描没有把标题栏那几行选出来）。
+    ///
+    /// 收场按 D-170：能力行与未判名单排在闸门与 skip 之前；只有**两臂都没有对象**才 skip。
+    /// runner 上的判法（开跑之前写死，不许看完再定）：
+    ///   ① 两臂都无对象 ⇒ 未判 + skip，不算答案；
+    ///   ② 列表有色度、字段无 ⇒ 160 的"按控件"结论两台都成立 ⇒ 结案；
+    ///   ③ 列表**也**是无彩度 ⇒ 本机那句"非 key 时侧栏仍然是蓝"是那台机器的通道事实
+    ///      （与 130 / 147 的"accent 在离屏通道不解析"同族），红要读成"两台的通道不同"，
+    ///      **不许**在这里换成"取两臂的比"把 ③ 悄悄吃掉。
+    /// 隐私：只打尺寸、坐标、类名、色号，一个字的内容都不打。
+    func testSelectionFillUnderInactiveWindowIsPerSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r108-surface-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var declined: [String] = []
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let all = self.fixtures(appearance: appearance)
+            guard let split = all.first(where: { $0.name == "cardprobe-split-groupbox" }),
+                  let pick = all.first(where: { $0.name == "quickpick-typed" }) else {
+                return XCTFail("\(tag)：`cardprobe-split-groupbox` 或 `quickpick-typed` 不在名册"
+                               + " ⇒ 这条判据没有对象，先查夹具而不是放宽判据")
+            }
+            // —— 臂 S：什么都不做，产品/通道怎么画就怎么拍。
+            var sidebar: (rect: CGRect, kind: String)?
+            var titleBottom: CGFloat?
+            let sFile = scratch.appendingPathComponent("r108-list-\(tag).png")
+            _ = try render(split, appearance: appearance, to: sFile) { host in
+                let column = Self.sidebarColumnRect(in: host)
+                sidebar = column
+                if let c = column {
+                    titleBottom = Self.titlebarBottom(in: host, xRange: c.rect.minX..<c.rect.maxX)
+                }
+            }
+            var listScan = SurfaceScan()
+            var listBand = ""
+            var listMinRun = 0
+            var listOK = false
+            if let found = sidebar, let image = NSImage(contentsOf: sFile),
+               let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+               let bytes = rep.bitmapData {
+                let scale = Double(rep.pixelsWide) / Double(split.size.width)
+                // 段长的地板用 **pt** 定（4pt），再按这一跑的倍率换算成像素：
+                // 2× 上是 8px、1× 上是 4px —— R38 那一课，像素数不能当两台机器的地板。
+                listMinRun = max(4, Int((4.0 * scale).rounded(.up)))
+                let band = Self.clampBand(found.rect, scale: scale,
+                                          pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh)
+                let page = Self.modalLuma(bytes: bytes, bytesPerRow: rep.bytesPerRow,
+                                          xRange: band.x, yRange: band.y)
+                // 从"标题栏下沿"开始扫：页底被排除后，红绿灯那一行的彩度比胶囊还高，
+                // 让它当选就是假绿（读数对、对象错）。装饰高度由视图树自己说，不是我猜的常数。
+                let yStart = max(0, min(Int(((titleBottom ?? 0) * scale).rounded(.up)), rep.pixelsHigh - 1))
+                listScan = Self.surfaceScan(bytes: bytes, bytesPerRow: rep.bytesPerRow,
+                                            samplesPerPixel: rep.samplesPerPixel,
+                                            xRange: band.x, yRange: yStart..<rep.pixelsHigh,
+                                            pageLuma: Double(page), minRunPx: listMinRun)
+                let tb = titleBottom.map { String(format: "%.1f", $0) } ?? "没有"
+                listBand = "列=\(found.kind) x带=\(band.x.lowerBound)..\(band.x.upperBound)px "
+                    + "y从=\(yStart)px 标题栏底=\(tb)pt 缩放=\(String(format: "%.2f", scale))x "
+                    + "越界=\(band.clipped)"
+                listOK = listScan.rows > 0
+            }
+            if listOK {
+                let cRGB = "rgb(\(listScan.chromaticR),\(listScan.chromaticG),\(listScan.chromaticB))"
+                let aRGB = "rgb(\(listScan.achromaticR),\(listScan.achromaticG),\(listScan.achromaticB))"
+                emit("SELECTION_CHROMA \(tag) 臂=列表 \(listBand) 段长地板=\(listMinRun)px "
+                    + "有填充段行=\(listScan.rows) 彩度行=\(listScan.chromaticRows) "
+                    + "无彩度行=\(listScan.achromaticRows) "
+                    + "最彩段=y=\(listScan.chromaticY)px 宽=\(listScan.chromaticRun)px \(cRGB) "
+                    + "色度=\(listScan.chromaticSpread) "
+                    + "最宽无彩段=y=\(listScan.achromaticY)px 宽=\(listScan.achromaticRun)px \(aRGB)")
+            }
+            // —— 臂 F：把选中装回去，再问那一块填充是什么颜色。
+            var installed = false
+            var fieldBandPt = ""
+            var fieldRect: CGRect?
+            let fFile = scratch.appendingPathComponent("r108-field-\(tag).png")
+            _ = try render(pick, appearance: appearance, to: fFile) { host in
+                guard let field = Self.firstOverlayTextField(in: host),
+                      let editor = field.currentEditor() as? NSTextView else { return }
+                let length = field.stringValue.utf16.count
+                editor.setSelectedRange(NSRange(location: 0, length: length))
+                editor.needsDisplay = true
+                // 用 `topDownRect` 而不是自己减一次高度：host 是否 flipped 决定方向（U-40x）。
+                fieldRect = Self.topDownRect(of: field, in: host)?.rect
+                installed = length > 0 && fieldRect != nil
+                fieldBandPt = "字段类名=\(type(of: field)) 装回选中长度=\(length)"
+            }
+            guard installed, let rect = fieldRect,
+                  let image = NSImage(contentsOf: fFile),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let bytes = rep.bitmapData else {
+                let why = installed ? "帧读不回来" : "这一档装不出 field editor（或串长为 0、或字段不在 host 的坐标系里）"
+                declined.append("\(tag)[臂=字段 原因=\(why) ⇒ 字段那一侧没有对象，色度对比不判]")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(pick.size.width)
+            let minRun = max(4, Int((4.0 * scale).rounded(.up)))
+            let band = Self.clampBand(rect, scale: scale,
+                                      pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh)
+            let page = Self.modalLuma(bytes: bytes, bytesPerRow: rep.bytesPerRow,
+                                      xRange: band.x, yRange: band.y)
+            let fieldScan = Self.surfaceScan(bytes: bytes, bytesPerRow: rep.bytesPerRow,
+                                             samplesPerPixel: rep.samplesPerPixel,
+                                             xRange: band.x, yRange: band.y, pageLuma: Double(page),
+                                             minRunPx: minRun)
+            let aRGB = "rgb(\(fieldScan.achromaticR),\(fieldScan.achromaticG),\(fieldScan.achromaticB))"
+            let peak = "y=\(fieldScan.peakY)px 非页底=\(fieldScan.peakOffPage) "
+                + "距页底=\(String(format: "%.1f", fieldScan.peakDistance)) 众数=\(fieldScan.peakTop)"
+            emit("SELECTION_CHROMA \(tag) 臂=字段 \(fieldBandPt) x带=\(band.x.lowerBound)..\(band.x.upperBound)px "
+                + "y带=\(band.y.lowerBound)..\(band.y.upperBound)px 越界=\(band.clipped) "
+                + "段长地板=\(minRun)px 有填充段行=\(fieldScan.rows) "
+                + "彩度行=\(fieldScan.chromaticRows) 无彩度行=\(fieldScan.achromaticRows) "
+                + "最宽无彩段=y=\(fieldScan.achromaticY)px 宽=\(fieldScan.achromaticRun)px \(aRGB) "
+                + "最彩段=y=\(fieldScan.chromaticY)px 宽=\(fieldScan.chromaticRun)px 色度=\(fieldScan.chromaticSpread) "
+                + "诊断峰行=\(peak) 页底档=\(page)")
+            guard listOK else {
+                declined.append("\(tag)[臂=列表 原因=这一档没找到侧栏那一列或帧读不回来]")
+                continue
+            }
+            // 证人（R68：证人必须与判据同一颗尺）：这条带里必须有墨 —— 带放错了地方就会露馅。
+            XCTAssertGreaterThan(fieldScan.rows, 0,
+                "\(tag)：字段那条带里一个 ≥4pt 的同色段都没有 ⇒ 带子放错（纵向约定或 x 带），"
+                    + "不是『选中没画』：先看上面那行 `SELECTION_CHROMA 臂=字段` 的 y 带、越界标记与诊断峰行")
+            // 段的**宽度**也要有地板：选中底盖住整串（本机 26pt），而字形的一横最多几 pt。
+            // 这一格是给 M591（撤掉"装回选中"）准备的牙 —— 只数"有没有 ≥4pt 的同色段"的话，
+            // 字形的横画也能凑数，那一臂就变成恒有对象。
+            XCTAssertGreaterThanOrEqual(fieldScan.achromaticRun, Int((12.0 * scale).rounded()),
+                "\(tag)：字段那一臂最宽的无彩度段只有 \(fieldScan.achromaticRun)px（地板 12pt），"
+                    + "不到选中底的宽度（本机实测 52px = 26pt）⇒ 这一臂没有对象")
+            XCTAssertGreaterThanOrEqual(fieldScan.achromaticRows, 4,
+                "\(tag)：刻意装回的选中区里只有 \(fieldScan.achromaticRows) 行是"
+                    + "『与页底亮度差 ≥8 而色度 ≤4』的无彩度填充 ⇒ 这一臂没有对象（通道又变了），"
+                    + "两臂的对比无从判起（本机实测 亮/暗 都是 31~32 行 × 52px 宽）。")
+            judged += 1
+            XCTAssertGreaterThanOrEqual(listScan.chromaticRun, listMinRun,
+                "\(tag)：侧栏那一列里没有一段 ≥\(listMinRun)px（4pt）的**同色填充** ⇒ "
+                    + "选中行根本没画填充，色度那一格就无从判起")
+            XCTAssertGreaterThan(listScan.chromaticSpread, 8,
+                "\(tag)：侧栏选中那一行的色度只有 \(listScan.chromaticSpread)（本机看图量的是 亮 34 / 暗 36）"
+                    + " ⇒ 这一台机器上 `List` 的选中在非 key 窗口里**也是灰的**。"
+                    + "按开跑前写死的判法，这读成「160 的按控件结论在这台机器上变成按机器」，"
+                    + "不是尺坏（同一臂的字段那一侧仍按下面那条判）。")
+            // 反向牙（不是恒真式）：字段那一臂**不许**出现一段 ≥地板宽且有彩度的填充。
+            // 第一版我顺手写成 `chromaticRun ≥ 0` —— 那是永远绿的句子，删掉。
+            XCTAssertEqual(fieldScan.chromaticRows, 0,
+                "\(tag)：字段那一臂量到 \(fieldScan.chromaticRows) 行**有彩度**的填充段"
+                    + "（最宽一段 y=\(fieldScan.chromaticY)px 宽 \(fieldScan.chromaticRun)px "
+                    + "色度 \(fieldScan.chromaticSpread)）⇒ 『非 key 时字段选中画成灰』这条前提被推翻，"
+                    + "R106/159 那一段的解释要重写（BACKLOG 160 的字段那一侧）")
+            XCTAssertLessThanOrEqual(fieldScan.chromaticSpread, 8,
+                "\(tag)：字段 editor 的选中底色度是 \(fieldScan.chromaticSpread)，超过无彩度门限 8 ⇒ "
+                    + "『字段选中在非 key 时画灰』这条前提被推翻，159 那一段解释要重写（BACKLOG 160）。")
+        }
+        emit("SELECTION_KEYSTATE_CAPABILITY 候选=2 有对象=\(judged) 未判=\(declined.count)"
+             + "（未判名单只在**这台机器两臂都装得出对象**时才要求为空）")
+        if !declined.isEmpty { emit("SELECTION_KEYSTATE_DECLINED " + declined.joined(separator: " ")) }
+        if judged == 0 {
+            throw XCTSkip("两臂都没有对象（\(declined.joined(separator: " "))）"
+                          + " ⇒ 160 这条『按表面』的对比在本机判不了，**不判（不是通过）**")
+        }
+        XCTAssertTrue(declined.isEmpty,
+            "这台机器**装得出**对象（有对象=\(judged)），却有一臂没判 ⇒ 坏的是尺或那一档的通道："
+                + "\(declined.joined(separator: " "))")
     }
 
     /// 药丸尺与"第一条墨列"尺的**真值表**（R104）：五格合成件，各钉一道地板。
@@ -5340,7 +5615,6 @@ final class UICaptureTests: XCTestCase {
     /// 也就是 PNG 的顶向下），否则这两行读数没法对（R58 那一族：坐标约定要实测）。
     static func columnBoxes(in host: NSView) -> [String] {
         var out: [String] = []
-        let rootHeight = host.bounds.height
         func name(_ v: NSView) -> String { String(describing: type(of: v)) }
         func walk(_ view: NSView) {
             let isSplit = view is NSSplitView || name(view).contains("Split")
@@ -5348,11 +5622,16 @@ final class UICaptureTests: XCTestCase {
                 for (i, sub) in view.subviews.enumerated() {
                     // `NSView.frame(in:)` 在 Swift 里不是一个方法（`frame` 是属性），
                     // 所以走 `convert(_:to:)`：把子视图自己的 bounds 换到 host 的坐标系。
-                    let f = sub.convert(sub.bounds, to: host)
+                    // R108 / U-40x：这里的"顶向下"以前**一律**用 `rootHeight - maxY`，
+                    // 那是非 flipped 视图的换算 —— 而 SwiftUI 的 `NSHostingView` 是 flipped 的，
+                    // 于是本轮实测到标题栏被打成 `顶向下y=248.0..300.0`（它其实在帧的最上面）。
+                    // 现在按 `host.isFlipped` 走 `topDownRect`，纵向约定由被测的 host 自己说。
+                    let f = Self.topDownRect(of: sub, in: host)?.rect
+                        ?? sub.convert(sub.bounds, to: host)
                     out.append("列\(i):\(name(sub))"
                         + "[x=\(String(format: "%.1f", f.minX))..\(String(format: "%.1f", f.maxX))"
-                        + " 顶向下y=\(String(format: "%.1f", rootHeight - f.maxY))"
-                        + "..\(String(format: "%.1f", rootHeight - f.minY))"
+                        + " 顶向下y=\(String(format: "%.1f", f.minY))"
+                        + "..\(String(format: "%.1f", f.maxY))"
                         + " 宽=\(String(format: "%.1f", f.width)) 高=\(String(format: "%.1f", f.height))]")
                 }
             }
@@ -5362,6 +5641,168 @@ final class UICaptureTests: XCTestCase {
         out.append("host=\(name(host))[宽=\(String(format: "%.1f", host.bounds.width))"
                    + " 高=\(String(format: "%.1f", host.bounds.height))]")
         return out
+    }
+
+    /// R108：**包住侧栏那一列的最里层** `_NSSplitViewItemViewWrapper` 的矩形（pt，host 坐标系）。
+    ///
+    /// 为什么不是"第一个 wrapper"：本轮实测的 `CARD_PROBE_GEOMETRY` 里有两个 wrapper ——
+    /// 一个 `x=0.0..720.0`（外层整块内容）、一个 `x=0.0..148.0`（侧栏那一列），
+    /// 而外层**也**包含侧栏的子树 ⇒ "第一个含 ColumnView 的"会选到整窗那一块，
+    /// 判据就变成"在整窗里找最彩的一行"（红绿灯那几行的众数虽然还是页底，但窗口装饰在两台机器上不一样）。
+    /// 取**最窄**那一块才是侧栏。
+    ///
+    /// 为什么只交 x、不交 y：`columnBoxes` 那个"顶向下"在 `NSHostingView` 上是**镜像的**
+    /// —— 本轮实测：同一张帧里 `NSTitlebarBackgroundView` 被打成 `顶向下y=248.0..300.0`，
+    /// 而它在 PNG 里明明在最上面（host 是 flipped，`rootHeight - maxY` 那一步方向反了）。
+    /// U-305 那一课：**关于中线对称的矩形永远不会暴露镜像错**，所以这里干脆不依赖纵向约定 ——
+    /// 纵向扫整列，靠"众数占该行的比例"把小面积彩点筛掉，而不是靠"从第几行开始"。
+    static func sidebarColumnRect(in host: NSView) -> (rect: CGRect, kind: String)? {
+        func name(_ v: NSView) -> String { String(describing: type(of: v)) }
+        func containsColumn(_ v: NSView) -> Bool {
+            if name(v).contains("ColumnView") { return true }
+            return v.subviews.contains { containsColumn($0) }
+        }
+        var best: (CGRect, String)?
+        func walk(_ view: NSView) {
+            let isSplit = view is NSSplitView || name(view).contains("SplitView")
+            if isSplit {
+                for sub in view.subviews where name(sub).contains("_NSSplitViewItemViewWrapper")
+                                            && containsColumn(sub) {
+                    let f = sub.convert(sub.bounds, to: host)
+                    if best == nil || f.width < best!.0.width { best = (f, name(sub)) }
+                }
+            }
+            view.subviews.forEach { walk($0) }
+        }
+        walk(host)
+        guard let found = best, found.0.width > 1 else { return nil }
+        return found
+    }
+
+    /// R108：**按"每一行的众数色"扫色度**，返回一行的分布签名。
+    ///
+    /// 为什么是色度而不是亮度（这是本轮判据的整个前提）：
+    /// 暗档里"非 key 的灰选中底"是 `rgb(70,70,70)`，而"仍然是蓝的侧栏选中"是 `rgb(28,43,64)` ——
+    /// 两者亮度分别约 70 与 43，**用亮度轴判会读成"都是深色、差不多"**，
+    /// 而色度是 0 对 36，一眼分开。R38 那一课的形状：一台机器的档位不能当另一台的地板，
+    /// 而"通道之间的差"在两档外观、两台机器、两种倍率下都是同一个定义。
+    ///
+    /// 为什么看**众数**而不是"这一行里有没有彩点"：红绿灯（红/黄/绿）只有几十像素宽，
+    /// 它所在那一行的众数仍然是页底色 ⇒ 小面积彩点被自然压掉；
+    /// 而侧栏选中那颗胶囊铺满整列（本机实测众数占该行的 77%）⇒ 大面积填充才进得了判据。
+    /// R108 的扫描结果：一行的**最长同色段**签名。
+    ///
+    /// 为什么不是"这一行的众数色"（这是本轮第二版栽过之后换的 shape，两处实测都在下面）：
+    ///   ① 众数把**页底也算进去** ⇒ 字段那一臂的选中底只有字那么宽（本机 52px）而整条带 800px，
+    ///      每一行的众数永远是页底 ⇒ 两臂读数一模一样（假绿）；
+    ///   ② 众数即使只取"离页底 ≥3"的像素，**字段自己的白底**会当选：
+    ///      本机亮档实测 `众数=255,255,255×748（距页底 3.0） 次位=220,220,220×52` ——
+    ///      真正的选中底排在第二名，众数那一格永远看不见它，于是亮档量到 `无彩度行=0`、
+    ///      暗档量到 31，看起来像"亮档没画填充"，其实是尺读错了对象。
+    /// **连续同色段**这两个问题都没有：它问的是"这里有没有一块面积"，
+    /// 而白底是"整片背景"不是"一块填充"—— 它离页底只有 3 档，被 ≥8 的档差门限直接排除。
+    /// 段长门限由调用方按**倍率**换算成 pt（R38：不许拿一台机器的像素数当另一台的地板）。
+    struct SurfaceScan {
+        var rows = 0
+        var chromaticRows = 0
+        var achromaticRows = 0
+        var chromaticY = -1
+        var chromaticRun = 0
+        var chromaticSpread = 0
+        var chromaticR = 0
+        var chromaticG = 0
+        var chromaticB = 0
+        var achromaticY = -1
+        var achromaticRun = 0
+        var achromaticR = 0
+        var achromaticG = 0
+        var achromaticB = 0
+        // 诊断那一格：非页底像素最多的一行的前三名色号。
+        // 留它的理由见上面 ② —— "填充没画"与"画了但离页底太近"在计数格里长得一样，
+        // 只有原始分布能把它们分开（R92 那一课：缺值与缺对象都要能被数出来）。
+        var peakY = -1
+        var peakOffPage = 0
+        var peakDistance = 0.0
+        var peakTop = ""
+    }
+
+    static func surfaceScan(bytes: UnsafePointer<UInt8>, bytesPerRow: Int, samplesPerPixel: Int,
+                            xRange: Range<Int>, yRange: Range<Int>,
+                            pageLuma: Double, minRunPx: Int) -> SurfaceScan {
+        var s = SurfaceScan()
+        for y in yRange {
+            var counts: [Int: Int] = [:]
+            var offPage = 0
+            var runColor = -1
+            var runLen = 0
+            var topRun = 0
+            var topColor = -1
+            for x in xRange {
+                let i = y * bytesPerRow + x * samplesPerPixel
+                let a = bytes[Int(i) + 3]
+                let r = Int(bytes[i]), g = Int(bytes[i + 1]), b = Int(bytes[i + 2])
+                let luma = 0.299 * Double(r) + 0.587 * Double(g) + 0.114 * Double(b)
+                let packed = (r << 16) | (g << 8) | b
+                // 与页底差 ≥8 的才算"不是背景"（8 沿用 `cardFill` 判第二层的那一档常数）。
+                if a > 250 && abs(luma - pageLuma) >= 8 {
+                    counts[packed, default: 0] += 1
+                    offPage += 1
+                    if packed == runColor {
+                        runLen += 1
+                    } else {
+                        runColor = packed
+                        runLen = 1
+                    }
+                    if runLen > topRun {
+                        topRun = runLen
+                        topColor = packed
+                    }
+                } else {
+                    runColor = -1
+                    runLen = 0
+                }
+            }
+            guard offPage > 0 else { continue }
+            if offPage > s.peakOffPage, let peak = counts.max(by: { $0.value < $1.value }) {
+                let pr = (peak.key >> 16) & 0xff, pg = (peak.key >> 8) & 0xff, pb = peak.key & 0xff
+                let pluma = 0.299 * Double(pr) + 0.587 * Double(pg) + 0.114 * Double(pb)
+                s.peakOffPage = offPage
+                s.peakY = y
+                s.peakDistance = pluma - pageLuma
+                var others: [String] = []
+                for extra in counts.sorted(by: { $0.value > $1.value }).dropFirst().prefix(2) {
+                    let er = (extra.key >> 16) & 0xff, eg = (extra.key >> 8) & 0xff, eb = extra.key & 0xff
+                    others.append("\(er),\(eg),\(eb)×\(extra.value)")
+                }
+                let tail = others.isEmpty ? "" : " 次位=\(others.joined(separator: " "))"
+                s.peakTop = "\(pr),\(pg),\(pb)×\(peak.value)\(tail)"
+            }
+            guard topRun >= minRunPx else { continue }
+            let r = (topColor >> 16) & 0xff, g = (topColor >> 8) & 0xff, b = topColor & 0xff
+            let spread = max(r, max(g, b)) - min(r, min(g, b))
+            s.rows += 1
+            if spread >= 6 {
+                s.chromaticRows += 1
+                if spread > s.chromaticSpread {
+                    s.chromaticSpread = spread
+                    s.chromaticY = y
+                    s.chromaticRun = topRun
+                    s.chromaticR = r
+                    s.chromaticG = g
+                    s.chromaticB = b
+                }
+            } else if spread <= 4 {
+                s.achromaticRows += 1
+                if topRun > s.achromaticRun {
+                    s.achromaticRun = topRun
+                    s.achromaticY = y
+                    s.achromaticR = r
+                    s.achromaticG = g
+                    s.achromaticB = b
+                }
+            }
+        }
+        return s
     }
 
     /// R107：分栏的**内容盒有没有溢出夹具**（pt）。0 = 完全在帧内。

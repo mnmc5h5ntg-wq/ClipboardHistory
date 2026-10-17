@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+## [Unreleased]
+### 判据与尺（R108）
+
+- **BACKLOG 160 结案**：新判据 `testSelectionFillUnderInactiveWindowIsPerSurface` 把"非 key ⇒ 选中一律画成灰"
+  拆成**按表面**的两臂读数 —— 同一棵 `key=false` 的离屏窗口里，SwiftUI `List` 的选中行是**有彩度**的
+  （本机 亮 `rgb(217,229,251)` 色度 34 / 暗 `rgb(28,43,64)` 色度 36，段宽 226px），
+  而 `NSTextField` 的 field editor 选中底是**无彩度**的（`220,220,220` / `70,70,70`，段宽 52px，彩度行 0）。
+  字段那一臂是刻意装回选中的"通道臂"，问的不是产品（159 已结案）。四格断言 + 能力行 `SELECTION_KEYSTATE_CAPABILITY`。
+- **尺换了 shape**：从"整行众数"改成"**最长同色段**"（与页底差 ≥8、段宽 ≥ 4pt 按倍率换算）。
+  两版众数各错一次：含页底 ⇒ 两臂读数一模一样；只排除 ≥3 ⇒ 字段自己的白底当选、真填充被挤成次位
+  （`众数=255,255,255×748 次位=220,220,220×52`）。新增 `诊断峰行=` 一格把"没画"与"被挤成次位"分开。
+- **`columnBoxes` 的纵向约定修掉**（U-342）：新增 `topDownRect` 按 `host.isFlipped` 换算 ——
+  实测标题栏（高 52、x 在 148pt 侧栏边界断开）以前被打成 `顶向下y=248.0..300.0`，方向是反的。
+  判据的扫描带起点改由视图树报（`titlebarBottom`），不再写常数（D-174 的纵向版本）。
+- **161 结案**：`QUICKPICK_GREY_BAND` 新增 `残余灰=` —— 亮档那 1 个纯灰像素在 `y=28px x=59..59`，
+  最近墨行 `y=29px` 的 x 段是 `47..86` ⇒ `落在其x内=true` ⇒ 字形抗锯齿边，判据不必管；暗档没有纯灰行。
+- **157 的 CI 答案（run `39002273057`）**：臂 2 在 runner 上 `整窗墨行=70 整窗最大偏离=165`、`带子墨行=0`、
+  `分栏内容溢出=0.0pt` ⇒ 对象在帧内、整窗有墨、带子里没有 —— 那是**runner 上详情那一格本来就是空的**，
+  不是容器吃掉材质。新开 **162**（150 那台实验在 CI 上还没开始跑）。预登记的三条判法没覆盖这一格 ⇒ **D-177**。
+- 变异表 `mutate_r108.py` 三刀 M591–M593 全 **CAUGHT**（撤掉"装回选中"⇒ 字段臂失去对象；
+  色度门限抬到 200 ⇒ 列表臂失去对象；两个分支对调 ⇒ 列表那侧色度等式红）。表数 16 → **17**、刀数 69 → **72**。
+- **产品代码 0 行改动**、帧 134 张逐字节不变 ⇒ 不换装。
 ### 判据与实验（R107）
 
 - **157 的堵点被查到在实验对象自己身上**：臂 2（`cardprobe-split-groupbox`）的分栏内容盒是 **258pt 高**，
