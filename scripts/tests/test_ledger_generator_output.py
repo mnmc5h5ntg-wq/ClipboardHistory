@@ -82,6 +82,32 @@ class GeneratorAgreementTests(unittest.TestCase):
 
 class DanglingReferenceTests(unittest.TestCase):
 
+    def test_prose_references_to_backlog_items_resolve_too(self):
+        """散文里的 `BACKLOG <n>` 也要能落到条目上 —— 只查表里的引用是半个盲区（U-454）。
+
+        本轮实测到的形状：`AGENT_BACKLOG.md` 里 172 那条的**条目号前缀被某次插入吃掉了**，
+        于是文件里所有"172"的引用都指向一个扫描器看不见的条目。
+        这条判据把同一把尺伸到正文台账上；它查的是"号存不存在"，不是"结论对不对"。
+        """
+        item_numbers = set()
+        for line in io.open(BACKLOG, encoding="utf-8"):
+            m = re.match(r"^(?:\*\*)?(\d{2,3})\.", line)
+            if m:
+                item_numbers.add(int(m.group(1)))
+        self.assertGreater(len(item_numbers), 100, "条目名册读不出来，这条判据会恒真")
+        dangling = []
+        for name in ("AGENT_UI_AUDIT.md", "AGENT_VISUAL_ITERATION.md", "CHANGELOG.md",
+                     "AGENT_STATE.md", "AGENT_FINAL_REPORT.md", "AGENT_DECISIONS.md"):
+            path = os.path.join(REPO, name)
+            if not os.path.exists(path):
+                continue
+            text = io.open(path, encoding="utf-8").read()
+            for n in set(int(x) for x in re.findall(r"BACKLOG\s*(\d{2,3})", text)):
+                if n not in item_numbers:
+                    dangling.append("%s → BACKLOG %d" % (name, n))
+        self.assertEqual([], sorted(dangling),
+                         "正文引用了扫描器认不出的条目号（要么号被吃掉，要么从没开过）")
+
     def test_every_backlog_reference_in_the_ledger_names_a_real_item(self):
         """表里写 `BACKLOG 58` 就必须真有条目 58；悬空引用多半是"半批已写"留下的。"""
         # 条目行有**两种形状**（R156 之后我改成用粗体起头）：

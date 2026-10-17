@@ -4358,7 +4358,7 @@ settings-general-login-unsupported, settings-min, settings-privacy, …]」。
     两条判据侧的账顺手钉住：U-442（变异表 needle 命中 2 次那一臂 DID-NOT-RUN 却整表 exit 0；红掉的测试名要按空格切）、
     U-443（放行一个出口要说清它放不掉什么）。本条等 runner 见过一次再结案。
 
-在离屏通道里几乎不画墨 —— 与暗档"反侧"是两种病，本轮只修了暗档**（R122 开 / 与 41、167、170、43 同族）：
+172. **R122 开：亮档侧栏图标在离屏通道里几乎不画墨 —— 与暗档"反侧"是两种病，本轮只修了暗档**（R122 开 / 与 41、167、170、43 同族）：
     `SettingsSidebarRow` 的渲染模式从 `.hierarchical` 换成 `.monochrome` 之后，两档的读数**朝相反方向动**：
 
     - `dark 期望 56→78、反侧 22→0`（`wand.and.stars` 推荐 与 `chart.bar` 统计 是六枚里仅有的两枚多色符号，
