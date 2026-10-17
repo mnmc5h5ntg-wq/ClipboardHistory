@@ -39,7 +39,7 @@ DIFFERENCE_MIN = 20          # 静置那一屏必须**几乎没有**彩色
 
 # 与 real_screen_sidebar_icons.py 共用同一套基础件（辅助功能闸门、矩形解析、外观判定）。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from real_screen_sidebar_icons import osascript  # noqa: E402
+from real_screen_sidebar_icons import osascript, display_channel_state  # noqa: E402
 
 
 def count_ink(path):
@@ -87,6 +87,15 @@ def main():
     ap.add_argument("--keep-png", action="store_true", help="把两张截图留在 /tmp")
     args = ap.parse_args()
 
+    # 先问显示器（R143 / U-476）：屏幕关掉时 `screencapture -R` 直接非零退出，
+    # 而 System Events 也看不到别的 App 的窗口 —— 那一格的真名是"没跑"，不是"产品没画"，
+    # 更不是把脚本崩掉。
+    alive, why = display_channel_state()
+    print("DISPLAY_CHANNEL 可判=%d 成因=%s" % (1 if alive else 0, why))
+    if not alive:
+        print("REALSCREEN_NOT_RUN display_channel（%s）⇒ 这一格是没跑，不是通过" % why)
+        return 1
+
     code, enabled = osascript('tell application "System Events" to return UI elements enabled')
     if code != 0 or enabled.lower() != "true":
         print("REALSCREEN_NOT_RUN accessibility（UI elements enabled=%s）⇒ 这一格是没跑，不是通过" % enabled)
@@ -119,9 +128,13 @@ def main():
         x, y, w, h = rect
         time.sleep(2.0)                         # 等淡入落定（0.16s）+ 两扇窗都画完
         clicked_png, idle_png = "/tmp/real_screen_ring_clicked.png", "/tmp/real_screen_ring_idle.png"
-        subprocess.run(["screencapture", "-x", "-R%d,%d,%d,%d" % (x, y, w, h), clicked_png], check=True)
-        subprocess.run(["screencapture", "-x", "-R%d,%d,%d,%d" % (x + IDLE_X_OFFSET, y, w, h), idle_png],
-                       check=True)
+        for rect_x, path in ((x, clicked_png), (x + IDLE_X_OFFSET, idle_png)):
+            cap = subprocess.run(["screencapture", "-x", "-R%d,%d,%d,%d" % (rect_x, y, w, h), path],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if cap.returncode != 0:
+                print("REALSCREEN_NOT_RUN screencapture（区域 %d,%d,%d,%d 退出码 %d）"
+                      "⇒ 通道在跑的过程中又不可用了，这一格不算通过" % (rect_x, y, w, h, cap.returncode))
+                return 1
         try:
             c_ink, c_strong, c_black = count_ink(clicked_png)
             i_ink, i_strong, i_black = count_ink(idle_png)

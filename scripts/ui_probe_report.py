@@ -455,6 +455,18 @@ def main(argv=None):
             sample_text = ""
         for line in analyse_sample(sample_text)[0]:
             print(line)
+    # R143 / BACKLOG 176：把帧间隔的三臂读数**转发**进 CI 日志。
+    # 为什么要在这一层转发：探针那三行原来走 `print`（块缓冲，进程被看门狗收掉就没了），
+    # 改成 `emit` 之后它们进了 /tmp/ui.log —— 但那份日志不上传，CI 里还是看不见，
+    # 于是"收紧预算"这件事依旧没有依据。缺席必须自己报一行，不许静默。
+    fps = [line.strip()[:240] for line in text.splitlines() if "PROBE_FPS" in line]
+    if fps:
+        for line in fps[-4:]:
+            print("FORWARDED " + line)
+    else:
+        print("UI_PROBE_FPS_ABSENT=1 这一卷的日志里没有 PROBE_FPS 行 ⇒ 那条用例没跑完，"
+              "或者读数没走 emit ⇒ BACKLOG 176 的收紧仍然没有 runner 依据（不许读成「没有回归」）")
+
     print("UI_PROBE_NAMED=%d" % (1 if named else 0))
     return 0 if named else 1
 

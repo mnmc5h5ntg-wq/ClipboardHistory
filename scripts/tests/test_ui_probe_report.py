@@ -20,6 +20,7 @@
 """
 import contextlib
 import io
+import sys
 import os
 import tempfile
 import unittest
@@ -672,3 +673,39 @@ class SampleWiringTests(unittest.TestCase):
             proc = subprocess.run(["bash", "-n", path], capture_output=True, text=True)
             os.unlink(path)
             self.assertEqual(0, proc.returncode, "%s 的正文语法坏了：%s" % (step, proc.stderr[:200]))
+
+
+class FpsForwardingTests(unittest.TestCase):
+    """R143 / BACKLOG 176：帧间隔的三臂读数必须被转发进 CI 日志，而**缺席必须自己报一行**。
+
+    为什么单独测：探针那三行原来走 `print`（块缓冲），CI 里从来没有它们；
+    改成 `emit` 之后它们进了 `/tmp/ui.log`，但那份日志不上传 —— 所以"转发"这一步才是
+    让 runner 读数真正存在的那一环。少了它，176 的收紧永远没有依据，
+    而 CI 看起来一切正常（这正是"只印不拦的读数=没读数"的反面：只写在本地=没写）。
+    """
+
+    def _run(self, body):
+        import os
+        import subprocess
+        import tempfile
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(tempfile.mkdtemp(), "ui.log")
+        with io.open(path, "w", encoding="utf-8") as handle:
+            handle.write(body)
+        proc = subprocess.run([sys.executable,
+                               os.path.join(repo, "scripts", "ui_probe_report.py"), path],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        return proc.stdout.decode("utf-8", "replace")
+
+    def test_a_present_reading_is_forwarded(self):
+        out = self._run(u"Test Case '-[X testA]' passed (1.0 seconds).\n"
+                        u"PROBE_FPS 机器=runner baseline_p95=16.70 off_p95=16.80 "
+                        u"loaded_p95=26.94 比值=1.604 预算=3.00 n=210 worst=88.0\n")
+        self.assertIn("FORWARDED PROBE_FPS", out)
+        self.assertNotIn("UI_PROBE_FPS_ABSENT", out)
+
+    def test_absence_is_named_rather_than_silent(self):
+        out = self._run(u"Test Case '-[X testA]' passed (1.0 seconds).\n")
+        self.assertIn("UI_PROBE_FPS_ABSENT=1", out,
+                      "没有读数时必须报这一行 ⇒ 否则 CI 绿会替我说「帧间隔没问题」，"
+                      "而实际是这条用例没跑完或者读数没走 emit")

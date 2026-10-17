@@ -67,10 +67,55 @@ def osascript(src):
     return proc.returncode, proc.stdout.decode("utf-8", "replace").strip()
 
 
+def display_channel_state():
+    """先问显示器，再问窗口 —— 这一格的成因顺序错了就会说假话（R143 / U-476）。
+
+    R141 那天我把 `NO_WINDOW` 读成「点击没打开设置窗口」，而真正的原因是显示器在 23:32:37
+    关了（`pmset -g log` 一行就能看见）：屏幕关掉/锁屏时，别的 App 的窗口在辅助功能里根本不存在，
+    `screencapture` 也给全黑。⇒ 这条通道的三种"读不到"里，**成因必须在点之前先定**，
+    否则一个环境事实会被记成一条产品缺陷。
+
+    返回 (是否可判, 人话原因)。判据：先问电源日志最近一次是 on 还是 off，再用一小块截图复核。
+    """
+    import subprocess as _sp
+    try:
+        log = _sp.run(["pmset", "-g", "log"], stdout=_sp.PIPE, stderr=_sp.DEVNULL).stdout
+        text = log.decode("utf-8", "replace")
+        last_on = text.rfind("Display is turned on")
+        last_off = text.rfind("Display is turned off")
+        if last_off > last_on:
+            tail = text[last_off:].split("\n")[0][:60]
+            return False, "显示器关闭（电源日志最近一条：%s）⇒ 锁屏/休眠时辅助功能看不到别的 App 的窗口" % tail
+    except Exception as exc:  # 读不到电源日志不算"显示器开着"，交给下面的像素复核
+        print("DISPLAY_CHANNEL pmset 读不到（%s）⇒ 改用像素复核" % type(exc).__name__)
+    probe = "/tmp/real_screen_display_probe.png"
+    if os.path.exists(probe):
+        os.remove(probe)
+    try:
+        _sp.run(["screencapture", "-x", "-R0,0,64,64", probe], check=True)
+        from PIL import Image
+        im = Image.open(probe).convert("L")
+        vals = list(im.getdata())
+        brightest = max(vals) if vals else 0
+        os.remove(probe)
+        if brightest <= 8:
+            return False, "截图全黑（64x64 探针最亮像素=%d/255）⇒ 没有可采的显示输出" % brightest
+    except Exception as exc:
+        return False, "探针截图失败（%s）" % type(exc).__name__
+    return True, "显示器开着"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep-png", action="store_true", help="把截图留在 /tmp（默认测完删掉）")
     args = ap.parse_args()
+
+    alive, why = display_channel_state()
+    print("DISPLAY_CHANNEL 可判=%d 成因=%s" % (1 if alive else 0, why))
+    if not alive:
+        print("REALSCREEN_NOT_RUN display_channel（%s）⇒ 这一格是没跑，不是通过，"
+              "也不是产品看不见" % why)
+        return 1
 
     code, enabled = osascript('tell application "System Events" to return UI elements enabled')
     if code != 0 or enabled.lower() != "true":
