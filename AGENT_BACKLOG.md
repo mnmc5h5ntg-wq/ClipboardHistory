@@ -4601,11 +4601,14 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
     R126→R139 每轮都是 `caught == 刀数 − 1`，也就是两个数里至少一个是推的 —— **这一条我本轮没有复算**，
     下一轮要么复算要么删句。现在预检打 `ARM_TOTAL files=121 arms=486 dupes=0 repeats=0`，
     那是它自己口径的**声明行数**，不等于任何历史累计值；要引用就引这个读数，别再手抄。
-184. **清账表的地板没有对上一版做差**（R143 复核开）：`BELOW_FLOOR` 只拿「已清账格子数」与 JSON 里的
+184. **清账表的地板没有对上一版做差**（R143 复核开，**R143 当场结案**）：`BELOW_FLOOR` 只拿「已清账格子数」与 JSON 里的
     `floor_cleared` 比，而 `floor_cleared` 自己可以被改小 ⇒「删五行 + 地板降五」这一刀今天不会红
     （`test_floor_is_monotone_and_cannot_be_a_wish` 是在合成表上证「地板写不成愿望」，不是对 git 里上一版做差）。
-    补法：闸门加一格「`floor_cleared` 与 `git show HEAD:docs/motion_surface_ledger.json` 比不许变小」，
-    并配一刀（降地板 + 删行必须红）。
+    **结案读数**：闸门新增出口 `FLOOR_WENT_BACK`（基准 = `git show HEAD:docs/motion_surface_ledger.json` 的地板），
+    临时落刀「删一行 + 地板 70→69」⇒ 旧判据 `BELOW_FLOOR` 是绿的（69 行 ≥ 地板 69），新出口红：
+    `MOTION_LEDGER_FLOOR_BASELINE head=70 now=69` + `MOTION_LEDGER_RESULT=red 不合法格=1`；`git checkout --` 还原后 `RESULT=ok`。
+    三格自检在 `scripts/tests/test_motion_surface_gate.py::FloorBaselineTests`（降了要红 / 没基准不许算红 /
+    本仓库必须读得到基准），电池 298 → 301。
 185. **结论句里的数字要能被脚本重算，否则它就是我手抄的印象**（R143 复核开，180 的一般形式）：
     本轮查出四处「能从仓库算出来却由我抄写」的数：R141 的「七行合计 100/105」（实 99）、
     「改成 `VisualShape.rounded` 之后 24 条全绿」（对不上任何一卷：`--filter HotKeyRecorder` 是 14 条、

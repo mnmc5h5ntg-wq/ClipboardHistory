@@ -16,6 +16,9 @@
                  同一族：会红的必须是单调量；均值与区间都被证伪过）。**只数已清账的行**，
                  占位行（`not-measured`）不把地板抬起来。
   FLOOR_LIES     `floor_cleared` 大于实际行数 ⇒ 红（把地板写成愿望，就是给自己留一张免检牌）。
+  FLOOR_WENT_BACK 本轮的 `floor_cleared` 小于 **HEAD 那一版** ⇒ 红（R143 / BACKLOG 184）。
+                 `BELOW_FLOOR` 的两个量都在同一份可写文件里 ⇒「删五行 + 地板降五」它防不住；
+                 单调性要压在表外的基准上。基准读不到 ⇒ 打 `head=无` 并**不判**（由电池断言本仓库读得到）。
   EVIDENCE_SHAPE 证据指针不含可复查对象（源码/测试/仓库内路径 / BACKLOG 号 / D-号 / 批次号）⇒ 红。
                  单独的轮次号只是"某个人在某轮写过"（U-424）。
   EVIDENCE_PATH_MISSING
@@ -110,7 +113,31 @@ def evidence_problems(row, where, root=None):
     return out
 
 
-def check(data, root=None):
+def head_floor_cleared(root=None, path="docs/motion_surface_ledger.json"):
+    """读 **HEAD 那一版**的 `floor_cleared`；读不到返回 None（= 这一格没判，不是通过）。
+
+    为什么要外部基准（R143 / BACKLOG 184）：`BELOW_FLOOR` 拿"已清账格子数"与 JSON 里的地板比，
+    而地板自己就在同一份可写的文件里 ⇒「删五行 + 地板降五」这一刀今天不会红。
+    单调性必须压在**表外**的一个量上（同 AGENTS.md 里"守卫要读字段不能读散文"那一族）。
+    基准读不到时不红：CI 的 shallow checkout 里 `HEAD` 仍然存在，所以读不到只可能是"不在 git 工作树里"；
+    那一格由 `scripts/tests/test_motion_surface_gate.py` 断言"在本仓库里必须读得到"，
+    于是"没判"与"判过"仍然分开记账。
+    """
+    import subprocess
+    root = root or repo_root()
+    try:
+        raw = subprocess.check_output(["git", "-C", root, "show", "HEAD:" + path],
+                                      stderr=subprocess.DEVNULL)
+    except Exception:
+        return None
+    try:
+        value = json.loads(raw.decode("utf-8")).get("floor_cleared")
+    except Exception:
+        return None
+    return value if isinstance(value, int) else None
+
+
+def check(data, root=None, head_floor=None):
     """返回 [(代码, 说明)]；空列表 = 全部合法。"""
     problems = []
     verdicts = data.get("verdicts") or []
@@ -131,6 +158,11 @@ def check(data, root=None):
     elif floor > len(rows):
         problems.append(("FLOOR_LIES",
                          "floor_cleared=%d 大于实际行数 %d ⇒ 地板写成了愿望" % (floor, len(rows))))
+    if isinstance(floor, int) and isinstance(head_floor, int) and floor < head_floor:
+        problems.append(("FLOOR_WENT_BACK",
+                         "floor_cleared 从 HEAD 的 %d 降到 %d ⇒ 清账只能往前不能往后。"
+                         "这一格补的是 BELOW_FLOOR 唯一防不住的形状：删掉已清账的行**同时**把地板降下来"
+                         "（R143 / BACKLOG 184）" % (head_floor, floor)))
     seen = set()
     root = root or repo_root()
     for i, row in enumerate(rows):
@@ -199,7 +231,12 @@ def main():
           % (len(data.get("surfaces") or []), len(data.get("states") or []), cells, len(rows),
              cleared_n, max(0, cells - cleared_n), data.get("floor_cleared")))
     print("MOTION_LEDGER_VERDICTS %s" % (dist or "无"))
-    problems = check(data)
+    # 基准只对**仓库里那一份**有意义：`--path` 指到别处（沙箱夹具）时不比对，读成 None。
+    head_floor = head_floor_cleared() if args.path == "docs/motion_surface_ledger.json" else None
+    problems = check(data, head_floor=head_floor)
+    print("MOTION_LEDGER_FLOOR_BASELINE head=%s now=%s"
+          % ("无（不在 git 工作树里 ⇒ 这一格没判）" if head_floor is None else head_floor,
+             data.get("floor_cleared")))
     for code, msg in problems:
         print("MOTION_LEDGER_%s %s" % (code, msg))
     print("MOTION_LEDGER_RESULT=%s 不合法格=%d（未清账不算不合法，它只是进度）"

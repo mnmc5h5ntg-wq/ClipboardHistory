@@ -228,5 +228,38 @@ class RealTableTests(unittest.TestCase):
         self.assertGreaterEqual(len(data["rows"]), data["floor_cleared"])
 
 
+class FloorBaselineTests(unittest.TestCase):
+    """R143 / BACKLOG 184：地板的单调性要压在**表外**的基准上。
+
+    `BELOW_FLOOR` 的两个量（已清账行数、`floor_cleared`）住在同一份可写文件里，
+    所以「删五行 + 同时把地板降五」这一刀它防不住 —— 而那张表的全部意义就是"清账只能往前"。
+    新出口 `FLOOR_WENT_BACK` 拿 HEAD 那一版的地板当基准。三格各管一个方向：
+    降了要红、读不到基准不许算红、以及**在本仓库里基准必须读得到**（否则这一格会静默变成没判）。
+    """
+
+    def test_a_lower_floor_than_head_is_named(self):
+        shrunk = base()
+        shrunk["floor_cleared"] = 1
+        shrunk["rows"] = shrunk["rows"][:1]        # 删行 + 降地板：BELOW_FLOOR 在这一刀下是绿的
+        problems = gate.check(shrunk, head_floor=2)
+        self.assertIn("FLOOR_WENT_BACK", codes(problems))
+        self.assertNotIn("BELOW_FLOOR", codes(problems),
+                         u"这一刀的证人必须只有一个；两个都红说明沙箱夹具没造出「删行 + 降地板」的形状")
+
+    def test_an_absent_baseline_is_not_a_red(self):
+        same = base()
+        self.assertEqual([], [c for c, _ in gate.check(same, head_floor=None) if c == "FLOOR_WENT_BACK"],
+                         u"读不到基准 ⇒ 这一格没判，不许当成红（也不许当成通过——由下面那格钉住）")
+
+    def test_the_repository_can_actually_read_the_baseline(self):
+        """正对照的另一半：如果 `head_floor_cleared()` 在这台机器上永远返回 None，上面两格都白写。"""
+        value = gate.head_floor_cleared()
+        self.assertIsNotNone(value, u"读不到 HEAD 的 floor_cleared ⇒ FLOOR_WENT_BACK 是恒真的死格子")
+        committed = json.loads(io.open(LEDGER, encoding="utf-8").read())
+        self.assertLessEqual(value, int(committed["floor_cleared"]),
+                             u"HEAD 的地板（%s）比工作树（%s）还高 ⇒ 现在就是该红的时刻，不是基准坏了"
+                             % (value, committed["floor_cleared"]))
+
+
 if __name__ == "__main__":
     unittest.main()
