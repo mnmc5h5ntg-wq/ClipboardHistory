@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 给 150 装了「详情列有没有东西」的树侧证人，并把 runner 读数落盘（R117 / U-392…U-394 · 产品 0 改动）
+
+- 新增 `CARD_PROBE_DETAIL_TREE`：报详情列里的 `嵌套hosting` 层数与**列内视图总数**。
+  runner 上一跑已排掉「列不存在」（wrapper 在树里、全高），剩下「没实例化」与「画了没进帧」
+  在像素上同形（`墨行=0 最大偏离=0`），这一行就是用来分它们的。本机基准 `hosting=6 列内视图数=16`。
+- **U-392**：证人第一版只数 `NSTextField`/`NSImageView` —— SwiftUI 的文字不是这两种，
+  本机有 24 行墨的那一臂也报 0 ⇒ 一把只会说 0 的尺会把两种成因抹平成一种。
+- **U-393**：用「锚点后追加」插助手时把锚点行复制了一份 ⇒ 重复声明，`emit-module` 才报
+  （写盘成功而内容坏，U-372 家族新形态）⇒ 插完立刻 build。
+- **U-394**：`gh run rerun` 会顶掉旧 attempt 的日志 ⇒ 台账引用过的 runner 读数会消失。
+  本轮起读 CI 时同步抽取落盘（`.scratch/motion-audit-2/ci/…_readings.log`，31 行），
+  并为 166 的「同一 commit 两跑」发起同版重跑（run 39020070349 的第二遍）。
+- 看图腿：真看 `cardprobe-split-groupbox-720x300-light`（臂 2 本机帧）—— 详情卡片与那行字都在、
+  侧栏六行从 y=60 起、四枚图标白到看不见而 `推荐`/`统计` 黑而清晰，与 R116 的矩形与逐行读数一致。
+- 验证：捕获 67 例 / 4 skip / 0 failures；帧 136 张 `CHANGED=0`（只加读数，不动产品与夹具）；
+  脚本电池 239；全量与变异见 STATE。
 ### 169 结案：台账矩形换成实测行带，并加一条会红的对账（R116 / U-388…U-390 · 产品 0 改动）
 
 - `settingsSidebarTextColumn` 从 `y 96 h 154`（**五行时代**的坐标）换成 `y 60 h 192` = 视图树给的六行；

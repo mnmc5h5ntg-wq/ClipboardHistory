@@ -6137,6 +6137,40 @@ final class UICaptureTests: XCTestCase {
     /// 后者是 R29d 刚在 `.scratch` 那把尺上犯过的错（`modalColor` 把 pt 当 px，
     /// 于是框其实没压住字，却报出一个像结论的数）。两种情况修法完全相反。
     static let settingsContentPane = CGRect(x: 160, y: 70, width: 400, height: 200)
+    /// 一列里**视图树自己有多少可画的东西**（R117 / BACKLOG 150 的证人）。
+    ///
+    /// 为什么像素那两把尺不够：`CARD_PROBE_WHOLE`（整窗 vs 带子）能分开"带子放错"与"整页没画"，
+    /// `CARD_PROBE_COLUMNS`（逐列墨）能分开"侧栏有墨"与"详情没墨"，
+    /// 但**"详情列在树里存在、里面却是空的"与"详情画了但被裁到帧外"**在像素上是同一个形状：0 墨。
+    /// 150 要的正是这两者的区别 —— 前者是实例化（runner 上的 `NavigationSplitView` 详情没被建出来），
+    /// 后者才是容器吃材质。所以直接数这一列里的文字/图像类子视图与它们的包围盒。
+    static func columnSubviewInventory(in host: NSView, rect: CGRect)
+        -> (texts: Int, images: Int, hosts: Int, inside: Int, sample: [String]) {
+        var texts = 0, images = 0, hosts = 0, inside = 0
+        var sample: [String] = []
+        func walk(_ view: NSView, depth: Int) {
+            let cls = String(describing: type(of: view))
+            // 只数"落在这一列里"的视图总数：SwiftUI 的文字不是 NSTextField（本机实测
+            // `详情列文字视图=0` 而有 24 行墨），所以"有没有东西"只能看子视图数量与 hosting 层数。
+            if let box = Self.topDownRect(of: view, in: host), box.rect.intersects(rect) { inside += 1 }
+            let isText = view is NSTextField
+            let isImage = view is NSImageView
+            if cls.contains("Hosting") { hosts += 1 }
+            if isText || isImage, let top = Self.topDownRect(of: view, in: host),
+               top.rect.intersects(rect) {
+                if isText { texts += 1 } else { images += 1 }
+                if sample.count < 5 {
+                    let r = top.rect
+                    sample.append("\(isText ? "文字" : "图像"):\(cls)"
+                                  + "[\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))]")
+                }
+            }
+            if depth < 18 { view.subviews.forEach { walk($0, depth: depth + 1) } }
+        }
+        walk(host, depth: 0)
+        return (texts, images, hosts, inside, sample)
+    }
+
 
     /// 侧栏**图标列**（pt）。这里只留两块**对账用**的列级矩形，判据一律走 `sidebarRowRects`：
     /// `settingsSidebarIconColumnWide` 就是 R114 撤 167 时手量的那块（x 8..40），
@@ -8017,10 +8051,14 @@ final class UICaptureTests: XCTestCase {
                 var geometry: [String] = []
                 var columns: [(name: String, rect: CGRect)] = []
                 var splitOverflow = 0.0
+                var detailInventory = (texts: 0, images: 0, hosts: 0, inside: 0, sample: [String]())
                 _ = try render(fixture, appearance: appearance, to: file) { host in
                     geometry = Self.columnBoxes(in: host)
                     columns = Self.splitColumnRects(in: host)
                     splitOverflow = Self.splitContentOverflow(in: host)
+                    if let detail = columns.first(where: { $0.name.contains("详情") }) {
+                        detailInventory = Self.columnSubviewInventory(in: host, rect: detail.rect)
+                    }
                 }
                 guard let image = NSImage(contentsOf: file),
                       let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
@@ -8133,6 +8171,17 @@ final class UICaptureTests: XCTestCase {
                     }
                     emit("CARD_PROBE_COLUMNS \(fixture.name) \(tag) "
                          + (columnLines.isEmpty ? "视图树没打出列" : columnLines.joined(separator: " ")))
+                    // 详情列的**树侧**证人：列在不在是一回事，列里有没有可画的视图是另一回事。
+                    // 这一行不判产品（D-163），它只把 150 的两种成因分开记账。
+                    if isProbe {
+                        emit("CARD_PROBE_DETAIL_TREE \(fixture.name) \(tag)"
+                             + " 详情列文字视图=\(detailInventory.texts)"
+                             + " 图像视图=\(detailInventory.images)"
+                             + " 嵌套hosting=\(detailInventory.hosts)"
+                             + " 列内视图数=\(detailInventory.inside)"
+                             + (detailInventory.sample.isEmpty
+                                ? " 样本=无" : " 样本=" + detailInventory.sample.joined(separator: " ; ")))
+                    }
                     // 尺自检（D-174③ 的形状）：**带子必须与详情那一列有交集**。
                     // 它不判产品，只判"我扫的是不是我想扫的那一块" —— 红的时候说的是仪器坏了。
                     // 为什么不是"带子必须包含整列"：本轮实测带子是 x=170..720 而详情列是 148..720，
