@@ -3771,8 +3771,18 @@ final class UICaptureTests: XCTestCase {
             })
         })
         if #available(macOS 13.0, *) {
+            // R107：这一臂的高度从 140pt 改成 **300pt**，理由是量出来的，不是"想让它画出来"：
+            // 本轮给臂 2 装了视图树包围盒读数（`CARD_PROBE_GEOMETRY`），它报的是
+            // `列0:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=-85.0..173.0 宽=720.0 高=258.0]`
+            // —— 分栏自己的内容盒是 **258pt 高**，而夹具只给 140pt ⇒
+            // 帧上看到的是"从一块 258pt 的内容里裁出来的一条 140pt 窗口"，
+            // 而那条窗口摆在哪儿**取决于窗口装饰（标题栏）的高度**，也就是**取决于机器**。
+            // 这正好是 157 那三成因里"带子没盖住内容"的形状：本机填充行落在 `y=48..68.5pt`，
+            // 带子 `24..124pt` 盖得住；换一台装饰更高的机器就会盖不住，而读数长得和
+            // "容器吃掉了材质"一模一样（`墨行=0 最大偏离=2`）。
+            // 所以先把**实验对象本身**修到不被装饰高度摆布（内容不裁），再来问容器。
             results.append(Fixture("cardprobe-split-groupbox",
-                                   NSSize(width: 720, height: 140)) {
+                                   NSSize(width: 720, height: 300)) {
                 AnyView(NavigationSplitView {
                     SettingsSidebarView(selectedCategory: .constant(.general))
                         .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
@@ -5319,6 +5329,69 @@ final class UICaptureTests: XCTestCase {
         return (rows, pixels, maxDelta)
     }
 
+    /// R107 / BACKLOG 157 的实验 (a)：把"这一臂的**视图树**里详情列到底占哪一块"打成读数。
+    ///
+    /// 为什么去问视图树而不是继续问像素：157 要分开的三种成因里，
+    /// 「扫描带没盖住内容」与「那棵视图在这台机器上根本没画」在像素上是**同一个形状**
+    /// （都读 0 行墨），而视图树自己知道答案 —— 分栏有几列、每列多宽、详情列有没有塌成 0。
+    /// 打印的只有**类名与数字**，没有任何字符串内容（帧与日志里不许出现用户剪贴板内容）。
+    ///
+    /// y 换算成"顶向下"与带子同一套约定（`textInkWitness` 直接拿 `rect.minY * scale` 当缓冲区行号，
+    /// 也就是 PNG 的顶向下），否则这两行读数没法对（R58 那一族：坐标约定要实测）。
+    static func columnBoxes(in host: NSView) -> [String] {
+        var out: [String] = []
+        let rootHeight = host.bounds.height
+        func name(_ v: NSView) -> String { String(describing: type(of: v)) }
+        func walk(_ view: NSView) {
+            let isSplit = view is NSSplitView || name(view).contains("Split")
+            if isSplit {
+                for (i, sub) in view.subviews.enumerated() {
+                    // `NSView.frame(in:)` 在 Swift 里不是一个方法（`frame` 是属性），
+                    // 所以走 `convert(_:to:)`：把子视图自己的 bounds 换到 host 的坐标系。
+                    let f = sub.convert(sub.bounds, to: host)
+                    out.append("列\(i):\(name(sub))"
+                        + "[x=\(String(format: "%.1f", f.minX))..\(String(format: "%.1f", f.maxX))"
+                        + " 顶向下y=\(String(format: "%.1f", rootHeight - f.maxY))"
+                        + "..\(String(format: "%.1f", rootHeight - f.minY))"
+                        + " 宽=\(String(format: "%.1f", f.width)) 高=\(String(format: "%.1f", f.height))]")
+                }
+            }
+            view.subviews.forEach { walk($0) }
+        }
+        walk(host)
+        out.append("host=\(name(host))[宽=\(String(format: "%.1f", host.bounds.width))"
+                   + " 高=\(String(format: "%.1f", host.bounds.height))]")
+        return out
+    }
+
+    /// R107：分栏的**内容盒有没有溢出夹具**（pt）。0 = 完全在帧内。
+    ///
+    /// 为什么要有它：本轮把臂 2 从 140pt 高改成 300pt，理由就是包围盒读数报的
+    /// `顶向下y=-85.0..173.0`（内容盒 258pt 塞进 140pt 的窗，于是帧看到的是"裁出来的一条窗口"，
+    /// 而这条窗口摆在哪儿**取决于窗口装饰高度**，也就是取决于机器）。
+    /// 那件事如果哪天回来（有人把夹具改矮、或某台机器的装饰更高），
+    /// 157 的实验就会重新变成"读 0 行墨"这种和"容器吃掉材质"长得一模一样的形状。
+    /// 所以这一格把那个混淆**钉成会红的**：溢出 > 1pt ⇒ 红，并且消息里说清这是实验对象坏了，不是产品。
+    static func splitContentOverflow(in host: NSView) -> Double {
+        var overflow = 0.0
+        func walk(_ view: NSView) {
+            let name = String(describing: type(of: view))
+            if name.contains("_NSSplitViewItemViewWrapper") || (view is NSSplitView && name != "NSHostingView") {
+                for sub in view.subviews where String(describing: type(of: sub)).contains("SplitViewItem") {
+                    let f = sub.convert(sub.bounds, to: host)
+                    overflow = max(overflow, -f.minY)
+                    overflow = max(overflow, f.maxY - host.bounds.height)
+                }
+            }
+            view.subviews.forEach { walk($0) }
+        }
+        walk(host)
+        // 归一化 -0.0：`max(0.0, -0.0)` 在 Swift 里可能留下负零，而读数打出 `-0.0pt` 会让人以为
+        // 有什么方向性（U-305 那一族：一个格式上的负号被读成一个物理事实）。
+        let rounded = Double((overflow * 10).rounded()) / 10
+        return rounded == 0 ? 0 : rounded
+    }
+
     /// 纯函数：一张浮层帧里**选中药丸**的位置（左沿 / 顶 / 底，px）；读不到返回 nil，**不返回 0**
     /// （0 会被读成"药丸贴着边"，那是把"仪器读不到"报成一个具体的产品值 —— R100 那一族）。
     ///
@@ -5778,7 +5851,9 @@ final class UICaptureTests: XCTestCase {
     static let cardprobeBands: [String: CGRect] = [
         "cardprobe-groupbox-default": CGRect(x: 24, y: 24, width: 672, height: 100),
         "cardprobe-scroll-groupbox": CGRect(x: 24, y: 24, width: 672, height: 100),
-        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 100),
+        // 臂 2 的带子跟着夹具一起放宽到 300pt 高（R107）：内容盒 258pt 不再被裁，
+        // 带子覆盖"整列详情"而不是"某一条窗口位置"，于是它盖不盖得住卡片**不再取决于机器装饰高度**。
+        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 260),
     ]
 
     static let menuSurfaceReplicaFixtures: Set<String> = [
@@ -7157,7 +7232,13 @@ final class UICaptureTests: XCTestCase {
                 let isSettings = fixture.name.hasPrefix("settings-") && fixture.name != "settings-min"
                 guard isProbe || isSettings else { continue }
                 let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
-                _ = try render(fixture, appearance: appearance, to: file)
+                // R107 / 157 的实验 (a)：拍之前把**这一臂自己的视图树**留下（`inspect:` 与帧同源）。
+                var geometry: [String] = []
+                var splitOverflow = 0.0
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    geometry = Self.columnBoxes(in: host)
+                    splitOverflow = Self.splitContentOverflow(in: host)
+                }
                 guard let image = NSImage(contentsOf: file),
                       let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
                       let base = rep.bitmapData else {
@@ -7226,6 +7307,73 @@ final class UICaptureTests: XCTestCase {
                          + " 最大偏离=\(witness.maxDelta) 参考条墨行=\(strip.rows)"
                          + " 带子=\(Int(band.minX))..\(Int(band.maxX))pt"
                          + " " + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
+                    // R107 / BACKLOG 157 的实验 (b)：**整窗**用同一颗尺再扫一遍。
+                    // 为什么这一行能把三种成因分开：`最大偏离` 是**与地板无关**的量
+                    //（它取这一带像素离两个背景的极值，不参与"够不够 60"的判断），于是
+                    //   整窗最大偏离 ≥ 60 而带子只有个位数 ⇒ 内容画在带子之外 ⇒ 改带子；
+                    //   整窗最大偏离也只有个位数 ⇒ 这棵视图在那台机器上根本没画东西；
+                    // 再配上 (a) 那行分栏列包围盒，"详情列宽≈0"与"列在、但带子没盖住"也分得开。
+                    // 这一格**只打读数不判产品**（D-163：机制没证实之前写断言就是猜），
+                    // 但它自带一条结构不变量当尺的自检 —— 整窗包含带子，
+                    // 所以整窗的极值与墨像素**不可能低于**带子的；反过来说明这一趟扫错了对象。
+                    // 整窗那一遍的矩形**只声明一次**（R107）： witness 与 cardRowKinds 两遍必须扫同一块，
+                    // 否则变异针只能打中其中一遍，而"整窗"这个词在两条通道上指两个矩形（D-172 的反面）。
+                    let wholeRect = CGRect(x: 0, y: 0, width: fixture.size.width,
+                                           height: fixture.size.height)
+                    let whole = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                    height: rep.pixelsHigh,
+                                                    bytesPerRow: rep.bytesPerRow,
+                                                    rect: wholeRect,
+                                                    scale: scale, fill: fill, pageLuma: pageLuma)
+                    emit("CARD_PROBE_WHOLE \(fixture.name) \(tag) 整窗墨行=\(whole.rows)"
+                         + " 整窗墨像素=\(whole.pixels) 整窗最大偏离=\(whole.maxDelta)"
+                         + " 带子墨行=\(witness.rows) 带子最大偏离=\(witness.maxDelta)"
+                         + " 帧=\(rep.pixelsWide)x\(rep.pixelsHigh)px 倍率=\(String(format: "%.1f", scale))x")
+                    emit("CARD_PROBE_GEOMETRY \(fixture.name) \(tag) "
+                         + (geometry.isEmpty ? "视图树没打出列" : geometry.joined(separator: " ")))
+                    // 整窗那一遍**同时问材质**：(a) 行墨与 (b) 视图树包围盒只说明"有东西"，
+                    // 而 150 问的是"那层填充还在不在"。所以整窗也要给出
+                    // `材质=有/无` 与**填充行落在哪一段 y**（顶向下，pt）——
+                    // 有了这两样，runner 上那一跑就能一句话定案：
+                    //   整窗材质=有、填充行的 y 段与带子的 y 段不相交 ⇒ 带子放错了（改带子，不是容器的罪）；
+                    //   整窗材质=有、且与带子相交 ⇒ 这一臂真的被容器吃掉了一部分，才轮到 150 说话；
+                    //   整窗材质=无 ⇒ 那台机器上这棵树的第二层墨根本没落地（并回 147 那一族）。
+                    let (wholeRows, wholeFill, _) = Self.cardRowKinds(bytes: base,
+                                                                      width: rep.pixelsWide,
+                                                                      height: rep.pixelsHigh,
+                                                                      bytesPerRow: rep.bytesPerRow,
+                                                                      rect: wholeRect,
+                                                                      scale: scale, pageLuma: pageLuma)
+                    var fillTop = -1.0, fillBottom = -1.0
+                    if wholeFill >= 0 {
+                        for (i, kind) in wholeRows.enumerated() {
+                            if kind == CardRowKind.card {
+                                if fillTop < 0 { fillTop = Double(i) / scale }
+                                fillBottom = Double(i + 1) / scale
+                            }
+                        }
+                    }
+                    emit("CARD_PROBE_WHOLE_FILL \(fixture.name) \(tag) 整窗材质=\(wholeFill >= 0 ? "有" : "无")"
+                         + " 整窗填充行y=\(String(format: "%.1f", fillTop))..\(String(format: "%.1f", fillBottom))pt"
+                         + " 带子y=\(String(format: "%.1f", band.minY))..\(String(format: "%.1f", band.maxY))pt"
+                         + " 带子材质=\(fill >= 0 ? "有" : "无")"
+                         + " 分栏内容溢出=\(String(format: "%.1f", splitOverflow))pt")
+                    // **实验对象自己必须在帧内**（R107 / 157 的堵点）：溢出 > 1pt 意味着
+                    // 帧看到的是"从一块比夹具高的内容里裁出来的一条窗口"，而裁在哪儿**取决于窗口装饰高度**
+                    // ——那正是 157 在 runner 上读到的形状（`墨行=0 最大偏离=2`）与"容器吃掉材质"混淆的来源。
+                    // 这一条红说的是**实验坏了**，不是产品坏了；消息里必须这样写，否则下一轮会有人去改产品。
+                    XCTAssertLessThanOrEqual(splitOverflow, 1.0,
+                        "\(fixture.name) \(tag)：分栏的内容盒比夹具高出 \(String(format: "%.1f", splitOverflow))pt"
+                            + " ⇒ 这张帧拍的是「从一块更高的内容里裁出来的一条窗口」，"
+                            + "而裁在哪儿取决于窗口装饰高度（本机实测：夹具 140pt 时溢出 85pt，改成 300pt 后为 0）。"
+                            + "这时候『带子里 0 行墨』不能读成『容器吃掉了材质』（BACKLOG 157），"
+                            + "也不许反过来去改产品 —— 先把实验对象放回帧内。")
+                    XCTAssertGreaterThanOrEqual(whole.maxDelta, witness.maxDelta,
+                        "\(fixture.name) \(tag)：整窗的最大偏离 \(whole.maxDelta) 低于带子的 \(witness.maxDelta)"
+                        + " ⇒ 整窗**包含**这条带子，极值不可能更小 —— 这一趟整窗扫的不是同一份字节"
+                        + "（rect / bytesPerRow / 缓冲区身份其中一处错了）。这是给新读数装的尺自检，不是产品判据。")
+                    XCTAssertGreaterThanOrEqual(whole.pixels, witness.pixels,
+                        "\(fixture.name) \(tag)：整窗墨像素 \(whole.pixels) 少于带子的 \(witness.pixels)（同上）")
                 }
                 if fill >= 0 {
                     materialCells += 1

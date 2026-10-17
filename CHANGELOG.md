@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据与实验（R107）
+
+- **157 的堵点被查到在实验对象自己身上**：臂 2（`cardprobe-split-groupbox`）的分栏内容盒是 **258pt 高**，
+  而夹具只给 140pt ⇒ 帧拍到的是"从一块更高的内容里裁出来的一条窗口"，裁在哪儿**取决于窗口装饰高度**
+  （包围盒读数 `列0:_NSSplitViewItemViewWrapper[顶向下y=-85.0..173.0 高=258.0]`）。
+  这就是 runner 上 `墨行=0 最大偏离=2` 与本机 `墨行=24 最大偏离=206` 能同时成立的第三种解释，
+  而它和"容器吃掉材质"在读数上长得一样。**夹具改成 720×300**（带子随之放宽到 `24..284pt`），
+  溢出读数归零，并新增一条**会红的断言**钉住"实验对象必须在帧内"（`分栏内容溢出 ≤ 1pt`）。
+  2 张帧换名换哈希（`-720x140-` → `-720x300-`），其余 132 张逐字节不变。**产品代码 0 行改动。**
+- 新读数三行：`CARD_PROBE_GEOMETRY`（分栏每一列的包围盒，类名 + 数字，无内容）、
+  `CARD_PROBE_WHOLE`（整窗墨行 / 墨像素 / **最大偏离** —— 与地板无关的那一格）、
+  `CARD_PROBE_WHOLE_FILL`（整窗材质有无 + 填充行落在哪一段 y + 带子的 y 段 + 溢出）。
+  判法写进 157 追记：整窗有材质而填充行与带子不相交 ⇒ 带子放错；整窗也没材质 ⇒ 并回 147；溢出 > 1pt ⇒ 实验又坏了。
+- 尺自检一条（D-174②③）：witness 与 cardRowKinds 的"整窗"合成同一个 `wholeRect`，
+  并钉住结构不变量"整窗包含带子 ⇒ 整窗的极值与墨像素不可能低于带子"。
+- **160 新开**：同一棵离屏窗口（`key=false`）里侧栏选中是**强调蓝**、浮层字段选中底是**灰**
+  ⇒ "非 key ⇒ 一律灰"是按控件成立的全局假设，130 / 148① / 82.2 那几格要按表面分开问（批次 84.1）。
+- 变异表 `mutate_r107.py` 三刀：M588 把整窗填充那行打印改成不存在的 TAG ⇒ 本机 **PASSED（按实登记）**；
+  M589 把整窗矩形改成 1pt 高 ⇒ **CAUGHT**（红在结构不变量）；
+  M590 把臂 2 高度改回 140pt ⇒ **CAUGHT**（红在 `85.0 > 1.0` 的溢出断言）。
+  实测 `n=3 caught=3 mismatch=0 not_run=0`、`RESTORE_CLEAN=yes`。表数 15 → **16**、刀数 66 → **69**。
+- **两处仪器自己坏了，都在本轮修掉**（不改产品）：
+  ① 臂 2 的带子 100→260 让 `mutate_r102` 的 M568 针命中 0 次 ⇒ pass-1 `PRECHECK_EXIT=1 bad=1` +
+  `r102 not_run=1`。needle 与变异文一起挪到 260（只改 needle 会让"纵向范围"变成两臂之间的第二个变量），
+  单跑 `n=1 caught=1 not_run=0`；**并把那支 1 秒的静态预检从电池第 6 步挪到第 0 步**（D-175）——
+  它一直能抓到这件事，只是抓得太晚。
+  ② `ledger_rows.py` 的空格分隔分支只认 `CARD_PROBE_ARM`，本轮新装的那三族读数**一行都没进 §8**
+  （旧搬运 15 行 / 这四族 0 行 ⇒ 放宽后 37 行 / 其中 22 行）。新增 `--must-include`：
+  每一轮声明自己的读数族，缺族就红（反例实测退出码 1），并总是打 `READINGS_FAMILIES 搬运=N 族=…`（D-176）。
+
 ### 判据与捕获通道（R106）
 
 - **BACKLOG 159 结案：浮层那两张"名字叫 typed / empty"的帧不再画着一块用户看不到的灰色选中底。**

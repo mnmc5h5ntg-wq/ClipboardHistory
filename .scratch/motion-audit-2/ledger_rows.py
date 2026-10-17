@@ -12,8 +12,11 @@
 因为第 12 行"本轮读数"是把日志里所有 `CARD_*` / `PROBE_*` 汇总行**原样搬运**，不重排版。
 
 用法：
-  PYTHONUTF8=1 python3 .scratch/motion-audit-2/ledger_rows.py <verify.log> [--pass 2]
-退出码：0=每一格都有值；1=有格子缺值（打印缺哪几格）；2=用法错。
+  PYTHONUTF8=1 python3 .scratch/motion-audit-2/ledger_rows.py <verify.log> [--pass 2] \
+      [--must-include CARD_PROBE_WHOLE CARD_PROBE_WHOLE_FILL CARD_PROBE_GEOMETRY]
+`--must-include` 是**本轮自己声明**的读数族：任何一族在 §8 的搬运结果里一行都没有 ⇒ 退出码 1。
+它拦的是"我新装了读数，但台账里没有它的数字"（R107 / U-339），不拦产品。
+退出码：0=每一格都有值且声明的族都在；1=有格子缺值或有声明的族被丢掉（打印缺哪几格/哪几族）；2=用法错。
 """
 import re
 import sys
@@ -40,11 +43,18 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_ARM |^QUICKPICK_")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_")   # R103：证人那一行是空格分隔的读数，不是 key=
                    # R105：浮层左轴那三行（`QUICKPICK_SEARCH_AXIS` / `_AXIS_CAPABILITY` / `_AXIS_DECLINED`）
                    #   同样是空格分隔 ⇒ 走第二个分支。R104 的 §8 把它们漏在了搬运之外
                    #   （那一轮 §8 的"本轮读数"只有 `CARD_*`），本轮补上 —— 判据的结论行必须与它的
                    #   数字一起进台账，否则下一轮又要靠我记得去 grep（U-264 那一族）。
+                   # R107 / U-339：第二个分支原来**只认 `CARD_PROBE_ARM`** 这一个名字，
+                   #   于是本轮新装的三族（`CARD_PROBE_WHOLE` / `_WHOLE_FILL` / `_GEOMETRY`，
+                   #   还有 R102 就在的 `CARD_PROBE_ARM_INSET`）在 §8 里**一行都没出现** ——
+                   #   而这一轮的结论恰恰建立在它们上面。放宽到"整族前缀 + 空格"，
+                   #   并加 `--must-include`：本轮声明哪几族是它的判据读数，缺任何一族就非 0 退出。
+                   #   为什么不做成"所有大写行都搬"：`PROBE_ELIGIBILITY` 一类有几十行，
+                   #   全搬会把 §8 冲成噪声；声明式让**每一轮自己**回答"我这轮的读数是哪几族"。
 
 
 def grab(text, pattern):
@@ -64,6 +74,16 @@ def main():
     pass_label = ""
     if "--pass" in args:
         pass_label = "（**这一份是 pass-%s**）" % args[args.index("--pass") + 1]
+    # 本轮声明"我的判据读数是哪几族"（U-339：不声明的话，新族会被白名单静默丢掉）。
+    must = []
+    if "--must-include" in args:
+        i = args.index("--must-include") + 1
+        while i < len(args) and not args[i].startswith("--"):
+            must.append(args[i])
+            i += 1
+        if not must:
+            sys.stderr.write("--must-include 后面一个前缀都没有 ⇒ 这等于没声明\n")
+            return 2
     text = log.read_text(encoding="utf-8")
     missing, out = [], []
     for name, pat in ROWS:
@@ -84,8 +104,21 @@ def main():
     print("\n".join(out))
     print()
     print("ROWS_TOTAL=%d ROWS_MISSING=%d" % (len(ROWS) + 1, len(missing)))
+    # 结论行打在闸门之前（R93 那一族：闸门一 return，它下面那行就永远不会出现在日志里）。
+    families = {}
+    for l in readings:
+        head = l.split(" ", 1)[0].split("=", 1)[0]
+        families[head] = families.get(head, 0) + 1
+    print("READINGS_FAMILIES 搬运=%d 族=%s"
+          % (len(readings), " ".join("%s:%d" % kv for kv in sorted(families.items()))))
+    lacking = [p for p in must if not any(l.startswith(p) for l in readings)]
+    print("READINGS_MUST_INCLUDE 声明=%d 缺=%d%s"
+          % (len(must), len(lacking), (" 缺的族=" + ",".join(lacking)) if lacking else ""))
     if missing:
         print("缺值的格子：%s ⇒ 不许用任何'看起来合理'的数补上" % ", ".join(missing))
+        return 1
+    if lacking:
+        print("!! 本轮自己声明的读数族有族一行都没搬进 §8 —— 台账里的结论将没有它的数字（U-339）")
         return 1
     if readings:
         print("=== 本轮读数全量（贴进 §8 下面那一节，别改数字） ===")

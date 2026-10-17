@@ -29,6 +29,10 @@ PASSED / CAUGHT / SKIPPED / DID-NOT-RUN 四个词，"按设计逃掉"在它嘴�
 R103 追记（改 needle 而不是改期望）：M568 的原文那一行跟着臂 2 的带子从 150/570 挪到了 170/550
 （证人不能由侧栏作证，见 `cardprobeBands` 的文档串）。变异文 660/60 不变：它仍然在卡片里、
 但那里没有字 —— 这一刀要红的是「带子里没有内容」，不是「带子跑到了卡片外」。
+R107 追记（同一族，U-338）：臂 2 的带子跟着夹具从 140 长到 300，needle 里的 `height: 100` 变成
+`height: 260` ⇒ needle 命中 [0] ⇒ 本机 `not_run=1`（表红，见 verify_r107 的 MUT_EXIT=1）。
+needle 与变异文**一起**挪到 260：这样这一刀与真实臂唯一的差别只剩"有没有盖住字"，
+纵向范围不再是两臂之间的变量（原来是 100 vs 100，现在是 260 vs 260）。
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r102.py [M568 ...]
 退出码：0 = 每一臂都拿到**它自己那一条**期望的 verdict，且还原干净。
 """
@@ -46,8 +50,8 @@ V_RHYTHM = "UICaptureTests/testSettingsCardVerticalRhythmIsOneNumber"
 # (编号, 说明, 文件, needle, 替换, 目标测试, 期望 verdict)
 ARMS = [
     ("M568", "参照臂的扫描带挪出卡片 ⇒ 「墨行>0」必须红（仪器错位不许冒充容器结论）", HARNESS,
-     '        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 100),',
-     '        "cardprobe-split-groupbox": CGRect(x: 660, y: 24, width: 60, height: 100),',
+     '        "cardprobe-split-groupbox": CGRect(x: 170, y: 24, width: 550, height: 260),',
+     '        "cardprobe-split-groupbox": CGRect(x: 660, y: 24, width: 60, height: 260),',
      H_INSET, "CAUGHT"),
     ("M569", "名册里删掉一臂（夹具还在）⇒ 名册守卫必须红", HARNESS,
      '            var expected: Set<String> = ["cardprobe-groupbox-default", "cardprobe-scroll-groupbox"]',

@@ -9826,3 +9826,171 @@ ROWS_TOTAL=13 ROWS_MISSING=0
    以及本轮新开的读数 —— 灰块没了之后，`纯灰行最宽=1px` 那 1 个像素是什么（抗锯齿还是残留），
    下一轮顺手量掉，别让它变成新的"看着像没问题"。
 5. 真机那一侧仍然欠着（批次 26.x–82.2 与 83.1）。
+## Round 107 · 157 挂了四轮的"读不到"，查出来是**实验对象自己不在帧内**（157 追记 / 新开 160 / U-334…U-339 / D-174、D-175 / 变异表 r107 三刀 M588–M590）
+
+### 1. 开场清单（本轮对象：容器梯子三臂"卡片到底画在哪"；数字来自本轮新装的读数，2× ⇒ pt=px/2）
+
+| 对象 | 填充行落在 y（pt，顶向下） | 扫描带 | 分栏内容溢出 |
+|---|---|---|---|
+| 臂 0 裸 `GroupBox`（720×140） | 73.0..99.0 | 24..124 | 0.0 |
+| 臂 1 + `ScrollView`（720×140） | 56.0..82.0（比臂 0 高 17pt） | 24..124 | 0.0 |
+| 臂 2 + `NavigationSplitView`（**改前** 720×140） | 48.0..68.5 | 170..720 × 24..124 | **85.0** |
+| 臂 2（**改后** 720×300） | 82.0..102.0（亮）/ 76.0..102.0（暗） | 170..720 × 24..284 | 0.0 |
+
+开场缺陷清单：① **157**（runner 上臂 2 整带 `墨行=0 最大偏离=2`，三成因未分）；② 155（同版双跑的分布）；
+③ R106 留下的那 1 个纯灰像素是什么；④ 真机批次 26.x–83.1。
+
+### 2. 本轮的收获不是答案，是"读不到"这句话一直兼容两种事实
+包围盒读数打的是 `列0:_NSSplitViewItemViewWrapper[顶向下y=-85.0..173.0 高=258.0]` ——
+分栏的内容盒 258pt，夹具只给 140pt ⇒ 帧拍到的是"从一块更高的内容里裁出来的一条窗口"，
+而**裁在哪儿取决于窗口装饰高度，也就是取决于机器**。
+runner 上 `墨行=0` 与本机 `墨行=24` 于是可以同时成立，而它和"容器吃掉材质"在读数上完全同形。
+把夹具改成 300pt（带子随之放宽）之后溢出归零，且这件事现在是**一条会红的断言**（`≤ 1pt`）：
+M590 把高度改回 140 就红在 `85.0 > 1.0`。规矩进 **D-174**：报"读不到"之前，
+先证明被读的东西在帧内、并且尺扫的是同一块（整窗 ⊇ 带子 ⇒ 整窗极值不可能低于带子）。
+
+### 3. 看图那一腿（真实视觉审查）：一张被裁了四轮的帧
+`cardprobe-split-groupbox-720x300-dark.png` 第一次拍到完整的设置窗口左列 ——
+快捷键 / 通用 / 隐私 / 推荐 / 数据 / 统计 六个分区全在帧内；
+140pt 那一版底部把"推荐"切成半行，而我前四轮都拿它当"臂 2 就长这样"。
+卡片填充与圆角与臂 0/1 同档，图标全是描线一档（D-008 没翻案）。
+**同一张帧翻出 160**：侧栏选中那一行是**强调蓝**，而 R106 刚处理过的浮层字段选中底在同一棵
+`key=false` 的离屏窗口里是**灰** ⇒ "非 key ⇒ 一律灰"是按控件成立的全局假设；
+我上一轮解释 159 时把它当全局事实用了（结论没错，理由的边界没量过）⇒ 真机那一问按表面分开（批次 84.1）。
+
+### 4. 位点逐个判（本轮新增/复核的两格）
+- **臂 2 的夹具尺寸**：改。理由不是"让它画出来"，是溢出被量出来（85pt）且它使实验结论依赖机器装饰高度。
+  代价可数：2 张帧换名换哈希（`-720x140-` → `-720x300-`），其余 132 张逐字节不变。
+- **侧栏选中那一行的蓝**：不动产品。本轮没有证据说它错（它正是系统 `List(selection:)` 的样子），
+  要判的是"活动/非活动会不会变"，那一格只能真机（160 / 批次 84.1）。
+
+### 5. 判据的形状账（本轮方法账）
+新读数三行（`CARD_PROBE_GEOMETRY` / `CARD_PROBE_WHOLE` / `CARD_PROBE_WHOLE_FILL`）本身不判产品，
+所以它们各自需要一条"坏的时候会说谎"的防线：本轮选的不是"再加一行打印"，而是
+**一条结构不变量**（整窗包含带子 ⇒ 整窗的 `最大偏离` 与墨像素不可能低于带子）。
+它红的时候说的是"我扫的不是同一块"，而不是"产品有问题"——这正是 157 四轮里最缺的那类东西。
+
+### 6. 本轮自己坏的
+- **U-334**：M588 第一版把多行 `emit` 的首行换成注释 ⇒ 后续行悬空 ⇒ 语法错 ⇒ DID-NOT-RUN
+  （U-327 / U-186 同族第三次）。改成"把 TAG 改成不存在的名字"：一行、可编译、语义正确。
+- **U-335**：M589 第一版改"整窗"矩形，而代码里有**两处一模一样的字面量**（witness 与 `cardRowKinds` 各一份），
+  针命中了没有断言读的那一份 ⇒ 拿到 PASSED。**针打在重复字面量的另一份拷贝上，比没针更坏**：
+  它把"这条不变量没牙"当成结论。修法是先合成一个 `wholeRect` 再打针（D-174②）。
+- **U-336**：`max(0.0, -0.0)` 留下负零，读数打出 `-0.0pt` 会被读成方向性（U-305 那一族）⇒ 归一化。
+- **U-337**（做对的一格）：新读数配的是结构不变量而不是"再多一行打印"。
+- **U-338**：臂 2 的带子从 `height: 100` 改到 `height: 260` ⇒ `mutate_r102` 里 M568 的 needle 命中 0 次。
+  pass-1 里 `PRECHECK_EXIT=1 bad=1` 与 `r102: not_run=1` **都红了**，但红在第 25 分钟——
+  那支纯静态、1 秒、不构建的预检排在构建 + 全量测试 + 在屏探针 + 拍帧 + 脚本电池后面。
+  修法是把顺序改掉（`verify_r107.sh` 第 0 步）而不是再给自己加一条"记得先跑"（U-289 那一族：靠记得的守卫不是守卫）。
+  needle 与变异文一起挪到 260，单跑 `n=1 caught=1 not_run=0`、`RESTORE_CLEAN=yes`。
+- **U-339**：**台账的搬运通道把本轮自己的读数丢了，而且丢得很安静**——`ledger_rows.py` 的空格分隔分支
+  只认 `CARD_PROBE_ARM` 一个名字，于是本轮新装的 `CARD_PROBE_WHOLE` / `_WHOLE_FILL` / `_GEOMETRY`
+  （连同 R102 就在的 `CARD_PROBE_ARM_INSET`）**在 §8 里一行都没有**：旧白名单搬 15 行、这四族 0 行；
+  放宽后搬 37 行、其中 22 行。这是 U-264 那一族的第四种形状（前三：手抄成上一轮的数、抄成中间态、缺值），
+  而且是最坏的一种 —— 表格看起来是满的，缺的恰恰是本轮用来下结论的那几行。
+  补法不是"以后记得看"：`--must-include` 让**每一轮自己声明**它的判据读数是哪几族，
+  任何一族在搬运结果里一行都没有 ⇒ 退出码 1（反例实测：声明一个不存在的族 ⇒ `NEG_EXIT=1`），
+  并把 `READINGS_FAMILIES 搬运=37 族=…` 打在闸门之前。规矩进 **D-175**。
+
+### 7. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 92 | 臂 2 现在拍到的是系统那套分栏的真实样子（六分区完整、侧栏选中是系统强调蓝）；没有为过判据而仿造 |
+| 层级与秩序 | 91 | 三臂第一次在"内容是否在自己帧内"这件事上可比；157 的两种解释被拆成两条独立读数 |
+| 动效恰当 | 90 | 零动效改动；也没借"这一臂看不清"去加任何视觉处理 |
+| 状态完备 | 92 | 侧栏六分区完整入帧；160 把"key 态"从全局规则降级为按控件事实，并给了真机判法 |
+| 细节打磨 | 93 | 三行新读数 + 溢出断言 + 结构不变量 + 负零归一化；"整窗"两处字面量合成一处 |
+| 克制 | 94 | 产品 0 行；只改夹具尺寸与判据；157 明确不写成已修（答案在下一跑） |
+| 一致性 | 80 | 五条：刀的形状同族第三次（U-334）、**新犯且最坏的一种**——针落在重复字面量的另一份拷贝上（U-335）、负零格式（U-336）、**前任的针老化而且守卫红在第 25 分钟**（U-338，U-332 同族复发）、**台账搬运把本轮自己的读数丢了且丢得很安静**（U-339）。做对的一格：本轮把"读不到"拆成可分开验证的两条读数，而不是再猜一次成因 |
+
+**均分 90.3**（最低 80 = 一致性；其余全过 90）。
+这一格是**改过的**：写 §7 时只记到 U-336（原定一致性 84 / 均分 90.9），
+U-338 是 pass-1 的电池红报出来的、U-339 是生成 §8 时才看见的——**分数跟着后发现的缺陷下调，
+原分留在这一句里**，不把 90.9 悄悄改成 90.3 让人以为我一开始就看见了。
+
+### 8. 验证（13 格，数字全部由 `ledger_rows.py` 从 `r107_verify.log` 解析（**这一份是 pass-2**））
+
+| 格子 | 读数 |
+|---|---|
+| 构建 | `BUILD_EXIT=0 BUILD_WARNING_LINES=0` |
+| 全量测试 | `TEST_EXIT=0 最后一行汇总: 	 Executed 819 tests, with 41 tests skipped and 0 failures (0 unexpected) in 183.808 (183.851) seconds` |
+| 在屏那一卷 | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.428 (15.430) seconds` |
+| 捕获卷 | `CAPTURE_EXIT=0 帧数=134 目录内文件=135` |
+| 帧基线 | `FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=134 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0` |
+| 脚本电池 | `PY_EXIT=0 Ran 221 tests in 11.542s OK` |
+| 变异表 | `MUT_EXIT=0 跑了=16 期望=16 表=r95_rhythm r94_order r96_triage r97_card r98_seed r98_card r99 r100 r100b r101 r102 r103 r104 r105 r106 r107 | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r99(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r100(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r100b(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r101(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r102(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r103(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r104(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r105(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r106(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r107(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0` |
+| 台账编号守卫 | `LEDGER_EXIT=0 Ran 9 tests in 0.026s OK` |
+| 曲线仪器 | `VIS_EXIT=0 ROUNDS=108  first=1  last=107 CURVE_DERIVED=95,96,97` |
+| 断言包含对账 | `CONTAIN_EXIT=0 0` |
+| 摘要缺值 | `SUMMARY_MISSING=0` |
+| 总结论 | `VERIFY_OK=1` |
+| 本轮读数（37 行，原样搬运） | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.428 (15.430) seconds`；`QUICKPICK_FIELD_STATE light 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false`；`QUICKPICK_GREY_BAND light 灰档行数=20 灰档像素=71 最宽一行=13px x=53..72 纯灰行无墨=1 纯灰行最宽=1px 最宽墨行=33px 墨档行数=24 页底档=252 带子=顶部40pt 门限=8..45灰阶` |
+
+ROWS_TOTAL=13 ROWS_MISSING=0
+READINGS_FAMILIES 搬运=37 族=CARD_PROBE_ARM:6 CARD_PROBE_ARM_INSET:4 CARD_PROBE_GEOMETRY:6 CARD_PROBE_WHOLE:6 CARD_PROBE_WHOLE_FILL:6 PROBE_EXIT:1 QUICKPICK_AXIS_CAPABILITY:1 QUICKPICK_FIELD_STATE:2 QUICKPICK_GREY_BAND:2 QUICKPICK_PHANTOM_CAPABILITY:1 QUICKPICK_SEARCH_AXIS:2
+READINGS_MUST_INCLUDE 声明=3 缺=0
+=== 本轮读数全量（贴进 §8 下面那一节，别改数字） ===
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 3 tests skipped and 0 failures (0 unexpected) in 15.428 (15.430) seconds
+QUICKPICK_FIELD_STATE light 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false
+QUICKPICK_GREY_BAND light 灰档行数=20 灰档像素=71 最宽一行=13px x=53..72 纯灰行无墨=1 纯灰行最宽=1px 最宽墨行=33px 墨档行数=24 页底档=252 带子=顶部40pt 门限=8..45灰阶
+QUICKPICK_FIELD_STATE dark 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false
+QUICKPICK_GREY_BAND dark 灰档行数=25 灰档像素=101 最宽一行=13px x=59..93 纯灰行无墨=0 纯灰行最宽=0px 最宽墨行=35px 墨档行数=25 页底档=28 带子=顶部40pt 门限=8..45灰阶
+QUICKPICK_PHANTOM_CAPABILITY 候选=2 有对象=2 未判=0（未判名单只在**这台机器装得出 field editor** 时才要求为空）
+QUICKPICK_SEARCH_AXIS light 药丸左沿=22.0pt 搜索第一列墨=22.5pt 差=1px 带子 y=0..90px 带内墨行=24 墨像素=1358 最大偏离=124（全局门限 60，本条带用 62） 页底档=252 倍率=2.0x 帧宽=840px
+QUICKPICK_SEARCH_AXIS dark 药丸左沿=22.0pt 搜索第一列墨=22.5pt 差=1px 带子 y=0..90px 带内墨行=24 墨像素=1585 最大偏离=126（全局门限 60，本条带用 63） 页底档=28 倍率=2.0x 帧宽=840px
+QUICKPICK_AXIS_CAPABILITY 候选=2 有对象=2 未判=0（未判名单只在**这台机器画得出占位语**时才要求为空）
+CARD_PROBE_ARM cardprobe-groupbox-default light 材质=有 卡片段=1 墨行=24 墨像素=1582 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-groupbox-default light 整窗墨行=24 整窗墨像素=1582 整窗最大偏离=206 带子墨行=24 带子最大偏离=206 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-groupbox-default light host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_WHOLE_FILL cardprobe-groupbox-default light 整窗材质=有 整窗填充行y=73.0..99.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1457 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-scroll-groupbox light 整窗墨行=24 整窗墨像素=1457 整窗最大偏离=206 带子墨行=24 带子最大偏离=206 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-scroll-groupbox light host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_WHOLE_FILL cardprobe-scroll-groupbox light 整窗材质=有 整窗填充行y=56.0..82.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-split-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1272 最大偏离=206 参考条墨行=0 带子=170..720pt 页底=252 前三=(252:468) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-split-groupbox light 整窗墨行=171 整窗墨像素=6026 整窗最大偏离=244 带子墨行=24 带子最大偏离=206 帧=1440x600px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-split-groupbox light 列0:NSView[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列0:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列1:NSTitlebarBackgroundView[x=0.0..148.0 顶向下y=248.0..300.0 宽=148.0 高=52.0] 列2:NSTitlebarBackgroundView[x=148.0..720.0 顶向下y=248.0..300.0 宽=572.0 高=52.0] 列3:_NSSplitViewShadowView[x=148.0..160.0 顶向下y=5.0..300.0 宽=12.0 高=295.0] 列4:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=5.0..300.0 宽=148.0 高=295.0] 列5:NSSplitDividerView[x=147.5..148.0 顶向下y=5.0..300.0 宽=0.5 高=295.0] 列6:_NSSplitViewCollapsedInteractionsView[x=0.0..15.0 顶向下y=5.0..300.0 宽=15.0 高=295.0] 列7:_NSSplitViewCollapsedInteractionsView[x=705.0..720.0 顶向下y=5.0..300.0 宽=15.0 高=295.0] 列0:NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列0:NSGlassEffectView[x=0.0..148.0 顶向下y=5.0..300.0 宽=148.0 高=295.0] host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=300.0]
+CARD_PROBE_WHOLE_FILL cardprobe-split-groupbox light 整窗材质=有 整窗填充行y=82.0..102.0pt 带子y=24.0..284.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-groupbox-default dark 材质=有 卡片段=1 墨行=24 墨像素=1777 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-groupbox-default dark 整窗墨行=24 整窗墨像素=1777 整窗最大偏离=185 带子墨行=24 带子最大偏离=185 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-groupbox-default dark host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_WHOLE_FILL cardprobe-groupbox-default dark 整窗材质=有 整窗填充行y=73.0..99.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1618 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-scroll-groupbox dark 整窗墨行=24 整窗墨像素=1618 整窗最大偏离=185 带子墨行=24 带子最大偏离=185 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-scroll-groupbox dark host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_WHOLE_FILL cardprobe-scroll-groupbox dark 整窗材质=有 整窗填充行y=56.0..82.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1425 最大偏离=185 参考条墨行=0 带子=170..720pt 页底=28 前三=(28:468) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-split-groupbox dark 整窗墨行=95 整窗墨像素=2852 整窗最大偏离=219 带子墨行=24 带子最大偏离=185 帧=1440x600px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-split-groupbox dark 列0:NSView[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列0:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列1:NSTitlebarBackgroundView[x=0.0..148.0 顶向下y=248.0..300.0 宽=148.0 高=52.0] 列2:NSTitlebarBackgroundView[x=148.0..720.0 顶向下y=248.0..300.0 宽=572.0 高=52.0] 列3:_NSSplitViewShadowView[x=148.0..160.0 顶向下y=5.0..300.0 宽=12.0 高=295.0] 列4:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=5.0..300.0 宽=148.0 高=295.0] 列5:NSSplitDividerView[x=147.5..148.0 顶向下y=5.0..300.0 宽=0.5 高=295.0] 列6:_NSSplitViewCollapsedInteractionsView[x=0.0..15.0 顶向下y=5.0..300.0 宽=15.0 高=295.0] 列7:_NSSplitViewCollapsedInteractionsView[x=705.0..720.0 顶向下y=5.0..300.0 宽=15.0 高=295.0] 列0:NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>[x=0.0..720.0 顶向下y=5.0..300.0 宽=720.0 高=295.0] 列0:NSGlassEffectView[x=0.0..148.0 顶向下y=5.0..300.0 宽=148.0 高=295.0] host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=300.0]
+CARD_PROBE_WHOLE_FILL cardprobe-split-groupbox dark 整窗材质=有 整窗填充行y=76.0..102.0pt 带子y=24.0..284.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox light 内缩=5.0pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox light 内缩=5.0pt
+
+生成这一格用的命令（**`--must-include` 是本轮自己声明的读数族，缺族就红 ⇒ U-339 / D-175**）：
+```
+PYTHONUTF8=1 python3 .scratch/motion-audit-2/ledger_rows.py .scratch/motion-audit-2/r107_verify.log --pass 2 --must-include CARD_PROBE_WHOLE CARD_PROBE_WHOLE_FILL CARD_PROBE_GEOMETRY
+```
+pass-1 的那一份按 mtime 另存在 `.scratch/motion-audit-2/r107_verify.20261017-112645.prev.log`（红的那次不删，
+里面就是 `PRECHECK_EXIT=1 bad=1` 与 `r102(exit=1): not_run=1` 那两行）。
+
+
+### 9. 下一轮（R108）的入口
+1. **读本轮这次 CI 的三行新读数**，按 157 追记里写死的判法定案：
+   `整窗材质=有` 且填充行与带子相交 ⇒ 容器没吃材质，150 那一支正式否掉；
+   `整窗材质=无` 且 `整窗最大偏离` 也只有个位数 ⇒ 并回 147；
+   `分栏内容溢出 > 1pt` ⇒ 红会自己说"实验对象又跑出帧了"。
+2. **160**：在同一棵离屏窗口里把"侧栏选中行的填充色"与"浮层字段选中底的颜色"各打一行读数
+   （同一颗尺、同一档外观），把"谁跟着 key 变"钉成判据；真机那格在批次 84.1。
+   本轮看图已经给了两族色号（侧栏亮 `rgb(217,229,251)` / 暗 `rgb(28,43,64)`，通道差 34~36；
+   浮层亮 `220,220,220` / 暗 `70,70,70`，色度 0）⇒ 判据必须走在**色度轴**上，不许用亮度轴（R38 那一族）。
+3. **R108 里有一格不用问用户**：本机把真设置窗口打开、把另一个 App 切到前台，**只截设置窗口那块区域**，
+   量"非 key 的真窗口"里侧栏选中还是不是蓝 —— 这一格能把 130 / 148① 从"只有用户能答"改成"通道能答"。
+4. **R106 那 1 个纯灰像素**：量掉它落在哪个 x、是不是字形的抗锯齿（别留成"看着像没问题"）。
+5. **155**：一次同版重跑两遍的分布（本轮起有天然样本：`CARD_PROBE_*` 在两个步骤各打一遍）。
+6. **D-175 / D-176 的后续动作**：新装的读数**当轮就写进 `--must-include`**
+   （声明本身没有牙，漏声明仍然会安静地不进台账）；改判据的行之前先静态预检（它现在在电池第 0 步，
+   但我也可以在动手前单独跑一次，1 秒）。
+7. 真机那一侧仍然欠着（批次 26.x–83.1 与本轮新增的 84.1）。
