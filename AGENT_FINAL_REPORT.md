@@ -1,4 +1,4 @@
-# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R101）
+# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R136）
 
 > 标题这一格曾经停在 **R46** 而账本已经写到 R99 —— 那是 U-264 记的那族「报告格子停在旧数」里最显眼的一处（同一族还有 D 行停在 D-149、判据行停在 796 例、帧行停在 112、变异行停在 M509、脚本行停在 127 条）。R99 起这几格跟着 pass-2 的日志一起刷新，出处写在每一格末尾。
 
@@ -776,13 +776,18 @@ R39 的判据在本机全绿、推上去 CI 恒红 —— 同一个坑的第三�
 ```bash
 cd ~/Codex_Project0/ClipboardHistory && unset SDKROOT
 swift build 2>&1 | grep -c "warning:"          # 期望 0
-swift test 2>&1 | tail -3                       # 期望 704 tests / 26 skipped / 0 failures
+swift test 2>&1 | tail -3                       # 期望 835 tests / 41 skipped / 0 failures
 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots swift test --filter UICaptureTests
-cd .. && python3 scripts/frame_baseline.py --against working compare /tmp/shots   # CHANGED=0（102 帧）
-python3 -m unittest discover -s scripts/tests   # 72 passed
-python3 .scratch/motion-audit-2/mutate_r28_text_clip.py   # CAUGHT=9/9, RESTORE_CLEAN=yes
-python3 .scratch/motion-audit-2/mutate_r29d_sidebar_text.py  # CAUGHT=5/5, RESTORE_CLEAN=yes
-python3 .scratch/motion-audit-2/mutate_r32_axis.py                # CAUGHT=4/4, RESTORE_CLEAN=yes
+cd .. && PYTHONUTF8=1 python3 scripts/frame_baseline.py check /tmp/shots --against working \ # CHANGED=0（136 帧）
+    --allow-missing content-wide-1100x800-light.png --allow-missing content-wide-1100x800-dark.png
+PYTHONUTF8=1 python3 -m unittest discover -s scripts/tests   # 275 passed（不带 PYTHONUTF8 会把 1 朵红放大成 9 朵）
+PYTHONUTF8=1 python3 scripts/motion_surface_gate.py          # 行数=60 未清账=102 地板=60 RESULT=ok
+PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_needle_precheck.py   # tables=37 bad=0
+# 变异表按轮存着，最新三张：
+PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r135.py   # 两臂 CAUGHT, RESTORE_CLEAN=yes
+PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r133.py   # 三臂 CAUGHT, RESTORE_CLEAN=yes
+PYTHONUTF8=1 python3 scripts/real_screen_sidebar_icons.py     # 真机通道（墨量）：REALSCREEN_VERDICT=ok
+PYTHONUTF8=1 python3 scripts/real_screen_control_chroma.py    # 真机通道（色度）：CHROMA_VERDICT=accent_in_content
 make bundle && bash scripts/install_local.sh --yes --no-build
 ```
 
@@ -809,3 +814,52 @@ make bundle && bash scripts/install_local.sh --yes --no-build
 如果只留一句给下一趟工作：**先证明尺能分辨，再拿它判产品。**
 这一趟有两次差点把对的界面改错，都是因为数没有方向；
 而最后带走的三条规矩是：**变异要打测量不要打断言、参照臂必须有地板与资格、判据只能用比值而不能用绝对像素。**
+
+---
+
+## 9. 更新到 R136（2026-10-17 晚，R102→R136 这段的收口）
+
+上面 §1–§8 写于 R101。之后又跑了 35 轮，这一节只补三件"会变结论"的事，不复述每轮流水（那在
+`AGENT_VISUAL_ITERATION.md` 的 Round 102–136 与 `AGENT_UI_AUDIT.md` 的第 104–138 轮）。
+
+### 9.1 这一段的净结论：四条长跑账结案，一条仍卡在用户那一眼
+
+| 账 | 结论 | 证据（能被重跑的） |
+|---|---|---|
+| BACKLOG 150 | runner 上分栏的**详情那一列整列没画**（同帧侧栏正常）⇒ 不是产品缺陷，是取证通道 | `CARD_PROBE_ARM_VERDICT` 四出口 + run 38967377231 等 |
+| BACKLOG 139 | 设置勾选框"色度为 0"是**离屏通道不解析语义色**；真机上就是强调蓝 | `scripts/real_screen_control_chroma.py`：参照 194 / 内容区 190 / 比值 0.979 / 强蓝 2463 颗 / 包围盒压在勾选框那一列，且我亲眼看了那张真机帧 |
+| BACKLOG 155 | 那条采样率判据在 runner 上量的不是它声称的东西（调度地板 21–23ms 是本机 5ms 的四倍，抓帧只省 5.6–9.6ms）⇒ ② 成立、① 被排除 | `MOTION_BAND_INTERVAL` 与 `MOTION_BAND_SAMPLING_VERDICT` 两台机器各一跑 |
+| BACKLOG 174 | 判据有了第三个出口「这台机器判不了」，前提由同一次运行量出来；**没动阈值、没塞 `suite_reds`**（那张表被自检钉成空表） | run 39038634407 = success：`出口=这台机器判不了=调度地板 22.13ms 大于省下的 5.64ms`，且 `judged=3/4` 未掉档 |
+| BACKLOG 172 | **仍开着**：亮档侧栏图标在离屏通道里几乎不画墨，与暗档"反侧"是两种病；暗档那半已修（`.monochrome`，有真机证据），亮档这半需要人眼 | 人工批次 86.1（或授权我切一次系统外观自己量）—— 这是整个目标现在唯一真正卡住用户的一项 |
+
+### 9.2 这一段的净产出（可打开的东西）
+
+- **一张按表面清账的表**：`docs/motion_surface_ledger.json` —— 18 个表面 × 9 个状态 = 162 格，
+  已判 **60** 格（`added=8 kept=20 not-added=10 not-applicable=22`），未判 **102** 格是显式的"没判"，不是"没做"。
+  目标原文要求"每一个元素/状态都要重新判断加动效是否有积极作用，无作用或有害就写明理由不加"——
+  这一张表是那句要求目前唯一的可核对形式；`scripts/motion_surface_gate.py` 判它的形状
+  （重格、名册外、词表外、无理由、无指针、**指针指向不存在的文件**、**缺席断言其实不成立**、地板低于已判数）。
+- **两条真机观测通道**（合成后的屏幕，不是离屏帧）：`scripts/real_screen_sidebar_icons.py`（墨量）与
+  `scripts/real_screen_control_chroma.py`（色度）。它们各自结了一条只有真机能答的账（172 的暗档那半、139）。
+  能力边界也量清了：**按名字操作 AX 不通（SwiftUI 窗口的 `name` 全是 `missing value`），按坐标可通**，
+  且落地由同一帧里另一枚读数验收（侧栏选中那枚蓝药丸的移动）。
+- **一条耐久规矩**（D-191 / D-192 / D-193）：读 CI 先看 job 结论与失败步骤名，再挑读数；
+  台账指针要"形状合法 → 文件存在 → 缺席可复查"三级；一台机器判不了时判据要有第三个出口，
+  且前提必须由那次运行自己量出来。
+
+### 9.3 仍未收口（不粉饰）
+
+1. **172 亮档那半**：需要用户那一眼或切系统外观的授权。
+2. **清账表还有 102 格未判**（`not-measured` 不抬地板，也不判红 —— 判红会逼人为了绿去填满它，
+   那正是目标禁止的"为动效而动效"）。下一批：主窗口/详情区 × 选中与禁用、设置窗口/侧栏 × 空与加载、
+   浮层/列表行 × 空与错误、菜单栏/推荐面板 × 成功。
+3. **173 那笔动效欠账**：判据清单与清账表都在，但"新加一个有作用的动效"这一件仍未发生 ——
+   最近的一次是 R126。要么由一次真机/用户观察指出具体缺陷再动，要么按 ①② 的样子把"不加"的理由量出来。
+4. §6 那几条人工批次（36.4 / 37.x / 43.x / 83.1 / 86.1）依旧只有你能判。
+5. 台账自身的两处薄弱（本轮刚撞过）：`ast.parse` 通过而生成器运行时 `NameError`（闸门读旧 JSON 仍报 ok ⇒
+   证人只认"行数变了"，U-450）；一批补丁里条件锚点会静默选错而留下"半批已写"（U-452）。
+   这两条都还没有各自的自动化守卫 —— 挂着，别当成已解决。
+
+一句给下一趟：**§8 那句"先证明尺能分辨，再拿它判产品"在 R102–R136 这段里又被验证了四次**
+（150、139、155、174 四条账，每一条都是尺先错、产品没错）。
+
