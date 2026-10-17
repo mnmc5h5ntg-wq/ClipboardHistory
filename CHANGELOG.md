@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 150 结案：runner 上「设置卡没有材质」是详情那一列整列没画，不是带子、不是帧高、不是容器（R121 / U-405…U-407 / D-183 · 产品 0 改动）
+
+- 证据（R119 的 CI，run 39024922502）：`CARD_PROBE_ARM cardprobe-split-groupbox light 材质=无 墨行=0 最大偏离=0`
+  配 `CARD_PROBE_WHOLE … 整窗墨行=70` 配 `CARD_PROBE_COLUMNS 列0[0..148] 墨行=70 / 列1、列2[151..720] 墨行=0`
+  ⇒ 上一轮的成因「帧太矮把内容裁掉」被自己那一跑证伪（帧已是 720×600），
+  「拍不出整页」也被证伪（整窗 70 行墨），剩下的唯一解释是**详情那一列在这台机器的离屏捕获里没画**。
+- 仪器形状：R107 写在注释里的分类法被取出来重做 —— 证人从「整窗」换成**被告那一列自己**，
+  `cardprobeArmVerdict` 给四种出口（可判 / 框错红 / 详情列0墨不可判 / 整帧0墨不可判），
+  `CARD_PROBE_ARM_VERDICT` 逐臂打结论（排在闸门之前），`CARD_PROBE_CAPABILITY` 钉恒等式
+  「参照臂 = 可判 + 框错红 + 不可判」。
+- 仪表自检：`columnSubviewInventory` 的样本改为「类名 + 矩形 + 隐藏 + 层不透明度」并按面积升序取叶子
+  （第一版按遍历序，8 条全是铺满整窗的容器 ⇒ 数字照报、证人沉默，U-406）；
+  新增 `CARD_PROBE_WITNESS`：`列内视图数` 与 `样本` 出自同一条 `intersects`，对不上即仪器坏。
+- 171：R120 的 CI（run 39025878222）把预言的那朵红落下来了 ——
+  `TEXT_SIDE_CAPABILITY 侧栏偏离=19470 内容区偏离=0 判了 13/13` + `testDarkSettingsSidebarTextIsACountedBlindSpot`
+  failed「这些帧的暗档侧栏文字现在落在期望侧了：[13 个夹具]」
+  ⇒ 名单是**机器相关**的，下一轮按实测键分机器；保持开着。
+- 43 的措辞按实测收窄：`SIDEBAR_ICON_NOT_RUN all` 不再写「这台机器拍不出 SettingsView」，
+  改成「这一档图标判据没跑：内容区 0 墨；盲区已收窄到详情那一列，侧栏列本身有墨」。
+- 变异第 25 张 `mutate_r121.py`：M616 样本恒空 / M617 两个不可判分支换序 / M618 存在性判据改恒真 /
+  M619 拆掉一臂计数 ⇒ 四臂全部 CAUGHT（刀数 94 → 98，caught 93 → 97）。
 ### 能力闸门改吃侧栏自己：runner 上"盲区名单不成立"这条真信息不再被 skip 掩盖（R120 / 新开 171 / U-402…U-404 · 产品 0 改动）
 
 - 证据（R118 的 CI，run 39023798233）：`TEXT_SIDE settings-general dark 亮侧=1503 暗侧=0 ⇒ 墨在期望侧`

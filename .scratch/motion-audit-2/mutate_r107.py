@@ -43,7 +43,7 @@ ARMS = [
      "                    let wholeRect = CGRect(x: 0, y: 0, width: fixture.size.width,\n                                           height: 1)",
      AXIS, "CAUGHT"),
     ("M590", "把臂 2 的夹具高度改回 140pt ⇒ 必须红在「实验对象必须在帧内」", HARNESS,
-     "                                   NSSize(width: 720, height: 300)) {",
+     "                                   NSSize(width: 720, height: 600)) {",  # R121 更新：R119 把臂 2 抬到 600，needle 跟着走（U-338 那一族）
      "                                   NSSize(width: 720, height: 140)) {",
      AXIS, "CAUGHT"),
 ]

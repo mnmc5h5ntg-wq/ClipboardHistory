@@ -6152,6 +6152,7 @@ final class UICaptureTests: XCTestCase {
     static func columnSubviewInventory(in host: NSView, rect: CGRect)
         -> (texts: Int, images: Int, hosts: Int, inside: Int, sample: [String]) {
         var texts = 0, images = 0, hosts = 0, inside = 0
+        var raw: [(area: CGFloat, line: String)] = []
         var sample: [String] = []
         func walk(_ view: NSView, depth: Int) {
             let cls = String(describing: type(of: view))
@@ -6161,18 +6162,31 @@ final class UICaptureTests: XCTestCase {
             let isText = view is NSTextField
             let isImage = view is NSImageView
             if cls.contains("Hosting") { hosts += 1 }
-            if isText || isImage, let top = Self.topDownRect(of: view, in: host),
-               top.rect.intersects(rect) {
+            if isText || isImage {
                 if isText { texts += 1 } else { images += 1 }
-                if sample.count < 5 {
-                    let r = top.rect
-                    sample.append("\(isText ? "文字" : "图像"):\(cls)"
-                                  + "[\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))]")
-                }
+            }
+            // R121：样本不再只收文字/图像 —— R119 的 CI 证明"只数数量"不够。
+            // 那一跑里详情列有 7 个视图、整带最大偏离 0，光知道"有 7 个"分不开
+            // "它们画在帧外"与"它们在帧内但一个像素都没动"。所以现在把矩形、
+            // 可见性与 layer 不透明度一起打出来，让下一跑自己说。
+            //
+            // R121 追改：样本按**面积升序**取前 8，而不是按遍历顺序。第一次本地跑出来
+            // 走的是遍历序，8 条全是 `NSHostingView / AppKitPlatformViewHost / NSSplitView /
+            // _NSSplitViewItemViewWrapper` 这类铺满整窗的容器（每条都是 720x600），
+            // 也就是说我加的证人根本没说该说的话 —— 我要看的是叶子，容器在
+            // `列内视图数` 那个数里已经记过账了（U-405：加了仪表不等于读到了仪表）。
+            if let top = Self.topDownRect(of: view, in: host), top.rect.intersects(rect) {
+                let r = top.rect
+                raw.append((area: r.width * r.height,
+                            line: "\(cls)[\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))]"
+                                  + (view.isHidden ? " 隐藏" : "")
+                                  + ((view.layer?.opacity ?? 1.0) < 0.999
+                                     ? String(format: " 层不透明度=%.2f", view.layer!.opacity) : "")))
             }
             if depth < 18 { view.subviews.forEach { walk($0, depth: depth + 1) } }
         }
         walk(host, depth: 0)
+        sample = raw.sorted { $0.area < $1.area }.prefix(8).map { $0.line }
         return (texts, images, hosts, inside, sample)
     }
 
@@ -6223,6 +6237,44 @@ final class UICaptureTests: XCTestCase {
         guard let detail = columns.first(where: { $0.name.contains("详情") }) else { return band }
         return CGRect(x: band.minX, y: detail.rect.minY,
                       width: band.width, height: detail.rect.height)
+    }
+
+    /// R121 / BACKLOG 150：参照臂"带子里没有墨"这一件事的**四种**结局。
+    ///
+    /// 为什么非要从像素里抽出这个函数：R107 把这条规则写在注释里（"整窗最大偏离 ≥ 60 而
+    /// 带子只有个位数 ⇒ 内容画在带子之外 ⇒ 改带子"），**但它从来没被当成判据跑过**，
+    /// 于是 R119 我在没有它的情况下给 150 认了一个成因（"帧太矮把内容裁掉了"），
+    /// 而 R119 自己的 CI 把它证伪了：帧已经 720×600、整窗墨行 70、带子仍然 0 墨。
+    /// 那条注释规则在那一跑上也会给出错的答案 —— 它拿**整窗**当"内容在不在"的证人，
+    /// 而整窗里那 70 行墨全在**侧栏**那一列（`CARD_PROBE_COLUMNS` 列0 墨行=70，列1/列2=0），
+    /// 详情那一列从头到尾是平涂。按整窗判就会说"改带子"，可带子已经铺满了详情列，
+    /// 没有任何带子能改到看得见一列不存在的东西。
+    /// ⇒ 证人换成**被告那一列自己**，三种 0 墨因此分得开：带子放错 / 这一列没画 / 整页没拍出来。
+    enum CardprobeArmVerdict: Equatable {
+        case judged          // 带子看得见内容：`材质=有/无` 是有对象的读数
+        case bandMisplaced   // 会红：这一列有墨而带子没有 ⇒ 是我框错了，不是容器没画
+        case regionUnpainted // 不可判（有名字）：整帧有墨、被告那一列 0 墨 ⇒ 这台机器画不出这一列
+        case pageUnrendered  // 不可判（有名字）：整帧 0 墨 ⇒ 这台机器拍不出这一页（BACKLOG 43）
+    }
+
+    static func cardprobeArmVerdict(pageInkRows: Int, regionInkRows: Int, bandInkRows: Int)
+        -> CardprobeArmVerdict {
+        if bandInkRows > 0 { return .judged }
+        if pageInkRows == 0 { return .pageUnrendered }
+        if regionInkRows == 0 { return .regionUnpainted }
+        return .bandMisplaced
+    }
+
+    /// 结论要打成中文读数，而且**四种结局必须各有一个词**：
+    /// 上一版只有"会红"与"没红"两格，于是"我框错了"与"这台机器画不出这一列"共用同一格，
+    /// 150 才会被"帧太矮"这种成因名糊过去（U-405）。
+    static func verdictText(_ verdict: CardprobeArmVerdict) -> String {
+        switch verdict {
+        case .judged: return "可判(带子里有内容)"
+        case .bandMisplaced: return "红(列里有墨而带子没有=框错)"
+        case .regionUnpainted: return "不可判(整帧有墨而详情列0墨=这台机器没画这一列)"
+        case .pageUnrendered: return "不可判(整帧0墨=这台机器拍不出这一页)"
+        }
     }
 
     /// 侧栏**文字列**的行带：x 用台账写的那条（40..142），y 用树给的每一行。
@@ -7371,7 +7423,9 @@ final class UICaptureTests: XCTestCase {
                        + "不等就是夹具集合在一档里被跳过了（别让这种不对称冒充成覆盖）")
 
         if contentInkTotal == 0 {
-            emit("SIDEBAR_ICON_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
+            emit("SIDEBAR_ICON_NOT_RUN all（这一档图标判据没跑：内容区读到 0 个偏离像素。"
+                 + "R121 的 `CARD_PROBE_COLUMNS` 已经把这台的盲区**收窄到详情那一列** —— "
+                 + "侧栏列本身有墨，不许再写成「整页拍不出」）")
             throw XCTSkip("SIDEBAR_ICON_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上整页是平涂底色 ⇒ 这条记为未运行")
         }
         XCTAssertGreaterThan((inked["light"] ?? 0) + (inked["dark"] ?? 0), 0,
@@ -8067,6 +8121,38 @@ final class UICaptureTests: XCTestCase {
     /// 所以按"16pt"去改会让这扇窗口**更不**像系统，与目标里那条"优先系统 API / 原生材质"反着走。
     /// 判据因此钉成"与系统参照同档"而不是"≥某个数"：它拦的是**以后有人给卡片加横向内边距**
     /// 或改掉 `GroupBox` 默认样式，而不是拦一个凭印象定的地板。
+    /// R121 / BACKLOG 150：参照臂"带子里没墨"的四种出口，先写真值表再接产品入口。
+    /// 全部 2³ = 8 种组合都列出来，包括物理上不可能的那几种（`整帧=0 而详情列>0`）——
+    /// 不可能的那几行是**顺序**的证据：函数先问整帧再问列，所以冲突输入只会走一个出口。
+    /// 为什么必须有这么一张表：R119 我在没有它的情况下把"带子 0 墨"读成了"帧太矮"，
+    /// 而这一跑 CI 的读数（`整窗墨行=70 带子墨行=0 详情列墨行=0`）说明当时有四种解释，
+    /// 我只看见了一种（U-405）。
+    func testCardprobeArmVerdictIsATruthTable() {
+        let ink = 7, none = 0
+        let table: [(page: Int, region: Int, band: Int, expect: CardprobeArmVerdict, why: String)] = [
+            (ink, ink, ink, .judged, "带子里有内容：材质那条读数有对象"),
+            (ink, ink, none, .bandMisplaced, "列里有墨而带子没有＝我框错了 ⇒ 会红"),
+            (ink, none, none, .regionUnpainted, "整帧有墨而这一列 0 墨＝这台机器没画这一列"),
+            (none, ink, ink, .judged, "物理上不可能，但顺序要求带子优先：仍然可判"),
+            (none, ink, none, .pageUnrendered, "冲突输入：整帧优先，先说'这一页没拍出来'"),
+            (none, none, ink, .judged, "带子有墨就不必问地板"),
+            (none, none, none, .pageUnrendered, "整帧 0 墨＝BACKLOG 43 那台机器的形状"),
+            (ink, none, ink, .judged, "带子是列的子集，这种组合不可能出现；顺序仍然给可判")
+        ]
+        for row in table {
+            let got = Self.cardprobeArmVerdict(pageInkRows: row.page,
+                                               regionInkRows: row.region,
+                                               bandInkRows: row.band)
+            XCTAssertEqual(got, row.expect,
+                           "整帧=\(row.page) 详情列=\(row.region) 带子=\(row.band)"
+                               + " 期望 \(Self.verdictText(row.expect))，实际 \(Self.verdictText(got))"
+                               + " —— 这一格讲的就是：\(row.why)")
+        }
+        // 四种出口必须各有不同的词：两个结局共用一个词，读数就分不开它们（这轮的新病的形状）。
+        let words = Set(table.map { Self.verdictText($0.expect) })
+        XCTAssertEqual(words.count, 4, "四种结局只打出 \(words.count) 个不同的词：\(words.sorted())")
+    }
+
     func testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r100-inset-\(UUID().uuidString)", isDirectory: true)
@@ -8093,6 +8179,12 @@ final class UICaptureTests: XCTestCase {
         // 混成一个数就会让"没有对象"与"没有对照"共用一个闸门（见调用点那段注释）。
         var controlMaterial = 0
         var defendantMaterial = 0
+        // R121：参照臂的"带子里没墨"从此有四个出口，其中两个是**有名字的不可判**。
+        // 必须计数：一条只打读数不计数的旁路，下一轮就会被读成"这一臂过了"。
+        var judgedProbeArms = 0
+        var blockedProbeArms = 0
+        var misplacedProbeArms = 0
+        var probeArmEvaluations = 0
         for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
                                   (NSAppearance.Name.darkAqua, "dark")] {
             for fixture in fixtures(appearance: appearance) {
@@ -8160,12 +8252,51 @@ final class UICaptureTests: XCTestCase {
                                                       height: rep.pixelsHigh,
                                                       bytesPerRow: rep.bytesPerRow, rect: band,
                                                       scale: scale, fill: fill, pageLuma: pageLuma)
-                    XCTAssertGreaterThan(witness.rows, 0,
-                                         "参照臂 \(fixture.name) \(tag) 在带子 \(Int(band.minX))..\(Int(band.maxX))pt × \(Int(band.minY))..\(Int(band.maxY))pt 里读到 0 行墨"
-                                         + "（证人自己扫字节，与材质那条通道无关；这一带里像素离两个背景的最大偏离是 "
-                                         + "\(witness.maxDelta)，门限 60）"
-                                         + " ⇒ 这一臂的扫描带没盖住它自己的内容，它的「材质=无」不能当结论。"
-                                         + "改带子（`cardprobeBands`），不要改这条断言。")
+                    // R121：**被告那一列自己**有多少墨。带子的矩形就是从这一列推出来的，
+                    // 所以"列里有墨而带子没有"才是"我框错了"；"列里也没有、整帧却有"
+                    // 才是"这一列在这台机器上没画"。两种的修法完全相反（150 卡的正是这个）。
+                    let regionRect = columns.first(where: { $0.name.contains("详情") })?.rect ?? band
+                    let regionWitness = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                            height: rep.pixelsHigh,
+                                                            bytesPerRow: rep.bytesPerRow,
+                                                            rect: regionRect, scale: scale,
+                                                            fill: fill, pageLuma: pageLuma)
+                    // 整窗那一遍提前到这里：它现在是这条判据的证人之一，不能再排在判据后面。
+                    // 矩形**只声明一次**（R107）：witness 与 cardRowKinds 两遍必须扫同一块。
+                    let wholeRect = CGRect(x: 0, y: 0, width: fixture.size.width,
+                                           height: fixture.size.height)
+                    let whole = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                                    height: rep.pixelsHigh,
+                                                    bytesPerRow: rep.bytesPerRow,
+                                                    rect: wholeRect,
+                                                    scale: scale, fill: fill, pageLuma: pageLuma)
+                    let verdict = Self.cardprobeArmVerdict(pageInkRows: whole.rows,
+                                                           regionInkRows: regionWitness.rows,
+                                                           bandInkRows: witness.rows)
+                    probeArmEvaluations += 1
+                    // 结论行打在闸门之前（U-391 那一族）：只在会红的那一臂才说清原因，
+                    // 等于让"没红"的那一臂没有读数可查。
+                    emit("CARD_PROBE_ARM_VERDICT \(fixture.name) \(tag)"
+                         + " 整帧墨行=\(whole.rows) 详情列墨行=\(regionWitness.rows)"
+                         + " 带子墨行=\(witness.rows) ⇒ \(Self.verdictText(verdict))")
+                    switch verdict {
+                    case .judged:
+                        judgedProbeArms += 1
+                    case .bandMisplaced:
+                        misplacedProbeArms += 1
+                        XCTAssertGreaterThan(witness.rows, 0,
+                                             "参照臂 \(fixture.name) \(tag) 在带子 \(Int(band.minX))..\(Int(band.maxX))pt × \(Int(band.minY))..\(Int(band.maxY))pt 里读到 0 行墨"
+                                             + "，而同一趟里被告那一列（\(Int(regionRect.minX))..\(Int(regionRect.maxX))pt）读到 "
+                                             + "\(regionWitness.rows) 行、整帧读到 \(whole.rows) 行"
+                                             + "（证人自己扫字节，与材质那条通道无关；这一带里像素离两个背景的最大偏离是 "
+                                             + "\(witness.maxDelta)，门限 60）"
+                                             + " ⇒ 这一臂的扫描带没盖住它自己的内容，它的「材质=无」不能当结论。"
+                                             + "改带子（`cardprobeBands`），不要改这条断言。")
+                    case .regionUnpainted, .pageUnrendered:
+                        // 不可判要有名字、要计数：把这一格静默算成"这一臂过去了"，
+                        // 下一轮就会拿着 0 墨当答案（R119 正是这样把「帧太矮」写成成因的）。
+                        blockedProbeArms += 1
+                    }
                     // **反方向那一半的牙**（R103）：同一条尺在页面底那条参考带上必须一个像素都不认。
                     // 只配「带子里必须有字」这一头，另一头可以随便松 —— 证人松到恒真时它照样绿，
                     // 而恒真的证人比缺席的证人更坏（它会把「我框错了」洗成「这是答案」）。
@@ -8187,23 +8318,19 @@ final class UICaptureTests: XCTestCase {
                          + " 带子=\(Int(band.minX))..\(Int(band.maxX))pt"
                          + " " + Self.fillCandidatesLine(pageLuma: pageLuma, modals: modals))
                     // R107 / BACKLOG 157 的实验 (b)：**整窗**用同一颗尺再扫一遍。
-                    // 为什么这一行能把三种成因分开：`最大偏离` 是**与地板无关**的量
+                    // 为什么这一行能把成因分开：`最大偏离` 是**与地板无关**的量
                     //（它取这一带像素离两个背景的极值，不参与"够不够 60"的判断），于是
                     //   整窗最大偏离 ≥ 60 而带子只有个位数 ⇒ 内容画在带子之外 ⇒ 改带子；
                     //   整窗最大偏离也只有个位数 ⇒ 这棵视图在那台机器上根本没画东西；
                     // 再配上 (a) 那行分栏列包围盒，"详情列宽≈0"与"列在、但带子没盖住"也分得开。
-                    // 这一格**只打读数不判产品**（D-163：机制没证实之前写断言就是猜），
-                    // 但它自带一条结构不变量当尺的自检 —— 整窗包含带子，
-                    // 所以整窗的极值与墨像素**不可能低于**带子的；反过来说明这一趟扫错了对象。
-                    // 整窗那一遍的矩形**只声明一次**（R107）： witness 与 cardRowKinds 两遍必须扫同一块，
-                    // 否则变异针只能打中其中一遍，而"整窗"这个词在两条通道上指两个矩形（D-172 的反面）。
-                    let wholeRect = CGRect(x: 0, y: 0, width: fixture.size.width,
-                                           height: fixture.size.height)
-                    let whole = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
-                                                    height: rep.pixelsHigh,
-                                                    bytesPerRow: rep.bytesPerRow,
-                                                    rect: wholeRect,
-                                                    scale: scale, fill: fill, pageLuma: pageLuma)
+                    // **R121 更正**：上面那条"整窗 ≥ 60 ⇒ 改带子"是不完整的 —— R119 的 CI 里
+                    // 整窗 70 行墨全在侧栏那一列，详情列 0 行，带子已经铺满详情列，
+                    // 按原句就会把"这一列没画"读成"我框错了"。现在这条规则被
+                    // `cardprobeArmVerdict` 接管（证人从整窗换成被告那一列），整窗只留作
+                    // 「这一页在这台机器上拍不拍得出」那一半的证人。
+                    // 这一格**只打读数不判产品**（D-163），但它自带一条结构不变量当尺的自检 ——
+                    // 整窗包含带子，所以整窗的极值与墨像素**不可能低于**带子的；反过来说明这一趟扫错了对象。
+                    // `wholeRect` / `whole` 已上移到判据之前（R121：它现在同时是证人和读数）。
                     emit("CARD_PROBE_WHOLE \(fixture.name) \(tag) 整窗墨行=\(whole.rows)"
                          + " 整窗墨像素=\(whole.pixels) 整窗最大偏离=\(whole.maxDelta)"
                          + " 带子墨行=\(witness.rows) 带子最大偏离=\(witness.maxDelta)"
@@ -8239,6 +8366,26 @@ final class UICaptureTests: XCTestCase {
                              + " 列内视图数=\(detailInventory.inside)"
                              + (detailInventory.sample.isEmpty
                                 ? " 样本=无" : " 样本=" + detailInventory.sample.joined(separator: " ; ")))
+                        // R121 尺自检（D-174③ 的形状，但对象是我新加的这台仪表）。
+                        // `列内视图数` 与 `样本` 走的是**同一条** `intersects` 判据的两个出口，
+                        // 所以 `inside>0 而样本为空` 只能是仪器坏（前缀丢了 / append 被删），
+                        // 不可能是产品的形状。本轮就差点把这条坏法当成产品结论用（U-405）：
+                        // 第一版样本按遍历顺序取前 8，本机跑出来 8 条全是铺满整窗的容器，
+                        // 数字照常报、证人一句话没说。红的时候要说"仪表坏了"，不要说"详情是空的"。
+                        let witnessVerdict = (detailInventory.inside > 0 && detailInventory.sample.isEmpty)
+                            ? "仪器坏" : "一致"
+                        emit("CARD_PROBE_WITNESS \(fixture.name) \(tag)"
+                             + " 列内视图数=\(detailInventory.inside) 样本数=\(detailInventory.sample.count)"
+                             + " 上限=8 ⇒ \(witnessVerdict)")
+                        if detailInventory.inside > 0 {
+                            XCTAssertFalse(detailInventory.sample.isEmpty,
+                                "CARD_PROBE_WITNESS_BROKEN \(fixture.name) \(tag)：详情列里数到 "
+                                    + "\(detailInventory.inside) 个与列相交的视图，样本却是空的。"
+                                    + "视图数与样本是同一条 `intersects` 的两个出口，两者对不上就是仪器坏了 "
+                                    + "（R121 / U-405）—— 这一跑的 `样本=无` 不能被读成"
+                                    + "「详情列里没有可画的视图」（150 要区分的正是这两件事）。"
+                                    + "改 `columnSubviewInventory`，不要改这条断言。")
+                        }
                     }
                     // 尺自检（D-174③ 的形状）：**带子必须与详情那一列有交集**。
                     // 它不判产品，只判"我扫的是不是我想扫的那一块" —— 红的时候说的是仪器坏了。
@@ -8409,6 +8556,18 @@ final class UICaptureTests: XCTestCase {
         emit("CARD_INSET_CAPABILITY 候选=\(cells) 有材质=\(materialCells)"
              + "（被告=\(defendantMaterial) 参照=\(controlMaterial)）"
              + " 量到=\(measured.count) 未判=\(declined.count)")
+        // R121 / BACKLOG 150：参照臂的四种出口各自计数，并且**必须加得回来**。
+        // 这条恒等式是这台新仪表自己的地板：如果哪天有人在 switch 里加了一个不计数就返回的
+        // 分支，"不可判"就会变成静默通过 —— 而 150 这一整轮卡住我的正是这种静默
+        // （R119 我把"这一臂读不到墨"直接写成成因"帧太矮"，没有第三个词可说）。
+        emit("CARD_PROBE_CAPABILITY 参照臂=\(probeArmEvaluations)"
+             + " 可判=\(judgedProbeArms) 框错红=\(misplacedProbeArms)"
+             + " 不可判=\(blockedProbeArms)"
+             + "（拆：详情列0墨/整帧0墨，逐臂见 CARD_PROBE_ARM_VERDICT）")
+        XCTAssertEqual(probeArmEvaluations, judgedProbeArms + blockedProbeArms + misplacedProbeArms,
+                       "参照臂数了 \(probeArmEvaluations) 次，三个出口只加回 "
+                           + "\(judgedProbeArms + blockedProbeArms + misplacedProbeArms) 次"
+                           + " ⇒ 有一臂掉在了 switch 外面（仪器坏，不是产品坏）。R121。")
         // **绝对锚点**（M559 那一刀教出来的）：参照那一格的左沿必须落在夹具自己声明的
         // `.padding(24)` 上。等式判据看不见"整把尺一起偏"，这一格看得见。
         // 它排在所有闸门**之前**：这一格要判的是"仪器有没有错位"，与"这台机器画不画得出材质"无关，
