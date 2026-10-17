@@ -12,13 +12,13 @@
 
 **验证（本轮，全部单独串行跑）**：全量 `Executed 847 tests, with 42 tests skipped and 0 failures` / 201.8s；
 `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`（新代码重拍）；编译 0 告警；
-脚本电池 `Ran 301 tests … OK`（294 → 298 是臂号查重三格，→ 301 是地板基准三格）；四张变异表 9/9、6/6、3/3、2/2 全 CAUGHT 且 `RESTORE_CLEAN=yes`；
+脚本电池 `Ran 305 tests … OK`（294 → 298 臂号查重、→ 301 地板基准、→ 305 §9.3 那四格）；四张变异表 9/9、6/6、3/3、2/2 全 CAUGHT 且 `RESTORE_CLEAN=yes`；
 针自检 `tables=42 covered=27 bad=0`。中途我并发开了两遍全量（两卷共用 `.build` 与固定路径的读数文件）⇒ **两卷都作废重跑**，
 这一格的教训是"串行"不是"重跑一次就行"。
 
 **仍然只有用户能做的**：批次 26.x–84.1、85.1、85.2、86.1、90.1（本轮把 85 / 86 / 90 三批补进了 `docs/MANUAL_TEST_v1.4.9_round3.md`，此前六轮它们只活在正文引用里）。
 
-**BACKLOG 184 当场结案**（清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 降五」不红；新出口 `FLOOR_WENT_BACK` 压在 `git show HEAD:` 的基准上，落刀实测旧判据绿、新出口红）。
+**BACKLOG 184 与 181 当场结案**：184 = 清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 降五」不红，新出口 `FLOOR_WENT_BACK` 压在 `git show HEAD:` 的基准上（落刀实测旧判据绿、新出口红）；181 = `AGENT_FINAL_REPORT.md` §9.3 那三句连着三轮与台账相反而无人看守，现在绑到读数上（`scripts/tests/test_final_report_claims.py`，4 格：现状干净 + 三格内存伪造的正对照）。
 
 **下一轮（R144）的靶，按顺序**：① BACKLOG 177 的录制态真帧夹具（136 → 138，`--must-include` 同步改，同一轮里 `update` 基线）；
 ② 读 R143 的 CI 里 `PROBE_FPS` 那三个数，按 R118 的规矩决定 176 的预算收紧到几倍；

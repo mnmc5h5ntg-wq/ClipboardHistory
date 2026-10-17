@@ -22,8 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   （暗档 1.40:1 高于亮档 1.08:1，「几乎同色」的方向是反的）；179 撤回并改名；新开 181–185。
 - **BACKLOG 184 当场结案**：清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 地板降五」不会红。
   新增出口 `FLOOR_WENT_BACK`（基准压在 `git show HEAD:` 那一版上），临时落刀实测旧判据绿、新出口红，还原后 ok。
+- **BACKLOG 181 当场结案**：`AGENT_FINAL_REPORT.md` §9.3 那三句"仍未收口"此前连着三轮与台账相反，而这份文件没有任何守卫。
+  新增 `scripts/tests/test_final_report_claims.py`（4 格：现状干净 + 三格内存伪造的正对照），
+  把「还有 NN 格未判」「这一件仍未发生」「都还没有各自的自动化守卫」三句分别绑到
+  表算出来的未清账数、`added` 行数、两份守卫文件的存在性上 ⇒ 报告再停在旧读数就会红。
 - 全量 **847 例 / 42 skip / 0 failures**（单独一遍：我先前并发开了两遍，两卷都作废重跑）、
-  `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`、编译告警 0、脚本测试 301 OK、四张变异表全 CAUGHT。
+  `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`、编译告警 0、脚本测试 305 OK、四张变异表全 CAUGHT。
 - 人工批次 85 / 86 / 90 补进 `docs/MANUAL_TEST_v1.4.9_round3.md`（此前六轮只在正文里被引用过）。
 
 ### 帧间隔那条会换班的绝对地板，换成同一次运行的相对判据（R142 / U-472…U-475 · 产品 0 改动，判据账）
