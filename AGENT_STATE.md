@@ -20,6 +20,12 @@
 
 **BACKLOG 184 与 181 当场结案**：184 = 清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 降五」不红，新出口 `FLOOR_WENT_BACK` 压在 `git show HEAD:` 的基准上（落刀实测旧判据绿、新出口红）；181 = `AGENT_FINAL_REPORT.md` §9.3 那三句连着三轮与台账相反而无人看守，现在绑到读数上（`scripts/tests/test_final_report_claims.py`，4 格：现状干净 + 三格内存伪造的正对照）。
 
+**读 CI（run 39052480365）翻出三件事**：① 我新写的那条产品入口判据在 runner 上红（`128 < 141`）——
+门限"单边占总量 5%"是**本机读数**推的，runner 的环几何给 4.5% ⇒ 换成对边比 + 单边绝对地板 80（U-486，本机读数不变 1354/1354/178/178）；
+② 电池那格红在 `No module named pytest`（runner 没装），报出来却是"样张那一卷自己没通过"⇒ 样张改用 unittest 跑，不依赖第三方；
+③ 在屏探针挂在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`（`UI_PROBE_HUNG=…`）——
+拿同一份合成日志喂 `28246ed` 版报告脚本，退出码同样是 1 ⇒ 排除"我改坏了脚本"，新开 **BACKLOG 186**。
+
 **下一轮（R144）的靶，按顺序**：① BACKLOG 177 的录制态真帧夹具（136 → 138，`--must-include` 同步改，同一轮里 `update` 基线）；
 ② 读 R143 的 CI 里 `PROBE_FPS` 那三个数，按 R118 的规矩决定 176 的预算收紧到几倍；
 ③ BACKLOG 181–185 五格里挑能变成判据的（181 的 §9.3 三句绑读数、184 的地板对 HEAD 做差）；

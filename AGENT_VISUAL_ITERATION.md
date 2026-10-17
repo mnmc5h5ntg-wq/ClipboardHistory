@@ -12058,7 +12058,14 @@ R140 的看图腿记成 NOT-RUN，本轮第一件事是**重新捕获**（`/tmp/
 - U-484 三本账对同一件事没有对账尺，而 `AGENT_FINAL_REPORT.md` 没有任何守卫。
 - U-485 能从仓库算出来的数我全是手抄的（四处，`git blame` 显示写入当轮就错）。
 
-### 5. 下一轮（R144）第一件事
+### 5. 读 CI 之后（part 5）与下一轮（R144）第一件事
 
-回到产品面：BACKLOG 177 的录制态真帧夹具（136 → 138，`--must-include` 同步改），
-顺带读 R143 的 CI 里 `PROBE_FPS` 那三个数（176 的预算收紧就等它）。
+`1427e46` 那一跑红在三步：① **我新写的那条判据在 runner 上红**（`128 < 141`）—— 门限"单边占总高色度 5%"
+是**本机一个读数**推出来的，runner 的环几何给 4.5% ⇒ 换成跟着几何走的对边比 + 单边绝对地板 80（U-486），本机读数不变；
+② 电池那格红在 `No module named pytest`（runner 没装 pytest），而它报出来的话是"样张那一卷自己没通过"
+⇒ 样张改用 `python -m unittest scripts.tests.test_ci_capture_gate`，不依赖第三方；
+③ 在屏探针挂在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped` —— 归因排除（同一份合成日志喂
+`28246ed` 版脚本，退出码同样是 1）⇒ 新开 BACKLOG 186。
+
+**R144 第一件事**：回到产品面 —— BACKLOG 177 的录制态真帧夹具（136 → 138，`--must-include` 同步改，同一轮里 `update` 基线）；
+顺带读 R143 之后每一跑的 `PROBE_FPS` 三个数（176 的预算收紧就等它）与 186 的第二跑对账。
