@@ -451,13 +451,17 @@ jobs:
       # 等同一 commit 的两跑给出一致名单，再把它升成硬门 —— 升不升由那份对账签，不由印象签。
       # 两个前缀是必须的：动效那两朵红住在**两个类**里（`MotionFilmstripTests` 与
       # `UIInteractionProbeTests`），只切一个会把有红的跑报成 0 红（U-370，本轮真跑日志抓到）。
-      - name: Motion gate (report-only census, BACKLOG 166)
+      # R119 升成硬门：166 自己写的判据是"同一 commit 两跑的名单一致"，
+      # 而这条已经拿到了（run 39020070349 的 attempt 1 与 attempt 2 都是
+      # `MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=82`，逐字相同）
+      # ⇒ 去掉 `--report-only` 与 `|| true`：动效那一卷再冒出红，CI 必须拦。
+      - name: Motion gate (BACKLOG 166, promoted from report-only census)
         if: always()
         timeout-minutes: 2
         run: |
           python3 scripts/ci_capture_gate.py /tmp/test.log --label MOTION \
             --class-prefix MotionFilmstrip --class-prefix UIInteraction \
-            --report-only 2>&1 | tee /tmp/motion-gate.log || true
+            2>&1 | tee /tmp/motion-gate.log
 
       - name: Capture gate (unregistered reds must be zero)
         if: always()

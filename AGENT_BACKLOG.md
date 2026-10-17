@@ -4048,7 +4048,7 @@ runner：`SELECTION_KEYSTATE_CAPABILITY 候选=2 有对象=2 未判=0`、
 是夹具的 detail 内容在那台机器上不出现 ⇒ 下一步是"让臂 2 的详情在 runner 上保证有内容"（selection 落点或显式给 detail），
 而不是再动带子。**本条不许写成 150 已推进**：150 仍然开着，只是它的堵点第一次有了名字。
 
-**166. runner 上的动效红在两次运行之间换了一朵，而捕获闸门看不见它**（R110 开 / 与 155、R55/R57 那族同源，**机器侧可复现性账**）：
+**166.（R119 结案：闸门已从 report-only 升成硬门）runner 上的动效红在两次运行之间换了一朵，而捕获闸门看不见它**（R110 开 / 与 155、R55/R57 那族同源，**机器侧可复现性账**）：
 `39005449295`（R108）的去重后红是 `testBandCaptureIsCheaperAndStillSeesTheMotion`（26.84 > 23.88）+ 157 那两朵证人；
 `39008599904`（R109，**产品只差一行声明**）的红的却是 `testFrameIntervalsUnderStateChanges`
 （最差帧 196.77 > 120ms、p95 42.43 > 20ms）+ 同样那两朵证人 —— **bandCapture 那一跑绿了**。
@@ -4206,3 +4206,20 @@ R115 的仪器报出 `SIDEBAR_ICON_ROSTER_DRIFT …更早的行数=52/156`。
 但 R116 结案时把**本机那台机器的绝对 y** 当成了跨机器契约，所以那条对账守卫在 runner 上必红。
 本轮把判据改成比高度与行数、绝对偏移只报不判，并让 `TEXT_SIDE` 也改吃树给行带（x 仍来自台账）。
 169 保持结案，但结论范围收窄成「本机矩形对齐」；跨机器对齐由 `SIDEBAR_ROSTER_OFFSET` 报数，不判。
+
+**150 追记 2（R119：定性完成 —— 不是容器吃材质，是帧太矮把内容裁掉了）**：R117 那跑（run 39022854686）
+的树侧证人给出答案：runner 上臂 2 的详情列**确实有东西** —— `嵌套hosting=4 列内视图数=7`（本机 `6 / 16`），
+可像素那两把尺读到 `墨行=0 最大偏离=0`。同一天另一条读数把它解释了：
+`SIDEBAR_ROSTER_RECT … 树给=342..534`（runner 上整列往下挪 **282pt**）。
+臂 2 的夹具只有 **300pt 高** ⇒ 内容被挪到帧外面去了，"0 墨"是**裁切**，不是材质消失。
+⇒ 本轮把夹具加高到 720×600（任何一台机器都装得下），并把带子的纵向范围改成**详情列自己**
+（`bandYFromColumn`：x 仍来自台账，y 来自那台机器的树）。帧名随尺寸换掉（`…-720x600-{light,dark}`），
+基线 `update` 后 `COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`。
+**runner 的红是否消失要等下一次 CI** —— 这条追记在拿到那一跑之前不算结案。
+
+**166 结案（R119）**：这条自己写的判据是「同一 commit 两跑的 `MOTION_GATE_CASES` 名单一致 ⇒ 才允许去掉
+`--report-only`」。R118 用 `gh run rerun` 把 `24b8936` 那一跑重跑成 attempt 2，两遍逐字相同：
+`MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=82`。
+⇒ workflow 那一步已去掉 `--report-only` 与 `|| true`，改名为 `Motion gate (BACKLOG 166, promoted from
+report-only census)`。附带一条：判据要按**登记的原文**执行 —— 本轮我一度想改成"三跑一致"才肯签，
+那是临时加严；登记的是两跑，两跑一致就升。

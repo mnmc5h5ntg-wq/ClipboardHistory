@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 150 定性：帧太矮把内容裁掉了，不是容器吃材质；166 按登记的判据把动效闸门升成硬门（R119 / U-398…U-400 · 产品 0 改动）
+
+- 证据链：runner 的树侧证人 `CARD_PROBE_DETAIL_TREE cardprobe-split-groupbox … 嵌套hosting=4 列内视图数=7`
+  （本机 `6 / 16`）说明**详情列里有东西**；同跑像素尺 `墨行=0 最大偏离=0` 说明**东西不在帧里**；
+  再配上 R118 报出的 `树给=342..534`（runner 上整列下挪 282pt）与臂 2 夹具只有 300pt 高 ⇒ **裁切**。
+- 改动：夹具 `cardprobe-split-groupbox` 720×300 → **720×600**；带子的纵向范围改成详情列自己
+  （`bandYFromColumn`，x 仍来自台账）⇒ 不再依赖任何一台机器的常数。
+  帧名随尺寸更换，基线 `update` 后 `COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`；新帧本机两档都真看过。
+- **166 结案**：同版两跑（run 39020070349 attempt 1 vs 2）的
+  `MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=0 NOT_RUN=82` 逐字相同
+  ⇒ workflow 的动效那一步去掉 `--report-only` 与 `|| true`，从此动效那卷的红会拦。
+- 三条自坏：U-398 一个成因在未否证对立解释的情况下被沿用了四轮 ⇒ 登记"X 导致 Y"必须同时写出
+  哪种读数会否证 X；U-399 拿到两跑之后我一度想改成"三跑才签"（事后加严）⇒ 按登记的原文执行；
+  U-400 把 `extension CGRect` 写进类型里 ⇒ `declaration is only valid at file scope`（助手放错层）。
+- 验证：全量 **827** / 41 skip / 0 failures；捕获 67 / 4 skip / 0 failures；脚本电池 239；
+  150 的红是否消失等 R119 的 CI，未结案前不改判据。
 ### R116 那条对账守卫在 runner 上第一次跑就红：我把本机的绝对坐标当成了契约（R118 / U-395…U-397 · 产品 0 改动）
 
 - **R116 那条对账守卫在 runner 上第一次跑就红**（run 39021652718 / `0ac7851`）：`SIDEBAR_ROSTER_RECT 台账=60..252 树给=342..534 行数=6 上界差=282.0pt 下界差=282.0pt` —— 同一份代码、同一个 720×540 帧，**整条侧栏在 runner 上往下挪了 282pt**，而行高（32pt）与行数（6）一点没变。

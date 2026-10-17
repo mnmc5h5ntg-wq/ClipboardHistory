@@ -4127,8 +4127,13 @@ final class UICaptureTests: XCTestCase {
             // 带子 `24..124pt` 盖得住；换一台装饰更高的机器就会盖不住，而读数长得和
             // "容器吃掉了材质"一模一样（`墨行=0 最大偏离=2`）。
             // 所以先把**实验对象本身**修到不被装饰高度摆布（内容不裁），再来问容器。
+            // R119：高度 300 → **600**。理由是被量的，不是猜的：
+            // R117 的 CI 上臂 2 的详情列**在树里有东西**（`嵌套hosting=4 列内视图数=7`，本机 6/16），
+            // 却整带读出 0 墨 —— 而同一天 `SIDEBAR_ROSTER_RECT` 报出 runner 上整列往下挪了 **282pt**。
+            // 两件事合起来只剩一种解释：内容被挪到 300pt 的帧外面去了（被裁），不是容器吃掉材质。
+            // ⇒ 把帧加高到任何一台机器都装得下，再问容器。
             results.append(Fixture("cardprobe-split-groupbox",
-                                   NSSize(width: 720, height: 300)) {
+                                   NSSize(width: 720, height: 600)) {
                 AnyView(NavigationSplitView {
                     SettingsSidebarView(selectedCategory: .constant(.general))
                         .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
@@ -6207,6 +6212,19 @@ final class UICaptureTests: XCTestCase {
         return kept
     }
 
+    /// 带子的**纵向范围换成详情列自己**（R119 / BACKLOG 150）。
+    ///
+    /// x 仍然来自台账（`cardprobeBands` 里那条 170..720），因为参照条要靠它定位；
+    /// y 改成这一列的完整高度 —— 列在树里就是"内容能出现的地方"，
+    /// 它在两台机器上各自是多少，由那台机器的树说，不由我记的常数说。
+    /// 没有详情列（臂 0 / 臂 1）时原样返回。
+    static func bandYFromColumn(_ band: CGRect,
+                                _ columns: [(name: String, rect: CGRect)]) -> CGRect {
+        guard let detail = columns.first(where: { $0.name.contains("详情") }) else { return band }
+        return CGRect(x: band.minX, y: detail.rect.minY,
+                      width: band.width, height: detail.rect.height)
+    }
+
     /// 侧栏**文字列**的行带：x 用台账写的那条（40..142），y 用树给的每一行。
     ///
     /// 为什么不许整列写死一个绝对 y：R116 那条对账守卫在 runner 上第一次跑就红，
@@ -8103,7 +8121,8 @@ final class UICaptureTests: XCTestCase {
                 // 每一臂的带子由**这一臂自己声明**：臂 2 的卡片长在详情列里（侧栏 148pt 之后），
                 // 拿臂 0 的带子去扫它，"读不到卡片"就只是带子没盖住，而不是容器没画材质。
                 let band = isProbe
-                    ? (Self.cardprobeBands[fixture.name] ?? CGRect(x: 24, y: 24, width: 672, height: 100))
+                    ? Self.bandYFromColumn(Self.cardprobeBands[fixture.name]
+                        ?? CGRect(x: 24, y: 24, width: 672, height: 100), columns)
                     : CGRect(x: 155, y: 60, width: 560, height: fixture.size.height - 60)
                 let (rows, fill, modals) = Self.cardRowKinds(bytes: base, width: rep.pixelsWide,
                                                      height: rep.pixelsHigh,
