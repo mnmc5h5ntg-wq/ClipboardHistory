@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 帧间隔那条会换班的绝对地板，换成同一次运行的相对判据（R142 / U-472…U-475 · 产品 0 改动，判据账）
+
+- 起点：`4486f6d` 在 CI 红在 `testFrameIntervalsUnderStateChanges`（26.939 > 20.0），两跑对账是 **ONLY_B 换班**。
+- 判据换成 `loaded.p95 ≤ max(baseline.p95, off.p95) × 3.0`（同机同窗同驱动）；`worst ≤ 120` 降级为粗卡顿锚点。
+- 三臂读数从 `print` 换成 `emit` 并带机器键 —— 那三行 `FPS-` 在 CI 里从来没被收集到过（U-472），
+  所以"收紧预算"这件事一直缺的不是判断，是一份读数。
+- 纯函数真值表 6 行 + 守卫（读数必须走 emit；本机数 `20` 不许回到判据位置）；`mutate_r142.py` **CAUGHT=4/4**。
+- **BACKLOG 176 保持开着**：3.0 是宽而不恒真的过渡值，收紧欠一次 runner 的 `PROBE_FPS` 读数。
+- U-473：守卫的搜索串会命中守卫自己 ⇒ 串拼出来、结束锚点选下一条用例、断言定义行恰好一次。
+
 ### 快捷键录制器的「我在听」第一次有形状：补上一次真动效（R141 / U-466…U-471 · 产品 1 文件）
 
 - 产品：`HotKeyRecorderView` 进录制态给一圈强调色描边（`HotKeyRecorderRing`，1.5pt + `controlAccentColor`），

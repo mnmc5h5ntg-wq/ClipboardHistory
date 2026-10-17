@@ -341,9 +341,31 @@ final class UIInteractionProbeTests: XCTestCase {
         print("FPS-MOTION-OFF n=\(off.n) p50=\(String(format: "%.2f", off.p50))ms p95=\(String(format: "%.2f", off.p95))ms worst=\(String(format: "%.1f", off.worst))ms >16.7ms:\(off.over16) >33.4ms:\(off.over33)")
         print("FPS-LOADED entries=\(store.entries.count) n=\(loaded.n) p50=\(String(format: "%.2f", loaded.p50))ms p95=\(String(format: "%.2f", loaded.p95))ms worst=\(String(format: "%.1f", loaded.worst))ms >16.7ms:\(loaded.over16) >33.4ms:\(loaded.over33)")
 
+        // R142 / BACKLOG 176：原来那三条断言里，`loaded.p95 ≤ 20ms` 是**本机的数**，
+        // 而 runner 自己那条 cadence 就在 25–32ms 之间换班（R103 三跑、R118 两跑都量到过）。
+        // 于是它红的时候没人知道该怪谁：`ci_red_stability.py 39041957806 39042028124` 报的是
+        // **ONLY_B 换班**（同一份尺、相邻两跑，一跑红=0 一跑红=1，而那一跑只改了台账）。
+        // ⇒ 判据换成**同一次运行内的相对量**：动画那一臂不许比"关掉动画"那一臂差过预算倍。
+        //   参照是同一台机器、同一个窗口、同一份驱动，所以它跟着机器负载一起动，不会换班。
+        //   绝对数（20ms / 120ms）不再当判过没过的依据：`worst ≤ 120` 留作**粗卡顿锚点**，
+        //   而三条 p95 一律进读数行（`emit`，不是 `print` —— `print` 走块缓冲，
+        //   CI 里那三行 FPS- 从来没被收集到，这次一并修掉）。
+        let budget = FrameIntervalBudget.ratio
+        let reference = max(baseline.p95, off.p95)
+        let ratio = loaded.p95 / max(reference, 0.001)
+        emit("PROBE_FPS 机器=\(MotionFilmstripTests.filmstripMachineKey()) "
+             + "baseline_p95=\(String(format: "%.2f", baseline.p95)) off_p95=\(String(format: "%.2f", off.p95)) "
+             + "loaded_p95=\(String(format: "%.2f", loaded.p95)) 比值=\(String(format: "%.3f", ratio)) "
+             + "预算=\(String(format: "%.2f", budget)) n=\(loaded.n) worst=\(String(format: "%.1f", loaded.worst))")
         XCTAssertGreaterThan(loaded.n, 60, "帧样本太少，结论无效")
-        XCTAssertLessThanOrEqual(loaded.p95, 20, "p95 帧间隔超过 20ms：60fps 目标未达")
-        XCTAssertLessThanOrEqual(loaded.worst, 120, "最差帧超过 120ms：有卡顿级掉帧")
+        XCTAssertGreaterThan(reference, 0,
+            "两个参照臂（空转 / 关掉动画）的 p95 都是 0 ⇒ 这把尺的**分母**是空的，"
+                + "比值无从判定。这一格是没跑，不许读成通过（R87：单遍读数不配给产品定罪）")
+        XCTAssertLessThanOrEqual(ratio, budget,
+            "动画那一臂的 p95 是关掉动画那一臂的 \(String(format: "%.2f", ratio)) 倍（预算 \(budget)）"
+                + "⇒ 动效让帧间隔变粗了。基线=\(String(format: "%.2f", baseline.p95))ms "
+                + "关动画=\(String(format: "%.2f", off.p95))ms 开动画=\(String(format: "%.2f", loaded.p95))ms")
+        XCTAssertLessThanOrEqual(loaded.worst, 120, "最差帧超过 120ms：有卡顿级掉帧（绝对锚点，不是 60fps 判据）")
     }
 
     // MARK: - 无障碍树
