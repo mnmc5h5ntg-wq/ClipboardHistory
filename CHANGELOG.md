@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 动效那一卷的红第一次有账（R112 · 工具轮，产品 0 改动）
+
+- `scripts/ci_capture_gate.py` 加 `--class-prefix`（按类名最后一段切，可重复）、`--label`（结论行按卷打）、
+  `--report-only`（只降级产品那一格，通道坏了照旧红）；**切片为空 = 红**（`MOTION_SCOPE_EMPTY=1`）。
+- 补上第二种红的形状 `FAILED 方法名：XCTAssert…`（R109 那朵 frameIntervals 就长这样，闸门以前整朵看不见）；
+  类名缺失的那种单列成「类未知名单」，不许并进"有名字的红"冒充干净。
+- workflow 新增 `Motion gate (report-only census, BACKLOG 166)` 一步，读 `/tmp/test.log` 切
+  `MotionFilmstrip` + `UIInteraction` 两个类 ⇒ 每次 CI 都会打 `MOTION_GATE_SCOPE` / `MOTION_GATE_CASES`。
+- 真日志实测：R109 `有名字的红=0 类未知名单=1(testFrameIntervalsUnderStateChanges)`、R110 `类未知名单=0`。
+- 脚本电池 230 → **236**；产品文件 0 改动、帧 136 张 `CHANGED=0`（swift 侧一行未动 ⇒ 复用上轮帧）。
+- 规矩进 D-181；新犯 U-370…U-372（U-373 是被自家守卫拦下的字段名改动）。
 ### 菜单的加载态不再挂死（R111）
 
 - **165 结案**：macOS 12 的状态项菜单以前只在 `makeMenu` / `menuWillOpen` 两处同步填，

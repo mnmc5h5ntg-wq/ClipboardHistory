@@ -399,3 +399,118 @@ class CauseLineHasToMatchItsEvidenceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+class MotionScopeTests(unittest.TestCase):
+    """R112 / BACKLOG 166：把「有名字的红」这份账推广到**别的卷**时的四格。
+
+    已知答案全部来自一份合成日志（两类用例、各一朵红），所以每一格都能被逐字说出：
+    ①切片要真能切到（前缀按类名最后一段比 —— 全限定名 `Target.Module.XxxTests` 用
+      `startswith("Xxx")` 才切得到，第一版按全串比 ⇒ 一朵都切不到）；
+    ②**切片为空必须红**（R99 那一族：一个用例都没匹配到还打「绿」，等于把"前缀写错"
+      记成"这一卷全过"）；
+    ③`--report-only` 只降级**产品那一格**（红/低于地板），通道坏了照旧红；
+    ④`--label` 换的是结论行的名字，两卷的账不许混在同一行里（166 的病根就是
+      「捕获那一卷说'唯一的红是 157'，而动效那一卷的红没人记账」）。
+    """
+
+    FIXTURE = (
+        "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testFrameIntervalsUnderStateChanges]' failed (0.500 seconds).\n"
+        "error: -[ClipboardHistoryAppTests.MotionFilmstripTests testFrameIntervalsUnderStateChanges] : XCTAssertLessThanOrEqual failed: (\"196.7\") is greater than (\"120.0\")\n"
+        "Test Case '-[ClipboardHistoryAppTests.UICaptureTests testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox]' failed (0.400 seconds).\n"
+        "error: -[ClipboardHistoryAppTests.UICaptureTests testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox] : XCTAssertGreaterThan failed: (\"0\") is greater than (\"0\")\n"
+        "Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges]' failed (0.300 seconds).\n"
+        "error: -[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges] : XCTAssertLessThanOrEqual failed: (\"42.4\") is greater than (\"20.0\")\n"
+        "Test Case '-[ClipboardHistoryAppTests.MotionFilmstripTests testSomeGreenThing]' passed (0.100 seconds).\n"
+        "Test Case '-[ClipboardHistoryAppTests.UICaptureTests testAnotherGreenThing]' passed (0.100 seconds).\n"
+    )
+
+    def setUp(self):
+        fd, self.path = tempfile.mkstemp(suffix=".log")
+        os.close(fd)
+        with io.open(self.path, "w", encoding="utf-8") as handle:
+            handle.write(self.FIXTURE)
+
+    def tearDown(self):
+        if os.path.exists(self.path):
+            os.unlink(self.path)
+
+    def _run(self, *extra):
+        return main([self.path, "--quiet"] + list(extra))
+
+    def test_prefix_slices_on_the_last_class_component(self):
+        self.assertEqual(1, self._run("--label", "MOTION", "--class-prefix", "MotionFilmstrip"),
+                         "切到了一朵动效红 ⇒ 必须红（默认不是 report-only）")
+        out = self._capture("--label", "MOTION", "--class-prefix", "MotionFilmstrip")
+        self.assertIn("MOTION_GATE_CASES passed=1 skipped=0 failed=1 有名字的红=1", out)
+        # 反向牙：切片之后**不能**把另一卷的那朵红也算进来
+        self.assertNotIn("testSettingsCardHorizontalInset", out.split("MOTION_GATE_CASES")[1][:400])
+
+    def test_two_prefixes_cover_both_motion_classes(self):
+        """U-370：动效那两朵红**住在两个不同的类里**（bandCapture 在 `MotionFilmstripTests`、
+        frameIntervals 在 `UIInteractionProbeTests`）。只切一个类的那版尺会把有红的跑报成 0 红
+        —— 这是"新尺第一次跑必须拿已知答案的真日志验一正一负"那一族（R102 的 U-302 同形），
+        本轮第一次真跑 R109 的 CI 日志就撞上：它明明有 frameIntervals 的红，切片却给 0。
+        """
+        one = self._capture("--label", "MOTION", "--class-prefix", "MotionFilmstrip", "--report-only")
+        self.assertIn("MOTION_GATE_CASES passed=1 skipped=0 failed=1 有名字的红=1", one)
+        two = self._capture("--label", "MOTION", "--class-prefix", "MotionFilmstrip",
+                            "--class-prefix", "UIInteraction", "--report-only")
+        self.assertIn("failed=2 有名字的红=2", two)
+        # 反向牙：只切 UIInteraction 时，MotionFilmstrip 那朵不许被算进来
+        other = self._capture("--label", "MOTION", "--class-prefix", "UIInteraction", "--report-only")
+        self.assertIn("failed=1 有名字的红=1", other)
+        self.assertNotIn("testBandCaptureIsCheaper", other.split("MOTION_GATE_CASES")[1][:300])
+
+    def test_empty_slice_is_red_not_green(self):
+        self.assertEqual(1, self._run("--label", "MOTION", "--class-prefix", "NoSuchSuite"))
+        out = self._capture("--label", "MOTION", "--class-prefix", "NoSuchSuite")
+        self.assertIn("MOTION_SCOPE_EMPTY=1", out)
+        self.assertIn("整份日志里 5 个用例、3 朵红", out)
+
+    def test_report_only_downgrades_the_product_verdict_but_not_the_channel(self):
+        self.assertEqual(0, self._run("--label", "MOTION", "--class-prefix", "MotionFilmstrip",
+                                      "--report-only"))
+        out = self._capture("--label", "MOTION", "--class-prefix", "MotionFilmstrip", "--report-only")
+        self.assertIn("MOTION_GATE_RESULT=report_only", out)
+        self.assertIn("有 1 个用例红了", out)          # 红仍然要**打出来**，只是不拦
+        # 而通道那一格不吃 report-only：读不到的日志照旧红
+        self.assertEqual(1, main(["/tmp/这一份日志不存在-r112.log", "--quiet", "--report-only"]))
+
+    def test_the_second_red_shape_is_not_silent(self):
+        """U-370：`FAILED 方法名：XCTAssert…` 这一种形状**没有类名** ⇒ 闸门不许把它读成 0 红。
+
+        正对照：日志里只有这一种形状的红、且切片切到的是别的类 ⇒ `有名字的红=0`，
+        但 `类未知名单=1` 必须露面，且整份那一跑必须红。
+        """
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix=".log")
+        os.close(fd)
+        with io.open(path, "w", encoding="utf-8") as handle:
+            handle.write("Test Case '-[T.SomeTests testA]' passed (0.100 seconds).\n")
+            handle.write("FAILED testFrameIntervalsUnderStateChanges：XCTAssertLessThanOrEqual failed: "
+                         "(\"42.4\") is greater than (\"20.0\")\n")
+        try:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                whole = main([path, "--quiet"])
+            out = buf.getvalue()
+            self.assertEqual(1, whole, out)
+            self.assertIn("类未知名单=1(testFrameIntervalsUnderStateChanges)", out)
+            # 切片那一卷自己 0 红，但同一行必须把类未知的那一笔带出来（不许冒充"这一卷干净"）
+            buf2 = io.StringIO()
+            with contextlib.redirect_stdout(buf2):
+                main([path, "--quiet", "--label", "MOTION", "--class-prefix", "SomeTests",
+                      "--report-only"])
+            self.assertIn("有名字的红=0 类未知名单=1", buf2.getvalue())
+        finally:
+            os.unlink(path)
+
+    def test_label_moves_the_whole_verdict_line(self):
+        cap = self._capture("--label", "CAP2", "--class-prefix", "UICapture")
+        self.assertIn("CAP2_GATE_CASES", cap)
+        self.assertNotIn("MOTION_GATE_CASES", cap)
+
+    def _capture(self, *extra):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            self._run(*extra)
+        return buf.getvalue()

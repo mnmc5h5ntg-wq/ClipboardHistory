@@ -42,6 +42,12 @@ import sys
 # ② Python 的 `\w` 默认含中文，于是**本文件顶部注释里那句"`error: -[类 方法]`"自己就会被匹配成红** ——
 #    夹具与注释都会污染它。被测的日志里只有 Swift 标识符，所以按 ASCII 收紧才是对的尺。
 RED = re.compile(r"error: -\[([A-Za-z0-9_.]+) ([A-Za-z0-9_]+)\]")
+# R112 / U-370：CI 里还有一朵红的写法是 `FAILED 方法名：XCTAssertLessThanOrEqual failed: …`
+# —— **没有 `error: -[类 方法]` 那个前缀**，所以 `RED` 一条都认不出。R109 那跑的
+# `testFrameIntervalsUnderStateChanges` 就是这么躲过闸门的（`ci_read.py` 在 R105 就学会认两种形状，
+# 闸门今天才补 —— 同一件事在两个工具里各坏一次，是"改一个要 grep 谁还读它"那一族）。
+# 类名在这一种形状里根本没有 ⇒ 只能进「类未知」那一格：**不许**让它冒充成"这一卷 0 红"。
+RED_FAILED = re.compile(r"FAILED ([A-Za-z0-9_]+)[：:]\s*(XCTAssert[A-Za-z]*)")
 #   Test Case '-[ClipboardHistoryAppTests.UICaptureTests testCaptureKeyViews]' failed (22.256 seconds).
 CASE_VERDICT = re.compile(r"Test Case '-\[([A-Za-z0-9_. ]+)\]' (passed|failed|skipped)")
 # 已登记的"这台机器判不了"：`XCTAssert* NOT_RUN` 那种标记一律由测试自己打，名字必须全大写。
@@ -73,6 +79,9 @@ def analyse(text: str) -> dict:
         # 红了但**连一条断言行都没有** ⇒ 崩溃/超时那一类，日志里只有结论行。
         # 单列出来是因为它的处置完全不同：不是判据被判红，是用例根本没跑到结论。
         "crashed": sorted(set(failed_cases) - named),
+        # 类名不认识的第二种形状（`FAILED 方法名：XCTAssert…`）。它**不**进 red_cases，
+        # 因为切片的按类名过滤对它不成立 —— 单列出来打在结论行上，谁都不能拿"切片 0 红"当"这一卷干净"。
+        "classless_reds": sorted({m.group(1) for m in RED_FAILED.finditer(text)}),
     }
 
 
@@ -122,6 +131,20 @@ def main(argv=None) -> int:
     parser.add_argument("--min-passed", type=int, default=0, metavar="N",
                         help="至少要有 N 个用例**判出绿**，否则红。挡住的是另一种"
                              "'红了没人看'：全部改成 skip，步骤一样是 0 条红")
+    # R112 / BACKLOG 166：把"有名字的红"这份账推广到**别的卷**。
+    #
+    # 为什么按类名前缀切而不是"读整份 CI 作业日志再按步骤过滤"：CI 里同一个标记会被多个步骤
+    # 各打一次且取值不同（U-178 那一族），拿一份混合日志做 census 就是在造"同一件事既红又不红"的
+    # 假矛盾。workflow 里全量那一卷本来就单独 tee 到 /tmp/test.log（一步一份文件），
+    # 所以切片只需要**类名**这一维，不需要步骤这一维 —— 这一点写在这里是因为下一个人一定会问。
+    parser.add_argument("--class-prefix", action="append", default=None, metavar="PREFIX",
+                        help="只统计类名以 PREFIX 开头的用例（可重复）。默认不切，统计整份。")
+    parser.add_argument("--label", default="CAPTURE", metavar="NAME",
+                        help="结论行的前缀（默认 CAPTURE ⇒ CAPTURE_GATE_CASES）。"
+                             "另一卷要能被单独 grep，就得有自己的名字（MOTION ⇒ MOTION_GATE_CASES）。")
+    parser.add_argument("--report-only", action="store_true",
+                        help="只把账打出来、不改变退出码。给「单次读数不配给产品定罪」那一族用"
+                             "（166：runner 上动效那两条地板三跑换三次花样）。")
     parser.add_argument("--quiet", action="store_true",
                         help="只打结论行，不逐条列 NOT_RUN 与红的原文")
     args = parser.parse_args(argv)
@@ -162,12 +185,56 @@ def main(argv=None) -> int:
         # 一个闸门说得出"我读到的日志只有 27 字节"，它的红就自己带上了一半诊断。
         print(f"CAPTURE_GATE_INPUT 日志通道={log_lines} 行/{log_bytes} 字节 @ {args.log}"
               f"（读数通道另计 {len(readings_lines)} 行）", flush=True)
-    print(f"CAPTURE_GATE_CASES passed={result['passed']} skipped={result['skipped']} "
-          f"failed={len(result['failed_cases'])} 有名字的红={len(result['red_cases'])} "
-          f"NOT_RUN={len(result['not_run'])}", flush=True)
-    if result["skipped_names"]:
+    # R112：按类名前缀切片。切片之后**所有**计数都从切片里重算，
+    # 不许"红按切片、passed 按整份"—— 那样分母与分子不同源，比值就是假的。
+    prefixes = tuple(args.class_prefix or ())
+    scope_all = not prefixes
+
+    def _cls(name: str) -> str:
+        # 取**最后一段**再比：日志里的类名是全限定（`Target.Module.MotionFilmstripTests`），
+        # 拿全串去 startswith("MotionFilmstrip") 会一个都切不到 —— 而切不到必须是红（见下面那一格），
+        # 不能是"这一卷今天真干净"。
+        return name.split(" ")[0].split(".")[-1]
+
+    if scope_all:
+        scope_passed = result["passed"]
+        scope_skipped = result["skipped"]
+        scope_failed = list(result["failed_cases"])
+        scope_reds = list(result["red_cases"])
+        scope_skipped_names = list(result["skipped_names"])
+    else:
+        keep = lambda name: _cls(name).startswith(prefixes)          # noqa: E731
+        scope_reds = [n for n in result["red_cases"] if keep(n)]
+        scope_failed = [n for n in result["failed_cases"] if keep(n)]
+        # passed / skipped 是按 verdict 逐条数的，切片要同样逐条数（不能按比例估）
+        verdicts = CASE_VERDICT.findall(text)
+        scope_passed = sum(1 for name, v in verdicts if v == "passed" and keep(name.strip()))
+        scope_skipped = sum(1 for name, v in verdicts if v == "skipped" and keep(name.strip()))
+        scope_skipped_names = [name.strip() for name, v in verdicts
+                               if v == "skipped" and keep(name.strip())]
+    if not scope_all and (scope_passed + scope_skipped + len(scope_failed)) == 0:
+        # 「名单为空必须红」那一族（R99）：一个用例都没切到时打"绿"，
+        # 就等于把"前缀写错/这一卷不在日志里"记成"这一卷全过"。
+        print(f"{args.label}_GATE_RESULT=fail {args.label}_SCOPE_EMPTY=1 "
+              f"前缀 {' '.join(prefixes)} 一个用例都没切到 ⇒ 要么类名前缀写错了，"
+              f"要么这一卷今天根本没在这份日志里跑（两种都不许当通过）。"
+              f"整份日志里 {result['passed'] + result['skipped'] + len(result['failed_cases'])} 个用例、"
+              f"{len(result['red_cases'])} 朵红", flush=True)
+        return 1
+    print(f"{args.label}_GATE_SCOPE 前缀={'(整份)' if scope_all else ' '.join(prefixes)} "
+          f"有名字的红={len(scope_reds)} 用例={scope_passed + scope_skipped + len(scope_failed)}", flush=True)
+    print(f"{args.label}_GATE_CASES passed={scope_passed} skipped={scope_skipped} "
+          f"failed={len(scope_failed)} 有名字的红={len(scope_reds)} "
+          f"类未知名单={len(result['classless_reds'])}"
+          f"{'(' + ' '.join(result['classless_reds']) + ')' if result['classless_reds'] else ''} "
+          # 字段名 `NOT_RUN=` 是既有契约（CI 日志与账本都按它 grep，改不得）；
+          # 但 `*_NOT_RUN` 标记里没有类名 ⇒ 它**切不了片**。整份的数照旧打，
+          # 只在切了片的那一行后面补一句口径，免得被读成「这一卷登记了 269 条未覆盖」。
+          f"NOT_RUN={len(result['not_run'])}" 
+          + ("" if scope_all else "（NOT_RUN 切不了片，这一格是整份的数）"), flush=True)
+    if scope_skipped_names:
         print("  被 skip 的用例（skip 不是通过，它只是**不红**）：" + " ".join(
-            name.split(" ")[-1] for name in result["skipped_names"]), flush=True)
+            name.split(" ")[-1] for name in scope_skipped_names), flush=True)
     if not args.quiet and result["not_run_markers"]:
         print("  已登记的标记：" + " ".join(result["not_run_markers"]), flush=True)
         for line in result["not_run"]:
@@ -212,10 +279,13 @@ def main(argv=None) -> int:
                   "，读数通道也是空的 ⇒ 这一步没跑到用例（挂死、崩溃、或 filter 打错）。**没跑不算通过**",
                   flush=True)
         return 1
-    if result["red_cases"]:
-        print(f"CAPTURE_GATE_RESULT=fail 有 {len(result['red_cases'])} 个用例红了（红有名字，这正是这一步存在的理由）：",
+    if scope_reds or (scope_all and result["classless_reds"]):
+        _tag = "report_only" if args.report_only else "fail"
+        print(f"{args.label}_GATE_RESULT={_tag} 有 {len(scope_reds) + (len(result['classless_reds']) if scope_all else 0)} 个用例红了"
+              f"（红有名字，这正是这一步存在的理由；"
+              f"{'report-only：这一卷在 runner 上换班，见 BACKLOG 166，只记账不拦' if args.report_only else '拦'}）：",
               flush=True)
-        for name in result["red_cases"]:
+        for name in scope_reds:
             print("  " + name, flush=True)
         if result["crashed"]:
             print("  其中只有结论行、没有断言行（崩溃/超时那一类，处置是查为什么没跑完，不是查判据）："
@@ -231,15 +301,16 @@ def main(argv=None) -> int:
         print("处置只有两种：①它确实是产品/判据的缺陷 ⇒ 修；"
               "②它是这台机器判不了的那一条 ⇒ 让测试把它登记成 *_NOT_RUN（带读数与原因），"
               "不要把它留成一条被吞掉的红。", flush=True)
-        return 1
+        return 0 if args.report_only else 1
     # skip 的口径和"红"不一样，但一样能骗人：把 8 条像素判据全改成 `throw XCTSkip` 之后，
     # 这一步**一条红都没有**，报表和"全都验过了"长得一模一样 —— 这正是 U-59 抱怨的那个形状，
     # 只不过换了个方向。所以除了"红=0"，还要求"判出绿的用例数"不低于门。
-    if result["passed"] < args.min_passed:
-        print(f"CAPTURE_GATE_RESULT=fail 判出绿的用例只有 {result['passed']} 个，低于这道步的门 "
-              f"{args.min_passed} ⇒ 有一批像素判据退回成了 skip（skip 不是通过，它只是不红）。"
-              f"被 skip 的：{(' '.join(result['skipped_names']) or '无')}", flush=True)
-        return 1
+    if scope_passed < args.min_passed:
+        _tag = "report_only" if args.report_only else "fail"
+        print(f"{args.label}_GATE_RESULT={_tag} 判出绿的用例只有 {scope_passed} 个，低于这道步的门 "
+              f"{args.min_passed} ⇒ 有一批判据退回成了 skip（skip 不是通过，它只是不红）。"
+              f"被 skip 的：{(' '.join(scope_skipped_names) or '无')}", flush=True)
+        return 0 if args.report_only else 1
     # 第二条通道单独算一条红，而且要放在**所有别的判据之后**：
     # 通道坏了时，前面那些结论仍然是这次真判出来的，先报最有处置价值的那一条。
     # 这一格挡的是"并集这一步自己坏了"：`--readings` 给了路径而文件不存在/为空，
@@ -251,7 +322,8 @@ def main(argv=None) -> int:
               f"少的都是连续大块、切点落在行中间）。"
               f"上面那些结论可能已经少了若干条，只是看不出来", flush=True)
         return 1
-    print("CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）", flush=True)
+    print(f"{args.label}_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）"
+          f"{'' if scope_all else ' scope=' + ','.join(prefixes)}", flush=True)
     return 0
 
 

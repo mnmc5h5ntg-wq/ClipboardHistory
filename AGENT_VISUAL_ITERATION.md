@@ -10613,3 +10613,61 @@ CARD_PROBE_ARM_INSET cardprobe-split-groupbox light 内缩=5.0pt
 ① 读 R110 / R111 的 CI（R110 那跑顺带验两张 `statusitem-glyph` 新帧在 runner 上没问题、以及 166 的换班是否再现）；
 ② **150**：让臂 2 的详情在 runner 上保证有内容；③ **166** 的修法选一；④ 155 扩第三个样本；
 ⑤ 批次 84.1 / 85 只有用户能做。
+
+---
+
+## Round 112 · 动效那一卷的红没有账，而闸门只认一种红的形状（166 的 ① 落地 / U-370…U-373 / D-181 / 脚本电池 230 → 236）
+
+**这一轮不碰像素，碰的是账**：CI 里那句"这次唯一的红是 157"来自捕获那一步的闸门，而它只读
+`/tmp/frames.log`。动效那两条地板（`testBandCaptureIsCheaperAndStillSeesTheMotion` /
+`testFrameIntervalsUnderStateChanges`）住在另一卷里，三跑换三次花样却从没进过任何账。
+本轮给闸门加了"按类名切片 + 按卷打结论行"（`--class-prefix` / `--label` / `--report-only`），
+并在 workflow 里加了一步 Motion gate（report-only），从此 `MOTION_GATE_CASES` 与
+`MOTION_GATE_SCOPE` 每次 CI 都会露面。
+
+**三条只有真日志能给的东西**：① 只切一个类会把有红的跑报成 0 红 —— `frameIntervals` 住在
+`UIInteractionProbeTests`，不在 `MotionFilmstripTests`（U-370，合成夹具永远给不出这一格）；
+② 那朵红在 CI 日志里只有 `FAILED 方法名：XCTAssert…` 这一种形状，而闸门只认
+`error: -[类 方法]` ⇒ 整朵看不见（U-371：`ci_read.py` R105 就会认两种，闸门今天才补）；
+③ 类名缺失的那种**不许**并进"有名字的红"，单列成「类未知名单=N(名字)」，
+于是 R109 那份真日志现在是 `有名字的红=0 类未知名单=1(testFrameIntervalsUnderStateChanges)`，
+R110 那份是 `… 类未知名单=0` —— 换班这件事第一次变成两行可 grep 的读数。
+
+**为什么先 report-only**：166 的判法是"单次读数不配给产品定罪"。升成硬门要由**同一 commit 两跑的对账**签
+（`scripts/ci_red_stability.py`），不由印象签；而 report-only 只降级产品那一格，
+**通道坏了照旧红**（读不到日志、切片为空 `MOTION_SCOPE_EMPTY=1` 都不吃这个旗号）。
+
+**工具层自己坏的三条**：U-372（用 python 生成 python，把带 ASCII 双引号的 CJK 串写进 `help=` ⇒
+文件写成功而语法坏，`py_compile` 才抓到 —— 写盘不校验被写物）、
+U-373（把结论行字段 `NOT_RUN=` 改名 ⇒ 被自家真值表拦下：字段名是既有契约，口径只能写成附注）。
+规矩进 **D-181**（跨卷的账按卷打；切片为空必须红；前缀名单由被测物自己给；新卷第一版 report-only，升级由两跑对账签）。
+
+### 5. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 90 | 无新界面，也没引入任何非系统东西 |
+| 层级与秩序 | 91 | 结论行按卷拆开，一行的账不再替两卷说话 |
+| 动效恰当 | 90 | 本轮碰的是"动效的账"，没顺手加动画 |
+| 状态完备 | 93 | 红的形状补到两种，"类未知"单列 ⇒ 不再存在整朵红被读成 0 |
+| 细节打磨 | 92 | 切片为空必须红、字段名回退成附注、两前缀由真日志定 |
+| 克制 | 95 | 产品 0 改动、帧 136 张 `CHANGED=0`（swift 侧一行未动 ⇒ 复用上轮帧） |
+| 一致性 | 86 | 四条：U-370/371 由真日志拦下、U-372 生成器语法、U-373 被自家守卫拦 |
+
+**均分 91**（由 `curve_from_ledger.py` 从这张表推导）。
+
+### 6. §8 本轮读数
+
+| 格子 | 读数 |
+|---|---|
+| 脚本电池 | `PY_EXIT=0 Ran 236 tests in 11.408s OK`（230 → 236：+4 切片真值表、+1 第二形状、+1 空切片） |
+| 产品改动 | `git status --short ClipboardHistory/Sources` 计数 **0** |
+| 帧 | `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`（复用上轮那份：swift 侧一行未动） |
+| 真日志 R109 | `MOTION_GATE_CASES passed=34 skipped=32 failed=0 有名字的红=0 类未知名单=1(testFrameIntervalsUnderStateChanges) NOT_RUN=267（NOT_RUN 切不了片，这一格是整份的数）` |
+| 真日志 R110 | 同上但 `类未知名单=0 NOT_RUN=269` |
+| 合成件四格 | 单前缀 `failed=1 有名字的红=1` / 双前缀 `failed=2 有名字的红=2` / 空切片 `MOTION_SCOPE_EMPTY=1` 退 1 / `--report-only` 退 0 且仍打出「有 1 个用例红了」 |
+
+### 7. 下一轮入口
+
+① 读 R111 / R112 的 CI（R112 那跑第一次会打 `MOTION_GATE_*` 两行）；② 166 升硬门要同一 commit 两跑名单一致；
+③ 150 让臂 2 的详情在 runner 上有内容；④ 155 扩第三样本；⑤ 批次 84.1 / 85 只有用户能做。

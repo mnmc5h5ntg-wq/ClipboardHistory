@@ -439,6 +439,26 @@ jobs:
       # 就会退回"要么全吞、要么因为环境的原因红"那两种已经各栽过一次的状态。
       # 台账：run 38473962277 里这一步有 **4 条断言行红**（属于 1 个用例），全部被吞。
 
+      # R112 / BACKLOG 166：动效那一卷的红以前**没有账**。
+      #
+      # 现场（三次相邻的 CI）：R108 红 `testBandCaptureIsCheaperAndStillSeesTheMotion`、
+      # R109 红 `testFrameIntervalsUnderStateChanges`、R110 两朵都绿 —— 同一台 runner、
+      # 同一份尺，红在换班；而捕获那一步的闸门三跑都报 `有名字的红=1`，
+      # 因为它只读 `/tmp/frames.log`。于是"唯一的红是 157"这句话覆盖的其实只有一卷。
+      #
+      # 这一步先把账**打出来**（report-only）：单次读数不配给产品定罪（166 的判法），
+      # 但它必须被记进日志，好让 `scripts/ci_red_stability.py` 能跨跑对账。
+      # 等同一 commit 的两跑给出一致名单，再把它升成硬门 —— 升不升由那份对账签，不由印象签。
+      # 两个前缀是必须的：动效那两朵红住在**两个类**里（`MotionFilmstripTests` 与
+      # `UIInteractionProbeTests`），只切一个会把有红的跑报成 0 红（U-370，本轮真跑日志抓到）。
+      - name: Motion gate (report-only census, BACKLOG 166)
+        if: always()
+        timeout-minutes: 2
+        run: |
+          python3 scripts/ci_capture_gate.py /tmp/test.log --label MOTION \
+            --class-prefix MotionFilmstrip --class-prefix UIInteraction \
+            --report-only 2>&1 | tee /tmp/motion-gate.log || true
+
       - name: Capture gate (unregistered reds must be zero)
         if: always()
         timeout-minutes: 2
