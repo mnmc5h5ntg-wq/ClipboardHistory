@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表补上三格真判据：指针要可复查、分母扩张要付账、地板只数已清账（R128 / 173 追记 3 / U-426…U-428 / D-190 · 产品 0 改动）
+
+- `scripts/motion_surface_gate.py` 加 `EVIDENCE_SHAPE`（指针必须含 `Sources/` `Tests/` `docs/` `scripts/`
+  `BACKLOG 号` `D-号` `批次号` 之一，只写轮次号不算）、`SURFACE_UNCOVERED`、`STATE_UNCOVERED`；
+  地板从总行数改成**已清账格子数**，`not-measured` 不算已清账（占位行不许抬地板）。
+- 表从 18 行扩到 **26 行**（`added=8 kept=13 not-added=3 not-applicable=2`，未清账 136/162）：
+  **先修数据再加判据** —— 9 行只有轮次号的指针补成可复查对象，否则闸门会红在自己的表上。
+- 闸门当场拦下我自己造的词：`UNKNOWN_CELL 第 14 行（主窗口/提示条 × 消失）` —— 「消失」是一次转换不是九个状态之一（U-426）；
+  它同样不给最小夹具免检（夹具的状态「禁用」没有行 ⇒ 三条自检一起红，U-427），这两件事合起来才证明新判据在判东西。
+- 自检 +6 条（`Ran 258 tests OK`）；变异第 31 张 `mutate_r128.py`：M633 证据形状恒过 / M634 摘掉名册扩张两格 /
+  M635 地板退回按总行数 ⇒ 三臂 CAUGHT（刀数 109 → 112，caught 108 → 111）。
+- **U-428 记在账上**：三刀红在同一条测试上（`test_a_file_or_backlog_pointer_is_checkable`），
+  所以「caught=3」为真但三格判据没有各自被单独证伪 —— 下一轮给每条判据配一条只测它自己的用例。
 ### 把 127 轮的动效判断变成一张可判的表：18 格有结论、144 格显式未清账（R127 / 173 追记 2 / U-423…U-425 / D-189 · 产品 0 改动）
 
 - 新增 `docs/motion_surface_ledger.json`：18 个表面 × 9 个状态 = 162 格，先清 18 格，

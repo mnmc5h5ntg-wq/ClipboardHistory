@@ -26,9 +26,21 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 
 MIN_REASON = 20
+
+# U-424：证据指针必须有**可复查的具体对象**。轮次号（`R14`）只是"某个人在某轮写过"，
+# 复查要翻台账；源码文件 / BACKLOG 号 / D-号 / 批次号 / 仓库内路径才是能直接点开的东西。
+EVIDENCE_PATTERNS = [
+    r"Sources/", r"Tests/", r"docs/", r"scripts/",
+    r"BACKLOG\s*\d+", r"D-\d{3}", r"批次\s*[\d.]+",
+]
+
+
+def evidence_is_checkable(text):
+    return any(re.search(pat, text or "") for pat in EVIDENCE_PATTERNS)
 
 
 def check(data):
@@ -38,14 +50,15 @@ def check(data):
     surfaces = data.get("surfaces") or []
     states = data.get("states") or []
     rows = data.get("rows") or []
-    floor = data.get("floor_rows")
+    floor = data.get("floor_cleared")
+    cleared_verdicts = data.get("cleared_verdicts") or verdicts
     if not verdicts or not surfaces or not states:
         problems.append(("BAD_TABLE", "verdicts / surfaces / states 三个名册都不许为空"))
     if not isinstance(floor, int):
         problems.append(("BAD_TABLE", "floor_rows 必须是整数"))
     elif floor > len(rows):
         problems.append(("FLOOR_LIES",
-                         "floor_rows=%d 大于实际行数 %d ⇒ 地板写成了愿望" % (floor, len(rows))))
+                         "floor_cleared=%d 大于实际行数 %d ⇒ 地板写成了愿望" % (floor, len(rows))))
     seen = set()
     for i, row in enumerate(rows):
         surface = row.get("surface", "")
@@ -66,11 +79,29 @@ def check(data):
         if len(reason) < MIN_REASON:
             problems.append(("REASONLESS", "%s：理由为空或短于 %d 字（没理由的 not-added 等于没决定）"
                              % (where, MIN_REASON)))
-        if not (row.get("evidence") or "").strip():
-            problems.append(("EVIDENCELESS", "%s：没有证据指针（哪一轮 / 哪个 BACKLOG / 哪个文件）" % where))
-    if isinstance(floor, int) and len(rows) < floor:
-        problems.append(("BELOW_FLOOR", "行数 %d 低于地板 %d ⇒ 清账只能往前不能往后"
-                         % (len(rows), floor)))
+        evidence = (row.get("evidence") or "").strip()
+        if not evidence:
+            problems.append(("EVIDENCELESS", "%s：没有证据指针（哪个文件 / 哪个 BACKLOG / 哪个批次）" % where))
+        elif not evidence_is_checkable(evidence):
+            problems.append(("EVIDENCE_SHAPE",
+                             "%s：指针不可复查（%r）—— 至少要含 Sources/ Tests/ docs/ scripts/ "
+                             "BACKLOG 号 D-号 或批次号之一；轮次号只能附带（U-424）" % (where, evidence[:40])))
+    cleared = [r for r in rows if (r.get("verdict") or "") in cleared_verdicts]
+    for surface in surfaces:
+        if not any(r.get("surface") == surface for r in rows):
+            problems.append(("SURFACE_UNCOVERED",
+                             "表面「%s」一行都没有 ⇒ 往名册里加表面必须同时给它记账，"
+                             "否则覆盖率会被分母稀释（U-425）" % surface))
+    for state in states:
+        if not any(r.get("state") == state for r in rows):
+            problems.append(("STATE_UNCOVERED",
+                             "状态「%s」一行都没有 ⇒ 同上，分母扩张要付账" % state))
+    if isinstance(floor, int) and len(cleared) < floor:
+        problems.append(("BELOW_FLOOR", "已清账格子数 %d 低于地板 %d ⇒ 清账只能往前不能往后"
+                         % (len(cleared), floor)))
+    if isinstance(floor, int) and floor > len(rows):
+        problems.append(("FLOOR_LIES", "floor_cleared=%d 大于总行数 %d ⇒ 地板写成了愿望"
+                         % (floor, len(rows))))
     return problems
 
 
@@ -92,9 +123,10 @@ def main():
     for row in rows:
         counts[row.get("verdict") or "?"] = counts.get(row.get("verdict") or "?", 0) + 1
     dist = " ".join("%s=%d" % (k, counts[k]) for k in sorted(counts))
-    print("MOTION_LEDGER 表面=%d 状态=%d 格子=%d 已清账=%d 未清账=%d 地板=%s"
+    cleared_n = len([r for r in rows if (r.get("verdict") or "") in (data.get("cleared_verdicts") or [])])
+    print("MOTION_LEDGER 表面=%d 状态=%d 格子=%d 行数=%d 已清账=%d 未清账=%d 地板=%s"
           % (len(data.get("surfaces") or []), len(data.get("states") or []), cells, len(rows),
-             max(0, cells - len(rows)), data.get("floor_rows")))
+             cleared_n, max(0, cells - cleared_n), data.get("floor_cleared")))
     print("MOTION_LEDGER_VERDICTS %s" % (dist or "无"))
     problems = check(data)
     for code, msg in problems:
