@@ -2,6 +2,16 @@
 
 最后更新：2026-10-17 22:40（本地 · R140 / 第 142 轮收尾：**清账表一次过八格，八格的证据全是本轮现量的**（U-463…U-465 · 产品 0 改动））
 
+**断点续跑（R141 的靶，按顺序，预算 ≤4 文件）**：
+⓪ **先读 R140 两跑的 CI**（`6f0c609` / `48be136`，2026-10-17 14:44 本地看到的还是 `in_progress` ⇒ 结论未读，本轮**没有**任何「CI 绿」的声明）。
+① **把看图腿补上** —— `/tmp/shots*` 已被系统清空（`COMPARED=0 / MISSING=134`），所以 R141 第一件事是重新捕获
+（`CLIPBOARD_HISTORY_UI_SHOTS=<目录> swift test --filter UICaptureTests` → `frame_baseline check`），
+并把**帧数**写进台账：任何 `X=0` 形状的通过，先看分母是不是 0（U-465 那一族的兄弟，R140 我自己刚栽过一次）。
+② **按 BACKLOG 173 点一次真动效** —— 自 R126 起欠，本轮 0 产品改动；下一批点的格已写进 173 追记（R140）。
+③ **`mutate_r140.py` 还没进针自检登记表** —— `mutate_needle_precheck.py` 带着并行会话的脏 diff，等它落盘再登记，不替别人提交。
+④ **BACKLOG 175**：给「文件级缺席」配一条资格判据（先 spike 证明夹具的 surface→文件名单能区分 `QuickPickController` 与 `SettingsView`）。
+⑤ **只有你能判的那几格**：172 的亮档图标（人工批次 86.1）—— 需要你看一眼或授权我切系统外观。
+
 **做了什么**：`docs/motion_surface_ledger.json` 从 60 行扩到 **68 行**（未清账 94/162，地板 60 → 68），
 八格的理由全部建立在**本轮现量**的 grep 计数上：`DetailView` highlightQuery=2 / disabled=0，
 `SettingsView` ProgressView=0 / isLoading=0，`QuickPickController` disabled=0 / emptyLabel=15，
