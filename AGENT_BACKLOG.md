@@ -4616,3 +4616,12 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
     由 `6f0c609` 的 verdict 差值证明）与 `MISSING=134`（帧基线从 `fa625f1` 起就是 136）。
     判据先做最小的一格：**同一节里标题声明的分数要等于七维表行相加**（它已经红过一次），
     其余按 180/181 的路子走。另记一条卫生：`git blame` 显示这些都是**写入当轮就错**，不是后来漂移的。
+**177 追记（R143 的第二半：spike 已答，这一条现在可做）**：动手前先跑了一次性 spike（临时文件跑完即删、不进提交），
+问的是「F7 之后，捕获夹具那扇**非 key** 的窗口还进得了录制态吗」。两臂各一次，原样读数：
+`SPIKE_R144 style=orderFrontRegardless key窗口=false 响应者前=NSWindow 后=HotKeyRecorderButton 录制中=true 高色度=1330`
+`SPIKE_R144 style=makeKeyAndOrderFront key窗口=false 响应者前=NSWindow 后=HotKeyRecorderButton 录制中=true 高色度=1329`
+⇒ 三点同时成立：① 非 key 窗口拿得到第一响应者（F7 那道守卫不会把夹具挡在录制态之外）；
+② `makeKeyAndOrderFront` 在 App 未激活时同样给不到 key（两臂都是 `key窗口=false`）⇒ "要不要 makeKey"在这一格里不是变量；
+③ 那一圈在离屏通道里画得出来（1330 / 1329，与 R143 修好的判据读数同量级）。
+⇒ 177 照原计划做（`SettingsCategory.shortcuts` 加录制态变体，136 → 138，`--must-include` 同步改，同一轮里 `update` 基线），
+**不再有"通道可能拍不到"这个前提**；下一轮（R144）第一件事就是它。
