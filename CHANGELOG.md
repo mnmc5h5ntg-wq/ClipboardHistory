@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 快捷键录制器的「我在听」第一次有形状：补上一次真动效（R141 / U-466…U-471 · 产品 1 文件）
+
+- 产品：`HotKeyRecorderView` 进录制态给一圈强调色描边（`HotKeyRecorderRing`，1.5pt + `controlAccentColor`），
+  由 `.animation(MotionCatalog.animation(for: .emphasis), value: isRecording)` 供电；不脉动、不常驻。
+  状态从私有里放出来（`onRecordingChange`，判等在 `setRecording`）—— 三行快捷键调用点签名不变。
+- 判据：`HotKeyRecorderEvidenceTests`（6 条）—— 两态与实心参照块**同框**渲染，本机读数
+  强度 0.965 / 0.976、面积 0.412 / 0.406、静置两档都是 0 个墨像素、@1x 录制态 600 个。
+  容差带是**量出来的**（U-468：第一版按印象写的 0.30…1.60 会把两种病都放过去）。
+- 变异表 `mutate_r141.py`：**CAUGHT=6/6、RESTORE_CLEAN=yes**。两把刀第一次没落下的原因都记进台账：
+  **U-466** xctest 的 `with 1 failure` 是单数，按复数写正则会把"只红一条"读成"没有汇总行"再顺着 PASSED 出口走；
+  **U-467** 只打开宽度而颜色仍是 `.clear` 的刀没有靶 ⇒ 一个表达由几个旋钮决定时刀要成组下（harness 支持一臂多处编辑 + 落刀后自证）。
+- 清账表 68 → **70 行**（新表面「设置窗口/快捷键录制器」，格子 171，地板 70），闸门 `RESULT=ok`。
+- 看图腿补账：R140 记 NOT-RUN，本轮重新捕获 136 帧并 `COMPARED=136 / CHANGED=0`（静置态逐像素不变是这条改动的不回归证明）。
+- 读 CI：`4486f6d` 那跑红在 `testFrameIntervalsUnderStateChanges`（p95 26.94 > 20.0），与上一跑对账是 **ONLY_B 换班**
+  ⇒ 新开 **BACKLOG 176**（把绝对 20ms 换成同一次运行的相对判据）；另开 **177**（录制态没有真帧）、**178**（暗档 bezel 与卡片几乎同色，未量）。
+
 ### 清账表一次过八格，八格的证据全是本轮现量的（R140 / U-463…U-465 · 产品 0 改动）
 
 - `docs/motion_surface_ledger.json` **60 → 68 行**（未清账 94/162），地板 60 → 68；八格的新证据是本轮 grep 的计数，不是回忆。

@@ -45,7 +45,8 @@
     "浮层/列表行",
     "浮层/搜索框",
     "浮层/空态",
-    "浮层/底部说明"
+    "浮层/底部说明",
+    "设置窗口/快捷键录制器"
   ],
   "states": [
     "空",
@@ -326,6 +327,20 @@
       "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"
     },
     {
+      "surface": "设置窗口/快捷键录制器",
+      "state": "按下",
+      "verdict": "added",
+      "reason": "这颗按钮在录制态会吃掉所有按键，而它以前唯一的说法是一句瞬间换掉的标题 —— 标题不是形状。现在进入录制给一圈强调色描边（`VisualStroke.highlight` 那一档，与命中高亮同一档），由 `.animation(MotionCatalog.animation(for: .emphasis), value: isRecording)` 供电；不脉动、不常驻（常驻时钟全仓只留骨架扫光那一条）。静置态宽度与颜色都是「没有」，所以 136 张旧帧逐字节不变（`COMPARED=136 / CHANGED=0`）",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `HotKeyRecorderRing`；Tests/ClipboardHistoryAppTests/HotKeyRecorderEvidenceTests.swift；BACKLOG 173"
+    },
+    {
+      "surface": "设置窗口/快捷键录制器",
+      "state": "成功",
+      "verdict": "not-added",
+      "reason": "录到新组合键之后是**回显**，不是庆祝：标题必须立刻等于新组合，淡一下会让用户不确定自己刚按到了什么（这一格与「状态要说话」同族，但说话的是字不是动）",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `keyDown`（提交分支里直接 `title = shortcut.displayString`）；Tests/ClipboardHistoryAppTests/HotKeyRecorderButtonTests.swift"
+    },
+    {
       "surface": "主窗口/详情区",
       "state": "选中",
       "verdict": "kept",
@@ -536,5 +551,5 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"
     }
   ],
-  "floor_cleared": 68
+  "floor_cleared": 70
 }

@@ -1,8 +1,27 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-17 22:40（本地 · R140 / 第 142 轮收尾：**清账表一次过八格，八格的证据全是本轮现量的**（U-463…U-465 · 产品 0 改动））
+最后更新：2026-10-17 23:20（本地 · R141 / 第 143 轮收尾：**快捷键录制器的「我在听」第一次有形状 —— 补上一次真动效**（U-466…U-468 · 产品 1 文件））
 
-**断点续跑（R141 的靶，按顺序，预算 ≤4 文件）**：
+**做了什么**：还了 BACKLOG 173 从 R126 起欠的那一次真动效。快捷键录制器进录制态以前只把标题瞬间换成「请输入快捷键」，
+而那颗按钮会吃掉所有按键 —— 屏幕上没有任何东西说"现在按下去会被记下来"。现在叠一圈强调色描边
+（`HotKeyRecorderRing`：1.5pt + `controlAccentColor`，`.animation(MotionCatalog.animation(for: .emphasis), value: isRecording)` 供电，
+不脉动、不常驻）。为了量它，状态从私有里放出来（`onRecordingChange`，判等在 `setRecording`），表达抽成可离线渲染的一圈。
+判据 6 条（两态与实心参照块**同框**，本机读数：强度 0.965 / 0.976、面积 0.412 / 0.406、静置两档 0 个墨像素、@1x 录制态 600 个）；
+变异表 `mutate_r141.py` **CAUGHT=6/6、RESTORE_CLEAN=yes**；清账表 68 → **70 行**（新表面「设置窗口/快捷键录制器」，格子 171，地板 70）；
+静置态逐像素不变 ⇒ 重新捕获的 136 张帧 `COMPARED=136 / CHANGED=0`（R140 那格 NOT-RUN 本轮补上）。
+三条新账：**U-466** xctest 的 `with 1 failure` 是单数，按复数写正则会把"只红一条"读成"没有汇总行"再顺着 PASSED 出口走
+（两把好刀因此被我误报成"判据没牙"）；**U-467** 只打开宽度而颜色仍是 `.clear` 的刀**没有靶**，多旋钮表达的刀要成组下；
+**U-468** 容差带先量后判（印象值 `0.30…1.60` 会把两种病都放过去）。
+**后半程翻出一条我写错的判据（U-470）**：按 AGENTS.md 补的「从产品入口进入」那条用例红了（离屏两帧之间「新增墨=0」），可同一时刻真机截图上点过那一屏有 1548 个高色度像素、静置 0 个⇒ **`cacheDisplay` 不合成挂在 `NSViewRepresentable` 外面的 SwiftUI overlay**；那一层的判据搬进 `scripts/real_screen_recorder_ring.py`（本轮 `ring_present`；退出码 0/1/2；纯函数真值表 8 条），离屏那条改判成只判接线（不同像素 > 200）。换装：`INSTALL_SHA_MATCH=1 / INSTALL_RESULT=ok`；带独立 `CLIPBOARD_HISTORY_DATA_DIR` 的第二条实例在守卫处静默退出（0 字节日志）⇒ BACKLOG 55 那个现象第二次由独立路径复现，也因此我没有去点用户那一扇真窗。
+
+改自评口径又照出曲线的尺一处死代码（**U-471**：`curve_from_ledger.py` 的 `DIM_ROW` 只认 `| 14 |`，而 R139 起的表写 `| 14/15 |` ⇒ 「没有结论行时从七维表推导」这条路从来没通过，只因每轮都还写着 `**自评 N/100**` 才没被发现）。处置：结论行仍写 /100，把 /105 的合计写在同一行；真正的修法要连 `DIM_ROW` 与 `SCORE` 一起改并配变异 ⇒ BACKLOG 180。
+
+全量：843 tests / 42 skipped / 0 failures、0 编译告警；电池 291 OK。
+
+读 CI：`cab72f8` / `6f0c609` / `48be136` 全 `success`；`4486f6d` 红在 `testFrameIntervalsUnderStateChanges`（p95 26.94 > 20.0），
+与上一跑对账是 **ONLY_B 换班** ⇒ 新开 **BACKLOG 176**（把绝对 20ms 换成同一次运行的相对判据），另开 **177**（录制态真帧）、**178**（暗档 bezel 与卡片几乎同色，未量）。
+
+（R140）**断点续跑（R141 的靶，按顺序，预算 ≤4 文件）**：
 ⓪ **先读三跑的 CI 结论**（本地 14:45 实测 status=in_progress、conclusion 为空，作业只有 build-and-test 一列 ⇒ 结论**未读**，本轮没有任何「CI 绿」的声明）：run 39042028124 = `4486f6d`、39041957806 = `48be136`（R140）、39041049852 = `cab72f8`（R139 那一跑也还没落地）。
 ① **把看图腿补上** —— `/tmp/shots*` 已被系统清空（`COMPARED=0 / MISSING=134`），所以 R141 第一件事是重新捕获
 （`CLIPBOARD_HISTORY_UI_SHOTS=<目录> swift test --filter UICaptureTests` → `frame_baseline check`），

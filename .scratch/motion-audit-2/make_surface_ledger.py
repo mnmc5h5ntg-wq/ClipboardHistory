@@ -21,6 +21,7 @@ surfaces = [
     "主窗口/拖入落点", "主窗口/提示条", "设置窗口/侧栏", "设置窗口/热图",
     "设置窗口/开关与滑块", "设置窗口/说明段", "菜单栏/状态图标", "菜单栏/状态菜单",
     "菜单栏/推荐面板", "浮层/列表行", "浮层/搜索框", "浮层/空态", "浮层/底部说明",
+    "设置窗口/快捷键录制器",   # R141 新加：这一处有自己的状态语言（录制中），不归「开关与滑块」
 ]
 states = ["空", "加载", "错误", "成功", "选中", "悬停", "按下", "聚焦", "禁用"]
 
@@ -166,6 +167,22 @@ rows = [
      "状态栏图标不在键盘焦点链里：Tab 走的是窗口内的 key-view 环，菜单栏那一行不参与。"
      "想让它可达要走系统的全键盘控制，那是另一件事，不该由这里补一层假的焦点环",
      "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"),
+    # ---- R141：快捷键录制器。这一格是**真做了一处动效**，不是清账（BACKLOG 173 欠的那一次）。
+    #      尺的读数在 `HotKeyRecorderEvidenceTests` 的 `RECORDER_RING` 那两行（本机 2x：
+    #      强度 0.965 / 0.976，面积 0.412 / 0.406，@1x 录制态 600 个墨像素，静置两档都是 0）。
+    ("设置窗口/快捷键录制器", "按下", "added",
+     "这颗按钮在录制态会吃掉所有按键，而它以前唯一的说法是一句瞬间换掉的标题 —— 标题不是形状。"
+     "现在进入录制给一圈强调色描边（`VisualStroke.highlight` 那一档，与命中高亮同一档），"
+     "由 `.animation(MotionCatalog.animation(for: .emphasis), value: isRecording)` 供电；"
+     "不脉动、不常驻（常驻时钟全仓只留骨架扫光那一条）。静置态宽度与颜色都是「没有」，"
+     "所以 136 张旧帧逐字节不变（`COMPARED=136 / CHANGED=0`）",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `HotKeyRecorderRing`；"
+     "Tests/ClipboardHistoryAppTests/HotKeyRecorderEvidenceTests.swift；BACKLOG 173"),
+    ("设置窗口/快捷键录制器", "成功", "not-added",
+     "录到新组合键之后是**回显**，不是庆祝：标题必须立刻等于新组合，"
+     "淡一下会让用户不确定自己刚按到了什么（这一格与「状态要说话」同族，但说话的是字不是动）",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `keyDown`（提交分支里直接 `title = shortcut.displayString`）；"
+     "Tests/ClipboardHistoryAppTests/HotKeyRecorderButtonTests.swift"),
     # ---- R140 清掉的八格。缺席断言的**射程**按「这个文件是不是只装这一个表面」来定（U-463）：
     #      QuickPickController 整个文件就是浮层 ⇒ 可以写文件级缺席；
     #      SettingsView 同时装着侧栏与六个分区 ⇒ 对「侧栏」只引用常量，不引用文件级缺席。
