@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 给"生成器坏了而闸门报 ok"补上自动守卫（R137 / U-453…U-455 · 产品 0 改动）
+
+- 新自检 `scripts/tests/test_ledger_generator_output.py`（4 条）：把生成器复制进临时目录跑一遍，要求 exit 0、
+  产物与仓库里那份**逐字相同**、打印的行数等于表里的行数 ⇒ U-450 那个形状（生成器 NameError + 闸门读旧 JSON 报 ok）从此会红。
+- 另一条查"表里引用的 BACKLOG 号必须真有条目"。它第一版就把 166 / 170 报成悬空 —— **假阳性**：
+  条目行有两种形状（`155. **…` 与 `**166.（…）…`），只认前者会漏二十多个条目（U-453，R94 那一课换文件重演）。
+- U-454：修好正则后仍缺号 `107 / 156 / 161 / 172`，两种解释都没排除 ⇒ 本轮**不定论**，开成开放项；
+  这也是新守卫的盲区（它只查表里的引用，不查散文里的引用）。
+- U-455：检查不许有副作用 —— 生成器写相对路径，所以守卫必须在沙箱里跑它。
+- 变异第 38 张两臂 CAUGHT（刀数 130 / caught 129）；脚本自检 275 → 279；§9.3 第 5 条按实收窄（一半有守卫，一半没有）。
+
 ### 174 与 155 同批结案：runner 第一次说出「这台机器判不了」，覆盖率没掉档（R136 · 清账表 52 → 60 / U-450 · 产品 0 改动）
 
 - run `39038634407`（success）：`出口=这台机器判不了=调度地板 22.13ms 大于省下的 5.64ms`，同行 ② 报 `1.78×`，
