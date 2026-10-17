@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 动效接线第一次成为一把会红的清单尺（R125 / 新开 173 / U-417…U-419 / D-187 · 产品 0 改动）
+
+- 起因是我自己犯的一次错：`grep "for: \.bannerOut"` 数出 **0 处**，我准备开一条
+  「这条动效声明没供电」的账。产品里其实是 5 处 —— 写的是
+  `MotionCatalog.asymmetricTransition(insertion: .bannerIn, removal: .bannerOut)`，
+  我的模式只认得一种写法（U-417）。差一点用一个工具的语法盲区给产品记假账。
+- 于是计数进仓库：`motionKindCallSites`（剥注释在尺内 + 词边界 `(?![A-Za-z0-9_])`）
+  + 7 行真值表 + `testEveryMotionKindIsWiredSomewhereInProduct`（九档地板 `>=1`，
+  排除 `MotionCatalog.swift` 自己；某档为 0 ⇒ `MOTION_KIND_UNWIRED` 红；找不到源码目录 ⇒ 记未运行）。
+- 第一次交出九档接线清单：`hover=17 / selection=5 / bannerIn=6 / bannerOut=5 / emphasis=9 / dropTarget=3 / contentFade=38 / slider=3 / skeletonSweep=1`。
+  两条独立实现（临时 python 与仓库里的 swift 正则）逐档相同 ⇒ 才敢写进台账。
+- 自坏两条当场抓住并修掉：U-418 第一版把"剥注释"外包给调用方，被真值表"注释里提一句"那一格
+  红出来（`("1") is not equal to ("0")`）；U-419 承认本轮**仍然零新增动效**（连续第五轮），
+  新开 BACKLOG 173 规定下一轮按清单点位的三句话答法，不许把"清单建好"读成"动效做过"。
+- 变异第 28 张 `mutate_r125.py`：M627 撤词边界 / M628 撤剥注释 ⇒ 两刀全部 CAUGHT（刀数 103 → 105，caught 102 → 104）。
 ### 盲区名单按机器分键：不在表里的那台必须红（R124 / 171 结案 / U-414…U-416 / D-186 · 产品 0 改动）
 
 - R122 的 CI（run 39029027567）只剩一朵红，正是 R120 预言的那朵：

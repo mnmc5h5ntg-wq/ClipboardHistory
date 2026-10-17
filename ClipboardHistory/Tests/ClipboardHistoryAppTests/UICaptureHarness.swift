@@ -8292,6 +8292,97 @@ final class UICaptureTests: XCTestCase {
         XCTAssertTrue(k1.contains("macOS"), "键里没带系统版本：\(k1)")
     }
 
+    /// R125 / U-417：数"某个动效档在产品里被不被用"的那颗尺。
+    ///
+    /// 来历：本轮我为了找"声明了却没供电"的档，在 shell 里 grep `for: .bannerOut`，
+    /// 得到 **0 个调用点**，差点据此开一条"这条声明是死的"的账。真去数才发现它是 5 处 ——
+    /// 产品里写的是 `asymmetricTransition(insertion: .bannerIn, removal: .bannerOut)`，
+    /// 我的模式只认得其中一种写法（U-417）。
+    /// ⇒ 计数不能靠临时 grep，必须是一把**在仓库里、会红、有真值表**的尺。
+    ///
+    /// 三条形状：① 只数代码不数注释（复用 `codeOnly`，M407 / M411 那一族）；
+    /// ② 词边界：`.bannerOut` 不许被 `.bannerOutX` 喂饱，也不许被 `selection:`（无点）喂饱；
+    /// ③ 它数的是"提到过"，不是"接上了动画" —— 所以地板是 **≥1**（撤掉声明时它会红），
+    ///    而不是某个精确数字；把它写成"等于 n"就是把今天的形状钉成契约（U-92 那一族）。
+    static func motionKindCallSites(in rawText: String, kindName: String) -> Int {
+        // 剥注释在**尺里面**做，不要求调用方先剥：调用方忘了就是一条会被注释喂饱的守卫
+        //（M407 / M411 那一族的形状）。
+        let text = Self.codeOnly(rawText)
+        let pattern = "\\." + NSRegularExpression.escapedPattern(for: kindName) + "(?![A-Za-z0-9_])"
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return 0 }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return re.numberOfMatches(in: text, range: range)
+    }
+
+    /// 从测试文件上溯找产品源码目录；找不到就报**未运行**，不许默默算通过。
+    static func productSourcesRoot() -> URL? {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<6 {
+            let dir = candidate.appendingPathComponent("Sources/ClipboardHistoryApp")
+            if FileManager.default.fileExists(atPath: dir.path) { return dir }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        return nil
+    }
+
+    static func swiftFiles(under dir: URL) -> [URL] {
+        let fm = FileManager.default
+        guard let en = fm.enumerator(at: dir, includingPropertiesForKeys: nil) else { return [] }
+        var out: [URL] = []
+        for case let url as URL in en where url.pathExtension == "swift" { out.append(url) }
+        return out.sorted { $0.path < $1.path }
+    }
+
+    func testMotionKindCallSitesRulerIsATruthTable() {
+        let samples: [(text: String, kind: String, expect: Int, why: String)] = [
+            ("withAnimation(MotionCatalog.animation(for: .bannerOut)) { hide() }",
+             "bannerOut", 1, "一种写法：命名参数里的枚举"),
+            ("MotionCatalog.asymmetricTransition(insertion: .bannerIn, removal: .bannerOut)",
+             "bannerOut", 1, "本轮差点漏掉的就是这一种（U-417 的本体）"),
+            (".hover\n.hover", "hover", 2, "同一颗尺要能数次数，不是数出现过"),
+            ("// 这里以前写的是 .bannerOut，现在撤了", "bannerOut", 0,
+             "注释里的提及不算供电（M407 / M411 那一族）"),
+            ("let x = .bannerOutExtra", "bannerOut", 0, "词边界：更长的名字不许喂饱它"),
+            ("List(selection: $sel)", "selection", 0, "无点的冒号标签不许算"),
+            ("", "contentFade", 0, "空文本给 0，不给 nil 也不给 1")
+        ]
+        for s in samples {
+            let got = Self.motionKindCallSites(in: s.text, kindName: s.kind)
+            XCTAssertEqual(got, s.expect,
+                           "文本「\(s.text.prefix(46))」数 .\(s.kind) 期望 \(s.expect) 实得 \(got)"
+                               + " —— 这一格讲的是：\(s.why)")
+        }
+    }
+
+    func testEveryMotionKindIsWiredSomewhereInProduct() throws {
+        guard let root = Self.productSourcesRoot() else {
+            emit("MOTION_KIND_NOT_RUN all（找不到 Sources/ClipboardHistoryApp，从 \(#filePath) 上溯 6 层未果）")
+            throw XCTSkip("MOTION_KIND_NOT_RUN：源码目录找不到 ⇒ 这条守卫记为未运行，不算通过")
+        }
+        var zero: [String] = []
+        for kind in MotionCatalog.Role.allCases {
+            // 这个枚举是 `String` rawValue 的：取 rawValue 而不是 `String(describing:)`，
+            // 后者对带原始值的枚举今天恰好等于 case 名，但那是实现细节，不是契约。
+            let name = kind.rawValue
+            var total = 0
+            var files: [String] = []
+            for url in Self.swiftFiles(under: root) {
+                // 目录自己不算调用点：`case bannerOut` 与 `case .bannerOut: return 0.12` 都在里面
+                if url.lastPathComponent == "MotionCatalog.swift" { continue }
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                let n = Self.motionKindCallSites(in: text, kindName: name)
+                if n > 0 { total += n; files.append("\(url.lastPathComponent):\(n)") }
+            }
+            emit("MOTION_KIND_COVERAGE kind=\(name) 产品调用点=\(total)"
+                 + " 文件=\(files.isEmpty ? "无" : files.prefix(4).joined(separator: " "))")
+            if total == 0 { zero.append(name) }
+        }
+        XCTAssert(zero.isEmpty,
+                  "MOTION_KIND_UNWIRED \(zero.sorted())：这些动效档在 MotionCatalog 里声明了，"
+                      + "产品里却一处都没提 ⇒ 要么供电、要么把声明撤掉（R42 立的规矩：不许留着空转的声明）。"
+                      + "不许为了让它绿而在注释里写一遍 —— 那颗尺只数代码（真值表第 4 格）。")
+    }
+
     func testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r100-inset-\(UUID().uuidString)", isDirectory: true)
