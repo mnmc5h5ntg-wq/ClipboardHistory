@@ -2453,6 +2453,98 @@ final class MotionFilmstripTests: XCTestCase {
     /// 但它必须是**已知**的：所以这里断言带上的峰值不低于整窗的峰值 ——
     /// 也就是"横幅确实在这一条带里"，而不是我猜它在。
     ///
+    // MARK: - BACKLOG 155：⑤ 那一条判据的两种解释要能被分开（R130）
+
+    /// 「省下的抓帧成本有没有进采样率」这把尺在 runner 上连红三跑（155：
+    /// 28.44>25.38 / 32.49>27.46 / 32.16>31.81），而两种解释一直**分不开**，
+    /// 因为行内只有比值没有绝对量（① 带那一臂在这台机器上真的更慢；
+    /// ② 调度把两臂一起拖住 ⇒ 这条判据在 CI 上量的不是它声称的东西）。
+    ///
+    /// 这里交出的是那个绝对量本身能做的分解：**间隔 − 抓帧 = 这台机器的调度地板**。
+    /// 没有新阈值（155 的下一步只欠读数，不欠一条我猜出来的线）。
+    ///
+    /// 关键形状：`间隔 < 抓帧` 物理上不该发生（一次采样里必然包含它的抓帧），
+    /// 它一旦发生就说明**两个量不是同一卷测的** —— 这里确实会：间隔取
+    /// `motionStamps` 相邻帧的中位，抓帧中位取**整卷**（含非运动帧）。
+    /// 那种情况下这一行只能报「无从分解」，不许拿它给 ①/② 任何一方定罪。
+    enum BandIntervalFacts: Equatable {
+        case unpainted
+        case notComparable(which: String)
+        case decomposable(bandOverhead: Double, fullOverhead: Double, bandFiner: Bool)
+    }
+
+    static func bandIntervalFacts(bandInterval: Double, fullInterval: Double,
+                                  bandGrab: Double, fullGrab: Double) -> BandIntervalFacts {
+        // 「没有两帧」这一格由 `medianInterval` 自己报的哨兵值签 —— 注意它是
+        // `.greatestFiniteMagnitude` 而**不是** `infinity`，用 `isInfinite` 判会静默漏掉整格
+        // （真值表前两行就是钉这条的）。
+        if bandInterval == .greatestFiniteMagnitude || fullInterval == .greatestFiniteMagnitude {
+            return .unpainted
+        }
+        var who: [String] = []
+        if bandInterval < bandGrab { who.append("带") }
+        if fullInterval < fullGrab { who.append("整窗") }
+        if !who.isEmpty { return .notComparable(which: who.joined(separator: "/")) }
+        return .decomposable(bandOverhead: bandInterval - bandGrab,
+                             fullOverhead: fullInterval - fullGrab,
+                             bandFiner: bandInterval <= fullInterval)
+    }
+
+    static func bandIntervalFactsText(_ facts: BandIntervalFacts) -> String {
+        switch facts {
+        case .unpainted: return "无从分解=任何一臂没有两帧"
+        case .notComparable(let which):
+            return "无从分解=间隔<抓帧（\(which)）⇒ 两个量不是同一卷测的，不给 ①/② 定罪"
+        case .decomposable(let bandOverhead, let fullOverhead, let bandFiner):
+            return String(format: "带地板=%.2fms 整窗地板=%.2fms 谁细=%@",
+                          bandOverhead, fullOverhead, bandFiner ? "带" : "整窗")
+        }
+    }
+
+    /// 与 171 那把键同形（`arch/macOS major.minor/1x|2x`）：155 要问的是
+    /// 「这一臂在哪台机器上判不了」，而跨机器混着读数正是 171 那轮学到的错。
+    static func filmstripMachineKey() -> String {
+        #if arch(arm64)
+        let arch = "arm64"
+        #else
+        let arch = "x86_64"
+        #endif
+        let v = ProcessInfo.processInfo.operatingSystemVersion
+        let scale = (NSScreen.main?.backingScaleFactor ?? 0) >= 1.75 ? "2x" : "1x"
+        return "\(arch)/macOS \(v.majorVersion).\(v.minorVersion)/\(scale)"
+    }
+
+    func testBandIntervalFactsRulerIsATruthTable() throws {
+        // 每一行都指定「谁细」与「能不能分解」—— 这两件事必须各判各的（同一条红只准认一种病）。
+        XCTAssertEqual(.unpainted,
+                       Self.bandIntervalFacts(bandInterval: .greatestFiniteMagnitude,
+                                              fullInterval: 20, bandGrab: 10, fullGrab: 20),
+                       "任何一臂没有两帧 ⇒ 只能记没判，不许当成『带更细』")
+        XCTAssertEqual(.unpainted,
+                       Self.bandIntervalFacts(bandInterval: 20, fullInterval: .greatestFiniteMagnitude,
+                                              bandGrab: 10, fullGrab: 20),
+                       "另一臂同样要能单独判出来（两臂共用一个分支就是没判）")
+        XCTAssertEqual(.notComparable(which: "带"),
+                       Self.bandIntervalFacts(bandInterval: 9, fullInterval: 30, bandGrab: 26, fullGrab: 20),
+                       "带的间隔比它的抓帧还短 ⇒ 两个量不同卷，这一行不给任何一方定罪")
+        XCTAssertEqual(.notComparable(which: "带/整窗"),
+                       Self.bandIntervalFacts(bandInterval: 9, fullInterval: 12, bandGrab: 26, fullGrab: 44),
+                       "两臂都不同卷 ⇒ 名字要把两臂都点出来")
+        XCTAssertEqual(.decomposable(bandOverhead: 2, fullOverhead: 5, bandFiner: true),
+                       Self.bandIntervalFacts(bandInterval: 12, fullInterval: 30, bandGrab: 10, fullGrab: 25))
+        XCTAssertEqual(.decomposable(bandOverhead: 20, fullOverhead: 1, bandFiner: false),
+                       Self.bandIntervalFacts(bandInterval: 30, fullInterval: 26, bandGrab: 10, fullGrab: 25),
+                       "『带更贵』这一格必须能被判出来 —— 155 的红正是这一格，它不能被前一条吞掉")
+        // 出口必须互不相同，否则「无从分解」与「带更贵」会共用一个词而读的人分不出来。
+        let words = [
+            Self.bandIntervalFactsText(.unpainted),
+            Self.bandIntervalFactsText(.notComparable(which: "带")),
+            Self.bandIntervalFactsText(.decomposable(bandOverhead: 2, fullOverhead: 5, bandFiner: true)),
+            Self.bandIntervalFactsText(.decomposable(bandOverhead: 8, fullOverhead: 5, bandFiner: false)),
+        ]
+        XCTAssertEqual(Set(words).count, words.count, "四条结论词互相重复 ⇒ 读数没有区分力")
+    }
+
     /// 两臂各跑两遍并**交错**（带→整窗→带→整窗），比较各自**最好的一遍**：
     /// 顺序跑会让后跑那一臂背上热漂移，读出来的"便宜"里混着时间。
     func testBandCaptureIsCheaperAndStillSeesTheMotion() throws {
@@ -2564,7 +2656,20 @@ final class MotionFilmstripTests: XCTestCase {
                                     "带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，"
                                         + "这一臂仍然只能记 not-run，那这条路就白走了")
         // ⑤ 采样必须真的变细（这才是要的目的：让那一臂从 clock-coarse 变成判得到）。
-        XCTAssertLessThanOrEqual(medianInterval(bandSecond), medianInterval(fullSecond),
+        //    结论行打在闸门**之前**（R53 那条规矩）：这一格在 runner 上会红，
+        //    红了之后日志里必须还能看见"到底是哪一个量把两臂分开的"（BACKLOG 155 欠的就是这句）。
+        //    断言与读数吃同一颗尺（`bandInterval` / `fullInterval` 就是下面比较的那两个数）。
+        let bandInterval = medianInterval(bandSecond)
+        let fullInterval = medianInterval(fullSecond)
+        let intervalFacts = Self.bandIntervalFacts(bandInterval: bandInterval, fullInterval: fullInterval,
+                                                   bandGrab: bandMedian, fullGrab: fullMedian)
+        emit("MOTION_BAND_INTERVAL 机器=\(Self.filmstripMachineKey()) "
+             + "带间隔=\(String(format: "%.2f", bandInterval))ms "
+             + "整窗间隔=\(String(format: "%.2f", fullInterval))ms "
+             + "带抓帧=\(String(format: "%.2f", bandMedian))ms "
+             + "整窗抓帧=\(String(format: "%.2f", fullMedian))ms ｜ "
+             + Self.bandIntervalFactsText(intervalFacts))
+        XCTAssertLessThanOrEqual(bandInterval, fullInterval,
             "带捕获之后整卷中位间隔没有变细 ⇒ 省下的钱没进采样率，这一臂仍然判不了")
         emit("MOTION_BAND dismiss 带：首尾差=\(String(format: "%.3f", bandSpan)) "
               + "整窗首尾差=\(String(format: "%.3f", fullSpan)) "

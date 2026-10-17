@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### BACKLOG 155 的仪器：把「间隔 − 抓帧 = 调度地板」打进行内读数（R130 / U-432…U-434 · 产品 0 改动）
+
+- `MOTION_BAND_INTERVAL`：两臂的绝对间隔、绝对抓帧、各自的调度地板、谁更细，外加与 171 同形的机器键；结论行打在断言之前，
+  断言与读数吃同一对局部变量。本机第一跑：`带地板=5.03ms 整窗地板=4.99ms 谁细=带` ⇒ 本机的 ② 被排除，runner 的那一行等下一次 CI。
+- 「无从分解」是一等出口（间隔 < 抓帧 ⇒ 两个量不是同一卷测的，不给 ①/② 定罪）；哨兵值按真形状判
+  （`.greatestFiniteMagnitude` 不是 `infinity` —— 我第一版就写错了，U-433 / M640）。
+- 真值表 6 行里有两行的**期望**被代码驳回（U-432）：名字该是 `带/整窗`、`18≤30` 是带更细。红的时候先怀疑期望。
+- 变异第 33 张 `mutate_r130.py`：M639 摘掉「无从分解」/ M640 哨兵写成 isInfinite / M641「谁细」改成比抓帧 ⇒ 三臂 CAUGHT。
+
 ### 修掉推出去的那朵红 + 一条规则只留一份实现 + 按 D-191 重读 CI（R129 / 155 追记 / U-429…U-431 · 产品 0 改动）
 
 - **更正**：R128 那批账本里六处「`Ran 258 tests OK`」是假的 —— 那一版是 `FAILED (failures=1)`，我带着红推了出去（`6bd7f9e`）。
