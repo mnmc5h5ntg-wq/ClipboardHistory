@@ -263,6 +263,13 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=focused；与 BACKLOG 61 的滚动语义对照"
     },
     {
+      "surface": "设置窗口/开关与滑块",
+      "state": "选中",
+      "verdict": "kept",
+      "reason": "勾选框选中就是系统强调蓝，这一格不需要产品动 —— 但这条结论以前只有离屏帧，而那一层不解析语义色（139）。R132 换成真机判：同一张帧里参照（侧栏选中行）最大 b-r=194、内容区 190、比值 0.979、强蓝 2463 颗，包围盒正好压在勾选框那一列",
+      "evidence": "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"
+    },
+    {
       "surface": "主窗口/列表行",
       "state": "聚焦",
       "verdict": "not-added",
@@ -326,5 +333,5 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"
     }
   ],
-  "floor_cleared": 38
+  "floor_cleared": 39
 }

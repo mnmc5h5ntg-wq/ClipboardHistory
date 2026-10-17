@@ -122,6 +122,11 @@ rows = [
     ("设置窗口/热图", "聚焦", "not-applicable",
      "键盘不落在格子上：日历是统计读出，不是可遍历的列表；若要让它可遍历，先要回答「Tab 到 365 个格子要按几次」",
      "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=focused；与 BACKLOG 61 的滚动语义对照"),
+    ("设置窗口/开关与滑块", "选中", "kept",
+     "勾选框选中就是系统强调蓝，这一格不需要产品动 —— 但这条结论以前只有离屏帧，而那一层不解析语义色（139）。"
+     "R132 换成真机判：同一张帧里参照（侧栏选中行）最大 b-r=194、内容区 190、比值 0.979、强蓝 2463 颗，"
+     "包围盒正好压在勾选框那一列",
+     "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"),
     ("主窗口/列表行", "聚焦", "not-added",
      "行不在 AppKit 的 key-view 环里，也不该在：实测连按 14 次 `selectNextKeyView`，第一响应者只在搜索框与详情文本之间走。"
      "再给行画一圈焦点环就会出现两个「当前」——选中环与焦点环各说一件事",

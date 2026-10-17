@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 真机通道回答 BACKLOG 139：勾选框在真机上就是强调蓝（R132 / U-438…U-440 · 产品 0 改动）
+
+- 新尺 `scripts/real_screen_control_chroma.py`：走产品入口开设置窗口、按坐标切到「通用」（落地由**同一帧里侧栏选中那一行的移动**验收），
+  同一张帧里比参照与内容区的 `b-r` 色度，判法预登记四出口。第一跑 `accent_in_content`（194 / 190 / 0.979 / 强蓝 2463 颗 / 包围盒压在勾选框那一列）。
+- **139 结案为离屏通道**（与 126/130/172 同族）：真机上三颗蓝勾 + 一颗灰勾，数字与目视同向 ⇒ 产品不改，而"不改"从推断变成有证据。
+- **149 追记**：这扇 SwiftUI 窗口的辅助功能树里 `name` 全是 `missing value`（按名字 AXPress 走不通），但**按坐标可通** ⇒ 真机观测能力扩大了一格。
+- U-438：点之前的探针复用了需要 `after` 的出口 ⇒ 一次成功的测量被印成"尺坏了"（假阴性会让人去修没坏的尺）。
+  U-439：包围盒四个数被印成 `x=177..98` 这种倒区间（形状像结论、对象是错的）⇒ 加 min ≤ max 恒等式与 `BAD_BOX` 出口。
+- 自检 265 → 275 OK；变异第 35 张两臂 CAUGHT；未动 Swift 源码 ⇒ 全量与帧基线沿用 R130 那一遍。
+
 ### 清账表一次清掉十二格，指针判据从「形状」升到「存在 + 缺席可复查」（R131 / U-435…U-437 / D-192 · 产品 0 改动）
 
 - 表 26 → **38 行**（未清账 136 → 124，地板 26 → 38 只准升）：热图、列表行、详情区、提示条、状态图标、说明段各判完。
