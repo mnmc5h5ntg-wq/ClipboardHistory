@@ -160,6 +160,57 @@ class ShapeRoundThreeTests(unittest.TestCase):
         self.assertIn("UNKNOWN_CELL", codes(gate.check(wrong_state)))
 
 
+class ShapeRoundFourTests(unittest.TestCase):
+    """R131：指针要真的指得到东西，缺席断言要真的缺席。"""
+
+    def test_a_pointer_to_a_missing_file_is_named(self):
+        """形状合法（含 `Sources/`）但文件不存在 ⇒ 读的人点不开，等于没有指针。"""
+        data = base()
+        data["rows"][0]["evidence"] = "Sources/ClipboardHistoryApp/Views/NoSuchRowViewsAnywhere.swift"
+        self.assertIn("EVIDENCE_PATH_MISSING", codes(gate.check(data)))
+
+    def test_an_absence_claim_that_is_false_is_named(self):
+        """写着「那个文件里没有 struct」，而 struct 就在里面 ⇒ 这条理由在替没做的东西开脱。"""
+        data = base()
+        data["rows"][0]["evidence"] = (
+            "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift "
+            "缺席:Sources/ClipboardHistoryApp/Views/NoticeBanner.swift=struct")
+        self.assertIn("ABSENT_CLAIM_FALSE", codes(gate.check(data)))
+
+    def test_an_absence_claim_that_holds_is_not_a_problem(self):
+        """正对照：同一个文件、一个真的不在里面的词 ⇒ 不许红（否则这条判据是恒红的门）。"""
+        data = base()
+        data["rows"][0]["evidence"] = (
+            "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift "
+            "缺席:Sources/ClipboardHistoryApp/Views/NoticeBanner.swift=zzzNoSuchToken")
+        self.assertEqual([], codes(gate.check(data)))
+
+    def test_an_absence_claim_on_a_missing_file_is_its_own_name(self):
+        """文件都不在，缺席就无从验证 ⇒ 单独一个名字，不许混进 ABSENT_CLAIM_FALSE。"""
+        data = base()
+        data["rows"][0]["evidence"] = "缺席:Sources/ClipboardHistoryApp/Views/Gone.swift=whatever"
+        found = codes(gate.check(data))
+        self.assertIn("ABSENT_CLAIM_UNVERIFIABLE", found)
+        self.assertNotIn("ABSENT_CLAIM_FALSE", found)
+
+    def test_the_new_rules_are_not_vacuous_on_the_real_table(self):
+        """新判据在真表上必须有对象：至少 10 行带着**能解析**的路径。
+
+        为什么这条要单独存在：如果真表里一行路径都没有，上面四条就只在合成样本上成立
+        （R36 那一族 —— 闸门红在自己的判据从没跑到东西上）。
+        """
+        import os
+        data = json.load(io.open(str(LEDGER), encoding="utf-8"))
+        resolved = 0
+        for row in data["rows"]:
+            for path in gate.PATH_RE.findall(row.get("evidence") or ""):
+                if gate.resolve(path):
+                    resolved += 1
+                    break
+        self.assertGreaterEqual(resolved, 10,
+                                "真表里只有 %d 行带着解析得到的路径 ⇒ 新判据没在判东西" % resolved)
+
+
 class RealTableTests(unittest.TestCase):
     def test_the_committed_ledger_passes_its_own_gate(self):
         """正对照的对照：真表必须自己过闸门（不然上面那批形状都是在判空气）。"""

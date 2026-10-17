@@ -18,6 +18,12 @@
   FLOOR_LIES     `floor_cleared` 大于实际行数 ⇒ 红（把地板写成愿望，就是给自己留一张免检牌）。
   EVIDENCE_SHAPE 证据指针不含可复查对象（源码/测试/仓库内路径 / BACKLOG 号 / D-号 / 批次号）⇒ 红。
                  单独的轮次号只是"某个人在某轮写过"（U-424）。
+  EVIDENCE_PATH_MISSING
+                 指针里写的那个源码/测试文件在仓库里不存在 ⇒ 红（路径写错与根本没这回事，读的人分不出）。
+  ABSENT_CLAIM_FALSE / ABSENT_CLAIM_UNCOVERED
+                 理由里写着「某文件里没有某个词」这种**缺席断言**，去查却发现那个词就在里面 ⇒ 红。
+                 写法：`缺席:<路径>=<词>`（R131：清账表里一半的 not-applicable 靠的是缺席，
+                 而"没量过的缺席"与"没做"在复核时是同一个样子）。
   SURFACE_UNCOVERED / STATE_UNCOVERED
                  名册里新增一个表面或状态却没有任何一行 ⇒ 红：分母扩张必须付账，
                  否则"未清账 136 格"会被稀释成看起来还在推进（U-425）。
@@ -52,8 +58,57 @@ EVIDENCE_PATTERNS = [
 def evidence_is_checkable(text):
     return any(re.search(pat, text or "") for pat in EVIDENCE_PATTERNS)
 
+# R131 的两条新判据（U-424 的下一步）：指针「含一个可复查对象」还不够 ——
+# 它必须**真的在那儿**，而理由里那些「grep 某个词 0 命中」的缺席断言必须**能被复查**。
+# 缺席写法：`缺席:<路径>=<词>`，一条 evidence 里可以写多条（用 ｜ 或 ；分开）。
+PATH_RE = re.compile(r"(?:Sources|Tests|scripts|docs|Managers)/[\w/\-.]*\.(?:swift|py|md|json)")
+ABSENT_RE = re.compile(r"缺席:([\w/\-.]*\.(?:swift|py|md|json))=([^；|｜\s]+)")
 
-def check(data):
+
+def repo_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def resolve(path, root=None):
+    """把台账里写的相对路径落到真实文件上。
+
+    指针一律写成 `Sources/...` 这种**从包根算起**的形状，而仓库根下面还有一层
+    `ClipboardHistory/` —— 所以候选根是两个。少一个候选根，整张表的每一条指针都会
+    被判成不存在（M644 就是这一格的证词：那条判据坏在最坏的一侧，比不判更糟）。
+    """
+    root = root or repo_root()
+    for base in (root, os.path.join(root, "ClipboardHistory")):
+        cand = os.path.join(base, path)
+        if os.path.exists(cand):
+            return cand
+    return None
+
+
+def evidence_problems(row, where, root=None):
+    """返回这一格指针上的两类新问题：路径不存在、缺席断言其实不成立。"""
+    out = []
+    evidence = (row.get("evidence") or "")
+    for path in PATH_RE.findall(evidence):
+        if resolve(path, root) is None:
+            out.append(("EVIDENCE_PATH_MISSING",
+                        "%s：指针指向的文件不存在（%s）—— 路径写错、文件改名、或者根本没这回事"
+                        % (where, path)))
+    for path, token in ABSENT_RE.findall(evidence):
+        found = resolve(path, root)
+        if found is None:
+            out.append(("ABSENT_CLAIM_UNVERIFIABLE",
+                        "%s：缺席断言指向不存在的文件（%s）⇒ 没量过的缺席不算缺席"
+                        % (where, path)))
+            continue
+        text = io.open(found, encoding="utf-8", errors="replace").read()
+        if token in text:
+            out.append(("ABSENT_CLAIM_FALSE",
+                        "%s：写着「%s 里没有 %s」，但它就在里面 ⇒ 这条理由是在替一个没做的东西开脱"
+                        % (where, path, token)))
+    return out
+
+
+def check(data, root=None):
     """返回 [(代码, 说明)]；空列表 = 全部合法。"""
     problems = []
     verdicts = data.get("verdicts") or []
@@ -70,6 +125,7 @@ def check(data):
         problems.append(("FLOOR_LIES",
                          "floor_cleared=%d 大于实际行数 %d ⇒ 地板写成了愿望" % (floor, len(rows))))
     seen = set()
+    root = root or repo_root()
     for i, row in enumerate(rows):
         surface = row.get("surface", "")
         state = row.get("state", "")
@@ -96,6 +152,7 @@ def check(data):
             problems.append(("EVIDENCE_SHAPE",
                              "%s：指针不可复查（%r）—— 至少要含 Sources/ Tests/ docs/ scripts/ "
                              "BACKLOG 号 D-号 或批次号之一；轮次号只能附带（U-424）" % (where, evidence[:40])))
+        problems.extend(evidence_problems(row, where, root))
     cleared = [r for r in rows if (r.get("verdict") or "") in cleared_verdicts]
     for surface in surfaces:
         if not any(r.get("surface") == surface for r in rows):

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表一次清掉十二格，指针判据从「形状」升到「存在 + 缺席可复查」（R131 / U-435…U-437 / D-192 · 产品 0 改动）
+
+- 表 26 → **38 行**（未清账 136 → 124，地板 26 → 38 只准升）：热图、列表行、详情区、提示条、状态图标、说明段各判完。
+- 新判据 `EVIDENCE_PATH_MISSING` 第一次跑就点名 R128 我自己写的两行假指针（`ContentView.swift` 少了 `Views/` 一段）—— 已修成真实路径并核对该处代码确实是 `.animation(for: .bannerIn)`。
+- 新文法 `缺席:<路径>=<词>`：靠缺席立论的格子从此必须能被复查（`ABSENT_CLAIM_FALSE` / `ABSENT_CLAIM_UNVERIFIABLE`），并配正对照与「真表上必须有对象」的守卫。
+- 变异第 34 张 `mutate_r131.py`：M642 摘掉路径检查 / M643 让缺席恒过 / M644 把候选根砍成一个 ⇒ 三臂 CAUGHT，前两刀各红在自己的测试上。
+- 电池 260 → 265 OK；未动 Swift 源码 ⇒ 全量与帧基线沿用 R130 那一遍。
+
 ### BACKLOG 155 的仪器：把「间隔 − 抓帧 = 调度地板」打进行内读数（R130 / U-432…U-434 · 产品 0 改动）
 
 - `MOTION_BAND_INTERVAL`：两臂的绝对间隔、绝对抓帧、各自的调度地板、谁更细，外加与 171 同形的机器键；结论行打在断言之前，

@@ -63,10 +63,10 @@ rows = [
      "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 dropTarget 三处；BACKLOG 117（R84 整组一条亮带）"),
     ("主窗口/提示条", "成功", "added",
      "回执行淡入 + `emphasis` 0.16s；「声明了动效却没供电」被抓到之后要么供电要么撤声明",
-     "Sources/ClipboardHistoryApp/ContentView.swift 的 `.transition(bannerIn)`；R42/R43"),
+     "Sources/ClipboardHistoryApp/Views/ContentView.swift 的 `.animation(for: .bannerIn)`；R42/R43"),
     ("主窗口/提示条", "错误", "added",
      "复制失败走同一条淡入但换文案与配色；不给它动效会让失败读成「什么都没发生」",
-     "Sources/ClipboardHistoryApp/ContentView.swift；BACKLOG 58/59（R40/R41）"),
+     "Sources/ClipboardHistoryApp/Views/ContentView.swift；BACKLOG 58/59（R40/R41）"),
     # 曾经在这里写过一行「主窗口/提示条 × 消失」，被闸门以 `UNKNOWN_CELL` 拦下：
     # 「消失」不在这九个状态里 —— 它是一次转换，不是一个状态。留着这行注释是为了记下
     # **闸门拦住了我自己造的词**（R128），而 `bannerOut` 那条事实挂在上面两行的指针里。
@@ -109,6 +109,52 @@ rows = [
     ("浮层/底部说明", "悬停", "not-added",
      "底部那一行讲的是键位，响应鼠标会把注意力从列表行引开；判过之后决定不加",
      "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的底部说明段（R64 位点逐个判）"),
+    # ---- R131 清的十二格（每一格的理由都落在一个可复查的对象上：源码里的调用点、
+    #      或"整份文件里 grep 某个词 0 命中"这种缺席证据 —— 缺席也要是被量出来的缺席）----
+    ("设置窗口/热图", "空", "kept",
+     "零记录不画一张空日历，而是一句成句的话；空↔有记录之间挂 contentFade，"
+     "而动画的键是「有没有记录」而不是那份计数本身 —— 后者每次复制都换实例，整张日历会跟着抖",
+     "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 的 isEmpty 分支与 `.animation(for: .contentFade)`"),
+    ("设置窗口/热图", "选中", "not-applicable",
+     "格子只回答「哪天多少条」，没有可延续的选中语义；整份文件里 Button / TapGesture / selection 全部 0 命中"
+     "（本轮实测，不是印象）。给它一个选中态会诱导「点一下看详情」，而那里没有详情",
+     "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=onTapGesture 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=selection"),
+    ("设置窗口/热图", "聚焦", "not-applicable",
+     "键盘不落在格子上：日历是统计读出，不是可遍历的列表；若要让它可遍历，先要回答「Tab 到 365 个格子要按几次」",
+     "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=focused；与 BACKLOG 61 的滚动语义对照"),
+    ("主窗口/列表行", "聚焦", "not-added",
+     "行不在 AppKit 的 key-view 环里，也不该在：实测连按 14 次 `selectNextKeyView`，第一响应者只在搜索框与详情文本之间走。"
+     "再给行画一圈焦点环就会出现两个「当前」——选中环与焦点环各说一件事",
+     "Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift 的 `testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView`"),
+    ("主窗口/列表行", "加载", "not-added",
+     "骨架只出现在详情区（那条约束就写在骨架自己的注释里）：行是「有数据才存在」的东西，"
+     "给整列同时做入场或骨架会把「在读」画成一片闪动，而 500 条上限下那片闪动每次启动都会来",
+     "Sources/ClipboardHistoryApp/Views/SkeletonShimmer.swift 开头关于 `SkeletonPreviewView` 出现位置的说明"),
+    ("主窗口/详情区", "悬停", "kept",
+     "详情区只有那颗「原文/渲染」的 chip 响应鼠标；正文不响应 —— 正文是可复制的内容不是控件，"
+     "整块文字跟着鼠标亮会让选择目标抖动",
+     "Sources/ClipboardHistoryApp/Views/DetailView.swift 的 `.onHover` 调用点（chip 那一处）"),
+    ("主窗口/提示条", "禁用", "not-applicable",
+     "横幅没有禁用态：它要么在、要么在淡出。一条点不动的回执再灰一档只会读成「系统卡了」，"
+     "而它存在的唯一理由就是让刚才那一下有回执",
+     "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift 缺席:Sources/ClipboardHistoryApp/Views/NoticeBanner.swift=disabled；BACKLOG 58"),
+    ("主窗口/提示条", "聚焦", "not-applicable",
+     "横幅不该抢焦点：抢了会把用户正在输入或正在选中的东西踢掉，而它只是回执",
+     "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift 缺席:Sources/ClipboardHistoryApp/Views/NoticeBanner.swift=focus"),
+    ("菜单栏/状态图标", "按下", "not-applicable",
+     "那颗按钮由系统状态栏绘制，SwiftUI 侧拿不到按下态，也不该自己叠一层高亮 —— 叠了会和系统自己的高亮打架",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`（`NSStatusBar.system.statusItem`）"),
+    ("设置窗口/说明段", "空", "not-applicable",
+     "说明段的有无由分区决定，不存在「空的说明段」；把这一格记下来是为了让下一轮不去给它补一个占位动画",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift"),
+    ("设置窗口/说明段", "错误", "not-applicable",
+     "错误不走说明段这条通道：写盘与复制失败由提示条和详情区说话，说明段讲的是规则不是状态。"
+     "记成 not-applicable 而不是留空，是因为留空看起来像还没判",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift；BACKLOG 58 / D-155"),
+    ("设置窗口/说明段", "按下", "not-applicable",
+     "说明段没有可按压的东西；它唯一的交互是「悬停时把整段折起来的那条 `.help`」，而那一条已经判过（悬停 not-added）",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"),
+
 ]
 
 data = {
