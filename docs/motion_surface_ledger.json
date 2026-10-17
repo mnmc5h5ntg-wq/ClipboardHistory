@@ -270,6 +270,48 @@
       "evidence": "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"
     },
     {
+      "surface": "浮层/列表行",
+      "state": "悬停",
+      "verdict": "kept",
+      "reason": "行悬停真的有一层底色：那个「哪一行被悬停」的属性会驱动表格重绘，行视图自己带跟踪区（进入/移动/离开各写一次）。取证通道单独存在，是因为离屏那一层送不进 mouseEntered",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `rowHoveredForCapture` 与行视图的 `hovered`"
+    },
+    {
+      "surface": "浮层/列表行",
+      "state": "按下",
+      "verdict": "not-added",
+      "reason": "行不是按钮：在这一层 mouseDown 就是选中，再叠一层按压底色会出现「按下的行」与「选中的行」两种底色（SwiftUI 的 pressedStyle 在真 AppKit 那一层根本不执行，D-055 同一族）",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=pressedStyle"
+    },
+    {
+      "surface": "主窗口/搜索框",
+      "state": "聚焦",
+      "verdict": "kept",
+      "reason": "焦点环是系统画的那一圈，被显式恢复过（审计第二轮 1.10 实测它被关掉）；跟着焦点一起变的是放大镜图标那一档灰度 —— 不聚焦时它是次要色，聚焦后抬到主色，这一档不给动画",
+      "evidence": "Sources/ClipboardHistoryApp/Views/ChineseTextContextMenu.swift 的 `focusRingType = .default`；Views/SearchField.swift 的 `isActive`"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "悬停",
+      "verdict": "not-added",
+      "reason": "勾选框与滑块是系统控件，自己画悬停档；SwiftUI 侧再叠一层会和它打架 —— R20 在圆形图标按钮上抓到过这种叠层（两层 hover 底色叠出第三档），当时的修法就是把悬停交给画它的那一处",
+      "evidence": "Sources/ClipboardHistoryApp/Views/GlassControls.swift 的 `pressedStyle(in: Circle(), hoverLevel: 0)`"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "按下",
+      "verdict": "not-added",
+      "reason": "同族：按下由系统画，这一格刻意不给自定义按压。开关的按下与它的状态切换是同一个动作，再加一层底色会把「我按了」与「它变了」混起来",
+      "evidence": "Sources/ClipboardHistoryApp/Views/GlassControls.swift；BACKLOG 166 那一族（自定义按压只给没有系统反馈的控件）"
+    },
+    {
+      "surface": "菜单栏/状态菜单",
+      "state": "悬停",
+      "verdict": "not-applicable",
+      "reason": "那一层是真 NSMenu：高亮由系统画，SwiftUI 的过渡与 hover 修饰符根本不执行。这不是「还没做」，是「这一层没有可挂的地方」",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `NSMenuItem`；D-055"
+    },
+    {
       "surface": "主窗口/列表行",
       "state": "聚焦",
       "verdict": "not-added",
@@ -333,5 +375,5 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"
     }
   ],
-  "floor_cleared": 39
+  "floor_cleared": 45
 }

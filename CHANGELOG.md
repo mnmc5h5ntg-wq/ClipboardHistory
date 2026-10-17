@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表 39 → 45 格：浮层那一卷与「系统控件」这一类判完（R134 / U-444…U-446 · 产品 0 改动）
+
+- 新增六格：浮层/列表行 × 悬停（kept）与 × 按下（not-added，`pressedStyle` 在该文件 0 命中，缺席由闸门查）、
+  主窗口/搜索框 × 聚焦（kept，焦点环是被显式恢复的）、设置窗口/开关与滑块 × 悬停与按下（not-added，系统自己画）、
+  菜单栏/状态菜单 × 悬停（not-applicable，那一层是真 NSMenu，没有可挂点）。
+- **U-444**：生成器抛 SyntaxError 的那一次，闸门读的是上一版 JSON 却打印 `RESULT=ok` —— 旧台账替新改动作了证。
+  证人换成「行数变了」（39 → 45），生成器落地后 `ast.parse` 自己一遍。
+- **U-445**：CJK 串里的 ASCII 双引号又打断了一次字面量（断的是台账生成器）。
+- **U-446**：`not-added` 与 `not-applicable` 的区别要落在「有没有可挂点」上，否则读的人会以为状态菜单那里还欠一次实现。
+- 表 45 行 / 未清账 117 / 地板 45；未动 Swift 源码 ⇒ 全量与帧基线沿用 R133 那一遍。
+
 ### ⑤ 那条采样率判据有了第三个出口「这台机器判不了」（R133 / BACKLOG 174 / U-441…U-443 / D-193 · 产品 0 改动）
 
 - `samplingRateVerdict` 四出口；前提由同一次运行量出来的 `min(两臂地板) > 省下的钱` 比出来 —— 不是新阈值、没动 ⑤ 的线、没塞 `suite_reds`。

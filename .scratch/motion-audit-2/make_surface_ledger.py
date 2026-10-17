@@ -127,6 +127,31 @@ rows = [
      "R132 换成真机判：同一张帧里参照（侧栏选中行）最大 b-r=194、内容区 190、比值 0.979、强蓝 2463 颗，"
      "包围盒正好压在勾选框那一列",
      "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"),
+    # ---- R134 清掉的六格（浮层那一卷 + 搜索框聚焦 + 设置里的系统控件 + 状态菜单）----
+    ("浮层/列表行", "悬停", "kept",
+     "行悬停真的有一层底色：那个「哪一行被悬停」的属性会驱动表格重绘，行视图自己带跟踪区"
+     "（进入/移动/离开各写一次）。取证通道单独存在，是因为离屏那一层送不进 mouseEntered",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `rowHoveredForCapture` 与行视图的 `hovered`"),
+    ("浮层/列表行", "按下", "not-added",
+     "行不是按钮：在这一层 mouseDown 就是选中，再叠一层按压底色会出现「按下的行」与「选中的行」两种底色"
+     "（SwiftUI 的 pressedStyle 在真 AppKit 那一层根本不执行，D-055 同一族）",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=pressedStyle"),
+    ("主窗口/搜索框", "聚焦", "kept",
+     "焦点环是系统画的那一圈，被显式恢复过（审计第二轮 1.10 实测它被关掉）；跟着焦点一起变的是"
+     "放大镜图标那一档灰度 —— 不聚焦时它是次要色，聚焦后抬到主色，这一档不给动画",
+     "Sources/ClipboardHistoryApp/Views/ChineseTextContextMenu.swift 的 `focusRingType = .default`；Views/SearchField.swift 的 `isActive`"),
+    ("设置窗口/开关与滑块", "悬停", "not-added",
+     "勾选框与滑块是系统控件，自己画悬停档；SwiftUI 侧再叠一层会和它打架 —— "
+     "R20 在圆形图标按钮上抓到过这种叠层（两层 hover 底色叠出第三档），当时的修法就是把悬停交给画它的那一处",
+     "Sources/ClipboardHistoryApp/Views/GlassControls.swift 的 `pressedStyle(in: Circle(), hoverLevel: 0)`"),
+    ("设置窗口/开关与滑块", "按下", "not-added",
+     "同族：按下由系统画，这一格刻意不给自定义按压。开关的按下与它的状态切换是同一个动作，"
+     "再加一层底色会把「我按了」与「它变了」混起来",
+     "Sources/ClipboardHistoryApp/Views/GlassControls.swift；BACKLOG 166 那一族（自定义按压只给没有系统反馈的控件）"),
+    ("菜单栏/状态菜单", "悬停", "not-applicable",
+     "那一层是真 NSMenu：高亮由系统画，SwiftUI 的过渡与 hover 修饰符根本不执行。"
+     "这不是「还没做」，是「这一层没有可挂的地方」",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `NSMenuItem`；D-055"),
     ("主窗口/列表行", "聚焦", "not-added",
      "行不在 AppKit 的 key-view 环里，也不该在：实测连按 14 次 `selectNextKeyView`，第一响应者只在搜索框与详情文本之间走。"
      "再给行画一圈焦点环就会出现两个「当前」——选中环与焦点环各说一件事",
