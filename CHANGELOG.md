@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 逐行仪器把 167 的结论打折，并结案 168（R115 / U-382…U-386 / D-182 · 产品 0 改动）
+
+- 撤 167 用的那套量法搬进 `UICaptureHarness` 真身：行带从**已布局的视图树**取（`_FocusRingView`），
+  行数钉在产品 `SettingsCategory.allCases`（6）上，图标墨的横向范围由 `iconInkSpan` 从帧自报。
+  2 档 × 13 个设置夹具 × 6 行 = **156 行**逐行读数，可重跑、可 grep ⇒ U-380 的债还上。
+- 读数：`light 有墨 35 / 无墨 43 / 反侧 0`，`dark 有墨 78 / 无墨 0 / 反侧 22`；按符号聚合成三种行为
+  （四枚固定成白、两枚固定成黑）⇒ 上一轮"图标在两档都落在期望侧"**只在列级成立**。
+  撤单仍有效，行级另开 **BACKLOG 170**（先只报数，等 CI 第二份读数与真机批次 86.1）。
+- **169 开（未修）**：`settingsSidebarTextColumn` 写 y 96..250，实测六行行带 y 60..252 ⇒
+  以它为准的 `TEXT_SIDE`／暗档盲区名单从阶段一加「统计」那行起只覆盖 5/6 行
+  （仪器报 `SIDEBAR_ICON_ROSTER_DRIFT …更早的行数=52/156`）。
+- **168 结案**：`--label` 只决定标记叫什么、不决定谁在打 —— 样张的 `_run` 不吞 stdout，
+  于是 runner 的 `MOTION_GATE_CASES passed=34 skipped=32` 与夹具的 `passed=1 skipped=0 failed=1`
+  在同一份日志里同形并存（166 的升硬门名单可被夹具冒充）。修：样张标签换 `SAMPLE`、
+  `_run` 单层重定向、新增 `scripts/tests/test_gate_marker_hygiene.py` 三条**判产物**的守卫。
+- 验证：全量 **826** 例 / 41 skip / 0 failures（825 → 826）；捕获 66 例 / 4 skip；
+  帧 136 张 `CHANGED=0`；脚本电池 236 → **239**；曲线 `115=90`；新读数进 §8 白名单（缺=0）。
 ### 167 开单与撤回发生在同一轮（R114 · 产品 0 改动）
 
 - 撤回用的是**仓库里那颗尺的口径**（`inkSideCounts`：与该列众数背景比、偏离 >16 记一侧）加

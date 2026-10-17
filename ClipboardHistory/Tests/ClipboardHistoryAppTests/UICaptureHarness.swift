@@ -6133,6 +6133,94 @@ final class UICaptureTests: XCTestCase {
     /// 于是框其实没压住字，却报出一个像结论的数）。两种情况修法完全相反。
     static let settingsContentPane = CGRect(x: 160, y: 70, width: 400, height: 200)
 
+    /// 侧栏**图标列**（pt）。这里只留两块**对账用**的列级矩形，判据一律走 `sidebarRowRects`：
+    /// `settingsSidebarIconColumnWide` 就是 R114 撤 167 时手量的那块（x 8..40），
+    /// `settingsSidebarIconColumn` 是把上面注释里「图标列在 12–34」这句话照抄成矩形。
+    /// **两条注释的 y 都是 96..250，而本轮实测行带是 y 60..252** ⇒ 老的列级矩形少盖第一行
+    /// （BACKLOG 169：`settingsSidebarTextColumn` 与它喂的 `TEXT_SIDE`／盲区名单都受影响）。
+    static let settingsSidebarIconColumn = CGRect(x: 12, y: 96, width: 22, height: 154)
+    static let settingsSidebarIconColumnWide = CGRect(x: 8, y: 96, width: 32, height: 154)
+
+    /// 侧栏**每一行**的矩形（顶向下 pt），从已布局的视图树里拿，不是把列高除出行数。
+    ///
+    /// 为什么不许除：除出来的行带是我对布局的假设，而假设错了它照样报数。
+    /// 本轮实测就是反例 —— 台账里那条 y 96..250 的"侧栏列"根本没盖住第一行。
+    /// `_FocusRingView` 是侧栏每个可聚焦按钮行都带一份的焦点环容器：
+    /// 它与 `SettingsCategory.allCases` 数量不符 ⇒ 红的是这条尺或产品的行数，两种都得去看。
+    static func sidebarRowRects(in host: NSView, column: CGRect) -> [CGRect] {
+        var found: [CGRect] = []
+        func walk(_ view: NSView, depth: Int) {
+            if String(describing: type(of: view)).contains("FocusRingView"),
+               let top = Self.topDownRect(of: view, in: host) {
+                let r = top.rect
+                if r.minX < column.maxX, r.maxX > column.minX, r.height > 8, r.height < 60, r.width > 40 {
+                    found.append(r)
+                }
+            }
+            if depth < 18 { view.subviews.forEach { walk($0, depth: depth + 1) } }
+        }
+        walk(host, depth: 0)
+        var kept: [CGRect] = []
+        for r in found.sorted(by: { $0.minY < $1.minY }) {
+            if kept.contains(where: { abs($0.minY - r.minY) < 2 && abs($0.height - r.height) < 2 }) { continue }
+            kept.append(r)
+        }
+        return kept
+    }
+
+    /// 带内候选（尺瞎了的时候自报家门，不靠我再搭一遍 /tmp 的复刻体）。
+    static func sidebarIconCandidates(in host: NSView, column: CGRect,
+                                      sizeCap: CGFloat = 60) -> [(name: String, rect: CGRect)] {
+        var out: [(String, CGRect)] = []
+        func walk(_ view: NSView, depth: Int) {
+            if let top = Self.topDownRect(of: view, in: host),
+               top.rect.intersects(column), top.rect.width < sizeCap, top.rect.height < sizeCap {
+                out.append((String(describing: type(of: view)), top.rect))
+            }
+            if depth < 18 { view.subviews.forEach { walk($0, depth: depth + 1) } }
+        }
+        walk(host, depth: 0)
+        return out.sorted { $0.1.height * $0.1.width < $1.1.height * $1.1.width }
+    }
+
+    /// 一行里**图标那半边**（x 到文字列左界为止）的墨横向铺在哪几列、两侧各多少偏离像素。
+    ///
+    /// 横向范围不写死「12–34」：那条评论本身没被量过，再拿它当尺就是把形容词换成数字
+    /// 而已。由帧自己报出墨的左右界，才能区分"图标画在别处"与"图标根本没墨"。
+    static func iconInkSpan(bytes: UnsafePointer<UInt8>, width: Int, height: Int, bytesPerRow: Int,
+                            row: CGRect, textLeft: CGFloat, scale: Double, gate: Int = 16)
+        -> (lo: Int, hi: Int, brighter: Int, darker: Int) {
+        let x0 = max(0, Int(row.minX * scale))
+        // x 上界内缩 2pt：贴着文字列左界的那 1~2 列是**标签字的抗锯齿**，不是图标。
+        // 实测过：不外缩时 `command` 那行在亮档读到 x=39..39 / 10 个偏离像素 ⇒ 判成"有墨"，
+        // 而那 10 个像素根本不是图标。把边界当墨，就是把尺的接缝当产品。
+        let x1 = min(width, Int(max(row.minX, min(row.maxX, textLeft - 2)) * scale))
+        let y0 = max(0, Int(row.minY * scale)), y1 = min(height, Int(row.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return (-1, -1, 0, 0) }
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        var histogram: [Int: Int] = [:]
+        for y in y0..<y1 { for x in x0..<x1 { histogram[luma(x, y) / 8, default: 0] += 1 } }
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+        var lo = -1, hi = -1, brighter = 0, darker = 0
+        for x in x0..<x1 {
+            var ink = 0
+            for y in y0..<y1 {
+                let signed = luma(x, y) - background
+                if signed > gate { brighter += 1; ink += 1 }
+                else if signed < -gate { darker += 1; ink += 1 }
+            }
+            if ink > 0 { if lo < 0 { lo = x }; hi = x }
+        }
+        // 报 pt 不报像素号：把"这把尺量在多少 pt 上"藏在像素里，下一个人就会再犯 R29d 的 pt/px 错。
+        return (lo < 0 ? -1 : Int(Double(lo) / scale), hi < 0 ? -1 : Int(Double(hi) / scale),
+                brighter, darker)
+    }
+
+
     /// R30 诊断（**不判产品，只问产物**）：暗档设置帧里侧栏那一列，到底是哪些视图在画。
     ///
     /// 为什么需要它：R29d 在仓库外搭了十五臂复刻体，**每一臂都画对**
@@ -7020,6 +7108,144 @@ final class UICaptureTests: XCTestCase {
         emit("TEXT_SIDE_BLIND_SPOTS \(wrongSide.count) of \(judged) settings fixtures"
               + "（名单 \(Self.darkSidebarTextBlindSpots.count) 条；vibrant 子树 \(vibrantColumns.count) 条）")
     }
+
+    /// 侧栏图标**逐行**的墨落在哪一侧（R115：把 167 撤回用的那套量法搬进仓库这颗尺真身）。
+    ///
+    /// **本轮只报数、不判产品** —— 167 的第一步就是这么写的，而 D-181 规定
+    /// 单次读数不配给产品定罪：地板要等这份读数在本机与 runner 各落一次再定。
+    /// 会红的全是**尺自己**：
+    /// ① 视图树数出来的行数与产品那个枚举不符（带子/尺寸闸门把行滤掉了，或侧栏行数真变了）；
+    /// ② 两档判的夹具数不等（不对称不能冒充覆盖）；
+    /// ③ 内容区拍得出来、可所有图标行加起来一行墨都没有（尺瞎了，环境问题走 skip 不走这里）。
+    ///
+    /// 为什么必须逐行：R114 只有列级聚合（暗侧 3966 / 亮侧 1391），而列级会把
+    /// "只有选中行有墨、其余五行没墨"抹平成"整列都在期望侧"。`SettingsSidebarRow`
+    /// 的注释里正写着未选中四行图标实测墨水 0.0000（离屏管线解析语义色），
+    /// 所以逐行是那次撤回唯一能被真正检验的形状。
+    func testSettingsSidebarIconsAreMeasuredRowByRow() throws {
+        let expectedRows = SettingsCategory.allCases.count
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r115-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var contentInkTotal = 0
+        var pairs: [String: Int] = [:]
+        var inked: [String: Int] = [:]
+        var blank: [String: Int] = [:]
+        var inverted: [String: Int] = [:]
+        var rowsAboveRosterMinY = 0
+        var rowsTotal = 0
+        // 每枚符号在各档各有几行判成什么：行号与符号的对应见下面 `categories[index]` 那段说明。
+        var bySymbol: [String: [String: Int]] = [:]
+        let categories = SettingsCategory.allCases
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let darkSide = tag == "dark"
+            for fixture in fixtures(appearance: appearance) where fixture.name.hasPrefix("settings-") {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                var rows: [CGRect] = []
+                var smalls: [(name: String, rect: CGRect)] = []
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    rows = Self.sidebarRowRects(in: host, column: Self.settingsSidebarIconColumn)
+                    smalls = Self.sidebarIconCandidates(in: host, column: Self.settingsSidebarIconColumn)
+                }
+                pairs[tag, default: 0] += 1
+                XCTAssertEqual(rows.count, expectedRows,
+                               "\(fixture.name) \(tag)：视图树在图标带 x \(Int(Self.settingsSidebarIconColumn.minX))..\(Int(Self.settingsSidebarIconColumn.maxX)) 里数到 \(rows.count) 个行容器，而产品侧栏有 \(expectedRows) 行（`SettingsCategory.allCases`）⇒ 要么焦点环容器不叫这个名字了、要么侧栏行数变了。先看下面那行候选名单再动这条尺。")
+                if rows.count != expectedRows {
+                    emit("SIDEBAR_ICON_CANDIDATES \(fixture.name) \(tag) 带内小视图共\(smalls.count) 个："
+                         + smalls.prefix(10).map { "\($0.name) [\(Int($0.rect.minX)),\(Int($0.rect.minY)) "
+                             + "\(Int($0.rect.width))x\(Int($0.rect.height))]" }.joined(separator: " ; "))
+
+                }
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("\(fixture.name)：读不回刚拍的帧")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                func side(_ rect: CGRect) -> (brighter: Int, darker: Int) {
+                    Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                       bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale)
+                }
+                let content = side(Self.settingsContentPane)
+                contentInkTotal += content.brighter + content.darker
+
+                for (index, row) in rows.enumerated() {
+                    rowsTotal += 1
+                    if row.minY < Self.settingsSidebarTextColumn.minY { rowsAboveRosterMinY += 1 }
+                    let span = Self.iconInkSpan(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                                bytesPerRow: rep.bytesPerRow, row: row,
+                                                textLeft: Self.settingsSidebarTextColumn.minX, scale: scale)
+                    let total = span.brighter + span.darker
+                    let verdict: String
+                    if total == 0 {
+                        blank[tag, default: 0] += 1
+                        verdict = "无墨"
+                    } else {
+                        inked[tag, default: 0] += 1
+                        if Self.inkFailureIsInverted(brighter: span.brighter, darker: span.darker,
+                                                     darkAppearance: darkSide) {
+                            inverted[tag, default: 0] += 1
+                            verdict = "反侧"
+                        } else {
+                            verdict = "期望侧"
+                        }
+                    }
+                    // 行号→产品那条枚举的顺序。这不是假设，是被药丸签名核对过的实测：
+                    // `settings-general` 的混合两侧那一行落在 row=1（=`general`）、
+                    // `settings-privacy` 落在 row=2、`settings-data` 落在 row=4
+                    // —— 选中行的药丸底色让它的图标带同时读出亮侧与暗侧偏离，所以签名可辨。
+                    let category = categories[index]
+                    bySymbol[category.icon, default: [:]][tag + " " + verdict, default: 0] += 1
+                    emit("SIDEBAR_ICON_ROW \(fixture.name) \(tag) row=\(index)"
+                         + " 标签=\(category.title) 符号=\(category.icon)"
+                         + " 行带y=\(Int(row.minY))..\(Int(row.maxY))"
+                         + " 图标墨x=\(span.lo)..\(span.hi) 亮侧=\(span.brighter) 暗侧=\(span.darker)"
+                         + " ⇒ \(verdict)")
+                }
+                // 与两份列级老矩形对账：R114 撤 167 用的就是 wide 那块（x 8..40）。
+                let narrow = side(Self.settingsSidebarIconColumn)
+                let wide = side(Self.settingsSidebarIconColumnWide)
+                let text = side(Self.settingsSidebarTextColumn)
+                emit("SIDEBAR_ICON_BAND \(fixture.name) \(tag)"
+                     + " 逐行合计 亮侧=\(inked[tag] ?? 0) 无墨=\(blank[tag] ?? 0)"
+                     + " | 窄 12..34×96..250 亮侧=\(narrow.brighter) 暗侧=\(narrow.darker)"
+                     + " | 宽 8..40×96..250 亮侧=\(wide.brighter) 暗侧=\(wide.darker)"
+                     + " | 文字列 40..142×96..250 亮侧=\(text.brighter) 暗侧=\(text.darker)"
+                     + " | 内容区偏离=\(content.brighter + content.darker)")
+            }
+        }
+
+        emit("SIDEBAR_ICON_COVERAGE 产品行数=\(expectedRows) 行带总数=\(rowsTotal)"
+             + " | light 有墨行=\(inked["light"] ?? 0) 无墨行=\(blank["light"] ?? 0) 反侧行=\(inverted["light"] ?? 0)"
+             + " | dark 有墨行=\(inked["dark"] ?? 0) 无墨行=\(blank["dark"] ?? 0) 反侧行=\(inverted["dark"] ?? 0)"
+             + "（本轮只报数：地板等两台机器各落一次再定）")
+        for symbol in bySymbol.keys.sorted() {
+            let cell = bySymbol[symbol]!
+            emit("SIDEBAR_ICON_BY_SYMBOL 符号=\(symbol)"
+                 + " | light 期望=\(cell["light 期望侧"] ?? 0) 反侧=\(cell["light 反侧"] ?? 0) 无墨=\(cell["light 无墨"] ?? 0)"
+                 + " | dark 期望=\(cell["dark 期望侧"] ?? 0) 反侧=\(cell["dark 反侧"] ?? 0) 无墨=\(cell["dark 无墨"] ?? 0)"
+                 + "（每档最多 \(expectedRows) 行 × \(pairs["light"] ?? 0) 个夹具）")
+        }
+        emit("SIDEBAR_ICON_ROSTER_DRIFT 行带起点比台账矩形（y \(Int(Self.settingsSidebarTextColumn.minY))）更早的行数=\(rowsAboveRosterMinY)/\(rowsTotal)"
+             + " ⇒ 老的列级矩形（含 `settingsSidebarTextColumn` 与它喂的 TEXT_SIDE／盲区名单）盖不全这些行，BACKLOG 169")
+        XCTAssertEqual(pairs["light"], pairs["dark"],
+                       "亮档判了 \(pairs["light"] ?? 0) 个设置夹具、暗档判了 \(pairs["dark"] ?? 0) 个 ⇒ 同一份名单该两边等量，"
+                       + "不等就是夹具集合在一档里被跳过了（别让这种不对称冒充成覆盖）")
+
+        if contentInkTotal == 0 {
+            emit("SIDEBAR_ICON_NOT_RUN all（这台机器拍不出 SettingsView：内容区也读到 0 个偏离像素）")
+            throw XCTSkip("SIDEBAR_ICON_NOT_RUN：BACKLOG 43 那一族 —— 这台机器上整页是平涂底色 ⇒ 这条记为未运行")
+        }
+        XCTAssertGreaterThan((inked["light"] ?? 0) + (inked["dark"] ?? 0), 0,
+                             "内容区读到了墨（\(contentInkTotal) 个偏离像素）⇒ 这台机器**拍得出**这一页，"
+                             + "可所有图标行加起来读不到一行有墨 ⇒ 是尺没压住字形（带子或尺寸闸门），不是产品没画。"
+                             + "回去核对 `sidebarRowRects` 的容器名与 `iconInkSpan` 的 x 上界（R29d 的 pt/px 教训）")
+    }
+
 
     /// 一小块区域的**众数亮度**（8 级量化），用来取"这一块的底色是多少"。
     /// 像素坐标，不是 pt —— 与 `meanLuminance` 同一套约定，两套混用是 R29d 那课的原价。
