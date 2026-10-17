@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表 45 → 52 格：筛选条、设置侧栏、浮层输入框、推荐面板判完，并给「挂在 API 默认值上的结论」配了守卫（R135 / U-447…U-449 · 产品 0 改动）
+
+- 七格：主窗口/筛选条 × 悬停与按下（kept）、设置窗口/侧栏 × 聚焦（not-added）与 × 禁用（not-applicable）、
+  浮层/搜索框 × 悬停（not-added）与 × 禁用（not-applicable）、菜单栏/推荐面板 × 悬停（not-applicable）。
+- U-447：最后那格的理由挂在 `.menuBarExtraStyle(.menu)` 这个**默认值**上，注释自己写着"默认值不是契约"
+  ⇒ 新增守卫 `testMenuBarExtraStyleStillSaysMenuWhileTheLedgerSaysNotApplicable`（那行被删或改成 .window 就红，失败文本点名要重判哪两格）。
+- U-448：守卫第一版用整文件 contains，命中了注释里那句"哪天有人加一行 .window"⇒ 第一次全量跑假红；扫前剥注释。
+- U-449：设置侧栏 × 禁用 差点写成"文件里没有 .disabled("—— 那里真有 4 处（别的控件上）。缺席断言必须绑到具体那一块。
+- 表 52 行 / 未清账 110 / 地板 52；构建 0 告警；swift 全量 835 条 0 失败；变异第 37 张两臂 CAUGHT（刀数 128）。
+
 ### 清账表 39 → 45 格：浮层那一卷与「系统控件」这一类判完（R134 / U-444…U-446 · 产品 0 改动）
 
 - 新增六格：浮层/列表行 × 悬停（kept）与 × 按下（not-added，`pressedStyle` 在该文件 0 命中，缺席由闸门查）、

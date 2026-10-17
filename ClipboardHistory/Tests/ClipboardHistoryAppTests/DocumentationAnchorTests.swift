@@ -115,4 +115,34 @@ final class DocumentationAnchorTests: XCTestCase {
         }
         return tokens
     }
+
+    /// 台账里两格「不归它」的判定，挂在**一个 API 的默认值**上 —— 现在它有自己的守卫（R135 / U-447）。
+    ///
+    /// 具体是哪两格：`docs/motion_surface_ledger.json` 里
+    /// 「菜单栏/推荐面板 × 加载」与「菜单栏/状态菜单 × 悬停」都判成"SwiftUI 的过渡与 hover 修饰符
+    /// 在那一层根本不执行"，理由是 `MenuBarExtra` 的样式是 `.menu`，内容会被编译成**真 NSMenu**。
+    /// `App.swift` 的注释自己写着"默认值不是契约：哪天有人加一行 `.menuBarExtraStyle(.window)`，
+    /// 这条结论要重判"。一句会过期的注释不等于守卫 —— 所以把它变成会红的断言：
+    /// 那行字面量一旦被删掉或改成 `.window`，这两格就得重判，而不是继续拿着旧结论当免检。
+    func testMenuBarExtraStyleStillSaysMenuWhileTheLedgerSaysNotApplicable() throws {
+        let url = repoRoot.appendingPathComponent(
+            "ClipboardHistory/Sources/ClipboardHistoryApp/App.swift")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        // 只扫**代码行**：App.swift 那段注释里就写着"哪天有人加一行 `.menuBarExtraStyle(.window)`"，
+        // 整文件 contains 会命中我自己引用的那句话 ⇒ 守卫第一次全量跑就假红（R135 / U-448，
+        // 与"region() 命中守卫自己"、"扫前剥注释"同一族）。
+        let codeOnly = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        let windowStyling = codeOnly.contains(".menuBarExtraStyle(.window)")
+        let menuStyling = codeOnly.contains(".menuBarExtraStyle(.menu)")
+        print("MENUBAR_STYLE 显式=.menu:\(menuStyling ? 1 : 0) 显式=.window:\(windowStyling ? 1 : 0)")
+        XCTAssertFalse(windowStyling,
+            "App.swift 里出现了 `.menuBarExtraStyle(.window)` ⇒ 推荐面板不再是真 NSMenu，"
+                + "台账里那两格『不归它 / 不执行』要重判（清账表与 BACKLOG 173 那一族都依赖它）")
+        XCTAssert(menuStyling,
+            "App.swift 里连 `.menuBarExtraStyle(.menu)` 这行都没了 ⇒ 样式回到默认值本身，"
+                + "而默认值不是契约：那两格的理由现在没有任何东西在守（R135 / U-447）")
+    }
 }
+

@@ -128,6 +128,34 @@ rows = [
      "包围盒正好压在勾选框那一列",
      "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"),
     # ---- R134 清掉的六格（浮层那一卷 + 搜索框聚焦 + 设置里的系统控件 + 状态菜单）----
+    # ---- R135 清掉的七格（筛选条那一卷 + 设置侧栏 + 浮层输入框 + 推荐面板）----
+    ("主窗口/筛选条", "悬停", "kept",
+     "缩放与底色两档一起给：减弱动态时缩放归 1.0，底色那一层就是**唯一**的悬停表达 —— "
+     "以前这一段只剩缩放一种说法，于是『开了减弱动态 = 悬停没有反馈』",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `FilterPillMotion.hoverFill` 与 `hoverScale`"),
+    ("主窗口/筛选条", "按下", "kept",
+     "药丸自己挂了按压样式（半径走 control 那一档），与主窗口其它小控件同一族；"
+     "不给它缩放以外的第二种反馈，因为按下与选中在药丸上是同一个动作",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.pressedStyle(in: VisualShape.rounded(VisualRadius.control))`"),
+    ("设置窗口/侧栏", "聚焦", "not-added",
+     "选中那一整条药丸已经在说『你在哪』，再画一圈焦点环会出现两个当前 —— 与主窗口列表行 × 聚焦同一族，"
+     "那边有焦点链实测撑着（连按 14 次 selectNextKeyView 的落点名单）",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsSidebarRow`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"),
+    ("设置窗口/侧栏", "禁用", "not-applicable",
+     "分类是常量，六行永远可点：这一屏没有『把某一类禁掉』这条分支。"
+     "（同文件里那四处 disabled 长在快捷键与数据页的控件上，不在侧栏行上 —— 所以这里不写整文件缺席）",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsSidebarRow`"),
+    ("浮层/搜索框", "悬停", "not-added",
+     "那一栏一出现就是第一响应者：焦点已经在说话，悬停再加一档会和焦点环抢同一个注意力位",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `QuickPickSearchField`"),
+    ("浮层/搜索框", "禁用", "not-applicable",
+     "浮层存在即可输入，没有『禁用的搜索框』这一态：真要禁的是整个浮层，而那是关闭而不是禁用",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"),
+    ("菜单栏/推荐面板", "悬停", "not-applicable",
+     "macOS 13 那一侧走 `MenuBarExtra(...).menuBarExtraStyle(.menu)`，内容被编译成**真 NSMenu**："
+     "SwiftUI 的过渡与 hover 修饰符在那一层不执行。这条判定挂在一个 API 的默认值上，"
+     "所以 R135 给它配了自己的守卫（那行字面量被删或改成 .window 就红），不再只靠注释",
+     "Sources/ClipboardHistoryApp/App.swift 的 `.menuBarExtraStyle(.menu)`；Tests/ClipboardHistoryAppTests/DocumentationAnchorTests.swift"),
     ("浮层/列表行", "悬停", "kept",
      "行悬停真的有一层底色：那个「哪一行被悬停」的属性会驱动表格重绘，行视图自己带跟踪区"
      "（进入/移动/离开各写一次）。取证通道单独存在，是因为离屏那一层送不进 mouseEntered",
