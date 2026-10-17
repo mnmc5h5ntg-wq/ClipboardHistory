@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据与工具（R105）
+
+- **浮层左轴那条判据补上"没有对象"的收场**（读 R104 的 CI 学到的，run `38975204376`）：
+  那一跑里唯一的新红是 `light：搜索那一条带（y=0..44px）里一个墨像素都没有`
+  ⇒ 参照物（药丸）在 runner 上读得到，**等式的另一边（占位语）在那台机器上不存在**。
+  判据现在按 D-166 的形状收场：`QUICKPICK_AXIS_CAPABILITY 候选/有对象/未判` 一行（排在 skip 之前）、
+  `QUICKPICK_AXIS_DECLINED` 带**成因数字**（带内墨行、墨像素、最大偏离、门限 60），
+  全都没对象 ⇒ `XCTSkip`；而"有一档画得出、另一档画不出"仍然红（skip 不是万能挡箭牌）。
+  搜索带改用 R103 那颗 `textInkWitness` 来量（同一颗尺，顺手拿到最大偏离）。
+- **`scripts/ci_read.py` 的红计数器漏数裸 `XCTFail`**：它只认 `XCTAssert…failed`，
+  而那一跑里我新写的那条判据红的是 `error: … : failed - light：…`（没有宏名），
+  于是"六行红"被报成"4 行 / 去重 2 条"——**一个只数自己认识的形状的红计数器，会把新出现的失败归进"没有新失败"**。
+  现在 `assertion_reds()` 两种形状都数，并配三条脚本测试（含正对照：删掉裸 XCTFail 那行，计数必须掉到 1）。
+  新开 **158**（runner 上浮层占位语不落地，三种成因都还开着，一次 CI 就能分）；规矩进 **D-170**。
+- **视觉审查腿（逐张放大看四张浮层帧）产出本轮唯一的新缺陷：新开 159**。
+  `quickpick-typed` / `quickpick-empty` 两张帧上，查询那串字底下有一块**实心灰矩形**
+  （typed `x=44..95px`=22.0..47.5pt 宽 25.5pt；empty 宽 63.5pt；两态高 16pt、两档几何一致；
+  查询为空的 `list` 态没有），宽度正好等于那两串字的排版宽度 ⇒ 整条查询带着一个"选中"区间，
+  而离屏窗口不是 key，所以选中底是灰的。**它从 R63 那三张帧进基线起就在**
+  （R104 之前的帧同一颗尺读到 `x=24..75` / `x=24..150`，宽度逐像素相同），不是本轮回归；
+  顺带成为 R104 那条内缩**作用于整个字段绘制矩形**的证据。机制三种可能都开着，
+  分开它们的实验（`inspect:` 打 `selectedRange` / `isHighlighted` / `currentEditor`）与真机那一格（批次 83.1）写在 159。
+  **本轮产品与夹具代码一行未动。**
+- **149 那一条"要不要给浮层搜索行一条底/描边"判掉了：不加**（**D-171**，三条量出来的理由：
+  上下 14.5pt / 20.0pt 的全宽 0 墨空带已经把分隔做完；加框会新增第三条左轴（框沿 ≠ 药丸 22.0pt ≠ 标签 34.5pt），
+  而 148 刚把三条收成一条；打字后查询在 22.0pt、行标签在 34.5pt，本来就不同列）。
+  真正欠的是**焦点态**那一档，只能真机判（批次 82.2）。
+- 变异表 `mutate_r105.py` 三刀：M581 本机模拟 runner ⇒ **SKIPPED**、M582 同一归零 + 摘 skip ⇒ **红**、
+  M583 摘掉未判打印 ⇒ 本机无判别力（按实登记）。实测 `n=3 caught=3 mismatch=0 not_run=0`。
+- 脚本电池 218 → **221**（`test_ci_read_reds.py` 三条）。
+
 ### 产品（R104）
 
 - **快速选择浮层：搜索那一行的字挪进列表自己那一列**（BACKLOG 148 结案）。

@@ -1,0 +1,206 @@
+QUICKPICK_LOOK light 帧=840x600px
+  参考列 x=8px 实心区 y=0..599 面板底档(中位)=255
+  y=  0px ink=  0 x=None..None maxd=0
+  y=  1px ink=  0 x=None..None maxd=0
+  y=  2px ink=  0 x=None..None maxd=0
+  y=  3px ink=  0 x=None..None maxd=0
+  y=  4px ink=  0 x=None..None maxd=0
+  y=  5px ink=  0 x=None..None maxd=0
+  y=  6px ink=  0 x=None..None maxd=0
+  y=  7px ink=  0 x=None..None maxd=0
+  y=  8px ink=  0 x=None..None maxd=0
+  y=  9px ink=  0 x=None..None maxd=0
+  y= 10px ink=  0 x=None..None maxd=0
+  y= 11px ink=  0 x=None..None maxd=0
+  y= 12px ink=  0 x=None..None maxd=0
+  y= 13px ink=  0 x=None..None maxd=0
+  y= 14px ink=  0 x=None..None maxd=0
+  y= 15px ink=  0 x=None..None maxd=0
+  y= 16px ink=  0 x=None..None maxd=0
+  y= 17px ink=  0 x=None..None maxd=0
+  y= 18px ink=  0 x=None..None maxd=0
+  y= 19px ink=  0 x=None..None maxd=0
+  y= 20px ink=  0 x=None..None maxd=0
+  y= 21px ink=  0 x=None..None maxd=0
+  y= 22px ink=  0 x=None..None maxd=0
+  y= 23px ink=  0 x=None..None maxd=0
+  y= 24px ink=  0 x=None..None maxd=0
+  y= 25px ink=  0 x=None..None maxd=0
+  y= 26px ink=  0 x=None..None maxd=0
+  y= 27px ink=  0 x=None..None maxd=0
+  y= 28px ink=  0 x=None..None maxd=0
+  y= 29px ink= 30 x=48..190 maxd=125
+  y= 30px ink= 78 x=48..191 maxd=127
+  y= 31px ink= 97 x=48..191 maxd=127
+  y= 32px ink= 97 x=48..191 maxd=127
+  y= 33px ink= 55 x=45..191 maxd=127
+  y= 34px ink= 89 x=45..191 maxd=127
+  y= 35px ink= 78 x=45..191 maxd=127
+  y= 36px ink= 78 x=48..191 maxd=127
+  y= 37px ink= 64 x=48..191 maxd=127
+  y= 38px ink=104 x=48..196 maxd=127
+  y= 39px ink=114 x=48..196 maxd=127
+  y= 40px ink=100 x=48..195 maxd=127
+  y= 41px ink= 71 x=46..193 maxd=127
+  y= 42px ink= 71 x=45..193 maxd=127
+  y= 43px ink= 71 x=45..192 maxd=127
+  y= 44px ink= 80 x=45..191 maxd=127
+  y= 45px ink= 73 x=48..190 maxd=127
+  y= 46px ink= 80 x=48..216 maxd=127
+  y= 47px ink= 82 x=48..217 maxd=127
+  y= 48px ink= 90 x=48..217 maxd=127
+  y= 49px ink=111 x=48..216 maxd=127
+  y= 50px ink=113 x=45..215 maxd=127
+  y= 51px ink= 83 x=45..195 maxd=127
+  y= 52px ink= 34 x=46..184 maxd=75
+  y= 53px ink=  0 x=None..None maxd=0
+  y= 54px ink=  0 x=None..None maxd=0
+  y= 55px ink=  0 x=None..None maxd=0
+  y= 56px ink=  0 x=None..None maxd=0
+  y= 57px ink=  0 x=None..None maxd=0
+  y= 58px ink=  0 x=None..None maxd=0
+  y= 59px ink=  0 x=None..None maxd=0
+  y= 60px ink=  0 x=None..None maxd=0
+  y= 61px ink=  0 x=None..None maxd=0
+  y= 62px ink=  0 x=None..None maxd=0
+  y= 63px ink=  0 x=None..None maxd=0
+  y= 64px ink=  0 x=None..None maxd=0
+  y= 65px ink=  0 x=None..None maxd=0
+  y= 66px ink=  0 x=None..None maxd=0
+  y= 67px ink=  0 x=None..None maxd=0
+  y= 68px ink=  0 x=None..None maxd=0
+  y= 69px ink=  0 x=None..None maxd=0
+  y= 70px ink=  0 x=None..None maxd=0
+  y= 71px ink=  0 x=None..None maxd=0
+  y= 72px ink=  0 x=None..None maxd=0
+  y= 73px ink=  0 x=None..None maxd=0
+  y= 74px ink=  0 x=None..None maxd=0
+  y= 75px ink=  0 x=None..None maxd=0
+  y= 76px ink=  0 x=None..None maxd=0
+  y= 77px ink=  0 x=None..None maxd=0
+  y= 78px ink=  0 x=None..None maxd=0
+  y= 79px ink=  0 x=None..None maxd=0
+  y= 80px ink=  0 x=None..None maxd=0
+  y= 81px ink=  0 x=None..None maxd=0
+  y= 82px ink=  0 x=None..None maxd=0
+  y= 83px ink=  0 x=None..None maxd=0
+  y= 84px ink=  0 x=None..None maxd=0
+  y= 85px ink=  0 x=None..None maxd=0
+  y= 86px ink=  0 x=None..None maxd=0
+  y= 87px ink=  0 x=None..None maxd=0
+  y= 88px ink=  0 x=None..None maxd=0
+  y= 89px ink=  0 x=None..None maxd=0
+  y= 90px ink=  0 x=None..None maxd=0
+  y= 91px ink=  0 x=None..None maxd=0
+  y= 92px ink=730 x=55..784 maxd=35
+  y= 93px ink=734 x=53..786 maxd=35
+  y= 94px ink=738 x=51..788 maxd=35
+  y= 95px ink=740 x=50..789 maxd=35
+  y= 96px ink=744 x=48..791 maxd=35
+  y= 97px ink=744 x=48..791 maxd=35
+  y= 98px ink=746 x=47..792 maxd=35
+  y= 99px ink=748 x=46..793 maxd=35
+  --- 顶部 0..100px 每列的 ink 计数（找有没有可见的框/底线）---
+QUICKPICK_LOOK dark 帧=840x600px
+  参考列 x=8px 实心区 y=0..599 面板底档(中位)=30
+  y=  0px ink=  0 x=None..None maxd=0
+  y=  1px ink=  0 x=None..None maxd=0
+  y=  2px ink=  0 x=None..None maxd=0
+  y=  3px ink=  0 x=None..None maxd=0
+  y=  4px ink=  0 x=None..None maxd=0
+  y=  5px ink=  0 x=None..None maxd=0
+  y=  6px ink=  0 x=None..None maxd=0
+  y=  7px ink=  0 x=None..None maxd=0
+  y=  8px ink=  0 x=None..None maxd=0
+  y=  9px ink=  0 x=None..None maxd=0
+  y= 10px ink=  0 x=None..None maxd=0
+  y= 11px ink=  0 x=None..None maxd=0
+  y= 12px ink=  0 x=None..None maxd=0
+  y= 13px ink=  0 x=None..None maxd=0
+  y= 14px ink=  0 x=None..None maxd=0
+  y= 15px ink=  0 x=None..None maxd=0
+  y= 16px ink=  0 x=None..None maxd=0
+  y= 17px ink=  0 x=None..None maxd=0
+  y= 18px ink=  0 x=None..None maxd=0
+  y= 19px ink=  0 x=None..None maxd=0
+  y= 20px ink=  0 x=None..None maxd=0
+  y= 21px ink=  0 x=None..None maxd=0
+  y= 22px ink=  0 x=None..None maxd=0
+  y= 23px ink=  0 x=None..None maxd=0
+  y= 24px ink=  0 x=None..None maxd=0
+  y= 25px ink=  0 x=None..None maxd=0
+  y= 26px ink=  0 x=None..None maxd=0
+  y= 27px ink=  0 x=None..None maxd=0
+  y= 28px ink= 11 x=48..134 maxd=32
+  y= 29px ink= 67 x=48..191 maxd=124
+  y= 30px ink= 98 x=48..191 maxd=124
+  y= 31px ink= 98 x=48..191 maxd=124
+  y= 32px ink= 98 x=48..191 maxd=124
+  y= 33px ink= 70 x=45..191 maxd=124
+  y= 34px ink= 91 x=45..191 maxd=124
+  y= 35px ink= 80 x=45..191 maxd=124
+  y= 36px ink= 81 x=48..191 maxd=124
+  y= 37px ink= 89 x=48..195 maxd=124
+  y= 38px ink=107 x=48..196 maxd=124
+  y= 39px ink=118 x=48..196 maxd=124
+  y= 40px ink=104 x=48..196 maxd=124
+  y= 41px ink= 77 x=45..194 maxd=124
+  y= 42px ink= 77 x=44..193 maxd=124
+  y= 43px ink= 79 x=45..192 maxd=124
+  y= 44px ink= 85 x=45..191 maxd=124
+  y= 45px ink= 78 x=48..190 maxd=124
+  y= 46px ink= 86 x=48..216 maxd=124
+  y= 47px ink= 91 x=48..217 maxd=124
+  y= 48px ink= 98 x=48..217 maxd=124
+  y= 49px ink=129 x=46..217 maxd=124
+  y= 50px ink=115 x=45..196 maxd=124
+  y= 51px ink= 87 x=45..195 maxd=124
+  y= 52px ink= 37 x=45..185 maxd=72
+  y= 53px ink=  0 x=None..None maxd=0
+  y= 54px ink=  0 x=None..None maxd=0
+  y= 55px ink=  0 x=None..None maxd=0
+  y= 56px ink=  0 x=None..None maxd=0
+  y= 57px ink=  0 x=None..None maxd=0
+  y= 58px ink=  0 x=None..None maxd=0
+  y= 59px ink=  0 x=None..None maxd=0
+  y= 60px ink=  0 x=None..None maxd=0
+  y= 61px ink=  0 x=None..None maxd=0
+  y= 62px ink=  0 x=None..None maxd=0
+  y= 63px ink=  0 x=None..None maxd=0
+  y= 64px ink=  0 x=None..None maxd=0
+  y= 65px ink=  0 x=None..None maxd=0
+  y= 66px ink=  0 x=None..None maxd=0
+  y= 67px ink=  0 x=None..None maxd=0
+  y= 68px ink=  0 x=None..None maxd=0
+  y= 69px ink=  0 x=None..None maxd=0
+  y= 70px ink=  0 x=None..None maxd=0
+  y= 71px ink=  0 x=None..None maxd=0
+  y= 72px ink=  0 x=None..None maxd=0
+  y= 73px ink=  0 x=None..None maxd=0
+  y= 74px ink=  0 x=None..None maxd=0
+  y= 75px ink=  0 x=None..None maxd=0
+  y= 76px ink=  0 x=None..None maxd=0
+  y= 77px ink=  0 x=None..None maxd=0
+  y= 78px ink=  0 x=None..None maxd=0
+  y= 79px ink=  0 x=None..None maxd=0
+  y= 80px ink=  0 x=None..None maxd=0
+  y= 81px ink=  0 x=None..None maxd=0
+  y= 82px ink=  0 x=None..None maxd=0
+  y= 83px ink=  0 x=None..None maxd=0
+  y= 84px ink=  0 x=None..None maxd=0
+  y= 85px ink=  0 x=None..None maxd=0
+  y= 86px ink=  0 x=None..None maxd=0
+  y= 87px ink=  0 x=None..None maxd=0
+  y= 88px ink=  0 x=None..None maxd=0
+  y= 89px ink=  0 x=None..None maxd=0
+  y= 90px ink=  0 x=None..None maxd=0
+  y= 91px ink=  0 x=None..None maxd=0
+  y= 92px ink=730 x=55..784 maxd=40
+  y= 93px ink=734 x=53..786 maxd=40
+  y= 94px ink=738 x=51..788 maxd=40
+  y= 95px ink=740 x=50..789 maxd=40
+  y= 96px ink=744 x=48..791 maxd=40
+  y= 97px ink=744 x=48..791 maxd=40
+  y= 98px ink=746 x=47..792 maxd=40
+  y= 99px ink=748 x=46..793 maxd=40
+  --- 顶部 0..100px 每列的 ink 计数（找有没有可见的框/底线）---

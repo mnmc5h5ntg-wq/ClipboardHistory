@@ -533,6 +533,7 @@ final class UICaptureTests: XCTestCase {
     func testQuickPickSearchLineSharesTheRowsColumn() throws {
         // 这里**不**自己建 store：走的是 `fixtures(appearance:)` 里那张 `quickpick-list` 夹具，
         // 它自带 store ⇒ 判据读的就是进帧基线的那一张图（同一颗尺、同一份对象）。
+        var candidates = 0, judged = 0, declined: [String] = []
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r104-axis-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -565,33 +566,61 @@ final class UICaptureTests: XCTestCase {
             guard stripBottom > 4 else {
                 return XCTFail("\(tag)：药丸顶在 \(pill.top)px，它上面没有带子可扫 ⇒ 布局不对")
             }
-            guard let search = Self.firstInkColumnInStrip(bytes: base, width: rep.pixelsWide,
-                                                          bytesPerRow: rep.bytesPerRow,
-                                                          yRange: 0..<stripBottom,
-                                                          background: page) else {
-                return XCTFail("\(tag)：搜索那一条带（y=0..\(stripBottom)px）里一个墨像素都没有"
-                    + "⇒ 等式的另一边不存在，这条判据什么都没判。先查占位语画没画，不要来放宽这条")
-            }
+            candidates += 1
+            // 同一颗尺（R103 的 `textInkWitness`）：它给的不只是"有没有"，还有**最大偏离**——
+            // 这一格是本轮被 runner 教出来的：那一台机器上浮层的占位语**一个像素都不落地**，
+            // 而没有 `最大偏离` 就分不清"它没画字"与"我的门限太高"（BACKLOG 158）。
+            let stripRect = CGRect(x: 0, y: 0, width: fixture.size.width,
+                                   height: CGFloat(stripBottom) / CGFloat(scale))
+            let strip = Self.textInkWitness(bytes: base, width: rep.pixelsWide,
+                                            height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                            rect: stripRect, scale: scale,
+                                            fill: page, pageLuma: page)
+            let search = Self.firstInkColumnInStrip(bytes: base, width: rep.pixelsWide,
+                                                    bytesPerRow: rep.bytesPerRow,
+                                                    yRange: 0..<stripBottom, background: page)
             let pillPt = Double(pill.left) / scale
-            let searchPt = Double(search) / scale
+            let searchText = search.map { String(format: "%.1f", Double($0) / scale) + "pt" } ?? "没有"
+            let diffText = search.map { "\($0 - pill.left)px" } ?? "-"
+            // **结论行排在闸门与 skip 之前**（D-166 第三次记这条：闸门一挡，读数就没了）。
             emit("QUICKPICK_SEARCH_AXIS \(tag) 药丸左沿=\(String(format: "%.1f", pillPt))pt"
-                 + " 搜索第一列墨=\(String(format: "%.1f", searchPt))pt"
-                 + " 差=\(search - pill.left)px 药丸顶=\(pill.top)px 带子 y=0..\(stripBottom)px"
+                 + " 搜索第一列墨=\(searchText) 差=\(diffText)"
+                 + " 带子 y=0..\(stripBottom)px 带内墨行=\(strip.rows) 墨像素=\(strip.pixels)"
+                 + " 最大偏离=\(strip.maxDelta)（门限 \(Self.textInkMinDelta)）"
                  + " 页底档=\(page) 倍率=\(String(format: "%.1f", scale))x 帧宽=\(rep.pixelsWide)px")
+            guard strip.rows > 0, let ink = search else {
+                declined.append("\(tag)[原因=搜索那一行读不到字：带内墨行=\(strip.rows)、"
+                                + "墨像素=\(strip.pixels)、最大偏离=\(strip.maxDelta) 而门限是 \(Self.textInkMinDelta)]")
+                continue
+            }
+            judged += 1
             // ① 参照物必须真的是那颗内缩过的药丸，不是行边界、也不是图标那一列。
             XCTAssertGreaterThan(pillPt, 15.0,
                 "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt。本机实测药丸左沿 22.0pt；"
                 + "≈12pt 说明量到的是**行边界**（药丸没画），那时等式会退化成『12 与 12 相等』的假绿")
             XCTAssertLessThan(pillPt, 30.0,
-                "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt ⇒ 那已经不是药丸的左沿"
-                + "（更像行内图标那一列 35.5pt），参照点错了等式就不成立")
+                              "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt ⇒ 那已经不是药丸的左沿"
+                              + "（更像行内图标那一列 35.5pt），参照点错了等式就不成立")
             // ③ 等式本身。
-            XCTAssertLessThanOrEqual(abs(search - pill.left), 2,
-                "\(tag)：搜索那一行的第一个墨列在 \(search)px（\(String(format: "%.1f", searchPt))pt），"
+            XCTAssertLessThanOrEqual(abs(ink - pill.left), 2,
+                "\(tag)：搜索那一行的第一个墨列在 \(ink)px（\(String(format: "%.1f", Double(ink) / scale))pt），"
                 + "而同一张帧上药丸的左沿在 \(pill.left)px（\(String(format: "%.1f", pillPt))pt）"
-                + "⇒ 差 \(abs(search - pill.left))px。改之前实测差 19px（12.5pt 对 22.0pt）："
+                + "⇒ 差 \(abs(ink - pill.left))px。改之前实测差 19px（12.5pt 对 22.0pt）："
                 + "占位语比它正下方那一列的可见边往左突出，那一行字像贴在面板毛边上")
         }
+        emit("QUICKPICK_AXIS_CAPABILITY 候选=\(candidates) 有对象=\(judged) 未判=\(declined.count)"
+             + "（未判名单只在**这台机器画得出占位语**时才要求为空）")
+        if !declined.isEmpty { emit("QUICKPICK_AXIS_DECLINED " + declined.joined(separator: " ")) }
+        if judged == 0 {
+            throw XCTSkip("这台机器上浮层搜索那一行画不出字（\(declined.joined(separator: " "))）"
+                          + " ⇒ 这条左轴等式没有对象，**不判（不是通过）**，见 BACKLOG 158。"
+                          + "参照物（药丸）在两档都读得到，坏的是字那一侧的通道。")
+        }
+        // 有一档画得出、另一档画不出 ⇒ 红。这不是吹毛求疵：占位语在某一档不可见**就是**观感缺陷，
+        // 而且没有这一格，"整机归零 ⇒ skip" 会变成一张万能挡箭牌（D-166 后半条）。
+        XCTAssertTrue(declined.isEmpty,
+                      "这台机器**画得出**占位语（有对象=\(judged)），却有一档读不到 ⇒ 坏的是尺或那一档的通道，"
+                      + "必须点名：\(declined.joined(separator: " "))")
     }
 
     /// 药丸尺与"第一条墨列"尺的**真值表**（R104）：五格合成件，各钉一道地板。

@@ -40,7 +40,11 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_ARM ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_ARM |^QUICKPICK_")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   # R105：浮层左轴那三行（`QUICKPICK_SEARCH_AXIS` / `_AXIS_CAPABILITY` / `_AXIS_DECLINED`）
+                   #   同样是空格分隔 ⇒ 走第二个分支。R104 的 §8 把它们漏在了搬运之外
+                   #   （那一轮 §8 的"本轮读数"只有 `CARD_*`），本轮补上 —— 判据的结论行必须与它的
+                   #   数字一起进台账，否则下一轮又要靠我记得去 grep（U-264 那一族）。
 
 
 def grab(text, pattern):

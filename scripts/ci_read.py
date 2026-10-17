@@ -95,6 +95,24 @@ def parse_log(text):
     return rows, unparsed
 
 
+def assertion_reds(rows):
+    """从 (job, step, body) 里挑出**断言红**的行。
+
+    两种形状都必须数（R105 / run 38975204376 实证）：
+      ① `XCTAssertLessThanOrEqual failed: ("32.19") is greater than …` —— 带宏名的；
+      ② `error: -[Suite test] : failed - light：搜索那一行…` —— **裸 `XCTFail` 的**，
+         它没有 `XCTAssert` 这个词。上一版只数①，于是那一跑明明有六行红，
+         这一格报的是 4 行 / 去重 2 条 —— 我新写的那条判据在 runner 上整个不见了都没报出来。
+    """
+    out = []
+    for _, _, body in rows:
+        if "XCTAssert" in body and "failed" in body:
+            out.append(body)
+        elif "error:" in body and " : failed - " in body:
+            out.append(body)
+    return out
+
+
 def readings(run_id, prefixes, text=None):
     if text is None:
         text = log_text(run_id)
@@ -119,7 +137,7 @@ def readings(run_id, prefixes, text=None):
         if len(hits) > 6:
             print("      …另有 %d 行" % (len(hits) - 6))
         seen |= {b for _, _, b in hits}
-    reds = [b for _, _, b in rows if "XCTAssert" in b and "failed" in b]
+    reds = assertion_reds(rows)
     distinct = sorted(set(re.sub(r"^\s*", "", r) for r in reds))
     print("ASSERTION_RED 行=%d 去重后=%d" % (len(reds), len(distinct)))
     for r in distinct[:10]:
