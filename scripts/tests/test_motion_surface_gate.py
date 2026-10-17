@@ -111,13 +111,53 @@ class ShapeRoundTwoTests(unittest.TestCase):
     def test_not_measured_does_not_count_as_cleared(self):
         """占位行不许把地板抬起来：它数的是"判过了"，不是"写了字"。"""
         data = base()
-        data["rows"].append({"surface": "主窗口/列表行", "state": "禁用",
+        # U-429：这一格必须落在**名册里存在**的组合上。上一版写的是 `禁用`，而我在 U-427
+        # 把夹具名册收窄成 `["悬停", "聚焦"]` 之后，这个测试的红就不再是关于地板的，
+        # 而是 UNKNOWN_CELL —— 断言仍然失败，失败的原因却整条换掉了，而两种红看起来一样。
+        # 收窄任何名册之前，先 grep 谁把这个成员串写在了字面量里。
+        data["rows"].append({"surface": "浮层/搜索框", "state": "悬停",
                              "verdict": "not-measured",
                              "reason": "这一格本轮没有依据，先占位，下一轮清账时替换成结论",
                              "evidence": "docs/motion_surface_ledger.json 的 verdict 词表"})
         self.assertEqual([], codes(gate.check(data)))
         data["floor_cleared"] = 3
         self.assertIn("BELOW_FLOOR", codes(gate.check(data)))
+
+
+class ShapeRoundThreeTests(unittest.TestCase):
+    """R129：一条规则只能有一份实现。"""
+
+    def test_floor_lies_is_reported_exactly_once(self):
+        """`FLOOR_LIES` 曾在两处各查一遍 ⇒ 同一条规则两份实现。
+
+        两份的后果不是"更保险"：变异任何一份都被另一份掩盖（刀落下去还是绿的），
+        而读数会印两遍，读的人以为发生了两件事。所以这里断言的是**次数**，不是成员。
+        """
+        lying = base()
+        lying["floor_cleared"] = 9
+        printed = [c for c, _ in gate.check(lying)]
+        self.assertEqual(1, printed.count("FLOOR_LIES"),
+                         "FLOOR_LIES 印了 %d 遍（应恰好 1 遍）：%s" % (printed.count("FLOOR_LIES"), printed))
+
+    def test_a_place_holder_cell_must_still_be_a_real_cell(self):
+        """占位行首先是**合法行**：它的表面与状态都得名册里有，否则红的是别的事。
+
+        M638 就是打在这一格上的：只测「表面不在名册里」的那一臂时，
+        把「状态不在名册里」那一格整条摘掉，全卷 0 红（我这一版就是这么写的，
+        而它上一版的失败恰好是这格造成的）。⇒ 两个维度必须各有证人。
+        """
+        wrong_surface = base()
+        wrong_surface["rows"].append({"surface": "不存在的表面", "state": "悬停",
+                                      "verdict": "not-measured",
+                                      "reason": "这一格本轮没有依据，先占位，下一轮清账时替换成结论",
+                                      "evidence": "docs/motion_surface_ledger.json 的 verdict 词表"})
+        self.assertIn("UNKNOWN_CELL", codes(gate.check(wrong_surface)))
+        wrong_state = base()
+        wrong_state["rows"].append({"surface": "主窗口/列表行", "state": "禁用",
+                                    "verdict": "kept",
+                                    "reason": "这一格的依据是真的，但状态名册里没有这一档",
+                                    "evidence": "Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift"})
+        self.assertIn("UNKNOWN_CELL", codes(gate.check(wrong_state)))
 
 
 class RealTableTests(unittest.TestCase):

@@ -12,12 +12,22 @@
   BAD_VERDICT    verdict 不在词表里 ⇒ 红（"看着像结论的字符串"不算结论）。
   REASONLESS     理由为空或短于 20 字 ⇒ 红。**没理由的 not-added 就等于还没决定**。
   EVIDENCELESS   证据指针为空 ⇒ 红（理由要能被复查：哪一轮、哪个 BACKLOG、哪个文件）。
-  BELOW_FLOOR    行数低于 `floor_rows` ⇒ 红。地板只准升不准降（`testHistoryStoreStaysThin` 同一族：
-                 会红的必须是单调量；均值与区间都被证伪过）。
-  FLOOR_LIES     `floor_rows` 大于实际行数 ⇒ 红（把地板写成愿望，就是给自己留一张免检牌）。
+  BELOW_FLOOR    已清账格子数低于 `floor_cleared` ⇒ 红。地板只准升不准降（`testHistoryStoreStaysThin`
+                 同一族：会红的必须是单调量；均值与区间都被证伪过）。**只数已清账的行**，
+                 占位行（`not-measured`）不把地板抬起来。
+  FLOOR_LIES     `floor_cleared` 大于实际行数 ⇒ 红（把地板写成愿望，就是给自己留一张免检牌）。
+  EVIDENCE_SHAPE 证据指针不含可复查对象（源码/测试/仓库内路径 / BACKLOG 号 / D-号 / 批次号）⇒ 红。
+                 单独的轮次号只是"某个人在某轮写过"（U-424）。
+  SURFACE_UNCOVERED / STATE_UNCOVERED
+                 名册里新增一个表面或状态却没有任何一行 ⇒ 红：分母扩张必须付账，
+                 否则"未清账 136 格"会被稀释成看起来还在推进（U-425）。
 
 未覆盖的格子**不红**，但必须被数出来（`MOTION_LEDGER 未清账=k`）：
 清账是进度，不是及格线 —— 假装 162 格都判过，比承认只判了 18 格更坏。
+
+每个代码只打印一次（R129 / U-430）：`FLOOR_LIES` 原来在名册解析和清账统计两处都查，
+于是同一条规则有两份实现 —— 变异任何一处都被另一处掩盖，读数还会印两遍。
+闸门自己的冗余也是判据的冗余。
 
 用法：PYTHONUTF8=1 python3 scripts/motion_surface_gate.py [--path docs/motion_surface_ledger.json]
 退出码：0 = 全部行合法；1 = 有任何一格不合法（逐条打印）；2 = 文件或 JSON 读不到。
@@ -99,9 +109,6 @@ def check(data):
     if isinstance(floor, int) and len(cleared) < floor:
         problems.append(("BELOW_FLOOR", "已清账格子数 %d 低于地板 %d ⇒ 清账只能往前不能往后"
                          % (len(cleared), floor)))
-    if isinstance(floor, int) and floor > len(rows):
-        problems.append(("FLOOR_LIES", "floor_cleared=%d 大于总行数 %d ⇒ 地板写成了愿望"
-                         % (floor, len(rows))))
     return problems
 
 

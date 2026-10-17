@@ -1,0 +1,12 @@
+build-and-test	Motion coverage floor	﻿2026-10-17T12:59:17.0900370Z ##[group]Run set -o pipefail
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.0900660Z ^[[36;1mset -o pipefail^[[0m
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.0900920Z ^[[36;1mpython3 scripts/motion_floor_gate.py /tmp/motion.log \^[[0m
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.0901290Z ^[[36;1m  --expectations scripts/motion_floor_expectations.json^[[0m
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.0937420Z shell: /bin/bash -e {0}
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.0937630Z ##[endgroup]
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1877740Z MOTION_FLOOR_FACTS judged=3/4 executed=55 not-run=notice-banner summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 红的用例=testBandCaptureIsCheaperAndStillSeesTheMotion 汇总行报红=1
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1879540Z MOTION_FLOOR_SUITE_RED=1 动效这一卷有未登记的红用例 ⇒ 红必须有名字，也要有人负责：testBandCaptureIsCheaperAndStillSeesTheMotion：XCTAssertLessThanOrEqual failed: ("32.16120833326386") is greater than ("31.812875000014174") - 带捕获之后整卷中位间隔没有变细 ⇒ 省下的钱没进采样率，这一臂仍然判不了
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1880460Z MOTION_FLOOR_LOOP_JUDGED=skeleton-loop 这一族今天判到了（状态 ok）
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1881000Z MOTION_FLOOR_LOOP_JUDGED=skeleton-band-position 这一族今天判到了（状态 ok）
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1881430Z MOTION_FLOOR_REDS=1
+build-and-test	Motion coverage floor	2026-10-17T12:59:17.1927180Z ##[error]Process completed with exit code 1.

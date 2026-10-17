@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 修掉推出去的那朵红 + 一条规则只留一份实现 + 按 D-191 重读 CI（R129 / 155 追记 / U-429…U-431 · 产品 0 改动）
+
+- **更正**：R128 那批账本里六处「`Ran 258 tests OK`」是假的 —— 那一版是 `FAILED (failures=1)`，我带着红推了出去（`6bd7f9e`）。
+- 根因（U-429）：占位行写死的 `"state": "禁用"` 在夹具名册收窄后换了红的对象；修法是让占位行落在名册内的格子上，
+  并把「名册成员被别处的字面量引用」这件事写成注释留在测试里。
+- U-430：`FLOOR_LIES` 在 `check()` 里查了两遍 —— M637 证明**任何一遍被摘掉都没人报**。摘掉第二份，自检从成员判据升级成次数判据。
+- M638 第一次跑是 PASSED：`UNKNOWN_CELL` 的两个维度只有表面那一臂有证人。补成两臂后三刀 CAUGHT（260 OK）。
+- D-191（读 CI 的顺序）当场生效：R124/R125/R126 三跑 `failure` 的失败步骤都是 `Motion coverage floor`，
+  红的是 **BACKLOG 155**（`testBandCaptureIsCheaperAndStillSeesTheMotion`，28.44>25.38 / 32.49>27.46 / 32.16>31.81）
+  ⇒ 上一轮「171 是最后一朵红」按 U-431 更正；155 拿到三跑绝对间隔与"差值在收窄"这两件新证据，仍不定性。
+
 ### 清账表补上三格真判据：指针要可复查、分母扩张要付账、地板只数已清账（R128 / 173 追记 3 / U-426…U-428 / D-190 · 产品 0 改动）
 
 - `scripts/motion_surface_gate.py` 加 `EVIDENCE_SHAPE`（指针必须含 `Sources/` `Tests/` `docs/` `scripts/`
@@ -14,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   **先修数据再加判据** —— 9 行只有轮次号的指针补成可复查对象，否则闸门会红在自己的表上。
 - 闸门当场拦下我自己造的词：`UNKNOWN_CELL 第 14 行（主窗口/提示条 × 消失）` —— 「消失」是一次转换不是九个状态之一（U-426）；
   它同样不给最小夹具免检（夹具的状态「禁用」没有行 ⇒ 三条自检一起红，U-427），这两件事合起来才证明新判据在判东西。
-- 自检 +6 条（`Ran 258 tests OK`）；变异第 31 张 `mutate_r128.py`：M633 证据形状恒过 / M634 摘掉名册扩张两格 /
+- 自检 +6 条（`Ran 258 tests OK` —— **这句当时是假的**：那一版电池是 `Ran 258 tests … FAILED (failures=1)`，我带着红推了出去（`6bd7f9e`）。R129 修好后是 `Ran 260 tests OK`。）；变异第 31 张 `mutate_r128.py`：M633 证据形状恒过 / M634 摘掉名册扩张两格 /
   M635 地板退回按总行数 ⇒ 三臂 CAUGHT（刀数 109 → 112，caught 108 → 111）。
 - **U-428 记在账上**：三刀红在同一条测试上（`test_a_file_or_backlog_pointer_is_checkable`），
   所以「caught=3」为真但三格判据没有各自被单独证伪 —— 下一轮给每条判据配一条只测它自己的用例。
