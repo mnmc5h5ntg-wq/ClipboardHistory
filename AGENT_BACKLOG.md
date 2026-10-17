@@ -4100,3 +4100,14 @@ runner：`SELECTION_KEYSTATE_CAPABILITY 候选=2 有对象=2 未判=0`、
 四刀 M602–M605 全 CAUGHT，其中 **M602 摘掉 `receive(on:)` 就红** —— 它钉的是「重填读哪一刻的值」，
 因为 `HistoryStore` 先置 `isRefreshingPredictions = false` 后写候选（`HistoryStore.swift:252-260`）。
 **165 结案范围要说清**：证的是「机制通 + 接线在」，12 上真菜单会不会当场变仍归批次 85.2（U-369）。
+
+**R111 补（读 R110 的 CI `39013515969`）：换班拿到第三个数据点，而 ① 的代价要说清**。
+三次相邻跑的红身份对账（`scripts/ci_red_stability.py`）：R108 只有 `testBandCaptureIsCheaperAndStillSeesTheMotion`、
+R109 只有 `testFrameIntervalsUnderStateChanges`、**R110 两朵都没有**（只剩 157 那朵证人，三跑都在）。
+⇒ 这一族在 runner 上不是"偶尔红"，是**每一跑换一朵**；捕获闸门三跑都报 `有名字的红=1`，
+因为它只看 `/tmp/frames.log` 那一卷。
+① 的真实代价（本轮读完闸门源码才知道，不写下来下一轮就会重估一遍）：`ci_capture_gate.py` 是通用的
+（任何 swift-test 日志都能判），缺的不是能力而是**接线**——要么在 workflow 里对全量日志再跑一次闸门，
+要么给它加"按步骤/按类名前缀切片"的入口。麻烦点在**切片**：CI 日志里同一个标记会由多个步骤各打一次且取值不同
+（U-178 那一族），所以新加的 `--class-prefix` 必须连带把"这条红来自哪个步骤"打出来，否则就是把 166
+换成一把新的会造假矛盾的尺。⇒ 这一格留给 R112（要改 workflow，验证要一次 CI 往返，不划算塞进收尾轮）。
