@@ -166,6 +166,39 @@ rows = [
      "状态栏图标不在键盘焦点链里：Tab 走的是窗口内的 key-view 环，菜单栏那一行不参与。"
      "想让它可达要走系统的全键盘控制，那是另一件事，不该由这里补一层假的焦点环",
      "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"),
+    # ---- R140 清掉的八格。缺席断言的**射程**按「这个文件是不是只装这一个表面」来定（U-463）：
+    #      QuickPickController 整个文件就是浮层 ⇒ 可以写文件级缺席；
+    #      SettingsView 同时装着侧栏与六个分区 ⇒ 对「侧栏」只引用常量，不引用文件级缺席。
+    ("主窗口/详情区", "选中", "kept",
+     "详情区有一件自己跟着选中走的事：搜索命中的高亮（正文里按当前查询标出命中）。"
+     "但「选中哪一条」由列表那一侧说，详情区不再叠一层选中描边 —— 否则同一屏两个地方都在喊「是这个」",
+     "Sources/ClipboardHistoryApp/Views/DetailView.swift 的 `highlightQuery`（两处调用点）"),
+    ("主窗口/详情区", "禁用", "not-applicable",
+     "详情区没有整块禁用态：它是只读文本加几颗各有自己可用态的按钮。"
+     "把整块压灰会连带把可读的内容也压掉，而「读不了」从来不是这里要表达的事",
+     "Sources/ClipboardHistoryApp/Views/DetailView.swift 缺席:Sources/ClipboardHistoryApp/Views/DetailView.swift=disabled"),
+    ("主窗口/侧栏", "选中", "kept",
+     "分类选中是整行药丸加图标同色，跟着 selection 走一档动画；这一格本来就有，判过之后保留",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `selected`（9 处）与 `.animation(for: .selection)`" ),
+    ("设置窗口/侧栏", "空", "not-applicable",
+     "分类是常量，六行永远在：这一屏不存在「空的侧栏」。这里刻意**不引用文件级缺席** —— "
+     "SettingsView 同时装着六个分区，文件级缺席说明不了侧栏那一列的事（U-463）",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsCategory`（allCases 常量）"),
+    ("设置窗口/侧栏", "加载", "not-applicable",
+     "侧栏行不等待任何 IO：分类与选中项都在内存里。这里可以引用文件级缺席，因为说的是「这一屏没有加载态」—— "
+     "ProgressView 与 isLoading 在整个 SettingsView 里 0 命中（本轮实测）",
+     "缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=isLoading；Sources/ClipboardHistoryApp/Views/SettingsView.swift"),
+    ("浮层/列表行", "空", "not-applicable",
+     "没有行就没有这一格：空态由「浮层/空态」那一格承担（那里是一句成句的话，不是骨架）",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `emptyLabel`"),
+    ("浮层/列表行", "错误", "not-applicable",
+     "那一层没有错误通道：查询无结果是「空」不是「错」，写回失败由主窗口提示条说话。"
+     "整个文件 ProgressView / isLoading / disabled 全 0 命中 ⇒ 它连「在读 / 不能动」的表达都没有",
+     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift；BACKLOG 58"),
+    ("菜单栏/推荐面板", "成功", "not-applicable",
+     "推荐面板被编译成真 NSMenu，成功回执不在这层：复制成功走主窗口提示条与菜单项文案。"
+     "该文件 highlight 与 selected 全 0 命中 ⇒ 我们在这层一层反馈都没叠",
+     "缺席:Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift=highlight 缺席:Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift=selected；Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift；BACKLOG 58"),
     ("主窗口/筛选条", "悬停", "kept",
      "缩放与底色两档一起给：减弱动态时缩放归 1.0，底色那一层就是**唯一**的悬停表达 —— "
      "以前这一段只剩缩放一种说法，于是『开了减弱动态 = 悬停没有反馈』",

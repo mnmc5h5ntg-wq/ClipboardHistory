@@ -4821,6 +4821,38 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 142 轮（R140 · 2026-10-17）：清账表一次过八格，八格的证据全是本轮现量的（U-463…U-465 · 产品 0 改动）
+
+**读数**（本轮现 grep，一次都不许来自回忆）：`DetailView.swift` highlightQuery=2 / selected=5 / disabled=0 / ProgressView=0 / isLoading=0；
+`SettingsView.swift` ProgressView=0 / isLoading=0 / disabled=4 / selected=11 / emptyLabel=0；
+`QuickPickController.swift` disabled=0 / ProgressView=0 / isLoading=0 / emptyLabel=15 / selected=3；
+`MenuBarRecommendationsView.swift` highlight=0 / selected=0 / disabled=0。
+表：`docs/motion_surface_ledger.json` **60 → 68 行**（已清账 68 / 未清账 94 / 格子 162），
+`MOTION_LEDGER_VERDICTS added=8 kept=22 not-added=10 not-applicable=28`，闸门 `RESULT=ok 不合法格=0`，
+地板跟着 60 → 68（U-425：地板 = 已清账格子数，不许写成愿望）。八格里 3 格 kept、5 格 not-applicable ——
+本轮的价值在那五张「判过、不加」的处方上，不在行数上。
+
+- **U-463：缺席断言的「射程」是判断，不是判据**。闸门只会查两件事 —— 路径存在、那个词不在文件里。
+  它查不出「这个缺席说明的是不是**这一格**」。所以本轮把射程按「这个文件是不是只装这一个表面」定死：
+  `QuickPickController` 整个文件就是浮层 ⇒ 文件级缺席有资格作证；`SettingsView` 同时装着侧栏那一列和六个分区
+  ⇒ 对「设置窗口/侧栏 × 空」只引用 `SettingsCategory` 常量，**不引用文件级缺席**（文件里 4 处 `disabled` 讲的是分区里的开关，
+  跟侧栏无关）。这条只能靠规矩 + 写明理由，机器兜不住 ⇒ 新开 BACKLOG 175 想把它变成资格判据。
+- **U-464：详情区 × 选中我差点按印象写成 not-applicable**。心里的理由是「选中哪条由列表说，详情区没叠东西」——
+  半对。grep 到 `highlightQuery` **2 处**（正文里跟着当前查询标出命中）⇒ 改判 kept。
+  ⇒ 「这一格没有我们叠的动画」与「这一格什么都没有」是两件事，混淆的代价是把真存在的机制登记成空白。
+- **U-465：生成器里的外部变量那一族第三次生效**。前两回（U-444 / U-450）修的是「语法错的时候不许写盘」，
+  这一回是**语法正确、`ast.parse` 通过、运行时 `NameError: name 'SV' is not defined`** ——
+  变量只在我那个补丁脚本里定义，生成器自己不认识。`MOTION_LEDGER` 当时照样打 `行数=60 / RESULT=ok`（它读的是旧 JSON）。
+  ⇒ 生成器里不许出现任何在本文件之外定义的东西，指针一律写字面路径；
+  真正兜住它的是 R137 那道「生成器产物 == 已提交表」的守卫（本轮第一次靠它把「表没变」和「生成器坏了」分开），
+  而 M658 把当初那次 NameError 原样复现了一遍 —— 它确实会红。
+
+**视觉审查：本轮 NOT-RUN**（诚实记账，不算通过）：没动 `Sources/`，本该复用上一批帧，但 `/tmp/shots*` 已全部空掉
+（`FRAME_BASELINE_COMPARED=0 / MISSING=134`）⇒ 无帧可看。第一版我写成「复用旧帧 + `CHANGED=0`」——
+而 `CHANGED=0` 在 `COMPARED=0` 时恒真，正是本仓库记过的空对账形状；改判之后 R141 的第一件事是重新捕获。
+本轮的"看"落在**数**上：八格新理由逐条与 grep 计数对过账，两处会写错的地方（详情区 kept、侧栏射程）是**读代码**读出来的，不是看图读出来的。
+诚实记账：本轮没有新增动效（BACKLOG 173 从 R126 起没新动作，这一格仍欠）。
+
 ## 第 141 轮（R139 · 2026-10-17）：U-452 那半道守卫补上了 —— 一轮必须同时写进三本账（U-459…U-462）
 
 ### 1. 开场清单

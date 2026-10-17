@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表一次过八格，八格的证据全是本轮现量的（R140 / U-463…U-465 · 产品 0 改动）
+
+- `docs/motion_surface_ledger.json` **60 → 68 行**（未清账 94/162），地板 60 → 68；八格的新证据是本轮 grep 的计数，不是回忆。
+- U-463：缺席断言的**射程**按「这个文件是不是只装这一个表面」定 —— `QuickPickController` 整文件就是浮层，
+  `SettingsView` 同时装侧栏与六个分区 ⇒ 后者只引用常量、不引用文件级缺席。闸门查不出越界 ⇒ 新开 **BACKLOG 175**。
+- U-464：详情区 × 选中差点写成 not-applicable，grep 到 `highlightQuery` 2 处才改判 kept。
+- U-465：生成器外部变量那一族第三次生效（语法对、运行 `NameError`）⇒ 指针一律写字面路径；M658 把那次错法原样复现。
+- 变异表 `.scratch/motion-audit-2/mutate_r140.py`（M657-M659）：M657 证明新行的「缺席」可证伪，M658/M659 证明生成器与已提交表互相钉住。
+
+### 一轮必须同时写进三本账：U-452 那半道守卫补上了（R139 / U-459…U-461 · 产品 0 改动）
+
+- 新自检 `scripts/tests/test_round_batch_consistency.py`（3 条）：从 STATE 的「最后更新」读本轮 R 号，
+  要求最近三轮在审计台账 / 迭代记录 / CHANGELOG 各自都有标题 ⇒ 「半批已写」从此是可检查的形式，不再靠人眼。
+- U-459：M655 第一版的替换串自己带着 `R138`，于是守卫读到了它要找的东西、报绿，**刀等于没下**；
+  改成整行删掉才 CAUGHT。规矩：删除型变异的替换串不许留着被测 token，且新守卫第一次 CAUGHT 之前的 PASSED 本身就是信号。
+- U-461：这道守卫查存在性、不查内容，也看不见「三轮都写了但互相矛盾」⇒ 它必须与区间守卫、行数对账、引用落地一起才算闭环。
+- 脚本自检 280 → 283 OK；变异第 39 张两臂 CAUGHT（刀数 133 / caught 132，RESTORE_CLEAN=yes）；§9.3 第 5 条两半都补齐。
+
 ### 查一个缺号，查出 BACKLOG 172 的条目号已经被吃掉（R138 / U-456…U-458 · 产品 0 改动）
 
 - 172 是整个目标里**唯一等用户**的那条账，而它在 `AGENT_BACKLOG.md` 里已经不成其为条目：

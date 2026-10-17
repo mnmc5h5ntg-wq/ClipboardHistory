@@ -326,6 +326,62 @@
       "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"
     },
     {
+      "surface": "主窗口/详情区",
+      "state": "选中",
+      "verdict": "kept",
+      "reason": "详情区有一件自己跟着选中走的事：搜索命中的高亮（正文里按当前查询标出命中）。但「选中哪一条」由列表那一侧说，详情区不再叠一层选中描边 —— 否则同一屏两个地方都在喊「是这个」",
+      "evidence": "Sources/ClipboardHistoryApp/Views/DetailView.swift 的 `highlightQuery`（两处调用点）"
+    },
+    {
+      "surface": "主窗口/详情区",
+      "state": "禁用",
+      "verdict": "not-applicable",
+      "reason": "详情区没有整块禁用态：它是只读文本加几颗各有自己可用态的按钮。把整块压灰会连带把可读的内容也压掉，而「读不了」从来不是这里要表达的事",
+      "evidence": "Sources/ClipboardHistoryApp/Views/DetailView.swift 缺席:Sources/ClipboardHistoryApp/Views/DetailView.swift=disabled"
+    },
+    {
+      "surface": "主窗口/侧栏",
+      "state": "选中",
+      "verdict": "kept",
+      "reason": "分类选中是整行药丸加图标同色，跟着 selection 走一档动画；这一格本来就有，判过之后保留",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `selected`（9 处）与 `.animation(for: .selection)`"
+    },
+    {
+      "surface": "设置窗口/侧栏",
+      "state": "空",
+      "verdict": "not-applicable",
+      "reason": "分类是常量，六行永远在：这一屏不存在「空的侧栏」。这里刻意**不引用文件级缺席** —— SettingsView 同时装着六个分区，文件级缺席说明不了侧栏那一列的事（U-463）",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsCategory`（allCases 常量）"
+    },
+    {
+      "surface": "设置窗口/侧栏",
+      "state": "加载",
+      "verdict": "not-applicable",
+      "reason": "侧栏行不等待任何 IO：分类与选中项都在内存里。这里可以引用文件级缺席，因为说的是「这一屏没有加载态」—— ProgressView 与 isLoading 在整个 SettingsView 里 0 命中（本轮实测）",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=isLoading；Sources/ClipboardHistoryApp/Views/SettingsView.swift"
+    },
+    {
+      "surface": "浮层/列表行",
+      "state": "空",
+      "verdict": "not-applicable",
+      "reason": "没有行就没有这一格：空态由「浮层/空态」那一格承担（那里是一句成句的话，不是骨架）",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `emptyLabel`"
+    },
+    {
+      "surface": "浮层/列表行",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "那一层没有错误通道：查询无结果是「空」不是「错」，写回失败由主窗口提示条说话。整个文件 ProgressView / isLoading / disabled 全 0 命中 ⇒ 它连「在读 / 不能动」的表达都没有",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift；BACKLOG 58"
+    },
+    {
+      "surface": "菜单栏/推荐面板",
+      "state": "成功",
+      "verdict": "not-applicable",
+      "reason": "推荐面板被编译成真 NSMenu，成功回执不在这层：复制成功走主窗口提示条与菜单项文案。该文件 highlight 与 selected 全 0 命中 ⇒ 我们在这层一层反馈都没叠",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift=highlight 缺席:Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift=selected；Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift；BACKLOG 58"
+    },
+    {
       "surface": "主窗口/筛选条",
       "state": "悬停",
       "verdict": "kept",
@@ -480,5 +536,5 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"
     }
   ],
-  "floor_cleared": 60
+  "floor_cleared": 68
 }
