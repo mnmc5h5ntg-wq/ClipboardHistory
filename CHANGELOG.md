@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-### 设置侧栏图标：暗档 22 行「黑底黑图标」修掉，亮档那一半判成通道盲区（R122 / 新开 172 / U-408…U-409 / D-184 · 产品 1 行）
+### 设置侧栏图标：暗档 22 行「黑底黑图标」修掉，亮档那一半判成通道盲区（R122 / 新开 172 / U-408…U-410 / D-184 · 产品 1 行）
 
 - 产品：`SettingsSidebarRow` 的 `.symbolRenderingMode(.hierarchical)` → `.monochrome`。
   六枚侧栏符号里 `wand.and.stars`（推荐）与 `chart.bar`（统计）是仅有的两枚**多色符号**，

@@ -11063,7 +11063,7 @@ R107 把分类法写在注释里，从没当判据跑过；R119 因此在三种�
 - 本轮新读数族（`ledger_rows.py` 搬运 600 行里的族计数）：`CARD_PROBE_ARM_VERDICT:12 CARD_PROBE_CAPABILITY:2 CARD_PROBE_WITNESS:12 CARD_PROBE_DETAIL_TREE:12 CARD_PROBE_COLUMNS:12 TEXT_SIDE_CAPABILITY:2`，`--must-include 声明=6 缺=0`
 - 未解析到的格子：`构建 / 在屏那一卷 / 曲线仪器 / 总结论` —— 本轮没有跑 `r102_closeout.py` 那种带标记的汇总日志，所以这几格按实记为**没跑**，不补数（U-264③ 的规矩）。
 
-## Round 122 · 侧栏图标：暗档 22 行"黑底黑图标"修掉，亮档那一半判成通道盲区（新开 172 / U-408…U-409 / D-184 · 产品 1 行）
+## Round 122 · 侧栏图标：暗档 22 行"黑底黑图标"修掉，亮档那一半判成通道盲区（新开 172 / U-408…U-410 / D-184 · 产品 1 行）
 
 ### 0. 开场缺陷清单
 
