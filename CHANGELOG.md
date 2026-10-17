@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 把 127 轮的动效判断变成一张可判的表：18 格有结论、144 格显式未清账（R127 / 173 追记 2 / U-423…U-425 / D-189 · 产品 0 改动）
+
+- 新增 `docs/motion_surface_ledger.json`：18 个表面 × 9 个状态 = 162 格，先清 18 格，
+  每格一个 verdict（`added` / `kept` / `not-added` / `not-applicable` / `not-measured`）+ 一条理由 + 一个证据指针。
+  三条「不加 / 不适用」是这张表最有价值的部分：它们证明"不加"也是判过的结果。
+- 新增 `scripts/motion_surface_gate.py`：七种不合法各有代码（重格、名册外的格子、verdict 不在词表、
+  理由过短、没有证据指针、行数低于地板、地板大于行数）。**未清账只数不红** ——
+  给"没判过"配红等于命令下一轮把 162 格填满，而填满唯一省力的办法就是造没作用的动画（D-189②）。
+- 地板取已清账行数（单调量），不取覆盖率；覆盖率会被名册扩张稀释（这一格已知不足，记 U-425）。
+- 自检 9 条（脚本电池 244 → **253 OK**），含「真表必须过自己的闸门」与「格子总数必须大于行数」两条防自欺。
+- 变异第 30 张 `mutate_r127.py`：M631 摘掉重格检查 / M632 让理由长度恒过 ⇒ 两刀 CAUGHT（刀数 107 → 109，caught 106 → 108）。
+- 自坏三条：**U-423** 变异表第一版两臂报 `PASSED`，其实是 `Ran 0 tests / OK`（`discover -p` 的 pattern 被拼成
+  `test_test_motion_surface_gate.py`）⇒ 现在 verdict 之前先读 `Ran N tests`，N=0 一律 `DID-NOT-RUN`；
+  **U-424** 证据指针只判非空，9 行只写了轮次号 ⇒ 下一轮加形状判据（本轮登记不掩盖）；
+  **U-425** 地板防删行但不防名册扩张，同样登记。
 ### runner 那一行盲区名单按它自己印的键登记；登记表加上两格本机就能红的结构判据（R126 / 171 全结案 / 173 改判 / U-420…U-422 / D-188 · 产品 0 改动）
 
 - R124 故意留的那朵红交出键来（run 39031123341）：
