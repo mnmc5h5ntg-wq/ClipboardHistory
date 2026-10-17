@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R116 那条对账守卫在 runner 上第一次跑就红：我把本机的绝对坐标当成了契约（R118 / U-395…U-397 · 产品 0 改动）
+
+- **R116 那条对账守卫在 runner 上第一次跑就红**（run 39021652718 / `0ac7851`）：`SIDEBAR_ROSTER_RECT 台账=60..252 树给=342..534 行数=6 上界差=282.0pt 下界差=282.0pt` —— 同一份代码、同一个 720×540 帧，**整条侧栏在 runner 上往下挪了 282pt**，而行高（32pt）与行数（6）一点没变。
+- 判据改成机器无关的三件事：比**高度**（≤1pt）、比**行数**（== `SettingsCategory.allCases`）、
+  绝对偏移**只报不判**（新增 `SIDEBAR_ROSTER_OFFSET`）。
+- `TEXT_SIDE`（暗档盲区名单那条守卫）也改吃 `sidebarTextBands`：x 来自台账、y 来自树给的六行
+  ⇒ 两台机器量的都是"那六行"，不再依赖任何一台机器的坐标系。
+  本机读数随之变化并如实报出：`亮侧 851 → 752`（行带之间那 8pt 缝隙不再进框）、`暗侧 2990` 不变、
+  `TEXT_SIDE_BANDS … 行带数=6 首行y=60`、名单仍 `13 of 13`。
+- 刀 M612（矩形高度改回 154 ⇒ 高度对账红）、M613（行带助手返回空 ⇒ 盲区名单等式红）——
+  2/2 CAUGHT、`RESTORE_CLEAN=yes`；变异表 23 张。
+- 两条自坏：U-396 新变量名撞上既有 `static func textBands`，而声明又插进了另一个测试
+  （只留一条 unused warning ⇒ "unused 变量"通常意味着插错地方）；
+  U-397 改名按"含关键词的行"做，emit 跨两行漏了第二行（同一根因本轮两次）。
+- 验证：全量 **827** 例 / 41 skip / 0 failures；捕获 67 例 / 4 skip / 0 failures；
+  帧 136 张 `CHANGED=0`（只动尺，不动产品与夹具）；脚本电池 239。
 ### 给 150 装了「详情列有没有东西」的树侧证人，并把 runner 读数落盘（R117 / U-392…U-394 · 产品 0 改动）
 
 - 新增 `CARD_PROBE_DETAIL_TREE`：报详情列里的 `嵌套hosting` 层数与**列内视图总数**。

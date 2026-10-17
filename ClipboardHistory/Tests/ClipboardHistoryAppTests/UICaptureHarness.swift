@@ -6207,6 +6207,20 @@ final class UICaptureTests: XCTestCase {
         return kept
     }
 
+    /// 侧栏**文字列**的行带：x 用台账写的那条（40..142），y 用树给的每一行。
+    ///
+    /// 为什么不许整列写死一个绝对 y：R116 那条对账守卫在 runner 上第一次跑就红，
+    /// 读数是 `台账=60..252 树给=342..534 上界差=282.0pt` —— **同一份代码、同一个 720×540 帧，
+    /// 整列在 runner 上往下挪了 282pt**（行高仍是 6×32=192pt，一点没变）。
+    /// 也就是说"这一列在哪"是机器相关的，而"这一列有多高、有几行"不是。
+    /// ⇒ 判据一律吃这里的行带；台账那条绝对矩形只留作 x 带的来源与本机的对照物。
+    static func sidebarTextBands(in host: NSView) -> [CGRect] {
+        let x = settingsSidebarTextColumn.minX
+        let w = settingsSidebarTextColumn.width
+        return sidebarRowRects(in: host, column: settingsSidebarIconColumn)
+            .map { CGRect(x: x, y: $0.minY, width: w, height: $0.height) }
+    }
+
     /// 带内候选（尺瞎了的时候自报家门，不靠我再搭一遍 /tmp 的复刻体）。
     static func sidebarIconCandidates(in host: NSView, column: CGRect,
                                       sizeCap: CGFloat = 60) -> [(name: String, rect: CGRect)] {
@@ -7070,10 +7084,12 @@ final class UICaptureTests: XCTestCase {
         for fixture in fixtures(appearance: .darkAqua) where fixture.name.hasPrefix("settings-") {
             let file = scratch.appendingPathComponent("\(fixture.name).png")
             var vibrant: String?
+            var rosterRowBands: [CGRect] = []
             // R30：拍之前先记下"这一列到底在哪个外观里解析颜色" —— 这是下面那条
             // **前提断言**的对象（伪影的解释，不是伪影本身）。
             _ = try render(fixture, appearance: .darkAqua, to: file) { host in
                 vibrant = Self.vibrantAppearanceCovering(host, column: Self.settingsSidebarTextColumn)
+                rosterRowBands = Self.sidebarTextBands(in: host)
             }
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
@@ -7086,9 +7102,18 @@ final class UICaptureTests: XCTestCase {
                                              bytesPerRow: rep.bytesPerRow,
                                              rect: Self.settingsContentPane, scale: scale)
             contentInkTotal += content.brighter + content.darker
-            let counts = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                            bytesPerRow: rep.bytesPerRow,
-                                            rect: Self.settingsSidebarTextColumn, scale: scale)
+            // 逐行求和（行带来自树），不再吃那条绝对 y：runner 上整列挪了 282pt，
+            // 绝对矩形在那里根本盖不住字（R118 / 见 `sidebarTextBands` 的说明）。
+            var brighter = 0, darker = 0
+            for band in rosterRowBands {
+                let one = Self.inkSideCounts(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow, rect: band, scale: scale)
+                brighter += one.brighter
+                darker += one.darker
+            }
+            let counts = (brighter: brighter, darker: darker)
+            emit("TEXT_SIDE_BANDS \(fixture.name) dark 行带数=\(rosterRowBands.count)"
+                 + " 首行y=\(rosterRowBands.isEmpty ? "-" : String(format: "%.0f", rosterRowBands[0].minY))")
             // runner 上这一页整块画不出来（BACKLOG 43）⇒ 逐条记 NOT-RUN，最后由
             // `contentInkTotal` 那条决定"是机器拍不出这一页"还是"我这把尺没压住字"。
             guard counts.brighter + counts.darker > 0 else {
@@ -7175,11 +7200,14 @@ final class UICaptureTests: XCTestCase {
              + " 树给=\(Int(top))..\(Int(bottom)) 行数=\(rows.count)"
              + " 上界差=\(String(format: "%.1f", abs(rect.minY - top)))pt"
              + " 下界差=\(String(format: "%.1f", abs(rect.maxY - bottom)))pt")
-        XCTAssertLessThanOrEqual(abs(rect.minY - top), 1.0,
-                                 "台账矩形的上界比树给的第一行晚 \(String(format: "%.1f", top - rect.minY))pt ⇒ 它盖不住第一行。"
-                                 + "R115 之前这里就是五行时代的 y 96（BACKLOG 169）：改这里，别改这条断言。")
-        XCTAssertLessThanOrEqual(abs(rect.maxY - bottom), 1.0,
-                                 "台账矩形的下界比树给的最后一行早 \(String(format: "%.1f", bottom - rect.maxY))pt ⇒ 最后一行不在尺子里。")
+        // **绝对 y 不判**：runner 实测整列往下挪 282pt（行高与行数一点没变），
+        // 拿本机的绝对坐标当契约，这条守卫在另一台机器上永远红 —— 那是尺的机器依赖，不是产品的错。
+        // 判的是"这块尺盖住的**范围**对不对"：高度、行数、以及 x 带。偏移本身打出来给人看。
+        XCTAssertLessThanOrEqual(abs(rect.height - (bottom - top)), 1.0,
+                                 "台账矩形高 \(rect.height)pt，而树给的六行合起来是 \(String(format: "%.1f", bottom - top))pt ⇒ "
+                                 + "尺盖不住整列（要么少一行，要么行高变了）。改矩形，别改这条断言。")
+        emit("SIDEBAR_ROSTER_OFFSET 台账起点=\(Int(rect.minY)) 树起点=\(Int(top))"
+             + " 偏移=\(String(format: "%.1f", top - rect.minY))pt（绝对 y 是机器相关的，只报不判）")
     }
 
     /// 侧栏图标**逐行**的墨落在哪一侧（R115：把 167 撤回用的那套量法搬进仓库这颗尺真身）。

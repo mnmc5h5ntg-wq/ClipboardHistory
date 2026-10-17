@@ -43,7 +43,7 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^SIDEBAR_ROSTER[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
                    # R105：浮层左轴那三行（`QUICKPICK_SEARCH_AXIS` / `_AXIS_CAPABILITY` / `_AXIS_DECLINED`）
                    #   同样是空格分隔 ⇒ 走第二个分支。R104 的 §8 把它们漏在了搬运之外
                    #   （那一轮 §8 的"本轮读数"只有 `CARD_*`），本轮补上 —— 判据的结论行必须与它的
