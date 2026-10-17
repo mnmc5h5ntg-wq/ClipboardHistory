@@ -22,6 +22,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   （暗档 1.40:1 高于亮档 1.08:1，「几乎同色」的方向是反的）；179 撤回并改名；新开 181–185。
 - **BACKLOG 184 当场结案**：清账表的地板原来只与同一份文件里的行数比 ⇒「删五行 + 地板降五」不会红。
   新增出口 `FLOOR_WENT_BACK`（基准压在 `git show HEAD:` 那一版上），临时落刀实测旧判据绿、新出口红，还原后 ok。
+- **读自己那一跑的 CI（run 39052480365）翻出三件事**：① 我新写的那条产品入口判据在 runner 上红
+  （`128 < 141`，"左右边占总量 5%" 是**本机读数**推出来的门限）⇒ 换成跟环的几何走的对边比 + 单边绝对地板 80（U-486）；
+  ② 脚本电池里那格红在 `No module named pytest`（runner 没装 pytest），报出来的话却是"样张那一卷自己没通过"
+  ⇒ 样张本来就是 unittest 形状，改成 `python -m unittest scripts.tests.test_ci_capture_gate`，不依赖第三方；
+  ③ 在屏探针那一卷在 runner 上挂在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`
+  —— 我先怀疑自己改坏了报告脚本，拿同一份合成日志在 `28246ed` 版上跑，退出码同样是 1 ⇒ 归因排除，新开 BACKLOG 186。
 - **BACKLOG 181 当场结案**：`AGENT_FINAL_REPORT.md` §9.3 那三句"仍未收口"此前连着三轮与台账相反，而这份文件没有任何守卫。
   新增 `scripts/tests/test_final_report_claims.py`（4 格：现状干净 + 三格内存伪造的正对照），
   把「还有 NN 格未判」「这一件仍未发生」「都还没有各自的自动化守卫」三句分别绑到

@@ -47,10 +47,14 @@ class GateMarkerHygieneTests(unittest.TestCase):
 
     def test_the_sample_suite_prints_no_production_marker(self):
         labels = production_labels()
+        # R143：原来这里跑 `python -m pytest`。本机装了 pytest 所以一直是绿的，
+        # 而 runner 上（homebrew python 3.14）**没有 pytest** ⇒ 整卷红在
+        # `No module named pytest`，报出来的却是"样张那一卷自己没通过"——一个错的解释盖住了一个真的环境差异。
+        # 样张那一卷本来就是 unittest 形状，所以直接用它自己的运行器，不引入第三方依赖。
         proc = subprocess.Popen(
-            [sys.executable, "-m", "pytest",
-             os.path.join("scripts", "tests", "test_ci_capture_gate.py"), "-q", "--no-header"],
-            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            [sys.executable, "-m", "unittest", "-v", "scripts.tests.test_ci_capture_gate"],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            env=dict(os.environ, PYTHONPATH=ROOT, PYTHONUTF8="1"))
         out = proc.communicate()[0].decode("utf-8", "replace")
         self.assertEqual(0, proc.returncode, "样张那一卷自己没通过（先把上面那卷修绿再看这一格）：\n%s" % out[-800:])
         self.assertEqual([], markers_present(out, labels),

@@ -4628,3 +4628,13 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
 ③ 那一圈在离屏通道里画得出来（1330 / 1329，与 R143 修好的判据读数同量级）。
 ⇒ 177 照原计划做（`SettingsCategory.shortcuts` 加录制态变体，136 → 138，`--must-include` 同步改，同一轮里 `update` 基线），
 **不再有"通道可能拍不到"这个前提**；下一轮（R144）第一件事就是它。
+186. **runner 上在屏探针那一卷这次**挂**在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`**（R143 读 `1427e46` 那跑开，run 39052480365）：
+    三个读数一起看才是这一格的形状 —— `UI_PROBE_HUNG=testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`
+    与 `=testRightClickMenusAppKitWouldShowAreChinese`（后者一次没轮到）、
+    `PROBE_COVERAGE_SUMMARY … 本次下结论=5 红=1`（那 1 条红就是 NOT_RUN：登记 `runner=can` 而日志里没有它的结论行）。
+    ⇒ 这一跑 CI 红**不是**产品判据红，也不是我改的脚本坏（同一份合成日志在 `28246ed` 版脚本上退出码同样是 1，实测对过）；
+    是那一卷没跑完。
+    **下一步**：先按 R87/R118 的规矩拿**两跑**对账（单跑不给产品定罪），如果它换班出现，
+    就把这条用例的 `runner` 登记从 `can` 改成 `cannot` 并写清 reason（挂在哪、什么旁证），
+    而不是把地板放松或把它 skip 掉。挂的成因候选：这条用例要真的 `orderFront` 一扇带选中行的列表窗口，
+    而 runner 上窗口/事件循环的行为与本机不同（R60/R61 那一族的旧账）。

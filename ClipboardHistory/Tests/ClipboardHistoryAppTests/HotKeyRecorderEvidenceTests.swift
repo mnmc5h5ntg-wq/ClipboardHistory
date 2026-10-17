@@ -259,15 +259,22 @@ final class HotKeyRecorderEvidenceTests: XCTestCase {
             "从产品入口点下去之后屏幕上没有出现强调色描边（高色度像素=\(clickedChroma)）⇒ 那一圈没画上，"
                 + "或者按钮→状态→overlay 这条边断了（这一条就是这个断点的证人）")
         for (name, count) in [("上", edges.top), ("下", edges.bottom), ("左", edges.left), ("右", edges.right)] {
-            XCTAssertGreaterThanOrEqual(count, Int(Double(clickedChroma) * 0.05),
-                "高色度像素里" + name + "边只占 \(count)/\(clickedChroma) ⇒ 画出来的不是一圈"
-                    + "（贴边的横带、单边裁切都会红在这里）")
+            XCTAssertGreaterThanOrEqual(count, Self.edgeFloor,
+                "高色度像素里" + name + "边只有 \(count)（地板 \(Self.edgeFloor)）⇒ 那一圈缺了一条边")
         }
+        // 形状那一半用**对边比**，不用「占总量的比例」。一圈的上下两条 ≈ 控件宽、左右两条 ≈ 控件高，
+        // 所以左右本来就远小于上下；第一版的门限是 `0.05 × 总高色度`，那是**本机一个读数**推出来的
+        // （本机左/右 178 / 总 2924 = 6.1%），runner 上同一份代码给 128 / 2828 = 4.5% ⇒ 红（U-486）。
+        // 换成「左右两条加起来 ≥ 上下两条的 5%」之后，判据跟着环自己的几何走，不跟着某台机器的读数走。
+        XCTAssertGreaterThanOrEqual(Double(edges.left + edges.right),
+                                    Double(edges.top + edges.bottom) * 0.05,
+            "左右两条 = \(edges.left)+\(edges.right) 低于上下两条 \(edges.top)+\(edges.bottom) 的 5%"
+                + " ⇒ 画出来的不是圈，是一条贴边的横带")
     }
 
     /// 「我在听」那一圈是一个**承诺**：按下去的键会被这里吃掉。响应者链没接上时不许亮。
     /// R143 审查轮（F7）指出：`makeFirstResponder` 的返回值原来被丢掉，于是"窗口在、链没接上"
-    /// 这一格会画出一圈假的承诺。这一条用例就是那个断点的证人（变异 M668 拆掉守卫，它必须红）。
+    /// 这一格会画出一圈假的承诺。这一条用例就是那个断点的证人（变异 M672 拆掉守卫，它必须红）。
     func testRingDoesNotPromiseListeningWhenTheResponderChainRefuses() throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 220, height: 60),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -457,6 +464,9 @@ final class HotKeyRecorderEvidenceTests: XCTestCase {
 
     /// 高色度像素：`max-min` 通道差超过 60。灰 bezel 与底色到不了这一档，
     /// 所以这一格量的正是"那一圈强调色"，而不是"有没有画东西"。
+    /// 单边地板：runner 实测 128、本机 178 ⇒ 80 留了一倍余量，而「缺一条边」读到的是 0。
+    static let edgeFloor = 80
+
     static let chromaMin = 60
 
     private static func highChromaPixels(_ rep: NSBitmapImageRep) -> Int {
