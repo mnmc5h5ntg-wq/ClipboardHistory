@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 174 与 155 同批结案：runner 第一次说出「这台机器判不了」，覆盖率没掉档（R136 · 清账表 52 → 60 / U-450 · 产品 0 改动）
+
+- run `39038634407`（success）：`出口=这台机器判不了=调度地板 22.13ms 大于省下的 5.64ms`，同行 ② 报 `1.78×`，
+  `MOTION_FLOOR_FACTS judged=3/4 … 红的用例=-` + `MOTION_FLOOR_REDS=0` ⇒ 预登记的两格期望都兑现。
+- **174 结案**：第三个出口在 runner 上被看见用了一次，且没有把覆盖率拖下来；全程未动阈值、未塞 `suite_reds`。
+- **155 结案**：① 被 R136 的读数排除、② 被它支持；耐久事实是这条判据**按机器分范围**（R38 / D-155 同一族）。
+- 清账表 +8 格（热图与浮层的加载/错误、落点的按下/聚焦、状态图标的选中/聚焦），全部缺席立论、逐条由闸门查文件。
+- **U-450**：`ast.parse` 通过而生成器运行时 `NameError`（我把变量留在了打补丁的脚本里），闸门读旧 JSON 仍报 ok
+  ⇒ 证人只认「行数变了」（52 → 60）；静态语法自检留着但替代不了一次真跑（U-444 的第二次）。
+
 ### 清账表 45 → 52 格：筛选条、设置侧栏、浮层输入框、推荐面板判完，并给「挂在 API 默认值上的结论」配了守卫（R135 / U-447…U-449 · 产品 0 改动）
 
 - 七格：主窗口/筛选条 × 悬停与按下（kept）、设置窗口/侧栏 × 聚焦（not-added）与 × 禁用（not-applicable）、

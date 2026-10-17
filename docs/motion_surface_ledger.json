@@ -270,6 +270,62 @@
       "evidence": "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"
     },
     {
+      "surface": "设置窗口/热图",
+      "state": "加载",
+      "verdict": "not-applicable",
+      "reason": "那一屏没有「正在读」这一态：按日计数来自已经在内存里的账本，渲染时不等待任何 IO。（ProgressView 与 isLoading 在该文件各 0 命中，本轮实测）",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=isLoading；Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift"
+    },
+    {
+      "surface": "设置窗口/热图",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "热图自己不报错：写盘与读盘失败的通道是提示条与详情区（BACKLOG 58 那一族），这一屏出现的唯一非常态是「还没有记录」那句成句的话",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=error；Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 的 isEmpty 分支；BACKLOG 58"
+    },
+    {
+      "surface": "浮层/空态",
+      "state": "加载",
+      "verdict": "not-applicable",
+      "reason": "浮层的数据是内存里那份历史，打开即有全貌，没有「读一半」的中间态；空态那一枚标签是 NSTextField 而不是骨架（ProgressView 与 isLoading 在该文件 0 命中）",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `emptyLabel`"
+    },
+    {
+      "surface": "浮层/空态",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "那一层没有错误通道：查询无结果是「空」不是「错」，而写回失败由主窗口提示条说话（浮层关掉之后用户需要知道为什么没粘上）",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=error；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift；BACKLOG 58"
+    },
+    {
+      "surface": "主窗口/拖入落点",
+      "state": "按下",
+      "verdict": "not-applicable",
+      "reason": "落点不是可按压的控件：它唯一的态是「拖拽进来了没有」（isTargeted），描边、过渡与那层光晕全都挂在这一个布尔上。没有手指按住的对应时刻",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.onDrop(of:isTargeted:)` 与 `transition(for: .dropTarget)`"
+    },
+    {
+      "surface": "主窗口/拖入落点",
+      "state": "聚焦",
+      "verdict": "not-applicable",
+      "reason": "键盘没有「把文件放到这里」的对应动作，所以这层不接收焦点；同文件里那处 focusable 是给筛选条留键盘导航的，不在落点上",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.onDrop(of:isTargeted:)`（落点那一段）"
+    },
+    {
+      "surface": "菜单栏/状态图标",
+      "state": "选中",
+      "verdict": "not-applicable",
+      "reason": "NSStatusItem 的按钮没有「选中」这一语义：只有常态与菜单打开时由系统画的高亮，我们一层都没叠（该文件 highlight 与 selected 各 0 命中）",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=highlight 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=selected；Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `statusItem`"
+    },
+    {
+      "surface": "菜单栏/状态图标",
+      "state": "聚焦",
+      "verdict": "not-applicable",
+      "reason": "状态栏图标不在键盘焦点链里：Tab 走的是窗口内的 key-view 环，菜单栏那一行不参与。想让它可达要走系统的全键盘控制，那是另一件事，不该由这里补一层假的焦点环",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"
+    },
+    {
       "surface": "主窗口/筛选条",
       "state": "悬停",
       "verdict": "kept",
@@ -424,5 +480,5 @@
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"
     }
   ],
-  "floor_cleared": 52
+  "floor_cleared": 60
 }

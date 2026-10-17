@@ -129,6 +129,43 @@ rows = [
      "scripts/real_screen_control_chroma.py；BACKLOG 139（R132 结案）"),
     # ---- R134 清掉的六格（浮层那一卷 + 搜索框聚焦 + 设置里的系统控件 + 状态菜单）----
     # ---- R135 清掉的七格（筛选条那一卷 + 设置侧栏 + 浮层输入框 + 推荐面板）----
+    # ---- R136 清掉的八格（热图与浮层的"加载/错误"、落点的"按下/聚焦"、状态图标的"选中/聚焦"）----
+    # 全部是**缺席立论**，所以每条都写成 缺席:路径=词 让闸门去文件里查（U-436）。
+    # 落点那两格刻意不写整文件缺席 —— 那个文件里 pressedStyle 有 2 处、focusable 有 1 处，
+    # 只是它们长在行与药丸上（U-449）。路径一律写字面量：上一版在这里用了 %s 格式化，
+    # 而生成器里没有那些变量 ⇒ NameError，而闸门读的是上一版 JSON 仍然报 ok（U-444 第二次，U-450）。
+    ("设置窗口/热图", "加载", "not-applicable",
+     "那一屏没有「正在读」这一态：按日计数来自已经在内存里的账本，渲染时不等待任何 IO。"
+     "（ProgressView 与 isLoading 在该文件各 0 命中，本轮实测）",
+     "缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=isLoading；Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift"),
+    ("设置窗口/热图", "错误", "not-applicable",
+     "热图自己不报错：写盘与读盘失败的通道是提示条与详情区（BACKLOG 58 那一族），"
+     "这一屏出现的唯一非常态是「还没有记录」那句成句的话",
+     "缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=error；Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 的 isEmpty 分支；BACKLOG 58"),
+    ("浮层/空态", "加载", "not-applicable",
+     "浮层的数据是内存里那份历史，打开即有全貌，没有「读一半」的中间态；"
+     "空态那一枚标签是 NSTextField 而不是骨架（ProgressView 与 isLoading 在该文件 0 命中）",
+     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `emptyLabel`"),
+    ("浮层/空态", "错误", "not-applicable",
+     "那一层没有错误通道：查询无结果是「空」不是「错」，而写回失败由主窗口提示条说话"
+     "（浮层关掉之后用户需要知道为什么没粘上）",
+     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=error；Sources/ClipboardHistoryApp/Managers/QuickPickController.swift；BACKLOG 58"),
+    ("主窗口/拖入落点", "按下", "not-applicable",
+     "落点不是可按压的控件：它唯一的态是「拖拽进来了没有」（isTargeted），"
+     "描边、过渡与那层光晕全都挂在这一个布尔上。没有手指按住的对应时刻",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.onDrop(of:isTargeted:)` 与 `transition(for: .dropTarget)`"),
+    ("主窗口/拖入落点", "聚焦", "not-applicable",
+     "键盘没有「把文件放到这里」的对应动作，所以这层不接收焦点；"
+     "同文件里那处 focusable 是给筛选条留键盘导航的，不在落点上",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.onDrop(of:isTargeted:)`（落点那一段）"),
+    ("菜单栏/状态图标", "选中", "not-applicable",
+     "NSStatusItem 的按钮没有「选中」这一语义：只有常态与菜单打开时由系统画的高亮，"
+     "我们一层都没叠（该文件 highlight 与 selected 各 0 命中）",
+     "缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=highlight 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=selected；Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `statusItem`"),
+    ("菜单栏/状态图标", "聚焦", "not-applicable",
+     "状态栏图标不在键盘焦点链里：Tab 走的是窗口内的 key-view 环，菜单栏那一行不参与。"
+     "想让它可达要走系统的全键盘控制，那是另一件事，不该由这里补一层假的焦点环",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 `installStatusItemIfNeeded`；Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift"),
     ("主窗口/筛选条", "悬停", "kept",
      "缩放与底色两档一起给：减弱动态时缩放归 1.0，底色那一层就是**唯一**的悬停表达 —— "
      "以前这一段只剩缩放一种说法，于是『开了减弱动态 = 悬停没有反馈』",
