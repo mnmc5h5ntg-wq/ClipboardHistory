@@ -6154,7 +6154,29 @@ final class UICaptureTests: XCTestCase {
     static let darkSidebarTextBlindSpotsByMachine: [String: Set<String>] = [
         // 本机（Retina 2x）：R29d / R30 / R39 / R98 一路看帧登记的 13 张。
         "arm64/macOS 27.0/2x": darkSidebarTextBlindSpots,
+        // CI runner（GitHub macos-15，arm64、非 Retina）：**空集是一条声明，不是一行占位**。
+        // 键与空集都不是我猜的 —— 来自 R124 那一跑自己印出来的两行：
+        //   `TEXT_SIDE_ROSTER_KEY arm64/macOS 15.7/1x 本机登记=-1 实测反侧=0 判了 13/13 个夹具`
+        //   （run 39031123341，171 故意留的那朵 `UNKEYED` 红）。
+        // ⇒ 这台机器上侧栏暗档文字**不反侧**（13/13 全部落在期望侧），所以它的盲区位就是空。
+        // 空集仍然被 extra/gone 两格钉着：哪天它反侧了 ⇒ `新盲区` 红；哪天有人往这一行里
+        // 抄进本机那 13 张 ⇒ 这一台的 `不再反侧` 立刻红。
+        "arm64/macOS 15.7/1x": [],
     ]
+
+    /// 键的形状也是判据：`arch/macOS 主次版本/倍率` 三段，倍率只准是 `1x` 或 `2x`。
+    /// 为什么要钉形状：这一行的键必须由**被打印出来的**读数填（D-186③），
+    /// 而"看起来像 runner 的键"（`runner`、`CI`、`macos-15`）都能通过 `count >= 2` 那种懒判据，
+    /// 却永远不会被命中 —— 那是一条死行，比没有更坏。
+    static func sidebarRosterKeyIsWellFormed(_ key: String) -> Bool {
+        let parts = key.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { return false }
+        let archOK = parts[0] == "arm64" || parts[0] == "x86_64"
+        let os = parts[1]
+        let version = os.hasPrefix("macOS ") && os.dropFirst(6).split(separator: ".").count == 2
+            && os.dropFirst(6).split(separator: ".").allSatisfy { Int($0) != nil }
+        return archOK && version && (parts[2] == "1x" || parts[2] == "2x")
+    }
 
     /// 名单与本机实测的四种关系，各有不同的修法（D-183 的形状：不许共用一个词）。
     enum SidebarRosterVerdict: Equatable {
@@ -8286,6 +8308,24 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(words.count, 5,
                        "四种关系（外加 extra/gone 的计数形状）只打出 \(words.count) 个不同的词：\(words.sorted())")
         // 键本身必须由**量出来**的事实组成：倍率是其中一格，不许写死成"我记得本机是 2x"。
+        for good in ["arm64/macOS 15.7/1x", "x86_64/macOS 26.0/2x", "arm64/macOS 27.0/2x"] {
+            XCTAssertTrue(Self.sidebarRosterKeyIsWellFormed(good), "成形的键被判不成形：\(good)")
+        }
+        for bad in ["runner", "CI", "macos-15", "arm64/macOS 15.7", "arm64/15.7/1x",
+                    "arm64/macOS 15/1x", "arm64/macOS 15.7/3x", "ppc64/macOS 15.7/1x"] {
+            XCTAssertFalse(Self.sidebarRosterKeyIsWellFormed(bad), "不成形的键被判成形：\(bad)")
+        }
+        // R126 / 171：这张表本身要能被本机判 —— 两行都在、键都成形，才谈得上"按机器分键"。
+        XCTAssertGreaterThanOrEqual(Self.darkSidebarTextBlindSpotsByMachine.count, 2,
+            "盲区名单只有 \(Self.darkSidebarTextBlindSpotsByMachine.count) 行 ⇒ 「按机器分键」退化成了"
+                + "一台机器的别名。第二行必须由另一台机器**自己印出来的键**填（D-186③），"
+                + "不许拿本机那一行改名凑数。")
+        let malformed = Self.darkSidebarTextBlindSpotsByMachine.keys
+            .filter { !Self.sidebarRosterKeyIsWellFormed($0) }.sorted()
+        XCTAssert(malformed.isEmpty,
+                  "盲区名单里有 \(malformed.count) 个键不成形：\(malformed) ⇒ 形状是 "
+                      + "`arch/macOS 主次版本/倍率`（倍率只准 1x 或 2x）。不成形的键永远不会被命中，"
+                      + "那是一条看起来像声明的死行（比没有更坏）。")
         let k1 = Self.sidebarRosterMachineKey(scale: 2.0)
         let k2 = Self.sidebarRosterMachineKey(scale: 1.0)
         XCTAssertNotEqual(k1, k2, "键里没带倍率 ⇒ 一台 Retina 与一台非 Retina 会共用同一行盲区名单")
