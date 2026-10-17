@@ -141,6 +141,14 @@ final class HotKeyRecorderButton: NSButton {
     override var acceptsFirstResponder: Bool { true }
 
     func startRecording() {
+        // 「我在听」这一圈是一个**承诺**：按下去的键会被这里吃掉。所以拿不到响应者链的时候
+        // 不许亮 —— R143 的审查轮指出：原来 `makeFirstResponder` 的返回值被丢掉，
+        // 于是"窗口在、但链没接上"这一格会画出一圈假的承诺。
+        // 没有窗口（单元测试里就是这种）不做这个判断：那时既没有承诺也没有观众。
+        if let window = window, !window.makeFirstResponder(self) {
+            NSSound.beep()
+            return
+        }
         setRecording(true)
         title = "请输入快捷键"
         window?.makeFirstResponder(self)

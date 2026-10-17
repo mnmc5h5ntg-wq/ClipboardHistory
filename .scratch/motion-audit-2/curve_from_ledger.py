@@ -28,7 +28,7 @@ HEAD = re.compile(r"^##+\s*Round\s+(\d+)([a-z]?)(?:（[^）]*）)?\s*·", re.MUL
 # 而正文那两行 `ROUNDS=58 last=60` 看着完全像是"账本就到这里"。
 # ⇒ 这正是本文件顶部那段话讲的错，只不过这次坏的是**算曲线的尺**。
 # 收紧成"必须是标题或加粗"，是为了不把正文里引用的旧分（"比 R61 的 96 低"）当成结论行。
-SCORE = re.compile(r"(?:^###\s*自评\s*|[＊*]{2}(?:自评[：:]?\s*)?)(\d{2})(?:\.\d+)?\s*/\s*100|"
+SCORE = re.compile(r"(?:^###\s*自评\s*|[＊*]{2}(?:自评[：:]?\s*)?)(\d{2,3})(?:\.\d+)?\s*/\s*(100|105)|"
                    r"[＊*]{2}均分\s*(\d{2}\.\d{1,2})[＊*]", re.MULTILINE)
 # R98 / U-249 加的第二种写法：R93 起结论行换成 `**均分 91.3**`（七维表下面那一行），不带 "/100"
 # ⇒ 93…98 六轮原来全部被静默跳过，而它照样打印 `last=92`。
@@ -37,7 +37,10 @@ SCORE = re.compile(r"(?:^###\s*自评\s*|[＊*]{2}(?:自评[：:]?\s*)?)(\d{2})(
 
 DERIVED = set()
 
-DIM_ROW = re.compile(r"^\|\s*[^|]+?\s*\|\s*(\d{2,3})\s*\|", re.MULTILINE)
+# R143 审查轮（#22）：R139 起的表写的是 `| 名称 | 14/15 | 依据 |`，而原来只认 `| 14 |` ——
+# 于是"没有结论行时从七维表推导"这条路对现在的表**从来没通过**（129…142 全报 DERIVED_BAD）。
+# 现在两种都认，取分子；分母只用来确认它是"七分制"那一族，不参与求和。
+DIM_ROW = re.compile(r"^\|\s*[^|]+?\s*\|\s*(\d{1,3})(?:\s*/\s*(\d{2,3}))?\s*\|", re.MULTILINE)
 
 
 def derive_from_dimensions(section, round_no):
@@ -50,7 +53,9 @@ def derive_from_dimensions(section, round_no):
     head = section.find(u"七维度自评")
     if head < 0:
         return None
-    rows = [int(r) for r in DIM_ROW.findall(section[head:]) if 0 <= int(r) <= 100]
+    # findall 给元组 ⇒ 取分子（第一组）。分母不是 15 的行不算七分制的一行。
+    pairs = [(int(a), int(b) if b else 15) for a, b in DIM_ROW.findall(section[head:])]
+    rows = [num for num, den in pairs if 0 <= num <= 105 and den in (14, 15)]
     if len(rows) != 7:
         print("DERIVED_BAD=%s 七维表读到 %d 行（要 7 行）⇒ 这一轮不给推导值"
               % (round_no, len(rows)), file=sys.stderr)

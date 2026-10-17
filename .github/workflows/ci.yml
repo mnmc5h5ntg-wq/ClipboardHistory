@@ -320,12 +320,22 @@ jobs:
       # 三条前提仍缺一不可（`executed` 有值、结论行在、judged 读得出），
       # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）—— 这一条由脚本的单测钉住。
       - name: Release script tests
+        # R143 审查轮（#32）：原来这三行几乎恒真 —— `grep -q "OK"` 会被自检自己打的
+        # `… exit=1   OK` 那十几行喂饱（汇总之后也还有），`Ran [0-9]+ tests` 漏掉单数 `Ran 1 test`，
+        # 而没有 `set -o pipefail` 时套件自己的退出码根本到不了这一步。现在：
+        # 汇总行必须**紧跟在 Ran 之后**、失败数必须为 0、跑到的用例数要过地板。
         run: |
+          set -o pipefail
           python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
-          grep -q "OK" /tmp/py.log
-          executed=$(grep -oE 'Ran [0-9]+ tests' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
+          status=$?
+          echo "suite exit: $status"
+          tail -6 /tmp/py.log
+          [ "$status" -eq 0 ] || exit 1
+          grep -Eq '^OK$' /tmp/py.log || { echo "PYTHON_SUMMARY_MISSING=1 没有汇总行 OK"; exit 1; }
+          grep -Eq '^FAILED' /tmp/py.log && { echo "PYTHON_SUMMARY_FAILED=1 汇总行是 FAILED"; exit 1; }
+          executed=$(grep -oE 'Ran [0-9]+ tests?' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
           echo "python cases: $executed"
-          test "$executed" -ge 48
+          test "${executed:-0}" -ge 250
 
       # 打包链路不产出可分发物，但必须能跑通：上一轮的缺陷正是"每一步都 || true"，
       # 于是缺键的 Info.plist 也算构建成功。这里跑脚本级校验，避免整包 universal 构建拖慢 CI。

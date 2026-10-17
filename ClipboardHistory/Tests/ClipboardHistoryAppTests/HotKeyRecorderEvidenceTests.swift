@@ -20,7 +20,9 @@ import XCTest
 ///    `CHANGED=0` 的原因，也是变异刀 M660 的靶。
 ///
 /// **覆盖管线**：渲染的是产品自己的 `HotKeyRecorderRing`，底色是设置页的
-/// `windowBackgroundColor`，尺寸是 `SettingsView:807` 给的那一框 128×28pt，亮暗两种外观都走；
+/// `windowBackgroundColor`；尺寸按 `SettingsView:807` 那一框给 128×28pt —— 但**产品实际画的是 128×24**
+/// （`.rounded` bezel 的固有高度把 representable 夹到 24pt；R143 实测宿主 frame=(16,18,128,24)），
+/// 所以组件级那一格量的是 128×28 的**理想框**，真框那一半由产品入口那条用例量。亮暗两种外观都走；
 /// 而「那一圈确实是录制器自己挂的」由 `testRecorderBodyRoutesThroughTheProductRing`
 /// 这条源码守卫钉住（不是「我测了个替身」）。
 /// **不覆盖**：**触发**那一半（真的点下去、真的进录制态）在离屏通道里做不到 ——
@@ -227,32 +229,81 @@ final class HotKeyRecorderEvidenceTests: XCTestCase {
 
     // MARK: - 从产品入口进：真的点一下那颗按钮
 
-    /// AGENTS.md 的硬规矩：修复的验收测试必须**从产品入口进入**。
-    /// 上面那两条像素判据渲染的是 `HotKeyRecorderRing` 本身 —— 那是"表达"，不是"点了会怎样"。
     /// 这一条走完整链条：真的 `NSWindow` + 真的 `NSHostingView` 里放产品那个 `HotKeyRecorderView`，
-    /// 在视图树里找到那颗真的 `NSButton`，`performClick` 它，再比两帧。
+    /// 在视图树里找到那颗真的 `NSButton`，`performClick` 它，再比两帧 —— 判的是**那一圈本身**。
     ///
-    /// **但这一条只判"接线"，不判"那一圈"** —— 因为这条通道量不到那一圈。
-    /// 现场（R141，两个各自只抓一次的宿主，同一时刻）：点过与静置两帧之间
-    /// **2940 个像素不同**（标题那 6 个字就是证人），而"点过才有、静置没有"的墨像素是 **0**；
-    /// 同一时刻用 `screencapture` 截真机，点过那一屏有 **1548 个高色度像素**、静置那屏 **0 个**
-    /// （`scripts/real_screen_recorder_ring.py`）。
-    /// ⇒ `cacheDisplay` 不合成挂在 `NSViewRepresentable` **外面**的 SwiftUI overlay。
-    /// 我第一版把这条读成"产品没画"，那是**通道的性质**被当成了产品的性质（BACKLOG 179）。
-    func testClickingTheRealControlRepaintsThroughTheProductEntry() throws {
+    /// **这一条是 R143 审查轮改回来的，改的是一条我自己写错的结论。**
+    /// R141 那天它红着（"点过才有、静置没有"的墨像素 = 0），我据此写下 U-470 / BACKLOG 179：
+    /// "`cacheDisplay` 不合成挂在 `NSViewRepresentable` 外面的 SwiftUI overlay"，并把那一圈的判据搬去真机通道。
+    /// 审查轮用同样的结构逐字重跑同一条通道，读到 **2924 个高色度像素** ⇒ 通道一直是好的，坏的是我的量法：
+    /// `backgroundLuma` 取整幅中位数，而控件之外全是**透明像素（luma=0）** ⇒ bg≈0 ⇒
+    /// `inkPixels` 数的其实是"整个控件矩形"（52800 = 440×120，两态当然一样），
+    /// 于是 `after 有墨 && before 无墨` **在构造上恒为 0**。
+    /// ⇒ U-470 撤回；真正的教训是 U-479：**两条读数矛盾时，先证明两边量的是同一个对象** ——
+    /// 我拿一把坏尺给的 0，去推翻一条真通道给的 1548，方向反了，还把它写进了四处台账。
+    func testClickingTheRealControlDrawsTheRingThroughTheProductEntry() throws {
         let idle = try Self.renderRealControl(clicked: false)
         let clicked = try Self.renderRealControl(clicked: true)
-        let bg = Self.backgroundLuma(clicked)
         let differing = Self.differingPixels(idle, clicked)
-        CaptureReadings.emit("RECORDER_ENTRY 通道=cacheDisplay 静置墨=\(Self.inkPixels(idle, bg: bg)) "
-                             + "点击后墨=\(Self.inkPixels(clicked, bg: bg)) "
-                             + "新增墨=\(Self.newInkPixels(idle, clicked, bg: bg)) 不同像素=\(differing) "
-                             + "（这一条只判接线；那一圈由真机通道判）")
-        XCTAssertGreaterThan(Self.inkPixels(idle, bg: bg), 0,
-            "静置那一帧连一颗按钮都没有 ⇒ 通道坏了或者宿主没布局，后面的比较全是空的")
+        let idleChroma = Self.highChromaPixels(idle)
+        let clickedChroma = Self.highChromaPixels(clicked)
+        let edges = Self.chromaByEdge(clicked)
+        CaptureReadings.emit("RECORDER_ENTRY 通道=cacheDisplay 不同像素=\(differing) "
+                             + "静置高色度=\(idleChroma) 点击后高色度=\(clickedChroma) "
+                             + "四边高色度=上\(edges.top)/下\(edges.bottom)/左\(edges.left)/右\(edges.right)")
         XCTAssertGreaterThan(differing, 200,
-            "从产品入口点下去之后这条视图树一个像素都没变（不同像素=\(differing)）⇒ 点击没走到状态、"
-                + "或者状态没走到视图 —— 那才是这一条要抓的东西")
+            "点下去之后这条视图树一个像素都没变（不同像素=\(differing)）⇒ 点击没走到状态、或者状态没走到视图")
+        XCTAssertEqual(idleChroma, 0,
+            "静置态读到 \(idleChroma) 个高色度像素 ⇒ 那一圈在没在录制的时候也在画（每一张快捷键帧都会变）")
+        XCTAssertGreaterThanOrEqual(clickedChroma, 200,
+            "从产品入口点下去之后屏幕上没有出现强调色描边（高色度像素=\(clickedChroma)）⇒ 那一圈没画上，"
+                + "或者按钮→状态→overlay 这条边断了（这一条就是这个断点的证人）")
+        for (name, count) in [("上", edges.top), ("下", edges.bottom), ("左", edges.left), ("右", edges.right)] {
+            XCTAssertGreaterThanOrEqual(count, Int(Double(clickedChroma) * 0.05),
+                "高色度像素里" + name + "边只占 \(count)/\(clickedChroma) ⇒ 画出来的不是一圈"
+                    + "（贴边的横带、单边裁切都会红在这里）")
+        }
+    }
+
+    /// 「我在听」那一圈是一个**承诺**：按下去的键会被这里吃掉。响应者链没接上时不许亮。
+    /// R143 审查轮（F7）指出：`makeFirstResponder` 的返回值原来被丢掉，于是"窗口在、链没接上"
+    /// 这一格会画出一圈假的承诺。这一条用例就是那个断点的证人（变异 M668 拆掉守卫，它必须红）。
+    func testRingDoesNotPromiseListeningWhenTheResponderChainRefuses() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 220, height: 60),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let blocker = RefusingFirstResponder()
+        blocker.frame = NSRect(x: 0, y: 0, width: 100, height: 20)
+        window.contentView?.addSubview(blocker)
+        let host = NSHostingView(rootView: HotKeyRecorderView(
+            shortcut: .constant(HotKeyShortcut.defaultShortcut), onInvalidShortcut: {}))
+        host.frame = NSRect(x: 0, y: 0, width: 220, height: 60)
+        window.contentView?.addSubview(host)
+        window.setFrameTopLeftPoint(NSPoint(x: -4000, y: -4000))
+        window.orderFront(nil)
+        host.layoutSubtreeIfNeeded()
+        Self.spin(0.05)
+        window.makeFirstResponder(blocker)
+        guard let button = Self.firstButton(in: host) else {
+            window.orderOut(nil)
+            XCTFail("视图树里找不到那颗 NSButton ⇒ 无从判定")
+            return
+        }
+        button.performClick(nil)
+        Self.spin(0.45)
+        let shot = try Self.grab(host, scale: 2)
+        let chroma = Self.highChromaPixels(shot)
+        window.orderOut(nil)
+        CaptureReadings.emit("RECORDER_REFUSING_CHAIN 高色度=\(chroma) 录制中=\(button.isRecording)")
+        XCTAssertEqual(chroma, 0,
+            "响应者链拒绝交接时仍然亮出那一圈（高色度=\(chroma)）⇒ 屏幕在说「按下去会被记下来」，"
+                + "而实际按键不会到这里 —— 这是假承诺，比没有反馈更坏")
+        XCTAssertFalse(button.isRecording, "同一件事的模型值侧：拿不到链就不该进入录制态")
+    }
+
+    /// 一个"占着响应者且不肯让"的视图：用来造出 `makeFirstResponder` 返回 false 的那一格。
+    private final class RefusingFirstResponder: NSView {
+        override var acceptsFirstResponder: Bool { true }
+        override func resignFirstResponder() -> Bool { false }
     }
 
     /// 真的 `NSWindow` + 真的 `NSHostingView` 里放产品那个 `HotKeyRecorderView`，
@@ -298,9 +349,19 @@ final class HotKeyRecorderEvidenceTests: XCTestCase {
                       "只在手动 spike 时跑（会把窗口摆到屏幕上）")
         let clicked = try renderRealControlOnScreen(clicked: true)
         let idle = try renderRealControlOnScreen(clicked: false)
-        let rect = clicked.frame
-        let screenH = NSScreen.main?.frame.height ?? 0
-        let text = "\(Int(rect.minX)),\(Int(screenH - rect.maxY)),\(Int(rect.width)),\(Int(rect.height))"
+        guard let screen = NSScreen.main else {
+            try? "NO_SCREEN".write(toFile: "/tmp/spike_ring_rect.txt", atomically: true, encoding: .utf8)
+            XCTFail("没有主屏 ⇒ 这一格是没跑（锁屏/休眠），不许由 python 那边猜坐标")
+            return
+        }
+        // 两扇窗的矩形**都由被测物自己印**（R143 审查轮 #33：python 那边手抄了一个 320pt 的
+        // 横向偏移，Swift 一改布局它就会截到错的那一态，而错法长得像"产品没画"）。
+        let screenH = screen.frame.height
+        func box(_ window: NSWindow) -> String {
+            let r = window.frame
+            return "\(Int(r.minX)),\(Int(screenH - r.maxY)),\(Int(r.width)),\(Int(r.height))"
+        }
+        let text = box(clicked) + ";" + box(idle)
         try text.write(toFile: "/tmp/spike_ring_rect.txt", atomically: true, encoding: .utf8)
         CaptureReadings.emit("SPIKE_RING rect=\(text) 两窗都在屏上，等待外部截图")
         RunLoop.current.run(until: Date().addingTimeInterval(12))
@@ -373,47 +434,78 @@ final class HotKeyRecorderEvidenceTests: XCTestCase {
         return n
     }
 
-    /// 背景 = 整幅的中位亮度（这颗按钮压在最左/最右都可能，取中位数比取角点稳）。
+    /// 背景 = **不透明像素**的中位亮度。
+    ///
+    /// 原来把透明像素也算进去了：内存里的 `NSBitmapImageRep` 带 alpha（与落盘 PNG 不是一回事），
+    /// 控件之外全是透明 ⇒ 中位数被拉到 0 ⇒ `isInk` 变成"这个像素不是全黑"，
+    /// 于是 `inkPixels` 数到的是整个控件矩形，两态恒等 —— R143 的审查轮就是这么揪出这把坏尺的。
     private static func backgroundLuma(_ rep: NSBitmapImageRep) -> Int {
         var values: [Int] = []
         for py in stride(from: 0, to: rep.pixelsHigh, by: 3) {
             for px in stride(from: 0, to: rep.pixelsWide, by: 3) {
-                values.append(luma(rgb(of: rep, px: px, py: py)))
+                guard let color = rep.colorAt(x: px, y: py), color.alphaComponent > 0.5,
+                      let rgbColor = color.usingColorSpace(.deviceRGB) else { continue }
+                values.append(luma(RGB(r: Int(rgbColor.redComponent * 255),
+                                       g: Int(rgbColor.greenComponent * 255),
+                                       b: Int(rgbColor.blueComponent * 255))))
             }
         }
         values.sort()
+        XCTAssertFalse(values.isEmpty, "整幅没有一个不透明像素 ⇒ 这条通道没量到任何画面，读数不算数")
         return values.isEmpty ? 0 : values[values.count / 2]
     }
 
-    private static func inkPixels(_ rep: NSBitmapImageRep, bg: Int) -> Int {
+    /// 高色度像素：`max-min` 通道差超过 60。灰 bezel 与底色到不了这一档，
+    /// 所以这一格量的正是"那一圈强调色"，而不是"有没有画东西"。
+    static let chromaMin = 60
+
+    private static func highChromaPixels(_ rep: NSBitmapImageRep) -> Int {
         var n = 0
         for py in 0..<rep.pixelsHigh {
-            for px in 0..<rep.pixelsWide where rgb(of: rep, px: px, py: py).isInk(against: bg,
-                                                                                  delta: inkDelta) {
+            for px in 0..<rep.pixelsWide where chroma(of: rep, px: px, py: py) > chromaMin {
                 n += 1
             }
         }
         return n
     }
 
-    /// **新增**的墨：点后是墨、点前不是。这样 bezel 本身（两态都在）不会替那一圈作证。
-    private static func newInkPixels(_ before: NSBitmapImageRep, _ after: NSBitmapImageRep,
-                                     bg: Int) -> Int {
-        guard before.pixelsWide == after.pixelsWide, before.pixelsHigh == after.pixelsHigh else {
-            XCTFail("两帧尺寸不同（\(before.pixelsWide)x\(before.pixelsHigh) vs "
-                    + "\(after.pixelsWide)x\(after.pixelsHigh)）⇒ 比的不是同一块屏幕")
-            return 0
-        }
-        var n = 0
-        for py in 0..<after.pixelsHigh {
-            for px in 0..<after.pixelsWide {
-                let a = rgb(of: after, px: px, py: py)
-                let b = rgb(of: before, px: px, py: py)
-                if a.isInk(against: bg, delta: inkDelta) && !b.isInk(against: bg, delta: inkDelta) { n += 1 }
+    private static func chroma(of rep: NSBitmapImageRep, px: Int, py: Int) -> Int {
+        guard let color = rep.colorAt(x: px, y: py)?.usingColorSpace(.deviceRGB) else { return 0 }
+        let r = color.redComponent, g = color.greenComponent, b = color.blueComponent
+        return Int((max(r, max(g, b)) - min(r, min(g, b))) * 255)
+    }
+
+    /// 把高色度像素按"离哪条边最近"分成四堆 —— 这是"一圈 vs 一条带"的形状判据。
+    private static func chromaByEdge(_ rep: NSBitmapImageRep) -> (top: Int, bottom: Int, left: Int, right: Int) {
+        guard let box = opaqueBoundingBox(rep), box.width > 4, box.height > 4 else { return (0, 0, 0, 0) }
+        var top = 0, bottom = 0, left = 0, right = 0
+        let band = max(3, Int(min(box.width, box.height) * 0.18))
+        for py in Int(box.minY)..<Int(box.maxY) {
+            for px in Int(box.minX)..<Int(box.maxX) where chroma(of: rep, px: px, py: py) > chromaMin {
+                if py - Int(box.minY) < band { top += 1 }
+                if Int(box.maxY) - 1 - py < band { bottom += 1 }
+                if px - Int(box.minX) < band { left += 1 }
+                if Int(box.maxX) - 1 - px < band { right += 1 }
             }
         }
-        return n
+        return (top, bottom, left, right)
     }
+
+    /// 不透明像素的包围盒 = 那颗按钮（含 overlay）实际占的矩形。
+    private static func opaqueBoundingBox(_ rep: NSBitmapImageRep) -> CGRect? {
+        var minX = rep.pixelsWide, minY = rep.pixelsHigh, maxX = -1, maxY = -1
+        for py in 0..<rep.pixelsHigh {
+            for px in 0..<rep.pixelsWide {
+                guard let color = rep.colorAt(x: px, y: py), color.alphaComponent > 0.5 else { continue }
+                minX = min(minX, px); maxX = max(maxX, px)
+                minY = min(minY, py); maxY = max(maxY, py)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return nil }
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+
+
 
     private func renderFrame(appearance: NSAppearance.Name, scale: Int) throws -> NSBitmapImageRep {
         let app = NSApplication.shared

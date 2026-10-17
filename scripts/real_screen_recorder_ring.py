@@ -32,7 +32,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKG = os.path.join(REPO, "ClipboardHistory")
 RECT_FILE = "/tmp/spike_ring_rect.txt"
 SPIKE_TEST = "HotKeyRecorderEvidenceTests/testSpikeOnScreenRingCapture"
-IDLE_X_OFFSET = 320          # spike 用例里两扇窗的横向间距（点过在左、静置在右）
+# 两扇窗的矩形**都由 spike 用例自己印**（`/tmp/spike_ring_rect.txt`，格式 `x,y,w,h;x,y,w,h`）。
+# 这里原来写死 `IDLE_X_OFFSET = 320` 去推静置那一扇 —— 那是把 Swift 的布局手抄进 python，
+# Swift 一改就截错，而截错的形状长得像"产品没画"（R143 审查轮 #33）。
 CHROMA_MIN = 60              # max-min 通道差超过它 = 有彩色（灰 bezel 与底色都到不了）
 STRONG_MIN = 200             # 点过那一屏至少要有这么多高色度像素才算"那一圈在"
 DIFFERENCE_MIN = 20          # 静置那一屏必须**几乎没有**彩色
@@ -40,6 +42,19 @@ DIFFERENCE_MIN = 20          # 静置那一屏必须**几乎没有**彩色
 # 与 real_screen_sidebar_icons.py 共用同一套基础件（辅助功能闸门、矩形解析、外观判定）。
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from real_screen_sidebar_icons import osascript, display_channel_state  # noqa: E402
+
+
+# 退出码是这支脚本对外的**契约**：0=那一圈在、1=这一格没跑、2=真机层面的缺陷。
+# 它必须是模块级的一个对象，而不是藏在 main() 里的一段字面量 ——
+# 否则自测只能抄一份自己的字典去断言自己（那是自我满足，不是检查）。
+EXIT_CODES = {
+    "ring_present": 0,
+    "all_black": 1,
+    "accent_unusable": 1,
+    "ring_absent": 2,
+    "frames_disagree": 2,
+    "undecided": 2,
+}
 
 
 def count_ink(path):
@@ -65,12 +80,29 @@ def count_ink(path):
     return ink, strong, all_black
 
 
-def verdict_of(clicked_strong, idle_strong, clicked_ink, idle_ink):
+def accent_is_chromatic():
+    """系统强调色有没有彩色。没有彩色时这一格**无从判定**，不是产品缺陷（R143 #34 / F4）。
+
+    `AppleAccentColor` = -1 是"石墨灰"；读不到也按无彩色处理 —— 因为整套判据压在色度轴上，
+    灰 accent 下静置与点过都读不到彩色，把那种形状报成"真机缺陷"就是给产品泼脏水。
+    """
+    try:
+        raw = subprocess.run(["defaults", "read", "-g", "AppleAccentColor"],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
+        value = int(raw.decode("utf-8", "replace").strip())
+    except Exception:
+        return False
+    return value >= 0
+
+
+def verdict_of(clicked_strong, idle_strong, clicked_ink, idle_ink, accent_chromatic=True):
     """把两态读数约成一个**有名字**的出口（判据只能用方向与比值，不用绝对像素）。
 
     三种"没画"要分得开：整幅读不到（通道坏）、点过与静置一样（这一圈没画）、
     点过有彩色而静置没有（这一圈在）。所以每一支都有自己的名字与修法。
     """
+    if not accent_chromatic:
+        return "accent_unusable"                # 系统强调色是灰的 ⇒ 色度轴上没有对手，无从判定
     if clicked_ink == 0 or idle_ink == 0:
         return "all_black"                      # 通道坏（没权限 / 显示器睡着）⇒ 不是产品结论
     if clicked_ink < idle_ink * 0.5:
@@ -119,21 +151,26 @@ def main():
                     text = open(RECT_FILE, encoding="utf-8").read().strip()
                 except OSError:
                     continue
-                nums = [int(v) for v in re.findall(r"-?[0-9]+", text)]
-                if len(nums) >= 4:
-                    rect = nums[:4]
+                halves = [seg for seg in text.split(";") if seg.strip()]
+                parsed = [[int(v) for v in re.findall(r"-?[0-9]+", seg)] for seg in halves]
+                if len(parsed) == 2 and all(len(v) >= 4 for v in parsed):
+                    rect = (tuple(parsed[0][:4]), tuple(parsed[1][:4]))
         if rect is None:
-            print("REALSCREEN_NOT_RUN rect（拿不到 spike 用例自己印的矩形 ⇒ 窗口没摆上屏幕）")
+            code = proc.poll()
+            print("REALSCREEN_NOT_RUN rect（拿不到 spike 用例自己印的矩形；spike 退出码=%s）"
+                  "⇒ 窗口没摆上屏幕，或者那条用例被 skip 了（env 名两边没对上）。这一格不是产品结论"
+                  % ("未退出" if code is None else code))
             return 1
-        x, y, w, h = rect
+        clicked_rect, idle_rect = rect
+        x, y, w, h = clicked_rect
         time.sleep(2.0)                         # 等淡入落定（0.16s）+ 两扇窗都画完
         clicked_png, idle_png = "/tmp/real_screen_ring_clicked.png", "/tmp/real_screen_ring_idle.png"
-        for rect_x, path in ((x, clicked_png), (x + IDLE_X_OFFSET, idle_png)):
-            cap = subprocess.run(["screencapture", "-x", "-R%d,%d,%d,%d" % (rect_x, y, w, h), path],
+        for (rect_x, rect_y), path in ((clicked_rect, clicked_png), (idle_rect, idle_png)):
+            cap = subprocess.run(["screencapture", "-x", "-R%d,%d,%d,%d" % (rect_x, rect_y, w, h), path],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if cap.returncode != 0:
                 print("REALSCREEN_NOT_RUN screencapture（区域 %d,%d,%d,%d 退出码 %d）"
-                      "⇒ 通道在跑的过程中又不可用了，这一格不算通过" % (rect_x, y, w, h, cap.returncode))
+                      "⇒ 通道在跑的过程中又不可用了，这一格不算通过" % (rect_x, rect_y, w, h, cap.returncode))
                 return 1
         try:
             c_ink, c_strong, c_black = count_ink(clicked_png)
@@ -141,16 +178,21 @@ def main():
         except ImportError:
             print("REALSCREEN_NOT_RUN pillow（没装 PIL ⇒ 量不了，不算通过）")
             return 1
-        verdict = "all_black" if (c_black or i_black) else verdict_of(c_strong, i_strong, c_ink, i_ink)
-        print("REALSCREEN_RING 矩形=%d,%d,%d,%d 点过：墨=%d 高色度=%d ｜ 静置：墨=%d 高色度=%d ⇒ %s"
-              % (x, y, w, h, c_ink, c_strong, i_ink, i_strong, verdict))
+        accent = accent_is_chromatic()
+        verdict = ("all_black" if (c_black or i_black)
+                   else verdict_of(c_strong, i_strong, c_ink, i_ink, accent_chromatic=accent))
+        print("REALSCREEN_RING 矩形=%s 点过：墨=%d 高色度=%d ｜ 静置：墨=%d 高色度=%d "
+              "accent有彩色=%d ⇒ %s"
+              % (rect_text, c_ink, c_strong, i_ink, i_strong, 1 if accent else 0, verdict))
         print("REALSCREEN_RING_VERDICT=%s（点过那一屏有强调色描边、静置那一屏没有 = 那一圈真的在屏幕上）"
               % verdict)
         for path in (clicked_png, idle_png):
             if not args.keep_png and os.path.exists(path):
                 os.remove(path)
-        return {"ring_present": 0, "ring_absent": 2, "frames_disagree": 2,
-                "undecided": 2, "all_black": 1}.get(verdict, 1)
+        if verdict not in EXIT_CODES:
+            print("REALSCREEN_NOT_RUN unknown_verdict=%s ⇒ 读不到的出口不许被读成通过" % verdict)
+            return 1
+        return EXIT_CODES[verdict]
     finally:
         if proc.poll() is None:
             proc.terminate()                    # spike 自己会在 12 秒后收窗；这里只兜住它卡住的情况

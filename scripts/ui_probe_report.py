@@ -180,8 +180,14 @@ def report(text, runner_alive=None, pulse_text=None):
         # 有名字：挂在哪一条说清了（哪怕同时有崩溃旁证，名字仍然要报出来）
         return lines, True
     if started:
-        lines.append("UI_PROBE_ALL_CONCLUDED=1")
-        return lines, True
+        # R143 审查轮（#26 的兄弟）：`ALL_CONCLUDED` 原来只看"每条 started 都有结论行"，
+        # 而 `failed` 也是结论 ⇒ 一份"六条全红"的日志会被报成"这一卷跑完了"。
+        # 红的那几条必须点名，且这一格的退出码要跟着红。
+        red = sorted({name for name, verdict in CASE.findall(text) if verdict == "failed"})
+        lines.append("UI_PROBE_CONCLUDED_RED=%d%s"
+                     % (len(red), (" " + ",".join(red[:8])) if red else ""))
+        lines.append("UI_PROBE_ALL_CONCLUDED=%d" % (0 if red else 1))
+        return lines, not red
     # 一条用例都没开始。但"没有 Test Case 行"有两种完全不同的成因：
     #   ① 进程真的在第一条用例开口之前就死了（这是**关于产品/环境**的结论）；
     #   ② 喂进来的根本不是 `swift test` 的原始日志，而是 CI 那一步自己的汇报片段

@@ -11,7 +11,8 @@
   AGENT_UI_AUDIT.md        `^## 第 N 轮（R<r>`
   AGENT_VISUAL_ITERATION.md `^## Round <r> · `
   CHANGELOG.md              `^### …R<r>`
-只查"存在"，不查内容 —— 内容对不对仍由别的判据管。
+查的是**标题行**（R143 起）：原来只查文件里有没有 `R<r>` 这串字，于是正文里提一句旧轮次就能喂饱它，而 M655（删掉 CHANGELOG 本轮标题）实测 PASSED。
+只查标题存在，不查内容 —— 内容对不对仍由别的判据管。
 名册下限（最近三轮）是防它退化成恒真：只查一轮时，那一轮恰好没写也不会红。
 """
 import io
@@ -21,10 +22,17 @@ import unittest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 STATE = os.path.join(REPO, "AGENT_STATE.md")
+# R143 收紧：这三条原来只是"文件里任何地方出现 R<r>"，而本文件要查的是**标题**。
+# 散文里提一句旧轮次就能喂饱它 —— 实测 M655（删掉 CHANGELOG 本轮那一行标题）在收紧前是 PASSED，
+# 因为正文里还留着 `R142`。判据要读结构，不读散文（与"守卫要读字段不能读散文"同族）。
+# 三本账的标题形状是本轮实测的（`grep -n '^#'` 各账），不是设想：
+#   AGENT_UI_AUDIT.md         `^## 第 N 轮（R<r> · 日期）：…`
+#   AGENT_VISUAL_ITERATION.md `^## Round <r> · …`
+#   CHANGELOG.md              `^### …（R<r> / U-… · 产品 …）`
 LEDGERS = {
-    "AGENT_UI_AUDIT.md": u"第 %d 轮",
-    "AGENT_VISUAL_ITERATION.md": u"Round %d",
-    "CHANGELOG.md": u"R%d",
+    "AGENT_UI_AUDIT.md": u"^## 第 \\d+ 轮（R%d",
+    "AGENT_VISUAL_ITERATION.md": u"^## Round %d · ",
+    "CHANGELOG.md": u"^### .*（R%d / ",
 }
 LOOKBACK = 3
 
@@ -55,9 +63,9 @@ class RoundBatchTests(unittest.TestCase):
                     continue
                 text = open(path, encoding="utf-8").read()
                 if back == 0:
-                    self.assertTrue(re.search(fmt % this, text),
-                                    "本轮（R%d）在 %s 里没有标题 ⇒ 半批已写" % (this, name))
-                if not re.search(fmt % this, text):
+                    self.assertTrue(re.search(fmt % this, text, re.M),
+                                    "本轮（R%d）在 %s 里没有**标题行** ⇒ 半批已写" % (this, name))
+                if not re.search(fmt % this, text, re.M):
                     missing.append("R%d 缺于 %s" % (this, name))
         self.assertEqual([], missing,
                          "有轮次在三本账里缺一本（这就是『锚点命中 0 次而其余落了盘』的可检查形式）")

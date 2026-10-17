@@ -20,7 +20,7 @@
                  单独的轮次号只是"某个人在某轮写过"（U-424）。
   EVIDENCE_PATH_MISSING
                  指针里写的那个源码/测试文件在仓库里不存在 ⇒ 红（路径写错与根本没这回事，读的人分不出）。
-  ABSENT_CLAIM_FALSE / ABSENT_CLAIM_UNCOVERED
+  ABSENT_CLAIM_FALSE / ABSENT_CLAIM_UNVERIFIABLE
                  理由里写着「某文件里没有某个词」这种**缺席断言**，去查却发现那个词就在里面 ⇒ 红。
                  写法：`缺席:<路径>=<词>`（R131：清账表里一半的 not-applicable 靠的是缺席，
                  而"没量过的缺席"与"没做"在复核时是同一个样子）。
@@ -101,7 +101,9 @@ def evidence_problems(row, where, root=None):
                         % (where, path)))
             continue
         text = io.open(found, encoding="utf-8", errors="replace").read()
-        if token in text:
+        # 比**忽略大小写**：Swift 里 `disabled` 与 `Disabled` 讲的是同一件事，
+        # 原来区分大小写的话，把断言写成 `缺席:X=Disabled` 就能在含 `disabled` 的文件上被"证实"。
+        if token.lower() in text.lower():
             out.append(("ABSENT_CLAIM_FALSE",
                         "%s：写着「%s 里没有 %s」，但它就在里面 ⇒ 这条理由是在替一个没做的东西开脱"
                         % (where, path, token)))
@@ -116,7 +118,12 @@ def check(data, root=None):
     states = data.get("states") or []
     rows = data.get("rows") or []
     floor = data.get("floor_cleared")
+    # 分母只能有一处定义。原来 check() 缺省时回落到 `verdicts`（全部），而 main() 回落到 `[]`
+    # ⇒ 同一份表在"判红"与"报数"两件事上用了两套已清账集合（R143 #13）。
     cleared_verdicts = data.get("cleared_verdicts") or verdicts
+    if not data.get("cleared_verdicts"):
+        problems.append(("BAD_TABLE", "cleared_verdicts 缺失或为空 ⇒ 已清账的名册没有定义，"
+                                      "地板与读数会各说一套"))
     if not verdicts or not surfaces or not states:
         problems.append(("BAD_TABLE", "verdicts / surfaces / states 三个名册都不许为空"))
     if not isinstance(floor, int):

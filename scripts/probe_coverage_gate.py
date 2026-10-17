@@ -61,6 +61,8 @@ CONCLUDED = re.compile(r"Test Case '-\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\]' (pa
 # 有了执行序它才变成读数。
 ANY_CASE_LINE = re.compile(r"Test Case '-\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\]' (started\.|passed|failed|skipped)")
 ASSERTION_RED = re.compile(r"error: -\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\] : (XCTAssert\w+)([^\n]*)")
+# R143 的洞（独立审查抓出来的，见账）：只认 `XCTAssert` 的话，**崩溃 / 超时 / `XCTFail` 那一类只有结论行、没有断言行**的红会整个看不见 —— 而 `CONCLUDED` 又把 `failed` 算成"下过结论"，# 隔壁 `ci_capture_gate.py` 早就把这两个来源并起来了（它的文档串就写着这句话），这一支漏了。
+CASE_FAILED = re.compile(r"Test Case '-\[[^\]]*?\b(test[A-Za-z0-9_]+)[^\]]*\]' failed")
 
 
 def source_cases(text):
@@ -145,6 +147,16 @@ def analyse(source_names, expectations, log_text):
         detail = message.strip()[:300]
         reds.append("FAILED %s：%s %s" % (name, kind,
                                           detail if detail else "在这份日志里打红了"))
+
+    # 第二个红的来源：**只有结论行**的失败（崩溃 / 超时 / XCTFail）。不并进来的话，
+    # 一份"全部红"的日志会被读成"全部下过结论"⇒ 地板绿。
+    already = {name for name, _k, _m in ASSERTION_RED.findall(log_text)}
+    for name in CASE_FAILED.findall(log_text):
+        if name in already:
+            continue
+        reds.append("FAILED %s：结论行是 failed，而这份日志里没有它的 XCTAssert 行"
+                    "（崩溃 / 超时 / XCTFail 那一类）⇒ 它**下过结论**不等于**通过**" % name)
+        already.add(name)
 
     can = sum(1 for e in expectations.values() if e.get("runner") == "can")
     order, appeared, interleaved = execution_order(log_text)

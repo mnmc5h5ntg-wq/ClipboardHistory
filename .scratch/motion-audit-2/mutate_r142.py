@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R142 的变异表：帧间隔那条相对判据的四颗牙（M666-M669）。
+"""R142 的变异表：帧间隔那条相对判据的牙（M666-M669），R143 审查轮补了名册的两颗（M673-M674）。
 
 R141 的教训照抄到自己身上：一把刀没有靶不算尺没牙（U-467），而"只红一条"必须被读成红（U-466）。
 所以这一轮：① 每一刀都红在**不同**的用例上；② harness 沿用 R141 修好的形状
@@ -11,7 +11,13 @@ R141 的教训照抄到自己身上：一把刀没有靶不算尺没牙（U-467�
   M667 去掉"分母是 0 就无从判定"那道 guard ⇒ 真值表里 XCTAssertNil 那一格要红
   M668 参照从 max(baseline, off) 换成 min ⇒ 真值表里"取 min 会算错"那一格要红
   M669 把三臂读数从 `emit` 换回 `print` ⇒ 读数通道守卫要红
-       （那三行 `FPS-` 在 CI 里从来没被收集到过，就是因为它们走的是块缓冲的 stdout）
+       （R143 更正：`swift test … > /tmp/ui.log 2>&1` 两条通道都进同一个文件，
+         真正的成因是 `print` 的**块缓冲** + 没有任何步骤去 grep 那些行，不是"通道没收集"。）
+  —— 以下两把是 R143 审查轮补的：R142 的台账写"三臂 + 比值 + 机器键一律走 emit"，
+     而当时只有新增那一行走成了 emit，三行 `FPS-` 原地没动，守卫照绿（U-480）。
+  M673 把 `FPS-BASELINE` 那一行写回 `print` ⇒ 名册里冒出一个未登记的标记 ⇒ 红
+  M674 把名册里的一条（`RINGVIEWS`）转成 `emit` ⇒ 登记过期 ⇒ 红
+       （两把一起才有牙：只挡新写法的话，"退了旧登记却忘了改名册"永远绿。）
 
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r142.py [M666 ...]
 """
@@ -40,6 +46,12 @@ ARMS = [
                u"        let reference = min(baselineP95, offP95)")], "CAUGHT"),
     ("M669", PROBE, [(u'        emit("PROBE_FPS 机器=',
                      u'        print("PROBE_FPS 机器=')], "CAUGHT"),
+    # R143 补的两把：读数名册必须**两个方向**都有牙（只挡"新写法"而不挡"旧登记过期"，
+    # 就还是 R142 那个形状 —— 台账说全改了，代码只改了一行，而守卫照绿）。
+    ("M673", PROBE, [(u'        emit("FPS-BASELINE n=',
+                     u'        print("FPS-BASELINE n=')], "CAUGHT"),
+    ("M674", PROBE, [(u'        print("RINGVIEWS 总数=',
+                     u'        emit("RINGVIEWS 总数=')], "CAUGHT"),
 ]
 
 
@@ -60,7 +72,7 @@ def run_suite():
     out = proc.stdout.decode("utf-8", "replace")
     executed = [int(m.group(1)) for m in re.finditer(r"Executed (\d+) tests", out)]
     n = max(executed) if executed else 0
-    summary = re.findall(r"Executed \d+ tests?, with (\d+) failures?", out)
+    summary = re.findall(r"Executed \d+ tests?, with (?:\d+ tests? skipped and )?(\d+) failures?", out)
     failures = sum(int(v) for v in summary) if summary else -1
     names = sorted({m.group(1).split()[-1].split(".")[-1]
                     for m in re.finditer(r"Test Case '([^']+)' failed", out)})
@@ -71,7 +83,17 @@ def run_suite():
 
 def main():
     want = sys.argv[1:]
+    known = {a[0] for a in ARMS}
+    unknown = sorted(set(want) - known)
+    if unknown:
+        # 打错一个臂号就会得到 `CAUGHT=0/0, RESTORE_CLEAN=yes` 与退出码 0 ——
+        # 一把刀都没下也算过关（R143 审查轮 #1）。未知名字必须是硬错。
+        print("ARG_ERROR 不认识这些臂号：%s（认识的是 %s）" % (", ".join(unknown), ", ".join(sorted(known))))
+        return 2
     arms = [a for a in ARMS if not want or a[0] in want]
+    if not arms:
+        print("ARG_ERROR 一臂都没选中 ⇒ 不许读成过关")
+        return 2
     originals = {path: read(path) for path in (PROBE, BUDGET)}
     clock = [time.time() + 10.0]
 

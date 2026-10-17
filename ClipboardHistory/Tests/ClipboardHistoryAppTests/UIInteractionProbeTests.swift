@@ -337,9 +337,9 @@ final class UIInteractionProbeTests: XCTestCase {
         offMeter.stop()
         MotionCatalog.animationsEnabled = true
 
-        print("FPS-BASELINE n=\(baseline.n) p50=\(String(format: "%.2f", baseline.p50))ms p95=\(String(format: "%.2f", baseline.p95))ms worst=\(String(format: "%.1f", baseline.worst))ms >16.7ms:\(baseline.over16) >33.4ms:\(baseline.over33)")
-        print("FPS-MOTION-OFF n=\(off.n) p50=\(String(format: "%.2f", off.p50))ms p95=\(String(format: "%.2f", off.p95))ms worst=\(String(format: "%.1f", off.worst))ms >16.7ms:\(off.over16) >33.4ms:\(off.over33)")
-        print("FPS-LOADED entries=\(store.entries.count) n=\(loaded.n) p50=\(String(format: "%.2f", loaded.p50))ms p95=\(String(format: "%.2f", loaded.p95))ms worst=\(String(format: "%.1f", loaded.worst))ms >16.7ms:\(loaded.over16) >33.4ms:\(loaded.over33)")
+        emit("FPS-BASELINE n=\(baseline.n) p50=\(String(format: "%.2f", baseline.p50))ms p95=\(String(format: "%.2f", baseline.p95))ms worst=\(String(format: "%.1f", baseline.worst))ms >16.7ms:\(baseline.over16) >33.4ms:\(baseline.over33)")
+        emit("FPS-MOTION-OFF n=\(off.n) p50=\(String(format: "%.2f", off.p50))ms p95=\(String(format: "%.2f", off.p95))ms worst=\(String(format: "%.1f", off.worst))ms >16.7ms:\(off.over16) >33.4ms:\(off.over33)")
+        emit("FPS-LOADED entries=\(store.entries.count) n=\(loaded.n) p50=\(String(format: "%.2f", loaded.p50))ms p95=\(String(format: "%.2f", loaded.p95))ms worst=\(String(format: "%.1f", loaded.worst))ms >16.7ms:\(loaded.over16) >33.4ms:\(loaded.over33)")
 
         // R142 / BACKLOG 176：原来那三条断言里，`loaded.p95 ≤ 20ms` 是**本机的数**，
         // 而 runner 自己那条 cadence 就在 25–32ms 之间换班（R103 三跑、R118 两跑都量到过）。
@@ -348,8 +348,11 @@ final class UIInteractionProbeTests: XCTestCase {
         // ⇒ 判据换成**同一次运行内的相对量**：动画那一臂不许比"关掉动画"那一臂差过预算倍。
         //   参照是同一台机器、同一个窗口、同一份驱动，所以它跟着机器负载一起动，不会换班。
         //   绝对数（20ms / 120ms）不再当判过没过的依据：`worst ≤ 120` 留作**粗卡顿锚点**，
-        //   而三条 p95 一律进读数行（`emit`，不是 `print` —— `print` 走块缓冲，
-        //   CI 里那三行 FPS- 从来没被收集到，这次一并修掉）。
+        //   而三条 p95 一律进读数行。**通道事实（R143 更正过一次）**：CI 那一步是
+        //   `swift test … > /tmp/ui.log 2>&1`，stdout 与 stderr 都进同一个文件，所以丢读数的原因
+        //   不是"通道没收集"，而是 `print` 走块缓冲 —— 进程被看门狗收掉时缓冲区里那段没落盘，
+        //   落盘了的那部分也没有任何步骤去 grep 它们（`scripts/ui_probe_report.py` 从 R143 起转发 `PROBE_FPS`）。
+        //   R142 只把新增的 `PROBE_FPS` 一行换成了 emit，这三行 `FPS-` 是 R143 才换的。
         let budget = FrameIntervalBudget.ratio
         let reference = max(baseline.p95, off.p95)
         let ratio = loaded.p95 / max(reference, 0.001)

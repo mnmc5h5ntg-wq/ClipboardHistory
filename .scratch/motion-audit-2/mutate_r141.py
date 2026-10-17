@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R141 的变异表：快捷键录制器那一圈描边的五条判据各配一刀（M660-M664）。
+"""R141 的变异表：快捷键录制器那一圈描边的判据（M660-M665），R143 审查轮又补了三把（M670-M672）。
 
-每一刀都打一条**不同的**判据 —— 五刀若只红在同一格上，说明其中四格没有牙：
+九刀各打在哪里（下面这份是 R143 那次 `CAUGHT=9/9` 的原样读数，不是设想）：
 
   M660 静置态也画那一圈（`strokeWidth(isRecording:false)` 不再返回 0）
        ⇒ 「静置墨像素必须恰好 0」必须红。这一刀同时是旧帧的对照：它红了而帧还不变，
          说明帧基线量不到这一层（那才是真问题）。
   M661 录制态的颜色换成透明 ⇒ 「录制墨 > 0」与强度带都要红。
   M662 把描边换成整块填充 ⇒ 「内部不许有墨」要红（抓"圈 vs 填充"的那颗牙）。
-  M663 撤掉 `.animation(..., value: isRecording)` 那一行 ⇒ 源码守卫要红
-       （R42 那一族：声明了表达而没有驱动）。
-  M664 把 `setRecording` 里的判等去掉 ⇒ 「每次转换恰好一次回调」要红
-       （R85：只数"出现过"的守卫会被另一条出口喂饱）。
+  M663 撤掉 `.animation(..., value: isRecording)` 那一行 ⇒ **只红**源码守卫那一条
+       （R42 那一族：声明了表达而没有驱动 ⇒ 那一格是它唯一的防线）。
+  M664 把 `setRecording` 里的判等去掉 ⇒ **只红**「每次转换恰好一次回调」。
+  M665 宽度归零 ⇒ 与 M661 红集相同（两把刀都把像素量降到 0，一个动颜色一个动宽度）。
+  M670 把 `onRecordingChange` 的闭包抽干（状态不再外传）⇒ **只红**产品入口那一条。
+  M671 overlay 钉死在 `isRecording:false` ⇒ 产品入口 + 接线守卫两条。
+  M672 去掉 `makeFirstResponder` 失败就回退那道守卫 ⇒ **只红**
+       `testRingDoesNotPromiseListeningWhenTheResponderChainRefuses`（R143 F7 的刀）。
+       没有这一把，F7 那一处产品修复就只是"我说过我修了"。
 
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r141.py [M660 ...]
 退出码：0 = 该下的刀都下了且还原干净；1 = 有刀等于没下 / 预检就红 / 还原后仍红。
@@ -46,6 +51,18 @@ ARMS = [
     ("M664", [(u"        guard isRecording != next else { return }\n", u"")], "CAUGHT"),
     ("M665", [(u"        isRecording ? VisualStroke.highlight : 0",
                u"        isRecording ? 0 : 0")], "CAUGHT"),
+    # R143 审查轮补的两把（F2）：**按钮→状态→overlay 这条边**原来一把刀都没有 ——
+    # 把闭包换成空实现，七条用例全绿，而功能整个是死的。
+    ("M670", [(u"                                isRecording = recording",
+               u"                                _ = recording")], "CAUGHT"),
+    ("M671", [(u"            .overlay(HotKeyRecorderRing(isRecording: isRecording))",
+               u"            .overlay(HotKeyRecorderRing(isRecording: false))")], "CAUGHT"),
+    # F7：拿不到响应者链也亮"我在听"那一圈 —— 这一刀把那条守卫拆掉，产品入口那条用例必须红。
+    ("M672", [(u"        if let window = window, !window.makeFirstResponder(self) {\n"
+               u"            NSSound.beep()\n"
+               u"            return\n"
+               u"        }\n",
+               u"        window?.makeFirstResponder(self)\n")], "CAUGHT"),
 ]
 
 
@@ -82,7 +99,7 @@ def run_suite():
     # 第一版按复数写，于是**只红一条**的臂全部读成"没有汇总行"，再被下面判成 PASSED ——
     # M663 与 M660 的第一版就是这么被冤枉成"判据没牙"的（复数能匹配、单数不能，
     # 而"红一条"恰恰是最常见的刀形）。
-    summary = re.findall(r"Executed \d+ tests?, with (\d+) failures?", out)
+    summary = re.findall(r"Executed \d+ tests?, with (?:\d+ tests? skipped and )?(\d+) failures?", out)
     failures = sum(int(v) for v in summary) if summary else -1
     names = sorted({m.group(1).split()[-1].split(".")[-1]
                     for m in re.finditer(r"Test Case '([^']+)' failed", out)})
@@ -93,7 +110,17 @@ def run_suite():
 
 def main():
     want = sys.argv[1:]
+    known = {a[0] for a in ARMS}
+    unknown = sorted(set(want) - known)
+    if unknown:
+        # 打错一个臂号就会得到 `CAUGHT=0/0, RESTORE_CLEAN=yes` 与退出码 0 ——
+        # 一把刀都没下也算过关（R143 审查轮 #1）。未知名字必须是硬错。
+        print("ARG_ERROR 不认识这些臂号：%s（认识的是 %s）" % (", ".join(unknown), ", ".join(sorted(known))))
+        return 2
     arms = [a for a in ARMS if not want or a[0] in want]
+    if not arms:
+        print("ARG_ERROR 一臂都没选中 ⇒ 不许读成过关")
+        return 2
     original = read(PRODUCT)
     clock = [time.time() + 10.0]
 

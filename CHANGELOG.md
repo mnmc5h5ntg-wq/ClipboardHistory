@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 审查轮：四路复审查出 35 条，六条改变了产品或判据（R143 / U-476…U-485 · 产品 1 文件）
+
+- **产品**：快捷键录制器拿不到第一响应者时不再画那一圈（F7，`NSSound.beep()` 后不进录制态），
+  头注释里那句「减弱动态时只是不淡入」是假的 —— `.emphasis` 在 reduce 下**不**降级（F6）。
+- **像素尺**：R141 那条产品入口判据用的 `inkPixels` 是坏尺（透明像素被并进中位数背景 ⇒ 整块控件都被数成墨 ⇒
+  「新增墨」结构上恒为 0）。删掉换色度轴 + 四边形状断言 ⇒ **U-470 / BACKLOG 179 的机制句撤回**
+  （我用这个 0 推翻过真机通道的 1548，并把错的通道事实写进了四本账）。
+- **读数通道**：R142 台账说「三臂一律走 emit」而代码只改了新增那一行 ⇒ 三行 `FPS-` 改完、守卫补负向格、
+  再加一条双向名册（实测 10 行 print / 9 种标记）与两把方向相反的刀 M673 / M674 ⇒ `mutate_r142.py CAUGHT=6/6`。
+- **变异表**：`mutate_r139.py` 整张跑不动（M656 的裸 needle 命中 2 ⇒ DID-NOT-RUN；M655 写死 R138 的标题，
+  窗口滑过之后删它 PASSED）。两处改成按当前状态现取，并把它测的守卫从**读散文**改成**读标题形状** ⇒ 2/2 CAUGHT。
+- **臂号查重**：R141 与 R142 撞了 M666–M668 ⇒ 改名 M670–M672，查重改成扫全部 121 张表
+  （`ARM_TOTAL arms=486 dupes=0`）+ 三格人造正对照（第三格是我第一版真报出的假阳性）。
+- **BACKLOG**：178 复位（上一轮只补回编号、正文那行留在 180 里）+ `D-0xx` 占位符换成真指针 + 量完判为不改
+  （暗档 1.40:1 高于亮档 1.08:1，「几乎同色」的方向是反的）；179 撤回并改名；新开 181–185。
+- 全量 **847 例 / 42 skip / 0 failures**（单独一遍：我先前并发开了两遍，两卷都作废重跑）、
+  `FRAME_BASELINE_COMPARED=136 CHANGED=0 MISSING=0 ADDED=0`、编译告警 0、脚本测试 298 OK、四张变异表全 CAUGHT。
+- 人工批次 85 / 86 / 90 补进 `docs/MANUAL_TEST_v1.4.9_round3.md`（此前六轮只在正文里被引用过）。
+
 ### 帧间隔那条会换班的绝对地板，换成同一次运行的相对判据（R142 / U-472…U-475 · 产品 0 改动，判据账）
 
 - 起点：`4486f6d` 在 CI 红在 `testFrameIntervalsUnderStateChanges`（26.939 > 20.0），两跑对账是 **ONLY_B 换班**。

@@ -61,9 +61,14 @@ def run_module(name):
                           cwd=ROOT, env=dict(ENV, PYTHONUTF8="1"),
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out = proc.stdout.decode("utf-8", "replace")
-    ran = re.search(r"Ran (\d+) tests", out)
+    ran = re.search(r"Ran (\d+) tests?", out)
     n = int(ran.group(1)) if ran else 0
     return n, (n >= 1 and "FAILED" in out)
+
+
+def baseline_ran():
+    """两个模块都要真的跑到用例（Ran >= 1）。"""
+    return all(run_module(name)[0] >= 1 for name in MODULES)
 
 
 def reds():
@@ -77,9 +82,20 @@ def reds():
 
 def main():
     want = sys.argv[1:]
+    known = {a[0] for a in ARMS}
+    unknown = sorted(set(want) - known)
+    if unknown:
+        # 打错一个臂号就会得到 `CAUGHT=0/0, RESTORE_CLEAN=yes` 与退出码 0 ——
+        # 一把刀都没下也算过关（R143 审查轮 #1）。未知名字必须是硬错。
+        print("ARG_ERROR 不认识这些臂号：%s（认识的是 %s）" % (", ".join(unknown), ", ".join(sorted(known))))
+        return 2
     arms = [a for a in ARMS if not want or a[0] in want]
+    if not arms:
+        print("ARG_ERROR 一臂都没选中 ⇒ 不许读成过关")
+        return 2
     originals = {p: read(p) for p in (GEN, TABLE)}
-    if reds():
+    # 预检必须也认"一条都没跑"：`Ran 0 tests / OK` 是这道门自己坏掉的形状（BACKLOG 121 那一族）。
+    if reds() or not baseline_ran():
         for p, text in originals.items():
             save(p, text)
         print("PRECHECK_FAILED 未落刀时已经红 ⇒ 后面的 CAUGHT 不说明任何事")

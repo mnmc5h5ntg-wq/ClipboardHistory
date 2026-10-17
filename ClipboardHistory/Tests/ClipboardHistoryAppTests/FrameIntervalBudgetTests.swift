@@ -12,7 +12,11 @@ import XCTest
 /// 为什么预算是 3.0 而不是 1.25：**这个倍率还没在 runner 上量过**。
 /// 本机现在这条采样通道是死的（`FRAME_CHANNEL baseline_n=0`，R91 那一格的原样），
 /// 而 runner 我只拿得到 `loaded_p95=26.94` 这一个数 —— 参照臂的数从来没能被收集到
-/// （那三行 `FPS-` 走的是 `print`，块缓冲，进程被拖选探针的看门狗收掉时就没了；本轮改成 `emit`）。
+/// （那三行 `FPS-` 走的是 `print`：CI 那一步是 `swift test … > /tmp/ui.log 2>&1`，两条通道其实都进了同一个文件，
+///   真正丢的原因是无缓冲/块缓冲，见下面那条守卫）。
+/// **R143 更正**：R142 只把新增的那一条 `PROBE_FPS` 走成了 `emit`，三行 `FPS-` 原地没动，
+/// 而当时这句注释就写着"本轮改成 emit" ⇒ 台账与代码相反、守卫照绿（U-480）。
+/// 现在三行也是 `emit`，并且守卫加了一格"这一条用例里不许再有 `print("FPS-`"。
 /// 所以这一轮的处置是**把会换班的假闸门换成宽但不恒真的守卫**：
 /// 3.0 倍仍然抓得住真正的回归（动画让 p95 翻倍就是红），而它不会因为 runner 今天负载高就红。
 /// 收紧欠一次 runner 读数 —— 176 保持开着，判据账，不是产品缺陷。
@@ -65,9 +69,41 @@ final class FrameIntervalBudgetTests: XCTestCase {
         XCTAssertFalse(body.isEmpty, "取不到那一条用例的正文 ⇒ 这条守卫无从判定")
         XCTAssertTrue(body.contains("emit(\"PROBE_FPS"),
             "帧间隔的三臂读数没走 emit ⇒ CI 收不到，而收紧预算这件事就永远欠一份数（R90 那一族）")
+        XCTAssertFalse(body.contains("print" + "(\"FPS-"),
+            "R142 的台账写着「三臂 + 比值 + 机器键一律走 emit」，可那三行 `FPS-` 当时原地没动 ⇒ "
+                + "这条判据现在钉的是**全部** FPS 读数，不只是新增那一行（U-480）")
         XCTAssertFalse(body.contains("loaded.p95, 20"),
             "本机量出来的 20ms 被放回了判据位置 ⇒ 这一臂又会在 runner 上换班（BACKLOG 176 的原样）")
         XCTAssertTrue(body.contains("MotionFilmstripTests.filmstripMachineKey()"),
             "读数没带机器键 ⇒ 两台机器的数会混成一条曲线（R38 那一族）")
+    }
+
+    /// R143：探针文件里「还在用 `print` 的读数」要有一份**名册**，不是一个计数。
+    /// 为什么不用上限：写成「≤10 条」时「转走一条 + 新加一条」照样绿，而那正是这次要防的形状
+    /// （R142 转走了新增那一行，三行旧的留着，台账却说全改了）。
+    /// 名册双向相等 ⇒ 新写法红（没登记）、旧写法退场也红（登记过期）—— 与 R78 那两把轴的处置同形。
+    /// 搜索串拼出来：这条守卫自己就含 `print` 加左引号的形状，写全等于把守卫自己数进名册（U-473）。
+    func testProbeFilePrintReadingsAreARosterNotACount() throws {
+        let needle = "print" + "(\""
+        let source = try String(contentsOf: URL(fileURLWithPath: "UIInteractionProbeTests.swift", relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()), encoding: .utf8)
+        var markers: [String] = []
+        for line in source.split(separator: "\n", omittingEmptySubsequences: false) where line.contains(needle) {
+            let text = String(line)
+            guard let found = text.range(of: needle) else { continue }
+            var marker = ""
+            for character in text[found.upperBound...] {
+                if character == " " || character == "\\" { break }
+                marker.append(character)
+            }
+            markers.append(marker)
+        }
+        // R143 实测：10 行 print 读数、9 种标记（`NOTE` 两行）。FPS- 那一族不在名单里，
+        // 因为它已经全部走 emit —— 若有人把它写回 print，Set 里会冒出一个没登记的标记而红。
+        XCTAssertEqual(Set(markers), Set([
+            "FOCUS-CHAIN", "TAB-KEY-CHAIN", "TAB-KEY-KINDS", "KEYBOARD-UIMODE",
+            "NOTE", "AX-VISITED", "AX-UNNAMED", "FOCUSCHAIN-RING", "RINGVIEWS",
+        ]), "探针里的 print 读数与名册不符 ⇒ 要么有未登记的新读数，要么有已退场的旧登记")
+        XCTAssertEqual(markers.count, 10,
+            "同一标记的行数变了（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改（NOTE 那两条是条件注记）")
     }
 }

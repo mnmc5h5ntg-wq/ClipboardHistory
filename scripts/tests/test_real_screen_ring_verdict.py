@@ -49,25 +49,38 @@ class RingVerdictTests(unittest.TestCase):
         self.assertEqual("undecided", ring.verdict_of(ring.STRONG_MIN, ring.DIFFERENCE_MIN + 1,
                                                       19312, 19000))
 
-    def test_exit_codes_are_distinct_for_not_run_and_defect(self):
-        # 退出码是脚本对外的契约：1 = 没跑（不许被 CI 读成通过），2 = 真机层面的缺陷。
-        table = {"ring_present": 0, "ring_absent": 2, "frames_disagree": 2,
-                 "undecided": 2, "all_black": 1}
-        self.assertEqual(sorted(table.values()), [0, 1, 2, 2, 2])
-        for name, code in table.items():
-            self.assertEqual(code, self.exit_code_of(name), name)
+    def test_the_exit_code_contract_is_the_script_own_object(self):
+        """断言必须压在**脚本自己那个字典**上。
 
-    def exit_code_of(self, verdict):
-        # 与脚本 `main()` 里那张表逐字对齐：改了脚本忘了改这里，这一条会红。
-        source = open(os.path.join(REPO, "scripts", "real_screen_recorder_ring.py"),
-                      encoding="utf-8").read()
-        for key, value in (("ring_present", 0), ("ring_absent", 2), ("frames_disagree", 2),
-                           ("undecided", 2), ("all_black", 1)):
-            if key == verdict:
-                self.assertIn('"%s": %d' % (key, value), source,
-                              "脚本里的退出码表改了，而这张契约没跟着改")
-                return value
-        raise AssertionError(verdict)
+        第一版这里写的是 `self.assertEqual(sorted(table.values()), [0, 1, 2, 2, 2])`，
+        而 `table` 是测试自己抄的一份字面量 —— 脚本把退出码改坏，这一格照样绿。
+        那是"断言初值已经等于期望"的同形错误（U-478）。
+        """
+        codes = ring.EXIT_CODES
+        self.assertEqual(0, codes["ring_present"], "『那一圈在』必须是 0")
+        self.assertEqual(1, codes["all_black"], "全黑=通道没跑，必须是 1（不许与通过共用 0）")
+        for defect in ("ring_absent", "frames_disagree", "undecided"):
+            self.assertEqual(2, codes[defect], "%s 是真机层面的缺陷，必须是 2" % defect)
+        # 三种处置必须互不相同：0=有 / 1=没跑 / 2=缺陷。若"没跑"与"缺陷"共用一个码，
+        # CI 就无法区分"这台机器不让我看"与"产品真的没画"。
+        self.assertEqual({0, 1, 2}, set(codes.values()),
+                         "退出码必须正好覆盖 0/1/2 三格，少一格就意味着有两种现实被合并了")
+        self.assertEqual(["accent_unusable", "all_black", "frames_disagree", "ring_absent",
+                          "ring_present", "undecided"], sorted(codes),
+                         "出口名册变了就要同时改这张表与脚本里的 verdict_of（漏一格会被上面那条 set 抓到）")
+
+    def test_a_grey_accent_is_undecided_rather_than_a_product_defect(self):
+        """系统强调色是灰的时候，色度轴上没有对手 ⇒ 这一格**无从判定**（R143 #34 / F4）。
+
+        原来只有 `accent_chromatic` 这个参数都不存在：石墨灰下静置与点过都读不到彩色，
+        于是 `verdict_of` 会走成 `ring_absent` ⇒ 脚本 exit 2 = "真机层面的缺陷"，
+        而实际是这台机器的设置让这条轴失效。给产品记一条不存在的缺陷，比不判更坏。
+        """
+        self.assertEqual("accent_unusable",
+                         ring.verdict_of(0, 0, 19000, 19000, accent_chromatic=False))
+        # 有彩色时同一对读数才是"产品没画"。
+        self.assertEqual("ring_absent",
+                         ring.verdict_of(0, 0, 19000, 19000, accent_chromatic=True))
 
     def test_the_rect_comes_from_the_thing_under_test_not_from_this_script(self):
         """写死坐标 = 截到哪一态由运气决定。所以矩形必须来自 spike 用例自己印的那个文件。"""
