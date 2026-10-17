@@ -4340,6 +4340,14 @@ settings-general-login-unsupported, settings-min, settings-privacy, …]」。
     必须同时配的三件：真值表（四行：细/粗/地板主导/无帧）、变异臂（摘掉前提那一格要红、把地板主导改成恒真要红）、
     以及一条**不许把 not-run 写成免检**的守卫（登记表里那一臂的 `must_judge` 今天怎么设，改完要重新对账）。
     禁止的两种偷懒：调 ⑤ 的阈值；把它登记进 `suite_reds`（那张表被钉成空表）。
+    **R133 追记（第三个出口已就位，等 runner 见一次）**：`MotionFilmstripTests.samplingRateVerdict` 四出口
+    （`判到=带更细` / `判到=带更粗且地板解释不了` / `这台机器判不了=调度地板 X 大于省下的 Y` / `无从判定=没有帧`），
+    前提是同一次运行量出来的 `min(两臂地板) > 两臂抓帧差` —— 不是新阈值、没动 ⑤ 的线、没塞 `suite_reds`。
+    本机第一跑 `出口=判到=带更细`（② 同一行报 `8.70×`）⇒ 判据没被改成恒真；
+    下一次 CI 的期望：`MOTION_BAND_SAMPLING_VERDICT 机器=arm64/macOS 15.7/1x 出口=这台机器判不了=调度地板 … 大于省下的 …`，
+    且 `MOTION_FLOOR_FACTS` 的 `judged` **不许掉档**（这个出口是**读数**，不走 `MOTION_NOT_RUN` 那条通道）。
+    两条判据侧的账顺手钉住：U-442（变异表 needle 命中 2 次那一臂 DID-NOT-RUN 却整表 exit 0；红掉的测试名要按空格切）、
+    U-443（放行一个出口要说清它放不掉什么）。本条等 runner 见过一次再结案。
 
 在离屏通道里几乎不画墨 —— 与暗档"反侧"是两种病，本轮只修了暗档**（R122 开 / 与 41、167、170、43 同族）：
     `SettingsSidebarRow` 的渲染模式从 `.hierarchical` 换成 `.monochrome` 之后，两档的读数**朝相反方向动**：

@@ -2545,6 +2545,94 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(Set(words).count, words.count, "四条结论词互相重复 ⇒ 读数没有区分力")
     }
 
+    // MARK: - BACKLOG 174：⑤ 需要第三个出口「这台机器判不了」（R133）
+
+    /// ⑤ 原来只有两个出口（通过 / 红），而 runner 上的真相需要第三个。
+    ///
+    /// 四跑读数：红 `28.44>25.38`、`32.49>27.46`、`32.16>31.81`，绿 `26.72≤38.44`（run `39036587208`）。
+    /// 同一次绿跑自己印出的分解：`带地板=21.27ms 整窗地板=23.37ms`，而抓帧只省了 9.63ms
+    /// ⇒ **间隔里约八成是调度**，胜负由剩下那两成决定 —— 也就是这条"A 臂比 B 臂细"在那台机器上
+    /// 量的不是它声称的东西（155 的 ② 那一读法，第一次由尺自己的数支持，而不是由我的推断支持）。
+    ///
+    /// 所以这里**不加新阈值**：前提由同一次运行量出来的两个数比出来 ——
+    /// 两臂各自地板（`间隔 − 抓帧`）里较小的那个，如果比"抓帧省下的钱"还大，
+    /// 那么这一次跑的间隔就不可能由抓帧成本决定，这一跑判不了这件事。
+    ///
+    /// 「放行地板主导」不会把"根本没省钱"放过去：**省没省钱由 ② 那条判据单独判**
+    /// （`bandMedian < fullMedian / bandCaptureSavingFloor`），这里只判"省下的钱有没有进采样率"。
+    /// 同一件事只判一次（R83 / U-162），两条判据各自能红。
+    enum SamplingRateVerdict: Equatable {
+        case unpainted
+        case floorDominant(schedulerMilliseconds: Double, savedMilliseconds: Double)
+        case finer
+        case coarser
+    }
+
+    static func samplingRateVerdict(bandInterval: Double, fullInterval: Double,
+                                    bandGrab: Double, fullGrab: Double) -> SamplingRateVerdict {
+        if bandInterval == .greatestFiniteMagnitude || fullInterval == .greatestFiniteMagnitude {
+            return .unpainted
+        }
+        let saved = fullGrab - bandGrab
+        let floor = min(bandInterval - bandGrab, fullInterval - fullGrab)
+        if floor > saved { return .floorDominant(schedulerMilliseconds: floor, savedMilliseconds: saved) }
+        return bandInterval <= fullInterval ? .finer : .coarser
+    }
+
+    static func samplingRateVerdictText(_ verdict: SamplingRateVerdict) -> String {
+        switch verdict {
+        case .unpainted: return "无从判定=任何一臂读不出相邻帧间隔（探针坏了，不是产品没省到钱）"
+        case .floorDominant(let floor, let saved):
+            return String(format: "这台机器判不了=调度地板 %.2fms 大于省下的 %.2fms", floor, saved)
+        case .finer: return "判到=带更细"
+        case .coarser: return "判到=带更粗，且调度地板解释不了"
+        }
+    }
+
+    /// 两行**真测量**各自落在哪个出口（本机 vs runner）。
+    /// 为什么单独一条测试：一条判据的真值表如果全是我编的样本，它就只在样本上成立；
+    /// 而这两行是从两次运行里抄回来的数 —— 同一份代码在两台机器上落到不同出口，
+    /// 这正是 174 存在的全部理由，值得有它自己的名字（M647 只红在这一条上）。
+    func testSamplingRateVerdictMatchesTheTwoRealMeasurements() throws {
+        let local = Self.samplingRateVerdict(bandInterval: 9.27, fullInterval: 43.16,
+                                             bandGrab: 4.24, fullGrab: 38.17)
+        XCTAssertEqual(.finer, local,
+                       "本机（run R130 那一跑）：地板 4.99ms 远小于省下的 33.93ms ⇒ ⑤ 照常判")
+        let runner = Self.samplingRateVerdict(bandInterval: 26.72, fullInterval: 38.44,
+                                              bandGrab: 5.44, fullGrab: 15.07)
+        // 十进制字面量相减不保证逐位相等 ⇒ 按带容差的两格判，而不是按整个枚举判相等
+        // （`XCTAssertEqual(Double, Double)` 无 accuracy 会把一次正确的测量判成红，U-441）。
+        guard case let .floorDominant(runnerFloor, runnerSaved) = runner else {
+            return XCTFail("runner（run 39036587208）应当落在『地板主导』，实际是 \(Self.samplingRateVerdictText(runner))")
+        }
+        XCTAssertEqual(21.28, runnerFloor, accuracy: 0.01)
+        XCTAssertEqual(9.63, runnerSaved, accuracy: 0.01)
+        XCTAssertNotEqual(local, runner, "同一份代码在两台机器上落到同一个出口 ⇒ 这台机器的差异没被说出来")
+    }
+
+    /// 另外三个出口 + 词表互不相同（合成样本，专门用来让"摘掉某一格"能被抓到）。
+    func testSamplingRateVerdictIsATruthTable() throws {
+        XCTAssertEqual(.coarser,
+                       Self.samplingRateVerdict(bandInterval: 20.0, fullInterval: 12.0,
+                                                bandGrab: 4.0, fullGrab: 10.0),
+                       "带更粗而地板（min(16,2)=2.0）小于省下的 6.0ms ⇒ 必须还能红")
+        XCTAssertEqual(.unpainted,
+                       Self.samplingRateVerdict(bandInterval: .greatestFiniteMagnitude,
+                                                fullInterval: 12.0, bandGrab: 4.0, fullGrab: 10.0))
+        XCTAssertEqual(.unpainted,
+                       Self.samplingRateVerdict(bandInterval: 12.0,
+                                                fullInterval: .greatestFiniteMagnitude,
+                                                bandGrab: 4.0, fullGrab: 10.0),
+                       "另一臂同样要能单独判出来（U-433 那一族：两臂共用一个分支就是没判）")
+        let words = [
+            Self.samplingRateVerdictText(.unpainted),
+            Self.samplingRateVerdictText(.floorDominant(schedulerMilliseconds: 21.3, savedMilliseconds: 9.6)),
+            Self.samplingRateVerdictText(.finer),
+            Self.samplingRateVerdictText(.coarser),
+        ]
+        XCTAssertEqual(Set(words).count, words.count, "四个出口塌成同一个词 ⇒ 读数没有区分力")
+    }
+
     /// 两臂各跑两遍并**交错**（带→整窗→带→整窗），比较各自**最好的一遍**：
     /// 顺序跑会让后跑那一臂背上热漂移，读出来的"便宜"里混着时间。
     func testBandCaptureIsCheaperAndStillSeesTheMotion() throws {
@@ -2669,8 +2757,23 @@ final class MotionFilmstripTests: XCTestCase {
              + "带抓帧=\(String(format: "%.2f", bandMedian))ms "
              + "整窗抓帧=\(String(format: "%.2f", fullMedian))ms ｜ "
              + Self.bandIntervalFactsText(intervalFacts))
-        XCTAssertLessThanOrEqual(bandInterval, fullInterval,
-            "带捕获之后整卷中位间隔没有变细 ⇒ 省下的钱没进采样率，这一臂仍然判不了")
+        // ⑤′ 三个出口（BACKLOG 174）：判到"更细"、判到"更粗且调度解释不了"、这台机器判不了。
+        //     前提不是新阈值，是同一次运行量出来的两个数之比（见 `samplingRateVerdict` 的理由）。
+        let samplingVerdict = Self.samplingRateVerdict(bandInterval: bandInterval, fullInterval: fullInterval,
+                                                       bandGrab: bandMedian, fullGrab: fullMedian)
+        emit("MOTION_BAND_SAMPLING_VERDICT 机器=\(Self.filmstripMachineKey()) "
+             + "出口=\(Self.samplingRateVerdictText(samplingVerdict)) "
+             + "｜ 省没省钱由 ② 单独判（那里已经报过 \(String(format: "%.2f", fullMedian / max(bandMedian, 0.001)))×），"
+             + "这里放行『地板主导』不会把没省钱放过去")
+        switch samplingVerdict {
+        case .coarser:
+            XCTFail("带捕获之后整卷中位间隔反而更粗，而这一跑的调度地板解释不了它（地板 ≤ 省下的钱）"
+                + " ⇒ 省下的钱没进采样率，这一臂仍然判不了（\(Self.samplingRateVerdictText(samplingVerdict))）")
+        case .unpainted:
+            XCTFail("任何一臂读不出相邻帧间隔 ⇒ 这条 A/B 没有对象，是探针坏了而不是产品没省到钱")
+        case .floorDominant, .finer:
+            break
+        }
         emit("MOTION_BAND dismiss 带：首尾差=\(String(format: "%.3f", bandSpan)) "
               + "整窗首尾差=\(String(format: "%.3f", fullSpan)) "
               + "位置同一性 带vs整窗头=\(String(format: "%.3f", headDiff)) "

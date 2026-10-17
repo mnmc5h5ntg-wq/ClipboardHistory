@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### ⑤ 那条采样率判据有了第三个出口「这台机器判不了」（R133 / BACKLOG 174 / U-441…U-443 / D-193 · 产品 0 改动）
+
+- `samplingRateVerdict` 四出口；前提由同一次运行量出来的 `min(两臂地板) > 省下的钱` 比出来 —— 不是新阈值、没动 ⑤ 的线、没塞 `suite_reds`。
+- 本机第一跑 `出口=判到=带更细`（② 同一行报 `8.70×`）⇒ 判据没被改成恒真；runner 那一格等下一次 CI（期望 `这台机器判不了=调度地板 … 大于省下的 …`）。
+- 放行不重叠：省没省钱由 ② 单独判（U-443）；这个出口是读数，不进 `MOTION_NOT_RUN`，覆盖率地板不许掉档。
+- U-442：变异表自己的两处"只印不拦"—— needle 命中 2 次那一臂 DID-NOT-RUN 却 exit 0（现在 `not_run>0` 也算失败）、
+  红掉的测试名正则按点切而原文是空格（三臂都印成 `-`）。
+- U-441：真值表改成 `guard case` + `accuracy`（枚举整体判相等对十进制减法太紧）—— 标为**未实测它会红**。
+- 构建 0 告警；swift 全量 832 → 834 条 0 失败；变异第 36 张三臂 CAUGHT（刀数 126 / caught 125）。
+
 ### 真机通道回答 BACKLOG 139：勾选框在真机上就是强调蓝（R132 / U-438…U-440 · 产品 0 改动）
 
 - 新尺 `scripts/real_screen_control_chroma.py`：走产品入口开设置窗口、按坐标切到「通用」（落地由**同一帧里侧栏选中那一行的移动**验收），
