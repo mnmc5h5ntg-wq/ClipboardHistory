@@ -31,7 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = "/Users/wangziyi/Codex_Project0"
 TABLES = ["mutate_r95_rhythm", "mutate_r94_order", "mutate_r96_triage", "mutate_r97_card",
           "mutate_r98_seed", "mutate_r98_card", "mutate_r99", "mutate_r100", "mutate_r100b",
-          "mutate_r101", "mutate_r102", "mutate_r103", "mutate_r104", "mutate_r105", "mutate_r106", "mutate_r107", "mutate_r108", "mutate_r109", "mutate_r110"]
+          "mutate_r101", "mutate_r102", "mutate_r103", "mutate_r104", "mutate_r105", "mutate_r106", "mutate_r107", "mutate_r108", "mutate_r109", "mutate_r110", "mutate_r111"]
 MID = re.compile(r"^M\d{3}[a-z]?$")
 
 

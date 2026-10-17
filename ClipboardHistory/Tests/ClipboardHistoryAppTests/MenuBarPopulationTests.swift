@@ -261,6 +261,56 @@ final class MenuBarPopulationTests: XCTestCase {
                        + " ⇒ 多于一次就是有人又把名字写死在调用点上")
     }
 
+    /// 165 的那一格：菜单已经填过（此刻刷新在飞 ⇒ 写着「正在整理推荐…」），
+    /// 刷新**落地之后**没有人再叫 `populate` ⇒ 那句话就一直挂着。
+    /// 这一格是"修前必须红"的证据：实现体落下去之前它应当红在下面那条断言上。
+    func testMenuRepopulatesItselfWhenTheRefreshLands() {
+        let store = populatedStore()
+        let controller = controller(for: store)
+        let menu = NSMenu()
+        controller.attachLiveRefresh(to: menu, store: store)
+        controller.populate(menu)
+        let before = menu.items.map { $0.attributedTitle?.string ?? $0.title }
+        XCTAssertTrue(before.contains("正在整理推荐…"),
+                      "前提不成立 ⇒ 这一格没有对象：populate 时刷新必须仍在途中。实际：\(before)")
+        // 等刷新真的收尾（结果落进 store），**不再叫 populate**
+        waitUntil("预测刷新要收尾") { !store.isRefreshingPredictions }
+        let after = menu.items.map { $0.attributedTitle?.string ?? $0.title }
+        XCTAssertFalse(after.contains("正在整理推荐…"),
+                       "刷新已经落地，这张菜单里那句「正在整理推荐…」还在 ⇒ 165：没有人重填（BACKLOG 165）")
+        XCTAssertTrue(after.contains("猜你要粘贴"),
+                      "刷新落地后菜单应当出现候选区。实际：\(after)")
+        // 读数走局部变量，不在字符串里嵌套带引号的 `contains("…")`
+        // （Swift 的插值里塞转义引号会直接把整行字面量打断，本轮实测一次）。
+        let loading = "正在整理推荐…"
+        let header = "猜你要粘贴"
+        let beforeHangs = before.contains(loading)
+        let afterHangs = after.contains(loading)
+        let afterHasCandidates = after.contains(header)
+        CaptureReadings.emit("MENU_LIVE_REFRESH 修前项数=" + String(before.count)
+                             + " 修后项数=" + String(after.count)
+                             + " 修前挂着正在整理=" + String(beforeHangs)
+                             + " 修后挂着正在整理=" + String(afterHangs)
+                             + " 修后有候选区=" + String(afterHasCandidates)
+                             + " store候选数=" + String(store.predictionSuggestionEntries.count))
+    }
+
+    /// 机制那一格之外还要钉**接线**：`attachLiveRefresh` 若没人调，上面那条判据照样绿
+    /// （判据是自己调它才通的）—— 那是「零调用点的死尺」那一族，R78 的 M416 记过。
+    func testLiveRefreshIsWiredIntoTheMenuTheControllerBuilds() throws {
+        let src = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
+        let make = src.components(separatedBy: "func makeMenu()").dropFirst().first ?? ""
+        let body = String(make.prefix(700))
+        XCTAssertTrue(body.contains("attachLiveRefresh(to: menu"),
+                      "12 那棵路径自己造的那张菜单没接上刷新桥 ⇒ 机制有牙但产品不咬（BACKLOG 165）")
+        XCTAssertTrue(body.contains("populate(menu)"), "makeMenu 里连初次填充都没了 ⇒ 这一格的锚点漂了")
+        XCTAssertTrue(src.contains("private var refreshBridge: AnyCancellable?"),
+                      "订阅没有被属性持有 ⇒ 返回的 AnyCancellable 当场释放，桥活不过一次赋值")
+        XCTAssertTrue(src.contains(".receive(on: DispatchQueue.main)"),
+                      "同步重填会读到「算完了但候选还没写」（HistoryStore 先置 false 后写候选）⇒ "
+                      + "菜单会当场从「正在整理」翻成「暂无推荐」，那是另一种假话。这一格由 M602 打红。")
+    }
+
     /// 读一份产品源码（与 `UICaptureHarness` 同一套找法）；找不到就红，不许跳过。
     private func productSource(named relativePath: String) throws -> String {
         var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()

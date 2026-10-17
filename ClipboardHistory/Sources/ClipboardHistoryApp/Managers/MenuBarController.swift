@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
@@ -16,7 +17,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// （源码两格 + 运行时逐像素那一格）。
     static let statusSymbolName = "clipboard"
 
-    private var statusItem: NSStatusItem?
+    /// 165 的那根线：菜单开着时，异步刷新落地要有人重填。
+    /// 只留一份 ⇒ 重复 attach 会顶掉旧的（不攒订阅）。
+    private var refreshBridge: AnyCancellable?
+
+        private var statusItem: NSStatusItem?
     private var commandHandler: CommandHandler?
     private var pasteHandler: ((HistoryStore.Entry) -> Void)?
     weak var historyStore: HistoryStore?
@@ -63,6 +68,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         LifecycleDebugLogger.log("makeMenu called")
         let menu = NSMenu()
         menu.delegate = self
+        // 165：`populate` 是同步的，而 `menuWillOpen` 里发起的刷新是异步的 ⇒
+        // 只在这两处填，菜单会一直挂着「正在整理推荐…」。把"算完了"接回这张菜单。
+        attachLiveRefresh(to: menu, store: historyStore)
         populate(menu)
         LifecycleDebugLogger.log("menu bound itemCount=\(menu.items.count)")
         return menu
@@ -253,6 +261,34 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         image.isTemplate = true
         image.accessibilityDescription = "时间剪史"
         return image
+    }
+
+    /// 把「刷新落地」接到这张菜单上（BACKLOG 165）。
+    ///
+    /// **不是 private**：macOS 12 那棵分支在本机（13+）永远不执行，判据只能自己造一张
+    /// `NSMenu` 喂进来问同一件事 —— 与 `populate` / `makeStatusBarIcon` 同一条先例。
+    /// 接法选「订阅刷新收尾」而不是 `menuNeedsUpdate:`：后者只在**要显示之前**触发，
+    /// 而 165 要修的正是"菜单已经开着、结果后到"那一格（`menuWillOpen` 已经覆盖了
+    /// "下次打开是新的"，再加一条 menuNeedsUpdate 等于把同一个洞补两遍）。
+    func attachLiveRefresh(to menu: NSMenu, store: HistoryStore?) {
+        guard let store = store else { refreshBridge = nil; return }
+        // 只跟「还算不算完」这一件事：`true` 那一趟什么都不做，落回 `false` 才重填。
+        // `removeDuplicates()` 是为了"同一代里被写两次"不重填两遍。
+        //
+        // **为什么必须 `receive(on: .main)` 而不是在 sink 里直接填**（R111 实测出来的那一格）：
+        // `HistoryStore` 收尾是在同一个 `MainActor.run` 里**先**置 `isRefreshingPredictions = false`、
+        // **后**才写 `predictionSuggestionEntries`（`HistoryStore.swift:252-260`），
+        // 而 `@Published` 的 sink 是同步的 ⇒ 直接填会读到"算完了但候选还是空"，
+        // 菜单会从「正在整理推荐…」当场翻成「暂无推荐」—— 那是**另一种**假话，比挂着更坏。
+        // 换到下一拍主线程，那三行写都落完了才重填。
+        refreshBridge = store.$isRefreshingPredictions
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak menu, weak store] refreshing in
+                guard let self = self, let menu = menu, let store = store else { return }
+                guard !refreshing, store.isRefreshingPredictions == false else { return }
+                self.populate(menu)
+            }
     }
 
     func logStatusItemState(context: String) {

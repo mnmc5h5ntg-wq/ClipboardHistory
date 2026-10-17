@@ -10491,3 +10491,125 @@ CARD_PROBE_ARM_INSET cardprobe-split-groupbox light 内缩=5.0pt
 
 ① 读 R109/R110 的 CI，按 162 的五格判法给 150 那台实验定案；② 165 的修法选一（先跑通道再选）；
 ③ 155 扩第三个样本（pass-2 与 CI 都是天然的第二/第三跑）；④ 批次 84.1 / 85 只有用户能做。
+
+---
+
+## Round 111 · 12 的菜单只在两处同步填，刷新是异步的 ⇒「正在整理推荐…」挂到关菜单（结案 165 / U-366…U-369 / D-180 / 变异表 r111 四刀 M602–M605 全 CAUGHT）
+
+**开场（通道 × 时机 × 判定）**：上一轮把菜单栏的**素材**判完（164），本轮判它的**填充时机**。
+`MenuBarController` 一共两条填充通道（`makeMenu` 一次、`menuWillOpen` 每次要显示之前），
+而 `HistoryStore.refreshPredictions()` 是异步的 ⇒ 打开菜单那一刻填的是「正在整理推荐…」，
+结果落地后**没有任何人再填一次**。表上还有第三个候选（`menuNeedsUpdate:`）——判为**不选**，
+理由写在 AGENT_UI_AUDIT 第 113 轮 §0：它只在要显示之前触发，而这一格要修的正是「已经开着、结果后到」，
+`menuWillOpen` 已经在管「下次打开是新的」，再加一条等于把同一个洞补两遍。
+
+**修前它是本机量得到的红**：`XCTAssertFalse failed - 刷新已经落地，这张菜单里那句「正在整理推荐…」还在`，
+并把当时 9 项名单原样打出来。修后 `MENU_LIVE_REFRESH 修前项数=9 修后项数=13 修前挂着正在整理=true 修后挂着正在整理=false 修后有候选区=true store候选数=2`。
+
+**本轮最值钱的一格不是"有没有重填"，是"重填读的是哪一刻的值"**：`HistoryStore` 收尾在同一个
+`MainActor.run` 里**先**置 `isRefreshingPredictions = false`、**后**才写候选，而 `@Published` 的 sink 是同步的
+⇒ 在 sink 里直接填会把「一直挂着正在整理」修成「当场翻成暂无推荐」——换了一种更坏的假话。
+所以订阅链是 `removeDuplicates().receive(on: DispatchQueue.main)`，而 **M602 就是摘掉 `receive(on:)`**，
+判据当场红在候选那一格。另三刀：M603 摘 `makeMenu` 的接线（防「零调用点的死尺」，R78 的 M416 同族）、
+M604 把「算完了才填」反成「开始算才填」、M605 让订阅不被属性持有。四刀全 CAUGHT、`RESTORE_CLEAN=yes`。
+
+**边界按实记（U-369）**：`attachLiveRefresh` 由 `makeMenu()` 调用，而 `makeMenu()` 只在 macOS 12 分支里跑
+⇒ 本机（13+）**产品运行时不会走这条线**。两格判据证的是「机制通 + 接线在」，
+「12 上真菜单会不会当场自己变」仍归批次 85.2 —— 与上一轮的 U-359 同形，分开记账，不互相代签。
+
+**本轮自己坏的三条编译/工具层**：U-366（Swift 插值里嵌套带引号的 `contains` 把字面量打断）、
+U-367（`NSMenuItem.attributedTitle` 是 Optional）、U-368（M605 第一版改成裸表达式会多一条
+「结果未使用」告警 ⇒ 0 告警那道硬门会红在刀上，改成 `_ =`）。
+
+### 5. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+|---|---|---|
+| 原生一致 | 94 | 只用 AppKit 自己的时机（订阅 + 下一拍主线程），没有自造定时器，也没把 SwiftUI 的观察方式搬到 12 |
+| 层级与秩序 | 92 | 只动填充时机；菜单的项序、字号档、颜色档一字未改 |
+| 动效恰当 | 93 | 加载态→内容态这一格**不加**淡入：系统跟踪的弹层里自造动画既抢注意力也无法在本机被量 |
+| 状态完备 | 95 | 「正在算 / 算完有 / 算完没有」三态第一次在同一棵 12 的树上被同一条判据串起来（修前红在中间那一格） |
+| 细节打磨 | 92 | 顺序陷阱（先置 false 后写候选）被钉成 M602，而不是留在注释里 |
+| 克制 | 94 | 产品只加一个方法 + 一根订阅；13+ 路径 0 改动 ⇒ 预期帧不变（由基线 `CHANGED=0` 证） |
+| 一致性 | 88 | 四条：两条编译层（U-366/367）、一条刀会把告警门弄红（U-368）、一条边界按实记（U-369） |
+
+**均分 92**（`curve_from_ledger.py` 从这张表推导、向下取整；最低 88 = 一致性）。
+
+### 8. 验证（13 格，数字全部由 `ledger_rows.py` 从 `r111_verify.log` 解析（**这一份是 pass-1**））
+
+| 格子 | 读数 |
+|---|---|
+| 构建 | `BUILD_EXIT=0 BUILD_WARNING_LINES=0` |
+| 全量测试 | `TEST_EXIT=0 最后一行汇总: 	 Executed 825 tests, with 41 tests skipped and 0 failures (0 unexpected) in 190.445 (190.491) seconds` |
+| 在屏那一卷 | `PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.977 (21.979) seconds` |
+| 捕获卷 | `CAPTURE_EXIT=0 帧数=136 目录内文件=137` |
+| 帧基线 | `FRAMES_EXIT=0 FRAME_BASELINE_AGAINST=working FRAME_BASELINE_COMPARED=136 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0` |
+| 脚本电池 | `PY_EXIT=0 Ran 230 tests in 11.513s OK` |
+| 变异表 | `MUT_EXIT=0 跑了=20 期望=20 表=r95_rhythm r94_order r96_triage r97_card r98_seed r98_card r99 r100 r100b r101 r102 r103 r104 r105 r106 r107 r108 r109 r110 r111 | r95_rhythm(exit=0): MUTATE_TABLE n=4 caught=4 intended_escaped=0 mismatch=0 not_run=0 | r94_order(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r96_triage(exit=0): MUTATE_TABLE n=7 caught=7 intended_escaped=0 mismatch=0 not_run=0 | r97_card(exit=0): MUTATE_TABLE n=5 caught=5 intended_escaped=0 mismatch=0 not_run=0 | r98_seed(exit=0): MUTATE_TABLE n=7 caught=7 mismatch=0 not_run=0 | r98_card(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r99(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r100(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r100b(exit=0): MUTATE_TABLE n=2 caught=2 mismatch=0 not_run=0 | r101(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r102(exit=0): MUTATE_TABLE n=5 caught=5 mismatch=0 not_run=0 | r103(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r104(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r105(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r106(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r107(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r108(exit=0): MUTATE_TABLE n=3 caught=3 mismatch=0 not_run=0 | r109(exit=0): MUTATE_TABLE n=4 caught=3 mismatch=0 not_run=0 | r110(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0 | r111(exit=0): MUTATE_TABLE n=4 caught=4 mismatch=0 not_run=0` |
+| 台账编号守卫 | `LEDGER_EXIT=0 Ran 11 tests in 0.029s OK` |
+| 曲线仪器 | `VIS_EXIT=0 ROUNDS=112  first=1  last=111 CURVE_DERIVED=110,111,95,96,97` |
+| 断言包含对账 | `CONTAIN_EXIT=0 0` |
+| 摘要缺值 | `SUMMARY_MISSING=0` |
+| 总结论 | `VERIFY_OK=1` |
+| 本轮读数（50 行，原样搬运） | `MENU_LIVE_REFRESH 修前项数=9 修后项数=13 修前挂着正在整理=true 修后挂着正在整理=false 修后有候选区=true store候选数=2`；`MENUBAR_GLYPH symbol=clipboard 倍率=4 边=72px 墨像素=892 包围盒px=10..60×7..67 墨占=0.17 与参考=相同 模板=true`；`PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.977 (21.979) seconds` |
+
+ROWS_TOTAL=13 ROWS_MISSING=0
+READINGS_FAMILIES 搬运=50 族=CARD_PROBE_ARM:6 CARD_PROBE_ARM_INSET:4 CARD_PROBE_COLUMNS:6 CARD_PROBE_GEOMETRY:6 CARD_PROBE_WHOLE:6 CARD_PROBE_WHOLE_FILL:6 MENUBAR_GLYPH:1 MENU_LIVE_REFRESH:1 PROBE_EXIT:1 QUICKPICK_AXIS_CAPABILITY:1 QUICKPICK_FIELD_STATE:2 QUICKPICK_GREY_BAND:2 QUICKPICK_PHANTOM_CAPABILITY:1 QUICKPICK_SEARCH_AXIS:2 SELECTION_CHROMA:4 SELECTION_KEYSTATE_CAPABILITY:1
+READINGS_MUST_INCLUDE 声明=4 缺=0
+=== 本轮读数全量（贴进 §8 下面那一节，别改数字） ===
+MENU_LIVE_REFRESH 修前项数=9 修后项数=13 修前挂着正在整理=true 修后挂着正在整理=false 修后有候选区=true store候选数=2
+MENUBAR_GLYPH symbol=clipboard 倍率=4 边=72px 墨像素=892 包围盒px=10..60×7..67 墨占=0.17 与参考=相同 模板=true
+PROBE_EXIT=0 汇总: 	 Executed 11 tests, with 2 tests skipped and 0 failures (0 unexpected) in 21.977 (21.979) seconds
+QUICKPICK_FIELD_STATE light 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false
+QUICKPICK_GREY_BAND light 灰档行数=20 灰档像素=71 最宽一行=13px x=53..72 纯灰行无墨=1 纯灰行最宽=1px 最宽墨行=33px 墨档行数=24 页底档=252 带子=顶部40pt 门限=8..45灰阶 残余灰=纯灰行 y=28px x=59..59 最近墨行 y=29px(差1px) x=47..86 落在其x内=true
+QUICKPICK_FIELD_STATE dark 字段类名=QuickPickSearchField 串长=2 有editor=true editor选中=(2,0) 选中覆盖整串=false firstResponder=NSTextView firstResponder就是editor=true 窗口是key=false 字段高亮=false 有边框=false 画底色=false
+QUICKPICK_GREY_BAND dark 灰档行数=25 灰档像素=101 最宽一行=13px x=59..93 纯灰行无墨=0 纯灰行最宽=0px 最宽墨行=35px 墨档行数=25 页底档=28 带子=顶部40pt 门限=8..45灰阶 残余灰=这一档没有纯灰行
+QUICKPICK_PHANTOM_CAPABILITY 候选=2 有对象=2 未判=0（未判名单只在**这台机器装得出 field editor** 时才要求为空）
+QUICKPICK_SEARCH_AXIS light 药丸左沿=22.0pt 搜索第一列墨=22.5pt 差=1px 带子 y=0..90px 带内墨行=24 墨像素=1358 最大偏离=124（全局门限 60，本条带用 62） 页底档=252 倍率=2.0x 帧宽=840px
+QUICKPICK_SEARCH_AXIS dark 药丸左沿=22.0pt 搜索第一列墨=22.5pt 差=1px 带子 y=0..90px 带内墨行=24 墨像素=1585 最大偏离=126（全局门限 60，本条带用 63） 页底档=28 倍率=2.0x 帧宽=840px
+QUICKPICK_AXIS_CAPABILITY 候选=2 有对象=2 未判=0（未判名单只在**这台机器画得出占位语**时才要求为空）
+SELECTION_CHROMA light 臂=列表 列=_NSSplitViewItemViewWrapper x带=0..296px y从=104px 标题栏底=52.0pt 缩放=2.00x 越界=false 段长地板=8px 有填充段行=104 彩度行=65 无彩度行=39 最彩段=y=184px 宽=226px rgb(217,229,251) 色度=34 最宽无彩段=y=336px 宽=21px rgb(0,0,0)
+SELECTION_CHROMA light 臂=字段 字段类名=QuickPickSearchField 装回选中长度=2 x带=20..820px y带=24..56px 越界=false 段长地板=8px 有填充段行=25 彩度行=0 无彩度行=25 最宽无彩段=y=24px 宽=52px rgb(220,220,220) 最彩段=y=-1px 宽=0px 色度=0 诊断峰行=y=24px 非页底=52 距页底=-32.0 众数=220,220,220×52 页底档=252
+SELECTION_CHROMA dark 臂=列表 列=_NSSplitViewItemViewWrapper x带=0..296px y从=104px 标题栏底=52.0pt 缩放=2.00x 越界=false 段长地板=8px 有填充段行=116 彩度行=65 无彩度行=51 最彩段=y=184px 宽=226px rgb(28,43,64) 色度=36 最宽无彩段=y=419px 宽=26px rgb(255,255,255)
+SELECTION_CHROMA dark 臂=字段 字段类名=QuickPickSearchField 装回选中长度=2 x带=20..820px y带=24..56px 越界=false 段长地板=8px 有填充段行=25 彩度行=0 无彩度行=25 最宽无彩段=y=24px 宽=52px rgb(70,70,70) 最彩段=y=-1px 宽=0px 色度=0 诊断峰行=y=24px 非页底=52 距页底=42.0 众数=70,70,70×52 页底档=28
+SELECTION_KEYSTATE_CAPABILITY 候选=2 有对象=2 未判=0（未判名单只在**这台机器两臂都装得出对象**时才要求为空）
+CARD_PROBE_ARM cardprobe-groupbox-default light 材质=有 卡片段=1 墨行=24 墨像素=1582 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-groupbox-default light 整窗墨行=24 整窗墨像素=1582 整窗最大偏离=206 带子墨行=24 带子最大偏离=206 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-groupbox-default light host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_COLUMNS cardprobe-groupbox-default light 视图树没打出列
+CARD_PROBE_WHOLE_FILL cardprobe-groupbox-default light 整窗填充候选档=244 整窗卡片行数=28 整窗卡片行y=73.0..99.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1457 最大偏离=206 参考条墨行=0 带子=24..696pt 页底=252 前三=(252:148) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-scroll-groupbox light 整窗墨行=24 整窗墨像素=1457 整窗最大偏离=206 带子墨行=24 带子最大偏离=206 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-scroll-groupbox light host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_COLUMNS cardprobe-scroll-groupbox light 视图树没打出列
+CARD_PROBE_WHOLE_FILL cardprobe-scroll-groupbox light 整窗填充候选档=244 整窗卡片行数=28 整窗卡片行y=56.0..82.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-split-groupbox light 材质=有 卡片段=1 墨行=24 墨像素=1272 最大偏离=206 参考条墨行=0 带子=170..720pt 页底=252 前三=(252:468) (244:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-split-groupbox light 整窗墨行=171 整窗墨像素=6026 整窗最大偏离=244 带子墨行=24 带子最大偏离=206 帧=1440x600px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-split-groupbox light 列0:NSView[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列0:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列1:NSTitlebarBackgroundView[x=0.0..148.0 顶向下y=0.0..52.0 宽=148.0 高=52.0] 列2:NSTitlebarBackgroundView[x=148.0..720.0 顶向下y=0.0..52.0 宽=572.0 高=52.0] 列3:_NSSplitViewShadowView[x=148.0..160.0 顶向下y=0.0..295.0 宽=12.0 高=295.0] 列4:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..295.0 宽=148.0 高=295.0] 列5:NSSplitDividerView[x=147.5..148.0 顶向下y=0.0..295.0 宽=0.5 高=295.0] 列6:_NSSplitViewCollapsedInteractionsView[x=0.0..15.0 顶向下y=0.0..295.0 宽=15.0 高=295.0] 列7:_NSSplitViewCollapsedInteractionsView[x=705.0..720.0 顶向下y=0.0..295.0 宽=15.0 高=295.0] 列0:NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列0:NSGlassEffectView[x=0.0..148.0 顶向下y=0.0..295.0 宽=148.0 高=295.0] host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=300.0]
+CARD_PROBE_COLUMNS cardprobe-split-groupbox light 列0:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..295.0] 页底=252 墨行=148 墨像素=4895 最大偏离=252 列1:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=0.0..295.0] 页底=252 墨行=172 墨像素=6207 最大偏离=252 列2:详情(外列−侧栏)[x=148.0..720.0 顶向下y=0.0..295.0] 页底=252 墨行=24 墨像素=1312 最大偏离=214
+CARD_PROBE_WHOLE_FILL cardprobe-split-groupbox light 整窗填充候选档=244 整窗卡片行数=16 整窗卡片行y=82.0..102.0pt 带子y=24.0..284.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-groupbox-default dark 材质=有 卡片段=1 墨行=24 墨像素=1777 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-groupbox-default dark 整窗墨行=24 整窗墨像素=1777 整窗最大偏离=185 带子墨行=24 带子最大偏离=185 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-groupbox-default dark host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_COLUMNS cardprobe-groupbox-default dark 视图树没打出列
+CARD_PROBE_WHOLE_FILL cardprobe-groupbox-default dark 整窗填充候选档=36 整窗卡片行数=28 整窗卡片行y=73.0..99.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-scroll-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1618 最大偏离=185 参考条墨行=0 带子=24..696pt 页底=28 前三=(28:148) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-scroll-groupbox dark 整窗墨行=24 整窗墨像素=1618 整窗最大偏离=185 带子墨行=24 带子最大偏离=185 帧=1440x280px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-scroll-groupbox dark host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=140.0]
+CARD_PROBE_COLUMNS cardprobe-scroll-groupbox dark 视图树没打出列
+CARD_PROBE_WHOLE_FILL cardprobe-scroll-groupbox dark 整窗填充候选档=36 整窗卡片行数=28 整窗卡片行y=56.0..82.0pt 带子y=24.0..124.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM cardprobe-split-groupbox dark 材质=有 卡片段=1 墨行=24 墨像素=1425 最大偏离=185 参考条墨行=0 带子=170..720pt 页底=28 前三=(28:468) (36:52) 门槛=abs(档-页底)>3且行数/倍率>=20pt
+CARD_PROBE_WHOLE cardprobe-split-groupbox dark 整窗墨行=95 整窗墨像素=2852 整窗最大偏离=219 带子墨行=24 带子最大偏离=185 帧=1440x600px 倍率=2.0x
+CARD_PROBE_GEOMETRY cardprobe-split-groupbox dark 列0:NSView[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列0:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列1:NSTitlebarBackgroundView[x=0.0..148.0 顶向下y=0.0..52.0 宽=148.0 高=52.0] 列2:NSTitlebarBackgroundView[x=148.0..720.0 顶向下y=0.0..52.0 宽=572.0 高=52.0] 列3:_NSSplitViewShadowView[x=148.0..160.0 顶向下y=0.0..295.0 宽=12.0 高=295.0] 列4:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..295.0 宽=148.0 高=295.0] 列5:NSSplitDividerView[x=147.5..148.0 顶向下y=0.0..295.0 宽=0.5 高=295.0] 列6:_NSSplitViewCollapsedInteractionsView[x=0.0..15.0 顶向下y=0.0..295.0 宽=15.0 高=295.0] 列7:_NSSplitViewCollapsedInteractionsView[x=705.0..720.0 顶向下y=0.0..295.0 宽=15.0 高=295.0] 列0:NSHostingView<ModifiedContent<ColumnView, NavigationPaneModifier<ContainerStyleContext>>>[x=0.0..720.0 顶向下y=0.0..295.0 宽=720.0 高=295.0] 列0:NSGlassEffectView[x=0.0..148.0 顶向下y=0.0..295.0 宽=148.0 高=295.0] host=NSHostingView<ModifiedContent<AnyView, _EnvironmentKeyWritingModifier<ColorScheme>>>[宽=720.0 高=300.0]
+CARD_PROBE_COLUMNS cardprobe-split-groupbox dark 列0:_NSSplitViewItemViewWrapper[x=0.0..148.0 顶向下y=0.0..295.0] 页底=28 墨行=74 墨像素=1524 最大偏离=227 列1:_NSSplitViewItemViewWrapper[x=0.0..720.0 顶向下y=0.0..295.0] 页底=28 墨行=98 墨像素=2988 最大偏离=227 列2:详情(外列−侧栏)[x=148.0..720.0 顶向下y=0.0..295.0] 页底=28 墨行=24 墨像素=1464 最大偏离=193
+CARD_PROBE_WHOLE_FILL cardprobe-split-groupbox dark 整窗填充候选档=36 整窗卡片行数=19 整窗卡片行y=76.0..102.0pt 带子y=24.0..284.0pt 带子材质=有 分栏内容溢出=0.0pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-scroll-groupbox light 内缩=5.0pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox dark 内缩=5.5pt
+CARD_PROBE_ARM_INSET cardprobe-split-groupbox light 内缩=5.0pt
+
+### 7. 下一轮入口
+
+① 读 R110 / R111 的 CI（R110 那跑顺带验两张 `statusitem-glyph` 新帧在 runner 上没问题、以及 166 的换班是否再现）；
+② **150**：让臂 2 的详情在 runner 上保证有内容；③ **166** 的修法选一；④ 155 扩第三个样本；
+⑤ 批次 84.1 / 85 只有用户能做。

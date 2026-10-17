@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 菜单的加载态不再挂死（R111）
+
+- **165 结案**：macOS 12 的状态项菜单以前只在 `makeMenu` / `menuWillOpen` 两处同步填，
+  异步刷新落地后没人重填 ⇒ 那句「正在整理推荐…」会挂到关菜单。新增
+  `attachLiveRefresh(to:store:)`（订阅 `isRefreshingPredictions` 落回 false，`removeDuplicates`
+  + `receive(on: .main)` 之后重填），由 `makeMenu()` 接线。判据两格：机制格
+  `testMenuRepopulatesItselfWhenTheRefreshLands`（修前实测红：9 项里那句还在；修后 13 项、候选区出现）
+  与接线格 `testLiveRefreshIsWiredIntoTheMenuTheControllerBuilds`。四刀 M602–M605 全 CAUGHT，
+  其中 M602（摘掉 `receive(on:)`）钉的是「重填读的是哪一刻的值」——
+  `HistoryStore` 先置 false 后写候选，同步重填会把「正在整理」翻成「暂无推荐」那种更坏的假话。
+- 规矩进 D-180；13+ 路径 0 改动（帧不变由基线 `CHANGED=0` 证）。
 ### 菜单栏图标的身份（R110）
 
 - **macOS 12 那颗状态项图标换成系统符号，并与 13+ 引用同一个名字**：新增

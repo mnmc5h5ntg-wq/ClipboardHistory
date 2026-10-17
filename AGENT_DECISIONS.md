@@ -5520,3 +5520,21 @@ R109 刚把"菜单栏的理由要写进代码"立成 D-178，本轮就在同一�
 5. 如果这个分支在本机根本不执行（`#available` 挡住），要在账上写明"本轮验的是工厂交出的那张图，
    不是真表面上那颗"（本轮 U-359 / 批次 85），不许把工厂级证据说成机器级证据。
 
+### D-180（R111）异步结果回填 UI 的三条硬规矩：订阅要被持有、重填要读到「这一代写完了」的那一刻、分支在本机不执行就要拆成两格
+
+`MenuBarController` 只在 `makeMenu()` 与 `menuWillOpen()` 两处同步 `populate`，而
+`HistoryStore.refreshPredictions()` 是异步的 ⇒ 菜单可以整段开着的时间都挂着「正在整理推荐…」（BACKLOG 165）。
+修的时候发现三件事都得钉住，任何一条松了就是一句假话：
+
+1. **订阅必须由属性持有**（`private var refreshBridge: AnyCancellable?`）。
+   `sink` 返回的 `AnyCancellable` 一丢就取消 —— 代码看着对、跑起来永远不响，而且**不会报错**。
+2. **重填读的是哪一刻的值**：`HistoryStore` 收尾在同一个 `MainActor.run` 里
+   **先**置 `isRefreshingPredictions = false`、**后**才写 `predictionSuggestionEntries`，
+   而 `@Published` 的 sink 是同步的 ⇒ 直接填会读到「算完但候选还空」，
+   于是把「一直挂着正在整理」修成「当场翻成暂无推荐」——**换了一种假话**。
+   所以链上是 `removeDuplicates().receive(on: DispatchQueue.main)`，并且这一格由 **M602** 打红。
+3. **分支在本机不执行 ⇒ 判据要拆两格**：机制格（喂一张 `NSMenu` 进来，等刷新落地，看内容自己变）
+   + 接线格（`makeMenu()` 里真的调了它，且订阅被属性持有、`receive(on:)` 还在）。
+   只有机制格就是「零调用点的死尺」（R78 的 M416）；只有接线格就是「注释改了没有」。
+   真机那一格（12 上开着菜单会不会当场变）另立批次 85.2，不许由这两格代签。
+
