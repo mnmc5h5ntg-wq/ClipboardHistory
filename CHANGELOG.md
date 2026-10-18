@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 自评曲线的量纲统一：两种七维表都归一到百分制（R152 / BACKLOG 190 修、守卫欠进 193 · 产品 0 文件）
+
+- `curve_from_ledger.py` 的推导改成**按每格自己的分母归一**：七分制表 `mean(num/den)×100`、百分制表 `mean(num)`。旧写法一律 `sum/7`，让同一条曲线上 145=91 与 146=13 并存，而 `PHASE2 mean` 把两种量纲相加（实测 `mean=170.69`）。
+- 我第一版修法（一律 ×100/105）更坏：把百分制那批推成 612/609/605 —— 由仪器自己打印的整条曲线当场抓到（`max=617`）。
+- 真台账重读：`MEAN=91.9`、`PHASE2 n=144 mean=92.10 min=82 max=99`；R146–R151 读成 86/90/84/82/86/90（都 <90，与那几轮的诚实扣分一致）。
+- 两格量纲守卫没写对、已回退测试文件，只留仪器修复 ⇒ 新开 BACKLOG 193 记下写法与踩过的坑。
+
 ### 材质尺加上「这一层有多宽」那一维：191 的修法落地（R151 / U-509…U-511 · 产品 0 文件，判据账）
 
 - `cardFill` 现在要求该层在行内**连续横贯 ≥40% 带宽**才算卡片的一层；`cardRowKinds` 第一遍顺手算最长连续段，交给判据与 `fillCandidatesLine` 的仍是同一份数组。
