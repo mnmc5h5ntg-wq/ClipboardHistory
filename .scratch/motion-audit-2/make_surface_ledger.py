@@ -418,7 +418,58 @@ rows = [
     ("浮层/空态", "禁用", "not-applicable",
      "没有「被禁用的空态」：它的有无由结果集决定（`empty.isHidden`），**隐藏比禁用诚实** —— "
      "一句没有结果的话不该以灰掉的方式留在原地",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `empty.isHidden = true`"),]
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `empty.isHidden = true`"),
+    # R166（第 168 轮）一批：热图剩余三格 + 菜单栏两族。每条都带 `缺席:` 例子（会被
+    # `scripts/ledger_absence_claims.py` 逐条复查），关键字计数是本轮逐个 grep 出来的，不是合并计数。
+    ("设置窗口/热图", "按下", "not-applicable",
+     "格子只回答「哪天多少条」，没有可点击的东西：整份文件里 `Button` / `TapGesture` 实测各 0 处。"
+     "要让它可点，先要回答「点一下发生什么」—— 目前没有那个动作",
+     "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=Button,TapGesture"),
+    ("设置窗口/热图", "成功", "not-applicable",
+     "没有动作就没有「成功」回执。这一屏唯一的反馈是 hover 那一格（描边 + 日期与条数的 tooltip），"
+     "它已经把「你指到的是哪天」说完；再加一层成功态就是把统计读出当成按钮",
+     "docs/motion_surface_ledger.json 的「设置窗口/热图 × 悬停」；`DailyCopyHeatmapView.swift` 的 `.helpLabel`"),
+    ("设置窗口/热图", "禁用", "not-applicable",
+     "没有可禁用的东西（`disabled` 实测 0 处、`selection` 0 处）。零记录那一屏是「空」不是「禁用」，"
+     "已由「热图 × 空」那格承担（那是一句成句的话，不是一张空日历）",
+     "Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 缺席:Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift=disabled,selection"),
+    ("菜单栏/状态图标", "加载", "not-applicable",
+     "那颗图标由系统状态栏绘制，这一层没有任何动画或转圈通道（`withAnimation` / `animation` / `transition` 实测各 0 处）。"
+     "推荐是在打开菜单那一刻算的（`onAppear` 里一次），图标不参与等待",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=withAnimation,transition"),
+    ("菜单栏/状态图标", "成功", "not-applicable",
+     "复制成功的回执不在这颗图标上：走主窗口提示条与菜单项文案。让状态栏图标闪一下是把系统区域当通知中心用",
+     "docs/motion_surface_ledger.json 的「主窗口/提示条 × 成功」；`MenuBarController.swift` 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=withAnimation"),
+    ("菜单栏/状态图标", "禁用", "not-applicable",
+     "图标没有「禁用」这条分支（`disabled` 实测 0 处）：它要么在，要么整个 App 不在。"
+     "灰掉一颗只能点开菜单的图标，等于做一个点不动的目标（R39 那一族）",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=disabled"),
+    ("菜单栏/状态图标", "空", "not-applicable",
+     "图标自己不承载内容，因此不存在「空的图标」；没有推荐时是菜单里回落到「暂无推荐」那一行（见「推荐面板 × 空」的分支）",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift；docs/motion_surface_ledger.json 的「菜单栏/推荐面板」各行"),
+    ("菜单栏/状态图标", "错误", "not-applicable",
+     "这一层没有错误通道：写盘 / 读档 / 剪贴板写入失败都由主窗口提示条与详情区说话（BACKLOG 58 那一族）。"
+     "把状态栏图标变成红色警报器，是把一条回执装在系统区域",
+     "docs/motion_surface_ledger.json 的「主窗口/提示条 × 错误」；账本 BACKLOG 58"),
+    ("菜单栏/状态菜单", "按下", "not-applicable",
+     "这层是真 NSMenu：按下的高亮由系统画，SwiftUI 的 `.pressedStyle` 在那一层根本不执行"
+     "（该文件 `onHover` / `transition` 实测各 0 处 —— 不是漏做，是这层没有可挂的地方）",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=onHover,transition"),
+    ("菜单栏/状态菜单", "选中", "not-applicable",
+     "菜单项没有「选中」语义：只有常态与系统画的悬停高亮。给菜单项加选中态会造出两个当前"
+     "（与「状态图标 × 选中」同一族，那格已判）",
+     "docs/motion_surface_ledger.json 的「菜单栏/状态图标 × 选中」；`MenuBarController.swift` 的 NSMenuItem 用法"),
+    ("菜单栏/状态菜单", "聚焦", "not-applicable",
+     "键盘在 NSMenu 里走系统的高亮与方向键，不经过 SwiftUI 的焦点环；这层没有任何 focus 代码"
+     "（`onHover` / `animation` 实测 0 处）",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=animation,onHover"),
+    ("菜单栏/推荐面板", "按下", "not-applicable",
+     "与「状态菜单 × 按下」同一个机制：`MenuBarExtraStyle.menu` 编译成真 NSMenu，"
+     "SwiftUI 的按压样式与过渡在那一层不执行；叠一层自绘底会把 U-1 拆掉的卡片感装回来",
+     "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 悬停」；`MenuBarRecommendationsView.swift` 的 `.buttonStyle(.plain)` 注释"),
+    ("菜单栏/推荐面板", "选中", "not-applicable",
+     "推荐项被点就是「复制并关闭」，没有停留的选中态；再画一层选中会把一次动作说成一个状态",
+     "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 成功」；账本 U-1"),]
 
 data = {
     "_comment": [

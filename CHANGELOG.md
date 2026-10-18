@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 热图与菜单栏两族再判 13 格（清账表 99 → 112），看图量出热图右侧一条 118pt 的空白带（R166 / U-551…U-553 · 产品 0 文件，动效主线）
+
+- 13 格全部带可复查的 `缺席:` 例子：热图的 按下/成功/禁用（`Button`/`TapGesture`/`selection`/`disabled`/`ProgressView` 逐个 0 处），
+  菜单栏 状态图标 5 格 + 状态菜单 3 格 + 推荐面板 2 格（那层 `withAnimation`/`animation`/`onHover`/`transition` 各 0 处，
+  真 NSMenu 与系统状态栏里 SwiftUI 的按压与过渡不执行）。缺席守卫从 29 条涨到 **41 条，全部成立**。
+- 看图 `settings-stats-populated-720x540-light.png`：量出 **网格右沿 560.5pt、说明段右沿 688.5pt**
+  ⇒ 图的右边有一条 ~118pt 的空白带，而它上下的文字都铺到卡片内沿。新开 BACKLOG 197（含两条候选修法与必须过的判据）。
+  **本轮刻意没改**：动布局要在同一笔里更新 138 帧基线、过 4.5pt 极差与 `contentMustFit`、再跑全量卷 —— 剩余轮次不够，
+  半测的布局改动进交付物比不改更坏。
+- 自曝一把坏尺：用"同一行换色次数"证明网格存在，本机打出 423 —— 那是量化与抗锯齿的噪声，不是 53 列网格；
+  这条读数被自己否掉，没进账当证据。
+- 状态：`MOTION_LEDGER_RESULT=ok 不合法格=0`、脚本电池 `Ran 342 tests OK`；194 的 `CAPTURE_GEOMETRY` 仍等 runner。
+
 ### "实测 0 处"从散文升成会红的守卫：29 条缺席声明全部可复查（R165 / U-548…U-550 · 产品 0 文件，判据账）
 
 - 新增 `scripts/ledger_absence_claims.py`：按文法 `缺席:<路径>=<标识符>[,<标识符>…]` 扫已提交的动效清账表，
