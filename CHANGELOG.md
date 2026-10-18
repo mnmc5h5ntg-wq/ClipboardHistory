@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 主窗口/列表行四格判完（空 / 错误 / 成功 / 禁用）+ 筛选条那格观察开单（R181 / U-601…U-603 · 产品 0 文件，动效主线）
+
+- 四格 `not-applicable`，理由统一为"承载物在别处"：空态在 `EmptyStateView`、失败在 `NoticeBanner`（`ContentView.swift` 四处）、复制成功回执在详情区那颗按钮（`ReceiptLine` 只被 `SettingsView` 用）、行没有可禁用态（`disabled`/`isEnabled`/`allowsHitTesting` 各 0 命中）
+- 清账表 111 → 115 行 / 已清账 115 / 未清账 51 → 47（格子 162 不变）；缺席复查 `声明=48 不成立=0`
+- 看图：`content-empty-750x560-dark` 里筛选分段控件右半实心白底黑字、左半深色带描边 ⇒ 没据此开缺陷单，开 BACKLOG 209 要求先拿同源读数（两段的填充亮度 + 夹具的选中项）
+- 把 R177 的真产物证人从写死行数改成解析闸门读数并断言恒等式（`格子==表面×状态`、`未清账==格子−已清账`、`行数≤格子`）
+- 验证：闸门 `RESULT=ok`、脚本电池 `Ran 362 / OK`（台账落盘之后跑）、0 产品文件 ⇒ 没构建、没重捕、没换装
 ### 208：颗数并进活下来的那一行 `PROBE_FPS`，接线契约改成数形状（R180 / U-598…U-600 · 产品 0 文件，判据账）
 
 - 起因：runner `39161493538` 里 `PROBE_FPS` 完整落地（`… n=222 worst=58.8`）而紧跟其后的独立行 `PROBE_WORST_FRAME` 整卷 0 次 ⇒ 尾部那一行被通道吃掉（R90/R146 那一族）

@@ -13,6 +13,7 @@
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -117,7 +118,15 @@ class RetirementTests(unittest.TestCase):
                                       cwd=REPO).decode("utf-8")
         self.assertIn("MOTION_LEDGER_RESULT=ok", out)
         self.assertIn(u"MOTION_LEDGER_RETIRED 1（%s）" % SURFACE, out)
-        self.assertIn(u"表面=18 状态=9 格子=162 行数=111 已清账=111 未清账=51", out)
+        # 不写死行数：清账每往前一次，写死的期望就要被改一次（那正是"守卫配合台账"）。
+        # 这里改成拿闸门自己那行读数对账：表面数 × 状态数 − 已清账 == 未清账，且退役名册恰好一格。
+        census = re.search(r"MOTION_LEDGER 表面=(\d+) 状态=(\d+) 格子=(\d+) 行数=(\d+) 已清账=(\d+) 未清账=(\d+)", out)
+        self.assertIsNotNone(census, "闸门那行读数解析不出来 ⇒ 形状变了，这一格要红给形状")
+        surfaces, states, cells, rows, cleared, open_n = (int(x) for x in census.groups())
+        self.assertEqual(surfaces * states, cells, "格子数不等于表面 × 状态 ⇒ 词表与行数对不上")
+        self.assertEqual(max(0, cells - cleared), open_n, "未清账不等于格子减已清账")
+        self.assertLessEqual(rows, cells, "行数超过格子数 ⇒ 表里有重复格")
+
         self.assertNotIn(u"RETIRED_UNDECLARED", out)
 
     def test_no_fixture_writes_land_in_docs(self):

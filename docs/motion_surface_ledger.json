@@ -838,7 +838,35 @@
       "verdict": "not-applicable",
       "reason": "推荐项被点就是「复制并关闭」，没有停留的选中态；再画一层选中会把一次动作说成一个状态",
       "evidence": "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 成功」；账本 U-1"
+    },
+    {
+      "surface": "主窗口/列表行",
+      "state": "空",
+      "verdict": "not-applicable",
+      "reason": "R181 看图 + 读源码：列表为空时**没有行**这一层可言 —— 空态由 EmptyStateView 承载（左栏那句「暂无剪贴板历史」+ 右栏「选择一条记录查看详情」，帧 content-empty-750x560 两档都读得通），给一个不存在的行做空态等于把空态画两遍",
+      "evidence": "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=EmptyStateView｜Sources/ClipboardHistoryApp/Views/EmptyStateView.swift｜帧 content-empty-750x560-dark.png"
+    },
+    {
+      "surface": "主窗口/列表行",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "行不承载错误：写盘 / 粘贴失败走 NoticeBanner（ContentView 四处调用，tone .warning / .error），而行文件里 failure / errorText 各 0 命中 ⇒ 这一格无所附；错误态已按提示条那一表面逐格判过",
+      "evidence": "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=failure｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=errorText｜Sources/ClipboardHistoryApp/Views/ContentView.swift"
+    },
+    {
+      "surface": "主窗口/列表行",
+      "state": "成功",
+      "verdict": "not-applicable",
+      "reason": "「已复制」回执只该有一处，而它已经长在详情区那颗按钮上（1.1 秒的勾 + VoiceOver 播报）；ReceiptLine 在产品源码里只被 SettingsView 用（三处）⇒ 行上再放一份会让两条回执互相追旧，详情区那句注释『上一条留下的回执必须收掉，否则挂在另一条记录上就是说谎』讲的正是这个风险",
+      "evidence": "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=ReceiptLine｜Sources/ClipboardHistoryApp/Views/DetailView.swift｜Sources/ClipboardHistoryApp/Views/GlassControls.swift"
+    },
+    {
+      "surface": "主窗口/列表行",
+      "state": "禁用",
+      "verdict": "not-applicable",
+      "reason": "行没有可禁用态：整份行文件里 disabled / isEnabled / allowsHitTesting 各 0 命中（R181 grep 实测）；行内会被禁用的只有收藏与图钉那两颗控件，它们已按自己的表面逐格判过",
+      "evidence": "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=disabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=isEnabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=allowsHitTesting"
     }
   ],
-  "floor_cleared": 111
+  "floor_cleared": 115
 }
