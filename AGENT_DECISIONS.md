@@ -5706,6 +5706,21 @@ R131 把判据扩到「路径必须存在」之后，第一次跑就点名 R128 
 
 **回滚方式**：删掉 `evidence_problems()` 的调用即可回到 R128 的形状判据；表数据不需要回滚。
 
+### D-194（R177）清账表的词表可以缩，但只能**显式退役**：撤项要有承载物缺席的证据 + 一条产品理由
+
+背景：BACKLOG 204 查出「浮层/底部说明」这个表面在今天的浮层里没有承载物
+（`QuickPickController.swift:262` 的面板 stack 只有 `field / empty / scroll`，`footerLabel` / `hintLabel` 产品源码 0 命中）。
+两种处置里选了②（撤词表项），理由不是「格子碍眼」，而是这一层的**功能**已被就地承担：
+唯一真正需要提示的场合（搜不到东西）由空态那一句在原地给了 Esc，
+而在一个 300pt 高的键盘驱动浮层里常驻一行键位 chrome 会与内容争注意力（与 D-171 同一取向：分隔由留白做完，不再加框）。
+
+代价与它的解法：清账表的地板是单调量（`FLOOR_WENT_BACK` 挡「清账退步」），
+而撤掉一个表面在纯计数上与退步**长得一模一样**（本轮 118 → 111）。
+所以退役被做成一条显式通道：表里多一个 `retired_surfaces`（表面 → 理由），闸门四条判据
+（`RETIRED_UNDECLARED` 静默少行 / `RETIRED_STILL_LISTED` 名册没撤干净 / `RETIRED_ROW_PRESENT` 行还在 /
+`RETIRED_NO_REASON` 理由短于 20 字），地板降幅**只从登记过的表面来**。
+本轮真产物读数即证人：`MOTION_LEDGER_FLOOR_BASELINE head=111 now=111` —— HEAD 的 118 被登记的 7 格降到 111，
+而不是把地板写成愿望；「没登记就少一行」那条路径由 `test_silent_removal_is_still_a_red` 钉住。
 ### D-191（R129）读 CI 的顺序：先看 job 结论与失败步骤名，再挑读数
 
 **背景**：`gh run list` 显示 R123–R126 四跑全是 `failure`，而 R124 的现场写的是

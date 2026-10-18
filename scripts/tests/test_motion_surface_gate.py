@@ -256,8 +256,9 @@ class FloorBaselineTests(unittest.TestCase):
         value = gate.head_floor_cleared()
         self.assertIsNotNone(value, u"读不到 HEAD 的 floor_cleared ⇒ FLOOR_WENT_BACK 是恒真的死格子")
         committed = json.loads(io.open(LEDGER, encoding="utf-8").read())
-        self.assertLessEqual(value, int(committed["floor_cleared"]),
-                             u"HEAD 的地板（%s）比工作树（%s）还高 ⇒ 现在就是该红的时刻，不是基准坏了"
+        self.assertLessEqual(value - gate.retirement_allowance(committed, gate.head_table()),
+                             int(committed["floor_cleared"]),
+                             u"HEAD 的地板（%s，已减登记过的退役降幅）比工作树（%s）还高 ⇒ 现在就是该红的时刻，不是基准坏了"
                              % (value, committed["floor_cleared"]))
 
 

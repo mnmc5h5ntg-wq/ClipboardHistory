@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 204 结案：撤掉没有承载物的「浮层/底部说明」，并给清账表装上显式退役通道（R177 / U-589…U-591 · 产品 0 文件，判据账）
+
+- 撤项理由落在产品上（D-194）：`QuickPickController.swift:262` 的面板 stack 只有 `field / empty / scroll`，`footerLabel` / `hintLabel` 产品源码 0 命中 ⇒ 七格一直在判一个不存在的层；键位提示的功能由空态那一句就地承担，常驻 chrome 与内容争注意力
+- 撤项在纯计数上与「清账退步」同形 ⇒ 表新增 `retired_surfaces`（表面 → 理由），闸门四条判据 `RETIRED_UNDECLARED` / `RETIRED_STILL_LISTED` / `RETIRED_ROW_PRESENT` / `RETIRED_NO_REASON`，地板降幅只从登记过的表面来
+- 真产物读数：`MOTION_LEDGER 表面=18 状态=9 格子=162 行数=111 已清账=111 未清账=51 地板=111`、`MOTION_LEDGER_RETIRED 1（浮层/底部说明）`、`FLOOR_BASELINE head=111 now=111`（HEAD 的 118 减去登记的 7 格）；缺席复查 `声明=41 不成立=0/41`
+- 新测试 8 格（`scripts/tests/test_motion_surface_gate_retirement.py`）：静默少行红 / 登记后绿 / 撤不干净红 / 理由太短红 / 降幅只从登记来 / 接线守卫 / 真产物绿；两格自己先红过（needle 命中定义行、基准断言要减降幅）
+- BACKLOG 204 结案；未清账 53 → 51（其中 2 格随该表面消失，不是新判的）
 ### 帧间隔的绝对锚点改成"要颗数撑着"：一朵靠单遍最大值换班的红（R176 / U-586…U-588 · 产品 0 文件，判据账）
 
 - ⓪ 读数：run `39157963970`（`0dbcbb5`）STEP[16] `On-screen probe coverage floor` 红在 `XCTAssertLessThanOrEqual failed: ("320.6537916667003 > 120")` = `testFrameIntervalsUnderStateChanges` 的绝对锚点；相邻两跑 `e61796c`/`9e1d3d4` 同一份判据绿 ⇒ 红在跑与跑之间换班，三份 diff 都没动产品

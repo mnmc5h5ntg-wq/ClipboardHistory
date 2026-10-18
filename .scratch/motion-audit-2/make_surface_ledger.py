@@ -20,10 +20,20 @@ surfaces = [
     "主窗口/列表行", "主窗口/详情区", "主窗口/侧栏", "主窗口/搜索框", "主窗口/筛选条",
     "主窗口/拖入落点", "主窗口/提示条", "设置窗口/侧栏", "设置窗口/热图",
     "设置窗口/开关与滑块", "设置窗口/说明段", "菜单栏/状态图标", "菜单栏/状态菜单",
-    "菜单栏/推荐面板", "浮层/列表行", "浮层/搜索框", "浮层/空态", "浮层/底部说明",
+    "菜单栏/推荐面板", "浮层/列表行", "浮层/搜索框", "浮层/空态",
     "设置窗口/快捷键录制器",   # R141 新加：这一处有自己的状态语言（录制中），不归「开关与滑块」
 ]
 states = ["空", "加载", "错误", "成功", "选中", "悬停", "按下", "聚焦", "禁用"]
+
+# R177 / BACKLOG 204：撤掉的表面**不许静默消失**。退役要在这里登记理由，
+# `scripts/motion_surface_gate.py` 拿 HEAD 那一版对账：已清账格子少了而表面没登记退役 ⇒ `RETIRED_UNDECLARED` 红；
+# 登记了退役却还在名册里 / 还留着行 / 理由为空 ⇒ 各有一格红。
+retired_surfaces = {
+    "浮层/底部说明": "R177 撤词表项：这一层在今天的浮层里没有承载物（`QuickPickController.swift:262` 的面板 stack 只有 field / empty / scroll 三个子视图，`footerLabel` / `hintLabel` 在产品源码 0 命中）。"
+                    "键位提示行判为不做（见 DECISIONS 的 D-19x）：300pt 高的浮层里加一行常驻 chrome 会与内容争注意力，"
+                    "而唯一真正需要提示的场合（搜不到东西）已经在空态那一句里就地给了 Esc。"
+                    "留着这个表面只会让九格逐格判 not-applicable、每轮都算成已推进 —— 那正是目标禁止的为清账而清账。",
+}
 
 # (surface, state, verdict, 理由, 证据指针)
 # 指针规则（U-424）：至少含一个可复查对象 —— Sources/…swift、Tests/…swift、docs/…、
@@ -77,24 +87,6 @@ rows = [
     # R173：浮层底部那一行说明逐格判（它是一把 NSTextField 静态标签 ⇒ 这几类交互态是 not-applicable，不是没做）。
     # 「空」与「选中」两格本轮故意不判：证据要落在标签那一行本身 ——
     # `isSelected` 在这个文件里确实有 4 处，但那都是列表行的，拿文件级缺席替「说明行不可选中」作证就是假话。
-    ("浮层/底部说明", "加载", "not-applicable",
-     u"R174 换主语：浮层的 stack 只有 field / empty / scroll 三个子视图（本文件 262 行），**没有底部说明这一层**；面板弹出来时候选已经在表里 ⇒ 加载态无所附",
-     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=footerLabel"),
-    ("浮层/底部说明", "禁用", "not-applicable",
-     u"这一层没有承载物（证据见「加载」那格的 stack 三子视图与 footerLabel 缺席）⇒ 禁用无所附；会被禁用的只有面板里的控件，各自有格",
-     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=footerLabel"),
-    ("浮层/底部说明", "聚焦", "not-applicable",
-     u"键盘焦点链只走搜索框与列表行；这一层连视图都不存在 ⇒ 谈不上焦点环，硬加会造出第三个假焦点位",
-     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=FocusState｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isFocused"),
-    ("浮层/底部说明", "按下", "not-applicable",
-     u"面板里那三视图之外没有可点的东西；给一行说明加按下态会把可读的说明读成可点的按钮，是减法不是加法",
-     "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=onTapGesture｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=hintLabel"),
-    ("浮层/底部说明", "成功", "not-applicable",
-     u"复制成功的反馈长在列表行的回执上（ReceiptLine 那一族），不另起一行说明 ⇒ 这一层没有成功态可言",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"),
-    ("浮层/底部说明", "错误", "not-applicable",
-     u"错误与空结果都由 `empty` 那一句承担，而它属于「浮层/空态」那一表面 ⇒ 这层不承载错误（这层根本不存在，见 BACKLOG 204）",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"),
 
     ("设置窗口/侧栏", "悬停", "kept",
      "与主窗口行同一档 0.12s；侧栏行是导航不是内容，动得比内容重会抢注意力",
@@ -143,9 +135,6 @@ rows = [
     ("浮层/空态", "空", "kept",
      "空态是一句成句的话而不是动画；给「没有结果」加动效会把注意力钉在空上",
      "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift；读数 `QUICKPICK_EMPTY_SENTENCE`（R64）"),
-    ("浮层/底部说明", "悬停", "not-added",
-     "R174 复查这条更早的理由：浮层里并没有「底部那一行」（stack 只有 field / empty / scroll）⇒ 悬停无所附，结论不变但主语换成真实存在的视图；这层要不要做见 BACKLOG 204",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的底部说明段（R64 位点逐个判）"),
     # ---- R131 清的十二格（每一格的理由都落在一个可复查的对象上：源码里的调用点、
     #      或"整份文件里 grep 某个词 0 命中"这种缺席证据 —— 缺席也要是被量出来的缺席）----
     ("设置窗口/热图", "空", "kept",
@@ -512,6 +501,7 @@ data = {
     "verdicts": ["added", "kept", "not-added", "not-applicable", "not-measured"],
     "cleared_verdicts": ["added", "kept", "not-added", "not-applicable"],
     "surfaces": surfaces,
+    "retired_surfaces": retired_surfaces,
     "states": states,
     "rows": [{"surface": a, "state": b, "verdict": c, "reason": d, "evidence": e}
              for (a, b, c, d, e) in rows],

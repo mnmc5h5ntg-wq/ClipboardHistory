@@ -1,5 +1,20 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 04:25（本地 · R177 / 第 179 轮：**204 结案 —— 撤掉没有承载物的「浮层/底部说明」，清账表学会显式退役**（U-589…U-591 · 产品 0 文件，判据账）
+
+决定：这一层没有承载物（stack 只有 `field / empty / scroll`；`footerLabel`/`hintLabel` 0 命中），功能由空态那一句就地承担，
+常驻键位 chrome 与内容争注意力 ⇒ 撤词表项，记 D-194。**将来要做键位提示行就是新需求：先做承载物，不许复活这一层继续判 not-applicable。**
+仪器代价与解法：撤项在纯计数上与「清账退步」同形（118 → 111）⇒ 表新增 `retired_surfaces`，闸门四条判据
+（`RETIRED_UNDECLARED` / `RETIRED_STILL_LISTED` / `RETIRED_ROW_PRESENT` / `RETIRED_NO_REASON`），地板降幅只从登记过的表面来。
+真产物：`表面=18 格子=162 行数=111 已清账=111 未清账=51 地板=111`、`RETIRED 1（浮层/底部说明）`、
+`FLOOR_BASELINE head=111 now=111`、缺席 `声明=41 不成立=0`。两格测试自己先红：needle 命中定义行、基准断言要减降幅。
+验证：0 产品文件（工作树钉子数过）⇒ 没构建、没重捕、没换装；CI：`fce0b84`（R176 的新判据第一次上 runner）与本轮那一跑都待读。
+
+**下一轮（R178）的靶**：⓪ 读 `fce0b84` 与本轮 push 那一跑的**全部失败步骤**；
+   预期：STEP[16] 不再因单帧离群红 —— 若还红，数 `PROBE_WORST_FRAME` 的颗数，≥2 颗查产品、**不许改判据**；
+   并确认 `MOTION_LEDGER_RESULT=ok` 在 runner 上也拿着退役后的表成立（`RETIRED 1` 要在）；
+② 206 的三把欠刀（M693 起：tolerance、`overAnchor` 过滤式、超锚点却 0 颗那一格）；
+③ 205 的按元素切带；④ 201 的带内读数；⑤ 清账表剩余 51 格（`--list-open`）；⑥ 189、188 的 ②③、176、182/183/185、202。
 最后更新：2026-10-19 04:15（本地 · R176 / 第 178 轮：**⓪ 那朵没人读的 CI 红有名字了 —— 绝对锚点原来靠单遍最大值撑**（U-586…U-588 · 产品 0 文件，判据账）
 
 `ci_read.py steps 39157963970` ⇒ STEP[16] `On-screen probe coverage floor` 红在 `worst=320.6537916667003 > 120ms`（`testFrameIntervalsUnderStateChanges` 的绝对锚点，

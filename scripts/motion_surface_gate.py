@@ -113,6 +113,72 @@ def evidence_problems(row, where, root=None):
     return out
 
 
+def head_table(path="docs/motion_surface_ledger.json", root=None):
+    """读 HEAD 那一版**整张表**；读不到返回 None（= 这一格没判，不是通过）。"""
+    import subprocess
+    root = root or repo_root()
+    try:
+        raw = subprocess.check_output(["git", "-C", root, "show", "HEAD:" + path],
+                                      stderr=subprocess.DEVNULL)
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None
+
+
+def _cleared_pairs(table):
+    cleared = (table or {}).get("cleared_verdicts") or []
+    return set((r.get("surface"), r.get("state")) for r in (table or {}).get("rows") or []
+               if (r.get("verdict") or "") in cleared)
+
+
+def retirement_allowance(data, head):
+    """本轮**显式退役**的表面，在 HEAD 那一版里已清账几格 —— 地板的合法降幅。
+
+    为什么地板需要一个降幅（R177 / BACKLOG 204）：`FLOOR_WENT_BACK` 要挡的是"清账退步"，
+    而撤掉一个不存在的表面也会让已清账行数下降。两件事在纯计数上长得一模一样，
+    所以要么禁止撤词表（等于逼着幽灵表面继续产生假进度），要么把"撤"变成**显式登记**的量。
+    这里选后者：降幅只从登记过的表面来，没登记的照旧红。
+    """
+    retired = set((data or {}).get("retired_surfaces") or {})
+    if not retired or not head:
+        return 0
+    head_surfaces = set(head.get("surfaces") or [])
+    return len([1 for pair in _cleared_pairs(head) if pair[0] in retired and pair[0] in head_surfaces])
+
+
+def retirement_problems(data, head):
+    """撤词表项的四条判据（每条都能红，红名各不一样）。"""
+    out = []
+    retired = (data or {}).get("retired_surfaces") or {}
+    surfaces = set((data or {}).get("surfaces") or [])
+    for name, reason in sorted(retired.items()):
+        if name in surfaces:
+            out.append(("RETIRED_STILL_LISTED",
+                        "%s：登记了退役，却还在 surfaces 名册里 ⇒ 撤项没撤干净" % name))
+        if not isinstance(reason, str) or len(reason.strip()) < 20:
+            out.append(("RETIRED_NO_REASON",
+                        "%s：退役理由为空或太短（%r）⇒ 撤词表项要有产品面的理由，不是嫌格子多"
+                        % (name, (reason or "")[:24])))
+    if any(name in surfaces for name in retired):
+        pass
+    for row in (data or {}).get("rows") or []:
+        if row.get("surface") in retired:
+            out.append(("RETIRED_ROW_PRESENT",
+                        "%s × %s：表面已退役却还留着这一行 ⇒ 表与名册自相矛盾"
+                        % (row.get("surface"), row.get("state"))))
+    if head:
+        head_surfaces = set(head.get("surfaces") or [])
+        lost = set(s for s, _ in _cleared_pairs(head) if s not in surfaces)
+        undeclared = sorted(lost - set(retired))
+        for name in undeclared[:3]:
+            out.append(("RETIRED_UNDECLARED",
+                        "%s：HEAD 里它有已清账的格子，本轮名册里没了，却没登记退役 ⇒ "
+                        "『少了一行』与『清账退步』分不开（R143 那一族）" % name))
+        if lost and not head_surfaces:
+            out.append(("RETIRED_HEAD_UNREADABLE", "HEAD 那张表读得出行数却读不出名册 ⇒ 无从对账"))
+    return out
+
+
 def head_floor_cleared(root=None, path="docs/motion_surface_ledger.json"):
     """读 **HEAD 那一版**的 `floor_cleared`；读不到返回 None（= 这一格没判，不是通过）。
 
@@ -248,6 +314,9 @@ def main():
           % (len(data.get("surfaces") or []), len(data.get("states") or []), cells, len(rows),
              cleared_n, max(0, cells - cleared_n), data.get("floor_cleared")))
     print("MOTION_LEDGER_VERDICTS %s" % (dist or "无"))
+    retired = data.get("retired_surfaces") or {}
+    print("MOTION_LEDGER_RETIRED %d%s"
+          % (len(retired), ("（" + "、".join(sorted(retired)) + "）") if retired else ""))
     if args.list_open:
         todo = open_cells(data)
         # 名单为空**不许**读成"活干完了"：也可能是词表漂了或 rows 被清空，
@@ -260,8 +329,14 @@ def main():
         for surface, state in todo:
             print("OPEN %s × %s" % (surface, state))
     # 基准只对**仓库里那一份**有意义：`--path` 指到别处（沙箱夹具）时不比对，读成 None。
-    head_floor = head_floor_cleared() if args.path == "docs/motion_surface_ledger.json" else None
+    in_repo = args.path == "docs/motion_surface_ledger.json"
+    head = head_table() if in_repo else None
+    head_floor = head_floor_cleared() if in_repo else None
+    allowance = retirement_allowance(data, head)
+    if head_floor is not None and allowance:
+        head_floor -= allowance   # 只有**登记过**的退役才算降幅；没登记的少一行就是退步
     problems = check(data, head_floor=head_floor)
+    problems += retirement_problems(data, head)
     print("MOTION_LEDGER_FLOOR_BASELINE head=%s now=%s"
           % ("无（不在 git 工作树里 ⇒ 这一格没判）" if head_floor is None else head_floor,
              data.get("floor_cleared")))
