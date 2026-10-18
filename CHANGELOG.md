@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 191 定性完成：两朵 capture 红是 R145 那张新帧顶翻了「materialCells == 0」这个机器前提（R150 / U-506…U-508 · 产品 0 文件）
+
+- 排除：runner 上 `CARD_FILL_CANDIDATES … 前三=(页底:480)` ⇒ 整幅仍只有一层，「分段那一关真看不见」这一支被杀掉。
+- 指认：`CARD_INSET_ALL settings-shortcuts-recording light=5.0`、`有材质=6（被告=2 参照=4）量到=1` ⇒ 唯一的假材质是录制态那颗高亮 pill（暗档 60 vs 页底 52）。
+- 修法写进 191：`cardFill` 除了行数还要问**这一层有多宽**（最长同色段 ÷ 内容宽；卡片 ~600pt，pill 87pt），不给帧开具名豁免；本轮不动判据。
+- 三条新账：U-506 以 `== 0` 为前提的闸门会被新帧顶翻；U-507 分辨实验要能杀掉一种解释；U-508 `量到 1 格` 不等于尺在工作。
+
+
 ### 读到 R146 的 CI：第 16 步绿了，另两朵红我漏看了三轮（R149 / U-503…U-505 · 产品 0 文件，读数与流程账）
 
 - **结案**：run `39114424945`（`3a557fb`）的失败步骤里已无 `On-screen probe coverage floor` ⇒ R146 的 `心跳 − 闭合` 在 runner 上成立，BACKLOG 186 结案。

@@ -4704,6 +4704,9 @@ cannot 带 reason 不红 / 没 reason 的 cannot 仍红 / cannot 而它跑完红
 基线同一轮 `update` 后 `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`；盲区名单被闸门逼着 +1（vibrancy 子树）。
 **收尾还欠一格**（这条不撤，改成判据账）：把"录制态帧的高色度像素 ≥ 地板"变成电池里会红的断言 ——
 今天它只由本轮脚本量过一次，帧名说谎目前还只能靠人眼发现。
+**191 追记（R150 定性完成，未动手）**：分辨实验已在**现有**日志里跑完 —— `CARD_FILL_CANDIDATES settings-general/stats light|dark 前三=(页底:480)` 排除了「分段那一关真看不见」这一支；`CARD_INSET_ALL settings-shortcuts-recording light=5.0` 指出 runner 上唯一的「第二层」是 R145 新帧那颗高亮 pill（暗档 60 vs 页底 52，差 8 > 门限 3）。⇒ 因是**一张新帧顶翻了 `materialCells == 0` 这个机器前提**（U-506），不是产品少画了东西。
+修法（下一轮做，本轮不动判据）：`cardFill` 除了行数还要问**这一层有多宽**（行内最长同色段占内容宽的比例；卡片横贯 ~600pt，pill 只有 87pt），而不是给录制态帧开具名豁免。验收两头都要看：runner 上 `materialCells` 回到 0 ⇒ R100 那条 skip 自己响、两朵红消失；本机 `CARD_INSET_CAPABILITY 有材质` 与 `CARD_ABOVE_CAPABILITY` 两行的数字**不许变小**（变小就是新尺把真卡片也挡掉了）。
+
 
 **186 追记（R146 结案一半）**：成因有名字了，而且**不是产品** —— 那条被记成"这台机器上它今天会挂"的
 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`，本机同一份通道量到的真实顺序里它是第 6 颗心跳且**已闭合**；
