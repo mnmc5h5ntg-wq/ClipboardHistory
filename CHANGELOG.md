@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 读到 R146 的 CI：第 16 步绿了，另两朵红我漏看了三轮（R149 / U-503…U-505 · 产品 0 文件，读数与流程账）
+
+- **结案**：run `39114424945`（`3a557fb`）的失败步骤里已无 `On-screen probe coverage floor` ⇒ R146 的 `心跳 − 闭合` 在 runner 上成立，BACKLOG 186 结案。
+- **新账**：同一跑挂着 `STEP[13] Swift tests` 与 `STEP[15] Capture gate`，R145 那一跑同形 ⇒ 我连续三轮只读第 16 步（U-503）。
+- 两朵红的原文进账：runner 看得见 2 格材质却量不到卡片段，连 `cardprobe-groupbox-default dark[参照]` 也是 `有材质但找不到卡片段（fill=60）`。
+- 决定不动判据（两种解释修法相反），分辨实验与新账写进 BACKLOG 191；两条红保持会红。
+
+
 ### 覆盖闸门接上闭合通道：登记判定不再只读那条会丢的 stdout（R148 / U-500…U-502 · 产品 0 文件，判据账）
 
 - `probe_coverage_gate.py` 的「跑过」= `日志结论行 ∪ 闭合行`；新增读数 `PROBE_LOG_LOSE_CONCLUSION` / `PROBE_PULSE_OPEN` / `PROBE_REGISTRATION_CONTRADICTED`（只报不判）与新红 `PROBE_CLOSE_WITHOUT_PULSE`；`--pulse` 不传 ⇒ 旧行为原样。

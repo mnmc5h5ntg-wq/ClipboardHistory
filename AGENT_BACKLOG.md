@@ -4644,6 +4644,15 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
 在修好之前，任何引用 `PHASE2_*` 均值的账本句子都要先复核它读的是哪种单位。
 
 **189. 覆盖闸门的 summary 要带机器键 —— 登记表说的是 runner，喂本机日志会造出 6 朵 `NOW_RUNS`**（R148 / U-502）
+
+**191. runner 现在看得见 2 格卡片材质、却量不到任何卡片段（连系统参照也是）—— 两朵 capture 红自 R145 挂着，先分辨再动判据**（R149）
+证据（run `39114424945` / `3a557fb`，R145 的 run `39103361921` 同形）：
+  * `testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` ⇒ `系统参照只有 ["light"]`、`被告读到 2 格材质却只量到 1 格内缩`、`未判 29 格`，其中 `cardprobe-groupbox-default dark[参照]=有材质但找不到卡片段（fill=60）`；
+  * `testSettingsCardVerticalRhythmIsOneNumber` ⇒ `本机读到 2 格材质，「统计」却有 4 格没进卡片计数（light/dark 全 `填充=-1`）`、`名单只有 1 格 < min(8, 2)`。
+为什么先不修：R100 的机器前提（`materialCells == 0` ⇒ skip）已被这组读数推翻，新的形状有两种解释且修法相反 ——
+① runner 镜像变了导致材质与背景同层（该加的是「参照自己读不到 ⇒ 这一档不判」的出口）；② 分段那一关在这台机器上真的看不见（该修尺，且**不许**加出口）。
+分辨实验：读失败正文上方的 `CARD_FILL_CANDIDATES cardprobe-groupbox-default dark …` 那一行，比较 `fill=60` 与那一档页面亮度的差值 ——
+差值小 ⇒ ①；差值大而仍读不到段 ⇒ ②。判据在实验出结果之前**一律不动**，两条红保持会红。
 本机那一遍 `CLIPBOARD_HISTORY_UI_INTERACTION=1` 下 11 条全跑完，把它喂给闸门 ⇒ 六条登记为 `cannot` 的用例全被反驳成「runner 上其实能跑」。那句话是**假的**，因为主语错了：闸门读的是哪台机器的日志，输出里一个字都没写。要做的：summary 行带上与 `MotionFilmstripTests.filmstripMachineKey()` 同源（或直接读 `PROBE_FPS 机器=` 那一格）的机器键，并且当机器键不是 runner 那一台时，把 `NOW_RUNS` / `NOT_RUN` 降级成 `PROBE_GATE_WRONG_SUBJECT=<键>` 一句有名字的话 —— 登记判定只对它登记的那台机器成立。
 `frame_recording_proof.py` 今天只对本机 `/tmp/shots_r145` 跑过一次。要做：① 在捕获那一步后面调用它（帧目录用 CI 自己的 `/tmp/shots-ci`），
 **只汇报不拦**；② 读 runner 第一遍的 delta 与四边读数；③ 升硬门的判据先写死在这里 ——
