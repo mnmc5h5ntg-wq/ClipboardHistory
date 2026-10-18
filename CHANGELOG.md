@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 194 的分辨读数落地（只出数不放行），并查证三处"该不该加动效"（R162 / U-539…U-541 · 产品 0 文件，判据账）
+
+- 新增 `CAPTURE_GEOMETRY`：对 `height>=1000` 的夹具打 `requested / content / host / screenVisibleHeightPt`，
+  三个尺寸同源于这一次捕获，不 skip、不豁免、不改门槛。本机六张高帧 ⇒ `720x1040 / 720x1040 / 720x1040 / 847`
+  ⇒ 本机既没被夹小也没铺不满，而屏幕比窗口矮 193pt 照样画满（R161 否证的那件事现在有自己的读数行）。
+- runner 回来时三种样子各绑定一个处置：`content<1040` ⇒ 夹具被屏幕收小；`content=1040 而 host<1040` ⇒ 布局没铺满；
+  三者都=1040 而像素仍空 ⇒ 与 191/196 同族的"整层不合成"，那时才按 196 的形状谈未运行。
+- 三处"该加而没加"的候选查在源码上，结论都是不加：详情区 chip 已有 `.pressedStyle` + `.helpLabel` + `.onHover`；
+  菜单栏推荐面板两处 `.buttonStyle(.plain)` 是 R4 刻意留的（菜单自己的高亮就是证据）；侧栏批量五颗 R13 已归队。
+- 验证：编译 0 告警；`UICaptureTests` 71 例 / 4 skip / 0 failures、138 帧不变；脚本电池 335 OK；
+  CI 三跑只剩 `STEP[15]`（194）。
+
 ### 给 194 写的那条「屏幕装不下」出口被本机读数证伪，已撤掉（R161 / U-536…U-538 · 产品 0 文件，判据账）
 
 - 假设：runner 上六张 `settings-*-tall-720x1040` 报"95% 像素未画"，是因为那台机器的主屏装不下 1040pt 高的窗口。

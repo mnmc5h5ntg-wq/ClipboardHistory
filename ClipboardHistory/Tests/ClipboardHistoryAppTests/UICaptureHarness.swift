@@ -10982,6 +10982,20 @@ final class UICaptureTests: XCTestCase {
         // 少一条豁免，就少一个"夹具与产品不同形"的地方（BACKLOG 36 那一族）。
         window.layoutIfNeeded()
         host.layoutSubtreeIfNeeded()
+        // R162 / BACKLOG 194：**只出读数，不放行、不 skip、不豁免**（这是 R161 那条被证伪的出口该有的样子）。
+        // runner 上六张 `settings-*-tall-720x1040` 报"有 95% 像素未画"，而"这台机器屏幕装不下"
+        // 已被本机否掉：`CAPTURE_SCREEN … visibleHeightPt=847` 而同一批高帧本机 `blank=0.0%`、画到第 2079 行
+        // ⇒ 离屏窗口不被屏幕可视高夹住。剩下三种成因（窗口被收小 / 内容视图没铺满 / 画了但整层不合成）
+        // 靠下面这一行分辨：三个尺寸全部来自**这一次**捕获，谁也不引用别处的常数。
+        if size.height >= 1000 {
+            let geometryTag = appearance == .darkAqua ? "dark" : "light"
+            let content = window.contentView?.frame.size ?? NSSize(width: -1, height: -1)
+            emit("CAPTURE_GEOMETRY \(fixture.name) \(geometryTag)"
+                 + " requested=\(Int(size.width))x\(Int(size.height))"
+                 + " content=\(Int(content.width))x\(Int(content.height))"
+                 + " host=\(Int(host.frame.width))x\(Int(host.frame.height))"
+                 + " screenVisibleHeightPt=\(Int(NSScreen.main?.visibleFrame.height ?? -1))")
+        }
 
         // 内容要等一次异步刷新才落定的夹具在这里 settle（会转 runloop）。
         // 放在"关 caret"之前：转完 runloop 可能装出新的 field editor，必须让后面的静默与重排照常生效。
