@@ -9,16 +9,27 @@ def grab(pat, text, what):
     if not h: raise SystemExit("PARSE_FAILED " + what)
     return h[-1] if not isinstance(h[-1], tuple) else h[-1]
 pill = rd("/tmp/r182_pills.txt")
-T = dict(DL=grab(r"左半\(全部\): \{'mean': ([\d.]+)", pill, "暗档左半"),
-         DR=grab(r"右半\(收藏\): \{'mean': ([\d.]+)", pill, "暗档右半"),
-         DRS=grab(r"top_color': \((\d+), 255, 255\)", pill, "暗档右半主色") or "255",
-         DTOP=grab(r"右半\(收藏\): \{'mean': [\d.]+, 'bright_pct': [\d.]+, 'top_color': \((\d+), (\d+), (\d+)\), 'top_pct': ([\d.]+)", pill, "暗档右半主色"),
-         LL=grab(r"'mean': ([\d.]+), 'bright_pct': 97.1", pill, "亮档左半"),
-         LR=grab(r"PILLS content-empty-750x560-light[\s\S]*?右半\(收藏\): \{'mean': ([\d.]+)", pill, "亮档右半"))
-T["DTOPC"] = "%s,%s,%s" % (T["DTOP"][0], T["DTOP"][1], T["DTOP"][2])
+# 按帧切片再取数：`grab()` 取的是最后一次命中，整份文件一把抓会让亮档的数盖掉暗档
+#（R182 第一次就是这么把 51.0/179.0 写成了 233.7/248.0 —— 假账，已 revert 重发）。
+dark_sec = pill.split("PILLS content-empty-750x560-dark")[1].split("PILLS")[0]
+light_sec = pill.split("PILLS content-empty-750x560-light")[1]
+def one(pat, text, what):
+    h = re.findall(pat, text)
+    if not h: raise SystemExit("PARSE_FAILED " + what)
+    return h[0] if not isinstance(h[0], tuple) else h[0]
+T = {}
+T["DL"] = one(r"左半\(全部\): \{'mean': ([\d.]+)", dark_sec, "暗档左半")
+T["DR"] = one(r"右半\(收藏\): \{'mean': ([\d.]+)", dark_sec, "暗档右半")
+T["LL"] = one(r"左半\(全部\): \{'mean': ([\d.]+)", light_sec, "亮档左半")
+T["LR"] = one(r"右半\(收藏\): \{'mean': ([\d.]+)", light_sec, "亮档右半")
+dt = one(r"右半\(收藏\): \{'mean': [\d.]+, 'bright_pct': [\d.]+, 'top_color': \((\d+), (\d+), (\d+)\), 'top_pct': ([\d.]+)", dark_sec, "暗档右半主色")
+T["DTOPC"] = "%s,%s,%s" % dt[:3]
+T["DTOPP"] = dt[3]
 T["DDELTA"] = str(round(float(T["DR"]) - float(T["DL"]), 1))
 T["LDELTA"] = str(round(float(T["LR"]) - float(T["LL"]), 1))
-T["DTOPP"] = T["DTOP"][3]
+if float(T["DDELTA"]) < 60: raise SystemExit("REFUSE 暗档两半差 %s（要 >60）" % T["DDELTA"])
+if not (10 < float(T["LDELTA"]) < 20): raise SystemExit("REFUSE 亮档两半差 %s（要在 10..20）" % T["LDELTA"])
+if T["DTOPC"] != "255,255,255": raise SystemExit("REFUSE 暗档右半主色不是纯白：%s" % T["DTOPC"])
 gate = subprocess.check_output(["python3", "scripts/motion_surface_gate.py"], cwd=ROOT).decode()
 g = grab(r"MOTION_LEDGER 表面=(\d+) 状态=(\d+) 格子=(\d+) 行数=(\d+) 已清账=(\d+) 未清账=(\d+) 地板=(\d+)", gate, "闸门")
 T.update(ROWS=g[3], CLEAR=g[4], OPEN=g[5], CELLS=g[2])
