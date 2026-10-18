@@ -36,6 +36,16 @@ LEDGERS = {
 }
 LOOKBACK = 3
 
+# R188 / 新开 211：**显式申报**过的「只动 BACKLOG」笔次。为什么不顺手给 186/187 补两行桩标题：
+# 桩标题会让「半批已写」这一格永远查不出来（守卫被散文喂饱）；而申报是**可查的** ——
+# `test_round_batch_declaration.py` 钉住三件事：申报必须带理由、申报的那轮必须确实缺一本账、当前轮永远不许被豁免。
+# 删掉这张表 ⇒ 186/187 又会让 STATE 轮换红三格（红回来，不是绿过去）。
+SINGLE_LEDGER_ROUNDS = {
+    186: "a90e380 只追加 BACKLOG 210 追记 2（绑定链查到底），三本账没写",
+    187: "2720e72 + 81105b0 只追加 BACKLOG 210 追记 3/4（病根改判与钉死），三本账没写；"
+         "该读数已在 R188（8b90efe）撤回 ⇒ 连内容也作废了",
+}
+
 
 def current_round():
     text = open(STATE, encoding="utf-8").read()
@@ -56,6 +66,9 @@ class RoundBatchTests(unittest.TestCase):
         missing = []
         for back in range(LOOKBACK):
             this = r - back
+            # 当前轮（back == 0）永远不许被豁免：豁免只给「已经落盘、且明说只动了一本账」的历史笔次
+            if back > 0 and this in SINGLE_LEDGER_ROUNDS:
+                continue
             for name, fmt in LEDGERS.items():
                 path = os.path.join(REPO, name)
                 if not os.path.exists(path):
