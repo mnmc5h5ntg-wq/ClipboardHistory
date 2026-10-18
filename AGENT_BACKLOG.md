@@ -4652,3 +4652,14 @@ cannot 带 reason 不红 / 没 reason 的 cannot 仍红 / cannot 而它跑完红
 新夹具 `fixtures/r144_probe_hung_ui.log`。**这条不开着的原因**：登记与"成因"是两件事 ——
 挂在哪一帧仍未实测（`UI_PROBE_SAMPLE_UNPARSED=1`：读不懂文件 ≠ 它挂在未知帧上），
 下一轮要真去 runner 上拿旁证；若哪一跑它又跑完，闸门会红在 `NOW_RUNS`，那时带着读数翻回去。
+**177 追记（R145 动手了一半，把两处硬事实留在账上）**：本轮真的开始做那张夹具帧，撞到两件事，都值得下一轮直接用：
+① **`Fixture.settle` 这个钩子放不了那一次点击** —— 捕获路径在 `settle` 之后还会 `window.makeFirstResponder(nil)`
+清闪烁 caret，而录制态是靠第一响应者活的（`HotKeyRecorderButton.resignFirstResponder` 会 `cancelRecording`）
+⇒ 先点再清 caret，等于自己把刚点出来的状态取消掉。要新增一个跑在 **caret 静默之后**的 `interact:(NSWindow)->Void` 钩子。
+② Swift 侧的形状：`Fixture.init` 的 `build` 是**最后一个无标签参数**，一旦前面出现带标签的 `interact:`，
+尾随闭包就不再映射到它（编译报 `expected ')' in expression list`）⇒ 正确写法是 `withAppKit` 那一族的
+`withInteract(_:)` 复制器，而不是往 init 里加参数。
+剩下的那一处编译错（闭包里 `HotKeyRecorderButton.self` 报 implicit use of `self`）本轮没来得及定位，
+**改动已全部 `git checkout` 回退，仓库没有半成品**。下一步从"加 `interact` 钩子 + `withInteract`"起步，
+136 → 138 之后要在同一轮里 `frame_baseline.py update`，并给那张帧配一条**状态自证**判据
+（帧名声称"录制中"，就得由帧自己的高色度像素证明，别让它成为一张会撒谎的证人 —— D-024 那条规矩）。
