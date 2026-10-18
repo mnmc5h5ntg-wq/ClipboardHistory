@@ -360,7 +360,65 @@ rows = [
     ("设置窗口/快捷键录制器", "选中", "not-applicable",
      "这颗按钮没有可延续的『选中』语义：按下即进入录制态，而录制态是一圈强调色描边 + 标题改成『按下新组合键』"
      "（那一格已判为 added）。再给『选中』画一层会出现『既在录制又被选中』两个当前",
-     "docs/motion_surface_ledger.json 的「设置窗口/快捷键录制器 × 按下」；`HotKeyRecorderView.swift` 的录制态标题"),]
+     "docs/motion_surface_ledger.json 的「设置窗口/快捷键录制器 × 按下」；`HotKeyRecorderView.swift` 的录制态标题"),
+    # R164（第 166 轮）一批：快捷键录制器与浮层剩余状态逐格判完。
+    # 每条"不加"都绑本轮实测的缺席计数或那一行代码，不是印象（判为不做要能在源码里被证伪）。
+    ("设置窗口/快捷键录制器", "加载", "not-applicable",
+     "这层不等待任何东西：`ProgressView` / `isLoading` 实测各 0 处。进入录制态由点击与 firstResponder 决定，"
+     "不存在「读一半」的中间态；给它转圈会把一个即时动作演成一次任务",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（本轮 grep：ProgressView=0 isLoading=0）"),
+    ("设置窗口/快捷键录制器", "禁用", "not-applicable",
+     "没有「禁用的录制器」这条分支（`disabled` / `isEnabled` 实测 0 处）。真要收回控制权走的是**退出录制**"
+     "（`cancelRecording`：交还 firstResponder、标题还原），不是把按钮灰掉 —— 灰掉会留下"
+     "「它在录制却点不动」那种 macOS 12 上抓过的错（R39 那一族）",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `cancelRecording()`"),
+    ("设置窗口/快捷键录制器", "空", "not-applicable",
+     "这颗按钮永远有标题：`shortcut.didSet { if !isRecording { title = shortcut.displayString } }`。"
+     "未设置时显示的是组合键自己的显示串，不是一片空白 ⇒ 这一屏不存在「空的录制器」",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `HotKeyRecorderButton.shortcut` didSet"),
+    ("设置窗口/快捷键录制器", "错误", "not-applicable",
+     "非法组合键**不在这一层说话**：它有唯一出口 `onInvalidShortcut`，回执由上层（提示条那一族）负责。"
+     "在这层再画一次红会把同一句话讲两遍，而 VoiceOver 会读到两条同样的失败",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `var onInvalidShortcut: (() -> Void)?`；账本 BACKLOG 58 那一族"),
+    ("设置窗口/快捷键录制器", "聚焦", "not-applicable",
+     "它是真 `NSButton`，焦点环由系统画；这层没有任何自定义 focus 代码（`focus` / `Focus` 实测 0 处）。"
+     "自己再叠一圈会出现两个当前（R20 在圆形图标按钮上抓过这种叠层）",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（无 focus 分支）；账本 R20"),
+    ("浮层/搜索框", "按下", "not-applicable",
+     "按下去就是系统插入点（那是一枚 `NSTextField`，`placeholderString = \"搜索历史记录…\"`）。"
+     "再叠一层按压底色会把「我在编辑」说成「我是按钮」",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `field.placeholderString`"),
+    ("浮层/搜索框", "选中", "not-applicable",
+     "文本框的「选中」是插入点与选区，作者是 NSTextField；这层没有可延续的 selection 语义，"
+     "也不该有 —— 浮层里被选中的是**行**，说那句话的地方是「浮层/列表行 × 选中」",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（field 是 NSTextField）"),
+    ("浮层/搜索框", "空", "not-applicable",
+     "空输入不是空态：它显示 placeholder。「没有结果」那一句由「浮层/空态 × 空」那一格承担（R7 / 审计 B-P2）",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `emptyLabel`"),
+    ("浮层/搜索框", "加载", "not-applicable",
+     "过滤是对内存里那份历史同步做：`QuickPickModel.swift` 里 `Task {` / `async` / `await` / `ProgressView` 实测各 0 处"
+     "⇒ 没有「读一半」可演；采集路径不许有同步磁盘写那条红线也正是要这里不出现转圈",
+     "Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift（本轮 grep：四个关键字全 0）"),
+    ("浮层/列表行", "加载", "not-applicable",
+     "表格数据是面板打开即有的那份历史（`QuickPickController.swift` 无 `ProgressView` / `isLoading`，实测 0）"
+     "⇒ 这一格以前被当成「没做」，其实是「没有这一态」",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（本轮 grep：ProgressView=0 isLoading=0）"),
+    ("浮层/空态", "悬停", "not-applicable",
+     "那一句是 `NSTextField(labelWithString:)`：不是控件、不可点、不进焦点环。"
+     "给它悬停反馈会造出一个「点不动却有反应」的目标（R39 那一族的反面）",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `let empty = NSTextField(labelWithString: \"\")`"),
+    ("浮层/空态", "按下", "not-applicable",
+     "同「悬停」那条的同一事实：标签没有可按压的东西。这里刻意**不引用文件级缺席**当理由 —— "
+     "用的是这一行声明的对象身份（它不是 NSButton）",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `empty` 构造行"),
+    ("浮层/空态", "聚焦", "not-applicable",
+     "标签不进 key-view 环；浮层里唯一该拿焦点的是搜索框（面板一出现就是第一响应者）。"
+     "让空态可聚焦会把 Tab 引到一句没有动作的话上",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（`becomesKeyOnly` 实测 0 处，焦点归 field）"),
+    ("浮层/空态", "禁用", "not-applicable",
+     "没有「被禁用的空态」：它的有无由结果集决定（`empty.isHidden`），**隐藏比禁用诚实** —— "
+     "一句没有结果的话不该以灰掉的方式留在原地",
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的 `empty.isHidden = true`"),]
 
 data = {
     "_comment": [

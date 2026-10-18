@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 快捷键录制器与浮层剩余状态一次判掉 14 格：清账表 85 → 99，看图抓到一条"理由与帧不配对"（R164 / U-545…U-547 · 产品 0 文件，动效主线）
+
+- 14 格全部绑本轮实测的缺席计数或具体代码行：录制器里 `ProgressView` / `isLoading` / `disabled` / `isEnabled` / `focus` 各 0 处、
+  标题由 `shortcut.didSet` 永远填着、非法组合键走 `onInvalidShortcut`（回执归提示条那一族）；
+  浮层 `QuickPickModel.swift` 里 `Task {` / `async` / `await` / `ProgressView` 各 0 处；
+  空态那一句是 `NSTextField(labelWithString:)`，有无由 `empty.isHidden` 决定 —— 隐藏比禁用诚实。
+  闸门原样读数 `行数=99 已清账=99 未清账=72 地板=99`、`不合法格=0`。
+- 看图：`quickpick-empty-420x300-light.png` 里搜索框**没有焦点环**（离屏面板不是 key window，环本来就不画），
+  而「浮层/搜索框 × 悬停」那格的理由写的是"焦点已经在说话" ⇒ 该条理由的证人是 R76 的焦点环判据，不是这张帧。
+  判语不改（另有证人），但"哪张帧能给哪条理由作证"写进账，防止下一轮拿空帧去复核一个不画的环。
+- 浮层空态"要不要配一点什么"查过并决定不加：这一层出现时用户的手在键盘上，那句话已说完"发生了什么 + 下一步"；
+  加插图/动效/提示条都是把注意力钉在"没有"上，与"不喧宾夺主"反着走。
+- 脚本电池 `Ran 335 tests OK`；194 的 `CAPTURE_GEOMETRY` 仍等 runner（三跑写账时 `in_progress` ⇒ 未读）。
+
 ### R160 那笔产品改动补上了会红的守卫；徽标那句话说明为什么不进清账表（R163 / U-542…U-544 · 产品 0 文件，判据账）
 
 - 新增 `AccessibilityLabelHygieneTests.testPinnedBadgeCarriesItsHoverHint`：只扫 `HistoryRowViews.swift` 里
