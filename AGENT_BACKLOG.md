@@ -4918,3 +4918,10 @@ runner `39152321051`（`72279ff`）六张高帧全部 `requested=1040 drawnBoxPt
 到 `timeout=5.0s` 或 `maxPolls=60` 才红，并把 `轮询 N 拍 / 秒数 / 最后一拍 reloaded / 期望 / 成因` 写进取证文本。
 真值表钉住两行容易糊的：`elapsed == timeout` 必须算超时（`>` 会永远多等一拍）；`reloaded > seeded` **不算落地**（那是读到了别的库 —— 临时目录被复用那一族）。
 **仍欠（下一轮结案）**：打在 `==` 与 `>=` 上的两把变异刀本轮没跑 ⇒ 记 NOT-RUN；满载下的第二证人是真 CI 那一跑（本机全量卷 864 例 / 失败 0 只算一次抽样）。
+
+**199 追记 2（R172）：三把刀补齐 ⇒ 结案（满载的第二证人仍待 CI 那一跑）**
+
+R171 落地时明写"仍欠：打在 `==` 与 `>=` 上的两把刀"。本轮 `mutate_r172.py` 三臂全 CAUGHT、RESTORE_CLEAN=yes：
+M690 `reloaded == seeded`→`>=` 红在 `testReloadWaitTruthTable`（读到比预期更多的库不许当落地）；
+M691 `elapsed >= timeout`→`>` 红在同一格（边界那拍必须超时）；M692 `maxPolls=60`→`100000` 红在 `testReloadWaitIsBounded`（没上限会把这一格挂到 CI 超时）。
+199 至此结案。仍记在账上的边界：满载下的**第二证人**是真 CI 那一跑（本机 R171 全量卷 864/42/0 只是 n=1 抽样）。

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R171 欠的三把刀补上 ⇒ BACKLOG 199 结案（R172 / U-574…U-576 · 产品 0 文件，刀账）
+
+- `mutate_r172.py` M690/M691/M692 全 CAUGHT、RESTORE_CLEAN=yes（基线 ran=6）：`==` 改 `>=`、边界那拍、`maxPolls` 三个方向各红在自己那一格
+- CI 复核：`c4366b3` 只有 `STEP[15] Capture gate` 红（与前两跑同形，无新增步骤）；`546dc97`/`3cb5461`/`1805351` 当时 `in_progress` ⇒ 结论未读，不作"没红"的说法
+- 0 产品文件 ⇒ 没重捕、没换装；清账表 行数=112 已清账=112 未清账=59 地板=112 未动
 ### BACKLOG 199 落地：固定 sleep 换成有界轮询，那朵会自己复发的红修掉成因（R171 / U-571…U-573 · 产品 0 文件，判据账）
 
 - `awaitFlushedSnapshot`：每一拍重开库，纯谓词 `ArchiveReloadWait.outcome` 判 `landed` / `keep-polling` / `timeout`；`pollInterval=0.1s`、`timeout=5.0s`、`maxPolls=60`
