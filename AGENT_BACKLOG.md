@@ -5021,3 +5021,15 @@ R64 的旧账写的是"空态那句在列表槽里**居中**，中心 209.25pt v
 **没结的部分**：`RESTORE_CLEAN=no` —— 表跑完的还原复跑报 `ran=0 broke=True`（没出测试结果），
 而三处 needle 当场复查都是原形、随后单跑 5 格全绿 ⇒ 刀账成立，那一格按 NOT-RUN 记，成因未命名（候选：还原后立刻复跑撞上构建中间态）。
 本机仍量不到真产物（采样通道死，R91 原样）⇒ 206 的 CI 复验还欠着：看 `PROBE_WORST_FRAME` 的颗数读数。
+
+**207. 一支变异表只准有一个靶：多靶会让"还原"把没该动的文件改掉，而结论行照打 CAUGHT（R178 撞到）**
+
+形状：`mutate_r178.py` 是从 `mutate_r172.py`（单靶）复制的外壳，我给 R178 加了第二个靶（`PROBE = UIInteractionProbeTests.swift`，M695 用它）。
+收尾"把原文写回去"用的是**同一个原文槽**，于是探针文件被写成 `FrameIntervalBudgetTests.swift` 的原文：
+`git diff --stat` = `+148 / −1565`，`swift test` 直接 `invalid redeclaration of 'FrameIntervalBudgetTests'`，
+而脚本照打 `CAUGHT=3/3`、`RESTORE_CLEAN=no`。⇒ 刀账没被污染（M695 在写坏之前已红在接线扫描那格），
+坏的是"还原干净"这句话，以及一支"检查"顺手改掉了它没资格碰的文件。
+要做的修法（两条都要）：① 启动时按 `ARMS` 里出现过的**全部**靶路径各存一份原文，还原按路径回填；
+② 收尾断言 `被改过的文件集合 ⊆ 本轮 ARMS 声明过的靶集合`，不满足就 `exit 1` —— 还原必须是可证的集合关系，不是"我记得写回去了"。
+在那之前多靶表不许用：要判两个文件就拆成两支单靶表各跑一遍（R178 的两臂复跑就是这么拿到 `RESTORE_CLEAN=yes` 的）。
+
