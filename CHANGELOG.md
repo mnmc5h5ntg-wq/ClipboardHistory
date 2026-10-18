@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### runner 的红是环境差异，本地那朵红是我的字节码缓存（R154 / U-515…U-517 · 产品 0 文件，仪器账）
+
+- 读 `39118582249`/`367519c` 全部失败步骤：`STEP[8] Release script tests` 是新一族，两句话（「测试模块导不进来」「脚本在这台解释器上构造不出来」）
+  都指向 runner 的 python 3.14 没装 Pillow —— R147 那把新尺把 `from PIL import Image` 写在模块顶上。
+- 分开**构造期**与**测量期**依赖：`_load_pil()` + `PillowMissing`，读不到 PIL ⇒ `FRAME_STATE_NOT_RUN=pillow（…）` 且退出码 1；
+  6 格合成对照改成带名字的 skip；新加 2 格不依赖 PIL 的判据（藏 PIL 后 `--help` 必须 0；帧在而 PIL 没 ⇒ 不许打出"成立"）。
+  两刀变异各打红一次。本机 `Ran 335 tests OK`，真帧读数与 R147 逐字相同。
+- 自曝一朵假红：修完后本地 `FAILED (failures=1)`，成因是 macOS 的 `~/Library/Caches/com.apple.python/...` 字节码缓存
+  （同长度变异 + 同一秒还原 ⇒ size+mtime 判新鲜 ⇒ 执行变异版）。清掉 + `PYTHONDONTWRITEBYTECODE=1` 即绿；
+  这条同时结掉 U-462 的「清过 `__pycache__` 而全局还是旧值，成因没定位」。新开 BACKLOG 195。
+
 ### 191 的修法被 runner 证伪：那两格假材质是宽的（R153 / U-512…U-514 · 产品 0 文件，读数账）
 
 - 读 `39118326554`/`6f11d95` 与 `39118085686`/`943c275`：第 16 步继续不红（R146 的闭合通道稳定成立），

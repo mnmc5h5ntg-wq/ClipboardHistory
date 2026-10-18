@@ -4821,6 +4821,48 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 156 轮（R154 · 2026-10-18）：runner 那朵新红是环境差异，而我自己的字节码缓存造了一朵假红（U-515…U-517 · 产品 0 文件，仪器账）
+
+- **U-515：环境差异不许报成代码结论。** 读 `39118582249`（`367519c`，已完成）的全部失败步骤：`STEP[8] Release script tests`
+  是新的一族（R153 只记了 `STEP[13]/[15]` 两朵捕获红）。失败正文里两句话都不是产品：
+  ① `ERROR: test_frame_recording_proof (unittest.loader._FailedTest)` —— 「测试模块导不进来」；
+  ② `FAIL: test_every_script_builds_its_parser_under_this_interpreter` —— 「这个脚本在这台解释器上构造不出来」。
+  两个都是同一件事：runner 的 python 3.14 没装 Pillow，而 R147 那把新尺把 `from PIL import Image` 写在**模块顶上**
+  （`ModuleNotFoundError: No module named 'PIL'`）。与 R143 的 `No module named pytest` 同一族：一个错的解释盖住一次环境差异。
+  - 修法不是删测试、也不是把守卫放宽：**构造期依赖与测量期依赖要分开**。`frame_recording_proof.py` 改成
+    `_load_pil()`（函数内 import）+ `PillowMissing` + `main()` 收成 `FRAME_STATE_NOT_RUN=pillow（…）` 且**退出码 1**；
+    测试侧需要 PIL 的 6 格合成对照改成**带名字的 skip**（`这台解释器没装 Pillow ⇒ 合成帧造不出来，这一格没量过`）。
+  - 新加两格**不依赖 PIL** 的判据（在两种解释器上都算数）：
+    `test_help_builds_parser_without_pillow`（把 PIL 藏进子进程的 PYTHONPATH，`--help` 必须 0 且无 traceback）、
+    `test_missing_pillow_is_a_named_not_run_and_exit_one`（帧在、PIL 没 ⇒ 必须是带名字的 NOT-RUN + 码 1，
+    并断言**不许**打出 `FRAME_STATE_PROVES_RECORDING`）。
+  - 变异对照：刀 A 把 import 搬回模块顶 ⇒ 复现 runner 的 `unittest.loader._FailedTest` 形状（红的比我的判据还大声）；
+    刀 B 把 `return 1` 改成 `return 0` ⇒ `test_missing_pillow…` FAILED。两刀各打红一次，出口不是死的。
+  - 本机验收：真帧读数与 R147 逐字相同（包围盒 x 958..1213 / y 503..550，亮 1569→3341、暗 1593→3357，四边 726/726/102/102），
+    模拟无 PIL 环境 ⇒ `Ran 9 tests OK (skipped=6)`，清掉缓存后全量 ⇒ **`Ran 335 tests OK`**（327→335：runner 那 6 格从"导不进来"变成"有名字的 skip"，本机 7→9）。
+
+- **U-516：这一轮我自己造了一朵假红，而且它长得完全像真红。** 修完之后第一次全量跑，本地打
+  `Ran 335 tests / FAILED (failures=1)`，红的正是我新写的 `test_missing_pillow_is_a_named_not_run_and_exit_one`，
+  失败文本里还带着那句 `FRAME_STATE_NOT_RUN=pillow（…simulated: no Pillow）` —— 看起来是"判据抓住了静默通过"。
+  实际成因：**macOS 把字节码缓存放在仓库外**（`~/Library/Caches/com.apple.python/<绝对路径>/<模块>.cpython-39.pyc`），
+  失效判据是「源码 mtime（整秒）+ 字节数」。我的变异刀 B 是 `return 1` → `return 0`：**长度不变**，
+  而还原（`cp /tmp/frp_good.py`）落在**同一秒**内 ⇒ 缓存自认为新鲜 ⇒ 解释器执行的是**变异版字节码**。
+  我先试的 `find scripts -name __pycache__ -delete` 完全无效（缓存在别处），直到打印 `p.__cached__` 才看见路径。
+  清掉那一份 + `PYTHONDONTWRITEBYTECODE=1` 再跑 ⇒ `Ran 2 tests OK`、全量 `335 OK`。
+  规则（下一轮起照办）：**改过 `.py` 的变异跑一律带 `PYTHONDONTWRITEBYTECODE=1`**；判据红而代码看起来对时，
+  先问「这台机器执行的是哪一份字节码」（`inspect.getsource` 读磁盘、`co_consts` 来自缓存，两者会不一致 —— 本轮就是靠这点差异定位的）。
+
+- **U-517：结掉 U-462。** 第 116 轮我在 `scripts/tests/test_round_batch_consistency.py` 的 docstring 里写下
+  「本轮实测到磁盘上 `LOOKBACK = 3`、清过 `__pycache__`、而 `unittest` 里读到的模块全局是 1 —— 成因没定位」，
+  当时把自检改成读源码文本来绕开它（那个绕法本身是对的）。本轮这朵假红把同一条链的另一端接上了：
+  同一个成因（缓存不在 `__pycache__`、按整秒 mtime + size 判新鲜），所以"清过缓存还旧值"不是玄学，是**清错了地方**。
+  已在那条 docstring 下面补一行追记（不改判据、不改窗口值）。
+
+- **没做/欠着**：产品文件连续第十轮 0 改动；清账表 171 格里仍欠 99 格。`STEP[13]/[15]` 两朵捕获红本轮**没动**
+  （R153 写死的下一步是「只加一行形状读数」，仍未落地，见 191 追记 3）；`-1040-` 那六张空白帧仍挂在 194；
+  188（把 `frame_recording_proof.py` 先接成 CI report-only）现在多了一条前提：**runner 没有 Pillow ⇒ 接进去只会天天 NOT-RUN**，
+  要么给 CI 装 Pillow 要么把接法改成"本机跑、结果入账"，这条进 195 一起判。
+
 ## 第 155 轮（R153 · 2026-10-18）：191 的修法被 runner 证伪 —— 那 2 格假材质是**宽**的，不是 pill（U-512…U-514 · 产品 0 文件，读数账）
 
 读 run `39118326554`（commit `6f11d95`，带着 R151 的 `cardFill` 宽度那一维）与 `39118085686`（`943c275`）。
@@ -4853,6 +4895,23 @@ runner 的读数把中间那一环打断了：那两格不但**过了**宽度那
 `该层的 最长连续段/带宽、过关行数、页底、层色号` —— 纯读数、不改任何判据、不放宽任何地板。
 runner 下一跑就能看出那两格是"整列同层"还是"描边带进来的行"。（BACKLOG 191 更新为这条。）
 
+
+## 第 154 轮（R152 · 2026-10-18）：自评曲线的量纲统一 —— 推导按每格自己的分母归一（产品 0 文件，仪器账 · 本节由 R154 补位写入）
+
+> 补位说明（不留隐形账）：R152 当时只把内容折进了 R151 的小节，`AGENT_UI_AUDIT.md` 里没有独立小节，
+> 而 `AGENT_VISUAL_ITERATION.md` 的 `## Round 152` 是 R152 收尾时补出来的。R154 落 `test_round_batch_consistency`
+> 的三账对账时被点名 `R152 缺于 AGENT_UI_AUDIT.md` ⇒ 这里补出本节，并把当时**没新增 U 号**这件事写清楚（不借 R151/R153 的号凑数）。
+
+- 做的事：`curve_from_ledger.py` 的推导原先对所有格子一律 `sum/7`，而七维表每格分母不同（7 分制与百分制混在同一张表里），
+  于是 `PHASE2 mean=170.69 / max=617` 这种**格式像结论的数**被打印出来过。改成按每格自己的分母归一
+  （七分制 `mean(num/den)×100`、百分制 `mean(num)`），真台账重读 `MEAN=91.9`、`PHASE2 n=144 mean=92.10 min=82 max=99`。
+- 第一版修法更坏：一律 `×100/105` 造出 612/609/605（`max=617`）。是仪器自己打印的**整条曲线**抓到它的 ⇒
+  「只打印汇总值」的仪器会把这种错留在表里（这条已写进 U-486 之后的仪器规矩，不再另开号）。
+- 两格量纲守卫没写对就回退了（① import 命中 `sys.modules` 缓存；② 改了 `curve()` 返回形状却没同步两处调用点）：
+  只留仪器修复，正确写法进 BACKLOG 193。这一条当时按"我写错了测试"记，**R154 才知道第 ① 条的成因**：
+  macOS 的字节码缓存在仓库外（`~/Library/Caches/com.apple.python/…`，按整秒 mtime + size 判新鲜），
+  见第 156 轮 U-516 —— 那次"清过 `__pycache__` 而全局还是旧值"的同类困惑（U-462）也是同一个成因。
+- 没做/欠着：产品 0 文件；193 的量纲守卫仍未落地；`STEP[13]/[15]` 两朵捕获红照旧（当时在读 CI，不在修产品）。
 
 ## 第 153 轮（R151 · 2026-10-18）：给 `cardFill` 加上"这一层有多宽"那一维 —— 191 的修法落地（U-509…U-511 · 产品 0 文件，判据账）
 

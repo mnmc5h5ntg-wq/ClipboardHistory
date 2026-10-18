@@ -24,7 +24,23 @@ import io
 import json
 import sys
 
-from PIL import Image
+# PIL 是**测量期**依赖，不是**构造期**依赖（R154 / CI run 39118582249 · STEP[8]）。
+# 原来这一行 `from PIL import Image` 写在模块顶上 ⇒ runner 的 python 3.14 没装 Pillow，
+# 连 `--help` 都以 `ModuleNotFoundError` 收场，于是 `test_every_script_builds_its_parser_under_this_interpreter`
+# 那一格红在**环境**上，而它报出来的话是「这个脚本在这台解释器上构造不出来」——
+# 与 R143 的 `No module named pytest` 同一族：一个错的解释盖住了一次环境差异（U-515）。
+# 同仓库的 `real_screen_*.py` 对同一件事早就有既定答案（函数内 import + 读不到时打**带名字的**
+# NOT-RUN，不静默、不假绿），这里照它办，不另造第三种收场。
+class PillowMissing(Exception):
+    """测量期依赖缺失。由 `main()` 收成带名字的 NOT-RUN，不许冒成 traceback。"""
+
+
+def _load_pil():
+    try:
+        from PIL import Image
+    except ImportError as error:
+        raise PillowMissing(str(error))
+    return Image
 
 CHROMA_MIN = 60
 # 地板全部由**这把尺自己**的读数推出来（U-486：不许拿别的脚本、别的机器、别的口径的读数当门限）。
@@ -110,6 +126,7 @@ def _edge_runs(image, bbox, band=8, chroma_min=CHROMA_MIN):
 
 def measure(idle_path, recording_path, chroma_min=CHROMA_MIN):
     """一份读数（不是判定）。判定在 `judge()`，这样正对照能喂合成的两帧。"""
+    Image = _load_pil()
     with Image.open(io.open(idle_path, "rb")) as idle, \
          Image.open(io.open(recording_path, "rb")) as recording:
         bbox = _diff_bbox(idle, recording)
@@ -187,13 +204,19 @@ def main(argv=None):
         pairs.append((shade, idle, recording))
 
     readings, all_ok = {}, True
-    for shade, idle, recording in pairs:
-        reading = measure(idle, recording)
-        readings[shade] = reading
-        lines, ok = judge(reading, shade)
-        for line in lines:
-            print(line)
-        all_ok = all_ok and ok
+    try:
+        for shade, idle, recording in pairs:
+            reading = measure(idle, recording)
+            readings[shade] = reading
+            lines, ok = judge(reading, shade)
+            for line in lines:
+                print(line)
+            all_ok = all_ok and ok
+    except PillowMissing as error:
+        # 这一格必须**响**，而且响成「我没量过」：静默 return 0 会把「这台机器读不到」
+        # 洗成「帧里那一圈没问题」（R143 / U-515 同一族的反面）。
+        print("FRAME_STATE_NOT_RUN=pillow（这台解释器没装 PIL ⇒ 量不了，不算通过：%s）" % error)
+        return 1
     if args.json_out:
         with io.open(args.json_out, "w", encoding="utf-8") as handle:
             handle.write(json.dumps(readings, ensure_ascii=False, sort_keys=True))

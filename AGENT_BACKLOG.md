@@ -4753,3 +4753,22 @@ CI 那次 `pulse=7 started=6 concluded=5` 里未闭的是第 7 颗 `testRightCli
 判"录制态比静置态多出的高色度 ≥ 900、四条边各 ≥ 40、改动包围盒 ≤ 340×90"；真帧读数 亮 1772 / 暗 1764、四边 上726/下726/左102/右102、
 包围盒 x 958..1213 / y 503..550。电池 7 格合成对照把四条出口各自打红（`Ran 327 tests … OK`）。
 177 到此结案；它派生的"接进 CI"另开 188，不再挂在这条上。
+
+**195. 改过 `.py` 的变异跑必须禁写字节码，否则测的是上一版字节码（R154）**
+
+R154 实测：把 `scripts/frame_recording_proof.py` 里 `return 1` 改成 `return 0`（**字节数不变**），跑完再 `cp` 还原；
+还原与变异落在**同一秒**内 ⇒ macOS 放在仓库外的缓存
+`~/Library/Caches/com.apple.python/Users/…/scripts/frame_recording_proof.cpython-39.pyc`
+（失效判据＝源码整秒 mtime + size）自认新鲜 ⇒ 之后的全量电池**执行的是变异版**，
+本地打出 `FAILED (failures=1)` 而源码是对的。`find scripts -name __pycache__ -delete` 无效（缓存在别处）。
+
+下一步（做这件事的判据形状，不是"记得小心点"）：
+① 变异执行器（`.scratch/motion-audit-2/mutate_*.py` 这一族）在**跑判据之前**统一带上
+   `PYTHONDONTWRITEBYTECODE=1`（或 `python3 -B`），并把这条写进执行器而不是只写进台账；
+② 若下一轮还会做 python 侧变异，配一格自检：**变异前后同名文件的 `co_consts` 必须不同**
+   （不同才证明执行的是刚编译的那一份；相同 ⇒ 缓存没失效，这一格红）。
+不许做的事：为了让本地绿而把 `cp` 换成 `touch`（那只掩盖整秒问题，size 相同这一半还在）。
+
+与 188 的关系：`frame_recording_proof.py` 想接进 CI（report-only）之前要先决定
+「runner 没 Pillow ⇒ 天天 `FRAME_STATE_NOT_RUN=pillow`」这一格算不算噪音：
+要么 CI 装 Pillow，要么把接法改成"本机跑、读数入账"。这条决定归 188，不在这里。
