@@ -54,13 +54,24 @@ def derive_from_dimensions(section, round_no):
     if head < 0:
         return None
     # findall 给元组 ⇒ 取分子（第一组）。分母不是 15 的行不算七分制的一行。
-    pairs = [(int(a), int(b) if b else 15) for a, b in DIM_ROW.findall(section[head:])]
-    rows = [num for num, den in pairs if 0 <= num <= 105 and den in (14, 15)]
-    if len(rows) != 7:
-        print("DERIVED_BAD=%s 七维表读到 %d 行（要 7 行）⇒ 这一轮不给推导值"
-              % (round_no, len(rows)), file=sys.stderr)
-        return None
-    return int(sum(rows) / 7.0)
+    # R152 / BACKLOG 190 · **分母决定这张表用的是哪一种约定**，两种都要归一到百分制：
+    # 台账里同时存在两种七维表 —— 早期轮次每格写百分制（`| 名称 | 92 | 依据 |`，没有 `/15`），
+    # R139 起每格写七分制（`| 名称 | 14/15 | 依据 |`）。旧代码一律 `sum/7`，于是同一条曲线上
+    # 145=91（百分制表的均值）与 146=13（七分制表的均值）并存，而 `PHASE2 mean` 照样把两种量纲相加
+    # （实测 `mean=170.69` —— 那个数从来不是分数）。第一版修法（一律 ×100/105）更坏：
+    # 它把百分制那批推成 612 / 609 / 605（`max=617`），当场被自己打印的曲线抓到。
+    pairs = [(int(a), (b or "").strip()) for a, b in DIM_ROW.findall(section[head:])]
+    seven = [(num, den) for num, den in pairs if den in ("14", "15") and 0 <= num <= 15]
+    hundred = [num for num, den in pairs if den == "" and 0 <= num <= 100]
+    if len(seven) == 7:
+        # 七分制：按每格自己的分母归一，再取均值 ⇒ 百分制。
+        return int(round(sum(float(num) / float(den) for num, den in seven) / 7.0 * 100.0))
+    if len(hundred) == 7:
+        # 百分制：均值本身就是百分制，不再乘任何系数。
+        return int(round(sum(hundred) / 7.0))
+    print("DERIVED_BAD=%s 七维表读到七分制 %d 行 / 百分制 %d 行（要其中一种恰好 7 行）⇒ 这一轮不给推导值"
+          % (round_no, len(seven), len(hundred)), file=sys.stderr)
+    return None
 
 
 def curve(path="AGENT_VISUAL_ITERATION.md"):
