@@ -94,8 +94,20 @@ final class FrameIntervalBudgetTests: XCTestCase {
                        "探针里 `overAnchor` 的取数处必须恰好一处（0 = 没接线；2 = 两把尺各数各的）")
         XCTAssertEqual(1, joined.components(separatedBy: "XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: loaded.worst, overAnchorCount: overAnchor)").count - 1,
                        "锚点判据必须以 `overAnchor` 为参数被断言一次 ⇒ 改成别的形状（比如又拿 worst 单判）这一格会红")
-        XCTAssertEqual(1, joined.components(separatedBy: "超锚点帧=\\(loaded.overAnchor)").count - 1,
-                       "读数行要印颗数：CI 那一跑只有这一行能替『是离群还是真卡顿』作证")
+        // R180 / BACKLOG 208：针脚数的是**形状**，不是某个易变的插值串
+        //（完整插值串要在 Swift 字面量里套 ASCII 双引号，R179 就是在这里失手的）。
+        // 契约：颗数必须**同时**活在 `PROBE_FPS`（经 `fpsTail` 这个局部尾段）与独立读数行里 ——
+        // 只活在尾部那一行的读数是拿不到证人的（runner `39161493538`：FPS 完整、`PROBE_WORST_FRAME` 整卷 0 次）。
+        XCTAssertEqual(1, joined.components(separatedBy: "let fpsTail = ").count - 1,
+                       "FPS 行的尾段要先算成局部常量：直接拼长插值会让编译器 type-check 超时（R176 实测）")
+        XCTAssertEqual(1, joined.components(separatedBy: "+ fpsTail)").count - 1,
+                       "`PROBE_FPS` 必须拼上那个尾段 —— 颗数不在活下来的那一行里，CI 上就没人替『离群还是真卡顿』作证")
+        // 实测载体是**三处**：`fpsTail`（跟着 `PROBE_FPS` 落地）、独立行 `PROBE_WORST_FRAME`、
+        // 以及离群时的 `WORST_OUTLIER`。少任何一处都意味着某条通道被悄悄撤掉 ⇒ 这一格按次数判，不按"提过"判。
+        let countHits = joined.components(separatedBy: "超锚点帧=").count - 1
+        XCTAssertEqual(3, countHits,
+                       "『超锚点帧』要出现在三处（FPS 尾段 / 独立读数行 / 离群提示行），实到 \(countHits) 次"
+                       + " ⇒ 有一处被删或被合并掉了；只活在尾部那一行等于 CI 上没人作证（208）")
     }
 
     /// 读数与「退掉的绝对判据」都要被钉住：

@@ -378,10 +378,17 @@ final class UIInteractionProbeTests: XCTestCase {
         let budget = FrameIntervalBudget.ratio
         let reference = max(baseline.p95, off.p95)
         let ratio = loaded.p95 / max(reference, 0.001)
+        // R180 / BACKLOG 208：颗数**必须在 `PROBE_FPS` 这一行里**。
+        // 证据：runner `39161493538` 的 `--log` 里 `PROBE_FPS` 完整落地（`… n=222 worst=58.8`），
+        // 而紧跟其后的独立行 `PROBE_WORST_FRAME` 整卷 0 次 ⇒ 丢的正是通道尾部那一行（R90/R146 那一族）。
+        // 尾段先算成局部常量再拼：直接把整段插值塞进上面那条长串会让编译器 type-check 超时（R176 实测）。
+        let overAnchor = loaded.overAnchor
+        let fpsTail = "预算=" + String(format: "%.2f", budget) + " n=" + String(loaded.n)
+            + " worst=" + String(format: "%.1f", loaded.worst) + "ms 超锚点帧=" + String(overAnchor)
         emit("PROBE_FPS 机器=\(MotionFilmstripTests.filmstripMachineKey()) "
              + "baseline_p95=\(String(format: "%.2f", baseline.p95)) off_p95=\(String(format: "%.2f", off.p95)) "
              + "loaded_p95=\(String(format: "%.2f", loaded.p95)) 比值=\(String(format: "%.3f", ratio)) "
-             + "预算=\(String(format: "%.2f", budget)) n=\(loaded.n) worst=\(String(format: "%.1f", loaded.worst))")
+             + fpsTail)
         emit("PROBE_WORST_FRAME worst=\(String(format: "%.1f", loaded.worst))ms 锚点=\(Int(FrameIntervalBudget.worstFrameAnchorMs))ms "
              + "超锚点帧=\(loaded.overAnchor) 颗 容差=\(FrameIntervalBudget.worstFrameOutlierTolerance) 颗")
         XCTAssertGreaterThan(loaded.n, 60, "帧样本太少，结论无效")
@@ -395,7 +402,6 @@ final class UIInteractionProbeTests: XCTestCase {
         // R176 / BACKLOG 206：绝对锚点留着，但它要**被样本数撑着**才有资格判产品。
         // 单遍最大值在 runner 上会换班（`39157963970` 红在 320.65ms，相邻两跑绿），
         // 而"一批帧都超锚点"那种真卡顿，颗数一定不止 1 ⇒ 红照旧。
-        let overAnchor = loaded.overAnchor
         XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: loaded.worst, overAnchorCount: overAnchor),
             "最差帧 \(String(format: "%.1f", loaded.worst))ms 超过锚点 \(Int(FrameIntervalBudget.worstFrameAnchorMs))ms，"
                 + "且超锚点的帧有 \(overAnchor) 颗（容差 \(FrameIntervalBudget.worstFrameOutlierTolerance) 颗）"
