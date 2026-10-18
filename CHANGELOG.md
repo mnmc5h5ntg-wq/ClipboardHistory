@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 热图 197 的"加周数"修法被量成数：+1 周放得下、+2 周顶破（R169 / U-563…U-566 · 产品 0 文件，判据账）
+
+- 组件帧可用宽 398pt（夹具 width=430 − 2×padding 16）、26 周网格宽 379pt、余量 19pt、一周占 14pt ⇒ `118pt` 空白带里只有 14pt 是周数能削的
+- 新判据卷 `DailyCopyHeatmapWidthBudgetTests`（4 格）：格宽/间距/标签列宽从产品定义处读，可用宽从夹具自己那几行读，读不到即红
+- 变异表 `mutate_r169.py` M684–M686 全 CAUGHT（`RESTORE_CLEAN=yes`），其中 M685 改的是**对照物**（夹具 430→460）⇒ 边界结论依赖夹具而非依赖注释
+- 新开 BACKLOG 200：197 真正卡住的是"最小窗口下右栏可用宽"那格没有读数（注释里的 412pt 从未复量）；本轮不动产品
 ### 194 的放行决定抽成会红的谓词，并补上它欠的那根分辨轴（R168 / U-557…U-562 · 产品 0 文件，判据账）
 
 - `shouldRegisterBlankAsMachineGap`：settings 族 + 需求高 ≥1000 + 内容视图与宿主窗口都等于需求高，才判"这台机器画不出来"；**尚未接成放行通道**，调用点只打 `BLANK_GAP_WOULD_RELEASE … would=`
