@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 把 R157 记成 NOT-RUN 的那格补成读数：全量卷 847/42/0，两条新 skip 出口在本机一次都没触发（R159 / U-530…U-532 · 产品 0 文件，验证账）
+
+- 本机 `env -u SDKROOT swift test` ⇒ `Executed 847 tests, with 42 tests skipped and 0 failures (0 unexpected) in 223.125 seconds`。
+  关键读数是 **42**：与 R157 改动之前账上的 `847/42/0` 同档 ⇒ R157 新加的 `CARD_INSET_NOT_RUN` /
+  `CARD_RHYTHM_SHADE_NOT_RUN` 两条 skip 出口在有对象的机器上没有吞掉任何判定（反向守卫的**负半**第一次有读数）。
+- 正半（单档为空时必须点名而不是红）只能由 runner 签：`39122480991`/`18b59d4`、`39122194463`/`c7ffbb5`、
+  `39122659644`/`61e451a` 写账时全部 `in_progress` ⇒ 未读，不写成已验收。
+- 本轮仍无产品改动（第十七笔），且这是判断不是遗漏：最近两个候选经源码读证分别是"已有"与"系统已画"。
+  脚本电池 `Ran 335 tests OK`；清账表停在 85/171（未清账 86）；194 未动。
+
 ### 设置侧栏与快捷键录制器逐格判完：清账表 82 → 85，看图那一腿没让印象变成工单（R158 / U-527…U-529 · 产品 0 文件，动效主线）
 
 - 三格判定各绑一行本轮真读过的源码：侧栏 × 按下 `kept`（`.pressedStyle(… scales: false)`，导航行不缩放是刻意的）；
