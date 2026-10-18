@@ -12,7 +12,9 @@ CI 启动那卷前 `rm -f /tmp/probe-pulse.log`。两条讲不通的形状**仍�
 四刀对照 `R146_KNIVES arms=4 bad=0`；全量 `Executed 847 tests, with 42 tests skipped and 0 failures` / 222.0s；脚本电池 `Ran 320 tests … OK`（310 → 320）；编译侧 0 告警。
 **本轮 CI 还没读**（不以"应该绿"记账）：下一跑要看的是那一步里出现 `UI_PROBE_HUNG_CHANNEL=file`，以及 `On-screen probe coverage floor` 是否变绿。
 
-**下一轮（R147）的靶，按顺序**：① 读 R146 的 CI（上面那两格）；② BACKLOG 187：让 coverage 闸门读同一份心跳+闭合，
+**下一轮（R147）的靶，按顺序**：⓪ 读 run `39114424945`（commit `3a557fb`，写这段时 `in_progress`）——
+那一步要出现 `UI_PROBE_HUNG_CHANNEL=file`，而 `On-screen probe coverage floor` 是否变绿是 186/187 的验收；
+① 读同一跑的 `PROBE_FPS` 三个数（176）；② BACKLOG 187：让 coverage 闸门读同一份心跳+闭合，
 缺席分成 `queued` / `hung` / `log-lost` 三种有名字的出口，再用一次真读数重判 186 那条登记；③ 177 收尾那一格（帧级状态自证读**已写出的 PNG**）；
 ④ 176（runner 的 `PROBE_FPS` 三个数）与 182 / 183 / 185；⑤ 清账表下一批（主窗口/搜索框 × 禁用、设置窗口/说明段 × 空与错误、
 菜单栏/状态菜单 × 加载与错误、浮层/底部说明 × 聚焦）。
