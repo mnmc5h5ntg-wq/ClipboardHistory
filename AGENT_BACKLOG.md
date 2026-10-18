@@ -4772,3 +4772,23 @@ R154 实测：把 `scripts/frame_recording_proof.py` 里 `return 1` 改成 `retu
 与 188 的关系：`frame_recording_proof.py` 想接进 CI（report-only）之前要先决定
 「runner 没 Pillow ⇒ 天天 `FRAME_STATE_NOT_RUN=pillow`」这一格算不算噪音：
 要么 CI 装 Pillow，要么把接法改成"本机跑、读数入账"。这条决定归 188，不在这里。
+
+**196. exit ② 的谓词落在"有没有材质"上，而 runner 的形状是"有材质但没有卡片段"（R156）**
+
+现象（run `39120938129` / `8faef80` 的 `STEP[13]`，三句同因）：
+`XCTAssertEqual ("1") is not equal to ("2")`（参照只剩 `["light"]`）、
+`被告读到 2 格材质却只量到 1 格内缩`、`未判 29 格`（其中绝大多数是 `这一带没有第二层（fill=-1）`，
+另有 `settings-shortcuts-recording dark` / `cardprobe-groupbox-default dark` / `cardprobe-scroll-groupbox dark`
+是 `有材质但找不到卡片段（fill=60）`）。
+
+为什么现在没 skip：`testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` 的出口 ② 写的是
+`if defendantMaterial == 0 { throw XCTSkip(…) }`，而 runner 上 `defendantMaterial == 2`（那两格是 fill=60 那一类）
+⇒ 谓词问的是"有没有第二层"，需要问的是"**有没有一段可判的卡片带**"。
+
+下一步（形状，不是"小心点"）：
+① 谓词换成"被告里量到卡片段的格数 == 0"（本机是 26 ⇒ 不受影响；runner 是 0 ⇒ 走出口）；
+② skip **之前**发一行 `CARD_INSET_NOT_RUN=…`（带 `defendantMaterial` / `measured` / `fill` 三个读数与原因）——
+   名字必须以 `_NOT_RUN` 结尾，`ci_capture_gate.py` 认这个后缀（R36 / U-59），且要满足 D-170 的"能力行排在闸门与 skip 之前"；
+③ 本机先用**合成读数**验一正一负：一份"全 fill=-1"的假表 ⇒ 必须走 NOT_RUN；一份"26 格有段"的表 ⇒ 必须照旧判；
+④ 不许顺手放宽 `未判 ≤ 4` 与 `measured ≥ min(16, defendantMaterial)` 这两条地板（那是把通道问题洗成产品结论）。
+与 191 的边界：191 问的是"那两格假材质是什么形状"（已在本轮被 runner 读数收窄为"没显"），这条问的是"出口为什么没接住它"。

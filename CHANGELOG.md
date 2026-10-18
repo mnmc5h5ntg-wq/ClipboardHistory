@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R154 的修复在 runner 上验收通过；191 欠的形状读数由 runner 自己打印出来了（R156 / U-521…U-523 · 产品 0 文件，读数账）
+
+- `39120938129`/`8faef80` 完成 ⇒ 失败步骤只剩 `STEP[13]/[15]`，**`STEP[8] Release script tests` 变绿**：
+  构造期 / 测量期依赖分开 + 需要 Pillow 的 6 格改成带名字的 skip，在没装 PIL 的 runner 上成立。
+- 191 的形状读数不用写仪器：runner 逐格打印了 29 格未判 —— 大头 `这一带没有第二层（fill=-1）`（亮暗两档都是），
+  另三格 `有材质但找不到卡片段（fill=60）`；配套 `参照只有 ["light"]`、`被告读到 2 格材质却只量到 1 格内缩`。
+- 于是 R153 那句"那两格假材质是宽的"被收窄成"`fill=-1` 不是宽，是那一层在这台机器上没显"（R100 同一件事）；
+  而出口 ② 的谓词写的是 `defendantMaterial == 0`，runner 的形状是 `defendantMaterial == 2 且 measured == 1`
+  ⇒ 谓词问错了对象，所以它没 skip、红了 3 格。本轮**没有**去 9000 行 harness 里盲改，修法与"先验一正一负"的形状开成 BACKLOG 196。
+- 读法边界也记一条：`gh run view --log-failed` 对**进行中**的 job 打 0 字节 ⇒ 未读不等于没红。
+
 ### 搜索框与侧栏容器逐格判完：清账表 72 → 82，看图那句"差不多"被数打掉（R155 / U-518…U-520 · 产品 0 文件，动效主线）
 
 - 一次判掉 10 格（搜索框 按下/选中/禁用/加载/成功/错误 + 侧栏容器 悬停/加载/成功/禁用），未清账 89 / 171。
