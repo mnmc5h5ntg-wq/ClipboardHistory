@@ -4910,3 +4910,11 @@ runner `39152321051`（`72279ff`）六张高帧全部 `requested=1040 drawnBoxPt
 下一轮可以从那 205pt 带里数一数量（有没有侧栏 / 卡片描边 / 文字行），与本机同一条带对账。
 为什么现在不动产品：两种成因（通道 vs 布局）的处置完全相反，而 194 已经按"通道"结案了一半（出口只认形状），
 布局那一半若有真缺陷，会在带内读数里露出来 —— 顺序是"先量带内是什么，再决定要不要怀疑产品"。
+
+**199 追记（R171 落地）：固定 sleep 换成有界轮询，断言口径没动**
+
+`pumpMain(seconds: 0.4)` → `awaitFlushedSnapshot(matching:in:)`：每一拍**重开一次库**（不读内存缓存），
+由 `ArchiveReloadWait.outcome(seeded:reloaded:elapsed:)` 决定 `landed` / `keep-polling` / `timeout`，
+到 `timeout=5.0s` 或 `maxPolls=60` 才红，并把 `轮询 N 拍 / 秒数 / 最后一拍 reloaded / 期望 / 成因` 写进取证文本。
+真值表钉住两行容易糊的：`elapsed == timeout` 必须算超时（`>` 会永远多等一拍）；`reloaded > seeded` **不算落地**（那是读到了别的库 —— 临时目录被复用那一族）。
+**仍欠（下一轮结案）**：打在 `==` 与 `>=` 上的两把变异刀本轮没跑 ⇒ 记 NOT-RUN；满载下的第二证人是真 CI 那一跑（本机全量卷 864 例 / 失败 0 只算一次抽样）。

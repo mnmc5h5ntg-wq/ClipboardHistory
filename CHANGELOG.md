@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### BACKLOG 199 落地：固定 sleep 换成有界轮询，那朵会自己复发的红修掉成因（R171 / U-571…U-573 · 产品 0 文件，判据账）
+
+- `awaitFlushedSnapshot`：每一拍重开库，纯谓词 `ArchiveReloadWait.outcome` 判 `landed` / `keep-polling` / `timeout`；`pollInterval=0.1s`、`timeout=5.0s`、`maxPolls=60`
+- 取证文本带上 `轮询 N 拍 / 秒数 / 最后一拍 reloaded / 期望 / 成因`；**断言口径未改**（`store.entries.count == seeding.entries.count`）
+- 真值表两格：`elapsed == timeout` 必须 `timeout`；`reloaded > seeded`（读到别的库）不算落地；另有一格钉上限存在性（没上限会把这一格挂到 CI 超时）
+- 变异刀本轮 **NOT-RUN**（`==` 与 `>=` 两把留给下一轮）；产品 0 文件 ⇒ 没重捕、没换装
+- 编译 0 告警；目标卷 6 格全绿；全量卷 864 例 / 跳过 42 / 失败 0（红名 0（有结论行、无红名））；脚本电池 `Ran 342 OK`
 ### runner 的分辨轴读数与 194 的出口接线：只认实测到的那种形状（R170 / U-567…U-570 · 产品 0 文件，判据账）
 
 - runner `39152321051` 六张高帧同形 `drawnBoxPt=205 / drawnBottomPt=1040 / transparent=95.9% / screenVisibleHeightPt=681`；本机同一批 `drawnBoxPt=1040…1040`（画满）⇒ 三种解释被数排除，BACKLOG 194 结案为**通道限制**（机制未命名，新开 201）
