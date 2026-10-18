@@ -4640,6 +4640,7 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
 本轮真看了 `menubar-refreshing-320x120-light/dark` 并判完两格：**菜单栏/状态菜单 × 加载 = not-added**（`NSMenuItem` 挂不了动画视图，而 macOS 的原生菜单在加载时就是改文字；`Sources/ClipboardHistoryApp/Managers/MenuBarController.swift:147` 已经在这么做，再加一个假转的圈等于把「文字说在算、图形说没在动」同时讲给用户）；**× 错误 = not-applicable**（这扇表面没有错误态：算不出来回落到「暂无推荐」，真失败走提示条与详情回执，那是另外两个表面）。
 但把它们手写进 `docs/motion_surface_ledger.json` 之后，电池当场红了四格，而且红得对：`test_the_committed_table_is_the_generators_own_output`（已提交的表 != 生成器输出 ⇒ 有一边是手改的）、`test_the_printed_row_count_is_the_committed_one`（70 != 72）、两格 `test_final_report_claims`（§9.3 写 101 格未判，而表算出来是 99 ⇒ 报告停在旧读数）。⇒ 已把手改**回退**，两格判定留在账上。
 要做的：把这两行加进生成器的输入并按生成器重出表（同一轮里把 §9.3 的那句改成由表推导），并顺手回答 190（量纲分叉）—— 两者都是「手抄/手改共享表」这一族，守卫已经在了，缺的是走对入口。
+**192 追记（R151 结案）**：两行已按生成器入表（`.scratch/motion-audit-2/make_surface_ledger.py` 加两条 tuple → `MOTION_LEDGER_ROWS=72 已清账=72 未清账=99`），§9.3 那两句陈旧计数同时改成由表推导的读数（`已判 60/未判 102` → `72/99`；`行数=70 … 未清账=101` → `72 … 99`），`MOTION_LEDGER_FLOOR_BASELINE head=70 now=72`（地板只升不降），电池 `Ran 333 tests … OK`。190（量纲分叉）**仍欠**。
 
 **190. 自评曲线把两种单位加在了一起：R145 那类表出百分制，R146–R148 三节出 0–15 的每维均值**（R148）
 仪器 `curve_from_ledger.py` 现在打的是 `145=91 146=13 147=14 148=12`，而它同一行还打 `PHASE2_TO_47 mean=91.30` ——

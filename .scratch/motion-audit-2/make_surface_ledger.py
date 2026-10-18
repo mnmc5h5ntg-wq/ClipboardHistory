@@ -95,6 +95,20 @@ rows = [
     ("菜单栏/状态菜单", "成功", "kept",
      "复制成功的反馈走主窗口提示条与菜单项文案，不给 NSMenu 项加动画（那层不执行 SwiftUI 过渡）",
      "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift；BACKLOG 165（R111）"),
+    ("菜单栏/状态菜单", "加载", "not-added",
+     "不给这行加动画，理由不是难而是自相矛盾：`NSMenuItem` 挂不了动画视图，而 macOS 的原生菜单在加载时就是改**文字**"
+     "（本仓库已经这么做：`isRefreshingPredictions ? \"正在整理推荐…\" : \"暂无推荐\"）。"
+     "再叠一个假转的圈，等于把「文字说在算、图形说没在动」同时讲给用户",
+     "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 `menubar-refreshing` 夹具"
+     "（帧 menubar-refreshing-320x120-light/dark，R151 真看：符号静止 + 「正在整理推荐…」）；"
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift:147、:282；"
+     "Sources/ClipboardHistoryApp/Utilities/StatePresentation.swift:92；BACKLOG 165"),
+    ("菜单栏/状态菜单", "错误", "not-applicable",
+     "这扇表面没有错误态可动：推荐算不出来时它回落到「暂无推荐」（同一三元式的 else 臂），"
+     "而真失败（写盘 / 读档 / 写剪贴板）走主窗口提示条与详情区回执 —— 那是另外两个已清过的表面。"
+     "给不存在的状态加动效，只会逼我造一条假的错误路径",
+     "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift:147、:282；"
+     "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 `menubar-*` 夹具只有 empty / refreshing / recommendations 三种；BACKLOG 165"),
     ("菜单栏/推荐面板", "加载", "not-added",
      "`MenuBarExtraStyle.menu` 编译成**真 NSMenu**，SwiftUI 的过渡在那一层根本不执行；在这里挂 `.transition` 等于给自己造一条永不生效的声明",
      "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift 的注释；D-055 / M15 实测"),
