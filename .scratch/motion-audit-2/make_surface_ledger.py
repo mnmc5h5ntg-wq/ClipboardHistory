@@ -346,7 +346,21 @@ rows = [
      "docs/motion_surface_ledger.json 的「主窗口/提示条 × 成功」；Sources/ClipboardHistoryApp/Views/NoticeBanner.swift"),
     ("主窗口/侧栏", "禁用", "not-applicable",
      "侧栏没有整体禁用态：搜索框与筛选条随时可改，列表的有无由数据决定。把整块压灰会连带把「还能改筛选」这条出口一起压掉",
-     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 无 disabled 分支"),]
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 无 disabled 分支"),
+    # R158（第 160 轮）一批：设置侧栏行与快捷键录制器逐格判完。两处"不加"都有源码证人，
+    # 且都是**这一轮真的读过的行**（不是印象）：录制器那颗是真 NSButton，侧栏行挂的是不缩放的按压样式。
+    ("设置窗口/侧栏", "按下", "kept",
+     "有按压，但**刻意不缩放**（`.pressedStyle(in: VisualShape.rounded(VisualRadius.panel), scales: false)`）：侧栏行是导航，"
+     "让整列跟着一次按下缩放会把「我在切分区」读成「整块在抖」；底色与选中同一层，跟着 hover/selection 两档动画走",
+     "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.pressedStyle(… scales: false)` 与 `.animation(for: .hover)`"),
+    ("设置窗口/快捷键录制器", "悬停", "not-applicable",
+     "这颗不是 SwiftUI 按钮：`makeNSView` 里 `button.setButtonType(.momentaryPushIn)`，悬停与按下都由 AppKit 画。"
+     "在 SwiftUI 侧再叠一层 hover 底色正是 R20 在圆形图标按钮上抓过的『两层打架』；录制态另有自己的一句话（描边那一格）",
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的 `setButtonType(.momentaryPushIn)`；账本 R20"),
+    ("设置窗口/快捷键录制器", "选中", "not-applicable",
+     "这颗按钮没有可延续的『选中』语义：按下即进入录制态，而录制态是一圈强调色描边 + 标题改成『按下新组合键』"
+     "（那一格已判为 added）。再给『选中』画一层会出现『既在录制又被选中』两个当前",
+     "docs/motion_surface_ledger.json 的「设置窗口/快捷键录制器 × 按下」；`HotKeyRecorderView.swift` 的录制态标题"),]
 
 data = {
     "_comment": [

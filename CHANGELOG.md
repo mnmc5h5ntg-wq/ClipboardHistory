@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 设置侧栏与快捷键录制器逐格判完：清账表 82 → 85，看图那一腿没让印象变成工单（R158 / U-527…U-529 · 产品 0 文件，动效主线）
+
+- 三格判定各绑一行本轮真读过的源码：侧栏 × 按下 `kept`（`.pressedStyle(… scales: false)`，导航行不缩放是刻意的）；
+  快捷键录制器 × 悬停 `not-applicable`（那颗是真 NSButton，`setButtonType(.momentaryPushIn)`，SwiftUI 再叠一层就是 R20 抓过的两层打架）；
+  × 选中 `not-applicable`（按下即录制态，录制态另有描边那一格）。
+- 证据闸门当场量到 `ProgressView=0 isLoading=0 disabled=0` ⇒ 「加载 / 禁用 / 错误」三格**留给下一批**，不拿缺席当已判。
+- 看图：`settings-privacy-720x540-light.png` 我第一反应是"卡片外这么多段墨是不是回归了 BACKLOG 142"，
+  但那条判据本来就有读数在管（`CARD_ABOVE_SUMMARY` / `CARD_BELOW_SUMMARY`，本机 `进名单=26 未判=0`）⇒ 没开单、没改产品。
+- 本轮没有产品改动，而且论证了"这里不该有"：唯一能确证的候选经源码读证是系统已经画了；为破 0 改动纪录叠一层没用的 hover
+  正是目标禁止的"为动而动"。复查条件写死：录制器哪天不再用 NSButton，那一格必须重判。
+
 ### BACKLOG 196 落地：捕获判据的出口从"有没有材质"换成"每一档有没有一段可判的卡片段"（R157 / U-524…U-526 · 产品 0 文件，判据账）
 
 - runner 的 `STEP[13]` 原样读数给出了 R153/R156 都在猜的那格：`候选=32 有材质=6（被告=2 参照=4） 量到=1 未判=29`，
