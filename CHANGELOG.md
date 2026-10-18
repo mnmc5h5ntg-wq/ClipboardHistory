@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 给 194 写的那条「屏幕装不下」出口被本机读数证伪，已撤掉（R161 / U-536…U-538 · 产品 0 文件，判据账）
+
+- 假设：runner 上六张 `settings-*-tall-720x1040` 报"95% 像素未画"，是因为那台机器的主屏装不下 1040pt 高的窗口。
+  配套出口都写好了（两个纯函数 + `CAPTURE_NOT_RUN` 带两个数 + 真值表 + 接线守卫）。
+- 本机第一行读数把它推翻：`CAPTURE_SCREEN main=有 visibleHeightPt=847`，同一次捕获里那六张高帧 `blank=0.0%`、
+  画到第 2079 行（1440x2080 全画）⇒ 离屏窗口不被屏幕可视高夹住。第二条独立证据：闸门红的是"未画"，
+  而"帧名==像素尺寸"由 R18 钉住 ⇒ runner 上位图尺寸正确、内容缺失；窗口若被夹小，先红的会是尺寸那一格。
+- 于是整条出口 `git checkout` 撤除（含新测试文件），仓库对 harness 净改动 0/0；**没有**调 95% 门槛、**没有**写豁免名单。
+  194 的下一步改成打三个同源读数（窗口实际高 / 内容视图高 / 位图与请求的比），三种成因各自的样子写进 BACKLOG 194 追记。
+- 顺带对平三跑 CI：`711120a`、`b09d646`、`a1889b4` 都只剩 `STEP[15]` 一朵（194），`STEP[8]` 与 `STEP[13]` 全绿
+  ⇒ R154 与 R157 的修复在 runner 上稳定成立。
+
 ### 行首固定徽标补上悬浮提示（R160 / U-533…U-535 · 产品 1 文件 · 十七笔之后的第一笔产品改动）
 
 - `RowPinnedBadge` 以前只有 `accessibilityLabel("已固定")`，没有任何一句话解释这枚图钉为什么在这儿。
