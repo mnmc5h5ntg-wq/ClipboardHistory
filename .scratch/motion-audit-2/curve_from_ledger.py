@@ -52,6 +52,14 @@ def derive_from_dimensions(section, round_no):
     """
     head = section.find(u"七维度自评")
     if head < 0:
+        # R188 / 新开 214：这里原来静默 `return None`，调用方只补一行 `ROUND_WITHOUT_SCORE=<轮>`。
+        # 于是「表里明明有 7 行 n/15 却推不出分」读起来像表的形状坏了，而真成因是**那个锚点短语不在这一节里**
+        # ——实测 R187 的补记节就是这样：七行齐全、量纲正确，就因为没写子标题，被当成"没有自评"。
+        # 处置仍是**不给分**（不放宽要求），但把要说的那句说出来。
+        cand = [(int(a), (b or "").strip()) for a, b in DIM_ROW.findall(section)
+                if (b or "").strip() in ("14", "15")]
+        print(u"DERIVED_NO_MARKER=%s 这一节读到 %d 行七维格子（n/15 形状）却找不到锚点「七维度自评」"
+              u"⇒ 推导拒绝：补上子标题，或写结论行 **N / 100**" % (round_no, len(cand)), file=sys.stderr)
         return None
     # findall 给元组 ⇒ 取分子（第一组）。分母不是 15 的行不算七分制的一行。
     # R152 / BACKLOG 190 · **分母决定这张表用的是哪一种约定**，两种都要归一到百分制：

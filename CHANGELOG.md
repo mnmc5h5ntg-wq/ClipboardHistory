@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R188 的三本账补齐：208 结案（runner 原文）、210 撤回（同一批像素上两把尺矛盾）、211 申报通道落地 + 新开 212（R188 / U-616…U-618 · 产品 0 文件，判据账）
+
+- 208 结案：`PROBE_FPS` 那一行自带 `n=217 worst=75.6ms 超锚点帧=0`（run `39163387579` = `949350d`）
+- 210 撤回：重捕 138 张、帧基线 `COMPARED=138 CHANGED=0` ⇒ 与 R185 是同一批像素；并集尺把不同行的带缝成一条（中心色 `(36,36,36)`），同行尺报亮区与底轨**同宽**（496px vs 498px）⇒ 「药丸在右段」不再是结论，产品不动
+- 211 落地：`SINGLE_LEDGER_ROUNDS`（186/187 带理由）+ `test_round_batch_declaration.py` 的四条自证（含 `back > 0` 恰好一次的删除型钉子）⇒ 本笔才敢换 STATE 表头
+- 212 新开：`testBandCaptureIsCheaperAndStillSeesTheMotion` 在 `fd6b43a`/`d4958a9` 各红一步 `STEP[17] Motion coverage floor`（「XCTAssertGreaterThanOrEqual failed: ("3") is less than ("4") - 带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，这一臂仍然只能记 not-run，那这条路就白走了」），而 R183/R184/R185 连着三跑绿、中间零改动 ⇒ 会翻脸的地板，先登记不定罪不放宽
+- 本机：编译 0 告警、捕获卷 71 例 / 失败 0、帧基线 138 张 changed=0；**全量卷与变异表本笔没跑**（记 NOT-RUN）
 ### 210 的读数归位：药丸是一整段、落在右段；亮档"过哑"其实是亮度阈值不适用（R185 / U-613…U-615 · 产品 0 文件，动效主线）
 
 - 方法升级：不再假设分界线（上一版 x=277 是我按控件宽度 1/2 猜的），改成逐行找连续亮区（亮度 >200、宽 ≥8px）
