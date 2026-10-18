@@ -36,6 +36,82 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         try? FileManager.default.removeItem(at: temporaryDirectory)
     }
 
+    // MARK: - R171：落盘轮询那颗纯谓词（把固定 sleep 换掉之后，"等不等"必须自己钉得住）
+    //
+    // 这两格是上面那三条判据的**前提钉子**，不是第四条判据：行为与时长仍然由 `HistoryStore.add` 那三条作证。
+
+    /// 三种结局互不重叠，而且都是读数不是形容词：
+    /// `landed` 数量对上 / `timeout` 到上限还不对（真红，带两端的数）/ `keep-polling` 还要等。
+    enum ArchiveReloadWait {
+        static let pollInterval: TimeInterval = 0.1
+        static let timeout: TimeInterval = 5.0
+        static let maxPolls = 60
+        static let landed = "landed"
+        static let timedOut = "timeout"
+        static let keepPolling = "keep-polling"
+
+        static func outcome(seeded: Int, reloaded: Int, elapsed: TimeInterval) -> String {
+            if reloaded == seeded { return landed }
+            return elapsed >= timeout ? timedOut : keepPolling
+        }
+    }
+
+    struct ReloadWait {
+        let reloaded: Int
+        let polls: Int
+        let elapsed: TimeInterval
+        let outcome: String
+    }
+
+    /// 重开库直到快照落地，或到上限。**每一拍都真的重开一次库**（不是读内存里那份缓存），
+    /// 所以它测的是"落盘到可读"这件事，不是"睡够了没"。
+    static func awaitFlushedSnapshot(matching expected: Int, in directory: URL) -> ReloadWait {
+        let start = Date()
+        var polls = 0
+        var reloaded = 0
+        var outcome = ArchiveReloadWait.keepPolling
+        while polls < ArchiveReloadWait.maxPolls {
+            polls += 1
+            let probe = HistoryStore(clipboardWriter: TestClipboardWriter(),
+                                     persistence: FileHistoryPersistence(rootDirectory: directory),
+                                     dailyCopyLedger: nil)
+            reloaded = probe.entries.count
+            outcome = ArchiveReloadWait.outcome(seeded: expected, reloaded: reloaded,
+                                                elapsed: -start.timeIntervalSinceNow)
+            if outcome != ArchiveReloadWait.keepPolling { break }
+            Thread.sleep(forTimeInterval: ArchiveReloadWait.pollInterval)
+        }
+        return ReloadWait(reloaded: reloaded, polls: polls,
+                          elapsed: -start.timeIntervalSinceNow, outcome: outcome)
+    }
+
+    func testReloadWaitTruthTable() {
+        XCTAssertEqual(CapturePathWriteBudgetTests.ArchiveReloadWait
+                       .outcome(seeded: 480, reloaded: 480, elapsed: 0.0),
+                       CapturePathWriteBudgetTests.ArchiveReloadWait.landed)
+        XCTAssertEqual(CapturePathWriteBudgetTests.ArchiveReloadWait
+                       .outcome(seeded: 480, reloaded: 459, elapsed: 2.0),
+                       CapturePathWriteBudgetTests.ArchiveReloadWait.keepPolling)
+        XCTAssertEqual(CapturePathWriteBudgetTests.ArchiveReloadWait
+                       .outcome(seeded: 480, reloaded: 459, elapsed: 5.0),
+                       CapturePathWriteBudgetTests.ArchiveReloadWait.timedOut,
+                       "边界那一拍（elapsed == timeout）必须是 timeout —— 写成 `>` 会永远多等一拍，而多等就是下一次假绿")
+        XCTAssertEqual(CapturePathWriteBudgetTests.ArchiveReloadWait
+                       .outcome(seeded: 480, reloaded: 500, elapsed: 0.1),
+                       CapturePathWriteBudgetTests.ArchiveReloadWait.keepPolling,
+                       "读到比预期更多的库不算「落地」：那是读到了别的库（临时目录被复用那一族），必须继续等到超时，不许当通过")
+    }
+
+    /// 上限必须存在：没有 `maxPolls`，一颗永不落地的快照会把这一格挂到 CI 超时（比红更坏）。
+    func testReloadWaitIsBounded() {
+        let total = CapturePathWriteBudgetTests.ArchiveReloadWait.pollInterval
+            * TimeInterval(CapturePathWriteBudgetTests.ArchiveReloadWait.maxPolls)
+        XCTAssertLessThanOrEqual(total, CapturePathWriteBudgetTests.ArchiveReloadWait.timeout + 1.0,
+                                 "轮询总时长 \(total)s 超过 timeout + 1s ⇒ 这条出口会变成挂住")
+        XCTAssertGreaterThan(CapturePathWriteBudgetTests.ArchiveReloadWait.timeout, 0.5,
+                             "上限小于 0.5s 等于回到固定 sleep：满载时照样读不到刚写完的库")
+    }
+
     // MARK: - 判据一：采集路径上不许有同步磁盘写
 
     /// 从产品入口复制一条内容，**主线程那一次不许碰盘**。
@@ -169,9 +245,14 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         for index in 0..<Self.fullArchiveEntries {
             seeding.add(entry("填满存档的第 \(index) 条：这条的存在只为了让快照变大"), timestamp: Date())
         }
-        pumpMain(seconds: 0.4)
+        // R171：这里以前是 `pumpMain(seconds: 0.4)` —— 一个**固定 sleep** 去等异步落盘。
+        // 满载时它不够（R168 实测红在 459 vs 480，R169 又一跑红到连 `failed` 那行都被 stdout 吞了），
+        // 而"等多久"从来不是这条判据要问的事：它要的是"库到底落没落地"。
+        // 现在换成**有界轮询**（`ArchiveReloadWait` 那颗纯谓词决定等不等，超时才红，并把第几拍的数打出来）。
 
-        // ② 换一个"写队列被堵住"的持久化重新开一个库：此时主线程只剩快照要做。
+        // ② 先把"快照落没落地"轮询到（落地的读数由 `ArchiveReloadWait` 那颗纯谓词判，不是拍脑袋等多久）。
+        let wait = Self.awaitFlushedSnapshot(matching: seeding.entries.count, in: temporaryDirectory)
+        // ③ 换一个"写队列被堵住"的持久化重新开一个库：此时主线程只剩快照要做。
         let blocked = DispatchSemaphore(value: 0)
         let queue = DispatchQueue(label: "r51.blocked-full-archive-queue")
         queue.async { blocked.wait() }
@@ -180,7 +261,9 @@ final class CapturePathWriteBudgetTests: XCTestCase {
             persistence: FileHistoryPersistence(rootDirectory: temporaryDirectory, saveQueue: queue),
             dailyCopyLedger: nil)
         XCTAssertEqual(store.entries.count, seeding.entries.count,
-                       "重新加载没拿到同一份库 ⇒ 下面测的是空库，白测")
+                       "重新加载没拿到同一份库 ⇒ 下面测的是空库，白测"
+                       + "（轮询 \(wait.polls) 拍 / \(String(format: "%.2f", wait.elapsed))s / "
+                       + "最后一拍 reloaded=\(wait.reloaded) 期望=\(seeding.entries.count) / 成因 \(wait.outcome)）")
         // 这一条钉的是**前提**：库真的接近上限。
         // 地板是一个**独立**的绝对数，不是 `fullArchiveEntries - 20`：R51 第一版写的就是后者，
         // 而那是自适应阈值 —— 把 `fullArchiveEntries` 改成 1，地板跟着变成 -19，
