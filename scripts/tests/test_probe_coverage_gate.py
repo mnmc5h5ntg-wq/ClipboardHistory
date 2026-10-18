@@ -93,6 +93,12 @@ class ProbeCoverageGateTest(unittest.TestCase):
         所以这里判的是**计数**与 queued 的名字，不是"谁挂住"。
         """
         expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
+        # R144：这份夹具采集于 run 38857388449，那时 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`
+        # 登记是 can（它确实跑完了）。今天它挂死、登记已翻成 cannot ⇒ 拿**现在**的名册判**历史**日志，
+        # 会红在 NOW_RUNS —— 那是让旧读数替新规则作证（R135 那一族）。所以这里按采集当时的登记判它，
+        # "今天的登记 + 今天的日志"那一格由 `test_todays_expectations_pair_green_with_todays_fixture` 管。
+        expectations["testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"] = {
+            "runner": "can", "reason": "夹具采集当时（R94）的登记，只用于判这份历史日志"}
         source = source_cases(SOURCE.read_text(encoding="utf-8"))
         reading, reds = analyse(source, expectations, R94_LOG)
         self.assertEqual([], reds, f"runner 这次跑得动的都跑到了，不该再判红：{reds}")
@@ -250,6 +256,60 @@ class ProbeCoverageGateTest(unittest.TestCase):
             with self.assertRaises(SystemExit) as caught:
                 main(["--help"])
         self.assertEqual(0, caught.exception.code)
+
+
+class HungCaseRegistrationTests(unittest.TestCase):
+    """R143/R144（BACKLOG 186）：`runner=can` 的用例挂死 ⇒ 闸门必须红；改登 `cannot` + reason ⇒ 不许再红。
+
+    为什么两向都写成测试而不是手工跑一遍：这一族是**会翻面**的登记（R94 凭一次 NOW_RUNS 翻成 can，
+    R144 凭三跑同形翻回 cannot）。只测一个方向的守卫，下一次翻面时它就变成"替今天的登记作证"。
+    所以这里**不读仓库当前的登记值**：测试自己在内存里造两种登记，各判一次。
+    """
+
+    NAME = "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"
+
+    def cases(self, runner):
+        expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
+        expectations[self.NAME] = {"runner": runner, "reason": u"测试造的登记，只判规则不替今天的名册作证"}
+        return expectations
+
+    def log(self, concluded):
+        text = (REPO / "scripts/tests/fixtures/r144_probe_hung_ui.log").read_text(encoding="utf-8")
+        if concluded:
+            text += ("Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests %s]' "
+                     "passed (1.000 seconds).\n" % self.NAME)
+        return text
+
+    def judge(self, runner, concluded):
+        _, reds = analyse(source_cases(SOURCE.read_text(encoding="utf-8")), self.cases(runner), self.log(concluded))
+        return [r for r in reds if self.NAME in r]
+
+    def test_absent_conclusion_reds_when_registered_can(self):
+        named = self.judge("can", concluded=False)
+        self.assertEqual(1, len(named), u"登记 can 而日志里没有结论行 ⇒ 必须恰好红这一条，实际：%s" % named)
+        self.assertIn("NOT_RUN", named[0])
+
+    def test_absent_conclusion_is_silent_when_registered_cannot_with_reason(self):
+        self.assertEqual([], self.judge("cannot", concluded=False),
+                         u"登记 cannot 且带 reason ⇒ 这是**有名字的未覆盖**，不许再红（也不许被删掉）")
+
+    def test_a_reasonless_cannot_still_reds(self):
+        expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
+        expectations[self.NAME] = {"runner": "cannot"}
+        _, reds = analyse(source_cases(SOURCE.read_text(encoding="utf-8")), expectations, self.log(concluded=False))
+        self.assertIn("REASONLESS", " ".join(reds),
+                      u"没有理由的 cannot 就等于没决定 —— 这一格防的是「用登记吃掉一条挂死」")
+
+    def test_when_it_runs_again_the_registration_is_challenged(self):
+        named = self.judge("cannot", concluded=True)
+        self.assertEqual(1, len(named), u"登记 cannot 而它其实下结论了 ⇒ 必须红在 NOW_RUNS（两向门）")
+        self.assertIn("NOW_RUNS", named[0])
+
+    def test_todays_expectations_pair_green_with_todays_fixture(self):
+        """接线判据：今天的登记 + 今天这份日志 ⇒ 一条都不红（历史夹具不许替现在作证）。"""
+        expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
+        _, reds = analyse(source_cases(SOURCE.read_text(encoding="utf-8")), expectations, self.log(concluded=False))
+        self.assertEqual([], reds, u"今天的登记配今天的日志还红：%s" % reds)
 
 
 if __name__ == "__main__":

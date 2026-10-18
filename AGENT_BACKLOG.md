@@ -4643,3 +4643,12 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
     就把这条用例的 `runner` 登记从 `can` 改成 `cannot` 并写清 reason（挂在哪、什么旁证），
     而不是把地板放松或把它 skip 掉。挂的成因候选：这条用例要真的 `orderFront` 一扇带选中行的列表窗口，
     而 runner 上窗口/事件循环的行为与本机不同（R60/R61 那一族的旧账）。
+**186 追记（R144 改登记，处置完成一半）**：三跑同形已到（run 39052480365 / 39054860497 / 39056187840，
+对应 `1427e46` / `f78af12` / `f26f4c9`，同一句 `NOT_RUN testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`
+原样重复）⇒ 不再等第四跑：名册里这条由 `can` 翻回 `cannot`，reason 带三跑 run 号、`UI_PROBE_HUNG=` 原文，
+**以及 R94 的反证**（run 38857388449 那一跑它 `passed`）⇒ 结论收窄成"这台机器上它今天会挂"，
+不是"runner 结构上拍不到"。两向门落进电池（`HungCaseRegistrationTests` 五格：can 缺结论红 /
+cannot 带 reason 不红 / 没 reason 的 cannot 仍红 / cannot 而它跑完红在 NOW_RUNS / 今天的登记配今天的日志全绿），
+新夹具 `fixtures/r144_probe_hung_ui.log`。**这条不开着的原因**：登记与"成因"是两件事 ——
+挂在哪一帧仍未实测（`UI_PROBE_SAMPLE_UNPARSED=1`：读不懂文件 ≠ 它挂在未知帧上），
+下一轮要真去 runner 上拿旁证；若哪一跑它又跑完，闸门会红在 `NOW_RUNS`，那时带着读数翻回去。

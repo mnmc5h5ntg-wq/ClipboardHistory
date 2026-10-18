@@ -1,0 +1,11 @@
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView]' passed (1.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testFrameIntervalsUnderStateChanges]' passed (1.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testAccessibilityTreeCoverage]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testAccessibilityTreeCoverage]' passed (1.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testOffScreenProgrammaticSelectionIsRevealedAndNotJumped]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testIntakeBehindATallPinnedBlockRevealsTheNewRow]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testIntakeBehindATallPinnedBlockRevealsTheNewRow]' passed (1.000 seconds).
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testMarkdownFilePreviewRendersInARealWindow]' started.
+Test Case '-[ClipboardHistoryAppTests.UIInteractionProbeTests testMarkdownFilePreviewRendersInARealWindow]' passed (1.000 seconds).

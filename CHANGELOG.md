@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 探针登记的三跑同形：改登记 + 两向门（R144 / U-488…U-490 · 产品 0 改动，判据账）
+
+- `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped` 在 runner 上连着三跑没有结论行
+  （run 39052480365 / 39054860497 / 39056187840，报告点名 `UI_PROBE_HUNG=`）⇒ 登记 `can` 翻回 `cannot`，
+  reason 带三跑 run 号与 **R94 的反证**（那一跑它 `passed`）：这是"今天它会挂"，不是"runner 拍不到"；成因未定。
+- 两向门落进电池（`HungCaseRegistrationTests` 五格）：can 缺结论要红 / cannot 带 reason 不许红 /
+  **没 reason 的 cannot 仍红** / cannot 而它跑完要红在 `NOW_RUNS` / 今天的登记配今天的日志必须全绿。
+- U-488：翻面那天，历史夹具（`fixtures/r94_runner_ui.log`）拿现在的名册判过去的日志，红在 `NOW_RUNS`
+  ⇒ 历史夹具按采集当时的登记判，别让它替新规则作证。
+- 脚本电池 305 → **310 OK**；本轮 0 产品文件、未重跑捕获 ⇒ 看图腿记 NOT-RUN。
+
 ### 审查轮：四路复审查出 35 条，六条改变了产品或判据（R143 / U-476…U-485 · 产品 1 文件）
 
 - **产品**：快捷键录制器拿不到第一响应者时不再画那一圈（F7，`NSSound.beep()` 后不进录制态），
