@@ -268,14 +268,18 @@ final class UIInteractionProbeTests: XCTestCase {
             link = nil
         }
 
-        func stats() -> (p50: Double, p95: Double, worst: Double, over16: Int, over33: Int, n: Int) {
+        /// `overAnchor` 是**超锚点帧的颗数**（R176 / BACKLOG 206）：最大值不稳、颗数稳，
+        /// 所以绝对锚点由它撑着才判产品。它与 `worst` 取同一个 `sorted` ⇒ 两把尺不会各数各的。
+        func stats() -> (p50: Double, p95: Double, worst: Double, over16: Int, over33: Int, overAnchor: Int, n: Int) {
             let sorted = deltas.sorted()
-            guard !sorted.isEmpty else { return (0, 0, 0, 0, 0, 0) }
+            let anchorSec = FrameIntervalBudget.worstFrameAnchorMs / 1000
+            guard !sorted.isEmpty else { return (0, 0, 0, 0, 0, 0, 0) }
             func q(_ fraction: Double) -> Double {
                 sorted[min(sorted.count - 1, Int(Double(sorted.count) * fraction))]
             }
             return (q(0.5) * 1000, q(0.95) * 1000, (sorted.last ?? 0) * 1000,
-                    sorted.filter { $0 > 0.0167 }.count, sorted.filter { $0 > 0.0334 }.count, sorted.count)
+                    sorted.filter { $0 > 0.0167 }.count, sorted.filter { $0 > 0.0334 }.count,
+                    sorted.filter { $0 > anchorSec }.count, sorted.count)
         }
     }
 
@@ -378,6 +382,8 @@ final class UIInteractionProbeTests: XCTestCase {
              + "baseline_p95=\(String(format: "%.2f", baseline.p95)) off_p95=\(String(format: "%.2f", off.p95)) "
              + "loaded_p95=\(String(format: "%.2f", loaded.p95)) 比值=\(String(format: "%.3f", ratio)) "
              + "预算=\(String(format: "%.2f", budget)) n=\(loaded.n) worst=\(String(format: "%.1f", loaded.worst))")
+        emit("PROBE_WORST_FRAME worst=\(String(format: "%.1f", loaded.worst))ms 锚点=\(Int(FrameIntervalBudget.worstFrameAnchorMs))ms "
+             + "超锚点帧=\(loaded.overAnchor) 颗 容差=\(FrameIntervalBudget.worstFrameOutlierTolerance) 颗")
         XCTAssertGreaterThan(loaded.n, 60, "帧样本太少，结论无效")
         XCTAssertGreaterThan(reference, 0,
             "两个参照臂（空转 / 关掉动画）的 p95 都是 0 ⇒ 这把尺的**分母**是空的，"
@@ -386,7 +392,18 @@ final class UIInteractionProbeTests: XCTestCase {
             "动画那一臂的 p95 是关掉动画那一臂的 \(String(format: "%.2f", ratio)) 倍（预算 \(budget)）"
                 + "⇒ 动效让帧间隔变粗了。基线=\(String(format: "%.2f", baseline.p95))ms "
                 + "关动画=\(String(format: "%.2f", off.p95))ms 开动画=\(String(format: "%.2f", loaded.p95))ms")
-        XCTAssertLessThanOrEqual(loaded.worst, 120, "最差帧超过 120ms：有卡顿级掉帧（绝对锚点，不是 60fps 判据）")
+        // R176 / BACKLOG 206：绝对锚点留着，但它要**被样本数撑着**才有资格判产品。
+        // 单遍最大值在 runner 上会换班（`39157963970` 红在 320.65ms，相邻两跑绿），
+        // 而"一批帧都超锚点"那种真卡顿，颗数一定不止 1 ⇒ 红照旧。
+        let overAnchor = loaded.overAnchor
+        XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: loaded.worst, overAnchorCount: overAnchor),
+            "最差帧 \(String(format: "%.1f", loaded.worst))ms 超过锚点 \(Int(FrameIntervalBudget.worstFrameAnchorMs))ms，"
+                + "且超锚点的帧有 \(overAnchor) 颗（容差 \(FrameIntervalBudget.worstFrameOutlierTolerance) 颗）"
+                + "⇒ 卡顿级掉帧（绝对锚点，不是 60fps 判据）")
+        if loaded.worst > FrameIntervalBudget.worstFrameAnchorMs {
+            emit("WORST_OUTLIER worst=\(String(format: "%.1f", loaded.worst))ms 超锚点帧=\(overAnchor) 颗 "
+                 + "容差=\(FrameIntervalBudget.worstFrameOutlierTolerance) 颗 ⇒ 单帧离群不判产品，见 BACKLOG 206")
+        }
     }
 
     // MARK: - 无障碍树

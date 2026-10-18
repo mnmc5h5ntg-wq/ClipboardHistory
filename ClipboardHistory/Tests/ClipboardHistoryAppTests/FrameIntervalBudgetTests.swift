@@ -23,6 +23,22 @@ import XCTest
 enum FrameIntervalBudget {
     static let ratio: Double = 3.0
 
+    /// R176 / BACKLOG 206：`worst ≤ 120ms` 原来按**单遍最大值**判，而最大值是一卷里最不稳的量。
+    /// 触发它的事实：run `39157963970`（`0dbcbb5`，只改台账那一笔）红在 `320.65 > 120`，
+    /// 而相邻两跑 `e61796c` / `9e1d3d4` 拿着同一份判据是绿的 ⇒ 120ms 这条线正落在 runner 的单帧离群分布里。
+    /// 处置**不是删锚点**（那是删弱尺），是要求它被样本数撑着：一帧超锚点 = 离群，≥2 帧才红。
+    static let worstFrameAnchorMs: Double = 120
+    static let worstFrameOutlierTolerance = 1
+
+    /// `true` = 判成卡顿级红。三种形状：
+    /// ① `worst ≤ 锚点` ⇒ 不红；② 超锚点且只有 `tolerance` 颗 ⇒ **不红**（单帧离群，登记成读数）；
+    /// ③ 超锚点却数到 0 颗 ⇒ 两把尺自相矛盾 ⇒ 红（回头修尺，不许当成"没超"）。
+    static func isWorstFrameJank(worstMs: Double, overAnchorCount: Int) -> Bool {
+        if worstMs <= worstFrameAnchorMs { return false }
+        if overAnchorCount == 0 { return true }
+        return overAnchorCount > worstFrameOutlierTolerance
+    }
+
     /// `nil` = 无从判定（两个参照臂都是 0 ⇒ 分母是空的）。
     /// 这不是"通过"，也不是"红"：它必须有自己的名字，否则又会变成一个静默的绿。
     static func isWithinBudget(loadedP95: Double, baselineP95: Double, offP95: Double) -> Bool? {
@@ -48,6 +64,21 @@ final class FrameIntervalBudgetTests: XCTestCase {
                      "分母是 0 要报「无从判定」，既不许是 true 也不许是 false")
         XCTAssertEqual(FrameIntervalBudget.isWithinBudget(loadedP95: 0, baselineP95: 16, offP95: 0), true,
                        "loaded=0 是「这一臂没帧」，由 n>60 那条抓；这里只管比值")
+    }
+
+    /// R176 的锚点判据：期望值全部手算（U-432 那一族：先写后算会把自己红成假案）。
+    func testTheWorstFrameAnchorNeedsMoreThanOneOutlier() {
+        XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: 119, overAnchorCount: 0))
+        XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: 120, overAnchorCount: 0),
+                       "恰好等于锚点算通过（边界不许两边都红）")
+        XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: 320.65, overAnchorCount: 1),
+                       "CI run 39157963970 的真实形状：一帧离群不判产品（相邻两跑同一份判据是绿的）")
+        XCTAssertTrue(FrameIntervalBudget.isWorstFrameJank(worstMs: 320.65, overAnchorCount: 2),
+                      "两帧就红：这条不许被写成「单帧永远不算」")
+        XCTAssertTrue(FrameIntervalBudget.isWorstFrameJank(worstMs: 130, overAnchorCount: 0),
+                      "worst 超锚点却数到 0 颗 ⇒ 两把尺矛盾，红给尺而不是绿")
+        XCTAssertTrue(FrameIntervalBudget.isWorstFrameJank(worstMs: 400, overAnchorCount: 40),
+                      "一批帧都掉到锚点之上 = 真卡顿，必须红")
     }
 
     /// 读数与「退掉的绝对判据」都要被钉住：

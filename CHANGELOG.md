@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 帧间隔的绝对锚点改成"要颗数撑着"：一朵靠单遍最大值换班的红（R176 / U-586…U-588 · 产品 0 文件，判据账）
+
+- ⓪ 读数：run `39157963970`（`0dbcbb5`）STEP[16] `On-screen probe coverage floor` 红在 `XCTAssertLessThanOrEqual failed: ("320.6537916667003 > 120")` = `testFrameIntervalsUnderStateChanges` 的绝对锚点；相邻两跑 `e61796c`/`9e1d3d4` 同一份判据绿 ⇒ 红在跑与跑之间换班，三份 diff 都没动产品
+- 修法不是删锚点：`FrameMeter.stats()` 多一格 `overAnchor`（与 `worst` 同一个 `sorted`），判据换成 `FrameIntervalBudget.isWorstFrameJank(worstMs:overAnchorCount:)` —— 只有 1 颗离群不判产品（打 `PROBE_WORST_FRAME` / `WORST_OUTLIER` 读数），≥2 颗红，超锚点却 0 颗 ⇒ 两把尺矛盾、红给尺
+- 真值表 6 格在 `FrameIntervalBudgetTests.testTheWorstFrameAnchorNeedsMoreThanOneOutlier`；编译 0 告警、纯函数卷 4 格绿；本机采样通道死（R91）⇒ 真产物验收等 CI，本轮没跑刀（NOT-RUN）
+- 新开 BACKLOG 206；清账表 118 行 / 未清账 53 未动
 ### 新尺 `frame_audit.py bands`：按文本行带取左轴，它先撤掉 R174 自己的前提（R175 / U-583…U-585 · 产品 0 文件，判据账）
 
 - 落地：像素行按 y 聚成文本行带（`min_gap=4`、`min_rows=4`），每带报 `最左墨 / 众数左沿 / 行内散布`；8 格自测覆盖正对照（同轴不许读成两根）、反方向（错开 30px 不许抹平）、碎屑、带图标的行不适用、混元素必须拒判

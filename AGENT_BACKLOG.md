@@ -4988,3 +4988,18 @@ R64 的旧账写的是"空态那句在列表槽里**居中**，中心 209.25pt v
 ⇒ 主读数改成 `min_x`，并加闸门：**带内散布 >40px 报『不可判』**（本轮三张真帧全部 `不可判`，列表帧 6 带的轴 22.5pt 37.5pt 35.5pt 37.5pt 36.5pt 37.5pt 都是图标+文字混带）。
 剩下的那一格（205 不结案的原因）：要谈"同一个表面里的两根轴"，得先在带内按 x 断簇、按**元素**切带；
 现在这把尺只能报"每一带最左的墨在哪"，它答不了"这一带里最左的那块墨是不是我要问的那个元素"。
+
+**206. 帧间隔那道绝对锚点是**单遍最大值**判的 ⇒ runner 上会换班（R176 量到形状，处置是"要颗数撑着"）**
+
+触发它的读数：run `39157963970`（=`0dbcbb5`，只改台账那一笔）的 STEP[16] `On-screen probe coverage floor` 红在
+`XCTAssertLessThanOrEqual failed: ("320.6537916667003 > 120")`，也就是 `testFrameIntervalsUnderStateChanges` 的 `worst ≤ 120ms` 绝对锚点；
+而相邻两跑 `e61796c` / `9e1d3d4` 拿着同一份判据是绿的（正文里 `FAILED test` 行数=0）。三份 diff 之间没有产品改动
+⇒ 120ms 这条线正落在 runner 单帧离群分布之内，红不红取决于一卷里最不稳的那一个数（最大值）。
+本轮**不删锚点**（那是"删弱尺"，账里禁止过），改成要求它被**样本数**撑着：
+`FrameMeter.stats()` 多一格 `overAnchor`（与 `worst` 取同一个 `sorted` ⇒ 两把尺不许各数各的），
+判据换成 `FrameIntervalBudget.isWorstFrameJank(worstMs:overAnchorCount:)`——
+`worst ≤ 120` 不红；超锚点且只有 1 颗 ⇒ 不红，另打 `PROBE_WORST_FRAME` / `WORST_OUTLIER` 两行读数；
+超锚点且 ≥2 颗 ⇒ 红（真卡顿是一批帧掉下去，颗数不止 1）；`worst` 超锚点却数到 0 颗 ⇒ 两把尺矛盾，红给尺。
+真值表 6 格在 `FrameIntervalBudgetTests.testTheWorstFrameAnchorNeedsMoreThanOneOutlier`（期望全部手算，U-432 那一族）。
+**没验到的部分**：本机这条采样通道是死的（R91 原样 `FRAME_CHANNEL baseline_n=0`），所以新判据的**真产物验收在 CI 那一跑**；
+本轮也没跑变异刀 ⇒ 记 NOT-RUN，不写成"验证通过"。
