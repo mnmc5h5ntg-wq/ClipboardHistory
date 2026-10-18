@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 210 的读数归位：药丸是一整段、落在右段；亮档"过哑"其实是亮度阈值不适用（R185 / U-613…U-615 · 产品 0 文件，动效主线）
+
+- 方法升级：不再假设分界线（上一版 x=277 是我按控件宽度 1/2 猜的），改成逐行找连续亮区（亮度 >200、宽 ≥8px）
+- 暗档 `content-empty-750x560-dark`：y=208..252 每行只有一段亮区 x=274..535、宽 **258px=129pt** = 控件可用宽（x=30..547，517px）的一半 ⇒ **药丸落在右段（收藏）**；带高 48px≈24pt 对上 `.frame(height: 26)`；y=276 那条 x=0..559 满宽亮线是分隔线（上一轮"最宽亮区 550px"就是它）
+- 亮档同带整幅 >200（背景本身亮）⇒ "两半只差 14.3 点"是阈值在亮档分不开材质与背景，不是选中态弱；判亮档要换口径（色相/描边）
+- 210 保持开着、证据等级抬升：默认 `.all` + 偏移公式给左段 + 帧上在右段 ⇒ 候选真缺陷；最后一步是查 `content-empty` 的 store 构造有没有被 helper 设过 filter，坐实即修 `slidingPill`（产品改动，走完整验证）
+- 清账表 115 行 / 162 格 / 未清账 47 未动；验证：闸门 `RESULT=ok`、脚本电池 `Ran 362 / OK`（台账之后跑）、0 产品文件
 ### 209 结案、210 开出：默认选中是"全部"、偏移公式给左段、帧上白药丸却在右段（R184 / U-610…U-612 · 产品 0 文件，动效主线）
 
 - 夹具：`HistoryStore.swift:63` `filter: Filter = .all`，`content-empty`（`UICaptureHarness.swift:3887`）没有任何 filter 设定 ⇒ 选中段=左段
