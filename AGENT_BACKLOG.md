@@ -5151,3 +5151,19 @@ vs **离屏材质只在某一段画出来**（通道缺陷，改的是判据、�
 若坐实没设 ⇒ 默认 `.all` + `allCases=[all, favorites]` + 偏移 `idx*(w/count)+1` 三处都该让药丸在左段，而它在右段 ⇒ **产品缺陷**，
 修 `SegmentedFilterPicker.slidingPill`，并按规矩走完整验证（build 0 告警 → 判据卷 → 重捕帧 + 基线同笔 update → 换装本机 → 台账 → 电池 → 推送）。
 这条 186 轮以来没有任何判据抓到过它 —— 修完之后要补一条"药丸 x 区间必须落在选中段那一半"的读数判据，否则同类错位还会回来。
+
+**210 追记 2（R186）：绑定链查到底 —— 夹具确实没设 filter，所以"药丸在右段"不是测试环境带进来的**
+
+四步都坐实了：① `content-empty` 的 store 是 `HistoryStore(clipboardWriter:persistence:retentionPolicy:)`（`UICaptureHarness.swift:3875`），
+`HistoryStore.init` **没有 filter 参数**、也不从存档恢复 filter；② filter 只能被 `.updateFilter` 改（`HistoryStore.swift:561`），而该夹具全程没调用；
+③ 选择绑定是直连的：`SegmentedFilterPicker(selection: Binding(get: { historyStore.filter }, set: { historyStore.perform(.updateFilter($0)) }))`
+（`HistorySidebarView.swift:19-22`），`ContentView` 只把 store 传进侧栏；④ 全仓侧栏/内容区**没有** `AppStorage` / `UserDefaults` 持久化 filter（grep 0 命中）。
+⇒ 渲染时 `selection == .all`、`allCases=[all, favorites]` ⇒ `idx=0`，而 `slidingPill` 的偏移 `idx*(w/count)+1` 应把药丸放在**左**段；
+帧上（已归位的连续亮区）药丸在 x=274..535（右段）。
+
+**还差最后一格才到"怎么修"**：亮的那一段究竟是 `slidingPill` 那枚材质，还是 `FilterSegmentButton` 自己画的选中背景
+（`isSelected` 分支里如果也铺了一层底，那"白在右段"说的是"收藏被画成选中"，病根在按钮不在偏移）。
+下一步顺序：读 `FilterSegmentButton` 的 `body` 里所有 `fill/background/opacity`（一条 grep），必要时造一个显式 `.favorites` 的夹具看亮区换不换段 ——
+换段 ⇒ 亮区跟着 `isSelected` 走（病根在选中判定/按钮背景），不换 ⇒ 亮区固定在右（病根在 `slidingPill` 几何）。
+**在这一步做完之前不动产品**：现在改 `slidingPill` 有 50% 概率改错地方，而这条错位已经活了 186 轮，不差这一轮把病根钉死。
+另记：无论病根在哪，修完都要补一条"亮区 x 区间必须落在选中段那一半"的读数判据（`frame_audit` 已具备逐行找连续亮区的能力，缺的只是把它接进判据卷）。
