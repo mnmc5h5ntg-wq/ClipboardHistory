@@ -5104,3 +5104,37 @@ build-and-test` ⇒ 三臂 p95 全等、比值 1.000、样本 n=222 —— 相�
 剩下的真问题只有一格：药丸两档都画在**右段**，而 `HistoryStore.Filter.allCases = [all, favorites]`、`idx = firstIndex(of: selection)`
 ⇒ 要么 `content-empty` 夹具真选了收藏，要么偏移算错（那才是缺陷）。关掉它只需一条 grep（夹具构造里有没有设 filter），
 写在 R184 第②条；在那之前 209 不结案、不动产品。
+
+**209 追记 3（R184）：结案 —— 白卡是材质合成假象已定；顺着它撞出的那条矛盾另开 210（见下）**
+
+209 的收口：`sliderPill = .ultraThickMaterial`（系统材质）+ 带高 52px = 26pt（= picker 的 `.frame(height: 26)`）
+⇒ 暗档那颗"白卡"属离屏材质合成那一族（D-090 / D-094 / R29d），不判产品缺陷；R182 那句"一档过响、一档过哑"已在 R183 降级为通道形状。
+
+**但顺着这条线撞出一件更该查的事（210）**：默认选中是"全部"，而白药丸画在右段。三条证据互相矛盾 ——
+① `HistoryStore.swift:63`：`@Published private(set) var filter: Filter = .all`；
+② `content-empty` 夹具（`UICaptureHarness.swift:3887`）只写 `ContentView(historyStore: empty)`，没有任何 filter 设定 ⇒ 选中仍是 `.all`；
+③ `SegmentedFilterPicker.slidingPill` 的偏移是 `idx * (geo.size.width / count) + 1`，而 `allCases` 顺序实测 [all, favorites] ⇒ `idx=0` 时药丸应在**左**段；
+   可帧上（暗档，侧栏区 x=20..600）亮度 >200 的像素集中在 x≈277..547，左半均值只有 51.0、右半 179.0（主色纯白 65.4%%）。
+两种成因的修法相反：**偏移/选中反号**（产品缺陷，改 `slidingPill`）vs **离屏材质只在某一段画出来**（通道缺陷，改判据不许判它）。
+分辨实验（R185）：造一个**显式** `filter = .favorites` 的夹具，量白药丸 x 区间是否换到左段 ——
+换段 ⇒ 产品 bug（选中态与药丸位置反号，且这条一直没被任何判据抓到）；不换 ⇒ 通道 bug，210 结案为通道限制。
+对照证据已有一格：`content-min-with-copy-failure-notice-600x440-dark` 的白区是 x=71..599（带高同为 26pt）⇒ "白在哪一段"随帧变化，不是固定伪影。
+本轮不动产品：拿候选缺陷去赌一次改动，正是目标禁止的那种"为了有产出而改"。
+
+**210. 分段筛选控件：默认选中是「全部」、偏移公式算出左段，而帧上白药丸画在右段 —— 三者互相矛盾（R184 量到，成因未定）**
+
+三条证据（都可复查）：① `ClipboardHistory/Sources/ClipboardHistoryApp/Managers/HistoryStore.swift:63`
+`@Published private(set) var filter: Filter = .all`；② 夹具 `content-empty`（`UICaptureHarness.swift:3887`）
+只有 `ContentView(historyStore: empty)`，全程没有设过 filter ⇒ 选中仍是 `.all`；
+③ `SegmentedFilterPicker.slidingPill` 的偏移是 `idx * (geo.size.width / count) + 1`，`allCases` 顺序实测 `[all, favorites]` ⇒ `idx=0`，药丸应在**左**段。
+可帧上（`frame_audit.read_png/luminance`，侧栏区 x=20..600，带高 52px = 26pt，与源码 `.frame(height: 26)` 对上）：
+暗档 `content-empty-750x560-dark` 亮度 >200 的像素集中在 **x≈277..547**（右半均值 179.0、主色纯白占 65.4%；左半均值 51.0、主色 (36,36,36)）。
+
+两种成因的修法相反：**选中态与药丸位置反号**（产品缺陷，改 `slidingPill`；且这条 186 轮以来没有任何判据抓到它）
+vs **离屏材质只在某一段画出来**（通道缺陷，改的是判据、不是产品）。
+分辨实验：造一个**显式** `filter = .favorites` 的夹具，用同一把尺量白药丸的 x 区间——
+换到左段 ⇒ 产品 bug；不换 ⇒ 通道 bug，210 结案为通道限制。
+已有一格旁证：`content-min-with-copy-failure-notice-600x440-dark` 的白区是 x=71..599（带高同为 26pt）
+⇒ "白在哪一段"随帧变化，不是一枚固定伪影。
+本轮（R184）**不动产品**：拿候选缺陷去赌一次改动，正是目标禁止的那种"为了有产出而改"。
+

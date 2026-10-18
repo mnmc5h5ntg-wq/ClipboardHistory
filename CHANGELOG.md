@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 209 结案、210 开出：默认选中是"全部"、偏移公式给左段、帧上白药丸却在右段（R184 / U-610…U-612 · 产品 0 文件，动效主线）
+
+- 夹具：`HistoryStore.swift:63` `filter: Filter = .all`，`content-empty`（`UICaptureHarness.swift:3887`）没有任何 filter 设定 ⇒ 选中段=左段
+- 帧：暗档 `content-empty-750x560-dark` 白药丸在 x≈277..547（右半均值 179.0、纯白 65.4%%；左半 51.0、主色 (36,36,36)）；`allCases=[all, favorites]` 与 `slidingPill` 的 `idx*(w/count)+1` 都指向左段 ⇒ **三者矛盾**，候选真缺陷
+- 处置：本轮不修（"偏移算错"与"离屏材质画错位置"两种成因修法相反）；分辨实验=造一个显式 `filter=.favorites` 的夹具看白药丸是否换到左段，并对照 `content-min-with-copy-failure-notice-600x440-dark`（白区 x=71..599、带高同为 26pt）
+- 209 结案（白卡=系统材质 `.ultraThickMaterial` 的离屏合成，不判产品）；210 开出（药丸落段与选中态是否一致）
+- 清账表 115 行 / 162 格 / 未清账 47 未动；验证：闸门 `RESULT=ok`、脚本电池 `Ran 362 / OK`（台账之后跑）、0 产品文件
 ### 209 归位：那颗白卡是 `.ultraThickMaterial` 在离屏通道的合成，产品缺陷读法被自己否掉（R183 / U-607…U-609 · 产品 0 文件，动效主线）
 
 - 几何证人：侧栏区亮度 >200 的像素只出现在 y=204..252（每行 225..486 颗），带高 52px = **26pt** = `SegmentedFilterPicker.frame(height: 26)` ⇒ R182 那条读数量的就是这颗分段控件（不是搜索框）；y=276 的 518 颗是下面那条分隔线
