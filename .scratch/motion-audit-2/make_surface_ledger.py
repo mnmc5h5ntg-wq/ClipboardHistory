@@ -314,7 +314,39 @@ rows = [
      "说明段没有可按压的东西；它唯一的交互是「悬停时把整段折起来的那条 `.help`」，而那一条已经判过（悬停 not-added）",
      "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.helpLabel`；R128 已登记的说明段 × 悬停"),
 
-]
+
+    # R155（第 157 轮）一批：搜索框与侧栏容器逐格判完。证据都是**这一轮 grep 过的那几行**，
+    # 判成"不加"的格要能在源码里被证伪（这条规矩来自 R74/R75：只在自家夹具上成立的理由不算理由）。
+    ("主窗口/搜索框", "按下", "kept",
+     "那颗 × 挂的是控件档按压（`.pressedStyle(in: Circle(), hoverLevel: controlHover, labelPadding: 4)`），而文本区按下去是系统插入点 —— 再叠一层底色会把「我在编辑」说成「我是按钮」",
+     "Sources/ClipboardHistoryApp/Views/SearchField.swift 的 `.pressedStyle`（R20 抬命中区 14→22pt、R21 抬静置墨到 control 那一档）"),
+    ("主窗口/搜索框", "选中", "not-applicable",
+     "文本框的「选中」是插入点与选区，作者是不锈钢的 NSTextField；这一层没有可延续的 selection 语义（整份文件没有 `selection`），给「焦点在搜索框」再画一圈会和系统的插入点变成两个当前",
+     "Sources/ClipboardHistoryApp/Views/SearchField.swift（无 selection 分支）；`ChineseEditableTextField` 才是文本的宿主"),
+    ("主窗口/搜索框", "禁用", "not-applicable",
+     "不存在「禁用的搜索框」这条分支：全文件没有 `disabled` / `isEnabled`。真要灰掉的只有那颗 ×，而它的有无由 `text.isEmpty` 决定 —— 消失比禁用诚实",
+     "Sources/ClipboardHistoryApp/Views/SearchField.swift 的 `if !text.isEmpty`"),
+    ("主窗口/搜索框", "加载", "not-applicable",
+     "搜索是对已经在内存里的那份历史做过滤（`perform(.updateSearch)` 同步返回），没有「读一半」的中间态；全文件无 `ProgressView` / `isLoading`。采集路径不许有同步磁盘写那条红线，也正是要这里**不出现**转圈",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `perform(.updateSearch(…))`；账本 C-1 采集路径约束"),
+    ("主窗口/搜索框", "成功", "not-applicable",
+     "搜索的「成功」就是列表变短，回执不写在框里；无结果那一句由空态承担，并且带着一颗「清除搜索」的动作按钮 —— 那才是这条通道的回执",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `EmptyStateView(actionTitle: … 清除搜索)`"),
+    ("主窗口/搜索框", "错误", "not-applicable",
+     "这一层没有错误通道：查询无结果是「空」不是「错」。把「0 条匹配」画成红色错误会把一次正常过滤读成一次故障（与 U-5 那句「说清发生了什么 + 说清下一步」相反）",
+     "Sources/ClipboardHistoryApp/Views/SearchField.swift 无错误分支；账本 U-5"),
+    ("主窗口/侧栏", "加载", "not-applicable",
+     "侧栏不等待任何 IO：`filteredEntries` 来自内存里那份 store。全文件没有 `ProgressView` / `isLoading` / `disabled` ⇒ 这一格以前被当成「没做」，其实是「没有这一态」",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift（本轮 grep：无 ProgressView / isLoading / disabled）"),
+    ("主窗口/侧栏", "悬停", "not-applicable",
+     "侧栏的悬停就是行的悬停，已由「主窗口/列表行 × 悬停」那格判过（0.12s 底色 + 图标 opacity）；容器自己再响应鼠标会让整块侧栏跟着亮，两把尺问同一件事时按 R86 的分工只留一颗",
+     "docs/motion_surface_ledger.json 的「主窗口/列表行 × 悬停」；`NonRedundancyTests` 的分工规矩"),
+    ("主窗口/侧栏", "成功", "not-applicable",
+     "复制成功的回执走提示条与行内符号那两格（已判），侧栏容器不再叠第三层：一条回执被三处同时说出来的时候，用户会去找「到底哪儿变了」",
+     "docs/motion_surface_ledger.json 的「主窗口/提示条 × 成功」；Sources/ClipboardHistoryApp/Views/NoticeBanner.swift"),
+    ("主窗口/侧栏", "禁用", "not-applicable",
+     "侧栏没有整体禁用态：搜索框与筛选条随时可改，列表的有无由数据决定。把整块压灰会连带把「还能改筛选」这条出口一起压掉",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 无 disabled 分支"),]
 
 data = {
     "_comment": [

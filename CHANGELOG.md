@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 搜索框与侧栏容器逐格判完：清账表 72 → 82，看图那句"差不多"被数打掉（R155 / U-518…U-520 · 产品 0 文件，动效主线）
+
+- 一次判掉 10 格（搜索框 按下/选中/禁用/加载/成功/错误 + 侧栏容器 悬停/加载/成功/禁用），未清账 89 / 171。
+  判"不加"的理由绑本轮实测缺席计数：`SearchField.swift` 与 `HistorySidebarView.swift` 里 `disabled` / `ProgressView` /
+  `isLoading` / `selection` 各 0 处；「按下」判 `kept`（那颗 × 挂着 `.pressedStyle`）；「侧栏 × 悬停」判 not-applicable
+  的理由是与「列表行 × 悬停」那格**分工**（两把尺不问同一件事）。
+- 看图腿换成读数：`search-field-320x112-light.png` 两态放大镜最暗 20 像素均值 240.4（空）/ 226.6（有字）、差 13.8
+  ⇒ `isActive` 那一档确实落到放大镜上，我第一眼的"看起来差不多"是错的（形容词第五次被数驳回）。
+- 0 产品改动也有帧侧证人：重捕 138 帧与工作基线名单逐名对账 `缺名=0 多名=0`；与 v1.4.8 快照的 `changed=62 / added=76`
+  是发布以来的累计漂移，不是本轮回归。
+
 ### runner 的红是环境差异，本地那朵红是我的字节码缓存（R154 / U-515…U-517 · 产品 0 文件，仪器账）
 
 - 读 `39118582249`/`367519c` 全部失败步骤：`STEP[8] Release script tests` 是新一族，两句话（「测试模块导不进来」「脚本在这台解释器上构造不出来」）
