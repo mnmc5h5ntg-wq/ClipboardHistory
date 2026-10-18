@@ -5167,3 +5167,24 @@ vs **离屏材质只在某一段画出来**（通道缺陷，改的是判据、�
 换段 ⇒ 亮区跟着 `isSelected` 走（病根在选中判定/按钮背景），不换 ⇒ 亮区固定在右（病根在 `slidingPill` 几何）。
 **在这一步做完之前不动产品**：现在改 `slidingPill` 有 50% 概率改错地方，而这条错位已经活了 186 轮，不差这一轮把病根钉死。
 另记：无论病根在哪，修完都要补一条"亮区 x 区间必须落在选中段那一半"的读数判据（`frame_audit` 已具备逐行找连续亮区的能力，缺的只是把它接进判据卷）。
+
+**210 追记 3（R186，同轮补读）：那条亮区是 `FilterSegmentButton` 自己铺的 `Color.primary` 底，不是 `slidingPill` —— 病根位置就此改判**
+
+补读的证据（`HistorySidebarView.swift` 里 `FilterSegmentButton.body`）：
+`.background( … .fill(Color.primary.opacity(FilterPillMotion.hoverFill(isHovered: isHovered, isSelected: isSelected))) … )`
++ `.animation(MotionCatalog.animation(for: .selection), value: isSelected)`。
+⇒ 帧上那块"纯白卡"是**按钮自己的选中/悬停填充**（暗档 `Color.primary` 就是白），不是那枚 `.ultraThickMaterial` 药丸。
+所以 R182–R185 我一直把两样东西混成一样：白卡 = 按钮选中底；药丸 = 另一层材质（在暗档可能几乎看不见，得单独量）。
+
+这条改判带来两个后果，都要留形：
+① **"亮区在右段"现在说的是"收藏那一格被画成选中（或被 hover）"**，而绑定链已证 `selection == .all` ⇒ 候选病根从"偏移公式"
+   挪到"选中/悬停判定"这一侧：要么 `FilterPillMotion.hoverFill` 在 `isSelected=false` 时也给了非 0（那"过响"是它的锅），
+   要么离屏通道里那颗按钮处在 hover 态（`isHovered` 的初值/复位）。分辨只需读 `FilterPillMotion.hoverFill` 的真值表 —— 一条 grep。
+② **R183/R184 里"白卡=系统材质离屏合成"那句结案要打折**：那个结论说的是药丸层，而我用它给白卡开脱了。
+   ⇒ 209 的结案范围收窄为"`.ultraThickMaterial` 那一层在离屏通道的表现不判产品"，
+   而"选中段在暗档铺一层纯白 `Color.primary`"是**另一件产品层面的事**（是否过响，要按 R101 那族的可辨性/喧宾夺主标准另判）。
+   这一段是自我更正：假账比没账更坏，而"把两层混成一层"是它的一种新形态。
+
+下一步（R187，顺序已定）：读 `FilterPillMotion.hoverFill(isHovered:isSelected:)` 真值表 → 若 `false,false` 也给非 0 就是产品 bug（改函数 + 补真值表 + 变异刀）；
+若只有 `hover` 给非 0，则查离屏夹具为什么带 hover 态（`UICaptureTests` 的 hover 夹具是显式驱动的，`content-empty` 不该有）；
+两条都完再谈"暗档选中底该不该是纯白"这件审美事。
