@@ -3639,6 +3639,14 @@ final class UICaptureTests: XCTestCase {
         /// 布局完成之后、按快门之前跑一次。给"内容要等一次异步刷新才落定"的视图用：
         /// 不 settle 就只能拍到刷新途中的那一帧，而那一帧是不是最终态取决于机器快慢。
         let settle: (() -> Void)?
+        /// R145 / BACKLOG 177：布局与 caret 静默**之后**、按快门之前，对真实窗口做一次产品入口操作。
+        ///
+        /// 为什么不能复用 `settle`：捕获路径在 `settle` 之后还会 `makeFirstResponder(nil)` 清闪烁光标，
+        /// 而录制态靠第一响应者活着（`HotKeyRecorderButton.resignFirstResponder` 会 `cancelRecording`）
+        /// ⇒ 先点再清 caret，等于自己把刚点出来的状态取消掉（本轮实测撞到的）。
+        /// 为什么不是"在 build 里造一个已经在录制的视图"：那拍的是我搭的样子，不是产品的入口
+        /// （AGENTS.md 第 1 条：验收必须从产品入口进入）。
+        let interact: (@MainActor (NSWindow) -> Void)?
         let build: () -> AnyView
         /// 按快门之前临时写进 `UserDefaults.standard` 的一个键，拍完立刻还原。
         ///
@@ -3671,12 +3679,14 @@ final class UICaptureTests: XCTestCase {
         let contentMustFit: Bool
 
         init(_ name: String, _ size: NSSize, settle: (() -> Void)? = nil,
+             interact: (@MainActor (NSWindow) -> Void)? = nil,
              seed: (key: String, value: String)? = nil,
              contentMustFit: Bool = false,
              appKit: (@MainActor () -> NSWindow?)? = nil, _ build: @escaping () -> AnyView) {
             self.name = name
             self.size = size
             self.settle = settle
+            self.interact = interact
             self.seed = seed
             self.contentMustFit = contentMustFit
             self.appKit = appKit
@@ -3691,6 +3701,14 @@ final class UICaptureTests: XCTestCase {
         func withAppKit(_ buildAppKit: @escaping @MainActor () -> NSWindow?) -> Fixture {
             Fixture(name, size, settle: settle, seed: seed, contentMustFit: contentMustFit,
                     appKit: buildAppKit, build)
+        }
+
+        /// 给一张已建好的夹具补上「按快门前的一次产品入口操作」（其余字段原样带走）。
+        /// 为什么要 helper 而不是直接写参数：`build` 是**无标签**的最后一个参数，
+        /// 前面一旦出现带标签的 `interact:`，尾随闭包就不再映射到它（编译器报 `expected ')'`）。
+        func withInteract(_ action: @escaping @MainActor (NSWindow) -> Void) -> Fixture {
+            Fixture(name, size, settle: settle, interact: action, seed: seed,
+                    contentMustFit: contentMustFit, appKit: appKit, build)
         }
     }
 
@@ -4066,6 +4084,34 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R145 / BACKLOG 177：**录制态第一次进帧基线**（136 → 138）。
+        // 为什么非拍不可：这颗按钮会吃掉所有按键，而它最重要的那一档状态在 136 张帧里一张都没有 ——
+        // R141 加上那一圈描边之后，"它在屏幕上长什么样"只有组件级渲染与一次性的真机截图作过证。
+        // R143 撤回 U-470 时确认了离屏通道看得见那一圈，同日 spike 又确认非 key 窗口进得了录制态
+        // ⇒ 这一格现在可做，没有"通道拍不到"这个前提。
+        results.append(Fixture("settings-shortcuts-recording", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts))
+        }.withInteract { window in
+            // 深度优先找那颗录制器。**按类名匹配**而不是写 `HotKeyRecorderButton.self`：
+            // 在 @MainActor 逃逸闭包里写「类型.self」会被判成 implicit use of self（本轮实测撞到）。
+            var stack: [NSView] = window.contentView.map { [$0] } ?? []
+            var found: NSControl?
+            while found == nil, let view = stack.popLast() {
+                if String(describing: type(of: view)) == "HotKeyRecorderButton" {
+                    found = view as? NSControl
+                }
+                stack.append(contentsOf: view.subviews)
+            }
+            guard let button = found else {
+                return XCTFail("录制态夹具在产品视图树里找不到那颗 `HotKeyRecorderButton` ⇒ 这一帧拍的是空气")
+            }
+            button.performClick(nil)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            XCTAssert(window.firstResponder === button,
+                      "点下去之后第一响应者不是那颗录制器 ⇒ 这一帧拍不到录制态"
+                          + "（要么 F7 那道守卫拒了，要么夹具与产品不同形）")
+        })
+
         // BACKLOG 140 ①：**隐私**与**推荐**各再拍一档 1040 高的。
         //
         // 为什么是这两屏、为什么非补不可：竖向节奏那把尺现在扫到窗口底，
@@ -6110,6 +6156,9 @@ final class UICaptureTests: XCTestCase {
         "settings-general", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
+        // R145：录制态那张新帧也在 vibrancy 子树里 ⇒ 同一处合成前极性盲区（闸门实测把它点名，
+        // 不是"顺手补名单"：`TEXT_SIDE_ROSTER_EXTRA` 的 vibrant 前提里有它）。
+        "settings-shortcuts-recording",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
         // 先看了那张帧（`/tmp/r39-crops/r39-settings-general-login-unsupported-dark-sidebar.png`）：
         // 暗档侧栏里"快捷键 / 隐私 / 推荐 / 数据 / 统计"五枚标签**黑字黑底看不见**，
@@ -10862,6 +10911,8 @@ final class UICaptureTests: XCTestCase {
         // 再递归把子树里所有 NSTextView 的插入点关掉。
         window.makeFirstResponder(nil)
         Self.silenceCarets(in: host)
+        // R145：产品入口操作放在 caret 静默**之后**（见 `Fixture.interact` 的注释）。
+        fixture.interact?(window)
         if fixture.appKit == nil {
             host.layoutSubtreeIfNeeded()
         }

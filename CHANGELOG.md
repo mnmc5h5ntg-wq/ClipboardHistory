@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 录制态第一次进帧基线：136 → 138（R145 / U-491…U-493 · 产品 0 文件，夹具与判据账）
+
+- `UICaptureHarness.Fixture` 新增 `interact:(NSWindow)->Void`（跑在 caret 静默之后 —— `settle` 之后那句
+  `makeFirstResponder(nil)` 会把刚点出来的录制态取消掉），新夹具 `settings-shortcuts-recording`
+  用 `performClick` 从**产品入口**进录制态，并在夹具里断言第一响应者就是那颗按钮。
+- 帧自证读数：差异包围盒 x 958..1212 / y 504..550（第三颗录制器），高色度 亮 386→**829**、暗 391→**832**。
+- 看图：那一圈贴着 pill 轮廓、不外溢、不压字，标题「请输入快捷键」可读 ⇒ 判为"看得出在听、不抢屏"。
+- 盲区名单被闸门**主动**加了一格（`TEXT_SIDE_ROSTER_EXTRA`）：新帧落在 vibrancy 子树里 ⇒ 暗档侧栏文字不可读，
+  它的可读性不能当证据。基线同一轮 `update`（`COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`）。
+- U-491 文件级插入落在 `@MainActor` 与 class 之间 ⇒ 整类失去隔离、十几处不相关判据红；
+  U-492 按台账坐标裁图裁到错的那一行 ⇒ 两帧对照要先量差异包围盒。
+  U-493 夹具里的 `XCTAssert` 不拦快门 ⇒ 第一次跑就是「两朵红 + 138 张帧落盘」同时成立，帧级自证必须读已写出的 PNG。
+
 ### 探针登记的三跑同形：改登记 + 两向门（R144 / U-488…U-490 · 产品 0 改动，判据账）
 
 - `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped` 在 runner 上连着三跑没有结论行

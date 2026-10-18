@@ -4663,3 +4663,9 @@ cannot 带 reason 不红 / 没 reason 的 cannot 仍红 / cannot 而它跑完红
 **改动已全部 `git checkout` 回退，仓库没有半成品**。下一步从"加 `interact` 钩子 + `withInteract`"起步，
 136 → 138 之后要在同一轮里 `frame_baseline.py update`，并给那张帧配一条**状态自证**判据
 （帧名声称"录制中"，就得由帧自己的高色度像素证明，别让它成为一张会撒谎的证人 —— D-024 那条规矩）。
+**177 追记（R145 结案）**：录制态进了帧基线 —— 新夹具 `settings-shortcuts-recording`（亮 / 暗两张，136 → 138），
+从产品入口 `performClick` 进入，夹具内断言 `window.firstResponder === button`。
+帧自己的证据：差异包围盒 x 958..1212 / y 504..550，高色度 亮 386→829、暗 391→832；
+基线同一轮 `update` 后 `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`；盲区名单被闸门逼着 +1（vibrancy 子树）。
+**收尾还欠一格**（这条不撤，改成判据账）：把"录制态帧的高色度像素 ≥ 地板"变成电池里会红的断言 ——
+今天它只由本轮脚本量过一次，帧名说谎目前还只能靠人眼发现。

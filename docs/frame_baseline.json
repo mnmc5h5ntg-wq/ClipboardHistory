@@ -1,5 +1,5 @@
 {
-  "count": 136,
+  "count": 138,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -117,6 +117,8 @@
     "settings-recommendations-tall-720x1040-light.png": "5a2ef9b98d8f7ed35aa0a2e30e813a3ce78d74de763baf41e5029e34e89cda57",
     "settings-shortcuts-720x540-dark.png": "bf8c4459de117acd3bc7419c3d542c9179a5e1a8882ec0740e9dc0e0ed18ae19",
     "settings-shortcuts-720x540-light.png": "f69d46410cf2cf52f26689df413ef1dd52d459890999289a2384f4c69fd2145e",
+    "settings-shortcuts-recording-720x540-dark.png": "b3657230ce2be73157523f7a421777c8d0c406dcd21808d50f0e6d6764ff6bf7",
+    "settings-shortcuts-recording-720x540-light.png": "5aa932e85deacfc57e0516614bfb24df91253f201d4e231514b0ce862e50d50d",
     "settings-stats-720x540-dark.png": "8f77eadbf253c621a1a7d70b04ef51df2fbefc59fb35646c153ed5f1ebeaddf3",
     "settings-stats-720x540-light.png": "afcf5fb8b1432006f43ad68866eddac0d8f95df4bb4e7ae56a72ebf56aee00e5",
     "settings-stats-populated-720x540-dark.png": "cc2a033908e428400ec78bc136d5484aa78be2d47c3214e52597041b8738606a",
