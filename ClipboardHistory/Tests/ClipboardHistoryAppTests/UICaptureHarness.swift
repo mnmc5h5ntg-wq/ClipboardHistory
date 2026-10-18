@@ -5299,10 +5299,28 @@ final class UICaptureTests: XCTestCase {
     /// 并列时取**离页面底近**的那一档：卡片材质是"比页面差一点点"，
     /// 而分隔线/胶囊是"差很多"的那一档。比较器必须全序 —— Swift 的字典遍历顺序不保证，
     /// 只按行数比的话同一帧两遍可能挑到不同的档（R80b 那一族：读数通道自己不稳定，判据就白搭）。
+    /// R151 / BACKLOG 191 · 除了"有多少行是这一层"，还要问**这一层在这一行里有多宽**。
+    ///
+    /// 为什么必须加这一维（runner 的读数，run 39114424945）：那一台机器上被告格整幅只有一层
+    /// （`CARD_FILL_CANDIDATES … 前三=(页底:480)`），唯一被当成"第二层"的是 R145 录制态帧那颗**高亮 pill**
+    /// （暗档 60 vs 页底 52，差 8 > 门限 3，行数 47px ≈ 23.5pt 刚好过 20pt 的高度门）⇒ `materialCells` 从 0 被抬到 2
+    /// ⇒ R100 那条 `materialCells == 0 ⇒ skip` 不再响 ⇒ 29 格未判撞上 `≤4` 地板（U-506）。
+    /// 一颗控件与一张卡片在"行数"这一维上可以同形，在"这一层横贯多宽"这一维上差一个数量级：
+    /// 本机实测（`/tmp/r151_span_probe.py`，临时尺）pill 行的最长连续段是带宽的 **0.08–0.13**，
+    /// 真卡片行是 **0.58–1.00**。切点取 0.4 —— 两侧余量都 ≥3 倍，且 28 张 settings 帧全量重扫后
+    /// 每一帧仍有 80–419 行过关（本机材质计数不会掉到地板以下）。
+    /// 注意**不要**改用"最左出现到最右出现"那种跨度：pill 行的众数在带子两端都出现，跨度实测 0.87–0.91，
+    /// 与真卡片的 0.95 不分辨 —— 那样尺会看起来修好了而什么都没拦住。
     static func cardFill(modals: [Int], pageLuma: Int, scale: Double,
-                         gate: Int = 3, minCardHeightPt: Double = 20) -> Int? {
+                         gate: Int = 3, minCardHeightPt: Double = 20,
+                         runs: [Int] = [], rowWidth: Int = 0,
+                         minRunFraction: Double = 0.4) -> Int? {
         var counts: [Int: Int] = [:]
-        for modal in modals where abs(modal - pageLuma) > gate {
+        let useRunAxis = runs.count == modals.count && rowWidth > 0
+        let minRun = useRunAxis ? max(1, Int(Double(rowWidth) * minRunFraction)) : 0
+        for (index, modal) in modals.enumerated() where abs(modal - pageLuma) > gate {
+            // 行数这一维照旧；加上 run 轴之后，"一行里只占一小段的层"（控件、胶囊、描边）不再算卡片的一行。
+            if useRunAxis && runs[index] < minRun { continue }
             counts[modal, default: 0] += 1
         }
         guard let best = counts.max(by: { lhs, rhs in
@@ -5385,13 +5403,29 @@ final class UICaptureTests: XCTestCase {
         // 线与自己的偏离是 0 ⇒ 一条线都检不出来（读数 `分隔线=0`，而边距那一栏照样给得出 14.5，
         // 一把一半好一半坏的尺 —— R95 里第三次撞上这一课）。
         var modals: [Int] = []
+        var runs: [Int] = []
         modals.reserveCapacity(y1 - y0)
+        runs.reserveCapacity(y1 - y0)
         for y in y0..<y1 {
             var histogram: [Int: Int] = [:]
-            for x in x0..<x1 { histogram[lumaAt(x, y) / 8, default: 0] += 1 }
-            modals.append(histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0)
+            var rowValues: [Int] = []
+            rowValues.reserveCapacity(x1 - x0)
+            for x in x0..<x1 {
+                let bucket = lumaAt(x, y) / 8
+                histogram[bucket, default: 0] += 1
+                rowValues.append(bucket)
+            }
+            let modal = histogram.max { $0.value < $1.value }.map { $0.key } ?? 0
+            modals.append(modal * 8 + 4)
+            var run = 0, best = 0
+            for bucket in rowValues {
+                run = (bucket == modal) ? run + 1 : 0
+                if run > best { best = run }
+            }
+            runs.append(best)
         }
-        guard let fill = cardFill(modals: modals, pageLuma: pageLuma, scale: scale) else {
+        guard let fill = cardFill(modals: modals, pageLuma: pageLuma, scale: scale,
+                                  runs: runs, rowWidth: x1 - x0) else {
             // 这一带**根本没有卡片**（而不是"有一张卡片但读不到字"）—— R97 之前这一格会往下走，
             // 于是「统计」那一屏被安上一张 1pt 的假卡片，报出来的是"尺没压住字"。
             // `modals` 照样交出去（BACKLOG 147）：调用方要拿**同一个数组**打前三名，
@@ -9223,6 +9257,16 @@ final class UICaptureTests: XCTestCase {
         // ② **通道问题**的形状：整带只有页底 ⇒ 那台机器根本没画材质。
         let flat = Array(repeating: page, count: 300)
         XCTAssertNil(Self.cardFill(modals: flat, pageLuma: page, scale: 2))
+        // R151 / BACKLOG 191 · 新那一维必须**自己就能改变结论**，否则它是装饰（同一份 modals，只换 runs）。
+        let pillRows = Array(repeating: 60, count: 60)
+        let narrowRuns = Array(repeating: 40, count: 60)          // 600px 带子里只占 40px（≈pill 的 0.07）
+        XCTAssertNil(Self.cardFill(modals: pillRows, pageLuma: 52, scale: 2,
+                                   runs: narrowRuns, rowWidth: 600),
+                     "一行里只横贯 7% 带宽的层是控件不是卡片：加了 runs 还判出材质 ⇒ 那一维没接上")
+        let wideRuns = Array(repeating: 560, count: 60)           // 同一批行，只是这一层横贯 93%
+        XCTAssertEqual(60, Self.cardFill(modals: pillRows, pageLuma: 52, scale: 2,
+                                         runs: wideRuns, rowWidth: 600),
+                       "同一份 modals 只换 runs：宽层必须照旧判成卡片（否则新维把真卡片也挡掉了）")
         let flatRanked = Self.fillCandidates(modals: flat)
         XCTAssertEqual([page], flatRanked.map { $0.luma },
                        "② 与①的区别只能靠这一格读出：前三名全等于页底 ⇒ 不是门限，是那条通道本身没画")

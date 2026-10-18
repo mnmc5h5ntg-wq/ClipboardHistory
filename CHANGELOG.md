@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 材质尺加上「这一层有多宽」那一维：191 的修法落地（R151 / U-509…U-511 · 产品 0 文件，判据账）
+
+- `cardFill` 现在要求该层在行内**连续横贯 ≥40% 带宽**才算卡片的一层；`cardRowKinds` 第一遍顺手算最长连续段，交给判据与 `fillCandidatesLine` 的仍是同一份数组。
+- 门槛来自测量不是直觉：我第一个想到的「跨度」实测不分辨（pill 0.87–0.91 vs 卡片 0.95），分辨的是行内最长连续段（pill 0.08–0.13 vs 卡片 0.58–1.00）⇒ 切点 0.4。
+- 本机两头验收：`CARD_INSET_CAPABILITY` / `CARD_ABOVE_CAPABILITY` / `CARD_STATS_CAPABILITY` 三行与改前逐字相同，`71 tests / 5 skipped / 0 failures`，编译 0 告警；两格新测试喂同一份 modals 只换 runs，保证那一维自己会红。
+- 未做：不给录制态帧开具名豁免、不动未判地板；runner 那颗假 pill 是否被挡住要等下一跑（191 的结案条件绑那一行）。
+
+
 ### 191 定性完成：两朵 capture 红是 R145 那张新帧顶翻了「materialCells == 0」这个机器前提（R150 / U-506…U-508 · 产品 0 文件）
 
 - 排除：runner 上 `CARD_FILL_CANDIDATES … 前三=(页底:480)` ⇒ 整幅仍只有一层，「分段那一关真看不见」这一支被杀掉。
