@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 209 归位：那颗白卡是 `.ultraThickMaterial` 在离屏通道的合成，产品缺陷读法被自己否掉（R183 / U-607…U-609 · 产品 0 文件，动效主线）
+
+- 几何证人：侧栏区亮度 >200 的像素只出现在 y=204..252（每行 225..486 颗），带高 52px = **26pt** = `SegmentedFilterPicker.frame(height: 26)` ⇒ R182 那条读数量的就是这颗分段控件（不是搜索框）；y=276 的 518 颗是下面那条分隔线
+- 令牌证人：`VisualTokens.swift` 里 `sliderPill = .ultraThickMaterial`、`track = .quaternary` ⇒ 白卡属"离屏材质早于外观合成"那一族（D-090 / D-094 / R29d），**不是**产品给选中段挑了写死的白 ⇒ 不动产品
+- 自我更正：R182 正文那句"一档过响、一档过哑"在离屏通道上不成立，本轮降级为通道形状；仍开着的一格是"药丸两档都画在右段"（`allCases = [all, favorites]`、`idx = firstIndex(of: selection)`）⇒ 夹具 filter 值一条 grep 关掉，写进 R184 第②条
+- 清账表 115 行 / 162 格 / 未清账 47 未动；验证：闸门 `RESULT=ok`、脚本电池 `Ran 362 / OK`（台账之后跑）、0 产品文件
 ### 209 的同源读数：分段筛选控件暗档是白卡、亮档几乎无差，通道判不了（R182 / U-604…U-606 · 产品 0 文件，动效主线）
 
 - 读数（`frame_audit.read_png/luminance`，带 y=204..278、x=30..547）：暗档左半 51.0 vs 右半 179.0（右半主色 (@255,255,255) 占 65.4%）；亮档左半 233.7 vs 右半 248.0（差 14.3 点，亮像素占比两边均 97%）
