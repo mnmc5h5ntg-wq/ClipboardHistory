@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 帧级状态自证：录制态那一圈从此由写出的 PNG 说话（R147 / U-497…U-499 · 产品 0 文件，判据账）
+
+- 新工具 `scripts/frame_recording_proof.py`：读静置帧与录制态帧 ⇒ `FRAME_STATE_PAIR/CHROMA/EDGES/PROVES_RECORDING`，
+  判"多出来的高色度够不够、四条边连不连续、有没有外溢"；读不到帧 ⇒ `FRAME_STATE_NOT_RUN` + 退出码 1（没有沉默出口）。
+- 真帧读数：包围盒 x 958..1213 / y 503..550（256×48）、高色度 亮 1569→3341、暗 1593→3357、四边 上726/下726/左102/右102（两档相同）。
+- 地板由这把尺自己的读数推出（delta 900、单边 40、包围盒上限 340×90），不引用别的脚本口径。
+- 7 格合成对照把四条出口各自打红；电池 `Ran 327 tests … OK`（320 → 327）。BACKLOG 177 结案，派生出 188（接进 CI，第一遍 report-only）。
+
+
 ### 心跳的另一半 PROBE_DONE：CI 那句"两条通道各点一条"该修的是减数（R146 / U-494…U-496 · 产品 0 文件，通道与判据账）
 
 - `UIInteractionProbeTests.tearDownWithError()` 第一行写 `PROBE_DONE <用例名>` 到同一份心跳文件（skip 也走 tearDown ⇒ 被 skip 的那几条同样闭合）。

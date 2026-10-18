@@ -4631,6 +4631,12 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
 186. **runner 上在屏探针那一卷这次**挂**在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`**（R143 读 `1427e46` 那跑开，run 39052480365）：
 
 **187. 在屏覆盖闸门还读那条会丢的通道 —— "它在 runner 上确实跑过"应改由心跳+闭合判**（R146）
+
+**188. 把帧级状态自证接进 CI 的捕获步骤（第一遍 report-only）**（R147）
+`frame_recording_proof.py` 今天只对本机 `/tmp/shots_r145` 跑过一次。要做：① 在捕获那一步后面调用它（帧目录用 CI 自己的 `/tmp/shots-ci`），
+**只汇报不拦**；② 读 runner 第一遍的 delta 与四边读数；③ 升硬门的判据先写死在这里 ——
+runner 的四边读数 ≥ 本机最小读数（102）的 50%，且两档同形，才允许把 `FRAME_STATE_RESULT=red` 变成退出码。
+不照抄本机地板当 runner 门限（U-486 就是这一步踩出来的）。
 `probe_coverage_gate.py` 只吃 `/tmp/ui.log`：一条用例只要结论行没落盘就被记成 `NOT_RUN`，
 而 R146 已经证明结论行会说谎（那块被 SIGKILL 带走的是 stdout，不是产品）。
 要做的三格，按顺序：① 让它读同一份 `probe-pulse.log`，把"跑过"判成**有心跳且有闭合**（与报告脚本同一个口径，别再各算一套）；
@@ -4687,3 +4693,8 @@ CI 那次 `pulse=7 started=6 concluded=5` 里未闭的是第 7 颗 `testRightCli
 两条讲不通的形状仍然红。登记值仍留 `cannot`，但 reason 已改写成仪器 —— **翻回 can 这件事交给 187**，
 因为 coverage 闸门今天还读那条会丢的通道。欠一次真 CI 验收：下一跑要看到 `UI_PROBE_HUNG_CHANNEL=file`，
 那时 186 才叫结案。
+
+**177 追记（R147 结案）**：收尾那一格落地 —— 新尺 `scripts/frame_recording_proof.py` 读**已写出的 PNG**，
+判"录制态比静置态多出的高色度 ≥ 900、四条边各 ≥ 40、改动包围盒 ≤ 340×90"；真帧读数 亮 1772 / 暗 1764、四边 上726/下726/左102/右102、
+包围盒 x 958..1213 / y 503..550。电池 7 格合成对照把四条出口各自打红（`Ran 327 tests … OK`）。
+177 到此结案；它派生的"接进 CI"另开 188，不再挂在这条上。
