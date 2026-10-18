@@ -409,13 +409,25 @@ private struct SegmentedFilterPicker: View {
 
     private var slidingPill: some View {
         GeometryReader { geo in
-            let count = CGFloat(HistoryStore.Filter.allCases.count)
-            let idx = CGFloat(HistoryStore.Filter.allCases.firstIndex(of: selection) ?? 0)
+            // R189 / BACKLOG 210：几何交给纯函数算，视图里只留"照着放"这一句。
+            //
+            // 原来是 `frame(width: w/count - 2)` + `offset(x: idx*(w/count)+1)` —— 那个 `offset` 的基准
+            // 是 `GeometryReader` 给子视图的**默认摆放位置**，而这件事实测与"第 idx 段"不一致：
+            // 两态对照（`.all` / `.favorites` 各拍一张，同一把尺量亮区中心）读出来是
+            // `.all` 的亮区在**右**段、`.favorites` 的亮区在**左**段（`FILTER_PILL_BAND` 24 桶：
+            // all=[…,36,255×11] / fav=[245,255×11,36,…]），也就是**镜像**。
+            // 改成 `.position`（把中心直接钉在纯函数算出来的那块上）之后，摆放不再依赖任何隐式对齐，
+            // 而"药丸在第几段"变成一个能被像素判据打红的数。
+            let allCases = HistoryStore.Filter.allCases
+            let idx = FilterPillGeometry.segmentIndex(selection, in: allCases)
+            let rect = FilterPillGeometry.pillRect(
+                in: CGRect(origin: .zero, size: geo.size),
+                count: allCases.count,
+                index: idx)
             VisualShape.rounded(VisualRadius.control)
                 .fill(VisualMaterial.sliderPill)
-                .frame(width: geo.size.width / count - 2)
-                .padding(.vertical, 1)
-                .offset(x: idx * (geo.size.width / count) + 1)
+                .frame(width: rect.width, height: rect.height)
+                .position(x: rect.midX, y: rect.midY)
                 .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: selection)
         }
     }

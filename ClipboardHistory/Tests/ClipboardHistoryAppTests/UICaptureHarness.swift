@@ -11021,6 +11021,278 @@ final class UICaptureTests: XCTestCase {
 
     // MARK: - 渲染
 
+    /// R189 / BACKLOG 210 欠的那把尺：那颗药丸到底**跟着选中走**，还是固定在控件的某一侧。
+    ///
+    /// 为什么这一格值得单独建一把尺：R182–R187 五轮里，「白卡在哪一半」这件事被三次改判
+    /// （材质合成 → 按钮选中底 → 药丸几何反号），而每一次都是拿**另一把尺**的结论给这一把尺开脱；
+    /// R188（`8b90efe`）把那句「病根钉死」撤回了，撤的理由是两把尺对**同一批逐字节相同的像素**给出矛盾形状，
+    /// 而且其中一把（`rel=(中心-轨左)/(轨宽/2)`）把正中 1.0 标成了右半。
+    ///
+    /// 所以这把尺的设计约束写死在这里：
+    /// ① **不预设分界线**：控件的 x 范围由帧里"与侧栏背景不同的最长连续段"给出（底轨自己说），
+    ///    选中段的位置由**两态相减**给出（换了 filter 之后控件里唯一该变的就是那一段）；
+    /// ② **不用绝对亮度**：亮区相对**自己那一行的中位数**判，于是 R185 那句"亮档整幅都过线"不再是理由；
+    /// ③ **两态都得真的存在**：`.all` 与 `.favorites` 都从产品入口 `perform(.updateFilter:)` 设，
+    ///    夹具不许直接改视图状态（AGENTS.md 第 1 条）；两态若画出一模一样的控件 ⇒ 当场红，
+    ///    因为"换了选中态而画面不动"本身就是这一族缺陷的一种。
+    ///
+    /// 隐私：只打坐标、长度、色号、档名 —— 一个字的用户内容都不打。
+    func testFilterPillBrightBandFollowsTheSelectedSegment() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r189-pill-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judgedAppearances = 0
+        for (tag, appearance) in [("dark", NSAppearance.Name.darkAqua),
+                                  ("light", NSAppearance.Name.aqua)] {
+            let roster = self.fixtures(appearance: appearance)
+            guard let proto = roster.first(where: { $0.name == "content-empty" }) else {
+                return XCTFail("\(tag)：`content-empty` 不在夹具名册 ⇒ 这一族判据失去对象，先查名册别放宽判据")
+            }
+            // 两态都从产品入口走：建一个空 store，再 perform(.updateFilter(_:))。
+            let allStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+            let favStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+            XCTAssertEqual(allStore.filter, .all, "\(tag)：新 store 的默认档不是 `.all` ⇒ 下面的对照失去基准")
+            favStore.perform(.updateFilter(.favorites))
+            XCTAssertEqual(favStore.filter, .favorites,
+                           "\(tag)：`perform(.updateFilter(.favorites))` 没把 filter 装上 ⇒ 两态其实是一态")
+
+            let allFix = Fixture("r189-pill-all", proto.size) { AnyView(ContentView(historyStore: allStore)) }
+            let favFix = Fixture("r189-pill-fav", proto.size) { AnyView(ContentView(historyStore: favStore)) }
+            var column: (rect: CGRect, kind: String)?
+            let allFile = scratch.appendingPathComponent("r189-all-\(tag).png")
+            let favFile = scratch.appendingPathComponent("r189-fav-\(tag).png")
+            _ = try render(allFix, appearance: appearance, to: allFile) { host in
+                column = Self.sidebarColumnRect(in: host)
+            }
+            _ = try render(favFix, appearance: appearance, to: favFile) { _ in }
+
+            guard let found = column,
+                  let imageA = NSImage(contentsOf: allFile), let repA = NSBitmapImageRep(data: imageA.tiffRepresentation ?? Data()),
+                  let imageF = NSImage(contentsOf: favFile), let repF = NSBitmapImageRep(data: imageF.tiffRepresentation ?? Data()),
+                  let bytesA = repA.bitmapData, let bytesF = repF.bitmapData,
+                  repA.pixelsWide == repF.pixelsWide, repA.pixelsHigh == repF.pixelsHigh else {
+                return XCTFail("\(tag)：两态帧读不回来或尺寸不一致 ⇒ 对照不成立（不是产品没画）")
+            }
+            let scale = Double(repA.pixelsWide) / Double(proto.size.width)
+            let colBand = Self.clampBand(found.rect, scale: scale,
+                                         pixelsWide: repA.pixelsWide, pixelsHigh: repA.pixelsHigh)
+            // 候选带：与侧栏背景不同的最长连续段（= 底轨自己说的 x 范围）。
+            // 侧栏背景取**该带左沿外两个像素** —— 取角点会被别的元素污染（R37 那一课）。
+            let spp = repA.samplesPerPixel, bpr = repA.bytesPerRow
+            func luma(_ bytes: UnsafeMutablePointer<UInt8>, _ x: Int, _ y: Int) -> Double {
+                let o = y * bpr + x * spp
+                return (Double(bytes[o]) + Double(bytes[o + 1]) + Double(bytes[o + 2])) / 3.0
+            }
+            func trackRun(_ bytes: UnsafeMutablePointer<UInt8>, _ y: Int) -> (Int, Int) {
+                let xLo = colBand.x.lowerBound, xHi = colBand.x.upperBound
+                let bg = (luma(bytes, max(0, xLo - 2), y) + luma(bytes, max(0, xLo - 1), y)) / 2.0
+                var best = (0, 0), cur: Int? = nil
+                for x in xLo..<xHi {
+                    if abs(luma(bytes, x, y) - bg) > 4.0 {
+                        if cur == nil { cur = x }
+                    } else if let s = cur {
+                        if x - s > best.1 - best.0 { best = (s, x) }
+                        cur = nil
+                    }
+                }
+                if let s = cur, xHi - s > best.1 - best.0 { best = (s, xHi) }
+                return best
+            }
+            func diffRun(_ y: Int, threshold: Double = 8.0) -> (Int, Int) {
+                let xLo = colBand.x.lowerBound, xHi = colBand.x.upperBound
+                var best = (0, 0), cur: Int? = nil
+                for x in xLo..<xHi {
+                    if abs(luma(bytesA, x, y) - luma(bytesF, x, y)) > threshold {
+                        if cur == nil { cur = x }
+                    } else if let s = cur {
+                        if x - s > best.1 - best.0 { best = (s, x) }
+                        cur = nil
+                    }
+                }
+                if let s = cur, xHi - s > best.1 - best.0 { best = (s, xHi) }
+                return best
+            }
+            let minRunPx = max(1, Int((80.0 * scale).rounded()))   // 差区至少 80pt 宽：文字换粗不够这一格
+            var bands: [(yLo: Int, yHi: Int, runLo: Int, runHi: Int)] = []
+            var open: (Int, Int, Int, Int)? = nil
+            for y in colBand.y.lowerBound..<colBand.y.upperBound {
+                let d = diffRun(y)
+                if d.1 - d.0 >= minRunPx {
+                    if open == nil { open = (y, d.0, d.1, d.1) }
+                    open = (open!.0, min(open!.1, d.0), max(open!.2, d.1), y)
+                } else if let o = open {
+                    bands.append((o.0, y, o.1, o.2))
+                    open = nil
+                }
+            }
+            if let o = open { bands.append((o.0, colBand.y.upperBound, o.1, o.2)) }
+            // 带高要与控件对得上：`SegmentedFilterPicker` 的 `.frame(height: 26)`（源码里那个 26 是契约），
+            // 但**这里不写死 26** —— 用带高/控件高之比筛，再把候选全打出来，红了能一眼看出是哪一格。
+            let pick = bands.max(by: { ($0.yHi - $0.yLo) * ($0.runHi - $0.runLo) < ($1.yHi - $1.yLo) * ($1.runHi - $1.runLo) })
+            var verdict = "无从判定"
+            var track = (0, 0)
+            var cAll = -1.0, cFav = -1.0, mid = -1.0
+            var expectedAll = -1, expectedFav = -1, obsAll = -1, obsFav = -1
+            var spread = -1.0
+            var leftA = -1.0, rightA = -1.0, leftF = -1.0, rightF = -1.0
+            var canJudge = false
+            if let b = pick {
+                let yMid = (b.yLo + b.yHi) / 2
+                track = trackRun(bytesA, yMid)
+                let trackW = max(1, track.1 - track.0)
+                func vals(_ bytes: UnsafeMutablePointer<UInt8>) -> [Double] {
+                    (track.0..<track.1).map { luma(bytes, $0, yMid) }
+                }
+                // 亮区基准取**底轨自己的最暗值 +60**，不取中位数：
+                // 第一版取中位数，而药丸正好占轨宽一半 ⇒ 双峰分布的中位数本身就是药丸的白，
+                // `med+12` 于是谁也超不过，读回来是 `all=-1 fav=-1`（本机实测，形状像"量不到"，其实是尺坏）。
+                // 这也与"参照点要问自己"那一族同源（R37 / U-60）。
+                func brightCenter(_ bytes: UnsafeMutablePointer<UInt8>) -> Double {
+                    let v = vals(bytes)
+                    guard let base = v.min() else { return -1 }
+                    var best = (0, 0), cur: Int? = nil
+                    for (i, value) in v.enumerated() {
+                        if value > base + 60.0 {
+                            if cur == nil { cur = i }
+                        } else if let s = cur {
+                            if i - s > best.1 - best.0 { best = (s, i) }
+                            cur = nil
+                        }
+                    }
+                    if let s = cur, v.count - s > best.1 - best.0 { best = (s, v.count) }
+                    return best.1 > best.0 ? Double(track.0 + (best.0 + best.1) / 2) : -1
+                }
+                func buckets(_ bytes: UnsafeMutablePointer<UInt8>) -> String {
+                    let v = vals(bytes)
+                    guard !v.isEmpty else { return "空" }
+                    var out: [String] = []
+                    for k in 0..<24 {
+                        let lo = v.count * k / 24
+                        let hi = max(lo + 1, v.count * (k + 1) / 24)
+                        out.append(String(format: "%.0f", v[lo..<hi].reduce(0.0, +) / Double(hi - lo)))
+                    }
+                    return out.joined(separator: ",")
+                }
+                func rowsAbove(_ threshold: Double) -> Int {
+                    var n = 0
+                    for y in colBand.y.lowerBound..<colBand.y.upperBound {
+                        let r = diffRun(y, threshold: threshold)
+                        if r.1 - r.0 >= minRunPx { n += 1 }
+                    }
+                    return n
+                }
+                cAll = brightCenter(bytesA)
+                cFav = brightCenter(bytesF)
+                mid = Double(track.0 + track.1) / 2.0
+                let allCases = HistoryStore.Filter.allCases
+                expectedAll = FilterPillGeometry.segmentIndex(HistoryStore.Filter.all, in: allCases)
+                expectedFav = FilterPillGeometry.segmentIndex(HistoryStore.Filter.favorites, in: allCases)
+                let trackRect = CGRect(x: CGFloat(track.0), y: 0, width: CGFloat(trackW), height: 1)
+                obsAll = cAll < 0 ? -1 : FilterPillGeometry.segmentIndex(
+                    containingX: CGFloat(cAll), in: trackRect, count: allCases.count)
+                obsFav = cFav < 0 ? -1 : FilterPillGeometry.segmentIndex(
+                    containingX: CGFloat(cFav), in: trackRect, count: allCases.count)
+                let valsA = vals(bytesA)
+                let valsF = vals(bytesF)
+                func halfLevels(_ v: [Double]) -> (Double, Double) {
+                    guard v.count >= 2 else { return (-1, -1) }
+                    let cut = v.count / 2
+                    let lo = Array(v[0..<cut]), hi = Array(v[cut..<v.count])
+                    return (lo.reduce(0.0, +) / Double(lo.count), hi.reduce(0.0, +) / Double(hi.count))
+                }
+                (leftA, rightA) = halfLevels(valsA)
+                (leftF, rightF) = halfLevels(valsF)
+                // 这一档能不能判，由**这一跑的数**决定，不是拿"亮档一贯判不了"的旧结论顶上来：
+                // 极差 = 轨道那一行里最亮桶减最暗桶。分不开 ⇒ 后面走"有名字的未判定"出口。
+                spread = (valsA.max() ?? 0) - (valsA.min() ?? 0)
+                canJudge = cAll >= 0 && cFav >= 0
+                if !canJudge {
+                    verdict = "量不到偏离轨道电平的连续区"
+                } else if obsAll == expectedAll && obsFav == expectedFav {
+                    verdict = "亮区两态都落在选中段 ⇒ 与「亮=轨道暴露面」相反，通道翻向了，先重看裁片再动代码"
+                } else if obsAll == expectedFav && obsFav == expectedAll {
+                    verdict = "亮区在两态各占**非**选中段 ⇒ 与「亮=轨道暴露面、暗=药丸」一致"
+                } else if abs(cAll - cFav) < Double(trackW) / 8.0 {
+                    verdict = "亮区没跟着选中换（固定）"
+                } else {
+                    verdict = "亮区形状不在预期三种之内 ⇒ 需要人判"
+                }
+                emit("FILTER_PILL_BAND \(tag) 列=\(found.kind) 列带x=\(colBand.x.lowerBound)..\(colBand.x.upperBound)px"
+                     + " 缩放=\(String(format: "%.2f", scale))x 候选带数=\(bands.count)"
+                     + " 选中的带: y=\(b.yLo)..\(b.yHi)px(高\(String(format: "%.1f", Double(b.yHi - b.yLo) / scale))pt)"
+                     + " 差区x=\(b.runLo)..\(b.runHi)px"
+                     + " 底轨x=\(track.0)..\(track.1)px(宽\(String(format: "%.1f", Double(trackW) / scale))pt) 轨中心=\(Int(mid))px"
+                     + " 亮区中心 all=\(Int(cAll))px fav=\(Int(cFav))px"
+                     + " 期望段 all=\(expectedAll) fav=\(expectedFav) 读到段 all=\(obsAll) fav=\(obsFav)"
+                     + " 轨道内极差=\(String(format: "%.0f", spread))luma 判定=\(verdict)"
+                     + " 24桶all=[\(buckets(bytesA))] 24桶fav=[\(buckets(bytesF))]"
+                     + " 差区行数(阈8)=\(rowsAbove(8.0))")
+            } else {
+                emit("FILTER_PILL_BAND \(tag) 列=\(found.kind) 候选带数=0 差区行=0"
+                     + " 判定=两态在侧栏里没有任何 ≥80pt 宽的差异")
+            }
+            XCTAssertNotNil(pick,
+                            "\(tag)：两态帧在侧栏里找不到一条 ≥80pt 宽的差异带 ⇒ 换了 filter 而画面一个字都没动，"
+                            + "这是选中态不可辨（不是判据坏）。候选带全打在那行 FILTER_PILL_BAND 里，先读它。")
+            guard canJudge else {
+                // **有名字的未判定**（三条一起满足，R133/174 那一族）：
+                // ① 前提由这一跑量出来 —— 轨道那一行的最亮桶减最暗桶 <30luma，材质与底轨分不开；
+                // ② 说清放不掉什么 —— 放掉的是"亮档那一条的亮区归位"，暗档那条照旧承重、不因此放宽；
+                // ③ 它是读数不是覆盖率通道 —— 极差 ≥30 却仍量不到 ⇒ 下面那条断言当场红（尺坏，不是档不行）。
+                emit("FILTER_PILL_UNJUDGED \(tag) 理由=轨道内极差只有\(String(format: "%.0f", spread))luma"
+                     + "（底轨x=\(track.0)..\(track.1)px 亮区中心 all=\(Int(cAll)) fav=\(Int(cFav))）"
+                     + " ⇒ 这一档的材质与底轨在这条离屏通道分不开；暗档判据照旧承重")
+                XCTAssertLessThan(spread, 30.0,
+                                  "\(tag)：量不到亮区，可轨道那一行的极差有 \(String(format: "%.0f", spread))luma（≥30）"
+                                    + " ⇒ 那不能算「这一档分不开」，是这把尺自己坏了，必须红")
+                continue
+            }
+            // 判据一（**与合成方向无关**）：换选中 ⇒ 控件两半的电平必须各自翻转。
+            // 这条不需要知道"药丸是亮的那半还是暗的那半"，所以它骗不过：
+            // 两态若画得一模一样（选中态没表达）或只动文字不动块，这里当场红。
+            XCTAssertGreaterThan(abs(leftA - leftF), 60.0,
+                                 "\(tag)：左半在两态之间的电平只差 \(String(format: "%.0f", abs(leftA - leftF)))luma（要 >60）"
+                                 + " ⇒ 换 filter 之后控件左半没动，选中态在这一档没有表达。"
+                                 + "左all=\(String(format: "%.0f", leftA)) 左fav=\(String(format: "%.0f", leftF))")
+            XCTAssertGreaterThan(abs(rightA - rightF), 60.0,
+                                 "\(tag)：右半在两态之间的电平只差 \(String(format: "%.0f", abs(rightA - rightF)))luma（要 >60）"
+                                 + " ⇒ 换 filter 之后控件右半没动。"
+                                 + "右all=\(String(format: "%.0f", rightA)) 右fav=\(String(format: "%.0f", rightF))")
+            judgedAppearances += 1
+            // 判据二（**通道标定**，出处写在下面）：这条离屏通道里药丸合成成**暗**的那一半
+            // （R189 直接裁片看过：`.all` 档暗块压住左段「全部」、右段轨道是白 255 —— 与屏幕上"亮药丸"的直觉相反）。
+            // 这一条是**可证伪的标定**，不是常识：哪天通道翻了向，它会红，而红的第一步是重看裁片，不是改阈值。
+            let darkSideAll = leftA < rightA ? 0 : 1
+            let darkSideFav = leftF < rightF ? 0 : 1
+            emit("FILTER_PILL_SWAP \(tag) 左all=\(String(format: "%.0f", leftA)) 右all=\(String(format: "%.0f", rightA))"
+                 + " 左fav=\(String(format: "%.0f", leftF)) 右fav=\(String(format: "%.0f", rightF))"
+                 + " 暗半all=\(darkSideAll) 暗半fav=\(darkSideFav) 期望段 all=\(expectedAll) fav=\(expectedFav)"
+                 + " 段号反解 all=\(obsAll) fav=\(obsFav) 判定=\(verdict)")
+            XCTAssertEqual(darkSideAll, expectedAll,
+                           "\(tag)：`.all` 档里药丸（暗的那半）在第 \(darkSideAll) 段，而产品自己的 allCases 说选中是第 \(expectedAll) 段"
+                            + "（左all=\(String(format: "%.0f", leftA)) 右all=\(String(format: "%.0f", rightA))）。"
+                            + "红了的顺序是：先把这一帧的控件裁出来用眼睛看（R189 就是这么定下合成方向的），再谈改代码 —— 不许直接改阈值。")
+            XCTAssertEqual(darkSideFav, expectedFav,
+                           "\(tag)：`.favorites` 档里药丸（暗的那半）在第 \(darkSideFav) 段，而选中的是第 \(expectedFav) 段"
+                            + "（左fav=\(String(format: "%.0f", leftF)) 右fav=\(String(format: "%.0f", rightF))）。"
+                            + "两半若互换，才是 BACKLOG 210 说的「镜像反号」。")
+        }
+        // **出口不许把判据吃掉**（R99 那一族"名单为空=红"，这里的主语是"档"）：
+        // 每一档都可以因为通道分不开而走"有名字的未判定"，但**全部档都走出口**就等于这条判据不存在了 ——
+        // 那正是变异臂 M701 要抓的形状（把 `canJudge` 恒置 false，两档都安静出口，一条断言都不会跑）。
+        XCTAssertGreaterThanOrEqual(judgedAppearances, 1,
+                                    "两态对照一次都没有真正判过（两档全走了「分不开」出口）⇒ 这条判据今天不存在，必须红")
+        emit("FILTER_PILL_JUDGED 真判的档数=\(judgedAppearances)/2")
+    }
+
     private func render(
         _ fixture: Fixture,
         appearance: NSAppearance.Name,
