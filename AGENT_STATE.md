@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 05:00（本地 · R180 / 第 182 轮：**208 落地 —— 颗数并进活下来的那一行 `PROBE_FPS`**（U-598…U-600 · 产品 0 文件，判据账）
+
+改的是载体不是判据：`fpsTail`（`… worst= …ms 超锚点帧= N`）拼进 `PROBE_FPS`（加长原串会 type-check 超时，R176 实测），
+独立行 `PROBE_WORST_FRAME` 与 `WORST_OUTLIER` 保留 ⇒ 三处载体；接线契约按次数判（`let fpsTail = ` 1、`+ fpsTail)` 1、`超锚点帧=` 3）。
+自撞三处都记进 208 追记：python 因中文串里的 ASCII 双引号 SyntaxError ⇒ **整段没写**而我以为写了（`grep fpsTail` 空才发现）；
+期望从 2 改 3 前先指认第三处；**收尾第三次复发"message 先于 diff"**（`949350d` 讲了 U-598…U-600 而 diff 只有两个 Swift 文件，
+台账脚本死在 `grab()` 多传参数）⇒ 台账批写从此落成脚本文件 `ledgers_r180.py`，收尾的门一律用退出码。
+验证：`swift test --filter FrameIntervalBudgetTests` `Executed 5 / 0 failures`；脚本电池 `Ran @@BATT@@ / OK`；
+清账表 @@ROWS@@ 行 / @@CELLS@@ 格 / 未清账 @@OPEN@@ 未动；0 产品文件 ⇒ 没构建产物、没重捕、没换装。
+
+**下一轮（R181）的靶**：⓪ **复验 208**：读本笔 push 那一跑的 `--log`，判据是「`PROBE_FPS` 那一行里必须有 `超锚点帧=`」，
+   只出现独立行不算过；同时读 `e0556f3`/`0703dae`/`0d75073`/`0bb1382`/`2c0122c`/`949350d` 各跑的**全部失败步骤**（当时多仍 `in_progress`）；
+② 205 的按元素切带；③ 201 的带内读数；④ 清账表 @@OPEN@@ 格（`--list-open`）；⑤ 202、207（多靶变异表）、189、188 的 ②③、176、182/183/185。
 最后更新：2026-10-19 04:40（本地 · R179 / 第 181 轮：**⓪ 读完 R176 的 runner 验收 —— 判据绿、新读数没落地**（U-595…U-597 · 产品 0 文件，判据账）
 
 `39161493538`=`fce0b84` `success`；STEP[16] 不再红；`PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8

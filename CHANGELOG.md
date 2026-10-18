@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 208：颗数并进活下来的那一行 `PROBE_FPS`，接线契约改成数形状（R180 / U-598…U-600 · 产品 0 文件，判据账）
+
+- 起因：runner `39161493538` 里 `PROBE_FPS` 完整落地（`… n=222 worst=58.8`）而紧跟其后的独立行 `PROBE_WORST_FRAME` 整卷 0 次 ⇒ 尾部那一行被通道吃掉（R90/R146 那一族）
+- 修法：`fpsTail` 先算成局部常量（加长原串会让编译器 type-check 超时，R176 实测）再拼进 `PROBE_FPS`；独立行与 `WORST_OUTLIER` 保留 ⇒ 颗数三处载体
+- 契约：`testTheProbeWiresTheAnchorToTheSampleCount` 要求 `let fpsTail = ` 1 次、`+ fpsTail)` 1 次、`超锚点帧=` 3 次（按次数判，防"提过就算"）
+- 两处自撞：中文串里 ASCII 双引号让整段 python SyntaxError（**一个字节都没写**，靠 `grep fpsTail` 空结果才发现）；期望从 2 改 3 前先指认第三处是 `WORST_OUTLIER`
+- 收尾同形错第三次复发：`949350d` 的 message 讲了 U-598…U-600 而 diff 只有两个 Swift 文件（台账脚本 `TypeError` 死掉、链子没拦住）⇒ 本笔补账，脚本落成 `ledgers_r180.py`
+- 验证：`swift test --filter FrameIntervalBudgetTests` `Executed 5 / 0 failures`、脚本电池 `Ran @@BATT@@ / OK`；清账表 @@ROWS@@/@@CELLS@@ 未动；0 产品文件
 ### R176 的 runner 验收：判据绿，但新加的读数行整卷没出现（R179 / U-595…U-597 · 产品 0 文件，判据账）
 
 - run `39161493538`=`fce0b84` `completed success`，STEP[16] `On-screen probe coverage floor` 不再红（上一跑红在 `worst=320.65 > 120`）；同跑 `PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8
