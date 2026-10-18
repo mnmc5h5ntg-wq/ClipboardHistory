@@ -56,6 +56,24 @@ final class AccessibilityLabelHygieneTests: XCTestCase {
                       "helpLabel 必须同时上 help 与 accessibilityLabel，否则守卫是假的")
     }
 
+    /// R160 那一格的守卫（R163 补）：行首"已固定"徽标必须带着那句悬浮提示。
+    ///
+    /// 为什么单独钉它：这枚徽标**不是控件**（点它没反应），却是这一行唯一"自己会变"的东西 ——
+    /// 用户点过「固定」，某天看见行首多出一枚图钉，手边没有那句话就只剩猜。
+    /// "两件事一起做"这件事不在这里重复断言：上面 `testHelpLabelActuallySetsBothAttributes`
+    /// 已经钉住 `helpLabel` 同时上 `.help` 与 `accessibilityLabel`，这里只钉**这一格有没有用它**。
+    /// 会红的形状：删掉那行 `.helpLabel(`，或把文案改成不含"已固定"（那等于换了另一句话）。
+    func testPinnedBadgeCarriesItsHoverHint() throws {
+        let root = try sourcesRoot()
+        let url = root.appendingPathComponent("ClipboardHistoryApp/Views/HistoryRowViews.swift")
+        let lines = try codeLines(of: url)
+        // 只看画徽标那一段（到 `RowLeadingVisual` 之前为止）——不许拿别的控件的标签顶名：
+        let badgeRegion = Array(lines.prefix { !$0.contains("struct RowLeadingVisual") })
+        XCTAssertTrue(badgeRegion.contains { $0.contains(".helpLabel(") && $0.contains("已固定") },
+                      "固定徽标的那句悬浮提示不见了 ⇒ 用户只看得到一枚图钉，看不到它为什么在这儿"
+                          + "（R160 那一格，判据：本行必须同时含 `.helpLabel(` 与「已固定」）")
+    }
+
     /// 图片视图必须要么给自己一个名字、要么显式声明"我是装饰"（审计第二轮 1.11）。
     /// 标签一律是固定文案：缩略图里可能是截图带出来的密码或聊天记录，
     /// 所以这里钉的是"有名字"，绝不是"名字里带内容"。

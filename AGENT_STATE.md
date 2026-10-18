@@ -1,5 +1,25 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-18 16:42（本地 · R163 / 第 165 轮：**R160 欠的守卫补上了，并说清徽标那句话为什么不进清账表**（U-542…U-544 · 产品 0 文件，判据账）
+
+**做了什么**：新增 `AccessibilityLabelHygieneTests.testPinnedBadgeCarriesItsHoverHint` ——
+只扫 `HistoryRowViews.swift` 里 `struct RowLeadingVisual` **之前那一段**，要求有一行同时含 `.helpLabel(` 与「已固定」。
+扫描范围收窄是有意的：整文件 `contains` 会被那颗 pin 按钮的 `.helpLabel` 喂饱（R76/R86 那一族"守卫被提到这个词喂饱"）。
+变异刀把那行注释掉 ⇒ 当场红；还原 ⇒ 4 例全绿、产品文件 `git diff --numstat` 0/0。
+
+**两格各判一句话**：本格管"这一格用没用 helpLabel"，既有的 `testHelpLabelActuallySetsBothAttributes`
+管"helper 是否同时上 `.help` 与 `accessibilityLabel`"。合起来会让两种坏法红在同一处，读日志的人分不开。
+
+**了结一件挂着的账**：徽标那句 hover 提示**不属于 171 格里任何一格**（表轴是表面 × 状态，这条判的是
+"非控件的可见变化要不要配一句话"）。不为了销账硬塞一格 —— 那会让分母变成可调的数，
+`MOTION_LEDGER_FLOOR_BASELINE` 的单调性就没意义了。
+
+**下一轮（R164）的靶**：⓪ 读 `39145955508`/`1deda5d`、`39145345916`/`bc53a5c` 与本跑的全部失败步骤，
+   重点 runner 那一行 `CAPTURE_GEOMETRY`：`content<1040` ⇒ 夹具被屏幕收小；`content=1040 而 host<1040` ⇒ 布局没铺满；
+   三者都 1040 而像素仍空 ⇒ 与 191/196 同族的"整层不合成"（那时才按 196 的形状谈未运行，且**指认之前不加出口**）；
+   ① 清账表下一批（录制器 加载/禁用/错误 三格缺席已量到 + `QuickPickController.swift`）；
+   ② **一格真的动效**（产品 > 0：落地 + 帧 + 换装本机 + 逐屏看图）—— 若 194 被指认成产品侧，那一格优先。
+
 最后更新：2026-10-18 16:39（本地 · R162 / 第 164 轮：**194 的分辨读数落地（只出数不放行）+ 三处"该不该加动效"查在源码上**（U-539…U-541 · 产品 0 文件，判据账）
 
 **做了什么**：`render` 里加一行 `CAPTURE_GEOMETRY`（只对 `height>=1000` 的夹具），打

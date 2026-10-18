@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R160 那笔产品改动补上了会红的守卫；徽标那句话说明为什么不进清账表（R163 / U-542…U-544 · 产品 0 文件，判据账）
+
+- 新增 `AccessibilityLabelHygieneTests.testPinnedBadgeCarriesItsHoverHint`：只扫 `HistoryRowViews.swift` 里
+  `struct RowLeadingVisual` 之前那一段，要求有一行同时含 `.helpLabel(` 与「已固定」
+  ⇒ 不许拿那颗 pin 按钮的标签顶名（整文件 `contains` 会被别的出口喂饱）。
+  变异刀把那行注释掉 ⇒ 当场红；还原 ⇒ 4 例全绿、产品文件 `git diff --numstat` 0/0。
+- 两格各判一句话：本格管"这一格用没用 `helpLabel`"，既有的 `testHelpLabelActuallySetsBothAttributes`
+  管"helper 是否同时上 `.help` 与 `accessibilityLabel`"。合并会让两种坏法红在同一处。
+- 了结一件挂着的账：徽标那句 hover 提示**不属于 171 格里任何一格**（表轴是表面 × 状态，
+  这条判的是"非控件的可见变化要不要配一句话"）。不为了销账硬塞一格 —— 那会让分母变成可调的数，
+  `MOTION_LEDGER_FLOOR_BASELINE` 的单调性失去意义；它的持久证人是上面那条守卫。
+
 ### 194 的分辨读数落地（只出数不放行），并查证三处"该不该加动效"（R162 / U-539…U-541 · 产品 0 文件，判据账）
 
 - 新增 `CAPTURE_GEOMETRY`：对 `height>=1000` 的夹具打 `requested / content / host / screenVisibleHeightPt`，
