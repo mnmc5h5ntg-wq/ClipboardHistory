@@ -4821,6 +4821,47 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 150 轮（R148 · 2026-10-18）：覆盖闸门接上闭合通道 —— 「这条在 runner 上跑没跑过」不再只由那条会丢的 stdout 判（U-500…U-502 · 产品 0 文件，判据账）
+
+**这一轮做的是 BACKLOG 187 的 ①**。R146 把"挂在哪一条"搬到了文件通道，但**登记判定**还留在日志上：
+`probe_coverage_gate.py` 只看结论行，所以"跑完了而结论行被 SIGKILL 带走"会被读成"没跑"（`testOffScreen…` 三跑 NOT_RUN 就是这么来的）。
+
+### 0. 开场清单
+
+| 项 | 位置 / 命令 | 读数 | 判 |
+|---|---|---|---|
+| 真产物跑一遍新闸门 | `probe_coverage_gate.py /tmp/r146_ui.log --pulse /tmp/r146_pulse/probe-pulse.log` | `闭合通道=接 本次跑过=11`（日志下结论=11，本机这一遍全跑完）；6 条 `NOW_RUNS` | 见 U-502：那 6 朵红说的是**我把本机日志喂给了 runner 的登记表**，主语错了，不是闸门坏了 |
+| 判据可证伪 | `python3 -m unittest scripts.tests.test_probe_coverage_gate` | 30 格 OK，其中新增 6 格：闭合行救回丢结论的（绿）／**没接通道时同一条日志照旧红**（正对照）／有心跳没闭合仍算没跑完（且只报数不抢名字）／有闭合没心跳 ⇒ 通道不可信（红）／cannot 被闭合行反驳 ⇒ 只报不判／`--pulse` 路径读不到 ⇒ `PROBE_PULSE_UNREADABLE` + 明说"未接" | 放宽与修好在测试里长得不一样 |
+| CI 接线 | `.github/workflows/ci.yml` 覆盖闸门那一处调用 | `--pulse /tmp/probe-pulse.log` 已加；`probe_coverage_gate.py` 的**调用行**恰好 1 处 | 三个消费者都不再只读会丢的那条通道 |
+| 电池 | `python3 -m unittest discover -s scripts/tests` | `Ran 333 tests … OK`（327 → 333） | 新格子进了会红的那一列 |
+
+### 1. 改了什么（产品文件 0 改动）
+
+- `probe_coverage_gate.py`：`analyse(..., closed=, pulsed=)`，"跑过" = `日志结论行 ∪ 闭合行`；
+  新读数 `PROBE_LOG_LOSE_CONCLUSION` / `PROBE_PULSE_OPEN` / `PROBE_REGISTRATION_CONTRADICTED`（三条**只报不判**），
+  新红 `PROBE_CLOSE_WITHOUT_PULSE`（通道自相矛盾时不许它给"跑过"签字）；`--pulse` 不传 ⇒ 完全维持旧行为。
+- 解析器**复用** `ui_probe_report` 的 `PULSE` / `DONE`（一条规则两份实现会互相掩盖，R130 记过）。
+- 分工没破：`未闭口` 仍然只报数，点名归 `ui_probe_report`（`UI_PROBE_HUNG_CHANNEL=file`）—— R94 那条不冗余的边界原样保留。
+
+### 2. 三处失误
+
+- **U-500：新写的守卫自己读散文。** 我断言"`probe_coverage_gate.py` 在 CI 里只许出现 1 次"，而第 2 次出现在一句**注释**里
+  （"与 `probe_coverage_gate.py` 的分工是刻意的"）⇒ 断言红。改成按 `^\\s*python3 \\S*probe_coverage_gate\\.py` 数**调用行**。
+  同一族 R74/R75 已经记过"守卫要读字段不能读散文"，这次是我自己新写了一处。
+- **U-501：换口径必须留一格"旧行为照旧红"。** 只测"闭合行救回来 ⇒ 绿"的话，"放宽判据"与"修好判据"在测试里长得一模一样；
+  所以配了 `test_without_the_channel_the_old_red_stands`（同一条日志、不传通道 ⇒ `NOT_RUN` 仍然红）。
+- **U-502：登记表说的是 runner，我喂的是本机日志。** 本机那一遍 11 条全跑完 ⇒ 6 条 `NOW_RUNS`（登记 cannot 的都被反驳）。
+  这不是闸门坏，是**主语没写在输出上**。要补的是把机器键打进 summary（新开 BACKLOG 189），
+  否则下一次有人会把这 6 朵红读成"runner 上它们其实都能跑"。
+
+### 3. 仍然欠着的
+
+- 187 的 ②：缺席分成 `queued` / `hung` / `log-lost` 三种有名字的出口（`log-lost` 已作为读数落地，还没进名册口径），
+  以及 `PROBE_REGISTRATION_CONTRADICTED` **升红**的判据 —— 目标名与条件写在 187 里，等 runner 上第一次真读到闭合行。
+- 188（帧尺接进 CI，第一遍 report-only）、189（summary 带机器键）、176 / 182 / 183 / 185、清账表下一批。
+- 本轮 0 产品改动 ⇒ 不重拍帧、不换装；看图腿未做（按事实记账，不借口"沿用上一轮"）。
+
+
 ## 第 149 轮（R147 · 2026-10-18）：帧级状态自证进电池 —— 「录制态那一圈」从此由写出的 PNG 说话（U-497…U-499 · 产品 0 文件，判据账）
 
 **这一轮做的是 BACKLOG 177 的收尾那一格**。R145 让录制态进了帧基线（136 → 138），但它的自证只有两条：

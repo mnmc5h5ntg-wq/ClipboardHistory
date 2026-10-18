@@ -48,6 +48,9 @@
 退出码：0 一切都在登记之内 / 1 上面任何一条红 / 2 清单、源码或日志读不到（读不到 ≠ 通过）。
 """
 import argparse
+import os
+# R148 / BACKLOG 187 · 心跳与闭合这两行的**正则不在这里复制**：`main()` 里 import `ui_probe_report`，
+# 同一条规则两份实现会互相掩盖（R130 记过），改一处忘另一处的后果是两支闸门各说一套。
 import json
 import re
 import sys
@@ -111,8 +114,13 @@ def execution_order(log_text):
     return order, concluded, sorted(set(interleaved))
 
 
-def analyse(source_names, expectations, log_text):
-    """返回 (读数, 红清单)。纯函数：所有 IO 都在 main() 里，这样它自己可测。"""
+def analyse(source_names, expectations, log_text, closed=None, pulsed=None):
+    """返回 (读数, 红清单)。纯函数：所有 IO 都在 main() 里，这样它自己可测。
+
+    R148 / BACKLOG 187 · `closed` / `pulsed`：闭合通道（`PROBE_DONE` / `PROBE_PULSE`）给的两份名单，
+    `None` = 这一格今天没接线 ⇒ **完全维持旧行为**（只看日志）。接上之后"这条在 runner 上到底跑没跑过"
+    由 `日志的结论行 ∪ 闭合行` 判，而不是只由那条会被 SIGKILL 整块带走的 stdout 判（R146 的 U-494）。
+    """
     reds = []
     for name, entry in sorted(expectations.items()):
         runner = entry.get("runner")
@@ -122,6 +130,16 @@ def analyse(source_names, expectations, log_text):
             reds.append(f"REASONLESS {name} 登记为 cannot 但没有 reason")
 
     concluded = concluded_cases(log_text)
+    # 闭合通道接没接，决定"跑过"这句话有多少依据。**不**把它写成默认空集：
+    # 空集与"没接线"在旧行为上长得一样，但读数上不一样（`闭合通道=未接` 要说出口）。
+    file_channel = closed is not None
+    ran = set(concluded) | set(closed or ())
+    log_lost = sorted(set(closed or ()) - set(concluded))
+    contradicted = sorted(name for name in (expectations or {})
+                          if expectations[name].get("runner") == "cannot"
+                          and name in ran and name not in concluded)
+    pulse_only = sorted(set(pulsed or ()) - set(closed or ()))
+    close_without_pulse = sorted(set(closed or ()) - set(pulsed or ())) if pulsed is not None else []
     for name in source_names:
         if name not in expectations:
             reds.append(f"UNLISTED {name}：源码里有这条在屏判据，清单里没有 ⇒ "
@@ -130,11 +148,17 @@ def analyse(source_names, expectations, log_text):
         if name not in source_names:
             reds.append(f"STALE {name}：清单里有、源码里已经没有这条用例 ⇒ 删掉这行登记")
         runner = expectations[name].get("runner")
-        if runner == "can" and name not in concluded:
-            reds.append(f"NOT_RUN {name}：登记为 runner=can，而这次日志里没有它的结论行")
+        if runner == "can" and name not in ran:
+            basis = "日志没有它的结论行，闭合通道也没有它的闭合行" if file_channel else "这次日志里没有它的结论行"
+            reds.append(f"NOT_RUN {name}：登记为 runner=can，而{basis}")
         if runner == "cannot" and name in concluded:
             reds.append(f"NOW_RUNS {name}：登记说 runner 跑不了，而这次它下结论了"
                         f"（{concluded[name]}）⇒ 把登记改成 can")
+    # 闭合通道自己讲不通 ⇒ 红：有闭合行却没有心跳行，说明这份文件被写坏了或者路径对错了，
+    # 那时上面那句"跑过"就没有依据，不许拿它给任何一条登记签字。
+    for name in close_without_pulse:
+        reds.append(f"PROBE_CLOSE_WITHOUT_PULSE {name}：文件里有它的闭合行却没有心跳行 ⇒ 闭合通道不可信，"
+                    "这一格的『跑过』不能由它支撑")
 
     for name, kind, message in ASSERTION_RED.findall(log_text)[:8]:
         # R99 / BACKLOG 145：**名字不够，还要那一句为什么**（同一行里就有，是这颗正则丢掉的）。
@@ -178,7 +202,12 @@ def analyse(source_names, expectations, log_text):
         "can": can,
         "cannot": len(expectations) - can,
         "concluded": len(concluded),
-        "absent": [n for n in source_names if n not in concluded],
+        "absent": [n for n in source_names if n not in ran],
+        "file_channel": file_channel,
+        "ran": len([n for n in source_names if n in ran]),
+        "log_lost": log_lost,
+        "contradicted": contradicted,
+        "pulse_only": pulse_only,
         "appeared": len(order),
         "open_not_closed": open_not_closed,
         "interleaved": interleaved,
@@ -193,6 +222,8 @@ def main(argv=None):
     parser.add_argument("log")
     parser.add_argument("--expectations", required=True)
     parser.add_argument("--source", required=True)
+    parser.add_argument("--pulse", default=None,
+                        help="心跳/闭合那份文件（`probe-pulse.log`）。不传 ⇒ 只看日志（旧行为）")
     args = parser.parse_args(argv)
 
     try:
@@ -207,10 +238,27 @@ def main(argv=None):
         print(f"PROBE_GATE_ERROR 输入读不到：{error}")
         return 2
 
-    reading, reds = analyse(source_names, expectations, log_text)
+    closed = pulsed = None
+    if args.pulse:
+        # 复用同一颗解析器（见模块头那句）：把脚本自己那一层放进 sys.path 再 import。
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from ui_probe_report import DONE, PULSE
+        try:
+            with open(args.pulse, encoding="utf-8", errors="replace") as handle:
+                pulse_text = handle.read()
+        except OSError as error:
+            print(f"PROBE_PULSE_UNREADABLE={args.pulse}（{error}）⇒ 闭合通道**未接**，"
+                  "下面那句『跑过』退回只看日志的旧口径")
+        else:
+            closed = [m.group(1) for m in DONE.finditer(pulse_text)]
+            pulsed = [m.group(1) for m in PULSE.finditer(pulse_text)]
+
+    reading, reds = analyse(source_names, expectations, log_text, closed=closed, pulsed=pulsed)
     print(f"PROBE_COVERAGE_SUMMARY 源码用例={reading['source_cases']} 登记={reading['listed']} "
           f"runner可跑={reading['can']} runner不可跑={reading['cannot']} "
-          f"本次下结论={reading['concluded']} 红={len(reds)}")
+          f"本次下结论={reading['concluded']} "
+          f"闭合通道={'接' if reading['file_channel'] else '未接'} "
+          f"本次跑过={reading['ran']} 红={len(reds)}")
     for red in reds:
         print("  " + red)
     # 缺席本身要打得**具体**：只说「没跑完」会让人以为所有判据都只是延迟。
@@ -230,6 +278,20 @@ def main(argv=None):
               % (len(reading["interleaved"]), " ".join(reading["interleaved"]))
               + " ⇒ 这份日志不止一个写入者（或同一例被跑了两遍）。结论按粘的处理（下过就算下过），"
                 "但 `未闭口` 这一格今天不可信 —— 132 的分诊要先解决写入者是谁")
+    # 三条闭合通道带来的读数，全部**只报不判**（除了上面那条通道自相矛盾的）：
+    # 「挂在哪一条」的名字归 `ui_probe_report.py`（它现在有两条文件内的通道可以对账），这里抢名字就是第二颗尺子。
+    if reading["log_lost"]:
+        print(f"  PROBE_LOG_LOSE_CONCLUSION {len(reading['log_lost'])} 条有闭合行却没有日志结论行："
+              + " ".join(reading["log_lost"][:12])
+              + " ⇒ 丢的是那一行 stdout，不是这条用例；这一格不许被读成『它没跑』")
+    if reading["pulse_only"]:
+        print(f"  PROBE_PULSE_OPEN {len(reading['pulse_only'])} 条有心跳没闭合："
+              + " ".join(reading["pulse_only"][:12])
+              + " ⇒ 正跑着被收掉的那一条**由 ui_probe_report 点名**（UI_PROBE_HUNG_CHANNEL=file），这里只报数")
+    if reading["contradicted"]:
+        print(f"  PROBE_REGISTRATION_CONTRADICTED {len(reading['contradicted'])} 条登记为 cannot，而闭合行说它跑完了："
+              + " ".join(reading["contradicted"][:12])
+              + " ⇒ 登记该翻面；**这一格今天只报不判**（升红的判据与目标名写在 BACKLOG 187）")
     if reading["queued"]:
         print(f"  PROBE_QUEUED {len(reading['queued'])}/{reading['source_cases']} 条一次都没轮到："
               + " ".join(reading["queued"][:12]) + (" …" if len(reading["queued"]) > 12 else ""))

@@ -22,6 +22,7 @@ import contextlib
 import io
 import sys
 import os
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -580,8 +581,15 @@ class PulseWiringTests(unittest.TestCase):
 
     def testCiWiresThePulseIntoBothReportCalls(self):
         ci = self.CI.read_text(encoding="utf-8")
-        self.assertEqual(2, ci.count("--pulse /tmp/probe-pulse.log"),
-                         "报告器两处调用里有一处没接 --pulse ⇒ 那一处的名字仍然只来自会被丢的通道")
+        # 2 → 3（R148 / BACKLOG 187）：现在有三个消费者 —— 报告器两处 + 覆盖闸门一处。
+        # 这一格判的是"**没有任何一个消费者只读那条会丢的通道**"，所以调用点数只许跟着消费者一起长。
+        self.assertEqual(3, ci.count("--pulse /tmp/probe-pulse.log"),
+                         "有一处调用没接 --pulse ⇒ 它给的『跑没跑过 / 挂在哪一条』仍然只来自会被整块带走的 stdout")
+        # 数的是**调用行**，不是文件名出现次数：CI 正文里那句"与 probe_coverage_gate.py 的分工是刻意的"
+        # 是散文，按子串数会被它喂饱（守卫要读结构不读散文 —— R74/R75 那一族，本轮自己又踩了一次）。
+        call_lines = re.findall(r"^\s*python3 \S*probe_coverage_gate\.py\b", ci, re.M)
+        self.assertEqual(1, len(call_lines),
+                         "覆盖闸门应当**只有一处**调用：两处就会有两套登记判定；读到的是 %r" % (call_lines,))
         self.assertIn("CLIPBOARD_HISTORY_PROBE_PULSE=/tmp", ci,
                       "CI 没给心跳目录 ⇒ 探针会退回默认路径，而闸门读的是 /tmp 那个文件")
 

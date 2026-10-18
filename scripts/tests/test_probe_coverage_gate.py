@@ -356,3 +356,74 @@ class InterleavedLogTests(unittest.TestCase):
         self.assertIn(code, (0, 1), "退出码只许是绿或红，2 意味着有一份输入没被读到")
         text = out.getvalue()
         self.assertIn("PROBE_ORDER_INTERLEAVED 1 条", text, text)
+
+
+class ClosingChannelTests(unittest.TestCase):
+    """R148 / BACKLOG 187 · 闸门接上闭合通道：「这条在 runner 上跑没跑过」不再只由那条会丢的 stdout 判。
+
+    起因是 R146 查明的：看门狗 `kill -9` 会整块带走驱动的 stdout，于是**跑完了**的用例
+    也可能没有结论行（`testOffScreen…` 连着三跑被记成 NOT_RUN 就是这么来的）。
+    闭合行 `PROBE_DONE` 与心跳 `PROBE_PULSE` 写在产品自己 open 的文件里，活得过收杀。
+    """
+
+    LOG_STARTED_ONLY = "Test Case '-[M.T testAlpha]' started.\n"
+
+    def reading_of(self, log, closed, pulsed, expectations=None):
+        reading, reds = analyse(CASES_A, expectations if expectations is not None else LIST_A,
+                                log, closed=closed, pulsed=pulsed)
+        return reading, reds
+
+    def test_closed_line_rescues_a_lost_conclusion(self):
+        """正方向：日志丢了结论行，而闭合行在 ⇒ 不许再报 NOT_RUN，且要说清丢的是 stdout。"""
+        reading, reds = self.reading_of(self.LOG_STARTED_ONLY, ["testAlpha"], ["testAlpha"])
+        self.assertEqual([], reds, "闭合行说它跑完了还报红=替那条会丢的通道签字：" + str(reds))
+        self.assertEqual(["testAlpha"], reading["log_lost"], str(reading))
+        self.assertTrue(reading["file_channel"])
+        self.assertEqual(["testBeta"], reading["absent"],
+                         "absent 现在按『跑过』算：testAlpha 有闭合行不该在里面，而 testBeta 两条通道都没有 ⇒ 它该在")
+
+    def test_without_the_channel_the_old_red_stands(self):
+        """反方向（正对照）：没接闭合通道时，同一条日志必须照旧红。"""
+        reading, reds = self.reading_of(self.LOG_STARTED_ONLY, None, None)
+        self.assertTrue(any(r.startswith("NOT_RUN testAlpha") for r in reds), str(reds))
+        self.assertFalse(reading["file_channel"])
+        self.assertEqual([], reading["log_lost"])
+
+    def test_pulse_without_close_is_still_not_run(self):
+        """有心跳没闭合 ⇒ 它正跑着被收掉：这条**仍然**算没跑完（红），但名字归 ui_probe_report。"""
+        reading, reds = self.reading_of(self.LOG_STARTED_ONLY, [], ["testAlpha"])
+        self.assertTrue(any(r.startswith("NOT_RUN testAlpha") for r in reds), str(reds))
+        self.assertEqual(["testAlpha"], reading["pulse_only"], "只报数、不抢名字：" + str(reading))
+        self.assertFalse(any("UI_PROBE_HUNG" in r for r in reds), "点名不是这一支的活（R94 的分工）")
+
+    def test_close_without_pulse_breaks_the_channel(self):
+        """文件里有闭合行却没有心跳行 ⇒ 这份文件不可信，『跑过』不能由它支撑 ⇒ 红。"""
+        reading, reds = self.reading_of(self.LOG_STARTED_ONLY, ["testAlpha"], [])
+        self.assertTrue(any(r.startswith("PROBE_CLOSE_WITHOUT_PULSE testAlpha") for r in reds), str(reds))
+
+    def test_cannot_registration_contradicted_is_a_reading_not_a_red(self):
+        """登记说 cannot 而闭合行说它跑完了 ⇒ 今天**只报**（升红的判据写在 BACKLOG 187）。"""
+        expectations = {"testAlpha": {"runner": "can"},
+                        "testBeta": {"runner": "cannot", "reason": "runner 上窗口起不来"}}
+        reading, reds = self.reading_of(self.LOG_STARTED_ONLY, ["testAlpha", "testBeta"],
+                                        ["testAlpha", "testBeta"], expectations)
+        self.assertEqual([], reds, "这一格不许今天就把 CI 弄红：" + str(reds))
+        self.assertEqual(["testBeta"], reading["contradicted"], str(reading))
+
+    def test_cli_announces_an_unreadable_pulse_file(self):
+        """路径写错与"这台机器没这条通道"必须长得不一样，且不许静默退回旧口径而不说。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            log = os.path.join(tmp, "ui.log")
+            with io.open(log, "w", encoding="utf-8") as handle:
+                handle.write(self.LOG_STARTED_ONLY)
+            exp = os.path.join(tmp, "exp.json")
+            with io.open(exp, "w", encoding="utf-8") as handle:
+                handle.write(json.dumps({"cases": {"testAlpha": {"runner": "can"},
+                                                   "testBeta": {"runner": "cannot", "reason": "x"}}}))
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                main([log, "--expectations", exp, "--source", str(SOURCE),
+                      "--pulse", os.path.join(tmp, "absent-pulse.log")])
+            text = out.getvalue()
+        self.assertIn("PROBE_PULSE_UNREADABLE=", text, text)
+        self.assertIn("闭合通道=未接", text, text)

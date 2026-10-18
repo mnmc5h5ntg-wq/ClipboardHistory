@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 覆盖闸门接上闭合通道：登记判定不再只读那条会丢的 stdout（R148 / U-500…U-502 · 产品 0 文件，判据账）
+
+- `probe_coverage_gate.py` 的「跑过」= `日志结论行 ∪ 闭合行`；新增读数 `PROBE_LOG_LOSE_CONCLUSION` / `PROBE_PULSE_OPEN` / `PROBE_REGISTRATION_CONTRADICTED`（只报不判）与新红 `PROBE_CLOSE_WITHOUT_PULSE`；`--pulse` 不传 ⇒ 旧行为原样。
+- 解析器复用 `ui_probe_report` 的 `PULSE`/`DONE`；点名仍归报告器（R94 的分工没破）。
+- CI 的覆盖闸门调用加 `--pulse /tmp/probe-pulse.log`；守卫改成数**调用行**（子串计数会被注释喂饱）。
+- 验证：电池 `Ran 333 tests … OK`（327→333）；真产物 `闭合通道=接 本次跑过=11`。BACKLOG 187 的 ① 落地，②③ 与新开的 189 仍欠。
+
+
 ### 帧级状态自证：录制态那一圈从此由写出的 PNG 说话（R147 / U-497…U-499 · 产品 0 文件，判据账）
 
 - 新工具 `scripts/frame_recording_proof.py`：读静置帧与录制态帧 ⇒ `FRAME_STATE_PAIR/CHROMA/EDGES/PROVES_RECORDING`，

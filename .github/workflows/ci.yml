@@ -493,9 +493,12 @@ jobs:
         working-directory: .
         run: |
           set -o pipefail
+          # R148 / BACKLOG 187：把闭合通道也接进来 —— "这条在 runner 上跑没跑过"从此由
+          # `日志的结论行 ∪ 闭合行` 判。只看日志会把"跑完了而结论行被 SIGKILL 带走"读成没跑（R146 的 U-494）。
           python3 scripts/probe_coverage_gate.py /tmp/ui.log \
             --expectations scripts/probe_coverage_expectations.json \
             --source ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift \
+            --pulse /tmp/probe-pulse.log \
             | tee /tmp/probe-floor.log
           # R86 / BACKLOG 92 路 a 的**有牙那一半**：登记与"这次为什么没结论"都要过这一关。
           # 与 `probe_coverage_gate.py` 的分工是刻意的、不冗余：
