@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R176 欠的三把刀补上：绝对锚点的"颗数"这一格有了反证（R178 / U-592…U-593 · 产品 0 文件，刀账）
+
+- `mutate_r178.py`：M693（容差 1→999 ⇒ 真卡顿不红）、M694（矛盾分支 return true→false ⇒ 给尺的那格被静音）、M695（探针里 XCTAssertFalse→True ⇒ 反装接线）三把全 CAUGHT：M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount
+- 新格 `testTheProbeWiresTheAnchorToTheSampleCount`：扫源码前先剥行注释，要求取数处、以 `overAnchor` 为参数的断言、印颗数的读数行**各恰好一次**
+- `RESTORE_CLEAN=no`：还原复跑 `ran=0 broke=True`，但三处 needle 复查为原形 + 单跑 `Executed 5 / 0 failures` ⇒ 刀账成立、那一格按 NOT-RUN 记（成因未命名，候选是构建目录中间态）
+- 预检 本轮预检在表之前跑，读数见 /tmp/r178_mut.log；0 产品文件 ⇒ 没构建、没重捕、没换装
 ### 204 结案：撤掉没有承载物的「浮层/底部说明」，并给清账表装上显式退役通道（R177 / U-589…U-591 · 产品 0 文件，判据账）
 
 - 撤项理由落在产品上（D-194）：`QuickPickController.swift:262` 的面板 stack 只有 `field / empty / scroll`，`footerLabel` / `hintLabel` 产品源码 0 命中 ⇒ 七格一直在判一个不存在的层；键位提示的功能由空态那一句就地承担，常驻 chrome 与内容争注意力

@@ -12905,3 +12905,24 @@ R140 的看图腿记成 NOT-RUN，本轮第一件事是**重新捕获**（`/tmp/
 | 台账一致性 | 14/15 | U-589…U-591 + D-194 + 204 结案 + CHANGELOG + STATE + 报告计数器同源；扣分：CI 三跑结论未读 |
 | 交付诚实性 | 15/15 | 明写「没做承载物就不许复活这一层」「改的是断言形状不是放宽」 |
 | 可复核性 | 15/15 | 文件行、红名、闸门原样读数、命令都在 |
+
+
+## Round 178 · R176 欠的三把刀补上：锚点要颗数撑着这件事从此有反证（2026-10-19 · 产品 0 文件，刀账）
+
+- M693/M694/M695 全 CAUGHT：M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount。前两把打在纯谓词的两个方向（容差、矛盾分支），第三把打在新加的**接线扫描**上。
+- 新格 `testTheProbeWiresTheAnchorToTheSampleCount`：扫源码前先剥行注释（R76/R77 那一族：注释里提到名字不算调用），
+  要求 `let overAnchor = loaded.overAnchor`、`XCTAssertFalse(...isWorstFrameJank(...overAnchor)`、读数行印颗数 —— 三处各恰好一次。
+- `RESTORE_CLEAN=no`：还原复跑 `ran=0 broke=True`，但三处 needle 复查为原形、单跑 5 格绿 ⇒ 刀账成立、那一格记 NOT-RUN（成因未命名）。
+- 0 产品文件 ⇒ 没构建新产物、没重捕、没换装；看图腿没有新画面。
+
+### 3. 七维度自评（本轮）
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 4/15 | 没有画面、没重捕（0 产品文件）；这条按"没看"记账 |
+| 判据有效性 | 15/15 | 三把各红在一格；两把打在纯谓词的两个相反方向，一把打在接线上 |
+| 假绿防御 | 14/15 | 还原复跑不绿就写不绿（no），并给出两处独立证人；扣分：那一格的成因还没命名 |
+| 产品面推进 | 9/15 | 画面 0 改动；推进的是 R176 那句话从"纸上证人"变成有反证 |
+| 台账一致性 | 14/15 | U-592…U-593 + 206 追记 + CHANGELOG + STATE + 名册登记 mutate_r178；扣分：CI 两跑结论仍未读 |
+| 交付诚实性 | 15/15 | 把 NOT-RUN 与"刀账成立"分开写，不合并成一句"验证通过" |
+| 可复核性 | 15/15 | 刀号、红名、命令（`mutate_r178.py`）、日志路径都在 |

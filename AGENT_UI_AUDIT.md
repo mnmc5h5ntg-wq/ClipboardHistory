@@ -4821,6 +4821,22 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 180 轮（R178 · 2026-10-19）：R176 欠的三把刀补上 —— 锚点的"颗数"这一格从此有反证（U-592…U-593 · 产品 0 文件，刀账）
+
+- **U-592：三把全 CAUGHT，各红在自己那一格。** M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount。
+  M693（`worstFrameOutlierTolerance = 1 → 999`）问的是"真卡顿还判不判"：容差放大后一批帧超锚点也不红 ⇒ 被真值表那格抓；
+  M694（矛盾分支 `return true → false`）问的是"worst 超锚点却数到 0 颗"这把**给尺自己**的红能不能被静音 ⇒ 抓到；
+  M695（探针里 `XCTAssertFalse → XCTAssertTrue`）问的是接线：锚点判据必须以 `overAnchor` 为参数被断言一次，
+  反装就被新加的扫描格 `testTheProbeWiresTheAnchorToTheSampleCount` 抓（它数的是**去掉行注释之后**的三处形状各恰好一次）。
+- **U-593：`RESTORE_CLEAN=no` 这一格不绿，我没把它写成绿。** 表跑完的还原复跑报 `ran=0 broke=True`
+  （编译层没出测试结果），而三处 needle 当场复查都是原形、随后单独复跑 `Executed 5 tests, with 0 failures`
+  ⇒ 结论：**刀账成立、还原复跑那一格成因未命名**（候选：还原后立刻复跑撞上构建目录的中间态）。
+  这一格按 NOT-RUN 记，不并入"验证通过"；预检 本轮预检在表之前跑，读数见 /tmp/r178_mut.log。
+- **U-595：CI 的账要按「已落地结论」那几跑说，不许替 `in_progress` 作证。** 本轮读数：
+  `659ec46`（R174）/ `e93c13b`（R175）/ `3ea2b40`（R175 补账）/ `9e1d3d4`（R173 修复）四跑 `completed success`；
+  `fce0b84`（R176 那颗新判据第一次上 runner）与 `0703dae`（R177 退役后的表）当时仍 `in_progress` ⇒ 结论未读。
+  于是 206 的真产物验收（`PROBE_WORST_FRAME` 的颗数读数）与"退役表在 runner 上仍 `RESULT=ok` + `RETIRED 1`"这两格**都还欠着**，
+  写进 R179 的第 ⓪ 条；而"最近四跑全绿"这句话只覆盖已经落地的那四跑，不是一句整体的"CI 绿了"。
 ## 第 179 轮（R177 · 2026-10-19）：204 选了「撤词表项」，于是清账表学会了**显式退役**（U-589…U-591 · 产品 0 文件，判据账）
 
 - **U-589：撤的是一个没有承载物的表面，理由落在产品上。** 「浮层/底部说明」有七格一直在判 `not-applicable`，

@@ -5013,3 +5013,11 @@ R64 的旧账写的是"空态那句在列表槽里**居中**，中心 209.25pt v
 撤项的代价也被处理了：地板是单调量，撤项在计数上与清账退步同形 ⇒ 新增 `retired_surfaces` + 四条闸门判据，降幅只从登记过的表面来
 （本轮 `head=111` 由 HEAD 的 118 减去登记的 7 格得到）。未清账 53 → 51：其中 2 格（该表面的「空」「选中」）随表面消失，
 **不是新判出来的** —— 这正是 202 说的那两格，202 继续开着（缺席粒度仍是文件级）。
+
+**206 追记（R178）：三把刀补上，"颗数撑着"这句话有了反证；还原复跑那一格仍不绿**
+
+`mutate_r178.py` 三臂全 CAUGHT（M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount）：容差被放大后真卡顿不再红被抓、"超锚点却 0 颗"的矛盾分支被静音被抓、
+探针里锚点断言被反装被抓（新格 `testTheProbeWiresTheAnchorToTheSampleCount` 扫的是剥掉行注释后的三处形状各恰好一次）。
+**没结的部分**：`RESTORE_CLEAN=no` —— 表跑完的还原复跑报 `ran=0 broke=True`（没出测试结果），
+而三处 needle 当场复查都是原形、随后单跑 5 格全绿 ⇒ 刀账成立，那一格按 NOT-RUN 记，成因未命名（候选：还原后立刻复跑撞上构建中间态）。
+本机仍量不到真产物（采样通道死，R91 原样）⇒ 206 的 CI 复验还欠着：看 `PROBE_WORST_FRAME` 的颗数读数。

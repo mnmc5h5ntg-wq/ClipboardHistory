@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 04:35（本地 · R178 / 第 180 轮：**R176 欠的三把刀补上，锚点"要颗数撑着"有了反证**（U-592…U-593 · 产品 0 文件，刀账）
+
+`mutate_r178.py`：M693/M694/M695 全 CAUGHT（M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount）。前两把打在纯谓词的两个相反方向（容差、矛盾分支），
+第三把打在新加的**接线扫描**上（`testTheProbeWiresTheAnchorToTheSampleCount`：剥行注释后要求取数处/以 `overAnchor` 为参数的断言/印颗数的读数行各恰好一次）。
+`RESTORE_CLEAN=no` 这一格不绿：还原复跑 `ran=0 broke=True`，而三处 needle 复查为原形、单跑 5 格绿
+⇒ 刀账成立、那一格按 NOT-RUN 记，成因未命名（候选：构建目录中间态）。预检 本轮预检在表之前跑，读数见 /tmp/r178_mut.log。
+0 产品文件 ⇒ 没构建、没重捕、没换装。
+
+**下一轮（R179）的靶**：⓪ 读 `fce0b84`（R176 新判据第一次上 runner）/ `0703dae`（R177 退役表）/ 本笔那一跑的**全部失败步骤**；
+   预期：STEP[16] 不再因单帧离群红，且 `PROBE_WORST_FRAME` 那一行**要在**（它没露面就是读数通道又坏了）；
+   退役后的表在 runner 上仍 `MOTION_LEDGER_RESULT=ok` 且 `RETIRED 1（浮层/底部说明）`；
+② 205 的按元素切带；③ 201 的带内读数；④ 清账表剩余 51 格（`--list-open`）；⑤ 189、188 的 ②③、176、182/183/185、202；
+⑥ 还原复跑那一格若再来，先按"能否复现"分诊，别改表也别改判据。
 最后更新：2026-10-19 04:25（本地 · R177 / 第 179 轮：**204 结案 —— 撤掉没有承载物的「浮层/底部说明」，清账表学会显式退役**（U-589…U-591 · 产品 0 文件，判据账）
 
 决定：这一层没有承载物（stack 只有 `field / empty / scroll`；`footerLabel`/`hintLabel` 0 命中），功能由空态那一句就地承担，

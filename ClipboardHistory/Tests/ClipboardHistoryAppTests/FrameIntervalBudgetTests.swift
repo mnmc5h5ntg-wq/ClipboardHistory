@@ -81,6 +81,23 @@ final class FrameIntervalBudgetTests: XCTestCase {
                       "一批帧都掉到锚点之上 = 真卡顿，必须红")
     }
 
+    /// R178：锚点判据不是纸上概念 —— 探针那一卷必须**真的**用它，而且用的是 `overAnchor` 这一格。
+    /// 扫源码而不是跑探针：这条采样通道在本机是死的（R91 `baseline_n=0`），
+    /// 所以"接没接线"只能按形状判，真产物那半由 CI 的 `PROBE_WORST_FRAME` 读数签（BACKLOG 206）。
+    func testTheProbeWiresTheAnchorToTheSampleCount() throws {
+        let src = try String(contentsOf: URL(fileURLWithPath: "UIInteractionProbeTests.swift",
+                                            relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()),
+                             encoding: .utf8)
+        let lines = src.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: CharacterSet(charactersIn: "/ ")).isEmpty && !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+        let joined = lines.joined(separator: "\n")
+        XCTAssertEqual(1, joined.components(separatedBy: "let overAnchor = loaded.overAnchor").count - 1,
+                       "探针里 `overAnchor` 的取数处必须恰好一处（0 = 没接线；2 = 两把尺各数各的）")
+        XCTAssertEqual(1, joined.components(separatedBy: "XCTAssertFalse(FrameIntervalBudget.isWorstFrameJank(worstMs: loaded.worst, overAnchorCount: overAnchor)").count - 1,
+                       "锚点判据必须以 `overAnchor` 为参数被断言一次 ⇒ 改成别的形状（比如又拿 worst 单判）这一格会红")
+        XCTAssertEqual(1, joined.components(separatedBy: "超锚点帧=\\(loaded.overAnchor)").count - 1,
+                       "读数行要印颗数：CI 那一跑只有这一行能替『是离群还是真卡顿』作证")
+    }
+
     /// 读数与「退掉的绝对判据」都要被钉住：
     /// ① `PROBE_FPS` 必须走 `emit`（stderr / 文件通道）而不是 `print` —— 那三行 `FPS-` 在 CI 里
     ///    从来没被收集到过（块缓冲 + 看门狗收进程），所以收紧这条判据欠的那份读数一直不存在；
