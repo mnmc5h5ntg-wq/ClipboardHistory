@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### runner 把 194 签成"第三种情形"，而我给自己造的两格正对照都是空的 ⇒ 出口撤回（R167 / U-554…U-556 · 产品 0 文件，判据账）
+
+- `--log` 取到 runner 的几何行：`requested=720x1040 content=720x1040 host=720x1040 screenVisibleHeightPt=681`（六张高帧同形）
+  ⇒ 按 R162 预登记的三分规则落在第三种（几何正确、像素全空），前两种解释被同一行排除。
+  读法教训：那行是 report-only 的**捕获步骤**打的，`--log-failed` 取不到。
+- 出口按规则写好又撤回：本机没有空白高帧，两格"正对照"都建在没有对象的数据上（强行放进循环的帧透明度 ~0，
+  两种实现都绿），所以它们什么都没证。**不加一条我没法证明会点火的放行通道** —— 那正是我这一路在防的事。
+- 还差一根分辨轴：`最后一行有墨的 y / 画到的包围盒高`（≈ 屏幕可视高 ⇒ 被裁；= 0 ⇒ 没渲染）。
+  下一轮先加它、拿 runner 读数分开两种解释，再谈出口。留下的是 `capturedGeometry` 与 `CAPTURE_GEOMETRY`
+  （编译 0 告警、`UICaptureTests` 71 例 / 4 skip / 0 failures、138 帧不变）。
+- 脚本电池 `Ran 342 tests OK`；清账表停在 112/171（未清账 59）；BACKLOG 197（热图比字窄 118pt）仍开。
+
 ### 热图与菜单栏两族再判 13 格（清账表 99 → 112），看图量出热图右侧一条 118pt 的空白带（R166 / U-551…U-553 · 产品 0 文件，动效主线）
 
 - 13 格全部带可复查的 `缺席:` 例子：热图的 按下/成功/禁用（`Button`/`TapGesture`/`selection`/`disabled`/`ProgressView` 逐个 0 处），

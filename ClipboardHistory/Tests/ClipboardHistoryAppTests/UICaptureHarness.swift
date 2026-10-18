@@ -246,6 +246,11 @@ final class UICaptureTests: XCTestCase {
 
     private func emit(_ line: String) { Self.emit(line) }
 
+    /// R167 / BACKLOG 194：**每一次 render 的几何，按帧名留着**，好让"未画"那一格能引用同源读数。
+    /// 只在这一整个测试实例活着的时候有效（XCTest 每个用例一个新实例），不跨用例、不跨机器。
+    /// 键是文件名（含尺寸与档位），值是那一次捕获里量到的四个数。
+    var capturedGeometry: [String: (requested: CGFloat, content: CGFloat, host: CGFloat, screen: CGFloat)] = [:]
+
     /// 取一条方法签名之后的**方法体**（到第一处「换行 + 四空格 + }」为止）。
     ///
     /// 为什么要有它：源码级守卫只会 `contains`，而整文件 `contains` 分不清
@@ -10995,6 +11000,9 @@ final class UICaptureTests: XCTestCase {
                  + " content=\(Int(content.width))x\(Int(content.height))"
                  + " host=\(Int(host.frame.width))x\(Int(host.frame.height))"
                  + " screenVisibleHeightPt=\(Int(NSScreen.main?.visibleFrame.height ?? -1))")
+            capturedGeometry[file.lastPathComponent] =
+                (size.height, content.height, host.frame.height,
+                 NSScreen.main?.visibleFrame.height ?? -1)
         }
 
         // 内容要等一次异步刷新才落定的夹具在这里 settle（会转 runloop）。
