@@ -74,6 +74,28 @@ rows = [
     ("主窗口/提示条", "选中", "not-applicable",
      "提示条没有「被选中」这一态；记 not-applicable 是为了让它不再被当成没做",
      "docs/motion_surface_ledger.json 的 verdict 词表第 4 项"),
+    # R173：浮层底部那一行说明逐格判（它是一把 NSTextField 静态标签 ⇒ 这几类交互态是 not-applicable，不是没做）。
+    # 「空」与「选中」两格本轮故意不判：证据要落在标签那一行本身 ——
+    # `isSelected` 在这个文件里确实有 4 处，但那都是列表行的，拿文件级缺席替「说明行不可选中」作证就是假话。
+    ("浮层/底部说明", "加载", "not-applicable",
+     u"底部这行是一把 NSTextField 静态标签；浮层弹出来时数据已经在表里，没有异步链 ⇒ 给它做加载态会读成「这行在等什么」，而它什么都不等",
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading"),
+    ("浮层/底部说明", "禁用", "not-applicable",
+     u"说明文字不是控件，没有可禁用/不可禁用的对象；真正会被禁用的是浮层里那几颗按钮，已按它们自己的格判过",
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled"),
+    ("浮层/底部说明", "聚焦", "not-applicable",
+     u"键盘焦点链只走搜索框与列表行；说明行拿不到焦点，也就没有焦点环可言（硬加反而是个假的可聚焦控件）",
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=FocusState｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isFocused"),
+    ("浮层/底部说明", "按下", "not-applicable",
+     u"它不接收点击：给静态文字加按下态会把「可读的说明」读成「可点的按钮」，是减法不是加法",
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=onTapGesture"),
+    ("浮层/底部说明", "成功", "not-applicable",
+     u"复制成功的反馈走浮层自己的回执通道（选中行即复制，回执长在那一行上），不写进底部说明 ⇒ 这一行没有成功态可言",
+     u"Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"),
+    ("浮层/底部说明", "错误", "not-applicable",
+     u"底部说明不承载错误：失败写在回执里，而拿不到数据时是空态那一格（本轮未判，见上）⇒ 不在这一行",
+     u"Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"),
+
     ("设置窗口/侧栏", "悬停", "kept",
      "与主窗口行同一档 0.12s；侧栏行是导航不是内容，动得比内容重会抢注意力",
      "Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `.animation(for: .hover)`"),

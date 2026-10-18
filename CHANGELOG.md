@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 浮层/底部说明六格清账 + 闸门新增 `--list-open`（R173 / U-577…U-579 · 产品 0 文件，动效主线）
+
+- 清账表 112 → 118（未清账 59 → 53 / 格子 171）：六格 `not-applicable`，理由是这一行是静态标签，加载态/按下态是减法
+- 「空」「选中」本轮不判并写明原因（`isSelected` 那 4 处属于列表行，文件级缺席不能替一行级结论作证）⇒ 新开 BACKLOG 202
+- `--list-open` 逐格列名单：与数名单同一颗函数、分叉打 `OPEN_MISMATCH`、空名单不许读成完工；四格测试（夹具只写一次性临时目录）
+- 缺席声明 47 条全部成立；表与生成器产物一致；生成器里的字符串把戏被闸门 6 条 + 电池 3 条当场抓红后改回字面路径
 ### 194 在 CI 上复验通过：出口点火六次、闸门 `红=0`、整跑 0 条 failed（R172 补验 · 自 R145 以来这一族第一次不红）
 
 - run `39156179381`（`546dc97`）⇒ `JOB build-and-test ⇒ success`、`CAPTURE_GATE_RESULT=ok 红=0`、`Test Case … failed` 0 条

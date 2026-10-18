@@ -208,9 +208,26 @@ def check(data, root=None, head_floor=None):
     return problems
 
 
+def open_cells(data):
+    """返回**还没被清账**的格子（表面, 状态），按字面顺序排。
+
+    为什么要闸门自己列（R173）：`MOTION_LEDGER 未清账=59` 只给了一个数，
+    而下一轮要挑格子判时必须知道"是哪 59 格"。以前这件事靠反推 JSON（读 `rows` 再手工求差），
+    而反推出来的名单一旦与 `cleared_verdicts` 的词表不一致，就会把已判的格子当成没判 ——
+    或者反过来把没判的当成判完了。列名单和数名单必须是**同一颗函数**。
+    """
+    cleared = set(data.get("cleared_verdicts") or [])
+    judged = {(r.get("surface"), r.get("state"))
+              for r in (data.get("rows") or []) if (r.get("verdict") or "") in cleared}
+    return [(s, t) for s in (data.get("surfaces") or [])
+            for t in (data.get("states") or []) if (s, t) not in judged]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--path", default="docs/motion_surface_ledger.json")
+    ap.add_argument("--list-open", action="store_true",
+                    help="逐格列出还没清账的格子（MOTION_LEDGER_OPEN k + 每格一行）")
     args = ap.parse_args()
     if not os.path.exists(args.path):
         print("MOTION_LEDGER_NOT_RUN 文件不存在（%s）⇒ 记为没跑，不算通过" % args.path)
@@ -231,6 +248,17 @@ def main():
           % (len(data.get("surfaces") or []), len(data.get("states") or []), cells, len(rows),
              cleared_n, max(0, cells - cleared_n), data.get("floor_cleared")))
     print("MOTION_LEDGER_VERDICTS %s" % (dist or "无"))
+    if args.list_open:
+        todo = open_cells(data)
+        # 名单为空**不许**读成"活干完了"：也可能是词表漂了或 rows 被清空，
+        # 所以这里打的是两种可能都写明的句子，而不是一句 OK（R99 那一族：空名单必须响）。
+        print("MOTION_LEDGER_OPEN %d（= 格子 %d − 已清账 %d；0 只说明没有缺失格，不等于阶段二做完了）"
+              % (len(todo), cells, cleared_n))
+        if len(todo) != max(0, cells - cleared_n):
+            print("MOTION_LEDGER_OPEN_MISMATCH 名单 %d 格、计数 %d 格 ⇒ 列名单与数名单分叉了"
+                  % (len(todo), max(0, cells - cleared_n)))
+        for surface, state in todo:
+            print("OPEN %s × %s" % (surface, state))
     # 基准只对**仓库里那一份**有意义：`--path` 指到别处（沙箱夹具）时不比对，读成 None。
     head_floor = head_floor_cleared() if args.path == "docs/motion_surface_ledger.json" else None
     problems = check(data, head_floor=head_floor)
