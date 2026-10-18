@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 211 落地：`SINGLE_LEDGER_ROUNDS`（186/187 带理由）+ `test_round_batch_declaration.py` 的四条自证（含 `back > 0` 恰好一次的删除型钉子）⇒ 本笔才敢换 STATE 表头
 - 212 新开：`testBandCaptureIsCheaperAndStillSeesTheMotion` 在 `fd6b43a`/`d4958a9` 各红一步 `STEP[17] Motion coverage floor`（「XCTAssertGreaterThanOrEqual failed: ("3") is less than ("4") - 带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，这一臂仍然只能记 not-run，那这条路就白走了」），而 R183/R184/R185 连着三跑绿、中间零改动 ⇒ 会翻脸的地板，先登记不定罪不放宽
 - 本机：编译 0 告警、捕获卷 71 例 / 失败 0、帧基线 138 张 changed=0；**全量卷与变异表本笔没跑**（记 NOT-RUN）
+### 210 结案：药丸一直在选中段，"亮=药丸"是未验的默认；几何做成纯核 + 两态像素判据（R189 / U-619…U-621 · 产品 2 文件，动效主线）
+
+- 两态对照（产品入口 `perform(.updateFilter)`，各拍一张）：`.all` 控件两半 `左=40 右=254`、`.favorites` `左=254 右=40` ⇒ 两半各自翻转、**暗的那半跟着选中走**
+- 通道事实（D-195）：这条离屏通道里 `.ultraThickMaterial` 药丸合成成**暗**、`.quaternary` 轨道合成成**白**，与屏幕直觉相反 ⇒ R182…R188 五轮三次改判的根因
+- 新增 `Sources/ClipboardHistoryApp/Views/FilterPillGeometry.swift`（段号↔矩形↔段号恒等式、内缩、越界夹住、退化给 `.zero`）；`slidingPill` 改 `.position`，不再依赖 `GeometryReader` 的隐式对齐
+- 判据：`FilterPillGeometryTests`（5 条，含接线扫描）+ `UICaptureTests/testFilterPillBrightBandFollowsTheSelectedSegment`（两态像素，带"档数闸门"）；变异 `mutate_r189.py` M696, M697, M698, M699, M700, M701, M702 ⇒ 7/7 CAUGHT、RESTORE_CLEAN=yes
+- 验证：编译 0 告警、捕获卷 72 例 / 失败 0、帧基线 138 张 `CHANGED=0`（行为保持）、全量卷 872 例 / 跳过 42 / 失败 0；清账表 MOTION_LEDGER 表面=18 状态=9 格子=162 行数=115 已清账=115 未清账=47 地板=115
+- 亮档：`FILTER_PILL_UNJUDGED`（轨道内极差 1luma）⇒ 有名字的未判定，另开 BACKLOG 215
 ### 210 的读数归位：药丸是一整段、落在右段；亮档"过哑"其实是亮度阈值不适用（R185 / U-613…U-615 · 产品 0 文件，动效主线）
 
 - 方法升级：不再假设分界线（上一版 x=277 是我按控件宽度 1/2 猜的），改成逐行找连续亮区（亮度 >200、宽 ≥8px）

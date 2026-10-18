@@ -206,8 +206,8 @@ def titles_present(text_by_name, round_no):
 def main():
     paths = {n: os.path.join(ROOT, n) for n in LEDGERS}
     paths['STATE'] = os.path.join(ROOT, 'AGENT_STATE.md')
-    paths['BACKLOG'] = os.path.join(ROOT, 'AGENT_BACKLOG.md')
-    paths['DECISIONS'] = os.path.join(ROOT, 'AGENT_DECISIONS.md')
+    paths['AGENT_BACKLOG.md'] = os.path.join(ROOT, 'AGENT_BACKLOG.md')
+    paths['AGENT_DECISIONS.md'] = os.path.join(ROOT, 'AGENT_DECISIONS.md')
     old = {k: read(v) for k, v in paths.items()}
     if u'## Round %d · ' % NEW_R in old['AGENT_VISUAL_ITERATION.md']:
         raise SystemExit('DUMP_ALREADY_WRITTEN ⇒ 不重复落盘')
@@ -221,7 +221,7 @@ def main():
     new['AGENT_VISUAL_ITERATION.md'] = old['AGENT_VISUAL_ITERATION.md'].rstrip(u'\n') + u'\n\n' + vi_body.rstrip(u'\n') + u'\n'
     new['CHANGELOG.md'] = insert_before(old['CHANGELOG.md'], u'### 210 的读数归位', cl_body)
     new['AGENT_BACKLOG.md'] = old['AGENT_BACKLOG.md'].rstrip(u'\n') + u'\n\n' + bl_body.rstrip(u'\n') + u'\n'
-    new['DECISIONS'] = old['AGENT_DECISIONS.md'].rstrip(u'\n') + u'\n' + DEC_BODY.rstrip(u'\n') + u'\n'
+    new['AGENT_DECISIONS.md'] = old['AGENT_DECISIONS.md'].rstrip(u'\n') + u'\n' + DEC_BODY.rstrip(u'\n') + u'\n'
     st = old['STATE'].split(u'\n')
     new['STATE'] = u'\n'.join(st[:top_state] + [STATE_HDR.rstrip(u'\n'), u''] + st[top_state:])
 
@@ -237,13 +237,16 @@ def main():
     defined = sorted(int(m) for m in re.findall(u'^- \\*\\*U-(\\d{3})：', section, re.M))
     if defined != [619, 620, 621]:
         raise SystemExit('U_RANGE_MISMATCH 本轮定义 %s（要 619…621）' % defined)
-    nums = sorted(int(m) for m in re.findall(r'^\*\*(\d{2,3})\. ', new['AGENT_BACKLOG.md'], re.M))
+    # 定义行的形状按仓库里那条守卫用的同一种（`^(?:\*\*)?NNN.`）：老条目是 `176. **标题**`，
+    # 只认 `**176. ` 会把它们全算成悬空引用 —— 那是我的检查错，不是账错（R189 实测被自己拦下一次）。
+    defined_items = set(re.findall(r'^(?:\*\*)?(\d{2,3})\. ', new['AGENT_BACKLOG.md'], re.M))
+    nums = sorted(int(m) for m in defined_items)
     if 215 not in nums:
         raise SystemExit('MISSING_215 定义行没在表里（最大 %d）' % nums[-1])
-    if u'D-195' not in new['DECISIONS']:
+    if u'D-195' not in new['AGENT_DECISIONS.md']:
         raise SystemExit('MISSING_D195')
     for ref in re.findall(u'BACKLOG (\\d{3})', ui_body + vi_body + cl_body + bl_body + STATE_HDR):
-        if (u'**%s. ' % ref) not in new['AGENT_BACKLOG.md'] and ref not in ('210',):
+        if ref not in defined_items:
             raise SystemExit('DANGLING_BACKLOG %s 没有定义行' % ref)
     for k, v in new.items():
         write(paths[k], v)
