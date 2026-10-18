@@ -4925,3 +4925,14 @@ R171 落地时明写"仍欠：打在 `==` 与 `>=` 上的两把刀"。本轮 `mu
 M690 `reloaded == seeded`→`>=` 红在 `testReloadWaitTruthTable`（读到比预期更多的库不许当落地）；
 M691 `elapsed >= timeout`→`>` 红在同一格（边界那拍必须超时）；M692 `maxPolls=60`→`100000` 红在 `testReloadWaitIsBounded`（没上限会把这一格挂到 CI 超时）。
 199 至此结案。仍记在账上的边界：满载下的**第二证人**是真 CI 那一跑（本机 R171 全量卷 864/42/0 只是 n=1 抽样）。
+
+**194 追记 5（R172 复验）：出口在 CI 上真点火并被闸门认下 ⇒ 这一格正式结案**
+
+run `39156179381`（= `546dc97`，R170 那笔接线）的 `--log`：`JOB build-and-test ⇒ success`，
+`CAPTURE_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）`，整跑日志里 `Test Case … failed` **0 条** ——
+这是自 R145 那两朵捕获红挂起来之后，这一族第一次不再红。
+出口点火的原文六次（六张高帧各一次），形状如：
+`BLANK_GAP_WOULD_RELEASE settings-privacy-tall-720x1040-light.png release=true requested=1040 content=1040 host=1040 drawnBoxPt=205 drawnBottomPt=1040 screenVisibleHeightPt=681`
+配套 `CAPTURE_BLANK_NOT_RUN <帧名> …`，census `loop_items=8 with_geometry=6 would_release=6`。
+**口径不变**：结案的是「不是产品缺陷」；那 205pt 的带里到底是什么**仍未命名** ⇒ BACKLOG 201 继续开着，
+下一条读数该是「带内数量与本机同一条带对账」。

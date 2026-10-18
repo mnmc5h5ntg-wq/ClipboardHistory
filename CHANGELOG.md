@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 194 在 CI 上复验通过：出口点火六次、闸门 `红=0`、整跑 0 条 failed（R172 补验 · 自 R145 以来这一族第一次不红）
+
+- run `39156179381`（`546dc97`）⇒ `JOB build-and-test ⇒ success`、`CAPTURE_GATE_RESULT=ok 红=0`、`Test Case … failed` 0 条
+- 六张高帧各打一次 `BLANK_GAP_WOULD_RELEASE … release=true … drawnBoxPt=205 screenVisibleHeightPt=681` + `CAPTURE_BLANK_NOT_RUN`；census `loop_items=8 with_geometry=6 would_release=6`
+- 口径：结案的是「不是产品缺陷」；那 205pt 带内是什么仍未命名 ⇒ BACKLOG 201 仍开
 ### R171 欠的三把刀补上 ⇒ BACKLOG 199 结案（R172 / U-574…U-576 · 产品 0 文件，刀账）
 
 - `mutate_r172.py` M690/M691/M692 全 CAUGHT、RESTORE_CLEAN=yes（基线 ran=6）：`==` 改 `>=`、边界那拍、`maxPolls` 三个方向各红在自己那一格
