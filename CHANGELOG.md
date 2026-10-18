@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### BACKLOG 196 落地：捕获判据的出口从"有没有材质"换成"每一档有没有一段可判的卡片段"（R157 / U-524…U-526 · 产品 0 文件，判据账）
+
+- runner 的 `STEP[13]` 原样读数给出了 R153/R156 都在猜的那格：`候选=32 有材质=6（被告=2 参照=4） 量到=1 未判=29`，
+  而唯一量到的那一格是 `settings-shortcuts-recording light` —— **暗档 0 格**。旧谓词 `defendantMaterial == 0` 问错了对象
+  （runner 那 2 格是 `fill=60 有材质但找不到卡片段`），所以它没 skip、红了 3 句都不是产品的话。
+- 两处出口一起换成**按档切片**：新增 `CARD_INSET_BANDS light|dark` 与 `CARD_ABOVE_BANDS light|dark` 两行读数，
+  某一档整档为 0 时先发 `CARD_INSET_NOT_RUN=1` / `CARD_RHYTHM_SHADE_NOT_RUN=1`（带四个读数与原因，排在 skip 之前）再 skip。
+  四条地板（`未判 ≤ 4`、`measured ≥ min(16,…)`、`statsDeclined.isEmpty`、`roster ≥ min(8, materialCells)`）**一条没放宽**。
+- 本机：编译 0 告警；`CARD_INSET_BANDS light=13 dark=13`、`CARD_ABOVE_BANDS light=13 dark=13`，
+  两格测试 `passed`（27.9s / 18.7s）。把 runner 自己打印的 `1 / 0` 代进同一谓词就是 skip —— 这是算术；
+  **执行证据要等下一跑 CI**，本轮不写成已修好。全量 `swift test`、变异刀、138 帧重捕本轮**没跑**，显式记成 NOT-RUN。
+
 ### R154 的修复在 runner 上验收通过；191 欠的形状读数由 runner 自己打印出来了（R156 / U-521…U-523 · 产品 0 文件，读数账）
 
 - `39120938129`/`8faef80` 完成 ⇒ 失败步骤只剩 `STEP[13]/[15]`，**`STEP[8] Release script tests` 变绿**：

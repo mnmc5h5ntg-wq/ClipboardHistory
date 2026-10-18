@@ -8019,6 +8019,24 @@ final class UICaptureTests: XCTestCase {
                               + "本机同一批帧读到 \(aboveRoster.count) 格；差异在 runner 的半透明材质"
                               + "不合成（页底 light=236/dark=52，卡片填充在 ±3 内）。见 BACKLOG 147。")
         }
+        // R157 / BACKLOG 196：**同一族错法在这一格里是"按档"的**。runner 打的是
+        // `CARD_ABOVE_CAPABILITY settings格=26 有材质=2 进名单=1`，而那一格来自
+        // `settings-shortcuts-recording light` —— **暗档一格都没有**。旧出口问的是"有没有材质"
+        // （`materialCells == 0`），runner 有 2 格 ⇒ 没 skip，于是红了两句都不是产品的话
+        // （`「统计」4 格没进卡片计数`、`名单只有 1 格而本机读到 2 格材质`）。
+        // 现在问的是这条判据真正需要的对象：**两档各都得有一格进得了名单**。
+        let rosterLight = aboveRoster.keys.filter { $0.hasSuffix(" light") }.count
+        let rosterDark = aboveRoster.keys.filter { $0.hasSuffix(" dark") }.count
+        emit("CARD_ABOVE_BANDS light=\(rosterLight) dark=\(rosterDark)"
+             + "（settings格=\(settingsCells) 有材质=\(materialCells) 进名单=\(aboveRoster.count)）")
+        if rosterLight == 0 || rosterDark == 0 {
+            emit("CARD_RHYTHM_SHADE_NOT_RUN=1 某一档整档进不了名单（light=\(rosterLight) dark=\(rosterDark)，"
+                 + "有材质=\(materialCells) 统计未判=\(statsDeclined.count)）"
+                 + " ⇒ 那一档的卡片材质在这台机器上不合成：不是通过，也不是产品缺陷。见 BACKLOG 147 / 196。")
+            throw XCTSkip("这台机器在某一档上拍不出**可判的卡片段**（light=\(rosterLight) dark=\(rosterDark)）"
+                              + " ⇒ 竖向节奏与「统计」那两格在那一档没有对象。本机两档各有十几格，照判。"
+                              + "（读数在上一行 `CARD_RHYTHM_SHADE_NOT_RUN=1`，见 BACKLOG 196）")
+        }
         emit("CARD_STATS_CAPABILITY 统计格候选=\(statsCells) 有对象=\(statsCells - statsDeclined.count)"
              + " 未判=\(statsDeclined.count)（未判名单只在**这台机器读得到材质**时才要求为空）")
         // skip 在上面那道 `materialCells == 0` 里已经响过了；能走到这一行说明
@@ -8947,6 +8965,27 @@ final class UICaptureTests: XCTestCase {
             throw XCTSkip("这台机器拍不出**被告**的卡片材质：\(cells) 格候选里被告全报「读不到卡片」"
                               + "（参照有 \(controlMaterial) 格量到了 ⇒ 不是尺瞎，是这扇窗口的材质层"
                               + "在这台机器上不显）。横向内缩这条判据没有对象，见 BACKLOG 147。")
+        }
+        // ②b **按档切片的盲区**（R157 / BACKLOG 196）。runner 的形状不是"被告全读不到"：
+        //    `CARD_INSET_CAPABILITY 候选=32 有材质=6（被告=2 参照=4） 量到=1 未判=29` ——
+        //    那唯一量到的一格是 `settings-shortcuts-recording light`，**暗档一格都没有**。
+        //    旧出口 ② 问的是"有没有材质"（`defendantMaterial == 0`），而 runner 有 2 格材质
+        //    （两格是 `fill=60 有材质但找不到卡片段`）⇒ 谓词落在错的量上，于是它没 skip、
+        //    红了 3 格（`参照只有 ["light"]`、`被告读到 2 格材质却只量到 1 格内缩`、`未判 29`）。
+        //    现在问的是本条判据真正需要的那个对象：**每一档都得至少有一格被告量到卡片段**，
+        //    否则那一档的等式在这台机器上无从判起。这是**读数**（两档各自的段数），不是覆盖率通道；
+        //    前提由同一次运行量出来，放不掉的是"那一档的等式"，不是整条判据（D-170：能力行排在 skip 之前）。
+        let insetBandsLight = measured.keys.filter { $0.hasSuffix(" light") }.count
+        let insetBandsDark = measured.keys.filter { $0.hasSuffix(" dark") }.count
+        emit("CARD_INSET_BANDS light=\(insetBandsLight) dark=\(insetBandsDark)"
+             + "（被告里各档量到卡片段的格数；候选=\(cells) 有材质=\(materialCells)）")
+        if insetBandsLight == 0 || insetBandsDark == 0 {
+            emit("CARD_INSET_NOT_RUN=1 被告有一档整档量不到卡片段（light=\(insetBandsLight) dark=\(insetBandsDark)，"
+                 + "被告有材质=\(defendantMaterial) 参照有材质=\(controlMaterial) 未判=\(declined.count)）"
+                 + " ⇒ 那一档的半透明材质在这台机器上不合成，等式没有对象：不是通过，也不是产品缺陷。见 BACKLOG 147 / 196。")
+            throw XCTSkip("这台机器在某一档上拍不出**可判的卡片段**（light=\(insetBandsLight) dark=\(insetBandsDark)）"
+                              + " ⇒ 横向内缩那条等式在那一档没有对象。本机两档各有十几格，所以本机照判。"
+                              + "（读数在上一行 `CARD_INSET_NOT_RUN=1`，见 BACKLOG 196）")
         }
         // ③ **参照必须亮暗两档各一条**（这一条 R100 的 CI 上红过，红在 `("2") is not equal to ("1")`；
         //    R101 重写角色分账时我把它**整条弄丢了** —— 不是决定撤掉，是编辑掉的，
