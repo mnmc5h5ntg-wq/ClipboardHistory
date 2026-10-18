@@ -5188,3 +5188,25 @@ vs **离屏材质只在某一段画出来**（通道缺陷，改的是判据、�
 下一步（R187，顺序已定）：读 `FilterPillMotion.hoverFill(isHovered:isSelected:)` 真值表 → 若 `false,false` 也给非 0 就是产品 bug（改函数 + 补真值表 + 变异刀）；
 若只有 `hover` 给非 0，则查离屏夹具为什么带 hover 态（`UICaptureTests` 的 hover 夹具是显式驱动的，`content-empty` 不该有）；
 两条都完再谈"暗档选中底该不该是纯白"这件审美事。
+
+**210 追记 4（R187）：病根钉死了 —— 同一张帧里侧栏标题写着「0 条记录」（= `.all`），而药丸画在收藏那一段 ⇒ `slidingPill` 的几何与选中态反号，是产品缺陷**
+
+排除法走完（三条都有源码或帧内证人）：
+① **不是悬停底**：`FilterPillMotion.hoverFill(isHovered:isSelected:)` 的真值表是 `(true,false)=VisualFill.controlHover`、
+   `(true,true)=0`、`(false,false)=0`（`FilterPillMotionTests.swift:34-39` 钉着），而 controlHover 那一档是 0.06 量级的弱底 ——
+   铺在 (28,28,28) 上最多到 40 多亮度，量不出帧上那块**主色 (255,255,255) 占 65.4%** 的实心卡。
+② **不是选中文字底**：按钮那层用的就是上面那个 hoverFill，同一条排除。
+③ **就是药丸那枚 `.ultraThickMaterial`**：亮区宽 258px = 控件可用宽 517px 的一半、x=274..535 落在右半 ——
+   与 `slidingPill` 的 `frame(width: w/count - 2)` + `offset(x: idx*(w/count)+1)` 在 **idx=1** 时的形状吻合。
+
+而**同一张帧里选中态确实是 `.all`**：侧栏标题那行字是「0 条记录」，
+`HistorySidebarView.swift:144-148` 写的是 `.all → "N 条记录"`、`.favorites → "N 个收藏"` ——
+标题与药丸在**同一帧、同一时刻**给出两个互相矛盾的答案 ⇒ 不是夹具设错、不是持久化残留（追记 2 已排）、不是 hover。
+⇒ 病根在 `SegmentedFilterPicker.slidingPill` 的几何：`GeometryReader` 在 `ZStack` 里的对齐/偏移基准与"第 idx 段"不一致
+（候选修法：给药丸 `.frame(maxWidth: .infinity, alignment: .leading)` 让 offset 以左沿为基准，或改用 `.position(x: 段中心)`）。
+
+**为什么这一轮还是不动产品**：修它要走完整验证（build 0 告警 → 判据卷 → 重捕帧 + 基线同笔 update → 换装本机 → 台账 → 电池 → 推送），
+而本轮预算只够把病根钉死；把一次没走完验证的产品改动推出去，正是账里反复记的那种"message 先于证据"。
+R188 第②条已按这个顺序写好，并附一条硬要求：**修完必须补"亮区必须落在选中段那一半"的读数判据**
+（`frame_audit` 已能逐行找连续亮区，缺的只是把它接进判据卷 + 配变异刀），否则这条错位还会静默回来 ——
+它已经在没有任何判据的情况下活了 186 轮。
