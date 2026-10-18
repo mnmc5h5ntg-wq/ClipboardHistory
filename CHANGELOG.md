@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表「浮层/底部说明」七条理由换主语：那一层没有承载物（R174 / U-580…U-582 · 产品 0 文件，动效主线）
+
+- 事实：`QuickPickController.swift:262` 的面板 stack 只有 `field / empty / scroll` 三个子视图，`footerLabel` / `hintLabel` 在产品源码里 0 命中 ⇒ 七条理由的主语从"底部那一行"换成真实存在的视图，并补两条可复查的缺席声明
+- 清账表 118 行 / 已清账 118 / 未清账 53 **一格没动**（本轮改的是账的可复查性，不是覆盖率）；缺席复查 `格=118 声明=50 不成立=0/50`
+- 新开 BACKLOG 204（幽灵表面的两种处置，禁止用删格子收口）与 205（看图那把 `align` 尺是逐像素行的，答不了"两行同不同轴" ⇒ 要按行带重切）
+- 看图腿复用盘上 138 张帧：空态两档各 2 / 2 簇 vs 列表帧 2 簇，与 R64 的"空态居中"记录形状不同 ⇒ 只形成问题，不判缺陷
+- 0 产品文件 ⇒ 没重捕、没换装；本轮没跑新刀（R173 的三格自证仍有效）
 ### 浮层/底部说明六格清账 + 闸门新增 `--list-open`（R173 / U-577…U-579 · 产品 0 文件，动效主线）
 
 - 清账表 112 → 118（未清账 59 → 53 / 格子 171）：六格 `not-applicable`，理由是这一行是静态标签，加载态/按下态是减法

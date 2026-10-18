@@ -162,42 +162,42 @@
       "surface": "浮层/底部说明",
       "state": "加载",
       "verdict": "not-applicable",
-      "reason": "底部这行是一把 NSTextField 静态标签；浮层弹出来时数据已经在表里，没有异步链 ⇒ 给它做加载态会读成「这行在等什么」，而它什么都不等",
-      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading"
+      "reason": "R174 换主语：浮层的 stack 只有 field / empty / scroll 三个子视图（本文件 262 行），**没有底部说明这一层**；面板弹出来时候选已经在表里 ⇒ 加载态无所附",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isLoading｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=footerLabel"
     },
     {
       "surface": "浮层/底部说明",
       "state": "禁用",
       "verdict": "not-applicable",
-      "reason": "说明文字不是控件，没有可禁用/不可禁用的对象；真正会被禁用的是浮层里那几颗按钮，已按它们自己的格判过",
-      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled"
+      "reason": "这一层没有承载物（证据见「加载」那格的 stack 三子视图与 footerLabel 缺席）⇒ 禁用无所附；会被禁用的只有面板里的控件，各自有格",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=footerLabel"
     },
     {
       "surface": "浮层/底部说明",
       "state": "聚焦",
       "verdict": "not-applicable",
-      "reason": "键盘焦点链只走搜索框与列表行；说明行拿不到焦点，也就没有焦点环可言（硬加反而是个假的可聚焦控件）",
+      "reason": "键盘焦点链只走搜索框与列表行；这一层连视图都不存在 ⇒ 谈不上焦点环，硬加会造出第三个假焦点位",
       "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=FocusState｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=isFocused"
     },
     {
       "surface": "浮层/底部说明",
       "state": "按下",
       "verdict": "not-applicable",
-      "reason": "它不接收点击：给静态文字加按下态会把「可读的说明」读成「可点的按钮」，是减法不是加法",
-      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=onTapGesture"
+      "reason": "面板里那三视图之外没有可点的东西；给一行说明加按下态会把可读的说明读成可点的按钮，是减法不是加法",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=onTapGesture｜缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=hintLabel"
     },
     {
       "surface": "浮层/底部说明",
       "state": "成功",
       "verdict": "not-applicable",
-      "reason": "复制成功的反馈走浮层自己的回执通道（选中行即复制，回执长在那一行上），不写进底部说明 ⇒ 这一行没有成功态可言",
+      "reason": "复制成功的反馈长在列表行的回执上（ReceiptLine 那一族），不另起一行说明 ⇒ 这一层没有成功态可言",
       "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"
     },
     {
       "surface": "浮层/底部说明",
       "state": "错误",
       "verdict": "not-applicable",
-      "reason": "底部说明不承载错误：失败写在回执里，而拿不到数据时是空态那一格（本轮未判，见上）⇒ 不在这一行",
+      "reason": "错误与空结果都由 `empty` 那一句承担，而它属于「浮层/空态」那一表面 ⇒ 这层不承载错误（这层根本不存在，见 BACKLOG 204）",
       "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"
     },
     {
@@ -295,7 +295,7 @@
       "surface": "浮层/底部说明",
       "state": "悬停",
       "verdict": "not-added",
-      "reason": "底部那一行讲的是键位，响应鼠标会把注意力从列表行引开；判过之后决定不加",
+      "reason": "R174 复查这条更早的理由：浮层里并没有「底部那一行」（stack 只有 field / empty / scroll）⇒ 悬停无所附，结论不变但主语换成真实存在的视图；这层要不要做见 BACKLOG 204",
       "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 的底部说明段（R64 位点逐个判）"
     },
     {
