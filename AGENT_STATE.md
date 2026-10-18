@@ -1,5 +1,28 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-18 19:35（本地 · R160 / 第 162 轮：**十七笔之后第一笔产品改动 —— 行首固定徽标有了悬浮提示，而守卫当场红了我**（U-533…U-535 · 产品 1 文件）
+
+**改了什么**：`HistoryRowViews.swift` 的 `RowPinnedBadge` 补 `.helpLabel("已固定：不会被新记录顶出历史，也不会被保留策略清理")`。
+它不是控件，但它是这一行唯一"自己会变"的东西，以前没有任何一句话解释它为什么在这儿 —— 这正是目标要的
+"hover 提示有积极作用才加"那一类。第一版写裸 `.help` 被自家
+`testViewsNeverUseBareHelpWithoutAccessibilityLabel` 红掉（只给悬浮提示 VoiceOver 读不到），
+改成仓库既有 `.helpLabel`（同时给 `.help` 与 `accessibilityLabel`）并撤掉重复的 `.accessibilityLabel` 行 ——
+**改的是我的写法，不是守卫**。
+
+**验证**：编译 0 告警；hygiene + RowInteraction 8 例全绿；`UICaptureTests` 71 例 / 4 skip / 0 failures、重捕 138 帧；
+换装本机 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=131 AFTER=131`（没碰用户数据）。
+
+**两处 NOT-RUN（不许说成验过）**：① help tag **不进帧** ⇒ 提示本身没有画面证据，要真机悬停人工确认（已列人工验收）；
+② `scripts/frame_baseline.py check --against working <目录>` 是我凭记忆抄的 ⇒ `unrecognized arguments`，
+工作基线那一门本轮没跑成，要用之前必须回 `.github/workflows/ci.yml` 第 10 步抄原文。
+
+**下一轮（R161）的靶**：⓪ 读 `39122480991`/`18b59d4`、`39122194463`/`c7ffbb5`、`39122659644`/`61e451a`、
+   `391229…`/`711120a` 与本跑（R160 这一笔）的**全部失败步骤**（196 的正半验收）；
+② 把这枚徽标在清账表里对应那格**登记**（本轮没量过就不写"已判"）+ 补一条会红的守卫：
+   「固定徽标必须有 help 文案」（形状：扫 `RowPinnedBadge` 那一段，缺 `.helpLabel` 就红）；
+③ 194（六张 `-1040-` 空白帧）；④ 清账表下一批（录制器 加载/禁用/错误 + `QuickPickController.swift`）；
+⑤ 195 的 ①；⑥ 189 / 188 / 187 的 ②③ / 176 / 182 / 183 / 185；⑦ 继续每轮至少一格产品面判断。
+
 最后更新：2026-10-18 19:24（本地 · R159 / 第 161 轮：**把 R157 的 NOT-RUN 补成读数 —— 全量卷 847/42/0，两条新 skip 出口在本机一次都没触发**（U-530…U-532 · 产品 0 文件，验证账）
 
 **做了什么**：跑本机全量 `env -u SDKROOT swift test` ⇒ `Executed 847 tests, with 42 tests skipped and 0 failures in 223.125 seconds`。

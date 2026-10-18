@@ -4821,6 +4821,30 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 162 轮（R160 · 2026-10-18）：十七笔之后第一笔产品改动 —— 行首固定徽标有了悬浮提示，而那道守卫当场红了我（U-533…U-535 · 产品 1 文件）
+
+- **U-533：改了什么。** `HistoryRowViews.swift` 的 `RowPinnedBadge` 以前只有 `accessibilityLabel("已固定")`，
+  **没有任何一句话**告诉用户这枚图钉为什么在这儿。它不是控件（点它没反应），但它是这一行唯一"自己会变"的东西：
+  用户点过「固定」，某天看见行首多出一枚图钉，手边没有解释。补的是原生那条通道（help tag：不占布局、不抢焦点、
+  与两档配色和减弱动态无关），文案回答"它为什么在这儿"（不会被新记录顶出历史、不会被保留策略清理）
+  而不是"这是一个图钉"（后者用户已经看得见）。这是阶段二要求的那类判断：**hover 提示有积极作用 ⇒ 才加**。
+- **U-534：我第一版写错了，被自家守卫红掉，而且改的是我的写法、不是守卫。**
+  我先写的是裸 `.help("…")` ⇒ `AccessibilityLabelHygieneTests.testViewsNeverUseBareHelpWithoutAccessibilityLabel`
+  当场打 `["HistoryRowViews.swift: 1 处裸 .help("]`（只给悬浮提示的话 VoiceOver 读不到 —— 这条规矩早就写在那个文件第 73 行的注释里）。
+  改成仓库既有的 `.helpLabel(…)`（它同时给 `.help` 与 `accessibilityLabel`）并**撤掉重复的那行 `.accessibilityLabel`**，
+  8 例（hygiene + RowInteraction）全绿。这是 R101 那一问的正面答案："每次手工发现一个可量的错，
+  要回答哪条断言会替我记住它" —— 这次断言本来就在，是它替我记住了。
+- **U-535：验证与它的边界（不许把看不见说成看过）。** 编译 0 告警；`swift test --filter UICaptureTests`
+  ⇒ `Executed 71 tests, with 4 tests skipped and 0 failures`、重捕 138 帧；换装本机
+  ⇒ `INSTALL_RESULT=ok`、`installed = 219c5bcc…`、`INSTALL_SHA_MATCH=1`、exe 路径逐字对上、
+  `INSTALL_ENTRIES_BEFORE=131 AFTER=131`（没碰用户数据）。**但悬浮提示不进帧**（help tag 不参与截图），
+  所以本轮的"看图腿"只能给"没有布局变化"作证，**不能给这一格作证** ⇒ 提示本身在真机上悬停可见，
+  这一步我没有自动化证据，记 NOT-RUN。另外 `scripts/frame_baseline.py check --against working <目录>`
+  这一跑打的是 `unrecognized arguments` ⇒ 命令是我凭记忆抄的，**没跑成**，工作基线那一门本轮记 NOT-RUN
+  （要用之前必须回 `.github/workflows/ci.yml` 第 10 步抄原文）。
+- 清账表：本轮判的是「主窗口/列表行 × 成功」旁边那族里的**固定徽标**（hover 提示），
+  表内对应条目留到 R161 一起登记（不许没量过就写"已判"）。
+
 ## 第 161 轮（R159 · 2026-10-18）：把 R157 记成 NOT-RUN 的那格补成读数 —— 全量卷绿、且新出口一次都没触发（U-530…U-532 · 产品 0 文件，验证账）
 
 - **U-530：R157 欠的那格验证落地了。** 本机全量 `env -u SDKROOT swift test` ⇒

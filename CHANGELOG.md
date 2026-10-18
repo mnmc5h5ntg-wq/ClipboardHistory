@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 行首固定徽标补上悬浮提示（R160 / U-533…U-535 · 产品 1 文件 · 十七笔之后的第一笔产品改动）
+
+- `RowPinnedBadge` 以前只有 `accessibilityLabel("已固定")`，没有任何一句话解释这枚图钉为什么在这儿。
+  它不是控件，但它是这一行唯一"自己会变"的东西 —— 补原生 help tag（不占布局、不抢焦点、与两档配色和减弱动态无关），
+  文案回答"为什么在这儿"：不会被新记录顶出历史，也不会被保留策略清理。
+- 第一版写的是裸 `.help(...)`，被仓库自己的 `testViewsNeverUseBareHelpWithoutAccessibilityLabel` 当场红
+  （只给悬浮提示 VoiceOver 读不到）⇒ 改成既有的 `.helpLabel(...)`（同时给 `.help` 与 `accessibilityLabel`）
+  并撤掉重复的 `.accessibilityLabel` 行。**改的是我的写法，不是守卫。**
+- 验证：编译 0 告警；`AccessibilityLabelHygieneTests` + `RowInteractionTests` 8 例全绿；
+  `UICaptureTests` 71 例 / 4 skip / 0 failures、重捕 138 帧；换装本机 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、
+  条目 131→131（没碰用户数据）。两处显式 NOT-RUN：help tag 不进帧（提示本身没有画面证据，需真机悬停）、
+  `frame_baseline.py check --against working <目录>` 命令凭记忆抄 ⇒ `unrecognized arguments`，工作基线那一门没跑成。
+
 ### 把 R157 记成 NOT-RUN 的那格补成读数：全量卷 847/42/0，两条新 skip 出口在本机一次都没触发（R159 / U-530…U-532 · 产品 0 文件，验证账）
 
 - 本机 `env -u SDKROOT swift test` ⇒ `Executed 847 tests, with 42 tests skipped and 0 failures (0 unexpected) in 223.125 seconds`。

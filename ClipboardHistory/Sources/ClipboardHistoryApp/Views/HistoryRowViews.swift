@@ -141,7 +141,16 @@ private struct RowPinnedBadge: View {
                 Image(systemName: PinTogglePresentation.symbolName(isPinned: true))
                     .font(.system(size: VisualGlyph.badge, weight: .semibold))
                     .foregroundStyle(Color.primary.opacity(0.78))
-                    .accessibilityLabel("已固定")
+                    // R160：这枚徽标**以前什么都不说**。它不是控件（点它没有反应），
+                    // 但它是这一行唯一"自己会变"的东西 —— 用户点过「固定」之后，某天看见行首多了一枚图钉，
+                    // 手边没有任何一句话告诉他"这条不会被新记录顶下去、也不会被保留策略删掉"。
+                    // 悬浮提示是这件事的唯一原生通道（help tag 不占布局、不抢焦点、与两档配色和减弱动态无关），
+                    // 文案回答"它为什么在这儿"而不是"这是一个图钉"（后者用户已经看得见）。
+                    // 用 `.helpLabel` 而不是裸 `.help`：前者同时给 `.help` 与 `accessibilityLabel`，
+                    // 只给悬浮提示的话 VoiceOver 读不到 —— 这一条由
+                    // `AccessibilityLabelHygieneTests.testViewsNeverUseBareHelpWithoutAccessibilityLabel` 钉住
+                    // （本轮第一版写的是裸 `.help`，被它当场红掉，改的是我的写法，不是那道守卫）。
+                    .helpLabel("已固定：不会被新记录顶出历史，也不会被保留策略清理")
                     // 徽标是"从无到有"，所以给淡入而不是弹跳：槽位宽度恒定（见上面注释），
                     // 淡入不会让任何一行横向抖。
                     .transition(MotionCatalog.transition(for: .contentFade))
