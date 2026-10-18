@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 191 的修法被 runner 证伪：那两格假材质是宽的（R153 / U-512…U-514 · 产品 0 文件，读数账）
+
+- 读 `39118326554`/`6f11d95` 与 `39118085686`/`943c275`：第 16 步继续不红（R146 的闭合通道稳定成立），
+  但 `STEP[13]/[15]` 照旧红，关键那一句与 R150 逐字同形 ⇒ 「最长连续段 ≥40% 带宽」没挡住那两格。
+- 断掉的一环：用本机的 pill 宽度去推 runner 上那层的宽度；runner 上那层是**宽的**（还在亮档量出 5.0pt 内缩）。
+  连形状都不许跨机器外推（U-512）。
+- 没有再放宽试试（U-513）：改动没改变任何判定，此时把代码改松就是事故。
+- 新记一朵红：六张 `-1040-` 高帧「95% 像素未画」以前被卡片那朵盖住没逐条读 ⇒ 新开 BACKLOG 194（U-514）。
+- 下一步只加形状读数（每格的最长连续段/带宽、过关行数、页底、层色号），不改判据、不放宽地板（191 追记 3）。
+
+
 ### 自评曲线的量纲统一：两种七维表都归一到百分制（R152 / BACKLOG 190 修、守卫欠进 193 · 产品 0 文件）
 
 - `curve_from_ledger.py` 的推导改成**按每格自己的分母归一**：七分制表 `mean(num/den)×100`、百分制表 `mean(num)`。旧写法一律 `sum/7`，让同一条曲线上 145=91 与 146=13 并存，而 `PHASE2 mean` 把两种量纲相加（实测 `mean=170.69`）。
