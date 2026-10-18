@@ -5033,3 +5033,25 @@ R64 的旧账写的是"空态那句在列表槽里**居中**，中心 209.25pt v
 ② 收尾断言 `被改过的文件集合 ⊆ 本轮 ARMS 声明过的靶集合`，不满足就 `exit 1` —— 还原必须是可证的集合关系，不是"我记得写回去了"。
 在那之前多靶表不许用：要判两个文件就拆成两支单靶表各跑一遍（R178 的两臂复跑就是这么拿到 `RESTORE_CLEAN=yes` 的）。
 
+**206 追记（R179）：判据的 runner 验收到手了，读数的没有**
+
+run `39161493538`（=`fce0b84`）`completed success`，STEP[16] 不再红（R176 之前那一跑红在 `worst=320.65 > 120ms`）。
+同跑读数：`PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8
+build-and-test` ⇒ 三臂 p95 全等、比值 1.000、样本 n=222 —— 相对判据（R142）+ 颗数锚点（R176）在 runner 上都是**通过**。
+**没到手的那半**：R176 新加的独立读数行 `PROBE_WORST_FRAME` 在 `--log` 全文里出现 `0` 次，
+而它前面的 `PROBE_FPS` **完整落地**（`… n=222 worst=58.8` ⇒ 这一跑 worst 未超 120ms 锚点，锚点本身是通过的）。
+⇒ 一颗新读数若只活在通道尾部，CI 上就没人能替"是离群还是真卡顿"作证；这条通道缺陷另开 208，206 保持开着。
+
+**208. 新读数要落在**活下来的那一行**：`PROBE_WORST_FRAME` 在 runner 上整卷 0 次，而 `PROBE_FPS` 在 `worst` 处被截断（R179 量到）**
+
+形状：R176 把颗数锚点做成一行**独立**的 `emit`，位置在 `PROBE_FPS` 之后。runner `39161493538` 的 `--log` 里
+`PROBE_FPS` 在、`PROBE_WORST_FRAME` 0 次，而 FPS 那行完整（`worst=58.8`）—— 丢的正好是它**后面那一行** ⇒ 尾部又被吃掉一段（R90/R146 那一族：
+`swift test` 下 fd1/fd2 都是驱动的管道，块缓冲的尾巴最先丢）。
+要做的修法（下一轮一次做完，别再留半改）：
+① 把 `超锚点帧=<颗数>` 并进 `PROBE_FPS` 那一行（活下来的那一行），独立那行保留当第二证人；
+   注意 Swift 侧**不要**把那行拼长到编译器 type-check 超时（R176 就是这么退回来的）—— 先把各段算成局部常量再拼。
+② 同步改 `FrameIntervalBudgetTests.testTheProbeWiresTheAnchorToTheSampleCount` 的针脚：
+   它现在数的是 `超锚点帧=\(loaded.overAnchor)`，而并进 FPS 行之后源码里会出现两处 `超锚点帧=`（FPS 行与独立行）
+   ⇒ 针脚要数**完整形状**（`loaded.worst))ms 超锚点帧=\(overAnchor)`），Swift 字面量里得写 `\\(`，
+   这一点本轮就是在这里失手的（读到 2 次、断言红）；改完必须重跑 `--filter FrameIntervalBudgetTests` 与整卷电池。
+③ 复验：下一跑的 `--log` 里那颗数必须**出现在 `PROBE_FPS` 行内**（这才叫读数落地），只出现独立行不算过。

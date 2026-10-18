@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R176 的 runner 验收：判据绿，但新加的读数行整卷没出现（R179 / U-595…U-597 · 产品 0 文件，判据账）
+
+- run `39161493538`=`fce0b84` `completed success`，STEP[16] `On-screen probe coverage floor` 不再红（上一跑红在 `worst=320.65 > 120`）；同跑 `PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8
+build-and-test` ⇒ 相对 p95 与颗数锚点在 runner 上都是**通过**（三臂全 16.67、比值 1.000、n=222）
+- 缺陷：`PROBE_WORST_FRAME` 在 `--log` 全文里 **0 次**，而它前面的 `PROBE_FPS` 完整落地（`… n=222 worst=58.8` ⇒ 这一跑 worst 未超锚点，锚点本身是通过的） ⇒ 新读数活在通道尾部第一个被吃掉的位置；206 不结案（判据验收到手、读数验收没到手），新开 208
+- 试改（把颗数并进 `PROBE_FPS` 那一行）能编译，但接线扫描的针脚没跟着改对 ⇒ **主动 `git checkout` 回滚两个 Swift 文件**，不留半改状态，修法与针脚坑写进 208
+- 修掉 R178 带出的那格红：第 180 轮标题声明 `U-592…U-593` 而该节实际定义 592/593/594（区间守卫抓到的是真半批 —— 那次批量补丁在中文串里用了 ASCII 双引号而中止）⇒ 改标题让它说实话；脚本电池 `Ran 362 / OK`
 ### R176 欠的三把刀补上：绝对锚点的"颗数"这一格有了反证（R178 / U-592…U-593 · 产品 0 文件，刀账）
 
 - `mutate_r178.py`：M693（容差 1→999 ⇒ 真卡顿不红）、M694（矛盾分支 return true→false ⇒ 给尺的那格被静音）、M695（探针里 XCTAssertFalse→True ⇒ 反装接线）三把全 CAUGHT：M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount

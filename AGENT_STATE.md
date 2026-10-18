@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 04:40（本地 · R179 / 第 181 轮：**⓪ 读完 R176 的 runner 验收 —— 判据绿、新读数没落地**（U-595…U-597 · 产品 0 文件，判据账）
+
+`39161493538`=`fce0b84` `success`；STEP[16] 不再红；`PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8
+build-and-test`（三臂 p95 全等、比值 1.000、n=222）
+⇒ R142 的相对判据与 R176 的颗数锚点在 runner 上都是**通过**。但 R176 新加的 `PROBE_WORST_FRAME` 在 `--log` 全文 **0 次**，
+而它前面的 `PROBE_FPS` 完整落地（`… n=222 worst=58.8`，这一跑锚点本就通过） ⇒ 读数通道尾部又吃一行（新开 208；206 不结案）。
+本轮试改"把颗数并进 FPS 行"能编译，但接线针脚没跟着改对 ⇒ **主动 `git checkout` 回滚两个 Swift 文件**，不留半改状态。
+另修掉 R178 带出的那格红：第 180 轮标题声明 `U-592…U-593` 而该节定义 592/593/594（区间守卫抓到真半批）⇒ 改标题，不改守卫。
+验证：`swift test --filter FrameIntervalBudgetTests` `Executed 5 / 0 failures`；脚本电池 `Ran 362 / OK`；0 产品文件 ⇒ 没构建、没重捕、没换装。
+
+**下一轮（R180）的靶**：⓪ 读本笔 push 那一跑 + `e0556f3`/`0703dae`/`0d75073` 三跑的**全部失败步骤**（当时仍 `in_progress`）；
+② **208 一次做完**（颗数并进 `PROBE_FPS` + 针脚数完整形状 + 复验"下一跑的 FPS 行里必须有那颗数"）；
+③ 205 的按元素切带；④ 201 的带内读数；⑤ 清账表 51 格（`--list-open`）；⑥ 189、188 的 ②③、176、182/183/185、202、207（多靶变异表）。
 最后更新：2026-10-19 04:35（本地 · R178 / 第 180 轮：**R176 欠的三把刀补上，锚点"要颗数撑着"有了反证**（U-592…U-593 · 产品 0 文件，刀账）
 
 `mutate_r178.py`：M693/M694/M695 全 CAUGHT（M693→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M694→testTheWorstFrameAnchorNeedsMoreThanOneOutlier、M695→testTheProbeWiresTheAnchorToTheSampleCount）。前两把打在纯谓词的两个相反方向（容差、矛盾分支），
