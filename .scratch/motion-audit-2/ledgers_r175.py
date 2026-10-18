@@ -36,8 +36,8 @@ for m in FRM.finditer(bandslog):
     body = bandslog[start:nxt.start() if nxt else len(bandslog)]
     frames[m.group(1)] = {"n": int(m.group(2)),
                           "bands": {int(b[0]): b for b in BAND.findall(body)},
-                          "verdict": (re.search(r"BANDS_VERDICT (\S+)", body).group(1)
-                                      if re.search(r"BANDS_VERDICT (\S+)", body) else "无")}
+                          "verdict": (re.search(r"BANDS_VERDICT ([^（\s]+)", body).group(1)
+                                      if re.search(r"BANDS_VERDICT ([^（\s]+)", body) else "无")}
 for need in ("quickpick-empty-420x300-light.png", "quickpick-empty-420x300-dark.png",
              "quickpick-list-420x300-dark.png"):
     if need not in frames:
@@ -65,8 +65,11 @@ if not (emp_l["verdict"] == emp_d["verdict"] == lst["verdict"] == u"不可判"):
                      % (emp_l["verdict"], emp_d["verdict"], lst["verdict"]))
 
 batt = read(L["battery"])
-if "OK" not in batt.splitlines()[-1]:
-    raise SystemExit("REFUSE_TO_WRITE 电池不绿：%s" % batt.splitlines()[-1])
+# 结论行**不在**最后一行：unittest 的汇总走 stderr，测试自己的 stdout 是块缓冲、
+# 在退出时才冲出去 ⇒ `splitlines()[-1]` 会落在某条 stdout 上（本轮就是这么被自己拒写一次的）。
+if not re.search(r"^OK$", batt, re.M) or re.search(r"^FAILED", batt, re.M):
+    raise SystemExit("REFUSE_TO_WRITE 电池不绿：Ran=%s FAILED=%s"
+                     % (bool(re.search(r"^Ran ", batt, re.M)), bool(re.search(r"^FAILED", batt, re.M))))
 batt_ran = grab(r"^Ran (\d+) tests", batt, "电池用例数", re.M)
 batt_fail = len(re.findall(r"^(?:FAIL|ERROR):", batt, re.M))
 surface = grab(r"MOTION_LEDGER 表面=(\d+) 状态=(\d+) 格子=(\d+) 行数=(\d+) 已清账=(\d+) 未清账=(\d+) 地板=(\d+)",

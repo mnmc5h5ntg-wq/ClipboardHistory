@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 新尺 `frame_audit.py bands`：按文本行带取左轴，它先撤掉 R174 自己的前提（R175 / U-583…U-585 · 产品 0 文件，判据账）
+
+- 落地：像素行按 y 聚成文本行带（`min_gap=4`、`min_rows=4`），每带报 `最左墨 / 众数左沿 / 行内散布`；8 格自测覆盖正对照（同轴不许读成两根）、反方向（错开 30px 不许抹平）、碎屑、带图标的行不适用、混元素必须拒判
+- 真帧读数：空态帧 2 带 = **两个元素**（搜索框行 22.5pt 对上 R104 的 22pt 内缩；空态那一句 53.5pt），两档逐位一致 ⇒ R174 的"空态两行不同轴"前提撤销，R64 的"空态居中"与本轮相容
+- 尺自己的失效：带0 `min_x` 两档同 45px 而 `众数左沿` 52.0pt vs 22.0pt ⇒ 主读数换 `min_x`，带内散布 >40px 一律 `BANDS_VERDICT 不可判`（本轮三张真帧全部不给同轴结论）
+- BACKLOG 205 不结案，收窄成"按元素切带"；清账表 118 行 / 未清账 53 未动
+- 验证：电池 `Ran 354 / 红 0`；0 产品文件 ⇒ 没构建、没重捕、没换装；CI `39160246493`=`659ec46` in_progress/未读; `39159208254`=`9e1d3d4` completed/success; `39159159623`=`e61796c` completed/success; `39157963970`=`0dbcbb5` completed/failure
 ### 清账表「浮层/底部说明」七条理由换主语：那一层没有承载物（R174 / U-580…U-582 · 产品 0 文件，动效主线）
 
 - 事实：`QuickPickController.swift:262` 的面板 stack 只有 `field / empty / scroll` 三个子视图，`footerLabel` / `hintLabel` 在产品源码里 0 命中 ⇒ 七条理由的主语从"底部那一行"换成真实存在的视图，并补两条可复查的缺席声明
