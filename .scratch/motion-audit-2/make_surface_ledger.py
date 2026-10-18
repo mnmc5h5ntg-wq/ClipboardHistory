@@ -366,7 +366,7 @@ rows = [
     ("设置窗口/快捷键录制器", "加载", "not-applicable",
      "这层不等待任何东西：`ProgressView` / `isLoading` 实测各 0 处。进入录制态由点击与 firstResponder 决定，"
      "不存在「读一半」的中间态；给它转圈会把一个即时动作演成一次任务",
-     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（本轮 grep：ProgressView=0 isLoading=0）"),
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 缺席:Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift=ProgressView,isLoading"),
     ("设置窗口/快捷键录制器", "禁用", "not-applicable",
      "没有「禁用的录制器」这条分支（`disabled` / `isEnabled` 实测 0 处）。真要收回控制权走的是**退出录制**"
      "（`cancelRecording`：交还 firstResponder、标题还原），不是把按钮灰掉 —— 灰掉会留下"
@@ -383,7 +383,7 @@ rows = [
     ("设置窗口/快捷键录制器", "聚焦", "not-applicable",
      "它是真 `NSButton`，焦点环由系统画；这层没有任何自定义 focus 代码（`focus` / `Focus` 实测 0 处）。"
      "自己再叠一圈会出现两个当前（R20 在圆形图标按钮上抓过这种叠层）",
-     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（无 focus 分支）；账本 R20"),
+     "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 缺席:Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift=focus,Focus；账本 R20"),
     ("浮层/搜索框", "按下", "not-applicable",
      "按下去就是系统插入点（那是一枚 `NSTextField`，`placeholderString = \"搜索历史记录…\"`）。"
      "再叠一层按压底色会把「我在编辑」说成「我是按钮」",
@@ -398,11 +398,11 @@ rows = [
     ("浮层/搜索框", "加载", "not-applicable",
      "过滤是对内存里那份历史同步做：`QuickPickModel.swift` 里 `Task {` / `async` / `await` / `ProgressView` 实测各 0 处"
      "⇒ 没有「读一半」可演；采集路径不许有同步磁盘写那条红线也正是要这里不出现转圈",
-     "Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift（本轮 grep：四个关键字全 0）"),
+     "Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift 缺席:Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift=ProgressView,isLoading"),
     ("浮层/列表行", "加载", "not-applicable",
      "表格数据是面板打开即有的那份历史（`QuickPickController.swift` 无 `ProgressView` / `isLoading`，实测 0）"
      "⇒ 这一格以前被当成「没做」，其实是「没有这一态」",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（本轮 grep：ProgressView=0 isLoading=0）"),
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView,isLoading"),
     ("浮层/空态", "悬停", "not-applicable",
      "那一句是 `NSTextField(labelWithString:)`：不是控件、不可点、不进焦点环。"
      "给它悬停反馈会造出一个「点不动却有反应」的目标（R39 那一族的反面）",
@@ -414,7 +414,7 @@ rows = [
     ("浮层/空态", "聚焦", "not-applicable",
      "标签不进 key-view 环；浮层里唯一该拿焦点的是搜索框（面板一出现就是第一响应者）。"
      "让空态可聚焦会把 Tab 引到一句没有动作的话上",
-     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（`becomesKeyOnly` 实测 0 处，焦点归 field）"),
+     "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=becomesKeyOnly"),
     ("浮层/空态", "禁用", "not-applicable",
      "没有「被禁用的空态」：它的有无由结果集决定（`empty.isHidden`），**隐藏比禁用诚实** —— "
      "一句没有结果的话不该以灰掉的方式留在原地",

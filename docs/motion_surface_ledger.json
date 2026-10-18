@@ -660,7 +660,7 @@
       "state": "加载",
       "verdict": "not-applicable",
       "reason": "这层不等待任何东西：`ProgressView` / `isLoading` 实测各 0 处。进入录制态由点击与 firstResponder 决定，不存在「读一半」的中间态；给它转圈会把一个即时动作演成一次任务",
-      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（本轮 grep：ProgressView=0 isLoading=0）"
+      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 缺席:Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift=ProgressView,isLoading"
     },
     {
       "surface": "设置窗口/快捷键录制器",
@@ -688,7 +688,7 @@
       "state": "聚焦",
       "verdict": "not-applicable",
       "reason": "它是真 `NSButton`，焦点环由系统画；这层没有任何自定义 focus 代码（`focus` / `Focus` 实测 0 处）。自己再叠一圈会出现两个当前（R20 在圆形图标按钮上抓过这种叠层）",
-      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift（无 focus 分支）；账本 R20"
+      "evidence": "Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 缺席:Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift=focus,Focus；账本 R20"
     },
     {
       "surface": "浮层/搜索框",
@@ -716,14 +716,14 @@
       "state": "加载",
       "verdict": "not-applicable",
       "reason": "过滤是对内存里那份历史同步做：`QuickPickModel.swift` 里 `Task {` / `async` / `await` / `ProgressView` 实测各 0 处⇒ 没有「读一半」可演；采集路径不许有同步磁盘写那条红线也正是要这里不出现转圈",
-      "evidence": "Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift（本轮 grep：四个关键字全 0）"
+      "evidence": "Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift 缺席:Sources/ClipboardHistoryApp/Utilities/QuickPickModel.swift=ProgressView,isLoading"
     },
     {
       "surface": "浮层/列表行",
       "state": "加载",
       "verdict": "not-applicable",
       "reason": "表格数据是面板打开即有的那份历史（`QuickPickController.swift` 无 `ProgressView` / `isLoading`，实测 0）⇒ 这一格以前被当成「没做」，其实是「没有这一态」",
-      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（本轮 grep：ProgressView=0 isLoading=0）"
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=ProgressView,isLoading"
     },
     {
       "surface": "浮层/空态",
@@ -744,7 +744,7 @@
       "state": "聚焦",
       "verdict": "not-applicable",
       "reason": "标签不进 key-view 环；浮层里唯一该拿焦点的是搜索框（面板一出现就是第一响应者）。让空态可聚焦会把 Tab 引到一句没有动作的话上",
-      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift（`becomesKeyOnly` 实测 0 处，焦点归 field）"
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=becomesKeyOnly"
     },
     {
       "surface": "浮层/空态",

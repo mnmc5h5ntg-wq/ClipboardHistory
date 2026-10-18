@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### "实测 0 处"从散文升成会红的守卫：29 条缺席声明全部可复查（R165 / U-548…U-550 · 产品 0 文件，判据账）
+
+- 新增 `scripts/ledger_absence_claims.py`：按文法 `缺席:<路径>=<标识符>[,<标识符>…]` 扫已提交的动效清账表，
+  逐条复查「这一屏没有加载态 / 这层没有禁用分支 / 这颗按钮永远有标题」这类**靠缺席立论**的格子。
+  散文里的"实测 0 处"不会自己保鲜 —— 哪天有人真加了那条分支，那格就成了谎话而不会红。
+  本机 `格=99 声明=29` ⇒ `LEDGER_ABSENCE_RESULT=ok 不成立=0/29`。
+- 第一次跑连红两次，都是仪器坏：只按仓库根解析路径（表里指针是**包内相对**，与 `motion_surface_gate.py` 同口径）；
+  脚本没有 argparse（仓库那条"每个脚本 `--help` 都要能构造"的守卫这次抓到了我）。两次都改工具，没放宽判据。
+- 三格正对照防"恒真的门"：假声明必须报 `理由过期`、路径解析不到必须点名、名册为空 `main()` 必须给非 0；
+  另加文法严格性（松散写法不算声明）与"表必须等于生成器输出"。脚本电池 `Ran 342 tests OK`。
+
 ### 快捷键录制器与浮层剩余状态一次判掉 14 格：清账表 85 → 99，看图抓到一条"理由与帧不配对"（R164 / U-545…U-547 · 产品 0 文件，动效主线）
 
 - 14 格全部绑本轮实测的缺席计数或具体代码行：录制器里 `ProgressView` / `isLoading` / `disabled` / `isEnabled` / `focus` 各 0 处、
