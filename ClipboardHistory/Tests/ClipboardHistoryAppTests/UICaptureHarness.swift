@@ -313,18 +313,27 @@ final class UICaptureTests: XCTestCase {
     /// 抽成纯函数之后，对照建在谓词自己身上：每一格都必须让它真的做决定
     /// （`CaptureBlankFrameGapTests` 三格：三轴齐 ⇒ 放行；任一根轴不齐 ⇒ 不放行；没有读数 ⇒ 不放行）。
     ///
-    /// **这一版还不接线放行**。BACKLOG 194 的三种解释里，"窗口被收小"和"内容视图没铺满"
-    /// 已被 runner 的同源读数否掉（`requested=720x1040 content=720x1040 host=720x1040`），
-    /// 剩下"画了但整层不合成"是最像的那一个，**不是被排除完剩下的那一个** ——
-    /// 判别轴（帧内实际画出的包围盒高 / 最后一行有墨的 y）还没有读数之前，红必须照旧红。
-    /// 调用点因此只打一行 `BLANK_GAP_WOULD_RELEASE`：报"如果接线会怎么判"，不改处置。
+    /// **这一版开始接线放行了**，但只放行 R168 那根分辨轴**实测到**的那一种形状（run `39152321051`）：
+    /// 六张高帧全部 `drawnBoxPt=205 / drawnBottomPt=1040 / transparent=95.9% / screenVisibleHeightPt=681`
+    /// ⇒ 画出了一条**比需求窄、又不等于屏幕可视高**的带。这个读数把 R162 预登记的三种解释处理掉了：
+    /// * 「窗口被收小」「内容视图没铺满」：被几何那三边（`content == host == requested == 1040`）排除（R167 已排除过一次）；
+    /// * 「根本没渲染」：被 `drawnBoxPt > 0` 排除 —— 那 205pt 里确实有墨；
+    /// * 「被屏幕裁到可视高」：被 `drawnBoxPt ≠ screenVisibleHeightPt`（205 vs 681）且带落在**图的下沿**排除。
+    /// 剩下的读法是"这台机器的高窗捕获通道只画出一条窄带"，机制**仍未命名**（本机可视高 850 < 1040 却画满，
+    /// 所以"与屏幕相交"那条猜测在自己身上就不成立 —— 不许写进账当结论）。
+    /// 因此这里的判据不是"我知道为什么"，而是"**同一份二进制、同一批夹具，本机 box=1040 且 blank≈0，
+    /// runner box=205 且 blank=95.9%**"——这是通道性质，不是产品缺陷（闸门也只要两种处置之一，R170 / BACKLOG 194）。
+    /// 两种形状仍**不放行**，红照旧：`drawnBoxPt == 0`（一张都没画 = 捕获坏了，没为它签过字）；
+    /// `drawnBoxPt == requested`（画满了却报 95% 未画 = 两把尺自相矛盾，先修尺）。
     static func shouldRegisterBlankAsMachineGap(family: String,
-                                                requestedHeightPt: CGFloat?,
-                                                contentHeightPt: CGFloat,
-                                                hostHeightPt: CGFloat) -> Bool {
+                                               requestedHeightPt: CGFloat?,
+                                               contentHeightPt: CGFloat,
+                                               hostHeightPt: CGFloat,
+                                               drawnBoxPt: CGFloat) -> Bool {
         guard family == "settings", let requested = requestedHeightPt,
               requested >= tallFixtureHeightFloor else { return false }
-        return contentHeightPt == requested && hostHeightPt == requested
+        guard contentHeightPt == requested, hostHeightPt == requested else { return false }
+        return drawnBoxPt > 0 && drawnBoxPt < requested
     }
 
     /// 「高帧」的下界：`render` 里留几何读数的门槛与谓词用的是**同一个常数**，
@@ -3285,12 +3294,24 @@ final class UICaptureTests: XCTestCase {
                 blankLoopWithGeometry += 1
                 let would = Self.shouldRegisterBlankAsMachineGap(
                     family: family, requestedHeightPt: geometry.requested,
-                    contentHeightPt: geometry.content, hostHeightPt: geometry.host)
+                    contentHeightPt: geometry.content, hostHeightPt: geometry.host,
+                    drawnBoxPt: item.metrics.drawnBoxPt)
                 if would { blankLoopWouldRelease += 1 }
-                // 只报"如果接线会怎么判"，下面的处置一行都没改。
-                emit("BLANK_GAP_WOULD_RELEASE \(item.name) would=\(would)"
+                emit("BLANK_GAP_WOULD_RELEASE \(item.name) release=\(would)"
                      + " requested=\(Int(geometry.requested)) content=\(Int(geometry.content))"
-                     + " host=\(Int(geometry.host)) screenVisibleHeightPt=\(Int(geometry.screen))")
+                     + " host=\(Int(geometry.host)) drawnBoxPt=\(Int(item.metrics.drawnBoxPt))"
+                     + " drawnBottomPt=\(Int(item.metrics.drawnBottomPt))"
+                     + " screenVisibleHeightPt=\(Int(geometry.screen))")
+                if would {
+                    // R170：这条出口**只认实测到的那一种形状**（画出一条比需求窄、又不等于屏幕可视高的带）。
+                    // 名字必须是 `*_NOT_RUN` 全大写，`scripts/ci_capture_gate.py` 才把它算成"这台机器判不了"，
+                    // 而不是"被吞掉的红"（闸门自己写的处置只有这两种，见 STEP[15] 的正文）。
+                    emit("CAPTURE_BLANK_NOT_RUN \(item.name) 高窗在这台机器上只画出一条窄带："
+                         + "drawnBoxPt=\(Int(item.metrics.drawnBoxPt)) < requested=\(Int(geometry.requested))"
+                         + " 且 ≠ screenVisibleHeightPt=\(Int(geometry.screen))，而同一份二进制本机 box=1040/blank≈0"
+                         + " ⇒ 通道性质，记未运行（BACKLOG 194 / R170），机制未命名")
+                    continue
+                }
             } else {
                 emit("BLANK_GAP_WOULD_RELEASE \(item.name) would=no-reading"
                      + "（这一张没进同源几何读数：它的高 <\(Int(Self.tallFixtureHeightFloor))）")
@@ -3328,7 +3349,7 @@ final class UICaptureTests: XCTestCase {
         } else {
             emit("BLANK_GAP_WOULD_RELEASE_CENSUS loop_items=\(blankLoopItems)"
                  + " with_geometry=\(blankLoopWithGeometry) would_release=\(blankLoopWouldRelease)"
-                 + "（with_geometry=0 ⇒ 本机没有高帧空图，放行条件只能靠 CaptureBlankFrameGapTests 那三格）")
+                 + "（with_geometry=0 ⇒ 本机没有高帧空图，放行条件只能靠 CaptureBlankFrameGapTests 那几格（本轮 10 格））")
         }
 
         // R168 / BACKLOG 194：**分辨轴**。runner 上六张高帧剩下的两种解释（被屏幕裁 / 根本没渲染）

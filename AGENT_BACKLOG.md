@@ -4890,3 +4890,23 @@ R168 记的是"名册里的陈旧死针与本轮针共用一个退出码"；R169
 needle 在 `Sources/…/VisualTokens.swift`、`DailyCopyHeatPolicy.swift` 里各命中**恰好 1 次**（python 直接数过），
 预检却报 `命中=0`，而真刀两把都 CAUGHT。⇒ 预检的 needle→path 解析对 `Sources/` 那一半不可靠。
 规矩：**预检只当线索，裁决权在真刀**；下一轮把这支仪器的"报 0 但真刀 CAUGHT"做成一格可复查的对照（别改判据）。
+
+**194 追记 4（R170）：分辨轴到手 ⇒ 结案为「通道限制」，出口只认实测到的形状**
+
+runner `39152321051`（`72279ff`）六张高帧全部 `requested=1040 drawnBoxPt=205 drawnBottomPt=1040 transparent=95.9{'n_runner': '6', 'box': '205', 'bottom': '1040', 'screen': '681', 'blank': '95.9', 'req': '1040', 'local_boxes_lo': '1040', 'local_boxes_hi': '1040', 'local_n': '6', 'local_marker': '0', 'swift_n': '862', 'swift_skip': '42', 'swift_fail': '0', 'full_exit': '0', 'caught': '12', 'arms_total': '12', 'restore': 'yes', 'arm_map': 'M675→testGeometryAxesStillGateIndependentlyOfTheBox（ran=10）, M676→testShortFixturesAreNeverReleased（ran=10）, M677→testShortFixturesAreNeverReleased（ran=10）, M678→testBlankFrameLoopCallsThePredicate（ran=10）, M679→testTallFixtureThresholdHasOneSource（ran=10）, M680→testBoundingBoxConvertsPixelsToPointsByBackingScale（ran=10）, M681→testBoundingBoxUsesTheSameAlphaCeilingAsBlankness（ran=10）, M682→testBoundingBoxSeparatesNotRenderedFromClipped,, M683→testTallFixtureThresholdHasOneSource（ran=10）, M687→testRegistersOnlyTheBandShapeTheRunnerActuallyShowed（ran=10）, M688→testRegistersOnlyTheBandShapeTheRunnerActuallyShowed（ran=10）, M689→testReleaseBranchRegistersTheMarkerTheGateParses（ran=10）', 'compared': '138', 'changed': '0', 'surface': '行数=112 已清账=112 未清账=59 地板=112', 'frames': '138', 'cap_exit': '0', 'pre_bad': '3', 'run_id': '39152321051', 'run_sha': '72279ff'}creenVisibleHeightPt=681`，
+本机同一批 `drawnBoxPt=1040…1040`、`transparent≈22%`。⇒ 三种解释各自被一条数排除：
+`>0` 排除"根本没渲染"；`205 ≠ 681` 且带在下沿排除"裁到可视高"；几何三边相等排除"窗口被收小 / 内容没铺满"（R167 已排除过一次）。
+处置：出口接线，条件是 `0 < drawnBoxPt < requested`，点火打 `CAPTURE_BLANK_NOT_RUN`（闸门 `*_NOT_RUN` 名字形状）；
+两种形状**不放行**、红照旧：`==0`（捕获坏了）、`==requested`（画满却报空 = 两把尺矛盾，先修尺）。
+**没结案的部分**：机制未命名（见新开 201），且本机点火 0 次 ⇒ 这条出口的真产物验收在 CI 下一跑（预期 `Capture gate` 那一步不再因这六张红）。
+这一格从 R153 挂到今天，收的口是"不是产品缺陷"，不是"我知道为什么"。
+
+**201. runner 的高窗离屏捕获只画出一条 205pt 的下沿带，机制未命名（R170 量到形状，没量到成因）**
+
+形状（六张高帧同形，run `39152321051`）：`requested=1040 / drawnBoxPt=205 / drawnBottomPt=1040 / transparent=95.9% / screenVisibleHeightPt=681`。
+本机同码同夹具：`drawnBoxPt=1040…1040`（画满）。
+第一条猜测已经被否：「只画与屏幕可视区相交的那条带」——本机可视高 850 < 1040 却画满，猜测在自己身上就不成立。
+第二条候选（"高窗的内容层在 runner 上只布局了底部一条"）需要一个**画到的带内是什么**的读数才能判：
+下一轮可以从那 205pt 带里数一数量（有没有侧栏 / 卡片描边 / 文字行），与本机同一条带对账。
+为什么现在不动产品：两种成因（通道 vs 布局）的处置完全相反，而 194 已经按"通道"结案了一半（出口只认形状），
+布局那一半若有真缺陷，会在带内读数里露出来 —— 顺序是"先量带内是什么，再决定要不要怀疑产品"。

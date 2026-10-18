@@ -4821,6 +4821,34 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 172 轮（R170 · 2026-10-19）：runner 的分辨轴给了一个**谁都没预测到**的形状 ⇒ 出口按实测接线（BACKLOG 194 结案为通道限制）（U-567…U-570 · 产品 0 文件，判据账）
+
+- **U-567：读数到手，而且两种预测都被推翻。** run `39152321051`（`72279ff`）的 `--log` 里六张高帧同形：
+  `requested=1040 drawnBoxPt=205 drawnBottomPt=1040 transparent=95.9% screenVisibleHeightPt=681`。
+  这把 R162/R167 预登记的三种解释逐条量掉：
+  * 「根本没渲染」被 `drawnBoxPt=205 > 0` 排除 —— 那 205pt 的带里确实有墨；
+  * 「被屏幕裁」被 `205 ≠ screenVisibleHeightPt=681`、且带落在**图的下沿**（bottom=1040）排除；
+  * 「窗口被收小 / 内容视图没铺满」早被几何三边（`content == host == requested`）排除（R167）。
+  本机同一条轴给的是另一侧标定：6 张高帧 `drawnBoxPt=1040…1040`（画满）。
+  ⇒ **剩下的读法是"这台机器的高窗捕获通道只画出一条窄带"，机制没有命名**：
+  本机可视高 681 的邻居 850 < 1040 却画满，所以"只画与屏幕相交的那条带"这条猜测在自己身上就不成立 —— 猜测不写进账当结论，
+  新开 BACKLOG 201 记这条未命名的机制。
+- **U-568：出口按**实测到的那一种形状**接线，两种形状明确不放行。**
+  `shouldRegisterBlankAsMachineGap` 多了 `drawnBoxPt` 这一根轴：放行条件是 `0 < drawnBoxPt < requested`；
+  `drawnBoxPt == 0`（一张都没画 = 捕获坏了，没人签过字）与 `drawnBoxPt == requested`（画满了却报 95.9% 未画 = 两把尺自相矛盾，先修尺）都照旧红。
+  点火时打 `CAPTURE_BLANK_NOT_RUN <帧名> …` —— 名字必须是全大写 `*_NOT_RUN` 形状，`scripts/ci_capture_gate.py` 的
+  `NOT_RUN` 正则才认它，闸门正文本来就只给两种处置（修 / 登记未运行），这是第二种。
+  本机 `0` 次点火 = 0（本机没有空白高帧），所以这条出口的**真产物验收只能等 CI 那一跑**：预期 STEP[15] 不再因为那六张红。
+  BACKLOG 194 至此**结案为通道限制**（口径：不是产品缺陷、机制未命名、出口只认实测形状；待 CI 复验，见 STATE ⓪）。
+- **U-569：12 把刀复跑 + 三把新的，前任死针当场退休。** `mutate_r168.py` 现在 12 臂全 CAUGHT、RESTORE_CLEAN=yes：
+  M675→testGeometryAxesStillGateIndependentlyOfTheBox（ran=10）, M676→testShortFixturesAreNeverReleased（ran=10）, M677→testShortFixturesAreNeverReleased（ran=10）, M678→testBlankFrameLoopCallsThePredicate（ran=10）, M679→testTallFixtureThresholdHasOneSource（ran=10）, M680→testBoundingBoxConvertsPixelsToPointsByBackingScale（ran=10）, M681→testBoundingBoxUsesTheSameAlphaCeilingAsBlankness（ran=10）, M682→testBoundingBoxSeparatesNotRenderedFromClipped,, M683→testTallFixtureThresholdHasOneSource（ran=10）, M687→testRegistersOnlyTheBandShapeTheRunnerActuallyShowed（ran=10）, M688→testRegistersOnlyTheBandShapeTheRunnerActuallyShowed（ran=10）, M689→testReleaseBranchRegistersTheMarkerTheGateParses（ran=10）。其中 M675/M678 的 needle 因为谓词换了形状而**当场改成新写法**（不改就会空转一整轮，R102 那条规矩第 N 次执行）；
+  新增的三把都打在出口点火那一支：M687（去掉 `> 0` ⇒ "根本没渲染"会被放行）、M688（去掉 `< requested` ⇒ "画满了却报空"会被放行）、
+  M689（把 marker 名改成 `CAPTURE_BLANK_NOTRUN` ⇒ 闸门再也认不出它，红会回来）。
+  预检同一次打 `bad=3`（还是 R168 记的那支陈旧死针 M541 + 它把活针报成 命中=0 的老毛病）。
+- **U-570：两台机器的对照写清楚，免得下一轮把"绿"读成"验过"。** 本轮本机：编译 0 告警、判据卷 10 格、
+  捕获卷退出码 0、帧基线 `--against working` 对账 138 张 changed=0（本机不走这条出口 ⇒ 帧不该变，变了就是尺坏）、
+  全量卷 862 例 / 跳过 42 / 失败 0（退出码 0）；清账表 行数=112 已清账=112 未清账=59 地板=112。
+  看图腿：产品 0 文件、帧逐字节未变，本轮"看"的是 runner 日志里那一行读数，不是画面 —— 这条按未看新画面记账，不写成"审查过"。
 ## 第 171 轮（R169 · 2026-10-19）：把热图 197 的『加周数』那条修法量成数——只能削 14pt，剩下的是另一件事（M684–M686 全 CAUGHT）（U-563…U-566 · 产品 0 文件，判据账）
 
 - **U-563：197 第一次有了数，而且推翻了我上一轮写在注释里的理由。** 组件帧（`heatmap-populated`，夹具自陈 width=430、padding=16）

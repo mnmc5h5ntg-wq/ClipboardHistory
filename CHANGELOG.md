@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### runner 的分辨轴读数与 194 的出口接线：只认实测到的那种形状（R170 / U-567…U-570 · 产品 0 文件，判据账）
+
+- runner `39152321051` 六张高帧同形 `drawnBoxPt=205 / drawnBottomPt=1040 / transparent=95.9% / screenVisibleHeightPt=681`；本机同一批 `drawnBoxPt=1040…1040`（画满）⇒ 三种解释被数排除，BACKLOG 194 结案为**通道限制**（机制未命名，新开 201）
+- 出口 `shouldRegisterBlankAsMachineGap` 增加 `drawnBoxPt` 轴，只在 `0 < drawnBoxPt < requested` 时登记 `CAPTURE_BLANK_NOT_RUN`（闸门按全大写 `*_NOT_RUN` 解析）；`==0`（没渲染）与 `==requested`（画满却报空）照旧红
+- 本机出口点火 0 次 = 0 ⇒ 真产物验收在 CI 下一跑（预期 STEP[15] 不再因这六张红）
+- `mutate_r168.py` 扩到 12 臂全 CAUGHT、RESTORE_CLEAN=yes；M675/M678 的 needle 跟着谓词新形状当场改写（不留空转的刀）
+- 全量卷 862 例 / 跳过 42 / 失败 0；帧基线 `--against working` 138 张 changed=0；判据卷 10 格
 ### 热图 197 的"加周数"修法被量成数：+1 周放得下、+2 周顶破（R169 / U-563…U-566 · 产品 0 文件，判据账）
 
 - 组件帧可用宽 398pt（夹具 width=430 − 2×padding 16）、26 周网格宽 379pt、余量 19pt、一周占 14pt ⇒ `118pt` 空白带里只有 14pt 是周数能削的

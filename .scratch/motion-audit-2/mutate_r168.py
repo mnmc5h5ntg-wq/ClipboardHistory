@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R168 的变异表：放行谓词的四根轴 + 活体调用点 + 门槛单一来源（M675-M679）。
+"""R168+R170 的变异表：放行谓词的轴、活体调用点、门槛单一来源，与出口点火那一支（M675–M689）。
 
 每把刀都对准本轮真实写下的那条判断，不是凭空造的错法：
 
@@ -33,8 +33,8 @@ ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 ARMS = [
     ("M675", HARNESS,
-     u"return contentHeightPt == requested && hostHeightPt == requested",
-     u"return contentHeightPt == requested", "CAUGHT"),
+     u"guard contentHeightPt == requested, hostHeightPt == requested else { return false }",
+     u"guard contentHeightPt == requested else { return false }", "CAUGHT"),
     ("M676", HARNESS,
      u"requested >= tallFixtureHeightFloor else { return false }",
      u"requested > 0 else { return false }", "CAUGHT"),
@@ -44,7 +44,8 @@ ARMS = [
     ("M678", HARNESS,
      u"                let would = Self.shouldRegisterBlankAsMachineGap(\n"
      u"                    family: family, requestedHeightPt: geometry.requested,\n"
-     u"                    contentHeightPt: geometry.content, hostHeightPt: geometry.host)",
+     u"                    contentHeightPt: geometry.content, hostHeightPt: geometry.host,\n"
+     u"                    drawnBoxPt: item.metrics.drawnBoxPt)",
      u"                let would = false", "CAUGHT"),
     ("M679", HARNESS,
      u"if size.height >= Self.tallFixtureHeightFloor {",
@@ -62,6 +63,16 @@ ARMS = [
     ("M683", HARNESS,
      u"requested >= Self.tallFixtureHeightFloor else { continue }",
      u"requested >= 1000 else { continue }", "CAUGHT"),
+    # ---- R170：出口点火那一支的三把刀 ----
+    ("M687", HARNESS,
+     u"return drawnBoxPt > 0 && drawnBoxPt < requested",
+     u"return drawnBoxPt < requested", "CAUGHT"),
+    ("M688", HARNESS,
+     u"return drawnBoxPt > 0 && drawnBoxPt < requested",
+     u"return drawnBoxPt > 0", "CAUGHT"),
+    ("M689", HARNESS,
+     u'emit("CAPTURE_BLANK_NOT_RUN \(item.name) 高窗在这台机器上只画出一条窄带："',
+     u'emit("CAPTURE_BLANK_NOTRUN \(item.name) 高窗在这台机器上只画出一条窄带："', "CAUGHT"),
 ]
 
 

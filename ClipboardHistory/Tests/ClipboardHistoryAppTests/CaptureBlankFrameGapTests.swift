@@ -16,31 +16,45 @@ import XCTest
 @MainActor
 final class CaptureBlankFrameGapTests: XCTestCase {
 
-    func testRegistersOnlyWhenGeometryEqualsTheRequest() {
-        // runner 的真实形状：三边都等于 1040 ⇒ 会放行（记未运行）
+    func testRegistersOnlyTheBandShapeTheRunnerActuallyShowed() {
+        // runner `39152321051` 的真实形状：几何三边都等于需求，而只画出 205pt 的一条带 ⇒ 放行（记未运行）
         XCTAssertTrue(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040, hostHeightPt: 1040))
-        // 内容视图没铺满 ⇒ 那是布局问题，不许放行
+            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040,
+            hostHeightPt: 1040, drawnBoxPt: 205))
+        // 一张都没画（box=0）⇒ **不放行**：那是"捕获坏了"，这一族没人签过字
         XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "settings", requestedHeightPt: 1040, contentHeightPt: 681, hostHeightPt: 1040))
-        // 窗口被收小 ⇒ 同上
+            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040,
+            hostHeightPt: 1040, drawnBoxPt: 0))
+        // 画满了却报 95% 未画 ⇒ 两把尺自相矛盾，不放行，回头修尺
         XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040, hostHeightPt: 681))
+            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040,
+            hostHeightPt: 1040, drawnBoxPt: 1040))
     }
 
     func testShortFixturesAreNeverReleased() {
-        // 540 那一档在 runner 上画得出来 ⇒ 它没资格走这条出口（否则出口成了万能挡箭牌）
+        // 540 那一档在两台机器上都画得出来 ⇒ 它没资格走这条出口（否则出口成了万能挡箭牌）
         XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "settings", requestedHeightPt: 540, contentHeightPt: 540, hostHeightPt: 540))
+            family: "settings", requestedHeightPt: 540, contentHeightPt: 540,
+            hostHeightPt: 540, drawnBoxPt: 120))
         // 别的族（浮层、菜单栏、内容区）也不许走
         XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "quickpick", requestedHeightPt: 1040, contentHeightPt: 1040, hostHeightPt: 1040))
+            family: "quickpick", requestedHeightPt: 1040, contentHeightPt: 1040,
+            hostHeightPt: 1040, drawnBoxPt: 205))
     }
 
-    func testMissingReadingIsNotEvidenceOfAMachineGap() {
-        // 读不出"这张帧要的多高" ⇒ 不放行：缺证据不是"这台机器不行"的证据
+    func testGeometryAxesStillGateIndependentlyOfTheBox() {
+        // 内容视图没铺满 ⇒ 布局问题，包围盒再"像带"也不放行
         XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
-            family: "settings", requestedHeightPt: nil, contentHeightPt: 1040, hostHeightPt: 1040))
+            family: "settings", requestedHeightPt: 1040, contentHeightPt: 681,
+            hostHeightPt: 1040, drawnBoxPt: 205))
+        // 窗口被收小 ⇒ 同上
+        XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
+            family: "settings", requestedHeightPt: 1040, contentHeightPt: 1040,
+            hostHeightPt: 681, drawnBoxPt: 205))
+        // 没有同源几何读数 ⇒ 缺证据不是"这台机器不行"的证据
+        XCTAssertFalse(UICaptureTests.shouldRegisterBlankAsMachineGap(
+            family: "settings", requestedHeightPt: nil, contentHeightPt: 1040,
+            hostHeightPt: 1040, drawnBoxPt: 205))
     }
 
     /// 谓词不是纸上概念：未画帧的处置循环必须**真的**调用它，否则"抽出来了"等于"没接线"。
@@ -58,8 +72,7 @@ final class CaptureBlankFrameGapTests: XCTestCase {
                        "方法体取空了（签名变了或缩进前提不成立）⇒ 这条守卫无从判定，红给它")
         let needle = "shouldRegisterBlankAsMachineGap"
         let hits = body.components(separatedBy: "\n").filter { $0.contains(needle) }
-        XCTAssertEqual(hits.count, 1,
-                       "未画循环里对放行谓词的调用应该有 1 处，实到 \(hits.count) 处"
+        XCTAssertEqual(hits.count, 1,                       "未画循环里对放行谓词的调用应该有 1 处，实到 \(hits.count) 处"
                        + " ⇒ 0 处等于谓词是死代码、2 处等于出口被复制成了两份实现")
     }
 
@@ -149,5 +162,25 @@ final class CaptureBlankFrameGapTests: XCTestCase {
         XCTAssertEqual(UICaptureTests.requestedHeightPt(fromFile: "quickpick-empty-420x300-dark.png"), 300)
         XCTAssertNil(UICaptureTests.requestedHeightPt(fromFile: "no-size-here.png"),
                      "没有尺寸的帧名必须返回 nil，不许返回 0（那会把\"读不到\"伪装成\"矮帧\"）")
+    }
+
+    /// R170：出口**点火**靠的是那条全大写 marker —— `scripts/ci_capture_gate.py` 的
+    /// `NOT_RUN = \b([A-Z][A-Z0-9_]*_NOT_RUN)\b` 只认这个名字形状。改名（哪怕只差一个下划线）
+    /// 会让闸门把它读成"未登记的"，而那六张高帧的红又回来了 —— 或者更坏：悄悄不算数。
+    /// 所以这里扫的是**处置循环那一段**：marker 出现 1 次、`continue` 紧跟其后。
+    func testReleaseBranchRegistersTheMarkerTheGateParses() throws {
+        let harness = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("UICaptureHarness.swift")
+        let body = UICaptureTests.functionBody(
+            named: "func testCaptureKeyViews() throws {",
+            in: UICaptureTests.codeOnly(try String(contentsOf: harness, encoding: .utf8)))
+        XCTAssertFalse(body.isEmpty, "方法体取空了 ⇒ 这条守卫无从判定")
+        let marker = "CAPTURE_BLANK_NOT_RUN"
+        XCTAssertEqual(body.components(separatedBy: "\n").filter { $0.contains(marker) }.count, 1,
+                       "`\(marker)` 在处置循环里必须出现恰好 1 次：0 次 = 出口没登记（红会回来），"
+                       + "2 次 = 有第二个人在决定同一件事")
+        XCTAssertTrue(body.contains("if would {") && body.contains("continue"),
+                      "判定之后必须有 `if would { … continue }`：只有读数没有处置 = 出口没接线（R168 那一版就是这个形状）")
     }
 }
