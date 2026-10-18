@@ -237,6 +237,115 @@ def command_align(path, threshold=40):
 
 
 
+def line_bands(width, height, channels, pixels, threshold=40, min_gap=4, min_rows=4):
+    """把"有墨的像素行"聚成**文本行**，逐行给出稳定的左边缘。
+
+    与 `command_align` 的分工（BACKLOG 205 逼出来的）：`align` 报的是每一像素行的第一个
+    有墨列，所以两行字号不同 / 长度不同的文本天然会给出好几簇 —— 它回答不了
+    "这两行是不是落在同一根左轴上"。这里先按 y 聚行，再在行内取**众数左沿**
+    （字形的升降部会让同一行文字的逐行 min-x 抖几像素，众数才是那一行的轴）。
+
+    返回按 y 升序的 dict 列表：`y0` / `y1`（像素行，含端点）、`rows`（参与聚类的墨行数）、
+    `min_x`（该行带里最小的有墨列）、`axis`（众数左沿，2px 分桶后取最多样本的中心）、
+    `axis_spread`（行内 min-x 的跨度，用来暴露"这一带里其实混了两样东西"）。
+    """
+    stride = width * channels
+    hist = {}
+    for y in range(height):
+        base = y * stride
+        for x in range(width):
+            pixel = bytes(pixels[base + x * channels: base + (x + 1) * channels])
+            hist[pixel] = hist.get(pixel, 0) + 1
+    if not hist:
+        return []
+    background_lum = luminance(max(hist, key=hist.get))
+
+    ink_rows = []
+    for y in range(height):
+        base = y * stride
+        first = None
+        for x in range(width):
+            pixel = bytes(pixels[base + x * channels: base + (x + 1) * channels])
+            if abs(luminance(pixel) - background_lum) > threshold:
+                first = x
+                break
+        if first is not None:
+            ink_rows.append((y, first))
+
+    bands, cur = [], []
+    for y, x in ink_rows:
+        if cur and y - cur[-1][0] > min_gap:
+            bands.append(cur)
+            cur = []
+        cur.append((y, x))
+    if cur:
+        bands.append(cur)
+
+    out = []
+    for band in bands:
+        if len(band) < min_rows:  # 抗锯齿碎屑 / 单行描边：不算一行字
+            continue
+        xs = [x for _, x in band]
+        buckets = {}
+        for x in xs:
+            buckets[x // 2] = buckets.get(x // 2, 0) + 1
+        axis = max(sorted(buckets), key=lambda b: buckets[b]) * 2
+        out.append({"y0": band[0][0], "y1": band[-1][0], "rows": len(band),
+                    "min_x": min(xs), "axis": axis, "axis_spread": max(xs) - min(xs)})
+    return out
+
+
+def command_bands(path, threshold=40, pt_width=None):
+    """解码一张 PNG 后逐文本行报左轴（真正的判定在 `command_bands_from_pixels`）。"""
+    width, height, channels, pixels = read_png(path)
+    return command_bands_from_pixels(pixels, width, height, channels=channels,
+                                     name=os.path.basename(path),
+                                     threshold=threshold, pt_width=pt_width)
+
+
+def command_bands_from_pixels(pixels, width, height, channels=4, name="pixels",
+                              threshold=40, pt_width=None):
+    """逐文本行报左轴，并直接给"同轴 / 不同轴 / 无从判定"三种结论之一。
+
+    拆成两层是为了让测试能直接喂像素缓冲：命令层若只被真帧跑过，它坏在"带聚错"上时
+    唯一的证人就是一张人眼看的帧 —— 那一族（结论挂在没人复查的读数上）账里记过多次。
+    """
+    bands = line_bands(width, height, channels, pixels, threshold=threshold)
+    scale = (float(width) / pt_width) if pt_width else 0.0
+
+    def fmt(px):
+        return "%dpx" % px if not scale else "%dpx=%.1fpt" % (px, px / scale)
+
+    # 带内散布过大 ⇒ 这一带里不止一个元素（本轮实测：搜索框那一行同时有 22.5pt 的查询文字
+    # 与 52.0pt 的另一枚墨，于是"众数左沿"在两档之间从 22.0pt 漂到 52.0pt，而 `min_x` 两档都是 22.5pt）。
+    # 所以主读数必须是 `min_x`，`axis` 只在"这一带确实只有一个元素"时才有资格进结论。
+    wide = 40
+    print("%s: 文本行带=%d（帧 %dx%d%s）"
+          % (name, len(bands), width, height,
+             "" if not scale else " / %gpt 宽 ⇒ %gpx/pt" % (pt_width, scale)))
+    flagged = []
+    for i, b in enumerate(bands):
+        suspect = b["axis_spread"] > wide
+        if suspect:
+            flagged.append(i)
+        print("  带%d y=%d..%d 行数=%d 最左墨=%s 众数左沿=%s 行内散布=%dpx%s"
+              % (i, b["y0"], b["y1"], b["rows"], fmt(b["min_x"]), fmt(b["axis"]), b["axis_spread"],
+                 "  ←带内不止一个元素，众数不可信" if suspect else ""))
+    axes = [b["min_x"] for b in bands]
+    if len(axes) < 2:
+        print("  BANDS_VERDICT 无从判定（只 %d 带：一根轴要两根以上才谈'同不同'）" % len(axes))
+        return 1
+    if flagged:
+        print("  BANDS_VERDICT 不可判（带 %s 内散布 >%dpx ⇒ 同一带里混了不止一个元素，"
+              "先按元素切带再谈同轴）" % (",".join(str(i) for i in flagged), wide))
+        return 1
+    spread = max(axes) - min(axes)
+    verdict = "同轴" if spread <= 2 else "不同轴"
+    print("  BANDS_VERDICT %s 左轴散布=%s（最左墨 %s）"
+          % (verdict, fmt(spread), " ".join(fmt(a) for a in axes)))
+    return 0
+
+
 def command_diff(directory_a, directory_b):
     names_a = set(n for n in os.listdir(directory_a) if n.endswith(".png"))
     names_b = set(n for n in os.listdir(directory_b) if n.endswith(".png"))
@@ -298,6 +407,12 @@ def main(argv=None):
     align.add_argument("path")
     align.add_argument("--threshold", type=int, default=40)
 
+    bands = sub.add_parser("bands", help="按文本行带取左轴（回答『这两行同不同轴』，align 答不了）")
+    bands.add_argument("path")
+    bands.add_argument("--threshold", type=int, default=40)
+    bands.add_argument("--pt-width", type=float, default=None,
+                       help="这张帧对应多少 pt 宽（420pt 的浮层夹具传 420 ⇒ 读数同时给 pt）")
+
     args = parser.parse_args(argv)
     if args.command == "diff":
         return command_diff(args.directory_a, args.directory_b)
@@ -305,6 +420,8 @@ def main(argv=None):
         return command_stats(args.path)
     if args.command == "align":
         return command_align(args.path, threshold=args.threshold)
+    if args.command == "bands":
+        return command_bands(args.path, threshold=args.threshold, pt_width=args.pt_width)
     return command_band(args.path, row=args.row, column=args.column)
 
 
