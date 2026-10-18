@@ -26,7 +26,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.ui_probe_report import PULSE, _dominant_path, analyse_sample, main, report
+from scripts.ui_probe_report import DONE, PULSE, _dominant_path, analyse_sample, main, report
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r62_runner_ui.log"
 RUNNER_ECHO = FIXTURE.read_text(encoding="utf-8")
@@ -365,6 +365,173 @@ class PulseChannelTests(unittest.TestCase):
         self.assertEqual(1, code, "读不到心跳文件而进程又活着 ⇒ 通道坏了，这一卷没有名字")
         self.assertIn("UI_PROBE_PULSE_UNREADABLE", text)
         self.assertIn("UI_PROBE_PULSE_EMPTY=1", text)
+
+
+class FileChannelTests(unittest.TestCase):
+    """R146 / BACKLOG 186 · 闭合行 `PROBE_DONE`：把「哪一条正跑着被截断」变成一份文件内部的减法。
+
+    触发这件事的是 run 39102076143 那朵红：`pulse=7 started=6 concluded=5` 让两条通道各点一条，
+    `UI_PROBE_CHANNELS_CONTRADICT` 拒绝点名 —— 而它**拒绝得对**：旧算法算的是
+    `心跳 − 日志里的结论行`，减数走的是会被 SIGKILL 整块带走的 stdout（R88 / R90 各实测过一次），
+    所以那个差集里混着「其实跑完了、只是结论行丢了」的用例。修的是把减数也搬进文件，
+    不是放宽那道拒绝。本机 2026-10-18 那一遍（11 颗心跳 + 11 条闭合，逐字节进夹具）证明了
+    闭合行是产品真的写得出来的东西，而不是我照着格式编的。
+    """
+
+    REAL = (Path(__file__).resolve().parent / "fixtures" / "r146_pulse_real.log").read_text(encoding="utf-8")
+    # 真实交错顺序（本机那一遍文件里数出来的；XCTest 按字母序跑，两台机器同一个顺序）。
+    ORDER = ["testAccessibilityTreeCoverage",
+             "testFocusChainReachesTheSearchFieldAndNotOnlyTheDetailTextView",
+             "testFrameIntervalsUnderStateChanges",
+             "testIntakeBehindATallPinnedBlockRevealsTheNewRow",
+             "testMarkdownFilePreviewRendersInARealWindow",
+             "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped",
+             "testRightClickMenusAppKitWouldShowAreChinese",
+             "testRowGesturesWorkInsideTheRealSidebarContainer",
+             "testRowIndexDriftDoesNotMoveTheViewport",
+             "testRowProxyCensusAsksTheConsequenceNotTheShape",
+             "testSidebarListFocusRingAfterClick"]
+
+    def pulse_file(self, pulses, dones):
+        """从真文件按**真实交错顺序**保留前 `pulses` 颗心跳与前 `dones` 条闭合，其余丢掉。
+
+        不手搓格式，也不按行号切（那份文件是 P/D 交替的，按 `pulses + dones` 切行会切出
+        相等颗数 —— 我第一版就是这么把 11/9 切成了 10/10，那条测试因此验不到 AMBIGUOUS）。
+        """
+        kept, seen_p, seen_d = [], 0, 0
+        for line in self.REAL.splitlines():
+            if line.startswith("PROBE_PULSE ") and seen_p < pulses:
+                seen_p += 1
+            elif line.startswith("PROBE_DONE ") and seen_d < dones:
+                seen_d += 1
+            else:
+                continue
+            kept.append(line)
+        self.assertEqual((pulses, dones), (seen_p, seen_d), "切出来的颗数不对 ⇒ 这个夹具构造器本身坏了")
+        return "\n".join(kept) + "\n"
+
+    def log(self, concluded_count, started_extra=1, states=None):
+        """`concluded_count` 条有结论，再加 `started_extra` 条只有 started 的（stdout 尾巴被带走）。"""
+        parts = []
+        for index in range(concluded_count):
+            name = self.ORDER[index]
+            state = (states or {}).get(name, "passed")
+            parts.append(started(name) + concluded(name, state))
+        for offset in range(started_extra):
+            index = concluded_count + offset
+            if index < len(self.ORDER):
+                parts.append(started(self.ORDER[index]))
+        return "".join(parts)
+
+    def testRealProductPairsPulseWithDone(self):
+        """正对照：解析的是产品今天真写出来的那 22 行，而且两边对得上。"""
+        pulses = [m.group(1) for m in PULSE.finditer(self.REAL)]
+        dones = [m.group(1) for m in DONE.finditer(self.REAL)]
+        self.assertEqual(self.ORDER, pulses, "心跳名单与我数的那 11 条不一致（顺序也要一致）")
+        self.assertEqual(pulses, dones, "闭合行与心跳配不上对 ⇒ 通道只接了一半，报告器的新分支不该跑")
+        self.assertEqual("testRightClickMenusAppKitWouldShowAreChinese", self.ORDER[6],
+                         "第七颗心跳必须是第 7 条：那正是 run 39102076143 里被截断的那一条")
+
+    def testCiRedShapeNamesTheInFlightCase(self):
+        """那次红的那份输入，喂进新算法 ⇒ 点第 7 条，而不是两条都不信。"""
+        lines, named = report(self.log(5, 1), 1, self.pulse_file(7, 6))
+        text = "\n".join(lines)
+        self.assertIn("UI_PROBE_FILE_CHANNEL pulse=7 done=6 open=1", text, text)
+        self.assertIn("UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese", text, text)
+        self.assertIn("UI_PROBE_HUNG_CHANNEL=file", text, text)
+        self.assertIn("UI_PROBE_LOG_CONCLUSION_LOST=testOffScreenProgrammaticSelectionIsRevealedAndNotJumped",
+                      text, "第 6 条要换成『结论行丢了』这句话，不许再被读成挂死：" + text)
+        self.assertNotIn("UI_PROBE_CHANNELS_CONTRADICT", text, text)
+        self.assertTrue(named, "文件通道讲得通还不许说『没有名字』：" + text)
+
+    def testTwoOpenHeartbeatsRefuseToName(self):
+        """两颗未闭的心跳 ⇒ 这条通道自己不可信（文件被上一遍复用 / 在并行），不许挑最后一条。"""
+        lines, named = report(self.log(8, 1), 1, self.pulse_file(11, 9))
+        text = "\n".join(lines)
+        self.assertFalse(named, "两条都未闭还点名=替一份脏文件签字：" + text)
+        self.assertIn("UI_PROBE_FILE_CHANNEL pulse=11 done=9 open=2", text, text)
+        self.assertIn("UI_PROBE_FILE_CHANNEL_AMBIGUOUS="
+                      "testRowProxyCensusAsksTheConsequenceNotTheShape,testSidebarListFocusRingAfterClick",
+                      text, text)
+
+    def testLogCaseWithNeitherPulseNorCloseIsRed(self):
+        """日志说有条用例没结论，文件里却既没它的闭合也没它的未闭心跳 ⇒ 两条通道不能同时成立 ⇒ 红。"""
+        log = self.log(5, 1) + started("testGhostThatNeverAppearedInAnyChannel") + "\n"
+        lines, named = report(log, 1, self.pulse_file(7, 6))
+        text = "\n".join(lines)
+        self.assertFalse(named, text)
+        self.assertIn("UI_PROBE_HUNG_WITHOUT_CLOSE=testGhostThatNeverAppearedInAnyChannel", text, text)
+
+    def testAllClosedUnderFileChannelSaysTheSuiteFinished(self):
+        """心跳与闭合配平 ⇒ 没有一条被截在半路；日志少掉的那些结论行是 stdout 丢的。"""
+        lines, named = report(self.log(5, 1), 1, self.pulse_file(7, 7))
+        text = "\n".join(lines)
+        self.assertTrue(named, text)
+        self.assertIn("UI_PROBE_FILE_CHANNEL pulse=7 done=7 open=0", text, text)
+        self.assertIn("UI_PROBE_FILE_CHANNEL_CLOSED_ALL=1", text, text)
+        self.assertIn("UI_PROBE_ALL_CONCLUDED=1", text, text)
+        self.assertNotIn("UI_PROBE_HUNG=", text, "没有未闭心跳就不该点任何一条：" + text)
+
+    def testEmptyLogStillNamedByTheFileChannel(self):
+        """R88 最坏那一形状（日志整块空）在闭合通道接上之后也有一点名字：不再把 11 条全报成挂死。"""
+        lines, named = report("", 1, self.pulse_file(7, 6))
+        text = "\n".join(lines)
+        self.assertTrue(named, text)
+        self.assertIn("UI_PROBE_LOG_EMPTY=1", text, text)
+        self.assertEqual(1, text.count("UI_PROBE_HUNG="), "只报那颗未闭的心跳：" + text)
+        self.assertIn("UI_PROBE_HUNG=testRightClickMenusAppKitWouldShowAreChinese", text, text)
+
+    def testRedCaseUnderFileChannelStillExitsOne(self):
+        """红用例与「点名」是两件事：说得出怎么停，也不许把这一卷读成跑完了。"""
+        log = self.log(5, 1, states={self.ORDER[4]: "failed"})
+        lines, named = report(log, 1, self.pulse_file(7, 6))
+        text = "\n".join(lines)
+        self.assertIn("UI_PROBE_CONCLUDED_RED=1 " + self.ORDER[4], text, text)
+        self.assertIn("UI_PROBE_ALL_CONCLUDED=0", text, text)
+        self.assertFalse(named, "有红用例时退出码必须跟着红（旧路径 R143 就立过这条）：" + text)
+
+    def testHalfWiredChannelFallsBackToOldVeto(self):
+        """只有心跳、没有闭合（旧二进制 / 通道接了一半）⇒ 维持 R90 的两通道对账，并说自己半接。"""
+        half = "".join(line + "\n" for line in self.REAL.splitlines() if line.startswith("PROBE_PULSE "))
+        lines, named = report(started("testAlpha") + "\n", 1, half)
+        text = "\n".join(lines)
+        self.assertIn("UI_PROBE_DONE_ABSENT=1", text, text)
+        self.assertIn("UI_PROBE_CHANNELS_CONTRADICT", text, text)
+        self.assertFalse(named, "减数还是 stdout 时，两个名字对不上就不许点名：" + text)
+
+
+class FileChannelWiringTests(unittest.TestCase):
+    """通道两头都得有人钉着：产品写、CI 删干净、报告器读 —— 少一环就是一条没人验过的装饰。"""
+
+    REPO = Path(__file__).resolve().parents[2]
+    PROBE = REPO / "ClipboardHistory" / "Tests" / "ClipboardHistoryAppTests" / "UIInteractionProbeTests.swift"
+    CI = REPO / ".github" / "workflows" / "ci.yml"
+    TEARDOWN_HEAD = "    override func tearDownWithError() throws {\n"
+    DONE_EMIT_LINE = "        CaptureReadings.emit(\"PROBE_DONE \\(pulseStamp)\", to: Self.pulseURL)\n"
+
+    def tearDownBody(self):
+        text = self.PROBE.read_text(encoding="utf-8")
+        self.assertEqual(1, text.count(self.TEARDOWN_HEAD),
+                         "tearDownWithError 的定义行不是恰好一处 ⇒ 位置判据没有对象")
+        at = text.index(self.TEARDOWN_HEAD)
+        return text[at:at + 400]
+
+    def testProductWritesTheClosingLineFirstInsideTearDown(self):
+        body = self.tearDownBody()
+        self.assertIn(self.DONE_EMIT_LINE, body,
+                      "闭合行不在 tearDown 里 ⇒ 通道只接了一半，报告器永远走不到文件通道：" + body)
+        self.assertLess(body.index(self.DONE_EMIT_LINE), body.index("try super.tearDownWithError()"),
+                        "闭合行排在 super 之后 ⇒ super 里一出问题这一行就不写了，差集会假报一条挂死")
+        for banned in ("print(", "FileHandle.standardError", "standardOutput"):
+            self.assertNotIn(banned, body, "换成 stdout/stderr 就回到那条会被 SIGKILL 带走的通道：" + banned)
+
+    def testCiDeletesThePulseFileBeforeLaunching(self):
+        """跨次复用这份文件会让这一遍读出 open>=2 ⇒ 报告器按 AMBIGUOUS 拒绝点名（红）。"""
+        ci = self.CI.read_text(encoding="utf-8")
+        self.assertIn("rm -f /tmp/probe-pulse.log", ci, "CI 必须在启动前删掉心跳文件")
+        self.assertLess(ci.index("rm -f /tmp/probe-pulse.log"),
+                        ci.index("swift test --filter UIInteractionProbeTests > /tmp/ui.log"),
+                        "删在启动**之前**才有意义，删在后面等于给下一遍留雷")
 
 
 class PulseWiringTests(unittest.TestCase):

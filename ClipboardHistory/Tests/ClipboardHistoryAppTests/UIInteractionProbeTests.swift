@@ -42,6 +42,24 @@ final class UIInteractionProbeTests: XCTestCase {
         try super.setUpWithError()
     }
 
+    /// R146 / BACKLOG 186 · **闭合行**：心跳只说"这条用例进来了"，它不说"这条用例走完了"。
+    ///
+    /// 为什么必须有这一半（本轮 CI 上抓出来的，run 39102076143）：只有心跳时报告器只能算
+    /// `心跳 − 日志里的结论行`，而减数走的是那条**会整块丢**的 stdout。于是那次读数
+    /// `pulse=7 started=6 concluded=5` 点出**两条**"没结论"的用例，两条通道各说一条、互相矛盾，
+    /// 报告器只能拒绝点名（`UI_PROBE_NAMED=0`）—— 而它拒绝得对：那两条里最多只有一条真的正在跑。
+    /// 加了闭合行之后，"正在跑的是哪一条"这句话**两个数都来自同一份文件**（`心跳 − 闭合`），
+    /// 不再依赖 stdout；stdout 那两条通道降级成对照，对不上时能说清是**日志丢了行**而不是产品挂了。
+    ///
+    /// 为什么挂在 `tearDownWithError`：skip 也走这里（`skipUnlessEnabled()` 在用例**体内**抛
+    /// `XCTSkipIf`，setUp 已成功 ⇒ 方法体返回/抛出后 XCTest 照常调 tearDown），
+    /// 所以"这台机器上被 skip 的那六条"同样会留下闭合行，`心跳 − 闭合` 才不会被它们污染。
+    /// 只有 setUp 自己抛掉时 tearDown 才不跑 —— 这一卷的 setUp 除了 `super` 之外什么都不做。
+    override func tearDownWithError() throws {
+        CaptureReadings.emit("PROBE_DONE \(pulseStamp)", to: Self.pulseURL)
+        try super.tearDownWithError()
+    }
+
     /// 心跳文件。路径由 CI 显式给（`CLIPBOARD_HISTORY_PROBE_PULSE`），没给就退回 shots 目录，
     /// 但**永远用自己的文件名**：`CaptureReadings.readingsURL` 与捕获卷同目录同名，
     /// 共用会把捕获卷那份读数整份重写掉（见那个重载的注释）。

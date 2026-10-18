@@ -1,5 +1,22 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-18 14:40（本地 · R146 / 第 148 轮：**心跳的另一半 `PROBE_DONE`** —— 那句"两条通道各点一条、不许挑一个信"拒绝得对，该修的是减数（U-494…U-496 · 产品 0 文件，通道与判据账）
+
+**R146 做了什么**：给 `UIInteractionProbeTests` 加了 `tearDownWithError` 的闭合行（`PROBE_DONE <用例名>`，与心跳同一份文件；skip 也走 tearDown），
+把 `ui_probe_report.py` 里「正跑着被截断的是哪一条」从 `心跳 − 日志的结论行` 改成**同一份文件内部的减法** `心跳 − 闭合`
+（新格子：`UI_PROBE_FILE_CHANNEL` / `…_CLOSED_ALL` / `…_AMBIGUOUS` / `UI_PROBE_HUNG_WITHOUT_CLOSE` / `UI_PROBE_LOG_CONCLUSION_LOST` / `UI_PROBE_DONE_ABSENT`）；
+CI 启动那卷前 `rm -f /tmp/probe-pulse.log`。两条讲不通的形状**仍然红** —— 这不是放宽 `CONTRADICT`，是把它的减数搬到免疫的那条通道上。
+**纠正的一处旧账**：`testOffScreen…` 被 R144 记成"这台机器上它今天会挂"，本机真实顺序里它是第 6 颗心跳且已闭合，
+未闭的是第 7 颗 `testRightClick…` ⇒ 丢的是它的**结论行**。登记的 reason 已改写成仪器，值暂留 `cannot`（翻回 can 交给 BACKLOG 187 —— coverage 闸门还读那条会丢的通道）。
+**验证**：真产物 11 心跳 / 11 闭合（`SUITE_EXIT=0`）；复刻 run 39102076143 的输入 ⇒ `UI_PROBE_HUNG=testRightClick…` + `LOG_CONCLUSION_LOST=testOffScreen…`，退出码 0；
+四刀对照 `R146_KNIVES arms=4 bad=0`；全量 `Executed 847 tests, with 42 tests skipped and 0 failures` / 222.0s；脚本电池 `Ran 320 tests … OK`（310 → 320）；编译侧 0 告警。
+**本轮 CI 还没读**（不以"应该绿"记账）：下一跑要看的是那一步里出现 `UI_PROBE_HUNG_CHANNEL=file`，以及 `On-screen probe coverage floor` 是否变绿。
+
+**下一轮（R147）的靶，按顺序**：① 读 R146 的 CI（上面那两格）；② BACKLOG 187：让 coverage 闸门读同一份心跳+闭合，
+缺席分成 `queued` / `hung` / `log-lost` 三种有名字的出口，再用一次真读数重判 186 那条登记；③ 177 收尾那一格（帧级状态自证读**已写出的 PNG**）；
+④ 176（runner 的 `PROBE_FPS` 三个数）与 182 / 183 / 185；⑤ 清账表下一批（主窗口/搜索框 × 禁用、设置窗口/说明段 × 空与错误、
+菜单栏/状态菜单 × 加载与错误、浮层/底部说明 × 聚焦）。
+
 最后更新：2026-10-18 06:10（本地 · R145 / 第 147 轮：**录制态第一次进帧基线**（136 → 138，BACKLOG 177 结案）（U-491…U-492 · 产品 0 文件，夹具与判据账）
 
 **R145 做了什么**：给 `UICaptureHarness.Fixture` 加了一条 `interact:(NSWindow)->Void` 钩子（跑在 caret 静默**之后** ——

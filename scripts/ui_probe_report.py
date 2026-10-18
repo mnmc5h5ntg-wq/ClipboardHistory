@@ -34,12 +34,28 @@ BACKLOG 92 要的就是这一步：**没跑完也要说清是哪一条没跑完*
 R90 / BACKLOG 122 加的第二条通道（每条用例在 `setUpWithError()` 里写到自己文件上的一行心跳）：
 
     UI_PROBE_CHANNELS pulse=P started=N concluded=M     两条通道各给了多少证据
-    UI_PROBE_HUNG_CHANNEL=pulse|started                 点出来的名字是哪条通道给的
+    UI_PROBE_HUNG_CHANNEL=file|pulse|started            点出来的名字是哪条通道给的
     UI_PROBE_CHANNELS_AGREE=1                           两条点的是同一批（心跳不是孤证）
     UI_PROBE_CHANNELS_CONTRADICT pulse=… started=…      各点一条不同的 ⇒ 红，不许挑一个信
     UI_PROBE_PULSE_EMPTY=1                              接了通道、进程又活着，却一条都没有 ⇒ 通道坏了
     UI_PROBE_PULSE_UNREADABLE=<路径>                    --pulse 指错了文件（与"没有心跳"分开记）
     UI_PROBE_HUNG_LOG=<用例名>                          矛盾时把日志那条也打出来，换个标记
+
+R146 / BACKLOG 186 加的那**一半**（`tearDownWithError()` 写的闭合行；只有心跳时减数仍是会丢的 stdout）：
+
+    UI_PROBE_FILE_CHANNEL pulse=P done=D open=K         完全由这份文件算出的差集（K=正跑着被截断的颗数）
+    UI_PROBE_HUNG=<用例名> + UI_PROBE_HUNG_CHANNEL=file  K=1 ⇒ 点这一条，不经过 stdout
+    UI_PROBE_FILE_CHANNEL_CLOSED_ALL=1                  K=0 ⇒ 没有一条被截在半路（这一卷跑完了）
+    UI_PROBE_FILE_CHANNEL_AMBIGUOUS=<名,名>             K>=2 ⇒ **红**：文件被上一遍复用了或在并行，不许挑一条
+    UI_PROBE_HUNG_WITHOUT_CLOSE=<名,名>                 日志说没结论而文件既无闭合也无未闭心跳 ⇒ **红**
+    UI_PROBE_LOG_CONCLUSION_LOST=<名>                   文件说它跑完了 ⇒ 丢的是那一行 stdout，不是这条用例
+    UI_PROBE_LOG_START_LINE_LOST=<名>                   同上，丢的是 started 行（旧算法会把它当孤儿）
+    UI_PROBE_LOG_IS_STEP_SUMMARY=1                      日志是步骤摘要；点名靠文件通道，这一格只登记日志不可用
+
+这一族的取舍：**闭合行把"哪一条正跑着被截断"变成了一份文件内部的减法**。旧的两通道对账（上面那组）
+只在没有闭合行时运行 —— 那时 `心跳 − 日志里的结论行` 的减数不可信，两个名字对不上就是红，
+`UI_PROBE_CHANNELS_CONTRADICT` 拒绝替一条说谎的通道签字（run 39102076143 就是这么红的，
+它拒绝得对，而修它的办法是把减数也搬到文件上，不是放宽这道拒绝）。
 
 退出码：0 = 给出了名字（跑完了、挂在哪条说清了、或一条都没开始也说清了）；
 1 = **给不出名字**，只有两种形状会走到这里，而它们都不是"探针坏了"，是"这份日志没资格说这句话"：
@@ -65,6 +81,13 @@ CASE = re.compile(r"Test Case '-\[[^\]]*?\b([A-Za-z0-9_]+)\]' (started|passed|fa
 # 所以两条通道可以对账；对不上时 `UI_PROBE_CHANNELS_CONTRADICT` 会红，而不是挑一个信。
 PULSE = re.compile(r"^PROBE_PULSE ([A-Za-z0-9_]+)[ \t]*$", re.M)
 
+# R146 / BACKLOG 186 · 心跳的**另一半**：`tearDownWithError()` 写的闭合行，同一份文件、同一批名字。
+# 为什么非要有它：旧算法算的是 `心跳 − 日志里的结论行`，而减数走的是那条会被 SIGKILL 整块带走的
+# stdout（R88 / R90 各自实测过一次）。减数不可信时，差集里就会多出"其实已经跑完、只是结论行丢了"
+# 的用例 —— run 39102076143 就是这么红的（`pulse=7 started=6 concluded=5` 点出两条，各说一条）。
+# 把减数也搬到文件上，"正跑着被截断的是哪一条"就只由一份文件回答。
+DONE = re.compile(r"^PROBE_DONE ([A-Za-z0-9_]+)[ \t]*$", re.M)
+
 # 崩溃/中止的旁证：有这些行时"没结论"是进程级的死法，不是某条用例的死法。
 CRASH = ("Fatal error", "Precondition failure", "signal code ", "Killed", "error: Exited with unexpected signal")
 
@@ -72,6 +95,110 @@ CRASH = ("Fatal error", "Precondition failure", "signal code ", "Killed", "error
 # 为什么要有这一格：拿错文件时脚本会自信地报"进程在第一条用例之前就死了"，
 # 而那是一句关于产品的假话（真相是我读错了文件）。见 `report()` 里那一格的注释。
 ECHO_MARKERS = re.compile(r"ui suite exit:|##\[group\]|没有跑完（看门狗")
+
+
+def _names(pattern, text):
+    """按文件里的先后顺序去重取名（同一条重跑只算一次，与 `_stdout_names` 同一口径）。"""
+    found = []
+    for match in pattern.finditer(text or ""):
+        if match.group(1) not in found:
+            found.append(match.group(1))
+    return found
+
+
+def _stdout_names(text):
+    """从 `swift test` 的原始日志里抽 started / concluded 两份名单（顺序=日志顺序）。"""
+    started, concluded = [], {}
+    for match in CASE.finditer(text):
+        name, state = match.group(1), match.group(2)
+        if state == "started":
+            if name not in started:          # 同一条重复出现（重跑或被两遍并进来）只算一次
+                started.append(name)
+        else:
+            concluded[name] = state
+    return started, concluded
+
+
+def _red_names(text):
+    return sorted({name for name, state in CASE.findall(text) if state == "failed"})
+
+
+def _file_channel_lines(pulse, done, started, concluded, text):
+    """心跳与闭合**都在这份文件里**时的整份汇报；返回 (行列表, 是否给出了名字)。
+
+    这条分支只处理"文件通道自己讲得通"的形状，讲不通的两种都**红**而不是挑一条信：
+
+      * `open >= 2` ⇒ 同一颗 xctest 是顺序跑的，不可能同时有两条用例没闭合。
+        多半是这份文件被上一遍复用了（CI 现在启动前先删），要么真在并行 ——
+        两种都不是"最后那条就是挂死的"，所以这一格不点名。
+      * 日志说某条没结论，而文件里既没有它的闭合行、它也不在那颗未闭的心跳里 ⇒
+        两条通道对同一条用例给了不能同时成立的话 ⇒ 红。
+        （反过来：日志说没结论而文件**有**闭合行 ⇒ 丢的是那一行 stdout，
+        报成 `UI_PROBE_LOG_CONCLUSION_LOST`，不报成产品挂了。）
+
+    退出码沿用旧口径：有红用例 ⇒ 说得出名字但这一格不算"跑完"（返回 not red）。
+    """
+    done_set = set(done)
+    hung_log = [n for n in started if n not in concluded]
+    open_heartbeats = [n for n in pulse if n not in done_set]
+    lines = [
+        "UI_PROBE_PROGRESS started=%d concluded=%d" % (len(started), len(concluded)),
+        "UI_PROBE_CHANNELS pulse=%d started=%d concluded=%d" % (len(pulse), len(started), len(concluded)),
+        "UI_PROBE_FILE_CHANNEL pulse=%d done=%d open=%d"
+        % (len(pulse), len(done), len(open_heartbeats)),
+    ]
+    if not text.strip():
+        lines.append("UI_PROBE_LOG_EMPTY=1 日志是空的（驱动那层被 SIGKILL，块缓冲整块丢）"
+                     " —— 下面的点名不依赖它，靠的是同一份文件里的心跳与闭合")
+
+    if len(open_heartbeats) >= 2:
+        lines.append(
+            "UI_PROBE_FILE_CHANNEL_AMBIGUOUS=%s （%d 颗心跳没闭合 ⇒ 『正跑着被截断的是哪一条』这句话没有依据："
+            "用例是顺序跑的，同时只可能在一条里面。这多半是**这份文件被上一遍复用了**（CI 该在启动前删掉它），"
+            "或者真有并行。这一格不许挑最后一条当结论）" % (",".join(open_heartbeats), len(open_heartbeats)))
+        return lines, False
+
+    # 日志与文件对同一条用例给了不能同时成立的话。
+    unexplained = [n for n in hung_log if n not in done_set and n not in open_heartbeats]
+    unexplained += [n for n in concluded if n not in started and n not in done_set and n not in pulse]
+    if unexplained:
+        lines.append(
+            "UI_PROBE_HUNG_WITHOUT_CLOSE=%s （日志说它们没结论，文件里却没有闭合行也没有对应的心跳 ⇒ "
+            "两条通道至少一条在说谎，这一格不许挑一条信）" % ",".join(unexplained))
+        return lines, False
+
+    # 到这里文件通道是自洽的：那颗未闭的心跳就是被收掉那一刻正在跑的那一条。
+    lost_conclusions = [n for n in hung_log if n in done_set]
+    if lost_conclusions:
+        lines.append(
+            "UI_PROBE_LOG_CONCLUSION_LOST=%s （日志说它没结论，而它的闭合行在文件里 ⇒ 丢的是**那一行 stdout**，"
+            "不是这条用例；这一格不许被读成『它挂死过』）" % ",".join(lost_conclusions))
+    lost_starts = [n for n in concluded if n not in started]
+    if lost_starts:
+        lines.append(
+            "UI_PROBE_LOG_START_LINE_LOST=%s （有结论却没有 started 行，而文件里有它的心跳与闭合 ⇒ "
+            "同样是 stdout 成块丢，不是孤儿）" % ",".join(lost_starts))
+    if ECHO_MARKERS.search(text):
+        lines.append(
+            "UI_PROBE_LOG_IS_STEP_SUMMARY=1 （这份文本里有 CI 那一步的汇报行；点名靠的是文件通道，"
+            "所以这一格只说明日志不可用，不影响点名）")
+
+    if open_heartbeats:
+        lines.append("UI_PROBE_HUNG=%s" % open_heartbeats[0])
+        lines.append("UI_PROBE_HUNG_CHANNEL=file （由同一份文件里『心跳 − 闭合』点出来，不经过 stdout）")
+    else:
+        lines.append(
+            "UI_PROBE_FILE_CHANNEL_CLOSED_ALL=1 （%d 颗心跳全部配到闭合行 ⇒ 没有一条用例正跑着被截断；"
+            "日志里少掉的那些结论行是 stdout 丢的，见上面那两格）" % len(pulse))
+
+    red = _red_names(text)
+    lines.append("UI_PROBE_CONCLUDED_RED=%d%s"
+                 % (len(red), (" " + ",".join(red[:8])) if red else ""))
+    lines.append("UI_PROBE_ALL_CONCLUDED=%d" % (0 if (red or open_heartbeats) else 1))
+    crashed = [marker for marker in CRASH if marker in text]
+    if crashed:
+        lines.append("UI_PROBE_CRASH_MARKERS=%s" % ",".join(crashed))
+    return lines, not red
 
 
 def report(text, runner_alive=None, pulse_text=None):
@@ -94,11 +221,14 @@ def report(text, runner_alive=None, pulse_text=None):
     # `ui.log` 仍是 119 字节（`.scratch/motion-audit-2/r90_findings_drag_hang_and_channel.md`）。
     # 放在最前面算：日志整块丢的时候（R88 的形状）它是**唯一**还有内容的通道，
     # 那时连"日志是空的"这一句都要让位给心跳点出来的名字。
-    pulse = []
-    if pulse_text:
-        for match in PULSE.finditer(pulse_text):
-            if match.group(1) not in pulse:
-                pulse.append(match.group(1))
+    pulse = _names(PULSE, pulse_text)
+    # R146 / BACKLOG 186 · 心跳的闭合行也在同一份文件里 ⇒ 这条通道可以**自己算自己**，
+    # 不必再减那份会丢的 stdout。先算 started/concluded，好让这条分支在"日志整块丢"时也能接管。
+    done = _names(DONE, pulse_text)
+    started, concluded = _stdout_names(text)
+    if pulse and done:
+        return _file_channel_lines(pulse, done, started, concluded, text)
+
     if not text.strip():
         if pulse:
             # 日志一个字没有，而心跳有 ⇒ 通道丢了但用例确实开了口，而且知道是哪一条。
@@ -117,21 +247,17 @@ def report(text, runner_alive=None, pulse_text=None):
         # 把仪器故障报成一句关于产品的结论，是这一族最贵的错（R64 那一课）。
         return (["UI_PROBE_LOG_EMPTY=1 日志是空的 ⇒ 这不是『探针没跑』，是『我没有它的输出』"], False)
 
-    started, concluded = [], {}
-    for match in CASE.finditer(text):
-        name, state = match.group(1), match.group(2)
-        if state == "started":
-            if name not in started:          # 同一条重复出现（重跑或被两遍并进来）只算一次
-                started.append(name)
-        else:
-            concluded[name] = state
-
     lines = ["UI_PROBE_PROGRESS started=%d concluded=%d" % (len(started), len(concluded))]
     # 只报"开了口却没有结论"的那些，并保持在日志里的先后顺序
     hung = [n for n in started if n not in concluded]
     pulse_hung = [n for n in pulse if n not in concluded]
     lines.append("UI_PROBE_CHANNELS pulse=%d started=%d concluded=%d"
                  % (len(pulse), len(started), len(concluded)))
+    if pulse_text and pulse and not done:
+        # 心跳有、闭合行没有 ⇒ 通道只接了一半（写闭合行的那半没上线，或者用的是旧二进制）。
+        # 这一格必须自己说出口：否则下面的两通道对账会拿"减数=会丢的 stdout"算出一个像结论的差集。
+        lines.append("UI_PROBE_DONE_ABSENT=1 有 PROBE_PULSE 却没有一条 PROBE_DONE ⇒ 这条通道只接了一半，"
+                     "下面的对账退回 R90 的旧形状（减数是 stdout 的结论行，它会被整块带走）")
 
     # 两条通道各点一条不同的"没结论" ⇒ 至少一条在说谎。这一格不许挑一个信：
     # 心跳在 setUp 第一行、started 在 XCTest 自己那里，两者对不上说明**其中一条通道被截断或串行**，

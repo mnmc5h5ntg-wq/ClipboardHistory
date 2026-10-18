@@ -138,6 +138,10 @@ jobs:
           # R89 把捕获闸门挪到所有产证据步骤之后（U-193 的修法）之后，这一卷的第一次写就把捕获卷那份
           # 读数换成了自己的 ⇒ 闸门读到 `passed=0 NOT_RUN=49`（run 38838819089 的那朵红）。
           # ⇒ 顺序修对了：证据先落地、红有名字；但它让一个原来"看不见"的共用文件变成了看得见的红。
+          # R146 / BACKLOG 186：心跳文件必须在启动前删掉。闭合通道算的是"心跳 − 闭合"这颗差，
+          # 而上一遍留下的**未闭**心跳会让这一遍读出 open>=2 ⇒ 报告器按 AMBIGUOUS 拒绝点名（红）。
+          # runner 每台是干净的，但本地按 CI 原样重跑时 /tmp 不是 ⇒ 这一行同时也是给本机那条路修的。
+          rm -f /tmp/probe-pulse.log
           CLIPBOARD_HISTORY_UI_INTERACTION=1 CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-probe \
             CLIPBOARD_HISTORY_PROBE_PULSE=/tmp \
             swift test --filter UIInteractionProbeTests > /tmp/ui.log 2>&1 &

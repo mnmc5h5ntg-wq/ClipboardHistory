@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 心跳的另一半 PROBE_DONE：CI 那句"两条通道各点一条"该修的是减数（R146 / U-494…U-496 · 产品 0 文件，通道与判据账）
+
+- `UIInteractionProbeTests.tearDownWithError()` 第一行写 `PROBE_DONE <用例名>` 到同一份心跳文件（skip 也走 tearDown ⇒ 被 skip 的那几条同样闭合）。
+- `ui_probe_report.py` 新增 `DONE` 尺与 `_file_channel_lines()`：「正跑着被截断的是哪一条」= **同一份文件里 `心跳 − 闭合`**，
+  不再减那条会被整块带走的 stdout。两颗未闭 ⇒ `FILE_CHANNEL_AMBIGUOUS` 红；日志说没结论而文件里什么都没有 ⇒ `HUNG_WITHOUT_CLOSE` 红；
+  只有心跳没闭合 ⇒ `DONE_ABSENT=1` 并退回 R90 的旧对账（历史夹具行为不变）。
+- CI 启动那卷前 `rm -f /tmp/probe-pulse.log`（跨次复用正是 AMBIGUOUS 的一种成因）。
+- 纠正一处旧账：`testOffScreen…` 的"稳定挂死"其实是它的**结论行没落盘**；被截断的是第 7 颗 `testRightClick…`。登记的 reason 改写成仪器，值暂留 `cannot`（BACKLOG 187）。
+- 验证：真产物 11 心跳 / 11 闭合；复刻 run 39102076143 的输入点名 `testRightClick…`；四刀对照 `arms=4 bad=0`；
+  全量 `847 tests / 42 skipped / 0 failures`；脚本 `Ran 320 tests … OK`；编译侧 0 告警。
+
+
 ### 录制态第一次进帧基线：136 → 138（R145 / U-491…U-493 · 产品 0 文件，夹具与判据账）
 
 - `UICaptureHarness.Fixture` 新增 `interact:(NSWindow)->Void`（跑在 caret 静默之后 —— `settle` 之后那句

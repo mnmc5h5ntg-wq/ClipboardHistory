@@ -25,7 +25,7 @@
     },
     "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped": {
       "runner": "cannot",
-      "reason": "R143/R144 翻回 cannot，依据是**读来的**：连着三跑同一台 runner 上这句原样重复 —— `NOT_RUN testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记为 runner=can，而这次日志里没有它的结论行`（run 39052480365 / 39054860497 / 39056187840，对应 `1427e46` / `f78af12` / `f26f4c9`），而同一步的报告把它点名为挂死：`UI_PROBE_HUNG=testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`，`本次下结论=5 红=1` 的那 1 就是这一格。**反证留着不回改**：R94 曾凭 run 38857388449（`8e6ed15`）的 `NOW_RUNS …（passed）` 把它翻成 can，所以这条不是『runner 结构上拍不到』，是**这台机器上它今天会挂**；两向门还活着 —— 哪一跑它又下结论了，闸门会红在 `NOW_RUNS`，那时再翻回去并带上那一跑的读数。挂的成因未定（BACKLOG 186 继续跟）：这条要真的 orderFront 一扇带选中行的列表窗口，候选是 runner 上事件循环/窗口服务与本机不同，**没有实测**，不许当成结论。"
+      "reason": "R144 按三跑同形翻成 cannot；R146 把**理由从产品改写成仪器**（登记本身暂不动）。连着三跑这句原样重复 —— `NOT_RUN testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记为 runner=can，而这次日志里没有它的结论行`（run 39052480365 / 39054860497 / 39056187840，对应 `1427e46` / `f78af12` / `f26f4c9`）。**它不是挂死**：本机同一份通道量到的真实顺序里它是第 6 颗心跳、而第 6 颗**有闭合行**（`scripts/tests/fixtures/r146_pulse_real.log` 逐字节），CI 那次 `pulse=7 started=6 concluded=5` 里未闭的是第 7 颗 ⇒ 少掉的是**它那一行 stdout**（看门狗收杀时块缓冲整块带走，R88 / R90 各实测过一次）；报告脚本当时拒绝在两通道之间挑一条信（`UI_PROBE_CHANNELS_CONTRADICT`），拒绝得对。登记不翻回 can 的原因换了：不是「这条跑不动」，而是 `probe_coverage_gate.py` **今天仍只看日志的结论行**，在它接上闭合通道之前翻 can 会红在仪器上（BACKLOG 187）。反证继续留着：R94 曾凭 run 38857388449（`8e6ed15`）的 `NOW_RUNS …（passed）` 把它翻成 can —— 那句话现在只有一种读法：那一跑的 stdout 恰好留住了它的结论行。"
     },
     "testRowIndexDriftDoesNotMoveTheViewport": {
       "runner": "cannot",

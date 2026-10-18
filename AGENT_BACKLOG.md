@@ -4629,6 +4629,14 @@ R124 故意留的那朵红在 run 39031123341 里交出键来了：
 ⇒ 177 照原计划做（`SettingsCategory.shortcuts` 加录制态变体，136 → 138，`--must-include` 同步改，同一轮里 `update` 基线），
 **不再有"通道可能拍不到"这个前提**；下一轮（R144）第一件事就是它。
 186. **runner 上在屏探针那一卷这次**挂**在 `testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`**（R143 读 `1427e46` 那跑开，run 39052480365）：
+
+**187. 在屏覆盖闸门还读那条会丢的通道 —— "它在 runner 上确实跑过"应改由心跳+闭合判**（R146）
+`probe_coverage_gate.py` 只吃 `/tmp/ui.log`：一条用例只要结论行没落盘就被记成 `NOT_RUN`，
+而 R146 已经证明结论行会说谎（那块被 SIGKILL 带走的是 stdout，不是产品）。
+要做的三格，按顺序：① 让它读同一份 `probe-pulse.log`，把"跑过"判成**有心跳且有闭合**（与报告脚本同一个口径，别再各算一套）；
+② 缺席因此分成三种有名字的出口：`queued`（没轮到）/ `hung`（心跳未闭）/ `log-lost`（闭合了而日志没结论行）——
+第三种不该算 runner 不可跑；③ 用一次真 CI 读数重判 `testOffScreen…` 该不该翻回 `can`，并把 186 的登记一起对齐。
+不给这格配"翻回 can"的预设结论：本轮只有本机那一遍的 11/11，runner 上的闭合通道**还没量过一次**。
     三个读数一起看才是这一格的形状 —— `UI_PROBE_HUNG=testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`
     与 `=testRightClickMenusAppKitWouldShowAreChinese`（后者一次没轮到）、
     `PROBE_COVERAGE_SUMMARY … 本次下结论=5 红=1`（那 1 条红就是 NOT_RUN：登记 `runner=can` 而日志里没有它的结论行）。
@@ -4669,3 +4677,13 @@ cannot 带 reason 不红 / 没 reason 的 cannot 仍红 / cannot 而它跑完红
 基线同一轮 `update` 后 `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`；盲区名单被闸门逼着 +1（vibrancy 子树）。
 **收尾还欠一格**（这条不撤，改成判据账）：把"录制态帧的高色度像素 ≥ 地板"变成电池里会红的断言 ——
 今天它只由本轮脚本量过一次，帧名说谎目前还只能靠人眼发现。
+
+**186 追记（R146 结案一半）**：成因有名字了，而且**不是产品** —— 那条被记成"这台机器上它今天会挂"的
+`testOffScreenProgrammaticSelectionIsRevealedAndNotJumped`，本机同一份通道量到的真实顺序里它是第 6 颗心跳且**已闭合**；
+CI 那次 `pulse=7 started=6 concluded=5` 里未闭的是第 7 颗 `testRightClickMenusAppKitWouldShowAreChinese`
+⇒ 少掉的是它的**结论行**（stdout 尾巴随 SIGKILL 整块丢，R88/R90 各实测过一次）。
+本轮落地的修法：探针加 `tearDownWithError` 的 `PROBE_DONE` 闭合行，报告脚本改成"心跳 − 闭合"这一份文件内部的减法
+（`UI_PROBE_FILE_CHANNEL` / `…_CLOSED_ALL` / `…_AMBIGUOUS` / `UI_PROBE_HUNG_WITHOUT_CLOSE` / `UI_PROBE_LOG_CONCLUSION_LOST`），
+两条讲不通的形状仍然红。登记值仍留 `cannot`，但 reason 已改写成仪器 —— **翻回 can 这件事交给 187**，
+因为 coverage 闸门今天还读那条会丢的通道。欠一次真 CI 验收：下一跑要看到 `UI_PROBE_HUNG_CHANNEL=file`，
+那时 186 才叫结案。

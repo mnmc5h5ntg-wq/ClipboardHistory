@@ -4821,6 +4821,52 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 148 轮（R146 · 2026-10-18）：心跳的另一半 `PROBE_DONE` —— 那句"两条通道各点一条、不许挑一个信"拒绝得对，该修的是减数（U-494…U-496 · 产品 0 文件，通道与判据账）
+
+**这一轮做的是 BACKLOG 186 的成因**。CI 的 `On-screen probe coverage floor` 连红三跑（`0f6c702` / `ff99d19` / `f26f4c9`），
+红因不是登记没翻对，而是报告脚本自己：`UI_PROBE_CHANNELS_CONTRADICT pulse=testOffScreen…,testRightClick…
+started=testOffScreen…` ⇒ `UI_PROBE_NAMED=0` ⇒ `PROBE_FLOOR_STOP_UNNAMED=1`（退出码 1）。
+
+### 0. 开场清单（本轮量了什么、判成什么）
+
+| 项 | 位置 / 命令 | 读数 | 判 |
+|---|---|---|---|
+| 闭合行是产品真写得出来的 | `CLIPBOARD_HISTORY_UI_INTERACTION=1 … swift test --filter UIInteractionProbeTests`（`/tmp/r146_pulse`） | 心跳 11 颗 / 闭合 11 条，逐条配对；`SUITE_EXIT=0` | 通道两头都接上了，不是我照格式编的 |
+| 本机真实顺序（同一份文件数的） | `scripts/tests/fixtures/r146_pulse_real.log` | 第 6 颗=`testOffScreen…`（**有闭合**），第 7 颗=`testRightClick…` | CI 那次 `pulse=7` 里未闭的是**第 7 颗** |
+| 复刻 run 39102076143 | 前 7 心跳 + 前 6 闭合，日志 6 started / 5 concluded，喂新算法 | `UI_PROBE_HUNG=testRightClick…`、`UI_PROBE_LOG_CONCLUSION_LOST=testOffScreen…`、`FILE_CHANNEL pulse=7 done=6 open=1`，退出码 0 | 名字有了，且不再需要"挑一条信" |
+| 四刀对照 | `.scratch/motion-audit-2/r146_file_channel_knives.py` | `BASELINE exit=0 OK` → `R146_KNIVES arms=4 bad=0`；K1/K2 各被 5 格抓住，K3/K4 各被 1 格抓住 | 两处拒绝（AMBIGUOUS / HUNG_WITHOUT_CLOSE）都有牙 |
+| 真产物对照 | `ui_probe_report.py /tmp/r146_ui.log --pulse /tmp/r146_pulse/probe-pulse.log` | `FILE_CHANNEL pulse=11 done=11 open=0`、`ALL_CONCLUDED=1`、`REPORT_EXIT=0` | 跑完的那一卷读成"跑完了"，不是读成"没名字" |
+| 全量 / 电池 | `swift test`；`python3 -m unittest discover -s scripts/tests` | 全量 `Executed 847 tests, with 42 tests skipped and 0 failures` / 222.0s；脚本电池 `Ran 320 tests … OK`（310 → 320，本轮 +10 格） | 编译侧 0 告警（日志里那 10 行 `CoreData: warning:` 是系统运行噪声，不是编译器告警） |
+
+### 1. 改了什么（产品文件 0 改动）
+
+- `UIInteractionProbeTests.tearDownWithError()` 第一行 `CaptureReadings.emit("PROBE_DONE \(pulseStamp)", to: Self.pulseURL)`。
+  skip 也走 tearDown（`skipUnlessEnabled()` 在方法**体内**抛），所以这台机器上被 skip 的那几条同样会闭合 ⇒ `心跳 − 闭合` 不被它们污染。
+- `scripts/ui_probe_report.py`：新增 `DONE` 尺 + `_file_channel_lines()`，"正跑着被截断的是哪一条"改成**一份文件内部的减法**；
+  两种讲不通的形状仍然红（`FILE_CHANNEL_AMBIGUOUS` / `HUNG_WITHOUT_CLOSE`）；只有心跳没闭合 ⇒ `DONE_ABSENT=1` 并退回 R90 的旧对账（历史夹具行为不变）。
+- `.github/workflows/ci.yml`：启动那卷之前 `rm -f /tmp/probe-pulse.log`（跨次复用会让这一遍读出 open≥2）。
+- 新夹具 `scripts/tests/fixtures/r146_pulse_real.log`（22 行原文件）+ 10 格测试（`FileChannelTests` 8 / `FileChannelWiringTests` 2）。
+- `probe_coverage_expectations.json`：`testOffScreen…` 那条登记的 **reason 从"产品会挂"改写成"日志丢了它的结论行"**（登记值暂留 `cannot`，理由换成仪器；见 BACKLOG 187）。
+
+### 2. 三处失误与一处纠正
+
+- **U-494：一条会丢的通道不配当减数。** 旧算法是 `心跳 − 日志里的结论行`，被减数免疫、减数会被 SIGKILL 整块带走（R88 / R90 各实测过一次）。
+  于是那朵红把**仪器不对称**报成了"两条通道互相矛盾"，而报告脚本的拒绝是对的 —— 修法是让减法在同一条免疫通道里闭合，
+  不是放宽那道拒绝。连带纠正 R144：`testOffScreen…` 的"稳定挂死"其实是它的结论行没落盘，被截断的是第 7 颗（`testRightClick…`）。
+- **U-495：一次性变异仪器自己的两种坏法，都是绿的。** ① 拿 `前 pulses+dones 行` 切真文件当 CI 形状 —— 那份文件是 P/D 交错的，
+  11/9 被切成 10/10，`AMBIGUOUS` 那一格当场没被验到；改成按颗数过滤 + 自己断言切出来的颗数。
+  ② 同形检查写成 `SANDBOX == TARGET.parents[2]` —— 一条恒假/恒真的路径等式；同形的实际含义是"测试按 `parents[2]` 真去读的那两处文件在不在"，改成存在性检查。
+- **U-496：替换整行 JSON 值时把上一行的逗号一起抄了进去** ⇒ 文件不再合法，而 `json.load` 是事后单独跑才发现的。
+  规矩：改 `probe_coverage_expectations.json` 这类登记表，补丁脚本末尾必须自己 `json.load` 一次并把 `cases=N` 打出来（本轮就是这么抓回来的）。
+
+### 3. 仍然欠着的（不在本轮做）
+
+- **BACKLOG 187（新开）**：`probe_coverage_gate.py` 仍只看日志的结论行 ⇒ "它在 runner 上确实跑过"这句话要改成由心跳+闭合判；
+  接上之后用一次真 CI 读数重判 `testOffScreen…` 该不该翻回 `can`。本轮 CI 未推之前，不以"应该绿"记账。
+- 177 收尾那一格（帧级状态自证读已写出的 PNG）；176（runner 的 `PROBE_FPS` 三个数）；182 / 183 / 185。
+- 本轮零产品改动 ⇒ 不重拍帧、不换装（装在本机的还是 R145 那一份，行为与本仓库一致）。
+
+
 ## 第 147 轮（R145 · 2026-10-18）：录制态第一次进帧基线（136 → 138），并记下四处装配与自证的陷阱（U-491…U-493 · 产品 0 文件，夹具与判据账）
 
 **这一轮做的是 BACKLOG 177**：快捷键录制器的「我在听」从 R141 起只有组件级渲染与一次性真机截图作过证，
