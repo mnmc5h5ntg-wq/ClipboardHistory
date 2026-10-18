@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 209 的同源读数：分段筛选控件暗档是白卡、亮档几乎无差，通道判不了（R182 / U-604…U-606 · 产品 0 文件，动效主线）
+
+- 读数（`frame_audit.read_png/luminance`，带 y=204..278、x=30..547）：暗档左半 233.7 vs 右半 248.0（右半主色 (@255,255,255) 占 65.9%）；亮档左半 233.7 vs 右半 248.0（差 14.3 点，亮像素占比两边均 97%）
+- 两种解释分不开：选中填充不随外观 / 离屏 vibrant 合成盲区（D-090 / D-094 / R29d 那一族）⇒ 需要夹具选中项 + 真机通道（`scripts/real_screen_*.py`，2026-10-17 起关着）；209 不结案、不动产品、不放宽成"通道限制"
+- 自撞纠回：第一次带子放错（按显示图心算 y 比例，两半都测成 (28,28,28)），改用逐行找亮墨定位到 y=204..277 ⇒ 尺没量到不等于不存在
+- 清账表 115 行 / 162 格 / 未清账 47 未动；验证：闸门 `RESULT=ok`、脚本电池 `Ran 362 / OK`（台账落盘之后跑）、0 产品文件
 ### 主窗口/列表行四格判完（空 / 错误 / 成功 / 禁用）+ 筛选条那格观察开单（R181 / U-601…U-603 · 产品 0 文件，动效主线）
 
 - 四格 `not-applicable`，理由统一为"承载物在别处"：空态在 `EmptyStateView`、失败在 `NoticeBanner`（`ContentView.swift` 四处）、复制成功回执在详情区那颗按钮（`ReceiptLine` 只被 `SettingsView` 用）、行没有可禁用态（`disabled`/`isEnabled`/`allowsHitTesting` 各 0 命中）
