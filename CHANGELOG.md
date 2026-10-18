@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 194 的放行决定抽成会红的谓词，并补上它欠的那根分辨轴（R168 / U-557…U-562 · 产品 0 文件，判据账）
+
+- `shouldRegisterBlankAsMachineGap`：settings 族 + 需求高 ≥1000 + 内容视图与宿主窗口都等于需求高，才判"这台机器画不出来"；**尚未接成放行通道**，调用点只打 `BLANK_GAP_WOULD_RELEASE … would=`
+- `drawnBoundingBox` + `CAPTURE_DRAW`：画到的包围盒三态哨兵（`-1` 量不到 / `0` 根本没渲染 / `>0` 画到这里），与 `transparent` 同源同常数；本机 6 张高帧读数 box 1040…1040 pt 作"画满"侧标定
+- 变异表 `mutate_r168.py` M675–M683（9 把，全 CAUGHT、RESTORE_CLEAN=yes），含"删调用"与"常数换回字面量"两把接线刀
+- 判据卷 `CaptureBlankFrameGapTests` 9 格；帧基线 `--against working` 对账 138 张、changed=0；全量卷 857 例 / 跳过 42 / 失败 1（那唯一一朵红在 `CapturePathWriteBudgetTests` 的异步落盘前提，单跑 4 例 / 失败 0 ⇒ BACKLOG 199）
 ### runner 把 194 签成"第三种情形"，而我给自己造的两格正对照都是空的 ⇒ 出口撤回（R167 / U-554…U-556 · 产品 0 文件，判据账）
 
 - `--log` 取到 runner 的几何行：`requested=720x1040 content=720x1040 host=720x1040 screenVisibleHeightPt=681`（六张高帧同形）

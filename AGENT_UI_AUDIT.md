@@ -4821,6 +4821,38 @@ R58 那半年缺的就是这颗钉子：网格只输出字符串、不参与断�
 - 逐行拆分（五个分区图标各一行）本轮**没做**，只有列级聚合 ⇒ 若某一行图标真有问题而其余四行很亮，
   列级读数会把它抹平（3966 与 1391 都是四五行相加）。R115 搬进仓库那颗尺时按结构推行，正好把这一格补上。
 - 人工批次 26.x–83.1、84.1、85.1、85.2 仍只能由用户在真机做。
+## 第 170 轮（R168 · 2026-10-19）：把 194 的放行决定抽成会红的谓词，并补上它欠的那根分辨轴（9 把刀全 CAUGHT）（U-557…U-562 · 产品 0 文件，判据账）
+
+- **U-557：放行决定现在是谓词，不是散文。** `UICaptureTests.shouldRegisterBlankAsMachineGap(family:requestedHeightPt:contentHeightPt:hostHeightPt:)`
+  —— 只有「settings 族 + 需求高 ≥1000 + 内容视图与宿主窗口都等于需求高」才判"这台机器画不出来"。
+  单测每一格都让谓词**真的做决定**：runner 的形状放行 / 内容没铺满不放行 / 窗口被收小不放行 / 矮帧不放行 / 别的族不放行 / 没有读数不放行。
+  这是对 R167 那次空对账的直接修复：上一轮我把**有对象的帧**塞进未画循环做对照，两种实现都绿；
+  这一版对照建在谓词自己身上，M675–M678 四把刀把它弄回四种错法，四把全红。
+- **U-558：194 欠的那根分辨轴落地了。** `drawnBoundingBox` 量"画到的包围盒"，读的是与 `transparent` **同一份 raw rep、同一个 `transparentAlphaCeiling`**，
+  三态哨兵互不重叠：`-1` = 拿不到字节（量不到）、`0` = 一个有墨像素都没有（根本没渲染）、`>0` = 画到这里（≈屏幕可视高 ⇒ 被裁；≈需求高 ⇒ 画满）。
+  调用点在 `testCaptureKeyViews` 里对每张高帧打 `CAPTURE_DRAW <帧名> requested=… drawnBoxPt=… drawnBottomPt=… transparent=…% screenVisibleHeightPt=…`，
+  本机 6 张高帧的读数落在 box=1040…1040 pt —— 这是"画满"那一侧的标定样本。**只出读数，不放行。**
+  变异刀 M680（不除 backingScale ⇒ 把 2x 帧说成两倍高）、M681（`>=` 改 `>` ⇒ 这根轴比"空"那把尺更迟钝）、
+  M682（哨兵 0 改 -1 ⇒ "没渲染"与"量不到"同形）全 CAUGHT；M682 同时红在两格，因为那两格都靠这个哨兵分辨方向。
+- **U-559：本机没有活体放行证人，这条必须自己说出来。** `BLANK_GAP_WOULD_RELEASE_CENSUS loop_items=2 with_geometry=0 would_release=0`
+  —— 本机未画循环有 2 张帧（`quickpick-empty` 亮/暗），但没有一张是高帧，所以谓词在本机的唯一证人是那 9 格单测。
+  调用点因此**只报 `would=`，不改处置**：runner 那六张红照旧红。下一轮拿 `CAPTURE_DRAW` 的 runner 读数分开"被裁 / 没渲染"之后，
+  才谈把 `would_release` 变成真出口（R162 的规矩：顺序不能反过来）。
+- **U-560：看图腿是复用，不是新画面。** 产品 0 文件，帧基线 `--against working` 对账 138 张、
+  changed=0 / missing=0 / added=0 ⇒ 本轮没有任何新东西可看；上一轮量出的热图 118pt 空白带仍挂在 BACKLOG 197。
+  （写清楚是为了不让"看了图"变成一个没有对象的断言 —— 这一族的教训是 R167 的空对照。）
+- **U-561：预检抓到一支陈旧死针，不是本轮的针。** `mutate_r97_card` 的 M541 命中=0（`NEEDLE_PRECHECK … bad=1` 且退出码 1），
+  本轮 9 根新针（M675, M676, M677, M678, M679, M680, M681, M682, M683）全部命中 1 次。名册里躺着一支早已被别的轮次改掉的死针 ⇒
+  预检的 `bad=1` 把"本轮的针是死的"与"名册该清一次"混在同一个退出码里，新开 BACKLOG 198。
+- **U-562：全量卷这一跑红了一朵，红的不是我碰的那一卷。** `CapturePathWriteBudgetTests / testAddingACopyWithANearlyFullArchiveStaysInsideBudget`：
+  `XCTAssertEqual failed: ("459") is not equal to ("480") - 重新加载没拿到同一份库`。
+  它是 R51 那条前提钉子：造完 480 条只 `pumpMain(seconds: 0.4)` 就重开库，等的是**异步落盘**，
+  满载时不够（这一格在整卷里跑了 8.6s、单跑 1.6…2.7s）。单跑该卷 4 例 / 失败 0（退出码 0）⇒
+  判为跨卷时序前提、不判成本轮的代码结论；**本轮不改它**（改法要动 R51 那批判据的承重，得配自己的正对照），
+  新开 BACKLOG 199 把"固定的 0.4s 换成有界轮询 + 超时才红"记下来。今天同一台机器上一遍全量卷是 857 例 / 失败 0（前半段那一跑）。
+- 读数：编译 0 告警；判据卷 9 例（`CaptureBlankFrameGapTests`）；全量卷 857 例 / 跳过 42 / 失败 1（退出码 1）；
+  捕获卷退出码 0、138 张帧、`CAPTURE_DRAW_CENSUS tall=6`；清账表 行数=112 已清账=112 未清账=59 地板=112（本轮没动它）；
+  变异表 9/9 把 CAUGHT、RESTORE_CLEAN=yes，红名逐个：M675→testRegistersOnlyWhenGeometryEqualsTheRequest（ran=9）, M676→testShortFixturesAreNeverReleased（ran=9）, M677→testShortFixturesAreNeverReleased（ran=9）, M678→testBlankFrameLoopCallsThePredicate（ran=9）, M679→testTallFixtureThresholdHasOneSource（ran=9）, M680→testBoundingBoxConvertsPixelsToPointsByBackingScale（ran=9）, M681→testBoundingBoxUsesTheSameAlphaCeilingAsBlankness（ran=9）, M682→testBoundingBoxSeparatesNotRenderedFromClipped,, M683→testTallFixtureThresholdHasOneSource（ran=9）。
 ## 第 169 轮（R167 · 2026-10-18）：runner 把 194 的几何签成"第三种"，而我给自己造的两格正对照都是空的 ⇒ 出口撤回（U-554…U-556 · 产品 0 文件，判据账）
 
 - **U-554：读数到手了。** run `39146135218`（`817be0d`）的 `--log` 里（**注意：`--log-failed` 读不到 —— 那行是

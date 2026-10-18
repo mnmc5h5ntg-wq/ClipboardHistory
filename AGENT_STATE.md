@@ -1,5 +1,23 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 01:5x（本地 · R168 / 第 170 轮：**把 194 的放行决定抽成会红的谓词，并补上它欠的那根分辨轴**（U-557…U-562 · 产品 0 文件，判据账）
+
+**落了什么**：① `shouldRegisterBlankAsMachineGap` —— settings 族 + 需求高 ≥1000 + `content == host == requested` 才判"这台机器画不出来"；
+调用点在未画循环里**只报 `BLANK_GAP_WOULD_RELEASE … would=`，处置一行没改**（runner 那六张红照旧红）。
+② `drawnBoundingBox` + `CAPTURE_DRAW` —— R167 欠的那根分辨轴：三态哨兵 `-1` 量不到 / `0` 根本没渲染 / `>0` 画到哪里，
+与 `transparent` 同一份 raw rep、同一个 `transparentAlphaCeiling`。本机 6 张高帧读数 box 1040…1040 pt（"画满"那一侧的标定）。
+**为什么这次不算空对账**：9 格单测每一格都让尺子/谓词真的给数；`mutate_r168.py` M675–M683 共 9 把全 CAUGHT、RESTORE_CLEAN=yes，
+其中删**调用**的那把红在 `testBlankFrameLoopCallsThePredicate`、换**常数来源**的那两把红在 `testTallFixtureThresholdHasOneSource`。
+**自陈**：本机 census `loop_items=2 with_geometry=0` ⇒ 高帧一张都不空，谓词在本机的唯一证人是单测，"出口已验收"这句话现在没人配说。
+**别人那一卷的红**：全量卷 857 例 / 失败 1，唯一一朵在 `CapturePathWriteBudgetTests` 的 `pumpMain(0.4)` 前提（单跑 4 例 / 失败 0）⇒ 记 BACKLOG 199，不改它的承重。
+
+**下一轮（R169）的靶**：⓪ 读本跑与 `490b1ea` 的**全部失败步骤**（`PYTHONUTF8=1 python3 scripts/ci_read.py steps <run>`），并从 `--log` 里取
+   `CAPTURE_DRAW settings-*-tall … drawnBoxPt=`（report-only 的捕获步骤，`--log-failed` 取不到）；
+① **按包围盒读数给 194 定性并决定出口**：`0` ⇒ 根本没渲染；`≈ screenVisibleHeightPt` ⇒ 被屏幕裁（出口按包围盒写，不是按屏幕高）；
+   `≈ 1000` ⇒ 修这把尺。三条出口的谓词都要先写单测再接线（R168 的形状可抄：谓词 + census 自陈覆盖面 + 删调用的刀）。
+② BACKLOG 197（热图右侧 ~118pt 空白带）—— 产品面第一笔：先 spike，帧基线同一笔 update，过 `CARD_RHYTHM` 与 `contentMustFit`，全量卷 + 换装本机 + 逐屏看图；
+③ BACKLOG 199（那朵红的有界轮询修法，带正对照）与 198（预检按表的新近度分栏）；
+④ 清账表下一批（新格一律带 `缺席:`）；⑤ 195 的 ①、189、188、187 的 ②③、176 / 182 / 183 / 185。
 最后更新：2026-10-18 17:06（本地 · R167 / 第 169 轮：**runner 把 194 签成第三种情形，而我给自己造的两格正对照都是空的 ⇒ 出口撤回**（U-554…U-556 · 产品 0 文件，判据账）
 
 **读数到手**：`--log`（**不是** `--log-failed` —— 那行是 report-only 的捕获步骤打的，那一步没红）里

@@ -147,6 +147,60 @@ final class UICaptureTests: XCTestCase {
         /// 这条只给 `contentMustFit` 那批夹具用 —— 列表/滚动区那批**天生**会被裁，
         /// 判它们等于把"滚动视图的正常行为"报成缺陷（这正是 R18 没敢立这条守卫的原因）。
         let bottomInkFraction: Double
+        /// **画到的包围盒高**（pt）—— BACKLOG 194 欠的那根分辨轴（R168）。
+        ///
+        /// 三种读法互不重叠，这是它有用的全部理由：
+        /// * `-1` = 拿不到字节 ⇒ **量不到**，不许当成"没画"（R130 的哨兵规矩：漏掉那格会掉进哪个出口要先想清楚）；
+        /// * `0`  = 一个有墨的像素都没有 ⇒ **根本没渲染**；
+        /// * `≈ 屏幕可视高` 而需求是 1040 ⇒ **渲染了但被裁**；`≈ 需求高` ⇒ 画满了。
+        ///
+        /// 它读的是 **raw rep 的 alpha**，与 `transparent` 同一来源、同一常数
+        /// （`transparentAlphaCeiling`）：一个说"多少像素没画"、一个说"画到的最远的那行在哪"，
+        /// 两边若用了不同的"什么算画过"，runner 上的空帧就会出现"占比说空、包围盒说满"这种自相矛盾。
+        let drawnBoxPt: Double
+        /// 最下面一条有墨的行（pt）；`drawnBoxPt == 0` 时是 `-1`（没有这样的行）。
+        let drawnBottomPt: Double
+    }
+
+    /// 画到的包围盒：第一条 / 最后一条"有墨"的行，以及它们之间的高（pt）。
+    ///
+    /// "有墨" = 这一行至少有一个像素 `alpha >= transparentAlphaCeiling`。门槛取**一个像素**：
+    /// 要分开的是 0 / ≈681 / 1040 这种**几百像素**的差，不是一把 1pt 的杂点；
+    /// 若将来要分辨的是"某几行有没有被裁"，门槛就得重量（别沿用这里的 1）。
+    static func drawnBoundingBox(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                 bytesPerRow: Int, backingScale: CGFloat)
+            -> (topPt: Double, bottomPt: Double, heightPt: Double) {
+        var top = -1
+        var bottom = -1
+        var y = 0
+        while y < height {
+            let row = y * bytesPerRow
+            var inked = false
+            var x = 0
+            while x < width {
+                if bytes[row + x * 4 + 3] >= transparentAlphaCeiling { inked = true; break }
+                x += 1
+            }
+            if inked {
+                if top < 0 { top = y }
+                bottom = y
+            }
+            y += 1
+        }
+        guard top >= 0 else { return (topPt: -1, bottomPt: -1, heightPt: 0) }
+        let scale = Double(backingScale > 0 ? backingScale : 1)
+        return (topPt: Double(top) / scale,
+                bottomPt: Double(bottom + 1) / scale,
+                heightPt: Double(bottom - top + 1) / scale)
+    }
+
+    /// 从帧文件名读**需求高**：`settings-privacy-tall-720x1040-light.png` → 1040。
+    /// 读不出来返回 `nil`（调用点不许把 nil 当成 0 —— 那会让"没尺寸"看起来像"矮帧"）。
+    static func requestedHeightPt(fromFile file: String) -> CGFloat? {
+        let base = (file as NSString).deletingPathExtension
+        guard let range = base.range(of: "-\\d+x(\\d+)-", options: .regularExpression) else { return nil }
+        let digits = base[range].dropFirst().dropLast().split(separator: "x")[1]
+        return CGFloat(Int(digits) ?? 0)
     }
 
     /// 纯黑填充带的最大高度（pt）。
@@ -250,6 +304,32 @@ final class UICaptureTests: XCTestCase {
     /// 只在这一整个测试实例活着的时候有效（XCTest 每个用例一个新实例），不跨用例、不跨机器。
     /// 键是文件名（含尺寸与档位），值是那一次捕获里量到的四个数。
     var capturedGeometry: [String: (requested: CGFloat, content: CGFloat, host: CGFloat, screen: CGFloat)] = [:]
+
+    /// R168 / BACKLOG 194：把"这张空帧该不该算这台机器画不出来"抽成**纯谓词**。
+    ///
+    /// 为什么单独抽：本机拍不出"高帧全空"那种形状（六张 `-1040-` 本机 `blank=0.0%`），
+    /// 于是放行条件**没法**靠"在真帧上跑一遍循环"来验收。R167 我就是这么造正对照的 ——
+    /// 把有对象的帧强行塞进未画循环，两种实现都绿，那两格是空的（空对账）。
+    /// 抽成纯函数之后，对照建在谓词自己身上：每一格都必须让它真的做决定
+    /// （`CaptureBlankFrameGapTests` 三格：三轴齐 ⇒ 放行；任一根轴不齐 ⇒ 不放行；没有读数 ⇒ 不放行）。
+    ///
+    /// **这一版还不接线放行**。BACKLOG 194 的三种解释里，"窗口被收小"和"内容视图没铺满"
+    /// 已被 runner 的同源读数否掉（`requested=720x1040 content=720x1040 host=720x1040`），
+    /// 剩下"画了但整层不合成"是最像的那一个，**不是被排除完剩下的那一个** ——
+    /// 判别轴（帧内实际画出的包围盒高 / 最后一行有墨的 y）还没有读数之前，红必须照旧红。
+    /// 调用点因此只打一行 `BLANK_GAP_WOULD_RELEASE`：报"如果接线会怎么判"，不改处置。
+    static func shouldRegisterBlankAsMachineGap(family: String,
+                                                requestedHeightPt: CGFloat?,
+                                                contentHeightPt: CGFloat,
+                                                hostHeightPt: CGFloat) -> Bool {
+        guard family == "settings", let requested = requestedHeightPt,
+              requested >= tallFixtureHeightFloor else { return false }
+        return contentHeightPt == requested && hostHeightPt == requested
+    }
+
+    /// 「高帧」的下界：`render` 里留几何读数的门槛与谓词用的是**同一个常数**，
+    /// 两处各写一遍字面量的那天，就是出口悄悄换档的那天。
+    static let tallFixtureHeightFloor: CGFloat = 1000
 
     /// 取一条方法签名之后的**方法体**（到第一处「换行 + 四空格 + }」为止）。
     ///
@@ -3190,10 +3270,31 @@ final class UICaptureTests: XCTestCase {
 
 
         var exemptedSparse = Set<String>()
+        // R168 / BACKLOG 194：这一格循环是"空帧"唯一被处置的地方，所以放行谓词的**活体调用点**
+        // 就建在这里 —— 计数器不是装饰：本机 `loop_items` 必须 ≥1（`quickpick-empty` 本机 97.9% 未绘制），
+        // 为 0 就说明这条分支在这台机器上根本没有证人，谓词接没接线都看不出来。
+        var blankLoopItems = 0
+        var blankLoopWithGeometry = 0
+        var blankLoopWouldRelease = 0
         for item in report where item.metrics.transparent > 0.95 {
             let name = Self.fixtureName(fromFile: item.name)
             let family = name.components(separatedBy: "-").first ?? ""
             let knownIncapable = (family == "settings" && settingsFamilyIsBlank)
+            blankLoopItems += 1
+            if let geometry = capturedGeometry[item.name] {
+                blankLoopWithGeometry += 1
+                let would = Self.shouldRegisterBlankAsMachineGap(
+                    family: family, requestedHeightPt: geometry.requested,
+                    contentHeightPt: geometry.content, hostHeightPt: geometry.host)
+                if would { blankLoopWouldRelease += 1 }
+                // 只报"如果接线会怎么判"，下面的处置一行都没改。
+                emit("BLANK_GAP_WOULD_RELEASE \(item.name) would=\(would)"
+                     + " requested=\(Int(geometry.requested)) content=\(Int(geometry.content))"
+                     + " host=\(Int(geometry.host)) screenVisibleHeightPt=\(Int(geometry.screen))")
+            } else {
+                emit("BLANK_GAP_WOULD_RELEASE \(item.name) would=no-reading"
+                     + "（这一张没进同源几何读数：它的高 <\(Int(Self.tallFixtureHeightFloor))）")
+            }
             if knownIncapable {
                 emit("CAPTURE_NOT_RUN \(item.name) \(Int(item.metrics.transparent * 100))% 未绘制"
                       + "，而 settings 族在这台机器上**每一张**都超过 "
@@ -3217,6 +3318,37 @@ final class UICaptureTests: XCTestCase {
                         + "（这一族的其他帧画得出来 ⇒ 不是机器不行，是这一张不行）")
             }
         }
+        // R168：这一行是谓词**活体调用**的证人。它不判产品，只说明这台机器上
+        // 这条分支有没有被真的走过 —— 没有证人的接线与没接线同形（R167 空对账那一族）。
+        // 本机与 runner 目前都有证人（本机 `quickpick-empty` 未绘制 ≈97.9%、runner 另有六张高帧），
+        // 所以这里**不加地板**：零证人是"这台机器测不到"，不是产品缺陷，写成 skip 名字而不是红。
+        if blankLoopItems == 0 {
+            emit("BLANK_GAP_WOULD_RELEASE_NOT_RUN 这次捕获一张未绘制帧都没有 ⇒ "
+                 + "放行谓词在本机没有活体调用，只有单测那三格（不许据此说出口已验收）")
+        } else {
+            emit("BLANK_GAP_WOULD_RELEASE_CENSUS loop_items=\(blankLoopItems)"
+                 + " with_geometry=\(blankLoopWithGeometry) would_release=\(blankLoopWouldRelease)"
+                 + "（with_geometry=0 ⇒ 本机没有高帧空图，放行条件只能靠 CaptureBlankFrameGapTests 那三格）")
+        }
+
+        // R168 / BACKLOG 194：**分辨轴**。runner 上六张高帧剩下的两种解释（被屏幕裁 / 根本没渲染）
+        // 由这一行的 `drawnBoxPt` 分开：`0` ⇒ 没渲染，`≈ screenVisibleHeightPt` ⇒ 被裁，`≈ requested` ⇒ 画满。
+        // 依旧**只出读数，不放行、不 skip、不豁免**（R162 的规矩）；本机的高帧是"画满"那一侧的标定样本，
+        // 所以两边一起看才知道这把尺在两种形状上都会说话。
+        var tallReadings = 0
+        for item in report {
+            guard let requested = Self.requestedHeightPt(fromFile: item.name),
+                  requested >= Self.tallFixtureHeightFloor else { continue }
+            tallReadings += 1
+            let screenPt = capturedGeometry[item.name]?.screen ?? -1
+            emit("CAPTURE_DRAW \(item.name) requested=\(Int(requested))"
+                 + " drawnBoxPt=\(Int(item.metrics.drawnBoxPt))"
+                 + " drawnBottomPt=\(Int(item.metrics.drawnBottomPt))"
+                 + " transparent=\(String(format: "%.1f", item.metrics.transparent * 100))%"
+                 + " screenVisibleHeightPt=\(Int(screenPt))")
+        }
+        emit("CAPTURE_DRAW_CENSUS tall=\(tallReadings)"
+             + "（tall=0 ⇒ 这台机器一张高帧都没拍出来，这根轴等于没接，不许读成\"轴已验收\"）")
 
         // 名单不许攒着 —— 但**判"攒着"的尺必须两台机器都成立**（R38 那条：一台机器的读数
         // 不能当另一台机器的地板）。R63 第一次上 runner 就是被这条自己写的新守卫判红的：
@@ -10992,7 +11124,7 @@ final class UICaptureTests: XCTestCase {
         // 已被本机否掉：`CAPTURE_SCREEN … visibleHeightPt=847` 而同一批高帧本机 `blank=0.0%`、画到第 2079 行
         // ⇒ 离屏窗口不被屏幕可视高夹住。剩下三种成因（窗口被收小 / 内容视图没铺满 / 画了但整层不合成）
         // 靠下面这一行分辨：三个尺寸全部来自**这一次**捕获，谁也不引用别处的常数。
-        if size.height >= 1000 {
+        if size.height >= Self.tallFixtureHeightFloor {
             let geometryTag = appearance == .darkAqua ? "dark" : "light"
             let content = window.contentView?.frame.size ?? NSSize(width: -1, height: -1)
             emit("CAPTURE_GEOMETRY \(fixture.name) \(geometryTag)"
@@ -11093,8 +11225,16 @@ final class UICaptureTests: XCTestCase {
         let (data, transparent) = try flattenedPNG(from: rep, appearance: appearance)
         var blackBand = 0.0
         var bottomInk = 0.0
+        // R168 / BACKLOG 194：包围盒读的是**同一份 raw rep 字节**（与 blackBand 同源）。
+        // -1 是"没拿到字节"，不是"没画" —— 两者在 194 的三分规则里落进不同出口。
+        var drawnBox = (topPt: -1.0, bottomPt: -1.0, heightPt: -1.0)
         if let base = rep.bitmapData {
             blackBand = Self.blackBandHeight(bytes: base,
+                                             width: rep.pixelsWide,
+                                             height: rep.pixelsHigh,
+                                             bytesPerRow: rep.bytesPerRow,
+                                             backingScale: CGFloat(rep.pixelsWide) / max(size.width, 1))
+            drawnBox = Self.drawnBoundingBox(bytes: base,
                                              width: rep.pixelsWide,
                                              height: rep.pixelsHigh,
                                              bytesPerRow: rep.bytesPerRow,
@@ -11118,7 +11258,8 @@ final class UICaptureTests: XCTestCase {
         }
         try data.write(to: file)
         return CaptureMetrics(transparent: transparent, blackBandPt: blackBand,
-                              bottomInkFraction: bottomInk)
+                              bottomInkFraction: bottomInk,
+                              drawnBoxPt: drawnBox.heightPt, drawnBottomPt: drawnBox.bottomPt)
     }
 
     /// 最底一行里"偏离**这一行自己的底色** >12"的像素占比（0…1）。
