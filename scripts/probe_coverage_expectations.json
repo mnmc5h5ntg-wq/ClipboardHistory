@@ -52,12 +52,12 @@
       "reason": "run 38864545930（`82fbd1f`）在屏那一步的三行读数：`源码用例=11 登记=11 runner可跑=6 runner不可跑=5 本次下结论=6 红=0`、`露面=7/11 未闭口=1 前缀=1`、`PROBE_QUEUED 4/11 条一次都没轮到 4/11`。 本条**一次都没轮到**（名字由 `PROBE_QUEUED` 逐条点名，不再是从字母序推的）⇒ 排队没到，不是跑不动。132 那格（挂住前先把栈拍下来）修好之后重估。"
     },
     "testFilterSegmentsAreReachableAndShowFocus": {
-      "runner": "cannot",
-      "reason": "R194 新加，runner 上还没有读数 ⇒ 登记成 cannot，理由就是「没有那台机器的读数」本身（R94 那一课：不许拿本机结果替它改登记）。下一跑若 `NOW_RUNS` 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can。本机这一跑：`Executed 3 tests, with 1 test skipped and 0 failures`，其中本条是**具名出口**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑。"
+      "runner": "can",
+      "reason": "R199 按 runner 自己的读数翻成 can：run 39220929124（commit f3b3933）第 16 步逐条点名它 —— NOW_RUNS「登记说 runner 跑不了，而这次它下结论了（skipped）⇒ 把登记改成 can」。这正是 R194 登记里预先写好的那一格（「下一跑若 NOW_RUNS 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can」）。它的结论是**具名出口的 skip**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑；翻成 can 之后，这条若连 skip 都没露面，NOT_RUN 会红 —— 那是我们要的（R94：skip 只证明跑得动，但跑得动就必须每次都说清为什么 skip）。"
     },
     "testFilterFocusExitIsWired": {
-      "runner": "cannot",
-      "reason": "R194 新加，runner 上还没有读数 ⇒ 登记成 cannot，理由就是「没有那台机器的读数」本身（R94 那一课：不许拿本机结果替它改登记）。下一跑若 `NOW_RUNS` 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can。本机这一跑：`Executed 3 tests, with 1 test skipped and 0 failures`，其中本条是**具名出口**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑。"
+      "runner": "can",
+      "reason": "R199 按 runner 自己的读数翻成 can：run 39220929124（commit f3b3933）第 16 步逐条点名它 —— NOW_RUNS「登记说 runner 跑不了，而这次它下结论了（passed）⇒ 把登记改成 can」。这条是 R195 给那条未判定出口配的四把刀之一的接线扫描（扫源码锚点、不抓窗口），所以在 runner 上 passed 是意料之中；此前写 cannot 的理由只是「还没有那台机器的读数」，现在有了 ⇒ 按证据翻面，不是翻成免检牌。"
     },
     "testSidebarKeyViewChainStructureIsPrinted": {
       "runner": "cannot",

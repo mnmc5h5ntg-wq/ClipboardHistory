@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 连红八跑的 CI 第 16 步：两张 R194 的 cannot 被 runner 逐条点名，按证据翻成 can（R199 / U-647…U-649 · 产品 0 文件，CI 账）
+
+- 八跑（`7e46b49`…`f3b3933`）全部 `conclusion=failure`，逐跑按步骤名读下来是同一朵：`STEP[16] On-screen probe coverage floor`
+- 证据（run 39220929124 正文）：NOW_RUNS testFilterFocusExitIsWired：登记说 runner 跑不了，而这次它下结论了（passed）⇒ 把登记改成 can；NOW_RUNS testFilterSegmentsAreReachableAndShowFocus：登记说 runner 跑不了，而这次它下结论了（skipped）⇒ 把登记改成 can
+- 处置：`scripts/probe_coverage_expectations.json` 两条 cannot → can，理由里带 run 号与 runner 原话；名册现在 can=7 / cannot=7
+- 连带修两格电池：判历史日志那格改按**采集当时**的登记判；"今天的登记 + 今天的夹具"那格改成钉**红的身份**（只许 NOT_RUN、只许那两个名字），旧测试名保留（R144 台账行引用它）
+- 新开 BACKLOG 223：翻面之后"今天的登记 + 今天的日志真的绿"这一格没有任何离线判据，只有 runner 每次推送自己演
+- 更正：R198 提交信息里手抄的"暗档保住 …153"是坏尺子那次的读数（最终版只有 97/98）；`swift test --filter "Class$"` 会给 `Executed 0 tests` 而 exit 0
+- 验证：脚本电池 368 / OK、JSON 解析通过、产品 0 文件（帧与换装沿用上一遍）；CI 是否真的不再红要等下一跑第 16 步的读数
 ### 221 结案在色觉模拟轴上：新判据 16 条最小 25.41，而第一版那个 10.41 是尺子的假红（R198 / U-644…U-646 · 产品 0 文件，判据账 + 看图腿）
 
 - 新判据 `HeatmapHoverEvidenceTests/testAdjacentHeatLevelsStaySeparableUnderDeuteranopia`：Viénot 1999 deuteranopia 近似（线性域乘矩阵、三通道一律重新编码回 sRGB），地板沿用 `adjacentLevelFloor255`=18.0，不新发明数

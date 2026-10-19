@@ -99,6 +99,12 @@ class ProbeCoverageGateTest(unittest.TestCase):
         # "今天的登记 + 今天的日志"那一格由 `test_todays_expectations_pair_green_with_todays_fixture` 管。
         expectations["testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"] = {
             "runner": "can", "reason": "夹具采集当时（R94）的登记，只用于判这份历史日志"}
+        # R199：这两条在 run 39220929124 上被 NOW_RUNS 逐条点名 ⇒ 名册已按证据翻成 can。
+        # 而这份夹具采集于 R94，那时两条**都还不存在**（它们就列在下面那份 queued 名单里），
+        # 所以判历史日志要按当时的登记判 —— 否则"旧读数替新规则作证"会以 NOT_RUN 的形状回来。
+        for late in ("testFilterSegmentsAreReachableAndShowFocus", "testFilterFocusExitIsWired"):
+            expectations[late] = {"runner": "cannot",
+                                  "reason": u"夹具采集当时（R94）这条判据还不存在，只用于判这份历史日志"}
         source = source_cases(SOURCE.read_text(encoding="utf-8"))
         reading, reds = analyse(source, expectations, R94_LOG)
         self.assertEqual([], reds, f"runner 这次跑得动的都跑到了，不该再判红：{reds}")
@@ -309,10 +315,23 @@ class HungCaseRegistrationTests(unittest.TestCase):
         self.assertIn("NOW_RUNS", named[0])
 
     def test_todays_expectations_pair_green_with_todays_fixture(self):
-        """接线判据：今天的登记 + 今天这份日志 ⇒ 一条都不红（历史夹具不许替现在作证）。"""
+        """今天的登记 + 这份 R144 夹具 ⇒ 红必须**恰好**落在"夹具比名册旧"那两条上。
+
+        名字保留（R144 的台账行引用它），但判法在 R199 换了。原来它要求"一条都不红" ——
+        那等于拿一份**历史日志**替**现在的名册**作证：R199 把两条筛选判据按 run 39220929124 的
+        `NOW_RUNS` 翻成 can 之后，夹具里当然没有它们的结论行 ⇒ 闸门红在 NOT_RUN。
+        那两红说的全是"这份夹具老了"，不是"登记翻错了"，所以这里钉的是**红的身份**：
+        只许 NOT_RUN 这一种，且只许那两条晚生的名字，多一条少一条都算量错。
+        "今天的登记 + 今天的日志真的绿"这一格不由夹具判 —— 它每次推送由 runner 第 16 步自己演一遍。
+        """
         expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
         _, reds = analyse(source_cases(SOURCE.read_text(encoding="utf-8")), expectations, self.log(concluded=False))
-        self.assertEqual([], reds, u"今天的登记配今天的日志还红：%s" % reds)
+        self.assertEqual({"NOT_RUN"}, codes(reds),
+                         u"这份夹具只该因为『比名册旧』而红，别种形状的红都得查：%s" % reds)
+        late = sorted(r.split()[1].split(u"：")[0] for r in reds)
+        self.assertEqual(sorted(["testFilterSegmentsAreReachableAndShowFocus",
+                                 "testFilterFocusExitIsWired"]), late,
+                         u"红必须恰好落在 R199 翻成 can 的那两条上（夹具采集时它们还不存在）：%s" % late)
 
 
 if __name__ == "__main__":
