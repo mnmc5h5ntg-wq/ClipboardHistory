@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R204 看图腿：138 帧重捕 + 热图阶梯下端在产物通道上量出 1.08 / 1.12 倍（R204 / U-662…U-664 · 产品 0 文件，看图账）
+
+- 捕获卷 `Executed 72 tests, with 4 tests skipped and 0 failures`，`/tmp/shots_r204` 139 项；
+  `frame_baseline compare --against working` ⇒ `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`（产品 0 文件 ⇒ CHANGED=0 是预期，不是结论）
+- 新读数（PIL 逐帧取色，两档各一张 `heatmap-populated-430x250`）：暗档对底比 空格 1.15 / 一档 1.24 / 二档 1.55 / 三档 2.14 / 四档 3.33；
+  亮档 1.11 / 1.24 / 1.54 / 2.12 / 3.23 ⇒ **最窄的一步在「空格↔第一档」**（1.08 与 1.12 倍），且**两档同形**
+  ⇒ 这是阶梯下端的间距设计，不是某一档调错。给 BACKLOG 221 那条质询补上产物通道的第二个证人，新开 BACKLOG 227 做分辨实验
+- 不许互推：判据那条量的是模拟色觉后的 max-channel 差（地板 18），本条量的是 WCAG 对比度比值 —— 两种估计量，产品本轮不动
+- 判为**不加**：说明档的墨在两档都远高于格子最低那一步（暗 L=0.3231、亮 L=0.2159），图例与格子同色阶 ⇒ 不给图例叠 hover/动效（R27 同族）
+- 台账：STATE 换到 R204 / 第 206 轮；新开 D-202（阶梯下端不改产品，先分辨实验）
+
 ### 补落：R201 / R202 / R203 三笔非轮次笔的 UI_AUDIT 与 ITERATION 台账（BACKLOG 225 的①出口 · 产品 0 文件，台账账）
 
 - 三笔各自的数字只从**盘上能复查的东西**抄：commit 正文（`33b1322`/`e97c17e`/`728a1b2`/`2351593`/`b6077be`/`bd7a64f`）、
