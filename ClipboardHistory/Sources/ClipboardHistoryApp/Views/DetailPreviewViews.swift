@@ -253,15 +253,29 @@ struct DetailFileView: View {
     /// 由 `DetailView` 传下来而不是在这里自己存一份：多文件展开时每条都走这个视图，
     /// 各存一份就会各切各的 —— 那正是 D-1 那一轮在侧栏上栽过的"两套选中语言"的同族问题。
     let markdownMode: MarkdownPreviewMode
+    /// **只给帧基线用的注入点**（R211 / BACKLOG 233）：把预览冻在 `.loading` 那一格，
+    /// 于是"头部 + 分隔线 + 骨架"这张**组合**帧可以被确定地拍一次。
+    ///
+    /// 为什么要有它：`detail-loading` 那张帧画的是 `DetailLoadingView` 一个视图，
+    /// 所以它只能回答"这块骨架长什么样"，回答不了"它在真实详情区里长什么样"——
+    /// 我看图时正是因此说错过一句"加载时头部消失了"（D-206 记的就是这个机制）。
+    /// 而旧写法要拍组合态就得赌"拍的那一瞬间还没加载完"，那是按墙钟判的夹具（R22 禁止）。
+    ///
+    /// 默认 `false` ⇒ 产品路径一行都不变：真实调用永远照常走 `loadPreview()`。
+    /// **注意：这条默认值今天没有守卫**（注释里曾声称有 `DetailPreviewCaptureSeamTests`，那支测试不存在 ⇒ 假话已删）。
+    /// 补那格守卫记在 BACKLOG 236；在补上之前，"默认关闭"只有源码可读、没有证人。
+    var freezeLoadingForCapture: Bool = false
     @State private var previewState: MediaLoadingState<FilePreview> = .loading
     @State private var loadingHandle: MediaLoadHandle?
     @State private var loadGeneration = 0
     @State private var timeoutTask: Task<Void, Never>?
 
-    init(url: URL, thumbnail: StoredImage?, markdownMode: MarkdownPreviewMode = .rendered) {
+    init(url: URL, thumbnail: StoredImage?, markdownMode: MarkdownPreviewMode = .rendered,
+         freezeLoadingForCapture: Bool = false) {
         self.url = url
         self.thumbnail = thumbnail
         self.markdownMode = markdownMode
+        self.freezeLoadingForCapture = freezeLoadingForCapture
     }
 
     var body: some View {
@@ -287,6 +301,9 @@ struct DetailFileView: View {
         // （换一条记录时阶段会 1→0→1，那是"又在加载"的证据，本身不需要额外过渡）。
         .animation(MotionCatalog.animation(for: .contentFade), value: previewStage)
         .task(id: url) {
+            // 夹具那一格：停在 `.loading`，不去取文件（R211 / BACKLOG 233）。
+            // 产品路径上 `freezeLoadingForCapture` 恒 false ⇒ 这一行等于没有。
+            guard !freezeLoadingForCapture else { return }
             await loadPreview()
         }
         .onDisappear {

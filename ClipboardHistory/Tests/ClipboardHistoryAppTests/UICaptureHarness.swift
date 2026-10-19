@@ -4646,6 +4646,20 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
+        // R211 / BACKLOG 233：**组合帧** —— 头部 + 分隔线 + 骨架一次拍全。
+        // 上面那张 `detail-loading` 画的是 `DetailLoadingView` 一个视图，所以它只能回答
+        // "这块骨架长什么样"，回答不了"它在真实详情区里长什么样"——
+        // 我看图时因此说错过一句"加载时头部消失了"（D-206 记的就是这个机制）。
+        // 这一张从产品入口（`DetailView`）进，靠 `freezeLoadingForCapture` 把异步冻住，
+        // 于是"头部与骨架同不同轴"这件事第一次能在**同一张帧**里被量，而不是跨两张帧比。
+        let loadingComposedStore = makePopulatedStore(selectingIndex: 2)
+        results.append(Fixture("detail-loading-composed", NSSize(width: 720, height: 520)) {
+            AnyView(
+                DetailView(historyStore: loadingComposedStore, freezeLoadingForCapture: true)
+                    .frame(width: 720, height: 520)
+            )
+        })
+
         return results
     }
 

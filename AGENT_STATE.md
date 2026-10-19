@@ -1,5 +1,21 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 20:58（本地 · R211 / 第 213 轮：**详情加载态的第一张组合帧（头部 + 骨架同框）+ 删掉注释里一句无人验收的承诺**（U-683…U-685 · 产品 2 文件，看图账 + 判据账）
+
+**本轮落地**：`DetailView` / `DetailFileView` 加默认关闭的 `freezeLoadingForCapture`，新帧
+`detail-loading-composed-720x520-{dark,light}` 进工作基线 ⇒ R209 那句"加载时头部消失"现在由**像素**否证：
+头部那行日期/文件名/来源在加载态确实在，头部最左墨 21.0pt、骨架 22.5pt（差 1.5pt = 字形侧边距，同一列）。
+自查抓到一处假话：注释声称 `DetailPreviewCaptureSeamTests` 钉住默认值，而那支测试不存在 ⇒ 删掉注释那句话，开 BACKLOG 236。
+验证：构建 0 告警、`Executed 72 tests, with 4 tests skipped and 0 failures (0 unexpected) in 207.326 (207.332) seconds`、帧 142 张、`FRAME_BASELINE_ADDED=2`、电池 `Ran 399 tests` 且 OK、清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`、已换装本机。
+**233 只算半结**：同帧关系判据（两枚探针 + 一把刀）本轮未做，写在 233 追记里。
+CI：`6` 跑 success（bbc5642=39251464899、04ccf7a=39247806444、3073943=39247153666、f6d3b4a=39246385660、187ec0b=39245844718）、`1` 跑仍未读（a800900）、失败跑 c232e82 ⇒ 未读的不算绿。
+
+**下一轮（R212）的靶**：⓪ 读仍未那几跑的 CI —— 特别是 `a800900`（R210 那一步在 runner 上的第一跑：ok / skipped / unavailable？）与本轮这一跑；
+① 233 的判据半：给 `surface_left_axes.py` 加"头部行 / 骨架行"两枚探针 + 同帧 ≤2pt 关系判据 + 一把"把头部内缩改歪"的刀；
+② 236 那格默认值守卫（产品入口进，带刀）；
+③ 227③、222、215、201/202、207；④ 220 路 A 与 228② 仍等用户。
+)
+
 最后更新：2026-10-19 20:48（本地 · R210 / 第 212 轮：**看图尺接进 CI —— 三种出口（red/skipped/unavailable）各配证人，三把刀全 CAUGHT**（U-680…U-682 · 产品 0 文件，判据账 + CI 接线）
 
 **本轮落地**：`scripts/surface_left_axes.py` 加 `--ci`（真红才 exit 1；只有 NOT_RUN ⇒ skipped 并把缺席写成读数；没有像素库 ⇒ unavailable），

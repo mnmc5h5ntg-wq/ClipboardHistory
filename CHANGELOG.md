@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 详情加载态第一次有组合帧：`DetailView(freezeLoadingForCapture:)` + `detail-loading-composed` 两张帧（R211 / U-683…U-685 · 产品 2 文件 + 夹具 1 文件）
+
+- 病根：`detail-loading` 画的是组件，所以"加载时头部在不在"在产物通道上不可判（D-206 / BACKLOG 233）
+- 修法：默认关闭的注入点把 `.task` 里那次 `loadPreview()` 冻住 ⇒ 组合态可被**确定地**拍（不按墙钟赌，R22 的规矩）
+- 看图：头部最左墨 21.0pt、骨架 22.5pt（差 1.5pt = 字形侧边距，同一列）；头部那行日期/文件名/来源在加载态**确实在**
+- 自查：注释里"由 `DetailPreviewCaptureSeamTests` 钉住默认值"是假话（那支测试不存在）⇒ 删掉，新开 BACKLOG 236
+- 验证：构建 0 告警；`Executed 72 tests, with 4 tests skipped and 0 failures (0 unexpected) in 207.326 (207.332) seconds`；帧 142 张、`FRAME_BASELINE_ADDED=2`（其余一张未变）；电池 `Ran 399 tests` 且 OK；已换装本机
+- 未做（不许算已交付）：把"头部↔骨架同轴"从跨帧比换成同帧判据（233 追记）；默认值的守卫（236）
+- CI：`6` 跑 success、`1` 跑未读、失败 c232e82
 ### 看图尺接进 CI 一步，并给三种出口各配证人（R210 / U-680…U-682 · 判据 2 文件 + workflow 1 文件 + 表 1 支，产品 0 文件）
 
 - `scripts/surface_left_axes.py` 加 `--ci`：真红 ⇒ exit 1；只有 NOT_RUN ⇒ `verdict=skipped` exit 0（缺席写成读数 not_run/missing_frames）；没有像素库 ⇒ `verdict=unavailable` exit 0

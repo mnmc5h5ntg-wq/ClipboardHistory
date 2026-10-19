@@ -5769,3 +5769,23 @@ run `39247153666`（3073943）`row-insert 开 帧数=4 峰值=0.057 采样≈33m
 处置：下一轮第 ⓪ 条读这一跑的 `LEFT_AXIS_CI` 行（按**步骤名**过滤），把结论填回本条；
 读出来若是 skipped ⇒ 这条尺在 CI 上暂时只是"能红"而没有"在判"，要按 201 的通道问题另开分辨实验；
 读出来若是 ok ⇒ 才允许在台账里把 234 写成"已交付到 CI"。**在那之前 234 只算本机结案。**
+
+**233 追记（R211）：产品半已落地 —— 组合帧在基线里了；判据半（同帧关系）仍未做，所以本条只算半结**
+
+已交付：`DetailView(historyStore:freezeLoadingForCapture:)` → `DetailFileView` 的默认关闭注入点，
+新帧 `detail-loading-composed-720x520-{dark,light}` 进工作基线（`FRAME_BASELINE_ADDED=2`、其余未变），
+捕获卷 `Executed 72 tests, with 4 tests skipped and 0 failures (0 unexpected) in 207.326 (207.332) seconds`。看图判读与 1.5pt 侧边距的归因写在 `第 213 轮`。
+仍未做（**不许写成已交付**）：把"头部与骨架同轴"从**跨帧比**换成**同帧判据** ——
+形状是给 `scripts/surface_left_axes.py` 加两枚探针（头部行、骨架行，同一张帧）+ 一条 ≤2pt 的关系判据，
+并配一把"把头部内缩改歪"的刀；另有一格默认值守卫欠账 ⇒ BACKLOG 236。
+
+**236. `freezeLoadingForCapture` 的"默认关闭"目前没有证人：那格守卫在 R211 的注释里被当成已有，实为不存在（本轮自查开单）**
+
+形状：注入点在 `DetailFileView` / `DetailView` 上都是 `= false` 的默认值，注释原本写着"由
+`DetailPreviewCaptureSeamTests` 钉住"——**仓库里没有这支测试**（本轮 grep 到自己打的脸）。
+⇒ 今天有人把默认值翻成 true，全量卷不会红，产品会在真实详情区**永远停在加载骨架**，而唯一能看见它的是那张组合帧——
+它恰恰只在夹具路径里被要求为 true。这是"不执行的声明比没有更坏"（R16/R42/R66）的最新一例，只是这次谎写在注释里。
+
+要补的格（下一轮，产品入口进）：① 断言 `DetailView(historyStore:)` 与 `DetailFileView(url:thumbnail:)` 的默认值使预览**会**加载
+（用一条会随时间推进到 `.success`/`.failure` 的判据，而不是读注释）；② 断言夹具那一格确实停在 `.loading`
+（否则组合帧会静默变成成功帧，142 张基线里 CHANGED 会抓到，但抓不到原因）；③ 一把刀：把默认值翻成 true ⇒ ① 必须红。

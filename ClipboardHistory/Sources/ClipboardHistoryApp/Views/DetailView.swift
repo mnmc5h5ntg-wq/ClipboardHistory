@@ -21,8 +21,15 @@ struct DetailView: View {
     @State private var copyConfirmed = false
     @State private var copyResetTask: Task<Void, Never>?
 
-    init(historyStore: HistoryStore, initialMarkdownMode: MarkdownPreviewMode = .rendered) {
+    /// 帧基线专用的注入点（R211 / BACKLOG 233）：把详情区的预览分支冻在加载态，
+    /// 好让"**头部 + 分隔线 + 骨架**"这张组合帧能被确定地拍一次 —— 组件帧回答不了组合问题（D-206）。
+    /// 默认 false ⇒ 产品路径不变。
+    var freezeLoadingForCapture: Bool = false
+
+    init(historyStore: HistoryStore, initialMarkdownMode: MarkdownPreviewMode = .rendered,
+         freezeLoadingForCapture: Bool = false) {
         self.historyStore = historyStore
+        self.freezeLoadingForCapture = freezeLoadingForCapture
         // 私有 @State 用注入参数的老手法（和 `SettingsView.initialCategory` 同一套）：
         // 离屏窗口建不出无障碍树，"点一下那颗控件"在夹具里做不到，
         // 而**没有夹具的两种状态就等于没有验收**。默认值不变，产品路径一行都没多。
@@ -276,7 +283,8 @@ struct DetailView: View {
         case .image(let stored):
             ImagePreviewView(nsImage: stored.nsImage)
         case .file(let url):
-            DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode)
+            DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode,
+                           freezeLoadingForCapture: freezeLoadingForCapture)
         case .files(let urls):
             MultiFileDetailView(urls: urls, markdownMode: markdownMode)
         }
