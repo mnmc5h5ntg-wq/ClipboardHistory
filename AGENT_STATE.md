@@ -1,6 +1,6 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-最后更新：2026-10-20 00:13（本地 · R227 / 第 229 轮：**252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在任何机器上都不会跑**（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+最后更新：2026-10-20 00:13（本地 · R227 / 第 229 轮：**252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在 runner 上永远 skip，本机只是恰好还留着那个目录**（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
 
 **本轮落地**：读 252 的名单 —— 那 3 条 skip 逐条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
 **没有一条是 PIL 类**，同跑 365 行 `... ok` ⇒ 上一轮 244 的结案范围站住（解释器接对了、像素判据真跑了）。

@@ -9,9 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - 名单（runner 正文现读、锚真打印形状）：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
 - 没有一条是 PIL 类 + 同跑 365 行 `... ok` ⇒ 244 的"解释器接对了"站住。
-- 两条挂在写死的 `/tmp/shots_r211`（R211 的临时帧目录，/tmp/shots_r211=在盘上）⇒ 这两格在任何机器上都不跑，却以 skip 的样子安静存在。
+- 两条挂在写死的 `/tmp/shots_r211`（R211 的临时帧目录，/tmp/shots_r211=在盘上）⇒ 这两格在 CI 上永远不跑、在本地也只是暂时跑，却以 skip 的样子安静存在。
   新开 **253**：帧目录改由捕获卷同一个环境变量派生，并加"判据里不许出现写死 /tmp/shots_rNNN"的会红守卫。
-- 左轴仍 `verdict=skipped not_run=7 probes=7`（`e015455` 早于 R224）；`da5da47` 仍 `in_progress`、`09d9bf7` 仍 `queued`
+- 左轴仍 `verdict=skipped not_run=7 probes=7`（`e015455` 早于 R224）
+- **自曝（本轮第一版写的是假话，被自己的 `ls` 打回）**：正文原本写「那两格在任何机器上都不跑」，而生成器算 `present` 时本机 `/tmp/shots_r211` **还在**（`在盘上=True`）⇒ 真话是「CI 上永远不跑、本地只是暂时跑」。根因：TITLE 与正文那句结论是**我预先写死的判断**，而 `{present}` 才是读出来的数 —— 生成器只核了数、没核那句判断。规矩：**凡结论里带「在不在／有没有」的判断，必须由解析出的量算出来（`assert present == 期望`），不许写死在模板里。**
+；`da5da47` 仍 `in_progress`、`09d9bf7` 仍 `queued`
   ⇒ **249 与 R225 的 runner 复验未读**。本轮 0 判据、0 产品、未换装、看图腿 NOT-RUN。
 
 ### 244 结案：runner 判据卷走上带 pillow 的解释器（R226 / U-728…U-730 · 判据 0 文件 + 台账，产品 0 文件（本轮是读数轮））

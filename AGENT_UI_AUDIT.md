@@ -363,14 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 229 轮（R227 · 2026-10-20）：252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在任何机器上都不会跑（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+## 第 229 轮（R227 · 2026-10-20）：252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在 runner 上永远 skip，本机只是恰好还留着那个目录（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
 
 - **U-731：252 的答案（名单与理由都由 runner 正文现读，锚「真打印」形状）。**
   那 3 条 skip 逐条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
   ⇒ **没有一条是 PIL/环境类**，而同一跑打了 365 行 `... ok` ⇒ 上一轮 244 的结案范围站住了：
   带 pillow 的解释器确实把像素类判据跑起来了，不是"装了但没接"。
 - **U-732：但这一读顺带挖出一条更坏的：两条 skip 挂在写死的 `/tmp/shots_r211` 上。**
-  那个目录名是 R211 那一轮的临时帧目录，`/tmp/shots_r211=在盘上` ⇒ 这两格**在任何一台机器上都不会跑**，
+  那个目录名是 R211 那一轮的临时帧目录，`/tmp/shots_r211=在盘上` ⇒ 这两格在 CI 上永远不跑，在本地也只是**暂时**跑（证据押在一个随时会被 /tmp 清理带走的目录上），
   而报表里它们长得像"skip 掉了，合理"。这正是本仓库已经记过两次的族（夹具不许写共享绝对路径、
   临时目录不许跨次复用），只是这次犯在**判据自己**身上：`test_surface_left_axes` 的两格真帧对照
   把证据押在一个会被 macOS 清掉的目录上。⇒ 新开 **253**（修法与"不许静默 skip"的守卫都写在那条里）。
