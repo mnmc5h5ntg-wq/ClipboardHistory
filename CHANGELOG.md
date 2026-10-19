@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 246 结案（runner 的成因读数=no-bg-window）+ 左轴尺的坐标约定修好（R224 / U-722…U-724 · 判据（python 尺）1 文件 + 表 1 文件，产品 0 文件）
+
+- runner 正文（run `39273827335` = `69bccbd`，success）：`LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`，
+  七行全 `cause=no-bg-window frame=420x300 / 720x520 / 720x540`、`missing_frames=0` ⇒ 帧在、尺寸对，掉到画外的是**取底窗口**。
+- 病根：`scripts/surface_left_axes.py` 的探针窗口按本机 **@2x 像素**写死 ⇒ @1x 的 runner 帧上必然取不到底。
+  修法：窗口按 **pt** 写，`像素每 pt` 由帧自己算（不猜 2）。
+- 两向对照：本机 @2x 真帧改前/改后**逐字相同**；@1x 复刻帧从 `7` 颗 no-bg-window 到 `NOT_RUN帧=0`。
+  复刻帧读数与真帧不同（REPLICA_SHIFT 改前=148.0 改后=177.0）⇒ 只配证明坐标被修好，不配给产品定罪；承重的是自检新增的缩放不变量那格。
+- 刀 `R224_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`（M761/M762）；
+  预检 `tables=65 covered=50 arms=182 bad=4`；名册去掉 `mutate_r220` 的重复登记。
+- 新开 **249**（runner 第一次真判这四条关系判据之后的归因规矩）、立 **D-216**（像素尺的坐标按 pt 写）。
+- 验证：电池 `Ran 403 tests OK`；产品 0 文件 ⇒ 未换装本机；看图腿真做了（5 张帧、两个候选位点均已有判词）。
+
 ### 247 结案（旧表锚点脱钩）+ 244 落地：判据卷走 venv，像素自检第一次有机会在 runner 上跑（R223 / U-719…U-721 · CI 1 文件 + 表 1 文件，产品 0 文件）
 
 - `bad` 的语义读明白了：只数"导入失败 / 读文件失败 / needle 命中≠1"（`dupes=0 repeats=0`）⇒ 五条都是**锚点脱钩**。

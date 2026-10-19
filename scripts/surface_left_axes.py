@@ -47,23 +47,30 @@ INK_THRESHOLD = 12
 BG_FLAT_TOLERANCE = 6
 
 # 探针表。stem=帧名去掉 -dark/-light；window=量墨的格子；bg=取底的空白格子（不许与 window 重叠）。
+#
+# **坐标一律写 pt，不写像素**（R224 / BACKLOG 246 的读数逼出来的这一改）。
+# 第一版写的是本机 @2x 帧上的像素，于是同一颗探针在 @1x 的帧上整块落到画面外面：
+# runner 那一跑 7 颗探针全部 `cause=no-bg-window`，而 `frame=420x300 / 720x540 / 720x520`
+# 说的是**帧拍到了、尺寸也对** —— 掉到外面的是取底窗口（例如统计页的 bg 写在 y=900..960，
+# 而 @1x 的帧只有 540 高）。也就是说那 7 个 NOT_RUN 量的是我这把尺的坐标约定，不是产品。
+# 现在按 `像素每 pt = 帧宽 ÷ 帧名里的 pt 宽` 换算：本机 @2x 读数一字不变，@1x 的帧第一次有对象。
 PROBES = [
     dict(name=u'浮层/选中行药丸', stem=u'quickpick-list-420x300',
-         window=(0, 104, 840, 148), bg=(0, 500, 840, 560)),
-    # 统计页：x 从 280 起，左边那条是侧栏，混进来会造出一条假轴
+         window=(0, 52, 420, 74), bg=(0, 250, 420, 280)),
+    # 统计页：x 从 140pt 起，左边那条是侧栏，混进来会造出一条假轴
     dict(name=u'统计/统计行', stem=u'settings-stats-populated-720x540',
-         window=(280, 246, 1440, 274), bg=(280, 900, 1400, 960)),
+         window=(140, 123, 720, 137), bg=(140, 450, 700, 480)),
     dict(name=u'统计/月份行', stem=u'settings-stats-populated-720x540',
-         window=(280, 296, 1440, 324), bg=(280, 900, 1400, 960)),
+         window=(140, 148, 720, 162), bg=(140, 450, 700, 480)),
     dict(name=u'统计/说明正文', stem=u'settings-stats-populated-720x540',
-         window=(280, 666, 1440, 700), bg=(280, 900, 1400, 960)),
+         window=(140, 333, 720, 350), bg=(140, 450, 700, 480)),
     dict(name=u'统计/热图网格', stem=u'settings-stats-populated-720x540',
-         window=(280, 326, 1440, 352), bg=(280, 900, 1400, 960)),
+         window=(140, 163, 720, 176), bg=(140, 450, 700, 480)),
     # R212 / BACKLOG 233 的判据半：**同一张组合帧**里的头部与骨架（R211 才有这张帧）
     dict(name=u'详情/组合帧头部', stem=u'detail-loading-composed-720x520',
-         window=(0, 74, 740, 98), bg=(760, 74, 1400, 98)),
+         window=(0, 37, 370, 49), bg=(380, 37, 700, 49)),
     dict(name=u'详情/组合帧骨架', stem=u'detail-loading-composed-720x520',
-         window=(0, 162, 700, 192), bg=(760, 162, 1400, 192), thr=6),
+         window=(0, 81, 350, 96), bg=(380, 81, 700, 96), thr=6),
 ]
 
 AXIS_GROUP_COMPOSED = u'详情/组合帧头部,详情/组合帧骨架'   # D 同轴（同帧，跨种类：文字 vs 圆角条带）
@@ -83,6 +90,15 @@ def parse_frame_pt_width(stem):
 def _clipped(window, W, H):
     x0, y0, x1, y1 = window
     return max(0, x0), max(0, y0), min(W, x1), min(H, y1)
+
+
+def _to_px(rect, ppp):
+    """把 pt 写的探针窗口换成这台机器这张帧上的像素（R224）。
+
+    `ppp` = 像素每 pt，由**帧自己**给出（帧宽像素 ÷ 帧名里的 pt 宽），不是猜的 2。
+    本机 @2x ⇒ ppp=2，换算结果与旧表逐字相同；runner @1x ⇒ ppp=1，旧表会整块掉到画外。
+    """
+    return tuple(int(round(v * ppp)) for v in rect)
 
 
 def background(px, window, W, H):
@@ -131,13 +147,17 @@ def probe_reading(im, probe):
     pt_w = parse_frame_pt_width(probe['stem'])
     if not pt_w:
         return absence('stem-unparsable', stem=probe['stem'])
-    bg, flat = background(px, probe['bg'], W, H)
+    ppp = W / float(pt_w)                      # 像素每 pt：由这张帧自己说，不猜 2
+    win = _to_px(probe['window'], ppp)
+    bgwin = _to_px(probe['bg'], ppp)
+    bg, flat = background(px, bgwin, W, H)
     if bg is None:
-        return absence('no-bg-window', frame='%dx%d' % (W, H))
+        return absence('no-bg-window', frame='%dx%d' % (W, H), ppp=round(ppp, 2),
+                       bg_window='x'.join(str(v) for v in bgwin))
     if not flat:
         return absence('bg-not-flat', bg=bg)
     scale = pt_w / float(W)
-    x0, y0, x1, y1 = _clipped(probe['window'], W, H)
+    x0, y0, x1, y1 = _clipped(win, W, H)
     xs = []
     for x in range(x0, x1):
         for y in range(y0, y1):
@@ -338,6 +358,40 @@ def self_test():
           % (u'反对照·底不纯的成因', u'bg-not-flat', u'对' if good3 else u'错',
              u'' if good3 else u'** 对照坏掉 **',
              (texts_noisy[0][:78] if texts_noisy else u'一行 NOT_RUN 都没有 ⇒ 噪声帧没被前提拦住')))
+    # 缩放不变量（R224 / BACKLOG 246 的修法本体）：探针窗口按 **pt** 写，"像素每 pt"由帧自己说。
+    # 这一格问的是"同一份内容、两种像素密度，读数是不是同一句话"。
+    # 旧表把窗口写在**本机 @2x 帧的像素**上，于是 @1x 的帧（runner 就是 @1x）整块掉到画外 ——
+    # runner 那一跑 7 颗全 `cause=no-bg-window`，量的其实是我这把尺的坐标约定，不是产品。
+    def synth(stem, ppp):
+        pt_w, pt_h = (int(v) for v in stem.rsplit(u'-', 1)[1].split(u'x'))
+        im = Image.new('RGB', (pt_w * ppp, pt_h * ppp), (30, 30, 30))
+        px = im.load()
+        for p in PROBES:
+            if p['stem'] != stem:
+                continue
+            wx0, wy0, wx1, wy1 = p['window']
+            ink = (52, 52, 52) if p.get(u'thr', INK_THRESHOLD) <= 6 else (230, 230, 230)
+            for yy in range((wy0 + 2) * ppp, max((wy0 + 2) * ppp, (wy1 - 2) * ppp)):
+                for xx in range((wx0 + 22) * ppp, (wx1 - 22) * ppp):
+                    px[xx, yy] = ink
+        return im
+
+    def readings_at(ppp):
+        return {p['name']: probe_reading(synth(p['stem'], ppp), p) for p in PROBES}
+
+    r2, r1 = readings_at(2), readings_at(1)
+    good4 = all(r2[n].get(u'ok') and r1[n].get(u'ok')
+                and r2[n][u'left_pt'] == r1[n][u'left_pt']
+                and r2[n][u'right_pt'] == r1[n][u'right_pt'] for n in r2)
+    ok = ok and good4
+    bad = next((n for n in r2 if not (r2[n].get(u'ok') and r1[n].get(u'ok')
+                                      and r2[n][u'left_pt'] == r1[n][u'left_pt'])), u'')
+    print(u'SELFTEST %-22s 期望=一致 实得=%s %s ｜ %s'
+          % (u'正对照·两档缩放同读数', u'一致' if good4 else u'分叉',
+             u'' if good4 else u'** 对照坏掉 **',
+             (u'%d 颗探针 × @2x/@1x 全部取到墨，pt 读数逐字相等' % len(r2)) if good4 else
+             u'%s @2x=%s @1x=%s' % (bad, r2[bad], r1[bad])))
+
     print(u'LEFT_AXIS_SELFTEST %s' % ('ok' if ok else 'bad'))
     return 0 if ok else 1
 
