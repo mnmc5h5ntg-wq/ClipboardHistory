@@ -6147,11 +6147,10 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   ⇒ 两机夹具的成像尺寸/合成不同，比值只是"各自过线"，**不许跨机当同一个量比**（R87/R100 那一条：两把尺问同一件事才谈一致）。
   `HOVER_PILL_PROOF light …比值=1.218 台阶=21…`、`HOVER_LADDER_PROBE light 两臂灰阶差=4` ⇒ R229 那两个位点在 runner 上也没被碰坏。
 - 仍**没接进 CI 的那一半**照旧：253 的"帧目录守卫接进 CI 步骤"、255 的性能预算格（本机红、runner 无红 ⇒ 255 的解释范围要收窄成"本机越预算"，别再写成全局缺陷）。
-- **253 的剩下那一半，成因本轮读准了（原先写的是"没接进 CI"，不准确）**：`ci.yml` 的 `Release script tests` 那一步**确实在 runner 上跑整卷 `scripts/tests`**
-  （第 358 行 `"$PY" -m unittest discover -s scripts/tests -v`），但整个 workflow 里 `CLIPBOARD_HISTORY_UI_SHOTS` 只在捕获那两步里给（第 54 / 145 行），
-  电池那一步没有 ⇒ 253 那两格在 runner 上走的是**"帧目录不在 ⇒ skip"**那个出口，不是"跑了并判过"。
-  修法很小：电池那一步把 `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci` 指到捕获步骤已经产出的目录（先确认那批帧在这一步仍在盘上），
-  并保留"帧不在就带名字 skip"的那条出口 —— 两向证人本仓库已有（R228 的 `给变量 ⇒ ok／不给 ⇒ skipped 且点名通道`）。
+- **253 的剩下那一半：本轮已接线，两向证人在本机拿到了（runner 验收等下一跑）**。原先这一条写的是"没接进 CI"，不准确 —— `ci.yml` 的 `Release script tests` 那一步**本来就在 runner 上跑整卷 `scripts/tests`**（第 358 行 `"$PY" -m unittest discover -s scripts/tests -v`），但整个 workflow 只在捕获与交互探针那两步给 `CLIPBOARD_HISTORY_UI_SHOTS`（第 54 / 145 行），电池那一步没有 ⇒ 253 那两格在 runner 上走的是**"帧目录不在 ⇒ skip"**那个出口，不是"跑了并判过"。
+  本轮改法（`.github/workflows/ci.yml`，电池那一步开头）：`export CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci` —— 即**同一个 job 里捕获步骤已经落盘的那批帧**，只读不写（R92 那族：夹具不许覆盖闸门要读的日志），并在跑套件**之前**先打一行 `SCRIPT_SHOTS_GLOB=… png_files=<通配张数>`（这行按仓库规矩**不叫"帧数"**，`ls|wc -l` 不是帧数；它的用途是让"读不到帧"那种红自带当时的 glob 计数，不必下一轮重新猜）。
+  **两向证人（本机实测，同一支电池两遍）**：不给变量 ⇒ `Ran 406 tests / OK (skipped=2)`；给变量指向本轮真帧目录（`/tmp/shots_r231`，盘上 155 个通配项）⇒ `Ran 406 tests / OK`，**skip 从 2 降到 0** ⇒ 这两格确实是"从跳过分到真判"，不是换了一条更宽的出口。
+  **没放弱任何一侧**：`--ci` 那一格缺帧仍给 `verdict=skipped`（绿、带 `not_run=<读数>`），非 `--ci` 那一格缺帧照旧红（"不许把缺席读成绿"是 R210 定的）。⇒ **风险留在 runner 那一侧**：如果 runner 的 `/tmp/shots-ci` 帧不全，非 `--ci` 那格会红，而那一红要读的是"当时 glob 到几张"，修法由那个数决定（补帧 vs. 把该缺席的探针做成有名有姓的按帧出口），**本轮不许先猜着放宽**。CI 结论待下一跑读：`02de8cc`→`39314291982`、`e347a0c`→`39314396070`、`4f170e9`→`39314810527`（写账时全 `in_progress` ⇒ 只能记未读），这一笔新加的接线之后还会再有一跑。
 - **255 多了一个反向读数，别把它写成恒红**：本轮全量卷 `Executed 905 tests, with 44 tests skipped and 0 failures`，
   也就是说 `PerfBudgetTests.testImageComparisonCostStaysBounded` 这一格**在工作树上绿了**（R229 是同机三跑全红：全量卷 / 单跑 / HEAD 干净 worktree）。
   ⇒ 现有样本是"三红一绿"，方向相同但结果翻脸 —— 按 R87 那条，这一格现在**不配被定罪**，

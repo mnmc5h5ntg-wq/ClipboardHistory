@@ -351,6 +351,18 @@ jobs:
           # R223：判据卷也走 venv 解释器（装不上就退回系统 python3，那几格继续 skip —— 那是环境缺席，不是产品结论）。
           # `SCRIPT_SKIPS` 这一格是**证人**：它印出本轮到底跳过了几条。
           # 以后若有人声称"runner 上像素判据已验收"，看这一行了不算，要 `SCRIPT_SKIPS` 里没有 PIL 那批。
+          # R231 / BACKLOG 253 的**剩下那一半**：这一整卷以前从来没有 `CLIPBOARD_HISTORY_UI_SHOTS`
+          # （整个 workflow 只在捕获与交互探针那两步给，第 54 / 145 行）⇒ `test_surface_left_axes`
+          # 的两格真帧对照在 runner 上永远走"帧目录不在 ⇒ skip"，而不是"跑了并判过"。
+          # 现在把**同一个 job 里捕获步骤已经落盘的那批帧**交给电池 ⇒ 它们第一次在 runner 上真判。
+          # 三条要紧的：
+          #   1) **只读不写** —— 这一格不许往 /tmp/shots-ci 落任何东西（R92 那族：夹具覆盖了闸门要读的日志）；
+          #   2) 先打计数**再**跑套件 —— 万一这一步读不到帧，红的正文里必须自带"当时 glob 到几张"；
+          #      这一行是 **png 通配的张数**，不叫"帧数"（`ls|wc -l` 不是帧数）；
+          #   3) 两格各自走自己已有的出口，**不放弱**：`--ci` 那一格缺帧 ⇒ `verdict=skipped`（绿，带读数），
+          #      非 `--ci` 那一格缺帧 ⇒ 照旧红（"不许把缺席读成绿"是 R210 定的，本轮不动它）。
+          echo "SCRIPT_SHOTS_GLOB=/tmp/shots-ci png_files=$(ls /tmp/shots-ci/*.png 2>/dev/null | wc -l | tr -d ' ')"
+          export CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci
           PY=python3
           if [ -x /tmp/pilenv/bin/python ]; then PY=/tmp/pilenv/bin/python; fi
           echo "SCRIPT_PYTHON=$PY"
