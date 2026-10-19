@@ -5704,3 +5704,8 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
 218、215、201/202/205/207、226、清账表 31 格（名单以 `MOTION_LEDGER_OPEN` 为准）、220 路 A（等授权改 `AppleKeyboardUIMode`）。
 ⑤ 活体计数器（停车时读到的）：清账表 162 格 / 已写 131 / 未写 31 / 地板 131、`MOTION_LEDGER_RESULT=ok 不合法格=0`、
 曲线 `GAPS=none`、变异预检 `tables=55 covered=40 arms=158 bad=3 dupes=0`、帧基线 140 张、脚本电池 `Ran 384 / OK`。
+
+**231 追记（停车后第一读 CI）**
+
+`gh api …/actions/runs?per_page=8` 逐跑读数：5bb95b9=queued/—、d183bfc=queued/—、7ee6749=in_progress/—、5358bf3=in_progress/—、7dc490f=in_progress/—、b36af66=in_progress/—、8d7b51c=in_progress/—、1620429=completed/success。
+本轮读到的所有**已完成**跑都是 success，没有 failure ⇒ 没有需要按步骤名逐条落账的新红；但仍有 7 跑 in_progress/queued ⇒ 那几跑结论**未读**，不许当绿。
