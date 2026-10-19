@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 浮层悬停那一档改成按色档取墨（R225 / U-725…U-727 · 产品 1 文件 + 判据 1 新文件 + 表 1 文件）
+
+- 病：`VisualFill.hover`=0.06 一档管两档 —— 亮档悬停带 `(240)`/白底 = **1.14:1**，低于仓库自己 R220 定的亮档地板 1.20；
+  暗档 `(43)`/`(30)` = **1.177:1**，过暗档地板 1.10。与 R219 的骨架屏同形。
+- 修法：`QuickPickController.hoverFillAlpha(dark:)`（暗档仍等于共享令牌，亮档 +`lightHoverLift`），
+  `HoverFillView.draw` 自己问 `effectiveAppearance`。改后亮档 `(232)` = **1.225:1**，与选中带 `(220)` 仍差 12 级。
+- 判据：`QuickPickHoverInkTests` 两格（按 sRGB 重算两档对比度 + 悬停不许撞选中；源码守卫钉画法必须读按档函数）。
+- 刀 `R225_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`（M763/M764）；名册登记 `mutate_r225`。
+- 帧：`COMPARED=142 CHANGED=1`，唯一动的 `quickpick-hover-420x300-light.png`，暗档逐字节不变；基线同一笔 update。
+- 验证：构建 0 告警、捕获卷 75 格 0 失败、全量卷 897 格 0 失败、换装本机 ok；新开 **251**。
+
 ### 246 结案（runner 的成因读数=no-bg-window）+ 左轴尺的坐标约定修好（R224 / U-722…U-724 · 判据（python 尺）1 文件 + 表 1 文件，产品 0 文件）
 
 - runner 正文（run `39273827335` = `69bccbd`，success）：`LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`，

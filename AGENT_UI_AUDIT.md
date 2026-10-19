@@ -363,6 +363,29 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 227 轮（R225 · 2026-10-20）：回到动效位点本体：浮层悬停那一档改成**按色档取墨** —— 亮档实测 1.14:1 掉在仓库自己的 1.20 地板下，抬到 1.225:1（暗档一字未动）（U-725…U-727 · 产品 1 文件 + 判据 1 新文件 + 表 1 文件）
+
+- **U-725：位点＝快速选择浮层 / 悬停。病是"一个 alpha 管两档"，与 R219 的骨架屏同形。**
+  取证在盘上的两张帧（本轮现算，不抄历史）：亮档悬停带 `(240)` 压白底 `(255)` = **1.14:1**，
+  而仓库自己给亮档定的地板是 **1.20**（R220 `testSkeletonBarsAreVisibleAgainstTheirOwnBackground`）；
+  同一颗 `VisualFill.hover`=0.06 在暗档是 `(43)` 压 `(30)` = **1.177:1**，过它那一档的 1.10。
+  ⇒ 错的不是数值，是"两档共用一个数"这个没写下来的默认。
+- **U-726：修法与边界**：`QuickPickController` 新增 `hoverFillAlpha(dark:)`（暗档 = 原令牌，亮档 = 原令牌 + `lightHoverLift`），
+  `HoverFillView.draw` 自己问 `effectiveAppearance`（不从外面传布尔，否则夹具能替产品决定这一档多亮）。
+  抬到 0.09 而不是"够 1.20 就行"：贴边躲不过一次调色，且亮档选中带实测 `(220)` —— 再往上抬就撞进选中那一档。
+  改后亮档悬停带 `(232)` = **1.225:1**，与选中带仍差 12 级灰。
+  **像素落点由帧签**：`FRAME_BASELINE_COMPARED=142 / CHANGED=1`，唯一动的那张是 `quickpick-hover-420x300-light.png`
+  （暗档那张逐字节不变，选中带两档都没动）⇒ "只抬亮档悬停"这句话不是声明，是名单。
+- **U-727：判据与刀。** 新增 `QuickPickHoverInkTests` 两格：数值格按 sRGB 相对亮度**重算**两档各自的对比度
+  （不引用这段散文）并钉"悬停不许撞选中"，源码格钉画法必须读 `hoverFillAlpha(dark:`；
+  刀 `R225_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`
+  （M763 去掉那一抬 ⇒ 地板格红；M764 画法搬回老令牌 ⇒ "数值对但产品没接"那一族）。
+  名册已登记 `mutate_r225`：`NEEDLE_PRECHECK tables=66 covered=51 arms=184 bad=4`。
+
+其余读数：构建 0 告警；捕获卷 `Executed 75 tests, 0 failures`；
+全量卷 `Executed 63 tests, 21 skipped, 0 failures`（D-208：动了 `Sources/` 必跑）；
+换装本机 `INSTALL_RESULT=ok`；电池见本轮结论行。看图腿：本轮真看了改后那张亮档帧与暗档对照。
+
 ## 第 226 轮（R224 · 2026-10-19）：246 的 runner 读数落账：七颗探针全在 no-bg-window，查出来是这把尺把窗口写在 @2x 像素上 —— 坐标约定已修（BACKLOG 249）（U-722…U-724 · 判据（python 尺）1 文件 + 表 1 文件，产品 0 文件）
 
 - **U-722：⓪ 的读数拿到了 —— runner 上那 7 个 NOT_RUN 第一次说得出成因，而成因说的是我这把尺。**

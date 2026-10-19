@@ -573,6 +573,26 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 就是靠"位点各自挑一个看着差不多的数"长出来的（守卫判据见捕获卷）。
     static let hoverFillAlpha = CGFloat(VisualFill.hover)
 
+    /// 亮档在 `VisualFill.hover` 之上再抬这么多（R225 / 与 R219 的骨架墨同一族病）。
+    ///
+    /// 为什么抬：`quickpick-hover-420x300-light.png` 逐像素量到悬停带 = `(240,240,240)`
+    /// 压在白底 `(255,255,255)` 上 ⇒ **对比度 1.14:1**，而仓库自己给亮档定的地板是
+    /// **1.20**（R220 / `testSkeletonBarsAreVisibleAgainstTheirOwnBackground`，骨架条带那条）。
+    /// 同一颗 0.06 在暗档是 `(43,43,43)` 压 `(30,30,30)` = **1.19:1**，过它那一档的地板 1.10。
+    /// 也就是说"两档共用一个 alpha"这件事，在暗档刚好够用、在亮档刚好不够 ——
+    /// 与 R219 的骨架屏是同一个形状的错（错的不是数值，是"一个数管两档"这个没写下来的默认）。
+    ///
+    /// 为什么抬到 0.09 而不是"够 1.20 就行"（0.0745 就够）：贴边的地板躲不过一次调色，
+    /// 而这一档还要**与选中那颗分开** —— 亮档选中带实测 `(220,220,220)`，
+    /// 0.09 ⇒ `(232)` 与它差 12 级灰；再往上抬就开始撞选中那一档（悬停不该读成选中）。
+    /// 判据把这两条都算了一遍（合成色 → sRGB 相对亮度 → 对比度），不是引用这段散文。
+    static let lightHoverLift = CGFloat(0.03)
+
+    /// 悬停那一档的墨，**按色档各给一个数**。暗档 = `VisualFill.hover` 原值，一字未动。
+    static func hoverFillAlpha(dark: Bool) -> CGFloat {
+        dark ? hoverFillAlpha : hoverFillAlpha + lightHoverLift
+    }
+
     /// 那一层灰左右各缩进多少。**10pt 是量出来的，不是挑的**：
     /// 暗档 `quickpick-list-420x300-dark.png` 上选中那颗药丸的强边沿在 x=42px 与 x=795px
     /// （2× 换算 = 21pt 与 397.5pt），而表格自己在面板里占 12…408pt ⇒ 药丸左右各内缩 ≈9pt。
@@ -760,7 +780,10 @@ final class HoverFillView: NSView {
     var cornerRadius: CGFloat = 0
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.labelColor.withAlphaComponent(QuickPickController.hoverFillAlpha).setFill()
+        // 色档由**这个视图自己**问（`effectiveAppearance`），不从外面传布尔：
+        // 传进来就等于允许调用方（含夹具）替产品决定"这一档该多亮"（R43 那一族）。
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        NSColor.labelColor.withAlphaComponent(QuickPickController.hoverFillAlpha(dark: dark)).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: insets, dy: 0),
                      xRadius: cornerRadius,
                      yRadius: cornerRadius).fill()
