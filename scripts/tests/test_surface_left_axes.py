@@ -12,9 +12,19 @@ import subprocess
 import sys
 import unittest
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'scripts'))
+import surface_left_axes as sla  # noqa E402
+
+try:
+    import PIL  # noqa F401
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+NEEDS_PIL = unittest.skipUnless(HAS_PIL, u'PIL 不可用 ⇒ 这一格造不出帧，记 NOT-RUN（不是通过）')
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPT = os.path.join(ROOT, 'scripts', 'surface_left_axes.py')
-SHOTS = '/tmp/shots_r207'
+SHOTS = '/tmp/shots_r211'
 
 
 def run(*args, **kw):
@@ -25,6 +35,7 @@ def run(*args, **kw):
     return p.returncode, p.stdout.decode('utf-8', 'replace')
 
 
+@NEEDS_PIL
 class SelfTruthTableTests(unittest.TestCase):
     def test_self_test_passes_and_names_every_control(self):
         code, out = run('--self-test')
@@ -38,26 +49,30 @@ class SelfTruthTableTests(unittest.TestCase):
         """正对照不许是唯一被跑过的那一侧：逐格读 SELFTEST 行的"实得"。"""
         _, out = run('--self-test')
         rows = [l for l in out.splitlines() if l.startswith(u'SELFTEST')]
-        self.assertEqual(5, len(rows), u'SELFTEST 行=%d，要 5 行' % len(rows))
+        self.assertGreaterEqual(len(rows), 7,
+                              u'SELFTEST 行=%d，至少要有正/反各一组' % len(rows))
         reds = [l for l in rows if u'实得=红' in l]
-        self.assertEqual(4, len(reds), u'四格反对照必须各自红，实红 %d：\n%s' % (len(reds), out))
+        self.assertGreaterEqual(len(reds), 5,
+                              u'反对照必须各自红，实红 %d：\n%s' % (len(reds), out))
         for code in (u'ASYMMETRIC', u'OFF_AXIS', u'GRID_PAST_TEXT', u'NOT_RUN'):
             self.assertIn(code, out, u'少了一类坏法：%s' % code)
 
 
 class RealFrameTests(unittest.TestCase):
     @unittest.skipUnless(os.path.isdir(SHOTS), u'帧目录不在（%s）⇒ 这一格本机 NOT-RUN' % SHOTS)
+    @NEEDS_PIL
     def test_working_frames_still_satisfy_the_three_relations(self):
         code, out = run('--shots', SHOTS)
         self.assertEqual(0, code, u'真帧上判据红了：\n%s' % out)
         self.assertIn(u'LEFT_AXIS_VERDICT ok', out)
         # 三条判据都得各自报数（不许"没问题"其实是"没量到"）：行首 `LEFT_AXIS ` 的规则行 = A/B/C
         rule_rows = [l for l in out.splitlines() if l.startswith(u'LEFT_AXIS ')]
-        self.assertEqual(3, len(rule_rows), u'判据行不全（要 A/B/C 三行）：\n%s' % out)
+        self.assertEqual(4, len(rule_rows), u'判据行不全（A/B/C/D 四行）：\n%s' % out)
         self.assertEqual(5, out.count(u'探针=') + out.count(u'药丸') + 99999, u'占位') if False else None
-        for tag in (u'A 对称', u'B 同轴', u'C 不越过'):
+        for tag in (u'A 对称', u'B 同轴', u'C 不越过', u'D 同轴·组合帧'):
             self.assertIn(tag, out, u'少了这一条判据：%s' % tag)
 
+    @NEEDS_PIL
     def test_missing_frames_are_not_run_not_green(self):
         empty = os.path.join(ROOT, '.scratch', 'motion-audit-2', '__no_such_frames__')
         os.makedirs(empty, exist_ok=True)
@@ -85,6 +100,7 @@ class CiExitTests(unittest.TestCase):
             im.save(os.path.join(d, name))
         return d
 
+    @NEEDS_PIL
     def test_real_frames_pass_and_report_ok(self):
         if not os.path.isdir(SHOTS):
             print(u'SKIPPED(本机)：帧目录不在 ⇒ 这一格 NOT-RUN')
@@ -93,18 +109,21 @@ class CiExitTests(unittest.TestCase):
         self.assertEqual(0, code, out)
         self.assertIn(u'LEFT_AXIS_CI verdict=ok', out)
 
+    @NEEDS_PIL
     def test_absent_frames_are_skipped_not_red(self):
         d = self._tmp_frames({})
         code, out = run('--shots', d, '--ci')
         self.assertEqual(0, code, u'缺席不该让 CI 红：\n%s' % out)
         self.assertIn(u'LEFT_AXIS_CI verdict=skipped', out)
-        self.assertIn(u'not_run=5', out, u'缺席要写成读数，不许只说"跳过了"：\n%s' % out)
+        self.assertIn(u'not_run=%d' % len(sla.PROBES), out,
+                      u'缺席要写成读数，不许只说"跳过了"：\n%s' % out)
 
     def test_missing_pillow_is_unavailable_not_red(self):
         code, out = run('--shots', SHOTS, '--ci', env={'SURFACE_LEFT_AXES_FORCE_NO_PIL': '1'})
         self.assertEqual(0, code, out)
         self.assertIn(u'LEFT_AXIS_CI verdict=unavailable', out)
 
+    @NEEDS_PIL
     def test_a_real_violation_still_goes_red(self):
         """正对照的反面：造一张药丸只往右缩的帧 ⇒ 这一步必须真的能让 CI 红。"""
         from PIL import Image
@@ -128,6 +147,15 @@ class CiExitTests(unittest.TestCase):
         self.assertEqual(1, code, u'真红被判成绿了（这一步会变成装饰）：\n%s' % out)
         self.assertIn(u'LEFT_AXIS_CI verdict=red', out)
         self.assertIn(u'ASYMMETRIC', out)
+
+
+    def test_plain_mode_without_pillow_reports_unavailable_not_traceback(self):
+        # R209 在 runner 上红的真因：非 --ci 路径让 ImportError 抛成崩溃，电池读不到结论行，
+        # 于是「环境没有像素库」被报成「代码结论不成立」（R154 那一族）。现在它必须是一条具名出口。
+        code, out = run('--shots', ROOT, env={'SURFACE_LEFT_AXES_FORCE_NO_PIL': '1'})
+        self.assertEqual(2, code, out)
+        self.assertIn(u'LEFT_AXIS_VERDICT unavailable', out)
+        self.assertNotIn(u'Traceback', out, u'崩栈不是结论：读栈的人无法判断产品对不对')
 
 
 class WorkflowWiringTests(unittest.TestCase):

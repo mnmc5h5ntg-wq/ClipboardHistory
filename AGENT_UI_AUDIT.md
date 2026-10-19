@@ -363,6 +363,28 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 214 轮（R212 · 2026-10-19）：runner 上两跑红的真因是我新加的电池格依赖像素库 —— 修成具名出口，顺手拆掉一条假绿遮蔽（U-686…U-688 · 判据 2 文件，产品 0 文件）
+
+- **U-686：`c232e82`（R209）在 runner 上 STEP[8] Release script tests 红 —— 红在我这一轮新加的电池格，不是产品。**
+  正文（`gh api …/jobs/{id}/logs`，按步骤读）：`AssertionError: 'LEFT_AXIS_VERDICT bad' not found in '… ModuleNotFoundError: No module named PIL'`。
+  两半：① 非 `--ci` 路径让 `ImportError` 抛成崩溃 ⇒ 结论行根本没打出来，断言读到的是一段栈；
+  ② 仓库早就有惯例（`test_heatmap_frame_levels.py`：`raise unittest.SkipTest(「PIL 不可用 ⇒ 这一格记 NOT-RUN（不是通过）」)`），**我没先查惯例就自己写了硬断言**。
+  修法：`main()` 的采集包进 try，具名出口 `LEFT_AXIS_VERDICT unavailable reason=pillow-missing` + **exit 2**（0 是通过、1 是产品结论、2 是没跑）；
+  需要像素的格子统一挂 `@NEEDS_PIL`；新增一格 `test_plain_mode_without_pillow_reports_unavailable_not_traceback`（用 `SURFACE_LEFT_AXES_FORCE_NO_PIL` 在任何机器上都能钉这条出口）。
+- **U-687：233 的判据半结案 —— 组合帧的同轴判据（D）落地，并纠正 R211 台账里我手量的两个数。**
+  `LEFT_AXIS D 同轴·组合帧 ｜ 头部、骨架 ｜ 最左墨=[20.5, 20.0]pt 跨度=0.5pt（容差 2.0）`。
+  R211 那句「头部 21.0pt / 骨架 22.5pt，差 1.5pt」是**单行扫描 + 全局门槛 12** 量的：门槛 12 把低对比骨架读成「没墨」，
+  于是那个 22.5 其实量到了别的行。给骨架探针单独 `thr=6` 之后才是真数（差 0.5pt）。教训：**门槛不够低时「读不到」会被写成「不存在」**（R90 那一族）。
+- **U-688：拆掉一条假绿遮蔽 + 计数改为从尺推导。**
+  第一版 `judge()` 在发现任何 NOT_RUN 后直接 return —— 于是「有一张帧没拍到」会把它旁边三条规则的结论一起吞掉，
+  真违反与缺席同时存在时 CI 只会读到 `skipped`。现在 NOT_RUN 只免掉**引用了它的那条规则**（`live(names)` 守卫），
+  其余规则照判；`test_a_real_violation_still_goes_red` 就是这一格的证人（它同时有缺席与真违反，必须仍红）。
+  测试里的 5/3 这类计数全部改成从 `sla.PROBES` 与四条规则名推导（手抄的计数会在加探针那天变成假账）。
+  本轮**没有**变异刀（判据被整条注释掉暂时不会红）⇒ 两把刀（D 恒真、把 unavailable 改回抛栈）开成 BACKLOG 238；
+  另一格账：pillow 安装在电池之后 ⇒ runner 上像素类电池格恒 NOT-RUN，要不要前移开成 BACKLOG 237。
+  验证：脚本电池 `Ran 400 tests` 且 OK；尺自检 7 格对照全对（含新增两格组合帧）；真帧 `LEFT_AXIS_CI verdict=ok … probes=7`。
+
+
 ## 第 213 轮（R211 · 2026-10-19）：详情加载态第一次有**组合帧** —— 头部 + 分隔线 + 骨架同框，D-206 的那句假话现在有像素可以否证（U-683…U-685 · 产品 2 文件，看图账 + 判据账）
 
 - **U-683：组合帧画出来了，R209 那句"加载时头部消失"现在是被像素否证，而不是只被代码否证。**

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### runner 上 R209/R210/R211 的 STEP[8] 红归因并修：像素库缺席走具名出口，NOT_RUN 不再连带免检（R212 / U-686…U-688 · 判据 2 文件，产品 0 文件）
+
+- 真因：`test_surface_left_axes` 硬依赖 PIL，而 runner 没装库；且非 `--ci` 路径把 `ImportError` 抛成崩溃 ⇒ 断言读到栈而不是结论行
+- 仓库既有惯例是 SkipTest（`test_heatmap_frame_levels.py`）⇒ 本轮按惯例挂 `@NEEDS_PIL`，并给 `main()` 加 `unavailable` + exit 2
+- 233 判据半：组合帧 D 同轴判据（头部 20.5pt / 骨架 20.0pt，跨度 0.5pt ≤2.0）；探针级 `thr=6` 修掉「门槛把低对比骨架读成没墨」
+- 纠正 R211 手量的 21.0/22.5（单行扫描 + 全局门槛的产物）
+- 拆掉一条假绿遮蔽：NOT_RUN 只免引用它的那条规则；新增证人「缺席与真违反并存必须仍红」
+- 计数从尺推导（`len(sla.PROBES)`、四条规则名），不再手抄 5/3
+- 未做：两把刀（BACKLOG 238）、pillow 安装位置（BACKLOG 237）；CI 上这一步的出口仍未读（235 继续开着）
+- 验证：脚本电池 `Ran 400 tests` 且 OK；尺自检 7 格对照全对
 ### 详情加载态第一次有组合帧：`DetailView(freezeLoadingForCapture:)` + `detail-loading-composed` 两张帧（R211 / U-683…U-685 · 产品 2 文件 + 夹具 1 文件）
 
 - 病根：`detail-loading` 画的是组件，所以"加载时头部在不在"在产物通道上不可判（D-206 / BACKLOG 233）

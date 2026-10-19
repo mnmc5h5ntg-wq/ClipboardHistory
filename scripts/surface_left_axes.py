@@ -59,7 +59,15 @@ PROBES = [
          window=(280, 666, 1440, 700), bg=(280, 900, 1400, 960)),
     dict(name=u'统计/热图网格', stem=u'settings-stats-populated-720x540',
          window=(280, 326, 1440, 352), bg=(280, 900, 1400, 960)),
+    # R212 / BACKLOG 233 的判据半：**同一张组合帧**里的头部与骨架（R211 才有这张帧）
+    dict(name=u'详情/组合帧头部', stem=u'detail-loading-composed-720x520',
+         window=(0, 74, 740, 98), bg=(760, 74, 1400, 98)),
+    dict(name=u'详情/组合帧骨架', stem=u'detail-loading-composed-720x520',
+         window=(0, 162, 700, 192), bg=(760, 162, 1400, 192), thr=6),
 ]
+
+AXIS_GROUP_COMPOSED = u'详情/组合帧头部,详情/组合帧骨架'   # D 同轴（同帧，跨种类：文字 vs 圆角条带）
+COMPOSED_TOL_PT = 2.0   # 与既有 Swift 判据同一档（≤2pt），不新造数
 
 AXIS_GROUP = u'统计/统计行,统计/月份行,统计/说明正文'      # B 同轴
 SYMMETRY_PROBE = u'浮层/选中行药丸'                        # A 对称
@@ -111,7 +119,7 @@ def probe_reading(im, probe):
     for x in range(x0, x1):
         for y in range(y0, y1):
             r, g, b = px[x, y]
-            if max(abs(r - bg[0]), abs(g - bg[1]), abs(b - bg[2])) > INK_THRESHOLD:
+            if max(abs(r - bg[0]), abs(g - bg[1]), abs(b - bg[2])) > probe.get('thr', INK_THRESHOLD):
                 xs.append(x)
                 break
     if not xs:
@@ -127,34 +135,57 @@ def judge(readings):
     for name, r in readings.items():
         if r is None:
             problems.append(('NOT_RUN', u'%s：探针取不到墨或底不纯 ⇒ 尺没有对象，不许给绿' % name))
-    if problems:
-        return rows, problems
+    # 关键：NOT_RUN 只免掉**引用了它的那条规则**，不免掉整把尺。
+    # 第一版在这里直接 return，于是「有一张帧没拍到」会把它旁边三条规则的结论一起吞掉 ——
+    # 那是一条假绿通道：真违反与缺席同时存在时，CI 只会读到 skipped。
+    def live(names):
+        return all(readings.get(n) is not None for n in names)
 
-    r = readings[SYMMETRY_PROBE]
-    d = round(abs(r['left_pt'] - r['right_pt']), 2)
-    rows.append(('A 对称', SYMMETRY_PROBE,
-                 u'左内缩=%spt 右内缩=%spt 差=%spt（容差 %s）' % (r['left_pt'], r['right_pt'], d, TOL_PT)))
-    if d > TOL_PT:
-        problems.append(('ASYMMETRIC', u'%s：左右内缩差 %spt > %spt' % (SYMMETRY_PROBE, d, TOL_PT)))
+    if live([SYMMETRY_PROBE]):
+        r = readings[SYMMETRY_PROBE]
+        d = round(abs(r['left_pt'] - r['right_pt']), 2)
+        rows.append(('A 对称', SYMMETRY_PROBE,
+                     u'左内缩=%spt 右内缩=%spt 差=%spt（容差 %s）' % (r['left_pt'], r['right_pt'], d, TOL_PT)))
+        if d > TOL_PT:
+            problems.append(('ASYMMETRIC', u'%s：左右内缩差 %spt > %spt' % (SYMMETRY_PROBE, d, TOL_PT)))
 
     names = [n.strip() for n in AXIS_GROUP.split(u',')]
-    lefts = [readings[n]['left_pt'] for n in names]
-    spread = round(max(lefts) - min(lefts), 2)
-    rows.append(('B 同轴', u'、'.join(names), u'最左墨=%spt 跨度=%spt（容差 %s）' % (lefts, spread, TOL_PT)))
-    if spread > TOL_PT:
-        problems.append(('OFF_AXIS', u'同组左轴跨度 %spt > %spt ⇒ 卡片里出现了第二条轴' % (spread, TOL_PT)))
+    if live(names):
+        lefts = [readings[n]['left_pt'] for n in names]
+        spread = round(max(lefts) - min(lefts), 2)
+        rows.append(('B 同轴', u'、'.join(names), u'最左墨=%spt 跨度=%spt（容差 %s）' % (lefts, spread, TOL_PT)))
+        if spread > TOL_PT:
+            problems.append(('OFF_AXIS', u'同组左轴跨度 %spt > %spt ⇒ 卡片里出现了第二条轴' % (spread, TOL_PT)))
 
     a, b = NO_OVERFLOW
-    ra, rb = readings[a], readings[b]
-    rows.append(('C 不越过', u'%s ⊆ %s' % (a, b),
-                 u'网格左缘=%spt 右内缩=%spt ｜参照左缘=%spt 右内缩=%spt' % (ra['left_pt'], ra['right_pt'],
-                                                              rb['left_pt'], rb['right_pt'])))
-    if ra['right_px'] > rb['right_px'] + 2:
-        problems.append(('GRID_PAST_TEXT', u'热图网格右缘 %spx 越过说明文字右缘 %spx ⇒ 内容顶到文字列外面'
-                                      % (ra['right_px'], rb['right_px'])))
-    if ra['left_px'] < rb['left_px'] - 2:
-        problems.append(('GRID_LEFT_OF_TEXT', u'热图网格左缘 %spx 早于说明文字 %spx ⇒ 网格跑到文字列外面'
-                                      % (ra['left_px'], rb['left_px'])))
+    if live([a, b]):
+        ra, rb = readings[a], readings[b]
+        rows.append(('C 不越过', u'%s ⊆ %s' % (a, b),
+                     u'网格左缘=%spt 右内缩=%spt ｜参照左缘=%spt 右内缩=%spt'
+                     % (ra['left_pt'], ra['right_pt'], rb['left_pt'], rb['right_pt'])))
+        if ra['right_px'] > rb['right_px'] + 2:
+            problems.append(('GRID_PAST_TEXT', u'热图网格右缘 %spx 越过说明文字右缘 %spx ⇒ 内容顶到文字列外面'
+                                             % (ra['right_px'], rb['right_px'])))
+        if ra['left_px'] < rb['left_px'] - 2:
+            problems.append(('GRID_LEFT_OF_TEXT', u'热图网格左缘 %spx 早于说明文字 %spx ⇒ 网格跑到文字列外面'
+                                             % (ra['left_px'], rb['left_px'])))
+
+    # D 同轴·组合帧（R212 / BACKLOG 233 的判据半）：**同一张帧**里头部那行与骨架条带共用一条左轴。
+    #   这一条替代的是原来"拿 detail-loading 的条带去比 detail-2-file 的头部"那种跨帧比 ——
+    #   两张帧各自改了内缩也会"仍然相等"，那是 D-206 记的那族（组件帧不替组合状态作证）。
+    #   容差单独一档 2.0pt：头部是文字（数字字形带侧边距）、骨架是圆角条带，跨种类比较要把侧边距算进来；
+    #   这个数不是新造的，与既有 Swift 判据（`detail-loading` 条带↔句子 ≤2pt）同一档。
+    names2 = [n.strip() for n in AXIS_GROUP_COMPOSED.split(u',')]
+    if live(names2):
+        lefts2 = [readings[n]['left_pt'] for n in names2]
+        spread2 = round(max(lefts2) - min(lefts2), 2)
+        rows.append(('D 同轴·组合帧', u'、'.join(names2),
+                     u'最左墨=%spt 跨度=%spt（容差 %s，跨种类 ⇒ 含字形侧边距）'
+                     % (lefts2, spread2, COMPOSED_TOL_PT)))
+        if spread2 > COMPOSED_TOL_PT:
+            problems.append(('COMPOSED_OFF_AXIS',
+                             u'组合帧里头部与骨架不同轴（跨度 %spt > %spt）⇒ 加载态换了列'
+                             % (spread2, COMPOSED_TOL_PT)))
     return rows, problems
 
 
@@ -174,7 +205,12 @@ def collect(shots_dir, suffix=u'-dark'):
 
 def self_test():
     """已知答案的对照：正对照要绿，三种坏法各自要红，空帧要 NOT_RUN。"""
-    from PIL import Image
+    try:
+        from PIL import Image
+    except ImportError:
+        print(u'LEFT_AXIS_SELFTEST unavailable reason=pillow-missing')
+        print(u'LEFT_AXIS_ENV_NOTE 没有像素库 ⇒ 真值表一格都跑不了：这是 NOT-RUN，不是通过')
+        return 2
     ok = True
 
     def stats_frame(axis_shift=0, grid_right=1117):
@@ -198,8 +234,21 @@ def self_test():
                 px[xx, yy] = (60, 60, 60)
         return im
 
-    def run(qp, st):
-        frames = {u'quickpick-list-420x300': qp, u'settings-stats-populated-720x540': st}
+    def composed_frame(header_x=40, bar_x=40):
+        im = Image.new('RGB', (1440, 1040), (30, 30, 30))
+        px = im.load()
+        for yy in range(74, 98):
+            for xx in range(header_x, 706):
+                px[xx, yy] = (200, 200, 200)
+        for yy in range(162, 192):
+            for xx in range(bar_x, 610):
+                px[xx, yy] = (52, 52, 52)
+        return im
+
+    def run(qp, st, cp=None):
+        frames = {u'quickpick-list-420x300': qp, u'settings-stats-populated-720x540': st,
+                  u'detail-loading-composed-720x520':
+                      composed_frame() if cp is None else cp}
         readings = {p['name']: probe_reading(frames[p['stem']], p) for p in PROBES}
         return judge(readings)
 
@@ -221,6 +270,20 @@ def self_test():
         print(u'SELFTEST %-22s 期望=%s 实得=%s %s ｜ %s'
               % (label, u'绿' if want_ok else u'红', u'绿' if got_ok else u'红',
                  u'' if good else u'** 对照坏掉 **', u'、'.join(codes) or u'无问题'))
+    _, pr0 = run(quickpick_frame(0), stats_frame(), composed_frame())
+    c0 = [c for c, _ in pr0]
+    good0 = u'COMPOSED_OFF_AXIS' not in c0 and u'NOT_RUN' not in c0
+    ok = ok and good0
+    print(u'SELFTEST %-22s 期望=绿 实得=%s %s ｜ %s'
+          % (u'正对照·组合帧同轴', u'绿' if good0 else u'红',
+             u'' if good0 else u'** 对照坏掉 **', u'、'.join(c0) or u'无问题'))
+    _, pr1 = run(quickpick_frame(0), stats_frame(), composed_frame(header_x=100))
+    c1 = [c for c, _ in pr1]
+    good1 = u'COMPOSED_OFF_AXIS' in c1
+    ok = ok and good1
+    print(u'SELFTEST %-22s 期望=红 实得=%s %s ｜ %s'
+          % (u'反对照·组合帧头部换列', u'红' if good1 else u'绿',
+             u'' if good1 else u'** 对照坏掉 **', u'、'.join(c1) or u'无问题'))
     print(u'LEFT_AXIS_SELFTEST %s' % ('ok' if ok else 'bad'))
     return 0 if ok else 1
 
@@ -284,7 +347,14 @@ def main(argv=None):
     if args.ci:
         return ci_mode(args.shots)
 
-    readings, absent = collect(args.shots, args.suffix)
+    try:
+        if os.environ.get('SURFACE_LEFT_AXES_FORCE_NO_PIL') == '1':
+            raise ImportError('forced: 模拟没有像素库的机器')
+        readings, absent = collect(args.shots, args.suffix)
+    except ImportError:
+        print(u'LEFT_AXIS_VERDICT unavailable reason=pillow-missing 探针=0 问题=0 NOT_RUN帧=0')
+        print(u'LEFT_AXIS_ENV_NOTE 没有像素库 ⇒ 这一格是 NOT-RUN（exit 2），不是通过也不是产品结论')
+        return 2
     for a in absent:
         print(u'LEFT_AXIS_NOT_RUN 探针取不到帧：%s' % a)
     rows, problems = judge(readings)

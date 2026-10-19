@@ -5789,3 +5789,17 @@ run `39247153666`（3073943）`row-insert 开 帧数=4 峰值=0.057 采样≈33m
 要补的格（下一轮，产品入口进）：① 断言 `DetailView(historyStore:)` 与 `DetailFileView(url:thumbnail:)` 的默认值使预览**会**加载
 （用一条会随时间推进到 `.success`/`.failure` 的判据，而不是读注释）；② 断言夹具那一格确实停在 `.loading`
 （否则组合帧会静默变成成功帧，142 张基线里 CHANGED 会抓到，但抓不到原因）；③ 一把刀：把默认值翻成 true ⇒ ① 必须红。
+
+**237. pillow 装在脚本电池**之后**：runner 上所有像素类电池格恒 NOT-RUN，要不要把安装步骤前移（R212 开单）**
+
+读数：CI 步骤顺序是 `STEP[8] Release script tests` → … → `Pillow for the frame rulers` → `Surface left-axis ruler`。
+⇒ 电池里 `@NEEDS_PIL` 的格子在 runner 上永远走 skip（这是诚实的，但也是"这一卷在 CI 上没判过像素"）。
+两个方向：① 把安装挪到电池之前 ⇒ 像素类格子在 CI 上真跑（多一次网络安装的不确定性）；
+② 保持现状，把"CI 上像素类电池格全 skip"登记成有名字的未覆盖（与 201/215 同一族）。
+本轮选 ②（不动安装顺序，先记账），因为 ① 会让 STEP[8] 的成败依赖网络安装 —— 那正是 R154 禁止的"环境差异报成代码结论"。
+
+**238. 这把尺至今没有变异刀：D 判据被整条注释掉、或 unavailable 出口被改回抛栈，都不会红（R212 自查开单）**
+
+要配的两把：① `if spread2 > COMPOSED_TOL_PT:` ⇒ `if False:`（同帧判据恒真）⇒ 自检的「反对照·组合帧头部换列」必须不红 ⇒ `LEFT_AXIS_SELFTEST bad`；
+② 把 `main()` 里的 `except ImportError:` 具名出口改回裸 `raise` ⇒ `test_plain_mode_without_pillow_reports_unavailable_not_traceback` 必须红。
+两把都是本轮**已经想到但没做**的（时间用在了修 runner 红与拆遮蔽上），所以记成账而不是"不需要"。
