@@ -6196,3 +6196,33 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   `4f170e9`→`39314810527`、`4edfea5`→`39315528849`、`847ab2b`→未取到 id，**加上这一笔 push 之后那一跑**
   （把 id 补在这一行末尾）。要读的还是 253 那两格：`SCRIPT_SHOTS_GLOB=… png_files=<N>` 与
   `LEFT_AXIS_CI verdict=` 到底是 `ok` / `skipped` / `unavailable` —— 三种结果修法相反，不许预选。
+
+## R231 补记第五笔（把上面那条 ⓪ 读掉了：253 的接线在 runner 上拿到了答案，而答案不是我预选的那三种之一）
+
+- **成对的读数**（gh api actions/runs，写账时）：`02de8cc`→`39314291982` **success**、`e347a0c`→`39314396070` **success**、
+  `4f170e9`→`39314810527` **success**、`4edfea5`→`39315528849` **failure**、`847ab2b`→`39315666980` **failure**、
+  `5cf95fe`→`39319255032` 写账时 `in_progress` ⇒ 只能记**未读**。
+- 两朵红的**失败步骤只有一个**：`STEP[9] Release script tests`；其后 5 步全 `skipped`
+  （Info.plist gate、帧基线 fixture-set gate、Surface left-axis ruler、change report、launch smoke）
+  ⇒ 那 5 步本轮**无从判定**，不许写成"也过了"。
+- 正文读数（按步骤名过滤 `--log-failed` 取的，两跑同形）：
+  `SCRIPT_SHOTS_GLOB=/tmp/shots-ci png_files=154` ⇒ **接线成功**（变量到位、帧在盘上、尺真的跑了）；
+  红在 `test_real_frames_pass_and_report_ok`：`AssertionError: 'LEFT_AXIS_CI verdict=ok' not found in`
+  那一行末尾是 `LEFT_AXIS_CI verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7`；
+  四条 NOT_RUN 的成因由**尺自己**印：`cause=bg-not-flat bg=(50, 50, 50)`（浮层/选中行药丸）、
+  `cause=no-ink bg=(50, 50, 50) thr=12`（统计/统计行、月份行、热图网格）；末行
+  `LEFT_AXIS_VERDICT bad 探针=7 问题=4 NOT_RUN帧=0`。
+- **判语（这一红说的是我那条断言，不是产品）**：`missing_frames=0` 把"runner 帧不全"那一支排除了，
+  `hard=0` 说没有硬违规 ⇒ 剩下的是"这台机器在那 4 个探针上**没有对象**"。而我把 `--ci` 那一格写成了
+  必须 `verdict=ok` —— 等于把本机的能力当成了 runner 的地板（R154 / R157 同族：环境差异被写进判据入口）。
+  归因对照用**改动之前那一跑**：`4f170e9` 是 success，因为那时电池步骤没有这个变量、那两格走 skip 出口。
+  ⇒ 这一红是"从跳过变真判"的代价，方向正是 253 要的。
+- **新开 259（下一笔做，别当成"改回 skip 就完事"）**：把 `--ci` 那一格的期望改成**按机器 × 按探针切片**的表 ——
+  本机 `not_run=0` ⇒ 期望 `verdict=ok`；runner ⇒ 期望 `verdict=skipped` 且 `not_run=4` **逐探针点名**那四条、
+  `missing_frames=0`、`hard=0`。两行都必须来自**量过的**读数（本机：这一笔的 `Ran 406 OK` 且 skip 归零；
+  runner：上面那行原文），第三台机器不在表里 ⇒ 继续红（R124 那条"没登记的那台必须红"）。
+  配刀两支：① 把表里 runner 那一行的名单清空 ⇒ 必须红；② 把"缺席"那一格（`not_run=len(PROBES)`）与
+  这一格缝成同一条出口 ⇒ 必须红。**不许**写成"`skipped` 也算过"—— 那正是 253 另一半要拦的事
+  （缺席不许被读成绿），从后门放掉就等于没接。
+- 253 的状态因此**收窄而不是结案**：接线与"帧读得到"两件事已结案，欠账换成 259 那一格期望表；
+  258 仍剩 `DetailView.swift:228`（`MarkdownModeButton`）与 `:541`（`MultiFileRow`）两处。
