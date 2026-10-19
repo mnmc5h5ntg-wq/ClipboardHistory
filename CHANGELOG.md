@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 验证：构建 0 告警；`Executed 72 tests, with 4 tests skipped and 0 failures (0 unexpected) in 207.326 (207.332) seconds`；帧 142 张、`FRAME_BASELINE_ADDED=2`（其余一张未变）；电池 `Ran 399 tests` 且 OK；已换装本机
 - 未做（不许算已交付）：把"头部↔骨架同轴"从跨帧比换成同帧判据（233 追记）；默认值的守卫（236）
 - CI：`6` 跑 success、`1` 跑未读、失败 c232e82
+- **补落（同一轮第二笔）**：上一笔把"帧基线同一笔 update"写进了账，但工作基线清单 `docs/frame_baseline.json` 没被 `git add`（我只加了 `docs/frame_baselines/` 那个目录）⇒ 那一笔里"同一笔"是假的。这一笔把清单补上，并把这句话改成事实：**新帧两张、清单落在下一笔**（R189 那一族：message 先于证据）。
 ### 看图尺接进 CI 一步，并给三种出口各配证人（R210 / U-680…U-682 · 判据 2 文件 + workflow 1 文件 + 表 1 支，产品 0 文件）
 
 - `scripts/surface_left_axes.py` 加 `--ci`：真红 ⇒ exit 1；只有 NOT_RUN ⇒ `verdict=skipped` exit 0（缺席写成读数 not_run/missing_frames）；没有像素库 ⇒ `verdict=unavailable` exit 0
