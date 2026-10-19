@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表一批 15 格：详情区 / 侧栏 / 浮层 / 状态菜单 / 设置侧栏的剩余格一次判完（R207 非轮次批 · 表 1 份 + 报告 3 行，产品 0 文件）
+
+- 131→146 行、未清账 31→16、地板同笔抬到 146（`MOTION_LEDGER_RESULT=ok 不合法格=0`）
+- 每一格都绑到能复查的对象与行号：详情区的回执（`DetailView.swift` 第 19/93/131/133 行）、两颗 .pressedStyle（:246、:587）、侧栏关环（`sidebarFocusRingHidden()`）、浮层键盘选中（`QuickPickController.swift` :333/:334/:787）、状态菜单的 disabled 说明项（`MenuBarController.swift` :91/:98/:150）、设置的成功/错误回执长在正文（`SettingsView.swift` :203/:637/:1000）
+- 三条缺席断言由闸门逐条验（`缺席:...=focusEffectDisabled`、`=keyView`、`=isEnabled`、`=NoticeBanner`、`=errorText`）⇒ 挑的都是结构名，不挑会被 focusEffectDisabled 喂饱的 disabled（那条教训现在有了牙：闸门自己会红）
+- 处置分布：kept 8 / not-applicable 7，**没有一格是"顺手加个动效"** —— 这一批的结论是这些状态要么已由系统表达、要么根本不存在；不为打破 0 改动纪录去加动效（这条规矩本身写在账上）
+- 报告 §9.3 与 §1 的两格由 `test_final_report_claims.py` 逼着换成新读数（未判 16、已写 146）
+
 ### R206 并笔：新回执进帧基线（138→140）+ 变异名册补齐 + 调用点守卫（R206 / U-668…U-670 · 判据 2 文件 + 表 1 支 + 基线 1 份，产品 0 文件）
 
 - 归因先于处置：三张暗帧的纯黑带高度**都是 132px（66pt @2x）**、只有 y 不同 ⇒ 判为已登记的材质盲区，登记条目带读数（不是裸名单）
