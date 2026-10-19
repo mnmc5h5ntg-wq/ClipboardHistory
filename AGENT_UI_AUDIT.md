@@ -373,7 +373,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 | 2 | 「行顶到 x≈0 而标题居中」 | 同上：不许判对齐；且复刻本来就没有右内边距 | 不开条目 |
 | 3 | 「最右下面那条是蓝的」 | 颜色档**可以**判，于是从产品入口量它（`populate` 交出的真 `NSMenuItem`） | **改产品**（两处），见 U-748 |
 
-### U-748（本轮的缺陷与修法）
+- **U-748：本轮的缺陷与修法。**
 
 `MenuBarController` 在 dismiss 行的 `attributedTitle` 上写死一颗蓝，13 那棵走
 `MenuBarRecommendationsView` 的同一条决定。写死的墨不参与系统为选中态准备的换色，
@@ -391,7 +391,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 两种态它都输 ⇒ 墨交回系统（`D-220`）。这一行的身份改由**分隔线 + 它自己在最后一段**承担，
 并把"前面必须有一条分隔线"一起写成会红的断言（去掉彩度之后，分组是它唯一的身份来源）。
 
-### U-749（代价、刀、以及 13 那棵有没有判据）
+- **U-749：代价、刀、以及 13 那棵有没有判据。**
 
 - 产品文件=0（`Managers/MenuBarController.swift`、`Views/MenuBarRecommendationsView.swift`）。
 - 判据：`MenuBarDismissRowInkTests` 两格 —— ①尺自己的对照（同色=1.00、黑白>15、
@@ -402,7 +402,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - 帧：重捕 162 帧对账，改前 CHANGED=2（changed  menubar-recommendations-320x320-dark / changed  menubar-recommendations-320x320-light）⇒ 基线同笔 update 后 CHANGED=0。
 - 捕获卷 执行 80 / skip 4 / 失败 0；全量卷 910/0/0；换装本机 旧包留在：/Users/wangziyi/Documents/Codex_Project0_backups/before。
 
-### U-750（本轮没做的，写清楚）
+- **U-750：本轮没做的，写清楚。**
 
 1. **悬停那一行的最终观感仍未看真机**：底色在这里是系统语义色**代理**，离屏画不出真菜单的
    vibrant 材质。人工批次要回答的是"悬停时那一行现在是什么颜色、还读不读得出"。
