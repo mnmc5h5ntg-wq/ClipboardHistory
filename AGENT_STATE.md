@@ -1,5 +1,22 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-20 00:13（本地 · R227 / 第 229 轮：**252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在任何机器上都不会跑**（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+
+**本轮落地**：读 252 的名单 —— 那 3 条 skip 逐条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
+**没有一条是 PIL 类**，同跑 365 行 `... ok` ⇒ 上一轮 244 的结案范围站住（解释器接对了、像素判据真跑了）。
+但顺带挖出更坏的一格：其中两条挂在写死的 `/tmp/shots_r211`（R211 的临时帧目录，/tmp/shots_r211=在盘上）⇒ 这两格**在任何机器上都不跑**，
+却以 skip 的样子安静存在 —— 同一族（夹具不许写共享绝对路径 / 临时目录不许跨次复用）这次犯在**判据自己**身上。
+新开 **253**（帧目录改由捕获卷同一个环境变量派生 + 一条"判据里不许出现写死 /tmp/shots_rNNN"的会红守卫）。
+左轴仍 `verdict=skipped not_run=7 probes=7`（`e015455` 早于 R224 的 pt 修法）；`da5da47` 仍 `in_progress`、
+`09d9bf7` 仍 `queued` ⇒ **249 与 R225 的 runner 复验未读**，未读不算绿。
+本轮 0 判据、0 产品改动 ⇒ 未换装本机、看图腿 NOT-RUN。
+
+**下一轮（R228）的靶**：⓪ 读 `da5da47`（run `39280048395`）与 R225 四跑：左轴在 @1x 上是否 `verdict=ok`（**249 的第一格**，
+红先归因不许放宽）、`Swift tests (executed-count gate)` 是否仍绿；
+① 修 253（写死的帧目录 + 那条会红守卫）；② 回到动效位点：251 先补两档帧再判；
+③ 248、243、227③、222、215、201/202、207、240、250；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-20 00:09（本地 · R226 / 第 228 轮：**244 结案：runner 的判据卷走上了带 pillow 的解释器（`SCRIPT_PIL_OK 13.0.0`、`SCRIPT_SKIPS=3`），左轴那一步仍等 `da5da47` 那一跑**（U-728…U-730 · 判据 0 文件 + 台账，产品 0 文件（本轮是读数轮））
 
 **本轮落地**：⓪ 读 run `39277485218`（`e015455`，**success**）：`SCRIPT_PYTHON=/tmp/pilenv/bin/python`、`SCRIPT_PIL_OK 13.0.0 /private/tmp/pilenv/bin/python`、

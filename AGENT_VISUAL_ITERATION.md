@@ -14054,3 +14054,32 @@ R225 的四跑（`09d9bf7`=`39282426231`）仍 `queued` ⇒ 未读不算绿。
 | 可复核性 | 14/15 |
 
 总分 87/105（226 轮）。GAPS=none
+## Round 227 · 252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在任何机器上都不会跑（2026-10-20 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+
+上一轮 244 结案时留了一句"还剩 3 条 skip，归属未读"。这一轮去读了名单 ——
+runner 正文里锚「时间戳 + 真打印」那一行，三条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
+**没有一条是 PIL 类**，同一跑打了 365 行 `... ok` ⇒ 244 那句"解释器接对了、像素判据真跑了"站得住。
+
+但这一读挖出更坏的一格：其中**两条**挂在写死的 `/tmp/shots_r211` 上 —— 那是 R211 的临时帧目录，
+`/tmp/shots_r211=在盘上` ⇒ 这两格真帧对照**在任何机器上都不跑**，而它们在报表里以"skip"的样子安静存在着。
+本仓库为同一族已经记过两次（夹具不许写共享绝对路径 / 临时目录不许跨次复用），这次犯的是**判据自己**。
+skip 的两种成因必须分开：环境缺席（合理，要能被点名）与**证据路径腐烂**（不合理，它把"从没跑过"洗成"跳过了"）。
+⇒ 新开 **253**：帧目录由捕获卷同一个环境变量派生 + 加一条"判据里不许出现写死的 /tmp/shots_rNNN"的会红守卫。
+
+其余：左轴这一跑仍 `verdict=skipped not_run=7 probes=7`（那是 `e015455`，早于 R224 的 pt 修法）；
+`da5da47` 仍 `in_progress`、R225 的 `09d9bf7` 仍 `queued` ⇒ **249 与 R225 的 runner 复验仍未读**，未读不算绿。
+本轮 0 判据、0 产品改动 ⇒ 未换装本机、看图腿 NOT-RUN。
+
+七维度自评：
+
+| 维度 | 得分 |
+|---|---|
+| 真实视觉审查 | 10/15 |
+| 判据有效性 | 13/15 |
+| 假绿防御 | 14/15 |
+| 产品面推进 | 8/15 |
+| 台账一致性 | 14/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+
+总分 88/105（227 轮）。GAPS=none

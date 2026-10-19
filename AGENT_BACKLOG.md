@@ -6029,3 +6029,17 @@ R200 以后新增的决定**一条都不在这条守卫的可见范围里**：�
 下一轮读法（不改判据，只读日志）：从 `/tmp/py.log` 那一步的正文里按 `... skipped` 行取**测试名**，
 按 skip 理由分档（环境类 / 能力闸门类 / 平台版本类），再决定要不要升硬门。
 不许做的事：把 3 当成「已经很少了」直接收口；也不许把 skip 名字打出来之前先加出口。
+**253. `test_surface_left_axes` 的两格真帧对照把证据押在写死的 `/tmp/shots_r211` 上：那个目录已被 macOS 清掉 ⇒ 两格永远 skip，而 skip 长得像"合理跳过"（R227 读 252 时挖出）**
+
+名单来自 runner 正文（`e015455`，`SCRIPT_SKIPS=3`）：
+   · 端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）
+   · test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上
+   · test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN
+其中两条的理由是同一个不存在的目录。**skip 有两种成因，处置相反**：环境缺席（这台机器判不了，要能被点名）
+与**证据路径腐烂**（这一格从来没跑过，却以"跳过"的样子混过每一轮报表）。本轮读到的是第二种。
+修法（两步，都要能红）：
+① 帧目录不许写死 —— 由捕获卷同一个环境变量（`CLIPBOARD_HISTORY_UI_SHOTS`）派生，或改读**仓库内**的基线帧目录；
+   取不到目录时 skip 文本必须带上"这一格上次真跑是哪一轮"，不许只报目录名。
+② 加一条会红守卫：扫 `scripts/tests/**` 与 `scripts/*.py`，出现字面 `/tmp/shots_r[0-9]+` 即红
+   （豁免名册为空；正对照 = 临时插一行含该字面串的注释，必须被点名）。
+不许做的事：把这两格直接删掉（那是把"没跑"改成"没这回事"）；也不许把 skip 当成通过写进结论行。

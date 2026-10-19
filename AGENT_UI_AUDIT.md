@@ -363,6 +363,23 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 229 轮（R227 · 2026-10-20）：252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在任何机器上都不会跑（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+
+- **U-731：252 的答案（名单与理由都由 runner 正文现读，锚「真打印」形状）。**
+  那 3 条 skip 逐条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
+  ⇒ **没有一条是 PIL/环境类**，而同一跑打了 365 行 `... ok` ⇒ 上一轮 244 的结案范围站住了：
+  带 pillow 的解释器确实把像素类判据跑起来了，不是"装了但没接"。
+- **U-732：但这一读顺带挖出一条更坏的：两条 skip 挂在写死的 `/tmp/shots_r211` 上。**
+  那个目录名是 R211 那一轮的临时帧目录，`/tmp/shots_r211=在盘上` ⇒ 这两格**在任何一台机器上都不会跑**，
+  而报表里它们长得像"skip 掉了，合理"。这正是本仓库已经记过两次的族（夹具不许写共享绝对路径、
+  临时目录不许跨次复用），只是这次犯在**判据自己**身上：`test_surface_left_axes` 的两格真帧对照
+  把证据押在一个会被 macOS 清掉的目录上。⇒ 新开 **253**（修法与"不许静默 skip"的守卫都写在那条里）。
+- **U-733：其余未读清单。**
+  左轴在 runner 上仍是 `verdict=skipped not_run=7 probes=7` —— 那是 `e015455` 那一跑（早于 R224 的 pt 修法）；
+  带修法的 `da5da47` 仍 `status=in_progress`（run `39280048395`），R225 的 `09d9bf7` 仍 `queued`（run `39282426231`）
+  ⇒ **249 与 R225 的 runner 复验都仍未读**，未读不算绿。
+  本轮 0 判据、0 产品改动 ⇒ 未换装本机、看图腿 NOT-RUN（不拿 R225 的帧替本轮作证）。
+
 ## 第 228 轮（R226 · 2026-10-20）：244 结案：runner 的判据卷走上了带 pillow 的解释器（`SCRIPT_PIL_OK 13.0.0`、`SCRIPT_SKIPS=3`），左轴那一步仍等 `da5da47` 那一跑（U-728…U-730 · 判据 0 文件 + 台账，产品 0 文件（本轮是读数轮））
 
 - **U-728：⓪ 读到了 244 的唯一通道，而且是齐的三行。**

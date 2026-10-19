@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 252 结案：3 条 skip 的名单读出来了，其中两条是腐烂的证据路径（R227 / U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
+
+- 名单（runner 正文现读、锚真打印形状）：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
+- 没有一条是 PIL 类 + 同跑 365 行 `... ok` ⇒ 244 的"解释器接对了"站住。
+- 两条挂在写死的 `/tmp/shots_r211`（R211 的临时帧目录，/tmp/shots_r211=在盘上）⇒ 这两格在任何机器上都不跑，却以 skip 的样子安静存在。
+  新开 **253**：帧目录改由捕获卷同一个环境变量派生，并加"判据里不许出现写死 /tmp/shots_rNNN"的会红守卫。
+- 左轴仍 `verdict=skipped not_run=7 probes=7`（`e015455` 早于 R224）；`da5da47` 仍 `in_progress`、`09d9bf7` 仍 `queued`
+  ⇒ **249 与 R225 的 runner 复验未读**。本轮 0 判据、0 产品、未换装、看图腿 NOT-RUN。
+
 ### 244 结案：runner 判据卷走上带 pillow 的解释器（R226 / U-728…U-730 · 判据 0 文件 + 台账，产品 0 文件（本轮是读数轮））
 
 - run `39277485218`（`e015455`，**success**）：`SCRIPT_PYTHON=/tmp/pilenv/bin/python`、`SCRIPT_PIL_OK 13.0.0 /private/tmp/pilenv/bin/python`、`SCRIPT_SKIPS=3`，
