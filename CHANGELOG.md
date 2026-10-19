@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 217 装好时间轴：五跑分布抓到"帧数 9~11 里只有 1~2 帧对是连续的"，而这条轴自己在 2.0 界上翻面（R193 / U-632…U-634 · 产品 0 文件，判据账）
+
+- 新尺：`armProcessInIntervals`（含峰值那段时长 ÷ **本次实测**中位间隔）+ `processReadingVerdict`（散点撑绿 / 有一段过程 / 帧数本来就不够）；2.0 个间隔这个界就是 `minimumTransitionFrames=3` 在时间轴上的等价形状，不是新阈值
+- 读数（五跑，`/tmp/r193_motion*.log`）：`row-insert 开` 2.9/2.9/1.1/1.6/2.6 个间隔（帧对 2/2/1/1/2 / 帧数 10/9/7/9/10 / 判：散点撑绿、有一段）；`选中没变` 1.6/1.4/4.2/2.8/1.4 个间隔（帧对 1/1/3/2/1 / 帧数 11/11/11/11/10 / 判：散点撑绿、有一段）；对照 `row-insert 关` 1.6/1.3/1.3/1.2/1.3 个间隔（帧对 1/1/1/1/1 / 帧数 1/1/1/1/1 / 判：帧数本来） ⇒ 现有 `≥3 帧` 的地板被散点撑绿
+- 分布自己翻界：2/5 跑落在"散点撑绿"、3/5 落在"有一段"、3/5 跑落在"散点撑绿"、2/5 落在"有一段" ⇒ 本轮**不换判据**（换上去就是拿采样相位当产品结论），新开 BACKLOG 218 要一个更稳的统计量
+- 顺带修一处会量错对象的形状：序列站点原来把 `recordProductSequence` 的返回值直接喂差分 ⇒ 第一臂的时刻被第二臂覆盖（R91 那一族）
+- 变异：`mutate_r193.py` M721, M722, M723, M724, M725 ⇒ 5/5 CAUGHT、RESTORE_CLEAN=yes；M723 先 ESCAPED（守卫 `contains` 被另一臂喂饱）后转 CAUGHT；已登记进 needle 预检名册
+- 验证：编译 0 告警、扫描卷 5/0/0、五跑动效卷各 6 条 `过程=` 读数（两臂腿 skip 属预期 ⇒ 由读数作证，不由 XCTest 那行作证）、全量卷 879/42/0、产品 0 文件（帧未动，未重捕）
 ### 216 结案：两处"两臂相同吗"换两把尺并判；同轮更正上一轮点名的两处位置（R192 / U-628…U-631 · 产品 0 文件，判据账）
 
 - 更正：216 点名的 `:2916`（分栏）与 `:2332`（热图淡入 A/B）**都不是** 212 的形状 —— 前者 R59 已用 `sharedMovingFloor`，

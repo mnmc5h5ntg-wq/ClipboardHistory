@@ -213,6 +213,49 @@ final class MotionFilmstripTests: XCTestCase {
                       "旧口径必须与新口径一起打印，否则换判据口径这件事在日志里没有证人（R146 那一课）")
     }
 
+    /// 一臂的"过程"折算成**这一次运行自己量到的采样间隔的倍数**（R193 / BACKLOG 217）。
+    ///
+    /// 为什么需要它：三处 AppKit 行 A/B（插行 / 移行 / 插行后紧跟写选中）判的是
+    /// `transitionFrameCount ≥ 3` 与 `≤ 1` —— 那是**帧对个数**，它有两个洞：
+    /// ① 散着变也算数（第 1、8、20 帧各抖一下 = 3 帧），可"演了一段"要求的是**连续**；
+    /// ② 一帧多长由抓帧耗时决定（R2 实测同一份代码本机跑过 2/3/2），所以"3 帧"在 6ms 与 50ms
+    ///    的时钟下不是同一个要求。
+    /// 217 说这两处欠的是时间轴。这里给的就是那条轴，但**不压毫秒数**：
+    /// 单位取本次实测的中位间隔 ⇒ 6ms 的机器与 50ms 的机器用的是同一条线（把毫秒写死会把两档
+    /// 用一把尺管住，那是 R74 那一族）。`nil` = 这一臂根本没有连续段（峰值低于绝对地板）⇒ 无从判定。
+    static func armProcessInIntervals(stamps: [TimeInterval], fractions: [Double])
+        -> (intervals: Double, run: ChangedRun)? {
+        guard let run = contiguousChangedRun(stamps: stamps, fractions: fractions) else { return nil }
+        let interval = Double(sampleIntervalMilliseconds(stamps))
+        guard interval > 0 else { return nil }
+        return (run.elapsedMilliseconds / interval, run)
+    }
+
+    /// `armProcessInIntervals` 的打印形状 —— 读不到打「无」，不许打空串（R100 那一课：
+    /// 形状形容词不许落在缺席读数上，而缺席要有缺席的样子）。
+    ///
+    /// 帧数与连续段**并排打**，因为本轮的真卷读数就是这两个数对不上：
+    /// `row-insert 开 帧数=9 … 过程=1.4个间隔 时长10ms 帧对1` —— 九帧是**散着抖**出来的，
+    /// 不是一段一直在演的过程。合读法把这件事说成一句话，免得读日志的人只看见那个 9。
+    static func processReading(_ value: (intervals: Double, run: ChangedRun)?, span: Int) -> String {
+        guard let v = value else { return "无连续段(整卷峰值低于绝对地板) 帧数=\(span)" }
+        return String(format: "%.1f个间隔 时长%.0fms 段内最粗%.0fms 帧对%d 帧数=%d ⇒ %@",
+                      v.intervals, v.run.elapsedMilliseconds, v.run.worstIntervalMilliseconds,
+                      v.run.endFrame - v.run.startFrame + 1, span,
+                      processReadingVerdict(span: span, intervals: v.intervals))
+    }
+
+    /// "这一臂到底演了一段，还是只是被数到几帧"（R193 / BACKLOG 217）—— 措辞由两个数生成。
+    ///
+    /// 2.0 个间隔这个界**不是新阈值**：它就是 `minimumTransitionFrames`(3) 在时间轴上的等价形状
+    /// —— 三帧**连续**在演，段长必然是"首帧到第四帧"= 2 个间隔。所以这条只在"帧数够、连续段不够"
+    /// 时说话，说的还是原来那条判据自己的要求。
+    static func processReadingVerdict(span: Int, intervals: Double) -> String {
+        if span < minimumTransitionFrames { return "帧数本来就不够 \(minimumTransitionFrames) ⇒ 这一臂判'没在演'" }
+        if intervals < 2.0 { return "散点撑绿：帧数 \(span) 够，但含峰值那段只跨 \(String(format: "%.1f", intervals)) 个间隔 ⇒ 这几帧不是一段过程（217）" }
+        return "有一段一直在演的过程（连续段 \(String(format: "%.1f", intervals)) 个间隔）"
+    }
+
     /// 两处"两臂相同吗"的比较必须**两把尺都说相同**（R192 / BACKLOG 216）—— 扫形状，不跑结果。
     ///
     /// 为什么不能只靠"跑一遍看红"：本机两臂峰值实测相等（`0.268/0.268`、`0.051/0.051`），
@@ -315,6 +358,99 @@ final class MotionFilmstripTests: XCTestCase {
                        "矛盾那格不许写出『这把尺看得见』——那是拿一把尺的产物当产品结论（212 那一课）")
         XCTAssertTrue(Self.armAgreementReading(sameUnderShared: true, sameUnderPerArm: false, sound: true)
                         .contains("先读两臂逐帧形状"))
+    }
+
+    /// `armProcessInIntervals` 的真值表（R193 / BACKLOG 217，合成用例）。
+    ///
+    /// 这条钉的是 217 的**立论本身**：同样"数到 3 帧在变"，连续演与散着抖在帧数尺上同形，
+    /// 在时间轴尺上差三倍。没有这一格，下一轮把三处判据搬到时间轴时就没有人管得住"搬了个寂寞"。
+    /// **不覆盖管线**：数组与时刻都是人造的，钉的是尺子；真卷那三处是
+    /// `testNativeRowAnimationIsVisibleToTheRuler`、`testNativeRowMoveIsVisibleToTheRuler`、
+    /// `testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt`。
+    func testContiguousProcessDiffersFromScatteredChanges() throws {
+        let stamps: [TimeInterval] = [0.000, 0.010, 0.020, 0.030, 0.040, 0.050]
+        // (a) 连续演三段：第 1→4 帧一直在变 ⇒ 时长 = stamps[4] − stamps[1] = 30ms = 3 个间隔。
+        let contiguous: [Double] = [0.00, 0.30, 0.20, 0.10, 0.00, 0.00]
+        // (b) 散着抖三下：变化量之和与峰值形状与 (a) 同量级，但**不连续**。
+        let scattered: [Double] = [0.00, 0.30, 0.00, 0.25, 0.00, 0.20]
+        XCTAssertEqual(Self.transitionFrameCount(contiguous), Self.transitionFrameCount(scattered),
+            "前提：帧数这把尺分不开这两种形状（分得开就不需要 217 了）")
+        let a = Self.armProcessInIntervals(stamps: stamps, fractions: contiguous)
+        let b = Self.armProcessInIntervals(stamps: stamps, fractions: scattered)
+        XCTAssertNotNil(a, "连续段必须读得出来")
+        XCTAssertNotNil(b)
+        XCTAssertEqual(a?.intervals ?? 0, 3.0, accuracy: 0.01,
+                       "连续三帧的过程必须读成 3 个间隔（时长 = 段首到段尾后一帧）")
+        XCTAssertEqual(b?.intervals ?? 0, 1.0, accuracy: 0.01,
+                       "散着抖 ⇒ 含峰值的那一段只有一帧 ⇒ 1 个间隔，不许把三次抖动加成一个过程")
+        XCTAssertGreaterThan((a?.intervals ?? 0) - (b?.intervals ?? 0), 1.5,
+                             "时间轴必须把这两种形状分开，分不开就是这颗尺白造了")
+        // (c) 段内有空档：时长被停顿撑大 ⇒ `worstIntervalMilliseconds` 必须把这件事报出来。
+        let gappedStamps: [TimeInterval] = [0.000, 0.010, 0.011, 0.310, 0.320, 0.330]
+        let gapped: [Double] = [0.00, 0.30, 0.20, 0.10, 0.00, 0.00]
+        let g = Self.armProcessInIntervals(stamps: gappedStamps, fractions: gapped)
+        XCTAssertEqual(g?.intervals ?? 0, 31.0, accuracy: 0.5,
+                       "中位间隔 10ms、段内一次 299ms 空档 ⇒ 折算 31 个间隔（310ms ÷ 10ms），这条读数本身就是可疑的形状")
+        XCTAssertGreaterThan(g?.run.worstIntervalMilliseconds ?? 0, 250.0,
+                             "段内最粗采样必须抓到那次空档（R48 那一课：时长不是被过程撑出来的）")
+        // (d) 整卷没动 ⇒ nil，不许读成"0 个间隔 = 一帧到位"。
+        XCTAssertNil(Self.armProcessInIntervals(stamps: stamps, fractions: [0, 0.001, 0.001, 0, 0, 0]),
+                     "峰值低于绝对地板时不许返回一个数 —— 那会把'没量到'说成'瞬移'")
+
+        // (e) 合读法三态：本轮真卷落在**散点撑绿**那一格（`row-insert 开 帧数=9 / 连续段 1.4 个间隔`）。
+        XCTAssertTrue(Self.processReadingVerdict(span: 9, intervals: 1.4).contains("散点撑绿"),
+                      "帧数够而连续段不够 ⇒ 必须说'散点撑绿'，不许只报那个 9")
+        XCTAssertTrue(Self.processReadingVerdict(span: 9, intervals: 2.0).contains("一直在演"))
+        XCTAssertTrue(Self.processReadingVerdict(span: 2, intervals: 1.0).contains("帧数本来就不够"),
+                      "帧数本来就不够那一臂 ⇒ 不许被读成'散点撑绿'（那是另一种病）")
+        XCTAssertTrue(Self.processReading(nil, span: 0).contains("无连续段"),
+                      "缺席要打「无连续段」并带上帧数，不许打空串（R100）")
+
+        // (e) 合读法三态：本轮真卷落在**散点撑绿**那一格（`row-insert 开 帧数=9 / 连续段 1.4 个间隔`）。
+        XCTAssertTrue(Self.processReadingVerdict(span: 9, intervals: 1.4).contains("散点撑绿"),
+                      "帧数够而连续段不够 ⇒ 必须说'散点撑绿'，不许只报那个 9")
+        XCTAssertTrue(Self.processReadingVerdict(span: 9, intervals: 2.0).contains("一直在演"))
+        XCTAssertTrue(Self.processReadingVerdict(span: 2, intervals: 1.0).contains("帧数本来就不够"),
+                      "帧数本来就不够那一臂 ⇒ 不许被读成'散点撑绿'（那是另一种病）")
+        XCTAssertTrue(Self.processReading(nil, span: 0).contains("无连续段"),
+                      "缺席要打「无连续段」并带上帧数，不许打空串（R100）")
+    }
+
+    /// 三处 AppKit 行 A/B 必须把时间轴打进日志（R193 / BACKLOG 217）—— 扫形状。
+    ///
+    /// 为什么这一轮只钉"打印"不钉"判定"：那三处在本机 `NATIVE_PROBE_STATE … active=false` ⇒ 判定腿 skip，
+    /// 本机拿不到分布（只有读数）。按"单次读数不配给产品签字"（R83/R87 那一族），
+    /// 先把两臂的时长与折算倍数送到 runner 上跑一跑，判据换形留到下一轮拿着分布做。
+    func testNativeRowAbSitesPrintTheTimeAxis() throws {
+        let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        let stripped = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        let parts = stripped.split(separator: "\n    func ")
+        let thisMethod = "testNativeRowAbSitesPrintTheTimeAxis"
+        let code = parts.filter { !$0.hasPrefix(thisMethod) }.joined(separator: "\n    func ")
+        XCTAssertEqual(code.components(separatedBy: "Self.armProcessInIntervals").count - 1, 10,
+                       "三处站点各两臂（6 次）+ 真值表那四组形状（4 次）⇒ 恰好 10 次调用（定义行不带 `Self.`，不会被算进来）")
+        for method in ["testNativeRowAnimationIsVisibleToTheRuler",
+                       "testNativeRowMoveIsVisibleToTheRuler",
+                       "testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt"] {
+            let section = parts.first(where: { $0.hasPrefix(method) }).map(String.init) ?? ""
+            XCTAssertFalse(section.isEmpty, "\(method)：找不到方法体 ⇒ 改名或删掉了，空串上的计数是假绿")
+            XCTAssertEqual(section.components(separatedBy: "Self.armProcessInIntervals").count - 1, 2,
+                           "\(method)：这一处必须给**两臂**各量一次连续段（读到 \(section.components(separatedBy: "Self.armProcessInIntervals").count - 1) 次）"
+                             + " ⇒ 少一次就是有一臂还只看帧数")
+            XCTAssertTrue(section.contains("过程="),
+                          "\(method)：两臂的连续段时长与折算倍数必须打进日志 —— 不印出来，runner 那一跑就没有读数，"
+                            + "下一轮换判据时又变成拿本机单次读数签字")
+            // 刀 M723 揭示的洞：`contains("过程=")` 会被**另一臂**那一行喂饱 ——
+            // 摘掉开臂的打印，关臂那行还在，判据照样绿。要数次数，次数=出口数（R85 那一课）。
+            let printed = section.components(separatedBy: "Self.processReading(").count - 1
+            XCTAssertEqual(printed, 2,
+                           "\(method)：两臂各要打印一次时间轴（读到 \(printed) 次）⇒ 少一次就是有一臂的读数没送到 runner")
+        }
+        XCTAssertFalse(code.contains("let sameRow = Self.deltas(probe.recordProductSequence"),
+                       "序列那处又用`recordProductSequence`的返回值直接算差分了 ⇒ 拿不到**这一臂自己**的时刻，"
+                         + "第二臂的 `lastStamps` 会把第一臂的时间轴顶掉（R91：对照自己也要防量错对象）")
     }
 
     /// 从触发到"落定"要几帧这件事，由 `settledAtFrame(_:band:)` 回答（R2）——
@@ -4979,15 +5115,21 @@ final class MotionFilmstripTests: XCTestCase {
         let animatedFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
             reduceMotion: false, animationsEnabled: true))
         let animated = Self.deltas(animatedFilm, band: band)
-        let animatedInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let animatedStamps = probe.lastStamps
+        let animatedInterval = Self.sampleIntervalMilliseconds(animatedStamps)
         let instantFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
             reduceMotion: true, animationsEnabled: true))
+        let instantStamps = probe.lastStamps
         let instant = Self.deltas(instantFilm, band: band)
-        let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let instantInterval = Self.sampleIntervalMilliseconds(instantStamps)
         let animatedSpan = Self.transitionFrameCount(animated)
         let instantSpan = Self.transitionFrameCount(instant)
-        emit("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms")
-        emit("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms")
+        // R193 / BACKLOG 217：帧数只是**对照** —— 这条判定欠的是连续段时长（散着抖三下也够 3 帧，
+        // 而一帧多长由抓帧耗时决定）。本轮先把两臂的时间轴送进日志，判据换形等 runner 那份分布。
+        let animatedProcess = Self.armProcessInIntervals(stamps: animatedStamps, fractions: animated)
+        let instantProcess = Self.armProcessInIntervals(stamps: instantStamps, fractions: instant)
+        emit("MOTION_NATIVE row-insert 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated))) 采样≈\(animatedInterval)ms 过程=\(Self.processReading(animatedProcess, span: animatedSpan))")
+        emit("MOTION_NATIVE row-insert 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant))) 采样≈\(instantInterval)ms 过程=\(Self.processReading(instantProcess, span: instantSpan))")
         // 数字先打，再决定"是产品没动还是这台机器没给前提"。问的是**布局那一臂**：
         // runner 上行动画量得到（3 帧），拿渐变那一臂去问会把它一起 skip 掉。
         try await requireObservableMotion(.layout)
@@ -5018,17 +5160,24 @@ final class MotionFilmstripTests: XCTestCase {
         let animatedFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
             reduceMotion: false, animationsEnabled: true))
         let animated = Self.deltas(animatedFilm, band: band)
-        let animatedInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let animatedStamps = probe.lastStamps
+        let animatedInterval = Self.sampleIntervalMilliseconds(animatedStamps)
         let instantFilm = probe.record(animation: QuickPickController.rowAnimationOptions(
             reduceMotion: true, animationsEnabled: true))
+        let instantStamps = probe.lastStamps
         let instant = Self.deltas(instantFilm, band: band)
-        let instantInterval = Self.sampleIntervalMilliseconds(probe.lastStamps)
+        let instantInterval = Self.sampleIntervalMilliseconds(instantStamps)
         let animatedSpan = Self.transitionFrameCount(animated)
         let instantSpan = Self.transitionFrameCount(instant)
+        // R193 / BACKLOG 217：`nativeMoveVerdict` 吃的两个数都是**各自归一化的帧对个数**，
+        // 而 `moveRow` 动不动由 `allowsImplicitAnimation` 决定 ⇒ 三态结论欠的仍是时间轴。
+        // 本机这一处 skip（`active=false`）⇒ 本轮只送读数，换判据等 runner 的分布。
+        let animatedProcess = Self.armProcessInIntervals(stamps: animatedStamps, fractions: animated)
+        let instantProcess = Self.armProcessInIntervals(stamps: instantStamps, fractions: instant)
         emit("MOTION_NATIVE row-move 开 帧数=\(animatedSpan) 峰值=\(String(format: "%.3f", Self.peak(animated)))"
-            + " 采样≈\(animatedInterval)ms")
+            + " 采样≈\(animatedInterval)ms 过程=\(Self.processReading(animatedProcess, span: animatedSpan))")
         emit("MOTION_NATIVE row-move 关 帧数=\(instantSpan) 峰值=\(String(format: "%.3f", Self.peak(instant)))"
-            + " 采样≈\(instantInterval)ms")
+            + " 采样≈\(instantInterval)ms 过程=\(Self.processReading(instantProcess, span: instantSpan))")
         // R53：结论行**打在两道 skip 之前**。
         //
         // R50 加这条三态判据时，我把 `print` 留在了 `requireAppWasActive` 后面，于是
@@ -5132,12 +5281,21 @@ final class MotionFilmstripTests: XCTestCase {
     func testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt() async throws {
         try skipUnlessEnabledAndCapable()
         let probe = TableProbe()
-        let sameRow = Self.deltas(probe.recordProductSequence(selectionChanges: false))
-        let moved = Self.deltas(probe.recordProductSequence(selectionChanges: true))
+        // R193 / BACKLOG 217：原来这两句直接把 `recordProductSequence` 的返回值喂给差分算法，
+        // 于是**时刻**只剩最后那一臂的（`probe.lastStamps` 被第二臂覆盖）⇒ 想给第一臂量时间轴，
+        // 拿到的会是另一臂的钟（R91：对照自己也要防量错对象）。先各存一份，再量。
+        let sameFilm = probe.recordProductSequence(selectionChanges: false)
+        let sameStamps = probe.lastStamps
+        let sameRow = Self.deltas(sameFilm)
+        let movedFilm = probe.recordProductSequence(selectionChanges: true)
+        let movedStamps = probe.lastStamps
+        let moved = Self.deltas(movedFilm)
         let sameSpan = Self.transitionFrameCount(sameRow)
         let movedSpan = Self.transitionFrameCount(moved)
-        emit("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow)))")
-        emit("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved)))")
+        let sameProcess = Self.armProcessInIntervals(stamps: sameStamps, fractions: sameRow)
+        let movedProcess = Self.armProcessInIntervals(stamps: movedStamps, fractions: moved)
+        emit("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow))) 过程=\(Self.processReading(sameProcess, span: sameSpan))")
+        emit("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved))) 过程=\(Self.processReading(movedProcess, span: movedSpan))")
         try await requireObservableMotion(.layout)
         try requireAppWasActive(probe.wasActive)
         XCTAssertGreaterThan(Self.peak(sameRow), Self.minimumVisibleChange,
