@@ -87,6 +87,12 @@ final class UICaptureTests: XCTestCase {
     /// 这份名单存在的理由：`FRAME_BASELINE_CHANGED=0` 在这些帧上**不等于**"选中态被看着"。
     /// 选中是用户点名要审的状态之一，而它一直是量不到的 —— 先让它能被数出来，再想办法拍到。
     static let materialBlindSpotFixtures: Set<String> = [
+        // R206 / BACKLOG 229：新夹具 `content-with-dropped-unreadable-notice` 第一次拍就冒黑带，
+        // 分辨实验的读数是「三张暗帧的纯黑带**高度都是 132px（66pt @2x）**、只有 y 不同」：
+        // `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、本帧 y=872..1003。
+        // ⇒ 同一处已登记的盲区（侧栏最后一行的选中材质在离屏下画成黑），横幅只是把它推上/推下；
+        //   登记的是**这一处**，不是给老毛病起一个新名字（名单里每一条都要能被这样追问）。
+        "content-with-dropped-unreadable-notice",
         "content-with-history", "content-min", "content-wide", "content-with-notice",
         "content-with-two-notices",
         // R40 新加的这张走的是**同一个** `ContentView`，读数与两张姐姐帧逐字相同
@@ -4535,11 +4541,25 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: twoNoticeStore))
         })
-        // R206 尝试给 R205 那条新回执补帧，被 `testCaptureKeyViews` 的纯黑填充带守卫拦下
-        // （新帧里被选中那一行整块画成纯黑 ⇒ 视觉状态量不到）。**先不放宽名单**：
-        // 成因没确认之前，加进名单就是把不懂的红洗成出口（BACKLOG 229 记着两个候选与分辨实验）。
-        // 回执本身的可复查证据今天仍在：`DroppedFileImportTests.testDroppedProvidersThatDecodeToNothingStillSpeakUp`
-        // 与那张被拦下的帧的临时读数（`/tmp/shots_r206/content-with-dropped-unreadable-notice-750x560-{dark,light}.png`，不入库）。
+        // R206 / BACKLOG 228① + 229：D-4 另一半那条回执**第一次进帧基线**。
+        //
+        // 为什么非要有这张帧：R205 修的那一格是「provider 声称是文件、`loadItem` 却解出 0 个 URL」，
+        // 判据三条对照全绿、刀两把全 CAUGHT，可 `frame_baseline compare` 打的是 `CHANGED=0` ——
+        // 那一句的真实含义是**这条新代码根本没被拍到**（新分支不在任何夹具里）。
+        // 文案与那个数都由产品生产者给（`addDroppedFiles(urls:attemptedCount:)` 自己写 `droppedFilesNotice`），
+        // 夹具不手写句子 ⇒ 以后改措辞、改个数、或者干脆不回执了，这张帧自己会红。
+        //
+        // 第一版被 `testCaptureKeyViews` 的「第一次出现纯黑填充带」拦下（BACKLOG 229）。分辨实验做完了，答案是**候选②**：
+        // 逐行扫 x=20..520、三张暗帧各有一条**同样高度**的纯黑带 —— `content-with-notice` y=896..1027、
+        // `content-with-two-notices` y=974..1105、本帧 y=872..1003，**高度都是 132px（=66pt @2x）**，只是被横幅推上/下移。
+        // ⇒ 黑带不是这张新帧带来的，是"侧栏最后一行的选中材质在离屏下画成黑"这一处**已登记**的盲区（R18 那一族），
+        //   新帧只是第一次走到"名单里没有这个名字"那一格。所以登记进 `materialBlindSpotFixtures` 并带上这条读数，
+        //   而不是放宽守卫、也不是给同一处盲区换一个新名字。
+        let droppedUnreadableStore = makePopulatedStore()
+        _ = droppedUnreadableStore.addDroppedFiles(urls: [], attemptedCount: 2)
+        results.append(Fixture("content-with-dropped-unreadable-notice", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: droppedUnreadableStore))
+        })
         // R40：**复制失败**那句回执必须放得下（U-66 / D-099）。
         //
         // 为什么要为一句新文案单开一张帧：这条链路的回执是**拼出来的**（"复制到剪贴板失败："

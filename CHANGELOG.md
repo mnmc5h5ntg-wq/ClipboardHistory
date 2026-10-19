@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R206 第二笔：补帧成功 —— 分辨实验把黑带归到**已登记的那一处**盲区，回执第一次进基线（138→140 张）（R206 / U-668…U-669 · 判据 1 文件 + 基线 1 份，产品 0 文件）
+
+- 分辨实验（不用新仪器，扫已有帧）：三张暗帧的纯黑带**高度都是 132px（66pt @2x）**、只有 y 不同 —— `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、新帧 y=872..1003 ⇒ 判为**候选②**：侧栏最后一行的选中材质在离屏下画成黑，横幅只是把它推上/推下；黑带**不是这张新帧带来的**
+- 因此登记进 `materialBlindSpotFixtures`（11 of 70 fixtures），登记条目里带着这条读数 —— 不是给老毛病起新名字，也不是放宽守卫
+- 夹具重加（走产品入口 `addDroppedFiles(urls: [], attemptedCount: 2)`，文案与个数都由生产者给）⇒ 捕获卷 `72 tests / 4 skipped / 0 failures`、`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0` ⇒ **BACKLOG 228① 结案**（这条回执现在有帧了）
+- 看图：新帧暗档里「拖入的 2 项不是本机文件，未加入历史」+「知道了」都画得对；亮档同一格也拍到（`/tmp/shots_r207`）
+- 仍欠：228②（真机拖一次解不出的样本）与 228③（把 M736/M737 搬进 `mutate_needle_precheck.py` 名册）；229 结案（成因已定）
+
 ### R206 尝试：给 R205 那条新回执补帧 ⇒ 被纯黑填充带守卫拦下，**不放宽名单**，夹具回滚（R206 非轮次笔 · 判据 1 文件加注释，产品 0 文件）
 
 - 新夹具走产品入口（`makePopulatedStore()` + `addDroppedFiles(urls: [], attemptedCount: 2)`）⇒ 捕获 140 张、`FRAME_BASELINE_ADDED=2`

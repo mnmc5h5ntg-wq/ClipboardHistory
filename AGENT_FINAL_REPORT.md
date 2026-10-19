@@ -914,7 +914,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 脚本电池 | Ran 384 tests / OK（R205 那一遍，`/tmp/r205_battery.log`） | `/tmp/r200_battery.log` |
 | 变异预检 | tables=54 covered=39 arms=155 bad=3（bad 是 R168 记的陈旧死针，不是本轮新增） | `mutate_needle_precheck.py` |
 | 自评曲线 | PHASE2_TO_47 n=40 mean=91.30；GAPS=none ⇒ 已含补落的 Round 201/202/203 与 R204 / R205 | `curve_from_ledger.py` |
-| 帧基线 | 138 张（工作基线；R205 复核 `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r205`） | `/tmp/shots_r197` + `frame_baseline.py` |
+| 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 18 支；`.scratch/motion-audit-2/*.py` 268 支 | 目录计数 |
 | 最后一次动到 `Sources/` 的轮次 | **R205**（commit `8cbe238）—— 真改产品行为（2 文件）：`addDroppedFiles` 新增 `attemptedCount`，「provider 声称是文件却解出 0 个 URL」那一格不再静默；判据三条对照 + 刀 M736/M737 全 CAUGHT、已换装本机。**但这条新回执还没有帧**（不在任何夹具里）⇒ BACKLOG 228；上一笔动到源码的 R194 只动注释 | `git log -- ClipboardHistory/Sources` |
 
