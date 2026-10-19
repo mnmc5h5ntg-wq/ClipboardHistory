@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 211 落地：`SINGLE_LEDGER_ROUNDS`（186/187 带理由）+ `test_round_batch_declaration.py` 的四条自证（含 `back > 0` 恰好一次的删除型钉子）⇒ 本笔才敢换 STATE 表头
 - 212 新开：`testBandCaptureIsCheaperAndStillSeesTheMotion` 在 `fd6b43a`/`d4958a9` 各红一步 `STEP[17] Motion coverage floor`（「XCTAssertGreaterThanOrEqual failed: ("3") is less than ("4") - 带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，这一臂仍然只能记 not-run，那这条路就白走了」），而 R183/R184/R185 连着三跑绿、中间零改动 ⇒ 会翻脸的地板，先登记不定罪不放宽
 - 本机：编译 0 告警、捕获卷 71 例 / 失败 0、帧基线 138 张 changed=0；**全量卷与变异表本笔没跑**（记 NOT-RUN）
+### 212 结案：跨臂比过渡帧数必须用同一条线，并补一条与粒度无关的地板（R191 / U-625…U-627 · 产品 0 文件，判据账）
+
+- 换形：`transitionFrameCount(_:sharedFloor:)` + `sharedMovingFloor`（四臂最大峰值 × 同一比例）套到带/整窗两臂；旧口径同打印在 `MOTION_BAND_PROCESS`
+- 新地板：`bandShared ≥ 1` —— 由刀 M708 暴露（恒 0 计数时 `0 ≥ 0` 照样绿），修完 M708 转 CAUGHT
+- 证据：五跑 `MOTION_BAND dismiss` 分布 —— 带那一臂恒 3 帧、整窗 3 或 4 ⇒ 翻脸的是"哪一把线"，不是产品；本机两跑同线口径 带=7/8、整窗=3
+- 变异：`mutate_r191.py` M708, M709, M710, M711 ⇒ 4/4 CAUGHT、RESTORE_CLEAN=yes；已登记进 needle 预检名册
+- 新开 BACKLOG 216：剩下的同类形状点名两处（`MotionFilmstripTests.swift:2916` 左右分栏、`:2332` 热图淡入 A/B 的跨臂计数）
+- 验证：编译 0 告警、判据卷 2 例/skip 0/失败 0、全量卷 875/42/0、产品 0 文件（帧未动，未重捕）
 ### 上一笔把 CI 推红：能力出口成码（`channelCanSeeMaterial`）+ 212 的描述更正（R190 / U-622…U-624 · 产品 1 文件，判据账）
 
 - 红因：runner 的这条离屏通道不合成 `.ultraThickMaterial`/`.quaternary` ⇒ 底轨在帧里不存在，而本机的两态判据把"能判"当成了普适前提（`STEP[13]`、`STEP[15]` 各红一步，同一判据）

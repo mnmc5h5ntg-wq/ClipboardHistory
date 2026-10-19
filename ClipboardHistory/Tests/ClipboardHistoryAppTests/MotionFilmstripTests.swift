@@ -143,6 +143,40 @@ final class MotionFilmstripTests: XCTestCase {
         return fractions.filter { $0 >= floor }.count
     }
 
+    /// **跨臂比"看到几帧过程"必须用同一条绝对线**（R191 / BACKLOG 212）。
+    ///
+    /// 上面那个的门槛是各自峰值 × `stepFloorRatio` —— 本文件在 R59 就已经为分栏对比写过这条批评
+    /// （`sharedMovingFloor` 的注释："两块各自归一化 ⇒ 峰值大的那块被一条更高的绝对线先判停…量的是墨量，不是时间"），
+    /// 但 ④ 那条"带 vs 整窗"的跨臂比较一直用的是**各自归一化**的计数。runner 上它 14 跑红 3 次，
+    /// 而分布显示翻脸的是整窗那一臂（3 或 4），带那一臂恒 3 —— 也就是说这条判据在比两把不同的尺。
+    /// 现在把线交给调用方：同一颗 `sharedMovingFloor` 套在两臂上，比的才是同一个量。
+    static func transitionFrameCount(_ fractions: [Double], sharedFloor: Double) -> Int {
+        fractions.filter { $0 >= sharedFloor }.count
+    }
+
+    /// ④ 那条跨臂比较必须用**同一条绝对线**（R191 / BACKLOG 212）—— 扫形状，不跑结果。
+    ///
+    /// 为什么不能只靠"跑一遍看红"：把线换回各自归一化，在本机**照样绿**（本机带臂峰值天然大，
+    /// 两臂 8 ≥ 3 两种口径都成立）；它只在 runner 那种两臂计数接近的形状下才露馅（14 跑红 3 次）。
+    /// 所以"退回旧口径"这件事只能由接线扫描钉住，并由变异臂 M709 证明这条钉子有牙。
+    /// 扫描前先滤掉本方法自己的行：整文件计数会命中"我正在数的那个串"（R100 那一族自指）。
+    func testBandProcessComparisonUsesOneSharedLine() throws {
+        let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        let scan = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .filter { !$0.contains("separatedBy:") && !$0.contains("contains(") }
+            .joined(separator: "\n")
+        let uses = scan.components(separatedBy: "sharedFloor: sharedMoving").count - 1
+        XCTAssertEqual(uses, 1,
+                       "同一条线应当只在一处被喂给两臂计数（读到 \(uses) 次）⇒ 0 次就是退回各自归一化，多次是重复实现")
+        XCTAssertEqual(scan.components(separatedBy: "XCTAssertGreaterThanOrEqual(bandShared, fullShared").count - 1, 1,
+                       "同线口径的那条断言必须恰好一处（多了是重复实现，少了是这条比较被摘掉）")
+        XCTAssertFalse(scan.contains("XCTAssertGreaterThanOrEqual(max(motionFrames(bandFirst)"),
+                     "旧那条『各自归一化的计数跨臂比』又回来了 —— 它在两臂计数接近的机器上会把判据变成掷硬币（BACKLOG 212）")
+        XCTAssertTrue(scan.contains("旧口径（各自归一化）带="),
+                      "旧口径必须与新口径一起打印，否则换判据口径这件事在日志里没有证人（R146 那一课）")
+    }
+
     /// 从触发到"落定"要几帧这件事，由 `settledAtFrame(_:band:)` 回答（R2）——
     /// 它返回**帧号**，调用方乘以实测采样间隔得到毫秒，于是判据表达的是时间而不是帧数。
     /// 这里以前是一个"预卷之后还有几帧在动"的计数器：它的两个上限（`>1`、`≤6`）都是帧数，
@@ -2739,10 +2773,36 @@ final class MotionFilmstripTests: XCTestCase {
                 + "横幅不在这一条带里，或者它已经挪走了。这时带上的任何判定都是在量一片别的东西，"
                 + "而 `Scenario.bannerBand` 那个 48pt 常数就是错的")
         // ④ 收窄之后必须**更能看清过程**（这才是这一改动的目的）：过渡帧数不许变少。
-        XCTAssertGreaterThanOrEqual(max(motionFrames(bandFirst), motionFrames(bandSecond)),
-                                    max(motionFrames(fullFirst), motionFrames(fullSecond)),
-                                    "带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，"
-                                        + "这一臂仍然只能记 not-run，那这条路就白走了")
+        //    R191 / BACKLOG 212：这条比较以前用"各自峰值归一化"的计数（`transitionFrameCount(_:)`），
+        //    而本文件在 R59 就批评过那种形状（`sharedMovingFloor` 的注释："两块各自归一化 ⇒ 峰值大的那块
+        //    被一条更高的绝对线先判停…量的是墨量，不是时间"）。带那一臂只看 48pt 那一条，
+        //    每帧变化占比天然比整窗大 ⇒ 它自己的线被抬得更高 ⇒ 两臂比的不是同一个量。
+        //    runner 上 14 跑红 3 次、分布显示翻脸的是**整窗那一臂**（3 或 4）而带恒 3 —— 正是这个错形状的形状。
+        //    现在：一条绝对线（四臂里最大的峰值 × 同一个比例）套到两臂上；旧口径同时打印，
+        //    这样"换口径有没有把真问题藏起来"在日志里看得见（R146：换判据口径要留正对照）。
+        let sharedMoving = Self.sharedMovingFloor([
+            Self.deltas(bandFirst.motionFrames), Self.deltas(bandSecond.motionFrames),
+            Self.deltas(fullFirst.motionFrames), Self.deltas(fullSecond.motionFrames)])
+        func sharedCount(_ film: Film) -> Int {
+            Self.transitionFrameCount(Self.deltas(film.motionFrames), sharedFloor: sharedMoving)
+        }
+        let bandShared = max(sharedCount(bandFirst), sharedCount(bandSecond))
+        let fullShared = max(sharedCount(fullFirst), sharedCount(fullSecond))
+        let bandOld = max(motionFrames(bandFirst), motionFrames(bandSecond))
+        let fullOld = max(motionFrames(fullFirst), motionFrames(fullSecond))
+        emit("MOTION_BAND_PROCESS 同一条线=\(String(format: "%.4f", sharedMoving)) "
+             + "同线口径 带=\(bandShared) 整窗=\(fullShared) "
+             + "｜ 旧口径（各自归一化）带=\(bandOld) 整窗=\(fullOld)")
+        // 先要"至少看到一帧过程"，再谈两臂比较 —— 否则比较可以在两边都是 0 时成立（M708 实测：
+        // 把同线计数改成恒 0，旧的那条 `bandShared ≥ fullShared` 照样绿，因为它退化成 0 ≥ 0）。
+        XCTAssertGreaterThanOrEqual(bandShared, 1,
+            "同一条绝对线（\(String(format: "%.4f", sharedMoving))）下带那一臂看到 0 帧过渡 ⇒ "
+                + "『收窄还能看清过程』这句话没有内容，而两臂比较会退化成 0 ≥ 0 的装饰"
+                + "（旧口径同时打印在 MOTION_BAND_PROCESS 里：带=\(bandOld) 整窗=\(fullOld)）")
+        XCTAssertGreaterThanOrEqual(bandShared, fullShared,
+            "同一条绝对线（\(String(format: "%.4f", sharedMoving))）下，带那一臂看到 \(bandShared) 帧过渡，"
+                + "少于整窗那一臂的 \(fullShared) ⇒ 采样变细没换来过程，这一臂仍然只能记 not-run，那这条路就白走了。"
+                + "旧口径同时打在 MOTION_BAND_PROCESS 里（带=\(bandOld) 整窗=\(fullOld)），换口径没藏东西")
         // ⑤ 采样必须真的变细（这才是要的目的：让那一臂从 clock-coarse 变成判得到）。
         //    结论行打在闸门**之前**（R53 那条规矩）：这一格在 runner 上会红，
         //    红了之后日志里必须还能看见"到底是哪一个量把两臂分开的"（BACKLOG 155 欠的就是这句）。
