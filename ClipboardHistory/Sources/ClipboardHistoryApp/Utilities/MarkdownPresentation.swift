@@ -403,6 +403,11 @@ enum MarkdownPresentation {
     /// 而它恰恰是最需要"这块是原样、那块是正文"的地方。属性串画不出圆角框，
     /// 一条通栏色带是 NSTextView 里唯一诚实的表达。
     static func appliesWideContentBackground(to block: MarkdownBlock) -> Bool {
-        isWideContent(block.kind)
+        // 代码块吃灰底，**表格不吃**。R234 看图时量到的病：渲染模式里表格与代码块在画面上
+        // 完全同形（同 13pt 等宽、同 `quaternaryLabel` 灰底、同 4pt 段前距），而那块灰底在 macOS
+        // 上一律读成"这是源码"——于是"渲染"这一档把一张数据表说成了代码，比 原文 更误导。
+        // 表格的分组靠等宽对齐与竖线本身；列重排仍然是刻意不做的那一件（见账 D 里那条）。
+        if case .table = block.kind { return false }
+        return isWideContent(block.kind)
     }
 }

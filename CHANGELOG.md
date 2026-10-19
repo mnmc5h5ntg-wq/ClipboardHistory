@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 产品：渲染档里的表格不再穿代码那块灰底（R234 / Round 231 / U-745 / D-219）
+
+- 看图量到的缺陷，不是读代码猜的：渲染档里 `| 名称 | 数量 |` 与 `let release = ...`
+  同 13pt 等宽、同 `quaternaryLabel` 通栏灰底、同 4pt 段前距 ⇒ 画面上同形，而那条灰底在 macOS 上
+  只有一个意思（源码）。"渲染"这一档于是把一张数据表说成了代码。
+- `MarkdownPresentation.appliesWideContentBackground(to:)` 对 `.table` 早返回 false；
+  字号 / 等宽 / 段距三处共用分组**一处没动**（撤掉等宽会让竖线散开，那是更糟的修法）。
+- 判据从产物读：`attributedString(for:)` 的 `.backgroundColor` 两向都有断言，并带"两行都必须露面"
+  的空判守卫；刀 M784、M785 一边删早返回、一边摘等宽分组，两次都红在命名的用例上。
+- 帧：`detail-markdown-rendered-720x520-dark/light` 两张随本笔 `update` 进基线（改前对账
+  `CHANGED=2` 恰好这两张，改后 `CHANGED=0`）。引用那一档一起判过，**不改**。
+
 ### 判据：纯文本那一格也不再拿本机的能力当另一台机器的地板（R233 / 253 的"接进 CI"结案）
 
 - run 39321660036 在 runner 上唯一那朵红读到了正文：`scripts/surface_left_axes.py` 在不带 `--ci`

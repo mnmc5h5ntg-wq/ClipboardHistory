@@ -415,6 +415,40 @@ final class Round4MarkdownTests: XCTestCase {
         }
     }
 
+    func testTableIsNotDressedAsCodeButKeepsItsOwnGrouping() {
+        // R234 看图量到的病：表格与代码块在画面上同形（同字号、同灰底、同段距），而那块灰底
+        // 在 macOS 上一律读成"这是源码"。这一格钉的是**两张不同的脸**：代码块吃灰底、表格不吃，
+        // 但表格仍然等宽（列对齐靠它）—— 摘掉底色不许顺手把等宽一起弄丢。
+        let code = MarkdownBlock(kind: .codeBlock(language: nil), runs: [MarkdownInline(text: "let x = 1")])
+        let table = MarkdownBlock(kind: .table, runs: [MarkdownInline(text: "| 名称 | 数量 |")])
+        XCTAssertTrue(MarkdownPresentation.appliesWideContentBackground(to: code),
+                      "代码块的灰底是它唯一的块边界，撤掉就没有边界了")
+        XCTAssertFalse(MarkdownPresentation.appliesWideContentBackground(to: table),
+                       "表格又吃灰底 ⇒ 和代码块同形，渲染模式把数据表说成源码")
+        // 谓词说了不算：读**真产物**上那一行的 `.backgroundColor`。
+        let doc = MarkdownDocument(blocks: [code, table], isTruncated: false)
+        let out = MarkdownPresentation.attributedString(for: doc)
+        var sawCodeBackground = false
+        var sawTableWithoutBackground = false
+        out.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: out.length)) { value, range, _ in
+            let text = (out.string as NSString).substring(with: range)
+            if text.contains("let x = 1") {
+                XCTAssertEqual(value as? NSColor, MarkdownPresentation.codeBackground,
+                               "代码块那一行没拿到灰底 ⇒ 这条断言没在判它说的事")
+                sawCodeBackground = true
+            }
+            if text.contains("| 名称 | 数量 |") {
+                XCTAssertNil(value, "表格那一行仍被涂了底色 ⇒ 和代码块同形")
+                sawTableWithoutBackground = true
+            }
+        }
+        XCTAssertTrue(sawCodeBackground && sawTableWithoutBackground,
+                      "两行都没在产物里露面 ⇒ 这一格是空判（枚举没覆盖到被测文本）")
+        XCTAssertTrue(MarkdownPresentation.fontPlan(for: MarkdownInline(text: "| 名称 | 数量 |"), in: table)
+                        .isMonospaced,
+                      "撤底色的代价如果是丢等宽，表格的竖线会散开 ⇒ 更糟")
+    }
+
     func testListAndQuoteIndentsStackAndAreClamped() {
         let nested = MarkdownBlock(kind: .unorderedItem(depth: 2, task: nil), runs: [], quoteDepth: 1)
         let flat = MarkdownBlock(kind: .paragraph, runs: [])
