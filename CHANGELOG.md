@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   在选中底上 1.93 / 2.36:1（参照 6.23 / 14.08:1）⇒ 两种态都读不出来，墨交回系统。
 - 新增 `MenuBarDismissRowInkTests`：尺的自对照 + 两档 × 静置 4.5 / 选中 3.0 两条地板，
   并要求"这一行前面必须有分隔线"（去掉彩度后分组是它唯一的身份）。
+- 变异对照（补正后的真读数）：M786 = CAUGHT、M787 = ESCAPED ⇒ 只有 AppKit 那棵有会红的牙，
+  13 那棵 SwiftUI 树的墨目前只由帧基线管（BACKLOG 264）。
 
 ### 产品：渲染档里的表格不再穿代码那块灰底（R234 / Round 231 / U-745 / D-219）
 

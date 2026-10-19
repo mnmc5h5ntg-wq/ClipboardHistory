@@ -6536,14 +6536,20 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 
 ## R235（第 234 轮 / Round 232）追加
 
-**264. 13 那棵 SwiftUI 树的 dismiss 行墨，只有帧基线在管、没有会红的行为判据（本轮 M787=NOT_RUN）**
-把那颗写死的蓝钉回 `MenuBarRecommendationsView`，本轮归类 = NOT_RUN（CAUGHT=有牙；ESCAPED=它真的不红；
-NOT_RUN=那一卷没打出摘要行 ⇒ 归类本身没跑通，既不判通过也不判有牙）。原因是这格判据走的是产品入口 `MenuBarController.populate(_:)`，而 13 那棵是另一棵树
+**264. 13 那棵 SwiftUI 树的 dismiss 行墨，只有帧基线在管、没有会红的行为判据（本轮 M787=ESCAPED，实测它真的不红）**
+把那颗写死的蓝钉回 `MenuBarRecommendationsView`，本轮归类 = **ESCAPED**（CAUGHT=有牙；ESCAPED=它真的不红；
+NOT_RUN=那一卷没打出摘要行 ⇒ 归类本身没跑通，既不判通过也不判有牙）。**补正**：第一次跑打的是 NOT_RUN，
+成因不在判据而在 runner 环境 —— 继承了与工具链不匹配的 `SDKROOT`；本轮反向复现过（`SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk swift test --filter MenuBarDismissRowInkTests`
+⇒ `error: 'clipboardhistory': Invalid manifest`，报错落在 CLT SDK 的 `Swift.swiftmodule/arm64e-apple-macos.swiftinterface`，
+日志 `/tmp/r235_manifest_repro.txt`；剥掉 SDKROOT 后同一卷绿）。剥 `SDKROOT` 并加一条"基线臂不绿就拒绝出表"
+之后重跑：基线 `Executed 2 tests, with 0 failures`、M786 CAUGHT、M787 ESCAPED、NOT_RUN=0、RESTORE_CLEAN=yes。
+原因是这格判据走的是产品入口 `MenuBarController.populate(_:)`，而 13 那棵是另一棵树
 （`MenuBarExtra(.menu)` 编译成真 `NSMenu`，夹具按离屏 `NSHostingView` 复刻）。
-于是本轮修了两处、只有一处有牙。要补的那格：把 `MenuBarRecommendationsView` 的 label 文案
+于是本轮修了两处、只有一处有牙 —— 这不是"死代码所以不用管"：`App.swift:28` 就在实例化
+`MenuBarRecommendationsView`，所以那是活的产品路径。要补的那格：把 `MenuBarRecommendationsView` 的 label 文案
 与墨做成可读的纯函数（像 `MarkdownPresentation.appliesWideContentBackground` 那样留一条缝），
-判据读缝、不读散文；帧基线继续做第二个证人。不做的代价：换主题/换强调色时那棵树可能再被钉住一颗色。
-出口条件：下一次动这棵树之前，或有人往菜单表面加第二块彩度之前。
+判据读缝、不读散文；帧基线继续做第二个证人。不做的代价：换主题/换强调色时那棵树可能再被钉住一颗色，
+而往它上面钉回去的改动会全绿通过。出口条件：下一次动这棵树之前，或有人往菜单表面加第二块彩度之前。
 
 **265. 悬停那一行的真实观感仍要真机（本轮底色是系统语义色代理）**
 `MENUBAR_DISMISS_INK` 的"选中底/强调底"两列是 `selectedTextBackgroundColor` /

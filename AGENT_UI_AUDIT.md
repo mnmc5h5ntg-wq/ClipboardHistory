@@ -393,12 +393,26 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 - **U-749：代价、刀、以及 13 那棵有没有判据。**
 
-- 产品文件=0（`Managers/MenuBarController.swift`、`Views/MenuBarRecommendationsView.swift`）。
+- 产品文件=2（`Managers/MenuBarController.swift`、`Views/MenuBarRecommendationsView.swift`）。
+  **补正**：这一格原来打的是 `产品文件=0`，成因是生成器拿 `git diff`（工作树 vs HEAD）数改动，
+  而台账半跑在产品半 `d4a2440` **已提交之后** ⇒ 工作树里当然没有产品改动。按 `df92052..d4a2440`
+  重数=2。这条假话比没写更坏，因为它把"本轮动了产品"的账抹成了"只动判据"。
 - 判据：`MenuBarDismissRowInkTests` 两格 —— ①尺自己的对照（同色=1.00、黑白>15、
   那颗目录色随外观变：0/145/255 与 0/136/255）；②两档 × 静置/选中两条地板 + 参照臂
   （参照臂自己不过 4.5 ⇒ 先判尺不判产品）。
-- 变异：M786（把蓝钉回 AppKit 树）= NOT_RUN；M787（把蓝钉回 SwiftUI 树）= NOT_RUN。
-  `RESTORE_CLEAN=yes`，汇总 R235_MUTATE 刀=2 CAUGHT=0 ESCAPED=0 NOT_RUN=2 RESTORE_CLEAN=yes。
+- 变异：**补正（原记 NOT_RUN 是错的）** —— 修掉 runner 环境后重跑，基线臂绿
+  （`Executed 2 tests, with 0 failures`），M786（把蓝钉回 AppKit 树）= **CAUGHT**
+  （`testDismissRowInkClearsTheTextFloorInBothStates` 三 failure），M787（把蓝钉回 SwiftUI 树）=
+  **ESCAPED**（`Executed 2 tests, with 0 failures`）。汇总
+  R235_MUTATE 刀=2 CAUGHT=1 ESCAPED=1 NOT_RUN=0 RESTORE_CLEAN=yes。
+  那一格 NOT_RUN 的成因不是判据没跑，是 runner 继承了与工具链不匹配的 `SDKROOT` ⇒ manifest
+  编译失败、整卷一条摘要都没有。这一条**本轮反向复现过**（不是猜测）：
+  `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk swift test --filter MenuBarDismissRowInkTests`
+  打出 `error: 'clipboardhistory': Invalid manifest`，报错落在
+  `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/swift/Swift.swiftmodule/arm64e-apple-macos.swiftinterface`
+  （Xcode 的 swiftc 拿 CLT 的 SDK 编 Package.swift），日志留在 `/tmp/r235_manifest_repro.txt`；
+  剥掉 `SDKROOT` 后同一命令绿。现在 `env.pop("SDKROOT")` + 基线臂不过就**拒绝出表**
+  （不再把"仪器坏了"印成结论）。
 - 帧：重捕 162 帧对账，改前 CHANGED=2（changed  menubar-recommendations-320x320-dark / changed  menubar-recommendations-320x320-light）⇒ 基线同笔 update 后 CHANGED=0。
 - 捕获卷 执行 80 / skip 4 / 失败 0；全量卷 910/0/0；换装本机 旧包留在：/Users/wangziyi/Documents/Codex_Project0_backups/before。
 
@@ -406,8 +420,10 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 1. **悬停那一行的最终观感仍未看真机**：底色在这里是系统语义色**代理**，离屏画不出真菜单的
    vibrant 材质。人工批次要回答的是"悬停时那一行现在是什么颜色、还读不读得出"。
-2. **13 那棵路径的判据资格**：M787 = NOT_RUN ⇒ 若 ESCAPED，SwiftUI 那棵树的墨只有帧基线在管、
-   没有会红的行为判据（新开 BACKLOG 264 记这条，不假称已覆盖）。
+2. **13 那棵路径的判据资格**：M787 = **ESCAPED**（量产品入口 `populate` 的那格判据读不到 SwiftUI
+   那棵树）⇒ 这不是"仪器没跑"，是**它真的不红**：SwiftUI 那棵树的墨只有帧基线在管、没有会红的
+   行为判据。`MenuBarRecommendationsView` 不是死代码 —— `App.swift:28` 就在实例化它，所以正确的
+   处置是给那棵树补一条会红的判据（BACKLOG 264），不是删代码。
 3. **CI（本轮收账时刚读到，run 39332980540 = df92052）**：job 结论 failure，两朵红步骤同根
    —— STEP[15] executed-count gate（全量卷 Executed 908 / skip 52 / 失败 2）与
    STEP[17] Capture gate（有名字的红=1），红的都是

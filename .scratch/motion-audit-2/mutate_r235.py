@@ -18,9 +18,30 @@ KNIVES = [
 ]
 
 def run_tests():
-    p = subprocess.run(["swift", "test", "--filter", FILTER], cwd=ROOT,
-                       capture_output=True, text=True, timeout=900)
+    # SDKROOT 必须由子跑剥掉：这台机器上 Xcode 的 swiftc + CommandLineTools 的 SDK 会让
+    # Package.swift 的 manifest 直接编不过（error: 'clipboardhistory': Invalid manifest，
+    # 正文是 SDK 里 Swift.swiftinterface 的 7 万余条 error:）⇒ 卷根本没跑。
+    # 上一版没剥它，两刀都成了 NOT_RUN（牙未被证明）。沿用 mutate_r234 的做法。
+    env = dict(os.environ)
+    env.pop("SDKROOT", None)
+    p = subprocess.run(["swift", "test", "--filter", FILTER], cwd=ROOT, env=env,
+                       capture_output=True, text=True, timeout=1800)
     return p.stdout + p.stderr
+
+
+def manifest_broken(out):
+    return "Invalid manifest" in out
+
+
+# 基线臂：不改动任何文件先跑一次。它红了 ⇒ 后面所有"红"都不能算产品的（拒绝出表）。
+base = run_tests()
+io.open("/tmp/r235_mutate_base.log", "w", encoding="utf-8").write(base)
+base_names = sorted({ln.split("'")[1].split("]")[-1].strip()
+                     for ln in base.splitlines() if "Test Case '-[" in ln and "failed" in ln})
+if manifest_broken(base) or "Executed" not in base or base_names:
+    print("R235_MUTATE_REFUSED 基线臂不可信 manifest_broken=%s executed=%s 红名=%s"
+          % (manifest_broken(base), "Executed" in base, ",".join(base_names) or "无"))
+    sys.exit(1)
 
 caught = escaped = not_run = 0
 rows = []
@@ -47,8 +68,11 @@ for kid, rel, anchor, repl, why in KNIVES:
     if names:
         verdict = "CAUGHT"
         caught += 1
+    elif manifest_broken(out):
+        verdict = "NOT_RUN(manifest 编不过)"
+        not_run += 1
     elif "Executed" not in out:
-        verdict = "NOT_RUN"
+        verdict = "NOT_RUN(卷没跑)"
         not_run += 1
     else:
         verdict = "ESCAPED"
