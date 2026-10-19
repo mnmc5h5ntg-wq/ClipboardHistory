@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 253 结案：判据里写死的轮次帧目录换成环境变量派生 + 三格守卫（R228 / U-734…U-736 · 判据（python）3 文件，产品 0 文件）
+
+- 病：`test_surface_left_axes` 两格真帧对照把证据押在写死的临时帧目录 ⇒ CI 上永远不跑、本地只是暂时跑，且与"环境判不了"同形。
+- 修法：`SHOTS` 由 `CLIPBOARD_HISTORY_UI_SHOTS` 派生；取不到时 skip 文本点名**通道**。
+  两向证人（本轮真跑）：给变量 ⇒ 两格 `ok`；不给 ⇒ `OK (skipped=2)` 且文本含变量名。
+- 守卫：`test_frames_path_hygiene.py` 三格（真扫 / 正对照必须点名坏行 / 负对照不许咬 `/tmp/shots-ci` 与注释行）。
+  第一跑抓到 `surface_left_axes.py` docstring 里那处我 grep 漏掉的写死目录 ⇒ 改成变量占位。
+- 记账未做：没把这两格接进 CI 步骤（要让 runner 也产帧，属 235/249 那一族）⇒ "runner 上真判"仍不成立。
+- 验证：电池 `Ran 406 OK (skipped=2)`；产品 0 文件 ⇒ 未换装本机；看图腿 NOT-RUN。
+
 ### 252 结案：3 条 skip 的名单读出来了，其中两条是腐烂的证据路径（R227 / U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
 
 - 名单（runner 正文现读、锚真打印形状）：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。

@@ -1,5 +1,20 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-20 00:20（本地 · R228 / 第 230 轮：**253 结案：判据不许把证据押在写死的轮次帧目录上 —— 换成 `CLIPBOARD_HISTORY_UI_SHOTS` 派生 + 三格守卫（守卫第一跑就抓到一处 grep 漏掉的）**（U-734…U-736 · 判据（python）3 文件，产品 0 文件）
+
+**本轮落地**：253 结案。两格真帧对照不再指着某一轮的临时帧目录，改由 `CLIPBOARD_HISTORY_UI_SHOTS` 派生；
+取不到时 skip 文本点名**通道**。两向证人都真跑：给变量 ⇒ 两格 `ok`；不给 ⇒ `OK (skipped=2)` 且文本含变量名。
+新守卫 `test_frames_path_hygiene.py`（真扫 / 正对照 / 负对照）第一跑就红在**我 grep 漏掉的那处**
+（`surface_left_axes.py` 的 docstring 用法示例）⇒ 改成变量占位。
+**记账未做**：没把这两格接进 CI 步骤（要让 runner 也产帧，属 235/249 那一族）⇒ "runner 上真判"仍不成立。
+电池 `Ran 406 OK (skipped=2)`；产品 0 文件 ⇒ 未换装本机；看图腿 NOT-RUN。
+
+**下一轮（R229）的靶**：⓪ 读 `da5da47` 与 R225 那四跑（左轴在 @1x 上是否 `verdict=ok` = **249 的第一格**，红先归因不许放宽）；
+① **回到动效位点本体**：251 那批共用 `VisualFill.hover` 的位点先补两档帧再逐位点判（自评连续 <90 就卡在这里）；
+② 把这两格真帧对照接进 CI 步骤（本轮明记未做）；③ 248、243、250、227③、222、215、201/202、207、240；
+④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-20 00:13（本地 · R227 / 第 229 轮：**252 结案：那 3 条 skip 没有一条是 PIL 类（像素判据在 runner 上真跑了 365 行 ok），但其中两条挂在写死的 `/tmp/shots_r211` 上 ⇒ 它们在 runner 上永远 skip，本机只是恰好还留着那个目录**（U-731…U-733 · 判据 0 文件 + 台账，产品 0 文件（读数轮））
 
 **本轮落地**：读 252 的名单 —— 那 3 条 skip 逐条是：端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。 ⇒ 仓库根目录没有已构建的 .app（先跑 make bundle 再验）；test_real_frames_pass_and_report_ok (test_surface_left_axes.CiExitTests.test_real_frames_pass_and_report_ok) ⇒ /tmp/shots_r211 不在盘上；test_working_frames_still_satisfy_the_three_relations (test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations) ⇒ 帧目录不在（/tmp/shots_r211）⇒ 这一格本机 NOT-RUN。
