@@ -6316,3 +6316,13 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 - **仍未读**：R231 那四跑（5cf95fe→39319255032、f798ff8→39319908786、920c327→39321237675、
   e6c696b→39321432401）与本轮这一跑；下一轮第 ⓪ 条 = 读它们，并核对 `CI_PROFILE_OK` 的主语是不是 `github-runner`。
 - **258 仍剩**第三处 `DetailView.swift:541`（`MultiFileRow`，同样还是 `private struct`，模式已验两遍）。
+
+- **追账（提交 030b7d1 之后当场读到的 runner 结论，2026-10-20）**：run **3921660036** 写错 ⇒ 正确号 **39321660036** /
+  commit **26c520e** ⇒ `conclusion=failure`，job `build-and-test`，**唯一红在 STEP[9] Release script tests**，
+  正文只有一条：`test_surface_left_axes.RealFrameTests.test_working_frames_still_satisfy_the_three_relations ... FAIL`。
+  两条读数因此分开：① 259 那张按机器切的期望表**这次没红**（`LEFT_AXIS_CI` 那一格在 runner 上过了它自己那行）；
+  ② 253 的三格守卫里**"真扫那一格"在 runner 上仍然红** —— 帧目录有帧、三条关系里至少一条不签字。
+  下一轮第 ⓪ 条：先把那条 FAIL 的 **assertion 正文**读出来（分辨是哪一条关系、哪一档、哪一帧），
+  **不许**去动 259 的表、也不许放宽 253 的守卫；本轮又往同一目录加了 4 张 `modechip-*` 帧
+  ⇒ 030b7d1 那一跑要么同样红、要么换一条消息，两种都是有用的读数。
+- 本轮新成对：`030b7d1 → run 39324330428`（取号时 queued ⇒ 只准记未读）。
