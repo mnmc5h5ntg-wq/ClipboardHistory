@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-### R206 第二笔：补帧成功 —— 分辨实验把黑带归到**已登记的那一处**盲区，回执第一次进基线（138→140 张）（R206 / U-668…U-669 · 判据 1 文件 + 基线 1 份，产品 0 文件）
+### R206 第二笔：补帧成功 —— 分辨实验把黑带归到**已登记的那一处**盲区，回执第一次进基线（138→140 张）（R206 第二笔非轮次 · 判据 1 文件 + 基线 1 份，产品 0 文件）
 
 - 分辨实验（不用新仪器，扫已有帧）：三张暗帧的纯黑带**高度都是 132px（66pt @2x）**、只有 y 不同 —— `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、新帧 y=872..1003 ⇒ 判为**候选②**：侧栏最后一行的选中材质在离屏下画成黑，横幅只是把它推上/推下；黑带**不是这张新帧带来的**
 - 因此登记进 `materialBlindSpotFixtures`（11 of 70 fixtures），登记条目里带着这条读数 —— 不是给老毛病起新名字，也不是放宽守卫
