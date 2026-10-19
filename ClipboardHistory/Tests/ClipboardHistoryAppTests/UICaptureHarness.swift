@@ -4165,6 +4165,24 @@ final class UICaptureTests: XCTestCase {
                 .environment(\.hoveredForCapture, true), width: 300, height: 96))
         })
 
+        // R232 / BACKLOG 258 第二处：**详情区头部那颗「原文 / 渲染」控件第一次有两态帧**。
+        // 它不走 `pressedStyle` 的悬停层 —— 自己拿 `.primary.opacity(hoverOpacity)` 在文字背后画一圈
+        // `VisualRadius.chip`，而 R231 刚把这层接进共享换算 `HoverInk.opacity(level:dark:)`。
+        // 接进换算只是**源码层的事实**：这一档灰对**它自己那片底**看不看得见，像素上从来没有证人。
+        // 族名叫 `modechip` 而不是 `settings-`（沿用 R231 补记第四笔量出来的那条规矩：
+        // 7 处按 `hasPrefix("settings-")` 收对象的尺都假设"对象 = 一整页设置窗口"，
+        // 一枚组件帧进去会把它们的对象集换掉；`family` 还会进 `CaptureCapability` 的机器盲区账）。
+        // 尺寸与 `segmented-filter-*` 同一档（200×60）：这颗控件本身只有 11pt 一行、刻意不加纵向 padding，
+        // 贴着装会把"这一圈多大"淹在帧边里，`contentMustFit` 也才有余量拦得住裁切。
+        results.append(Fixture("modechip-hover-idle", NSSize(width: 200, height: 60), contentMustFit: true) {
+            AnyView(self.probeFrame(DetailView.MarkdownModeButton(title: "原文", action: {}),
+                                    width: 200, height: 60))
+        })
+        results.append(Fixture("modechip-hover-lit", NSSize(width: 200, height: 60), contentMustFit: true) {
+            AnyView(self.probeFrame(DetailView.MarkdownModeButton(title: "原文", action: {})
+                .environment(\.hoveredForCapture, true), width: 200, height: 60))
+        })
+
         // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
         // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
         let starTarget = store.entries[0]
@@ -4857,6 +4875,21 @@ final class UICaptureTests: XCTestCase {
     /// 与"矩形打在纸上"这两种绿分开（R230：两块矩形不许落在同一个表面上）。
     static let settingsRowSurfaceRect = CGRect(x: 150, y: 8, width: 130, height: 12)
 
+    /// `modechip-hover-*` 夹具（200×60pt）里那颗「原文 / 渲染」控件的悬停填充（R232 / BACKLOG 258 第二处）。
+    ///
+    /// 和上面那组一样，**两块矩形都是量出来的**：亮/暗两档各自把 idle 与 lit 逐像素相减
+    /// （|ΔR|+|ΔG|+|ΔB| > 6），两档得到的差异带**一模一样**：像素 x 166…233 / y 78…105（@2x）
+    /// ⇒ pt `x 83.0…116.5 × y 39.0…52.5`，也就是 33.5 × 13.5pt。
+    /// 这个尺寸与源码对得上才算归位：`.fixedSize()` 的 11pt 行高 ≈ 13.5pt（这颗控件**刻意不加纵向 padding**，
+    /// 见 `DetailView.MarkdownModeButton`），宽 = 两个汉字 22pt + `padding(.horizontal, 6)` × 2 = 34pt。
+    /// 差异带里空闲那帧只缺字形墨（lit 帧众数 1341/1282 颗），所以整块带子可以直接当取样矩形 ——
+    /// 不必像设置行那样"取右半段躲字形"，因为这一块本来就窄。
+    static let modeChipFillRect = CGRect(x: 83, y: 39, width: 33.5, height: 13.5)
+    /// **同一列、控件上方**那一条（pt y 20…32）：夹具外框 `probeFrame` 的 `windowBackgroundColor`，
+    /// 实测全块只有一个色号（亮 255 / 暗 30）。它给第二证人：空闲那帧的填充位 == 这一条背景，
+    /// 才把"取证通道漏电"与"矩形打在纸上"两种绿分开（沿用 `settingsRowSurfaceRect` 的形状）。
+    static let modeChipSurfaceRect = CGRect(x: 83, y: 20, width: 33.5, height: 12)
+
     /// 一块矩形里的**众数灰阶**与它的像素数（R230 / BACKLOG 251）。
     ///
     /// 为什么不能沿用 `pillReading`：那一把尺的"底"是从**同一段左缘 8 列**取的，
@@ -5213,6 +5246,79 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(idle.grey, surface.grey,
                            "\(tag)：空闲那一帧的填充位（\(idle.grey)）与药丸外同列那条背景"
                            + "（\(surface.grey)）不等 ⇒ 取证通道漏电：没有指针、也没选中的情况下它自己亮了")
+        }
+    }
+
+    /// 详情区头部那颗「原文 / 渲染」控件的悬停层，第一次在像素上对账（R232 / BACKLOG 258 第二处）。
+    ///
+    /// 为什么单独一条判据而不是并进名册：`ControlHoverLadderTests` 按**引用**数这一层有没有走
+    /// 共享换算 `HoverInk.opacity(level:dark:)`，R231 把它接进去了 ⇒ 名册早就绿。
+    /// 但"引用对而换算错（少一个色档出口）"名册照样绿 —— R230 那朵 `(233)→(228)` 就是这么抓到的 ——
+    /// 而"这一档灰对它自己那片底看不看得见"是另一句话，只有帧能答。
+    ///
+    /// 四条断言各判一件事，谁也不许替谁签字（形状沿用 `testSettingsRowHoverFillIsVisibleOnItsOwnSurface`）：
+    /// ① 点亮那一块数得到像素 ⇒ 层画出来了（数不到是**量不到**，不是没问题）；
+    /// ② 空闲与点亮不许读到同一个灰阶 ⇒ 矩形打在那一层上（否则下面那条比值没有对象）；
+    /// ③ 比值压在仓库自己定的两条地板上（亮 1.20 / 暗 1.10）。**比的是可见性不是灰阶方向**
+    ///    （R230：亮档黑墨压白底 ⇒ 更暗，暗档白墨压深底 ⇒ 更亮，按一档的符号下结论另一档立刻假红）；
+    /// ④ 空闲那帧的填充位 == 同列上方那条夹具外框背景 ⇒ 取证通道没漏电。
+    ///
+    /// 本轮实测（两档各自一跑）：亮 `255 → 220` 比值 1.372、暗 `30 → 52` 比值 1.338，
+    /// 点亮像素 1341 / 1282 颗 ⇒ 这一档**看得见**，不需要为它开新的缺陷条目。
+    /// 顺带交出第二条产品事实：R229 抬亮档那一档前后，这一层的墨量在帧上确实跟着动了
+    /// （`VisualFill.hover` = 0.06 铺在白底上只会到 240，读到的 220 只可能来自 `HoverInk` 的抬档出口）。
+    func testModeChipHoverFillIsVisibleOnItsOwnSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r232-modechip-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func modal(_ fixtureName: String, _ appearance: NSAppearance.Name,
+                   rectPt: CGRect) -> (grey: Int, pixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 \(fixtureName) ⇒ 这条判据没有对象")
+                return (-1, 0)
+            }
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail("\(fixtureName)：渲染失败 \(error)"); return (-1, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(fixtureName)：读不回 \(file.lastPathComponent)"); return (-1, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return Self.bandModal(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                  bytesPerRow: rep.bytesPerRow, rectPt: rectPt, framePtWidth: 200)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let minimum = appearance == .darkAqua ? 1.10 : 1.20
+
+            let idle = modal("modechip-hover-idle", appearance, rectPt: Self.modeChipFillRect)
+            let lit = modal("modechip-hover-lit", appearance, rectPt: Self.modeChipFillRect)
+            let surface = modal("modechip-hover-idle", appearance, rectPt: Self.modeChipSurfaceRect)
+            let ratio = Self.contrastRatio(idle.grey, lit.grey)
+
+            emit("HOVER_MODE_CHIP_PROOF \(tag) 空闲填充位=\(idle.grey) 点亮=\(lit.grey) "
+                 + "像素=\(lit.pixels) 比值=\(String(format: "%.3f", ratio)) 下界=\(minimum) "
+                 + "｜同列控件上方背景(空闲)=\(surface.grey)")
+
+            XCTAssertGreaterThan(lit.pixels, 400,
+                                 "\(tag)：点亮那一块只数到 \(lit.pixels) 个像素 ⇒ 那层填充没被画出来。"
+                                 + "这一格是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+            XCTAssertNotEqual(lit.grey, idle.grey,
+                              "\(tag)：空闲与点亮读到同一个灰阶（\(idle.grey)）⇒ 矩形没打在那一层上，"
+                              + "下面那条比值断言因此没有对象（先查坐标，再查产品）")
+            XCTAssertGreaterThanOrEqual(ratio, minimum,
+                                        "\(tag)档「原文 / 渲染」控件的悬停层对它自己的底只有 "
+                                        + "\(String(format: "%.3f", ratio))（下界 \(minimum)）"
+                                        + "⇒ 这一档反馈淡到没有读者")
+            XCTAssertEqual(idle.grey, surface.grey,
+                           "\(tag)：空闲那一帧的填充位（\(idle.grey)）与控件上方同列那条背景"
+                           + "（\(surface.grey)）不等 ⇒ 取证通道漏电：没有指针的情况下它自己亮了")
         }
     }
 

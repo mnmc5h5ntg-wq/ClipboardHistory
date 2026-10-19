@@ -6283,3 +6283,36 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   红在 CHANGELOG 写了「BACKLOG 259」而 259 从没登记成条目（补记第五笔只在散文里"新开"了一句）⇒ 现在补上 `**259.` 定义行。
   ③顺手记一条工具形状：`unittest discover -s scripts/tests -p "test_{a,b}.py"` 在花括号不展开时打 **`Ran 0 tests / OK`** ——
   零用例也算绿，这一族的"绿"要按 `Ran N` 的 N 判，不能只看 OK（本笔第一次重跑就是这么空的）。
+
+
+## R231 补记第七笔（258 第二处结案：详情区那颗「原文 / 渲染」控件第一次有两态帧 · 2026-10-20）
+
+- **病根**：`DetailView.MarkdownModeButton` 的悬停层在 R231 刚接进共享换算 `HoverInk.opacity`，
+  但那只是**源码层的事实** —— 名册按**引用**计数，引用对而换算错（少一个色档出口）名册照样绿
+  （R230 那朵 `233→228` 就是这么被抓到的）。"这一档灰对**它自己那片底**看不看得见"在像素上从来没有证人。
+- **修法（产品 1 文件）**：摘 `private struct` → `struct`（夹具引用不到 `private`，先例 `SettingsSidebarRow`），
+  接 `@Environment(\.hoveredForCapture)`，把 `.fill(.primary.opacity(isHovered ? … : 0))` 提成 `hoverOpacity`
+  —— 真实指针**或**取证通道点亮，两条汇到**同一个绘制分支**。**档位一字未改**（还是 `VisualFill.hover`）。
+- **判据**：`modechip-hover-idle` / `modechip-hover-lit`（200×60、`contentMustFit`；族名另起，
+  不撞那 7 处按 `hasPrefix("settings-")` 收对象的尺）+ `testModeChipHoverFillIsVisibleOnItsOwnSurface`
+  四条断言（像素>400 / 两态不许同灰 / 比值压地板 / 空闲==同列上方背景）。
+  矩形是**量出来的**：两档各自逐像素相减得到**同一条**差异带 px x166…233 / y78…105
+  ⇒ pt `83.0…116.5 × 39.0…52.5`（33.5×13.5），与源码对得上才算归位
+  （11pt 行高 + `padding(.horizontal, 6)` × 2 = 34pt、刻意无纵向 padding）。
+- **读数**：亮 `255→220` 比值 **1.371**（地板 1.20）、暗 `30→52` 比值 **1.339**（地板 1.10），
+  点亮像素 1281 / 1222 颗，两档空闲位都 == 同列上方背景（255 / 30）⇒ 取证通道没漏电。
+  **这一档看得见，不为它开新的缺陷条目。** 顺带交出第二条产品事实：0.06 铺在白底只会到 240，
+  读到的 220 只可能来自 R229 那个抬档出口 ⇒ 那一抬在**这颗控件**上真的落地了（以前只有注释撑着）。
+- **看图腿真做**：两张 lit 帧（亮/暗）—— 药丸圆角完整、四边不贴字形、亮档比暗档更醒目，
+  两档都还是"安静的行内动作"，不喧宾夺主 ⇒ 不加第二层效果。
+- **刀**：R232_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0｜RESTORE_CLEAN=yes（M779 摘产品侧出口 / M780 把夹具点亮写成 false；两刀都该红，都不许 skip）。
+- **验证顺序**：构建 0 告警 → 新判据与 R231 那条一起跑（2 格 0 失败）→ 刀 → 重捕帧
+  `COMPARED=162 CHANGED=0 ADDED=4`（旧帧哈希一条没动 ⇒ `hoveredForCapture` 为 nil 的产品路径像素零变化）
+  → 基线同一笔 update（162 帧）→ 全量卷 `passed=863 skipped=44 failed=0`（All tests passed）
+  → 换装本机 → 本台账 → 电池。
+- **形状自曝**：本笔记按**补记**落账 ⇒ 不轮换 `AGENT_STATE.md`、不开新的 U/D 编号、
+  也不给 `AGENT_VISUAL_ITERATION.md` 添整轮条目（那要连七维表与 U 区间一起写，本轮预算不够；
+  半份账比没账更坏，所以在这里写明"没写哪几本"）。
+- **仍未读**：R231 那四跑（5cf95fe→39319255032、f798ff8→39319908786、920c327→39321237675、
+  e6c696b→39321432401）与本轮这一跑；下一轮第 ⓪ 条 = 读它们，并核对 `CI_PROFILE_OK` 的主语是不是 `github-runner`。
+- **258 仍剩**第三处 `DetailView.swift:541`（`MultiFileRow`，同样还是 `private struct`，模式已验两遍）。

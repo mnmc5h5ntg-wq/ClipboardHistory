@@ -225,13 +225,25 @@ struct DetailView: View {
     /// 放在头部那一行的右端而不是浮在正文上：正文区已经有一条 GlassPill（收藏/固定/复制/删除），
     /// 再叠一颗浮层就是两块会抢焦点的玻璃；而这一行本来就是"次要信息"的住处。
     /// 标题说"点下去会变成什么"，不说"现在是什么"（`MarkdownPreviewMode.controlTitle`）。
-    private struct MarkdownModeButton: View {
+    struct MarkdownModeButton: View {
         let title: String
         let action: () -> Void
         @State private var isHovered = false
         /// 色档由这个视图自己问（`PressedLabel` / `FilterSegmentButton` 同一条规矩：
         /// 从外面传布尔 = 允许夹具替产品决定"这一档该多亮"）。
         @Environment(\.colorScheme) private var colorScheme
+        /// 取证通道（R232 / BACKLOG 258 第二处）：只有捕获夹具会写这个键，产品路径永远是 `nil`
+        /// ⇒ 真实指针那条 `.onHover` 的路一字未动，而"悬停那一档"第一次能被离线渲染出来逐档量。
+        /// 摘掉 `private` 不是为好看：`isHovered` 是视图私有 `@State`，三条合成 hover 的路 R14 实测全断，
+        /// 不摘就只能在注释里说"这一档会亮"（R13 那一族叫"载荷绿、消费侧坏"）。
+        @Environment(\.hoveredForCapture) private var hoveredForCapture
+
+        /// 画哪一档：真实指针 **或** 取证通道点亮，两条汇到**同一个绘制分支** ——
+        /// 不新加一档：档位还是 `VisualFill.hover`（0.06），本轮只让它可以被拍到。
+        private var hoverOpacity: Double {
+            guard isHovered || (hoveredForCapture ?? false) else { return 0 }
+            return HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
+        }
 
         var body: some View {
             Button(action: action) {
@@ -252,8 +264,7 @@ struct DetailView: View {
                             // R231 / BACKLOG 256：这一层以前直接读 `VisualFill.hover`，
                             // 于是 R229 的"亮档抬一档"落不到它身上（名册 reads 里的一格）。
                             // 档位**故意不变**（还是行那一档 0.06）：本轮只统一换算，不顺手改强度。
-                            .fill(.primary.opacity(isHovered
-                                ? HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark) : 0))
+                            .fill(.primary.opacity(hoverOpacity))
                     }
                     .contentShape(VisualShape.rounded(VisualRadius.chip))
             }

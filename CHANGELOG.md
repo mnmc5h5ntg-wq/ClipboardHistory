@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 详情区「原文 / 渲染」那颗控件的悬停档，第一次在像素上对账（R231 补记第七笔 / BACKLOG 258 第二处）
+
+`MarkdownModeButton` 的悬停层在上一轮接进了共享换算，但"接进了"只有名册知道、帧上从来没有证人。
+本轮摘掉 `private`、接上取证通道，两态各一张帧，四条断言各判一件事、谁也不替谁签字。
+实测：亮 `255→220`（1.371:1，地板 1.20）、暗 `30→52`（1.339:1，地板 1.10），点亮像素 1281 / 1222 颗；
+空闲那一帧的填充位与同列上方背景相等 ⇒ 取证通道没漏电。
+**强度一字未改**，产品路径（没有指针）像素零变化：162 帧对账 `CHANGED=0`、只多 4 张新帧。
+两把刀（摘产品侧出口 / 把夹具点亮写成 false）都必须红，实测 `R232_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0｜RESTORE_CLEAN=yes`。
+
 ### `--ci` 那一格不再是本机的地板：期望表按机器 × 按探针切片（R231 补记第六笔 / BACKLOG 259）
 
 `scripts/tests/test_surface_left_axes.py` 里那条 `verdict=ok` 断言在 runner 上连红两跑

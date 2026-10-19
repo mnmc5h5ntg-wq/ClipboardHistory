@@ -1,5 +1,5 @@
 {
-  "count": 158,
+  "count": 162,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -69,6 +69,10 @@
     "menubar-recommendations-320x320-light.png": "a093ba50a32c45c417042adf5d0d71e96d9eee2b8c437d8663e084d5da9d99a6",
     "menubar-refreshing-320x120-dark.png": "34d41326d00d175b8d976da763a13edda0b04cd8f0586fb62cbc4e0f95eb47cd",
     "menubar-refreshing-320x120-light.png": "67fd69434988342ad19d77b72277bdeed882cc53c66e4c1ca8d49ff185de1f97",
+    "modechip-hover-idle-200x60-dark.png": "405a2adf9fccf0e7ea30d7bc9e6ea022641cafaa980673c2f43459f39afe66cf",
+    "modechip-hover-idle-200x60-light.png": "6818b3cdffb9b971aaf61934f988bc98805280b0020aefeb84492f3215a0eb6c",
+    "modechip-hover-lit-200x60-dark.png": "becbd93d02f9fd4ee1aada033d885e7a9e46d479b95d991dad35edd85924e5a1",
+    "modechip-hover-lit-200x60-light.png": "654a65f8e673582f596b857b2948d413f4d4f4b7ffffd6e8b0ce713d2afa33e0",
     "notice-banner-560x170-dark.png": "376d3a84fcb77ae64b48ec7689b3f0280d035fffb4b6a82cfd48f56f483e7d54",
     "notice-banner-560x170-light.png": "9904597535967a106164acd08d4bf818e76cb527df9dc19efe137340eea032b7",
     "quickpick-empty-420x300-dark.png": "2e7bdf64ddf788213386443e9fcc9b163d5f6b042feb97e1d0af04392db0d64f",
