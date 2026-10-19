@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏那一行蓝被量成两种态都输（U-748…U-751 / D-220）
+## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏那一行蓝被量成两种态都输（U-748…U-752 / D-220）
 
 ### 开场缺陷清单（看图那条目测，先量形状与轴范围再谈颜色）
 
@@ -451,6 +451,22 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
    —— 从 R205（8cbe238）改成 **R235（d4a2440）**，数字来自 `git log -1 -- ClipboardHistory/Sources`
    与 `git show --stat`，不是抄上一格；同一次还列出 R234 / R230 / R225 三个更早动过 Sources 的轮次。
    欠的不再是"没刷新"，而是"这一格没接进那支现读的仪器"（标题闸门不管它）⇒ 记进 **266**。
+
+- **U-752：那两对 run 落了地 —— 结论是 failure，红还是同一朵，且日志把关键数字截断了。**
+
+现读（`gh run view --json status,conclusion` + `scripts/ci_read.py steps`）：
+`39339075372=e218a92` 与 `39339197911=52e4efb` 都是 completed / failure，两跑的红步骤**完全同形**
+—— STEP[15] executed-count gate 与 STEP[17] Capture gate，别的步骤没红。正文读数：
+STEP[15] `Executed 910 tests, with 52 tests skipped and 2 failures`，
+STEP[17] `CAPTURE_GATE_CASES passed=67 skipped=12 failed=1 有名字的红=1 类未知名单=0 NOT_RUN=77`，
+唯一的红仍是 `ClipboardHistoryAppTests.UICaptureTests/testModeChipHoverFillIsVisibleOnItsOwnSurface`
+（`UICaptureHarness.swift:5309`）⇒ 与 d4a2440 那一跑逐字相同：**这两笔台账补正没引入任何新的 runner 红**，
+263 那朵红也没自己消失（它跨三个 commit 稳定复现，所以「偶发」这个解释被排除，剩下「产品弱」与「这台机器的合成差异」两种、修法相反 ⇒ 249 的分辨实验仍是欠的那格）。
+新记一笔工具的坑：这条断言的正文在 `--log-failed` 里打到
+`XCTAssertGreaterThan failed: ("2` 就断了（两条副本都断在同一个字符），所以 runner 上那个**绝对值现读拿不到**
+—— 分辨实验不许押在「从日志里抄那个数」上：要么改由判据自己把两个数印成一行读数（读数通道那条），
+要么认本机读数（暗档 218 / 亮档 229，地板 400）并把它标成「未与 runner 对账」。
+`39340316744=614ec3c` 此刻仍 in_progress、`39341701083=e4fb89a`（本笔）queued ⇒ 两跑结论都读不到，只能写未读。
 
 - **U-751：把台账轮次映射钉成常数的那两根闸门，本轮被活账证伪并改成读字段。**
 

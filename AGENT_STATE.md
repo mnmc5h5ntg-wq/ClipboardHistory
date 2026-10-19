@@ -17,7 +17,11 @@ Invalid manifest`（`/tmp/r235_manifest_repro.txt`）；修法是剥 `SDKROOT` �
 帧 162 对账 CHANGED 2→0 同笔 update；捕获卷 80/4/0；全量卷 910/44/0；换装本机 ok；电池 416 OK(skipped=2)。
 
 **下一轮（R236 / 第 235 轮 / Round 233）的靶**：⓪ 读三对仍未落地的 run —— `39339075372=e218a92`、
-`39339197911=52e4efb`、`39340316744=614ec3c`（台账补正笔）；`conclusion` 读不到只能写"未读"。
+`39339197911=52e4efb` 已读到 = **failure**，两跑红步骤同形（STEP[15] 910/skip52/失败2、
+STEP[17] 67/12/1、NOT_RUN=77），唯一的红仍是 `testModeChipHoverFillIsVisibleOnItsOwnSurface`（UICaptureHarness.swift:5309）
+⇒ 台账补正没引入新红、263 跨三个 commit 稳定复现；但那句断言正文在 `--log-failed` 里断在 `("2`
+⇒ runner 的绝对值现读拿不到，分辨实验不许押在抄日志数字上（详见 U-752）。
+`39340316744=614ec3c`（in_progress）与本笔 `39341701083=e4fb89a`（queued）仍**未读**。
 本补记笔（U-751 / BACKLOG 266：两根轮次映射闸门改成读字段）push 之后，它的 run↔commit 用
 `python3 scripts/ci_read.py latest` 现读拿，不许手写 id ⇒ ⓪ 的全集是「上面三对 + 这一对」，不是只有三对。
 ① **264**：给 13 那棵补一条会红的判据（label 文案与墨做成可读纯函数，像
