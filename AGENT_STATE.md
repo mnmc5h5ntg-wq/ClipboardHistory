@@ -21,7 +21,7 @@ Invalid manifest`（`/tmp/r235_manifest_repro.txt`）；修法是剥 `SDKROOT` �
 STEP[17] 67/12/1、NOT_RUN=77），唯一的红仍是 `testModeChipHoverFillIsVisibleOnItsOwnSurface`（UICaptureHarness.swift:5309）
 ⇒ 台账补正没引入新红、263 跨三个 commit 稳定复现；但那句断言正文在 `--log-failed` 里断在 `("2`
 ⇒ runner 的绝对值现读拿不到，分辨实验不许押在抄日志数字上（详见 U-752）。
-`39340316744=614ec3c`（in_progress）与本笔 `39341701083=e4fb89a`（queued）仍**未读**。
+`39340316744=614ec3c`（in_progress）、`39341701083=e4fb89a`、其后两笔台账补记 `b0dc251`（U-752）与 `e5c4185`（U-753）触发的 run 仍**未读** ⇒ ⓪ 的完整清单用 `python3 scripts/ci_read.py latest` 现拿，不手数。本笔之后 266 已结案（U-753：那一格改成 `live_sources` 现读、无 LAG 容差），电池计数 **416 → 418**。
 本补记笔（U-751 / BACKLOG 266：两根轮次映射闸门改成读字段）push 之后，它的 run↔commit 用
 `python3 scripts/ci_read.py latest` 现读拿，不许手写 id ⇒ ⓪ 的全集是「上面三对 + 这一对」，不是只有三对。
 ① **264**：给 13 那棵补一条会红的判据（label 文案与墨做成可读纯函数，像
