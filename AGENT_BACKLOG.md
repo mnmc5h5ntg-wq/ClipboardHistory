@@ -6162,3 +6162,37 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 - 本轮是**补记不是成轮**：`AGENT_STATE.md` 的轮次标题没轮换（还停在 R230 / 第 232 轮），
   所以 `Round 231 / 第 233 轮` 那套编号、七维表与 U/D 分配**都还没发生** —— 下一轮照常从 R231 编号开始，
   把这一笔当成"已发生的代码改动 + 已归零的名册"来引用，不要重复搬同样三处。
+
+## R231 补记第四笔（258 的第一处：设置侧栏那一行的悬停层第一次有像素证人）
+
+- **258 结案三分之一**：`SettingsSidebarRow` 这一处做完了 —— 可见性决定（摘掉 `private`，先例是
+  `SegmentedFilterPicker` / `GlassPill` 本来就是 internal）、取证出口（`guard isHovered || (hoveredForCapture ?? false)`，
+  产品路径上那个键永远是 `nil` ⇒ 真实指针那条 `.onHover` 一字未动）、两态夹具各一张、两块**类级共享矩形**、
+  三条断言（像素数 / 空闲位==框外背景 / 比值压地板）、两支刀。
+  **读数（本机，判据自己印的 `HOVER_SETTINGS_ROW_PROOF`）**：亮 `255→220` = **1.371**（地板 1.20）、
+  暗 `30→52` = **1.339**（地板 1.10），点亮那一块 12480 像素，空闲那一帧的填充位与药丸外同列背景逐字同值。
+  ⇒ 这一家的墨量**不用改**（两档都过地板），本轮补的是"像素侧有没有证人"这件事本身。
+- 刀：M777 产品侧摘掉取证出口 ⇒ CAUGHT；M778 夹具侧把点亮写成 `false` ⇒ CAUGHT；
+  `RESTORE_CLEAN=yes`。两刀都让那一格**红**而不是 skip —— 这一族判据若把"两帧同值"读成通过就等于没判。
+- **新记一条加夹具的规矩（本轮真付了学费）**：组件级夹具的名字**不许落在整页判据的前缀里**。
+  第一版叫 `settings-row-*` / 300×44 ⇒ 捕获卷当场 12 朵红、红在 3 条上（`testCaptureKeyViews`、
+  `testSettingsCardVerticalRhythmIsOneNumber`、`testSettingsSidebarIconsAreMeasuredRowByRow`），
+  成因是这一族里有 **7 处**按 `hasPrefix("settings-")` 收对象、且它们的前提都是"对象 = 一整页"
+  （一条要求每个对象数到 6 个行容器、一条要求带子下沿 == 窗口底）；另外帧名**第一段就是 family**
+  （`components(separatedBy: "-").first`），`settings` 族被 `CaptureCapability` 当"整页在 runner 上平涂"
+  的机器盲区记账，一行组件帧不该进那本账。第二件事与 family 无关：44pt 那一档药丸下沿正压在帧底
+  （`contentMustFit` 读到 6.2% 底行墨 ⇒ 被裁的那半从来没进过帧基线）。
+  换名 `settingsrow-hover-{idle,lit}` + 抬到 96pt 后重捕：`Executed 78 tests, with 4 tests skipped and 0 failures`。
+  ⇒ 下次加夹具先 `grep 'hasPrefix("' ` 数清它进了谁的对象集，再定名字与尺寸（R98 那条的具体化）。
+- 验证读数（本机，全部在这一笔的树上）：build `0 warning`；捕获卷 78/4skip/**0 failure**；
+  全量卷 `Executed 906 tests, with 44 tests skipped and 0 failures`（905→906 就是这一格）；
+  帧基线 154→**158**（同一笔 `update`，re-compare `COMPARED=158 CHANGED=0 MISSING=0 ADDED=0`）；
+  换装本机 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 192→192。
+  看图腿：四张帧逐张看过 —— 空闲只有图标与标签（无一层灰），悬停亮档是一片浅灰药丸、暗档是一片比底亮的药丸，
+  两档都不与"选中那档的强调色"抢读者。
+- **258 还剩两处**：`DetailView.swift:228 MarkdownModeButton`、`DetailView.swift:541 MultiFileRow`
+  （都还是 `private struct`，本轮已证明"摘 `private` + 接出口 + 两态夹具 + 共享矩形"这条路走得通，照搬即可）。
+- 下一轮第 ⓪ 条（run↔commit 成对，写账时全未读）：`02de8cc`→`39314291982`、`e347a0c`→`39314396070`、
+  `4f170e9`→`39314810527`、`4edfea5`→`39315528849`、`847ab2b`→未取到 id，**加上这一笔 push 之后那一跑**
+  （把 id 补在这一行末尾）。要读的还是 253 那两格：`SCRIPT_SHOTS_GLOB=… png_files=<N>` 与
+  `LEFT_AXIS_CI verdict=` 到底是 `ok` / `skipped` / `unavailable` —— 三种结果修法相反，不许预选。

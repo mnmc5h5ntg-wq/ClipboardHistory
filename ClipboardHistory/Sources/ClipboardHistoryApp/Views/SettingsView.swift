@@ -854,19 +854,24 @@ struct SettingsSidebarView: View {
     }
 }
 
-private struct SettingsSidebarRow: View {
+struct SettingsSidebarRow: View {
     let category: SettingsCategory
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
     /// 色档自己问（`PressedLabel` / `FilterSegmentButton` / `MarkdownModeButton` 同一条规矩）。
     @Environment(\.colorScheme) private var colorScheme
+    /// **取证通道**（R231 / BACKLOG 258）：`EnvironmentValues.hoveredForCapture` 只有捕获夹具会写，
+    /// 产品路径上永远是 `nil` ⇒ 真实指针那条 `.onHover` 的路一字未动。
+    /// 摘掉 `private` 不是为好看：这一族判据要看渲染出来的画面，而夹具引用不到 `private` 类型
+    /// （先例是 `SegmentedFilterPicker` / `GlassPill`，它们本来就是 internal）。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
 
     private var backgroundOpacity: Double {
         if isSelected { return VisualFill.selected }
         // R231 / BACKLOG 256：`selected` 那一格**不接**共享换算 —— 它是选中态不是悬停态，
         // 抬量长在悬停上会把"选中的那一行"和"指针所在的那一行"糊成同一档。
-        guard isHovered else { return 0 }
+        guard isHovered || (hoveredForCapture ?? false) else { return 0 }
         return HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
     }
 

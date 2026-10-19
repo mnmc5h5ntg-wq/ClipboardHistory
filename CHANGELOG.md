@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 设置侧栏那一行的悬停层第一次有像素证人（R231 补记第四笔 · 产品 1 文件 + 判据 1 文件 + 夹具 2 帧对 + 刀 2 支）
+
+- 欠账（BACKLOG 258 的第一处）：这一家在 R231 之前只有**源码层的事实** —— `backgroundOpacity` 走了
+  `HoverInk.opacity(level:dark:)` 那条共用换算，跨文件名册守卫也数着它；而"这一层灰对**它自己那片底**
+  看不看得见"在像素上从来没有证人。名册按**引用**计数，引用对而换算错（少一个色档出口）名册照样绿 ——
+  R230 那朵 `(233)→(228)` 就是被帧而不是被名册抓到的。
+- 前置量到而不是猜的：`SettingsSidebarRow` 原来是 `private struct`，夹具引用不到 ⇒ 摘掉 `private`
+  （先例：`SegmentedFilterPicker` / `GlassPill` 本来就是 internal），并接上 `hoveredForCapture` 取证出口。
+  **产品路径一字未动**：那个 env 键只有捕获夹具会写，真实指针那条 `.onHover` 的路照旧。
+- 两态各一张帧（`settingsrow-hover-idle` / `settingsrow-hover-lit`，300×96pt，亮/暗各两格）+
+  两块**类级共享矩形**（尺的已知答案对照与产品判据同一组坐标，沿用 R230 那条）。坐标按两帧逐像素相减量出来：
+  差异带 pt `x 6…293.5 / y 48…79.5`（行左右各内缩 6pt、高 31.5pt），取样块取无字右半段。
+- 修完两档直接读数：亮 `255→220` = **1.371**（地板 1.20）、暗 `30→52` = **1.339**（地板 1.10），
+  点亮那一块 12480 像素；空闲那一帧的填充位与药丸外同列背景逐字同值（255 / 30）⇒ 取证通道不漏电。
+- 两支刀都 CAUGHT（`RESTORE_CLEAN=yes`）：M777 产品侧摘掉 `hoveredForCapture` 出口、M778 夹具侧把点亮写成
+  `false` —— 两刀都让那一格**红**而不是 skip（"两帧同值"不许被读成通过）。
+- 这一笔的代价也记下来：夹具**第一次**上线时叫 `settings-row-*`、高 44pt，捕获卷当场 12 朵红（红在 3 条上：
+  `testCaptureKeyViews` / `testSettingsCardVerticalRhythmIsOneNumber` /
+  `testSettingsSidebarIconsAreMeasuredRowByRow`）。成因全在尺的对象集与夹具形状，不在产品 ——
+  这一族判据里有 **7 处**按 `hasPrefix("settings-")` 收对象，而它们的前提都是"对象 = 一整页设置窗口"
+  （逐行图标那条要求每个对象数到 6 个行容器、卡片节奏那条要求带子下沿 == 窗口底、…），
+  我给的是一行组件帧不是整页；而 44pt 那一档药丸下沿正压在帧底（`contentMustFit`
+  读到 6.2% 底行墨 ⇒ 被裁的那半从来没进过帧基线）。换名 + 抬到 96pt 之后重捕：
+  `Executed 78 tests, with 4 tests skipped and 0 failures`，帧基线 154→158（同一笔 update，
+  re-compare `COMPARED=158 CHANGED=0 ADDED=0`）。
+- 258 还剩两处（`DetailView.swift:228 MarkdownModeButton`、`DetailView.swift:541 MultiFileRow`，
+  仍是 `private struct`），下一笔接着做。
+
 ### 悬停那一层灰全仓只留一条换算 + 抓到 R229 那一抬的洞（R230 / U-741…U-744 · 产品 3 文件（换算出口 + 段按钮让位 + 玻璃圆改走共用路径） + 判据 2 文件 + 夹具 1 文件 + 表 1 文件）
 
 - 洞（**上一轮已上线**）：`HoverInk.opacity` 少一个 `level == 0` 出口 ⇒ 写 `hoverLevel: 0` 的位点被抬量抬成 0.025，

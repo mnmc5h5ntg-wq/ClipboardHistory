@@ -4136,6 +4136,35 @@ final class UICaptureTests: XCTestCase {
                 .environment(\.hoveredForCapture, true), width: 120, height: 232))
         })
 
+        // R231 / BACKLOG 258：**设置侧栏那一行悬停第一次有帧**（两态各一张，R77 的规矩）。
+        // 这一家不走 `pressedStyle` 的悬停层判定吗？它**走** —— 第 900 行那颗 `.pressedStyle(in:scale:false)`
+        // 之外**还**自己画了一层 `.background`（`isSelected ? accent : primary` 按 `backgroundOpacity` 取墨）。
+        // 前一轮把 `backgroundOpacity` 接进了 `HoverInk.opacity(level:dark:)`，但那是**源码层的事实**，
+        // 像素上到底有没有一层、对**它自己那片底**是不是看得见，从来没有证人 ⇒ 这两张就是证人。
+        // `isSelected: false` 是重点：选中那一档按 256 那条决定**不接**共享换算，
+        // 拿选中行来量悬停会把两件事缝成一件（R87：一条红只准认一种病）。
+        // **名字为什么不带 `settings-` 前缀**（R231 补记第四笔量出来的，不是审美）：这一族判据里有
+        // **7 处**按 `hasPrefix("settings-")` 收对象，而它们的前提都是"对象 = 一整页设置窗口"
+        // —— 本轮实测：夹具一加上就红在 3 条上（逐行图标那条要求每个对象数到 6 个行容器、
+        // 卡片节奏那条要求带子下沿 == 窗口底、`testCaptureKeyViews` 的底行墨那条按 mustFit 名单收）。
+        // 我给的是一行 300pt 宽的**组件帧**不是整页 ⇒ 一加进去就把这些尺的对象集换掉，
+        // 红的是它们的前提而不是产品。
+        // 同一件事也发生在 `family` 上：帧名第一段就是族名（`fixtureName(...).components(separatedBy: "-").first`），
+        // `settings` 族被 `CaptureCapability` 当"整页在 runner 上是平涂"的机器盲区记账 —— 一行组件帧不该进那本账。
+        // 规矩沿用 R98 那条：**加夹具要数清它进了谁的对象集**，这里的答案是"7 处、当场红 3 条"，所以换名。
+        //
+        // **高度 96 而不是 44**：44 那一版实测差异带是 y=22..43.5pt（@2x 44..87）—— 药丸的下沿
+        // 正压在帧底（`contentMustFit` 因此读到 6.2% 底行墨）。被裁的那半从来没有进过帧基线，
+        // 也就从来没有被审过，所以抬高度而不是关掉那条断言。
+        results.append(Fixture("settingsrow-hover-idle", NSSize(width: 300, height: 96), contentMustFit: true) {
+            AnyView(self.probeFrame(SettingsSidebarRow(category: .privacy, isSelected: false, action: {}),
+                                     width: 300, height: 96))
+        })
+        results.append(Fixture("settingsrow-hover-lit", NSSize(width: 300, height: 96), contentMustFit: true) {
+            AnyView(self.probeFrame(SettingsSidebarRow(category: .privacy, isSelected: false, action: {})
+                .environment(\.hoveredForCapture, true), width: 300, height: 96))
+        })
+
         // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
         // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
         let starTarget = store.entries[0]
@@ -4813,6 +4842,21 @@ final class UICaptureTests: XCTestCase {
     /// `glass-pill-*` 夹具（120×232pt）里那四颗 44pt 圆所在的竖条（实测像素 x 76…164 / y 80…446）。
     static let circleColumnRect = CGRect(x: 38, y: 40, width: 44, height: 185)
 
+    /// `settingsrow-hover-*` 夹具（300×96pt）里那一层悬停填充（R231 / BACKLOG 258）。
+    ///
+    /// 两块矩形都是**量出来的**，不是按"行高居中在 96pt 框里"算的：两帧逐像素相减得到差异带
+    /// 像素 x 12…587 / y 96…159（@2x）⇒ pt 6…293.5 × 48…79.5，也就是行本身左右各内缩 6pt、
+    /// 高 31.5pt。空闲帧里的字与图标墨只到 x 64pt（差异带内另测）⇒ 取样块取右半段
+    /// `x 150…280 / y 52…76`，离圆角与字形都有余量。
+    ///
+    /// 写成**类级共享常量**沿用 R230 那条：尺的已知答案对照与产品判据必须用同一组坐标，
+    /// 否则"对照过了"不等于"产品那一眼量对了"。
+    static let settingsRowFillRect = CGRect(x: 150, y: 52, width: 130, height: 24)
+    /// 同一列、药丸**上方**那一条（y 8…20pt）：只有夹具外框的 `windowBackgroundColor`。
+    /// 它给的是第二证人 —— "空闲那一帧的填充位 = 这一条背景" 才把"取证通道漏电"
+    /// 与"矩形打在纸上"这两种绿分开（R230：两块矩形不许落在同一个表面上）。
+    static let settingsRowSurfaceRect = CGRect(x: 150, y: 8, width: 130, height: 12)
+
     /// 一块矩形里的**众数灰阶**与它的像素数（R230 / BACKLOG 251）。
     ///
     /// 为什么不能沿用 `pillReading`：那一把尺的"底"是从**同一段左缘 8 列**取的，
@@ -5097,6 +5141,78 @@ final class UICaptureTests: XCTestCase {
             XCTAssertNotEqual(segIdleL.grey, segIdleR.grey,
                               "两段读到同一个灰阶（\(segIdleL.grey)）⇒ 矩形没打在胶囊上，"
                               + "上面那两条断言因此都不成立（先查坐标，再查产品）")
+        }
+    }
+
+    /// **设置侧栏那一行的悬停层：底来自同一坐标的空闲帧，不来自令牌**（R231 / BACKLOG 258）。
+    ///
+    /// 这一家在 R231 之前只有**源码层的事实**：`backgroundOpacity` 走了 `HoverInk.opacity(level:dark:)`
+    /// 那条共享换算，跨文件名册守卫（`ControlHoverLadderTests`）也数着它 —— 而"这一层灰对它自己
+    /// 那片底看不看得见"在像素上从来没有证人。名册按**引用**计数，引用对而换算错（少一个色档出口）
+    /// 名册照样绿，R230 那朵 `(233)→(228)` 就是这么被抓到的。
+    ///
+    /// 三条断言各判一件事，谁也不许替谁签字：
+    /// ① 点亮那一块数得到像素 ⇒ 层画出来了（数不到是**量不到**，不是没问题）；
+    /// ② 空闲那一帧的填充位 == 药丸**外**同列那条背景 ⇒ 取证通道没漏电，
+    ///    没有指针、也没选中的情况下它自己亮 = 夹具坏了；
+    /// ③ 比值压在仓库自己定的那两条地板上（亮 1.20 / 暗 1.10，R220 骨架条带、R225 浮层悬停、
+    ///    R229 小控件、R230 直读位点同一族）。**比较的是可见性而不是灰阶方向**（R230：
+    ///    亮档黑墨压白底 ⇒ 更暗，暗档白墨压深底 ⇒ 更亮，按一档的符号下结论另一档立刻假红）。
+    ///
+    /// `isSelected: false` 是刻意的：选中那一档按 256 那条决定**不接**共享换算，
+    /// 拿选中行来量悬停会把两件事缝成一件（R87：一条红只准认一种病）。
+    func testSettingsRowHoverFillIsVisibleOnItsOwnSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r231-settingsrow-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func modal(_ fixtureName: String, _ appearance: NSAppearance.Name,
+                   rectPt: CGRect) -> (grey: Int, pixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 \(fixtureName) ⇒ 这条判据没有对象")
+                return (-1, 0)
+            }
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail("\(fixtureName)：渲染失败 \(error)"); return (-1, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(fixtureName)：读不回 \(file.lastPathComponent)"); return (-1, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return Self.bandModal(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                  bytesPerRow: rep.bytesPerRow, rectPt: rectPt, framePtWidth: 300)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let minimum = appearance == .darkAqua ? 1.10 : 1.20
+
+            let idle = modal("settingsrow-hover-idle", appearance, rectPt: Self.settingsRowFillRect)
+            let lit = modal("settingsrow-hover-lit", appearance, rectPt: Self.settingsRowFillRect)
+            let surface = modal("settingsrow-hover-idle", appearance, rectPt: Self.settingsRowSurfaceRect)
+            let ratio = Self.contrastRatio(idle.grey, lit.grey)
+
+            emit("HOVER_SETTINGS_ROW_PROOF \(tag) 空闲填充位=\(idle.grey) 点亮=\(lit.grey) "
+                 + "像素=\(lit.pixels) 比值=\(String(format: "%.3f", ratio)) 下界=\(minimum) "
+                 + "｜同列框外背景(空闲)=\(surface.grey)")
+
+            XCTAssertGreaterThan(lit.pixels, 400,
+                                 "\(tag)：点亮那一块只数到 \(lit.pixels) 个像素 ⇒ 那层填充没被画出来。"
+                                 + "这一格是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+            XCTAssertNotEqual(lit.grey, idle.grey,
+                              "\(tag)：空闲与点亮读到同一个灰阶（\(idle.grey)）⇒ 矩形没打在那一层上，"
+                              + "下面那条比值断言因此没有对象（先查坐标，再查产品）")
+            XCTAssertGreaterThanOrEqual(ratio, minimum,
+                                        "\(tag)档设置侧栏行的悬停层对它自己的底只有 "
+                                        + "\(String(format: "%.3f", ratio))（下界 \(minimum)）"
+                                        + "⇒ 这一档反馈淡到没有读者")
+            XCTAssertEqual(idle.grey, surface.grey,
+                           "\(tag)：空闲那一帧的填充位（\(idle.grey)）与药丸外同列那条背景"
+                           + "（\(surface.grey)）不等 ⇒ 取证通道漏电：没有指针、也没选中的情况下它自己亮了")
         }
     }
 
