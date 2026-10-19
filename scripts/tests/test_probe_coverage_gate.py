@@ -108,6 +108,8 @@ class ProbeCoverageGateTest(unittest.TestCase):
                          "开口没闭口的必须正好一条 —— 两条就是又一卷被吞，零条就是这把尺读不到运动")
         self.assertEqual(sorted(["testRowGesturesWorkInsideTheRealSidebarContainer",
                                  "testRowIndexDriftDoesNotMoveTheViewport",
+                                 "testFilterFocusExitIsWired",
+                                 "testFilterSegmentsAreReachableAndShowFocus",
                                  "testRowProxyCensusAsksTheConsequenceNotTheShape",
                                  "testSidebarListFocusRingAfterClick"]),
                          sorted(reading["queued"]),
@@ -155,7 +157,7 @@ class ProbeCoverageGateTest(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             main([str(R94_FIXTURE), "--expectations", str(EXPECTATIONS), "--source", str(SOURCE)])
         text = out.getvalue()
-        for marker in ("PROBE_ORDER 露面=7/11 未闭口=1 前缀=1",
+        for marker in ("PROBE_ORDER 露面=7/13 未闭口=1 前缀=1",
                        "PROBE_QUEUED 4/11 条一次都没轮到"):
             self.assertIn(marker, text, f"读数少了这一行：{marker}\n实际输出：{text}")
         self.assertNotIn("PROBE_ORDER_WARNING", text, "这份日志是连续前缀，警告不该出现")

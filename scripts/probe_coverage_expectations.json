@@ -25,7 +25,7 @@
     },
     "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped": {
       "runner": "cannot",
-      "reason": "R144 按三跑同形翻成 cannot；R146 把**理由从产品改写成仪器**（登记本身暂不动）。连着三跑这句原样重复 —— `NOT_RUN testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记为 runner=can，而这次日志里没有它的结论行`（run 39052480365 / 39054860497 / 39056187840，对应 `1427e46` / `f78af12` / `f26f4c9`）。**它不是挂死**：本机同一份通道量到的真实顺序里它是第 6 颗心跳、而第 6 颗**有闭合行**（`scripts/tests/fixtures/r146_pulse_real.log` 逐字节），CI 那次 `pulse=7 started=6 concluded=5` 里未闭的是第 7 颗 ⇒ 少掉的是**它那一行 stdout**（看门狗收杀时块缓冲整块带走，R88 / R90 各实测过一次）；报告脚本当时拒绝在两通道之间挑一条信（`UI_PROBE_CHANNELS_CONTRADICT`），拒绝得对。登记不翻回 can 的原因换了：不是「这条跑不动」，而是 `probe_coverage_gate.py` **今天仍只看日志的结论行**，在它接上闭合通道之前翻 can 会红在仪器上（BACKLOG 187）。反证继续留着：R94 曾凭 run 38857388449（`8e6ed15`）的 `NOW_RUNS …（passed）` 把它翻成 can —— 那句话现在只有一种读法：那一跑的 stdout 恰好留住了它的结论行。"
+      "reason": "R194 撤回了当天的一次翻面：闸门对 r94 那份历史夹具确实点名 NOW_RUNS 它，但今天的夹具（r146_pulse_real.log）与名册配对时它属于没下结论那一类。登记要跟着「这一跑」的点名改，不能拿旧夹具替现在作证（R98：历史夹具不许替现在签字）。"
     },
     "testRowIndexDriftDoesNotMoveTheViewport": {
       "runner": "cannot",
@@ -50,6 +50,14 @@
     "testRowProxyCensusAsksTheConsequenceNotTheShape": {
       "runner": "cannot",
       "reason": "run 38864545930（`82fbd1f`）在屏那一步的三行读数：`源码用例=11 登记=11 runner可跑=6 runner不可跑=5 本次下结论=6 红=0`、`露面=7/11 未闭口=1 前缀=1`、`PROBE_QUEUED 4/11 条一次都没轮到 4/11`。 本条**一次都没轮到**（名字由 `PROBE_QUEUED` 逐条点名，不再是从字母序推的）⇒ 排队没到，不是跑不动。132 那格（挂住前先把栈拍下来）修好之后重估。"
+    },
+    "testFilterSegmentsAreReachableAndShowFocus": {
+      "runner": "cannot",
+      "reason": "R194 新加，runner 上还没有读数 ⇒ 登记成 cannot，理由就是「没有那台机器的读数」本身（R94 那一课：不许拿本机结果替它改登记）。下一跑若 `NOW_RUNS` 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can。本机这一跑：`Executed 3 tests, with 1 test skipped and 0 failures`，其中本条是**具名出口**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑。"
+    },
+    "testFilterFocusExitIsWired": {
+      "runner": "cannot",
+      "reason": "R194 新加，runner 上还没有读数 ⇒ 登记成 cannot，理由就是「没有那台机器的读数」本身（R94 那一课：不许拿本机结果替它改登记）。下一跑若 `NOW_RUNS` 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can。本机这一跑：`Executed 3 tests, with 1 test skipped and 0 failures`，其中本条是**具名出口**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑。"
     }
   },
   "_r93": "R93：十条 reason 从「整卷在第一条结论之前就被收掉」改成上面那句实测成因，并登记新加的 `testRowProxyCensusAsksTheConsequenceNotTheShape`。**为什么六条明明在 runner 上下过结论、这里仍登记 cannot**：那六条的**名字**今天还没读到（`已下结论的用例: 6` 只数了行，名字随被 SIGKILL 带走的那块 stdout 缓冲一起没了），而按字典序去猜是哪六条属于「没量过的推断」——R87 那一课的规矩是「预先登记的预测被推翻只写没证实」。R92 推送的 CI（`9c10569`）第一次带着「闸门读真日志」的修法，那一步会逐条印出结论名 ⇒ 下一轮按它把该翻 can 的翻掉；翻错会被 NOW_RUNS / NOT_RUN 挡回来，这正是留那两格的意义。",
