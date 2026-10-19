@@ -1,5 +1,19 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 21:34（本地 · R215 / 第 217 轮：**回到画面：重捕 142 张拿到可重复性证人 + 亮档骨架 1.05 的不对称，判为不加**（U-695…U-697 · 产品 0 文件，看图账）
+
+**本轮落地**：同一份工作树重捕整卷 ⇒ `Executed 72 tests, with 4 tests skipped and 0 failures`、`FRAME_BASELINE_COMPARED=142 CHANGED=0 MISSING=0 ADDED=0`、尺 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`。
+看亮档组合帧量出条带↔底 **1.05**（暗档 1.17）、句子 6.06/3.72、头部 5.91/4.10 ⇒ 亮档"条带近乎不可见"是真的；
+成因是 `Color.primary.opacity(0.06)`（纯色，不是材质）⇒ 不是离屏通道；
+抬升预算 `0.18-0.06=0.12` 是测量结论（抬 5 个点时胶片峰值 0.0000），只抬 base 会让扫光退回"测不到"
+⇒ **判为不加**，"要抬就同时抬两档并重跑胶片判据"记成 BACKLOG 242。
+CI：`982faff`=39258075868、`3d4e2f1`=39258514435、`cd9d0cb`=39259442003 三跑 in_progress（未读不算绿）；
+`8650547`/`2eb1bee` 已 failure 且归因到同一个 PIL 原因（R212 已修）⇒ 235 继续开着。
+
+**下一轮（R216）的靶**：⓪ 读上面三跑：STEP[8] 是否恢复绿、`Surface left-axis ruler` 打的是 ok/skipped/unavailable（235 结案的唯一通道）、全量卷是否绿；
+① 240 的行为证人（同一视图两臂像素判据）+ 第三把刀；② 237（pillow 安装位置）；③ 227③、222、215、201/202、207；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-19 21:22（本地 · R214 / 第 216 轮：**`freezeLoadingForCapture` 的默认值有了证人（236 值域结案）+ 一次 ESCAPED 挖出两个 bug**（U-692…U-694 · 产品 3 文件）
 
 **本轮落地**：决定提成纯函数 `MediaLoadingPlan.startsLoad`（视图里只留薄胶水），`MediaLoadingPlanTests` 四格（真值表 / 读结构体默认值 / 产品码不许传 true / 夹具恰好一处 true）。

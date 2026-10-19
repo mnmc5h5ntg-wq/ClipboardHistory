@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 看图腿：重捕整卷做可重复性证人 + 亮档骨架对比度 1.05 的不对称（判为不加）（R215 / U-695…U-697 · 产品 0 文件）
+
+- `Executed 72 tests, with 4 tests skipped and 0 failures` → `FRAME_BASELINE_COMPARED=142 CHANGED=0 MISSING=0 ADDED=0`；尺在新目录 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`
+- 亮档条带 (242,242,242)↔底 (248,248,248) = 1.05，暗档 (41,41,41)↔(28,28,28) = 1.17；句子 6.06/3.72、头部 5.91/4.10
+- 成因不是离屏通道：条带是 `Color.primary.opacity(0.06)`（`SkeletonShimmer.swift:96,173`），纯色不是材质
+- 判为不加：`highlight - base = 0.12` 是测量结论（抬 5 个点 ⇒ 胶片峰值 0.0000），只抬 base 会让扫光退回测不到 ⇒ BACKLOG 242
+- CI：`982faff`/`3d4e2f1`/`cd9d0cb` 三跑仍 in_progress ⇒ 235 未读、234 不写"已交付到 CI"
 ### `MediaLoadingPlan`：默认值守卫 + 两把刀（BACKLOG 236 结案），并修掉刀打空的两处成因（R214 / U-692…U-694 · 产品 3 文件）
 
 - 新增 `Utilities/MediaLoadingPlan.swift`（`startsLoad` = 取反；`stageWhenLoadNotStarted()==0`），`DetailFileView.task` 只留薄胶水
