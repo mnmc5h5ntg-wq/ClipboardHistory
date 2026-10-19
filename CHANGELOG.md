@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 看图腿：浮层与统计页的左轴量成三条关系判据，新尺 `scripts/surface_left_axes.py` 入库（R209 / U-677…U-679 · 判据 2 文件，产品 0 文件）
+
+- 浮层 `quickpick-list`：药丸左缘 22.0pt / 右内缩 22.0pt（对称差 0.0pt）、占位墨 24.0pt、行图标 35.5pt ⇒ "没对齐"这句撤回
+- 统计页：卡片内三条文字轴同在 148.0pt；热图网格右缘 558.5pt、说明文字右缘 678.5pt ⇒ 网格短 120pt，**判为不改**（格子尺寸是一天一格的编码前提）
+- 新尺只留关系判据（A 对称 / B 同轴 / C 不越过），容差 1.0pt，探针坐标钉死并断言有墨；空帧 ⇒ NOT_RUN 不给绿
+- 第一版的坑记进尺的注释：背景色不许从被量对象自己那块窗口取（药丸把背景吃掉 ⇒ 读出 0.0pt）
+- `detail-loading` 是组件帧 ⇒ "加载时头部消失"被 `DetailView.swift:69-72` 否掉；机制立 D-206，覆盖洞开 BACKLOG 233
+- 218 结案方向：runner 两跑 `row-insert 开` 连续段 0.4 / 1.3 个间隔、关档 1.0 / 1.0 ⇒ 分不开 ⇒ 不升硬门（登记，见 BACKLOG 218 追记）
+- 变异表 NOT-RUN（本轮判据对象是新 python 尺，刀与 CI 接线一起配）⇒ 新开 BACKLOG 234
+- 验证：`LEFT_AXIS_SELFTEST ok`、真帧 `LEFT_AXIS_VERDICT ok 探针=5 问题=0 NOT_RUN帧=0`、电池 `Ran 393 tests` 且 OK、`MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品 0 文件 ⇒ 无新帧、无换装
 ### 缺席断言的"在场"判定改成标识符边界匹配，并配三把方向各别的刀（R208 / U-674…U-676 · 判据 2 文件 + 表 1 支，产品 0 文件）
 
 - 病根一：闸门用 `token.lower() in text.lower()` 判缺席 ⇒ `缺席:...HistorySidebarView.swift=disabled` 被 `focusEffectDisabled()` 判成假话
