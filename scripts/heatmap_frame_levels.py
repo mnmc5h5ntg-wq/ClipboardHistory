@@ -103,12 +103,35 @@ def judgment_channel(log_text):
     return {tag: ([r[0] for r in rows] + [rows[-1][1]], [(r[2], r[3]) for r in rows]) for tag, rows in out.items()}
 
 
+P3_ICC = '/System/Library/ColorSync/Profiles/Display P3.icc'
+
+
+def managed(px, space):
+    """把 PNG 的存储值按 space 解释后转成 sRGB。转不了就返回 None —— 环境差异要被读出来，不许悄悄当成量到了。"""
+    if space == 'srgb':
+        return tuple(int(v) for v in px)
+    try:
+        from PIL import Image, ImageCms
+        tr = ImageCms.buildTransform(ImageCms.getOpenProfile(P3_ICC),
+                                     ImageCms.getOpenProfile(ImageCms.createProfile('sRGB')),
+                                     'RGB', 'RGB')
+        return tuple(int(v) for v in ImageCms.applyTransform(
+            Image.new('RGB', (1, 1), tuple(int(v) for v in px)), tr).getpixel((0, 0)))
+    except Exception as e:
+        print('HEAT_FRAME_SPACE_UNAVAILABLE %s ⇒ %s（这一格记 NOT-RUN，不替产品签字）' % (space, e))
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser(prog=os.path.basename(__file__), description=__doc__.splitlines()[0])
     ap.add_argument('--shots', help='帧目录（CLIPBOARD_HISTORY_UI_SHOTS 指的那个）')
     ap.add_argument('--judgment-log', help='判据那 16 条 HEAT_ADJACENT_CVD 所在的日志')
     ap.add_argument('--max-col-offset', type=float, default=24.0,
                     help='允许 G/B 两列的最大偏移（超过就说明偏的不只一列）；默认 24，由本轮实测 1 放宽到 24 留余量')
+    ap.add_argument('--png-space', choices=('srgb', 'display-p3', 'both'), default='both',
+                    help='PNG 的存储值按哪种口径解释。R202 定性：落盘那条路把**设备值直接标成 sRGB** ⇒ '
+                         '按 sRGB 读出来的 6…21/255 是标注产物；按 Display P3 转 sRGB 后收到 2…4/255。'
+                         '判定仍按文件自己声明的口径(srgb)走，另一份只报不判 ⇒ 把口径写进读数，不藏在实现里')
     args = ap.parse_args()
 
     shots = args.shots or os.environ.get('CLIPBOARD_HISTORY_UI_SHOTS')
@@ -150,6 +173,13 @@ def main():
             tag, u'、'.join(u'%g→%g' % (b, a) for b, a in fr),
             u'、'.join(u'%g→%g' % (b, a) for b, a in j_steps)))
         print('  HEAT_FRAME_OFFSET %s 逐档 真帧−判据 %s ⇒ 最大 |R|=%g 最大 |G/B|=%g' % (tag, offs, rr, gb))
+        if args.png_space in ('display-p3', 'both'):
+            conv = [managed(c, 'display-p3') for c in uniq]
+            if all(conv):
+                offs2 = [tuple(conv[i][c] - j_inks[i][c] for c in range(3)) for i in range(5)]
+                print('  HEAT_FRAME_OFFSET_P3 %s 逐档 (P3→sRGB)−判据 %s ⇒ 最大 |R|=%g 最大 |G/B|=%g'
+                      % (tag, offs2, max(abs(o[0]) for o in offs2),
+                         max(abs(o[c]) for o in offs2 for c in (1, 2))))
         print('  HEAT_FRAME_MARGIN %s 真帧最小模拟后=%g 判据=%g 地板=%g ⇒ 余量 真帧=%g 判据=%g'
               % (tag, fr_min, j_min, FLOOR, fr_min - FLOOR, j_min - FLOOR))
         if fr_min < FLOOR:
