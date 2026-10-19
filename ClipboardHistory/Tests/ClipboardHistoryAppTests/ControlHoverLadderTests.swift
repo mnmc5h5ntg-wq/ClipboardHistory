@@ -116,8 +116,12 @@ final class ControlHoverLadderTests: XCTestCase {
         let root = productSourcesRoot()
         // 定义处豁免：令牌自己（声明）与共享换算自己（`fillOpacity` / `HoverInk`）。
         let exemptFiles: Set<String> = ["VisualTokens.swift", "PressableStyle.swift"]
-        let knownPending = ["DetailView.swift": 2,        // chip / card 的自绘层，行那一档 0.06
-                            "SettingsView.swift": 1]       // 侧栏分类行的 `backgroundOpacity`
+        // R231 / BACKLOG 256：**这张册子现在是空的**。三处自绘悬停层（`DetailView` 的 chip 与 card、
+        // `SettingsView` 的侧栏分类行）都接进了 `HoverInk.opacity(level:dark:)` ⇒ 数字从 3 降到 0，
+        // 而这条断言就是替这次"变小"说话的那个人（变大 = 新写一处自绘层 ⇒ 不许通过）。
+        // 留空不等于留盲区：`strays` 那一条仍然会把任何没登记的新直读位点拦下来，
+        // `conformingElsewhere` 那一条仍然要求浮层那一条按档换算能被数出来。
+        let knownPending: [String: Int] = [:]
         // 这两家**不共享那条换算**，但等价：`QuickPickController` 自带 `hoverFillAlpha(dark:)`
         // 的按档抬量（R225），走的是 AppKit 的绘制路径而不是 SwiftUI。它们在册是因为
         // "另一条按档换算"是可以的，"没有按档换算"才是不行的 —— 而这一格也得能被数出来。

@@ -229,6 +229,9 @@ struct DetailView: View {
         let title: String
         let action: () -> Void
         @State private var isHovered = false
+        /// 色档由这个视图自己问（`PressedLabel` / `FilterSegmentButton` 同一条规矩：
+        /// 从外面传布尔 = 允许夹具替产品决定"这一档该多亮"）。
+        @Environment(\.colorScheme) private var colorScheme
 
         var body: some View {
             Button(action: action) {
@@ -246,7 +249,11 @@ struct DetailView: View {
                     // 悬停底色因此贴着字形那一行 —— 它本来就是个安静的行内动作，不是按钮区。
                     .background {
                         VisualShape.rounded(VisualRadius.chip)
-                            .fill(.primary.opacity(isHovered ? VisualFill.hover : 0))
+                            // R231 / BACKLOG 256：这一层以前直接读 `VisualFill.hover`，
+                            // 于是 R229 的"亮档抬一档"落不到它身上（名册 reads 里的一格）。
+                            // 档位**故意不变**（还是行那一档 0.06）：本轮只统一换算，不顺手改强度。
+                            .fill(.primary.opacity(isHovered
+                                ? HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark) : 0))
                     }
                     .contentShape(VisualShape.rounded(VisualRadius.chip))
             }
@@ -537,6 +544,8 @@ private struct MultiFileRow: View {
     let symbol: String
     let action: () -> Void
     @State private var isHovered = false
+    /// 同 `MarkdownModeButton`：色档自己问，不从调用点传。
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -582,7 +591,11 @@ private struct MultiFileRow: View {
             .padding(.vertical, 9)
             .background {
                 VisualShape.rounded(VisualRadius.card)
-                    .fill(.primary.opacity(isHovered ? VisualFill.hover : 0))
+                    // R231 / BACKLOG 256：与上面那颗 chip 同一族病 —— 直接读令牌 ⇒ 亮档那一抬落不到这里。
+                    // 这一家的**描边**（下一条 `overlay`，`VisualTint.hoverStroke`）本轮不动：
+                    // 它不在 `VisualFill` 那条换算上，判它要先量"描边 vs 底色谁在说话"，记成新的一笔。
+                    .fill(.primary.opacity(isHovered
+                        ? HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark) : 0))
             }
             .overlay {
                 VisualShape.rounded(VisualRadius.card)

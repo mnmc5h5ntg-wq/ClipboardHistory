@@ -1665,13 +1665,21 @@ final class UICaptureTests: XCTestCase {
                       "`rebuildRows` 不再清悬停了 ⇒ 打字时候选增减，那层灰会留在错误的一行上")
 
         // 跨文件守卫：SwiftUI 侧那一族行悬停确实读的是同一枚令牌
-        // （`DetailView` 的两处 `.fill(.primary.opacity(isHovered ? VisualFill.hover : 0))`）。
+        // （R231 之前长这样：`.fill(.primary.opacity(isHovered ? VisualFill.hover : 0))`；
+        //  现在两处都写成 `HoverInk.opacity(level: VisualFill.hover, dark:)` ⇒ 令牌还在、换算换成了共用的那一条。
+        //  所以这里断言**两件事各一条**：令牌必须仍被引用（否则这条守卫就成了空守卫，两边可以各挑一个数），
+        //  而且必须走共享换算（否则 R229 的亮档那一抬又落不到它们身上 —— 那正是 BACKLOG 256 的病根）。
         // 这条守卫只读**产品**文件，不读测试自己 —— 否则它会因为本文件里也出现
         // `VisualFill.hover` 而永远通过（R53 那一课：扫源码的守卫会命中守卫自己）。
         let sidebar = Self.codeOnly(try productSource(named: "Views/DetailView.swift"))
         XCTAssertTrue(sidebar.contains("VisualFill.hover"),
                       "SwiftUI 侧的行悬停不再引用 `VisualFill.hover` ⇒ 浮层这条守卫就成了空守卫："
                           + "两边可以各挑一个数而仍然全绿")
+        // 与名册那颗尺同形：**按行**数，且剥过注释（`codeOnly`），免得数到散文。
+        let liftedLines = sidebar.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { $0.contains("HoverInk.opacity(level: VisualFill.hover") }
+        XCTAssertEqual(liftedLines.count, 2,
+                       "`DetailView` 的两处悬停底色里有几处退回了直读令牌 ⇒ 亮档那一抬会再次落空（R231 / 256）")
     }
 
     /// 诊断用：这条通道给的位图到底是**预乘**还是非预乘、opaque 与否。

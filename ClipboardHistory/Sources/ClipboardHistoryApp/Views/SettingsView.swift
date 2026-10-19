@@ -859,10 +859,15 @@ private struct SettingsSidebarRow: View {
     let isSelected: Bool
     let action: () -> Void
     @State private var isHovered = false
+    /// 色档自己问（`PressedLabel` / `FilterSegmentButton` / `MarkdownModeButton` 同一条规矩）。
+    @Environment(\.colorScheme) private var colorScheme
 
     private var backgroundOpacity: Double {
         if isSelected { return VisualFill.selected }
-        return isHovered ? VisualFill.hover : 0
+        // R231 / BACKLOG 256：`selected` 那一格**不接**共享换算 —— 它是选中态不是悬停态，
+        // 抬量长在悬停上会把"选中的那一行"和"指针所在的那一行"糊成同一档。
+        guard isHovered else { return 0 }
+        return HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
     }
 
     var body: some View {
