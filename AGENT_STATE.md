@@ -1,5 +1,19 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 15:50（本地 · R196 / 第 198 轮：**220 结构诊断 —— 代理不接受第一响应者，而焦点环零件已在位**（U-641…U-643 · 产品 0 文件，判据账）
+
+**本轮落地**：新量法把侧栏那棵树的 nextKeyView 结构拍成读数：KEYCHAIN 视图数=45 有 nextKeyView=15 acceptsFirstResponder=4 环=NSHostingView<AnyView>>AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> 环长=2；两枚段按钮位置上各有 `KeyViewProxy`（`fr=false`、彼此连着）与**已在位**的 `_FocusRingView` ⇒ 病根是"代理不接受第一响应者"，不是"没有焦点表达"。`mutate_r196.py` M730, M731 ⇒ 2/2 CAUGHT、RESTORE_CLEAN=yes。
+**分辨实验没翻面**：本进程 register `AppleKeyboardUIMode=3` 后 KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=4/4 环长=1/2 代理=_FocusRingView fr=false frame=(12.0, 50.0, 148.0, 26.0) | _FocusRingView fr=false frame=(160.0, 50.0, 148.0, 26.0) ⇒ "全键盘访问决定可达性"这条假设既不证实也不证伪；要判它得改全局偏好 + 重启会话（需用户授权，不偷跑）。
+**决定：不改产品**（D-198）：自绘焦点环被"零件已在位"否掉；换 `NSSegmentedControl` 会换掉 R189/R190 那套两态判据的对象，得单独一轮带画面证人做。
+验证：编译 0 告警、全量卷 882/44/0、三个新 print 标记进名册（12→15 行）、产品 0 文件（帧与换装沿用上一遍）；脚本电池见 commit 输出。
+
+**下一轮（R197）的靶**：⓪ 读 R195/R196 这几笔的 CI 全部失败步骤（`7e46b49`=已确认 failure 且成因是它自身缺文件；`4cde716`/`4b38b29`/`9b0a17b` 与本轮写这笔时都仍 in_progress ⇒ 结论未读）；
+② 220 路 A：**等用户授权**改 `AppleKeyboardUIMode` 后重跑同一条探针（翻面 ⇒ 产品不用改，只改文档与验收条件）；
+③ 220 路 B：若路 A 不翻面，才谈换原生控件 —— 且要先想清楚 R189/R190 那两条判据跟着怎么改；
+④ 218（行 A/B 的统计量 + runner 那份分布）、215（真机亮档一格）、201/202/205/207；
+⑤ 清账表：筛选条剩 5 格（加载、空、错误、成功、禁用）；⑥ 看图腿：产品已连续五轮 0 文件 —— R197 要么动一个真位点，要么把 218 那三臂的逐帧条带像 R192 那样真看一遍。
+）
+
 最后更新：2026-10-19 15:30（本地 · R195 / 第 197 轮：**还 R194 的三件债 —— 四把刀验出牙、全量卷 0 失败、电池 OK**（U-638…U-640 · 产品 0 文件，判据账）
 
 **本轮落地**：`mutate_r195.py` M726, M727, M728, M729 ⇒ 4/4 CAUGHT、RESTORE_CLEAN=yes，catcher 全是 R194 那条 `testFilterFocusExitIsWired` ⇒ 那个"有名字的未判定"出口第一次被证明可证伪。电池那 1 红修绿：真因是 `PROBE_QUEUED 4/11→6/13` 与 print 读数名册（新增 `FILTER_FOCUS`、`FILTER_PILL_FOCUS_UNCOVERED`，10 行→12 行），两处按**真实文本**重钉、名册仍是双向相等。

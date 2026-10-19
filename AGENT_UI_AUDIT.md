@@ -363,6 +363,30 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 198 轮（R196 · 2026-10-19）：220 的结构诊断 —— 段按钮的 KeyViewProxy 在树里、　_FocusRingView 已在位，缺的只有「接受第一响应者」这一件事（U-641…U-643 · 产品 0 文件，判据账）
+
+- **U-641：三种成因被区分开了，答案是第二种。** R194 只量到"走不到"（Tab 12 站全是字段编辑器），
+  那有三种修法互相冲突，所以本轮先把结构拍下来：KEYCHAIN 视图数=45 有 nextKeyView=15 acceptsFirstResponder=4 环=NSHostingView<AnyView>>AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> 环长=2
+  逐视图清单里两枚段按钮的位置上各有 2 个 `KeyViewProxy`，它们**彼此连着 nextKeyView**、
+  几何就是段控件那两格（148×26 @x=12 与 @x=160），但 `fr=false`；
+  而**同一位置上已经有 `_FocusRingView`**（`fr=['false']`）。
+  ⇒ 病根不是"宿主不在环里"，是"代理不接受第一响应者"；
+  而"焦点表达"这件事系统零件已经在那儿了 —— 自绘一条描边会变成画两圈（与 `PressableStyle` 注释里
+  搜索框那条同一个道理）。清单：KEYCHAIN_TREE NSHostingView<AnyView> fr=false ring=0 next=AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> frame=(0.0, 0.0, 320.0, 460.0) 带内=false |  KeyViewProxy fr=false ring=0 next=KeyViewProxy frame=(12.0, 50.0, 148.0, 26.0) 带内=true |  KeyViewProxy fr=false ring=0 next=AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<SelectedRowRevealer>> frame=(160.0, 50.0, 148.0, 26.0) 带内=true |  AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> fr=fals
+- **U-642：那条机制假设我**没有**拿它当结论，而是做了分辨实验，实验没翻面。**
+  假设是"AppKit 只在系统『全键盘访问』开启时把这些代理放进 Tab 环"。本机 `defaults read -g AppleKeyboardUIMode`
+  读不到这个键（=0）。我在**本进程内** `register(defaults:)` 设成 3 再建一棵树（不写全局偏好、不动用户设置），
+  读数：KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=4/4 环长=1/2 代理=_FocusRingView fr=false frame=(12.0, 50.0, 148.0, 26.0) | _FocusRingView fr=false frame=(160.0, 50.0, 148.0, 26.0) ⇒ `acceptsFirstResponder` 4→4、环长 2→1，**什么都没翻**。
+  ⇒ 这条假设既没被证实也没被证伪：进程内 register 很可能不是 AppKit 读它的时机。
+  真要判它得改全局偏好并重启会话 —— 那是需要用户授权的动作，我不偷跑，写进 220 的下一步。
+- **U-643：本轮决定**不改产品**，并把"为什么不改"写成可证伪的两条路。**
+  自绘焦点环：被结构读数反驳（`_FocusRingView` 已在位 ⇒ 两圈）；
+  换原生 `NSSegmentedControl`：能进环，但会改材质与几何，而 R189/R190 刚为这条通道建好两态像素判据与能力谓词，
+  换控件等于把那些判据的**对象**换掉 —— 那不是"顺手升级"，是一次有代价的重判，得单独一轮带着画面证人做。
+  刀 M730, M731 ⇒ 2/2 CAUGHT、RESTORE_CLEAN=yes：
+  M730 把量法的起点弄丢（空环该红）、M731 把 FKA 那行标记改名（读数还在但名册看不见 ⇒ 静默免检）。
+  顺带第二次踩到"新增 print 读数要同改三处名册"：本轮三个标记（`KEYCHAIN`/`KEYCHAIN_TREE`/`KEYCHAIN_FKA`）
+  都要进 `FrameIntervalBudgetTests` 的名册，行数 12→15。
 ## 第 197 轮（R195 · 2026-10-19）：还 R194 欠的三件债 —— 四把刀给那条接线扫描验出牙、全量卷跑回 0 失败、电池从 1 红修到 OK（U-638…U-640 · 产品 0 文件，判据账）
 
 - **U-638：R194 那条接线扫描当时只有"跑过一遍绿"一个证人，现在它有四把刀。**

@@ -5794,3 +5794,16 @@ row-insert `0.043/0.052`（线 0.0078）安全；而 `MOTION_SEQUENCE` 两臂 `0
 处置：两把尺并排打印、判据不动，等一个更稳的统计量（BACKLOG 218）。
 适用面：本文件所有以 `transitionFrameCount ≥ N` 表达"有过程"的判据；
 不适用：已搬到连续段时长的热图淡入那一条（R47/R48 就是为它造的这颗尺），以及"两臂相同吗"那两处（R192/D-196）。
+
+**D-198（R196）：筛选段按钮的键盘可达性缺陷**不修**，因为两条修法各自欠一个还没做的实验；焦点环零件已在位这一事实先否掉"自绘描边"**
+
+读数（本机，`/tmp/r196_chain2.log`）：KEYCHAIN 视图数=45 有 nextKeyView=15 acceptsFirstResponder=4 环=NSHostingView<AnyView>>AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> 环长=2；
+两枚段按钮位置上各有 `KeyViewProxy`（`fr=false`、连着 nextKeyView、148×26 @x=12 / @x=160），
+同位置**已有** `_FocusRingView`（`fr=['false']`）。进程内把 `AppleKeyboardUIMode` register 成 3 之后：
+KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=4/4 环长=1/2 代理=_FocusRingView fr=false frame=(12.0, 50.0, 148.0, 26.0) | _FocusRingView fr=false frame=(160.0, 50.0, 148.0, 26.0) ⇒ 没有任何翻面。
+
+⇒ 三条结论：① 不自绘焦点环（零件已在位，再加一圈是画两圈 —— 与搜索框那条同一个理由，但这次有 `_FocusRingView` 的在场作证人）；
+② 不为可达性顺手换 `NSSegmentedControl`：那会换掉 R189/R190 两态像素判据与能力谓词的**对象**，是一次有代价的重判；
+③ "FKA 决定可达性"这条机制假设**既不证实也不证伪**（进程内 register 不是 AppKit 读它的时机），
+   要判它必须改用户机器的全局偏好并重启会话 —— 属于要先授权的动作，本轮不做。
+适用面：任何"SwiftUI 控件在 AppKit 响应者链里没有身份"的判断；不适用：真响应者（`acceptsFirstResponder=true` 的那 4 个）。

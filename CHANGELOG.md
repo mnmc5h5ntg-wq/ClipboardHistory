@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 220 结构诊断：段按钮的 KeyViewProxy 在树里、`_FocusRingView` 已在位，缺的是接受第一响应者（R196 / U-641…U-643 · 产品 0 文件，判据账）
+
+- 新量法 `UIInteractionProbeTests.testSidebarKeyViewChainStructureIsPrinted`：整棵树 + nextKeyView 环 + 带内几何，全部走 print 读数
+- 读数：KEYCHAIN 视图数=45 有 nextKeyView=15 acceptsFirstResponder=4 环=NSHostingView<AnyView>>AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> 环长=2；两枚段按钮位置上各有 `KeyViewProxy`（连着 nextKeyView、`fr=false`）与**已在位**的 `_FocusRingView` ⇒ 焦点环零件齐
+- 分辨实验：本进程 `register(defaults: ["AppleKeyboardUIMode": 3])` 后重建一棵树 ⇒ KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=4/4 环长=1/2 代理=_FocusRingView fr=false frame=(12.0, 50.0, 148.0, 26.0) | _FocusRingView fr=false frame=(160.0, 50.0, 148.0, 26.0) ⇒ 什么都没翻 ⇒ 假设既不证实也不证伪（要证它得改全局偏好 + 重启会话，需用户授权）
+- 决定：不改产品。自绘焦点环被结构读数反驳（会画两圈）；换 `NSSegmentedControl` 能进环但会换掉 R189/R190 那套两态判据的**对象**，得单独一轮带画面证人做 ⇒ D-198
+- 变异：`mutate_r196.py` M730, M731 ⇒ 2/2 CAUGHT、RESTORE_CLEAN=yes；三个新 print 标记同步进名册（12→15 行）
+- 验证：编译 0 告警、全量卷 882/44/0、脚本电池见 commit 输出、产品 0 文件（帧未动，沿用上一遍）
 ### 还 R194 的三件债：4/4 把刀给未判定出口验出牙，全量卷 881/43/0，电池 Ran 368 / OK（R195 / U-638…U-640 · 产品 0 文件，判据账）
 
 - `mutate_r195.py` M726, M727, M728, M729 ⇒ 4/4 CAUGHT、RESTORE_CLEAN=yes；catcher 是 `testFilterFocusExitIsWired` 本身

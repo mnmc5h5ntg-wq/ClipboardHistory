@@ -932,6 +932,115 @@ final class UIInteractionProbeTests: XCTestCase {
     //   `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession` 钉住：
     //   以后谁再往探针卷里塞合成拖拽就会红，红话里写着为什么。
 
+    /// 侧栏宿主这棵树的 **key-view 结构**长什么样（R196 / BACKLOG 220 的前置量法，只出读数不下结论）。
+    ///
+    /// 为什么先量这个再谈修法：R194 量到「Tab 12 站全是字段编辑器、段按钮 0 站」，但那只说明
+    /// **走不到**，没说是哪一种走不到。三种成因的修法互相冲突：
+    /// ① 段按钮的宿主根本不在 `nextKeyView` 环里（→ 要显式接环，或换原生控件）；
+    /// ② 它在环里但 `acceptsFirstResponder=false`（→ 是 SwiftUI 的 ButtonStyle 把可聚焦性吃掉了）；
+    /// ③ 它在环里也可聚焦，只是 `selectNextKeyView` 从搜索框那一站开始循环回自己（→ 环被字段编辑器独占）。
+    /// 拿三张不同的药方去治一个没确诊的病，正是这一整轮审计反复在防的事。
+    func testSidebarKeyViewChainStructureIsPrinted() throws {
+        try skipUnlessEnabled()
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        for index in 0..<6 {
+            store.add(ClipboardIntake.Entry(
+                content: .text("key-view 结构第 \(index) 条"), thumbnail: nil,
+                sourceUTIs: ["public.utf8-plain-text"]
+            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
+        }
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+        // 整棵树：类名、是否可当响应者、焦点环类型、它的 nextKeyView 指向谁、在不在筛选条带内。
+        var rows: [String] = []
+        var withNext = 0
+        var focusable = 0
+        func dump(_ v: NSView, depth: Int) {
+            let next = v.nextKeyView
+            if next != nil { withNext += 1 }
+            if v.acceptsFirstResponder { focusable += 1 }
+            let f = v.convert(v.bounds, to: host)
+            let band = f.minY >= 0 && f.maxY <= 120 && f.width > 20 && f.height > 8
+            rows.append("\(String(repeating: " ", count: depth))\(String(describing: type(of: v)))"
+                + " fr=\(v.acceptsFirstResponder) ring=\(v.focusRingType.rawValue)"
+                + " next=\(next.map { String(describing: type(of: $0) ) } ?? "无")"
+                + " frame=\(f.integral) 带内=\(band)")
+            for sub in v.subviews { dump(sub, depth: depth + 1) }
+        }
+        dump(host, depth: 0)
+        // 环的起点与长度：从 contentView 出发沿 nextKeyView 走 20 步，看它闭不闭环、经不经段按钮。
+        var loop: [String] = []
+        var cursor: NSView? = window.contentView
+        var seen = Set<ObjectIdentifier>()
+        var steps = 0
+        while let c = cursor, steps < 20, !seen.contains(ObjectIdentifier(c)) {
+            seen.insert(ObjectIdentifier(c))
+            loop.append(String(describing: type(of: c)))
+            cursor = c.nextKeyView
+            steps += 1
+        }
+        print("KEYCHAIN 视图数=\(rows.count) 有 nextKeyView=\(withNext) acceptsFirstResponder=\(focusable)"
+            + " 环=\(loop.joined(separator: ">")) 环长=\(steps)")
+        print("KEYCHAIN_TREE \(rows.prefix(40).joined(separator: " | "))")
+
+        // 分辨实验（R196）：段按钮的 `KeyViewProxy` 在树里、彼此连着 nextKeyView，却 `fr=false`，
+        // 而它们位置上**已经有 `_FocusRingView`** ⇒ 焦点环的零件在，缺的是"拿到焦点"。
+        // 本机 `defaults read -g AppleKeyboardUIMode` 读不到这个键（=0，全键盘访问关），
+        // 这与"AppKit 只在 FKA 开启时把这些控件放进 Tab 环"的机制一致 —— 但那是**假设**，
+        // 所以这里在**本进程内**（不写全局偏好、不动用户的系统设置）把它设成 3 再建一棵树，
+        // 看两件事会不会翻面：`acceptsFirstResponder` 变 true？环长从 2 变 4？
+        // 两条读数是相反的两张药方：翻面 ⇒ 产品不用改（改的是文档与验收条件）；
+        // 不翻面 ⇒ SwiftUI 不吃这个开关，才轮到"换原生 NSSegmentedControl / 显式接环"。
+        UserDefaults.standard.register(defaults: ["AppleKeyboardUIMode": 3])
+        let host2 = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host2.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        var focusable2 = 0
+        var proxies: [String] = []
+        func dump2(_ v: NSView) {
+            if v.acceptsFirstResponder { focusable2 += 1 }
+            let name = String(describing: type(of: v))
+            if name.contains("KeyViewProxy") || name.contains("FocusRing") {
+                let f = v.convert(v.bounds, to: host2)
+                proxies.append("\(name) fr=\(v.acceptsFirstResponder) frame=\(f.integral)")
+            }
+            for sub in v.subviews { dump2(sub) }
+        }
+        window.contentView = host2
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        dump2(host2)
+        var loop2: [String] = []
+        var cursor2: NSView? = window.contentView
+        var seen2 = Set<ObjectIdentifier>()
+        var steps2 = 0
+        while let c = cursor2, steps2 < 20, !seen2.contains(ObjectIdentifier(c)) {
+            seen2.insert(ObjectIdentifier(c))
+            loop2.append(String(describing: type(of: c)))
+            cursor2 = c.nextKeyView
+            steps2 += 1
+        }
+        print("KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=\(focusable2)/\(focusable)"
+            + " 环长=\(steps2)/\(steps) 代理=\(proxies.prefix(6).joined(separator: " | "))")
+        UserDefaults.standard.removeObject(forKey: "AppleKeyboardUIMode")
+        XCTAssertGreaterThan(rows.count, 5,
+                             "树都没建起来（只看到 \(rows.count) 个视图）⇒ 上面的读数无意义，先修夹具")
+        XCTAssertFalse(loop.isEmpty, "从 contentView 出发一步都走不到 ⇒ nextKeyView 环整条是空的，这本身就是要记的读数")
+    }
+
     /// 筛选段按钮拿得到键盘焦点吗，拿到了有**任何**焦点表达吗（R194 / BACKLOG 219 的「筛选条 · 聚焦」格）。
     ///
     /// 为什么这一格值得单独量：`PressableStyle.swift` 末尾那段注释明写"焦点态这一半本轮故意没做，

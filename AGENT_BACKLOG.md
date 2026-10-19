@@ -5425,3 +5425,16 @@ M709（退回各自归一化，只有接线扫描抓得到）、M710（方向反
 `mutate_r195.py` M726, M727, M728, M729 全 CAUGHT、全量卷 881/43/0、电池 Ran 368 / OK。
 220 本身仍开着：它欠的是"先量清 `List`/`NSHostingView` 怎么排 nextKeyView"，本轮没有动它，
 也不许用"扫描有牙了"替那条缺陷说进展 —— 两件事不同尺。
+
+**220 追记（R196）：病根定位到"代理不接受第一响应者"，两条修法各自的代价与实验都写清**
+
+结构读数：KEYCHAIN 视图数=45 有 nextKeyView=15 acceptsFirstResponder=4 环=NSHostingView<AnyView>>AppKitPlatformViewHost<PlatformViewRepresentableAdaptor<ChineseEditableTextField>> 环长=2；清单里两枚段按钮的位置上各有 `KeyViewProxy`（`fr=false`、彼此连着 nextKeyView、
+几何 148×26 @x=12 / @x=160），**同位置已有 `_FocusRingView`**。
+⇒ ①"焦点表达"不缺零件（自绘描边会变成两圈，别做）；②缺的是"接受第一响应者"。
+下一步分两条，各自要先做实验，不许直接动产品：
+- 路 A（便宜）：证实/证伪"系统『全键盘访问』决定可达性"。本轮的**进程内**实验没翻面（KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=4/4 环长=1/2 代理=_FocusRingView fr=false frame=(12.0, 50.0, 148.0, 26.0) | _FocusRingView fr=false frame=(160.0, 50.0, 148.0, 26.0)），
+  要真判需要 `defaults write -g AppleKeyboardUIMode -int 3` + 重启会话 —— 改的是用户机器的全局偏好，
+  **要先拿授权**；拿到后重跑同一条探针，看 `fr` 与环长是否翻面。
+- 路 B（贵）：换原生 `NSSegmentedControl`（NSViewRepresentable）。它能进环，但会改材质与几何，
+  而 R189/R190 为这条通道建的两态像素判据与能力谓词的**对象**就是现在这套视图 ⇒ 换控件等于重判那些判据，
+  要单独一轮、带画面证人，不能顺手。

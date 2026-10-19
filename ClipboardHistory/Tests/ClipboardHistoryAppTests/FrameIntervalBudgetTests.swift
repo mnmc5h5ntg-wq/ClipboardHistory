@@ -168,8 +168,11 @@ final class FrameIntervalBudgetTests: XCTestCase {
             "FOCUS-CHAIN", "TAB-KEY-CHAIN", "TAB-KEY-KINDS", "KEYBOARD-UIMODE",
             "NOTE", "AX-VISITED", "AX-UNNAMED", "FOCUSCHAIN-RING", "RINGVIEWS",
             "FILTER_FOCUS", "FILTER_PILL_FOCUS_UNCOVERED",
+            // R196：key-view 结构量法（BACKLOG 220 的前置）新增两行 —— `KEYCHAIN` 是环与计数，
+            // `KEYCHAIN_TREE` 是逐视图清单。先登记才允许存在（R143/U-473 那条路）。
+            "KEYCHAIN", "KEYCHAIN_TREE", "KEYCHAIN_FKA",
         ]), "探针里的 print 读数与名册不符 ⇒ 要么有未登记的新读数，要么有已退场的旧登记")
-        XCTAssertEqual(markers.count, 12,
+        XCTAssertEqual(markers.count, 15,
             "同一标记的行数变了（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改（NOTE 那两条是条件注记）")
     }
 }

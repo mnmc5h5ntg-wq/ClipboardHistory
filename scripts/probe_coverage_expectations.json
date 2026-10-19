@@ -58,6 +58,10 @@
     "testFilterFocusExitIsWired": {
       "runner": "cannot",
       "reason": "R194 新加，runner 上还没有读数 ⇒ 登记成 cannot，理由就是「没有那台机器的读数」本身（R94 那一课：不许拿本机结果替它改登记）。下一跑若 `NOW_RUNS` 逐条点名它，闸门会当场红在这里 ⇒ 那时按读来的证据翻成 can。本机这一跑：`Executed 3 tests, with 1 test skipped and 0 failures`，其中本条是**具名出口**（FILTER_PILL_FOCUS_UNCOVERED），不是没跑。"
+    },
+    "testSidebarKeyViewChainStructureIsPrinted": {
+      "runner": "cannot",
+      "reason": "R196 新加的结构量法，runner 上还没有这一跑的读数 ⇒ 登记 cannot，理由就是这件事本身（R94/R101：不许拿本机结果替它改登记，也不许让它静默免检）。本机这一跑：Executed 1 test, with 0 failures，三行读数 KEYCHAIN / KEYCHAIN_TREE / KEYCHAIN_FKA 齐全。"
     }
   },
   "_r93": "R93：十条 reason 从「整卷在第一条结论之前就被收掉」改成上面那句实测成因，并登记新加的 `testRowProxyCensusAsksTheConsequenceNotTheShape`。**为什么六条明明在 runner 上下过结论、这里仍登记 cannot**：那六条的**名字**今天还没读到（`已下结论的用例: 6` 只数了行，名字随被 SIGKILL 带走的那块 stdout 缓冲一起没了），而按字典序去猜是哪六条属于「没量过的推断」——R87 那一课的规矩是「预先登记的预测被推翻只写没证实」。R92 推送的 CI（`9c10569`）第一次带着「闸门读真日志」的修法，那一步会逐条印出结论名 ⇒ 下一轮按它把该翻 can 的翻掉；翻错会被 NOW_RUNS / NOT_RUN 挡回来，这正是留那两格的意义。",
