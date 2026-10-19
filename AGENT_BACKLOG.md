@@ -6271,7 +6271,7 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 - 帧：158（未重捕，产品 0 文件）；看图腿：NOT-RUN（无新对象可看，沿用上一笔的帧只做尺的对照）。
 - 电池（本笔台账之后跑）：`Ran 410`（406 → 本格净增 4）。
 - **下一轮第 ⓪ 条**：三个 run 成对待读 —— 5cf95fe → 39319255032、f798ff8 → 39319908786（写本笔时均
-  in_progress ⇒ 只准记「未读」）、本笔这一跑（commit 待定 ⇒ 下一轮先取 id）。要验的两件事按名列出：
+  in_progress ⇒ 只准记「未读」）、本笔这一跑已成对拿到：920c327 → run **39321237675**（取号时 status=queued、conclusion 空 ⇒ 只准记**未读**，不许写成"过了"）。要验的两件事按名列出：
   (a) `Release script tests` 那一步的 `test_ci_exit_matches_this_machines_registered_profile` 是否绿，
   且 `CI_PROFILE_OK`/红话里打印的**主语**是不是 `github-runner`；(b) `png_files` 是否 =158（新加的四格
   `settingsrow-hover-*` 帧进了 runner 的帧目录 ⇒ 尺的探针数仍是 7，画像里 probes=7 不许被顺手改掉）。
