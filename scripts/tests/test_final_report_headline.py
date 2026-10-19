@@ -103,5 +103,79 @@ class FinalReportHeadlineTests(unittest.TestCase):
             sorted(codes), u'读不到形状时给的是 %s ⇒ 不许当成通过' % codes)
 
 
+# R235 补记 / BACKLOG 266 的那格：报告里「最后一次动到 Sources/ 的轮次」**以前只靠手抄**，
+# 于是它停在 R205 连着九轮说假话（那期间动了 R225 / R230 / R234 / R235 四次源码），而标题闸门完全不管它。
+# 现在把它接进同一支现读仪器：真相由 `git log` 给，报告只是**声称**，两边不符就红，并点名两边各是什么。
+SOURCES_CELL = re.compile(u'最后一次动到 `Sources/` 的轮次.*?\\*\\*R(\\d+)\\*\\*（commit `([0-9a-f]{7,40})`）')
+SOURCES_PATH = u'ClipboardHistory/Sources'
+
+
+def live_sources(n=1):
+    """最近 n 笔动到源码的提交 [(sha, R 或 None, subject)]；git 不在/读不到就抛（不许静默通过）。"""
+    import subprocess
+    out = subprocess.Popen(
+        ['git', '-C', REPO, 'log', '-%d' % n, '--format=%h%x09%s', '--', SOURCES_PATH],
+        stdout=subprocess.PIPE).communicate()[0].decode('utf-8', 'replace')
+    rows = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        sha, _, subject = line.partition(u'\t')
+        m = re.search(u'（R(\\d+)', subject) or re.search(u'\\bR(\\d+)', subject)
+        rows.append((sha.strip(), int(m.group(1)) if m else None, subject))
+    return rows
+
+
+def sources_problems(text, rows):
+    problems = []
+    c = SOURCES_CELL.search(text)
+    if not c:
+        problems.append(('FINAL_REPORT_SOURCES_CELL_UNPARSEABLE',
+                         u'报告里读不到「最后一次动到 Sources/ 的轮次」那一格的 **R<NNN>**（commit `<sha>`）形状 ⇒ 这一格无从对账'))
+        return problems
+    claimed_round, claimed_sha = int(c.group(1)), c.group(2)
+    if not rows:
+        problems.append(('FINAL_REPORT_SOURCES_LIVE_EMPTY',
+                         u'`git log -- %s` 一笔都没读到 ⇒ 对照数是空的，不许当成通过' % SOURCES_PATH))
+        return problems
+    live_sha, live_round, subject = rows[0]
+    if not claimed_sha.startswith(live_sha[:7]) and not live_sha.startswith(claimed_sha[:7]):
+        problems.append(('FINAL_REPORT_SOURCES_CELL_STALE',
+                         u'那一格写 commit `%s`，而 git 说最近动源码的是 `%s`（%s）⇒ 动过源码却没刷这张格'
+                         % (claimed_sha, live_sha, subject[:48])))
+    elif live_round is None:
+        problems.append(('FINAL_REPORT_SOURCES_COMMIT_ROUND_UNPARSEABLE',
+                         u'最近那笔源码提交 `%s` 的标题里读不出 R 号 ⇒ 只能对 sha、对不了轮次：%s'
+                         % (live_sha, subject[:48])))
+    elif claimed_round != live_round:
+        problems.append(('FINAL_REPORT_SOURCES_CELL_STALE',
+                         u'那一格写 R%d，而 commit `%s` 的标题说自己属于 R%d ⇒ 两边有一边抄错'
+                         % (claimed_round, live_sha, live_round)))
+    return problems
+
+
+class FinalReportSourcesCellTests(unittest.TestCase):
+    """这一格是纯手抄、没有 LAG 容差挡着 ⇒ 必须逐字对 git。"""
+
+    def test_the_sources_cell_agrees_with_git(self):
+        self.assertEqual([], sources_problems(read(REPORT), live_sources(3)),
+                         u'「最后一次动到 Sources/ 的轮次」与 git 不同源')
+
+    def test_a_stale_sources_cell_is_named(self):
+        """正对照：把 sha 换成**上一笔**动源码的提交 ⇒ 必须点名（换个数它不响 ⇒ 这一格是假的）。"""
+        rows = live_sources(3)
+        if len(rows) < 2:
+            self.skipTest(u'仓库里动到 Sources 的提交不足两笔 ⇒ 这一格造不出对照')
+        text = read(REPORT)
+        stale = SOURCES_CELL.sub(u'最后一次动到 `Sources/` 的轮次 **R0**（commit `%s`）' % rows[1][0], text, count=1)
+        self.assertNotEqual(stale, text, u'锚点漂了：报告里没有那一格')
+        codes = [c for c, _ in sources_problems(stale, rows)]
+        self.assertIn('FINAL_REPORT_SOURCES_CELL_STALE', codes)
+        missing = SOURCES_CELL.sub(u'最后一次动到 Sources 的轮次（这一格故意没有形状）', text, count=1)
+        self.assertIn('FINAL_REPORT_SOURCES_CELL_UNPARSEABLE',
+                      [c for c, _ in sources_problems(missing, rows)],
+                      u'形状被改掉时不许静默通过')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R235**（commit `d4a2440`）—— 真改产品行为（2 文件）：菜单栏 dismiss 行的**写死蓝墨撤掉、交回系统**（实测那颗蓝静置亮档 3.52:1、两档选中底 1.93 / 2.36:1，两种态都输给同棵菜单正文参照）；判据 `MenuBarDismissRowInkTests` 两格 + 刀 M786 CAUGHT / **M787 ESCAPED**（⇒ 13 那棵 SwiftUI 树仍没有会红的墨判据，BACKLOG 264）；**runner 已验收**（run 39338153114：暗 12.82/6.23、亮 17.78/14.08，两档地板全过）；已换装本机。往前三笔动到源码的是 R234（撤渲染档表格灰底）、R230（悬停灰全仓一条换算）、R225（浮层悬停按色档取墨）| `git log -1 -- ClipboardHistory/Sources` |
+| 最后一次动到 `Sources/` 的轮次 | **R235**（commit `d4a2440`）—— 真改产品行为（2 文件）：菜单栏 dismiss 行的**写死蓝墨撤掉、交回系统**（实测那颗蓝静置亮档 3.52:1、两档选中底 1.93 / 2.36:1，两种态都输给同棵菜单正文参照）；判据 `MenuBarDismissRowInkTests` 两格 + 刀 M786 CAUGHT / **M787 ESCAPED**（⇒ 13 那棵 SwiftUI 树仍没有会红的墨判据，BACKLOG 264）；**runner 已验收**（run 39338153114：暗 12.82/6.23、亮 17.78/14.08，两档地板全过）；已换装本机。往前三笔动到源码的是 R234（撤渲染档表格灰底）、R230（悬停灰全仓一条换算）、R225（浮层悬停按色档取墨）| `git log -1 --format=%h%x09%s -- ClipboardHistory/Sources`（R235 补记起由 `scripts/tests/test_final_report_headline.py::live_sources` 现读对账，这一格不再靠手抄；不符就红 `FINAL_REPORT_SOURCES_CELL_STALE`） |
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 

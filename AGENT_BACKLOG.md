@@ -6568,3 +6568,10 @@ R235 实测：`test_round_batch_consistency.py` 从 R188 起写死 `第 N 轮 = 
 标题闸门不管它 ⇒ 下一轮要么把它接进同一支现读仪器（像 U 上界那样），要么每次手工改都要在这一条里补一次读数。
 不做的代价：那一格会比 U 上界更容易说假话（它是纯手抄，没有 `LAG_U = 3` 这种容差挡着）。
 出口条件：下一次动到 `Sources/` 之前，或者有人再靠人眼发现它停在旧数之时。
+
+266 **追记（R235 补记第三笔 / U-753）结案**：那一格已接进现读仪器 —— `test_final_report_headline.py` 的
+`live_sources(3)` 从 `git log -- ClipboardHistory/Sources` 取真相，报告那格只算声称；
+两向证人各跑过（baseline ok；把 sha 换成上一笔 `22346d3` ⇒ `FINAL_REPORT_SOURCES_CELL_STALE`；
+改成没形状 ⇒ `..._UNPARSEABLE`；git 读到 0 笔 ⇒ `..._LIVE_EMPTY` 而不是通过）。
+这一格**没有 LAG 容差**：动过源码当轮就得刷，否则电池红 —— 这是设计，不是负担。
+电池 416 → **418**（`Ran 418 tests in 14.419s OK (skipped=2)`）。

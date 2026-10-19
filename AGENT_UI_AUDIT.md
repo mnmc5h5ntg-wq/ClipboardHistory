@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏那一行蓝被量成两种态都输（U-748…U-752 / D-220）
+## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏那一行蓝被量成两种态都输（U-748…U-753 / D-220）
 
 ### 开场缺陷清单（看图那条目测，先量形状与轴范围再谈颜色）
 
@@ -451,6 +451,19 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
    —— 从 R205（8cbe238）改成 **R235（d4a2440）**，数字来自 `git log -1 -- ClipboardHistory/Sources`
    与 `git show --stat`，不是抄上一格；同一次还列出 R234 / R230 / R225 三个更早动过 Sources 的轮次。
    欠的不再是"没刷新"，而是"这一格没接进那支现读的仪器"（标题闸门不管它）⇒ 记进 **266**。
+
+- **U-753：BACKLOG 266 就地结案 —— 「最后一次动到 Sources/ 的轮次」那一格现在有活了。**
+
+上一笔（U-751）我自己写的是「欠的是那一格仍靠手抄」，本笔把它接进了同一支现读仪器：
+`scripts/tests/test_final_report_headline.py` 新增 `live_sources(3)`（`git log -3 --format=%h%x09%s -- ClipboardHistory/Sources`）
+与 `sources_problems()`，报告里那格只是**声称**，真相由 git 给；sha 不符 ⇒ `FINAL_REPORT_SOURCES_CELL_STALE`，
+形状读不到 ⇒ `..._UNPARSEABLE`，git 读到 0 笔 ⇒ `..._LIVE_EMPTY`（空对照数不许当通过），
+提交标题里读不出 R 号 ⇒ `..._COMMIT_ROUND_UNPARSEABLE`。
+这一格**故意不给 LAG 容差**（与 `LAG_U = 3` 相反）：它是纯手抄的绝对事实，动过源码当轮就得刷，容差只会用来放过假话。
+两向证人：baseline `test_the_sources_cell_agrees_with_git` ok（现在写的是 R235 / `d4a2440`，与 git 逐字同源）；
+正对照把 sha 换成**上一笔**动源码的提交（`22346d3`）⇒ 点名 STALE，把那一格改成没有形状 ⇒ 点名 UNPARSEABLE。
+电池 `Ran 418 tests in 14.419s` / `OK (skipped=2)`（/tmp/r235_battery12.log；416→418 就是这两格）。
+形状教训：这条不测「报告写了几」而测「git 说几」—— 与「守卫要读字段不能读散文」同族，手抄格子必须换成现读。
 
 - **U-752：那两对 run 落了地 —— 结论是 failure，红还是同一朵，且日志把关键数字截断了。**
 
