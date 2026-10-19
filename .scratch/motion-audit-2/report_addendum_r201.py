@@ -11,7 +11,7 @@ import io, os, re, subprocess, sys
 
 ROOT = '/Users/wangziyi/Codex_Project0'
 REPORT = os.path.join(ROOT, 'AGENT_FINAL_REPORT.md')
-NEW_R, NEW_N = 199, 201
+NEW_R, NEW_N = 200, 202
 
 
 def sh(args, cwd=ROOT):
@@ -83,7 +83,23 @@ for l in prod_rows:
 if not last_prod:
     raise SystemExit('LAST_PRODUCT_ROUND 读不到 ⇒ 拒绝写盘（不许凭印象写 R192）')
 
-V = dict(round=str(NEW_R), newn=str(NEW_N), surfaces=str(surfaces), states=str(states), cells=str(cells),
+# —— R199 那跑的验收：读得到就写读数，读不到就老实写"还没读"（不许写"应该绿了"）
+CI_PATH = '/tmp/r200_ci.log'
+ci_txt = io.open(CI_PATH, encoding='utf-8', errors='replace').read() if os.path.exists(CI_PATH) else u''
+cm2 = re.search(r'RUN=39227062038 conclusion=(\w+)', ci_txt)
+if cm2 and cm2.group(1) == 'success':
+    ci_line = (u'**八跑连红断了，而且是读数不是预测**：R199 那笔（commit `a7f16c1`，run 39227062038）'
+               u'`conclusion=success`、作业 `build-and-test` 无失败步骤 ⇒ 第 16 步这次没红；'
+               u'上一跑（R198，run 39225680017）仍 `failure` 且只红在同一格 `STEP[16] On-screen probe coverage floor`，'
+               u'两跑对照正好把这次修复圈出来（出处 `/tmp/r200_ci.log`）')
+elif cm2:
+    ci_line = (u'**最后一跑只读到一半**：R199 那笔 run 39227062038 的 conclusion=`%s` ⇒ '
+               u'第 16 步还红不红，只按这一行说，不许提前宣布修好' % cm2.group(1))
+else:
+    ci_line = (u'**最后一跑的验收还没读**：R199 那笔（commit `a7f16c1`，run 39227062038）此刻结论未读 ⇒ '
+               u'"第 16 步不再红"是**预测**不是读数，等它落地要回来改这一行')
+
+V = dict(ci_line=ci_line, round=str(NEW_R), newn=str(NEW_N), surfaces=str(surfaces), states=str(states), cells=str(cells),
          rows=str(rows), cleared=str(cleared), unwritten=str(unwritten), floor=str(floor),
          verdicts=u'、'.join(u'%s=%s' % (k, verdicts[k]) for k in ('added', 'kept', 'not-added', 'not-applicable')),
          max_u=str(max_u), rounds_ui=str(rounds_ui), rounds_vi=str(len(rounds_vi)),
@@ -98,9 +114,9 @@ V = dict(round=str(NEW_R), newn=str(NEW_N), surfaces=str(surfaces), states=str(s
 SECTION = u'''
 ---
 
-## 补记 · R144…R%(round)s（写于 R200 之前，2026-10-19）：这份报告曾经过期五十多轮，这一节把它接上
+## 补记 · R144…R%(round)s（写于 R200 落盘当天，2026-10-19）：这份报告曾经过期五十多轮，这一节把它接上
 
-**先记账不记功**：本文件上面那部分的最后一个轮次标记停在 R143，而仓库已经走到第 %(newn)s 轮（R200 正在路上）。
+**先记账不记功**：本文件上面那部分的最后一个轮次标记停在 R143，而仓库已经走到第 %(newn)s 轮（R200 这一轮正在落盘）。
 R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）—— 它随后真的烂了：
 正文里"清账表停在 102 格""最近一次新动效是 R126""82 帧基线"这类句子，今天全部与活体读数不符。
 ⇒ 这一节**只追加、不改写历史正文**（改写历史正文等于伪造），并把每个数标成"由哪台仪器在什么时候打的"。
@@ -135,7 +151,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 
 - 开放项：BACKLOG %(open_list)s。其中 **219** 欠的是 %(unwritten)s 格没判（清单在条目正文里），**220** 欠的是"改全局偏好重跑同一条探针"这个**需要用户授权**的动作，**222** 欠的是一条真帧通道的证人（离屏与真帧在 R 那一列差 6…21/255，地板余量 7.4 对 3），**223** 欠的是"今天的登记 + 今天的日志真的绿"这一格的离线判据（现在只有 runner 每次自己演）。
 - **真机通道**：215（亮档图标那一格）自 2026-10-17 起仍是黑的（全黑 0/625240），`screen=有` 只说 `NSScreen.main` 存在 ⇒ 本机验收不能替代它。
-- **最后一跑的验收还没读**：R199 那笔（commit `a7f16c1`，run 39227062038）写这份补记时仍 `in_progress` ⇒ "第 16 步不再红"今天是**预测**，不是读数。等它落地后要回来把这一行改掉。
+- %(ci_line)s
 
 ### 4. 一句话给下一趟
 
@@ -147,8 +163,17 @@ R199 那八跑连红如果继续被推到"下一轮再读"，就会有一张免�
 
 def main():
     text = read(REPORT)
-    if u'## 补记 · R144…R%s' % NEW_R in text:
-        raise SystemExit('ALREADY_WRITTEN ⇒ 不重复落盘')
+    # 认**前缀**而不是整串标题：补记的编号会随轮次往前走（R144…R199 → R144…R200），
+    # 只按新编号找就找不到旧那一节，于是会追加出第二份补记 —— 两份互相打假账。
+    prefix = u'## 补记 · R144…'
+    if prefix in text:
+        head, sep, tail = text.partition(u'\n---\n\n' + prefix)
+        if not sep:
+            raise SystemExit('SPLIT_FAILED 找不到补记的分隔头 ⇒ 不动盘')
+        if prefix in tail:
+            raise SystemExit('DUPLICATE_SECTION 补记标题出现不止一次 ⇒ 不动盘')
+        text = head.rstrip(u'\n') + u'\n'
+        print('REGENERATING 旧补记已切掉（%d 字），标题前那段保持逐字不变' % len(tail))
     if re.search(r'%\([a-z_0-9]+\)(?!s)', SECTION):
         raise SystemExit('FORMAT_LEAK 有没带 s 的占位符')
     if re.search(r'%\([a-z_0-9]+\)s', SECTION):

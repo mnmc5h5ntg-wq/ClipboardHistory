@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 看图腿四张帧的行带读数 + R198/R199 两跑 CI 的验收（R200 / U-650…U-652 · 产品 0 文件）
+
+- 新读数器 `.scratch/motion-audit-2/frame_bands_r200.py`：逐行取众数当背景，与背景亮度差 >24 算墨，连续成带；缺帧 exit 1
+- 读数：亮档 typed 3 带、暗档 hover 6 带、亮档 list 6 带、菜单栏推荐 6 带 ⇒ "亮档下面空得可疑"量成"真的只有两条结果"（反方向对照通过）
+- 查重挡下一次开单：浮层固定尺寸与留白已由 D-122（R63）判定 ⇒ 本轮不开单
+- CI 验收：R198 failure（run 39225680017 ↔ commit 3740c51）失败步骤：STEP[16] On-screen probe coverage floor⇒failure；R199 success（run 39227062038 ↔ commit a7f16c1）失败步骤：无 ⇒ 第 16 步 已不再红
+- 验证：脚本电池 368 / OK、产品 0 文件（帧与换装沿用上一遍）
 ### 连红八跑的 CI 第 16 步：两张 R194 的 cannot 被 runner 逐条点名，按证据翻成 can（R199 / U-647…U-649 · 产品 0 文件，CI 账）
 
 - 八跑（`7e46b49`…`f3b3933`）全部 `conclusion=failure`，逐跑按步骤名读下来是同一朵：`STEP[16] On-screen probe coverage floor`
