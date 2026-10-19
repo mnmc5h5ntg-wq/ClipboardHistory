@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### `MediaLoadingPlan`：默认值守卫 + 两把刀（BACKLOG 236 结案），并修掉刀打空的两处成因（R214 / U-692…U-694 · 产品 3 文件）
+
+- 新增 `Utilities/MediaLoadingPlan.swift`（`startsLoad` = 取反；`stageWhenLoadNotStarted()==0`），`DetailFileView.task` 只留薄胶水
+- `MediaLoadingPlanTests` 四格：真值表 / 从结构体读默认值 / 产品码不许 `freezeLoadingForCapture: true`（剥注释后扫）/ 夹具恰好一处 true
+- M748 第一版 ESCAPED 的两个真因：默认值有两处（属性 + init 参数，刀打在死的那处）⇒ 合并成一处；解析只认 `failures` 复数 ⇒ 改认 `with N failure`
+- 现跑 `R214_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=59 covered=44 arms=169 bad=3`
+- 第三把刀（guard 写成恒加载）**没配**：没有行为证人 ⇒ BACKLOG 240；236 因此记为"值域结案、行为未结案"
+- 动了 `Sources/` ⇒ 已换装本机；全量卷交 CI，未读不算绿；看图腿 NOT-RUN（无新帧）
 ### 看图尺的三把刀落地（BACKLOG 238 结案）+ a800900 失败步骤逐条落账（R213 / U-689…U-690 · 判据 1 支 + 名册 1 处，产品 0 文件）
 
 - M745 同帧判据恒真 ⇒ 自检反对照不红；M746 具名出口改回裸 raise ⇒ unavailable 那格红；M747 缺席被当成有对象 ⇒ "并存必须仍红"那格红

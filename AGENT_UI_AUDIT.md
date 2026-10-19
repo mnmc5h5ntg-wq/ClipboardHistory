@@ -363,6 +363,25 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 216 轮（R214 · 2026-10-19）：`freezeLoadingForCapture` 的默认值第一次有了证人（236 结案）—— 一次 ESCAPED 里挖出两个 bug（U-692…U-694 · 产品 3 文件，判据账）
+
+- **U-692：两把刀全 CAUGHT（`R214_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`），但值钱的是 M748 第一次**没咬到**的那次 —— 它一次暴露两个 bug。**
+  ① `DetailFileView` 的默认值当时有**两处**（属性初始化 `= false` 与 init 参数默认 `= false`），刀打在属性那一处，
+  而生效的是 init 那一处 ⇒ 变异改了个**死地方**，测试照绿。已合并成一处（属性不再自带默认值，只由 init 赋），这一刀才咬得到。
+  ② 就算打对了也读不出来：摘要行只有一条用例时 Swift 印的是 `with 1 failure`（**单数**），
+  我的解析只认 `failures` ⇒ 把真红翻成 ESCAPED。两处都修完才是现在这条 `R214_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。
+  教训：**ESCAPED 通常是仪器在替产品说真话**，先怀疑刀与解析，别急着怀疑产品；而"两处默认值"这种形状本身就是刀打空的常见原因。
+- **U-693：决定提成纯函数，测试文件开头按 AGENTS.md 写明"不覆盖管线"的指向。**
+  新增 `Utilities/MediaLoadingPlan.swift`（`startsLoad(freezeLoadingForCapture:)` = 取反，另给一格 `stageWhenLoadNotStarted()==0`
+  钉住"没开始加载就停在骨架档"）；`DetailFileView` 的 `.task` 只留薄胶水。
+  `MediaLoadingPlanTests` 四格：真值表、**从视图结构体读默认值**（不是读注释）、产品代码里不许出现 `freezeLoadingForCapture: true`（剥行注释后扫，R76 那一族）、
+  夹具里必须**恰好一处**显式冻结（那格被删了组合帧会静默退化成成功帧）。
+- **U-694：第三把刀故意没配，因为今天没有行为证人 —— 开成 BACKLOG 240。**
+  想钉的形状是把 `.task` 里的 `guard MediaLoadingPlan.startsLoad(freezeLoadingForCapture: freezeLoadingForCapture)`
+  写成恒加载（传死值 false）：默认值守卫读字段、调用点守卫读源码，**两格都不会红**，
+  只有帧基线会报"像素变了"而说不出原因。补法写在 240 里（同一视图两臂的像素判据：冻结臂有骨架、默认臂没有），
+  在那之前不许把 236 写成"完全结案"。
+  预检 `NEEDLE_PRECHECK tables=59 covered=44 arms=169 bad=3`；本轮动了 `Sources/` ⇒ 已换装本机，全量卷交给 CI（未读之前不算它绿）。
 ## 第 215 轮（R213 · 2026-10-19）：给那把尺补上欠的三把刀（BACKLOG 238 结案），并把 a800900 的失败步骤逐条落账（U-689…U-691 · 产品 0 文件，判据账）
 
 - **U-689：三把刀各打一种"尺坏了还照绿"的形态 —— 现跑 `R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。**

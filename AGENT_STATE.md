@@ -1,5 +1,17 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 21:22（本地 · R214 / 第 216 轮：**`freezeLoadingForCapture` 的默认值有了证人（236 值域结案）+ 一次 ESCAPED 挖出两个 bug**（U-692…U-694 · 产品 3 文件）
+
+**本轮落地**：决定提成纯函数 `MediaLoadingPlan.startsLoad`（视图里只留薄胶水），`MediaLoadingPlanTests` 四格（真值表 / 读结构体默认值 / 产品码不许传 true / 夹具恰好一处 true）。
+两把刀 `R214_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。**M748 第一版没咬到**，两个真因都记进账：① 默认值当时有两处（属性初始化 + init 参数），刀打在死的那处 ⇒ 已合并成一处；
+② 我的解析只认 `failures` 复数，而单条用例印的是 `with 1 failure` ⇒ 真红被读成 ESCAPED。两处都修完才拿到这条结论行。
+**第三把刀故意没配**（把 guard 写成恒加载今天没人会红，只有帧基线会报"像素变了"而说不出原因）⇒ BACKLOG 240；236 记为"值域结案、行为未结案"。
+预检 `NEEDLE_PRECHECK tables=59 covered=44 arms=169 bad=3`；动了 `Sources/` ⇒ 已换装本机；全量卷交 CI；看图腿 NOT-RUN（无新帧）。
+
+**下一轮（R215）的靶**：⓪ 读 982faff / 3d4e2f1 / 本跑：STEP[8] 是否恢复绿、`Surface left-axis ruler` 在 runner 上的出口（235）、全量卷是否绿；
+① 240 的行为证人（同一视图两臂像素判据）+ 第三把刀；② 237（pillow 安装位置）；③ 227③、222、215、201/202、207；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-19 21:15（本地 · R213 / 第 215 轮：**看图尺的三把刀落地（238 结案）+ a800900 逐步骤落账（235 改挂 982faff）**（U-689…U-690 · 产品 0 文件）
 
 **本轮落地**：`mutate_r213.py` 三把刀全 CAUGHT、`RESTORE_CLEAN=yes`（M745 同帧判据恒真 / M746 把 unavailable 改回裸 raise / M747 让缺席被当成有对象）；

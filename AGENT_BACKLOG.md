@@ -5810,3 +5810,19 @@ run `39247153666`（3073943）`row-insert 开 帧数=4 峰值=0.057 采样≈33m
 M746 打 R212 刚立的 `unavailable` 出口（改回裸 `raise` ⇒ 那一格红）—— 这一把的语义是"**R209 那朵 runner 红的复发**"；
 M747 打 `live()`（⇒ True 时缺席探针被解引用 ⇒ 崩栈 ⇒ "并存必须仍红"那格红），顺带证明证人读的是结论行而不是退出码。
 现跑：`R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`。
+
+**236 追记（R214 结案·值域）：默认值与取反两处都有证人、两把刀全 CAUGHT；行为那一半移交 240**
+
+`MediaLoadingPlanTests` 四格 + `mutate_r214.py`：M748 翻 init 默认值 ⇒ `testDefaultsStartTheLoad` 红；
+M749 去掉 `startsLoad` 的取反 ⇒ 真值表红。现跑 `R214_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。
+两把刀之间挖出的两个 bug（默认值写了两处、解析只认复数 `failures`）已分别修掉并记在 `第 216 轮`。
+本条**不写完全结案**：把 guard 写成恒加载仍无人会红 ⇒ 那一格的行为证人开成 BACKLOG 240。
+
+**240. `freezeLoadingForCapture` 的**行为**没有证人：把 `.task` 的 guard 写成恒加载，今天没有任何一格会红（R214 自查开单）**
+
+读数：R214 的两格守卫分别读**字段默认值**（`testDefaultsStartTheLoad`）与**源码形状**（产品码不许传 true、夹具恰好一处 true），
+它们都不能发现"`guard MediaLoadingPlan.startsLoad(freezeLoadingForCapture: freezeLoadingForCapture)` 被改成传死值 false"。
+真被改成那样时：默认臂照旧加载（绿），冻结臂也去加载 ⇒ 组合帧退化成成功帧 ⇒ 只有 `frame_baseline` 会报 `CHANGED=1`，
+而它只说"像素变了"、说不出原因，且 CI 上这一步在无头 runner 有 skip 通道（BACKLOG 201）。
+补法（下一轮起，先做实验再动产品）：同一视图两臂的像素判据 —— 冻结臂必须数得出骨架条带（低对比、`thr` 与 R212 同源），
+默认臂必须**没有**条带；两臂同一份夹具、只差那个参数。有了它，第三把刀（传死值）才会 ESCAPED→CAUGHT。

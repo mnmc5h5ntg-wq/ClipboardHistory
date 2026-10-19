@@ -264,7 +264,7 @@ struct DetailFileView: View {
     /// 默认 `false` ⇒ 产品路径一行都不变：真实调用永远照常走 `loadPreview()`。
     /// **注意：这条默认值今天没有守卫**（注释里曾声称有 `DetailPreviewCaptureSeamTests`，那支测试不存在 ⇒ 假话已删）。
     /// 补那格守卫记在 BACKLOG 236；在补上之前，"默认关闭"只有源码可读、没有证人。
-    var freezeLoadingForCapture: Bool = false
+    var freezeLoadingForCapture: Bool   // 默认值只有**一处**：init 的参数默认（两处默认会让刀打空）
     @State private var previewState: MediaLoadingState<FilePreview> = .loading
     @State private var loadingHandle: MediaLoadHandle?
     @State private var loadGeneration = 0
@@ -302,8 +302,9 @@ struct DetailFileView: View {
         .animation(MotionCatalog.animation(for: .contentFade), value: previewStage)
         .task(id: url) {
             // 夹具那一格：停在 `.loading`，不去取文件（R211 / BACKLOG 233）。
-            // 产品路径上 `freezeLoadingForCapture` 恒 false ⇒ 这一行等于没有。
-            guard !freezeLoadingForCapture else { return }
+            // 决定本身是纯函数 `MediaLoadingPlan.startsLoad(...)`，证人写在 `MediaLoadingPlanTests`：
+            // 默认值 ⇒ 真去加载，只有夹具显式传 true 才冻结。产品路径上这一行等于没有。
+            guard MediaLoadingPlan.startsLoad(freezeLoadingForCapture: freezeLoadingForCapture) else { return }
             await loadPreview()
         }
         .onDisappear {
