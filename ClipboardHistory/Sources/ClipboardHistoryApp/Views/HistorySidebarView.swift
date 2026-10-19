@@ -355,10 +355,15 @@ enum FilterPillMotion {
     /// 开了「减弱动态效果」的用户把鼠标放上去，什么反馈都没有 ——
     /// "reduce 是替换不是删除"这条规矩，在悬停这件事上以前是空的。
     /// 底色不承担物理隐喻，所以它不受 reduce 影响：两臂都给同一个值。
-    static func hoverFill(isHovered: Bool, isSelected: Bool) -> Double {
+    ///
+    /// `dark` 是 R230 加的：这一层**以前两档共用一个数**，而它正是"直接读令牌、不走按钮样式"
+    /// 的那一类位点 ⇒ R229 的亮档那一抬落不到它身上。规矩改成问 `HoverInk`（同文件里那条注释）。
+    /// 抬量只允许长在"真的要画"这条分支里：未悬停 / 选中那两段必须还是 0，
+    /// 否则就是把 0.025 画在了没有悬停的段上（`FilterSegmentButton` 那一段注释记的是同一件事）。
+    static func hoverFill(isHovered: Bool, isSelected: Bool, dark: Bool) -> Double {
         // 选中的那一段下面就是那颗胶囊，再叠一层悬停底会糊成两块。
         guard isHovered, !isSelected else { return 0 }
-        return VisualFill.controlHover
+        return HoverInk.opacity(level: VisualFill.controlHover, dark: dark)
     }
 }
 
@@ -377,7 +382,15 @@ fileprivate extension View {
     }
 }
 
-private struct SegmentedFilterPicker: View {
+/// 侧栏顶部那颗「全部 / 收藏」。
+///
+/// **为什么不是 `private`**（R230 / BACKLOG 251）：要一张"只有这一段被点亮"的帧，
+/// 只能把它单独放进夹具 —— 挂在整条侧栏上拍的话，同一枚取证键会同时点亮列表里每一颗星标，
+/// 那张帧替证的就不是"悬停的那一层灰"，而是"指针同时出现在八个地方"这种产品里不存在的样子。
+/// 表面没换：这颗胶囊自己画底（`VisualMaterial.track` + `sliderPill`），所以单独放它出来
+/// 读到的就是产品里那片底（R24 那条"组件帧必须与产品对齐"判的是同一件事）。
+/// 放开可见性的先例是 R45 / R229 的 `RowFavoriteButton`。
+struct SegmentedFilterPicker: View {
     @Binding var selection: HistoryStore.Filter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -441,6 +454,19 @@ private struct FilterSegmentButton: View {
     let action: () -> Void
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 色档由**这个视图自己**问，不从调用点传（`PressedLabel` 同一条规矩：
+    /// 传进来就等于允许调用方 —— 包括夹具 —— 替产品决定"这一档该多亮"）。
+    @Environment(\.colorScheme) private var colorScheme
+    /// 取证通道（R229 的键，R230 接到这一家）。产品路径永远 `nil` ⇒ 这一半行为一字未动。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+
+    /// **只有底色那一层**跟着取证通道亮，缩放不亮。
+    ///
+    /// 为什么不一起亮：`hoverScale` 改的是几何，一张"什么都没人指、四段却都放大 8%"的帧
+    /// 不是产品里任何一个样子，把它钉进基线就是让基线替一个不存在的状态作证。
+    /// 而本轮要量的恰好只有"多出来的那层灰看不看得见"这一半 —— 那半必须是产品画的那半，
+    /// 所以汇到同一个 `hoverFill` 调用（R14 那一课）。
+    private var isHoveredForFill: Bool { isHovered || (hoveredForCapture ?? false) }
 
     /// 同 `SegmentedFilterPicker.shouldReduce`：系统开关 ∪ VoiceOver。
     private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
@@ -458,11 +484,18 @@ private struct FilterSegmentButton: View {
                     // 以前这一段只剩缩放一种说法，于是"开了减弱动态 = 悬停没有反馈"。
                     VisualShape.rounded(VisualRadius.control)
                         .fill(Color.primary.opacity(
-                            FilterPillMotion.hoverFill(isHovered: isHovered, isSelected: isSelected)))
+                            FilterPillMotion.hoverFill(isHovered: isHoveredForFill, isSelected: isSelected,
+                                                       dark: colorScheme == .dark)))
                 )
                 .contentShape(Rectangle())
         }
-        .pressedStyle(in: VisualShape.rounded(VisualRadius.control))
+        // **`hoverLevel: 0` 是刻意的**（R230，与 `GlassPillButton` 的 R20 那一处同一件事）：
+        // 这一段本来就已经在上面自己画了一层 `controlHover`，而 `pressedStyle` 默认还要再叠一层
+        // `VisualFill.hover`=0.06 ⇒ 悬停时实际是 0.06 + 0.08 = 约 0.14，**比"控件"那一档高一倍**，
+        // 而且这两层各走各的换算 —— R229 那一抬只落在下面那层上，于是"亮档抬一档"在这里
+        // 变成了"两层里的一层抬、另一层不抬"。修法与 R20 一致：悬停交给画它的那一处，
+        // 样式只留按压那一档（`isPressed` 分支不受 `hoverLevel` 影响）。
+        .pressedStyle(in: VisualShape.rounded(VisualRadius.control), hoverLevel: 0)
         // R194 试过在这里加 `.focusable(true) + @FocusState + 一条 accent 描边`，
         // 探针实测**没有效果**（Tab 链 12 站仍然全是搜索框的字段编辑器，段按钮一站都不是）⇒ 代码删掉，
         // 只留下这条读数与它撑着的缺口：可达性不是加一个修饰符就能买到的，得先弄清 List 宿主怎么排 key-view。

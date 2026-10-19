@@ -1,5 +1,5 @@
 {
-  "count": 148,
+  "count": 154,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -51,6 +51,8 @@
     "empty-state-320x160-light.png": "1a460f067634b4336f58918dba13fe5678cb6d26861ff385adc2e47b0097ed3e",
     "glass-pill-120x232-dark.png": "f65e335d965949d004f4631b986ef3a9da3e3a4bb9362f448e2dbefdee8d028a",
     "glass-pill-120x232-light.png": "4cb264fd4ae1de5a97f0ffdef257a9b7b53c063d210545905d2e7e618af2192f",
+    "glass-pill-hover-120x232-dark.png": "249fdaba9c2516735125e127b93ea7df7aa02be018023a1adf706cae124d70d0",
+    "glass-pill-hover-120x232-light.png": "5c7ccc9e9dfb1b0fa59f791a9c7f3eae2a9dd5908f2a3a31a1318e46518daab0",
     "glass-pill-states-120x232-dark.png": "6472533eb1c37dfead1a31f3b8d0112b465c4c7ed8460b02b19aa950765e17fd",
     "glass-pill-states-120x232-light.png": "11b25238ae1e2561312747b599bc89ab88c4b5d95fde50cbe4384de5d7a655cd",
     "heatmap-cell-strip-hover-90x140-dark.png": "e469a8eefa6bd678c2e035b4c727aa1e013f1345ae01588f49acd8cfcfa93f16",
@@ -105,6 +107,10 @@
     "row-text-300x74-light.png": "04771ab7ee4d1a27149dae8648942b21030d2fa16b895edd5d791c9a71a97c7e",
     "search-field-320x112-dark.png": "19920701bc07fad249f165267fe78deaeae2fdb0520b7d21864484575fcff2bd",
     "search-field-320x112-light.png": "7cab707d02d19eaca09d509d26ba656e6dc1f0e04fffddc4c998ee9375881260",
+    "segmented-filter-hover-200x60-dark.png": "3fe7691ad81fcb77d2d79ddc5d5d5b5cd36c08fd80efe7d21f1330d17241feb4",
+    "segmented-filter-hover-200x60-light.png": "3f73b7eec029ec5b539ef7014f6dff6a9d5afb0e58d8454d06b7b8efc14179f9",
+    "segmented-filter-idle-200x60-dark.png": "780307ade929ecb68c8c54b916d5b91301f0587dc8febfc2592127b06a3b7da7",
+    "segmented-filter-idle-200x60-light.png": "0cfae1d2d837cd8589f7744833466b1135d869cc3b9308c7d74e8e29a16f3fdf",
     "settings-data-720x540-dark.png": "b46c77fa7e886252fd859bd4897cfa897b87445f99e888b176d55dd11430c02b",
     "settings-data-720x540-light.png": "189dca55e18a784de6cbbf3cecb157c6765c49f57e42ec489822287191de9872",
     "settings-general-720x540-dark.png": "605d04cebf9848b15c49f9119b3aea69ae1fc909c961cffe1640ecd1e68338c6",

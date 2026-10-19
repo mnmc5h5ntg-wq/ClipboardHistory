@@ -30,16 +30,33 @@ final class FilterPillMotionTests: XCTestCase {
     }
 
     /// 减弱动态时**悬停不能变成零反馈**：缩放是物理隐喻，收掉之后必须留下非运动的那一层。
+    ///
+    /// R230 把这一格从"一个数"改成"按档两个数"（`dark:` 是新增的参数）。
+    /// 原来那条 `== VisualFill.controlHover` 是一种**静态断言把缺陷钉成契约**的形状：
+    /// 它把"亮档与暗档共用 0.08"写成了期望值，于是同一家族在别的位点被修掉时（R219 骨架墨、
+    /// R225 浮层悬停、R229 小控件）这一条永远不会替它说话。
+    /// 现在断的是**次序与出口**，不是某个字面量：暗档 = 令牌原值、亮档 = 令牌 + 抬量、
+    /// 未悬停与选中那两段必须是 0（抬量不许长在"没画"那两条分支上）。
+    /// 屏幕上的那一半不在这里证 —— 见 `UICaptureHarness` 的 `segmented-filter-hover` 帧判据。
     func testHoverKeepsANonMotionSubstituteWhenReducingMotion() {
-        XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: false),
+        XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: true),
                        VisualFill.controlHover,
-                       "悬停底色不受 reduce 影响：它是信息，不是运动")
-        XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: true), 0,
-                       "选中那一段下面就是胶囊，再叠一层悬停底会读成两块")
-        XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: false, isSelected: false), 0)
+                       "暗档 = 令牌原值：这一轮没有动暗档的任何一个数（R229 同一条规矩）")
+        XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: false),
+                       VisualFill.controlHover + VisualFillLift.hover,
+                       "亮档 = 令牌 + 抬量：这一层以前两档共用一个数（R230 / BACKLOG 251）")
+        XCTAssertGreaterThan(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: false),
+                             FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: true),
+                             "亮档必须比暗档重：primary 在亮档是 85% 黑、暗档是 85% 白，同一 alpha 下亮档天然更淡")
+        for dark in [true, false] {
+            XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: true, dark: dark), 0,
+                           "选中那一段下面就是胶囊，再叠一层悬停底会读成两块")
+            XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: false, isSelected: false, dark: dark), 0,
+                           "没悬停就不许有抬量：0.025 画在没被指的段上就是凭空多一层灰")
+        }
         // 两臂合起来才成立：reduce 收掉缩放、底色留着。
         XCTAssertEqual(FilterPillMotion.hoverScale(isHovered: true, reduceMotion: true), 1.0)
-        XCTAssertGreaterThan(FilterPillMotion.hoverFill(isHovered: true, isSelected: false), 0,
+        XCTAssertGreaterThan(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: true), 0,
                              "缩放被收掉而底色也没有 ⇒ 开了减弱动态的用户悬停无反馈")
     }
 

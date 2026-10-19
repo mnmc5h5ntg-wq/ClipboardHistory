@@ -240,9 +240,11 @@ final class PressFeedbackTests: XCTestCase {
             consumers += codeOnly(source)
                 .components(separatedBy: "hoverLevel: VisualFill.controlHover").count - 1
         }
-        XCTAssertEqual(consumers, 7,
-                       "显式抬到控件档的位点从 7 处变成 \(consumers) 处：R15 的三处（侧栏批量按钮、"
-                       + "「移除」、回执 ×）+ R20 的四处（行首星标、清除 ×、播放、静音）。"
+        XCTAssertEqual(consumers, 8,
+                       "显式抬到控件档的位点从 8 处变成 \(consumers) 处：R15 的三处（侧栏批量按钮、"
+                       + "「移除」、回执 ×）+ R20 的四处（行首星标、清除 ×、播放、静音）"
+                       + "+ R230 的一处（药丸里的 `GlassPillButton`：它以前不走样式表、自己在 `.compositingGroup()` "
+                       + "内部画那一层，同一名义 alpha 实测比共用路径弱 ⇒ 搬进来，第 8 处）。"
                        + "多一处要红（提醒把新位点判一遍），少一处也要红（等于把它退回 6% 那一档）")
     }
 
@@ -353,14 +355,23 @@ final class PressFeedbackTests: XCTestCase {
     /// 两层相加悬停时约 0.14，**比全仓"控件"那一档高 1.75 倍**，
     /// 而它是这一圈里唯一被画两层的表面。修法：那一处的 `hoverLevel` 必须是 0。
     func testGlassPillPaintsExactlyOneHoverLayer() throws {
+        // R20 立的规矩是**一层**，不是"由谁画这一层"。R230 把这一层从药丸内部搬到共用换算上：
+        // `GlassIconControl` 原来在 `.compositingGroup()` **内部**自绘 `.fill(.primary.opacity(isHovered ? …))`，
+        // 而同一名义 alpha 画在共用的 `PressedLabel` overlay 上实测更亮 —— 亮档自绘版只有 1.175:1
+        // （地板 1.20），共用路径 1.220:1（读数在 `HOVER_DIRECT_READ_PROOF`，帧 `glass-pill-hover`）。
+        // 所以旧版那两条断言（"药丸自己画一层" + "`pressedStyle` 必须 `hoverLevel: 0`"）**方向整个翻了**：
+        // 保留的是"只有一层"这个不变量，两条断言各守一侧 —— 一侧不许回来，另一侧必须在。
         let code = codeOnly(try productSource(named: "Views/GlassControls.swift"))
-        XCTAssertTrue(code.contains(".fill(.primary.opacity(isHovered ? VisualFill.controlHover : 0))"),
-                      "药丸自己那一层悬停底色不在了 ⇒ 下面那条 `hoverLevel: 0` 就失去对象，"
-                      + "两件事必须一起改")
+        XCTAssertFalse(code.contains("isHovered ?"),
+                       "药丸文件里又出现了按 `isHovered` 自己算的一层灰 ⇒ 它叠在 `pressedStyle` 那层之上（R20 的 0.14），"
+                       + "而且会重新掉进「组内自绘比共用路径弱」这个坑（R230）")
+        XCTAssertFalse(code.contains("hoverLayer"),
+                       "`hoverLayer` 那个子视图回来了 ⇒ 上面那条 `isHovered ?` 只是换了写法，病没走")
         let calls = Self.callArguments(in: code, named: ".pressedStyle(")
         XCTAssertEqual(calls.count, 1, "药丸文件里的 `pressedStyle` 调用点数量变了，重新判一遍叠层")
-        XCTAssertTrue(calls[0].contains("hoverLevel: 0"),
-                      "药丸的 `pressedStyle` 又自带悬停层了：它与 `GlassIconControl` 那层相加 ⇒ 0.14")
+        XCTAssertTrue(calls[0].contains("hoverLevel: VisualFill.controlHover"),
+                      "药丸那一层现在**只**由 `pressedStyle` 画；这里写成 0 就等于药丸完全没有悬停反馈"
+                      + "（两档读数会一起掉到 1.000，`UICaptureTests` 那条直接读数判据会红）")
     }
 
     /// 只读数值不许说"可点"（R18 · 权重页那一列）。

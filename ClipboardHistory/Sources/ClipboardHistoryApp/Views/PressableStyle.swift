@@ -37,7 +37,37 @@ enum PressableAppearance {
             // 那正是 R14 拦下"把 controlHover 定在 0.10"的理由，所以这一改必须两档同抬。
             return dark ? VisualFill.pressed : VisualFill.pressed + VisualFillLift.pressed
         }
-        return isHovered ? hoverLevel + (dark ? 0 : VisualFillLift.hover) : 0
+        return isHovered ? HoverInk.opacity(level: hoverLevel, dark: dark) : 0
+    }
+}
+
+/// 悬停那一层灰的**唯一换算**（R230 / BACKLOG 251）。
+///
+/// 为什么需要单独一个入口：R229 那一抬原本只住在 `PressableAppearance.fillOpacity` 里，
+/// 而全仓有几处**不走按钮样式**、自己拿令牌画一层灰的位点（段按钮的 `background`、
+/// 详情的 chip / card、设置行）。那些位点读的是同一个 `VisualFill`，
+/// 却拿不到按档给的那一等 ⇒ "两档共用一个数"这一族病（R219 骨架墨 / R225 浮层悬停 / R229 小控件）
+/// 在它们身上并没有被 R229 修掉，只是被绕过了。
+///
+/// 另一条出路是**让位点回到共享路径**（本轮的玻璃圆钮就是这么处理的：删掉自绘那一层，
+/// 悬停交给 `pressedStyle(hoverLevel: controlHover)`）。两条都合法，选哪条看这一层
+/// 有没有非共享不可的理由；没有理由就删，因为少一个定义处少一种漂移。
+///
+/// 规矩：**任何直接画悬停层的地方都问这里，不要自己写 `+ 0.025`**。
+/// 换算住在产品侧而不是令牌文件里，是 D-217 第 ③ 条：常数与消费互相掩护会让
+/// `testEveryVisualTokenIsReadByTheProduct` 失去消费者（R229 那一轮真红过）。
+enum HoverInk {
+    /// 暗档 = 令牌原值（一字未动）；亮档 = 令牌 + `VisualFillLift.hover`。
+    ///
+    /// `level == 0` 那一格是 R230 补的，而且**不是防御性代码**：调用点写 `hoverLevel: 0`
+    /// 是在说"这一家的悬停我不画"（R20 的 `GlassPillButton`、本轮的段按钮都是），
+    /// 而抬量如果无条件加上去，0 就变成 0.025 ⇒ 屏幕上凭空多出一层灰。
+    /// 这一条是被**帧**抓到的，不是想出来的：`segmented-filter-hover` 亮档里**选中那一段**
+    /// （它根本没有悬停层）从 `(233)` 变成 `(228)`，而暗档同一格一动不动 ⇒ 多出来的正是那一抬。
+    /// R229 那一版已经带着这个洞推上线了（`a7e3154`），所以这里记的不是"以后要注意"。
+    static func opacity(level: Double, dark: Bool) -> Double {
+        guard level > 0 else { return 0 }
+        return dark ? level : level + VisualFillLift.hover
     }
 }
 

@@ -4102,6 +4102,32 @@ final class UICaptureTests: XCTestCase {
             }))
         })
 
+        // MARK: R230 / BACKLOG 251 的第二批：两处**直接读令牌**的悬停层
+        //
+        // 上一轮把 `VisualFill.controlHover` 的亮档那一抬接到了按钮样式里，而这两家**不走那条路** ——
+        // 它们自己拿令牌画一层灰（段按钮的 `.background`、玻璃圆钮的 `.overlay`），
+        // 所以"两档共用一个数"这一族病在它们身上还在。要判就得看得见 ⇒ 两态各一张。
+        //
+        // 为什么把 `SegmentedFilterPicker` 单独拍而不挂在整条侧栏上：
+        // 同一枚取证键会同时点亮侧栏里每一颗星标，那张帧替证的就不是"悬停的那层灰"，
+        // 而是"指针同时出现在八个地方"这种产品里不存在的样子。这颗胶囊自己画底
+        // （`VisualMaterial.track` + `sliderPill`），所以单独放出来读到的就是产品里那片底。
+        results.append(Fixture("segmented-filter-idle", NSSize(width: 200, height: 60), contentMustFit: true) {
+            AnyView(self.probeFrame(SegmentedFilterPicker(selection: .constant(.all)), width: 200, height: 60))
+        })
+        results.append(Fixture("segmented-filter-hover", NSSize(width: 200, height: 60), contentMustFit: true) {
+            AnyView(self.probeFrame(SegmentedFilterPicker(selection: .constant(.all))
+                // `.all` 选中的是**左**段 ⇒ 点亮时只有右段（未选中那一半）会多出一层灰，
+                // 这正是 `hoverFill` 里 `guard !isSelected` 那条分支要的效果。
+                .environment(\.hoveredForCapture, true), width: 200, height: 60))
+        })
+        results.append(Fixture("glass-pill-hover", NSSize(width: 120, height: 232), contentMustFit: true) {
+            AnyView(self.probeFrame(GlassPill(isFavorite: true, favoriteAction: {},
+                                              isPinned: true, pinAction: {},
+                                              copyAction: {}, deleteAction: {})
+                .environment(\.hoveredForCapture, true), width: 120, height: 232))
+        })
+
         // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
         // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
         let starTarget = store.entries[0]
@@ -4762,12 +4788,51 @@ final class UICaptureTests: XCTestCase {
         guard let (pill, count) = band.max(by: { $0.value < $1.value }) else {
             return (bg, -1, 0, 0, 0)
         }
-        func srgb(_ v: Int) -> Double {
-            let c = Double(v) / 255.0
-            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        // 比值走仓库里那一条 `contrastRatio`（本文件 5818 行，R230 之前 `pillReading`
+        // 自己内联了一份同式的 sRGB —— 两份定义处意味着"亮档 1.20 / 暗档 1.10"这对地板
+        // 可以在两处各自算成两个数）。下面那条已知答案的对照就是钉这个合并没跑偏的。
+        return (bg, pill, Self.contrastRatio(bg, pill), abs(bg - pill), count)
+    }
+
+    /// `segmented-filter-*` 夹具（200×60pt）里那两段的矩形。**写成共享常量而不是各测各写一遍**：
+    /// 尺的已知答案对照与产品判据必须用同一组坐标，否则对照过了不等于产品那一眼量对了。
+    ///
+    /// 带子位置是**量出来的**（像素 y 66…118 ÷ 2 = pt 33…59），不是按"26pt 高的胶囊居中在 60pt 框里"
+    /// 算出来的：第一版用了算出来的 17…43，两段都落在纸上，比值恒 1.000 ——
+    /// 那朵红说的是"矩形没打到对象"，很容易被读成"产品没反馈"。
+    static let segmentRectLeft = CGRect(x: 8, y: 35, width: 84, height: 22)
+    static let segmentRectRight = CGRect(x: 108, y: 35, width: 84, height: 22)
+    /// `glass-pill-*` 夹具（120×232pt）里那四颗 44pt 圆所在的竖条（实测像素 x 76…164 / y 80…446）。
+    static let circleColumnRect = CGRect(x: 38, y: 40, width: 44, height: 185)
+
+    /// 一块矩形里的**众数灰阶**与它的像素数（R230 / BACKLOG 251）。
+    ///
+    /// 为什么不能沿用 `pillReading`：那一把尺的"底"是从**同一段左缘 8 列**取的，
+    /// 它默认段里有一片没被盖住的表面。而段按钮与玻璃圆钮那一层灰**铺满整段** ——
+    /// 段内没有未盖住的地方，尺会把"被盖住的那片"同时当成底和对象，于是比值恒等于 1.000。
+    /// 正确形状是：**底来自同一坐标的空闲那一帧**，悬停帧只交出它自己的众数
+    /// （R77：两态对照必须真的有两态；R102：不许让尺自己猜对象）。
+    ///
+    /// 矩形按 **pt** 给，内部按 `帧宽像素 ÷ 帧宽 pt` 换算（D-216 那条约定，@1x/@2x 都读得对）。
+    static func bandModal(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int, bytesPerRow: Int,
+                          rectPt: CGRect, framePtWidth: CGFloat) -> (grey: Int, pixels: Int) {
+        let scale = CGFloat(width) / framePtWidth
+        let x0 = max(0, Int((rectPt.minX * scale).rounded()))
+        let x1 = min(width, Int((rectPt.maxX * scale).rounded()))
+        let y0 = max(0, Int((rectPt.minY * scale).rounded()))
+        let y1 = min(height, Int((rectPt.maxY * scale).rounded()))
+        guard x1 > x0, y1 > y0 else { return (-1, 0) }
+        var hist = [Int: Int]()
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = y * bytesPerRow + x * 4
+                let v = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                            + 0.0722 * Double(bytes[i + 2])).rounded())
+                hist[v, default: 0] += 1
+            }
         }
-        let hi2 = max(srgb(bg), srgb(pill)), lo2 = min(srgb(bg), srgb(pill))
-        return (bg, pill, (hi2 + 0.05) / (lo2 + 0.05), abs(bg - pill), count)
+        guard let top = hist.max(by: { $0.value < $1.value }) else { return (-1, 0) }
+        return (top.key, top.value)
     }
 
     /// **已知答案的对照**（尺先要读对一块答案已知的图，才有资格给产品读数）。
@@ -4824,6 +4889,43 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(two.pill, 235,
                        "带内有两块面积时取错了对象（取到 \(two.pill)，\(two.pillPixels) 像素）⇒ 众数方向反了")
         XCTAssertGreaterThan(two.pillPixels, 300, "大块面积没读出来：\(two.pillPixels)")
+
+        // ———— R230 新加的两把小尺：也要先答对一道已知答案的题 ————
+        // 一块 200×60pt 的假帧（@2x ⇒ 400×120px），带子放在**真夹具那一刻的位置**（pt 33…59，
+        // 也就是 px 66…118）—— 这样这道对照不只测尺，还替上面那两个矩形常量作证：
+        // 常量要是算错到纸上，这里就会读出 255。左半 233、右半 230、其余 255。
+        // 答案是我构造的，所以"读没读到"当场能判；`bandModal` 要是把背景算成命中，
+        // 报出来的就是 255 而不是 233/230（R102 那一族：临时谓词把背景本身算命中）。
+        let pw = 400, ph = 120, pbpr = pw * 4
+        var fake = [UInt8](repeating: 0, count: pw * ph * 4)
+        for y in 0..<ph {
+            for x in 0..<pw {
+                let v: Int
+                if y < 66 || y > 118 { v = 255 }                     // 胶囊之外的纸
+                else if x < 200 { v = 233 }                           // 左段
+                else { v = 230 }                                      // 右段
+                let i = (y * pw + x) * 4
+                fake[i] = UInt8(v); fake[i + 1] = UInt8(v); fake[i + 2] = UInt8(v); fake[i + 3] = 255
+            }
+        }
+        func modalAt(_ rect: CGRect) -> (grey: Int, pixels: Int) {
+            fake.withUnsafeBufferPointer { buf in
+                Self.bandModal(bytes: buf, width: pw, height: ph, bytesPerRow: pbpr,
+                               rectPt: rect, framePtWidth: 200)
+            }
+        }
+        XCTAssertEqual(modalAt(Self.segmentRectLeft).grey, 233, "左段读错 ⇒ pt→px 的换算或矩形常量漂了")
+        XCTAssertEqual(modalAt(Self.segmentRectRight).grey, 230, "右段读错 ⇒ 两段的矩形没分开")
+        XCTAssertEqual(modalAt(CGRect(x: 8, y: 0, width: 84, height: 60)).grey, 255,
+                       "整列高度的众数应当是占面积最大的那片纸（255）⇒ 众数那一步坏了")
+        XCTAssertEqual(modalAt(Self.segmentRectRight).pixels, 84 * 22 * 4,
+                       "像素数不对 ⇒ 面积门槛这把尺本身量错了")
+        // R230 把 `pillReading` 里内联的那份 sRGB 比值并进仓库已有的 `contrastRatio`。
+        // 这里**不再**写 `contrastRatio(255,235) == pill.ratio` —— 合并之后两边是同一个调用，
+        // 那条断言恒真（R100 那一族："同形 assert"）。真正有牙的是上面那条 1.19 的绝对锚点，
+        // 以及下面这条：比值不许依赖参数顺序（亮档黑墨压白底、暗档白墨压深底，两档方向相反）。
+        XCTAssertEqual(Self.contrastRatio(30, 45), Self.contrastRatio(45, 30), accuracy: 0.0001,
+                       "比值依赖参数顺序 ⇒ 暗档那一档会被读成反的")
     }
 
     /// **产品判据**：悬停那一圈淡底，在两档各量一次 —— 对**它自己那片底**，不对纸面 alpha。
@@ -4903,11 +5005,107 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// **两处"直接读令牌"的悬停位点**（R230 / BACKLOG 251 的第二批）。
+    ///
+    /// 它们不走 `pressedStyle`，所以 R229 那一抬落不到它们身上；这一条判据量的就是
+    /// "这一层灰对**它自己那片底**看不看得见"，两档各量一次，下界沿用仓库自己定的那两条
+    /// （亮 1.20 / 暗 1.10，R220 骨架条带、R225 浮层悬停、R229 小控件同一族）。
+    ///
+    /// 配一根**幽灵层**的反向断言：段按钮里"选中的那一段"按 `guard !isSelected` 不该画任何一层，
+    /// 而 `hoverLevel: 0` 那一家在亮档也不该被抬量画成 0.025 ⇒ 空闲帧与点亮帧在那一块必须逐字节同值。
+    /// 这一格不是假想的：R229 推上去的那版（`a7e3154`）就在这里把 `(233)` 画成了 `(228)`，
+    /// 而暗档同一格一动不动 —— 尺先量到，人才知道换算少了一个出口。
+    func testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r230-direct-read-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        /// 按夹具名 + 矩形（pt）读一块众数。坐标全部钉死：让尺自己找对象会把背景算成命中（R102）。
+        func modal(_ fixtureName: String, _ appearance: NSAppearance.Name,
+                   rectPt: CGRect, framePtWidth: CGFloat) -> (grey: Int, pixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 \(fixtureName) ⇒ 这条判据没有对象")
+                return (-1, 0)
+            }
+            let file = scratch.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail("\(fixtureName)：渲染失败 \(error)"); return (-1, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(fixtureName)：读不回 \(file.lastPathComponent)"); return (-1, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return Self.bandModal(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                  bytesPerRow: rep.bytesPerRow, rectPt: rectPt,
+                                  framePtWidth: framePtWidth)
+        }
+
+        // 三块矩形都是类级共享常量：尺的已知答案对照与这条产品判据用的是同一组坐标。
+        let leftSeg = Self.segmentRectLeft      // 选中那一段：不许有任何一层
+        let rightSeg = Self.segmentRectRight    // 未选中、被点亮的这一段
+        let circleColumn = Self.circleColumnRect
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let minimum = appearance == .darkAqua ? 1.10 : 1.20
+
+            let segIdleR = modal("segmented-filter-idle", appearance, rectPt: rightSeg, framePtWidth: 200)
+            let segHovR = modal("segmented-filter-hover", appearance, rectPt: rightSeg, framePtWidth: 200)
+            let segRatio = Self.contrastRatio(segIdleR.grey, segHovR.grey)
+            let segIdleL = modal("segmented-filter-idle", appearance, rectPt: leftSeg, framePtWidth: 200)
+            let segHovL = modal("segmented-filter-hover", appearance, rectPt: leftSeg, framePtWidth: 200)
+
+            let pillIdle = modal("glass-pill-states", appearance, rectPt: circleColumn, framePtWidth: 120)
+            let pillHover = modal("glass-pill-hover", appearance, rectPt: circleColumn, framePtWidth: 120)
+            let pillRatio = Self.contrastRatio(pillIdle.grey, pillHover.grey)
+
+            emit("HOVER_DIRECT_READ_PROOF \(tag) "
+                 + "段按钮 空闲底=\(segIdleR.grey) 悬停=\(segHovR.grey) 比值=\(String(format: "%.3f", segRatio)) "
+                 + "像素=\(segHovR.pixels) 选中段 空闲=\(segIdleL.grey) 悬停=\(segHovL.grey) "
+                 + "| 玻璃圆 空闲底=\(pillIdle.grey) 悬停=\(pillHover.grey) "
+                 + "比值=\(String(format: "%.3f", pillRatio)) 像素=\(pillHover.pixels) 下界=\(minimum)")
+
+            for (site, idle, hover, ratio) in [
+                ("段按钮", segIdleR, segHovR, segRatio), ("玻璃圆", pillIdle, pillHover, pillRatio),
+            ] {
+                XCTAssertGreaterThan(hover.pixels, 400,
+                                     "\(tag) \(site)：点亮那一块只数到 \(hover.pixels) 个像素 ⇒ 层没画出来，"
+                                     + "这是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+                XCTAssertGreaterThanOrEqual(ratio, minimum,
+                                            "\(tag)档 \(site) 的悬停层对它自己那片底只有 "
+                                            + "\(String(format: "%.3f", ratio))（下界 \(minimum)）"
+                                            + "：空闲=\(idle.grey) 悬停=\(hover.grey) ⇒ 这一档反馈淡到没有读者")
+            }
+            XCTAssertEqual(segHovL.grey, segIdleL.grey,
+                           "亮/暗档的**选中那一段**在点亮帧里从 \(segIdleL.grey) 变成 \(segHovL.grey) ⇒ "
+                           + "有一层本该是 0 的东西被画上了。成因就是 `hoverLevel: 0` 那一家被抬量抬成了 0.025 "
+                           + "（R230：`HoverInk.opacity(level:dark:)` 少一个 `level == 0` 的出口）")
+            // 两块矩形必须打在**两个不同表面**上（选中那段有胶囊底、未选中那段是轨道）。
+            // 这一格看着像废话，它是上面那两条断言的前提：如果两块都落在纸上，
+            // "空闲==悬停"会绿（纸上永远不会变），而"比值 ≥ 下界"会红 —— 两句话说的都不是产品。
+            XCTAssertNotEqual(segIdleL.grey, segIdleR.grey,
+                              "两段读到同一个灰阶（\(segIdleL.grey)）⇒ 矩形没打在胶囊上，"
+                              + "上面那两条断言因此都不成立（先查坐标，再查产品）")
+        }
+    }
+
     /// 控件类夹具的外框：与 `rowFrame` 同一句背景，只是框小 —— 药丸要贴着内容拍，
     /// 铺在 300pt 行里会让"这一圈到底多大"被行底色淹没。
     private func controlFrame<V: View>(_ view: V) -> some View {
         view
             .frame(width: 60, height: 40, alignment: .center)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 同上，但框的尺寸由夹具声明给 —— R230 那三家（胶囊 / 圆钮列）各自的外形差别很大，
+    /// 再塞进一个 60×40 的固定框就会把内容裁掉，而 `contentMustFit` 只拦"底行有墨"这一种裁法。
+    /// 背景仍然是同一句 `windowBackgroundColor`：**外框只许改尺寸，不许换表面。**
+    private func probeFrame<V: View>(_ view: V, width: CGFloat, height: CGFloat) -> some View {
+        view
+            .frame(width: width, height: height, alignment: .center)
             .background(Color(nsColor: .windowBackgroundColor))
     }
 

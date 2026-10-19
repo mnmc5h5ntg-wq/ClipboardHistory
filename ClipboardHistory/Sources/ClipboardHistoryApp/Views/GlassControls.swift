@@ -97,7 +97,6 @@ private struct GlassPillButton: View {
     /// 复制那颗**故意不传** —— 每天上百次的动作按频率闸门不该有弹跳。
     var bounceValue: Int? = nil
     let action: () -> Void
-    @State private var isHovered = false
 
     var body: some View {
         Button(action: action) {
@@ -105,7 +104,6 @@ private struct GlassPillButton: View {
                 symbol: symbol,
                 size: 44,
                 iconSize: 18,
-                isHovered: isHovered,
                 foregroundStyle: foregroundStyle,
                 replacesSymbol: replaceSymbol,
                 bounceValue: bounceValue
@@ -113,24 +111,25 @@ private struct GlassPillButton: View {
         }
         // 按压态（R4）：这四颗是"状态被改了"的控件，点下去必须先有一下"收到了"。
         //
-        // **`hoverLevel: 0` 是刻意的**（R20 抓到的一处叠层）：这四颗的悬停底色本来就由
-        // `GlassIconControl` 自己画（`:168` 那一层 `.primary.opacity(controlHover)`，
-        // 画在 44pt 的圆上），而 `pressedStyle` 默认还要再叠一层 `VisualFill.hover`=0.06 ——
-        // 两层相加悬停时约 0.14，**比全仓"控件"那一档（0.08）高 1.75 倍**，
-        // 而它是这一圈里唯一被画两层的表面。
-        // 修法是把这一家的悬停交给"画它的那一处"，`pressedStyle` 只留按压那一档
-        // （`VisualFill.pressed` 走的是 `isPressed` 分支，不受这里影响）。
-        .pressedStyle(in: Circle(), hoverLevel: 0)
-        .onHover { hovering in
-            withAnimation(MotionCatalog.animation(for: .hover)) {
-                isHovered = hovering
-            }
-        }
+        // R230 把**悬停那一层也交回这一条共享路径**，于是 R20 那段"两层叠加"的修法换了个方向：
+        // 以前是"样式让位、自绘那一层算数"（`hoverLevel: 0` + `GlassIconControl` 自己画），
+        // 现在是"样式算数、自绘那一层删掉"。理由不是审美，是两笔实测：
+        // ① 自绘那一层夹在 `.compositingGroup()` 里，同一枚 `controlHover` 画出来比别家**淡**
+        //    —— 帧上亮档 248→230（1.175:1，掉在仓库自己的地板 1.20 之下），
+        //    而走共享路径的同一颗 44pt 圆是 248→226（1.220:1）。机制未逐行读，但**换画法读数就动**，
+        //    这条分辨实验做得起（R74/R75 那一课：判"接线"要有一正一反两臂）。
+        // ② 自绘那一层不走 `HoverInk`，R229 的亮档那一抬落不到它身上 ⇒ "亮档该更重一点"这件事
+        //    在同一个控件上有两种说法。
+        // 现在全仓的悬停墨只有一条换算、一个定义处（`PressableAppearance.fillOpacity` → `HoverInk`）。
+        .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
         .helpLabel(helpText)
     }
 }
 
-/// 胶囊里的一颗图标按钮本体：44pt 圆、悬停时给一层底色。
+/// 胶囊里的一颗图标按钮本体：44pt 圆，只画图标。
+///
+/// 悬停与按压这两层反馈**不在这里**（R230 起）：由外层 `GlassPillButton` 的 `pressedStyle` 画，
+/// 全仓的悬停墨因此只有一条换算、一种混色路径。
 ///
 /// 曾经它还有 `hasOwnSurface` / `showsBorder` 两个开关（自带玻璃底 + 自带描边），
 /// 唯一的调用方是 `GlassCircleButton` —— 一颗产品里**零调用点**的独立圆形玻璃按钮，
@@ -141,7 +140,6 @@ private struct GlassIconControl: View {
     let symbol: String
     let size: CGFloat
     let iconSize: CGFloat
-    let isHovered: Bool
     var foregroundStyle: AnyShapeStyle = AnyShapeStyle(.primary)
     /// 状态反馈（换符号的连续过渡 / 值变了弹一下）。默认关：
     /// 只有"图标代表一个状态"的那些按钮才开，纯动作按钮不该弹。
@@ -151,7 +149,10 @@ private struct GlassIconControl: View {
     var body: some View {
         content
             .frame(width: size, height: size)
-            .overlay(hoverLayer)
+            // R230 这里少了 `.overlay(hoverLayer)`：悬停那一层改由外层的 `pressedStyle` 画
+            // （理由与两笔实测见 `GlassPillButton` 那段注释）。
+            // 本体现在**不知道悬停这件事** —— 它只画图标，反馈归样式，于是 `isHovered`
+            // 与色档两个入参也一起没了：一个视图不该持有它不画的-state。
             .clipShape(Circle())
             .contentShape(Circle())
             .compositingGroup()
@@ -167,13 +168,6 @@ private struct GlassIconControl: View {
             .foregroundStyle(foregroundStyle)
             .symbolMotion(symbol: symbol, replacesSymbol: replacesSymbol, bounceValue: bounceValue)
             .frame(width: size, height: size)
-    }
-
-    private var hoverLayer: some View {
-        Circle()
-            // 亮色材质上 `.white.opacity` 是看不见的（审计第二轮 14-06 / R2-03）：
-            // 描边、分隔线、悬停层一律改用语义色或 primary 派生的透明度，两种外观下都在。
-            .fill(.primary.opacity(isHovered ? VisualFill.controlHover : 0))
     }
 }
 

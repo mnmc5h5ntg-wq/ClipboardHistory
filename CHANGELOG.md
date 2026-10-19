@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 悬停那一层灰全仓只留一条换算 + 抓到 R229 那一抬的洞（R230 / U-741…U-744 · 产品 3 文件（换算出口 + 段按钮让位 + 玻璃圆改走共用路径） + 判据 2 文件 + 夹具 1 文件 + 表 1 文件）
+
+- 洞（**上一轮已上线**）：`HoverInk.opacity` 少一个 `level == 0` 出口 ⇒ 写 `hoverLevel: 0` 的位点被抬量抬成 0.025，
+  屏幕上凭空一层灰。由帧抓到：亮档 `segmented-filter-hover` 选中段 `233→228`、暗档同一格 `36→36`（两态对照）。
+  修：`guard level > 0` + 真值表那一格 + 像素断言 + 刀 M772。
+- 两处直读位点搬进同一条换算：段按钮原来**两层灰叠着**⇒ 样式层让位（`hoverLevel: 0`）；
+  玻璃圆钮在 `.compositingGroup()` 内自绘 ⇒ 同一名义 alpha 实测更弱（改前亮档 230 = 1.175:1 < 地板 1.20，
+  共用路径同令牌 1.225:1）⇒ 删自绘层（连带 `isHovered`/`colorScheme`/`hoverLayer`）改走 `pressedStyle`。
+- 修完两档直接读数：段按钮 亮 230→209 = 1.224、暗 52→66 = 1.239；
+  玻璃圆 亮 248→226 = 1.220、暗 28→44 = 1.220（地板 1.20/1.10 全过）；
+  选中段 233→233 / 36→36；R229 旧药丸仍 1.225 / 1.211（未碰坏）。
+- 新守卫 `HOVER_TOKEN_ROSTER files=3 reads=4`：把"还有几处自己画悬停层"变成只准降的数
+  （剥行注释后按文件点名；豁免=定义处/换算本身/AppKit 浮层）⇒ 剩下的三处开 **256**，逐颗悬停帧开 **257**。
+- 产品改动面（由 `git diff` 算出，不手抄）：GlassControls.swift、HistorySidebarView.swift、PressableStyle.swift。
+- 自曝两笔：判断矩形第一版是猜的（两块都落在纸上 ⇒ 比值 1.000 假读数）⇒ 真带 px 66…118 = pt 33…59，
+  矩形升成共享常量 + "两段不许同灰"前提断言；`pillReading` 重写了文件里已有的 `contrastRatio` ⇒ 改调用既有那颗，
+  再把变同形的已知答案断言换成与顺序无关的判据。
+- 验证：构建 0 告警、捕获卷 78/0 失败、全量卷 905/44/0（（无））、
+  `COMPARED=154 CHANGED=0 BASELINE_ADDED=6`（旧帧哈希未动，由断言签）、
+  刀 4/4 全 CAUGHT（M771、M772、M773、M774）、换装本机 `INSTALL_RESULT=ok`、看图 6 张新帧。
+- **CI 未读**：`a7e3154`（run `39301400951`）提交时未落地 ⇒ 249 / 253 的"接进 CI"那一半照旧未读。
+
 ### 悬停那一档第一次有两档帧 + 亮档反馈梯抬一档（R229 / U-737…U-740 · 产品 3 文件（令牌 + 按压样式 + 行收藏按钮的可见性） + 判据 1 新文件 + 夹具 1 文件 + 表 1 文件）
 
 - ⓪ 249 的第一格：`da5da47` runner **success**，`verdict=skipped not_run=4 probes=7`、`missing_frames=0`；

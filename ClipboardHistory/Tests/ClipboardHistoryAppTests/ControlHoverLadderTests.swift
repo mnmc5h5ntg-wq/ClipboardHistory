@@ -68,6 +68,26 @@ final class ControlHoverLadderTests: XCTestCase {
                                                           hoverLevel: VisualFill.controlHover, dark: dark),
                            dark ? 0.12 : 0.135, accuracy: 0.0001, "\(tag)：pressed 那一档不对")
         }
+        // R230 补的三格。第一格不是"防御性断言"：`hoverLevel: 0` 是调用点在说
+        // "这一家的悬停我不画"（段按钮就是），而抬量如果无条件加上去，0 就变成 0.025 ⇒
+        // 屏幕上凭空多出一层灰。这一格本轮是被**帧**抓到的 —— 段按钮里**选中的那一段**
+        // （它根本没有悬停层）亮档从 `(233)` 被画成 `(228)`，暗档同一格一动不动。
+        // 而 R229 那一版已经带着这个洞推上线了（`a7e3154`）。
+        for dark in [true, false] {
+            let tag = dark ? "dark" : "light"
+            XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
+                                                           hoverLevel: 0, dark: dark),
+                           0, accuracy: 0.0001,
+                           "\(tag)：调用点说了不画，抬量还是把 0 抬成了 0.025 ⇒ 幽灵层")
+        }
+        // 行那一档（0.06）也在这条换算上：亮档 0.085。写出来是因为DetailView / 设置行那几处
+        // 直接读的是这一档，BACKLOG 251 剩下的一半要搬的就是它 —— 先让数在这儿可见。
+        XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
+                                                       hoverLevel: VisualFill.hover, dark: false),
+                       0.085, accuracy: 0.0001, "行那一档的亮档抬量不对")
+        XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
+                                                       hoverLevel: VisualFill.hover, dark: true),
+                       VisualFill.hover, accuracy: 0.0001, "暗档必须等于令牌原值：本轮没动暗档的任何一个数")
     }
 
     /// 画法必须自己去问色档 —— 数值对了但调用点没接，屏幕上什么都没变（R219 同一族）。
@@ -79,6 +99,85 @@ final class ControlHoverLadderTests: XCTestCase {
                       "色档必须由视图自己问，不从外面传布尔")
         XCTAssertFalse(text.contains("hoverLevel: hoverLevel))"),
                        "画法还在读不带色档的旧调用")
+    }
+
+    /// 名册守卫（R230 / BACKLOG 251 剩下那一半）：**产品里每一个读悬停令牌的地方，
+    /// 要么把令牌交给共享换算（`hoverLevel:` 传进样式、或 `HoverInk.opacity(level:`），
+    /// 要么就在这张名册上登记着。**
+    ///
+    /// 为什么要这张册子：R229 把亮档那一抬接进了 `fillOpacity`，于是"改了抬量"在**样式那一条路**上
+    /// 生效，而自绘那一层的路径静悄悄地没动 —— 同一件事有两种说法，而且不会有任何东西变红。
+    /// 一张按文件计数、且**只准变短**的册子是这条盲区唯一的证人（与 `testHistoryStoreStaysThin`
+    /// 同一形状：用单调量，不用均值）。
+    ///
+    /// 册子要改的时候必须带着判据一起改：修掉一处 ⇒ 数字变小 ⇒ 这条红替你说话，去把数改成新的；
+    /// 新写一处自绘悬停 ⇒ 数字变大 ⇒ 不许通过，把它接进共享换算。
+    func testEveryHoverTokenReaderGoesThroughTheSharedConversionOrIsOnTheRoster() throws {
+        let root = productSourcesRoot()
+        // 定义处豁免：令牌自己（声明）与共享换算自己（`fillOpacity` / `HoverInk`）。
+        let exemptFiles: Set<String> = ["VisualTokens.swift", "PressableStyle.swift"]
+        let knownPending = ["DetailView.swift": 2,        // chip / card 的自绘层，行那一档 0.06
+                            "SettingsView.swift": 1]       // 侧栏分类行的 `backgroundOpacity`
+        // 这两家**不共享那条换算**，但等价：`QuickPickController` 自带 `hoverFillAlpha(dark:)`
+        // 的按档抬量（R225），走的是 AppKit 的绘制路径而不是 SwiftUI。它们在册是因为
+        // "另一条按档换算"是可以的，"没有按档换算"才是不行的 —— 而这一格也得能被数出来。
+        let conformingElsewhere = ["QuickPickController.swift": 1]
+        var found: [String: Int] = [:]
+        for url in allSwiftFiles(in: root) {
+            let name = url.lastPathComponent
+            if exemptFiles.contains(name) { continue }
+            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
+                // 剥行注释：判"用没用"要看代码，不能看散文（R76 那一族：整文件 contains 会命中引用自己的注释）。
+                var line = String(raw)
+                if let cut = line.range(of: "//") { line = String(line[..<cut.lowerBound]) }
+                guard line.contains("VisualFill.hover") || line.contains("VisualFill.controlHover") else {
+                    continue
+                }
+                if line.contains("hoverLevel: VisualFill") || line.contains("HoverInk.opacity(level: VisualFill") {
+                    continue          // 这两条都汇进共享换算
+                }
+                found[name, default: 0] += 1
+            }
+        }
+        emitHoverRoster(found)
+        let strays = found.filter { !knownPending.keys.contains($0.key)
+            && !conformingElsewhere.keys.contains($0.key) }
+        XCTAssertTrue(strays.isEmpty,
+                      "出现**没登记**的悬停令牌直读位点：\(strays) ⇒ 要么接进共享换算（`hoverLevel:` / `HoverInk`），"
+                      + "要么把它写进上面两张册子之一并说清为什么")
+        let pending = found.filter { knownPending.keys.contains($0.key) }
+        XCTAssertEqual(pending, knownPending,
+                       "待改名册不吻合。变大 = 新写了一处自绘悬停层（不该）；"
+                       + "变小 = 修掉了一处（把册子里的数字改小，并在台账记一笔）")
+        let elsewhere = found.filter { conformingElsewhere.keys.contains($0.key) }
+        XCTAssertEqual(elsewhere, conformingElsewhere,
+                       "「另一条按档换算」那张册子不吻合 ⇒ 浮层那一条按档换算被改了或多了")
+    }
+
+    /// 把名册打到 stdout：判据的处置要能被复查，而不是只留一句断言文本。
+    private func emitHoverRoster(_ found: [String: Int]) {
+        let pairs = found.keys.sorted().map { "\($0)=\(found[$0]!)" }
+        print("HOVER_TOKEN_ROSTER files=\(found.keys.count) reads=\(found.values.reduce(0, +)) "
+              + (pairs.isEmpty ? "none" : pairs.joined(separator: " ")))
+    }
+
+    private func allSwiftFiles(in dir: URL) -> [URL] {
+        let fm = FileManager.default
+        guard let en = fm.enumerator(at: dir, includingPropertiesForKeys: nil) else { return [] }
+        return en.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }.sorted { $0.path < $1.path }
+    }
+
+    private func productSourcesRoot() -> URL {
+        var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<8 {
+            let url = dir.appendingPathComponent("Sources/ClipboardHistoryApp")
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+            dir = dir.deletingLastPathComponent()
+        }
+        // 找不到目录**红**而不是跳过：会跳过的守卫和通过的守卫在报表里长得一样（R99）。
+        XCTFail("找不到 Sources/ClipboardHistoryApp ⇒ 名册守卫根本没在看东西")
+        return URL(fileURLWithPath: "/nonexistent")
     }
 
     private func productSource(_ relative: String) throws -> String {
