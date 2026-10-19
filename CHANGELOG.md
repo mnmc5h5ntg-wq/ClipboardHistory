@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 222 第一半：热图真帧通道的证人 `scripts/heatmap_frame_levels.py`（R201 非轮次笔 · 产品 0 文件）
+
+- 把 R198 那句「真帧比离屏红 6…21/255、偏移只压在 R 那一列」变成读数与断言：按中轴游程取 5 档（排掉夹具背景），逐档与判据日志 HEAT_ADJACENT_CVD 的墨色相减
+- 三条判据：真帧最小模拟后 ≥ 地板 18；G/B 两列偏移 ≤ 24；输入读不到（缺帧目录 / 缺帧 / 档数不是 5 / 判据日志只覆盖一档）一律 exit 2 —— 分母为 0 不许被读成通过
+- 跨运行时对账：矩阵常数从 Swift 源码 simulateDeuteranopia 里**读出来比**（按通道归位，不按书写顺序），不在 python 侧抄第二份
+- 本机读数（R197 那批帧）：暗档 |R|=13 / |G/B|=1，亮档 |R|=21 / |G/B|=1；真帧最小模拟后 21（余量 3）对判据 25.41（余量 7.41）
+- 测试 10 条含正反对照（塌一档 ⇒ exit 1、偏差离开 R 列 ⇒ exit 1、只给一档日志 ⇒ exit 2、两通道一致 ⇒ exit 0）；脚本电池 Ran 368 → Ran 378 全绿
+- 未做：接进捕获卷（Swift 判据卷仍只读离屏单格）⇒ 222 不结案
+
 ### 看图腿四张帧的行带读数 + R198/R199 两跑 CI 的验收（R200 / U-650…U-652 · 产品 0 文件）
 
 - 新读数器 `.scratch/motion-audit-2/frame_bands_r200.py`：逐行取众数当背景，与背景亮度差 >24 算墨，连续成带；缺帧 exit 1
