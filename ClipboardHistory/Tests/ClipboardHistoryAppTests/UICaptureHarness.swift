@@ -4535,6 +4535,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: twoNoticeStore))
         })
+        // R206 尝试给 R205 那条新回执补帧，被 `testCaptureKeyViews` 的纯黑填充带守卫拦下
+        // （新帧里被选中那一行整块画成纯黑 ⇒ 视觉状态量不到）。**先不放宽名单**：
+        // 成因没确认之前，加进名单就是把不懂的红洗成出口（BACKLOG 229 记着两个候选与分辨实验）。
+        // 回执本身的可复查证据今天仍在：`DroppedFileImportTests.testDroppedProvidersThatDecodeToNothingStillSpeakUp`
+        // 与那张被拦下的帧的临时读数（`/tmp/shots_r206/content-with-dropped-unreadable-notice-750x560-{dark,light}.png`，不入库）。
         // R40：**复制失败**那句回执必须放得下（U-66 / D-099）。
         //
         // 为什么要为一句新文案单开一张帧：这条链路的回执是**拼出来的**（"复制到剪贴板失败："

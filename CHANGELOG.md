@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R206 尝试：给 R205 那条新回执补帧 ⇒ 被纯黑填充带守卫拦下，**不放宽名单**，夹具回滚（R206 非轮次笔 · 判据 1 文件加注释，产品 0 文件）
+
+- 新夹具走产品入口（`makePopulatedStore()` + `addDroppedFiles(urls: [], attemptedCount: 2)`）⇒ 捕获 140 张、`FRAME_BASELINE_ADDED=2`
+- `testCaptureKeyViews` 当场红：`这些帧第一次出现纯黑填充带：["content-with-dropped-unreadable-notice"]`（`UICaptureHarness.swift:3421`）
+- 真看了那张暗档帧：**横幅画得对**（「拖入的 2 项不是本机文件，未加入历史」+「知道了」都在），黑的是**侧栏被选中的那一行**（整块纯黑、只剩星形图标，文字与日期不见）⇒ `MATERIAL_BLIND_SPOTS 11 of 70 fixtures` 同一族
+- 两个候选（① 横幅把列表下移使选中行落在捕获边界带；② 选中材质在离屏下本来就是黑）各写了一条能证伪的分辨实验 ⇒ 见 BACKLOG 229。**成因没确认之前不改名单、不改产品**：把不懂的红放宽成出口，就是把"不懂"记成"允许"
+- 夹具回滚，捕获卷回到 `72 tests / 4 skipped / 0 failures`；R205 那条回执今天仍可复查的证据是判据卷那三条对照 + 两把刀
+- 这是一笔**非轮次**记录：STATE 不轮换（下一次轮换时它必须与 R204/R205 一起在三本账里有真标题，别写桩）
+
 ### 拖入「声称是文件却一个 URL 都没解出来」不再静默 —— D-4 的另一半接上（R205 / U-665…U-667 · 产品 2 文件，动效主线）
 
 - `HistoryStore.addDroppedFiles(urls:attemptedCount:timestamp:)`：回执说 **attempted** 而不是解出的个数；`HistoryStore.swift` 只 +1 行（1118→1119，`testHistoryStoreStaysThin` 仍绿，上限只准降）
