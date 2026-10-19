@@ -341,6 +341,20 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 let size = renders[0].pixelsWide
                 let band = Self.fillBand(size: size, scale: scale)
                 XCTAssertFalse(band.isEmpty, "\(tag)/\(scale)x 的填充带是空的 ⇒ 这条判据没在量任何东西")
+                // R202 的分辨实验读数。两条通道（判据读内存 rep / 脚本读落盘 PNG）对同一格
+                // **只在 R 上不同**：按 gamma 混合反解出来的 accent 是 判据≈(0,122,255) 对 真帧≈(30,122,255)，
+                // G/B 一模一样 ⇒ 既不是 alpha（两边都 255），也不是混合空间不同（那会三通道一起动，
+                // 且暗档动得最多的会是 B 而不是 R）。剩下的候选是**同一种颜色被标注/解析成不同色彩空间**，
+                // 所以这一行把 rep 自己的色彩标签与 `colorAt` 返回色的标签都打出来，让下一跑直接判掉它。
+                let csRep = renders[0].colorSpace.localizedName ?? "无名"
+                var csPix = "读不到"
+                if let first = band.min() {
+                    let p = (Self.x(of: first, size: size), Self.y(of: first, size: size))
+                    if let c = renders[0].colorAt(x: p.0, y: p.1) {
+                        csPix = c.colorSpace.localizedName ?? "无名"
+                    }
+                }
+                print("HEAT_INK_SPACE \(tag)/\(scale)x rep=\(csRep) 取色=\(csPix)")
                 for i in 1..<Self.levels.count {
                     let a = Self.levels[i - 1], b = Self.levels[i]
                     let normal = Self.meanMaxChannelDelta(renders[i - 1], renders[i], over: band, size: size)

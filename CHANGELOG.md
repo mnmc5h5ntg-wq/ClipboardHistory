@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 222 机制定性：那 6…21/255 是落盘的色彩标注造成的（R202 · 判据 1 文件加一行 print，产品 0 文件）
+
+- 新 print `HEAT_INK_SPACE`：判据的 rep 与取色都是**设备 RGB**，而 PNG 声明 sRGB、alpha 全 255 ⇒ 三条口径其实互不相同
+- 反解 accent 的形状否掉「混合空间」候选：判据解出 (0,122,255)、真帧解出 (30,122,255)，只有 R 动、G/B 不动；混合空间不同会让三通道一起动
+- 把真帧存储值按 Display P3 转 sRGB 后，逐档差从 (6,1,0)/(12,1,0)/(18,0,0) 收到 (2,2,0)/(4,2,0)/(3,2,0) ⇒ 定性为「落盘把设备值标成了 sRGB」
+- 产品不动：两条通道各自的模拟后最小分离 21 与 25.41 都 ≥ 地板 18，谁对谁错都不改结论；要改的是 `heatmap_frame_levels.py` 的口径声明（下一轮加 `--png-space` 并两种都印）
+- 222 收窄为工具账，仍不结案
+
 ### 222 更正：撤回「卡片材质」那句机制，只留现象 + 两个未测候选（R202 非轮次笔 · 判据 1 文件，产品 0 文件）
 
 - 现象保留：判据读内存 rep、脚本读落盘 PNG，同一格只在 R 上偏 +6…+21（G/B ≤1）；本轮实测 PNG 是 sRGB 标签、alpha 全 255
