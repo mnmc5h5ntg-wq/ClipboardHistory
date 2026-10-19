@@ -11044,8 +11044,11 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         var judgedAppearances = 0
-        for (tag, appearance) in [("dark", NSAppearance.Name.darkAqua),
-                                  ("light", NSAppearance.Name.aqua)] {
+        var uncapableTags: [(tag: String, contrast: Double)] = []
+        let appearances: [(tag: String, appearance: NSAppearance.Name)] = [
+            ("dark", NSAppearance.Name.darkAqua), ("light", NSAppearance.Name.aqua)]
+        for item in appearances {
+            let tag = item.tag, appearance = item.appearance
             let roster = self.fixtures(appearance: appearance)
             guard let proto = roster.first(where: { $0.name == "content-empty" }) else {
                 return XCTFail("\(tag)：`content-empty` 不在夹具名册 ⇒ 这一族判据失去对象，先查名册别放宽判据")
@@ -11120,7 +11123,43 @@ final class UICaptureTests: XCTestCase {
                 if let s = cur, xHi - s > best.1 - best.0 { best = (s, xHi) }
                 return best
             }
-            let minRunPx = max(1, Int((80.0 * scale).rounded()))   // 差区至少 80pt 宽：文字换粗不够这一格
+            let minRunPx = max(1, Int((80.0 * scale).rounded()))
+            // **能力闸门（本机与 runner 不一样，这件事必须由这一跑量出来）**
+            // R189 推上去那一笔在 runner 上红在两句：`找不到 ≥80pt 的差异带`（dark）与
+            // `两态对照一次都没有真正判过`（档数闸门）。两句都是真话，但说的不是产品：
+            // runner 那条离屏通道**不合成这层材质**（R100 早就量过"runner 看不见卡片材质"，
+            // 真机 16 / 离屏 7 那一族），于是底轨与侧栏底是同一个数，控件整条带在帧里根本不存在。
+            // 判法不用任何别处的常数：底轨 = 这一列里"与侧栏底不同"的最长连续段，
+            // 它要么存在且与底之差 ≥ 地板（能判），要么不存在/差太小（这一档今天无从判定，点名出去）。
+            var bestTrack = (0, 0, -1)
+            for y in colBand.y.lowerBound..<colBand.y.upperBound {
+                let t = trackRun(bytesA, y)
+                if t.1 - t.0 > bestTrack.1 - bestTrack.0 { bestTrack = (t.0, t.1, y) }
+            }
+            let colW = max(1, colBand.x.upperBound - colBand.x.lowerBound)
+            var materialContrast = -1.0
+            if bestTrack.2 >= 0 {
+                let bg = luma(bytesA, max(0, bestTrack.0 - 2), bestTrack.2)
+                var mx = 0.0
+                for x in bestTrack.0..<bestTrack.1 { mx = max(mx, abs(luma(bytesA, x, bestTrack.2) - bg)) }
+                materialContrast = mx
+            }
+            let canSeeMaterial = FilterPillGeometry.channelCanSeeMaterial(
+                trackWidth: bestTrack.1 - bestTrack.0, columnWidth: colW, contrast: materialContrast)
+            if !canSeeMaterial {
+                // 拆成局部串再拼：整条 `emit(a + b + c …)` 一长串会让编译器超时（R180 那一课）。
+                let head = "FILTER_PILL_UNCAPABLE \(tag) 帧=\(repA.pixelsWide)x\(repA.pixelsHigh)"
+                    + " 缩放=\(String(format: "%.2f", scale))x"
+                let trackPart = "底轨宽=\(bestTrack.1 - bestTrack.0)px/列宽 \(colW)px 轨在y=\(bestTrack.2)px"
+                let floorPart = "占比地板=\(String(format: "%.2f", FilterPillGeometry.trackMustCoverColumnFraction))"
+                    + " 对比地板=\(String(format: "%.0f", FilterPillGeometry.materialContrastFloor))luma"
+                let contrastPart = "轨与侧栏底之差=\(String(format: "%.0f", materialContrast))luma"
+                let why = "⇒ 这台机器的这条离屏通道不合成这层材质（R100 那一族），这一档今天无从判定；"
+                    + "承重的是能判的那一档，不是把地板调低"
+                emit(head + " " + trackPart + " " + floorPart + " " + contrastPart + " " + why)
+                uncapableTags.append((tag, materialContrast))
+                continue
+            }   // 差区至少 80pt 宽：文字换粗不够这一格
             var bands: [(yLo: Int, yHi: Int, runLo: Int, runHi: Int)] = []
             var open: (Int, Int, Int, Int)? = nil
             for y in colBand.y.lowerBound..<colBand.y.upperBound {
@@ -11288,9 +11327,20 @@ final class UICaptureTests: XCTestCase {
         // **出口不许把判据吃掉**（R99 那一族"名单为空=红"，这里的主语是"档"）：
         // 每一档都可以因为通道分不开而走"有名字的未判定"，但**全部档都走出口**就等于这条判据不存在了 ——
         // 那正是变异臂 M701 要抓的形状（把 `canJudge` 恒置 false，两档都安静出口，一条断言都不会跑）。
+        if judgedAppearances == 0 && uncapableTags.count == appearances.count {
+            let premise = uncapableTags.map { "\($0.tag)=\(String(format: "%.0f", $0.contrast))luma" }
+                .joined(separator: " ")
+            throw XCTSkip("FILTER_PILL_UNCAPABLE 两档都判不了（\(premise)，地板 "
+                + "\(String(format: "%.0f", FilterPillGeometry.materialContrastFloor))luma）"
+                + " ⇒ 这台机器的这条离屏通道不合成这层材质（R100 那一族：runner 看不见卡片材质），不是产品没画。"
+                + "承重的那一格在能判的机器上（本机暗档同一把尺读到 214luma），而这条出口自己有证人："
+                + "`FilterPillGeometryTests.testChannelCapabilityRejectsTheTwoBlindShapes`")
+        }
         XCTAssertGreaterThanOrEqual(judgedAppearances, 1,
-                                    "两态对照一次都没有真正判过（两档全走了「分不开」出口）⇒ 这条判据今天不存在，必须红")
-        emit("FILTER_PILL_JUDGED 真判的档数=\(judgedAppearances)/2")
+                                    "两态对照一次都没有真正判过，而判不了的原因不是「通道看不见材质」"
+                                    + "（能判的档=\(judgedAppearances)，无能力的档=\(uncapableTags.count)）"
+                                    + " ⇒ 这条判据今天不存在，必须红")
+        emit("FILTER_PILL_JUDGED 真判的档数=\(judgedAppearances)/\(appearances.count) 判不了的档=\(uncapableTags.count)")
     }
 
     private func render(

@@ -12,6 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 211 落地：`SINGLE_LEDGER_ROUNDS`（186/187 带理由）+ `test_round_batch_declaration.py` 的四条自证（含 `back > 0` 恰好一次的删除型钉子）⇒ 本笔才敢换 STATE 表头
 - 212 新开：`testBandCaptureIsCheaperAndStillSeesTheMotion` 在 `fd6b43a`/`d4958a9` 各红一步 `STEP[17] Motion coverage floor`（「XCTAssertGreaterThanOrEqual failed: ("3") is less than ("4") - 带捕获之后的过渡帧数反而比整窗少 ⇒ 采样变细没换来过程，这一臂仍然只能记 not-run，那这条路就白走了」），而 R183/R184/R185 连着三跑绿、中间零改动 ⇒ 会翻脸的地板，先登记不定罪不放宽
 - 本机：编译 0 告警、捕获卷 71 例 / 失败 0、帧基线 138 张 changed=0；**全量卷与变异表本笔没跑**（记 NOT-RUN）
+### 上一笔把 CI 推红：能力出口成码（`channelCanSeeMaterial`）+ 212 的描述更正（R190 / U-622…U-624 · 产品 1 文件，判据账）
+
+- 红因：runner 的这条离屏通道不合成 `.ultraThickMaterial`/`.quaternary` ⇒ 底轨在帧里不存在，而本机的两态判据把"能判"当成了普适前提（`STEP[13]`、`STEP[15]` 各红一步，同一判据）
+- 修法：新增纯谓词 `FilterPillGeometry.channelCanSeeMaterial(trackWidth:columnWidth:contrast:)`（底轨占列宽 ≥0.40 且与侧栏底之差 ≥30luma）；全档无能力 ⇒ 带读数 `XCTSkip`，否则承重断言照旧
+- 真值表 6 格（本机暗档 214luma 能判 / 本机亮档 13 luma 判不了 / 找不到底轨判不了 / 宽度不足但对比高仍判不了 / 两条地板取等号放行 / 列宽 0 不算占比）+ 接线扫描（谓词恰好调一次、点名读数在、skip 分支在）
+- 变异：`mutate_r190.py` M703, M704, M705, M706, M707 ⇒ 5/5 CAUGHT、RESTORE_CLEAN=yes；M706 是唯一能抓"出口变装饰"的那把
+- 212 更正：那条断言是 `max(带过渡帧数) ≥ max(整窗过渡帧数)`，同跑两臂相对量（R142 早已换形），不是绝对地板；分布：run `39169952987` 带=3/整窗=3；run `39169849821` 带=3/整窗=3；run `39166453147` 带=3/整窗=4；run `39167782287` 带=3/整窗=3；run `39164744805` 带=3/整窗=3
+- 验证：编译 0 告警、捕获卷 72 例/失败 0、全量卷 874/42/0、帧基线 138 张 `CHANGED=0`、清账表 MOTION_LEDGER 表面=18 状态=9 格子=162 行数=115 已清账=115 未清账=47 地板=115
 ### 210 结案：药丸一直在选中段，"亮=药丸"是未验的默认；几何做成纯核 + 两态像素判据（R189 / U-619…U-621 · 产品 2 文件，动效主线）
 
 - 两态对照（产品入口 `perform(.updateFilter)`，各拍一张）：`.all` 控件两半 `左=40 右=254`、`.favorites` `左=254 右=40` ⇒ 两半各自翻转、**暗的那半跟着选中走**

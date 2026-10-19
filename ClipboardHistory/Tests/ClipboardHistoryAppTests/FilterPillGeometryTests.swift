@@ -60,6 +60,42 @@ final class FilterPillGeometryTests: XCTestCase {
                        "轨道外的 x 不许被算成某一段（宁可给 -1 让判据点名）")
     }
 
+    /// 三种真实形状各钉一格（R190）。为什么必须在本机钉：这条出口在 runner 上被走到，
+    /// 而 runner 不能当自己的证人 —— 出口如果哪天误判（把能判的说成判不了），只有本机的表能红。
+    func testChannelCapabilityRejectsTheTwoBlindShapes() {
+        let col = 560
+        XCTAssertTrue(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 512, columnWidth: col, contrast: 214),
+                      "本机暗档的真实形状（底轨占满列、材质与侧栏底差 214luma）必须判成「能判」，"
+                      + "否则这条判据永远只走出口")
+        XCTAssertFalse(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 250, columnWidth: col, contrast: 9),
+                       "本机亮档的真实形状（差只有 9luma）必须判成「判不了」——它不是能判的那一档")
+        XCTAssertFalse(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 0, columnWidth: col, contrast: -1),
+                       "runner 的真实形状（底轨根本找不到）必须判成「判不了」，而不是拿 -1 当对比去红")
+        XCTAssertFalse(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 100, columnWidth: col, contrast: 250),
+                       "底轨只占列宽 18% 就说「找到了」是恒真式：宽度这一半前提也得有牙")
+        XCTAssertTrue(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 224, columnWidth: col, contrast: 30),
+                      "两条地板取等号时必须放行（`>=` 而不是 `>`），否则边界那一格永远差一点点")
+        XCTAssertFalse(FilterPillGeometry.channelCanSeeMaterial(trackWidth: 512, columnWidth: 0, contrast: 214),
+                       "列宽为 0 不许被算成「占比无穷大」")
+    }
+
+    /// 接线：出口与它的点名读数必须真的在判据里（把谓词从判据里删掉 ⇒ 这一格红）。
+    func testCaptureJudgmentWiresTheCapabilityExit() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("UICaptureHarness.swift")
+        let text = try String(contentsOf: url, encoding: .utf8)
+        let code = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("///") }
+            .joined(separator: "\n")
+        XCTAssertEqual(code.components(separatedBy: "FilterPillGeometry.channelCanSeeMaterial(").count - 1, 1,
+                       "能力谓词在判据里应当恰好调用一次（多了是重复实现，少了是出口被摘掉）")
+        XCTAssertTrue(code.contains("FILTER_PILL_UNCAPABLE"),
+                      "点名读数不在了 ⇒ 出口变成静默 skip，那正是「把红放宽成沉默」那一族")
+        XCTAssertTrue(code.contains("两档都判不了"),
+                      "全档无能力时的 XCTSkip 分支不在了：那时判据会安静地什么都不判")
+    }
+
     /// 接线扫描（**能力**而不是词汇）：视图里必须真的拿轨道尺寸去问这颗纯核，
     /// 并且摆放要用 `.position` —— 原来的 `frame(width:) + offset(x:)` 组合把基准交给了
     /// `GeometryReader` 的隐式对齐，实测两态读回来是镜像的（BACKLOG 210 / R189）。

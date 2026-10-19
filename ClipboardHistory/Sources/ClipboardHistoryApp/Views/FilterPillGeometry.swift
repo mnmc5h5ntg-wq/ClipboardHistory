@@ -50,4 +50,23 @@ enum FilterPillGeometry {
         guard segment > 0, x >= track.minX, x < track.maxX else { return -1 }
         return Int((x - track.minX) / segment)
     }
+
+    // MARK: - 这条离屏通道今天能不能判这件事（R190 / runner 上 `0c97820` 那两朵红换来的）
+
+    /// 底轨至少要占列宽的这个比例，否则"找到底轨"这句话没有内容（整列都是背景也能过）。
+    static let trackMustCoverColumnFraction: Double = 0.4
+
+    /// 底轨与侧栏底的最小差（luma）。**地板的来源写在判据的注释里**：本机暗档同一把尺读到 214，
+    /// 亮档读到 1，runner 读到的是"底轨根本不存在"—— 三种形状里只有第一种能判。
+    static let materialContrastFloor: Double = 30
+
+    /// 纯谓词：给定"底轨宽/列宽"与"底轨与侧栏底之差"，说这一档今天判得了还是判不了。
+    /// 抽出来的理由：这条出口如果只在某台机器上被走到，它就永远没有证人 ——
+    /// 变成纯函数后，本机就能把三种形状各钉一格（R154 那一课：环境差异不许报成代码结论，
+    /// 而"这台机器判不了"这句话本身必须能在不换机器的情况下被打红）。
+    static func channelCanSeeMaterial(trackWidth: Int, columnWidth: Int, contrast: Double) -> Bool {
+        guard columnWidth > 0, trackWidth > 0 else { return false }
+        if Double(trackWidth) / Double(columnWidth) < trackMustCoverColumnFraction { return false }
+        return contrast >= materialContrastFloor
+    }
 }
