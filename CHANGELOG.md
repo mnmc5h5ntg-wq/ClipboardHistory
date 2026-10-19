@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 最终报告的活数格对账 + 一条会红的守卫（R222 / U-716…U-718 · 判据 1 文件 + 报告本体，产品 0 文件）
+
+- 刷新：标题 **R9–R221，214 轮自评**、§1 轮数 **214**、视觉台账 **U-31 … U-715（432 条定义行）**、
+  日期、本机 install（R219 实际读数；R33 那两行标为历史）。全部由生成器现读，不手抄。
+- 新增 §12：R137–R221 这一段做了什么 / 撤回了什么 / 还欠什么（含五次否证与两次自曝量错对象）。
+- 新守卫 `scripts/tests/test_final_report_headline.py`（三格：与活账一致、伪造旧值必须点名、
+  形状读不到不许静默通过）。before/after：`Ran 403 FAILED` → `Ran 403 OK`（+3 格）。
+- 刀：`R222_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0`（M759/M760 各打一条比较）；
+  第一版报 ESCAPED 是**表的解析坏了**（python3.9 `-v` 把失败印成两段），手工复现分开之后修解析。
+- 自锁死记录：生成器"电池不绿不写"与新守卫"靠报告旧数才红"互相咬 ⇒ 只豁免这一条守卫的名字，其余红照旧拦。
+- 新开 248：§1 剩下的格子（位点清单 179 行、人工批次、swift/脚本计数）还没纳入对账。
+  立 **D-214**：报告里的活数格必须有守卫对账，一次性叙述要标"历史，别当本轮证人"。
+- 同一轮内的自我修正：新守卫第一版钉的是"报告 == 活账"，于是**写完本轮台账它自己就红了**（报告是"截至第 N 轮"的快照，
+  台账每轮都在长）。改成有界落后 `LAG_ROUNDS=1` / `LAG_U=3`，并补上反方向 `..._AHEAD`（报告不许说没发生的事）；
+  两把刀按新形状重跑仍 2/2 CAUGHT。详见 `AGENT_BACKLOG.md` 248 追记。
+
 ### NOT_RUN 交得出成因（246 的仪器）+ 两格已知答案对照 + 两把刀（R221 / U-713…U-715 · 判据（python 尺）1 文件，产品 0 文件）
 
 - `scripts/surface_left_axes.py`：四种失败各有一个名字（`stem-unparsable` / `no-bg-window` /
