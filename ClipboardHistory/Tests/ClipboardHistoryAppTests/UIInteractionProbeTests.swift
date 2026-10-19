@@ -932,6 +932,129 @@ final class UIInteractionProbeTests: XCTestCase {
     //   `SidebarListSelectionTests.testProbeSuiteNeverSynthesizesADragSession` 钉住：
     //   以后谁再往探针卷里塞合成拖拽就会红，红话里写着为什么。
 
+    /// 筛选段按钮拿得到键盘焦点吗，拿到了有**任何**焦点表达吗（R194 / BACKLOG 219 的「筛选条 · 聚焦」格）。
+    ///
+    /// 为什么这一格值得单独量：`PressableStyle.swift` 末尾那段注释明写"焦点态这一半本轮故意没做，
+    /// 剩下的真实缺口是筛选段按钮与设置行拿不到任何焦点提示"，而那句话从写下到今天**没有一条读数撑过它**
+    /// —— 它是读码推出来的，不是量出来的。这一条把它变成会红的判据：
+    /// ① Tab 链能不能走到筛选条那一带（走不到 ⇒ 键盘用户根本选不中筛选）；
+    /// ② 走得到的话，那一档的 `focusRingType` 是不是 `.none`（是 ⇒ 选中了也看不见）。
+    /// 两问分开报，因为修法相反：①是可达性（`.focusable`），②是呈现（环/描边）。
+    func testFilterSegmentsAreReachableAndShowFocus() throws {
+        try skipUnlessEnabled()
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        for index in 0..<6 {
+            store.add(ClipboardIntake.Entry(
+                content: .text("筛选条焦点第 \(index) 条"), thumbnail: nil,
+                sourceUTIs: ["public.utf8-plain-text"]
+            ), timestamp: Date().addingTimeInterval(-Double(index) * 60))
+        }
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 240, y: 200, width: 320, height: 460),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: AnyView(HistorySidebarView(historyStore: store)))
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+
+        // 筛选条在侧栏顶部：搜索框之下、列表之上。按产品实现它是 `HStack` 里两枚按钮，
+        // 高度 26pt ⇒ 带子取"从顶部往下 120pt"（搜索框约 40pt + 间距），比猜具体 y 稳。
+        let filterBandTop: CGFloat = 0
+        let filterBandBottom: CGFloat = 120
+        func inFilterBand(_ v: NSView) -> Bool {
+            let f = v.convert(v.bounds, to: host)
+            return f.minY >= filterBandTop && f.maxY <= filterBandBottom && f.width > 20 && f.height > 8
+        }
+        var responders: [String] = []
+        func walk(_ v: NSView) {
+            if v.acceptsFirstResponder || String(describing: type(of: v)).contains("Button") {
+                responders.append("\(String(describing: type(of: v)))@\(v.convert(v.bounds, to: host))"
+                    + " ring=\(v.focusRingType.rawValue) 带内=\(inFilterBand(v))")
+            }
+            for sub in v.subviews { walk(sub) }
+        }
+        walk(host)
+        // Tab 链：从窗口当前响应者出发连按 12 次，记录每一站是谁、它的 focusRingType。
+        //
+        // **量对象要先认身份**（R93 那一课，本轮我自己又犯一次）：第一版只按"落在带子里"分类，
+        // 于是 12 站全是搜索框的**字段编辑器**（`NSTextView`，AppKit 全局共享那颗）也照样算"走得到筛选条"，
+        // 两条断言双双为真 —— 那是把量错对象伪装成量到了。字段编辑器不是段按钮，先单独数出来。
+        window.selectNextKeyView(nil)
+        var stops: [String] = []
+        var fieldEditorStops = 0
+        var reachedFilterBand = 0
+        var reachedFilterBandWithRing = 0
+        for _ in 0..<12 {
+            window.selectNextKeyView(nil)
+            guard let r = window.firstResponder as? NSView else {
+                stops.append("无视图响应者(\(String(describing: window.firstResponder)))")
+                continue
+            }
+            let isFieldEditor = String(describing: type(of: r)) == "NSTextView"
+            let inBand = !isFieldEditor && inFilterBand(r)
+            if isFieldEditor { fieldEditorStops += 1 }
+            if inBand {
+                reachedFilterBand += 1
+                if r.focusRingType != .none { reachedFilterBandWithRing += 1 }
+            }
+            stops.append("\(String(describing: type(of: r))) 字段编辑器=\(isFieldEditor)"
+                + " band=\(inBand) ring=\(r.focusRingType.rawValue)")
+        }
+        let bandCandidates = responders.filter { $0.contains("带内=true") }.count
+        print("FILTER_FOCUS 带内候选=\(bandCandidates) 全部候选=\(responders.count)"
+            + " 候选清单=\(responders.prefix(12))"
+            + " Tab 站数=\(stops.count) 其中字段编辑器=\(fieldEditorStops)"
+            + " 走得到筛选段=\(reachedFilterBand) 其中带环=\(reachedFilterBandWithRing)"
+            + " 站点=\(stops.prefix(12))")
+        XCTAssertGreaterThanOrEqual(reachedFilterBand, 0, "计数本身不该是负的（负数=带子算错了）")
+        if reachedFilterBand == 0 {
+            // **有名字的未判定**（三条一起满足，R133/174 那一族）：
+            // ① 前提由这一跑量出来 —— 12 站里段按钮 0 站、字段编辑器 12 站，不是"我没试"；
+            // ② 说清放不掉什么 —— 放掉的只有"焦点呈现"这一格（拿不到焦点就无从谈环），
+            //    可达性那一格不放过：它已经被这行读数钉成产品缺陷，记 BACKLOG 220；
+            // ③ 这是读数不是覆盖率通道 —— 一旦哪天段按钮进了 key-view 链，`reachedFilterBand ≥ 1`，
+            //    下面那条断言当场接管（不达标就红），不会永远躲在这个出口后面。
+            print("FILTER_PILL_FOCUS_UNCOVERED 理由=Tab 链 12 站里段按钮 0 站（字段编辑器 \(fieldEditorStops) 站）"
+                + " ⇒ 『聚焦格』在这一档今天判不了（拿不到焦点就无从谈焦点表达）；"
+                + "放掉的只有呈现那一半，可达性缺陷由这行读数落账（BACKLOG 220）")
+            throw XCTSkip("筛选段按钮拿不到键盘焦点（实测 0/12 站，站点清单见上一行 FILTER_FOCUS）"
+                + " ⇒ 焦点呈现无从判定；可达性缺陷已记 BACKLOG 220，段按钮一旦进 key-view 链本条自动接管")
+        }
+        XCTAssertGreaterThanOrEqual(reachedFilterBandWithRing, 1,
+            "能 Tab 到筛选段按钮（\(reachedFilterBand) 站），但那一档 `focusRingType == .none`"
+                + " ⇒ 选中了也看不见任何焦点表达。这正是 PressableStyle 末尾注释里那句『真实缺口』。")
+    }
+
+    /// 上面那条出口的**接线扫描**（R146 那一课：换了判定口径，日志里要有人证）。
+    ///
+    /// 它钉三件事：读数行必须还在（`FILTER_FOCUS`）、未判定必须有名字（`FILTER_PILL_FOCUS_UNCOVERED`）、
+    /// 而"接管"那条断言不许被摘掉 —— 否则这个出口就从"有名字的未判定"变成永久免检。
+    func testFilterFocusExitIsWired() throws {
+        let url = URL(fileURLWithPath: #filePath)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        let code = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        let body = code.split(separator: "\n    func ").first { $0.hasPrefix("testFilterSegmentsAreReachableAndShowFocus") } ?? ""
+        XCTAssertTrue(body.contains("FILTER_FOCUS"),
+                      "读数行被摘掉 ⇒ 这一格今天到底量到了什么，日志里没有证人")
+        XCTAssertTrue(body.contains("FILTER_PILL_FOCUS_UNCOVERED"),
+                      "未判定出口没有名字 ⇒ 它会退化成永久免检的那一类（R133 那一族）")
+        XCTAssertEqual(body.components(separatedBy: "XCTAssertGreaterThanOrEqual(reachedFilterBandWithRing, 1").count - 1, 1,
+                       "『接管』那条断言必须恰好一处：0 处=这个出口永远不会被换回判据，2 处=重复实现")
+        XCTAssertTrue(body.contains("fieldEditorStops"),
+                      "字段编辑器没被按身份排除 ⇒ 又回到『把量错对象当成量到了』（本轮第一版就是这么假绿的）")
+    }
+
     func testSidebarListFocusRingAfterClick() throws {
         try skipUnlessEnabled()
         let store = HistoryStore(

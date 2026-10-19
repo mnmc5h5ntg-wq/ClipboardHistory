@@ -461,6 +461,10 @@ private struct FilterSegmentButton: View {
                 .contentShape(Rectangle())
         }
         .pressedStyle(in: VisualShape.rounded(VisualRadius.control))
+        // R194 试过在这里加 `.focusable(true) + @FocusState + 一条 accent 描边`，
+        // 探针实测**没有效果**（Tab 链 12 站仍然全是搜索框的字段编辑器，段按钮一站都不是）⇒ 代码删掉，
+        // 只留下这条读数与它撑着的缺口：可达性不是加一个修饰符就能买到的，得先弄清 List 宿主怎么排 key-view。
+        // 见 `UIInteractionProbeTests.testFilterSegmentsAreReachableAndShowFocus` 与 BACKLOG 220。
         // 参数从目录拿，不在这里写死 0.14：这一档以前散在四处、分别是 0.11/0.14/0.15/0.18，
         // 没人说得出哪个对（M11）。悬停跟着鼠标 ⇒ 给最短的那一档。
         .animation(MotionCatalog.animation(for: .hover), value: isHovered)

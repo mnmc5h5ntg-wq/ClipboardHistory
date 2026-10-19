@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 筛选条「聚焦」格：键盘走不到段按钮（12/12 站是搜索框的字段编辑器），试过的 .focusable 修法被探针驳回（R194 / U-635…U-636 · 产品 1 文件仅注释）
+
+- 新判据：`UIInteractionProbeTests.testFilterSegmentsAreReachableAndShowFocus`（真窗口 + key-view 链 12 站，按**身份**排除字段编辑器）
+- 读数：FILTER_FOCUS 带内候选=1 全部候选=4 候选清单=["ChineseMenuTextField@(43.0, 18.0, 258.0, 16.0) ring=0 带内=true", "ListCoreScrollView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "ListCoreClipView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "SwiftUIOutlineListView@(0.0, 126.
+- 试过并删除：`FilterSegmentButton` 的 `@FocusState` + `.focusable(true)` + 聚焦描边 —— 编译 0 告警但探针照红 ⇒ 产品只留 4 行注释（无行为改动，帧未重捕）
+- 焦点呈现那一格 = 有名字的未判定：FILTER_PILL_FOCUS_UNCOVERED 理由=Tab 链 12 站里段按钮 0 站（字段编辑器 12 站） ⇒ 『聚焦格』在这一档今天判不了（拿不到焦点就无从谈焦点表达）；放掉的只有呈现那一半，可达性缺陷由这行读数落账（BACKLOG 220）；接管断言由 `testFilterFocusExitIsWired` 钉住
+- 新开 BACKLOG 220（可达性缺陷本体）；本轮变异表 **NOT-RUN**，两把待补刀 M726/M727 已写进账
+- 验证：编译 0 告警、探针卷 3 例/skip 1/失败 0
 ### 217 装好时间轴：五跑分布抓到"帧数 9~11 里只有 1~2 帧对是连续的"，而这条轴自己在 2.0 界上翻面（R193 / U-632…U-634 · 产品 0 文件，判据账）
 
 - 新尺：`armProcessInIntervals`（含峰值那段时长 ÷ **本次实测**中位间隔）+ `processReadingVerdict`（散点撑绿 / 有一段过程 / 帧数本来就不够）；2.0 个间隔这个界就是 `minimumTransitionFrames=3` 在时间轴上的等价形状，不是新阈值

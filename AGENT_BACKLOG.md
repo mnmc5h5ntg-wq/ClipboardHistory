@@ -5408,3 +5408,15 @@ M709（退回各自归一化，只有接线扫描抓得到）、M710（方向反
 `not-applicable` 要有产品理由，不许当垃圾桶。地板只由已清账抬（D-038 那条单调量规矩）。
 优先做**主窗口/筛选条**那 6 格：本轮 R189–R190 已经把这一处的两态像素判据建好（`FILTER_PILL_BAND` +
 `channelCanSeeMaterial`），其余表面还没有这种承重尺 —— 有尺的地方判起来才不是看图说话。
+
+**220. 筛选段按钮进不了 key-view 链 ⇒ 键盘用户选不中「全部/收藏」（R194 探针实测开单，不是读码猜测）**
+
+读数：`FILTER_FOCUS 带内候选=1 全部候选=4 候选清单=["ChineseMenuTextField@(43.0, 18.0, 258.0, 16.0) ring=0 带内=true", "ListCoreScrollView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "ListCoreClipView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "SwiftUIOutlineListView@(0.0, 126.` —— 真窗口里沿 `selectNextKeyView` 走 12 站，**12 站全是搜索框的字段编辑器**（`NSTextView`），
+带内候选只有 `ChineseMenuTextField` 一个（就是那颗搜索框）。⇒ 侧栏顶部的两枚段按钮在 AppKit 响应者链里没有身份。
+已试过并被驳回的修法：`FilterSegmentButton` 加 `@FocusState` + `.focusable(true)` + 只在聚焦时出现的 accent 描边
+⇒ 编译 0 告警、探针**照红**（0/12 站）。所以这不是"加个修饰符"的事：
+欠的是先弄清 `List`/`NSHostingView` 怎么排 key-view（同 R93 那段：一棵侧栏树里只有 2 个 `KeyViewProxy`、
+且都 `acceptsFirstResponder=false`），可能的路是 ① 换成原生 `NSSegmentedControl`（NSViewRepresentable）
+② 或给段按钮装一个显式 `NSView` 代理并接进 `nextKeyView` 链。两条都要先看渲染画面再定，别再来一次"我以为修好了"。
+判据已经就位：段按钮一旦进链（`reachedFilterBand ≥ 1`），`reachedFilterBandWithRing` 那条断言自动接管，
+今天的 `FILTER_PILL_FOCUS_UNCOVERED` 出口当场失效 —— 它不会永久免检。
