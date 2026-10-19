@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据：纯文本那一格也不再拿本机的能力当另一台机器的地板（R233 / 253 的"接进 CI"结案）
+
+- run 39321660036 在 runner 上唯一那朵红读到了正文：`scripts/surface_left_axes.py` 在不带 `--ci`
+  的调用里把「硬违反」与「尺没有对象」缝进同一个 `问题=` 计数 ⇒ 那四条环境盲区让它 exit 1，
+  而上一轮只把 `--ci` 那一格改成按机器切片，**同一件事的第二份判定漏了**。
+- 现在两格由同一行机器画像推导：`问题 = hard + not_run`、规则行 = 未被盲区探针引用的那些条；
+  产品那一条轴（`hard`）在两台机器都钉死 0，另有独立一格钉它不许跟着机器放宽。没抬地板、没删断言。
+- 新契约卷 `PlainContractTests` 六格不碰环境就能红；三把刀 M781 / M782 / M783 全 CAUGHT、
+  ESCAPED=0、NOT_RUN=0、RESTORE_CLEAN=yes。
+- 两处形状自曝：M782 第一版让被审文件在导入期 SyntaxError，rc≠0 却没有 `FAIL:` 行 ⇒ 这一支现在
+  要求"红必须有名字"，否则判 NOT_RUN 并出非 0；上一轮那张 `RUNNER_SAMPLE` 样本的第一行是我手拼的
+  （runner 上那条关系根本不会打行），四张样本已改为由真输出逐字生成，并加了会红的牙钉住这种拼法。
+- 新开 260：把新表登记进预检名册会让预检在导入那张表时静默截断（表的 `sys.exit()` 穿过
+  `except Exception`），结论行不打而 exit 仍是 0 ⇒ 名册本轮退回，欠一条带证人的修法。
+
 ### 详情区「原文 / 渲染」那颗控件的悬停档，第一次在像素上对账（R231 补记第七笔 / BACKLOG 258 第二处）
 
 `MarkdownModeButton` 的悬停层在上一轮接进了共享换算，但"接进了"只有名册知道、帧上从来没有证人。
