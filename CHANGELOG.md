@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### R206 并笔：新回执进帧基线（138→140）+ 变异名册补齐 + 调用点守卫（R206 / U-668…U-670 · 判据 2 文件 + 表 1 支 + 基线 1 份，产品 0 文件）
+
+- 归因先于处置：三张暗帧的纯黑带高度**都是 132px（66pt @2x）**、只有 y 不同 ⇒ 判为已登记的材质盲区，登记条目带读数（不是裸名单）
+- 帧基线 140 张、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`；新帧暗档里「拖入的 2 项不是本机文件，未加入历史」+「知道了」都画得对
+- `mutate_r205.py` 登记进名册：`M736, M737, M738` ⇒ `R205_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `tables=55 covered=40 arms=158 dupes=0`
+- 建表时抓到的新洞当场补：新断言 `testSidebarWiresTheAttemptedCountAtTheCallSite`（剥行注释 + 整行字面量 1 次 + 裸调用 0 次）+ 刀 M738；卷 `10 tests / 0 failures`
+- 三笔自我更正留在账上：假 U 区间收回、message 先于证据补落、zsh 退出码判断让电池没跑（诊断靠日志文件在不在）
+- CI：`5` 跑 success、`1` 跑未读、失败跑 无；BACKLOG 231 的停车读数已刷新
+- 台账：STATE 换到 R206 / 第 208 轮；新开 D-203（补帧要先归因、登记要带读数）
 ### 调用点守卫落地 + 刀 M738（R206 第四笔非轮次 · 判据 1 文件 + 表 1 支，产品 0 文件）
 
 - 新断言 `testSidebarWiresTheAttemptedCountAtTheCallSite`：从 `#filePath` 推到视图，**先剥行注释**，再要求整行字面量出现 1 次、裸调用出现 0 次（两个方向各一条）
