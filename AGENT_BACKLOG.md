@@ -6043,3 +6043,14 @@ R200 以后新增的决定**一条都不在这条守卫的可见范围里**：�
 ② 加一条会红守卫：扫 `scripts/tests/**` 与 `scripts/*.py`，出现字面 `/tmp/shots_r[0-9]+` 即红
    （豁免名册为空；正对照 = 临时插一行含该字面串的注释，必须被点名）。
 不许做的事：把这两格直接删掉（那是把"没跑"改成"没这回事"）；也不许把 skip 当成通过写进结论行。
+
+**253 追记（R228 结案）：写死的帧目录已换成环境变量，守卫上线第一秒就抓到第二个我没 grep 到的对象**
+
+`scripts/tests/test_surface_left_axes.py` 的 `SHOTS` 不再指向某一轮的临时目录，改由捕获卷同一个环境变量
+`CLIPBOARD_HISTORY_UI_SHOTS` 派生；取不到时仍 skip，但 skip 文本点名的是**通道**（未给该变量），不再是某个不存在的路径。
+新守卫 `scripts/tests/test_frames_path_hygiene.py` 三格（真扫 / 正对照 / 负对照）。
+第一跑就红了，而红的不是我 grep 到的那一处：`scripts/surface_left_axes.py` 的**模块 docstring** 里那行用法示例
+写着某一轮的临时目录（我先前 grep 时被 `head -12` 截断，没看见它）⇒ 已改成 `--shots "$CLIPBOARD_HISTORY_UI_SHOTS"`。
+这条正是守卫该有的样子：它抓的是**形状**，不是我当时想到的那一处。
+两向证人：给了变量 ⇒ 那两格真帧对照 `ok`（11 tests OK）；不给变量 ⇒ 两格 skip 且文本点名通道（`OK (skipped=2)`）。
+电池 `Ran 406 tests ... OK`（新增 3 格）。**没做的事**：没把这两格接进 CI 步骤（那要让 runner 也产帧，属 235/249 那一族）。
