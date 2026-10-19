@@ -323,6 +323,24 @@ jobs:
       # 清单外的盲区 / 没有理由的 not-run / 换了新理由 / 少了一臂的键 都会红。
       # 三条前提仍缺一不可（`executed` 有值、结论行在、judged 读得出），
       # 否则会把"探针没跑完"算成"产品没验到"（D-055 那一族）—— 这一条由脚本的单测钉住。
+      # R223 / BACKLOG 244：pillow 的 venv 必须在**判据卷之前**建好。
+      # 原来它排在 `Release script tests` 之后（R212 只为了让左轴那一步能用上像素库），
+      # 于是 `scripts/tests` 里所有 `@NEEDS_PIL` 的格子在 runner 上**永远 skip** ——
+      # 像素判据的自检真值表至今只有本机跑过。本机 python3 有 PIL 11.3.0 且这些格子是绿的，
+      # 所以把它们搬到 venv 解释器下跑不是"赌一把"，是把本机已有的覆盖面搬到 CI。
+      # 三种"装不上"各打一条 echo（venv 建不起来 / pip 失败 / 装了 import 不到），下一轮不用猜。
+      - name: Pillow for the frame rulers (venv · R218 / BACKLOG 237, moved before the battery in R223)
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          # run 39262764467 的正文把成因签死了：`python3 -m pip install --quiet pillow` 在这台 runner 上
+          # 直接 `error: externally-managed-environment`（PEP 668），而 `--break-system-packages`
+          # 要动的是作业机器的系统解释器 —— 一把像素尺不该要这个副作用（D-210）。
+          # 所以装进一次性 venv，用得上它的每一步**显式**指那台解释器（不指望 PATH）。
+          python3 -m venv /tmp/pilenv || echo "PILLOW_VENV_FAILED=1（下面两步会读成 unavailable / skip，不会伪装成产品结论）"
+          /tmp/pilenv/bin/python -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（同上）"
+          /tmp/pilenv/bin/python -c "import PIL, sys; print('PILLOW_OK', PIL.__version__, sys.executable)" || echo "PILLOW_IMPORT_FAILED=1（装了但 import 不到：与「没装」是两种成因，正文要能分开）"
+
       - name: Release script tests
         # R143 审查轮（#32）：原来这三行几乎恒真 —— `grep -q "OK"` 会被自检自己打的
         # `… exit=1   OK` 那十几行喂饱（汇总之后也还有），`Ran [0-9]+ tests` 漏掉单数 `Ran 1 test`，
@@ -330,10 +348,18 @@ jobs:
         # 汇总行必须**紧跟在 Ran 之后**、失败数必须为 0、跑到的用例数要过地板。
         run: |
           set -o pipefail
-          python3 -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
+          # R223：判据卷也走 venv 解释器（装不上就退回系统 python3，那几格继续 skip —— 那是环境缺席，不是产品结论）。
+          # `SCRIPT_SKIPS` 这一格是**证人**：它印出本轮到底跳过了几条。
+          # 以后若有人声称"runner 上像素判据已验收"，看这一行了不算，要 `SCRIPT_SKIPS` 里没有 PIL 那批。
+          PY=python3
+          if [ -x /tmp/pilenv/bin/python ]; then PY=/tmp/pilenv/bin/python; fi
+          echo "SCRIPT_PYTHON=$PY"
+          "$PY" -c "import PIL, sys; print('SCRIPT_PIL_OK', PIL.__version__, sys.executable)" 2>/dev/null || echo "SCRIPT_PIL_MISSING=1（@NEEDS_PIL 的格子这一跑仍是 skip）"
+          "$PY" -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
           status=$?
           echo "suite exit: $status"
           tail -6 /tmp/py.log
+          grep -c "\.\.\. skipped" /tmp/py.log | sed 's/^/SCRIPT_SKIPS=/'
           [ "$status" -eq 0 ] || exit 1
           # `^OK$` 是我在 R143 part 2 亲手写窄的：unittest 有 skip 时打的是 `OK (skipped=1)`，
           # 本机 0 skip 所以绿，runner 上至少 1 条 skip ⇒ 这一步红在**闸门自己**身上（不是产品）。
@@ -387,17 +413,6 @@ jobs:
       # 为什么允许 skipped/unavailable：无头 runner 的高窗只画一条下沿带（BACKLOG 201），
       # 而环境缺席被报成产品结论就是 R154 那朵假红的形状。缺席必须是**读数**
       # （not_run=几颗、缺哪些帧），两侧都由 scripts/tests/test_surface_left_axes.py 钉住。
-      - name: Pillow for the frame rulers (venv · R218 / BACKLOG 237)
-        continue-on-error: true
-        timeout-minutes: 3
-        run: |
-          # run 39262764467 的正文把成因签死了：`python3 -m pip install --quiet pillow` 在这台 runner 上
-          # 直接 `error: externally-managed-environment`（PEP 668），而 `--break-system-packages`
-          # 要动的是作业机器的系统解释器 —— 一把像素尺不该要这个副作用。所以装进一次性 venv，
-          # 下一步**显式用那台解释器**跑（不指望 PATH）。装不上仍然只报 unavailable，不许报成产品结论。
-          python3 -m venv /tmp/pilenv || echo "PILLOW_VENV_FAILED=1（下一步会读成 unavailable，不会伪装成产品结论）"
-          /tmp/pilenv/bin/python -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（同上）"
-          /tmp/pilenv/bin/python -c "import PIL, sys; print('PILLOW_OK', PIL.__version__, sys.executable)" || echo "PILLOW_IMPORT_FAILED=1（装了但 import 不到：与「没装」是两种成因，正文要能分开）"
 
       - name: "Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)"
         timeout-minutes: 2

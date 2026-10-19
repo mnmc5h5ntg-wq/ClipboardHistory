@@ -363,6 +363,35 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 225 轮（R223 · 2026-10-19）：247 解释并修好（旧变异表的锚点被我上一轮改源码时弄脱钩）、244 落地：判据卷也走 venv，像素自检第一次有机会在 runner 上跑（U-719…U-721 · CI 1 文件 + 表 1 文件，产品 0 文件）
+
+- **U-719：上一轮那格"未解释的数"这一轮解释了，而且解释完发现自己欠了一格。**
+  预检的 `bad` 累加点只有三处（导入失败 / 读文件失败 / **needle 在文件里命中≠1**），
+  `dupes`/`repeats` 都是 0 ⇒ `bad=5` 就是五条脱钩的锚点，本轮日志点名的是：mutate_r97_card M541 命中=0；mutate_r169 M684 命中=0；mutate_r217 M750 命中=2。
+  其中 **`mutate_r213` 的 M747 是我上一轮弄脱钩的** —— R221 把 `live()` 从
+  `readings.get(n) is not None` 改成 `readings.get(n) and readings[n].get('ok')`，
+  而那张 2026-10-19 早些时候的表的锚点没跟着改 ⇒ 它今天**重跑不了**（NOT_RUN），
+  而 CI 与人都只看结论行，没人会去重跑历史表。修锚点后 `bad` 5→4，
+  并**真把旧表重跑了一遍**：`R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`
+  （⇒ 提成 **D-215**：改源码就要当场把打它的那张表改到能跑）。
+- **U-720：244 的修法落地 —— venv 前移到判据卷之前，`@NEEDS_PIL` 那批第一次有机会在 runner 上真跑。**
+  步骤顺序现在是 `Pillow for the frame rulers (venv …)` → `Release script tests` → `Surface left-axis ruler …`（venv 只剩一条，R218 那条已删，重复会被本轮的断言拦下）。
+  判据卷不再写死 `python3`：有 `/tmp/pilenv/bin/python` 就用它，装不上才退回系统解释器
+  —— 那几格继续 skip 是**环境缺席**，不是产品结论（R154 那一族）。三行证人：
+  `SCRIPT_PYTHON=`、`SCRIPT_PIL_OK <版本> <路径>`（或 `SCRIPT_PIL_MISSING=1`）、`SCRIPT_SKIPS=<条数>`。
+  本机前提已核（不是赌）：本机 `python3` 有 PIL 13.0.0 同族（实测 11.3.0），`@NEEDS_PIL` 那批本来就是绿的，
+  所以搬到 CI 只是把本机已有的覆盖面搬过去。**runner 那一跑仍待读** ⇒ 244 不写结案。
+- **U-721：CI 读数与未读清单。**
+  `cc0e358` = run `39272745719` **success**，正文里 `PILLOW_OK 13.0.0` 与 `LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`
+  —— 但那一跑**早于** R221 的成因分档，所以 runner 上还没有 `cause=` 读数。
+  带着分档代码的三跑 `69bccbd`/`540bb1e`/`04a68ed` 全部 `in_progress` ⇒ **246 仍等**，
+  本轮这一跑是第一个"cause 分档 + venv 判据卷"同时上去的 ⇒ 246 与 244 的结案通道都在它身上。
+  看图腿 NOT-RUN：本轮 0 像素改动、无新帧（盘上那 142 张属 R219/R220 两遍，不替本轮作证）。
+
+其余读数：电池 `Ran 403 tests ... OK`（含 `test_ci_workflow_shape` 与本轮新改的 workflow）；
+预检 `NEEDLE_PRECHECK tables=65 covered=50 arms=182 bad=4`；
+产品 0 文件 ⇒ 未换装本机、本地全量卷按 D-208 的适用面不需要。
+
 ## 第 224 轮（R222 · 2026-10-19）：最终报告的活数格换到对账：标题停在 R136 / §1 停在 94 轮与 U-210，本轮起有一条守卫盯着它（并配两把刀）（U-716…U-718 · 判据 1 文件 + 报告本体，产品 0 文件）
 
 - **U-716：报告里那几格"活数"停得比账本还旧 —— 本轮把它们换到现读，并追加 R137–R221 那一段。**

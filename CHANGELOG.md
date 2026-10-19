@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 247 结案（旧表锚点脱钩）+ 244 落地：判据卷走 venv，像素自检第一次有机会在 runner 上跑（R223 / U-719…U-721 · CI 1 文件 + 表 1 文件，产品 0 文件）
+
+- `bad` 的语义读明白了：只数"导入失败 / 读文件失败 / needle 命中≠1"（`dupes=0 repeats=0`）⇒ 五条都是**锚点脱钩**。
+  其中 `mutate_r213` 的 M747 是 R221 我改 `live()` 时弄脱钩的 ⇒ 修锚点、`bad` 5→4，
+  并真重跑旧表：`R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。立 **D-215**。
+- 244：venv 步骤前移到 `Release script tests` 之前（只剩一条，R218 那条删除；顺序与条数由脚本断言核过），
+  判据卷改用 `/tmp/pilenv/bin/python`（装不上才退回系统解释器），加三行证人
+  `SCRIPT_PYTHON` / `SCRIPT_PIL_OK` / `SCRIPT_SKIPS=`。
+- CI：`cc0e358`=`39272745719` **success** 有 `PILLOW_OK 13.0.0` 但 `LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`，
+  且早于成因分档 ⇒ runner 上仍无 `cause=` 读数；带分档的三跑全 in_progress ⇒ **246 仍等**。
+- 验证：电池 `Ran 403 tests OK`（含 ci workflow 形状守卫）；预检 `tables=65 covered=50 arms=182 bad=4`；
+  产品 0 文件 ⇒ 未换装本机；看图腿 NOT-RUN（0 像素改动、无新帧）。
+
 ### 最终报告的活数格对账 + 一条会红的守卫（R222 / U-716…U-718 · 判据 1 文件 + 报告本体，产品 0 文件）
 
 - 刷新：标题 **R9–R221，214 轮自评**、§1 轮数 **214**、视觉台账 **U-31 … U-715（432 条定义行）**、

@@ -25,7 +25,7 @@ T = 'scripts.tests.test_surface_left_axes'
 D_NEEDLE = '    if spread2 > COMPOSED_TOL_PT:'
 EXIT_NEEDLE = ("    except ImportError:\n"
                "        print(u'LEFT_AXIS_VERDICT unavailable reason=pillow-missing 探针=0 问题=0 NOT_RUN帧=0')")
-LIVE_NEEDLE = '        return all(readings.get(n) is not None for n in names)'
+LIVE_NEEDLE = "        return all(readings.get(n) and readings[n].get('ok') for n in names)"  # R223 跟着 R221 的成因分档改过锚点
 
 ARMS = [
     ('M745', u'同帧判据恒真（D 被注释掉也不会有反应）', RULER,

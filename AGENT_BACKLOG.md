@@ -5975,3 +5975,19 @@ R222 只对账了三格（标题的轮次区间、§1 的阶段二轮数、视�
 本条剩下的活（§1 其余格子纳入对账或删掉）不变，但下一轮还要注意：
 `final_report_r222.py` **不是幂等的**（它的行内锚点已经被本轮改掉），要么把锚点改成"新旧两种都认"，
 要么把报告刷新排到**轮次台账之后**，让报告永远停在"截至本轮"。
+**247 追记（R223 结案）：`bad` 数的是"锚点与文件脱钩"，本轮 +1 那一条是我自己上一轮弄的**
+
+三个累加点读完了：导入失败、读文件失败、`needle.count != 1`；`dupes`/`repeats` 本轮都是 0。
+本轮日志点名的五条：mutate_r97_card M541 命中=0；mutate_r169 M684 命中=0；mutate_r217 M750 命中=2。
+`mutate_r213` 的 M747 打在 `live()` 那一行，而 R221 我把那行改成了按 `ok` 判 ⇒ 锚点命中 0，
+那张表今天重跑会 NOT_RUN（不是 ESCAPED，是**跑不了**）。处置：改锚点 + 真重跑
+`R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`，`bad` 5→4。
+本条结案。剩下四条（`mutate_r97_card` M541、`mutate_r169` M684/M686、`mutate_r217` M750 命中=2）
+是更早的历史漂移，按 D-215 的规矩要么下次动到那张表时顺手修，要么显式标退役 —— 不许留着不管。
+
+**244 追记（R223 修法落地·待 runner 验收）**
+
+venv 步骤前移到 `Release script tests` 之前，判据卷改用 `/tmp/pilenv/bin/python`（不存在才退回 `python3`）；
+证人三行：`SCRIPT_PYTHON=`、`SCRIPT_PIL_OK <版本> <路径>` 或 `SCRIPT_PIL_MISSING=1`、`SCRIPT_SKIPS=<条数>`。
+本机前提：`python3 -c "import PIL"` = 11.3.0，`@NEEDS_PIL` 那批在带 PIL 的解释器下本来就是绿的。
+仍欠：runner 那一跑 `SCRIPT_SKIPS` 实际掉到几条、以及带 PIL 之后有没有新的红（若有，那是第一次真判，红要归因不要放宽）。
