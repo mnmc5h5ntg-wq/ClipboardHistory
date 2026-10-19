@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 调用点守卫落地 + 刀 M738（R206 第四笔非轮次 · 判据 1 文件 + 表 1 支，产品 0 文件）
+
+- 新断言 `testSidebarWiresTheAttemptedCountAtTheCallSite`：从 `#filePath` 推到视图，**先剥行注释**，再要求整行字面量出现 1 次、裸调用出现 0 次（两个方向各一条）
+- `mutate_r205.py` 加第三把刀 `M738`（把视图那一处换回裸调用）⇒ `R205_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；卷 `Executed 10 tests / 0 failures`；预检 `arms=158 dupes=0`
+- ⇒ BACKLOG 230 结案（候选①）。**候选②仍欠**：从视图入口真拖一次要 in-screen 探针，runner 今天跑不动 ⇒ 这条守卫是"接线"层今天能落的最强形状，不是终点
+- 228 现在只剩②（真机拖一次"声称是文件但解不出"的样本）
+
 ### 把 R205 的两把内联刀搬进变异名册；建表时自我复查抓到一格新洞：调用点没有守卫（R206 第三笔非轮次 · 工具 2 文件，产品 0 文件）
 
 - 新表 `.scratch/motion-audit-2/mutate_r205.py`（M736 钉"会不会说话"、M737 钉"说的是不是那个数"），登记进 `mutate_needle_precheck.py` 的 TABLES

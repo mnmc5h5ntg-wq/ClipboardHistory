@@ -912,7 +912,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 判定分布 | added=9 kept=30 not-added=15 not-applicable=77（之和 == 行数，由生成器对账） | 同上 |
 | Swift 全量卷 | 884 / skip 44 / fail 0 —— **R198 那一跑的读数，R199…R205 未再跑全量**（R205 动了产品 ⇒ 全量交给 CI，未读之前不算它绿） | `/tmp/r198_full.log` 摘要行 |
 | 脚本电池 | Ran 384 tests / OK（R205 那一遍，`/tmp/r205_battery.log`） | `/tmp/r200_battery.log` |
-| 变异预检 | tables=55 covered=40 arms=157 bad=3（bad 是 R168 记的陈旧死针）；`ARM_TOTAL dupes=0 repeats=0`；R206 补登 `mutate_r205.py` | `mutate_needle_precheck.py` |
+| 变异预检 | tables=55 covered=40 arms=158 bad=3（bad 是 R168 记的陈旧死针）；`ARM_TOTAL dupes=0 repeats=0`；R206 补登 `mutate_r205.py`（M736/M737/M738 三刀全 CAUGHT） | `mutate_needle_precheck.py` |
 | 自评曲线 | PHASE2_TO_47 n=40 mean=91.30；GAPS=none ⇒ 已含补落的 Round 201/202/203 与 R204 / R205 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 18 支；`.scratch/motion-audit-2/*.py` 268 支 | 目录计数 |

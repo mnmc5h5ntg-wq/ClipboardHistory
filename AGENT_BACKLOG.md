@@ -5684,4 +5684,8 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
 
 形状：判据从 `HistoryStore.addDroppedFiles` 入口进，它不读调用点 ⇒ 视图里那一处传参一旦被改回去（或从来没人传），store 仍"有说话的能力"、测试仍全绿，而产品重新变静默。这正是 R43/R44 那一族"零调用点的死尺"：判据有牙，但咬不到接线。
 修法候选（先做实验再定形状，别顺手加一条 contains）：① 整行源码形状断言（`addDroppedFiles(urls: urls, attemptedCount: wanted.count)` 必须出现且次数==1）；② 更强的版本让判据从视图入口进（要 in-screen 探针，runner 今天跑不动，见覆盖登记表）；③ 把 `attemptedCount` 改成必填 ⇒ 漏传直接编译不过（今天只有两处调用方：视图与测试）。
-本笔**未做**；`mutate_r205.py` 的文档串里写明"按实记账：调用点没有守卫"，不当成已交付。
+**230 追记（R206 结案）：调用点守卫已落地 —— 走的是候选①，并配了一把新的刀 M738。**
+新断言 `DroppedFileImportTests.testSidebarWiresTheAttemptedCountAtTheCallSite`：从 `#filePath` 推到 `HistorySidebarView.swift`，**先剥行注释**再数整行字面量 —— 传参那一处必须出现 1 次、旧的裸调用 `addDroppedFiles(urls: urls)` 必须 0 次（两条各一个方向，防"整文件 contains 命中自己引用的注释"那一族）。
+刀 `M738`（把视图那一处换回裸调用）catcher 就是这条守卫 ⇒ `R205_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；卷 `Executed 10 tests, with 0 failures`；预检 `tables=55 covered=40 arms=158 dupes=0`。
+候选②（从视图入口真拖一次）仍欠 —— 它要 in-screen 探针，runner 今天跑不动（见覆盖登记表），所以这条守卫是"接线"层能落的最强形状。
+原记录：本笔**未做**；`mutate_r205.py` 的文档串里写明"按实记账：调用点没有守卫"，不当成已交付。

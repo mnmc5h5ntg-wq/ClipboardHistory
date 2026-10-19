@@ -15,16 +15,20 @@ M737 只把文案里的 `\(attempted)` 换成 `\(urls.count)` ⇒ 话照说、�
      同一颗判据里那条 `notice?.contains("2 项")` 红。
      这把刀钉的是**说的是不是那个数** —— 没有它，"永远说 0 项"这种半修好的东西能带着绿活很多轮。
 
-按实记账（不在本表里，别当成已交付）：**调用点没有守卫**。
-把 `HistorySidebarView` 里的 `attemptedCount: wanted.count` 摘掉，本表两把刀都不会红 —— 因为判据是从 store 入口进的，
-不读调用点。那一格的牙要另配一条源码形状断言（与 R43/R44 那族"零调用点的死尺"同一个洞），
-今天仍欠 ⇒ 记在 BACKLOG 230。
+按实记账（R206 之后已补上）：**调用点这一格现在有 M738 与一条源码形状断言**（BACKLOG 230 结案）。
+前两把刀都从 store 入口进，所以摘掉视图里的传参它们都不会红 —— 那正是"判据有牙但咬不到接线"，
+M738 钉的就是这一格：它的 catcher 是新加的那条调用点守卫，不是 store 那三条对照。
 """
 import io, os, re, subprocess, sys
 
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 STORE = "Sources/ClipboardHistoryApp/Managers/HistoryStore.swift"
+VIEW = "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 RECEIPT = "DroppedFileImportTests/testDroppedProvidersThatDecodeToNothingStillSpeakUp"
+WIRING = "DroppedFileImportTests/testSidebarWiresTheAttemptedCountAtTheCallSite"
+
+WIRED = "historyStore?.addDroppedFiles(urls: urls, attemptedCount: wanted.count)"
+BARE = "historyStore?.addDroppedFiles(urls: urls)"
 
 ARMS = [
     ("M736", "attemptedCount 被丢掉（声称有几个却解出 0 ⇒ 那一格重新变静默）", STORE,
@@ -33,6 +37,8 @@ ARMS = [
     ("M737", "回执改口说解出的个数（话照说、数永远是 0 ⇒ 半修好）", STORE,
      r"拖入的 \(attempted) 项不是本机文件",
      r"拖入的 \(urls.count) 项不是本机文件", RECEIPT),
+    ("M738", "调用点退回不传 attemptedCount（store 那三条对照全绿，产品却重新静默 ⇒ 接线必须有自己的守卫）", VIEW,
+     WIRED, BARE, WIRING),
 ]
 
 

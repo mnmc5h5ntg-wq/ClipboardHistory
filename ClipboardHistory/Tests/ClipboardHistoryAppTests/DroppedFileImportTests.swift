@@ -116,4 +116,29 @@ final class DroppedFileImportTests: XCTestCase {
         XCTAssertEqual(ok.addDroppedFiles(urls: [file], attemptedCount: 1), 1)
         XCTAssertNil(ok.droppedFilesNotice, "成功那一格不该被横幅打断")
     }
+
+    /// BACKLOG 230（R206）：**调用点守卫**。
+    ///
+    /// 为什么单独要有这一条：上面那三条对照都从 store 入口进，它们证明的是"store 有说话的能力"。
+    /// 把视图里那一处传参摘掉，store 看到的是空数组、`attemptedCount` 是 nil ⇒ 三对照全绿，
+    /// 而产品重新变回"我拖了，什么都没发生"。判据有牙但咬不到接线 —— 这是 R43/R44 那一族"零调用点的死尺"。
+    /// 扫之前剥行注释：整文件 contains 会命中引用它自己的那些注释（R74/R75 记过同一族）。
+    func testSidebarWiresTheAttemptedCountAtTheCallSite() throws {
+        let view = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift")
+        let raw = try String(contentsOf: view, encoding: .utf8)
+        let code = raw.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+            guard let cut = line.range(of: "//") else { return String(line) }
+            return String(line[..<cut.lowerBound])
+        }.joined(separator: "\n")
+        let wired = "addDroppedFiles(urls: urls, attemptedCount: wanted.count)"
+        let bare = "addDroppedFiles(urls: urls)"
+        let wiredHits = code.components(separatedBy: wired).count - 1
+        let bareHits = code.components(separatedBy: bare).count - 1
+        XCTAssertEqual(wiredHits, 1, "侧栏只有一处拖入调用点，且必须把「声称有几个」传进 store ⇒ 传参就是这条回执唯一的接线")
+        XCTAssertEqual(bareHits, 0, "调用点退回不传 attemptedCount：store 会看到空数组而重新静默，而 store 那三条对照全都会绿")
+    }
 }
