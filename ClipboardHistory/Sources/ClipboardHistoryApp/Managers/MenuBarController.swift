@@ -133,10 +133,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 action: #selector(dismissAllRecommendationsFromMenu),
                 keyEquivalent: ""
             )
-            dismissItem.attributedTitle = NSAttributedString(
-                string: "都不是我想要的",
-                attributes: [.foregroundColor: NSColor.systemBlue]
-            )
+            // R235（D-220）：这里原先把这一行的墨**写死**成一颗蓝，墨写死就不参与系统为
+            // 选中态准备的换色。实测（MENUBAR_DISMISS_INK，底色用系统语义色当代理）：
+            // 静置底上 3.52:1（亮）/5.16:1（暗），而同一棵菜单的正文参照是 21.00/16.67；
+            // 选中底上 1.93/2.36，压强调底 1.14/1.24。静置与悬停两种态它都输 ⇒ 墨交回系统。
+            // 这一行"我是退出这轮推荐"的身份改由**分隔线 + 它自己在最后一段**承担。
             menu.addItem(dismissItem)
         } else if let store = historyStore {
             // 没有推荐时也要说一句话：旧实现在这种情况下整段静默消失，用户分不清

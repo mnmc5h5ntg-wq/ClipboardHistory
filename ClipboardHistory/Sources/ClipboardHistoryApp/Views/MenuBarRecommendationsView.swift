@@ -75,7 +75,8 @@ struct MenuBarRecommendationsView: View {
                 } label: {
                     Text("都不是我想要的")
                         .font(.system(size: VisualFont.meta))
-                        .foregroundStyle(.blue)
+                    // R235（D-220）：不在这里钉颜色，与 `MenuBarController` 那棵 12 的树同一条决定
+                    // —— 写死的墨在静置与选中两种底上都读不过自家正文参照（实测见那条）。
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
