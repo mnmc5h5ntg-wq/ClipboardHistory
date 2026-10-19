@@ -1,5 +1,23 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 20:48（本地 · R210 / 第 212 轮：**看图尺接进 CI —— 三种出口（red/skipped/unavailable）各配证人，三把刀全 CAUGHT**（U-680…U-682 · 产品 0 文件，判据账 + CI 接线）
+
+**本轮落地**：`scripts/surface_left_axes.py` 加 `--ci`（真红才 exit 1；只有 NOT_RUN ⇒ skipped 并把缺席写成读数；没有像素库 ⇒ unavailable），
+`.github/workflows/ci.yml` 加两步：装 pillow（continue-on-error）与 `Surface left-axis ruler (BACKLOG 234, wired in R210)`（**不** continue-on-error）。
+处置逻辑写在 python 里而不是 shell 里（R64）。新表 `mutate_r210.py`：M742 恒绿出口 / M743 缺席算真红 / M744 容差放大成恒真 ⇒
+`R210_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=57 covered=42 arms=164 bad=3`、`ARM_TOTAL files=136 arms=550 dupes=0 repeats=0`。规矩立成 **D-207**：任何新接进 CI 的判据，落地那一轮就要有"把它改成恒绿"的刀。
+电池 `Ran 399 tests` 且 OK（新增 6 格）；本机真帧 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=5`、`LEFT_AXIS_SELFTEST ok`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`。
+**BACKLOG 234 只算本机结案**：这一步在 runner 上的第一跑结论未读 ⇒ 新开 235，下一轮第 ⓪ 条读它。
+CI：`7` 跑 success（bbc5642=39251464899、04ccf7a=39247806444、3073943=39247153666、f6d3b4a=39246385660、187ec0b=39245844718）、`1` 跑仍未读（c232e82）、失败跑 无 ⇒ 未读的不算绿。
+
+**下一轮（R211）的靶**：⓪ 读本轮这一跑的 CI，按**步骤名**过滤 `LEFT_AXIS_CI` 那一行（ok / skipped / unavailable 三种出口谁出现），
+并把 235 填回账；顺带把 `bbc5642` 之后仍未读的那几跑逐条落账；
+① 233：详情加载态的组合帧注入点（产品半：给 `DetailFileView` 的加载分支一个默认值=现行行为的 seam）+ 把跨帧比换成同帧关系判据；
+② 227③、222（亮档真帧余量只剩 3）、215（真机通道的第二格读数）、201/202、207；
+③ 回到画面：本轮看图腿 NOT-RUN，下一轮至少看两帧新拍的（换夹具或换档）；
+④ 220 路 A 与 228② 仍等用户（授权改 `AppleKeyboardUIMode` / 真机拖一次样本）。
+)
+
 最后更新：2026-10-19 20:42（本地 · R209 / 第 211 轮：**看图腿真做了一遍 + 新尺 `surface_left_axes.py` 入库（只留关系判据，自带五格真值表）**（U-677…U-679 · 产品 0 文件，看图账 + 判据账）
 
 **本轮落地**：浮层三条左轴量成 22.0 / 24.0 / 35.5pt（药丸左右内缩差 0.0pt ⇒ 对称），统计页卡片内三轴同在 148.0pt、

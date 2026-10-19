@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 看图尺接进 CI 一步，并给三种出口各配证人（R210 / U-680…U-682 · 判据 2 文件 + workflow 1 文件 + 表 1 支，产品 0 文件）
+
+- `scripts/surface_left_axes.py` 加 `--ci`：真红 ⇒ exit 1；只有 NOT_RUN ⇒ `verdict=skipped` exit 0（缺席写成读数 not_run/missing_frames）；没有像素库 ⇒ `verdict=unavailable` exit 0
+- `.github/workflows/ci.yml` 新增两步：`Pillow for the frame rulers`（continue-on-error）与 `Surface left-axis ruler (BACKLOG 234, wired in R210)`（**不** continue-on-error）
+- 判据与出口处置放在 python 而不是 shell：R64 的教训 —— awk 没有一份自测能证明它把"该红"和"该跳"分对了
+- `mutate_r210.py` 三把刀：M742 恒绿出口、M743 缺席算真红、M744 容差放大成恒真 ⇒ `R210_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=57 covered=42 arms=164 bad=3`、`ARM_TOTAL files=136 arms=550 dupes=0 repeats=0`
+- 电池 `Ran 399 tests` 且 OK（新增 6 格：CI 四出口 + workflow 两格形状）；本机真帧 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=5`、`LEFT_AXIS_SELFTEST ok`
+- BACKLOG 234 结案；新开 235（这一步在 runner 上的第一跑结论未读 —— 本机 ok 不等于 CI ok）
+- 产品 0 文件 ⇒ 无新帧、无换装、看图腿 NOT-RUN
 ### 看图腿：浮层与统计页的左轴量成三条关系判据，新尺 `scripts/surface_left_axes.py` 入库（R209 / U-677…U-679 · 判据 2 文件，产品 0 文件）
 
 - 浮层 `quickpick-list`：药丸左缘 22.0pt / 右内缩 22.0pt（对称差 0.0pt）、占位墨 24.0pt、行图标 35.5pt ⇒ "没对齐"这句撤回

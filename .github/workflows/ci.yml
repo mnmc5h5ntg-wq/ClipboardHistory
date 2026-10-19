@@ -380,6 +380,27 @@ jobs:
             --allow-missing content-wide-1100x800-dark.png | tee /tmp/baseline.log || status=$?
           exit "$status"
 
+      # R210 / BACKLOG 234：把 R209 那支看图尺接进 CI。判据与出口处置全在 python 里
+      # （R64 的教训：shell 里的 awk 没有一份自测能证明它把"该红"和"该跳"分对了），
+      # 这一步只跑它、把结论行留在日志。三种出口：真红 ⇒ 步骤红；只有 NOT_RUN（帧没拍到/窗口没墨）
+      # ⇒ skipped 且 exit 0；没有像素库 ⇒ unavailable 且 exit 0。
+      # 为什么允许 skipped/unavailable：无头 runner 的高窗只画一条下沿带（BACKLOG 201），
+      # 而环境缺席被报成产品结论就是 R154 那朵假红的形状。缺席必须是**读数**
+      # （not_run=几颗、缺哪些帧），两侧都由 scripts/tests/test_surface_left_axes.py 钉住。
+      - name: Pillow for the frame rulers
+        continue-on-error: true
+        timeout-minutes: 3
+        run: python3 -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（下一步会读成 unavailable，不会伪装成产品结论）"
+
+      - name: "Surface left-axis ruler (BACKLOG 234, wired in R210)"
+        timeout-minutes: 2
+        run: |
+          set -o pipefail
+          status=0
+          python3 scripts/surface_left_axes.py --shots /tmp/shots-ci --ci | tee /tmp/left-axes.log || status=$?
+          grep -E "LEFT_AXIS" /tmp/left-axes.log || true
+          exit "$status"
+
       # 审计 §3 C-2 的原话问句在这里回答："和**上一版**比，哪些帧变了"。
       # 基准是发布时由 prepare_release.py 冻结的 docs/frame_baselines/vX.Y.Z.json（auto 取最新一版）。
       # 报告型而不是硬门：新版本本来就该改像素，把"改了 62 帧"挡成红色只会训练人看红不看红。

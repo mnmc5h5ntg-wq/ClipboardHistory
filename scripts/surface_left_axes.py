@@ -225,11 +225,51 @@ def self_test():
     return 0 if ok else 1
 
 
+def ci_mode(shots_dir):
+    """CI 那一刀的处置策略，写在 python 里而不是 shell 里（R64 的教训：awk 没有一份自测能证明它对）。
+
+    三种出口，处置不同：
+      · 关系判据真红（ASYMMETRIC / OFF_AXIS / GRID_*）⇒ `verdict=red`，exit 1 —— 这才是产品/夹具的结论。
+      · 只有 NOT_RUN（帧没拍到、或那块窗口没墨）⇒ `verdict=skipped`，exit 0 ——
+        无头 runner 的高窗只画一条下沿带（BACKLOG 201），拿环境缺席去判产品就是 R154 那朵假红。
+        跳过必须是**读数**（`not_run=几颗、缺哪些帧`），不许变成一条覆盖率通道。
+      · 全绿 ⇒ `verdict=ok`。
+    """
+    if os.environ.get('SURFACE_LEFT_AXES_FORCE_NO_PIL') == '1':
+        print(u'LEFT_AXIS_CI verdict=unavailable reason=pillow-blocked hard=0 not_run=0 '
+              u'missing_frames=0 probes=0')
+        print(u'LEFT_AXIS_ENV_NOTE 这一格只说"这台机器/这一步没有像素库"，不说产品对不对 ⇒ exit 0')
+        return 0
+    try:
+        readings, absent = collect(shots_dir)
+    except ImportError:
+        print(u'LEFT_AXIS_CI verdict=unavailable reason=pillow-missing hard=0 not_run=0 '
+              u'missing_frames=0 probes=0')
+        print(u'LEFT_AXIS_ENV_NOTE import PIL 失败 ⇒ 环境缺席，不许报成产品结论（R154 那一族）')
+        return 0
+    rows, problems = judge(readings)
+    codes = [c for c, _ in problems]
+
+    hard = [c for c in codes if c != 'NOT_RUN']
+    not_run = codes.count('NOT_RUN')
+    for name, probe, text in rows:
+        print(u'LEFT_AXIS %s ｜ %s ｜ %s' % (name, probe, text))
+    for code, why in problems:
+        print(u'LEFT_AXIS_%s %s' % (code, why))
+    for a in absent:
+        print(u'LEFT_AXIS_MISSING_FRAME %s' % a)
+    verdict = 'red' if hard else ('skipped' if not_run else 'ok')
+    print(u'LEFT_AXIS_CI verdict=%s hard=%d not_run=%d missing_frames=%d probes=%d'
+          % (verdict, len(hard), not_run, len(absent), len(readings)))
+    return 1 if hard else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--shots', default=None)
     ap.add_argument('--json', action='store_true')
     ap.add_argument('--self-test', action='store_true')
+    ap.add_argument('--ci', action='store_true', help=u'CI 用：只有关系判据真红才让步骤红')
     ap.add_argument('--suffix', default=u'-dark')
     args = ap.parse_args(argv)
 
@@ -241,6 +281,8 @@ def main(argv=None):
     if not os.path.isdir(args.shots):
         sys.stderr.write('FRAME_DIR_MISSING %s\n' % args.shots)
         return 2
+    if args.ci:
+        return ci_mode(args.shots)
 
     readings, absent = collect(args.shots, args.suffix)
     for a in absent:

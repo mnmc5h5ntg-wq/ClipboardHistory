@@ -5760,3 +5760,12 @@ run `39247153666`（3073943）`row-insert 开 帧数=4 峰值=0.057 采样≈33m
 ⇒ 开档两跑相差 3 倍（0.4↔1.3），而关档落在它们中间 ⇒ **这条轴不能把两臂分开**，无论阈值压在哪一侧都会随机红。
 按本条自己写的处置规矩（"若证明这条轴不稳，正确产物是只能由分布签字并登记成有名字的未覆盖"）：
 不升硬门、不放宽、不改产品；`row-insert`/`row-move` 的过程性由 `MOTION_GATE` 那两道 skip 与已登记名单承重，本条继续开着等 ①② 之外的新通道。
+
+**235. `Surface left-axis ruler` 在 runner 上的第一跑结论未读：本机 ok 不等于 CI ok（R210 接线当轮开单）**
+
+已知的只有本机：`LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=5`、`LEFT_AXIS_SELFTEST ok`。runner 上这一步会走哪个出口，取决于两件事，两件都没量过：
+① `/tmp/shots-ci` 里有没有 `quickpick-list-420x300-dark.png` 与 `settings-stats-populated-720x540-dark.png`；
+② 那两张帧在 runner 上是不是**部分未画**（BACKLOG 201：高窗只画一条下沿带 ⇒ 探针窗口可能整块无墨 ⇒ skipped）。
+处置：下一轮第 ⓪ 条读这一跑的 `LEFT_AXIS_CI` 行（按**步骤名**过滤），把结论填回本条；
+读出来若是 skipped ⇒ 这条尺在 CI 上暂时只是"能红"而没有"在判"，要按 201 的通道问题另开分辨实验；
+读出来若是 ok ⇒ 才允许在台账里把 234 写成"已交付到 CI"。**在那之前 234 只算本机结案。**

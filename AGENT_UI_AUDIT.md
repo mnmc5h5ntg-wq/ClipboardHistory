@@ -363,6 +363,28 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 212 轮（R210 · 2026-10-19）：看图尺接进 CI —— "该红"与"该跳"是两个出口，各配一把刀（U-680…U-682 · 产品 0 文件，判据账 + CI 接线）
+
+- **U-680：接线的价值全在"它真的能让流水线红"这一格上 —— M742 就是钉这一格的。**
+  R209 那支尺只在本机承重（BACKLOG 234 记的就是这笔欠账）。本轮把它接成 CI 的一步
+  （`Surface left-axis ruler (BACKLOG 234, wired in R210)`，跑 `--ci`，判据与出口处置全在 python 里 ——
+  R64 的教训：shell 里的 awk 没有一份自测能证明它把"该红"和"该跳"分对了）。
+  刀 M742 把出口改成 `return 0`（永远不红）⇒ `test_a_real_violation_still_goes_red` 必须红。
+  **接了线不承重比不接更坏**：日志里会有一行 `verdict=red` 而流水线照绿，那是在制造"已经管住了"的错觉。
+- **U-681：环境缺席不许被报成产品结论 —— 这是相反方向的那把刀（M743）。**
+  无头 runner 的高窗只画一条下沿带（BACKLOG 201），所以探针可能取不到墨；那种情况必须走
+  `verdict=skipped` + exit 0，并把缺席写成**读数**（`not_run=几颗、missing_frames=几帧`），不是一条沉默。
+  M743 把 NOT_RUN 也算进 hard ⇒ `test_absent_frames_are_skipped_not_red` 必须红 —— 这一刀钉的是 R154 那朵假红的形状。
+  第三个出口 `verdict=unavailable`（没有像素库）由 `test_missing_pillow_is_unavailable_not_red` 钉，
+  装库那一步 `continue-on-error: true`：它失败只该让尺说"我没库"，不该让整条流水线说"产品坏了"。
+- **U-682：三把刀各打一个方向，加上"容差被放大"那把 ⇒ 尺的牙是可证的，不是声称的。**
+  M744 把 `TOL_PT` 从 1.0 改成 999.0 ⇒ 尺自带的四格反对照全部不红 ⇒ `LEFT_AXIS_SELFTEST` 从 ok 变 bad ⇒
+  `test_self_test_passes_and_names_every_control` 红。这一刀顺便证明**真值表不是只在正对照上跑过**。
+  现跑：`R210_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=57 covered=42 arms=164 bad=3`、`ARM_TOTAL files=136 arms=550 dupes=0 repeats=0`；CI 模式本机真帧 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=5`；自检 `LEFT_AXIS_SELFTEST ok`；
+  电池 `Ran 399 tests` 且 OK（新增 6 格：CI 四出口 + workflow 两格形状）。清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`（地板未回退）。
+  看图腿本轮 NOT-RUN（没有新帧、也没有重捕，做的是接线与判据）；上一轮的看图读数已经在这支尺里承重。
+  CI 逐跑：`7` 跑 success（bbc5642=39251464899、04ccf7a=39247806444、3073943=39247153666、f6d3b4a=39246385660、187ec0b=39245844718）、`1` 跑仍未读（c232e82）、失败跑 无 ⇒ 未读的不算绿；
+  **这一步在 runner 上的第一跑结论还没读到**（本机是 ok，runner 大概率是 skipped —— 两个出口谁替谁签字要由那一跑说，开成 BACKLOG 235）。
 ## 第 211 轮（R209 · 2026-10-19）：看图腿真做了一遍 —— 三帧 + 两把尺，把"看起来没对齐"量成三条关系判据（U-677…U-679 · 产品 0 文件，看图账 + 判据账）
 
 - **U-677：看图产生的第一句形容词又被自己的尺否掉了（第七次）。**
