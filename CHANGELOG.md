@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 222 更正：撤回「卡片材质」那句机制，只留现象 + 两个未测候选（R202 非轮次笔 · 判据 1 文件，产品 0 文件）
+
+- 现象保留：判据读内存 rep、脚本读落盘 PNG，同一格只在 R 上偏 +6…+21（G/B ≤1）；本轮实测 PNG 是 sRGB 标签、alpha 全 255
+- 机制撤回：竖条夹具画在 `windowBackgroundColor` 上，路径里没有卡片材质 ⇒ 原来那句解释是编的（`heatmap-populated` 才有 GroupBox）
+- 判据侧改动：`fillInk` 的读数从 `(r,g,b)` 扩到 `(r,g,b,a)`，让下一次能拿到 stdout 的那一跑直接判掉「内存带 alpha / 落盘已压平」这个候选
+- 本机通道事故：这一跑 11 条用例全 passed 而日志里 0 条 `HEAT_*` 读数 ⇒ print 未被转发 ⇒ 按 NOT-RUN 记，不拿上一跑日志替这一跑作证
+- 222 不结案、`VisualHeat` 不动：两个候选机制的修法相反（改判据采样通道 vs 统一色彩空间），先拿读数再决定
+
 ### 222 第一半：热图真帧通道的证人 `scripts/heatmap_frame_levels.py`（R201 非轮次笔 · 产品 0 文件）
 
 - 把 R198 那句「真帧比离屏红 6…21/255、偏移只压在 R 那一列」变成读数与断言：按中轴游程取 5 档（排掉夹具背景），逐档与判据日志 HEAT_ADJACENT_CVD 的墨色相减

@@ -500,20 +500,25 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         return (255.0 * total / Double(sampled), sampled, undecodable)
     }
 
-    /// 填充带的均值墨色（整数 0…255 的 r,g,b）—— 判据交出它自己读过的那三个数，
-    /// 这样"哪一根通道在撑这次判定"在日志里是可查的，而不是只留一个差值。
+    /// 填充带的均值墨色（整数 0…255 的 r,g,b + **alpha**）—— 判据交出它自己读过的那四个数，
+    /// 这样"哪一根通道在撑这次判定"与"这一格到底是半透明还是已压平"在日志里都可查。
+    /// 带上 alpha 是 R202 补的：真帧（落盘 PNG，alpha 恒 255）与这条判据（内存 rep）
+    /// 对同一格给出的 R 差 6…21/255 而 G/B 只差 ≤1，两种解释（rep 带 alpha vs 色彩标签不同）
+    /// 分别指向不同的修法 ⇒ 不许把任何一种写进台账当机制，先把 alpha 打出来。
     /// 只印调色板数字，不含任何用户内容。
     static func fillInk(_ render: NSBitmapImageRep, over band: Set<Int>, size: Int) -> String {
         guard !band.isEmpty else { return "无" }
-        var r = 0.0, g = 0.0, b = 0.0
+        var r = 0.0, g = 0.0, b = 0.0, a = 0.0
         var n = 0
         for index in band {
             let point = (x(of: index, size: size), y(of: index, size: size))
             guard let c = render.colorAt(x: point.0, y: point.1)?.usingColorSpace(.sRGB) else { continue }
-            r += Double(c.redComponent); g += Double(c.greenComponent); b += Double(c.blueComponent); n += 1
+            r += Double(c.redComponent); g += Double(c.greenComponent)
+            b += Double(c.blueComponent); a += Double(c.alphaComponent); n += 1
         }
         guard n > 0 else { return "读不到" }
-        return "(\(Int((255.0 * r / Double(n)).rounded())),\(Int((255.0 * g / Double(n)).rounded())),\(Int((255.0 * b / Double(n)).rounded())))"
+        return "(\(Int((255.0 * r / Double(n)).rounded())),\(Int((255.0 * g / Double(n)).rounded())),"
+            + "\(Int((255.0 * b / Double(n)).rounded())),\(Int((255.0 * a / Double(n)).rounded())))"
     }
 
     /// 相邻两档**必须分得开**（R54 / BACKLOG 71 / U-79 的后续）。

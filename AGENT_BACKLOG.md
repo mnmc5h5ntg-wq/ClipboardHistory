@@ -5501,3 +5501,24 @@ R198 按中轴游程从 R197 的 `heatmap-cell-strip-still-90x140-*.png` 复量�
 测试 `scripts/tests/test_heatmap_frame_levels.py` 10 条，电池从 Ran 368 涨到 Ran 378 全绿。
 **仍然欠第二半**：这一支住在脚本电池里，判据卷（Swift）本身还是只读离屏单格 ⇒
 把它接进捕获卷（帧捕获那一步顺手跑一次，红了就点名是哪一档、哪一列）是下一轮的活，222 因此**不结案**。
+
+**222 更正（R202）：那条「卡片材质把最低档往背景提」的机制句是错的 —— 现象成立，机制未测**
+
+上面 222 与 R198 那几处正文都写着"卡片材质把最低档往背景方向提了 6…21/255"。这句**不成立**：
+`heatmap-cell-strip-still-*` 那两张夹具是画在 `Color(nsColor: .windowBackgroundColor)` 上的
+（`UICaptureHarness` 里 `heatmapCellStrip(...).padding(16).frame(...).background(windowBackgroundColor)`），
+这条路径上**没有卡片材质** —— 卡片材质只出现在 `heatmap-populated` 那张（走设置页那个 `GroupBox`）。
+⇒ 机制句撤回，只保留现象：同一个产品视图、同一个名义背景，两条通道（判据读**内存 rep**、脚本读**落盘 PNG**）
+对每一档只在一个通道上给不同的数：**R 偏 +6…+21，G/B ≤1**（暗档 |R|≤13、亮档 |R|≤21，本轮脚本复量一致）。
+本轮实测到的两条硬事实：落盘 PNG 是 `sRGB IEC61966-2.1` 标签、**alpha 全 255**（`sips` + PIL 原始像素双查）。
+
+还没测的两个候选机制（修法相反，所以判据不动、也不许再写机制）：
+① 内存 rep 带 alpha 而 PNG 已压平 ⇒ `colorAt` 返回的是**未压乘**的填充色，判据读到的其实不是屏上合成的颜色；
+   成立的话要改的是**判据的采样通道**（把格子画在底色上再量），不是产品。
+② 两条路径的色彩标签/转换不同（rep 的 tag 与 PNG 的 sRGB 不一致）⇒ 要改的是**比对方式**（统一到同一颗色彩空间）。
+⇒ 本轮把 `fillInk` 的读数从 `(r,g,b)` 扩成 `(r,g,b,a)`，①会被下一次拿到 stdout 的那一跑直接判掉：
+   alpha=255 ⇒ ①被否、②升为主嫌；alpha<255 ⇒ ①成立。**在此之前 222 不结案，也不许动 `VisualHeat`。**
+
+顺带记一次通道事故（同族第二次，新形态）：本机这一跑 `swift test --filter HeatmapHoverEvidenceTests`
+11 条用例全 passed，而日志只有 39 行、**一条 `HEAT_*` 读数都没有** ⇒ print 没被转发出来。
+"跑过"不等于"读数在"：读不到就要按 NOT-RUN 记，不许拿上一跑的日志替这一跑作证。
