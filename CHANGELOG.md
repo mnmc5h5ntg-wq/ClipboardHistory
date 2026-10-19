@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表判完 + 守卫改写：R207 两批并成一轮（R207 / U-671…U673 · 判据 2 文件 + 表 1 份，产品 0 文件）
+
+- 162 格全部有判决：`MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；判定分布 `added=9 kept=41 not-added=17 not-applicable=95`（之和 == 行数，由生成器对账）；地板同笔抬到 162
+- 两条把"还没判完"当不变量的守卫改成上下界对账：判完必须能证明不是缩表/清行/占位冒充；名册收缩另有 `FLOOR_WENT_BACK` 与 `MOTION_LEDGER_RETIRED` 管
+- 报告 §9.3 的措辞被 `test_final_report_claims.py` 逼回可复查句式（`清账表还有 0 格未判`）
+- 本轮产品 0 文件 ⇒ 无新帧、看图腿 NOT-RUN；下一轮（R208）的第一个动作是回到画面：228② 真机拖入验收 + 从 227③/222 里挑一条真改
+- CI：`3` 跑 success、`3` 跑未读、失败跑 无
+- 新开 D-204（"现状快照"不许写成不变量）；STATE 换到 R207 / 第 209 轮
 ### 清账表判完：最后 16 格（开关与滑块 5 + 说明段 5 + 推荐面板 4 + 浮层空态 2）⇒ 162/162，未清账 0（R207 第二批非轮次 · 表 1 份 + 两条守卫改写，产品 0 文件）
 
 - 146→162 行、未清账 16→0、地板同笔抬到 162；`MOTION_LEDGER_RESULT=ok 不合法格=0`、判定分布 added=9 kept=41 not-added=17 not-applicable=95

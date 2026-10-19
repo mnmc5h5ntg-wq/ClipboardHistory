@@ -5709,3 +5709,7 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
 
 `gh api …/actions/runs?per_page=8` 逐跑读数：5bb95b9=queued/—、d183bfc=queued/—、7ee6749=in_progress/—、5358bf3=in_progress/—、7dc490f=in_progress/—、b36af66=in_progress/—、8d7b51c=in_progress/—、1620429=completed/success。
 本轮读到的所有**已完成**跑都是 success，没有 failure ⇒ 没有需要按步骤名逐条落账的新红；但仍有 7 跑 in_progress/queued ⇒ 那几跑结论**未读**，不许当绿。
+
+**231 追记（R207）：清账表判完 162/162 ⇒ ②那半（R206 四笔非轮次）已由 R206 并笔补落，①的 CI 读数继续往下传**
+
+停车时写的"未清账 31 格"今天清零：`MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`。R206 那几笔非轮次已在 `Round 206` / `第 208 轮` 并成一节（三账窗口 R207/R206/R205 齐），STATE 换到 R207 / 第 209 轮。仍未读的是这些跑：3073943、f6d3b4a、187ec0b（未读不算绿）。
