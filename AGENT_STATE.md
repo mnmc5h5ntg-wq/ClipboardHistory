@@ -16,11 +16,7 @@
 Invalid manifest`（`/tmp/r235_manifest_repro.txt`）；修法是剥 `SDKROOT` 并让基线臂不绿就拒绝出表。
 帧 162 对账 CHANGED 2→0 同笔 update；捕获卷 80/4/0；全量卷 910/44/0；换装本机 ok；电池 416 OK(skipped=2)。
 
-**下一轮（R236 / 第 235 轮 / Round 233）的靶**：⓪ 读三对仍未落地的 run —— `39339075372=e218a92`、
-`39339197911=52e4efb` 已读到 = **failure**，两跑红步骤同形（STEP[15] 910/skip52/失败2、
-STEP[17] 67/12/1、NOT_RUN=77），唯一的红仍是 `testModeChipHoverFillIsVisibleOnItsOwnSurface`（UICaptureHarness.swift:5309）
-⇒ 台账补正没引入新红、263 跨三个 commit 稳定复现；但那句断言正文在 `--log-failed` 里断在 `("2`
-⇒ **本笔已补正（U-754）：那句是我读漏了第二条通道** —— 判据的 emit 行`HOVER_MODE_CHIP_PROOF` 在 `--log` 里齐全（light 236→204 像素=229 比值=1.359 ≥1.2、dark 50→70 像素=218 比值=1.358 ≥1.1，同版两跑同值）⇒ 比值两档都过线、掉线的只有 `pixels > 400`；「产品墨太弱」被被告自家读数驳回，263 欠的是「400 这个地板该不该由夹具自己的 rect 推导」。
+**下一轮（R236 / 第 235 轮 / Round 233）的靶**：⓪ 已读：`39340316744=614ec3c` ⇒ failure，STEP[15] **两朵**（263 那朵 + 新露面的 `testAddingACopyWritesNothingOnTheMainThread` 11.56ms>10ms，见 U-756 / 新开 267），STEP[17] 捕获门 1 朵；其余 run 用 `python3 scripts/ci_read.py latest` 现拿，`conclusion` 读不到只能写「未读」。
 `39340316744=614ec3c`（in_progress）、`39341701083=e4fb89a`、其后两笔台账补记 `b0dc251`（U-752）与 `e5c4185`（U-753）触发的 run 仍**未读** ⇒ ⓪ 的完整清单用 `python3 scripts/ci_read.py latest` 现拿，不手数。本笔之后 266 已结案（U-753：那一格改成 `live_sources` 现读、无 LAG 容差），电池计数 **416 → 418**。
 本补记笔（U-751 / BACKLOG 266：两根轮次映射闸门改成读字段）push 之后，它的 run↔commit 用
 `python3 scripts/ci_read.py latest` 现读拿，不许手写 id ⇒ ⓪ 的全集是「上面三对 + 这一对」，不是只有三对。

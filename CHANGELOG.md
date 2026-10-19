@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+- R235 补记第八笔（U-756 / 新开 267）：读 run 39340316744 时撤掉「唯一的 runner 红」那句假话 —— STEP[15] 两朵，第二朵 `CapturePathWriteBudgetTests testAddingACopyWritesNothingOnTheMainThread` 首次露面（11.56ms > 10ms 地板），而同一判据的三条存在性断言全过；三个 runner 样本 1.20/0.89/11.56ms ⇒ 不给产品定罪、也不放宽地板，新开 267 记下「谁在扛契约」的分辨实验与口径变更需配的正对照 + 一刀。产品文件 0 改动，帧与看图腿 NOT-RUN。
 
 ### 产品：菜单栏「都不是我想要的」不再钉死蓝墨（R235 / U-748 / D-220）
 
