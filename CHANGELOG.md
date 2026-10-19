@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### NOT_RUN 交得出成因（246 的仪器）+ 两格已知答案对照 + 两把刀（R221 / U-713…U-715 · 判据（python 尺）1 文件，产品 0 文件）
+
+- `scripts/surface_left_axes.py`：四种失败各有一个名字（`stem-unparsable` / `no-bg-window` /
+  `bg-not-flat` / `no-ink`，另有 `frame-missing`），NOT_RUN 文本改成可机器读的 `cause=… bg=… thr=…`。
+  三档处置相反（通道／这台机器画不出／尺自己要修）⇒ 混成一档就等于下一轮重问（提成 **D-213**）。
+- 自检加两格已知答案对照：空帧必须 `no-ink`、棋盘底必须 `bg-not-flat`；本机出口未变
+  （`verdict=ok probes=7`）⇒ 加的是读数不是判定。
+- 刀：`R221_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0`（M757 混档、M758 把缺席当通过）；
+  这张表跑的是尺的 `--self-test` 而不是 swift 卷。
+- CI：`7ebda4c` **success**、`9ab453a` **success** ⇒ R219 的像素改动没弄红 runner；`bc5c5d7`/`cc0e358` 未读。
+- 未解释：预检 `bad` 4→5（`dupes=0 repeats=0`）⇒ 按"未解释"记账，不猜成因。
+- 验证：电池 `Ran 400 OK`；产品 0 文件 ⇒ 未换装本机；看图腿 NOT-RUN（0 像素改动、无新帧）。
+
 ### 骨架条带对比度进仓库（245 结案）+ 237 结案 + 235 的坏消息（R220 / U-710…U-712 · 判据 1 文件 + 表面账，产品 0 文件）
 
 - 新谓词 `UICaptureTests.skeletonBarContrast` + 两条判据：两档各一条下界（暗 1.1、亮 **1.2**），

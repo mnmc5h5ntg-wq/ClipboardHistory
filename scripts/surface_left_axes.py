@@ -103,16 +103,39 @@ def background(px, window, W, H):
     return modal, (total and far / float(total)) < 0.02
 
 
+def absence(why, **numbers):
+    """NOT_RUN 也要交出**成因**（R221 / BACKLOG 246）。
+
+    以前所有缺席都印成同一句"探针取不到墨或底不纯"，于是 runner 上 7 颗全 NOT_RUN 时，
+    下一轮还得重新问一遍"到底是帧没画、窗口无墨、还是底不纯"——
+    而这三档的处置**相反**：帧没画 = 捕获通道的事；窗口无墨 = 这台机器画不出这块表面；
+    底不纯 = 尺自己的前提没成立，要修的是尺。
+    """
+    out = dict(ok=False, why=why)
+    out.update(numbers)
+    return out
+
+
+def absence_text(r):
+    """把成因印成可机器读的 `cause=xxx k=v` —— 下一跑 CI 的正文里就能直接分档。"""
+    if r is None:
+        return u'cause=frame-missing'
+    nums = u' '.join(u'%s=%s' % (k, v) for k, v in sorted(r.items()) if k not in (u'ok', u'why'))
+    return u'cause=%s %s' % (r.get(u'why'), nums)
+
+
 def probe_reading(im, probe):
-    """返回 (最左/最右墨，像素与 pt)；取不到墨或底不纯 ⇒ None（宁可 NOT_RUN 不给假数）。"""
+    """返回 (最左/最右墨，像素与 pt)；取不到墨或底不纯 ⇒ `ok=False` 并带成因（宁可 NOT_RUN 不给假数）。"""
     px = im.load()
     W, H = im.size
     pt_w = parse_frame_pt_width(probe['stem'])
     if not pt_w:
-        return None
+        return absence('stem-unparsable', stem=probe['stem'])
     bg, flat = background(px, probe['bg'], W, H)
-    if bg is None or not flat:
-        return None
+    if bg is None:
+        return absence('no-bg-window', frame='%dx%d' % (W, H))
+    if not flat:
+        return absence('bg-not-flat', bg=bg)
     scale = pt_w / float(W)
     x0, y0, x1, y1 = _clipped(probe['window'], W, H)
     xs = []
@@ -123,8 +146,9 @@ def probe_reading(im, probe):
                 xs.append(x)
                 break
     if not xs:
-        return None
-    return dict(left_px=xs[0], right_px=xs[-1], width_px=W,
+        return absence('no-ink', bg=bg, thr=probe.get('thr', INK_THRESHOLD),
+                       window='%dx%d' % (max(0, x1 - x0), max(0, y1 - y0)))
+    return dict(ok=True, left_px=xs[0], right_px=xs[-1], width_px=W,
                 left_pt=round(xs[0] * scale, 2), right_pt=round((W - 1 - xs[-1]) * scale, 2),
                 pt_width=pt_w)
 
@@ -133,13 +157,13 @@ def judge(readings):
     """三条关系判据。readings: {probe_name: reading|None} → (rows, problems)。"""
     rows, problems = [], []
     for name, r in readings.items():
-        if r is None:
-            problems.append(('NOT_RUN', u'%s：探针取不到墨或底不纯 ⇒ 尺没有对象，不许给绿' % name))
+        if r is None or not r.get('ok'):
+            problems.append(('NOT_RUN', u'%s：%s ⇒ 尺没有对象，不许给绿' % (name, absence_text(r))))
     # 关键：NOT_RUN 只免掉**引用了它的那条规则**，不免掉整把尺。
     # 第一版在这里直接 return，于是「有一张帧没拍到」会把它旁边三条规则的结论一起吞掉 ——
     # 那是一条假绿通道：真违反与缺席同时存在时，CI 只会读到 skipped。
     def live(names):
-        return all(readings.get(n) is not None for n in names)
+        return all(readings.get(n) and readings[n].get('ok') for n in names)
 
     if live([SYMMETRY_PROBE]):
         r = readings[SYMMETRY_PROBE]
@@ -284,6 +308,36 @@ def self_test():
     print(u'SELFTEST %-22s 期望=红 实得=%s %s ｜ %s'
           % (u'反对照·组合帧头部换列', u'红' if good1 else u'绿',
              u'' if good1 else u'** 对照坏掉 **', u'、'.join(c1) or u'无问题'))
+    # 成因分档（R221 / BACKLOG 246）：NOT_RUN 必须说得出**是哪一种**，否则下一轮还要重问一遍，
+    # 而三种成因的处置相反（帧没画 / 窗口无墨 / 底不纯 —— 最后一档要修的是尺自己）。
+    def causes(qp, st, cp=None):
+        _, problems = run(qp, st, cp)
+        return [t for c, t in problems if c == u'NOT_RUN']
+
+    def noisy_stats_frame():
+        im = Image.new('RGB', (1440, 1080), (30, 30, 30))
+        px = im.load()
+        for yy in range(1080):
+            for xx in range(1440):
+                px[xx, yy] = (30, 30, 30) if (xx // 4 + yy // 4) % 2 else (90, 90, 90)
+        return im
+
+    texts_empty = causes(Image.new('RGB', (840, 600), (30, 30, 30)),
+                         Image.new('RGB', (1440, 1080), (30, 30, 30)))
+    good2 = bool(texts_empty) and all(u'cause=no-ink' in t for t in texts_empty)
+    ok = ok and good2
+    print(u'SELFTEST %-22s 期望=%s 实得=%s %s ｜ %s'
+          % (u'反对照·空帧的成因', u'no-ink', u'no-ink' if good2 else u'混了',
+             u'' if good2 else u'** 对照坏掉 **',
+             (texts_empty[0][:78] if texts_empty else u'一行 NOT_RUN 都没有')))
+
+    texts_noisy = causes(quickpick_frame(0), noisy_stats_frame())
+    good3 = any(u'cause=bg-not-flat' in t for t in texts_noisy)
+    ok = ok and good3
+    print(u'SELFTEST %-22s 期望=%s 实得=%s %s ｜ %s'
+          % (u'反对照·底不纯的成因', u'bg-not-flat', u'对' if good3 else u'错',
+             u'' if good3 else u'** 对照坏掉 **',
+             (texts_noisy[0][:78] if texts_noisy else u'一行 NOT_RUN 都没有 ⇒ 噪声帧没被前提拦住')))
     print(u'LEFT_AXIS_SELFTEST %s' % ('ok' if ok else 'bad'))
     return 0 if ok else 1
 

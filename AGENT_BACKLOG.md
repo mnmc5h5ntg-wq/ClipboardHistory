@@ -5935,3 +5935,22 @@ run `39267039118` 的正文：`PILLOW_OK 13.0.0 /private/tmp/pilenv/bin/python`�
 ①帧根本没被捕获卷画出来、②画了但那块窗口无墨、③有墨但底不纯（尺自己的前提不成立）三档；
 只有 ①② 属于通道限制，③ 属于尺要修。分完之后才谈"要不要按表面切片"。
 适用面：`scripts/surface_left_axes.py` 的全部探针；不适用：本机（本机 7 颗全绿，`verdict=ok`）。
+**246 追记（R221 仪器落地·仍开）：NOT_RUN 现在交得出成因，runner 那一跑待读**
+
+`scripts/surface_left_axes.py` 的四种失败各有一个名字（`cause=stem-unparsable|no-bg-window|bg-not-flat|no-ink`，
+文件不在盘上另有 `frame-missing`），NOT_RUN 那行文本变成可机器读的 `cause=… bg=… thr=… window=…`。
+自检里加了两格**已知答案的对照**：全空帧必须报 `no-ink`、棋盘底必须报 `bg-not-flat`（本轮实测两格绿）。
+本机出口未变：`LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`。
+刀：M757（把 bg-not-flat 混进 no-ink ⇒ 新对照红）、M758（把缺席判定改成恒不缺席 ⇒ "全空帧"红）。
+本条**不写结案**：等的是 runner 那一跑打出的 7 颗探针各是哪一档 —— 只有 ①帧没画 ②窗口无墨 属于通道限制，
+③底不纯 属于尺要修；分档之后才谈要不要按表面切片。
+
+**247. 预检的 `bad` 从 4 涨到 5，本轮没解释这一格（R221 记，下一轮读）**
+
+同一次运行的其它计数器都对得上：`tables` 62→63、`covered` 47→48（新登记 `mutate_r221` 一张表）、
+`ARM_TOTAL dupes=0 repeats=0`。但 `bad` 的累加点有三处（臂号解析失败 / needle 判不了 / 跨表问题），
+本轮只读到"新表的两支臂都印了 ok"，没逐条把 +1 归到某一处 ⇒ **不猜成因**。
+要做的：读 `mutate_needle_precheck.py` 那三个 `bad += 1` 各自的条件，再对照本轮日志点名是哪一处；
+如果它是"每登记一张新表就会 +1"的结构性计数（例如按表统计未覆盖臂），那 `bad` 的语义就要在结论行里写明，
+否则下一轮会把一个结构性计数当成真毛病去修。
+适用面：`mutate_needle_precheck.py` 的结论行；不适用：变异表自己的 刀/CAUGHT/ESCAPED/NOT_RUN 四个数。
