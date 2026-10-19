@@ -5865,3 +5865,28 @@ R217 把它补上了（`testFrozenAndLiveArmsReadTheSameSkeletonRows`），读�
 先做实验再动产品：spike 三种通道（渲染后跑一次 runloop / 给夹具一个"完成回调"再拍 / 用现成的 in-screen 通道），
 各自答"能不能让不冻臂真的走到失败态"。三条都不行就把本条结案成"通道限制"，并把它挂到 201 那一族（无头 runner 的高窗只画一条下沿带）下面记。
 适用面：所有异步状态（图片/文件预览、加载→成功/失败切换）的像素验收；不适用：同步就能画出来的状态。
+**235 追记（R218 结案·受限）：runner 那一跑读到了，出口按设计工作，但尺没判过产品像素**
+
+`610e93c` = run `39262764467`（`completed success`）里 `Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)` 打的正文：
+`LEFT_AXIS_CI verdict=unavailable reason=pillow-missing hard=0 not_run=0 missing_frames=0 probes=0`。
+本条问的是"接线在 runner 上到底怎么处置"，答案：环境缺席 ⇒ `unavailable` + exit 0，没被报成产品结论 ⇒ **结案**。
+但结案的范围要写死：`probes=0` 意味着那把尺**从未在 runner 上判过一张产品像素**，
+"runner 已验收"这句话不成立；那一半移交 244 与 237（pillow 装上之后重读才算）。
+
+**237 追记（R218 成因签死·修法落地待 runner 验收）**
+
+真因不是"两台解释器"，是同一台按 PEP 668 拒绝被装：正文 `error: externally-managed-environment`
++ `PILLOW_INSTALL_FAILED=1`（run `39262764467`）。R217 我写在 STATE ⓪ 的那句猜测已撤回。
+修法（已入库）：`python3 -m venv /tmp/pilenv` ⇒ 装进 venv ⇒ 下一步**显式**用 `/tmp/pilenv/bin/python` 跑尺；
+三条 echo 分开三种成因（venv 建不起来 / 装失败 / 装了 import 不到）。
+仍欠：venv 那台解释器在 runner 上能不能真装上 pillow（下一跑读 `PILLOW_OK <版本>` 与新的 `LEFT_AXIS_CI`）。
+
+**244. 判据卷（`STEP[8]`）仍用系统解释器：装了 pillow 的 venv 只对左轴那一步生效，NEEDS_PIL 的格子在 runner 上恒 skip（R218 开单）**
+
+R218 把 pillow 装进 `/tmp/pilenv`，并让 `Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)` 显式用那台解释器 —— 但 `Release script tests`（脚本电池）
+仍跑系统 `python3`，于是 `scripts/tests/test_surface_left_axes.py` 里 `@NEEDS_PIL` 那几格在 runner 上继续 skip。
+后果：**像素判据的自检真值表在 CI 上从未执行过**，只有本机跑过。
+要不要把电池整体搬进 venv 是个决定，不是显然：搬了以后"CI 上的 skip"会从"环境缺席"变成"环境有"，
+那几格第一次在 runner 上真判 ⇒ 可能立刻冒出新的红（R154 那一族）。先做的实验：只把带 `NEEDS_PIL` 的那一支
+单独用 venv 解释器跑一遍，看它在 runner 上给什么结论，再决定要不要整体搬。
+适用面：所有 `@NEEDS_PIL` 守卫的格子；不适用：不需要像素的那些（它们本来就在系统解释器上跑）。

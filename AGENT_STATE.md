@@ -1,5 +1,21 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 22:15（本地 · R218 / 第 220 轮：**235 结案成「接线对、runner 没 Pillow」，237 的成因由 runner 正文签死并换成一次性 venv**（U-704…U-706 · CI 1 文件，产品 0 文件）
+
+**本轮落地**：`610e93c`=`39262764467` **completed success** ⇒ R216 修的两朵红在 runner 上消失；
+同跑左轴那一步打 `LEFT_AXIS_CI verdict=unavailable reason=pillow-missing probes=0` ⇒ **235 结案成"接线正确、runner 没判过产品像素"**（probes=0 明写）。
+237 的真因由 runner 正文签：`error: externally-managed-environment`（PEP 668）+ `PILLOW_INSTALL_FAILED=1`，
+R217 我猜的"两台解释器"**已撤回**；修法换成一次性 venv + 下一步显式用 venv 解释器，三种成因三条 echo，
+拒用 `--break-system-packages`（**D-210**）。新开 244：判据卷仍用系统解释器 ⇒ NEEDS_PIL 的格子在 runner 上恒 skip。
+验证边界：YAML 静态解析 NOT-RUN：本机没有 PyYAML（ModuleNotFoundError），结构证人换成仓库自己的 ci.yml 形状守卫 + 电池 400 格 OK；尺自检 `LEFT_AXIS_SELFTEST ok`；电池 `Ran 400 tests OK`（台账落盘后还要再跑）；
+看图腿 NOT-RUN（0 像素改动、无新帧，盘上 142 张属 R217）；产品 0 文件 ⇒ 未换装本机。
+CI：本跑（venv 修法）+ `193d5be`=39265858795、`1462b38`=39265952407 仍 in_progress ⇒ 未读不算绿。
+
+**下一轮（R219）的靶**：⓪ 读 venv 那一跑：`PILLOW_OK <版本>` 有没有露面、左轴那一步是否从 `unavailable` 变成 `ok/skipped/red`（**237 结案的唯一通道**）、`193d5be`/`1462b38` 的结论；
+① **回到动效位点本体**（已经连续 7 笔 0 产品改动）：清账表里未判的格子挑一位点真做动效 + 帧 + 刀，别再交判据账；
+② 243：捕帧通道能不能等到 `.task`（先 spike，别改产品）；③ 227③、222、215、201/202、207；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-19 22:10（本地 · R217 / 第 219 轮：**BACKLOG 240 的行为证人补上了，实验答案是否定的 —— 捕帧通道分不出两臂，R211 那句「靠它冻住」撤回**（U-701…U-703 · 判据 1 文件，产品 0 文件）
 
 **本轮落地**：240 的行为证人（同一视图两臂像素判据）落地，读数是**两臂相等**（light 50 vs 50；dark 50 vs 50）

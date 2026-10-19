@@ -363,6 +363,31 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 220 轮（R218 · 2026-10-19）：235 结案成「接线对、runner 没 Pillow」，237 的成因由 runner 正文签死并换成一次性 venv（U-704…U-706 · CI 1 文件，产品 0 文件）
+
+- **U-704：235 结案，但结的是"接线正确"而不是"runner 判过产品"。**
+  runner 自己印的结论行（run `39262764467`，步骤 `Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)`）：
+  `LEFT_AXIS_CI verdict=unavailable reason=pillow-missing hard=0 not_run=0 missing_frames=0 probes=0`。
+  出口处置完全按 R210 设计工作：环境缺席 ⇒ `unavailable` + exit 0，**没有**被报成产品结论。
+  但 `probes=0` 要说白：那把尺至今**没在 runner 上判过一次产品像素**，235 不许写成"runner 已验收"。
+  同跑 `STEP[8]`/`STEP[15]` 全绿（job `completed success`）⇒ R216 修的两朵红在 runner 上确认消失。
+- **U-705：237 的成因由 runner 的正文签死，不是我的猜测；修法换成一次性 venv。**
+  正文：`error: externally-managed-environment` + `PILLOW_INSTALL_FAILED=1`（PEP 668 的机器闸门），
+  于是 `python3 -m pip install pillow` 从来没装成过。R217 我在 STATE 的 ⓪ 里猜的是
+  "装 python 的那台解释器和下一步是不是同一个" —— **这条猜测被正文否证并已撤回**（真因是同一台解释器拒绝被装）。
+  修法：`python3 -m venv /tmp/pilenv` + 装进 venv + 下一步**显式**用 `/tmp/pilenv/bin/python` 跑；
+  三种成因分三条 echo（`PILLOW_VENV_FAILED` / `PILLOW_INSTALL_FAILED` / `PILLOW_IMPORT_FAILED`），
+  下次再读就不用猜。**不用 `--break-system-packages`**：那要动作业机器的系统解释器，提成 210。
+- **U-706：验证边界要写清 —— YAML 静态解析没跑，结构证人换成了仓库自己的守卫。**
+  YAML 静态解析 NOT-RUN：本机没有 PyYAML（ModuleNotFoundError），结构证人换成仓库自己的 ci.yml 形状守卫 + 电池 400 格 OK；尺的自检 `LEFT_AXIS_SELFTEST ok`（7 格真值表，本轮没动 python 侧）；
+  步骤改名后那条接线守卫（`test_surface_left_axes.py` 按子串 `Surface left-axis ruler` 认）仍咬得住，已实测；
+  电池 `Ran 400 tests ... OK`（台账落盘之前先跑过一遍，落盘之后还要再跑一遍）。
+  **runner 能不能真装上 pillow 仍是未读**（要下一跑）⇒ 237 不写结案，只写"修法落地、待 runner 验收"，
+  并把"电池那一步仍用系统解释器 ⇒ 判据卷里 NEEDS_PIL 的格子在 runner 上恒 skip"开成 244。
+  看图腿本轮 NOT-RUN：0 个像素改动、无新帧（盘上那 142 张是 R217 那一遍的，不替本轮作证）。
+
+其余读数：产品文件 0 个、workflow 文件 1 个 ⇒ 无需换装本机；帧沿用上一遍（142 张在盘上）。
+
 ## 第 219 轮（R217 · 2026-10-19）：BACKLOG 240 的行为证人补上了，实验答案是否定的 —— 捕帧通道分不出两臂，R211 那句「靠它冻住」撤回（U-701…U-703 · 判据 1 文件，产品 0 文件）
 
 - **U-701：两臂像素判据落地，读数是「两臂相同」⇒ 那个参数在捕帧通道里没有像素后果。**

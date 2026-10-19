@@ -387,17 +387,27 @@ jobs:
       # 为什么允许 skipped/unavailable：无头 runner 的高窗只画一条下沿带（BACKLOG 201），
       # 而环境缺席被报成产品结论就是 R154 那朵假红的形状。缺席必须是**读数**
       # （not_run=几颗、缺哪些帧），两侧都由 scripts/tests/test_surface_left_axes.py 钉住。
-      - name: Pillow for the frame rulers
+      - name: Pillow for the frame rulers (venv · R218 / BACKLOG 237)
         continue-on-error: true
         timeout-minutes: 3
-        run: python3 -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（下一步会读成 unavailable，不会伪装成产品结论）"
+        run: |
+          # run 39262764467 的正文把成因签死了：`python3 -m pip install --quiet pillow` 在这台 runner 上
+          # 直接 `error: externally-managed-environment`（PEP 668），而 `--break-system-packages`
+          # 要动的是作业机器的系统解释器 —— 一把像素尺不该要这个副作用。所以装进一次性 venv，
+          # 下一步**显式用那台解释器**跑（不指望 PATH）。装不上仍然只报 unavailable，不许报成产品结论。
+          python3 -m venv /tmp/pilenv || echo "PILLOW_VENV_FAILED=1（下一步会读成 unavailable，不会伪装成产品结论）"
+          /tmp/pilenv/bin/python -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（同上）"
+          /tmp/pilenv/bin/python -c "import PIL, sys; print('PILLOW_OK', PIL.__version__, sys.executable)" || echo "PILLOW_IMPORT_FAILED=1（装了但 import 不到：与「没装」是两种成因，正文要能分开）"
 
-      - name: "Surface left-axis ruler (BACKLOG 234, wired in R210)"
+      - name: "Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)"
         timeout-minutes: 2
         run: |
           set -o pipefail
           status=0
-          python3 scripts/surface_left_axes.py --shots /tmp/shots-ci --ci | tee /tmp/left-axes.log || status=$?
+          PY=python3
+          if [ -x /tmp/pilenv/bin/python ]; then PY=/tmp/pilenv/bin/python; fi
+          echo "LEFT_AXIS_INTERPRETER=$PY"
+          "$PY" scripts/surface_left_axes.py --shots /tmp/shots-ci --ci | tee /tmp/left-axes.log || status=$?
           grep -E "LEFT_AXIS" /tmp/left-axes.log || true
           exit "$status"
 

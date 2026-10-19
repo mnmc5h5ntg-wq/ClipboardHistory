@@ -13752,3 +13752,37 @@ R214 留的话是"补了行为证人，第三把刀才会 CAUGHT"。R217 真补�
 | 可复核性 | 12/15 |
 
 总分 88/105（217 轮）。GAPS=none
+## Round 218 · 235 结案成「接线对、runner 没 Pillow」，237 的成因由 runner 正文签死并换成一次性 venv（2026-10-19 · CI 1 文件，产品 0 文件）
+
+开场读数来自 R217 收尾时那一跑：`610e93c` = run `39262764467` **completed success** ⇒ R216 修掉的两朵红在 runner 上确认消失；
+同跑 `Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)` 打的是 `LEFT_AXIS_CI verdict=unavailable reason=pillow-missing probes=0`。
+235 因此结成一个**受限**的案子：出口处置按设计工作（环境缺席没有被报成产品结论），但 `probes=0` 说明那把尺
+在 runner 上**一次产品像素都没判过** —— 我把这条写进账，而不是写成"CI 已验收"。
+
+237 的成因是 runner 正文自己签的：`error: externally-managed-environment` + `PILLOW_INSTALL_FAILED=1`。
+R217 我在 STATE 的 ⓪ 里写过一句猜测（"装的和用的可能不是同一台解释器"），**这句被正文否证**：
+是同一台解释器按 PEP 668 拒绝被装。修法因此不是换 `python3` 的路径，而是开一次性 venv，
+下一步显式用 `/tmp/pilenv/bin/python`；三种成因（venv 建不起来 / 装失败 / 装了 import 不到）分三条 echo。
+拒用 `--break-system-packages`：一把像素尺不该去动作业机器的系统解释器（提成 210）。
+
+诚实边界：本机没有 PyYAML ⇒ 我**没能**静态解析这份 workflow（YAML 静态解析 NOT-RUN：本机没有 PyYAML（ModuleNotFoundError），结构证人换成仓库自己的 ci.yml 形状守卫 + 电池 400 格 OK），结构证人只有仓库自己的 `test_ci_workflow_shape.py`
++ 电池 `Ran 400 tests OK`，以及"接线守卫按子串认步骤名、改名后仍咬得住"这一格实测。
+runner 真装上 pillow 没有，要下一跑才知道 ⇒ 237 只写"修法落地、待验收"。
+看图腿 NOT-RUN：本轮 0 像素改动、无新帧，盘上那 142 张是 R217 的，不替本轮作证。
+
+本轮是连续第 7 笔 0 产品改动的提交（由 `git log` 数出来，含补账那一类笔），七维里"真实视觉审查"和"产品面推进"两格因此只有 6+7。
+下一轮（R219）的靶把**动效位点本体**提到 ①：清账表里还有未判的格子，220 那条键盘可达性在等真机或授权。
+
+七维度自评：
+
+| 维度 | 得分 |
+|---|---|
+| 真实视觉审查 | 6/15 |
+| 判据有效性 | 13/15 |
+| 假绿防御 | 13/15 |
+| 产品面推进 | 7/15 |
+| 台账一致性 | 13/15 |
+| 交付诚实性 | 13/15 |
+| 可复核性 | 12/15 |
+
+总分 77/105（218 轮）。GAPS=none

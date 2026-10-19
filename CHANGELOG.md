@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 235 结案（受限）+ 237 的成因由 runner 正文签死并换成一次性 venv（R218 / U-704…U-706 · CI 1 文件，产品 0 文件）
+
+- runner run `39262764467`（commit `610e93c`）**completed success**：R216 修的 `STEP[8]`/`STEP[15]` 两朵红确认消失。
+- 同跑 `Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)` 打 `LEFT_AXIS_CI verdict=unavailable reason=pillow-missing probes=0` ⇒ 235 结案成"接线正确、
+  但尺在 runner 上没判过产品像素"（`probes=0` 明写，不写成已验收）。
+- 237 真因：`error: externally-managed-environment`（PEP 668）—— 不是"两台解释器"，
+  R217 写在 STATE ⓪ 的那句猜测已撤回。修法：一次性 venv + 下一步显式用 venv 解释器，
+  三种成因三条 echo；拒用 `--break-system-packages`（**D-210**）。
+- 边界：YAML 静态解析 NOT-RUN：本机没有 PyYAML（ModuleNotFoundError），结构证人换成仓库自己的 ci.yml 形状守卫 + 电池 400 格 OK；电池 `Ran 400 tests OK`；看图腿 NOT-RUN（0 像素改动、无新帧）。
+- 新开 244：判据卷（`STEP[8]`）仍用系统解释器 ⇒ NEEDS_PIL 那几格在 runner 上恒 skip。
+
 ### 行为证人否证了自己：捕帧通道分不出冻结臂与不冻臂（R217 / U-701…U-703 · 判据 1 文件，产品 0 文件）
 
 - 新增 `UICaptureTests.testFrozenAndLiveArmsReadTheSameSkeletonRows`：同一份夹具、同一个 `DetailView` 入口，
