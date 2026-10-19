@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 把 R205 的两把内联刀搬进变异名册；建表时自我复查抓到一格新洞：调用点没有守卫（R206 第三笔非轮次 · 工具 2 文件，产品 0 文件）
+
+- 新表 `.scratch/motion-audit-2/mutate_r205.py`（M736 钉"会不会说话"、M737 钉"说的是不是那个数"），登记进 `mutate_needle_precheck.py` 的 TABLES
+- 真跑：`R205_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检：`tables=55 covered=40 arms=157 bad=3`（bad 是 R168 记的陈旧死针）、`ARM_TOTAL files=134 arms=549 dupes=0 repeats=0`
+- **新洞**：两把刀都从 store 入口进 ⇒ 把视图里 `attemptedCount: wanted.count` 摘掉它们都不会红 ⇒ 判据有牙但咬不到接线（R43/R44 那一族）⇒ 新开 BACKLOG 230（三个候选，本笔未做）
+- 228③ 结案；228 只剩②（真机拖一次"声称是文件但解不出"的样本）
+- **落盘顺序更正**：上一笔 `5358bf3` 的 message 先写了这些台账结论，而那批 python 补丁因 SyntaxError 一个文件都没改 ⇒ 这一笔才是台账真正落盘的地方（同一族老毛病：message 先于证据）
+
 ### R206 第二笔：补帧成功 —— 分辨实验把黑带归到**已登记的那一处**盲区，回执第一次进基线（138→140 张）（R206 第二笔非轮次 · 判据 1 文件 + 基线 1 份，产品 0 文件）
 
 - 分辨实验（不用新仪器，扫已有帧）：三张暗帧的纯黑带**高度都是 132px（66pt @2x）**、只有 y 不同 —— `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、新帧 y=872..1003 ⇒ 判为**候选②**：侧栏最后一行的选中材质在离屏下画成黑，横幅只是把它推上/推下；黑带**不是这张新帧带来的**

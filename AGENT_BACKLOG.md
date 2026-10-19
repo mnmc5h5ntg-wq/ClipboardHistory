@@ -5657,6 +5657,7 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
 ① 已于 R206 结案（`content-with-dropped-unreadable-notice` 两档进基线，138→140）。
 ③ **名册**：M736/M737 本轮是**内联**跑的（临时 python 打补丁），没进 `scripts/mutate_needle_precheck.py` 的 TABLES ⇒
    下一轮复查不到，且刀号跨表唯一性也没被检查过。搬进名册并让预检认这两个号。
+   **③ 已于 R206 结案**：`.scratch/motion-audit-2/mutate_r205.py` 建表并登记进 `mutate_needle_precheck.py` 的 TABLES，真跑 `R205_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`、预检 `tables=55 covered=40 arms=157 dupes=0`。
 适用面：任何"新分支只被单元测试覆盖、没进画面也没进名册"的时刻；不适用：纯判据/纯工具笔（那些本来没有画面）。
 
 **229. 给 R205 那条回执补帧时，被选中的那一行整块画成纯黑 —— 先确认是谁、为什么黑，再决定加名单还是修黑（R206 尝试记录，夹具已回滚）**
@@ -5679,3 +5680,8 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
 
 读数（扫已有帧，不新造仪器）：三张暗帧的纯黑带高度**都是 132px（66pt @2x）**，只有 y 不同 —— `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、新帧 y=872..1003。⇒ 横幅把整块列表推上/推下，被推的那个位置本来就是黑的（侧栏最后一行的选中材质在离屏下画成黑，R18/R19 那一族）。处置：把新夹具登记进 `materialBlindSpotFixtures`（登记条目里带着这条读数，不是裸名单），帧照拍 ⇒ 138→140 张、`FRAME_BASELINE_UPDATED=140`、复验 `CHANGED=0 ADDED=0`。候选①（"落在捕获边界带上"）被同一组数否掉：若成因是边界，带高会随 y 变，而三张带高逐像素相同。
 
+**230. R205 那条回执的调用点没有守卫：把 `attemptedCount: wanted.count` 摘掉，两把刀都不会红（R206 建表时的自我复查开单）**
+
+形状：判据从 `HistoryStore.addDroppedFiles` 入口进，它不读调用点 ⇒ 视图里那一处传参一旦被改回去（或从来没人传），store 仍"有说话的能力"、测试仍全绿，而产品重新变静默。这正是 R43/R44 那一族"零调用点的死尺"：判据有牙，但咬不到接线。
+修法候选（先做实验再定形状，别顺手加一条 contains）：① 整行源码形状断言（`addDroppedFiles(urls: urls, attemptedCount: wanted.count)` 必须出现且次数==1）；② 更强的版本让判据从视图入口进（要 in-screen 探针，runner 今天跑不动，见覆盖登记表）；③ 把 `attemptedCount` 改成必填 ⇒ 漏传直接编译不过（今天只有两处调用方：视图与测试）。
+本笔**未做**；`mutate_r205.py` 的文档串里写明"按实记账：调用点没有守卫"，不当成已交付。
