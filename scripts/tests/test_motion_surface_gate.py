@@ -337,5 +337,62 @@ class LoosePointerTests(unittest.TestCase):
         self.assertEqual(0, loose, "已提交的表上还有 %d 条点不开的指针" % loose)
 
 
+class AbsenceTokenBoundaryTests(unittest.TestCase):
+    """R208 / BACKLOG 226：缺席断言要比**标识符**，不是比子串。
+
+    来历（都是这台机器上真发生过的）：`HistorySidebarView.swift` 里没有任何 `.disabled(`，
+    但它有 `focusEffectDisabled()` —— 忽略大小写的**子串**比较因此把
+    `缺席:...HistorySidebarView.swift=disabled` 判成"词在里面"⇒ ABSENT_CLAIM_FALSE。
+    红得不对还不是最坏的：最坏的是人会去换一个更怪的词来绕过，
+    于是缺席断言挑的词与被讨论的东西脱钩（尺子量错对象，R90/R100 那一族）。
+    """
+
+    SIDEBAR = "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
+
+    def test_a_word_only_embedded_in_a_longer_identifier_is_not_present(self):
+        data = base()
+        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=disabled"
+        self.assertEqual([], codes(gate.check(data)),
+                         u"focusEffectDisabled() 不该把 `disabled` 判成在场")
+
+    def test_a_standalone_identifier_still_makes_the_claim_false(self):
+        """牙还在：`allowsHitTesting` 在这个文件里是独立标识符（两处），写着"没有"必须红。"""
+        data = base()
+        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=allowsHitTesting"
+        self.assertIn("ABSENT_CLAIM_FALSE", codes(gate.check(data)))
+
+    def test_a_dotted_or_call_form_token_still_matches(self):
+        """正向：调用形/带点的写法不许被边界规则误伤（否则整条判据变瞎，而且是"假清白"那一侧）。
+
+        `ForEach(` 在 SettingsView 里出现 4 次，每一次后面紧跟的都是标识符 ——
+        若两侧都无条件要求边界，这 4 次全都匹配不上，"没有 ForEach(" 就会绿着过（R208 的第一版就这么坏过，
+        由 D-205 记下）。这一格是那条坏法的正对照。
+        """
+        settings = "Sources/ClipboardHistoryApp/Views/SettingsView.swift"
+        for token in (u"ForEach(", u"Toggle(", u".disabled("):
+            data = base()
+            data["rows"][0]["evidence"] = u"缺席:" + settings + u"=" + token
+            found = codes(gate.check(data))
+            self.assertIn("ABSENT_CLAIM_FALSE", found,
+                          u"%s 真在 SettingsView 里 ⇒ 写着「没有」必须红（实测各出现 4/9/4 次）" % token)
+
+    def test_call_form_token_is_absent_when_the_file_really_has_none(self):
+        """同一条放松不许把"假清白"换成"假在场"：侧栏里一次 `ProgressView(` 都没有 ⇒ 声明照旧过。
+
+        这一格的词是**量出来**的（`ProgressView(` 在 HistorySidebarView.swift 出现 0 次）。
+        我最初写的是 `ForEach(`，实测那文件里有 2 次 —— 于是这一格自己红了一次，
+        正好把"形容词不是读数"那一族又钉了一遍（见 D-205）。
+        """
+        data = base()
+        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=ProgressView("
+        self.assertEqual([], codes(gate.check(data)),
+                         u"HistorySidebarView.swift 里 `ProgressView(` 出现 0 次")
+
+    def test_the_positive_control_is_still_green(self):
+        data = base()
+        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=zzzNoSuchTokenAtAll"
+        self.assertEqual([], codes(gate.check(data)))
+
+
 if __name__ == "__main__":
     unittest.main()

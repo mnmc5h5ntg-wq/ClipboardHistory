@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 缺席断言的"在场"判定改成标识符边界匹配，并配三把方向各别的刀（R208 / U-674…U-676 · 判据 2 文件 + 表 1 支，产品 0 文件）
+
+- 病根一：闸门用 `token.lower() in text.lower()` 判缺席 ⇒ `缺席:...HistorySidebarView.swift=disabled` 被 `focusEffectDisabled()` 判成假话
+  （那文件里没有任何 `.disabled(`）。真实代价不是红得不对，是人会换更怪的词绕过 ⇒ 缺席断言挑的词与所讨论的东西脱钩
+- 病根二（第一版修法自己造的）：两侧一律要求边界 ⇒ 调用形词元 `ForEach(` 虽在 `SettingsView.swift` 出现 4 次仍被判"查无此词"
+  ⇒ 写着「没有 ForEach(」能绿；**假清白比误报坏**，它把缺席断言变成免检
+- 定形：只有词元自己那一头是单词字符时才要求边界（`absence_pattern()`）；真表 162 格 `不合法格=0`
+- 自检 384→389 格（嵌入不算在场 / standalone 仍红 / 带点带括号不误伤 / 调用形真缺席仍绿 / 真没有仍绿）
+- `mutate_r208.py` 登记进名册并现跑（M739 退回子串、M740 永远不在场、M741 放松改回去）：`R208_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=56 covered=41 arms=161 bad=3`、`ARM_TOTAL files=135 arms=550 dupes=0 repeats=0`
+- BACKLOG 226 结案；新开 D-205（修误报要配一把"修过头"的刀；放松判据要配一格"确实在场"的正对照）
+- 产品 0 文件 ⇒ 无新帧、无换装、看图腿 NOT-RUN；CI：`8` 跑 success、`0` 跑未读、失败 无
 ### 清账表判完 + 守卫改写：R207 两批并成一轮（R207 / U-671…U673 · 判据 2 文件 + 表 1 份，产品 0 文件）
 
 - 162 格全部有判决：`MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；判定分布 `added=9 kept=41 not-added=17 not-applicable=95`（之和 == 行数，由生成器对账）；地板同笔抬到 162

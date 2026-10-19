@@ -75,6 +75,17 @@ PATH_RE_LAX = re.compile(r"[\w/\-.]*\.(?:swift|py|md|json)")
 INDEX_DIRS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "docs")
 _index_cache = {}
 
+# R208 的第二种坏法（是 R208 自己在写完第一版边界规则后量出来的，见 D-205）：
+# 「两侧都不许是单词字符」这条规则会把**调用形**的词元判成不在场 —— `ForEach(` 在 SettingsView 里出现 4 次，
+# 每一次后面紧跟的都是标识符，于是后视/前视一起把它挡掉 ⇒ 写着「没有 ForEach(」也能过。
+# 那是比误报更坏的一侧：误报逼人去换词，假清白直接让缺席断言变成免检。
+# 规矩：只有词元那一头本身是单词字符时，才要求那一侧有边界。带点、带括号的写法照旧算在场。
+def absence_pattern(token):
+    """把缺席词编译成"标识符边界"匹配式；边界只在词元自己那一头是单词字符时才要求。"""
+    head = r"(?<![\w])" if token[:1].isalnum() or token[:1] == "_" else ""
+    tail = r"(?![\w])" if token[-1:].isalnum() or token[-1:] == "_" else ""
+    return re.compile(head + re.escape(token) + tail, re.I)
+
 
 def repo_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -153,7 +164,13 @@ def evidence_problems(row, where, root=None):
         text = io.open(found, encoding="utf-8", errors="replace").read()
         # 比**忽略大小写**：Swift 里 `disabled` 与 `Disabled` 讲的是同一件事，
         # 原来区分大小写的话，把断言写成 `缺席:X=Disabled` 就能在含 `disabled` 的文件上被"证实"。
-        if token.lower() in text.lower():
+        #
+        # R208 / BACKLOG 226：但"在文本里出现"不等于"这个标识符在文件里"。
+        # 裸子串会把 `缺席:...HistorySidebarView.swift=disabled` 判成假，因为那文件里有
+        # `focusEffectDisabled()` —— 一个**更长的标识符的一部分**。后果不是红得不对那么简单：
+        # 它会逼人改挑一个更怪的词来绕过，于是缺席断言挑的词与被讨论的东西脱钩（尺子量错对象）。
+        # 改成标识符边界匹配：`focusEffectDisabled` 里的 `disabled` 不算在场。
+        if absence_pattern(token).search(text):
             out.append(("ABSENT_CLAIM_FALSE",
                         "%s：写着「%s 里没有 %s」，但它就在里面 ⇒ 这条理由是在替一个没做的东西开脱"
                         % (where, path, token)))

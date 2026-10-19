@@ -906,16 +906,16 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 
 | 量 | 现在 | 出处 |
 | --- | --- | --- |
-| 阶段二轮次 | ITERATION 记到 Round 205（204 节，197..205 连续）；UI_AUDIT 有 74 个「第 N 轮」节 | 两份台账的标题行计数 |
-| 缺陷编号 | 最大 U-667；BACKLOG 218 条、最大 228 | 台账正则 |
+| 阶段二轮次 | ITERATION 记到 Round 208（207 节，197..208 连续）；UI_AUDIT 有 211 个「第 N 轮」节（最大 第 210 轮） | 两份台账的标题行计数（R208 现取） |
+| 缺陷编号 | 最大 U-676；BACKLOG 216 条（按行首「编号 + 点」正则去重）、最大 232；最大 D-205 | 台账正则 |
 | 表面清账表 | 18 表面 × 9 状态 = 162 格；已写 162 行、未写 0 格；地板 162（R207 两批之后**全表判完**） | `motion_surface_gate.py` |
 | 判定分布 | added=9 kept=41 not-added=17 not-applicable=95（之和 == 行数，由生成器对账） | 同上 |
-| Swift 全量卷 | 884 / skip 44 / fail 0 —— **R198 那一跑的读数，R199…R205 未再跑全量**（R205 动了产品 ⇒ 全量交给 CI，未读之前不算它绿） | `/tmp/r198_full.log` 摘要行 |
-| 脚本电池 | Ran 384 tests / OK（R205 那一遍，`/tmp/r205_battery.log`） | `/tmp/r200_battery.log` |
-| 变异预检 | tables=55 covered=40 arms=158 bad=3（bad 是 R168 记的陈旧死针）；`ARM_TOTAL dupes=0 repeats=0`；R206 补登 `mutate_r205.py`（M736/M737/M738 三刀全 CAUGHT） | `mutate_needle_precheck.py` |
-| 自评曲线 | PHASE2_TO_47 n=40 mean=91.30；GAPS=none ⇒ 已含补落的 Round 201/202/203 与 R204 / R205 | `curve_from_ledger.py` |
-| 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`） | `/tmp/shots_r197` + `frame_baseline.py` |
-| 判据/工具 | `scripts/*.py` 18 支；`.scratch/motion-audit-2/*.py` 268 支 | 目录计数 |
+| Swift 全量卷 | 884 / skip 44 / fail 0 —— **R198 那一跑的读数，R199…R208 未再跑全量**（R205 动过产品 ⇒ 全量交给 CI；R206…R208 产品 0 文件，不需要新全量） | `/tmp/r198_full.log` 摘要行 |
+| 脚本电池 | **Ran 389 tests / OK**（R208 台账落盘之后现跑，`/tmp/r208f_battery.log`） | `python3 -m unittest discover -s scripts/tests` |
+| 变异预检 | tables=56 covered=41 arms=161 bad=3（bad 是 R168 记的陈旧死针）；`ARM_TOTAL files=135 arms=550 dupes=0 repeats=0`；R208 补登 `mutate_r208.py`（M739/M740/M741 三刀全 CAUGHT、RESTORE_CLEAN=yes） | `mutate_needle_precheck.py` |
+| 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
+| 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
+| 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
 | 最后一次动到 `Sources/` 的轮次 | **R205**（commit `8cbe238）—— 真改产品行为（2 文件）：`addDroppedFiles` 新增 `attemptedCount`，「provider 声称是文件却解出 0 个 URL」那一格不再静默；判据三条对照 + 刀 M736/M737 全 CAUGHT、已换装本机。**但这条新回执还没有帧**（不在任何夹具里）⇒ BACKLOG 228；上一笔动到源码的 R194 只动注释 | `git log -- ClipboardHistory/Sources` |
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
