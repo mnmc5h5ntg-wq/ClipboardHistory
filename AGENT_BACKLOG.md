@@ -6146,7 +6146,9 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   runner 是 213→194 / 222→202，**像素数差一个量级**（本机 6725/20740 vs runner 1637/4876）
   ⇒ 两机夹具的成像尺寸/合成不同，比值只是"各自过线"，**不许跨机当同一个量比**（R87/R100 那一条：两把尺问同一件事才谈一致）。
   `HOVER_PILL_PROOF light …比值=1.218 台阶=21…`、`HOVER_LADDER_PROBE light 两臂灰阶差=4` ⇒ R229 那两个位点在 runner 上也没被碰坏。
-- 仍**没接进 CI 的那一半**照旧：253 的"帧目录守卫接进 CI 步骤"、255 的性能预算格（本机红、runner 无红 ⇒ 255 的解释范围要收窄成"本机越预算"，别再写成全局缺陷）。
+- **253 已接线（本轮第二笔 `4edfea5`），CI 那一跑 = `39315528849`（写账时 `in_progress` ⇒ 未读）**。下一轮第 ⓪ 条要在那一跑的 `Release script tests` 正文里读**两行**：`SCRIPT_SHOTS_GLOB=/tmp/shots-ci png_files=<N>` 与各步的 skip 情况。三种结果处置相反，别预先选一种：`N` 与本机同量级且两格真判绿 ⇒ 253 全结；`N` 明显小（帧不全）⇒ 那一红读的是"缺哪几张"，要做成按帧有名有姓的出口，**不许整格放宽**；`N=0` ⇒ 是捕获那一步的产物没活到这一步（/tmp 跨步骤不共享或被清），那是接线问题不是产品问题。
+  另记一笔本机没法验的：**`ci.yml` 的 YAML 语法在本机读不了**（这台机器没有 `pyyaml`，`import yaml` 直接 `ModuleNotFoundError`）⇒ 电池里那几格只按文本形状扫（`test_ci_report_selftest` 的锚点命中数、`test_frames_path_hygiene` 的写死路径扫描），真正的解析证人是下一跑本身。
+- **258 的前置本轮量到了，不是猜的：那三个位点全是 `private struct`，捕获夹具够不着**（`DetailView.swift:228 MarkdownModeButton`、`DetailView.swift:541 MultiFileRow`、`SettingsView.swift:857 SettingsSidebarRow` 都带 `private`），而已有夹具引用的是 internal 的那些（`HistorySidebarView.swift:393 SegmentedFilterPicker`、`GlassControls.swift:3 GlassPill`）。⇒ 258 第一步是个**可见性决定**（把这三型摘掉 `private`，还是经由父视图在产品真实排版里驱动），不是"接个 env 键"那么小。选后一种的代价要一起记：整窗帧里同一枚取证键会把别处一起点亮（R230 为段按钮写下的那句"指针同时出现在八个地方"就是同一个理由）。
 - **253 的剩下那一半：本轮已接线，两向证人在本机拿到了（runner 验收等下一跑）**。原先这一条写的是"没接进 CI"，不准确 —— `ci.yml` 的 `Release script tests` 那一步**本来就在 runner 上跑整卷 `scripts/tests`**（第 358 行 `"$PY" -m unittest discover -s scripts/tests -v`），但整个 workflow 只在捕获与交互探针那两步给 `CLIPBOARD_HISTORY_UI_SHOTS`（第 54 / 145 行），电池那一步没有 ⇒ 253 那两格在 runner 上走的是**"帧目录不在 ⇒ skip"**那个出口，不是"跑了并判过"。
   本轮改法（`.github/workflows/ci.yml`，电池那一步开头）：`export CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci` —— 即**同一个 job 里捕获步骤已经落盘的那批帧**，只读不写（R92 那族：夹具不许覆盖闸门要读的日志），并在跑套件**之前**先打一行 `SCRIPT_SHOTS_GLOB=… png_files=<通配张数>`（这行按仓库规矩**不叫"帧数"**，`ls|wc -l` 不是帧数；它的用途是让"读不到帧"那种红自带当时的 glob 计数，不必下一轮重新猜）。
   **两向证人（本机实测，同一支电池两遍）**：不给变量 ⇒ `Ran 406 tests / OK (skipped=2)`；给变量指向本轮真帧目录（`/tmp/shots_r231`，盘上 155 个通配项）⇒ `Ran 406 tests / OK`，**skip 从 2 降到 0** ⇒ 这两格确实是"从跳过分到真判"，不是换了一条更宽的出口。
