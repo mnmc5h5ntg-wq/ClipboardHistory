@@ -304,6 +304,218 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
 
     // MARK: - 地板
 
+    /// 色觉模拟之后，相邻两档**还分得开吗**（R198 / 结案 BACKLOG 221）。
+    ///
+    /// 为什么加这一根轴：R197 我先用**亮度比值**去质询 `空→第 1 档`（亮档比值只有 1.05），
+    /// 那其实是把 R51/R53 已经证伪过的轴又提一遍 —— 那一步差的是**色相/彩度**不是明度
+    /// （`VisualHeat.empty` 走 `primary` 灰，四档走 `accent` 蓝），所以"亮度几乎不动"是设计如此，不是缺陷。
+    /// 但质询本身问对了另一半：**只靠彩度分开的两档，在色觉障碍下会不会并成一步？** 这个能测。
+    ///
+    /// **实测答案（本轮那 16 条 `HEAT_ADJACENT_CVD`）：不会并成一步** —— 最小的一格是 `light 空→第 1 档`
+    /// 的 25.41/255，其余 15 格在 29.22…64.02，全部压在地板之上 ⇒ 梯子在绿色盲下仍是五档。
+    /// 方向是量出来才看清的，而且和直觉相反：**暗档几乎不掉（保住 97–98%），亮档掉到 65–80%**。
+    /// 两档的分离压在不同通道上：暗档 (41,41,41)→(25,47,71)→…→(4,108,221) 的差大头在**蓝**，
+    /// 而 deuteranopia 矩阵对蓝几乎不动（`0.96 b + 0.04 g`）⇒ 蓝是这条轴的免疫通道；
+    /// 亮档 (243,243,243)→(209,231,255)→…→(38,142,255) 的差里有大头在**红**，那正是被红绿混合压掉的那一根。
+    /// ⇒ 结案 BACKLOG 221 时给的是**通道读数**，不是"彩度够不够"这种形容词。
+    ///
+    /// 1x 与 2x 给出**完全相同**的 16 个数（只有 `像素=49` 对 `像素=256` 不同）：静态色判据没有尺度依赖。
+    /// 2x 留着不是为了多覆盖，是为了"哪天描边或圆角把填充带吃掉会立刻在像素数上被看见"。
+    ///
+    /// 地板**沿用同一把 `adjacentLevelFloor255`（=18，R45 从 20 条真读数推出来的"看得出来"线）**，
+    /// 不新发明数，也不为这条新轴放宽：如果哪天它红了，改的是产品的梯子（`VisualHeat.ladder`/`empty`），
+    /// 并且要同步帧基线 —— 与上面那条同规矩。**这条现在有正对照钉着**（`M735`：把模拟的两格换成同一格 ⇒ 立刻红）。
+    ///
+    /// **R198 第一版这条判据是红的，而红的是尺子、不是产品**：那版蓝通道漏了重新编码
+    /// （红绿走 sRGB 编码、蓝留线性），同一个产品在暗档 `空→第 1 档` 读成 10.41（假红），
+    /// 又在 `第 3→第 4 档` 读出 99.60 > 模拟前 65.00 —— "模拟之后反而更分得开"物理上不可能，
+    /// 那就是同一颗尺两头用两种单位的证人。它由下面那条**与产品颜色无关**的真值表钉住，不许靠肉眼发现第二次。
+    func testAdjacentHeatLevelsStaySeparableUnderDeuteranopia() throws {
+        var readings: [String] = []
+        for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for scale in [1, 2] {
+                let renders = try Self.levels.map {
+                    try renderCell(level: $0, hovered: false, appearance: appearance, scale: scale)
+                }
+                let size = renders[0].pixelsWide
+                let band = Self.fillBand(size: size, scale: scale)
+                XCTAssertFalse(band.isEmpty, "\(tag)/\(scale)x 的填充带是空的 ⇒ 这条判据没在量任何东西")
+                for i in 1..<Self.levels.count {
+                    let a = Self.levels[i - 1], b = Self.levels[i]
+                    let normal = Self.meanMaxChannelDelta(renders[i - 1], renders[i], over: band, size: size)
+                    let simulated = Self.meanMaxChannelDeltaSimulated(renders[i - 1], renders[i], over: band, size: size)
+                    let cvd = simulated.delta
+                    // 两颗尺必须量同一批像素，否则"模拟前/模拟后"是两个数而不是一个比。
+                    XCTAssertEqual(simulated.undecodable, 0,
+                                   "\(tag)/\(scale)x 的 \(a.name)→\(b.name) 有 \(simulated.undecodable) 格像素转不成 sRGB ⇒ "
+                                   + "模拟那一步跳过了它们，均值只剩 \(simulated.sampled)/\(band.count)，这条读数不可信")
+                    XCTAssertEqual(simulated.sampled, band.count,
+                                   "\(tag)/\(scale)x 的 \(a.name)→\(b.name)：填充带 \(band.count) 格只量到 \(simulated.sampled) 格 ⇒ 分母不是它自己说的那个")
+                    readings.append("HEAT_ADJACENT_CVD \(tag)/\(scale)x \(a.name)→\(b.name) 像素=\(simulated.sampled) "
+                                    + "前墨=\(Self.fillInk(renders[i - 1], over: band, size: size)) "
+                                    + "后墨=\(Self.fillInk(renders[i], over: band, size: size)) "
+                                    + "模拟前=\(String(format: "%.2f", normal)) "
+                                    + "模拟后=\(String(format: "%.2f", cvd)) "
+                                    + "保住=\(String(format: "%.0f%%", 100.0 * cvd / max(normal, 0.001)))")
+                    XCTAssertGreaterThanOrEqual(cvd, Self.adjacentLevelFloor255,
+                        "\(tag)/\(scale)x 的 \(a.name)→\(b.name)：绿色盲模拟之后整格填充只差 "
+                            + "\(String(format: "%.2f", cvd))/255（最大通道那一根），低于地板 "
+                            + "\(Self.adjacentLevelFloor255) ⇒ 这两档对色觉障碍用户是同一档。"
+                            + "改 `VisualHeat.ladder`/`empty`（往低档里掺一点亮度，别只靠彩度）并同步帧基线；"
+                            + "不许把地板调低，也不许把这条判据删掉。模拟前=\(String(format: "%.2f", normal))")
+                }
+            }
+        }
+        readings.forEach { print($0) }
+        XCTAssertEqual(readings.count, 16,
+                       "读数必须是 4 对 × 2 外观 × 2 尺度 = 16 条，少一条就是有一对没被量")
+    }
+
+    /// 那矩阵本身接对了吗（R198 的正对照，输入是**合成的纯色**，与产品梯子无关）。
+    ///
+    /// 为什么必须有这条：上面那条判据只压一根地板，而"模拟被写成恒等变换"时 16 条读数会**原封不动等于模拟前**、
+    /// 照样全绿 —— 那等于整条轴没接电却替产品签了字（R198 第一版的量纲 bug 也是同一族：产品测试照样全绿，
+    /// 只有 `99.60 > 65.00` 那个形状露了一下，肉眼可见但判据不可见）。⇒ 判据要能分辨
+    /// "梯子在色盲下挺住了" 与 "我压根没模拟"，就得有一根**不依赖产品颜色**的尺。
+    ///
+    /// 钉两件事，都不设经验阈值：
+    /// 1. **红↔绿 的分离必须小于 蓝↔黄 的分离**（deuteranopia 的定义性后果：红绿混、蓝黄不混）。
+    ///    恒等变换给 255 < 255 ⇒ 红。
+    /// 2. **中性灰是不动点**：三行的系数各自和为 1 ⇒ 灰进灰出。这条专治 R198 第一版漏掉重新编码的那一路
+    ///    （蓝留线性时 (128,128,128) 被读成 (128,128,55)，漂移 73/255）—— 它是矩阵自己的恒等式，不是容差。
+    func testDeuteranopiaSimulationMatrixIsWired() throws {
+        func rgb(_ r: Int, _ g: Int, _ b: Int) -> NSColor {
+            NSColor(srgbRed: CGFloat(r) / 255.0, green: CGFloat(g) / 255.0, blue: CGFloat(b) / 255.0, alpha: 1.0)
+        }
+        func plain(_ c: NSColor) throws -> (r: Double, g: Double, b: Double) {
+            let s = try XCTUnwrap(c.usingColorSpace(.sRGB), "合成色转不成 sRGB ⇒ 这条正对照没在量任何东西")
+            return (Double(s.redComponent), Double(s.greenComponent), Double(s.blueComponent))
+        }
+        func sim(_ c: NSColor) throws -> (r: Double, g: Double, b: Double) {
+            try XCTUnwrap(Self.simulateDeuteranopia(c), "合成色过不了模拟 ⇒ 矩阵那一步根本没跑")
+        }
+        func maxDelta(_ a: (r: Double, g: Double, b: Double),
+                      _ b: (r: Double, g: Double, b: Double)) -> Double {
+            255.0 * max(abs(a.r - b.r), max(abs(a.g - b.g), abs(a.b - b.b)))
+        }
+
+        let red = rgb(255, 0, 0), green = rgb(0, 255, 0)
+        let blue = rgb(0, 0, 255), yellow = rgb(255, 255, 0)
+        let grey = rgb(128, 128, 128)
+
+        let rgBefore = maxDelta(try plain(red), try plain(green))
+        let rgAfter = maxDelta(try sim(red), try sim(green))
+        let byBefore = maxDelta(try plain(blue), try plain(yellow))
+        let byAfter = maxDelta(try sim(blue), try sim(yellow))
+        let g0 = try plain(grey), g1 = try sim(grey)
+        let greyDrift = max(abs(g1.r - g0.r), max(abs(g1.g - g0.g), abs(g1.b - g0.b))) * 255.0
+
+        print("SIM_MATRIX 红↔绿 前=\(String(format: "%.2f", rgBefore)) 后=\(String(format: "%.2f", rgAfter)) "
+              + "| 蓝↔黄 前=\(String(format: "%.2f", byBefore)) 后=\(String(format: "%.2f", byAfter)) "
+              + "| 灰 \(Self.inkString(g0))→\(Self.inkString(g1)) 漂移=\(String(format: "%.2f", greyDrift))")
+
+        XCTAssertLessThan(rgAfter, byAfter,
+            "红绿那一对模拟后差 \(String(format: "%.2f", rgAfter))，蓝黄那一对差 \(String(format: "%.2f", byAfter)) ⇒ "
+            + "模拟没有把红绿混起来，等于没模拟（恒等变换的签名）。这时候上面那条产品判据的 16 条读数会正好等于模拟前，"
+            + "全绿而毫无意义 —— 所以这条正对照不许跟着一起删。")
+        XCTAssertLessThan(rgAfter, rgBefore,
+            "红绿分离模拟后 \(String(format: "%.2f", rgAfter)) 没有比模拟前 "
+                + "\(String(format: "%.2f", rgBefore)) 小 ⇒ deuteranopia 的定义性后果没发生，矩阵没接电。")
+        XCTAssertGreaterThanOrEqual(byAfter, byBefore - Self.deutanBlueRowSlack255,
+            "蓝黄分离从 \(String(format: "%.2f", byBefore)) 掉到 \(String(format: "%.2f", byAfter)) ⇒ "
+            + "这不再是 deuteranopia（蓝黄那一对本来就该几乎不动），矩阵里混进了别的通道的系数。"
+            + "这根容差不是拍的：它由矩阵自己的蓝行推出来 —— b' = 0.96 b + 0.04 g ⇒ 分离全压在蓝通道时最多丢 4%，"
+            + "再加 8 位量化取整 1/255，上界就是 " + String(format: "%.1f", Self.deutanBlueRowSlack255) + "。"
+            + "本轮实测 蓝↔黄 前后都是 255.00：那一对的分离其实压在**红**通道上（黄 r=255、蓝 r=0），一点没丢。")
+        XCTAssertLessThanOrEqual(greyDrift, 2.0,
+            "中性灰 \(Self.inkString(g0)) 过完模拟变成 \(Self.inkString(g1))，漂移 "
+                + "\(String(format: "%.2f", greyDrift))/255 ⇒ 三行系数不再各自和为 1，或者某一路的量纲没统一"
+                + "（R198 第一版就是把蓝通道留在线性域，那一次这条会给出 73）。灰必须是不动点，与产品颜色无关。"
+                + "2.0 是这条**恒等式**的量化上界（行和恰为 1 ⇒ 数学上是 0，本轮实测漂移 0.00，只留幂函数往返与 8 位取整的余量），不是经验阈值。")
+    }
+
+    /// deuteranopia 矩阵蓝行 `b' = 0.96 b + 0.04 g` 允许的最大通道损失，换算到 0…255：
+    /// 分离全压在蓝通道时是 4%，再加 8 位量化取整的 1/255。上面那条"蓝黄必须保住"的容差由它推出来，
+    /// 免得将来有人把这根数当成拍脑袋的经验阈值去调。
+    static let deutanBlueRowSlack255: Double = 255.0 * 0.04 + 1.0
+
+    /// 三元组 → 日志里那个 `(r,g,b)`（0…255 取整）。只印调色板数字，不含任何用户内容。
+    static func inkString(_ c: (r: Double, g: Double, b: Double)) -> String {
+        "(\(Int((255.0 * c.r).rounded())),\(Int((255.0 * c.g).rounded())),\(Int((255.0 * c.b).rounded())))"
+    }
+
+    /// Viénot–Brettel–Fagot 1999 的 deuteranopia 近似：**线性域里乘矩阵，三通道一律重新编码回 sRGB**。
+    ///
+    /// 三通道同量纲是这条的命门。R198 第一版只在红/绿那两路做了 `encoded()`，蓝那一路直接返回线性值，
+    /// 于是"最大通道差"会在不同格子里混着两种单位比：暗档低亮度区蓝通道被线性化**压缩**
+    /// （encoded 0.1→0.2 在线性域只有 0.010→0.033），`空→第 1 档` 读成 10.41（假红，看着像产品塌了）；
+    /// 而高亮度区线性化是**放大**的（0.85→1.0 的线性差 0.31 > 编码差 0.15），`第 3→第 4 档` 读出 99.60 > 模拟前 65.00，
+    /// "模拟之后反而更分得开"这种物理上不可能的形状，就是同一颗尺两头用两种单位的证人。
+    /// ⇒ 现在三通道走同一个 `encodeSRGB`，与 `pixelMaxChannelDelta` 同量纲，"模拟前/模拟后"才真能相除。
+    static func simulateDeuteranopia(_ c: NSColor) -> (r: Double, g: Double, b: Double)? {
+        guard let lin = linearSRGB(c) else { return nil }
+        return (encodeSRGB(0.625 * lin.r + 0.375 * lin.g),
+                encodeSRGB(0.700 * lin.g + 0.300 * lin.r),
+                encodeSRGB(0.960 * lin.b + 0.040 * lin.g))
+    }
+
+    /// sRGB 解码到线性 RGB（矩阵必须在亮度线性域里乘，这是色觉模拟的标准做法）。
+    /// 转换失败返回 nil，由调用方**计数**而不是 `continue` 混进均值。
+    static func linearSRGB(_ c: NSColor) -> (r: Double, g: Double, b: Double)? {
+        guard let s = c.usingColorSpace(.sRGB) else { return nil }
+        func lin(_ v: CGFloat) -> Double {
+            let x = Double(max(0.0, min(1.0, Double(v))))
+            return x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+        }
+        return (lin(s.redComponent), lin(s.greenComponent), lin(s.blueComponent))
+    }
+
+    /// 线性 → sRGB 编码，返回 0…1 的 Double（与 `pixelMaxChannelDelta` 的 `*255` 口径对齐）。
+    static func encodeSRGB(_ v: Double) -> Double {
+        let x = max(0.0, min(1.0, v))
+        return x <= 0.0031308 ? x * 12.92 : 1.055 * pow(x, 1.0 / 2.4) - 0.055
+    }
+
+    /// 两格先各自过一遍色觉模拟，再取逐像素最大通道差的均值 —— 与 `meanMaxChannelDelta` 同一颗尺，
+    /// 唯一的区别是中间多了那一步模拟（这样"模拟前/模拟后"两个数才是可比的）。
+    /// 返回三元组：均值 + 真正被量的像素数 + 转换失败的像素数，后两者由判据自己钉住，
+    /// 不让"有一片像素没换算出来"稀释成一次假绿或假红。
+    static func meanMaxChannelDeltaSimulated(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                                             over band: Set<Int>, size: Int)
+        -> (delta: Double, sampled: Int, undecodable: Int) {
+        guard !band.isEmpty else { return (-1, 0, 0) }   // 空带 = 没量，与上面那颗尺同一规矩给负数
+        var total = 0.0
+        var sampled = 0
+        var undecodable = 0
+        for index in band {
+            let point = (x(of: index, size: size), y(of: index, size: size))
+            guard let pa = a.colorAt(x: point.0, y: point.1),
+                  let pb = b.colorAt(x: point.0, y: point.1) else { undecodable += 1; continue }
+            guard let sa = simulateDeuteranopia(pa), let sb = simulateDeuteranopia(pb) else { undecodable += 1; continue }
+            total += max(abs(sa.r - sb.r), max(abs(sa.g - sb.g), abs(sa.b - sb.b)))
+            sampled += 1
+        }
+        guard sampled > 0 else { return (-1, 0, undecodable) }
+        return (255.0 * total / Double(sampled), sampled, undecodable)
+    }
+
+    /// 填充带的均值墨色（整数 0…255 的 r,g,b）—— 判据交出它自己读过的那三个数，
+    /// 这样"哪一根通道在撑这次判定"在日志里是可查的，而不是只留一个差值。
+    /// 只印调色板数字，不含任何用户内容。
+    static func fillInk(_ render: NSBitmapImageRep, over band: Set<Int>, size: Int) -> String {
+        guard !band.isEmpty else { return "无" }
+        var r = 0.0, g = 0.0, b = 0.0
+        var n = 0
+        for index in band {
+            let point = (x(of: index, size: size), y(of: index, size: size))
+            guard let c = render.colorAt(x: point.0, y: point.1)?.usingColorSpace(.sRGB) else { continue }
+            r += Double(c.redComponent); g += Double(c.greenComponent); b += Double(c.blueComponent); n += 1
+        }
+        guard n > 0 else { return "读不到" }
+        return "(\(Int((255.0 * r / Double(n)).rounded())),\(Int((255.0 * g / Double(n)).rounded())),\(Int((255.0 * b / Double(n)).rounded())))"
+    }
+
     /// 相邻两档**必须分得开**（R54 / BACKLOG 71 / U-79 的后续）。
     ///
     /// 为什么这条要到 R54 才立：R45 量的是「悬停那一圈相对于整条数据范围响不响」，

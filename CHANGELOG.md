@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 221 结案在色觉模拟轴上：新判据 16 条最小 25.41，而第一版那个 10.41 是尺子的假红（R198 / U-644…U-646 · 产品 0 文件，判据账 + 看图腿）
+
+- 新判据 `HeatmapHoverEvidenceTests/testAdjacentHeatLevelsStaySeparableUnderDeuteranopia`：Viénot 1999 deuteranopia 近似（线性域乘矩阵、三通道一律重新编码回 sRGB），地板沿用 `adjacentLevelFloor255`=18.0，不新发明数
+- 读数：暗档保住 97/98、亮档 65/75/76/80，最小 light/1x empty→bucket1=25.41 ⇒ 绿色盲下仍是五档；方向反直觉（暗档分离压在蓝通道 = 免疫通道，亮档大头在红）
+- **本轮第一版是假红**：蓝通道漏了重新编码 ⇒ 暗档 `空→第 1 档` 读 10.41、`第 3→第 4 档` 读 99.60 > 模拟前 65.00（物理不可能）⇒ 修尺子，不改产品
+- 补一条与产品颜色无关的真值表 `testDeuteranopiaSimulationMatrixIsWired`：红↔绿分离必须小于蓝↔黄、中性灰必须是不动点 ⇒ SIM_MATRIX 红↔绿 前=255.00 后=68.97 | 蓝↔黄 前=255.00 后=255.00 | 灰 (128,128,128)→(128,128,128) 漂移=0.00
+- 变异：`mutate_r198.py` M732, M733, M734, M735 ⇒ 4/4 CAUGHT、ESCAPED=0、NOT_RUN=0、RESTORE_CLEAN=yes；M732/M733 只有真值表能抓（产品判据在两种坏法下全绿）
+- 看图腿：产品 0 文件 ⇒ 先 `ls` 数出 138 张再沿用 R197 的帧，COMPARED=138 CHANGED=0；真帧按中轴游程复量并与判据逐档相减 ⇒ 偏移集中在 R 那一列（6…21，G/B ≤1），亮档最低一格真帧 21 对判据 25.41、地板余量 3 对 7.4 ⇒ 新开 222
+- 验证：编译 0 告警、全量卷 884/44/0、脚本电池见 commit 输出；R197 那笔按 211 的通道显式申报为单本账笔次
 ### 220 结构诊断：段按钮的 KeyViewProxy 在树里、`_FocusRingView` 已在位，缺的是接受第一响应者（R196 / U-641…U-643 · 产品 0 文件，判据账）
 
 - 新量法 `UIInteractionProbeTests.testSidebarKeyViewChainStructureIsPrinted`：整棵树 + nextKeyView 环 + 带内几何，全部走 print 读数
