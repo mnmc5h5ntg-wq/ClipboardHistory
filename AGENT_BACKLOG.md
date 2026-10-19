@@ -5803,3 +5803,10 @@ run `39247153666`（3073943）`row-insert 开 帧数=4 峰值=0.057 采样≈33m
 要配的两把：① `if spread2 > COMPOSED_TOL_PT:` ⇒ `if False:`（同帧判据恒真）⇒ 自检的「反对照·组合帧头部换列」必须不红 ⇒ `LEFT_AXIS_SELFTEST bad`；
 ② 把 `main()` 里的 `except ImportError:` 具名出口改回裸 `raise` ⇒ `test_plain_mode_without_pillow_reports_unavailable_not_traceback` 必须红。
 两把都是本轮**已经想到但没做**的（时间用在了修 runner 红与拆遮蔽上），所以记成账而不是"不需要"。
+
+**238 追记（R213 结案）：三把刀落地 —— 同帧判据恒真 / 具名出口改回抛栈 / 缺席被当成有对象，全 CAUGHT**
+
+`mutate_r213.py`：M745 打 D 判据（`if spread2 > COMPOSED_TOL_PT:` ⇒ `if False:` ⇒ 自检反对照不红 ⇒ `LEFT_AXIS_SELFTEST bad`）；
+M746 打 R212 刚立的 `unavailable` 出口（改回裸 `raise` ⇒ 那一格红）—— 这一把的语义是"**R209 那朵 runner 红的复发**"；
+M747 打 `live()`（⇒ True 时缺席探针被解引用 ⇒ 崩栈 ⇒ "并存必须仍红"那格红），顺带证明证人读的是结论行而不是退出码。
+现跑：`R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`。

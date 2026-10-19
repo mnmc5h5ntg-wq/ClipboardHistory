@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 看图尺的三把刀落地（BACKLOG 238 结案）+ a800900 失败步骤逐条落账（R213 / U-689…U-690 · 判据 1 支 + 名册 1 处，产品 0 文件）
+
+- M745 同帧判据恒真 ⇒ 自检反对照不红；M746 具名出口改回裸 raise ⇒ unavailable 那格红；M747 缺席被当成有对象 ⇒ "并存必须仍红"那格红
+- 现跑 `R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；预检 `NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`、`ARM_TOTAL files=137 arms=550 dupes=0 repeats=0`
+- `a800900` 只有 `STEP[8] Release script tests` 红，`Pillow for the frame rulers` 与 `Surface left-axis ruler` 都在被 skip 的段里
+  ⇒ 235 在 R209/R210/R211 三跑不可能被读到，改挂 982faff；234 在那之前只算本机结案
+- 产品 0 文件 ⇒ 无新帧、无换装、看图腿 NOT-RUN
 ### runner 上 R209/R210/R211 的 STEP[8] 红归因并修：像素库缺席走具名出口，NOT_RUN 不再连带免检（R212 / U-686…U-688 · 判据 2 文件，产品 0 文件）
 
 - 真因：`test_surface_left_axes` 硬依赖 PIL，而 runner 没装库；且非 `--ci` 路径把 `ImportError` 抛成崩溃 ⇒ 断言读到栈而不是结论行

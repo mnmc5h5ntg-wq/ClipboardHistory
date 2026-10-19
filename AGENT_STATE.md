@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 21:15（本地 · R213 / 第 215 轮：**看图尺的三把刀落地（238 结案）+ a800900 逐步骤落账（235 改挂 982faff）**（U-689…U-690 · 产品 0 文件）
+
+**本轮落地**：`mutate_r213.py` 三把刀全 CAUGHT、`RESTORE_CLEAN=yes`（M745 同帧判据恒真 / M746 把 unavailable 改回裸 raise / M747 让缺席被当成有对象）；
+预检 `NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`、`ARM_TOTAL files=137 arms=550 dupes=0 repeats=0`。BACKLOG 238 结案。
+**顺序账**：`a800900` 只有 STEP[8] 红，`Pillow for the frame rulers` 与 `Surface left-axis ruler` 都在被 skip 的段里
+⇒ 235（尺在 runner 上的出口）在 R209/R210/R211 三跑里**不可能**被读到，改挂到 982faff；234 在那之前只算本机结案。
+本轮产品 0 文件 ⇒ 无新帧、无换装、看图腿 NOT-RUN。
+
+**下一轮（R214）的靶**：⓪ 读 982faff 与本跑的 CI：STEP[8] 是否恢复绿、`Surface left-axis ruler` 在 runner 上打的是 ok/skipped/unavailable（235 结案的唯一通道）；
+① 236 的默认值守卫（Swift 侧，带刀）；② 237（pillow 安装位置：保持现状 + 登记，还是前移）；
+③ 227③、222、215、201/202、207；④ 220 路 A 与 228② 等用户。
+)
+
 最后更新：2026-10-19 21:12（本地 · R212 / 第 214 轮：**runner 那朵红的归属与修法（具名出口 unavailable + exit 2）+ 233 判据半落地 + 拆掉一条 NOT_RUN 遮蔽**（U-686…U-688 · 产品 0 文件）
 
 **本轮落地**：① `c232e82` 起 STEP[8] 的红来自我新加的电池格硬依赖 PIL（runner 没装库），且非 `--ci` 路径抛栈 ⇒ 现在走具名出口 `unavailable` + exit 2，

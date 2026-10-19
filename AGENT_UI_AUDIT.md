@@ -363,6 +363,31 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 215 轮（R213 · 2026-10-19）：给那把尺补上欠的三把刀（BACKLOG 238 结案），并把 a800900 的失败步骤逐条落账（U-689…U-691 · 产品 0 文件，判据账）
+
+- **U-689：三把刀各打一种"尺坏了还照绿"的形态 —— 现跑 `R213_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。**
+  M745 把同帧判据 `if spread2 > COMPOSED_TOL_PT:` 改成 `if False:` ⇒ 自检的「反对照·组合帧头部换列」不再红 ⇒ `LEFT_AXIS_SELFTEST bad`；
+  这一格是 233 判据半的牙：**没有它，把 D 整条注释掉不会有任何反应**。
+  M746 把 R212 刚立的具名出口改回裸 `raise` ⇒ `test_plain_mode_without_pillow_reports_unavailable_not_traceback` 红 ——
+  这一刀钉的是 **R209 那朵 runner 红的原样复发**。
+  M747 把"NOT_RUN 只免引用它的那条规则"改回"永远活着" ⇒ 缺席探针被当成有对象去解引用 ⇒
+  `test_a_real_violation_still_goes_red` 红；它顺带证明**证人读的是结论行，不只是退出码**（崩栈的退出码也是 1）。
+  预检：`NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`、`ARM_TOTAL files=137 arms=550 dupes=0 repeats=0`。
+- **U-690：`a800900`（R210）的失败步骤逐条落账，只有 STEP[8] 红，其余六步是被 skip —— 235 因此仍不能结案。**
+  原文：`STEP[8] Release script tests ⇒ failure`，随后 `Info.plist gate`、`Frame baseline vs working manifest`、
+  `Pillow for the frame rulers`、`Surface left-axis ruler (BACKLOG 234, wired in R210)`、
+  `Frame baseline vs previous release` 全部 `⇒ skipped`。
+  ⇒ 这不是"那一步没做"，是**顺序**：电池一红就把后面的像素步骤整段带走，所以尺在 runner 上的出口（235）
+  在 R209/R210/R211 三跑里根本不可能被读到。这条账改挂在 982faff（修好电池的那跑）上，
+  读不到 `LEFT_AXIS_CI` 那行之前 234 只算本机结案、235 继续开着。
+  本轮产品 0 文件 ⇒ 无新帧、无换装、看图腿 NOT-RUN；验证：脚本电池现跑、预检、变异表三刀全 CAUGHT 且 RESTORE_CLEAN=yes。
+- **U-691：M746 的 needle 必须是「两行字面」—— 同一行文本在尺里出现两次，靠缩进分不开（R100 那一族的复现）。**
+  `    except ImportError:` 在 `ci_mode()` 与 `main()` 里各一次，缩进也相同。若 needle 只写这一行，
+  `count()==2` 会让这一刀 NOT_RUN（仪器拒跑，不算通过）；而如果改用"替换第一次出现"，
+  就会去改**另一条出口**（CI 那条），刀打的就不是它想问的那一格。所以 needle 取
+  `except ImportError:` 加上它下面那行唯一的 `print(...)` 文案。
+  规矩照 R100/R135：**needle 要靠相邻行的形状定位，不许靠缩进深浅**。
+  预检现在报 `NEEDLE_PRECHECK tables=58 covered=43 arms=167 bad=3`，其中 `mutate_r213` 三把全 ok（M745 ok；M746 ok；M747 ok）。
 ## 第 214 轮（R212 · 2026-10-19）：runner 上两跑红的真因是我新加的电池格依赖像素库 —— 修成具名出口，顺手拆掉一条假绿遮蔽（U-686…U-688 · 判据 2 文件，产品 0 文件）
 
 - **U-686：`c232e82`（R209）在 runner 上 STEP[8] Release script tests 红 —— 红在我这一轮新加的电池格，不是产品。**
