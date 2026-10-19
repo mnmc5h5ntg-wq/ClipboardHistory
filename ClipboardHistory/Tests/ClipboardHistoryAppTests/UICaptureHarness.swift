@@ -4660,6 +4660,10 @@ final class UICaptureTests: XCTestCase {
             )
         })
 
+        // 行为证人的**不冻臂**住在判据里而不是夹具名单里（R217 / BACKLOG 240）：
+        // 它只服务那一条两臂对照，不该进帧基线名单 —— 进了就是多两张帧、动 142 的地板，
+        // 而两臂的画实测完全相同（见 `testFrozenArmShowsSkeletonWhileLiveArmDoesNot` 的读数），没有新信息。
+
         return results
     }
 
@@ -10872,6 +10876,75 @@ final class UICaptureTests: XCTestCase {
                                                 bytesPerRow: bytesPerRow, rect: rect, scale: scale)
         }
         return (barLeading, textLeading, aboveBarLeading, barRows.count, textRows.count)
+    }
+
+    /// **行为证人：冻住的那一臂画条带，不冻的那一臂不画**（R217 / BACKLOG 240）。
+    ///
+    /// 为什么这条必须存在：`freezeLoadingForCapture` 是捕帧通道唯一"把异步按住"的开关。
+    /// 只看 `detail-loading-composed` 那张帧并不能证明它起作用了 —— 骨架本来就是
+    /// `.task` 尚未完成时 SwiftUI 自己画的初始态，**参数被传成死值时帧里也照旧有条带**。
+    /// 于是 R211 那句"冻住了所以拍得到"是一句没有证人的话。
+    /// 两臂同一份夹具、同一个产品入口（`DetailView`），只差那一个参数 ⇒ 帧里的差别只能来自它。
+    ///
+    /// **实验的答案是否定的**（本机 2026-10-19 实测：亮 50 == 50、暗 50 == 50）：
+    /// 那个参数在离屏捕帧通道里**没有像素后果**，因为 `.task` 里那一跳不会在渲染期内落地。
+    /// 所以 BACKLOG 240 想要的"第三把刀（传死值）才会 CAUGHT"在这个通道里做不到 ——
+    /// 死值刀要能被像素抓住，前提是通道分得出两臂。这条判据因此留着当**绊线**（见下面断言的说明），
+    /// 参数现在能证的只有源码形状那三条（`MediaLoadingPlanTests`）。
+    func testFrozenAndLiveArmsReadTheSameSkeletonRows() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r217-behavior-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func barRows(_ fixture: Fixture, _ appearance: NSAppearance.Name,
+                     _ name: String, _ tag: String) throws -> Int {
+            let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("读不回 \(file.lastPathComponent) ⇒ 这一臂没有读数"); return -1
+            }
+            return Self.skeletonAxisReadings(
+                bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                bytesPerRow: rep.bytesPerRow,
+                scale: Double(rep.pixelsWide) / Double(fixture.size.width)).barRows
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let frozen = try XCTUnwrap(
+                fixtures(appearance: appearance).first { $0.name == "detail-loading-composed" },
+                "\(tag)：找不到冻结臂夹具 ⇒ 这条判据没有对象")
+            // 不冻臂在这里现造，**不登记进夹具名单**：它只服务这一条对照。
+            let liveStore = makePopulatedStore(selectingIndex: 2)
+            let live = Fixture("detail-load-live-composed", NSSize(width: 720, height: 520)) {
+                AnyView(
+                    DetailView(historyStore: liveStore, freezeLoadingForCapture: false)
+                        .frame(width: 720, height: 520)
+                )
+            }
+
+            let frozenRows = try barRows(frozen, appearance, "detail-loading-composed", tag)
+            let liveRows = try barRows(live, appearance, "detail-load-live-composed", tag)
+            emit("SKELETON_BEHAVIOR_PROOF \(tag) 冻结臂条带行=\(frozenRows) 不冻臂条带行=\(liveRows)")
+
+            XCTAssertGreaterThan(frozenRows, 20,
+                "\(tag)：冻结臂只数出 \(frozenRows) 行条带 ⇒ 骨架不在了，"
+                    + "或者 `freezeLoadingForCapture` 没有真的把加载按住（这一臂的意义就是它）")
+            XCTAssertGreaterThanOrEqual(liveRows, 0,
+                "\(tag)：不冻臂没有读数（\(liveRows)）⇒ 帧读不回来，等号那一条会退化成 -1 == -1 的空对账")
+            // 两臂**实测相等**（本机 2026-10-19：亮/暗都是 50 == 50）。这不是一条把参数钉成契约的断言，
+            // 而是一条**通道改变时会响的绊线**：它记录的是"离屏捕帧里 `.task` 那一跳不会在渲染期内完成"，
+            // 于是 `detail-loading-composed` 那张骨架帧不是 R22 禁的那种时机赌 —— 换谁重捕都是这张。
+            // 它红了**不是**"把期望改成新数字"，而是"捕帧通道现在能让加载落地了"，
+            // 那时候 `freezeLoadingForCapture` 才第一次有像素后果，BACKLOG 240 的第三把刀才有对象。
+            XCTAssertEqual(liveRows, frozenRows,
+                "\(tag)：不冻臂 \(liveRows) 行 vs 冻结臂 \(frozenRows) 行 ⇒ 捕帧通道里加载真的能完成了，"
+                    + "骨架帧从此变成时机赌（R22 禁的那件事）。要做的不是改这条的期望值，"
+                    + "而是让冻结臂真的冻住并给参数补像素级证人（BACKLOG 240 的原文）")
+        }
     }
 
     /// **加载块必须站在详情栏那一条左轴上**（R26 / U-48 / D-085）。

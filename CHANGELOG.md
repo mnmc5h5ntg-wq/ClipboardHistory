@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 行为证人否证了自己：捕帧通道分不出冻结臂与不冻臂（R217 / U-701…U-703 · 判据 1 文件，产品 0 文件）
+
+- 新增 `UICaptureTests.testFrozenAndLiveArmsReadTheSameSkeletonRows`：同一份夹具、同一个 `DetailView` 入口，
+  只差 `freezeLoadingForCapture` ⇒ 实测两臂条带行数相等（light 50 vs 50；dark 50 vs 50）。
+  **`freezeLoadingForCapture` 在离屏捕帧通道里没有像素后果**，R211 台账里"靠它冻住"那句推断撤回。
+- 两把刀：M750（尺的子句恒假 ⇒ 条带 0 行）、M751（不冻臂外框 520→300 ⇒ 两臂分叉）——
+  `R217_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0`。
+- BACKLOG 240 追记 + 新开 243（先让通道能等 `.task`）；立 **D-209**：证人要按"它能拦什么"登记，
+  拦不住的那一类要显式写成不登记，不许留一把假装跑过的刀。
+- 验证：构建告警 0；捕获卷 `Executed 73 / skipped 4 / 0 failures`；
+  帧基线 `COMPARED=142 CHANGED=0 MISSING=0 ADDED=0`；产品 0 文件 ⇒ 未换装本机。
+
 ### 两朵 CI 红的归因与修法：调用点守卫改形状匹配、新出口测试去掉环境依赖（R216 / U-698…U-700 · 判据 2 文件，产品 0 文件）
 
 - `STEP[15]`：`Round4MarkdownTests.testDetailViewRoutesMarkdownToTheRendererAndBack：XCTAssertTrue failed - 文件预览没接到当前模式` ⇒ 根因是 R211 把 `DetailFileView(...)` 调用拆成两行，整行字面量守卫读不到了；改成按空白折叠后比形状 + 新增「freeze 必须接属性」
