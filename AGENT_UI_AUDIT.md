@@ -377,6 +377,8 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
   表面账那格的担心是没读过的假设）。
 - **U-717：这一格以后停旧数会红 —— 新守卫三格，同一份样本的 before/after 都有证人。**
   `scripts/tests/test_final_report_headline.py`：① 报告标题与 §1 的 U 上界必须等于活账；
+  **（同一轮的自我修正：这条原来钉的是"恒等"，写完本轮台账它自己就红了 ⇒ 改成有界落后 `LAG_ROUNDS=1`/`LAG_U=3`，
+  并补上反方向 `..._AHEAD`；两把刀按新形状重跑仍 2/2 CAUGHT。详见 `AGENT_BACKLOG.md` 248 追记与 CHANGELOG R222 最后一条。）**
   ② 伪造旧值必须点名（`FINAL_REPORT_HEADLINE_STALE` / `FINAL_REPORT_UCELL_STALE`）；
   ③ 形状读不到（换了破折号）必须报 `..._UNPARSEABLE` 而**不许静默通过**。
   before/after：改前电池 `Ran 403 ... FAILED (failures=1)`，红的就是这条新守卫（它靠报告的旧数才红）；
