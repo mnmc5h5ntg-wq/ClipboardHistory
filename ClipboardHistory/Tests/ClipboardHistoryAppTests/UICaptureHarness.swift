@@ -4056,6 +4056,52 @@ final class UICaptureTests: XCTestCase {
             )))
         })
 
+        // R229 / BACKLOG 251：**这一档第一次有帧**。
+        //
+        // `VisualFill.controlHover` 存在的全部理由是 R15/R20 那句"6% 铺在一整行上读得出来，
+        // 铺在 20pt 的图标上等于没有 ⇒ 小控件要显式抬一档"。那句话以前**只有注释撑着**：
+        // 悬停那一档由 `PressedLabel` 的私有 `@State` 驱动，而合成 hover 的三条路 R14 实测全断
+        // （CGEvent 被窗口服务器丢、直接喂 `mouseEntered` 不回调、`sendEvent` 崩）。
+        // 现在走 `EnvironmentValues.hoveredForCapture` 取证通道点亮 —— 与上面 `quickpick-hover`
+        // 用的 `rowHoveredForCapture` 同一手法：**产品自己永远不写这个键**，真实指针那条路一字未动。
+        //
+        // 两态各一张（idle / hover）：只拍点亮的那张量不出"抬一档"这件事 ——
+        // R77 的规矩是两态对照必须真的有两态。
+        results.append(Fixture("row-favorite-idle", NSSize(width: 60, height: 56), contentMustFit: true) {
+            AnyView(self.controlFrame(RowFavoriteButton(isFavorite: false, action: {})))
+        })
+        results.append(Fixture("row-favorite-hover", NSSize(width: 60, height: 56), contentMustFit: true) {
+            AnyView(self.controlFrame(RowFavoriteButton(isFavorite: false, action: {})
+                .environment(\.hoveredForCapture, true)))
+        })
+        // **尺的对照物**（不是产品证据，与 `cardprobe-*` / `row-clipped-control` 同一族）：
+        // 同一颗图标、同一片底，左边按 `VisualFill.hover`、右边按 `VisualFill.controlHover` 点亮。
+        // 它量的是 R20 那句理由本身 —— 两臂在同帧同底，任何"整把尺一起偏"都同时作用在两臂上，
+        // 所以分不分得开这一问是干净的（R100：对照判据对整体偏移免疫，因此下面还配一条绝对下界）。
+        results.append(Fixture("controlprobe-hover-ladder", NSSize(width: 120, height: 56), contentMustFit: true) {
+            AnyView(self.controlFrame(HStack(spacing: 12) {
+                // 两臂都必须是**真的 Button**：`.pressedStyle` 就是 `.buttonStyle`，
+                // 挂在裸 `Image` 上什么都不会发生 —— 第一版就是这么写的，
+                // 于是两臂读数一模一样（6 像素 / 6 像素），那是夹具坏，不是产品没差。
+                Button(action: {}) {
+                    Image(systemName: "star")
+                        .font(.system(size: VisualFont.meta, weight: .regular))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .frame(width: 20, height: 20)
+                }
+                .pressedStyle(in: Circle(), hoverLevel: VisualFill.hover)
+                .environment(\.hoveredForCapture, true)
+                Button(action: {}) {
+                    Image(systemName: "star")
+                        .font(.system(size: VisualFont.meta, weight: .regular))
+                        .foregroundStyle(Color.primary.opacity(0.55))
+                        .frame(width: 20, height: 20)
+                }
+                .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
+                .environment(\.hoveredForCapture, true)
+            }))
+        })
+
         // 行首星标两个状态各拍一张。以前这颗星在未收藏时是 `.clear`（等于这个控件不存在），
         // 现在它是真按钮，两种状态都必须看得见 —— 这条帧就是那件事的证据。
         let starTarget = store.entries[0]
@@ -4679,6 +4725,192 @@ final class UICaptureTests: XCTestCase {
 
     /// 单行夹具的外框。拍的是 `HistoryRowButton`（带星标与悬停底色的那一层）而不是裸内容，
     /// 这样行上新增的可点控件会真的进帧。
+    // MARK: - 悬停药丸的像素尺（R229 / BACKLOG 251）
+
+    /// 在给定 x 段里量"那一圈淡底"：底取该段左缘的众数，药丸取**整段**里与底差在
+    /// `2..<60` 之间的众数，并交出它的**像素数**。
+    ///
+    /// 为什么用"众数的面积"而不是"有没有差值"：字形抗锯齿会在笔画边缘产生一批
+    /// 落在同一差值带里的像素，但它散在很多个灰阶上、每个只有几个像素；
+    /// 药丸是一整片同色区域，面积大得多。所以 `pillPixels` 才是"有没有第二层"的证人，
+    /// 而单看"存在差值"会把一颗干净的图标读成"有药丸"（R102 那一族：把背景本身算命中）。
+    static func pillReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                            bytesPerRow: Int, x0: Int, x1: Int)
+        -> (background: Int, pill: Int, ratio: Double, step: Int, pillPixels: Int) {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        let lo = max(0, min(x0, x1 - 1)), hi = max(lo + 1, min(x1, width))
+        var edge = [Int: Int]()
+        for x in lo..<min(lo + 8, hi) {
+            for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
+        }
+        let bg = edge.max { $0.value < $1.value }?.key ?? 0
+        var band = [Int: Int]()
+        for x in lo..<hi {
+            for y in 0..<height {
+                let d = abs(luma(x, y) - bg)
+                if d > 2 && d < 60 { band[luma(x, y), default: 0] += 1 }
+            }
+        }
+        // 注意方向：`max(by:)` 要的是 `areInIncreasingOrder`（"a 是否小于 b"）。
+        // 第一版写成 `$0.value > $1.value` ⇒ 它取的是**面积最小**的那一档，
+        // 于是真产物上"药丸 719 像素"被读成"某个 1 像素的边缘噪声"（比值、台阶全跟着错）。
+        // 已知答案的对照当时没抓到，因为它那块图只有一种带内灰阶 —— 见下面新增的"大小两块"那一格。
+        guard let (pill, count) = band.max(by: { $0.value < $1.value }) else {
+            return (bg, -1, 0, 0, 0)
+        }
+        func srgb(_ v: Int) -> Double {
+            let c = Double(v) / 255.0
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let hi2 = max(srgb(bg), srgb(pill)), lo2 = min(srgb(bg), srgb(pill))
+        return (bg, pill, (hi2 + 0.05) / (lo2 + 0.05), abs(bg - pill), count)
+    }
+
+    /// **已知答案的对照**（尺先要读对一块答案已知的图，才有资格给产品读数）。
+    /// 三格：纯色 ⇒ 不许有第二层；实心淡块 ⇒ 灰阶/台阶/比值逐项等于构造值且面积够大；
+    /// **只有抗锯齿斜坡** ⇒ 面积必须小（这一格钉的是"边缘噪声不算药丸"，缺了它
+    /// `pillPixels` 就只是一个数字，不是一把有牙的尺）。
+    func testHoverPillRulerKnowsItsOwnAnswers() {
+        let w = 40, h = 20, bpr = w * 4
+        func make(_ fill: (Int, Int) -> Int) -> [UInt8] {
+            var px = [UInt8](repeating: 0, count: w * h * 4)
+            for y in 0..<h {
+                for x in 0..<w {
+                    let v = UInt8(truncatingIfNeeded: fill(x, y))
+                    let i = (y * w + x) * 4
+                    px[i] = v; px[i + 1] = v; px[i + 2] = v; px[i + 3] = 255
+                }
+            }
+            return px
+        }
+        func measure(_ px: [UInt8]) -> (background: Int, pill: Int, ratio: Double, step: Int, pillPixels: Int) {
+            px.withUnsafeBufferPointer { buf in
+                Self.pillReading(bytes: buf, width: w, height: h, bytesPerRow: bpr, x0: 0, x1: w)
+            }
+        }
+
+        let flat = measure(make { _, _ in 255 })
+        XCTAssertEqual(flat.pillPixels, 0, "纯色图上数出了第二层 ⇒ 这把尺把背景本身算成了对象")
+
+        let pill = measure(make { x, _ in x >= 12 ? 235 : 255 })
+        XCTAssertEqual(pill.background, 255, "底色读错：\(pill.background)")
+        XCTAssertEqual(pill.pill, 235, "药丸灰阶读错：\(pill.pill)")
+        XCTAssertEqual(pill.step, 20, "台阶读错：\(pill.step)")
+        XCTAssertEqual(pill.ratio, 1.19, accuracy: 0.02, "比值读错：\(String(format: "%.3f", pill.ratio))")
+        XCTAssertGreaterThan(pill.pillPixels, 100, "实心淡块的面积没读出来 ⇒ 计数那一半坏了")
+
+        // 抗锯齿斜坡：中心一条 3px 宽的渐变，没有任何一片同色区域
+        let ramp = measure(make { x, _ in
+            if x < 18 { return 255 }
+            if x > 20 { return 255 }
+            return 255 - (x - 17) * 12          // 243 / 231 / 219，各占一列
+        })
+        XCTAssertLessThan(ramp.pillPixels, h * 2,
+                          "只有笔画边缘的图被读成有药丸（\(ramp.pillPixels) 像素）⇒ 面积门槛形同虚设")
+
+        // **大小两块**：一片 600 像素的药丸 + 一小撮 12 像素的边缘噪声。
+        // 这一格是 R229 自己踩出来的：上面那块"实心淡块"只有一种带内灰阶，
+        // 于是把 `max(by:)` 的比较方向写反（取到面积最小那一档）也照样全绿 ——
+        // 正对照必须落在判据自己那个量上（这里是"众数的面积"），否则它只是另一条断言的复读。
+        let two = measure(make { x, y in
+            if x >= 12 && y < 15 { return 235 }          // 28×15 = 420 像素的药丸
+            if x >= 36 && y >= 17 { return 247 }         // 4×3 = 12 像素的噪声
+            return 255
+        })
+        XCTAssertEqual(two.pill, 235,
+                       "带内有两块面积时取错了对象（取到 \(two.pill)，\(two.pillPixels) 像素）⇒ 众数方向反了")
+        XCTAssertGreaterThan(two.pillPixels, 300, "大块面积没读出来：\(two.pillPixels)")
+    }
+
+    /// **产品判据**：悬停那一圈淡底，在两档各量一次 —— 对**它自己那片底**，不对纸面 alpha。
+    ///
+    /// 下界沿用仓库自己定的那两条（R220 骨架条带 / R225 浮层悬停同一族）：亮档 1.20、暗档 1.10。
+    /// 第二根轴是 R20 那句理由本身："6% 铺在一整行读得出来，铺在 20pt 圆上等于没有 ⇒ 小控件抬一档"。
+    /// 它以前只有注释撑着，现在由 `controlprobe-hover-ladder` 两臂（同帧同底）第一次给数。
+    /// 取证通道还配了一条**漏电对照**：空闲那一帧不许量到第二层 ——
+    /// 否则"点亮"就不是夹具干的，而是产品自己每帧都亮着。
+    func testHoverPillIsVisibleAgainstItsOwnSurfaceInBothAppearances() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r229-hoverpill-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        /// `arm`：nil=整幅、0=左半、1=右半（按**像素宽**切，不猜密度 —— R224 那一课）
+        func read(_ fixtureName: String, _ appearance: NSAppearance.Name, arm: Int? = nil)
+            -> (background: Int, pill: Int, ratio: Double, step: Int, pillPixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 \(fixtureName) ⇒ 这条判据没有对象")
+                return (-1, -1, 0, 0, 0)
+            }
+            let file = scratch.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail("\(fixtureName)：渲染失败 \(error)"); return (-1, -1, 0, 0, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(fixtureName)：读不回 \(file.lastPathComponent)"); return (-1, -1, 0, 0, 0)
+            }
+            let w = rep.pixelsWide
+            let h = rep.pixelsHigh
+            let stride = rep.bytesPerRow
+            let x0 = arm == 1 ? w / 2 + 8 : 0
+            let x1 = arm == 0 ? w / 2 - 8 : w
+            // `bitmapData` 是裸指针（不是 Data）⇒ 自己包成 BufferPointer，别写 withUnsafeBytes
+            let buf = UnsafeBufferPointer(start: base, count: stride * h)
+            return Self.pillReading(bytes: buf, width: w, height: h, bytesPerRow: stride,
+                                    x0: x0, x1: x1)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let minimum = appearance == .darkAqua ? 1.10 : 1.20
+            let idleRead = read("row-favorite-idle", appearance)
+            let hoverRead = read("row-favorite-hover", appearance)
+            emit("HOVER_PILL_PROOF \(tag) 空闲底=\(idleRead.background) 空闲第二层像素=\(idleRead.pillPixels) "
+                  + "悬停底=\(hoverRead.background) 悬停药丸=\(hoverRead.pill) 药丸像素=\(hoverRead.pillPixels) "
+                  + "比值=\(String(format: "%.3f", hoverRead.ratio)) 台阶=\(hoverRead.step) 下界=\(minimum)")
+            XCTAssertGreaterThan(hoverRead.pillPixels, 100,
+                                 "\(tag)：悬停那一圈只数到 \(hoverRead.pillPixels) 个像素 ⇒ 药丸没被画出来。"
+                                 + "这一格是**量不到**而不是没问题（先查 `hoveredForCapture` 接没接上）")
+            XCTAssertGreaterThanOrEqual(hoverRead.ratio, minimum,
+                                        "\(tag)档悬停药丸对它自己的底只有 \(String(format: "%.3f", hoverRead.ratio))"
+                                        + "（下界 \(minimum)）⇒ 这一档反馈淡到没有读者")
+            XCTAssertLessThan(idleRead.pillPixels, 40,
+                              "\(tag)：空闲那一帧也量到了一整片第二层（\(idleRead.pillPixels) 像素）⇒ "
+                              + "取证通道漏电：没有指针、也没点亮的情况下它自己亮了")
+
+            let left = read("controlprobe-hover-ladder", appearance, arm: 0)
+            let right = read("controlprobe-hover-ladder", appearance, arm: 1)
+            emit("HOVER_LADDER_PROBE \(tag) hover 臂=\(left.pill)(像素 \(left.pillPixels), "
+                  + "比值 \(String(format: "%.3f", left.ratio))) controlHover 臂=\(right.pill)"
+                  + "(像素 \(right.pillPixels), 比值 \(String(format: "%.3f", right.ratio))) "
+                  + "两臂灰阶差=\(abs(left.pill - right.pill))")
+            XCTAssertGreaterThan(left.pillPixels, 20, "hover 臂没有对象 ⇒ 探针夹具或尺坏了")
+            XCTAssertGreaterThan(right.pillPixels, 20, "controlHover 臂没有对象 ⇒ 探针夹具或尺坏了")
+            // 比较**可见性**而不是灰阶方向：亮档是黑墨压白底（抬一档 ⇒ 更暗），
+            // 暗档是白墨压深底（抬一档 ⇒ 更亮）。第一版按灰阶比，暗档立刻红得"像是令牌反了"，
+            // 而反的是我的比较方向（R107 那一族：两档反方向就不许按一档的符号下结论）。
+            XCTAssertGreaterThanOrEqual(right.ratio, left.ratio,
+                                        "抬的那一档反而更看不见（controlHover \(String(format: "%.3f", right.ratio)) "
+                                        + "vs hover \(String(format: "%.3f", left.ratio))）⇒ 令牌次序反了")
+            XCTAssertGreaterThanOrEqual(right.ratio - left.ratio, 0.01,
+                                        "两臂差不到 0.01 比值 ⇒ 「小控件要抬一档」这件事在像素上不存在")
+        }
+    }
+
+    /// 控件类夹具的外框：与 `rowFrame` 同一句背景，只是框小 —— 药丸要贴着内容拍，
+    /// 铺在 300pt 行里会让"这一圈到底多大"被行底色淹没。
+    private func controlFrame<V: View>(_ view: V) -> some View {
+        view
+            .frame(width: 60, height: 40, alignment: .center)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+
     private func rowFrame<V: View>(_ view: V) -> some View {
         view
             .frame(width: 300, height: 74, alignment: .leading)

@@ -1,5 +1,5 @@
 {
-  "count": 142,
+  "count": 148,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -27,6 +27,8 @@
     "content-with-notice-750x560-light.png": "beda87de570306dc0f11dbb857c4c20530da9df2072d33c4af1fe3bf87bef03e",
     "content-with-two-notices-750x560-dark.png": "8ea60a6bddbfd7ea30a93736b9ed68078c2b2870439c032fa7090701b6c635f6",
     "content-with-two-notices-750x560-light.png": "4b1158b7391b6bd89e31b0f87d4352be81448ae44a10f33d518af9422a711955",
+    "controlprobe-hover-ladder-120x56-dark.png": "1a93f88e647764899cf90f6d8a827838461b0b92dd1a33a53ecd0c83bf7c866d",
+    "controlprobe-hover-ladder-120x56-light.png": "41de68c5876f1ebed1aacb97c05b9e7dce3efbb0d14da4ed5f379c85630ae86a",
     "detail-0-text-720x520-dark.png": "c3b729acbe1ad8c7965592e4089f820358ccdd0f3e1cb64dd70eb58292525b6a",
     "detail-0-text-720x520-light.png": "a03612fb1c3e1633a1cd3951da6dc69914eca83c5b78b3b31211cf552ee8ea19",
     "detail-1-image-720x520-dark.png": "a9e7eab69807263204b74c7431c61b2725e37e8bad7d263fe6161e062f78289e",
@@ -79,6 +81,10 @@
     "receipt-line-430x72-light.png": "22098329d5c4b91502ab619554b827be7ab37ab6f2fc9d325efa6b8464dd3d06",
     "row-clipped-control-300x58-dark.png": "15370117b18171e608290825e99130ff51f210906c433c08f84f008ba3b9acfc",
     "row-clipped-control-300x58-light.png": "7191c02aebd8d47aa06d9a2411d308bed7d860e11f741aadfbe0878a6093cdc8",
+    "row-favorite-hover-60x56-dark.png": "00aed27d27900edcee3cc1ce5ad12d4dca464520d1e0bba164f821ff98319fae",
+    "row-favorite-hover-60x56-light.png": "6cfd88430202c079dcfb917fdf41fa48ce6822fb675d204a2210ed336f8f4418",
+    "row-favorite-idle-60x56-dark.png": "9c978529f80f71aebed6db635ad1b902b72c582c5cd355a32eb4e6a898845fff",
+    "row-favorite-idle-60x56-light.png": "d8d962833dc38b9776fa376ce46c78ab30c2171ececdaf75d832baa5d4fd8be7",
     "row-favorite-off-300x74-dark.png": "3127f25dd01529ecd7c613f7f2cf6beccdd03dfff288950d15a82b9d0c1b82aa",
     "row-favorite-off-300x74-light.png": "04771ab7ee4d1a27149dae8648942b21030d2fa16b895edd5d791c9a71a97c7e",
     "row-favorite-on-300x74-dark.png": "2ad3211a036b28740333bcb873af3fab2bc590b58044124beb53af0f4e1baf8e",

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 悬停那一档第一次有两档帧 + 亮档反馈梯抬一档（R229 / U-737…U-740 · 产品 3 文件（令牌 + 按压样式 + 行收藏按钮的可见性） + 判据 1 新文件 + 夹具 1 文件 + 表 1 文件）
+
+- ⓪ 249 的第一格：`da5da47` runner **success**，`verdict=skipped not_run=4 probes=7`、`missing_frames=0`；
+  D 判据第一次在 CI 上给产品读数（组合帧最左墨 [20.0, 20.0]pt）。剩下 4 颗成因 `bg-not-flat、no-ink`（统计页平涂那一族）⇒ 量的仍是通道。
+- 取证通道 `EnvironmentValues.hoveredForCapture`（产品不写）+ `RowFavoriteButton` 留出文件边界 ⇒
+  新增 `row-favorite-idle` / `row-favorite-hover` / `controlprobe-hover-ladder` × 两档 = 6 张帧。
+  `contentMustFit` 拦下第一版（40pt 裁掉药丸）⇒ 抬到 56pt。
+- 病与两难：亮档药丸改前 `(238)`/白 = 1.160:1 < 地板 1.20（改前那一跑 = `pre_lift_r229.py`，红在 `testHoverPillIsVisibleAgainstItsOwnSurfaceInBothAppearances`）；只抬 hover 会把 `hover→pressed` 压到 3.7/255（R14 实测）。
+  ⇒ 整条亮档梯子同抬（hover +0.025、pressed +0.015），暗档未动。抬完亮档 `(232)` = 1.225:1、台阶 23；暗档 1.211:1。
+  梯子探针两臂差 亮 5 / 暗 4 ⇒ R20 的理由第一次有像素证人。
+- 两条既有守卫各红一次（新档位要进梯子 / `pressed` 只剩声明）⇒ 抬量搬成 `enum VisualFillLift`、换算进产品侧 `fillOpacity`，未放宽。
+- 刀 `R229_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0`（M768、M769、M770）。自曝三笔（认红的正则漏 `]`、buttonStyle 挂错宿主、判据走助手）。
+- 产品改动面（文件名由 `git diff` 算出，不手抄）：VisualTokens.swift、HistoryRowViews.swift、PressableStyle.swift。第三处只是 `private` → 内部可见，为了取证通道能引用它，不改行为。
+- 不稳两笔（非本轮引入）：`settings-shortcuts-recording-720x540-dark.png、settings-shortcuts-recording-720x540-light.png` 同版两跑自变 ⇒ 开 **254**；全量卷唯一红 `testImageComparisonCostStaysBounded`（工作树单跑也红，HEAD 干净 worktree 同格也红 ⇒ **先于本轮存在**）⇒ 开 **255**，地板不放宽。
+- 验证：构建 0 告警、捕获卷 77/0 失败、全量卷 903/44/1（唯一红 `testImageComparisonCostStaysBounded`，有 HEAD 对照证人：工作树 255.97ms vs HEAD 258.75ms）、`COMPARED=148 CHANGED=2 BASELINE_ADDED=6`、换装本机 ok、看图 4 张。
+
 ### 253 结案：判据里写死的轮次帧目录换成环境变量派生 + 三格守卫（R228 / U-734…U-736 · 判据（python）3 文件，产品 0 文件）
 
 - 病：`test_surface_left_axes` 两格真帧对照把证据押在写死的临时帧目录 ⇒ CI 上永远不跑、本地只是暂时跑，且与"环境判不了"同形。

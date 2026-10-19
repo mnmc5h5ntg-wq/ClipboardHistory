@@ -30,9 +30,14 @@ enum PressableAppearance {
     /// （`VisualFill.controlHover` 自己那条注释说的就是同一件事）。
     static func fillOpacity(isPressed: Bool,
                             isHovered: Bool,
-                            hoverLevel: Double = VisualFill.hover) -> Double {
-        if isPressed { return VisualFill.pressed }
-        return isHovered ? hoverLevel : 0
+                            hoverLevel: Double = VisualFill.hover,
+                            dark: Bool = true) -> Double {
+        if isPressed {
+            // 亮档整梯一起抬（R229）：只抬 hover 会把 `hover→pressed` 压到 4/255 之下 ——
+            // 那正是 R14 拦下"把 controlHover 定在 0.10"的理由，所以这一改必须两档同抬。
+            return dark ? VisualFill.pressed : VisualFill.pressed + VisualFillLift.pressed
+        }
+        return isHovered ? hoverLevel + (dark ? 0 : VisualFillLift.hover) : 0
     }
 }
 
@@ -85,6 +90,15 @@ private struct PressedLabel<S: Shape>: View {
     let hoverLevel: Double
     let labelPadding: CGFloat
     @State private var isHovered = false
+    /// 色档由**这个视图自己**问（不从调用点传布尔）：传进来就等于允许调用方 —— 包括夹具 ——
+    /// 替产品决定"这一档该多亮"（R43 那条"夹具不许手写回执文案"判的是同一件事）。
+    @Environment(\.colorScheme) private var colorScheme
+    /// 取证通道（见文件末尾 `hoveredForCapture`）。产品路径永远是 `nil`。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+
+    /// 画哪一档：真实指针 **或** 取证通道点亮。两条汇到**同一个绘制分支** ——
+    /// R14 那一课：`hovered` 若是视图私有状态，"悬停那一帧"就在判据里存在、在产物里从未存在过。
+    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     var body: some View {
         configuration.label
@@ -98,13 +112,35 @@ private struct PressedLabel<S: Shape>: View {
             .overlay(
                 fillShape.fill(Color.primary.opacity(
                     PressableAppearance.fillOpacity(isPressed: configuration.isPressed,
-                                                   isHovered: isHovered,
-                                                   hoverLevel: hoverLevel)))
+                                                   isHovered: isHoveredForDrawing,
+                                                   hoverLevel: hoverLevel,
+                                                   dark: colorScheme == .dark)))
             )
             // 时长用 `.hover` 那一档（0.12s）：按下跟鼠标事件同频，比内容切换更快才不觉得黏。
             .animation(MotionCatalog.animation(for: .hover), value: configuration.isPressed)
-            .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+            .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
             .onHover { inside in isHovered = inside }
+    }
+}
+
+// MARK: - 取证通道：把悬停那一档点亮给夹具拍
+//
+// 为什么要有它：`PressedLabel.isHovered` 是视图私有的 `@State`，而 R14 实测三条"合成 hover"
+// 的路全断（CGEvent 被窗口服务器丢弃、直接喂 `mouseEntered` 不回调、`sendEvent` 崩）。
+// 后果不是"少一张图"：`VisualFill.controlHover` 存在的**全部理由** —— R15/R20 那句
+// "6% 铺在一整行上读得出来，铺在 20pt 的图标上等于没有，所以小控件要抬一档" ——
+// 从来没有被画出来对过账，那句话现在只有注释撑着。
+// 与 `QuickPickController.rowHoveredForCapture` 同一手法：**产品自己永远不写这个键**，
+// 只有夹具写 ⇒ 真实指针事件那条路一字未动，而"表达"这一半第一次可离线渲染、可逐档量。
+private struct HoveredForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
+    var hoveredForCapture: Bool? {
+        get { self[HoveredForCaptureKey.self] }
+        set { self[HoveredForCaptureKey.self] = newValue }
     }
 }
 

@@ -1,5 +1,28 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-20 02:16（本地 · R229 / 第 231 轮：**回到动效位点：悬停那一档第一次有两档帧（251 的第一批），量出亮档药丸 1.160:1 掉在自家地板 1.20 下 ⇒ 整条亮档反馈梯抬一档（暗档一字未动）**（U-737…U-740 · 产品 3 文件（令牌 + 按压样式 + 行收藏按钮的可见性） + 判据 1 新文件 + 夹具 1 文件 + 表 1 文件）
+
+**本轮落地**：⓪ `da5da47` 在 runner 上 success ⇒ **249 的第一格读到**：`verdict=skipped not_run=4 probes=7`、
+`missing_frames=0`，D 判据第一次在 CI 上给产品读数（组合帧最左墨 [20.0, 20.0]pt）；剩下 4 颗成因 `bg-not-flat、no-ink`
+（统计页内容列平涂那一族）⇒ 那几颗量的仍是通道不是产品。
+① 回到动效位点：加取证通道 `hoveredForCapture`（产品不写）+ `RowFavoriteButton` 留出文件边界 ⇒
+`row-favorite-idle` / `row-favorite-hover` / `controlprobe-hover-ladder` × 两档共 6 张帧；
+`contentMustFit` 拦下第一版（40pt 裁掉药丸）⇒ 抬到 56pt。
+量出两难：亮档药丸改前 `(238)`/白 = 1.160:1 < 自家地板 1.20（改前那一读由 `pre_lift_r229.py` 签：撤掉那一抬重跑捕获卷，那一跑红在 `testHoverPillIsVisibleAgainstItsOwnSurfaceInBothAppearances`），而只抬 hover 会把 `hover→pressed` 压到 3.7/255（R14 实测）
+⇒ **整条亮档梯子同抬**（hover +0.025、pressed +0.015），暗档一字未动；抬完亮档 `(232)` = 1.225:1、台阶 23，
+梯子探针两臂差 亮 5 / 暗 4 ⇒ R20"小控件要抬一档"第一次有像素证人。
+两条既有守卫各红一次（新档位要进梯子 / `pressed` 只剩声明）⇒ 抬量搬成 `enum VisualFillLift`、换算进产品侧 `fillOpacity`，未放宽。
+刀 3 把全 CAUGHT（M768、M769、M770）；自曝三笔（认红的正则漏 `]` ⇒ 三度 ESCAPED 假账、buttonStyle 挂错宿主、判据走助手）。
+验证：构建 0 告警、捕获卷 77/0 失败、全量卷 903/44/1（唯一红 `testImageComparisonCostStaysBounded`，**工作树单跑也红**）、
+`COMPARED=148 CHANGED=2 BASELINE_ADDED=6`（动的两张是"录制中"，非本轮引入 ⇒ 开 **254**）、
+性能预算格先于本轮就红（HEAD worktree 同格最快 258.75ms 对照工作树 255.97ms）⇒ 开 **255**、换装本机 `INSTALL_RESULT=ok`、看图腿真做（4 张新帧）。
+
+**下一轮（R230）的靶**：⓪ 读本轮与 R225 那几跑（左轴在 @1x 上应稳定 `not_run=4`、捕获卷在 runner 上是否仍绿）；
+① 251 剩下的位点：`DetailView` 那两处 hover 底与侧栏批量按钮 —— 本轮的取证通道已经打通，逐位点补帧再判；
+② 254（"录制中"两帧相位不确定 ⇒ 冻结相位或换判据）、255（性能预算格**先于本轮**就越预算，HEAD 对照已证 ⇒ 换成同一次运行内的相对判据，不许直接抬 250）；
+③ 248、243、250、227③、222、215、201/202、207、240；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-20 00:20（本地 · R228 / 第 230 轮：**253 结案：判据不许把证据押在写死的轮次帧目录上 —— 换成 `CLIPBOARD_HISTORY_UI_SHOTS` 派生 + 三格守卫（守卫第一跑就抓到一处 grep 漏掉的）**（U-734…U-736 · 判据（python）3 文件，产品 0 文件）
 
 **本轮落地**：253 结案。两格真帧对照不再指着某一轮的临时帧目录，改由 `CLIPBOARD_HISTORY_UI_SHOTS` 派生；

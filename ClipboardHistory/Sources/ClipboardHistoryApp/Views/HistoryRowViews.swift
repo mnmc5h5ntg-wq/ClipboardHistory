@@ -78,7 +78,14 @@ private struct RowDragHelpModifier: ViewModifier {
 
 /// 行首的收藏星标。以前它只是"已收藏"的指示器（未收藏时整颗是 `.clear`，等于不存在），
 /// 现在它是真正的控件：未收藏时也要看得见、点得到，否则用户不知道有这个东西。
-private struct RowFavoriteButton: View {
+///
+/// **为什么不是 `private`**（R229 / BACKLOG 251）：`VisualFill.controlHover` 存在的理由
+/// 全在这颗 20pt 圆上（"6% 铺在整行读得出来，铺在图标上等于没有"），而这一档从来没有一张帧 ——
+/// 合成 hover 的三条路 R14 实测全断。把它留出文件边界，配合 `EnvironmentValues.hoveredForCapture`
+/// 取证通道，这一档第一次能被离线渲染、逐档量、被眼睛看。抽取/放开的先例是 R45 的
+/// `DailyCopyHeatmapCell`（"抽它的理由不是文件长，是这件事以前只能靠注释"）。
+/// 产品路径仍然只由 `onHover` 驱动，这个可见性变化不改任何行为。
+struct RowFavoriteButton: View {
     let isFavorite: Bool
     let action: () -> Void
     @State private var isHovered = false

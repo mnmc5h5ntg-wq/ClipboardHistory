@@ -363,6 +363,53 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 231 轮（R229 · 2026-10-20）：回到动效位点：悬停那一档第一次有两档帧（251 的第一批），量出亮档药丸 1.160:1 掉在自家地板 1.20 下 ⇒ 整条亮档反馈梯抬一档（暗档一字未动）（U-737…U-740 · 产品 3 文件（令牌 + 按压样式 + 行收藏按钮的可见性） + 判据 1 新文件 + 夹具 1 文件 + 表 1 文件）
+
+- **U-737：⓪ 249 的第一格读到了 —— R224 的 pt 修法在 runner 上落地，缺席从 7 颗降到 4 颗。**
+  run `39280048395`（`da5da47`，**success**）：`LEFT_AXIS_CI verdict=skipped not_run=4 probes=7`、
+  `missing_frames=0`，且 **D 判据第一次在 CI 上给出产品读数**：
+  `详情/组合帧头部、详情/组合帧骨架 最左墨=[20.0, 20.0]pt`（跨度 0 ⇒ 同轴）。
+  剩下 4 颗的成因换了档：`bg-not-flat、no-ink` —— 浮层那颗是 `bg-not-flat`，统计页三颗是 `no-ink` 且底是 `(50,50,50)`，
+  与 R121/R146 记下的"runner 上设置页内容列是平涂"同一件事 ⇒ **这四颗在 runner 上量的是通道，不是产品**，
+  这条尺在 CI 上能承重的是浮层与组合帧那几颗（本轮不据此改产品）。
+- **U-738：251 的第一批两档帧：悬停那一档以前只能靠注释。**
+  `PressedLabel.isHovered` 是视图私有 `@State`，合成 hover 三条路 R14 实测全断 ⇒
+  `VisualFill.controlHover` 存在的**全部理由**（R15/R20："6% 铺在整行读得出来，铺在 20pt 圆上等于没有"）
+  从来没有被画出来对过账。本轮加 `EnvironmentValues.hoveredForCapture` 取证通道
+  （与浮层的 `rowHoveredForCapture` 同一手法，产品路径永远不写它），把 `RowFavoriteButton` 留出文件边界（R45 先例），
+  新增三张夹具 × 两档 = 6 张帧：`row-favorite-idle` / `row-favorite-hover` / `controlprobe-hover-ladder`。
+  **`contentMustFit` 当场拦下我的第一版**：40pt 高的框把药丸裁掉了（底行有墨 10%）⇒ 抬到 56pt 才放得下 ——
+  这条守卫不许关，只准把框抬够（R22 的原话）。
+- **U-739：量出来的病与它的两难。** 亮档药丸改前 `(238)` 压白底 = **1.160:1**，掉在仓库自己定的亮档地板 1.20 之下；
+  暗档 `(45)` 压 `(30)` = **1.211:1**，过暗档的 1.10。这一读不是从旧日志里翻出来的：
+  HEAD 里还没有这两张夹具（回不去也量不到），所以真正的反事实是**当前代码减去那一抬**——
+  `.scratch/motion-audit-2/pre_lift_r229.py` 就是跑这一遍（同一批夹具、同一把尺、日志 `/tmp/r229_pre_lift.log`），
+  而它**当场红在 `testHoverPillIsVisibleAgainstItsOwnSurfaceInBothAppearances`** ⇒ 这条病是一条会红的判据，不是形容词（撤抬那一跑必须红，脚本里钉着）。
+  而**只抬亮档 hover 是不行的**：`controlHover` 那条注释记着 R14 的实测 ——
+  抬到 0.10 会让 `hover→pressed` 只剩 `3.7/255`，低于 4/255 的台阶地板。
+  ⇒ 两条地板在单一亮度通道上无解，正确解是**整条亮档梯子一起抬**：hover +0.025（0.08→0.105）、pressed +0.015（0.12→0.135）。
+  抬完实测：亮档 `(232)` = **1.225:1** ≥1.20、台阶 23/255 ≥4；暗档 `(45)` = **1.211:1** 一字未动。
+  梯子探针（同帧同底两臂）：两臂灰阶差 亮 5 / 暗 4 ⇒ R20 那句"小控件要抬一档"**第一次有像素证人**。
+- **U-740：刀、两条把我逼到改结构的守卫、以及三笔自曝。**
+  刀 `R229_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`（M768、M769、M770）。
+  两条既有守卫各红一次，且都红得对：`testEveryVisualFillTierIsCoveredByALadder`（新档位必须进梯子）与
+  `testEveryVisualTokenIsReadByTheProduct`（`VisualFill.pressed` 被我换成助手函数后**只剩声明**）
+  ⇒ 抬量搬出 `enum VisualFill` 成 `enum VisualFillLift`、换算搬进产品侧 `fillOpacity`，**没有放宽任何一条**。
+  自曝三笔：① 变异表第一版**认红的尺**坏了（正则漏了方法名后的 `]`，且 `failed` 只看 names）⇒ 三把刀全被记成 ESCAPED，
+  真跑一遍才看见红；② 探针夹具第一版把 `.pressedStyle` 挂在裸 `Image` 上（它是 `buttonStyle`）⇒ 两臂读数一模一样，
+  那是夹具坏不是产品没差；③ 新判据第一版走内部助手，会被"令牌必须有消费者"那条骗过去 ⇒ 改走产品入口 `fillOpacity`。
+  另记两笔**不是本轮引入**的不稳：`settings-shortcuts-recording-720x540-dark.png、settings-shortcuts-recording-720x540-light.png` 两帧在同版两跑之间自己变（包围盒约 250×45px，"录制中"的脉冲）⇒ 开 **254**；
+  全量卷 `Executed 903 / 44 skip / 1 失败`，唯一一朵是 `testImageComparisonCostStaysBounded`（工作树单跑最快 255.97ms > 预算 250ms）。
+  **归因有证人**：同一格在 HEAD 的干净 worktree 里跑，最快 258.75ms、同样红 ⇒ **这朵红先于本轮存在**，
+  不是悬停那一抬带来的（也不是"单跑就绿"那种侥幸）。记 **255**：预算要按 R142 那条换成同一次运行内的相对判据，
+  或重测本机地板 —— **不许**直接抬 250 了事。
+
+其余读数：捕获卷 `Executed 77 tests, 4 skipped, 0 failures`；
+帧名单 `COMPARED=148 CHANGED=2 BASELINE_ADDED=6`（"新增几张"按**基线两版相减**：HEAD 的 142 张 vs 工作树的 148 张；`compare` 通道那一次报的是 `ADDED=0` —— 那不是"没加帧"，是"基线已经在本轮更新过了"，第一版我把它当成新增数写进了台账）；动的两张都是"录制中"那对，与本轮改动无关；
+盘上帧数 148；构建 0 告警；换装本机 `INSTALL_RESULT=ok`；
+看图腿真做：`row-favorite-idle/hover`（亮）、`controlprobe-hover-ladder`（亮）、`row-favorite-hover`（暗）——
+空闲是裸星、悬停是一圈清楚的浅灰药丸、两臂深浅看得出差别。
+
 ## 第 230 轮（R228 · 2026-10-20）：253 结案：判据不许把证据押在写死的轮次帧目录上 —— 换成 `CLIPBOARD_HISTORY_UI_SHOTS` 派生 + 三格守卫（守卫第一跑就抓到一处 grep 漏掉的）（U-734…U-736 · 判据（python）3 文件，产品 0 文件）
 
 - **U-734：skip 有两种成因，处置相反 —— 环境缺席要能被点名，证据路径腐烂要修路径。**
