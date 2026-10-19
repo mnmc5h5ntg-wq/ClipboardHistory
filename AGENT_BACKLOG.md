@@ -6523,7 +6523,7 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 | 悬停（第 3 行，夹具 `hoveredRow: 3`） | 232 | 43 | **直角、满高满宽带**（逐行 x 恒为 42…797） |
 | 静置行 | 页底 | 页底 | 无填充 |
 
-- 两态**不是**同形：夹具与既有判据 `testOverlayFillSharesTheSelectionPillsOutline`（`UICaptureHarness.swift:1517`）
+- 两态**不是**同形：夹具与既有判据 `testOverlayHoverFillSharesTheSelectionPillsOutline`（`UICaptureHarness.swift:1517`）
   早就钉住"悬停是直角满宽带、选中是圆角胶囊"，形状就是那根分辨轴；我上一格只比了灰，没比形状。
 - 灰差：亮档 220→232（12 级，比值 1.055）、暗档 70→43（27 级，1.44）。**这不违反 1.20 地板** ——
   那条地板判的是"同一形状上的一档反馈抬了多少"，不是"两个不同形状的态彼此差多少"。
