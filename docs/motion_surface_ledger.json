@@ -936,7 +936,49 @@
       "verdict": "kept",
       "reason": "动作位走 StateLine 的按钮，按下态由 PressableStyle 统一；R25 那一改把按钮从「跟第一行基线」换成「相对整组垂直居中」，本轮看 notice-banner-560x170 两张帧复核：单行与三行那两条横幅的动作按钮都在色带中心（当年量出的偏差是两行 7.5pt、三行 14.5pt）。",
       "evidence": "Sources/ClipboardHistoryApp/Utilities/StatePresentation.swift 的 StateLine body 注释（R25 / U-47 / D-084）；Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 Fixture(「notice-banner」, 560×170)（帧只在本机 /tmp，未入库）"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "空",
+      "verdict": "kept",
+      "reason": "列表为空时药丸与轨道整段照旧可点，空态那句话由 EmptyStateView 那一支承载（还带「清除搜索」那颗动作位），筛选条不额外说一句 ⇒ 保留现状。两个空要分开：filteredEntries 为空是「筛完没结果」，entries 为空是「整库空」，同一帧两档都读得通。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 第 32 行的 if historyStore.filteredEntries.isEmpty 与第 153 行的 entries.isEmpty 那一支｜Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 Fixture(「content-empty」, 750×560)"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "加载",
+      "verdict": "not-added",
+      "reason": "骨架屏加载时不遮蔽筛选条，条上也没有进度表达；决定不加脉冲或转圈 —— 「当前筛的是哪一段」与「正在加载」是两种语言，叠在同一颗胶囊上会让人以为筛选本身在算。加载那一格归骨架屏自己那表面（R26 已判）。",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift=isLoading｜缺席:Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift=showSkeleton｜Sources/ClipboardHistoryApp/Views/SkeletonShimmer.swift｜Tests/ClipboardHistoryAppTests/FilterPillMotionTests.swift"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "筛选是纯本地谓词：没有 IO、没有异步，也就没有「筛选失败」这条通道；写盘与粘贴那类失败走 NoticeBanner，而它不在侧栏这个文件里（该文件 NoticeBanner 0 命中）。",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift=NoticeBanner｜缺席:Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift=errorText｜Sources/ClipboardHistoryApp/Views/FilterPillGeometry.swift 的 segmentIndex 与 pillRect（纯函数、无抛出）"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "成功",
+      "verdict": "kept",
+      "reason": "切换成功的回执就是药丸滑到那一段 + 列表内容变化，不叠横幅也不加勾。两态像素判据把这件事钉成能复查的读数：亮区必须落在**选中**那一段，两档都量（R189/R190 那批）。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 slidingPill 与 FilterPillMotion.slideAnimation｜Tests/ClipboardHistoryAppTests/FilterPillGeometryTests.swift 的 testFilterPillBrightBandFollowsTheSelectedSegment｜Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 r189-pill-all 与 r189-pill-fav（第 11070、11071 行那对夹具）"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "聚焦",
+      "verdict": "kept",
+      "reason": "这一格是**有意识地**「保留可聚焦、关掉系统焦点环」：sidebarFocusRingHidden() 在 macOS 14+ 调 focusEffectDisabled()，12/13 没有对应 API 所以环照旧画 —— 那是平台缺开关不是漏。判据数的是视野内的焦点环视图个数。不加自绘描边：R196 的结构读数显示同位置已有 _FocusRingView，再画一圈是两圈；键盘可达性那一半还欠一条要用户授权的实验（BACKLOG 220）。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 fileprivate extension View 的 sidebarFocusRingHidden()｜Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift 的 class SidebarKeyboardNavigationTests（焦点环个数读数在第 1255、1269 行）｜Tests/ClipboardHistoryAppTests/UIInteractionProbeTests.swift 的 testSidebarKeyViewChainStructureIsPrinted｜BACKLOG 220"
+    },
+    {
+      "surface": "主窗口/筛选条",
+      "state": "禁用",
+      "verdict": "not-applicable",
+      "reason": "两段筛选永远可点：该文件里 isEnabled 0 命中；确有两条 .allowsHitTesting(false)（第 211、225 行）但它们在 SegmentedFilterPicker 之外（那个 enum 从第 359 行才开始），挂的是落点覆盖层。把「暂停采集」做成禁用胶囊会让用户以为筛选在算数据 —— 采集开关的语言在设置与菜单栏那边已经有了。",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift=isEnabled｜Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 第 211、225 行的 .allowsHitTesting(false) 与第 359 行起的 SegmentedFilterPicker"
     }
   ],
-  "floor_cleared": 125
+  "floor_cleared": 131
 }

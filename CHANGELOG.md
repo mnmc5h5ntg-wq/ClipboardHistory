@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表再补 6 格：主窗口/筛选条一次判完（R203 第二笔非轮次 · 表 1 份 + 报告 1 处，产品 0 文件）
+
+- 125→131 行、未清账 37→31、地板同笔抬到 131（`MOTION_LEDGER_RESULT=ok 不合法格=0`）
+- 空 kept（空态归 EmptyStateView 那一支，药丸照旧可点；`filteredEntries` 与 `entries` 两个空分开写）／加载 **not-added**（不给胶囊加脉冲：「筛的是哪段」与「正在加载」是两种语言）／错误 not-applicable（纯本地谓词无失败通道，`NoticeBanner` 在该文件 0 命中）／成功 kept（回执=药丸滑动 + 列表变化，两态像素判据 `testFilterPillBrightBandFollowsTheSelectedSegment` + `r189-pill-all/fav` 那对夹具）／聚焦 kept（`sidebarFocusRingHidden()` 是**有意识**地保留可聚焦、关掉系统环；macOS 12/13 没那个 API 所以环照旧画，平台缺开关不是漏）／禁用 not-applicable（`isEnabled` 0 命中；两条 `allowsHitTesting(false)` 在 `SegmentedFilterPicker` 之外）
+- 诚实记账：这六格全部来自读码 + 已在册判据，**本轮没有新帧、也没有真看图**（产品 0 文件 ⇒ 看图腿记 NOT-RUN，不许拿 R25 的旧读数冒充）
+- `AGENT_FINAL_REPORT.md` §9.3 第 2 条按 `test_final_report_claims.py` 换成新读数（47→37→31；散文点名已改成 `MOTION_LEDGER_OPEN`）
+- 一条量法教训**记在这里，还没配判据**：闸门按忽略大小写比缺席词，所以 `缺席:...=disabled` 会被 `focusEffectDisabled()` 喂饱 ⇒ 缺席词要挑**结构性的名字**（`isEnabled`/`isLoading`/`showSkeleton`）而不是动效词根。要把它钉住欠一条守卫（挑词错了就红），本轮没做，别当成已交付
+
 ### 清账表补 10 格（拖入落点 6 + 提示条 4），顺手修掉指针名册看不见的那一类（R203 非轮次笔 · 判据 2 文件 + 表 1 份，产品 0 文件）
 
 - `docs/motion_surface_ledger.json` 115→125 行：未清账 47→37，地板同笔抬到 125（`MOTION_LEDGER_RESULT=ok 不合法格=0`）
