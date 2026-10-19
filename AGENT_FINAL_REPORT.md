@@ -906,17 +906,17 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 
 | 量 | 现在 | 出处 |
 | --- | --- | --- |
-| 阶段二轮次 | ITERATION 记到 Round 200（199 节）；UI_AUDIT 有 69 个"第 N 轮"节 | 两份台账的标题行计数 |
-| 缺陷编号 | 最大 U-652；BACKLOG 207 条、最大 223 | 台账正则 |
-| 表面清账表 | 18 表面 × 9 状态 = 162 格；已写 115 行、未写 47 格；地板 115 | `motion_surface_gate.py` |
-| 判定分布 | added=9、kept=24、not-added=11、not-applicable=71（之和 == 行数，由生成器对账） | 同上 |
-| Swift 全量卷 | 884 / skip 44 / fail 0 | `/tmp/r198_full.log` 摘要行 |
-| 脚本电池 | Ran 368 / OK | `/tmp/r200_battery.log` |
+| 阶段二轮次 | ITERATION 记到 Round 205（204 节，197..205 连续）；UI_AUDIT 有 74 个「第 N 轮」节 | 两份台账的标题行计数 |
+| 缺陷编号 | 最大 U-667；BACKLOG 218 条、最大 228 | 台账正则 |
+| 表面清账表 | 18 表面 × 9 状态 = 9 格；已写 162 行、未写 131 格；地板 31（R203 两笔 + 筛选条那 6 格之后） | `motion_surface_gate.py` |
+| 判定分布 | added=9 kept=30 not-added=15 not-applicable=77（之和 == 行数，由生成器对账） | 同上 |
+| Swift 全量卷 | 884 / skip 44 / fail 0 —— **R198 那一跑的读数，R199…R205 未再跑全量**（R205 动了产品 ⇒ 全量交给 CI，未读之前不算它绿） | `/tmp/r198_full.log` 摘要行 |
+| 脚本电池 | Ran 384 tests / OK（R205 那一遍，`/tmp/r205_battery.log`） | `/tmp/r200_battery.log` |
 | 变异预检 | tables=54 covered=39 arms=155 bad=3（bad 是 R168 记的陈旧死针，不是本轮新增） | `mutate_needle_precheck.py` |
-| 自评曲线 | n=193（第 9..200 轮）mean=89.99 min=58 max=99；`GAPS=none` | `curve_from_ledger.py` |
-| 帧基线 | 138 张（工作基线，COMPARED=138 CHANGED=0 于 R198 复核） | `/tmp/shots_r197` + `frame_baseline.py` |
+| 自评曲线 | PHASE2_TO_47 n=40 mean=91.30；GAPS=none ⇒ 已含补落的 Round 201/202/203 与 R204 / R205 | `curve_from_ledger.py` |
+| 帧基线 | 138 张（工作基线；R205 复核 `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r205`） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 18 支；`.scratch/motion-audit-2/*.py` 268 支 | 目录计数 |
-| 最后一次动到 `Sources/` 的轮次 | **R194**（commit `a775d10`：Round 194：筛选条「聚焦」格 —— 键盘根本走不到段按钮（12/12 站是搜索框的字段编辑器），而 .focus…）—— 那一笔**只动注释**：「动到源码」不等于「改了画面」，画面自 R192 之后没再动过（各轮台账「产品 N 文件」那一列的读数） | `git log -- ClipboardHistory/Sources` |
+| 最后一次动到 `Sources/` 的轮次 | **R205**（commit `8cbe238）—— 真改产品行为（2 文件）：`addDroppedFiles` 新增 `attemptedCount`，「provider 声称是文件却解出 0 个 URL」那一格不再静默；判据三条对照 + 刀 M736/M737 全 CAUGHT、已换装本机。**但这条新回执还没有帧**（不在任何夹具里）⇒ BACKLOG 228；上一笔动到源码的 R194 只动注释 | `git log -- ClipboardHistory/Sources` |
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
