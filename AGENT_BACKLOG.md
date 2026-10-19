@@ -6534,3 +6534,19 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   实测是"两块**不一样形状**的灰，其中一块比另一块深 12 级"。⇒ 下一轮看图腿的规矩加一条：
   **先量形状与轴范围，再谈颜色**；只报颜色的目测不算读数。
 
+## R235（第 234 轮 / Round 232）追加
+
+**264. 13 那棵 SwiftUI 树的 dismiss 行墨，只有帧基线在管、没有会红的行为判据（本轮 M787=NOT_RUN）**
+把那颗写死的蓝钉回 `MenuBarRecommendationsView`，本轮归类 = NOT_RUN（CAUGHT=有牙；ESCAPED=它真的不红；
+NOT_RUN=那一卷没打出摘要行 ⇒ 归类本身没跑通，既不判通过也不判有牙）。原因是这格判据走的是产品入口 `MenuBarController.populate(_:)`，而 13 那棵是另一棵树
+（`MenuBarExtra(.menu)` 编译成真 `NSMenu`，夹具按离屏 `NSHostingView` 复刻）。
+于是本轮修了两处、只有一处有牙。要补的那格：把 `MenuBarRecommendationsView` 的 label 文案
+与墨做成可读的纯函数（像 `MarkdownPresentation.appliesWideContentBackground` 那样留一条缝），
+判据读缝、不读散文；帧基线继续做第二个证人。不做的代价：换主题/换强调色时那棵树可能再被钉住一颗色。
+出口条件：下一次动这棵树之前，或有人往菜单表面加第二块彩度之前。
+
+**265. 悬停那一行的真实观感仍要真机（本轮底色是系统语义色代理）**
+`MENUBAR_DISMISS_INK` 的"选中底/强调底"两列是 `selectedTextBackgroundColor` /
+`controlAccentColor` 的解析值，不是真菜单的 vibrant 材质 —— 离屏进程没有走窗口服务器的取图通道
+（D-093；真机通道 2026-10-17 起在本机关闭）。人工批次要答：现在悬停那一行是什么颜色、读不读得出。
+不据此改产品的理由：两条地板在代理底上已经各自过线，且参照臂（系统正文墨）与它同底同尺。

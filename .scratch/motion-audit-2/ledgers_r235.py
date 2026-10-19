@@ -81,17 +81,32 @@ changed_after = len(cl_after)
 CHANGED_NAMES = " / ".join(sorted({ln.split(".png")[0][-58:] for ln in cl_before})) or "无名字"
 if frames_n < 100 or (changed_after != 0):
     sys.exit("ABORT：基线 update 之后仍有 %d 帧 CHANGED" % changed_after)
-capture_runs = re.findall(r"Executed (\d+) tests?, with (\d+) failure", cap)
-if not capture_runs:
+cap_re = re.findall(
+    r"Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?", cap)
+if not cap_re:
     sys.exit("ABORT：捕获卷摘要没落进文件（这一格必须从卷自己打印的行取）")
+for _g in cap_re:                       # 有键无值算红（记忆：摘要里"有键无值"必须算红）
+    for _x in _g:
+        if _x and not _x.isdigit():
+            sys.exit("ABORT：捕获卷摘要解不出数字 %r" % (_g,))
+cap_exec, cap_skip, cap_fail = cap_re[-1][0], cap_re[-1][1] or "0", cap_re[-1][2]
+if int(cap_fail) != 0:
+    sys.exit("ABORT：捕获卷自身有 %s 条失败" % cap_fail)
+if int(cap_exec) < 50:
+    sys.exit("ABORT：捕获卷只执行 %s 条 ⇒ 不像满卷" % cap_exec)
+CAP_SUMMARY = "执行 %s / skip %s / 失败 %s" % (cap_exec, cap_skip, cap_fail)
 
 full = read("full")
-fr = re.findall(r"Executed (\d+) tests?, with (\d+) failures?(?: and (\d+) errors?)?", full)
+fr = re.findall(
+    r"Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?"
+    r"(?: \((\d+) unexpected\))?", full)
 if not fr:
     sys.exit("ABORT：全量卷摘要解不出")
-ran, fails, errs = fr[-1]
+ran, skips, fails, errs = fr[-1]
 if int(ran) < 900:
     sys.exit("ABORT：全量卷只跑了 %s 条（上一轮 908）⇒ 不像满卷" % ran)
+if int(fails) or int(errs or 0):
+    sys.exit("ABORT：全量卷有失败 %s / 错误 %s" % (fails, errs))
 
 install = read("install")
 if "OK" not in install and "安装" not in install:
@@ -158,7 +173,13 @@ new_block = u"""## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏�
    vibrant 材质。人工批次要回答的是"悬停时那一行现在是什么颜色、还读不读得出"。
 2. **13 那棵路径的判据资格**：M787 = %s ⇒ 若 ESCAPED，SwiftUI 那棵树的墨只有帧基线在管、
    没有会红的行为判据（新开 BACKLOG 264 记这条，不假称已覆盖）。
-3. **CI 未读**：本轮与上一轮的两个 run 还没落地（见 BACKLOG 263 与 ⓪ 那笔）。
+3. **CI（本轮收账时刚读到，run 39332980540 = df92052）**：job 结论 failure，两朵红步骤同根
+   —— STEP[15] executed-count gate（全量卷 Executed 908 / skip 52 / 失败 2）与
+   STEP[17] Capture gate（有名字的红=1），红的都是
+   `testModeChipHoverFillIsVisibleOnItsOwnSurface`：runner 上点亮那一块的偏离 light=229 /
+   dark=218，地板 400 ⇒ 填充**画出来了（非 0）但比地板弱**，这正是 BACKLOG 249 欠的那格读数
+   （"弱"是产品还是这台机器的合成差异，249 的分辨实验还没做）。本轮 d4a2440 的
+   run 39338153114 在收账时仍 in_progress ⇒ 未读，成对写进下一轮第 ⓪ 条。
 4. `AGENT_FINAL_REPORT.md` 的计数器与"最后一次动到 Sources/ 的轮次"仍停在旧值。
 
 """ % (U,
@@ -168,7 +189,7 @@ new_block = u"""## 第 234 轮（R235 / Round 232 · 2026-10-20）：菜单栏�
        n_src, knives[0][1], view_knife,
        [ln for ln in mut.splitlines() if "R235_MUTATE" in ln][0].strip(),
        frames_n, changed_before, changed_after,
-       capture_runs[-1], ran, fails, errs or "0", install.strip().splitlines()[-1][:60],
+       CAP_SUMMARY, ran, fails, errs or "0", install.strip().splitlines()[-1][:60],
        view_knife)
 new_block = new_block.replace("（menubar-recommendations 两张）", "（%s）" % CHANGED_NAMES)
 

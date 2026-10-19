@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+
+### 产品：菜单栏「都不是我想要的」不再钉死蓝墨（R235 / U-748 / D-220）
+
+- `MenuBarController`（macOS 12 那棵 AppKit 树）与 `MenuBarRecommendationsView`（13 那棵）
+  原先都把这一行的墨写死成一颗蓝。实测这颗蓝在静置底上亮档只有 3.52:1（正文参照 21.00:1），
+  在选中底上 1.93 / 2.36:1（参照 6.23 / 14.08:1）⇒ 两种态都读不出来，墨交回系统。
+- 新增 `MenuBarDismissRowInkTests`：尺的自对照 + 两档 × 静置 4.5 / 选中 3.0 两条地板，
+  并要求"这一行前面必须有分隔线"（去掉彩度后分组是它唯一的身份）。
+
 ### 产品：渲染档里的表格不再穿代码那块灰底（R234 / Round 231 / U-745 / D-219）
 
 - 看图量到的缺陷，不是读代码猜的：渲染档里 `| 名称 | 数量 |` 与 `let release = ...`
