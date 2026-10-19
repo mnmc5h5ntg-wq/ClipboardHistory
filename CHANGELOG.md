@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 两朵 CI 红的归因与修法：调用点守卫改形状匹配、新出口测试去掉环境依赖（R216 / U-698…U-700 · 判据 2 文件，产品 0 文件）
+
+- `STEP[15]`：`Round4MarkdownTests.testDetailViewRoutesMarkdownToTheRendererAndBack：XCTAssertTrue failed - 文件预览没接到当前模式` ⇒ 根因是 R211 把 `DetailFileView(...)` 调用拆成两行，整行字面量守卫读不到了；改成按空白折叠后比形状 + 新增「freeze 必须接属性」
+- `STEP[8]`：`AssertionError: 0 != 2 : FRAME_DIR_MISSING /tmp/shots_r211` ⇒ R212 新格子把 `--shots` 指到 /tmp/shots_r211；改指仓库根目录（这一格只测出口，不该依赖帧目录）
+- 新规矩 D-208：动了 `Sources/` 的那一轮本地必须跑全量卷，CI 只做复验（R211/R214 没跑 ⇒ 两朵红 + 三跑排队）
+- 本地补跑：`Executed 890 tests, with 44 tests skipped and 0 failures`（`/tmp/r216b_full.log`，大日志不入库）；脚本电池现跑 OK
+- CI：`e8643e2`=39260809114、`9af75f7`=39260903335 仍 in_progress ⇒ 235 未读、234 不写"已交付到 CI"
 ### 看图腿：重捕整卷做可重复性证人 + 亮档骨架对比度 1.05 的不对称（判为不加）（R215 / U-695…U-697 · 产品 0 文件）
 
 - `Executed 72 tests, with 4 tests skipped and 0 failures` → `FRAME_BASELINE_COMPARED=142 CHANGED=0 MISSING=0 ADDED=0`；尺在新目录 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`

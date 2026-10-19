@@ -119,7 +119,10 @@ class CiExitTests(unittest.TestCase):
                       u'缺席要写成读数，不许只说"跳过了"：\n%s' % out)
 
     def test_missing_pillow_is_unavailable_not_red(self):
-        code, out = run('--shots', SHOTS, '--ci', env={'SURFACE_LEFT_AXES_FORCE_NO_PIL': '1'})
+        # 这一格只测「没有像素库时走哪个出口」，不该依赖某个帧目录存在：
+        # R212 那版指 /tmp/shots_r211，在 runner 上先撞上 FRAME_DIR_MISSING（exit 2）而红了
+        # —— 环境依赖被写进了判据的入口，run 39258514435 的 STEP[8] 就是这么红的。
+        code, out = run('--shots', ROOT, '--ci', env={'SURFACE_LEFT_AXES_FORCE_NO_PIL': '1'})
         self.assertEqual(0, code, out)
         self.assertIn(u'LEFT_AXIS_CI verdict=unavailable', out)
 

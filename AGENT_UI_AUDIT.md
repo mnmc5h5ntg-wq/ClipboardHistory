@@ -363,6 +363,25 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 218 轮（R216 · 2026-10-19）：读 982faff 的两朵红 —— 一朵是我 R211 拆行拆断的调用点守卫，一朵是我 R212 写进判据的环境依赖（U-698…U-700 · 判据 2 文件，产品 0 文件）
+
+- **U-698：`STEP[15] Swift tests (executed-count gate)` 的红归因到我 R211 那一笔。**
+  正文：`Round4MarkdownTests.testDetailViewRoutesMarkdownToTheRendererAndBack：XCTAssertTrue failed - 文件预览没接到当前模式`。原因不是产品坏了：那条守卫拿**整行字面量**比 `DetailView.swift` 里的
+  `DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode)`，
+  而 R211 为了组合帧给这颗调用加了第二个实参 ⇒ 源码变成两行 ⇒ 字面量不再连续。
+  修法不是放宽守卫，是换**形状**：把源码按空白折叠成单行再比，并顺手加一句更强的断言 ——
+  `freezeLoadingForCapture:` 接的必须是**属性**（写死 true 会让产品永远停在骨架，那正是夹具需要、产品不该有的状态）。
+  本地复跑：`Executed 890 tests, with 44 tests skipped and 0 failures`。
+- **U-699：`STEP[8]` 那朵红是我 R212 自己写进去的环境依赖。**
+  正文：`AssertionError: 0 != 2 : FRAME_DIR_MISSING /tmp/shots_r211` —— 我新加的 `test_missing_pillow_is_unavailable_not_red` 把 `--shots` 指到 `/tmp/shots_r211`，
+  而 runner 上没有那个目录 ⇒ 主流程先按"帧目录不存在"退出 2，断言等的是出口 0。
+  这一格想测的是"没有像素库时走哪个出口"，**不该依赖某个帧目录存在** ⇒ 改指仓库根目录（一定在）。
+  同一族的教训：R212 我刚把"环境缺席不许被报成代码结论"写进尺的出口，转头就在自己的测试里造了一朵新的。
+- **U-700：新规矩 D-208 —— 动了 `Sources/` 的那一轮，本地必须跑全量卷，CI 只做复验。**
+  代价是量出来的：R211 与 R214 两笔都动了 `Sources/` 而我只跑 filter 卷，把全量卷"交给 CI"；
+  结果是 `982faff` 两朵红 + 三跑排队，而 U-698 那朵红在本地跑一次就会当场现形（4 分钟）。
+  本轮补跑：`Executed 890 tests, with 44 tests skipped and 0 failures`（日志 `/tmp/r216b_full.log`，大日志不入库）。
+  CI 侧：`e8643e2`=39260809114、`9af75f7`=39260903335 仍 in_progress ⇒ 235（尺在 runner 上的出口）继续未读，234 不写"已交付到 CI"。
 ## 第 217 轮（R215 · 2026-10-19）：回到画面 —— 重捕 142 张做可重复性证人，亮档骨架 1.05 的不对称量出来了，判为不加（U-695…U-697 · 产品 0 文件，看图账）
 
 - **U-695：可重复性第一次有整卷证人：同一份工作树重捕一遍，142 张逐字节未变。**

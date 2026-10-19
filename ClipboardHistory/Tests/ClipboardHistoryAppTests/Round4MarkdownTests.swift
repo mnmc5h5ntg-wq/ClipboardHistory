@@ -609,8 +609,17 @@ final class Round4MarkdownTests: XCTestCase {
                       "渲染分支根本没建富文本视图 —— 判定对了、视图没换，缺陷还在")
         XCTAssertTrue(detail.contains("ChineseSelectableTextView("),
                       "「原文」那条路被删了：渲染器一旦出错用户没有退路")
-        XCTAssertTrue(detail.contains("DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode)"),
-                      "文件预览没接到当前模式")
+        // R211 之后这颗调用变成两行（多了 `freezeLoadingForCapture:`），整行字面量匹配不到 ⇒
+        // 这条守卫在 runner 上红过一轮（run 39258514435，`Executed 886 tests / 1 failure`）。
+        // 改成「折行也算数」的形状匹配，并额外钉住新参数接的是**属性**而不是死值
+        // （写死 true 会让产品永远停在骨架，而那正是这张帧需要的、产品不该有的状态）。
+        let fileCall = detail.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        XCTAssertTrue(fileCall.contains("DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode, freezeLoadingForCapture: freezeLoadingForCapture)"),
+                      "文件预览没接到当前模式，或没把冻结开关原样传下去")
+        XCTAssertTrue(fileCall.contains("markdownMode: markdownMode"),
+                      "「原文 / 渲染」那颗开关没接到文件预览上")
         XCTAssertTrue(detail.contains("MultiFileDetailView(urls: urls, markdownMode: markdownMode)"),
                       "多文件里展开的 Markdown 不受开关控制")
         XCTAssertTrue(detail.contains("MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode))"),

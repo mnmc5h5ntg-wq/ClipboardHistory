@@ -1,5 +1,17 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 21:45（本地 · R216 / 第 218 轮：**两朵 CI 红归因到自己头上并修好：调用点守卫改形状匹配、新出口测试去掉环境依赖；立 D-208**（U-698…U-700 · 判据 2 文件，产品 0 文件）
+
+**本轮落地**：`982faff` 的 `STEP[15]` 是 R211 我加实参把 `DetailFileView(...)` 调用拆成两行，
+整行字面量守卫读不到 ⇒ 改成按空白折叠后比形状，并加一句「freeze 必须接属性」的更强断言；
+`STEP[8]` 是 R212 我新加的出口测试把 `--shots` 指到 /tmp/shots_r211，runner 上没这个目录 ⇒ 改指仓库根目录。
+本地补跑全量卷：`Executed 890 tests, with 44 tests skipped and 0 failures`（大日志留 /tmp）。新规矩 **D-208**：动了 `Sources/` 的那一轮本地必须跑全量卷，CI 只做复验。
+CI：`e8643e2`=39260809114、`9af75f7`=39260903335 仍 in_progress ⇒ 235（尺在 runner 上的出口）继续未读；本轮这一跑也要读。
+
+**下一轮（R217）的靶**：⓪ 读 `9af75f7`/本跑：`STEP[8]`、`STEP[15]` 是否恢复绿、`Surface left-axis ruler` 打的是 ok/skipped/unavailable（235 结案的唯一通道）；
+① 240 的行为证人（同一视图两臂像素判据）+ 第三把刀；② 237（pillow 安装位置）；③ 227③、222、215、201/202、207；④ 220 路 A、228② 等用户。
+)
+
 最后更新：2026-10-19 21:34（本地 · R215 / 第 217 轮：**回到画面：重捕 142 张拿到可重复性证人 + 亮档骨架 1.05 的不对称，判为不加**（U-695…U-697 · 产品 0 文件，看图账）
 
 **本轮落地**：同一份工作树重捕整卷 ⇒ `Executed 72 tests, with 4 tests skipped and 0 failures`、`FRAME_BASELINE_COMPARED=142 CHANGED=0 MISSING=0 ADDED=0`、尺 `LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`。
