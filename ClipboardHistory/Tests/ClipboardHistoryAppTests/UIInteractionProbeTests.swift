@@ -1045,14 +1045,17 @@ final class UIInteractionProbeTests: XCTestCase {
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .joined(separator: "\n")
         let body = code.split(separator: "\n    func ").first { $0.hasPrefix("testFilterSegmentsAreReachableAndShowFocus") } ?? ""
-        XCTAssertTrue(body.contains("FILTER_FOCUS"),
-                      "读数行被摘掉 ⇒ 这一格今天到底量到了什么，日志里没有证人")
+        XCTAssertTrue(body.contains("FILTER_FOCUS 带内候选="),
+                      "读数行被摘掉 ⇒ 这一格今天到底量到了什么，日志里没有证人"
+                        + "（锚点写的是**整行前缀**而不是 `FILTER_FOCUS`：只写前者的话，"
+                        + "把标记改成 `FILTER_FOCUSX` 也算命中 —— 子串查看不见删掉了什么，R88 那一课）")
         XCTAssertTrue(body.contains("FILTER_PILL_FOCUS_UNCOVERED"),
                       "未判定出口没有名字 ⇒ 它会退化成永久免检的那一类（R133 那一族）")
         XCTAssertEqual(body.components(separatedBy: "XCTAssertGreaterThanOrEqual(reachedFilterBandWithRing, 1").count - 1, 1,
                        "『接管』那条断言必须恰好一处：0 处=这个出口永远不会被换回判据，2 处=重复实现")
-        XCTAssertTrue(body.contains("fieldEditorStops"),
-                      "字段编辑器没被按身份排除 ⇒ 又回到『把量错对象当成量到了』（本轮第一版就是这么假绿的）")
+        XCTAssertTrue(body.contains("!isFieldEditor && inFilterBand("),
+                      "字段编辑器没被按**身份**排除 ⇒ 又回到『把量错对象当成量到了』"
+                        + "（本轮第一版就是这么假绿的：12 站全是搜索框的编辑器，两条断言双双为真）")
     }
 
     func testSidebarListFocusRingAfterClick() throws {

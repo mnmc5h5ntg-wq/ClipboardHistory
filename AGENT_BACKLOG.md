@@ -5420,3 +5420,8 @@ M709（退回各自归一化，只有接线扫描抓得到）、M710（方向反
 ② 或给段按钮装一个显式 `NSView` 代理并接进 `nextKeyView` 链。两条都要先看渲染画面再定，别再来一次"我以为修好了"。
 判据已经就位：段按钮一旦进链（`reachedFilterBand ≥ 1`），`reachedFilterBandWithRing` 那条断言自动接管，
 今天的 `FILTER_PILL_FOCUS_UNCOVERED` 出口当场失效 —— 它不会永久免检。
+
+**R195 追记（220 不动，先还债）**：R194 记 NOT-RUN 的三件（变异刀、全量卷、电池）本轮全部落地 ——
+`mutate_r195.py` M726, M727, M728, M729 全 CAUGHT、全量卷 881/43/0、电池 Ran 368 / OK。
+220 本身仍开着：它欠的是"先量清 `List`/`NSHostingView` 怎么排 nextKeyView"，本轮没有动它，
+也不许用"扫描有牙了"替那条缺陷说进展 —— 两件事不同尺。

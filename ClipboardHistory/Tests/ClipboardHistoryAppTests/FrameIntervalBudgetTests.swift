@@ -159,11 +159,17 @@ final class FrameIntervalBudgetTests: XCTestCase {
         }
         // R143 实测：10 行 print 读数、9 种标记（`NOTE` 两行）。FPS- 那一族不在名单里，
         // 因为它已经全部走 emit —— 若有人把它写回 print，Set 里会冒出一个没登记的标记而红。
+        //
+        // R195 重登记：R194 的筛选条焦点探针**新增两行 print**（`FILTER_FOCUS` 是量到的站点点清单，
+        // `FILTER_PILL_FOCUS_UNCOVERED` 是有名字的未判定出口），于是 10 行→12 行、9 种→11 种。
+        // 走的是这条守卫设计好的路：新读数必须先登记才允许存在（R143/U-473），
+        // 而不是把 count 改成 ≤12 或干脆删掉这条 —— 那样"转走一条 + 新加一条"就又绿了。
         XCTAssertEqual(Set(markers), Set([
             "FOCUS-CHAIN", "TAB-KEY-CHAIN", "TAB-KEY-KINDS", "KEYBOARD-UIMODE",
             "NOTE", "AX-VISITED", "AX-UNNAMED", "FOCUSCHAIN-RING", "RINGVIEWS",
+            "FILTER_FOCUS", "FILTER_PILL_FOCUS_UNCOVERED",
         ]), "探针里的 print 读数与名册不符 ⇒ 要么有未登记的新读数，要么有已退场的旧登记")
-        XCTAssertEqual(markers.count, 10,
+        XCTAssertEqual(markers.count, 12,
             "同一标记的行数变了（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改（NOTE 那两条是条件注记）")
     }
 }

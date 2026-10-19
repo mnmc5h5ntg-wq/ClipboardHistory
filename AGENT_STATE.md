@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 15:30（本地 · R195 / 第 197 轮：**还 R194 的三件债 —— 四把刀验出牙、全量卷 0 失败、电池 OK**（U-638…U-640 · 产品 0 文件，判据账）
+
+**本轮落地**：`mutate_r195.py` M726, M727, M728, M729 ⇒ 4/4 CAUGHT、RESTORE_CLEAN=yes，catcher 全是 R194 那条 `testFilterFocusExitIsWired` ⇒ 那个"有名字的未判定"出口第一次被证明可证伪。电池那 1 红修绿：真因是 `PROBE_QUEUED 4/11→6/13` 与 print 读数名册（新增 `FILTER_FOCUS`、`FILTER_PILL_FOCUS_UNCOVERED`，10 行→12 行），两处按**真实文本**重钉、名册仍是双向相等。
+**一条自我更正**：上一笔提交信息里我写"漏了另一处 7/11"是没读失败正文就猜的 ⇒ 实际成因见上；教训是红话要抄原文（R94 新变体）。
+验证：编译 0 告警、全量卷 881/43/0、脚本电池 Ran 368 / OK、产品 0 文件（帧与换装沿用上一遍）。
+
+**下一轮（R196）的靶**：⓪ 读这一笔与 `7e46b49` 之后所有跑的**全部**失败步骤（关键预期：`FILTER_PILL_FOCUS_UNCOVERED` 要在 runner 上露面且那一步不因此红）；
+① 220：量清 `List`/`NSHostingView` 的 nextKeyView 排布（先读数、后选路：原生 NSSegmentedControl 或显式 NSView 代理），选定后要画面证人；
+② 218（行 A/B 的统计量：帧对中位 / 段长 ÷ 声明时长，配 runner 那份分布）、215（真机亮档一格）；
+③ 201、202、205、207；④ 清账表：筛选条剩 5 格（加载、空、错误、成功、禁用）；
+⑤ 看图腿：产品已连续四轮 0 文件 —— 下一轮要么动一个真位点，要么把 220 的两条候选路各拍一张对照。
+）
+
 最后更新：2026-10-19 15:05（本地 · R194 / 第 196 轮：**筛选条「聚焦」格 —— 键盘走不到段按钮，.focusable 被探针驳回**（U-635…U-636 · 产品 1 文件仅注释）
 
 **本轮落地**：新探针 `testFilterSegmentsAreReachableAndShowFocus` 在真窗口沿 key-view 链走 12 站，读数：FILTER_FOCUS 带内候选=1 全部候选=4 候选清单=["ChineseMenuTextField@(43.0, 18.0, 258.0, 16.0) ring=0 带内=true", "ListCoreScrollView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "ListCoreClipView@(0.0, 126.0, 320.0, 334.0) ring=0 带内=false", "SwiftUIOutlineListView@(0.0, 126. ⇒ 12 站全是搜索框的字段编辑器，段按钮 0 站 ⇒ 键盘不可达（新开 BACKLOG 220）。试过 `@FocusState + .focusable(true) + 聚焦描边`：编译 0 告警但探针照红 ⇒ 代码删掉，产品只留 4 行注释。

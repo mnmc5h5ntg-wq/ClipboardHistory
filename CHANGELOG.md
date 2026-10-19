@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 还 R194 的三件债：4/4 把刀给未判定出口验出牙，全量卷 881/43/0，电池 Ran 368 / OK（R195 / U-638…U-640 · 产品 0 文件，判据账）
+
+- `mutate_r195.py` M726, M727, M728, M729 ⇒ 4/4 CAUGHT、RESTORE_CLEAN=yes；catcher 是 `testFilterFocusExitIsWired` 本身
+- 锚点两条规矩落地：needle 要带相邻行才命中一次（扫描自己的字面量会撞）；扫描的锚点必须写**整行前缀**，否则 `FILTER_FOCUSX` 也算命中
+- 电池那 1 红的真因：`PROBE_QUEUED 4/11 → 6/13`（新增两条在屏判据）与 `FrameIntervalBudgetTests` 的 print 读数名册（+`FILTER_FOCUS`、+`FILTER_PILL_FOCUS_UNCOVERED`，10→12 行）；两处按真实文本重钉，名册仍是双向相等
+- 自我更正：上一笔提交信息里"漏了另一处 7/11"是**没读失败正文就写的猜测**，实际成因见上；红话要抄原文不要复述
+- 验证：编译 0 告警、全量卷 881/43/0、脚本电池 Ran 368 / OK、产品 0 文件（帧未动，沿用上一遍）
 ### 筛选条「聚焦」格：键盘走不到段按钮（12/12 站是搜索框的字段编辑器），试过的 .focusable 修法被探针驳回（R194 / U-635…U-636 · 产品 1 文件仅注释）
 
 - 新判据：`UIInteractionProbeTests.testFilterSegmentsAreReachableAndShowFocus`（真窗口 + key-view 链 12 站，按**身份**排除字段编辑器）
