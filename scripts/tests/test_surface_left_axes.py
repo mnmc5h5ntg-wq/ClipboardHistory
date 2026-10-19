@@ -68,18 +68,35 @@ class SelfTruthTableTests(unittest.TestCase):
 
 
 class RealFrameTests(unittest.TestCase):
+    """在**真帧**上跑尺（不带 --ci），期望由这台机器自己登记的那一行推导（R233）。
+
+    与 `CiExitTests` 的分工：那一格判 `--ci` 的出口处置，这一格判尺在真产物上有没有
+    把四条关系各自报数 —— 纯文本正文是这四条关系**唯一**逐条打数的地方，删掉它就等于
+    把"尺读没读到对象"从账上抹了。
+    """
+
     @unittest.skipUnless(os.path.isdir(SHOTS), u'帧目录不在（%s）⇒ 这一格本机 NOT-RUN' % SHOTS_NOTE)
     @NEEDS_PIL
     def test_working_frames_still_satisfy_the_three_relations(self):
+        key = machine_key()
+        if key not in CI_EXPECTATIONS:
+            self.fail(u'未登记的机器：解析出 %s=%s ⇒ 这一格必须红（不许静默通过、也不许改成 skip）。'
+                      u'名册里已有：[%s]。补行的依据是**这台机器自己打的** LEFT_AXIS_VERDICT 结论行'
+                      u'与逐颗 NOT_RUN / 规则行，不是别人的输出。'
+                      % (MACHINE_KEY_ENV, key, u' | '.join(sorted(CI_EXPECTATIONS))))
         code, out = run('--shots', SHOTS)
-        self.assertEqual(0, code, u'真帧上判据红了：\n%s' % out)
-        self.assertIn(u'LEFT_AXIS_VERDICT ok', out)
-        # 三条判据都得各自报数（不许"没问题"其实是"没量到"）：行首 `LEFT_AXIS ` 的规则行 = A/B/C
-        rule_rows = [l for l in out.splitlines() if l.startswith(u'LEFT_AXIS ')]
-        self.assertEqual(4, len(rule_rows), u'判据行不全（A/B/C/D 四行）：\n%s' % out)
-        self.assertEqual(5, out.count(u'探针=') + out.count(u'药丸') + 99999, u'占位') if False else None
-        for tag in (u'A 对称', u'B 同轴', u'C 不越过', u'D 同轴·组合帧'):
-            self.assertIn(tag, out, u'少了这一条判据：%s' % tag)
+        want = plain_expectation_from_row(CI_EXPECTATIONS[key])
+        got = parse_plain_profile(out)
+        self.assertEqual(want[u'exit_code'], code,
+                         u'exit 与推导对不上（期望 %d 实得 %d）；这一格的处置由 hard/not_run 两轴决定：\n%s'
+                         % (want[u'exit_code'], code, out))
+        self.assertEqual([], diff_plain_profile(want, got),
+                         u'机器=%s（%s）纯文本画像不匹配：\n%s\n原输出：\n%s'
+                         % (key, CI_EXPECTATIONS[key][u'provenance'],
+                            u'\n'.join(diff_plain_profile(want, got)), out))
+        print(u'PLAIN_PROFILE_OK 机器=%s verdict=%s 问题=%d 真红=%d 盲区=[%s] 规则行=[%s] 帧目录=%s'
+              % (key, got[u'verdict'], got[u'problems'], len(got[u'hard']),
+                 u', '.join(got[u'blind']), u', '.join(got[u'tags']), SHOTS))
 
     @NEEDS_PIL
     def test_missing_frames_are_not_run_not_green(self):
@@ -129,7 +146,7 @@ def machine_key():
 # 与 NOT_RUN（帧到了但那块没墨）不许并成一支 —— 刀二钉的就是这条。
 CI_EXPECTATIONS = {
     LOCAL_KEY: dict(
-        provenance=u'R231 本机实测：帧目录由 CLIPBOARD_HISTORY_UI_SHOTS 给出（158 帧 @2x）',
+        provenance=u'R231 本机实测、R233 复测：帧目录由 CLIPBOARD_HISTORY_UI_SHOTS 给出（162 帧 @2x，纯文本四条关系行都打）',
         verdict=u'ok', hard=0, not_run=0, missing_frames=0, probes=7,
         not_run_names=(), missing_names=()),
     GITHUB_RUNNER_KEY: dict(
@@ -179,20 +196,245 @@ def diff_ci_profile(want, got):
     return bad
 
 
-# 两份逐字抄录的样本（不依赖任何环境，正对照与刀都拿它们重放）：
-RUNNER_SAMPLE = (
+# 四张**逐字抄录**的正文（不依赖任何环境，正对照与刀都拿它们重放）。
+#
+# 来历（R233）：上一版这里只有两张 ci 样本，而 `RUNNER_SAMPLE` 的第一行是我手写拼上去的 ——
+# 它给的是 `LEFT_AXIS A 对称 ｜ 浮层/选中行药丸`，而同一份正文里 浮层/选中行药丸 在 NOT_RUN 名单里。
+# `judge()` 的规矩是「NOT_RUN 只免掉**引用了那颗探针的那条关系**」，所以那一行在 runner 上**根本不可能**
+# 被打印。它当时没让任何一格红（解析器只读结论行与名单行），于是"逐字抄录"这句注释一直在替
+# 一份拼出来的证据作证。现在四处都在：本机 39321660036 同一时刻的纯文本正文（R233 实测：
+# 四条关系行一条不缺、`问题=0`）、runner 那一跑的失败正文逐字取出（只剩 D 一行 + 4 颗 NOT_RUN），
+# 以及同一 `judge()` 在 `--ci` 下的结论行。行部分与名单互为证人：下面 `PlainContractTests` 里
+# "给没有对象的探针打规则行 = 红"那一格，正是让这种拼出来的样本从此不能过账的牙。
+
+LOCAL_PLAIN_SAMPLE = (
     u'LEFT_AXIS A 对称 ｜ 浮层/选中行药丸 ｜ 左内缩=22.0pt 右内缩=22.0pt 差=0.0pt（容差 1.0）\n'
-    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.0, 20.0]pt 跨度=0.0pt\n'
+    u'LEFT_AXIS B 同轴 ｜ 统计/统计行、统计/月份行、统计/说明正文 ｜ 最左墨=[148.0, 148.0, 148.0]pt 跨度=0.0pt（容差 1.0）\n'
+    u'LEFT_AXIS C 不越过 ｜ 统计/热图网格 ⊆ 统计/说明正文 ｜ 网格左缘=148.0pt 右内缩=161.0pt ｜参照左缘=148.0pt 右内缩=32.0pt\n'
+    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.5, 20.0]pt 跨度=0.5pt（容差 2.0，跨种类 ⇒ 含字形侧边距）\n'
+    u'LEFT_AXIS_VERDICT ok 探针=7 问题=0 NOT_RUN帧=0\n'
+)
+
+RUNNER_PLAIN_SAMPLE = (
+    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.0, 20.0]pt 跨度=0.0pt（容差 2.0，跨种类 ⇒ 含字形侧边距）\n'
     u'LEFT_AXIS_NOT_RUN 浮层/选中行药丸：cause=bg-not-flat bg=(50, 50, 50) ⇒ 尺没有对象，不许给绿\n'
     u'LEFT_AXIS_NOT_RUN 统计/统计行：cause=no-ink bg=(50, 50, 50) thr=12 window=580x14 ⇒ 尺没有对象，不许给绿\n'
     u'LEFT_AXIS_NOT_RUN 统计/月份行：cause=no-ink bg=(50, 50, 50) thr=12 window=580x14 ⇒ 尺没有对象，不许给绿\n'
     u'LEFT_AXIS_NOT_RUN 统计/热图网格：cause=no-ink bg=(50, 50, 50) thr=12 window=580x13 ⇒ 尺没有对象，不许给绿\n'
-    u'LEFT_AXIS_CI verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7\n')
+    u'LEFT_AXIS_VERDICT bad 探针=7 问题=4 NOT_RUN帧=0\n'
+)
 
 LOCAL_SAMPLE = (
     u'LEFT_AXIS A 对称 ｜ 浮层/选中行药丸 ｜ 左内缩=22.0pt 右内缩=22.0pt 差=0.0pt（容差 1.0）\n'
-    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.5, 20.0]pt 跨度=0.5pt\n'
-    u'LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7\n')
+    u'LEFT_AXIS B 同轴 ｜ 统计/统计行、统计/月份行、统计/说明正文 ｜ 最左墨=[148.0, 148.0, 148.0]pt 跨度=0.0pt（容差 1.0）\n'
+    u'LEFT_AXIS C 不越过 ｜ 统计/热图网格 ⊆ 统计/说明正文 ｜ 网格左缘=148.0pt 右内缩=161.0pt ｜参照左缘=148.0pt 右内缩=32.0pt\n'
+    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.5, 20.0]pt 跨度=0.5pt（容差 2.0，跨种类 ⇒ 含字形侧边距）\n'
+    u'LEFT_AXIS_CI verdict=ok hard=0 not_run=0 missing_frames=0 probes=7\n'
+)
+
+RUNNER_SAMPLE = (
+    u'LEFT_AXIS D 同轴·组合帧 ｜ 详情/组合帧头部、详情/组合帧骨架 ｜ 最左墨=[20.0, 20.0]pt 跨度=0.0pt（容差 2.0，跨种类 ⇒ 含字形侧边距）\n'
+    u'LEFT_AXIS_NOT_RUN 浮层/选中行药丸：cause=bg-not-flat bg=(50, 50, 50) ⇒ 尺没有对象，不许给绿\n'
+    u'LEFT_AXIS_NOT_RUN 统计/统计行：cause=no-ink bg=(50, 50, 50) thr=12 window=580x14 ⇒ 尺没有对象，不许给绿\n'
+    u'LEFT_AXIS_NOT_RUN 统计/月份行：cause=no-ink bg=(50, 50, 50) thr=12 window=580x14 ⇒ 尺没有对象，不许给绿\n'
+    u'LEFT_AXIS_NOT_RUN 统计/热图网格：cause=no-ink bg=(50, 50, 50) thr=12 window=580x13 ⇒ 尺没有对象，不许给绿\n'
+    u'LEFT_AXIS_CI verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7\n'
+)
+
+
+# ---------------------------------------------------------------------------
+# 纯文本模式（不带 --ci）的期望：由**同一行机器画像**推导，不再抄第二遍数字
+# ---------------------------------------------------------------------------
+# 来历：253 把帧目录接进电池之后，`RealFrameTests` 那一格在 runner 上红了（run 39321660036 /
+# STEP[9]「Release script tests」，那一跑**唯一**一朵红，正文逐字抄进上面的 RUNNER_PLAIN_SAMPLE）。
+# 它原来写死两件事：① `assertEqual(0, code)` 加 `assertIn(u'LEFT_AXIS_VERDICT ok')`；
+# ② `assertEqual(4, len(rule_rows))`。两件都是"拿本机的能力当另一台机器的地板"
+# （R154 / R231 同一族），只是 259 那轮只把 `--ci` 那一格改成按机器切片，纯文本这一格漏了 ——
+# **同一件事两份判定，修了一处忘另一处**（R151 那一族：一条规则两份实现互相掩盖）。
+#
+# 尺在两种模式里跑的是同一个 `judge()`，差别只在结论行：纯文本把「硬违反」与「尺没有对象」
+# 缝进同一个 `问题=` 计数 ⇒ 环境盲区也 exit 1；`--ci` 把它们拆成 `hard` / `not_run` ⇒ 只有真红才 exit 1。
+# 两个方向都不许走：这一格不许改成"skip 也算过"（那会让它变成永远绿的装饰，R210 立它的原意），
+# 也不许把 runner 的四条 NOT_RUN 说成产品没问题。处置：期望由**这一台机器已登记的那一行**推导，
+# 并把尺自陈的那条规矩钉成会红的判据 —— 缺席名单与规则行必须互相解释：
+# 引用了盲区探针的那条关系不许打行，其余每条都必须各自报数；尺自陈的 `问题=` 必须等于
+# 它自己点名的（没对象的颗 + 真红的条数）。
+PLAIN_VERDICT_RE = re.compile(u'LEFT_AXIS_VERDICT (\\w+) 探针=(\\d+) 问题=(\\d+) NOT_RUN帧=(\\d+)')
+NOT_RUN_PREFIX = u'LEFT_AXIS_NOT_RUN '
+ROW_PREFIX = u'LEFT_AXIS '
+ABSENT_MARK = u'探针取不到帧'
+# 尺能报的"真红"编码，从被告自己的 `judge()` 抄。新增一类坏法而这里没跟上 ⇒
+# 下面的"计数与名单互相签字"会红，不会让新的一类悄悄免检。
+HARD_CODES = (u'ASYMMETRIC', u'OFF_AXIS', u'GRID_PAST_TEXT', u'GRID_LEFT_OF_TEXT',
+              u'COMPOSED_OFF_AXIS')
+
+
+def relation_probes():
+    """四条关系各自引用哪几颗探针 —— 从尺的常量读，不在测试里另抄一份名单。"""
+    return (
+        (u'A 对称', (sla.SYMMETRY_PROBE,)),
+        (u'B 同轴', tuple(n.strip() for n in sla.AXIS_GROUP.split(u','))),
+        (u'C 不越过', tuple(sla.NO_OVERFLOW)),
+        (u'D 同轴·组合帧', tuple(n.strip() for n in sla.AXIS_GROUP_COMPOSED.split(u','))))
+
+
+def parse_plain_profile(text):
+    """纯文本正文 → 画像。结论行缺失、或尺自陈的计数与它自己点名的名单不签字 ⇒ 响。"""
+    m = PLAIN_VERDICT_RE.search(text)
+    if m is None:
+        raise AssertionError(u'LEFT_AXIS_VERDICT 结论行没打出来 ⇒ 尺没跑完，不许判通过：\n%s' % text[-400:])
+    blind, absent = [], []
+    for line in text.splitlines():
+        if not line.startswith(NOT_RUN_PREFIX):
+            continue
+        rest = line[len(NOT_RUN_PREFIX):]
+        if rest.startswith(ABSENT_MARK):
+            absent.append(rest.split(u'：', 1)[-1])
+        else:
+            blind.append(rest.split(u'：')[0])
+    hard = [c for c in HARD_CODES if (u'LEFT_AXIS_' + c) in text]
+    tags = [l[len(ROW_PREFIX):].split(u' ｜')[0]
+            for l in text.splitlines() if l.startswith(ROW_PREFIX) and u' ｜' in l]
+    problems = int(m.group(3))
+    if problems != len(blind) + len(hard):
+        raise AssertionError(
+            u'尺自陈 问题=%d，却点名了 %d 颗没有对象 + %d 条真红（没对象=[%s] 真红=[%s]）'
+            u'⇒ 计数与名单有一个在说谎，这一格的任何一个数都不配当期望：\n%s'
+            % (problems, len(blind), len(hard), u', '.join(sorted(set(blind))),
+               u', '.join(hard), text[-400:]))
+    return dict(verdict=m.group(1), probes=int(m.group(2)), problems=problems,
+                missing=int(m.group(4)), blind=tuple(sorted(set(blind))),
+                absent=tuple(sorted(set(absent))), hard=tuple(sorted(set(hard))),
+                tags=tuple(sorted(set(tags))))
+
+
+def plain_expectation_from_row(row):
+    """由**同一行**机器画像推出纯文本模式该打什么：`问题 = hard + not_run`，其余全是推导。"""
+    want_problems = row[u'hard'] + row[u'not_run']
+    blind = tuple(sorted(row[u'not_run_names']))
+    return dict(verdict=u'ok' if want_problems == 0 else u'bad',
+                exit_code=0 if want_problems == 0 else 1,
+                problems=want_problems,
+                probes=row[u'probes'],
+                missing=row[u'missing_frames'],
+                hard=() if row[u'hard'] == 0 else None,
+                hard_count=row[u'hard'],
+                blind=blind,
+                tags=tuple(sorted(tag for tag, probes in relation_probes()
+                                  if not (set(probes) & set(blind)))))
+
+
+PLAIN_FIELDS = (u'verdict', u'problems', u'probes', u'missing')
+
+
+def diff_plain_profile(want, got):
+    """期望 vs 实得，逐字段返回不匹配的话；全匹配 ⇒ 空表。"""
+    bad = [u'%s 期望=%s 实得=%s' % (f, want[f], got[f])
+           for f in PLAIN_FIELDS if want[f] != got[f]]
+    if want[u'hard'] is not None and tuple(sorted(got[u'hard'])) != want[u'hard']:
+        bad.append(u'真红名单 期望=[%s] 实得=[%s]'
+                   % (u', '.join(want[u'hard']), u', '.join(got[u'hard'])))
+    if len(got[u'hard']) != want[u'hard_count']:
+        bad.append(u'真红条数 期望=%d 实得=%d（[%s]）⇒ 产品那一条轴不许按机器放宽'
+                   % (want[u'hard_count'], len(got[u'hard']), u', '.join(got[u'hard'])))
+    for label, field in ((u'NOT_RUN 名单', u'blind'), (u'规则行', u'tags')):
+        w, g = tuple(sorted(want[field])), tuple(sorted(got[field]))
+        if w != g:
+            bad.append(u'%s 期望=[%s] 实得=[%s]' % (label, u', '.join(w), u', '.join(g)))
+    return bad
+
+
+class PlainContractTests(unittest.TestCase):
+    """纯文本那一格的**契约**：不碰环境、不跑子进程，只验"表 + 推导 + 解析器"这套东西本身。
+
+    为什么单独钉：`RealFrameTests` 那一格要等下一跑 CI 用别人的机器替我试；这一族现在就红。
+    """
+
+    def test_the_two_rows_derive_different_plain_expectations(self):
+        loc = plain_expectation_from_row(CI_EXPECTATIONS[LOCAL_KEY])
+        run_ = plain_expectation_from_row(CI_EXPECTATIONS[GITHUB_RUNNER_KEY])
+        self.assertEqual((u'ok', 0, 0, ()),
+                         (loc[u'verdict'], loc[u'problems'], loc[u'hard_count'], loc[u'blind']),
+                         u'本机那一行推出来的期望必须仍然苛刻： verdict=ok、问题=0、没有盲区名单')
+        self.assertEqual(4, len(loc[u'tags']), u'本机四条关系都要各自报数：%s' % u','.join(loc[u'tags']))
+        self.assertEqual(0, loc[u'exit_code'])
+        self.assertEqual(u'bad', run_[u'verdict'])
+        self.assertEqual(4, run_[u'problems'], u'runner 那一行：四条盲区缝在 问题= 里')
+        self.assertEqual(1, run_[u'exit_code'], u'纯文本的 exit 1 由推导给，不许写死也不许放宽成 0')
+        self.assertEqual(0, run_[u'hard_count'], u'产品那一条轴在 runner 上也是 0，这一格才不是"环境说"')
+        self.assertEqual((u'D 同轴·组合帧',), run_[u'tags'],
+                         u'runner 上只该活下来 D：A/B/C 引用的探针都在它的盲区名单里')
+        self.assertNotEqual(loc[u'tags'], run_[u'tags'], u'两行推不出差别 ⇒ 按机器切片失效')
+
+    def test_each_verbatim_body_satisfies_its_own_rows(self):
+        for key, plain, ci in ((LOCAL_KEY, LOCAL_PLAIN_SAMPLE, LOCAL_SAMPLE),
+                               (GITHUB_RUNNER_KEY, RUNNER_PLAIN_SAMPLE, RUNNER_SAMPLE)):
+            got = parse_plain_profile(plain)
+            self.assertEqual([], diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[key]), got),
+                             u'%s 的纯文本正文满足不了自己那一行：\n%s\n%s'
+                             % (key, u'\n'.join(
+                                 diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[key]), got)), plain))
+            self.assertEqual([], diff_ci_profile(CI_EXPECTATIONS[key], parse_ci_profile(ci)),
+                             u'%s 的 --ci 正文满足不了自己那一行：\n%s' % (key, ci))
+
+    def test_a_body_must_not_satisfy_the_other_machines_expectation(self):
+        """切片要双向：runner 的正文不许满足本机那一行，反之亦然。"""
+        for mine, other in ((RUNNER_PLAIN_SAMPLE, LOCAL_KEY), (LOCAL_PLAIN_SAMPLE, GITHUB_RUNNER_KEY)):
+            got = parse_plain_profile(mine)
+            self.assertTrue(diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[other]), got),
+                            u'一份正文同时满足两台机器的期望 ⇒ 这一格退回成"一把尺判另一台机器"')
+
+    def test_pinning_the_plain_verdict_to_ok_for_every_machine_is_red(self):
+        """刀一复演：把推导写成"人人都该 ok"（= 拿本机能力当另一台的地板）必须判不匹配。
+
+        上一版的判据就是这个形状，而且它在 runner 上**真的**红了 —— 这一格钉的是
+        "改回那个形状会被现在这套契约抓住"，不是"我记得它坏过"。
+        """
+        pinned = dict(plain_expectation_from_row(CI_EXPECTATIONS[LOCAL_KEY]))
+        bad = diff_plain_profile(pinned, parse_plain_profile(RUNNER_PLAIN_SAMPLE))
+        joined = u' '.join(bad)
+        self.assertTrue(bad, u'把期望钉死成本机那一行仍然匹配 ⇒ 这一格没有牙')
+        for word in (u'verdict', u'problems', u'NOT_RUN 名单', u'规则行'):
+            self.assertIn(word, joined, u'放宽的那一格要能点名：%s\n%s' % (word, joined))
+
+    def test_a_rule_row_for_a_blind_probe_is_red(self):
+        """刀二复演：给没有对象的探针打规则行（= 缺席那一侧冒充结论）必须判不匹配。
+
+        预登记的期望在这里被推翻过一次，记下来免得下轮再猜：我原本以为"计数与名单互相签字"
+        那道闸门会抓住伪造的行 —— **它不会**。规则行进不了 `问题=` 计数（那个数只由
+        「没有对象的颗 + 真红的条数」构成），抓住它的是画像里单独一根 `规则行` 轴。
+        两侧各一格，谁也不许替谁签字：伪造行撞盲区那一侧，删行撞"活着的不许沉默"那一侧。
+        """
+        forged = (u'LEFT_AXIS B 同轴 ｜ 统计/统计行、统计/月份行、统计/说明正文 ｜ '
+                  u'最左墨=[148.0, 148.0, 148.0]pt 跨度=0.0pt（容差 1.0）\n' + RUNNER_PLAIN_SAMPLE)
+        got = parse_plain_profile(forged)
+        bad = diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[GITHUB_RUNNER_KEY]), got)
+        self.assertTrue(any(u'规则行' in b for b in bad),
+                        u'没有对象的探针竟能打报告行而不被判红：\n%s' % u'\n'.join(bad))
+        # 反面对照：伪造行不许把尺自己弄矛盾（问题= 计数照旧，只有规则行那一根轴动）
+        self.assertEqual(4, got[u'problems'], u'规则行不该进 问题= 计数：进两根轴就分不开是谁动的')
+        # 另一侧：尺**没**自相矛盾、只是少打了一条该活着的行（本机正文里删掉 C 行）
+        dropped = u'\n'.join(l for l in LOCAL_PLAIN_SAMPLE.splitlines() if not l.startswith(u'LEFT_AXIS C'))
+        bad = diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[LOCAL_KEY]),
+                                 parse_plain_profile(dropped))
+        self.assertTrue(any(u'规则行' in b for b in bad),
+                        u'活着的探针少了报告行必须点名：\n%s' % u'\n'.join(bad))
+
+    def test_a_hard_violation_is_never_a_per_machine_exit(self):
+        """产品那一条轴不许跟着机器放宽：真红在**两台**机器的期望里都是 0 条。"""
+        for key in (LOCAL_KEY, GITHUB_RUNNER_KEY):
+            self.assertEqual(0, CI_EXPECTATIONS[key][u'hard'],
+                             u'%s 那一行登记了硬违反 ⇒ 环境出口与产品结论被并成一支' % key)
+            self.assertEqual(0, plain_expectation_from_row(CI_EXPECTATIONS[key])[u'hard_count'])
+        forged = RUNNER_PLAIN_SAMPLE + u'LEFT_AXIS_ASYMMETRIC 浮层/选中行药丸：左右内缩差 3.0pt > 1.0pt\n'
+        with self.assertRaises(AssertionError):
+            parse_plain_profile(forged)
+        # 尺自陈把它算进 问题 之后，画像就要能读出来并判成与期望不符（= CI 该红）
+        counted = forged.replace(u'问题=4', u'问题=5')
+        got = parse_plain_profile(counted)
+        self.assertEqual((u'ASYMMETRIC',), got[u'hard'])
+        bad = diff_plain_profile(plain_expectation_from_row(CI_EXPECTATIONS[GITHUB_RUNNER_KEY]), got)
+        self.assertTrue(any(u'真红条数' in b for b in bad), u'真红必须单独成一条轴：\n%s' % u'\n'.join(bad))
 
 
 class CiExitTests(unittest.TestCase):
