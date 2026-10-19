@@ -18,6 +18,8 @@ Invalid manifest`（`/tmp/r235_manifest_repro.txt`）；修法是剥 `SDKROOT` �
 
 **下一轮（R236 / 第 235 轮 / Round 233）的靶**：⓪ 读三对仍未落地的 run —— `39339075372=e218a92`、
 `39339197911=52e4efb`、`39340316744=614ec3c`（台账补正笔）；`conclusion` 读不到只能写"未读"。
+本补记笔（U-751 / BACKLOG 266：两根轮次映射闸门改成读字段）push 之后，它的 run↔commit 用
+`python3 scripts/ci_read.py latest` 现读拿，不许手写 id ⇒ ⓪ 的全集是「上面三对 + 这一对」，不是只有三对。
 ① **264**：给 13 那棵补一条会红的判据（label 文案与墨做成可读纯函数，像
 `MarkdownPresentation.appliesWideContentBackground` 那样留缝），并配一刀把 M787 的 ESCAPED 关成 CAUGHT。
 ② **249 / 263**：modechip 悬停填充 runner 218/229 < 地板 400 的分辨实验（产品弱 vs 这台机器合成差异），

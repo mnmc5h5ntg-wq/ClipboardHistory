@@ -30,10 +30,12 @@ def guard_module():
 
 def titles_present(round_no, mod):
     out = {}
-    for name, fmt in mod.LEDGERS.items():
+    for name in mod.LEDGERS:
         path = os.path.join(REPO, name)
         text = io.open(path, encoding="utf-8").read() if os.path.exists(path) else u""
-        out[name] = bool(re.search(fmt % round_no, text, re.M))
+        # R235 起 LEDGERS 的值是**形状列表**（ITERATION 那本的 Round 号与 R 号不同源，
+        # 允许多种标题形状），所以这里不能再用 `fmt % round_no` 单发正则。
+        out[name] = any(re.search(p, text, re.M) for p in mod.patterns_for(name, round_no))
     return out
 
 
