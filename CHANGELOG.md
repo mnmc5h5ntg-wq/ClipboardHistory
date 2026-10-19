@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 244 结案：runner 判据卷走上带 pillow 的解释器（R226 / U-728…U-730 · 判据 0 文件 + 台账，产品 0 文件（本轮是读数轮））
+
+- run `39277485218`（`e015455`，**success**）：`SCRIPT_PYTHON=/tmp/pilenv/bin/python`、`SCRIPT_PIL_OK 13.0.0 /private/tmp/pilenv/bin/python`、`SCRIPT_SKIPS=3`，
+  `SCRIPT_PIL_MISSING` 未露面 ⇒ R223 的接线在 runner 上验收通过。
+- 范围：结的是「解释器接对了」，不是「像素判据全跑了」—— 仍有 3 条 skip，归属未读 ⇒ 开 **252**。
+- 左轴仍 `cause=no-bg-window`（`verdict=skipped not_run=7 probes=7`，帧 @1x）：按 pt 写窗口是 R224（`da5da47`，
+  run `39280048395` 仍 `in_progress`）⇒ **249 的第一格未读**，这一跑既不能证伪也不能证明 R224。
+- R225 四跑 `09d9bf7`=`39282426231` 仍 `queued` ⇒ 未读不算绿。本轮 0 产品、0 判据、未换装、看图腿 NOT-RUN。
+
 ### 浮层悬停那一档改成按色档取墨（R225 / U-725…U-727 · 产品 1 文件 + 判据 1 新文件 + 表 1 文件）
 
 - 病：`VisualFill.hover`=0.06 一档管两档 —— 亮档悬停带 `(240)`/白底 = **1.14:1**，低于仓库自己 R220 定的亮档地板 1.20；
