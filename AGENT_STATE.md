@@ -11,7 +11,8 @@
 验证：脚本电池见 commit 输出、`MOTION_LEDGER_RESULT=ok`；**全量 `swift test` 本笔未跑，交给 CI 这一跑**（不许把 CI 未读说成绿）。
 台账：第 207 轮 / Round 205（七维表）/ CHANGELOG / BACKLOG 224 结案 / 228 开单；三账窗口 R205/R204/R203 齐。
 
-**下一轮（R206）的靶**：⓪ 读 CI 并把 run id↔commit 成对写回来：`c90790e`、`2b9238c`、`13075d4` 与本轮这笔（`in_progress` 只能说未读）；
+**⓪ 的读数（R206 第一遍，`gh api …/actions/runs`）**：`c90790e`、`13075d4`、`2b9238c`、`8cbe238`、`8ebdbb1` 五跑全部 `completed success`（含 R205 那笔真改产品的 `8cbe238` ⇒ 全量 `swift test` 由 CI 那一跑代跑，本笔未再本地跑全量）；`1620429`、`8d7b51c`、`b36af66` 三跑写这笔时仍 `in_progress` ⇒ **结论未读**，不许说它们绿。坑记一条：`--jq` 里 `.databaseId` 在这台 gh 上打出 `null`，SHA 与结论照旧读得到 ⇒ 要 run id 得换 `.id`（与 `reference-github-ci-readings` 那条同源）。
+**下一轮（R206 之后）的靶**：⓪ 把上面三跑 `in_progress` 的读完（用 `.id` 拿 run id 成对）；
 ① **BACKLOG 228**：给"解出 0 个 URL"那一格补夹具（要真有帧），并把 M736/M737 搬进变异名册；
 ② 227 的③（两条尺若给相反处置要补"哪条尺有资格判这一格"的守卫）与 222（色彩标注机制仍未定，亮档真帧余量只剩 3）；
 ③ 215（真机亮档一格）、218、201/202/205/207、226；④ 220 路 A 仍等用户授权改 `AppleKeyboardUIMode`；
