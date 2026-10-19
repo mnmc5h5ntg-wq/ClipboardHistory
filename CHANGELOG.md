@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 亮档骨架墨按档给（BACKLOG 242 结案）：暗档不动、亮档 1.12 → 1.31（R219 / U-707…U-709 · 产品 1 文件，判据 1 文件）
+
+- `SkeletonMotion.inkOpacities(dark:)`：暗档仍是 0.06 / 0.18（未动），亮档给 **0.14 / 0.26**（lift 两档同 0.12）。
+  视图经 `@Environment(\.colorScheme)` 问系统，**唯一一处**读档的地方（提成 **D-211**）。
+- 证人：帧基线 `changed` 共 3 张 = 亮档 3 / 暗档 0 ⇒ 按档生效第一次在像素上分开可见；
+  组件帧亮档条带 (242,242,242) → (225,225,225)、对比度 1.12 → 1.31（两趟条带行数同）。
+- 判据：真值表（两档各过 lift 下界 + 亮档底色必须深于暗档 + 暗档仍是原令牌）+ 接线守卫；
+  `R219_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0`（M754 第一版 NOT_RUN，换成能编译的坏法后才 CAUGHT）。
+- 自曝：一次性尺在组合帧上量错对象（条带行数 168）⇒ 242 原文的 1.05 不作本轮改前值引用，开 245 做仓库内按档像素判据。
+- 验证：构建告警 0；判据卷 63 格 0 红；**全量卷 893 格 0 红**（D-208）；
+  `FRAME_BASELINE_UPDATED=142` 且 update 后重比 CHANGED=0（同一笔提交里 update）；已换装本机。
+
 ### 235 结案（受限）+ 237 的成因由 runner 正文签死并换成一次性 venv（R218 / U-704…U-706 · CI 1 文件，产品 0 文件）
 
 - runner run `39262764467`（commit `610e93c`）**completed success**：R216 修的 `STEP[8]`/`STEP[15]` 两朵红确认消失。

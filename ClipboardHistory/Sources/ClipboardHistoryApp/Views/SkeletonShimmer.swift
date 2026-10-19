@@ -108,6 +108,27 @@ enum SkeletonMotion {
     /// 比 spinner 更没用。所以把下限写成数字，而不是写成一句"要克制"。
     static let minimumHighlightLift: Double = 0.08
 
+    // MARK: - 按档给的墨（R219 / BACKLOG 242）
+
+    /// 亮档的底色墨。**为什么亮档要单独一个数**：`Color.primary.opacity(α)` 是乘法，
+    /// 同一个 α 在两个底上给的**绝对**差值差一个量级 —— 实测（R215，`/tmp/shots_r215` 的组合帧）：
+    /// 暗档 底 28 ↔ 条带 41 = Δ13、对比度 **1.17**；亮档 底 248 ↔ 条带 242 = Δ6、对比度 **1.05**。
+    /// 也就是同一份代码在亮档几乎画不出可见的条带 —— 骨架承诺的是"这块内容马上来"，
+    /// 看不见就等于没承诺。0.14 是按"要跨过那条 8 级的噪声门槛"给的：
+    /// Δ6 → Δ14（≈ 2.3 倍），仍远低于同帧那一句说明文字的 3.72。
+    static let lightBaseOpacity: Double = 0.14
+    /// 亮档的亮带墨。**抬 base 必须同时抬这一档**，否则抬升预算 `highlight - base` 被吃掉，
+    /// 扫光会从"能测到"退回 R214 注释里那个 0.0000（242 的原话条件）。0.26 - 0.14 = 0.12，
+    /// 与暗档同一个抬升量，也仍在 `testHighlightIsFarEnoughAboveTheBaseToBeSeen` 的 0.35 天花板之下。
+    static let lightHighlightOpacity: Double = 0.26
+
+    /// 这一档该用多少墨。**唯一一处**读"是亮档还是暗档"的地方 —— 视图里只调它，
+    /// 于是"两档各一套"这件事有一个可以问"是不是恒真"的谓词（`SkeletonMotionTests` 的真值表）。
+    static func inkOpacities(dark: Bool) -> (base: Double, highlight: Double) {
+        dark ? (baseOpacity, highlightOpacity)
+             : (lightBaseOpacity, lightHighlightOpacity)
+    }
+
     /// 亮带的两个端点。`phase` 只影响**位置**，不影响形状 ——
     /// 形状（三个 stop）是固定的，这也是为什么 Timer 每拍只需要改一个数。
     ///
@@ -128,6 +149,12 @@ enum SkeletonMotion {
 struct SkeletonPreviewView: View {
     /// 注入点：默认跟随全源门（系统开关 + VoiceOver）。
     var reduceMotion: Bool = MotionCatalog.motionShouldBeReduced
+
+    /// 这一档是亮还是暗。**为什么由视图问系统而不是由调用方传进来**：
+    /// 骨架的宿主有三处（详情预览、组合帧夹具、以及以后可能有的占位），
+    /// 让每个宿主各传一个 `isDark` 就会有一处传错，而"传错"在画面上只是"亮档那条带看不见"——
+    /// 正是 R215 量出来、已经存在过一次的那个缺陷。系统这一路只有一个真相源。
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var phase: CGFloat = 0
 
@@ -170,8 +197,15 @@ struct SkeletonPreviewView: View {
             startPoint: points.start, endPoint: points.end)
     }
 
-    private var base: Color { Color.primary.opacity(SkeletonMotion.baseOpacity) }
-    private var highlight: Color { Color.primary.opacity(SkeletonMotion.highlightOpacity) }
+    /// 两档各一套墨（R219 / BACKLOG 242）。为什么不能共用一个 opacity：见 `inkOpacities(dark:)` 的注释 ——
+    /// 同一支 6/100 的墨在 248 的底上只给 Δ6（对比度 1.05），在 28 的底上给 Δ13（1.17），
+    /// 于是"亮档几乎看不见条带"是**乘法**的必然，不是谁没画。
+    private var ink: (base: Double, highlight: Double) {
+        SkeletonMotion.inkOpacities(dark: colorScheme == .dark)
+    }
+
+    private var base: Color { Color.primary.opacity(ink.base) }
+    private var highlight: Color { Color.primary.opacity(ink.highlight) }
 }
 
 /// 三根条带的**轮廓**：一个 `Shape`，里面三个 `VisualShape.rounded(.chip)`。

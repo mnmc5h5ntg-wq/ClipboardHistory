@@ -98,6 +98,53 @@ final class SkeletonMotionTests: XCTestCase {
         XCTAssertGreaterThan(SkeletonMotion.baseOpacity, 0)
     }
 
+    /// 两档各一套墨的**真值表**（R219 / BACKLOG 242）。
+    ///
+    /// 这条要拦的坏法有两种，它们不是同一件事：
+    /// ① 把亮档接回 0.06 ⇒ 亮档条带对比度退回实测的 **1.05**（近乎看不见，就是 242 开单的那个缺陷）；
+    /// ② 只抬亮档的 base 不抬 highlight ⇒ 抬升预算掉到 `minimumHighlightLift` 以下，
+    ///    扫光退回 R214 注释里那个峰值 0.0000。所以**两档各自都要过 lift 下界**，不能只验暗档。
+    func testInkOpacitiesArePerAppearanceAndKeepTheLift() {
+        for dark in [true, false] {
+            let ink = SkeletonMotion.inkOpacities(dark: dark)
+            let tag = dark ? "暗" : "亮"
+            XCTAssertGreaterThan(ink.base, 0, "\(tag)档的底色墨是 0 ⇒ 条带根本不画")
+            XCTAssertGreaterThan(ink.highlight, ink.base,
+                                 "\(tag)档亮带不比底色亮 ⇒ 这一档没有扫光，只有三根灰条")
+            XCTAssertGreaterThanOrEqual(ink.highlight - ink.base, SkeletonMotion.minimumHighlightLift,
+                                        "\(tag)档抬升只有 \(ink.highlight - ink.base)：像素上等于没动（R214 的 0.0000）")
+            XCTAssertLessThanOrEqual(ink.highlight, 0.35,
+                                     "\(tag)档亮带到 \(ink.highlight)：再亮就成三条白杠，抢的是正文")
+        }
+        let dark = SkeletonMotion.inkOpacities(dark: true)
+        let light = SkeletonMotion.inkOpacities(dark: false)
+        // 不对称的方向要钉住：亮档需要**更多**墨（同一个 α 在 248 的底上给的绝对差值更小）。
+        XCTAssertGreaterThan(light.base, dark.base,
+            "亮档底色墨 \(light.base) 不深于暗档 \(dark.base) ⇒ 乘法的不对称没被补掉，242 的缺陷照旧")
+        // 暗档那两个数必须仍是原令牌：这一格防的是"顺手把暗档也抬了"——
+        // 暗档实测 1.17 已经在可辨之上，再抬就往"有分量的灰块"走（目标里的 不喧宾夺主 红线）。
+        XCTAssertEqual(dark.base, SkeletonMotion.baseOpacity, accuracy: 1e-12,
+                       "暗档底色墨被换掉了 ⇒ 这一轮的靶只有亮档，暗档动了要单独判")
+        XCTAssertEqual(dark.highlight, SkeletonMotion.highlightOpacity, accuracy: 1e-12,
+                       "暗档亮带被换掉了 ⇒ 同上")
+    }
+
+    /// 接线守卫（D-055 那一族）：**按档取墨这件事必须真的被视图调用**。
+    ///
+    /// 值全对而没人调用，等于这一轮的 0.14 只是台账里的一个数。
+    /// 这条同时钉住反方向：视图里不许再出现"直接吃档盲常量"的那种写法。
+    func testSkeletonViewReadsItsInkPerAppearance() throws {
+        let shimmer = codeOnly(try productSource(named: "Views/SkeletonShimmer.swift"))
+        XCTAssertTrue(shimmer.contains("SkeletonMotion.inkOpacities(dark:"),
+                      "视图没在按档取墨 ⇒ 那两个亮档令牌是死值，242 没修")
+        XCTAssertTrue(shimmer.contains("@Environment(\\.colorScheme)"),
+                      "视图没有颜色档的来源 ⇒ 那个 dark 参数只能被写死")
+        XCTAssertFalse(shimmer.contains("Color.primary.opacity(SkeletonMotion.baseOpacity)"),
+                       "视图还在直接吃档盲的底色常量 ⇒ 亮档那一条永远不会生效")
+        XCTAssertFalse(shimmer.contains("Color.primary.opacity(SkeletonMotion.highlightOpacity)"),
+                       "视图还在直接吃档盲的亮带常量 ⇒ 同上")
+    }
+
     // MARK: - 接线守卫
 
     /// 接线守卫（D-055 / MC-12 的教训：纯值全对，也可能没人调用）。
