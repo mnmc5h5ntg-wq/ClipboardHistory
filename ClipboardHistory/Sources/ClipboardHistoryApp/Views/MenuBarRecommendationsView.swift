@@ -5,6 +5,27 @@ struct MenuBarRecommendationsView: View {
     @ObservedObject var historyStore: HistoryStore
     let appDelegate: AppDelegate
 
+    // MARK: R236（BACKLOG 264）—— 「都不是我想要的」那一行的墨，只有这一条缝
+
+    /// `nil` = 交回系统。这是 D-220 那一条决定的落点：写死的墨在静置与选中两种底上都读不过自家正文参照
+    /// （实测那颗蓝 3.52 / 5.16 on 静置底、2.36 / 1.93 on 选中底代理，同棵菜单正文参照 21.00 / 16.67）。
+    /// 做成**可读的值**而不是就地修饰符，是为了让「有人把那颗蓝钉回来」在未渲染的情况下也能被抓住：
+    /// 行为轴读这个值（`MenuBarSwiftUIDismissRowInkTests.testSeamInkClearsTheTextFloorInBothStates`），
+    /// 结构轴要求这一行的标签只能经由 `dismissRowLabel()` 出来、且函数体内只有一处走缝的着色
+    /// （`testDismissRowLabelRoutesThroughTheSeam`，它的正对照就是变异刀 M787）。
+    static var dismissRowInk: Color? { nil }
+
+    @ViewBuilder
+    static func dismissRowLabel() -> some View {
+        let titled = Text("都不是我想要的")
+            .font(.system(size: VisualFont.meta))
+        if let ink = dismissRowInk {
+            titled.foregroundStyle(ink)
+        } else {
+            titled
+        }
+    }
+
 
     var body: some View {
         Group {
@@ -73,10 +94,12 @@ struct MenuBarRecommendationsView: View {
                 Button {
                     historyStore.perform(.dismissAllRecommendations)
                 } label: {
-                    Text("都不是我想要的")
-                        .font(.system(size: VisualFont.meta))
-                    // R235（D-220）：不在这里钉颜色，与 `MenuBarController` 那棵 12 的树同一条决定
-                    // —— 写死的墨在静置与选中两种底上都读不过自家正文参照（实测见那条）。
+                    // R236（BACKLOG 264）：这一行的文案与墨**只走 `Self.dismissRowLabel()` 这一条缝**。
+                    // 以前这里是一行裸 `Text(...)`，于是「把那颗蓝钉回来」在产品源码里改了也没有任何
+                    // 会红的判据抓得到（只有帧基线在管，而帧基线判不了墨的身份 —— 变异对照 M787=ESCAPED）。
+                    // 缝把决定权收成一个可读的值（`dismissRowInk`），判据就能同时问两句：
+                    // 缝给的是哪颗墨（行为轴），以及这一行有没有绕过缝自己钉色（结构轴）。
+                    Self.dismissRowLabel()
                 }
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
