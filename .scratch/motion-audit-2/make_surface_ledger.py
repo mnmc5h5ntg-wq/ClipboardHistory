@@ -279,7 +279,7 @@ rows = [
     ("主窗口/搜索框", "聚焦", "kept",
      "焦点环是系统画的那一圈，被显式恢复过（审计第二轮 1.10 实测它被关掉）；跟着焦点一起变的是"
      "放大镜图标那一档灰度 —— 不聚焦时它是次要色，聚焦后抬到主色，这一档不给动画",
-     "Sources/ClipboardHistoryApp/Views/ChineseTextContextMenu.swift 的 `focusRingType = .default`；Views/SearchField.swift 的 `isActive`"),
+     "Sources/ClipboardHistoryApp/Views/ChineseTextContextMenu.swift 的 `focusRingType = .default`；Sources/ClipboardHistoryApp/Views/SearchField.swift 的 `isActive`"),
     ("设置窗口/开关与滑块", "悬停", "not-added",
      "勾选框与滑块是系统控件，自己画悬停档；SwiftUI 侧再叠一层会和它打架 —— "
      "R20 在圆形图标按钮上抓到过这种叠层（两层 hover 底色叠出第三档），当时的修法就是把悬停交给画它的那一处",
@@ -371,7 +371,7 @@ rows = [
     ("设置窗口/快捷键录制器", "选中", "not-applicable",
      "这颗按钮没有可延续的『选中』语义：按下即进入录制态，而录制态是一圈强调色描边 + 标题改成『按下新组合键』"
      "（那一格已判为 added）。再给『选中』画一层会出现『既在录制又被选中』两个当前",
-     "docs/motion_surface_ledger.json 的「设置窗口/快捷键录制器 × 按下」；`HotKeyRecorderView.swift` 的录制态标题"),
+     "docs/motion_surface_ledger.json 的「设置窗口/快捷键录制器 × 按下」；Sources/ClipboardHistoryApp/Views/HotKeyRecorderView.swift 的录制态标题"),
     # R164（第 166 轮）一批：快捷键录制器与浮层剩余状态逐格判完。
     # 每条"不加"都绑本轮实测的缺席计数或那一行代码，不是印象（判为不做要能在源码里被证伪）。
     ("设置窗口/快捷键录制器", "加载", "not-applicable",
@@ -439,7 +439,7 @@ rows = [
     ("设置窗口/热图", "成功", "not-applicable",
      "没有动作就没有「成功」回执。这一屏唯一的反馈是 hover 那一格（描边 + 日期与条数的 tooltip），"
      "它已经把「你指到的是哪天」说完；再加一层成功态就是把统计读出当成按钮",
-     "docs/motion_surface_ledger.json 的「设置窗口/热图 × 悬停」；`DailyCopyHeatmapView.swift` 的 `.helpLabel`"),
+     "docs/motion_surface_ledger.json 的「设置窗口/热图 × 悬停」；Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift 的 `.helpLabel`"),
     ("设置窗口/热图", "禁用", "not-applicable",
      "没有可禁用的东西（`disabled` 实测 0 处、`selection` 0 处）。零记录那一屏是「空」不是「禁用」，"
      "已由「热图 × 空」那格承担（那是一句成句的话，不是一张空日历）",
@@ -450,7 +450,7 @@ rows = [
      "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=withAnimation,transition"),
     ("菜单栏/状态图标", "成功", "not-applicable",
      "复制成功的回执不在这颗图标上：走主窗口提示条与菜单项文案。让状态栏图标闪一下是把系统区域当通知中心用",
-     "docs/motion_surface_ledger.json 的「主窗口/提示条 × 成功」；`MenuBarController.swift` 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=withAnimation"),
+     "docs/motion_surface_ledger.json 的「主窗口/提示条 × 成功」；Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 缺席:Sources/ClipboardHistoryApp/Managers/MenuBarController.swift=withAnimation"),
     ("菜单栏/状态图标", "禁用", "not-applicable",
      "图标没有「禁用」这条分支（`disabled` 实测 0 处）：它要么在，要么整个 App 不在。"
      "灰掉一颗只能点开菜单的图标，等于做一个点不动的目标（R39 那一族）",
@@ -469,7 +469,7 @@ rows = [
     ("菜单栏/状态菜单", "选中", "not-applicable",
      "菜单项没有「选中」语义：只有常态与系统画的悬停高亮。给菜单项加选中态会造出两个当前"
      "（与「状态图标 × 选中」同一族，那格已判）",
-     "docs/motion_surface_ledger.json 的「菜单栏/状态图标 × 选中」；`MenuBarController.swift` 的 NSMenuItem 用法"),
+     "docs/motion_surface_ledger.json 的「菜单栏/状态图标 × 选中」；Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 NSMenuItem 用法"),
     ("菜单栏/状态菜单", "聚焦", "not-applicable",
      "键盘在 NSMenu 里走系统的高亮与方向键，不经过 SwiftUI 的焦点环；这层没有任何 focus 代码"
      "（`onHover` / `animation` 实测 0 处）",
@@ -477,7 +477,7 @@ rows = [
     ("菜单栏/推荐面板", "按下", "not-applicable",
      "与「状态菜单 × 按下」同一个机制：`MenuBarExtraStyle.menu` 编译成真 NSMenu，"
      "SwiftUI 的按压样式与过渡在那一层不执行；叠一层自绘底会把 U-1 拆掉的卡片感装回来",
-     "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 悬停」；`MenuBarRecommendationsView.swift` 的 `.buttonStyle(.plain)` 注释"),
+     "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 悬停」；Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift 的 `.buttonStyle(.plain)` 注释"),
     ("菜单栏/推荐面板", "选中", "not-applicable",
      "推荐项被点就是「复制并关闭」，没有停留的选中态；再画一层选中会把一次动作说成一个状态",
      "docs/motion_surface_ledger.json 的「菜单栏/推荐面板 × 成功」；账本 U-1"),
@@ -485,7 +485,7 @@ rows = [
      "R181 看图 + 读源码：列表为空时**没有行**这一层可言 —— 空态由 EmptyStateView 承载"
      "（左栏那句「暂无剪贴板历史」+ 右栏「选择一条记录查看详情」，帧 content-empty-750x560 两档都读得通），"
      "给一个不存在的行做空态等于把空态画两遍",
-     "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=EmptyStateView｜Sources/ClipboardHistoryApp/Views/EmptyStateView.swift｜帧 content-empty-750x560-dark.png"),
+     "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=EmptyStateView｜Sources/ClipboardHistoryApp/Views/EmptyStateView.swift｜Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 Fixture(「content-empty」, 750×560)"),
     ("主窗口/列表行", "错误", "not-applicable",
      "行不承载错误：写盘 / 粘贴失败走 NoticeBanner（ContentView 四处调用，tone .warning / .error），"
      "而行文件里 failure / errorText 各 0 命中 ⇒ 这一格无所附；错误态已按提示条那一表面逐格判过",
@@ -498,7 +498,45 @@ rows = [
     ("主窗口/列表行", "禁用", "not-applicable",
      "行没有可禁用态：整份行文件里 disabled / isEnabled / allowsHitTesting 各 0 命中（R181 grep 实测）；"
      "行内会被禁用的只有收藏与图钉那两颗控件，它们已按自己的表面逐格判过",
-     "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=disabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=isEnabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=allowsHitTesting")]
+     "缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=disabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=isEnabled｜缺席:ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift=allowsHitTesting"),
+    # ===== R203 批次（拖入落点 6 格 + 提示条 4 格；看图腿：notice-banner-560x170 两条横幅的动作位都垂直居中）=====
+    ("主窗口/拖入落点", "空", "kept",
+     "落点那一圈挂在 List 本体上而不是挂在行上：空列表时同一圈虚线框照样出现（空态只是列表里的内容），所以不需要为它另加一句话。"
+     "口径如实分开写：这一格是读码 + 结构得到的，本轮没有「空列表 + 正在拖入」的帧，像素未验。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 `.overlay { if isDropTargeted ... }`（挂在 List 之后）"),
+    ("主窗口/拖入落点", "加载", "not-applicable",
+     "落点没有加载态：`loadItem` 是异步的，但那段时间描边已经在位；再叠一层进度会把「松手就在这里」这一句稀释成两句。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 acceptDroppedFileProviders / fileURLs(withCheckedContinuation)"),
+    ("主窗口/拖入落点", "错误", "not-added",
+     "类型不符时 `guard !wanted.isEmpty else { return false }` ⇒ 由系统画禁投光标，应用内不补话。"
+     "这一格与批次 D-4 修的那个洞只隔一步：D-4 补的是「接住了但什么都没发生」，而「根本没接住」今天只有光标。"
+     "翻面条件写在 BACKLOG 224：若分辨实验表明确实区分不了，就要就地补一句回执。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 acceptDroppedFileProviders；BACKLOG 224"),
+    ("主窗口/拖入落点", "成功", "kept",
+     "入库成功的回执就是「新行出现在列表里」本身：`_ = historyStore?.addDroppedFiles(urls:)` 刻意丢弃返回值，"
+     "不再叠一条横幅 —— 刚松手的那一瞬间注意力在指针上，横幅会跟它争。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 acceptDroppedFileProviders 里那行 `_ = historyStore?.addDroppedFiles`"),
+    ("主窗口/拖入落点", "选中", "not-applicable",
+     "落点是整块面板描边（圆角 strokeBorder + 虚线），与「哪一行被选中」不是同一根轴，两者不互斥也不互相覆盖。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift 的 VisualShape.rounded(VisualRadius.panel).strokeBorder"),
+    ("主窗口/拖入落点", "禁用", "not-added",
+     "暂停采集不禁拖入：拖入是用户显式动作，把落点灰掉会让「我正在放文件」这件事没有解释；"
+     "该停的是自动轮询，那一半在采集侧已经有自己的开关语言。",
+     "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift（该文件内 paused 0 命中，即落点与暂停开关无耦合）"),
+    ("主窗口/提示条", "空", "not-applicable",
+     "横幅只在有话说时存在：`message` 是非空 String 入参，没有「空横幅」这个状态；空态那一格归 EmptyStateView。",
+     "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift 的 struct NoticeBanner 入参 message: String"),
+    ("主窗口/提示条", "加载", "not-applicable",
+     "NoticeTone 只有 warning / error 两例，没有进度语义；加载由骨架屏那条通道承担，不在横幅里画转圈。",
+     "Sources/ClipboardHistoryApp/Views/NoticeBanner.swift 的 enum NoticeTone；Sources/ClipboardHistoryApp/Views/SkeletonShimmer.swift"),
+    ("主窗口/提示条", "悬停", "not-added",
+     "横幅本体不可点，能点的只有动作位；悬停那一格归 StateLine 的按钮，在横幅这层再画一遍就是两层反馈打架。",
+     "Sources/ClipboardHistoryApp/Utilities/StatePresentation.swift 的 struct StateLine（action 路径今天只有 NoticeBanner 在用）"),
+    ("主窗口/提示条", "按下", "kept",
+     "动作位走 StateLine 的按钮，按下态由 PressableStyle 统一；R25 那一改把按钮从「跟第一行基线」换成「相对整组垂直居中」，"
+     "本轮看 notice-banner-560x170 两张帧复核：单行与三行那两条横幅的动作按钮都在色带中心（当年量出的偏差是两行 7.5pt、三行 14.5pt）。",
+     "Sources/ClipboardHistoryApp/Utilities/StatePresentation.swift 的 StateLine body 注释（R25 / U-47 / D-084）；Tests/ClipboardHistoryAppTests/UICaptureHarness.swift 的 Fixture(「notice-banner」, 560×170)（帧只在本机 /tmp，未入库）"),
+]
 
 
 data = {

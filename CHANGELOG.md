@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表补 10 格（拖入落点 6 + 提示条 4），顺手修掉指针名册看不见的那一类（R203 非轮次笔 · 判据 2 文件 + 表 1 份，产品 0 文件）
+
+- `docs/motion_surface_ledger.json` 115→125 行：未清账 47→37，地板同笔抬到 125（`MOTION_LEDGER_RESULT=ok 不合法格=0`）
+- 拖入落点：空 kept（描边挂在 List 本体上，空列表同一圈虚线照旧）／加载 not-applicable／错误 **not-added**（类型不符由系统画禁投光标，应用内不补话 ⇒ 转 BACKLOG 224 的分辨实验）／成功 kept（回执就是"新行出现"，`_ = historyStore?.addDroppedFiles` 刻意丢返回值）／选中 not-applicable／禁用 not-added（暂停采集不禁拖入，`paused` 在该文件 0 命中）
+- 提示条：空 not-applicable（`message: String` 非空入参，没有空横幅）／加载 not-applicable（`NoticeTone` 只有 warning/error，进度归骨架屏那条通道）／悬停 not-added（横幅本体不可点，动作位已按 StateLine 的按钮判过）／按下 kept
+- 看图腿沿用 `/tmp/shots_r197` 的 `notice-banner-560x170-{dark,light}` 两帧（产品 0 文件 ⇒ 帧未动）：单行与三行两条横幅的动作按钮都在色带中心，与 R25 量出的 0 / 7.5 / 14.5pt 一致
+- `scripts/motion_surface_gate.py` 补**指针的第三种坏法**：`PATH_RE` 只认以 `Sources/Tests/docs/scripts/` 开头的形状，于是真表里 7 行「只写文件名」（`MenuBarController.swift`）或「少写包根」（`Views/SearchField.swift`）的指针**从来没被检查过** —— 闸门绿着而读者点不开。新增 `PATH_RE_LAX` 与 `EVIDENCE_PATH_PARTIAL` / `EVIDENCE_PATH_AMBIGUOUS`（按文件名建索引，索引排除点开头目录与 `__pycache__`，否则 `.pytest_cache/README.md` 会让 `README.md` 变歧义）；先把那 7 行改成整路径，再让尺子有牙
+- `scripts/tests/test_motion_surface_gate.py` 24→30 格：松散指针该红、整路径不许红（正对照，否则这条判据是恒红的门、会把人推去删指针）、找不到文件仍是 MISSING 而不是 PARTIAL、歧义独立编号、新 lax 尺在真表上有对象且点不开的指针为 0
+- 验证：产品 0 文件（帧与换装沿用上一遍）、全量脚本电池与 `swift test` 见 commit 输出
+
 ### 222 机制定性：那 6…21/255 是落盘的色彩标注造成的（R202 · 判据 1 文件加一行 print，产品 0 文件）
 
 - 新 print `HEAT_INK_SPACE`：判据的 rep 与取色都是**设备 RGB**，而 PNG 声明 sRGB、alpha 全 255 ⇒ 三条口径其实互不相同

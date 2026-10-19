@@ -262,5 +262,59 @@ class FloorBaselineTests(unittest.TestCase):
                              % (value, committed["floor_cleared"]))
 
 
+class LoosePointerTests(unittest.TestCase):
+    """R203：指针「存在但点不开」是第三种坏法，原来那条 PATH_RE 完全看不见它。
+
+    为什么单独一类：R131 那四条只认 `Sources/…` 这种开头，于是真表里有 7 行写的是
+    `MenuBarController.swift`（只给文件名）或 `Views/SearchField.swift`（少写包根），
+    闸门一路绿灯，而按图去找的人什么也打不开 —— 形状合法 ≠ 指得到东西。
+    """
+
+    def test_a_basename_only_pointer_is_named(self):
+        data = base()
+        data["rows"][0]["evidence"] = "MenuBarController.swift 的 NSMenuItem 用法"
+        self.assertIn("EVIDENCE_PATH_PARTIAL", codes(gate.check(data)))
+
+    def test_a_path_missing_the_package_prefix_is_named(self):
+        data = base()
+        data["rows"][0]["evidence"] = "Views/SearchField.swift 的 `isActive`"
+        self.assertIn("EVIDENCE_PATH_PARTIAL", codes(gate.check(data)))
+
+    def test_the_same_pointer_written_as_a_whole_path_stays_green(self):
+        """正对照：同一件事、写成整路径 ⇒ 不许红（否则这条判据是恒红的门，会把人推去删指针）。"""
+        data = base()
+        data["rows"][0]["evidence"] = ("Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 NSMenuItem 用法；"
+                                       "Sources/ClipboardHistoryApp/Views/SearchField.swift 的 `isActive`")
+        self.assertEqual([], codes(gate.check(data)))
+
+    def test_a_name_that_cannot_be_found_anywhere_is_still_missing(self):
+        """分得开「写得松」与「根本没这文件」，后者不能被 PARTIAL 洗白。"""
+        data = base()
+        data["rows"][0]["evidence"] = "ThisFileHasNeverExistsAnywhere.swift"
+        found = codes(gate.check(data))
+        self.assertIn("EVIDENCE_PATH_MISSING", found)
+        self.assertNotIn("EVIDENCE_PATH_PARTIAL", found)
+
+    def test_an_ambiguous_basename_is_its_own_name(self):
+        """同名两个文件时不许猜一个：给独立编号，否则「按文件名对上」会变成随机通过。"""
+        import tempfile
+        root = tempfile.mkdtemp(prefix="gate-amb-")
+        gate._index_cache[(root, tuple(gate.INDEX_DIRS))] = {"Foo.swift": {"a/Foo.swift", "b/Foo.swift"}}
+        code, msg = gate.path_problem("Foo.swift", root)
+        self.assertEqual("EVIDENCE_PATH_AMBIGUOUS", code)
+        self.assertIn("a/Foo.swift", msg)
+
+    def test_the_lax_rule_has_objects_on_the_real_table(self):
+        """新尺在真表上必须真的扫到东西：否则上面五格只在合成样本上成立（R36 那一族）。"""
+        data = json.load(io.open(str(LEDGER), encoding="utf-8"))
+        matched = sum(1 for row in data["rows"] if gate.PATH_RE_LAX.findall(row.get("evidence") or ""))
+        self.assertGreaterEqual(matched, 40,
+                                "真表里只有 %d 行带路径形状的指针 ⇒ lax 判据没在判东西" % matched)
+        loose = sum(1 for row in data["rows"]
+                    for p in gate.PATH_RE_LAX.findall(row.get("evidence") or "")
+                    if gate.resolve(p) is None)
+        self.assertEqual(0, loose, "已提交的表上还有 %d 条点不开的指针" % loose)
+
+
 if __name__ == "__main__":
     unittest.main()

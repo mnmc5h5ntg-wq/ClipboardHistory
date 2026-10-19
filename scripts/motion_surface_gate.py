@@ -66,10 +66,40 @@ def evidence_is_checkable(text):
 # 缺席写法：`缺席:<路径>=<词>`，一条 evidence 里可以写多条（用 ｜ 或 ；分开）。
 PATH_RE = re.compile(r"(?:Sources|Tests|scripts|docs|Managers)/[\w/\-.]*\.(?:swift|py|md|json)")
 ABSENT_RE = re.compile(r"缺席:([\w/\-.]*\.(?:swift|py|md|json))=([^；|｜\s]+)")
+# R203 补的第三种坏法（U-644…U-646 那批的读数）：PATH_RE 只认「以 Sources/Tests/… 开头」的形状，
+# 于是 `Views/SearchField.swift`（少写前缀）和 `MenuBarController.swift`（只写文件名）这两类指针
+# **从来没有被检查过** —— 闸门绿着，而读者点不开。 lax 那条把两类都收进来，
+# 解析方式不同：能按整条路径解析 = 过；只能按文件名解析 = PARTIAL（要改写成可点击的整路径）；
+# 文件名也找不到 = MISSING（假证人）。
+PATH_RE_LAX = re.compile(r"[\w/\-.]*\.(?:swift|py|md|json)")
+INDEX_DIRS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "docs")
+_index_cache = {}
 
 
 def repo_root():
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def basename_index(root=None):
+    """按 (root, 目录集) 建一次「文件名 -> 相对路径」的索引。
+
+    为什么按文件名而不是整路径：松散指针（`Foo.swift`）本来就少了前缀，
+    只有按文件名才判得出「这文件真有、但你写的路径点不开」与「根本没这文件」的区别。
+    """
+    root = root or repo_root()
+    key = (root, tuple(INDEX_DIRS))
+    if key not in _index_cache:
+        idx = {}
+        for rel_dir in INDEX_DIRS:
+            top = os.path.join(root, rel_dir)
+            for dirpath, dirnames, filenames in os.walk(top):
+                dirnames[:] = [d for d in dirnames if not d.startswith(".") and d != "__pycache__"]
+                for name in filenames:
+                    if not name.endswith((".swift", ".py", ".md", ".json")):
+                        continue
+                    idx.setdefault(name, set()).add(os.path.relpath(os.path.join(dirpath, name), root))
+        _index_cache[key] = idx
+    return _index_cache[key]
 
 
 def resolve(path, root=None):
@@ -87,15 +117,32 @@ def resolve(path, root=None):
     return None
 
 
+def path_problem(path, root=None):
+    """一条路径指针的三种结局：过 / 松散（存在但点不开）/ 不存在。"""
+    root = root or repo_root()
+    if resolve(path, root) is not None:
+        return None
+    hits = sorted(basename_index(root).get(os.path.basename(path), ()))
+    if not hits:
+        return ("EVIDENCE_PATH_MISSING",
+                "指针指向的文件不存在（%s）—— 路径写错、文件改名、或者根本没这回事" % path)
+    if len(hits) > 1:
+        return ("EVIDENCE_PATH_AMBIGUOUS",
+                "%s 按文件名能对上 %d 个文件（%s）⇒ 指针必须写成整路径，别让读者猜"
+                % (path, len(hits), u"、".join(hits)))
+    return ("EVIDENCE_PATH_PARTIAL",
+            "%s 这个文件在（%s），但指针写的形状点不开 ⇒ 改成从包根算起的整路径"
+            % (path, hits[0]))
+
+
 def evidence_problems(row, where, root=None):
-    """返回这一格指针上的两类新问题：路径不存在、缺席断言其实不成立。"""
+    """返回这一格指针上的三类新问题：路径不存在、路径写得点不开、缺席断言其实不成立。"""
     out = []
     evidence = (row.get("evidence") or "")
-    for path in PATH_RE.findall(evidence):
-        if resolve(path, root) is None:
-            out.append(("EVIDENCE_PATH_MISSING",
-                        "%s：指针指向的文件不存在（%s）—— 路径写错、文件改名、或者根本没这回事"
-                        % (where, path)))
+    for path in sorted(set(PATH_RE_LAX.findall(evidence))):
+        got = path_problem(path, root)
+        if got is not None:
+            out.append((got[0], "%s：%s" % (where, got[1])))
     for path, token in ABSENT_RE.findall(evidence):
         found = resolve(path, root)
         if found is None:
