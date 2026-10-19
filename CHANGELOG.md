@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 骨架条带对比度进仓库（245 结案）+ 237 结案 + 235 的坏消息（R220 / U-710…U-712 · 判据 1 文件 + 表面账，产品 0 文件）
+
+- 新谓词 `UICaptureTests.skeletonBarContrast` + 两条判据：两档各一条下界（暗 1.1、亮 **1.2**），
+  以及"已知答案对照"（合成 255/225 ⇒ 必须读回 225 与 ≈1.31；整幅同色 ⇒ 必须报 `barRows=0`）。
+  本轮读数：亮档 **1.30**、暗档 **1.15**（条带行数 48）。亮档那条下界在 R219 之前会红（实测 1.12）。
+- 刀：`R220_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0`。M755（亮档墨退回 0.06）⇒ 尺读 1.10 < 1.2 红、
+  **真值表照样绿** ⇒ 立 **D-212**：值判据替代不了像素判据。M756（尺的底改成最小值）⇒ 对照红；第一版 NOT_RUN 是 needle 前缀子串。
+- CI：run `39267039118` 打 `PILLOW_OK 13.0.0 /private/tmp/pilenv/bin/python` ⇒ **237 结案**；同跑 `LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`
+  ⇒ 235 的第二半答了：尺在 runner 上仍无对象，成因由"没库"换成"帧没墨"（201 那一族）⇒ 开 246。
+- 表面账：`主窗口/详情区 × 加载` 本来就是 `added`（R219 收尾那句担心是没读过的假设）；走生成器补 reason/evidence，
+  `MOTION_LEDGER_RESULT=ok`、`FLOOR head=162 now=162`、verdict 未翻。
+- 验证：构建告警 0；捕获卷 75 格 0 红（新增两格）；帧基线 `COMPARED=142 CHANGED=0`；
+  预检 `tables=62 covered=47 arms=176 bad=4`；产品 0 文件 ⇒ 未换装本机。
+
 ### 亮档骨架墨按档给（BACKLOG 242 结案）：暗档不动、亮档 1.12 → 1.31（R219 / U-707…U-709 · 产品 1 文件，判据 1 文件）
 
 - `SkeletonMotion.inkOpacities(dark:)`：暗档仍是 0.06 / 0.18（未动），亮档给 **0.14 / 0.26**（lift 两档同 0.12）。

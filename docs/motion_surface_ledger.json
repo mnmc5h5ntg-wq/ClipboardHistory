@@ -87,7 +87,7 @@
       "surface": "主窗口/详情区",
       "state": "加载",
       "verdict": "added",
-      "reason": "spinner 说「我在等」，骨架说「内容马上来」；扫光是全仓唯一常驻时钟，30Hz、只在 `.loading` 分支存在、8s 上界",
+      "reason": "spinner 说「我在等」，骨架说「内容马上来」；扫光是全仓唯一常驻时钟，30Hz、只在 `.loading` 分支存在、8s 上界；亮档的墨按档给（R219 / BACKLOG 242：暗档 0.06/0.18 未动、亮档 0.14/0.26，两档 lift 同 0.12 —— 同一个 opacity 在两个底上给的绝对差值差一个量级）",
       "evidence": "Sources/ClipboardHistoryApp/Views/SkeletonShimmer.swift；BACKLOG 38；R84/R85"
     },
     {

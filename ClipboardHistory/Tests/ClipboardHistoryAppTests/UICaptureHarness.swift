@@ -10947,6 +10947,129 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// 条带 ↔ **它自己的底**（R220 / BACKLOG 245）。
+    ///
+    /// 为什么这颗尺必须住在仓库里：R219 抬亮档墨的整个决定，靠的是一把 `/tmp` 手搓尺，
+    /// 而那把尺在组合帧上把"面板与窗口的接缝"读成了条带（条带行数 168 vs 组件帧 48）——
+    /// R99/R100 记过的老毛病又犯了一次。判断要能被复查，尺就得进仓库，还要**自带已知答案的对照**。
+    ///
+    /// 谓词与 `skeletonAxisReadings` **同源**（同一颗尺，R68 的规矩：证人要与它作证的判据同尺）：
+    /// 底 = 全幅亮度众数（4 级量化）；条带行 = `strong < 8 && weak > width/8`
+    /// （Δ>6 且 ≤40 算弱墨、Δ>40 算强墨）；条带色 = **只在那些行里**取弱墨的众数（2 级量化）。
+    /// 最后那一句是本尺与 R219 那把手搓尺的唯一差别，也是它唯一的错处：
+    /// 全幅取众数会把别的表面的接缝算成墨。
+    /// `barRows == 0` 表示**没有对象** —— 调用方必须当成"量不到"，不许当成"没问题"。
+    static func skeletonBarContrast(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                                    bytesPerRow: Int)
+        -> (ratio: Double, barRows: Int, barLuma: Int, background: Int) {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return (Int(bytes[o]) * 299 + Int(bytes[o + 1]) * 587 + Int(bytes[o + 2]) * 114) / 1000
+        }
+        var histogram: [Int: Int] = [:]
+        for y in stride(from: 0, to: height, by: 4) {
+            for x in stride(from: 0, to: width, by: 4) { histogram[luma(x, y) / 4, default: 0] += 1 }
+        }
+        let background = (histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+        var barRows: [Int] = []
+        for y in 0..<height {
+            var weak = 0, strong = 0
+            for x in 0..<width {
+                let delta = abs(luma(x, y) - background)
+                if delta > 40 { strong += 1 } else if delta > 6 { weak += 1 }
+            }
+            if strong < 8 && weak > width / 8 { barRows.append(y) }
+        }
+        guard !barRows.isEmpty else { return (1.0, 0, background, background) }
+        var ink: [Int: Int] = [:]
+        for y in barRows {
+            for x in 0..<width {
+                let delta = abs(luma(x, y) - background)
+                if delta > 6 && delta <= 40 { ink[luma(x, y) / 2, default: 0] += 1 }
+            }
+        }
+        guard let top = ink.max(by: { $0.value < $1.value }) else {
+            return (1.0, barRows.count, background, background)
+        }
+        return (Self.contrastRatio(top.key * 2 + 1, background), barRows.count, top.key * 2 + 1, background)
+    }
+
+    /// 这把尺的**已知答案对照**（正对照 + 反对照各一格）。
+    ///
+    /// 没有这一格，"条带对比度 1.31"就只是尺自己说的话；合成图的正确答案由我摆上去的数决定，
+    /// 尺必须能把它读回来。反对照钉的是另一头：整幅同色时**不许**报出一个像结论的数。
+    func testSkeletonBarContrastRulerKnowsItsOwnAnswers() throws {
+        let w = 400, h = 200
+        var known = [UInt8](repeating: 0, count: w * h * 4)
+        for y in 0..<h {
+            let isBar = (60..<140).contains(y)
+            let v: UInt8 = isBar ? 225 : 255
+            for x in 0..<w {
+                let o = (y * w + x) * 4
+                known[o] = v; known[o + 1] = v; known[o + 2] = v; known[o + 3] = 255
+            }
+        }
+        known.withUnsafeBufferPointer { buf in
+            let got = Self.skeletonBarContrast(bytes: buf.baseAddress!, width: w, height: h,
+                                               bytesPerRow: w * 4)
+            XCTAssertEqual(got.background, 255, accuracy: 6, "正对照：底没读对（\(got.background)）")
+            XCTAssertEqual(got.barLuma, 225, accuracy: 6, "正对照：条带色没读对（\(got.barLuma)）")
+            XCTAssertEqual(got.ratio, 1.31, accuracy: 0.05,
+                           "正对照：底 255 / 条带 225 必须是 ≈1.31（实得 \(got.ratio)）")
+            XCTAssertGreaterThanOrEqual(got.barRows, 60, "正对照：条带行数少了 ⇒ 谓词在漏")
+        }
+        var flat = [UInt8](repeating: 0, count: w * h * 4)
+        for i in 0..<(w * h) {
+            let o = i * 4
+            flat[o] = 250; flat[o + 1] = 250; flat[o + 2] = 250; flat[o + 3] = 255
+        }
+        flat.withUnsafeBufferPointer { buf in
+            let got = Self.skeletonBarContrast(bytes: buf.baseAddress!, width: w, height: h,
+                                               bytesPerRow: w * 4)
+            XCTAssertEqual(got.barRows, 0, "反对照：整幅同色却数出 \(got.barRows) 行 ⇒ 谓词恒真")
+        }
+    }
+
+    /// **两档各一条对比度下界**（R220 / BACKLOG 245 的结案形状）。
+    ///
+    /// 下界不是审美偏好，是从测量倒推的：暗档实测 1.15（R219 前后都没动）⇒ 压到 1.10；
+    /// 亮档 R219 之后实测 1.31 ⇒ 压到 **1.20**，而 R219 **之前**是 1.12 ⇒
+    /// 这一格在上一轮之前会红。这正是"哪条断言会替我记住它"（R101 的规矩）该给的答案。
+    /// 量的是**组件帧** `detail-loading`（单一表面）；组合帧不在这条判据的对象里 ——
+    /// 那里有两块表面，接缝会冒充墨（R219 那把手搓尺就是死在这上面）。
+    func testSkeletonBarsAreVisibleAgainstTheirOwnBackground() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r220-contrast-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let minimum = appearance == .darkAqua ? 1.10 : 1.20
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == "detail-loading" }) else {
+                XCTFail("\(tag)：找不到夹具 detail-loading ⇒ 这条判据没有对象"); continue
+            }
+            let file = scratch.appendingPathComponent("detail-loading-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(tag)：读不回 \(file.lastPathComponent)"); continue
+            }
+            let got = Self.skeletonBarContrast(bytes: base, width: rep.pixelsWide,
+                                               height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow)
+            emit("SKELETON_CONTRAST \(tag) 底=\(got.background) 条带=\(got.barLuma) "
+                  + "条带行=\(got.barRows) 比值=\(String(format: "%.2f", got.ratio)) 下界=\(minimum)")
+            XCTAssertGreaterThan(got.barRows, 8,
+                                 "\(tag)：数出 \(got.barRows) 行条带 ⇒ 尺没有对象，"
+                                    + "这一格是量不到而不是没问题（先查骨架还在不在画）")
+            XCTAssertGreaterThanOrEqual(got.ratio, minimum,
+                                        "\(tag)档骨架条带对它的底只有 \(String(format: "%.2f", got.ratio)) "
+                                            + "（下界 \(minimum)）⇒ 条带淡到看不见，"
+                                            + "骨架承诺的「内容马上来」就没有读者（BACKLOG 242 那一族）")
+        }
+    }
+
     /// **加载块必须站在详情栏那一条左轴上**（R26 / U-48 / D-085）。
     ///
     /// 这块表面以前从来没有进过帧基线（它是异步的，拍它等于赌时机），所以这三件事一次都没被看过：

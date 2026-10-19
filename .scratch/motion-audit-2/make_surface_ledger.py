@@ -49,7 +49,7 @@ rows = [
      "选中靠系统强调色 + 把视口外的行滚进来；再给选中加动画会把「哪一行被选中」变成运动而不是状态",
      "Sources/ClipboardHistoryApp/Views/SelectedRowRevealer.swift；BACKLOG 61"),
     ("主窗口/详情区", "加载", "added",
-     "spinner 说「我在等」，骨架说「内容马上来」；扫光是全仓唯一常驻时钟，30Hz、只在 `.loading` 分支存在、8s 上界",
+     "spinner 说「我在等」，骨架说「内容马上来」；扫光是全仓唯一常驻时钟，30Hz、只在 `.loading` 分支存在、8s 上界；亮档的墨按档给（R219 / BACKLOG 242：暗档 0.06/0.18 未动、亮档 0.14/0.26，两档 lift 同 0.12 —— 同一个 opacity 在两个底上给的绝对差值差一个量级）",
      "Sources/ClipboardHistoryApp/Views/SkeletonShimmer.swift；BACKLOG 38；R84/R85"),
     ("主窗口/详情区", "空", "kept",
      "空态与内容之间是 0.16s 交叉淡 —— 只有一臂的过渡等于没有，所以两臂都挂",
