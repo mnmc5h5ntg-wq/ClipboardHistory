@@ -27,7 +27,7 @@
 伪装成量到了）。任何一条探针取不到墨或底不纯 ⇒ `NOT_RUN`，判据整体红 —— 不许在空名单上给绿（R99）。
 
 用法：
-  python3 scripts/surface_left_axes.py --shots /tmp/shots_r207      # 真帧
+  python3 scripts/surface_left_axes.py --shots "$CLIPBOARD_HISTORY_UI_SHOTS"   # 真帧（本轮捕获卷那个目录）
   python3 scripts/surface_left_axes.py --shots DIR --json
   python3 scripts/surface_left_axes.py --self-test                  # 已知答案的对照
 退出码：0=三条都过；1=有判据红（含 NOT_RUN）；2=帧取不到/用法错。

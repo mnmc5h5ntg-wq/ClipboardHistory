@@ -24,7 +24,16 @@ NEEDS_PIL = unittest.skipUnless(HAS_PIL, u'PIL 不可用 ⇒ 这一格造不出�
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPT = os.path.join(ROOT, 'scripts', 'surface_left_axes.py')
-SHOTS = '/tmp/shots_r211'
+# 帧目录**不许写死**（R227 / BACKLOG 253）。上一版这里是一个临时捕获目录
+# （`/tmp/` + `shots_r` + 某一轮的轮次号），后果分两半：runner 上那个目录从来不存在 ⇒
+# 这两格真帧对照在 CI 上永远 skip；本机只是"那个目录还没被 /tmp 清理带走"时才跑。
+# 两种"没跑"都穿着 skip 的衣服，报表里看不出区别 —— 而 skip 的两种成因处置相反
+# （环境缺席要能被点名；证据路径腐烂要修路径）。
+# 现在由**捕获卷同一个环境变量**给；取不到就 skip，但 skip 文本必须说清找的是哪个通道。
+# 这条规矩由 `test_frames_path_hygiene.py` 钉住（写死的轮次帧目录 = 红）。
+SHOTS = (os.environ.get('CLIPBOARD_HISTORY_UI_SHOTS') or '').strip()
+SHOTS_NOTE = SHOTS if SHOTS else u'未给 CLIPBOARD_HISTORY_UI_SHOTS'
+
 
 
 def run(*args, **kw):
@@ -59,7 +68,7 @@ class SelfTruthTableTests(unittest.TestCase):
 
 
 class RealFrameTests(unittest.TestCase):
-    @unittest.skipUnless(os.path.isdir(SHOTS), u'帧目录不在（%s）⇒ 这一格本机 NOT-RUN' % SHOTS)
+    @unittest.skipUnless(os.path.isdir(SHOTS), u'帧目录不在（%s）⇒ 这一格本机 NOT-RUN' % SHOTS_NOTE)
     @NEEDS_PIL
     def test_working_frames_still_satisfy_the_three_relations(self):
         code, out = run('--shots', SHOTS)
@@ -104,7 +113,7 @@ class CiExitTests(unittest.TestCase):
     def test_real_frames_pass_and_report_ok(self):
         if not os.path.isdir(SHOTS):
             print(u'SKIPPED(本机)：帧目录不在 ⇒ 这一格 NOT-RUN')
-            self.skipTest(u'%s 不在盘上' % SHOTS)
+            self.skipTest(u'帧目录不在盘上：%s' % SHOTS_NOTE)
         code, out = run('--shots', SHOTS, '--ci')
         self.assertEqual(0, code, out)
         self.assertIn(u'LEFT_AXIS_CI verdict=ok', out)
