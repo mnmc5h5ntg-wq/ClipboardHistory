@@ -6125,6 +6125,11 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 
 **续跑清单（R231 补记写的，下一轮第 ⓪ 条从这里取，别手写编号）**
 
+- **本轮这一笔 `02de8cc`（已 push）的 CI 未读**：run id 还不知道。下一轮第 ⓪ 条先取 run↔commit 成对
+  （`python3 scripts/ci_read.py latest --workflow UI`，再 `steps <run-id>` / `readings <run-id>`，都是位置参数），
+  只查两件事：名册归零后 runner 上的 `HOVER_TOKEN_ROSTER` 是否也读成 `files=1 reads=1`，
+  以及 255 那一格在 runner 上有没有落成红（本轮本地全量卷它是绿的 ⇒ 若 runner 也绿，255 就该往"本机负载"收窄）。
+  不要轮询等它落地 —— `in_progress` 能跨两轮不落地，取不到结论就写"未读"，不许把"没红"说成"过了"。
 - 两跑 CI **已读**（`python3 scripts/ci_read.py steps/readings <run-id>`，注意位置参数、不是 `--run`）：
   R229 的代码笔 `a7e3154` → run `39301400951` **conclusion=success**；
   R230 的整轮笔 `a45ab33` → run `39311184801` **conclusion=success**、job `build-and-test` success、
