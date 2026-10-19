@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 清账表判完：最后 16 格（开关与滑块 5 + 说明段 5 + 推荐面板 4 + 浮层空态 2）⇒ 162/162，未清账 0（R207 第二批非轮次 · 表 1 份 + 两条守卫改写，产品 0 文件）
+
+- 146→162 行、未清账 16→0、地板同笔抬到 162；`MOTION_LEDGER_RESULT=ok 不合法格=0`、判定分布 added=9 kept=41 not-added=17 not-applicable=95
+- **两条守卫是这一笔真正要记的东西**：`test_uncovered_cells_are_counted_not_forgotten` 与 list-open 那条都写着「仓库现状不该是 0 未清账」——
+  那不是不变量，是"还没判完"的快照。全表判完那天它会变成一张**永远会红的门**，而逼人为了绿去改表。
+  现在换成方向相反的两条账：一格都没判（rows 被清空）照旧红；未清账为 0 则必须同时满足「行数==名册乘积」「没有一格不在已清账词表里」「地板==已清账数」。
+  而"缩表装完"由 `FLOOR_WENT_BACK`（对 HEAD 的地板）与 `MOTION_LEDGER_RETIRED`（退役要登记）管，不由"必须还剩一些"管。
+- 这一批的处置：not-applicable 10 / kept 4 / not-added 2 —— 说明段与开关那几格里最有价值的一条是**说明段不跟着开关一起淡**：
+  开关被禁（这台机器不支持登录项）时，那句解释恰恰最需要被读到（用户要的是「为什么这颗点不动」）
+- 报告 §9.3 与 §1 两格由 `test_final_report_claims.py` 逼着换成新读数；脚本电池见本笔输出
+
 ### 清账表一批 15 格：详情区 / 侧栏 / 浮层 / 状态菜单 / 设置侧栏的剩余格一次判完（R207 非轮次批 · 表 1 份 + 报告 3 行，产品 0 文件）
 
 - 131→146 行、未清账 31→16、地板同笔抬到 146（`MOTION_LEDGER_RESULT=ok 不合法格=0`）

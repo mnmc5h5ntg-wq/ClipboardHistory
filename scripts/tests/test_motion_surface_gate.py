@@ -220,12 +220,33 @@ class RealTableTests(unittest.TestCase):
                          "已提交的清账表过不了自己的闸门")
 
     def test_uncovered_cells_are_counted_not_forgotten(self):
-        """这张表的**目的**：没判过的格子要能被数出来。"""
+        """这张表的**目的**：没判过的格子要能被数出来 —— 而"数出来"不等于"必须还剩一些"。
+
+        R207 之前这里写的是 `cells > rows`（"仓库现状不该是 0 未清账"）。那一格在 162 格全部判完的那天
+        会变成一张**永远会红的门**，而它当初真正要防的从来不是"判完"，是**缩表装完**：
+        删掉一个表面、或把 rows 清空、或把 not-measured 混进已清账。
+        那三件事现在各有各的牙，所以这里换成"判完必须是真判完"的四条对账：
+        ① 行数 == 名册乘积（没有整格缺失）；② 没有一格还是 not-measured（占位不算判过）；
+        ③ 已清账数 == 行数（清账口径与词表一致）；④ 地板 == 已清账数（地板只能被真判过的格子抬起来）。
+        而"名册被缩"由 `FLOOR_WENT_BACK`（对 HEAD 的地板）与 `MOTION_LEDGER_RETIRED`（退役要登记）管，
+        不由这条假装的"必须没判完"管。
+        """
         data = json.load(io.open(str(LEDGER), encoding="utf-8"))
         cells = len(data["surfaces"]) * len(data["states"])
-        self.assertGreater(cells, len(data["rows"]),
-                           "格子总数必须大于已清账行数，否则这张表在假装全部判过")
-        self.assertGreaterEqual(len(data["rows"]), data["floor_cleared"])
+        cleared = set(data["cleared_verdicts"])
+        rows = data["rows"]
+        cleared_n = len([r for r in rows if (r.get("verdict") or "") in cleared])
+        self.assertGreaterEqual(len(rows), data["floor_cleared"])
+        self.assertLessEqual(cleared_n, cells, "已清账比名册乘积还多 ⇒ 有格子被重复判（重格另有 DUP_KEY）")
+        placeholder = [r for r in rows if (r.get("verdict") or "") not in cleared]
+        if cleared_n == cells:
+            self.assertEqual([], placeholder,
+                              "全表判完了却还有 %d 格不在已清账词表里 ⇒ 那是一格占了位置的空白" % len(placeholder))
+            self.assertEqual(cells, len(rows),
+                              "判完必须是每格都有一行：名册 %d 格、表里 %d 行" % (cells, len(rows)))
+            self.assertEqual(data["floor_cleared"], cleared_n,
+                              "地板（%s）不等于已清账（%s）⇒ 地板是被抬上去的还是被写下来的？"
+                              % (data["floor_cleared"], cleared_n))
 
 
 class FloorBaselineTests(unittest.TestCase):

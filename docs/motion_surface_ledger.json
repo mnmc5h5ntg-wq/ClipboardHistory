@@ -1083,7 +1083,119 @@
       "verdict": "not-applicable",
       "reason": "侧栏不承载成功回执：导出/反馈那条成功长在正文（exportMessage 由 FeedbackExportReceipt.success 生成），在导航栏上再说一遍会让「我刚刚做了什么」看起来像「我在哪一页」。",
       "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 203 行的 FeedbackExportReceipt.success"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "空",
+      "verdict": "not-applicable",
+      "reason": "开关不承载「空」：它是设置项，永远有值（Bool 或枚举），没有「还没有数据」这一格。真要说什么都不显示，那是整个分区不存在，而不是这一颗开关空着。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 354、374、387 行那三枚 Toggle（同一形状：标签 + isOn 绑定）"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "加载",
+      "verdict": "not-applicable",
+      "reason": "设置页的值都是打开时同步从 store / UserDefaults 读的，没有「读一半」的中间态；唯一会慢的那一步（开机启动项向系统注册）也是**结果**说话（失败写 exportMessage / StateLine），不画转圈。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 354 行 Toggle 与紧邻的 .disabled(!loginItemSettings.isSupported)（第 355 行）｜BACKLOG 38"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "开关本身不报错：错误来自它触发的动作（注册登录项、导出、清空），而那些各有一条自己的文本通道，不在开关身上再画一遍。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 1098 行那枚 StateLine 的 .helpLabel(\"收起这条提示\") 路径｜缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=errorText"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "成功",
+      "verdict": "not-added",
+      "reason": "切换成功的回执**就是开关自己滑到新位置**（系统 Toggle 自带那一下），再叠一条横幅会把「我刚改了哪个设置」说两遍；这一档与「详情区 × 按下」同一族判断：控件自己已经把状态说完了。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 374 行的 recordingPaused 绑定（切换即生效，无异步）｜Sources/ClipboardHistoryApp/Views/GlassControls.swift 的 .pressedStyle 家族（可点控件的反馈统一在那一层）"
+    },
+    {
+      "surface": "设置窗口/开关与滑块",
+      "state": "聚焦",
+      "verdict": "kept",
+      "reason": "这层的焦点环由系统画，产品没有关它也没有自绘：设置页是**要能用 Tab 走的一页**，而侧栏那种关环理由（旁边有一圈自绘的落点/选中表达会打架）在这里不成立。",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=focusEffectDisabled｜Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 354、374、387 行那三枚 Toggle"
+    },
+    {
+      "surface": "设置窗口/说明段",
+      "state": "加载",
+      "verdict": "not-applicable",
+      "reason": "说明段是静态文字（11pt caption），没有「正在加载的说明」：它解释的那颗控件有没有值都不改变这句话本身。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 8~15 行那段关于「说明段离它解释的开关更近」的注释与判据名"
+    },
+    {
+      "surface": "设置窗口/说明段",
+      "state": "成功",
+      "verdict": "not-applicable",
+      "reason": "说明段不承载回执：成功/失败由 StateLine 与 exportMessage 那条通道说，说明段只是解释「这个开关会改变什么」。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 203 行的 FeedbackExportReceipt.success 那条通道｜BACKLOG 58"
+    },
+    {
+      "surface": "设置窗口/说明段",
+      "state": "选中",
+      "verdict": "not-applicable",
+      "reason": "说明段不可选、不可点：它是被读的文字。给它做选中态会让一段解释读起来像一项可操作的设置。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 795 行那段注释：说明文字的可发现性靠「看得见」，并把 .help() 折进悬停提示"
+    },
+    {
+      "surface": "设置窗口/说明段",
+      "state": "聚焦",
+      "verdict": "not-applicable",
+      "reason": "文字不进 key-view 环（能聚焦的是它上面那颗开关）；让说明段可聚焦会把 Tab 引到读不动的东西上。",
+      "evidence": "缺席:Sources/ClipboardHistoryApp/Views/SettingsView.swift=focusEffectDisabled｜Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 8~15 行那段说明段间距的判据注释"
+    },
+    {
+      "surface": "设置窗口/说明段",
+      "state": "禁用",
+      "verdict": "not-added",
+      "reason": "说明段不跟着它所解释的开关一起淡：开关被禁用（例如这台机器不支持登录项）时，**那句解释恰恰最需要被读到** —— 用户要的是「为什么这颗点不动」。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/SettingsView.swift 第 355 行的 .disabled(!loginItemSettings.isSupported)（开关被禁而说明文字保持原档）"
+    },
+    {
+      "surface": "菜单栏/推荐面板",
+      "state": "空",
+      "verdict": "kept",
+      "reason": "空态在代码里就是一个显式的 isEmpty 分支（没有推荐就不建那一节），而不是把空列表画出来；这与「状态菜单 × 空」同一族：菜单是即时弹层，没有骨架也没有动画。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift 第 14 行的 if historyStore.predictionSuggestionEntries.isEmpty"
+    },
+    {
+      "surface": "菜单栏/推荐面板",
+      "state": "错误",
+      "verdict": "not-applicable",
+      "reason": "推荐面板没有错误通道：算不出推荐就是「没有推荐」（走上面那一格），而真正会失败的那一步（写剪贴板）由主窗口提示条说话。",
+      "evidence": "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift 第 14 行的 isEmpty 分支｜缺席:Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift=errorText"
+    },
+    {
+      "surface": "菜单栏/推荐面板",
+      "state": "聚焦",
+      "verdict": "not-applicable",
+      "reason": "这一层是 NSMenu 里的行，键盘走系统的菜单高亮，不经过 SwiftUI 的焦点环；这一族在「状态菜单 × 聚焦」那格已经量过（该文件 onHover / animation 0 处）。",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 的 NSMenuItem 用法（推荐项是 menu item，不是 SwiftUI 视图）｜BACKLOG 220"
+    },
+    {
+      "surface": "菜单栏/推荐面板",
+      "state": "禁用",
+      "verdict": "kept",
+      "reason": "面板里「不可点」的东西（标题与分组头）都显式 isEnabled=false，这是系统菜单里唯一的禁用语言；再叠一层淡化会与系统自己的灰字重复。",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 第 91 行的 titleItem.isEnabled = false｜Sources/ClipboardHistoryApp/Managers/MenuBarController.swift 第 98 行的 headerItem.isEnabled = false"
+    },
+    {
+      "surface": "浮层/空态",
+      "state": "成功",
+      "verdict": "not-applicable",
+      "reason": "空态是「没有结果」这句话本身，它不承载成功：真正的成功是选中某一行并关掉面板，而那一格归「浮层/列表行 × 成功」（那里判过：不留回执）。",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 第 243 行的 NSTextField(labelWithString:) 空态标签"
+    },
+    {
+      "surface": "浮层/空态",
+      "state": "选中",
+      "verdict": "not-applicable",
+      "reason": "标签不进 key-view 环、不可点：浮层里唯一该拿焦点的是搜索框。给一句「没有结果」做选中态，等于把键盘引到一个没有动作的地方。",
+      "evidence": "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift 第 243、246、247、248、249 行那枚标签的声明（labelWithString + secondaryLabelColor + 居中 + 截尾）"
     }
   ],
-  "floor_cleared": 146
+  "floor_cleared": 162
 }

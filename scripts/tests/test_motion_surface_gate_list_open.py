@@ -78,9 +78,16 @@ class MotionSurfaceGateListOpenTests(unittest.TestCase):
         cleared_n = len([r for r in data["rows"] if (r.get("verdict") or "") in cleared])
         self.assertEqual(cells - cleared_n, len(todo),
                          u"列名单与数名单分叉：%d vs %d" % (len(todo), cells - cleared_n))
-        self.assertGreater(len(todo), 0,
-                           u"仓库现状不该是 0 未清账；真是 0 就说明词表或 rows 被动过")
+        # R207 改：原来这两行钉的是「仓库现状必须还剩一些没判」，而"还剩一些"不是不变量 ——
+        # 它会在真的判完那天变成恒红的门。要防的是**假判完**，所以换成两条方向相反的账：
+        # 上界：一格都没判（rows 被清空）⇒ todo 等于满乘积，这一格仍然红；
+        # 下界：todo 为空 ⇒ 必须能证明"每一格都有一行且都在已清账词表里"，否则红。
         self.assertLess(len(todo), cells, u"一格都没判 ⇒ 名单等于满乘积，通常意味着 rows 被清空")
+        if not todo:
+            self.assertEqual(cells, len(data["rows"]),
+                              u"未清账为 0 但行数 %d != 名册乘积 %d ⇒ 有格子整行不见了" % (len(data["rows"]), cells))
+            self.assertEqual([], [r for r in data["rows"] if (r.get("verdict") or "") not in cleared],
+                              u"未清账为 0 却还有不在已清账词表里的行 ⇒ 词表被动过")
         for surface, state in todo:
             self.assertIn(surface, data["surfaces"], u"名单里冒出词表外的表面：%s" % surface)
             self.assertIn(state, data["states"], u"名单里冒出词表外的状态：%s" % state)
