@@ -6488,3 +6488,18 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   **整本 BACKLOG**，而账本正文里本来就有花括号 ⇒ 闸门误伤。第二版把扫描范围收窄到本轮正文与真正的
   两个占位符。**红在新判据自己身上、而不是在被告身上**——这一形状本轮已是第二次（R233 那格是 grep 漏了 docstring）。
 
+## R234 追账第三笔（下一轮第 ⓪ 条：两对 run↔commit 成对登记，读时都还没落地）
+
+- `22346d3 → run 39332097725`、`1a0b7c1 → run 39332376209` —— 2026-10-20 22:06 读时**双双 in_progress**，
+  conclusion 为空 ⇒ 只能说"未读"，不许写"绿了"。
+- 下一轮开场要答的三问：① 这两跑在 runner 上是否仍红在**同一格**
+  `testModeChipHoverFillIsVisibleOnItsOwnSurface`（若是 ⇒ 263 的分辨实验就是本轮的靶，别开新战场）；
+  ② 本轮那笔产品改动（表格不穿灰底）有没有让 `Capture gate` 之外的**帧基线**步骤红
+  —— 若红，先分辨"基线是本机刷的"与"runner 没画"，不许抬地板；
+  ③ `PLAIN_PROFILE_OK` 是否仍逐字给 `verdict=bad 问题=4 真红=0`（259 那张表的持续复验）。
+- 工具坑（本轮自己踩的，别再踩）：取失败步骤名单用
+  `gh api repos/…/actions/runs/<id>/jobs --jq '.jobs[] | .name as $n | .steps[] | select(.conclusion=="failure") | "FAIL_STEP \($n) [\(.name)]"'`
+  —— 我第二版把 `join(...)` 写在字符串里括号配错，gh 直接报 jq 解析失败；名单为空**不等于**跑绿，要回读 job 的 conclusion。
+- `scripts/ci_read.py steps` 本轮实测是坏的（拼成 `gh run view --run`），已在 262 旁边记过 ⇒
+  下一轮若要用它，先修那一个参数位置，别又退回手写。
+
