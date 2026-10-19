@@ -5837,3 +5837,16 @@ R94 那份夹具采集时这两条判据还不存在（它们就列在同一份�
 就要在 STATE 里把"欠了几跑、最后一跑的 run 号"写成读数（本轮起生效，见 STATE 的下一轮靶 ⓪）。
 适用面：探针覆盖闸门、动效地板、捕获闸门这类"登记 + 日志"两头对账的判据；
 不适用面：只有一份产物、没有登记通道的判据（那些的正对照是变异刀）。
+
+**D-201（R201…R203 补落）：清账表的证据指针必须写成**从包根算起的整路径**；缺席断言要挑结构名而不是动效词根**
+
+读数（本机，`python3 scripts/motion_surface_gate.py` + 125/131 行那张表）：真表里曾有 7 行指针写成
+`MenuBarController.swift` 或 `Views/SearchField.swift` 这种形状，而 `PATH_RE` 只认 `Sources|Tests|docs|scripts|Managers` 开头
+⇒ 这 7 行既不红也不被检查，`不合法格=0` 是个空的通过。改成整路径后全表 0 红，闸门新增
+`PATH_RE_LAX` + `EVIDENCE_PATH_PARTIAL` / `EVIDENCE_PATH_AMBIGUOUS` / `MISSING` 三态，
+`scripts/tests/test_motion_surface_gate.py` 24→30 格（含正对照：整路径不许红）。
+
+⇒ 两条规矩：① 指针要么整路径、要么不写；「形状合法」不等于「指得到东西」（U-424 的第二种失效）。
+② 缺席断言的比较是**忽略大小写**的，所以 `缺席:...=disabled` 会被同一文件里的 `focusEffectDisabled()` 喂饱
+   —— 这一条**目前只有台账记着，没有会红的守卫**（写下来就是为了不让它被当成已交付）。
+适用面：`docs/motion_surface_ledger.json` 与所有走同一文法的证据指针；不适用：D-号 / BACKLOG 号 / 批次号那类符号指针。

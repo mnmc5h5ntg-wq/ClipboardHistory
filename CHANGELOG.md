@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
-### 清账表再补 6 格：主窗口/筛选条一次判完（R203 第二笔非轮次 · 表 1 份 + 报告 1 处，产品 0 文件）
+### 补落：R201 / R202 / R203 三笔非轮次笔的 UI_AUDIT 与 ITERATION 台账（BACKLOG 225 的①出口 · 产品 0 文件，台账账）
+
+- 三笔各自的数字只从**盘上能复查的东西**抄：commit 正文（`33b1322`/`e97c17e`/`728a1b2`/`2351593`/`b6077be`/`bd7a64f`）、
+  已在册的读数行（`SIM_MATRIX`、`HEAT_INK_SPACE`、`MOTION_LEDGER_*`）与脚本电池当下这次（384 格）。
+- 没跑过的验证照实写 NOT-RUN：这三笔都没有新帧（产品 0 文件 ⇒ 看图腿空），R201/R202 没有跑全量 `swift test`，R203 没有跑变异刀。
+- 三条既有 CHANGELOG 标题做了**最小机械改写**（在 `（R20X` 后插入 `/ U-6xx…U-6yy`），正文一字未动 —— 这样轮换 STATE 时
+  `test_round_batch_consistency.py` 读的是**真标题**而不是我为它造的桩标题（186/187 那次就是这么把「半批已写」查没的）。
+- 新开 D-201（指针必须整路径 + 缺席词要挑结构名，只有前半有牙）；BACKLOG 225 记追记结案，并把「缺席词挑错还欠一条守卫」写清未开单。
+### 清账表再补 6 格：主窗口/筛选条一次判完（R203 / U-659…U-661 · 第二笔非轮次 · 表 1 份 + 报告 1 处，产品 0 文件）
 
 - 125→131 行、未清账 37→31、地板同笔抬到 131（`MOTION_LEDGER_RESULT=ok 不合法格=0`）
 - 空 kept（空态归 EmptyStateView 那一支，药丸照旧可点；`filteredEntries` 与 `entries` 两个空分开写）／加载 **not-added**（不给胶囊加脉冲：「筛的是哪段」与「正在加载」是两种语言）／错误 not-applicable（纯本地谓词无失败通道，`NoticeBanner` 在该文件 0 命中）／成功 kept（回执=药丸滑动 + 列表变化，两态像素判据 `testFilterPillBrightBandFollowsTheSelectedSegment` + `r189-pill-all/fav` 那对夹具）／聚焦 kept（`sidebarFocusRingHidden()` 是**有意识**地保留可聚焦、关掉系统环；macOS 12/13 没那个 API 所以环照旧画，平台缺开关不是漏）／禁用 not-applicable（`isEnabled` 0 命中；两条 `allowsHitTesting(false)` 在 `SegmentedFilterPicker` 之外）
@@ -23,7 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `scripts/tests/test_motion_surface_gate.py` 24→30 格：松散指针该红、整路径不许红（正对照，否则这条判据是恒红的门、会把人推去删指针）、找不到文件仍是 MISSING 而不是 PARTIAL、歧义独立编号、新 lax 尺在真表上有对象且点不开的指针为 0
 - 验证：产品 0 文件（帧与换装沿用上一遍）、全量脚本电池与 `swift test` 见 commit 输出
 
-### 222 机制定性：那 6…21/255 是落盘的色彩标注造成的（R202 · 判据 1 文件加一行 print，产品 0 文件）
+### 222 机制定性：那 6…21/255 是落盘的色彩标注造成的（R202 / U-656…U-658 · 判据 1 文件加一行 print，产品 0 文件）
 
 - 新 print `HEAT_INK_SPACE`：判据的 rep 与取色都是**设备 RGB**，而 PNG 声明 sRGB、alpha 全 255 ⇒ 三条口径其实互不相同
 - 反解 accent 的形状否掉「混合空间」候选：判据解出 (0,122,255)、真帧解出 (30,122,255)，只有 R 动、G/B 不动；混合空间不同会让三通道一起动
@@ -39,7 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 本机通道事故：这一跑 11 条用例全 passed 而日志里 0 条 `HEAT_*` 读数 ⇒ print 未被转发 ⇒ 按 NOT-RUN 记，不拿上一跑日志替这一跑作证
 - 222 不结案、`VisualHeat` 不动：两个候选机制的修法相反（改判据采样通道 vs 统一色彩空间），先拿读数再决定
 
-### 222 第一半：热图真帧通道的证人 `scripts/heatmap_frame_levels.py`（R201 非轮次笔 · 产品 0 文件）
+### 222 第一半：热图真帧通道的证人 `scripts/heatmap_frame_levels.py`（R201 / U-653…U-655 · 非轮次笔 · 产品 0 文件）
 
 - 把 R198 那句「真帧比离屏红 6…21/255、偏移只压在 R 那一列」变成读数与断言：按中轴游程取 5 档（排掉夹具背景），逐档与判据日志 HEAT_ADJACENT_CVD 的墨色相减
 - 三条判据：真帧最小模拟后 ≥ 地板 18；G/B 两列偏移 ≤ 24；输入读不到（缺帧目录 / 缺帧 / 档数不是 5 / 判据日志只覆盖一档）一律 exit 2 —— 分母为 0 不许被读成通过
