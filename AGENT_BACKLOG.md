@@ -5349,3 +5349,26 @@ M709（退回各自归一化，只有接线扫描抓得到）、M710（方向反
 下一轮的处置与 R191 同形：两臂共用 `sharedMovingFloor`，各配一把"退回各自归一化"的接线刀；
 若某一处其实是在比**合成输入**（如 `:1570`/`:1773` 那两处真值表，输入是自己造的数组），那它不是跨臂比较，**不改**——
 这条区分要写在刀的名字里，免得下一轮把真值表也"修"成同一条线。
+
+**216 追记 + 结案（R192）：两处点名的位置是错的，真站点是"两臂相同吗"那两处**
+
+上一轮我按"行号 + `grep transitionFrameCount`"开单，没读周围 ⇒ 两处靶都不成立：
+① `testBannerDismissColumnAsymmetryIsMeasured`（R59）早就把 `sharedMovingFloor` 套在两栏上比"最后还在变的帧号"，
+各自归一化的计数只出现在标着「旧轴…这条轴的差是墨量，不是时间」的打印里；
+② 热图淡入 A/B 的 `帧数=` 上面两行写着"帧数照旧打印，但**不参与判定**：它由采样相位决定"，判定走连续段时长。
+真站点是两处**相同性**比较（不是先后比较）：`testSystemSymbolEffectsAreOutOfThisRulersReach` 的
+`XCTAssertEqual(计数(开), 计数(关))`、`testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind` 的
+`if onSpan == offSpan …`。处置：同一条线 + 旧口径**并判**，合读法由纯函数 `armAgreementReading` 生成并被真值表钉住。
+刀 M712–M718 全 CAUGHT，其中七把只有接线扫描抓得到（本机两臂峰值相等 ⇒ 跑结果两种口径都绿）。
+216 至此结案；不可推广的那一族另开 217（见下）。
+
+**217. 幅度不对称的跨臂 A/B 欠的是**时间轴**，不是同一条线（R192 实测开单，防下一轮把它们"修"成假红）**
+
+三处：`testNativeRowAnimationIsVisibleToTheRuler`（本机 开=9 帧/峰值 0.043、关=1 帧/0.052，采样≈6ms）、
+`testNativeRowMoveIsVisibleToTheRuler`（`nativeMoveVerdict` 吃两个各自归一化的计数）、
+`testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt`（选中没变 11 帧/0.027、选中变了 1 帧/0.234）。
+它们的门槛由**各自峰值**决定 ⇒ 与 212 同形；但按 216 的办法套同一条线会把小臂判成 0 帧
+（0.027 低于 0.234 × 0.15 = 0.0351，实测见 `/tmp/r192_motion.log`），那是把"没量到"说成"落定"。
+所以这三处的处置是 R47 那一族：**时长来自连续段**（`contiguousChangedRun`），帧数只当对照打印；
+`contiguousChangedRun` 的地板要按"这段里每对帧都在同一条线上"表达，而不是"数到几帧"。
+判据形状要能各自被证伪：先量两臂峰值比（`sharedLineIsSound`），比值不足就不许用共用线，也不许用帧数下结论。

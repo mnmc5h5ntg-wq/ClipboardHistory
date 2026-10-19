@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 216 结案：两处"两臂相同吗"换两把尺并判；同轮更正上一轮点名的两处位置（R192 / U-628…U-631 · 产品 0 文件，判据账）
+
+- 更正：216 点名的 `:2916`（分栏）与 `:2332`（热图淡入 A/B）**都不是** 212 的形状 —— 前者 R59 已用 `sharedMovingFloor`，
+  后者的 `帧数=` 上面两行写着"不参与判定"。真站点是 `testSystemSymbolEffectsAreOutOfThisRulersReach` 与
+  `testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind`
+- 换形：`sharedLineIsSound`（小臂峰值必须在那条线之上）+ `armAgreementReading`（两把尺的回答并成一句话）；
+  免责分支与硬断言都改成"新旧口径**都**说相同"，只准变严
+- 证据：本机 MOTION_SYMBOL row-star 同一条线=0.0403 共用线安全=true 峰值=0.268/0.268 新口径 开=1 关=1 ｜ 旧口径（各自归一化）开=1 关=1 ⇒ 两把尺都说两臂相同 ⇒ 「源码已接、产物未量」这条免责可以记 ／ MOTION_DETAIL_AB empty-to-content 开 帧数=1(旧口径1) 峰值=0.051 冷闸=true  关 帧数=1(旧口径1) 峰值=0.051 同一条线=0.0077 共用线安全=true ｜ 旧口径（各自归一化）开=1 关=1 采样≈51ms ⇒ 两把尺都说两臂相同 ⇒ 「源码已接、产物未量」这条免责可以记 ⇒ 两把尺都说相同；反例读数 0.027/0.234 ⇒ 线 0.0351 把小臂判成 0 帧（真值表 (a) 格）
+- 变异：`mutate_r192.py` M712, M713, M714, M715, M716, M717, M718, M719, M720 ⇒ 9/9 CAUGHT、RESTORE_CLEAN=yes；已登记进 needle 预检名册
+- 新开 BACKLOG 217：幅度不对称那一族（三处 AppKit 行 A/B）欠的是时间轴不是同一条线；D-196 记共用线的适用域
+- 验证：编译 0 告警、扫描卷 3 例/skip 0/失败 0、动效卷 2/0/0、全量卷 877/42/0、产品 0 文件（帧未动，未重捕）
 ### R188 的三本账补齐：208 结案（runner 原文）、210 撤回（同一批像素上两把尺矛盾）、211 申报通道落地 + 新开 212（R188 / U-616…U-618 · 产品 0 文件，判据账）
 
 - 208 结案：`PROBE_FPS` 那一行自带 `n=217 worst=75.6ms 超锚点帧=0`（run `39163387579` = `949350d`）

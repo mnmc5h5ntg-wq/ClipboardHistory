@@ -154,6 +154,42 @@ final class MotionFilmstripTests: XCTestCase {
         fractions.filter { $0 >= sharedFloor }.count
     }
 
+    /// 这一对臂**能不能**共用一条线 —— 判据是"较小那一臂的峰值是否在这条线之上"（R192 / BACKLOG 216）。
+    ///
+    /// 为什么需要它：`sharedMovingFloor` 取的是**较大**峰值 × `stepFloorRatio`。两臂幅度相当时这条线
+    /// 对两边都公平；幅度差很多时，较小那一臂的峰值整臂低于这条线 ⇒ 它读 **0 帧**，于是"同一条线下两臂相同"
+    /// 其实读的是"两臂都落定了" —— 那不是把 A/B 判成相同，是把小臂判成不存在。
+    /// 本机实测（`/tmp/r192_base_motion.log`，同一份帧数据两臂对照）给的形状：
+    /// row-star `0.268/0.268`、detail-empty-to-content `0.051/0.051`、row-insert `0.043/0.052`
+    /// ⇒ 较小臂都在线上，共用线成立；而 `MOTION_SEQUENCE` 两臂 `0.027/0.234` ⇒ 那条线是 0.0351，
+    /// 小臂的**峰值**都不够 ⇒ 从 11 帧掉到 0 帧，判据当场红，红的却不是产品。
+    /// 这条函数没有新阈值：线本身（`sharedMovingFloor`）就是判据，所以"安不安全"是量出来的，不是拍的。
+    static func sharedLineIsSound(_ regions: [[Double]]) -> Bool {
+        guard let lo = regions.map({ peak($0) }).min() else { return false }
+        return lo >= sharedMovingFloor(regions)
+    }
+
+    /// 两把尺（同一条线 / 各自归一化）对同一对臂的**合读法** —— 措辞由数字生成（R192）。
+    ///
+    /// 为什么单独一个纯函数：212 那一族的原罪是"一把尺的输出被写成产品结论"。这里把两把尺的回答
+    /// 并成一句话，就能被合成真值表钉住（见 `testCrossArmRulerAgreementIsATruthTable`），
+    /// 而"矛盾"那一格必须**指名**它是矛盾、而不是替其中一把尺背书。
+    /// **不覆盖管线**：钉的是尺子的话术；真卷那两条是
+    /// `testSystemSymbolEffectsAreOutOfThisRulersReach` 与 `testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind`。
+    static func armAgreementReading(sameUnderShared: Bool, sameUnderPerArm: Bool, sound: Bool) -> String {
+        switch (sameUnderShared, sameUnderPerArm) {
+        case (true, true):
+            return "两把尺都说两臂相同 ⇒ 「源码已接、产物未量」这条免责可以记"
+        case (false, false):
+            return "两把尺都说两臂有别 ⇒ 这把尺看得见这条动效，本条必须升级成硬判据（不许留免责）"
+        case (true, false), (false, true):
+            return sound
+                ? "两把尺矛盾，而共用线是安全的 ⇒ 差别只在一把尺上出现，先读两臂逐帧形状再动判据"
+                : "两把尺矛盾，且共用线**不安全**（较小臂的峰值低于这条线 ⇒ 那一臂读 0 帧）"
+                    + "⇒ 这是幅度不对称把小臂判成不存在，不是这条 A/B 真的可见（BACKLOG 217）"
+        }
+    }
+
     /// ④ 那条跨臂比较必须用**同一条绝对线**（R191 / BACKLOG 212）—— 扫形状，不跑结果。
     ///
     /// 为什么不能只靠"跑一遍看红"：把线换回各自归一化，在本机**照样绿**（本机带臂峰值天然大，
@@ -175,6 +211,110 @@ final class MotionFilmstripTests: XCTestCase {
                      "旧那条『各自归一化的计数跨臂比』又回来了 —— 它在两臂计数接近的机器上会把判据变成掷硬币（BACKLOG 212）")
         XCTAssertTrue(scan.contains("旧口径（各自归一化）带="),
                       "旧口径必须与新口径一起打印，否则换判据口径这件事在日志里没有证人（R146 那一课）")
+    }
+
+    /// 两处"两臂相同吗"的比较必须**两把尺都说相同**（R192 / BACKLOG 216）—— 扫形状，不跑结果。
+    ///
+    /// 为什么不能只靠"跑一遍看红"：本机两臂峰值实测相等（`0.268/0.268`、`0.051/0.051`），
+    /// 旧口径与新口径给同一个数 ⇒ 退回旧口径在这台机器上**照样绿**。它只在两臂幅度不等时露馅，
+    /// 而幅度不等正是 runner 那一侧的形状。所以这条只能由接线扫描钉住，由 M712…M716 证明有牙。
+    func testCrossArmSamenessComparisonsUseBothRulers() throws {
+        let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        let stripped = text.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        /// 按**方法体**切片读（R100 那一课：整文件 contains 会命中引用它的注释与别的用例）。
+        /// 真值表那条也在调 `armAgreementReading`，全文件计数会把"接线"与"措辞用例"缝成一个数；
+        /// 而本方法自己的行里就写着那些 needle —— R192 第一版就是这么红的（自指命中）。
+        let parts = stripped.split(separator: "\n    func ")
+        let thisMethod = "testCrossArmSamenessComparisonsUseBothRulers"
+        let code = parts.filter { !$0.hasPrefix(thisMethod) }.joined(separator: "\n    func ")
+        func body(_ name: String) -> String {
+            parts.first(where: { $0.hasPrefix(name) }).map(String.init) ?? ""
+        }
+        for method in ["testSystemSymbolEffectsAreOutOfThisRulersReach",
+                       "testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind"] {
+            let section = body(method)
+            XCTAssertFalse(section.isEmpty,
+                           "\(method)：找不到这个方法体 ⇒ 它被改名或删掉了；计数判据在空串上恒真是假绿（R140 那一族）")
+            // 分母先数：两臂各喂一次线，缺一次就是有一臂退回各自归一化。
+            let feeds = section.components(separatedBy: "sharedFloor: shared" + "Line").count - 1
+            XCTAssertEqual(feeds, 2,
+                           "\(method)：同一条线应当喂给**两臂**各一次（读到 \(feeds) 次）")
+            XCTAssertTrue(section.contains("sharedMovingFloor([on, " + "off])"),
+                          "\(method)：线必须由两臂一起导出，不是拿一臂的峰值自己乘自己")
+            XCTAssertTrue(section.contains("armAgreementReading(sameUnder" + "Shared:"),
+                          "\(method)：两把尺的回答必须合成一句合读法打进日志，否则读日志的人只能信一把尺")
+            XCTAssertTrue(section.contains(" ⇒ \\(agreement"),
+                          "\(method)：合读法要打进那一行的日志里 —— 只算不印，两把尺的关系就只剩在测试代码里，"
+                            + "读 runner 的人看不到（R146 那一课）")
+            XCTAssertTrue(section.contains("旧口径（各自归一化）" + "开="),
+                          "\(method)：旧口径要和新口径一起打印（R146 那一课：换判据口径要有证人）")
+        }
+        XCTAssertFalse(code.contains("XCTAssertEqual(Self.transitionFrameCount(on), "
+                                   + "Self.transitionFrameCount(off)"),
+                     "row-star 那条『各自归一化的计数跨臂比』又回来了 —— 它是 212 那一族（BACKLOG 216）")
+        XCTAssertFalse(code.contains("if onSpan == offSpan,"),
+                       "detail 那条免责分支又只问一把尺了 —— 单把尺说『相同』就记『产物未量』，"
+                         + "而那把尺的线是自己峰值决定的（BACKLOG 216）")
+        // 承重的是**两条**判据，不是一条读数：只数计数会把"摘掉一条硬断言"放过去。
+        XCTAssertEqual(code.components(separatedBy: "XCTAssertTrue(onShared == offShared && onPerArm == offPerArm")
+                         .count - 1, 1,
+                       "row-star 那条『两把尺都说相同才不红』的硬判据必须恰好一处（0 = 被摘掉或退回单把尺，2 = 重复实现）")
+        XCTAssertEqual(code.components(separatedBy: "onSpanShared == offSpanShared").count - 1, 2,
+                       "detail 的合读法与免责分支各用一次同一条线的比较（少一次就是有一处只问一把尺）")
+    }
+
+    /// `sharedLineIsSound` / `armAgreementReading` 的真值表（R192，合成用例）。
+    ///
+    /// 为什么要有这一条：216 的原提案是"把同一条线**推广**到剩下的跨臂比较"。我先在真卷上量了一遍，
+    /// 结果是反例 —— `MOTION_SEQUENCE` 两臂峰值 0.027 / 0.234，共用线 0.0351 比小臂的峰值还高，
+    /// 那一臂从 11 帧掉到 **0 帧**。所以"共用一条线"不是无条件更对：它把幅度小的那一臂判成不存在。
+    /// 这条真值表钉的就是这条适用域，免得下一轮把那一族"修"成一条会红的假判据。
+    /// **不覆盖管线**：这里的数组是人造的，钉的是尺子的适用域与措辞；
+    /// 真卷那两条是 `testSystemSymbolEffectsAreOutOfThisRulersReach` 与
+    /// `testDetailEmptyToContentCrossfadeIsMeasuredOrDeclaredBlind`。
+    func testCrossArmRulerAgreementIsATruthTable() throws {
+        // (a) 反例形状（本机 MOTION_SEQUENCE 实测 0.027 / 0.234）：共用线吃掉了小臂。
+        let small: [Double] = [0.000, 0.027, 0.025, 0.023, 0.021, 0.019,
+                               0.017, 0.015, 0.013, 0.011, 0.009, 0.007]
+        let big: [Double] = [0.000, 0.234, 0.001]
+        let line = Self.sharedMovingFloor([small, big])
+        XCTAssertEqual(line, 0.234 * Self.stepFloorRatio, accuracy: 1e-12,
+                       "共享线必须由**较大**那个峰值导出")
+        XCTAssertEqual(Self.transitionFrameCount(small), 11, "旧口径：小臂扛自己的线 ⇒ 11 帧在动")
+        XCTAssertEqual(Self.transitionFrameCount(small, sharedFloor: line), 0,
+                       "同一条线下小臂读 0 ⇒ 这就是 216 不许推广到幅度不对称那一族的成因")
+        XCTAssertFalse(Self.sharedLineIsSound([small, big]),
+                       "小臂峰值 0.027 低于线 0.0351 ⇒ 必须判成『共用线不安全』")
+
+        // (b) 安全形状（本机 detail 实测 0.051 / 0.051）：两臂都在线上 ⇒ 共用线可以当主尺。
+        let a: [Double] = [0.000, 0.051, 0.020]
+        let b: [Double] = [0.000, 0.051, 0.018]
+        XCTAssertTrue(Self.sharedLineIsSound([a, b]), "两臂峰值相等 ⇒ 共用线安全")
+        XCTAssertEqual(Self.transitionFrameCount(a, sharedFloor: Self.sharedMovingFloor([a, b])),
+                       Self.transitionFrameCount(b, sharedFloor: Self.sharedMovingFloor([a, b])),
+                       "安全形状下新口径应当给同一个数")
+
+        // (c) 边界：小臂峰值**正好等于**线 ⇒ 算安全（`>=`，不是" strictly 高于"）。
+        let edgeLow: [Double] = [0.000, 0.15]
+        let edgeHigh: [Double] = [0.000, 1.0]
+        XCTAssertTrue(Self.sharedLineIsSound([edgeLow, edgeHigh]),
+                      "0.15 == 1.0 × 0.15 ⇒ 这一臂还有最后一帧在线上的边界，判成不安全就是多砍一格")
+
+        // (d) 合读法四格：措辞只能由两把尺的回答生成，矛盾那格不许替任何一把尺背书。
+        XCTAssertTrue(Self.armAgreementReading(sameUnderShared: true, sameUnderPerArm: true, sound: true)
+                        .contains("两把尺都说两臂相同"))
+        XCTAssertTrue(Self.armAgreementReading(sameUnderShared: false, sameUnderPerArm: false, sound: true)
+                        .contains("升级成硬判据"))
+        let contradictedUnsafe = Self.armAgreementReading(sameUnderShared: false,
+                                                          sameUnderPerArm: true, sound: false)
+        XCTAssertTrue(contradictedUnsafe.contains("幅度不对称"),
+                      "不安全 + 矛盾 ⇒ 必须先说清这是小臂被线吃掉（217），不是产品有差别：\(contradictedUnsafe)")
+        XCTAssertFalse(contradictedUnsafe.contains("看得见"),
+                       "矛盾那格不许写出『这把尺看得见』——那是拿一把尺的产物当产品结论（212 那一课）")
+        XCTAssertTrue(Self.armAgreementReading(sameUnderShared: true, sameUnderPerArm: false, sound: true)
+                        .contains("先读两臂逐帧形状"))
     }
 
     /// 从触发到"落定"要几帧这件事，由 `settledAtFrame(_:band:)` 回答（R2）——
@@ -4680,19 +4820,38 @@ final class MotionFilmstripTests: XCTestCase {
         let off = Self.deltas(offFilm.motionFrames, band: band)
         let onSpan = Self.transitionFrameCount(on)
         let offSpan = Self.transitionFrameCount(off)
-        emit("MOTION_DETAIL_AB empty-to-content 开 帧数=\(onSpan) 峰值=\(String(format: "%.3f", Self.peak(on)))"
-            + " 冷闸=\(onFilm.clockIsWarm)  关 帧数=\(offSpan) 峰值=\(String(format: "%.3f", Self.peak(off)))"
-            + " 采样≈\(Self.sampleIntervalMilliseconds(onFilm.motionStamps))ms")
+        // R192 / BACKLOG 216：下面那句"两臂读数相同 ⇒ 尺子看不见"是**跨臂比**，而 onSpan/offSpan
+        // 各自扛着各自峰值导出的线 ⇒ 与 212 同形。同一条线并排加上：这条免责必须**两把尺都说相同**
+        // 才成立（只准变严，不准变松；两把尺矛盾时红，并由合读法指名是"幅度不对称"还是"真可见"）。
+        let sharedLineDetail = Self.sharedMovingFloor([on, off])
+        let onSpanShared = Self.transitionFrameCount(on, sharedFloor: sharedLineDetail)
+        let offSpanShared = Self.transitionFrameCount(off, sharedFloor: sharedLineDetail)
+        let soundDetail = Self.sharedLineIsSound([on, off])
+        let floorDetail = String(format: "%.4f", sharedLineDetail)
+        let agreementDetail = Self.armAgreementReading(sameUnderShared: onSpanShared == offSpanShared,
+                                                       sameUnderPerArm: onSpan == offSpan,
+                                                       sound: soundDetail)
+        emit("MOTION_DETAIL_AB empty-to-content 开 帧数=\(onSpanShared)(旧口径\(onSpan))"
+            + " 峰值=\(String(format: "%.3f", Self.peak(on)))"
+            + " 冷闸=\(onFilm.clockIsWarm)  关 帧数=\(offSpanShared)(旧口径\(offSpan))"
+            + " 峰值=\(String(format: "%.3f", Self.peak(off)))"
+            + " 同一条线=\(floorDetail) 共用线安全=\(soundDetail)"
+            + " ｜ 旧口径（各自归一化）开=\(onSpan) 关=\(offSpan)"
+            + " 采样≈\(Self.sampleIntervalMilliseconds(onFilm.motionStamps))ms ⇒ \(agreementDetail)")
         XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
                              "两臂什么都没变 ⇒ 触发没让图长出来，这条 A/B 没有对照物（是探针坏了，不是动效坏了）")
         XCTAssertTrue(onFilm.clockIsWarm && offFilm.clockIsWarm,
                       "有一臂是在冷采样下抓的 ⇒ 两臂相同不能算尺子的极限，这条结论今天不成立")
-        if onSpan == offSpan, abs(Self.peak(on) - Self.peak(off)) < 0.02 {
+        if onSpan == offSpan && onSpanShared == offSpanShared && abs(Self.peak(on) - Self.peak(off)) < 0.02 {
             emit("MOTION_NOT_RUN=opacity-fade-invisible-to-cacheDisplay detail-empty-to-content："
                 + "开关两臂读数相同 ⇒ 这把尺看不见这条交叉淡，只能记「源码已接、产物未量」")
         } else {
             XCTFail("两臂读数不同 ⇒ 这把尺**看得见**这条交叉淡 ⇒ 把本条改成硬判据"
-                    + "（开着的过渡帧数必须大于关着的），别留一句免责")
+                    + "（开着的过渡帧数必须大于关着的），别留一句免责。"
+                    + "先读上一行的合读法：若它说『共用线不安全』⇒ 那是幅度不对称把小臂判成 0 帧"
+                    + "（BACKLOG 217），不是这条交叉淡可见。"
+                    + " 读数：新口径 开=\(onSpanShared) 关=\(offSpanShared) / 旧口径 开=\(onSpan) 关=\(offSpan)"
+                    + " 线=\(floorDetail) 安全=\(soundDetail)")
         }
     }
 
@@ -4770,13 +4929,33 @@ final class MotionFilmstripTests: XCTestCase {
         MotionCatalog.animationsEnabled = false
         let off = Self.deltas(record(scenario).frames, band: band)
         MotionCatalog.animationsEnabled = true
-        emit("MOTION_SYMBOL row-star 开 帧数=\(Self.transitionFrameCount(on)) 峰值=\(String(format: "%.3f", Self.peak(on)))")
-        emit("MOTION_SYMBOL row-star 关 帧数=\(Self.transitionFrameCount(off)) 峰值=\(String(format: "%.3f", Self.peak(off)))")
+        let onPerArm = Self.transitionFrameCount(on)
+        let offPerArm = Self.transitionFrameCount(off)
+        // R192 / BACKLOG 216：本条问的是"两臂**相同**吗"，而两臂各自的计数是**两把不同的线**
+        // ⇒ 与 212 同形（峰值大的那臂被一条更高的线先判停）。现在同一条线为主、旧口径并列，
+        // 而且**两把尺都必须说"相同"**这条免责才成立 —— 只准变严，不准变松。
+        let sharedLineSymbol = Self.sharedMovingFloor([on, off])
+        let onShared = Self.transitionFrameCount(on, sharedFloor: sharedLineSymbol)
+        let offShared = Self.transitionFrameCount(off, sharedFloor: sharedLineSymbol)
+        let soundSymbol = Self.sharedLineIsSound([on, off])
+        let floorSymbol = String(format: "%.4f", sharedLineSymbol)
+        let peakSymbol = String(format: "%.3f", Self.peak(on)) + "/" + String(format: "%.3f", Self.peak(off))
+        let agreementSymbol = Self.armAgreementReading(sameUnderShared: onShared == offShared,
+                                                      sameUnderPerArm: onPerArm == offPerArm,
+                                                      sound: soundSymbol)
+        emit("MOTION_SYMBOL row-star 同一条线=\(floorSymbol) 共用线安全=\(soundSymbol) 峰值=\(peakSymbol)"
+             + " 新口径 开=\(onShared) 关=\(offShared)"
+             + " ｜ 旧口径（各自归一化）开=\(onPerArm) 关=\(offPerArm)"
+             + " ⇒ \(agreementSymbol)")
         XCTAssertGreaterThan(Self.peak(on), Self.minimumVisibleChange,
                              "带里什么都没变 ⇒ 我连星标在哪都没框到，这条'测不到'的结论本身不成立")
-        XCTAssertEqual(Self.transitionFrameCount(on), Self.transitionFrameCount(off),
-                       "两臂现在有差别了 ⇒ 这把尺重新看得见系统符号动效，把这条改成真判据，"
-                       + "并把 `AGENT_UI_AUDIT` 里那条'量不到'的边界撤掉")
+        XCTAssertTrue(onShared == offShared && onPerArm == offPerArm,
+                      "两把尺里至少一把说两臂有别 ⇒ 这条『量不到』的边界可能要撤。先读上一行的合读法："
+                        + "它说『共用线不安全』⇒ 那是幅度不对称把小臂判成 0 帧（BACKLOG 217），不是产品有差别；"
+                        + "两把尺都说有别 ⇒ 尺子真的看得见，把本条改成真判据，"
+                        + "并把 `AGENT_UI_AUDIT` 里那条'量不到'的边界撤掉。"
+                        + " 读数：新口径 开=\(onShared) 关=\(offShared) / 旧口径 开=\(onPerArm) 关=\(offPerArm)"
+                        + " 线=\(floorSymbol) 峰值=\(peakSymbol) 安全=\(soundSymbol)")
     }
 
     /// 这把尺看不看得见 **AppKit 自己的行动画**（`insertRows/removeRows(withAnimation:)`）——
