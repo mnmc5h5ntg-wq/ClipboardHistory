@@ -158,7 +158,7 @@ class ProbeCoverageGateTest(unittest.TestCase):
             main([str(R94_FIXTURE), "--expectations", str(EXPECTATIONS), "--source", str(SOURCE)])
         text = out.getvalue()
         for marker in ("PROBE_ORDER 露面=7/13 未闭口=1 前缀=1",
-                       "PROBE_QUEUED 4/11 条一次都没轮到"):
+                       "PROBE_QUEUED 6/13 条一次都没轮到"):
             self.assertIn(marker, text, f"读数少了这一行：{marker}\n实际输出：{text}")
         self.assertNotIn("PROBE_ORDER_WARNING", text, "这份日志是连续前缀，警告不该出现")
         order_line = [l for l in text.splitlines() if l.strip().startswith("PROBE_ORDER ")][0]
