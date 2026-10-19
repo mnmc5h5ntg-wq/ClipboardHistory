@@ -6123,6 +6123,22 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
 判据要一起到位：直接读令牌的旧形状不许回来（名册那条已经钉住），而"看得见"那一半必须由帧钉住，不能由 `0.06 + 0.025` 这句算术钉住。
 不许做的事：把这条写成"换算已经共用 ⇒ 观感已经一致"；也不许为了让帧数好看而给某一家单独凑一个数（那正是 D-218 判掉的形状）。
 
+**259. `--ci` 那一格把本机的能力当成了 runner 的地板：`verdict=ok` 断言在 runner 上连红两跑（R231 补记第五笔开单，第六笔结案）**
+
+现场：253 把帧目录接进电池那一步之后，`CiExitTests` 里那一格要求 `verdict=ok`，而 runner 自己打
+`verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7`（run 39315528849 / 39315666980，commit 4edfea5 / 847ab2b，
+两跑均 `conclusion=failure`）。四条 NOT_RUN 由尺逐颗点名：浮层/选中行药丸 cause=bg-not-flat，统计/统计行、统计/月份行、
+统计/热图网格 cause=no-ink，全带 bg=(50, 50, 50)；而 `missing_frames=0` ⇒ 帧到了、尺也真跑了。
+红的是**我的断言**，不是产品，也不是「runner 没跑」—— 拿本机的画像当 runner 的地板就是 R154 / R87 那一族。
+
+修法（第六笔，产品 0 文件）：期望换成 `CI_EXPECTATIONS` 一张表，一行 = 一台机器自己该看到的完整画像
+（verdict + hard / not_run / missing_frames / probes + `not_run_names` 逐颗 + `missing_names`）。机器键从可观察事实推
+（`GITHUB_ACTIONS=true` ⇒ `github-runner`，否则 `local:` + `platform.node()`），`LEFT_AXIS_MACHINE_KEY` 只是显式逃生口、
+也只准填名册里已有的键；**未登记的机器仍红**，红话里带解析出来的键和名册清单。没写成「skipped 也算过」（那是 R210 立这两格的原意）。
+证人四格：两张逐字抄录样本各自满足自己那行**且互不满足**（切片没被并成一行）、清空 runner 那行的名册必须红、
+把「帧没到」这一支并进来必须红、尺自陈计数与名单不签字时解析器当场响。
+仍未读到：真 runner 那一跑 —— 本地重放只证明「表 + 解析器」这套契约成立，不证明那台机器的环境与四条名单一字未变（下一轮第 ⓪ 条点名要读）。
+
 **续跑清单（R231 补记写的，下一轮第 ⓪ 条从这里取，别手写编号）**
 
 - **本轮两笔的 run↔commit 已成对拿到，结论还没拿到**（`gh run list --limit 5` 原文）：`02de8cc` → run **`39314291982`**、`e347a0c` → run **`39314396070`**，两跑都 `in_progress`、`conclusion=` 空 ⇒ 只能说**未读**，不许写成"过了"。
@@ -6226,3 +6242,44 @@ R231 把剩下三处也接进同一条换算 —— 但没有帧。逐处补帧�
   （缺席不许被读成绿），从后门放掉就等于没接。
 - 253 的状态因此**收窄而不是结案**：接线与"帧读得到"两件事已结案，欠账换成 259 那一格期望表；
   258 仍剩 `DetailView.swift:228`（`MarkdownModeButton`）与 `:541`（`MultiFileRow`）两处。
+
+## R231 补记第六笔（259 结案：`--ci` 那一格改成「按机器 × 按探针」切片的期望表）
+
+- **病根**：253 把帧目录接进电池那一步之后，`CiExitTests.test_real_frames_pass_and_report_ok`
+  在 runner 上连红两跑（847ab2b → run 39315666980，conclusion=failure）。红的是**我的断言**，不是产品：
+  runner 自己打 `LEFT_AXIS_CI verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7`，四条 NOT_RUN
+  由尺逐颗点名（浮层/选中行药丸 cause=bg-not-flat；统计/统计行、统计/月份行、统计/热图网格 cause=no-ink，
+  全带 bg=(50, 50, 50)），而 `missing_frames=0` ⇒ 帧到了、尺也真跑了。本机同一把尺打
+  `verdict=ok hard=0 not_run=0 missing_frames=0 probes=7`（/tmp/shots_r231c，158 帧 @2x）。
+  把本机的能力当成 runner 的地板 = 一把尺去判另一台机器（R154 / R87 那一族）。
+- **修法**（产品 0 文件，只动判据）：期望换成 `CI_EXPECTATIONS` 一张表，一行 = 一台机器的**完整画像**
+  （verdict + hard / not_run / missing_frames / probes + `not_run_names` 逐颗 + `missing_names`）。
+  机器键从可观察事实推：`GITHUB_ACTIONS=true` ⇒ `github-runner`，否则 `local:` + `platform.node()`
+  （本机实测 `MacBook-Air.local`）；`LEFT_AXIS_MACHINE_KEY` 只是显式逃生口，也只准填名册里已有的键。
+  **未登记的机器仍红**，红话里带解析出来的键和名册清单 —— 没写成「skipped 也算过」（那是 R210 立这两格的原意）。
+- **解析器自己的两道闸门**：`LEFT_AXIS_CI` 结论行打不出来 = 坏（不许当空画像通过）；尺自陈的
+  `missing_frames` 数目与它自己点名的缺席名单不签字 = 坏（R99 那一族：只数数量会被另一条出口喂饱）。
+- **证人**（`scripts/tests/test_surface_left_axes.py`：给帧变量 `Ran 15 OK`，不给 `Ran 15 OK (skipped=2)`）：
+  ① 正对照 —— runner 原文抄录（run 39315666980）满足 runner 行、本机样本满足本机行，**且两样本互不满足**
+  ⇒ 切片没被并成一行；② 刀一 —— 把 runner 行的名册清空 + verdict 写 ok，同一份原文必须判不匹配，
+  且 verdict / not_run / NOT_RUN 名单三样都报出来；③ 刀二 —— 造一份只缺帧的样本去撞本机行，
+  `missing_frames` 与「缺席帧名单」两处都要报；再喂一份计数与名单矛盾的样本，解析器必须当场响；
+  ④ 负对照 —— 键不在名册 ⇒ 走 fail 分支（红），不许被 skip 或 ok 吃掉。
+- **仍属未读**：真 runner 会不会因此绿，只能由下一跑签。抄录样本在本地重放只证明「表 + 解析器」这套契约成立，
+  不证明那台机器的 `GITHUB_ACTIONS` 真为 true、四条 NOT_RUN 名单与上次一字未变。若它红在「未登记的机器」
+  那一支，红话会打印它自己解析出的键 —— 按那个键补一行，**不许**顺手把本机行改成通配或把断言删掉。
+- 帧：158（未重捕，产品 0 文件）；看图腿：NOT-RUN（无新对象可看，沿用上一笔的帧只做尺的对照）。
+- 电池（本笔台账之后跑）：`Ran 410`（406 → 本格净增 4）。
+- **下一轮第 ⓪ 条**：三个 run 成对待读 —— 5cf95fe → 39319255032、f798ff8 → 39319908786（写本笔时均
+  in_progress ⇒ 只准记「未读」）、本笔这一跑（commit 待定 ⇒ 下一轮先取 id）。要验的两件事按名列出：
+  (a) `Release script tests` 那一步的 `test_ci_exit_matches_this_machines_registered_profile` 是否绿，
+  且 `CI_PROFILE_OK`/红话里打印的**主语**是不是 `github-runner`；(b) `png_files` 是否 =158（新加的四格
+  `settingsrow-hover-*` 帧进了 runner 的帧目录 ⇒ 尺的探针数仍是 7，画像里 probes=7 不许被顺手改掉）。
+  之后接着做的是 258 剩下两处（`DetailView.swift:228` `MarkdownModeButton`、`:541` `MultiFileRow`，
+  两处仍是 `private struct`，模式已在 258 第一处验过），再往后 254 → 255 → 248 → 243 → 250 → 227③ → 222 → 215。
+- **自曝（这一笔被自家两道守卫各抓一次，都是我的文本而不是判据坏）**：①`test_frames_path_hygiene.test_no_hardcoded_round_frame_directory`
+  红在我刚写进 `CI_EXPECTATIONS` 的那句 provenance —— 它把 `/tmp/shots_r231c` 写死在 scripts 里的字符串里，正是 253 判掉的那个形状；
+  已改成「帧目录由 CLIPBOARD_HISTORY_UI_SHOTS 给出」。②`test_ledger_generator_output.test_prose_references_to_backlog_items_resolve_too`
+  红在 CHANGELOG 写了「BACKLOG 259」而 259 从没登记成条目（补记第五笔只在散文里"新开"了一句）⇒ 现在补上 `**259.` 定义行。
+  ③顺手记一条工具形状：`unittest discover -s scripts/tests -p "test_{a,b}.py"` 在花括号不展开时打 **`Ran 0 tests / OK`** ——
+  零用例也算绿，这一族的"绿"要按 `Ran N` 的 N 判，不能只看 OK（本笔第一次重跑就是这么空的）。

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### `--ci` 那一格不再是本机的地板：期望表按机器 × 按探针切片（R231 补记第六笔 / BACKLOG 259）
+
+`scripts/tests/test_surface_left_axes.py` 里那条 `verdict=ok` 断言在 runner 上连红两跑
+（847ab2b → run 39315666980）。它红的不是产品：runner 自己打
+`verdict=skipped hard=0 not_run=4 missing_frames=0 probes=7`，四条 NOT_RUN 由尺逐颗点名，
+而本机同一把尺打 `verdict=ok not_run=0`。现在期望来自一张 `CI_EXPECTATIONS` 表 —— 每台机器登记
+它自己该看到的完整画像（三个计数 + `probes` + 逐颗 NOT_RUN / 缺席帧名单），机器键从可观察事实推
+（`GITHUB_ACTIONS` ⇒ `github-runner`，否则 `local:MacBook-Air.local`），未登记的机器仍红并把解析出的键
+打进输出。另加两张逐字抄录的样本做正对照：runner 样本满足 runner 行、本机样本满足本机行，且两行互不满足。
+两支负对照钉这张表有牙：清空 runner 那行的名册必须红（verdict / not_run / 名单三样都报）；
+把「帧没到」这一支并进来了也必须红（`missing_frames` 与缺席名单两处），计数与名单不签字的样本让解析器当场响。
+产品 0 文件 ⇒ 未换装、看图腿 NOT-RUN；判据卷 `Ran 15 OK`（不给帧变量 `OK skipped=2`），电池 `Ran 410`。
+
 ### 设置侧栏那一行的悬停层第一次有像素证人（R231 补记第四笔 · 产品 1 文件 + 判据 1 文件 + 夹具 2 帧对 + 刀 2 支）
 
 - 欠账（BACKLOG 258 的第一处）：这一家在 R231 之前只有**源码层的事实** —— `backgroundOpacity` 走了
