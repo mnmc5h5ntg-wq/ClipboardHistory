@@ -383,7 +383,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
   名册已登记 `mutate_r225`：`NEEDLE_PRECHECK tables=66 covered=51 arms=184 bad=4`。
 
 其余读数：构建 0 告警；捕获卷 `Executed 75 tests, 0 failures`；
-全量卷 `Executed 63 tests, 21 skipped, 0 failures`（D-208：动了 `Sources/` 必跑）；
+全量卷 `Executed 897 tests, 44 skipped, 0 failures`（D-208：动了 `Sources/` 必跑）；
 换装本机 `INSTALL_RESULT=ok`；电池见本轮结论行。看图腿：本轮真看了改后那张亮档帧与暗档对照。
 
 ## 第 226 轮（R224 · 2026-10-19）：246 的 runner 读数落账：七颗探针全在 no-bg-window，查出来是这把尺把窗口写在 @2x 像素上 —— 坐标约定已修（BACKLOG 249）（U-722…U-724 · 判据（python 尺）1 文件 + 表 1 文件，产品 0 文件）

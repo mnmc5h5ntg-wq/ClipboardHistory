@@ -8,7 +8,7 @@
 画法自己问 `effectiveAppearance`。改后亮档 `(232)` = **1.225:1**，与选中带 `(220)` 仍差 12 级（不撞选中）。
 **帧签**：`COMPARED=142 CHANGED=1`，唯一动的 `quickpick-hover-420x300-light.png`，暗档那张逐字节不变；基线同一笔 update。
 新判据 `QuickPickHoverInkTests` 两格；刀 `R225_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0`（M763/M764），名册已登记。
-验证：构建 0 告警、捕获卷 75 格 0 失败、**全量卷 63 格 21 skip 0 失败**（D-208）、换装本机 `INSTALL_RESULT=ok`。
+验证：构建 0 告警、捕获卷 75 格 0 失败、**全量卷 897 格 44 skip 0 失败**（D-208）、换装本机 `INSTALL_RESULT=ok`。
 新开 **251**（其余共用该令牌的位点没有两档帧可量 ⇒ 先补取证再改，不顺手）。
 
 **下一轮（R226）的靶**：⓪ 读本轮与 `da5da47`/`e015455` 三跑：`SCRIPT_PIL_OK`/`SCRIPT_SKIPS`（**244 结案的唯一通道**）、

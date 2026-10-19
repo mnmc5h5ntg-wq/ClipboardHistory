@@ -15,7 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - 刀 `R225_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`（M763/M764）；名册登记 `mutate_r225`。
 - 帧：`COMPARED=142 CHANGED=1`，唯一动的 `quickpick-hover-420x300-light.png`，暗档逐字节不变；基线同一笔 update。
 - 验证：构建 0 告警、捕获卷 75 格 0 失败、全量卷 897 格 0 失败、换装本机 ok；新开 **251**。
-
+- 自曝两格（同一轮复查抓到）：① 结论行里的「全量卷」数第一次落的是**内层 suite 的 63/21**，不是总数 897/44 ——
+  生成器那条 `re.search` 取的是日志里第一次匹配，已改成取最后一次（All tests 那一行），四处正文按真总数改回。
+  ② 上一笔 commit 的 message 声称「已把全量卷数改回 897/44」，而那一轮改数的脚本因 CJK 串里的 ASCII 双引号当场
+  SyntaxError 没跑（`&&` 链在 python 失败后仍继续 ⇒ message 先于证据）。这一笔才是那件事的证据。
+  规矩：**改数脚本里不许出现 ASCII 双引号；git 链要在 python 之后加退出码门；结论行要落在「总数」语义上、正则按日志形状取尾。**
 ### 246 结案（runner 的成因读数=no-bg-window）+ 左轴尺的坐标约定修好（R224 / U-722…U-724 · 判据（python 尺）1 文件 + 表 1 文件，产品 0 文件）
 
 - runner 正文（run `39273827335` = `69bccbd`，success）：`LEFT_AXIS_CI verdict=skipped not_run=7 probes=7`，
