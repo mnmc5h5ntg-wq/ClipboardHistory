@@ -1,5 +1,23 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+最后更新：2026-10-19 18:55（本地 · R205 / 第 207 轮：**D-4 的另一半接上 —— provider 声称是文件却解出 0 个 URL 时不再静默**（U-665…U-667 · 产品 2 文件，动效主线）
+
+**本轮落地（真改产品）**：`HistoryStore.addDroppedFiles` 加 `attemptedCount`，调用方传 `wanted.count`，
+回执说 attempted 而不是解出的 0；`HistoryStore.swift` 只 +1 行（1118→1119，`testHistoryStoreStaysThin` 仍绿）。
+判据 `testDroppedProvidersThatDecodeToNothingStillSpeakUp` 三条对照（说话 / 不传就照旧不说话 / 成功不留横幅），卷 `9 tests / 0 failures`；
+刀 `M736`（打"会不会说话"）与 `M737`（打"说的是哪个数"）⇒ **2/2 CAUGHT、ESCAPED=0、NOT_RUN=0**，还原后重跑同一卷仍 9/0。
+**画面未变**：`COMPARED=138 CHANGED=0 MISSING=0 ADDED=0` ⇒ 这条新回执**没有帧**（新分支不在任何夹具里）⇒ 开 BACKLOG 228（夹具 + 真机拖样本 + 把这两把刀搬进 `mutate_needle_precheck.py` 名册，否则下一轮复查不到）。
+已换装本机：`INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、`INSTALL_RUNNING_PID=54647`、条目 163→163；旧包留在 `Documents/Codex_Project0_backups/before-local-20261019-185024`。
+验证：脚本电池见 commit 输出、`MOTION_LEDGER_RESULT=ok`；**全量 `swift test` 本笔未跑，交给 CI 这一跑**（不许把 CI 未读说成绿）。
+台账：第 207 轮 / Round 205（七维表）/ CHANGELOG / BACKLOG 224 结案 / 228 开单；三账窗口 R205/R204/R203 齐。
+
+**下一轮（R206）的靶**：⓪ 读 CI 并把 run id↔commit 成对写回来：`c90790e`、`2b9238c`、`13075d4` 与本轮这笔（`in_progress` 只能说未读）；
+① **BACKLOG 228**：给"解出 0 个 URL"那一格补夹具（要真有帧），并把 M736/M737 搬进变异名册；
+② 227 的③（两条尺若给相反处置要补"哪条尺有资格判这一格"的守卫）与 222（色彩标注机制仍未定，亮档真帧余量只剩 3）；
+③ 215（真机亮档一格）、218、201/202/205/207、226；④ 220 路 A 仍等用户授权改 `AppleKeyboardUIMode`；
+⑤ 未清账 31 格，名单以 `MOTION_LEDGER_OPEN` 为准。
+）
+
 最后更新：2026-10-19 18:40（本地 · R204 / 第 206 轮：**看图腿真做了一遍 —— 热图阶梯下端量出 1.08 / 1.12 倍，221 拿到产物通道的第二个证人**（U-662…U-664 · 产品 0 文件，看图账）
 
 **本轮落地**：`/tmp/shots_r204` 重捕 138 帧（捕获卷 `Executed 72 tests, with 4 tests skipped and 0 failures`），

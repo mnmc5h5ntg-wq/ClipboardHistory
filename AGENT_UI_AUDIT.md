@@ -363,6 +363,25 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 207 轮（R205 · 2026-10-19）：D-4 的另一半接上了 —— provider 声称是文件却一个 URL 都没解出来时不再静默（U-665…U-667 · 产品 2 文件，动效主线）
+
+- **U-665：静默的第三格找到了自己的位置。** 改前 `acceptDroppedFileProviders` 里是 `_ = historyStore?.addDroppedFiles(urls: urls)`：
+  provider 过了 `hasItemConformingToTypeIdentifier` 但 `loadItem` 解出 0 个 URL 时，store 看到的是**空数组**，
+  而 `addDroppedFiles` 的守卫写的是 `if !urls.isEmpty` ⇒ 连 D-4 那条回执也不发 ⇒ 用户视角仍是"我拖了，什么都没发生"。
+  修法是最小形状：`addDroppedFiles(urls:attemptedCount:timestamp:)`，调用方把"声称有几个"（`wanted.count`）传进来，
+  回执说 attempted 而不是解出的个数。`HistoryStore.swift` 只 +1 行（1118→1119，`testHistoryStoreStaysThin` 仍绿；上限只准降）。
+- **U-666：三条对照 + 两把刀，两把都 CAUGHT。** `DroppedFileImportTests.testDroppedProvidersThatDecodeToNothingStillSpeakUp`：
+  ① `urls: []` + `attemptedCount: 2` ⇒ 返回 0、回执非空、且文案含"2 项"、仍然不入库；
+  ② 不传 `attemptedCount` ⇒ 照旧不说话（这一格是**反向**对照，防的是把回执放宽成"每次拖都说话"）；
+  ③ 真解出一个 ⇒ 返回 1 且不留横幅（成功不该被横幅打断）。
+  卷 `Executed 9 tests, with 0 failures`；刀 `M736`（`attemptedCount ?? urls.count` → `urls.count`）与
+  `M737`（文案 `\(attempted)` → `\(urls.count)`）⇒ **2/2 CAUGHT、ESCAPED=0、NOT_RUN=0**，
+  还原后重跑同一卷仍 9/0（`POST_RESTORE_EXIT=0`）。两把刀各打一条轴：一把打"会不会说话"，一把打"说的是不是那个数"。
+- **U-667：画面未变 ⇒ 这条新回执**没有帧**，真机也没拖过。** `frame_baseline compare /tmp/shots_r205 --against working` ⇒
+  `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0`（新分支不在任何夹具里；现有 `content-with-two-notices` 走的是"混着来"那一格）。
+  已换装本机：`INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、`INSTALL_RUNNING_PID=54647`（启动晚于安装、exe 路径逐字对上）、
+  `INSTALL_ENTRIES_BEFORE=163 AFTER=163`。欠的两件事写进 BACKLOG 228：给第三格补夹具（有帧），以及真机拖一次"声称是文件但解不出"的样本。
+
 ## 第 206 轮（R204 · 2026-10-19）：看图腿真做了一遍 —— 热图**最低两档在产物通道上几乎不可分**（1.08 / 1.12 倍），221 拿到第二个证人（U-662…U-664 · 产品 0 文件，看图账）
 
 - **U-662：帧是真的重捕的，对账分母不是 0。** `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots_r204 swift test --filter UICaptureTests`

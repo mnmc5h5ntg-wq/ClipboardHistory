@@ -450,12 +450,13 @@ final class HistoryStore: ObservableObject {
     ///
     /// 第三轮审计 D-4：`DroppedFileImport.Planned.ignoredCount` 一直算得出来，却没有任何调用方读它
     /// ⇒ 用户看到虚线落点框闪一下、什么都没发生。现在两种情况都会给出横幅：
-    /// ① 一个都不是本机文件；② 混着来（"3 个里有 1 个不是文件"）。
+    /// ① 一个都不是本机文件；② 混着来（"3 个里有 1 个不是文件"）；③ provider 声称是文件却一个 URL 都没解出来 —— 这一种 `urls` 是空的，只有调用方知道 attempted 几个（R205 / BACKLOG 224 ⇒ 传 `attemptedCount`）。
     @discardableResult
-    func addDroppedFiles(urls: [URL], timestamp: Date = Date()) -> Int {
+    func addDroppedFiles(urls: [URL], attemptedCount: Int? = nil, timestamp: Date = Date()) -> Int {
+        let attempted = attemptedCount ?? urls.count
         guard let planned = DroppedFileImport.plan(for: urls) else {
-            if !urls.isEmpty {
-                droppedFilesNotice = "拖入的 \(urls.count) 项不是本机文件，未加入历史"
+            if attempted > 0 {
+                droppedFilesNotice = "拖入的 \(attempted) 项不是本机文件，未加入历史"
             }
             return 0
         }

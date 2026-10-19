@@ -276,7 +276,9 @@ struct HistorySidebarView: View {
             for provider in wanted {
                 urls.append(contentsOf: await Self.fileURLs(from: provider, identifier: identifier))
             }
-            _ = historyStore?.addDroppedFiles(urls: urls)
+            /// ③ 那一格的调用方：`wanted` 是"声称自己是文件"的个数，`urls` 是"真解出来"的个数。
+            /// 只传 `urls` 的话，一个都没解出来时 store 看到的是空数组 ⇒ 静默（BACKLOG 224）。
+            _ = historyStore?.addDroppedFiles(urls: urls, attemptedCount: wanted.count)
         }
         return true
     }

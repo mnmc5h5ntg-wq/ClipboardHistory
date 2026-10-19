@@ -91,4 +91,29 @@ final class DroppedFileImportTests: XCTestCase {
         XCTAssertEqual(store.addDroppedFiles(urls: []), 0)
         XCTAssertTrue(store.entries.isEmpty, "没有可用文件时不能留下空记录")
     }
+
+    /// BACKLOG 224（R205）：D-4 修了"接住了但什么都没发生"，漏了另一半 ——
+    /// provider **声称**是文件、`loadItem` 却一个 URL 都没解出来时，`urls` 是空数组，
+    /// store 看到的是"什么都没拖进来"，于是连 D-4 那条回执也不发 ⇒ 用户视角仍然是"我拖了，什么都没发生"。
+    /// 三条正反对照一起写：① attempted=2 而解出 0 ⇒ 必须说话，且说的是 2 不是 0；
+    /// ② 不传 attemptedCount（旧调用方）⇒ 行为与改前一致，不许凭空造回执；③ 真解出来一个 ⇒ 成功不该被横幅打断。
+    func testDroppedProvidersThatDecodeToNothingStillSpeakUp() {
+        let store = makeStore()
+        XCTAssertEqual(store.addDroppedFiles(urls: [], attemptedCount: 2), 0)
+        let notice = store.droppedFilesNotice
+        XCTAssertNotNil(notice, "声称是文件却一个都没解出来 ⇒ 必须就地说话（D-4 的另一半）")
+        XCTAssertEqual(notice?.contains("2 项"), true, "回执要说 attempted 的个数而不是解出来的 0：\(notice ?? "nil")")
+        XCTAssertTrue(store.entries.isEmpty, "说话不等于入库：仍然不能留下空记录")
+
+        let quiet = makeStore()
+        XCTAssertEqual(quiet.addDroppedFiles(urls: []), 0)
+        XCTAssertNil(quiet.droppedFilesNotice, "没传 attemptedCount 的旧调用方照旧不说话（这条不许被放宽成默认回执）")
+
+        let ok = makeStore()
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("dropped-\(UUID().uuidString).txt")
+        FileManager.default.createFile(atPath: file.path, contents: Data("x".utf8))
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        XCTAssertEqual(ok.addDroppedFiles(urls: [file], attemptedCount: 1), 1)
+        XCTAssertNil(ok.droppedFilesNotice, "成功那一格不该被横幅打断")
+    }
 }

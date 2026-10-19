@@ -5636,3 +5636,24 @@ CHANGELOG 三条既有标题做最小机械改写补上 `/ U-…` 段。STATE �
    调色板或地板任何一处动过，先红的会是产物通道。
 配对合法性：最近一笔动过 `ClipboardHistory/Sources` 的是 `a775d10`（Round 194）⇒ R198 的判据日志与 R204 的帧同源于同一份调色板，
 这条配对不是跨版本比较。
+
+**224 追记（R205 结案）：产品半已修 —— 「声称是文件却解出 0 个 URL」那一格现在有就地回执；本条的"先分辨"用的是读码分辨，不是 in-screen 实验**
+
+分辨结论来自代码结构而不是实验：`guard !wanted.isEmpty else { return false }`（系统层拒收，画禁投光标）与
+`wanted` 非空但 `fileURLs` 解出 0 个（应用层接住了却什么都没做）在源码里就是**两个分支**，
+前者有系统光标、后者完全静默 ⇒ 不需要在屏探针也能分开，于是直接补后者。
+修法与验收见 `AGENT_UI_AUDIT.md` 第 207 轮（U-665…U-667）：`addDroppedFiles` 新增 `attemptedCount`、
+`testDroppedProvidersThatDecodeToNothingStillSpeakUp` 三条对照、刀 M736/M737 全 CAUGHT、已换装本机。
+**没做的两件事转 BACKLOG 228**（所以本条结的是"要不要加回执"这个决定，不是"这条回执已被看见"）。
+
+**228. 新回执「拖入的 N 项不是本机文件」没有帧、没在真机拖过，而 R205 那两把刀也没进变异名册（R205 开单）**
+
+三件事，各自都能被复查：
+① **夹具**：`UICaptureHarness` 里 `content-with-two-notices` 走的是"混着来"那一格（`addDroppedFiles(urls:[远程 URL])`），
+   第三格（`urls: []` + `attemptedCount: n`）不在任何夹具里 ⇒ 帧基线 `CHANGED=0` 其实说的是"这条新代码没被拍到"。
+   补一个夹具，让这条文案进帧，两档各一张。
+② **真机**：拖一次"声称是文件但解不出 URL"的样本（例如某些云端占位文件），看回执是否真的出现、文案是否说对个数。
+   不许用模拟器造 —— 这一格的成因本来就是 `loadItem` 解不出。
+③ **名册**：M736/M737 本轮是**内联**跑的（临时 python 打补丁），没进 `scripts/mutate_needle_precheck.py` 的 TABLES ⇒
+   下一轮复查不到，且刀号跨表唯一性也没被检查过。搬进名册并让预检认这两个号。
+适用面：任何"新分支只被单元测试覆盖、没进画面也没进名册"的时刻；不适用：纯判据/纯工具笔（那些本来没有画面）。

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 拖入「声称是文件却一个 URL 都没解出来」不再静默 —— D-4 的另一半接上（R205 / U-665…U-667 · 产品 2 文件，动效主线）
+
+- `HistoryStore.addDroppedFiles(urls:attemptedCount:timestamp:)`：回执说 **attempted** 而不是解出的个数；`HistoryStore.swift` 只 +1 行（1118→1119，`testHistoryStoreStaysThin` 仍绿，上限只准降）
+- 调用方 `HistorySidebarView.acceptDroppedFileProviders` 传 `wanted.count`（"声称有几个"），改前这一格 store 只看到空数组 ⇒ 连 D-4 那条也不发
+- 判据 `testDroppedProvidersThatDecodeToNothingStillSpeakUp` 三条对照：说话 / **不传就照旧不说话**（防放宽成"每次拖都说话"）/ 成功不留横幅；卷 `9 tests / 0 failures`
+- 变异：`M736`（`attemptedCount ?? urls.count`→`urls.count`，打"会不会说话"）、`M737`（文案 `\(attempted)`→`\(urls.count)`，打"说的是哪个数"）⇒ 2/2 CAUGHT、ESCAPED=0、NOT_RUN=0、还原后重跑仍 9/0
+- 画面未变：`frame_baseline compare /tmp/shots_r205 --against working` ⇒ `COMPARED=138 CHANGED=0 MISSING=0 ADDED=0` ⇒ **这条新回执没有帧**（新分支不在任何夹具里）⇒ 夹具与真机拖样本开成 BACKLOG 228
+- 已换装本机：`INSTALL_RESULT=ok 版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_RUNNING_PID=54647`（启动晚于安装、exe 路径逐字对上）、条目 163→163；旧包留在 `Documents/Codex_Project0_backups/before-local-20261019-185024`
+- 台账：STATE 换到 R205 / 第 207 轮；BACKLOG 224 结案（分辨结论来自读码：两条路径在代码里本就是两个分支）；全量 `swift test` 本笔交给 CI 这一跑
+
 ### R204 看图腿：138 帧重捕 + 热图阶梯下端在产物通道上量出 1.08 / 1.12 倍（R204 / U-662…U-664 · 产品 0 文件，看图账）
 
 - 捕获卷 `Executed 72 tests, with 4 tests skipped and 0 failures`，`/tmp/shots_r204` 139 项；
