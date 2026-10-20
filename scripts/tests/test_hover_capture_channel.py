@@ -27,8 +27,10 @@ DEBT = {
                                   '但 hover 那一档没有独立的两态帧；接法=在夹具里给同一份数据点两下键，别在产品里读键',
     'GlassControls.swift': '欠账：这里只剩注释与 .pressedStyle(hoverLevel:) 的委托，真正的悬停墨换算在 PressableStyle（已接键）里；'
                            '登记的理由是"本文件不再有独立的悬停画法"，若哪天又自己画一层就必须接键',
-    'SearchField.swift': '欠账：图标颜色直接读裸 isHovered（controlTargeted vs control），这一条画法离屏拍不到；'
-                         '接法=与同文件那颗清除按钮共用一个 isHoveredForDrawing，一行改动',
+    'HistoryRowViews.swift': 'R249 剥注释后现读：这个文件的 hoveredForCapture 只出现在文档注释里（第 84 行），代码没接 ⇒ 键其实不在这位。'
+                                      '它 116 行的 .pressedStyle(hoverLevel:) 那一层经 PressableStyle 可拍，'
+                                      '但 120 行 .onHover 的状态还驱动着什么画法，本轮没量 ⇒ 记欠账，接法=先数清它自己直读 isHovered 的画法有几处，'
+                                      '再决定是共用 PressableStyle 那层还是自己接键（不许再把它当已接）',
     'VideoPreview.swift': '欠账：两处 .pressedStyle(hoverLevel:) 委托给已接键的 PressableStyle，'
                           '但预览卡自身没有两态夹具帧；登记是因为它从未进过帧基线，不是因为不需要',
 }
@@ -40,16 +42,24 @@ def hover_files(views=VIEWS):
         if not name.endswith('.swift'):
             continue
         text = io.open(os.path.join(views, name), encoding='utf-8').read()
-        if '.onHover' in text or 'hoverLevel' in text or 'HoverInk' in text:
+        code = strip_line_comments(text)
+        if any(tok in code for tok in ('.onHover', 'hoverLevel', 'HoverInk')):
             out.append(name)
     return out
 
 
+def strip_line_comments(text):
+    """R249 / M813 现读出来的坏法：`KEY in text` 会被**引用了键名的注释**喂饱 —— 我自己记过这条规矩
+    （整文件 contains 命中自己引用的注释，扫前剥行注释），却还是把它写错了。M813 摘掉真正的声明时
+    名册那格不红，就是这条假绿的证人。剥注释比的是"代码里有没有"，不是"文件里提没提"。"""
+    return '\n'.join(l.split('//')[0] for l in text.split('\n'))
+
+
 def wiring(views=VIEWS):
-    """返回 [(文件, 是否接键)]，按文件名排序 —— 结论行要打印的就是这张表。"""
+    """返回 [(文件, 是否接键)]，按文件名排序 —— 结论行要打印的就是这张表（只看代码，不看注释）。"""
     rows = []
     for name in hover_files(views):
-        text = io.open(os.path.join(views, name), encoding='utf-8').read()
+        text = strip_line_comments(io.open(os.path.join(views, name), encoding='utf-8').read())
         rows.append((name, KEY in text))
     return rows
 
@@ -99,6 +109,24 @@ class HoverCaptureChannelTests(unittest.TestCase):
         broken = [(rows[0][0], False)] + rows[1:]
         codes = [c for c, _ in problems(broken)]
         self.assertIn('HOVER_CHANNEL_UNPAIRED', codes, '把接了键的说成没接时不许静默通过')
+
+
+class SearchFieldChannelTests(unittest.TestCase):
+
+    def test_search_field_ink_honours_the_capture_channel(self):
+        """R249 / BACKLOG 291：这一位是名册里唯一"画法本身拍不到"的真缺陷，现已接上。
+
+        断言打在**画法**上而不是文件里有没有键：图标墨与清除按钮的可见性都必须读同一层
+        `isHoveredForDrawing`；谁再退回裸 `isHovered`，这一格就红。
+        """
+        text = io.open(os.path.join(VIEWS, 'SearchField.swift'), encoding='utf-8').read()
+        self.assertIn('@Environment(\\.hoveredForCapture) private var hoveredForCapture', text,
+                      'SearchField 里没有取证键 ⇒ 291 没做完')
+        self.assertIn('.foregroundStyle(isHoveredForDrawing ? VisualInk.controlTargeted : VisualInk.control)', text,
+                      '图标墨又读回裸 isHovered ⇒ 两态帧拍不到这一条（量不到 ≠ 没问题）')
+        self.assertIn('isHoveredForDrawing || !text.isEmpty', text,
+                      '清除按钮的可见性又读回裸 isHovered ⇒ 悬停时它出现不出现，帧里读不到')
+        self.assertNotIn('isHovered || !text.isEmpty', text, '残留一处直读 isHovered')
 
 
 class HoverChannelReadingsTests(unittest.TestCase):

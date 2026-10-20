@@ -1,0 +1,1 @@
+.foregroundStyle(isHovered ? VisualInk.controlTargeted : VisualInk.control)

@@ -3,9 +3,15 @@ import SwiftUI
 struct SearchField: View {
     @Binding var text: String
     @State private var isHovered = false
+    /// R249 / BACKLOG 291：与 `MultiFileRow`（R248）同一族 —— 这一位的图标墨与清除按钮的可见性
+    /// 原来直接读裸 `isHovered`，离屏渲染里恒 false ⇒ 两态帧拍不到这两条画法（"拍不到"被记成"没问题"）。
+    /// 键在产品路径永远是 nil，不参与悬停语义。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+    /// 一层判定只留一处：图标墨与清除按钮共用它。
+    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     private var isActive: Bool {
-        isHovered || !text.isEmpty
+        isHoveredForDrawing || !text.isEmpty
     }
 
     var body: some View {
@@ -38,7 +44,7 @@ struct SearchField: View {
                         // **看不见的大目标仍然看不见**。
                         // 悬停那一下交给 `controlTargeted` + 底色药丸（颜色说"这是控件"，
                         // 药丸说"指针在这儿"），不再靠"从看不见变成勉强看得见"当反馈。
-                        .foregroundStyle(isHovered ? VisualInk.controlTargeted : VisualInk.control)
+                        .foregroundStyle(isHoveredForDrawing ? VisualInk.controlTargeted : VisualInk.control)
                 }
                 // 悬停药丸与命中区一起抬（R20）：这颗 × 的 label **只有字形那么大**
                 // （`xmark.circle.fill` 在 `VisualFont.row` 下约 14pt，没有 frame、没有 padding），

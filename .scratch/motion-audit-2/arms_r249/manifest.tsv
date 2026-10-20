@@ -1,0 +1,2 @@
+M811	python	ClipboardHistory/Sources/ClipboardHistoryApp/Views/SearchField.swift	.scratch/motion-audit-2/arms_r249/M811.old	.scratch/motion-audit-2/arms_r249/M811.new	test_search_field_ink_honours_the_capture_channel	图标墨退回裸 isHovered ⇒ 两态帧又拍不到这一条画法
+M812	python	ClipboardHistory/Sources/ClipboardHistoryApp/Views/SearchField.swift	.scratch/motion-audit-2/arms_r249/M812.old	.scratch/motion-audit-2/arms_r249/M812.new	test_search_field_ink_honours_the_capture_channel	清除按钮的可见性退回裸 isHovered ⇒ 悬停时它出现与否读不到
