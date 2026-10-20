@@ -6,7 +6,7 @@
 **本轮落地**：`DetailView.swift` 的 `MultiFileRow` 接上 `hoveredForCapture`（填充与描边共用一层判定）；`test_hover_capture_channel.py` 4 格名册（位点=9 / 已接=5 / 欠账=4，双向对账）；`swift build` 零告警；modechip 捕获格绿。
 
 **下一轮（R249 / 第 248 轮 / Round 246）的靶**：
-⓪ 读 CI：`python3 scripts/ci_read.py latest` 现拿成对。未读三笔（取数时仍 `in_progress` ⇒ 只能说未读）：`39477446836↔5941520`（本笔 push 后现取）、`39475884846↔550fb43`、`39474398455↔09a8763`。要读的仍是 287 那三件（runner 自印 `HOVER_TWO_STATE_277` 定线、`HOVER_DIFF_CONTROL=` 只剩两颗、`SOURCES_CELL_HISTORY … 处置=judge`）。
+⓪ 读 CI：**run 号只能 gh 现取**。现读成对（2026-10-20 12:55）：`39478148037↔0bb02e1`（本笔，in_progress ⇒ 未读）、`39476999347↔5941520`（R247，in_progress ⇒ 未读）、`39475884846↔550fb43`（R246，in_progress ⇒ 未读）、`39474398455↔09a8763`（R245）**completed/failure ⇒ 有结论**：唯一失败步骤 `STEP[9] Release script tests`，其后六步 skipped；正文本次未读 ⇒ 不断言它与 R243/R244 那朵 `HOVER_DIFF_CONTROL_INCOMPLETE` 同源（同一步≠同一因）。要读的仍是 287 那三件：runner 自印 `HOVER_TWO_STATE_277` 定线、`HOVER_DIFF_CONTROL=` 是否只剩两颗、`SOURCES_CELL_HISTORY … 处置=judge`。
 ① 做 290：`MultiFileRow` 的多文件夹具 + 两态帧（同一色档 idle/lit），按 WCAG 地板判，并把帧拿在眼里看一遍（眼睛腿本轮必须 RUN：连续六轮 NOT-RUN 是本表最重的缺口）。
 ② 做 291 的 `SearchField` 那一行：唯一一处"画法本身拍不到"的真缺陷（图标色读裸 `isHovered`），一行改动 + 一把刀。
 ③ 做 292：换装本机 —— 改了产品代码就要重装，或具名 NOT-RUN 并说清代价。
