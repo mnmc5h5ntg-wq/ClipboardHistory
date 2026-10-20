@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R255 / 第 254 轮 / Round 252 · round_verify.sh 落地；第一次跑就把 R253 那笔改动照成 4 失败）
+
+新增 `scripts/round_verify.sh`（295 结案）：一条命令跑完 D-236 的四件套并打一行摘要；全量日志（这台机器 326MB）只留 /tmp；帧基线只 compare 不 update。
+现读：`Executed 915 tests, with 44 tests skipped and 4 failures`；红名 `testLightLadderClearsTheFloorAndKeepsTheStep`、`testFillOpacityTruthTableBothAppearances`（都是 R253 那次抬量打破的既有等式）、`testImageComparisonCostStaysBounded`（281 已知抖动）。帧基线 168 张 changed=1（`settings-shortcuts-recording-720x540-dark.png`）missing=0。
+改判：R253/R254 写的「297 结案」作废，297 回到仍开；处置与新项 300（修等式还是回退 0.04，两条路都要重跑四件）。
+脚本自己的两个 bug 当场修：`swift_failures` 抓错形状会把 4 次失败藏成空键；`grep -c ... || echo 0` 让 `build_warnings` 变两行。
+本轮 0 产品文件；眼睛腿 NOT-RUN；自评 84/105。
+
 ### Changed（R254 / 第 253 轮 / Round 251 · 看图验收 + 第一把「重捕型」刀 M814）
 
 看图腿 RUN：同一位改前/改后两张亮档帧对比 —— 改前几乎看不出有层在亮（1.171），改后是明确的浅灰横底、不压字不抢视线 ⇒ R253 那次产品改动完成视觉验收（范围只这一个位点，其余亮档悬停未重看）。

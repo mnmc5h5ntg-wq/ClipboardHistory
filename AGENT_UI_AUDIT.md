@@ -363,6 +363,22 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 254 轮（R255 / 第 254 轮 / Round 252 · 2026-10-20）：`round_verify.sh` 落地 —— 它第一次跑就把 R253 那笔产品改动照成红的（U-822…U-824 / D-241 · 295 结案、新开 300、297 改判仍开 · 产品 0 文件）
+
+本轮次对照：与 R254（看图 + 一把重捕型刀，自评 90）相比，本轮把 D-236 的四件套脚本化；脚本第一次跑就给出 4 次失败，其中两格直指 R253 那笔我没跑全量卷就 push 的产品改动。
+
+- **U-822：`scripts/round_verify.sh` 一条命令跑完四件套**（build → 全量卷 → 重捕帧 → 帧基线 compare → make dmg → ditto 换装），只打一行摘要、大日志留 /tmp、基线只 compare 不 update。它存在的理由不是省事：同一个漏（改了产品没跑全量卷）在 R248/R249/R253 连续出现三次。
+- **U-823：第一次跑的现读就是代价** —— `Executed 915 tests, with 44 tests skipped and 4 failures`。三格红名：`testLightLadderClearsTheFloorAndKeepsTheStep`、`testFillOpacityTruthTableBothAppearances`（这两格是 R253 的 `VisualFillLift.hover` 0.025→0.04 打破的既有等式）、`testImageComparisonCostStaysBounded`（281 的已知抖动）。⇒ R253/R254 账里那句「297 结案」是过早的，本笔改成**仍开**，新开 300 决定"修等式还是回退 0.04"。帧基线 168 张 compare：changed=1（`settings-shortcuts-recording-720x540-dark.png`，R141 起就有计时敏感史）、missing=0。
+- **U-824：摘要脚本自己也被抓出两个"有键无值"级 bug 并当场修**：① 汇总行形状是 `with 44 tests skipped and 0 failures`，按 `with N failures` 永远抓不到 ⇒ 摘要打成 `swift_failures=NOT-RUN`，会把 4 次失败藏成一个空键；② `grep -c ... || echo 0` 在 grep 已打 0 时又补一行 ⇒ `build_warnings` 变两行。两处都改成"抓不到就显式 NOT-RUN，且不许覆盖已有读数"，`bash -n` 通过。
+
+读数腿：RUN —— 摘要一行 + 三份日志（`/tmp/r255_verify/{build,full,capture,baseline,dmg}.log`）。
+
+眼睛腿：NOT-RUN —— 本轮没有看帧（changed 那一格是计时敏感帧，看图不解决问题，问题在 300）。
+
+变异腿：RUN（上一轮的 M814 仍是那笔改动的唯一刀证人）—— 但本轮新脚本没有刀；它自己的两个 bug 是靠"跑出来对不对"发现的，不是靠判据。
+
+未做（逐条）：① 300（修等式或回退 0.04；在此之前 297 仍开）；② 298 的全量卷已跑但结果是红的 ⇒ 债没清，换了个形态；③ 299、291 那四位、287/284/286；④ CI 未读（`df2fd71` 及之前六笔）。
+
 ## 第 253 轮（R254 / 第 253 轮 / Round 251 · 2026-10-20）：看图验收完成 + 第一把「重捕型」刀 —— M814 证明 R253 那 0.04 正是把读数顶过线的东西（U-819…U-821 / D-240 · 298 部分结案、新开 299 · 产品 0 文件）
 
 本轮次对照：与 R253（改了亮档抬量、尺说它过线，但眼睛没看改后帧、也没有刀）相比，本轮把这两件都补上，并且补的方式暴露了一种新的刀形。
