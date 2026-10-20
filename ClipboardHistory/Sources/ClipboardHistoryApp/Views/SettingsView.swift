@@ -868,9 +868,12 @@ struct SettingsSidebarRow: View {
     @Environment(\.hoveredForCapture) private var hoveredForCapture
 
     private var backgroundOpacity: Double {
-        if isSelected { return VisualFill.selected }
-        // R231 / BACKLOG 256：`selected` 那一格**不接**共享换算 —— 它是选中态不是悬停态，
-        // 抬量长在悬停上会把"选中的那一行"和"指针所在的那一行"糊成同一档。
+        if isSelected { return SelectedInk.opacity(dark: colorScheme == .dark) }
+        // R231 / BACKLOG 256 的原话是：`selected` 那一格**不接**悬停那条共享换算 —— 它是选中态
+        // 不是悬停态，抬量长在悬停上会把"选中的那一行"和"指针所在的那一行"糊成同一档。
+        // R260 更正：这条前提被后来的抬量挪走了。亮档下面两级抬到 0.12 / 0.15 之后，
+        // 糊成一档的换成了**按下与选中**（0.16 − 0.15 = 0.01 = 2.55/255 < 地板 4/255），
+        // 所以选中现在走自己的换算 `SelectedInk`（暗档仍等于令牌原值）。
         guard isHovered || (hoveredForCapture ?? false) else { return 0 }
         return HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
     }

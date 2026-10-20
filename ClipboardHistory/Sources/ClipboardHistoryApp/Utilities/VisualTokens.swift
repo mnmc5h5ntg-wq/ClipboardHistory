@@ -281,6 +281,15 @@ enum VisualFillLift {
     /// 抬量必须一起抬，否则"修亮档偏淡"会顺手把"按得下去"这件事抹平。0.015 → 0.03：
     /// 台阶 = 0.03 = 7.65/255（地板 4/255），次序仍是 hover(0.12) < pressed(0.15) < selected(0.16)。
     static let pressed: Double = 0.03
+
+    /// R260 / BACKLOG 308：亮档 selected 也要抬 —— 上面那句注释里"次序仍是"三个字当时成立，
+    /// 是因为 `pressed→selected` 还剩 0.04；而 R253/R256 把亮档下面两级一路抬到
+    /// hover 0.12 / pressed 0.15，最上面那级没动 ⇒ 现读 **0.16 − 0.15 = 0.01 = 2.55/255**，
+    /// 低于仓库自己给相邻两级定的 4/255 地板。次序对、分不开：按下那一瞬间的反馈会被选中态吃掉。
+    /// 这条不是审美：`ControlHoverLadderTests.testEveryRungOfTheLadderIsSeparableInBothAppearances`
+    /// 先红在改之前（红名 light，暗档同一格一直绿），红就是证人。
+    /// 0.02 让亮档变成 0.12 / 0.15 / 0.18 —— 两级台阶各 0.03，与暗档的等距结构同形（暗档 0.08/0.12/0.16 未动）。
+    static let selected: Double = 0.02
 }
 
 // MARK: - 描边强度

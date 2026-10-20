@@ -140,39 +140,66 @@ def rung_from_readings(text, machine):
     本文件已有的 `_ratio_wcag`，输入是判据印出来的三个灰阶 ⇒ 两台机器走同一条代码，地板才推得出来。
 
     校准是这条尺的**正对照**：用判据自印的灰阶重算"悬停对底""按下对底"两个比值，
-    必须复现判据自己印的那两个数（误差 ≤0.002）。复现不了就是两把尺在读不同对象，
-    台阶数一律不算。返回 (行列表, 退出码)。
+    必须复现判据自己印的那两个数（误差 ≤0.002）。复现不了就是两把尺在读不同对象，台阶数一律不算。
+
+    **按步骤切片（R260 / 上一轮自己写下的形状警告）**：runner 的一份日志里捕获卷会在两个步骤各跑一遍
+    （现读：`Offscreen frame capture (report-only, gated below)` 与 `Swift tests (executed-count gate)`），
+    所以"行数"从来不是覆盖率 —— 第一版把 4 行当成 4 个读数（R102：计数必须按步骤分组）。
+    现在每个档按步骤分组：同值只签一条并印出它来自几个步骤，**异值必须红**（同一台机器两次跑不一致，
+    先怀疑尺与环境，不给产品签字），签字时取最保守的那条（最小台阶）。
     """
-    rows, rc = [], 0
     pat = re.compile(
         r'PRESS_LADDER_PROOF (light|dark) 底 idle=(\d+) hover=(\d+) press=(\d+)'
         r'｜药丸 idle=(\d+) hover=(\d+) press=(\d+)'
         r'｜比值 ([\d.]+) → ([\d.]+)')
-    found = pat.findall(text)
-    if not found:
+    per = {}
+    for line in text.splitlines():
+        m = pat.search(line)
+        if not m:
+            continue
+        parts = line.split('\t')
+        step = parts[1].strip() if len(parts) >= 3 else '(无步骤字段)'
+        per.setdefault(m.group(1), {})[step] = dict(
+            bg=int(m.group(2)), hover=int(m.group(6)), press=int(m.group(7)),
+            r0=m.group(8), r1=m.group(9))
+    if not per:
         return (['RUNG_STEP_EMPTY=1 日志里一行 PRESS_LADDER_PROOF 都没有 ⇒ 这台机器没量到按下档，'
                  '不许在空名单上给绿（R99）'], 1)
-    seen = set()
-    for tag, _bi, _bh, _bp, _pi, hover, press, r0, r1 in found:
-        seen.add(tag)
-        # 底：三个 idle/hover/press 的底是同一片纸，取判据印的 hover 那一格
-        bg = int(re.search(r'PRESS_LADDER_PROOF ' + tag + r' 底 idle=(\d+)', text).group(1))
-        mine0, mine1 = _ratio_wcag(bg, int(hover)), _ratio_wcag(bg, int(press))
-        step = _ratio_wcag(int(hover), int(press))
-        calib_ok = abs(mine0 - float(r0)) <= 0.002 and abs(mine1 - float(r1)) <= 0.002
-        if not calib_ok:
+    rows, rc = [], 0
+    for tag in ('light', 'dark'):
+        groups = per.get(tag)
+        if not groups:
             rc = 1
-            rows.append('RUNG_STEP_CALIB=BAD %s 用判据自印的灰阶重算得 %.3f/%.3f，而它印的是 %s/%s'
-                        ' ⇒ 两把尺在读不同对象，台阶数不算' % (tag, mine0, mine1, r0, r1))
+            rows.append('RUNG_STEP_INCOMPLETE %s 档没有按下态读数 ⇒ 两档对照不存在，'
+                        '不许只按有读数的那档下结论' % tag)
             continue
-        rows.append('RUNG_STEP %s %s 悬停=%s 按下=%s 底=%s｜悬停→按下台阶(WCAG)=%.3f'
-                    '｜悬停对底=%s 按下对底=%s｜判定=只印不判（305：地板要两机各读一次才推）'
-                    % (machine, tag, hover, press, bg, step, r0, r1))
-    for need in ('light', 'dark'):
-        if need not in seen:
+        signed = []
+        broke = False
+        for step, d in sorted(groups.items()):
+            mine0 = _ratio_wcag(d['bg'], d['hover'])
+            mine1 = _ratio_wcag(d['bg'], d['press'])
+            if abs(mine0 - float(d['r0'])) > 0.002 or abs(mine1 - float(d['r1'])) > 0.002:
+                rc = 1
+                broke = True
+                rows.append('RUNG_STEP_CALIB=BAD %s[%s] 用判据自印的灰阶重算得 %.3f/%.3f，'
+                            '而它印的是 %s/%s ⇒ 两把尺在读不同对象，台阶数不算'
+                            % (tag, step, mine0, mine1, d['r0'], d['r1']))
+                continue
+            signed.append((_ratio_wcag(d['hover'], d['press']), step, d))
+        if broke:
+            continue
+        distinct = sorted({round(s[0], 3) for s in signed})
+        if len(distinct) > 1:
             rc = 1
-            rows.append('RUNG_STEP_INCOMPLETE %s 档没有按下态读数 ⇒ 两档对照不存在，不许只按有读数的那档下结论'
-                        % need)
+            rows.append('RUNG_STEP_STEP_DISAGREE %s 同一台机器的不同步骤读出台阶 %s ⇒ 先怀疑尺与环境，'
+                        '这一档不给任何签字（R87：单遍读数不配给产品定罪）'
+                        % (tag, ' / '.join('%.3f' % v for v in distinct)))
+            continue
+        signed_ratio, signed_step, d = min(signed, key=lambda s: s[0])   # 取最保守的一条
+        rows.append('RUNG_STEP %s %s 悬停=%s 按下=%s 底=%s｜悬停→按下台阶(WCAG)=%.3f'
+                    '｜悬停对底=%s 按下对底=%s｜步骤=%d(%s)｜判定=只印不判（305：地板要两机各读一次才推）'
+                    % (machine, tag, d['hover'], d['press'], d['bg'], signed_ratio, d['r0'], d['r1'],
+                       len(signed), ' ; '.join(sorted({s[1] for s in signed}))[:60]))
     return rows, rc
 
 

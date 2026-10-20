@@ -32,6 +32,34 @@ final class ControlHoverLadderTests: XCTestCase {
                        "暗档 pressed 必须一字未动")
     }
 
+    /// **梯子的每一级都要分得开，不只是 hover→pressed 那一级**（R260 / BACKLOG 308）。
+    ///
+    /// 现读：亮档 hover 0.12 → pressed 0.15 → selected 0.16 —— 最后一级只剩 0.01 = 2.55/255，
+    /// 比仓库自己给 hover→pressed 定的 4/255 地板还小，而这一条**从来没有被断言过**：
+    /// 上面那格里 ② 有地板、③ 只查了严格小于。次序对、分不开，是两种不同的病。
+    /// 暗档 0.08 → 0.12 → 0.16 两级都是 0.04，所以这条在暗档一直成立、在亮档一直不成立 ——
+    /// 亮档那一级是被 R256 抬 hover（0.105→0.12）时挤出来的：抬了下面两级，没动最上面那一级。
+    /// 这条判据先红在**改之前**（红名只有 light），红本身就是缺陷的证人；
+    /// 修法是给选中那一档一条自己的换算 `SelectedInk`（亮档 0.16→0.18，暗档一字未动）。
+    func testEveryRungOfTheLadderIsSeparableInBothAppearances() {
+        let minimumStep = 4.0 / 255.0
+        for dark in [true, false] {
+            let tag = dark ? "dark" : "light"
+            let hover = level(isPressed: false, isHovered: true, dark: dark)
+            let pressed = level(isPressed: true, isHovered: false, dark: dark)
+            let selected = SelectedInk.opacity(dark: dark)
+            // 绝对锚点压在**字面数**上（R100：对照/相对判据对"整把尺一起偏"免疫，
+            // 必须有一条压在自陈输入上的绝对格）：暗档一字未动、亮档 0.18。
+            XCTAssertEqual(selected, dark ? 0.16 : 0.18, accuracy: 0.0001,
+                           "\(tag)：选中那一档的字面数不是这个 ⇒ 令牌或换算被改了（R219：抬亮档不许顺手改暗档）")
+            XCTAssertGreaterThanOrEqual(pressed - hover, minimumStep,
+                                        "\(tag)：hover→pressed 只剩 \(pressed - hover) ⇒ 两档会被读成同一档")
+            XCTAssertGreaterThanOrEqual(selected - pressed, minimumStep,
+                                        "\(tag)：pressed→selected 只剩 \(selected - pressed)（地板 \(minimumStep)）"
+                                        + "⇒ 按下与选中长得一样：瞬时状态盖不住持久状态，次序虽然对但读者分不出来")
+        }
+    }
+
     func testLightLadderClearsTheFloorAndKeepsTheStep() {
         let hover = level(isPressed: false, isHovered: true, dark: false)
         let pressed = level(isPressed: true, isHovered: false, dark: false)

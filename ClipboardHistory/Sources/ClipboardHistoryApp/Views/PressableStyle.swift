@@ -71,6 +71,20 @@ enum HoverInk {
     }
 }
 
+/// 选中那一档的**唯一换算**（R260 / BACKLOG 308）。
+///
+/// 为什么现在才有一个入口：`VisualFill.selected` 原本被调用点直接读，而"亮档要抬量"这件事
+/// 只长在悬停那一条换算上 —— 于是 R253/R256 把亮档下面两级抬上去之后，最上面那级留在 0.16，
+/// `pressed→selected` 被挤成 0.01（2.55/255 < 地板 4/255）。`SettingsView` 里 R231 那句
+/// "selected 不接共享换算"的理由当时是对的（抬量长在**悬停**上会把选中与指针所在糊成一档），
+/// 但它的前提被后来的抬量挪走了：现在糊成一档的是**按下与选中**。
+/// 暗档一字未动（`SelectedInk.opacity(dark: true) == VisualFill.selected`），由梯子判据钉住。
+enum SelectedInk {
+    static func opacity(dark: Bool) -> Double {
+        dark ? VisualFill.selected : VisualFill.selected + VisualFillLift.selected
+    }
+}
+
 /// 按钮样式：把 `configuration.isPressed` 翻成缩放 + 底色。
 ///
 /// 形状由调用方给，因为这一家的按钮形状本来就不一样（圆图标、圆角矩形行、胶囊里的段）。

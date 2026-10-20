@@ -445,3 +445,32 @@ class RungStepTests(RulerTestCase):
         self.assertEqual(2, out.count(u"判定=只印不判"), out[-300:])
         self.assertNotIn(u"RUNG_STEP_FLOOR_RED", out)
 
+    def test_the_same_reading_in_two_steps_signs_once(self):
+        # R260：runner 的捕获卷在一次 run 的两个步骤里各跑一遍 ⇒ 4 行从来不是 4 个读数。
+        # 这一格钉的就是"行数≠覆盖率"（R102：计数必须按步骤分组）。
+        text = "\n".join([
+            "build-and-test\tOffscreen frame capture\t" + self.LIGHT,
+            "build-and-test\tOffscreen frame capture\t" + self.DARK,
+            "build-and-test\tSwift tests (executed-count gate)\t" + self.LIGHT,
+            "build-and-test\tSwift tests (executed-count gate)\t" + self.DARK,
+        ]) + "\n"
+        rc, out = self.run_ruler(text, machine="github-runner")
+        self.assertEqual(0, rc, u"两步骤同值不该红：\n" + out[-400:])
+        self.assertEqual(2, len(re.findall(u"RUNG_STEP github-runner ", out)),
+                         u"两步骤同值应当各档只签一条，而不是签四条：\n" + out[-400:])
+        self.assertIn(u"步骤=2", out, out[-300:])
+
+    def test_two_steps_that_disagree_refuse_to_sign(self):
+        # 异值必须红，而且**另一档仍要交出读数**（不许把整卷拖成沉默）。
+        alt_press = 215
+        alt_r1 = u"%.3f" % _ruler._ratio_wcag(255, alt_press)   # 夹具自洽用尺的估计量；断言的是"两步不一致"，不是台阶大小
+        alt = (self.LIGHT.replace(u"press=223", u"press=%d" % alt_press)
+               .replace(u"比值 1.260 → 1.333", u"比值 1.260 → " + alt_r1))
+        text = "\n".join([u"a\tstepA\t" + self.LIGHT, u"a\tstepB\t" + alt,
+                          u"a\tstepA\t" + self.DARK, u"a\tstepB\t" + self.DARK]) + "\n"
+        rc, out = self.run_ruler(text)
+        self.assertEqual(1, rc, u"两步骤读出不同台阶却给了绿：\n" + out[-500:])
+        self.assertIn(u"RUNG_STEP_STEP_DISAGREE light", out, out[-500:])
+        self.assertIn(u"RUNG_STEP local:fixture dark", out, u"一档出事不许把另一档的读数一起藏掉")
+        self.assertNotIn(u"RUNG_STEP local:fixture light", out, u"不一致的那档不许签字")
+
