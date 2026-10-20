@@ -50,6 +50,7 @@ final class ControlHoverLadderTests: XCTestCase {
     }
 
     /// 真值表：`fillOpacity` 的四个分支 × 两档，期望值写成**令牌表达式**再对字面数，
+/// R256 / 300：亮档两行随抬量改（0.105→0.12、0.135→0.15）；暗档三行一字未动。
     /// 这样"令牌被改"与"函数被改坏"会分别红，而不是互相当对方的证人。
     func testFillOpacityTruthTableBothAppearances() {
         for dark in [true, false] {
@@ -59,14 +60,14 @@ final class ControlHoverLadderTests: XCTestCase {
                            0, accuracy: 0.0001, "\(tag)：既没按也没悬停却画了底")
             XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
                                                           hoverLevel: VisualFill.controlHover, dark: dark),
-                           dark ? 0.08 : 0.105, accuracy: 0.0001, "\(tag)：hover 那一档不对")
+                           dark ? 0.08 : 0.12, accuracy: 0.0001, "\(tag)：hover 那一档不对")
             XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: true, isHovered: true,
                                                           hoverLevel: VisualFill.controlHover, dark: dark),
-                           dark ? 0.12 : 0.135, accuracy: 0.0001,
+                           dark ? 0.12 : 0.15, accuracy: 0.0001,
                            "\(tag)：按下时 hover 还在 ⇒ 两档叠成一坨（R20 抓到过的叠层那一族）")
             XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: true, isHovered: false,
                                                           hoverLevel: VisualFill.controlHover, dark: dark),
-                           dark ? 0.12 : 0.135, accuracy: 0.0001, "\(tag)：pressed 那一档不对")
+                           dark ? 0.12 : 0.15, accuracy: 0.0001, "\(tag)：pressed 那一档不对")
         }
         // R230 补的三格。第一格不是"防御性断言"：`hoverLevel: 0` 是调用点在说
         // "这一家的悬停我不画"（段按钮就是），而抬量如果无条件加上去，0 就变成 0.025 ⇒
@@ -84,7 +85,9 @@ final class ControlHoverLadderTests: XCTestCase {
         // 直接读的是这一档，BACKLOG 251 剩下的一半要搬的就是它 —— 先让数在这儿可见。
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
                                                        hoverLevel: VisualFill.hover, dark: false),
-                       0.085, accuracy: 0.0001, "行那一档的亮档抬量不对")
+                       0.10, accuracy: 0.0001,
+                       "行那一档的亮档抬量不对（R253/300：0.085 → 0.10 —— 旧字面数把缺陷钉成了契约，"
+                       "而 1.171 < 1.20 正是它换来的那一格；改这里的理由见 VisualFillLift 的注释）")
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
                                                        hoverLevel: VisualFill.hover, dark: true),
                        VisualFill.hover, accuracy: 0.0001, "暗档必须等于令牌原值：本轮没动暗档的任何一个数")

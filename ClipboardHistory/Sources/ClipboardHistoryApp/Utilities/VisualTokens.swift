@@ -276,7 +276,11 @@ enum VisualFillLift {
 
     /// 亮档 pressed 跟着抬 0.015 —— 少了这一条，只抬 hover 会把 `hover→pressed`
     /// 压到 4/255 之下，正是 R14 当年拦下 0.10 的那个形状。
-    static let pressed: Double = 0.015
+    /// R256 / BACKLOG 300：亮档 hover 抬到 0.04 之后，`controlHover` 那一档的
+    /// `hover→pressed` 台阶被压成 0.015（= 3.82/255 < 地板 4/255）—— 被红的是 `ControlHoverLadderTests` 的②。
+    /// 抬量必须一起抬，否则"修亮档偏淡"会顺手把"按得下去"这件事抹平。0.015 → 0.03：
+    /// 台阶 = 0.03 = 7.65/255（地板 4/255），次序仍是 hover(0.12) < pressed(0.15) < selected(0.16)。
+    static let pressed: Double = 0.03
 }
 
 // MARK: - 描边强度
