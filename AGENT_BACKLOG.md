@@ -6012,6 +6012,7 @@ R200 以后新增的决定**一条都不在这条守卫的可见范围里**：�
 ② 把 `DEC_DEF` 扩成"标题 ∪ 粗体定义行"，配**正/负两格**对照（正：伪造一条只被引用、没有正文的号必须红；负：现有 17 条不许被读成缺失）。
 不许做的事：把这条守卫放宽成"引用不查正文"，也不许把标题里的编号引用整体删掉来逃红。
 **251. 其余共用 `VisualFill.hover` 的位点仍是"一个 alpha 管两档"：本轮只改浮层，因为只有浮层两档都有帧可量（R225 开单）**
+  追记（R248）：第三处（`DetailView.swift:609` 的 `MultiFileRow`）**病根已修** —— 不是缺夹具，是 `hoveredForCapture` 从来没接到那一行；本轮接上并把填充/描边收成一层 `isHoveredForDrawing`（`swift build` 零告警）。**仍未结案**：两态帧要一个多文件条目的夹具 ⇒ 新开 290，量到之前这一位不许写成"判过"。
 
 本轮量到的病是形状病（同一颗令牌在两档给出两种可见性），不是数值病。
 所以凡共用 `VisualFill.hover` 的位点（侧栏行 hover、`DetailView` 那两处 `.fill(.primary.opacity(isHovered ? VisualFill.hover : 0))`、
@@ -6727,3 +6728,7 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 
 **288. 把"抽正文 + dedent + `bash -n` + 合成对象真跑"这把尺推广到其余 CI 步骤（现在只有 HOVER_DIFF 那一步有判据卷；捕获闸门、帧基线、`SEAM_READER_ISOLATION` 那几步的红仍只能在 runner 上第一次发现）（R247 新开）**
 **289. CI 抓帧那一步的 stdout 漏非 UTF-8 字节（本轮实测 `UnicodeDecodeError 0xbc`，位置在帧目录列完之后）：判据卷已按 D-233 改成按字节收，但成因未归 —— 要分辨是 `tee /tmp/hoverdiff.log`、`ls` 与帧名里的非 ASCII、还是尺自己 print 了字节；不许把"绕过解码"记成"已解释"（R247 新开）**
+
+**290. 给 `MultiFileRow` 补多文件条目夹具与两态帧（idle / hover 同一色档两颗），按 `hover_two_state_diff` 的 WCAG 地板判（D-229/D-232：底平涂前提 + 两台机器各自定线）；量到之后才允许结 251 第三处（R248 新开）**
+**291. 悬停可拍性名册里那四位欠账逐位处置（`DailyCopyHeatmapView` / `GlassControls` / `SearchField` / `VideoPreview`）：接法已写在名册行内，做完一行删一行；`SearchField` 那颗图标色直接读裸 `isHovered`，是唯一一处"画法本身拍不到"的真缺陷（R248 新开）**
+**292. 改了产品代码却没换装本机 = 缺席：把 `make dmg`/换装接进轮末的强制清单，或在台账里以具名 NOT-RUN 记账（本轮后者）；不许让"惰性等价"成为免检理由（R248 新开）**

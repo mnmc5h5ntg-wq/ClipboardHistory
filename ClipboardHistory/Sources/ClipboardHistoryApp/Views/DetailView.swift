@@ -557,6 +557,13 @@ private struct MultiFileRow: View {
     @State private var isHovered = false
     /// 同 `MarkdownModeButton`：色档自己问，不从调用点传。
     @Environment(\.colorScheme) private var colorScheme
+    /// R248 / BACKLOG 251 第三处：这一行以前**没有两态帧可拍** —— 不是没做夹具，是取证通道
+    /// 从来没接到这里（`.onHover` 的 `isHovered` 在没有指针的离屏渲染里恒 false）。
+    /// 与同文件 `MarkdownModeButton`（第 239 行）与设置侧那一行（`SettingsView.swift:868`）同一族接法：
+    /// 产品路径永远读不到这个键（`nil`），只有捕获夹具点它，所以它不参与产品的悬停语义。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+    /// 一层判定只留一处：填充与描边共用它，免得两态帧里只亮一半。
+    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     var body: some View {
         Button(action: action) {
@@ -605,12 +612,12 @@ private struct MultiFileRow: View {
                     // R231 / BACKLOG 256：与上面那颗 chip 同一族病 —— 直接读令牌 ⇒ 亮档那一抬落不到这里。
                     // 这一家的**描边**（下一条 `overlay`，`VisualTint.hoverStroke`）本轮不动：
                     // 它不在 `VisualFill` 那条换算上，判它要先量"描边 vs 底色谁在说话"，记成新的一笔。
-                    .fill(.primary.opacity(isHovered
+                    .fill(.primary.opacity(isHoveredForDrawing
                         ? HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark) : 0))
             }
             .overlay {
                 VisualShape.rounded(VisualRadius.card)
-                    .strokeBorder(.primary.opacity(isHovered ? VisualTint.hoverStroke : 0),
+                    .strokeBorder(.primary.opacity(isHoveredForDrawing ? VisualTint.hoverStroke : 0),
                                   lineWidth: VisualHairline.rule)
             }
             .contentShape(VisualShape.rounded(VisualRadius.card))

@@ -1,6 +1,17 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-## R247 状态（第 246 轮 / Round 244 · 2026-10-20）
+## R249 状态（第 248 轮 / Round 246 · 2026-10-20）
+最后更新：2026-10-20 12:50（本地 · R248 / 第 247 轮 / Round 245）：**一笔真产品改动 + 悬停可拍性名册**（U-800…U-802 · D-234 · 新开 290/291/292 · 产品 1 文件，眼睛腿/变异腿/换装 NOT-RUN）
+
+**本轮落地**：`DetailView.swift` 的 `MultiFileRow` 接上 `hoveredForCapture`（填充与描边共用一层判定）；`test_hover_capture_channel.py` 4 格名册（位点=9 / 已接=5 / 欠账=4，双向对账）；`swift build` 零告警；modechip 捕获格绿。
+
+**下一轮（R249 / 第 248 轮 / Round 246）的靶**：
+⓪ 读 CI：`python3 scripts/ci_read.py latest` 现拿成对。未读三笔（取数时仍 `in_progress` ⇒ 只能说未读）：`39477446836↔5941520`（本笔 push 后现取）、`39475884846↔550fb43`、`39474398455↔09a8763`。要读的仍是 287 那三件（runner 自印 `HOVER_TWO_STATE_277` 定线、`HOVER_DIFF_CONTROL=` 只剩两颗、`SOURCES_CELL_HISTORY … 处置=judge`）。
+① 做 290：`MultiFileRow` 的多文件夹具 + 两态帧（同一色档 idle/lit），按 WCAG 地板判，并把帧拿在眼里看一遍（眼睛腿本轮必须 RUN：连续六轮 NOT-RUN 是本表最重的缺口）。
+② 做 291 的 `SearchField` 那一行：唯一一处"画法本身拍不到"的真缺陷（图标色读裸 `isHovered`），一行改动 + 一把刀。
+③ 做 292：换装本机 —— 改了产品代码就要重装，或具名 NOT-RUN 并说清代价。
+④ 仍开 249 / 263 / 268 runner 半 / 269 / 267 / 260 / 262 / 258 第三处 / 254→255→248 / 243 / 227③ / 222 / 215 / 201 / 202 / 207 / 240 / 251 / 275 / 279 / 281 / 282 / 284 / 285 / 286 / 287 / 288 / 289 / 290 / 291 / 292；用户闸门 220 路 A、228②、265。
+
 最后更新：2026-10-20 12:10（本地 · R247 / 第 246 轮 / Round 244）：**CI 抓帧那一步的正文有了自己的判据卷（6 格）+ 三把刀全 CAUGHT、274 结案**（U-797…U-799 · D-233 · 新开 288/289 · 产品 0 文件，眼睛腿与 Swift 腿 NOT-RUN）
 
 **本轮落地**：`scripts/tests/test_ci_hover_wiring.py`（`Ran 6 OK`，已进电池）；`arms_r247/manifest.tsv` + `mutate_r247.sh`（kind/rel 从 manifest 现取）+ `mutate_r247.py`（影子表，进名册）；`R247_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`；D-233（CI 正文判据按字节收 + 抽正文真跑是可复用形状）。

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R248 / 第 247 轮 / Round 245 · 取证通道接到 DetailView 多文件行 + 悬停可拍性名册）
+
+产品（1 文件）`ClipboardHistory/Sources/ClipboardHistoryApp/Views/DetailView.swift`：`MultiFileRow` 声明 `hoveredForCapture`，填充与描边共用 `isHoveredForDrawing`；照同仓两处已验证接法（`MarkdownModeButton:239`、`SettingsView:868`）。产品路径读不到该键（恒 `nil`），语义不变，但这一位从此**可拍**。验证：`swift build` 零告警、modechip 捕获格 `Executed 1 test, with 0 failures`。
+判据：新增 `scripts/tests/test_hover_capture_channel.py`（4 格，进电池）：按文件枚举悬停位点并集合对账（现读 位点=9 已接=5 未接=4），名册是**欠账**（每行写接法）不是豁免；两条对照保证名册过期也会红。
+BACKLOG：251 第三处病根写成追记（仍未结案，缺夹具 ⇒ 新开 290）；新开 290/291/292（第三条是"改了产品必须换装本机，否则具名 NOT-RUN"）。
+本轮 NOT-RUN：眼睛腿（没看任何一张帧）、变异腿（没插刀）、全量 Swift 卷 / 重捕帧 / 帧基线 / 换装本机。
+
 ### Changed（R247 / 第 246 轮 / Round 244 · CI 抓帧那一步的正文进判据卷：六格 + 三把刀，274 结案）
 
 - `scripts/tests/test_ci_hover_wiring.py`（6 格，已进电池）：从 `.github/workflows/ci.yml` 抽出抓帧那一步的 bash、dedent、`bash -n`，再对着合成帧目录真跑。四种处置各有证人：完整一对 ⇒ 退出 0 且正对照恰好那两颗（另一色档那颗故意在场）；缺 idle / 缺 lit ⇒ 点名 `HOVER_DIFF_CONTROL_INCOMPLETE=1` 且非 0；整目录无 png ⇒ 点名 `HOVER_DIFF_NOT_RUN=1` 而退出 0。另两格管抽取本身（语法、起点唯一）。
