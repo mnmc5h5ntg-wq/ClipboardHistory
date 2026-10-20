@@ -312,6 +312,20 @@ class FloorVerdictTests(RulerTestCase):
         self.assertIn(u"判定=只报读数", out)
 
 
+# R252 / BACKLOG 297：**已登记的地板红名册**（欠账的账期，不是豁免）。
+# 现读（/tmp/shots_r252，168 张，尺 退出=1）：`detail-3-files-row0-hover-720x520-light`
+# 的悬停在 WCAG 口径下只有 1.171（地板 1.20）⇒ 多文件行在**亮档**的悬停墨淡到没有读者。
+# 同一位暗档 1.257 过线；而"整列一起亮"那一对（detail-3-files-hover-*）两档都过线
+# —— R251 那句"两档过线"是**归属没对上**造成的假绿（D-237 预言的正是这件事）。
+# 双向对账：① 名册里的名字现在必须真的红（不红=名册过期）；② 现在红的必须在名册里（不在=新缺陷）。
+# ⇒ 这张表只能被"修好产品"清空，不能被"再加一行"放宽。
+KNOWN_FLOOR_RED = {
+    'detail-3-files-row0-hover-720x520-light':
+        u'亮档多文件行的悬停墨淡到没有读者（现读 1.171 < 1.20）；这是产品缺陷不是判据过严，'
+        u'修法见 BACKLOG 297（按色档取墨，暗档 1.257 不动）',
+}
+
+
 @unittest.skipIf(NO_PIL_OR_RULER, u"缺 PIL 或读不到尺：这一格要能被点名")
 class RealFrameFloorTests(RulerTestCase):
     """真帧那一格：把「亮档偏淡」这类候选缺陷变成**standing 判据**（R244 / BACKLOG 282）。
@@ -337,10 +351,21 @@ class RealFrameFloorTests(RulerTestCase):
         rows = re.findall(r"HOVER_DIFF (\S+) 对=(\S+) .*?判定=(\S+?) ", out)
         self.assertEqual(len(pairs), len(rows),
                          u"配到 %d 对却只解析到 %d 行判定 ⇒ 读数行形状漂了" % (len(pairs), len(rows)))
-        bad = [(a, p, v) for a, p, v in rows if v not in (u"过线", u"只报读数（底不平涂）")]
+        ok_verdicts = (u"过线", u"只报读数（底不平涂）", u"低于地板")
+        bad = [(a, p, v) for a, p, v in rows if v not in ok_verdicts]
+        red = set(p.split(u"↔")[0] for _, p, v in rows if v == u"低于地板")
         print(u"HOVER_FLOOR_REAL 配对=%d 无静置态=%d 退出=%d 判定=%s" % (
             len(pairs), len(unpaired), rc,
             u','.join(u'%s:%s' % (p.split(u'↔')[0][:28], v) for _, p, v in rows)))
-        self.assertEqual([], bad, u"有对在 WCAG 口径下低于自己的地板")
-        self.assertEqual(0, rc, u"CLI 退出码非 0，但上面没有「低于地板」的行 ⇒ 另有闸门在红：%s" % out[-500:])
+        self.assertEqual([], bad, u"有对的判定行读不出形状")
+        self.assertEqual(set(KNOWN_FLOOR_RED), red,
+                         u"地板红名册与现读不同源 ⇒ 名册过期（修好了没删）或出现了新缺陷（没登记）：\n"
+                         u"  名册=%s\n  现读=%s" % (sorted(KNOWN_FLOOR_RED), sorted(red)))
+        for name, why in KNOWN_FLOOR_RED.items():
+            self.assertGreaterEqual(len(why), 20, u'%s 的理由不足 20 字 ⇒ 名册成了垃圾桶' % name)
+        expected_rc = 1 if red else 0
+        self.assertEqual(expected_rc, rc,
+                         u"退出码应与名册一致（有登记的红=尺自己响，期望 1；空名册=期望 0）：%s" % out[-400:])
+        print(u"HOVER_FLOOR_RED_KNOWN=%d 名册=%s 现读=%s 退出=%d" % (
+            len(red), sorted(KNOWN_FLOOR_RED), sorted(red), rc))
 

@@ -166,11 +166,25 @@ private struct HoveredForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// R252 / BACKLOG 296（D-237）：整棵视图一个布尔**证不了归属**。
+/// `detail-3-files-hover` 那两张帧里三行同时抬，而产品里只有指针下那一行抬 ——
+/// 读数是真的，量的是另一件事。这颗键按行号点亮，于是"只亮被指的那一行"第一次可拍。
+/// 与 `hoveredForCapture` 同一族规矩：产品自己永远不写这个键，只有夹具写。
+private struct HoveredRowForCaptureKey: EnvironmentKey {
+    static let defaultValue: Int? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
         get { self[HoveredForCaptureKey.self] }
         set { self[HoveredForCaptureKey.self] = newValue }
+    }
+
+    /// 取证用的**按行**悬停覆盖。`nil` = 不覆盖；`n` = 只有第 n 行按悬停画。
+    var hoveredRowForCapture: Int? {
+        get { self[HoveredRowForCaptureKey.self] }
+        set { self[HoveredRowForCaptureKey.self] = newValue }
     }
 }
 

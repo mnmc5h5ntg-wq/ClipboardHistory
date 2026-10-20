@@ -318,12 +318,13 @@ private struct MultiFileDetailView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 0, pinnedViews: []) {
-                ForEach(Array(urls.enumerated()), id: \.offset) { _, url in
+                ForEach(Array(urls.enumerated()), id: \.offset) { offset, url in
                     VStack(spacing: 0) {
                         MultiFileRow(
                             url: url,
                             isExpanded: expandedURL == url,
                             symbol: symbol(for: url),
+                            row: offset,
                             action: { toggle(url) }
                         )
 
@@ -553,6 +554,8 @@ private struct MultiFileRow: View {
     let url: URL
     let isExpanded: Bool
     let symbol: String
+    /// R252 / 296：行号只服务取证键 `hoveredRowForCapture`（产品路径不读它做任何事）。
+    var row: Int = 0
     let action: () -> Void
     @State private var isHovered = false
     /// 同 `MarkdownModeButton`：色档自己问，不从调用点传。
@@ -562,8 +565,12 @@ private struct MultiFileRow: View {
     /// 与同文件 `MarkdownModeButton`（第 239 行）与设置侧那一行（`SettingsView.swift:868`）同一族接法：
     /// 产品路径永远读不到这个键（`nil`），只有捕获夹具点它，所以它不参与产品的悬停语义。
     @Environment(\.hoveredForCapture) private var hoveredForCapture
+    @Environment(\.hoveredRowForCapture) private var hoveredRowForCapture
     /// 一层判定只留一处：填充与描边共用它，免得两态帧里只亮一半。
-    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
+    /// 三路并起来：真实指针 / 整棵覆盖（旧形状）/ **按行覆盖**（296 新增，产品永远不写）。
+    private var isHoveredForDrawing: Bool {
+        isHovered || (hoveredForCapture ?? false) || (hoveredRowForCapture == row)
+    }
 
     var body: some View {
         Button(action: action) {
