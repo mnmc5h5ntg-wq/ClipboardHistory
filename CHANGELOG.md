@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R254 / 第 253 轮 / Round 251 · 看图验收 + 第一把「重捕型」刀 M814）
+
+看图腿 RUN：同一位改前/改后两张亮档帧对比 —— 改前几乎看不出有层在亮（1.171），改后是明确的浅灰横底、不压字不抢视线 ⇒ R253 那次产品改动完成视觉验收（范围只这一个位点，其余亮档悬停未重看）。
+新刀形（D-240）：`mutate_r254.sh` —— 插刀（`VisualFillLift.hover` 0.04→0.025）→ `swift build` → 重捕 168 张 → 尺量新帧 ⇒ `HOVER_DIFF_FLOOR_RED=1 … 1.171`、`退出=1` ⇒ CAUGHT；还原整文件备份 + `cmp` 逐字节（clean）。为什么必须重捕：判据卷读的是已落盘的帧，不重捕就必然 ESCAPED，而 ESCAPED 会被误读成"判据没牙"。
+一条未覆盖明记：M814 在 bash 脚本里，`mutate_needle_precheck.py` 抽不到它的锚点 ⇒ 刀号未进名册覆盖（与 285 同族）；做成执行器第二种 kind 并纳入预检 = 新开 299。
+本轮 0 产品文件；298 只结一半（全量卷与换装本机仍未跑 ⇒ D-236 的债跨第 3 轮）。
+
 ### Changed（R253 / 第 252 轮 / Round 250 · 亮档悬停抬量 0.025→0.04：第一次看得见的产品反馈修正，297 结案）
 
 产品（1 文件）`Utilities/VisualTokens.swift`：`VisualFillLift.hover` 0.025 → 0.04（只加亮档那一支，暗档一字未动）。理由写成不等式放在定义处：合成上限 229.5 ⇒ 亮档 hover 必须 ≥ 0.10 才能在白底达到 1.20，而 0.06 + 0.025 = 0.085 永远达不到 ⇒ 此前**任何**用这一档铺在白底上的整行悬停都不可能过线。
