@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 判据与尺：台账编号守卫的「定义行」从只认标题扩成「标题 ∪ 粗体定义行」（R238 / U-765…U-768 / D-223 · 产品 0 文件，画面一字未动）
+
+- `scripts/tests/test_ledger_ids.py` 过去只把二/三级标题当决定正文，而 R200 以后的决定按台账既有形状写成粗体
+  ⇒ 最近 28 条决定对"被引用却没正文"这条守卫**完全隐形**（标题形最大只到 D-194，粗体形到 D-222；BACKLOG 250，R224 曾红过一次）。
+  本轮按 250 的选项②扩成两种形状（仍是**一支**正则），并按要求补齐正 / 负两格对照；该文件从 11 格长到 16 格。
+- 两把变异刀各摘掉一半：M793 摘粗体 ⇒ 两态对照必须红；M794 把 `strip_definition` 退回只认标题形 ⇒
+  "抹掉粗体定义行"那格必须红。M794 第一版期望写在「被引用且编号最大」那条正对照上，跑回来是 ESCAPED ——
+  因为 victim 此刻是标题形；据此补了一格不依赖台账现状的证人，两刀才各自抓到各自该抓的格。
+- 本轮**产品 0 文件**：不换装、不重捕帧、没重跑 `swift build` 与全量 `swift test`（Swift 侧未变），看图腿记 NOT-RUN；
+  runner 上这一卷电池认不认两种形状，与 268 的 runner 验收一起待读。另新开 269（预检 `bad=5` 与电池的关系要先分辨成因）。
+
+
 ### 判据与尺：读缝的格子必须标 `@MainActor` —— runner 的 STEP[4] 判编译期 error、本机不报，补一把与 SDK 无关的静态尺（R237 / U-761…U-764 / D-222 · 产品 0 文件，画面一字未动）
 
 - `MenuBarSwiftUIDismissRowInkTests.testSeamInkClearsTheTextFloorInBothStates` 加一行 `@MainActor`（run `39345462910` STEP[4] 的 error 原文：`main actor-isolated static property 'dismissRowInk' can not be referenced from a nonisolated context`）。

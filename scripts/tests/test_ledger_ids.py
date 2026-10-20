@@ -18,6 +18,13 @@
   ① 轮次标题里出现的每一个 `D-\\d{3}`，都必须在 `AGENT_DECISIONS.md` 里有 `### D-xxx（RNN）` 那条正文；
   ② 决定条目自己的轮次标签必须与它写在哪儿无关 —— 只查号存在，不查内容（内容归人读）；
   ③ 编号必须连续（中间空一号 = 有人手抄了一个还没落盘的号，或者删过一条没改引用）。
+
+R238（BACKLOG 250）：① 的「定义行」从**只认标题**扩成**标题 ∪ 粗体定义行**。
+现场数字（本轮在真台账上实测，不是估的）：标题形 201 条、粗体形 28 条、两集**零重叠**、
+并集 D-000…D-222 **无空洞**。在此之前那 28 条对 ① 完全隐形 —— R224 的电池红
+（`missing=['D-216']`）就是同一件事第一次露头，当时的处置是把标题里的引用撤掉（止血不是修）。
+扩正则**不配单独算结案**：`BoldDefinitionLineTests` 用同一份合成语料的两态对照，
+让「粗体那一半有没有接上」与「老标题那一半有没有被弄坏」各自能被证伪。
 """
 import re
 import unittest
@@ -31,24 +38,61 @@ ROUND_HEADERS = (REPO / "AGENT_UI_AUDIT.md", REPO / "AGENT_VISUAL_ITERATION.md")
 # 实测这份台账的形状：老条目是 `## D-000 基线与分支（2026-10-08）`（121 条），
 # 近来的轮次写成 `### D-150（R92）标题`（36 条），另有 `### D-037 追补：…` 这种补记行。
 # ⇒ 定义 = 二/三级标题 + 编号开头；轮次标签只写在括号里，不作为闸门的一部分。
-DEC_DEF = re.compile(r"^#{2,3} (D-\d{3})\b", re.M)
+# R238 之前的字面，保留**只**给「老形状仍算定义」那格当对照用。
+DEC_DEF_HEADING_ONLY = re.compile(r"^#{2,3} (D-\d{3})\b", re.M)
+BOLD_DEF = re.compile(r"^\*\*(D-\d{3})（", re.M)
+# 定义行 = 标题 ∪ 粗体定义行，写成**一支**正则：两半同生同死，
+# 不许出现「两份实现各自判、其中一份坏了另一份掩盖」那种形状。
+DEC_DEF = re.compile(r"^(?:#{2,3} (D-\d{3})\b|\*\*(D-\d{3})（)", re.M)
+
+
+def ids_from(text):
+    """把 DEC_DEF 的两种形状收敛成一个号列表（组 1 = 标题形，组 2 = 粗体形）。"""
+    return [m.group(1) or m.group(2) for m in DEC_DEF.finditer(text)]
 # 轮次标题行：`## 第 95 轮 · R93：…` / `## Round 93 · …`
 HEADER = re.compile(r"^## (?:第 \d+ 轮|Round \d+) ·.*$", re.M)
 CITED = re.compile(r"\bD-(\d{3})\b")
 
 
+def strip_definition(text, victim):
+    """按**当前形状**抹掉一条决定的定义行：标题形或粗体形，两种都要能抹。
+
+    这一格以前只写 `^#{2,3} victim`。R238 把定义集扩成两种形状之后，编号最大的那条
+    被引用决定是**粗体**的（D-222）⇒ 只抹标题形的话 stripped 与 text 一模一样，
+    正对照会红在「抹不掉」那一句上 —— 那说的是尺，不是台账。
+    """
+    for pat in (r"^#{2,3} " + victim + r"\b", r"^\*\*" + victim + r"（"):
+        out = re.sub(pat, "## 已删（" + victim + "）", text, count=1, flags=re.M)
+        if out != text:
+            return out
+    return text
+
+
 def defined_ids(text=None):
     if text is None:
         text = DECISIONS.read_text(encoding="utf-8")
-    return [m.group(1) for m in DEC_DEF.finditer(text)]
+    return ids_from(text)
 
 
-def cited_ids(path):
-    text = path.read_text(encoding="utf-8")
+def cited_in(text):
+    """轮次标题里引用到的号 —— 收文本，好让对照能喂合成语料。"""
     out = []
     for header in HEADER.findall(text):
         out += CITED.findall(header)
     return out
+
+
+def cited_missing(text):
+    """被轮次标题引用、却没有定义行的号（**统一成 D-xxx 再比**）。
+
+    CITED 的捕获组只有三位数字，DEC_DEF 的捕获组自带 `D-` —— 两种单位直接相减，
+    得到的"缺失"说的是尺，不是台账（本轮第一版就红在这一句上：报出 `223` 而不是 `D-223`）。
+    """
+    return sorted({"D-" + n for n in cited_in(text)} - set(ids_from(text)))
+
+
+def cited_ids(path):
+    return cited_in(path.read_text(encoding="utf-8"))
 
 
 def cited_everywhere():
@@ -86,9 +130,9 @@ class LedgerIdTests(unittest.TestCase):
         self.assertGreaterEqual(len(pool), 3, "被引用又落盘的决定少于 3 条 ⇒ 样本不够，这条测试是空的")
         victim = pool[-1]
         text = DECISIONS.read_text(encoding="utf-8")
-        stripped = re.sub(r"^#{2,3} " + victim + r"\b", "## 已删（" + victim + "）", text, count=1, flags=re.M)
+        stripped = strip_definition(text, victim)
         self.assertNotEqual(text, stripped, f"抹掉 {victim} 的定义行没生效 ⇒ 定义行的形状与正则不一致")
-        after = set(m.group(1) for m in DEC_DEF.finditer(stripped))
+        after = set(ids_from(stripped))
         # 判的是**增量**：抹掉它之后，缺失集只许多出它这一条。
         # （第一版写成"缺失集正好等于 [victim]"，而仓库此刻真的还缺 D-151 ⇒ 两条红叠在一起，
         #  读日志的人会以为正对照在报同一个缺陷 —— 增量形状让这两件事各说各的。）
@@ -97,8 +141,10 @@ class LedgerIdTests(unittest.TestCase):
 
     def test_citation_regex_does_not_match_prose_ids(self):
         """守卫不许命中正文里的引用（R53 那一族：region() 先命中守卫自己写的名字）。"""
-        sample = "正文里提到 D-034 与 D-999，但它们不是定义行\n### D-034（R7）标题\n"
-        self.assertEqual(["D-034"], [m.group(1) for m in DEC_DEF.finditer(sample)])
+        sample = ("正文里提到 D-034 与 D-999，但它们不是定义行\n"
+                  "句子里有 **D-998（R9）** 这种加粗引用，行首不是星号 ⇒ 不算定义\n"
+                  "### D-034（R7）标题\n")
+        self.assertEqual(["D-034"], ids_from(sample))
 
 
 # ---------- R102 加的两格：重复编号 ----------
@@ -242,6 +288,101 @@ class NewestRoundIdRangeTests(unittest.TestCase):
         self.assertNotEqual(sec, forged, "删不掉那条定义 ⇒ 正则与这份账的形状不一致")
         self.assertEqual(["U-%s" % victim], sorted(missing_in_declared_u_range(forged)),
                          "删了一条定义而守卫没只抓到它 ⇒ 它不是在判'区间与定义吻合'")
+
+
+class BoldDefinitionLineTests(unittest.TestCase):
+    """R238 / BACKLOG 250：扩出来的那半正则，必须**各自**能被证伪。
+
+    为什么不能只改正则就算结案：这条守卫在过去若干轮里一直是**绿的**，而它看不见 28 条决定
+    ——「绿的守卫」不等于「有效的守卫」（R85 那一族：只在自家夹具上成立的理由比没做决定更贵）。
+    所以这里用**同一份合成语料、两态对照**：给粗体正文 ⇒ ① 不许报缺失；不给 ⇒ ① 必须只报那一条。
+    再加两格管住反向风险：老标题形状不许被扩正则弄坏、真台账里现有的粗体条不许被读成缺失。
+    """
+
+    FORGED = "D-223"          # 合成号：仓库里不存在，专门用来伪造「被引用却没正文」
+    OLD_SHAPE = "D-000"       # 真台账里最老的那条，标题形，用来证明老形状仍算定义
+
+    def corpus(self, with_bold):
+        text = ("## Round 999 · 假轮次（R999）：" + self.FORGED + "\n"
+                + "## 第 999 轮（R999）：假标题 " + self.FORGED + "\n"
+                + "### " + self.OLD_SHAPE + " 老形状仍在（2026-10-08）\n")
+        if with_bold:
+            text += "**" + self.FORGED + "（R999）：伪造的决定正文**\n"
+        return text
+
+    def test_bold_definition_line_makes_the_citation_land(self):
+        """两态之一：给了粗体定义行 ⇒ 引用集与定义集的差必须为空。"""
+        text = self.corpus(with_bold=True)
+        self.assertIn(self.FORGED, ids_from(text),
+                      "粗体定义行没进定义集 ⇒ DEC_DEF 的粗体那一半没接上")
+        self.assertEqual([], cited_missing(text),
+                         "给了正文却仍报缺失 ⇒ ① 与这份台账的形状不一致")
+
+    def test_without_any_definition_line_it_is_red(self):
+        """两态之二：同一份语料**不给**粗体正文 ⇒ 必须只报那一条伪造号。
+
+        少了这一格，上面那格可以靠「引用集 = 定义集 = 空」永远绿（初值即期望）。
+        """
+        text = self.corpus(with_bold=False)
+        self.assertNotIn(self.FORGED, ids_from(text))
+        self.assertEqual([self.FORGED], cited_missing(text),
+                         "没给正文也不报缺失 ⇒ ① 是恒真的")
+
+    def test_the_older_heading_shape_is_still_a_definition(self):
+        """扩正则的反向风险：老标题形状一条都不许因为这次放宽而丢掉。
+
+        对照用 `DEC_DEF_HEADING_ONLY`（R238 之前的字面）在真台账上跑：
+        老集合必须是新集合的子集，而且**多出来的那批恰好等于**粗体定义行 ——
+        不等于就说明有第三种形状混进了定义集（那才是下一次假绿的入口）。
+        """
+        text = DECISIONS.read_text(encoding="utf-8")
+        new = set(defined_ids(text))
+        old = set(DEC_DEF_HEADING_ONLY.findall(text))
+        self.assertTrue(old, "标题形一条都没抓到 ⇒ 正则坏了")
+        self.assertTrue(old <= new,
+                        "老形状里的号现在读不到：%s ⇒ 这次改动把守卫弄坏了" % sorted(old - new))
+        self.assertEqual(set(BOLD_DEF.findall(text)), new - old,
+                         "新增可见的号不等于粗体定义行 ⇒ 定义集里混进了别的形状")
+
+    def test_recent_bold_decisions_are_not_read_as_missing(self):
+        """负格（BACKLOG 250 要的那一半）：现有粗体条一条都不许被读成「没正文」。
+
+        地板 20 是**量出来的**（本轮实测 28 条），不是我估的：这份账只会更长，
+        掉了说明形状变了，守卫该红。
+        """
+        text = DECISIONS.read_text(encoding="utf-8")
+        bold = BOLD_DEF.findall(text)
+        self.assertGreaterEqual(len(bold), 20,
+                                "只数到 %d 条粗体定义行 ⇒ 与这份台账的形状不一致（本轮实测 28）" % len(bold))
+        missing = sorted(set(bold) - set(defined_ids(text)))
+        self.assertEqual([], missing, "粗体决定被读成缺失：%s" % missing)
+        # 这一格还要真的**改过判据**：把粗体那一半从正则里摘掉（只留标题形），
+        # 上面那条负格必须红 —— 否则它只是在陈述「正则现在能匹配」，没有牙。
+        blind = set(DEC_DEF_HEADING_ONLY.findall(text))
+        would_be_missing = sorted(set(bold) - blind)
+        self.assertEqual(len(bold), len(would_be_missing),
+                         "只用老标题形时这些粗体条没全部变成缺失 ⇒ 这 28 条里有的其实是标题形")
+        self.assertGreaterEqual(len(would_be_missing), 20,
+                                "摘掉粗体那一半之后缺失数少于 20 ⇒ 正对照样本不够")
+
+    def test_the_bold_definition_line_can_be_stripped_and_is_named(self):
+        """`strip_definition` 的**粗体那一半**要有自己的证人。
+
+        为什么单开这一格（R238 的 M794 第一次跑是 ESCAPED 挖出来的）：
+        上面那条正对照挑 victim 靠「被引用且编号最大」，而本轮把 D-222 从轮次标题里撤掉之后
+        victim 落回**标题形**的那条 ⇒ 把粗体分支从 strip 里摘掉，它照样绿。
+        换句话说「尺有两种形状」这件事只被 `DEC_DEF` 证过，没被 `strip_definition` 证过。
+        这一格不依赖台账此刻引用了谁：直接在合成语料上抹粗体定义行，
+        要求「真的抹掉了」+「① 恰好点名那一条」两件事同时成立。
+        """
+        text = self.corpus(with_bold=True)
+        self.assertEqual([], cited_missing(text), "前提不成立：给了正文却还是缺失")
+        stripped = strip_definition(text, self.FORGED)
+        self.assertNotEqual(text, stripped,
+                            "抹不掉粗体定义行 ⇒ strip_definition 的粗体分支坏了（R238 / M794 的那一刀）")
+        self.assertEqual([self.FORGED], cited_missing(stripped),
+                         "抹掉之后 ① 没只点名这一条 ⇒ 它不是在判引用有没有落盘")
+
 
 
 if __name__ == "__main__":

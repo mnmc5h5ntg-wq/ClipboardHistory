@@ -363,6 +363,38 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 237 轮（R238 / Round 235 · 2026-10-20）：一条绿了若干轮的守卫其实看不见 28 条决定 —— 把「定义行」从只认标题扩成「标题 ∪ 粗体」，并让两半各自可被证伪（U-765…U-768）
+
+- **U-765：现场数字（本轮在真台账上实测）。** `AGENT_DECISIONS.md` 里"决定正文"有两种形状：二/三级标题那种 201 条、
+  最大只到 **D-194**；粗体 `**D-xxx（RNNN）：…**` 那种 **28** 条、最大到 **D-222**；两集**零重叠**，并集 D-000…D-222 **无空洞**。
+  复现命令：`grep -cE '^#{2,3} D-[0-9]{3}\b' AGENT_DECISIONS.md` / `grep -cE '^\*\*D-[0-9]{3}（' AGENT_DECISIONS.md`。
+  ⇒ BACKLOG 250 说的「R200 之后写的决定对这条守卫隐形」不是修辞：① 只认标题形，所以此后任何轮次标题引用粗体决定
+  **都不会红**。这一族 R224 红过一次（`missing=['D-216']`），当时靠撤掉标题里的引用止血 —— 止血不是修。
+- **U-766：结案动作 = 扩覆盖面，不是放宽守卫。** `DEC_DEF` 改成**一支**正则两种形状（标题 ∪ 粗体定义行），
+  不写成两份实现互相掩盖（R108 那一族）；按 250 的要求配**正 / 负两格**：
+  正 = 同一份合成语料两态对照（给粗体正文 ⇒ 不许报缺失；不给 ⇒ 必须只报那一条伪造号）；
+  负 = 真台账现有粗体条一条都不许被读成缺失（地板 20，实测 28）。另加一格守反向风险：
+  只用 R238 之前的字面（`DEC_DEF_HEADING_ONLY`）在真台账上跑，老集合必须是新集合的子集，
+  且**多出来的那批恰好等于**粗体定义行 —— 不相等就说明有第三种形状混进了定义集。
+  该判据文件从 **11** 格长到 **16** 格（`python3 -m unittest scripts.tests.test_ledger_ids -v`）。
+- **U-767：这一轮真正的收获在「刀跑回来是 ESCAPED」那一次。** M794 第一版期望红在
+  `test_the_guard_itself_is_not_vacuous`，实际无红名。读判据才知道那条正对照挑靶子的规则是「被引用且编号最大」，
+  而 R237 把 D-222 撤出轮次标题之后 victim 落回**标题形**那条 ⇒ 把 `strip_definition` 的粗体分支摘掉它也无感：
+  「尺有两种形状」只被 `DEC_DEF` 证过，**没被 `strip_definition` 证过**。修的是判据不是刀 ——
+  补 `test_the_bold_definition_line_can_be_stripped_and_is_named`（在合成语料上抹粗体定义行，
+  要求「真的抹掉了」+「① 恰好点名那一条」同时成立，不依赖台账此刻引用了谁），并把 M794 的期望改成那一格
+  ⇒ `R238_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`。
+  同批纠了一处单位错：`CITED` 的捕获组只有三位数字而 `DEC_DEF` 自带 `D-`，第一版两态对照红在 `223 != D-223`
+  （把单位差读成缺失）⇒ 归一收进 `cited_missing()` 一处。
+- **U-768：本轮没做的事，写清楚。** ① **产品 0 文件**（`git diff --name-only HEAD -- ClipboardHistory/Sources ClipboardHistory/Resources`
+  数出来是 0）⇒ 不换装本机、不重捕帧；看图腿只借 `/tmp/shots_r236` 的 **162** 张 png（先 `ls` 数过，`/tmp` 会被清）
+  确证画面没被这一笔动到，**本轮没有新的像素读数 ⇒ 看图腿记 NOT-RUN**；② **没重跑 `swift build` 与全量 `swift test`**
+  （改的只有 `scripts/tests/`，Swift 侧一个字节未动；上一笔 7b7495d 的全量卷是 `Executed 915 tests / 44 skipped / 0 failures`）；
+  ③ **本笔与上一笔的 CI 都未读**（`RUN=39347522293 sha=7b7495d status=in_progress conclusion=` 空）——
+  250 里「runner 也认这两种形状」那一半，要等电池在 runner 上绿了才算被外部机器复验；
+  ④ 手工跑 `mutate_needle_precheck.py` 读到 `tables=68 covered=53 arms=191 bad=5`（含 `mutate_r229` 的 M768 命中=0），
+  而同一天本机电池 423 条全绿 ⇒ 新开 **269**：这一格是**只印不拦**、还是根本不在电池里，两种成因要先分辨。
+
 ## 第 236 轮（R237 / Round 234 · 2026-10-20）：本机绿的边界 —— runner 的 STEP[4] 把「读缝的格子」判成编译期 error，本机不报，于是补一把**与 SDK 无关**的静态尺（U-761…U-764）
 
 - **U-761：`Build (must be warning-free)` 在 runner 上是 error，在本机连警告都没有。** run `39345462910`（= 台账半 `7713d18`，产品半 `415abf3` 同一次 push 只出这一跑）STEP[4] 正文只有一条不同的诊断，逐字：`ClipboardHistory/Tests/ClipboardHistoryAppTests/MenuBarSwiftUIDismissRowInkTests.swift:80:57: error: main actor-isolated static property 'dismissRowInk' can not be referenced from a nonisolated context`，配套 `note: add '@MainActor' to make instance method 'testSeamInkClearsTheTextFloorInBothStates()' part of global actor 'MainActor'`，收尾 `##[error]Process completed with exit code 1.`。同一支文件本机 `swift build --build-tests` 里这一条**不存在**（本轮重跑：`BUILD_WARN=0`、全量卷 全量卷 Executed 915 tests / 44 skipped / 0 failures（Test Suite 'All tests' passed，见 /tmp/r237_full.log）、判据卷 5 格 0 失败）。成因按「缺席解释逐一列全」判：① 我写错了？被 runner 自己的 note 否掉 —— 它说的是**推断出来的**隔离，不是我引用了不存在的东西；② 两套工具链对 conform `View` 的类型成员是否整体推断成 main-actor 不一致 ⇒ 与「本机 0 error」共存且唯一解释得通。修法取最小的一处：给那一格加 `@MainActor`（**产品 0 文件**，画面一字未动）。这条推断本机复现不出来：本机只有一套 SDK。
