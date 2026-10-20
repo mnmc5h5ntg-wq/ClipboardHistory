@@ -1,5 +1,23 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+## R237（本地 · 2026-10-20 08:2x）：本机绿≠CI 绿 —— runner 的 STEP[4] 是编译期 error，补了一把与 SDK 无关的静态尺（第 236 轮 / Round 234 / U-761…U-764 / D-222 / BACKLOG 268）
+
+最后更新：2026-10-20 08:25（本地 · R237 / 第 236 轮 / Round 234）
+
+本轮落地：① 读 R236 那一跑 CI ⇒ `STEP[4] Build (must be warning-free)` 打的是 **error**（`dismissRowInk` 非隔离引用），STEP[5]–[14] 因此 skipped、STEP[15]/[17]/[18]/[19] 的红是同一成因的回声；② 最小修法加一行 `@MainActor`（**产品 0 文件**）；③ 新判据 `MenuBarSeamReaderIsolationTests`（真值表 + 真扫，现读 `SEAM_READER_ISOLATION 文件=98 代码位引用=1 未标注=0`）；④ 变异刀 M792 CAUGHT、`RESTORE_CLEAN=yes`；⑤ 看图腿复用上一轮 162 张帧：`COMPARED=162 CHANGED=0 MISSING=0 ADDED=0`（先量 `PRODUCT_FILES=0` 才复用）。
+
+验证：`BUILD_WARN=0`；判据卷 `MenuBarSeamReaderIsolationTests|MenuBarSwiftUIDismissRowInkTests` 5 格 0 失败；全量卷 全量卷 Executed 915 tests / 44 skipped / 0 failures（Test Suite 'All tests' passed，见 /tmp/r237_full.log）；帧基线如上；脚本电池在台账落盘之后跑，读数写在本笔 commit message 里（顺序规矩）。
+
+**下一轮（R238 / 第 237 轮 / Round 235）的靶**
+
+⓪ **本笔的 CI 完全未读**（268 的 runner 半、也是 R236 那三笔一直没读完的那一半）⇒ `python3 scripts/ci_read.py latest` 现拿 run↔commit 成对，再看 `steps <run>`：**要验的是 STEP[4] 有没有转绿**（这一条不绿，后面所有步骤的处置都不许当成产品读数）、`SEAM_READER_ISOLATION` 在 runner 上打的那一行、新判据两格有没有露面、以及 249 / 263 那两格。
+① 249 与 263 的分辨读数（`pixels > 400` 那个证人；判据要自印读数，`--log-failed` 会截断断言正文）。
+② 268 的 runner 半（见 ⓪）。
+③ 251 / 250 / 253 的「接进 CI」那半。
+④ 267（10ms 绝对地板 vs 存在性断言）、260、262、258 第三处、254→255→248、243、227③、222、215、201 / 202、207、240。
+⑤ 要用户真机或授权的：220 路 A（改全局键盘偏好）、228②、265（悬停那一行的真机观感）。
+
+
 最后更新：2026-10-20 08:02（本地 · R236 / 第 235 轮 / Round 233：**13 那棵 SwiftUI 树的「都不是我想要的」收成一条可读的缝 + 两轴判据 —— R235 那枚 ESCAPED（M787，本轮同一处变异重编号 M790）关成 CAUGHT，而画面一字未动**（U-757…U-760 · D-221 · 产品 1 文件 + 判据 1 新文件 + 刀 3 把）
 
 **本轮落地**：① **264 结案**：`MenuBarRecommendationsView` 新增 `dismissRowInk: Color? { nil }` 与

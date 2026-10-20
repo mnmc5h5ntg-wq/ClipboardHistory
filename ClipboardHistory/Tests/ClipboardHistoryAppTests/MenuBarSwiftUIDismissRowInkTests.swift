@@ -74,6 +74,12 @@ final class MenuBarSwiftUIDismissRowInkTests: XCTestCase {
 
     // MARK: ②行为轴：缝给的墨，两档 × 两种底色都要过 D-220 那两条地板
 
+    /// `@MainActor` **不许删**：`MenuBarRecommendationsView`  conforms `View`，在本轮 runner 那套
+    /// SDK 上整个类型的成员都被推断成 main-actor 隔离 ⇒ 非隔离上下文读 `dismissRowInk` 是
+    /// **编译期 error**（run 39345462910 的 STEP[4] 就红在这一句，本机工具链放过）。
+    /// 这一格本来就只在主线程解 `NSAppearance`，标注不改行为，只把「换台机器就编译不过」这件事
+    /// 交给 `MenuBarSeamReaderIsolationTests` 钉住。
+    @MainActor
     func testSeamInkClearsTheTextFloorInBothStates() throws {
         guard #available(macOS 13, *) else { throw XCTSkip("这棵 SwiftUI 树是 macOS 13 起的") }
         // 产品入口：这一行实际用的就是这条缝与这个标签构造器（③钉住它不许绕）。

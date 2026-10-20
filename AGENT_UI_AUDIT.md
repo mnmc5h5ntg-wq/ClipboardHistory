@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 236 轮（R237 / Round 234 · 2026-10-20）：本机绿的边界 —— runner 的 STEP[4] 把「读缝的格子」判成编译期 error，本机不报，于是补一把**与 SDK 无关**的静态尺（U-761…U-764）
+
+- **U-761：`Build (must be warning-free)` 在 runner 上是 error，在本机连警告都没有。** run `39345462910`（= 台账半 `7713d18`，产品半 `415abf3` 同一次 push 只出这一跑）STEP[4] 正文只有一条不同的诊断，逐字：`ClipboardHistory/Tests/ClipboardHistoryAppTests/MenuBarSwiftUIDismissRowInkTests.swift:80:57: error: main actor-isolated static property 'dismissRowInk' can not be referenced from a nonisolated context`，配套 `note: add '@MainActor' to make instance method 'testSeamInkClearsTheTextFloorInBothStates()' part of global actor 'MainActor'`，收尾 `##[error]Process completed with exit code 1.`。同一支文件本机 `swift build --build-tests` 里这一条**不存在**（本轮重跑：`BUILD_WARN=0`、全量卷 全量卷 Executed 915 tests / 44 skipped / 0 failures（Test Suite 'All tests' passed，见 /tmp/r237_full.log）、判据卷 5 格 0 失败）。成因按「缺席解释逐一列全」判：① 我写错了？被 runner 自己的 note 否掉 —— 它说的是**推断出来的**隔离，不是我引用了不存在的东西；② 两套工具链对 conform `View` 的类型成员是否整体推断成 main-actor 不一致 ⇒ 与「本机 0 error」共存且唯一解释得通。修法取最小的一处：给那一格加 `@MainActor`（**产品 0 文件**，画面一字未动）。这条推断本机复现不出来：本机只有一套 SDK。
+- **U-762：于是「编译器会替我记住」在本机等于没有 ⇒ 补静态尺。** `Tests/ClipboardHistoryAppTests/MenuBarSeamReaderIsolationTests.swift` 两格：①真值表（没标注 / 有标注 / 只在注释与字符串字面量里，三形状各判一次；夹具用假名 `Foo.Bar.`，免得①里出现真名被②算成一处引用）；②真扫测试目录，剥掉行注释与字面量后要求「代码位读缝的那根 func（或外层类型）紧邻标注里有 main-actor」。本轮现读的结论行：`SEAM_READER_ISOLATION 目录=ClipboardHistoryAppTests 文件=98 代码位引用=1 未标注=0`。名单为空=红（`refs >= 1`），结论行打在闸门之前。它是**尺不是编译器**：不解析语法树，只管这一颗名字，管不了别的 SwiftUI 成员。
+- **U-763：这把尺有没有牙 —— M792 CAUGHT。** `.scratch/motion-audit-2/mutate_r237.py` 一刀：删掉 U-761 刚补的那行 `@MainActor`（删除型替换串不留原 token）。基线先绿（`R237_BASELINE 绿`、红名=无），变异后红在**该红的那一格**：`R237_KNIFE M792 CAUGHT EXTRA=ClipboardHistoryAppTests.MenuBarSeamReaderIsolationTests.testEveryLiveSeamReaderCarriesMainActor`，`R237_MUTATE 刀=1 CAUGHT=1 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。这正是要的形状：本机编译器不报的写法，改完之后**判据自己红**，不用等下一跑 CI 编译失败。刀号先在台账查重：M792 未出现过（R236 用到 M791），跨表唯一。
+- **U-764：未做 / 未证（不许写成已交付）。** ① 本笔修复的 **runner 侧验收未读** —— STEP[4] 会不会转绿，只有下一跑 CI 说了算；② STEP[15]/[17]/[18]/[19] 这四朵在 STEP[4] 修好之前**不许重新归因成产品事实**：编译不过 ⇒ 后面的步骤根本没有以「跑过产品判据」的身份运行，它们的红现在只说明同一个成因；③ 这把尺只覆盖「读 `MenuBarRecommendationsView` 那颗缝」，没推广到别处（推广要先量还有几处代码位在读别的 SwiftUI 静态成员 —— 未量）；④ 本机没有第二套 SDK，「工具链推断不同」这一句是**由两边的观测共存推出来的**，不是我在本机实测过两套；⑤ 249 / 263 与 251 / 250 / 253 的「接进 CI」那半仍欠，与上一轮同。
+
 ## 第 235 轮（R236 / Round 233 · 2026-10-20）：13 那棵的墨第一次有**两轴**会红的判据 —— R235 那枚 ESCAPED 的 M787（同一处变异，本轮重编号 M790）关成 CAUGHT（U-757…U-760 / D-221）
 
 - **U-757：把「都不是我想要的」那一行的文案与墨收成一条缝，然后两轴各一条判据 —— 变异读数：三刀 CAUGHT=3 / ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes。**

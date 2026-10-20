@@ -14287,3 +14287,22 @@ R235 留下的活路径缺牙：13 那棵 SwiftUI 树的「都不是我想要的
 合计 97/105。GAPS=none（欠的四件事写在第 235 轮 U-760 里，是登记不是漏）。
 本轮次对照：脚本臂 R236 = 台账「第 235 轮」= 「Round 233」（差 3，两枚标签都写进标题）。
 
+## Round 234 · 本机绿≠CI 绿：runner 把「读缝的格子」判成编译期 error，本机连警告都没有 ⇒ 补一把与 SDK 无关的静态尺（2026-10-20 / R237 / 第 236 轮 / U-761…U-764 · 产品 0 文件）
+
+本轮次对照：脚本臂 R237 = 第 236 轮 = Round 234（这本账自己的编号仍比脚本臂慢 3，标题里逐字带上 R237 供 `test_round_batch_consistency` 的第二种形状命中）。
+
+做了什么：读 R236 那一跑的 CI ⇒ STEP[4] `Build (must be warning-free)` 是 **error** 不是 warning，指在 R236 新写的判据格上（`@MainActor` 推断差异）。最小修法加一行标注（产品 0 文件），再补 `MenuBarSeamReaderIsolationTests`（真值表 + 真扫：`SEAM_READER_ISOLATION 文件=98 代码位引用=1 未标注=0`），配一刀 M792 问「这把尺有没有牙」⇒ CAUGHT、RESTORE_CLEAN=yes。
+
+看图腿：本轮**没重捕帧**。前置量先读了 —— `git status --porcelain ClipboardHistory/Sources` = `PRODUCT_FILES=0`，上一轮的 162 张帧仍在盘上（`ls /tmp/shots_r236/*.png`），于是按零产品改动的规矩复用它对账：`FRAME_BASELINE_COMPARED=162 / CHANGED=0 / MISSING=0 / ADDED=0`。这是「画面没动」的对账，不是本轮有新画面。
+
+七维度自评：
+
+| 真实视觉审查 | 13/15 |
+| 判据有效性 | 14/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 14/15 |
+| 台账一致性 | 9/15 |
+| 交付诚实性 | 14/15 |
+| 可复核性 | 12/15 |
+
+合计 91/105。

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+
+### 判据与尺：读缝的格子必须标 `@MainActor` —— runner 的 STEP[4] 判编译期 error、本机不报，补一把与 SDK 无关的静态尺（R237 / U-761…U-764 / D-222 · 产品 0 文件，画面一字未动）
+
+- `MenuBarSwiftUIDismissRowInkTests.testSeamInkClearsTheTextFloorInBothStates` 加一行 `@MainActor`（run `39345462910` STEP[4] 的 error 原文：`main actor-isolated static property 'dismissRowInk' can not be referenced from a nonisolated context`）。
+- 新增 `MenuBarSeamReaderIsolationTests`：①真值表三形状（没标注 / 有标注 / 只在注释与字面量里）②真扫测试目录（剥注释与字面量，要求代码位引用所在 func 紧邻标注里有 main-actor；名单为空=红）；自印 `SEAM_READER_ISOLATION 文件=98 代码位引用=1 未标注=0`。
+- 变异刀 M792（删掉那行标注）**CAUGHT** 在 `testEveryLiveSeamReaderCarriesMainActor`，`刀=1 CAUGHT=1 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；未做的：runner 侧验收、推广到别的 SwiftUI 成员（见 U-764 / 268）。
 ### 判据与缝：13 那棵 SwiftUI 树的 dismiss 行墨第一次有**两轴**会红的判据（R236 / U-757…U-760 / D-221 · 产品 1 文件，画面一字未动）
 
 - 墨与文案收成一条可读的缝（`dismissRowInk` + `dismissRowLabel()`），判据 `MenuBarSwiftUIDismissRowInkTests` 三格：尺自对照 / 行为轴（钉进缝里 ⇒ 两档 × 4.5 与 3.0 地板必须红）/ 结构轴（绕过缝就地钉色 ⇒ 必须红）。变异三刀 M789 / M790 / M791 CAUGHT=3 / ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes ⇒ R235 那枚 ESCAPED 的 M787（同一处变异，本轮号 M790）就地关成 CAUGHT，BACKLOG 264 结案。画面不变（重捕 162 帧 `CHANGED=0 / MISSING=0`）⇒ 这是一笔**不改变画面的可证伪性**改动。
