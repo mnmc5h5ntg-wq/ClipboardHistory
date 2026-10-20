@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R252 / 第 251 轮 / Round 249 · 按行取证键：归属可拍了，R251 的"两档过线"被推翻并登记成缺陷）
+
+产品（2 文件，惰性等价）：`PressableStyle.swift` 新增 `HoveredRowForCaptureKey` 与 `EnvironmentValues.hoveredRowForCapture: Int?`；`DetailView.swift` 的 `MultiFileRow` 收 `row`，`isHoveredForDrawing` 并三路（真实指针 / 整棵覆盖 / 按行覆盖）。产品路径两个键恒 nil。`swift build` 零告警。
+夹具：`detail-3-files-row0`（静置）与 `detail-3-files-row0-hover`（只点亮第 0 行）⇒ 尺自动配对，`/tmp/shots_r252` 168 张、捕获卷 80 格 0 失败、帧基线同一笔 update 到 168。
+读数（本轮的核心）：整列那对 带=(40,142,1408,1008) 变化=28.6% 两档过线；按行那对 带=(40,142,1400,242) 变化=9.0%，**暗档 1.257 过线、亮档 1.171 低于地板 1.20** ⇒ `HOVER_DIFF_FLOOR_RED=1`、尺 `退出=1`。R251 的"两档过线、保留不改"就此作废：三行一起抬把单行的不足盖住了。
+判据：`test_hover_two_state_diff.py` 新增 `KNOWN_FLOOR_RED` 双向对账（名册里的必须真红、真红的必须在名册、理由 ≥20 字），两次现读同源；它只能被"修好产品"清空。新开 297。
+一条自坏：名册第一版插在 `@unittest.skipIf` 与它装饰的类之间 ⇒ 整卷 SyntaxError，`ast.parse` 拦下后把装饰器移回类正上方。
+本轮 NOT-RUN：眼睛腿（没看帧 —— 297 的前置）、变异腿（名册没有刀）、全量 Swift 卷与换装本机（改了产品却没跑 ⇒ D-236 的债又开一格）。
+
 ### Changed（R251 / 第 250 轮 / Round 248 · 多文件行第一次有两态帧并被量到；量出夹具证明不了的事）
 
 夹具（Tests 半，产品 0 文件）`UICaptureHarness.swift`：新增 `detail-3-files-hover`（`DetailView(historyStore:).environment(\.hoveredForCapture, true)`，index 3 = `.files` 是多文件行的唯一载体）。帧名形状让 `hover_two_state_diff.find_pairs` 自己配对，不写坐标也不列名单。
