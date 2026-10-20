@@ -36,13 +36,14 @@ except ImportError:                                       # 与 252 同一族：
 
 _ruler = None
 _load_error = None
-if Image is not None:
-    _spec = importlib.util.spec_from_file_location("hover_two_state_diff", SCRIPT)
-    try:
-        _ruler = importlib.util.module_from_spec(_spec)
-        _spec.loader.exec_module(_ruler)
-    except Exception as exc:                              # pragma: no cover - 只在本机之外可能命中
-        _load_error = str(exc)
+# R259：模块加载**不再挂在 PIL 上** —— 台阶那把尺（--readings）只解析判据印的行，
+# 不需要写帧。挂在 PIL 上会让那几格在缺库的机器上变成 skip，而它们恰恰是尺的自我检查。
+_spec = importlib.util.spec_from_file_location("hover_two_state_diff", SCRIPT)
+try:
+    _ruler = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_ruler)
+except Exception as exc:                              # pragma: no cover - 只在本机之外可能命中
+    _load_error = str(exc)
 
 NO_PIL = Image is None
 NO_RULER = _ruler is None
@@ -366,4 +367,81 @@ class RealFrameFloorTests(RulerTestCase):
                          u"退出码应与名册一致（有登记的红=尺自己响，期望 1；空名册=期望 0）：%s" % out[-400:])
         print(u"HOVER_FLOOR_RED_KNOWN=%d 名册=%s 现读=%s 退出=%d" % (
             len(red), sorted(KNOWN_FLOOR_RED), sorted(red), rc))
+
+
+class RungStepTests(RulerTestCase):
+    """305 的尺：相邻两档（悬停↔按下）的台阶。输入是**判据自己印的灰阶**，不是重扫帧。
+
+    正对照 = 校准：用印出来的三个灰阶重算"悬停对底""按下对底"，必须复现判据自印的那两个比值。
+    复现不了 ⇒ 两把尺在读不同对象，台阶一律不算（这条正是 R258 生成器自己踩过的坑：
+    我把星形符号的众数当成了那片纸的底，1.385 vs 1.260，被同一条校准当场打红）。
+    期望值由**第二份实现**给（R243 的规矩：不许拿被检的那把尺自己算期望）。
+    """
+
+    LIGHT = (u'PRESS_LADDER_PROOF light 底 idle=255 hover=255 press=255｜药丸 idle=196 hover=229 press=223'
+             u'｜比值 1.260 → 1.333 差=0.073｜码值台阶 hover=26 press=32 差=6｜按下像素=933 空闲像素=6')
+    DARK = (u'PRESS_LADDER_PROOF dark 底 idle=30 hover=30 press=30｜药丸 idle=82 hover=45 press=53'
+            u'｜比值 1.211 → 1.359 差=0.149｜码值台阶 hover=15 press=23 差=8｜按下像素=933 空闲像素=6')
+
+    def log(self, *lines):
+        return "\n".join(lines) + "\n"
+
+    def run_ruler(self, text, machine="local:fixture"):
+        path = os.path.join(self.dir, "readings.log")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(text)
+        return self.cli(["--readings", path, "--machine", machine])
+
+    @staticmethod
+    def independent_ratio(a, b):
+        """第二份 WCAG 实现，只用来生成期望值。"""
+        def lin(v):
+            v = v / 255.0
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        la, lb = lin(a), lin(b)
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+    def test_the_step_matches_an_independent_implementation_in_both_appearances(self):
+        rc, out = self.run_ruler(self.log(self.LIGHT, self.DARK))
+        self.assertEqual(0, rc, u"干净日志必须 rc=0，两向证人的另一向：\n" + out[-400:])
+        for tag, hover, press in ((u"light", 229, 223), (u"dark", 45, 53)):
+            m = re.search(u"RUNG_STEP \\S+ " + tag + u" 悬停=\\d+ 按下=\\d+ 底=\\d+｜"
+                          u"悬停→按下台阶\\(WCAG\\)=([\\d.]+)", out)
+            self.assertIsNotNone(m, tag + u" 档没印出台阶行：\n" + out[-400:])
+            want = self.independent_ratio(hover, press)
+            self.assertAlmostEqual(want, float(m.group(1)), places=3,
+                                   msg=u"%s 档台阶与独立实现不符（尺 %s vs 独立 %s）"
+                                       % (tag, m.group(1), round(want, 4)))
+
+    def test_a_printed_ratio_that_disagrees_with_its_own_greys_is_refused(self):
+        # 把印出来的比值改成假的：校准必须红，而且不许顺手把台阶数照印
+        bad = self.LIGHT.replace(u"比值 1.260 → 1.333", u"比值 1.900 → 1.990")
+        rc, out = self.run_ruler(self.log(bad, self.DARK))
+        self.assertEqual(1, rc, u"校准被篡改还绿 ⇒ 这条正对照是摆设：\n" + out[-400:])
+        self.assertIn(u"RUNG_STEP_CALIB=BAD light", out)
+        self.assertNotIn(u"RUNG_STEP local:fixture light", out)
+
+    def test_an_empty_log_is_red_not_skipped(self):
+        rc, out = self.run_ruler(u"HOVER_PILL_PROOF light 什么都有就是没有按下档\n")
+        self.assertEqual(1, rc, u"一行按下态都没有却给了绿：\n" + out[-400:])
+        self.assertIn(u"RUNG_STEP_EMPTY=1", out)
+
+    def test_a_missing_appearance_is_named_not_averaged_away(self):
+        rc, out = self.run_ruler(self.log(self.LIGHT))
+        self.assertEqual(1, rc, u"只有一档时不许宣布通过：\n" + out[-400:])
+        self.assertIn(u"RUNG_STEP_INCOMPLETE dark", out)
+        self.assertIn(u"RUNG_STEP local:fixture light", out, u"有读数的那一档仍要把数交出来（缺席不等于没收据）")
+
+    def test_every_line_names_its_machine(self):
+        rc, out = self.run_ruler(self.log(self.LIGHT, self.DARK), machine="github-runner")
+        self.assertEqual(0, rc, out[-400:])
+        self.assertEqual(2, len(re.findall(u"RUNG_STEP github-runner ", out)),
+                         u"读数没带机器键 ⇒ 两台机器的数会被当成同一个量比（R38/R121 那一族）：\n" + out[-300:])
+
+    def test_the_ruler_does_not_invent_a_floor_yet(self):
+        # 305 的规矩：地板要两机各读一次才推。今天它只印"判定=只印不判"。
+        rc, out = self.run_ruler(self.log(self.LIGHT, self.DARK))
+        self.assertEqual(0, rc, out[-400:])
+        self.assertEqual(2, out.count(u"判定=只印不判"), out[-300:])
+        self.assertNotIn(u"RUNG_STEP_FLOOR_RED", out)
 

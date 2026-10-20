@@ -25,7 +25,10 @@ import subprocess
 import sys
 
 DEFAULT_CHANNELS = ("CARD_PROBE_ARM", "CARD_STATS_", "CARD_INSET_", "CARD_ABOVE_",
-                    "CARD_BELOW_", "CARD_BAND", "CARD_FILL_CANDIDATES")
+                    "CARD_BELOW_", "CARD_BAND", "CARD_FILL_CANDIDATES",
+                    # R259 / BACKLOG 305：按下档的台阶要两机各读一次才推得出地板，
+                    # 而 runner 那半只差这条前缀 —— 判据早就在印，通道没登记就等于读不到。
+                    "PRESS_LADDER_", "HOVER_PILL_")
 
 
 def gh(*args):

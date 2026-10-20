@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R259 / 第 258 轮 / Round 256 · 305 的尺：相邻两档台阶，读判据自己印的数）
+
+`scripts/hover_two_state_diff.py` 新增 `--readings <日志> [--machine <键>]`：从判据印出的 `PRESS_LADDER_PROOF` 行取三个灰阶，用本文件已有的 `_ratio_wcag` 算"悬停→按下"的台阶，并做两点校准（复现判据自印的"悬停对底""按下对底"，误差 ≤0.002 才算数）。**不重扫 PNG** —— 众数那一步只有一份定义处（D-245）。
+现读：亮 1.058 / 暗 1.123，判定=只印不判（305 的地板要两机各读一次）。
+`scripts/ci_read.py` 的 `DEFAULT_CHANNELS` 加 `PRESS_LADDER_` / `HOVER_PILL_` 两个前缀（判据在印、通道没登记等于读不到）。
+判据卷 `scripts/tests/test_hover_two_state_diff.py` 26 格（+6）：独立实现给期望、篡改比值必须被抓、空名单红、缺一档点名、每行带机器键、不许提前发明地板；并把模块加载从 PIL 依赖上摘下来（那几格是尺的自我检查，不该在缺库机器上变 skip）。
+电池 `Ran 468 / OK`；CI：5952827 → 39503229242 / in_progress / 未读；9ffb6fd → 39502927591 / in_progress / 未读；c2ede9f 没有自己的 run（同一次 push 只给 head 那笔建跑，不是缺陷）（两跑未读 ⇒ 305 仍开）。产品 0 文件。
+
+
 ### Added（R258 / 第 257 轮 / Round 255 · 按下那一档第一次可拍、可量、可被刀红回来）
 
 产品侧一颗取证键 `EnvironmentValues.pressedForCapture`（`Views/PressableStyle.swift`）：`PressedLabel` 的缩放与底色两半都汇到同一个绘制分支，真实 `configuration.isPressed` 那条路一字未动；产品源码写这颗键 = 红（扫描前剥行注释）。

@@ -21,6 +21,7 @@
 """
 import argparse
 import os
+import re
 import statistics
 import sys
 
@@ -131,12 +132,71 @@ def find_pairs(dirpath):
     return pairs, unpaired
 
 
+def rung_from_readings(text, machine):
+    """305 的尺：相邻两档（悬停↔按下）的台阶，从**判据自己印的灰阶**里算，不去重扫 PNG。
+
+    为什么读日志而不是读帧：灰阶众数那一步住在 Swift 的 `pillReading` 里，在 python 再写一份
+    就是第二个定义处（R229/R230 那一族：两份定义会各自算出两个数还互相掩盖）。这里只借用
+    本文件已有的 `_ratio_wcag`，输入是判据印出来的三个灰阶 ⇒ 两台机器走同一条代码，地板才推得出来。
+
+    校准是这条尺的**正对照**：用判据自印的灰阶重算"悬停对底""按下对底"两个比值，
+    必须复现判据自己印的那两个数（误差 ≤0.002）。复现不了就是两把尺在读不同对象，
+    台阶数一律不算。返回 (行列表, 退出码)。
+    """
+    rows, rc = [], 0
+    pat = re.compile(
+        r'PRESS_LADDER_PROOF (light|dark) 底 idle=(\d+) hover=(\d+) press=(\d+)'
+        r'｜药丸 idle=(\d+) hover=(\d+) press=(\d+)'
+        r'｜比值 ([\d.]+) → ([\d.]+)')
+    found = pat.findall(text)
+    if not found:
+        return (['RUNG_STEP_EMPTY=1 日志里一行 PRESS_LADDER_PROOF 都没有 ⇒ 这台机器没量到按下档，'
+                 '不许在空名单上给绿（R99）'], 1)
+    seen = set()
+    for tag, _bi, _bh, _bp, _pi, hover, press, r0, r1 in found:
+        seen.add(tag)
+        # 底：三个 idle/hover/press 的底是同一片纸，取判据印的 hover 那一格
+        bg = int(re.search(r'PRESS_LADDER_PROOF ' + tag + r' 底 idle=(\d+)', text).group(1))
+        mine0, mine1 = _ratio_wcag(bg, int(hover)), _ratio_wcag(bg, int(press))
+        step = _ratio_wcag(int(hover), int(press))
+        calib_ok = abs(mine0 - float(r0)) <= 0.002 and abs(mine1 - float(r1)) <= 0.002
+        if not calib_ok:
+            rc = 1
+            rows.append('RUNG_STEP_CALIB=BAD %s 用判据自印的灰阶重算得 %.3f/%.3f，而它印的是 %s/%s'
+                        ' ⇒ 两把尺在读不同对象，台阶数不算' % (tag, mine0, mine1, r0, r1))
+            continue
+        rows.append('RUNG_STEP %s %s 悬停=%s 按下=%s 底=%s｜悬停→按下台阶(WCAG)=%.3f'
+                    '｜悬停对底=%s 按下对底=%s｜判定=只印不判（305：地板要两机各读一次才推）'
+                    % (machine, tag, hover, press, bg, step, r0, r1))
+    for need in ('light', 'dark'):
+        if need not in seen:
+            rc = 1
+            rows.append('RUNG_STEP_INCOMPLETE %s 档没有按下态读数 ⇒ 两档对照不存在，不许只按有读数的那档下结论'
+                        % need)
+    return rows, rc
+
+
 def main():
     ap = argparse.ArgumentParser(description='两态差尺（带内均值 + 变化像素逐点中位数）')
     ap.add_argument('--shots', help='帧目录（默认取 CLIPBOARD_HISTORY_UI_SHOTS）')
     ap.add_argument('--min-pairs', type=int, default=1, help='至少要配到几对（覆盖率地板，本机实测 2）')
     ap.add_argument('--control', help='正对照：a,b 两个帧名（不含 .png），必须已知有变化')
+    ap.add_argument('--readings', help='305 的尺：从判据自己印的日志算「相邻两档台阶」，不重扫帧')
+    ap.add_argument('--machine', default='', help='读数归属的机器键（喂 runner 日志时要显式写，别默认成本机）')
     args = ap.parse_args()
+    machine = args.machine or ('local:' + (os.uname().nodename if hasattr(os, 'uname') else 'unknown'))
+    if args.readings:
+        try:
+            with open(args.readings, encoding='utf-8', errors='replace') as f:
+                text = f.read()
+        except OSError as e:
+            print('RUNG_STEP_REFUSED 读不到日志 %s（%s）' % (args.readings, e))
+            return 2
+        rows, rc = rung_from_readings(text, machine)
+        for row in rows:
+            print(row)
+        print('RUNG_STEP 行数=%d 机器=%s 退出=%d' % (len(rows), machine, rc))
+        return rc
     shots = args.shots or os.environ.get('CLIPBOARD_HISTORY_UI_SHOTS')
     if not shots or not os.path.isdir(shots):
         print('HOVER_DIFF_REFUSED 帧目录不可用（要 --shots 或 CLIPBOARD_HISTORY_UI_SHOTS）：%s' % shots)
