@@ -815,7 +815,7 @@ BACKLOG：251 第三处病根写成追记（仍未结案，缺夹具 ⇒ 新开 
 - 契约：`testTheProbeWiresTheAnchorToTheSampleCount` 要求 `let fpsTail = ` 1 次、`+ fpsTail)` 1 次、`超锚点帧=` 3 次（按次数判，防"提过就算"）
 - 两处自撞：中文串里 ASCII 双引号让整段 python SyntaxError（**一个字节都没写**，靠 `grep fpsTail` 空结果才发现）；期望从 2 改 3 前先指认第三处是 `WORST_OUTLIER`
 - 收尾同形错第三次复发：`949350d` 的 message 讲了 U-598…U-600 而 diff 只有两个 Swift 文件（台账脚本 `TypeError` 死掉、链子没拦住）⇒ 本笔补账，脚本落成 `ledgers_r180.py`
-- 验证：`swift test --filter FrameIntervalBudgetTests` `Executed 5 / 0 failures`、脚本电池 `Ran @@BATT@@ / OK`；清账表 @@ROWS@@/@@CELLS@@ 未动；0 产品文件
+- 验证：`swift test --filter FrameIntervalBudgetTests` `Executed 5 / 0 failures`、脚本电池结论行未落数；清账表条数未落（R258 现读：这一行是当年生成器把占位符原样写进台账留下的空壳，不是读数；见 BACKLOG 307）；0 产品文件
 ### R176 的 runner 验收：判据绿，但新加的读数行整卷没出现（R179 / U-595…U-597 · 产品 0 文件，判据账）
 
 - run `39161493538`=`fce0b84` `completed success`，STEP[16] `On-screen probe coverage floor` 不再红（上一跑红在 `worst=320.65 > 120`）；同跑 `PROBE_FPS 机器=arm64/macOS 15.7/1x baseline_p95=16.67 off_p95=16.67 loaded_p95=16.67 比值=1.000 预算=3.00 n=222 worst=58.8
