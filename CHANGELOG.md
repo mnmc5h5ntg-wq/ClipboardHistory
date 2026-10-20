@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R249 / 第 248 轮 / Round 246 · SearchField 接上进证通道；名册判法改成剥注释后判）
+
+产品（1 文件）`ClipboardHistory/Sources/ClipboardHistoryApp/Views/SearchField.swift`：新增 `hoveredForCapture` 与一层 `isHoveredForDrawing`，图标墨（`controlTargeted`）与清除按钮可见性都改读它；产品路径该键恒 `nil`。`swift build` 零告警。
+判据 `scripts/tests/test_hover_capture_channel.py`：加画法级断言（谁还直读裸 `isHovered` 就红）；`wiring()` 先剥行注释再判有无键 ⇒ `HistoryRowViews.swift` 从"已接"翻成"未接"并补进欠账名册（现读 位点=9 已接=6 欠=3，含新翻出的一位）。
+变异：`arms_r249/manifest.tsv` + `mutate_r249.sh`（kind/rel 从 manifest 现取）；`R249_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`。M813 退役并新开 294（python kind 的臂打在 Swift 文件上会穿过编译错误）。
+看图：本轮 RUN，范围只 `settingsrow-hover-{idle,lit}-300x96-dark.png` 两张 —— 点亮是一整条圆角横底、不压字不抢视线 ⇒ 保留不改；亮档与"横底 vs 系统选中底色"未看未判。
+一次错位明记：代码半在 `b9e9412` 已 push，而它的生成器在写账之前 IndentationError 崩掉 ⇒ 那笔的提交信息提到 U/D 号却只有代码进仓；本笔才是账半。规矩补一条：heredoc 生成器必须先落盘成文件、`ast.parse` 通过，才允许进入"提交链"那一支。
+未跑：全量 Swift 卷、重捕帧、帧基线、换装本机（292 仍开）。
+
 ### Changed（R248 / 第 247 轮 / Round 245 · 取证通道接到 DetailView 多文件行 + 悬停可拍性名册）
 
 产品（1 文件）`ClipboardHistory/Sources/ClipboardHistoryApp/Views/DetailView.swift`：`MultiFileRow` 声明 `hoveredForCapture`，填充与描边共用 `isHoveredForDrawing`；照同仓两处已验证接法（`MarkdownModeButton:239`、`SettingsView:868`）。产品路径读不到该键（恒 `nil`），语义不变，但这一位从此**可拍**。验证：`swift build` 零告警、modechip 捕获格 `Executed 1 test, with 0 failures`。
