@@ -1,4 +1,4 @@
-# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R256，256 轮自评）
+# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R257，257 轮自评）
 
 > 标题这一格曾经停在 **R46** 而账本已经写到 R99 —— 那是 U-264 记的那族「报告格子停在旧数」里最显眼的一处（同一族还有 D 行停在 D-149、判据行停在 796 例、帧行停在 112、变异行停在 M509、脚本行停在 127 条）。R99 起这几格跟着 pass-2 的日志一起刷新，出处写在每一格末尾。
 
@@ -19,7 +19,7 @@
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
 | 阶段二 **223 轮**审计（R9–R230；以 `curve_from_ledger.py` 的 `PHASE2 n=223` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 221 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-845（R259：U-841…U-845 之后现读刷新；612 条定义行是 R259 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-852（R260：U-846…U-852 之后现读刷新；619 条定义行是 R260 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R258**（commit `c2ede9f`）—— 1 文件，**动的是取证面不是画面**：`EnvironmentValues.pressedForCapture` 让按下那一档第一次可拍、可量、可被刀红回来（台阶读数 U-836、两把刀各钉一条轴 D-244、看图 U-838；产品侧写这颗键=0 有守卫）。上一笔是 R256（`c7d8385`：亮档 pressed 抬量 0.015→0.03，那一笔的代价账记在 D-242/D-243 与第 255 轮）。上一笔动源码是 R253（commit `a01d17e`，真改产品文件但**不改画面**，1 文件，纯缝）：`MenuBarRecommendationsView` 把「都不是我想要的」那一行的文案与墨收成 `dismissRowInk: Color? { nil }` + `dismissRowLabel()`，判据 `MenuBarSwiftUIDismissRowInkTests` 三格走两轴（行为轴地板从 D-220 继承：静置 4.5 / 选中 3.0；结构轴：body 必须走缝、函数体内着色恰好一处且参数是 `ink`）；三刀 M789 / M790 / M791 **各红在自己那一格**（第一版撞了 `mutate_r235.py` 的 M786 / M787 ⇒ 脚本电池的跨表撞号守卫钉红，改号后**重跑**），`CAUGHT=3 / ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes` ⇒ BACKLOG 264 那枚 ESCAPED（13 那棵没有会红的墨判据）就地结案；帧 162 对基线 `CHANGED=0 / MISSING=0`（不改变画面的重构，把可证伪性从一轴抬到两轴）；**CI 未读**（写进 R237 的 ⓪）；已换装本机。往前三笔动到源码的是 R235（`d4a2440`：菜单栏 dismiss 行撤写死蓝，runner 已验收 39338153114）、R234（`22346d3`：撤渲染档表格灰底）、R230（悬停灰全仓一条换算）| `git log -1 --format=%h%x09%s -- ClipboardHistory/Sources`（R235 补记起由 `scripts/tests/test_final_report_headline.py::live_sources` 现读对账，这一格不再靠手抄；不符就红 `FINAL_REPORT_SOURCES_CELL_STALE`） |
+| 最后一次动到 `Sources/` 的轮次 | **R258**（commit `4717c34`）—— 1 文件，**动的是取证面不是画面**：`EnvironmentValues.pressedForCapture` 让按下那一档第一次可拍、可量、可被刀红回来（台阶读数 U-836、两把刀各钉一条轴 D-244、看图 U-838；产品侧写这颗键=0 有守卫）。上一笔是 R256（`c7d8385`：亮档 pressed 抬量 0.015→0.03，那一笔的代价账记在 D-242/D-243 与第 255 轮）。上一笔动源码是 R253（commit `a01d17e`，真改产品文件但**不改画面**，1 文件，纯缝）：`MenuBarRecommendationsView` 把「都不是我想要的」那一行的文案与墨收成 `dismissRowInk: Color? { nil }` + `dismissRowLabel()`，判据 `MenuBarSwiftUIDismissRowInkTests` 三格走两轴（行为轴地板从 D-220 继承：静置 4.5 / 选中 3.0；结构轴：body 必须走缝、函数体内着色恰好一处且参数是 `ink`）；三刀 M789 / M790 / M791 **各红在自己那一格**（第一版撞了 `mutate_r235.py` 的 M786 / M787 ⇒ 脚本电池的跨表撞号守卫钉红，改号后**重跑**），`CAUGHT=3 / ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes` ⇒ BACKLOG 264 那枚 ESCAPED（13 那棵没有会红的墨判据）就地结案；帧 162 对基线 `CHANGED=0 / MISSING=0`（不改变画面的重构，把可证伪性从一轴抬到两轴）；**CI 未读**（写进 R237 的 ⓪）；已换装本机。往前三笔动到源码的是 R235（`d4a2440`：菜单栏 dismiss 行撤写死蓝，runner 已验收 39338153114）、R234（`22346d3`：撤渲染档表格灰底）、R230（悬停灰全仓一条换算）| `git log -1 --format=%h%x09%s -- ClipboardHistory/Sources`（R235 补记起由 `scripts/tests/test_final_report_headline.py::live_sources` 现读对账，这一格不再靠手抄；不符就红 `FINAL_REPORT_SOURCES_CELL_STALE`） |
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 

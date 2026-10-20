@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R260 / 第 259 轮 / Round 257 · 亮档按下与选中糊成一档：梯子顶层第一次有自己的地板与换算）
+
+新守卫 `ControlHoverLadderTests.testEveryRungOfTheLadderIsSeparableInBothAppearances` 先红在改之前：亮档 `pressed→selected = 0.01`（2.55/255，低于仓库给相邻两级定的 4/255），暗档同一格一直绿。病根：R253 抬 hover、R256 抬 pressed 把下面两级推到 0.12 / 0.15，最上级 `VisualFill.selected` 0.16 没人动；R231 那句"selected 不接共享换算"的前提被挪走（D-246）。
+修法：新增 `VisualFillLift.selected = 0.02` 与唯一换算 `SelectedInk.opacity(dark:)`（暗档仍等于令牌原值），`SettingsSidebarRow` 选中分支走它 ⇒ 亮档 0.12 / 0.15 / 0.18，与暗档 0.08 / 0.12 / 0.16 的等距结构同形。梯子判据加绝对锚点（暗 0.16 / 亮 0.18）。
+现读：Executed 6 / skipped 0 / failures 0；四件套 build 告警 0、全量卷 917 / skip 44 / failures 1、重捕 170 张 compare changed=15（亮档 15 张：cardprobe-split-groupbox-720x600-light.png、settings-data-720x540-light.png、settings-general-720x540-light.png、settings-general-login-failed-720x540-light.png、settings-general-login-unsupported-720x540-light.png、settings-min-640x440-light.png…（共 15 张））missing=0、dmg ok、换装 1.4.8；脚本电池 Ran 470 tests OK。
+两把刀（D-244 各钉一条轴）：M817 令牌轴 CAUGHT（lift→0，只有 light 红）、M818 产物轴 CAUGHT（调用点绕开 SelectedInk ⇒ 判据全绿而帧 changed=16、设置窗口 15 张）。
+另：尺的按步骤切片落地（R259 自己写下的形状警告兑掉）—— 同值只签一条并印 `步骤=N`，异值必红；runner 日志重跑行数 4→2、读数不变。新开 308（当场结案）、305 追记。
+
+
 ### Added（R259 / 第 258 轮 / Round 256 · 305 的尺：相邻两档台阶，读判据自己印的数）
 
 `scripts/hover_two_state_diff.py` 新增 `--readings <日志> [--machine <键>]`：从判据印出的 `PRESS_LADDER_PROOF` 行取三个灰阶，用本文件已有的 `_ratio_wcag` 算"悬停→按下"的台阶，并做两点校准（复现判据自印的"悬停对底""按下对底"，误差 ≤0.002 才算数）。**不重扫 PNG** —— 众数那一步只有一份定义处（D-245）。
