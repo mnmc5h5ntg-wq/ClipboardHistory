@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R242 / 第 241 轮 / Round 239 · CI 七笔读数交账：modechip 悬停那格换成两态变化尺，sources 格加浅历史闸门）
+
+- `UICaptureHarness` 新增 `bandChanged(idle:lit:…:delta:)`：数「两态之间变了多少颗」连同矩形自己的像素总数。`testModeChipHoverFillIsVisibleOnItsOwnSurface` 的「众数颗数 > 400」换成四条 —— 变化 > 100 颗、占比 ≥ 0.10、分母 > 100 颗、同一帧自己必须 0 颗。成因：runner 与本机对同一颗夹具读出 229 / 1281 颗而比值同为 1.36，绝对颗数量的是那台机器底是否平涂（D-228 / 277）。
+- `scripts/tests/test_final_report_headline.py` 把「能不能判」和「判出来什么」拆成 `sources_gate()`：浅历史上只许 ('skip', 原因)，全历史才许 ('judge', problems)；新增合成小仓库证人（`git init` + 两笔 + `file://` 上 `--depth 1`）当场重现「浅历史上 HEAD 被读成最近动过 Sources/ 的提交」，并配 M801 那把摘闸门的刀。结论行 `SOURCES_CELL_HISTORY 浅=… 处置=…` 排在闸门之前。
+- `.github/workflows/ci.yml`：①`actions/checkout@v4` 加 `fetch-depth: 50`（278）—— 默认 depth=1 让 STEP[9] 那一朵 `FINAL_REPORT_SOURCES_CELL_STALE` 成为没有对象的假红；②电池那一步之后挂上 `scripts/hover_two_state_diff.py`（274）—— 先打 `HOVER_DIFF_WIRED_AT png_files=`，整目录没 png 走具名 NOT_RUN，有 png 却凑不出 modechip 的 idle/lit 对算接线坏（红），CI 上**不设** `HOVER_DIFF_MIN_PAIRS`，等 runner 自己打印 `HOVER_DIFF 配对=…`。
+- 变异表 `.scratch/motion-audit-2/mutate_r242.py`（M798…M801，四把 CAUGHT、四把 RESTORE_CLEAN）已登记进 `mutate_needle_precheck.py` 的名册。
+
 ### Changed（R241 / 第 240 轮 / Round 238 · 两态差尺的判据卷进电池：两个口径各一把刀，闸门两向证人）
 
 - `scripts/tests/test_hover_two_state_diff.py`（16 格）：合成帧把 `band_mean` 与 `per_pixel` 钉成两个可复查的数（整带都变 ⇒ 2.17=2.17；带内只有 2/10 颗变 ⇒ 1.234 ≠ 2.17），期望值由手算推出；闸门用 CLI 子进程量（无通道 exit 2、空名单 exit 1 且不打「退出=0」、缺 `--control` exit 1、`--min-pairs` 高于实际配对 exit 1，而同一批帧在地板之内必须 exit 0）。

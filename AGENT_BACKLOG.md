@@ -6697,6 +6697,15 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 另外 251 的欠账形状已经由这把尺自己打印出来：18 个 `-hover` 帧名里只有 3 个基名（共 6 对）配到同尺寸静置态 —— 逐条打印为显式缺席，下一轮补哪几对由它点名。
 
 **274. 尺挂进 CI 的抓帧那一步（runner 上帧目录缺席时这一格必须走有名字的 skip，不许静默通过），并给那一格的退出码接上 grep（R109：新读数要接在它被打印的那一步上）（R241 新开）**
+  接线追记（R242）：尺已挂进 CI 电池那一步之后（先打 `HOVER_DIFF_WIRED_AT png_files=`，整目录没 png ⇒ 具名 NOT_RUN；有 png 凑不出 modechip 的 idle/lit 对 ⇒ 判成接线坏、红；CI 上不设 `HOVER_DIFF_MIN_PAIRS`）。**runner 上的实际读数还没拿到**（要看下一跑的 `HOVER_DIFF 配对=…`）⇒ 这一条只算"接线完成、验收未读"，不许记成结案。
 **275. `HOVER_DIFF_MIN_PAIRS` 在 runner 上该登记几：先让 CI 跑一次并把配对数写进豁免名册的机器键，再决定要不要设地板（D-227：地板属于量它的那台机器，本机数不许外推）（R241 新开）**
 
 **276. 交接用的 CI 未读名册（R241 收尾新开，七笔成对）：`39353879945↔e241389`（R241 本笔，取数时 `in_progress`、`conclusion` 空 ⇒ 未读）、`39352533580↔070cbab`（R240 本笔，同样 `in_progress` ⇒ 未读）、`39352046610↔5252c05`、`39351035433↔6927880`、`39350006461↔3e90ab4`、`39347522293↔7b7495d`、以及 R238 之前那笔已读的对照跑。** 每笔要读的四件事：① STEP[4] 的 `dismissRowInk` 编译期 error 是否转绿（236/237 的修复验收）；② `SEAM_READER_ISOLATION` 那一行的三个数；③ runner 上的脚本电池是否**认两种形状**（250/270 的 runner 半，含新加的 `test_hover_two_state_diff` 16 格在缺 PIL / 缺帧通道时是否走「有名字的 skip」而不是静默通过）；④ 判据卷在 runner 上打出的 `真帧配对=` 数（那是 275 要登记的 runner 地板，不许拿本机的 6 顶）。规矩照旧：一次 `python3 scripts/ci_read.py latest` 现拿、不轮询；编译红没恢复前下游红不当产品读数。
+  结案追记（R242）：三跑（`39354504524`、`39353879945`、`39352533580`）逐 job 下正文读齐，四个读数各自交账 —— ①STEP[4] 的 `dismissRowInk` 编译红已消失（R236/R237 修复拿到 runner 验收）；②`SEAM_READER_ISOLATION 目录=ClipboardHistoryAppTests 文件=98 代码位引用=1 未标注=0` 与本机同值；③电池 `Ran 443 / FAILED (failures=1, skipped=2)`，唯一一朵是浅历史假红（本轮已处置并加闸门）；④判据卷进了 runner 名单，`真帧配对=` 那格走通道缺席的具名 skip（那三跑时尺还没挂进 CI；本轮 push 的这一跑才第一次带上 274 的接线，读数下一轮读）。**遗留两格没解释**：skip 数本机 3 / runner 2 的成因、以及 STEP[17] 之外的红（STEP[15] `Executed 915 tests, 52 skipped, 2 failures` 那两条 failure 里，只有 modechip 那一朵被捕获闸门点名，另一朵与它是同一条用例在两个步骤各判一次）⇒ 拆成 277/278/279 继续追。
+
+**277. 其余两处「众数绝对颗数 > 400」也换成两态变化颗数 + 占比 + 分母 + 负对照（`UICaptureHarness.swift` 里段按钮/玻璃圆那一族与设置行那一格）—— 它们在 runner 上这次是**侥幸**靠矩形大过线（1637 / 4876 / 3120），不是免疫（D-228）（R242 新开）**
+**278. `fetch-depth: 50` 之后，`SOURCES_CELL_HISTORY` 那一格必须在 runner 上从 skip 变 judge（浅历史闸门保留：万一某跑又变浅，它要响成具名 skip 而不是假红或假绿）（R242 新开）**
+**279. runner 自己打印的 `HOVER_MODE_CHIP_PROOF … 两态变化=X/Y 占比=Z` 读数单：拿到之后把占比地板从"两机都能被证明过线的 0.10"抬到实测下沿，并解释 skip 数本机 3 / runner 2 的差（D-227：地板属于量它的那台机器）（R242 新开）**
+
+**280. 变异表 mutate_r242.py 五次都拒发基线：同一句 swift test --filter UICaptureTests/testModeChipHoverFillIsVisibleOnItsOwnSurface 在 shell 里 rc=0（Executed 3 行），而经 python subprocess.run 调用稳定 rc=1、输出 21,663,809 字节的 Invalid manifest（内联复现过，见 /tmp/r242_inline.log）⇒ 差在调用方式不在判据。先定位这个差异（怀疑 subprocess 拿到的 SDK/manifest 缓存路径与 shell 不同），再把 M798/M799/M800/M801 四把插进去（R242 新开）**
+**281. PerfBudgetTests.testImageComparisonCostStaysBounded 3000x2000 冷比较本机三次采样 290/331/342ms 顶到阈值 250ms；本机 load1 7.4~10.9 全来自桌面进程（Codex/Qoder Renderer 各 ~101% CPU、pgrep xctest 无残留），而**同一条判据在 CI 那一跑里是绿的**（那跑全量卷唯一红的用例是 modechip）⇒ 成因未定线。按 D-227/R154 的规矩：不为让它不响而放宽阈值，要做的是低负载重跑 + 负载读数 + 按机器的出口（R242 新开）**

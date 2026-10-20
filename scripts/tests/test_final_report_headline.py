@@ -110,11 +110,11 @@ SOURCES_CELL = re.compile(u'最后一次动到 `Sources/` 的轮次.*?\\*\\*R(\\
 SOURCES_PATH = u'ClipboardHistory/Sources'
 
 
-def live_sources(n=1):
+def live_sources(n=1, repo=None):
     """最近 n 笔动到源码的提交 [(sha, R 或 None, subject)]；git 不在/读不到就抛（不许静默通过）。"""
     import subprocess
     out = subprocess.Popen(
-        ['git', '-C', REPO, 'log', '-%d' % n, '--format=%h%x09%s', '--', SOURCES_PATH],
+        ['git', '-C', repo or REPO, 'log', '-%d' % n, '--format=%h%x09%s', '--', SOURCES_PATH],
         stdout=subprocess.PIPE).communicate()[0].decode('utf-8', 'replace')
     rows = []
     for line in out.splitlines():
@@ -124,6 +124,30 @@ def live_sources(n=1):
         m = re.search(u'（R(\\d+)', subject) or re.search(u'\\bR(\\d+)', subject)
         rows.append((sha.strip(), int(m.group(1)) if m else None, subject))
     return rows
+
+
+def is_shallow(repo=None):
+    """仓库是不是浅clone（浅 ⇒ 边界提交的 diff 对着空树，路径历史不可解析）。读不出就抛，不许静默通过。"""
+    import subprocess
+    out = subprocess.Popen(
+        ['git', '-C', repo or REPO, 'rev-parse', '--is-shallow-repository'],
+        stdout=subprocess.PIPE).communicate()[0].decode('utf-8', 'replace').strip()
+    if out not in (u'true', u'false'):
+        raise RuntimeError(u'`git rev-parse --is-shallow-repository` 读出 %r ⇒ 历史深度无从判定' % out)
+    return out == u'true'
+
+
+def sources_gate(shallow, rows, text):
+    """把"这一格能不能判"和"判出来是什么"分成两句说（R242 / BACKLOG 278）。
+
+    浅历史上 `git log -- <路径>` 只会给边界那一笔，而那一笔的 diff 对着空树 ⇒ 它**必然**被读成
+    「最近动过 Sources/ 的提交」。于是 STALE 这句话在浅 clone 上没有对象：既不能说台账错了，
+    也不能说它对了，只能具名 skip。返回 ('skip', 原因) 或 ('judge', problems)。
+    """
+    if shallow:
+        return ('skip', u'浅clone（fetch-depth=1）里路径历史不可解析 ⇒ HEAD 会被读成答案，'
+                        u'这一格在 runner 上没有对象（ci.yml 已改 fetch-depth: 50）')
+    return ('judge', sources_problems(text, rows))
 
 
 def sources_problems(text, rows):
@@ -158,8 +182,74 @@ class FinalReportSourcesCellTests(unittest.TestCase):
     """这一格是纯手抄、没有 LAG 容差挡着 ⇒ 必须逐字对 git。"""
 
     def test_the_sources_cell_agrees_with_git(self):
-        self.assertEqual([], sources_problems(read(REPORT), live_sources(3)),
-                         u'「最后一次动到 Sources/ 的轮次」与 git 不同源')
+        shallow, rows = is_shallow(), live_sources(3)
+        # 结论行排在能力闸门之前（R85：闸门先响就没有读数可读了）
+        mode, detail = sources_gate(shallow, rows, read(REPORT))
+        print(u'SOURCES_CELL_HISTORY 浅=%s 对照数=%d 头笔=%s 处置=%s'
+              % (shallow, len(rows), rows[0][0] if rows else u'无', mode))
+        if mode == 'skip':
+            self.skipTest(u'%s —— 这一格在浅历史上不许给台账定罪（BACKLOG 278）' % detail)
+        self.assertEqual([], detail, u'「最后一次动到 Sources/ 的轮次」与 git 不同源：%s' % detail)
+
+    def test_a_shallow_history_must_not_be_allowed_to_judge(self):
+        """浅历史是**真造一颗合成小仓库**判的（`git init` + 两笔 + `file://` 上 `--depth 1` 克隆），
+        不是嘴上说说：那种历史上只读到边界那一笔，而边界那笔**根本没动源码**却被报成"最近动过
+        Sources/ 的提交" ⇒ 「STALE」在浅历史上只能是尺的假话。
+        闸门那一支被摘掉（`if shallow:` 变恒假）时这一格必须红（M801 就是这一刀）。
+        两边各判一次：全历史的 origin 必须判得出"只有一笔动过源码"，浅克隆必须只读到 HEAD。
+        （第一版是克隆本仓库 —— `.git` 220 MB，一格把电池拖成 4 分钟，才改成合成仓库。）"""
+        import subprocess, tempfile, shutil, os
+        devnull = open(os.devnull, 'wb')
+        d = tempfile.mkdtemp(prefix='sources_shallow_')
+        try:
+            origin = os.path.join(d, 'origin')
+            os.makedirs(os.path.join(origin, SOURCES_PATH))
+            os.makedirs(os.path.join(origin, 'ClipboardHistory', 'Docs'))
+
+            def git(root, *args):
+                subprocess.check_call(['git', '-C', root] + list(args),
+                                      stdout=devnull, stderr=devnull)
+            git(origin, 'init', '-q')
+            git(origin, 'config', 'user.email', 'x@x.invalid')
+            git(origin, 'config', 'user.name', 'x')
+            io.open(os.path.join(origin, SOURCES_PATH, 'a.swift'), 'w', encoding='utf-8').write(u'1\n')
+            git(origin, 'add', '-A')
+            git(origin, 'commit', '-q', '-m', u'第一笔（R1）：动了源码')
+            io.open(os.path.join(origin, 'ClipboardHistory', 'Docs', 'n.md'), 'w',
+                    encoding='utf-8').write(u'只动文档\n')
+            git(origin, 'add', '-A')
+            git(origin, 'commit', '-q', '-m', u'第二笔（R2）：一笔都没动源码')
+            self.assertFalse(is_shallow(origin), u'刚造的对照仓库应当是全历史')
+            full = live_sources(3, origin)
+            print(u'SOURCES_CELL_SYNTH 全历史对照数=%d 头笔标题=%s'
+                  % (len(full), full[0][2][:20] if full else u'无'))
+            self.assertEqual(1, len(full),
+                             u'全历史下「动过源码的提交」只该读到第一笔，读到 %s ⇒ pathspec 没生效' % full)
+            self.assertEqual(1, full[0][1], u'第二笔没动源码，头笔的轮次应当是 R1：%s' % (full,))
+
+            shallow = os.path.join(d, 'shallow')
+            subprocess.check_call(['git', 'clone', '--depth', '1', '-q', 'file://' + origin, shallow],
+                                  stdout=devnull, stderr=devnull)
+            self.assertTrue(is_shallow(shallow),
+                            u'`git clone --depth 1` 造出来的居然不是浅仓库 ⇒ 这一格没有对象'
+                            u'（走本地路径会被忽略，必须 file://）')
+            rows = live_sources(3, shallow)
+            head = subprocess.Popen(['git', '-C', shallow, 'rev-parse', '--short=7', 'HEAD'],
+                                    stdout=subprocess.PIPE).communicate()[0].decode().strip()
+            print(u'SOURCES_CELL_SHALLOW 对照数=%d 头笔=%s HEAD=%s（HEAD 那一笔其实没动源码）'
+                  % (len(rows), rows[0][0] if rows else u'无', head))
+            self.assertEqual(1, len(rows), u'浅历史上只该读到边界那一笔：%s' % (rows,))
+            self.assertEqual(head, rows[0][0],
+                             u'浅历史上「最近动源码的提交」应当恰好是 HEAD —— 若不是，'
+                             u'下面那条 skip 保护的就不是同一件事')
+            mode, detail = sources_gate(True, rows, read(REPORT))
+            self.assertEqual('skip', mode,
+                             u'浅历史仍去判（%s）⇒ 这一格会对台账说假话' % (detail,))
+            mode_full, detail_full = sources_gate(False, live_sources(3, origin), read(REPORT))
+            self.assertEqual('judge', mode_full, u'全历史上这一格必须有处置，不许一律 skip')
+        finally:
+            devnull.close()
+            shutil.rmtree(d, ignore_errors=True)
 
     def test_a_stale_sources_cell_is_named(self):
         """正对照：把 sha 换成**上一笔**动源码的提交 ⇒ 必须点名（换个数它不响 ⇒ 这一格是假的）。"""

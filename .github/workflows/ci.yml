@@ -20,6 +20,11 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # R242 / BACKLOG 278：默认 fetch-depth=1 会让边界提交的 diff 对着空树，于是
+          # 「最近哪一笔动过 Sources/」在 runner 上把 HEAD 读成答案（本机全历史绿）——
+          # run 39354504524 的 STEP[9] 唯一那朵红就是这个成因。给 50 笔，够 -3 的回看。
+          fetch-depth: 50
 
       - name: Toolchain
         run: |
@@ -381,6 +386,31 @@ jobs:
           executed=$(grep -oE 'Ran [0-9]+ tests?' /tmp/py.log | tail -1 | grep -oE '[0-9]+')
           echo "python cases: $executed"
           test "${executed:-0}" -ge 250
+          # R242 / BACKLOG 274：两态差尺挂进 CI —— 接在**它被打印的那一步**上（R109 的规矩），
+          # 而且接在电池那一步之后，因为这一跑已经有 `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots-ci`。
+          # 三种缺席分开说，不许都算绿：整目录没有 png ⇒ 环境缺席（具名 NOT_RUN，绿）；
+          # 有 png 却凑不出 modechip 的 idle/lit 对 ⇒ 接线坏了（红）；尺自己 exit 非 0 ⇒ 红。
+          # 覆盖率地板 CI 上**不设**（D-227：地板属于量它的那台机器）—— 先让 runner 打印它自己配到几对，
+          # 那一行 `HOVER_DIFF 配对=…` 就是 BACKLOG 275/279 要登记的值，不许拿本机的 6 顶。
+          n_png=$(ls /tmp/shots-ci/*.png 2>/dev/null | wc -l | tr -d ' ')
+          echo "HOVER_DIFF_WIRED_AT png_files=$n_png shots=/tmp/shots-ci"
+          if [ "$n_png" -eq 0 ]; then
+            echo "HOVER_DIFF_NOT_RUN=1 帧目录里没有 png ⇒ 这一格在 runner 上没对象（环境缺席，不是产品结论）"
+          else
+            CTL=$(ls /tmp/shots-ci/*.png | sed 's#.*/##; s#\.png$##' \
+                  | grep -E 'modechip-hover-(idle|lit)' | sort | paste -sd, -)
+            echo "HOVER_DIFF_CONTROL=$CTL"
+            if [ "$(printf '%s' "$CTL" | tr ',' '\n' | wc -l | tr -d ' ')" -ne 2 ]; then
+              echo "HOVER_DIFF_CONTROL_INCOMPLETE=1 有 $n_png 张帧却凑不出 idle+lit 两颗 ⇒ 接线/命名漂了，这一步要响"
+              exit 1
+            fi
+            "$PY" scripts/hover_two_state_diff.py --shots /tmp/shots-ci --control "$CTL" \
+              2>&1 | tee /tmp/hoverdiff.log
+            hd=${PIPESTATUS[0]}
+            echo "HOVER_DIFF_EXIT=$hd（0=判过并达标 / 1=配对空或不达地板或正对照无效 / 2=帧目录不可用）"
+            grep -E '^HOVER_DIFF ' /tmp/hoverdiff.log || { echo "HOVER_DIFF_READING_MISSING=1 尺没打结论行"; exit 1; }
+            [ "$hd" -eq 0 ] || exit 1
+          fi
 
       # 打包链路不产出可分发物，但必须能跑通：上一轮的缺陷正是"每一步都 || true"，
       # 于是缺键的 Info.plist 也算构建成功。这里跑脚本级校验，避免整包 universal 构建拖慢 CI。

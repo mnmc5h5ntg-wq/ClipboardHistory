@@ -4920,6 +4920,41 @@ final class UICaptureTests: XCTestCase {
         return (top.key, top.value)
     }
 
+    /// 两态之间在一块矩形里**真的变了多少颗**像素，连同矩形自己的像素总数（R242 / BACKLOG 277 第一步）。
+    ///
+    /// 为什么要另造一把，而不是接着用 `bandModal(...).pixels`：那颗数同时被两件事撑着 ——
+    /// ① 这一层画了多大（产品事实），② 这台机器的底是不是**一整块平涂**（通道事实）。
+    /// 同一次 CI 里两件事被分开签死了：runner 读 `空闲填充位=236 点亮=204 像素=229`，
+    /// 本机读 `空闲填充位=255 点亮=220 像素=1281`，而两档的**比值**两边都是 1.36
+    /// ⇒ 差的那 5.6 倍不是反馈强弱，是 runner 上那片底被抖成了许多小格子，没有哪一格能当众数。
+    /// 所以"绝对颗数 ≥ 400"量的其实是那台机器的材质通道。换成 `idle ↔ lit` 之间变了多少颗，
+    /// 读数只跟几何有关：底是否平涂、众数被谁抢走，都不改变"这一格从 236 变成了 204"。
+    ///
+    /// `delta` 是"算变了"的门槛（灰阶档）。它必须有牙：负对照（同一帧与自己比）在 `delta` 退到 0/1
+    /// 时必须变红，否则这把尺只是在数抖动。
+    static func bandChanged(idle: [UInt8], lit: [UInt8], width: Int, height: Int, bytesPerRow: Int,
+                            rectPt: CGRect, framePtWidth: CGFloat, delta: Int) -> (changed: Int, total: Int) {
+        let scale = CGFloat(width) / framePtWidth
+        let x0 = max(0, Int((rectPt.minX * scale).rounded()))
+        let x1 = min(width, Int((rectPt.maxX * scale).rounded()))
+        let y0 = max(0, Int((rectPt.minY * scale).rounded()))
+        let y1 = min(height, Int((rectPt.maxY * scale).rounded()))
+        guard x1 > x0, y1 > y0 else { return (0, 0) }
+        func grey(_ b: [UInt8], _ i: Int) -> Int {
+            Int((0.2126 * Double(b[i]) + 0.7152 * Double(b[i + 1]) + 0.0722 * Double(b[i + 2])).rounded())
+        }
+        var changed = 0, total = 0
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = y * bytesPerRow + x * 4
+                guard i + 2 < idle.count, i + 2 < lit.count else { continue }
+                total += 1
+                if abs(grey(idle, i) - grey(lit, i)) >= delta { changed += 1 }
+            }
+        }
+        return (changed, total)
+    }
+
     /// **已知答案的对照**（尺先要读对一块答案已知的图，才有资格给产品读数）。
     /// 三格：纯色 ⇒ 不许有第二层；实心淡块 ⇒ 灰阶/台阶/比值逐项等于构造值且面积够大；
     /// **只有抗锯齿斜坡** ⇒ 面积必须小（这一格钉的是"边缘噪声不算药丸"，缺了它
@@ -5257,14 +5292,23 @@ final class UICaptureTests: XCTestCase {
     /// 而"这一档灰对它自己那片底看不看得见"是另一句话，只有帧能答。
     ///
     /// 四条断言各判一件事，谁也不许替谁签字（形状沿用 `testSettingsRowHoverFillIsVisibleOnItsOwnSurface`）：
-    /// ① 点亮那一块数得到像素 ⇒ 层画出来了（数不到是**量不到**，不是没问题）；
+    /// ① 两态之间在矩形里**真的变了 ≥ 100 颗**、且**占比 ≥ 10%**，分母（矩形自身）也要够 —— 层画出来了；
+    ///    再加一格负对照：同一帧与自己比必须读 0 颗，否则这把尺是在数抖动而不是在数反馈；
     /// ② 空闲与点亮不许读到同一个灰阶 ⇒ 矩形打在那一层上（否则下面那条比值没有对象）；
     /// ③ 比值压在仓库自己定的两条地板上（亮 1.20 / 暗 1.10）。**比的是可见性不是灰阶方向**
     ///    （R230：亮档黑墨压白底 ⇒ 更暗，暗档白墨压深底 ⇒ 更亮，按一档的符号下结论另一档立刻假红）；
     /// ④ 空闲那帧的填充位 == 同列上方那条夹具外框背景 ⇒ 取证通道没漏电。
     ///
-    /// 本轮实测（两档各自一跑）：亮 `255 → 220` 比值 1.372、暗 `30 → 52` 比值 1.338，
-    /// 点亮像素 1341 / 1282 颗 ⇒ 这一档**看得见**，不需要为它开新的缺陷条目。
+    /// 本机实测（两档各自一跑）：亮 `255 → 220` 比值 1.371、暗 `30 → 52` 比值 1.339，
+    /// 众数 1281 / 1222 颗 ⇒ 这一档**看得见**，不需要为它开新的缺陷条目。
+    ///
+    /// 为什么 ① 从「众数颗数 > 400」换掉（R242 / BACKLOG 277，红在 run 39354504524 的 STEP[17]）：
+    /// 同一格 runner 读 `空闲=236 点亮=204 像素=229`，本机读 `空闲=255 点亮=220 像素=1281`，
+    /// 而比值两边几乎相等（1.359 / 1.371、1.358 / 1.339）⇒ 差的 5.6 倍不是反馈强弱，是 runner 上
+    /// 那片底被抖成许多小格子、没有哪一格能当众数（同一次 CI 里旁证：段按钮 1637、玻璃圆 4876、
+    /// 设置行 3120 都过线 ⇒ 不是全局掉档，是这一块的**底**不同）。所以绝对颗数地板量的是那台机器的
+    /// 材质通道。新地板由**两台机器各自的实读**推：runner 众数 229 ⇒ changed 不可能低于它太多，
+    /// 本机众数 1281 ⇒ share ≈ 0.71，取 100 颗 / 10% 都在两侧实测之下、在「只有抗锯齿边」（台阶 4 颗）之上。
     /// 顺带交出第二条产品事实：R229 抬亮档那一档前后，这一层的墨量在帧上确实跟着动了
     /// （`VisualFill.hover` = 0.06 铺在白底上只会到 240，读到的 220 只可能来自 `HoverInk` 的抬档出口）。
     func testModeChipHoverFillIsVisibleOnItsOwnSurface() throws {
@@ -5302,13 +5346,54 @@ final class UICaptureTests: XCTestCase {
             let surface = modal("modechip-hover-idle", appearance, rectPt: Self.modeChipSurfaceRect)
             let ratio = Self.contrastRatio(idle.grey, lit.grey)
 
+            // 同一颗夹具再渲一遍、把原始字节交出去（两态差那把尺要的是**一对帧**，不是一灰阶一读数）。
+            // 输出名带 `raw-` 前缀：不许和 `modal` 那次共用文件，否则两次渲染互相覆盖。
+            let raw: (String, NSAppearance.Name) -> (buf: [UInt8], w: Int, h: Int, bpr: Int) = { fixtureName, appr in
+                guard let fixture = self.fixtures(appearance: appr).first(where: { $0.name == fixtureName }) else {
+                    XCTFail("找不到夹具 \(fixtureName) ⇒ 两态差那把尺没有对象"); return ([], 0, 0, 0)
+                }
+                let file = scratch.appendingPathComponent("raw-\(fixture.name)-\(appr.rawValue).png")
+                do { _ = try self.render(fixture, appearance: appr, to: file) } catch {
+                    XCTFail("\(fixtureName)：渲染失败 \(error)"); return ([], 0, 0, 0)
+                }
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    XCTFail("\(fixtureName)：读不回 \(file.lastPathComponent)"); return ([], 0, 0, 0)
+                }
+                let n = rep.bytesPerRow * rep.pixelsHigh
+                return (Array(UnsafeBufferPointer(start: base, count: n)),
+                        rep.pixelsWide, rep.pixelsHigh, rep.bytesPerRow)
+            }
+
+            let idleRaw = raw("modechip-hover-idle", appearance)
+            let litRaw = raw("modechip-hover-lit", appearance)
+            let pair = Self.bandChanged(idle: idleRaw.buf, lit: litRaw.buf, width: idleRaw.w,
+                                        height: idleRaw.h, bytesPerRow: idleRaw.bpr,
+                                        rectPt: Self.modeChipFillRect, framePtWidth: 200, delta: 4)
+            let selfCheck = Self.bandChanged(idle: idleRaw.buf, lit: idleRaw.buf, width: idleRaw.w,
+                                             height: idleRaw.h, bytesPerRow: idleRaw.bpr,
+                                             rectPt: Self.modeChipFillRect, framePtWidth: 200, delta: 4)
+            let share = pair.total > 0 ? Double(pair.changed) / Double(pair.total) : 0
+
             emit("HOVER_MODE_CHIP_PROOF \(tag) 空闲填充位=\(idle.grey) 点亮=\(lit.grey) "
-                 + "像素=\(lit.pixels) 比值=\(String(format: "%.3f", ratio)) 下界=\(minimum) "
+                 + "像素=\(lit.pixels) 两态变化=\(pair.changed)/\(pair.total) 占比="
+                 + String(format: "%.3f", share) + " 负对照=\(selfCheck.changed) "
+                 + "比值=\(String(format: "%.3f", ratio)) 下界=\(minimum) "
                  + "｜同列控件上方背景(空闲)=\(surface.grey)")
 
-            XCTAssertGreaterThan(lit.pixels, 400,
-                                 "\(tag)：点亮那一块只数到 \(lit.pixels) 个像素 ⇒ 那层填充没被画出来。"
-                                 + "这一格是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+            XCTAssertGreaterThan(pair.total, 100,
+                                 "\(tag)：矩形自己只剩 \(pair.total) 颗 ⇒ 分母塌了（坐标或夹具漂了）。"
+                                 + "占比与颗数都不许在这一格上签字（空对账）")
+            XCTAssertGreaterThan(pair.changed, 100,
+                                 "\(tag)：两态之间只变到 \(pair.changed) 颗 ⇒ 那层填充没被画出来，"
+                                 + "或者只画了一圈边。地板 100 由两侧实读推：runner 众数 229 / 本机 1281")
+            XCTAssertGreaterThanOrEqual(share, 0.10,
+                                        "\(tag)：变化只占矩形的 \(String(format: "%.3f", share)) ⇒ "
+                                        + "这一层盖不住它声称盖住的那块（本机实测 ≈0.71）")
+            XCTAssertEqual(selfCheck.changed, 0,
+                           "\(tag)：负对照里同一帧与自己比读出 \(selfCheck.changed) 颗变化 ⇒ 这把尺在数"
+                           + "抖动而不是数反馈，上面两条地板因此没有意义")
             XCTAssertNotEqual(lit.grey, idle.grey,
                               "\(tag)：空闲与点亮读到同一个灰阶（\(idle.grey)）⇒ 矩形没打在那一层上，"
                               + "下面那条比值断言因此没有对象（先查坐标，再查产品）")

@@ -1386,7 +1386,14 @@ final class MotionFilmstripTests: XCTestCase {
                     + "本机实测 12 步（row/control/field × 亮/暗）全部 alpha差=0.00/255 而均值差 6.97–15.85，"
                     + "⇒ 这一族夹具确实铺的是实底。哪一步出现『均值差低于地板而 alpha差>8』，"
                     + "`testFillLaddersAreVisibleOnBothControlClasses` 就会红，这条豁免必须撤。"),
-        ]
+                (qualifiedName: "UICaptureHarness.swift#bandChanged",
+         reason: "R242 新建的两态变化尺（BACKLOG 277 第一步）：数的是「idle↔lit 之间变了多少颗」，"
+                + "为把 modechip 悬停那格从**绝对颗数地板**换掉——同一次 CI 里 runner 读 229 颗、本机读 1281 颗，"
+                + "而对比度比值两边同为 1.36 ⇒ 那颗地板量的是那台机器的底平不平涂，不是反馈有没有。"
+                + "alpha 那一根已经写进判定（`max(lumaDelta, alphaDelta) >= delta`），但这批 PNG 落盘时 alpha 恒 255"
+                + "（R76/U-132 同族：内存里带 alpha、落盘那张不带）⇒ 这根轴今天**没有对象**，有效轴就是亮度。"
+                + "代价与其余各条登记同族：「只改透明度不改颜色」的悬停层它读成没动 ⇒ 归 BACKLOG 108。"),
+]
     }
 
     /// 反方向：只读 alpha 的两态尺子。这一半不是本轮新发现的 —— R67/R76 那两条尺子是**故意**这么写的，
