@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R253 / 第 252 轮 / Round 250 · 亮档悬停抬量 0.025→0.04：第一次看得见的产品反馈修正，297 结案）
+
+产品（1 文件）`Utilities/VisualTokens.swift`：`VisualFillLift.hover` 0.025 → 0.04（只加亮档那一支，暗档一字未动）。理由写成不等式放在定义处：合成上限 229.5 ⇒ 亮档 hover 必须 ≥ 0.10 才能在白底达到 1.20，而 0.06 + 0.025 = 0.085 永远达不到 ⇒ 此前**任何**用这一档铺在白底上的整行悬停都不可能过线。
+读数：改前 亮档 1.171 < 1.20（尺 `退出=1`）→ 改后 判定=过线、`退出=0`、全表无「低于地板」；亮档带内均值(码值) 1.074 → 1.091；`pressed - hover` = 8.9/255（地板 4/255）。`swift build` 零告警；捕获卷 80 格 0 失败；帧基线同一笔 update 到 168 张（`/tmp/shots_r253`）。
+判据：`KNOWN_FLOOR_RED` 按双向对账清空（`HOVER_FLOOR_RED_KNOWN=0 名册=[] 现读=[] 退出=0`、`Ran 20 tests OK`）—— 修好了不删名册，对账的另一半就会红。
+未做（新开 298）：改后帧的看图验收（本轮只看了一张**改前**帧）、给抬量配的刀、全量 Swift 卷、换装本机。
+
 ### Changed（R252 / 第 251 轮 / Round 249 · 按行取证键：归属可拍了，R251 的"两档过线"被推翻并登记成缺陷）
 
 产品（2 文件，惰性等价）：`PressableStyle.swift` 新增 `HoveredRowForCaptureKey` 与 `EnvironmentValues.hoveredRowForCapture: Int?`；`DetailView.swift` 的 `MultiFileRow` 收 `row`，`isHoveredForDrawing` 并三路（真实指针 / 整棵覆盖 / 按行覆盖）。产品路径两个键恒 nil。`swift build` 零告警。
