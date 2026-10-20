@@ -4082,6 +4082,16 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.controlFrame(RowFavoriteButton(isFavorite: false, action: {})
                 .environment(\.hoveredForCapture, true)))
         })
+        // R258 / BACKLOG 302（D-239 的续账）：**按下那一档第一次有帧**。
+        // 上面 idle / hover 两态是 R229 加的，而 R253 抬 hover、R256 抬 pressed 改的正是这一档 ——
+        // 「台阶 ≥4/255」当时只有纯函数真值表撑着，产物上从来没有一张按下态的帧。
+        // R257 想拿帧去对账，才发现 `changed=1` 量的根本不是这一档：那是覆盖缺口，不是清白。
+        // 点亮**只**走 `pressedForCapture`（故意不同时点亮 hover）⇒ 这张帧与 idle 之间只差
+        // "按下那一层"，台阶才可归因；真实指针与真实按压两条路一字未动。
+        results.append(Fixture("row-favorite-press", NSSize(width: 60, height: 56), contentMustFit: true) {
+            AnyView(self.controlFrame(RowFavoriteButton(isFavorite: false, action: {})
+                .environment(\.pressedForCapture, true)))
+        })
         // **尺的对照物**（不是产品证据，与 `cardprobe-*` / `row-clipped-control` 同一族）：
         // 同一颗图标、同一片底，左边按 `VisualFill.hover`、右边按 `VisualFill.controlHover` 点亮。
         // 它量的是 R20 那句理由本身 —— 两臂在同帧同底，任何"整把尺一起偏"都同时作用在两臂上，
@@ -5171,6 +5181,153 @@ final class UICaptureTests: XCTestCase {
                                         + "vs hover \(String(format: "%.3f", left.ratio))）⇒ 令牌次序反了")
             XCTAssertGreaterThanOrEqual(right.ratio - left.ratio, 0.01,
                                         "两臂差不到 0.01 比值 ⇒ 「小控件要抬一档」这件事在像素上不存在")
+        }
+    }
+
+    /// **按下那一档第一次在产物像素上有台阶读数**（R258 / BACKLOG 302，D-239 的续账）。
+    ///
+    /// 三态各一张同一颗控件（`RowFavoriteButton`，60×56 探针框）、同一片底：idle / hover / press。
+    /// 判的是**次序**：按下必须比悬停更看得见。口径走 `pillReading` 的比值 —— R230 那条规矩：
+    /// 亮档是黑墨压白底、暗档是白墨压深底，两档灰阶方向相反，按灰阶符号下结论会立刻假红。
+    /// 码值台阶 `step` 与比值**同印、不互当证人**（D-229）。
+    ///
+    /// 本轮只下四条硬判据：层画出来了（颗数地板）、两态不同（键真接上了画法）、次序对、
+    /// 空闲帧不漏电。"按下这一档对它的底至少该有多少对比"这类**绝对地板先只印不判**
+    /// （D-232 同一处置）：第一次出现在这台机器上的读数不配当场变成硬门，
+    /// 要等 runner 也读一次、两侧各推一次地板才升（这正是 302 的结案条件）。
+    ///
+    /// 不覆盖管线：这条读的是渲染产物（`render` → PNG → 像素），但控件本身是探针框里的单颗按钮，
+    /// 不是从主窗口入口走到的那一位 —— 管线级同族判据见 `HoverCaptureChannelTests` 的调用点级名册。
+    func testPressRungIsOrderedAboveTheHoverRung() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r258-pressladder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func read(_ fixtureName: String, _ appearance: NSAppearance.Name)
+            -> (background: Int, pill: Int, ratio: Double, step: Int, pillPixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 " + fixtureName + " ⇒ 这条判据没有对象")
+                return (-1, -1, 0, 0, 0)
+            }
+            let file = scratch.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(fixtureName + "：渲染失败 " + String(describing: error))
+                return (-1, -1, 0, 0, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(fixtureName + "：读不回 " + file.lastPathComponent)
+                return (-1, -1, 0, 0, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return Self.pillReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                    bytesPerRow: rep.bytesPerRow, x0: 0, x1: rep.pixelsWide)
+        }
+
+        /// 从测试文件位置往上找产品源码根。**找不到就红而不是跳过**（R99：会跳过的守卫
+        /// 和通过的守卫在报表里长得一样）。
+        func productRoot() -> URL {
+            var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            for _ in 0..<8 {
+                let url = dir.appendingPathComponent("Sources/ClipboardHistoryApp")
+                if FileManager.default.fileExists(atPath: url.path) { return url }
+                dir = dir.deletingLastPathComponent()
+            }
+            XCTFail("找不到 Sources/ClipboardHistoryApp ⇒ 接线判据没在看东西")
+            return URL(fileURLWithPath: "/nonexistent")
+        }
+        /// 剥掉行尾注释再搜：D-235 那一课（注释里的提及会把"接了"喂成假绿，也会把"没写"喂成假红）。
+        func codeOnly(_ text: String) -> String {
+            text.split(separator: "\n").map { line in
+                if let r = line.range(of: "//") { return String(line[..<r.lowerBound]) }
+                return String(line)
+            }.joined(separator: "\n")
+        }
+
+        let root = productRoot()
+        let files: [(String, String)] = {
+            guard let en = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil) else {
+                XCTFail("列不出 Sources/ClipboardHistoryApp ⇒ 名册守卫没有对象"); return []
+            }
+            var out = [(String, String)]()
+            for case let url as URL in en where url.pathExtension == "swift" {
+                if let t = try? String(contentsOf: url, encoding: .utf8) {
+                    out.append((url.lastPathComponent, t))
+                }
+            }
+            return out
+        }()
+        XCTAssertGreaterThan(files.count, 50, "只列出 " + String(files.count) + " 个产品源文件 ⇒ 扫描本身坏了")
+
+        // 调用点级接线（R219 那一课：纯函数两个分支都绿、调用点只喂一个分支 = 屏幕上什么都没发生）。
+        let style = files.first { $0.0 == "PressableStyle.swift" }?.1 ?? ""
+        XCTAssertFalse(style.isEmpty, "读不到 PressableStyle.swift ⇒ 下面两条接线断言没有对象")
+        XCTAssertTrue(codeOnly(style).contains("isPressed: isPressedForDrawing"),
+                      "按下那一档的画法没去读取证键 ⇒ 帧上亮的是别的层，上面所有台阶读数都不是这一档")
+        let writers = files.filter { codeOnly($0.1).contains(".environment(\\.pressedForCapture") }.map { $0.0 }
+        XCTAssertEqual([], writers, "产品侧自己在写按下取证键 ⇒ 这一档在真实路径上常亮：" + writers.joined(separator: ","))
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let idle = read("row-favorite-idle", appearance)
+            let hover = read("row-favorite-hover", appearance)
+            let press = read("row-favorite-press", appearance)
+            emit("PRESS_LADDER_PROOF " + tag
+                 + " 底 idle=" + String(idle.background) + " hover=" + String(hover.background)
+                 + " press=" + String(press.background)
+                 + "｜药丸 idle=" + String(idle.pill) + " hover=" + String(hover.pill)
+                 + " press=" + String(press.pill)
+                 + "｜比值 " + String(format: "%.3f", hover.ratio) + " → "
+                 + String(format: "%.3f", press.ratio) + " 差="
+                 + String(format: "%.3f", press.ratio - hover.ratio)
+                 + "｜码值台阶 hover=" + String(hover.step) + " press=" + String(press.step)
+                 + " 差=" + String(press.step - hover.step)
+                 + "｜按下像素=" + String(press.pillPixels) + " 空闲像素=" + String(idle.pillPixels))
+            XCTAssertGreaterThan(press.pillPixels, 100,
+                                 tag + "：按下那一圈只数到 " + String(press.pillPixels) + " 颗 ⇒ 那一层没被画出来。"
+                                 + "这一格是**量不到**而不是没问题（先查夹具与 `pressedForCapture` 接没接上）")
+            XCTAssertNotEqual(press.pill, hover.pill,
+                              tag + "：按下与悬停读到同一个灰阶（" + String(hover.pill) + "）⇒ 这颗键没有改变画法，"
+                              + "下面那条次序断言因此没有对象")
+            XCTAssertGreaterThan(press.ratio, hover.ratio,
+                                 tag + "：按下这一档反而不比悬停更看得见（"
+                                 + String(format: "%.3f", press.ratio) + " vs "
+                                 + String(format: "%.3f", hover.ratio) + "）⇒ 梯子次序在产物上是反的")
+            // 第二根轴同向才收：比值与码值台阶是两种口径（D-229 不许互当证人），但**次序**必须一致 ——
+            // 一根说按下更看得见、另一根说按下离底更近，那说明这两根轴的其中一把坏了（R87 同一族）。
+            XCTAssertGreaterThan(press.step, hover.step,
+                                 tag + "：码值台阶（" + String(press.step) + "）不比悬停（" + String(hover.step)
+                                 + "）大，而比值轴说按下更看得见 ⇒ 两轴反着，先怀疑尺再怀疑产品")
+            XCTAssertLessThan(idle.pillPixels, 40,
+                              tag + "：空闲帧也量到一整片第二层（" + String(idle.pillPixels) + " 颗）⇒ 取证通道漏电，"
+                              + "上面三条读数全部作废")
+            // **令牌 ↔ 像素 的一致性** —— 这一格才是"台阶画错档"的证人，而它跟上面三条判的是不同的话：
+            // 上面只管存在与次序，这里管**画出来的量**是否等于这颗控件自己声明的两档 alpha
+            // （悬停 = `controlHover`，亮档再 +`Lift.hover`；按下 = `pressed`，亮档再 +`Lift.pressed`）。
+            // `hover.step / aHover` 就是这片底的「单位 alpha 走多少灰阶」，于是按下那一档可以被打预报。
+            // 单位规矩（D-229/D-230 那一族）：这里比的是**灰阶**，不是把令牌的 4/255 直接搬到像素上 ——
+            // 那是两种单位，谁也不能替谁作证。
+            // 已知答案（本机现读，两档各一次）：light 预测 32.5 / 实读 32、dark 预测 22.5 / 实读 23
+            // ⇒ 偏差 0.5，容差 2 是它的四倍（不是拍出来的）。
+            XCTAssertGreaterThan(hover.step, 0, tag + "：悬停台阶读到 0 灰阶 ⇒ 分母塌了，下面那条恒等式没有对象")
+            let aHover = appearance == .darkAqua ? VisualFill.controlHover
+                                                 : VisualFill.controlHover + VisualFillLift.hover
+            let aPress = appearance == .darkAqua ? VisualFill.pressed
+                                                 : VisualFill.pressed + VisualFillLift.pressed
+            let predicted = Double(hover.step) * aPress / aHover
+            let deviation = abs(predicted - Double(press.step))
+            emit("PRESS_LADDER_IDENTITY " + tag
+                 + " 预测按下台阶=" + String(format: "%.1f", predicted)
+                 + " 实读=" + String(press.step)
+                 + " 偏差=" + String(format: "%.1f", deviation)
+                 + "（aHover=" + String(format: "%.3f", aHover)
+                 + " aPress=" + String(format: "%.3f", aPress) + " 容差=2.0）")
+            XCTAssertLessThanOrEqual(deviation, 2.0,
+                                     tag + "：像素上的按下台阶（" + String(press.step) + "）与令牌预测（"
+                                     + String(format: "%.1f", predicted) + "）差 " + String(format: "%.1f", deviation)
+                                     + " 灰阶 ⇒ 画出来的不是声明的那一档（先查调用点喂了哪个 level，再查底）")
         }
     }
 

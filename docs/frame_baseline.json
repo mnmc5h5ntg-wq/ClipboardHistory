@@ -1,5 +1,5 @@
 {
-  "count": 168,
+  "count": 170,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -101,6 +101,8 @@
     "row-favorite-off-300x74-light.png": "04771ab7ee4d1a27149dae8648942b21030d2fa16b895edd5d791c9a71a97c7e",
     "row-favorite-on-300x74-dark.png": "2ad3211a036b28740333bcb873af3fab2bc590b58044124beb53af0f4e1baf8e",
     "row-favorite-on-300x74-light.png": "e5d89eca6a5a201decceb959144f37854998f6898ed67ae0313fd3b30425007e",
+    "row-favorite-press-60x56-dark.png": "b496872fc4dd517c86df503f5735efad596d51b22dd5a89ce95efc9a504698fb",
+    "row-favorite-press-60x56-light.png": "402f71b866e4830f552159af078df018c4549ddb7fd24c323ea973f65dfca7dd",
     "row-file-300x74-dark.png": "ab43b904a25b428b1670ff229e6db95ca15c96b593bd8c19f6ed8b2ab358453f",
     "row-file-300x74-light.png": "146179601b7eeff0d688a96877b7333b9ac64a79cefc80586d7901eda1a811ab",
     "row-file-thumb-300x74-dark.png": "ab094dc15cbaf1048a2dc202cd77d2d11a88c3393fd21dba51533694d4414b80",
@@ -144,7 +146,7 @@
     "settings-shortcuts-720x540-dark.png": "bf8c4459de117acd3bc7419c3d542c9179a5e1a8882ec0740e9dc0e0ed18ae19",
     "settings-shortcuts-720x540-light.png": "f69d46410cf2cf52f26689df413ef1dd52d459890999289a2384f4c69fd2145e",
     "settings-shortcuts-recording-720x540-dark.png": "b3657230ce2be73157523f7a421777c8d0c406dcd21808d50f0e6d6764ff6bf7",
-    "settings-shortcuts-recording-720x540-light.png": "5aa932e85deacfc57e0516614bfb24df91253f201d4e231514b0ce862e50d50d",
+    "settings-shortcuts-recording-720x540-light.png": "2582e55e76c15d114c903c7f0719734f85c2bf829b202af8080e3859213d08f3",
     "settings-stats-720x540-dark.png": "8f77eadbf253c621a1a7d70b04ef51df2fbefc59fb35646c153ed5f1ebeaddf3",
     "settings-stats-720x540-light.png": "afcf5fb8b1432006f43ad68866eddac0d8f95df4bb4e7ae56a72ebf56aee00e5",
     "settings-stats-populated-720x540-dark.png": "cc2a033908e428400ec78bc136d5484aa78be2d47c3214e52597041b8738606a",

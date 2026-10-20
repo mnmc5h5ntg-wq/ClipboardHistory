@@ -125,10 +125,22 @@ private struct PressedLabel<S: Shape>: View {
     @Environment(\.colorScheme) private var colorScheme
     /// 取证通道（见文件末尾 `hoveredForCapture`）。产品路径永远是 `nil`。
     @Environment(\.hoveredForCapture) private var hoveredForCapture
+    /// 按下那一档的取证通道（R258 / BACKLOG 302）。产品路径永远是 `nil`。
+    @Environment(\.pressedForCapture) private var pressedForCapture
 
     /// 画哪一档：真实指针 **或** 取证通道点亮。两条汇到**同一个绘制分支** ——
     /// R14 那一课：`hovered` 若是视图私有状态，"悬停那一帧"就在判据里存在、在产物里从未存在过。
     private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
+
+    /// 同一族规矩管按下这一半（R258 / D-239 的续账）。
+    ///
+    /// 为什么现在才补：`configuration.isPressed` 由 ButtonStyle 注入，夹具拿不到它，
+    /// 于是**按下那一档从来没有一张帧** —— 而 R253/R256 两轮改的正是这一档的抬量
+    /// （`VisualFillLift.pressed` 0.015→0.03）。R255 那句「台阶 ≥4/255」当时只有纯函数
+    /// 真值表撑着；R257 想拿帧去对账，才发现 `changed=1` 量的根本不是这一档（夹具里没有按下态位点），
+    /// 那是覆盖缺口而不是清白。这一颗键把"正在按"变成可离线渲染、可逐档量的东西。
+    /// 与 `hoveredForCapture` 一样：**产品自己永远不写**，只有夹具写 ⇒ 真实按压那条路一字未动。
+    private var isPressedForDrawing: Bool { configuration.isPressed || (pressedForCapture ?? false) }
 
     var body: some View {
         configuration.label
@@ -136,18 +148,18 @@ private struct PressedLabel<S: Shape>: View {
             // 始终是"未缩放的那一圈"，而它覆盖的是**内容 + 边**——
             // 也就是高亮比字形大一圈，且这一圈同样点得动（padding 在 label 里，命中区跟着长）。
             .padding(labelPadding)
-            .scaleEffect(scales ? PressableAppearance.scale(isPressed: configuration.isPressed,
+            .scaleEffect(scales ? PressableAppearance.scale(isPressed: isPressedForDrawing,
                                                            reduceMotion: reduceMotion)
                                 : 1.0)
             .overlay(
                 fillShape.fill(Color.primary.opacity(
-                    PressableAppearance.fillOpacity(isPressed: configuration.isPressed,
+                    PressableAppearance.fillOpacity(isPressed: isPressedForDrawing,
                                                    isHovered: isHoveredForDrawing,
                                                    hoverLevel: hoverLevel,
                                                    dark: colorScheme == .dark)))
             )
             // 时长用 `.hover` 那一档（0.12s）：按下跟鼠标事件同频，比内容切换更快才不觉得黏。
-            .animation(MotionCatalog.animation(for: .hover), value: configuration.isPressed)
+            .animation(MotionCatalog.animation(for: .hover), value: isPressedForDrawing)
             .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
             .onHover { inside in isHovered = inside }
     }
@@ -174,6 +186,12 @@ private struct HoveredRowForCaptureKey: EnvironmentKey {
     static let defaultValue: Int? = nil
 }
 
+/// R258 / BACKLOG 302：把"正在按"变成可拍的东西。
+/// 与上面两颗同一族规矩：默认 `nil`、产品路径永远不写、只有夹具写。
+private struct PressedForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
@@ -185,6 +203,13 @@ extension EnvironmentValues {
     var hoveredRowForCapture: Int? {
         get { self[HoveredRowForCaptureKey.self] }
         set { self[HoveredRowForCaptureKey.self] = newValue }
+    }
+
+    /// 取证用的按下覆盖。`nil` = 不覆盖（产品路径走的还是 `configuration.isPressed`）；
+    /// `true` = 这一家的按钮按"正在被按下"画（底色 + 缩放两半都点亮，见 `PressedLabel`）。
+    var pressedForCapture: Bool? {
+        get { self[PressedForCaptureKey.self] }
+        set { self[PressedForCaptureKey.self] = newValue }
     }
 }
 
