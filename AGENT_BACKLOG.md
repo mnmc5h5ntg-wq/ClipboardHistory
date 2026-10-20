@@ -6604,3 +6604,16 @@ R235 实测：`test_round_batch_consistency.py` 从 R188 起写死 `第 N 轮 = 
    给时间轴补一条同一次运行内的相对证人（对照一次纯内存 `add` 或一次空队列操作），并把「没有这条证人」打成红。
 ② 若要换成相对/多样本判据：必须当场配一格正对照 —— 「不接新通道时，旧的 10ms 红照旧红」，
    并补一刀（把产品里 `add` 改成同步写盘，新判据必须 CAUGHT）。缺任一格就维持现状、红保持会红，本项不结。
+
+**264 追记（R236 结案）：缝做了，两轴各一条判据、各一刀 —— M787 那一处变异（重编号 M790）由 ESCAPED 关成 CAUGHT**
+
+形状（D-221）：`MenuBarRecommendationsView.dismissRowInk: Color?`（唯一能读的值）+
+`dismissRowLabel()`（这一行标签的唯一构造路径，body 只许调它）。判据 `MenuBarSwiftUIDismissRowInkTests` 三格：
+尺自对照 / 行为轴（非 nil 的墨必须过 D-220 的两档 × 4.5 与 3.0）/ 结构轴（`Self.dismissRowLabel()` 恰好一处调用，
+且构造器体内 `.foregroundStyle(` 恰好一处且参数必须是 `ink`；扫前剥行注释 —— 这条本轮自己红过一次，
+红在我写在文档注释里的那句引用）。刀（`.scratch/motion-audit-2/mutate_r236.py`，FILTER 覆盖两棵树）：
+M789 CAUGHT（在岗证人，红在 12 那棵的行为轴）、M790 CAUGHT（就地钉蓝 ⇒ 结构轴）、M791 CAUGHT（钉进缝里 ⇒ 行为轴），
+ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes（三枚都是重跑后的号：原先借了 `mutate_r235.py` 的 M786 / M787，被脚本电池的跨表撞号守卫钉红）。
+**没结案的部分**：悬停那一行的真机观感（265 仍开）；这个形状只在 13 这一棵的这一行落地，
+别处新写死的色还得推广（登记在 U-760，不属 264 的题面）。
+

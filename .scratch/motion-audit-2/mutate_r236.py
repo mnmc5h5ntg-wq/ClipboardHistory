@@ -3,23 +3,23 @@ import io, os, subprocess, sys
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILTER = "MenuBarDismissRowInkTests|MenuBarSwiftUIDismissRowInkTests"
 
-# R236（BACKLOG 264）：三刀两轴。M786 = 12 那棵 AppKit 树的在岗证人（顺带做回归对照），
-# M787 = 沿用 R235 那一刀的字面（问「绕过缝就地钉色」有没有牙），M788 = 新加（问「钉进缝里」有没有牙）。
-# M787 的 needle 在重构之后仍然命中一次 —— 它钉的就是缝体内那一句 Text，缝没把它搬走。
+# R236（BACKLOG 264）：三刀两轴。M789 = 12 那棵 AppKit 树的在岗证人（顺带做回归对照），
+# M790 = 沿用（即 R235 那枚 ESCAPED 的 M787 同一处变异） R235 那一刀的字面（问「绕过缝就地钉色」有没有牙），M791 = 新加（问「钉进缝里」有没有牙）。
+# M790 的 needle 在重构之后仍然命中一次 —— 它钉的就是缝体内那一句 Text，缝没把它搬走。
 DISMISS = 'Text("都不是我想要的")'
 KNIVES = [
-    ("M786", "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift",
+    ("M789", "Sources/ClipboardHistoryApp/Managers/MenuBarController.swift",
      "            menu.addItem(dismissItem)",
      "            dismissItem.attributedTitle = NSAttributedString(\n"
      '                string: "都不是我想要的",\n'
      "                attributes: [.foregroundColor: NSColor.systemBlue])\n"
      "            menu.addItem(dismissItem)",
      "把写死的那颗蓝钉回 12 那棵 AppKit 树（在岗证人：两档静置与选中都必须红）"),
-    ("M787", "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift",
+    ("M790", "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift",
      DISMISS,
      DISMISS + '.foregroundStyle(.blue)',
      "把那颗蓝就地钉回 13 那棵的标签里（绕过缝）⇒ 结构轴 testDismissRowLabelRoutesThroughTheSeam 必须抓到"),
-    ("M788", "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift",
+    ("M791", "Sources/ClipboardHistoryApp/Views/MenuBarRecommendationsView.swift",
      "static var dismissRowInk: Color? { nil }",
      "static var dismissRowInk: Color? { .blue }",
      "把那颗蓝钉进缝里（缝参与判定）⇒ 行为轴两档 × 两种地板必须抓到"),

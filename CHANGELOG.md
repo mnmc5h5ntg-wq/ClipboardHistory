@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 判据与缝：13 那棵 SwiftUI 树的 dismiss 行墨第一次有**两轴**会红的判据（R236 / U-757…U-760 / D-221 · 产品 1 文件，画面一字未动）
+
+- 墨与文案收成一条可读的缝（`dismissRowInk` + `dismissRowLabel()`），判据 `MenuBarSwiftUIDismissRowInkTests` 三格：尺自对照 / 行为轴（钉进缝里 ⇒ 两档 × 4.5 与 3.0 地板必须红）/ 结构轴（绕过缝就地钉色 ⇒ 必须红）。变异三刀 M789 / M790 / M791 CAUGHT=3 / ESCAPED=0 / NOT_RUN=0 / RESTORE_CLEAN=yes ⇒ R235 那枚 ESCAPED 的 M787（同一处变异，本轮号 M790）就地关成 CAUGHT，BACKLOG 264 结案。画面不变（重捕 162 帧 `CHANGED=0 / MISSING=0`）⇒ 这是一笔**不改变画面的可证伪性**改动。
+- 仪器自己的两处坏（本轮实测并修）：变异表的「红名」列被 `split("]")[-1]` 恒取成空串（U-759，本轮修成 `[-2]` 并要非空）；三刀第一版借用了 `mutate_r235.py` 的 M786 / M787 ⇒ 脚本电池 `test_mutate_arm_registry` 判红，改号之后**重跑**变异而不是只改账。
 - R235 补记第八笔（U-756 / 新开 267）：读 run 39340316744 时撤掉「唯一的 runner 红」那句假话 —— STEP[15] 两朵，第二朵 `CapturePathWriteBudgetTests testAddingACopyWritesNothingOnTheMainThread` 首次露面（11.56ms > 10ms 地板），而同一判据的三条存在性断言全过；三个 runner 样本 1.20/0.89/11.56ms ⇒ 不给产品定罪、也不放宽地板，新开 267 记下「谁在扛契约」的分辨实验与口径变更需配的正对照 + 一刀。产品文件 0 改动，帧与看图腿 NOT-RUN。
 
 ### 产品：菜单栏「都不是我想要的」不再钉死蓝墨（R235 / U-748 / D-220）
