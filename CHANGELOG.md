@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R241 / 第 240 轮 / Round 238 · 两态差尺的判据卷进电池：两个口径各一把刀，闸门两向证人）
+
+- `scripts/tests/test_hover_two_state_diff.py`（16 格）：合成帧把 `band_mean` 与 `per_pixel` 钉成两个可复查的数（整带都变 ⇒ 2.17=2.17；带内只有 2/10 颗变 ⇒ 1.234 ≠ 2.17），期望值由手算推出；闸门用 CLI 子进程量（无通道 exit 2、空名单 exit 1 且不打「退出=0」、缺 `--control` exit 1、`--min-pairs` 高于实际配对 exit 1，而同一批帧在地板之内必须 exit 0）。
+- 尺的覆盖率地板改由环境变量 `HOVER_DIFF_MIN_PAIRS` 按机器登记（本机 6，R240 实测）；真帧那一格在通道缺席时是有名字的 skip。
+- 三把变异刀 M795/M796/M797（表 `.scratch/motion-audit-2/mutate_r241.py`）：门槛、口径分离、闸门各摘一半，三把 CAUGHT、三把 RESTORE_CLEAN。
+
 ### 看图与尺子：两态差尺进仓库 `scripts/hover_two_state_diff.py`（R240 / 第 239 轮 / Round 237 · U-774…U-776 / D-226 / BACKLOG 272 结案、新开 273 · 产品 0 文件，画面一字未动）
 
 - 新尺一次给两个口径（带内均值 / 变化像素逐点中位数 + 变化面积占比），配对按帧名推、明确拒绝点坐标（@2x 帧把点坐标当像素会全读平涂背景）；三把闸门 = 帧↔自身必须 0、`--control` 正对照必须读到变化、空名单必须红，另加 `--min-pairs` 覆盖率地板。
