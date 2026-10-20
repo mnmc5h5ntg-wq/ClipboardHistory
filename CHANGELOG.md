@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R257 / 第 256 轮 / Round 254 · 修回能红的形状：判据从「编译不过」恢复成「跑得出读数」）
+
+R256 把一条失败消息写成两个相邻 Swift 字面量 ⇒ ControlHoverLadderTests.swift:89:134 error: expected ',' separator，于是两整轮的「全量卷」其实是 0 条断言跑过。本轮把消息压成一行、理由搬进注释，并同步把注释里过期的亮档 0.085 改判成 0.10。
+现读：Executed 915 tests, with 45 skipped and 1 failures（红名 testAddingACopyWithANearlyFullArchiveStaysInsideBudget，TEST_EXIT=1）；swift build 告警 0 颗；帧基线 RUN（重捕 168 张、compare 168、changed=1、missing=0，变的那张 settings-shortcuts-recording-720x540-light.png）。
+CI 成对号（gh 现取）：c7d8385 → 39492493661 / completed / failure；c1dfd4b → 39491954566 / in_progress / 未读（in_progress）；df2fd71 → 39488500831 / completed / failure；359a261 → 39487277039 / completed / failure；a01d17e → 39487013454 / completed / failure；c4fc11a → 39485819361 / completed / failure。
+补账：R256 那一轮五本台账 0 行，本轮以【R257 补记】形状补齐，事后补记不计分以保曲线量纲。新开 301（提交链里的 Swift 退出码读点）、302（那 0.03 的刀与 pressed 捕获键）、303（STATE ⓪ 与 FINAL_REPORT 计数器）、304（那朵负载敏感的红）；297/298/300 全部仍开。
+
+### Changed（R256 / 第 255 轮 / Round 253 · 亮档 pressed 抬量 0.015→0.03：300 选「修等式」那一支）
+
+VisualFillLift.hover 抬到 0.04 之后，controlHover 那一档的 hover→pressed 台阶被压成 0.015（= 3.82/255 < 地板 4/255）⇒ 抬 pressed 到 0.03：台阶 7.65/255，次序仍是 hover(0.12) < pressed(0.15) < selected(0.16)。
+真值表同步改判：亮档 hover 0.105→0.12、pressed 0.135→0.15、行那一档 0.085→0.10 —— 旧字面数把缺陷钉成了契约，而 1.171 < 1.20 正是它换来的那一格。
+代价（R257 现读，见 D-242/D-243）：那一笔没有台账、没有刀、没看图，且带着编译错 push；CI c7d8385 → 39492493661 为 failure。
+
+
 ### Changed（R255 / 第 254 轮 / Round 252 · round_verify.sh 落地；第一次跑就把 R253 那笔改动照成 4 失败）
 
 新增 `scripts/round_verify.sh`（295 结案）：一条命令跑完 D-236 的四件套并打一行摘要；全量日志（这台机器 326MB）只留 /tmp；帧基线只 compare 不 update。

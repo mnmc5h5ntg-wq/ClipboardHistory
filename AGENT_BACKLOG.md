@@ -6757,3 +6757,12 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 **299. 把「重捕型」刀做成执行器的第二种 kind（`recapture`：插刀 → swift build → 重捕到独立目录 → 量产物 → 逐字节还原），并让 `mutate_needle_precheck.py` 能按 manifest 列读到它的锚点（现在 M814 住在 bash 脚本里，名册看不见 ⇒ 与 285 同族，本轮明记未覆盖）（R254 新开）**
 
 **300. R253 的产品改动（亮档抬量 0.04）与两条既有 Swift 等式冲突（R255 全量卷现读 4 failures）：要么修那两条等式并说清它当初为什么允许 0.085（即 1.171 这一档是否本来就被判成可接受），要么回退 0.04 另找修法；两条路都要重跑「全量卷 + 尺 + 看图 + 重捕型刀」四件，且 297 在此之前保持仍开（R255 新开）**
+
+**301. 把「本轮动过 Swift ⇒ 提交前必须有一条会红的退出码读点」从手写的命令链变成仓库里的东西（R257 新开）**：形状 —— scripts/round_verify.sh 已经把四件套压成一行摘要，但它不写「这份树被验过」的戳；需要一个由被测脚本自己落的 stamp（当前树 + swift test 退出码 + 帧目录），加一条会红的判据：动过 Sources/ 或 Tests/ 而 stamp 与当前树不符 ⇒ exit 1。动手前先写清三条嫌疑：① stamp 落哪（.local/ 不入库 vs 入库会跨机分叉）；② 与 253 那条「CI 不给 CLIPBOARD_HISTORY_UI_SHOTS 就走 skip」的通道会不会互相喂饱；③ 判定要读脚本自己打的那一行，不许调用方重扫（R98）。
+
+**302. R256 的产品改动（亮档 VisualFillLift.pressed 0.015→0.03，台阶回到 7.65/255）没有变异刀、没有看图，而且现有夹具里根本没有 pressed 态位点（R257 新开）**：所以本轮 changed=1 这个数**不许**读成「没改坏画面」，只能读成覆盖缺口（与 291 同族）。要补三件：① 一个能按 isPressed 供电的捕获键（与 hoveredForCapture / hoveredRowForCapture 同族，别自绘状态）；② 一把按 D-240「重捕型」跑法的刀，证明台阶读数确实来自那 0.03；③ 改前/改后同一位两张真看图。在此之前 300 不许结案、297 保持仍开。
+
+**303. 交接债：AGENT_STATE.md 第 ⓪ 条与 AGENT_FINAL_REPORT.md 计数器仍停在 R255（R257 新开）**：STATE ⓪ 要写成本轮新笔的 run↔commit 成对号（run id 只能从 gh run list --json databaseId,headSha,status,conclusion 取，取不到就写「未取到 + 成因」，见 293）；FINAL_REPORT 三处要改并与 git log 对账 —— U 区间上界（现读 U-833）、轮次数、「最后一次动到 Sources/ 的轮次」（现读应为 R256 / c7d8385，R257 是 0 产品文件）。
+
+**304. 一朵新登记的红：CapturePathWriteBudgetTests.testAddingACopyWithANearlyFullArchiveStaysInsideBudget 在全量卷里失败（testAddingACopyWithANearlyFullArchiveStaysInsideBudget（全量卷 17.688s 失败 / 隔离复跑 6.885s 通过）理由：全量卷 17.688s 失败、隔离复跑 6.885s 通过：单遍读数不配给产品定罪，本机负载与墙钟预算贴边这两种相反成因还没分开，登记成 304，不放宽也不写成已通过），但没有放宽它，也没写成已通过（R257 新开）**：分辨实验欠的是「同一台机器、同一棵树、两跑对照」——现在只有「全量卷 1 次失败 / 隔离 1 次通过」两个单遍读数，按 R87 的规矩单遍读数不配给产品定罪，两种相反成因（这台机器负载 vs 该判据的墙钟预算本来就贴边）还没被分开。要做的第一步：把这条判据的预算量成相对量（同一次运行内的比值），并在注释里写清它量的是墙钟还是写盘次数。
+

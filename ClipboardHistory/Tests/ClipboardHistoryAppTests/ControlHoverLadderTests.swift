@@ -81,13 +81,14 @@ final class ControlHoverLadderTests: XCTestCase {
                            0, accuracy: 0.0001,
                            "\(tag)：调用点说了不画，抬量还是把 0 抬成了 0.025 ⇒ 幽灵层")
         }
-        // 行那一档（0.06）也在这条换算上：亮档 0.085。写出来是因为DetailView / 设置行那几处
-        // 直接读的是这一档，BACKLOG 251 剩下的一半要搬的就是它 —— 先让数在这儿可见。
+        // 行那一档（0.06）也在这条换算上：亮档 0.10（R256 之前是 0.085）。写出来是因为
+        // DetailView / 设置行那几处直接读的是这一档，BACKLOG 251 剩下的一半要搬的就是它。
+        // 0.085 → 0.10 的改判理由：旧字面数把缺陷钉成了契约，而 1.171 < 1.20
+        // 正是它换来的那一格；详见 VisualFillLift 的注释（R253/300）。
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
                                                        hoverLevel: VisualFill.hover, dark: false),
                        0.10, accuracy: 0.0001,
-                       "行那一档的亮档抬量不对（R253/300：0.085 → 0.10 —— 旧字面数把缺陷钉成了契约，"
-                       "而 1.171 < 1.20 正是它换来的那一格；改这里的理由见 VisualFillLift 的注释）")
+                       "行那一档的亮档抬量不对（R256/300 改判 0.085 → 0.10）")
         XCTAssertEqual(PressableAppearance.fillOpacity(isPressed: false, isHovered: true,
                                                        hoverLevel: VisualFill.hover, dark: true),
                        VisualFill.hover, accuracy: 0.0001, "暗档必须等于令牌原值：本轮没动暗档的任何一个数")
