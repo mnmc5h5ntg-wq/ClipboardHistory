@@ -4237,6 +4237,16 @@ final class UICaptureTests: XCTestCase {
             })
         }
 
+        // R251 / BACKLOG 290：多文件详情（`.files` ⇒ `MultiFileDetailView` ⇒ `MultiFileRow`）的两态帧。
+        // 为什么只有 index 3 有 hover 版：只有它是那一族行的载体，其余三格详情里没有 `MultiFileRow`。
+        // 帧名形状 `detail-3-files-hover-<尺寸>-<档>` 与静置态 `detail-3-files-<尺寸>-<档>` 由
+        // `hover_two_state_diff.find_pairs` 自动配对 —— 不猜坐标、不手写名单（R240 的规矩）。
+        results.append(Fixture("detail-3-files-hover", NSSize(width: 720, height: 520)) {
+            let target = self.makePopulatedStore(selectingIndex: 3)
+            return AnyView(DetailView(historyStore: target)
+                .environment(\.hoveredForCapture, true))
+        })
+
         // 一颗浮层药丸一张帧。以前两张挤在 200pt 高的框里（四颗按钮 + 分隔线 + padding 实际
         // 需要 ~187pt，加上 32pt padding 就被裁掉了），加了固定按钮后更放不下 ——
         // 被裁的帧会让人误判"按钮少了"，所以一种状态一帧，高度按内容给足。

@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R251 / 第 250 轮 / Round 248 · 多文件行第一次有两态帧并被量到；量出夹具证明不了的事）
+
+夹具（Tests 半，产品 0 文件）`UICaptureHarness.swift`：新增 `detail-3-files-hover`（`DetailView(historyStore:).environment(\.hoveredForCapture, true)`，index 3 = `.files` 是多文件行的唯一载体）。帧名形状让 `hover_two_state_diff.find_pairs` 自己配对，不写坐标也不列名单。
+读数：帧目录 `/tmp/shots_r251`（164 张）；捕获卷 `Executed 80 tests, with 4 tests skipped and 0 failures`；尺 CLI `退出=0`、配对数 6→8，暗档 变化=28.6% 逐点中位(码值)=1.515、亮档 变化=28.8% 带内均值=1.049，两档 `判定=过线`；判据卷 `Ran 20 tests OK`。
+看图：眼睛腿 RUN（暗档 idle/hover 两张）—— 横底不压字、图标与动作栏不受影响 ⇒ 保留不改；一条未判的排版观察（分隔线穿过药丸两端）留给清账表。
+D-237 / 新开 296：三行同时亮是"整棵视图一个布尔"的产物 ⇒ 这类帧只能证"有层会亮 + 强度"，不能证"只亮被指的那一行"；归属问题在 296 落地之前不许用这批帧下结论。
+变异腿本轮 NOT-RUN（新夹具只由既有配对地板与 standing 判据覆盖，没有"摘掉它必须红"的刀）。
+
 ### Changed（R250 / 第 249 轮 / Round 247 · 补跑 Swift 侧验证四件套：全量卷 + 帧基线 + 换装本机）
 
 零代码改动。全量 Swift 卷 `Executed 915 tests, with 42 tests skipped and 0 failures in 368.858s`（日志 320MB 留 `/tmp/r250_full.log`，只入摘要 —— 这台机器上大日志入库会把 push 撑坏）。
