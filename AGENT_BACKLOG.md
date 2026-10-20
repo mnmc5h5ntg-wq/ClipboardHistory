@@ -6763,6 +6763,8 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 **302. R256 的产品改动（亮档 VisualFillLift.pressed 0.015→0.03，台阶回到 7.65/255）没有变异刀、没有看图，而且现有夹具里根本没有 pressed 态位点（R257 新开）**：所以本轮 changed=1 这个数**不许**读成「没改坏画面」，只能读成覆盖缺口（与 291 同族）。要补三件：① 一个能按 isPressed 供电的捕获键（与 hoveredForCapture / hoveredRowForCapture 同族，别自绘状态）；② 一把按 D-240「重捕型」跑法的刀，证明台阶读数确实来自那 0.03；③ 改前/改后同一位两张真看图。在此之前 300 不许结案、297 保持仍开。
 
 **303. 交接债：AGENT_STATE.md 第 ⓪ 条与 AGENT_FINAL_REPORT.md 计数器仍停在 R255（R257 新开）**：STATE ⓪ 要写成本轮新笔的 run↔commit 成对号（run id 只能从 gh run list --json databaseId,headSha,status,conclusion 取，取不到就写「未取到 + 成因」，见 293）；FINAL_REPORT 三处要改并与 git log 对账 —— U 区间上界（现读 U-833）、轮次数、「最后一次动到 Sources/ 的轮次」（现读应为 R256 / c7d8385，R257 是 0 产品文件）。
+  追记（R257 收尾）：成对号现取（gh run list --json databaseId,headSha,status,conclusion）—— 账半 62520ec → 39496791768 / in_progress / 未读；代码半 dbae7e6 → gh 列表里还没有（成因：那一跑还没被列出，取不到就不写，见 293）；另 c1dfd4b 本轮从 in_progress 落成 39491954566 / completed / failure。
+  追记（R257 收尾）：FINAL_REPORT 三张格本轮已刷并过守卫（标题 R9–R254 / U 上界 U-833 / 最后一次动到 Sources/ 改绑 R256 的 c7d8385）；STATE 第 ⓪ 条仍停在 R255 未轮换 ⇒ 本项只结一半，剩下的就是那一行轮换，下一轮第一件事仍是 301、302、303 的剩余半与 304 的两跑对照。
 
 **304. 一朵新登记的红：CapturePathWriteBudgetTests.testAddingACopyWithANearlyFullArchiveStaysInsideBudget 在全量卷里失败（testAddingACopyWithANearlyFullArchiveStaysInsideBudget（全量卷 17.688s 失败 / 隔离复跑 6.885s 通过）理由：全量卷 17.688s 失败、隔离复跑 6.885s 通过：单遍读数不配给产品定罪，本机负载与墙钟预算贴边这两种相反成因还没分开，登记成 304，不放宽也不写成已通过），但没有放宽它，也没写成已通过（R257 新开）**：分辨实验欠的是「同一台机器、同一棵树、两跑对照」——现在只有「全量卷 1 次失败 / 隔离 1 次通过」两个单遍读数，按 R87 的规矩单遍读数不配给产品定罪，两种相反成因（这台机器负载 vs 该判据的墙钟预算本来就贴边）还没被分开。要做的第一步：把这条判据的预算量成相对量（同一次运行内的比值），并在注释里写清它量的是墙钟还是写盘次数。
 
