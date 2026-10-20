@@ -23,9 +23,12 @@ ARMS = [
     # 锚点跟着 R229 的**结构改动**重钉：抬量从 `VisualFill` 里的两个助手函数
     # 搬进了 `PressableAppearance.fillOpacity`（两条既有守卫要求的形状），
     # 旧锚点会命中 0 ⇒ NOT_RUN。规矩见 D-215：改源码那一轮就把打它的表改到还能跑。
+    # R262 重钉：这一抬在 R229 之后又被搬进 `HoverInk.opacity`（D-215 的规矩 ——
+    # 改源码那一轮就把打它的表改到还能跑，旧锚点命中 0 ⇒ NOT_RUN 是假账）。
+    # 替换只留 `return level`：两档重新共用一个数，`guard level > 0` 仍在 ⇒ 能编译。
     ('M768', u'去掉亮档 hover 那一抬（两档又共用一个数）', STYLE,
-     "        return isHovered ? hoverLevel + (dark ? 0 : VisualFillLift.hover) : 0",
-     "        return isHovered ? hoverLevel : 0"),
+     "        return dark ? level : level + VisualFillLift.hover",
+     "        return level"),
     ('M769', u'去掉亮档 pressed 那一抬（把 hover→pressed 压平 = R14 拦下的那个形状）', STYLE,
      "            return dark ? VisualFill.pressed : VisualFill.pressed + VisualFillLift.pressed",
      "            return VisualFill.pressed"),
@@ -54,8 +57,14 @@ def run():
                           env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     text = proc.stdout.decode('utf-8', 'replace')
     names = sorted(set(re.findall(r"Test Case '-\[[\w.]+ (\w+)\]' failed", text)))
-    ran = ('Executed 4 tests' in text) or ('error: ' in text)
-    return proc.returncode, (1 if ran else 0), (bool(names) or proc.returncode != 0), text, names
+    # 「跑起来了」由结论行的**形状**判定，不写死数字（R262：这一卷从 4 条长到 6 条，
+    # 上一版那句 `'Executed 4 tests' in text` 会把"真红了"读成"根本没跑"）。
+    # 取**最后**一条 —— swift 先打单类小结再打总计，取首命中会把内层的数当总数（R147 同一族）。
+    executed = re.findall(r'Executed (\d+) tests?, with (\d+) failures?', text)
+    n_ran = int(executed[-1][0]) if executed else 0
+    # 编译红不许记成 CAUGHT（D-243）：编译失败是把每条断言的机会整个拿走，
+    # 那行 `error:` 不是判据在判，所以没有结论行时一律 NOT_RUN。
+    return proc.returncode, n_ran, bool(names), text, names
 
 
 def main():
@@ -77,11 +86,13 @@ def main():
                 return 2
         if not n_ran:
             not_run += 1
-            print('%s NOT_RUN 那一卷根本没跑起来（编译失败？）⇒ 不算 CAUGHT：%s' % (arm_id, why), flush=True)
+            print('%s NOT_RUN 那一卷根本没跑起来（无结论行；编译红不算 CAUGHT = D-243）⇒ 不算 CAUGHT：%s'
+                  % (arm_id, why), flush=True)
             continue
         if failed:
             caught += 1
-            print('%s CAUGHT  %s ｜ 红在 %s' % (arm_id, why, ', '.join(names) or 'exit=%d' % code), flush=True)
+            print('%s CAUGHT  %s ｜ 红在 %s（跑=%d exit=%d）'
+                  % (arm_id, why, ', '.join(names) or '仅 exit 非 0', n_ran, code), flush=True)
         else:
             escaped += 1
             print('%s ESCAPED %s' % (arm_id, why), flush=True)

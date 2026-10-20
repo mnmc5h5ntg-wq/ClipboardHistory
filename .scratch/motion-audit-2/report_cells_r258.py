@@ -50,9 +50,17 @@ t = rd(REP)
 if mode == "headline":
     t = sub_once(t, r"R9–R\d+，\d+ 轮自评", "R9–R" + str(last_round) + "，" + str(last_round) + " 轮自评",
                  "标题轮次格")
+    # 刷新者那一格由 UI_AUDIT **最大轮次**那一节的 R 标签派生 —— 上一版把 "R258" 写死在替换文本里，
+    # 于是 R262 之后每次刷新都会说"这是 R258 现读的数"（假出处）。
+    # 也不许取"文件里第一个匹配"：R256 那节是**补记**，插在降序块之上（现读第 366 行），
+    # 按文本顺序取会拿到 R256（R262 撞过一次，正对照就是它）。
+    sections = re.findall(r"^## 第 (\d+) 轮（(R\d+) / ", ui, re.M)
+    if not sections:
+        die("UI_AUDIT 读不到任何一节的 R 标签 ⇒ 出处那一格不许手抄")
+    tag = max(sections, key=lambda s: int(s[0]))[1]
     t = sub_once(t, r"U-31 … U-\d+（R\d+：[^；]*；\d+ 条定义行是 R\d+ 现读的数",
-                 "U-31 … U-" + str(mx) + "（R258：U-834…U-" + str(mx) + " 之后现读刷新；" + str(cnt)
-                 + " 条定义行是 R258 现读的数", "U 上界格")
+                 "U-31 … U-" + str(mx) + "（" + tag + "：现读刷新到最新一节之后；" + str(cnt)
+                 + " 条定义行是 " + tag + " 现读的数", "U 上界格")
     wr(REP, t)
     print("REPORT_CELLS headline last_round=" + str(last_round) + " maxU=" + str(mx) + " defs=" + str(cnt))
 elif mode == "sources":

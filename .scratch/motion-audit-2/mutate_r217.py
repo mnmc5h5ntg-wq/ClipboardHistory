@@ -27,8 +27,10 @@ TEST = 'testFrozenAndLiveArmsReadTheSameSkeletonRows'
 
 ARMS = [
     ('M750', u'尺的第一个子句恒假 ⇒ 数不出条带（证人失去对象）', HARNESS,
-     '            if strong < 8 && weak > width / 8 { barRows.append(y) }',
-     '            if strong < 0 && weak > width / 8 { barRows.append(y) }',
+     '            if strong < 8 && weak > width / 8 { barRows.append(y) }\n'
+     '            if strong >= 3 { textRows.append(y) }',
+     '            if strong < 0 && weak > width / 8 { barRows.append(y) }\n'
+     '            if strong >= 3 { textRows.append(y) }',
      TEST),
     ('M751', u'不冻臂外框高度改成 300 ⇒ 两臂读数分叉（等号那条正对照）', HARNESS,
      '                    DetailView(historyStore: liveStore, freezeLoadingForCapture: false)\n'

@@ -45,8 +45,8 @@ MUTATIONS = [
      "                              height: 440)",
      CARD, "扫描带必须扫到窗口底"),
     ("M541", "把 cardFill 的地板从 20pt 撤到 0（第一行差 3 又算卡片填充）", HARNESS,
-     "                         gate: Int = 3, minCardHeightPt: Double = 20) -> Int? {",
-     "                         gate: Int = 3, minCardHeightPt: Double = 0) -> Int? {",
+     "minCardHeightPt: Double = 20",
+     "minCardHeightPt: Double = 0",
      CARD, "一条 1pt 的分隔线没有资格当卡片填充"),
 ]
 

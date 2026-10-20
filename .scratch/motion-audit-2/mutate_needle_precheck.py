@@ -28,18 +28,26 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = "/Users/wangziyi/Codex_Project0"
+# 仓库根**由自己所在位置推**，不写死。写死的那一版（R261）在 runner 上把
+# `check_manifests` 打成 FileNotFoundError：它去开 `/Users/wangziyi/...`，而作业树在
+# `/Users/runner/work/ClipboardHistory/ClipboardHistory` ⇒ 一格"本机绿 / 另一台机器只能报错"的判据
+# 不是判据（run 39512069087 / STEP[9]，R262 现读；同一族先例见 R100 的夹具绝对路径）。
+REPO = os.path.dirname(os.path.dirname(HERE))
 TABLES = [
     "mutate_r245", "mutate_r247", "mutate_r249",
-    "mutate_r242","mutate_r241", "mutate_r95_rhythm", "mutate_r94_order", "mutate_r96_triage", "mutate_r97_card", "mutate_r98_seed", "mutate_r98_card", "mutate_r99", "mutate_r100", "mutate_r100b", "mutate_r101", "mutate_r102", "mutate_r103", "mutate_r104", "mutate_r105", "mutate_r106", "mutate_r107", "mutate_r108", "mutate_r109", "mutate_r110", "mutate_r111", "mutate_r115", "mutate_r116", "mutate_r118", "mutate_r120", "mutate_r121", "mutate_r122", "mutate_r124", "mutate_r125", "mutate_r126", "mutate_r127", "mutate_r128", "mutate_r129", "mutate_r130", "mutate_r131", "mutate_r132", "mutate_r133", "mutate_r135", "mutate_r137", "mutate_r139", "mutate_r140", "mutate_r141", "mutate_r142", "mutate_r168", "mutate_r169", "mutate_r172", "mutate_r178", "mutate_r189", "mutate_r190", "mutate_r191", "mutate_r192", "mutate_r193", "mutate_r195", "mutate_r196", "mutate_r198", "mutate_r205", "mutate_r208", "mutate_r210", "mutate_r213", "mutate_r214", "mutate_r217", "mutate_r219", "mutate_r220", "mutate_r221", "mutate_r222", "mutate_r224", "mutate_r225", "mutate_r229", "mutate_r230"]
+    "mutate_r242","mutate_r241", "mutate_r95_rhythm", "mutate_r94_order", "mutate_r96_triage", "mutate_r97_card", "mutate_r98_seed", "mutate_r98_card", "mutate_r99", "mutate_r100", "mutate_r100b", "mutate_r101", "mutate_r102", "mutate_r103", "mutate_r104", "mutate_r105", "mutate_r106", "mutate_r107", "mutate_r108", "mutate_r109", "mutate_r110", "mutate_r111", "mutate_r115", "mutate_r116", "mutate_r118", "mutate_r120", "mutate_r121", "mutate_r122", "mutate_r124", "mutate_r125", "mutate_r126", "mutate_r127", "mutate_r128", "mutate_r129", "mutate_r130", "mutate_r131", "mutate_r132", "mutate_r133", "mutate_r135", "mutate_r137", "mutate_r139", "mutate_r140", "mutate_r141", "mutate_r142", "mutate_r168", "mutate_r169", "mutate_r172", "mutate_r178", "mutate_r189", "mutate_r190", "mutate_r191", "mutate_r192", "mutate_r193", "mutate_r195", "mutate_r196", "mutate_r198", "mutate_r205", "mutate_r208", "mutate_r210", "mutate_r213", "mutate_r214", "mutate_r217", "mutate_r219", "mutate_r220", "mutate_r221", "mutate_r222", "mutate_r224", "mutate_r225", "mutate_r229", "mutate_r230", "mutate_r262"]
 MID = re.compile(r"^M\d{3}[a-z]?$")
 
 
-ARM_LINE = re.compile(r'^\s*\("(M\d{3}[a-z]?)"\s*,')
+# R262 放宽：引号两种都要认。旧版只认 `("M6NN",` 双引号形状 ⇒ 现读 **123 把刀 / 34 张表**
+# 用 `('M6NN', …` 写 ARMS（r94/r96、r208…r230、r22–r28 那几批），它们对跨表查重**完全隐形** ——
+# 与 306 结掉的那半个洞同源，只是这次坏在引号上而不是坏在语言上。
+# 用反向引用锁"两边引号必须同种"，免得 `("M123',` 这种不合法写法也被抽成一个号。
+ARM_LINE = re.compile(r'^\s*\(?\s*(["\'])(M\d{3}[a-z]?)\1\s*,')
 
 
 def arm_ids(path):
-    """从表的**源码形状**里抽臂号：ARMS 里每一行都以 `("M6NN", …` 开头。
+    """从表的**源码形状**里抽臂号：ARMS 里每一行都以 `("M6NN", …` 或 `('M6NN', …` 开头。
 
     为什么不用 `needles()` 抽出来的号：那个抽取只覆盖 27/42 张表（needle 藏在 lambda 里的抽不出），
     而 R141 与 R142 撞号那两张表恰好都在"抽不出"那一半里 ⇒ 照它们做的查重会**恒静默**。
@@ -55,7 +63,11 @@ def arm_ids(path):
             continue
         m = ARM_LINE.match(line)
         if m:
-            out.append(m.group(1))
+            # 放宽引号之后编号住在**第二**组（第一组是引号本身）。这一行若还取 group(1)，
+            # 抽出来的是 `"` 或 `'` ⇒ 全部臂号塌成两个"号"，查重会报出一墙假撞号。
+            # 这条不是猜的：现读放宽前 arms=572、放宽后 arms=695（+123 把单引号表里的刀），
+            # 且 dupes=0 —— 如果组号取错，这里不可能还是 0。
+            out.append(m.group(2))
     return out
 
 
@@ -104,6 +116,11 @@ def arm_sites(arm, default_path):
     mid = arm[0]
     if not (isinstance(mid, str) and MID.match(mid)):
         return None
+    # 第四种形状（R169 那两张表）：`(编号, 文件, needle, 变异文, 期望)` —— 没有"说明"这一格。
+    # 旧版不认识它，就把 needle 当"文件"、再退回 default_path（HARNESS）去数 ⇒ 数到 0，
+    # 于是 R261 的预检把两把好刀报成"腐烂"（假指控，D-247 的反方向）。
+    if isinstance(arm[1], str) and is_source(arm[1]) and isinstance(arm[2], str) and len(arm[2]) > 4:
+        return (mid, arm[1], [arm[2]])
     third, fourth = arm[2], arm[3]
     if isinstance(third, str) and is_source(third):
         path = third
@@ -194,8 +211,10 @@ def check_manifests(repo=REPO, directory=HERE):
     problems = []
     rows = manifest_rows(directory)
     for table, mid, kind, rel, oldf, newf, want, why in rows:
-        old_txt = io.open(os.path.join(repo, oldf), encoding="utf-8").read().strip("\n")
-        new_txt = io.open(os.path.join(repo, newf), encoding="utf-8").read().strip("\n")
+        with io.open(os.path.join(repo, oldf), encoding="utf-8") as handle:
+            old_txt = handle.read().strip("\n")
+        with io.open(os.path.join(repo, newf), encoding="utf-8") as handle:
+            new_txt = handle.read().strip("\n")
         if old_txt == new_txt:
             problems.append("%s %s 的 .old 与 .new 一模一样 ⇒ 空刀" % (table, mid))
             continue

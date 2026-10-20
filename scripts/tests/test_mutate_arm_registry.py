@@ -138,12 +138,95 @@ class MutateArmRegistryTests(unittest.TestCase):
         self.assertEqual({}, dupes)
         self.assertEqual({}, repeats)
 
+    def test_single_quoted_arm_lines_are_extracted_too(self):
+        """R262：`('M6NN', …` 这种单引号写法以前一颗都抽不出来（现读 34 张表 / 123 把刀隐形）。
+
+        这一格还钉住**组号**：放宽引号之后编号住在第二组，若代码退回 `group(1)`，
+        抽出来的是引号字符本身 ⇒ 所有臂号塌成两个"号"。所以这里断言里没有引号。
+        """
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_table(directory, u"mutate_r906", [
+                u"ARMS = [",
+                u"    ('M703', u'单引号写法', '/tmp/a', 'needle', 'repl'),",
+                u'    ("M704", "双引号写法", "/tmp/b", "needle", "repl"),',
+                u"]",
+            ])
+            got = tool.arm_ids(path)
+        self.assertEqual([u"M703", u"M704"], got,
+                         u"两种引号都得抽得出来（少一种就是那 123 把刀继续隐形）")
+        self.assertFalse([x for x in got if not x.startswith(u"M")],
+                         u"抽出来的是引号而不是刀号 ⇒ ARM_LINE 的组号取错了：%s" % got)
+
+    def test_quoting_style_does_not_hide_a_cross_table_collision(self):
+        """正对照：一张双引号表 + 一张单引号表撞同一个号 ⇒ 必须被点名。
+
+        放宽之前这两张表在查重器里**各是一个宇宙**：单引号那张一颗号都抽不出来，
+        于是撞号静默通过。形状照 R141/R142 那一次，只把引号换成历史上看不见的那一种。
+        """
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_table(directory, u"mutate_r907", [
+                u"ARMS = [",
+                u'    ("M705", "双引号那张", "/tmp/a", "n", "r"),',
+                u"]",
+            ])
+            self.write_table(directory, u"mutate_r908", [
+                u"ARMS = [",
+                u"    ('M705', u'单引号那张', '/tmp/b', 'n', 'r'),",
+                u"]",
+            ])
+            files, dupes, repeats, total = tool.cross_table_ids(directory)
+        self.assertEqual(2, total, u"两张表各一颗号：%s" % total)
+        self.assertEqual([u"mutate_r907", u"mutate_r908"], dupes.get(u"M705"),
+                         u"引号不同就不算撞号 ⇒ 这正是 306 结掉的那个洞的另一半")
+
+    def test_the_tools_derive_their_repo_root_instead_of_hardcoding_it(self):
+        """R262：runner 上这一格只能报 FileNotFoundError —— 预检把仓库根写死成了我本机的路径。
+
+        run 39512069087 / STEP[9] 现读：`check_manifests` 去开 `/Users/wangziyi/Codex_Project0/...`，
+        而作业树在 `/Users/runner/work/ClipboardHistory/ClipboardHistory` ⇒ 一格"本机绿、
+        另一台机器只能报错"的判据不是判据（R100 的夹具绝对路径、R154 的环境差异是同一族）。
+
+        扫的是**代码里的字符串常量**：用 `ast`，所以注释里引用那句路径不会被误伤
+        （本文件上面那段 docstring 就写着 `/Users/...`，它不该喂饱这条守卫）。
+        估计量与 `scripts/mutation_verdict_scan.py` 共用同一颗 = D-247，不另抄一份。
+        """
+        import ast
+
+        spec = importlib.util.spec_from_file_location(
+            u"verdict_scan_under_test", str(REPO / u"scripts" / u"mutation_verdict_scan.py"))
+        ruler = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ruler)
+
+        def abs_home(path):
+            with open(path, encoding=u"utf-8") as handle:
+                tree = ast.parse(handle.read())
+            return [s for s in ruler.string_constants(tree) if u"/Users/" in s]
+
+        tools = [str(TOOL), str(REPO / u"scripts" / u"mutation_verdict_scan.py"),
+                 str(REPO / u".scratch" / u"motion-audit-2" / u"curve_from_ledger.py"),
+                 str(REPO / u".scratch" / u"motion-audit-2" / u"make_surface_ledger.py")]
+        for tool_path in tools:
+            self.assertEqual([], abs_home(tool_path),
+                              u"%s 里不许出现写死的家目录路径：换一台机器它只会报错，不会给出读数"
+                              % os.path.basename(tool_path))
+        with tempfile.TemporaryDirectory() as directory:
+            planted = self.write_table(directory, u"mutate_r909", [
+                u"ROOT = '/Users/someone/else'",
+            ])
+            self.assertEqual(1, len(abs_home(planted)),
+                             u"写死绝对路径的正对照没被点名 ⇒ 上面那条守卫是恒真的")
+
     def test_the_repository_currently_has_no_arm_id_collisions(self):
         tool = load_tool()
         files, dupes, repeats, total = tool.cross_table_ids()
         self.assertGreaterEqual(len(files), 100,
                                 u"扫到的表少于 100 张 ⇒ 目录参数或通配漂了，这条守卫会空跑")
-        self.assertGreaterEqual(total, 400, u"臂号总数掉到 400 以下 ⇒ 扫描形状变了，先修尺再谈结论")
+        # 地板是量出来的，不是猜的：R262 现读 695（双引号 572 颗 + 单引号 123 颗 + manifest 16 把）。
+        # 谁把 ARM_LINE 收窄回"只认双引号"，这一格会先红在数上，而不是让 123 把刀重新隐形。
+        self.assertGreaterEqual(total, 600,
+                                u"臂号总数掉到 600 以下（R262 实测 695）⇒ 扫描形状收窄了，先修尺再谈结论")
         self.assertEqual({}, dupes, u"跨表撞号：%s" % dupes)
         self.assertEqual({}, repeats, u"同表重号：%s" % repeats)
 

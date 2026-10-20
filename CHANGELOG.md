@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R262 / 第 261 轮 / Round 259 · 三根腐烂针修完，名册改成按「抽得出来」算）
+
+三根真腐烂针重钉并把那三张表重跑：M541（5/5 CAUGHT）、M750（2/2 CAUGHT）、M768（3/3 CAUGHT），RESTORE_CLEAN；预检 `NEEDLE_PRECHECK tables=74 covered=58 arms=202 bad=0` ⇒ **286 结案**。
+撤回上一轮的两次假指控：M684/M686 不是腐烂，是 `arm_sites` 不认识五字段臂形状（把 needle 当文件去数）⇒ 假账挂在 286 正文里七轮，本轮公开更正。
+`mutate_r229.py` 的"跑起来了没"从写死 `'Executed 4 tests'` 改成按结论行形状认，并钉住 D-243 那一侧：没有结论行一律 NOT_RUN，编译红不算 CAUGHT。
+新尺 `scripts/mutation_verdict_scan.py`（只测不判）+ 判据卷 11 格（正/负对照、`Executed 0` 是状态、注释与 docstring 不喂守卫、解析失败要响、缺目录必须红）+ 四把 python 刀 M819…M822（4/4 CAUGHT）。
+`ARM_LINE` 放宽到两种引号 ⇒ 现读 123 把刀 / 34 张表此前对跨表查重隐形；`ARM_TOTAL arms=572 → 695`、dupes=0；名册那格地板由猜的 400 改成量出来的 600。
+runner 那一朵新红（6bf6f3e → 39512069087 / completed / failure / STEP[9]）成因是预检把仓库根写死成我本机的路径 ⇒ 改成由 `__file__` 推，并加一格守卫（四支被电池 import 的工具里不许出现写死的家目录，配人造正对照）。
+眼睛腿 RUN：亮档 `row-favorite` 的 hover 与 press 两张肉眼分不出（差别押在缩放不在墨），范围只这两张。产品 0 文件、帧未重捕。脚本电池 Ran 487 tests / OK (skipped=4)。新开 309/310/311。
+
+
 ### Changed（R261 / 第 260 轮 / Round 258 · 五把重捕型刀进名册）
 
 `mutate_needle_precheck.py`：`cross_table_ids` 除 `mutate_r*.py` 之外也吃 `arms_r*/manifest.tsv`（沿用 R245 起的七列契约，不另造形状 = D-245），新增 `manifest_rows` / `anchor_hits` / `check_manifests` —— 锚点必须恰好命中一次、`.new` 不得等于 `.old`。现读：manifest 表 6 张、刀 16 把（M802…M818）、`ARM_TOTAL arms=572 dupes=0`、`BASH_ARMS bad=0`。
