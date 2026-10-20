@@ -54,6 +54,18 @@ BG, LIT = 30, 80   # 两个灰阶：BG 与本机暗档平涂背景同量级，LI
 RATIO_LIT_VS_BG = 2.17
 #   稀释带：hover 带内均值 = (2×80 + 8×30)/10 = 40 ⇒ (0.1568627451+0.05)/0.1676470588 = 1.23393 ⇒ 1.234
 RATIO_DILUTED = 1.234
+# 同一个 80:30 在 **WCAG 线性口径**下的手算（仓库 1.20/1.10 那条地板就是这个口径）：
+#   L(80)=((0.3137254902+0.055)/1.055)^2.4=0.080182，L(30)=((0.1176470588+0.055)/1.055)^2.4=0.012973
+#   ⇒ (0.0801905+0.05)/(0.0129728+0.05)=0.1301905/0.0629728=2.067538 ⇒ 四舍五入 2.068
+#   （期望值由独立算式现算，不许心算：第一版我手算成 2.067，被自己这一格红回来）
+RATIO_LIT_VS_BG_WCAG = 2.068
+# 亮档那一族（R243 / D-229 的真靶）：白底 255 上 alpha=0.085 的悬停层 ⇒ 合成灰 255×(1−0.085)=233.325
+#   码值口径 (1.0+0.05)/(233/255+0.05)=1.05/0.9637254902=1.08951 ⇒ 1.090 —— **看着低于 1.20**
+#   WCAG 口径  L(255)=1.0，L(233)=((233/255+0.055)/1.055)^2.4=0.814869
+#              ⇒ 1.05/(0.814869+0.05)=1.05/0.864869=1.21405 ⇒ 1.214 —— **过地板**
+WHITE, LIFT_085 = 255, 233
+RATIO_LIGHT_HUFF_CODE = 1.090
+RATIO_LIGHT_HUFF_WCAG = 1.214
 
 
 def block(x0, y0, w, h, grey):
@@ -103,6 +115,28 @@ class EstimatorTests(RulerTestCase):
         self.assertEqual((0, 0, 2, 5), m["bbox"])
         self.assertEqual(RATIO_LIT_VS_BG, m["band_mean"], "整带都变了 ⇒ 带内均值就是 80:30，手算 2.17")
         self.assertEqual(RATIO_LIT_VS_BG, m["per_pixel"], "逐点中位数与带内均值在这一块上必须同值")
+        self.assertEqual(RATIO_LIT_VS_BG_WCAG, m["per_pixel_wcag"],
+                         "同一对像素在 WCAG 线性口径下手算 2.067 ⇒ 两个口径不许互相当对方的证人")
+
+    def test_the_light_hover_fill_clears_the_floor_only_in_the_floor_s_own_estimator(self):
+        """R243 / D-229：这一格钉的是**别拿错口径给产品定罪**。
+
+        白底上 alpha=0.085 的悬停层合成出 233，码值口径读 1.090、WCAG 口径读 1.214。
+        仓库那条"亮档 ≥1.20"地板是 WCAG 口径（`UICaptureHarness.contrastRatio` 做了 2.4 次幂线性化），
+        所以 1.090 < 1.20 这句话**不成立** —— R240 那次拦下改档、R243 又差点按它抬梯子，同一坑两种形状。
+        两列同时断言：只断言一列的话，另一列被改坏就没人报。
+        """
+        write_frame(self.dir, "pill-hover-10x10-light", (10, 10), block(0, 0, 2, 5, LIFT_085), WHITE)
+        write_frame(self.dir, "pill-10x10-light", (10, 10), (), WHITE)   # 平涂白底：亮档才是这一格的对象
+        m = _ruler.measure(self.dir, "pill-hover-10x10-light", "pill-10x10-light")
+        self.assertEqual(10, m["changed"])
+        self.assertAlmostEqual(RATIO_LIGHT_HUFF_CODE, m["per_pixel"], places=3,
+                               msg="码值口径应当复现 1.090（=1.05/0.9637254902）")
+        self.assertAlmostEqual(RATIO_LIGHT_HUFF_WCAG, m["per_pixel_wcag"], places=3,
+                               msg="WCAG 口径应当复现 1.214 ⇒ 地板按这个口径才有效")
+        self.assertLess(m["per_pixel"], 1.20, "码值口径确实在 1.20 之下 —— 这正是假缺陷的来源")
+        self.assertGreaterEqual(m["per_pixel_wcag"], 1.20,
+                                "同一块填充在地板自己的口径里是过了的 ⇒ 不许按 1.09 改产品")
 
     def test_unchanged_pixels_dilute_band_mean_but_not_per_pixel(self):
         # 变化带横跨整行（x=0..9, y=5）而只有两端真的变了 ⇒ 带内 8 个未变像素进分母。
@@ -220,7 +254,8 @@ class InstrumentContractTests(RulerTestCase):
         rc, out = self.cli(["--shots", self.dir, "--control", "pill-hover-20x20-dark,pill-20x20-dark"])
         self.assertEqual(0, rc, out)
         self.assertIn("带内均值=", out)
-        self.assertIn("变化像素逐点中位=", out)
+        self.assertIn("变化像素逐点中位(码值)=", out)
+        self.assertIn("WCAG口径", out)
         # 负对照这一格必须真的两向：帧↔自身读出 0，否则"尺在量差"这句话没有证人。
         m = _ruler.measure(self.dir, "pill-hover-20x20-dark", "pill-hover-20x20-dark")
         self.assertEqual(0, m["changed"])

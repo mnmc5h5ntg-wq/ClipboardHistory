@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R243 / 第 242 轮 / Round 240 · 两态差尺加 WCAG 口径：把「亮档 1.09 掉在 1.20 之下」这条候选缺陷判成尺的假话）
+
+- `scripts/hover_two_state_diff.py` 现在同时给**码值口径**与 **WCAG 线性口径**（`_wcag_lum` 与 `UICaptureHarness.contrastRatio` 同一算式），读数行尾明写「只有最后一列可以拿去和地板比」。真帧现读：玻璃圆钮 亮 1.220 / 暗 1.220、收藏星 亮 1.225 / 暗 1.211、段按钮 亮 1.224 / 暗 1.239、正对照 modechip 亮 1.371 ⇒ 四处全部过仓库自己的 1.20 地板，R240 挂着的"亮档偏淡"候选缺陷**撤销**，产品不改（D-229）。
+- 判据卷加一格 `test_the_light_hover_fill_clears_the_floor_only_in_the_floor_s_own_estimator`（同一块填充同时断言码值 1.090 与 WCAG 1.214，并断言前者低于地板、后者不低于）⇒ 拿错口径给产品定罪这件事从此会红。卷共 17 格、`Ran 17 OK (skipped=1)`；脚本电池 `Ran 445 OK (skipped=3)`。
+- 两条自坏明记：期望值手算 2.067 被独立现算 2.068 红回来（第二次犯"心算真值表"）；改打印标签被 `InstrumentContractTests` 红回来（这条红是对的，改的是契约期望而不是放宽它）。变异腿本轮 NOT-RUN：`mutate_r242.py` 第五次拒发基线（BACKLOG 280 未破）。
+
 ### Changed（R242 / 第 241 轮 / Round 239 · CI 七笔读数交账：modechip 悬停那格换成两态变化尺，sources 格加浅历史闸门）
 
 - `UICaptureHarness` 新增 `bandChanged(idle:lit:…:delta:)`：数「两态之间变了多少颗」连同矩形自己的像素总数。`testModeChipHoverFillIsVisibleOnItsOwnSurface` 的「众数颗数 > 400」换成四条 —— 变化 > 100 颗、占比 ≥ 0.10、分母 > 100 颗、同一帧自己必须 0 颗。成因：runner 与本机对同一颗夹具读出 229 / 1281 颗而比值同为 1.36，绝对颗数量的是那台机器底是否平涂（D-228 / 277）。

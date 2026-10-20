@@ -29,14 +29,30 @@ from PIL import Image, ImageChops
 DELTA = 4          # 逐通道差大于该值才算"这个像素变了"（与 frame_audit 同一门槛）
 MIN_CHANGED = 50   # 正对照至少要看到这么多变化像素，否则算"尺读不到变化"
 
-
+# ── 口径对账（R243 / D-229）─────────────────────────────────────────────────
+# 仓库里的亮/暗地板（1.20 / 1.10）是 **WCAG 线性口径**：`UICaptureHarness.contrastRatio` 对每个
+# 通道做 `c<=0.03928 ? c/12.92 : ((c+0.055)/1.055)**2.4` 再加 0.05 取比值。本尺原来的 `_ratio`
+# 走的是**码值口径**（c/255 直接加 0.05）。两者在同一对像素上给的数不同：白底上 alpha=0.085 的
+# 悬停层，码值口径读 1.09、WCAG 口径读 1.22 —— 拿 1.09 去比 1.20 那条地板会**造出一个假缺陷**
+# （R240/D-225 拦下过一次改档，这次是同一个坑的第二种形状：不是估计量不同，是线性化不同）。
+# 所以这把尺现在把两个口径一起交出来，谁也不许冒充谁，也不许拿一个去比另一个的地板。
 def _lum(p):
     return (p / 255.0)
+
+
+def _wcag_lum(p):
+    c = p / 255.0
+    return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
 
 
 def _ratio(a, b):
     hi, lo = (max(a, b), min(a, b))
     return (_lum(hi) + 0.05) / (_lum(lo) + 0.05)
+
+
+def _ratio_wcag(a, b):
+    hi, lo = (max(a, b), min(a, b))
+    return (_wcag_lum(hi) + 0.05) / (_wcag_lum(lo) + 0.05)
 
 
 def _open(path):
@@ -66,9 +82,11 @@ def measure(dirpath, a_name, b_name):
         data = list(im.getdata())
         means.append(sum(sum(p) for p in data) / (3.0 * len(data)))
     per = [_ratio(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in changed]
+    per_wcag = [_ratio_wcag(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in changed]
     return {'changed': len(changed), 'share': 100.0 * len(changed) / total,
             'band_mean': round(_ratio(means[0], means[1]), 3),
-            'per_pixel': round(statistics.median(per), 3), 'bbox': bbox}
+            'per_pixel': round(statistics.median(per), 3),
+            'per_pixel_wcag': round(statistics.median(per_wcag), 3), 'bbox': bbox}
 
 
 def find_pairs(dirpath):
@@ -115,8 +133,11 @@ def main():
             print('HOVER_DIFF 缺帧/尺寸不符 %s ↔ %s' % (hover, idle))
             rc = 1
             continue
-        print('HOVER_DIFF %s 对=%s↔%s 带=%s 变化=%.1f%% 带内均值=%s 变化像素逐点中位=%s' % (
-            app, hover, idle, m['bbox'], m['share'], m['band_mean'], m['per_pixel']))
+        print('HOVER_DIFF %s 对=%s↔%s 带=%s 变化=%.1f%% 带内均值(码值)=%s 变化像素逐点中位(码值)=%s '
+              '变化像素逐点中位(WCAG口径=%s，仓库的 1.20/1.10 地板是这个口径) '
+              '⇒ 只有最后一列可以拿去和地板比' % (
+                  app, hover, idle, m['bbox'], m['share'], m['band_mean'],
+                  m['per_pixel'], m['per_pixel_wcag']))
     neg = measure(shots, pairs[0][1], pairs[0][1])
     if neg is None or neg['changed'] != 0:
         print('HOVER_DIFF_NEG_CONTROL=BAD 帧↔自身应当 0 个变化像素，读到 %s ⇒ 尺坏了，上面的数一律不算' % (
