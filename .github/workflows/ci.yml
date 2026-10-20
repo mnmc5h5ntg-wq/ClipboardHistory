@@ -21,10 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # R242 / BACKLOG 278：默认 fetch-depth=1 会让边界提交的 diff 对着空树，于是
+          # R246 / BACKLOG 278 结案：runner 现读 `SOURCES_CELL_HISTORY 浅=True 对照数=3 处置=skip`（run 39394134380）
+          # ⇒ R242 的 fetch-depth: 50 没解除浅克隆（actions/checkout 仍然落 .git/shallow），闸门按同一条件恒 skip。
+          # 改成 0（完整历史）让那一格在 runner 上真的有对象可判；代价是 clone 变慢，不是判据变松。
+          # 原 R242 的理由保留：默认 fetch-depth=1 会让边界提交的 diff 对着空树，于是
           # 「最近哪一笔动过 Sources/」在 runner 上把 HEAD 读成答案（本机全历史绿）——
           # run 39354504524 的 STEP[9] 唯一那朵红就是这个成因。给 50 笔，够 -3 的回看。
-          fetch-depth: 50
+          fetch-depth: 0
 
       - name: Toolchain
         run: |
@@ -397,10 +400,18 @@ jobs:
           if [ "$n_png" -eq 0 ]; then
             echo "HOVER_DIFF_NOT_RUN=1 帧目录里没有 png ⇒ 这一格在 runner 上没对象（环境缺席，不是产品结论）"
           else
-            CTL=$(ls /tmp/shots-ci/*.png | sed 's#.*/##; s#\.png$##' \
-                  | grep -E 'modechip-hover-(idle|lit)' | sort | paste -sd, -)
-            echo "HOVER_DIFF_CONTROL=$CTL"
-            if [ "$(printf '%s' "$CTL" | tr ',' '\n' | wc -l | tr -d ' ')" -ne 2 ]; then
+            # R246 / 274 的 runner 半：run 39394134380 现读 `HOVER_DIFF_CONTROL=` 给了 4 个名字
+            # ⇒ 上一版的 grep 同时吃掉 dark 与 light 两颗 idle、两颗 lit，count -ne 2 当场把这一步响成
+            #    HOVER_DIFF_CONTROL_INCOMPLETE=1。这不是产品缺陷，是接线按"名字里含 idle 或 lit"配对，
+            #    而帧名的身份是 (状态 × 色档) 两维。现在按档各取一颗，两维都对齐才叫一对。
+            HB=$(ls /tmp/shots-ci/*.png | sed 's#.*/##; s#\.png$##')
+            IDLE=$(printf '%s\n' "$HB" | grep -E '^modechip-hover-idle-200x60-dark$' | head -1)
+            LIT=$(printf '%s\n' "$HB" | grep -E '^modechip-hover-lit-200x60-dark$' | head -1)
+            CTL="$IDLE,$LIT"
+            echo "HOVER_DIFF_CONTROL=$CTL idle_found=${IDLE:-无} lit_found=${LIT:-无}"
+            # 空 IDLE + 非空 LIT 也会数出两颗 ⇒ 按"名字里含 idle 或 lit"配对那版的同一个毛病（数量对得上、身份不对）。
+            # 所以判据是两颗**都非空**，不是"逗号切出两段"。
+            if [ -z "$IDLE" ] || [ -z "$LIT" ]; then
               echo "HOVER_DIFF_CONTROL_INCOMPLETE=1 有 $n_png 张帧却凑不出 idle+lit 两颗 ⇒ 接线/命名漂了，这一步要响"
               exit 1
             fi

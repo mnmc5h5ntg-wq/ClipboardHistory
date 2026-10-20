@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R246 / 第 245 轮 / Round 243 · 两处绝对颗数地板换成两态差尺；CI 的正对照配对与浅历史通道各修一处）
+
+- `UICaptureHarness.swift`：新增类内 `rawFrame(_:_:)`（渲染到临时目录并读回缓冲区，判定仍只在 `bandChanged` 一处）；`testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces` 与 `testSettingsRowHoverFillIsVisibleOnItsOwnSurface` 里的 `pixels > 400` 换成「负对照必须 0 颗 + 分母 > 100 颗 + 比值 ≥ 档位下界」，并印 `HOVER_TWO_STATE_277 … 两态变化/占比/负对照/旧读数`。本机 `Executed 2 tests, with 0 failures`。
+- `.github/workflows/ci.yml`：① 正对照改为按色档各取一颗（`modechip-hover-idle-200x60-dark` ↔ `modechip-hover-lit-200x60-dark`），闸门从「逗号切出两段」换成「两颗都非空」（run 39394134380 现读 `HOVER_DIFF_CONTROL=` 给了四个名字 ⇒ `HOVER_DIFF_CONTROL_INCOMPLETE=1`）；② `fetch-depth: 50 → 0`（同一跑现读 `SOURCES_CELL_HISTORY 浅=True … 处置=skip` ⇒ 有限 depth 仍落 `.git/shallow`，闸门恒 skip）。
+- D-232：换尺那一跑只印读数、不同时定新地板 —— 本机六行占比跨 0.709~1.000，几何不同就不该共用一根线；runner 数待读（新开 287）。
+- 台账生成器这一支不用百分号格式化（R245 两次 arity 崩盘的直接后果），数字全部硬写并断言与日志现读一致。
+- 产品侧 0 文件；眼睛腿 NOT-RUN；变异腿 NOT-RUN（本轮三根新牙没有刀，记为弱并拆给 287）；全量 Swift 卷与换装本机未跑。
+
 ### Changed（R245 / 第 244 轮 / Round 242 · 变异腿换到 shell 执行器：六把刀第一次全 CAUGHT）
 
 - 新执行器（`.scratch/motion-audit-2/`）：`arm_patch.py` 做插拔（needle 命中恰好一次才写、`restore` 后 `verify` 逐字节复核），`arms_r245/manifest.tsv` 一行一把刀（臂内容存成 `.old/.new` 文件而不是 python 字符串），`mutate_r245.sh` 在 shell 里跑判据（`swift test --filter` / `python3 -m unittest -v`），按 kind 各建一次基线、基线不绿整表 NOT_RUN，红名按空格切并与「期望那一格」对账。

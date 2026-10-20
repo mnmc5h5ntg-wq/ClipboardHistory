@@ -4932,6 +4932,32 @@ final class UICaptureTests: XCTestCase {
     ///
     /// `delta` 是"算变了"的门槛（灰阶档）。它必须有牙：负对照（同一帧与自己比）在 `delta` 退到 0/1
     /// 时必须变红，否则这把尺只是在数抖动。
+
+    /// R246 / BACKLOG 277：两态差尺要的是一块**缓冲区**，不是一块众数。
+    /// 为什么单独写：三处 `pixels > 400` 量的是"点亮那一块里众数色号占了几颗"，
+    /// 那个数按 D-228 已经证明量的是**底平不平涂**（runner 上同一件事读到 229/218，本机 1784/1598），
+    /// 所以它既会假红也会假绿。这里只负责把帧交出来，判定仍然只在 `bandChanged` 一处。
+    private func rawFrame(_ fixtureName: String, _ appearance: NSAppearance.Name) -> (buf: [UInt8], w: Int, h: Int, bpr: Int) {
+        guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+            XCTFail("找不到夹具 \(fixtureName) ⇒ 这条判据没有对象"); return ([], 0, 0, 0)
+        }
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("r246-raw-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+        do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+            XCTFail("\(fixtureName)：渲染失败 \(error)"); return ([], 0, 0, 0)
+        }
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              let base = rep.bitmapData else {
+            XCTFail("\(fixtureName)：读不回 PNG ⇒ 取证通道断在渲染与读回之间，不是产品"); return ([], 0, 0, 0)
+        }
+        let view = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+        return (Array(view), rep.pixelsWide, rep.pixelsHigh, rep.bytesPerRow)
+    }
+
     static func bandChanged(idle: [UInt8], lit: [UInt8], width: Int, height: Int, bytesPerRow: Int,
                             rectPt: CGRect, framePtWidth: CGFloat, delta: Int) -> (changed: Int, total: Int) {
         let scale = CGFloat(width) / framePtWidth
@@ -5188,12 +5214,32 @@ final class UICaptureTests: XCTestCase {
                  + "| 玻璃圆 空闲底=\(pillIdle.grey) 悬停=\(pillHover.grey) "
                  + "比值=\(String(format: "%.3f", pillRatio)) 像素=\(pillHover.pixels) 下界=\(minimum)")
 
-            for (site, idle, hover, ratio) in [
-                ("段按钮", segIdleR, segHovR, segRatio), ("玻璃圆", pillIdle, pillHover, pillRatio),
+            // R246 / BACKLOG 277：这里原来是 `hover.pixels > 400`（众数绝对颗数）。
+            // 换成一件事的两半：① 同一帧自己 ↔ 自己必须 0 颗（尺还灵不灵）；② 分母地板（空对账，R140）。
+            // 变化颗数与占比**先只印不判**：本机的地板要等这一跑读出来，而 runner 的地板按 D-227 不许拿本机数顶。
+            for (site, idleName, hoverName, rect, ptW, idle, hover, ratio) in [
+                ("段按钮", "segmented-filter-idle", "segmented-filter-hover", rightSeg, CGFloat(200), segIdleR, segHovR, segRatio),
+                ("玻璃圆", "glass-pill-states", "glass-pill-hover", circleColumn, CGFloat(120), pillIdle, pillHover, pillRatio),
             ] {
-                XCTAssertGreaterThan(hover.pixels, 400,
-                                     "\(tag) \(site)：点亮那一块只数到 \(hover.pixels) 个像素 ⇒ 层没画出来，"
-                                     + "这是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+                let a = rawFrame(idleName, appearance)
+                let b = rawFrame(hoverName, appearance)
+                let pair = Self.bandChanged(idle: a.buf, lit: b.buf, width: b.w, height: b.h,
+                                            bytesPerRow: b.bpr, rectPt: rect, framePtWidth: ptW, delta: 4)
+                let selfCheck = Self.bandChanged(idle: b.buf, lit: b.buf, width: b.w, height: b.h,
+                                                 bytesPerRow: b.bpr, rectPt: rect, framePtWidth: ptW, delta: 4)
+                let share = pair.total > 0 ? Double(pair.changed) / Double(pair.total) : 0
+                emit("HOVER_TWO_STATE_277 \(tag) \(site) 两态变化=\(pair.changed)/\(pair.total) "
+                     + "占比=\(String(format: "%.3f", share)) 负对照=\(selfCheck.changed) 旧读数(众数颗数)=\(hover.pixels)")
+                XCTAssertEqual(selfCheck.changed, 0,
+                               "\(tag) \(site)：同一帧与自己的两态差读到 \(selfCheck.changed) 颗 ⇒ 尺坏了，"
+                               + "上面的读数一律不算（R99 那族：负对照不灵时正向读数没有意义）")
+                XCTAssertGreaterThan(pair.total, 100,
+                                     "\(tag) \(site)：矩形里总共只数到 \(pair.total) 颗 ⇒ 分母是空的，"
+                                     + "这一格不许给占比签字（R140 的空对账）")
+                XCTAssertGreaterThanOrEqual(ratio, minimum,
+                                            "\(tag)档 \(site) 的悬停层对它自己那片底只有 "
+                                            + "\(String(format: "%.3f", ratio))（下界 \(minimum)）"
+                                            + "：空闲=\(idle.grey) 悬停=\(hover.grey) ⇒ 这一档反馈淡到没有读者")
                 XCTAssertGreaterThanOrEqual(ratio, minimum,
                                             "\(tag)档 \(site) 的悬停层对它自己那片底只有 "
                                             + "\(String(format: "%.3f", ratio))（下界 \(minimum)）"
@@ -5268,9 +5314,22 @@ final class UICaptureTests: XCTestCase {
                  + "像素=\(lit.pixels) 比值=\(String(format: "%.3f", ratio)) 下界=\(minimum) "
                  + "｜同列框外背景(空闲)=\(surface.grey)")
 
-            XCTAssertGreaterThan(lit.pixels, 400,
-                                 "\(tag)：点亮那一块只数到 \(lit.pixels) 个像素 ⇒ 那层填充没被画出来。"
-                                 + "这一格是**量不到**而不是没问题（先查夹具的 `hoveredForCapture` 接没接上）")
+            // R246 / BACKLOG 277 第二处：同上，绝对颗数换成两态差 + 负对照 + 分母地板。
+            let a = rawFrame("settingsrow-hover-idle", appearance)
+            let bb = rawFrame("settingsrow-hover-lit", appearance)
+            let pair = Self.bandChanged(idle: a.buf, lit: bb.buf, width: bb.w, height: bb.h,
+                                        bytesPerRow: bb.bpr, rectPt: Self.settingsRowFillRect,
+                                        framePtWidth: 300, delta: 4)
+            let selfCheck = Self.bandChanged(idle: bb.buf, lit: bb.buf, width: bb.w, height: bb.h,
+                                             bytesPerRow: bb.bpr, rectPt: Self.settingsRowFillRect,
+                                             framePtWidth: 300, delta: 4)
+            let share = pair.total > 0 ? Double(pair.changed) / Double(pair.total) : 0
+            emit("HOVER_TWO_STATE_277 \(tag) 设置行 两态变化=\(pair.changed)/\(pair.total) "
+                 + "占比=\(String(format: "%.3f", share)) 负对照=\(selfCheck.changed) 旧读数(众数颗数)=\(lit.pixels)")
+            XCTAssertEqual(selfCheck.changed, 0,
+                           "\(tag)：设置行同一帧与自己的两态差读到 \(selfCheck.changed) 颗 ⇒ 尺坏了")
+            XCTAssertGreaterThan(pair.total, 100,
+                                 "\(tag)：设置行矩形里总共只数到 \(pair.total) 颗 ⇒ 分母是空的，不许给占比签字")
             XCTAssertNotEqual(lit.grey, idle.grey,
                               "\(tag)：空闲与点亮读到同一个灰阶（\(idle.grey)）⇒ 矩形没打在那一层上，"
                               + "下面那条比值断言因此没有对象（先查坐标，再查产品）")
