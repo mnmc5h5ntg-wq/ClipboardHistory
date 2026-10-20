@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added（R258 / 第 257 轮 / Round 255 · 按下那一档第一次可拍、可量、可被刀红回来）
+
+产品侧一颗取证键 `EnvironmentValues.pressedForCapture`（`Views/PressableStyle.swift`）：`PressedLabel` 的缩放与底色两半都汇到同一个绘制分支，真实 `configuration.isPressed` 那条路一字未动；产品源码写这颗键 = 红（扫描前剥行注释）。
+新夹具 `row-favorite-press-60x56-{dark,light}` ⇒ 帧基线 168 → 170（同一笔 update）。新判据 `testPressRungIsOrderedAboveTheHoverRung`：亮档 229→223（比值 1.260→1.333，台阶差 6 灰阶）、暗档 45→53（1.211→1.359，差 8），外加令牌↔像素恒等式（偏差 0.5 / 0.5，容差 2）与漏电对照。
+两把刀：M815（`VisualFillLift.pressed` 0.03→0.015）令牌轴 CAUGHT、M816（→0.0）产物轴 CAUGHT；M815 顺带读出"像素轴对抬量偏小免疫"这条分工（D-244）。看图 5 张：R256 改前/改后同一位肉眼分不出 ⇒ 那一笔的依据是算术不是画面。
+现读：build 告警 0、全量卷 916 / skip 44 / failures 0、捕获卷 81 格 / skip 4 / failures 0、基线 compare changed=1 missing=0、dmg=ok、换装 1.4.8。CI：62520ec → 39496791768 / completed / success；2b17297 → 39497014625 / completed / success。
+302 结案；新开 305（台阶那把尺与它自己的地板）、306（三把重捕型刀进预检名册）；301/299 仍开。
+
+
 ### Fixed（R257 / 第 256 轮 / Round 254 · 修回能红的形状：判据从「编译不过」恢复成「跑得出读数」）
 
 R256 把一条失败消息写成两个相邻 Swift 字面量 ⇒ ControlHoverLadderTests.swift:89:134 error: expected ',' separator，于是两整轮的「全量卷」其实是 0 条断言跑过。本轮把消息压成一行、理由搬进注释，并同步把注释里过期的亮档 0.085 改判成 0.10。
