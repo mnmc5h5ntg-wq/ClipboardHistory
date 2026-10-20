@@ -15,6 +15,7 @@
 
 **下一轮（R239 / 第 238 轮 / Round 236）的靶**
 ⓪ **本笔与上一笔的 CI 都还没读**：`RUN=39347522293 sha=7b7495d status=in_progress conclusion=`（空）。
+- **R238 补记（同一轮第二次落盘）**：`RUN=39350006461 sha=3e90ab4 status=in_progress conclusion=`（空 ⇒ 只能报未读）。270 结案（`ITEM` 两种形状 + 地板 150，该卷 16→20 格）、新开 271（上一笔 subject 手抄错轮次标签 ⇒ 从台账派生）。下一轮 ⓪ 读的是**这两笔**的 run，另要把 M795/M796 登记成变异臂；编译没恢复之前 STEP[15]/[17]/[18]/[19] 那几朵红一律不当产品读数。
    先 `python3 scripts/ci_read.py latest` 现拿 run↔commit 成对（别轮询），要验三件事：STEP[4] 有没有转绿、
    `SEAM_READER_ISOLATION` 在 runner 上打的那一行、以及**电池那一卷认不认粗体定义行**（250 的 runner 半）。
    编译没恢复之前，STEP[15]/[17]/[18]/[19] 那几朵红一律不许当成产品读数。

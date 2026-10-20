@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 ### 判据与尺：台账编号守卫的「定义行」从只认标题扩成「标题 ∪ 粗体定义行」（R238 / U-765…U-768 / D-223 · 产品 0 文件，画面一字未动）
+- 判据：`DuplicateIdTests` 的 BACKLOG 条目正则从只认 `^NNN. ` 扩成「标题形 ∪ 粗体形」，地板 40→150 改成量出来的绝对锚点，
+  两形各配造重复正对照（R238 补记 / U-769…U-770 / D-224 / BACKLOG 270 结案、新开 271 · 产品 0 文件，画面一字未动）。
 
 - `scripts/tests/test_ledger_ids.py` 过去只把二/三级标题当决定正文，而 R200 以后的决定按台账既有形状写成粗体
   ⇒ 最近 28 条决定对"被引用却没正文"这条守卫**完全隐形**（标题形最大只到 D-194，粗体形到 D-222；BACKLOG 250，R224 曾红过一次）。

@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 237 轮（R238 / Round 235 · 2026-10-20）：一条绿了若干轮的守卫其实看不见 28 条决定 —— 把「定义行」从只认标题扩成「标题 ∪ 粗体」，并让两半各自可被证伪（U-765…U-768）
+## 第 237 轮（R238 / Round 235 · 2026-10-20）：一条绿了若干轮的守卫其实看不见 28 条决定 —— 把「定义行」从只认标题扩成「标题 ∪ 粗体」，并让两半各自可被证伪（U-765…U-770）
 
 - **U-765：现场数字（本轮在真台账上实测）。** `AGENT_DECISIONS.md` 里"决定正文"有两种形状：二/三级标题那种 201 条、
   最大只到 **D-194**；粗体 `**D-xxx（RNNN）：…**` 那种 **28** 条、最大到 **D-222**；两集**零重叠**，并集 D-000…D-222 **无空洞**。
@@ -395,6 +395,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
   ④ 手工跑 `mutate_needle_precheck.py` 读到 `tables=68 covered=53 arms=191 bad=5`（含 `mutate_r229` 的 M768 命中=0），
   而同一天本机电池 423 条全绿 ⇒ 新开 **269**：这一格是**只印不拦**、还是根本不在电池里，两种成因要先分辨。
 
+- **U-769：补记读数（BACKLOG 270 的现场数字与结案形状）。** 同一条「按形状认东西」的病在同一个文件里重演：
+  `ITEM = ^(\d{3})\. ` 在 `AGENT_BACKLOG.md` 上数到 **72** 条（最大 186），而写成 `**NNN. ` 的那一整代条目
+  ——**90** 条、最大 269 —— 对它完全隐形，于是「编号唯一」这条守卫**声称的覆盖面比实际的宽**。
+  复现：`python3 -m unittest scripts.tests.test_ledger_ids -v`（**20** 格，16→20）。
+  处置照 D-223：一支正则两种形状 + 新形状两态证人 + 老形状子集证人 + 两形各自造重复 + 地板 40→**150**（绝对锚点，
+  退回老字面只剩 72 条就必红）。一次性反证：`FAILED (failures=4)`、`RESTORE_CLEAN=yes`；**这四朵红未登记成变异臂**。
+- **U-770：我这一轮自己印错了一个数，且错在「数红名」那把尺上。** 反证脚本按 `^(test_\w+)` 抓 stderr 报「红名=20」，
+  而那一次真实只有 4 朵（结论行 `FAILED (failures=4)`）—— `-v` 的清单里连 `... ok` 的行也以 `test_` 开头。
+  ⇒ 红名要按 `^FAIL: (test_\w+)` 抓（R102「红掉的测试名要按空格切」、R149「按步骤名过滤」同一族：
+  **计数尺的行首要按输出实际形状写，不能按"看起来像测试名"写**）。这条没做成守卫，只记在这里，
+  因为下一轮的 M795/796 要用它挑红名；写台账时把它当已知坑，不当结论。
 ## 第 236 轮（R237 / Round 234 · 2026-10-20）：本机绿的边界 —— runner 的 STEP[4] 把「读缝的格子」判成编译期 error，本机不报，于是补一把**与 SDK 无关**的静态尺（U-761…U-764）
 
 - **U-761：`Build (must be warning-free)` 在 runner 上是 error，在本机连警告都没有。** run `39345462910`（= 台账半 `7713d18`，产品半 `415abf3` 同一次 push 只出这一跑）STEP[4] 正文只有一条不同的诊断，逐字：`ClipboardHistory/Tests/ClipboardHistoryAppTests/MenuBarSwiftUIDismissRowInkTests.swift:80:57: error: main actor-isolated static property 'dismissRowInk' can not be referenced from a nonisolated context`，配套 `note: add '@MainActor' to make instance method 'testSeamInkClearsTheTextFloorInBothStates()' part of global actor 'MainActor'`，收尾 `##[error]Process completed with exit code 1.`。同一支文件本机 `swift build --build-tests` 里这一条**不存在**（本轮重跑：`BUILD_WARN=0`、全量卷 全量卷 Executed 915 tests / 44 skipped / 0 failures（Test Suite 'All tests' passed，见 /tmp/r237_full.log）、判据卷 5 格 0 失败）。成因按「缺席解释逐一列全」判：① 我写错了？被 runner 自己的 note 否掉 —— 它说的是**推断出来的**隔离，不是我引用了不存在的东西；② 两套工具链对 conform `View` 的类型成员是否整体推断成 main-actor 不一致 ⇒ 与「本机 0 error」共存且唯一解释得通。修法取最小的一处：给那一格加 `@MainActor`（**产品 0 文件**，画面一字未动）。这条推断本机复现不出来：本机只有一套 SDK。
