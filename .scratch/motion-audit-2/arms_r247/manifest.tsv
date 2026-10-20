@@ -1,0 +1,3 @@
+M808	python	.github/workflows/ci.yml	.scratch/motion-audit-2/arms_r247/M808.old	.scratch/motion-audit-2/arms_r247/M808.new	test_a_complete_pair_exits_zero_and_names_exactly_two_frames	把闸门退回「逗号切出两段」⇒ 好接线也被判红（wc -l 数换行数：a,b 只得 1）⇒ 期望证人换成"完整一对必须绿"那一格（本轮现读 WRONG_CELL 后改的登记，不是事前猜的）
+M809	python	.github/workflows/ci.yml	.scratch/motion-audit-2/arms_r247/M809.old	.scratch/motion-audit-2/arms_r247/M809.new	test_a_complete_pair_exits_zero_and_names_exactly_two_frames	把正对照的选择退回「名字里含 idle 或 lit」⇒ 会跨色档配对
+M810	python	.github/workflows/ci.yml	.scratch/motion-audit-2/arms_r247/M810.old	.scratch/motion-audit-2/arms_r247/M810.new	test_an_empty_frames_dir_is_a_named_absence_and_stays_green	把「环境缺席 ⇒ 点名并绿」改成点名并红 ⇒ 空帧目录那一格必须翻

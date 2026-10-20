@@ -1,0 +1,2 @@
+            echo "HOVER_DIFF_NOT_RUN=1 帧目录里没有 png ⇒ 这一格在 runner 上没对象（环境缺席，不是产品结论）"
+            exit 1

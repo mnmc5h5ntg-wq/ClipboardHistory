@@ -1,0 +1,1 @@
+            if [ "$(printf '%s' "$CTL" | tr ',' '\n' | wc -l | tr -d ' ')" -ne 2 ]; then

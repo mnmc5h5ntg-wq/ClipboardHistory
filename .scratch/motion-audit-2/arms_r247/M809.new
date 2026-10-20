@@ -1,0 +1,3 @@
+            IDLE=$(printf '%s\n' "$HB" | grep -E 'modechip-hover-(idle|lit)' | head -1)
+            LIT=$(printf '%s\n' "$HB" | grep -E 'modechip-hover-(idle|lit)' | tail -1)
+            CTL="$IDLE,$LIT"

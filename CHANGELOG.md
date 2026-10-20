@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R247 / 第 246 轮 / Round 244 · CI 抓帧那一步的正文进判据卷：六格 + 三把刀，274 结案）
+
+- `scripts/tests/test_ci_hover_wiring.py`（6 格，已进电池）：从 `.github/workflows/ci.yml` 抽出抓帧那一步的 bash、dedent、`bash -n`，再对着合成帧目录真跑。四种处置各有证人：完整一对 ⇒ 退出 0 且正对照恰好那两颗（另一色档那颗故意在场）；缺 idle / 缺 lit ⇒ 点名 `HOVER_DIFF_CONTROL_INCOMPLETE=1` 且非 0；整目录无 png ⇒ 点名 `HOVER_DIFF_NOT_RUN=1` 而退出 0。另两格管抽取本身（语法、起点唯一）。
+- 按 D-233 收字节：这一步的 stdout 漏非 UTF-8 字节（实测 `0xbc`），判据改成 `stdout=PIPE` + `errors=replace`；成因未归，新开 289。
+- 新执行器形状：`mutate_r247.sh` 的 kind 与 rel 从 `arms_r247/manifest.tsv` 现取（只有 python 臂的表不再白跑 swift 基线）；`mutate_r247.py` 是影子登记表，已进预检名册。三把刀 `R247_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`。
+- M808 的期望证人按实改登记（第一跑是 WRONG_CELL）：旧"逗号切两段"闸门在好接线下也恒红 —— `wc -l` 数换行数，`a,b` 只得 1。这条读数把 274 的修法从"比旧写法好"升级成"旧写法本来就是错的"。
+- 产品侧 0 文件；眼睛腿与 Swift 腿 NOT-RUN（一行 Swift 都没改）。
+
 ### Changed（R246 / 第 245 轮 / Round 243 · 两处绝对颗数地板换成两态差尺；CI 的正对照配对与浅历史通道各修一处）
 
 - `UICaptureHarness.swift`：新增类内 `rawFrame(_:_:)`（渲染到临时目录并读回缓冲区，判定仍只在 `bandChanged` 一处）；`testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces` 与 `testSettingsRowHoverFillIsVisibleOnItsOwnSurface` 里的 `pixels > 400` 换成「负对照必须 0 颗 + 分母 > 100 颗 + 比值 ≥ 档位下界」，并印 `HOVER_TWO_STATE_277 … 两态变化/占比/负对照/旧读数`。本机 `Executed 2 tests, with 0 failures`。
