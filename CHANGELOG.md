@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R244 / 第 243 轮 / Round 241 · 地板判定进尺：只对 WCAG 列生效，底不平涂降级成只报读数）
+
+- `scripts/hover_two_state_diff.py` 新增 `FLOOR_LIGHT=1.20 / FLOOR_DARK=1.10 / FLAT_SHARE=0.70`：每对给出 `底平涂=… 判定=…`，低于地板时打 `HOVER_DIFF_FLOOR_RED=1` 并 exit 1；底不平涂时**不判**但照打读数，另印 `HOVER_DIFF_BASE … 底众数占比=`。平涂线由真帧分布推（六对 0.827~0.962、棋盘对照 0.500），不是拍的。
+- 判据卷加三格（共 20 格）：`FloorVerdictTests` 两格（平涂底上弱悬停必须被点名并 exit 1；同一块弱填充放棋盘底上必须只报读数、不红），`RealFrameFloorTests` 一格 standing 判据（真帧每一对都必须"过线"或被具名降级，否则红；无帧通道时是有名字的 skip）。
+- 一条自坏明记：底占比第一版算在点亮帧上（`measure(a=hover, b=idle)` 里我用 `pa`），被合成棋盘对照当场红出来；修完重测的分布与旧数字都留在注释里（D-230）。
+- 280 排掉三条嫌疑（符号链接路径 / stdin / 登录 shell 环境变量），失败确定性重放 ⇒ 新开 283：变异表改 bash 驱动，破了再回头补成因。本轮变异腿、眼睛腿、Swift 腿均 NOT-RUN。
+
 ### Changed（R243 / 第 242 轮 / Round 240 · 两态差尺加 WCAG 口径：把「亮档 1.09 掉在 1.20 之下」这条候选缺陷判成尺的假话）
 
 - `scripts/hover_two_state_diff.py` 现在同时给**码值口径**与 **WCAG 线性口径**（`_wcag_lum` 与 `UICaptureHarness.contrastRatio` 同一算式），读数行尾明写「只有最后一列可以拿去和地板比」。真帧现读：玻璃圆钮 亮 1.220 / 暗 1.220、收藏星 亮 1.225 / 暗 1.211、段按钮 亮 1.224 / 暗 1.239、正对照 modechip 亮 1.371 ⇒ 四处全部过仓库自己的 1.20 地板，R240 挂着的"亮档偏淡"候选缺陷**撤销**，产品不改（D-229）。

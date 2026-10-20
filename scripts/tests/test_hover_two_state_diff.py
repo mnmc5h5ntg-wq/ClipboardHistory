@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -86,8 +87,8 @@ class RulerTestCase(unittest.TestCase):
         self.dir = tempfile.mkdtemp(prefix="hover_ruler_")
         self.addCleanup(shutil.rmtree, self.dir, True)
 
-    def add(self, name, size=(10, 10), spots=()):
-        write_frame(self.dir, name, size, spots)
+    def add(self, name, size=(10, 10), spots=(), fill=BG):
+        write_frame(self.dir, name, size, spots, fill)
 
     def clean_pair(self, size=(20, 20)):
         """一整块 10×10 亮档 ⇒ 100 个变化像素（够正对照的 MIN_CHANGED=50）。"""
@@ -269,3 +270,77 @@ class InstrumentContractTests(RulerTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+@unittest.skipIf(NO_PIL_OR_RULER, u"缺 PIL 或读不到尺：这两格要能被点名，不许静默通过")
+class FloorVerdictTests(RulerTestCase):
+    """地板判定必须只看 WCAG 那一列，且**底不平涂时不许判**（R244 / D-229 / BACKLOG 282）。"""
+
+    def test_a_weak_light_hover_is_named_by_the_floor_verdict(self):
+        """平涂白底上只抬到 245（alpha≈0.04）⇒ WCAG 1.090 < 1.20 ⇒ 必须点名并 exit 1。
+
+        期望值现算（不心算）：L(245)=((245/255+0.055)/1.055)^2.4=0.91310 ⇒ 1.05/(0.91310+0.05)=1.09024。
+        """
+        self.add(u"pill-hover-20x20-light", (20, 20), block(0, 0, 10, 10, 245), WHITE)
+        self.add(u"pill-20x20-light", (20, 20), (), WHITE)
+        m = _ruler.measure(self.dir, u"pill-hover-20x20-light", u"pill-20x20-light")
+        self.assertTrue(m[u"idle_flat"], u"整块平涂白底 ⇒ 这一格的对象是「底平」")
+        self.assertEqual(1.090, m[u"per_pixel_wcag"], u"WCAG 现算 1.09024 ⇒ 四舍五入 1.090")
+        self.assertEqual(u"低于地板", m[u"verdict"])
+        rc, out = self.cli([u"--shots", self.dir,
+                            u"--control", u"pill-hover-20x20-light,pill-20x20-light"])
+        self.assertEqual(1, rc, u"平涂底上弱悬停被判低于地板却不 exit 1 ⇒ 地板只是装饰")
+        self.assertIn(u"HOVER_DIFF_FLOOR_RED=1", out)
+
+    def test_a_nonflat_base_is_reported_as_a_reading_not_a_verdict(self):
+        """同一块弱填充放在**抖动底**上（250/255 棋盘，众数只占一半）⇒ 只报读数、不判、不红。
+
+        这一格钉的是 R242 那台 runner 的形状：底不是平涂时「对底比值」没有单一的底可对，
+        硬判就会造出跨机假红；但也不许因此把整行吞掉 —— 读数照打。
+        """
+        dither = [(x, y, WHITE) for y in range(10) for x in range(10) if (x + y) % 2 == 0]
+        self.add(u"pill-hover-20x20-light", (20, 20), block(0, 0, 10, 10, 245), 250)
+        self.add(u"pill-20x20-light", (20, 20), dither, 250)
+        m = _ruler.measure(self.dir, u"pill-hover-20x20-light", u"pill-20x20-light")
+        self.assertFalse(m[u"idle_flat"], u"棋盘底众数只占 50%% ⇒ 不该被当成平涂")
+        self.assertLess(m[u"per_pixel_wcag"], 1.20,
+                        u"这一格要的就是「数值上确实低于地板」—— 不然下一句断言没有对象")
+        self.assertEqual(u"只报读数（底不平涂）", m[u"verdict"])
+        rc, out = self.cli([u"--shots", self.dir,
+                            u"--control", u"pill-hover-20x20-light,pill-20x20-light"])
+        self.assertEqual(0, rc, u"底不平涂的那一格不许变成红（但读数必须照打）")
+        self.assertNotIn(u"HOVER_DIFF_FLOOR_RED", out)
+        self.assertIn(u"判定=只报读数", out)
+
+
+@unittest.skipIf(NO_PIL_OR_RULER, u"缺 PIL 或读不到尺：这一格要能被点名")
+class RealFrameFloorTests(RulerTestCase):
+    """真帧那一格：把「亮档偏淡」这类候选缺陷变成**standing 判据**（R244 / BACKLOG 282）。
+
+    帧目录由 `CLIPBOARD_HISTORY_UI_SHOTS` 给；不在就是具名 skip（NOT-RUN），
+    不许把「没帧」读成「没问题」。正对照从帧名里现取，不写死 —— 写死的名字一漂，
+    这一格就会在没有任何产品判断的情况下绿（R102 那一族）。
+    """
+
+    def setUp(self):
+        RulerTestCase.setUp(self)          # 底座建自己的临时目录；这一格读的是真帧通道
+        self.dir = os.environ.get(u"CLIPBOARD_HISTORY_UI_SHOTS")
+        if not self.dir or not os.path.isdir(self.dir):
+            self.skipTest(u"CLIPBOARD_HISTORY_UI_SHOTS 未设或目录不在 ⇒ 真帧地板那一格 NOT-RUN（不是通过）")
+
+    def test_every_real_pair_clears_the_floor_or_is_named_nonflat(self):
+        pairs, unpaired = _ruler.find_pairs(self.dir)
+        if not pairs:
+            self.skipTest(u"目录里没有「悬停↔静置」配对 ⇒ 这一格没有对象（帧目录=%s）" % self.dir)
+        app, hover, idle = pairs[0]
+        rc, out = self.cli([u"--shots", self.dir,
+                            u"--control", u"%s,%s" % (hover, idle)])
+        rows = re.findall(r"HOVER_DIFF (\S+) 对=(\S+) .*?判定=(\S+?) ", out)
+        self.assertEqual(len(pairs), len(rows),
+                         u"配到 %d 对却只解析到 %d 行判定 ⇒ 读数行形状漂了" % (len(pairs), len(rows)))
+        bad = [(a, p, v) for a, p, v in rows if v not in (u"过线", u"只报读数（底不平涂）")]
+        print(u"HOVER_FLOOR_REAL 配对=%d 无静置态=%d 退出=%d 判定=%s" % (
+            len(pairs), len(unpaired), rc,
+            u','.join(u'%s:%s' % (p.split(u'↔')[0][:28], v) for _, p, v in rows)))
+        self.assertEqual([], bad, u"有对在 WCAG 口径下低于自己的地板")
+        self.assertEqual(0, rc, u"CLI 退出码非 0，但上面没有「低于地板」的行 ⇒ 另有闸门在红：%s" % out[-500:])
+

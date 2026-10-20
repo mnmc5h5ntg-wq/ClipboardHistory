@@ -28,6 +28,15 @@ from PIL import Image, ImageChops
 
 DELTA = 4          # 逐通道差大于该值才算"这个像素变了"（与 frame_audit 同一门槛）
 MIN_CHANGED = 50   # 正对照至少要看到这么多变化像素，否则算"尺读不到变化"
+# 仓库自己的可见性地板（`UICaptureHarness` 里 R220 骨架条带 / R225 浮层悬停 / R229 小控件三处沿用）。
+# **这两条是 WCAG 线性口径的数** —— 只有 `per_pixel_wcag` 那一列有资格和它们比（D-229）。
+FLOOR_LIGHT, FLOOR_DARK = 1.20, 1.10
+# 底"平涂"的判据：静置帧在变化带里众数占到这个比例以上，才认为那一块底是平的。
+# 为什么要有这一格：R242 在同一次 CI 里看到 runner 的 `空闲=236 点亮=204`、本机 `255→220`
+# —— runner 那片底被抖成许多小格子。底不平涂时"对底比值"没有单一的底可对，
+# 那种格子只能报读数，不能拿去判过线/不过线（否则又造一次跨机假红）。
+FLAT_SHARE = 0.70
+# 门槛是量出来的，不是拍的（R244）：本机 162 帧里六对真帧的底众数占比 = 0.962 / 0.955 / 0.931 / 0.892 / 0.828 / 0.827（真帧的底上有字形，所以到不了 1.0）；棋盘抖动对照 = 0.500；runner 那片被抖成许多小格子的底（R242：空闲=236 而本机=255）会更低。取 0.70 = 最低真帧读数（0.827）之下留 0.13 余量、又在抖动对照之上留四成空间。注：第一版这条占比算在了**点亮那帧**上（measure 的 a 是 hover、b 是 idle，我用错了 pa），于是真帧读数全被压到 0.741~0.957 且合成棋盘格被判成平涂 —— 是合成对照格把它红出来的。
 
 # ── 口径对账（R243 / D-229）─────────────────────────────────────────────────
 # 仓库里的亮/暗地板（1.20 / 1.10）是 **WCAG 线性口径**：`UICaptureHarness.contrastRatio` 对每个
@@ -83,10 +92,22 @@ def measure(dirpath, a_name, b_name):
         means.append(sum(sum(p) for p in data) / (3.0 * len(data)))
     per = [_ratio(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in changed]
     per_wcag = [_ratio_wcag(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in changed]
+    # 底平不平涂：静置帧在变化带里，众数灰阶占多少颗。不平涂 ⇒ 地板判定没有对象，只报读数。
+    # 「底」取的是**变化像素在静置帧上的那些值** —— 不是整个包围盒：
+    # 包围盒把字形与四周都算进来，那里永远不平涂（第一版就是这么把六对全判成"底不平涂"的）。
+    greys = [int(round(sum(pb[n]) / 3.0)) for n in changed]
+    mode_grey = max(set(greys), key=greys.count)
+    base_share = greys.count(mode_grey) / float(len(greys))
+    flat = base_share >= FLAT_SHARE
+    med_wcag = statistics.median(per_wcag)
+    floor = FLOOR_LIGHT if 'light' in b_name else FLOOR_DARK
+    verdict = ('只报读数（底不平涂）' if not flat
+               else ('过线' if med_wcag >= floor else '低于地板'))
     return {'changed': len(changed), 'share': 100.0 * len(changed) / total,
             'band_mean': round(_ratio(means[0], means[1]), 3),
             'per_pixel': round(statistics.median(per), 3),
-            'per_pixel_wcag': round(statistics.median(per_wcag), 3), 'bbox': bbox}
+            'per_pixel_wcag': round(med_wcag, 3), 'bbox': bbox,
+            'idle_flat': flat, 'base_share': round(base_share, 3), 'floor': floor, 'verdict': verdict}
 
 
 def find_pairs(dirpath):
@@ -134,10 +155,16 @@ def main():
             rc = 1
             continue
         print('HOVER_DIFF %s 对=%s↔%s 带=%s 变化=%.1f%% 带内均值(码值)=%s 变化像素逐点中位(码值)=%s '
-              '变化像素逐点中位(WCAG口径=%s，仓库的 1.20/1.10 地板是这个口径) '
-              '⇒ 只有最后一列可以拿去和地板比' % (
+              '变化像素逐点中位(WCAG口径=%s) 地板=%s 底平涂=%s 判定=%s '
+              '⇒ 只有 WCAG 那一列可以拿去和地板比（D-229）' % (
                   app, hover, idle, m['bbox'], m['share'], m['band_mean'],
-                  m['per_pixel'], m['per_pixel_wcag']))
+                  m['per_pixel'], m['per_pixel_wcag'], m['floor'],
+                  '是' if m['idle_flat'] else '否', m['verdict']))
+        print(u'HOVER_DIFF_BASE %s 底众数占比=%s（平涂线 %s）' % (app, m['base_share'], FLAT_SHARE))
+        if m['verdict'] == u'低于地板':
+            print('HOVER_DIFF_FLOOR_RED=1 %s 的悬停在 WCAG 口径下只有 %s（地板 %s）⇒ 这一档反馈淡到没有读者'
+                  % (hover, m['per_pixel_wcag'], m['floor']))
+            rc = 1
     neg = measure(shots, pairs[0][1], pairs[0][1])
     if neg is None or neg['changed'] != 0:
         print('HOVER_DIFF_NEG_CONTROL=BAD 帧↔自身应当 0 个变化像素，读到 %s ⇒ 尺坏了，上面的数一律不算' % (
