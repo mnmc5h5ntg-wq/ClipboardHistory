@@ -1,0 +1,2 @@
+bytesPerRow: idleRaw.bpr,
+                                        rectPt: Self.modeChipFillRect, framePtWidth: 200, delta: 4)

@@ -1,0 +1,2 @@
+    if shallow:
+        return ('skip',

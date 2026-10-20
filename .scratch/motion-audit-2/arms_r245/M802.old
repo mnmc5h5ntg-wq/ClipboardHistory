@@ -1,0 +1,1 @@
+if abs(grey(idle, i) - grey(lit, i)) >= delta { changed += 1 }

@@ -27,8 +27,8 @@ ARMS = [
      'DELTA = 100',
      'test_a_fully_changed_band_makes_the_two_estimators_agree'),
     ('M796', u'把 per_pixel 的取值域从变化像素换成全体像素（稀释吞掉控件局部口径）', RULER,
-     'sum(pb[n]) / 3.0) for n in changed]',
-     'sum(pb[n]) / 3.0) for n in range(len(pa))]',
+     'per = [_ratio(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in changed]',
+     'per = [_ratio(sum(pa[n]) / 3.0, sum(pb[n]) / 3.0) for n in range(len(pa))]',
      'test_unchanged_pixels_dilute_band_mean_but_not_per_pixel'),
     ('M797', u'摘掉「没给 --control」那一支的 rc = 1（闸门退化成一行 print）', RULER,
      "        rc = 1\n    else:\n        a, b = args.control.split(',', 1)",
@@ -69,39 +69,45 @@ if 'Ran ' not in base or not base.rstrip().splitlines()[-1].startswith('OK') or 
           % ('Ran ' in base, base.rstrip().splitlines()[-1].startswith('OK'), ','.join(base_reds) or '无'))
     sys.exit(1)
 
-rows = []
-caught = escaped = not_run = other = 0
-for mid, why, rel, old, new, want in ARMS:
-    text = read(rel)
-    hits = text.count(old)
-    if hits != 1:
-        not_run += 1
-        rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
-        continue
-    write(rel, text.replace(old, new, 1))
-    out = run_guard()
-    io.open('/tmp/r241_%s.log' % mid, 'w', encoding='utf-8').write(out)
-    write(rel, text)
-    restore = (read(rel) == text)
-    reds = red_names(out)
-    if not reds:
-        escaped += 1
-        verdict = 'ESCAPED'
-    elif want in reds:
-        caught += 1
-        verdict = 'CAUGHT'
-    else:
-        other += 1
-        verdict = 'WRONG_CELL'
-    if not restore:
-        verdict += '/RESTORE_DIRTY'
-    rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
+# R245 / U-792：预检 mutate_needle_precheck.py 是 **import 每张表** 的，而本表的臂循环写在模块顶层，
+# 于是「跑一次预检」= 把这张表的刀真跑一遍（会起 subprocess 跑测试、会插拔源码文件）。
+# 修法：执行只在直接运行时发生；被 import 时只登记 ARMS —— needle 唯一性是静态检查，不需要跑测试。
+if __name__ != '__main__':
+    pass
+else:
+    rows = []
+    caught = escaped = not_run = other = 0
+    for mid, why, rel, old, new, want in ARMS:
+        text = read(rel)
+        hits = text.count(old)
+        if hits != 1:
+            not_run += 1
+            rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
+            continue
+        write(rel, text.replace(old, new, 1))
+        out = run_guard()
+        io.open('/tmp/r241_%s.log' % mid, 'w', encoding='utf-8').write(out)
+        write(rel, text)
+        restore = (read(rel) == text)
+        reds = red_names(out)
+        if not reds:
+            escaped += 1
+            verdict = 'ESCAPED'
+        elif want in reds:
+            caught += 1
+            verdict = 'CAUGHT'
+        else:
+            other += 1
+            verdict = 'WRONG_CELL'
+        if not restore:
+            verdict += '/RESTORE_DIRTY'
+        rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
 
-print('R241 变异表（对象=尺自己，产品 0 文件）')
-print('%-6s %-14s %-46s %-56s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
-for r in rows:
-    print('%-6s %-14s %-46s %-56s %s' % (r[0], r[1], r[2][:46], r[3][:56], r[4]))
-print('R241_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
-      % (len(ARMS), caught, escaped, not_run, other,
-         'yes' if all(r[4] == 'yes' for r in rows) else 'NO'))
-sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0) else 1)
+    print('R241 变异表（对象=尺自己，产品 0 文件）')
+    print('%-6s %-14s %-46s %-56s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
+    for r in rows:
+        print('%-6s %-14s %-46s %-56s %s' % (r[0], r[1], r[2][:46], r[3][:56], r[4]))
+    print('R241_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
+          % (len(ARMS), caught, escaped, not_run, other,
+             'yes' if all(r[4] == 'yes' for r in rows) else 'NO'))
+    sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0) else 1)

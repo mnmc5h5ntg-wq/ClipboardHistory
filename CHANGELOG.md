@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R245 / 第 244 轮 / Round 242 · 变异腿换到 shell 执行器：六把刀第一次全 CAUGHT）
+
+- 新执行器（`.scratch/motion-audit-2/`）：`arm_patch.py` 做插拔（needle 命中恰好一次才写、`restore` 后 `verify` 逐字节复核），`arms_r245/manifest.tsv` 一行一把刀（臂内容存成 `.old/.new` 文件而不是 python 字符串），`mutate_r245.sh` 在 shell 里跑判据（`swift test --filter` / `python3 -m unittest -v`），按 kind 各建一次基线、基线不绿整表 NOT_RUN，红名按空格切并与「期望那一格」对账。
+- 结果：`R245_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`（日志 `/tmp/r245_mutate2.log`）。M802 两态差判定换恒真 ⇒ 负对照红；M803 矩形挪出窗外 ⇒ 分母地板红；M804 点亮帧换成空闲帧 ⇒ 颗数与占比两条一起红；M805 摘浅历史闸门；M806 平涂线 0.70→0.0；M807 地板判定永远说过线。
+- `mutate_r245.py` 是影子登记表（只 load manifest），因为 `mutate_needle_precheck.py` 会 import 每张表 —— 表若在 import 时执行测试，预检从秒级变成十几分钟。已登记进名册 TABLES。
+- 预检关门（D-231 配套）：mutate_r235/r236/r238/r241/r242 五张表的臂循环关进直接运行那一支，mutate_needle_precheck.py 现在是纯静态（1.68s，不再起测试、不再改文件）。
+- 一把腐烂的历史刀修好并重新证明：mutate_r241.py 的 M796 锚点因 R244 给 measure() 加占比行而两次命中（NOT_RUN），换成整串后 R241_MUTATE 刀=3 CAUGHT=3 NOT_RUN=0 RESTORE_CLEAN=yes；同跑现读出 r169/r217/r229 三张表各自的锚点腐烂，新开 286 逐张处置。
+- 台账与规矩两处新明记：刀号是身份不是结果（未跑过的 M798…M801 也算消费，撞号要查重）；改号不许循环 rename（本轮把 `.old/.new` 盖错位一次，整批重生成后才继续）。
+- 产品侧 0 文件；`swift build` 0 告警 / 全量卷 / 重捕帧 / 换装本机本轮 NOT-RUN（Swift 只动 `Tests/` 里的一格且已逐字节还原）。
+
 ### Changed（R244 / 第 243 轮 / Round 241 · 地板判定进尺：只对 WCAG 列生效，底不平涂降级成只报读数）
 
 - `scripts/hover_two_state_diff.py` 新增 `FLOOR_LIGHT=1.20 / FLOOR_DARK=1.10 / FLAT_SHARE=0.70`：每对给出 `底平涂=… 判定=…`，低于地板时打 `HOVER_DIFF_FLOOR_RED=1` 并 exit 1；底不平涂时**不判**但照打读数，另印 `HOVER_DIFF_BASE … 底众数占比=`。平涂线由真帧分布推（六对 0.827~0.962、棋盘对照 0.500），不是拍的。

@@ -1,0 +1,6 @@
+M802	swift	ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift	.scratch/motion-audit-2/arms_r245/M802.old	.scratch/motion-audit-2/arms_r245/M802.new	testModeChipHoverFillIsVisibleOnItsOwnSurface	两态差判定换成恒真 ⇒ 同一帧负对照必须红
+M803	swift	ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift	.scratch/motion-audit-2/arms_r245/M803.old	.scratch/motion-audit-2/arms_r245/M803.new	testModeChipHoverFillIsVisibleOnItsOwnSurface	矩形挪出窗外 ⇒ 分母地板必须红（空对账不许给占比签字）
+M804	swift	ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift	.scratch/motion-audit-2/arms_r245/M804.old	.scratch/motion-audit-2/arms_r245/M804.new	testModeChipHoverFillIsVisibleOnItsOwnSurface	点亮那帧换成空闲那帧 ⇒ 颗数与占比两条地板必须一起红
+M805	python	scripts/tests/test_final_report_headline.py	.scratch/motion-audit-2/arms_r245/M805.old	.scratch/motion-audit-2/arms_r245/M805.new	test_a_shallow_history_must_not_be_allowed_to_judge	摘掉浅历史闸门 ⇒ 合成浅克隆那格必须红
+M806	python	scripts/hover_two_state_diff.py	.scratch/motion-audit-2/arms_r245/M806.old	.scratch/motion-audit-2/arms_r245/M806.new	test_a_nonflat_base_is_reported_as_a_reading_not_a_verdict	平涂线压到 0 ⇒ 棋盘底被当平涂硬判（D-230 前提失效）
+M807	python	scripts/hover_two_state_diff.py	.scratch/motion-audit-2/arms_r245/M807.old	.scratch/motion-audit-2/arms_r245/M807.new	test_a_weak_light_hover_is_named_by_the_floor_verdict	地板判定永远说过线 ⇒ 弱悬停那格必须红（判定退化成 print）

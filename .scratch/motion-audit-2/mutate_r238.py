@@ -71,39 +71,45 @@ if 'Ran ' not in base or not base.rstrip().endswith('OK') or base_reds:
           % ('Ran ' in base, base.rstrip().endswith('OK'), ','.join(base_reds) or '无'))
     sys.exit(1)
 
-rows = []
-caught = escaped = not_run = other = 0
-for mid, why, rel, old, new, want in ARMS:
-    text = read(rel)
-    hits = text.count(old)
-    if hits != 1:
-        not_run += 1
-        rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
-        continue
-    write(rel, text.replace(old, new, 1))
-    out = run_guard()
-    io.open('/tmp/r238_%s.log' % mid, 'w', encoding='utf-8').write(out)
-    write(rel, text)
-    restore = (read(rel) == text)
-    reds = red_names(out)
-    if not reds:
-        escaped += 1
-        verdict = 'ESCAPED'
-    elif want in reds:
-        caught += 1
-        verdict = 'CAUGHT'
-    else:
-        other += 1
-        verdict = 'WRONG_CELL'
-    if not restore:
-        verdict += '/RESTORE_DIRTY'
-    rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
+# R245 / U-792：预检 mutate_needle_precheck.py 是 **import 每张表** 的，而本表的臂循环写在模块顶层，
+# 于是「跑一次预检」= 把这张表的刀真跑一遍（会起 subprocess 跑测试、会插拔源码文件）。
+# 修法：执行只在直接运行时发生；被 import 时只登记 ARMS —— needle 唯一性是静态检查，不需要跑测试。
+if __name__ != '__main__':
+    pass
+else:
+    rows = []
+    caught = escaped = not_run = other = 0
+    for mid, why, rel, old, new, want in ARMS:
+        text = read(rel)
+        hits = text.count(old)
+        if hits != 1:
+            not_run += 1
+            rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
+            continue
+        write(rel, text.replace(old, new, 1))
+        out = run_guard()
+        io.open('/tmp/r238_%s.log' % mid, 'w', encoding='utf-8').write(out)
+        write(rel, text)
+        restore = (read(rel) == text)
+        reds = red_names(out)
+        if not reds:
+            escaped += 1
+            verdict = 'ESCAPED'
+        elif want in reds:
+            caught += 1
+            verdict = 'CAUGHT'
+        else:
+            other += 1
+            verdict = 'WRONG_CELL'
+        if not restore:
+            verdict += '/RESTORE_DIRTY'
+        rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
 
-print('R238 变异表（对象=守卫自己，产品 0 文件）')
-print('%-6s %-14s %-42s %-52s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
-for r in rows:
-    print('%-6s %-14s %-42s %-52s %s' % (r[0], r[1], r[2][:42], r[3][:52], r[4]))
-print('R238_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
-      % (len(ARMS), caught, escaped, not_run, other,
-         'yes' if all(r[4] == 'yes' for r in rows) else 'NO'))
-sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0) else 1)
+    print('R238 变异表（对象=守卫自己，产品 0 文件）')
+    print('%-6s %-14s %-42s %-52s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
+    for r in rows:
+        print('%-6s %-14s %-42s %-52s %s' % (r[0], r[1], r[2][:42], r[3][:52], r[4]))
+    print('R238_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
+          % (len(ARMS), caught, escaped, not_run, other,
+             'yes' if all(r[4] == 'yes' for r in rows) else 'NO'))
+    sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0) else 1)

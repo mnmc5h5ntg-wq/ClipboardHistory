@@ -96,49 +96,55 @@ def baseline(kind):
     return BASE_CACHE[kind][0], BASE_CACHE[kind][1]
 
 
-rows = []
-caught = escaped = not_run = other = dirty = 0
-for mid, why, kind, rel, old, new, want in ARMS:
-    base, ok = baseline(kind)
-    io.open('/tmp/r242_base_%s.log' % mid, 'w', encoding='utf-8').write(base)
-    if not ok:
-        print('%s 基线臂不可信 ⇒ 拒绝出表（红名=%s）' % (mid, ','.join(red_names(base, kind)) or '无'))
-        sys.exit(1)
-    text = read(rel)
-    hits = text.count(old)
-    if hits != 1:
-        not_run += 1
-        rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
-        continue
-    write(rel, text.replace(old, new, 1))
-    out, rc = run(kind)
-    io.open('/tmp/r242_%s.log' % mid, 'w', encoding='utf-8').write(out)
-    write(rel, text)
-    restore = (read(rel) == text)
-    if not restore:
-        dirty += 1
-    marker = u'Executed' if kind == 'swift' else u'Ran '
-    if marker not in out:
-        not_run += 1
-        rows.append((mid, 'NOT_RUN', u'插刀后这一卷根本没跑成（rc=%d，没有 %s 行）—— 不许当成 ESCAPED'
-                     % (rc, marker), want, 'yes' if restore else 'NO'))
-        continue
-    reds = red_names(out, kind)
-    if not reds:
-        escaped += 1
-        verdict = 'ESCAPED'
-    elif want in reds:
-        caught += 1
-        verdict = 'CAUGHT'
-    else:
-        other += 1
-        verdict = 'WRONG_CELL'
-    rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
+# R245 / U-792：预检（mutate_needle_precheck.py）是 **import 每张表** 的，而本表的臂循环写在模块顶层，
+# 于是「跑一次预检」= 把 R242 那四把刀真跑一遍（每把起一次 swift test，基线不绿还 sys.exit(1)）。
+# 修法：循环与结论只在直接执行时跑；被 import 时只登记 ARMS（静态抽 needle 不需要跑测试）。
+if __name__ != '__main__':
+    pass
+else:
+    rows = []
+    caught = escaped = not_run = other = dirty = 0
+    for mid, why, kind, rel, old, new, want in ARMS:
+        base, ok = baseline(kind)
+        io.open('/tmp/r242_base_%s.log' % mid, 'w', encoding='utf-8').write(base)
+        if not ok:
+            print('%s 基线臂不可信 ⇒ 拒绝出表（红名=%s）' % (mid, ','.join(red_names(base, kind)) or '无'))
+            sys.exit(1)
+        text = read(rel)
+        hits = text.count(old)
+        if hits != 1:
+            not_run += 1
+            rows.append((mid, 'NOT_RUN', 'needle 命中 %d 次（要恰好 1）' % hits, '', 'yes'))
+            continue
+        write(rel, text.replace(old, new, 1))
+        out, rc = run(kind)
+        io.open('/tmp/r242_%s.log' % mid, 'w', encoding='utf-8').write(out)
+        write(rel, text)
+        restore = (read(rel) == text)
+        if not restore:
+            dirty += 1
+        marker = u'Executed' if kind == 'swift' else u'Ran '
+        if marker not in out:
+            not_run += 1
+            rows.append((mid, 'NOT_RUN', u'插刀后这一卷根本没跑成（rc=%d，没有 %s 行）—— 不许当成 ESCAPED'
+                         % (rc, marker), want, 'yes' if restore else 'NO'))
+            continue
+        reds = red_names(out, kind)
+        if not reds:
+            escaped += 1
+            verdict = 'ESCAPED'
+        elif want in reds:
+            caught += 1
+            verdict = 'CAUGHT'
+        else:
+            other += 1
+            verdict = 'WRONG_CELL'
+        rows.append((mid, verdict, ','.join(reds) or '无', want, 'yes' if restore else 'NO'))
 
-print('R242 变异表（对象=两把尺自己，产品 Swift 视图 0 文件）')
-print('%-6s %-10s %-46s %-52s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
-for r in rows:
-    print('%-6s %-10s %-46s %-52s %s' % (r[0], r[1], r[2][:46], r[3][:52], r[4]))
-print('R242_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
-      % (len(ARMS), caught, escaped, not_run, other, 'yes' if dirty == 0 else 'NO'))
-sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0 and dirty == 0) else 1)
+    print('R242 变异表（对象=两把尺自己，产品 Swift 视图 0 文件）')
+    print('%-6s %-10s %-46s %-52s %s' % ('刀号', '结论', '红名', '期望那一格', '还原'))
+    for r in rows:
+        print('%-6s %-10s %-46s %-52s %s' % (r[0], r[1], r[2][:46], r[3][:52], r[4]))
+    print('R242_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d 抓错格=%d RESTORE_CLEAN=%s'
+          % (len(ARMS), caught, escaped, not_run, other, 'yes' if dirty == 0 else 'NO'))
+    sys.exit(0 if (caught == len(ARMS) and escaped == 0 and not_run == 0 and other == 0 and dirty == 0) else 1)

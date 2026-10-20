@@ -57,36 +57,42 @@ if manifest_broken(base) or "Executed" not in base or red_names(base):
     sys.exit(1)
 
 caught = escaped = not_run = 0
-rows = []
-for kid, rel, anchor, repl, why in KNIVES:
-    path = os.path.join(ROOT, rel)
-    src = io.open(path, encoding="utf-8").read()
-    n = src.count(anchor)
-    if n != 1:
-        rows.append((kid, "ANCHOR=%d" % n, "-"))
-        not_run += 1
-        continue
-    io.open(path, "w", encoding="utf-8").write(src.replace(anchor, repl))
-    try:
-        out = run_tests()
-    finally:
-        io.open(path, "w", encoding="utf-8").write(src)
-    clean = "yes" if io.open(path, encoding="utf-8").read() == src else "NO"
-    names = red_names(out)
-    io.open("/tmp/r236_knife_%s.log" % kid, "w", encoding="utf-8").write(out)
-    # 归类顺序不许反：红掉的测试名先算数（失败行本身带 error:，按 error: 判会把 CAUGHT 误判成 NOT_RUN）
-    if names:
-        verdict, caught = "CAUGHT", caught + 1
-    elif manifest_broken(out):
-        verdict, not_run = "NOT_RUN(manifest 编不过)", not_run + 1
-    elif "Executed" not in out:
-        verdict, not_run = "NOT_RUN(卷没跑)", not_run + 1
-    else:
-        verdict, escaped = "ESCAPED", escaped + 1
-    rows.append((kid, verdict, clean + "|" + (";".join(names) if names else verdict)))
+# R245 / U-792：预检 mutate_needle_precheck.py 是 **import 每张表** 的，而本表的臂循环写在模块顶层，
+# 于是「跑一次预检」= 把这张表的刀真跑一遍（会起 subprocess 跑测试、会插拔源码文件）。
+# 修法：执行只在直接运行时发生；被 import 时只登记 ARMS —— needle 唯一性是静态检查，不需要跑测试。
+if __name__ != '__main__':
+    pass
+else:
+    rows = []
+    for kid, rel, anchor, repl, why in KNIVES:
+        path = os.path.join(ROOT, rel)
+        src = io.open(path, encoding="utf-8").read()
+        n = src.count(anchor)
+        if n != 1:
+            rows.append((kid, "ANCHOR=%d" % n, "-"))
+            not_run += 1
+            continue
+        io.open(path, "w", encoding="utf-8").write(src.replace(anchor, repl))
+        try:
+            out = run_tests()
+        finally:
+            io.open(path, "w", encoding="utf-8").write(src)
+        clean = "yes" if io.open(path, encoding="utf-8").read() == src else "NO"
+        names = red_names(out)
+        io.open("/tmp/r236_knife_%s.log" % kid, "w", encoding="utf-8").write(out)
+        # 归类顺序不许反：红掉的测试名先算数（失败行本身带 error:，按 error: 判会把 CAUGHT 误判成 NOT_RUN）
+        if names:
+            verdict, caught = "CAUGHT", caught + 1
+        elif manifest_broken(out):
+            verdict, not_run = "NOT_RUN(manifest 编不过)", not_run + 1
+        elif "Executed" not in out:
+            verdict, not_run = "NOT_RUN(卷没跑)", not_run + 1
+        else:
+            verdict, escaped = "ESCAPED", escaped + 1
+        rows.append((kid, verdict, clean + "|" + (";".join(names) if names else verdict)))
 
-for r in rows:
-    print("R236_KNIFE %s %s EXTRA=%s" % (r[0], r[1], r[2]))
-print("R236_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d RESTORE_CLEAN=%s"
-      % (len(KNIVES), caught, escaped, not_run,
-         "yes" if all(x[2].startswith("yes") for x in rows) else "NO"))
+    for r in rows:
+        print("R236_KNIFE %s %s EXTRA=%s" % (r[0], r[1], r[2]))
+    print("R236_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d RESTORE_CLEAN=%s"
+          % (len(KNIVES), caught, escaped, not_run,
+             "yes" if all(x[2].startswith("yes") for x in rows) else "NO"))

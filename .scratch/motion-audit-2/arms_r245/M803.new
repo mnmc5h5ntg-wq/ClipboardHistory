@@ -1,0 +1,2 @@
+bytesPerRow: idleRaw.bpr,
+                                        rectPt: CGRect(x: 900, y: 900, width: 4, height: 4), framePtWidth: 200, delta: 4)

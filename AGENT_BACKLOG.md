@@ -6708,9 +6708,15 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 **279. runner 自己打印的 `HOVER_MODE_CHIP_PROOF … 两态变化=X/Y 占比=Z` 读数单：拿到之后把占比地板从"两机都能被证明过线的 0.10"抬到实测下沿，并解释 skip 数本机 3 / runner 2 的差（D-227：地板属于量它的那台机器）（R242 新开）**
 
 **280. 变异表 mutate_r242.py 五次都拒发基线：同一句 swift test --filter UICaptureTests/testModeChipHoverFillIsVisibleOnItsOwnSurface 在 shell 里 rc=0（Executed 3 行），而经 python subprocess.run 调用稳定 rc=1、输出 21,663,809 字节的 Invalid manifest（内联复现过，见 /tmp/r242_inline.log）⇒ 差在调用方式不在判据。先定位这个差异（怀疑 subprocess 拿到的 SDK/manifest 缓存路径与 shell 不同），再把 M798/M799/M800/M801 四把插进去（R242 新开）**
+  结案追记（R245）：执行器换成 shell（D-231）之后一次就破 —— `arms_r245/manifest.tsv` 六把 M802…M807 全部 CAUGHT，`R245_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`。所以成因归到「python 作为父进程起 swift 驱动」这一侧。但机制仍未命名（为什么 python 起会重放同一份 manifest 诊断、而 shell 起不会），这条不许写成「已诊断」，另开 284 时保留。
   追记（R242 同轮，07:20）：分辨实验做过三步，**没破**，但把范围缩了：① 同一条 `swift test --filter …` 在 shell 直跑 rc=0（`Executed 3 tests`）、② 经 python `subprocess.run` 稳定 rc=1 且日志字节数一模一样（21,663,809 ⇒ 像是命中同一份 manifest 诊断缓存）、③ `bash -lc` 从 python 起也一样 rc=1，而登录 shell 与非登录 shell 的 `env` 差集为空 ⇒ 不是环境变量、不是 `-l`。剩下的候选是 stdin/会话差异或 `.build` 里的 manifest 缓存本身；下一轮先试 `stdin=DEVNULL` 与清 `~/.swiftpm`/` .build/checkouts` 之外的 manifest 缓存，别再从环境变量查。四把刀 M798…M801 仍一颗没插。
 **281. PerfBudgetTests.testImageComparisonCostStaysBounded 3000x2000 冷比较本机三次采样 290/331/342ms 顶到阈值 250ms；本机 load1 7.4~10.9 全来自桌面进程（Codex/Qoder Renderer 各 ~101% CPU、pgrep xctest 无残留），而**同一条判据在 CI 那一跑里是绿的**（那跑全量卷唯一红的用例是 modechip）⇒ 成因未定线。按 D-227/R154 的规矩：不为让它不响而放宽阈值，要做的是低负载重跑 + 负载读数 + 按机器的出口（R242 新开）**
 
 **282. 251 与清账表里其余按**码值口径**记下来的两态读数，逐条用 WCAG 口径重判一遍（本轮只重判了玻璃圆钮 / 收藏星 / 段按钮 / modechip 四处，全部过 1.20 ⇒ 那几条"亮档偏淡"的印象要撤回或改判）；重判时顺带把 277 那两处 Swift 侧的绝对颗数地板按同口径复核（D-229）（R243 新开）**
 
 **283. 变异表改用 bash 驱动跑（同一条 `swift test --filter …` 在 shell 里 rc=0 已验，经 python subprocess 稳定 rc=1 且日志字节数恒定 21,663,809 ⇒ 症状是同一份 manifest 诊断在重放）：把 M798/M799/M800/M801 四把插进去，并给本轮新加的三格（地板判定 / 平涂前提 / 真帧 standing 判据）各配一把刀；破了之后回头补 280 的成因（R244 新开）**
+  结案追记（R245）：bash 驱动落地 = `arm_patch.py`（patch|restore|verify，needle 恰好一次）+ `mutate_r245.sh`（按 kind 建基线、基线不绿整表 NOT_RUN、红名按空格切、逐把还原后 verify）。本轮新加的三格（地板判定 / 平涂前提 / 真帧 standing 判据）里前两把有刀（M806/M807），第三格（真帧 standing）仍是合成对照撑着 —— 它要的是帧通道，runner 半属于 275。M798…M801 那四把不在本轮表里，拆给 284 补跑。
+
+**284. 用 R245 的 shell 执行器补跑 `mutate_r242.py` 那四把（M798/M799/M800/M801，登记六轮、一颗没插）：臂内容搬到 `arms_rNNN/manifest.tsv` 形状，四把各自 CAUGHT 之后才允许把 280 的追记升级成「机制已命名」；同一条 python-subprocess 通道的失败原因仍未解释，不许因为「换 shell 就好了」就当成诊断完成（R245 新开）**
+**285. 影子登记表的锚点不在静态预检覆盖里：`mutate_needle_precheck.py` 是 import 表 + 抽 python 字面量，看不见 `arms_*/*.old` 文件里的 needle（它如实报「不在覆盖里」，所以是薄而不是坏）。要么加一支按 `manifest.tsv` 列读 needle 的预检并与 `arm_patch.py` 的「恰好一次」闸门对账，要么在名册里显式登记这张表的覆盖缺口（不许静默）（R245 新开）**
+**286. 预检现读的变异表腐烂逐张处置：mutate_r169 的 M684/M686 命中=0、mutate_r217 的 M750 命中=2、mutate_r229 的 M768 命中=0（本轮只点名没修）。处置只有两种：换锚点重跑那张表并登记新的 CAUGHT，或显式退役那张表并从名册摘掉 ——不许留成「预检恒红」，也不许留成「锚点存在但没人跑」。M796 是同一族第一个样本，本轮已按前者修好（R245 新开）**
