@@ -6,7 +6,7 @@
 **本轮落地**：M541/M750/M768 重钉 + 三张表重跑全 CAUGHT、预检 bad=0；M684/M686 公开撤回（`arm_sites` 少认一种臂形状）；`mutate_r229.py` 的颗数写死换成形状判据；新尺 `scripts/mutation_verdict_scan.py` + 11 格 + 四把刀 M819…M822；`ARM_LINE` 放宽 ⇒ 123 把此前隐形的刀进查重（572 → 695）；预检仓库根由 `__file__` 推（runner 那朵 FileNotFoundError 的修法）+ 一格绝对路径守卫；脚本电池 Ran 487 tests / OK (skipped=4)。
 
 **下一轮（R263 / 第 262 轮 / Round 260）的 ⓪**：
-⓪ 读 CI：6bf6f3e → 39512069087 / completed / failure 已读（那朵 runner 红本轮修）；本笔 push 后再取新跑 —— 要验的是**放宽引号 + 根路径改派生之后 runner 上 `test_the_repo_manifests…` 与 `test_the_tools_derive…` 两格是否绿**，以及 `RUNG_STEP`/`PRESS_LADDER` 有没有新读数。取不到就写「未取到 + 成因」（293）。
+⓪ 读 CI：**本笔成对号 `93b2cbd` → run 39515829941 / in_progress / 未读**（push 后现取，只登记号不轮询，R140）—— 要验的是**放宽引号 + 根路径改派生之后 runner 上 `test_the_repo_manifests…` 与 `test_the_tools_derive…` 两格是否绿**，以及 `RUNG_STEP`/`PRESS_LADDER` 有没有新读数。取不到就写「未取到 + 成因」（293）。上一笔 6bf6f3e → 39512069087 / completed / failure 已读：STEP[9] 的 `check_manifests` FileNotFoundError，成因是预检写死本机仓库根，本轮已修。
 ① 309：那 6 张写死颗数的表一张张迁并各自重跑（迁完删名册一行）。
 ② 310：`TABLES` 手写名册（74 登记 vs 163 存在）⇒ 未登记表静默不覆盖。
 ③ 305 的地板（本轮那两张"肉眼分不出"是新证人）；299 的执行器半；301 + 307；311。
