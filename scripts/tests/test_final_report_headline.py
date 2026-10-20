@@ -110,6 +110,20 @@ SOURCES_CELL = re.compile(u'最后一次动到 `Sources/` 的轮次.*?\\*\\*R(\\
 SOURCES_PATH = u'ClipboardHistory/Sources'
 
 
+def round_from_subject(subject):
+    """从 commit 标题抠归属轮次：**开头的徽章说了算**，正文里的引用不算。
+
+    为什么单独做成一个函数并配已知答案的格子：R260 的标题是
+    `R260 代码半（第 259 轮 / Round 257）：…（R259 自己写下的形状警告）…`，
+    旧顺序先找 `（R(\\d+)` ⇒ 它先撞上正文里那句引用，把这笔提交说成属于 R259，
+    于是「最后一次动到 Sources/ 的轮次」这一格红在一张**没写错**的账上。
+    引用赢过署名，是尺的错，不是账的错。
+    """
+    m = (re.match(u'^R(\\d+)', subject) or re.search(u'（R(\\d+)', subject)
+         or re.search(u'\\bR(\\d+)', subject))
+    return int(m.group(1)) if m else None
+
+
 def live_sources(n=1, repo=None):
     """最近 n 笔动到源码的提交 [(sha, R 或 None, subject)]；git 不在/读不到就抛（不许静默通过）。"""
     import subprocess
@@ -121,8 +135,7 @@ def live_sources(n=1, repo=None):
         if not line.strip():
             continue
         sha, _, subject = line.partition(u'\t')
-        m = re.search(u'（R(\\d+)', subject) or re.search(u'\\bR(\\d+)', subject)
-        rows.append((sha.strip(), int(m.group(1)) if m else None, subject))
+        rows.append((sha.strip(), round_from_subject(subject), subject))
     return rows
 
 
@@ -180,6 +193,19 @@ def sources_problems(text, rows):
 
 class FinalReportSourcesCellTests(unittest.TestCase):
     """这一格是纯手抄、没有 LAG 容差挡着 ⇒ 必须逐字对 git。"""
+
+    def test_the_commit_badge_wins_over_a_citation_in_the_subject(self):
+        """已知答案的三格：归属号必须来自**开头的徽章**，正文里的引用不许赢过署名。
+
+        这一格是 R260 现读撞上的：标题写成 `R260 代码半（第 259 轮 / Round 257）：…（R259 自己写下的…）`，
+        旧尺先找 `（R(\\d+)` ⇒ 撞上正文里那句引用，把一笔 R260 的提交判成 R259，
+        于是这张格红在一份**没写错**的账上。修法是排优先级，不是把账改回去。
+        """
+        self.assertEqual(260, round_from_subject(
+            u'R260 代码半（第 259 轮 / Round 257）：亮档按下与选中糊成一档 —— 尺的按步骤切片同笔落地（R259 自己写下的形状警告）'))
+        self.assertEqual(253, round_from_subject(u'R253（第 252 轮 / Round 250）：抬量'))
+        self.assertEqual(242, round_from_subject(u'收尾：（R242 新开）'))   # 没有开头徽章时才退到旧形状
+        self.assertIsNone(round_from_subject(u'没有轮次徽章的一笔'))
 
     def test_the_sources_cell_agrees_with_git(self):
         shallow, rows = is_shallow(), live_sources(3)
