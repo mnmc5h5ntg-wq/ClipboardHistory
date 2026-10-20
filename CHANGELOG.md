@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R250 / 第 249 轮 / Round 247 · 补跑 Swift 侧验证四件套：全量卷 + 帧基线 + 换装本机）
+
+零代码改动。全量 Swift 卷 `Executed 915 tests, with 42 tests skipped and 0 failures in 368.858s`（日志 320MB 留 `/tmp/r250_full.log`，只入摘要 —— 这台机器上大日志入库会把 push 撑坏）。
+帧基线同一笔：新帧目录 `/tmp/shots_r250`（162 张）→ `FRAME_BASELINE_AGAINST=working COMPARED=162 CHANGED=0 MISSING=0 ADDED=0` ⇒ R248/R249 两笔产品改动"画面不变"从断言变成读数，基线无需 update。
+换装本机（292 结案）：`make dmg` 签名 `valid on disk / satisfies its Designated Requirement`、`shasum -a 256 -c` OK；`ditto` 覆盖安装到 `/Applications/时间剪史.app`，装后现读版本 1.4.8、codesign 通过、二进制时间戳为本次构建。
+看图：眼睛腿 RUN，范围一张新帧 `search-field-320x112-dark.png`（R249 刚改那一位的静置态）；顺带记下一条未判的排版观察（占位符"……"六个点偏长），留给清账表。
+规矩：D-236（改产品的轮次收口必须凑齐四件套，缺一具名 NOT-RUN）；脚本化留给 295。变异腿本轮 NOT-RUN（没有新判据要证）。
+
 ### Changed（R249 / 第 248 轮 / Round 246 · SearchField 接上进证通道；名册判法改成剥注释后判）
 
 产品（1 文件）`ClipboardHistory/Sources/ClipboardHistoryApp/Views/SearchField.swift`：新增 `hoveredForCapture` 与一层 `isHoveredForDrawing`，图标墨（`controlTargeted`）与清除按钮可见性都改读它；产品路径该键恒 `nil`。`swift build` 零告警。

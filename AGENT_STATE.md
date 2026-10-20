@@ -1,6 +1,17 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
-## R250 状态（第 249 轮 / Round 247 · 2026-10-20）
+## R251 状态（第 250 轮 / Round 248 · 2026-10-20）
+最后更新：2026-10-20 13:25（本地 · R250 / 第 249 轮 / Round 247）：**Swift 侧验证四件套补跑完 —— 全量卷 915 绿、帧基线 162/0、换装本机成功**（U-806…U-809 · D-236 · 292 结案、新开 295 · 产品 0 文件）
+
+**本轮落地**：全量卷 `Executed 915 tests, with 42 tests skipped and 0 failures in 368.858s`（`/tmp/r250_full.log`，320MB 不入库）；`FRAME_BASELINE_AGAINST=working COMPARED=162 CHANGED=0 MISSING=0 ADDED=0`（`/tmp/shots_r250`）；dmg 签名 + sha256 OK、`ditto` 覆盖安装、装后版本 1.4.8；眼睛腿看了一张新帧。
+
+**下一轮（R251 / 第 250 轮 / Round 248）的靶**：
+⓪ 读 CI：**run 号只能 gh 现取，取不到写"未取到 + 成因"**（293）。上一笔现读：`39478148037↔0bb02e1`、`39476999347↔5941520`、`39475884846↔550fb43` 取数时 `in_progress` ⇒ 未读；`39474398455↔09a8763` completed/failure（STEP[9]，正文未读 ⇒ 不断言同源）。`917f327`/`7589b21`/`b9e9412`/`5e2b374`/本笔 push 后现取。
+① 做 290：`MultiFileRow` 的多文件夹具 + 两态帧（同一色档 idle/lit），按 WCAG 地板判（D-232：两台机器各印一次再定线），并把帧拿进眼里看 —— 这是 R248 那条通道第一次被量。
+② 做 295：`scripts/round_verify.sh`（全量卷 → 重捕帧 → 基线 compare → 换装 → 摘要一行），让 D-236 不再靠记忆。
+③ 291 那四位欠账逐位清（`HistoryRowViews` 先数清它自己直读 `isHovered` 的画法有几处）；287 / 284 / 286 仍开。
+④ 用户闸门 220 路 A、228②、265；其余仍开 249 / 263 / 268 runner 半 / 269 / 267 / 260 / 262 / 258 第三处 / 254→255→248 / 243 / 227③ / 222 / 215 / 201 / 202 / 207 / 240 / 251 / 275 / 279 / 281 / 282 / 285 / 288 / 289 / 290 / 291 / 293 / 294 / 295。
+
 最后更新：2026-10-20 13:12（本地 · R249 / 第 248 轮 / Round 246）：**第二笔产品改动（SearchField 接通道）+ 刀把守卫自己的假绿照出来**（U-803…U-805 · D-235 · 新开 294 · 产品 1 文件 · 眼睛腿本轮 RUN 两张帧）
 
 **本轮落地**：`SearchField.swift` 图标墨与清除按钮改读一层 `isHoveredForDrawing`；`test_hover_capture_channel.py` 加画法级断言并把 `wiring()` 改成剥注释后判（`HistoryRowViews` 因此翻成未接）；`swift build` 零告警；`R249_MUTATE 刀=2 CAUGHT=2 ESCAPED=0 NOT_RUN=0 抓错格=0 RESTORE_CLEAN=yes`；看了设置行暗档 idle/lit 两张并判为保留不改。**账与代码分两笔**：代码半 `b9e9412`、账半本笔。
