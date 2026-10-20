@@ -1,0 +1,2 @@
+M817	swift	ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift	.scratch/motion-audit-2/arms_r260/M817.old	.scratch/motion-audit-2/arms_r260/M817.new	ControlHoverLadderTests.testEveryRungOfTheLadderIsSeparableInBothAppearances	令牌轴：只有 light 红（mutate_r260.sh）
+M818	recapture	ClipboardHistory/Sources/ClipboardHistoryApp/Views/SettingsView.swift	.scratch/motion-audit-2/arms_r260/M818.old	.scratch/motion-audit-2/arms_r260/M818.new	frame_baseline:changed(settings-* light)	产物轴：判据全绿而重捕帧变 ⇒ 断调用点只有帧看得见（mutate_r260.sh）

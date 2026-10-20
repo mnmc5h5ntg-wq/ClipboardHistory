@@ -69,6 +69,12 @@ def cross_table_ids(directory=HERE):
     for path in files:
         for mid in arm_ids(path):
             ids.setdefault(mid, []).append(os.path.basename(path)[:-3])
+    # 重捕型刀住在 bash + `arms_r*/manifest.tsv`，旧版看不见它们 ⇒ 跨表撞号只在 python 表之间查得出来
+    bash_tables = set()
+    for table, mid, _k, _r, _o, _n, _w, _y in manifest_rows(directory):
+        ids.setdefault(mid, []).append(table)
+        bash_tables.add(table)
+    files = files + sorted(glob.glob(os.path.join(directory, "arms_*", "manifest.tsv")))
     dupes = {k: sorted(set(v)) for k, v in ids.items() if len(set(v)) > 1}
     repeats = {k: v for k, v in ids.items() if len(v) != len(set(v))}
     return files, dupes, repeats, sum(len(v) for v in ids.values())
@@ -132,6 +138,82 @@ def needles(module):
     return [found[k] for k in sorted(found)]
 
 
+KINDS = ("swift", "python", "recapture")
+
+
+def manifest_rows(directory=HERE):
+    """读 `arms_r*/manifest.tsv` —— 重捕型刀（M814…M818）住在 bash 脚本里，python 的 `ARMS` 形状抽不到。
+
+    列形状沿用 R245 起就存在的那七列（`mutate_r245/247/249.py` 写的、`ledgers_r*.py` 读的），
+    **不另造一份契约**（D-245：第二份定义处就是第二个可以各自算错的地方）：
+        刀号  kind  被注入文件  .old 路径  .new 路径  期望红名  说明
+    `.old` 的内容就是锚点：它在目标文件里必须**恰好命中一次**（0=针死了，>1=针不唯一）。
+    格式不对直接抛，不许静默跳过。
+    """
+    import glob
+    rows = []
+    for path in sorted(glob.glob(os.path.join(directory, "arms_*", "manifest.tsv"))):
+        table = os.path.basename(os.path.dirname(path))
+        with io.open(path, encoding="utf-8") as handle:
+            for lineno, line in enumerate(handle, 1):
+                if not line.strip():
+                    continue
+                cols = line.rstrip("\n").split("\t")
+                if len(cols) != 7:
+                    raise ValueError("%s:%d 列数=%d（要 7 列：刀号 kind 文件 old new 期望 说明）"
+                                     % (table, lineno, len(cols)))
+                mid, kind, rel, oldf, newf, want, why = cols
+                if not MID.match(mid):
+                    raise ValueError("%s:%d 刀号形状不对：%r" % (table, lineno, mid))
+                if kind not in KINDS:
+                    raise ValueError("%s:%d kind=%r 不在 %s" % (table, lineno, kind, KINDS))
+                rows.append((table, mid, kind, rel, oldf, newf, want, why))
+    return rows
+
+
+def anchor_hits(abs_path, anchor):
+    """锚点命中次数 = **原文里这个块出现几次**（子串计数）。
+
+    为什么不是整行相等：`.old` 存的是变异表真正拿去 `text.count(old)` 的那段文本，
+    而它常常没有行首缩进（`arms_r245/M802.old`、`arms_r249/M811.old` 都是）。
+    第一版按整行比 ⇒ 7 把老刀全被报成"针死了"，那是**尺的假话**：
+    证人必须与它作证的那把尺同一颗（R68），变异怎么找针，预检就怎么找针。
+    """
+    if not os.path.exists(abs_path):
+        return -1
+    with io.open(abs_path, encoding="utf-8", errors="replace") as handle:
+        text = handle.read()
+    needle = anchor.rstrip("\n")
+    if not needle:
+        return 0
+    return text.count(needle)
+
+
+def check_manifests(repo=REPO, directory=HERE):
+    """返回 (行数, 坏行说明)。`.old` 必须命中恰好一次，且 `.new` 必须与 `.old` 不同（否则是空刀）。"""
+    problems = []
+    rows = manifest_rows(directory)
+    for table, mid, kind, rel, oldf, newf, want, why in rows:
+        old_txt = io.open(os.path.join(repo, oldf), encoding="utf-8").read().strip("\n")
+        new_txt = io.open(os.path.join(repo, newf), encoding="utf-8").read().strip("\n")
+        if old_txt == new_txt:
+            problems.append("%s %s 的 .old 与 .new 一模一样 ⇒ 空刀" % (table, mid))
+            continue
+        hits = anchor_hits(os.path.join(repo, rel), old_txt)
+        if hits != 1:
+            problems.append("%s %s 锚点在 %s 命中 %d 次（要恰好 1 次）⇒ %s"
+                            % (table, mid, rel, hits, want[:40]))
+    return len(rows), problems
+
+
+def bash_arm_ids(directory=HERE):
+    """给 `cross_table_ids` 用：把 manifest 里的刀号也拉进跨表查重（旧版只看 python 表 ⇒ bash 刀可以撞号没人看见）。"""
+    out = {}
+    for table, mid, _k, _r, _o, _n, _w, _y in manifest_rows(directory):
+        out.setdefault(table, []).append(mid)
+    return out
+
+
 def main():
     bad = 0
     covered = 0
@@ -186,6 +268,20 @@ def main():
     # 台账里那句「刀数 131 → 133」从来没有仪器产过这个数（R143 复审查出来的）。
     # 这一行给的是**它自己口径**的数：全部 mutate_r*.py 里按行首形状声明的臂号数与表数，
     # 它不等于任何历史累计值，别拿它去对旧账（旧账那句先记 BACKLOG 184）。
+    # R261 / BACKLOG 306：bash + manifest 里的重捕型刀也要被看见 —— 锚点（.old 的内容）
+    # 必须在目标文件里恰好命中一次，`.new` 必须与 `.old` 不同（否则是空刀）。
+    try:
+        mani_rows_all = manifest_rows()
+        mani_n, mani_bad = check_manifests()
+    except ValueError as exc:
+        print("BASH_ARM_MANIFEST_REFUSED %s ⇒ 名册格式坏了，这一支不许给绿" % exc)
+        return 2
+    for p in mani_bad:
+        print("  BASH_ARM_ANCHOR %s" % p)
+    bad += len(mani_bad)
+    print("BASH_ARMS tables=%d arms=%d kinds=%s bad=%d"
+          % (len({r[0] for r in mani_rows_all}), mani_n,
+             ",".join(sorted({r[2] for r in mani_rows_all})), len(mani_bad)))
     print("ARM_TOTAL files=%d arms=%d dupes=%d repeats=%d" % (len(files), arm_total, len(dupes), len(repeats)))
     print("NEEDLE_PRECHECK tables=%d covered=%d arms=%d bad=%d"
           % (len(TABLES), covered, arms_total, bad))

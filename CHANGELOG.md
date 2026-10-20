@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R261 / 第 260 轮 / Round 258 · 五把重捕型刀进名册）
+
+`mutate_needle_precheck.py`：`cross_table_ids` 除 `mutate_r*.py` 之外也吃 `arms_r*/manifest.tsv`（沿用 R245 起的七列契约，不另造形状 = D-245），新增 `manifest_rows` / `anchor_hits` / `check_manifests` —— 锚点必须恰好命中一次、`.new` 不得等于 `.old`。现读：manifest 表 6 张、刀 16 把（M802…M818）、`ARM_TOTAL arms=572 dupes=0`、`BASH_ARMS bad=0`。
+名册卷 `scripts/tests/test_mutate_arm_registry.py` +2 格：人造撞号 manifest 必须被点名（正对照）、仓库现状必须 0 撞号且锚点全过。Ran 473 tests / OK。
+自我误判一次并记进 D-247：锚点计数第一版按整行相等，误报 7 把老刀腐烂 —— 预检必须与变异表共用同一个估计量。
+真账：5 根针确实死了（M541（命中 0）、M684（命中 0）、M686（命中 0）、M750（命中 2）、M768（命中 0）），286 从猜测升级成名单，本轮未修、未把数字改小。306 结案、299 的执行器半仍开。产品 0 文件。
+
+
 ### Fixed（R260 / 第 259 轮 / Round 257 · 亮档按下与选中糊成一档：梯子顶层第一次有自己的地板与换算）
 
 新守卫 `ControlHoverLadderTests.testEveryRungOfTheLadderIsSeparableInBothAppearances` 先红在改之前：亮档 `pressed→selected = 0.01`（2.55/255，低于仓库给相邻两级定的 4/255），暗档同一格一直绿。病根：R253 抬 hover、R256 抬 pressed 把下面两级推到 0.12 / 0.15，最上级 `VisualFill.selected` 0.16 没人动；R231 那句"selected 不接共享换算"的前提被挪走（D-246）。

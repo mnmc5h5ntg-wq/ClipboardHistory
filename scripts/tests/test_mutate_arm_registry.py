@@ -38,6 +38,51 @@ class MutateArmRegistryTests(unittest.TestCase):
             handle.write(u"\n".join(lines) + u"\n")
         return path
 
+    def test_bash_recapture_arms_are_in_the_same_cross_table_dedup(self):
+        """R261 / BACKLOG 306：重捕型刀住在 bash + `arms_r*/manifest.tsv`，旧查重只看 `mutate_r*.py`
+        ⇒ M814…M818 五把刀连续四轮"名册看不见"，撞号不会有人发现。
+        这一格种一对**人造的**撞号 manifest（正对照）：尺必须把它们点名。
+        """
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            for table, mid in ((u"arms_r900", u"M890"), (u"arms_r901", u"M890")):
+                d = os.path.join(directory, table)
+                os.makedirs(d)
+                with open(os.path.join(d, u"manifest.tsv"), u"w", encoding=u"utf-8") as handle:
+                    handle.write(u"\t".join([mid, u"recapture", u"ClipboardHistory/x.swift",
+                                             u".scratch/a.old", u".scratch/a.new",
+                                             u"someTest", u"人造撞号对照"]) + u"\n")
+            _files, dupes, _repeats, total = tool.cross_table_ids(directory)
+        self.assertEqual(2, total, u"两张 manifest 各一把 ⇒ 该数到 2，现读 %d" % total)
+        self.assertEqual([u"arms_r900", u"arms_r901"], dupes.get(u"M890"),
+                         u"bash 刀撞号没被抓到 ⇒ 名册还是看不见它们：%s" % dupes)
+
+    def test_the_repo_manifests_are_registered_unique_and_anchored(self):
+        """仓库现状：五把重捕型刀要在名册里、号不撞、锚点各自恰好命中一次。
+
+        锚点命中=0 有两种成因（R103：要么针死了，要么此刻正有表把它注入了）⇒ 这一格必须在
+        **电池之外**跑预检时读，别在变异表跑到一半时读。
+        """
+        tool = load_tool()
+        rows = tool.manifest_rows()
+        ids = [r[1] for r in rows]
+        self.assertGreaterEqual(len(ids), 5,
+                                u"重捕型刀少于 5 把 ⇒ 名册又看不见 bash 刀了（M814…M818）：%s" % ids)
+        self.assertEqual(sorted(ids), sorted(set(ids)), u"manifest 内部撞号：%s" % ids)
+        self.assertEqual(set(), set(ids) & set(self.python_arm_ids(tool)),
+                         u"bash 刀号与 python 表撞号")
+        n, problems = tool.check_manifests()
+        self.assertEqual(len(ids), n)
+        self.assertEqual([], problems, u"锚点腐烂或空刀：\n  " + u"\n  ".join(problems))
+
+    def python_arm_ids(self, tool):
+        out = set()
+        for name in tool.TABLES:
+            path = os.path.join(str(REPO / u".scratch" / u"motion-audit-2"), name + u".py")
+            if os.path.exists(path):
+                out.update(tool.arm_ids(path))
+        return out
+
     def test_duplicate_arm_id_across_two_tables_is_found(self):
         tool = load_tool()
         with tempfile.TemporaryDirectory() as directory:

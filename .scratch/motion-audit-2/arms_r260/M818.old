@@ -1,0 +1,1 @@
+        if isSelected { return SelectedInk.opacity(dark: colorScheme == .dark) }
