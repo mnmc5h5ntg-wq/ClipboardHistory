@@ -363,6 +363,20 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 239 轮（R240 / Round 237 · 2026-10-20）：把 R239 那把临时尺搬进仓库（`scripts/hover_two_state_diff.py`），两个口径同时交出来，并让它先红在我自己的配对规则上（U-774…U-776）
+
+- **U-774：尺入库。** `scripts/hover_two_state_diff.py` 一次给两个口径：**带内均值**（变化带内全部像素，会被未变像素稀释）与**变化像素逐点中位数**（只看真的变了的那些点，才是"控件局部"那一档），外加变化面积占比。
+  配对**按帧名推、不接受点坐标**（@2x 的教训在文件头写明）；三把闸门：负对照（帧↔自身必须 0）、正对照（`--control` 给一对已知有变化的帧，必须 ≥50 个变化像素）、空名单=红（`HOVER_DIFF_EMPTY=1`）。
+  复现：`python3 scripts/hover_two_state_diff.py --shots <目录> --control modechip-hover-idle-200x60-dark,modechip-hover-lit-200x60-dark`。
+- **U-775：本机真读数（配对=6 / 无静置态=14 / 三把对照全 OK / `RULER_EXIT=0`）。** 玻璃圆钮 暗 面积 21.1%、带内均值 **1.232**、逐点中位 **1.393**；亮 22.1%、**1.078**、**1.092**。
+  另两处同批量到：行内收藏星 `row-favorite-hover↔idle` 暗 1.218 / 逐点中位 1.351、亮 1.071 / 1.094（面积 9.5%）；段按钮 暗 1.179 / 1.216、亮 1.093 / 1.095（面积 19.7%）。
+  正对照 modechip 暗：面积 3.4%、带内均值 1.223、逐点中位 **1.515**。⇒ **两个口径给出的结论不同向**：按带内均值，亮档 1.078 低于正对照 1.223；按逐点中位，亮档 1.092 也低于正对照 1.515，但暗档 1.393 同样低于 1.515。
+  ⇒ 这条尺**能报数、还不能判产品**：缺的是"可分辨线压在哪个口径的哪个值上"，而那要先有第二台机器的读数（CI）与 251 的第三处两态帧。本轮**不动 `VisualFill.hover` 任何一档**。
+- **U-776：新尺第一次跑就红，红在它自己的配对规则上（不是产品）。** 第一版只试 `X-hover-…`→`X-…` 与 `X-hover-…`→`X-hover-…-idle`，于是 `segmented-filter-hover-200x60` 被报成"无静置态"，而 `segmented-filter-idle-200x60-dark` 明明在盘上 —— 漏了把 `-hover` 换成 `-idle` 的中缀形。
+  发现方式：加 `--min-pairs 4` 让覆盖率地板说话（真产物上只有 2 对 ⇒ 红），而不是数"有没有出现过配对"。修候选后配到 **6 对**（三处基名 × 两档：`glass-pill` / `row-favorite` / `segmented-filter`）；剩下 14 个 `-hover` 名：`heatmap-cell-strip-hover` / `row-favorite-hover` / `quickpick-hover` / `controlprobe-hover-ladder` / `settingsrow-hover-idle↔lit` / `modechip-hover-idle↔lit` 这些**没有 hover↔静置同尺寸对**，逐条打印成显式缺席（不是红，是读数）。
+  还有一格要记：这把新尺第一次进仓库就被**自己的守卫**红了一次 —— `test_frames_path_hygiene.test_no_hardcoded_round_frame_directory` 抓到我在 docstring 的用法示例里写死了某一轮的临时帧目录（R228/253 那条规矩正是为这个立的）。⇒ 改成了 `<目录>` 占位；**守卫比作者先看见形状漂移**，这一格算它的第二次立功。
+  **未做**：① 这把尺**还没接进电池**（`scripts/tests` 里没有对应守卫，CI 也没有那一步）⇒ 下一轮接线，且要配"不给 `--control` 就红"的正对照；② 251 第三处（`DetailView.swift:609`）仍无两态帧；③ M795/M796 仍未登记；④ CI 未读（`RUN=39352046610 sha=5252c05 status=in_progress conclusion=` 空）。
+
 ## 第 238 轮（R239 / Round 236 · 2026-10-20）：看图腿回来了 —— 重捕 162 帧、给 251 的两处悬停位点配上「静置↔悬停」两态差读数，并当场量到自己那把临时尺的单位错（U-771…U-773）
 
 - **U-771：帧通道恢复（连续几轮的看图腿都是 NOT-RUN，这一轮不是）。** `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/shots_r239 swift test --filter UICaptureTests` ⇒ `CAPTURE_EXIT=0`、
