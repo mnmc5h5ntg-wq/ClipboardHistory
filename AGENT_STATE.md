@@ -5,6 +5,8 @@
 
 **本轮落地**：空转基线只为把噪声打成读数；`blockedQueuePrintOnlyMilliseconds` / `blockedRatioReference` 只印不判；刀 M831（needle 从 R51 表读）1/1 CAUGHT、RESTORE_CLEAN；定向卷 Executed 6/failures=0；脚本电池 Ran 513 tests / OK (skipped=4)；预检 tables=80 covered=63 arms=210 bad=0、ARM_TOTAL arms=703、310 缺口 75 张 / 423 把。本轮 0 产品文件 ⇒ sources 格不动、四件套沿用上一笔、看图腿 NOT-RUN。
 
+**收尾登记（R271 之后）**：325 结案 —— a481ab4→39572947743 success（该格在 runner 日志出现 2 次、:153 出现 0 次），坏法仍被行为断言抓住（M831 CAUGHT、红在 XCTAssertFalse）。台账半 3f8050b→39576062490 交接时 in_progress / 未读（只登记号不轮询，R140）。
+
 **下一轮（R272 / 第 271 轮 / Round 269）的 ⓪**：
 ⓪ 读 CI：**a481ab4 → 39572947743 / completed / success（本轮代码半那一笔）是 325 的结案条件** —— 它不再红在 `CapturePathWriteBudgetTests.swift:153` 才算；68ab84a → 39570994287 / completed / failure 那一跑红在 STEP[2] checkout 属基建红，重跑一次看它是否自己消失（基建红也不许长期挂着）。只登记号不轮询（R140）。
 ① 326（比值恒真这条轴：基线必须来自另一个对象 + 一把会红的刀）、327（运行时 needle 让静态预检看不见）。
