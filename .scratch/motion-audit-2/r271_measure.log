@@ -1,0 +1,9 @@
+CLEAN 1 用时=0.397 基线=0.353 倍率=1.13 跑=1 失败=0
+CLEAN 2 用时=0.407 基线=0.388 倍率=1.05 跑=1 失败=0
+CLEAN 3 用时=0.408 基线=0.426 倍率=0.96 跑=1 失败=0
+Traceback (most recent call last):
+  File "/Users/wangziyi/Codex_Project0/.scratch/motion-audit-2/r271_measure.py", line 89, in <module>
+    sys.exit(main())
+  File "/Users/wangziyi/Codex_Project0/.scratch/motion-audit-2/r271_measure.py", line 80, in main
+    print('MUTANT %s 跑=%d 失败=%d %s' % (('%(用时=%.3f 基线=%.3f 倍率=%.2f)' % r) if r else '无读数',
+TypeError: format requires a mapping

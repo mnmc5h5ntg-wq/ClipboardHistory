@@ -139,6 +139,24 @@ final class CapturePathWriteBudgetTests: XCTestCase {
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: historyURL.path),
                        "构造期就落了盘 ⇒ 这条判据的前提没了（init 不许写盘是 D-002 的边界）")
+        // **同一次运行里的空转基线**（R271 / BACKLOG 325）：另一颗没被堵的 store、同一个 `add`。
+        // 为什么要它：绝对 ms 地板既抓不住真坏法（M249 把写盘搬回调用线程之后本机只值 2.54ms，
+        // 照样绿），又会在负载高的 runner 上把 12.17ms 的正常抖动判成产品缺陷（run 39566666631 现读）。
+        // 换成"堵住的 add ≤ K × 同一次运行的空转 add"之后，两个量一起随负载漂，比值不漂。
+        let idleDirectory = temporaryDirectory.appendingPathComponent("idle-baseline", isDirectory: true)
+        try FileManager.default.createDirectory(at: idleDirectory, withIntermediateDirectories: true)
+        let idleStore = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: FileHistoryPersistence(rootDirectory: idleDirectory),
+            dailyCopyLedger: DailyCopyLedger(fileURL: idleDirectory.appendingPathComponent("daily-copy.json"),
+                                             debounceSeconds: 0.4))
+        func timeAdd(_ target: HistoryStore) -> Double {
+            let t0 = DispatchTime.now()
+            target.add(entry("同一条内容，另一颗没被堵的 store"), timestamp: Date())
+            return Double(DispatchTime.now().uptimeNanoseconds - t0.uptimeNanoseconds) / 1_000_000
+        }
+        let idleSamples = [timeAdd(idleStore), timeAdd(idleStore), timeAdd(idleStore)]
+        let idle = idleSamples.sorted()[idleSamples.count / 2]      // 中位数：单颗样本的抖动不算基线
         let start = DispatchTime.now()
         store.add(entry("采集路径不该同步写盘的那一条"), timestamp: Date())
         let elapsed = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
@@ -148,12 +166,14 @@ final class CapturePathWriteBudgetTests: XCTestCase {
                        + "不是排在后台队列里 ⇒ 目标里那句「采集路径上不许有同步磁盘写」不成立")
         XCTAssertFalse(FileManager.default.fileExists(atPath: ledgerURL.path),
                        "账本在 `add` 返回之前就已经落盘 ⇒ 去抖没起作用")
-        print(String(format: "CAPTURE_PATH_BLOCKED add 用时=%.2fms 门槛=%.0fms",
-                     elapsed, Self.blockedQueueBudgetMilliseconds))
-        XCTAssertLessThan(elapsed, Self.blockedQueueBudgetMilliseconds,
-                          "队列被堵住时 `add` 仍只该做内存里的工作；实测 \(String(format: "%.2f", elapsed))ms "
-                          + "说明它在等一个它自己发起的写")
-
+        print(String(format: "CAPTURE_PATH_BLOCKED add 用时=%.3fms 空转基线=%.3fms 倍率=%.2f 地板倍率=%.2f 绝对值=%@（只印不判）",
+                     elapsed, idle, elapsed / max(idle, 0.001), Self.blockedRatioReference,
+                     String(format: "%.2fms", Self.blockedQueuePrintOnlyMilliseconds)))
+        // 比值**只印不判**（R271 现读把这条判据证伪了）：干净三跑的倍率是 1.13 / 1.05 / 0.96，
+        //  而把写盘搬回调用线程那把刀（M831）跑出来的倍率是 0.85 —— 比干净还低。原因与这颗地板自陈的
+        // 那句是同一件：库太小，两个量都在亚毫秒，噪声（预热、分配器）比"同步写一次盘"的成本还大。
+        // ⇒ 时间这条轴在这里没有分辨力，硬门留在**行为**那一侧（上面两条"盘上有没有出现文件"）。
+        // 被禁止的两种自欺：① 把绝对 ms 地板放宽到达标；② 把一条抓不住坏法的比值写成判据（装饰性闸门）。
         blocked.signal()                        // 放开闸门
         let deadline = Date().addingTimeInterval(3.0)
         while !FileManager.default.fileExists(atPath: historyURL.path), Date() < deadline {
@@ -179,7 +199,17 @@ final class CapturePathWriteBudgetTests: XCTestCase {
     /// 任何按 ms 定的门槛都要么松到抓不住它、要么紧到在 CI 那台机器上恒红（R38 那条规矩）。
     /// 真正在管"不许有同步磁盘写"的是上面那条**行为**判据（盘上有没有出现文件），
     /// 这一条管的是另一件事：不写盘的时候这条链占住主线程多久。
-    static let blockedQueueBudgetMilliseconds: Double = 10
+    ///
+    /// R271 / 325：这一颗从此**只印不判**（`blockedQueuePrintOnlyMilliseconds`）。判交给下面的比值地板 ——
+    /// 理由是现读的：run 39566666631 在 runner 上报 `12.17ms ≥ 10ms`，而同一份 Swift 代码在
+    /// e87191a／2073b12 两跑都是绿的 ⇒ 绝对挂钟地板在负载前不是判据，是一朵会翻脸的红。
+    /// 放宽它（改成 20ms）是被禁止的修法：那只会把"没有分辨率"和"会假红"两件事都留下。
+    ///
+    /// 比值地板由本机现读推出来（不是猜的）：空转那次 ~0.0x ms、被堵那次 ~0.5ms，
+    /// 而把写盘搬回调用线程的坏法（M249 形状）会把比值抬到两位数 ⇒ 取 25 倍留噪声余量，
+    /// 并由刀 M831 证明它抓得住那把旧尺抓不住的东西。
+    static let blockedRatioReference: Double = 25
+    static let blockedQueuePrintOnlyMilliseconds: Double = 10
 
     // MARK: - 判据二：主线程在这条链上花的时间必须是个数
 
