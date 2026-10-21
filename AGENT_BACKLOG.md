@@ -6884,3 +6884,5 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 
 **327. `mutate_r271.py` 的 needle 是运行时从 R51 那张表读来的 ⇒ 静态预检抽不出它：表进了名册（tables=80）却没进覆盖（covered=63），M831 只被 ARM_TOTAL 的 dupes/repeats 管到，锚点唯一性没人管。要么把这类「跨表复用 needle」的表做成预检认识的第二种形状（读表时跟着解析 load_arm() 的来源），要么规定表不许在运行时取 needle —— 但别让它看起来已被覆盖（D-248 的又一种形态）（R271 新开）**
   追记（R272）：结一半 —— mutate_r271 的 TARGET/NEEDLE/REPL 改成静态字面量，预检从此抽得到（covered 63 → 64、bad=0、  arms=211），刀重跑仍 1/1 CAUGHT（红在 XCTAssertFalse、倍率 0.79）；字面量的腐烂风险由新格   scripts/tests/test_mutate_r271_needle.py 三格钉住（与 R51 那颗 needle 逐字对账 + 锚点在产品文件里恰好一次 + 一条漂移正对照）。  剩下那半：预检本身还没有「运行时取 needle」这种表的通用形状，靠每轮手写镜像格 + 对账格撑着，等第三张这种表出现再抽象。
+
+**328. 把「比摘要」这类对账统一成一条会红的尺（R273 现读：`docs/frame_baseline.json` 的 note 自陈 sha256、`scripts/frame_baseline.py:53` 是 `sha256_of`，而本轮台账生成器第一版拿 **md5** 去比它，还允许 `endswith`/子串这两种含糊包容 ⇒ 它红在自己的格子上，侥幸方向是「永远绿」）。逐处扫 `scripts/` 与 `.scratch/motion-audit-2/` 里所有比对帧/产物摘要的地方：每处要回答①用的是哪种摘要、②是不是整条严格相等、③算法是否从被比对对象自己声明（note/schema）推出来而不是写在比较式里。含糊包容一律删掉；扫完要把「拿 md5 比 sha256」做成一把刀（喂错的摘要 ⇒ 必须拒），别只改生成器不配证人（R273 新开）**
