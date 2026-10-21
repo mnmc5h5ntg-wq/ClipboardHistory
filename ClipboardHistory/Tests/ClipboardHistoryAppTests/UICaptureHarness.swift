@@ -4889,7 +4889,7 @@ final class UICaptureTests: XCTestCase {
     /// （墨心；抗锯齿的边缘散在很多灰阶上、每档只有几颗，所以众数仍是墨心）。两把尺共用一条带的话，
     /// 抬墨那一半会被填充那一半挤掉 —— R182 那一族"两层材质混成一层"的同一种坏法。
     static func glyphInkReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
-                                bytesPerRow: Int) -> (background: Int, ink: Int, ratio: Double, inkPixels: Int) {
+                                bytesPerRow: Int) -> (background: Int, ink: Int, ratio: Double, inkPixels: Int, nearPixels: Int) {
         func luma(_ x: Int, _ y: Int) -> Int {
             let i = y * bytesPerRow + x * 4
             return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
@@ -4901,16 +4901,22 @@ final class UICaptureTests: XCTestCase {
         }
         let bg = edge.max { $0.value < $1.value }?.key ?? 0
         var band = [Int: Int]()
+        var near = 0
         for x in 0..<width {
             for y in 0..<height {
                 let g = luma(x, y)
-                if abs(g - bg) >= 60 { band[g, default: 0] += 1 }
+                let d = abs(g - bg)
+                // `near` 与 `band` 是**两条宽度不同的尺**，这是 R265 为 313 加的分辨读数：
+                // "一颗都没画"（near 也≈0）与"画了但在这台机器上淡到进不了 ≥60 的带"（near 有几百、
+                // band 只有个位数）修法相反 —— 前者要查画法，后者要查带子/解析色。
+                if d >= 20 { near += 1 }
+                if d >= 60 { band[g, default: 0] += 1 }
             }
         }
         guard let (ink, count) = band.max(by: { $0.value < $1.value }) else {
-            return (bg, -1, 0, 0)
+            return (bg, -1, 0, 0, near)
         }
-        return (bg, ink, Self.contrastRatio(bg, ink), count)
+        return (bg, ink, Self.contrastRatio(bg, ink), count, near)
     }
 
     /// 收藏星的字形墨：**静置**必须过"可交互控件至少 3:1"那条线，**悬停**必须真的更清楚
@@ -4927,21 +4933,21 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         func read(_ fixtureName: String, _ appearance: NSAppearance.Name)
-            -> (background: Int, ink: Int, ratio: Double, inkPixels: Int) {
+            -> (background: Int, ink: Int, ratio: Double, inkPixels: Int, nearPixels: Int) {
             guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
                 XCTFail("找不到夹具 " + fixtureName + " ⇒ 这条判据没有对象")
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, 0)
             }
             let file = scratch.appendingPathComponent(fixtureName + "-" + appearance.rawValue + ".png")
             do { _ = try render(fixture, appearance: appearance, to: file) } catch {
                 XCTFail(fixtureName + "：渲染失败 " + String(describing: error))
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, 0)
             }
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
                   let base = rep.bitmapData else {
                 XCTFail(fixtureName + "：读不回 " + file.lastPathComponent)
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, 0)
             }
             let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
             return Self.glyphInkReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
@@ -4978,6 +4984,7 @@ final class UICaptureTests: XCTestCase {
                  + "｜对比 idle=" + String(format: "%.3f", idle.ratio)
                  + " hover=" + String(format: "%.3f", hover.ratio)
                  + "｜墨像素 idle=" + String(idle.inkPixels) + " hover=" + String(hover.inkPixels)
+                 + "｜近墨像素(≥20) idle=" + String(idle.nearPixels) + " hover=" + String(hover.nearPixels)
                  + "｜地板 3.000（注释里那句「两边都过 3:1」现在会红）")
             // 出口按**对象存在性**切片，不按机器名（R264 / runner run 39519770384 现读）：
             // 同一份夹具在 runner 上只数到 3~5 颗墨（本机 47 颗），比值 2.668/1.878 ——
@@ -4985,7 +4992,14 @@ final class UICaptureTests: XCTestCase {
             // 但这条出口有代价：它让 runner 从此看不见这一位的墨 —— 代价记 BACKLOG 313，
             // 且上面三条**接线断言**（与机器无关）照旧硬红，放宽的只有像素判据。
             if idle.inkPixels < 20 || hover.inkPixels < 20 {
-                declined.append(tag + "(idle=" + String(idle.inkPixels) + " hover=" + String(hover.inkPixels) + ")")
+                // 分辨读数（R265，为 313 加）：`近墨像素` 回答"这一层到底有没有画"。
+                // 两种成因的修法相反 —— 几乎没画要查画法/符号变体；画了但淡到进不了 ≥60 的带，
+                // 要查带子与解析色（现读差异已经在那儿：本机底 255、runner 底 236）。
+                // 不猜成因，把分辨交给下一次 runner 自己印的这一行。
+                let drawn = max(idle.nearPixels, hover.nearPixels)
+                declined.append(tag + "(墨心 idle=" + String(idle.inkPixels) + " hover=" + String(hover.inkPixels)
+                                + " 近墨=" + String(drawn) + " 底=" + String(idle.background)
+                                + (drawn < 20 ? " 读法=这一层几乎没画" : " 读法=画了但进不了≥60的带") + ")")
                 continue
             }
             judged += 1

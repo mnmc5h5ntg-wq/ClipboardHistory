@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R265 / 第 264 轮 / Round 262 · 给 313 装分辨读数，把「降地板」这条路堵死）
+
+`glyphInkReading` 新增第二条带子：`近墨像素 = 与底 |Δ| ≥ 20 的颗数`（回答"这一层到底有没有画"），与原来的 `墨心 = |Δ| ≥ 60 的众数颗数` 并列打进 `FAVORITE_INK_PROOF`；出口那行从 `(idle=… hover=…)` 变成带 `近墨=… 底=… 读法=这一层几乎没画｜画了但进不了≥60的带`。现读：本机亮档近墨 177/1224、暗档 173/209，墨心 47/47 颗 ⇒ 两档都有对象、判据照旧全跑（亮 3.545→8.321、暗 4.641→8.312）。
+313 的新证人（runner 自印）：底 236 vs 本机 255（绝对带子的参照被整体挪走），墨心只有 3/4 颗，且 hover 101 > idle 161（本机方向相反）⇒ **不降 3.000**，因为降完那格会绿在同一批噪声上（D-251）。
+两把刀 M823/M824 在加完读数后重跑仍 2/2 CAUGHT、RESTORE_CLEAN（出口不许钝化判据）；build 0 告警；脚本电池 Ran 489 tests / OK (skipped=4)；预检 bad=0、310 缺口 75 张 / 423 把未收窄。新开 316（阈值 20 本身待实测支撑）。产品 0 文件，sources 格按规矩不动。
+
+
 ### Changed（R264 / 第 263 轮 / Round 261 · 缺口被数出来，上一轮的 runner 红被归因）
 
 `mutate_needle_precheck.py` 新增 `roster_gap()`：现读"声明了臂却没登记进 `TABLES`"的表 ⇒ `TABLE_ROSTER registered=75 unregistered_with_arms=75 hidden_arms=423`（只测不判，逐张点名）。电池 +2 格：把这两个数钉成 `assertEqual` 地板（D-250：等式挡"账与现状脱钩"，单调地板挡不住），正对照用人造未登记表。
