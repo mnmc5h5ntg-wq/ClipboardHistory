@@ -7,6 +7,7 @@
 
 **下一轮（R277 / 第 276 轮 / Round 274）的 ⓪**：
 ⓪ 读 CI：c99f1fb → 未取到（293）、f09006b → 39588588601 / completed / failure、ad61d2d → 39589146197 / completed / failure、1c831f2 → 39583125728 / completed / failure、3ec2a97 → 39581623084 / completed / failure 与本轮新跑（只登记号不轮询，R140）。本轮**要验的具体一件**：STEP[9]「Release script tests」在闭包门 + R51 归根之后转绿（failures 必须归 0，且 `Ran ≥ 521`）—— 这是 D-260/D-262 这条链第一次拿到 runner 验收；同时读 STEP[11] 那两张 recording 帧是否仍报 changed（若 changed≠0 按 D-251 开具名出口，不许改基线迁就）。
+   交账（R276 收尾二 · 现读 `gh run list` 与 `scripts/ci_read.py steps`，正文存 /tmp/r277_log3.txt）：f09006b → 39588588601、3d0fcec → 39588916568、ad61d2d → 39589146197 三笔都已 completed / failure，三笔的唯一红步骤都是 STEP[9]「Release script tests」，正文同形 `Ran 519 / FAILED (failures=1, skipped=1)` ⇒ **同一颗 R51 病根，不是第三种成因**（修法在 99f3284 里，那两跑早于它）；99f3284 → 39591885399 与 dc25e6e → 39592303302 交接时 in_progress ⇒ 只登记号不轮询（R140），所以 D-260/D-262 这条链的 runner 验收**今天仍然没拿到**，R277 第一件事就是读 39591885399 之后的那一跑：STEP[9] 必须 failures=0 且 `Ran ≥ 521`。
 ① **312 的具名出口（欠第八轮）**：按「纸」那一维推，本机 3.000 不许降（D-251）。
 ② 331（按机器键登记 skip 差异）、332（按闭包重排 329 的优先级）、330（三处淡入的两态夹具与中间态证人）、328、323、322、317、314-316。
 ③ 310 的 75 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 画法轴四位。
