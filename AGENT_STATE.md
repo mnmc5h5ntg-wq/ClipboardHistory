@@ -12,6 +12,18 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R290 状态（第 289 轮 / Round 287 · 2026-10-21）
+最后更新：2026-10-21（本地 · R290 / 第 289 轮 / Round 287）：**撤回 R289 那句「48 = 文字轴」：行分隔线的左端从来不对齐任何一列，现在由行首三列导出，漂移第一次会红**（U-944…U-948 · D-270 · 产品 1 文件 · 自评 95/105）
+
+**本轮落地**：`DetailView.swift` 把行首三列（内缩 12／箭头 12／图标 18／间距 10）升成 `MultiFilePreviewLayout` 常量、分隔线左端改成导出的 `rowTextLeading`；`UICaptureHarness.swift` 新增 `columnClusters`／`paperMode` 两把尺 + `changedXSpan` 交出 y 带 + 两格判据（列簇已知答案对照、左端产品判据，Executed 3 / failures=0）；`mutate_r290.py` M845/M846/M847（3/3 全 CAUGHT、RESTORE_CLEAN=yes，已登记进预检 tables=87 covered=71 bad=0）。现读：LEFT_AXIS_R290 light｜行带 y=142..241｜墨簇左沿 箭头=36.0 图标=55.0 文字=82.5｜细线数=3 左=[82.0,82.0,82.0]｜地板 1.5pt（改前：线 48.0 对文字 82.5，差 34.5pt；改完现读线 82.0 对文字 82.5）；右端那条（R289）同卷照绿 RIGHT_AXIS_R289 light｜密度=2.00｜药丸(两态差) 左=20.0 右=700.0 宽=680.0 变化=135821颗｜细线数=3 左=82.0 右=[700.0,700.0,700.0]｜地板 1.000pt，细线上限 2.0pt（改前同一颗尺读到 20.000pt）；改前 changed=8/compared=170 → 同一笔 update 后 0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=928 swift_skipped=44 swift_failures=2 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r290_verify2；脚本电池 Ran 538 tests / OK (skipped=5)。新开 339；337 第一处结案、第二处判为另一种约定（未升判据）。
+
+**下一轮（R291 / 第 290 轮 / Round 288）的 ⓪**：
+⓪ 读 CI：dcf5813 → 39621499774 / completed / success、3fa4e8b → 39621722785 / completed / success、4eb86ff → 未取到（293）、88b22cd → 39608506355 / completed / failure 加上本两笔（`gh run list --limit 6 --json databaseId,headSha,status,conclusion` 现取配对）。要验的两件事：STEP[9] 的 failures=0（R289 把 331 的 runner 行由外推改成读数）与 STEP[4]/捕获卷里 `LEFT_AXIS_R290` 有没有对象 —— 若 runner 上墨簇数不到 3 个，那朵红说的是尺（按 313/316 那一族解释，不许放宽地板、不许改产品）。只登记不轮询，R140。
+① **339**：把"细线不得越过所属容器"搬进仓库并按容器配对（先枚举容器，再判约定）。
+② **回到动效过程**（连续两轮的产物面仍是静态边界）：305（按下台阶的地板分辨实验）、291 的墨轴、314（热图那圈描边的语义：要不要换成别的记号 —— 先量它与哪一层混淆，再决定）。
+③ 312 的具名出口（欠第十三轮，本机 3.000 不许降，D-251）、333 的 CI 半、335、334、310（75 张表 / 423 把刀静默不覆盖）、338 的另一半、328、323、322、317、314-316。
+④ 用户闸门 220 路 A / 228② / 265。
+
 ## R289 状态（第 288 轮 / Round 286 · 2026-10-21）
 最后更新：2026-10-21（本地 · R289 / 第 288 轮 / Round 286）：**回到产品面：多文件详情区的行分隔线从悬停药丸外面穿出去 20.000pt，两条右轴现在读同一份数，判据从渲染产物里量**（U-939…U-943 · D-268、D-269 · 产品 1 文件 · 自评 93/105）
 
