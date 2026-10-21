@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R267 / 第 266 轮 / Round 264 · runner 负载打回一格"等挂钟"的判据）
+
+`DailyCopyHeatmapTests.testWriteFailureBecomesVisibleWithoutAnotherCopy`：`pumpMain(seconds: 0.8)` 改成"轮询到条件成立或 10 s 上限"，等待时间打成 `LEDGER_WRITE_ERROR_VISIBLE waited_ms=… publishes=… 有错误=…`；两条断言与地板一字未动。现读：本机 209 ms / 发布 2 次（基线 1）；刀 M825（把产品里镜像那行换成不再发布）顶到 10015 ms 才红 ⇒ 1/1 CAUGHT、RESTORE_CLEAN（"等条件"没有退化成"永远绿"）。
+CI 交账：30135fa → 39555625399 / completed / success、d7dfdba → 39555767398 / completed / success 绿；08ddaa1 → 39557244740 / completed / failure 红 = 本轮这格；e53706c → 39559154078 / completed / success 未读。同一步正文里 `FAVORITE_INK_NOT_RUN` 被运动闸门列为"已登记的标记" ⇒ R264/R266 那套出口没有把红藏起来。
+312 追记（runner 自印）：亮 底 236 近墨 57/300 对比 2.668、暗 底 50 近墨 57/69 对比 3.158 vs 本机 底 255/30、近墨 177/173、对比 3.545/4.641 ⇒ 星在 runner 上更淡，3.000 属通道差异 ⇒ 不降地板，下一轮做具名出口 + 两机各自推。新开 318（7 处固定挂钟 pump 待分辨）。脚本电池 Ran 489 tests / OK (skipped=4)、预检 bad=0（310 缺口 75 张 / 423 把）。产品 0 文件。
+
+
 ### Changed（R266 / 第 265 轮 / Round 263 · 313 由合成实验结案，字形墨尺换成对锐度不敏感的估计量）
 
 合成扰动现读（同一张真帧 `row-favorite-idle-60x56-light`）：纸 255→236 ⇒ 墨心众数颗数 **47→47**；高斯模糊一次 ⇒ **47→12**、两次 ⇒ **47→0**，近墨(≥20) 174→345；半分辨率再放大 ⇒ 47→6 ⇒ runner 那 3~5 颗是**估计量对锐度过敏**，不是"没画"。

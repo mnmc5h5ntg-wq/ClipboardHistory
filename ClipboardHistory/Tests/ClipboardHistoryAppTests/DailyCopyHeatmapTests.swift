@@ -461,12 +461,30 @@ final class DailyCopyHeatmapTests: XCTestCase {
         ledger.recordCopy(at: ledger.today)
         let afterCopy = publishes
 
-        pumpMain(seconds: 0.8)
+        // **等条件，不等挂钟**（R267 / runner run 39557244740 现读）：这一格原来只
+        // `pumpMain(seconds: 0.8)`，而产品的写盘在 `saveQueue(qos: .utility)` 上、
+        // 可见性回主线程还要再等 `debounce + grace` —— 本机 0.8s 够，runner 负载高时
+        // .utility 队列被压后 ⇒ 两条断言同时红（`lastWriteError=nil`、`publishes=1`），
+        // 红的是"还没到时候"，不是"产品没做"。固定睡眠是这种假红的温床（281/304 同一族）。
+        // 现在等到条件成立或 10s 上限；**断言一条没放宽**，超时仍然红，而且把等了多久打出来。
+        let started = Date()
+        let deadline = 10.0
+        while Date().timeIntervalSince(started) < deadline
+                && (ledger.lastWriteError == nil || publishes <= afterCopy) {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        let waitedMs = Int(Date().timeIntervalSince(started) * 1000)
+        CaptureReadings.emit("LEDGER_WRITE_ERROR_VISIBLE waited_ms=" + String(waitedMs)
+                             + " publishes=" + String(publishes) + " 复制后基线=" + String(afterCopy)
+                             + " 有错误=" + String(ledger.lastWriteError != nil)
+                             + " 上限_ms=10000")
 
         XCTAssertNotNil(ledger.lastWriteError,
-                        "写盘失败没有上屏 ⇒ 又回到「只防了一半」的那版")
+                        "写盘失败没有上屏 ⇒ 又回到「只防了一半」的那版（等了 " + String(waitedMs)
+                        + " ms，上限 10000 ms）")
         XCTAssertGreaterThan(publishes, afterCopy,
-                             "值变了但一次也没发布 ⇒ 观察它的设置页不会重绘，用户看不到这一行")
+                             "值变了但一次也没发布 ⇒ 观察它的设置页不会重绘，用户看不到这一行（等了 "
+                             + String(waitedMs) + " ms）")
         sink.cancel()   // 订阅必须活过 pump：提前解订阅会让上面那条只能靠运气绿
     }
 
