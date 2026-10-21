@@ -337,6 +337,9 @@ private struct MultiFileDetailView: View {
 
                     Divider()
                         .padding(.leading, 48)
+                        // 右端收到与药丸同一条右轴上（R289：原来它一路画到窗口边，
+                        // 比药丸右沿多出 20.000pt —— 数由判据 RIGHT_AXIS_R289 现读）
+                        .padding(.trailing, MultiFilePreviewLayout.rowHorizontalInset)
                 }
             }
             .padding(.vertical, 8)
@@ -366,6 +369,17 @@ private struct MultiFileDetailView: View {
 }
 
 enum MultiFilePreviewLayout {
+    /// 多文件列表的**水平内缩**：行的悬停药丸与行间分隔线必须共用这一份。
+    ///
+    /// 为什么单独成一个有名字的数（R289，量出来的）：分隔线原来只写 `.padding(.leading, 48)`
+    /// （48 = 文字左轴，那是 R31/R104 立过的轴，不动），**右边没有内缩** ⇒ 帧里实测
+    /// 药丸右沿 700.0pt、分隔线右沿 720.0pt，差 **20.000pt**（亮暗两档同形）。读数来自判据
+    /// `UICaptureTests/testMultiFileRowSeparatorsEndOnThePillRightAxis` 打的那行 `RIGHT_AXIS_R289`，
+    /// 刀 M842 会把改前那一版再量一遍 —— 注释里的实测值要么升成判据、要么删掉。
+    /// 分隔线从药丸右沿外面穿出去整整 20pt，两套边界在同一条缝里并存。修法是让分隔线的右端
+    /// 收到与药丸同一条右轴上，左端仍是文字轴：这样"左=文字轴、右=药丸右沿"是一套自洽的坐标，
+    /// 而不是两条各自为政的线。
+    static let rowHorizontalInset: CGFloat = 20
     static let minimumPreviewHeight: CGFloat = 120
     static let fallbackPreviewHeight: CGFloat = 260
     static let fallbackCompactPreviewHeight: CGFloat = 190
@@ -631,7 +645,9 @@ private struct MultiFileRow: View {
         }
         // 整行类：`scales: false`。行的主反馈是选中与底色，缩放一条铺满的行会读成"布局抖了一下"。
         .pressedStyle(in: VisualShape.rounded(VisualRadius.card), scales: false)
-        .padding(.horizontal, 20)
+        // R289：与上面那条分隔线的右端共用同一份内缩 —— 原来这里和 Divider 各写各的数，
+        // 于是药丸右沿 700.0pt、分隔线右沿 720.0pt，两条右轴在帧里并存（判据 RIGHT_AXIS_R289）。
+        .padding(.horizontal, MultiFilePreviewLayout.rowHorizontalInset)
         .padding(.vertical, 3)
         .onHover { hovering in
             withAnimation(MotionCatalog.animation(for: .hover)) {

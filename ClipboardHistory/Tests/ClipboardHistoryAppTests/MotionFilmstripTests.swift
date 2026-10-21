@@ -1393,6 +1393,12 @@ final class MotionFilmstripTests: XCTestCase {
                 + "alpha 那一根已经写进判定（`max(lumaDelta, alphaDelta) >= delta`），但这批 PNG 落盘时 alpha 恒 255"
                 + "（R76/U-132 同族：内存里带 alpha、落盘那张不带）⇒ 这根轴今天**没有对象**，有效轴就是亮度。"
                 + "代价与其余各条登记同族：「只改透明度不改颜色」的悬停层它读成没动 ⇒ 归 BACKLOG 108。"),
+            (qualifiedName: "UICaptureHarness.swift#changedXSpan",
+             reason: "R289 新建的两态**几何**尺（多文件详情区那条右轴的判据用它量悬停药丸铺到哪儿）。"
+                    + "它按灰阶差 ≥2 找变化像素，交出的是 x 跨度与颗数 —— 判定用的是边的位置而不是边的深浅，"
+                    + "补 alpha 那根轴换不出任何一个 x。通道事实与 `bandChanged` 同一条："
+                    + "这批 PNG 落盘时 alpha 恒 255（R76/U-132：内存里带 alpha、落盘那张不带）⇒ 这根轴今天没有对象。"
+                    + "代价照其余登记写明：「只改透明度、不改颜色」且合成后 RGB 完全相同的一层，它读成没动 ⇒ 归 BACKLOG 108。"),
 ]
     }
 

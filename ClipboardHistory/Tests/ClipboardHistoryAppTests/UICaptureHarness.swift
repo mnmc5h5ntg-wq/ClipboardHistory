@@ -5948,6 +5948,368 @@ final class UICaptureTests: XCTestCase {
         )
     }
 
+    // MARK: - 同一张帧里的两条右轴（R289 / BACKLOG 337）
+
+    /// 一条"整行大部分像素都是同一灰阶"的水平带，连它的左右沿一起交出来。
+    struct FlatBand {
+        let value: Int
+        let y0: Int
+        let y1: Int
+        let x0: Int
+        let x1: Int
+        var thicknessPx: Int { y1 - y0 + 1 }
+    }
+
+    /// 把一张帧切成水平带：只收**同一灰阶的横向跨度 ≥ 半幅**的那些行，再按 y 相邻合并。
+    ///
+    /// 为什么不是仓库里已有的那三把尺：`pillReading` 答「药丸比它自己的底淡多少」（墨）、
+    /// `glyphInkReading` 答「字形有多黑」（墨）、`changedXRange` 答「两态差了哪些像素」（要两张帧）。
+    /// 这一把答的是**几何** —— 同一帧里几块水平元素各自的左右沿是多少，单位是像素，
+    /// 换算成 pt 由调用方按 `密度 = 像素宽 ÷ 夹具宽` 现算（R224 那一课：不猜密度）。
+    ///
+    /// 归类只靠**厚度**（药丸 49.5pt、分隔线 1.0pt，两档差一个量级），不靠绝对色号：
+    /// 绝对灰阶窗在暗档会整幅失效（R102 那一课：同一条灰阶门限在两档一个是悬崖）。
+    /// 纸 = 左缘 8 列的众数，与上面那两把墨尺同一条约定，不另立第二套；
+    /// 候选灰阶必须离纸 ≥2，否则"带"就是背景本身（把背景算成命中 = 假读数）。
+    static func flatBands(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                          bytesPerRow: Int, minSpanFraction: Double = 0.5) -> [FlatBand] {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        var edge = [Int: Int]()
+        for x in 0..<min(8, width) {
+            for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
+        }
+        let paper = edge.max { $0.value < $1.value }?.key ?? 0
+        let minSpan = max(16, Int(Double(width) * minSpanFraction))
+        var bands: [FlatBand] = []
+        var open: FlatBand?
+        func flush() { if let b = open { bands.append(b) }; open = nil }
+        for y in 0..<height {
+            var hist = [Int: Int]()
+            for x in 0..<width {
+                let v = luma(x, y)
+                if abs(v - paper) >= 2 { hist[v, default: 0] += 1 }
+            }
+            guard let (value, count) = hist.max(by: { $0.value < $1.value }), count >= minSpan else {
+                flush()
+                continue
+            }
+            var lo = -1
+            var hi = -1
+            for x in 0..<width where abs(luma(x, y) - value) <= 1 {
+                if lo < 0 { lo = x }
+                hi = x
+            }
+            // 合并条件：灰阶同一（±1）、左右沿差 ≤8px、y 之间只隔 ≤2 行。
+            if let b = open, abs(b.value - value) <= 1, abs(b.x0 - lo) <= 8, abs(b.x1 - hi) <= 8,
+               y - b.y1 <= 3 {
+                open = FlatBand(value: b.value, y0: b.y0, y1: y,
+                                x0: min(b.x0, lo), x1: max(b.x1, hi))
+            } else {
+                flush()
+                open = FlatBand(value: value, y0: y, y1: y, x0: lo, x1: hi)
+            }
+        }
+        flush()
+        return bands
+    }
+
+    /// 两张同尺寸帧逐像素比灰阶，交出「变化像素的 x 跨度与颗数」（整幅扫，不先框）。
+    ///
+    /// 为什么不用已有的 `changedXRange`：那条要调用方先给一个 `clipping` 矩形 —— 也就是**先知道答案**
+    /// 才能量，而这里要问的正是"悬停点亮的那一层横向铺到哪儿"；它把 alpha 合成到 128 灰、阈值 8，
+    /// 而淡底对纸只差 10 灰阶上下，压在阈值边上。这一条按灰阶差 ≥2 算命中，不给矩形。
+    static func changedXSpan(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep, threshold: Int = 2)
+        -> (minX: Int, maxX: Int, count: Int) {
+        guard let pa = a.bitmapData, let pb = b.bitmapData,
+              a.samplesPerPixel >= 4, b.samplesPerPixel >= 4,
+              a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh else { return (-1, -1, 0) }
+        func luma(_ p: UnsafeMutablePointer<UInt8>, _ i: Int) -> Int {
+            return Int((0.2126 * Double(p[i]) + 0.7152 * Double(p[i + 1])
+                        + 0.0722 * Double(p[i + 2])).rounded())
+        }
+        var lo = Int.max
+        var hi = -1
+        var count = 0
+        for y in 0..<a.pixelsHigh {
+            for x in 0..<a.pixelsWide {
+                let i = y * a.bytesPerRow + x * 4
+                let j = y * b.bytesPerRow + x * 4
+                if abs(luma(pa, i) - luma(pb, j)) >= threshold {
+                    count += 1
+                    if x < lo { lo = x }
+                    // 第一版这里写的是 `hi = x`（跟 `lo` 不对称），于是取到的是**最后一行**的右端
+                    // 而不是全局右端：药丸下沿的圆角让最后一行比中间行短 11px，
+                    // 真产物上把 700.0pt 读成 694.5pt —— 一条与产品无关的假红，
+                    // 被仓库外的临时尺（逐行取 max）否掉才发现。现在两边都按比较赋值，
+                    // 并由 `testChangedXSpanRulerKnowsItsOwnAnswers` 里"最宽的那行不在最后一行"
+                    // 那块形状钉住。
+                    if x > hi { hi = x }
+                }
+            }
+        }
+        return (lo == Int.max ? -1 : lo, hi, count)
+    }
+
+    /// 这条尺的三个数，全部来自现读，不来自印象。
+    enum RightAxis {
+        /// 两态之间「真的有药丸」的地板。真产物现读（R289，改完那一版）：亮档变化 135821 颗、
+        /// 暗档 134996 颗，宽 680.0pt、左沿 20.0pt。地板 5000 颗 / 100pt 拦的是「尺找错了对象」
+        /// （两帧读成同一张、带子被拆散），不是产品的形状 —— 两边差两个数量级，中间没有可争的地带。
+        static let pillMinChangedPixels: Int = 5000
+        static let pillMinWidthPt: Double = 100
+        /// 细线那一层的厚度上限：真产物 1.0pt，取 2pt。
+        static let hairlineMaxThicknessPt: Double = 2
+        /// 两条右轴允许差多少。**地板由真产物推**（R147 的规矩）：改完两档现读都是 700.0 vs 700.0，
+        /// Δ=0.0pt，1.0pt 是留给亚像素取整的余量。改前那一版由**同一颗尺**读到 **20.000pt**：
+        /// 分隔线右沿 720.0 / 药丸右沿 700.0，亮暗两档、三条线全同形（刀 M842 把
+        /// `.padding(.trailing, …)` 摘掉再量一次，红话里印的就是这个数 —— 台账抄它，不手抄）。
+        /// 这条地板**不是**为了让某一台机器变绿而放的。
+        static let tolerancePt: Double = 1.0
+    }
+
+    /// **已知答案的对照**：这把新尺第一次上真产物之前，先在两块已知形状的合成帧上答对题。
+    /// 期望值不是心算出来的：纸 250、药丸 240（y 8…27 ⇒ 20 行）、细线 226（只有 y=30 那一行），
+    /// 再加一小撮"文字"（120 灰阶、每行 8 颗）——它**不许**被读成一条带，因为它过不了跨度半幅那条。
+    func testFlatBandRulerKnowsItsOwnAnswers() {
+        let w = 200
+        let h = 40
+        let bpr = w * 4
+        func make(_ fill: (Int, Int) -> Int) -> [UInt8] {
+            var px = [UInt8](repeating: 0, count: w * h * 4)
+            for y in 0..<h {
+                for x in 0..<w {
+                    let v = UInt8(truncatingIfNeeded: fill(x, y))
+                    let i = (y * w + x) * 4
+                    px[i] = v; px[i + 1] = v; px[i + 2] = v; px[i + 3] = 255
+                }
+            }
+            return px
+        }
+        func measure(_ px: [UInt8], fraction: Double = 0.5) -> [FlatBand] {
+            px.withUnsafeBufferPointer { buf in
+                Self.flatBands(bytes: buf, width: w, height: h, bytesPerRow: bpr, minSpanFraction: fraction)
+            }
+        }
+        func describe(_ bands: [FlatBand]) -> String {
+            bands.map { "灰\( $0.value ) y\( $0.y0 )…\( $0.y1 ) x\( $0.x0 )…\( $0.x1 )" }.joined(separator: "｜")
+        }
+
+        XCTAssertEqual(measure(make { _, _ in 250 }).count, 0,
+                       "纯色帧被读出了带 ⇒ 尺把背景本身当成了对象")
+
+        let drawn = measure(make { x, y in
+            if y >= 8 && y < 28 && x >= 20 && x < 160 { return 240 }      // 药丸：20 行厚
+            if y == 30 && x >= 40 && x < 190 { return 226 }               // 细线：1 行厚
+            if y >= 14 && y < 20 && x >= 60 && x < 68 { return 120 }      // 一小撮"文字"
+            return 250
+        })
+        XCTAssertEqual(drawn.count, 2, "带的条数不对（\(describe(drawn))）⇒ 合并或拆带有问题")
+        guard drawn.count == 2 else { return }
+        let thick = drawn.first { $0.thicknessPx >= 8 }
+        let thin = drawn.first { $0.thicknessPx <= 2 }
+        XCTAssertNotNil(thick, "没有厚带 ⇒ 药丸那一层被拆散了：\(describe(drawn))")
+        XCTAssertNotNil(thin, "没有细带 ⇒ 细线那一层丢了：\(describe(drawn))")
+        XCTAssertEqual(thick?.value, 240, "厚带的灰阶读错")
+        XCTAssertEqual(thick?.x0, 20, "厚带左沿读错：\(describe(drawn))")
+        XCTAssertEqual(thick?.x1, 159, "厚带右沿读错：\(describe(drawn))")
+        XCTAssertEqual(thin?.value, 226, "细带的灰阶读错")
+        XCTAssertEqual(thin?.x0, 40, "细带左沿读错：\(describe(drawn))")
+        XCTAssertEqual(thin?.x1, 189, "细带右沿读错：\(describe(drawn))")
+        XCTAssertNil(drawn.first { $0.value == 120 },
+                     "8 颗宽的一小撮文字被读成了一条带 ⇒ 跨度那条闸门是摆设")
+
+        // 反方向对照：把跨度闸门抬到 0.98，同一张图必须**一条带都数不到**。
+        // 这一格是 M843 那把刀的预演 —— 尺失去对象时判据必须走「没有对象」那条红话，
+        // 不许安静地"没有可比的 ⇒ 通过"。
+        let starved = measure(make { x, y in
+            if y >= 8 && y < 28 && x >= 20 && x < 160 { return 240 }
+            if y == 30 && x >= 40 && x < 190 { return 226 }
+            return 250
+        }, fraction: 0.98)
+        XCTAssertEqual(starved.count, 0,
+                       "闸门抬到 0.98 后仍然数到了带 ⇒ 上面那条「跨度 ≥ 半幅」根本没在筛东西")
+    }
+
+    /// **已知答案的对照**（R289）：`changedXSpan` 的右端必须是**全局**最右的变化像素。
+    ///
+    /// 这一格钉的是我自己刚踩的那个形状：第一版里 `lo` 按比较赋值、`hi` 直接 `hi = x`，
+    /// 于是"最后一行有变化的那个 x"被当成了全局右端。真产物上药丸下沿是圆的，最后一行比中间行短
+    /// 11px ⇒ 右沿 700.0pt 被读成 694.5pt，判据红在产品的一条**不存在**的边界上。
+    /// 所以这块形状的钉子必须是「**最宽的那一行不在最后一行**」。
+    func testChangedXSpanRulerKnowsItsOwnAnswers() throws {
+        func rep(_ rows: [[Int]]) -> NSBitmapImageRep? {
+            guard let w = rows.first?.count, rows.allSatisfy({ $0.count == w }) else { return nil }
+            guard let r = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: rows.count,
+                                           bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                           isPlanar: false, colorSpaceName: .deviceRGB,
+                                           bytesPerRow: w * 4, bitsPerPixel: 32),
+                  let base = r.bitmapData else { return nil }
+            for (y, row) in rows.enumerated() {
+                for (x, v) in row.enumerated() {
+                    let i = y * r.bytesPerRow + x * 4
+                    base[i] = UInt8(truncatingIfNeeded: v)
+                    base[i + 1] = UInt8(truncatingIfNeeded: v)
+                    base[i + 2] = UInt8(truncatingIfNeeded: v)
+                    base[i + 3] = 255
+                }
+            }
+            return r
+        }
+        func row(_ w: Int, lit: ClosedRange<Int>?, grey: Int) -> [Int] {
+            (0..<w).map { x in (lit?.contains(x) ?? false) ? grey : 250 }
+        }
+
+        // 纸 250、墨 230（差 20，过 ≥2 那条阈值）。前五行铺到 x=30，**最后一行**只铺到 x=22。
+        let flat = rep([row(40, lit: nil, grey: 250), row(40, lit: nil, grey: 250),
+                        row(40, lit: nil, grey: 250), row(40, lit: nil, grey: 250),
+                        row(40, lit: nil, grey: 250), row(40, lit: nil, grey: 250)])
+        let wide = rep([row(40, lit: 10...30, grey: 230), row(40, lit: 10...30, grey: 230),
+                        row(40, lit: 10...30, grey: 230), row(40, lit: 10...30, grey: 230),
+                        row(40, lit: 10...30, grey: 230), row(40, lit: 10...22, grey: 230)])
+        let short = rep([row(40, lit: nil, grey: 250)])
+        guard let f = flat, let g = wide, let s = short else {
+            XCTFail("造不出对照位图 ⇒ 这一格没在看东西"); return
+        }
+        let none = Self.changedXSpan(f, f)
+        XCTAssertEqual(none.count, 0, "同一张帧自己减自己，变化颗数不是 0 ⇒ 尺把纸本身算成了墨")
+        XCTAssertEqual(none.minX, -1, "没有对象时左端不许报坐标（R99：「没找到」不是距离）")
+        XCTAssertEqual(none.maxX, -1, "没有对象时右端不许报坐标")
+        let some = Self.changedXSpan(f, g)
+        XCTAssertEqual(some.minX, 10, "左端读错：\(some.minX)")
+        XCTAssertEqual(some.maxX, 30,
+                       "右端读成 " + String(some.maxX) + "（最后一行的右端是 22）⇒ 取的不是全局最右，"
+                        + "圆角那一层会把它压成假的产品边界")
+        XCTAssertEqual(some.count, 5 * 21 + 13, "变化颗数不对：\(some.count)（答案 5×21+13=118）")
+
+        // 两帧尺寸不符时给出的是**同一个** (-1,-1,0) 出口 —— 这条尺不区分"没变"与"没法比"。
+        // 所以调用方必须把"颗数=0"当成失败来判，而不是当成"通过"：
+        // 产品判据里 `RightAxis.pillMinChangedPixels` 那一格就是干这个的（R140：空对账）。
+        let mismatch = Self.changedXSpan(f, s)
+        XCTAssertEqual(mismatch.count, 0, "尺寸不符却数到了变化像素 ⇒ 缓冲越界了")
+        XCTAssertEqual(mismatch.maxX, -1, "尺寸不符却给出了右端 ⇒ 那是编出来的坐标")
+    }
+
+    /// **产品判据**：多文件详情区里，行分隔线的右端必须落在悬停药丸的同一条右轴上
+    /// （R289 / BACKLOG 337 的第一处）。
+    ///
+    /// 病是量出来的：改前同一张帧里药丸右沿 **700.0pt**、三条行分隔线右沿 **720.0pt**，
+    /// 细线从药丸右沿外面穿出去 20.000pt ⇒ "行"这块东西同时有两条右边界。
+    /// （仓库外那把临时尺读的是 699.5 / 719.5：差半颗是"最后一列"的取整口径，不是两个事实，
+    /// 账上只留这把进判据的尺的数。）
+    /// 修法是 `MultiFilePreviewLayout.rowHorizontalInset`：行与分隔线的右端读同一份数，
+    /// 改完这条判据在**同一颗尺**上读到 700.0 vs 700.0。
+    ///
+    /// 为什么左端不动：分隔线左沿 48pt 是文字轴（R31/R104 立过的那条），药丸左沿 20pt 是行的边 ——
+    /// 「细线从图标那一列下面穿过去」是列表的通行画法，不是两套边界。
+    /// 为什么这条判据只看**右**轴：同一件事只判一次。
+    ///
+    /// 细线取自**静置那一帧**、药丸取自**两态之差**（点亮帧减静置帧）：悬停帧里药丸下沿有一圈
+    /// 抗锯齿的暗边（改前亮档点亮帧现读 0.5pt 厚、x 26…693.5），
+    /// 拿"找细线"去点亮帧里找会把尺自己的毛边读成产品的缺陷。
+    ///
+    /// 不覆盖管线：读的是渲染产物（`render` → PNG → 像素）里的几何；
+    /// 按行归属那一路（夹具 → `hoveredRowForCapture` → 两态差）住在 `scripts/hover_two_state_diff.py`
+    /// 与它那条 `KNOWN_FLOOR_RED` 闸门里（R252 / BACKLOG 296），两处问的不是同一件事。
+    func testMultiFileRowSeparatorsEndOnThePillRightAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r289-rightaxis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func read(_ fixtureName: String, _ appearance: NSAppearance.Name)
+            -> (density: Double, bands: [FlatBand], rep: NSBitmapImageRep)? {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 " + fixtureName + " ⇒ 这条判据没有对象")
+                return nil
+            }
+            let file = scratch.appendingPathComponent(fixtureName + "-" + appearance.rawValue + ".png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(fixtureName + "：渲染失败 " + String(describing: error))
+                return nil
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(fixtureName + "：读不回 " + file.lastPathComponent)
+                return nil
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            let bands = Self.flatBands(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                       bytesPerRow: rep.bytesPerRow)
+            return (Double(rep.pixelsWide) / fixture.size.width, bands, rep)
+        }
+
+        var declined = [String]()
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = read("detail-3-files-row0", appearance),
+                  let hover = read("detail-3-files-row0-hover", appearance) else { continue }
+
+            // 药丸 = 两态之差。点亮帧里那圈 0.5pt 的抗锯齿暗边只随药丸一起出现，
+            // 拿"细线"去静置帧里找就不会把尺自己的毛边读成产品的缺陷。
+            let span = Self.changedXSpan(idle.rep, hover.rep)
+            let pillLeft = span.minX >= 0 ? Double(span.minX) / hover.density : -1
+            let pillRight = span.maxX >= 0 ? (Double(span.maxX) + 1.0) / hover.density : -1
+            let pillWidth = span.maxX >= 0 ? (Double(span.maxX - span.minX) + 1.0) / hover.density : -1
+            // 左沿在 0 的那条是详情区**头部与内容之间跨整幅**的段落线，另一种约定，
+            // 本轮不判它（新开 BACKLOG 337 的第二处）；这里要的是列表自己的行分隔线。
+            let rules = idle.bands.filter {
+                Double($0.thicknessPx) / idle.density <= RightAxis.hairlineMaxThicknessPt && $0.x0 > 0
+            }
+            func rightPt(_ b: FlatBand, _ d: Double) -> Double { return (Double(b.x1) + 1.0) / d }
+            func leftPt(_ b: FlatBand, _ d: Double) -> Double { return Double(b.x0) / d }
+
+            let ruleRights = rules.map { String(format: "%.1f", rightPt($0, idle.density)) }
+                .joined(separator: ",")
+            let ruleLeft = rules.first.map { leftPt($0, idle.density) } ?? -1
+            let thick = String(format: "%.1f", RightAxis.hairlineMaxThicknessPt)
+            let line = "RIGHT_AXIS_R289 " + tag
+                + "｜密度=" + String(format: "%.2f", idle.density)
+                + "｜药丸(两态差) 左=" + String(format: "%.1f", pillLeft)
+                + " 右=" + String(format: "%.1f", pillRight)
+                + " 宽=" + String(format: "%.1f", pillWidth)
+                + " 变化=" + String(span.count) + "颗"
+                + "｜细线数=" + String(rules.count) + " 左=" + String(format: "%.1f", ruleLeft)
+                + " 右=[" + ruleRights + "]"
+                + "｜地板 " + String(format: "%.3f", RightAxis.tolerancePt)
+                + "pt，细线上限 " + thick + "pt（改前同一颗尺读到 20.000pt）"
+            emit(line)
+
+            if span.count < RightAxis.pillMinChangedPixels || pillWidth < RightAxis.pillMinWidthPt {
+                declined.append(tag + "(两态差只数到 " + String(span.count) + " 颗、宽 "
+                                + String(format: "%.1f", pillWidth) + "pt ⇒ 尺没有对象：悬停那一层没画，"
+                                + "或点亮帧与静置帧读的是同一张)")
+                continue
+            }
+            // 夹具里三行 ⇒ 三条行分隔线。只数到 1 条就是带子找错了对象，不能拿它给产品签字。
+            if rules.count < 2 {
+                declined.append(tag + "(静置帧里只数到 " + String(rules.count)
+                                + " 条 ≤" + thick + "pt 且左沿不在 0 的细线 ⇒ 尺没有对象：行分隔线没被认出来)")
+                continue
+            }
+            judged += 1
+            for rule in rules {
+                let ruleRight = rightPt(rule, idle.density)
+                let gap = abs(ruleRight - pillRight)
+                XCTAssertLessThanOrEqual(gap, RightAxis.tolerancePt,
+                                         tag + "：行分隔线右沿 " + String(format: "%.1f", ruleRight)
+                                        + "pt 与悬停药丸右沿 " + String(format: "%.1f", pillRight)
+                                        + "pt 差 " + String(format: "%.3f", gap) + "pt（地板 "
+                                        + String(format: "%.1f", RightAxis.tolerancePt) + "）⇒ 同一列行同时有两条右边界，"
+                                        + "细线从药丸外面穿出去（改前同一颗尺读到 20.000pt）。"
+                                        + "两边都该读 MultiFilePreviewLayout.rowHorizontalInset")
+            }
+        }
+        XCTAssertEqual(judged, 2,
+                       "两档里有一档没量到对象（" + declined.joined(separator: "；") + "）⇒ 红话该说尺，不该说产品；"
+                        + "但「没量到」本身也是失败：这条判据没有免检出口")
+    }
+
     /// 热图夹具的数据。`today` 固定 ⇒ 这张帧**永远长一样**。
     ///
     /// 为什么不让它跟着真实日期走：帧基线是逐字节比的，用"今天"当锚点的话

@@ -54,7 +54,15 @@ ROSTER = {
         'test_working_frames_still_satisfy_the_three_relations': '帧目录不在（本机 NOT-RUN）',
     },
     'github-runner': {
-        'test_app_launches_and_terminates_cleanly': 'runner 的仓库根没有已构建的 .app（R276 现读唯一那一格）',
+        # 这一行原来是 R276 的**外推**（那一次只读到 `skipped=1` 这个数，没读到是谁），
+        # 外推填的是 `test_app_launches_and_terminates_cleanly`。它被 runner 自己两跑驳回：
+        # run 39608106160（41e1e66）与 39607521077（3403a78）都打
+        # `SKIP_ROSTER 键=github-runner … 名单外=['test_built_bundle_carries_no_app_delegate_stub']
+        #  名册未跳=['test_app_launches_and_terminates_cleanly']` —— 跳的是端到端读包那一格
+        # （`时间剪史.app` 不在 runner 的仓库根），而启动冒烟那一格在 runner 上是**跑过的**。
+        # 现在填的是读来的名字，不是猜的；两跑同读才签（R83：单次 runner 读数不配签字）。
+        'test_built_bundle_carries_no_app_delegate_stub':
+            'runner 的仓库根没有已构建的 时间剪史.app（run 39608106160 与 39607521077 两跑同读）',
     },
 }
 
