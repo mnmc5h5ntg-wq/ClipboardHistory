@@ -6,7 +6,7 @@
 **本轮落地**：`round_verify.sh` [3/4] 的帧基线门改成 changed≠0 ⇒ `exit 1`（排在 dmg/换装之前，红话只给一条正路、无 `|| true`、无环境变量后门；NOT-RUN 同样拦）+ 证人卷 `scripts/tests/test_round_verify_frame_gate.py` 6 格 + `mutate_r279.py` M834/M835（2/2 全 CAUGHT、RESTORE_CLEAN=yes，已登记进预检 tables=82 covered=66 bad=0）。四件套现读 build_warnings=0 swift_executed=923 skipped=44 failures=0 frames=170 changed=0 missing=0 dmg=ok installed=1.4.8；脚本电池 Ran 527 tests / OK (skipped=4)。两处自坏入账：守卫恒红在自己门里的散文上（剥注释后才判"用没用"，U-925）；D-260 的闭包只盖被 import 的工具 ⇒ 现读 280/379 支脚本仍写死本机根，新开 334（D-265）。R277/R278 两笔只落台账、没有 UI 小节，本轮标题按轮次映射写第 278 轮并把缺口明写。
 
 **下一轮（R280 / 第 279 轮 / Round 277）的 ⓪**：
-⓪ 读 CI：bfb8acf → 39594743756 / completed / success、41e5ce0 → 39595586063 / completed / success 加上本笔推送自动触发的那一跑（用 `gh run list --limit 3 --json databaseId,headSha,status,conclusion` 现取配对，别编号；只登记号不轮询，R140）。要验的是 **STEP[9]「Release script tests」的 failures 必须为 0**：本轮新增那 6 格证人卷里有一格会把闸门那段真跑一遍 bash，runner 上没有 `bash` 或抽不出那一段就会红 —— 那是尺的缺席不是产品。颗数与本机是否相等按 331 的名册回答，不许先假设：本机现读 527 颗（runner 若少收，差额要由 331 那两张按机器键的名册解释，不许先假设两边同数）。
+⓪ 读 CI（R279 收尾现读，三笔已落地）：bfb8acf → 39594743756 / completed / success、41e5ce0 → 39595586063 / completed / success、268287d → 39594029100 / completed / success —— 三笔全 completed/success ⇒ D-260／D-262／D-265 这条链在 runner 上没有红。本笔两枚（8a972d0、8717741）交接时未取到号 ⇒ 下一轮用 gh run list 现取配对，别编号（R140）。原句那句「交接时未读」已被现读推翻 ⇒ 就地改，不留过期断言。
 ① **333 的 CI 半**：runner 那次捕获 COMPARED=170 CHANGED=170 ⇒ 按机器键的具名出口（`FRAME_CHANGED_CHANNEL_DIFF=runner`，计入读数、不红不静默，D-251）+ 一把"真通道差异不误红"的刀；本机这半的 M834 不能替它作证。
 ② **312 的具名出口（欠第八轮）**：按"纸"那一维推，本机 3.000 不许降（D-251）。
 ③ 331（观测式名册：按"表头行 + 结果行"配对归属 + 恒等式闸门，两版已回退）、332、330、328、323、322、317、314-316。
