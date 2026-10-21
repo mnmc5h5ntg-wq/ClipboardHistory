@@ -4430,7 +4430,22 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("录制态夹具在产品视图树里找不到那颗 `HotKeyRecorderButton` ⇒ 这一帧拍的是空气")
             }
             button.performClick(nil)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            // **等画面停下来，不等挂钟**（R273 / BACKLOG 324）。原来这里是固定泵 0.35s，而「录制中」
+            // 那一圈描边带一次淡入 ⇒ 帧落在哪个相位由此刻负载决定。现读证据：这张帧在盘上 6 份历史
+            // 捕获里有 5 种 md5，差异 1753 颗像素、包围盒 x 958…1213 / y 503…550，与
+            // `scripts/frame_recording_proof.py` 量的那块逐位相同。现在等到 Core Animation 的动画键
+            // 清空（或 1.5s 上限），并把「等了多久、还剩几个键」打成读数 —— 形状同 D-253。
+            let settleStart = Date()
+            var keysLeft = -1
+            while Date().timeIntervalSince(settleStart) < 1.5 {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
+                let keys = button.layer?.animationKeys() ?? []
+                keysLeft = keys.count
+                if keys.isEmpty { break }
+            }
+            CaptureReadings.emit("RECORDER_SETTLE waited_ms="
+                                 + String(Int(Date().timeIntervalSince(settleStart) * 1000))
+                                 + " 动画键=" + String(keysLeft) + " 上限_ms=1500")
             XCTAssert(window.firstResponder === button,
                       "点下去之后第一响应者不是那颗录制器 ⇒ 这一帧拍不到录制态"
                           + "（要么 F7 那道守卫拒了，要么夹具与产品不同形）")
