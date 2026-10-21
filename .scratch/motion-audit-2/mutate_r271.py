@@ -18,7 +18,12 @@ import re
 import subprocess
 import sys
 
-ROOT = '/Users/wangziyi/Codex_Project0'
+# 仓库根由本文件自己的位置推 —— **不许写死本机绝对路径**：这一把会被脚本电池 import
+# （`scripts/tests/test_mutate_r271_needle.py`），而 runner 上的检出路径不是这里 ⇒ 写死就是
+# 三格 FileNotFoundError（R273 的账半在 run 39579621207 上正是这么红的，errors=3 全落在这三格）。
+# 同族的旧教训是 R262 修预检那一次（「预检把仓库根写死成我本机路径 ⇒ 改成由 __file__ 推」）。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(_HERE))
 R51 = os.path.join(ROOT, '.scratch', 'motion-audit-2', 'mutate_r51_capture_path_blocked.py')
 TEST1 = 'CapturePathWriteBudgetTests/testAddingACopyWritesNothingOnTheMainThread'
 

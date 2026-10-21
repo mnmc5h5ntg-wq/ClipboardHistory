@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R274 / 第 273 轮 / Round 271 · runner 上那一朵在我名下的红）
+
+`.scratch/motion-audit-2/mutate_r271.py` 的仓库根从写死 `/Users/wangziyi/Codex_Project0` 改成由 `__file__` 推 —— 它是被脚本电池 import 的工具，runner 的检出目录不是本机路径 ⇒ R273 的账半那一跑 STEP[9]「Release script tests」`Ran 516 / FAILED (errors=3, skipped=1)`，三格全是我上一轮为 327 写的漂移守卫（FileNotFoundError 样本 2 条同形）。同轮把这一次修升成会红的门：`test_mutate_r271_needle.py` 3 格 → 6 格（`mod.ROOT` 必须等于由 `__file__` 推的那一个；电池 import 的工具名单**现读**、逐个不许写死本机根、**名单为空=红**；正负对照测谓词自己）。刀 M831 重跑 1/1 CAUGHT、RESTORE_CLEAN=yes（D-215）；脚本电池 Ran 519 tests / OK (skipped=4)；预检 tables=80 covered=64 arms=211 bad=0。新开 329：其余 206 处写死本机根的脚本逐张搬。CI：6e810e6 → 39580528220 / in_progress / 未读、3ec2a97 → 39581623084 / in_progress / 未读、ecfc012 → 39581770417 / in_progress / 未读 交接时未读 ⇒ 只登记号不轮询（R140）。产品 0 文件；Swift 全量卷与帧基线本轮未跑 ⇒ NOT-RUN。
+
+
 ### Fixed（R273 / 第 272 轮 / Round 270 · 一张会同码翻脸的帧被钉住）
 
 `UICaptureHarness.swift` 的录制态夹具：`performClick` 之后的固定 `RunLoop.run(until: +0.35s)` 换成"等 Core Animation 动画键清空（1.5s 上限）"+ 读数 `RECORDER_SETTLE waited_ms=… 动画键=…`。现读：动画键全部 0，等待 129/147/42/52 ms。验收证人 = 同码双跑：170 张 vs 170 张逐张比 md5 与 sha256，两种摘要都是不同 0（此前是"盘上 6 份历史捕获 5 种 md5"）；与 `git show 6e810e6^:docs/frame_baseline.json` 逐键比摘要 ⇒ 换摘要的键数 2（settings-shortcuts-recording-720x540-dark.png、settings-shortcuts-recording-720x540-light.png，名单增删 0），且这两张的新摘要与本轮新捕文件**整条严格相等**（不是 endswith / 子串）。**324 结案**。过程里自坏两次并都留在账上：批量改注释的脚本吃掉了 `#if arch` 指令 ⇒ 编译失败 ⇒ 整本还原并记因（D-259）；补齐台账的生成器第一版拿 md5 比 sha256 基线 ⇒ 它拒绝写盘（U-914，新开 328 去扫其余同形尺）。脚本电池 Ran 516 tests / OK (skipped=4)、预检 tables=80 covered=64 arms=211 bad=0。CI：6e810e6 → 39580528220 / in_progress / 未读／5a6694b → 39580570540 / in_progress / 未读／cc8cb91 → 39579621207 / in_progress / 未读 交接时未读（只登记号不轮询，R140）。产品 0 文件 ⇒ sources 格不动；看图腿 NOT-RUN。

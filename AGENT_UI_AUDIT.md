@@ -376,6 +376,19 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 273 轮（R274 / 第 273 轮 / Round 271 · 2026-10-21）：runner 把我自己那一卷脚本电池弄红了 —— 三格 FileNotFoundError 的成因是工具写死了本机仓库根（U-915…U-917 / D-260 · 产品 0 文件）
+
+本轮次对照：与 R273（自评 83，324 结案 + 半套账补齐）相比，本轮做的是 R274 的 ⓪ 本身 —— 读自己那一跑的 CI，并且红的那一朵确实在我名下。
+
+- **U-915：归因先于修法，且只准由 runner 自己打印的正文签** —— cc8cb91 → 39579621207 / completed / failure 已 completed / failure，唯一红掉的步骤是 STEP[9]「Release script tests」，结论行现读 `Ran 516 tests / FAILED (errors=3, skipped=1)`。三格错误全部是同一形状：`FileNotFoundError` 指向 `/Users/wangziyi/Codex_Project0/.scratch/motion-audit-2/mutate_r51_capture_path_blocked.py` 这类**本机绝对路径**（样本 2 条、无一例外）。按 read-own-ci 的规矩我没有只盯自己新加的那一步：STEP[10..14] 全 skipped 是被这一步挡住，不是另一朵红。
+- **U-916：病根与修法 —— 被电池 import 的工具必须从 `__file__` 推根，和 R262 修预检同一条路** —— `mutate_r271.py` 的 `ROOT` 写死成 `/Users/wangziyi/Codex_Project0`：本机永远绿，runner 的检出目录不是它 ⇒ 站在它上面的三格守卫一起 error。改成由 `__file__` 推；并且当场问了一句「还有谁这样写」：现读 `.scratch/motion-audit-2/` 里 **206** 个脚本仍写死本机根，其中被电池 import 的 3 个（curve_from_ledger.py、make_surface_ledger.py、mutate_r271.py）现已全部干净。刀 M831 按 D-215 重跑（1/1 CAUGHT、RESTORE_CLEAN=yes）⇒ 改根没把刀弄哑。
+- **U-917：把这一次修升级成会红的门，而不是「我知道该怎么做」** —— `test_mutate_r271_needle.py` 由 3 格长到 6 格：① 行为证人 `mod.ROOT` 必须等于由 `mod.__file__` 推出的那一个，且推出来的根下面真有仓库；② 名单**现读**（扫 `scripts/tests/*.py` 正文里 `'motion-audit-2', 'x.py'` 的 import 形状）抽出的每颗工具都不许写死本机根，**名单为空本身要红**；③ 正负对照 —— 旧的写法（含行尾注释那种）必须被谓词判成红、新写法必须判成绿、只在注释里出现那个路径不算（R76：判"用没用"要剥注释）。
+
+眼睛腿：NOT-RUN —— 本轮 0 产品文件、帧未重捕，看图这一维按实记低分。
+读数腿：RUN —— runner STEP[9] 正文（`/tmp/r274_log.txt`，3 errors、2 条同形 FileNotFoundError）、M831 重跑（1/1 CAUGHT、RESTORE_CLEAN=yes）、脚本电池 Ran 519 tests / OK (skipped=4)、预检 tables=80 covered=64 arms=211 bad=0。
+产品腿：0 文件（`Sources/` 未动 ⇒ sources 格按规矩不动）。
+未做（逐条）：① 其余 206 处写死本机根的脚本没搬（新开 329，逐张搬并每张重跑）；② **312 的具名出口（欠第七轮）**；③ 328、323、322、317、314、315、316；④ 310 的 75 张表 / 423 把刀、309 那 6 张、305、291 三位；⑤ 用户闸门 220 路 A / 228② / 265。
+
 ## 第 272 轮（R273 / 第 272 轮 / Round 270 · 2026-10-21）：一张会同码翻脸的帧被钉住了 —— 固定挂钟泵换成等条件，证人是一次同码双跑（U-911…U-914 / D-259 · 产品 0 文件）
 
 本轮次对照：与 R272（自评 80，预检"看得见"与"不抄两份"同时成立）相比，本轮收 R272 收尾定位到病根的那张单子：**324**。
