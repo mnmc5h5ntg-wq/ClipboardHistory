@@ -6864,3 +6864,5 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
   与 `RunLoop.main.run(until: Date().addingTimeInterval(0.25))`（撞 `maximumDuration`）—— 两边都**更像巧合而不是抄**（胶片探针的 preroll
   与账本写盘的可见性之间没有因果边）⇒ 收窄之后的估计量仍只是**候选生成器**，判"抄没抄"要看那颗值有没有因果边。
   下一轮把这条估计量搬进 scripts/（配正负对照与刀）再逐处判，别拿 /tmp 那把尺的数进账。
+**325. runner 上那朵新的负载敏感红要换成相对判据，不许放宽地板（R270 收尾现读）：`CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`（CapturePathWriteBudgetTests.swift:153）在 c0abdec 那一跑红在 `XCTAssertLessThan failed: ("12.1725") is not less than ("10.0")` —— 而这颗 10.0 ms 地板按该文件自己的注释只是**分辨率**判据（「真正在管『不许有同步磁盘写』的是上面那条行为判据：盘上有没有出现文件」）。同一份 Swift 代码三跑两绿一红（e87191a 绿、c0abdec 红、2073b12 绿）⇒ 与 281/304/PerfBudget 同族。处置方向：按 R142（绝对阈值换成同一次运行内的相对判据）与 D-253 的路子，把这条 ms 阈值改成「与同一次运行里那颗空转 `add` 的基线相比」，或者先只印不判；同时把「行为判据仍是硬门」写成一条会红的守卫，并配两把刀（相对判据被拿掉 ⇒ 红；把写盘搬回调用线程 ⇒ 必须红）。**禁止的修法只有一种：把 10.0 放宽到达标**（R270 收尾新开）**
+

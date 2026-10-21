@@ -5,6 +5,9 @@
 
 **本轮落地**：`DailyCopyLedger.visibilityGrace` private → internal static + 调用点 `Self.`；观察窗口 `Int(3 * (0.05 + DailyCopyLedger.visibilityGrace) * 1000)`（计划 600 ms，改前 616／改后 639 ms 两份读数 + 帧基线 changed=1 证明行为没变）；`scripts/ledger_timing_scan.py`（9 格）现读 TIMING_SCAN product_grace=0.15 windows=1 读常量=1 抄值=0 判=PASS；刀 1/1 CAUGHT、RESTORE_CLEAN；四件套重跑（0 告警／全量 919 failures=0／帧 170 changed=1／dmg=ok／1.4.8）；脚本电池 Ran 513 tests / OK (skipped=4)；预检 tables=79 covered=63 arms=210 bad=0、310 缺口 75 张 / 423 把。CI 三跑（e87191a → 39565724396 / completed / success／c0abdec → 39566666631 / completed / failure／2073b12 → 39566913243 / completed / success）交接时未读。
 
+**收尾登记（R270 之后，只登记不轮询，R140）**：CI 六跑 —— e87191a → 39565724396 / completed / success；c0abdec → 39566666631 / completed / failure；2073b12 → 39566913243 / completed / success；a73c80d → 39569764918 / in_progress / 未读；7f15e97 → 39570257402 / in_progress / 未读；c1fe940 → 39570503582 / in_progress / 未读。其中 **c0abdec 那一跑红在 STEP[15]（Swift tests executed-count gate）**，红的是 `CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`（CapturePathWriteBudgetTests.swift:153）：实测 12.1725 ms ≥ 地板 10.0 ms，而同一份 Swift 代码在 e87191a 与 2073b12 两跑都是绿的 ⇒ 负载敏感，不是 R268/R269 那两次改动引入的坏法（那两笔都没动这颗阈值，且 R269 只动 scripts/）。新开 325 记的就是这条：换成同一次运行内的相对判据或先只印不判，行为判据继续当硬门，**不许把 10.0 放宽到达标**。
+
+**下一轮（R271 / 第 270 轮 / Round 268）的 ⓪ 增补**：先读 a73c80d／7f15e97／c1fe940 三跑（当时仍 in_progress），再按 ① 处理 325 那朵红 —— 它排在 312 之前，因为它是**唯一一朵正在红的**。
 **下一轮（R271 / 第 270 轮 / Round 268）的 ⓪**：
 ⓪ 读 CI：e87191a → 39565724396 / completed / success、c0abdec → 39566666631 / completed / failure、2073b12 → 39566913243 / completed / success 与本轮新跑（只登记号不轮询，R140）。要验的是 **runner 上 `DailyCopyLedger` 那格改完常量来源之后是否仍绿**，以及 ledger_timing_scan 这类静态尺在 runner 上有没有被接进 CI（没接就照 309/253 那族记账）。
 ① 312 的具名出口（第四轮欠账）：按**纸**那一维推，本机 3.000 不许降（D-251）。
