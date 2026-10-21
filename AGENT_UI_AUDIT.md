@@ -376,6 +376,41 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 278 轮（R279 / 第 278 轮 / Round 276 · 2026-10-21）：`changed` 从读数变闸门 —— 退出码丢掉的那道门等于不存在（U-924…U-926 / D-263…D-265 · 333 本机半结案 · 产品 0 文件）
+
+本轮次对照：与 R276（自评 80，门只扫直接 import）相比，本轮收的是 R277/R278 只落台账、没落判据的那笔账：**333**。第 276、277 轮（R277/R278）当时只动了 BACKLOG 与 STATE，三本账不齐、自评曲线断档 GAPS=[274,275] —— 那两节由本轮同一笔用 backfill_r277_r278.py 补落（补的是真正文与按实记的低分，不是桩标题；先例是 R197 的 patch_r197_backfill.py：曲线不认申报通道，少一轮就把均值算错）。
+
+- **U-924：333 的本机半结案，证人是四件套真跑过的那一行** —— `scripts/round_verify.sh` 第 [3/4] 步以前把 `frame_baseline.py compare` 的**退出码丢掉**，只把 `FRAME_BASELINE_CHANGED=` 抄进 `ROUND_VERIFY … baseline_changed=`：R252/R253 那两轮能发现 changed=1/2，是因为我恰好在读那个数。现在 changed≠0 直接 `exit 1`，且红话里只有一条正路（`frame_baseline.py update` 之后重跑），不留 `|| true`、不留环境变量后门（豁免一旦能被环境变量关掉就会腐烂成噪声）。三态各有合成读数：changed=3 ⇒ 红、changed=0 ⇒ 绿并仍把 compared/missing 一起打出来、**读不到（NOT-RUN）⇒ 也红**（R99：缺席不许比通过更宽松）。本轮同一笔四件套现读 脚本电池 Ran 527 tests / OK (skipped=4)、`FRAME_GATE_PASS changed=0 compared=170 missing=0`，即这道门不是只在合成样本上绿过。CI：bfb8acf → 39594743756 / completed / success、41e5ce0 → 39595586063 / completed / success 交接时未读 ⇒ 只登记号不轮询（R140），本轮不引用任何 runner 结论。
+- **U-925：新守卫第一次红，是红在自己的散文上** —— 门里那行注释写着「故意不留 `|| true`」，而我的证人格用的是**整块子串搜** ⇒ `Ran 6 / failures=1`，一道设计正确的判据恒红。修法按 R76/R100 那条老规矩：判"用没用"要判它出现在**可执行行**里（剥掉行首 `#` 与行尾注释后再搜），并同时留一条正对照 —— 若那块注释哪天被删，`'|| true' in block` 就红，提醒我这把尺剥的已经不是当初那一处。这把刀是 M835（把 `code_lines` 弄瞎 ⇒ 必须红在这一格），与拆门刀 M834（`exit 1` 换成 `true` ⇒ 必须红在"changed=3 要红"那一格）各钉一条轴（D-244）：M834 钉产品轴（门会不会拦），M835 钉尺轴（守卫是不是只在读散文）。现读 2 把全 CAUGHT、RESTORE_CLEAN=yes。
+- **U-926：D-260 的适用范围划错了一档，缺口是数出来的** —— 闭包门覆盖的是"电池 import 的工具"，而**台账生成器不被 import**（它由人跑）。现读 `.scratch/motion-audit-2/` 下 379 支 python，剥注释后仍有 280 支把仓库根写成 `/Users/wangziyi/…` 字面量（点名 backfill_r186_r187.py,final_report_r222.py,ledger_r121.py,ledger_r122.py,ledger_r124.py…）。⇒ 新开 **334**：按"谁会被别人/别的机器跑"重新划名单，而不是按"谁被 import"。本轮新写的两支（`ledgers_r279.py`、`mutate_r279.py`）自己按 `__file__` 推根，并且生成器里有一条"一把都没扫出来就拒写"的守卫 —— 一把只能读出 0 的尺不配登记结案。
+
+眼睛腿：RUN —— 现读 170 张帧在 settings-shortcuts-recording-720x540-light、settings-shortcuts-recording-720x540-dark 上按 EYE 名单逐张看过。两张都还在画「录制中」那一态：第三行录制器显示占位文案「请输入快捷键」，另两行是 ⌃⌥V／⌃⌥C，说明段与录制器同基线、没有互相吃掉；暗档侧栏五枚图标是清晰的白墨（R121 那笔 .monochrome 的效果仍在），亮档同五枚明显更淡 —— 那个淡法早被 172 判成离屏通道限制，本轮不改判也不重复结案。两帧与基线逐摘要相同（changed=0）⇒ R273 钉住的相位没漂。本轮改动全在脚本侧，画面没有新位点可判，所以这一维按实记低分，不编一句「看了两张发现更好」。
+读数腿：RUN —— `ROUND_VERIFY build_warnings=0 swift_executed=923 swift_skipped=44 swift_failures=0 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8`；`FRAME_GATE_PASS` 与该行同笔现读且两数互相对账；变异 2/2 CAUGHT；脚本电池 Ran 527 tests / OK (skipped=4)；预检 tables=82 covered=66 arms=214 bad=0、ARM_TOTAL arms=708 dupes=0；334 的数 280/379。
+产品腿：0 文件（只动 `scripts/round_verify.sh` + 新增一格证人卷 + 两张表 ⇒ sources 格按规矩不动，由电池里那条与 git 对账的守卫签）。
+未做（逐条）：① **333 的 CI 半**（runner 上 changed==compared 的按机器具名出口 + "真通道差异不误红"那把刀）；② **312 的具名出口（欠第八轮）**；③ 331（观测式名册，两版已回退、正解形状已定）、332、330、328、323、322、317、314-316；④ 310 的 75 张表 / 423 把刀 + 新增的 334；⑤ 305、299、301、307、297/298/300、304、291 三位；⑥ 用户闸门 220 路 A / 228② / 265。
+
+## 第 276 轮（R277 / 第 276 轮 / Round 274 · 2026-10-21）：331 两次尝试都回退了 —— 回退的原因各留下一组读数，spike 不进判据（U-927…U-929 / 产品 0 文件）【R279 补记】
+
+本轮次对照：与 R276（自评 79，门只扫直接 import）相比，本轮没有落地任何判据，做的是"把一条走不通的路证伪并写清下一步形状"。
+本节由 R279 补落（当时只动了 AGENT_BACKLOG.md 的追记二/追记三）；正文里的文件数由 `git show --name-only 759b0df 268287d` 现读（1 个文件，全在台账与 .scratch）。
+
+- **U-927：静态扫源码预测谁会 skip —— 两种错法都有读数** —— 第一版按"def test_x … skipTest(" 跨行匹配，把后面格子的 skip 记到前面格子头上：现读 15 条 findings 里 4 条 STALE 是尺自己造的。改成只认语句级 `self.skipTest(` 之后认出 8 处，而名册说本机该跳的 4 格里只认出 2 格 —— 因为 skip 的形状至少三种（装饰器 `@unittest.skipUnless(...)`、语句级但理由讲数据形状、以及藏在 helper 里）。结论：这条路对"谁会 skip"没有足够分辨力 ⇒ 整支回退。
+- **U-928：观测式（把电池跑成子进程）第一版坏在归属，正对照当场抓住** —— 防递归与"排除观察者恰好 1 格"两条都工作（现读 排除观察者=1 通过），但内层只认出 2 格、名册说 4 格 ⇒ 两格被误报成 NOT_SKIPPING_ANYMORE。根因：`unittest -v` 把格子 docstring 打在第一行、把 `... skipped '理由'` 落在另一行，那两行行首不是 `test_x (模块.类)`，按 marker 切拿不到 id。我自己写的正对照格把这条 bug 抓了出来（它多认出一条 `mod.SomeTests)` 这种 docstring 拼出来的垃圾 id）。
+- **U-929：下一版的形状因此是确定的，且回退笔也要留实物** —— 按"表头行 + 结果行"配对归属，并加一条恒等式闸门：解析出的 id 数必须等于内层汇总行 `OK (skipped=N)` 的 N 减去观察者那一格，不相等就红（少认一格正是这次的红法）。spike 留在 `.scratch/spikes/skip_roster_spike.py`（它现在还会 `KeyError: None`，正是"理由认不出通道"那一类没处理干净的实物），仓库净变化 0 个判据文件；脚本电池回到 Ran 521 / OK (skipped=4)。
+
+眼睛腿：NOT-RUN —— 本轮没有新位点可看，也没有重捕帧。读数腿：RUN —— 上面三格里的 15/4、8/4/2、排除观察者=1 都是脚本自己打印的现读值。产品腿：0 文件。
+
+## 第 277 轮（R278 / 第 277 轮 / Round 275 · 2026-10-21）：一笔好消息 + 一次公开更正 —— runner 第一次给 D-260/D-262 这条链签字，而我上一笔把脚本回显当成了执行输出（U-930…U-932 / 产品 0 文件）【R279 补记】
+
+本轮次对照：与 R277（自评 63，两版 331 都回退）相比，本轮拿到的是"修仪器"那条链的 runner 验收，代价是自曝一笔假指控。
+本节由 R279 补落（当时动了 AGENT_STATE.md 与 AGENT_BACKLOG.md 两本）；文件数由 `git show --name-only bfb8acf 41e5ce0` 现读（2 个文件，全在台账）。
+
+- **U-930：D-260 / D-262 这条链第一次被 runner 签字** —— `99f3284 → 39591885399 = completed / success`，STEP[9]「Release script tests」现读 `Ran 521 tests / OK (skipped=1)`；同一跑里 `mutate_r271` 的镜像对账格不再红 ⇒ "R51 归根 + exec 命名空间补 `__file__`"两处都生效，且不是靠放宽。
+- **U-931：公开更正 —— 「硬门在 runner 上等于不存在」是假的，成因是我读错了日志** —— 上一笔我按步骤名过滤，同一步里既看到 `FRAME_BASELINE_SKIPPED=runner-capture-unavailable` 又看到 `CHANGED=170` 却 exit 0。真相：`--log` 的回显段含 GitHub 打印的脚本正文，按 `##[endgroup]` 之后切执行段再数，SKIPPED 出现 0 次，那条 `count<60` 的整步放行今天根本没走过。教训写进 D-263：**按步骤名过滤日志 ≠ 拿到执行输出**。
+- **U-932：更正之后剩下的那半句仍是真问题，而且比原话更窄** —— `frame_baseline.py` 的 `check` 模式按设计只在 missing 时返回 1（源码注释：只要求一帧不许少，多帧与变帧交给人判断），所以 CHANGED=170 → exit 0 正是该步名字（fixture-set gate）声明的行为。留下的是：runner 那次捕获与本机整体不同（COMPARED=170 CHANGED=170 MISSING=0 ADDED=0），而"改界面没在同一笔 update 基线"在任何一侧都没有闸门 ⇒ 333 收窄成"给 changed 开一条按机器键的具名出口 + 两把刀"，本笔只改台账、判据零改动。
+
+眼睛腿：NOT-RUN —— 本轮没有新看位点（读数全在 CI 文本通道）。读数腿：RUN —— run 39591885399 的 STEP[9] 结论行、执行段里 SKIPPED 计数 0、CHANGED=170/COMPARED=170。产品腿：0 文件。
+
 ## 第 275 轮（R276 / 第 275 轮 / Round 273 · 2026-10-21）：门只扫了直接 import —— runner 上那朵红来自被运行时读的第二张表（U-921…U-923 / D-262 · 产品 0 文件）
 
 本轮次对照：与 R275（自评 88，三处 hover 动画与画法对齐）相比，本轮读的是 R276 的 ⓪ 本身，而红还在名下：R274 修完 `mutate_r271.py` 的写死根之后，runner 仍然红。

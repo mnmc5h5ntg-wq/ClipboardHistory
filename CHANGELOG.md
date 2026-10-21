@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 回退记账（R277 / 第 276 轮 / Round 274 · 331 两次尝试）【R279 补记】
+
+静态扫源码预测"谁会 skip"没有足够分辨力（跨行匹配把后面的 skip 记到前面格子头上，现读 15 findings/4 STALE；改成语句级只认 8 处而名册说 4 格、只覆盖 2 格，skip 形状至少三种）；观测式（把电池跑成子进程）防递归与排除观察者都工作（排除观察者=1 通过），但归属仍坏 —— `unittest -v` 把 docstring 与 `... skipped` 打在两行，按 marker 切拿不到 id，内层只认出 2 格 ⇒ 两格误报 NOT_SKIPPING_ANYMORE，我自己写的正对照格当场抓出这条 bug。两版都不进仓库判据（净变化 0），spike 留 `.scratch/spikes/skip_roster_spike.py`。下一版形状确定：表头行 + 结果行配对归属 + 恒等式闸门（解析 id 数 == 内层 `OK (skipped=N)` − 观察者那一格）。电池 Ran 521 OK (skipped=4)。
+
+### 交账与更正（R278 / 第 277 轮 / Round 275 · runner 签字 + 撤回一句假指控）【R279 补记】
+
+好消息：`99f3284 → 39591885399` completed/success，STEP[9] 现读 `Ran 521 tests / OK (skipped=1)` ⇒ D-260（写死本机根）与 D-262（可达闭包）这条链第一次拿到 runner 验收，且不是靠放宽。坏消息：上一笔那句"硬门在 runner 上等于不存在"是我把 GitHub 回显的脚本正文当成执行输出 —— 按 `##[endgroup]` 之后切执行段再数，`FRAME_BASELINE_SKIPPED` 出现 0 次，`count<60` 那条整步放行今天没走过；`check` 按设计只在 missing 时返回 1，所以 CHANGED=170 → exit 0 正是该步声明的行为。撤回归因，但真问题剩半句且更窄：runner 那次捕获与本机整体不同（COMPARED=170 CHANGED=170），而"改界面没在同一笔 update 基线"两侧都没有闸门 ⇒ 333 收窄成"changed 的按机器具名出口 + 两把刀"（本机半由 R279 落地）。教训升成 D-263：按步骤名过滤日志 ≠ 拿到执行输出。
+
+### Fixed（R279 / 第 278 轮 / Round 276 · `changed` 从读数变闸门）
+
+`scripts/round_verify.sh` 第 [3/4] 步：`frame_baseline.py compare` 的退出码以前被丢掉，只把 `FRAME_BASELINE_CHANGED=` 抄进 `ROUND_VERIFY` 摘要 ⇒ "改了界面没在同一笔 update 基线"这条纪律在任何一侧都不是红。现在 changed≠0 直接 `exit 1`（排在 dmg/换装之前），红话里只给一条正路（`frame_baseline.py update` 之后重跑），不留 `|| true`、不留环境变量后门；`changed` 读不到（NOT-RUN）同样拦。新增证人卷 `scripts/tests/test_round_verify_frame_gate.py`（6 格：接线 + 顺序 + 合成三态 3/0/NOT-RUN + 空名单仍印 missing），两把刀 `mutate_r279.py` M834（拆门 = 产品轴）／M835（守卫不剥注释 = 尺轴）现读 2/2 全 CAUGHT、RESTORE_CLEAN=yes，并已登记进预检名册（tables=82 covered=66 bad=0）。**333 的本机半结案**，CI 半（runner 上 changed==compared 的按机器具名出口）留在原单。本轮另两处自曝入账：守卫第一次恒红是红在自己门里的散文上（D-263 那族的镜像，U-925）；D-260 的闭包只盖住被 import 的工具，现读 280/379 支脚本仍写死本机根 ⇒ 新开 334（D-265）。脚本电池 Ran 527 tests / OK (skipped=4)；四件套现读 build_warnings=0 swift_executed=923 skipped=44 failures=0 frames=170 changed=0 missing=0 dmg=ok installed=1.4.8。CI：bfb8acf → 39594743756 / completed / success／41e5ce0 → 39595586063 / completed / success 交接时未读（只登记号不轮询，R140）。产品 0 文件 ⇒ sources 格不动；看图腿 RUN（settings-shortcuts-recording-720x540-light、settings-shortcuts-recording-720x540-dark）。
+
+
 ### Fixed（R276 / 第 275 轮 / Round 273 · runner 上第二朵在我名下的红）
 
 `mutate_r51_capture_path_blocked.py` 的包根由 `__file__` 推（原来写死 `/Users/wangziyi/Codex_Project0/ClipboardHistory`）；`mutate_r271.py` 的 `resolve_r51()` 在 exec 命名空间里补 `__file__`（exec 与 import 是两条通道，只给 `os`/`sys` 会让由 `__file__` 推根的那张表 `NameError`）。门扩到**可达闭包**：`closure_tool_names()` 从电池直接 import 的 3 颗推到 4 颗（curve_from_ledger、make_surface_ledger、mutate_r271、mutate_r51_capture_path_blocked），并新增两格 —— 一格钉"闭包必须含 R51 那张表"（不含就是装饰），一格测归一化的牙（同一颗文件两台机器相等、不同文件必须不等）。证据：1c831f2 → 39583125728 / completed / failure 与 3ec2a97 → 39581623084 / completed / failure 均 completed / failure，STEP[9] 正文 `Ran 519 / FAILED (failures=1, skipped=1)`，红格 `test_the_static_mirror_equals_the_r51_needle`。三张表按 D-215 重跑：mutate_r51 5 支：4 CAUGHT + M253 按设计绿（灵敏度对照臂），该红没红=0、还原不干净=0、mutate_r271 1/1 CAUGHT、RESTORE_CLEAN=yes、mutate_r275 2/2 CAUGHT、RESTORE_CLEAN=yes；脚本电池 Ran 521 tests / OK (skipped=4)；预检 tables=81 covered=65 arms=213 bad=0。写成 D-262；新开 331（runner 与本机 skip 数不一致，按机器键定名）、329 现读重数（目录 .py 377 颗、仍写死根 205 颗）。产品 0 文件 ⇒ sources 格不动；帧与全量卷未跑 ⇒ NOT-RUN。CI：c99f1fb → 未取到（293）／f09006b → 39588588601 / completed / failure／ad61d2d → 39589146197 / completed / failure 未读 ⇒ 只登记号不轮询（R140）。
