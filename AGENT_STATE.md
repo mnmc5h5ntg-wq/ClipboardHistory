@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+## R270 状态（第 269 轮 / Round 267 · 2026-10-21）
+最后更新：2026-10-21（本地 · R270 / 第 269 轮 / Round 267）：**判据里抄来的产品常量换成读常量（visibilityGrace 让出真相），新尺 ledger_timing_scan 钉住"抄值复活就红"；320 结案、新开 323**（U-897…U-900 · D-256 · 产品 1 文件·仅可见性 · 自评 89/105）
+
+**本轮落地**：`DailyCopyLedger.visibilityGrace` private → internal static + 调用点 `Self.`；观察窗口 `Int(3 * (0.05 + DailyCopyLedger.visibilityGrace) * 1000)`（计划 600 ms，改前 616／改后 639 ms 两份读数 + 帧基线 changed=1 证明行为没变）；`scripts/ledger_timing_scan.py`（9 格）现读 TIMING_SCAN product_grace=0.15 windows=1 读常量=1 抄值=0 判=PASS；刀 1/1 CAUGHT、RESTORE_CLEAN；四件套重跑（0 告警／全量 919 failures=0／帧 170 changed=1／dmg=ok／1.4.8）；脚本电池 Ran 513 tests / OK (skipped=4)；预检 tables=79 covered=63 arms=210 bad=0、310 缺口 75 张 / 423 把。CI 三跑（e87191a → 39565724396 / completed / success／c0abdec → 39566666631 / completed / failure／2073b12 → 39566913243 / completed / success）交接时未读。
+
+**下一轮（R271 / 第 270 轮 / Round 268）的 ⓪**：
+⓪ 读 CI：e87191a → 39565724396 / completed / success、c0abdec → 39566666631 / completed / failure、2073b12 → 39566913243 / completed / success 与本轮新跑（只登记号不轮询，R140）。要验的是 **runner 上 `DailyCopyLedger` 那格改完常量来源之后是否仍绿**，以及 ledger_timing_scan 这类静态尺在 runner 上有没有被接进 CI（没接就照 309/253 那族记账）。
+① 312 的具名出口（第四轮欠账）：按**纸**那一维推，本机 3.000 不许降（D-251）。
+② 323（数出还有几处抄值）、322（`asyncAfter` 逐处问有没有判据押在那段延迟上）、317（候选带 ≥60 推广前先做同样的合成扰动）。
+③ 314、315、316；310 的 75 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 三位。
+④ 产品动效面仍是最弱一维（本轮产品文件只改可见性）：按 173/242 那张清账表点一个位真做动效或撤声明。
+⑤ 用户闸门 220 路 A / 228② / 265。
+
 ## R269 状态（第 268 轮 / Round 266 · 2026-10-21）
 最后更新：2026-10-21（本地 · R269 / 第 268 轮 / Round 266）：**321 由既有读数结案（悬停取证键是整颗控件级，不是指针坐标）；`wait_scan` 指向第二个根时暴露作用域 bug，当场修 + 两格守卫 + 刀 M829；319 结一半 ⇒ 新开 322**（U-893…U-896 · D-255 · 产品 0 文件 · 自评 86/105）
 

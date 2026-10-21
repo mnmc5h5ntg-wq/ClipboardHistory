@@ -67,12 +67,14 @@ elif mode == "sources":
     sha = sys.argv[2] if len(sys.argv) > 2 else ""
     if not re.fullmatch(r"[0-9a-f]{7,40}", sha):
         die("sources 模式要一个真实的短 sha（只能来自 git rev-parse，不许编）")
-    pat = r"\| 最后一次动到 `Sources/` 的轮次 \|.*?上一笔动源码是 R253"
-    new = ("| 最后一次动到 `Sources/` 的轮次 | **R258**（commit `" + sha + "`）—— 1 文件，**动的是取证面不是画面**："
-           "`EnvironmentValues.pressedForCapture` 让按下那一档第一次可拍、可量、可被刀红回来"
-           "（台阶读数 U-836、两把刀各钉一条轴 D-244、看图 U-838；产品侧写这颗键=0 有守卫）。"
-           "上一笔是 R256（`c7d8385`：亮档 pressed 抬量 0.015→0.03，那一笔的代价账记在 D-242/D-243 与第 255 轮）。"
-           "上一笔动源码是 R253")
+    # 锚点按**行首标签**认（不按上一版的正文认）：R270 撞过一次 —— 旧锚点要求句尾出现
+    # 「上一笔动源码是 R253」，而那格早在 R263 就被改写 ⇒ 命中 0 次。守卫用的也是这个标签，
+    # 所以尺与闸门读同一个对象（D-247）。
+    pat = r"\| 最后一次动到 `Sources/` 的轮次 \|.*\n"
+    new = ("| 最后一次动到 `Sources/` 的轮次 | **R270**（commit `" + sha + "`）—— 1 文件，"
+           "**动的是常量的可见性，不是画面**：`DailyCopyLedger.visibilityGrace` 从 private let 升成 "
+           "internal static let，判据的观察窗口不再抄值而是读它（D-256；新尺 ledger_timing_scan 9 格 + 刀 M830；"
+           "行为不变由同一格改前改后两份读数与帧基线 changed=0 签）。上一笔是 R263（收藏星字形墨那一抬）。\n")
     t = sub_once(t, pat, new.replace("\\", "\\\\"), "Sources 格")
     wr(REP, t)
     print("REPORT_CELLS sources sha=" + sha + " maxU=" + str(mx))

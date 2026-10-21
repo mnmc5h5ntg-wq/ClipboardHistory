@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R270 / 第 269 轮 / Round 267 · 判据不再抄产品常量）
+
+`DailyCopyLedger.visibilityGrace`：`private let` → `internal static let`（值不变，0.15 s），调用点 `Self.visibilityGrace`。`DailyCopyHeatmapTests.testASuccessfulWriteDoesNotRepublish` 的观察窗口从字面量 `600` 换成 `Int(3 * (0.05 + DailyCopyLedger.visibilityGrace) * 1000)` —— 计划长度仍是 600 ms，改前/改后实跑 616 ms / 639 ms（同一格定向卷 Executed 31、failures=0）。新工具 `scripts/ledger_timing_scan.py` + 判据卷 9 格 + 刀 M830（1/1 CAUGHT、RESTORE_CLEAN）：窗口表达式必须出现常量名，判据文件里（剥行注释后）不许再出现等于该值的裸字面量，产品常量读不到时不许报空 PASS。320 结案 ⇒ 新开 323（其余抄值对子还没数）。四件套（本轮动了 Sources ⇒ 重跑）：0 告警、全量 919（skipped=42、failures=0）、帧 170 compared=170 changed=1 missing=0、dmg=ok、本机 1.4.8。脚本电池 Ran 513 tests / OK (skipped=4)、预检 tables=79 covered=63 arms=210 bad=0。CI：e87191a → 39565724396 / completed / success、c0abdec → 39566666631 / completed / failure、2073b12 → 39566913243 / completed / success（交接时未读，只登记号）。
+
+
 ### Changed（R269 / 第 268 轮 / Round 266 · 新尺的作用域 + 一颗被误读的悬停结案）
 
 `scripts/wait_scan.py`：`judge(...)` 增加 `present=`（本次扫描真正走到的文件名集合），名册只在范围内对账 —— 第一次把尺指向 `ClipboardHistory/Sources` 时它把住在 `Tests/` 的那格报成 `名册失配=1`（"没扫到"被说成"账没了"）。判据卷 +2 格（范围外不报 / 范围内消失仍红 + 产品根现读 bet=0 的钉死格），刀 M829 去掉作用域 ⇒ 现读 1/1 CAUGHT、红在 test_a_window_living_outside_the_scanned_root_is_not_stale, test_the_product_sources_scan_clean、RESTORE_CLEAN。两根现读：WAIT_SCAN bet=1 未登记=0 名册失配=0 poll_step=2 poll_until=4 判=PASS ／ WAIT_SCAN bet=0 未登记=0 名册失配=0 poll_step=0 poll_until=0 判=PASS。
