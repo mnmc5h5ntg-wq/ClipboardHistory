@@ -1,5 +1,16 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+## R263 状态（第 262 轮 / Round 260 · 2026-10-21）
+最后更新：2026-10-21（本地 · R263 / 第 262 轮 / Round 260）：**收藏星的字形墨接进取证通道，注释里那句「量出来的」第一次会红**（U-865…U-870 · D-249 · 291 剩三位 · 产品 1 文件 · 自评 93/105）
+
+**本轮落地**：`RowFavoriteButton.tint` 与 `animation(value:)` 改读 `isHoveredForDrawing`；新判据从帧里读两态字形墨（亮 3.545→8.321、暗 4.641→8.312，地板 3.000 两档都过）+ 新尺 `glyphInkReading`（与药丸带子不相交）；名册删一行（291 剩 DailyCopyHeatmapView / GlassControls / VideoPreview）；两把刀 2 把全 CAUGHT（不必重捕帧，理由写在表头）；脚本电池 Ran 487 tests / OK (skipped=4)；预检 tables=75 covered=59 arms=204 bad=0。四件套：全量 918、唯一红 = `testImageComparisonCostStaysBounded`（284.1140031814575ms 全量 / 15.372s 单跑通过，281/304 家族，未放宽）、帧 changed=2（row-favorite-hover-60x56-dark.png、row-favorite-hover-60x56-light.png）后基线同一笔 update、dmg ok、换装 1.4.8。
+
+**下一轮（R264 / 第 263 轮 / Round 261）的 ⓪**：
+⓪ 读 CI：93b2cbd → 39515829941 / completed / success、b5a54f1 → 39516070653 / completed / success **已读且两跑绿**（R262 的放宽引号 + 根路径派生被 runner 验收）；本笔 push 后再取新跑（只登记号不轮询，R140），要看的是 `testFavoriteGlyphInkClearsTheInteractiveFloor` 在 runner 上怎么说 —— 那 3.000 地板目前只有本机一台的读数（312）。
+① 312：3.000 地板的 runner 复验（红就按 D-232 加按机器的具名出口，不许放宽数值）。
+② 291 剩下三位（`DailyCopyHeatmapView` / `GlassControls` / `VideoPreview`）；305 的地板（本轮那张"比值跳变而肉眼有限"是反方证人）；309 那 6 张写死颗数的表；310 的 TABLES 名册。
+③ 299 执行器半、301、307、287/284、297/298/300、304；用户闸门 220 路 A / 228② / 265。
+
 ## R262 状态（第 261 轮 / Round 259 · 2026-10-21）
 最后更新：2026-10-21（本地 · R262 / 第 261 轮 / Round 259）：**三根腐烂针修完并重跑，名册改成按「抽得出来」算，撤回上一轮两次假指控**（U-858…U-864 · D-248 · 286 结案 · 产品 0 文件 · 自评 83/105）
 

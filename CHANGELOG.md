@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R263 / 第 262 轮 / Round 260 · 收藏星的字形墨接进取证通道）
+
+产品 1 文件：`RowFavoriteButton` 的 `tint`（0.55↔0.78）与 `animation(value:)` 从裸 `isHovered` 改读 `isHoveredForDrawing`（`@Environment(\.hoveredForCapture)`，产品自己永远不写这颗键）⇒ 悬停那一抬第一次出现在离屏帧里。
+新判据 `UICaptureTests.testFavoriteGlyphInkClearsTheInteractiveFloor`：从帧里读两态字形墨，把 `tint` 注释里那句「两边都过 3:1」升成会红的地板 —— 现读亮 3.545／8.321、暗 4.641／8.312（墨心 136→78、135→183）。新尺 `glyphInkReading` 与 `pillReading` 故意用不相交带子（`|Δ| ≥ 60` 对 `2 ≤ |Δ| < 60`，D-249）。
+名册 `test_hover_capture_channel.py` 删掉 `HistoryRowViews.swift` 那一行（291 剩三位）；变异表 `mutate_r263.py` 两把刀（M823 令牌轴 / M824 产品轴）2 把全 CAUGHT、RESTORE_CLEAN，并写明**这两把不必重捕帧**（被量的产物在测试进程里现渲染）。
+四件套：build 0 告警、全量卷 Executed 918（skipped 44）里 failures=1 唯一那朵是 `PerfBudgetTests.testImageComparisonCostStaysBounded`（全量 284.1140031814575ms ≥ 250，单跑 15.372s 通过 = 281/304 家族，未放宽未修）、帧 170 张 compared=170 changed=2（row-favorite-hover-60x56-dark.png、row-favorite-hover-60x56-light.png）missing=0、基线同一笔 update、dmg ok、换装本机 1.4.8。
+看图 RUN：改后亮/暗各一张 —— 亮档更黑一档，但 11pt 笔画让肉眼差别远小于比值跳变 ⇒ 给 305 交一个"比值不等于可见性"的反方证人。新开 312。脚本电池 Ran 487 tests / OK (skipped=4)。
+
+
 ### Changed（R262 / 第 261 轮 / Round 259 · 三根腐烂针修完，名册改成按「抽得出来」算）
 
 三根真腐烂针重钉并把那三张表重跑：M541（5/5 CAUGHT）、M750（2/2 CAUGHT）、M768（3/3 CAUGHT），RESTORE_CLEAN；预检 `NEEDLE_PRECHECK tables=74 covered=58 arms=202 bad=0` ⇒ **286 结案**。
