@@ -7,6 +7,7 @@
 
 **下一轮（R275 / 第 274 轮 / Round 272）的 ⓪**：
 ⓪ 读 CI：6e810e6 → 39580528220 / in_progress / 未读、3ec2a97 → 39581623084 / in_progress / 未读、ecfc012 → 39581770417 / in_progress / 未读 与本轮新跑（只登记号不轮询，R140）。本轮**要验的具体一件**：STEP[9]「Release script tests」在新门上转绿（errors 必须归 0，且 `Ran` 颗数 >= 519），而 R273 那两张 recording 帧在 STEP[11] 的相位稳定性仍未读 —— 若报 changed=2 按 D-251 开具名出口，不许改基线迁就。
+   交账（R274 收尾三 · 现读 `gh run list` 与 `scripts/ci_read.py steps`）：39580528220（RUN=39580528220 conclusion=failure）红在：STEP[9]Release script tests；39580570540（RUN=39580570540 conclusion=failure）红在：STEP[9]Release script tests。**两笔都已 completed / failure ⇒ R273 的 recording 帧修法在 runner 上未通过验收**，本笔未读正文细节（预算尽头）⇒ 不猜成因，R275 第一件事就是按步骤取正文分诊：若红在 STEP[11] 帧基线 changed=2 就是「这台机器判不了这颗夹具的相位」按 D-251 开具名出口（不许改基线迁就）；若红在 STEP[9] 电池则是 R274 那把新门未覆盖的形状；若红在别处就是第三种，须另开单子。其余 3ec2a97／ecfc012／5f3c9f1／7a3fdba／a9cd06b 交接时仍 in_progress ⇒ 只登记号不轮询（R140）。
 ① **312 的具名出口（欠第七轮）**：按「纸」那一维推，本机 3.000 不许降（D-251）。
 ② 329（其余 206 处写死根，每张搬完重跑那张表）、328（比摘要的尺统一成一条会红的 + 一把喂错摘要的刀）、323、322、317、314、315、316。
 ③ 310 的 75 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 三位。
