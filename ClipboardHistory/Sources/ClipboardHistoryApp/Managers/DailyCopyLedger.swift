@@ -70,7 +70,13 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
 
     /// 通知比写盘截止点晚这么多再看：留出去抖项被排到队列后面的时间。
     /// 不是"等够就一定写完"—— 值一直在盒子里，这一条只决定什么时候上屏。
-    private let visibilityGrace: TimeInterval = 0.15
+    /// 写盘截止点之后，回主线程看盒子之前再让出来的那一段（秒）。
+    ///
+    /// R270 / BACKLOG 320：原来是 `private let` —— 于是判据想按这条日程推观察窗口长度，
+    /// 只能把 0.15 **抄**进测试里（抄值会腐烂，R94 那条规矩）。改成 `static let`（internal）
+    /// 之后测试直接读它：产品里改这个值，`ledger_timing_scan.py` 与那条判据的窗口长度会一起动，
+    /// 不需要有人记得去改注释里的数字。
+    static let visibilityGrace: TimeInterval = 0.15
 
     /// 保留多久。两年 = 104 周，够看"去年这时候忙不忙"，又让文件尺寸有界
     ///（一天一个键，最坏 730 条 ≈ 12KB）。
@@ -154,7 +160,7 @@ final class DailyCopyLedger: ObservableObject, DailyCopyRecording {
         pendingVisibilityCheck?.cancel()
         let item = DispatchWorkItem { [weak self] in self?.syncWriteFailure() }
         pendingVisibilityCheck = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + debounceSeconds + visibilityGrace, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + debounceSeconds + Self.visibilityGrace, execute: item)
     }
 
     /// 盒子 → `@Published` 镜像。**相同就不发变更** ——

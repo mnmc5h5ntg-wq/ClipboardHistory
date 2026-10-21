@@ -534,8 +534,10 @@ final class DailyCopyHeatmapTests: XCTestCase {
         // 这条断言问的是「盒子→@Published 那次镜像有没有多发」，而那颗事件排在
         // `debounce + visibilityGrace` 之后 —— 实测文件在 115 ms 就出现了，镜像要到 ~200 ms，
         // 所以"等到文件出现"不等于"等到那颗事件"。窗口的长度由那条日程推：
-        // 3 × (去抖 0.05 + grace 0.15) = 600 ms。`grace` 是 private，值抄在这里 ⇒ BACKLOG 320。
-        pumpWindow(cell: "success-no-republish", milliseconds: 600)
+        // 长度由那条日程推：3 × (去抖 + grace)，而 grace **读产品那个常量**（R270 / 320：
+        // 上一版把 0.15 抄在这里，抄值会腐烂）⇒ 产品改值，这段窗口跟着改，不需要有人记得。
+        pumpWindow(cell: "success-no-republish",
+                   milliseconds: Int(3 * (0.05 + DailyCopyLedger.visibilityGrace) * 1000))
         XCTAssertNil(ledger.lastWriteError)
         XCTAssertEqual(publishes, afterCopy,
                        "写成功也发了一次变更 ⇒ 那个「只在值变了才同步」的比较被拿掉了"
