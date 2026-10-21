@@ -1,6 +1,8 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
 ## R272 状态（第 271 轮 / Round 269 · 2026-10-21）
+> **R273 已落地但只落了半本账（诚实记账）**：`6e810e6` 结了 BACKLOG 324（夹具固定泵 ⇒ 等条件；同码双跑 170/170 逐字节相同；> 基线同一笔 update，FRAME_BASELINE_UPDATED=170；电池 Ran 516 OK；build --build-tests 干净）。> **欠的是台账半**：AGENT_UI_AUDIT 的第 272 轮一节、AGENT_VISUAL_ITERATION 的 Round 270 一节（含七维表）、> AGENT_DECISIONS 的 D-259、CHANGELOG 一条、STATE 轮换与 FINAL_REPORT 两格刷新 —— 下一轮第一件事就是把它补成完整一轮，> 补的时候数字一律从 `/tmp/r273_a`、`/tmp/r273_b`、`/tmp/r273_a.log`、`/tmp/r273_batt.log` 与 > `docs/frame_baseline.json` 现读，不许照抄这条引言。
+
 最后更新：2026-10-21（本地 · R272 / 第 271 轮 / Round 269）：**327 结一半：一把运行时取 needle 的刀改成静态可读，并配"逐字对账 + 漂移正对照"钉住不抄两份（D-258）；326 改判为前提消失并留复活条件**（U-907…U-910 · 产品 0 文件 · 自评 80/105）
 
 **本轮落地**：`mutate_r271` 静态化 ⇒ 预检 covered 63 → 64、bad=0、`M831 ok`；刀重跑 1/1 CAUGHT（红在 testAddingACopyWritesNothingOnTheMainThread 的 XCTAssertFalse、倍率 0.79、RESTORE_CLEAN）；新判据卷 `test_mutate_r271_needle.py` 3 格；脚本电池 Ran 516 tests / OK (skipped=4)；ARM_TOTAL arms=704 dupes=0、310 缺口 75 张 / 423 把。本轮 0 产品文件 ⇒ sources 格不动、四件套沿用上一笔、看图腿 NOT-RUN。
