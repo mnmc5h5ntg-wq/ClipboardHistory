@@ -866,6 +866,12 @@ struct SettingsSidebarRow: View {
     /// 摘掉 `private` 不是为好看：这一族判据要看渲染出来的画面，而夹具引用不到 `private` 类型
     /// （先例是 `SegmentedFilterPicker` / `GlassPill`，它们本来就是 internal）。
     @Environment(\.hoveredForCapture) private var hoveredForCapture
+    /// **画法与动画必须问同一句话**（R275 / D-249 那一族在第二个文件里的复发）：
+    /// 下面 `backgroundOpacity` 早就接了取证键，而 `.animation(for: .hover, value:)` 一直直读裸
+    /// `isHovered` ⇒ 离屏渲染里 `.onHover` 恒 false，那条淡入的**触发条件**在帧里从来不存在
+    /// —— 墨落下了，但没有过程，于是"这一档到底是不是淡进来的"没有任何读数能回答。
+    /// 真实指针那条路一字未动：`isHovered` 仍然由 `.onHover` 供。
+    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     private var backgroundOpacity: Double {
         if isSelected { return SelectedInk.opacity(dark: colorScheme == .dark) }
@@ -874,7 +880,7 @@ struct SettingsSidebarRow: View {
         // R260 更正：这条前提被后来的抬量挪走了。亮档下面两级抬到 0.12 / 0.15 之后，
         // 糊成一档的换成了**按下与选中**（0.16 − 0.15 = 0.01 = 2.55/255 < 地板 4/255），
         // 所以选中现在走自己的换算 `SelectedInk`（暗档仍等于令牌原值）。
-        guard isHovered || (hoveredForCapture ?? false) else { return 0 }
+        guard isHoveredForDrawing else { return 0 }
         return HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
     }
 
@@ -910,7 +916,7 @@ struct SettingsSidebarRow: View {
         )
         .font(.system(size: VisualFont.body, weight: isSelected ? .semibold : .regular))
         .padding(.horizontal, 6)
-        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
         .animation(MotionCatalog.animation(for: .selection), value: isSelected)
         .onHover { hovering in
             isHovered = hovering

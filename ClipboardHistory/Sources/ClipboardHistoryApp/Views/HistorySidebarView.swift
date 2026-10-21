@@ -502,7 +502,7 @@ private struct FilterSegmentButton: View {
         // 见 `UIInteractionProbeTests.testFilterSegmentsAreReachableAndShowFocus` 与 BACKLOG 220。
         // 参数从目录拿，不在这里写死 0.14：这一档以前散在四处、分别是 0.11/0.14/0.15/0.18，
         // 没人说得出哪个对（M11）。悬停跟着鼠标 ⇒ 给最短的那一档。
-        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .hover), value: isHoveredForFill)
         .animation(MotionCatalog.animation(for: .selection), value: isSelected)
         .onHover { hovering in
             isHovered = hovering

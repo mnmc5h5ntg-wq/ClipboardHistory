@@ -75,7 +75,7 @@ struct SearchField: View {
                 .stroke(Color.primary.opacity(isActive ? VisualTint.fieldActiveStroke : VisualTint.fieldIdleStroke),
                         lineWidth: VisualHairline.edge)
         )
-        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
         .animation(MotionCatalog.animation(for: .contentFade), value: text.isEmpty)
         .onHover { hovering in
             isHovered = hovering
