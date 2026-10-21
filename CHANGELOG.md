@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R264 / 第 263 轮 / Round 261 · 缺口被数出来，上一轮的 runner 红被归因）
+
+`mutate_needle_precheck.py` 新增 `roster_gap()`：现读"声明了臂却没登记进 `TABLES`"的表 ⇒ `TABLE_ROSTER registered=75 unregistered_with_arms=75 hidden_arms=423`（只测不判，逐张点名）。电池 +2 格：把这两个数钉成 `assertEqual` 地板（D-250：等式挡"账与现状脱钩"，单调地板挡不住），正对照用人造未登记表。
+`testFavoriteGlyphInkClearsTheInteractiveFloor` 的出口按**对象存在性**切片：先跑三条与机器无关的接线断言（硬），再要求墨心 ≥20 颗才判该档；无对象打 `FAVORITE_INK_NOT_RUN 判定档=… 无对象档=… 机器=…`，两档都无对象才 `XCTSkip`。起因是 8512d4e → 39519690827 / completed / failure / 50aaca9 → 39519770384 / completed / failure 两跑红：runner 只数到 3、4、5 颗（本机 47），静置比值 2.668、台阶 3.000 ≤ 20.000 —— 那是尺没有对象，红话不该说产品。出口落地后重跑 M823/M824 仍 2/2 CAUGHT（正对照）。
+新开 313（runner 那颗星为什么无对象，三条可分辨嫌疑）、314（热图描边语义像选中 —— 看图现读，接键之前先判）、315（STEP[15] 那行 case-insensitive 的 error 未归因）。310 追记：开单时那句"74 vs 163"是文件数，真缺口是 75 张表 / 423 把刀。
+眼睛腿 RUN：热图格子两态（亮档）。产品 0 文件（只动 `Tests/` 与工具 ⇒ `Sources/` 未改，FINAL_REPORT 的 sources 格本轮不动）。脚本电池 Ran 489 tests / OK (skipped=4)。
+
+
 ### Changed（R263 / 第 262 轮 / Round 260 · 收藏星的字形墨接进取证通道）
 
 产品 1 文件：`RowFavoriteButton` 的 `tint`（0.55↔0.78）与 `animation(value:)` 从裸 `isHovered` 改读 `isHoveredForDrawing`（`@Environment(\.hoveredForCapture)`，产品自己永远不写这颗键）⇒ 悬停那一抬第一次出现在离屏帧里。

@@ -233,6 +233,28 @@ def bash_arm_ids(directory=HERE):
     return out
 
 
+def roster_gap(directory=HERE, tables=None):
+    """现读缺口：**声明了臂却没登记进 `TABLES`** 的表（BACKLOG 310）。
+
+    `cross_table_ids` 按 glob 扫全部表（所以撞号查重看得见它们），而 `main()` 的 needle 预检
+    只走手写的 `TABLES` ⇒ 新写一张表忘了登记，就是**静默不覆盖**：锚点腐烂、R262 那两种坏法
+    都会重新出现，而且报表上是一片绿。
+    只数"静态抽得出臂"的那些：抽不出臂的表登记了也不进覆盖（那是 285 那族的"薄"），
+    把两种相反的成因混成一个数，下一次就会有人去"修"错的那一半。
+    """
+    import glob
+    registered = set(TABLES if tables is None else tables)
+    gaps = []
+    for path in sorted(glob.glob(os.path.join(directory, "mutate_r*.py"))):
+        name = os.path.basename(path)[:-3]
+        if name in registered:
+            continue
+        ids = arm_ids(path)
+        if ids:
+            gaps.append((name, len(ids)))
+    return gaps
+
+
 def main():
     bad = 0
     covered = 0
@@ -304,6 +326,12 @@ def main():
     print("ARM_TOTAL files=%d arms=%d dupes=%d repeats=%d" % (len(files), arm_total, len(dupes), len(repeats)))
     print("NEEDLE_PRECHECK tables=%d covered=%d arms=%d bad=%d"
           % (len(TABLES), covered, arms_total, bad))
+    # 310：登记面要有仪器产数，不许靠"我以为通配到了"。这一行只测不判（判定在电池那格，
+    # 它把这个数钉成地板 —— 新表忘了登记就会红）。
+    gaps = roster_gap()
+    print("TABLE_ROSTER registered=%d unregistered_with_arms=%d hidden_arms=%d named=%s"
+          % (len(TABLES), len(gaps), sum(n for _, n in gaps),
+             ",".join("%s(%d)" % (n, k) for n, k in gaps) or "无"))
     if covered != len(TABLES):
         print("  ↑ 覆盖不全：那几支的 needle 藏在 lambda 里，静态判不了（要判只能真跑）")
     return 1 if bad else 0

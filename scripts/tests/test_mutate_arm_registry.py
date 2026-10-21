@@ -218,6 +218,45 @@ class MutateArmRegistryTests(unittest.TestCase):
             self.assertEqual(1, len(abs_home(planted)),
                              u"写死绝对路径的正对照没被点名 ⇒ 上面那条守卫是恒真的")
 
+    def test_the_roster_gap_is_pinned_to_the_measured_number(self):
+        """BACKLOG 310 的地板（R264 现读）：**75 张表声明了臂却没登记进 `TABLES`，共 423 把刀**。
+
+        撞号查重按 glob 扫全部表，而 needle 预检只走手写名册 ⇒ 未登记的表**静默不覆盖**：
+        锚点腐烂（286 那一族）可以在它们身上重新长出来而报表一片绿。
+        这一格用 `assertEqual` 而不是 `assertLessEqual`：多一张表没登记 ⇒ 红；
+        少一张（真去登记了）⇒ 也红，但红话是"把地板降到实测值"，逼着那一笔同时进台账。
+        数的是"抽得出臂"的那些（抽不出的是 285 那族的"薄"，两种成因不许混成一个数）。
+        """
+        tool = load_tool()
+        gaps = tool.roster_gap()
+        tables = len(gaps)
+        arms = sum(n for _, n in gaps)
+        detail = u"未登记表=%d 隐藏臂=%d；前几名 %s" % (
+            tables, arms, u"、".join(u"%s(%d)" % (n, k) for n, k in sorted(gaps)[:6]))
+        self.assertEqual(75, tables,
+                         u"登记表与实存表的缺口变了（R264 现读 75）⇒ 要么有新表静默不覆盖，"
+                         u"要么真登记掉了 —— 两种都要改账。" + detail)
+        self.assertEqual(423, arms,
+                         u"缺口里的臂数变了（R264 现读 423）⇒ 同上，改账之前先看清是哪张表。" + detail)
+
+    def test_an_unregistered_table_that_declares_arms_is_named(self):
+        """正对照：人造一张"声明了臂但没登记"的表 ⇒ 必须被点名（否则上面那个地板是在数空气）。"""
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            self.write_table(directory, u"mutate_r910", [
+                u"ARMS = [",
+                u'    ("M706", "已登记那张", "/tmp/a", "n", "r"),',
+                u"]",
+            ])
+            self.write_table(directory, u"mutate_r911", [
+                u"ARMS = [",
+                u"    ('M707', u'没登记那张', '/tmp/b', 'n', 'r'),",
+                u"]",
+            ])
+            gaps = tool.roster_gap(directory, tables=[u"mutate_r910"])
+        self.assertEqual([(u"mutate_r911", 1)], gaps,
+                         u"未登记却声明了臂的表没被点名 ⇒ 310 那个缺口仍然只能靠记忆守")
+
     def test_the_repository_currently_has_no_arm_id_collisions(self):
         tool = load_tool()
         files, dupes, repeats, total = tool.cross_table_ids()
