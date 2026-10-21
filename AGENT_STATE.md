@@ -6,7 +6,7 @@
 **本轮落地**：`roster_gap()` + `TABLE_ROSTER` 一行（只测不判、逐张点名）；电池 2 格（等式地板 + 人造正对照，D-250）；字形墨判据的出口按"墨心 ≥20 颗"切片、接线断言照旧硬跑、两档全无对象才 skip；出口后重跑 M823/M824 仍 2/2 CAUGHT；脚本电池 Ran 489 tests / OK (skipped=4)；预检 `NEEDLE_PRECHECK tables=75 covered=59 arms=204 bad=0`、`ARM_TOTAL arms=697 dupes=0`。看图 RUN（热图格子两态，描边像选中 ⇒ 314）。
 
 **下一轮（R265 / 第 264 轮 / Round 262）的 ⓪**：
-⓪ 读 CI：8512d4e → 39519690827 / completed / failure、50aaca9 → 39519770384 / completed / failure 已读（红因 = 字形墨那格在 runner 上无对象，本轮已给出口）；93b2cbd → 39515829941 / completed / success 绿（R262 修法验收）。本笔 push 后取新跑，要验的是 **runner 上 `FAVORITE_INK_NOT_RUN` 有没有被捕获闸门登记成"已登记 NOT-RUN"而不是红**，以及 STEP[15] 那行 case-insensitive 的 error 是否再现（315）。只登记号不轮询（R140）。
+⓪ 读 CI：8512d4e → 39519690827 / completed / failure、50aaca9 → 39519770384 / completed / failure 已读（红因 = 字形墨那格在 runner 上无对象，本轮已给出口）；93b2cbd → 39515829941 / completed / success 绿（R262 修法验收）。本笔成对号已现取：**`30135fa` → run 39555625399 / in_progress / 未读**（只登记号不轮询，R140），要验的是 **runner 上 `FAVORITE_INK_NOT_RUN` 有没有被捕获闸门登记成"已登记 NOT-RUN"而不是红**，以及 STEP[15] 那行 case-insensitive 的 error 是否再现（315）。只登记号不轮询（R140）。
 ① 313：runner 那颗星为什么无对象 —— 三条嫌疑各配一条能分辨的读数，别混着试；不许靠降 3.000 地板解决。
 ② 314：热图描边的语义（选中 vs 悬停）—— 先做「同一格分别点亮两态」的对照夹具再交眼睛，之后才接 291 那位。
 ③ 310 的登记本身（75 张表）、309 那 6 张写死颗数的表、315。
