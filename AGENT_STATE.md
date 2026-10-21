@@ -5,6 +5,8 @@
 
 **本轮落地**：CI 交账 37accf9 → 39562680539 / completed / success 绿（R267 等待修法的 runner 验收）；321 结案（亮 未选中段 230→207 比值 1.248 vs 选中段 233→233；暗同形）；319 结一半（Sources 现读 bet=0）并修掉 `wait_scan` 的名册作用域（`present=`）+ 判据卷 15 格 + 刀 1/1 CAUGHT；脚本电池 Ran 504 tests / OK (skipped=4)；预检 tables=78 covered=62 arms=209 bad=0、ARM_TOTAL arms=702、310 缺口 75 张 / 423 把。本轮 0 Swift 文件 ⇒ 四件套沿用上一笔、帧重捕与换装 NOT-RUN。
 
+**收尾登记（R269 之后，只登记号不轮询，R140）**：本轮台账半 push 之后新跑 c0abdec → 39566666631 / in_progress / 未读；代码半那一笔 e87191a → 39565724396 / in_progress / 未读。两跑都要读的是：runner 上三格改过等待形状的判据是否仍绿，以及 FAVORITE_INK_NOT_RUN 是否仍被登记为已登记 NOT-RUN。
+
 **下一轮（R270 / 第 269 轮 / Round 267）的 ⓪**：
 ⓪ 读 CI：e87191a → 39565724396 / in_progress / 未读 与本轮新跑（只登记号不轮询，R140）。要验的是 **runner 上 `WAIT_SCAN` 那一步（若已接进 CI）与三格改过等待形状的判据是否仍绿**，以及 `FAVORITE_INK_NOT_RUN` 是否仍被登记为已登记 NOT-RUN。
 ① 312 的具名出口：按**纸**（实测底）那一维推，本机 3.000 不许降（D-251）。这是欠了三轮的那一条。
