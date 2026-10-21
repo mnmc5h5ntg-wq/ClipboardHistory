@@ -7,6 +7,7 @@
 
 **下一轮（R276 / 第 275 轮 / Round 273）的 ⓪**：
 ⓪ 读 CI：1c831f2 → 39583125728 / completed / failure、3ec2a97 → 39581623084 / completed / failure 与本轮新跑（只登记号不轮询，R140）。要验的两件：STEP[9]「Release script tests」在新门上转绿（errors 归 0 且 `Ran` 颗数不低于本笔），以及 STEP[11] 那两张 recording 帧在 runner 上是否仍报 changed —— 若 changed≠0 按 D-251 开具名出口，**不许改基线迁就**。
+   交账（R275 收尾 · 现读 `gh run list`，正文存 /tmp/r276_ci.json）：c99f1fb → 未取到（293）；f09006b → 39588588601 / in_progress / 未读；1c831f2 → 39583125728 / completed / failure；3ec2a97 → 39581623084 / completed / failure。取到号时全部 in_progress ⇒ 本轮不引用任何 runner 结论（R140）；R276 要验的两件仍写在这一节上面那行：STEP[9] 电池在新门上 errors 归 0 且 Ran ≥ 519、STEP[11] 那两张 recording 帧是否仍报 changed（若 changed≠0 按 D-251 开具名出口，不许改基线迁就）。
 ① **312 的具名出口（欠第七轮）**：按「纸」那一维推，本机 3.000 不许降（D-251）。
 ② 330（三处淡入的中间态产物证人）、329（206 处写死本机根，每张搬完重跑那张表）、328、323、322、317、314、315、316。
 ③ 310 的 75 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 画法轴那四位。
