@@ -6903,5 +6903,15 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 **330. 三处 hover 淡入的『过程』还没有产物证人（R275）：本轮把 `SettingsSidebarRow` / 筛选段按钮 / `SearchField` 的动画 value 与画法对齐，判据只证明了两半是同一句话（源码形状），**没有**证明这条淡入在离屏通道里真的被切成可数的中间态。要么给这三处各配一条 `MotionFilmstripTests` 那条路的中间态证人（`Scenario` 得能在触发时翻 `hoveredForCapture`，并处理「新场景会改变别的守卫的对象数」⇒ 加一卷要全量重跑并登记名单为何变长，R98 那一课），要么显式记「源码已接、产物未量」并把它留在未交付清单上 —— 不许把对齐本身写成「淡入已验收」（R275 新开）**
 
 **331. 同一版本的脚本电池在 runner 上 `skipped=1`、在本机 `skipped=4`（R276 现读：STEP[9] 正文 vs 本机电池日志）——这三格的缺席没有任何按机器键的名单登记（D-255 同族：名册只准在实际扫到的对象里对账）。逐格定名：哪三格在 runner 上 skip、skip 的理由是什么（缺 venv？缺 `CLIPBOARD_HISTORY_UI_SHOTS`？缺屏幕？），把答案写成按机器键的名单 + 一条「名单外出现 skip 就红」的守卫；不许把差异解释成「环境不同所以正常」就翻篇（R276 新开）**
+  追记（R276 收尾：两台的缺席集合现读出来了，而且它们几乎不相交 —— 这正是本单要登记的东西）：
+  本机 `Ran 521 / OK (skipped=4)`，四格全部是**帧通道缺席**：`test_hover_two_state_diff` 的地板格（理由原文「通道缺席：CLIPBOARD_HISTORY_UI_SHOTS=None」）、
+  `RealFrameFloorTests.test_every_real_pair_clears_the_floor_or_is_named_nonflat`、`test_surface_left_axes` 的机器画像格（R231/259 那张表）、
+  `RealFrameTests.test_working_frames_still_satisfy_the_three_relations`。runner `Ran 519 / FAILED (failures=1, skipped=1)`，那唯一一格是
+  **端到端启动冒烟**（理由原文「仓库根目录没有已构建的 .app（先跑 make bundle 再验）」）—— 本机装了 1.4.8 所以它不跳，runner 上没有 .app 所以它跳。
+  结论的形状不是「同一格一边跳一边不跳」，而是**两台各有一类判不了的格子，且没有任何名册登记过**：
+  runner 有帧通道（CI 抓帧那一步给了 `CLIPBOARD_HISTORY_UI_SHOTS`）⇒ 那四格在它那里是**承重**的；本机有 .app ⇒ 冒烟格在我这里是承重的。
+  因此 331 的正解要写成两张按机器键的名册（每台一行：它跳哪些格、理由键是什么）+ 一条「名单外出现 skip 就红」的守卫，
+  并把「谁在替谁承重」写进 STATE 的 ⓪ —— 不许解释成「环境不同所以正常」就翻篇（D-255 同族：名册只准在实际扫到的对象里对账）。
+  证人：本机 `/tmp/r277_batt_v.log`、runner `/tmp/r276_log1.txt`（同一版本、同一步 STEP[9]）。
 
 **332. 329 的口径要按可达闭包重排优先级（R276 现读：目录里 .py 377 颗、仍写死本机根 205 颗）：先搬**被闭包够到的**那些（它们会进 runner），再搬只在单轮里手工跑的；每搬一颗重跑它自己那张表（D-215），并把「搬完的颗数」现读登记，不许把 205 抄成下一次的起点（R276 新开）**
