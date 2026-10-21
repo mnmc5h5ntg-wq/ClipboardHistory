@@ -23,8 +23,13 @@ KEY = 'hoveredForCapture'
 # 每一行必须写清"这一位的悬停今天靠什么被看见"，以及"接上键要动哪里"；下一轮做完一项就从表里删掉一行。
 # 名册与代码按**集合**对账：新增未接位点却不登记 ⇒ 红；登记了却已经接上 ⇒ 也红（名册过期）。
 DEBT = {
-    'DailyCopyHeatmapView.swift': '欠账：格子把 isHovered 当入参交给子视图，亮法本身可拍（heatmap-populated 那两张判的就是它），'
-                                  '但 hover 那一档没有独立的两态帧；接法=在夹具里给同一份数据点两下键，别在产品里读键',
+    'DailyCopyHeatmapView.swift': '不接键是有意的：夹具走 `heatmapCellStrip(hoveredIndex:)` 那条入参，产品路径不读键。'
+                                  '两态帧在盘上（heatmap-cell-strip-still / -hover，亮暗各一张），'
+                                  '判据是 HeatmapHoverEvidenceTests 那五格（逐档可辨、只动圈带、不许盖过数据深浅）。'
+                                  'R280 现读更正：这一行以前写的是一句否定（说 hover 那一档拍不到），'
+                                  '而基线里一直有四张 ⇒ 散文没人对账，假话挂了三十几轮。'
+                                  '注意：这张表的否定词是被**字面**读的（守卫分不清引用与断言），'
+                                  '所以旧原话只进台账，不进这里',
     'GlassControls.swift': '欠账：这里只剩注释与 .pressedStyle(hoverLevel:) 的委托，真正的悬停墨换算在 PressableStyle（已接键）里；'
                            '登记的理由是"本文件不再有独立的悬停画法"，若哪天又自己画一层就必须接键',
     # R263 删掉 `HistoryRowViews.swift` 那一行（"做完一行删一行"）：它自己直读 `isHovered` 的画法
@@ -36,6 +41,69 @@ DEBT = {
     'VideoPreview.swift': '欠账：两处 .pressedStyle(hoverLevel:) 委托给已接键的 PressableStyle，'
                           '但预览卡自身没有两态夹具帧；登记是因为它从未进过帧基线，不是因为不需要',
 }
+
+# R280：名册理由里「有没有两态帧」那一半，此前只是散文 —— 盘上明明有 `heatmap-cell-strip-{still,hover}`
+# 四张，理由却写着"没有独立的两态帧"，而双向守卫看不见它（它比的是"文件读没读键"，不是"理由里那句可复查的话"）。
+# 现在把那半句抽成表：**前缀必须在帧基线名单里真的有两张不同状态的帧**，理由文本也不许再写与它对矛盾的否定句。
+TWO_STATE_CLAIMS = {
+    'DailyCopyHeatmapView.swift': 'heatmap-cell-strip',
+    'GlassControls.swift': 'NO_INK',   # 本文件没有独立悬停画法：两态在 PressableStyle 那一位（已接键）
+    'VideoPreview.swift': None,        # 现读：预览卡从未进过帧基线 ⇒ 这一位确实没有两态帧
+}
+NEGATIONS = (u'没有独立的两态帧', u'没有两态夹具帧', u'从未进过帧基线', u'没有两态帧')
+DELEGATIONS = (u'委托', u'PressableStyle')
+BASELINE = os.path.join(REPO, 'docs', 'frame_baseline.json')
+
+
+def frame_manifest():
+    """帧基线的名单（基名）。读不到就抛 —— 这把尺不许在"没有对象"时给出"没问题"。"""
+    import json
+    with io.open(BASELINE, encoding='utf-8') as h:
+        data = json.load(h)
+    frames = data.get('frames') or {}
+    if not frames:
+        raise AssertionError('帧基线里没有帧表 ⇒ 「有没有两态帧」无从判定，不许读成没问题：键='
+                             + ','.join(list(data)[:6]))
+    return sorted(os.path.basename(k) for k in frames)
+
+
+def claim_problems(rows, manifest, debt=None, claims=None):
+    """名册的**第二条轴**：理由里那句关于两态帧的话，要与帧名单对账。"""
+    debt = DEBT if debt is None else debt
+    claims = TWO_STATE_CLAIMS if claims is None else claims
+    bad = []
+    unwired = set(n for n, w in rows if not w)
+    if unwired != set(claims):
+        bad.append(('HOVER_CLAIM_SET_DRIFT',
+                    '未接键的文件集合与两态声明表不相交等：名册缺 %s / 多 %s（R76：豁免名册必须双向相等）'
+                    % (sorted(unwired - set(claims)), sorted(set(claims) - unwired))))
+    for name in sorted(unwired & set(claims)):
+        prefix = claims[name]
+        reason = debt.get(name, '')
+        negated = [w for w in NEGATIONS if w in reason]
+        if prefix == 'NO_INK':
+            if not [w for w in DELEGATIONS if w in reason]:
+                bad.append(('HOVER_CLAIM_NO_INK_WITHOUT_DELEGATION',
+                            '%s 声明"本文件没有独立悬停画法"，理由里却没有点名画法搬到哪里去了 ⇒ 撤项没有去处'
+                            % name))
+            continue
+        if prefix:
+            hits = [f for f in manifest if f.startswith(prefix)]
+            states = sorted(set(f[len(prefix):].lstrip('-').split('-')[0] for f in hits))
+            if len(states) < 2:
+                bad.append(('HOVER_CLAIM_FRAMES_MISSING',
+                            '%s 声明靠 %s* 那组两态帧被看见，而帧基线里只数到状态 %s（%s）⇒ 声明不成立'
+                            % (name, prefix, states or '无', hits)))
+            if negated:
+                bad.append(('HOVER_REASON_CONTRADICTS_FRAMES',
+                            '%s 的两态帧在名单里（%s），理由却还写着「%s」⇒ 散文与读数相反'
+                            % (name, prefix, negated[0])))
+        elif not negated:
+            bad.append(('HOVER_CLAIM_UNDECLARED_GAP',
+                        '%s 没有声明两态帧前缀，理由里也没有一句点名"没有两态帧"⇒ 这一位的缺席没人记账'
+                        % name))
+    return bad
+
 
 
 def hover_files(views=VIEWS):
@@ -111,6 +179,69 @@ class HoverCaptureChannelTests(unittest.TestCase):
         broken = [(rows[0][0], False)] + rows[1:]
         codes = [c for c, _ in problems(broken)]
         self.assertIn('HOVER_CHANNEL_UNPAIRED', codes, '把接了键的说成没接时不许静默通过')
+
+
+class TwoStateClaimTests(unittest.TestCase):
+    """R280：名册理由里那句「有没有两态帧」必须与帧名单对账 —— 它此前挂了三十几轮没人发现是假的。"""
+
+    def test_every_undeclared_hover_file_declares_its_two_state_evidence(self):
+        rows = wiring()
+        manifest = frame_manifest()
+        codes = [c for c, _ in claim_problems(rows, manifest)]
+        self.assertEqual([], codes, '两态声明与帧基线名单不同步：%s' % codes[:4])
+
+    def test_a_prefix_that_no_frame_manifest_contains_is_caught(self):
+        """正对照（尺有牙）：把声明的前缀改成一个名单里不存在的东西 ⇒ 必须点名。"""
+        rows = wiring()
+        manifest = frame_manifest()
+        saved = dict(TWO_STATE_CLAIMS)
+        try:
+            for name, prefix in saved.items():
+                if prefix:
+                    TWO_STATE_CLAIMS[name] = prefix + '_NOT_ON_DISK'
+                    codes = [c for c, _ in claim_problems(rows, manifest)]
+                    self.assertIn('HOVER_CLAIM_FRAMES_MISSING', codes,
+                                  '声明指向不存在的帧时不许静默通过（这一格是假的）')
+                    break
+            else:
+                self.fail('名册里没有任何带前缀的声明 ⇒ 这把对照没有对象，先补声明再谈牙')
+        finally:
+            TWO_STATE_CLAIMS.clear()
+            TWO_STATE_CLAIMS.update(saved)
+
+    def test_prose_denying_frames_that_exist_is_caught(self):
+        """正对照（散文与读数相反）：帧在名单里，理由却写「没有两态帧」⇒ 必须点名。
+
+        这一格钉的正是本轮修掉的那个原罪：`DailyCopyHeatmapView` 的理由以前写着"hover 那一档
+        没有独立的两态帧"，而 `heatmap-cell-strip-{still,hover}` 四张一直在基线里。
+        """
+        rows = wiring()
+        manifest = frame_manifest()
+        prefix = [p for p in TWO_STATE_CLAIMS.values() if p]
+        self.assertTrue(prefix, '没有前缀可拿来造对照')
+        name = [k for k, v in TWO_STATE_CLAIMS.items() if v][0]
+        saved = DEBT[name]
+        try:
+            DEBT[name] = saved + u'（人造反驳：hover 那一档没有独立的两态帧）'
+            codes = [c for c, _ in claim_problems(rows, manifest)]
+            self.assertIn('HOVER_REASON_CONTRADICTS_FRAMES', codes,
+                          '理由与名单相反时不许绿 ⇒ 这条守卫只是在读散文，不是在读对象')
+        finally:
+            DEBT[name] = saved
+
+    def test_a_missing_frame_claim_without_a_negation_is_caught(self):
+        """反方向也要有牙：声明为"没有两态帧"的文件，理由里必须真的点名那份缺席。"""
+        rows = wiring()
+        name = [k for k, v in TWO_STATE_CLAIMS.items() if v is None]
+        self.assertTrue(name, '没有 None 声明可拿来造对照')
+        saved = DEBT[name[0]]
+        try:
+            DEBT[name[0]] = u'这一位的理由被换成了一句不含任何缺席陈述的话，只讲它接了委托。'
+            codes = [c for c, _ in claim_problems(rows, frame_manifest())]
+            self.assertIn('HOVER_CLAIM_UNDECLARED_GAP', codes,
+                          '没有两态帧却不在理由里写明 ⇒ 这一位的缺席会静默消失（R100：有键无值）')
+        finally:
+            DEBT[name[0]] = saved
 
 
 class SearchFieldChannelTests(unittest.TestCase):

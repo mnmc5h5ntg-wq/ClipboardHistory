@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R280 / 第 279 轮 / Round 277 · 名册理由接上对象）
+
+`scripts/tests/test_hover_capture_channel.py` 新增第二条轴 `TWO_STATE_CLAIMS` + `claim_problems()`：每个未接取证键的悬停文件必须声明它靠哪组两态帧被看见（或显式 `None`／`NO_INK`），声明的前缀要在 `docs/frame_baseline.json` 的名单里真的数到 ≥2 种状态；理由文本里出现与声明对撞的否定句 ⇒ 红；声明为"没有"而理由没点名缺席 ⇒ 也红。修掉的假账：`DailyCopyHeatmapView` 那行"hover 那一档没有独立的两态帧"——基线现读有 `heatmap-cell-strip-{still,hover}` 亮暗 4 张、判据五格一直在跑，这句挂了三十几轮。新增 `mutate_r280.py`：M836（前缀指向不存在的帧 = 对象轴）／M837（否定词扫描弄瞎 = 尺轴）现读 2/2 全 CAUGHT、RESTORE_CLEAN=yes，并登记进预检（tables=83 covered=67 bad=0、ARM_TOTAL arms=710 dupes=0）。本轮自己撞的镜像也入账：更正后的理由引用了旧假话原句，守卫按字面读否定词 ⇒ 真产物那一格反而红（Ran 9/failures=1），处置是把"否定词被字面读、旧原话只进台账"写进理由本身（U-934）。新开 335：其余 2 个文件共 2 句同形理由仍未结构化（点名 test_motion_surface_gate.py、test_probe_coverage_gate.py…）。脚本电池 Ran 531 tests / OK (skipped=4)；眼睛腿 RUN（静置／悬停各一张，圈只在那一格）。产品 0 文件 ⇒ sources 格不动。CI：8a972d0 → 未取到（293）／8717741 → 39599249700 / in_progress / 未读／f7205b6 → 39599556093 / in_progress / 未读。
+
+
 ### 回退记账（R277 / 第 276 轮 / Round 274 · 331 两次尝试）【R279 补记】
 
 静态扫源码预测"谁会 skip"没有足够分辨力（跨行匹配把后面的 skip 记到前面格子头上，现读 15 findings/4 STALE；改成语句级只认 8 处而名册说 4 格、只覆盖 2 格，skip 形状至少三种）；观测式（把电池跑成子进程）防递归与排除观察者都工作（排除观察者=1 通过），但归属仍坏 —— `unittest -v` 把 docstring 与 `... skipped` 打在两行，按 marker 切拿不到 id，内层只认出 2 格 ⇒ 两格误报 NOT_SKIPPING_ANYMORE，我自己写的正对照格当场抓出这条 bug。两版都不进仓库判据（净变化 0），spike 留 `.scratch/spikes/skip_roster_spike.py`。下一版形状确定：表头行 + 结果行配对归属 + 恒等式闸门（解析 id 数 == 内层 `OK (skipped=N)` − 观察者那一格）。电池 Ran 521 OK (skipped=4)。
