@@ -37,7 +37,7 @@ ARMS = [
 ]
 
 ASSERT_SHAPE = re.compile(r"-\[[\w.]+ (test\w+)\] :\s*(XCTAssert\w+) failed")
-CASE_SHAPE = re.compile(r"Test Case '-\[[\w.]+ (test\w+)'\] failed")
+CASE_SHAPE = re.compile(r"Test Case '-\[[\w.]+ (test\w+)\]' failed")
 
 
 def run_arm(arm_id, why, rel_target, needle, repl, expected_cell):

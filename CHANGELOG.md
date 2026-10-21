@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R275 / 第 274 轮 / Round 272 · 三处悬停淡入接进取证通道）
+
+`SettingsView.swift` 的 `SettingsSidebarRow`、`HistorySidebarView.swift` 的筛选段按钮、`SearchField.swift`：`.animation(MotionCatalog.animation(for: .hover), value:)` 从直读裸 `isHovered` 改成与该视图**画法同一个合取式**（`isHoveredForDrawing` / `isHoveredForFill`）⇒ 离屏取证时这条淡入第一次有触发条件（此前 value 永不变化，墨落下但没有过程）。判据现读：files=105 源码文件、hover 动画位点 6 处、免检（不读取证键）=0、裸读=0 判=PASS；新卷 `HoverAnimationChannelTests` 4 格（对齐 + 真值表 + 剥注释 + 豁免方向性），根由 `#filePath` 推（D-260）。刀 2/2 CAUGHT、RESTORE_CLEAN=yes：M832（红在 XCTAssertEqual，钉的是产品轴：动画条件退回裸读）、M833（红在 XCTAssertTrue，钉的是尺轴：把裸读谓词弄瞎）（第一版按错的行形状找失败格 ⇒ 两把都误报 WRONG_CELL，刀读不到不等于产品没红）。四件套：告警 0、全量 Executed=923 failures=0 skipped=45、帧 170 changed=0 missing=0、dmg=ok、本机 1.4.8；脚本电池 Ran 519 tests / OK (skipped=4)；预检 tables=81 covered=65 arms=213 bad=0。新开 330（这三处的中间态产物证人）。写成 D-261。CI：1c831f2 → 39583125728 / completed / failure、3ec2a97 → 39581623084 / completed / failure 交接时未读 ⇒ 只登记号不轮询（R140）。
+
+
 ### Fixed（R274 / 第 273 轮 / Round 271 · runner 上那一朵在我名下的红）
 
 `.scratch/motion-audit-2/mutate_r271.py` 的仓库根从写死 `/Users/wangziyi/Codex_Project0` 改成由 `__file__` 推 —— 它是被脚本电池 import 的工具，runner 的检出目录不是本机路径 ⇒ R273 的账半那一跑 STEP[9]「Release script tests」`Ran 516 / FAILED (errors=3, skipped=1)`，三格全是我上一轮为 327 写的漂移守卫（FileNotFoundError 样本 2 条同形）。同轮把这一次修升成会红的门：`test_mutate_r271_needle.py` 3 格 → 6 格（`mod.ROOT` 必须等于由 `__file__` 推的那一个；电池 import 的工具名单**现读**、逐个不许写死本机根、**名单为空=红**；正负对照测谓词自己）。刀 M831 重跑 1/1 CAUGHT、RESTORE_CLEAN=yes（D-215）；脚本电池 Ran 519 tests / OK (skipped=4)；预检 tables=80 covered=64 arms=211 bad=0。新开 329：其余 206 处写死本机根的脚本逐张搬。CI：6e810e6 → 39580528220 / in_progress / 未读、3ec2a97 → 39581623084 / in_progress / 未读、ecfc012 → 39581770417 / in_progress / 未读 交接时未读 ⇒ 只登记号不轮询（R140）。产品 0 文件；Swift 全量卷与帧基线本轮未跑 ⇒ NOT-RUN。

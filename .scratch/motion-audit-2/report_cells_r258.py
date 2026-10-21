@@ -70,11 +70,28 @@ elif mode == "sources":
     # 锚点按**行首标签**认（不按上一版的正文认）：R270 撞过一次 —— 旧锚点要求句尾出现
     # 「上一笔动源码是 R253」，而那格早在 R263 就被改写 ⇒ 命中 0 次。守卫用的也是这个标签，
     # 所以尺与闸门读同一个对象（D-247）。
+    # 正文里的**轮次与文件数一律现读**（R275 的自曝：上一版把「R270 … 1 文件 …」整句写死，
+    # 于是每次刷新都在替一笔旧提交说话 —— `test_the_sources_cell_agrees_with_git` 当场把它拦下，
+    # 红在写盘之前而不是红在台账里）。
     pat = r"\| 最后一次动到 `Sources/` 的轮次 \|.*\n"
-    new = ("| 最后一次动到 `Sources/` 的轮次 | **R270**（commit `" + sha + "`）—— 1 文件，"
-           "**动的是常量的可见性，不是画面**：`DailyCopyLedger.visibilityGrace` 从 private let 升成 "
-           "internal static let，判据的观察窗口不再抄值而是读它（D-256；新尺 ledger_timing_scan 9 格 + 刀 M830；"
-           "行为不变由同一格改前改后两份读数与帧基线 changed=0 签）。上一笔是 R263（收藏星字形墨那一抬）。\n")
+    subj = os.popen("git log -1 --format=%s " + sha).read().strip()
+    mround = re.search(r"\bR(\d+)\b", subj)
+    if not mround:
+        die("commit " + sha + " 的标题里读不到 R 号 ⇒ 那一格不许手抄轮次")
+    nfiles = len([l for l in os.popen("git show --numstat --format= " + sha
+                                      + " -- ClipboardHistory/Sources").read().splitlines() if l.strip()])
+    if nfiles < 1:
+        die("commit " + sha + " 没动任何 Sources 文件 ⇒ 这一格不该被它刷新")
+    prev = os.popen("git log --format=%h -2 -- ClipboardHistory/Sources").read().split()
+    prevtxt = ""
+    if len(prev) > 1:
+        ps = os.popen("git log -1 --format=%s " + prev[1]).read().strip()
+        pm = re.search(r"\bR(\d+)\b", ps)
+        prevtxt = "上一笔动 `Sources/` 的是 " + (pm.group(0) if pm else "（标题里没有 R 号）") \
+                  + "（`" + prev[1] + "`）。"
+    new = ("| 最后一次动到 `Sources/` 的轮次 | **" + mround.group(0) + "**（commit `" + sha
+           + "`）—— 现读 " + str(nfiles) + " 个 `Sources/` 文件；改了什么以 `AGENT_UI_AUDIT.md` 里 "
+           + mround.group(0) + " 那一节为准（这一格只登记号与数，不复述结论）。" + prevtxt + "\n")
     t = sub_once(t, pat, new.replace("\\", "\\\\"), "Sources 格")
     wr(REP, t)
     print("REPORT_CELLS sources sha=" + sha + " maxU=" + str(mx))

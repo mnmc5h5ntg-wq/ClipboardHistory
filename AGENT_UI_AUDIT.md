@@ -376,6 +376,18 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 274 轮（R275 / 第 274 轮 / Round 272 · 2026-10-21）：三处悬停淡入在取证通道里从来没有过程 —— 画法和动画的触发条件必须问同一句话（U-918…U-920 / D-261 · 产品 3 文件）
+
+本轮次对照：与 R274（自评 80，runner 那朵红归因到自己头上）相比，本轮回到产品面：R263 结掉 `HistoryRowViews` 那一族时把范围写成"一处 tint + 一条 animation value"，但那是**按文件**记的账 —— 同一形状在另外三个文件里还活着，而且没有任何尺会红。
+
+- **U-918：缺陷本身与修法** —— `.animation(MotionCatalog.animation(for: .hover), value: X)` 在 6 处位点里（105 个源码文件现读）有 3 处把 X 直读裸 `@State isHovered`：HistorySidebarView.swift、SearchField.swift、SettingsView.swift。这三颗文件的**画法**早就接了取证键（`hoveredForCapture`），于是离屏渲染时墨会落下、动画却永远不触发（`.onHover` 在无指针的离屏通道恒 false ⇒ value 从不变化 ⇒ 没有中间态可数）。后果不是像素错，是**这条淡入是否存在于可测通道里**这句话没有证人 —— 与 R263 那条"量不到被记成没问题"（D-249）同族，只是这次坏的是动画那一半。修法：三处都改读同一个合取式（`SettingsSidebarRow` 新建 `isHoveredForDrawing`，`HistorySidebarView` 复用既有的 `isHoveredForFill`，`SearchField` 复用既有的 `isHoveredForDrawing`）⇒ 现在 6 处位点里裸读 0 处不读取证键、其余全部对齐（判据现读：files=105 sites=6 免检=0 裸读=0）。
+- **U-919：一把新尺与两把刀，外加刀自己的一次误报** —— 新卷 `HoverAnimationChannelTests`（4 格：对齐判据 + `isBare` 真值表 + 剥注释后才数（R76）+ 豁免的**方向性**：不读取证键的文件豁免，一旦接了键同一处写法就必须翻红）。根由 `#filePath` 推（D-260 —— 上一轮刚为同一件事红在 runner 上）。刀 2/2 CAUGHT、RESTORE_CLEAN=yes：M832（红在 XCTAssertEqual，钉的是产品轴：动画条件退回裸读）、M833（红在 XCTAssertTrue，钉的是尺轴：把裸读谓词弄瞎）。要单独记一笔的是刀的第一版：它按 `name : XCTAssert… failed` 这种形状找失败格，而 SwiftPM 实际打的是 `-[Module.Class testFoo] : XCTAssertEqual failed` ⇒ 两把刀都被报成 WRONG_CELL —— **刀读不到不等于产品没红**，那是尺的失灵（现读 /tmp/r275_raw.log 的真实形状后重写正则，两把才各自红在正确的格上）。
+- **U-920：静置画面一字未动，这一次"画面没变"是读数不是断言** —— 四件套现读：构建告警=0、全量卷 Executed=923 skipped=45 failures=0、帧 frames=170 基线 compared 后 changed=0 missing=0、dmg=ok、换装本机 1.4.8。改的是动画触发条件而不是任何一档墨 ⇒ changed 必须为 0，而它确实是 0；这条等式本身就是本轮"没有偷偷改外观"的证人（若哪天这里变成非 0，就是有人借"对齐条件"的名义挪了画法）。眼睛腿：RUN —— 三处里只有**一颗**有两态帧可看：`segmented-filter-idle` 与 `segmented-filter-hover`（亮/暗各一对，200x60）—— 悬停那一档确实多出一层灰、且只落在未选中那枚，与 `hoverFill` 的 `guard !isSelected` 一致；另外两处**没有两态帧可看**：`search-field-320x112` 只有单态（没有 hover 孪生帧），设置侧栏行 `SettingsSidebarRow` 根本没有 hover 夹具（`settings-*` 全是整窗、不点亮取证键）⇒ 本轮修的是"条件同式"这件事本身，三处的**过程**与两态对照都还没有产物读数，这就是 330 的真实范围（不是笼统的"缺一把尺"，而是按位点数出来的：两处缺两态夹具、三处缺中间态证人）。
+
+变异腿：RUN（2/2 CAUGHT、RESTORE_CLEAN=yes、预检已登记 mutate_r275：tables=81 covered=65 arms=213 bad=0、ARM_TOTAL arms=706 dupes=0、310 缺口 423 把）。
+产品腿：3 文件（`SettingsView.swift` / `HistorySidebarView.swift` / `SearchField.swift`，全是动画触发条件一行）⇒ sources 格本轮要刷新。
+未做（逐条）：① 330（这三处的**中间态**产物证人，或显式记「源码已接、产物未量」）；② **312 的具名出口（欠第七轮）**；③ 329（206 处写死本机根）、328、323、322、317、314、315、316；④ 310 的 75 张表 / 423 把刀、309 那 6 张、305、299、301、307、291 画法轴那四位；⑤ 用户闸门 220 路 A / 228② / 265。
+
 ## 第 273 轮（R274 / 第 273 轮 / Round 271 · 2026-10-21）：runner 把我自己那一卷脚本电池弄红了 —— 三格 FileNotFoundError 的成因是工具写死了本机仓库根（U-915…U-917 / D-260 · 产品 0 文件）
 
 本轮次对照：与 R273（自评 83，324 结案 + 半套账补齐）相比，本轮做的是 R274 的 ⓪ 本身 —— 读自己那一跑的 CI，并且红的那一朵确实在我名下。

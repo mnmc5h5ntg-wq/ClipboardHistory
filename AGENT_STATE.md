@@ -1,5 +1,18 @@
 # AGENT_STATE · 当前工作状态（自主修复引擎）
 
+## R275 状态（第 274 轮 / Round 272 · 2026-10-21）
+最后更新：2026-10-21（本地 · R275 / 第 274 轮 / Round 272）：**三处悬停淡入在取证通道里从来没有过程 —— 画法与动画的触发条件对齐，并给这条规则一把会红的尺**（U-918…U-920 · D-261 · 产品 3 文件 · 自评 88/105）
+
+**本轮落地**：`SettingsView.swift` / `HistorySidebarView.swift` / `SearchField.swift` 的 hover 动画 value 改读合取式；新卷 `HoverAnimationChannelTests`（4 格，根由 `#filePath` 推）现读 files=105 sites=6 裸读=0 判=PASS；刀 2/2 CAUGHT、RESTORE_CLEAN=yes（M832（红在 XCTAssertEqual，钉的是产品轴：动画条件退回裸读）、M833（红在 XCTAssertTrue，钉的是尺轴：把裸读谓词弄瞎））；四件套 告警=0 全量 Executed=923 failures=0 skipped=45 帧=170 changed=0 missing=0 dmg=ok 本机=1.4.8；脚本电池 Ran 519 tests / OK (skipped=4)；预检 tables=81 covered=65 arms=213 bad=0、310 缺口 75 张 / 423 把。新开 330。
+
+**下一轮（R276 / 第 275 轮 / Round 273）的 ⓪**：
+⓪ 读 CI：1c831f2 → 39583125728 / completed / failure、3ec2a97 → 39581623084 / completed / failure 与本轮新跑（只登记号不轮询，R140）。要验的两件：STEP[9]「Release script tests」在新门上转绿（errors 归 0 且 `Ran` 颗数不低于本笔），以及 STEP[11] 那两张 recording 帧在 runner 上是否仍报 changed —— 若 changed≠0 按 D-251 开具名出口，**不许改基线迁就**。
+① **312 的具名出口（欠第七轮）**：按「纸」那一维推，本机 3.000 不许降（D-251）。
+② 330（三处淡入的中间态产物证人）、329（206 处写死本机根，每张搬完重跑那张表）、328、323、322、317、314、315、316。
+③ 310 的 75 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 画法轴那四位。
+④ 产品动效面：本轮 3 个产品文件，但都是可测性；仍需按清账表点一个位真做动效或撤声明。
+⑤ 用户闸门 220 路 A / 228② / 265。
+
 ## R274 状态（第 273 轮 / Round 271 · 2026-10-21）
 最后更新：2026-10-21（本地 · R274 / 第 273 轮 / Round 271）：**runner 那一朵红归因到我自己的守卫上：被电池 import 的工具写死本机根 ⇒ 由 `__file__` 推，并把这一次修升成会红的门**（U-915…U-917 · D-260 · 产品 0 文件 · 自评 80/105）
 
