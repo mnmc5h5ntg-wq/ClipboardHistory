@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 实验（R281 / 第 280 轮 / Round 278 · 330 的两臂第一次真跑，两次撤回）
+
+按 330 的正解在 `MotionFilmstripTests.swift` 里自建宿主 + 复用 `Grabber`/`sharedMovingFloor`，fade 臂在同一棵视图树里翻 `hoveredForCapture`、jump 臂换整棵 `rootView`。两臂各 24 帧、峰值 0.000、共享地板 0.000、时钟热=是/是 ⇒ 今天没有判决可下。第一版把 `floor>0` 写成断言（三朵同因红），改成前提闸门 + 具名 skip；第二版补上 `probeFrame` 等价容器，`静置墨` 0.1 → 0.158，我当时据此写「控件没画」，随后现读 `meanLevel` 正文发现它是 0..1 归一化亮度、而我的地板是 `>1.0` ⇒ 结论当场撤回（D-267），读数保留。两版 spike 都不入库（新的 skip 需要 331 的机器名册；本轮未跑四件套），判据与产品净变化 0；下一版：空白参照前提 + `ContentView` 行 + `hoveredRowForCapture`（键 `Int?`）。脚本电池 Ran 531 tests / OK (skipped=4)；眼睛腿 NOT-RUN。
+
+
 ### Fixed（R280 / 第 279 轮 / Round 277 · 名册理由接上对象）
 
 `scripts/tests/test_hover_capture_channel.py` 新增第二条轴 `TWO_STATE_CLAIMS` + `claim_problems()`：每个未接取证键的悬停文件必须声明它靠哪组两态帧被看见（或显式 `None`／`NO_INK`），声明的前缀要在 `docs/frame_baseline.json` 的名单里真的数到 ≥2 种状态；理由文本里出现与声明对撞的否定句 ⇒ 红；声明为"没有"而理由没点名缺席 ⇒ 也红。修掉的假账：`DailyCopyHeatmapView` 那行"hover 那一档没有独立的两态帧"——基线现读有 `heatmap-cell-strip-{still,hover}` 亮暗 4 张、判据五格一直在跑，这句挂了三十几轮。新增 `mutate_r280.py`：M836（前缀指向不存在的帧 = 对象轴）／M837（否定词扫描弄瞎 = 尺轴）现读 2/2 全 CAUGHT、RESTORE_CLEAN=yes，并登记进预检（tables=83 covered=67 bad=0、ARM_TOTAL arms=710 dupes=0）。本轮自己撞的镜像也入账：更正后的理由引用了旧假话原句，守卫按字面读否定词 ⇒ 真产物那一格反而红（Ran 9/failures=1），处置是把"否定词被字面读、旧原话只进台账"写进理由本身（U-934）。新开 335：其余 2 个文件共 2 句同形理由仍未结构化（点名 test_motion_surface_gate.py、test_probe_coverage_gate.py…）。脚本电池 Ran 531 tests / OK (skipped=4)；眼睛腿 RUN（静置／悬停各一张，圈只在那一格）。产品 0 文件 ⇒ sources 格不动。CI：8a972d0 → 未取到（293）／8717741 → 39599249700 / in_progress / 未读／f7205b6 → 39599556093 / in_progress / 未读。
