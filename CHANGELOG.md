@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R268 / 第 267 轮 / Round 265 · 等待的两种形状拆成两个符号 + 一把新尺数它们）
+
+`DailyCopyHeatmapTests`：3 处 `pumpMain(seconds: 0.8)` 搬成 `pollUntil(cell:cap:10000)`（等待打成 `WAIT_POLL … waited_ms=… 等到=…`，`hit` 直接进断言）；`testASuccessfulWriteDoesNotRepublish` 在证人之后加一段从事件起算的 `pumpWindow`（计划 600 ms／实跑 616 ms）—— 这是 M826 第一把 ESCAPED 逼出来的修法。`CapturePathWriteBudgetTests` 的 helper 改名 `pumpRunLoopStep`（它一直在 `while` 条件里，是轮询步进不是赌注）。新工具 `scripts/wait_scan.py` + 判据卷 13 格 + 刀 M828：按符号数等待形状，名册双向对账，现读 `bet=1 未登记=0 poll_step=2 poll_until=4 判=PASS`。
+
+刀：3/3 CAUGHT（M826 产品轴「只在值变了才同步」／M827 等待形状轴「pollUntil 空转」／M828 工具轴「URL 那行被截断」），RESTORE_CLEAN。CI 交账：e53706c → 39559154078 / completed / success 绿 = R267 那笔等待修法的 runner 验收，且那两笔之间该测试文件字节相同 ⇒ 同一份断言一红一绿由负载决定（不再是推理）；08ddaa1 → 39557244740 / completed / failure 是那一次红；本轮新跑 37accf9 → 39562680539 / completed / success 未读。318 结案（含把 R267 的「7 处」改口成真数 5 处调用点）；312 成因改写成"纸动了、墨没动"，仍开；新开 319／320／321。四件套：0 告警、全量 919（skipped=42、failures=0）、帧 170 compared=170 changed=0 missing=0、dmg=ok、本机 1.4.8。脚本电池 Ran 502 tests / OK (skipped=4)、预检 tables=77 covered=61 arms=208 bad=0。产品 0 文件。
+
+
 ### Changed（R267 / 第 266 轮 / Round 264 · runner 负载打回一格"等挂钟"的判据）
 
 `DailyCopyHeatmapTests.testWriteFailureBecomesVisibleWithoutAnotherCopy`：`pumpMain(seconds: 0.8)` 改成"轮询到条件成立或 10 s 上限"，等待时间打成 `LEDGER_WRITE_ERROR_VISIBLE waited_ms=… publishes=… 有错误=…`；两条断言与地板一字未动。现读：本机 209 ms / 发布 2 次（基线 1）；刀 M825（把产品里镜像那行换成不再发布）顶到 10015 ms 才红 ⇒ 1/1 CAUGHT、RESTORE_CLEAN（"等条件"没有退化成"永远绿"）。

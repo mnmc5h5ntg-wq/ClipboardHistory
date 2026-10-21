@@ -157,7 +157,7 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         blocked.signal()                        // 放开闸门
         let deadline = Date().addingTimeInterval(3.0)
         while !FileManager.default.fileExists(atPath: historyURL.path), Date() < deadline {
-            pumpMain(seconds: 0.05)
+            pumpRunLoopStep(seconds: 0.05)
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: historyURL.path),
                       "放开闸门之后存档仍然没出现 ⇒ 上面那两条「没写盘」是因为根本没接上盘，"
@@ -165,7 +165,7 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         // 账本走的是"去抖 + 后台队列"，所以它必须**晚一点**才出现；这里只要求它最终出现。
         let ledgerDeadline = Date().addingTimeInterval(3.0)
         while !FileManager.default.fileExists(atPath: ledgerURL.path), Date() < ledgerDeadline {
-            pumpMain(seconds: 0.05)
+            pumpRunLoopStep(seconds: 0.05)
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: ledgerURL.path),
                       "账本始终没落盘 ⇒ 计数只活在内存里，重启就丢（阶段一的可回溯性要求）")
@@ -377,7 +377,10 @@ final class CapturePathWriteBudgetTests: XCTestCase {
                               sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录")
     }
 
-    private func pumpMain(seconds: TimeInterval) {
+    /// 这是**轮询步进**而不是「赌一段挂钟」：两处调用都在 `while 条件, Date() < deadline`
+    /// 的循环体里。R268 / 318 把这两种形状起成两个名字，就是为了让 `wait_scan.py` 能按符号分它们 ——
+    /// 读散文的守卫不算守卫（D-235 那一族）。
+    private func pumpRunLoopStep(seconds: TimeInterval) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
     }
 }

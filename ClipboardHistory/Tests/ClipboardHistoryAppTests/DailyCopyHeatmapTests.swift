@@ -262,8 +262,14 @@ final class DailyCopyHeatmapTests: XCTestCase {
         subject.recordCopy(at: day(2026, 3, 12))
         subject.recordCopy(at: day(2026, 3, 11))
         XCTAssertFalse(FileManager.default.fileExists(atPath: url().path), "去抖之前不许写")
-        // 让后台队列有机会跑：主线程睡 0.6s（12 倍去抖窗口）。
-        Thread.sleep(forTimeInterval: 0.6)
+        // 等**产物**而不是等挂钟（R268 / 318）：睡死 0.6s 在负载高的机器上是赌一次，
+        // 而赌输的形态是"没写盘"⇒ 这条要防的 SIGTRAP 也就从来没被复现过，却报绿。
+        let fired = pollUntil(cell: "debounced-write-fires", capMilliseconds: 10_000) {
+            FileManager.default.fileExists(atPath: url().path)
+        }
+        XCTAssertTrue(fired.hit,
+                      "10000 ms 内去抖项始终没落盘：这条路径从来没被执行过，隔离问题也就看不见"
+                      + "（等了 " + String(fired.waitedMs) + " ms）")
         XCTAssertTrue(FileManager.default.fileExists(atPath: url().path),
                       "去抖到期没写盘：这条路径从来没被执行过，隔离问题也就看不见")
         XCTAssertNil(subject.lastWriteError, subject.lastWriteError ?? "nil")
@@ -507,16 +513,33 @@ final class DailyCopyHeatmapTests: XCTestCase {
     /// `@Published` 是"每次赋值都发"，不看值相不相等 ⇒ 少了那句比较，
     /// 每复制一条都会让设置页为一条并不存在的错误重排一次（比静默更吵的那种坏法）。
     func testASuccessfulWriteDoesNotRepublish() throws {
-        let ledger = DailyCopyLedger(fileURL: temporaryDirectory.appendingPathComponent("ok/daily-copy.json"),
-                                     debounceSeconds: 0.05)
+        let ledgerURL = temporaryDirectory.appendingPathComponent("ok/daily-copy.json")
+        let ledger = DailyCopyLedger(fileURL: ledgerURL, debounceSeconds: 0.05)
         var publishes = 0
         let sink = ledger.objectWillChange.sink { _ in publishes += 1 }
         ledger.recordCopy(at: ledger.today)
         let afterCopy = publishes
-        pumpMain(seconds: 0.8)
+        // **正面证人先行**（R268 / BACKLOG 318）：原来这里 `pumpMain(seconds: 0.8)` 之后直接断言
+        // 「发布次数没涨」。少了证人，这一格绿只说明「那 0.8s 里什么都没发生」⇒ 负载高的机器上
+        // 写盘还没轮到，"没有多余发布"与"还没到时候"长得一模一样，于是那把「只在值变了才同步」
+        // 的比较被拿掉时这一格会**假绿** —— 比假红更坏的那一侧。
+        // 现在先等到文件真的出现（10s 上限、把等待打成读数），再问那一句"多发了没有"。
+        let written = pollUntil(cell: "success-no-republish", capMilliseconds: 10_000) {
+            FileManager.default.fileExists(atPath: ledgerURL.path)
+        }
+        XCTAssertTrue(written.hit,
+                      "10000 ms 上限内那次成功的写盘始终没出现 ⇒ 下面那句「没有多余发布」无从判定"
+                      + "（等了 " + String(written.waitedMs) + " ms）")
+        // 证人之后还要再看一段**固定观察窗口**（M826 第一版在这里 ESCAPED，那是真话）：
+        // 这条断言问的是「盒子→@Published 那次镜像有没有多发」，而那颗事件排在
+        // `debounce + visibilityGrace` 之后 —— 实测文件在 115 ms 就出现了，镜像要到 ~200 ms，
+        // 所以"等到文件出现"不等于"等到那颗事件"。窗口的长度由那条日程推：
+        // 3 × (去抖 0.05 + grace 0.15) = 600 ms。`grace` 是 private，值抄在这里 ⇒ BACKLOG 320。
+        pumpWindow(cell: "success-no-republish", milliseconds: 600)
         XCTAssertNil(ledger.lastWriteError)
         XCTAssertEqual(publishes, afterCopy,
-                       "写成功也发了一次变更 ⇒ 那个「只在值变了才同步」的比较被拿掉了")
+                       "写成功也发了一次变更 ⇒ 那个「只在值变了才同步」的比较被拿掉了"
+                       + "（写盘已在 " + String(written.waitedMs) + " ms 内出现，不是没到时候）")
         sink.cancel()
     }
 
@@ -529,22 +552,61 @@ final class DailyCopyHeatmapTests: XCTestCase {
         let ledger = DailyCopyLedger(fileURL: gate.appendingPathComponent("sub/daily-copy.json"),
                                      debounceSeconds: 0.05)
         ledger.recordCopy(at: ledger.today)
-        pumpMain(seconds: 0.8)
+        let failed = pollUntil(cell: "failure-becomes-visible", capMilliseconds: 10_000) {
+            ledger.lastWriteError != nil
+        }
+        XCTAssertTrue(failed.hit,
+                      "10000 ms 内那次失败没有回到主线程 ⇒ 「失败要看得见」这条路径根本没接上，"
+                      + "不是等得不够久（等了 " + String(failed.waitedMs) + " ms）")
         XCTAssertNotNil(ledger.lastWriteError, "前提：先让它真的失败一次")
 
         try FileManager.default.removeItem(at: gate)   // 障碍清掉 ⇒ 同一条路径现在写得进去
         ledger.recordCopy(at: ledger.today)
-        pumpMain(seconds: 0.8)
+        let cleared = pollUntil(cell: "failure-cleared", capMilliseconds: 10_000) {
+            ledger.lastWriteError == nil
+        }
+        XCTAssertTrue(cleared.hit,
+                      "障碍清掉之后 10000 ms 内那行失败提示仍没撤掉 ⇒ 「永久横幅」那一坏法"
+                      + "被这台机器的负载挡在判据之外（等了 " + String(cleared.waitedMs) + " ms）")
         XCTAssertNil(ledger.lastWriteError, "已经恢复还在报失败 ⇒ 这条提示从此变成噪声")
     }
 
-    /// 主队列的"看一眼"要靠 runloop 跑，`Thread.sleep` 会**堵死**主线程 ⇒ 那一格永远不响。
-    /// 这条 helper 本身就是判据的一部分：用错等待方式的测试会绿着什么都没测到。
-    private func pumpMain(seconds: TimeInterval) {
-        let deadline = Date().addingTimeInterval(seconds)
-        while Date() < deadline {
-            RunLoop.main.run(mode: .default, before: deadline)
+    /// 等到条件成立或到达上限，并把「等了多久、等到没等到」打成读数（D-253 / R268 / 318）。
+    ///
+    /// 三件事缺一不可，否则"改成等条件"只是把假红换成假绿：
+    /// ① **正面证人**：调用方给的条件必须是「产物出现了」这种可轮询的东西，不许是「什么都没发生」；
+    ///    要断言缺席的格子（`testBackfillDoesNotWriteDuringConstruction`）留的是固定观察窗口，
+    ///    由同一条测试末尾 `flushPendingSaves` + 文件出现当正面控制 —— 那种窗口不许改成轮询。
+    /// ② **上限到了必须红**：`hit` 直接进断言，不是只打印（M827 钉的就是这一格）。
+    /// ③ 主队列的"看一眼"要靠 runloop 跑，`Thread.sleep` 会**堵死**主线程 ⇒ 那一格永远不响。
+    private func pollUntil(cell: String, capMilliseconds: Int,
+                           _ condition: () -> Bool) -> (waitedMs: Int, hit: Bool) {
+        let started = Date()
+        let deadline = started.addingTimeInterval(TimeInterval(capMilliseconds) / 1000.0)
+        var hit = condition()
+        while !hit && Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+            hit = condition()
         }
+        let waitedMs = Int(Date().timeIntervalSince(started) * 1000)
+        CaptureReadings.emit("WAIT_POLL 格子=" + cell + " waited_ms=" + String(waitedMs)
+                             + " 等到=" + (hit ? "true" : "false")
+                             + " 上限_ms=" + String(capMilliseconds))
+        return (waitedMs, hit)
+    }
+
+    /// 事件**之后**的一段固定观察窗口（D-253 允许的那一类：断言的是「这一段里没多出东西」，
+    /// 缺席没法轮询）。它和 R267 之前那种赌注的区别在起点：这段时钟是从产物出现那刻开始走的，
+    /// 不是从 `recordCopy` 开始，所以队列被压后不会把窗口吃掉。
+    private func pumpWindow(cell: String, milliseconds: Int) {
+        let started = Date()
+        let deadline = started.addingTimeInterval(TimeInterval(milliseconds) / 1000.0)
+        while Date() < deadline {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.05))
+        }
+        let waitedMs = Int(Date().timeIntervalSince(started) * 1000)
+        CaptureReadings.emit("WAIT_WINDOW 格子=" + cell + " 观察_ms=" + String(waitedMs)
+                             + " 计划_ms=" + String(milliseconds))
     }
 
     // MARK: - R9：动效必须"被供电"，不许只是声明
