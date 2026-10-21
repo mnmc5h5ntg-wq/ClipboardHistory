@@ -23,20 +23,33 @@ R51 = os.path.join(ROOT, '.scratch', 'motion-audit-2', 'mutate_r51_capture_path_
 TEST1 = 'CapturePathWriteBudgetTests/testAddingACopyWritesNothingOnTheMainThread'
 
 
-def load_arm():
-    """从 R51 那张表里取 M249 的 (文件, 锚点, 替换) —— 同一把坏法，不手抄。"""
+# 静态可抽的三件套（预检按字面量认，运行时读表会让它看不见 ⇒ BACKLOG 327）。
+# 单一真相仍在 R51 那张表里：`scripts/tests/test_mutate_r271_needle.py` 每次跑电池都会
+# 把下面三个字面量与 R51 解析出来的值对账，漂移就红 —— 这样"能被预检看见"与"不抄两份"同时成立。
+TARGET = 'ClipboardHistory/Sources/ClipboardHistoryApp/Managers/HistoryPersistence.swift'
+NEEDLE = '        saveQueue.async(execute: workItem)'
+REPL = '        workItem.perform()   // MUTANT：同步写 = 搬回调用线程'
+
+ARMS = [
+    ('M831', u'写盘搬回调用线程（needle 与 R51 的 M249 同一颗）= 产品轴', TARGET, NEEDLE, REPL),
+]
+
+
+def resolve_r51():
+    """回到 R51 那张表里取同一颗 needle，只为对账（不为运行）。"""
     src = io.open(R51, encoding='utf-8').read()
     head = src.split('# (编号, 说明, 文件, 锚点, 替换, 过滤器, 必须出现的失败消息, 预期)')[0]
     ns = {'os': os, 'sys': sys}
     exec(compile(head, R51, 'exec'), ns)          # noqa: S101 - 自家表的常量
     m = re.search(r'\("M249",\s*"([^"]*)",\s*(\w+),\s*(\w+),\s*\n?\s*"((?:[^"\\]|\\.)*)"', src)
     if not m:
-        raise SystemExit('M831 NOT_RUN 读不到 R51 表里的 M249')
+        raise SystemExit('读不到 R51 表里的 M249')
     return ns[m.group(2)], ns[m.group(3)], m.group(4)
 
 
 def main():
-    target, needle, repl = load_arm()
+    arm_id, why, target, needle, repl = ARMS[0]
+    target = os.path.join(ROOT, target)
     rel = os.path.relpath(target, ROOT)
     original = io.open(target, encoding='utf-8').read()
     hits = original.count(needle)
