@@ -6860,4 +6860,7 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
   测试里出现同值裸字面量 18524 处。这个数说明**朴素值相等不是一个可用的估计量**（10、1、2 这类整数在测试里到处出现，
   它量的是巧合不是抄值），所以 323 的第一格不是"报个数"，而是先定"什么才算抄"：收窄到「TimeInterval 且非整数的常量 × 等待语境
   （sleep / pumpWindow / asyncAfter / debounceSeconds / addingTimeInterval …）」之后只剩 10 处 —— 这才是能逐张判的规模。
+  那 10 处去重之后只有两颗位点，都在 `MotionFilmstripTests.swift`：`Date().addingTimeInterval(0.15)`（撞产品 `visibilityGrace` 的值）
+  与 `RunLoop.main.run(until: Date().addingTimeInterval(0.25))`（撞 `maximumDuration`）—— 两边都**更像巧合而不是抄**（胶片探针的 preroll
+  与账本写盘的可见性之间没有因果边）⇒ 收窄之后的估计量仍只是**候选生成器**，判"抄没抄"要看那颗值有没有因果边。
   下一轮把这条估计量搬进 scripts/（配正负对照与刀）再逐处判，别拿 /tmp 那把尺的数进账。
