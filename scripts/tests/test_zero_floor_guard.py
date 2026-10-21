@@ -20,7 +20,8 @@ import re
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SCAN_DIRS = ('scripts', os.path.join('ClipboardHistory', 'Tests'))
+SCAN_DIRS = ('scripts', os.path.join('ClipboardHistory', 'Tests'),
+           os.path.join('ClipboardHistory', 'Sources'))   # R286：336 的 ② —— 范围扩到产品源码
 # 相对地板：同一批样本的峰值/最大值乘一个比例，直接进比较式
 RELATIVE_FLOOR = re.compile(r'>=\s*(?:[A-Za-z_][\w.]*\s*\([^)]*\)\s*\*|peak\b[^*\n]*\*)')
 # 绝对下限的三种合法形状：常量名、max(...) 包一层、显式 min_floor
@@ -43,7 +44,7 @@ def code_lines(path):
 
 
 SELF = 'scripts/tests/test_zero_floor_guard.py'
-FUNC_START = re.compile(r'^\s{4}(?:public |private |fileprivate |nonisolated[^\n]* )*static func \w+')
+FUNC_START = re.compile(r'^\s{2,8}(?:@\w+\s+)?(?:\w+\s+)*func \w+')   # 修饰符任意，落到 func 名字那一行
 
 
 def swift_function_blobs(text):
@@ -105,6 +106,34 @@ class ZeroFloorGuardTests(unittest.TestCase):
         self.assertTrue(MOTIONISH.search(line), '形状词没命中 ⇒ 扫描范围比被测对象窄')
         self.assertTrue(RELATIVE_FLOOR.search(line), '相对地板没被认出来 ⇒ 这把尺坏了')
         self.assertFalse(ABSOLUTE_CLAMP.search(line), '这一行没有绝对下限，对照不该被自己放过')
+
+    def test_the_scan_itself_is_end_to_end_controlled(self):
+        """端到端正负对照（R286）：扩范围之后必须证明**扫描函数**还认得出坏写法。
+
+        上面的对照都打在正则上；而 `scan()` 还经过"切函数块 → 按块找下限 → 按行找形状"三层，
+        任何一层被改窄（比如我把 FUNC_START 写坏）都会让全仓扫描静默变成 0 offender ——
+        那正是"绿着的门"最省事的长成方式。所以这里造一棵假树，一正一负各走一遍 `scan()`。
+        """
+        import tempfile
+        d = tempfile.mkdtemp()
+        for sub in (('scripts',), (os.path.join('ClipboardHistory', 'Tests', 'A'),),
+                    (os.path.join('ClipboardHistory', 'Sources', 'B'),)):
+            os.makedirs(os.path.join(d, *sub))
+        bad = (u'    static func movingCount(_ fractions: [Double]) -> Int {\n'
+               u'        let moving = fractions.filter { $0 >= peak(fractions) * 0.15 }  // moving frames\n'
+               u'        return moving.count\n    }\n')
+        good = (u'    static func changedSpan(_ fractions: [Double]) -> Int? {\n'
+                u'        guard let peak = fractions.max(), peak >= minimumVisibleChange else { return nil }\n'
+                u'        let moving = fractions.filter { $0 >= peak * stepFloorRatio }  // moving frames\n'
+                u'        return moving.count\n    }\n')
+        io.open(os.path.join(d, 'ClipboardHistory', 'Sources', 'B', 'Bad.swift'), 'w', encoding='utf-8').write(bad)
+        io.open(os.path.join(d, 'ClipboardHistory', 'Tests', 'A', 'Good.swift'), 'w', encoding='utf-8').write(good)
+        offenders, scanned = scan(root=d)
+        self.assertGreaterEqual(scanned, 2, '假树没被扫到 ⇒ 目录约定变了，这一格是空的')
+        self.assertEqual(1, len(offenders),
+                         '端到端对照失效：期望恰好点名 Bad.swift，实得 %s ⇒ 扫描在扩范围时被改窄了' % offenders)
+        self.assertIn(os.path.join('ClipboardHistory', 'Sources', 'B', 'Bad.swift'), offenders[0],
+                      '点名的不是那颗文件 ⇒ Sources/ 这一档其实没被扫（范围是假的）')
 
     def test_the_shipped_clamp_is_not_flagged(self):
         """负对照：仓库里那一行**合法**的写法不许被点名（否则这条门只会逼人删掉判据）。"""
