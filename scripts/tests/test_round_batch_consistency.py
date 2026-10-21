@@ -64,6 +64,18 @@ def patterns_for(name, round_no):
 # `test_round_batch_declaration.py` 钉住三件事：申报必须带理由、申报的那轮必须确实缺一本账、当前轮永远不许被豁免。
 # 删掉这张表 ⇒ 186/187 又会让 STATE 轮换红三格（红回来，不是绿过去）。
 SINGLE_LEDGER_ROUNDS = {
+    # R289 补记时一次登记五轮：那五笔的落点全在 scripts/tests 与 .scratch（外加 BACKLOG 追记），
+    # 三本账里只有 ITERATION 被 R289 补了节（曲线不认申报通道，少一轮就把均值算高），
+    # AGENT_UI_AUDIT 与 CHANGELOG 到今天仍没有以它们为标签的标题行 ⇒ 申报，不补桩（R188 那条）。
+    288: "41e1e66 只落 mutate_r288.py（M840/M841）+ 预检登记；三本账没写，ITERATION 那节由 R289 补记",
+    287: "8d427f3 + 3403a78 只落 scripts/tests/test_skip_roster.py（观测式名册 + 恒等式闸门）与 331 的追记"
+         "（第一版的追记因 heredoc 里 CJK 串夹 ASCII 双引号没落盘，下一笔自曝并补齐）；"
+         "三本账没写，ITERATION 那节由 R289 补记",
+    286: "d47476d + 1f119e0 只把零地板守卫扩到 Sources/（6 格）并结案 336，加一次流程自曝；三本账没写，"
+         "ITERATION 那节由 R289 补记",
+    285: "1b16a23 只落 mutate_r285.py（M838/M839）+ 预检登记；三本账没写，ITERATION 那节由 R289 补记",
+    284: "00888ae + 6bed4bf 把 330 收成一条具名通道限制、新开 336 并让零地板守卫进电池 5 格；"
+         "三本账没写，ITERATION 那节由 R289 补记",
     283: "eb650e7 之后的 R283 只追加 BACKLOG 330 的追记五（第四/五版：走 record(Scenario) 拿到可判决读数 —— "
          "前提差 0.0430 而 fade 臂触发后 26 帧逐帧全等 ⇒ 这一位是一帧跳变；spike 已回退，判据与产品净变化 0），"
          "三本账没写；申报而不是补桩标题（R188）。分辨 a/b 的正对照实验写在追记五末尾",
