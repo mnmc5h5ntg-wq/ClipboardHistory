@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R276 / 第 275 轮 / Round 273 · runner 上第二朵在我名下的红）
+
+`mutate_r51_capture_path_blocked.py` 的包根由 `__file__` 推（原来写死 `/Users/wangziyi/Codex_Project0/ClipboardHistory`）；`mutate_r271.py` 的 `resolve_r51()` 在 exec 命名空间里补 `__file__`（exec 与 import 是两条通道，只给 `os`/`sys` 会让由 `__file__` 推根的那张表 `NameError`）。门扩到**可达闭包**：`closure_tool_names()` 从电池直接 import 的 3 颗推到 4 颗（curve_from_ledger、make_surface_ledger、mutate_r271、mutate_r51_capture_path_blocked），并新增两格 —— 一格钉"闭包必须含 R51 那张表"（不含就是装饰），一格测归一化的牙（同一颗文件两台机器相等、不同文件必须不等）。证据：1c831f2 → 39583125728 / completed / failure 与 3ec2a97 → 39581623084 / completed / failure 均 completed / failure，STEP[9] 正文 `Ran 519 / FAILED (failures=1, skipped=1)`，红格 `test_the_static_mirror_equals_the_r51_needle`。三张表按 D-215 重跑：mutate_r51 5 支：4 CAUGHT + M253 按设计绿（灵敏度对照臂），该红没红=0、还原不干净=0、mutate_r271 1/1 CAUGHT、RESTORE_CLEAN=yes、mutate_r275 2/2 CAUGHT、RESTORE_CLEAN=yes；脚本电池 Ran 521 tests / OK (skipped=4)；预检 tables=81 covered=65 arms=213 bad=0。写成 D-262；新开 331（runner 与本机 skip 数不一致，按机器键定名）、329 现读重数（目录 .py 377 颗、仍写死根 205 颗）。产品 0 文件 ⇒ sources 格不动；帧与全量卷未跑 ⇒ NOT-RUN。CI：c99f1fb → 未取到（293）／f09006b → 39588588601 / completed / failure／ad61d2d → 39589146197 / completed / failure 未读 ⇒ 只登记号不轮询（R140）。
+
+
 ### Changed（R275 / 第 274 轮 / Round 272 · 三处悬停淡入接进取证通道）
 
 `SettingsView.swift` 的 `SettingsSidebarRow`、`HistorySidebarView.swift` 的筛选段按钮、`SearchField.swift`：`.animation(MotionCatalog.animation(for: .hover), value:)` 从直读裸 `isHovered` 改成与该视图**画法同一个合取式**（`isHoveredForDrawing` / `isHoveredForFill`）⇒ 离屏取证时这条淡入第一次有触发条件（此前 value 永不变化，墨落下但没有过程）。判据现读：files=105 源码文件、hover 动画位点 6 处、免检（不读取证键）=0、裸读=0 判=PASS；新卷 `HoverAnimationChannelTests` 4 格（对齐 + 真值表 + 剥注释 + 豁免方向性），根由 `#filePath` 推（D-260）。刀 2/2 CAUGHT、RESTORE_CLEAN=yes：M832（红在 XCTAssertEqual，钉的是产品轴：动画条件退回裸读）、M833（红在 XCTAssertTrue，钉的是尺轴：把裸读谓词弄瞎）（第一版按错的行形状找失败格 ⇒ 两把都误报 WRONG_CELL，刀读不到不等于产品没红）。四件套：告警 0、全量 Executed=923 failures=0 skipped=45、帧 170 changed=0 missing=0、dmg=ok、本机 1.4.8；脚本电池 Ran 519 tests / OK (skipped=4)；预检 tables=81 covered=65 arms=213 bad=0。新开 330（这三处的中间态产物证人）。写成 D-261。CI：1c831f2 → 39583125728 / completed / failure、3ec2a97 → 39581623084 / completed / failure 交接时未读 ⇒ 只登记号不轮询（R140）。

@@ -44,7 +44,10 @@ def resolve_r51():
     """回到 R51 那张表里取同一颗 needle，只为对账（不为运行）。"""
     src = io.open(R51, encoding='utf-8').read()
     head = src.split('# (编号, 说明, 文件, 锚点, 替换, 过滤器, 必须出现的失败消息, 预期)')[0]
-    ns = {'os': os, 'sys': sys}
+    # `__file__` 必须给：R51 那张表的 ROOT 现在由 `__file__` 推（R276 / D-262），
+    # 而 exec 出来的命名空间里没有它 ⇒ NameError。exec 一段文件就得把它**用到的东西**给全，
+    # 否则"能 import"与"能 exec"是两条不同的通道（本机 exec 过、电池里 exec 过、runner 上没跑过）。
+    ns = {'os': os, 'sys': sys, '__file__': R51}
     exec(compile(head, R51, 'exec'), ns)          # noqa: S101 - 自家表的常量
     m = re.search(r'\("M249",\s*"([^"]*)",\s*(\w+),\s*(\w+),\s*\n?\s*"((?:[^"\\]|\\.)*)"', src)
     if not m:

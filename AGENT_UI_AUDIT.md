@@ -376,6 +376,19 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 275 轮（R276 / 第 275 轮 / Round 273 · 2026-10-21）：门只扫了直接 import —— runner 上那朵红来自被运行时读的第二张表（U-921…U-923 / D-262 · 产品 0 文件）
+
+本轮次对照：与 R275（自评 88，三处 hover 动画与画法对齐）相比，本轮读的是 R276 的 ⓪ 本身，而红还在名下：R274 修完 `mutate_r271.py` 的写死根之后，runner 仍然红。
+
+- **U-921：归因 —— 同一族病根的第二颗文件，藏在「运行时读表」那条边上** —— 1c831f2 → 39583125728 / completed / failure 与 3ec2a97 → 39581623084 / completed / failure 都是 completed / failure，唯一红步骤仍是 STEP[9]「Release script tests」，正文现读 `Ran 519 / FAILED (failures=1, skipped=1)`，红的那一格是 `test_the_static_mirror_equals_the_r51_needle`。它的断言原文里两边长这样：`../../../../wangziyi/Codex_Project0/Clipb[69 chars]wift` 对 `ClipboardHistory/Sources/ClipboardHistory[33 chars]wift` —— 左边是 runner 上由**本机绝对路径**算 relpath 算出来的东西，右边是仓库相对路径。成因：`mutate_r51_capture_path_blocked.py`（R271 那张表的 needle 单一真相）里 `ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"` 仍然写死。修法两步：R51 的 ROOT 改由 `__file__` 推；并且 `resolve_r51()` 用 `exec(compile(head, …))` 读那张表，而 exec 出来的命名空间里没有 `__file__` ⇒ 当场 `NameError`（这条是本机电池抓到的，不是 runner —— **能 import 与能 exec 是两条通道**）。三张表按 D-215 全部重跑：mutate_r51 5 支：4 CAUGHT + M253 按设计绿（灵敏度对照臂），该红没红=0、还原不干净=0、mutate_r271 1/1 CAUGHT、RESTORE_CLEAN=yes、mutate_r275 2/2 CAUGHT、RESTORE_CLEAN=yes。
+- **U-922：门从「直接 import」扩到「可达闭包」，并给归一化配正负对照** —— 上一轮那把门只扫电池正文里直接引用的 3 颗工具 ⇒ 被 `mutate_r271` 运行时读的 R51 不在名单里，于是它绿着、runner 红着。现在 `closure_tool_names()` 推到不动点（只认同目录里真实存在的 `.py` 文件名，避免把注释里的散文当依赖），现读 直接=3 闭包=4（curve_from_ledger、make_surface_ledger、mutate_r271、mutate_r51_capture_path_blocked），并新增一格**钉住闭包必须真的包含 R51 那张表**（不含它这格就是装饰）。同时把比较改成走 `repo_relative()` 归一化，配一格正负对照：同一颗文件在两台机器路径下必须相等、不同文件必须不等 —— 归一化只消机器差异，不许消对象差异（否则这条对账会被放宽成恒真）。
+- **U-923：两台机器的 skip 数不一样这件事，第一次被数出来** —— 同一颗 STEP[9]：runner 现读 `Ran 519 / skipped=1`，本机同一版本 `Ran 脚本电池 Ran 521 tests / OK (skipped=4)`（skipped=4）⇒ **有三格在 runner 上是 skip 而本机不是**（或反之），而仓库里没有任何按机器键的名单登记它（D-255 同族：豁免/名册只准在实际扫到的对象里对账）。新开 331 逐格定名，不在本轮判它好坏。另：329 的口径本轮重数 —— 目录里 .py 共 377 颗，仍写死本机根的 205 颗（本轮搬掉的是被闭包够到的那颗，不是全表）。CI：c99f1fb → 未取到（293）／f09006b → 39588588601 / completed / failure／ad61d2d → 39589146197 / completed / failure 交接时未读 ⇒ 只登记号不轮询（R140）。
+
+眼睛腿：NOT-RUN —— 本轮 0 产品文件、Swift 侧零改动 ⇒ 帧未重捕、全量卷未重跑（按 R269 的规矩显式记账，不引用上一轮的数当本轮的）。
+读数腿：RUN —— runner 正文（`/tmp/r276_log1.txt`：test_the_static_mirror_equals_the_r51_needle 那一格、那条跨机器不等式）、三张表重跑（5 支：4 CAUGHT + M253 按设计绿（灵敏度对照臂），该红没红=0、还原不干净=0／1/1 CAUGHT、RESTORE_CLEAN=yes／2/2 CAUGHT、RESTORE_CLEAN=yes）、脚本电池 Ran 521 tests / OK (skipped=4)、预检 tables=81 covered=65 arms=213 bad=0。
+产品腿：0 文件（只动 `.scratch/` 与 `scripts/` ⇒ sources 格按规矩不动）。
+未做（逐条）：① 331（按机器键登记那三格 skip 差异）；② **312 的具名出口（欠第八轮）**；③ 330（三处淡入的两态夹具与中间态证人）、328、323、322、317、314、315、316；④ 329 剩下的 205 颗、310 的 75 张表 / 423 把刀、309、305、291 画法轴四位；⑤ 用户闸门 220 路 A / 228② / 265。
+
 ## 第 274 轮（R275 / 第 274 轮 / Round 272 · 2026-10-21）：三处悬停淡入在取证通道里从来没有过程 —— 画法和动画的触发条件必须问同一句话（U-918…U-920 / D-261 · 产品 3 文件）
 
 本轮次对照：与 R274（自评 80，runner 那朵红归因到自己头上）相比，本轮回到产品面：R263 结掉 `HistoryRowViews` 那一族时把范围写成"一处 tint + 一条 animation value"，但那是**按文件**记的账 —— 同一形状在另外三个文件里还活着，而且没有任何尺会红。

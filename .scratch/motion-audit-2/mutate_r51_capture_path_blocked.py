@@ -29,7 +29,14 @@ import os
 import subprocess
 import sys
 
-ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
+# 包根由本文件自己的位置推 —— **不许写死本机绝对路径**（R276 / D-260 的第二次发作）：
+# 这张表被 `mutate_r271.py` 在运行时读（needle 单一真相），而 `mutate_r271.py` 被脚本电池 import
+# ⇒ runner 上 `os.path.relpath(这里的绝对路径, 仓库根)` 会算出 `../../../../wangziyi/Codex_Project0/...`
+# 而不是仓库相对路径 ⇒ `test_the_static_mirror_equals_the_r51_needle` 在 run 39583125728 上红
+# （STEP[9]「Release script tests」Ran 519 / failures=1，正文存 /tmp/r276_log1.txt）。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(_HERE))
+ROOT = os.path.join(REPO, "ClipboardHistory")
 TESTS = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/CapturePathWriteBudgetTests.swift")
 PERSIST = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Managers/HistoryPersistence.swift")
 LEDGER = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Managers/DailyCopyLedger.swift")
