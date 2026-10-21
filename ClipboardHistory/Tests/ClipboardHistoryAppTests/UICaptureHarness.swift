@@ -6023,16 +6023,19 @@ final class UICaptureTests: XCTestCase {
     /// 才能量，而这里要问的正是"悬停点亮的那一层横向铺到哪儿"；它把 alpha 合成到 128 灰、阈值 8，
     /// 而淡底对纸只差 10 灰阶上下，压在阈值边上。这一条按灰阶差 ≥2 算命中，不给矩形。
     static func changedXSpan(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep, threshold: Int = 2)
-        -> (minX: Int, maxX: Int, count: Int) {
+        -> (minX: Int, maxX: Int, count: Int, minY: Int, maxY: Int) {
         guard let pa = a.bitmapData, let pb = b.bitmapData,
               a.samplesPerPixel >= 4, b.samplesPerPixel >= 4,
-              a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh else { return (-1, -1, 0) }
+              a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh
+        else { return (-1, -1, 0, -1, -1) }
         func luma(_ p: UnsafeMutablePointer<UInt8>, _ i: Int) -> Int {
             return Int((0.2126 * Double(p[i]) + 0.7152 * Double(p[i + 1])
                         + 0.0722 * Double(p[i + 2])).rounded())
         }
         var lo = Int.max
         var hi = -1
+        var ylo = Int.max
+        var yhi = -1
         var count = 0
         for y in 0..<a.pixelsHigh {
             for x in 0..<a.pixelsWide {
@@ -6040,6 +6043,8 @@ final class UICaptureTests: XCTestCase {
                 let j = y * b.bytesPerRow + x * 4
                 if abs(luma(pa, i) - luma(pb, j)) >= threshold {
                     count += 1
+                    if y < ylo { ylo = y }
+                    if y > yhi { yhi = y }
                     if x < lo { lo = x }
                     // 第一版这里写的是 `hi = x`（跟 `lo` 不对称），于是取到的是**最后一行**的右端
                     // 而不是全局右端：药丸下沿的圆角让最后一行比中间行短 11px，
@@ -6051,7 +6056,88 @@ final class UICaptureTests: XCTestCase {
                 }
             }
         }
-        return (lo == Int.max ? -1 : lo, hi, count)
+        return (lo == Int.max ? -1 : lo, hi, count, ylo == Int.max ? -1 : ylo, yhi)
+    }
+
+    /// 把一段行带按**列**切成墨簇：列里至少一颗像素离纸 ≥paperDelta 就算这一列有墨，
+    /// 相邻墨列之间允许 ≤mergeGapPx 的空隙（字与字之间的缝），超过它就换一列。
+    ///
+    /// 为什么要有这一把（R290）：要问「分隔线的左端落在哪一列上」，就必须能从帧里
+    /// 把"展开箭头列 / 类型图标列 / 文件名文字列"三簇的左沿各自量出来 —— 不猜坐标、不写死列宽。
+    /// `mergeGapPx` 的分界是量出来的：同一行里**字与字**的空隙 ≤2pt（=4px @2x），
+    /// **列与列**的空隙 ≥10pt（=20px），6pt（12px）坐在中间，两侧都差 3 倍。
+    static func columnClusters(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                               bytesPerRow: Int, y0: Int, y1: Int, paper: Int,
+                               paperDelta: Int = 24, mergeGapPx: Int = 12) -> [(x0: Int, x1: Int)] {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        let lo = max(0, min(y0, y1)), hi = max(lo, min(y1, height))
+        guard hi > lo else { return [] }
+        var clusters: [(x0: Int, x1: Int)] = []
+        var runStart = -1
+        var lastInked = -1
+        for x in 0..<width {
+            var inked = false
+            for y in lo..<hi where abs(luma(x, y) - paper) >= paperDelta {
+                inked = true
+                break
+            }
+            if inked {
+                if runStart < 0 { runStart = x }
+                lastInked = x
+            } else if runStart >= 0, x - lastInked > mergeGapPx {
+                clusters.append((runStart, lastInked))
+                runStart = -1
+            }
+        }
+        if runStart >= 0 { clusters.append((runStart, lastInked)) }
+        return clusters
+    }
+
+    /// 把一张夹具在测试进程里现渲染、读回位图（R290：三格判据共用，别再各抄一份 render→PNG→NSImage）。
+    /// 返回 nil 表示"没有对象"——调用方必须把它走成失败，不许当成"通过"（R140：空对账）。
+    private func renderFixtureRep(_ fixtureName: String, _ appearance: NSAppearance.Name,
+                                  _ scratch: URL) -> NSBitmapImageRep? {
+        guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+            return nil
+        }
+        let file = scratch.appendingPathComponent(fixtureName + "-" + appearance.rawValue + ".png")
+        do { _ = try render(fixture, appearance: appearance, to: file) } catch { return nil }
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              rep.bitmapData != nil else { return nil }
+        return rep
+    }
+
+    static func buffer(of rep: NSBitmapImageRep) -> UnsafeBufferPointer<UInt8> {
+        let base = rep.bitmapData!
+        return UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+    }
+
+    /// 左缘 8 列的众数 = 纸。与 `pillReading`/`glyphInkReading`/`flatBands` 同一条约定。
+    static func paperMode(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                          bytesPerRow: Int) -> Int {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        var edge = [Int: Int]()
+        for x in 0..<min(8, width) {
+            for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
+        }
+        return edge.max { $0.value < $1.value }?.key ?? 0
+    }
+
+    /// 左端那条轴的两个数（R290）：地板由真产物推，改前的差值由刀读回来。
+    enum LeftAxis {
+        /// 改完现读：线 82.0pt 对文字墨沿 82.5pt ⇒ Δ=0.5pt。1.5pt 留的是**字形侧边距**的余量
+        /// （第一枚glyph 的左空腔本来就 <1pt），不是"再差一点也算过"。
+        /// 改前那条线在 48.0pt：差 **34.5pt**（刀 M845 把 leading 退回裸字面量，红话里印的就是它）。
+        static let tolerancePt: Double = 1.5
     }
 
     /// 这条尺的三个数，全部来自现读，不来自印象。
@@ -6191,6 +6277,143 @@ final class UICaptureTests: XCTestCase {
         let mismatch = Self.changedXSpan(f, s)
         XCTAssertEqual(mismatch.count, 0, "尺寸不符却数到了变化像素 ⇒ 缓冲越界了")
         XCTAssertEqual(mismatch.maxX, -1, "尺寸不符却给出了右端 ⇒ 那是编出来的坐标")
+    }
+
+    /// **已知答案的对照**（R290）：`columnClusters` 必须把"字与字的缝"和"列与列的缝"分在两侧。
+    /// 这块形状是照着真产物量的：同一行里字与字的空隙 ≤2pt（=4px @2x），列与列 ≥10pt（=20px）。
+    /// 期望值全部是我构造的，所以当场能判；把 `mergeGapPx` 从 12 改到 4，中间那一簇必须**裂成两簇**
+    /// —— 这条反方向对照钉的是"6pt 这个分界确实在承重"，不是"随便填个数都绿"。
+    func testColumnClusterRulerKnowsItsOwnAnswers() {
+        let w = 200
+        let h = 40
+        let bpr = w * 4
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        func ink(_ x0: Int, _ x1: Int) {
+            for x in x0...x1 {
+                for y in 8..<32 {
+                    let i = (y * w + x) * 4
+                    px[i] = 30; px[i + 1] = 30; px[i + 2] = 30; px[i + 3] = 255
+                }
+            }
+        }
+        ink(20, 30)      // 第一列（箭头）
+        ink(51, 59)      // 第二列（图标）—— 与下面那截之间留 6px，模拟同一枚符号内部的断笔
+        ink(66, 70)
+        ink(91, 150)     // 第三列（文字）
+        for y in 0..<h {
+            for x in 0..<w {
+                let i = (y * w + x) * 4
+                if px[i + 3] == 0 {
+                    px[i] = 250; px[i + 1] = 250; px[i + 2] = 250; px[i + 3] = 255
+                }
+            }
+        }
+        func clusters(gap: Int) -> [(x0: Int, x1: Int)] {
+            px.withUnsafeBufferPointer { buf in
+                Self.columnClusters(bytes: buf, width: w, height: h, bytesPerRow: bpr,
+                                    y0: 0, y1: h, paper: 250, mergeGapPx: gap)
+            }
+        }
+        let three = clusters(gap: 12)
+        XCTAssertEqual(three.map { $0.x0 }, [20, 51, 91],
+                       "三列的左沿读成 " + three.map { String($0.x0) }.joined(separator: ",") + " ⇒ 缝的分界没在承重")
+        XCTAssertEqual(three.map { $0.x1 }, [30, 70, 150],
+                       "右沿读成 " + three.map { String($0.x1) }.joined(separator: ","))
+        let four = clusters(gap: 4)
+        XCTAssertEqual(four.count, 4,
+                       "把缝收到 4px 之后仍然只数到 " + String(four.count) + " 簇 ⇒ 6pt 那条分界根本没在筛东西")
+        XCTAssertEqual(four.map { $0.x0 }, [20, 51, 66, 91])
+        XCTAssertEqual(clusters(gap: 12).count, 3, "同一张图两次读数不一致")
+        // 空带：没有墨的一段必须给 0 簇，而不是 (0,0) 那种看着像坐标的假答案（R99：「没找到」不许报成距离）
+        let none = px.withUnsafeBufferPointer { buf in
+            Self.columnClusters(bytes: buf, width: w, height: h, bytesPerRow: bpr,
+                                y0: 0, y1: 4, paper: 250, mergeGapPx: 12)
+        }
+        XCTAssertEqual(none.count, 0, "空白行带被读出了簇 ⇒ 前提闸门会失去对象")
+    }
+
+    /// **产品判据**（R290 / BACKLOG 337 的第二处）：行分隔线的**左端**必须落在文件名文字的左沿上。
+    ///
+    /// 病是量出来的，而且它先纠正了我自己上一轮写进注释的那句假话：R289 留着 `.padding(.leading, 48)`
+    /// 不动，理由写的是"48 = 文字轴"。判据 `LEFT_AXIS_R290` 现读这一行三个墨簇的**墨沿**：
+    /// 箭头 36.0pt、类型图标 55.0pt、文件名文字 82.5pt（亮暗两档同读数）；
+    /// 而列**框**的边界是 32/44、54/72、82——48 两边都不是：它坐在箭头列框右沿(44)与图标列框左沿(54)
+    /// 之间那道 10pt 空隙里。一条对齐到"不存在的轴"的线，和 R289 那条穿出药丸的线是同一族病：
+    /// 数字没有来源（R90 那一课：抄来的常量错位一整列）。
+    ///
+    /// 修法不是把 48 改成 82 再写一颗裸字面量，而是把行首三列的宽度与间距升成
+    /// `MultiFilePreviewLayout` 的常量，左端由它们**导出** —— 于是"改了列宽而分隔线没跟上"
+    /// 这件事从"注释里的一句希望"变成会红的判据（刀 M846 就是钉这一条）。
+    ///
+    /// 不覆盖管线：读的是渲染产物里的列几何；同一条缝的**右端**由
+    /// `testMultiFileRowSeparatorsEndOnThePillRightAxis` 判（两件事两条判据，D-244）。
+    func testMultiFileRowSeparatorsStartAtTheTextAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r290-leftaxis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var declined = [String]()
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = renderFixtureRep("detail-3-files-row0", appearance, scratch),
+                  let hover = renderFixtureRep("detail-3-files-row0-hover", appearance, scratch)
+            else { declined.append(tag + "(渲染或读回失败 ⇒ 尺没有对象)"); continue }
+            let idleBytes = Self.buffer(of: idle)
+            let density = Double(idle.pixelsWide) / 720.0
+            let paper = Self.paperMode(bytes: idleBytes, width: idle.pixelsWide,
+                                       height: idle.pixelsHigh, bytesPerRow: idle.bytesPerRow)
+            let span = Self.changedXSpan(idle, hover)
+            let idleBands = Self.flatBands(bytes: idleBytes, width: idle.pixelsWide,
+                                           height: idle.pixelsHigh, bytesPerRow: idle.bytesPerRow)
+            let rules = idleBands.filter {
+                Double($0.thicknessPx) / density <= RightAxis.hairlineMaxThicknessPt
+                    && $0.x0 > 0 && $0.x0 < span.minX + 400
+            }
+            guard span.count >= RightAxis.pillMinChangedPixels, span.minY >= 0, span.maxY > span.minY else {
+                declined.append(tag + "(两态差只数到 " + String(span.count) + " 颗 ⇒ 尺没有对象：拿不到行的 y 带)")
+                continue
+            }
+            let clusters = Self.columnClusters(bytes: idleBytes, width: idle.pixelsWide,
+                                               height: idle.pixelsHigh,
+                                               bytesPerRow: idle.bytesPerRow,
+                                               y0: span.minY, y1: span.maxY + 1, paper: paper)
+            guard clusters.count >= 3 else {
+                declined.append(tag + "(行带里只数到 " + String(clusters.count)
+                                + " 个墨簇 ⇒ 尺没有对象：箭头/图标/文字三列没被分开)")
+                continue
+            }
+            judged += 1
+            let textLeft = Double(clusters[2].x0) / density
+            let chevronLeft = Double(clusters[0].x0) / density
+            let iconLeft = Double(clusters[1].x0) / density
+            let ruleLefts = rules.map { String(format: "%.1f", Double($0.x0) / density) }.joined(separator: ",")
+            emit("LEFT_AXIS_R290 " + tag
+                 + "｜行带 y=" + String(span.minY) + ".." + String(span.maxY)
+                 + "｜墨簇左沿 箭头=" + String(format: "%.1f", chevronLeft)
+                 + " 图标=" + String(format: "%.1f", iconLeft)
+                 + " 文字=" + String(format: "%.1f", textLeft)
+                 + "｜细线数=" + String(rules.count) + " 左=[" + ruleLefts + "]"
+                 + "｜地板 " + String(format: "%.1f", LeftAxis.tolerancePt)
+                 + "pt（改前：线 48.0 对文字 82.5，差 34.5pt；改完现读线 82.0 对文字 82.5）")
+            XCTAssertGreaterThanOrEqual(rules.count, 2,
+                                        tag + "：只数到 " + String(rules.count)
+                                        + " 条属于这一行的细线 ⇒ 判据没有对象（夹具里是三条）")
+            for rule in rules {
+                let gap = abs(Double(rule.x0) / density - textLeft)
+                XCTAssertLessThanOrEqual(gap, LeftAxis.tolerancePt,
+                                         tag + "：行分隔线左端 " + String(format: "%.1f", Double(rule.x0) / density)
+                                        + "pt 与文件名文字左沿 " + String(format: "%.1f", textLeft)
+                                        + "pt 差 " + String(format: "%.3f", gap) + "pt（地板 "
+                                        + String(format: "%.1f", LeftAxis.tolerancePt)
+                                        + "）⇒ 这条线对齐到一列不存在的轴。"
+                                        + "两边都该读 MultiFilePreviewLayout.rowTextLeading（由行首三列导出）")
+            }
+        }
+        XCTAssertEqual(judged, 2,
+                       "两档里有一档没量到对象（" + declined.joined(separator: "；") + "）⇒ 红话该说尺，不该说产品；"
+                        + "但「没量到」本身也是失败：这条判据没有免检出口")
     }
 
     /// **产品判据**：多文件详情区里，行分隔线的右端必须落在悬停药丸的同一条右轴上

@@ -336,7 +336,9 @@ private struct MultiFileDetailView: View {
                     .animation(MultiFilePreviewLayout.animation, value: expandedURL)
 
                     Divider()
-                        .padding(.leading, 48)
+                        // 左端 = 文件名文字的左沿，由行首三列导出（R290：原来这里是一颗裸字面量 48，
+                        // 量出来它谁都不对齐 —— 见 `MultiFilePreviewLayout.rowTextLeading` 的来历）。
+                        .padding(.leading, MultiFilePreviewLayout.rowTextLeading)
                         // 右端收到与药丸同一条右轴上（R289：原来它一路画到窗口边，
                         // 比药丸右沿多出 20.000pt —— 数由判据 RIGHT_AXIS_R289 现读）
                         .padding(.trailing, MultiFilePreviewLayout.rowHorizontalInset)
@@ -372,14 +374,35 @@ enum MultiFilePreviewLayout {
     /// 多文件列表的**水平内缩**：行的悬停药丸与行间分隔线必须共用这一份。
     ///
     /// 为什么单独成一个有名字的数（R289，量出来的）：分隔线原来只写 `.padding(.leading, 48)`
-    /// （48 = 文字左轴，那是 R31/R104 立过的轴，不动），**右边没有内缩** ⇒ 帧里实测
-    /// 药丸右沿 700.0pt、分隔线右沿 720.0pt，差 **20.000pt**（亮暗两档同形）。读数来自判据
+    /// 而**右边没有内缩** ⇒ 帧里实测药丸右沿 700.0pt、分隔线右沿 720.0pt，差 **20.000pt**
+    /// （亮暗两档同形）。读数来自判据
     /// `UICaptureTests/testMultiFileRowSeparatorsEndOnThePillRightAxis` 打的那行 `RIGHT_AXIS_R289`，
     /// 刀 M842 会把改前那一版再量一遍 —— 注释里的实测值要么升成判据、要么删掉。
     /// 分隔线从药丸右沿外面穿出去整整 20pt，两套边界在同一条缝里并存。修法是让分隔线的右端
-    /// 收到与药丸同一条右轴上，左端仍是文字轴：这样"左=文字轴、右=药丸右沿"是一套自洽的坐标，
-    /// 而不是两条各自为政的线。
+    /// 收到与药丸同一条右轴上。
     static let rowHorizontalInset: CGFloat = 20
+
+    /// 行首三列的宽度与列间距 —— **R290 才升成常量**，因为分隔线的左端要引用它们。
+    ///
+    /// 来历（R289 的注释里那句"48 = 文字轴"是错的，这一笔公开更正）：R289 把右端并到药丸右轴时，
+    /// 左端留着 `.padding(.leading, 48)` 没动，理由是"那是 R31/R104 立的文字轴"。R290 拿同一颗尺
+    /// 去量这一行的列：药丸左沿 20，行内容左内缩 12 ⇒ 展开箭头那一列占 32…44，
+    /// 类型图标列 54…72，**文件名文字从 82 起**（亮暗两档同读数）。48 既不是文字的左沿，
+    /// 也不是任何一列的边界 —— 它是"44 + 4"，落在箭头列与图标列之间那道 10pt 的空隙里。
+    /// 也就是说这条线对齐的是**一个不存在的轴**。R90 那一课（抄来的常量错位一整列）在这里的
+    /// 形状是：48 大概是从别处（历史行那一族 20+12+16 的排布）抄来的，从来没有按这一行的结构推过。
+    ///
+    /// 所以左端改成**由这几列导出**的文字左沿：`rowTextLeading`。改完之后"左=文字轴、
+    /// 右=药丸右沿"才是它本来声称的那套自洽坐标，而这两条轴都不再是裸字面量。
+    static let rowContentHorizontalPadding: CGFloat = 12
+    static let rowDisclosureColumn: CGFloat = 12
+    static let rowTypeIconColumn: CGFloat = 18
+    static let rowColumnSpacing: CGFloat = 10
+    static var rowTextLeading: CGFloat {
+        rowHorizontalInset + rowContentHorizontalPadding + rowDisclosureColumn + rowColumnSpacing
+            + rowTypeIconColumn + rowColumnSpacing
+    }
+
     static let minimumPreviewHeight: CGFloat = 120
     static let fallbackPreviewHeight: CGFloat = 260
     static let fallbackCompactPreviewHeight: CGFloat = 190
@@ -588,7 +611,9 @@ private struct MultiFileRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            // 列宽与列间距全部读 `MultiFilePreviewLayout` 的那几颗常量 —— 不是整理风格，
+            // 是因为**行间分隔线的左端要落在文字左沿上**，两处各写一份数就会各飘各的（R290）。
+            HStack(spacing: MultiFilePreviewLayout.rowColumnSpacing) {
                 // 一个符号 + 旋转，而不是 `chevron.down` ↔ `chevron.right` 换名字（R6 / 审计 B-P2）。
                 // 换名字是**一帧硬换**，而它旁边的内容正在用 0.22s 展开 —— 箭头先落地、内容还在路上，
                 // 读起来就是"对不上"。旋转挂在**同一条**揭示曲线上，两者天然同步
@@ -603,12 +628,12 @@ private struct MultiFileRow: View {
                     .foregroundStyle(VisualInk.control)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     .animation(MultiFilePreviewLayout.animation, value: isExpanded)
-                    .frame(width: 12)
+                    .frame(width: MultiFilePreviewLayout.rowDisclosureColumn)
 
                 Image(systemName: symbol)
                     .font(.system(size: VisualGlyph.rowIcon))
                     .foregroundStyle(.secondary)
-                    .frame(width: 18)
+                    .frame(width: MultiFilePreviewLayout.rowTypeIconColumn)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(url.lastPathComponent)
@@ -626,7 +651,7 @@ private struct MultiFileRow: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, MultiFilePreviewLayout.rowContentHorizontalPadding)
             .padding(.vertical, 9)
             .background {
                 VisualShape.rounded(VisualRadius.card)
