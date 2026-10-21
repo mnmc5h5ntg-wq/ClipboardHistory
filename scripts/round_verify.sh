@@ -35,6 +35,21 @@ BC=$(grep -E "^FRAME_BASELINE_CHANGED=" "$RUN/baseline.log" | tail -1 | cut -d= 
 CM=$(grep -E "^FRAME_BASELINE_COMPARED=" "$RUN/baseline.log" | tail -1 | cut -d= -f2); CM=${CM:-0}
 MS=$(grep -E "^FRAME_BASELINE_MISSING=" "$RUN/baseline.log" | tail -1 | cut -d= -f2); MS=${MS:-0}
 
+# R279 / BACKLOG 333：这一格以前**只把 changed 抄成读数，从不拦人**。
+# `frame_baseline.py compare` 的退出码在这里被丢掉了（子 shell 的 $? 没人看），而 CI 那一步用的是
+# `check`（按设计只在 missing 时红）⇒ "改了界面却没在同一笔里 update 基线"这条纪律在**任何一侧都不是红**，
+# 只靠人记得去看 ROUND_VERIFY 里那个 baseline_changed=。R252/R253 那两轮能发现 changed=1/2，
+# 是因为我恰好在读那个数 —— 读数不是闸门。
+# 现在它是闸门：changed≠0 就停在这一步（后面的 dmg/换装不再假装绿）。修法只有一条正路：
+# 跑 `python3 scripts/frame_baseline.py update "$RUN/frames"` 之后重跑本脚本 ——
+# 故意不留 `|| true`、不留环境变量后门（豁免一旦能被环境变量关掉，它就会腐烂成噪声）。
+if [ "${BC:-NOT-RUN}" != "0" ]; then
+  echo "FRAME_GATE_RED=changed=${BC} compared=${CM} missing=${MS} ⇒ 界面/夹具变了却没在同一笔里 update 基线（或帧数漂了）"
+  echo "FRAME_GATE_HOWTO=python3 scripts/frame_baseline.py update \"$RUN/frames\" 之后重跑 scripts/round_verify.sh"
+  exit 1
+fi
+echo "FRAME_GATE_PASS changed=0 compared=${CM} missing=${MS}"
+
 echo "[4/4] make dmg + 换装本机（ditto 覆盖）"
 ( cd "$ROOT" && make dmg ) > "$RUN/dmg.log" 2>&1
 if grep -q "DMG created" "$RUN/dmg.log" 2>/dev/null; then DMG=ok; else DMG=failed; fi
