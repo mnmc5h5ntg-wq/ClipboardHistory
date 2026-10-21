@@ -6950,6 +6950,8 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
   两版都没进仓库判据（`scripts/tests/` 净变化 0），spike 在 `.scratch/spikes/skip_roster_spike.py`；第二版全文在 759b0df 之后的工作树里被删除，
   形状与读数都抄在这条追记里，不必再抄一遍代码。本笔确认脚本电池回到 `Ran 521 OK (skipped=4)`。
 
+  追记四（R287：本机半落地成会红的守卫，runner 那一行仍是预期不是读数）：新增 `scripts/tests/test_skip_roster.py` —— 由一格测试把整卷电池以 -v 跑成子进程（`SKIP_ROSTER_NESTED=1` 防递归），按「表头行 + 结果行」配对归属，再用恒等式闸门要求解析到的 skip 数等于内层 `OK (skipped=N)` 减去观察者那一格，并与按机器类登记的名册双向对账（名单外出现 skip 红、名册说会跳而实际没跳也红）；排除观察者写成会红的判据（必须恰好 1 格），不是沉默的减法。机器身份沿用 `test_surface_left_axes.machine_key()`，不另造第二套（import 失败直接红，不许退回 hostname 猜）。 过程里恒等式闸门当场抓到两次我自己的归属错：① 内层说 5 格、只解析到 2 格 —— 没有 docstring 的格子把 `test_x (模块.类) ... skipped '理由'` 打在同一行，第一版在表头分支直接 continue 把结果丢了；② 归属修好后，名单外那一格正是观察者本身 —— 于是补上「恰好 1 次」的断言再排除。 现读本机 `Ran 538 OK (skipped=4)`，四格全部是帧通道缺席，与 R276 那次的名单一致。本单仍开：① runner 那一行（唯一 skip = 端到端启动冒烟）是 R276 读数的**外推**，要等下一次 runner 验收把它变成读数；② 这卷还没配变异刀（把归属弄瞎 / 把名册放宽 ⇒ 必须红），按 336 的规矩，没有刀的守卫不算有证人。
+
 **332. 329 的口径要按可达闭包重排优先级（R276 现读：目录里 .py 377 颗、仍写死本机根 205 颗）：先搬**被闭包够到的**那些（它们会进 runner），再搬只在单轮里手工跑的；每搬一颗重跑它自己那张表（D-215），并把「搬完的颗数」现读登记，不许把 205 抄成下一次的起点（R276 新开）**
 
 **333. 帧基线那道硬门在 runner 上等于不存在（R278 现读 run 39591885399 / 步骤 「Frame baseline vs working manifest (fixture-set gate)」正文：同一步里既打了 `FRAME_BASELINE_SKIPPED=runner-capture-unavailable`，又打了 `FRAME_BASELINE_AGAINST=working COMPARED=170 CHANGED=170 MISSING=0 ADDED=0`，而 job 结论是 success）**：
