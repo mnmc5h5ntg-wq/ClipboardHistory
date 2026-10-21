@@ -27,10 +27,12 @@ DEBT = {
                                   '但 hover 那一档没有独立的两态帧；接法=在夹具里给同一份数据点两下键，别在产品里读键',
     'GlassControls.swift': '欠账：这里只剩注释与 .pressedStyle(hoverLevel:) 的委托，真正的悬停墨换算在 PressableStyle（已接键）里；'
                            '登记的理由是"本文件不再有独立的悬停画法"，若哪天又自己画一层就必须接键',
-    'HistoryRowViews.swift': 'R249 剥注释后现读：这个文件的 hoveredForCapture 只出现在文档注释里（第 84 行），代码没接 ⇒ 键其实不在这位。'
-                                      '它 116 行的 .pressedStyle(hoverLevel:) 那一层经 PressableStyle 可拍，'
-                                      '但 120 行 .onHover 的状态还驱动着什么画法，本轮没量 ⇒ 记欠账，接法=先数清它自己直读 isHovered 的画法有几处，'
-                                      '再决定是共用 PressableStyle 那层还是自己接键（不许再把它当已接）',
+    # R263 删掉 `HistoryRowViews.swift` 那一行（"做完一行删一行"）：它自己直读 `isHovered` 的画法
+    # 只有一处 —— `RowFavoriteButton.tint` 的 0.55↔0.78 字形墨，现已与 `.pressedStyle` 那一层
+    # 一样走 `isHoveredForDrawing`，判据是 `UICaptureTests.testFavoriteGlyphInkClearsTheInteractiveFloor`
+    # （从帧里读静置/悬停两态的字形墨，并把注释里那句"两边都过 3:1"升成会红的地板）。
+    # 留在这里的是**没被删掉的那半句**：当年"120 行的 .onHover 还驱动着什么画法，本轮没量"
+    # 是猜，R263 数清了：一处（tint）+ 一条 animation value。
     'VideoPreview.swift': '欠账：两处 .pressedStyle(hoverLevel:) 委托给已接键的 PressableStyle，'
                           '但预览卡自身没有两态夹具帧；登记是因为它从未进过帧基线，不是因为不需要',
 }

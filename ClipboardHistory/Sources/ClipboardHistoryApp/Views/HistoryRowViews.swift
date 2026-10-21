@@ -89,6 +89,14 @@ struct RowFavoriteButton: View {
     let isFavorite: Bool
     let action: () -> Void
     @State private var isHovered = false
+    /// 取证通道（R263 / BACKLOG 291 的 `HistoryRowViews.swift` 那一行）：**产品永远不写这颗键**，
+    /// 只有夹具写。它补的是"两半只接了一半"——`.pressedStyle` 那一层（药丸填充）早就经
+    /// `PressableStyle` 读得到键，而**字形墨**这一半（下面 `tint` 的 0.55 → 0.78）当时还直读
+    /// 裸 `isHovered` ⇒ 离屏渲染里 `.onHover` 恒 false，那一抬在帧里根本不存在，
+    /// 于是"量不到"被记成"这一位没问题"（R90 那一族）。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+
+    private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     var body: some View {
         Button(action: action) {
@@ -116,7 +124,7 @@ struct RowFavoriteButton: View {
         .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)
         .helpLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
         .accessibilityLabel(FavoriteTogglePresentation.helpText(isFavorite: isFavorite))
-        .animation(MotionCatalog.animation(for: .hover), value: isHovered)
+        .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -125,9 +133,12 @@ struct RowFavoriteButton: View {
     /// 未收藏时不能是 `.clear`（看不见就没人会去点），也不能太抢眼（一行里它是配角）。
     /// 0.55 这个值是量出来的：0.28 时星标与行底的对比度只有亮色 1.76:1 / 暗色 2.17:1，
     /// 达不到"可交互控件至少 3:1"这一条；提到 0.55 后两边都过 3:1，悬停再抬到 0.78。
+    /// R263：那两句"量出来的"第一次有了会红的判据（`testFavoriteGlyphInkClearsTheInteractiveFloor`
+    /// 从**帧**里读静置与悬停两态的字形墨），而这一抬以前只活在注释里 —— 读裸 `isHovered`
+    /// 意味着离屏帧里 0.78 那一档从来不存在。
     private var tint: AnyShapeStyle {
         if isFavorite { return AnyShapeStyle(FavoriteTogglePresentation.favoriteColor) }
-        return AnyShapeStyle(Color.primary.opacity(isHovered ? 0.78 : 0.55))
+        return AnyShapeStyle(Color.primary.opacity(isHoveredForDrawing ? 0.78 : 0.55))
     }
 }
 

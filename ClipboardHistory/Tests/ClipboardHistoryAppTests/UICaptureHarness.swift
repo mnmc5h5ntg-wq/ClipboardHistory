@@ -4882,6 +4882,117 @@ final class UICaptureTests: XCTestCase {
         return (bg, pill, Self.contrastRatio(bg, pill), abs(bg - pill), count)
     }
 
+    /// 字形墨（R263 / BACKLOG 291 的 `HistoryRowViews.swift` 那一行）：`row-favorite-*` 那两张里
+    /// 那颗星的**笔画本体**，与 `pillReading` 故意用**不相交**的带子。
+    ///
+    /// 为什么必须不相交：药丸取 `2 ≤ |Δ| < 60` 的众数（一整片同色填充），字形取 `|Δ| ≥ 60` 的众数
+    /// （墨心；抗锯齿的边缘散在很多灰阶上、每档只有几颗，所以众数仍是墨心）。两把尺共用一条带的话，
+    /// 抬墨那一半会被填充那一半挤掉 —— R182 那一族"两层材质混成一层"的同一种坏法。
+    static func glyphInkReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                                bytesPerRow: Int) -> (background: Int, ink: Int, ratio: Double, inkPixels: Int) {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        var edge = [Int: Int]()
+        for x in 0..<min(8, width) {
+            for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
+        }
+        let bg = edge.max { $0.value < $1.value }?.key ?? 0
+        var band = [Int: Int]()
+        for x in 0..<width {
+            for y in 0..<height {
+                let g = luma(x, y)
+                if abs(g - bg) >= 60 { band[g, default: 0] += 1 }
+            }
+        }
+        guard let (ink, count) = band.max(by: { $0.value < $1.value }) else {
+            return (bg, -1, 0, 0)
+        }
+        return (bg, ink, Self.contrastRatio(bg, ink), count)
+    }
+
+    /// 收藏星的字形墨：**静置**必须过"可交互控件至少 3:1"那条线，**悬停**必须真的更清楚
+    /// （R263 / BACKLOG 291）。这两句以前只有 `HistoryRowViews.tint` 的注释撑着，
+    /// 而注释里那句"悬停再抬到 0.78"在离屏帧里根本不存在 —— 画法读的是裸 `isHovered`，
+    /// `.onHover` 在离屏恒 false ⇒ 量不到被记成"这一位没问题"（R90 那一族）。
+    ///
+    /// 不覆盖管线：读的是渲染产物（`render` → PNG → 像素）里探针框中的单颗按钮；
+    /// 管线级同族判据见 `HoverCaptureChannelTests` 的调用点级名册。
+    func testFavoriteGlyphInkClearsTheInteractiveFloor() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r263-favoriteink-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func read(_ fixtureName: String, _ appearance: NSAppearance.Name)
+            -> (background: Int, ink: Int, ratio: Double, inkPixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 " + fixtureName + " ⇒ 这条判据没有对象")
+                return (-1, -1, 0, 0)
+            }
+            let file = scratch.appendingPathComponent(fixtureName + "-" + appearance.rawValue + ".png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(fixtureName + "：渲染失败 " + String(describing: error))
+                return (-1, -1, 0, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(fixtureName + "：读不回 " + file.lastPathComponent)
+                return (-1, -1, 0, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return Self.glyphInkReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow)
+        }
+
+        // 接线（R219 那一课：令牌对、调用点没接 = 屏幕上什么都没发生）。
+        let path = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift")
+        guard let text = try? String(contentsOf: path, encoding: .utf8) else {
+            XCTFail("读不到 " + path.lastPathComponent + " ⇒ 接线判据没在看东西"); return
+        }
+        let code = text.split(separator: "\n").map { line -> String in
+            if let r = line.range(of: "//") { return String(line[..<r.lowerBound]) }
+            return String(line)
+        }.joined(separator: "\n")
+        XCTAssertTrue(code.contains("@Environment(\\.hoveredForCapture)"),
+                      "HistoryRowViews 里没有取证键 ⇒ 291 那一行仍是欠账")
+        XCTAssertTrue(code.contains("Color.primary.opacity(isHoveredForDrawing"),
+                      "字形墨又读回裸 isHovered ⇒ 悬停那一抬在帧里不存在，下面所有比值量的都不是它")
+        XCTAssertTrue(code.contains("value: isHoveredForDrawing"),
+                      "动画的 value 还读裸 isHovered ⇒ 键点亮时这一档不会走过渡，帧与真实路径分叉")
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            let idle = read("row-favorite-idle", appearance)
+            let hover = read("row-favorite-hover", appearance)
+            emit("FAVORITE_INK_PROOF " + tag
+                 + " 底 idle=" + String(idle.background) + " hover=" + String(hover.background)
+                 + "｜字形墨 idle=" + String(idle.ink) + " hover=" + String(hover.ink)
+                 + "｜对比 idle=" + String(format: "%.3f", idle.ratio)
+                 + " hover=" + String(format: "%.3f", hover.ratio)
+                 + "｜墨像素 idle=" + String(idle.inkPixels) + " hover=" + String(hover.inkPixels)
+                 + "｜地板 3.000（注释里那句「两边都过 3:1」现在会红）")
+            XCTAssertGreaterThan(idle.inkPixels, 20,
+                                 tag + "：静置帧只数到 " + String(idle.inkPixels) + " 颗墨 ⇒ 尺没有对象，"
+                                 + "不是星没画（先查带子 ≥60 这条线是否把这颗字形整颗挡在外面）")
+            XCTAssertGreaterThan(hover.inkPixels, 20,
+                                 tag + "：悬停帧数不到墨 ⇒ 字形在悬停帧里消失了，那是画法坏了")
+            XCTAssertGreaterThanOrEqual(idle.ratio, 3.0,
+                                        tag + "：静置字形墨对纸只有 " + String(format: "%.3f", idle.ratio)
+                                        + "（地板 3.000）⇒ 「可交互控件至少 3:1」这句在产物上不成立，"
+                                        + "而它一直是 `tint` 那段注释的理由")
+            XCTAssertGreaterThan(hover.ratio, idle.ratio,
+                                 tag + "：悬停没有把墨抬起来（" + String(format: "%.3f", hover.ratio)
+                                 + " ≤ " + String(format: "%.3f", idle.ratio) + "）⇒ 取证通道又退回裸 isHovered，"
+                                 + "或者 0.78 那一档被谁改平了")
+        }
+    }
+
     /// `segmented-filter-*` 夹具（200×60pt）里那两段的矩形。**写成共享常量而不是各测各写一遍**：
     /// 尺的已知答案对照与产品判据必须用同一组坐标，否则对照过了不等于产品那一眼量对了。
     ///
