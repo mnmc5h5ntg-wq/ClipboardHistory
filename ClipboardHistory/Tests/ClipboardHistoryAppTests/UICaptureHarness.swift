@@ -4883,11 +4883,16 @@ final class UICaptureTests: XCTestCase {
     }
 
     /// 字形墨（R263 / BACKLOG 291 的 `HistoryRowViews.swift` 那一行）：`row-favorite-*` 那两张里
-    /// 那颗星的**笔画本体**，与 `pillReading` 故意用**不相交**的带子。
+    /// 那颗星的**笔画本体**，与 `pillReading` 故意量**不同的一层**。
     ///
-    /// 为什么必须不相交：药丸取 `2 ≤ |Δ| < 60` 的众数（一整片同色填充），字形取 `|Δ| ≥ 60` 的众数
-    /// （墨心；抗锯齿的边缘散在很多灰阶上、每档只有几颗，所以众数仍是墨心）。两把尺共用一条带的话，
-    /// 抬墨那一半会被填充那一半挤掉 —— R182 那一族"两层材质混成一层"的同一种坏法。
+    /// 为什么两层不能共用一条带：药丸是 `2 ≤ |Δ| < 60` 的众数（一整片同色填充），字形是"离底最远的
+    /// 那十分之一颗"的均值。共用一条带的话，抬墨那一半会被填充那一半挤掉（R182 那族"两层材质混成一层"）。
+    ///
+    /// 为什么 R266 把"众数"换成"极端十分位均值"：这是被**实验**逼的，不是被 runner 的红逼的 ——
+    /// 同一张真帧做合成扰动现读：纸从 255 等比压到 236，众数颗数**一动不动**（47→47）；
+    /// 一次高斯模糊把它打散成 12 颗、两次模糊成 0 颗，而"近墨"反而从 174 涨到 345。
+    /// ⇒ runner 上那 3~5 颗不是"没画"，是**抗锯齿把墨心摊到多个灰阶上**，众数对锐度过敏。
+    /// 这条估计量换成对锐度不敏感的"极端十分位"，两把尺（近墨 / 墨心）都保留。
     static func glyphInkReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
                                 bytesPerRow: Int) -> (background: Int, ink: Int, ratio: Double, inkPixels: Int, nearPixels: Int) {
         func luma(_ x: Int, _ y: Int) -> Int {
@@ -4900,23 +4905,72 @@ final class UICaptureTests: XCTestCase {
             for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
         }
         let bg = edge.max { $0.value < $1.value }?.key ?? 0
-        var band = [Int: Int]()
+        var far = [(g: Int, d: Int)]()
         var near = 0
         for x in 0..<width {
             for y in 0..<height {
                 let g = luma(x, y)
                 let d = abs(g - bg)
-                // `near` 与 `band` 是**两条宽度不同的尺**，这是 R265 为 313 加的分辨读数：
-                // "一颗都没画"（near 也≈0）与"画了但在这台机器上淡到进不了 ≥60 的带"（near 有几百、
-                // band 只有个位数）修法相反 —— 前者要查画法，后者要查带子/解析色。
                 if d >= 20 { near += 1 }
-                if d >= 60 { band[g, default: 0] += 1 }
+                // 候选只收 `|Δ| ≥ 60` 的那些 —— 这一条带子是为了**与药丸那层分开**（D-249：
+                // 同一颗控件上的两层，两把尺不许互相挤）。R266 第一版把候选放宽到 ≥20，
+                // 结果亮档悬停的墨心被 1224 颗药丸像素摊成 96（比值 6.289），量的已经不是字形了。
+                if d >= 60 { far.append((g, d)) }
             }
         }
-        guard let (ink, count) = band.max(by: { $0.value < $1.value }) else {
-            return (bg, -1, 0, 0, near)
+        guard !far.isEmpty else { return (bg, -1, 0, 0, near) }
+        // 墨心 = 候选里离底**最远的那十分之一颗**的均值（不是"某一个灰阶的众数"）。
+        // 换掉众数是被合成实验逼的：同一张真帧，纸从 255 等比压到 236 时众数颗数一动不动（47→47），
+        // 而一次高斯模糊就把 47 颗打散成 12 颗、两次模糊成 0 颗 ⇒ runner 那 3~5 颗不是"没画"，
+        // 是抗锯齿把墨心摊到多个灰阶上，众数对锐度过敏。
+        far.sort { $0.d > $1.d }
+        let core = Array(far.prefix(max(1, far.count / 10)))
+        let ink = Int(Double(core.reduce(0) { $0 + $1.g }) / Double(core.count))
+        return (bg, ink, Self.contrastRatio(bg, ink), core.count, near)
+    }
+
+    /// 已知答案的对照（R266）：**同一颗字形，笔画灰阶被抗锯齿摊开成几档时，尺必须还量到同一层墨。**
+    /// 这一格不需要任何机器或帧 —— 它钉的就是"估计量对锐度过敏"这一条，也就是 runner 那 3~5 颗的成因。
+    /// 期望值不心算：锐版四列全是 100；摊开版是 90/100/110/120（均值 105），两版都要求落在 100±15。
+    func testGlyphInkRulerSurvivesTheAntiAliasingSpread() {
+        func measure(_ rows: [[Int]]) -> (background: Int, ink: Int, ratio: Double, inkPixels: Int, nearPixels: Int) {
+            let h = rows.count, w = rows[0].count
+            let p = UnsafeMutablePointer<UInt8>.allocate(capacity: w * h * 4)
+            defer { p.deallocate() }
+            for y in 0..<h {
+                for x in 0..<w {
+                    let g = UInt8(clamping: rows[y][x])
+                    p[(y * w + x) * 4] = g
+                    p[(y * w + x) * 4 + 1] = g
+                    p[(y * w + x) * 4 + 2] = g
+                    p[(y * w + x) * 4 + 3] = 255
+                }
+            }
+            let buf = UnsafeBufferPointer(start: p, count: w * h * 4)
+            return Self.glyphInkReading(bytes: buf, width: w, height: h, bytesPerRow: w * 4)
         }
-        return (bg, ink, Self.contrastRatio(bg, ink), count, near)
+        let sharp = (0..<20).map { _ in (0..<20).map { x in (x >= 8 && x < 12) ? 100 : 250 } }
+        let spread = (0..<20).map { _ in (0..<20).map { x -> Int in
+            guard x >= 8 && x < 12 else { return 250 }
+            return 90 + 10 * (x - 8)
+        } }
+        let cases: [(String, [[Int]], Int)] = [("锐版", sharp, 100), ("摊开版", spread, 100)]
+        for (tag, rows, expectInk) in cases {
+            let r = measure(rows)
+            XCTAssertEqual(r.background, 250, tag + "：参照（纸）读错了")
+            XCTAssertGreaterThanOrEqual(r.nearPixels, 60,
+                                        tag + "：合成帧里 4×20=80 颗墨，近墨只数到 " + String(r.nearPixels) + " ⇒ 对象丢了")
+            XCTAssertLessThanOrEqual(abs(r.ink - expectInk), 15,
+                                     tag + "：墨心读成 " + String(r.ink) + "，笔画真值 " + String(expectInk)
+                                     + "（±15）⇒ 估计量对锐度过敏，正是 runner 那 3~5 颗的形状")
+            XCTAssertGreaterThan(r.ratio, 2.0, tag + "：比值读成 " + String(format: "%.3f", r.ratio))
+        }
+        // 反面对照：把"笔画"整体压到离底只有 15 灰阶 —— 这条尺**必须**报"没有对象"，
+        // 否则上面那三格只是在证明尺恒真。
+        let faint = (0..<20).map { _ in (0..<20).map { x in (x >= 8 && x < 12) ? 235 : 250 } }
+        let fr = measure(faint)
+        XCTAssertEqual(fr.nearPixels, 0,
+                       "淡到 15 灰阶的笔画仍被读成有对象（近墨=" + String(fr.nearPixels) + "）⇒ 出口那条闸门是摆设")
     }
 
     /// 收藏星的字形墨：**静置**必须过"可交互控件至少 3:1"那条线，**悬停**必须真的更清楚
@@ -4991,15 +5045,17 @@ final class UICaptureTests: XCTestCase {
             // 那是**尺没有对象**，不是产品把墨改淡了；在没对象的情况下 assert，红话说的会是尺。
             // 但这条出口有代价：它让 runner 从此看不见这一位的墨 —— 代价记 BACKLOG 313，
             // 且上面三条**接线断言**（与机器无关）照旧硬红，放宽的只有像素判据。
-            if idle.inkPixels < 20 || hover.inkPixels < 20 {
-                // 分辨读数（R265，为 313 加）：`近墨像素` 回答"这一层到底有没有画"。
-                // 两种成因的修法相反 —— 几乎没画要查画法/符号变体；画了但淡到进不了 ≥60 的带，
-                // 要查带子与解析色（现读差异已经在那儿：本机底 255、runner 底 236）。
-                // 不猜成因，把分辨交给下一次 runner 自己印的这一行。
+            // 出口按**对象存在性**切片，不按机器名（R264 / runner run 39519770384 现读）。
+            // R266 起闸门量的是「近墨」而不是「墨心颗数」：墨心现在是十分位均值，颗数天然只有
+            // 近墨的 1/10（本机 174 颗近墨 → 17 颗墨心），拿它当闸门会把有对象的本机也判成无对象。
+            // 合成对照已钉住这条闸门的两侧：抗锯齿摊开版仍有几百颗近墨（放行），
+            // 淡到 15 灰阶那一版近墨=0（拦下）—— 见 `testGlyphInkRulerSurvivesTheAntiAliasingSpread`。
+            if idle.nearPixels < 60 || hover.nearPixels < 60 {
                 let drawn = max(idle.nearPixels, hover.nearPixels)
-                declined.append(tag + "(墨心 idle=" + String(idle.inkPixels) + " hover=" + String(hover.inkPixels)
-                                + " 近墨=" + String(drawn) + " 底=" + String(idle.background)
-                                + (drawn < 20 ? " 读法=这一层几乎没画" : " 读法=画了但进不了≥60的带") + ")")
+                declined.append(tag + "(近墨 idle=" + String(idle.nearPixels) + " hover=" + String(hover.nearPixels)
+                                + " 墨心 idle=" + String(idle.ink) + " hover=" + String(hover.ink)
+                                + " 底=" + String(idle.background)
+                                + (drawn < 60 ? " 读法=这一层几乎没画" : " 读法=对象太少，先查尺") + ")")
                 continue
             }
             judged += 1
