@@ -95,6 +95,27 @@ class RosterTests(unittest.TestCase):
         self.assertEqual(1, len(unregistered))
         self.assertEqual(1, len(stale))
 
+    def test_a_window_living_outside_the_scanned_root_is_not_stale(self):
+        # R269 现读：把尺指向 Sources/ 时，名册里那格（住在 Tests/）一度被报成"名册失配=1"。
+        # 那是作用域坏了，不是账坏了 ⇒ 名册只在**这次走到的文件**里对账。
+        unregistered, stale = wait_scan.judge([], windows=[('Tests.swift', 'testX', '窗口')],
+                                              present={'Other.swift'})
+        self.assertEqual(([], []), (unregistered, stale))
+        unregistered, stale = wait_scan.judge([], windows=[('Tests.swift', 'testX', '窗口')],
+                                              present={'Tests.swift'})
+        self.assertEqual(1, len(stale), '文件在这次扫描里、格子却没了 ⇒ 仍要红')
+
+    def test_the_product_sources_scan_clean(self):
+        # 319：产品侧到底有没有「睡一段挂钟等异步产物」的形状 —— 现读，不是推理。
+        root = os.path.join(wait_scan.REPO, 'ClipboardHistory', 'Sources')
+        self.assertTrue(os.path.isdir(root), '产品源码目录不在 ⇒ 这一格无从判定')
+        bets, steps, untils = wait_scan.scan(root)
+        unregistered, stale = wait_scan.judge(bets, present=set(
+            os.path.basename(x) for x in wait_scan.swift_files(root)))
+        self.assertEqual([], unregistered, '产品里有未登记的固定挂钟等待：' + repr(unregistered))
+        self.assertEqual([], stale, '名册漏进了产品扫描里：' + repr(stale))
+        self.assertEqual(0, len(bets), '产品侧现读赌注颗数变了，要把这一格的期望改成现读值并写明成因')
+
     def test_the_real_repository_matches_the_roster_exactly(self):
         bets, steps, untils = wait_scan.scan(wait_scan.DEFAULT_ROOT)
         unregistered, stale = wait_scan.judge(bets)

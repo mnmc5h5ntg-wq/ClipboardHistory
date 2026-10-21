@@ -121,13 +121,19 @@ def scan(root=DEFAULT_ROOT):
     return bets, steps, untils
 
 
-def judge(bets, windows=None):
-    """名册双向对账：没登记的赌注 + 已经不存在的名册格。"""
+def judge(bets, windows=None, present=None):
+    """名册双向对账：没登记的赌注 + 已经不存在的名册格。
+
+    `present` 是**这次扫描真正走到的文件名集合**。少了这个参数，把尺指向 `Sources/` 会因为
+    名册里那格住在 `Tests/` 而报"名册失配"—— 那是尺的作用域坏了，不是账坏了
+    （R269 第一次把 `--root ClipboardHistory/Sources` 指上去就撞上，现读 名册失配=1）。
+    """
     windows = OBSERVATION_WINDOWS if windows is None else windows
     keyed = set((b[0], b[1]) for b in bets)
     allowed = set((w[0], w[1]) for w in windows)
     unregistered = [b for b in bets if (b[0], b[1]) not in allowed]
-    stale = [w for w in windows if (w[0], w[1]) not in keyed]
+    in_scope = [w for w in windows if present is None or w[0] in present]
+    stale = [w for w in in_scope if (w[0], w[1]) not in keyed]
     return unregistered, stale
 
 
@@ -148,7 +154,7 @@ def main(argv=None):
         return 1
 
     bets, steps, untils = scan(args.root)
-    unregistered, stale = judge(bets)
+    unregistered, stale = judge(bets, present=set(os.path.basename(x) for x in swift_files(args.root)))
     verdict = 'PASS' if not unregistered and not stale else 'FAIL'
     print('WAIT_SCAN bet=%d 未登记=%d 名册失配=%d poll_step=%d poll_until=%d 判=%s'
           % (len(bets), len(unregistered), len(stale), steps, untils, verdict), flush=True)

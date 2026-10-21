@@ -376,6 +376,20 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 268 轮（R269 / 第 268 轮 / Round 266 · 2026-10-21）：一颗"看起来像缺陷"的悬停由既有读数结案，一把新尺在第二个根上暴露自己的作用域 bug（U-893…U-896 / D-255 · 产品 0 文件）
+
+本轮次对照：与 R268（把等待的两种形状拆成两个符号 + 新尺 `wait_scan`，自评 87）相比，本轮不写新判据形状，做两件 R268 留下的事：**321 结案**、**319 结一半**，并在做第二件时抓到这把新尺自己的坏法。
+
+- **U-893：CI 交账 —— R267 那笔"等条件"修法的 runner 验收到手** —— 37accf9 → 39562680539 / completed / success **绿**（R268 交接时它是 in_progress / 未读，当时按 R140 只登记号不轮询）。上一笔 e53706c → 39559154078 / completed / success 也绿；本轮代码半 push 之后新跑 e87191a → 39565724396 / in_progress / 未读（未读）。这条把 R268 的"同一份断言两台机器一红一绿"闭环了：改完之后 runner 不再红。
+- **U-894：321 结案 —— 我眼睛看到的"变暗的是没被悬停那一枚"是真的，但推论是错的：那颗取证键是整颗控件级的，不是指针位置** —— 夹具把 `hoveredForCapture` 打在整颗 `SegmentedFilterPicker` 上、`selection` 钉在 `.all`（左段选中），而产品里 `hoverFill` 有 `guard !isSelected` ⇒ 只有右段（未选中那一半）会多出一层灰。既有读数（上一笔捕获卷自印，本轮 0 Swift 文件未重捕）替这句话签字：亮档 未选中段 230→207（比值 1.248、像素 6725），**选中段 233→233**；暗档 未选中段 52→66（比值 1.239），**选中段 36→36** —— 选中那一颗两态逐位相同 ⇒ 它确实没有第二层，这是设计不是漏。教训写进 D-255 旁边那格：**"悬停位点"在这种控件上不是一个坐标，是一枚布尔键**，按帧名猜坐标会把设计读成缺陷。
+- **U-895：319 结一半，代价是这把尺当场坏了一次** —— 把 `wait_scan` 指向 `ClipboardHistory/Sources` 现读 WAIT_SCAN bet=0 未登记=0 名册失配=0 poll_step=0 poll_until=0 判=PASS ⇒ 产品侧没有"睡一段挂钟等异步产物"的形状（`Thread.sleep(字面量)` 与 `pumpMain` 都是 0 处）。但**第一次**指上去时它报的是 `名册失配=1`：名册里那格观察窗口住在 `Tests/`，换了根之后"没扫到"被尺说成"账没了"。修法 = 名册只在**这次真正走到的文件**里对账（`present=`），并配两格守卫（格在扫描范围内却没了 ⇒ 仍红；格住在范围外 ⇒ 不报）与一把刀 M829（去掉作用域 ⇒ 那两格必须红，现读 1/1 CAUGHT、红在 test_a_window_living_outside_the_scanned_root_is_not_stale, test_the_product_sources_scan_clean、RESTORE_CLEAN）。产品里的 `DispatchQueue.asyncAfter(deadline: .now() + …)` 不在这把尺的图案集里 —— 它是**调度**不是**等待**（没有断言押在它上面），要不要覆盖另开 322 先问"有没有判据依赖它"。
+- **U-896：本轮的四件套不是重跑，是引用** —— 本轮只动 `scripts/`（0 个 Swift 文件，`git status --porcelain` 现读不含 `ClipboardHistory/`），所以四件套沿用上一笔的现读行：ROUND_VERIFY build_warnings=0 swift_executed=919 swift_skipped=42 swift_failures=0 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r268_verify。帧重捕与换装本机**本轮没跑**，按 NOT-RUN 记（不是 0 变化，是没测）；这条与 R254 那格"看图腿只看了改前那张"同一族：不重跑就要留下"没重跑"的名字。
+
+眼睛腿：RUN —— 与 R268 同一对帧（`segmented-filter-idle/hover-200x60-light`），但这一次由既有读数与夹具源码共同结案（U-894），范围只这两张；本轮未重捕（0 Swift 文件）。
+读数腿：RUN —— 两个根的 `WAIT_SCAN`（WAIT_SCAN bet=1 未登记=0 名册失配=0 poll_step=2 poll_until=4 判=PASS ／ WAIT_SCAN bet=0 未登记=0 名册失配=0 poll_step=0 poll_until=0 判=PASS）、刀 1/1 CAUGHT（红在 test_a_window_living_outside_the_scanned_root_is_not_stale, test_the_product_sources_scan_clean）、上一笔捕获卷两行 `HOVER_DIRECT_READ_PROOF`、脚本电池 Ran 504 tests / OK (skipped=4)、预检 tables=78 covered=62 arms=209 bad=0、ARM_TOTAL arms=702。
+产品腿：0 文件（`Sources/` 未动 ⇒ sources 格按规矩不动）。
+未做（逐条）：① 312 的具名出口（按"纸"那一维推，本机 3.000 不许降）；② 322（`asyncAfter` 要不要进这把尺，先问有没有断言押它）、319 剩下那半（产品侧的**节流/延迟**语义还没逐处判，只判了"没有睡挂钟"）；③ 320（`visibilityGrace` 抄值升成守卫 + 配刀）、317、314、315、316；④ 310 的 75 张表 / 423 把刀、309 那 6 张；⑤ 305、299、301、307、287/284、297/298/300、304、291 三位；⑥ 本轮 NOT-RUN 的两件（帧重捕、换装本机）；⑦ 用户闸门 220 路 A / 228② / 265。
+
 ## 第 267 轮（R268 / 第 267 轮 / Round 265 · 2026-10-21）：把「等挂钟」与「等产物」拆成两个符号，再让一把新尺去数它们（U-888…U-892 / D-254 · 产品 0 文件）
 
 本轮次对照：与 R267（读别人那一跑的红、把一格改成等条件，自评 84）相比，本轮先把 R267 交下来的两件事各做一半：**318 逐张判完并落地**，**312 只把成因改写对**（出口仍欠，见未做①）。

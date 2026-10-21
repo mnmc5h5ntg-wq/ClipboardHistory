@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R269 / 第 268 轮 / Round 266 · 新尺的作用域 + 一颗被误读的悬停结案）
+
+`scripts/wait_scan.py`：`judge(...)` 增加 `present=`（本次扫描真正走到的文件名集合），名册只在范围内对账 —— 第一次把尺指向 `ClipboardHistory/Sources` 时它把住在 `Tests/` 的那格报成 `名册失配=1`（"没扫到"被说成"账没了"）。判据卷 +2 格（范围外不报 / 范围内消失仍红 + 产品根现读 bet=0 的钉死格），刀 M829 去掉作用域 ⇒ 现读 1/1 CAUGHT、红在 test_a_window_living_outside_the_scanned_root_is_not_stale, test_the_product_sources_scan_clean、RESTORE_CLEAN。两根现读：WAIT_SCAN bet=1 未登记=0 名册失配=0 poll_step=2 poll_until=4 判=PASS ／ WAIT_SCAN bet=0 未登记=0 名册失配=0 poll_step=0 poll_until=0 判=PASS。
+
+321 结案（不是产品的事）：`hoveredForCapture` 是整颗控件级布尔，夹具 `selection` 钉 `.all` ⇒ 只有未选中右枚抬一层，选中段两态逐位相同（亮 233/233、暗 36/36）。319 结一半 ⇒ 新开 322（`asyncAfter` 要不要进图案集）。CI：37accf9 → 39562680539 / completed / success 绿 = R267 那笔"等条件"修法的 runner 验收；e53706c → 39559154078 / completed / success 绿；本轮代码半 push 之后新跑 e87191a → 39565724396 / in_progress / 未读 未读。脚本电池 Ran 504 tests / OK (skipped=4)、预检 tables=78 covered=62 arms=209 bad=0。本轮 0 Swift 文件 ⇒ 四件套沿用上一笔（ROUND_VERIFY build_warnings=0 swift_executed=919 swift_skipped=42 swift_failures=0 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r268_verify），帧重捕与换装本机按 NOT-RUN 记；产品 0 文件。
+
+
 ### Changed（R268 / 第 267 轮 / Round 265 · 等待的两种形状拆成两个符号 + 一把新尺数它们）
 
 `DailyCopyHeatmapTests`：3 处 `pumpMain(seconds: 0.8)` 搬成 `pollUntil(cell:cap:10000)`（等待打成 `WAIT_POLL … waited_ms=… 等到=…`，`hit` 直接进断言）；`testASuccessfulWriteDoesNotRepublish` 在证人之后加一段从事件起算的 `pumpWindow`（计划 600 ms／实跑 616 ms）—— 这是 M826 第一把 ESCAPED 逼出来的修法。`CapturePathWriteBudgetTests` 的 helper 改名 `pumpRunLoopStep`（它一直在 `while` 条件里，是轮询步进不是赌注）。新工具 `scripts/wait_scan.py` + 判据卷 13 格 + 刀 M828：按符号数等待形状，名册双向对账，现读 `bet=1 未登记=0 poll_step=2 poll_until=4 判=PASS`。
