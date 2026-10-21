@@ -40,34 +40,38 @@ def sh(cmd):
 
 # ---- 测量：干净倍率分布 + 坏法倍率 ----
 meas = rd("/tmp/r271_measure.log")
+knife_early = rd("/tmp/r271_knife.log")
 clean = [float(x) for x in re.findall(r"CLEAN \d 用时=[\d.]+ 基线=[\d.]+ 倍率=([\d.]+)", meas)]
-mut = re.search(r"MUTANT 用时=([\d.]+) 基线=([\d.]+) 倍率=([\d.]+)", meas)
-if len(clean) < 3 or not mut:
-    die("测量不全（干净 %d 跑、坏法 %s）⇒ 地板没有两界证人" % (len(clean), "有" if mut else "无"))
-clean_max = max(clean)
-mut_ratio = float(mut.group(3))
-if mut_ratio <= clean_max:
-    die("坏法倍率 %.2f 没超过干净倍率上界 %.2f ⇒ 这把尺没有分辨力，本轮不许结案" % (mut_ratio, clean_max))
-
-# ---- 源码里的地板必须等于测量推出来的那个数（不手抄）----
+mut_ratio_m = re.search(r"读数=倍率=([\d.]+)", knife_early)
+if len(clean) < 3 or not mut_ratio_m:
+    die("测量不全（干净 %d 跑、坏法 %s）⇒ 两界证人不齐" % (len(clean), "有" if mut_ratio_m else "无"))
+cm = clean_max = max(clean)
+K = float(re.search(r"static let blockedRatioReference: Double = ([\d.]+)",
+                rd(os.path.join(ROOT, "ClipboardHistory/Tests/ClipboardHistoryAppTests/CapturePathWriteBudgetTests.swift"))).group(1))
+mut_ratio = float(mut_ratio_m.group(1))
+# ---- 时间这条轴没有分辨力：这条"负证人"必须成立，否则本轮的处置就不该是"只印不判" ----
+cm = max(clean)
+if not (mut_ratio <= cm):
+    die("坏法倍率 %.2f 高于干净上界 %.2f ⇒ 相对判据其实是有牙的，本轮不该拆它（该重新设计地板）" % (mut_ratio, cm))
 src = rd(os.path.join(ROOT, "ClipboardHistory/Tests/ClipboardHistoryAppTests/CapturePathWriteBudgetTests.swift"))
-k_src = re.search(r"static let blockedRatioBudget: Double = ([\d.]+)", src)
-if not k_src:
-    die("读不到 blockedRatioBudget ⇒ 地板不在源码里")
-K = float(k_src.group(1))
-if not (clean_max < K < mut_ratio):
-    die("地板 K=%.2f 不在两界之间（干净上界 %.2f ／ 坏法 %.2f）⇒ 要么太松要么会假红" % (K, clean_max, mut_ratio))
+if re.search(r"XCTAssert\w*\(elapsed", src):
+    die("源码里还剩一条以 elapsed 为对象的断言 ⇒ 「只印不判」没做到")
+for need in ("blockedQueuePrintOnlyMilliseconds", "blockedRatioReference"):
+    if need not in src:
+        die("常量没改名（缺 " + need + "）⇒ 注释与符号还在说它是地板")
 
 # ---- 最终那一遍刀 ----
-knife = rd("/tmp/r271_knife.log")
+knife = knife_early
 kn = re.search(r"R271_MUTATE 刀=(\d+) CAUGHT=(\d+) ESCAPED=(\d+) NOT_RUN=(\d+)", knife)
 if not kn or kn.group(1) != kn.group(2) or kn.group(3) != "0" or kn.group(4) != "0" or kn.group(1) != "1":
     die("M831 不是 CAUGHT：" + (kn.group(0) if kn else "无汇总行"))
 if "RESTORE_CLEAN=yes" not in knife:
     die("刀没有 RESTORE_CLEAN")
-kread = re.search(r"倍率=([\d.]+) 地板倍率=([\d.]+)", knife)
+kread = re.search(r"读数=倍率=([\d.]+)", knife)
 if not kread:
     die("刀那一跑没有自印倍率读数")
+if "XCTAssertFalse" not in knife:
+    die("刀没有红在行为断言（XCTAssertFalse）上 ⇒ 硬门不在行为那一侧，本轮结论不成立")
 
 # ---- 定向卷（改完之后）----
 cell = rd("/tmp/r271_cell.log")
@@ -127,83 +131,88 @@ V = {
     "@@BLOCK@@": reading.group(1), "@@IDLE@@": reading.group(2), "@@RATIO@@": reading.group(3),
     "@@EXECN@@": ex[-1][0], "@@EXECF@@": ex[-1][1],
     "@@KN@@": kn.group(1) + "/" + kn.group(2) + " CAUGHT",
-    "@@KNR@@": kread.group(1), "@@KNK@@": kread.group(2),
+    "@@KNR@@": "%.2f" % mut_ratio,
+    "@@KNR@@": "%.2f" % mut_ratio, "@@KNK@@": "%.2f" % K,
     "@@RV@@": rv.group(0).strip(),
     "@@RVFR@@": rvd["frames"], "@@RVCHG@@": rvd["baseline_changed"],
     "@@TBL@@": cover.group(1), "@@COV@@": cover.group(2), "@@PARMS@@": cover.group(3),
     "@@GAPT@@": roster.group(2), "@@GAPA@@": roster.group(3), "@@ARMS@@": total.group(2),
     "@@BATT@@": "脚本电池 Ran " + pre_ran + " tests / OK (skipped=" + pre_skip + ")",
-    "@@CI1@@": pair("c0abdec"), "@@CI2@@": pair("e87191a"), "@@CI3@@": pair("2073b12"),
-    "@@CI4@@": pair("a73c80d"), "@@CI5@@": pair("68ab84a"),
+    "@@CI1@@": pair("68ab84a"), "@@CI2@@": pair("c0abdec"), "@@CI3@@": pair("c1fe940"),
+    "@@CI4@@": pair("7f15e97"), "@@CI5@@": pair("a481ab4"),
 }
 
-UI_NEW = """## 第 270 轮（R271 / 第 270 轮 / Round 268 · @@DATE@@）：那朵会翻脸的绝对 ms 红，换成同一次运行里的比值地板 —— 顺手让这把新尺抓住了旧尺抓不住的坏法（U-902…U-905 / D-257 · 产品 0 文件）
+UI_NEW = """## 第 270 轮（R271 / 第 270 轮 / Round 268 · @@DATE@@）：一条"看起来更聪明"的相对判据，被自己装的刀当场证伪 —— 时间这条轴改成只印不判，硬门留在行为那一侧（U-902…U-906 / D-257 · 产品 0 文件）
 
-本轮次对照：与 R270（自评 89，判据不再抄产品常量）相比，本轮处理的是 R270 收尾抓到的那朵**正在红的** CI（325）：`CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread` 在 runner 上报 `12.1725ms ≥ 10ms`，而同一份 Swift 代码两跑绿一跑红 ⇒ 绝对挂钟地板在负载前不是判据。
+本轮次对照：与 R270（自评 89，判据不再抄产品常量）相比，本轮处理 R270 收尾抓到的那朵**正在红的** CI（325：runner 报 `12.1725ms ≥ 10ms`，同一份 Swift 代码两跑绿一跑红）。我按 R142 的路子把绝对 ms 地板换成"同一次运行内的比值地板"，然后**先让刀试一遍**——刀说这条路不通。
 
-- **U-902：地板由两界证人推出来，不是拍的** —— 干净三跑的倍率（被堵那次 ÷ 同一次运行的空转中位数）是 @@CLEAN@@（上界 @@CLEANMAX@@），把写盘搬回调用线程那把刀的倍率是 @@MUT@@ ⇒ 取 **@@K@@** 落在两界之间；生成器把这条不等式钉成写盘前的闸门（`clean_max < K < mutant`），所以"以后有人把 K 挪出两界"这件事会让清账脚本拒绝落盘，而不是让判据悄悄失去分辨力。
-- **U-903：新尺比旧尺更有牙，这是现读的** —— 旧的那颗 10 ms 地板按该文件自己的注释就没有分辨率（M249 形状只值 2.54ms，照样绿）；换成比值之后同一把坏法被 @@KN@@（刀那一跑自印 倍率=@@KNR@@、地板倍率=@@KNK@@）。也就是说：这**不是**"把红放宽成绿"的第四种写法，而是同一件事换成了既抗负载又更灵敏的判据。
-- **U-904：绝对值没有删，改成只印不判，并把理由留在原地** —— 读数行现在是 `CAPTURE_PATH_BLOCKED add 用时=@@BLOCK@@ms 空转基线=@@IDLE@@ms 倍率=@@RATIO@@ 地板倍率=@@K@@ 绝对值=10.00ms（只印不判）`；那颗常量改名 `blockedQueuePrintOnlyMilliseconds`。**唯一被禁止的修法（把 10 放宽到 20）没做**，而且写进了注释与 D-257。
-- **U-905：一条没钉住的轴，按名字记下来** —— 本轮只有一把刀（产品轴）。"把比值地板改成恒真"（例如让空转基线去读被堵那颗 store 自己的时间）这一类坏法**没有**被钉住：仓库里现在没有一把尺会因为"基线 = 被测值"而红。新开 326 记它（形状与 D-254 的"证人要对准事件"同族：基线必须来自**另一个对象**，否则比值恒为 1）。
+- **U-902：相对判据没有分辨力，这是现读出来的，不是推出来的** —— 干净三跑的倍率（被堵那次 ÷ 同一次运行的空转中位数）是 @@CLEAN@@；把写盘搬回调用线程那把刀（M831，needle 从 R51 那张表里读、不手抄）跑出的倍率是 @@MUT@@ —— **比干净还低**。原因与该文件自陈的那句是同一件事：库太小，两个量都在亚毫秒，预热与分配器的噪声比一次同步写还大。于是处置改成：绝对 ms 与倍率**都只印不判**（常量改名 `blockedQueuePrintOnlyMilliseconds` / `blockedRatioReference`），断言只剩行为那两条。
+- **U-903：拆掉时间断言之后，硬门确实还在行为那一侧 —— 这一条有刀签** —— 刀那一跑现读：@@KN@@、红在 `testAddingACopyWritesNothingOnTheMainThread(XCTAssertFalse)`、失败=1、自印倍率=@@KNR@@。也就是说这一格仍然抓得住那把坏法，靠的是"被堵期间盘上不许出现 history.json"，不是靠任何计时。生成器把这条钉成闸门：刀若没红在行为断言上，本轮不许写盘。
+- **U-904：生成器第一版差点把一件没做成的事记成交了** —— 我原先给它写的闸门是 `clean_max < K < mutant`（地板必须落在两界之间）。第一次跑就拒绝落盘，因为**根本没有两界**（坏法在干净之下）。这把闸门这次的作用不是"防手抄"，是"防我把装饰性判据写成进步"；随后把它改成负证人形状：`mutant ≤ clean_max` 必须成立，且源码里不许再有任何以 `elapsed` 为对象的断言。
+- **U-905：CI 交账 —— 一朵红是基建不是判据，一朵仍是那颗地板** —— @@CI1@@ **红在 STEP[2] `Run actions/checkout@v4`**（后续步骤全 skip ⇒ 这不是任何判据的红，是拉取代码的基建红，形状与 R154 那族环境红同科，不记账到产品头上也不"重跑当没看见"）；@@CI3@@、@@CI4@@ 绿；@@CI2@@ 是那朵 :153 的负载敏感红（本轮换了形状）；@@CI5@@ 交接时 in_progress ⇒ **325 的结案条件就是它不再红在 :153**，本机绿不算。
+- **U-906：两条没钉住的轴，按名字记账** —— 新开 **326**：比值这条轴可以被弄成恒真（让空转基线去读被测那颗 store 自己的时间）而仓库里没有一把尺会红；新开 **327**：`mutate_r271.py` 的 needle 是**运行时从另一张表读来的**，静态预检抽不出它 ⇒ 表进了名册（tables=@@TBL@@）却没进覆盖（covered=@@COV@@），M831 的唯一性只靠 `ARM_TOTAL dupes=0 repeats=0` 这一层，锚点唯一性没人管（D-248 的又一种形态：登记≠覆盖，覆盖≠锚点可查）。
 
-眼睛腿：NOT-RUN —— 本轮 0 个产品文件、帧未重捕（上一笔基线现读 @@RVFR@@ 张、changed=@@RVCHG@@ 那张是已分辨的翻脸帧，见 324），所以没有新画面可看；这一眼本轮不记账，也不说"画面没变"。
-读数腿：RUN —— 干净三跑倍率 @@CLEAN@@、坏法倍率 @@MUT@@、地板 @@K@@（源码现读）、定向卷 Executed @@EXECN@@/failures=@@EXECF@@、刀 @@KN@@、@@BATT@@、预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0、ARM_TOTAL arms=@@ARMS@@。
+眼睛腿：NOT-RUN —— 本轮 0 个产品文件、帧未重捕（上一笔基线现读 @@RVFR@@ 张、changed=@@RVCHG@@ 那张是已分辨的翻脸帧，见 324），所以没有新画面可看；本轮**不写**"画面没变"，因为那句没有证人。
+读数腿：RUN —— 干净三跑倍率 @@CLEAN@@、坏法倍率 @@MUT@@、刀 @@KN@@（自印倍率 @@KNR@@、红在行为断言）、定向卷 Executed @@EXECN@@/failures=@@EXECF@@ 与读数行（用时 @@BLOCK@@ms、空转基线 @@IDLE@@ms、倍率 @@RATIO@@、两条时间值都标着只印不判）、@@BATT@@、预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0、ARM_TOTAL arms=@@ARMS@@。
 产品腿：0 文件（`Sources/` 未动 ⇒ sources 格按规矩不动；四件套沿用上一笔：@@RV@@）。
-CI 交账：@@CI1@@ **红** = 本轮这颗地板（已换形状）；@@CI2@@、@@CI3@@ 绿；@@CI4@@、@@CI5@@ 交接时未读（只登记号不轮询，R140）。
-未做（逐条）：① 325 的**runner 验收**（要等本轮这一跑绿/红才算结案，本机绿不算）；② 326（比值地板被弄成恒真的那把尺）、324（那颗会同码翻脸的帧）、323（抄值对子的可用估计量）、322、317；③ **312 的具名出口（欠第五轮）**；④ 314、315、316；310 的 @@GAPT@@ 张表 / @@GAPA@@ 把刀、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 三位；⑤ 用户闸门 220 路 A / 228② / 265。
+未做（逐条）：① **325 的 runner 验收**（等 @@CI5@@ 那一跑）；② 326、327（上面那两条没钉住的轴）；③ **312 的具名出口（欠第五轮）**；④ 324（会同码翻脸的那张帧）、323（抄值的可用估计量）、322、317、314、315、316；⑤ 310 的 @@GAPT@@ 张表 / @@GAPA@@ 把刀、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 三位；⑥ 用户闸门 220 路 A / 228② / 265。
 
 """
 
-ITER_NEW = """## Round 268 · 会翻脸的绝对 ms 红换成同一次运行内的比值地板；新尺抓住了旧尺抓不住的坏法（R271 / 第 270 轮）/ D-257 · 产品 0 文件
+ITER_NEW = """## Round 268 · 一条相对判据在被采纳之前先被自己的刀证伪：时间这条轴改成只印不判，硬门留在行为那一侧（R271 / 第 270 轮）/ D-257 · 产品 0 文件
 
-本轮次对照：与 R270（自评 89）相比，本轮只做一件事但做完整：325 那朵负载敏感红 —— 地板从"10 ms 绝对值"换成"被堵那次 ≤ @@K@@ × 同一次运行的空转中位数"，两界都是现读（干净 @@CLEAN@@、坏法 @@MUT@@）。
-看图腿：NOT-RUN —— 0 产品文件、帧未重捕，本轮没有新画面可看；不说"画面没变"，因为那句本轮没有证人。
-读数腿：RUN —— 干净三跑倍率 @@CLEAN@@（上界 @@CLEANMAX@@）、坏法倍率 @@MUT@@、源码里的地板 @@K@@、定向卷 Executed @@EXECN@@/@@EXECF@@ 与读数行（用时 @@BLOCK@@ ms、基线 @@IDLE@@ ms、倍率 @@RATIO@@）、刀 @@KN@@（自印 倍率=@@KNR@@ 地板=@@KNK@@）、@@BATT@@、预检 bad=0。
+本轮次对照：与 R270（自评 89）相比，本轮只做 325 一件事，但把它做成了负结果：换相对判据 → 刀试 → 倍率 @@MUT@@ 低于干净上界 @@CLEANMAX@@ → 拆回只印不判，硬门交给行为断言（刀现读 @@KN@@、红在 XCTAssertFalse）。
+看图腿：NOT-RUN —— 0 产品文件、帧未重捕，没有新画面可看；也没把"画面没变"当成结论写。
+读数腿：RUN —— 干净三跑倍率 @@CLEAN@@、坏法倍率 @@MUT@@、刀 @@KN@@（自印倍率 @@KNR@@）、定向卷 Executed @@EXECN@@/failures=@@EXECF@@、@@BATT@@、预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0。
 七维度自评：
 | 维度 | 分/满分 |
 | 真实视觉审查 | 5/15 |
-| 判据有效性 | 15/15 |
-| 假绿防御 | 14/15 |
-| 产品面推进 | 3/15 |
-| 台账一致性 | 15/15 |
+| 判据有效性 | 14/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 2/15 |
+| 台账一致性 | 14/15 |
 | 交付诚实性 | 15/15 |
 | 可复核性 | 15/15 |
-各维理由：真实视觉审查 5 —— 本轮没有可看的画面（0 产品文件、未重捕），这一维按实记低分而不是编一个"看了两张没变"；判据有效性 15 —— 地板由两界推出且被生成器钉成不等式；假绿防御 14 —— 刀证明新尺抓住了 10 ms 抓不住的坏法，但"基线读成被测值 ⇒ 比值恒真"这一类还没尺会红（326 记名）；产品面推进 3 —— 0 产品文件；台账一致性 15 —— 数字全解析、两界不等式在写盘之前；交付诚实性 15 —— 没把"本机绿"说成 325 结案，runner 验收显式挂在未做①；可复核性 15 —— 三跑倍率、坏法倍率、地板、刀读数全是自印行。合计 **82**/105。
+各维理由：真实视觉审查 5 —— 本轮没有可看的画面，按实记低分而不是编一句"看了两张没变"；判据有效性 14 —— 结论是"这条轴不该判"，有刀签，扣一分是 325 的 runner 验收还没回来；假绿防御 15 —— 拦住的正是最像进步的那种假绿（把没分辨力的比值写成断言），并且生成器闸门第一次运行就拒绝落盘；产品面推进 2 —— 0 产品文件，本轮连可见性都没改；台账一致性 14 —— 五本 + STATE + 报告两格派生，sources 格按规矩不动；交付诚实性 15 —— 负结果、两把没钉住的轴、基建红都写在账上；可复核性 15 —— 三跑倍率、坏法倍率、刀读数、只印不判的读数行全是自印行。合计 **80**/105。
 
 """
 
-DEC_NEW = """**D-257（R271）：负载敏感的绝对时间地板不许"放宽到达标"，要换成同一次运行内的相对判据；换完必须用同一把旧刀证明新尺更有牙，并把地板的两界钉成写盘前的闸门。** 理由：`blockedQueueBudgetMilliseconds = 10` 在 runner 上报 `12.1725ms ≥ 10ms`（@@CI1@@），而同一份 Swift 代码两跑绿一跑红 —— 这颗地板既没有分辨率（该文件注释自陈：M249 形状只值 2.54ms，照样绿），又会在负载前假红。放宽到 20ms 是第三种假绿，被禁止。改法：判据里加一颗**同一次运行**的空转基线（另一 store、同一 `add`、三样本取中位数），断言换成 `被堵 ≤ @@K@@ × 基线`，绝对值改名 `blockedQueuePrintOnlyMilliseconds` 只印不判。两界现读：干净三跑 @@CLEAN@@（上界 @@CLEANMAX@@）、坏法 @@MUT@@ ⇒ @@K@@ 落在中间；`ledgers_r271.py` 把 `clean_max < K < mutant` 钉成闸门。刀 M831（needle 从 R51 那张表里读，不手抄）现读 @@KN@@、RESTORE_CLEAN ⇒ **新尺抓住了旧尺抓不住的坏法**，这条改动因此不是"把红洗成绿"。没钉住的轴按名字记账（326：让基线去读被测对象自己 ⇒ 比值恒真，现在没有尺会红）。与 R142（p95 换成同一次运行的相对判据）、D-253（等条件不等挂钟）、D-251（不许降地板达标）同族，但这是第一次把"两界都要现读"写成清账闸门。
+DEC_NEW = """**D-257（R271）：负载敏感的绝对时间地板既不许"放宽到达标"，也不许顺手换成"看起来更聪明"的相对判据 —— 换之前必须先用同一把刀量出两界；量不出两界，就只印不判。** 理由：`blockedQueueBudgetMilliseconds = 10` 在 runner 上报 `12.1725ms ≥ 10ms`（@@CI2@@），而同一份 Swift 代码两跑绿一跑红。第一步我按 R142 换成"被堵那次 ≤ K × 同一次运行的空转中位数"，并给清账脚本写了闸门 `clean_max < K < mutant` —— 它第一次跑就拒绝落盘，因为**两界不存在**：干净三跑倍率 @@CLEAN@@，而把写盘搬回调用线程那把刀（M831）跑出的倍率是 @@MUT@@，比干净还低（亚毫秒的两个量，噪声比一次同步写大）。于是正确处置不是调 K，而是承认这条轴在此刻的库尺寸上没有分辨力：绝对值与倍率都改成只印不判，判交给行为断言（被堵期间盘上不许出现 `history.json` / `daily-copy.json`；放开闸门之后必须出现），并由刀 M831 现读 @@KN@@、红在 `XCTAssertFalse` 签住"硬门还在"。与 D-251（不许降地板达标）、R142（绝对阈值换相对判据要配同一次运行的对照）、D-254（证人要对准事件）同族；新的一条是：**相对判据也不是自动更对的，它同样要先过刀**。没钉住的轴按名字记账（326 比值恒真、327 运行时 needle 抽不出 ⇒ 登记≠覆盖）。
 
 """
 
-NOTE_325 = ("  追记（R271）：形状已换、**结案要等 runner** —— 绝对 ms 地板改成 `被堵 ≤ @@K@@ × 同一次运行的空转中位数`，\n"
-            "  两界现读：干净三跑 @@CLEAN@@、坏法（M831）@@MUT@@；刀 @@KN@@、RESTORE_CLEAN；绝对值只印不判。\n"
-            "  本机绿不算结案：这一条本来就是 runner 上才红的，验收要读本轮那一跑（@@CI5@@ 之后新的一笔）。\n")
+NOTE_325 = ("  追记（R271）：形状已定，但结论是「这条轴不该判」 —— 相对判据被自己的刀证伪（干净三跑倍率 @@CLEAN@@、"
+            "  坏法 M831 倍率 @@MUT@@，比干净还低）⇒ 绝对 ms 与倍率都改成只印不判，硬门留在行为断言那两侧；"
+            "  刀现读 @@KN@@、红在 XCTAssertFalse、RESTORE_CLEAN。结案仍等 runner：@@CI5@@ 那一跑不再红在 :153 才算。"
+            "  被禁止的两种自欺记名：① 把 10ms 放宽到达标；② 把一条抓不住坏法的比值写成判据。\n")
 
 BACK_NEW = [
-    "**326. 「比值地板」可以被弄成恒真而没有一把尺会红（R271 现读：本轮只钉了产品轴 M831）：把空转基线改成去读被堵那颗 store 自己的时间，"
-    "倍率恒为 1 ⇒ 判据永远绿。修法方向与 D-254 同族 —— 基线必须来自**另一个对象**，并且要有一条会红的证人（例如断言两次的原始 ms 读数不逐位相同、"
-    "或让刀 M831 的倍率读数必须显著大于 1）。本轮没做，按名字记（R271 新开）**",
+    "**326. 「比值地板」可以被弄成恒真而没有一把尺会红（R271 现读：本轮只钉了产品轴 M831）：让空转基线去读被堵那颗 store 自己的时间，"
+    "倍率恒为 1 ⇒ 判据永远绿。修法方向与 D-254 同族 —— 基线必须来自另一个对象，并且要有一条会红的证人（例如断言两次的原始 ms 读数不逐位相同，"
+    "或让坏法那一跑的倍率读数必须显著不等于 1）（R271 新开）**",
+    "**327. `mutate_r271.py` 的 needle 是运行时从 R51 那张表读来的 ⇒ 静态预检抽不出它：表进了名册（tables=@@TBL@@）却没进覆盖（covered=@@COV@@），"
+    "M831 只被 ARM_TOTAL 的 dupes/repeats 管到，锚点唯一性没人管。要么把这类「跨表复用 needle」的表做成预检认识的第二种形状"
+    "（读表时跟着解析 load_arm() 的来源），要么规定表不许在运行时取 needle —— 但别让它看起来已被覆盖（D-248 的又一种形态）（R271 新开）**",
 ]
 
-CHG_NEW = """### Changed（R271 / 第 270 轮 / Round 268 · 负载敏感的 ms 地板换成同一次运行内的比值地板）
+CHG_NEW = """### Changed（R271 / 第 270 轮 / Round 268 · 时间这条轴改成只印不判，硬门交给行为）
 
-`CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`：新增一颗同一次运行的空转基线（另一 store、同一 `add`、三样本取中位数），断言从 `XCTAssertLessThan(elapsed, 10ms)` 换成 `elapsed ≤ @@K@@ × 基线`；那颗常量改名 `blockedQueuePrintOnlyMilliseconds` 并**只印不判**。读数行现在是 `用时=@@BLOCK@@ms 空转基线=@@IDLE@@ms 倍率=@@RATIO@@ 地板倍率=@@K@@`。地板由两界推出（干净三跑 @@CLEAN@@、坏法 @@MUT@@），且 `ledgers_r271.py` 把 `clean_max < K < mutant` 钉成写盘闸门。刀 M831（needle 从 R51 那张表读，把写盘搬回调用线程）@@KN@@、RESTORE_CLEAN ⇒ 旧那颗 10 ms 地板抓不住的坏法（其自陈：只值 2.54ms）现在会被抓住；**没有把 10 放宽到达标**。CI：@@CI1@@ 红 = 本轮这颗地板、@@CI2@@／@@CI3@@ 绿、@@CI4@@／@@CI5@@ 未读。新开 326（比值地板被弄成恒真的那条轴没钉）。@@BATT@@、预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0。产品 0 文件、帧未重捕 ⇒ 四件套沿用上一笔、看图腿本轮 NOT-RUN。
+`CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`：新增一颗同一次运行的空转基线（另一 store、同一 `add`、三样本取中位数）**只为把噪声打成读数**；绝对地板改名 `blockedQueuePrintOnlyMilliseconds`、比值参考改名 `blockedRatioReference`，两条都只印不判；断言只剩行为那两侧。为什么不用比值当判据：干净三跑倍率 @@CLEAN@@，而把写盘搬回调用线程的刀（M831）跑出倍率 @@MUT@@ —— 比干净还低 ⇒ 这条轴在此刻的库尺寸上没有分辨力（该文件早就自陈 M249 只值 2.54ms 照样绿）。刀现读 @@KN@@、红在 `XCTAssertFalse`、RESTORE_CLEAN ⇒ 拆掉时间断言没有拆掉判据。定向卷 Executed @@EXECN@@/failures=@@EXECF@@，读数行 `用时=@@BLOCK@@ms 空转基线=@@IDLE@@ms 倍率=@@RATIO@@ 地板倍率=25.00 绝对值=10.00ms（只印不判）`。清账脚本的闸门从 `clean_max < K < mutant` 改成负证人（`mutant ≤ clean_max` 且源码里不许再有以 `elapsed` 为对象的断言）。CI：@@CI1@@ 红在 STEP[2] checkout（基建红，后续全 skip，不记到判据头上）、@@CI3@@／@@CI4@@ 绿、@@CI2@@ 是那朵 :153、@@CI5@@ 未读 ⇒ 325 结案等它。新开 326（比值恒真没尺会红）、327（运行时 needle 让预检看不见 ⇒ 登记≠覆盖）。@@BATT@@、预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0。产品 0 文件、帧未重捕 ⇒ 四件套沿用上一笔、看图腿 NOT-RUN。
 
 """
 
 STATE_NEW = """## R271 状态（第 270 轮 / Round 268 · @@DATE@@）
-最后更新：2026-10-21（本地 · R271 / 第 270 轮 / Round 268）：**325 那朵负载敏感红换形状：绝对 ms 地板 → 同一次运行内的比值地板（两界现读、闸门钉死），新尺比旧尺更有牙**（U-902…U-905 · D-257 · 产品 0 文件 · 自评 82/105）
+最后更新：2026-10-21（本地 · R271 / 第 270 轮 / Round 268）：**325：相对判据被自己的刀证伪 ⇒ 时间这条轴只印不判，硬门留在行为那一侧（M831 CAUGHT 红在 XCTAssertFalse）**（U-902…U-906 · D-257 · 产品 0 文件 · 自评 80/105）
 
-**本轮落地**：空转基线 + 比值地板 @@K@@（干净三跑 @@CLEAN@@、坏法 @@MUT@@，`clean_max < K < mutant` 是清账闸门）；绝对值只印不判（改名 `blockedQueuePrintOnlyMilliseconds`）；刀 M831 @@KN@@、RESTORE_CLEAN；定向卷 Executed @@EXECN@@/failures=@@EXECF@@；@@BATT@@；预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0、ARM_TOTAL arms=@@ARMS@@、310 缺口 @@GAPT@@ 张 / @@GAPA@@ 把。本轮 0 产品文件 ⇒ sources 格不动、四件套沿用上一笔、看图腿 NOT-RUN。
+**本轮落地**：空转基线只为把噪声打成读数；`blockedQueuePrintOnlyMilliseconds` / `blockedRatioReference` 只印不判；刀 M831（needle 从 R51 表读）@@KN@@、RESTORE_CLEAN；定向卷 Executed @@EXECN@@/failures=@@EXECF@@；@@BATT@@；预检 tables=@@TBL@@ covered=@@COV@@ arms=@@PARMS@@ bad=0、ARM_TOTAL arms=@@ARMS@@、310 缺口 @@GAPT@@ 张 / @@GAPA@@ 把。本轮 0 产品文件 ⇒ sources 格不动、四件套沿用上一笔、看图腿 NOT-RUN。
 
 **下一轮（R272 / 第 271 轮 / Round 269）的 ⓪**：
-⓪ 读 CI：@@CI4@@、@@CI5@@ 与本轮新跑（只登记号不轮询，R140）。**325 的结案条件就是本轮那一跑在 runner 上不再红在 :153** —— 本机绿不算（它本来就只在 runner 红）。
-① 326（比值地板被弄成恒真这条轴：基线必须来自另一个对象，并配一把会红的刀）。
+⓪ 读 CI：**@@CI5@@（本轮代码半那一笔）是 325 的结案条件** —— 它不再红在 `CapturePathWriteBudgetTests.swift:153` 才算；@@CI1@@ 那一跑红在 STEP[2] checkout 属基建红，重跑一次看它是否自己消失（基建红也不许长期挂着）。只登记号不轮询（R140）。
+① 326（比值恒真这条轴：基线必须来自另一个对象 + 一把会红的刀）、327（运行时 needle 让静态预检看不见）。
 ② **312 的具名出口（欠第五轮）**：按"纸"那一维推，本机 3.000 不许降（D-251）。
-③ 324（那颗会同码翻脸的帧）、323（抄值的可用估计量）、322、317、314、315、316。
+③ 324（会同码翻脸的那张帧）、323（抄值的可用估计量）、322、317、314、315、316。
 ④ 310 的 @@GAPT@@ 张表、309 那 6 张；305、299、301、307、287/284、297/298/300、304、291 三位。
-⑤ 产品动效面仍是最弱一维（本轮看图腿直接 NOT-RUN 记分 5/15）：按清账表点一个位真做动效或撤声明。
+⑤ 产品动效面仍是最弱一维（本轮看图腿直接 NOT-RUN，5/15）：按清账表点一个位真做动效或撤声明。
 ⑥ 用户闸门 220 路 A / 228② / 265。
 
 """
@@ -272,9 +281,9 @@ st_new = st_old.replace("## R270 状态", STATE_NEW + "## R270 状态", 1)
 must_preserve(st_old, st_new, "AGENT_STATE.md")
 
 ids = [int(x) for x in re.findall(r"- \*\*U-(\d+)", UI_NEW)]
-if ids != list(range(902, 906)):
+if ids != list(range(902, 907)):
     die("U 号不连续：" + str(ids))
-if "U-902…U-905" not in UI_NEW.splitlines()[0]:
+if "U-902…U-906" not in UI_NEW.splitlines()[0]:
     die("节标题 U 区间与定义不符")
 if not it_new.startswith(it_old.rstrip("\n")) or not dc_new.startswith(dc_old.rstrip("\n")):
     die("升序那本不是纯追加")
@@ -289,7 +298,7 @@ if not mt or int(mt.group(1)) != sum(scores):
     die("合计手抄错了：" + str(sum(scores)))
 if "D-257" in dc_old or "D-256" not in dc_old:
     die("D 号不对")
-if bk_new.count("\n**326. ") != 1:
+if bk_new.count("\n**326. ") != 1 or bk_new.count("\n**327. ") != 1:
     die("新开 326 没落上")
 if bk_new.count("追记（R271）") != 1:
     die("325 的追记没写上")
@@ -307,5 +316,5 @@ ran2, skip2 = battery()
 if ran2 != pre_ran:
     die("写盘前后电池颗数不一致（" + pre_ran + " → " + ran2 + "）")
 print("LEDGERS_R271 OK batt=Ran " + ran2 + " (skipped=" + skip2 + ") K=" + V["@@K@@"]
-      + " clean=" + V["@@CLEAN@@"] + " mutant=" + V["@@MUT@@"] + " knife=" + V["@@KN@@"] + " U=902..905 D=257")
+      + " clean=" + V["@@CLEAN@@"] + " mutant=" + V["@@MUT@@"] + " knife=" + V["@@KN@@"] + " U=902..906 D=257")
 print(out.strip().splitlines()[-1])

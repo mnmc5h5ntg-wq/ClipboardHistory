@@ -1,0 +1,2 @@
+M831 CAUGHT  写盘搬回调用线程 = 产品轴 ｜ 红在 testAddingACopyWritesNothingOnTheMainThread(XCTAssertFalse)（跑=1 失败=1）｜ 读数=倍率=0.84
+R271_MUTATE 刀=1 CAUGHT=1 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R271 / 第 270 轮 / Round 268 · 时间这条轴改成只印不判，硬门交给行为）
+
+`CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`：新增一颗同一次运行的空转基线（另一 store、同一 `add`、三样本取中位数）**只为把噪声打成读数**；绝对地板改名 `blockedQueuePrintOnlyMilliseconds`、比值参考改名 `blockedRatioReference`，两条都只印不判；断言只剩行为那两侧。为什么不用比值当判据：干净三跑倍率 1.13/1.05/0.96，而把写盘搬回调用线程的刀（M831）跑出倍率 0.84 —— 比干净还低 ⇒ 这条轴在此刻的库尺寸上没有分辨力（该文件早就自陈 M249 只值 2.54ms 照样绿）。刀现读 1/1 CAUGHT、红在 `XCTAssertFalse`、RESTORE_CLEAN ⇒ 拆掉时间断言没有拆掉判据。定向卷 Executed 6/failures=0，读数行 `用时=0.421ms 空转基线=0.359ms 倍率=1.17 地板倍率=25.00 绝对值=10.00ms（只印不判）`。清账脚本的闸门从 `clean_max < K < mutant` 改成负证人（`mutant ≤ clean_max` 且源码里不许再有以 `elapsed` 为对象的断言）。CI：68ab84a → 39570994287 / completed / failure 红在 STEP[2] checkout（基建红，后续全 skip，不记到判据头上）、c1fe940 → 39570503582 / completed / success／7f15e97 → 39570257402 / completed / success 绿、c0abdec → 39566666631 / completed / failure 是那朵 :153、a481ab4 → 39572947743 / completed / success 未读 ⇒ 325 结案等它。新开 326（比值恒真没尺会红）、327（运行时 needle 让预检看不见 ⇒ 登记≠覆盖）。脚本电池 Ran 513 tests / OK (skipped=4)、预检 tables=80 covered=63 arms=210 bad=0。产品 0 文件、帧未重捕 ⇒ 四件套沿用上一笔、看图腿 NOT-RUN。
+
+
 ### Changed（R270 / 第 269 轮 / Round 267 · 判据不再抄产品常量）
 
 `DailyCopyLedger.visibilityGrace`：`private let` → `internal static let`（值不变，0.15 s），调用点 `Self.visibilityGrace`。`DailyCopyHeatmapTests.testASuccessfulWriteDoesNotRepublish` 的观察窗口从字面量 `600` 换成 `Int(3 * (0.05 + DailyCopyLedger.visibilityGrace) * 1000)` —— 计划长度仍是 600 ms，改前/改后实跑 616 ms / 639 ms（同一格定向卷 Executed 31、failures=0）。新工具 `scripts/ledger_timing_scan.py` + 判据卷 9 格 + 刀 M830（1/1 CAUGHT、RESTORE_CLEAN）：窗口表达式必须出现常量名，判据文件里（剥行注释后）不许再出现等于该值的裸字面量，产品常量读不到时不许报空 PASS。320 结案 ⇒ 新开 323（其余抄值对子还没数）。四件套（本轮动了 Sources ⇒ 重跑）：0 告警、全量 919（skipped=42、failures=0）、帧 170 compared=170 changed=1 missing=0、dmg=ok、本机 1.4.8。脚本电池 Ran 513 tests / OK (skipped=4)、预检 tables=79 covered=63 arms=210 bad=0。CI：e87191a → 39565724396 / completed / success、c0abdec → 39566666631 / completed / failure、2073b12 → 39566913243 / completed / success（交接时未读，只登记号）。
