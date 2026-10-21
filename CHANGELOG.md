@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R272 / 第 271 轮 / Round 269 · 预检看得见这把刀了）
+
+`.scratch/motion-audit-2/mutate_r271.py`：`TARGET`/`NEEDLE`/`REPL` 从运行时读 R51 表改成静态字面量 ⇒ `mutate_needle_precheck.py` 抽得到（现读 tables=80 covered=64 arms=211 bad=0，covered 63 → 64，表行从"静态抽不出"变成 `M831 ok`）；刀重跑仍 1/1 CAUGHT、红在 `testAddingACopyWritesNothingOnTheMainThread(XCTAssertFalse)`、倍率=0.79、RESTORE_CLEAN。新增 `scripts/tests/test_mutate_r271_needle.py`（3 格）把字面量钉回 R51 那颗 needle（逐字对账 + 锚点恰好一次 + 漂移正对照）⇒ 单一真相不变、预检同时看得见（D-258）。327 结一半（通用形状等第三张这种表）、326 改判为"前提消失"并写明复活条件（比值若升回判据立刻复活）。脚本电池 Ran 516 tests / OK (skipped=4)、ARM_TOTAL arms=704 dupes=0、310 缺口 75 张 / 423 把本轮未收窄。CI：3f8050b → 39576062490 / in_progress / 未读／da00b70 → 39576839824 / in_progress / 未读 交接时未读、本轮新跑 fbbf530 → 39577120481 / in_progress / 未读；325 已结案。产品 0 文件、帧未重捕 ⇒ 四件套沿用上一笔、看图腿 NOT-RUN。
+
+
 ### Changed（R271 / 第 270 轮 / Round 268 · 时间这条轴改成只印不判，硬门交给行为）
 
 `CapturePathWriteBudgetTests.testAddingACopyWritesNothingOnTheMainThread`：新增一颗同一次运行的空转基线（另一 store、同一 `add`、三样本取中位数）**只为把噪声打成读数**；绝对地板改名 `blockedQueuePrintOnlyMilliseconds`、比值参考改名 `blockedRatioReference`，两条都只印不判；断言只剩行为那两侧。为什么不用比值当判据：干净三跑倍率 1.13/1.05/0.96，而把写盘搬回调用线程的刀（M831）跑出倍率 0.84 —— 比干净还低 ⇒ 这条轴在此刻的库尺寸上没有分辨力（该文件早就自陈 M249 只值 2.54ms 照样绿）。刀现读 1/1 CAUGHT、红在 `XCTAssertFalse`、RESTORE_CLEAN ⇒ 拆掉时间断言没有拆掉判据。定向卷 Executed 6/failures=0，读数行 `用时=0.421ms 空转基线=0.359ms 倍率=1.17 地板倍率=25.00 绝对值=10.00ms（只印不判）`。清账脚本的闸门从 `clean_max < K < mutant` 改成负证人（`mutant ≤ clean_max` 且源码里不许再有以 `elapsed` 为对象的断言）。CI：68ab84a → 39570994287 / completed / failure 红在 STEP[2] checkout（基建红，后续全 skip，不记到判据头上）、c1fe940 → 39570503582 / completed / success／7f15e97 → 39570257402 / completed / success 绿、c0abdec → 39566666631 / completed / failure 是那朵 :153、a481ab4 → 39572947743 / completed / success 未读 ⇒ 325 结案等它。新开 326（比值恒真没尺会红）、327（运行时 needle 让预检看不见 ⇒ 登记≠覆盖）。脚本电池 Ran 513 tests / OK (skipped=4)、预检 tables=80 covered=63 arms=210 bad=0。产品 0 文件、帧未重捕 ⇒ 四件套沿用上一笔、看图腿 NOT-RUN。
