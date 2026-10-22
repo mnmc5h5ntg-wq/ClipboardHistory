@@ -17,7 +17,7 @@
 | 项 | 状态 | 证据 |
 |---|---|---|
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
-| 阶段二 **223 轮**审计（R9–R230；以 `curve_from_ledger.py` 的 `PHASE2 n=223` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 221 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
+| 阶段二 **283 轮**审计（R9–R290；以 `curve_from_ledger.py` 的 `PHASE2 n=283` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 290 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
 | 视觉台账 | U-31 … U-961（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
