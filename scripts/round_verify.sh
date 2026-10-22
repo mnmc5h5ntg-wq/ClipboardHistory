@@ -20,8 +20,17 @@ echo "[1/4] swift build --build-tests"
 # 于是 `build_warnings=0` 是一半覆盖的尺。CI 的 STEP[4] 带的正是 `--build-tests`
 # （workflow 注释里写着 R59/BACKLOG 87 就为这件事改过 CI，本机四件套漏了同一个坑），
 # runner 那朵告警红（UICaptureHarness 的 withUnsafeBytes unused）因此在本机绿了三轮。
-( cd "$ROOT/ClipboardHistory" && swift build --build-tests ) > "$RUN/build.log" 2>&1
-W=$(grep -c "warning:" "$RUN/build.log" 2>/dev/null); W=${W:-0}   # 不用 `|| echo 0`：grep -c 已经打 0，那半句会再补一行 ⇒ W 变成两行
+# 0 告警那道门由 `scripts/warning_gate.sh` 独立成支（R296 / BACKLOG 343）：它印读数，**并且**能拦。
+# 原来这里只把 `$W` 印进汇总行，从不 exit 非零 ⇒「0 告警」一直是散文不是门。
+# 拦下就停在这里：有告警的一跑不该继续产其余读数，否则那一句会变成事后追述。
+bash "$ROOT/scripts/warning_gate.sh" "$RUN" > "$RUN/warning_gate.log" 2>&1
+GATE=$?
+cat "$RUN/warning_gate.log"
+if [ "$GATE" -ne 0 ]; then
+  echo "ROUND_VERIFY ABORTED_AT_WARNING_GATE exit=$GATE（门本体 scripts/warning_gate.sh，正文 $RUN/warning_gate.log）"
+  exit 1
+fi
+W=$(grep -oE "warnings=[0-9]+" "$RUN/warning_gate.log" | tail -1 | grep -oE "[0-9]+"); W=${W:-NOT-RUN}
 
 echo "[2/4] 全量 swift test（日志只留 ${RUN}）"
 ( cd "$ROOT/ClipboardHistory" && swift test ) > "$RUN/full.log" 2>&1
