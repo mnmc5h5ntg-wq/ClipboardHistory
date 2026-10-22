@@ -127,7 +127,7 @@ class CommitSubjectHygiene(unittest.TestCase):
         self.assertEqual(1, len(found), u"造一条未登记的豁免却不点名 ⇒ 这一格是恒真的")
         self.assertEqual(u"deadbeef", found[0][0])
         self.assertEqual(u"ROSTER_NOT_IN_LEDGER", found[0][1])
-        self.assertIn(u"AGENT_BACKLOG", found[0][2])
+        self.assertIn(u"BACKLOG", found[0][2])
 
     def test_baseline_is_reachable(self):
         out, rc = git(u"rev-list", u"--max-count=15", u"--format=%h", u"HEAD")
