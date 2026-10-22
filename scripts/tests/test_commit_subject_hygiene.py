@@ -45,6 +45,22 @@ def git(*args):
     return proc.communicate()[0].decode(u"utf-8", u"replace"), proc.returncode
 
 
+def roster_problems(roster, backlog_text):
+    """纯函数：每一条具名豁免都必须能在 BACKLOG 里被查得到。
+
+    为什么需要这一格（R298 现读的教训）：豁免名单是我自己写的，写进测试文件就等于「自我批准」——
+    没有第二处账，下一轮加一条豁免时没人看得见它被谁批过。要求每条 sha 在 `AGENT_BACKLOG.md`
+    里出现一次，就是让放宽必须留下**人类会读的那份**痕迹（R74：放宽要成对；D-279：豁免要能退场）。
+    名单为空时这里恒不报（那是对的：没有需要解释的东西），但正对照那一格保证机制不是空的。
+    """
+    out = []
+    for sha in sorted(roster):
+        if sha not in backlog_text:
+            out.append((sha, u"ROSTER_NOT_IN_LEDGER",
+                        u"豁免在册但 BACKLOG 里查不到这笔 sha ⇒ 放宽没有人类可读的登记"))
+    return out
+
+
 def check(messages, current_round, window=2):
     """返回问题列表（空 = 干净）。纯函数：判据与正对照走同一条路。"""
     problems = []
@@ -98,6 +114,20 @@ class CommitSubjectHygiene(unittest.TestCase):
         stale = sorted(set(AHEAD_ROSTER) - in_range)
         self.assertEqual([], stale,
                          u"这些 sha 已不在最近 15 笔里，豁免要删掉：" + ", ".join(stale))
+
+    def test_roster_entries_must_be_registered_in_the_ledger(self):
+        """每一条豁免都要在 `AGENT_BACKLOG.md` 里查得到 —— 名单是我自己写的，不能自我批准。"""
+        backlog = io.open(os.path.join(ROOT, "AGENT_BACKLOG.md"), encoding="utf-8").read()
+        self.assertEqual([], roster_problems(AHEAD_ROSTER, backlog),
+                         u"在册豁免没在账里登记：放宽必须留下人类会读的那份痕迹（R74 / D-279）")
+        # 正对照：造一条没登记的豁免 ⇒ 必须被点名（名单为空时这一格仍然有牙）
+        forged = {u"deadbeef": u"伪造的豁免"}
+        found = roster_problems(forged, backlog)
+        # 逐字段判，不许拿 found 自己当期望（同形 assert 恒真 = 没判，R146 那一课）
+        self.assertEqual(1, len(found), u"造一条未登记的豁免却不点名 ⇒ 这一格是恒真的")
+        self.assertEqual(u"deadbeef", found[0][0])
+        self.assertEqual(u"ROSTER_NOT_IN_LEDGER", found[0][1])
+        self.assertIn(u"AGENT_BACKLOG", found[0][2])
 
     def test_baseline_is_reachable(self):
         out, rc = git(u"rev-list", u"--max-count=15", u"--format=%h", u"HEAD")
