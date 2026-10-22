@@ -4909,6 +4909,38 @@ final class UICaptureTests: XCTestCase {
         return (bg, pill, Self.contrastRatio(bg, pill), abs(bg - pill), count)
     }
 
+    /// **346 的第一半：把带窗外的那部分墨量出来，让盲区自己可见。**
+    ///
+    /// 为什么不动 `pillReading`：它的带窗（`2 < Δ < 60`）被一堆既有地板与比值依赖（悬停差、
+    /// 收藏星墨、右轴…），一次改带窗等于同时挪十几条地板 —— 那要先重测（R147 那一课）。
+    /// 这一颗尺只做一件事：**不设上界**，并报**带符号**的台阶，于是"按下变暗到 Δ≈70"这种
+    /// 强反馈不再读成缺席。两者读数不一致，本身就是那条"不单调"的证据。
+    static func wideBlockReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
+                                 bytesPerRow: Int, x0: Int, x1: Int, minDelta: Int = 2)
+        -> (background: Int, block: Int, signedStep: Int, pixels: Int) {
+        func luma(_ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        let lo = max(0, min(x0, x1 - 1)), hi = max(lo + 1, min(x1, width))
+        var edge = [Int: Int]()
+        for x in lo..<min(lo + 8, hi) {
+            for y in 0..<height { edge[luma(x, y), default: 0] += 1 }
+        }
+        let bg = edge.max { $0.value < $1.value }?.key ?? 0
+        var band = [Int: Int]()
+        for x in lo..<hi {
+            for y in 0..<height {
+                if abs(luma(x, y) - bg) > minDelta { band[luma(x, y), default: 0] += 1 }
+            }
+        }
+        guard let (block, count) = band.max(by: { $0.value < $1.value }) else {
+            return (bg, -1, 0, 0)
+        }
+        return (bg, block, block - bg, count)
+    }
+
     /// 字形墨（R263 / BACKLOG 291 的 `HistoryRowViews.swift` 那一行）：`row-favorite-*` 那两张里
     /// 那颗星的**笔画本体**，与 `pillReading` 故意量**不同的一层**。
     ///
@@ -5459,26 +5491,31 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         func read(_ name: String, _ appearance: NSAppearance.Name)
-            -> (background: Int, pill: Int, step: Int, pillPixels: Int) {
+            -> (background: Int, pill: Int, step: Int, pillPixels: Int,
+                wideBlock: Int, wideSigned: Int, widePixels: Int) {
             guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
                 XCTFail("找不到夹具 " + name + " ⇒ 参照臂没有对象")
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, -1, 0, 0)
             }
             let file = scratch.appendingPathComponent("\(name)-\(appearance.rawValue).png")
             do { _ = try render(fixture, appearance: appearance, to: file) } catch {
                 XCTFail(name + "：渲染失败 " + String(describing: error))
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, -1, 0, 0)
             }
             guard let image = NSImage(contentsOf: file),
                   let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
                   let base = rep.bitmapData else {
                 XCTFail(name + "：读不回 " + file.lastPathComponent)
-                return (-1, -1, 0, 0)
+                return (-1, -1, 0, 0, -1, 0, 0)
             }
             let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
             let r = Self.pillReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
                                      bytesPerRow: rep.bytesPerRow, x0: 0, x1: rep.pixelsWide)
-            return (r.background, r.pill, r.step, r.pillPixels)
+            // 同一张图、同一颗尺的**无界版本**（346）：带窗 2<Δ<60 把强按下整块排除，
+            // 所以这里两个读数不一致本身就是那条"不单调"的证据。
+            let w = Self.wideBlockReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                          bytesPerRow: rep.bytesPerRow, x0: 0, x1: rep.pixelsWide)
+            return (r.background, r.pill, r.step, r.pillPixels, w.block, w.signedStep, w.pixels)
         }
 
         var judged = 0
@@ -5499,6 +5536,17 @@ final class UICaptureTests: XCTestCase {
             XCTAssertNotEqual(press.step, idle.step,
                               tag + "：按下与空闲在同一颗尺下读出现同一个台阶码值（" + String(idle.step)
                               + "）⇒ 参照臂没有可分的两态，拿它当分母没有意义")
+            XCTAssertGreaterThan(press.widePixels, 0,
+                                 tag + "：无界尺也读不到任何块 ⇒ 参照臂这次是真没画（不是掉出带窗）")
+            // 346 的牙：带窗尺读到缺席时，无界尺必须读到块 —— 否则「没画」与「画得太狠掉出带窗」
+            // 这两种成因在读数上同形，而处置完全相反（前者修夹具，后者修尺）。
+            if press.pillPixels == 0 {
+                XCTAssertGreaterThan(press.widePixels, 0,
+                                     tag + "：带窗尺 0 颗而无界尺也 0 颗 ⇒ 分不清缺席的成因，"
+                                     + "这一格是尺的缺席不是产品的缺席（346）")
+                XCTAssertGreaterThanOrEqual(abs(press.wideSigned), 60,
+                                            tag + "：带窗读到 0 颗却又不满 60 的偏离 ⇒ 上面那句归因不成立")
+            }
             judged += 1
             emit("SYSTEM_PRESS_REF " + tag
                  + "｜idle 底=" + String(idle.background) + " 块=" + String(idle.pill)
@@ -5506,7 +5554,7 @@ final class UICaptureTests: XCTestCase {
                  + "｜press 底=" + String(press.background) + " 块=" + String(press.pill)
                  + " 颗=" + String(press.pillPixels)
                  + "｜|press-idle| 码值=" + String(abs(press.step - idle.step))
-                 + "（342 只判存在；亮档按下读到 0 颗是**这颗尺方向瞎**，见 346，不是系统没画按下）")
+                 + "（342 只判存在；亮档按下读到 0 颗是**带窗上界 Δ<60 把它整块排除**（无界尺读到块且 |Δ|≥60），见 346，不是系统没画按下）")
         }
         XCTAssertEqual(judged, 2, "两档里有一档没跑完参照臂 ⇒ 判据没有对象")
     }
