@@ -146,6 +146,91 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         }
     }
 
+    /// 悬停那一圈**不许比「多做一次复制」更响**（R300 / BACKLOG 314 的下半）。
+    ///
+    /// 上面那条 `testHoverIsNotLouderThanTheDataRange` 的分母是**全幅度**（空 → 最忙）。那条等式很宽：
+    /// 全幅度横跨四档，所以「环 ≤ 1.0 × 全幅度」实际允许环等于**四档**的变化量。而这张图唯一的
+    /// 信息通道就是深浅一档一档的差别（`VisualHeat.ladder` 的注释自己就写着「分不开就等于少一档」），
+    /// 于是真正该问的是：**鼠标划过一格，变化相当于几档数据？** 当它比最细的一档还粗，交互就在跟数据
+    /// 抢同一根轴 —— 这才是目标里那句「不喧宾夺主」的可数版本。R264 看图时我只写下「那圈一眼可见」，
+    /// 没有这一格，那句话到今天为止都只是形容词。
+    ///
+    /// 分母不是拍的，也不是外部惯例：**同一颗尺、同一条 render** 现量 —— 把五档挨个画成未悬停，
+    /// 取相邻档在**填充带**上的档步（只收过噪声地板的真换档），再要求每一档悬停时在**描边带**上的变化
+    /// 不超过 `heaviestDataStepAllowed × 最重的那一步`。两根带不重叠由
+    /// `testAdjacentLevelRulersAreATruthTable` 钉着，所以分子分母量的不是同一块像素。
+    /// 读数同时打印「对最重」与「对最细」两个倍率：后者今天过不了，那是**记在账上的形状限制**（356），
+    /// 不是把它删掉的理由。
+    func testHoverIsNotLouderThanOneDataStep() throws {
+        var readings: [String] = []
+        for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for scale in [1, 2] {
+                let size = (Int(VisualHeat.cell) + 8) * scale
+                let fill = Self.fillBand(size: size, scale: scale)
+                let ring = Self.ringBand(size: size, scale: scale)
+                XCTAssertFalse(fill.isEmpty, "\(tag)/\(scale)x 的填充带是空的 ⇒ 分母没有对象")
+                XCTAssertFalse(ring.isEmpty, "\(tag)/\(scale)x 的描边带是空的 ⇒ 分子没有对象")
+                let stills = try Self.levels.map {
+                    try renderCell(level: $0, hovered: false, appearance: appearance, scale: scale)
+                }
+                var steps: [Double] = []
+                for i in 1..<stills.count {
+                    let d = Self.meanChannelDelta(stills[i - 1], stills[i], over: fill, size: size)
+                    if d > Self.ringNoiseFloor255 { steps.append(d) }
+                }
+                XCTAssertFalse(steps.isEmpty,
+                    "\(tag)/\(scale)x：一个正档步都没量到 ⇒ 分母是空的，这条判据不许把「没量到」读成合规")
+                let minStep = steps.min()!
+                let maxStep = steps.max()!
+                let stepList = steps.map { String(format: "%.2f", $0) }.joined(separator: "/")
+                XCTAssertEqual(steps.count, Self.levels.count - 1,
+                    "\(tag)/\(scale)x：四对相邻档里只有 \(steps.count) 对被算进分母 ⇒ 有一对落在噪声地板以下，"
+                    + "那正是上面那条档间判据该红的时候，不该在这里被悄悄丢掉")
+                for (i, level) in Self.levels.enumerated() {
+                    let hover = try renderCell(level: level, hovered: true,
+                                               appearance: appearance, scale: scale)
+                    let ringStep = Self.meanChannelDelta(stills[i], hover, over: ring, size: size)
+                    let ratio = ringStep / maxStep
+                    let vsMin = ringStep / minStep
+                    readings.append("HEAT_RING_VS_STEP \(tag)/\(scale)x \(level.name) "
+                                    + "环=\(String(format: "%.2f", ringStep)) "
+                                    + "档步=[\(stepList)] "
+                                    + "最细=\(String(format: "%.2f", minStep)) 最重=\(String(format: "%.2f", maxStep)) "
+                                    + "倍率(对最重)=\(String(format: "%.2f", ratio)) "
+                                    + "倍率(对最细)=\(String(format: "%.2f", vsMin)) "
+                                    + "令牌=\(String(format: "%.3f", VisualHeat.hoverRingOpacity(isHovered: true)))")
+                    XCTAssertLessThanOrEqual(ratio, Self.heaviestDataStepAllowed,
+                        "\(tag)/\(scale)x 的 \(level.name)：鼠标划过那一格改了 \(String(format: "%.2f", ringStep))/255，"
+                        + "而这张图最重的一次数据变化只改 \(String(format: "%.2f", maxStep))/255"
+                        + "（四对档步=[\(stepList)]）⇒ 交互比一次真实的数据变化还响。"
+                        + "改 `VisualHeat.hoverRingOpacity`（或描边宽度），别把这条地板抬高；"
+                        + "降下来之后 `testHoverRingIsVisibleOnEveryHeatLevelAndBothScales` 那根 18 的地板仍在，"
+                        + "两条一起把这一圈夹在一个窗口里")
+                }
+            }
+        }
+        readings.forEach { print($0) }
+        XCTAssertEqual(readings.count, 20, "读数必须是 外观2 × 尺度2 × 档5 = 20 条，少一条就是有一臂没被量")
+    }
+
+    /// 「悬停不许比一次真实的数据变化更响」的允许倍率。1.0 的意思很直白：
+    /// 鼠标划过一格带来的像素变化，不许超过这张图上**最重的一次数据变化**（第 3 档 → 第 4 档）。
+    ///
+    /// 为什么分母取最重的那一步而不是最细的那一步 —— 我第一版就是那么写的，然后被自己的读数驳回：
+    /// 亮档四对档步 = 19.33 / 21.00 / 28.33 / 37.33，暗档 = 17.33 / 18.33 / 25.33 / 33.67，
+    /// 而 `testHoverRingIsVisibleOnEveryHeatLevelAndBothScales` 那根 18 的地板要求这一圈在**最安静的那一档**
+    /// （bucket4 / 1x）上至少改 18/255；那一臂在 0.55 时只改 36.10，按比例算出**能看见的下限是 0.274**，
+    /// 而 0.274 的环在最响的一臂上是 0.274/0.55 × 75.50 = 37.6 —— 恰好等于**最重**的一次档步。
+    /// 也就是说「环 ≤ 最细一档」在这套形状（11pt 格 + 4 档 + 描边环）下**数学上装不下**：
+    /// 四步全要 ≥ 37.6 就得有 150 的总幅度，而整条梯子只有约 106。⇒ 这条界今天只能压在最重的一步上，
+    /// 「要让它连最细的一步都不许超过」欠的是形状（档数 / 格子尺寸 / 悬停换通道），记在 BACKLOG 356，
+    /// 不许把它写成"已达标"，也不许偷偷把倍率抬高去迁就现状。
+    static let heaviestDataStepAllowed: Double = 1.0
+
+    /// 什么算「一次真的换档」：与捕获卷那把带窗同一条界（`|Δ| > 2`），不是新发明的数。
+    static let ringNoiseFloor255: Double = 2.0
+
     /// 分类器自己的真值表：带 = `strokeBorder` 实际覆盖的那一圈（SDF 判）。
     ///
     /// 为什么单独立：上面两条判据的全部含义都在「哪些像素算这条带」上。
@@ -233,8 +318,9 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
 
     /// `hoverRingOpacity` 的真值表（纯函数那一半）。
     func testHoverRingOpacityTruthTable() {
-        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.55, accuracy: 0.0001,
-                       "悬停那一圈的透明度是本轮量出来的那个数，改了令牌就得同时改判据里的说明")
+        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.30, accuracy: 0.0001,
+                       "悬停那一圈的透明度是本轮量出来的那个数（R300 从 0.55 降到 0.30），"
+                       + "改了令牌就得同时改判据里的说明")
         XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: false), 0, accuracy: 0.0001,
                        "非悬停必须是 0，不是「几乎看不见」的 0.02：常驻淡描边会让 126 格同时开口说话")
         // ③ 只有两档：不许出现第三值（比如按 bucket 分轻重 —— 这张图的信息全在深浅上）。

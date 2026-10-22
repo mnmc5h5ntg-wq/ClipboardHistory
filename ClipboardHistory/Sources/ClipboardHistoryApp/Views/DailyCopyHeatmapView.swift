@@ -274,8 +274,10 @@ struct DailyCopyHeatmapCell: View {
                 // 悬停那一圈只在悬停时出现：常驻描边会让 126 个格子同时开口说话，
                 // 而这张图的信息全在**深浅**上。
                 // 透明度走 `VisualHeat.hoverRingOpacity`：让"这一圈有多重"是一个有名字的数，
-                // 而不是调用点上一个裸的 0.55（R45：它第一次被逐档量之前，
-                // 这个 0.55 凭什么这么定，盘面上没有任何记录）。
+                // 而不是调用点上一个裸字面量（R45：它第一次被逐档量之前，
+                // 那个裸数凭什么这么定，盘面上没有任何记录。R300 又量了一次：
+                // 0.55 时这一圈在最响的一臂上改 75.50/255，而最重的一次数据变化只改 37.33 ⇒
+                // 交互比数据响，于是它被降到 0.30（推导与两条界一起写在令牌那段的注释里）。
                 VisualShape.rounded(VisualRadius.heatCell)
                     .strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity(isHovered: isHovered)),
                                   lineWidth: VisualHeat.hoverStroke)
