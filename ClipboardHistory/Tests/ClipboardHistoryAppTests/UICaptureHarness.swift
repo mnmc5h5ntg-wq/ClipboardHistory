@@ -5958,6 +5958,9 @@ final class UICaptureTests: XCTestCase {
         let x0: Int
         let x1: Int
         var thicknessPx: Int { y1 - y0 + 1 }
+        /// 厚度换算成 pt。R291：判据里几处各自 `Double(thicknessPx) / density` 是同一件事，
+        /// 收成一颗方法，免得某一处忘了除密度（那会把 1pt 的线读成 2px 的"厚带"，分类就翻了）。
+        func thicknessPt(_ density: Double) -> Double { return Double(thicknessPx) / max(density, 1e-9) }
     }
 
     /// 把一张帧切成水平带：只收**同一灰阶的横向跨度 ≥ 半幅**的那些行，再按 y 相邻合并。
@@ -6527,6 +6530,78 @@ final class UICaptureTests: XCTestCase {
                                         + "细线从药丸外面穿出去（改前同一颗尺读到 20.000pt）。"
                                         + "两边都该读 MultiFilePreviewLayout.rowHorizontalInset")
             }
+        }
+        XCTAssertEqual(judged, 2,
+                       "两档里有一档没量到对象（" + declined.joined(separator: "；") + "）⇒ 红话该说尺，不该说产品；"
+                        + "但「没量到」本身也是失败：这条判据没有免检出口")
+    }
+
+    /// 详情区**段落线**的约定（R291 / BACKLOG 337 的第二处）：地板由真产物推。
+    enum SectionRule {
+        /// 段落线两端允许离窗边各差多少。现读：左沿 0.0pt、右沿 720.0pt（亮暗同形）⇒ 差 0；
+        /// 1.0pt 留给半颗像素的取整。这条不是"为了让某台机器变绿"放的。
+        static let edgeTolerancePt: Double = 1.0
+    }
+
+    /// **产品判据**（R291 / BACKLOG 337 的第二处）：详情区头部与内容之间那条段落线必须**跨整幅**，
+    /// 而且不许停在半路上。
+    ///
+    /// 为什么这一条与 R289/R290 那两条方向相反：那两条判的是"线穿过药丸 / 线对齐到一个不存在的轴"，
+    /// 因为**同一块列表里**同时存在两条右边界。这一条判的是另一种约定 —— 段落线属于**面板本身**，
+    /// 它的参照是面板的左右边（现读 0.0 与 720.0，亮暗同形），不是它下面那块内容的内缩。
+    /// 这不是"看起来差不多所以放行"：判据把两端各钉一次，于是任何人把它改成"跟着内容内缩"或
+    /// "只内缩一边"都会红（刀 M850 就是把左端抬进内容内缩，红话里印出差值）。
+    ///
+    /// 同一条判据顺手把**另一种线**分开：行分隔线（左沿 > 0）不参与这里的断言 ——
+    /// 那两条轴由 R289（右端）与 R290（左端）各判一次，这里不重复判（同一件事只判一次）。
+    ///
+    /// 不覆盖管线：读的是渲染产物里的几何。
+    func testDetailSectionRuleSpansTheWholePane() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r291-section-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var declined = [String]()
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let rep = renderFixtureRep("detail-3-files-row0", appearance, scratch) else {
+                declined.append(tag + "(夹具渲染或读回失败 ⇒ 尺没有对象)"); continue
+            }
+            let bytes = Self.buffer(of: rep)
+            let density = Double(rep.pixelsWide) / 720.0
+            let bands = Self.flatBands(bytes: bytes, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                       bytesPerRow: rep.bytesPerRow)
+            let thin = bands.filter { $0.thicknessPt(density) <= RightAxis.hairlineMaxThicknessPt }
+                .sorted { $0.y0 < $1.y0 }
+            // 段落线**按结构认**：详情区从上到下是 头部 → 段落线 → 内容，所以它是这张帧里最靠上的
+            // 那条细线。刻意**不**拿"左沿贴着窗边"当身份 —— 那正是本轮要判的量：第一版用它当身份，
+            // 刀 M850（把左端抬进内容内缩）就报 WRONG_CELL —— 线"消失"了，红话说的是尺，
+            // 而两把刀挤在同一个出口上等于只有一把有牙。
+            guard thin.count >= 2, let line = thin.first else {
+                declined.append(tag + "(细线只数到 " + String(thin.count)
+                                + " 条 ⇒ 尺没有对象：这张帧里没有可比对的线)")
+                continue
+            }
+            let others = Array(thin.dropFirst())
+            judged += 1
+            emit("DETAIL_SECTION_R291 " + tag
+                 + "｜细线总数=" + String(thin.count)
+                 + " 段落线 y=" + String(line.y0)
+                 + " 左=" + String(format: "%.1f", Double(line.x0) / density)
+                 + " 右=" + String(format: "%.1f", (Double(line.x1) + 1.0) / density)
+                 + "｜其余线左=[" + others.map { String(format: "%.1f", Double($0.x0) / density) }
+                    .joined(separator: ",") + "]"
+                 + "｜窗宽=720.0 地板 " + String(format: "%.1f", SectionRule.edgeTolerancePt) + "pt")
+            XCTAssertEqual(Double(line.x0) / density, 0.0, accuracy: SectionRule.edgeTolerancePt,
+                           tag + "：段落线左沿读到 " + String(format: "%.1f", Double(line.x0) / density)
+                            + "pt，不再贴着窗边 ⇒ 它既不是面板的边、也不是内容的边（第三种约定）。"
+                            + "要么改回跨整幅，要么把这条判据连同 337 一起改口")
+            XCTAssertEqual((Double(line.x1) + 1.0) / density, 720.0,
+                           accuracy: SectionRule.edgeTolerancePt,
+                           tag + "：段落线右沿读到 " + String(format: "%.1f", (Double(line.x1) + 1.0) / density)
+                            + "pt，不再贴着窗边 ⇒ 同上")
         }
         XCTAssertEqual(judged, 2,
                        "两档里有一档没量到对象（" + declined.joined(separator: "；") + "）⇒ 红话该说尺，不该说产品；"
