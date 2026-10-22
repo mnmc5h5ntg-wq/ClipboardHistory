@@ -6897,6 +6897,29 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
   不许的做法：把登记值抬高来「容纳」新增的裸 stdout（那等于把规矩换成现状的抄本），
   或者给某个文件开白名单（R55 的 M276 就是白名单腐烂的样子）。
 
+  追记（R303 第一步，**不结案**）：本轮搬走的是这张表里最大的一处 —— `UIInteractionProbeTests.swift`
+  15 行 → 0 行（FOCUS-CHAIN / TAB-KEY-CHAIN / KEYBOARD-UIMODE / AX-VISITED / AX-UNNAMED /
+  FOCUSCHAIN-RING / RINGVIEWS / KEYCHAIN / KEYCHAIN_TREE / KEYCHAIN_FKA / FILTER_FOCUS /
+  FILTER_PILL_FOCUS_UNCOVERED / NOTE 全部改走 `CaptureReadings.emit`）。
+  棘轮跟着降到现读 42（登记值与 `NAMED_UNCOVERED` 同一轮改，两个方向各有刀：M875 / M876）。
+  搬动同时暴露另一件事：按 `print` 写的读数名册会因此瞎掉，M731 先 ESCAPED 后 CAUGHT 才算修好
+  （见 D-284），Swift 那张名册现在按通道读、合计 77 行。
+  剩下的 18 份文件 42 行继续按「一轮搬几份、搬完就降登记值」走，本单不结案。
+
+
+**361. 同一个问题现在有三张名单：脚本电池的派生名册（谁进了通道）、脚本电池的棘轮（还剩几行裸 stdout）、Swift 的按文件读数名册（读数有没有名字）—— 三份都各自对账，但没有一处是另一处的上游（R303 现读）**：
+  本轮把 `UIInteractionProbeTests.swift` 搬进 emit 之后，三张名单各自变红过一次或各自更新过一次：
+  棘轮（登记值 57 → 42）、派生名册（3 → 11 个）、Swift 名册（按 print 改成按通道，合计 77 行）。
+  这不是重复劳动那么简单 —— 它们**口径不同**：派生名册问「这个文件的代码里还有没有裸 stdout」，
+  棘轮问「全仓库还剩几行」，Swift 名册问「这些读数有没有登记过的名字」。三句话都对，
+  但同一次改动要三处手工同步，漏一处就是下一轮的假绿。
+  终点形状（先量再选，别先写门）：① 名字清单做成**一份数据**（按文件 → 按标记 → 行数），
+  Swift 那格与 python 那格都从同一份读；棘轮只是它的一个求和视图；
+  ② 或者明确两张名单的分工并让"漏同步"本身会红：谁没被另一张覆盖到就红（现在靠人记得跑三处）。
+  ① 需要先回答一个未知数：Swift 侧能不能读到 python 侧那张表（跨 target 的文件读法已经用过一次，
+  见 `UICaptureTests` 读仓库源码），② 只需要一条按文件的双向对账。
+  本轮已做的是把三处各自的注释写成「判的是哪一句话」，并把分工写进 D-284。
+
 **359. 一轮的证据目录不是读数汇聚点：`round_verify.sh` 第 3 步只跑 `--filter UICaptureTests`，住在别的判据类里的 marker 永远进不了本轮的 `frames/capture-readings.log`（R301 现读：定向跑 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1 对四件套 HEAT=0 行）**：
   量到的事实：热图悬停那 20 条倍率只在 `/tmp/r301_frames/capture-readings.log` 里，本轮四件套目录 `/tmp/r301_verify/frames/capture-readings.log` 里 HEAT 开头 0 行；
   R300 同形状 ⇒ 结构性缺失，不是这一轮改坏的，也不是 `CaptureReadings` 又漏了（357 那条通道本身是通的）。

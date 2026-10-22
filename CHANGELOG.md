@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R303 / 第 302 轮 / Round 300 · 搬走一批裸 stdout，名册换成按通道读）
+
+360 的第一步：`UIInteractionProbeTests.swift` 的 15 行读数改走 `CaptureReadings.emit`，覆盖率棘轮随之从 57 降到现读 42（登记值与未覆盖名单同一轮改）。三把新刀：M875 把一行改回裸 stdout ⇒ 红在盘上有，M876 把登记值抬到 43 去容纳现状 ⇒ 红在登记值是（R74 的「放宽要成对」在这一格落地），M877 把刚进派生名册的文件删掉 ⇒ 红在未纳管。本轮真正的产出是一次 ESCAPED：`FrameIntervalBudgetTests` 那张 R143 建的读数名册是按「print 加左引号」找读数的，搬动之后刀 M731（把标记 KEYCHAIN_FKA 改名）红不出来 —— 它把读数的名字和读数的通道绑成了一件事。名册因此改成按通道读（该文件现登记 53 行 / 42 种标记，整张表合计 77 行），M731 重跑 CAUGHT（D-284）。同轮还复活的三根哑针：R195 的 M728/M729 与 R196 的 M731 因整行字面量锚点漂了命中 0 次（预检 bad=3），重钉后 `R195_MUTATE 刀=4/4`、`R196_MUTATE 刀=2/2`、`R303_MUTATE 刀=3/3` 三张表全 CAUGHT，预检 bad=0、ARM_TOTAL=746。新开 361（三张名单并存，缺一处上游）。359 本轮重量：四件套取证目录 1158 行里热图 marker 仍 0 行 ⇒ 仍开。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 571 / OK (skipped=4)。
+
 ### Improved（R302 / 第 301 轮 / Round 299 · 读数的两条腿合成一份，覆盖率进电池）
 
 358 结案：`MotionFilmstripTests` 自己那份读数落盘（裸 stdout + FileHandle 追加 + 共享布尔做首次整份重写）删成一层 `CaptureReadings.emit(line, to: readingsURL)` 的壳 —— 被锤过的「按 URL 记首次 + 进程内锁 + 整行一次 write」原来只长在 `CaptureReadings` 那一侧，而这份没锁的实现每天在写动效卷的全部读数（R79 / BACKLOG 112 抓过「后写的把前一份整卷抹掉」）。`TableProbe` 里两处 `NATIVE_PROBE_STATE` 同轮接进同一通道。名册由手挑 3 个名字改成**派生集**（10 个），新卷 `scripts/tests/test_readings_channel_coverage.py` 5 格把覆盖率钉成**双向棘轮**：现读 57 行 = 登记值，变多=新写会死的通道、变少=修好了没重登，两种都红；未覆盖 19 份文件按文件名登记（最大一处 UIInteractionProbeTests.swift 15 行）。刀 M872 / M873 / M874 全 CAUGHT=3/3、RESTORE_CLEAN=yes；R301 被本轮改动弄哑的 M871 重钉后重跑 2/2 CAUGHT（预检 bad=0、ARM_TOTAL=743）。新开 360（剩下的裸 stdout 读数按文件搬进通道）。359 本轮重量：四件套取证目录 1158 行读数里热图 marker 仍 0 行 ⇒ 仍开。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 570 / OK (skipped=4)。

@@ -376,6 +376,40 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 302 轮（R303 · U-992…U-994 · 2026-10-23）：搬走一批裸 stdout，然后被自己搬出来的洞红了一次
+
+- **U-992：360 的第一步落地 —— 探针那一卷 15 行读数从裸 stdout 搬进 `CaptureReadings.emit`，棘轮跟着从 57 降到现读 42。**
+  搬的是 `UIInteractionProbeTests.swift` 里那些**已经被写进过台账**的数（FOCUS-CHAIN / TAB-KEY-CHAIN /
+  KEYBOARD-UIMODE / AX-VISITED / AX-UNNAMED / KEYCHAIN / KEYCHAIN_TREE / KEYCHAIN_FKA /
+  FOCUSCHAIN-RING / RINGVIEWS / FILTER_FOCUS / FILTER_PILL_FOCUS_UNCOVERED / NOTE）。
+  同一轮名册由派生集自动抬到 11 个（这个文件搬完就干净了 ⇒ 必须进名册，不进就红「未纳管」），
+  未覆盖名单里它的 15 行退场。三把刀：M875 把其中一行改回裸 stdout ⇒ 红「盘上有 43 行」；
+  M876 把**登记值本身**抬到 43（模拟拿登记值容纳现状）⇒ 红「登记值是 43」，这是 R74 那条
+  「放宽要成对」在这一格上的落地；M877 把刚进名册的名字删掉 ⇒ 红「未纳管」。刀=3/3 全 CAUGHT、
+  RESTORE_CLEAN=yes。
+- **U-993：本轮最值钱的一格是刀 ESCAPED 出来的 —— 按 print 找读数的名册，被「搬进 emit」这件事弄瞎了。**
+  `FrameIntervalBudgetTests.testProbeFilePrintReadingsAreARosterNotACount`（R143 建）登记的是
+  `UIInteractionProbeTests.swift` 的 print 读数清单。本轮把那 15 行搬走之后，M731（把
+  `KEYCHAIN_FKA` 改名）**真的 ESCAPED 了一次**：读数还在、通道更好了，而那格再也不知道它存不存在 ——
+  因为它把「读数的名字」和「读数的通道」绑成了同一件事。修法不是把刀删掉，是让名册**按通道读**：
+  每个文件登记它现在走哪条腿（搬过的按 `emit("` 数、没搬的按 `print("` 数），并把这张名册的 subject
+  从「这个文件还剩几行没搬」改成「这个文件的读数有没有名字」。现读：这张名册覆盖 8 份文件、
+  合计 77 行，其中探针那份 53 行 / 42 种标记全部登记。M731 重跑 ⇒ CAUGHT（`R196_MUTATE 刀=2/2`）。
+- **U-994：历史 needle 又哑了一批，而且是同一轮里第三次（腐烂的不只是 git 锚点，还有源码字面量锚点）。**
+  把探针那 15 行改走 emit 之后，预检当场报 `bad=3`：R195 的 M728 / M729 与 R196 的 M731 的 needle
+  都写着 `print("FILTER_…` / `print("KEYCHAIN_FKA 开关=` 这种**整行字面量**，源文件一改形状就命中 0 次。
+  这一类不会自己响 —— 刀表会一路报绿而那一把刀从未跑过（DID-NOT-RUN 不是通过）。本轮把三根重钉到
+  当前形状并重跑两张历史表：`R195_MUTATE 刀=4/4`、`R196_MUTATE 刀=2/2`，预检 bad=0、ARM_TOTAL=746。
+  另记一笔**没做完的**：现在有三张「谁还在用 print / 谁的读数有名字」的名单并存（脚本电池的派生名册、
+  脚本电池的棘轮、Swift 的按文件标记名册），分工写在注释里，但合并成一处派生才是终点 —— 新开 361。
+
+本轮产品文件 0 个（Tests / scripts / .scratch），连续零改动 **3** 轮
+（现读 `python3 scripts/product_streak.py --streak-for 302`：as-of 第 302 轮的最后一笔产品提交是
+6ac317f = 第 299 轮，即 R300 的代码半；R301 / R302 / 本轮都只动判据与工具）。
+四件套现读：全量卷 933 用例 / 失败 0、build 告警 0、帧 174 张 compared=174 changed=0、
+dmg=ok、换装 1.4.8。看图腿：本轮没有新帧（产品 0 文件）⇒ 读的是文件里的读数清单与名册行数，
+不是画面；四件套取证目录 1158 行里热图 marker 仍 0 行 ⇒ 359 仍开，没有沿用上一轮的结论。
+
 ## 第 301 轮（R302 · U-989…U-991 · 2026-10-23）：两份「两条腿」合成一份，覆盖率第一次是一个会红的数
 
 - **U-989：358 结案 —— 动效卷那份「两条腿」的重复实现删掉了；这不是整理，是缺陷。**

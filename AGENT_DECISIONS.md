@@ -6331,3 +6331,13 @@ R64 立的规矩是「`UICaptureHarness.swift` 里一行裸 stdout 调用都不�
    Swift 侧那格仍绿，而新卷红在「未纳管=FrameIntervalBudgetTests.swift」——
    一条只有被约束者自己监督的规矩，等于把规矩交给想破它的人（与 D-282 名册不许空转是同族，
    这次补的是「谁来发现名册变短」）。
+**D-284（R303）：读数名册要登记「读数的名字」，不能把「读数的通道」一起绑进去；换通道的那一轮必须同时重量所有按旧通道写的名单。**
+证据是刀而不是形容词：R143 建的 `testProbeFilePrintReadingsAreARosterNotACount` 按 `print("` 找
+`UIInteractionProbeTests.swift` 的读数，本轮把这 15 行搬进 `CaptureReadings.emit` 之后，
+M731（把标记 `KEYCHAIN_FKA` 改名）**先 ESCAPED 后 CAUGHT** —— 同一条断言，在搬动前后对同一种坏的
+可见性变了，因为它问的其实是「有没有一行 print」。修法分两层：① 名册的 subject 换成
+「这个文件的读数清单」，通道由名册自己按文件登记（搬过的按 `emit("` 数，没搬的按 `print("` 数）；
+② 「谁还没搬」这件事交给另一格（脚本电池的派生名册与棘轮），两格各判一句话，不许互相顶。
+同一轮的第二条：needle 用整行字面量做锚点的历史刀表，会在被扫文件改形状时**静默变哑**
+（本轮预检 bad=3：R195 的 M728/M729、R196 的 M731）。规矩因此加一句：改判据代码的那一轮，
+必须跑一次预检并把「哪几根命中 0 次」当成本轮产出，重钉后重跑该表拿到 CAUGHT 才算完。
