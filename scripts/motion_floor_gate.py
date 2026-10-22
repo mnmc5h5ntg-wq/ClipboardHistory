@@ -68,6 +68,8 @@ R2 已经把这件事证伪过一次 —— 同一份代码本机实测跑过 `2
 """
 import argparse
 import json
+import os
+import platform
 import re
 import sys
 
@@ -182,31 +184,68 @@ def parse(text: str) -> dict:
     }
 
 
-def suite_verdicts(facts: dict, expectations: dict) -> list:
-    """这一卷有没有红用例、红的那条登记过没有（R66 / BACKLOG 100）。
+def machine_key(overrides=None) -> str:
+    """这台机器的键 —— 与 `test_surface_left_axes.machine_key()` 同一套约定，不另发明一种。
+
+    R305 / BACKLOG 354 的②：动效那一卷的红是**按机器**登记的（runner 上会红的两朵，
+    在本机一次都没红过），所以登记必须切片到机器，否则「在 runner 上登记过」会变成
+    本机那朵新红的免检牌（254/255 那一族：同版两跑自己变，红的是那台机器）。
+    """
+    env = os.environ if overrides is None else overrides
+    explicit = env.get("MOTION_FLOOR_MACHINE_KEY")
+    if explicit:
+        return explicit
+    if env.get("GITHUB_ACTIONS", "").lower() in ("1", "true"):
+        return "github-runner"
+    return "local:" + platform.node()
+
+
+def suite_verdicts(facts: dict, expectations: dict, machine=None) -> list:
+    """这一卷有没有红用例、红的那条**在这台机器上**登记过没有（R66 / BACKLOG 100 / 354②）。
 
     单独成一个函数而不是塞进 `verdicts`：`verdicts` 有两处提前 `return`
     （`executed==0` 与"没有结论行"），而红用例**恰恰常和"没有结论行"同时发生** ——
     判据自己崩了才会既没读数又红。放在前面又会被那两处 return 吃掉，所以由调用方
     在两个提前 return 之前先取走这一段。
+
+    R305 起这张表是**按机器切片**的：`machine` 缺失 ⇒ 读环境的键；
+    一条登记没有 `machine` ⇒ 红（`SUITE_UNSCOPED`，跨机免检就是它要拦的），
+    一条登记属于另一台机器 ⇒ **不顶本机那份免检**（照旧红，并另打一行说它在别处登记过）。
     """
+    if machine is None:
+        machine = machine_key()
     registry = {}
+    unscoped = []
     for entry in expectations.get("suite_reds", []):
         name = entry.get("test")
-        if name:
-            registry[name] = entry
+        if not name:
+            continue
+        if not entry.get("machine"):
+            unscoped.append(name)
+            continue
+        registry.setdefault(entry["machine"], {})[name] = entry
+    mine = registry.get(machine, {})
+    elsewhere = dict((name, entry)
+                     for other, table in registry.items() if other != machine
+                     for name, entry in table.items())
     named = facts["failures"]
     messages = facts["failure_messages"]
     summary = facts["summary_failures"]
     out = []
 
+    if unscoped:
+        out.append(("MOTION_FLOOR_SUITE_UNSCOPED=%d" % len(unscoped),
+                    "`suite_reds` 里有 %d 条**没有机器键**（%s）⇒ 登记必须写明它免的是哪一台的检，"
+                    "没有机器键的登记等于对所有人免检（354②：那两朵红只在 runner 上出现过）"
+                    % (len(unscoped), ", ".join(sorted(unscoped))), True))
+
     if not named and summary == 0:
         out.append(("MOTION_FLOOR_SUITE_CLEAN=0",
-                    "这一卷没有红用例（汇总行也没说有）", False))
+                    "这一卷没有红用例（汇总行也没说有）｜机器=%s" % machine, False))
         return out
 
-    unregistered = [name for name in named if name not in registry]
-    registered = [name for name in named if name in registry]
+    unregistered = [name for name in named if name not in mine]
+    registered = [name for name in named if name in mine]
 
     def describe(name: str) -> str:
         reason = messages.get(name)
@@ -214,15 +253,24 @@ def suite_verdicts(facts: dict, expectations: dict) -> list:
 
     if unregistered:
         out.append(("MOTION_FLOOR_SUITE_RED=%d" % len(unregistered),
-                    "动效这一卷有未登记的红用例 ⇒ 红必须有名字，也要有人负责：%s"
-                    % " | ".join(describe(name) for name in unregistered), True))
+                    "动效这一卷在机器 %s 上有未登记的红用例 ⇒ 红必须有名字，也要有人负责：%s"
+                    % (machine, " | ".join(describe(name) for name in unregistered)), True))
     if registered:
         out.append(("MOTION_FLOOR_REGISTERED_REDS=%d" % len(registered),
-                    "这些红用例在 `suite_reds` 里登记过，不挡发布，但它们**仍然是红**：%s"
-                    % " | ".join("%s（登记于 run %s，见 %s）"
-                                 % (name, registry[name].get("registered_run", "?"),
-                                    registry[name].get("points_to", "?"))
-                                 for name in registered), False))
+                    "这些红用例在**这台机器（%s）**的登记之内，不挡发布，但它们**仍然是红**：%s"
+                    % (machine, " | ".join(
+                        "%s（机器=%s，登记于 run %s，见 %s）"
+                        % (name, mine[name].get("machine", "?"),
+                           mine[name].get("registered_run", "?"),
+                           mine[name].get("points_to", "?"))
+                        for name in registered)), False))
+    shadowed = [name for name in unregistered if name in elsewhere]
+    if shadowed:
+        out.append(("MOTION_FLOOR_REGISTERED_ELSEWHERE=%d" % len(shadowed),
+                    "%s 只在别的机器上登记过（%s）⇒ **本机这条红不被那份登记顶掉**："
+                    "登记是按机器切的，不是全局免检牌（354②）"
+                    % (", ".join(sorted(shadowed)),
+                       ", ".join(sorted(set(elsewhere[n]["machine"] for n in shadowed)))), False))
     attributable = max(facts.get("failure_lines", 0), len(named))
     if summary > attributable:
         out.append(("MOTION_FLOOR_SUITE_NAMELESS_RED=%d" % (summary - attributable),
@@ -231,11 +279,11 @@ def suite_verdicts(facts: dict, expectations: dict) -> list:
                     "而它今天最可能的成因是 stdout 成块丢（R64）—— 那就是为什么结论必须同时进文件通道。"
                     "比较的两边同为**失败行数**：一条用例里两句断言一起红不算'没名字'（R83）"
                     % (summary, attributable, len(named)), True))
-    stale = [name for name in sorted(registry) if name not in named]
+    stale = [name for name in sorted(mine) if name not in named]
     for name in stale:
         out.append(("MOTION_FLOOR_SUITE_STALE",
-                    "%s 登记在 `suite_reds` 里，这次**没有**再红 ⇒ 这是好消息，"
-                    "把登记表里这一条删掉（留着它，登记就慢慢变成免检牌堆）" % name, False))
+                    "%s 登记在机器 %s 的 `suite_reds` 里，这次**没有**再红 ⇒ 这是好消息，"
+                    "把登记表里这一条删掉（留着它，登记就慢慢变成免检牌堆）" % (name, machine), False))
     return out
 
 
@@ -293,7 +341,7 @@ def loop_verdicts(text: str, expectations: dict) -> list:
     return out
 
 
-def verdicts(facts: dict, expectations: dict) -> list:
+def verdicts(facts: dict, expectations: dict, machine=None) -> list:
     """返回 [(标记, 消息, 是否红)]。全绿时只有一条 OK。"""
     arms = expectations.get("arms", {})
     scenarios = expectations.get("scenarios", [])
@@ -311,7 +359,7 @@ def verdicts(facts: dict, expectations: dict) -> list:
     # R66：用例级的红排在**所有提前 return 之前**。"没有结论行"与"有红用例"经常是同一件事
     # 的两个症状（判据自己崩了），而旧版在这里 return 之后什么都不再说 ——
     # 那正好把这一轮要修的那个洞又挖了一遍。
-    out.extend(suite_verdicts(facts, expectations))
+    out.extend(suite_verdicts(facts, expectations, machine=machine))
 
     if facts["judged"] is None:
         out.append(("MOTION_FLOOR_NO_RESOLVE",
@@ -415,13 +463,17 @@ def main(argv=None) -> int:
         return 2
 
     facts = parse(text)
+    # `machine=` 刻意打在**行尾**：`scripts/tests/test_ci_report_selftest.py` 钉的是
+    # `MOTION_FLOOR_FACTS judged=2/4` 这种"前缀紧挨着被判的那个量"的子串（CI 的 report-only 契约），
+    # 把新键插在 judged 前面会让那三格一起红 —— 那是把契约测试弄坏，不是把它证伪（R223 一批：
+    # 变异表与源码是同一份契约，改源码当轮要把锚点改到还能跑；这里选择**不打断已登记的形状**）。
     print("MOTION_FLOOR_FACTS judged=%s/%s executed=%d not-run=%s summary=%s "
-          "红的用例=%s 汇总行报红=%d"
+          "红的用例=%s 汇总行报红=%d 机器=%s"
           % (facts["judged"], facts["total"], facts["executed"],
              ",".join(sorted(facts["not_run"])) or "-",
              " ".join("%s=%d" % pair for pair in sorted(facts["summary_arms"].items())),
              ",".join(facts["failures"]) or "-",
-             facts["summary_failures"]))
+             facts["summary_failures"], machine_key()))
     results = verdicts(facts, expectations)
     reds = 0
     for marker, message, is_red in results:

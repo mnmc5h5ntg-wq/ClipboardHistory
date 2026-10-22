@@ -38,7 +38,7 @@ import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
 
-from scripts.motion_floor_gate import main, parse, verdicts
+from scripts.motion_floor_gate import main, parse, suite_verdicts, verdicts
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "r46_motion_local.log"
 HEADER_LINES = [line for line in FIXTURE.read_text(encoding="utf-8").splitlines()
@@ -52,6 +52,26 @@ RUNNER_SILENT_LOG = "\n".join(line for line in SILENT_FIXTURE.read_text(encoding
 
 EXPECTATIONS_PATH = Path(__file__).resolve().parents[2] / "scripts" / "motion_floor_expectations.json"
 EXPECTATIONS = json.loads(EXPECTATIONS_PATH.read_text(encoding="utf-8"))
+
+ROOT = Path(__file__).resolve().parents[2]
+MOTION_SOURCE = (ROOT / "ClipboardHistory" / "Tests" / "ClipboardHistoryAppTests"
+                 / "MotionFilmstripTests.swift")
+BACKLOG_TEXT = (ROOT / "AGENT_BACKLOG.md").read_text(encoding="utf-8")
+
+
+def _machine_here():
+    """测试用的本机键 —— 与闸门同一个估计量，但显式钉住，不跟着 CI 环境翻面。
+
+    电池在 runner 上跑时 `machine_key()` 会返回 github-runner，那正好是登记表里那两条的机器，
+    于是『本机不许预先登记』那一格会自己变红。所以这里按**跑在哪**取，但把 CI 那种情形排除掉：
+    判『这台机器』的格一律用显式键，判**活账**的格用 github-runner（登记本来就属于它）。
+    """
+    from scripts.motion_floor_gate import machine_key
+    key = machine_key()
+    return key if key != "github-runner" else "local:test-box"
+
+
+HERE = _machine_here()
 
 SUMMARY = "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 detail-kind-change=3 empty-state=4"
 EXECUTED = "\t Executed 24 tests, with 5 tests skipped and 0 failures (0 unexpected) in 76.171 seconds"
@@ -477,6 +497,8 @@ class MotionFloorGateTests(unittest.TestCase):
 
 
 class MotionSuiteRedTests(unittest.TestCase):
+
+    RED_NAME = "testListRowsDoNotAnimateAndNothingClaimsTheyDo"
     """R66 / BACKLOG 100：**这一卷有没有红用例**，与"读数形状对不对"是两层判据。
 
     正对照是 runner 上真实红过两次的那一卷（`fixtures/r66_motion_runner_red.log`，
@@ -560,11 +582,12 @@ class MotionSuiteRedTests(unittest.TestCase):
         registry = dict(EXPECTATIONS)
         registry["suite_reds"] = [{
             "test": "testListRowsDoNotAnimateAndNothingClaimsTheyDo",
+            "machine": HERE,
             "reason": "合成：登记过的机器差异",
             "registered_run": "38696695788",
             "points_to": "BACKLOG 100",
         }]
-        marks = verdicts(self.facts, registry)
+        marks = verdicts(self.facts, registry, machine=HERE)
         self.assertEqual([m for m, _, red in marks if red], [],
                          "登记过之后还挡发布 ⇒ 登记就成了假动作，下一步就是有人删闸门")
         printed = dict((m, msg) for m, msg, _ in marks)
@@ -575,9 +598,9 @@ class MotionSuiteRedTests(unittest.TestCase):
 
     def testRegisteredRedThatStoppedFiringIsPrinted(self):
         registry = dict(EXPECTATIONS)
-        registry["suite_reds"] = [{"test": "testSomethingLongFixed", "registered_run": "1",
-                                   "points_to": "BACKLOG 0"}]
-        marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, registry))
+        registry["suite_reds"] = [{"test": "testSomethingLongFixed", "machine": HERE,
+                                   "registered_run": "1", "points_to": "BACKLOG 0"}]
+        marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, registry, machine=HERE))
         self.assertIn("MOTION_FLOOR_SUITE_STALE", marks)
         self.assertFalse(marks["MOTION_FLOOR_SUITE_STALE"][1],
                          "不再复现的登记条目红一次没用 —— 只会逼人把整层闸门删掉（R39 那一族）")
@@ -665,13 +688,124 @@ class MotionSuiteRedTests(unittest.TestCase):
         self.assertNotIn("MOTION_FLOOR_SUITE_CLEAN=0", marks,
                          "没跑完的一卷被说成'没有红用例' ⇒ 那是把缺席当证据（D-055 那一族）")
 
-    def testRegistryIsEmptyOnPurposeAndEntriesNeedProvenance(self):
-        """今天的 `suite_reds` 必须是空的，而且不许有人往里面塞没出处的条目。"""
-        self.assertEqual(EXPECTATIONS["suite_reds"], [],
-                         "登记表非空 ⇒ CI 的绿有一部分是登记来的。要么修判据，"
-                         "要么在账本里写清这条为什么今天只能登记（BACKLOG 49）")
-        for name in ("suite_reds", "arms", "scenarios", "thin_warnings"):
-            self.assertIn(name, EXPECTATIONS, "闸门读的键被改名了：%s" % name)
+    def testTheTwoLiveRegistrationsActuallyWorkOnTheirOwnMachine(self):
+        """登记不是装饰品：在那台机器上，那两朵红应当从 SUITE_RED 变成 REGISTERED_REDS。
+
+        用的是**活账**（`EXPECTATIONS["suite_reds"]`）而不是合成表，所以它同时是那条
+        「条目必须带机器键 + 真 run 号 + 判据还存在」的下游证人 —— 上游改了名字而这里没改，
+        两格会一起红（一格说名字不存在，一格说红没被顶住）。
+        """
+        live = EXPECTATIONS["suite_reds"]
+        names = [e["test"] for e in live]
+        machines = set(e["machine"] for e in live)
+        self.assertEqual(1, len(machines), u"本轮的登记应当只属于一台机器，读到 %s" % machines)
+        facts = dict(self.facts)
+        facts["failures"] = names
+        facts["summary_failures"] = len(names)
+        facts["failure_lines"] = len(names)
+        marks = dict((m, (msg, red)) for m, msg, red in suite_verdicts(facts, EXPECTATIONS,
+                                                                      machine=live[0]["machine"]))
+        self.assertNotIn("MOTION_FLOOR_SUITE_RED=%d" % len(names), marks,
+                         u"在自己那台机器上，登记之内的红仍然挡发布 ⇒ 登记是装饰品：%s" % marks)
+        printed = marks["MOTION_FLOOR_REGISTERED_REDS=%d" % len(names)][0]
+        for name in names:
+            self.assertIn(name, printed)
+        self.assertIn(live[0]["registered_run"], printed, u"红话没打印 run 号")
+        self.assertIn(live[0]["machine"], printed, u"红话没打印机器键（354② 要求的就是这一格）")
+
+    def testLiveRegistryIsMachineScopedWithRealProvenance(self):
+        """R305 / 354② 换掉的旧契约：这张表从前「必须一直是空的」，现在是**空的没有牙、
+        非空的必须有机器键 + 真 run 号 + 还没关的单子 + 判据真的存在**。
+
+        为什么允许它非空：那两朵红在 runner 上出现过、在本机同码从没出现过（出现率 1/17 与 1/7，
+        见 354①）。旧写法只有两条路 —— 每轮重读一次单跑，或者把它删了当没发生；
+        登记成有名字的未覆盖是第三条，前提是它**切片到机器**并且**能退场**。
+        """
+        entries = EXPECTATIONS["suite_reds"]
+        self.assertTrue(entries, u"登记表又空了 ⇒ 要么 354 结案了（那就连本单一起收，别只删条目），"
+                                 u"要么有人拿『表必须是空的』当挡箭牌把登记改回每轮重读")
+        source = MOTION_SOURCE.read_text(encoding="utf-8")
+        for entry in entries:
+            for key in ("test", "machine", "reason", "registered_run", "points_to"):
+                self.assertIn(key, entry, u"登记条目缺字段 %s：%s" % (key, entry.get("test")))
+            self.assertTrue(entry["registered_run"].isdigit() and len(entry["registered_run"]) >= 8,
+                            u"registered_run 必须是真 run 号（%r）⇒ 没有出处的登记是一行随时可以编的借口"
+                            % entry["registered_run"])
+            self.assertRegex(entry["points_to"], r"BACKLOG \d+",
+                             u"points_to 必须指着一个条目号（%r）" % entry["points_to"])
+            item = entry["points_to"].split()[-1]
+            self.assertIn(u"**%s. " % item, BACKLOG_TEXT,
+                          u"登记指着 BACKLOG %s，而那一条不在台账里 ⇒ 登记成了无主的免检" % item)
+            self.assertIn(u"func %s(" % entry["test"], source,
+                          u"登记的用例 %s 在 %s 里已经不存在 ⇒ 这是**已退场的登记**，删掉它"
+                          % (entry["test"], os.path.relpath(str(MOTION_SOURCE), ROOT)))
+            self.assertNotIn(HERE, {entry["machine"]},
+                             u"本机的红不许预先登记（现在登记等于今天就把这朵红免检）：%r" % entry)
+
+    def testRegistrationForAnotherMachineDoesNotExcuseThisOne(self):
+        """正对照：同一条红、同一份登记，只是属于**另一台机器** ⇒ 本机照旧红，并说明它在别处登记过。
+
+        这一格是 354② 的全部要点。少了它，「runner 上登记过」就会变成一张跨机免检牌 ——
+        而 254/255 那一族说得很清楚：红的是那台机器今天的采样，本机的同码今天不红。
+        """
+        registry = dict(EXPECTATIONS)
+        other = u"github-runner" if HERE != u"github-runner" else u"local:some-other-box"
+        registry["suite_reds"] = [{"test": self.RED_NAME, "machine": other,
+                                   "reason": u"合成：只在另一台机器上登记过",
+                                   "registered_run": "39795800668", "points_to": "BACKLOG 354"}]
+        marks = dict((m, (msg, red)) for m, msg, red in suite_verdicts(self.facts, registry, machine=HERE))
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks,
+                      u"别的机器的登记顶掉了本机的红 ⇒ 切片没生效（本机键=%s）" % HERE)
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_RED=1"][1])
+        self.assertNotIn("MOTION_FLOOR_REGISTERED_REDS=1", marks,
+                         u"本机没登记过却被算成『登记内的红』")
+        elsewhere = marks.get("MOTION_FLOOR_REGISTERED_ELSEWHERE=1")
+        self.assertIsNotNone(elsewhere,
+                             u"跨机那条登记什么都没说不就丢了吗：要打印的是『它在 %s 上登记过』" % other)
+        self.assertIn(other, elsewhere[0], u" REGISTERED_ELSEWHERE 没打印那台机器的键")
+        self.assertFalse(elsewhere[1], u"『别处登记过』这一行本身不许红 —— 红的是 SUITE_RED 那一格")
+
+    def testCrossMachineShadowIsPrintedSoSomebodySeesIt(self):
+        """跨机那条不红的读数也要能被看见：REGISTERED_ELSEWHERE 打出来的是**哪台机器**登记过。"""
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = [{"test": self.RED_NAME, "machine": u"github-runner",
+                                   "reason": u"合成", "registered_run": "39795800668",
+                                   "points_to": "BACKLOG 354"}]
+        marks = dict((m, msg) for m, msg, _ in suite_verdicts(self.facts, registry,
+                                                              machine=u"local:this-box"))
+        self.assertIn("MOTION_FLOOR_REGISTERED_ELSEWHERE=1", marks)
+        self.assertIn(u"github-runner", marks["MOTION_FLOOR_REGISTERED_ELSEWHERE=1"],
+                      u"红话没打印键 ⇒ 有人看见 SUITE_RED 也不知道它其实别处登记过")
+        self.assertIn(u"local:this-box", marks["MOTION_FLOOR_SUITE_RED=1"],
+                      u"本机的红话要带上本机键（354② 要求『红话打印键』）")
+
+    def testEntryWithoutMachineKeyIsRedNotSilentlyGlobal(self):
+        """没有机器键的登记 = 对所有人免检 ⇒ 红，不许读成『那条登记适用于每台机器』。"""
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = [{"test": self.RED_NAME, "reason": u"合成：忘了写机器",
+                                   "registered_run": "1", "points_to": "BACKLOG 354"}]
+        marks = dict((m, (msg, red)) for m, msg, red in suite_verdicts(self.facts, registry, machine=HERE))
+        self.assertIn("MOTION_FLOOR_SUITE_UNSCOPED=1", marks)
+        self.assertTrue(marks["MOTION_FLOOR_SUITE_UNSCOPED=1"][1])
+        self.assertIn("MOTION_FLOOR_SUITE_RED=1", marks,
+                      u"缺机器键的条目被当成全局免检 ⇒ 红同时还得照旧红")
+
+    def testStaleNoticeOnlyCountsThisMachinesEntries(self):
+        """退场提示按机器切：另一台机器那条**这次没红**不许在本机喊『删掉它』。
+
+        不切就会这样：本机跑一次 ⇒ 提示删掉 runner 的登记，而那条登记在 runner 上仍然会红；
+        这是『在错的机器上退场』，比不退场更坏。
+        """
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = [{"test": u"testSomethingLongFixed", "machine": u"github-runner",
+                                   "reason": u"合成", "registered_run": "1", "points_to": "BACKLOG 354"}]
+        marks = dict((m, (msg, red)) for m, msg, red in suite_verdicts(self.facts, registry, machine=HERE))
+        self.assertNotIn("MOTION_FLOOR_SUITE_STALE", marks,
+                         u"本机替 runner 退场 ⇒ 那条登记在 runner 上还有用")
+        marks2 = dict((m, (msg, red)) for m, msg, red in suite_verdicts(
+            self.facts, registry, machine=u"github-runner"))
+        self.assertIn("MOTION_FLOOR_SUITE_STALE", marks2,
+                      u"在真正登记的那台机器上也不喊退场 ⇒ 登记就变成永久免检牌堆")
 
     def testGateExitCodeIsOneOnTheRealRunnerRed(self):
         with tempfile.TemporaryDirectory() as folder:

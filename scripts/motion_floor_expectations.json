@@ -63,13 +63,28 @@
     "   \"registered_run\": \"38696695788\", \"points_to\": \"BACKLOG 100\"}",
     "`registered_run` 必须是**真的 run 号**（没有它，登记就成了一行随时可以编的借口），",
     "`points_to` 必须指着一个还没关的条目（登记是欠账，不是决定）。",
-    "**这张表现在是空的，而且它应该一直是空的**：R66 把上面那条红的成因查清了",
+    "R305 / BACKLOG 354 的②：每条登记多了一个 **machine** 键，闸门只认**这台机器**的那几条 —— 那两朵红只在 runner 上出现过（本机同码不红），所以「在 runner 上登记过」不许顶掉本机的红；没有 machine 的条目直接红（MOTION_FLOOR_SUITE_UNSCOPED），跨机登记会在日志里打一行 MOTION_FLOOR_REGISTERED_ELSEWHERE 但仍红。R66 那句「这张表应该一直是空的」到此作废，但它换成了有牙的形状：条目必须带机器键 + 真 run 号 + 指着还没关的单子，而这次没红的那条会打 MOTION_FLOOR_SUITE_STALE 要你删（`scripts/tests/test_motion_floor_gate.py` 逐格钉）。",
     "（淡入时钟探针 `FadeClockProbe`：本机 跨度=1.000 中间态帧数=10 ⇒ 证人能分辨，",
     "而 runner 的读数由下一次 CI 自己回答），所以正确处置是修判据，不是登记。",
     "如果哪天这里多了条目，`MOTION_FLOOR_REGISTERED_REDS=n` 会在日志里把 n 打出来 ——",
     "「靠登记过的绿」必须数得出来（BACKLOG 49）。"
   ],
-  "suite_reds": [],
+  "suite_reds": [
+    {
+      "test": "testNativeRowMoveIsVisibleToTheRuler",
+      "machine": "github-runner",
+      "reason": "runner 上这一臂的两条腿读出同一个形状（开 1 帧/峰值 0.053、关 1 帧/峰值 0.053）⇒ 判据判的是『这次 moveRow 是瞬移』，而它吃的就是帧数；本机同码不红（1/17 的出现率见 354①）。登记不等于放行：地板 3 帧一条不放宽（D-251：单遍 runner 读数既不配给产品定罪，也不配替产品脱罪），要修的是判据不吃采样这件事（BACKLOG 77 路 b / 354③ 的 MOTION_BAND_INTERVAL 读数）。",
+      "registered_run": "39795800668",
+      "points_to": "BACKLOG 354"
+    },
+    {
+      "test": "testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt",
+      "machine": "github-runner",
+      "reason": "同一次 runner 跑里那条 XCTAssertGreaterThanOrEqual 读到 2 < 3（变化段只剩两帧），而同一份 Swift 代码的早一跑整跑绿 ⇒ 红的是那台机器今天的采样，不是产品今天变了（254/255 那一族）。出现率 1/7（另一棵树分组的读数，见 354①）。同样不放宽地板。",
+      "registered_run": "39795800668",
+      "points_to": "BACKLOG 354"
+    }
+  ],
   "loops": [
     {
       "name": "skeleton-loop",

@@ -161,9 +161,14 @@ BACKLOG = REPO / "AGENT_BACKLOG.md"
 ITEM = re.compile(r"^(?:\*\*)?(\d{3})\. ", re.M)   # R239：标题形 ∪ 粗体形（一支正则两种形状）
 ITEM_HEADING_ONLY = re.compile(r"^(\d{3})\. ", re.M)   # 老字面，只当对照用
 ITEM_BOLD = re.compile(r"^\*\*(\d{3})\. ", re.M)      # 新认的那一半，也只当对照用
-U_DEF = re.compile(r"^- \*\*U-(\d{3})", re.M)
+# R305 的边界轮：下一节要写 U-1000，四位数。
+# 原来这两支只认三位 ⇒ 到 1000 那天，标题里的区间**匹配不到**（`missing_in_declared_u_range`
+# 直接返回 None = "形状变了"，那一格从此对最新一节静默），而定义行一支也数不到 ⇒
+# 「声明 3 条就要有 3 条定义行」那格会报"样本不够"。两种收场都不是"当场红给我看"，
+# 而是静默降级 —— 所以 widening 要配一格**四位数正对照**（下面 test_the_u_patterns_learn_the_four_digit_boundary）。
+U_DEF = re.compile(r"^- \*\*U-(\d{3,4})", re.M)
 # 轮次标题里声明的区间：`U-290…U-299`（省略号是 U+2026，不是三个点）。
-U_RANGE = re.compile(r"U-(\d{3})…U-(\d{3})")
+U_RANGE = re.compile(r"U-(\d{3,4})…U-(\d{3,4})")
 
 
 def newest_section(text):
@@ -448,3 +453,59 @@ class BacklogItemShapeTests(unittest.TestCase):
             after = backlog_items(forged)
             self.assertEqual([victim], sorted({n for n in after if after.count(n) > 1}, key=int),
                              "%s 造出一个重复号而守卫没只抓到它" % shape)
+
+
+class FourDigitUIdBoundaryTests(unittest.TestCase):
+    """R305 是边界轮：下一节的编号从三位变四位（U-999 之后是 U-1000），而这两支尺原本只认三位。
+
+    为什么现在就把这一格写下来，而不是等 1000 那天再说：三位假设坏掉的形状**不是红**，是**静默降级** ——
+    `U_RANGE` 匹配不到标题 ⇒ `missing_in_declared_u_range()` 返回 None，而调用方把 None 读成
+    「这一节没有区间这种形状」，不报错；`U_DEF` 一条也数不到 ⇒ 「声明几条就要有几条定义行」只会说样本不够。
+    当天最可能的收场是我照着消息去改台账，而不是去改尺子（R289 一批：钉死前先读历史形状）。
+    """
+
+    SECTION = (u"## 第 999 轮（R999 · U-1000…U-1002 · 2031-01-01）：边界\n"
+               u"- **U-1000：甲**\n"
+               u"- **U-1001：乙**\n"
+               u"- **U-1002：丙**\n")
+
+    def ui_text(self):
+        return (REPO / "AGENT_UI_AUDIT.md").read_text(encoding="utf-8")
+
+    def test_four_digit_range_and_definitions_are_recognised(self):
+        self.assertIsNotNone(U_RANGE.search(self.SECTION),
+                             u"四位区间匹配不到 ⇒ 这一节的对账会被静默跳过")
+        self.assertEqual(3, len(U_DEF.findall(self.SECTION)),
+                         u"四位定义行数不到 ⇒ 「声明几条=定义几条」那一格会报样本不够")
+        self.assertEqual([], missing_in_declared_u_range(self.SECTION),
+                         u"三条定义行都在却被报成缺 ⇒ 抬宽之后比较的两边不同格式")
+
+    def test_a_missing_four_digit_definition_is_still_named(self):
+        """抬宽之后**还要有牙**：删掉中间那条定义行，必须正好点到 U-1001。"""
+        section = u"\n".join(line for line in self.SECTION.splitlines()
+                             if not line.startswith(u"- **U-1001"))
+        self.assertEqual([u"U-1001"], missing_in_declared_u_range(section),
+                         u"缺一条四位定义行而守卫没点名 ⇒ 它其实没在看这一节")
+
+    def test_the_crossing_is_visible_to_both_rulers(self):
+        """越界前后都要能判：几位数由账说了算，而**最新那一节必须被两支尺看到**。
+
+        这一格换过写法，而且是被自己逼的：原来它断言「现读最大仍是三位」，
+        本轮台账一落 U-1002 它就当场红。红得有道理 —— 它的前提过期了 ——
+        但正确的修法不是删断言，而是换成一个**跨界成立**的判据：
+        不管最大号是几位，最新一节都要被 `U_RANGE` 认到区间、被 `U_DEF` 数到至少三条定义行，
+        并且区间与定义完全吻合。位数本身只打成一行读数，不当判据。
+        """
+        text = self.ui_text()
+        ids = [int(x) for x in U_DEF.findall(text)]
+        self.assertTrue(ids, u"一条 U 定义行都没读到 ⇒ 正则或这份台账的形状漂了")
+        sec = newest_section(text)
+        self.assertIsNotNone(U_RANGE.search(sec),
+                             u"最新一节的标题区间匹配不到 ⇒ 对账会被静默跳过（现读最大 U-%d）" % max(ids))
+        self.assertEqual([], sorted(missing_in_declared_u_range(sec)),
+                         u"最新一节的区间与定义不吻合（现读最大 U-%d）" % max(ids))
+        newest = U_DEF.findall(sec)
+        self.assertGreaterEqual(len(newest), 3,
+                                u"最新一节只数到 %d 条定义行 ⇒ 正对照本来就是空的" % len(newest))
+        print(u"U_ID_BOUNDARY 现读最大=U-%d 位数=%d 最新一节定义行=%d"
+              % (max(ids), len(str(max(ids))), len(newest)))
