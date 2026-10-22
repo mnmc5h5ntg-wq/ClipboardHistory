@@ -12,6 +12,38 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R305 状态（第 304 轮 / Round 302 · 2026-10-23）
+
+⓪ 读 CI（R306 的开场取数，只登记不轮询 = R140，并按 362 的写法**只列每次 push 的 tip**）：成对号按 362 的写法现读（只列每次 push 的 **tip**，逐笔按 `actions/runs?head_sha=` 查）：`91ff498`（R304 的账半，tip）→ 39833209888 / completed / **success**，其中 STEP[19] Motion coverage floor 现读 `MOTION_FLOOR_SUITE_CLEAN=0`、`红的用例=-`、`MOTION_FLOOR_REDS=0` ⇒ 354 那两朵红**这一跑根本没出现**（与出现率 1/17 一致），所以这一跑只能证明「登记没把别的东西弄红」，**不能替登记本身作证** —— 登记的证人是它下一次真的红在 `MOTION_FLOOR_REGISTERED_REDS=2` 那一跑；`e9647ed`（R304 的代码半）→ **total_count=0**（push 边界，从来没有 run，不再记未读）；R304 交账的 `811c4fc` 那朵 STEP[18] `NOW_RUNS` 已按点名翻 can，并被本次 success 复验（探针那一步不再红）。本轮两笔由 R306 现取
+要验的三件事：① STEP[18] On-screen probe coverage floor 那朵 `NOW_RUNS` 在名册翻回 can 之后是否不再红
+（`811c4fc` 那一跑的答案见 R304 的 ⓪，本轮已交账）；
+② **STEP[19] Motion coverage floor** 那两朵红在机器切片之后应当变成
+`MOTION_FLOOR_REGISTERED_REDS=2` 且退出码 0 —— 这是本轮修法唯一真正的证人，本机签不了这一半；
+若它仍然红在 `SUITE_RED`，那说明 runner 上报的机器键与 `github-runner` 不一致（读 FACTS 行尾的「机器=」）；
+③ 登记里那两个用例名在 runner 上是否**存在**（名字与源码对账由本机那格判，跨机存在性只有 runner 能说）。
+
+最后更新：2026-10-23（本地 · R305 / 第 304 轮 / Round 302）：**354 的第二步结案到「登记做成」这一层** ——
+`motion_floor_gate.py` 的用例级登记按机器切片，2 条只属于 github-runner；缺键红、跨机不顶检、退场按机器切，
+刀 M880/M881 各钉一侧、2/2 CAUGHT、RESTORE_CLEAN=yes；闸门卷 44 格（含读活账那一格）。
+编号越界先把尺抬宽：`U_DEF` / `U_RANGE` `\d{3}` → `\d{3,4}` + 三格对照（D / BACKLOG 号同形，新开 363）。
+四件套沿用 R304 那笔的现读（本轮 0 个 Swift 文件）：告警 0、全量卷 933/失败 0、
+帧 174 changed=0、dmg=ok、换装 1.4.8；看图腿与换装本机 **NOT-RUN**（没测，不是没变）。
+预检 tables=99 arms=750 bad=0；占位符扫描 7 本 stray=0；电池 Ran 586 / OK (skipped=4)。
+产品文件 0 个，连续零改动 **5** 轮（现读 `python3 scripts/product_streak.py --streak-for 304`：
+as-of 第 304 轮的最后一笔产品提交是 6ac317f = 第 299 轮，即 R300 的代码半）。
+
+① 下一轮（R306）的靶：**354 的第三步** —— 等 runner 自己说这两条现在不红（② 那一格），
+若两跑同现就先读 `MOTION_BAND_INTERVAL` 在负载下的数再谈判据；顺带 360 的第三批与 363（编号尺剩下两处三位假设）。
+产品面：347 / 305 仍挡在用户那一边（要退出 App，或回答一句「收藏星按下够不够明显」）。
+
+② 仍开：347（真机证人）、305（等 347）、354 的第三步（负载下的调度地板读数）、
+363（D / BACKLOG 号的三位假设）、360（已搬两批）、361（同步点已数出，尚未合并）、
+359（取证目录没有读数汇聚点）、362（⓪ 的成对号按 commit 列；本轮量到 3 笔根本没有 run）、
+356（悬停换形状的三条候选）、348 的「数字对不对」那一格、349、350 第二步、351、344、
+341 的 CI 契约半、339、312 具名出口、333、335、334、310、338 的另一半、328、323、322、317、304、291。
+
+③ 用户闸门：220 路 A / 228② / 265。
+
 ## R304 状态（第 303 轮 / Round 301 · 2026-10-23）
 
 ⓪ 读 CI（R305 的开场取数，只登记不轮询 = R140）：成对号本轮**按 push 的 tip 现读**（`gh api "repos/…/actions/runs?head_sha=<完整 sha>"` 逐笔查，取数口见 U-999）：`811c4fc`（R303 账半）→ 39825878608 / completed / **failure** —— 只红在 STEP[18] On-screen probe coverage floor，正文 `NOW_RUNS testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记说 runner 跑不了，而这次它下结论了（passed）` ⇒ 本轮照 runner 的点名把 `scripts/probe_coverage_expectations.json` 那一格翻回 can（配对测试的「红身份」名单从两条抬成三条，夹具不动）；`ac1ed6b` → 39822963311 / success、`8c63c46` → 39817856053 / success、`8f6c300` → 39814465153 / success、`f5a563a` → 39806766619 / success；而 `b420967` / `4adc04f` / `5713c89` 的 **total_count=0** —— 这三笔**从来没有 run**（一次 push 只给 tip 那笔建），台账从前把它们写成「不在最近 10 跑里（未读）」是把结构性不存在记成待办 ⇒ 新开 362，本轮起 ⓪ 不再为它们挂「未读」。本轮两笔（Tests/判据半 + 台账半）由 R305 现取

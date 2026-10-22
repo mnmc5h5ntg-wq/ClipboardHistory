@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R305 / 第 304 轮 / Round 302 · 动效红名的登记按机器切片）
+
+354 的第二步：`suite_reds` 每条登记现在必须带 `machine`，闸门只认这台机器那份 —— testNativeRowMoveIsVisibleToTheRuler / testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt 两条登记只属于 github-runner（run 39795800668），本机同码不红；缺机器键 ⇒ `MOTION_FLOOR_SUITE_UNSCOPED` 红；只在他机登记过的红 ⇒ 本机照旧红并另打 `MOTION_FLOOR_REGISTERED_ELSEWHERE`；退场提示按机器切。闸门卷 39 → 44 格，其中一格直接读**活账**证明登记在自己机器上真的顶用；两把刀 M880 / M881 打在闸门源码上，2/2 CAUGHT、RESTORE_CLEAN=yes、预检 tables=99 arms=750 bad=0。同轮抬宽编号尺：`U_DEF` / `U_RANGE` 从 `\d{3}` 到 `\d{3,4}`，配三位/四位两向对照；D 与 BACKLOG 号的同类假设新开 363。另记一次自伤并当场修：把机器键插在 `judged=` 前会让 CI 的 report-only 契约三格一起红，改打行尾；`test_skip_roster` 那朵是同源的第二个形状不是独立缺陷。产品文件 0 个；四件套沿用上一笔现读（告警 0、全量卷 933/失败 0、帧 174 changed=0、dmg=ok、换装 1.4.8，取数口 /tmp/r304_verify_run.log），看图腿与换装本机本轮 NOT-RUN；电池 Ran 586 / OK (skipped=4)。
+
 ### Improved（R304 / 第 303 轮 / Round 301 · 第二批裸 stdout 搬进文件通道）
 
 360 的第二批：`MotionDriverTests`（3 行）、`PressFeedbackTests`（5 行）、`SettingsFailureReceiptTests`（5 行）里的读数改走 `CaptureReadings.emit`，覆盖率棘轮 42 → 现读 29，派生名册 11 → 14 个，按文件的未覆盖名单剩 15 条。Swift 那张名字名册补一张**显式通道表** `emitChannel`：上一轮靠 `file == 某一份` 判断走哪条腿，多搬一份之后那种特例就会让清单凭空变空而守卫仍绿。两把新刀：M878 从通道表里删一个名字 ⇒ Swift 侧红在与名册不符；M879 把一行改回裸 stdout ⇒ 电池红在盘上有 30 行。同轮把 `R303_MUTATE` 三根 needle 重钉（两根的期望值写的是上一轮的数字 42 / 43，预检 bad=2）⇒ 三张表全 CAUGHT，预检 bad=0、ARM_TOTAL=748。给 361 补一条实测尺寸：一次搬动要同步 搬动本身 13 处调用 + 名册 2 张（Swift 通道名册 14 个名字、Swift 名字名册的 emitChannel 4 个名字）+ 电池那一卷的登记值 1 处与按文件未覆盖名单 15 条。359 重量：四件套取证目录 1158 行里热图 marker 仍 0 行 ⇒ 仍开。另往回查了台账自己：本轮生成器把一个占位符的键注册成复数、正文写单数 ⇒ 顺着这个形状扫七本账，数出历史遗留的 11 处未替换洞（346 的 R296 结案追记 7 处、305 的 R295 追记 4 处，两处正文都写着「现读」），就地按别处的同一批现读记录填回，并新增 `scripts/tests/test_ledger_tokens.py`（4 格）与生成器的写盘前自扫。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 578 / OK (skipped=4)。

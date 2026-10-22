@@ -7209,5 +7209,24 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
   **短语统计不是「近似的数」，它量的是另一件事**（我写没写这句话），所以没有「先近似着用」的余地。
 
 **354. runner 在 STEP[19] Motion coverage floor 单跑红两朵，而同一份 Swift 代码的早一跑整跑绿（39795800668 vs 39795221489，R299 现读）**：两朵红是 `MotionFilmstripTests/testRowMoveIsVisibleToTheRuler`（两臂形状一致：开 1 帧/峰值 0.053、关 1 帧/峰值 0.053 ⇒ 断言判「这次 moveRow 是瞬移」）与 `testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt`（`XCTAssertGreaterThanOrEqual` 2 < 3）。R299 那笔台账只动了 `AGENT_BACKLOG.md`，产品与测试代码与绿跑逐字节相同 ⇒ 成因在机器不在代码，属 254/255 那一族（同版两跑之间自己变）。**不许据此放宽地板**：单次 runner 读数既不配给产品定罪，也不配替产品脱罪（R87 / D-251 同一课）。做法：① 同一份代码在 runner 上凑够两跑，把「这两朵红的出现率」变成读数而不是巧合；② 出现率 > 0 就登记成有名字的未覆盖（像 155/166 那样按机器×按用例切片），而不是每轮重读一次单跑；③ 若两跑同现，先读 `MOTION_BAND_INTERVAL`（间隔 − 抓帧 = 调度地板）在负载下的读数，再谈判据本身。
+  追记（R305 第二步落地）：登记做成了，但**切片切的是机器**而不是名字。
+  `scripts/motion_floor_expectations.json` 现在有 2 条：testNativeRowMoveIsVisibleToTheRuler / testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt，全部 `machine=github-runner`、
+  `registered_run=39795800668`、`points_to=BACKLOG 354`。闸门按 `machine_key()` 取本机那份：
+  没有机器键 ⇒ 红；只在他机登记 ⇒ 本机照旧红并打一行 `REGISTERED_ELSEWHERE`；
+  不再复现 ⇒ 按机器打退场提示。刀 M880（切片退回全局）与 M881（退场不分机器）各钉一侧。
+  本格同时更正一处台账原文：本单开头写的红名 `testRowMoveIsVisibleToTheRuler` 少了 `Native` 前缀，
+  闸门 FACTS 与源码里的都是 `testNativeRowMoveIsVisibleToTheRuler`（登记条目按逐字取，新判据会当场红）。
+  本单剩下的：③ 若两跑同现，先读 `MOTION_BAND_INTERVAL`（间隔 − 抓帧 = 调度地板）在负载下的数，再谈判据本身；
+  以及登记退场的**真验证**要等 runner 下一次那一跑自己说「这两条现在不红了」。
 
 **355. 台账守卫的第二种腐烂：把「当前轮」读成一个全局数，于是历史笔每轮都在被今天的尺重判（R299 现读三朵假红，证人 7b8f123 / 8a3e488 / 5225de5）**：`scripts/tests/test_commit_subject_hygiene.py` 的扫描范围是「判据生日（含）之后所有笔」，而期望值取自**工作树** STATE 的第一节 ⇒ 本轮把当前轮推到 R299 之后，三笔 R296 的提交立刻被判「标签是手抄的」—— 它们落笔当时是干净的。这与 R298 那一格（锚在 sha 上的基线会滑出窗口）是同一件事的两种坏法：**守卫的期望值必须与它问的那一笔同时代**。修法两条，本轮已落地并结案：① 按笔取轮（`git show <sha>:AGENT_STATE.md`，读不到红，不许静默放行）；② 界要有方向 —— 超前 1 轮合法（代码半先于轮次账）、超前 2 轮红、落后 >2 轮红，三种形状各一格正对照。剩下的欠账（仍开，记在 348）：电池只覆盖 `scripts/tests`，台账正文里的数字没有一道门要求它来自仪器（353 只钉住了产品面那一格）。
+
+**363. 台账编号的三位假设还剩两处，会在 D-1000 / BACKLOG 1000 那天以同样的形状静默降级（R305 现读）**：
+本轮为了 U-1000 这个四位边界把 `scripts/tests/test_ledger_ids.py` 的 `U_DEF` / `U_RANGE` 抬成 `\d{3,4}`，
+顺手把同文件里剩下两支也数了一遍 —— `DEC_DEF` / `CITED` 写死 `D-\d{3}`，`ITEM` 写死 `^(?:\*\*)?(\d{3})\. `。
+今天读到 D-286 / BACKLOG-363，离 1000 还远，但坏法与本轮修掉的那一支**完全同形**：
+匹配不到不是红，是被读成「这一节/这一条没有这种形状」，于是「标题引用了 D-xxx 就必须有正文」那格
+会安静地不再判任何东西。要做的事很少（两处宽度 + 一格四位正对照 + 一格「现读还没越界」的证人），
+先别做的原因是：没有当天的读数证明另两支也已经是 `\d+` 的语义（`test_ui_round_interval_parity.py`
+用的是 `\d+`，说明这仓库里对同一件事有两种约定，合并时要先定哪种作准）。
+不许写成「反正还远」——远的那几天没人会想起来，这正是 349/353 那一族的成因。
