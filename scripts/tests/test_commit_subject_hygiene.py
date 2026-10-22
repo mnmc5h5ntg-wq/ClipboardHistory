@@ -37,6 +37,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 THIS_FILE = os.path.basename(__file__)
 
 
+def round_at(sha):
+    """那一笔提交**自己的树**里 STATE 的当前轮（STATE 新轮在上 ⇒ 取第一个匹配）。
+
+    不许退回工作树：工作树只有一份，历史里的每一笔都得向它对齐，那就是拿今天的尺量昨天的笔。
+    """
+    out, rc = git(u"show", sha + u":AGENT_STATE.md")
+    if rc != 0:
+        return None
+    found = STATE_LINE.findall(out)
+    return int(found[0]) if found else None
+
+
 def baseline_sha():
     out, rc = git(u"log", u"--diff-filter=A", u"--format=%H", u"--reverse", u"--",
                   u"scripts/tests/" + THIS_FILE)
@@ -93,10 +105,21 @@ def roster_problems(roster, backlog_text):
     return out
 
 
-def check(messages, current_round, window=2):
-    """返回问题列表（空 = 干净）。纯函数：判据与正对照走同一条路。"""
+def check(messages, rounds, window=2, ahead_allowed=1):
+    """返回问题列表（空 = 干净）。纯函数：判据与正对照走同一条路。
+
+    `rounds` 是 sha → **那一笔提交当时**的当前轮（R299 现读的腐烂：原来这里收一个全局 current_round，
+    而扫描范围从判据生日一路到 HEAD，于是每推一轮，历史里那些「R296 代码半」就自动变成超前/落后的假红 ——
+    拿今天的尺量昨天的笔，红的是尺。改成按笔取轮：每笔与**它自己那一棵树里的 STATE** 对账）。
+    收 int 也可以（正对照与合成用例走这条路）：那种情况下所有行都用同一个轮次。
+    """
     problems = []
     for sha, subject in messages:
+        current_round = rounds if isinstance(rounds, int) else rounds.get(sha)
+        if current_round is None:
+            problems.append((sha, u"COMMIT_SUBJECT_ROUND_UNKNOWN",
+                             u"取不到那一笔提交当时的当前轮 ⇒ 这一格不许静默放行（算不出来必须响，R102）"))
+            continue
         for needle in RESIDUE:
             if needle in subject:
                 problems.append((sha, u"COMMIT_SUBJECT_HEREDOC_RESIDUE",
@@ -107,12 +130,17 @@ def check(messages, current_round, window=2):
                              u"subject 里没有轮次标签 R<NNN>：" + subject[:80]))
             continue
         claimed = int(m.group(1))
-        if not (current_round - window <= claimed <= current_round):
+        # 方向规矩（R299 现读，两笔 f78b6ac / efeca29 是证人）：**代码半常先于本轮的轮次账** ——
+        # 那一笔自己的 STATE 还停在上一轮，而 subject 已经写本轮，这是本仓库的既有形状，不是手抄错。
+        # 所以往前只许 1 轮（本轮），往后允许 window 轮（补记与台账半）。
+        # 这条不是豁免名册：它是一条有方向的界，写错成 R7 / R999 照样红（正对照钉着）。
+        if not (current_round - window <= claimed <= current_round + ahead_allowed):
             if sha in AHEAD_ROSTER:
                 continue      # 在册例外：代码半先于轮次账，由 AHEAD_ROSTER 那一格要求它退场
             problems.append((sha, u"COMMIT_SUBJECT_ROUND_OFF",
-                             u"subject 写 R%d，而 STATE 现读当前轮是 R%d（允许往前 %d 轮）⇒ 标签是手抄的"
-                             % (claimed, current_round, window)))
+                             u"subject 写 R%d，而那一笔自己的 STATE 里当前轮是 R%d"
+                             u"（只许超前 %d 轮、落后 %d 轮）⇒ 标签是手抄的"
+                             % (claimed, current_round, ahead_allowed, window)))
     return problems
 
 
@@ -126,6 +154,20 @@ class CommitSubjectHygiene(unittest.TestCase):
         kinds = sorted(set(k for _, k, _ in found))
         self.assertEqual([u"COMMIT_SUBJECT_HEREDOC_RESIDUE", u"COMMIT_SUBJECT_NO_ROUND",
                           u"COMMIT_SUBJECT_ROUND_OFF"], kinds, found)
+        # 按笔取轮那条路也要有牙：拿今天的当前轮去判历史笔会假红，而**读不到当时的轮**必须红。
+        hist = [(u"aa000001", u"R296 代码半：某处修法")]
+        self.assertEqual([], check(hist, {u"aa000001": 298}),
+                         u"历史笔与它自己当时的轮（298）同域，却被今天的尺判成红 ⇒ 按笔取轮没生效")
+        self.assertEqual([(u"aa000001", u"COMMIT_SUBJECT_ROUND_UNKNOWN")],
+                         [(sha, kind) for sha, kind, _ in check(hist, {u"aa000001": None})],
+                         u"读不到当时的当前轮却静默放行 ⇒ 这一格没有对象也算绿（不许）")
+        # 界本身要有方向：超前 1 轮合法（代码半先于轮次账），超前 2 轮必须红。
+        self.assertEqual([], check([(u"aa000002", u"R299 代码半")], {u"aa000002": 298}),
+                         u"代码半那笔超前一轮被拦 ⇒ 这条界与本仓库的落盘顺序不符")
+        self.assertEqual([(u"aa000003", u"COMMIT_SUBJECT_ROUND_OFF")],
+                         [(sha, kind) for sha, kind, _ in check([(u"aa000003", u"R301 代码半")],
+                                                               {u"aa000003": 298})],
+                         u"超前 3 轮却放行 ⇒ 把界写成免检了")
 
     def test_clean_subjects_pass_the_same_function(self):
         good = [(u"aaaa1111", u"R296 轮次台账（第 295 轮 / Round 293）补齐"),
@@ -171,12 +213,6 @@ class CommitSubjectHygiene(unittest.TestCase):
         self.assertTrue(out.split(), u"生日之后一笔都没有 ⇒ 空对账，这一格没有对象")
 
     def test_recent_subjects_are_clean(self):
-        state = io.open(os.path.join(ROOT, "AGENT_STATE.md"), encoding="utf-8").read()
-        cur = STATE_LINE.findall(state)
-        self.assertTrue(cur, u"STATE 里没有「最后更新 … R<NNN>」那一行 ⇒ 当前轮读不到，这一格没有对象")
-        # AGENT_STATE.md 是**新轮在上**的顺序，所以当前轮要取**第一个**匹配；取末会读到最老那一节
-        # （本轮现读撞过：取末得到 R258，于是三笔 R296 的提交全被误判成「标签是手抄的」）。
-        current_round = int(cur[0])
         args = scan_args()
         self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 这一格没有对象")
         out, rc = git(*args)
@@ -190,7 +226,11 @@ class CommitSubjectHygiene(unittest.TestCase):
         self.assertIn(birth_short(), [r[0] for r in rows],
                       u"扫描范围里连判据自己的生日那一笔都不到 ⇒ 范围算错了")
         self.assertTrue(rows, u"基线之后一笔都没有 ⇒ 空对账（COMPARED=0 的绿不算绿）")
-        problems = check(rows, current_round)
+        # 每一笔与它自己那棵树里的当前轮对账；读不到就红（fail-closed，见 round_at）
+        rounds = {sha: round_at(sha) for sha, _ in rows}
+        self.assertTrue(any(v is not None for v in rounds.values()),
+                        u"扫描范围里没有任何一笔能读到当时的当前轮 ⇒ 尺没有对象")
+        problems = check(rows, rounds)
         self.assertEqual([], problems, u"\n".join(u"%s %s %s" % p for p in problems))
 
 

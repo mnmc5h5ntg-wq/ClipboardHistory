@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R299 / 第 298 轮 / Round 296 · 产品面那一格改成 git 派生，撤回报告里的一句假话）
+
+新增取数口 `scripts/product_streak.py` 与门 `scripts/tests/test_product_streak_cell.py`（8 格）：「产品面连续零改动轮数」在 `AGENT_FINAL_REPORT.md` §13 与 `AGENT_STATE.md` 当前轮两格**只能由该命令派生**，且那一行必须引用它 —— 数不等红、数对但没引用红、格缺席红、两候选不同值红。现读 `PRODUCT_STREAK last=2f8b1e0 last_round=289 ui_audit_max_round=297 streak=8`，据此**撤回**上一版报告里「连续 7 轮」与「上一次落到 `Sources/` 的改动是 R263 的收藏星字形墨」两句（git 现读 R263 之后还有 R275 / R289 / R290 三笔产品提交）。同一轮把 §13 的计数器全部接到仪器（电池 / 曲线 / U·D·BACKLOG 最大值 / 变异臂 / 帧基线），并登记 runner 单跑红两朵（新开 354，地板一条不降）。产品文件 0 个；帧 174 张 changed=0（复用上一轮帧，本轮无产品改动）；脚本电池 Ran 563 / OK (skipped=4)。
+
 ### Improved（R298 / 第 297 轮 / Round 295 · 台账区间的对账门 + 豁免要能退场）
 
 新增 `scripts/tests/test_ui_round_interval_parity.py`（5 格）：轮标题声明的 U 区间必须与该节规范定义的 id
