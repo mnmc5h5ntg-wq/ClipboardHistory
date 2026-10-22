@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed（R300 / 第 299 轮 / Round 297 · 热图悬停那一圈不再比数据响，产品 2 文件）
+
+新增判据 `HeatmapHoverEvidenceTests/testHoverIsNotLouderThanOneDataStep`（20 条读数 = 2 外观 × 2 尺度 × 5 档）：分子是悬停在**描边带**上的变化，分母是同一条 render 现量的**相邻档在填充带上的档步**，界压在「不超过最重的一次数据变化」。现读改前：亮档档步 19.33 / 21.00 / 28.33 / 37.33、暗档 17.33 / 18.33 / 25.33 / 33.67，而 0.55 的环最响一臂改 75.50 ⇒ 两倍于数据。产品改动 2 个文件（VisualTokens.swift、DailyCopyHeatmapView.swift）：`VisualHeat.hoverRingOpacity` 0.55 → **0.30**、`VisualHeat.ladder` 顶档 0.85 → **0.92** —— 抬顶档是因为两条界（可见性 18 / 克制度 1.0）夹出来的窗口原本是空集（≥0.274 与 ≤0.272），D-281。314 结案：热图那一圈**不是**选中态的同形物（全仓库没有描边式选中），过响那一半按数值修掉；「比最细一档还安静」这套形状装不下 ⇒ 新开 356。刀 M866…M869 全 CAUGHT=4/4、RESTORE_CLEAN=yes（现读倍率：装回 0.55 是 1.28、退回顶档是 1.11、环降到 0.12 时最安静一臂只改 13.17、出货版是 0.70）；预检 ARM_TOTAL=738 bad=0；全量卷 933 用例 / 失败 0、build 告警 0、帧 174 张基线同一笔 changed=0、dmg=ok 且已换装本机 1.4.8；脚本电池 Ran 565 / OK (skipped=4)。连续零改动纪录归零（`scripts/product_streak.py` 现读 streak=0）。
+
 ### Fixed（R299 / 第 298 轮 / Round 296 · 产品面那一格改成 git 派生，撤回报告里的一句假话）
 
 新增取数口 `scripts/product_streak.py` 与门 `scripts/tests/test_product_streak_cell.py`（8 格）：「产品面连续零改动轮数」在 `AGENT_FINAL_REPORT.md` §13 与 `AGENT_STATE.md` 当前轮两格**只能由该命令派生**，且那一行必须引用它 —— 数不等红、数对但没引用红、格缺席红、两候选不同值红。现读 `PRODUCT_STREAK last=2f8b1e0 last_round=289 ui_audit_max_round=297 streak=8`，据此**撤回**上一版报告里「连续 7 轮」与「上一次落到 `Sources/` 的改动是 R263 的收藏星字形墨」两句（git 现读 R263 之后还有 R275 / R289 / R290 三笔产品提交）。同一轮把 §13 的计数器全部接到仪器（电池 / 曲线 / U·D·BACKLOG 最大值 / 变异臂 / 帧基线），并登记 runner 单跑红两朵（新开 354，地板一条不降）。产品文件 0 个；帧 174 张 changed=0（复用上一轮帧，本轮无产品改动）；脚本电池 Ran 563 / OK (skipped=4)。

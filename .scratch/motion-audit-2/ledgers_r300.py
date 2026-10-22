@@ -32,7 +32,7 @@ FILES = {
     "CH": os.path.join(ROOT, "CHANGELOG.md"),
     "FR": os.path.join(ROOT, "AGENT_FINAL_REPORT.md"),
 }
-VERIFY_LOG = "/tmp/r300_verify_run.log"
+VERIFY_LOG = "/tmp/r300_verify2_run.log"
 CAPTURE = "/tmp/r300_verify/capture.log"
 CURVE = os.path.join(ROOT, ".scratch", "motion-audit-2", "curve_from_ledger.py")
 STREAK = os.path.join(ROOT, "scripts", "product_streak.py")
@@ -44,8 +44,9 @@ DIMS = [u"真实视觉审查", u"判据有效性", u"假绿防御", u"产品面�
 SCORES = [13, 14, 14, 11, 12, 14, 12]
 R_TAG = u"R300"
 R_NEXT = u"R301"
-TODAY = u"2026-10-22"
-RUN_R300_LEDGER = u"f5a563a"        # R299 台账笔（CI 仍 in_progress，未读）
+# 日期也不手抄：跨零点写过一次假日期（R298/R299 之间），这一格由系统现读
+TODAY = subprocess.check_output([u"date", u"+%Y-%m-%d"]).decode().strip()
+RUN_R300_LEDGER = u"f5a563a"        # R299 台账笔（本轮取时仍 in_progress，未读）
 RUN_R300_LEDGER_ID = u"39806766619"
 
 
@@ -108,24 +109,37 @@ def fill_tpl(t, mapping):
 
 
 # ── 读数（全部现取；任一缺档就整体不写）────────────────────────────
-sout, src = sh(["python3", STREAK])
-slines = re.findall(u"^PRODUCT_STREAK (.*)$", sout, re.M)
-if src != 0 or not slines:
-    die(u"product_streak 没出读数（rc=%s）：%s" % (src, sout.strip()[-300:]))
-sk = dict(x.split(u"=", 1) for x in slines[0].split())
-for key in (u"streak", u"last", u"last_round", u"ui_audit_max_round"):
-    if key not in sk:
-        die(u"product_streak 读数缺格 %s：%s" % (key, slines[0]))
-STREAK_N, LAST_SHA = sk[u"streak"], sk[u"last"]
-LAST_ROUND, MAX_ROUND = sk[u"last_round"], sk[u"ui_audit_max_round"]
-# 代码半必须先提交：否则「最后一笔产品提交」还是 R290，这一格会被写成 10 而不是 0。
-if LAST_ROUND != s(int(MAX_ROUND) + 1) and LAST_ROUND != s(int(MAX_ROUND)):
-    die(u"product_streak 读到最后一笔产品提交是第 %s 轮，而 UI_AUDIT 最大节是第 %s 轮 ⇒ "
-        u"本轮的产品改动（代码半）还没提交，先把代码半进账再写台账" % (LAST_ROUND, MAX_ROUND))
+# 取数口是 **as-of** 口径：本轮那一格写的是「第 ROUND 轮」的答案，所以问 --streak-for，
+# 而不是问"此刻"（此刻台账最大节还停在上一轮 —— 那是 355 那一族的另一种坏法）。
+dout, drc = sh(["python3", STREAK])
+dline = (re.findall(u"^PRODUCT_STREAK (.*)$", dout, re.M) or [u""])[-1]
+dk = dict(x.split(u"=", 1) for x in dline.split() if u"=" in x)
+if drc != 0 or u"ledger_round" not in dk:
+    die(u"product_streak 没出现读（rc=%s）：%s" % (drc, dout.strip()[-300:]))
+MAX_ROUND = dk[u"ledger_round"]              # 台账当前最大节（本轮那一节还没落）
 ROUND = int(MAX_ROUND) + 1
-if LAST_ROUND != s(MAX_ROUND) and LAST_ROUND != s(ROUND):
-    die(u"最后一笔产品提交（第 %s 轮）与本轮（第 %d 轮）不同源 ⇒ streak=%s 不可信"
-        % (LAST_ROUND, ROUND, STREAK_N))
+fout, frc = sh(["python3", STREAK, "--streak-for", s(ROUND)])
+fl = (re.findall(u"^PRODUCT_STREAK_FOR (.*)$", fout, re.M) or [u""])[-1]
+fk = dict(x.split(u"=", 1) for x in fl.split() if u"=" in x)
+if frc != 0 or u"streak" not in fk:
+    die(u"--streak-for 第 %d 轮取不到：%s" % (ROUND, fout.strip()[-300:]))
+STREAK_N = fk[u"streak"]
+LAST_SHA = (re.findall(u"last=(\\S+)", fl) or [u"?"])[-1]
+LAST_ROUND = (re.findall(u"last_round=(\\d+)", fl) or [u"?"])[-1]
+NEWEST_LABEL = dk.get(u"newest_round", u"?")
+# 本轮动了产品 ⇒ 第 ROUND 轮的答案必须是 0，且最新那笔产品提交就标着本轮
+# 「上一笔动 Sources 的是谁」也要现读：问取数口第 MAX_ROUND 轮的答案是谁
+pout, prc2 = sh([u"python3", STREAK, u"--streak-for", MAX_ROUND])
+pl = (re.findall(u"^PRODUCT_STREAK_FOR (.*)$", pout, re.M) or [u""])[-1]
+PREV_SHA = (re.findall(u"last=(\\S+)", pl) or [u"?"])[-1]
+PREV_ROUND = (re.findall(u"last_round=(\\d+)", pl) or [u"?"])[-1]
+PREV_R = int(PREV_ROUND) + 1 if PREV_ROUND.isdigit() else 0
+if PREV_SHA == u"?":
+    die(u"上一笔产品提交取不到（--streak-for %s 的输出：%r）" % (MAX_ROUND, pl))
+
+if STREAK_N != u"0" or NEWEST_LABEL != s(ROUND):
+    die(u"本轮改了产品，但 as-of 第 %d 轮读到 streak=%s、最新产品提交标到第 %s 轮 ⇒ "
+        u"代码半没提交或标签不对（顺序：代码半 → 台账半）" % (ROUND, STREAK_N, NEWEST_LABEL))
 
 vlog = ""
 if os.path.exists(VERIFY_LOG):
@@ -150,7 +164,8 @@ KS = re.findall(u"(?m)^R300_MUTATE 刀=(\\d+) CAUGHT=(\\d+) ESCAPED=(\\d+) NOT_R
 if krc != 0 or not KS:
     die(u"变异表不是全 CAUGHT（rc=%s）：%s" % (krc, kout.strip()[-400:]))
 KN, KC, KE, KNR, KREST = KS[-1]
-if KE != u"0" or KNR != u"0" or KREST != u"True" or KC != KN:
+# 这张表印的是 RESTORE_CLEAN=yes/no（不是 True/False）—— 照实际输出比，别照上一轮的表
+if KE != u"0" or KNR != u"0" or KREST != u"yes" or KC != KN:
     die(u"变异表不干净：刀=%s CAUGHT=%s ESCAPED=%s NOT_RUN=%s RESTORE_CLEAN=%s"
         % (KN, KC, KE, KNR, KREST))
 
@@ -368,6 +383,9 @@ STATE_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
 （最后一笔产品提交 @LASTSHA@ = 第 @LASTROUND@ 轮）。
 四件套：全量卷 @SWIFT@/失败 @SWFAIL@、build 告警 @WARN@、帧 @FRAMES@ 张 changed=@CH@（基线同一笔）、
 dmg=@Dmg@、换装 @VER@；变异 @KC@/@KN@ 全 CAUGHT、RESTORE_CLEAN=@KREST@；电池 Ran @BATT@ / OK (skipped=@SKIP@)。
+产品文件 **@PROD@** 个，连续零改动 **@STREAK@** 轮（现读 `python3 scripts/product_streak.py --streak-for @ROUND@`：
+as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@（本轮的代码半 @CODESHA@）⇒ 这条纪录归零；
+本节上一版写的「连续 9 轮」也是同一颗尺的现读值，只作历史不作数）。
 
 ① 下一轮（@RNEXT@）的靶：按同一条思路给**其余**只有一根地板的强度参数补对偶 ——
 候选是 `VisualFillLift.hover/pressed/selected`（0.04/0.03/0.02，D-249 只钉了带子不相交，没钉上限）
@@ -460,6 +478,8 @@ FR_DOOR = (u"- **判据与门的规模**：脚本电池 **Ran @BATT@**（现读 
 
 SUBS2 = dict(SUBS)
 SUBS2[u"@UDEF@"] = s(U_DEFS + 4)
+SUBS2[u"@PREVR@"] = s(PREV_R)
+SUBS2[u"@PREVSHA@"] = PREV_SHA
 fr = orig["FR"]
 repl = []
 for label, tpl in ((u"走到哪了", FR_WALK), (u"判据与门的规模", FR_DOOR),
@@ -482,6 +502,26 @@ fr_new, n_ucell = re.subn(u"U-31 … U-\\d+", u"U-31 … U-%d（@RTAG@ 现读抬
 if n_ucell != 1:
     die(u"§1 的 U 上界那一格没命中（%d 处）" % n_ucell)
 fr_new = fill_tpl(fr_new, SUBS2)
+# 标题那一格（R9–R<NNN>，N 轮自评）：`test_final_report_headline` 拿 ITERATION 最新一节比，
+# 允许落后 1 轮。上一版生成器（r298）有抬格逻辑而我没抄过来 —— 这就是"新写一轮生成器时
+# 先列出上一版改了哪几格计数器，逐格确认本轮也抬"那条教训的又一次现场。
+fr_new, n_title = re.subn(u"R9–R\\d+，\\d+ 轮自评",
+                          u"R9–R%d，%s 轮自评" % (RD_N, SUBS2[u"@SECTIONS@"]), fr_new, count=1)
+if n_title != 1:
+    die(u"报告标题那一格没命中（%d 处）⇒ 形状变了，先读再改" % n_title)
+
+# §1 那张「最后一次动到 Sources/ 的轮次」格：动了产品就必须由本轮刷新，
+# 它自己就有一道门（test_final_report_headline / FINAL_REPORT_SOURCES_CELL_STALE），不刷就红。
+SOURCES_ROW = (u"| 最后一次动到 `Sources/` 的轮次 | **@RTAG@**（commit `@CODESHA@`）—— "
+               u"现读 @PROD@ 个 `Sources/` 文件（@PRODFILES@）；"
+               u"改了什么以 `AGENT_UI_AUDIT.md` 里 @RTAG@ 那一节为准（这一格只登记号与数，不复述结论）。"
+               u"上一笔动 `Sources/` 的是 R@PREVR@（`@PREVSHA@`）。|")
+row_rx = re.compile(u"(?m)^\| 最后一次动到 `Sources/` 的轮次 \| .*$")
+if len(row_rx.findall(fr_new)) != 1:
+    die(u"§1 的 Sources 那一格命中 %d 处（要恰好 1 处）⇒ 形状变了，先读再改"
+        % len(row_rx.findall(fr_new)))
+fr_new = row_rx.sub(fill_tpl(SOURCES_ROW, SUBS2), fr_new, count=1)
+
 if u"scripts/product_streak.py" not in fr_new:
     die(u"报告里找不到取数口引用 ⇒ 353 的修法被回退了，先查")
 
@@ -498,8 +538,20 @@ new = {
 for key in new:
     if key != u"FR" and len(new[key]) <= len(orig[key]):
         die(u"%s 写后不比写前长 ⇒ 可能是替换而不是插入" % key)
-if len(new["FR"]) <= len(orig["FR"]):
-    die(u"报告写后不比写前长 ⇒ §13 的 bullet 可能被吞了")
+# 报告那一本不是"插入"而是"重写格子"，所以长度不是好判据 —— 换成两条真的：
+# ① §13 的 bullet 颗数不许变少（吞条就是事故）；② 本轮该出现的两格必须在（streak 与 Sources 行）。
+sec = re.compile(u"(?m)^## 13\\. .*?(?=^## |\\Z)", re.S)
+old_sec, new_sec = sec.search(orig["FR"]), sec.search(new["FR"])
+if not (old_sec and new_sec):
+    die(u"§13 那一节在写前或写后不见了")
+n_old = len(re.findall(u"(?m)^- \\*\\*", old_sec.group(0)))
+n_new = len(re.findall(u"(?m)^- \\*\\*", new_sec.group(0)))
+if n_new < n_old:
+    die(u"§13 的 bullet 从 %d 条变成 %d 条 ⇒ 有内容被替换掉了而不是刷新" % (n_old, n_new))
+if (u"产品面连续零改动轮数 = **%s**" % STREAK_N) not in new["FR"]:
+    die(u"报告的 streak 那一格没落成本轮的值")
+if (u"**%s**（commit `%s`）" % (R_TAG, CODE_SHA)) not in new["FR"]:
+    die(u"§1 的 Sources 那一格没刷成本轮代码半")
 
 for key, text in new.items():
     wr(FILES[key], text)

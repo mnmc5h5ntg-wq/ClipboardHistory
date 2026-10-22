@@ -19,6 +19,7 @@ R298 现读的账目事故（不是假想）：同一件事在台账里有四种
 """
 import io
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -54,7 +55,11 @@ class ProductStreakCellTests(unittest.TestCase):
         # ① 派生本身：有 problems 就没什么可对账的，让原文把尺坏在哪印出来。
         self.assertEqual(self.problems, [], u"git 派生这一格失败：%s" % (self.problems,))
         self.assertIsInstance(self.info["streak"], int)
-        self.assertEqual(self.info["sources_after"].strip(), u"0")
+        # as-of 口径：streak 是「台账最大节那一轮」的答案，不是「此刻最新产品提交」的答案
+        self.assertEqual(self.info["streak"],
+                         self.info["ledger_round"] - int(re.search(
+                             u"last_round=(\d+)", self.info[u"note"]).group(1)))
+        self.assertGreaterEqual(self.info["streak"], 0)
 
     def test_ledger_cells_agree_with_git(self):
         probs = ps.check_ledger(read(u"AGENT_FINAL_REPORT.md"),
@@ -106,6 +111,24 @@ class ProductStreakCellTests(unittest.TestCase):
                                 newest + older, self.info["streak"])
         self.assertEqual(probs, [], probs)
         self.assertIn(u"R299", ps._state_top_section(newest + older))
+
+    def test_a_streak_cell_is_answered_as_of_its_own_round(self):
+        # R300 现读的坑：代码半先提交、台账半后提交。若拿"此刻最新产品提交"去判上一轮写对的格，
+        # 会把历史判成假红（与 355 同一族：期望值必须与它问的那一笔同时代）。
+        rows = [(u"shaA", 299, u"aaa1111", u"2026-10-23", u"R300 代码半"),
+                (u"shaB", 289, u"2f8b1e0", u"2026-10-21", u"R290 代码半"),
+                (u"shaC", 263, u"15c6a56", u"2026-10-21", u"R263 代码半")]
+        self.assertEqual((0, u"last=aaa1111 last_round=299"), ps.streak_at(299, rows))
+        self.assertEqual((9, u"last=2f8b1e0 last_round=289"), ps.streak_at(298, rows))
+        # 期望值一律**手算给死**再写进测试（R298 那一课：心算出来的期望会把对的代码判成错的）
+        self.assertEqual((8, u"last=2f8b1e0 last_round=289"), ps.streak_at(297, rows))
+        self.assertEqual((7, u"last=15c6a56 last_round=263"), ps.streak_at(270, rows))
+        # 标签多义/缺失的提交跳过，但不许被当成"没有产品改动"
+        noisy = [(u"shaD", None, u"ddd0000", u"2026-10-23", u"没有轮次标签的一笔"),
+                 (u"shaB", 289, u"2f8b1e0", u"2026-10-21", u"R290 代码半")]
+        self.assertEqual(9, ps.streak_at(298, noisy)[0])
+        self.assertEqual((None, u"标签 ≤ 第 300 轮的产品提交一笔都没有（跳过 0 笔标签多义/缺失的）"),
+                         ps.streak_at(300, [(u"shaE", 400, u"eee", u"2026-12-31", u"未来的笔")]))
 
     def test_subject_label_parser_rejects_ambiguous_and_missing(self):
         # derive() 的两条拒绝路径靠这两种输入成立：无标签 / 多标签都不许变成一个数。

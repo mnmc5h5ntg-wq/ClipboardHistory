@@ -150,7 +150,7 @@ def is_shallow(repo=None):
     return out == u'true'
 
 
-def sources_gate(shallow, rows, text):
+def sources_gate(shallow, rows, text, round_n=None):
     """把"这一格能不能判"和"判出来是什么"分成两句说（R242 / BACKLOG 278）。
 
     浅历史上 `git log -- <路径>` 只会给边界那一笔，而那一笔的 diff 对着空树 ⇒ 它**必然**被读成
@@ -160,10 +160,37 @@ def sources_gate(shallow, rows, text):
     if shallow:
         return ('skip', u'浅clone（fetch-depth=1）里路径历史不可解析 ⇒ HEAD 会被读成答案，'
                         u'这一格在 runner 上没有对象（ci.yml 已改 fetch-depth: 50）')
-    return ('judge', sources_problems(text, rows))
+    return ('judge', sources_problems(text, rows, round_n))
 
 
-def sources_problems(text, rows):
+def ledger_round(repo=None):
+    """台账当前的最大节号（`AGENT_UI_AUDIT.md` 的「## 第 N 轮」）。读不到就抛，不许静默放行。"""
+    import io as _io
+    import os as _os
+    path = _os.path.join(repo or REPO, "AGENT_UI_AUDIT.md")
+    with _io.open(path, encoding="utf-8") as h:
+        found = [int(x) for x in re.findall(u"(?m)^## 第 (\\d+) 轮", h.read())]
+    if not found:
+        raise RuntimeError(u"%s 里解析不到任何「## 第 N 轮」节 ⇒ as-of 口径没有参照" % path)
+    return max(found)
+
+
+def as_of(rows, round_n):
+    """第 round_n 轮的那一格该对哪一笔提交：标签 ≤ round_n 的**最近一笔**动过源码的提交。
+
+    为什么必须有这一层（R300 现读，与 355 同一族）：本仓库一轮常拆成"代码半 + 台账半"两笔，
+    代码半先落地时 `git log -1 -- Sources` 已经指向**下一轮**那一笔，而台账最大节还停在上一轮。
+    拿"此刻最新"去判上一轮写对的格，会把没写错的账判成 STALE —— 于是每次动产品都必须在
+    "写台账之前"那一跑里红着，或者逼着人把两半塞成一笔。改成 as-of 之后两半谁先落都不红。
+
+    `round_n` 与 `rows` 里的标签**同为 R 号**（调用方负责把「第 N 轮」换成 R 号：R_n = 第 n−1 轮）。
+    """
+    picked = [(sha, label, subject) for sha, label, subject in rows
+              if label is not None and label <= round_n]
+    return picked[0] if picked else None
+
+
+def sources_problems(text, rows, round_n=None):
     problems = []
     c = SOURCES_CELL.search(text)
     if not c:
@@ -175,6 +202,13 @@ def sources_problems(text, rows):
         problems.append(('FINAL_REPORT_SOURCES_LIVE_EMPTY',
                          u'`git log -- %s` 一笔都没读到 ⇒ 对照数是空的，不许当成通过' % SOURCES_PATH))
         return problems
+    if round_n is not None:
+        picked = as_of(rows, round_n)
+        if picked is None:
+            return [(u'FINAL_REPORT_SOURCES_NO_COMMIT_AS_OF',
+                     u'标签 ≤ 第 %d 轮的源码提交一笔都没有 ⇒ as-of 口径没有分界，'
+                     u'这一格不许拿"此刻最新"凑数' % round_n)]
+        rows = [picked] + [r for r in rows if r is not picked]
     live_sha, live_round, subject = rows[0]
     if not claimed_sha.startswith(live_sha[:7]) and not live_sha.startswith(claimed_sha[:7]):
         problems.append(('FINAL_REPORT_SOURCES_CELL_STALE',
@@ -208,14 +242,37 @@ class FinalReportSourcesCellTests(unittest.TestCase):
         self.assertIsNone(round_from_subject(u'没有轮次徽章的一笔'))
 
     def test_the_sources_cell_agrees_with_git(self):
-        shallow, rows = is_shallow(), live_sources(3)
+        # 40 笔而不是 3 笔：as-of 口径要能往回找到"标签 ≤ 台账最大节"的那一笔
+        # 单位换算要说死：本仓库 R_n = 第 n−1 轮（STATE 的标题行就是这么配的），
+        # 而 `AGENT_UI_AUDIT.md` 的节号是「第 N 轮」，git 那侧的标签是 R 号 ⇒ as-of 要拿 R 号比。
+        shallow, rows, round_n = is_shallow(), live_sources(40), ledger_round() + 1
         # 结论行排在能力闸门之前（R85：闸门先响就没有读数可读了）
-        mode, detail = sources_gate(shallow, rows, read(REPORT))
-        print(u'SOURCES_CELL_HISTORY 浅=%s 对照数=%d 头笔=%s 处置=%s'
-              % (shallow, len(rows), rows[0][0] if rows else u'无', mode))
+        mode, detail = sources_gate(shallow, rows, read(REPORT), round_n)
+        print(u'SOURCES_CELL_HISTORY 浅=%s 对照数=%d 头笔=%s as_of第%d轮=%s 处置=%s'
+              % (shallow, len(rows), rows[0][0] if rows else u'无', round_n,
+                 (as_of(rows, round_n) or (u'无',))[0], mode))
         if mode == 'skip':
             self.skipTest(u'%s —— 这一格在浅历史上不许给台账定罪（BACKLOG 278）' % detail)
         self.assertEqual([], detail, u'「最后一次动到 Sources/ 的轮次」与 git 不同源：%s' % detail)
+
+    def test_as_of_ignores_a_commit_from_a_round_the_ledger_has_not_reached(self):
+        """正对照：代码半先落地时，"此刻最新"那一笔属于**还没写账**的那一轮 ⇒ 不许拿它判上一轮的格。
+
+        两半各判一次：as-of 上一轮 ⇒ 账是对的（无 problems）；as-of 到那一笔自己的轮次 ⇒ 必须 STALE。
+        这一格钉的就是 R300 撞到的那个形状：不改成 as-of，每次动产品都会"写台账之前必然红一次"。
+        """
+        ahead = (u'aaa1111', 299, u'R300 代码半（第 299 轮 / Round 297）：动了产品')
+        old = (u'2f8b1e0', 290, u'R290 代码半（第 289 轮 / Round 287）：上一笔产品改动')
+        rows = [ahead, old]
+        cell = (u'| 最后一次动到 `Sources/` 的轮次 | **R290**（commit `2f8b1e0`）—— 现读 1 个文件。|')
+        self.assertEqual([], sources_problems(cell, rows, 298),
+                         u'as-of 第 298 轮时，账写 R290 是对的，却被判成 STALE ⇒ 过滤没生效')
+        detail = sources_problems(cell, rows, 299)
+        self.assertEqual(1, len(detail), u'as-of 到第 299 轮却不判这张格 ⇒ 这一格被写成了恒真')
+        self.assertEqual(u'FINAL_REPORT_SOURCES_CELL_STALE', detail[0][0], detail)
+        # 一笔都挑不出来时必须响，不许退回"此刻最新"
+        self.assertEqual([u'FINAL_REPORT_SOURCES_NO_COMMIT_AS_OF'],
+                         [k for k, _ in sources_problems(cell, rows, 100)])
 
     def test_a_shallow_history_must_not_be_allowed_to_judge(self):
         """浅历史是**真造一颗合成小仓库**判的（`git init` + 两笔 + `file://` 上 `--depth 1` 克隆），
