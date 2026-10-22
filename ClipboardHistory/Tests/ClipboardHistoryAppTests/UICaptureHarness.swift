@@ -4941,6 +4941,50 @@ final class UICaptureTests: XCTestCase {
         return (bg, block, block - bg, count)
     }
 
+    /// 两态**逐像素差**（R295 / BACKLOG 305 的分母来源）。
+    ///
+    /// 为什么需要第三颗尺：`pillReading` 与 `wideBlockReading` 都是在**一帧之内**找众数，
+    /// 于是众数的水落石出让两帧的 `step` 不同源 —— R295 本机现读：`row-favorite-idle` 的无界
+    /// 众数是星形笔画的 47 颗墨（块=136），`row-favorite-press` 的无界众数是整片填充，
+    /// 两个"码值台阶"量的不是同一层。把它们的差说成"按下离空闲走了多少灰阶"是一句假等式
+    /// （R182 那族"两层材质混成一层"的对称形态：这里是两帧的众数各自换了主语）。
+    ///
+    /// 这颗尺把两态按同一坐标逐颗相减，自家行与系统参照按钮走**同一个函数**（D-275：
+    /// 参照与自家必须同一条 render、同一颗尺才可比）。本轮只判存在与可分，
+    /// 台阶地板要等这行读数被现读登记之后再推（D-275「参照先证明存在，地板一条都不加」）。
+    static func pairDelta(bytesA: UnsafeBufferPointer<UInt8>, bytesB: UnsafeBufferPointer<UInt8>,
+                          width: Int, height: Int, bytesPerRow: Int,
+                          x0: Int, x1: Int, minDelta: Int = 2)
+        -> (base: Int, changed: Int, meanAbs: Int, changedMeanAbs: Int, signedMean: Int, maxAbs: Int) {
+        func luma(_ bytes: UnsafeBufferPointer<UInt8>, _ x: Int, _ y: Int) -> Int {
+            let i = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                        + 0.0722 * Double(bytes[i + 2])).rounded())
+        }
+        let lo = max(0, min(x0, x1 - 1)), hi = max(lo + 1, min(x1, width))
+        var edge = [Int: Int]()
+        for x in lo..<min(lo + 8, hi) {
+            for y in 0..<height { edge[luma(bytesA, x, y), default: 0] += 1 }
+        }
+        let bg = edge.max { $0.value < $1.value }?.key ?? 0
+        var changed = 0, sumAbs = 0, sumSigned = 0, n = 0, maxAbs = 0, sumAbsChanged = 0
+        for x in lo..<hi {
+            for y in 0..<height {
+                let d = luma(bytesB, x, y) - luma(bytesA, x, y)
+                n += 1
+                if abs(d) > minDelta { changed += 1; sumAbsChanged += abs(d) }
+                sumAbs += abs(d); sumSigned += d; maxAbs = max(maxAbs, abs(d))
+            }
+        }
+        guard n > 0 else { return (bg, 0, 0, 0, 0, 0) }
+        // `meanAbs` 把整块都算进分母 ⇒ 控件在 60x56 里占多大比例会直接改写它（两臂占的比例不同，
+        // 拿它当"按下的强度"是一句假等式）。`changedMeanAbs` 的分母是**变了的颗数**，
+        // 量的是"这一档动过的每一颗平均走多少灰阶"，两臂因此可比。
+        return (bg, changed, Int((Double(sumAbs) / Double(n)).rounded()),
+                changed > 0 ? Int((Double(sumAbsChanged) / Double(changed)).rounded()) : 0,
+                Int((Double(sumSigned) / Double(n)).rounded()), maxAbs)
+    }
+
     /// 字形墨（R263 / BACKLOG 291 的 `HistoryRowViews.swift` 那一行）：`row-favorite-*` 那两张里
     /// 那颗星的**笔画本体**，与 `pillReading` 故意量**不同的一层**。
     ///
@@ -5557,6 +5601,79 @@ final class UICaptureTests: XCTestCase {
                  + "（342 只判存在；亮档按下读到 0 颗是**带窗上界 Δ<60 把它整块排除**（无界尺读到块且 |Δ|≥60），见 346，不是系统没画按下）")
         }
         XCTAssertEqual(judged, 2, "两档里有一档没跑完参照臂 ⇒ 判据没有对象")
+    }
+
+    /// R295（305 的分母来源 + 342 的参照臂搬进同一条 render）：自家行与系统参照按钮的
+    /// 「按下 vs 空闲」走**同一颗逐像素差尺**、同一夹具通道（都经 `controlFrame`、同为 60x56）。
+    /// 本轮只判三件事：这条通道画得出真底、两态在同一坐标下量得出差别、且参照臂不是空的。
+    /// 台阶地板**一条都不加**（D-275）—— 分母要先由下面那行 `PRESS_PAIR_REF` 现读登记，
+    /// 305 才有一个不是拍出来的阈值可推。
+    func testPressTravelSharesOneRulerWithTheSystemReference() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r295-pairdelta-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        // 声明要在闭包之前：`bytes` 捕获它，Swift 不允许用声明在它之后的局部变量。
+        var retained = [NSBitmapImageRep]()
+
+        func bytes(_ fixtureName: String, _ appearance: NSAppearance.Name)
+            -> (data: UnsafeBufferPointer<UInt8>, width: Int, height: Int, stride: Int)? {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 " + fixtureName + " ⇒ 这一臂没有对象（342 的参照臂或自家的行被改名/删掉了）")
+                return nil
+            }
+            let file = scratch.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(fixtureName + "：渲染失败 " + String(describing: error)); return nil
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(fixtureName + "：读不回 " + file.lastPathComponent); return nil
+            }
+            // 缓冲区要**留活**：UnsafeBufferPointer 指向 rep 的内存，rep 一出作用域就是野指针。
+            retained.append(rep)
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            return (buf, rep.pixelsWide, rep.pixelsHigh, rep.bytesPerRow)
+        }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            guard let a = bytes("row-favorite-idle", appearance),
+                  let b = bytes("row-favorite-press", appearance),
+                  let ra = bytes("sysref-button-idle", appearance),
+                  let rb = bytes("sysref-button-press", appearance) else {
+                XCTFail(tag + "：四条臂里有一条例外没取到像素 ⇒ 本轮的读数没有对象"); continue
+            }
+            let ours = Self.pairDelta(bytesA: a.data, bytesB: b.data, width: a.width, height: a.height,
+                                      bytesPerRow: a.stride, x0: 0, x1: a.width)
+            let ref = Self.pairDelta(bytesA: ra.data, bytesB: rb.data, width: ra.width, height: ra.height,
+                                     bytesPerRow: ra.stride, x0: 0, x1: ra.width)
+            XCTAssertGreaterThan(ours.base, 0, tag + "：自家 idle 的底读 " + String(ours.base)
+                                 + " ⇒ 这条通道没画真底（R293 那一格），自家与参照同时不成立")
+            XCTAssertGreaterThan(ref.base, 0, tag + "：参照 idle 的底读 0 ⇒ 同上")
+            XCTAssertGreaterThan(ours.changed, 0, tag + "：按下与空闲逐像素相减为 0 颗 ⇒ 这一档在产物上真没画"
+                                 + "（先查 `pressedForCapture`，不许把它读成「不需要按下」）")
+            XCTAssertGreaterThan(ref.changed, 0, tag + "：系统参照按下与空闲没差别 ⇒ 参照臂没画，"
+                                 + "这一格修夹具不修判据")
+            XCTAssertNotEqual(ours.signedMean, 0, tag + "：整块平均带符号差为 0 ⇒ 上面那条「有差别」只是几颗噪声")
+            XCTAssertNotEqual(ref.signedMean, 0, tag + "：参照整块平均带符号差为 0 ⇒ 同上")
+            judged += 1
+            emit("PRESS_PAIR_REF " + tag
+                 + "｜自家 底=" + String(ours.base) + " 变=" + String(ours.changed) + "颗"
+                 + " 整块平均|Δ|=" + String(ours.meanAbs) + " 变颗平均|Δ|=" + String(ours.changedMeanAbs)
+                 + " 带符号=" + String(ours.signedMean)
+                 + " 峰|Δ|=" + String(ours.maxAbs)
+                 + "｜参照 底=" + String(ref.base) + " 变=" + String(ref.changed) + "颗"
+                 + " 整块平均|Δ|=" + String(ref.meanAbs) + " 变颗平均|Δ|=" + String(ref.changedMeanAbs)
+                 + " 带符号=" + String(ref.signedMean)
+                 + " 峰|Δ|=" + String(ref.maxAbs)
+                 + "（305 的地板只能建在「变颗平均|Δ|」上：整块平均被控件占的面积稀释，两臂占比不同 ⇒ 不可比）")
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没跑完 ⇒ 判据没有对象")
+        _ = retained
     }
 
     func testPressRungIsOrderedAboveTheHoverRung() throws {

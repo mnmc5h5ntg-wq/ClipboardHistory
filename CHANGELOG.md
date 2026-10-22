@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R295 / 第 294 轮 / Round 292 · 两态差换成逐像素相减，整块平均被证成面积假象）
+
+新增尺 `UICaptureHarness.pairDelta`（两态按同一坐标逐颗相减，报底、变化颗数、整块平均、变颗平均、带符号均值、峰值）
+与判据 `UICaptureTests/testPressTravelSharesOneRulerWithTheSystemReference`：自家 `row-favorite-idle/press`
+与系统 `sysref-button-idle/press` 走同一个函数、同一条 render。现读 `PRESS_PAIR_REF`：
+亮档 自家 底=255 变=1290颗 整块平均=3 变颗平均=29 峰=42／
+参照 底=255 变=7192颗 整块平均=28 变颗平均=52 峰=55；
+暗档 自家 30/1291颗/2/21/32／参照 30/7168颗/10/18/21。
+"整块平均差十倍"因此被判成**面积稀释**而不是产品结论（D-276），305 的地板分母改成变化颗数。
+刀 M860/M861 各钉一条轴（参照两态轴、变化计数轴），全 CAUGHT、RESTORE_CLEAN=yes。
+产品文件 0 个；帧 174 张、基线 changed=0 added=0。
+
 ### Improved（R294 / 第 293 轮 / Round 291 · 系统参照臂进夹具通道，照出 pillReading 带窗有上界）
 
 新增夹具 `sysref-button-idle` / `sysref-button-press` 与判据 `UICaptureTests/testSystemPressReferenceExistsOnTheFixtureChannel`：342 的参照臂搬进**会画真底的那条通道**，只判存在（两态画得出、底非 0、两态可分），台阶地板一条不加（D-274/D-275）。现读 `SYSTEM_PRESS_REF`：亮档底=255、按下 块=-1 颗=0、码值=13；暗档底=30、块 56→79、码值=23。亮档那 0 颗不是「系统没画按下」，而是 `pillReading` 带窗写死成 2<Δ<60 ⇒ Δ≥60 的强按下被整块排除（R294 实测：亮档按下 带内=0 颗、带外=7680 颗，Δ 前几名 74/66/76/72 ⇒ 这把尺对台阶**不单调**：按下越狠，读出来越是「没有块」而不是「块更大」）、原生按钮按下是变暗 —— 自家梯子亮档那一格因此可疑，新开 346。刀 M858/M859 各钉一条轴，全 CAUGHT、RESTORE_CLEAN=yes。产品文件 0 个；帧 174 张（`docs/frame_baseline.json` 同一笔 update）。
