@@ -376,6 +376,60 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 303 轮（R304 · U-995…U-999 · 2026-10-23）：第二批裸 stdout 搬完，顺手把「一次搬动要同步几处」数出来
+
+- **U-995：360 的第二批 —— 又搬掉三份判据卷的 13 行，覆盖率棘轮 42 → 现读 29。**
+  搬的是 `MotionDriverTests`（3：`RECEIPT_DRIVE` / `DERIVED_KEY_EXPANSION` / `BANNER_DRIVE`）、
+  `PressFeedbackTests`（5：`PRESS_AXIS` / `FILL_STEP`）、`SettingsFailureReceiptTests`
+  （5：`FEEDBACK_EXPORT_RECEIPT_TRUTH_TABLE` / `EXPORT_FEEDBACK_CHANNEL` / `ARCHIVE_TRANSFER_RECEIPT`
+  / `ARCHIVE_ACTION_CHANNEL` / `RECEIPT_FIXTURE_COPY`）—— 都是历轮写进过台账的数（按下台阶、
+  回执真值表、驱动调用点）。派生名册由 11 抬到 14 个（这三份搬完就干净了 ⇒ 不进名册就红「未纳管」），
+  按文件的未覆盖名单剩 15 条 / 29 行。两把新刀：M879 把 `BANNER_DRIVE` 那一行改回裸 stdout
+  ⇒ 红「盘上有 30 行」；M878 把 `MotionDriverTests.swift` 从下面那张通道表里删掉 ⇒
+  Swift 侧名字名册红「与名册不符」。刀表 2/2 全 CAUGHT、RESTORE_CLEAN=yes。
+- **U-996：本轮新增的那处账是**通道表**，不是第四张名单 —— 它是 R303 那格教训的制度化。**
+  `FrameIntervalBudgetTests` 的名字名册原来靠 `file == "UIInteractionProbeTests.swift"` 判断走哪条腿；
+  第二批搬完，那种单文件特例就会变成"漏一个文件 = 那份清单凭空消失而守卫仍绿"。
+  现在是一张显式 `emitChannel` 名单，M878 钉的正是「从名单里删一个名字」这件事必须红。
+  历史刀表也被本轮改动弄哑过一次：`R303` 的 M875/M876/M877 三根 needle 里，前两根的期望值写的是
+  **上一轮的数字**（43 / 42），名册形状也变了 ⇒ 预检 `bad=2`、表里 ESCAPED=1。重钉之后
+  `R303_MUTATE 刀=3 CAUGHT=3`、`R195/R196` 各自全 CAUGHT、预检 bad=0、ARM_TOTAL=748。
+  这正是 D-284 第二条说的事：改判据代码的那一轮必须跑预检，并把「命中 0 次 / 期望值过期」当本轮产出。
+- **U-997：361 被本轮量成了具体的数字 —— 一次搬动要同步 搬动本身 13 处调用 + 名册 2 张（Swift 通道名册 14 个名字、Swift 名字名册的 emitChannel 4 个名字）+ 电池那一卷的登记值 1 处与按文件未覆盖名单 15 条。**
+  也就是说「谁还在走会死的通道」这句话现在由**四处**各自记一份：判据源码的调用、Swift 通道名册、
+  Swift 名字名册的通道表、电池那一卷的登记值与按文件名单。四处都对，但没有一处是另一处的上游 ⇒
+  漏同步只会以「某一格红」或更糟的「某一格静默变空」出现。本轮把 361 的追记写成这个尺寸，
+  并给下一步定了形状：**先把「同步点数量」变成读数**（就是 搬动本身 13 处调用 + 名册 2 张（Swift 通道名册 14 个名字、Swift 名字名册的 emitChannel 4 个名字）+ 电池那一卷的登记值 1 处与按文件未覆盖名单 15 条 这句），再谈合并成一份数据。
+- **U-998：台账自己也被同一族的洞咬过，而且洞就在「现读」那两个字后面 —— 本轮数出 11 个并把它们填回。**
+  写这一节的生成器自己的键写错一格（注册成复数、正文写单数）就当场抓到一枚没替换的占位符；顺着同一形状
+  扫七本台账（`scripts/tests/test_ledger_tokens.py`），另有 **11 处历史洞**是历轮落盘时留下的：
+  BACKLOG 346 的「R296 结案」追记 7 处（那道 0 告警门的 warnings / incremental / cold / target 与刀的 CAUGHT / RESTORE_CLEAN），
+  305 的「R295」追记 4 处（`pairDelta` 的亮暗两侧自家与系统变颗平均）。也就是说这两格账在落盘之后
+  **从来没有被读过** —— 尤其 346 那一格正文写的正是「本机基线现读」。两处的值都从别处的同一批现读记录取回
+  （346 ← 同一单上一条「代码半」追记 + UI_AUDIT 第 295 轮的门行；305 ← 347 的追记 + `AGENT_DECISIONS.md` + 报告 §13，
+  亮 29 对 52、暗 21 对 18），并在台账里注明是取回而不是补的估计。
+  新门四格：正对照（注入三种真实漏法都要数出来）、反对照（`@MainActor` 一类属性标注、`@1x` 倍率写法、邮箱都不算洞，
+  冤枉人的门会被绕）、名单不许空转（七本都要在盘上且各大于 20000 字符）、正题（现读 stray=0）。
+  这一族归到 348 的第二格（写台账本身没有门）下追记，不另开单。
+
+- **U-999：⓪ 那条「成对号」的取数假设被本轮量穿了 —— 一轮里 push 的中间那几笔 commit 根本没有 run。**
+  `811c4fc`（R303 的账半）→ run 39825878608 **completed / failure**，红在 STEP[18] On-screen probe coverage floor，
+  正文是 `NOW_RUNS testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记说 runner 跑不了，而这次它下结论了（passed）` ⇒
+  照 runner 自己的点名把 `scripts/probe_coverage_expectations.json` 那一格翻回 can，并把
+  `test_todays_expectations_pair_green_with_todays_fixture` 的「红只许落在这几条」名单从两条抬成三条
+  （**不改夹具** —— 让旧读数替现在作证是 R194 那一条；夹具老了就以 NOT_RUN 的身份红出来，登记对了它自己会闭嘴）。
+  另一半是取数口：逐笔按 `actions/runs?head_sha=` 查，`b420967` / `4adc04f` / `5713c89` 的 **total_count=0**，
+  而 `811c4fc` / `8c63c46` / `ac1ed6b` / `8f6c300` / `f5a563a` 各有 1 跑。也就是说台账连着几轮写的那句
+  「不在最近 10 跑里（未读）」是**结构性不存在**而不是待读 —— 成因是 push 边界（一次 push 只给 tip 那笔建 run），
+  把它记成未读就是每轮重读一次不存在的东西。⇒ 新开 362，并把本轮 ⓪ 改写成「按 push 的 tip 列成对号」。
+  
+本轮产品文件 0 个（Tests / scripts / .scratch），连续零改动 **4** 轮
+（现读 `python3 scripts/product_streak.py --streak-for 303`：as-of 第 303 轮的最后一笔产品提交是
+6ac317f = 第 299 轮，即 R300 的代码半）。四件套现读：全量卷 933 / 失败 0、
+build 告警 0、帧 174 张 compared=174 changed=0、dmg=ok、换装 1.4.8。
+看图腿：本轮无新帧（产品 0 文件），读的是通道与名单的数；四件套取证目录 1158 行里热图 marker
+仍 0 行 ⇒ 359 仍开（重量，不沿用）。
+
 ## 第 302 轮（R303 · U-992…U-994 · 2026-10-23）：搬走一批裸 stdout，然后被自己搬出来的洞红了一次
 
 - **U-992：360 的第一步落地 —— 探针那一卷 15 行读数从裸 stdout 搬进 `CaptureReadings.emit`，棘轮跟着从 57 降到现读 42。**

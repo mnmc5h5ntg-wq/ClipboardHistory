@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R304 / 第 303 轮 / Round 301 · 第二批裸 stdout 搬进文件通道）
+
+360 的第二批：`MotionDriverTests`（3 行）、`PressFeedbackTests`（5 行）、`SettingsFailureReceiptTests`（5 行）里的读数改走 `CaptureReadings.emit`，覆盖率棘轮 42 → 现读 29，派生名册 11 → 14 个，按文件的未覆盖名单剩 15 条。Swift 那张名字名册补一张**显式通道表** `emitChannel`：上一轮靠 `file == 某一份` 判断走哪条腿，多搬一份之后那种特例就会让清单凭空变空而守卫仍绿。两把新刀：M878 从通道表里删一个名字 ⇒ Swift 侧红在与名册不符；M879 把一行改回裸 stdout ⇒ 电池红在盘上有 30 行。同轮把 `R303_MUTATE` 三根 needle 重钉（两根的期望值写的是上一轮的数字 42 / 43，预检 bad=2）⇒ 三张表全 CAUGHT，预检 bad=0、ARM_TOTAL=748。给 361 补一条实测尺寸：一次搬动要同步 搬动本身 13 处调用 + 名册 2 张（Swift 通道名册 14 个名字、Swift 名字名册的 emitChannel 4 个名字）+ 电池那一卷的登记值 1 处与按文件未覆盖名单 15 条。359 重量：四件套取证目录 1158 行里热图 marker 仍 0 行 ⇒ 仍开。另往回查了台账自己：本轮生成器把一个占位符的键注册成复数、正文写单数 ⇒ 顺着这个形状扫七本账，数出历史遗留的 11 处未替换洞（346 的 R296 结案追记 7 处、305 的 R295 追记 4 处，两处正文都写着「现读」），就地按别处的同一批现读记录填回，并新增 `scripts/tests/test_ledger_tokens.py`（4 格）与生成器的写盘前自扫。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 578 / OK (skipped=4)。
+
 ### Improved（R303 / 第 302 轮 / Round 300 · 搬走一批裸 stdout，名册换成按通道读）
 
 360 的第一步：`UIInteractionProbeTests.swift` 的 15 行读数改走 `CaptureReadings.emit`，覆盖率棘轮随之从 57 降到现读 42（登记值与未覆盖名单同一轮改）。三把新刀：M875 把一行改回裸 stdout ⇒ 红在盘上有，M876 把登记值抬到 43 去容纳现状 ⇒ 红在登记值是（R74 的「放宽要成对」在这一格落地），M877 把刚进派生名册的文件删掉 ⇒ 红在未纳管。本轮真正的产出是一次 ESCAPED：`FrameIntervalBudgetTests` 那张 R143 建的读数名册是按「print 加左引号」找读数的，搬动之后刀 M731（把标记 KEYCHAIN_FKA 改名）红不出来 —— 它把读数的名字和读数的通道绑成了一件事。名册因此改成按通道读（该文件现登记 53 行 / 42 种标记，整张表合计 77 行），M731 重跑 CAUGHT（D-284）。同轮还复活的三根哑针：R195 的 M728/M729 与 R196 的 M731 因整行字面量锚点漂了命中 0 次（预检 bad=3），重钉后 `R195_MUTATE 刀=4/4`、`R196_MUTATE 刀=2/2`、`R303_MUTATE 刀=3/3` 三张表全 CAUGHT，预检 bad=0、ARM_TOTAL=746。新开 361（三张名单并存，缺一处上游）。359 本轮重量：四件套取证目录 1158 行里热图 marker 仍 0 行 ⇒ 仍开。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 571 / OK (skipped=4)。
