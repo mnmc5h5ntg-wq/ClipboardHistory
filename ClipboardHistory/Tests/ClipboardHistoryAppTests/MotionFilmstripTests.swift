@@ -85,41 +85,25 @@ final class MotionFilmstripTests: XCTestCase {
         filmsDirectory.appendingPathComponent("motion-readings.log")
     }
 
-    /// 每个进程第一次写要**整份重写**：上一遍的读数冒充这一遍，比没有读数更坏
-    /// （`MOTION_RESOLVE_SUMMARY judged=4/4` 会是从昨天带上来的）。
-    nonisolated(unsafe) static var readingsOpened = false
-
     /// 实例侧的同名转发。Swift 不允许实例方法不加限定地调静态成员（编译期就挡），
     /// 而 44 处读数散在两种语境里 —— 与其到处写 `Self.emit`，不如让两条语境共用一个名字。
     private func emit(_ line: String) { Self.emit(line) }
 
     /// 打一行读数，**并且**把它记进文件通道。所有 `MOTION_*` 行都必须走这里
     /// （`testMotionReadingsUseTheFileChannel` 钉着这条规矩）。
+    /// 打一行读数，**并且**把它记进文件通道。所有 `MOTION_*` 行都必须走这里
+    /// （`testMotionReadingsUseTheFileChannel` 钉着这条规矩）。
+    ///
+    /// R302 / BACKLOG 358：这里原来**自己实现**了一遍两条腿（stdout 一条、FileHandle 追加一条，
+    /// 再加一颗共享布尔做首次整份重写），和 `CaptureReadings` 里那份是同一件事写了两遍。
+    /// 问题不是重复十行代码，是**只有一份被锤过**：R79 / BACKLOG 112 在 CI 日志里抓到过
+    /// 「两个线程同时看见没开过 ⇒ 两边都做整份重写 ⇒ 后写的把前一份整卷抹掉」，解法是按 URL 记首次、
+    /// 进程内一把锁、**一整行一次 write** —— 这三样当时只长在 `CaptureReadings` 那一侧，
+    /// 而这份没锁的版本每天在写 44 条动效读数。现在只剩一层壳：通道语义（含「文件坏了不许把
+    /// 判据变红、但必须被看见」）由 `CaptureReadings` 单独负责，本文件也因此能进
+    /// 「零裸 stdout」的名册（`UICaptureTests.testCaptureReadingsUseTheFileChannel`）。
     static func emit(_ line: String) {
-        print(line)
-        guard let payload = (line + "\n").data(using: .utf8) else { return }
-        let url = readingsURL
-        do {
-            if !readingsOpened {
-                readingsOpened = true
-                try payload.write(to: url)
-                return
-            }
-            let handle = try FileHandle(forWritingTo: url)
-            handle.seekToEndOfFile()
-            handle.write(payload)
-            try? handle.close()
-        } catch {
-            // 文件通道坏了**不许**把判据变成红（那是拿环境问题判产品）。
-            // 但它必须被看见。这一行为什么故意不叫 `MOTION_*`：它不是一条读数，而是
-            // "文件通道坏了"这件事本身，且只能走 stdout。带上 MOTION_ 前缀就会被
-            // `testMotionReadingsUseTheFileChannel` 的扫描判成"有条读数没进文件"——
-            // 而那正是它要抓的形状，所以这条元信息**不能**借用读数的命名空间
-            // （否则任何人加一行 `print("MOTION_…")` 都能把那条扫描变成恒红，或者反过来
-            //  逼守卫开一个"例外名单"，例外名单就是这种规矩腐烂的地方）。
-            // 通道坏的真信号在下一步：文件里没有结论行，CI 会打 `MOTION_READINGS_FILE_ABSENT=1`。
-            print("READINGS_FILE_FAILED=\(type(of: error)) 路径=\(url.path)")
-        }
+        CaptureReadings.emit(line, to: readingsURL)
     }
 
     /// 判据：一次过渡 = **有好几帧都还在变**，而不是"某一帧变了很大一片"。
@@ -3886,17 +3870,18 @@ final class MotionFilmstripTests: XCTestCase {
         // 而守卫一直绿。**发现它靠的是去数文件里有多少行，不是靠守卫报警。**
         // ⇒ 一条靠"列举形式"的扫描，形式一多就会漏；改成"两个必要条件同时成立"。
         let quote = "\""
+        let printCall = "pr" + "int("   // R302/358：本文件进了名册，被搜的串不许原样出现在自己文本里（R55 的 M276 同族）
         let readingPrefix = "MOTION"
-        let positiveControl = ["  print(" + quote + readingPrefix + "_X 1)",
-                               "  print(String(format: " + quote + readingPrefix + "_Y %@\", a))",
-                               "  print(" + quote + readingPrefix + " \(name) frames=1)",
+        let positiveControl = ["  " + printCall + quote + readingPrefix + "_X 1)",
+                               "  " + printCall + "(String(format: " + quote + readingPrefix + "_Y %@\", a))",
+                               "  " + printCall + quote + readingPrefix + " \(name) frames=1)",
                                "  emit(" + quote + readingPrefix + "_Z 1)"]
-        let caught = positiveControl.filter { $0.contains("print(") && $0.contains(quote + readingPrefix) }
+        let caught = positiveControl.filter { $0.contains(printCall) && $0.contains(quote + readingPrefix) }
         XCTAssertEqual(caught.count, 3,
             "正对照只抓到 \(caught.count)/3 种写法 ⇒ 这条扫描本身是坏的（第 4 条是 emit，必须**不**被抓到），"
                 + "下面那句\"没有游离读数\"因此什么都没说")
         let strays = source.components(separatedBy: "\n").filter { line in
-            line.contains("print(") && line.contains(quote + readingPrefix)
+            line.contains(printCall) && line.contains(quote + readingPrefix)
         }
         XCTAssertTrue(strays.isEmpty,
             "有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
@@ -7051,7 +7036,7 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
         wasActive = NSApp.isActive
-        print("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
+        MotionFilmstripTests.emit("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
 
         let grabber = Grabber(view: scroll, limit: 24)
         let prerollDeadline = Date().addingTimeInterval(0.15)
@@ -7130,7 +7115,7 @@ private final class TableProbe: NSObject, NSTableViewDataSource, NSTableViewDele
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
         wasActive = NSApp.isActive
-        print("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
+        MotionFilmstripTests.emit("NATIVE_PROBE_STATE visible=\(window.isVisible) key=\(window.isKeyWindow) active=\(NSApp.isActive)")
         // 起点必须已经是选中第 0 行 —— 否则"写同一个选中"这一臂就不成立
         // （从"没选中"到"选中 0"本身就是一次真的选中变化）。
         table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)

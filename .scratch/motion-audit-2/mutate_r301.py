@@ -29,10 +29,12 @@ HARNESS = 'ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swif
 
 N_EMIT = u'    static func emit(_ line: String) { CaptureReadings.emit(line) }'
 R_EMIT_STDOUT = u'    static func emit(_ line: String) { pri' + u'nt(line) }'
-N_ROSTER = (u'        let roster = ["UICaptureHarness.swift", "HeatmapHoverEvidenceTests.swift",\n'
-            u'                      "CaptureReadings.swift"]')
-R_ROSTER_GONE = (u'        let roster = ["UICaptureHarness.swift", "HeatmapHoverEvidenceTestsRenamed.swift",\n'
-                 u'                      "CaptureReadings.swift"]')
+# R302 把名册从 3 个名字扩成 10 个（派生集上门），这一根的 needle 跟着换到当前形状，
+# 否则 M871 会变成「needle 命中 0 次」的哑刀（DID-NOT-RUN 不是通过，D-234 同一族）。
+N_ROSTER = (u'        let roster = ["CaptureReadings.swift", "DailyCopyHeatmapTests.swift",\n'
+            u'                      "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",\n')
+R_ROSTER_GONE = (u'        let roster = ["CaptureReadings.swift", "DailyCopyHeatmapTests.swift",\n'
+                 u'                      "FrameIntervalBudgetTestsRenamed.swift", "HeatmapHoverEvidenceTests.swift",\n')
 
 GUARD = 'UICaptureTests/testCaptureReadingsUseTheFileChannel'
 

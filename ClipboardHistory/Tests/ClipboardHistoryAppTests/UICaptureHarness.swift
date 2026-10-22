@@ -392,12 +392,20 @@ final class UICaptureTests: XCTestCase {
         // 本地一行都拿不到，只能靠一把刀把界写成 0.0 让它红一次才逼出数字。
         // 现在按名册扫：名单里少一个文件（改名/删掉）就红，"没扫到"永远不等于"扫过了"。
         let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        // 名册为什么不含 `MotionFilmstripTests.swift`：它自带一颗 R56 时代的 `emit` 实现，
-        // 里面**合法地**有 `print(line)`（那就是它的第二条腿）、还有它自己正对照里的字面量。
-        // 把它塞进这张绝对零 print 的名册，等于把合法实现判成违规 —— 那正是"白名单"要解决的形状，
-        // 而白名单是下一次绕过去的入口（R55 的 M276）。**同一件事两份实现**本身是欠账：新开 358。
-        let roster = ["UICaptureHarness.swift", "HeatmapHoverEvidenceTests.swift",
-                      "CaptureReadings.swift"]
+        // R302 / BACKLOG 358：`MotionFilmstripTests.swift` 现在**在**名册里。
+        // 上一轮它进不来，因为那里自带一颗 R56 时代的 `emit` 实现，合法地写着裸 stdout（那是它的
+        // 第二条腿）—— 把它塞进这张绝对零 print 的名册等于把合法实现判成违规，而那正是白名单要
+        // 解决的形状（白名单是下一次绕过去的入口，R55 的 M276）。正确处置不是开白名单，是**删掉
+        // 重复的那份实现**：它没有按 URL 记首次、也没有锁，而 R79 / BACKLOG 112 锤过的坏法只修在
+        // `CaptureReadings` 那一侧。现在它只剩一层壳，名册就扫得到它了。
+        // R302 / BACKLOG 358：名册不再手挑 —— 它必须等于**派生集**（用 `emit(` 且代码里零裸 stdout 的文件），
+        // 派生与对账由 `scripts/tests/test_readings_channel_coverage.py` 在脚本电池里钉住：
+        // 少一个名字（哪怕只是把名册改短）就红，多一个已经不干净的名字也红。
+        let roster = ["CaptureReadings.swift", "DailyCopyHeatmapTests.swift",
+                      "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",
+                      "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
+                      "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",
+                      "MotionFilmstripTests.swift", "UICaptureHarness.swift"]
         var strays: [String] = []
         for name in roster {
             let url = dir.appendingPathComponent(name)
