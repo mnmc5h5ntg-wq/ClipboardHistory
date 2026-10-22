@@ -98,7 +98,9 @@ def is_source(path):
     第一版只认 `.swift` ⇒ `mutate_r96_triage`（它注入的是 `scripts/ui_probe_report.py`）
     被当成"抽不出臂"，而那句解释写的是"needle 藏在 lambda 里"—— **一个错的解释盖住了一次漏覆盖**。
     """
-    return path.endswith(".swift") or path.endswith(".py")
+    # R296：门本体的刀住在 bash 里（mutate_r296 的 M863 改的是 scripts/warning_gate.sh），
+    # 白名单漏 .sh ⇒ 那把针恒报「命中 0」，预检 exit 1 —— 尺看不见不等于针不存在。
+    return path.endswith((".swift", ".py", ".sh"))
 
 
 
