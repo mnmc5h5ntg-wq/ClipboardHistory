@@ -14,13 +14,7 @@
 
 ## R295 状态（第 294 轮 / Round 292 · 2026-10-22）
 
-⓪ 读 CI：本笔 push 之后由 R296 用 `gh run list --limit 6 --json databaseId,headSha,status,conclusion`
-（字段要连成**一个**逗号串，R293 那一课）现取 run↔commit 成对登记；取不到的写明「push 在台账之后」，别编号。
-要验的两件事：① 新判据 `testPressTravelSharesOneRulerWithTheSystemReference` 在 runner 上**有没有对象** ——
-它读的是夹具通道，而 runner 的离屏 render 历史上画不出真底；若两臂底读 0，那是通道账（342/346 那一族），
-按 313/316 解释，一条地板都不放宽（D-251）；② `PRESS_PAIR_REF` 两行在 runner 上的**变颗平均**与本机是否同量级
-（亮 29/52、暗 21/18）—— 不同也只登记不改判据，尤其不许把参照臂改成
-"runner 上能过"的形状。只登记不轮询（R140）。
+⓪ 读 CI（R297 的开场取数，只登记不轮询 = R140）：成对关系要现取，取不到的写明「push 在台账之后」而不是编一个号 —— 用 `gh run list --limit 8 --json databaseId,headSha,status,conclusion`（字段连成一个逗号串，R293 那一课），再 `python3 scripts/ci_read.py steps <run>` 与 readings。要配对的三笔：R295 的 5f7dc7b（本机读到 run 39780211456 当时 in_progress、结论未读；它前面两笔 cbd05b9 与 1c6155b 已读到 success）；R296 代码半两笔 c7b952f 与 36f8d4a（push 在这段台账之后 ⇒ 号由 R297 现取）。要验的三件事：① 新判据 testPressTravelSharesOneRulerWithTheSystemReference 在 runner 上有没有对象 —— 它读夹具通道，而 runner 的离屏 render 历史上画不出真底；两臂底若读 0 那是通道账（342/346 那一族），按 313/316 解释，一条地板都不放宽（D-251）；② PRESS_PAIR_REF 两行在 runner 上的变颗平均（本机：亮 自家 29 / 参照 52，暗 21 / 18）与本机是否同量级 —— 不同也只登记，不许把参照臂改成 runner 上能过的形状；③ 新门 scripts/warning_gate.sh 只在本机验过（M862/M863 两把刀 CAUGHT、基线 exit 0），runner 那一侧它从没跑过：CI 的 STEP[4] 仍按自己的告警口径走，两边若给相反处置，那是接线缺失不是阈值问题（R74/R75 那一课）。
 
 最后更新：2026-10-22（本地 · R295 / 第 294 轮 / Round 292）：**两态差的分子被推翻并重做** ——
 `PRESS_LADDER_SPAN` 的 27/29 是两帧各自众数之差（不同源），新尺 `pairDelta` 逐像素相减；
