@@ -547,6 +547,7 @@
 
 **下一轮（R240 / 第 239 轮 / Round 237）的靶**：
 ⓪ 读 CI：`python3 scripts/ci_read.py latest` 现拿 run↔commit 成对（别轮询）。未读的三笔：`RUN=39351035433 sha=6927880 status=in_progress conclusion=`（空 ⇒ 只能说未读）、
+⓪ 续（R293 之后 push 的六笔，交给 R294 第 ⓪ 条）：1cb8446 → 39746101918 / in_progress / 未读、2ecd569 → 39745244448 / in_progress / 未读、bd12f4b → 39744426884 / in_progress / 未读、c1bee12 → 39743534010 / completed / success、1a488c6 → 39743282481 / completed / success、1dfc04d → 39742725697 / completed / success。要验的两件事：① 这一批里若有红，先按**步骤名**逐条落账再归因（R149：别只盯自己新加的那一步）；② 本轮新入库的 `scripts/tests/test_final_report_section1_cell.py` 与 `refresh_report_section1.py` 都靠现跑 `curve_from_ledger.py` 取数，而 runner 的浅历史与工作目录不同 ⇒ 「本机绿」不配替 runner 签字（R131）。只登记不轮询，R140。
    `39350006461↔3e90ab4`、`39347522293↔7b7495d`；要验 STEP[4] 是否转绿、`SEAM_READER_ISOLATION` 那一行、以及**电池认不认两种形状**（250/270 的 runner 半）。编译红没恢复前下游红不当产品读数。
 ① 把 272 的尺搬进 `scripts/`：两口径各一版（变化带均值 / 控件局部对比度）、配正负对照、名单为空=红，再决定 251 亮档要不要动 `VisualFill.hover`。
 ② 给 251 第三处（`DetailView.swift:609`）补两态帧 —— 现在 `detail-*` 里 hover/idle 对数=0。
