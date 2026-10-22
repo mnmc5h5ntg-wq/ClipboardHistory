@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed（R297 / 第 296 轮 / Round 294 · 346 结案：带窗上界去掉，漏电地板换成相对判据）
+
+`pillReading` 的候选带去掉上界 `d < 60` —— 它把强填充（系统参照按钮亮档按下 Δ≈70）整块排除，
+于是「按得很狠」与「根本没画」在读数上同形。改前先做实验（临时去掉上界跑整卷 `UICaptureTests`）：
+只有两格红且同一成因（idle 众数 6 颗边缘 → 47 颗星形笔画，撞上写死的 40 颗），其余地板不动
+⇒ 台账里「会挪十几条地板」那句推测被证伪。两处「空闲不许有第二层」换成相对判据
+`idle.pillPixels × 4 < 同档那一层的像素数`；参照臂那格的 `if pillPixels == 0` 出口升成无条件断言。
+刀 M864（给 idle 夹具真的接上悬停键 ⇒ 红「空闲帧也量到一整片第二层」）与
+M865（把上界装回去 ⇒ 红「去掉带窗上界之后仍数不到按下那一块」）各钉一侧，全 CAUGHT、RESTORE_CLEAN=yes。
+结案读数：`SYSTEM_PRESS_REF light` 按下 颗=0 → 颗=934（与无界尺同数）。
+新开 349（两颗尺该合并）与 350（轮标题 U 区间与定义行对账，先量形状再上门）。
+产品文件 0 个；全量卷 932/44 skip/0 失败、帧 174 张 changed=0、
+门 ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests、预检 bad=0、脚本电池 Ran 548 / OK (skipped=4)。
+
 ### Improved（R296 / 第 295 轮 / Round 293 · 0 告警变成一道能拦的门，预检补上 bash 的可见性）
 
 新增 `scripts/warning_gate.sh`：与 CI 的 STEP[4] 编同一个目标（`--build-tests`），数到 0 时换全新
