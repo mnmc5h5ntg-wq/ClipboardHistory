@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R306 / 第 305 轮 / Round 303 · 第三批读数进文件通道 + 编号尺抬齐）
+
+四份判据卷共 14 行裸 stdout 读数改走 `CaptureReadings.emit`，裸 stdout 棘轮 29 → 现读 15（登记值同源改下来，两向各有刀），派生名册 14 → 18；Swift 那张标记名册的显式通道表补两个名字 —— 这两份文件本来就在被登记的 8 个文件里，读数换了腿而不加通道，名册就会按 print 去找已经不存在的形状。三把刀 M882 / M883 / M884 分别钉登记值、通道表、编号尺，3/3 CAUGHT、RESTORE_CLEAN=yes；因为改了 6 份 Swift，按 D-284 第二条重跑 R301 / R302 / R303 / R304 四张历史表全部 CAUGHT、预检 bad=0。363 结案：`test_ledger_ids.py` 七支三位正则抬成 `\d{3,4}` 并配四位正/反对照，位数只打成读数（D-287 定了宽度约定：不用 `\d+`，那会把引用式写法数进定义行）。354 第三步交账：runner 那一跑（39837096189 / 90fa327）现读 MOTION_FLOOR_SUITE_CLEAN=0 这一卷没有红用例（汇总行也没说有）｜机器=github-runner ⇒ 本机登记的 2 条没露面，而门在「没露面」那一支直接 return、连一行都不打 ⇒ 转成第四步（缺席要能被打点），不据此删登记。看图腿 RUN：重捕 174 张帧、changed=0。看的是本轮重捕帧里的四张（`settings-stats-populated` 两档、`heatmap-cell-strip-still/hover`、`quickpick-list-dark` 与 `quickpick-typed-dark`）
+
 ### Improved（R305 / 第 304 轮 / Round 302 · 动效红名的登记按机器切片）
 
 354 的第二步：`suite_reds` 每条登记现在必须带 `machine`，闸门只认这台机器那份 —— testNativeRowMoveIsVisibleToTheRuler / testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt 两条登记只属于 github-runner（run 39795800668），本机同码不红；缺机器键 ⇒ `MOTION_FLOOR_SUITE_UNSCOPED` 红；只在他机登记过的红 ⇒ 本机照旧红并另打 `MOTION_FLOOR_REGISTERED_ELSEWHERE`；退场提示按机器切。闸门卷 39 → 44 格，其中一格直接读**活账**证明登记在自己机器上真的顶用；两把刀 M880 / M881 打在闸门源码上，2/2 CAUGHT、RESTORE_CLEAN=yes、预检 tables=99 arms=750 bad=0。同轮抬宽编号尺：`U_DEF` / `U_RANGE` 从 `\d{3}` 到 `\d{3,4}`，配三位/四位两向对照；D 与 BACKLOG 号的同类假设新开 363。另记一次自伤并当场修：把机器键插在 `judged=` 前会让 CI 的 report-only 契约三格一起红，改打行尾；`test_skip_roster` 那朵是同源的第二个形状不是独立缺陷。产品文件 0 个；四件套沿用上一笔现读（告警 0、全量卷 933/失败 0、帧 174 changed=0、dmg=ok、换装 1.4.8，取数口 /tmp/r304_verify_run.log），看图腿与换装本机本轮 NOT-RUN；电池 Ran 586 / OK (skipped=4)。

@@ -376,6 +376,59 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 305 轮（R306 · U-1003…U-1006 · 2026-10-23）：第三批裸 stdout 搬完，编号尺一次抬齐，看图腿回到 RUN，354 的 runner 证人到了
+
+- **U-1003：360 的第三批 —— 四份判据卷 14 行搬进文件通道，棘轮 29 → 现读 15，派生名册 14 → 18。**
+  搬的是 `OffscreenSymbolInkProbeTests`（4：`INK 前提` / `INK 逐枚` / `INK 产品设置侧栏` / `INK 结论`）、
+  `Round4MarkdownTests`（4：`COLOR_PROBE` + 三条 `MARKDOWN_PERF`）、`CapturePathWriteBudgetTests`
+  （3：`CAPTURE_PATH_BLOCKED` / `CAPTURE_PATH_BUDGET` / `CAPTURE_PATH_FULL_ARCHIVE`）、
+  `PerfBudgetTests`（3：`PERF[...]` / 小图采样 / 稳态一次比较）。
+  同步点本轮数是**四处**：判据源码的调用、电池那一卷的登记值（29→15）、按文件的未覆盖名单（15 份 29 行→
+  11 份 15 行）、Swift 那张名字名册的通道表（+`OffscreenSymbolInkProbeTests` +`PerfBudgetTests`，
+  因为它们本来就在那 8 个文件的标记名册里 ⇒ 换了腿就得换通道）。三处都有证人：
+  M882 写回一行裸 print ⇒ 红在「盘上有 登记值+1 行」（这一格的期望正文也是派生的）；M883 从通道表删名字 ⇒ Swift 红在与名册不符；
+  M884（下面那格）打在编号尺上。刀 3/3 全 CAUGHT、RESTORE_CLEAN=yes。
+  而**重跑历史表**（D-284 第二条）这一格今天交出了五把坏刀：`mutate_r301` 的 M871 与 `mutate_r302` 的 M873
+  钉在 Swift `roster` 的**头两行**，本轮按字母序插入新文件名把头部挤走 ⇒ 命中 0 次 = NOT_RUN；
+  `mutate_r303` 的 M875/M876 与 `mutate_r304` 的 M879 把**棘轮旧值手抄进 needle 与期望正文**（「盘上有 30 行」，
+  而同一张表的文件头还写着 43 ⇒ 一份表里三个数）⇒ WRONG_CELL / NOT_RUN。两根改成钉名单尾行（字母序只往上插），
+  三根改成从守卫文件**现读登记值再派生** needle 与期望（与 R298「让判据自己定位生日」同一修法：
+  推迟腐烂不是修，自己找数才是），本轮自己的 M882 也一并改成派生 —— 它原本写着「盘上有 16 行」，下一批搬完一样会烂。
+  另把 r302 加进本轮的历史表名单（它也被本轮改过的文件喂着）。
+- **U-1004：363 结案 —— D 号与 BACKLOG 条目号的三位假设一起抬成 `\d{3,4}`，位数只当读数不当判据。**
+  现读最大 D-287、条目 364（都还是三位），而 R305 已经演示过一次三位假设坏掉的形状是**静默降级**：
+  匹配不到就被读成「这条引用不存在 / 这节没有区间」，于是"引用了就必须有正文"那格安静地不再判任何东西。
+  本轮把 `DEC_DEF_HEADING_ONLY` / `BOLD_DEF` / `DEC_DEF` / `CITED` / `ITEM` / `ITEM_HEADING_ONLY` / `ITEM_BOLD`
+  七支一起抬宽，并加三格：四位决定号要被认到（正对照，期望值**从 findall 的元组形状摊平后比**，
+  我第一版按单组心算 ⇒ 红在自己写的期望上）、四位条目号两形都认到、三位存量形状仍然认到；
+  最后一格只 `print` 现读位数（`D_ID_BOUNDARY 决定最大=D-287 位数=3｜条目最大=364 位数=3`）不做断言 ——
+  R305 那格「还没越界」在越界当天红过一次，这次不再犯同一个错。
+  **这一格是被自己的刀逼出来的一处真洞**：M884 第一版把 `DEC_DEF_HEADING_ONLY` 从 `\d{3,4}` 改回 `\d{3}`，
+  26 格全绿 ⇒ `ESCAPED`。刀没坏，是判据缺一根轴 —— 那两支对照尺只在**真台账**上跑，而真台账今天全是三位号，
+  所以"对照尺认得四位"这件事从来没有断言证过。补两条断言（标题形对照要认到 `D-1000`、粗体形对照要认到 `D-1001`）
+  之后 M884 才红在该点名的那一格。这与「临时尺要配正对照」同族，但这次的证人是一把打空的刀，比推理便宜且不可辩驳。
+- **U-1005：看图腿回到 RUN —— 看的是本轮重捕的 174 张帧（174 张进基线对账、changed=0、missing=0）。**
+  看的是本轮重捕帧里的四张（`settings-stats-populated` 两档、`heatmap-cell-strip-still/hover`、`quickpick-list-dark` 与 `quickpick-typed-dark`）⇒ 三条判断，头两条把我自己的看图怀疑量没了：① 看浮层那两张时怀疑「搜索框的字比列表左移了一档」，同源读数不支持 —— `OVERLAY_HOVER` 现读 药丸 x=44…795 与 灰带 x=44…795（左差=0px 右差=0px），`QUICKPICK_FOCUS` 的占位字带内包围盒左沿=45px（亮）/44px（暗）⇒ 与药丸左沿差 ≤1px，怀疑不成立、不开单；② 统计页那句「右下角是今天」在帧里右边缘是 3 月而本机是 10 月，读代码确认夹具注入的是 `heatToday`（`DailyCopyHeatmapView(counts:today:calendar:)` 的 `today:` 形参，产品不读 Date()）⇒ 那是夹具的固定锚，不是产品缺陷；③ 亮档设置侧栏那五枚图标仍比暗档淡（暗档是可辨的白，亮档是浅灰）⇒ 这一格不自开新单，它就是 172 的另外一半（判成通道、要真机眼），本轮没有新的可量通道，也不据此说它好或坏。本轮 0 个产品文件 ⇒ 没有新画面形状要判；看图腿记 RUN（本轮真的重捕并逐张看），不记沿用。
+
+- **U-1006：354 的 runner 证人到了，而它说的是「这一跑没红」⇒ 这张登记表缺的不是证据，是退场通道。**
+  现读 run 39837096189（sha 90fa327，结论 success）的 STEP「Motion coverage floor」：MOTION_FLOOR_SUITE_CLEAN=0 这一卷没有红用例（汇总行也没说有）｜机器=github-runner
+  —— 也就是这台机器（github-runner）这一跑**一条红用例都没有**，而 `suite_reds` 里为它登记着 2 条
+  （testNativeRowMoveIsVisibleToTheRuler / testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt）。同一格在上一跑 39833209888 也是 CLEAN=0 ⇒ **连续两跑没红**。
+  这一格不许读成「登记被证伪」：两条登记的理由自己写着出现率 1/17 与 1/7，一跑不红本就在预期之内
+  （D-251：单遍读数既不配给产品定罪，也不配替产品脱罪）。真正的缺口在门自己身上 ——
+  `suite_verdicts` 在 `not named and summary == 0` 那一支直接 `return`，于是"本机登记的名字这一跑没露面"
+  连一行都不打 ⇒ 登记可以无限期留在表里慢慢变成免检牌堆；arms 那一侧早就有 `MOTION_FLOOR_STALE`
+  专治这一格（判到了就点名删条目），`suite_reds` 这一侧没有对应物。同跑另两行现读：
+  `MOTION_FLOOR_OK=4/4`、`MOTION_FLOOR_REDS=0`。⇒ 354 加**第四步**：缺席要能被打点，而不是再等一跑。
+
+本轮产品文件 0 个（Tests / scripts / .scratch），连续零改动 **6** 轮
+（现读 `python3 scripts/product_streak.py --streak-for 305`：as-of 第 305 轮的最后一笔产品提交是
+6ac317f = 第 299 轮）。四件套现读（本轮重跑）：全量卷 933 / skip 44 / 失败 0、
+build 告警 0、帧 174 张 compared=174 changed=0 missing=0、dmg=ok、换装 1.4.8。
+覆盖率现读：判据文件 99 份、用文件通道 18 份、名册 18 个、裸 stdout **15 行 = 登记值**；
+Swift 名字名册合计 77 行、覆盖 8 份文件。预检 tables=100 arms=753 bad=0、
+R301 / R302 / R303 / R304 四张历史表本轮全 CAUGHT；电池 Ran 589 / OK (skipped=4)。
+
 ## 第 304 轮（R305 · U-1000…U-1002 · 2026-10-23）：动效那两朵红有了按机器的登记，而编号本身越了界
 
 - **U-1000：354 的第二步落地 —— `suite_reds` 从一张全局名单变成按机器切片的名单，2 条登记只属于 github-runner。**
