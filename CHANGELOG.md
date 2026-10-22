@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R294 / 第 293 轮 / Round 291 · 系统参照臂进夹具通道，照出 pillReading 方向瞎）
+
+新增夹具 `sysref-button-idle` / `sysref-button-press` 与判据 `UICaptureTests/testSystemPressReferenceExistsOnTheFixtureChannel`：342 的参照臂搬进**会画真底的那条通道**，只判存在（两态画得出、底非 0、两态可分），台阶地板一条不加（D-274/D-275）。现读 `SYSTEM_PRESS_REF`：亮档底=255、按下 块=-1 颗=0、码值=13；暗档底=30、块 56→79、码值=23。亮档那 0 颗不是「系统没画按下」，而是 `pillReading` 只认比底亮的墨、原生按钮按下是变暗 —— 自家梯子亮档那一格因此可疑，新开 346。刀 M858/M859 各钉一条轴，全 CAUGHT、RESTORE_CLEAN=yes。产品文件 0 个；帧 174 张（`docs/frame_baseline.json` 同一笔 update）。
+
 ### Improved（R293 / 第 292 轮 / Round 290 · 按下档的跨度读数与系统参照臂的死法）
 
 `UICaptureTests/testPressRungIsOrderedAboveTheHoverRung` 里新增一条**只印不判**的 `PRESS_LADDER_SPAN`：按下离空闲走多少灰阶、离悬停走多少灰阶 —— 现读亮 27／6、暗 29／8（PRESS_LADDER_SPAN light｜|按下-空闲| 码值=27 ｜|按下-悬停| 码值=6（305 的地板还没来源：系统参照臂要换通道重做，见 342））。这一格把 R262 那句「亮档 hover 与 press 肉眼分不出」从形容词变成数（6 灰阶），也把 305 真正要判的对象钉清楚：是**离悬停的增量**，不是离空闲的总量。为它试过一条系统参照臂（AppKit 按钮走 `cacheDisplay`），本机现读两档底都=0 ⇒ 台阶全是拿黑底当参照，对象闸门在亮档红（按下态第二层像素=0）⇒ 探针撤掉，另开 342 走夹具窗口重做。本轮**没有产品改动**：地板的来源未成立之前抬 alpha 就是把「我觉得不够明显」写成契约。四件套 ROUND_VERIFY build_warnings=0 swift_executed=930 swift_skipped=44 swift_failures=1 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r293_verify；脚本电池 Ran 540 tests / OK (skipped=4，名单逐条对上=4 条)；预检 tables=89 covered=73 bad=0；CI：63cc715 → 39732589843 / completed / failure／217be91 → 39732491219 / completed / failure／79b7950 → 未取到（293）（只登记不轮询）。
