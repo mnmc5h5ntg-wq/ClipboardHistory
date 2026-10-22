@@ -18,7 +18,7 @@
 **本轮落地**：`UICaptureHarness.swift` 的梯子那一格里新增 `PRESS_LADDER_SPAN`（只印不判）：PRESS_LADDER_SPAN light｜|按下-空闲| 码值=27 ｜|按下-悬停| 码值=6（305 的地板还没来源：系统参照臂要换通道重做，见 342）；PRESS_LADDER_SPAN dark｜|按下-空闲| 码值=29 ｜|按下-悬停| 码值=8（305 的地板还没来源：系统参照臂要换通道重做，见 342）。系统参照臂（`cacheDisplay` 抽系统按钮）本机现读两档底都=0 ⇒ 撤探针，另开 342；两种坏法自曝（恒真的自比断言、带符号量当增量）→ D-274。判据卷现读 Executed 1 / failures=0；PRESS_LADDER_PROOF light 底 idle=255 hover=255 press=255｜药丸 idle=196 hover=229 press=223｜比值 1.260 → 1.333 差=0.073｜码值台阶 hover=26 press=32 差=6｜按下像素=933 空闲像素=6；预检 tables=89 covered=73 bad=0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=930 swift_skipped=44 swift_failures=1 frames=170 baseline_compared=170 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r293_verify；脚本电池 Ran 540 tests / OK (skipped=4，名单逐条对上=4 条)。305 追记进场、地板仍不定。
 
 **下一轮（R294 / 第 293 轮 / Round 291）的 ⓪**：
-⓪ 读 CI：63cc715 → 39732589843 / completed / failure、217be91 → 39732491219 / completed / failure、79b7950 → 未取到（293） 加本两笔（只登记不轮询，R140）。要验的是 R292 那笔修完之后 **STEP[15]/STEP[17] 那三跑同形红是否消失**（红话「行带里只数到 2 个墨簇」不该再出现）；若仍在，回到单位这一层继续查，不许改成 skip。
+⓪ 读 CI：63cc715 → 39732589843 / completed / failure、217be91 → 39732491219 / completed / failure、79b7950 → 未取到（293） 加本两笔（只登记不轮询，R140）。要验的是 R292 那笔修完之后 **STEP[15]/STEP[17] 那三跑同形红是否消失**（红话「行带里只数到 2 个墨簇」不该再出现）；若仍在，回到单位这一层继续查，不许改成 skip。 —— 本笔读数已交（R293 收尾）：63cc715 那跑的红在 STEP[4] 的告警（正文与 48 条计数见 340 追记），STEP[5..14] 整段 skipped ⇒ **340 的第④条这次无从判定**，不许当成红消失；本两笔 5253bf4／125884d 的 run 由下一轮成对取（只登记不轮询，R140）。
 ① **342 → 305**：给系统控件加夹具（画真底那条路），先让「参照系存在」的闸门绿，再谈台阶地板；两机各读一次才升硬门。
 ② 动效过程（连续五轮 0 文件，垫底那一维）：314 热图那圈描边的语义、291 墨轴。
 ③ 341 剩下的半（`ci_capture_gate.py` 的 `skipped=` 是 CI 契约行，改名要连 workflow 与它的断言一起动）、339、312 具名出口（欠第十六轮，本机 3.000 不许降，D-251）、333、335、334、310、338 的另一半、328、323、322、317、304。

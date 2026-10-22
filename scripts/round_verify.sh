@@ -15,11 +15,15 @@ mkdir -p "$RUN"
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 W=NA; T=NA; S=NA; F=NA; FR=NA; BC=NA; VER=NA; DMG=NA
 
-echo "[1/4] swift build"
-( cd "$ROOT/ClipboardHistory" && swift build ) > "$RUN/build.log" 2>&1
+echo "[1/4] swift build --build-tests"
+# R293 自曝：这里原来只 `swift build` ⇒ 编译的是产品目标，测试目标从来没编过，
+# 于是 `build_warnings=0` 是一半覆盖的尺。CI 的 STEP[4] 带的正是 `--build-tests`
+# （workflow 注释里写着 R59/BACKLOG 87 就为这件事改过 CI，本机四件套漏了同一个坑），
+# runner 那朵告警红（UICaptureHarness 的 withUnsafeBytes unused）因此在本机绿了三轮。
+( cd "$ROOT/ClipboardHistory" && swift build --build-tests ) > "$RUN/build.log" 2>&1
 W=$(grep -c "warning:" "$RUN/build.log" 2>/dev/null); W=${W:-0}   # 不用 `|| echo 0`：grep -c 已经打 0，那半句会再补一行 ⇒ W 变成两行
 
-echo "[2/4] 全量 swift test（日志只留 $RUN）"
+echo "[2/4] 全量 swift test（日志只留 ${RUN}）"
 ( cd "$ROOT/ClipboardHistory" && swift test ) > "$RUN/full.log" 2>&1
 LINE=$(grep -E "Executed [0-9]+ tests" "$RUN/full.log" | tail -1)
 T=$(printf '%s' "$LINE" | grep -oE "Executed [0-9]+ test" | grep -oE "[0-9]+" | tail -1); T=${T:-NOT-RUN}
