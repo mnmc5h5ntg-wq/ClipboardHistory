@@ -4893,7 +4893,11 @@ final class UICaptureTests: XCTestCase {
         for x in lo..<hi {
             for y in 0..<height {
                 let d = abs(luma(x, y) - bg)
-                if d > 2 && d < 60 { band[luma(x, y), default: 0] += 1 }
+                // 346：上界 `d < 60` 去掉。它原来把「按得很狠的填充」（Δ≥60，例如系统参照按钮
+                // 亮档按下 Δ≈70）整块排除，于是强反馈在尺下读成缺席 —— 与「没画」同形而处置相反。
+                // 去掉之后 idle 的众数会落到星形笔画（47 颗），那两格「空闲不许有第二层」的地板因此
+                // 从绝对颗数换成与同档药丸面积相比（见下面两处 XCTAssertLessThan）。
+                if d > 2 { band[luma(x, y), default: 0] += 1 }
             }
         }
         // 注意方向：`max(by:)` 要的是 `areInIncreasingOrder`（"a 是否小于 b"）。
@@ -4911,10 +4915,11 @@ final class UICaptureTests: XCTestCase {
 
     /// **346 的第一半：把带窗外的那部分墨量出来，让盲区自己可见。**
     ///
-    /// 为什么不动 `pillReading`：它的带窗（`2 < Δ < 60`）被一堆既有地板与比值依赖（悬停差、
-    /// 收藏星墨、右轴…），一次改带窗等于同时挪十几条地板 —— 那要先重测（R147 那一课）。
-    /// 这一颗尺只做一件事：**不设上界**，并报**带符号**的台阶，于是"按下变暗到 Δ≈70"这种
-    /// 强反馈不再读成缺席。两者读数不一致，本身就是那条"不单调"的证据。
+    /// 与 `pillReading` 的关系（R297 更新）：那一颗尺的带窗**上界已经去掉**（346 结案），两者现在只差
+    /// 「报不报带符号台阶」这一件事。上一版这里写的是「刻意不动 pillReading，因为带窗被一堆地板依赖」——
+    /// 实验之后那句不成立了：临时去掉上界跑整卷 `UICaptureTests`，只有两格红，且同一个成因
+    /// （idle 的众数从 6 颗边缘变成 47 颗星形笔画，撞上写死的 40 颗），其余地板一动不动 ⇒ 依赖只有那两条，
+    /// 而它们本来就该换成相对判据（本轮已换）。旧注释留着会让下一轮以为这颗无界尺是备用的第二把。
     static func wideBlockReading(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
                                  bytesPerRow: Int, x0: Int, x1: Int, minDelta: Int = 2)
         -> (background: Int, block: Int, signedStep: Int, pixels: Int) {
@@ -5461,7 +5466,10 @@ final class UICaptureTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(hoverRead.ratio, minimum,
                                         "\(tag)档悬停药丸对它自己的底只有 \(String(format: "%.3f", hoverRead.ratio))"
                                         + "（下界 \(minimum)）⇒ 这一档反馈淡到没有读者")
-            XCTAssertLessThan(idleRead.pillPixels, 40,
+            // 相对判据（346）：空闲那一帧的第二层面积必须**远小于**同档悬停药丸。
+            // 旧版写死 40 颗，是「把带窗当尺时量出来的数」；带窗上界去掉后 idle 的众数变成星形笔画的 47 颗，
+            // 那条绝对阈值就会以另一个理由红 —— 门槛要量出来（R83），更要绑在被判对象自己身上。
+            XCTAssertLessThan(idleRead.pillPixels * 4, hoverRead.pillPixels,
                               "\(tag)：空闲那一帧也量到了一整片第二层（\(idleRead.pillPixels) 像素）⇒ "
                               + "取证通道漏电：没有指针、也没点亮的情况下它自己亮了")
 
@@ -5584,7 +5592,11 @@ final class UICaptureTests: XCTestCase {
                                  tag + "：无界尺也读不到任何块 ⇒ 参照臂这次是真没画（不是掉出带窗）")
             // 346 的牙：带窗尺读到缺席时，无界尺必须读到块 —— 否则「没画」与「画得太狠掉出带窗」
             // 这两种成因在读数上同形，而处置完全相反（前者修夹具，后者修尺）。
-            if press.pillPixels == 0 {
+            // 346 之后这一格改成无条件断言：带窗上界已去掉，读不到块就是真没画（原来的 `== 0` 分支
+            // 是给「画得太狠掉出带窗」留的出口，那个出口本身是缺陷，不该长期留在判据里）。
+            XCTAssertGreaterThan(press.pillPixels, 0,
+                                 tag + "：去掉带窗上界之后仍数不到按下那一块 ⇒ 346 的修法没生效，或参照臂真没画")
+            if false {   // 346 之后不可达（上面已无条件断言 pillPixels > 0）；留着只为对照旧出口，正文由上面接管
                 XCTAssertGreaterThan(press.widePixels, 0,
                                      tag + "：带窗尺 0 颗而无界尺也 0 颗 ⇒ 分不清缺席的成因，"
                                      + "这一格是尺的缺席不是产品的缺席（346）")
@@ -5785,7 +5797,7 @@ final class UICaptureTests: XCTestCase {
                  + "｜|按下-空闲| 码值=" + String(abs(press.step - idle.step))
                  + " ｜|按下-悬停| 码值=" + String(abs(press.step - hover.step))
                  + "（305 的地板还没来源：系统参照臂要换通道重做，见 342）")
-            XCTAssertLessThan(idle.pillPixels, 40,
+            XCTAssertLessThan(idle.pillPixels * 4, press.pillPixels,
                               tag + "：空闲帧也量到一整片第二层（" + String(idle.pillPixels) + " 颗）⇒ 取证通道漏电，"
                               + "上面三条读数全部作废")
             // **令牌 ↔ 像素 的一致性** —— 这一格才是"台阶画错档"的证人，而它跟上面三条判的是不同的话：
