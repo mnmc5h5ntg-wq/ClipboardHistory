@@ -44,11 +44,11 @@ ROUND_HEADERS = (REPO / "AGENT_UI_AUDIT.md", REPO / "AGENT_VISUAL_ITERATION.md")
 # 近来的轮次写成 `### D-150（R92）标题`（36 条），另有 `### D-037 追补：…` 这种补记行。
 # ⇒ 定义 = 二/三级标题 + 编号开头；轮次标签只写在括号里，不作为闸门的一部分。
 # R238 之前的字面，保留**只**给「老形状仍算定义」那格当对照用。
-DEC_DEF_HEADING_ONLY = re.compile(r"^#{2,3} (D-\d{3})\b", re.M)
-BOLD_DEF = re.compile(r"^\*\*(D-\d{3})（", re.M)
+DEC_DEF_HEADING_ONLY = re.compile(r"^#{2,3} (D-\d{3,4})\b", re.M)
+BOLD_DEF = re.compile(r"^\*\*(D-\d{3,4})（", re.M)
 # 定义行 = 标题 ∪ 粗体定义行，写成**一支**正则：两半同生同死，
 # 不许出现「两份实现各自判、其中一份坏了另一份掩盖」那种形状。
-DEC_DEF = re.compile(r"^(?:#{2,3} (D-\d{3})\b|\*\*(D-\d{3})（)", re.M)
+DEC_DEF = re.compile(r"^(?:#{2,3} (D-\d{3,4})\b|\*\*(D-\d{3,4})（)", re.M)
 
 
 def ids_from(text):
@@ -56,7 +56,7 @@ def ids_from(text):
     return [m.group(1) or m.group(2) for m in DEC_DEF.finditer(text)]
 # 轮次标题行：`## 第 95 轮 · R93：…` / `## Round 93 · …`
 HEADER = re.compile(r"^## (?:第 \d+ 轮|Round \d+) ·.*$", re.M)
-CITED = re.compile(r"\bD-(\d{3})\b")
+CITED = re.compile(r"\bD-(\d{3,4})\b")
 
 
 def strip_definition(text, victim):
@@ -158,9 +158,9 @@ class LedgerIdTests(unittest.TestCase):
 # 本文件原本只查 D 编号（①③两条），所以这件事**没有任何守卫会红** ——
 # 我是靠 `grep -n "^15[0-3]\."` 数出来的。守卫的覆盖面比它声称的窄，这本身就是缺陷。
 BACKLOG = REPO / "AGENT_BACKLOG.md"
-ITEM = re.compile(r"^(?:\*\*)?(\d{3})\. ", re.M)   # R239：标题形 ∪ 粗体形（一支正则两种形状）
-ITEM_HEADING_ONLY = re.compile(r"^(\d{3})\. ", re.M)   # 老字面，只当对照用
-ITEM_BOLD = re.compile(r"^\*\*(\d{3})\. ", re.M)      # 新认的那一半，也只当对照用
+ITEM = re.compile(r"^(?:\*\*)?(\d{3,4})\. ", re.M)   # R239：标题形 ∪ 粗体形（一支正则两种形状）
+ITEM_HEADING_ONLY = re.compile(r"^(\d{3,4})\. ", re.M)   # 老字面，只当对照用
+ITEM_BOLD = re.compile(r"^\*\*(\d{3,4})\. ", re.M)      # 新认的那一半，也只当对照用
 # R305 的边界轮：下一节要写 U-1000，四位数。
 # 原来这两支只认三位 ⇒ 到 1000 那天，标题里的区间**匹配不到**（`missing_in_declared_u_range`
 # 直接返回 None = "形状变了"，那一格从此对最新一节静默），而定义行一支也数不到 ⇒
@@ -509,3 +509,53 @@ class FourDigitUIdBoundaryTests(unittest.TestCase):
                                 u"最新一节只数到 %d 条定义行 ⇒ 正对照本来就是空的" % len(newest))
         print(u"U_ID_BOUNDARY 现读最大=U-%d 位数=%d 最新一节定义行=%d"
               % (max(ids), len(str(max(ids))), len(newest)))
+
+
+class FourDigitDAndItemIdTests(unittest.TestCase):
+    """R306 / 363：把 R305 在 U 号上学到的那一课搬到另外两支尺子上（决定号与 BACKLOG 条目号）。
+
+    三条正则原本写死三位，坏法与 U 那两支**完全同形**：四位那天不是红，是被读成
+    「这一条不存在 / 这一节没有区间」，于是"标题引用了 D-xxx 就必须有正文"那格安静地不再判任何东西。
+    这里不预测哪天越界，只钉两件事：① 合成的四位号必须被认到（正对照）；
+    ② 三位号仍然被认到（不许因为抬宽就漏了存量形状）。现读的位数只打成一行读数。
+    """
+
+    def test_four_digit_decision_ids_are_recognised(self):
+        block = (u"### D-1000（R999）标题\n正文\n"
+                 u"**D-1001（R999）：粗体形**\n")
+        # 期望值不心算：DEC_DEF 是两支 alternation、每组各两个捕获组，所以先摊平再比。
+        found = sorted({g for pair in DEC_DEF.findall(block) for g in pair if g})
+        self.assertEqual([u"D-1000", u"D-1001"], found,
+                         u"四位的决定正文行没被认到 ⇒ 越界那天会报「引用了却没正文」的假矛盾")
+        self.assertEqual([u"1000", u"1001"], CITED.findall(u"见 D-1000 与 D-1001 两格"))
+        # 两支**对照尺**也要各自见过四位号。为什么这一格要单独钉：R306 的刀 M884 一开始把
+        # `DEC_DEF_HEADING_ONLY` 改回三位，全卷仍然绿 —— 因为它只在**真台账**上跑，而真台账今天
+        # 全是三位号，于是"它认得四位"这件事从来没有任何断言证过（刀打空，ESCAPED 说得对）。
+        # 对照尺存在的意义就是"证明并集没漏形状"，没见过四位的对照尺在越界那天同样会静默降级。
+        self.assertEqual([u"D-1000"], DEC_DEF_HEADING_ONLY.findall(block),
+                         u"标题形那支对照尺认不出四位的决定号 ⇒ 它只在三位存量上跑过，越界那天会截断或漏读")
+        self.assertEqual([u"D-1001"], BOLD_DEF.findall(block),
+                         u"粗体形那支对照尺认不出四位的决定号 ⇒ 同上：对照尺也要见过四位形状")
+
+    def test_four_digit_backlog_items_are_recognised(self):
+        text = (u"**1000. 标题形条目**：正文\n"
+                u"1001. 老字面条目：正文\n"
+                u"**999. 三位那条仍然要在**：正文\n")
+        self.assertEqual([u"1000", u"1001", u"999"], ITEM.findall(text),
+                         u"条目号集合不对 ⇒ 抬宽之后要么漏了四位要么丢了三位存量形状")
+        self.assertEqual([u"1000", u"999"], ITEM_BOLD.findall(text))
+        self.assertEqual([u"1001"], ITEM_HEADING_ONLY.findall(text))
+        self.assertEqual(set(), set(ITEM_BOLD.findall(text)) & set(ITEM_HEADING_ONLY.findall(text)),
+                         u"两形出现同一个号 ⇒ 并集去重的前提被这一份合成样本破坏了")
+
+    def test_the_live_ids_are_reported_not_assumed(self):
+        """现读的位数只印成读数，不当判据（R305 的教训：写死"还没越界"的断言会在越界当天红）。"""
+        dec = (REPO / "AGENT_DECISIONS.md").read_text(encoding="utf-8")
+        ids = sorted({int(g[2:]) for pair in DEC_DEF.findall(dec) for g in pair if g})
+        self.assertTrue(ids, u"一条决定正文都没认到")
+        biggest = max(ids)
+        items = backlog_items()
+        self.assertTrue(items, u"一条 BACKLOG 条目都没认到")
+        print(u"D_ID_BOUNDARY 决定最大=D-%d 位数=%d｜条目最大=%d 位数=%d 条目数=%d"
+              % (biggest, len(str(biggest)), max(int(x) for x in items),
+                 len(str(max(int(x) for x in items))), len(set(items))))

@@ -199,9 +199,12 @@ final class FrameIntervalBudgetTests: XCTestCase {
         let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         // R304：搬进 emit 的文件变成一张表（不是单个 if）—— 每搬一份就要在这里换一次通道，
         // 否则名册会像 R303 那样对「标记被改名」瞎掉（刀 M878 钉这一侧）。
+        // R306：第三批里有两份住在这张名册的 8 个文件之内 —— 它们的读数换了腿，
+        // 于是通道表必须跟着加名字（D-284：名册登记的是名字，通道是另一件事，两者都要显式）。
         let emitChannel: Set<String> = [
             "UIInteractionProbeTests.swift", "PressFeedbackTests.swift",
             "SettingsFailureReceiptTests.swift", "MotionDriverTests.swift",
+            "OffscreenSymbolInkProbeTests.swift", "PerfBudgetTests.swift",
         ]
         func channel(_ file: String) -> String { emitChannel.contains(file) ? emitNeedle : printNeedle }
         var measured: [String: [String]] = [:]

@@ -30,15 +30,11 @@ HARNESS = os.path.join(TESTS_DIR, "UICaptureHarness.swift")
 
 # ── 登记值（R302 现读 `python3 scripts/tests/test_readings_channel_coverage.py` 之外
 #    的唯一来源是下面的 `measure_corpus()`，不许手抄别处的数）────────────────
-BARE_PRINT_LINE_CEILING = 29
+BARE_PRINT_LINE_CEILING = 15
 
 # 未覆盖的账，按**文件**登记（本轮量到的裸 stdout 行数 > 0 且确实发了读数的卷）。
 # 这张表的作用是"下一轮该搬谁"，不是豁免名单：名册那一格不看它，棘轮那一格也不放过它。
 NAMED_UNCOVERED = {
-    "OffscreenSymbolInkProbeTests.swift": 4,
-    "Round4MarkdownTests.swift": 4,
-    "CapturePathWriteBudgetTests.swift": 3,
-    "PerfBudgetTests.swift": 3,
     "ControlHoverLadderTests.swift": 1,
     "DocumentationAnchorTests.swift": 1,
     "FileThumbnailTests.swift": 1,
@@ -50,6 +46,7 @@ NAMED_UNCOVERED = {
     "PressInteractionProbeTests.swift": 2,
     "SystemSymbolValidityTests.swift": 1,
     "WindowChromeLayoutTests.swift": 3,
+# R306：第三批 OffscreenSymbolInkProbeTests 4 + Round4MarkdownTests 4 + CapturePathWriteBudgetTests 3 + PerfBudgetTests 3 = 14 行搬进 emit，这张表从 15 份 29 行退到 11 份 15 行（WindowChromeLayoutTests 那 3 行本轮没搬，留在表里）。
 # R304：MotionDriver / PressFeedback / SettingsFailureReceipt（3 + 5 + 5 行）同族搬进 emit，
 #   于是三行从这张表退场、Swift 那张名册的 emitChannel 多三个名字。
 # R303：UIInteractionProbeTests 那 15 行已搬进 CaptureReadings（FOCUS-CHAIN / TAB-KEY-CHAIN / AX-VISITED /

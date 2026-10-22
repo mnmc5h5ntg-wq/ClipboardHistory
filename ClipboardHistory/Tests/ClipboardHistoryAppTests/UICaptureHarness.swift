@@ -401,7 +401,9 @@ final class UICaptureTests: XCTestCase {
         // R302 / BACKLOG 358：名册不再手挑 —— 它必须等于**派生集**（用 `emit(` 且代码里零裸 stdout 的文件），
         // 派生与对账由 `scripts/tests/test_readings_channel_coverage.py` 在脚本电池里钉住：
         // 少一个名字（哪怕只是把名册改短）就红，多一个已经不干净的名字也红。
-        let roster = ["CaptureReadings.swift", "DailyCopyHeatmapTests.swift",
+        let roster = ["CapturePathWriteBudgetTests.swift", "CaptureReadings.swift",
+                      "DailyCopyHeatmapTests.swift", "OffscreenSymbolInkProbeTests.swift",
+                      "PerfBudgetTests.swift", "Round4MarkdownTests.swift",
                       "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",
                       "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
                       "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",

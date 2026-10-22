@@ -619,7 +619,7 @@ final class Round4MarkdownTests: XCTestCase {
                                 under: .darkAqua)
         let differs = abs(bakedDark.g - dark.g) > 0.01 || abs(bakedDark.b - dark.b) > 0.01
         XCTAssertTrue(differs, "烤色与动态色在暗色下解析成同一个值 ⇒ 这条守卫没有判别力")
-        print("COLOR_PROBE dynamic_dark=(\(dark.r),\(dark.g),\(dark.b)) baked_dark=(\(bakedDark.r),\(bakedDark.g),\(bakedDark.b))")
+        CaptureReadings.emit("COLOR_PROBE dynamic_dark=(\(dark.r),\(dark.g),\(dark.b)) baked_dark=(\(bakedDark.r),\(bakedDark.g),\(bakedDark.b))")
     }
 
     func testMarkdownPresentationDoesNotBakeDynamicColours() throws {
@@ -712,7 +712,7 @@ final class Round4MarkdownTests: XCTestCase {
         let document = MarkdownParser.parse(adversarial)
         let rendered = MarkdownPresentation.attributedString(for: document)
         let elapsed = Date().timeIntervalSince(start)
-        print("MARKDOWN_PERF adversarial_40k_ms=\(Int(elapsed * 1000)) runs=\(document.blocks.first?.runs.count ?? 0)")
+        CaptureReadings.emit("MARKDOWN_PERF adversarial_40k_ms=\(Int(elapsed * 1000)) runs=\(document.blocks.first?.runs.count ?? 0)")
         XCTAssertLessThan(elapsed, 2.0, "解析+构建 40000 个未闭合标记超过 2 秒：主线程会被冻住")
         XCTAssertTrue(rendered.string.contains("a"))
 
@@ -720,12 +720,12 @@ final class Round4MarkdownTests: XCTestCase {
         let denseStart = Date()
         let denseRendered = MarkdownPresentation.attributedString(for: MarkdownParser.parse(dense))
         let denseElapsed = Date().timeIntervalSince(denseStart)
-        print("MARKDOWN_PERF dense_40k_ms=\(Int(denseElapsed * 1000)) length=\(denseRendered.length)")
+        CaptureReadings.emit("MARKDOWN_PERF dense_40k_ms=\(Int(denseElapsed * 1000)) length=\(denseRendered.length)")
         XCTAssertLessThan(denseElapsed, 2.0)
 
         let richStart = Date()
         _ = MarkdownPresentation.attributedString(for: MarkdownParser.parse(sample))
-        print("MARKDOWN_PERF real_sample_ms=\(Int(Date().timeIntervalSince(richStart) * 1000))")
+        CaptureReadings.emit("MARKDOWN_PERF real_sample_ms=\(Int(Date().timeIntervalSince(richStart) * 1000))")
     }
 
     // MARK: - 夹具

@@ -166,7 +166,7 @@ final class CapturePathWriteBudgetTests: XCTestCase {
                        + "不是排在后台队列里 ⇒ 目标里那句「采集路径上不许有同步磁盘写」不成立")
         XCTAssertFalse(FileManager.default.fileExists(atPath: ledgerURL.path),
                        "账本在 `add` 返回之前就已经落盘 ⇒ 去抖没起作用")
-        print(String(format: "CAPTURE_PATH_BLOCKED add 用时=%.3fms 空转基线=%.3fms 倍率=%.2f 地板倍率=%.2f 绝对值=%@（只印不判）",
+        CaptureReadings.emit(String(format: "CAPTURE_PATH_BLOCKED add 用时=%.3fms 空转基线=%.3fms 倍率=%.2f 地板倍率=%.2f 绝对值=%@（只印不判）",
                      elapsed, idle, elapsed / max(idle, 0.001), Self.blockedRatioReference,
                      String(format: "%.2fms", Self.blockedQueuePrintOnlyMilliseconds)))
         // 比值**只印不判**（R271 现读把这条判据证伪了）：干净三跑的倍率是 1.13 / 1.05 / 0.96，
@@ -237,7 +237,7 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         let median = Self.percentile(samples, 0.5)
         let p95 = Self.percentile(samples, 0.95)
         let worst = samples.max() ?? 0
-        print(String(format: "CAPTURE_PATH_BUDGET n=%d median=%.2fms p95=%.2fms max=%.2fms 门槛=%.0fms",
+        CaptureReadings.emit(String(format: "CAPTURE_PATH_BUDGET n=%d median=%.2fms p95=%.2fms max=%.2fms 门槛=%.0fms",
                      samples.count, median, p95, worst, Self.budgetMilliseconds))
 
         XCTAssertLessThanOrEqual(median, Self.budgetMilliseconds,
@@ -312,7 +312,7 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         blocked.signal()
         let median = Self.percentile(samples, 0.5)
         let p95 = Self.percentile(samples, 0.95)
-        print(String(format: "CAPTURE_PATH_FULL_ARCHIVE n=%d 库=%d 条 median=%.2fms p95=%.2fms 门槛=%.0fms",
+        CaptureReadings.emit(String(format: "CAPTURE_PATH_FULL_ARCHIVE n=%d 库=%d 条 median=%.2fms p95=%.2fms 门槛=%.0fms",
                      samples.count, seeding.entries.count, median, p95, Self.fullArchiveBudgetMilliseconds))
         XCTAssertGreaterThanOrEqual(samples.count, Self.minimumSampleCount)
         XCTAssertLessThanOrEqual(median, Self.fullArchiveBudgetMilliseconds,

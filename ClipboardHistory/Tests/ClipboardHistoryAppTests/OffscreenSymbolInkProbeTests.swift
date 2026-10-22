@@ -189,7 +189,7 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
                                  size: NSSize(width: 360, height: 300))
         let bands = rowBands(frame)
         let strip = ink(frame, x: Self.iconColumn, yRange: 0...(frame.height - 1))
-        print("INK 前提(固定色, Button 包装)：整列图标墨水=\(String(format: "%.4f", strip)) 文字行数=\(bands.count)")
+        CaptureReadings.emit("INK 前提(固定色, Button 包装)：整列图标墨水=\(String(format: "%.4f", strip)) 文字行数=\(bands.count)")
         XCTAssertGreaterThan(strip, 0.01, "固定色都画不出来：这条管线不能用来判图标可见性")
     }
 
@@ -225,7 +225,7 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
                 size: NSSize(width: 360, height: 300))
             readings[name] = ink(frame, x: Self.iconColumn, yRange: 0...(frame.height - 1))
         }
-        print("INK 逐枚 " + readings.keys.sorted().map {
+        CaptureReadings.emit("INK 逐枚 " + readings.keys.sorted().map {
             "\($0)=\(String(format: "%.4f", readings[$0] ?? 0))"
         }.joined(separator: " "))
         for (name, value) in readings {
@@ -279,8 +279,8 @@ final class OffscreenSymbolInkProbeTests: XCTestCase {
                          + (fraction < 0.005
                             ? "（亮\(signed.brighter)/暗\(signed.darker)）" : ""))
         }
-        print("INK 产品设置侧栏(语义色) \(lines.joined(separator: " "))")
-        print(collapsed == 0
+        CaptureReadings.emit("INK 产品设置侧栏(语义色) \(lines.joined(separator: " "))")
+        CaptureReadings.emit(collapsed == 0
               ? "INK 结论 产品侧栏五个图标都画得出来 ⇒ 可以按帧判图标可见性"
               : "INK 结论 \(collapsed)/\(SettingsCategory.allCases.count) 行的图标列是 0.0000，"
                 + "而同一套管线里固定色的同款符号能画到 0.18 以上 ⇒ "

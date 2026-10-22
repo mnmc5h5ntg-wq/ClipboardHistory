@@ -33,11 +33,21 @@ REPL_CHANNEL = u'            "SettingsFailureReceiptTests.swift",\n'
 NEEDLE_LINE = u'        CaptureReadings.emit("BANNER_DRIVE 调用点 \\(gates.count) 个、键 \\(keys.count) 条、"'
 REPL_LINE = u'        pri' + u'nt("BANNER_DRIVE 调用点 \\(gates.count) 个、键 \\(keys.count) 条、"'
 
+# R306：期望正文原本手抄「盘上有 30 行」，而棘轮每搬一批就降一格 ⇒ 抄的那个数当天就过期
+# （同一份表里 M878 还活着，只有这一把 WRONG_CELL）。改成从守卫文件现读登记值再 +1，表不再需要跟着搬动改。
+with io.open(os.path.join(ROOT, 'scripts/tests/test_readings_channel_coverage.py'),
+             encoding='utf-8') as _handle:
+    _ceil = re.search(r'^BARE_PRINT_LINE_CEILING = (\d+)', _handle.read(), re.M)
+if not _ceil:
+    sys.stderr.write(u'R304_PRECHECK_FAILED 读不到 BARE_PRINT_LINE_CEILING ⇒ 期望正文无从派生，不出表\n')
+    sys.exit(1)
+CEIL_NOW = int(_ceil.group(1))
+
 ARMS = [
     ('M878', u'通道表里删掉一个搬过的名字 = 那份文件的名字清单必须红', ROSTER,
      NEEDLE_CHANNEL, REPL_CHANNEL, GUARD_SWIFT, u'与名册不符'),
     ('M879', u'把搬好的读数改回裸 stdout = 棘轮上界有牙', DRIVER,
-     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 30 行'),
+     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 %d 行' % (CEIL_NOW + 1)),
 ]
 
 EXECUTED = re.compile(r'Executed (\d+) tests?, with (\d+) failures?')

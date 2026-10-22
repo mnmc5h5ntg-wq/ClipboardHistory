@@ -33,7 +33,7 @@ final class PerfBudgetTests: XCTestCase {
         let fastest = samples.min() ?? .infinity
         let slowest = samples.max() ?? 0
         let mean = samples.reduce(0, +) / Double(max(samples.count, 1))
-        print("PERF[\(test)] \(what)：最快\(String(format: "%.2f", fastest))ms 均值"
+        CaptureReadings.emit("PERF[\(test)] \(what)：最快\(String(format: "%.2f", fastest))ms 均值"
             + "\(String(format: "%.2f", mean))ms 最慢\(String(format: "%.2f", slowest))ms"
             + "（阈值 \(threshold)ms，n=\(samples.count)，load1=\(String(format: "%.1f", load1))"
             + " 活跃核=\(ProcessInfo.processInfo.activeProcessorCount)）")
@@ -139,7 +139,7 @@ final class PerfBudgetTests: XCTestCase {
             what: "图片比较 冷（同字节重复）"
         )
 
-        print("PERF 小图采样（200x150，仅打印）=\(String(format: "%.2f", smallSampleMs))ms")
+        CaptureReadings.emit("PERF 小图采样（200x150，仅打印）=\(String(format: "%.2f", smallSampleMs))ms")
 
         XCTAssertTrue(twinPairs[0].0 == twinPairs[0].1, "同字节的两张图必须判为同一张")
         XCTAssertNotEqual(coldPlain, coldMarked, "同尺寸不同内容不得被判为同一张")
@@ -153,7 +153,7 @@ final class PerfBudgetTests: XCTestCase {
         // 所以"再复制一张新图"只该付**一次**采样，而不是每次两张。
         let anotherNew = try markedStoredImage(size: NSSize(width: 3200, height: 2100))
         let warmMs = milliseconds { _ = (coldPlain == anotherNew) }
-        print("PERF 稳态一次比较（一侧已焐热）=\(String(format: "%.1f", warmMs))ms（冷=\(String(format: "%.0f", largeSampleMs))ms）")
+        CaptureReadings.emit("PERF 稳态一次比较（一侧已焐热）=\(String(format: "%.1f", warmMs))ms（冷=\(String(format: "%.0f", largeSampleMs))ms）")
 
         // 判据改用**计数**而不是计时。CI 的 2 核 runner 上冷/热差值会被调度噪声吃掉 ——
         // `f7398f3` 就是这样假红的（冷 34.5ms、热 40.7ms，"热 < 冷"必然失败，而缓存其实是好的）。

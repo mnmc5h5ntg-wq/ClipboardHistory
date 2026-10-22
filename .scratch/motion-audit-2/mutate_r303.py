@@ -8,7 +8,7 @@ FOCUSCHAIN-RING / RINGVIEWS）改走 `CaptureReadings.emit`，于是
 ① 棘轮的登记值从 57 降到现读的 42；② 那份文件从「未覆盖名单」退场、并进派生集 ⇒ 名册 11 个。
 
 三把刀各钉一个新面：
-· M875 **反方向的上界**：把其中一行改回裸 stdout ⇒ 棘轮必须红在「盘上有 43 行」。
+· M875 **反方向的上界**：把其中一行改回裸 stdout ⇒ 棘轮必须红在「盘上有 N+1 行」（N 由表现读登记值，不抄常数）。
 · M876 **棘轮的下界**（R74：放宽要成对两刀）：把登记值本身抬到 43（模拟「修好了却没重登」
   之外的另一种坏法 —— 拿登记值去容纳现状）⇒ 必须红在「登记值是 43」。
   这一把的 needle 就在判据文件里，是本轮唯一一把**改尺子而不是改被测量**的刀：
@@ -32,17 +32,28 @@ GUARD_PY = 'python:' + GUARD_FILE
 NEEDLE_LINE = u'        CaptureReadings.emit("FOCUS-CHAIN " + chain.joined(separator: " | "))'
 REPL_LINE = u'        pri' + u'nt("FOCUS-CHAIN " + chain.joined(separator: " | "))'
 
-NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 29'   # R304：棘轮随第二批搬动降到 29，这根 needle 跟着重钉
-REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 30'
+# R306：这三处原本把**棘轮的当前值**抄进刀表（needle `= 29`、期望正文「盘上有 30 行」，而文件开头的
+# 说明还写着 43 —— 一份表里三个数），于是每搬一批读数就要回来改三行，改慢一格就是 NOT_RUN / WRONG_CELL。
+# 现在让表**自己定位**：登记值从被改的那份文件里现读，needle 与两处期望全部由它派生
+# （与 R298 那条「死基线会腐烂 ⇒ 让判据自己找生日」同一修法）。
+with io.open(os.path.join(ROOT, GUARD_FILE), encoding='utf-8') as _handle:
+    _ceil = re.search(r'^BARE_PRINT_LINE_CEILING = (\d+)', _handle.read(), re.M)
+if not _ceil:
+    sys.stderr.write(u'R303_PRECHECK_FAILED 读不到 BARE_PRINT_LINE_CEILING ⇒ 三把针无从派生，不出表\n')
+    sys.exit(1)
+CEIL_NOW = int(_ceil.group(1))
+
+NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = %d' % CEIL_NOW
+REPL_CEIL = u'BARE_PRINT_LINE_CEILING = %d' % (CEIL_NOW + 1)
 
 NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
 REPL_ROSTER = u'                      "UICaptureHarness.swift"]'
 
 ARMS = [
     ('M875', u'把一行搬好的读数改回裸 stdout = 上界有牙', PROBE,
-     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 30 行'),
+     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 %d 行' % (CEIL_NOW + 1)),
     ('M876', u'把登记值抬去容纳现状 = 下界有牙（放宽要成对）', GUARD_FILE,
-     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, u'登记值是 30'),
+     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, u'登记值是 %d' % (CEIL_NOW + 1)),
     ('M877', u'刚进名册的名字被删掉 = 未纳管必须红', HARNESS,
      NEEDLE_ROSTER, REPL_ROSTER, GUARD_PY, u'未纳管'),
 ]
