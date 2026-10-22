@@ -5512,6 +5512,13 @@ final class UICaptureTests: XCTestCase {
             XCTAssertGreaterThan(press.step, hover.step,
                                  tag + "：码值台阶（" + String(press.step) + "）不比悬停（" + String(hover.step)
                                  + "）大，而比值轴说按下更看得见 ⇒ 两轴反着，先怀疑尺再怀疑产品")
+            // R293 补的一格**只印不判**的读数：305 要的是"按下这一档离空闲走了多少灰阶"。
+            // 上一版把它接到 cacheDisplay 那条通道上，结果两档的底都读成 0（窗口底不被画出来）⇒ 撤了；
+            // 这里改用梯子自己那三张夹具，符号按绝对值取（亮档药丸比底暗，带符号相减会把 27 报成 -27）。
+            emit("PRESS_LADDER_SPAN " + tag
+                 + "｜|按下-空闲| 码值=" + String(abs(press.step - idle.step))
+                 + " ｜|按下-悬停| 码值=" + String(abs(press.step - hover.step))
+                 + "（305 的地板还没来源：系统参照臂要换通道重做，见 342）")
             XCTAssertLessThan(idle.pillPixels, 40,
                               tag + "：空闲帧也量到一整片第二层（" + String(idle.pillPixels) + " 颗）⇒ 取证通道漏电，"
                               + "上面三条读数全部作废")
@@ -6136,7 +6143,7 @@ final class UICaptureTests: XCTestCase {
                                          isPlanar: false, colorSpaceName: .deviceRGB,
                                          bytesPerRow: w * spp, bitsPerPixel: 8 * spp) else { return nil }
         guard let dstPtr = out.bitmapData else { return nil }
-        dst.withUnsafeBytes { raw in memcpy(dstPtr, raw.baseAddress!, w * h * spp) }
+        _ = dst.withUnsafeBytes { raw in memcpy(dstPtr, raw.baseAddress!, w * h * spp) }
         return out
     }
 
