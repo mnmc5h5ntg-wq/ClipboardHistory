@@ -23,11 +23,11 @@ ARMS = [
      "let inBand = !isFieldEditor && inFilterBand(r)",
      "let inBand = inFilterBand(r)", SCAN),
     ("M728", "未判定出口失去名字 ⇒ 它退化成一句注释而不是可复查的读数", TEST,
-     'print("FILTER_PILL_FOCUS_UNCOVERED 理由=',
-     'print("FILTER_PILL_FOCUS_NOTE 理由=', SCAN),
+     'CaptureReadings.emit("FILTER_PILL_FOCUS_UNCOVERED 理由=',
+     'CaptureReadings.emit("FILTER_PILL_FOCUS_NOTE 理由=', SCAN),
     ("M729", "读数行的标记被改名 ⇒ 子串锚点看不见这件事（锚点写的是整行前缀）", TEST,
-     'print("FILTER_FOCUS 带内候选=',
-     'print("FILTER_FOCUSX 带内候选=', SCAN),
+     'CaptureReadings.emit("FILTER_FOCUS 带内候选=',
+     'CaptureReadings.emit("FILTER_FOCUSX 带内候选=', SCAN),
 ]
 
 

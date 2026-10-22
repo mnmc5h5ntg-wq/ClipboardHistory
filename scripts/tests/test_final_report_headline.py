@@ -11,6 +11,7 @@ import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REPORT = os.path.join(REPO, 'AGENT_FINAL_REPORT.md')
+STATE = os.path.join(REPO, 'AGENT_STATE.md')
 ITERATION = os.path.join(REPO, 'AGENT_VISUAL_ITERATION.md')
 UI_AUDIT = os.path.join(REPO, 'AGENT_UI_AUDIT.md')
 
@@ -352,3 +353,48 @@ class FinalReportSourcesCellTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+NOTE_RX = re.compile(u"（R\\d+ 现读抬到最新一节）")
+STILL_OPEN_RX = re.compile(u"(?m)^- \\*\\*仍开（截至本轮，完整名单以 `AGENT_STATE.md` 的 (R\\d+) 节 ② 为准）\\*\\*")
+
+
+def count_derivation_notes(line):
+    """U 格那一行里有几条「（Rnnn 现读抬到最新一节）」注记。"""
+    return len(NOTE_RX.findall(line))
+
+
+class LedgerPointerTests(unittest.TestCase):
+    """R303：报告里两处**指针**必须各自指向当下，而不是每轮再贴一张贴纸。
+
+    本轮量到的两种坏法都是我自己写的生成器造成的：
+    ① §1 的 U 格每轮 `re.subn(u"U-31 … U-\\d+", ...)` 只吃数字，括号里的派生注记留在那里，
+       于是攒成「（R303 现读…）（R302 现读…）（R301 现读…）」五连 —— 数字是对的，句子是烂的；
+    ② §13 的「仍开（…以 `AGENT_STATE.md` 的 Rnnn 节 ② 为准）」指针，本轮因为一次按行号的
+       手术把 `PREV_TAG → R_TAG` 那行 re.sub 切掉了 ⇒ 报告指着**上一轮**的 STATE 节。
+    两条都是「账看起来更新过，其实指向过期对象」——比没更新更坏（R88 那一族）。
+    """
+
+    def test_positive_control_two_notes_are_counted_not_eyeballed(self):
+        self.assertEqual(2, count_derivation_notes(
+            u"U-31 … U-994（R303 现读抬到最新一节）（R302 现读抬到最新一节）"))
+        self.assertEqual(1, count_derivation_notes(u"U-31 … U-994（R303 现读抬到最新一节）"))
+        self.assertEqual(0, count_derivation_notes(u"U-31 … U-994"))
+
+    def test_the_u_cell_carries_exactly_one_derivation_note(self):
+        text = io.open(REPORT, encoding=u"utf-8").read()
+        hits = [l for l in text.split(u"\n") if u"U-31 … U-" in l]
+        self.assertEqual(1, len(hits), u"U 格那一格应当只在 §1 出现一次，读到 %d 处" % len(hits))
+        self.assertEqual(1, count_derivation_notes(hits[0]),
+                         u"§1 的 U 格上堆了多条派生注记 ⇒ 生成器的替换不是幂等的：" + hits[0][:120])
+
+    def test_still_open_bullet_points_at_the_newest_state_section(self):
+        text = io.open(REPORT, encoding=u"utf-8").read()
+        m = STILL_OPEN_RX.search(text)
+        self.assertIsNotNone(m, u"读不到 §13 的「仍开（…为准）」bullet 标签形状 ⇒ 这一格无从判定，红")
+        state = io.open(STATE, encoding=u"utf-8").read()
+        newest = (re.findall(u"(?m)^## (R\\d{3}) 状态", state) or [None])[0]
+        self.assertIsNotNone(newest, u"STATE 里读不到任何 `## Rnnn 状态` 节")
+        self.assertEqual(newest, m.group(1),
+                         u"§13 的仍开名单指着 %s 节，而 STATE 最新一节是 %s ⇒ 指针过期，"
+                         u"读者会去翻上一轮的账" % (m.group(1), newest))
+

@@ -405,7 +405,8 @@ final class UICaptureTests: XCTestCase {
                       "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",
                       "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
                       "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",
-                      "MotionFilmstripTests.swift", "UICaptureHarness.swift"]
+                      "MotionFilmstripTests.swift", "UICaptureHarness.swift",
+                      "UIInteractionProbeTests.swift"]
         var strays: [String] = []
         for name in roster {
             let url = dir.appendingPathComponent(name)

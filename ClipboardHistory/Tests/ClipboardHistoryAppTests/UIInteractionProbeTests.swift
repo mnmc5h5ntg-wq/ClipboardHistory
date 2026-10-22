@@ -158,7 +158,7 @@ final class UIInteractionProbeTests: XCTestCase {
             let responder = window.firstResponder
             chain.append("\(step):\(responder.map { String(describing: type(of: $0)) } ?? "nil")")
         }
-        print("FOCUS-CHAIN " + chain.joined(separator: " | "))
+        CaptureReadings.emit("FOCUS-CHAIN " + chain.joined(separator: " | "))
 
         // 第二条链：**合成真实 Tab 按键**（走 `NSApp.sendEvent`，即用户按键的通道）。
         // `selectNextKeyView` 只走 AppKit 的 key-view 环，而 SwiftUI 的焦点由它自己的引擎管，
@@ -170,7 +170,7 @@ final class UIInteractionProbeTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.06))
             keyChain.append("\(step):\(describe(window.firstResponder))")
         }
-        print("TAB-KEY-CHAIN " + keyChain.joined(separator: " | "))
+        CaptureReadings.emit("TAB-KEY-CHAIN " + keyChain.joined(separator: " | "))
 
         let keyKinds = Set(keyChain.map { $0.split(separator: ":").last.map(String.init) ?? "" })
         // 判据只钉"真实 Tab 能走到搜索框"这一条：它是可复现、可归因的。
@@ -184,17 +184,17 @@ final class UIInteractionProbeTests: XCTestCase {
         // 的自绘视图根本不进环；= 3 即「完全键盘访问」才全走）。所以把这个模式一起打出来，
         // 否则"14 次 Tab 全在同一个控件"这种数字无法归因（审计第二轮 1.10 就缺这一栏）。
         let keyboardUIMode = UserDefaults(suiteName: "NSGlobalDomain")?.integer(forKey: "AppleKeyboardUIMode") ?? -1
-        print("KEYBOARD-UIMODE \(keyboardUIMode)（0/缺省=Tab 只走文本框与列表，3=完全键盘访问）")
-        print("TAB-KEY-KINDS \(keyKinds.sorted())")
+        CaptureReadings.emit("KEYBOARD-UIMODE \(keyboardUIMode)（0/缺省=Tab 只走文本框与列表，3=完全键盘访问）")
+        CaptureReadings.emit("TAB-KEY-KINDS \(keyKinds.sorted())")
         if keyKinds.count <= 1 {
-            print("NOTE 真实 Tab 只停在一种控件上。若 KEYBOARD-UIMODE 不是 3，先开"
+            CaptureReadings.emit("NOTE 真实 Tab 只停在一种控件上。若 KEYBOARD-UIMODE 不是 3，先开"
                 + "「系统设置 → 键盘 → 完全键盘访问」再复测，不能据此判产品缺陷；"
                 + "列表方向键导航由 SidebarKeyboardNavigationTests 与接线守卫覆盖")
         }
 
         let kinds = Set(chain.map { $0.split(separator: ":").last.map(String.init) ?? "" })
         if kinds.count <= 1 {
-            print("NOTE AppKit key-view 环仍然只有一种第一响应者（\(kinds)）；"
+            CaptureReadings.emit("NOTE AppKit key-view 环仍然只有一种第一响应者（\(kinds)）；"
                 + "SwiftUI 焦点不走 nextKeyView，这一条只作对照，判据看 TAB-KEY-CHAIN")
         }
 
@@ -461,8 +461,8 @@ final class UIInteractionProbeTests: XCTestCase {
            let windows = windowsValue as? [AXUIElement] {
             for element in windows { visit(element, depth: 0) }
         }
-        print("AX-VISITED \(visited) interactive=\(interactive) unnamed=\(unnamedInteractive.count) roles=\(roles.sorted { $0.value > $1.value }.prefix(8))")
-        print("AX-UNNAMED \(unnamedInteractive.prefix(20).joined(separator: ","))")
+        CaptureReadings.emit("AX-VISITED \(visited) interactive=\(interactive) unnamed=\(unnamedInteractive.count) roles=\(roles.sorted { $0.value > $1.value }.prefix(8))")
+        CaptureReadings.emit("AX-UNNAMED \(unnamedInteractive.prefix(20).joined(separator: ","))")
 
         try XCTSkipIf(visited <= 1,
                       "本进程拿不到无障碍树（AX-VISITED \(visited)）：这是 xctest 的环境限制，不能据此判产品缺陷")
@@ -994,9 +994,9 @@ final class UIInteractionProbeTests: XCTestCase {
             cursor = c.nextKeyView
             steps += 1
         }
-        print("KEYCHAIN 视图数=\(rows.count) 有 nextKeyView=\(withNext) acceptsFirstResponder=\(focusable)"
+        CaptureReadings.emit("KEYCHAIN 视图数=\(rows.count) 有 nextKeyView=\(withNext) acceptsFirstResponder=\(focusable)"
             + " 环=\(loop.joined(separator: ">")) 环长=\(steps)")
-        print("KEYCHAIN_TREE \(rows.prefix(40).joined(separator: " | "))")
+        CaptureReadings.emit("KEYCHAIN_TREE \(rows.prefix(40).joined(separator: " | "))")
 
         // 分辨实验（R196）：段按钮的 `KeyViewProxy` 在树里、彼此连着 nextKeyView，却 `fr=false`，
         // 而它们位置上**已经有 `_FocusRingView`** ⇒ 焦点环的零件在，缺的是"拿到焦点"。
@@ -1033,7 +1033,7 @@ final class UIInteractionProbeTests: XCTestCase {
             cursor2 = c.nextKeyView
             steps2 += 1
         }
-        print("KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=\(focusable2)/\(focusable)"
+        CaptureReadings.emit("KEYCHAIN_FKA 开关=3(本进程 register，未写全局) acceptsFirstResponder=\(focusable2)/\(focusable)"
             + " 环长=\(steps2)/\(steps) 代理=\(proxies.prefix(6).joined(separator: " | "))")
         UserDefaults.standard.removeObject(forKey: "AppleKeyboardUIMode")
         XCTAssertGreaterThan(rows.count, 5,
@@ -1119,7 +1119,7 @@ final class UIInteractionProbeTests: XCTestCase {
                 + " band=\(inBand) ring=\(r.focusRingType.rawValue)")
         }
         let bandCandidates = responders.filter { $0.contains("带内=true") }.count
-        print("FILTER_FOCUS 带内候选=\(bandCandidates) 全部候选=\(responders.count)"
+        CaptureReadings.emit("FILTER_FOCUS 带内候选=\(bandCandidates) 全部候选=\(responders.count)"
             + " 候选清单=\(responders.prefix(12))"
             + " Tab 站数=\(stops.count) 其中字段编辑器=\(fieldEditorStops)"
             + " 走得到筛选段=\(reachedFilterBand) 其中带环=\(reachedFilterBandWithRing)"
@@ -1132,7 +1132,7 @@ final class UIInteractionProbeTests: XCTestCase {
             //    可达性那一格不放过：它已经被这行读数钉成产品缺陷，记 BACKLOG 220；
             // ③ 这是读数不是覆盖率通道 —— 一旦哪天段按钮进了 key-view 链，`reachedFilterBand ≥ 1`，
             //    下面那条断言当场接管（不达标就红），不会永远躲在这个出口后面。
-            print("FILTER_PILL_FOCUS_UNCOVERED 理由=Tab 链 12 站里段按钮 0 站（字段编辑器 \(fieldEditorStops) 站）"
+            CaptureReadings.emit("FILTER_PILL_FOCUS_UNCOVERED 理由=Tab 链 12 站里段按钮 0 站（字段编辑器 \(fieldEditorStops) 站）"
                 + " ⇒ 『聚焦格』在这一档今天判不了（拿不到焦点就无从谈焦点表达）；"
                 + "放掉的只有呈现那一半，可达性缺陷由这行读数落账（BACKLOG 220）")
             throw XCTSkip("筛选段按钮拿不到键盘焦点（实测 0/12 站，站点清单见上一行 FILTER_FOCUS）"
@@ -1247,7 +1247,7 @@ final class UIInteractionProbeTests: XCTestCase {
             chain.append("\(type(of: current))=\(current.focusRingType.rawValue)")
             view = current === window.contentView ? nil : current.superview
         }
-        print("FOCUSCHAIN-RING firstResponder=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil") "
+        CaptureReadings.emit("FOCUSCHAIN-RING firstResponder=\(window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil") "
             + "链(视图=focusRingType；0=none 1=default 2=around)：\(chain.joined(separator: " ← "))")
 
         // AppKit 的环这一路读出来是 .none ⇒ 那圈蓝框不是 AppKit 画的，是 SwiftUI 的 `_FocusRingView`。
@@ -1263,7 +1263,7 @@ final class UIInteractionProbeTests: XCTestCase {
         let listSizedRings = ringFrames.filter {
             $0.width >= host.frame.width * 0.9 && $0.height > 200
         }
-        print("RINGVIEWS 总数=\(ringFrames.count) 覆盖整块列表的=\(listSizedRings.map { NSStringFromRect($0) })")
+        CaptureReadings.emit("RINGVIEWS 总数=\(ringFrames.count) 覆盖整块列表的=\(listSizedRings.map { NSStringFromRect($0) })")
         XCTAssertTrue(listSizedRings.isEmpty,
                       "列表容器上还挂着一圈覆盖整块列表的焦点环（用户要移除的蓝框）。"
                       + "如果这是在 macOS 13 及更早跑出来的：`focusEffectDisabled()` 需要 macOS 14+，那属于平台限制而不是回归。")

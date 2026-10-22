@@ -21,6 +21,7 @@ R301 把热图那一卷搬进文件通道，并把"零裸 stdout"的守卫从只
 import io
 import os
 import re
+import sys
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,12 +30,11 @@ HARNESS = os.path.join(TESTS_DIR, "UICaptureHarness.swift")
 
 # ── 登记值（R302 现读 `python3 scripts/tests/test_readings_channel_coverage.py` 之外
 #    的唯一来源是下面的 `measure_corpus()`，不许手抄别处的数）────────────────
-BARE_PRINT_LINE_CEILING = 57
+BARE_PRINT_LINE_CEILING = 42
 
 # 未覆盖的账，按**文件**登记（本轮量到的裸 stdout 行数 > 0 且确实发了读数的卷）。
 # 这张表的作用是"下一轮该搬谁"，不是豁免名单：名册那一格不看它，棘轮那一格也不放过它。
 NAMED_UNCOVERED = {
-    "UIInteractionProbeTests.swift": 15,
     "SettingsFailureReceiptTests.swift": 5,
     "PressFeedbackTests.swift": 5,
     "OffscreenSymbolInkProbeTests.swift": 4,
@@ -53,6 +53,10 @@ NAMED_UNCOVERED = {
     "PressInteractionProbeTests.swift": 2,
     "SystemSymbolValidityTests.swift": 1,
     "WindowChromeLayoutTests.swift": 3,
+# R303：UIInteractionProbeTests 那 15 行已搬进 CaptureReadings（FOCUS-CHAIN / TAB-KEY-CHAIN / AX-VISITED /
+# KEYCHAIN* / FILTER_FOCUS / FOCUSCHAIN-RING / RINGVIEWS），于是它从这张表里退场并进了名册（派生集 11 个）。
+# 它文件级那颗 emit 仍然走 stderr —— 那是看门狗与 @Sendable 回调的通道（R88：主线程模态循环里
+# 只能靠无缓冲的 stderr 留下最后一句话），不是读数的第二条腿，故不算重复实现。
 }
 
 
@@ -133,7 +137,7 @@ def measure_corpus():
     files = swift_readings_files()
     total_prints = sum(bare_print_count(l) for l in files.values())
     emitters = sorted(n for n, l in files.items() if emit_usage_count(l) > 0)
-    return {
+    out = {
         "files_scanned": len(files),
         "bare_print_lines": total_prints,
         "emitters": len(emitters),
@@ -141,9 +145,30 @@ def measure_corpus():
         "roster": declared_roster(),
         "uncovered_named": sum(v for v in NAMED_UNCOVERED.values()),
     }
+    out.update(swift_roster_numbers())
+    return out
+
+
+def swift_roster_numbers():
+    """Swift 那张按文件的读数名册 —— 数字只从同一份解析里取，不手抄（scripts/readings_roster_source.py）。
+
+    R303 的理由：那张名册原来是按 `print("` 找读数的，搬动之后它对搬走的读数瞎了（刀 M731
+    先 ESCAPED 后 CAUGHT，D-284）。台账要引用的合计/文件数/标记数从此必须"读得到或者响亮失败"。
+    """
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from readings_roster_source import swift_roster_readings
+    return swift_roster_readings()
 
 
 class ReadingsChannelCoverageTests(unittest.TestCase):
+
+    def test_the_swift_side_roster_is_readable_and_counts_both_channels(self):
+        """Swift 名册必须读得到，且合计与探针那份都不许是零（读不到就响亮失败，不是"没有了"）。"""
+        n = swift_roster_numbers()
+        self.assertGreater(n["files"], 1, u"Swift 名册只覆盖 1 份文件以下 ⇒ 它已经不是名册")
+        self.assertGreater(n["total"], 0, u"Swift 名册合计 0 行 ⇒ 形状漂了（读不到不等于没有了）")
+        self.assertGreater(n["probe_lines"], 0, u"探针那份按名册读不到行数 ⇒ 通道键或表名漂了")
+        self.assertGreater(n["probe_markers"], 5, u"探针的标记清单短到不像清单 ⇒ 改名不会再被抓到")
 
     def test_positive_and_negative_controls_on_the_estimator(self):
         """先锤尺子：正负对照各一格，缺一个方向都不算它会量。"""
@@ -165,10 +190,11 @@ class ReadingsChannelCoverageTests(unittest.TestCase):
         """双向棘轮：盘上的裸 stdout 读数行数必须**等于**登记值。"""
         m = measure_corpus()
         print(u"READINGS_COVERAGE files_scanned=%d emitters=%d clean_emitters=%d "
-              u"roster=%d bare_print_lines=%d ceiling=%d named_uncovered=%d"
+              u"roster=%d bare_print_lines=%d ceiling=%d named_uncovered=%d "
+              u"swift_total=%d swift_files=%d probe_lines=%d probe_markers=%d"
               % (m["files_scanned"], m["emitters"], len(m["clean_emitters"]),
                  len(m["roster"]), m["bare_print_lines"], BARE_PRINT_LINE_CEILING,
-                 m["uncovered_named"]))
+                 m["uncovered_named"], m["total"], m["files"], m["probe_lines"], m["probe_markers"]))
         self.assertEqual(BARE_PRINT_LINE_CEILING, m["bare_print_lines"],
             u"盘上有 %d 行裸 stdout 读数，登记值是 %d ⇒ 两种情况都坏："
             u"①变多 = 新写了只走会死的通道（R64 量过 stdout 会成块丢）；"

@@ -19,8 +19,8 @@ ARMS = [
      "var cursor: NSView? = window.contentView",
      "var cursor: NSView? = nil", MEASURE),
     ("M731", "FKA 分辨实验的标记被改名（读数还在，名册看不见 ⇒ 静默免检）", TEST,
-     'print("KEYCHAIN_FKA 开关=',
-     'print("KEYCHAIN_FKAX 开关=', ROSTER),
+     'CaptureReadings.emit("KEYCHAIN_FKA 开关=',
+     'CaptureReadings.emit("KEYCHAIN_FKAX 开关=', ROSTER),
 ]
 
 

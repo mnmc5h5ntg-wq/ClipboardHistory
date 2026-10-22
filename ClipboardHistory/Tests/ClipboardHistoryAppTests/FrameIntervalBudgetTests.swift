@@ -144,35 +144,87 @@ final class FrameIntervalBudgetTests: XCTestCase {
     /// 名册双向相等 ⇒ 新写法红（没登记）、旧写法退场也红（登记过期）—— 与 R78 那两把轴的处置同形。
     /// 搜索串拼出来：这条守卫自己就含 `print` 加左引号的形状，写全等于把守卫自己数进名册（U-473）。
     func testProbeFilePrintReadingsAreARosterNotACount() throws {
-        let needle = "print" + "(\""
-        let source = try String(contentsOf: URL(fileURLWithPath: "UIInteractionProbeTests.swift", relativeTo: URL(fileURLWithPath: #filePath).deletingLastPathComponent()), encoding: .utf8)
-        var markers: [String] = []
-        for line in source.split(separator: "\n", omittingEmptySubsequences: false) where line.contains(needle) {
-            let text = String(line)
-            guard let found = text.range(of: needle) else { continue }
-            var marker = ""
-            for character in text[found.upperBound...] {
-                if character == " " || character == "\\" { break }
-                marker.append(character)
+        let printNeedle = "print" + "(\""
+        let emitNeedle = "emit" + "(\""
+        // R303 的另一格教训：搬进 emit 之后，「按 print 找读数」的名单就瞎了 ——
+        // 刀 M731（把 KEYCHAIN_FKA 改名）本轮真的 ESCAPED 过一次。所以这张名册问的是
+        // **这个文件的读数清单**，通道由名册自己登记：搬过的文件按 emit 数，没搬的按 print 数。
+        // 「谁还没搬」由 `scripts/tests/test_readings_channel_coverage.py` 那根棘轮管，两格判的是两句不同的话。
+        // R303 / BACKLOG 360 第一步：这张名册的**主语从一份文件变成一批文件**。
+        // 起因是本轮把 `UIInteractionProbeTests.swift` 里 15 行读数全搬进 `CaptureReadings.emit`
+        // —— 那一格如果只扫这一个文件，搬完之后就变成「空名册对空读数」：仍然绿，
+        // 却什么都不再判（恒真的名单遍历，U- 家族里写过两次）。所以把 360 队列里接下来的
+        // 探针文件一起放进来，每个文件各自登记标记与行数：
+        //   · 已搬空的文件留在名单里、登记为空 ⇒ 谁把读数写回 print，立刻红（退场可复查）；
+        //   · 还没搬的文件必须有名字与行数 ⇒ 新写法红（没登记），搬走也红（登记过期）。
+        // 与 `scripts/tests/test_readings_channel_coverage.py` 的分工：那一卷数的是**全部判据文件**
+        // 的裸 stdout 行数（一根双向棘轮），这一格数的是**按文件按标记**的清单（谁能被读到）。
+        // 三份名单并存是本回合到的另一件事，记在 361。
+        let registered: [String: [String]] = [
+            // R303：这一份的读数全部走 emit ⇒ 名单按 emit 数，而且登记的是**这个文件的全部读数**，
+            // 不只是本轮搬走的那 15 行 —— 名册问的是「这些读数有没有名字」，与它走哪条通道无关。
+            // 现读 53 行 / 42 种标记（MENUS 6 行、REVEAL 4 行是循环里逐次打的同一标记）。
+            "UIInteractionProbeTests.swift": [
+                "MENUS", "REVEAL", "NOTE", "DRIFT", "MARKDOWN", "PROBE_PULSE", "PROBE_DONE",
+                "FOCUS-CHAIN", "TAB-KEY-CHAIN", "TAB-KEY-KINDS", "KEYBOARD-UIMODE",
+                "FRAME_CHANNEL", "FPS-BASELINE", "FPS-MOTION-OFF", "FPS-LOADED", "PROBE_FPS",
+                "PROBE_WORST_FRAME", "WORST_OUTLIER", "AX-VISITED", "AX-UNNAMED", "TREE2",
+                "DRAG-LIMIT", "OBSERVE", "OBSERVE-TABLE", "INTAKE_PIN", "INTAKE_READING",
+                "KEYCHAIN", "KEYCHAIN_TREE", "KEYCHAIN_FKA", "FILTER_FOCUS",
+                "FILTER_PILL_FOCUS_UNCOVERED", "FOCUSCHAIN-RING", "RINGVIEWS",
+                "ROW_PROXY_TRUTHTABLE", "ROW_PROXY_CENSUS", "ROW_PROXY[", "ROW_PROXY_LISTROWS",
+                "TAB_STOPS_NOT_RUN=NO_PROXY", "TAB_STOPS_FROM_TOP_ROW", "ROW_PROXY_CONTRAST",
+                "ROW_PROXY_CONTRAST_NOT_RUN=QUICKPICK_WINDOW_NIL", "WATCHDOG",
+            ],
+            "PressInteractionProbeTests.swift": ["PRESS_PROBE", "INTERACTION_NOT_RUN=synthetic-mouse-"],
+            "OffscreenSymbolInkProbeTests.swift": ["INK"],
+            "WindowChromeLayoutTests.swift": ["CHROME", "SIDEBAR_PIN"],
+            "MotionDriverTests.swift": ["RECEIPT_DRIVE", "DERIVED_KEY_EXPANSION", "BANNER_DRIVE"],
+            "PressFeedbackTests.swift": ["PRESS_AXIS", "FILL_STEP"],
+            "SettingsFailureReceiptTests.swift": ["FEEDBACK_EXPORT_RECEIPT_TRUTH_TABLE",
+                                                  "EXPORT_FEEDBACK_CHANNEL", "ARCHIVE_TRANSFER_RECEIPT",
+                                                  "ARCHIVE_ACTION_CHANNEL", "RECEIPT_FIXTURE_COPY"],
+            "PerfBudgetTests.swift": ["PERF", "PERF["],
+        ]
+        let counts: [String: Int] = [
+            "UIInteractionProbeTests.swift": 53,
+            "PressInteractionProbeTests.swift": 2,
+            "OffscreenSymbolInkProbeTests.swift": 3,
+            "WindowChromeLayoutTests.swift": 3,
+            "MotionDriverTests.swift": 3,
+            "PressFeedbackTests.swift": 5,
+            "SettingsFailureReceiptTests.swift": 5,
+            "PerfBudgetTests.swift": 3,
+        ]
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        func channel(_ file: String) -> String { file == "UIInteractionProbeTests.swift" ? emitNeedle : printNeedle }
+        var measured: [String: [String]] = [:]
+        var total = 0
+        for name in registered.keys.sorted() {
+            let source = try String(contentsOf: URL(fileURLWithPath: name, relativeTo: dir), encoding: .utf8)
+            var markers: [String] = []
+            for line in source.split(separator: "\n", omittingEmptySubsequences: false) where line.contains(channel(name)) {
+                let text = String(line)
+                guard let found = text.range(of: channel(name)) else { continue }
+                var marker = ""
+                for character in text[found.upperBound...] {
+                    if character == " " || character == "\\" { break }
+                    marker.append(character)
+                }
+                markers.append(marker)
             }
-            markers.append(marker)
+            measured[name] = markers
+            total += markers.count
         }
-        // R143 实测：10 行 print 读数、9 种标记（`NOTE` 两行）。FPS- 那一族不在名单里，
-        // 因为它已经全部走 emit —— 若有人把它写回 print，Set 里会冒出一个没登记的标记而红。
-        //
-        // R195 重登记：R194 的筛选条焦点探针**新增两行 print**（`FILTER_FOCUS` 是量到的站点点清单，
-        // `FILTER_PILL_FOCUS_UNCOVERED` 是有名字的未判定出口），于是 10 行→12 行、9 种→11 种。
-        // 走的是这条守卫设计好的路：新读数必须先登记才允许存在（R143/U-473），
-        // 而不是把 count 改成 ≤12 或干脆删掉这条 —— 那样"转走一条 + 新加一条"就又绿了。
-        XCTAssertEqual(Set(markers), Set([
-            "FOCUS-CHAIN", "TAB-KEY-CHAIN", "TAB-KEY-KINDS", "KEYBOARD-UIMODE",
-            "NOTE", "AX-VISITED", "AX-UNNAMED", "FOCUSCHAIN-RING", "RINGVIEWS",
-            "FILTER_FOCUS", "FILTER_PILL_FOCUS_UNCOVERED",
-            // R196：key-view 结构量法（BACKLOG 220 的前置）新增两行 —— `KEYCHAIN` 是环与计数，
-            // `KEYCHAIN_TREE` 是逐视图清单。先登记才允许存在（R143/U-473 那条路）。
-            "KEYCHAIN", "KEYCHAIN_TREE", "KEYCHAIN_FKA",
-        ]), "探针里的 print 读数与名册不符 ⇒ 要么有未登记的新读数，要么有已退场的旧登记")
-        XCTAssertEqual(markers.count, 15,
-            "同一标记的行数变了（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改（NOTE 那两条是条件注记）")
+        for name in registered.keys.sorted() {
+            XCTAssertEqual(Set(measured[name] ?? []), Set(registered[name] ?? []),
+                "\(name) 的 print 读数与名册不符 ⇒ 要么有未登记的新读数，要么有已退场的旧登记"
+                    + "（R143/U-473：先登记才允许存在；R303：搬走之后名字留着、清单变空）")
+            XCTAssertEqual((measured[name] ?? []).count, counts[name] ?? -1,
+                "\(name) 的行数与登记不符（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改")
+        }
+        XCTAssertEqual(total, 77,
+            "这张名册覆盖的探针文件里裸 stdout 读数总数变了 ⇒ 要么 360 搬走了一批（那就把上面两张表"
+                + "一起改到现读，并把搬空的文件留在名单里登记为空），要么新写了只走 stdout 的读数")
     }
 }
