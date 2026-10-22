@@ -14,6 +14,8 @@
 
 ## R296 状态（第 295 轮 / Round 293 · 2026-10-22）
 
+⓪-a 交付债（先办这件再读 CI）：本轮的账半 `0e95e25` **没推出去** —— `git push` 两次失败，`ssh -T git@github.com` 给 `Connection closed by 20.205.243.166 port 22`，而同会话几分钟前 `b1b43da` 刚推成功 ⇒ 判网络／边缘侧断开，不判密钥。账因此只在本地（`main` ahead 1），CI 对这一笔还不存在；下一轮开场第一件事是 `git push origin main`（成功之后再按 ⓪ 取 run↔commit 号），在它推上去之前不许把本轮记成已交付。
+
 ⓪ 读 CI（R297 的开场取数，只登记不轮询 = R140）：`gh run list --limit 8 --json databaseId,headSha,status,conclusion`
 （字段连成一个逗号串），再 `python3 scripts/ci_read.py steps <run>`。要配对的 push：R295 `5f7dc7b`
 ⇒ run 39780211456 **completed success**（本轮现读，不是编号未取）：新判据在 runner 上**有对象**（两臂底非 0 才会绿）、R296 代码半 `c7b952f` / `36f8d4a` /
