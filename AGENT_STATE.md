@@ -12,6 +12,34 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R296 状态（第 295 轮 / Round 293 · 2026-10-22）
+
+⓪ 读 CI（R297 的开场取数，只登记不轮询 = R140）：`gh run list --limit 8 --json databaseId,headSha,status,conclusion`
+（字段连成一个逗号串），再 `python3 scripts/ci_read.py steps <run>`。要配对的 push：R295 `5f7dc7b`
+⇒ run 39780211456 **completed success**（本轮现读，不是编号未取）：新判据在 runner 上**有对象**（两臂底非 0 才会绿）、R296 代码半 `c7b952f` / `36f8d4a` /
+`b1b43da`、本轮这笔（push 在台账之后 ⇒ 号由 R297 现取）。要验的两件事：① 新判据
+`testPressTravelSharesOneRulerWithTheSystemReference` 在 runner 上有没有对象（夹具通道的底；读不到是通道账
+342/346 那一族，一条地板都不放宽 D-251）；②（本轮已读，转登记）runner 的变颗平均 亮 27 / 暗 19 对 本机 29 / 21 —— 同量级；而颗数 332 对 1290 差约 4 倍，正是 @1x 与 @2x 的面积比 ⇒ 305 的地板只压**变颗平均**，不许压颗数（D-272 与 D-276 在这一格对上）
+（本机 亮 自家 29 / 参照 52，暗 21 / 18；不同也只登记，不许把参照臂改成 runner 上能过的形状）；
+③ 新门 `scripts/warning_gate.sh` 在 runner 那一侧从没跑过（本机两刀 CAUGHT），两边若给相反处置那是接线缺失
+不是阈值问题（R74/R75 那一课）。
+
+最后更新：2026-10-22（本地 · R296 / 第 295 轮 / Round 293）：**「0 告警」从散文变成门** ——
+门本体 `scripts/warning_gate.sh`（同 CI 目标口径 / 0 要用冷编挣 / 尺坏了 exit 2），
+`round_verify.sh` 第 1 步调它；M862/M863 两轴两刀全 CAUGHT=2/2、RESTORE_CLEAN=yes；
+预检 `is_source` 补 `.sh`（看不见被报成不存在，D-277）；343 结案、开 348（写台账本身没有门）。
+全量卷 932/44 skip/0 失败、0 告警、帧 174 张 changed=0 added=0、
+dmg ok 且已换装本机、产品文件 0 个（连续第九轮 0 产品改动）。
+
+① 下一轮（R297）的靶：**348**（给台账落盘加一格会红的对账 + 一把「故意漏写一本」的刀）与
+**346 的下半场**（带窗 `Δ<60` 仍会把强填充读成缺席）。347 卡在取证通道：那一格在主窗口，
+而主窗口含用户剪贴板原文、按规矩不许截屏 ⇒ 要么用户真机看，要么换一条不依赖截图的证人。
+
+② 仍开：347（真机或替代证人）、305（等 347）、348、346、344、341 的 CI 契约半、339、312 具名出口、
+333、335、334、310、338 的另一半、328、323、322、317、304、296、291。
+
+③ 用户闸门：220 路 A / 228② / 265。
+
 ## R295 状态（第 294 轮 / Round 292 · 2026-10-22）
 
 ⓪ 读 CI（R297 的开场取数，只登记不轮询 = R140）：成对关系要现取，取不到的写明「push 在台账之后」而不是编一个号 —— 用 `gh run list --limit 8 --json databaseId,headSha,status,conclusion`（字段连成一个逗号串，R293 那一课），再 `python3 scripts/ci_read.py steps <run>` 与 readings。要配对的三笔：R295 的 5f7dc7b（本机读到 run 39780211456 当时 in_progress、结论未读；它前面两笔 cbd05b9 与 1c6155b 已读到 success）；R296 代码半两笔 c7b952f 与 36f8d4a（push 在这段台账之后 ⇒ 号由 R297 现取）。要验的三件事：① 新判据 testPressTravelSharesOneRulerWithTheSystemReference 在 runner 上有没有对象 —— 它读夹具通道，而 runner 的离屏 render 历史上画不出真底；两臂底若读 0 那是通道账（342/346 那一族），按 313/316 解释，一条地板都不放宽（D-251）；② PRESS_PAIR_REF 两行在 runner 上的变颗平均（本机：亮 自家 29 / 参照 52，暗 21 / 18）与本机是否同量级 —— 不同也只登记，不许把参照臂改成 runner 上能过的形状；③ 新门 scripts/warning_gate.sh 只在本机验过（M862/M863 两把刀 CAUGHT、基线 exit 0），runner 那一侧它从没跑过：CI 的 STEP[4] 仍按自己的告警口径走，两边若给相反处置，那是接线缺失不是阈值问题（R74/R75 那一课）。

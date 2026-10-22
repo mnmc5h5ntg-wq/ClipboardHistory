@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R296 / 第 295 轮 / Round 293 · 0 告警变成一道能拦的门，预检补上 bash 的可见性）
+
+新增 `scripts/warning_gate.sh`：与 CI 的 STEP[4] 编同一个目标（`--build-tests`），数到 0 时换全新
+scratch-path 冷编把那个 0 挣出来，构建失败或没有可判正文一律 exit 2；`round_verify.sh` 第 1 步改成调它，
+拦下即 `ABORTED_AT_WARNING_GATE` 非零退出（原来只把告警数印进汇总行、从不 exit）。
+变异表 `mutate_r296.py`：M862（注入未使用常量 ⇒ exit 1 + `ROUND_WARNING_GATE_FAIL`）、
+M863（冷编换成必然失败的命令 ⇒ exit 2 + `warnings=NOT-RUN`）全 CAUGHT、RESTORE_CLEAN=yes。
+预检 `is_source` 的白名单补 `.sh`（bash 里的针此前被报成「命中 0」= 看不见被当成不存在），
+现读 `NEEDLE_PRECHECK tables=92 covered=76 arms=239 bad=0`。
+本轮补齐 R296 代码半欠的完整验证与轮次台账：全量卷 932/44 skip/0 失败、0 告警、
+帧 174 张 changed=0 added=0、dmg ok 且已换装本机、产品文件 0 个。
+
 ### Improved（R295 / 第 294 轮 / Round 292 · 两态差换成逐像素相减，整块平均被证成面积假象）
 
 新增尺 `UICaptureHarness.pairDelta`（两态按同一坐标逐颗相减，报底、变化颗数、整块平均、变颗平均、带符号均值、峰值）
