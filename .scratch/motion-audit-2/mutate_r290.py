@@ -10,7 +10,8 @@
 · M846 **漂移轴**（这一把才是本轮真正买的东西）—— 把行首 HStack 的 spacing 改成另一份数（10 → 14）。
   列宽与间距各写一份的时候，文字会走到 90pt 而分隔线还停在 82pt —— 屏幕上看得见，代码里没人红。
   这一刀证明"导出"不是整理风格：它把"两处各写一份数"变成会红的判据。
-· M847 尺的对象闸门 —— 把 `columnClusters` 的**默认**缝宽从 12px 抬到 40px（超过列间距 20px）。
+· M847 尺的对象闸门 —— 把 `columnClusters` 的**默认**缝宽从 6pt 抬到 40pt（超过列间距 10pt）。
+  （R292 重钉：单位从像素换成点，旧针腐烂 ⇒ 命中 0 次；这一把在 2x 与 1x 两臂上都会并簇。）
   三列会被并成一簇 ⇒ 判据必须红在「墨簇数不够」那条出口上，而不是安静地拿箭头那簇当文字。
   已知答案的对照自己显式传 gap（12 与 4 两侧都钉），所以这一刀只可能红在产品判据那条 —— 两件事分开。
 
@@ -32,7 +33,10 @@ CONTROL = 'UICaptureTests/testColumnClusterRulerKnowsItsOwnAnswers'
 
 N_LEADING = '.padding(.leading, MultiFilePreviewLayout.rowTextLeading)'
 N_SPACING = 'HStack(spacing: MultiFilePreviewLayout.rowColumnSpacing)'
-N_MERGE = 'paperDelta: Int = 24, mergeGapPx: Int = 12) -> [(x0: Int, x1: Int)] {'
+# R292 重钉：`columnClusters` 的默认缝宽从固定像素改成随密度换算的点（BACKLOG 340），
+# 旧针 `mergeGapPx: Int = 12` 命中 0 次 ⇒ 这一把从「能红」退化成「NOT_RUN」。按 R262 那一课当场重钉，
+# 并把表头那句话改掉：抬缝宽这件事现在抬的是**点**，两臂都并簇。
+N_MERGE = 'mergeGapPt: Double = 6) -> [(x0: Int, x1: Int)] {'
 
 ARMS = [
     ('M845', u'分隔线左端退回裸字面量 48 = 产品轴', DETAILS,
@@ -40,7 +44,7 @@ ARMS = [
     ('M846', u'行首列间距另写一份（10→14）而左端没跟上 = 漂移轴', DETAILS,
      N_SPACING, 'HStack(spacing: 14)', LEFT, u'行分隔线左端'),
     ('M847', u'把列缝宽抬到 40px（三列并成一簇）= 对象闸门轴', HARNESS,
-     N_MERGE, N_MERGE.replace('mergeGapPx: Int = 12', 'mergeGapPx: Int = 40'), LEFT, u'墨簇'),
+     N_MERGE, N_MERGE.replace('Double = 6', 'Double = 40'), LEFT, u'墨簇'),
 ]
 
 

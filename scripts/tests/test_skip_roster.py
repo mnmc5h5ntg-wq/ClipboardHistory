@@ -100,6 +100,57 @@ def parse_verbose(text):
     return records
 
 
+
+class TestReadingKeyHygiene(unittest.TestCase):
+    """R292 / BACKLOG 341：一台工具不许把自己的读数印成**别人的结论行的键名**。
+
+    为什么这一格值得红：台账生成器普遍用未锚定的 `re.search(r"skipped=(\\d+)")` 去取
+    unittest 的结论行 `OK (skipped=4)`。而名册闸门自己那一行印在它**前面**，键名里也带着
+    `skipped=` ⇒ 生成器借到的是内层那一卷的数（合法地多一颗观察者自己的防递归 skip），
+    于是「外层电池 skipped=4」被写成 5，一路进了五本台账。修法是两边都做：
+    闸门那行改叫 `内层skip汇总=`（源头消歧），这一格钉住"以后不许再有 print 用 `skipped=` 当键"。
+    """
+
+    KEY = u"skipped="
+
+    def _print_string_constants(self, path):
+        import ast
+        tree = ast.parse(io.open(path, encoding="utf-8").read())
+        out = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "print":
+                for sub in ast.walk(node):
+                    # 只看字面量本身；注释与 docstring 不算（R76：扫前剥掉不参与判定的文本）
+                    if isinstance(sub, ast.Constant) and isinstance(sub.value, str) \
+                            and not isinstance(getattr(sub, "_doc", None), str):
+                        out.append((sub.lineno, sub.value))
+        return out
+
+    def test_no_print_uses_the_unittest_summary_key(self):
+        import glob
+        offenders = []
+        for path in sorted(glob.glob(os.path.join(SUITE_DIR, "*.py"))):
+            for line, text in self._print_string_constants(path):
+                if self.KEY in text:
+                    offenders.append("%s:%d" % (os.path.basename(path), line))
+        self.assertEqual([], offenders,
+                         u"这些 print 用了 unittest 结论行的键名 `%s` ⇒ 任何未锚定的取数都会借错主语（341）：%s"
+                         % (self.KEY, offenders))
+
+    def test_the_guard_itself_has_teeth(self):
+        # 正对照：把同一颗尺喂给一段**已知违规**的源码，必须报出来（否则上面那格是恒真式）。
+        import tempfile
+        src = u"print('X 汇总skipped=%s' % 1)\n"
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as h:
+            h.write(src)
+            path = h.name
+        try:
+            hits = [ln for ln, t in self._print_string_constants(path) if self.KEY in t]
+        finally:
+            os.unlink(path)
+        self.assertEqual([1], hits, u"正对照没抓到已知违规 ⇒ 这一格判不了任何东西（341）")
+
+
 class SkipRosterTests(unittest.TestCase):
 
     def test_the_roster_matches_what_this_machine_actually_skips(self):
@@ -135,7 +186,10 @@ class SkipRosterTests(unittest.TestCase):
         expected = set(ROSTER[klass])
         extra = [n for n in actual if n not in expected]
         gone = sorted(expected - set(actual))
-        print('SKIP_ROSTER 键=%s 类=%s 内层Ran=%s 汇总skipped=%s 解析=%d 名单外=%s 名册未跳=%s'
+        # 字段名不许叫 `skipped=`（R292 / 341）：台账生成器普遍用未锚定的 re.search(r"skipped=(\d+)")
+        # 取电池自己的结论行，而这一行印在它前面 ⇒ 借到的是**内层那一卷**的数（合法地多一颗观察者自己的
+        # 防递归 skip）。歧义要在源头消掉：读数行的键名与 unittest 的结论行键名不许重名。
+        print('SKIP_ROSTER 键=%s 类=%s 内层Ran=%s 内层skip汇总=%s 解析=%d 名单外=%s 名册未跳=%s'
               % (key, klass, ran[-1], skipped.group(1), len(actual), extra or u'无', gone or u'无'), flush=True)
         self.assertEqual([], extra,
                          '名单外出现 skip（%s）⇒ 有人新增了一格会跳的判据却没登记它替谁承重（331）' % extra)

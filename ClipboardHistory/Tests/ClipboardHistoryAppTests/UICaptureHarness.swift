@@ -6063,15 +6063,24 @@ final class UICaptureTests: XCTestCase {
     }
 
     /// 把一段行带按**列**切成墨簇：列里至少一颗像素离纸 ≥paperDelta 就算这一列有墨，
-    /// 相邻墨列之间允许 ≤mergeGapPx 的空隙（字与字之间的缝），超过它就换一列。
+    /// 相邻墨列之间允许 ≤mergeGapPt 的点空隙（字与字之间的缝），超过它就换一列。
     ///
     /// 为什么要有这一把（R290）：要问「分隔线的左端落在哪一列上」，就必须能从帧里
     /// 把"展开箭头列 / 类型图标列 / 文件名文字列"三簇的左沿各自量出来 —— 不猜坐标、不写死列宽。
-    /// `mergeGapPx` 的分界是量出来的：同一行里**字与字**的空隙 ≤2pt（=4px @2x），
-    /// **列与列**的空隙 ≥10pt（=20px），6pt（12px）坐在中间，两侧都差 3 倍。
+    /// 分界值是量出来的：同一行里**字与字**的空隙 ≤2pt，**列与列**的空隙 ≥10pt，6pt 坐在中间，两侧都差 3 倍。
+    ///
+    /// **为什么阈值必须是点而不是像素（R292 / BACKLOG 340，这是被 runner 红出来的）**：
+    /// 原来这一颗写的是 `mergeGapPx: Int = 12`，注释里那句"6pt"是**在本机 @2x 上量的**。
+    /// 账上早就有读数：runner 的截图是 `位图=720x540 scale=1.0`，本机是 2x。于是同一把尺在
+    /// 两台机器上量的不是同一个东西 —— 1x 下 12px 就是 12pt，比列与列之间那 10pt 的缝**还宽**，
+    /// 相邻两列必然并成一簇（runner 现读 2 簇 ⇒ 判据走「尺没有对象」出口而红；本机 3 簇 ⇒ 绿）。
+    /// 这与 D-269 同族（比较两边要同为一种单位），只是这次是我自己犯的：**"本机绿"从来不等于
+    /// "两台机器绿"**。所以这里改成 `mergeGapPt × density`，密度由调用方从位图自己推
+    /// （`pixelsWide / 逻辑宽`），于是阈值跟着产物缩放，而不是跟着某台机器的屏幕说话。
     static func columnClusters(bytes: UnsafeBufferPointer<UInt8>, width: Int, height: Int,
                                bytesPerRow: Int, y0: Int, y1: Int, paper: Int,
-                               paperDelta: Int = 24, mergeGapPx: Int = 12) -> [(x0: Int, x1: Int)] {
+                               density: Double = 1, paperDelta: Int = 24,
+                               mergeGapPt: Double = 6) -> [(x0: Int, x1: Int)] {
         func luma(_ x: Int, _ y: Int) -> Int {
             let i = y * bytesPerRow + x * 4
             return Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
@@ -6079,6 +6088,8 @@ final class UICaptureTests: XCTestCase {
         }
         let lo = max(0, min(y0, y1)), hi = max(lo, min(y1, height))
         guard hi > lo else { return [] }
+        // 至少 1px：密度再低也不许把缝收成 0，否则每一颗像素自己成一簇。
+        let mergeGapPx = max(1, Int((mergeGapPt * max(density, 1e-9)).rounded()))
         var clusters: [(x0: Int, x1: Int)] = []
         var runStart = -1
         var lastInked = -1
@@ -6098,6 +6109,35 @@ final class UICaptureTests: XCTestCase {
         }
         if runStart >= 0 { clusters.append((runStart, lastInked)) }
         return clusters
+    }
+
+    /// 把一张位图按最近邻抽成 `factor` 分之一（R292）：**在本机复现 runner 的 @1x 通道**。
+    ///
+    /// 为什么需要它：判据不许押在"另一台机器上大概是绿的"。runner 的帧是 1x，而这台机器给不了 1x，
+    /// 所以把自家 2x 的帧抽成 1x，就得到一个**同一段内容、不同密度**的对象 —— 尺必须两臂都给同一个
+    /// 点空间答案，否则就是单位错（340）。抽的是像素，不是重新渲染，所以字形内容一致、只有密度变。
+    static func downsampleNearest(_ rep: NSBitmapImageRep, factor: Int) -> NSBitmapImageRep? {
+        guard factor >= 1, rep.samplesPerPixel >= 3, rep.bitmapData != nil else { return nil }
+        let w = rep.pixelsWide / factor, h = rep.pixelsHigh / factor
+        guard w > 0, h > 0 else { return nil }
+        let spp = rep.samplesPerPixel
+        let src = rep.bitmapData!
+        let srcBpr = rep.bytesPerRow
+        var dst = [UInt8](repeating: 0, count: w * h * spp)
+        for y in 0..<h {
+            for x in 0..<w {
+                let si = (y * factor) * srcBpr + (x * factor) * spp
+                let di = (y * w + x) * spp
+                for c in 0..<spp { dst[di + c] = src[si + c] }
+            }
+        }
+        guard let out = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                                         bitsPerSample: 8, samplesPerPixel: spp, hasAlpha: spp == 4,
+                                         isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: w * spp, bitsPerPixel: 8 * spp) else { return nil }
+        guard let dstPtr = out.bitmapData else { return nil }
+        dst.withUnsafeBytes { raw in memcpy(dstPtr, raw.baseAddress!, w * h * spp) }
+        return out
     }
 
     /// 把一张夹具在测试进程里现渲染、读回位图（R290：三格判据共用，别再各抄一份 render→PNG→NSImage）。
@@ -6314,7 +6354,7 @@ final class UICaptureTests: XCTestCase {
         func clusters(gap: Int) -> [(x0: Int, x1: Int)] {
             px.withUnsafeBufferPointer { buf in
                 Self.columnClusters(bytes: buf, width: w, height: h, bytesPerRow: bpr,
-                                    y0: 0, y1: h, paper: 250, mergeGapPx: gap)
+                                    y0: 0, y1: h, paper: 250, mergeGapPt: Double(gap))
             }
         }
         let three = clusters(gap: 12)
@@ -6330,9 +6370,56 @@ final class UICaptureTests: XCTestCase {
         // 空带：没有墨的一段必须给 0 簇，而不是 (0,0) 那种看着像坐标的假答案（R99：「没找到」不许报成距离）
         let none = px.withUnsafeBufferPointer { buf in
             Self.columnClusters(bytes: buf, width: w, height: h, bytesPerRow: bpr,
-                                y0: 0, y1: 4, paper: 250, mergeGapPx: 12)
+                                y0: 0, y1: 4, paper: 250, mergeGapPt: 12)
         }
         XCTAssertEqual(none.count, 0, "空白行带被读出了簇 ⇒ 前提闸门会失去对象")
+    }
+
+    /// **已知答案的对照（R292 / BACKLOG 340）**：同一份点空间形状，画在 1x 与 2x 两种密度上，
+    /// 这把尺必须给出**同一个点空间答案**。
+    ///
+    /// 这一格是 runner 那两笔红换来的：形状与上面那颗对照一致（字与字 2pt、列与列 10pt），
+    /// 只是整幅按 density 放大。旧实现（`mergeGapPx: Int = 12` 固定像素）在 1x 那一臂上会把
+    /// 图标列的断笔并成同一簇 ⇒ 数到 2 簇，正是 runner 现读的那个数；新实现按 `mergeGapPt × density`
+    /// 换算，两臂都是 3 簇。**刀 M855 就是把换算退化成固定 12px，它必须红在 1x 那一臂上**
+    /// （本机 2x 恰好躲过 —— 一把只在一种密度上有牙的刀，才证明这一臂在承重）。
+    func testColumnClusterRulerIsDensityIndependent() {
+        let h = 20
+        func inked(_ density: Int) -> (px: [UInt8], w: Int, bpr: Int) {
+            let w = 100 * density
+            let bpr = w * 4
+            var px = [UInt8](repeating: 250, count: w * h * 4)
+            func bar(_ a: Double, _ b: Double) {   // 点坐标 → 像素坐标
+                let x0 = Int((a * Double(density)).rounded()), x1 = Int((b * Double(density)).rounded())
+                for x in max(0, min(x0, w - 1))...min(max(x1, 0), w - 1) {
+                    for y in 4..<(4 + 12 * density) where y < h {
+                        let i = (y * w + x) * 4
+                        px[i] = 30; px[i + 1] = 30; px[i + 2] = 30; px[i + 3] = 255
+                    }
+                }
+            }
+            bar(4, 10)      // 箭头列
+            bar(20, 24)     // 图标列（同一枚符号内部断笔：与下一截留 2pt）
+            bar(26, 30)
+            bar(40, 80)     // 文字列
+            return (px, w, bpr)
+        }
+        func leftEdges(density: Int) -> [Double] {
+            let g = inked(density)
+            return g.px.withUnsafeBufferPointer { buf in
+                Self.columnClusters(bytes: buf, width: g.w, height: h, bytesPerRow: g.bpr,
+                                    y0: 0, y1: h, paper: 250, density: Double(density))
+                    .map { Double($0.x0) / Double(density) }
+            }
+        }
+        let at1x = leftEdges(density: 1), at2x = leftEdges(density: 2)
+        XCTAssertEqual(at1x.count, 3, "1x 臂数到 " + String(at1x.count) + " 簇 ⇒ 阈值又回到像素了")
+        XCTAssertEqual(at2x.count, 3, "2x 臂数到 " + String(at2x.count) + " 簇")
+        for (i, a) in at1x.enumerated() {
+            XCTAssertLessThanOrEqual(abs(a - at2x[i]), 1.0,
+                                     "第 " + String(i + 1) + " 列的左沿 1x 读 " + String(format: "%.1f", a)
+                                     + "pt、2x 读 " + String(format: "%.1f", at2x[i]) + "pt ⇒ 两臂不是同一个量")
+        }
     }
 
     /// **产品判据**（R290 / BACKLOG 337 的第二处）：行分隔线的**左端**必须落在文件名文字的左沿上。
@@ -6381,16 +6468,68 @@ final class UICaptureTests: XCTestCase {
             let clusters = Self.columnClusters(bytes: idleBytes, width: idle.pixelsWide,
                                                height: idle.pixelsHigh,
                                                bytesPerRow: idle.bytesPerRow,
-                                               y0: span.minY, y1: span.maxY + 1, paper: paper)
+                                               y0: span.minY, y1: span.maxY + 1, paper: paper,
+                                               density: density)
+            // 缺席文本必须带现场（R292 / 340）：上一版只报「数到几簇」，于是 runner 那两跑红成
+            // "2 个墨簇"时，我拿不到任何几何线索，只能靠读源码反推。现在把每簇的点区间与密度一起打出来。
+            func spans(_ cs: [(x0: Int, x1: Int)], _ d: Double) -> String {
+                cs.map { String(format: "%.1f..%.1f", Double($0.x0) / d, Double($0.x1) / d) }
+                    .joined(separator: ",")
+            }
             guard clusters.count >= 3 else {
                 declined.append(tag + "(行带里只数到 " + String(clusters.count)
-                                + " 个墨簇 ⇒ 尺没有对象：箭头/图标/文字三列没被分开)")
+                                + " 个墨簇 ⇒ 尺没有对象：箭头/图标/文字三列没被分开"
+                                + "｜密度=" + String(format: "%.2f", density)
+                                + "px/pt 簇区间=[" + spans(clusters, density) + "])")
                 continue
             }
             judged += 1
             let textLeft = Double(clusters[2].x0) / density
             let chevronLeft = Double(clusters[0].x0) / density
             let iconLeft = Double(clusters[1].x0) / density
+            // **1x 臂**（R292 / 340）：runner 的截图是 @1x、本机是 2x，而"本机绿"不配替另一台机器签字。
+            // 把同一张帧按最近邻抽成 1x（内容不变、只有密度变），尺必须给出同一个**点空间**答案。
+            let factor = max(1, Int(density.rounded()))
+            guard let idle1x = Self.downsampleNearest(idle, factor: factor) else {
+                declined.append(tag + "(抽不出 1x 臂 ⇒ 两臂对照没有对象，340 的验收落空)")
+                continue
+            }
+            let density1x = density / Double(factor)
+            // 这一臂的**身份**：它必须真的在 @1x 上量（runner 就是 1x）。身份不许借用被判断的量（D-271），
+            // 所以这里判的是"密度是不是 1"，不是"簇数对不对"——后者由下面两条判。
+            XCTAssertLessThanOrEqual(abs(density1x - 1.0), 0.01,
+                                     tag + "：1x 臂的密度读成 " + String(format: "%.2f", density1x)
+                                    + " ⇒ 这一臂根本没在 @1x 上量，runner 那个对象的替身失效（340）")
+
+            let bytes1x = Self.buffer(of: idle1x)
+            let clusters1x = Self.columnClusters(bytes: bytes1x, width: idle1x.pixelsWide,
+                                                 height: idle1x.pixelsHigh,
+                                                 bytesPerRow: idle1x.bytesPerRow,
+                                                 y0: Int(Double(span.minY) / Double(factor)),
+                                                 y1: Int(Double(span.maxY + 1) / Double(factor)),
+                                                 paper: paper, density: density1x)
+            let textLeft1x = clusters1x.count >= 3 ? Double(clusters1x[2].x0) / density1x : -1
+            emit("LEFT_AXIS_R292_1X " + tag
+                 + "｜抽帧倍率=1/" + String(factor)
+                 + "｜1x 位图宽=" + String(idle1x.pixelsWide)
+                 + " 密度=" + String(format: "%.2f", density1x)
+                 + "｜簇数=" + String(clusters1x.count) + " 簇区间=[" + spans(clusters1x, density1x) + "]"
+                 + "｜文字左沿 2x=" + String(format: "%.1f", textLeft)
+                 + " 1x=" + String(format: "%.1f", textLeft1x) + "pt")
+            XCTAssertEqual(clusters1x.count, clusters.count,
+                           tag + "：同一份内容，2x 数到 " + String(clusters.count)
+                            + " 簇、抽成 1x 之后数到 " + String(clusters1x.count)
+                            + " 簇 ⇒ 这把尺量的不是同一种东西（阈值没随密度换算，340）"
+                            + "｜2x 簇区间=[" + spans(clusters, density) + "] 1x=[" + spans(clusters1x, density1x) + "]")
+            XCTAssertGreaterThanOrEqual(clusters1x.count, 3,
+                                        tag + "：1x 臂只数到 " + String(clusters1x.count)
+                                        + " 簇 ⇒ 正是 runner 那两跑红出来的数，说明阈值又回到像素了")
+            if clusters1x.count >= 3 {
+                XCTAssertLessThanOrEqual(abs(textLeft1x - textLeft), LeftAxis.tolerancePt,
+                                         tag + "：文字左沿 2x 读 " + String(format: "%.1f", textLeft)
+                                        + "pt、1x 读 " + String(format: "%.1f", textLeft1x)
+                                        + "pt，差过地板 ⇒ 两臂不是同一个量")
+            }
             let ruleLefts = rules.map { String(format: "%.1f", Double($0.x0) / density) }.joined(separator: ",")
             emit("LEFT_AXIS_R290 " + tag
                  + "｜行带 y=" + String(span.minY) + ".." + String(span.maxY)
