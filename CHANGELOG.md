@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R298 / 第 297 轮 / Round 295 · 台账区间的对账门 + 豁免要能退场）
+
+新增 `scripts/tests/test_ui_round_interval_parity.py`（5 格）：轮标题声明的 U 区间必须与该节规范定义的 id
+对得上，只判「有定义行」的结构化箱（现读 结构化=183 / 叙述形=31 / 单号形=76），
+不符名单要求恰好等于在册那一条（第 103 轮），并配正对照「删一条定义行必须被点名」与「最新一节必须结构化」。
+定义行的正则并集三种形状（纯冒号、括注在粗体内、括注在粗体内而冒号在粗体外）—— 旧正则漏后两种，
+会把「有定义」误判成「缺定义」。`test_commit_subject_hygiene` 同日加 `AHEAD_ROSTER` 与
+`test_roster_must_retire`：我上一笔 f78b6ac 的 subject 标签超前当前轮，正是那支守卫要抓的形态，
+处置是具名登记 + 要求退场，而不是放宽窗口（D-251 / D-279）。
+新开 351（单号标题形那批仍无对账）。验证：门 ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests、全量卷 932/44 skip/0 失败、
+帧 174 张 changed=0、预检 bad=0、脚本电池写盘前后同数、dmg 已换装本机、产品文件 0 个。
+
 ### Fixed（R297 / 第 296 轮 / Round 294 · 346 结案：带窗上界去掉，漏电地板换成相对判据）
 
 `pillReading` 的候选带去掉上界 `d < 60` —— 它把强填充（系统参照按钮亮档按下 Δ≈70）整块排除，
