@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R301 / 第 300 轮 / Round 298 · 判据读数落盘，357 结案）
+
+`HeatmapHoverEvidenceTests` 的 9 行读数改走 `CaptureReadings`（stdout + 文件两条腿，整行原子）：`swift test` 的 stdout 会成块丢（R64 量过：两遍分别少 324 / 238 行），R300 因此拿不到出货版的环倍率，只能靠刀 M869 把界写成 0.0 逼一次红。本轮现读文件里 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1，其中 `HEAT_RING_VS_STEP` 20 条（= 2 外观 × 2 尺度 × 5 档），倍率区间 0.70…0.57。守卫 `testCaptureReadingsUseTheFileChannel` 从「只扫自己那个文件」扩成**按名册扫**：名册里的文件不存在就红、每个被扫文件必须至少用一次 `emit`（D-282），刀 M870（换回裸 stdout）与 M871（名册放一个不存在的文件）各钉一侧，全 CAUGHT=2/2、RESTORE_CLEAN=yes。同一轮把 354 欠的「出现率」按 **Swift 树**分组从 CI 历史里读出来：动效地板 1/17 与 1/7（同树 17 跑 1 红 + 另一树 7 跑 1 红），登记成有名字的未覆盖那一步仍欠，本单不结案。新开 358（「读数落盘」两份实现，名册只能扫一份）。同一轮量到取证面另一格：四件套目录 `/tmp/r301_verify/frames/capture-readings.log` 里热图 marker = 0 行，而定向跑 `/tmp/r301_frames/capture-readings.log` 有整批 ⇒ 第 3 步的 `--filter UICaptureTests` 结构上装不下别的判据类，新开 359；本轮进账的读数一律写明取数口绝对路径。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 565 / OK (skipped=4)。
+
 ### Changed（R300 / 第 299 轮 / Round 297 · 热图悬停那一圈不再比数据响，产品 2 文件）
 
 新增判据 `HeatmapHoverEvidenceTests/testHoverIsNotLouderThanOneDataStep`（20 条读数 = 2 外观 × 2 尺度 × 5 档）：分子是悬停在**描边带**上的变化，分母是同一条 render 现量的**相邻档在填充带上的档步**，界压在「不超过最重的一次数据变化」。现读改前：亮档档步 19.33 / 21.00 / 28.33 / 37.33、暗档 17.33 / 18.33 / 25.33 / 33.67，而 0.55 的环最响一臂改 75.50 ⇒ 两倍于数据。产品改动 2 个文件（VisualTokens.swift、DailyCopyHeatmapView.swift）：`VisualHeat.hoverRingOpacity` 0.55 → **0.30**、`VisualHeat.ladder` 顶档 0.85 → **0.92** —— 抬顶档是因为两条界（可见性 18 / 克制度 1.0）夹出来的窗口原本是空集（≥0.274 与 ≤0.272），D-281。314 结案：热图那一圈**不是**选中态的同形物（全仓库没有描边式选中），过响那一半按数值修掉；「比最细一档还安静」这套形状装不下 ⇒ 新开 356。刀 M866…M869 全 CAUGHT=4/4、RESTORE_CLEAN=yes（现读倍率：装回 0.55 是 1.28、退回顶档是 1.11、环降到 0.12 时最安静一臂只改 13.17、出货版是 0.70）；预检 ARM_TOTAL=738 bad=0；全量卷 933 用例 / 失败 0、build 告警 0、帧 174 张基线同一笔 changed=0、dmg=ok 且已换装本机 1.4.8；脚本电池 Ran 565 / OK (skipped=4)。连续零改动纪录归零（`scripts/product_streak.py` 现读 streak=0）。

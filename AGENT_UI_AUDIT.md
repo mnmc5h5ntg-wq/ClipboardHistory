@@ -376,6 +376,47 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 300 轮（R301 · U-985…U-988 · 2026-10-23）：读数终于有了能活下来的通道，热图那 20 条倍率第一次读得到
+
+- **U-985：`HeatmapHoverEvidenceTests` 的 9 行读数改走 `CaptureReadings`（stdout + 文件两条腿）。**
+  上一轮我要引用「出货版的环倍率」时本地**一行都拿不到** —— `swift test` 的 stdout 会成块丢
+  （R64 量过：同一批代码两遍分别少 324 / 238 行，切点在行中间），只能靠刀 M869 把界写成 0.0
+  让判据红一次才逼出数字。本轮结案 357：读数一律 `emit`。现读文件里的 marker：HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1，
+  其中 `HEAT_RING_VS_STEP` 20 条（判据自己要求的正好是 20 条 = 2 外观 × 2 尺度 × 5 档），
+  倍率区间 0.70…0.57。
+- **U-986：那条「零裸 stdout」的绝对规矩原来只扫守卫自己那一个文件。** 这就是它能漏掉一整卷读数的原因。
+  现在按**名册**扫（`UICaptureHarness.swift` / `HeatmapHoverEvidenceTests.swift` / `CaptureReadings.swift`），
+  并且加了两格防空转：名册里的文件**不存在就红**（改名或删文件不会让守卫悄悄少扫一处），
+  每个被扫文件**必须至少用一次 `emit`**（否则「零违规」只是「没东西可违规」的别名）。
+  两把刀各钉一侧：M870 把 `emit` 换回裸 stdout ⇒ 红「只走 stdout」；M871 把名册里一个文件名改成不存在的名字 ⇒
+  红「不存在」。刀表 2 把全 CAUGHT=2、RESTORE_CLEAN=yes。
+- **U-987：354 的出现率不再是「又一次单跑」。** 把 CI 历史按 **Swift 树**分组
+  （`git rev-parse <sha>:ClipboardHistory` 相同 = 同一份 Swift 代码），现读：
+  树 `7454b4767ddd` 跑了 17 次全已判、红 5 次，但**失败步骤各不相同** ——
+  3 次在 Release script tests（那是当轮已修的守卫腐烂：commit-subject 基线滑窗 + 台账半没刷 §1），
+  1 次在 Motion coverage floor（1/17 与 1/7 的另一侧是树 `7899574daa7e` 的 7 跑 1 红，R293 的 bd12f4b），
+  1 次整跑无失败步骤（aa7e6cc，就是「红着 push」那一笔）。
+  ⇒ **动效地板的出现率是 1/17 与 1/7**，不是「偶发一次可以忽略」，也不是「代码有问题」；
+  按 354 的②它该被登记成有名字的未覆盖（按机器×按用例切片，照 155/166 那一族），本单不结案。
+
+- **U-988：本轮的取证目录里读不到本轮的热图读数 —— 四件套那一跑根本没跑热图判据。**
+  现数两个文件：定向那一跑 `/tmp/r301_frames/capture-readings.log` 有 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1；而四件套的 `/tmp/r301_verify/frames/capture-readings.log` 里以 `HEAT` 开头的读数
+  **0 行**。成因在 `scripts/round_verify.sh` 第 3 步的命令：`swift test --filter UICaptureTests`
+  —— 热图悬停那批读数住在 `HeatmapHoverEvidenceTests`，不在这支 filter 的名单里，所以本轮证据目录
+  天然缺它（R300 那一跑同样 0 行 ⇒ 结构性缺失，不是本轮改坏的）。
+  后果不是学术问题：进台账的数字本来应当能从**本轮那一次跑**的证据里复查，现在靠的是散在 /tmp 的
+  定向跑文件，而 /tmp 会被清（R140 量过）⇒ 取数口会过期而账还在。登记成 359；本轮的处置是把
+  取数口的**绝对路径**写进账（上面那条与 CHANGELOG 都写了），不许再用「某个 /tmp 文件」含糊指代。
+
+本轮产品文件 0 个（只动 Tests 与 .scratch），连续零改动 **1** 轮
+（现读 `python3 scripts/product_streak.py --streak-for 300`：as-of 第 300 轮的最后一笔产品提交
+是 6ac317f = 第 299 轮，即 R300 的代码半 ⇒ R300 归零之后又开始数）。
+四件套现读：全量卷 933 用例 / 失败 0、build 告警 0、帧 174 张
+compared=174 changed=0（产品没动 ⇒ changed 必须是 0）、dmg=ok、换装 1.4.8；
+预检 ARM_TOTAL=740 bad=0。看图腿 RUN：读的是**画面之外的证据** —— 本轮把热图那 20 条倍率、
+16 条档间差、10 条响度比从文件里逐条读了一遍（最响一臂 0.70…0.57），
+帧本身沿 R300 的基线未变。
+
 ## 第 299 轮（R300 · U-981…U-984 · 2026-10-23）：热图悬停那一圈被两条界夹住，产品动了 2 个文件
 
 - **U-981：新判据 `testHoverIsNotLouderThanOneDataStep` —— 交互不许比一次真实的数据变化更响。**

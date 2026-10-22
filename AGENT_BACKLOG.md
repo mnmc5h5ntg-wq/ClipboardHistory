@@ -6855,6 +6855,34 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 （绿的时候也在，代价是失败信息变长）。做完之前，凡是"改完之后是多少"这一类进账的数都必须来自
 一次会红的运行或一次刀，不许来自记忆，也不许来自按比例换算。
 
+  追记（R301 结案）：通道接上了，而且不是新造一条 —— 复用 R64 的 `CaptureReadings`（stdout + 文件两条腿、
+  整行原子、按 URL 记首次整份重写）。`HeatmapHoverEvidenceTests` 的 9 行读数全部改走 `emit`，
+  现读文件里 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1（`HEAT_RING_VS_STEP` 20 条 = 判据要求的 20 条，倍率区间 0.70…0.57）。
+  规矩本身按 D-282 扩成名册扫描 + 两格防空转，刀 M870/M871 各钉一侧。
+  结案条件里「凡是改完之后要进账的数都必须来自能活下来的通道」这一条，从本轮起对热图卷成立；
+  对动效卷**还不成立**（它自带一颗 R56 时代的 `emit` 实现与三处合法裸 stdout 调用，
+  塞进绝对零 print 的名册会把合法实现判成违规）⇒ 那份重复另开 358，本单不因它不结案。
+
+
+**358. 同一件「读数落盘」有两份实现：`CaptureReadings`（R64）与 `MotionFilmstripTests` 自带的那颗 `emit`（R56），而名册只能扫其中一份（R301 现读）**：
+把 `MotionFilmstripTests.swift` 塞进「零裸 stdout」的绝对名册会红在它自己的合法代码上 ——
+它的 `emit` 实现里那一行 stdout 写就是它的第二条腿，另外两处是它正对照里的字面量。
+白名单是下一次绕过去的入口（R55 的 M276），所以本轮选择**不扩名册**，把重复记成这一单。
+做法两步：① 让 `MotionFilmstripTests.emit` 变成 `CaptureReadings.emit` 的一层薄壳（删掉自己那份
+文件写入与首次整份重写逻辑 —— 那两段已经在 `CaptureReadings` 里被 M338/R81 锤过并发与残file），
+② 然后把该文件加进名册，并保留「名册里文件不存在就红」那一格。
+做完之前，动效卷的读数仍然依赖它自己那份实现：两条腿长得像，但只有一条被锤过。
+
+**359. 一轮的证据目录不是读数汇聚点：`round_verify.sh` 第 3 步只跑 `--filter UICaptureTests`，住在别的判据类里的 marker 永远进不了本轮的 `frames/capture-readings.log`（R301 现读：定向跑 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1 对四件套 HEAT=0 行）**：
+  量到的事实：热图悬停那 20 条倍率只在 `/tmp/r301_frames/capture-readings.log` 里，本轮四件套目录 `/tmp/r301_verify/frames/capture-readings.log` 里 HEAT 开头 0 行；
+  R300 同形状 ⇒ 结构性缺失，不是这一轮改坏的，也不是 `CaptureReadings` 又漏了（357 那条通道本身是通的）。
+  为什么值得红：进台账的数字要能从**本轮那一次跑**的证据复查；现在引的是散在 /tmp 的定向跑文件，而 /tmp 会被清（R140）。
+  两条候选修法（先量再选，别先写门）：① 第 3 步接受一支 filter 名单，逐类各跑一次，每类读数按类名分文件落到
+  `$RUN/readings/`，台账生成器按名册合并且「名册里缺一类就红」—— 前提是先确认不同判据类往同一个 SHOTS 目录
+  写样张会不会污染帧基线（R115 / 168 那一族）；② 每个判据类把自己的读数写到 `<shots>/readings/<类名>.log`，
+  四件套只做聚合并断言每类都有文件。
+  未做之前的规矩（本轮已按它记账）：任何进账的读数必须在账里写清取数口的绝对路径。
+
 **315. runner 的 STEP[15] 里有一行 `error: You're on a case-insensitive filesystem, and the remote you are…`（run 39519770384 原文，00:11:24）：本轮未归因 —— 它不与任何断言同行出现，而那一步仍产出了完整用例结果，所以既不能说它无害，也不能说它导致了那朵红。要做的：把这一行接成一条具名读数（按步骤切片），并分辨它是 SwiftPM 解析依赖时的一次性告警还是仓库里真有一对只差大小写的文件（R264 新开）**
 
 **316. 「近墨像素(≥20)」这条带子的宽度本身是 R265 拍的，没有实测支撑（本机亮档 idle=177 / hover=1224，暗档 173/209，runner 尚无此读数）：等 runner 下一跑印出这条读数之后，要回答两问 —— ① 20 这颗是否把「抗锯齿边缘」与「真墨」分在正确两侧（换一颗阈值看方向会不会翻）；② 出口那半句「读法=…」在真产物上是否只出现过它该出现的那种。在此之前，任何用这条带子得出的「画了／没画」结论都只算读数，不算结案依据（R265 新开）**
