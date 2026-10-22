@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R302 / 第 301 轮 / Round 299 · 读数的两条腿合成一份，覆盖率进电池）
+
+358 结案：`MotionFilmstripTests` 自己那份读数落盘（裸 stdout + FileHandle 追加 + 共享布尔做首次整份重写）删成一层 `CaptureReadings.emit(line, to: readingsURL)` 的壳 —— 被锤过的「按 URL 记首次 + 进程内锁 + 整行一次 write」原来只长在 `CaptureReadings` 那一侧，而这份没锁的实现每天在写动效卷的全部读数（R79 / BACKLOG 112 抓过「后写的把前一份整卷抹掉」）。`TableProbe` 里两处 `NATIVE_PROBE_STATE` 同轮接进同一通道。名册由手挑 3 个名字改成**派生集**（10 个），新卷 `scripts/tests/test_readings_channel_coverage.py` 5 格把覆盖率钉成**双向棘轮**：现读 57 行 = 登记值，变多=新写会死的通道、变少=修好了没重登，两种都红；未覆盖 19 份文件按文件名登记（最大一处 UIInteractionProbeTests.swift 15 行）。刀 M872 / M873 / M874 全 CAUGHT=3/3、RESTORE_CLEAN=yes；R301 被本轮改动弄哑的 M871 重钉后重跑 2/2 CAUGHT（预检 bad=0、ARM_TOTAL=743）。新开 360（剩下的裸 stdout 读数按文件搬进通道）。359 本轮重量：四件套取证目录 1158 行读数里热图 marker 仍 0 行 ⇒ 仍开。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 570 / OK (skipped=4)。
+
 ### Improved（R301 / 第 300 轮 / Round 298 · 判据读数落盘，357 结案）
 
 `HeatmapHoverEvidenceTests` 的 9 行读数改走 `CaptureReadings`（stdout + 文件两条腿，整行原子）：`swift test` 的 stdout 会成块丢（R64 量过：两遍分别少 324 / 238 行），R300 因此拿不到出货版的环倍率，只能靠刀 M869 把界写成 0.0 逼一次红。本轮现读文件里 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1，其中 `HEAT_RING_VS_STEP` 20 条（= 2 外观 × 2 尺度 × 5 档），倍率区间 0.70…0.57。守卫 `testCaptureReadingsUseTheFileChannel` 从「只扫自己那个文件」扩成**按名册扫**：名册里的文件不存在就红、每个被扫文件必须至少用一次 `emit`（D-282），刀 M870（换回裸 stdout）与 M871（名册放一个不存在的文件）各钉一侧，全 CAUGHT=2/2、RESTORE_CLEAN=yes。同一轮把 354 欠的「出现率」按 **Swift 树**分组从 CI 历史里读出来：动效地板 1/17 与 1/7（同树 17 跑 1 红 + 另一树 7 跑 1 红），登记成有名字的未覆盖那一步仍欠，本单不结案。新开 358（「读数落盘」两份实现，名册只能扫一份）。同一轮量到取证面另一格：四件套目录 `/tmp/r301_verify/frames/capture-readings.log` 里热图 marker = 0 行，而定向跑 `/tmp/r301_frames/capture-readings.log` 有整批 ⇒ 第 3 步的 `--filter UICaptureTests` 结构上装不下别的判据类，新开 359；本轮进账的读数一律写明取数口绝对路径。产品文件 0 个；四件套现读：全量卷 933/失败 0、告警 0、帧 174 张 changed=0、dmg=ok、换装 1.4.8；电池 Ran 565 / OK (skipped=4)。

@@ -6873,6 +6873,30 @@ lambda 里」那句免责；它当时的**退出码我没记**，而电池整卷
 ② 然后把该文件加进名册，并保留「名册里文件不存在就红」那一格。
 做完之前，动效卷的读数仍然依赖它自己那份实现：两条腿长得像，但只有一条被锤过。
 
+  追记（R302 结案）：本轮把重复的那一份**删掉**，而不是给守卫开白名单。
+  `MotionFilmstripTests.emit` 现在只是 `CaptureReadings.emit(line, to: readingsURL)` 的一层壳：
+  按 URL 记首次、进程内一把锁、一整行一次 write 这三样从此只有一份实现，而动效卷那 44+ 条读数
+  第一次站在被锤过的那条通道上（`testMotionReadingsUseTheFileChannel` 仍在，正负对照未动）。
+  同轮把 `TableProbe` 两处 `NATIVE_PROBE_STATE` 也接进来（那是探针「这一趟看不看得见运动」的前提读数，
+  原来只走会整块丢的 stdout）。名册因此能扫这个文件：从手挑 3 个名字改成派生集 10 个，
+  并把「名册 = 派生集」与「裸 stdout 行数 = 57」两条接进脚本电池（990 / 283）。
+  刀 M874（壳换回裸 stdout ⇒ Swift 侧红）与 M872（名册内文件长出一行 ⇒ 电池红）两侧各有牙。
+
+
+**360. 判据读数还有一多半只走会死的那条通道：本轮现读 57 行裸 stdout 散在 19 份判据文件里，最大一处 `UIInteractionProbeTests.swift` 15 行（R302 现读，283 的另一半）**：
+  数出来的形状（不是形容词）：扫描 99 份判据 Swift 文件，其中 11 份已经在用文件通道；
+  代码里（剥掉注释后）仍有 57 行写着裸 stdout，登记在 `test_readings_channel_coverage.py` 的
+  `NAMED_UNCOVERED` 里，**按文件**给数 —— 这一条是 357 / 358 的续集，不是新开一件同样的事：
+  357 修的是「守卫只扫自己那个文件」，358 修的是「同一件事写了两遍」，本单修的是「还有一多半发射器没进通道」。
+  为什么不能一次搬完：每搬一份都要重跑那一份的判据（很多是胶片/探针类，跑一次几分钟），
+  而把 57 一次写成 0 会让棘轮失去**现读同源**这个性质（登记值必须等于盘上的数）。
+  做法（一轮搬几份，按最大一处优先）：① 从 `UIInteractionProbeTests.swift`（15 行）起，把它里面的裸 stdout
+  调用改成 `CaptureReadings.emit`（或该卷自己的 `emit` 壳）；② 同一轮把 `NAMED_UNCOVERED` 与
+  `BARE_PRINT_LINE_CEILING` 两个数一起降到现读值，并让棘轮那一格重新相等；
+  ③ 搬干净的自动进名册（派生集那一格会把它拉进去，不需要手工加名字）。
+  不许的做法：把登记值抬高来「容纳」新增的裸 stdout（那等于把规矩换成现状的抄本），
+  或者给某个文件开白名单（R55 的 M276 就是白名单腐烂的样子）。
+
 **359. 一轮的证据目录不是读数汇聚点：`round_verify.sh` 第 3 步只跑 `--filter UICaptureTests`，住在别的判据类里的 marker 永远进不了本轮的 `frames/capture-readings.log`（R301 现读：定向跑 HEAT_ADJACENT=32、HEAT_INK_SPACE=4、HEAT_LOUDNESS=10、HEAT_RING=50、HEAT_RING_CONFINEMENT=10、HEAT_RING_VS_STEP=20、HEAT_STRIP=1 对四件套 HEAT=0 行）**：
   量到的事实：热图悬停那 20 条倍率只在 `/tmp/r301_frames/capture-readings.log` 里，本轮四件套目录 `/tmp/r301_verify/frames/capture-readings.log` 里 HEAT 开头 0 行；
   R300 同形状 ⇒ 结构性缺失，不是这一轮改坏的，也不是 `CaptureReadings` 又漏了（357 那条通道本身是通的）。
