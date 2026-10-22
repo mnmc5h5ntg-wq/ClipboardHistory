@@ -28,6 +28,15 @@ import XCTest
 @MainActor
 final class HeatmapHoverEvidenceTests: XCTestCase {
 
+    /// 读数一律走 `CaptureReadings`（stdout + 文件两条腿，整行原子）。
+    /// 为什么不是 `print`：R64 量过 `swift test` 的 stdout **会成块丢**（同一批代码本机两遍
+    /// 分别少 324 行与 238 行，切点落在行中间），而 R300 就是被这件事咬到的 ——
+    /// 出货版的环读数当时只能靠一把刀把界写成 0.0、让它红一次才拿到（BACKLOG 357）。
+    /// 这一格由 `testCaptureReadingsUseTheFileChannel` 扫源码钉住：本文件里一行裸 print 都不许有。
+    static func emit(_ line: String) { CaptureReadings.emit(line) }
+
+    private func emit(_ line: String) { Self.emit(line) }
+
     // MARK: - 判据
 
     /// 五档深浅 × 亮暗两种外观 × 两种采样率：未悬停与悬停之间，
@@ -71,7 +80,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 }
             }
         }
-        readings.forEach { print($0) }
+        readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 20, "读数条数必须是 外观2 × 采样率2 × 档5，少一条就是有一档没被量")
     }
 
@@ -93,7 +102,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                     let d = Self.pixelChannelDelta(still, hover, index: index, size: size)
                     if d > worst.delta { worst = (index, d) }
                 }
-                print("HEAT_RING_CONFINEMENT \(tag) \(level.name) 带外最大变化="
+                emit("HEAT_RING_CONFINEMENT \(tag) \(level.name) 带外最大变化="
                       + "\(String(format: "%.2f", worst.delta))/255"
                       + " @(\(Self.x(of: max(worst.index, 0), size: size)),"
                       + " \(Self.y(of: max(worst.index, 0), size: size)))")
@@ -133,7 +142,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                                            appearance: appearance, scale: 2)
                 let step = Self.meanChannelDelta(still, hover, over: band, size: still.pixelsWide)
                 let ratio = dataRange > 0 ? step / dataRange : -1
-                print("HEAT_LOUDNESS \(tag) \(level.name) 悬停差=\(String(format: "%.2f", step))"
+                emit("HEAT_LOUDNESS \(tag) \(level.name) 悬停差=\(String(format: "%.2f", step))"
                       + " 数据全幅度=\(String(format: "%.2f", dataRange)) 倍率=\(String(format: "%.2f", ratio))")
                 XCTAssertLessThanOrEqual(ratio, Self.louderThanDataAllowed,
                     "\(tag) 的 \(level.name)：鼠标划过的变化是这张图数据全幅度的 "
@@ -210,7 +219,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 }
             }
         }
-        readings.forEach { print($0) }
+        readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 20, "读数必须是 外观2 × 尺度2 × 档5 = 20 条，少一条就是有一臂没被量")
     }
 
@@ -372,7 +381,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         let drawable = Array(cells.enumerated().filter {
             $0.element.dayKey != nil && !$0.element.isFuture
         })
-        print("HEAT_STRIP n=\(cells.count) 可画=\(drawable.count) "
+        emit("HEAT_STRIP n=\(cells.count) 可画=\(drawable.count) "
               + "档=\(Set(drawable.map { $1.bucket }).sorted()) 计数=\(cells.map { $0.count })")
         // 未来格留白是**对的**（画成灰格等于宣称那天没复制），所以这里不要求 21 格全可画，
         // 只要求可画的占多数 —— 少了这一半，那张带就退化成一片空白。
@@ -440,7 +449,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                         csPix = c.colorSpace.localizedName ?? "无名"
                     }
                 }
-                print("HEAT_INK_SPACE \(tag)/\(scale)x rep=\(csRep) 取色=\(csPix)")
+                emit("HEAT_INK_SPACE \(tag)/\(scale)x rep=\(csRep) 取色=\(csPix)")
                 for i in 1..<Self.levels.count {
                     let a = Self.levels[i - 1], b = Self.levels[i]
                     let normal = Self.meanMaxChannelDelta(renders[i - 1], renders[i], over: band, size: size)
@@ -467,7 +476,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 }
             }
         }
-        readings.forEach { print($0) }
+        readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 16,
                        "读数必须是 4 对 × 2 外观 × 2 尺度 = 16 条，少一条就是有一对没被量")
     }
@@ -511,7 +520,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         let g0 = try plain(grey), g1 = try sim(grey)
         let greyDrift = max(abs(g1.r - g0.r), max(abs(g1.g - g0.g), abs(g1.b - g0.b))) * 255.0
 
-        print("SIM_MATRIX 红↔绿 前=\(String(format: "%.2f", rgBefore)) 后=\(String(format: "%.2f", rgAfter)) "
+        emit("SIM_MATRIX 红↔绿 前=\(String(format: "%.2f", rgBefore)) 后=\(String(format: "%.2f", rgAfter)) "
               + "| 蓝↔黄 前=\(String(format: "%.2f", byBefore)) 后=\(String(format: "%.2f", byAfter)) "
               + "| 灰 \(Self.inkString(g0))→\(Self.inkString(g1)) 漂移=\(String(format: "%.2f", greyDrift))")
 
@@ -672,7 +681,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 }
             }
         }
-        readings.forEach { print($0) }
+        readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 16,
                        "读数必须是 4 对 × 2 外观 × 2 尺度 = 16 条，少一条就是有一对没被量")
     }

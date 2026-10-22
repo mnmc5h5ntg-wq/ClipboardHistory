@@ -387,11 +387,36 @@ final class UICaptureTests: XCTestCase {
     func testCaptureReadingsUseTheFileChannel() throws {
         // ① 被搜的串不能原样出现在守卫自己的文本里：拼出来。
         let printCall = "pr" + "int("
-        let source = UICaptureTests.codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath)))
-        let strays = source.components(separatedBy: "\n").filter { $0.contains(printCall) }
+        // R301 / BACKLOG 357：这条规矩原来只扫**守卫自己那一个文件**。
+        // 于是 `HeatmapHoverEvidenceTests` 那 9 行读数一直走 stdout —— R300 要引用货版环读数时
+        // 本地一行都拿不到，只能靠一把刀把界写成 0.0 让它红一次才逼出数字。
+        // 现在按名册扫：名单里少一个文件（改名/删掉）就红，"没扫到"永远不等于"扫过了"。
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        // 名册为什么不含 `MotionFilmstripTests.swift`：它自带一颗 R56 时代的 `emit` 实现，
+        // 里面**合法地**有 `print(line)`（那就是它的第二条腿）、还有它自己正对照里的字面量。
+        // 把它塞进这张绝对零 print 的名册，等于把合法实现判成违规 —— 那正是"白名单"要解决的形状，
+        // 而白名单是下一次绕过去的入口（R55 的 M276）。**同一件事两份实现**本身是欠账：新开 358。
+        let roster = ["UICaptureHarness.swift", "HeatmapHoverEvidenceTests.swift",
+                      "CaptureReadings.swift"]
+        var strays: [String] = []
+        for name in roster {
+            let url = dir.appendingPathComponent(name)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: url.path),
+                          "读数名册里的 \(name) 不存在 ⇒ 守卫在扫一个不存在的文件，这一格已经空转")
+            for line in UICaptureTests.codeOnly(try String(contentsOf: url))
+                .components(separatedBy: "\n") where line.contains(printCall) {
+                strays.append("\(name): \(line.trimmingCharacters(in: .whitespaces).prefix(48))")
+            }
+        }
+        // 名册不能靠"扫了个空文件"通过：除通道实现本身，每个文件都要**至少用一次** `emit`。
+        for name in roster where name != "CaptureReadings.swift" {
+            let body = try String(contentsOf: dir.appendingPathComponent(name))
+            XCTAssertTrue(body.contains("emit("),
+                          "\(name) 里一次 `emit` 都没有 ⇒ 它把读数交给了谁？名册在空转（357）")
+        }
         XCTAssertTrue(strays.isEmpty,
-                      "捕获卷里有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
-                      + " ⇒ 通道丢一次的那天，这些读数一条都不剩（BACKLOG 96）。改走 `emit`")
+                      "捕获/动效卷里有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3))"
+                      + " ⇒ 通道丢一次的那天，这些读数一条都不剩（BACKLOG 96 / 357）。改走 `emit`")
 
         // ② 正对照：扫描本身得抓得住三种真实写法，并且**不**抓 `emit`。
         //    没有这一步，"零条游离"这句话可能只是扫描坏了的别名
