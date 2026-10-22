@@ -49,7 +49,8 @@
   SUITE_REGISTERED（**不红**） 红用例登记过 ⇒ 不挡发布，但把理由、登记时的 run 号、
                   以及指向的 BACKLOG 条目打出来；`MOTION_FLOOR_REGISTERED_REDS=n` 单独计数，
                   这样"靠登记过绿"这件事在日志里数得出来（BACKLOG 49：登记不许变成免检牌）。
-                  登记表里那条这次**没有**再红 ⇒ 打一行 `MOTION_FLOOR_SUITE_STALE`（不红）
+                  登记表里那条这次**没有**再红 ⇒ 走 `retirement_verdicts`：`recurrence=always` 红
+                  （过期登记要退场）、`sampled` 只点名（一跑没抽中不配退场，R39：恒红的守卫会被删）
                   提醒删掉它。为什么不红：一条偶尔才红的判据被登记之后如果不再红就恒红，
                   等于把登记变成反向的恒红 —— R46 在臂那一层已经为同样的形状让过一步。
 
@@ -200,6 +201,46 @@ def machine_key(overrides=None) -> str:
     return "local:" + platform.node()
 
 
+def retirement_verdicts(mine, named, machine):
+    """本机登记的名字这一跑**没露面** ⇒ 该红、该点名、还是该安静（R307 / BACKLOG 354 第四步）。
+
+    为什么只许有一份实现：旧代码在"这卷还有别的红"那条路上有一段 per-name 的
+    `MOTION_FLOOR_SUITE_STALE`（不红），而"全卷干净"那条路直接 `return` 什么都不说 ——
+    同一件事两份代码，其中一份永远不响（R102 那一族：一条规则两份实现会互相掩盖）。
+    而"全卷干净"恰恰是登记最该被质疑的时刻：R306 读到 runner 连两跑 `SUITE_CLEAN=0`，
+    表里那两条登记一次都没被提起。
+
+    三档的分别不是修辞：
+      `always`  ⇒ 缺席就是过期 ⇒ **红**，逼着删登记或修根因；
+      `sampled` ⇒ 缺席只是一个样本（那两条自己写着出现率 1/17、1/7）⇒ **点名不红**，
+                  做成红就得到一把恒红的守卫，而恒红的守卫最后会被人删掉（R39）；
+      没写 recurrence ⇒ **红**：不许用默认值替作者选一个永远不会响的方向。
+    登记为空（或这一跑全都红了）⇒ 一段都不响：既不是恒真也不是恒红。
+    """
+    absent = [name for name in sorted(mine) if name not in named]
+    out = []
+    no_rec = [n for n in absent if mine[n].get("recurrence") not in (u"always", u"sampled")]
+    if no_rec:
+        out.append(("MOTION_FLOOR_SUITE_NO_RECURRENCE=%d" % len(no_rec),
+                    "%s 这条登记没写 recurrence ⇒ 门不知道它缺席时该红还是该只点名，"
+                    "而替它选一个默认值 = 替它选一个永远不会响的方向（354④）"
+                    % u", ".join(no_rec), True))
+    always = [n for n in absent if mine[n].get("recurrence") == u"always"]
+    if always:
+        out.append(("MOTION_FLOOR_SUITE_STALE=%d" % len(always),
+                    "这几条登记在机器 %s 上写着『每次都红』，这一跑却一条都没露面 ⇒ 这是好消息："
+                    "根因修掉了就把登记删掉，留着它这张表会慢慢变成免检牌堆（354④）：%s"
+                    % (machine, ", ".join(always)), True))
+    sampled = [n for n in absent if mine[n].get("recurrence") == u"sampled"]
+    if sampled:
+        out.append(("MOTION_FLOOR_SUITE_NOT_SEEN=%d" % len(sampled),
+                    "这几条登记是**随采样漂**的红，这一跑没露面只说明「今天这一遍没抽中」，"
+                    "不说明它们已被修好 ⇒ 不许据此删登记，也不许把「门没红」读成「门在看这件事」；"
+                    "要退场得拿出现率重新量过的数（出现率写在各自的 reason 里）：%s"
+                    % ", ".join(sampled), False))
+    return out
+
+
 def suite_verdicts(facts: dict, expectations: dict, machine=None) -> list:
     """这一卷有没有红用例、红的那条**在这台机器上**登记过没有（R66 / BACKLOG 100 / 354②）。
 
@@ -242,6 +283,10 @@ def suite_verdicts(facts: dict, expectations: dict, machine=None) -> list:
     if not named and summary == 0:
         out.append(("MOTION_FLOOR_SUITE_CLEAN=0",
                     "这一卷没有红用例（汇总行也没说有）｜机器=%s" % machine, False))
+        # R307 / 354 第四步：旧代码在这一支**直接 return**，于是"本机登记的名字这一跑没露面"
+        # 连一行都不打 —— 而全卷干净恰恰是登记最该被质疑的那一刻。现在两条路都走同一个
+        # `retirement_verdicts`（一份实现，见那个函数的文档串：一条规则两份实现会互相掩盖）。
+        out.extend(retirement_verdicts(mine, named, machine))
         return out
 
     unregistered = [name for name in named if name not in mine]
@@ -279,11 +324,7 @@ def suite_verdicts(facts: dict, expectations: dict, machine=None) -> list:
                     "而它今天最可能的成因是 stdout 成块丢（R64）—— 那就是为什么结论必须同时进文件通道。"
                     "比较的两边同为**失败行数**：一条用例里两句断言一起红不算'没名字'（R83）"
                     % (summary, attributable, len(named)), True))
-    stale = [name for name in sorted(mine) if name not in named]
-    for name in stale:
-        out.append(("MOTION_FLOOR_SUITE_STALE",
-                    "%s 登记在机器 %s 的 `suite_reds` 里，这次**没有**再红 ⇒ 这是好消息，"
-                    "把登记表里这一条删掉（留着它，登记就慢慢变成免检牌堆）" % (name, machine), False))
+    out.extend(retirement_verdicts(mine, named, machine))
     return out
 
 

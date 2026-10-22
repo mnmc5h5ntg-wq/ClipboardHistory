@@ -73,6 +73,7 @@
     {
       "test": "testNativeRowMoveIsVisibleToTheRuler",
       "machine": "github-runner",
+      "recurrence": "sampled",
       "reason": "runner 上这一臂的两条腿读出同一个形状（开 1 帧/峰值 0.053、关 1 帧/峰值 0.053）⇒ 判据判的是『这次 moveRow 是瞬移』，而它吃的就是帧数；本机同码不红（1/17 的出现率见 354①）。登记不等于放行：地板 3 帧一条不放宽（D-251：单遍 runner 读数既不配给产品定罪，也不配替产品脱罪），要修的是判据不吃采样这件事（BACKLOG 77 路 b / 354③ 的 MOTION_BAND_INTERVAL 读数）。",
       "registered_run": "39795800668",
       "points_to": "BACKLOG 354"
@@ -80,6 +81,7 @@
     {
       "test": "testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt",
       "machine": "github-runner",
+      "recurrence": "sampled",
       "reason": "同一次 runner 跑里那条 XCTAssertGreaterThanOrEqual 读到 2 < 3（变化段只剩两帧），而同一份 Swift 代码的早一跑整跑绿 ⇒ 红的是那台机器今天的采样，不是产品今天变了（254/255 那一族）。出现率 1/7（另一棵树分组的读数，见 354①）。同样不放宽地板。",
       "registered_run": "39795800668",
       "points_to": "BACKLOG 354"

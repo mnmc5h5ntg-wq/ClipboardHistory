@@ -31,9 +31,12 @@ MODULE = 'scripts.tests.test_motion_floor_gate'
 
 SLICE_NEEDLE = u'        registry.setdefault(entry["machine"], {})[name] = entry'
 SLICE_GLOBAL = u'        registry.setdefault(machine, {})[name] = entry'
-STALE_NEEDLE = u'    stale = [name for name in sorted(mine) if name not in named]'
-STALE_GLOBAL = (u'    stale = [name for name in sorted(n for table in registry.values() for n in table)\n'
-                u'               if name not in named]')
+# R307 重钉：这把针原本钉在 `stale = [name for name in sorted(mine) ...]` 那一行，而 R307 把退场逻辑
+# 收成一份 `retirement_verdicts`（D-288）⇒ 那一行没了，needle 命中 0。
+# 现在钉在**上游的取表那一行**：机器切片真正的落点是 `mine` 怎么来的，钉这里比钉消费方更不容易腐烂
+# （消费方那几行还会因为分档继续长，取表这一行不会）。
+STALE_NEEDLE = u'    mine = registry.get(machine, {})'
+STALE_GLOBAL = (u'    mine = dict((n, e) for table in registry.values() for n, e in table.items())')
 
 ARMS = [
     ('M880', u'登记不分机器 = runner 的免检顶掉本机的红', GATE, SLICE_NEEDLE, SLICE_GLOBAL,

@@ -29,6 +29,7 @@
 而是那句话已被实测推翻两次（run 38538371464 与 38543812477，理由与毫秒数都在登记里）。
 于是本机那份真日志从"红两处"变成"绿 + 一行 THIN"，正对照的角色交给 `RUNNER_SILENT_LOG`。
 """
+import inspect
 import io
 import json
 import os
@@ -599,12 +600,17 @@ class MotionSuiteRedTests(unittest.TestCase):
     def testRegisteredRedThatStoppedFiringIsPrinted(self):
         registry = dict(EXPECTATIONS)
         registry["suite_reds"] = [{"test": "testSomethingLongFixed", "machine": HERE,
+                                   "recurrence": "sampled",
                                    "registered_run": "1", "points_to": "BACKLOG 0"}]
         marks = dict((m, (msg, red)) for m, msg, red in verdicts(self.facts, registry, machine=HERE))
-        self.assertIn("MOTION_FLOOR_SUITE_STALE", marks)
-        self.assertFalse(marks["MOTION_FLOOR_SUITE_STALE"][1],
-                         "不再复现的登记条目红一次没用 —— 只会逼人把整层闸门删掉（R39 那一族）")
-        self.assertIn("删掉", marks["MOTION_FLOOR_SUITE_STALE"][0])
+        # R307 起这条读数换了键名（三档里的 sampled 档）：旧键 `MOTION_FLOOR_SUITE_STALE` 现在只给
+        # `recurrence=always`，而且**是红的**。这里要证的还是同一件事——缺席必须被说出来。
+        self.assertIn("MOTION_FLOOR_SUITE_NOT_SEEN=1", marks,
+                      "登记不再复现却什么都不说 ⇒ 表会变成永久免检牌堆（354④）")
+        self.assertFalse(marks["MOTION_FLOOR_SUITE_NOT_SEEN=1"][1],
+                         "sampled 的缺席红一次没用 —— 只会逼人把整层闸门删掉（R39 那一族）")
+        self.assertIn("没抽中", marks["MOTION_FLOOR_SUITE_NOT_SEEN=1"][0],
+                      "点名要带上「这一跑不配退场」的理由，否则下一轮就有人来删登记")
 
     def testNamelessRedIsRed(self):
         """汇总行说有 1 条红，日志里一个名字都没有 ⇒ 红，且红在"没有名字"这件事上。"""
@@ -798,14 +804,17 @@ class MotionSuiteRedTests(unittest.TestCase):
         """
         registry = dict(EXPECTATIONS)
         registry["suite_reds"] = [{"test": u"testSomethingLongFixed", "machine": u"github-runner",
+                                   "recurrence": u"always",
                                    "reason": u"合成", "registered_run": "1", "points_to": "BACKLOG 354"}]
         marks = dict((m, (msg, red)) for m, msg, red in suite_verdicts(self.facts, registry, machine=HERE))
-        self.assertNotIn("MOTION_FLOOR_SUITE_STALE", marks,
+        self.assertNotIn("MOTION_FLOOR_SUITE_STALE=1", marks,
                          u"本机替 runner 退场 ⇒ 那条登记在 runner 上还有用")
         marks2 = dict((m, (msg, red)) for m, msg, red in suite_verdicts(
             self.facts, registry, machine=u"github-runner"))
-        self.assertIn("MOTION_FLOOR_SUITE_STALE", marks2,
+        self.assertIn("MOTION_FLOOR_SUITE_STALE=1", marks2,
                       u"在真正登记的那台机器上也不喊退场 ⇒ 登记就变成永久免检牌堆")
+        self.assertTrue(marks2["MOTION_FLOOR_SUITE_STALE=1"][1],
+                        u"recurrence=always 的缺席要**红**（只点名 = 没人会去删）")
 
     def testGateExitCodeIsOneOnTheRealRunnerRed(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -820,6 +829,96 @@ class MotionSuiteRedTests(unittest.TestCase):
             self.assertIn("红的用例=testListRowsDoNotAnimateAndNothingClaimsTheyDo", out,
                           "FACTS 行必须把红用例打出来：只给一个退出码，下一次还是没人知道是哪条")
             self.assertIn("MOTION_FLOOR_REDS=1", out)
+
+
+class SuiteRedRetirementTests(unittest.TestCase):
+    """R307 / BACKLOG 354 第四步：本机登记的红这一跑**没露面**时，门要发声，且发声方式按 recurrence 分档。
+
+    为什么现在才加：R306 现读到 runner 连两跑打 `MOTION_FLOOR_SUITE_CLEAN=0`（39833209888 / 39837096189），
+    而 `suite_reds` 里为 `github-runner` 登记着两条 —— 那两跑里门对这两条**一行都没提**：
+    `suite_verdicts` 在 `not named and summary == 0` 那一支直接 `return`。于是登记可以无限期留在表里，
+    慢慢变成免检牌堆（arms 那一侧早有 `MOTION_FLOOR_STALE` 专治这一格，`suite_reds` 这一侧没有对应物）。
+
+    两档的分别不是修辞：`sampled` 的缺席只是**一个样本**（那两条自己写着出现率 1/17、1/7），
+    把它做成红就会得到一把**恒红的守卫** —— 而 R39 的教训是恒红的守卫最后被人删掉。
+    所以 sampled 只点名不红，always 缺席即红，两者都不许保持沉默，而**没有 recurrence 的登记要红**
+    （不许用默认值替作者选一个永远不会响的方向）。
+    """
+
+    CLEAN = {"failures": [], "failure_messages": {}, "summary_failures": 0}
+
+    def _marks(self, entries, machine=None):
+        registry = dict(EXPECTATIONS)
+        registry["suite_reds"] = entries
+        return dict((m, (msg, red)) for m, msg, red in
+                    suite_verdicts(self.CLEAN, registry, machine=machine or HERE))
+
+    def _entry(self, recurrence=None):
+        entry = {"test": u"testRegisteredSomewhere", "machine": HERE,
+                 "reason": u"合成：出现率 1/7", "registered_run": "39795800668",
+                 "points_to": u"BACKLOG 354"}
+        if recurrence is not None:
+            entry["recurrence"] = recurrence
+        return entry
+
+    def test_sampled_absence_is_named_but_not_red(self):
+        marks = self._marks([self._entry(u"sampled")])
+        self.assertIn("MOTION_FLOOR_SUITE_CLEAN=0", marks)
+        key = u"MOTION_FLOOR_SUITE_NOT_SEEN=1"
+        self.assertIn(key, marks, u"登记着 sampled 的红而这一跑没露面 ⇒ 至少要被点名，不许静默 return")
+        msg, red = marks[key]
+        self.assertFalse(red, u"sampled 的缺席不许红：一跑没抽中就红 = 恒红的守卫（R39）")
+        self.assertIn(u"testRegisteredSomewhere", msg, u"点名要点到名字，否则读者不知道该删哪条")
+        self.assertIn(u"没抽中", msg, u"要写清这一跑证明不了什么 —— 缺席≠修好")
+
+    def test_always_absence_is_red_and_asks_for_retirement(self):
+        marks = self._marks([self._entry(u"always")])
+        key = u"MOTION_FLOOR_SUITE_STALE=1"
+        self.assertIn(key, marks, u"写着『每次都红』的登记这一跑没露面 = 过期，必须红着逼退场")
+        self.assertTrue(marks[key][1], u"always 那一档的缺席必须是红，不是提示")
+        self.assertIn(u"删", marks[key][0], u"红话要给出路：把登记删掉，而不是留着一张免检牌")
+        self.assertNotIn(u"MOTION_FLOOR_SUITE_NOT_SEEN=1", marks,
+                         u"同一档不该既红又只点名 —— 两档要互斥，否则读数会被挑着信")
+
+    def test_missing_recurrence_is_red_not_a_silent_default(self):
+        marks = self._marks([self._entry(None)])
+        key = u"MOTION_FLOOR_SUITE_NO_RECURRENCE=1"
+        self.assertIn(key, marks, u"没写 recurrence 的登记被默认成某一档 ⇒ 默认值替作者决定了它会不会响")
+        self.assertTrue(marks[key][1])
+
+    def test_empty_registry_does_not_make_noise(self):
+        """登记为空时这段不许响 —— 否则它就是一把恒红的守卫，而恒红的守卫最后会被人删掉（R39）。"""
+        marks = self._marks([])
+        self.assertEqual([u"MOTION_FLOOR_SUITE_CLEAN=0"], sorted(marks),
+                         u"没有登记却还打出退场/缺席提示 ⇒ 这一格在没有对象时也在响，是恒真的反面")
+
+    def test_there_is_exactly_one_retirement_implementation(self):
+        """一条规则只许一份实现 —— 旧代码的毛病正是"两份 stale，其中一份永远不响"。
+
+        R306 之前：`suite_verdicts` 的红路上有一段 per-name 的 MOTION_FLOOR_SUITE_STALE（不红），
+        而全卷干净那条路直接 return ⇒ 同一件事两份代码，坏的那份恰好是登记最该被质疑的那一刻。
+        数次数而不是数"有没有提到"：只扫词汇会放过第二份实现（R76/R77 那一族）。
+        """
+        source = Path(inspect.getsourcefile(suite_verdicts)).read_text(encoding="utf-8")
+        self.assertEqual(1, source.count('("MOTION_FLOOR_SUITE_STALE=%d"'),
+                         u"退场判据的**被打印键**出现在两处 ⇒ 又变成两份实现，先问哪一份会真的响"
+                         u"（数的是打印形状，不是提到过这个名字）")
+        self.assertEqual(3, source.count("retirement_verdicts("),
+                         u"def + 两条调用（干净那支与红那支）= 3；少一份就还有一条路不发声")
+
+    def test_the_live_registrations_declare_a_recurrence_backed_by_a_rate(self):
+        """现读名册：每条登记都要写 recurrence；sampled 的那条要在 reason 里给得出出现率（n/m）。"""
+        entries = EXPECTATIONS.get("suite_reds", [])
+        print(u"SUITE_RED_RECURRENCE 登记=%d 条 %s"
+              % (len(entries), u" ".join(u"%s:%s" % (e.get("test"), e.get("recurrence", "无"))
+                                         for e in entries)))
+        for entry in entries:
+            self.assertIn(entry.get("recurrence"), (u"always", u"sampled"),
+                          u"登记 %s 没写 recurrence ⇒ 门只能替它选一个默认档" % entry.get("test"))
+            if entry.get("recurrence") == u"sampled":
+                self.assertRegex(entry.get("reason", u""), r"\d+/\d+",
+                                 u"sampled 的登记要在 reason 里写出现率，否则『一跑没红不配退场』这句话"
+                                 u"没有数撑着（%s）" % entry.get("test"))
 
 
 if __name__ == "__main__":
