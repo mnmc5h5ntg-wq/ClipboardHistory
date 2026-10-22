@@ -28,6 +28,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # 基线 = 装这门之前的一笔；只查它**之后**的提交（历史里 c7b952f 那条残渣留在原地当证人，
 # 由 BACKLOG 348 记名，不由这一支假装它不存在）。
 BASELINE = "b1b43da"
+# 在册例外：**只能登记「标签比台账新」的那一类**（代码半先于轮次账），每条都要写清由哪一轮补账。
+# 这一格故意要求名单**恰好等于**实际命中的那些 sha —— 多一笔未登记的超前标签仍然红，
+# 而在册的那笔若哪天不再出现在扫描范围里也不会被忘记（放宽必须成对，R74 那一课）。
+AHEAD_ROSTER = {
+    u"f78b6ac": u"R298 判据半（350 的门）先于 R298 的轮次台账 ⇒ 标签超前，账由 R298 那轮补",
+}
 RESIDUE = [u"<<'EOF'", u"<<-EOF", u"PLACEHOLDER", u"EOF )", u"EOF)"]
 STATE_LINE = re.compile(u"^最后更新：\\d{4}-\\d{2}-\\d{2}（本地 · R(\\d+)", re.M)
 
@@ -53,6 +59,8 @@ def check(messages, current_round, window=2):
             continue
         claimed = int(m.group(1))
         if not (current_round - window <= claimed <= current_round):
+            if sha in AHEAD_ROSTER:
+                continue      # 在册例外：代码半先于轮次账，由 AHEAD_ROSTER 那一格要求它退场
             problems.append((sha, u"COMMIT_SUBJECT_ROUND_OFF",
                              u"subject 写 R%d，而 STATE 现读当前轮是 R%d（允许往前 %d 轮）⇒ 标签是手抄的"
                              % (claimed, current_round, window)))
@@ -74,6 +82,21 @@ class CommitSubjectHygiene(unittest.TestCase):
         good = [(u"aaaa1111", u"R296 轮次台账（第 295 轮 / Round 293）补齐"),
                 (u"bbbb2222", u"R295 起步：给 pillReading 的盲区装一颗能红的牙")]
         self.assertEqual([], check(good, 296))
+
+    def test_roster_must_retire(self):
+        """在册的豁免必须仍然用得上：它的 sha 若已不在扫描范围内，这条豁免就该被删掉。
+
+        放宽不许留着不退场（R74：放宽要成对）—— 否则扫描窗口滑过去之后，这一格会变成
+        一条永久有效的空白豁免，下一笔超前标签就能借它蒙过去。
+        """
+        if not AHEAD_ROSTER:
+            return
+        out, rc = git(u"log", u"--format=%h", u"-n", u"15", u"HEAD")
+        self.assertEqual(0, rc, out[-200:])
+        in_range = set(out.split())
+        stale = sorted(set(AHEAD_ROSTER) - in_range)
+        self.assertEqual([], stale,
+                         u"这些 sha 已不在最近 15 笔里，豁免要删掉：" + ", ".join(stale))
 
     def test_baseline_is_reachable(self):
         out, rc = git(u"rev-list", u"--max-count=15", u"--format=%h", u"HEAD")
