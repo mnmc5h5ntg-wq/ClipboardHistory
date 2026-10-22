@@ -24,8 +24,8 @@
       "reason": "run 38864545930（`82fbd1f`）在屏那一步的三行读数：`源码用例=11 登记=11 runner可跑=6 runner不可跑=5 本次下结论=6 红=0`、`露面=7/11 未闭口=1 前缀=1`、`PROBE_QUEUED 4/11 条一次都没轮到 4/11`。 本条**一次都没轮到**（名字由 `PROBE_QUEUED` 逐条点名，不再是从字母序推的）⇒ 排队没到，不是跑不动。132 那格（挂住前先把栈拍下来）修好之后重估。"
     },
     "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped": {
-      "runner": "cannot",
-      "reason": "R194 撤回了当天的一次翻面：闸门对 r94 那份历史夹具确实点名 NOW_RUNS 它，但今天的夹具（r146_pulse_real.log）与名册配对时它属于没下结论那一类。登记要跟着「这一跑」的点名改，不能拿旧夹具替现在作证（R98：历史夹具不许替现在签字）。"
+      "runner": "can",
+      "reason": "R304 按 runner 自己点名翻回 can：run 39825878608（`811c4fc`，R303 的账半）在屏那一步打 `NOW_RUNS testOffScreenProgrammaticSelectionIsRevealedAndNotJumped：登记说 runner 跑不了，而这次它下结论了（passed）` —— 这是**那一跑的读数**，不是推断（R94 第一次翻 can 用的就是同一句点名）。翻面的历史留在原地当证人：R94 can ← 一次 NOW_RUNS；R144 cannot ← 连着三跑同一句 NOT_RUN；R194 拒绝再翻 ← 那时拿的是旧夹具；本轮 can ← runner 现读的 passed。登记两侧都有牙（`HungCaseRegistrationTests` 四格），所以它哪天再挂死会红在 NOT_RUN 而不是静默免检 —— 这一格读的是「这台机器今天跑不跑得到」，不是产品结论。"
     },
     "testRowIndexDriftDoesNotMoveTheViewport": {
       "runner": "cannot",

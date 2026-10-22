@@ -32,18 +32,17 @@ GUARD_PY = 'python:' + GUARD_FILE
 NEEDLE_LINE = u'        CaptureReadings.emit("FOCUS-CHAIN " + chain.joined(separator: " | "))'
 REPL_LINE = u'        pri' + u'nt("FOCUS-CHAIN " + chain.joined(separator: " | "))'
 
-NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 42'
-REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 43'
+NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 29'   # R304：棘轮随第二批搬动降到 29，这根 needle 跟着重钉
+REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 30'
 
-NEEDLE_ROSTER = (u'                      "MotionFilmstripTests.swift", "UICaptureHarness.swift",\n'
-                 u'                      "UIInteractionProbeTests.swift"]')
-REPL_ROSTER = (u'                      "MotionFilmstripTests.swift", "UICaptureHarness.swift"]')
+NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
+REPL_ROSTER = u'                      "UICaptureHarness.swift"]'
 
 ARMS = [
     ('M875', u'把一行搬好的读数改回裸 stdout = 上界有牙', PROBE,
-     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 43 行'),
+     NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 30 行'),
     ('M876', u'把登记值抬去容纳现状 = 下界有牙（放宽要成对）', GUARD_FILE,
-     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, u'登记值是 43'),
+     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, u'登记值是 30'),
     ('M877', u'刚进名册的名字被删掉 = 未纳管必须红', HARNESS,
      NEEDLE_ROSTER, REPL_ROSTER, GUARD_PY, u'未纳管'),
 ]

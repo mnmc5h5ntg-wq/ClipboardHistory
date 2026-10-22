@@ -112,7 +112,7 @@ final class MotionDriverTests: XCTestCase {
                       + " ⇒ `ReceiptLine` 里那句 `.transition(.contentFade)` 是**死的**，"
                       + "用户看到的是瞬间插入、瞬间消失。要么供电，要么把那句声明撤掉"
                       + "（挂一臂不存在的过渡比不挂更坏：读代码的人会以为这里已经动了）")
-        print("RECEIPT_DRIVE 调用点 \(gates.count) 个，无驱动 \(undriven.count) 个，键总数=\(keys.count)")
+        CaptureReadings.emit("RECEIPT_DRIVE 调用点 \(gates.count) 个，无驱动 \(undriven.count) 个，键总数=\(keys.count)")
     }
 
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
@@ -381,7 +381,7 @@ final class MotionDriverTests: XCTestCase {
         //    展开只到"最后一段"，不拆出前缀（`store` 单独出现在状态集合里没有意义）。
         XCTAssertEqual(Self.drivingStates(for: ["store.foo == nil"], in: bannerFile),
                        Set(["store.foo", "foo"]))
-        print("DERIVED_KEY_EXPANSION 五格：展开认最后一段 / 没点到的仍算没电 / 读不懂不放行")
+        CaptureReadings.emit("DERIVED_KEY_EXPANSION 五格：展开认最后一段 / 没点到的仍算没电 / 读不懂不放行")
     }
 
     /// 推广：`NoticeBanner` 那五个调用点，每个都必须被某条驱动**真的**推到。
@@ -400,7 +400,7 @@ final class MotionDriverTests: XCTestCase {
         XCTAssertTrue(undriven.isEmpty,
                       "这些横幅的门控状态没被任何一条驱动（含派生键展开）推到：\(undriven.sorted())"
                       + " ⇒ `NoticeBanner` 外面那句 `.transition` 是死的")
-        print("BANNER_DRIVE 调用点 \(gates.count) 个、键 \(keys.count) 条、"
+        CaptureReadings.emit("BANNER_DRIVE 调用点 \(gates.count) 个、键 \(keys.count) 条、"
               + "展开后状态 \(Self.drivingStates(for: keys, in: code).count) 个、无驱动 \(undriven.count) 个")
     }
 

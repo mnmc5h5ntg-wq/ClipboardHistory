@@ -50,7 +50,7 @@ final class SettingsFailureReceiptTests: XCTestCase {
             XCTAssertFalse(message.contains("ErrorDomain"), "界面文案里不许出现错误域：" + message)
             XCTAssertFalse(message.contains("error -"), "界面文案里不许出现 OSStatus 原文：" + message)
         }
-        print("FEEDBACK_EXPORT_RECEIPT_TRUTH_TABLE 5 格：noData≠失败 / 两种失败都给下一步 / 无系统原文")
+        CaptureReadings.emit("FEEDBACK_EXPORT_RECEIPT_TRUTH_TABLE 5 格：noData≠失败 / 两种失败都给下一步 / 无系统原文")
     }
 
     // MARK: - 管线级：那个真动作
@@ -82,7 +82,7 @@ final class SettingsFailureReceiptTests: XCTestCase {
                        "第二条通道被加回来了：同一个导出结果既走行内回执又弹模态（BACKLOG 62）")
         XCTAssertFalse(code.contains(".alert(\"导出反馈数据\""),
                        "同上 —— 那条 `.alert` 就是模态那一半")
-        print("EXPORT_FEEDBACK_CHANNEL 一条通道：行内 ReceiptLine；原文进日志")
+        CaptureReadings.emit("EXPORT_FEEDBACK_CHANNEL 一条通道：行内 ReceiptLine；原文进日志")
     }
 
     /// 「暂无数据」这一支从 `catch noData` 变成 `catch let error` 之后，
@@ -129,7 +129,7 @@ final class SettingsFailureReceiptTests: XCTestCase {
             XCTAssertFalse(message.contains("ErrorDomain"), "系统原文不许进界面：" + message)
             XCTAssertFalse(message.contains("couldn"), "英文原文不许进界面：" + message)
         }
-        print("ARCHIVE_TRANSFER_RECEIPT 两格：都含下一步、都不含原文，且钉住“改动之前抛完”这个前提")
+        CaptureReadings.emit("ARCHIVE_TRANSFER_RECEIPT 两格：都含下一步、都不含原文，且钉住“改动之前抛完”这个前提")
     }
 
     /// 那两个闭包必须走映射器，而且不许再把 `localizedDescription` 拼进界面。
@@ -144,7 +144,7 @@ final class SettingsFailureReceiptTests: XCTestCase {
                        "又有人把系统原文拼进界面了（BACKLOG 62 的原样）")
         let logs = code.components(separatedBy: "LifecycleDebugLogger.log").count - 1
         XCTAssertEqual(logs, 2, "原文不进界面不等于丢掉：两个 catch 各该有一条日志（实际读到 \(logs) 条）")
-        print("ARCHIVE_ACTION_CHANNEL 措辞走映射器、原文走日志（2 个 catch）")
+        CaptureReadings.emit("ARCHIVE_ACTION_CHANNEL 措辞走映射器、原文走日志（2 个 catch）")
     }
 
     // MARK: - 夹具不许替产品写文案（R24 那条规矩的又一次落地）
@@ -162,7 +162,7 @@ final class SettingsFailureReceiptTests: XCTestCase {
                           + offenders.joined(separator: "\n")
                           + "\n⇒ 换成生产者函数（`FeedbackExportReceipt` / `ArchiveTransferReceipt` / "
                           + "`CopyThenPaste.decide`），让措辞一改帧就红")
-        print("RECEIPT_FIXTURE_COPY 手写文案 0 处")
+        CaptureReadings.emit("RECEIPT_FIXTURE_COPY 手写文案 0 处")
     }
 
     /// 上面那把尺自己的真值表：抓得住手写，也不把合法写法误报。

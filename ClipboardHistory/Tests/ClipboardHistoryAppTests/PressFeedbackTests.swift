@@ -71,13 +71,13 @@ final class PressFeedbackTests: XCTestCase {
 
         let scaled = renderPill(scale: PressableAppearance.scale(isPressed: true, reduceMotion: false), fill: 0)
         let scaledFraction = Self.changedFraction(idle, scaled)
-        print("PRESS_AXIS 缩放 " + Self.axisLine(idle, scaled))
+        CaptureReadings.emit("PRESS_AXIS 缩放 " + Self.axisLine(idle, scaled))
         XCTAssertGreaterThan(scaledFraction, 0.005,
                              "只改缩放时读不出任何像素差（\(String(format: "%.4f", scaledFraction))）⇒ 0.97 这一档是装饰")
 
         let filled = renderPill(scale: 1.0, fill: VisualFill.pressed)
         let filledFraction = Self.changedFraction(idle, filled)
-        print("PRESS_AXIS 底色 " + Self.axisLine(idle, filled))
+        CaptureReadings.emit("PRESS_AXIS 底色 " + Self.axisLine(idle, filled))
         XCTAssertGreaterThan(filledFraction, 0.02,
                              "只改底色时读不出变化 ⇒ 减弱动态那条退化（只剩底色）是空的")
 
@@ -85,8 +85,8 @@ final class PressFeedbackTests: XCTestCase {
                               fill: VisualFill.pressed)
         // 不是"合起来必须更大"（那是量级问题，不是设计问题），而是**两通道互不遮蔽**：
         // 在已缩放的图上再加底色要看得见，在已有底色的图上再缩放也要看得见。
-        print("PRESS_AXIS 缩放之上叠底色 " + Self.axisLine(both, scaled))
-        print("PRESS_AXIS 底色之上叠缩放 " + Self.axisLine(both, filled))
+        CaptureReadings.emit("PRESS_AXIS 缩放之上叠底色 " + Self.axisLine(both, scaled))
+        CaptureReadings.emit("PRESS_AXIS 底色之上叠缩放 " + Self.axisLine(both, filled))
         XCTAssertGreaterThan(Self.changedFraction(both, scaled), 0.02,
                              "缩放之上再叠底色读不出来 ⇒ 两通道互相遮蔽，其中一条是白占位置")
         XCTAssertGreaterThan(Self.changedFraction(both, filled), 0,
@@ -546,7 +546,7 @@ final class PressFeedbackTests: XCTestCase {
                     // 读数里带上**两档各自的令牌值**：R15 在这里栽过一次 ——
                     // 改了令牌之后读数一模一样，而日志里看不出量的是哪两个数，
                     // 只能靠再跑一遍去猜是不是用了旧二进制。
-                    print("FILL_STEP \(ladder.name)/\(tag) \(previousName)(\(String(format: "%.3f", previousLevel)))"
+                    CaptureReadings.emit("FILL_STEP \(ladder.name)/\(tag) \(previousName)(\(String(format: "%.3f", previousLevel)))"
                         + "->\(name)(\(String(format: "%.3f", level))) "
                         + "均值通道差=\(String(format: "%.2f", step))/255 "
                         + "alpha差=\(String(format: "%.2f", alphaStep))/255")

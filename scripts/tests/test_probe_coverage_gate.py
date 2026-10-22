@@ -315,14 +315,19 @@ class HungCaseRegistrationTests(unittest.TestCase):
         self.assertIn("NOW_RUNS", named[0])
 
     def test_todays_expectations_pair_green_with_todays_fixture(self):
-        """今天的登记 + 这份 R144 夹具 ⇒ 红必须**恰好**落在"夹具比名册旧"那两条上。
+        """今天的登记 + 这份 R144 夹具 ⇒ 红必须**恰好**落在"夹具比名册旧"那几条上。
 
         名字保留（R144 的台账行引用它），但判法在 R199 换了。原来它要求"一条都不红" ——
         那等于拿一份**历史日志**替**现在的名册**作证：R199 把两条筛选判据按 run 39220929124 的
         `NOW_RUNS` 翻成 can 之后，夹具里当然没有它们的结论行 ⇒ 闸门红在 NOT_RUN。
         那两红说的全是"这份夹具老了"，不是"登记翻错了"，所以这里钉的是**红的身份**：
-        只许 NOT_RUN 这一种，且只许那两条晚生的名字，多一条少一条都算量错。
+        只许 NOT_RUN 这一种，且只许那几条晚生的名字，多一条少一条都算量错。
         "今天的登记 + 今天的日志真的绿"这一格不由夹具判 —— 它每次推送由 runner 第 16 步自己演一遍。
+
+        R304 名单从两条变成三条：`testOffScreenProgrammatic…` 按 run 39825878608 的
+        `NOW_RUNS …（passed）` 翻回 can，而这份夹具采自它挂死那阵（started 有、结论没有）⇒
+        同一句"夹具比名册旧"，红在 NOT_RUN。这里刻意**不**把它从名单里挪走也不改夹具：
+        改夹具就是让旧读数替现在作证（R194 的那一条），而它现在正确的出处是 runner 那一跑。
         """
         expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))["cases"]
         _, reds = analyse(source_cases(SOURCE.read_text(encoding="utf-8")), expectations, self.log(concluded=False))
@@ -330,8 +335,12 @@ class HungCaseRegistrationTests(unittest.TestCase):
                          u"这份夹具只该因为『比名册旧』而红，别种形状的红都得查：%s" % reds)
         late = sorted(r.split()[1].split(u"：")[0] for r in reds)
         self.assertEqual(sorted(["testFilterSegmentsAreReachableAndShowFocus",
-                                 "testFilterFocusExitIsWired"]), late,
-                         u"红必须恰好落在 R199 翻成 can 的那两条上（夹具采集时它们还不存在）：%s" % late)
+                                 "testFilterFocusExitIsWired",
+                                 "testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"]), late,
+                         u"红必须恰好落在『登记按 runner 现读翻成 can、而这份夹具采集时它还没结论』的那三条上：%s" % late)
+        # 三条都得带自己的名字（红不许只报个数），且都落在**这条判据自己**那一句上
+        for name in late:
+            self.assertTrue(any(name in r for r in reds), u"%s 的红没点名 ⇒ 只能数出条数不能指出是谁" % name)
 
 
 if __name__ == "__main__":
