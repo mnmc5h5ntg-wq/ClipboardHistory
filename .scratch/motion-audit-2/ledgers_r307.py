@@ -316,8 +316,8 @@ STATE_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
 电池 Ran @BATT@ / OK (skipped=@SKIP@)；`product_streak --check` 绿；`LEDGER_TOKENS stray=0`。
 本轮产品 @NPROD@ 文件、Swift @NSWIFT@ 份 ⇒ 四件套的 Swift 三条腿**没有新对象**，沿用上轮读数并写明理由
 （不是"跑过"）；看图腿 @EYELEG@（@PNGS@ 张帧在盘上）。
-产品文件 0 个，连续零改动 **@STREAK@** 轮（现读 `--streak-for @ROUND@`：as-of 第 @ROUND@ 轮的最后一笔
-产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮）。
+产品文件 0 个，连续零改动 **@STREAK@** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for @ROUND@`，
+同形用于 `--check`）。as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
 
 ① 下一轮（@RNEXT@）的靶：① 354 的第五步 —— `sampled` 的退场阈值要拿"响过的次数"当依据来定，
 别再凭一次读数删登记；② 把 ⓪ 那两件事交账（尤其 `NOT_SEEN=2` 在 runner 上第一次响没响）；
@@ -455,6 +455,17 @@ new = {
 }
 for a, b, t in sorted(repl, key=lambda x: x[0], reverse=True):
     new["FR"] = new["FR"][:a] + t + new["FR"][b:]
+
+# §1 的「视觉台账 U-31 … U-<NNN>」那一格由闸门按 LAG_U=3 判 ⇒ 每轮现读抬，
+# 停在上一轮的数就是 R307 写盘后电池里那朵 FINAL_REPORT_UCELL_STALE 的成因。
+before_u = len(re.findall(u"U-31 … U-\\d+（R\\d+ 现读抬到最新一节）", new["FR"]))
+if before_u != 1:
+    die(u"§1 的 U 那一格锚点命中 %d 次（要恰好 1）⇒ 形状漂了，先打印原文再钉锚点" % before_u)
+new["FR"] = re.sub(u"U-31 … U-\\d+（R\\d+ 现读抬到最新一节）",
+                   u"U-31 … U-%d（%s 现读抬到最新一节）" % (UC, R_TAG),
+                   new["FR"], count=1)
+if u"U-31 … U-%d（%s 现读抬" % (UC, R_TAG) not in new["FR"]:
+    die(u"§1 的 U 上界没抬到 U-%d ⇒ 写盘后那一格照旧会红" % UC)
 
 for key in new:
     if key != u"FR" and len(new[key]) <= len(orig[key]):

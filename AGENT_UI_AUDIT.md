@@ -376,6 +376,30 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 306 轮（R307 · U-1007…U-1009 · 2026-10-23）：登记缺席要被打点 —— 退场判据从两份实现收成一份（U-1007…U-1009 · 产品 0 文件，判据账）
+
+- **U-1007：354 第四步 —— 全卷干净那一支以前直接 return，于是"本机登记的名字没露面"连一行都不打。**
+  现读证人（R306 那格交来的）：run 39837096189 与 39833209888 两跑都打 `MOTION_FLOOR_SUITE_CLEAN=0｜机器=github-runner`，
+  而 `suite_reds` 里为它登记着两条 ⇒ 那两跑里门对这两条**一字未提**。修法是把它收成一份实现：
+  新增 `retirement_verdicts(mine, named, machine)`，干净那支与红那支**都**走它。
+  为什么"两份实现"本身就是缺陷：旧代码在红路上有一段 per-name 的 `MOTION_FLOOR_SUITE_STALE`（不红），
+  而它恰好挂在"这卷还有别的红"那条路上 —— 全卷干净（正是登记最该被质疑的时刻）永远轮不到它响。
+  这一格由 `test_there_is_exactly_one_retirement_implementation` 钉住：数**次数**而不是数"有没有提到"
+  （键出现 1 次、`retirement_verdicts(` 出现 3 次 = def + 两条调用）。
+- **U-1008：退场分三档，且"没写档位"要红 —— 默认值等于替作者选一个永远不会响的方向。**
+  `always` 缺席 ⇒ **红**（写着每次都红却没露面 = 过期，逼退场）；`sampled` 缺席 ⇒ **点名不红**
+  （这两条登记的理由自己写着出现率 1/17、1/7，一跑没抽中不配退场；做成红就得到一把恒红的守卫，
+  而 R39 的教训是恒红的守卫最后被人删掉）；没写 `recurrence` ⇒ **红**。
+  现读名册：`SUITE_RED_RECURRENCE 登记=2 条 testNativeRowMoveIsVisibleToTheRuler:sampled testRowAnimationSurvivesTheSelectionUpdateThatFollowsIt:sampled`。两条既有登记都补成 `sampled`，reason 里的出现率被
+  `test_the_live_registrations_declare_a_recurrence_backed_by_a_rate` 要求成 `n/m` 形状（不许只说"偶尔"）。
+- **U-1009：看图腿 RUN —— 本轮 0 份 Swift、0 个产品文件 ⇒ 没有新画面形状可判。**
+  看的是盘上那 174 张里本轮挑的两张（`settings-shortcuts-recording-light`、`content-with-two-notices-light`）⇒ 本轮 0 份 Swift、0 个产品文件，没有新帧可捕，按 D-236 复用上轮产物复核（先 ls 数到帧还在盘上）。两条判断：① 快捷键「录制中」那一格与静置只差文案（按钮底同档灰、没有可见强调或焦点环）⇒ 这条**不许变成工单**：仓库对「焦点环在这条通道读不到」已有具名出口（`QUICKPICK_FOCUS_RING_NOT_RUN`、人工批次 68.1），录制器那一格要么下一轮量成读数、要么并进同一条人工批次；② 右侧浮动工具条（星/图钉/复制/删除）压在详情区之上，这张帧里正文只有一行所以看不出遮挡 ⇒ 记成**可量但本轮没量**的候选（工具条左沿 vs 详情正文最右 x），不写成缺陷。另两处看到但早已登记：两条横幅之间 spacing=0（R22 已判）、左下那块纯黑是侧栏选中材质在离屏的盲区（R18/229 已登记）。本轮没有据此改产品。
+
+本轮改动面现读（`git diff --name-only`）：产品 0 份、Swift 0 份 ⇒ 四件套的 Swift 三条腿
+**没有新对象**，按 D-236 沿用上轮读数并写明理由（全量卷 R306 现读 933/44skip/0 失败、帧 changed=0、dmg=ok、换装 1.4.8），
+不是"跑过"也不是"验过"。刀 4/4 全 CAUGHT、RESTORE_CLEAN=yes；历史表 R305（钉着同一份 gate 文件）本轮全 CAUGHT；
+预检 tables=101 arms=757 bad=0；门那一卷 Ran 50 全绿；电池 Ran 595 / OK (skipped=4)。
+
 ## 第 305 轮（R306 · U-1003…U-1006 · 2026-10-23）：第三批裸 stdout 搬完，编号尺一次抬齐，看图腿回到 RUN，354 的 runner 证人到了
 
 - **U-1003：360 的第三批 —— 四份判据卷 14 行搬进文件通道，棘轮 29 → 现读 15，派生名册 14 → 18。**
