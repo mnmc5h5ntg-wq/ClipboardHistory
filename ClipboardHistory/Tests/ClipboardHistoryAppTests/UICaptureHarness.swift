@@ -4092,6 +4092,18 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.controlFrame(RowFavoriteButton(isFavorite: false, action: {})
                 .environment(\.pressedForCapture, true)))
         })
+        // ── 342：系统参照臂搬进**夹具这条通道**（R293 看图腿的答案）────────────────
+        // 上一轮那把 `cacheDisplay` 探针两档都读 background=0 ⇒ 它量的不是"系统怎么画按下"，
+        // 而是"我那条通道画不画底"。而这一族帧（row-favorite-*）的 idle 那一档**有纸** ⇒
+        // 夹具这条通道会画真底 ⇒ 参照臂要走这里，才与自家臂同一条 render、同一颗尺、
+        // 同一个 density 换算（D-269：参照与自家不可比时，比值没有意义）。
+        // 与 `cardprobe-*` / `row-clipped-control` 同族：**这是尺的对照物，不是产品证据。**
+        results.append(Fixture("sysref-button-idle", NSSize(width: 60, height: 56), contentMustFit: false) {
+            AnyView(self.controlFrame(SystemPressProbe(highlighted: false)))
+        })
+        results.append(Fixture("sysref-button-press", NSSize(width: 60, height: 56), contentMustFit: false) {
+            AnyView(self.controlFrame(SystemPressProbe(highlighted: true)))
+        })
         // **尺的对照物**（不是产品证据，与 `cardprobe-*` / `row-clipped-control` 同一族）：
         // 同一颗图标、同一片底，左边按 `VisualFill.hover`、右边按 `VisualFill.controlHover` 点亮。
         // 它量的是 R20 那句理由本身 —— 两臂在同帧同底，任何"整把尺一起偏"都同时作用在两臂上，
@@ -5410,6 +5422,95 @@ final class UICaptureTests: XCTestCase {
     ///
     /// 不覆盖管线：这条读的是渲染产物（`render` → PNG → 像素），但控件本身是探针框里的单颗按钮，
     /// 不是从主窗口入口走到的那一位 —— 管线级同族判据见 `HoverCaptureChannelTests` 的调用点级名册。
+    /// 342 的参照物：一颗**系统的**图标按钮，按下态用 `cell.isHighlighted` 点亮。
+    /// 它不是产品代码，也不许被当成产品证据 —— 它是尺的对照物（与 `cardprobe-*` 同族），
+    /// 存在的唯一理由是给"自家按下那一档该有多大"一个**外部的**分母（D-269）。
+    private struct SystemPressProbe: NSViewRepresentable {
+        let highlighted: Bool
+
+        func makeNSView(context: Context) -> NSButton {
+            let button = NSButton(title: "", target: nil, action: nil)
+            button.bezelStyle = .shadowlessSquare
+            button.isBordered = true
+            button.image = NSImage(systemSymbolName: "star", accessibilityDescription: nil)
+            button.imagePosition = .imageOnly
+            button.controlSize = .small
+            button.refusesFirstResponder = true
+            button.state = .off
+            return button
+        }
+
+        func updateNSView(_ button: NSButton, context: Context) {
+            button.cell?.isHighlighted = highlighted
+            button.needsDisplay = true
+        }
+    }
+
+    /// **342 的存在性闸门**：系统控件画在夹具这条通道上，按下态要能被同一颗尺读到。
+    ///
+    /// 只判存在（两态都画得出、底非 0），**不加台阶地板** —— D-274：地板在参照被证明
+    /// 存在之前一条都不加，否则那个阈值是在替一条没跑通的通道背书（上一轮 `cacheDisplay`
+    /// 探针两档都读 background=0，就是这种"有阈值没对象"的形状）。
+    /// `|press − idle|` 的码值**只印不判**：这一格欠的是"系统的台阶到底有多大"这个数。
+    func testSystemPressReferenceExistsOnTheFixtureChannel() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r294-sysref-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func read(_ name: String, _ appearance: NSAppearance.Name)
+            -> (background: Int, pill: Int, step: Int, pillPixels: Int) {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                XCTFail("找不到夹具 " + name + " ⇒ 参照臂没有对象")
+                return (-1, -1, 0, 0)
+            }
+            let file = scratch.appendingPathComponent("\(name)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(name + "：渲染失败 " + String(describing: error))
+                return (-1, -1, 0, 0)
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(name + "：读不回 " + file.lastPathComponent)
+                return (-1, -1, 0, 0)
+            }
+            let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+            let r = Self.pillReading(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                     bytesPerRow: rep.bytesPerRow, x0: 0, x1: rep.pixelsWide)
+            return (r.background, r.pill, r.step, r.pillPixels)
+        }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let idle = read("sysref-button-idle", appearance)
+            let press = read("sysref-button-press", appearance)
+            XCTAssertGreaterThan(idle.background, 0,
+                                 tag + "：参照臂 idle 的底读 " + String(idle.background)
+                                 + " ⇒ 这条通道没画真底，参照不成立（要换通道，不许把 0 说成「系统没底」）")
+            XCTAssertGreaterThan(press.background, 0, tag + "：参照臂按下态的底读 0 ⇒ 同上")
+            XCTAssertGreaterThan(idle.pillPixels, 0,
+                                 tag + "：idle 没读到任何控件块 ⇒ 系统按钮根本没画出来")
+            // 按下态**不**断言 `pillPixels > 0`：本轮实测亮档按下态读 0 颗，成因不是"没画"，
+            // 而是这颗尺只认比底**亮**的墨，而系统按钮按下是**变暗**（R90 那一课：量不到先问
+            // 这把尺在反方向灵不灵）。所以这里判的是"两态在尺下可分"，把"方向瞎"这一格显式
+            // 记进 BACKLOG（346），而不是把 0 颗读成"系统按下没画"。
+            XCTAssertNotEqual(press.step, idle.step,
+                              tag + "：按下与空闲在同一颗尺下读出现同一个台阶码值（" + String(idle.step)
+                              + "）⇒ 参照臂没有可分的两态，拿它当分母没有意义")
+            judged += 1
+            emit("SYSTEM_PRESS_REF " + tag
+                 + "｜idle 底=" + String(idle.background) + " 块=" + String(idle.pill)
+                 + " 颗=" + String(idle.pillPixels)
+                 + "｜press 底=" + String(press.background) + " 块=" + String(press.pill)
+                 + " 颗=" + String(press.pillPixels)
+                 + "｜|press-idle| 码值=" + String(abs(press.step - idle.step))
+                 + "（342 只判存在；亮档按下读到 0 颗是**这颗尺方向瞎**，见 346，不是系统没画按下）")
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没跑完参照臂 ⇒ 判据没有对象")
+    }
+
     func testPressRungIsOrderedAboveTheHoverRung() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r258-pressladder-\(UUID().uuidString)", isDirectory: true)
