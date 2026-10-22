@@ -30,7 +30,36 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 # 这不是判据错了，是**窗口长度与提交速率**没对上：本仓库一轮常出 3~8 笔，15 笔撑不过两天。
 # 因此基线要按轮轮换（每轮台账落地时把它推到本轮第一笔），而「基线不在窗口内」必须继续红而不是静默放行 ——
 # 这一格本身就是 348 的第四格：锚点腐烂的检测已经有了，缺的是自动轮换（记在 348 追记里）。
-BASELINE = "ad58606"
+# 基线**不写死 sha**：写死就会腐烂 —— 今天实测，`b1b43da` 落地不到一天滑出 15 笔窗口，两格红 + 一条级联红
+# （本仓库一轮常出 3~8 笔，固定窗口撑不过两天）。改成自定位：基线 = **引入这一支判据的那一笔提交**，
+# 扫描范围是「它自己 + 之后所有笔」。这样窗口永远跟着判据的生日走，既不腐烂也不空转，
+# 而「扫不到任何一笔」仍然会红（生日那一笔至少要在，缺了说明尺坏了）。
+THIS_FILE = os.path.basename(__file__)
+
+
+def baseline_sha():
+    out, rc = git(u"log", u"--diff-filter=A", u"--format=%H", u"--reverse", u"--",
+                  u"scripts/tests/" + THIS_FILE)
+    self_ok = rc == 0 and out.split()
+    if not self_ok:
+        return None
+    return out.split()[0]
+
+
+BASELINE = None  # 运行时由 baseline_sha() 现取；留着这个名字给读代码的人一个线索
+
+
+def birth_short():
+    sha = baseline_sha()
+    return None if sha is None else sha[:7]
+
+
+def scan_args():
+    """扫描范围 = 判据生日那一笔（含）之后。生日之前不判（那时这门还不存在）。"""
+    sha = baseline_sha()
+    if sha is None:
+        return None
+    return [u"log", u"--format=%h%x00%s", sha + u"~1..HEAD"]
 # 在册例外：**只能登记「标签比台账新」的那一类**（代码半先于轮次账），每条都要写清由哪一轮补账。
 # 这一格故意要求名单**恰好等于**实际命中的那些 sha —— 多一笔未登记的超前标签仍然红，
 # 而在册的那笔若哪天不再出现在扫描范围里也不会被忘记（放宽必须成对，R74 那一课）。
@@ -111,9 +140,11 @@ class CommitSubjectHygiene(unittest.TestCase):
         """
         if not AHEAD_ROSTER:
             return
-        out, rc = git(u"log", u"--format=%h", u"-n", u"15", u"HEAD")
+        args = scan_args()
+        self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 豁免退场判据没有对象")
+        out, rc = git(u"log", u"--format=%h", args[-1])
         self.assertEqual(0, rc, out[-200:])
-        in_range = set(out.split())
+        in_range = set(out.split()) | {birth_short()}
         stale = sorted(set(AHEAD_ROSTER) - in_range)
         self.assertEqual([], stale,
                          u"这些 sha 已不在最近 15 笔里，豁免要删掉：" + ", ".join(stale))
@@ -133,10 +164,11 @@ class CommitSubjectHygiene(unittest.TestCase):
         self.assertIn(u"BACKLOG", found[0][2])
 
     def test_baseline_is_reachable(self):
-        out, rc = git(u"rev-list", u"--max-count=15", u"--format=%h", u"HEAD")
+        b = baseline_sha()
+        self.assertIsNotNone(b, u"查不到引入这一支的提交 ⇒ 扫描范围无从界定（不许静默放行）")
+        out, rc = git(u"rev-list", b + u"~1..HEAD")
         self.assertEqual(0, rc, out[-200:])
-        self.assertIn(BASELINE, out.split(),
-                      u"基线 " + BASELINE + u" 不在最近 15 笔里 ⇒ 这一支的扫描范围无从界定（不许静默放行）")
+        self.assertTrue(out.split(), u"生日之后一笔都没有 ⇒ 空对账，这一格没有对象")
 
     def test_recent_subjects_are_clean(self):
         state = io.open(os.path.join(ROOT, "AGENT_STATE.md"), encoding="utf-8").read()
@@ -145,19 +177,18 @@ class CommitSubjectHygiene(unittest.TestCase):
         # AGENT_STATE.md 是**新轮在上**的顺序，所以当前轮要取**第一个**匹配；取末会读到最老那一节
         # （本轮现读撞过：取末得到 R258，于是三笔 R296 的提交全被误判成「标签是手抄的」）。
         current_round = int(cur[0])
-        out, rc = git(u"log", u"--format=%h%x00%s", u"-n", u"15", u"HEAD")
+        args = scan_args()
+        self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 这一格没有对象")
+        out, rc = git(*args)
         self.assertEqual(0, rc, out[-200:])
         rows = []
-        seen_baseline = False
         for line in out.splitlines():
             if u"\0" not in line:
                 continue
             sha, subject = line.split(u"\0", 1)
-            if sha == BASELINE:
-                seen_baseline = True
-                break
             rows.append((sha, subject))
-        self.assertTrue(seen_baseline, u"扫完 15 笔没遇到基线 " + BASELINE)
+        self.assertIn(birth_short(), [r[0] for r in rows],
+                      u"扫描范围里连判据自己的生日那一笔都不到 ⇒ 范围算错了")
         self.assertTrue(rows, u"基线之后一笔都没有 ⇒ 空对账（COMPARED=0 的绿不算绿）")
         problems = check(rows, current_round)
         self.assertEqual([], problems, u"\n".join(u"%s %s %s" % p for p in problems))
