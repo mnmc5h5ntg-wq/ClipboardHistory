@@ -29,7 +29,7 @@
 读数族 `READINGS_MUST_INCLUDE 声明=5 缺=0`；脚本电池 `Ran 611（skipped=4）`；
 产品文件 0 个，连续零改动 **4** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 322`，`--check` 同形；上一轮 3）。
 
-⓪ R324 开场要先读的（成对：run id ↔ commit）：本轮 push 之后那一跑的 id **未取**（合法中间态，由追记那一笔回填）；本轮已读的是 R322 那两跑 —— RUN=40023610164 sha=1a37edc（status=completed conclusion=failure，红因与处置见 U-1063），本轮代码半 sha=445fde4。要读的：
+⓪ R324 开场要先读的（成对：run id ↔ commit）：**R323 追记回填** —— RUN=40032708615 sha=28c8510（回填这一刻 status=in_progress，结论未读：进行中的 job 日志打 0 字节，不许把「没读到」写成「没跑」）；本轮已读的是 R322 那两跑 —— RUN=40023610164 sha=1a37edc（status=completed conclusion=failure，红因与处置见 U-1063），本轮代码半 sha=445fde4。要读的：
    ① **斜坡尺与那条出口在 runner 上各自怎么说**（期望先写死在这里，读到才算结案）：
       `MOTION_PILL_RAMP_GEOM` 那一行的 `轨道=/药丸=/分离=` 三个数 —— 若 runner 的分离 < 8，
       它会报 `MOTION_NOT_RUN=pill-ramp-low-separation`（材质在那台机器上落到哪一档，本轮没数）；
