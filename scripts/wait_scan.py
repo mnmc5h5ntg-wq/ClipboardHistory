@@ -43,6 +43,14 @@ POLL_UNTIL = re.compile(r'(?<!func )\bpollUntil\(cell:')
 OBSERVATION_WINDOWS = [
     ('DailyCopyHeatmapTests.swift', 'testBackfillDoesNotWriteDuringConstruction',
      '断言缺席 ⇒ 不可轮询；同格末尾 flushPendingSaves + 文件出现当正面控制'),
+    # R319 / BACKLOG 374：这一格的"等待"是**主动把秒界跨过去** —— 条件是被观察的秒变化
+    # （`while Date().timeIntervalSince(crossed) < 1.05`），里面的 `Thread.sleep(0.05)` 只是让出 CPU。
+    # 它被扫出来是因为扫描认字面式（这条尺不该去猜"这个 sleep 是不是有意的"），
+    # 登记的理由就是这一格与"撞运气的固定等待"的区别：**去掉这个等待，断言仍然成立；
+    # 但它回来了 ⇒ 374 那朵"跟着挂钟走"的红会回来**，所以它是证据不是运气。
+    ('HistoryPersistenceRecoveryTests.swift',
+     'testCorruptHistoryWithoutBackupPreservesOriginalAndReferencedImages',
+     '等条件是秒界（374：断言不许依赖挂钟粒度）；sleep 只让出 CPU，不决定结果'),
 ]
 
 FUNC_DEF = re.compile(r'^\s*(?:@[\w.]+\s+)*(?:private |fileprivate |public |open |static |final )*func\s+(\w+)')

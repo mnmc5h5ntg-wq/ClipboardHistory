@@ -122,6 +122,27 @@ final class HistoryPersistenceRecoveryTests: XCTestCase {
         let persistence = FileHistoryPersistence(rootDirectory: root)
         XCTAssertEqual(persistence.load(), [])
         XCTAssertNotNil(persistence.recoveryNotice)
+        // R319 / BACKLOG 374：这一格原来只在"两次载入落在同一秒"时才成立 ——
+        // `preserveCorruptFile` 的名字是**秒**粒度、同名不覆盖，于是同一秒返回 nil
+        // （恢复提示只能说"未知位置"），跨秒界就多写一份逐字节相同的副本（红）。
+        // R318 的四件套就是跨了秒界那一次：同版两跑 935 例一次红一次绿、独跑 12 次全绿。
+        // 一条断言的结果跟着挂钟走，它报的就不是产品，是运气。
+        //
+        // 所以现在**故意跨过秒界**再载入一次（等条件，不是固定 sleep 撞运气 —— 见账本 R267 那一族），
+        // 然后要求"恰好一份 + 与原件逐字节相同 + 提示里有真文件名"。
+        // 修之前这两条都会红（第二份 / 未知位置），修之后它们才叫证据。**不许**降成 `>= 1`。
+        let crossed = Date()
+        while Date().timeIntervalSince(crossed) < 1.05 {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        XCTAssertEqual(persistence.load(), [], "第二次载入仍要以空历史启动（原件没被修好）")
+        let secondNotice = try XCTUnwrap(persistence.recoveryNotice)
+        XCTAssertFalse(secondNotice.contains("未知位置"),
+                       "第二次载入也要交回真实的保全文件名 ⇒ 幂等之后不许把已有副本报成 nil")
+        let preserved = try FileManager.default.contentsOfDirectory(atPath: root.path)
+            .filter { $0.hasPrefix("history.corrupt-") }
+        XCTAssertEqual(preserved.count, 1,
+                       "原件必须被保全**恰好一份**：跨过秒界的第二次载入不许再抄一份相同的副本")
 
         let store = HistoryStore(
             intake: ClipboardIntake(pasteboard: .general),
@@ -139,13 +160,16 @@ final class HistoryPersistenceRecoveryTests: XCTestCase {
         XCTAssertTrue(survivors.contains(keptName), "损坏文本里被引用的图片必须保住")
         XCTAssertFalse(survivors.contains(orphanName), "未被引用的孤儿图片仍应清理（保留既有语义）")
 
-        let preserved = try FileManager.default.contentsOfDirectory(atPath: root.path)
+        // 上面已经跨过秒界做过第二次载入并数过"恰好一份"；这里再确认**正常保存那一条路径**
+        // 也不会追加 corrupt 副本，并且那一份确实是原件的逐字节拷贝（可手工抢救的前提）。
+        let preservedAfterSave = try FileManager.default.contentsOfDirectory(atPath: root.path)
             .filter { $0.hasPrefix("history.corrupt-") }
-        XCTAssertEqual(preserved.count, 1, "原件必须被保全一份副本")
-        let preservedText = try String(
-            contentsOf: root.appendingPathComponent(preserved[0]),
-            encoding: .utf8
-        )
+        XCTAssertEqual(preservedAfterSave, preserved,
+                       "恢复之后的一次正常保存不许再产生 corrupt 副本")
+        let preservedURL = root.appendingPathComponent(preserved[0])
+        XCTAssertEqual(try Data(contentsOf: preservedURL), Data(corruptBody.utf8),
+                       "保全副本必须与损坏原件逐字节相同（可手工抢救的前提）")
+        let preservedText = try String(contentsOf: preservedURL, encoding: .utf8)
         XCTAssertTrue(preservedText.contains(keptName), "保全副本应包含原始（可手工抢救的）内容")
     }
 

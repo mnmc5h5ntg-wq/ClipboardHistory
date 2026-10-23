@@ -123,7 +123,10 @@ class RosterTests(unittest.TestCase):
                          '还有没登记的固定挂钟等待：' + repr(unregistered))
         self.assertEqual([], stale, '名册失配：' + repr(stale))
         # 颗数钉死（D-250：间隙用 assertEqual，不用 assertLessEqual）
-        self.assertEqual(1, len(bets), '观察窗口颗数：' + repr(bets))
+        # 1 → 2 是 R319 登记的**第二颗**观察窗口：`HistoryPersistenceRecoveryTests`
+        # 里那处等待的条件是"秒界被跨过去"（BACKLOG 374：断言不许依赖挂钟粒度），
+        # 不是撞运气的固定 sleep。等式仍然是**恰好**，改的是现读值 + 成因（这一格的存在理由）。
+        self.assertEqual(2, len(bets), '观察窗口颗数：' + repr(bets))
         self.assertEqual(2, steps, '轮询步进调用点颗数')
         self.assertEqual(4, untils, 'pollUntil 调用点颗数')
 

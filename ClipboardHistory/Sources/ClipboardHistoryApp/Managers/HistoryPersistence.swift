@@ -527,15 +527,37 @@ final class FileHistoryPersistence: HistoryPersisting {
     }
 
     /// 把无法解析的原件保全成 `history.corrupt-<时间戳>.json`，绝不删除原件。
+    ///
+    /// 为什么必须**按内容幂等**（R319 / BACKLOG 374，红是 R318 的四件套抓的）：这一支原来只挡"同名"，
+    /// 而名字是**秒**粒度 —— 一次启动里 `load()` 会被走两遍（存档恢复路径 + `HistoryStore` 初始化），
+    /// 于是结果跟着挂钟走：落在同一秒 ⇒ 第二遍撞上同名，返回 **nil**，恢复提示只能说"保全在未知位置"；
+    /// 跨过秒界 ⇒ 第二遍再写一份与第一份**逐字节相同**的副本。用户如果一直带着坏存档启动，
+    /// 支持目录里就会随启动次数无限攒同一份损坏原件。
+    /// 现在先把语义摆正：这一条要保证的是"这份损坏原件被保全着、随时可手工抢救"，
+    /// 不是"每次载入都再抄一遍"。所以写之前先看同目录里有没有**字节相同**的 corrupt 副本，
+    /// 有就把它交回去（不写盘、提示里也就有了真文件名）。
     nonisolated private static func preserveCorruptFile(at url: URL) -> URL? {
+        let fileManager = FileManager.default
+        guard let original = try? Data(contentsOf: url) else { return nil }
+        let directory = url.deletingLastPathComponent()
+        // `sorted()` 不是美观问题：`contentsOfDirectory` 的顺序不保证，
+        // 而"交回哪一份副本"必须可复现，否则恢复提示里的文件名会随目录顺序抖。
+        if let names = try? fileManager.contentsOfDirectory(atPath: directory.path) {
+            for name in names.sorted() where name.hasPrefix("history.corrupt-") && name.hasSuffix(".json") {
+                let sibling = directory.appendingPathComponent(name)
+                if let existing = try? Data(contentsOf: sibling), existing == original {
+                    return sibling
+                }
+            }
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let candidate = url.deletingPathExtension()
             .appendingPathExtension("corrupt-\(formatter.string(from: Date())).json")
-        guard !FileManager.default.fileExists(atPath: candidate.path) else { return nil }
+        guard !fileManager.fileExists(atPath: candidate.path) else { return nil }
         do {
-            try FileManager.default.copyItem(at: url, to: candidate)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: candidate.path)
+            try fileManager.copyItem(at: url, to: candidate)
+            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: candidate.path)
             return candidate
         } catch {
             return nil
