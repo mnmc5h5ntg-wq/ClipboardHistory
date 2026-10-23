@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 撤销自己一小时前开的单，补上它欠的同族对照，再把那张重复臂拿走（R315 / U-1032…U-1035 · D-296 · 产品 0 文件，判据轮）
+
+- **BACKLOG 371 撤销**：空态不渲染「这张图怎么读」是 **R9 的决定**（`SettingsView.swift:1027-1041`，
+  与"共 0 次"同族），且 `DailyCopyHeatmapTests.testHeatmapReadingGuideFollowsTheChart` 已钉着两条回归
+  ⇒ 量到一处缺席 ≠ 新条目。教训写成 D-296：开单之前先过三道查重（源码里的决定 / 会红的判据 / 同族对照）。
+- **补上对照**：逐分区底部留白比例现读 统计 0.533 ｜ 通用 0.502 ｜ 0.472 ｜ 快捷键 0.460 ｜ 数据 0.424 ｜
+  推荐 0.013 ｜ 隐私 0.000 ⇒ 统计页不是异类。量尺进仓库：`measure_pane_whitespace_r315.py`。
+- **"贴边"分辨成读数**：行剖面末三行 205→44→28 vs 健康对照底下 14 像素空白，加 `detailScrollView`
+  与夹具注释（滚动区那批天生会被裁）三条同向 ⇒ 隐私页那一格是**滚动折**，不是文字被裁。
+- **BACKLOG 370 结案（出口①）**：撤掉 R314 自曝的那张重复臂，`CAPTURED 176→174`、
+  基线**同一笔** update（`COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`）、捕获卷 92/0 红。
+  撤名册的副作用：M566 那根针跟着第二次换形状（本轮改回单行原形，预检 `bad=0`、M563…M567 全 ok）⇒ 369 的证人。
+- 一格未归因照实记：捕获卷 skip **5→4**，第 5 条是谁没查 ⇒ 新开 372（属 341 那一族）。
+- 现读：构建告警 0（`--build-tests`）；捕获卷 `Ran 92 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failure(s)；
+  帧 CAPTURED 174 -> /tmp/r316_shots、基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0；换装 没读到换装结论行；预检 tables=106 bad=0、名册 arms=780；
+  腐烂尺 `HIDDEN_ARMS 表=194 可判=712 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；电池 `Ran 611 / OK (skipped=4)`（写盘后同数）。
+
 ### 空态补上「组合状态」那一臂：顶出两处名册缺口，也自曝它是重复臂（R314 / U-1028…U-1031 · D-295 · 产品 0 文件，判据轮）
 
 - 上一轮那句「热图空状态 69% 是留白」被追到**夹具**：`heatmap-empty` 自己写着

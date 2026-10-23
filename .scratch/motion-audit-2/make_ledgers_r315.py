@@ -164,19 +164,22 @@ def main():
     post = [
         (re.compile(u'本轮最该被读的一格是自曝：.*?产品侧缺席单 %s。', re.S),
          u'本轮最该被读的一格是撤销：@RPREVTAG@ 自己开的缺席单 371 被查重撤掉（R9 的决定 + 已有判据 + 同族不离群），'
-         u'并把 @RPREVTAG@ 自曝的那张重复臂拿走（帧基线 176→174 同一笔 update）；新开 %s。'),
-        (re.compile(u'（新增两张 empty 帧，\\*\\*同一笔 update\\*\\*）'),
-         u'（撤掉两张重复帧，**同一笔 update**）'),
+         u'并把 @RPREVTAG@ 自曝的那张重复臂拿走（帧基线 176→174 同一笔 update）；新开 %s。', 1),
+        (re.compile(r'INSTALL_LINE, BLNEW3\)\)'), u'INSTALL_LINE, BLNEW))', 1),
+        (re.compile(u'R314_LOAD_RED'), u'R315_LOAD_RED', 2),
     ]
-    for rx, rep in post:
+    for rx, rep, want in post:
         n = len(rx.findall(src))
-        if n != 1:
-            sys.stderr.write(u"POST 正则命中 %d 次（要 1）：%s\n" % (n, rx.pattern[:50]))
+        if n != want:
+            sys.stderr.write(u"POST 正则命中 %d 次（要 %d）：%s\n" % (n, want, rx.pattern[:50]))
             sys.exit(1)
-        src = rx.sub(rep, src, count=1)
-    leftovers = [m.group(0) for m in re.finditer(u"R314|BLNEW2|BLNEW3|CAP1_REDS|MD5_SAME", src)]
+        src = rx.sub(rep, src)
+    leftovers = [l for l in src.split(u"\n")
+                 if re.search(u"R314|BLNEW2|BLNEW3|CAP1_REDS|MD5_SAME", l)
+                 and u'PREV_TAG, R_NEXT' not in l]
     if leftovers:
-        sys.stderr.write(u"派生物里还留着上一轮的东西：%s" % sorted(set(leftovers)))
+        sys.stderr.write(u"派生物里还留着上一轮的东西（%d 行）：\n%s\n"
+                         % (len(leftovers), u"\n".join(x.strip()[:120] for x in leftovers[:6])))
         sys.exit(1)
     io.open(DST, "w", encoding="utf-8").write(src)
     compile(src, DST, "exec")

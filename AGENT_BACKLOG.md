@@ -7447,7 +7447,15 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
 
   规矩层面已经先落了一条（见 D-295 末段）：**新增一臂之前必须与既有臂做 md5 对拍**，
   名字不同不等于内容不同。这一条本轮只在 D 里有正文、没有会红的门，所以这条单还开着。
-
+  追记（R315）：**出口①已落地 —— 撤掉那张重复臂。**
+  `settings-stats-empty` 夹具与它的两处名册条目一起删掉，帧基线**同一笔** update：
+  `CAPTURED 176 → 174`、`UPDATED=174`、复验 `COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`、捕获卷 92 用例 0 红。
+  空态的对照改用一直存在的那一对（`settings-stats` 0.533 vs `settings-stats-populated` 0.252）。
+  顺带把这一条的**副作用**记全：撤名册 ⇒ `iconFirstCells` 的声明从两行回到一行 ⇒
+  `mutate_r101.py` 的 M566 针必须跟着改回单行原形（预检现读 M563…M567 全 ok、bad=0）——
+  这是 R314 那把针在同一张名册上第二次被咬，证人记在 369。
+  本条结案：出口②（给成对臂配一条会红的判据）不再需要 —— 臂都没了，判据就没有对象；
+  而"新增一臂之前先 md5 对拍"这条已经落在 D-295 与 D-296 的正文里。
 **371. 「统计」页空态把说明段整段丢掉：缺席 = 2 段，同一屏下半部 53% 是纯白（R314 看图腿现读）**（R314）
 
   两条臂走同一个 `SettingsView`、同一个 720x540、同一条 render，只差账本有没有内容：
@@ -7490,3 +7498,19 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
   不是"文字被裁一半"那种缺陷；`settings-privacy-tall-720x1040` 底部整段无墨，佐证同一内容在够高的框里完整。
   这一格记在这里而不是另开单，因为**判的是"不是缺陷"**：要让它变成工单，缺的读数是
   "折处那一行是否被切掉 ≥ 一个字形的行高"，而不是"它贴边"。
+
+**372. 捕获卷的 skip 从 5 变成 4，差的那一颗没有名字（R315 现读：撤掉重复臂那一笔之后）**（R315）
+
+  R314 那遍 `Test Suite 'UICaptureTests' passed … Executed 92 tests, with **5** tests skipped`，
+  R315 撤掉 `settings-stats-empty` 之后同一卷是 `Executed 92 tests, with **4** tests skipped` ——
+  用例总数没变、红没变，skip 少了一颗。本轮点名的四条是
+  `testMenuBarRowTruncationAcrossWidthsDiagnostic`、`testProbeVibrantEligibilityDiagnostic`、
+  `testSettingsCaptionRowTierProfileDiagnostic`、`testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic`，
+  第 5 条**是谁、为什么不再 skip、它现在是真的在跑还是被静默吞掉**，本轮没查。
+
+  为什么必须查：这一族已经红过（341：电池汇总数与 `-v` 名单不同源 ⇒ 差的那一颗没有名字）。
+  "少一条 skip"有两种相反的成因 —— (a) 那一格本来在等某个夹具/某张帧，帧被撤了它就不该再被问；
+  (b) 判定条件被写坏，它从"跳过"漂成"永不执行"。两种都不红。
+  做法：① 让捕获卷自己把 skip 名单与汇总数做**同源对账**（名单颗数 != 汇总 skipped 就红并点名差额）；
+  ② 配一把刀：把某条诊断的 skip 前提改成恒真 ⇒ 汇总数必须动、名单必须点名它。
+  归因之前，台账里凡写"捕获卷 skipped=N"都要带名单出处。
