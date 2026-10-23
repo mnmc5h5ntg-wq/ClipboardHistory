@@ -200,13 +200,12 @@ if len(INK_ROWS) < 3:
 INK_PAIR = (re.findall(u"R314_INK_PAIR .+$", chain) or [u""])[-1]
 
 RD_LINE = (re.findall(r"(?m)^SWIFT_SUMMARY .+$", chain) or [u""])[-1]
-_sum = re.findall(u"Executed (\\d+) tests?, with (\\d+) tests? skipped and (\\d+) failures", RD_LINE)
+_sum = re.findall(u"Executed=(\\d+) skipped=(\\d+) failures=(\\d+)", RD_LINE)
 if not _sum:
-    die(u"SWIFT_SUMMARY 那行解析不出三个数（或被多条总结行污染）：%s" % RD_LINE[:160])
-if len(re.findall(u"Executed \\d+ tests?, with", chain[chain.find(u"### SWIFT_SUMMARY"):
-                                                 chain.find(u"### SWIFT_LEGS")])) != 1:
-    die(u"SWIFT_SUMMARY 那一节不止一条总结行 ⇒ 不知道哪一条是全量卷")
-FULL_LINE = u"Executed %s tests, with %s skipped and %s failures" % _sum[-1]
+    die(u"SWIFT_SUMMARY 那行解析不出三个数：%s" % RD_LINE[:160])
+if u"通道=anchored" not in RD_LINE:
+    die(u"全量卷的总数不是从 `Test Suite 'All tests'` 那一块取的 ⇒ 会读到小卷：%s" % RD_LINE[:160])
+FULL_LINE = u"Executed %s tests, with %s skipped and %s failure(s)" % _sum[-1]
 FULL_FAILS = int(_sum[-1][2])
 LOAD_RED = (re.findall(r"(?m)^R314_LOAD_RED .+$", chain) or [u""])[-1]
 _hits = re.findall(u"R314_LOAD_RED 命中=(\\d+)", LOAD_RED)

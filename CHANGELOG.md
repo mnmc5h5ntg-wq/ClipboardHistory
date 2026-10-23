@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 空态补上「组合状态」那一臂：顶出两处名册缺口，也自曝它是重复臂（R314 / U-1028…U-1031 · D-295 · 产品 0 文件，判据轮）
+
+- 上一轮那句「热图空状态 69% 是留白」被追到**夹具**：`heatmap-empty` 自己写着
+  `.frame(width:430,height:150,alignment:.topLeading)`，而它的对照臂走真入口 ⇒ 两臂不同源。
+- 补 `settings-stats-empty`（同一个 `SettingsView`、同一尺寸、账本为空，其余逐字相同）。
+  所有空状态帧的墨带中心比例现读：0.107 / 0.267 / **0.298（新）** / 0.418 / 0.603 / 0.640
+  ⇒ 热图不是异类，那句读数不承重。
+- **自曝**：新臂与既有 `settings-stats` 两档 md5 相同（默认夹具早就注入空账本）⇒ 真入口的空态臂一直存在，
+  本轮补的是重复品。能判产品的数是 `settings-stats` 0.533 vs `settings-stats-populated` 0.252（底部留白比例）。
+  新开 370：要么撤这一臂，要么给它一条会红的成对判据。
+- **看图腿判出一处缺席**（不是形容词）：有数据那一屏卡片里有三段（汇总行 / 日历 / 「这张图怎么读」整段说明），
+  空态那一屏只有 `StateLine` 一行 ⇒ 说明段在空态**整段消失**，同一屏下半部 53% 是纯白（0.533 vs 0.252）。新开 371。
+- 新帧顶出两处名册缺口，两处都只登记：卡片内缩的"首墨是图标"那一格（实测 delta=+1.0，
+  在 R101 立的 [+0.5,+2.0] 有界替代判据里），以及暗档侧栏文字盲区名册（`TEXT_SIDE_ROSTER_EXTRA`）。
+- 本轮**没有新刀**（判断，不是遗漏）：证人是同一次改动里的两次捕获 —— 第一跑 3 朵红、
+  登记后第二跑 `CAPTURED 176` 零 error。另新开 369：`iconFirstCells` 自指，诊断只给名单里的格子打。
+- 现读：构建告警 0；判据卷 `Ran 92 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 1 failure(s)；
+  帧 没读到 CAPTURED 行、基线 FRAME_BASELINE_COMPARED=176 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0 + 同一笔 update（`UPDATED=176`，复验 `CHANGED=0 ADDED=0`）；换装 没读到换装结论行；
+  预检 tables=106 bad=0、名册 arms=780；电池 `Ran 611 / OK (skipped=4)`（写盘后同数）。
+- 另记一条不属于本轮但量到的：`PerfBudgetTests/testImageComparisonCostStaysBounded`
+  在负载下 371.7ms > 地板 250ms，单独连跑两次都绿 ⇒ 墙钟预算会被同机并发推过去，
+  这条挂进 354 那一族（不改地板、不加 sleep 重试）。
+
 ### 腐烂针的账从一箱变两箱：表自己声明针，顺手挖出尺本体三轮的假归因（R313 / U-1025…U-1027 · D-294 · 产品 0 文件，判据轮）
 
 - 367 的第一步：`scripts/hidden_arms.py` 新增 `NEEDLES` 通道 ⇒ 声明过的臂**逐根**判（可加总），

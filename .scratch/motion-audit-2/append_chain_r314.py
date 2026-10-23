@@ -126,12 +126,18 @@ def main():
         raw = read(FULL)
         # 「被计数物自己打印的那一行」：swift 卷的总结行就是它自己写的结论，
         # 不从这里另起一个数，也不拿临时正则去猜 —— 只取**最后一条**总结行。
-        sums = re.findall(r"(?m)^[ \t]*Executed (\d+) tests?, with (\d+) tests skipped and (\d+) failures", raw)
-        last = sums[-1] if sums else None
+        cands = re.findall(r"(?m)^[ \t]*Executed (\d+) tests?, with (\d+) tests skipped and (\d+) failures?", raw)
+        # 全量卷的总数**只能**取自 `Test Suite 'All tests'` 那一块的结论行：
+        # 拿"最后一条 Executed 行"会读到某个小卷（本机第一版就这么读成了 92 tests），
+        # 而 `failures` 少写那个问号会让真总数（"1 failure"）整条漏掉 ⇒ 通道退回 max-only 并选错。
+        anch = re.findall(r"(?m)^Test Suite 'All tests' (?:passed|failed) at .*\n"
+                          r"[ \t]*Executed (\d+) tests?, with (\d+) tests skipped and (\d+) failures?", raw)
+        pick = anch[-1] if anch else (max(cands, key=lambda t: int(t[0])) if cands else None)
+        vals = pick if pick else (u"?", u"?", u"?")
         parts.append(sect(u"SWIFT_SUMMARY",
-                          u"SWIFT_SUMMARY %s\nSWIFT_SUMMARY_HITS=%d"
-                          % (u"Executed %s tests, with %s skipped and %s failures" % last if last
-                             else u"没读到总结行", len(sums))))
+                          u"SWIFT_SUMMARY 全量卷 Executed=%s skipped=%s failures=%s 候选=%d 通道=%s"
+                          % (vals[0], vals[1], vals[2], len(cands),
+                             u"anchored" if anch else u"max-only")))
         suite = re.findall(r"(?m)^Test Suite 'UICaptureTests' (?:passed|failed) at .*\n"
                            r"[ \t]*Executed (\d+) tests?, with (\d+) tests skipped and (\d+) failures", raw)
         parts.append(sect(u"SWIFT_LEGS", u"UICAPTURE_TESTS ran=%s failed=%s（取自该卷自己的结论行，不是摘要）"
