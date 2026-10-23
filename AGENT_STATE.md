@@ -29,6 +29,14 @@
 产品文件 1 个 ⇒ 连续零改动 **0** 轮（由上一轮的 7 归零；唯一取数口 `python3 scripts/product_streak.py --streak-for 318`，
 同形用于 `--check`；本轮之前的最后一笔产品提交是 84c5468 = 第 318 轮 —— 本轮之后 as-of 就是本轮自己）。
 
+①-b 本节的 commit message 自伤（就地记，不改历史）：`121ef8f`（R319 账半）的正文用了**未加引号的 heredoc**，
+   于是三处反引号里的守卫名与两个 shell 变量被命令替换吃掉 ⇒ 那笔信息里"一、二、三"各缺主语、"落点"是空的。
+   缺的事实补在这里：三条守卫分别是 `scripts/tests/test_product_streak_cell.py`（九条 + `--help` 门一起红）、
+   `scripts/tests/test_wait_scan.py`（RosterTests 的"观察窗口颗数"1 → 现读 2 + 写明成因）、
+   `scripts/tests/test_final_report_headline.py`（§13 的 Sources 那一格还停在 `9551730` = R311）；
+   代码半那笔是 `84c5468`；落点 = `QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey`。
+   规矩：**台账与 commit 的正文一律用引号形式的 heredoc（<<'EOF'），串里不写裸反引号**（这一族已犯过两次）。
+
 ⓪ R320 开场要先读的（成对：run id ↔ commit）：RUN=40008003697 sha=ca6bc31 status=completed conclusion=failure title=R318 账半（七本一起落：U-1043…U-1046、D-299、D-300、373 的②号结案、新开 374、STA workflow=CI
    —— 必须读到：① 本轮三笔在 runner 上是否全绿（**特别是 `HistoryPersistenceRecoveryTests`
       那一朵间歇红**：runner 上如果绿，它是"没跨秒界"还是"幂等生效"？这一格只有幂等之后才分得清）；
