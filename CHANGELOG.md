@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Improved（R308 / 第 307 轮 / Round 305 · 热图悬停那一圈搬到格子外面：交互不再换数据像素）
+
+`DailyCopyHeatmapCell` 的悬停反馈从 `strokeBorder`（画在形状里面，会盖掉那一格外圈的数据像素，
+且响度随深浅变 1.73…1.75 倍、最响处正是空格）改成 `stroke` + `padding(-VisualHeat.hoverRingGap)`
+的同心 halo：圆角半径跟着外扩，环整个落在 3pt 格间距里，一格数据像素都不动。
+新令牌 `hoverRingGap = 1`；环的透明度 0.30 → **0.20**（档间离散归一之后两条界第一次同时可满足，
+窗口 0.176…0.236 取中点）。判据侧新立三条（整格均值差 ≤1.0 现读 0.000 / `HEAT_RING_LEVEL_SPREAD` ≤1.05 现读 1.000 /
+halo 分类器按行号点验 + 同心），公开更正一条旧等式（两条带不再互补分格 ⇒ 换成"整格恰好 cellPx² 且与环带不相交"），
+并把"交互不许比一次真实数据变化响"的分子分母分成两条带。六把刀 M889…M894 各钉一条轴，
+历史表 r300 重钉针、r45 重钉画法与正文后全 CAUGHT；预检 bad=0；判据卷 `Executed 13 / 0 失败`；全量卷 `Executed 934 tests, with 44 skipped and 0 failures`（共 2 跑：`FULL SUITE` = 934 格 / 44 skip / 3 失败 ｜ `FULL SUITE 第二遍（修完 halo 分类器的数据带之后）` = 934 格 / 44 skip / 0 失败 ⇒ 引的是最后一跑（前几跑的红是本轮改动过程中自己修掉的，原样留档））；
+重捕 174 帧、`COMPARED=174 CHANGED=2` 且改的正是那两张 hover 帧，基线同一笔 update；换装本机 ok。
+看图腿 RUN：看的是本轮真的变了的那两张（`heatmap-cell-strip-hover-light` / `-dark`，90x140 组件帧）：亮档里被悬停那一格现在带着一圈与格子同心、隔 1pt 的中性灰 halo，格子自己的蓝一点没被压，读起来像系统的焦点环而不是「这一格变色了」；暗档同一格的外圈是浅灰，四条边到格边的距离一致
+
 ### Improved（R307 / 第 306 轮 / Round 304 · 登记的缺席要被打点，退场判据收成一份实现）
 
 `scripts/motion_floor_gate.py` 新增 `retirement_verdicts`，干净那支与红那支共用：本机登记的名字这一跑没露面时 `always` 红、`sampled` 点名、没写 `recurrence` 红，登记为空时整段不响。起因是 R306 的 runner 证人（连两跑 `SUITE_CLEAN=0`）——旧的退场提示只长在红路上，全卷干净那一支直接 return ⇒ 门恰好在登记最该被质疑的时刻不响（D-288）。四把刀 M885…M888 各钉一条轴（含「不许恒响」这条反向轴），4/4 CAUGHT、RESTORE_CLEAN=yes；历史表 R305 重跑全 CAUGHT、预检 bad=0、门那一卷 Ran 50 全绿。本轮产品 0 文件、Swift 0 份 ⇒ Swift 三条腿没有新对象，按 D-236 沿用上轮读数并写明理由。看图腿 RUN：看的是盘上那 174 张里本轮挑的两张（`settings-shortcuts-recording-light`、`content-with-two-notices-light`）
