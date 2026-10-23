@@ -1,0 +1,228 @@
+UI_NEW = u"""## 第 @ROUND@ 轮（@RTAG@ · U-@UA@…U-@UD@ · @TODAY@）：回到动效主线 —— 那颗胶囊的横移第一次有**过程证人**（本机 开臂 3 帧 / 关臂 1 帧），而第一版的根视图是替身、被前提闸门当场拦红（U-@UA@…U-@UC@ · 产品 0 文件，判据轮）
+
+- **U-@UA@：`filter-pill-slide` 进真窗口逐帧取证 ⇒ 位移档第一次有过程证人，并当场升成硬判据。**
+  全仓只有这一条走 `.slider` 档（`Slide.leading` → 临界阻尼弹簧），而它以前只有**两态**证据
+  （`segmented-filter-idle` 那张帧 + `FILTER_PILL_BAND`：R189 把 `offset` 换成 `.position` 之后
+  "药丸在第几段"能被像素判）。两端都对不等于中间那段在演 —— 它完全可以瞬移而两态尺一声不响。
+  本机现读：@PILL@；@PILL_SETTLE@。⇒ 开臂中间态帧数严格大于关臂（**两把尺**都说：共用线 @SPAN_A@>@SPAN_OFF@、旧口径 @OLD_A@>@OLD_OFF@），
+  峰值 @PEAK_A@ 对 @PEAK_OFF@（同一次位移摊到几帧上必然矮），落定 ≈@SETTLE_MS@ms 在"声明两倍 + 一个采样间隔"的上限之内。
+  判据是 `MotionFilmstripTests/testFilterPillSlideIsAProcessNotATeleport`，开臂抓两遍（R47 的 A/A/B），
+  两遍方向不一致就报 `MOTION_NOT_RUN=pill-slide-aa-inconsistent` 而不是挑一次算数。
+  说清楚这条**不判**什么：@SETTLE_MS@ms 落定不等于"产品只动了 @SETTLE_MS@ms"——临界阻尼弹簧先做完大部分位移再拖尾，
+  尾段那零点几个 pt 落在这把尺的逐像素相等判据之下；"声明 200ms 是不是 200ms"由纯值守卫
+  `testCurveSecondsComeFromTheDurationTable` 从参数侧钉，不由这把像素尺冒充（R2 那一课）。
+
+- **U-@UB@：第一版根视图是替身 ⇒ 两臂峰值都是 0.000，被前提闸门拦成红而不是绿；换成产品自己观察状态的那一层才有对象。**
+  我先写的是 `SegmentedFilterPicker(selection: Binding(get: store.filter, set: …))` —— 看着与产品同形，
+  但**没有任何一层 `@ObservedObject` 观察 store** ⇒ SwiftUI 整棵树不重算 ⇒ 胶囊根本不会动。
+  如果那一版只打印读数不判前提，这条判据就会带着"两臂相同 ⇒ 这条动效没在演"的**假结论**进台账
+  （与 R161 那一族同形：绕开被测系统自己的驱动路径，会把它伪装成产品缺陷）。
+  修法不是放宽闸门，是换根视图：`HistorySidebarView`（`@ObservedObject var historyStore` 就长在它身上），
+  绑定链一个字没替它做。前提闸门（`peak > minimumVisibleChange` + 冷采样闸）是这一格唯一的证人。
+
+- **U-@UC@：runner 交账 —— R321 那把尺的修在第二台机器上兑现，四跑的红清零。**
+  @RUN_SUM@；@RUN_BANDS@。两块的众数**互相印证**（前导 100% / 右侧 80%，同一个 (236,236,236) 与 (50,50,50)），
+  页底来源=前导，两档落点仍是 `系统nonKey` ⇒ 373 的②号那一格现在在**两台机器上**都有了一次读数，
+  而参照物是被证明过是页底的（上一轮那朵"错的参照物报出的落点"不再可能）。
+  顺带把那条机器差异钉成读数：同一张浮层，全帧页底档 runner 236/52 对本机 252/28 ——
+  这条早就在账上（R318 的 ⓪ 写过），本轮它由 `QUICKPICK_SELARM_BANDS` 自己印出来，不再靠记忆。
+
+- **U-@UD@：三把刀各拆一环（M922 把观察带挪出胶囊那一行、M923 让关臂其实没关、M924 把触发换成 no-op）。**
+  @KNIFELINE@（逐臂 @KNIFEARMS@）。M922 与 M924 都红在前提那一句上，但它们坏的是**不同的东西**：
+  一个坏观察面（带子框错地方还报结论），一个坏驱动面（触发其实什么都没改）——
+  "同一句红必须分得清是谁坏的"，所以两把都留。M923 坏的是 A/B 开关本身 ⇒ 红在"中间态帧数"那一条。
+
+读数（全部现读）：构建 `@WARN@`；全量卷 `@FULL@`；重捕帧 `@CAPT@`；帧基线 `@BASE@`；四件套 `@RVLINE@`；
+过程证人卷 `@PILL_EXEC@`；变异表 `@KNIFELINE@`；针预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、
+名册 files=@ARMFILES@ arms=@ARMREG@；腐烂尺 `@HALINE@`；读数族搬运名单 `@MUST_INCLUDE@`；
+脚本电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）。
+产品文件 0 个 ⇒ 连续零改动 = **@STREAK@** 轮（R319 那笔之后重新起算；取数口
+`python3 scripts/product_streak.py --streak-for @ROUND@`，`--check` 同形；上一轮 @PREVSTREAK@）。
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 13/15 |
+| 判据有效性 | 13/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 9/15 |
+| 台账一致性 | 14/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 15/15 |
+| 合计 | 94/105 |
+
+为什么不是满分（逐条）：真实视觉审查 13 —— 本轮第一次逐张看的是**胶片条带**
+（`filter-pill-slide-开A/开B/关` 三卷，动效该看的形态就是它），而不只是静帧；
+仍没看新的静帧位点全集，也不给到 14。
+判据有效性 13 —— 新判据有牙（三刀 3/3）且是硬判据不是免责，但它只判"有没有过程"，
+不判"这个过程好不好"（时长与曲线品质那一维仍未被任何尺量过）。
+假绿防御 15 —— 替身根视图那一次是**被自己写的前提闸门拦下来的**，不是事后想起来的。
+产品面推进 9 —— 产品 0 文件（连续 @STREAK@ 轮）；主线这一维本轮交的是"证人"，不是"改动"。
+台账一致性 14 —— 两处追记都落在原条目内部（373 / 375），条目数不变；runner 交账把上一轮写死的期望
+  结成了读数，而不是改口。
+可复核性 15 —— 三行 `MOTION_PILL_SLIDE*` 出厂第一天就进搬运名单（`@MUST_INCLUDE@`），条带 PNG 落盘可看。
+交付诚实性 15 —— 猜错的根视图、"@SETTLE_MS@ms 不等于产品只动 @SETTLE_MS@ms"、"这条只判上限不判够长"都写在正文里。
+
+"""
+
+IT_NEW = u"""## Round @RDN@ · @RTAG@（第 @ROUND@ 轮 · @TODAY@）：回到动效主线 —— 胶囊横移第一次有过程证人，而第一版的根视图是替身（产品 0 文件，判据轮）
+
+阶段二从 R9 起就在还这一笔债：**声明了的动效，产物到底演没演**。账上"源码已接、产物未量"那一族
+（R11 / R42 / R248）大多是纯 opacity 的淡 —— `cacheDisplay` 抓模型树，抓不到 presentation 层。
+但侧栏顶部那颗「全部 / 收藏」不一样：它走的是 `.slider` 档，变的是**位置**，
+而 R288 那格写过"值变化进胶片、hover 那类环境键的变化不进" ⇒ 这一条**有资格**被看见。
+它也是全仓唯一一条位移档，而关于它的证据只有两态（`FILTER_PILL_BAND` 判"药丸在第几段"）——
+两端都对，中间那段完全可以瞬移。
+
+本轮把它放进真窗口逐帧取证：@PILL@；@PILL_SETTLE@
+⇒ 开臂中间态帧数 @SPAN_A@ 对关臂 @SPAN_OFF@（旧口径 @OLD_A@ 对 @OLD_OFF@，两把尺同方向），峰值 @PEAK_A@ 对 @PEAK_OFF@，落定 ≈@SETTLE_MS@ms。
+按仓库自己的规矩（看得见就不许留免责），当场升成硬判据：
+`testFilterPillSlideIsAProcessNotATeleport` 判三条方向 —— 中间态帧数开 > 关、峰值开 < 关、
+落定 ≤ 声明两倍 + 一个采样间隔；开臂抓两遍，两遍方向不一致 ⇒ 报
+`MOTION_NOT_RUN=pill-slide-aa-inconsistent` 并 skip，不挑一次算数（R47）。
+
+**中间摔了一次，而且摔得有价值**：第一版根视图我写的是裸 `SegmentedFilterPicker` + 手搭的
+`Binding(get: store.filter, set: …)`，看着与产品同形，实际没有任何一层 `@ObservedObject` 观察 store
+⇒ 树不重算 ⇒ **两臂峰值都是 0.000**。这一版如果只打印不判前提，就会把"这条动效没在演"当成产品事实写进台账
+（绕开被测系统自己的驱动路径 = 把它伪装成产品缺陷，R161 那一族）。换成产品的
+`HistorySidebarView`（观察那一层长在它身上）之后才有对象。前提闸门是这一格的唯一证人。
+
+顺带把上一轮欠的 runner 交账结掉：@RUN_SUM@；@RUN_BANDS@
+⇒ R321 那把尺的修在第二台机器上兑现，四跑（ca6bc31 / 121ef8f / a033b98 / 0e225d2）的红清零，
+373 的②号那一格在两台机器上都有了**参照物被证明过**的读数。
+
+牙：三把刀 @KNIFELINE@（逐臂 @KNIFEARMS@）—— M922 挪走观察带（坏观察面）、M923 让关臂其实没关（坏 A/B 开关）、
+M924 把触发换成 no-op（坏驱动面）。M922 与 M924 都红在前提那一句，但坏的是不同的东西，两把都留。
+
+读数：构建 `@WARN@`；全量卷 `@FULL@`；重捕帧 `@CAPT@`；帧基线 `@BASE@`；四件套 `@RVLINE@`；
+过程证人卷 `@PILL_EXEC@`；脚本电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）；
+针预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 arms=@ARMREG@；
+腐烂尺 `@HALINE@`；搬运名单 `@MUST_INCLUDE@`；产品文件 0 个 ⇒ 连续零改动 **@STREAK@** 轮（上一轮 @PREVSTREAK@）。
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 13/15 |
+| 判据有效性 | 13/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 9/15 |
+| 台账一致性 | 14/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 15/15 |
+| 合计 | 94/105 |
+
+"""
+
+DEC_NEW = u"""**D-@DN@（@RTAG@）：动效的过程证人必须由"产品自己观察状态的那一层"承载；夹具侧手搭一条绑定不算，而它坏起来的形状是"两臂读数全等"，不是"红"。**
+
+`filter-pill-slide` 第一版的根视图是 `SegmentedFilterPicker(selection: Binding(get: store.filter,
+set: store.perform(.updateFilter)))` —— 与产品同形，但 `HistoryStore` 的 `@Published` 没有任何
+`@ObservedObject` 在观察它，于是触发之后整棵树不重算，胶囊一步没动。
+这条通道的输出是**两臂峰值都 0.000**：一把看起来"跑了、绿了、只是看不见"的尺。
+如果本轮照例把它写成"看不见 ⇒ 源码已接、产物未量"，那就是**拿探针的替身当产品的通道限制**入账 ——
+比红更坏，因为它读起来像结论。
+
+三条落成的规矩：
+① **根视图必须是产品自己观察状态的那一层**（这里只能是 `HistorySidebarView`，
+   `@ObservedObject var historyStore` 就长在它身上）。手搭 Binding 只复刻了"值从哪来"，
+   没复刻"谁让视图重算" —— 而动效取证问的恰恰是后者。
+② **过程判据出厂第一天就要带前提闸门**（带内峰值 > 地板 + 冷采样闸），
+   且闸门红的时候**先怀疑驱动路径**，不许先怀疑产品。本轮那条红就是这么变成 U-@UB@ 的。
+③ **"两臂全等"有两种成因，必须分开**：尺看不见这条动效（→ 具名出口），
+   或根本没有东西在动（→ 探针坏了）。分开它们的不是措辞，是**同一格里另一臂必须仍然量到一次变化**
+   （关臂 teleport 的峰值 @PEAK_OFF@ 就是这一格的第二只眼：它证明带子里确实有东西在动）。
+
+配套：这条判据**只判上限**（落定 ≤ 声明两倍 + 一个采样间隔），不判"够长"。
+本机现读 `@PILL_SETTLE@` 而声明是 200ms —— 临界阻尼弹簧先做完大部分位移再拖尾，
+尾段落在这把尺的逐像素相等判据之下。真要判"声明的时长是不是那个时长"需要 4ms 一帧（R2），
+而那件事归纯值守卫 `testCurveSecondsComeFromTheDurationTable`，不归像素尺冒充。
+"""
+
+CH_NEW = u"""### 回到动效主线：侧栏那颗胶囊的横移第一次有过程证人（开臂 3 帧 / 关臂 1 帧），而第一版的根视图是替身（@RTAG@ / U-@UA@…U-@UD@ · D-@DN@ · 产品 0 文件，判据轮）
+
+- 新场景 `Scenario.filterPillSlide()` + 新判据 `MotionFilmstripTests/testFilterPillSlideIsAProcessNotATeleport`：
+  真窗口逐帧、开臂抓两遍、共用线与旧口径**两把尺同方向**。@PILL@；@PILL_SETTLE@
+- 判"有没有过程"三条方向：中间态帧数开 > 关（@SPAN_A@>@SPAN_OFF@ / 旧口径 @OLD_A@>@OLD_OFF@）、峰值开 < 关（@PEAK_A@ 对 @PEAK_OFF@）、
+  落定 ≤ 声明两倍 + 一个采样间隔。看得见 ⇒ 当场升硬判据，**不留免责**。
+- 一次自曝：第一版根视图是手搭 Binding 的裸 `SegmentedFilterPicker`，没人观察 store ⇒ 两臂峰值 0.000。
+  换成产品的 `HistorySidebarView`（`@ObservedObject` 那层在它身上）才有对象；
+  前提闸门（带内峰值 + 冷采样）是这一格唯一的证人。规矩升成 D-@DN@。
+- runner 交账（R321 那笔的下游）：@RUN_SUM@；@RUN_BANDS@ ⇒ 四跑的红清零，
+  373 的②号那一格在两台机器上都有参照物被证明过的读数。
+- 牙：M922（观察带挪走）/ M923（关臂其实没关）/ M924（触发换成 no-op）⇒ @KNIFELINE@。
+- 新读数族 `MOTION_PILL_SLIDE` / `_SETTLE` 出厂第一天就进搬运名单：@MUST_INCLUDE@。
+- 现读：构建 `@WARN@`；全量卷 `@FULL@`；重捕帧 `@CAPT@`；帧基线 `@BASE@`；四件套 `@RVLINE@`；
+  脚本电池 `Ran @BATT@ / OK (skipped=@SKIP@)`；针预检 bad=@PREBAD@、名册 arms=@ARMREG@。
+
+"""
+
+BL_追记_373 = u"""  追记（@RTAG@）：**②号那把尺在 runner 上兑现了 —— 四跑的红清零，两档都有了一次"参照物被证明过"的读数。**
+  R321 修完之后的那一跑（run 40019174985，sha 4271ff1）现读：@RUN_SUM@；@RUN_BANDS@
+  ⇒ 两块候选窗在那台机器上互相印证（前导占比 100% / 右侧 80%，同一个众数），页底来源=前导，
+  两档落点仍 `系统nonKey`。之前四跑（ca6bc31 / 121ef8f / a033b98 / 0e225d2）全红在
+  `testQuickPickSelectionPillAgainstSystemArms` 那一格，本轮起没了。
+  顺带把一条机器差异钉成读数而不是记忆：同一张浮层，全帧页底档 runner 236/52 对本机 252/28
+  （R318 的 ⓪ 早就写过这两个数，本轮它由 `QUICKPICK_SELARM_BANDS` 自己印出来）。
+  本单剩下的仍只有①号真机眼（key window 下选中档到底是不是强调色）—— 与 347 / 305 / 368 同批。
+"""
+
+BL_追记_375 = u"""  追记（@RTAG@）：**③那一步提前兑现了 —— 两处几何差现在由同一把尺在两台上各印一行。**
+  R321 新开这单时写的"判据：两处几何差必须被同一把尺印出来（本机 2× 与 runner 1× 各一行）"，
+  本轮由 `QUICKPICK_SELARM_BANDS` 做到：本机 `@SEL_BANDS@`，runner `@RUN_BANDS@`
+  ⇒ 药丸右沿本机 398pt / runner 383px=383pt（差约 15pt），倍率一行 2.0x 一行 1.0x，
+  页底档一行 252/28 一行 236/52。**这单剩下的第①步（数出还有几处按右沿定位的尺）与第②步（按机器具名）仍开着。**
+"""
+
+ST_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
+
+本轮一笔（动效主线）：侧栏那颗「全部 / 收藏」的**横移**第一次有过程证人 ——
+新场景 `Scenario.filterPillSlide()` + 新硬判据 `testFilterPillSlideIsAProcessNotATeleport`，
+@PILL@；@PILL_SETTLE@ ⇒ 中间态帧数开 > 关（两把尺同方向）、峰值开 < 关、落定在上限之内。
+它也是全仓唯一一条位移档（`.slider`），以前只有两态证据（两端都对不等于中间在演）。
+中间摔了一次：第一版根视图是手搭 Binding 的裸 `SegmentedFilterPicker`，没人观察 store ⇒ 两臂峰值 0.000
+—— 换成产品的 `HistorySidebarView`（`@ObservedObject` 那层在它身上）才有对象；规矩升成 D-@DN@。
+三把刀 M922 / M923 / M924 @KNIFELINE@。
+⓪ 的 runner 交账一并结掉：@RUN_SUM@ ⇒ R321 那把尺的修在第二台机器上兑现，四跑的红清零（373 写了追记）。
+
+最后更新：@TODAY@（本地 · @RTAG@ / 第 @ROUND@ 轮 / Round @RDN@）：**动效主线：位移档第一次"看得见在演"，而替身根视图被自己的前提闸门拦红**（产品 0 文件，判据轮）
+现读：构建 `@WARN@`；全量卷 `@FULL@`；重捕帧 `@CAPT@`；帧基线 `@BASE@`；四件套 `@RVLINE@`；
+过程证人卷 `@PILL_EXEC@`；变异表 `@KNIFELINE@`；
+针预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 arms=@ARMREG@；
+腐烂尺 `@HALINE@`；搬运名单 `@MUST_INCLUDE@`；电池 Ran @BATT@ / OK (skipped=@SKIP@)（写盘后同数）；
+看图腿 RUN（@EYE_SHORT@）。
+产品文件 0 个，连续零改动 **@STREAK@** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for @ROUND@`，
+同形用于 `--check`；上一轮 @PREVSTREAK@）。as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
+
+⓪ @RNEXT@ 开场要先读的（成对：run id ↔ commit）：@CI@
+   —— 必须读到：① **本轮这一笔在 runner 上是否全绿**，特别是 `testFilterPillSlideIsAProcessNotATeleport`：
+      期望（写死在这里，读到才算结案）—— 若那台机器 `可分帧 ≥ 3` 就必须给出与本机同方向的三条读数；
+      若 `可分帧 < 3` 则必须印 `MOTION_NOT_RUN=clock-too-coarse pill-slide-process` 并 skip，
+      **不许**在那台机器上把"看不见过程"读成"没在演"；
+   ② `MOTION_PILL_SLIDE` / `_SETTLE` 两行在 runner 上的数（采样间隔本机是 8ms，runner 历史上 31–90ms）；
+   ③ 上一轮 ⓪ 欠的：`HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` 在 runner 上是否签（R320 那一笔）。
+
+① 下一轮（@RNEXT@）的靶：① **产品面**：连续 @STREAK@ 轮零产品文件，而本轮已经量到一条可动的东西 ——
+      过程证人齐了之后，位移档**还缺一维**：没有任何尺判过"这条滑动的时长/曲线品质"
+      （本机 @SETTLE_MS@ms 落定 vs 声明 200ms 这件事现在只用上限挡了"跑飞"）。
+      候选做法：给 `.slider` 装一条**斜坡尺**（逐帧读亮区中心，量位移是否单调、有没有回头），
+      量出来若与声明不符就是第一笔产品改动；若这台机器量不出，就按 D-@DN@ 的形状写成具名出口。
+   ② @BLMINUS@ 的第一步（数出还有几处按药丸右沿定位的尺）；
+   ③ 367 迁移（已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）；④ 360 最后一批；⑤ 361 合并；
+   ⑥ 364 的"抽不出候选的 @OPAQUE@ 把要真跑"；
+   ⑦ 347 / 305 / 373① / 368 四格都在**同一批真机眼**后面 —— 需要用户先退出正在运行的 App，
+      那一轮可以一次把它们全推成读数（人工验收批次已列）。
+
+② 仍开：347（真机证人）、305（等 347）、373（只剩①号真机眼；②号已在两台机器兑现）、
+   368（**已判到通道边界**：离屏无通道，剩真机眼那半）、
+   @BLMINUS@（两台机器行几何差 16pt：③已兑现，①②仍开）、
+   @BLPREV@（腐烂针待清：已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）、
+   354 的第五步 + 负载红一条、348 的"读数族还没纳全"、360（剩 11 份）、361（未合并）、
+   359、362、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；
+   **R321**：373 的②号那把尺修好 + 该格改口；**R319 结案**：374；
+   用户闸门 220 路 A / 228② / 265。
+
+"""

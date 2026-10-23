@@ -12,6 +12,59 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R322 状态（第 321 轮 / Round 319 · 2026-10-24）
+
+本轮一笔（动效主线）：侧栏那颗「全部 / 收藏」的**横移**第一次有过程证人 ——
+新场景 `Scenario.filterPillSlide()` + 新硬判据 `testFilterPillSlideIsAProcessNotATeleport`，
+MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=3(旧口径6) 峰值=0.101 冷闸=true  开B 帧数=3(旧口径6) 峰值=0.090 冷闸=true  关 帧数=1(旧口径1) 峰值=0.362 同一条线=0.0544 共用线安全=true 声明=200ms 采样≈8ms；MOTION_PILL_SLIDE_SETTLE filter-pill-slide 到位帧=7 采样≈8ms ⇒ 实测落定≈56ms（声明 200ms） 可分帧=25 ⇒ 中间态帧数开 > 关（两把尺同方向）、峰值开 < 关、落定在上限之内。
+它也是全仓唯一一条位移档（`.slider`），以前只有两态证据（两端都对不等于中间在演）。
+中间摔了一次：第一版根视图是手搭 Binding 的裸 `SegmentedFilterPicker`，没人观察 store ⇒ 两臂峰值 0.000
+—— 换成产品的 `HistorySidebarView`（`@ObservedObject` 那层在它身上）才有对象；规矩升成 D-305。
+三把刀 M922 / M923 / M924 CAUGHT=3/3, RESTORE_CLEAN=yes。
+⓪ 的 runner 交账一并结掉：QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey ⇒ R321 那把尺的修在第二台机器上兑现，四跑的红清零（373 写了追记）。
+
+最后更新：2026-10-24（本地 · R322 / 第 321 轮 / Round 319）：**动效主线：位移档第一次"看得见在演"，而替身根视图被自己的前提闸门拦红**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 946 tests, with 45 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r322_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=946 swift_skipped=45 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r322_rv`；
+过程证人卷 `Executed 1 test, with 0 failures（不设 CLIPBOARD_HISTORY_UI_MOTION 时整卷 skip）`；变异表 `CAUGHT=3/3, RESTORE_CLEAN=yes`；
+针预检 tables=110 covered=93 bad=0、名册 arms=791；
+腐烂尺 `HIDDEN_ARMS 表=198 可判=723 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；搬运名单 `声明=2 缺=0`；电池 Ran 611 / OK (skipped=4)（写盘后同数）；
+看图腿 RUN（本轮的看图腿看的是**胶片本身**（动效该看的形态），不是静帧。三卷条带逐张过：`/tmp/motion-films/filter-pill-slide-开A-strip.png`、`-开B-strip.png`、`-关-strip.png`（各 30 帧、暗档、侧栏 300×520，由 `writeStrip` 落盘）。
+肉眼可辨的差别只有一处，但它是本轮的全部问题：**开臂的头几帧里那颗药丸不在末位**（左段那一片亮仍偏左、右段还没被填上），到第 4 帧前后才落到右段；而**关臂第一帧就已经在末位** —— 这与判据自己那把尺同方向（MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=3(旧口径6) 峰值=0.101 冷闸=true  开B 帧数=3(旧口径6) 峰值=0.090 冷闸=true  关 帧数=1(旧口径1) 峰值=0.362 同一条线=0.0544 共用线安全=true 声明=200ms 采样≈8ms）。
+一条被我自己否掉的一次性尺，记在这里免得下一次再上当：我试着直接从条带上量每格药丸的质心，读出来是 0.57→0.48、格间差不足 0.02 格宽 —— 条带是缩放图（每格 300px 宽），暗档下药丸与轨道只差十几级灰，这把尺在这个形态上**分辨不出**，所以它不许当结论；"有没有过程"由判据那把逐帧尺说，条带只是给人复核的现场。
+另外两处看清了：条带右下角那块灰**不是**某一帧没画出来，是 `writeStrip` 预填的画布底色（0.25/0.25/0.28，读代码确认）；而胶囊移到右段之后整块列表换成"暂无收藏"的空态，那句空态文案与图标是居中在列表槽里的 —— 这一条 R64 已判过，本轮不重开。
+审美判断（这一维该给的结论）：这条位移**该留，也该保持现在这样** —— 它是"你按了哪一段"的唯一连续指示；本机 3 帧中间态在 8ms 采样下已经是"看得见挪动但不抢注意力"的量级，而 MC-1 那条规矩（程序触发的位移不给过冲）在这里是对的：给一颗自己会停在原地的胶囊加过冲，读起来像坏了。
+静帧侧本轮重看了 `sidebar-history-300x520-light/dark` 两张 —— 过程证人那条带子（y≈66…92pt）就是从这两张量出来的；两档的搜索框、胶囊、分隔线三条左轴一致，没有新的错位。）。
+产品文件 0 个，连续零改动 **3** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 321`，
+同形用于 `--check`；上一轮 2）。as-of 第 321 轮的最后一笔产品提交是 84c5468 = 第 318 轮。
+
+⓪ R323 开场要先读的（成对：run id ↔ commit）：RUN=40019426681 sha=32f1104 status=completed conclusion=success title=R321 追记（把 push 之后的 run↔commit 成对写回 STATE 的 R322 第 ⓪ 条，并把四跑的红 workflow=CI
+   —— 必须读到：① **本轮这一笔在 runner 上是否全绿**，特别是 `testFilterPillSlideIsAProcessNotATeleport`：
+      期望（写死在这里，读到才算结案）—— 若那台机器 `可分帧 ≥ 3` 就必须给出与本机同方向的三条读数；
+      若 `可分帧 < 3` 则必须印 `MOTION_NOT_RUN=clock-too-coarse pill-slide-process` 并 skip，
+      **不许**在那台机器上把"看不见过程"读成"没在演"；
+   ② `MOTION_PILL_SLIDE` / `_SETTLE` 两行在 runner 上的数（采样间隔本机是 8ms，runner 历史上 31–90ms）；
+   ③ 上一轮 ⓪ 欠的：`HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` 在 runner 上是否签（R320 那一笔）。
+
+① 下一轮（R323）的靶：① **产品面**：连续 3 轮零产品文件，而本轮已经量到一条可动的东西 ——
+      过程证人齐了之后，位移档**还缺一维**：没有任何尺判过"这条滑动的时长/曲线品质"
+      （本机 56ms 落定 vs 声明 200ms 这件事现在只用上限挡了"跑飞"）。
+      候选做法：给 `.slider` 装一条**斜坡尺**（逐帧读亮区中心，量位移是否单调、有没有回头），
+      量出来若与声明不符就是第一笔产品改动；若这台机器量不出，就按 D-305 的形状写成具名出口。
+   ② 375 的第一步（数出还有几处按药丸右沿定位的尺）；
+   ③ 367 迁移（已声明 2 张 / 剩 0 张）；④ 360 最后一批；⑤ 361 合并；
+   ⑥ 364 的"抽不出候选的 6 把要真跑"；
+   ⑦ 347 / 305 / 373① / 368 四格都在**同一批真机眼**后面 —— 需要用户先退出正在运行的 App，
+      那一轮可以一次把它们全推成读数（人工验收批次已列）。
+
+② 仍开：347（真机证人）、305（等 347）、373（只剩①号真机眼；②号已在两台机器兑现）、
+   368（**已判到通道边界**：离屏无通道，剩真机眼那半）、
+   375（两台机器行几何差 16pt：③已兑现，①②仍开）、
+   367（腐烂针待清：已声明 2 张 / 剩 0 张）、
+   354 的第五步 + 负载红一条、348 的"读数族还没纳全"、360（剩 11 份）、361（未合并）、
+   359、362、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；
+   **R321**：373 的②号那把尺修好 + 该格改口；**R319 结案**：374；
+   用户闸门 220 路 A / 228② / 265。
+
 ## R321 状态（第 320 轮 / Round 318 · 2026-10-24）
 
 本轮一笔：runner 三跑的红归因到尺并修掉 —— SELARM 的页底原来只有一格，

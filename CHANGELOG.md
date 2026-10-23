@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 回到动效主线：侧栏那颗胶囊的横移第一次有过程证人（开臂 3 帧 / 关臂 1 帧），而第一版的根视图是替身（R322 / U-1056…U-1059 · D-305 · 产品 0 文件，判据轮）
+
+- 新场景 `Scenario.filterPillSlide()` + 新判据 `MotionFilmstripTests/testFilterPillSlideIsAProcessNotATeleport`：
+  真窗口逐帧、开臂抓两遍、共用线与旧口径**两把尺同方向**。MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=3(旧口径6) 峰值=0.101 冷闸=true  开B 帧数=3(旧口径6) 峰值=0.090 冷闸=true  关 帧数=1(旧口径1) 峰值=0.362 同一条线=0.0544 共用线安全=true 声明=200ms 采样≈8ms；MOTION_PILL_SLIDE_SETTLE filter-pill-slide 到位帧=7 采样≈8ms ⇒ 实测落定≈56ms（声明 200ms） 可分帧=25
+- 判"有没有过程"三条方向：中间态帧数开 > 关（3>1 / 旧口径 6>1）、峰值开 < 关（0.101 对 0.362）、
+  落定 ≤ 声明两倍 + 一个采样间隔。看得见 ⇒ 当场升硬判据，**不留免责**。
+- 一次自曝：第一版根视图是手搭 Binding 的裸 `SegmentedFilterPicker`，没人观察 store ⇒ 两臂峰值 0.000。
+  换成产品的 `HistorySidebarView`（`@ObservedObject` 那层在它身上）才有对象；
+  前提闸门（带内峰值 + 冷采样）是这一格唯一的证人。规矩升成 D-305。
+- runner 交账（R321 那笔的下游）：QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey；QUICKPICK_SELARM_BANDS dark 倍率=1.0x 页底档=52 药丸=22..<383px@y=62 候选=前导[2..<20px]((50,50,50) 占比=100%) 右侧[385..<395px]((50,50,50) 占比=80%) 选择=前导((50,50,50) 占比=100%) 闸=用前导((50,50,50) 占比=100%) ｜ 用右侧 ⇒ 四跑的红清零，
+  373 的②号那一格在两台机器上都有参照物被证明过的读数。
+- 牙：M922（观察带挪走）/ M923（关臂其实没关）/ M924（触发换成 no-op）⇒ CAUGHT=3/3, RESTORE_CLEAN=yes。
+- 新读数族 `MOTION_PILL_SLIDE` / `_SETTLE` 出厂第一天就进搬运名单：声明=2 缺=0。
+- 现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 946 tests, with 45 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r322_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=946 swift_skipped=45 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r322_rv`；
+  脚本电池 `Ran 611 / OK (skipped=4)`；针预检 bad=0、名册 arms=791。
+
 ### runner 判红的是尺：SELARM 的页底参照落在滚动条槽里，"底色稳"从此不等于"是页底"（R321 / U-1053…U-1055 · D-304 · 产品 0 文件，判据轮）
 
 - 现读成因（run 40008003697）：暗档**过了 60% 的占比闸**却把页底读成 (61,61,61)，
