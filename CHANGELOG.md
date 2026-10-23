@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 腐烂针的账从一箱变两箱：表自己声明针，顺手挖出尺本体三轮的假归因（R313 / U-1025…U-1027 · D-294 · 产品 0 文件，判据轮）
+
+- 367 的第一步：`scripts/hidden_arms.py` 新增 `NEEDLES` 通道 ⇒ 声明过的臂**逐根**判（可加总），
+  未声明的维持 `any()`（下界）。已声明 `mutate_r308`(6) + `mutate_r312`(3)；棘轮 2 个数 → 4 个数。
+- 正对照夹具：一臂两针、一根活一根死（判据卷显式喂 text）⇒ 旧估计量报"活的"，新箱必须报"死了 1 根"。
+- 两处自曝并修好：`ARM_ID` 写成 `r"M\\d{3,4}"` 恒不命中（R310 起刀号归因一直是 `臂#N` 兜底）；
+  覆盖面按"字典存在"数 ⇒ 第一次跑 `已声明表=2 / 已声明臂=0` 的假绿。
+- 刀 M911（塌箱）/ M912（把下界写成 `all()`）/ M913（只判单向）：`R313_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。
+  M913 第一次是 ESCAPED —— 判据卷原本没有反方向那一格，补了才钉得住（D-294）。
+- 新开 368：热图格子的 hover 提示**产物级**判据通道不存在（两次探针 `views=1 toolTips=0`），
+  下一步要复用 `UICaptureHarness` 的建树路径而不是另造 host。
+- 现读：构建告警 0；判据卷 `Ran 13 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failures；
+  帧 CAPTURED 174 -> /tmp/r313_verify/frames、基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=0（不 update）；换装 INSTALL_RESULT=ok  dmg=ok  installed_version=1.4.8（判据轮：0 产品文件，产物与上一笔同源）；预检 tables=106 bad=0、名册 arms=780；
+  腐烂尺 `HIDDEN_ARMS 表=194 可判=712 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；电池 `Ran 611 / OK (skipped=4)`（写盘后同数）；产品面连续零改动 **2** 轮。
+
 ### 三根轴必须同时可查：356 剩下的那一半被证伪并撤回（R312 / U-1022…U-1024 · D-293 · 产品 0 文件，判据轮）
 
 - 现读 `HEAT_ADJACENT dark/1x empty→bucket1 最大通道差=30.00 均值通道差=17.33 亮度差=2.16`

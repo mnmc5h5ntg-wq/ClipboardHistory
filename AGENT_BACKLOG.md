@@ -7384,3 +7384,28 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
   规模读数（现读）：名册 registered=105 / unregistered_with_arms=75 /
   隐藏臂 423；也就是说 ① 的迁移面是 75 张表，不是一支脚本改得完的，
   按轮摊开做，每迁一张就降一格「未声明」那一箱的上界。
+  追记（R313）：第一步已落地。`scripts/hidden_arms.py` 一箱变两箱 ——
+  表里写 `NEEDLES = {刀号: [针, …]}` 的臂走**逐根判**（可加总），其余臂维持 `any(候选命中)`（只配当下界）。
+  已声明 2 张真表（`mutate_r308` 6 把、`mutate_r312` 3 把），棘轮从 2 个数变 4 个数、四个方向都有正对照。
+  同一轮把尺本体的两处假归因修了：`ARM_ID` 的 `r"M\\d{3,4}"` 恒不命中（R310 以来刀号归因一直走
+  `臂#N` 兜底），以及"覆盖面按字典存在来数"（第一次跑 `已声明表=2` 而 `已声明臂=0` 的假绿）。
+  剩下的迁移面：73 张真表还没声明（名册 unregistered_with_arms 那一串），
+  每迁一张就降一格「未声明」那一箱的上界 —— 这是按轮的活，不是一轮的。
+
+**368. 热图格子的 hover 提示文本，产物级判据的通道不存在 —— 两次探针都读不到（R313 现读）**（R313）
+
+  阶段一的验收要求里明写「格子有 hover 提示（日期 + 当日条数）」。现在账上只有两类证据：
+  `DailyCopyHeatPolicy.tooltip` 的真值表（纯函数）与"这里用了 `helpLabel` 而不是裸 `.help`"的源码级守卫。
+  **两者都没量过产物** —— R11 / R248 那一族「源码已接、产物未量」。
+
+  R313 试了两条通道，两条都失败，读数留在账上：
+  ① 直接 `NSHostingView(rootView:).layoutSubtreeIfNeeded()` 后遍历 `subviews` ⇒ `TOOLTIP_SPIKE views=1 toolTips=0`
+    （整棵 AppKit 子树根本没 materialize）；
+  ② 离屏挂窗（`orderFrontRegardless`）+ `displayIfNeeded()` ⇒ 仍然 `views=1 toolTips=0`。
+  而 `UICaptureHarness` 里已经有能长出 `NSHostingView / AppKitPlatformViewHost / NSSplitView` 的建树路径
+  （它拍帧时就在走那条路）⇒ **要判这条，必须复用 harness 的建树路径，而不是自己新造一个 host**。
+
+  下一步（不许把它读成"判不了就算了"）：把 harness 的建树函数提出来给判据卷用，
+  要求每一格的 `toolTip` 非空、且等于 `DailyCopyHeatPolicy.tooltip` 对同一 (dayKey, count) 的输出；
+  配一把刀（把 `.helpLabel` 换成 `.help` ⇒ 产物级判据必须红）。
+  探针本身已删，没在仓库里留半截测试。
