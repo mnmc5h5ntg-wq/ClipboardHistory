@@ -769,6 +769,234 @@ final class UICaptureTests: XCTestCase {
                       + "必须点名：\(declined.joined(separator: " "))")
     }
 
+    // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
+
+    /// 一条 RGB 读数（整数 0…255）。
+    ///
+    /// 为什么自己写而不用 `NSColor`：判据要把**帧上量到的字节**与**系统解析出的色**放在
+    /// 同一个离散尺度上比，浮点分量会让"两臂相同"这种退化情形判不干净（`==` 对 Int 是确定的）。
+    struct ArmRGB: Hashable, CustomStringConvertible {
+        let r: Int
+        let g: Int
+        let b: Int
+        var description: String { "(\(r),\(g),\(b))" }
+        /// 彩度 = 最大通道减最小通道。灰的彩度是 0，蓝的不是。
+        var chroma: Int { max(r, max(g, b)) - min(r, min(g, b)) }
+    }
+
+    /// 纯函数：一条横向取样带里三通道各自的**中位数**，外加每通道散布（最大−最小）。
+    ///
+    /// 为什么不是众数（第一版写的是众数，本机一跑当场被打回）：药丸内部在字节层面**不是实心**的 ——
+    /// 744px 宽的取样带里没有任何一个读数占过半，于是"这里没有药丸"与"这里有纹理"
+    /// 在那一把尺上长得一模一样（R104 那一课的翻版：读不到与没有是两种话）。
+    /// 中位数对纹理稳健；而**散布就是这一轮的读数**，它进日志，不许只当注释。
+    /// `xRange.count >= 8` 是取样带下限：再窄的话中位数只是某一个像素，不构成一条带。
+    static func armMedian(bytes: UnsafePointer<UInt8>, bytesPerRow: Int,
+                          xRange: Range<Int>, y: Int) -> (rgb: ArmRGB, spread: Int)? {
+        guard y >= 0, xRange.count >= 8 else { return nil }
+        var rs: [Int] = [], gs: [Int] = [], bs: [Int] = []
+        for x in xRange {
+            let o = y * bytesPerRow + x * 4
+            rs.append(Int(bytes[o])); gs.append(Int(bytes[o + 1])); bs.append(Int(bytes[o + 2]))
+        }
+        func med(_ v: [Int]) -> Int { let s = v.sorted(); return s[s.count / 2] }
+        func spread(_ v: [Int]) -> Int { (v.max() ?? 0) - (v.min() ?? 0) }
+        return (ArmRGB(r: med(rs), g: med(gs), b: med(bs)),
+                max(spread(rs), max(spread(gs), spread(bs))))
+    }
+
+    /// 纯函数：药丸那一行上，从 `left` 往右第一条**回到页底档**的列（= 药丸右沿）。
+    /// 读不到（一路到底都不同）⇒ nil。
+    static func pillRightEdge(bytes: UnsafePointer<UInt8>, bytesPerRow: Int, width: Int,
+                              y: Int, left: Int, pageLuma: Int, minDelta: Int = 12) -> Int? {
+        guard left >= 0, left < width, y >= 0 else { return nil }
+        var sawInside = false
+        for x in left..<width {
+            let o = y * bytesPerRow + x * 4
+            let luma = Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                            + 0.0722 * Double(bytes[o + 2])).rounded())
+            if abs(luma - pageLuma) >= minDelta { sawInside = true }
+            else if sawInside { return x }
+        }
+        return nil
+    }
+
+    /// 在**给定外观**下解析一枚动态色（与 `windowBackgroundColor(for:)` 同一手法，
+    /// 那一格是 R30 之后为"缓存成 cgColor 会钉死外观"立的）。
+    static func armResolved(_ color: NSColor, appearanceName: NSAppearance.Name) -> ArmRGB {
+        var out = ArmRGB(r: -1, g: -1, b: -1)
+        if #available(macOS 11.0, *) {
+            NSAppearance(named: appearanceName)?.performAsCurrentDrawingAppearance {
+                if let rgb = color.usingColorSpace(.sRGB) {
+                    out = ArmRGB(r: Int((rgb.redComponent * 255).rounded()),
+                                 g: Int((rgb.greenComponent * 255).rounded()),
+                                 b: Int((rgb.blueComponent * 255).rounded()))
+                }
+            }
+        } else {
+            let previous = NSAppearance.current
+            NSAppearance.current = NSAppearance(named: appearanceName)
+            if let rgb = color.usingColorSpace(.sRGB) {
+                out = ArmRGB(r: Int((rgb.redComponent * 255).rounded()),
+                             g: Int((rgb.greenComponent * 255).rounded()),
+                             b: Int((rgb.blueComponent * 255).rounded()))
+            }
+            NSAppearance.current = previous
+        }
+        return out
+    }
+
+    /// 纯函数：`obs` 是不是「`arm` 以某个覆盖率 a 压在 `page` 上」的产物。
+    ///
+    /// 为什么必须有这一格而不是直接比距离：`flattenedPNG` 会把面板**合成到窗口底色上**
+    /// （R30 之后那颗尺自己写的），所以帧上的药丸是"系统那一档色 × 面板不透明度 × 页底"的结果。
+    /// 直接比 obs 与 arm 会把**混合**读成"产品自绘了一个别的灰"。
+    /// 最小二乘解 a（闭式、夹在 0…1），残差取三通道最大绝对差；残差 0 = obs 正好在 arm→page 这条线上。
+    static func blendResidual(arm: ArmRGB, page: ArmRGB, obs: ArmRGB)
+        -> (a: Double, residual: Int, offSegment: Bool) {
+        var num = 0.0, den = 0.0
+        let obs3 = [Double(obs.r), Double(obs.g), Double(obs.b)]
+        let arm3 = [Double(arm.r), Double(arm.g), Double(arm.b)]
+        let page3 = [Double(page.r), Double(page.g), Double(page.b)]
+        for i in 0..<3 {
+            let d = page3[i] - arm3[i]
+            num += d * (page3[i] - obs3[i])
+            den += d * d
+        }
+        guard den > 0 else { return (a: -1, residual: 255, offSegment: true) }
+        let raw = num / den
+        let a = min(1.0, max(0.0, raw))
+        var worst = 0
+        for i in 0..<3 {
+            let predicted = arm3[i] * a + page3[i] * (1 - a)
+            // **绝对值**。第一版这里写的是「max(带符号差)」，本机第一遍读数就自曝了：
+            // 暗档打印 `nonKey残差=0(a=1.00)`，而同一行明写着 obs=(106,106,106)、arm=(70,70,70) ——
+            // 帧比预测值**更亮**的通道差是负数，被 `worst = max(0, 负数)` 吃成 0。
+            // 那是一把会把"对不上"报成"完全吻合"的尺，正是 D-243/反向差那一族。修abs，不修期望值。
+            worst = max(worst, abs(Int((predicted - obs3[i]).rounded())))
+        }
+        // `offSegment`：解出来的 a 落在 0…1 之外 ⇒ obs 根本不在 arm→page 这条**线段**上
+            //（把 a 夹回来只是为了给残差一个定义，而"被夹过"这件事本身必须可见）。
+        return (a: a, residual: worst, offSegment: abs(raw - a) > 0.01)
+    }
+
+    /// 纯函数：把一次读数归成**有名字的一种**结局。词表就是这一轮的产物，不许意译。
+    ///
+    /// 五格：`系统key` / `系统nonKey` / `两臂都在容差内`（尺没有分辨力）/
+    /// `两臂都不在`（帧上那一档不是系统画的，或混合模型不成立）/ `两臂不可分`（参照臂塌成一枚）。
+    /// 最后一格正是 M 刀要把它逼出来的那一格 —— 所以它必须是**一个会被判红的值**，不是日志里的形容词。
+    static func armVerdict(obs: ArmRGB, page: ArmRGB, key: ArmRGB, nonKey: ArmRGB,
+                           tol: Int) -> (label: String, detail: String) {
+        if key == nonKey {
+            return ("两臂不可分", "key=\(key) 与 nonKey=\(nonKey) 逐通道相等 ⇒ 参照臂塌成一枚，这条判据没有对象")
+        }
+        let k = blendResidual(arm: key, page: page, obs: obs)
+        let n = blendResidual(arm: nonKey, page: page, obs: obs)
+        let detail = "key残差=\(k.residual)(a=\(String(format: "%.2f", k.a))) "
+            + "nonKey残差=\(n.residual)(a=\(String(format: "%.2f", n.a))) 容差=\(tol)"
+        if k.residual <= tol && n.residual <= tol { return ("两臂都在容差内", detail) }
+        if k.residual <= tol { return ("系统key", detail) }
+        if n.residual <= tol { return ("系统nonKey", detail) }
+        return ("两臂都不在", detail)
+    }
+
+    /// R318 / BACKLOG 373②：浮层那颗选中药丸的**色**，第一次被放到两枚系统参照色之间判。
+    ///
+    /// 这一轮为什么只判一件事：R317 量到选中行 (181,181,181)（零强调色），但那是一个
+    /// **没有参照物的形容词** —— 灰可以是"产品选了灰"，也可以是"离屏窗口不是 key window，
+    /// AppKit 本来就画灰"。这一格把第二种解释变成可判的：在同一外观下解析
+    /// `selectedContentBackgroundColor`（key 那一档）与 `unemphasizedSelectedContentBackgroundColor`
+    /// （非 key 那一档），再看帧上的数落在哪条线上（含 `flattenedPNG` 的混合）。
+    ///
+    /// **本轮不替产品定罪**，也不写"已修"：落点由读数说，而落点要能红，得先把容差
+    /// 建立在这一次的实测散布上（不是先选一个能让它绿的数）。所以断言只有两条承重的：
+    ///   ① 参照臂必须分得开（`两臂不可分` 判红）—— 这一条是 M 刀的靶；
+    ///   ② 每一档都必须**读得出一个有名字的落点**（药丸读不到 ⇒ 点名，不许记成通过）。
+    func testQuickPickSelectionPillAgainstSystemArms() throws {
+        var judged = 0, declined: [String] = []
+        var verdicts: [String] = []
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r318-selarm-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        // 容差：三通道最大残差 ≤ 6 级灰。它现在的身份是**探针的刻度**，不是产品线；
+        // 下一轮要把它换成从两臂散布推出来的数（D-250 那条等式地板的形状）。
+        let tol = 6
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let fixture = fixtures.first(where: { $0.name == "quickpick-list" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-list` 夹具 ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+            // 走**落盘的 PNG**（R104 同一选择）：`render` 给的是 `CaptureMetrics`，
+            // 而这一格要的是一整帧字节 —— 合成过页底的那一张才与帧基线同源。
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：读不回刚拍的帧")
+            }
+            let pageLuma = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                         xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            guard let pill = Self.overlayPill(bytes: base, width: rep.pixelsWide,
+                                              height: rep.pixelsHigh,
+                                              bytesPerRow: rep.bytesPerRow,
+                                              pageLuma: pageLuma) else {
+                return XCTFail("\(tag)：这张帧上读不到选中药丸（页底档=\(pageLuma)）"
+                    + "⇒ 参照物不存在，先查捕获通道")
+            }
+            let midY = (pill.top + pill.bottom) / 2
+            guard let right = Self.pillRightEdge(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                 width: rep.pixelsWide, y: midY,
+                                                 left: pill.left, pageLuma: pageLuma),
+                  right - pill.left > 8 else {
+                declined.append("\(tag)[原因=药丸右沿读不到 ⇒ 取样带不存在]")
+                continue
+            }
+            // 药丸取样带：左右各让 4px，不吃圆角与边沿；中间那点字墨由**中位数**挡掉。
+            let inside = (pill.left + 4)..<max(pill.left + 5, right - 4)
+            guard let obsProbe = Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                xRange: inside, y: midY) else {
+                declined.append("\(tag)[原因=药丸取样带读不出（带宽=\(inside.count)px，下限 8）]")
+                continue
+            }
+            // 页底那一侧：同一行、药丸右沿之外 4…24px（那里没有别的材质）。
+            let pageRange = (right + 4)..<min(rep.pixelsWide, right + 24)
+            guard let pageProbe = Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                 xRange: pageRange, y: midY) else {
+                declined.append("\(tag)[原因=药丸右侧的页底读不出（x=\(pageRange.lowerBound)..<\(pageRange.upperBound)）]")
+                continue
+            }
+            let obs = obsProbe.rgb
+            let page = pageProbe.rgb
+            // 两枚参照臂在同一外观下解析（key 那一档写死在下面这一行 ⇒ M 刀钉的就是这一行）。
+            let key = Self.armResolved(.selectedContentBackgroundColor, appearanceName: appearance)
+            let nonKey = Self.armResolved(.unemphasizedSelectedContentBackgroundColor,
+                                          appearanceName: appearance)
+            let (label, detail) = Self.armVerdict(obs: obs, page: page, key: key,
+                                                  nonKey: nonKey, tol: tol)
+            verdicts.append("\(tag)=\(label)")
+            emit("QUICKPICK_SELARM \(tag) 帧选中底=\(obs) 页底=\(page)"
+                 + " key=\(key) nonKey=\(nonKey)"
+                 + " 帧彩度=\(obs.chroma) key彩度=\(key.chroma) nonKey彩度=\(nonKey.chroma)"
+                 + " 取样带=\(inside.lowerBound)..<\(inside.upperBound)px@y=\(midY)"
+                 + " 判定=\(label) \(detail)")
+            XCTAssertTrue(label != "两臂不可分",
+                          "\(tag)：\(detail) ⇒ 两枚系统参照色逐通道相等，这条判据没有对象")
+            judged += 1
+        }
+        emit("QUICKPICK_SELARM_SUMMARY 候选=2 有对象=\(judged) 未判=\(declined.count)"
+             + " 落点=" + (verdicts.isEmpty ? "无" : verdicts.joined(separator: " ")))
+        if !declined.isEmpty { emit("QUICKPICK_SELARM_DECLINED " + declined.joined(separator: " ")) }
+        if judged == 0 {
+            throw XCTSkip("这台机器上两档都没能同时读出药丸与两枚系统参照色（\(declined.joined(separator: " "))）"
+                          + " ⇒ 这条参照等式没有对象，**不判（不是通过）**")
+        }
+        XCTAssertTrue(declined.isEmpty,
+                      "有对象=\(judged) 却有一档读不到 ⇒ 坏的是尺或那一档的通道，必须点名：\(declined.joined(separator: " "))")
+    }
+
     /// R106 · BACKLOG 159 结案：`quickpick-typed` 那张帧上不许有**用户看不到的选中底**。
     ///
     /// 这一条先当探针跑过一遍、拿到机制，再变成判据（机制没证实之前写断言就是猜，D-163 那一族）。
