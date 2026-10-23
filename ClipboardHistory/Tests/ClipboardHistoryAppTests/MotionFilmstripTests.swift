@@ -4989,6 +4989,130 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R322 / 动效主线：**这颗胶囊的横移到底有没有过程** —— 第一次把它放进真窗口逐帧取证，
+    /// 并且当场升成硬判据（本机实测：开臂中间态帧数 3 / 关臂 1，峰值 0.097 对 0.354）。
+    ///
+    /// 为什么这个位点值得单独一格：它是全仓**唯一一条位移档**（`.slider` → `Slide.leading` → 弹簧），
+    /// 而账上关于它只有两态证据（`segmented-filter-idle` 那张帧 + `FILTER_PILL_BAND`：
+    /// R189 把 `offset` 换成 `.position` 之后，"药丸在第几段"能被像素判）。
+    /// **两端都对，不等于中间那段在演** —— 它完全可以瞬移而两态尺一声不响（R16 那一族的正面版）。
+    ///
+    /// 判法（三条方向都是**先写死再跑**的，跑完才升硬）：
+    /// ① 开臂的中间态帧数必须**严格大于**关臂，且**两把尺**（各自归一化的旧口径 + 共用线的新口径）都说大；
+    /// ② 开臂峰值必须**小于**关臂 —— 同一次位移，摊到几帧上就比一帧到位矮；
+    /// ③ 落定耗时上限 = 声明的两倍再让一个采样间隔（"没跑飞"；上限判据，不是"够长"判据）。
+    /// 开臂抓两遍（R47 的 A/A/B）：两遍方向不一致 ⇒ 报 `MOTION_NOT_RUN=pill-slide-aa-inconsistent`
+    /// 并 skip —— 前提由同一次运行量出来、说清放掉了什么、交回的是读数，不是覆盖率通道。
+    func testFilterPillSlideIsAProcessNotATeleport() throws {
+        try skipUnlessEnabledAndCapable()
+        // 带子**量出来的**，不是目测：`/tmp/r321_rv/frames/sidebar-history-300x520-light.png`
+        // 逐行扫（仓库外一次性尺，只配形成问题）⇒ 胶囊那一行在 y≈66…92pt（26pt 高，与
+        // `SegmentedFilterPicker` 的 `.frame(height: 26)` 对上），左右各让 12pt（`.padding(.horizontal, 12)`）；
+        // 分隔线在 y≈102pt、列表在它下面 ⇒ 这条带里**只有胶囊**，换档引起的列表重排进不了分母。
+        let band = CGRect(x: 12.0 / 300.0, y: 66.0 / 520.0,
+                          width: 276.0 / 300.0, height: 26.0 / 520.0)
+        let scenario = Scenario.filterPillSlide()
+        let saved = MotionCatalog.animationsEnabled
+        let onFilmA = record(scenario)
+        let onFilmB = record(scenario)
+        MotionCatalog.animationsEnabled = false
+        let offFilm = record(scenario)
+        MotionCatalog.animationsEnabled = saved
+
+        writeStrip("filter-pill-slide-开A", onFilmA.motionFrames)
+        writeStrip("filter-pill-slide-开B", onFilmB.motionFrames)
+        writeStrip("filter-pill-slide-关", offFilm.motionFrames)
+
+        let dA = Self.deltas(onFilmA.motionFrames, band: band)
+        let dB = Self.deltas(onFilmB.motionFrames, band: band)
+        let dOff = Self.deltas(offFilm.motionFrames, band: band)
+        let shared = Self.sharedMovingFloor([dA, dB, dOff])
+        let sound = Self.sharedLineIsSound([dA, dB, dOff])
+        let spanA = Self.transitionFrameCount(dA, sharedFloor: shared)
+        let spanB = Self.transitionFrameCount(dB, sharedFloor: shared)
+        let spanOff = Self.transitionFrameCount(dOff, sharedFloor: shared)
+        let oldA = Self.transitionFrameCount(dA)
+        let oldB = Self.transitionFrameCount(dB)
+        let oldOff = Self.transitionFrameCount(dOff)
+        let interval = Self.sampleIntervalMilliseconds(onFilmA.motionStamps)
+        let duration = scenario.declaredDurationMilliseconds
+        emit("MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=\(spanA)(旧口径\(oldA))"
+            + " 峰值=\(String(format: "%.3f", Self.peak(dA))) 冷闸=\(onFilmA.clockIsWarm)"
+            + "  开B 帧数=\(spanB)(旧口径\(oldB)) 峰值=\(String(format: "%.3f", Self.peak(dB)))"
+            + " 冷闸=\(onFilmB.clockIsWarm)"
+            + "  关 帧数=\(spanOff)(旧口径\(oldOff)) 峰值=\(String(format: "%.3f", Self.peak(dOff)))"
+            + " 同一条线=\(String(format: "%.4f", shared)) 共用线安全=\(sound)"
+            + " 声明=\(String(format: "%.0f", duration))ms 采样≈\(interval)ms")
+
+        // 前提：这一卷里得**有**一次变化，而且不是在冷采样下抓的。
+        XCTAssertGreaterThan(Self.peak(dA), Self.minimumVisibleChange,
+            "开臂带内一个像素都没变 ⇒ 触发没让胶囊移动（探针/夹具坏了，不是动效坏了）。"
+            + " 峰值=\(String(format: "%.3f", Self.peak(dA))) 地板=\(Self.minimumVisibleChange)")
+        XCTAssertTrue(onFilmA.clockIsWarm && onFilmB.clockIsWarm && offFilm.clockIsWarm,
+                      "有一臂是在冷采样下抓的 ⇒ 两臂的比较不成立，这条结论今天不判")
+
+        // ③ 落定耗时**上限**（"没跑飞"）—— 这一半与采样粒度无关，任何一台都判。
+        //
+        // 它只判上限、不判"够长"，理由写在这里免得下一次被读成缺陷：
+        // 本机实测 `到位帧=8 采样≈8ms ⇒ 落定≈64ms`，而目录声明的是 200ms（`.slider` 的 response）。
+        // 临界阻尼弹簧本来就先把绝大部分位移做完再拖尾，尾段那零点几个 pt 落在这把尺的
+        // 逐像素相等判据之下 ⇒ "64ms 落定"与"response=200ms"**不矛盾**，
+        // 它是这条尺的分辨率，不是产品的时长。真要判"声明 200ms 是不是 200ms"，
+        // 需要 4ms 一帧（R2 那一课），而那件事由纯值守卫 `testCurveSecondsComeFromTheDurationTable`
+        // 从参数侧钉住，不由这把像素尺冒充。
+        let settled = Self.settledAtFrame(onFilmA.motionFrames, band: band)
+        if let settled {
+            let settledMilliseconds = Double(settled) * Double(max(interval, 1))
+            emit("MOTION_PILL_SLIDE_SETTLE filter-pill-slide 到位帧=\(settled)"
+                + " 采样≈\(interval)ms ⇒ 实测落定≈\(Int(settledMilliseconds))ms（声明 \(Int(duration))ms）"
+                + " 可分帧=\(Self.resolvableFrames(durationMilliseconds: duration, sampleMilliseconds: interval))")
+            XCTAssertLessThanOrEqual(settledMilliseconds, duration * 2 + Double(interval),
+                "胶囊滑入实测落定 ≈\(Int(settledMilliseconds))ms，远超声明的 \(Int(duration))ms："
+                + "曲线跑飞或者有别的东西在重排这一带")
+        } else {
+            XCTFail("开臂读不出落定帧 ⇒ 这条带从头到尾没变过（没触发，或者没框到）；"
+                + "带=x\(band.minX * 300)…\((band.minX + band.width) * 300)pt"
+                + " y\(band.minY * 520)…\((band.minY + band.height) * 520)pt")
+        }
+
+        // 「有没有过程」这一半只在**这一台的时钟切得出至少 3 帧**时才判（R47 / R2 的同一把尺：
+        // 帧数由采样相位决定，而 runner 的采样在本卷里量过 31–90ms 一档）。
+        // 放行条件读的是**同一次运行量出来的采样间隔与声明时长**，不是覆盖率通道（R161）。
+        let resolvable = Self.resolvableFrames(durationMilliseconds: duration,
+                                               sampleMilliseconds: interval)
+        guard resolvable >= 3 else {
+            emit("MOTION_NOT_RUN=clock-too-coarse pill-slide-process 采样≈\(interval)ms"
+                + " 声明=\(Int(duration))ms ⇒ 这一台的时钟切不出 3 帧，「中间态比关臂多」这一半无从判定"
+                + "（前提与落定上限照判）。开A 帧数=\(spanA)/旧\(oldA) 关 帧数=\(spanOff)/旧\(oldOff)")
+            return
+        }
+        // A/A 不一致 ⇒ 这条判据今天没有对照物（**不挑一次算数**，R47）。
+        let aAgree = (spanA > spanOff) == (spanB > spanOff) && (oldA > oldOff) == (oldB > oldOff)
+        guard aAgree else {
+            emit("MOTION_NOT_RUN=pill-slide-aa-inconsistent filter-pill-slide"
+                + " 开A 帧数=\(spanA)/旧\(oldA) 开B 帧数=\(spanB)/旧\(oldB) 关 帧数=\(spanOff)/旧\(oldOff)"
+                + " ⇒ 同一臂两遍方向不一致，判的是进程历史而不是产品")
+            throw XCTSkip("MOTION_NOT_RUN=pill-slide-aa-inconsistent：开臂两遍不一致，今天不判")
+        }
+        // ① 中间态帧数：两把尺都必须说"开着比关着多"。
+        XCTAssertGreaterThan(spanA, spanOff,
+            "共用线口径下开臂中间态帧数=\(spanA) 不大于关臂 \(spanOff) ⇒ 这条位移是**瞬移**，"
+            + "而目录里给它写了 \(String(format: "%.0f", duration))ms 的弹簧：声明与产物不符（R11 那一族）。")
+        XCTAssertGreaterThan(oldA, oldOff,
+            "旧口径（各自归一化）下开臂=\(oldA) 不大于关臂 \(oldOff) ⇒ 两把尺必须同方向，"
+            + "只有一把说多就是其中一把坏了（R192 / BACKLOG 216 同一形状）。")
+        // ② 峰值：摊到几帧上，必然比"一帧到位"矮。
+        XCTAssertLessThan(Self.peak(dA), Self.peak(dOff),
+            "开臂峰值=\(String(format: "%.3f", Self.peak(dA))) 不小于关臂"
+            + " \(String(format: "%.3f", Self.peak(dOff))) ⇒ 两臂在同一帧里改了同样多的像素，"
+            + "也就是这次变更没有被摊开 —— 声明的位移档没在演。")
+        // ④ 时钟切得出来的时候，"两帧就到位"就是没有过程。
+        if let settled {
+            XCTAssertGreaterThanOrEqual(settled, 2,
+                "触发后第 \(settled) 帧就已经是最终态 ⇒ 这条位移档没有过程")
+        }
+    }
+
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
     ///
     /// 以前它写的是"到位帧数 ≤6"，而 6 帧在 31ms 采样下是 186ms、在 90ms 采样下是 540ms ——
@@ -6351,6 +6475,45 @@ final class MotionFilmstripTests: XCTestCase {
         static func searchReflow() -> Scenario {
             Scenario(name: "search-reflow", size: NSSize(width: 380, height: 520)) { store in
                 store.perform(.updateSearch("记录 5"))
+            }
+        }
+
+        /// R322 / 动效主线：侧栏顶部那颗「全部 / 收藏」的**横移**，第一次被放进真窗口逐帧取证。
+        ///
+        /// 为什么是这一个位点：它是全仓**唯一一条"位移"档**（`.slider` → `Slide.leading` → 弹簧）
+        /// 的现场，而账上关于它的证据只有两态 —— `segmented-filter-idle` 那张帧 +
+        /// `FILTER_PILL_BAND`（R189 把 `offset` 换成 `.position` 之后，"药丸在第几段"能被像素判）。
+        /// **两端都对，不等于中间那段在演**：它完全可以瞬移，而两态尺一声不响。
+        /// 这一族仓库里有名字：R11「源码已接、产物未量」、R16「只有一臂在演的过渡等于没有」。
+        ///
+        /// 为什么这一格**有资格**期待被看见（与热图那条纯 opacity 的淡入相反）：
+        /// `cacheDisplay` 抓的是模型树，而这条动效变的是**位置** ——
+        /// R288 那格写的正是"环境键的变化过程不进胶片，值变化进"，选中态同一驱动 16 帧渐变当反证。
+        /// 也就是说"位移该看得见"是**可被推翻的预测**，不是免责：推翻它就把这条改成具名出口。
+        ///
+        /// 根视图用**产品那个** `SegmentedFilterPicker`，绑定走产品自己那条动作
+        /// （`HistorySidebarView.swift:19-24` 同形：`get: store.filter` / `set: perform(.updateFilter)`）——
+        /// 自带一份"长得像"的宿主视图就是在测替身（第二轮 N-1 那一族）。
+        /// 根视图用**产品自己的** `HistorySidebarView`（`@ObservedObject var historyStore` 那一层就在它身上）：
+        /// 第一版这里放的是裸的 `SegmentedFilterPicker(selection: Binding(get: store.filter, …))`，
+        /// 结果两臂峰值都是 **0.000** —— 没有任何一层观察 store，SwiftUI 整棵树不重算，
+        /// 胶囊当然不动。那是**探针坏了**，不是产品没动（R161 那一课：绕开被测系统自己的驱动路径，
+        /// 会把它伪装成产品缺陷）。绑定链本身与 `HistorySidebarView.swift:19-24` 同形
+        /// （`get: historyStore.filter` / `set: perform(.updateFilter)`），本轮没有替它做任何一层。
+        ///
+        /// 尺寸 300×520 与 `sidebar-history-300x520-*` 夹具同档（`sidebarFrame` 的默认宽）。
+        static func filterPillSlide() -> Scenario {
+            Scenario(name: "filter-pill-slide", size: NSSize(width: 300, height: 520),
+                     prepare: { store in store.perform(.updateFilter(.all)) },
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000,
+                     root: { store in
+                         AnyView(
+                             HistorySidebarView(historyStore: store)
+                                 .frame(width: 300, height: 520, alignment: .top)
+                                 .background(Color(nsColor: .windowBackgroundColor))
+                         )
+                     }) { store in
+                store.perform(.updateFilter(.favorites))
             }
         }
 

@@ -43,7 +43,12 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_SLIDE[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   # R322：动效主线这一轮的结论全写在 `MOTION_PILL_SLIDE` / `_SETTLE` 两行上
+                   #   （胶囊横移的过程证人：开臂中间态帧数 3 对关臂 1、峰值 0.09 对 0.354、落定 64ms）。
+                   #   这一族原来不在名单里 ⇒ 按 R107 的规矩**补进白名单并声明**，
+                   #   而不是"这轮的读数特殊，不用搬"。为什么只补这一族而不是整条 `^MOTION_`：
+                   #   `MOTION_SUMMARY` / `MOTION_GRAB` 一次就是几十行，全搬会把表格冲成噪声（同一理由见 R107 末段）。
                    # R105：浮层左轴那三行（`QUICKPICK_SEARCH_AXIS` / `_AXIS_CAPABILITY` / `_AXIS_DECLINED`）
                    #   同样是空格分隔 ⇒ 走第二个分支。R104 的 §8 把它们漏在了搬运之外
                    #   （那一轮 §8 的"本轮读数"只有 `CARD_*`），本轮补上 —— 判据的结论行必须与它的
