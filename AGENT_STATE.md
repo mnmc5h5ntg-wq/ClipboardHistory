@@ -12,6 +12,46 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R319 状态（第 318 轮 / Round 316 · 2026-10-24）
+
+本轮三笔：① 产品 1 文件（`HistoryPersistence.swift`）—— 损坏原件的保全改成**按内容幂等**，
+并修掉撞名返回 nil 让恢复提示说"未知位置"那一支；② 用例改成**主动跨过秒界**再断言恰好一份
+（不降成 `>= 1`）；③ 三把刀 M914 / M915 / M916（CAUGHT=3/3, RESTORE_CLEAN=yes（预检 tables=107 covered=90 bad=0）），其中 M915 第一版打在
+不可观察的位上（PASSED），改针到悬停真值表本体后才红 —— 这一格按原样记账并升成 D-302。
+374 结案；373 只剩①号真机眼。
+
+最后更新：2026-10-24（本地 · R319 / 第 318 轮 / Round 316）：**连续 7 轮零产品文件之后的第一笔产品改动**（产品 1 文件，判据 + 修法）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 935 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r319_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=935 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r319_rv`；
+变异表 `CAUGHT=3/3, RESTORE_CLEAN=yes（预检 tables=107 covered=90 bad=0）`；针预检 tables=107 covered=90 bad=0、名册 files=201 arms=783；
+腐烂尺 `HIDDEN_ARMS 表=195 可判=715 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；电池 Ran 611 / OK (skipped=4)（写盘后同数）；看图腿 RUN（本轮看图腿做的是**完整性核对 + 重看**，不是新的审美判断 —— 这一点先说清，免得把它当成"看过了"。本轮改动全在恢复路径的磁盘写与提示措辞上，像素一张都不该动；这一条不靠"我觉得没动"，靠两遍帧目录逐字节对拍：R318 那一遍 174 张与本轮这一遍 174 张，同图 174 / 变图 0 / 缺对照 0（`R319_FRAME_CMP`，md5 逐张比）。
+
+重看的是浮层两档与那一张悬停位点（`quickpick-hover-420x300-dark.png`）。要看的是"次序还在不在"：页底 30、悬停那一档约 43（`VisualFill.hover` 0.06 的白墨压在暗底上）、选中那颗药丸 70）。
+产品文件 1 个 ⇒ 连续零改动 **0** 轮（由上一轮的 7 归零；唯一取数口 `python3 scripts/product_streak.py --streak-for 318`，
+同形用于 `--check`；本轮之前的最后一笔产品提交是 84c5468 = 第 318 轮 —— 本轮之后 as-of 就是本轮自己）。
+
+⓪ R320 开场要先读的（成对：run id ↔ commit）：RUN=40008003697 sha=ca6bc31 status=completed conclusion=failure title=R318 账半（七本一起落：U-1043…U-1046、D-299、D-300、373 的②号结案、新开 374、STA workflow=CI
+   —— 必须读到：① 本轮三笔在 runner 上是否全绿（**特别是 `HistoryPersistenceRecoveryTests`
+      那一朵间歇红**：runner 上如果绿，它是"没跨秒界"还是"幂等生效"？这一格只有幂等之后才分得清）；
+   ② 新尺 `QUICKPICK_SELARM` 两行在 runner 上的落点（那台机器页底 236/52 对本机 252/28）；
+   ③ R318 那三跑（`3b1a8b9` / `689691e` / `adace25`）与账半 `ca6bc31` 的结论。
+
+① 下一轮（R320）的靶：① **回到动效主线**（这是本轮之后最该做的一件事）：
+      347 / 305 / 373① 都需要用户先退出正在运行的 App（单实例守卫会中止第二实例）⇒
+      在那之前用**已有夹具通道**点一个真实位做动效判断或撤一条不成立的声明，
+      跑完整四件套 + 逐张看图 + 配刀；
+   ② 368（hover 提示的产物级通道）；③ 367 迁移（已声明 2 张 / 剩 0 张）；
+   ④ 348 剩下的读数族各配恒等式（`QUICKPICK_SELARM` / `_SUMMARY` 与本轮的 `MUTATE_TABLE` 行都在这一族里）；
+   ⑤ 360 最后一批；⑥ 361 合并；⑦ 364 的"抽不出候选的 6 把要真跑"；
+   ⑧ 354 的第五步（本轮新增的"等条件跨秒界"给那条用例加了 ~1.1 秒，值得被数到）。
+
+② 仍开：347（真机证人）、305（等 347）、373（只剩①号真机眼：key window 下选中档是不是强调色）、
+   367（腐烂针待清：已声明 2 张 / 剩 0 张）、
+   368（hover 提示的产物级通道）、354 的第五步 + 负载红一条、348 的"读数族还没纳全"、
+   360（剩 11 份）、361（未合并）、359、362、349、350 第二步、351、344、341 的 CI 契约半、339、
+   312 具名出口、304、296、291；**R318 结案**：373 的②号出口（两枚系统参照臂进尺）；
+   **R319 结案**：374（corrupt 原件保全不幂等）；
+   用户闸门 220 路 A / 228② / 265。
+
 ## R318 状态（第 317 轮 / Round 315 · 2026-10-24）
 
 本轮三笔：① `0a39dd1` 代码半 —— 373② 的两枚系统参照臂进尺（`testQuickPickSelectionPillAgainstSystemArms`）；

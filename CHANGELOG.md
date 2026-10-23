@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 八轮来的第一笔产品改动：损坏存档的原件保全改成按内容幂等，用例改成主动跨过挂钟粒度；三把刀里有一把先打在不可观察的位上（R319 / U-1047…U-1049 · D-301、D-302 · 产品 1 文件）
+
+- 产品（`HistoryPersistence.swift`）：`preserveCorruptFile` 写之前先在同目录里找**字节相同**的
+  `history.corrupt-*.json`，有就交回那一份、不再写盘。顺带修掉撞名返回 nil 导致恢复提示说
+  "保全在未知位置"那一支（用户被告知有备份却拿不到文件名）。374 结案。
+- 用例：等条件把秒界跨过去再载入第二次，然后要求"恰好一份 + 逐字节相同 + 两次交回同一个文件 +
+  正常保存不追加"。**没有**把它降成 `>= 1`。
+- 三把刀 M914 / M915 / M916（CAUGHT=3/3, RESTORE_CLEAN=yes（预检 tables=107 covered=90 bad=0））：分别钉"两枚参照臂不许塌成一枚"、
+  "选中那一行不许被自家灰盖住"、"幂等守卫不许抽掉"。
+  M915 第一版打在 `isSelected` 取反上，跑出来 PASSED —— 离屏没有悬停，那一位不产生像素；
+  改针到真值表本体后才红。这一格按原样记账（D-302）。
+- 新规矩 D-301（断言不许依赖挂钟粒度；要证明"恰好一份"就主动跨过去）与
+  D-302（刀报 PASSED 先问它下的那一位可不可观察）。
+- 现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 935 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r319_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=935 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r319_rv`；
+  脚本电池 `Ran 611 / OK (skipped=4)`；针预检 bad=0、名册 arms=783。
+
 ### 浮层选中底第一次被放到两枚系统参照色之间判：两档都逐字节落在系统非 key 那一档；这把尺自曝两次，全量卷另抓到损坏原件保全不幂等（R318 / U-1043…U-1046 · D-299、D-300 · 产品 0 文件，判据轮）
 
 - 新判据 `UICaptureTests/testQuickPickSelectionPillAgainstSystemArms`：同一外观下解析 key 档与
