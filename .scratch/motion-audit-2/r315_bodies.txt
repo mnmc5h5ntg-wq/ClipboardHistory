@@ -1,0 +1,219 @@
+UI_NEW = u"""## 第 @ROUND@ 轮（@RTAG@ · U-@UA@…U-@UD@ · @TODAY@）：一小时前开的单，本轮查重后撤销 —— 撤完才补上它欠的对照，最后把那张重复臂从仓库里拿走（U-@UA@…U-@UD@ · 产品 0 文件，判据轮）
+
+- **U-@UA@：@RPREVTAG@ 开的 BACKLOG 371 是重复单，本轮开场查重后撤销 —— 撤销的依据不是"我觉得不该改"，是三处既有的东西。**
+  动手去改那一屏之前先查了两处：① `SettingsView.swift:1027-1041` 的注释写着「这张图怎么读」**跟着图一起出现**
+  是 **R9 的决定**，理由是空账本那一屏会同时说两句矛盾的话（"还没有可统计的记录" + 五行读图说明 =
+  教用户读一张不在这里的图，与阶段一"共 0 次"同族，U-30 缺陷 5），并且说明块必须挂在**观察账本那一层**，
+  挂回 `SettingsView.statsSection` 会读到开页快照、用户复制第一条之后说明永远不出现；
+  ② 判据 `DailyCopyHeatmapTests.testHeatmapReadingGuideFollowsTheChart` 已经在钉这两条回归。
+  ⇒ 371 里我自己写的三个做法，①的答案是**不加**、③那把刀**已存在**。教训写成一条：
+  **量到一处缺席 ≠ 新条目**，开单之前必须先查"这件事是不是已经被判过、被钉过"。
+
+- **U-@UB@：撤销当时只有理由、没有数 —— 本轮把那五个数补上了，结论支持维持撤销。**
+  `measure_pane_whitespace_r315.py` 用**同一颗尺**（墨带相对本帧众数背景、最大通道差 > 20）逐分区的
+  底部留白比例现读：统计空态 **0.533** ｜ 通用 0.502 ｜ 通用（登录失败/不支持）0.472 ｜ 快捷键 0.460 ｜
+  数据 0.424 ｜ 推荐 0.013 ｜ 隐私 0.000（720x1040 两版：隐私 0.171、推荐 0.120）
+  ⇒ 统计页在同族里**不是异类**：与最接近的短页只差 0.031，真正填满的是推荐/隐私那两页长内容。
+  上一轮那句"53% 空白"之所以不该变成工单，不是因为 R9 说过不要，而是因为**它本来就不是离群值**。
+
+- **U-@UC@：`距底=0` 这一格不判任何东西 —— 两种成因的判法相反，本轮把它分辨成了读数。**
+  隐私页两档的墨带末行都压在最后一行像素（`距底=0`），这既可能是"文字被裁一半"（缺陷，R28 那一族），
+  也可能是 ScrollView 的折（正常）。分辨用了三层证据：
+  ① **行剖面**：末三行墨像素 205→44→28 的收口，而健康对照 `settings-recommendations` 最后一行文字之下
+     还有 **14 像素**空白（81→1→1→…）；② **产品代码**：设置详情页整个在 `detailScrollView`（`SettingsView.swift:279-280`）
+     里，折处半行是滚动视图的常态；③ **夹具自己声明**：`UICaptureHarness.swift:153` 写着
+     `contentMustFit` 那条只给"必须装下"那批夹具用，"列表/滚动区那批**天生**会被裁"。
+  三条同向 ⇒ 判**不是缺陷**，且这一格记在 371 的追记里而不是另开单（判"不加"也要绑读数）。
+
+- **U-@UD@：重复臂从仓库里拿走了（BACKLOG 370 出口①），而 M566 那根针跟着换了一次形状 —— 这是 369 的第二次咬合。**
+  撤掉 `settings-stats-empty` 夹具 + 两处名册条目之后：`CAPTURED 174`（从 176 降回 174），
+  帧基线**同一笔 update**：`UPDATED=174 → 复验 COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`；
+  捕获卷 `Executed 92 / 0 failures`。而 `iconFirstCells` 的声明从两行回到一行，
+  于是 R314 刚重钉的 M566 针**又**必须跟着改 —— 本轮把它改回单行原形，预检现读
+  `M563 ok；M564 ok；M565 ok；M566 ok；M567 ok`、`bad=0`。
+  同一根针在一轮之内被同一张名册咬了两次，这就是 @BLMINUS@-1 那张单（369：名册手写且自指）要的证人：**不是"下次记得"，
+  是要把"首墨是不是图标"变成派生判定**。
+  另记一格**未归因**的读数，写下来不藏：捕获卷的 skip 从 5 变成 4，本轮点名的四条是
+  `testMenuBarRowTruncationAcrossWidthsDiagnostic` / `testProbeVibrantEligibilityDiagnostic` /
+  `testSettingsCaptionRowTierProfileDiagnostic` / `testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic`，
+  第 5 条是谁、为什么不再 skip 没查 ⇒ 新开 @BLNEW@（属 341 那一族：汇总数与名单必须同源）。
+
+读数（全部现读）：构建告警 @WARN@（`--build-tests`）；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；
+重捕帧 @CAP@；帧基线 @BASE@ + **同一笔 update**（176→174，撤的就是那两张）；换装 @INSTALL@；
+预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 files=@ARMFILES@ arms=@ARMREG@；
+腐烂尺 `@HALINE@`；脚本电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）；
+产品面连续零改动 = **@STREAK@** 轮（取数口 `scripts/product_streak.py --streak-for @ROUND@`；上一轮 @PREVSTREAK@）。
+@KNIFESUM@
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 14/15 |
+| 判据有效性 | 14/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 10/15 |
+| 台账一致性 | 14/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+| 合计 | 96/105 |
+
+为什么不是满分（逐条）：真实视觉审查 14 —— 本轮的看图不是"再看一张新帧"，而是**去证自己上一轮写下的判断**：
+裁出隐私页底边那一横条，看见"默认排除：com.dashlane.DashlaneMacOS"整行被折在底边、字形下半截没了，
+再回到代码与夹具注释确认它是滚动折而不是被裁 —— 扣分在只看了一处（其余分区的底边没有逐张看）。
+判据有效性 14 —— 撤掉一张重复单 + 撤掉一张重复臂，两次都是"仓库里少了一样东西"，这类动作没有新判据可配，
+但都有现读兜着（预检 bad=0、基线 CHANGED=0、留白七个数）。假绿防御 15 —— skip 5→4 这格没归因就照实写并开单，
+没有把它当成"少一条 skip 是好事"。产品面推进 10 —— 产品 0 文件（本轮动的是夹具与判据本体），
+动效主线仍欠真机眼。台账一致性 14 —— @RPREVTAG@ 的账隔了一轮才补（上一格扣过分），本轮三笔都在当天落账，
+且撤销与结案都写进**原条目**的追记而不是另开同号。可复核性 14 —— 量尺进了仓库
+（`measure_pane_whitespace_r315.py`），但三笔 commit 的读数分散在两个日志目录里。交付诚实性 15 ——
+"我上一轮开了一张重复单"这句话写在最前面，而不是写成"复查后确认无需改动"。
+
+"""
+
+IT_NEW = u"""## Round @RDN@ · @RTAG@（第 @ROUND@ 轮 · @TODAY@）：撤销自己一小时前开的单，并补上它欠的对照（产品 0 文件，判据轮）
+
+@RPREVTAG@ 的看图腿判出"统计页空态丢掉整段说明"，据此开了 BACKLOG 371。本轮开场就去改那一屏，
+动手前查了两处，两处都已经有答案：`SettingsView.swift:1027-1041` 写着这是 **R9 的决定**
+（空账本时同时说"还没有记录"和五行读图说明 = 教人读一张不在这里的图，U-30 缺陷 5 同族），
+而 `DailyCopyHeatmapTests.testHeatmapReadingGuideFollowsTheChart` 已经把这两条回归钉住。⇒ 371 撤销。
+
+撤销当时只有理由没有数，所以本轮把那五个数补上（同一颗尺、逐分区底部留白比例）：
+统计空态 **0.533** ｜ 通用 0.502 ｜ 通用（登录失败）0.472 ｜ 快捷键 0.460 ｜ 数据 0.424 ｜ 推荐 0.013 ｜ 隐私 0.000
+⇒ 统计页**不是异类**，与最近的短页只差 0.031。"53% 空白"不该变成工单的真正原因不是"R9 说过"，而是它本来就不离群。
+
+隐私页那格 `距底=0` 单独分辨了一次，因为"贴边"有两种成因、判法相反：
+行剖面末三行 205→44→28 的收口 vs 健康对照 `settings-recommendations` 底下还有 14 像素空白；
+产品侧整个详情页在 `detailScrollView` 里；夹具注释（`UICaptureHarness.swift:153`）本来就写着滚动区那批天生会被裁
+⇒ 判**滚动折**，不是缺陷。看图腿把那一横条裁出来亲眼确认了字形下半截被折在底边。
+
+最后把 @RPREVTAG@ 自曝的那张重复臂拿走（370 出口①）：`CAPTURED 176 → 174`、基线**同一笔** update、
+`COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`、捕获卷 92 用例 0 红。
+名册回到单行形状 ⇒ M566 那根针跟着第二次被同一张名册咬（本轮改回原形，预检 `bad=0`、M563…M567 全 ok）——
+这正是 369 要的证人。一格未归因的读数照实记：捕获卷 skip 5→4，第 5 条是谁没查 ⇒ 新开 @BLNEW@。
+
+读数：构建告警 @WARN@；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；@CAP@；帧基线 @BASE@；
+换装 @INSTALL@；预检 bad=@PREBAD@、名册 arms=@ARMREG@；电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）；
+产品面连续零改动 **@STREAK@** 轮（上一轮 @PREVSTREAK@）。@KNIFESUM@
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 14/15 |
+| 判据有效性 | 14/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 10/15 |
+| 台账一致性 | 14/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+| 合计 | 96/105 |
+
+"""
+
+DEC_NEW = u"""**D-@DN@（@RTAG@）：看图腿判出的"缺席"在变成工单之前，必须先过三道查重 —— 源码里是否已有决定、判据卷里是否已有钉、同族对照是否量过。**
+
+@RPREVTAG@ 的看图腿量到"统计页空态整段说明消失、下半屏 53% 空白"，据此开了一张单（371）。
+本轮开场准备去改那一屏，动手前查了三处，三处都说明**这一单不该开**：
+① 源码注释里写着这是 R9 的**决定**，理由是空账本时同时说"还没有记录"和五行读图说明，
+   等于教用户读一张不在这里的图（与阶段一"共 0 次"同族）；
+② 判据卷里已经有一条会红的钉着这两条回归（`testHeatmapReadingGuideFollowsTheChart`）；
+③ 同族对照本轮量出来了：其余分区底部留白 0.502 / 0.472 / 0.460 / 0.424，统计页 0.533 **不是离群值**。
+
+所以规矩是：**"缺席"这个词本身就是待查的** —— 它可能是不作为，也可能是已经判过的取舍。
+三种既有证据（注释里的决定、会红的判据、同族读数）里任何一条存在，都要先把它读进来再决定开不开单；
+三条都没有，才轮到"这是一处新缺陷"。反过来，如果判的是**不加**，也必须像本轮这样绑上同族读数 ——
+只写"R9 说过不要"等于把一句旧话抄成契约，下一轮换个作者就会再开一次同一张单。
+
+配套一条（本轮第二次踩到）：**手改任何名册/名单之后，立刻跑针预检。**
+`iconFirstCells` 在 @RPREVTAG@ 加了两格、本轮又撤回来，同一根 M566 的针被咬了两次；
+第一次红在预检上（bad=1、rot 33→34），第二次因为撤得干净才没红。刀不重、名单不钉，靠记性一定会漏。
+"""
+
+BL_370 = u"""  追记（@RTAG@）：**出口①已落地 —— 撤掉那张重复臂。**
+  `settings-stats-empty` 夹具与它的两处名册条目一起删掉，帧基线**同一笔** update：
+  `CAPTURED 176 → 174`、`UPDATED=174`、复验 `COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`、捕获卷 92 用例 0 红。
+  空态的对照改用一直存在的那一对（`settings-stats` 0.533 vs `settings-stats-populated` 0.252）。
+  顺带把这一条的**副作用**记全：撤名册 ⇒ `iconFirstCells` 的声明从两行回到一行 ⇒
+  `mutate_r101.py` 的 M566 针必须跟着改回单行原形（预检现读 M563…M567 全 ok、bad=0）——
+  这是 @RPREVTAG@ 那把针在同一张名册上第二次被咬，证人记在 369。
+  本条结案：出口②（给成对臂配一条会红的判据）不再需要 —— 臂都没了，判据就没有对象；
+  而"新增一臂之前先 md5 对拍"这条已经落在 D-295 与 D-@DN@ 的正文里。"""
+
+BL_NEW = u"""**@BLNEW@. 捕获卷的 skip 从 5 变成 4，差的那一颗没有名字（@RTAG@ 现读：撤掉重复臂那一笔之后）**（@RTAG@）
+
+  @RPREVTAG@ 那遍 `Test Suite 'UICaptureTests' passed … Executed 92 tests, with **5** tests skipped`，
+  @RTAG@ 撤掉 `settings-stats-empty` 之后同一卷是 `Executed 92 tests, with **4** tests skipped` ——
+  用例总数没变、红没变，skip 少了一颗。本轮点名的四条是
+  `testMenuBarRowTruncationAcrossWidthsDiagnostic`、`testProbeVibrantEligibilityDiagnostic`、
+  `testSettingsCaptionRowTierProfileDiagnostic`、`testSettingsSidebarSubtreeWhoDrawsTheColumnDiagnostic`，
+  第 5 条**是谁、为什么不再 skip、它现在是真的在跑还是被静默吞掉**，本轮没查。
+
+  为什么必须查：这一族已经红过（341：电池汇总数与 `-v` 名单不同源 ⇒ 差的那一颗没有名字）。
+  "少一条 skip"有两种相反的成因 —— (a) 那一格本来在等某个夹具/某张帧，帧被撤了它就不该再被问；
+  (b) 判定条件被写坏，它从"跳过"漂成"永不执行"。两种都不红。
+  做法：① 让捕获卷自己把 skip 名单与汇总数做**同源对账**（名单颗数 != 汇总 skipped 就红并点名差额）；
+  ② 配一把刀：把某条诊断的 skip 前提改成恒真 ⇒ 汇总数必须动、名单必须点名它。
+  归因之前，台账里凡写"捕获卷 skipped=N"都要带名单出处。"""
+
+CH_NEW = u"""### 撤销自己一小时前开的单，补上它欠的同族对照，再把那张重复臂拿走（@RTAG@ / U-@UA@…U-@UD@ · D-@DN@ · 产品 0 文件，判据轮）
+
+- **BACKLOG 371 撤销**：空态不渲染「这张图怎么读」是 **R9 的决定**（`SettingsView.swift:1027-1041`，
+  与"共 0 次"同族），且 `DailyCopyHeatmapTests.testHeatmapReadingGuideFollowsTheChart` 已钉着两条回归
+  ⇒ 量到一处缺席 ≠ 新条目。教训写成 D-@DN@：开单之前先过三道查重（源码里的决定 / 会红的判据 / 同族对照）。
+- **补上对照**：逐分区底部留白比例现读 统计 0.533 ｜ 通用 0.502 ｜ 0.472 ｜ 快捷键 0.460 ｜ 数据 0.424 ｜
+  推荐 0.013 ｜ 隐私 0.000 ⇒ 统计页不是异类。量尺进仓库：`measure_pane_whitespace_r315.py`。
+- **"贴边"分辨成读数**：行剖面末三行 205→44→28 vs 健康对照底下 14 像素空白，加 `detailScrollView`
+  与夹具注释（滚动区那批天生会被裁）三条同向 ⇒ 隐私页那一格是**滚动折**，不是文字被裁。
+- **BACKLOG 370 结案（出口①）**：撤掉 @RPREVTAG@ 自曝的那张重复臂，`CAPTURED 176→174`、
+  基线**同一笔** update（`COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`）、捕获卷 92/0 红。
+  撤名册的副作用：M566 那根针跟着第二次换形状（本轮改回单行原形，预检 `bad=0`、M563…M567 全 ok）⇒ 369 的证人。
+- 一格未归因照实记：捕获卷 skip **5→4**，第 5 条是谁没查 ⇒ 新开 @BLNEW@（属 341 那一族）。
+- 现读：构建告警 @WARN@（`--build-tests`）；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；
+  帧 @CAP@、基线 @BASE@；换装 @INSTALL@；预检 tables=@TABLES@ bad=@PREBAD@、名册 arms=@ARMREG@；
+  腐烂尺 `@HALINE@`；电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）。
+
+"""
+
+ST_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
+
+本轮三笔：① 开场查重把 @RPREVTAG@ 自己开的 BACKLOG 371 **撤销**（空态不渲染说明段是 R9 的决定，
+且 `DailyCopyHeatmapTests.testHeatmapReadingGuideFollowsTheChart` 已钉着）；② 给那次撤销补上它欠的**同族对照**
+（逐分区底部留白 0.533 / 0.502 / 0.472 / 0.460 / 0.424 / 0.013 / 0.000 ⇒ 统计页不是异类），
+并把隐私页 `距底=0` 分辨成**滚动折**（行剖面 205→44→28 vs 健康对照余量 14 像素 + `detailScrollView` + 夹具注释）；
+③ 撤掉 @RPREVTAG@ 自曝的那张重复臂（370 出口①）：`CAPTURED 176→174`、基线同一笔 update、
+M566 的针跟着回到单行原形（预检 `bad=0`、M563…M567 全 ok）。
+
+最后更新：@TODAY@（本地 · @RTAG@ / 第 @ROUND@ 轮 / Round @RDN@）：**重复单撤销 + 重复臂拿走**（产品 0 文件，判据轮）
+现读：构建告警 @WARN@；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；@CAP@；帧基线 @BASE@（176→174 同一笔）；
+换装 @INSTALL@；@KNIFESUM@；预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 arms=@ARMREG@；
+腐烂尺 `@HALINE@`；电池 Ran @BATT@ / OK (skipped=@SKIP@)（写盘后同数）；看图腿 RUN（@EYE_SHORT@）。
+产品文件 0 个，连续零改动 **@STREAK@** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for @ROUND@`，
+同形用于 `--check`；上一轮 @PREVSTREAK@）。as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
+
+⓪ @RNEXT@ 开场要先读的（成对：run id ↔ commit）：@CI@
+   —— 必须读到：① 撤帧那一笔在 runner 上是否也 `CAPTURED 174`（基线 174 已进仓库，
+   若 runner 仍按 176 找那两张就是名单/基线不同源）；② 捕获卷 skip 5→4 那一格在 runner 上是几颗
+   （@BLNEW@ 的第二个数据点，本机一条不算归因）；③ @RPREVTAG@ 那笔负载红（`PerfBudget` 371.7ms > 250ms，
+   本机两跑 1/0）在 runner 上怎么表现。
+
+① 下一轮（@RNEXT@）的靶：⓪ **@BLNEW@**：捕获卷 skip 那颗没名字的差 —— 同源对账 + 一把"skip 前提改恒真"的刀；
+   ① **369**：把"首墨是图标"变成**派生**判定（连通块高度比 / 左沿错开），让 `CARD_INSET_ICON_FIRST`
+      从开关变成结论 —— 本轮 M566 的针**第二次**被同一张名册咬，这就是它的证人；配那把"图标换成等宽文字必须翻判"的刀；
+   ② **回到动效主线**（已连续 @STREAK@ 轮 0 产品文件）—— 347 / 305 需用户先退出 App，
+      在那之前把 305 的台阶地板用已有夹具通道再推一格；
+   ③ 368：把 `UICaptureHarness` 的建树路径提给判据卷（对照臂用 `settings-stats` vs `settings-stats-populated`）；
+   ④ 367 的迁移继续（已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）；⑤ 348 剩下的读数族各配恒等式；
+   ⑥ 360 最后一批；⑦ 361 合并。
+
+② 仍开：347（真机证人）、305（等 347）、@BLMINUS@（腐烂针待清：已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）、
+   @BLNEW@（捕获卷 skip 那颗没名字的差）、@BLNEW@-1（`iconFirstCells` 自指 = 369，本轮第二次咬合作为证人）、
+   368（hover 提示的产物级通道）、354 的第五步 + 负载红一条、
+   364 的"抽不出候选的 @OPAQUE@ 把要真跑"、348 的"读数族还没纳全"、360（剩 11 份）、361（未合并）、359、362、349、
+   350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；
+   **本轮结案/撤销**：370（出口①落地）、371（R9 已判 + 已有判据 + 同族不是离群）；
+   用户闸门 220 路 A / 228② / 265。
+
+"""
