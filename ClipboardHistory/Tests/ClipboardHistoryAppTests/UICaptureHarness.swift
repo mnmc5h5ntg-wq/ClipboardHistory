@@ -1051,6 +1051,176 @@ final class UICaptureTests: XCTestCase {
                       "有对象=\(judged) 却有一档读不到 ⇒ 坏的是尺或那一档的通道，必须点名：\(declined.joined(separator: " "))")
     }
 
+    // MARK: - R320 · BACKLOG 368：热图 hover 提示的产物级通道（第三次试，这次复用 harness 的建树路径）
+
+    /// 纯函数：把一棵 AppKit 树里的**两条候选通道**数出来。
+    ///
+    /// 为什么一次数两条（而不是只找 `toolTip`）：`.helpLabel(…)` 同时写 `.help` 与
+    /// `accessibilityLabel`，而 R313 那两次探针只找了 `toolTip` 那一半，两次都是 0 ——
+    /// 一次只找一条通道，找不到就整格归零，那是**观察面**的缺陷不是产品的。
+    /// 无障碍标签正是辅助技术读到的那一句话，它长出来了就有产物级判据的对象。
+    ///
+    /// 返回：`(views, tips, a11y, samples)` —— 走过的视图数、`toolTip` 命中数、
+    /// 无障碍标签命中数，以及前几条命中的原文（**只收热图那两型文案**，
+    /// 别的控件也有提示，混进来会让"这一格有没有通道"这句话数错分母）。
+    static func tooltipChannels(of view: NSView,
+                                limit: Int = 6)
+        -> (views: Int, tips: Int, a11y: Int, anyTips: Int, anyLabels: Int,
+            samples: [String], truncated: Bool) {
+        var views = 0, tips = 0, a11y = 0, anyTips = 0, anyLabels = 0
+        var samples: [String] = []
+        var truncated = false
+        func heatShaped(_ s: String?) -> Bool {
+            guard let s else { return false }
+            return s.contains("复制") || s.contains("没有记录")
+        }
+        func walk(_ v: NSView) {
+            views += 1
+            if v.toolTip?.isEmpty == false { anyTips += 1 }
+            if heatShaped(v.toolTip) { tips += 1 }
+            let label = v.accessibilityLabel()
+            if label?.isEmpty == false { anyLabels += 1 }
+            if heatShaped(label) {
+                a11y += 1
+                if samples.count < limit {
+                    samples.append(label ?? "")
+                } else {
+                    truncated = true
+                }
+            }
+            for child in v.subviews { walk(child) }
+        }
+        walk(view)
+        return (views, tips, a11y, anyTips, anyLabels, samples, truncated)
+    }
+
+    /// 纯函数（第二版探针）：走 **无障碍树**，不是 `subviews`。
+    ///
+    /// 为什么必须有这一条（本机第一版读数：`视图=54 toolTip=0 无障碍=0`，四屏×档全 0）：
+    /// 热图的格子是纯 SwiftUI 形状（`Rectangle`/`Circle`），SwiftUI **不给它们建 NSView** ——
+    /// `.help()` 落进的是 SwiftUI 自己的无障碍元素树，`subviews` 那条路永远数不到。
+    /// 也就是说第一版的 0 不是"提示不存在"，是"我敲错了门"（R104 那一课的第三种形状：
+    /// 读不到有三种成因 —— 没有、没画、**问错了对象**）。
+    ///
+    /// 用 `perform(_:)` 动态取 `accessibilityLabel` / `accessibilityChildren`：
+    /// 无障碍元素的具体类型是框架私有的（`NSAccessibilityElement` 或 SwiftUI 的内部类），
+    /// 但它们都响应这两个选择子。探针阶段这样问是对的；等它读出东西了，
+    /// 下一轮再把这条判据正式化（正式判据要能点名"哪一格缺标签"，那时得用稳定 API）。
+    static func accessibilityTreeChannels(of root: NSView, limit: Int = 8)
+        -> (elements: Int, labels: Int, samples: [String], truncated: Bool) {
+        var elements = 0, labels = 0, samples: [String] = []
+        var truncated = false
+        let labelSel = NSSelectorFromString("accessibilityLabel")
+        let childrenSel = NSSelectorFromString("accessibilityChildren")
+        func heatShaped(_ s: String?) -> Bool {
+            guard let s else { return false }
+            return s.contains("复制") || s.contains("没有记录")
+        }
+        func string(_ obj: NSObject, _ sel: Selector) -> String? {
+            guard obj.responds(to: sel), let raw = obj.perform(sel) else { return nil }
+            // `takeUnretainedValue` 而不是 bitcast：这两个选择子返回的是自动释放的对象，
+            // bitcast 成 `Optional<String>` 在返回 nil 时会把探针跑成崩测试进程（探针不许有那种坏法）。
+            return raw.takeUnretainedValue() as? String
+        }
+        func walk(_ obj: NSObject?, depth: Int) {
+            guard let obj, depth <= 24 else { return }
+            elements += 1
+            let label = string(obj, labelSel)
+            if heatShaped(label) {
+                labels += 1
+                if samples.count < limit { samples.append(label ?? "") } else { truncated = true }
+            }
+            if obj.responds(to: childrenSel), let raw = obj.perform(childrenSel) {
+                let kids = (raw.takeUnretainedValue() as? [AnyObject]) ?? []
+                for kid in kids { walk(kid as? NSObject, depth: depth + 1) }
+            }
+        }
+        walk(root, depth: 0)
+        return (elements, labels, samples, truncated)
+    }
+
+    /// R320 / BACKLOG 368：热图格子的 hover 提示，产物级通道**到底存不存在**。
+    ///
+    /// 阶段一的验收要求里明写「格子有 hover 提示（日期 + 当日条数）」，而账上今天只有两类证据：
+    /// `DailyCopyHeatPolicy.tooltip` 的真值表（纯函数）与"这里用了 `helpLabel` 而不是裸 `.help`"
+    /// 的源码级守卫 —— **两者都没量过产物**（R11 / R248 那一族：源码已接、产物未量）。
+    ///
+    /// 为什么这是第三次而不许是最后一次：R313 两次探针都**自己新建 host**
+    /// （`NSHostingView(rootView:).layoutSubtreeIfNeeded()` 与离屏挂窗 + `displayIfNeeded()`），
+    /// 两条都读到 `views=1 toolTips=0` —— 也就是那两棵树根本没 materialize。
+    /// 而 harness 拍帧时走的是另一条路径，它确实长出 `NSHostingView` / `AppKitPlatformViewHost`
+    /// （R30 为"侧栏暗档黑字"立的 `inspect:` 钩子就是走那棵树读到真凶的）。
+    /// 所以这次复用**画出帧的那同一棵树**：拿 `settings-stats-populated`（有数据那一屏）与
+    /// `settings-stats`（空账本那一屏）各走一遍，两条通道一起数。
+    ///
+    /// **本轮不下判断**（探针轮）：读数是下一轮的判据或具名出口的前提。
+    /// 但有一格是本轮就能说的：如果两条通道都还是 0，那 368 的出口就不在离屏产物里，
+    /// 而在"这条通道这台机器判不了"那一格里 —— 那必须写成**具名出口 + 谁在什么时候能判**，
+    /// 不许再留成第四次尝试。
+    func testHeatmapTooltipChannelProbe() throws {
+        // 正对照（D-168 / R103 那一族）：**先证明这把尺读得到，才有资格说产品里没有**。
+        // 没有这一格，下面那些 0 就只是"我又敲错了一扇门"的第四次记录。
+        let control = NSView(frame: NSRect(x: 0, y: 0, width: 40, height: 40))
+        let tipChild = NSView(frame: NSRect(x: 0, y: 0, width: 20, height: 20))
+        tipChild.toolTip = "2026年3月12日 周四 · 复制 5 次"
+        let labelChild = NSView(frame: NSRect(x: 20, y: 0, width: 20, height: 20))
+        labelChild.setAccessibilityLabel("2026年3月12日 周四 · 没有记录")
+        control.addSubview(tipChild)
+        control.addSubview(labelChild)
+        let ctl = Self.tooltipChannels(of: control)
+        emit("HEATMAP_TOOLTIP_CONTROL 视图=\(ctl.views) 热图型toolTip=\(ctl.tips)"
+             + " 热图型无障碍=\(ctl.a11y) 任意toolTip=\(ctl.anyTips) 任意标签=\(ctl.anyLabels)")
+        XCTAssertEqual(1, ctl.tips,
+                       "正对照：自己写的 toolTip 都读不到 ⇒ 这把尺是瞎的，产品那侧的 0 不算证据")
+        XCTAssertEqual(1, ctl.a11y,
+                       "正对照：自己写的 accessibilityLabel 都读不到 ⇒ 同上（无障碍那条也瞎）")
+        XCTAssertEqual(3, ctl.views,
+                       "正对照：遍历没走全 ⇒ 分母是假的（对照树是 1 个父 + 2 个子，共 3 个视图）")
+
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r320-tooltip-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var lines: [String] = []
+        var sumTips = 0, sumA11y = 0, sumAnyTips = 0, sumAnyLabels = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            for name in ["settings-stats-populated", "settings-stats"] {
+                let fixtures = self.fixtures(appearance: appearance)
+                guard let fixture = fixtures.first(where: { $0.name == name }) else {
+                    return XCTFail("\(tag)：找不到 `\(name)` 夹具 ⇒ 这一格没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                var found: (views: Int, tips: Int, a11y: Int, anyTips: Int, anyLabels: Int,
+                            samples: [String], truncated: Bool)?
+                var tree: (elements: Int, labels: Int, samples: [String], truncated: Bool)?
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    found = Self.tooltipChannels(of: host)
+                    tree = Self.accessibilityTreeChannels(of: host)
+                }
+                guard let hit = found, let a11yTree = tree else {
+                    return XCTFail("\(tag)/\(name)：inspect 钩子没交出树 ⇒ 通道无从数起")
+                }
+                let sample = hit.samples.isEmpty ? "无" : hit.samples.prefix(2).joined(separator: " | ")
+                let line = "HEATMAP_TOOLTIP_PROBE \(tag) 夹具=\(name)"
+                    + " 视图=\(hit.views) 热图型toolTip=\(hit.tips) 热图型无障碍=\(hit.a11y)"
+                    + " 任意toolTip=\(hit.anyTips) 任意标签=\(hit.anyLabels)"
+                    + " 无障碍树元素=\(a11yTree.elements) 树内标签=\(a11yTree.labels)"
+                    + "（截断=\(a11yTree.truncated ? "是" : "否")）样例=\(sample)"
+                emit(line)
+                lines.append(line)
+                sumTips += hit.tips
+                sumA11y += hit.a11y
+                sumAnyTips += hit.anyTips
+                sumAnyLabels += hit.anyLabels
+            }
+        }
+        emit("HEATMAP_TOOLTIP_CHANNELS 走过=\(lines.count) 屏×档"
+             + " 热图型toolTip合计=\(sumTips) 热图型无障碍合计=\(sumA11y)"
+             + " 任意toolTip合计=\(sumAnyTips) 任意标签合计=\(sumAnyLabels)"
+             + "（正对照已签：这把尺读得到 toolTip 与 accessibilityLabel）")
+    }
+
     /// R106 · BACKLOG 159 结案：`quickpick-typed` 那张帧上不许有**用户看不到的选中底**。
     ///
     /// 这一条先当探针跑过一遍、拿到机制，再变成判据（机制没证实之前写断言就是猜，D-163 那一族）。
