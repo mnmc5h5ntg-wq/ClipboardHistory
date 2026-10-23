@@ -53,8 +53,8 @@ ARMS = [
      #   R314 往名册里加了两格 ⇒ 声明漂成两行 ⇒ 旧针命中 0（bad=1、rot 33→34）；
      #   R315 撤掉那张重复臂（BACKLOG 370 出口①）⇒ 声明回到一行 ⇒ 针跟着回原形。
      # 两次都不是"针坏了"，是**名册是手写的**：改名册的人不会想到自己动了刀 —— 见 BACKLOG 369。
-     '        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]',
-     "        let iconFirstCells: Set<String> = []",
+     '        let iconFirstRosterMode = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_ICON_FIRST_ROSTER"] ?? "on"',
+     '        let iconFirstRosterMode = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_ICON_FIRST_ROSTER"] ?? "off"',
      H_INSET, "CAUGHT"),
     # M567 是**收尾时补的**：多重集包含检查发现 R101 重写角色分账时把 R100 那条
     # 「系统参照必须亮暗两档各一条」**整条弄丢了**（不是决定撤，是编辑掉的）。

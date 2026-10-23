@@ -11550,14 +11550,30 @@ final class UICaptureTests: XCTestCase {
         //（那是把一条能判的格记成"没判"）—— 换成给这一格一条**有界的**替代判据：
         // 图标 bearing 必须落在 [+0.5, +2.0]。产品如果真改了前导留白，这一格照样会红；
         // 而如果这一屏哪天首墨变成文字，`>= +0.5` 也会红，逼下一次把名册改掉。
+        // R316（BACKLOG 369 的出口）：刀不再钉在名册**内容**上。
+        //
+        // 为什么：R314 往名册里加两格、R315 又撤回来，同一根 M566 的针被咬了两次 ——
+        // 因为针钉的是那一行字面量，而那一行正是会被手改的东西。R316 先量过一条看起来更漂亮的路：
+        // 用"第一处墨的连续高度"派生"首墨是不是图标"。本机现读把它证伪了 ——
+        // `settings-stats`（首墨是托盘符号）暗 3.5pt / 亮 3.0pt，而首墨是文字的
+        // `settings-stats-populated` 是**同一个数**（3.5 / 3.0），其余文字行普遍 12pt
+        // ⇒ 高度这根轴分不开"图标 vs 文字"，只能分开"CJK 行 vs 拉丁行"。
+        // 剩下的那根轴（左沿错开）就是 delta 本身，而这一格要套的替代判据问的正是 delta ⇒ 循环。
+        // 所以名册保留手写，但把**开关**与**名单**拆开：M566 钉 `useIconFirstRoster` 这一行
+        //（它不随名册增删而变），改名册再也弄不死这把刀。
+        let iconFirstRosterMode = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_ICON_FIRST_ROSTER"] ?? "on"
+        let useIconFirstRoster = iconFirstRosterMode == "on"
         let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]
+        emit("CARD_INSET_ROSTER_SWITCH 开关=\(useIconFirstRoster ? "on" : "off")"
+             + " 名册=\(iconFirstCells.sorted().joined(separator: " "))"
+             + "（M566 钉的是上面那个开关，不是这份名单 ⇒ 增删名册不再弄死刀）")
         for (key, inset) in measured.keys.sorted().map({ ($0, measured[$0]!) }) {
             let tag = key.hasSuffix("dark") ? "dark" : "light"
             guard let want = control[tag] else {
                 XCTFail("\(key)：参照缺席（\(tag) 档没量到）⇒ 这一格没有资格报干净")
                 continue
             }
-            if iconFirstCells.contains(key) {
+            if useIconFirstRoster, iconFirstCells.contains(key) {
                 let delta = inset - want
                 XCTAssertGreaterThanOrEqual(delta, 0.5,
                                             "\(key) 的首墨是空态图标，量到 \(inset)pt 对文字参照 "
