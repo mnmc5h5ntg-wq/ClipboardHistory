@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 三根轴必须同时可查：356 剩下的那一半被证伪并撤回（R312 / U-1022…U-1024 · D-293 · 产品 0 文件，判据轮）
+
+- 现读 `HEAT_ADJACENT dark/1x empty→bucket1 最大通道差=30.00 均值通道差=17.33 亮度差=2.16`
+  ⇒ 那句「暗档最细一步低于地板 18」读的是**均值**那一根，而地板从 R52 起施加在**最大通道**上。
+  撤回，不改 `VisualHeat.ladder`、不放宽地板（D-292）。
+- 撤回之前先补证人：`testAdjacentHeatLevelsAreSeparableOnTheRightAxis` 新增一格，
+  要求 16 条读数每条同时带三根轴；刀 M908 / M909 / M910 三把全 CAUGHT、RESTORE_CLEAN=yes。
+- 366 的两条出口被现读证伪（位置可判臂 16/715；"部分死"当上界得到 658，绝大多数是变异文本身）
+  ⇒ 新开 367：rot 做成上界只能靠**表自己声明针**，并给出可执行的三步与分箱形状。
+- 356 结案：两半处置相反（环那一半是真缺陷由 R311 修；相邻档那一半是读错轴由本轮撤回）。
+- 现读：构建告警 0；判据卷 `Ran 13 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failures；
+  帧 CAPTURED 174 -> /tmp/r312_verify/frames、基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=0（判据轮不 update）；换装 INSTALL_RESULT=ok  dmg=ok  installed_version=1.4.8（判据轮：0 产品文件，产物与上一笔同源）；预检 tables=105 bad=0、
+  名册 arms=777；腐烂尺 `HIDDEN_ARMS 表=193 可判=709 rot=33 抽不出=6 上界 rot=33 抽不出=6 处置=ok`；电池 `Ran 608 / OK (skipped=4)`（写盘后同数）；
+  产品面连续零改动 **1** 轮。
+
 ### runner 把 0.20 判成低于地板：悬停环抬回 0.23，地板不按机器放宽（R311 / U-1019…U-1021 · D-292 · 产品 1 文件）
 
 - ⓪ 读到两跑 runner 都红（run 39963980031 / 39965996188，STEP[15]）：dark/1x 悬停那一圈只变

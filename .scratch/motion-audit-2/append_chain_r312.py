@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-"""R312 验证链日志的补记：把生成器要读的那几节现量现补（不改动已有行、不凭记忆填）。
+"""R312 验证链补记：把 round_verify.sh 的汇总行**原样派生**成生成器要读的那几行。
 
-R312 用的是 `scripts/round_verify.sh`，它打印的形状与 R311 手写链不同 ⇒
-生成器要求的 `### HIDDEN_ARMS` / `### BUILD` / `### FRAMES` / `### SWIFT_LEGS` 四节要由
-**这一支**现场补齐，每一行都是当场跑出来的读数：
-· BUILD  ← /tmp/r312_verify/warning_gate.log（门本体自己打印的那行）
-· HIDDEN_ARMS ← 现跑 scripts/hidden_arms.py
-· FRAMES ← 现场数 PNG 张数，并与 CAPTURED 那行对账
-· LEDGER_READINGS ← 现跑 scripts/ledger_readings.py（它吃这份链日志）
-· SWIFT_LEGS ← 把链日志里已有的那几行原样列出来
-幂等：已经有 NEEDLE_PROBE 那一节就说明补过，直接退出。
+为什么需要：R311 的链是我手写的，键名（CAPTURED / INSTALL_RESULT= / FRAME_BASELINE_*）与
+`scripts/round_verify.sh` 打印的形状不同。本轮改用 round_verify（它才是仓库里那颗四件套），
+所以这里做一次**机械换形**：每一行都从它自己打印的那一行抄出来，不新增任何判断。
+
+· WARNINGS          ← /tmp/r312_verify/warning_gate.log 的 ROUND_WARNING_GATE warnings=N
+· CAPTURED          ← /tmp/r312_verify/capture.log 里最后一条 `CAPTURED n -> dir`
+· FRAME_BASELINE_*  ← 链日志里 FRAME_GATE_PASS changed=C compared=N missing=M 与
+                      ROUND_VERIFY 的 baseline_compared/baseline_changed
+· INSTALL_RESULT    ← ROUND_VERIFY 的 dmg=D 与 installed_version=V（dmg=ok ⇒ ok）
+· FRAMES_ON_DISK    ← 现场数 frames/ 里的 PNG（语义计数，不是 ls | wc -l）
+· HIDDEN_ARMS / LEDGER_READINGS / NEEDLE_RANGE ← 现跑仓库里那两颗尺与探针
+幂等：已经有 FRAMES_ON_DISK 那一行就说明补过。
 """
 import io
 import os
@@ -20,7 +23,7 @@ import sys
 ROOT = u"/Users/wangziyi/Codex_Project0"
 CHAIN = u"/tmp/r312_chain.log"
 VERIFY = u"/tmp/r312_verify"
-SHOTS = u"/tmp/r312_verify/frames"
+FRAMES = os.path.join(VERIFY, "frames")
 
 
 def run(argv):
@@ -28,50 +31,60 @@ def run(argv):
     return p.stdout.decode("utf-8", "replace"), p.returncode
 
 
-if not os.path.exists(CHAIN):
-    sys.stderr.write(u"APPEND_REFUSE 验证链日志不存在\n")
+def cat(path):
+    if not os.path.exists(path):
+        return u""
+    return io.open(path, encoding="utf-8", errors="replace").read()
+
+
+chain = cat(CHAIN)
+if not chain:
+    sys.stderr.write(u"APPEND_REFUSE 链日志不存在\n")
     sys.exit(1)
-text = io.open(CHAIN, encoding="utf-8").read()
-if u"### FRAMES_ON_LEDGER" in text:
+if u"FRAMES_ON_DISK=" in chain:
     sys.stdout.write(u"APPEND_SKIP 已经补过\n")
     sys.exit(0)
 
+gate = cat(os.path.join(VERIFY, "warning_gate.log"))
+caplog = cat(os.path.join(VERIFY, "capture.log"))
+rv = (re.findall(r"(?m)^ROUND_VERIFY .+$", chain) or [u""])[-1]
+fg = (re.findall(r"(?m)^FRAME_GATE_PASS .+$", chain) or [u""])[-1]
+
 rows = []
+warn = (re.findall(r"warnings=(\d+)", gate) or [None])[-1]
+rows += [u"### BUILD（现读自 round_verify 的告警门）",
+         u"WARNINGS=%s" % (warn if warn is not None else u"没解析到 " + gate.strip()[-100:])]
 
-# BUILD：告警门那一行原样抄
-gate = u""
-if os.path.exists(os.path.join(VERIFY, "warning_gate.log")):
-    gate = io.open(os.path.join(VERIFY, "warning_gate.log"), encoding="utf-8").read()
-warn = (re.findall(r"WARNINGS=(\d+)", gate) or re.findall(r"warnings=(\d+)", gate) or [u""])[-1]
-rows += [u"### BUILD（现读自 %s/warning_gate.log）" % VERIFY,
-         u"WARNINGS=%s" % (warn or u"没解析到 " + gate.strip()[-120:])]
+cap = (re.findall(r"CAPTURED \d+ -> \S+", caplog) or [None])[-1]
+rows.append(cap if cap else u"CAPTURED 没读到（capture.log 缺或形状变了）")
 
-# HIDDEN_ARMS：现跑仓库里那颗尺
+n_cmp = (re.findall(r"compared=(\d+)", fg) or re.findall(r"baseline_compared=(\d+)", rv) or [None])[-1]
+n_chg = (re.findall(r"changed=(\d+)", fg) or re.findall(r"baseline_changed=(\d+)", rv) or [None])[-1]
+rows += [u"FRAME_BASELINE_COMPARED=%s" % n_cmp, u"FRAME_BASELINE_CHANGED=%s" % n_chg]
+
+pngs = [n for n in os.listdir(FRAMES) if n.endswith(u".png")] if os.path.isdir(FRAMES) else []
+rows += [u"### FRAMES_ON_LEDGER（落账之前现场数，语义计数只算 PNG）",
+         u"FRAMES_ON_DISK=%d" % len(pngs),
+         u"FRAMES_MATCH=%s" % (u"1" if cap and re.search(r"CAPTURED (\d+)", cap).group(1) == str(len(pngs)) else u"0")]
+
+dmg = (re.findall(r"dmg=(\w+)", rv) or [None])[-1]
+ver = (re.findall(r"installed_version=(\S+)", rv) or [None])[-1]
+rows.append(u"INSTALL_RESULT=%s  dmg=%s  installed_version=%s（判据轮：0 产品文件，产物与上一笔同源）"
+            % (u"ok" if dmg == u"ok" else u"NOT-RUN", dmg, ver))
+rows += [u"### SWIFT_LEGS（判据轮：四件套由 round_verify 跑；**不 update 基线**，因为 changed=%s）" % n_chg]
+
 ha, ha_rc = run([sys.executable, u"scripts/hidden_arms.py"])
-ha_line = (re.findall(r"(?m)^HIDDEN_ARMS .+$", ha) or [u"没打印结论行 rc=%d" % ha_rc])[-1]
-rows += [u"### HIDDEN_ARMS", ha_line]
+rows += [u"### HIDDEN_ARMS",
+         (re.findall(r"(?m)^HIDDEN_ARMS .+$", ha) or [u"没打印结论行 rc=%d" % ha_rc])[-1]]
 
-# FRAMES：语义计数（只数 PNG），并与 CAPTURED 对账
-if os.path.isdir(SHOTS):
-    pngs = [n for n in os.listdir(SHOTS) if n.endswith(u".png")]
-    cap = re.findall(r"CAPTURED (\d+)", text)
-    rows += [u"### FRAMES_ON_LEDGER（落账之前现场数）",
-             u"FRAMES_ON_DISK=%d" % len(pngs),
-             u"FRAMES_MATCH=%s" % (u"1" if cap and int(cap[-1]) == len(pngs) else u"0"),
-             u"### SWIFT_LEGS（本轮：判据轮，帧与换装由 round_verify 跑）",
-             u"LEG CAPTURED=%s" % (cap[-1] if cap else u"没读到"),
-             u"LEG BASELINE=%s" % (u" ".join(re.findall(r"FRAME_BASELINE_\w+=\d+", text)[:3]) or u"没读到"),
-             u"LEG INSTALL=%s" % ((re.findall(r"(?m)^INSTALL_RESULT=.+$", text) or [u"没读到"])[-1])]
-else:
-    rows += [u"### FRAMES_ON_LEDGER", u"FRAMES_ON_DISK=0",
-             u"FRAMES_DIR_MISSING %s 不在盘上 ⇒ 看图腿记 NOT-RUN" % SHOTS]
+pr = run([sys.executable, u".scratch/motion-audit-2/probe_needle_positions_r312.py"])[0]
+rows += [u"### PROBE（366 的两条出口）"] + [l for l in pr.splitlines() if l.startswith(u"NEEDLE_")]
 
-# LEDGER_READINGS：现跑读数口
 lr, lrc = run([sys.executable, u"scripts/ledger_readings.py", CHAIN])
 rows += [u"### LEDGER_READINGS",
          ((re.findall(r"(?m)^LEDGER_READINGS .+$", lr) or [u""])[0]
           or u"LEDGER_READINGS_RC=%d %s" % (lrc, lr.strip()[-160:]))]
 
 with io.open(CHAIN, "a", encoding="utf-8") as h:
-    h.write(u"\n".join(rows) + u"\n")
+    h.write(u"\n" + u"\n".join(rows) + u"\n")
 sys.stdout.write(u"\n".join(rows) + u"\nAPPEND_DONE\n")
