@@ -4735,6 +4735,35 @@ final class UICaptureTests: XCTestCase {
                 initialCategory: .stats
             ))
         })
+        // R314 · 「空态那一臂只有组件帧」这条不对称的补帧。
+        //
+        // 为什么必须有：`heatmap-empty` 这张是**组件帧**，它自己写着
+        // `.frame(width: 430, height: 150, alignment: .topLeading)` —— 也就是说
+        // "空态那行字贴在框的上部、下面 69% 是空的"这个读数**是夹具决定的，不是产品决定的**。
+        // 而它的对照臂 `settings-stats-populated` 走的是真入口（整个 `SettingsView`）。
+        // 两臂不同源 ⇒ 任何关于空态布局的判断都拿不到产品那一侧的证据
+        // （R209 那批记过同族：组件帧不替组合状态作证）。
+        // 这张帧指向一个**空的**账本文件（不写任何计数），其余参数与有数据那一臂逐字相同。
+        let emptyLedgerURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("capture-ledger-empty-r314.json")
+        try? FileManager.default.removeItem(at: emptyLedgerURL)
+        let emptyLedger = DailyCopyLedger(fileURL: emptyLedgerURL,
+                                          calendar: heatCalendar,
+                                          debounceSeconds: 3600,
+                                          now: { heatToday })
+        results.append(Fixture("settings-stats-empty", NSSize(width: 720, height: 540)) {
+            AnyView(SettingsView(
+                showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+                repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
+                loginItemSettings: LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
+                contextPreferences: ContextPreferenceSettings(),
+                weightsStore: store.weightsStore,
+                feedbackStore: store.feedbackStore,
+                dailyCopyLedger: emptyLedger,
+                clearHistoryAction: { nil },
+                initialCategory: .stats
+            ))
+        })
         results.append(Fixture("heatmap-empty", NSSize(width: 430, height: 150), contentMustFit: true) {
             AnyView(
                 DailyCopyHeatmapView(counts: [:], today: heatToday, calendar: heatCalendar)
@@ -8708,6 +8737,7 @@ final class UICaptureTests: XCTestCase {
         "settings-general", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
+        "settings-stats-empty",
         // R145：录制态那张新帧也在 vibrancy 子树里 ⇒ 同一处合成前极性盲区（闸门实测把它点名，
         // 不是"顺手补名单"：`TEXT_SIDE_ROSTER_EXTRA` 的 vibrant 前提里有它）。
         "settings-shortcuts-recording",
@@ -11541,7 +11571,8 @@ final class UICaptureTests: XCTestCase {
         //（那是把一条能判的格记成"没判"）—— 换成给这一格一条**有界的**替代判据：
         // 图标 bearing 必须落在 [+0.5, +2.0]。产品如果真改了前导留白，这一格照样会红；
         // 而如果这一屏哪天首墨变成文字，`>= +0.5` 也会红，逼下一次把名册改掉。
-        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]
+        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark",
+                                       "settings-stats-empty light", "settings-stats-empty dark"]
         for (key, inset) in measured.keys.sorted().map({ ($0, measured[$0]!) }) {
             let tag = key.hasSuffix("dark") ? "dark" : "light"
             guard let want = control[tag] else {
