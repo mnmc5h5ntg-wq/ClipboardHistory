@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### runner 判红的是尺：SELARM 的页底参照落在滚动条槽里，"底色稳"从此不等于"是页底"（R321 / U-1053…U-1055 · D-304 · 产品 0 文件，判据轮）
+
+- 现读成因（run 40008003697）：暗档**过了 60% 的占比闸**却把页底读成 (61,61,61)，
+  而本机同外观的页底是 (30,30,30) ⇒ 那一格不是页底那一层；obs 与非 key 逐字节相等
+  ⇒ a=1.00、残差 0 ⇒ **错的参照物照样报出落点**（R318/R319 那格的改口写在 373 追记）。
+- `choosePageArm` 加**第二道闸**（候选窗众数必须与那一台自己的全帧页底档同档，差 < 12）；
+  页底窗从一格变成两块（前导 / trailing），两块都能用时必须互相印证，印不上整格点名。
+- 候选窗的横向偏移从裸像素改成按倍率换算（`pageBands(scale:)`）：本机 2× 仍 800..<820px、
+  1× 那台变 383..<393px。顺量出两台机器的浮层行几何差约 16pt ⇒ 新开 375：
+  凡按药丸右沿定位的尺都要重查。
+- 读数**先打后判**：新行 `QUICKPICK_SELARM_BANDS` 把倍率、药丸矩形、两块窗的读数与闸结果在判之前交出来
+  （本轮 `QUICKPICK_SELARM_BANDS light 倍率=2.0x 页底档=252 药丸=44..<796px@y=125 候选=前导[4..<40px]((255,255,255) 占比=100%) 右侧[800..<820px]((255,255,255) 占比=100%) 选择=前导((255,255,255) 占比=100%) 闸=用前导((255,255,255) 占比=100%) ｜ 用右侧((255,255,255) 占比=100%)`）。
+- 判据：`QuickPickSelectionArmTests` Executed 9 tests, with 0 failures（含把 runner 那一格**合成**出来的证人臂）；
+  刀 M919 / M920 / M921 各拆一道闸 ⇒ CAUGHT=3/3, RESTORE_CLEAN=yes，M921 钉的是"拦下它的理由"而不是"有没有红"。
+- 一条被自己否掉的假设也记账：裸像素偏移**不是**成因（本机 1× 代理上页底带占比仍 100%）——
+  先量再认成因，不许拿猜测落刀。
+- 现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 945 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r321_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=945 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r321_rv`；
+  捕获卷 `QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey`；脚本电池 `Ran 611 / OK (skipped=4)`；针预检 bad=0、名册 arms=788。
+
 ### 368 判到底：热图 hover 提示在离屏产物里没有可读通道，而这次的"全 0"背后站着一个签了名的正对照（R320 / U-1050…U-1052 · D-303 · 产品 0 文件，判据轮）
 
 - 新判据 `UICaptureTests/testHeatmapTooltipChannelProbe`：复用**画出帧的同一棵树**（`inspect:` 钩子），

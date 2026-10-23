@@ -12,6 +12,54 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R321 状态（第 320 轮 / Round 318 · 2026-10-24）
+
+本轮一笔：runner 三跑的红归因到尺并修掉 —— SELARM 的页底原来只有一格，
+而那一格在 1× 那台机器上落在滚动条槽里（暗档 (61,61,61) 占 65% **过了占比闸**，
+本机同外观的页底是 (30,30,30)）。新加第二道闸（候选窗必须与那一台自己的全帧页底档同档）、
+页底窗改成前导/trailing 两块且要互相印证、偏移按倍率换算、读数先打后判（`QUICKPICK_SELARM_BANDS`）。
+R318/R319 记的"runner 也判 nonKey"（暗档那一半）就地改口 —— 那是错的参照物报出的落点（a=1.00、残差 0）。
+成因路上先猜错一次（裸像素偏移），被本机 1× 代理否掉之后才认对（16pt 的 trailing gutter）。
+判据 `QuickPickSelectionArmTests` Executed 9 tests, with 0 failures（含合成臂）；刀 M919 / M920 / M921 CAUGHT=3/3, RESTORE_CLEAN=yes；
+新规矩 D-304、新开 375（两台机器行几何差 16pt，凡按右沿定位的尺都要重查）、373 写了追记。
+
+最后更新：2026-10-24（本地 · R321 / 第 320 轮 / Round 318）：**一朵绿了两轮的臂被钉成会红：底色"稳"不等于它是那一层**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 945 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r321_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=945 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r321_rv`；
+真值表卷 `Executed 9 tests, with 0 failures`；捕获卷 `QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey`；变异表 `CAUGHT=3/3, RESTORE_CLEAN=yes`；
+针预检 tables=109 covered=92 bad=0、名册 arms=788；
+腐烂尺 `HIDDEN_ARMS 表=197 可判=720 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；电池 Ran 611 / OK (skipped=4)（写盘后同数）；看图腿 RUN（本轮逐张看的是**浮层的四个状态位点**与热图亮档那张。先做完整性核对：R320 那一遍 174 张与本轮这一遍 174 张逐张 md5 对拍）。
+产品文件 0 个，连续零改动 **2** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 320`，
+同形用于 `--check`；上一轮 1）。as-of 第 320 轮的最后一笔产品提交是 84c5468 = 第 318 轮。
+
+⓪ R322 开场要先读的（成对：run id ↔ commit）：RUN=40014023716 sha=0e225d2 status=completed conclusion=failure title=R320 账半（七本一起落：U-1050…U-1052、D-303、368 判到头的追记、STATE 轮换、报告计数器） workflow=CI
+   —— 必须读到：① **本轮这一笔在 runner 上是否把三跑的红清零**：
+      `ca6bc31` / `121ef8f` / `a033b98` 都红在 `UICaptureHarness.swift` 的 SELARM 那一格；
+   ② `QUICKPICK_SELARM_BANDS` 两行在 runner 上的读数 —— 期望先写死在这里，读到才算结案：
+      `选择=前导(...)`、两块窗里 trailing 那一格被点名"不是页底那一层"、`未判=0`、
+      两档落点仍 `系统nonKey`；**若前导那一格在那台机器上也不干净**，
+      那一行会把两块窗的读数与倍率一起交出来 ⇒ 按 354 那族做具名出口，不再猜第三次；
+   ③ 还欠的：`HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` 在 runner 上是否签（R320 的 ⓪ 欠着）、
+      `QUICKPICK_SELARM_SUMMARY 候选=2 有对象=1 未判=1 落点=dark=系统nonKey` 那一跑与本轮同源的 SUMMARY 行在 runner 上变成 有对象=2。
+
+① 下一轮（R322）的靶：① **回到动效主线**（本轮又是判据轮，这一格已连续三轮排第一）：
+      候选 —— 354 第五步（观察窗口成本）、348 给 `HEATMAP_TOOLTIP_*` / `QUICKPICK_SELARM*` /
+      `MUTATE_TABLE` 三族配恒等式、或撤一条不成立的声明；
+      必须跑完整四件套 + 逐张看图 + 配刀。
+   ② 375 的第一步（数出还有几处按右沿定位的尺）—— 与本轮同源，趁热做便宜；
+   ③ 367 迁移（已声明 2 张 / 剩 0 张）；④ 360 最后一批；⑤ 361 合并；
+   ⑥ 364 的"抽不出候选的 6 把要真跑"；
+   ⑦ 347 / 305 / 373① / 368 四格都在**同一批真机眼**后面 —— 需要用户先退出正在运行的 App，
+      那一轮可以一次把它们全推成读数（人工验收批次已列）。
+
+② 仍开：347（真机证人）、305（等 347）、373（只剩①号真机眼；②号的尺本轮修好并改口）、
+   368（**已判到通道边界**：离屏无通道，剩真机眼那半）、
+   375（两台机器行几何差 16pt，其余按右沿定位的尺待查）、
+   367（腐烂针待清：已声明 2 张 / 剩 0 张）、
+   354 的第五步 + 负载红一条、348 的"读数族还没纳全"、360（剩 11 份）、361（未合并）、
+   359、362、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；
+   **R319 结案**：374（corrupt 保全不幂等）；**R321**：373 的②号那把尺修好 + 该格改口（本单仍开在①号）；
+   用户闸门 220 路 A / 228② / 265。
+
 ## R320 状态（第 319 轮 / Round 317 · 2026-10-24）
 
 本轮一笔：368 判到底 —— 新判据 `testHeatmapTooltipChannelProbe` 复用 harness 的建树路径 + 正对照，
