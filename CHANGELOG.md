@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 一张单结案、一张单的派生方案被证伪，刀从名册内容搬到名册开关（R316 / U-1036…U-1039 · D-297 · 产品 0 文件，判据轮）
+
+- **372 结案**：那颗"没名字的 skip"是 `testCaptureKeyViews`，条件是 `CLIPBOARD_HISTORY_UI_SHOTS` 未设
+  ⇒ R315 的全量卷 skip、本轮的定向跑不 skip；两遍用例总数都是 92，差不是缺陷也不是撤帧。
+- **369 的派生方案被证伪**：首墨连续墨高在图标那格与文字那格给出同一个数（3.5 / 3.0pt），
+  左沿错开 = delta 本身（循环）⇒ 没有可用的独立轴。
+- **换成的出口已落地**：判据里加运行时开关 `CLIPBOARD_HISTORY_ICON_FIRST_ROSTER`，
+  M566 的针搬到开关那一行 ⇒ 改名册再也弄不死刀；重跑 `exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、
+  预检 `M563…M567 全 ok、bad=0`。
+- **0 告警门抓到我一次**：开关第一版写成 `let … = true` ⇒ 编译器报 `will never be executed` 两朵
+  （`WARNINGS=2`）；改成运行时读 env 之后归零。
+- 完整性：R316_FRAME_CMP 同图=174 变图=0 缺对照=0（本轮改动全在判据侧 ⇒ 变图必须是 0）（判据侧改动，产品像素一张都不该动）。
+- 新开 D-297：给判据加"派生"之前先证明那根轴分得开它声称能分的两件事；跨两跑比计数先证同源。
+- 现读：构建告警 0；捕获卷 `Ran 92 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failure(s)；帧 CAPTURED 174 -> /tmp/r317_shots、基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=0 FRAME_BASELINE_MISSING=0 FRAME_BASELINE_ADDED=0（不 update）；
+  换装 没读到换装结论行（四件套第 4 步未落盘 ⇒ 记 NOT-RUN）；预检 tables=106 bad=0、名册 arms=780；腐烂尺 `HIDDEN_ARMS 表=194 可判=712 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；
+  电池 `Ran 611 / OK (skipped=4)`（写盘后同数）。
+
 ### 撤销自己一小时前开的单，补上它欠的同族对照，再把那张重复臂拿走（R315 / U-1032…U-1035 · D-296 · 产品 0 文件，判据轮）
 
 - **BACKLOG 371 撤销**：空态不渲染「这张图怎么读」是 **R9 的决定**（`SettingsView.swift:1027-1041`，

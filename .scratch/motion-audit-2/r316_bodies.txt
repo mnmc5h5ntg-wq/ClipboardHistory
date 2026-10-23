@@ -1,0 +1,190 @@
+UI_NEW = u"""## 第 @ROUND@ 轮（@RTAG@ · U-@UA@…U-@UD@ · @TODAY@）：上一轮开的两张单一张结案一张证伪，刀从「名册内容」搬到「名册开关」上（U-@UA@…U-@UD@ · 产品 0 文件，判据轮）
+
+- **U-@UA@：@RPREVTAG@ 那句"捕获卷 skip 5→4 差一颗没名字"是我自己造的 —— 两跑根本不同源。**
+  那颗是 `UICaptureTests/testCaptureKeyViews`，它的 skip 条件写在 `UICaptureHarness.swift:3169`：
+  `guard let directory = outputDirectory else { throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS…") }`。
+  @RPREVTAG@ 那一遍是**全量卷**（没带这个 env）⇒ 它 skip；本轮那一遍是带 env 的定向跑 ⇒ 它真的在跑。
+  两遍的用例总数都是 92（分母同源），所以 5→4 既不是"少了一条被静默吞掉"也不是撤帧的后果。
+  ⇒ 372 当场结案，并留下一条比原单有用的规矩：**跨两跑比 skip 颗数，必须先证 env 与 filter 相同** ——
+  不同源相减得到的差，本来就不会有名字。
+
+- **U-@UB@：369 的派生出口被现读**证伪** —— 两根候选轴一根量不到、一根循环。**
+  上一轮我把做法写成"量第一处墨的连通块高度与该行文字行高之比，或量左沿是否错开"。本轮先在仓库外量了一遍：
+  第一处墨的连续墨高（本机 2x、同一颗近墨尺、阈值 20）—— `settings-stats`（首墨是托盘符号）
+  暗 **3.5pt** / 亮 **3.0pt**，而首墨是纯文字的 `settings-stats-populated` 是**同一个数**（3.5 / 3.0）；
+  其余普遍 12pt 的是 CJK 文字行 ⇒ 这根轴分的是"CJK 行 vs 符号/拉丁行"，**不是**"图标 vs 文字"。
+  另一根（左沿错开）就是 delta 本身，而这一格要套的替代判据问的正是 delta ∈ [+0.5, +2.0]
+  ⇒ 用 delta 决定该套哪条判据 = 恒真，比现在手写名册**更坏**。派生这条路关掉。
+
+- **U-@UC@：369 换成一个更小但真的出口 —— 把「名册开关」与「名单」拆开，刀从此钉在开关那一行。**
+  R314 往 `iconFirstCells` 加两格 ⇒ 钉在那一行的 M566 针命中 0（`bad=1`、`rot 33→34`）；
+  R315 撤两格 ⇒ 同一根针要改回去。两轮都不是针坏，是**改名册的人不知道自己在动刀**。
+  现在判据里多一行运行时开关（`CLIPBOARD_HISTORY_ICON_FIRST_ROSTER`，默认 on），
+  M566 的针搬到那一行上 —— 它不随名册增删而变；名册保留手写，但**弄不死刀了**。
+  刀重跑现读：`M566 exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、`MUTATE_TABLE n=1 caught=1 mismatch=0 not_run=0`、
+  预检 `M563…M567 全 ok、bad=0`。
+
+- **U-@UD@：0 告警那道门当场抓住我的写法 —— 第一版把开关写成编译期常量，冒出两朵 `will never be executed`。**
+  `let useIconFirstRoster = true` 让编译器知道 else 分支永不到达 ⇒ `swift build --build-tests` 报 2 条告警
+  （`WARNINGS=2`，门红）。改成运行时读 env 之后归零。这条记进账的理由：
+  它证明这道门量的不是我"想不想干净"，而是**产物里到底有没有告警** —— 我本来打算让这个开关恒真。
+  另附一格完整性读数：本轮改动是判据侧的，产品像素**一张都不该动**，实测 @FRAMECMP@。
+
+读数（全部现读）：构建告警 @WARN@（`--build-tests`）；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；
+重捕帧 @CAP@；帧基线 @BASE@（本轮**不 update** —— 没有像素变化，update 一次就是伪造一次同步）；换装 @INSTALL@；
+预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 files=@ARMFILES@ arms=@ARMREG@；
+腐烂尺 `@HALINE@`；脚本电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）；
+产品面连续零改动 = **@STREAK@** 轮（取数口 `scripts/product_streak.py --streak-for @ROUND@`；上一轮 @PREVSTREAK@）。
+@KNIFESUM@
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 12/15 |
+| 判据有效性 | 15/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 10/15 |
+| 台账一致性 | 15/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+| 合计 | 96/105 |
+
+为什么不是满分（逐条）：真实视觉审查 12 —— 本轮的看图是**完整性核对**（174 张帧逐字节对拍，确认判据侧改动没动像素），
+它不是新的审美判断；动效主线已经连续 @STREAK@ 轮没有新帧可看，这一格该扣就扣。
+判据有效性 15 —— 一张单结案、一张单的原方案被证伪并换成可落地出口、刀重钉并抓到红。
+假绿防御 15 —— 证伪的是我自己上一轮写的方案；"派生"听着比"开关"高级，但量不过就撤。
+产品面推进 10 —— 产品 0 文件。台账一致性 15 —— 本轮三笔都在当天落账，没有隔轮。
+可复核性 14 —— 证伪用的是一次性脚本（未进仓库），下一轮若还要用这根轴就得先搬进去。
+交付诚实性 15 —— 0 告警门抓到我、372 是我自己造的、369 的原方案不成立，三件都写在账上。
+
+"""
+
+IT_NEW = u"""## Round @RDN@ · @RTAG@（第 @ROUND@ 轮 · @TODAY@）：一张单结案、一张单的派生方案被证伪，刀搬到「名册开关」上（产品 0 文件，判据轮）
+
+@RPREVTAG@ 我记下"捕获卷 skip 从 5 变 4、那颗没名字"。本轮一查：那颗是 `testCaptureKeyViews`，
+skip 条件是 `CLIPBOARD_HISTORY_UI_SHOTS` 没设 —— 前一遍是全量卷（没设），这一遍是带 env 的定向跑（设了）。
+两遍用例总数都是 92 ⇒ 差不是缺陷也不是撤帧，是**我拿两次不同源的读数相减**。372 结案（@BLMINUS@）。
+
+同一轮我为 369 写的"把首墨是不是图标变成派生判定"，本轮先量再改，两根轴都不成立：
+首墨连续墨高 —— 图标那格 3.5/3.0pt，文字那格 `settings-stats-populated` **也是** 3.5/3.0pt，
+普遍 12pt 的是 CJK 文字行 ⇒ 这根轴量的是字种不是图标；左沿错开 = delta 本身，
+而这一格要套的替代判据问的就是 delta ⇒ 循环。派生撤，换成**开关与名单拆开**：
+M566 的针从名册那一行搬到 `CLIPBOARD_HISTORY_ICON_FIRST_ROSTER` 那一行（不随名册增删而变）。
+刀重跑 `exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、预检 `bad=0`。
+
+过程里 0 告警那道门还抓了我一次：开关第一版写成 `let … = true`，编译器报 `will never be executed` 两朵
+⇒ `WARNINGS=2` 门红；改成运行时读 env 才归零。完整性：@FRAMECMP@。
+
+读数：构建告警 @WARN@；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；@CAP@；帧基线 @BASE@（本轮不 update）；
+换装 @INSTALL@；预检 bad=@PREBAD@、名册 arms=@ARMREG@；电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）；
+产品面连续零改动 **@STREAK@** 轮（上一轮 @PREVSTREAK@）。@KNIFESUM@
+
+看图腿 RUN：@EYE@
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 12/15 |
+| 判据有效性 | 15/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 10/15 |
+| 台账一致性 | 15/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+| 合计 | 96/105 |
+
+"""
+
+DEC_NEW = u"""**D-@DN@（@RTAG@）：给判据加"派生"之前，先证明那根轴分得开它声称能分的两件事 —— 分不开就用开关把刀钉住，别硬派生。**
+
+369 的原方案是"把首墨是不是图标变成可测的"。本轮量完发现：
+① 第一处墨的连续高度在图标那格与文字那格给出**同一个数**（3.5 / 3.0pt），它真正分开的是 CJK 行与符号/拉丁行；
+② 左沿错开就是 delta，而这一格的替代判据问的正是 delta ⇒ 用它选判据等于恒真。
+两条都不成立时，正确动作不是"降低派生的门槛让它过"，也不是"把名册继续当免检牌"，
+而是**承认这根轴量不到**，退回去解决真正咬人的那件事：刀钉在会被手改的内容上。
+于是 M566 的针从名册那一行搬到名册**开关**那一行 —— 名册仍手写，但增删它不再弄死刀。
+
+配套一条（同一轮的另一半）：**跨两次运行比任何计数，先证两次运行的同源条件**（env、filter、机器、档位）。
+@RPREVTAG@ 我拿"全量卷没带 env 的一遍"与"定向跑带 env 的一遍"相减，得到一个 5→4 的差，
+还给它开了一张单（372）。差是真的，但差没有名字是**必然的** —— 不同源相减本来就不产生可归因的量。
+"""
+
+BL_372 = u"""  追记（@RTAG@）：**结案 —— 那颗没名字的 skip 是 `UICaptureTests/testCaptureKeyViews`，成因是两跑的 env 不同，不是撤帧。**
+  它的 skip 条件写在 `UICaptureHarness.swift:3169`：`guard let directory = outputDirectory else { throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染") }`。
+  @RPREVTAG@ 那一遍是全量卷（没带这个变量）⇒ 它 skip；本轮这一遍是带变量的 `--filter UICaptureTests` ⇒ 它真的在跑。
+  两遍用例总数都是 92（分母同源），所以 5→4 既不是"少了一条被静默吞掉"，也不是撤帧的副作用。
+  本单的原做法①（名单与汇总数同源对账）不需要 —— 名单本来就印在 `-v` 正文里，缺的是**比较之前先对齐环境**。
+  留下的规矩已写进 D-@DN@ 末段：跨两跑比任何计数，必须先证 env / filter / 机器 / 档位相同；
+  不同源相减得到的差本来就不会有名字。原做法②（把某条诊断的 skip 前提改恒真、汇总数必须动）
+  属 341/348 那一族的通用形状，不再算这一条的欠账。"""
+
+BL_369 = u"""  追记（@RTAG@）：**派生这条路被现读关掉，本单换成"开关与名单拆开"这个出口，并据此可结案。**
+  ① 上面建议的两根轴都不成立：第一处墨的连续墨高在图标那格（`settings-stats` 暗 3.5 / 亮 3.0pt）
+  与文字那格（`settings-stats-populated` **同为** 3.5 / 3.0pt）分不开，它分开的是 CJK 行与符号/拉丁行；
+  左沿错开就是 delta 本身，而这一格要套的替代判据问的正是 delta ∈ [+0.5, +2.0] ⇒ 循环。
+  ② 真正咬人的是"刀钉在会被手改的内容上"，这一条已经修掉：判据里新增运行时开关
+  `CLIPBOARD_HISTORY_ICON_FIRST_ROSTER`（默认 on），M566 的针从 `iconFirstCells` 那一行搬到开关那一行，
+  名册增删再也弄不死刀（R314 加两格、R315 撤两格，两轮各咬过一次，本轮重钉后
+  `exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、预检 `bad=0`）。
+  ③ 剩下的"让 `CARD_INSET_ICON_FIRST` 从开关变成结论"这一半**不再做**：没有可用的独立轴，
+  硬做只会造出一把按帧名在猜的假派生（D-@DN@ 就是这个决定）。名册保留手写，但它现在**只是名册**，
+  不再是刀的口 —— 本单按此结案。"""
+
+BL_NEW = u""""""
+
+CH_NEW = u"""### 一张单结案、一张单的派生方案被证伪，刀从名册内容搬到名册开关（@RTAG@ / U-@UA@…U-@UD@ · D-@DN@ · 产品 0 文件，判据轮）
+
+- **372 结案**：那颗"没名字的 skip"是 `testCaptureKeyViews`，条件是 `CLIPBOARD_HISTORY_UI_SHOTS` 未设
+  ⇒ @RPREVTAG@ 的全量卷 skip、本轮的定向跑不 skip；两遍用例总数都是 92，差不是缺陷也不是撤帧。
+- **369 的派生方案被证伪**：首墨连续墨高在图标那格与文字那格给出同一个数（3.5 / 3.0pt），
+  左沿错开 = delta 本身（循环）⇒ 没有可用的独立轴。
+- **换成的出口已落地**：判据里加运行时开关 `CLIPBOARD_HISTORY_ICON_FIRST_ROSTER`，
+  M566 的针搬到开关那一行 ⇒ 改名册再也弄不死刀；重跑 `exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、
+  预检 `M563…M567 全 ok、bad=0`。
+- **0 告警门抓到我一次**：开关第一版写成 `let … = true` ⇒ 编译器报 `will never be executed` 两朵
+  （`WARNINGS=2`）；改成运行时读 env 之后归零。
+- 完整性：@FRAMECMP@（判据侧改动，产品像素一张都不该动）。
+- 新开 D-@DN@：给判据加"派生"之前先证明那根轴分得开它声称能分的两件事；跨两跑比计数先证同源。
+- 现读：构建告警 @WARN@；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；帧 @CAP@、基线 @BASE@（不 update）；
+  换装 @INSTALL@；预检 tables=@TABLES@ bad=@PREBAD@、名册 arms=@ARMREG@；腐烂尺 `@HALINE@`；
+  电池 `Ran @BATT@ / OK (skipped=@SKIP@)`（写盘后同数）。
+
+"""
+
+ST_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
+
+本轮三笔：① 372 结案（那颗没名字的 skip 是 `testCaptureKeyViews`，成因是两跑 env 不同源）；
+② 369 的派生方案被现读证伪（首墨连续墨高分不开图标与文字：3.5/3.0pt 对 3.5/3.0pt；左沿错开 = delta 本身 = 循环）；
+③ 换成"开关与名单拆开"并落地 —— M566 的针从 `iconFirstCells` 那一行搬到 `CLIPBOARD_HISTORY_ICON_FIRST_ROSTER`
+那一行，名册增删再也弄不死刀；重跑 `exp=CAUGHT got=CAUGHT`、`RESTORE_CLEAN=yes`、预检 `bad=0`。
+过程里 0 告警那道门抓了我一次（`let … = true` ⇒ `will never be executed` 两朵，`WARNINGS=2`）。
+
+最后更新：@TODAY@（本地 · @RTAG@ / 第 @ROUND@ 轮 / Round @RDN@）：**两张单收掉，刀换了落点**（产品 0 文件，判据轮）
+现读：构建告警 @WARN@；捕获卷 `Ran @JUDGERUN@ / @JUDGEFAIL@ 失败`；全量卷 @FULL@；@CAP@；帧基线 @BASE@（本轮不 update）；
+换装 @INSTALL@；@KNIFESUM@；预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 arms=@ARMREG@；
+腐烂尺 `@HALINE@`；电池 Ran @BATT@ / OK (skipped=@SKIP@)（写盘后同数）；看图腿 RUN（@EYE_SHORT@）。
+产品文件 0 个，连续零改动 **@STREAK@** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for @ROUND@`，
+同形用于 `--check`；上一轮 @PREVSTREAK@）。as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
+
+⓪ @RNEXT@ 开场要先读的（成对：run id ↔ commit）：@CI@
+   —— 必须读到：① 本轮三笔（`f505fc4` / `fbd72dc` / `133f196`）在 runner 上是否仍 `bad=0`
+   （M566 换了落点，runner 的 @1x 与档位不同 ⇒ 那把刀在新锚点上有没有牙，本机一条不算）；
+   ② 撤帧之后 runner 是否也 `CAPTURED 174`（基线 174 已进仓库）；
+   ③ 负载红 `PerfBudget` 本机三跑 1/0/0，runner 独占机器上怎么表现。
+
+① 下一轮（@RNEXT@）的靶：① **回到动效主线**（已连续 @STREAK@ 轮 0 产品文件）——
+      347 / 305 需用户先退出 App；在那之前把 305 的台阶地板用已有夹具通道再推一格，
+      或按清账表里那批未判位点挑一个真做动效；
+   ② 368：把 `UICaptureHarness` 的建树路径提给判据卷（hover 提示第一次可被产物级判据判到）+ 配刀；
+   ③ 367 的迁移继续（已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）；④ 348 剩下的读数族各配恒等式；
+   ⑤ 360 最后一批；⑥ 361 合并；⑦ 364 的"抽不出候选的 @OPAQUE@ 把要真跑"。
+
+② 仍开：347（真机证人）、305（等 347）、@BLMINUS@（腐烂针待清：已声明 @HIDTBL@ 张 / 剩 @HIDTBL2@ 张）、
+   368（hover 提示的产物级通道）、354 的第五步 + 负载红一条、348 的"读数族还没纳全"、
+   360（剩 11 份）、361（未合并）、359、362、349、350 第二步、351、344、341 的 CI 契约半、339、
+   312 具名出口、304、296、291；**本轮结案/撤销**：372（env 不同源）、369（派生不成立，出口=开关与名单拆开）；
+   用户闸门 220 路 A / 228② / 265。
+
+"""
