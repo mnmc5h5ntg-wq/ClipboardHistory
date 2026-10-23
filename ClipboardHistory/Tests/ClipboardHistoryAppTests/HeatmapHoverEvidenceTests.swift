@@ -886,6 +886,17 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 16,
                        "读数必须是 4 对 × 2 外观 × 2 尺度 = 16 条，少一条就是有一对没被量")
+        // 三根轴必须**同时**在每一条读数里。这条断言钉的不是产品，是 R312 那次更正的证人：
+        // BACKLOG 356 剩下的那一半说的是「暗档最细一步 17.33 低于地板 18」，而 17.33 是**均值通道**
+        // 那一根，承重的判据在**最大通道**那一根（同一步 = 30.00）。两根轴必须同时可查，否则下一个人
+        // 只看见一根，就会把"色相步被均值冲淡"当成缺陷去改梯子 —— R51/R53 那一次是反方向：
+        // 用亮度轴读出了同一个假缺陷。删掉任意一列 ⇒ 这一格必须红。
+        for line in readings {
+            for axis in ["最大通道差=", "均值通道差=", "亮度差="] {
+                XCTAssertTrue(line.contains(axis),
+                    "读数少了一根轴 ⇒ 「判据钉在哪一根上」这件事失去证人：\(line.prefix(72))")
+            }
+        }
     }
 
     /// 新尺子自己的真值表：`fillBand` 的归属，与"最大通道差"到底在量什么。
