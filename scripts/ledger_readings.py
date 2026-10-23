@@ -21,6 +21,7 @@
 结论行：`LEDGER_READINGS 小节=… 取用=… 其它最大=… 早先红=… 红=…`（「红」非 0 ⇒ exit 1）。
 缺文件、读不到结论行、恒等式不符 —— 三种都算红，不算「没数据所以通过」。
 """
+import argparse
 import io
 import os
 import re
@@ -94,11 +95,22 @@ def pick_full_run(text, prefix=u"FULL SUITE"):
 
 
 def main(argv):
-    if len(argv) < 2:
-        sys.stderr.write(u"USAGE ledger_readings.py <验证链日志> [小节前缀]\n")
+    # 走 argparse：仓库里有一条守卫（`test_script_help_runs`）要求每个 scripts/*.py 的 `--help`
+    # 在**当前解释器**上能跑出来（runner 的 python 比本机严，argparse 构造期就会炸）。
+    # 所以 help 串里不写裸的百分号，也不自己解析 argv。
+    ap = argparse.ArgumentParser(
+        prog="ledger_readings.py",
+        description=u"按小节切片读验证链日志里的全量卷结论行，并过恒等式闸门"
+                    u"（全量卷不可能比同一份日志里任何一卷小）。")
+    ap.add_argument("log", nargs="?", help=u"验证链日志路径（例如 /tmp/rNNN_chain.log）")
+    ap.add_argument("prefix", nargs="?", default=u"FULL SUITE",
+                    help=u"小节标题前缀，默认 FULL SUITE")
+    ns = ap.parse_args(argv[1:])
+    if not ns.log:
+        ap.print_help()
         return 2
-    path = argv[1]
-    prefix = argv[2] if len(argv) > 2 else u"FULL SUITE"
+    path = ns.log
+    prefix = ns.prefix
     if not os.path.exists(path):
         sys.stderr.write(u"LEDGER_READINGS_REFUSED 日志不存在：%s ⇒ 缺产物算红，不算通过\n" % path)
         return 1
