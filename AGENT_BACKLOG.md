@@ -7514,3 +7514,13 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
   做法：① 让捕获卷自己把 skip 名单与汇总数做**同源对账**（名单颗数 != 汇总 skipped 就红并点名差额）；
   ② 配一把刀：把某条诊断的 skip 前提改成恒真 ⇒ 汇总数必须动、名单必须点名它。
   归因之前，台账里凡写"捕获卷 skipped=N"都要带名单出处。
+
+  **追记（R316 开场）：已归因，本条结案 —— 差的那一颗是 `UICaptureTests/testCaptureKeyViews`，成因是两次跑的环境不同，不是撤帧。**
+  它的 skip 条件写在 `UICaptureHarness.swift:3169`：`guard let directory = outputDirectory else { throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染") }`。
+  R315 那一遍是**全量卷**（没带 `CLIPBOARD_HISTORY_UI_SHOTS`）⇒ 它 skip；R316 这一遍是
+  `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/r316_shots swift test --filter UICaptureTests` ⇒ 它真的在跑。
+  两遍的 UICaptureTests 用例总数都是 92，分母同源，所以 5→4 不是"少了一条被静默吞掉"，而是"那一颗本来就该跑"。  做法①（名单与汇总数同源对账）本轮不需要 —— 名单本来就印在 `-v` 正文里，缺的是**比较之前先对齐环境**。
+  留下的规矩一条（这条比原单有用）：**跨两跑比 skip 颗数，必须先证两跑的 env 与 filter 相同**；
+  不同源的两次读数相减，得到的差没有名字是必然的（本轮我自己造了一个"没名字的差"并给它开了一张单）。
+  做法②（把某条诊断的 skip 前提改恒真、汇总数必须动）仍未做，但那是 348/341 那一族的通用形状，
+  不再算这一条的欠账。runner 那一跑的对照：CI `RUN=39995473499`（e1ab901）里捕获步骤带 env ⇒ 预期那颗不 skip。
