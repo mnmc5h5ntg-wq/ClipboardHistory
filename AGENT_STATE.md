@@ -37,7 +37,9 @@ MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=3(旧口径6) 峰值=0.101 冷�
 产品文件 0 个，连续零改动 **3** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 321`，
 同形用于 `--check`；上一轮 2）。as-of 第 321 轮的最后一笔产品提交是 84c5468 = 第 318 轮。
 
-⓪ R323 开场要先读的（成对：run id ↔ commit）：RUN=40019426681 sha=32f1104 status=completed conclusion=success title=R321 追记（把 push 之后的 run↔commit 成对写回 STATE 的 R322 第 ⓪ 条，并把四跑的红 workflow=CI
+⓪ R323 开场要先读的（成对：run id ↔ commit）：RUN=40023610164 sha=1a37edc status=in_progress conclusion= title=R322 账半（七本一起落：U-1056…U-1059、D-305、373 与 375 各一处追记、STATE 轮换、报告计数器） workflow=CI
+   —— 收尾时现读：上一轮的 `40019426681`(32f1104) 与 `40019174985`(4271ff1) 都已 completed/success，
+   R318 以来那四跑的红（ca6bc31 / 121ef8f / a033b98 / 0e225d2）确认清零，runner 的 SELARM 读数已写进 373/375 的追记。
    —— 必须读到：① **本轮这一笔在 runner 上是否全绿**，特别是 `testFilterPillSlideIsAProcessNotATeleport`：
       期望（写死在这里，读到才算结案）—— 若那台机器 `可分帧 ≥ 3` 就必须给出与本机同方向的三条读数；
       若 `可分帧 < 3` 则必须印 `MOTION_NOT_RUN=clock-too-coarse pill-slide-process` 并 skip，
