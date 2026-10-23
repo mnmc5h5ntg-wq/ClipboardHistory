@@ -74,3 +74,12 @@
 2. 带符号的 `max(0, 负差)` 会把「对不上」报成「完全吻合」。凡写残差/偏差，先问它能不能为负。
 3. 一把要求「实心众数」的尺，在有纹理的表面上等于「读不到」，于是整条判据会安静地 skip 掉自己。
    结论行排在闸门与 skip 之前（D-166 那条老规矩），否则没人发现它没判。
+
+## ⓪-b 配对补一行（停车这最后一次现读，`python3 scripts/ci_read.py latest`）
+
+RUN=40003194220 ↔ sha=3b1a8b9 status=in_progress / **结论未读**；本笔停车提交 = 689691e。
+下一轮第一件事除了账半，就是把这一跑的正文读掉（走 `scripts/ci_read.py steps/readings 40003194220`，
+不要临时 `gh run view | grep`），并确认 `e54715c` 那一跑的结论。
+
+新判据的名字要进 §8 搬运名单：`QUICKPICK_SELARM` / `QUICKPICK_SELARM_SUMMARY`
+（`python3 .scratch/motion-audit-2/ledger_rows.py --must-include QUICKPICK_SELARM …` 要读到 缺=0）。
