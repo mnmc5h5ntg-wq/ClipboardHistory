@@ -782,6 +782,12 @@ final class UICaptureTests: XCTestCase {
         var description: String { "(\(r),\(g),\(b))" }
         /// 彩度 = 最大通道减最小通道。灰的彩度是 0，蓝的不是。
         var chroma: Int { max(r, max(g, b)) - min(r, min(g, b)) }
+        /// 亮度（Rec. 709 那一组系数）。**这一格与 `pillRightEdge` 共用**：
+        /// R321 之前那处是自己内联算的，于是"页底档"这个量在两处各有一份公式 ——
+        /// 新加的"这块窗到底是不是页底"那道闸必须读同一个量，就顺手把内联那份搬进来。
+        var luma: Int {
+            Int((0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)).rounded())
+        }
     }
 
     /// 底色**占比**的下限（取样窗里等于众数那个精确读数的像素占多少百分比）。
@@ -827,12 +833,89 @@ final class UICaptureTests: XCTestCase {
         var sawInside = false
         for x in left..<width {
             let o = y * bytesPerRow + x * 4
-            let luma = Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
-                            + 0.0722 * Double(bytes[o + 2])).rounded())
+            let luma = ArmRGB(r: Int(bytes[o]), g: Int(bytes[o + 1]), b: Int(bytes[o + 2])).luma
             if abs(luma - pageLuma) >= minDelta { sawInside = true }
             else if sawInside { return x }
         }
         return nil
+    }
+
+    /// 页底参照的**候选窗**（R321）：药丸所在的同一行带里，药丸左侧的前导留白与右侧的 trailing 带。
+    ///
+    /// 为什么从一格变成两格：runner 实测"药丸右侧那一格"不是页底 —— 暗档读到 (61,61,61) 占 65%、
+    /// 亮档占比只有 45%，而那一台自己全帧的页底档是 30。那一格落到了**滚动条槽**上：
+    /// 同一台机器上药丸比本机窄 16pt（`OVERLAY_HOVER_OUTLINE` 在 runner 印 22…382，
+    /// 本机是 43…796px = 21.5…398pt），右侧留白被槽占掉之后，
+    /// "右沿之外 4…24px"量的是一整片槽，不是页底。
+    ///
+    /// 为什么偏移必须按倍率换算：原来写的是**裸像素** —— 2× 上 4…24px 是 2…12pt，
+    /// 1× 上同样这两个数字就成了 4…24pt，两台机器量的不是同一片地方
+    /// （R58 / 帧带那一族同一件事：像素数不是几何）。
+    /// 本机实测（`/tmp/r320_rv/frames/quickpick-list-*.png` 与其 1× 代理）：
+    /// 前导带 x=4…39px@2× 与 x=2…21px@1× 的**精确众数占比都是 100%**（亮 255 / 暗 30），
+    /// 也就是说这一格在两台的几何里都是干净页底 —— 它不依赖 trailing 那一条 gutter。
+    static func pageBands(width: Int, pillLeft: Int, pillRight: Int, scale: Double)
+        -> [(label: String, xRange: Range<Int>)] {
+        guard width > 0, scale > 0 else { return [] }
+        let near = max(1, Int((2.0 * scale).rounded()))
+        let far = max(near + 2, Int((12.0 * scale).rounded()))
+        var out: [(label: String, xRange: Range<Int>)] = []
+        let leadEnd = pillLeft - near
+        if leadEnd - near >= armBandMinPixels { out.append((label: "前导", xRange: near..<leadEnd)) }
+        let trailEnd = min(width, pillRight + far)
+        if trailEnd - (pillRight + near) >= armBandMinPixels {
+            out.append((label: "右侧", xRange: (pillRight + near)..<trailEnd))
+        }
+        return out
+    }
+
+    /// 候选窗最短多少像素才值得当一块窗（再窄就是一根线，众数没有意义）。
+    static let armBandMinPixels = 8
+
+    /// 纯函数：从几块页底候选窗里挑出**能用的那一块**，用不了的必须点名。
+    ///
+    /// 三道闸，各拦一种已经发生过的坏法：
+    /// ① 占比地板（`armSolidShareFloor`）—— 拦"窗里混了字墨"（本机第一版把 (106,106,106)
+    ///    读成"暗档在系统选中底上叠了一层材质"的成因）；
+    /// ② **这块窗得真的是页底那一层**：众数那一档的亮度与全帧页底档相差必须 < `minDelta`。
+    ///    这一道是本轮新加的。runner 上第①道以 65% **放行了滚动条槽** —— 底色"稳"与
+    ///    底色"是页底"是两件事。少了这一道，参照物就是错的，而**错的参照物照样能报出落点**：
+    ///    暗档 obs 与非 key 逐字节相等时最小二乘解出 a=1.00、残差 0，判定写"系统nonKey"，
+    ///    于是喂进去的页底是 (61,61,61) 也没人拦（那一行的 key残差=11、a=0.04 就是它撑不住的形状）。
+    /// ③ 两块都能用时必须**互相印证**：众数不相等 ⇒ 至少有一块不是页底，
+    ///    这时不挑一块算数，整格点名（只准变严，不准变松）。
+    static func choosePageArm(
+        probes: [(label: String, probe: (rgb: ArmRGB, share: Int)?)],
+        pageLuma: Int, floor: Int, minDelta: Int = 12
+    ) -> (chosen: (label: String, rgb: ArmRGB, share: Int)?, report: String) {
+        var accepted: [(label: String, rgb: ArmRGB, share: Int)] = []
+        var rejects: [String] = []
+        for entry in probes {
+            guard let probe = entry.probe else {
+                rejects.append("\(entry.label)[读不出：窗太窄或越界]")
+                continue
+            }
+            if probe.share < floor {
+                rejects.append("\(entry.label)[占比=\(probe.share)%<\(floor)%]")
+                continue
+            }
+            let delta = abs(probe.rgb.luma - pageLuma)
+            if delta >= minDelta {
+                rejects.append("\(entry.label)[档=\(probe.rgb) 亮度=\(probe.rgb.luma)"
+                    + " 与全帧页底档=\(pageLuma) 差=\(delta)≥\(minDelta) ⇒ 不是页底那一层]")
+                continue
+            }
+            accepted.append((label: entry.label, rgb: probe.rgb, share: probe.share))
+        }
+        let report = (accepted.map { "用\($0.label)(\($0.rgb) 占比=\($0.share)%)" }
+            + rejects).joined(separator: " ｜ ")
+        guard let first = accepted.first else { return (nil, report) }
+        if accepted.count > 1, Set(accepted.map { $0.rgb }).count > 1 {
+            let listing = accepted.map { "\($0.label)=\($0.rgb)" }.joined(separator: " ")
+            return (nil, "两格都用但互不相印：\(listing)（全帧页底档=\(pageLuma)）"
+                + " ⇒ 至少一格不是页底，不挑一块算数")
+        }
+        return (first, report)
     }
 
     /// 在**给定外观**下解析一枚动态色（与 `windowBackgroundColor(for:)` 同一手法，
@@ -997,25 +1080,47 @@ final class UICaptureTests: XCTestCase {
                 declined.append("\(tag)[原因=药丸中段取样带读不出（带宽=\(inside.count)px，下限 8）]")
                 continue
             }
-            // 页底那一侧：同一行、药丸右沿之外 4…24px（那里没有别的材质）。
-            let pageRange = (right + 4)..<min(rep.pixelsWide, right + 24)
-            guard let pageProbe = Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
-                                                 xRange: pageRange,
-                                                 yRange: (pill.top)..<(pill.bottom + 1)) else {
-                declined.append("\(tag)[原因=药丸右侧的页底读不出（x=\(pageRange.lowerBound)..<\(pageRange.upperBound)）]")
+            // 页底参照：同一行带里**两块候选窗**（药丸左侧的前导留白、药丸右侧的 trailing 带），
+            // 由 `choosePageArm` 挑一块。上一版只有右侧那一格，而它在 runner 上不是页底（见那里）。
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let bands = Self.pageBands(width: rep.pixelsWide, pillLeft: pill.left,
+                                       pillRight: right, scale: scale)
+            let pageProbes: [(label: String, probe: (rgb: ArmRGB, share: Int)?)] =
+                bands.map { band in
+                    (label: band.label,
+                     probe: Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                           xRange: band.xRange,
+                                           yRange: (pill.top)..<(pill.bottom + 1)))
+                }
+            let pageChoice = Self.choosePageArm(probes: pageProbes, pageLuma: pageLuma,
+                                                floor: Self.armSolidShareFloor)
+            let obs = obsProbe.rgb
+            let bandListing = bands.isEmpty ? "没有一块宽度够 \(Self.armBandMinPixels)px 的候选窗"
+                : zip(bands, pageProbes).map { band, probe in
+                    "\(band.label)[\(band.xRange.lowerBound)..<\(band.xRange.upperBound)px]"
+                        + (probe.probe.map { "(\($0.rgb) 占比=\($0.share)%)" } ?? "(读不出)")
+                }.joined(separator: " ")
+            // 读数**先打、后判**：上一版在闸门之后才 emit，于是 runner 那一档只留下一句
+            // "底色不实"、没留任何几何 ⇒ 下一次机器差异还是只能猜（规矩：红必须连原文一起给）。
+            emit("QUICKPICK_SELARM_BANDS \(tag) 倍率=\(String(format: "%.1f", scale))x"
+                 + " 页底档=\(pageLuma) 药丸=\(pill.left)..<\(right)px@y=\(midY)"
+                 + " 候选=" + bandListing
+                 + " 选择=" + (pageChoice.chosen.map { "\($0.label)(\($0.rgb) 占比=\($0.share)%)" } ?? "无")
+                 + " 闸=" + pageChoice.report)
+            guard let chosen = pageChoice.chosen else {
+                declined.append("\(tag)[原因=没有一块页底候选窗能用 ⇒ \(pageChoice.report)"
+                    + " 窗=" + bandListing + "]")
                 continue
             }
-            let obs = obsProbe.rgb
-            let page = pageProbe.rgb
             // 占比闸门：底色不是一个被重复很多次的精确值就**不判（点名）**，
             // 而不是拿被笔画污染的数字去给产品定罪 —— 第一版的 (106,106,106)
             // 与那句"暗档两臂都不在"就是这样来的（下限见 `armSolidShareFloor`）。
-            guard obsProbe.share >= Self.armSolidShareFloor,
-                  pageProbe.share >= Self.armSolidShareFloor else {
-                declined.append("\(tag)[原因=取样窗底色不实：药丸中段占比=\(obsProbe.share)%"
-                    + " 页底占比=\(pageProbe.share)%，下限 \(Self.armSolidShareFloor)%]")
+            guard obsProbe.share >= Self.armSolidShareFloor else {
+                declined.append("\(tag)[原因=药丸中段底色不实：占比=\(obsProbe.share)%，"
+                    + "下限 \(Self.armSolidShareFloor)%（窗=\(inside.lowerBound)..<\(inside.upperBound)px）]")
                 continue
             }
+            let page = chosen.rgb
             // 两枚参照臂在同一外观下解析（key 那一档写死在下面这一行 ⇒ M 刀钉的就是这一行）。
             let key = Self.armResolved(.selectedContentBackgroundColor, appearanceName: appearance)
             let nonKey = Self.armResolved(.unemphasizedSelectedContentBackgroundColor,
@@ -1027,8 +1132,8 @@ final class UICaptureTests: XCTestCase {
                  + " key=\(key) nonKey=\(nonKey)"
                  + " 帧彩度=\(obs.chroma) key彩度=\(key.chroma) nonKey彩度=\(nonKey.chroma)"
                  + " 取样带=\(inside.lowerBound)..<\(inside.upperBound)px@y=\(midY)"
-                 + " 底色占比=药丸\(obsProbe.share)%/页底\(pageProbe.share)%（下限 \(Self.armSolidShareFloor)%）"
-                 + " 判定=\(label) \(detail)")
+                 + " 底色占比=药丸\(obsProbe.share)%/页底\(chosen.share)%（下限 \(Self.armSolidShareFloor)%）"
+                 + " 页底来源=\(chosen.label) 判定=\(label) \(detail)")
             XCTAssertTrue(label != "两臂不可分",
                           "\(tag)：\(detail) ⇒ 两枚系统参照色逐通道相等，这条判据没有对象")
             // 这一格才是"选中底是系统画的那一档"这句话的**可执行形式**：落点必须是两枚参照色之一。
