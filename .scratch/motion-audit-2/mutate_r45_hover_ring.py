@@ -26,17 +26,23 @@ HARNESS = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/UICaptureHarness.sw
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "HeatmapHoverEvidenceTests"
 
-RING_OPACITY = "        isHovered ? 0.55 : 0"
+# R308 重钉：这根针从 R300 那次 0.55→0.30 起就是死的（当时没人重跑这张表，而它的 needle 藏在
+# lambda 里、静态预检抽不出来 ⇒ 预检报不了 bad）。本轮改了同一行（0.30→0.20）才发现。
+# 记进 BACKLOG：隐藏 needle 也要有一种会红的腐烂检测，不能只靠"下一轮刚好改到同一行"。
+RING_OPACITY = "        isHovered ? 0.20 : 0"
 FILL_LINE = """            .fill(cell.count == 0
                   ? Color.primary.opacity(VisualHeat.empty)
                   : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket)))"""
 STROKE_ANCHOR = ("            .animation(MotionCatalog.animation(for: .contentFade), value: cell.bucket)\n"
                  "            .overlay(")
+# R308：源码守卫数的串换成新画法（`stroke` + `padding(-gap)`），所以这份"多画一处"的替身
+# 也必须用同一种画法 —— 留着旧的 strokeBorder 形式，它数不到，那一把就变成空刀。
 STROKE_DUPLICATE = ("            .animation(MotionCatalog.animation(for: .contentFade), value: cell.bucket)\n"
                     "            .overlay(VisualShape.rounded(VisualRadius.heatCell)\n"
-                    "                .strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity"
+                    "                .stroke(Color.primary.opacity(VisualHeat.hoverRingOpacity"
                     "(isHovered: isHovered)),\n"
-                    "                              lineWidth: VisualHeat.hoverStroke))  // MUTANT 第二处画法\n"
+                    "                        lineWidth: VisualHeat.hoverStroke)\n"
+                    "                .padding(-VisualHeat.hoverRingGap))  // MUTANT 第二处画法\n"
                     "            .overlay(")
 STRIP_INDEX = "    static let heatmapHoverStripHoveredIndex = 10"
 STRIP_COLUMNS = "            .suffix(3).flatMap { $0.cells })"
@@ -45,14 +51,18 @@ MUTATIONS = [
     ("M210", "描边整个没了", TOKENS, RING_OPACITY,
      "        isHovered ? 0 : 0  // MUTANT", ["悬停之后描边带只变了 0.00/255"]),
     ("M211", "描边淡到 0.02", TOKENS, RING_OPACITY,
-     "        isHovered ? 0.02 : 0  // MUTANT", ["悬停之后描边带只变了 2.11/255"]),
+     # R308：期望正文从「只变了 2.11/255」改成「低于地板」。那个数是**旧几何**（环压在格子上）
+     # 量出来的，环搬到留白之后它必然变 —— 数不许抄，而这一把真正要钉的是"可见性地板响了"。
+     "        isHovered ? 0.02 : 0  // MUTANT", ["低于地板"]),
     ("M212", "悬停时连格子内部一起换色", CELL, FILL_LINE,
      """            .fill(isHovered
                   ? Color.accentColor.opacity(VisualHeat.ladder[3])
                   : (cell.count == 0
                      ? Color.primary.opacity(VisualHeat.empty)
                      : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket))))  // MUTANT""",
-     ["带外有一处变了 106.00/255，位置 (11, 11)"]),
+     # R308：那条判据的正文从「带外有一处变了 106.00/255，位置 (11, 11)」改写成三格形状
+     # （裙边内 / 裙边外 / 整格不许动），数字与位置都随几何变 ⇒ 钉"裙边之外"那句。
+     ["裙边之外有一处变了"]),
     ("M213", "文件里再画一份那一圈", CELL, STROKE_ANCHOR, STROKE_DUPLICATE,
      ["悬停那一圈的画法出现 2 次"]),
     ("M214", "被悬停的那一格指到未来格", HARNESS, STRIP_INDEX,

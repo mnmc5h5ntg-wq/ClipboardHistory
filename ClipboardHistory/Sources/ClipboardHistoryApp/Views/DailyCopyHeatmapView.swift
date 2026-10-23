@@ -278,9 +278,18 @@ struct DailyCopyHeatmapCell: View {
                 // 那个裸数凭什么这么定，盘面上没有任何记录。R300 又量了一次：
                 // 0.55 时这一圈在最响的一臂上改 75.50/255，而最重的一次数据变化只改 37.33 ⇒
                 // 交互比数据响，于是它被降到 0.30（推导与两条界一起写在令牌那段的注释里）。
-                VisualShape.rounded(VisualRadius.heatCell)
-                    .strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity(isHovered: isHovered)),
-                                  lineWidth: VisualHeat.hoverStroke)
+                //
+                // **R308：`strokeBorder` → `stroke` + `padding(-hoverRingGap)`。**
+                // 前者把描边画在形状**里面**，于是"鼠标划过"这件事会改掉那一格外圈的
+                // **数据像素**（深浅就是这张图的全部信息），而且环的响度跟着档位变：
+                // 现读同一颗尺，最响的一臂（亮档 2x 空格）41.42、最安静的一臂
+                // （bucket4）18.87 —— 同一个动作的响度差 2.19 倍，且**最响的地方正是没有数据的那一格**。
+                // 搬到格子外面的留白之后，环画在窗口底色上：数据像素一个都不动，
+                // 响度也不再随档位变（剩下的离散只来自外观与像素密度，不来自数据）。
+                VisualShape.rounded(VisualRadius.heatCell + VisualHeat.hoverRingGap)
+                    .stroke(Color.primary.opacity(VisualHeat.hoverRingOpacity(isHovered: isHovered)),
+                            lineWidth: VisualHeat.hoverStroke)
+                    .padding(-VisualHeat.hoverRingGap)
             )
             .contentShape(Rectangle())
             .onHover(perform: onHover)

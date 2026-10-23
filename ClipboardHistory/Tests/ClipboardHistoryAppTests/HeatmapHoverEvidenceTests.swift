@@ -84,11 +84,17 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         XCTAssertEqual(readings.count, 20, "读数条数必须是 外观2 × 采样率2 × 档5，少一条就是有一档没被量")
     }
 
-    /// 悬停**只**改描边那一条带：格子内部、格间距、页面底色都不许被这圈墨碰到。
+    /// 悬停**只**改描边那一条带（外加它自己的抗锯齿裙边）：格子内部、别处都不许被这圈墨碰到。
     ///
     /// 这条是上一半的反面，也是「不喧宾夺主」的可数版本：
     /// 如果悬停会推着别的像素一起变（比如实现成了「整格换色」或「带阴影」），
     /// 那 126 格之间读起来就不是「哪一格被指着」，而是「一片都在亮」。
+    ///
+    /// R308 把这一族切成三格，因为环搬到留白之后**旧的二分不成立了**：
+    /// ① 数据像素（整格）—— 由 `testHoverLeavesTheDataPixelsUntouched` 判，现读 0.000；
+    /// ② 环自己的裙边（外径 ±(stroke/2 + 1.5px)）—— 那是同一个物体的半个像素，不是"别处"，
+    ///    现读 7.00/255，界给到 12；旧版把它当成"带外"判红，等于要求一条矢量描边没有抗锯齿；
+    /// ③ 裙边**之外**—— 仍必须是 3/255 以内（那才是「整格换色 / 阴影 / 邻居一起亮」的形状）。
     func testHoverChangesOnlyTheRingBand() throws {
         for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
@@ -97,22 +103,64 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                 let hover = try renderCell(level: level, hovered: true, appearance: appearance, scale: 2)
                 let size = still.pixelsWide
                 let band = Self.ringBand(size: size, scale: 2)
+                let fringe = Self.haloFringe(size: size, scale: 2)
+                XCTAssertTrue(fringe.isDisjoint(with: band), "裙边与带重叠 ⇒ 两格量的是同一批像素")
+                var worstFringe: (index: Int, delta: Double) = (-1, 0)
                 var worst: (index: Int, delta: Double) = (-1, 0)
                 for index in 0..<(size * size) where !band.contains(index) {
                     let d = Self.pixelChannelDelta(still, hover, index: index, size: size)
-                    if d > worst.delta { worst = (index, d) }
+                    if fringe.contains(index) {
+                        if d > worstFringe.delta { worstFringe = (index, d) }
+                    } else if d > worst.delta {
+                        worst = (index, d)
+                    }
                 }
-                emit("HEAT_RING_CONFINEMENT \(tag) \(level.name) 带外最大变化="
-                      + "\(String(format: "%.2f", worst.delta))/255"
+                emit("HEAT_RING_CONFINEMENT \(tag) \(level.name) 裙边最大变化="
+                      + "\(String(format: "%.2f", worstFringe.delta))/255 @(\(Self.x(of: max(worstFringe.index, 0), size: size)),"
+                      + " \(Self.y(of: max(worstFringe.index, 0), size: size)))"
+                      + " 裙边外最大变化=\(String(format: "%.2f", worst.delta))/255"
                       + " @(\(Self.x(of: max(worst.index, 0), size: size)),"
                       + " \(Self.y(of: max(worst.index, 0), size: size)))")
+                XCTAssertLessThanOrEqual(worstFringe.delta, Self.haloFringeTolerance255,
+                    "\(tag) 的 \(level.name)：裙边里有一处变了 \(String(format: "%.2f", worstFringe.delta))/255"
+                        + " ⇒ 那一圈的抗锯齿比半个像素还宽，已经不是描边本身了")
                 XCTAssertLessThanOrEqual(worst.delta, Self.outsideBandTolerance255,
-                    "\(tag) 的 \(level.name)：带外有一处变了 \(String(format: "%.2f", worst.delta))/255"
+                    "\(tag) 的 \(level.name)：裙边之外有一处变了 \(String(format: "%.2f", worst.delta))/255"
                         + "，位置 (\(worst.index % size), \(worst.index / size)) ⇒ "
                         + "这一圈不止改了描边（喧宾夺主那一族）")
             }
         }
     }
+
+    /// 环的抗锯齿裙边：外径 ±(stroke/2 + 1.5 设备像素) 之内、`ringBand` 之外。
+    static func haloFringe(size: Int, scale: Int) -> Set<Int> {
+        guard size > 0, scale > 0 else { return [] }
+        let inset = 4 * scale
+        let cellPx = size - inset * 2
+        guard cellPx > 0 else { return [] }
+        let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
+        let gapPx = Double(Int(VisualHeat.hoverRingGap) * scale)
+        let radius = Double(Int(VisualRadius.heatCell + VisualHeat.hoverRingGap) * scale)
+        let cellHalf = Double(cellPx) / 2.0
+        let outerHalf = cellHalf + gapPx
+        let band = ringBand(size: size, scale: scale)
+        var fringe = Set<Int>()
+        for py in 0..<size {
+            for px in 0..<size {
+                let sdf = roundedRectSDF(px: Double(px) + 0.5 - Double(inset) - cellHalf,
+                                         py: Double(py) + 0.5 - Double(inset) - cellHalf,
+                                         half: outerHalf, radius: radius)
+                guard abs(sdf) <= strokePx / 2.0 + 1.5 else { continue }
+                let index = py * size + px
+                guard !band.contains(index) else { continue }
+                fringe.insert(index)
+            }
+        }
+        return fringe
+    }
+
+    /// 裙边的界（现读 7.00/255；给到 12 = 一半以上的余量，同时仍远低于"整格换色"那一族）。
+    static let haloFringeTolerance255: Double = 12.0
 
     /// 「不喧宾夺主」那一半：**悬停那一下不许比这张图全部的数据幅度还响**。
     ///
@@ -122,18 +170,31 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
     /// 也就是说悬停已经**接近**数据全幅度了：再重一档就会盖过深浅本身。
     /// 一张以深浅为唯一信息通道的图，交互层不许爬到数据层上面去，所以这里判 ≤ 1.0 倍。
     ///
-    /// 轴要说清楚：比的是**同一批像素上的通道差**，不是"谁面积大"。
+    /// 轴要说清楚：比的是**通道差**的幅度，不是"谁面积大"。
     /// 分母取 empty↔bucket4 这两端，因为那是这张图能画出的最大数据差；
     /// 若哪天 `ladder` 改了，分母跟着改（它不是常数，这正是它比"写死一个 100"好的地方）。
+    ///
+    /// **R308 把两条带分开了**：旧画法下环就压在格子上，所以分子分母可以共用 `ringBand`
+    /// （同一批像素：既是被环盖住的地方，也是数据的地方）。环搬到留白之后，
+    /// 外径那条带上 empty 与 bucket4 **一模一样** ⇒ 分母恒为 0，倍率变成 −1（这条判据自己红出"没在量东西"，
+    /// 这是它该有的行为：今天这一格红，是因为它里面的假设随产品变了，不是因为产品坏了）。
+    /// 现在分子 = 环带（交互那一条），分母 = 填充带（数据那一片），两根带严格不相交，
+    /// 由 `testAdjacentLevelRulersAreATruthTable` 与 `testRingBandSelectorIsATruthTable` 各自钉住。
     func testHoverIsNotLouderThanTheDataRange() throws {
         for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            let band = Self.ringBand(size: (Int(VisualHeat.cell) + 8) * 2, scale: 2)
+            let size = (Int(VisualHeat.cell) + 8) * 2
+            let band = Self.ringBand(size: size, scale: 2)
+            let dataBand = Self.fillBand(size: size, scale: 2)
+            XCTAssertFalse(band.isEmpty, "\(tag)：环带是空的 ⇒ 分子没有对象")
+            XCTAssertFalse(dataBand.isEmpty, "\(tag)：填充带是空的 ⇒ 分母没有对象")
+            XCTAssertTrue(band.isDisjoint(with: dataBand),
+                          "\(tag)：环带与填充带重叠 ⇒ 分子分母在量同一批像素，倍率说的是别的事")
             let empty = try renderCell(level: Self.levels[0], hovered: false,
                                        appearance: appearance, scale: 2)
             let busiest = try renderCell(level: Self.levels[Self.levels.count - 1], hovered: false,
                                          appearance: appearance, scale: 2)
-            let dataRange = Self.meanChannelDelta(empty, busiest, over: band,
+            let dataRange = Self.meanChannelDelta(empty, busiest, over: dataBand,
                                                   size: empty.pixelsWide)
             for level in Self.levels {
                 let still = try renderCell(level: level, hovered: false,
@@ -172,6 +233,7 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
     /// 不是把它删掉的理由。
     func testHoverIsNotLouderThanOneDataStep() throws {
         var readings: [String] = []
+        var spreadReadings: [String] = []
         for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             for scale in [1, 2] {
@@ -184,9 +246,12 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                     try renderCell(level: $0, hovered: false, appearance: appearance, scale: scale)
                 }
                 var steps: [Double] = []
+                var maxSteps: [Double] = []
+                var levelDeltas: [Double] = []
                 for i in 1..<stills.count {
                     let d = Self.meanChannelDelta(stills[i - 1], stills[i], over: fill, size: size)
                     if d > Self.ringNoiseFloor255 { steps.append(d) }
+                    maxSteps.append(Self.meanMaxChannelDelta(stills[i - 1], stills[i], over: fill, size: size))
                 }
                 XCTAssertFalse(steps.isEmpty,
                     "\(tag)/\(scale)x：一个正档步都没量到 ⇒ 分母是空的，这条判据不许把「没量到」读成合规")
@@ -200,15 +265,24 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                     let hover = try renderCell(level: level, hovered: true,
                                                appearance: appearance, scale: scale)
                     let ringStep = Self.meanChannelDelta(stills[i], hover, over: ring, size: size)
+                    // R308 第二遍：把**两根轴同时**量出来。本文件在相邻档那条判据里已经写过
+                    // 「拿均值判『灰 vs 蓝』会低 3 倍」（`testAdjacentHeatLevelsAreSeparableOnTheRightAxis`），
+                    // 而这一格的分母正是同一批灰→蓝的档步 ⇒ 只在均值上比，等于用一把自己承认过用错的轴
+                    // 去判交互响不响。先都印出来，界怎么压由读数决定，不由愿望决定。
+                    let ringMax = Self.meanMaxChannelDelta(stills[i], hover, over: ring, size: size)
                     let ratio = ringStep / maxStep
                     let vsMin = ringStep / minStep
+                    let maxStepList = maxSteps.map { String(format: "%.2f", $0) }.joined(separator: "/")
                     readings.append("HEAT_RING_VS_STEP \(tag)/\(scale)x \(level.name) "
                                     + "环=\(String(format: "%.2f", ringStep)) "
                                     + "档步=[\(stepList)] "
                                     + "最细=\(String(format: "%.2f", minStep)) 最重=\(String(format: "%.2f", maxStep)) "
                                     + "倍率(对最重)=\(String(format: "%.2f", ratio)) "
                                     + "倍率(对最细)=\(String(format: "%.2f", vsMin)) "
-                                    + "令牌=\(String(format: "%.3f", VisualHeat.hoverRingOpacity(isHovered: true)))")
+                                    + "令牌=\(String(format: "%.3f", VisualHeat.hoverRingOpacity(isHovered: true))) "
+                                    + "｜最大通道轴 环=\(String(format: "%.2f", ringMax)) "
+                                    + "档步=[\(maxStepList)] "
+                                    + "倍率(对最细那步)=\(String(format: "%.2f", ringMax / maxSteps.min()!))")
                     XCTAssertLessThanOrEqual(ratio, Self.heaviestDataStepAllowed,
                         "\(tag)/\(scale)x 的 \(level.name)：鼠标划过那一格改了 \(String(format: "%.2f", ringStep))/255，"
                         + "而这张图最重的一次数据变化只改 \(String(format: "%.2f", maxStep))/255"
@@ -216,12 +290,87 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                         + "改 `VisualHeat.hoverRingOpacity`（或描边宽度），别把这条地板抬高；"
                         + "降下来之后 `testHoverRingIsVisibleOnEveryHeatLevelAndBothScales` 那根 18 的地板仍在，"
                         + "两条一起把这一圈夹在一个窗口里")
+                    levelDeltas.append(ringStep)
+                }
+                // R308 新增的那一根轴：**同一个动作不许随数据深浅变响**。
+                // 旧画法（环压在格子上）现读亮 2x 41.42…23.65 = 1.75 倍、亮 1x 32.60…18.87 = 1.73 倍，
+                // 而且**最响的一臂正是空格**（那格里根本没有数据要保护）；
+                // 环搬到留白之后同一批臂量出 1.00 —— 这一格就是把那个 1.00 钉成契约，
+                // 谁把画法搬回格子里、或按档位改环的轻重，这里当场红（界给 1.05，只放得下测量噪声）。
+                let spread = levelDeltas.max()! / levelDeltas.min()!
+                spreadReadings.append("HEAT_RING_LEVEL_SPREAD \(tag)/\(scale)x 最响/最安静=\(String(format: "%.3f", spread)) "
+                                + "各档=[\(levelDeltas.map { String(format: "%.2f", $0) }.joined(separator: "/"))]")
+                XCTAssertLessThanOrEqual(spread, Self.ringLevelSpreadAllowed,
+                    "\(tag)/\(scale)x：鼠标划过**同样一下**，在最深的格上只改 "
+                        + "\(String(format: "%.2f", levelDeltas.min()!))/255，在最浅的格上改 "
+                        + "\(String(format: "%.2f", levelDeltas.max()!))/255 ⇒ 差 \(String(format: "%.2f", spread)) 倍，"
+                        + "交互的响度在跟着数据变（旧画法的形状）。改的是画法（环不许压数据像素），不是这条界")
+            }
+        }
+        readings.forEach { emit($0) }
+        spreadReadings.forEach { emit($0) }
+        XCTAssertEqual(readings.count, 20, "读数必须是 外观2 × 尺度2 × 档5 = 20 条，少一条就是有一臂没被量")
+        XCTAssertEqual(spreadReadings.count, 4, "档间离散必须是 外观2 × 尺度2 = 4 条 ⇒ 少一条就有一臂没算进离散")
+    }
+
+    /// 「同一个动作的响度不许随数据深浅变」的界（同一外观、同一尺度内，最响 ÷ 最安静）。
+    ///
+    /// 现读 1.000（环在留白里，五档给同一个数），界给 1.05 —— 那半成是测量噪声，不是余量：
+    /// 旧画法是 1.73…1.75，把界放到 1.2 也照样拦得住，但**放那么宽就等于允许"按档微调"**，
+    /// 而 `testHoverRingOpacityTruthTable` 第③格已经写明这一圈只能表达「被指着」，不许表达轻重。
+    static let ringLevelSpreadAllowed: Double = 1.05
+
+    /// 悬停**一个数据像素都不许动**（R308 / BACKLOG 356 的换形状落地）。
+    ///
+    /// 旧画法 `strokeBorder` 把那一圈画在形状**里面**：鼠标每划过一格，那一格外圈的
+    /// **数据像素**就被灰色的环换掉 —— 而这张图唯一的信息服务于深浅。旧的三条判据对这件事是**盲的**：
+    /// `fillBand` 刻意离边一条描边之远（为的是"两档差多少"不被抗锯齿污染），
+    /// `ringBand` 又把那一圈当成"环"，于是"环压掉数据"正好落在两条带**之间**被缝掉 ——
+    /// 本轮之前没有任何一格量过**整格**。这是"尺子只量它切好的地方"那一族（D-244 的反面：
+    /// 不是判据不响，是根本没有判据对着这件事）。
+    ///
+    /// 分母是 `cellBoxBand`（整格 = cellPx²，由 `testAdjacentLevelRulersAreATruthTable` 钉着它自己），
+    /// 分子沿用同一颗 `meanChannelDelta`，不新造尺。
+    /// 上限不是口味：环搬到留白之后格内唯一可能的变化是 halo 的抗锯齿外溢，
+    /// 界压到 1.0/255 —— 把画法改回 `strokeBorder` 会当场跳到 10 以上（刀 M889 钉的就是这件事）。
+    func testHoverLeavesTheDataPixelsUntouched() throws {
+        var readings: [String] = []
+        for appearance in [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for scale in [1, 2] {
+                for level in Self.levels {
+                    let still = try renderCell(level: level, hovered: false,
+                                               appearance: appearance, scale: scale)
+                    let hover = try renderCell(level: level, hovered: true,
+                                               appearance: appearance, scale: scale)
+                    let size = still.pixelsWide
+                    let box = Self.cellDataBand(size: size, scale: scale)
+                    XCTAssertFalse(box.isEmpty, "\(tag)/\(scale)x 的数据带是空的 ⇒ 这条判据没有对象")
+                    let delta = Self.meanChannelDelta(still, hover, over: box, size: size)
+                    XCTAssertGreaterThanOrEqual(delta, 0,
+                        "\(tag)/\(scale)x 的 \(level.name)：整格差是负数 ⇒ 分母或取像素已经坏了，别拿它当「通过了」")
+                    readings.append("HEAT_DATA_UNTOUCHED \(tag)/\(scale)x \(level.name) "
+                                    + "数据像素均值通道差=\(String(format: "%.3f", delta))/255 "
+                                    + "像素=\(box.count) 环距=\(String(format: "%.2f", VisualHeat.hoverRingGap))pt "
+                                    + "环宽=\(String(format: "%.2f", VisualHeat.hoverStroke))pt")
+                    XCTAssertLessThanOrEqual(delta, Self.hoverMustNotTouchDataInk255,
+                        "\(tag)/\(scale)x 的 \(level.name)：鼠标划过那一格让**数据像素**均值改了 "
+                            + "\(String(format: "%.3f", delta))/255 ⇒ 那一圈还在换掉数据像素。"
+                            + "改的是画法（环要在格子外面的留白里，`stroke` + `padding(-hoverRingGap)`），"
+                            + "不许把这条界抬高")
                 }
             }
         }
         readings.forEach { emit($0) }
         XCTAssertEqual(readings.count, 20, "读数必须是 外观2 × 尺度2 × 档5 = 20 条，少一条就是有一臂没被量")
     }
+
+    /// 「悬停不许动数据像素」的界（均值通道，0–255）。见上面那条的注释：1.0 给的是抗锯齿外溢的余量。
+    static let hoverMustNotTouchDataInk255: Double = 1.0
+
+    /// halo 分类器的容差（设备像素）。**不是半像素**：0.5 会把零覆盖的那一行算进带里稀释均值，
+    /// 详见 `ringBand` 那段注释；这一格的实际落点由 `testRingBandSelectorIsATruthTable` ④b 按行号验。
+    static let ringBandAllowance: Double = 0.4
 
     /// 「悬停不许比一次真实的数据变化更响」的允许倍率。1.0 的意思很直白：
     /// 鼠标划过一格带来的像素变化，不许超过这张图上**最重的一次数据变化**（第 3 档 → 第 4 档）。
@@ -249,7 +398,8 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
     ///
     /// 坐标一律**从几何算出来**，不写死 22 这种数：写死一次，改了留白之后这一格就悄悄量的是别的地方。
     func testRingBandSelectorIsATruthTable() {
-        // ① 真实几何：11pt 格 + 每边 4pt 留白，2x ⇒ 边长 38、格子占中间 22。
+        // ① 真实几何：11pt 格 + 每边 4pt 留白，2x ⇒ 边长 38、格子占中间 22，
+        //    而 R308 之后环画在格子**外面**的那 4pt 留白里（外径 = 22 + 2×gap）。
         let scale = 2
         let size = (Int(VisualHeat.cell) + 8) * scale
         let inset = 4 * scale
@@ -261,55 +411,95 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
         XCTAssertFalse(band.isEmpty, "带是空的 ⇒ 上面两条判据会拿着 0 个像素算均值，那等于没有判据")
         XCTAssertLessThan(band.count, cellPx * cellPx / 2,
                           "带占了半张格以上 ⇒ 量的已经不是那一圈，而是整格")
-        // ② 带里每个点都在格子框内（描边是 `strokeBorder`，画在形状**里面**）。
-        let outsideBox = band.filter {
+        // ② 带里没有一个像素落在**数据像素**上（格子真的画出来的那一片，圆角以内）。
+        //    这一格与下面那条「悬停不许动数据像素」是一对：那格量产品，这格量尺子。
+        let dataPixels = Self.cellDataBand(size: size, scale: scale)
+        let insideData = band.filter { dataPixels.contains($0) }
+        XCTAssertTrue(insideData.isEmpty,
+                      "带伸进了数据像素 \(insideData.count) 个 ⇒ 它量的是格子画出来的地方，"
+                    + "「环搬到留白」这件产品事实会被尺子抹掉")
+        // ③ 带必须还在**夹具的留白**里：贴在位图边缘的环会被裁掉，读数看着"环很淡"，
+        //    真相是那一圈根本没被画全（R209 那一族：组件的边不出现在帧里，尺子就瞎）。
+        let clipped = band.filter {
             let x = Self.x(of: $0, size: size), y = Self.y(of: $0, size: size)
-            return !(x >= inset && x < inset + cellPx && y >= inset && y < inset + cellPx)
+            return x < 1 || y < 1 || x > size - 2 || y > size - 2
         }
-        XCTAssertTrue(outsideBox.isEmpty, "带跑到了格子框外 ⇒ 那一片是窗口底色，量出来的差与那一圈无关")
-        // ③ 带里没有一个点**压不到边界**：每个点到圆角矩形边界的距离都小于 stroke + 容差。
-        //    这一格就是把第一版打红的那一格的反面守卫（第一版用的是方框减角块）。
-        let half = Double(cellPx) / 2.0
+        XCTAssertTrue(clipped.isEmpty, "带贴到位图边缘 ⇒ 那一圈被裁了，量出来的差不是产品画的那一圈")
+        // ④ 带里每个点都必须在「外径那一圈」的 ±(stroke/2 + 容差) 内 ——
+        //    外径 = 格子半宽 + gap，半径**不跟着放大**（产品是在放大后的框上画同一个 cornerRadius），
+        //    而**中心与格子同心**（`.padding` 四边等量外扩）。
+        let gapPx = Double(Int(VisualHeat.hoverRingGap) * scale)
+        let cellHalf = Double(cellPx) / 2.0
+        let outerHalf = cellHalf + gapPx
         let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
-        let radius = Double(Int(VisualRadius.heatCell) * scale)
-        let tooDeep = band.filter {
-            let dx = Double(Self.x(of: $0, size: size) - inset) + 0.5 - half
-            let dy = Double(Self.y(of: $0, size: size) - inset) + 0.5 - half
-            return Self.roundedRectSDF(px: dx, py: dy, half: half, radius: radius) < -strokePx - 0.5
+        let radius = Double(Int(VisualRadius.heatCell + VisualHeat.hoverRingGap) * scale)
+        let offRing = band.filter {
+            let dx = Double(Self.x(of: $0, size: size)) + 0.5 - Double(inset) - cellHalf
+            let dy = Double(Self.y(of: $0, size: size)) + 0.5 - Double(inset) - cellHalf
+            return abs(Self.roundedRectSDF(px: dx, py: dy, half: outerHalf, radius: radius))
+                > strokePx / 2.0 + Self.ringBandAllowance
         }
-        XCTAssertTrue(tooDeep.isEmpty, "带伸进了格子内部 \(tooDeep.count) 个像素 ⇒ 「整格换色」会被读成合规")
-        // ④ 四条边都得有人，**四个角也得有人**。
-        //    角那一半就是本轮的靶：`strokeBorder` 沿圆角走，真描边在角上是连续的，
-        //    旧版按「离边小于 stroke 的方框减角块」切，把角上的真描边切掉了。
+        XCTAssertTrue(offRing.isEmpty, "带里有 \(offRing.count) 个像素不在这条外径上 ⇒ 分类器量的不是那一圈")
+        // ④c **同心**：带里每个点到「格子自己那条圆角路径」的距离都得是 gap ±(描边一半 + 容差)。
+        //     半径不跟着外扩的写法（本轮第一版）在直边上是准的，只有 45° 角上外偏 0.41pt = 0.83 设备像素
+        //     ⇒ 这一格专治角：直边的读数看不见它，肉眼在 11pt 的格子上也几乎挑不出来，
+        //     但它就是"同一圈到格子的间距不统一"，而这一圈的全部作用就是把自己读成一圈。
+        let cellRadiusPx = Double(Int(VisualRadius.heatCell) * scale)
+        let uneven = band.filter {
+            let dx = Double(Self.x(of: $0, size: size)) + 0.5 - Double(inset) - cellHalf
+            let dy = Double(Self.y(of: $0, size: size)) + 0.5 - Double(inset) - cellHalf
+            return abs(Self.roundedRectSDF(px: dx, py: dy, half: cellHalf, radius: cellRadiusPx) - gapPx)
+                > strokePx / 2.0 + 0.5
+        }
+        XCTAssertTrue(uneven.isEmpty,
+                      "环到格子边的距离不统一（\(uneven.count) 个像素偏出 gap ± 半个描边）"
+                      + " ⇒ 角上的间距与直边不一样，那一圈不是同心的（圆角半径要跟着外扩）")
+        // ④b **带的位置按行号点验**：中间那一列（x = inset + cellPx/2）会同时穿过**上、下两条**
+        //     halo，2x 上应当是行 {5, 6}（外边距 8−2=6 为中心线 ±1）与 {31, 32}。
+        //     第一版的 `ringBand` 把中心也外推了一个 gap ⇒ 带整体偏移 2px：真 halo 被算成带外
+        //     （`testHoverChangesOnlyTheRingBand` 抓到 (11,5) 变了 65 却不在带里），
+        //     而带里那些没画的像素把均值稀释 ⇒ 可见性地板会红在尺子上。这一格让那种整体偏移必红。
+        let midColumnRows = Set(band.filter { Self.x(of: $0, size: size) == inset + cellPx / 2 }
+                                   .map { Self.y(of: $0, size: size) })
+        XCTAssertEqual(midColumnRows, Set([5, 6, 31, 32]),
+                       "中间那一列带覆盖的行 = \(midColumnRows.sorted())，要 [5, 6, 31, 32]（上下两条 halo）"
+                       + " ⇒ halo 的几何与产品画的不再是同一圈")
+        XCTAssertEqual(band.filter { Self.x(of: $0, size: size) == inset + cellPx / 2 && Self.y(of: $0, size: size) == 8 }.count, 0,
+                       "带压进了格子的第一行（y=8）⇒ 它会把数据像素算进「那一圈」")
+        // ⑤ 四条边都得有人，**四个角也得有人**（角那一半是 R45 第一版切掉过的地方，留着当反面守卫）。
+        //    R308 起"边"指的是留白里那四条 halo，**不是**格子的四条边 ——
+        //    左边 = x < inset，右边 = x ≥ inset + cellPx，上下同理。
         let edges = [
-            ("左边", band.filter { Self.x(of: $0, size: size) == inset }.count),
-            ("右边", band.filter { Self.x(of: $0, size: size) == inset + cellPx - 1 }.count),
-            ("上边", band.filter { Self.y(of: $0, size: size) == inset }.count),
-            ("下边", band.filter { Self.y(of: $0, size: size) == inset + cellPx - 1 }.count),
+            ("左边", band.filter { Self.x(of: $0, size: size) < inset }.count),
+            ("右边", band.filter { Self.x(of: $0, size: size) >= inset + cellPx }.count),
+            ("上边", band.filter { Self.y(of: $0, size: size) < inset }.count),
+            ("下边", band.filter { Self.y(of: $0, size: size) >= inset + cellPx }.count),
         ]
         for (name, count) in edges {
             XCTAssertGreaterThan(count, 0, "\(name)一个像素都没有 ⇒ 这条带判不了那一边的圈")
         }
         let corners = [
-            ("左上", band.filter { Self.x(of: $0, size: size) <= inset + 2 && Self.y(of: $0, size: size) <= inset + 2 }.count),
-            ("右上", band.filter { Self.x(of: $0, size: size) >= inset + cellPx - 3 && Self.y(of: $0, size: size) <= inset + 2 }.count),
-            ("左下", band.filter { Self.x(of: $0, size: size) <= inset + 2 && Self.y(of: $0, size: size) >= inset + cellPx - 3 }.count),
-            ("右下", band.filter { Self.x(of: $0, size: size) >= inset + cellPx - 3 && Self.y(of: $0, size: size) >= inset + cellPx - 3 }.count),
+            ("左上", band.filter { Self.x(of: $0, size: size) < inset && Self.y(of: $0, size: size) < inset }.count),
+            ("右上", band.filter { Self.x(of: $0, size: size) >= inset + cellPx && Self.y(of: $0, size: size) < inset }.count),
+            ("左下", band.filter { Self.x(of: $0, size: size) < inset && Self.y(of: $0, size: size) >= inset + cellPx }.count),
+            ("右下", band.filter { Self.x(of: $0, size: size) >= inset + cellPx && Self.y(of: $0, size: size) >= inset + cellPx }.count),
         ]
         for (name, count) in corners {
             XCTAssertGreaterThan(count, 0, "角区 \(name) 一个带像素都没有 ⇒ 描边在角上被切掉了（第一版的毛病）")
         }
-        // ⑤ 1× 屏（格宽就是 11 个设备像素）：带还得非空，四条边也得有人。
+        // ⑥ 1× 屏（格宽就是 11 个设备像素，halo 只有 1 个像素宽）：带还得非空，四条边也得有人。
         //    这一格不是凑数 —— 若选择器在「带宽 ≈ 描边宽」这种退化几何上返回空，
         //    1× 那条判据臂会拿着 0 像素的均值「通过」。
         let oneXSize = Int(VisualHeat.cell) + 8
         let oneX = Self.ringBand(size: oneXSize, scale: 1)
         XCTAssertFalse(oneX.isEmpty, "1× 屏上带是空的 ⇒ 那一整臂什么都没量")
+        XCTAssertTrue(oneX.filter(Self.cellDataBand(size: oneXSize, scale: 1).contains).isEmpty,
+                      "1× 的带伸进了数据像素 ⇒ 与 2× 那条同一件事：halo 不许量格子画出来的地方")
         let oneXEdges = [
-            oneX.filter { Self.x(of: $0, size: oneXSize) == 4 }.count,
-            oneX.filter { Self.x(of: $0, size: oneXSize) == 4 + 11 - 1 }.count,
-            oneX.filter { Self.y(of: $0, size: oneXSize) == 4 }.count,
-            oneX.filter { Self.y(of: $0, size: oneXSize) == 4 + 11 - 1 }.count,
+            oneX.filter { Self.x(of: $0, size: oneXSize) < 4 }.count,
+            oneX.filter { Self.x(of: $0, size: oneXSize) >= 4 + 11 }.count,
+            oneX.filter { Self.y(of: $0, size: oneXSize) < 4 }.count,
+            oneX.filter { Self.y(of: $0, size: oneXSize) >= 4 + 11 }.count,
         ]
         XCTAssertTrue(oneXEdges.allSatisfy { $0 > 0 }, "1× 的带缺了某一条边：\(oneXEdges)")
         // ⑥ 退化几何必须是**空**而不是越界崩溃：留白比整张图还大的那一刻没有格子像素。
@@ -327,9 +517,9 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
 
     /// `hoverRingOpacity` 的真值表（纯函数那一半）。
     func testHoverRingOpacityTruthTable() {
-        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.30, accuracy: 0.0001,
-                       "悬停那一圈的透明度是本轮量出来的那个数（R300 从 0.55 降到 0.30），"
-                       + "改了令牌就得同时改判据里的说明")
+        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.20, accuracy: 0.0001,
+                       "悬停那一圈的透明度是量出来的那个数（R300 从 0.55 降到 0.30，"
+                       + "R308 环搬到留白、档间离散归一之后降到 0.20）；改了令牌就得同时改判据里的说明")
         XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: false), 0, accuracy: 0.0001,
                        "非悬停必须是 0，不是「几乎看不见」的 0.02：常驻淡描边会让 126 格同时开口说话")
         // ③ 只有两档：不许出现第三值（比如按 bucket 分轻重 —— 这张图的信息全在深浅上）。
@@ -348,9 +538,17 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                       "`cellView` 不再把格子交给 `DailyCopyHeatmapCell` ⇒ 判据量的是影子")
         // ② 那一圈的画法在文件里只有一处（两处就是两份会分叉的真值）。
         //    按完整串数，不按子串前缀（账本里「按名字查消费者会被前缀白拿」那一族）。
-        let draws = Self.occurrences(of: ".strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity",
+        //    R308 起画法是 `stroke` + `padding(-gap)`（环在格子**外面**），
+        //    所以串的锚点跟着换了；旧锚 `.strokeBorder(` 现在必须是 0 次 ——
+        //    这一格就是那把刀的替身：谁把画法搬回格子内侧，这里当场红，不必等到像素判据。
+        let draws = Self.occurrences(of: ".stroke(Color.primary.opacity(VisualHeat.hoverRingOpacity",
                                      in: source)
         XCTAssertEqual(draws, 1, "悬停那一圈的画法出现 \(draws) 次 ⇒ 有两份会分叉的真值")
+        XCTAssertEqual(Self.occurrences(of: ".strokeBorder(Color.primary.opacity(VisualHeat.hoverRingOpacity",
+                                        in: source), 0,
+                       "画法退回了 `strokeBorder`（画在形状里面）⇒ 那一圈会盖掉数据像素")
+        XCTAssertEqual(Self.occurrences(of: ".padding(-VisualHeat.hoverRingGap)", in: source), 1,
+                       "环的外推距离不再走令牌 ⇒ 尺子里的 halo 几何与画面上的环不是同一个数")
         // ③ 圈的那半只由 `hoverRingOpacity` 决定，不许有第二个裸数写进这一层。
         XCTAssertEqual(Self.occurrences(of: "Color.primary.opacity(0.55)", in: source), 0,
                        "调用点上有裸的 0.55 ⇒ 令牌与画面上不是同一个数")
@@ -705,10 +903,22 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
                              "填充带不到格子的三分之一 ⇒ 它量的已经不是格子内部")
         XCTAssertTrue(fill.isDisjoint(with: ring),
                       "填充带与描边带重叠 ⇒ 悬停那一圈会混进相邻档的比较里")
-        // 两个带加起来要几乎等于整格（差额只允许是 SDF 边界那一圈容差里的像素）：
-        // 不然"两档差多少"与"那一圈响不响"量的会是两块互相渗透、且都没量全的地方。
-        XCTAssertGreaterThanOrEqual(fill.count + ring.count, cellPx * cellPx - 4 * cellPx,
-                                    "填充带 + 描边带漏了太多格子像素：\(fill.count)+\(ring.count) / \(cellPx * cellPx)")
+        // R308 公开更正旧契约「两个带加起来要几乎等于整格」：那条说的是 strokeBorder 时代的
+        // **互补分格**（环在格子里，两带分掉整格）。现在环在格子外面的留白里，
+        // 两带加起来只到格子的绝大部分 —— 按旧式判它就是把产品事实读成尺子坏了。
+        // 取而代之的是两条各自更强的等式：整格带必须是完整的 cellPx²（"悬停不许动数据像素"的分母），
+        // 而描边带与整格必须**严格不相交**（环真在外面；一旦重叠就说明它又压回数据像素上）。
+        let box = Self.cellBoxBand(size: size, scale: scale)
+        let data = Self.cellDataBand(size: size, scale: scale)
+        XCTAssertEqual(box.count, cellPx * cellPx,
+                       "方框带不是 \(cellPx * cellPx) 个像素 ⇒ 分母自己就不完整")
+        let radiusPx = Int(VisualRadius.heatCell) * scale
+        XCTAssertLessThan(data.count, box.count,
+                          "数据带等于方框 ⇒ 圆角那四个角被当成数据像素了（产品根本没在那儿落墨）")
+        XCTAssertGreaterThanOrEqual(data.count, box.count - 4 * radiusPx * radiusPx,
+                                    "数据带比方框少太多（\(box.count - data.count) 个）⇒ 形状带切错了地方")
+        XCTAssertTrue(ring.isDisjoint(with: data),
+                      "描边带与数据像素有交集 ⇒ 环还在压数据，而这条尺会把那一片同时算进「深浅」与「那一圈」")
         // ② 填充带里每个点都在格子框内、且离边界超过一条描边（SDF 比 -stroke 更负）。
         let half = Double(cellPx) / 2.0
         let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
@@ -936,25 +1146,83 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
     ///
     /// 返回**压平后的下标**（`y * size + x`）：带要被 `contains` 查两万次，
     /// 而元组不能 `Hashable`（Swift 只给未命名元组合成一致性）。
+    /// 悬停那一圈**实际落在哪里**：R308 起在格子**外面**的留白里 ——
+    /// 产品画的是「把圆角矩形放大 `hoverRingGap` 再描 `hoverStroke`」，
+    /// 所以这条带 = 外径那一圈的 SDF ∈ [−w/2−容差, +w/2+容差]。
+    ///
+    /// 旧版切的是格子**里面**的一圈，因为那时产品用 `strokeBorder`（画在形状内侧）。
+    /// **带的定义必须跟着被测物走**：产品换画法之后把带留在原地，量到的就是"环画过的那片空白"，
+    /// 读数为 0 会被读成"环没了"（假红），或读数为大会被读成"环很响"（假绿）。
     static func ringBand(size: Int, scale: Int) -> Set<Int> {
         guard size > 0, scale > 0 else { return [] }
         let inset = 4 * scale
         let cellPx = size - inset * 2
         guard cellPx > 0 else { return [] }
         let strokePx = Double(max(1, Int(VisualHeat.hoverStroke) * scale))
+        let gapPx = Double(Int(VisualHeat.hoverRingGap) * scale)
+        // 产品画的是「半径跟着外扩」的圆角矩形（`heatCell + gap`）—— 只有那样这一圈与格子才**同心**，
+        // 直角边与 45° 角上的间距才都是 gap。尺子必须照抄这一点，否则角上量的会是别处。
+        let radius = Double(Int(VisualRadius.heatCell + VisualHeat.hoverRingGap) * scale)
+        let cellHalf = Double(cellPx) / 2.0
+        let outerHalf = cellHalf + gapPx
+        // 容差取 0.4（不是 0.5）：描边的几何覆盖正好落在 `|SDF| ≤ stroke/2`，
+        // 半像素容差会把**零覆盖**的那一行也算进带里（2x 上就是 y=4 与 y=7），
+        // 均值被稀释 ⇒ 可见性地板会红在尺子上。这一条由
+        // `testRingBandSelectorIsATruthTable` 的第④b 格按行号点验。
+        let allowance = Self.ringBandAllowance
+        var band = Set<Int>()
+        // 像素坐标一律相对**格子的中心**（外径与格子同心 —— `.padding` 是四边等量外扩）。
+        // 第一版这里减的是 `inset + outerHalf`，等于把中心也往外推了一个 gap ⇒ 带整体偏移 2 个
+        // 设备像素：真正的 halo 被算成"带外"，而带里混进的是没画的像素。
+        // 这条偏移由下面 `testRingBandSelectorIsATruthTable` 的第④格钉住（它按行号点验带的位置）。
+        for py in 0..<size {
+            for px in 0..<size {
+                let sdf = roundedRectSDF(px: Double(px) + 0.5 - Double(inset) - cellHalf,
+                                         py: Double(py) + 0.5 - Double(inset) - cellHalf,
+                                         half: outerHalf,
+                                         radius: radius)
+                guard abs(sdf) <= strokePx / 2.0 + allowance else { continue }
+                band.insert(py * size + px)
+            }
+        }
+        return band
+    }
+
+    /// **格子的方框**（cellPx² 个像素，含圆角切掉的那四个角）。只用来量"分母自己完不完整"。
+    static func cellBoxBand(size: Int, scale: Int) -> Set<Int> {
+        guard size > 0, scale > 0 else { return [] }
+        let inset = 4 * scale
+        let cellPx = size - inset * 2
+        guard cellPx > 0 else { return [] }
+        var band = Set<Int>()
+        for dy in 0..<cellPx {
+            for dx in 0..<cellPx {
+                band.insert((dy + inset) * size + (dx + inset))
+            }
+        }
+        return band
+    }
+
+    /// **数据像素** = 格子**真的画出来的**那一片（圆角矩形以内）。
+    ///
+    /// 为什么不是方框：`VisualRadius.heatCell` 把四个角切掉了，角上那几个像素是**背景**，
+    /// 产品从来没在那里落过数据的墨。第一版拿方框当数据，于是"环不许动数据像素"这条尺
+    /// 会在角上冤枉环 —— 实测 halo 与方框在角上重叠 4 个像素，而产品在那 4 个像素上
+    /// 一个数据像素都没画。同心 halo 到格子边的距离是 gap，到**形状**边才是常数。
+    static func cellDataBand(size: Int, scale: Int) -> Set<Int> {
+        guard size > 0, scale > 0 else { return [] }
+        let inset = 4 * scale
+        let cellPx = size - inset * 2
+        guard cellPx > 0 else { return [] }
         let radius = Double(Int(VisualRadius.heatCell) * scale)
         let half = Double(cellPx) / 2.0
-        // `strokeBorder` 画在形状**里面**：带 = SDF ∈ [-stroke, 0]。
-        // 留半像素容差给抗锯齿（容差 0 会让分类器判在噪声上，账本里有这一族）。
-        let allowance = 0.5
         var band = Set<Int>()
         for dy in 0..<cellPx {
             for dx in 0..<cellPx {
                 let sdf = roundedRectSDF(px: Double(dx) + 0.5 - half,
                                          py: Double(dy) + 0.5 - half,
-                                         half: half,
-                                         radius: radius)
-                guard sdf <= allowance, sdf >= -strokePx - allowance else { continue }
+                                         half: half, radius: radius)
+                guard sdf < 0 else { continue }
                 band.insert((dy + inset) * size + (dx + inset))
             }
         }

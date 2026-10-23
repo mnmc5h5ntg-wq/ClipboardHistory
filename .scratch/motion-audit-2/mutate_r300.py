@@ -28,7 +28,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOKENS = 'ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift'
 
-N_RING = u'        isHovered ? 0.30 : 0'
+N_RING = u'        isHovered ? 0.20 : 0'   # R308 重钉（0.30→0.20：环搬到留白、档间离散归一之后重取的窗口中点）
+
 R_RING_OLD = u'        isHovered ? 0.55 : 0'
 R_RING_FAINT = u'        isHovered ? 0.12 : 0'
 N_LADDER = u'    static let ladder: [Double] = [0.18, 0.34, 0.56, 0.92]'
@@ -49,8 +50,11 @@ ARMS = [
      N_RING, R_RING_OLD, LOUD, u'交互比一次真实的数据变化还响'),
     ('M867', u'把环降到 0.12 = 可见性地板的反方向牙', TOKENS,
      N_RING, R_RING_FAINT, VISIBLE, u'那一圈在屏幕上根本不存在'),
-    ('M868', u'把顶档改回 0.85（环留在 0.30）= 顶档那一格是承重的', TOKENS,
-     N_LADDER, R_LADDER_OLD, LOUD, u'交互比一次真实的数据变化还响'),
+    # M868 已于 R308 退役（2026-10-23 实测 ESCAPED：把顶档改回 0.85 之后克制度那条不再红）。
+    # 退役的理由不是"刀坏了"，而是**它钉的那个前提被产品改掉了**：R300 抬顶档（0.85→0.92）
+    # 是为了给环腾出窗口 —— 而 R308 把环搬到格子外面的留白里，档间离散从 1.75 倍归到 1.000，
+    # 窗口不再依赖顶档那一格。按 D-284 / R102 那一课：前提失效的刀要**摘下来并写明证人**，
+    # 不许留在表里空转，也不许把期望改成"能过"的形状（那是把 ESCAPED 洗成 CAUGHT）。
     ('M869', u'把克制度的界写成 0.0 = 这条界本身是承重的（正文给出货版读数）', TESTFILE,
      N_BOUND, R_BOUND_ZERO, LOUD, u'交互比一次真实的数据变化还响'),
 ]
