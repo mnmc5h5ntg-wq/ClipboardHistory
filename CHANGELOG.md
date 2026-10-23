@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 台账的读数口搬进仓库：按小节取数 + 恒等式闸门（R309 / U-1013…U-1015 · D-290 · 产品 0 文件，判据轮）
+
+- R308 落账时生成器在整份验证链日志里取末，把 `### CAPTURE 结论行补记` 那一行（捕帧卷 92 格）
+  当成全量卷 ⇒ ITERATION / CHANGELOG / STATE 三本一起写着 `Executed 92`，真读数是 934 / 44 skip / 0；
+  而「FULL_FAIL != 0 就拒写」那道门完全不响，因为抄来的那行恰好 0 失败。
+- 本轮收成仓库里的尺：`scripts/ledger_readings.py`（小节切片 + 恒等式闸门 + 多跑每跑各自记账）、
+  `scripts/tests/test_ledger_readings.py`（现读 `Ran 8 / OK`，合成已知答案 + 真产物对照）、
+  刀 M895…M900（6 把全 CAUGHT、RESTORE_CLEAN=yes、未落刀基线 `Ran 8`）。
+- 写这一支的过程里又踩了 `re.split` 的块形状坑（标题与正文同住一块），**是新闸门当场 REFUSED 抓到的**，
+  七本一个字节都没落盘；另一处自曝：M896 第一版的变异文写了 Swift 的 `//` 注释 ⇒ python 语法红 ⇒ NOT_RUN，
+  改成 `#` 才有 CAUGHT（刀坏不是判据没牙，D-243 同一课）。
+- Swift 三条腿本轮 NOT-RUN 并写明理由（0 产品文件、0 Swift 文件）；帧目录仍 174 张在盘上（现读）。
+- 判据轮：构建告警 0；预检 tables=103 bad=0、名册 arms=768；
+  脚本电池 `Ran 603 / OK (skipped=4)`（写盘后同数）；产品面连续零改动 **1** 轮。
+
 ### Improved（R308 / 第 307 轮 / Round 305 · 热图悬停那一圈搬到格子外面：交互不再换数据像素）
 
 `DailyCopyHeatmapCell` 的悬停反馈从 `strokeBorder`（画在形状里面，会盖掉那一格外圈的数据像素，
