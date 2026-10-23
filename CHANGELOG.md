@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层选中底第一次被放到两枚系统参照色之间判：两档都逐字节落在系统非 key 那一档；这把尺自曝两次，全量卷另抓到损坏原件保全不幂等（R318 / U-1043…U-1046 · D-299、D-300 · 产品 0 文件，判据轮）
+
+- 新判据 `UICaptureTests/testQuickPickSelectionPillAgainstSystemArms`：同一外观下解析 key 档与
+  非 key 档两枚系统选中色，把帧上药丸底色投影到「参照色 → 页底」线段上再判落点。QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey
+  ⇒ **373 的②号出口结案：帧上那颗灰是系统的非 key 选中档，不是产品挑的配色**；①号真机眼仍开。
+- 尺自曝两次：① 残差写成 `max(带符号差)` ⇒ 暗档 `residual=0` 而 obs 与 arm 差 36（会把对不上
+  报成完全吻合）⇒ 修 abs + `offSegment`；② 取样窗横跨整颗药丸，把圆角端 + 页底 + 行内字墨混进一条带，
+  于是暗档被报成"两臂都不在、比两枚参照色都亮 36 级"——**尺的污染读成了产品事实**；
+  估计量改到第四版（二维精确众数 + 占比 药丸 83%（亮）/ 81%（暗），页底 100% / 100%，闸门 60%）之后两档残差都是 0。
+- 新规矩 D-299（残差取绝对值、容差在建立到实测上之前只是探针刻度）与
+  D-300（读底色的尺必须自带实心证明；占比不过就不判，不许定罪也不许免罪）。
+- 全量卷那一朵红**归到产品侧**（新开 374）：`history.corrupt-<秒级时间戳>.json` 的保全不幂等 ——
+  同名只挡同一秒，而 `load()` 一次启动被走两遍 ⇒ 同一秒绿、跨秒界红；
+  用例的 `preserved.count == 1` 因此跟着挂钟走（独跑 12 次全绿、全量卷 935 例红 1 次）。
+  修法：按内容幂等 + 用例等条件跨过秒界再断言恰好一份，**不许**降成 `>= 1`。
+- 现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 935 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r318_rv2/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0 ADDED=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=935 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r318_rv2`；
+  脚本电池 `Ran 611 / OK (skipped=4)`（写盘后同数）；腐烂尺 `HIDDEN_ARMS 表=194 可判=712 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；
+  预检 bad=0、名册 arms=780；本轮 0 把刀（新尺刚出厂，容差还是探针刻度）：两把刀的锚点已现场 grep 各命中恰好 1（M914 钉参照臂解析那一行、M915 钉 `fill.isHidden = !showsHoverTint(isSelected: isSelected,` 那一行），表与跑归 R319 —— 没有刀的判据今天只是尺，不是牙。
+
 ### 看图腿判出浮层选中行零强调色，并当场标出它判不了；runner 交账发现刀的牙是分机器的（R317 / U-1040…U-1042 · D-298 · 产品 0 文件，看图轮）
 
 - 新位点：快速选择浮层的选中行底 = (181,181,181) 对未选/页底 (255,255,255) ⇒ 差 74、**零强调色**，

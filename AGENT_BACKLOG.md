@@ -7595,3 +7595,39 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
      （或读 `NSColor.selectedContentBackgroundColor` 作为参照臂，与 `cardprobe` 那条系统参照臂同一形状），
      然后判"我们的选中底与系统强调色的色相距离"，两档各自登记。
   在①或②之前，这一格只登记成**有名字的未判**，不许写进"已修"，也不许照着 181 去改产品配色。
+  追记（R318）：**②号出口已落地成常驻尺并结案 —— 帧上那颗选中底就是系统的非 key 选中色，两档逐字节相等；本单只剩①号真机眼。**
+  尺在 `UICaptureHarness.swift` 的 `testQuickPickSelectionPillAgainstSystemArms`：同一外观下解析
+  `selectedContentBackgroundColor`（key 档）与 `unemphasizedSelectedContentBackgroundColor`（非 key 档），
+  把帧上药丸底色投影到「参照色 → 页底」线段上（含 `flattenedPNG` 的混合，解覆盖率 a）。
+  QUICKPICK_SELARM light 帧选中底=(220,220,220) 页底=(255,255,255) key=(0,100,225) nonKey=(220,220,220) 帧彩度=0 key彩度=225 nonKey彩度=0 取样带=345..<494px@y=125 底色占比=药丸83%/页底100%（下限 60%） 判定=系统nonKey key残差=30(a=0.17) nonKey残差=0(a=1.00) 容差=2；QUICKPICK_SELARM dark 帧选中底=(70,70,70) 页底=(30,30,30) key=(0,89,209) nonKey=(70,70,70) 帧彩度=0 key彩度=209 nonKey彩度=0 取样带=345..<494px@y=125 底色占比=药丸81%/页底100%（下限 60%） 判定=系统nonKey key残差=47(a=0.23) nonKey残差=0(a=1.00) 容差=2；QUICKPICK_SELARM_SUMMARY 候选=2 有对象=2 未判=0 落点=light=系统nonKey dark=系统nonKey
+  也就是说 R317 那个"纯灰"不是产品选的配色，而是 AppKit 在非 key 窗口画选中时的系统档 ——
+  **不许照着它去改产品配色**这一条现在有读数支撑了。仍开的是①号：用户真正看到的那一档
+  （面板是 key window 时）是不是强调色，这台机器判不了，与 347 同批、需要用户先退出正在运行的 App。
+  过程里这把尺自曝两次（反向差假绿、取样窗把笔画混进底色 ⇒ 一度把暗档报成"两臂都不在"），
+  已升成 D-299 与 D-300；那条"暗档缺陷"是尺的污染，不是产品事实，**没有为它开单**。
+
+**374. 存档损坏时的原件保全不幂等：`history.corrupt-<秒级时间戳>.json` 会随载入次数增长，而用例的 `preserved.count == 1` 恰好只在两次载入落在同一秒时才成立（R318 全量卷现读）**（R318）
+
+  红在 `HistoryPersistenceRecoveryTests/testCorruptHistoryWithoutBackupPreservesOriginalAndReferencedImages`
+  （`HistoryPersistenceRecoveryTests.swift:144`，`XCTAssertEqual(preserved.count, 1)` 读到 2）。三条机制都是现读的：
+
+  · `preserveCorruptFile`（`HistoryPersistence.swift:530`）的名字是 `yyyyMMdd-HHmmss` —— **秒**粒度，
+    而且 `guard !fileExists(candidate) else { return nil }` 只在同一秒内挡住重复；
+  · 它唯一的调用点在 `load()` 的"主存档坏且备份也坏"那一支（:167）；
+  · `load()` 在这条用例里被走了两次（:123 用例自己一次，`HistoryStore` 初始化一次）。
+
+  ⇒ 两次载入在同一秒 = 1 份（绿），跨秒界 = 2 份（红）。间歇性也是现读的，而且是**同版两跑**：
+  第一遍四件套 935 例红 1 次（就是这一朵）、第二遍 935 例 **0 红**；
+  独跑 12 次 12 绿、整卷 `HistoryPersistenceRecoveryTests` 绿。
+  两层问题分开写：**尺**那一层是"断言的结果跟着挂钟走"（354 / 负载红那一族的新成员，
+  但它不是慢，是**未定义**）；**产品**那一层是"每次载入都再保全一份"，
+  而原件本来就没被删改，多出来的那份与第一份逐字节相同 ⇒ 用户若一直带着坏存档启动，
+  支持目录里会无限攒同一份损坏原件的副本。
+
+  做法（两条都要，不许只做一半）：
+  ① 产品侧改成**按内容幂等**：写之前先看同目录里有没有 `history.corrupt-*.json` 与本份字节相同，
+     有就复用（返回那个 URL，不再写盘）。这条同时让"原件不删不改"的语义更干净。
+  ② 用例侧改成**故意跨过秒界**再断言恰好一份：在两次载入之间等到可观察的秒变化（等条件，
+     不是固定 sleep —— R267 那条规矩），这样"1 份"不再靠运气。
+     **不许**把它降成 `>= 1`：那是把"越攒越多"读成正常。
+  ③ 配一把刀：把幂等那一步的守卫抽掉 ⇒ 跨秒界那条用例必须红（锚点命中恰好 1，跑完 `RESTORE_CLEAN=yes`）。
