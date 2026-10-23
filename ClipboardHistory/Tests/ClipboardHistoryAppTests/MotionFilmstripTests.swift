@@ -4990,7 +4990,9 @@ final class MotionFilmstripTests: XCTestCase {
     }
 
     /// R322 / 动效主线：**这颗胶囊的横移到底有没有过程** —— 第一次把它放进真窗口逐帧取证，
-    /// 并且当场升成硬判据（本机实测：开臂中间态帧数 3 / 关臂 1，峰值 0.097 对 0.354）。
+    /// 并且当场升成硬判据。R323 把带子改成本卷量出来之后，本机读数是
+    /// **开臂中间态帧数 3（旧口径 6）/ 关臂 1，峰值 0.277 对 0.939，落定 7 帧 ≈56ms**
+    /// （R322 记的是 0.097 对 0.354 —— 带子只盖住半颗胶囊时，峰值被低估近三倍）。
     ///
     /// 为什么这个位点值得单独一格：它是全仓**唯一一条位移档**（`.slider` → `Slide.leading` → 弹簧），
     /// 而账上关于它只有两态证据（`segmented-filter-idle` 那张帧 + `FILTER_PILL_BAND`：
@@ -5005,12 +5007,6 @@ final class MotionFilmstripTests: XCTestCase {
     /// 并 skip —— 前提由同一次运行量出来、说清放掉了什么、交回的是读数，不是覆盖率通道。
     func testFilterPillSlideIsAProcessNotATeleport() throws {
         try skipUnlessEnabledAndCapable()
-        // 带子**量出来的**，不是目测：`/tmp/r321_rv/frames/sidebar-history-300x520-light.png`
-        // 逐行扫（仓库外一次性尺，只配形成问题）⇒ 胶囊那一行在 y≈66…92pt（26pt 高，与
-        // `SegmentedFilterPicker` 的 `.frame(height: 26)` 对上），左右各让 12pt（`.padding(.horizontal, 12)`）；
-        // 分隔线在 y≈102pt、列表在它下面 ⇒ 这条带里**只有胶囊**，换档引起的列表重排进不了分母。
-        let band = CGRect(x: 12.0 / 300.0, y: 66.0 / 520.0,
-                          width: 276.0 / 300.0, height: 26.0 / 520.0)
         let scenario = Scenario.filterPillSlide()
         let saved = MotionCatalog.animationsEnabled
         let onFilmA = record(scenario)
@@ -5018,6 +5014,35 @@ final class MotionFilmstripTests: XCTestCase {
         MotionCatalog.animationsEnabled = false
         let offFilm = record(scenario)
         MotionCatalog.animationsEnabled = saved
+        // 前提①（排在带子之前，R323）：**整幅**首末必须不同。这条与带子无关，拦的是"触发没驱动任何东西"。
+        // 少了它，一个 no-op 触发会先撞在 `pill-band-unmeasured` 上、被读成"这台机器看不见"——
+        // 那就是把探针坏洗成 skip（M924 那一刀今天正是从这里被抓回红的）。
+        XCTAssertTrue(Self.premisePictureChanged(onFilmA.motionFrames, band: nil),
+            "触发后整幅画面首末逐像素相同 ⇒ 这次点档什么都没驱动（夹具/探针坏了，不是通道看不见）。"
+            + " 帧数=\(onFilmA.motionFrames.count)")
+        // 前提②：A/B 开关必须**落进过胶片** —— 关臂得真是 `animationsEnabled == false` 时抓的。
+        // 这一条是出口的前置：出口只能放行"开关生效了、胶片仍然分不开"的那种机器，
+        // 不许替一把坏开关说话（同一个形状：R70 把门本身变成被量的对象）。
+        XCTAssertTrue(onFilmA.animationsEnabledAtRecord && onFilmB.animationsEnabledAtRecord
+                        && !offFilm.animationsEnabledAtRecord,
+            "A/B 开关没落进胶片（开A=\(onFilmA.animationsEnabledAtRecord)"
+            + " 开B=\(onFilmB.animationsEnabledAtRecord) 关=\(offFilm.animationsEnabledAtRecord)）"
+            + " ⇒ 两臂其实是同一臂，『有没有过程』这一判据根本没在演")
+        // R323 更正：带子改回**从这一卷量**。R322 那一版写的是 `y 66…92pt`，来源是
+        // 组件帧 `/tmp/r321_rv/frames/sidebar-history-300x520-light.png` 逐行扫出来的那一条 ——
+        // 那张帧里胶囊确实在 66…92pt，可本卷是**真窗口**（`HistorySidebarView` 直接进帧），
+        // 同一颗胶囊量出来在 49…75pt。写死的 66…92 因此只盖住胶囊下缘那 9pt 再加一条分隔线，
+        // 结论（开臂中间态比关臂多）没被推翻，但峰值 0.097 是**被低估**的读数，
+        // 而斜坡尺要的中心绝不能拿半颗胶囊量（R107 / R108 那一族：尺读的是不是它声称的那个对象）。
+        guard let band = measuredPillBand(onFilmA) else {
+            emit("MOTION_NOT_RUN=pill-band-unmeasured pill-slide-process 首末帧之间读不出一颗"
+                + "'宽度稳定、位置会走'的洞 ⇒ 这一台框不住那颗胶囊，两臂比较不成立（不写产品事实，D-305）")
+            throw XCTSkip("MOTION_NOT_RUN=pill-band-unmeasured")
+        }
+        emit("MOTION_PILL_BAND filter-pill-slide 带=x\(String(format: "%.1f", band.minX * 300))"
+            + "…\(String(format: "%.1f", (band.minX + band.width) * 300))pt"
+            + " y\(String(format: "%.1f", band.minY * 520))…\(String(format: "%.1f", (band.minY + band.height) * 520))pt"
+            + " 来源=本卷首末帧之差(R323 改前=组件帧目测 66…92pt)")
 
         writeStrip("filter-pill-slide-开A", onFilmA.motionFrames)
         writeStrip("filter-pill-slide-开B", onFilmB.motionFrames)
@@ -5051,10 +5076,28 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(onFilmA.clockIsWarm && onFilmB.clockIsWarm && offFilm.clockIsWarm,
                       "有一臂是在冷采样下抓的 ⇒ 两臂的比较不成立，这条结论今天不判")
 
+        // R323 / runner 交账（RUN=40023610164 与 40023766162，同一朵红）：那一跑**三臂逐帧相同** ——
+        //   开A 帧数=1 峰值=0.463 / 开B 帧数=1 峰值=0.463 / 关 帧数=1 峰值=0.463，可分帧=7、冷闸=true。
+        // 这句话不能读成"这条位移在那台机器上只占一帧"，因为**开关两臂连一帧差异都没有**：
+        // 把 `animationsEnabled` 打开与关上拍出同一卷胶片，说明这段过程根本没进那台机器的画面，
+        // 于是"开臂比关臂多 / 比关臂矮"两条判据都没有对照物（R47 的 A/A 同一形状，只是这次跨臂）。
+        // 出口的前提在本机是**相反方向**量过的（R161 的规矩）：本机同一卷 开=0.277 对 关=0.939、
+        // 帧数 3 对 1 ⇒ 这条出口放掉的是通道，不是产品；产品侧留下一格**有名字的未覆盖**（BACKLOG 376）。
+        let armsIdentical = Self.armsAreIdentical(onA: dA, onB: dB, off: dOff)
+        guard !armsIdentical else {
+            let resolvableOnThisMachine = Self.resolvableFrames(durationMilliseconds: duration,
+                                                                 sampleMilliseconds: interval)
+            emit("MOTION_NOT_RUN=pill-slide-arms-identical filter-pill-slide 开A/开B/关 三臂的逐帧差数组完全相同"
+                + "（帧数=\(spanOff) 峰值=\(String(format: "%.4f", Self.peak(dOff)))"
+                + " 采样≈\(interval)ms 可分帧=\(resolvableOnThisMachine)）"
+                + " ⇒ 这一台的胶片里这段位移只占一帧且开关不可分，『有没有过程』这一半没有对照物")
+            throw XCTSkip("MOTION_NOT_RUN=pill-slide-arms-identical")
+        }
+
         // ③ 落定耗时**上限**（"没跑飞"）—— 这一半与采样粒度无关，任何一台都判。
         //
         // 它只判上限、不判"够长"，理由写在这里免得下一次被读成缺陷：
-        // 本机实测 `到位帧=8 采样≈8ms ⇒ 落定≈64ms`，而目录声明的是 200ms（`.slider` 的 response）。
+        // 本机实测（R323 改带之后）`到位帧=7 采样≈8ms ⇒ 落定≈56ms`，而目录声明的是 200ms（`.slider` 的 response）。
         // 临界阻尼弹簧本来就先把绝大部分位移做完再拖尾，尾段那零点几个 pt 落在这把尺的
         // 逐像素相等判据之下 ⇒ "64ms 落定"与"response=200ms"**不矛盾**，
         // 它是这条尺的分辨率，不是产品的时长。真要判"声明 200ms 是不是 200ms"，
@@ -5111,6 +5154,384 @@ final class MotionFilmstripTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(settled, 2,
                 "触发后第 \(settled) 帧就已经是最终态 ⇒ 这条位移档没有过程")
         }
+    }
+
+    // MARK: - R323 / 斜坡尺：四颗纯尺 + 一条逐帧判据
+    //
+    // 这一组纯尺存在的全部理由：R322 那条"有没有过程"用的带子是**在另一张帧上目测**的
+    // （组件帧 `sidebar-history-300x520-light`，胶囊在 66…92pt），而这一卷真窗口里逐行量出来的
+    // 胶囊行带在 49…75pt —— 同一句"胶囊那一行"指向了两块地方。
+    // 结论没被推翻（半颗胶囊仍然读得出"开臂比关臂多"），但那一格的峰值是**被低估**的读数，
+    // 而斜坡尺要的是**中心**：中心不能拿半颗胶囊量
+    // （R107 / R108 那一族：尺读的是不是它声称的那个对象）。
+
+    /// 纯函数：一个像素的 Rec.709 亮度（与 `UICaptureHarness.ArmRGB.luma` 同一组系数，
+    /// 两把尺不许各抄一份系数表 —— R68：证人要与它作证的判据同一颗尺子）。
+    static func lumaAt(_ pixels: [UInt8], _ bytesPerRow: Int, _ x: Int, _ y: Int) -> Double {
+        let o = y * bytesPerRow + x * 4
+        return 0.2126 * Double(pixels[o]) + 0.7152 * Double(pixels[o + 1])
+            + 0.0722 * Double(pixels[o + 2])
+    }
+
+    /// 纯函数：给定行带里**逐列取中位数**的横向剖面（长度 = xRange.count，索引 0 对 xRange.lowerBound）。
+    ///
+    /// 为什么是中位数，不是均值也不是最大值：行带正中间穿过两个段的**字**。
+    /// 字墨（本机 130…230）比轨道（52）亮得多 —— 按列取均值会把药丸内部那一段抬上去，
+    /// 取最大值干脆整条剖面都是字。字只占那一列行高的小三成 ⇒ 中位数仍然落回底上。
+    /// （与 `testGlyphInkUsesTenthDecile` 那一族同一件事：锐度对均值过敏。）
+    static func columnMedianProfile(pixels: [UInt8], bytesPerRow: Int, yRange: Range<Int>,
+                                    xRange: Range<Int>, yStride: Int = 2) -> [Double] {
+        guard !xRange.isEmpty, !yRange.isEmpty, yStride > 0 else { return [] }
+        var out: [Double] = []
+        out.reserveCapacity(xRange.count)
+        for x in xRange {
+            var col: [Double] = []
+            var y = yRange.lowerBound
+            while y < yRange.upperBound {
+                col.append(lumaAt(pixels, bytesPerRow, x, y))
+                y += yStride
+            }
+            out.append(Self.median(col))
+        }
+        return out
+    }
+
+    /// 纯函数：单行上的"轨道 + 会动的洞"读数（首末两帧一起看）。三条都不成立 ⇒ nil：
+    /// ① 这一行有一段与页底**不同档**的轨道；② 轨道里有一段与页底**同档**的洞（= 药丸）；
+    /// ③ 这个洞在两帧之间**走了**至少 `minMoveFraction` 个轨道宽。
+    ///
+    /// 为什么不用"哪些行在变"来定位（本轮自曝的第一版）：换档会**重排整个列表**，
+    /// 本机量出来列表那一片（y≈128…520pt）逐行都在变，比胶囊那 26pt 大一个数量级 ⇒
+    /// "最长连续变化行带"选到的是列表，不是胶囊（读数：行带=126…520pt 那一版）。
+    /// "一颗宽度稳定、位置会走的洞"才是胶囊的形状；重排后的列表读不出这种东西。
+    static func movingHoleRowReading(pixelsA: [UInt8], pixelsB: [UInt8], bytesPerRow: Int, y: Int,
+                                     xRange: Range<Int>, marginWindow: Int, delta: Double,
+                                     minTrackPixels: Int, minHolePixels: Int,
+                                     maxHoleFraction: Double, minMoveFraction: Double)
+        -> (extent: Range<Int>, holeA: Range<Int>, holeB: Range<Int>, margin: Double)? {
+        guard !xRange.isEmpty, y >= 0, marginWindow > 0 else { return nil }
+        let rowA = (0..<xRange.count).map { lumaAt(pixelsA, bytesPerRow, xRange.lowerBound + $0, y) }
+        let rowB = (0..<xRange.count).map { lumaAt(pixelsB, bytesPerRow, xRange.lowerBound + $0, y) }
+        let window = min(marginWindow, rowA.count)
+        let margin = Self.median(Array(rowA[0..<window]))
+        guard margin >= 0 else { return nil }
+        guard let extA = trackExtent(profile: rowA, margin: margin, delta: delta,
+                                     minTrackPixels: minTrackPixels),
+              let extB = trackExtent(profile: rowB, margin: margin, delta: delta,
+                                     minTrackPixels: minTrackPixels) else { return nil }
+        let extent = Range<Int>(uncheckedBounds: (lower: Swift.min(extA.lowerBound, extB.lowerBound),
+                                                  upper: Swift.max(extA.upperBound, extB.upperBound)))
+        guard extent.count >= minTrackPixels,
+              let holeA = pillRun(profile: rowA, margin: margin, delta: delta, extent: extent,
+                                  minPillPixels: minHolePixels),
+              let holeB = pillRun(profile: rowB, margin: margin, delta: delta, extent: extent,
+                                  minPillPixels: minHolePixels) else { return nil }
+        let width = Double(extent.count)
+        guard Double(holeA.range.count) / width <= maxHoleFraction,
+              Double(holeB.range.count) / width <= maxHoleFraction else { return nil }
+        let move = abs(Double(holeB.range.lowerBound + holeB.range.upperBound
+                              - holeA.range.lowerBound - holeA.range.upperBound) / 2.0)
+        guard move >= minMoveFraction * width else { return nil }
+        return (extent, holeA.range, holeB.range, margin)
+    }
+
+    /// 纯函数：逐行跑 `movingHoleRowReading`，返回**最长的一段连续通过行**（px，自上往下）。
+    /// 一段都不够 `minRows` ⇒ nil；调用方必须把它写成具名出口。
+    static func movingHoleBand(pixelsA: [UInt8], pixelsB: [UInt8], bytesPerRow: Int, height: Int,
+                               xRange: Range<Int>, marginWindow: Int, delta: Double,
+                               minTrackPixels: Int, minHolePixels: Int, maxHoleFraction: Double,
+                               minMoveFraction: Double, yStride: Int, minRows: Int) -> Range<Int>? {
+        guard height > 0, yStride > 0, !xRange.isEmpty else { return nil }
+        var passing: [Bool] = []
+        var y = 0
+        while y < height {
+            passing.append(movingHoleRowReading(pixelsA: pixelsA, pixelsB: pixelsB,
+                                                bytesPerRow: bytesPerRow, y: y, xRange: xRange,
+                                                marginWindow: marginWindow, delta: delta,
+                                                minTrackPixels: minTrackPixels,
+                                                minHolePixels: minHolePixels,
+                                                maxHoleFraction: maxHoleFraction,
+                                                minMoveFraction: minMoveFraction) != nil)
+            y += yStride
+        }
+        var best = (-1, -1)
+        var start = -1
+        for (i, ok) in passing.enumerated() {
+            if ok {
+                if start < 0 { start = i }
+            } else if start >= 0 {
+                if (i - start) * yStride > best.1 - best.0 { best = (start * yStride, i * yStride) }
+                start = -1
+            }
+        }
+        if start >= 0, (passing.count - start) * yStride > best.1 - best.0 {
+            best = (start * yStride, Swift.min(height, passing.count * yStride))
+        }
+        guard best.1 - best.0 >= minRows, best.1 > best.0 else { return nil }
+        return best.0..<best.1
+    }
+
+    /// 纯函数：剖面上"与页底**不同档**"的第一列到最后一次出现的那一列 = 轨道的横向范围（剖面索引）。
+    ///
+    /// 为什么范围要**整卷取并**而不是逐帧自算：药丸停在某一段时，亮区只剩轨道的另一半，
+    /// 逐帧自算会让范围跟着跳（本机实测：首帧的亮区只有 146…286pt，末帧只有 12…154pt）。
+    static func trackExtent(profile: [Double], margin: Double, delta: Double,
+                            minTrackPixels: Int) -> Range<Int>? {
+        guard !profile.isEmpty, minTrackPixels > 0 else { return nil }
+        var first = -1, last = -1
+        for (i, value) in profile.enumerated() where abs(value - margin) >= delta {
+            if first < 0 { first = i }
+            last = i
+        }
+        guard first >= 0, last - first >= minTrackPixels else { return nil }
+        return first..<(last + 1)
+    }
+
+    /// 纯函数：轨道范围里"与页底同档"的最长连续段 = 药丸；连两级亮度一起交出来当前提读数。
+    ///
+    /// 为什么"药丸 = 与页底同档"而不是"药丸 = 亮的那一段"：本机这一卷量出来
+    /// 轨道 52、药丸 36、页底 30 —— `VisualMaterial.sliderPill` 是 `.ultraThickMaterial`，
+    /// 材质在离屏捕获里落到**页底那一档**，于是胶囊读起来是轨道上的一个洞
+    /// （三个数都印在 `MOTION_PILL_RAMP` 那行，不许让这句话只活在注释里）。
+    /// 这不影响产品画了什么，但它决定尺该找哪一段：写死"亮的那段是药丸"会把洞当成轨道，
+    /// 中心就永远读到轨道两端去了（R33 那一族：探针的前提要先成立）。
+    static func pillRun(profile: [Double], margin: Double, delta: Double, extent: Range<Int>,
+                        minPillPixels: Int)
+        -> (range: Range<Int>, pillLuma: Double, trackLuma: Double)? {
+        guard extent.lowerBound >= 0, extent.upperBound <= profile.count,
+              !extent.isEmpty, minPillPixels > 0 else { return nil }
+        let hole = extent.map { abs(profile[$0] - margin) < delta }
+        var best = (-1, -1)
+        var start = -1
+        var pillSum = 0.0, pillN = 0, trackSum = 0.0, trackN = 0
+        for (i, isHole) in hole.enumerated() {
+            let value = profile[extent.lowerBound + i]
+            if isHole {
+                pillSum += value
+                pillN += 1
+                if start < 0 { start = i }
+            } else {
+                trackSum += value
+                trackN += 1
+                if start >= 0 {
+                    if i - start > best.1 - best.0 { best = (start, i) }
+                    start = -1
+                }
+            }
+        }
+        if start >= 0, hole.count - start > best.1 - best.0 { best = (start, hole.count) }
+        guard best.1 - best.0 >= minPillPixels, pillN > 0, trackN > 0 else { return nil }
+        return (Range<Int>(uncheckedBounds: (lower: extent.lowerBound + best.0,
+                                             upper: extent.lowerBound + best.1)),
+                pillLuma: pillSum / Double(pillN), trackLuma: trackSum / Double(trackN))
+    }
+
+    /// 纯函数：三臂的逐帧差数组是否**完全相同** —— 也就是这台机器的胶片里"开"与"关"不可分。
+    ///
+    /// 这条单独抽出来是因为它是**出口**，而出口最容易变成洗红的水：
+    /// "两臂读数一样 = 尺坏/通道看不见"（R47 / BACKLOG 216 同一形状）在这里反过来用 ——
+    /// 三臂一样 ⇒ 没有对照物 ⇒ 放行。所以它必须自己有一格正对照：
+    /// 只要有任何一臂差一个数，它就不许说"相同"（`MotionPillRampTests.testArmsAreIdenticalRefuses...`）。
+    static func armsAreIdentical(onA: [Double], onB: [Double], off: [Double]) -> Bool {
+        onA == off && onB == off
+    }
+
+    /// 纯函数：把一串亮区中心归成**有名字的一种**斜坡结论。词表就是这一轮的产物，不许意译。
+    ///
+    /// 四格：`无对象`（任何一帧读不出中心 ⇒ 后面每一格都没有对象）/
+    /// `没动`（首末中心之差 < `tolerance`，也就是这一卷里药丸根本没挪）/
+    /// `回头`（相邻两帧之间出现 > `tolerance` 的**倒退** —— MC-1 说程序触发的位移不给过冲，
+    /// 而"过冲后弹回来"正是它的像素形状）/ `单调`（其余：一路朝一个方向走）。
+    ///
+    /// 为什么 `tolerance` 用长度而不用"帧数比例"：这条判据要说的是"药丸在轨道上退回去多少"，
+    /// 那是个长度量；比例会把倍率与轨道宽度混进来（R58 那一族：像素数不是几何）。
+    /// 中心交给调用方换算成 **pt**，所以同一个容差在本机与 runner 上是同一条线。
+    static func rampVerdict(_ centers: [Double], tolerance: Double) -> (label: String, detail: String) {
+        guard !centers.isEmpty else { return ("无对象", "一个中心都没读到") }
+        if let bad = centers.firstIndex(where: { $0 < 0 }) {
+            return ("无对象", "第 \(bad) 帧起读不出药丸连续段：\(centers.map { String(format: "%.1f", $0) })")
+        }
+        let first = centers[0], last = centers[centers.count - 1]
+        var worstBack = 0.0
+        for i in 1..<centers.count { worstBack = max(worstBack, Double(centers[i - 1] - centers[i])) }
+        let travel = Double(last - first)
+        let detail = "首=\(String(format: "%.1f", first))pt 末=\(String(format: "%.1f", last))pt"
+            + " 位移=\(String(format: "%.1f", travel))pt 最大倒退=\(String(format: "%.1f", worstBack))pt"
+            + " 容差=\(String(format: "%.1f", tolerance))pt 帧数=\(centers.count)"
+        if abs(travel) < tolerance { return ("没动", detail) }
+        if worstBack > tolerance { return ("回头", detail) }
+        return ("单调", detail)
+    }
+
+    /// 两处调用共用的一颗参数表（写两遍就会漂：R38 那一族，同一个阈值不许有两个权威）。
+    private func measuredMovingHoleBand(_ a: Bitmap, _ b: Bitmap, scale: Double) -> Range<Int>? {
+        let xLo = max(0, Int((1.0 * scale).rounded()))
+        let xHi = min(a.width, Int((299.0 * scale).rounded()))
+        guard xHi - xLo >= 16, a.height == b.height, a.width == b.width else { return nil }
+        return Self.movingHoleBand(pixelsA: a.pixels, pixelsB: b.pixels, bytesPerRow: a.width * 4,
+                                   height: a.height, xRange: xLo..<xHi,
+                                   marginWindow: max(2, Int((6.0 * scale).rounded())),
+                                   delta: 8, minTrackPixels: max(8, Int((20.0 * scale).rounded())),
+                                   minHolePixels: max(4, Int((12.0 * scale).rounded())),
+                                   maxHoleFraction: 0.8, minMoveFraction: 0.1,
+                                   yStride: 2, minRows: max(4, Int((6.0 * scale).rounded())))
+    }
+
+    /// 从**这一卷**的首末帧量出胶囊所在的归一化带（R323：R322 那条带是在别的帧上目测的）。
+    /// 读不出 ⇒ nil，调用方必须写成具名出口，不许拿目测带顶上去。
+    private func measuredPillBand(_ film: Film) -> CGRect? {
+        guard film.motionFrames.count > 2,
+              let head = film.motionFrames.first, let tail = film.motionFrames.last else { return nil }
+        let a = Self.raster(head), b = Self.raster(tail)
+        guard a.height > 0, a.width > 0 else { return nil }
+        let scale = Double(a.height) / 520.0
+        let xLo = max(0, Int((1.0 * scale).rounded()))
+        let xHi = min(a.width, Int((299.0 * scale).rounded()))
+        guard xHi - xLo >= 16, let band = measuredMovingHoleBand(a, b, scale: scale) else { return nil }
+        let xRange = xLo..<xHi
+        let profileA = Self.columnMedianProfile(pixels: a.pixels, bytesPerRow: a.width * 4,
+                                                yRange: band, xRange: xRange)
+        let profileB = Self.columnMedianProfile(pixels: b.pixels, bytesPerRow: b.width * 4,
+                                                yRange: band, xRange: xRange)
+        let margin = Self.median(Array(profileA[0..<max(2, xRange.count / 40)]))
+        let minTrack = max(8, Int((20.0 * scale).rounded()))
+        guard margin >= 0,
+              let extA = Self.trackExtent(profile: profileA, margin: margin, delta: 8,
+                                          minTrackPixels: minTrack),
+              let extB = Self.trackExtent(profile: profileB, margin: margin, delta: 8,
+                                          minTrackPixels: minTrack) else { return nil }
+        // 横向范围取**两帧的并**：药丸停在某一段时，亮区只剩轨道的另一半，
+        // 逐帧自算会让带子只盖住半颗胶囊（`trackExtent` 上面记的是同一件事）。
+        let extent = Range<Int>(uncheckedBounds: (lower: Swift.min(extA.lowerBound, extB.lowerBound),
+                                                  upper: Swift.max(extA.upperBound, extB.upperBound)))
+        return CGRect(x: CGFloat(xRange.lowerBound + extent.lowerBound) / CGFloat(a.width),
+                      y: CGFloat(band.lowerBound) / CGFloat(a.height),
+                      width: CGFloat(extent.count) / CGFloat(a.width),
+                      height: CGFloat(band.count) / CGFloat(a.height))
+    }
+
+    /// R323 / 产品面：那条位移**走得怎么样** —— 斜坡尺第一次逐帧读药丸中心。
+    ///
+    /// 上一轮结的是"有没有过程"（@R322 那格：开臂中间态帧数 3 对关臂 1）。到线之后剩下的问题是品质：
+    /// MC-1 写着"只有手势跟手的位移才给过冲"，而这颗胶囊是**程序触发**的 ⇒ 它的像素形状必须是
+    /// 一路朝一个方向、不回头。以前这句话只有纯值守卫（`damping == 1.0`）在钉，产物侧一次也没被看过。
+    ///
+    /// 判法：两遍各判一次（同臂两遍都必须给同一个词），词表是 `rampVerdict` 那四格。
+    /// `无对象` / `没动` / 分离度不够 是**通道问题**（这一台量不出 ⇒ 具名出口，不写产品事实，D-305 同一形状）；
+    /// `回头` 才是产品事实 —— 那意味着曲线里混进了过冲，第一笔该改的就是它。
+    func testFilterPillRampIsMonotone() throws {
+        try skipUnlessEnabledAndCapable()
+        let scenario = Scenario.filterPillSlide()
+        let filmA = record(scenario)
+        let filmB = record(scenario)
+        guard filmA.motionFrames.count > 3, filmB.motionFrames.count > 3 else {
+            emit("MOTION_NOT_RUN=too-few-frames pill-ramp A=\(filmA.motionFrames.count)"
+                + " B=\(filmB.motionFrames.count) ⇒ 斜坡无从逐帧判")
+            throw XCTSkip("MOTION_NOT_RUN=too-few-frames：这一卷帧数不足")
+        }
+        // 前提（与带子无关，R323 同一课）：首末必须真的换了档。
+        // no-op 触发不许被读成"这台机器看不见"——它得红在"什么都没驱动"上。
+        XCTAssertTrue(Self.premisePictureChanged(filmA.motionFrames, band: nil),
+            "触发后整幅画面首末逐像素相同 ⇒ 这次点档什么都没驱动（夹具/探针坏了，不是通道看不见）。"
+            + " 帧数=\(filmA.motionFrames.count)")
+        // 几何全部由**这一卷自己的帧**量出来：行带 = 首末帧之间那颗"会走的洞"所在的连续行
+        // （为什么不用"哪些行在变"：换档重排整个列表，列表那一片比胶囊大一个数量级）；
+        // 页底档 = 轨道之外那几列的中位数；轨道范围 = 整卷取并（理由写在 `trackExtent` 上面）。
+        let head = Self.raster(filmA.motionFrames[0])
+        let tail = Self.raster(filmA.motionFrames[filmA.motionFrames.count - 1])
+        guard head.width == tail.width, head.height == tail.height, head.width > 0, head.height > 0 else {
+            emit("MOTION_NOT_RUN=pill-ramp-frame-shape 首末帧尺寸不一致 ⇒ 逐行差无从算")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-frame-shape")
+        }
+        let scale = Double(head.height) / 520.0
+        let xRange = max(0, Int((1.0 * scale).rounded()))
+            ..< min(head.width, Int((299.0 * scale).rounded()))
+        guard let band = measuredMovingHoleBand(head, tail, scale: scale) else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-band pill-slide-ramp 首末帧里读不出一颗'宽度稳定、位置会走'的洞"
+                + " ⇒ 这一台看不见那颗胶囊走过（不写产品事实，D-305）")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-band")
+        }
+        func profile(of image: CGImage) -> [Double] {
+            let bmp = Self.raster(image)
+            return Self.columnMedianProfile(pixels: bmp.pixels, bytesPerRow: bmp.width * 4,
+                                            yRange: band, xRange: xRange)
+        }
+        let profilesA = filmA.motionFrames.map { profile(of: $0) }
+        let profilesB = filmB.motionFrames.map { profile(of: $0) }
+        let marginWindow = max(2, xRange.count / 40)
+        let margin = Self.median(Array(profilesA[profilesA.count - 1][0..<marginWindow]))
+        guard margin >= 0 else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-margin 页底那几列一个数都没读到")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-margin")
+        }
+        var extLo = Int.max, extHi = Int.min
+        for values in profilesA {
+            guard let e = Self.trackExtent(profile: values, margin: margin, delta: 8,
+                                           minTrackPixels: max(8, Int((20.0 * scale).rounded()))) else { continue }
+            extLo = min(extLo, e.lowerBound)
+            extHi = max(extHi, e.upperBound)
+        }
+        guard extHi > extLo, extLo != Int.max else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-track 页底=\(String(format: "%.1f", margin))"
+                + " ⇒ 这一行带里没有一段与页底不同档的轨道，尺找不到对象")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-track")
+        }
+        let extent = extLo..<extHi
+        func centers(_ profiles: [[Double]]) -> [Double] {
+            profiles.map { values in
+                guard let run = Self.pillRun(profile: values, margin: margin, delta: 8, extent: extent,
+                                             minPillPixels: max(4, Int((12.0 * scale).rounded()))) else { return -1 }
+                return Double((run.range.lowerBound + run.range.upperBound) / 2 + xRange.lowerBound) / scale
+            }
+        }
+        let cA = centers(profilesA), cB = centers(profilesB)
+        // 分离度前提：轨道档与药丸档必须分得开（本机实测 52 对 36）。分不开就不是"没动"，
+        // 是这台机器的材质把那两级洗成了同一档 ⇒ 具名出口，不许把它读成"胶囊不动"。
+        let settledRun = Self.pillRun(profile: profilesA[profilesA.count - 1], margin: margin,
+                                      delta: 8, extent: extent,
+                                      minPillPixels: max(4, Int((12.0 * scale).rounded())))
+        let separation = settledRun.map { abs($0.trackLuma - $0.pillLuma) } ?? -1
+        let trackWidthPt = Double(extent.count) / scale
+        let tolerance = max(2.0, trackWidthPt * 0.02)
+        emit("MOTION_PILL_RAMP_GEOM filter-pill-slide 行带=\(String(format: "%.1f", Double(band.lowerBound) / scale))"
+            + "…\(String(format: "%.1f", Double(band.upperBound) / scale))pt"
+            + " 轨道范围=\(String(format: "%.1f", Double(extent.lowerBound + xRange.lowerBound) / scale))"
+            + "…\(String(format: "%.1f", Double(extent.upperBound + xRange.lowerBound) / scale))pt"
+            + " 倍率=\(String(format: "%.2f", scale)) 页底=\(String(format: "%.1f", margin))"
+            + " 轨道=\(String(format: "%.1f", settledRun?.trackLuma ?? -1))"
+            + " 药丸=\(String(format: "%.1f", settledRun?.pillLuma ?? -1))"
+            + " 分离=\(String(format: "%.1f", separation)) 容差=\(String(format: "%.1f", tolerance))pt")
+        guard separation >= 8 else {
+            emit("MOTION_NOT_RUN=pill-ramp-low-separation 轨道与药丸两档之差=\(String(format: "%.1f", separation))"
+                + " < 8 ⇒ 这一台的通道分不开这两级，斜坡品质无从逐帧判（分离度是量出来的，不是假设）")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-low-separation")
+        }
+        let vA = Self.rampVerdict(cA, tolerance: tolerance)
+        let vB = Self.rampVerdict(cB, tolerance: tolerance)
+        emit("MOTION_PILL_RAMP filter-pill-slide A 判定=\(vA.label) \(vA.detail)"
+            + " 中心=" + cA.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            + " ｜ B 判定=\(vB.label) \(vB.detail)")
+        guard vA.label != "无对象" && vB.label != "无对象" else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-object A=\(vA.detail) B=\(vB.detail)"
+                + " ⇒ 有帧在轨道范围里读不出药丸连续段，斜坡品质在这一台判不了")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-object")
+        }
+        guard vA.label != "没动" && vB.label != "没动" else {
+            emit("MOTION_NOT_RUN=pill-ramp-flat A=\(vA.detail) B=\(vB.detail)"
+                + " ⇒ 两遍都读成『药丸没挪』：这一台的采样看不见这条斜坡（不写产品事实，D-305）")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-flat")
+        }
+        // 两遍必须给**同一个词**：不一致就是通道在抖，不挑一次算数（R47）。
+        XCTAssertEqual(vA.label, vB.label,
+            "同臂两遍的斜坡结论不一致（A=\(vA.label) \(vA.detail) / B=\(vB.label) \(vB.detail)）"
+            + " ⇒ 这条判据今天没有对照物")
+        // 方向：这一卷是 `.all` → `.favorites`，第二段在右 ⇒ 中心必须往右走。
+        XCTAssertLessThan(cA[0], cA[cA.count - 1],
+            "首帧中心 \(String(format: "%.1f", cA[0]))pt 不在末帧"
+            + " \(String(format: "%.1f", cA[cA.count - 1]))pt 左边 ⇒ 带子或方向错了：\(vA.detail)")
+        XCTAssertEqual(vA.label, "单调",
+            "药丸的横移读成了「\(vA.label)」：\(vA.detail) ⇒ MC-1 说程序触发的位移不给过冲，"
+            + "而『回头』正是过冲的像素形状 —— 这是产品事实，改曲线，不是改这条判据。")
     }
 
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
@@ -6557,6 +6978,14 @@ final class MotionFilmstripTests: XCTestCase {
         /// 而那些场景不经过新的预卷循环时也不该被这条新闸门误伤。
         var clockIsWarm: Bool = true
 
+        /// 抓这一卷时 `MotionCatalog.animationsEnabled` 落在哪一边（R323）。
+        ///
+        /// 这条存在的全部理由：新加的「三臂逐帧相同 ⇒ 这台机器的胶片里开关不可分」出口，
+        /// 与"A/B 开关根本没生效"在**胶片上长得一模一样**（两者都交出一卷同样的画面）。
+        /// 没有这个数，出口就会把一把坏开关读成"这台机器判不了" —— 那是把真红洗成 skip。
+        /// M923 那一刀（把 `animationsEnabled = false` 删掉）今天正是被这条抓回来的。
+        var animationsEnabledAtRecord: Bool = true
+
         /// 这一卷抓帧成本的**中位数**（ms）。−1 = 没量。
         ///
         /// 为什么与 `worst` 一起带出来（R57）：A/B 比的是"整条带的常态成本 vs 整窗的常态成本"，
@@ -6736,6 +7165,7 @@ final class MotionFilmstripTests: XCTestCase {
                      Int(scenario.declaredDurationMilliseconds)))
         return Film(frames: grabber.frames, stamps: grabber.stamps,
                     triggerFrame: triggerFrame, clockIsWarm: clockIsWarm,
+                    animationsEnabledAtRecord: MotionCatalog.animationsEnabled,
                     medianGrabMilliseconds: grabber.medianGrabMilliseconds,
                     worstGrabMilliseconds: grabber.worstGrabMilliseconds)
     }
