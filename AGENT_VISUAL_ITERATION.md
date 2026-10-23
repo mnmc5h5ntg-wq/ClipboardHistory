@@ -15789,3 +15789,32 @@ Swift 三条腿 NOT-RUN（理由逐条写在正文）；看图腿 RUN（174 张�
 | 交付诚实性 | 15/15 |
 | 可复核性 | 14/15 |
 | 合计 | 90/105 |
+
+## Round 308 · R311（第 310 轮 · 2026-10-23）：runner 把 0.20 判成低于地板 —— 悬停环抬回 0.23（产品 1 文件）
+
+R308 的产品改动在**本机**全绿，但两跑 runner 都红在 `testHoverRingIsVisibleOnEveryHeatLevelAndBothScales`：
+dark/1x 各档 17.11…17.13 < 地板 18（本机同一颗尺给 18.75，差 0.912 倍）。
+本轮把 α 从 0.20 抬回 **0.23**（仍在 0.176…0.236 的窗口内），三条判据一起过：
+档间离散 `HEAT_RING_LEVEL_SPREAD dark/1x 最响/最安静=1.001 各档=[21.75/21.75/21.75/21.74/21.74]`、克制度倍率 0.37、数据像素 0.000。
+地板没有按机器放宽（D-251），改的是产品。
+
+顺带兑现两件事：① 改数值弄腐烂的三根历史针被上一轮刚写的 `scripts/hidden_arms.py` 当场数出来
+（rot 33→35→重钉→33），这是那把尺第一次在真事故上生效；② R309 新格在 runner 上必然 skip，
+名字由 run 39965996188 自己点出来后才登记进名册。
+
+读数：构建告警 0；判据卷 `Ran 13 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failures；CAPTURED 174 -> /tmp/r311_shots；帧基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=2 + 同一笔 update；
+换装 INSTALL_RESULT=ok  版本=1.4.8→1.4.8；刀 R308_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes ｜ R300_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes；预检 bad=0、名册 arms=774；
+脚本电池 `Ran 608 / OK (skipped=4)`（写盘后同数）；产品面连续零改动 = **0** 轮（上一轮 2）。
+看图腿 RUN：看的是这一跑重捕的 4 张：heatmap-cell-strip-still-90x140-{light,dark}.png 与 heatmap-cell-strip-hover-90x140-{light,dark}.png，并且把两档并排比过（/tmp/r311_eye/ring-dark.png 与 ring-light.png：逐像素差取最亮点定环心、34x34 裁、14 倍放大，左=R308 的 0.20、中=R311 的 0.23、右=同跑静置帧）⇒ 环在暗、亮两档都看得见，且只在悬停帧出现（静置帧那一圈是空的）；环与格子填色之间留着一整条空、圆角同心，抬到 0.23 之后没有被压成「整格描边」；暗档比 0.20 明显更实一档但仍然不越过格子本身的颜色梯度，亮档仍是浅灰、不刺眼。判据侧同跑读数 HEAT_RING_LEVEL_SPREAD dark/1x 最响/最安静=1.001 各档=[21.75/21.75/21.75/21.74/21.74] 与眼睛一致（环的强度不随档位漂移），裙边外最大变化 0.00/255 说明没有外溢。结论：这一笔是「把 runner 判成看不见的那一圈抬回可见」，不是把动效加响，不需要为它开新单。
+
+七维度自评：
+| 维度 | 分/满分 |
+| --- | --- |
+| 真实视觉审查 | 13/15 |
+| 判据有效性 | 14/15 |
+| 假绿防御 | 15/15 |
+| 产品面推进 | 12/15 |
+| 台账一致性 | 13/15 |
+| 交付诚实性 | 15/15 |
+| 可复核性 | 14/15 |
+| 合计 | 96/105 |

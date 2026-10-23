@@ -12,6 +12,39 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R311 状态（第 310 轮 / Round 308 · 2026-10-23）
+
+本轮是 R308 那次产品改动的**跨机器复核**：两跑 runner 都红在
+`testHoverRingIsVisibleOnEveryHeatLevelAndBothScales`（dark/1x 17.11…17.13 < 地板 18，
+本机 18.75 ⇒ 差 0.912 倍）。地板不按机器放宽（D-292），改产品：α 0.20 → 0.23，
+仍在 0.176…0.236 的窗口里；三条判据一起过（离散 1.001、数据像素 0.000、克制度 0.37）。
+副产物两条：改数值弄腐烂的三根针被上一轮刚写的 `scripts/hidden_arms.py` 当场数出来
+（rot 33→35→重钉→33，那把尺第一次在真事故上生效）；R309 新格在 runner 上的 skip 由它自己点名后登记。
+
+最后更新：2026-10-23（本地 · R311 / 第 310 轮 / Round 308）：**悬停环抬回 0.23 —— 产品在两台机器上都过线**（产品 1 文件）
+现读：构建告警 0；判据卷 `Ran 13 / 0 失败`；全量卷 Executed 934 tests, with 44 skipped and 0 failures；CAPTURED 174 -> /tmp/r311_shots；帧基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=2 + 同一笔 update；
+换装 INSTALL_RESULT=ok  版本=1.4.8→1.4.8；刀 R308_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes ｜ R300_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes；预检 tables=104 bad=0、名册 arms=774；
+腐烂尺 `HIDDEN_ARMS 表=192 可判=706 rot=33 抽不出=6 上界 rot=33 抽不出=6 处置=ok`；电池 Ran 608 / OK (skipped=4)（写盘后同数）；看图腿 RUN（看的是这一跑重捕的 4 张：heatmap-cell-strip-still-90x140-{light,dark}.png 与 heatmap-cell-strip-hover-90x140-{light,dark}.png，并且把两档并排比过（/tmp/r311_eye/ring-dark.png 与 ring-light.png：逐像素差取最亮点定环心、34x34 裁、14 倍放大，左=R308 的 0.20、中=R311 的 0.23、右=同跑静置帧））。
+产品文件 1 个，连续零改动 **0** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for 310`，
+同形用于 `--check`；上一轮 2 ⇒ 本轮归零）。as-of 第 310 轮的最后一笔产品提交是 9551730 = 第 310 轮。
+
+⓪ R312 开场要先读的（成对：run id ↔ commit）：RUN=39970777765 sha=9551730 status=in_progress conclusion= title=R311 代码半（第 310 轮 / Round 308 · runner 把 0.20 判成低于地板：悬停环抬回 0. workflow=CI
+   —— 必须读到的是**这一跑 runner 上 dark/1x 的 halo 读数**：本机预测 19.7（17.12 / 0.20 × 0.23），
+   若那边仍低于 18，就不许再抬 α（窗口上界 0.236 已经贴着），而要改的是**环的画法**
+   （加宽 hoverStroke 或改成两像素）并把这条写成一单；
+   另外 R308 / R309 那两跑的红（STEP[15] 五格 + STEP[9] 名单外）本轮已修，要复核它们是否消失。
+
+① 下一轮（R312）的靶：① 356 的剩下那一半（暗档最细一步 17.33 低于地板 18 —— 与本轮同源，
+   现在多了一个已知事实：runner 的 1x 比本机低 0.912 倍，任何"贴着地板"的设计在对面那台都会掉出去）；
+   ② 366：33 把腐烂针逐条处置，并把 rot 从下界做成上界（按位置取针）；
+   ③ 348 剩下的读数族各配一条恒等式；④ 360 的最后一批；⑤ 361 的合并；
+   ⑥ 347 / 305 仍欠用户的真机眼。
+
+② 仍开：347（真机证人）、305（等 347）、356 的**那一半**、366（腐烂针待清 + 下界做成上界）、
+   364 的"抽不出候选的 6 把要真跑"、348 的"读数族还没纳全"、354 的第五步、
+   360（剩 11 份）、361（未合并）、359、362、349、350 第二步、351、344、341 的 CI 契约半、
+   339、312 具名出口、304、296、291；用户闸门 220 路 A / 228② / 265。
+
 ## R310 状态（第 309 轮 / Round 307 · 2026-10-23）
 
 本轮做"腐烂的针要能被数出来"：`scripts/hidden_arms.py`（AST + 常量传播 + 双向棘轮）现读

@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### runner 把 0.20 判成低于地板：悬停环抬回 0.23，地板不按机器放宽（R311 / U-1019…U-1021 · D-292 · 产品 1 文件）
+
+- ⓪ 读到两跑 runner 都红（run 39963980031 / 39965996188，STEP[15]）：dark/1x 悬停那一圈只变
+  17.11…17.13/255，低于可见性地板 18；本机同一颗尺给 18.75 ⇒ 两台差 0.912 倍。
+- 修的是产品不是判据：α 0.20 → **0.23**（仍在 R308 自己推出来的窗口 0.176…0.236 内）。
+  本机现读 `HEAT_RING_LEVEL_SPREAD dark/1x 最响/最安静=1.001 各档=[21.75/21.75/21.75/21.74/21.74]`；克制度倍率 0.37、数据像素 0.000、档间离散 1.001 一起过。
+- 三根被弄腐烂的历史针由上一轮新写的 `scripts/hidden_arms.py` 当场数出来（rot 33→35→重钉→33）；
+  重钉 r308 / r300 / r45 三张表并复跑全 CAUGHT、RESTORE_CLEAN=yes。
+- R309 的新格在 runner 上必然 skip ⇒ 名字由 run 39965996188 自己点出后登记进 skip 名册。
+- 现读：构建告警 0；Executed 934 tests, with 44 skipped and 0 failures；CAPTURED 174 -> /tmp/r311_shots；帧基线 FRAME_BASELINE_COMPARED=174 FRAME_BASELINE_CHANGED=2 + 同一笔 update；换装 ok；
+  脚本电池 `Ran 608 / OK (skipped=4)`（写盘后同数）；产品面连续零改动 **0** 轮。
+
 ### 腐烂的针要能被数出来：静态 AST + 常量传播 + 双向棘轮（R310 / U-1016…U-1018 · D-291 · 产品 0 文件，判据轮）
 
 - BACKLOG 364 从"规模"做成"可归因的数"：`scripts/hidden_arms.py` 现读 表=192 可判=706
