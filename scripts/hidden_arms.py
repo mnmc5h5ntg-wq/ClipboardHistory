@@ -37,11 +37,32 @@ MIN_LEN = 12
 LIST_NAMES = ("ARMS", "MUTATIONS", "CASES", "TABLE")
 SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "docs", ".github")
 
-# 双向棘轮：这两个数**必须**等于现读值（R310 现读：rot=33 / 抽不出=6）。
+# 双向棘轮：这三个数**必须**等于现读值（R313 现读）。
 # 注：过滤掉「路径型候选」之前测得 30 / 5 —— 那 3 把是被路径命中洗活的死刀（见 arm_candidates 的注释）。
+# R313 起 rot 这一箱**只数未声明的臂**：表里写了 `NEEDLES = {刀号: [针, …]}` 的那些臂改走
+# 「逐根判」那一箱（declared_dead），因为对已声明的针，"第几根死了"是可加总的真数；
+# 未声明的仍然只配当下界（`any(候选命中)` 的漏报形状见 BACKLOG 366）。
 ROT_CEILING = 33
 OPAQUE_CEILING = 6
-ARM_ID = re.compile(r"M\\d{3,4}")
+DECLARED_DEAD_CEILING = 0
+DECLARED_TABLES_CEILING = 2  # R313 现读：mutate_r308 与 mutate_r312 已声明 NEEDLES
+# 注：这里**必须**单反斜杠。R310 交付时它写的是 `r"M\\d{3,4}"` —— 在 raw 字符串里那是
+# 「反斜杠 + d」，正则永远不命中，于是刀号归因静默退化成「臂#N」整整三轮，
+# 直到 R313 的声明对账格（NEEDLES 的键要靠刀号匹配）把它撞出来。
+# 同一族坏法在 R311 的台账补丁器里也出现过（三处 `\\d`），那条记在 BACKLOG 364 的追记里。
+ARM_ID = re.compile(r"M\d{3,4}")
+# 刀号那一格通常就是 `'M908'` —— 4~5 个字符，**过不了** `arm_candidates` 的 MIN_LEN=12，
+# 所以不能靠候选集去找它。R313 第一次跑就是这么让 declared_arms 静默变成 0 的
+# （而 declared_tables 仍然报 2 ⇒ 那一格是假绿，见下面的修正）。
+ARM_LABEL = re.compile(r"^M\d{3,4}[a-z]?$")
+
+
+def arm_label_of(elt):
+    """臂里**恰好**是刀号的那一格（`'M908'` / `'M213b'`），不是"描述里含 M9xx"。"""
+    for sub in ast.walk(elt):
+        if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and ARM_LABEL.match(sub.value):
+            return sub.value
+    return u""
 PATHISH = re.compile(u"^[\\w./\\\\-]+$")
 
 
@@ -124,13 +145,49 @@ def arm_candidates(elt, cmap):
     return [c for c in out if len(c) >= MIN_LEN and not _is_pathish(c)]
 
 
+def needle_map(tree, cmap):
+    """表里声明的 `NEEDLES = {"M890": GAP_LINE, "M891": [PAD_A, PAD_B]}` ⇒ 刀号 → 针的原文列表。
+
+    为什么要有这个通道（BACKLOG 367）：把 rot 做成上界**没有**静态可推断的办法 ——
+    R312 现读：按位置取针只能覆盖 16/715 臂（可判面塌掉），而"至少一根候选不命中"当上界
+    会把**变异文**算成死针（它本来就不在盘上）。所以只能由表自己说哪根是针。
+    值可以是字符串字面量、也可以是模块级常量名（走 `const_map` 解析，与臂本身同一套）。
+    """
+    out = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Name) and t.id == "NEEDLES" for t in node.targets):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        for k, v in zip(node.value.keys, node.value.values):
+            if not (isinstance(k, ast.Constant) and isinstance(k.value, str)):
+                continue
+            items = []
+            for e in (v.elts if isinstance(v, (ast.List, ast.Tuple, ast.Set)) else [v]):
+                if isinstance(e, ast.Constant) and isinstance(e.value, str):
+                    items.append(e.value)
+                elif isinstance(e, ast.Name) and e.id in cmap:
+                    items.extend(cmap[e.id])
+            if items:
+                out[k.value] = items
+    return out
+
+
 def scan(directory=TABLE_DIR, text=None):
-    """返回 (读数, 每张表的 rot 明细)。"""
+    """返回 (读数, 未声明那一箱的 rot 明细, 抽不出的明细)。
+
+    读数里另有一箱：`declared_dead`（已声明针里死掉的**根数**，可加总）与
+    `declared_arms` / `declared_tables`（覆盖面，用来钉"不许悄悄取消声明"）。
+    明细放在 `info["declared_rows"]`，不改三元组的形状（调用方与判据卷都吃三元组）。
+    """
     if text is None:
         text = corpus()
     tables = sorted(f for f in os.listdir(directory) if f.startswith("mutate_r") and f.endswith(".py"))
     judged = rot = opaque = 0
-    rot_rows, opaque_rows = [], []
+    declared_arms = declared_dead = declared_tables = 0
+    rot_rows, opaque_rows, declared_rows = [], [], []
     for name in tables:
         try:
             with io.open(os.path.join(directory, name), encoding="utf-8") as h:
@@ -140,28 +197,48 @@ def scan(directory=TABLE_DIR, text=None):
             opaque += 1
             continue
         cmap = const_map(tree)
+        nmap = needle_map(tree, cmap)
+        hit_in_table = 0
         for idx, (_var, elt) in enumerate(arms_of(tree)):
-            arm_id = u""
+            arm_id = arm_label_of(elt)
             cands = arm_candidates(elt, cmap)
+            if not arm_id:
+                for c in cands:
+                    m = ARM_ID.search(c)
+                    if m:
+                        arm_id = m.group(0)
+                        break
+            if arm_id and arm_id in nmap:
+                judged += 1
+                declared_arms += 1
+                hit_in_table += 1
+                for n in nmap[arm_id]:
+                    if n not in text:
+                        declared_dead += 1
+                        declared_rows.append((name, arm_id, n[:48]))
+                continue
             if not cands:
                 opaque += 1
                 opaque_rows.append((name, u"臂#" + str(idx), u"抽不出候选"))
                 continue
             judged += 1
             if not any(c in text for c in cands):
-                for c in cands:
-                    m = ARM_ID.search(c)
-                    if m:
-                        arm_id = m.group(0)
-                        break
                 rot += 1
                 rot_rows.append((name, arm_id or (u"臂#" + str(idx)), len(cands)))
-    return ({u"tables": len(tables), u"judged": judged, u"rot": rot, u"opaque": opaque},
+        # 「声明了几张表」必须按**真的匹配上了臂**来数，不能按"文件里有个 NEEDLES 字典"来数 ——
+        # 后者会让一张键名对不上任何臂的表也被算成已覆盖（R313 第一次跑就是这个形状）。
+        if hit_in_table:
+            declared_tables += 1
+    return ({u"tables": len(tables), u"judged": judged, u"rot": rot, u"opaque": opaque,
+             u"declared_arms": declared_arms, u"declared_dead": declared_dead,
+             u"declared_tables": declared_tables, u"declared_rows": declared_rows},
             rot_rows, opaque_rows)
 
 
-def verdict(info, rot_ceiling=ROT_CEILING, opaque_ceiling=OPAQUE_CEILING):
-    """双向棘轮：两个数都必须**恰好**等于现读值（只判一个方向 = 另一半没有牙）。"""
+def verdict(info, rot_ceiling=ROT_CEILING, opaque_ceiling=OPAQUE_CEILING,
+            declared_dead_ceiling=DECLARED_DEAD_CEILING,
+            declared_tables_ceiling=DECLARED_TABLES_CEILING):
+    """双向棘轮：四个数都必须**恰好**等于现读值（只判一个方向 = 另一半没有牙）。"""
     problems = []
     if info[u"rot"] != rot_ceiling:
         problems.append(u"HIDDEN_ROT_DRIFT 现读 rot=%s 而上界写着 %s ⇒ "
@@ -171,6 +248,15 @@ def verdict(info, rot_ceiling=ROT_CEILING, opaque_ceiling=OPAQUE_CEILING):
         problems.append(u"HIDDEN_OPAQUE_DRIFT 现读 抽不出=%s 而上界写着 %s ⇒ "
                         u"抽不出候选的臂变多=静态判据又瞎了一块"
                         % (info[u"opaque"], opaque_ceiling))
+    if info[u"declared_dead"] != declared_dead_ceiling:
+        problems.append(u"HIDDEN_DECLARED_DEAD_DRIFT 现读 已声明死针=%s 而上界写着 %s ⇒ "
+                        u"这一箱是**逐根**数的可加总真数：变多=有声明过的针腐烂（必须重钉），"
+                        u"变少=重钉了却没降上界"
+                        % (info[u"declared_dead"], declared_dead_ceiling))
+    if info[u"declared_tables"] != declared_tables_ceiling:
+        problems.append(u"HIDDEN_DECLARED_TABLES_DRIFT 现读 已声明表=%s 而上界写着 %s ⇒ "
+                        u"变少=有人悄悄删掉 NEEDLES 把已判的臂退回下界箱（那是洗白，不是修好）"
+                        % (info[u"declared_tables"], declared_tables_ceiling))
     return problems
 
 
@@ -184,16 +270,33 @@ def main(argv):
     ns = ap.parse_args(argv[1:])
     if ns.synthetic:
         info, rot_rows, opaque_rows = scan(os.path.join(HERE, "tests", "fixtures", "hidden_arms_synth"))
-        print(u"HIDDEN_ARMS_SYNTH 表=%d 可判=%d rot=%d 抽不出=%d 期望 rot=1 抽不出=1"
-              % (info[u"tables"], info[u"judged"], info[u"rot"], info[u"opaque"]))
-        return 0 if (info[u"rot"] == 1 and info[u"opaque"] == 1) else 1
+        # 三个期望各钉一件事：
+        #   rot=1        —— 未声明那一箱仍然只报"整臂全死"（下界形状，别把它当上界）；
+        #   抽不出=1     —— 静态抽不出候选的臂要显式露出来，不许悄悄算活的；
+        #   已声明死针=1 —— **正对照**：夹具里 M997 那一臂有两根针、一根活一根死。
+        #                  旧估计量看这一臂会报"活的"（`any` 命中），新那一箱必须报"死了 1 根"。
+        #                  这一格就是 BACKLOG 366 说的那个漏报的证人。
+        want = (info[u"rot"] == 1 and info[u"opaque"] == 1 and info[u"declared_dead"] == 1)
+        print(u"HIDDEN_ARMS_SYNTH 表=%d 可判=%d rot=%d 抽不出=%d 已声明臂=%d 已声明死针=%d "
+              u"期望 rot=1 抽不出=1 已声明死针=1"
+              % (info[u"tables"], info[u"judged"], info[u"rot"], info[u"opaque"],
+                 info[u"declared_arms"], info[u"declared_dead"]))
+        for name, arm, needle in info[u"declared_rows"]:
+            print(u"  HIDDEN_DECLARED_ROT %s %s 针=%r" % (name, arm, needle))
+        return 0 if want else 1
     info, rot_rows, opaque_rows = scan(ns.dir)
     problems = verdict(info)
-    print(u"HIDDEN_ARMS 表=%d 可判=%d rot=%d 抽不出=%d 上界 rot=%d 抽不出=%d 处置=%s"
+    print(u"HIDDEN_ARMS 表=%d 可判=%d rot=%d 抽不出=%d 已声明表=%d 已声明死针=%d "
+          u"上界 rot=%d 抽不出=%d 已声明死针=%d 已声明表=%d 处置=%s"
           % (info[u"tables"], info[u"judged"], info[u"rot"], info[u"opaque"],
-             ROT_CEILING, OPAQUE_CEILING, u"red" if problems else u"ok"))
+             info[u"declared_tables"], info[u"declared_dead"],
+             ROT_CEILING, OPAQUE_CEILING, DECLARED_DEAD_CEILING, DECLARED_TABLES_CEILING,
+             u"red" if problems else u"ok"))
     for name, arm, n in rot_rows:
         print(u"  HIDDEN_ROT %s %s（候选 %d 个，盘上一个都不命中 ⇒ 这一臂的针已腐烂）" % (name, arm, n))
+    for name, arm, needle in info[u"declared_rows"]:
+        print(u"  HIDDEN_DECLARED_ROT %s %s 针=%r（已声明的针在盘上找不到 ⇒ 必须重钉）"
+              % (name, arm, needle))
     for name, arm, why in opaque_rows:
         print(u"  HIDDEN_OPAQUE %s %s %s" % (name, arm, why))
     for p in problems:

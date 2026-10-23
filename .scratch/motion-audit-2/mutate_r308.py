@@ -77,6 +77,18 @@ ARMS = [
      CONFINE_TEST, u'裙边之外有一处变了'),
 ]
 
+# R313 / BACKLOG 367：声明每一臂的针（见 mutate_r312 里那段注释说的两箱形状）。
+# 这张表正是 R311 那次"人改到同一行才撞见腐烂"的现场之一：ALPHA 当时从 0.20 抬到 0.23，
+# 而尺只报了另一张表的两根针 —— 因为本臂别的候选字符串还活着。声明之后它必须被逐根点名。
+NEEDLES = {
+    "M889": [DRAW_NEW],
+    "M890": [GAP_LINE],
+    "M891": [PAD_LINE],
+    "M892": [ALPHA],
+    "M893": [BAND_CENTER],
+    "M894": [FRINGE_LINE],
+}
+
 # 结论行有**两种形状**（R168 记过这一族，我又踩了一次）：`Executed 13 tests, with 0 failures`
 # 与 `Executed 92 tests, with 4 tests skipped and 0 failures`。只认后一种会把"跑起来了没"读成 0，
 # 于是基线闸门以「跑=0」为由拒发整张表 —— 方向是安全的（宁可不出版），但白跑一遍。
