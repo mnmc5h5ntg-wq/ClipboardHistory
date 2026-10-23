@@ -167,9 +167,8 @@ ST_NEW = u"""## @RTAG@ 状态（第 @ROUND@ 轮 / Round @RDN@ · @TODAY@）
 现读：构建 `@WARN@`；全量卷 `@FULL@`；重捕帧 `@CAPT@`；帧基线 `@BASE@`；四件套 `@RVLINE@`；
 探针卷 `@PROBE_EXEC@`；变异表 `@KNIFELINE@`；针预检 tables=@TABLES@ covered=@COVERED@ bad=@PREBAD@、名册 arms=@ARMREG@；
 腐烂尺 `@HALINE@`；电池 Ran @BATT@ / OK (skipped=@SKIP@)（写盘后同数）；看图腿 RUN（@EYE_SHORT@）。
-产品文件 0 个，连续零改动 **@STREAK@** 轮（R319 那笔产品改动之后重新起算；唯一取数口
-`python3 scripts/product_streak.py --streak-for @ROUND@`，同形用于 `--check`；上一轮 @PREVSTREAK@）。
-as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
+产品文件 0 个，连续零改动 **@STREAK@** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for @ROUND@`，
+同形用于 `--check`；上一轮 @PREVSTREAK@）。as-of 第 @ROUND@ 轮的最后一笔产品提交是 @LASTSHA@ = 第 @LASTROUND@ 轮。
 
 ⓪ @RNEXT@ 开场要先读的（成对：run id ↔ commit）：@CI@
    —— 必须读到：① 本轮这一笔与 R319 那三笔（`84c5468` / `121ef8f` / `a033b98`）在 runner 上是否全绿；

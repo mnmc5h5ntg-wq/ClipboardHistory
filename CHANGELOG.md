@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 368 判到底：热图 hover 提示在离屏产物里没有可读通道，而这次的"全 0"背后站着一个签了名的正对照（R320 / U-1050…U-1052 · D-303 · 产品 0 文件，判据轮）
+
+- 新判据 `UICaptureTests/testHeatmapTooltipChannelProbe`：复用**画出帧的同一棵树**（`inspect:` 钩子），
+  对 `settings-stats-populated` / `settings-stats` 各走亮暗两档，一次数两条通道
+  （`NSView.toolTip` 与 `accessibilityLabel`）。HEATMAP_TOOLTIP_CHANNELS 走过=4 屏×档 热图型toolTip合计=0 热图型无障碍合计=0 任意toolTip合计=0 任意标签合计=0（正对照已签：这把尺读得到 toolTip 与 accessibilityLabel）
+- **正对照先签**：HEATMAP_TOOLTIP_CONTROL 视图=3 热图型toolTip=1 热图型无障碍=1 任意toolTip=1 任意标签=1 ⇒ 尺读得到，产品那侧的 0 才是结论；
+  R313 那两次没有这一格，所以那两次的 0 只能说明敲错了门。
+- 第二条门（`accessibilityChildren`）也只数到 1 个元素 = 只有根：热图格子是纯 SwiftUI 形状，
+  SwiftUI 不给它们建 NSView ⇒ `.help()` 不落进 `NSView` 树。368 因此收成**具名出口**
+  （真窗 + 真辅助技术才能判，与 347 / 305 / 373① 同批），**不留第四次尝试**。
+- 两把刀钉在证人上：M917（不再认"没有记录"那一型文案）、M918（整条无障碍通道读成 nil）
+  ⇒ 都红在正对照那一格。CAUGHT=2/2, RESTORE_CLEAN=yes。
+- 新规矩 D-303：全 0 的读数必须先有正对照签名，正对照要断言具体数、要能被刀弄瞎，
+  而且"0"说的是通道不是产品。
+- 现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 936 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r320_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=936 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r320_rv`；
+  脚本电池 `Ran 611 / OK (skipped=4)`；针预检 bad=0、名册 arms=785。
+
 ### 八轮来的第一笔产品改动：损坏存档的原件保全改成按内容幂等，用例改成主动跨过挂钟粒度；三把刀里有一把先打在不可观察的位上（R319 / U-1047…U-1049 · D-301、D-302 · 产品 1 文件）
 
 - 产品（`HistoryPersistence.swift`）：`preserveCorruptFile` 写之前先在同目录里找**字节相同**的

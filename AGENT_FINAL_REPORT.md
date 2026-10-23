@@ -1,4 +1,4 @@
-# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R316，317 节自评）
+# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R317，318 节自评）
 
 > 标题这一格曾经停在 **R46** 而账本已经写到 R99 —— 那是 U-264 记的那族「报告格子停在旧数」里最显眼的一处（同一族还有 D 行停在 D-149、判据行停在 796 例、帧行停在 112、变异行停在 M509、脚本行停在 127 条）。R99 起这几格跟着 pass-2 的日志一起刷新，出处写在每一格末尾。
 
@@ -17,9 +17,9 @@
 | 项 | 状态 | 证据 |
 |---|---|---|
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
-| 阶段二 **309 轮**审计（R9–R316；以 `curve_from_ledger.py` 的 `PHASE2 n=309` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 316 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
+| 阶段二 **310 轮**审计（R9–R317；以 `curve_from_ledger.py` 的 `PHASE2 n=310` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 317 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-1049（R319 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-1052（R320 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -982,9 +982,9 @@ R199 那八跑连红如果继续被推到"下一轮再读"，就会有一张免�
 
 这一节由仪器与台账**现读**生成，不手抄：数字后面括号里是取数的地方。
 
-- **走到哪了**：阶段二累计 `## Round` 节 **317** 节，最新一节是 **Round 316**；自评曲线按轮现读 313=91 314=90 315=86 316=91（现读 `curve_from_ledger.py`）。派生分连续多轮低于 90 ⇒ 按目标继续修，不收口。
-- **产品面（这一节最该被读的部分）**：本轮产品文件 **1** 个（ClipboardHistory/Sources/ClipboardHistoryApp/Managers/HistoryPersistence.swift）—— **连续 7 轮零产品文件之后的第一笔产品改动**：损坏存档的原件保全改成按内容幂等，顺带修掉撞名返回 nil 让恢复提示说「未知位置」那一支。产品面连续零改动轮数 = **0**（归零）；唯一取数口 `python3 scripts/product_streak.py --streak-for 318`，`--check` 同形；本轮之前的最后一笔产品提交是 84c5468 = 第 318 轮。五腿全部现读：ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests；全量卷 Executed 935 tests, with 44 tests skipped and 0 failures；重捕 CAPTURED 174 -> /tmp/r319_rv/frames；基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=935 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r319_rv。三把刀 M914 / M915 / M916 CAUGHT=3/3, RESTORE_CLEAN=yes（预检 tables=107 covered=90 bad=0）（M915 第一版打在不可观察的位上 ⇒ PASSED，改针到真值表本体才 CAUGHT）。
-- **判据与门的规模**：脚本电池现读 **Ran 611**（写盘后同数），变异臂在册 **783** 把 / 201 张表（预检 tables=107 covered=90 bad=0）；腐烂针尺现读 `HIDDEN_ARMS 表=195 可判=715 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；U 定义行 **766 条**、最大 **U-1049**；决定台账最大 **D-302**，BACKLOG 最大 **374**（本轮不开新单，给 374 写了结案追记）
+- **走到哪了**：阶段二累计 `## Round` 节 **318** 节，最新一节是 **Round 317**；自评曲线按轮现读 314=90 315=86 316=91 317=87（现读 `curve_from_ledger.py`）。派生分连续多轮低于 90 ⇒ 按目标继续修，不收口。
+- **产品面（这一节最该被读的部分）**：本轮产品文件 0 个（**判据轮**：git 现读改动面 = 5 个文件，产品 0 个、判据 1 个（`UICaptureHarness.swift`）；五腿**全部适用且都跑了**：ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests；全量卷 Executed 936 tests, with 44 tests skipped and 0 failures；重捕 CAPTURED 174 -> /tmp/r320_rv/frames；基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=936 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r320_rv。产品面连续零改动轮数 = **1**（R318 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 319`，`--check` 同形；上一轮那一格是 0）。本轮的结论是**一条带正对照签名的全 0**：HEATMAP_TOOLTIP_CONTROL 视图=3 热图型toolTip=1 热图型无障碍=1 任意toolTip=1 任意标签=1；HEATMAP_TOOLTIP_CHANNELS 走过=4 屏×档 热图型toolTip合计=0 热图型无障碍合计=0 任意toolTip合计=0 任意标签合计=0（正对照已签：这把尺读得到 toolTip 与 accessibilityLabel） ⇒ 热图 hover 提示在离屏产物里没有可读通道（368 收成具名出口，剩真机眼那半）。两把刀钉在证人上：CAUGHT=2/2, RESTORE_CLEAN=yes。
+- **判据与门的规模**：脚本电池现读 **Ran 611**（写盘后同数），变异臂在册 **785** 把 / 202 张表（预检 tables=108 covered=91 bad=0）；腐烂针尺现读 `HIDDEN_ARMS 表=196 可判=717 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；U 定义行 **769 条**、最大 **U-1052**；决定台账最大 **D-303**，BACKLOG 最大 **374**（本轮不开新单，给 368 写了判到头的追记）
 - **为什么产品面停着（量出来的，不是背出来的）**：347 要判「亮档按下要不要抬到系统量级」（本机变颗平均 亮 29 对 系统 52、暗 21 对 18；runner 27 / 19 与本机同量级）。我连着两轮把它写成「被截屏规矩挡住」，R298 实测更正：数据隔离开关 `CLIPBOARD_HISTORY_DATA_DIR` 早有、真机合成层通道当天可判（`DISPLAY_CHANNEL 可判=1`、`REALSCREEN_VERDICT=ok`），真卡点是**单实例守卫会中止探针实例** ⇒ 要跑真机证人必须先由用户退出正在运行的 App。这是唯一还挡着产品判断的一条，且它需要用户点头（352 写全了路线与两道 fail-closed 断言）。
 - **公开撤回与更正（这一段的账里最贵的部分）**：R295 撤回「带窗把 R263 的字形墨地板截成 6 颗」那句假话（两层两尺，我把它们当成一条）；R298 撤回「347 被截屏规矩挡住」；同轮更正自己 commit 里抄错的电池读数（556 → 现读 555）；并当场量出我自己当天写的守卫的锚点腐烂（15 笔窗口撑不过两天）⇒ 改成自定位生日。
-- **仍开（截至本轮，完整名单以 `AGENT_STATE.md` 的 R319 节 ② 为准）**：347、305、364（隐藏 needle 的腐烂检测）、354（runner 单跑红的分布读数）、356 的那一半（暗档最细一步 17.33 低于可见性地板 18；R308 已把环搬到格子外面，档间离散 1.75→1.000，α 0.30→0.20）、354 的第五步（sampled 那两条的退场阈值：连续几跑没红才算，还是要求作者显式删）、360（已搬三批，剩 11 份 15 行；R307 就地更正上一版这里的叠写）、361（同步点已数出，尚未合并）、362（⓪ 的成对号按 commit 列，本轮量到 3 笔根本没有 run）、359（取证目录没有读数汇聚点）、348 的「数字对不对」那一格、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；用户闸门 220 路 A / 228② / 265。
+- **仍开（截至本轮，完整名单以 `AGENT_STATE.md` 的 R320 节 ② 为准）**：347、305、364（隐藏 needle 的腐烂检测）、354（runner 单跑红的分布读数）、356 的那一半（暗档最细一步 17.33 低于可见性地板 18；R308 已把环搬到格子外面，档间离散 1.75→1.000，α 0.30→0.20）、354 的第五步（sampled 那两条的退场阈值：连续几跑没红才算，还是要求作者显式删）、360（已搬三批，剩 11 份 15 行；R307 就地更正上一版这里的叠写）、361（同步点已数出，尚未合并）、362（⓪ 的成对号按 commit 列，本轮量到 3 笔根本没有 run）、359（取证目录没有读数汇聚点）、348 的「数字对不对」那一格、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；用户闸门 220 路 A / 228② / 265。

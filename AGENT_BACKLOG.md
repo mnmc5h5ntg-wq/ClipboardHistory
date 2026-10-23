@@ -7416,6 +7416,20 @@ D-284 那条"重跑历史表"的义务）。倾向 ①：它只加一层自证�
   368 要做的"把 harness 的建树路径提给判据卷"应当拿 `settings-stats`（空）对 `settings-stats-populated`（有数据），
   不需要再新增臂；顺带给 370 留了出口（要么撤重复臂，要么给它一条会红的判据）。
 
+  追记（R320）：**判到底了 —— 这条通道在离屏产物里不存在；本单从"要做产物级判据"改成"具名出口 + 谁能判"。**
+  第三次尝试换了做法：不再自己新建 host，而是复用**画出帧的同一棵树**
+  （`UICaptureHarness` 的 `render(...)` + `inspect:` 钩子，R30 为"侧栏暗档黑字"立的那条路），
+  对 `settings-stats-populated`（有数据）与 `settings-stats`（空账本）各走亮暗两档，
+  一次数两条通道（`NSView.toolTip` 与 `accessibilityLabel`），**并先跑正对照**：
+  HEATMAP_TOOLTIP_CONTROL 视图=3 热图型toolTip=1 热图型无障碍=1 任意toolTip=1 任意标签=1；HEATMAP_TOOLTIP_CHANNELS 走过=4 屏×档 热图型toolTip合计=0 热图型无障碍合计=0 任意toolTip合计=0 任意标签合计=0（正对照已签：这把尺读得到 toolTip 与 accessibilityLabel）
+  ⇒ 尺读得到（对照 toolTip=1 / 无障碍=1 / 视图=3），产品那侧四屏×档全 0。
+  第二条门（`accessibilityChildren`）也只数到 1 个元素 = 只有根 ⇒ 热图格子是纯 SwiftUI 形状，
+  SwiftUI 不给它们建 NSView，`.help()` 落进的是 SwiftUI 自己的无障碍元素树，不落进 `NSView` 树。
+  所以本单原来的"下一步（把 harness 的建树路径提给判据卷）"**已经做完并且判出了否定答案** ——
+  剩下的不是工程债，是通道边界：**能判它的是真窗 + 真辅助技术**（VoiceOver 或已上屏窗口的
+  `NSAccessibility` 查询），与 347 / 305 / 373① 同批，需要用户先退出正在运行的 App。
+  牙：M917 / M918 两把都钉在**正对照**上（把尺弄瞎 ⇒ 对照那一格必须红），CAUGHT=2/2, RESTORE_CLEAN=yes；
+  规矩升成 D-299 之后的 D-303（全 0 的读数必须先有正对照签名）。**不留第四次尝试。**
 **369. `iconFirstCells` 是手写且自指的：诊断行只给名单里的格子打，于是"该不该进名单"这件事本身没有证人（R314 现读）**（R314）
 
   卡片内缩那把尺对首墨是图标的卡片要走一条**有界**替代判据（delta ∈ [+0.5, +2.0]），

@@ -12,6 +12,44 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R320 状态（第 319 轮 / Round 317 · 2026-10-24）
+
+本轮一笔：368 判到底 —— 新判据 `testHeatmapTooltipChannelProbe` 复用 harness 的建树路径 + 正对照，
+HEATMAP_TOOLTIP_CHANNELS 走过=4 屏×档 热图型toolTip合计=0 热图型无障碍合计=0 任意toolTip合计=0 任意标签合计=0（正对照已签：这把尺读得到 toolTip 与 accessibilityLabel）；对照那格读到 `toolTip=1 无障碍=1`，所以产品那侧的 0 是结论不是敲门声。
+第二条门（`accessibilityChildren`）只数到根 ⇒ SwiftUI 形状的 `.help()` 不落进 `NSView` 树。
+本单收成**具名出口**（真窗 + 真辅助技术才能判，与 347 / 305 / 373① 同批），不留第四次尝试。
+两把刀 M917 / M918 钉在证人上（CAUGHT=2/2, RESTORE_CLEAN=yes）；新规矩 D-303。
+
+最后更新：2026-10-24（本地 · R320 / 第 319 轮 / Round 317）：**一条"全 0"第一次带着正对照的签名进台账**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 936 tests, with 44 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r320_rv/frames`；帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=936 swift_skipped=44 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r320_rv`；
+探针卷 `Executed 1 test, with 0 failures（正对照 toolTip=1 / 无障碍=1 / 视图=3 已签；产品四屏×档合计 toolTip=0 无障碍=0）`；变异表 `CAUGHT=2/2, RESTORE_CLEAN=yes`；针预检 tables=108 covered=91 bad=0、名册 arms=785；
+腐烂尺 `HIDDEN_ARMS 表=196 可判=717 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；电池 Ran 611 / OK (skipped=4)（写盘后同数）；看图腿 RUN（本轮看图看的是**热图那一圈悬停描边**（`heatmap-cell-strip-hover-90x140-light.png`，本轮重捕的 174 张之一），并把浮层两档与设置统计屏重看了一遍；同时做了完整性核对：R319 那一遍 174 张与本轮这一遍 174 张逐字节对拍）。
+产品文件 0 个，连续零改动 **1** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 319`，
+同形用于 `--check`；上一轮 0）。as-of 第 319 轮的最后一笔产品提交是 84c5468 = 第 318 轮。
+
+⓪ R321 开场要先读的（成对：run id ↔ commit）：RUN=40011516876 sha=a033b98 status=completed conclusion=failure title=R319 补记（把被 shell 吃掉的三条守卫名与落点写回台账，不改历史） workflow=CI
+   —— 必须读到：① 本轮这一笔与 R319 那三笔（`84c5468` / `121ef8f` / `a033b98`）在 runner 上是否全绿；
+   ② `HEATMAP_TOOLTIP_CONTROL` / `HEATMAP_TOOLTIP_CHANNELS` 两行在 runner 上的读数
+      （那台机器的 SwiftUI 无障碍行为可能不同 —— 若对照也读不到，就是**尺的机器差异**，要按 354 那族切片）；
+   ③ 新尺 `QUICKPICK_SELARM` 在 runner 上的落点（页底 236/52 对本机 252/28）。
+
+① 下一轮（R321）的靶：① **回到动效主线**（本轮又是判据轮）：清账表 162/162 已全清，
+      所以要从"撤一条不成立的声明"或"给一个真实位补过程证人"里挑一件做，
+      并跑完整四件套 + 逐张看图 + 配刀；候选：354 的第五步（观察窗口成本）、
+      348 给 `HEATMAP_TOOLTIP_*` / `QUICKPICK_SELARM` / `MUTATE_TABLE` 三族配恒等式；
+   ② 367 迁移（已声明 2 张 / 剩 0 张）；③ 360 最后一批；④ 361 合并；
+   ⑤ 364 的"抽不出候选的 6 把要真跑"；
+   ⑥ 347 / 305 / 373① / 368 四格都在**同一批真机眼**后面 —— 需要用户先退出正在运行的 App，
+      那一轮可以一次把它们全推成读数（人工验收批次已列）。
+
+② 仍开：347（真机证人）、305（等 347）、373（只剩①号真机眼）、
+   368（**已判到通道边界**：离屏无通道，剩真机眼那半）、
+   367（腐烂针待清：已声明 2 张 / 剩 0 张）、
+   354 的第五步 + 负载红一条、348 的"读数族还没纳全"、360（剩 11 份）、361（未合并）、
+   359、362、349、350 第二步、351、344、341 的 CI 契约半、339、312 具名出口、304、296、291；
+   **R318 结案**：373 的②号出口；**R319 结案**：374（corrupt 保全不幂等）；
+   用户闸门 220 路 A / 228② / 265。
+
 ## R319 状态（第 318 轮 / Round 316 · 2026-10-24）
 
 本轮三笔：① 产品 1 文件（`HistoryPersistence.swift`）—— 损坏原件的保全改成**按内容幂等**，
