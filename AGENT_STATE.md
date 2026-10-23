@@ -12,6 +12,38 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R323 状态（2026-10-24 · 本地 · 第 322 轮 / Round 320）：斜坡尺第一次读出那颗胶囊走的路（单调、倒退 0.0pt），三处自曝落在盘之前（产品 0 文件，动效主线）
+
+本轮做了什么：① **产品面主线** —— 给全仓唯一那条位移档（`.slider`）装上**斜坡尺**：
+逐帧读药丸中心（四颗纯尺 + 词表），本机判定=**单调**、位移 138.0pt、最大倒退 0.0pt、两遍同词
+⇒ MC-1"程序触发的位移不给过冲"第一次在产物侧有证人；② **更正 R322 的观察带**：
+那条 `y 66…92pt` 是从组件帧目测来的，真窗口这一卷量出来是 49…75pt ⇒ 峰值从 0.097 重测成 0.269；
+③ **runner 交账**：R322 那三条硬断言在 runner 上红，红因是三臂逐帧差数组完全相同
+⇒ 新增具名出口 + 两条与通道无关的前置硬前提（D-306），并把 M922 那根腐烂针重钉、重跑 3/3。
+
+验证读数（全部现读，不手抄）：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 960 tests, with 46 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r323_rv/frames`；
+帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`（本轮没改夹具也没改像素）；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=960 swift_skipped=46 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r323_rv`；
+判据卷 `MotionPillRampTests` 13 格全绿、`MotionFilmstripTests` 65 格 3 skip 0 红；
+变异表本轮 `CAUGHT=6/6, RESTORE_CLEAN=yes`（M925…M930，逐臂 M925 CAUGHT；M926 CAUGHT；M927 CAUGHT；M928 CAUGHT；M929 CAUGHT；M930 CAUGHT）、R322 那支重跑 `CAUGHT=3/3, RESTORE_CLEAN=yes`；
+针预检 tables=111 covered=94 bad=0、名册 arms=797 files=205；
+读数族 `READINGS_MUST_INCLUDE 声明=5 缺=0`；脚本电池 `Ran 611（skipped=4）`；
+产品文件 0 个，连续零改动 **4** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 322`，`--check` 同形；上一轮 3）。
+
+⓪ R324 开场要先读的（成对：run id ↔ commit）：本轮 push 之后那一跑的 id **未取**（合法中间态，由追记那一笔回填）；本轮已读的是 R322 那两跑 —— RUN=40023610164 sha=1a37edc（status=completed conclusion=failure，红因与处置见 U-1063），本轮代码半 sha=445fde4。要读的：
+   ① **斜坡尺与那条出口在 runner 上各自怎么说**（期望先写死在这里，读到才算结案）：
+      `MOTION_PILL_RAMP_GEOM` 那一行的 `轨道=/药丸=/分离=` 三个数 —— 若 runner 的分离 < 8，
+      它会报 `MOTION_NOT_RUN=pill-ramp-low-separation`（材质在那台机器上落到哪一档，本轮没数）；
+      若分离够而两臂仍逐字节相同，斜坡尺会报 `pill-ramp-flat` ⇒ 与 376 同一件事，不许读成产品没动；
+   ② `MOTION_NOT_RUN=pill-slide-arms-identical` 在 runner 上**必须出现**（那一跑的红就是它该接住的），
+      同时 `MOTION_FLOOR_SUITE_RED` 必须归零 —— 若红换成别的用例名，先读它，别改判据；
+   ③ R322 欠的 `HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` **本轮签了**：两台机器同读`走过=4 屏×档、四类合计全 0`，而同一跑的正对照读到 `视图=3 热图型toolTip=1 热图型无障碍=1` ⇒ 368 的出口是**通道限制**（SwiftUI 的 `.help` 不落进被遍历的那层 `NSView.toolTip`），已写进 368 的追记；剩下的判法只有真机眼（与 347 / 305 / 373① / 377 同一批）。
+
+① R324 的靶：① **真机眼批次**（现在压着五格：347 亮档按下、305 台阶地板、373① 浮层强调色、
+      368 产物级通道、本轮新开的 377 胶囊比轨道暗）—— 需要用户先退出正在跑的 App，
+      一次跑完比一轮跑一格省；② 378 那把静态尺（写死的矩形逐条问出处）；
+      ③ 动效主线继续：354 第五步（观察窗口成本）与 376 的第二条通道；
+      ④ 367 迁移 / 360 最后一批 / 361 合并 / 364 六把抽不出的刀。
+
 ## R322 状态（第 321 轮 / Round 319 · 2026-10-24）
 
 本轮一笔（动效主线）：侧栏那颗「全部 / 收藏」的**横移**第一次有过程证人 ——

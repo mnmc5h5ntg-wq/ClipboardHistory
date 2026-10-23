@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 斜坡尺第一次逐帧读出侧栏那颗胶囊的横移：判定=单调、最大倒退 0.0pt（R323 / U-1060…U-1064 · 产品 0 文件，动效主线）
+
+- 新增 `MotionFilmstripTests/testFilterPillRampIsMonotone` + 四颗纯尺
+  （`columnMedianProfile` / `trackExtent` / `pillRun` / `movingHoleRowReading`）与词表 `rampVerdict`；
+  合成证人卷 `MotionPillRampTests`（13 格）。本机 MOTION_PILL_RAMP_GEOM filter-pill-slide 行带=51.0…75.0pt 轨道范围=12.0…288.0pt 倍率=2.00 页底=30.0 轨道=52.0 药丸=36.0 分离=16.0 容差=5.5pt ⇒ MOTION_PILL_RAMP filter-pill-slide A 判定=单调 首=81.0pt 末=219.0pt 位移=138.0pt 最大倒退=0.0pt 容差=5.5pt 帧数=27 中心=81.0,81.0,93.0,129.5,156.0,181.5,195.0,204.5,210.0,213.0,214.0,214.5,215.5,216.0,216.5,217.0,217.0,217.5,217.5,218.0,218.0,218.0,218.5,218.5,218.5,218.5,219.0 ｜ B 判定=单调 首=81.0pt 末=219.0pt 位移=138.0pt 最大倒退=0.0pt 容差=5.5pt 帧数=27。
+- 更正 R322 那条过程证人的观察带：改成从**本卷首末帧**量（MOTION_PILL_BAND filter-pill-slide 带=x12.0…288.0pt y51.0…75.0pt 来源=本卷首末帧之差(R323 改前=组件帧目测 66…92pt)），
+  同一台同一卷的峰值从 0.097 / 0.354 重测成 0.269 / 0.939（旧值只盖住半颗胶囊）。
+- runner 交账：那条硬判据在 runner 上红，原因是三臂逐帧差数组完全相同（MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=1(旧口径1) 峰值=0.463 冷闸=true  开B 帧数=1(旧口径1) 峰值=0.463 冷闸=true  关 帧数=1(旧口径1) 峰值=0.463 同一条线=0.0694 共用线安全=true 声明=200ms 采样≈27ms）
+  ⇒ 新增具名出口 `pill-slide-arms-identical`，并在它之前压两条与通道无关的硬前提
+  （整幅画面必须变、A/B 开关必须落进胶片）。新开 BACKLOG 376…378。
+- 变异：本轮 M925…M930 六把 CAUGHT=6/6, RESTORE_CLEAN=yes；R322 那支表因带子重构重钉 M922，重跑 CAUGHT=3/3, RESTORE_CLEAN=yes。
+
 ### 回到动效主线：侧栏那颗胶囊的横移第一次有过程证人（开臂 3 帧 / 关臂 1 帧），而第一版的根视图是替身（R322 / U-1056…U-1059 · D-305 · 产品 0 文件，判据轮）
 
 - 新场景 `Scenario.filterPillSlide()` + 新判据 `MotionFilmstripTests/testFilterPillSlideIsAProcessNotATeleport`：
