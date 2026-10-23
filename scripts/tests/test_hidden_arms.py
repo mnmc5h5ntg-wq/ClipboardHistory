@@ -150,6 +150,9 @@ class RealRepoRatchetTests(unittest.TestCase):
         # 新那一箱的两个方向也要各自响（否则"逐根数"这一箱可以靠不响蒙过去）
         self.assertIn(u"HIDDEN_DECLARED_DEAD_DRIFT",
                       [p.split()[0] for p in ha.verdict(dict(live, declared_dead=live[u"declared_dead"] + 1))])
+        self.assertIn(u"HIDDEN_DECLARED_DEAD_DRIFT",
+                      [p.split()[0] for p in ha.verdict(dict(live, declared_dead=live[u"declared_dead"] - 1))],
+                      u"变少不响 ⇒ 把已声明死针清零（比如整箱被摘掉）也能蒙过去")
         self.assertIn(u"HIDDEN_DECLARED_TABLES_DRIFT",
                       [p.split()[0] for p in ha.verdict(dict(live, declared_tables=live[u"declared_tables"] - 1))],
                       u"悄悄删掉一张表的 NEEDLES = 把已判的臂退回下界箱 ⇒ 那是洗白，必须响")
