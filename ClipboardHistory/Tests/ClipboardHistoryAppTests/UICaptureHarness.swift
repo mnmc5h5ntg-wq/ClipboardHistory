@@ -784,25 +784,39 @@ final class UICaptureTests: XCTestCase {
         var chroma: Int { max(r, max(g, b)) - min(r, min(g, b)) }
     }
 
-    /// 纯函数：一条横向取样带里三通道各自的**中位数**，外加每通道散布（最大−最小）。
+    /// 底色**占比**的下限（取样窗里等于众数那个精确读数的像素占多少百分比）。
     ///
-    /// 为什么不是众数（第一版写的是众数，本机一跑当场被打回）：药丸内部在字节层面**不是实心**的 ——
-    /// 744px 宽的取样带里没有任何一个读数占过半，于是"这里没有药丸"与"这里有纹理"
-    /// 在那一把尺上长得一模一样（R104 那一课的翻版：读不到与没有是两种话）。
-    /// 中位数对纹理稳健；而**散布就是这一轮的读数**，它进日志，不许只当注释。
-    /// `xRange.count >= 8` 是取样带下限：再窄的话中位数只是某一个像素，不构成一条带。
+    /// 为什么不是"散布上限"（这一格本机改了三次，形状都记在这里）：
+    /// ① 第一版要求"整颗药丸那一行里某个读数占过半"⇒ 两档都读不到（药丸内部本来就有纹理与字）；
+    /// ② 第二版改成单行中位数 + 逐像素散布 ⇒ 撞上笔画最密的那一行，散布 215（亮）/ 181（暗）；
+    /// ③ 第三版改成"行中位数的中位数 + 行间断散布"⇒ 仍然 165 / 161 ——
+    ///    因为中段那一列**每一行都有笔画**，行与行之间谁都不代表底色。
+    /// 现在的判法直接问"这块窗里最多的那个读数占多少"：底色是一个精确值、被重复很多次，
+    /// 笔画与抗锯齿都是零头 ⇒ 占比才是"这块底色稳不稳"的那个量。
+    /// 60% 这一档是**预测**：跑完要看实测占比，如果连 60 都不到，那是取样窗还没找对对象
+    /// （先修窗，不许把下限降到能过为止）。它也不是产品线 —— 产品线是"落点必须是两枚参照色之一"。
+    static let armSolidShareFloor = 60
+
+    /// 纯函数：一块**二维取样窗**里的底色 = 出现次数最多的那个精确 RGB，以及它的占比（百分数）。
+    ///
+    /// 为什么取"精确相等的众数"而不是容差内的聚类：底色是一个被重复很多次的确定值，
+    /// 而聚类会把"半透明叠了一层"这种情况也吸收进"底色"里 —— 那正是这一格要能发现的事。
+    /// 窗太小（< 64 像素）⇒ nil：占比在小样本上没有意义。
     static func armMedian(bytes: UnsafePointer<UInt8>, bytesPerRow: Int,
-                          xRange: Range<Int>, y: Int) -> (rgb: ArmRGB, spread: Int)? {
-        guard y >= 0, xRange.count >= 8 else { return nil }
-        var rs: [Int] = [], gs: [Int] = [], bs: [Int] = []
-        for x in xRange {
-            let o = y * bytesPerRow + x * 4
-            rs.append(Int(bytes[o])); gs.append(Int(bytes[o + 1])); bs.append(Int(bytes[o + 2]))
+                          xRange: Range<Int>, yRange: Range<Int>) -> (rgb: ArmRGB, share: Int)? {
+        guard !xRange.isEmpty, !yRange.isEmpty else { return nil }
+        var counts: [ArmRGB: Int] = [:]
+        var total = 0
+        for y in yRange {
+            for x in xRange {
+                let o = y * bytesPerRow + x * 4
+                counts[ArmRGB(r: Int(bytes[o]), g: Int(bytes[o + 1]), b: Int(bytes[o + 2])),
+                      default: 0] += 1
+                total += 1
+            }
         }
-        func med(_ v: [Int]) -> Int { let s = v.sorted(); return s[s.count / 2] }
-        func spread(_ v: [Int]) -> Int { (v.max() ?? 0) - (v.min() ?? 0) }
-        return (ArmRGB(r: med(rs), g: med(gs), b: med(bs)),
-                max(spread(rs), max(spread(gs), spread(bs))))
+        guard total >= 64, let best = counts.max(by: { $0.value < $1.value }) else { return nil }
+        return (best.key, best.value * 100 / total)
     }
 
     /// 纯函数：药丸那一行上，从 `left` 往右第一条**回到页底档**的列（= 药丸右沿）。
@@ -908,10 +922,15 @@ final class UICaptureTests: XCTestCase {
     /// `selectedContentBackgroundColor`（key 那一档）与 `unemphasizedSelectedContentBackgroundColor`
     /// （非 key 那一档），再看帧上的数落在哪条线上（含 `flattenedPNG` 的混合）。
     ///
-    /// **本轮不替产品定罪**，也不写"已修"：落点由读数说，而落点要能红，得先把容差
-    /// 建立在这一次的实测散布上（不是先选一个能让它绿的数）。所以断言只有两条承重的：
-    ///   ① 参照臂必须分得开（`两臂不可分` 判红）—— 这一条是 M 刀的靶；
-    ///   ② 每一档都必须**读得出一个有名字的落点**（药丸读不到 ⇒ 点名，不许记成通过）。
+    /// 断言三条，各自拦一种坏法：
+    ///   ① 参照臂必须分得开（`两臂不可分` 判红）—— 刀 A 的靶；
+    ///   ② 每一档都必须**读得出一个有名字的落点**（药丸读不到 / 带子不干净 ⇒ 点名，不许记成通过）；
+    ///   ③ 落点必须是两枚系统参照色**之一** —— 这一条才是"选中底是系统画的那一档"的可执行形式，
+    ///      也是刀 B 的靶（往选中那一行上叠自家灰 ⇒ 掉成"两臂都不在" ⇒ 红）。
+    ///
+    /// 三条的先后是有讲究的：第一遍跑的时候只有①②，容差 6，两档都"落不进参照臂"，
+    /// 那看起来像暗档的产品事实；把取样带换成干净中段之后两档**逐字节**落在非 key 那一档上，
+    /// 容差才收到 2、③才有资格承重。**先让尺对上对象，再让尺说话**（R104 / R18 那一族）。
     func testQuickPickSelectionPillAgainstSystemArms() throws {
         var judged = 0, declined: [String] = []
         var verdicts: [String] = []
@@ -919,9 +938,14 @@ final class UICaptureTests: XCTestCase {
             .appendingPathComponent("r318-selarm-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
-        // 容差：三通道最大残差 ≤ 6 级灰。它现在的身份是**探针的刻度**，不是产品线；
-        // 下一轮要把它换成从两臂散布推出来的数（D-250 那条等式地板的形状）。
-        let tol = 6
+        // 容差：三通道最大残差 ≤ 2 级灰。
+        //
+        // 为什么从 6 收到 2，而且**不是**为了让它绿：这一格现在有实测依据了 ——
+        // 在干净的中段带上，两档的帧读数与各自那一档的系统非 key 参照色**逐字节相等**
+        // （本机：亮 (220,220,220) 对 (220,220,220)、暗 (70,70,70) 对 (70,70,70)，带内散布 0），
+        // 而 key 那一档差 35 / 89 级 ⇒ 2 级这个窗口容得下 PNG 量化的零头，又离两臂的间距很远。
+        // 反过来它才有牙：往选中那一行上叠任何一层自家半透明墨（悬停那档走错分支）都会立刻涨出 2。
+        let tol = 2
         for (tag, appearance) in [("light", NSAppearance.Name.aqua),
                                   ("dark", NSAppearance.Name.darkAqua)] {
             let fixtures = self.fixtures(appearance: appearance)
@@ -954,22 +978,44 @@ final class UICaptureTests: XCTestCase {
                 declined.append("\(tag)[原因=药丸右沿读不到 ⇒ 取样带不存在]")
                 continue
             }
-            // 药丸取样带：左右各让 4px，不吃圆角与边沿；中间那点字墨由**中位数**挡掉。
-            let inside = (pill.left + 4)..<max(pill.left + 5, right - 4)
+            // 取样窗：**药丸中段那一块**，不是整颗药丸。
+            //
+            // 为什么（本机第二遍实测）：第一版取的是"整颗药丸左右各让 4px"，
+            // 亮档读到 (214,214,214)、暗档 (106,106,106)，两档都落不进任何一枚参照色 ——
+            // 那看起来像"暗档在系统选中底之上还叠了一层材质"。
+            // 当时用一把仓库外的一次性尺（PIL，只配形成问题不配当判据）在干净的那一行上重量：
+            // 亮 (220,220,220)、暗 (70,70,70)，与各自那一档的系统非 key 参照色**逐字节相等、该行散布 0**
+            // ⇒ 上一版把"圆角端 + 页底 + 行内字墨"混进了同一条带，读数被拉走了：
+            // **尺的污染被读成了产品事实**。常驻尺必须自己复现那个数才算结案，
+            // 所以窗取 40%…60%（两端各有圆角与文字起收），而"干净"由下面那道占比闸门判。
+            let span = max(1, right - pill.left - 8)
+            let inside = (pill.left + 4 + span * 2 / 5)..<max(pill.left + 5,
+                                                              pill.left + 4 + span * 3 / 5)
             guard let obsProbe = Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
-                                                xRange: inside, y: midY) else {
-                declined.append("\(tag)[原因=药丸取样带读不出（带宽=\(inside.count)px，下限 8）]")
+                                                xRange: inside,
+                                                yRange: (pill.top)..<(pill.bottom + 1)) else {
+                declined.append("\(tag)[原因=药丸中段取样带读不出（带宽=\(inside.count)px，下限 8）]")
                 continue
             }
             // 页底那一侧：同一行、药丸右沿之外 4…24px（那里没有别的材质）。
             let pageRange = (right + 4)..<min(rep.pixelsWide, right + 24)
             guard let pageProbe = Self.armMedian(bytes: base, bytesPerRow: rep.bytesPerRow,
-                                                 xRange: pageRange, y: midY) else {
+                                                 xRange: pageRange,
+                                                 yRange: (pill.top)..<(pill.bottom + 1)) else {
                 declined.append("\(tag)[原因=药丸右侧的页底读不出（x=\(pageRange.lowerBound)..<\(pageRange.upperBound)）]")
                 continue
             }
             let obs = obsProbe.rgb
             let page = pageProbe.rgb
+            // 占比闸门：底色不是一个被重复很多次的精确值就**不判（点名）**，
+            // 而不是拿被笔画污染的数字去给产品定罪 —— 第一版的 (106,106,106)
+            // 与那句"暗档两臂都不在"就是这样来的（下限见 `armSolidShareFloor`）。
+            guard obsProbe.share >= Self.armSolidShareFloor,
+                  pageProbe.share >= Self.armSolidShareFloor else {
+                declined.append("\(tag)[原因=取样窗底色不实：药丸中段占比=\(obsProbe.share)%"
+                    + " 页底占比=\(pageProbe.share)%，下限 \(Self.armSolidShareFloor)%]")
+                continue
+            }
             // 两枚参照臂在同一外观下解析（key 那一档写死在下面这一行 ⇒ M 刀钉的就是这一行）。
             let key = Self.armResolved(.selectedContentBackgroundColor, appearanceName: appearance)
             let nonKey = Self.armResolved(.unemphasizedSelectedContentBackgroundColor,
@@ -981,9 +1027,17 @@ final class UICaptureTests: XCTestCase {
                  + " key=\(key) nonKey=\(nonKey)"
                  + " 帧彩度=\(obs.chroma) key彩度=\(key.chroma) nonKey彩度=\(nonKey.chroma)"
                  + " 取样带=\(inside.lowerBound)..<\(inside.upperBound)px@y=\(midY)"
+                 + " 底色占比=药丸\(obsProbe.share)%/页底\(pageProbe.share)%（下限 \(Self.armSolidShareFloor)%）"
                  + " 判定=\(label) \(detail)")
             XCTAssertTrue(label != "两臂不可分",
                           "\(tag)：\(detail) ⇒ 两枚系统参照色逐通道相等，这条判据没有对象")
+            // 这一格才是"选中底是系统画的那一档"这句话的**可执行形式**：落点必须是两枚参照色之一。
+            // 它同时是刀 B 的牙 —— 往选中那一行上叠一层自家灰，判定就掉成"两臂都不在" ⇒ 当场红。
+            // 现在两档都精确落在非 key 那一档（残差 0），所以这一条不是为绿而写的：
+            // 它比"读得到一个落点"强，而容差已经从 6 收到 2。
+            XCTAssertTrue(label == "系统key" || label == "系统nonKey",
+                          "\(tag)：落点=\(label)（\(detail)）⇒ 帧上那颗选中底既不是 key 档也不是非 key 档："
+                          + "要么自家墨叠到了选中那一行上，要么这条通道又变了。先归因，不许放宽这一条。")
             judged += 1
         }
         emit("QUICKPICK_SELARM_SUMMARY 候选=2 有对象=\(judged) 未判=\(declined.count)"
