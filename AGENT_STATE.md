@@ -31,15 +31,19 @@ R318/R319 记的"runner 也判 nonKey"（暗档那一半）就地改口 —— �
 产品文件 0 个，连续零改动 **2** 轮（R319 那笔产品改动之后重新起算；唯一取数口 `python3 scripts/product_streak.py --streak-for 320`，
 同形用于 `--check`；上一轮 1）。as-of 第 320 轮的最后一笔产品提交是 84c5468 = 第 318 轮。
 
-⓪ R322 开场要先读的（成对：run id ↔ commit）：RUN=40014023716 sha=0e225d2 status=completed conclusion=failure title=R320 账半（七本一起落：U-1050…U-1052、D-303、368 判到头的追记、STATE 轮换、报告计数器） workflow=CI
-   —— 必须读到：① **本轮这一笔在 runner 上是否把三跑的红清零**：
-      `ca6bc31` / `121ef8f` / `a033b98` 都红在 `UICaptureHarness.swift` 的 SELARM 那一格；
+⓪ R322 开场要先读的（成对：run id ↔ commit）：RUN=40019174985 sha=4271ff1 status=in_progress conclusion= title=R321 账半（七本一起落：U-1053…U-1055、D-304、373 的改口追记、新开 375、STATE 轮换、报告计数器） workflow=CI
+   —— 收尾时**现读**写死在这里的已知事实（不是猜）：本轮之前的四跑
+   `ca6bc31`(40008003697) / `121ef8f`(40011458013) / `a033b98`(40011516876) / `0e225d2`(40014023716)
+   全部 conclusion=failure，而失败的是**同一朵**：STEP[15] 与 STEP[17] 都红在
+   `UICaptureHarness.swift:1050 testQuickPickSelectionPillAgainstSystemArms`
+   （`light[原因=取样窗底色不实：药丸中段占比=78% 页底占比=45%，下限 60%]`）
+   ⇒ 自 R318 立那把尺起 CI 一直红在这一格，R321 修的就是它。
+   必须读到：① **本轮这一笔（`4271ff1` / `f6d2fc2`）在 runner 上是否把那四跑的红清零**；
    ② `QUICKPICK_SELARM_BANDS` 两行在 runner 上的读数 —— 期望先写死在这里，读到才算结案：
       `选择=前导(...)`、两块窗里 trailing 那一格被点名"不是页底那一层"、`未判=0`、
       两档落点仍 `系统nonKey`；**若前导那一格在那台机器上也不干净**，
       那一行会把两块窗的读数与倍率一起交出来 ⇒ 按 354 那族做具名出口，不再猜第三次；
-   ③ 还欠的：`HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` 在 runner 上是否签（R320 的 ⓪ 欠着）、
-      `QUICKPICK_SELARM_SUMMARY 候选=2 有对象=1 未判=1 落点=dark=系统nonKey` 那一跑与本轮同源的 SUMMARY 行在 runner 上变成 有对象=2。
+   ③ 还欠的：`HEATMAP_TOOLTIP_CONTROL` / `_CHANNELS` 在 runner 上是否签（R320 的 ⓪ 欠着）。
 
 ① 下一轮（R322）的靶：① **回到动效主线**（本轮又是判据轮，这一格已连续三轮排第一）：
       候选 —— 354 第五步（观察窗口成本）、348 给 `HEATMAP_TOOLTIP_*` / `QUICKPICK_SELARM*` /
