@@ -1,5 +1,5 @@
 {
-  "count": 176,
+  "count": 174,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -149,8 +149,6 @@
     "settings-shortcuts-recording-720x540-light.png": "0208a8d1b381c40dfe2f8286d69eff9d0c1cc6fe4973a0c25ab759d62277b379",
     "settings-stats-720x540-dark.png": "8f77eadbf253c621a1a7d70b04ef51df2fbefc59fb35646c153ed5f1ebeaddf3",
     "settings-stats-720x540-light.png": "0ab54c91dc5b2bb776fdf64a0a795c8efa07fb28a5b8e4717fd3b4669a6b58a7",
-    "settings-stats-empty-720x540-dark.png": "8f77eadbf253c621a1a7d70b04ef51df2fbefc59fb35646c153ed5f1ebeaddf3",
-    "settings-stats-empty-720x540-light.png": "0ab54c91dc5b2bb776fdf64a0a795c8efa07fb28a5b8e4717fd3b4669a6b58a7",
     "settings-stats-populated-720x540-dark.png": "c547436b4c378a18cc8c4cef42e199843406f0b960220f464156b242cc0346f3",
     "settings-stats-populated-720x540-light.png": "9300dd7329fddf5ac667f263ffe819808628f7ec6ad4a9801e661425ef584762",
     "settingsrow-hover-idle-300x96-dark.png": "f7b8943cd42ecd7cc10ec86b1c8d2a1819dea19e7bcef3fc0ccb039e459ae097",

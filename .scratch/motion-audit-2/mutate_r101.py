@@ -49,11 +49,11 @@ ARMS = [
      H_INSET, "CAUGHT"),
     ("M566", "判据：清空图标首墨名册 ⇒ 等式必须红（6.5 对 5.0 差 1.5 > 1.0）",
      HARNESS,
-     # R314 重钉：那一行原本是一行的字面量，本轮往名册里加了 `settings-stats-empty` 两格，
-     # 声明漂成了两行 ⇒ 旧针命中 0（`NEEDLE_PRECHECK ... bad=1`、`rot 33→34`）。
-     # 这正是 BACKLOG 369 那张单说的形状：名册是手写的，改名册的人不会想到自己弄死了一把刀。
-     '        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark",\n'
-     '                                       "settings-stats-empty light", "settings-stats-empty dark"]',
+     # R314 重钉、R315 又改回去：这根针跟着名册的形状走。
+     #   R314 往名册里加了两格 ⇒ 声明漂成两行 ⇒ 旧针命中 0（bad=1、rot 33→34）；
+     #   R315 撤掉那张重复臂（BACKLOG 370 出口①）⇒ 声明回到一行 ⇒ 针跟着回原形。
+     # 两次都不是"针坏了"，是**名册是手写的**：改名册的人不会想到自己动了刀 —— 见 BACKLOG 369。
+     '        let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]',
      "        let iconFirstCells: Set<String> = []",
      H_INSET, "CAUGHT"),
     # M567 是**收尾时补的**：多重集包含检查发现 R101 重写角色分账时把 R100 那条
