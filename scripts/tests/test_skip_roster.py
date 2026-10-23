@@ -63,6 +63,13 @@ ROSTER = {
         # 现在填的是读来的名字，不是猜的；两跑同读才签（R83：单次 runner 读数不配签字）。
         'test_built_bundle_carries_no_app_delegate_stub':
             'runner 的仓库根没有已构建的 时间剪史.app（run 39608106160 与 39607521077 两跑同读）',
+        # R309 新加的那格「拿真产物日志对账」在 runner 上必然缺席：/tmp/r308_chain.log 是本机
+        # 验证链留下的，runner 的 /tmp 里没有它。名字是 **runner 自己点出来的**，不是我猜的：
+        # run 39965996188（340452f）STEP[9] 打
+        #   名单外=['test_the_round_chain_log_reads_as_the_ledger_claims']
+        # ⇒ 这一格在 runner 上不承重（本机仍承重：文件在就真跑）。
+        'test_the_round_chain_log_reads_as_the_ledger_claims':
+            'runner 的 /tmp 没有本机验证链日志（run 39965996188 点名；本机有文件时不跳）',
     },
 }
 

@@ -29,7 +29,7 @@ FILTER = "HeatmapHoverEvidenceTests"
 # R308 重钉：这根针从 R300 那次 0.55→0.30 起就是死的（当时没人重跑这张表，而它的 needle 藏在
 # lambda 里、静态预检抽不出来 ⇒ 预检报不了 bad）。本轮改了同一行（0.30→0.20）才发现。
 # 记进 BACKLOG：隐藏 needle 也要有一种会红的腐烂检测，不能只靠"下一轮刚好改到同一行"。
-RING_OPACITY = "        isHovered ? 0.20 : 0"
+RING_OPACITY = "        isHovered ? 0.23 : 0"  # R311：0.20 在 runner 上 17.11 < 地板 18 ⇒ 抬到 0.23
 FILL_LINE = """            .fill(cell.count == 0
                   ? Color.primary.opacity(VisualHeat.empty)
                   : Color.accentColor.opacity(VisualHeat.opacity(bucket: cell.bucket)))"""

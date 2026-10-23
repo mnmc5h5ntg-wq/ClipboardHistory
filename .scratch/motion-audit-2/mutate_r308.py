@@ -44,7 +44,7 @@ DRAW_OLD = (u'                VisualShape.rounded(VisualRadius.heatCell)\n'
 GAP_LINE = u'    static let hoverRingGap: CGFloat = 1\n'
 GAP_ZERO = u'    static let hoverRingGap: CGFloat = 0\n'
 PAD_LINE = u'                    .padding(-VisualHeat.hoverRingGap)\n'
-ALPHA = u'        isHovered ? 0.20 : 0\n'
+ALPHA = u"        isHovered ? 0.23 : 0"  # R311 重钉：0.20 在 runner 上 17.11 < 地板 18 ⇒ 产品抬到 0.23
 ALPHA_LOUD = u'        isHovered ? 0.30 : 0\n'
 BAND_CENTER = (u'                let sdf = roundedRectSDF(px: Double(px) + 0.5 - Double(inset) - cellHalf,\n'
                u'                                         py: Double(py) + 0.5 - Double(inset) - cellHalf,\n'

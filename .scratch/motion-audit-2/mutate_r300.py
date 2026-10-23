@@ -28,7 +28,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOKENS = 'ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift'
 
-N_RING = u'        isHovered ? 0.20 : 0'   # R308 重钉（0.30→0.20：环搬到留白、档间离散归一之后重取的窗口中点）
+N_RING = u'        isHovered ? 0.23 : 0'  # R311 重钉（0.20 只在过 0.20 的世界里有牙）   # R308 重钉（0.30→0.20：环搬到留白、档间离散归一之后重取的窗口中点）
 
 R_RING_OLD = u'        isHovered ? 0.55 : 0'
 R_RING_FAINT = u'        isHovered ? 0.12 : 0'

@@ -517,9 +517,13 @@ final class HeatmapHoverEvidenceTests: XCTestCase {
 
     /// `hoverRingOpacity` 的真值表（纯函数那一半）。
     func testHoverRingOpacityTruthTable() {
-        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.20, accuracy: 0.0001,
-                       "悬停那一圈的透明度是量出来的那个数（R300 从 0.55 降到 0.30，"
-                       + "R308 环搬到留白、档间离散归一之后降到 0.20）；改了令牌就得同时改判据里的说明")
+        XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: true), 0.23, accuracy: 0.0001,
+                       "悬停那一圈的透明度是量出来的那个数（R300 从 0.55 降到 0.30；R308 环搬到留白、"
+                       + "档间离散归一之后降到 0.20；R311 又抬回 0.23 —— 因为 0.20 在 runner 上读出 "
+                       + "17.11…17.13，低于可见性地板 18，五格红在 testHoverRingIsVisibleOnEveryHeatLevel"
+                       + "AndBothScales（run 39963980031 / 39965996188）。地板不按机器放宽，改产品让它"
+                       + "两台都过线：0.23 期望 runner 暗 1x ≈ 19.7、本机现读 21.75）；"
+                       + "改了令牌就得同时改判据里的说明")
         XCTAssertEqual(VisualHeat.hoverRingOpacity(isHovered: false), 0, accuracy: 0.0001,
                        "非悬停必须是 0，不是「几乎看不见」的 0.02：常驻淡描边会让 126 格同时开口说话")
         // ③ 只有两档：不许出现第三值（比如按 bucket 分轻重 —— 这张图的信息全在深浅上）。
