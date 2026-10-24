@@ -5402,6 +5402,7 @@ final class MotionFilmstripTests: XCTestCase {
             return (nil, "参数不成立(height=\(height) yStride=\(yStride) xRange=\(xRange))")
         }
         var verdicts: [String] = []
+        var holeFractions: [Double] = []
         var y = 0
         while y < height {
             if let r = movingHoleRowReading(pixelsA: pixelsA, pixelsB: pixelsB,
@@ -5415,27 +5416,34 @@ final class MotionFilmstripTests: XCTestCase {
                                             edgeFlushFraction: edgeFlushFraction,
                                             widthToleranceFraction: widthToleranceFraction) {
                 verdicts.append(r.gate)
+                // R327：被拒的那一段要带**差多少**的数。"洞太窄"这三个字在 R326 之前就是全部信息，
+                // 于是"是地板定高了还是对象没框全"两种坏法读不出区别 —— 本轮量到被拒段 23% / 25%
+                // 而通过段 49%（差一倍，不是刚过线），这一格直接把 384 的下一步定成"修对象"。
+                holeFractions.append(Double(r.holeA.count) / Double(Swift.max(1, r.extent.count)))
             } else {
                 verdicts.append("非候选")
+                holeFractions.append(-1)
             }
             y += yStride
         }
         // 连续同判定的行段（"非候选"不进报告：它不是候选，没什么可解释的）
-        var groups: [(gate: String, from: Int, to: Int)] = []
+        var groups: [(gate: String, from: Int, to: Int, hole: Double)] = []
         var i = 0
         while i < verdicts.count {
             var j = i
             while j + 1 < verdicts.count, verdicts[j + 1] == verdicts[i] { j += 1 }
             if verdicts[i] != "非候选" {
-                groups.append((verdicts[i], i * yStride, Swift.min(height, (j + 1) * yStride)))
+                let slice = holeFractions[i...j].filter { $0 >= 0 }
+                groups.append((verdicts[i], i * yStride, Swift.min(height, (j + 1) * yStride),
+                               slice.isEmpty ? -1 : Self.median(Array(slice))))
             }
             i = j + 1
         }
-        let accepted: [(gate: String, from: Int, to: Int)] =
+        let accepted: [(gate: String, from: Int, to: Int, hole: Double)] =
             groups.filter { $0.gate == "过" && $0.to - $0.from >= minRows }
-        let best: (gate: String, from: Int, to: Int)? =
+        let best: (gate: String, from: Int, to: Int, hole: Double)? =
             accepted.max { ($0.to - $0.from) < ($1.to - $1.from) }
-        let ranked: [(gate: String, from: Int, to: Int)] =
+        let ranked: [(gate: String, from: Int, to: Int, hole: Double)] =
             groups.sorted { ($0.to - $0.from) > ($1.to - $1.from) }
         var parts: [String] = []
         for g in ranked.prefix(4) {
@@ -5443,7 +5451,8 @@ final class MotionFilmstripTests: XCTestCase {
             // 而真相是"候选找到了、被 minRows 掉了" —— 这两种坏的修法相反。
             let label = (g.gate == "过" && g.to - g.from < minRows) ? "过但太短" : g.gate
             parts.append("y" + String(g.from) + ".." + String(g.to) + "px 高"
-                + String(g.to - g.from) + "px 判=" + label)
+                + String(g.to - g.from) + "px 判=" + label
+                + " 洞宽=" + (g.hole < 0 ? "无" : String(format: "%.0f%%", g.hole * 100.0)))
         }
         var taken = "无"
         var band: Range<Int>?

@@ -134,6 +134,34 @@ final class MotionPillRampTests: XCTestCase {
             "报告必须点名'一个候选都没有'（否则判据只能干说一句找不到）：" + got.report)
     }
 
+    /// 被拒的那一段必须带**差多少**的数（R327）。只有"洞太窄"三个字时，
+    /// "地板定高了"与"对象没框全"这两种坏法读不出区别 —— 本轮就是靠这一格把 384 的下一步
+    /// 定成"修对象"：真帧上被拒段读 23% / 25%，通过段读 49%（差一倍，不是刚过线），
+    /// 所以降 `minHoleFraction` 是错的修法。
+    func testRejectedSegmentCarriesItsHoleWidth() {
+        let width = 44, height = 8
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
+        b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
+        // 字墨吃六列：把 20 列的洞切成 8 + 6 ⇒ 最长 8 列 / 轨道 36 列 = 22% < 0.25 ⇒ 判"洞太窄"
+        // （第一版只切三列，剩下的那截刚好 25% 压在线上，判据回我"不贴两端"—— 那是它对，我错）
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        let got = band(a, b, width: width, height: height)
+        XCTAssertTrue(got.report.range(of: "洞太窄 洞宽=[0-9]+%", options: .regularExpression) != nil,
+                      "被拒段没带洞宽那一格（或这一段根本没被判洞太窄）：" + got.report)
+        XCTAssertFalse(got.report.contains("洞宽=无"),
+                       "进了报告的候选段读不出洞宽 ⇒ 那一格是装饰：" + got.report)
+        // 分母必须是**轨道宽度**，不是洞自己：拿洞除洞会得到 100%，那是一句永远成立的话。
+        XCTAssertFalse(got.report.contains("洞太窄 洞宽=100%"),
+                       "被判洞太窄的那一段却报出 100% ⇒ 分母用错了（应是轨道列数）：" + got.report)
+        XCTAssertTrue(got.report.range(of: "洞太窄 洞宽=([0-9]|1[0-9]|2[0-4])%", options: .regularExpression) != nil,
+                      "洞太窄 那一格的数必须落在地板(25%)以下，否则这一格没在读它声称的那个量：" + got.report)
+    }
+
     // MARK: - ④ 行带定位：洞要**会走**，还要**长得像那颗胶囊**
 
     /// 三道结构闸 + 三道形状闸的参数表（与判据侧 `measuredMovingHoleBand` 同一组数）。
