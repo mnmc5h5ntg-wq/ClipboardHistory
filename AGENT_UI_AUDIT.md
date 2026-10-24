@@ -363,6 +363,26 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 331 轮（R332 · U-1102…U-1104 · 2026-10-24）：真机通道的「读不到」拆成三颗修法相反的缺席 ——本轮现场被登录窗锁住（SecureInput 属主=loginwindow），旧句子把它报成了通道坏了（U-1102…U-1104 · 产品 0 文件，判据账）
+
+- **U-1102：`display_channel_state()` 现在分得开三种"读不到"** —— `display_off`（电源日志最近一条是关）/
+  `screen_locked`（会话的 SecureInput 属主是 loginwindow）/ `capture_failed`（开着、没锁、还是截不出来）。
+  本轮现场就是第二种：`pmset` 现读显示器 on，而 `screencapture -R0,0,64,64` 抛
+  CalledProcessError（could not create image from rect），`ioreg` 里
+  `kCGSSessionSecureInputPID` 的属主现读 loginwindow ⇒ 分类器给 `(False, screen_locked)`，
+  人话句："会话被登录窗锁住（SecureInput 属主=loginwindow）⇒ 区域捕获被拒、别的 App 的窗口在辅助功能里不存在；这一格要*"。旧的那一句只会说"探针截图失败（CalledProcessError）"，
+  读起来像**通道坏了** —— 按那句去修尺，就会去动一条没坏的尺。
+- **U-1103：分类器只许读元数据，不许"再截一张全屏看看"** —— `secure_input_owner()` 只走
+  `ioreg` + `ps -o comm=`。这一格拦的是形状而不是正确性：锁屏时全屏截图是**成功**的
+  （它拍到的是用户的桌面），所以"能走通"和"该走"是两件事；
+  这条仓库的红线是不采集用户屏幕上的内容，隐私红线在这里就是一条判据。
+  证人：`test_the_classifier_is_metadata_only`（函数体里出现 screencapture 就红）。
+- **U-1104：393 的真机那一半被这一颗挡住了** —— 用户授权退出 App（现读 `already_running` 已解除、
+  实例已退），但会话锁着 ⇒ `REALSCREEN_NOT_RUN screen_locked`。
+  尺不猜密码、不替用户解锁（D-322 的第三条），所以 393 的改前/改后四数本轮只能取到离屏那一半。
+  判据卷 `test_real_screen_probe` 现读 `Ran 8 tests` 全绿，刀 `CAUGHT=2/2, RESTORE_CLEAN=yes`（逐臂 M963, M964）。
+
+
 ## 第 330 轮（R331 · U-1098…U-1101 · 2026-10-24）：391 的方向不再由记性定 —— 系统参照臂进夹具通道，暗档现读 系统 +26.0 / 自家 -16.0；同一轮里「压轨道」那一发被它自己红起来的过程证人否掉（U-1098…U-1101 · 产品 0 文件，参照臂账）
 
 - **U-1098：分段控件的系统参照臂第一次进夹具通道** —— 两张 200×60（`sysref-segmented-selected-left` /

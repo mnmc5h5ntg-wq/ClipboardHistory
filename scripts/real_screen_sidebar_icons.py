@@ -67,27 +67,85 @@ def osascript(src):
     return proc.returncode, proc.stdout.decode("utf-8", "replace").strip()
 
 
+def secure_input_owner():
+    """当前会话的 SecureInput 属主（**只看元数据，不碰像素**）。
+
+    为什么用这一颗而不是"再截一张全屏的看看"：全屏截图在锁屏时是成功的（它拍到的是锁屏画面），
+    而那一格会把"用户的桌面被拍下来了"这件事变成我的副作用 —— 这条仓库的红线不允许。
+    IORegistry 里 `kCGSSessionSecureInputPID` 的属主是 loginwindow 时，等价于"登录窗在收键盘"，
+    也就是锁屏；这是会话状态，不是屏幕内容。
+    """
+    try:
+        text = subprocess.run(["ioreg", "-l", "-w", "0"], stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL).stdout.decode("utf-8", "replace")
+    except Exception:
+        return None
+    m = re.search(r'kCGSSessionSecureInputPID"\s*=\s*(\d+)', text)
+    if not m:
+        return None
+    try:
+        comm = subprocess.run(["ps", "-p", m.group(1), "-o", "comm="], stdout=subprocess.PIPE,
+                              stderr=subprocess.DEVNULL).stdout.decode("utf-8", "replace").strip()
+    except Exception:
+        return "other"
+    if comm.endswith("loginwindow"):
+        return "loginwindow"
+    return "other" if comm else None
+
+
+def classify_display_channel(power, secure_owner, region_ok):
+    """把"真机这一格读不到"分成三种**修法相反**的成因（D-322 那一族的第四颗）。
+
+    power:        "off" | "on" | "unknown"   ← `pmset -g log` 最近一条是关还是开
+    secure_owner: "loginwindow" | "other" | None ← 登录窗在收键盘 = 锁屏
+    region_ok:    那块 64×64 区域截图成功了吗
+
+    为什么必须分开：三种缺席的动作完全不同 —— 显示器关了要等它开；锁屏要**人**来解锁
+    （尺不许猜密码，也不许替用户解锁）；而显示器开着、没锁、又截不出来，那是通道/权限坏了，
+    要查的是屏幕录制授权。混成一句"截图失败"就会让下一轮去修一条没坏的尺。
+    """
+    if power == "off":
+        return False, "display_off"
+    if secure_owner == "loginwindow":
+        return False, "screen_locked"
+    if not region_ok:
+        return False, "capture_failed"
+    return True, "ok"
+
+
 def display_channel_state():
-    """先问显示器，再问窗口 —— 这一格的成因顺序错了就会说假话（R143 / U-476）。
+    """先问显示器，再问锁屏，最后才问像素 —— 这一格的成因顺序错了就会说假话（R143 / U-476 / R332）。
 
     R141 那天我把 `NO_WINDOW` 读成「点击没打开设置窗口」，而真正的原因是显示器在 23:32:37
     关了（`pmset -g log` 一行就能看见）：屏幕关掉/锁屏时，别的 App 的窗口在辅助功能里根本不存在，
-    `screencapture` 也给全黑。⇒ 这条通道的三种"读不到"里，**成因必须在点之前先定**，
+    `screencapture` 也给全黑。⇒ 这条通道的几种"读不到"里，**成因必须在点之前先定**，
     否则一个环境事实会被记成一条产品缺陷。
 
-    返回 (是否可判, 人话原因)。判据：先问电源日志最近一次是 on 还是 off，再用一小块截图复核。
+    R332 补上第三颗：同一句"探针截图失败"下面其实藏着两种**修法相反**的缺席 ——
+    显示器开着但会话被登录窗锁住（要人来解锁，尺不许猜密码）与屏幕录制权限/通道坏了
+    （要查授权）。本轮现场就是这一发：`pmset` 说 21:51 显示器已开，而 `screencapture -R0,0,64,64`
+    报 could not create image from rect，`ioreg` 里 `kCGSSessionSecureInputPID` 的属主是 loginwindow。
+    区分这两者**只用元数据**：全屏截图在锁屏时是成功的，而它拍到的是用户的桌面 —— 那条红线不碰。
+
+    返回 (是否可判, 人话原因)。
     """
     import subprocess as _sp
+    power = "unknown"
     try:
         log = _sp.run(["pmset", "-g", "log"], stdout=_sp.PIPE, stderr=_sp.DEVNULL).stdout
         text = log.decode("utf-8", "replace")
         last_on = text.rfind("Display is turned on")
         last_off = text.rfind("Display is turned off")
         if last_off > last_on:
-            tail = text[last_off:].split("\n")[0][:60]
-            return False, "显示器关闭（电源日志最近一条：%s）⇒ 锁屏/休眠时辅助功能看不到别的 App 的窗口" % tail
-    except Exception as exc:  # 读不到电源日志不算"显示器开着"，交给下面的像素复核
+            power = "off"
+        elif last_on >= 0:
+            power = "on"
+    except Exception as exc:  # 读不到电源日志不算"显示器开着"，交给下面的复核
         print("DISPLAY_CHANNEL pmset 读不到（%s）⇒ 改用像素复核" % type(exc).__name__)
+
+    owner = secure_input_owner()
+    region_ok = True
+    brightest = None
     probe = "/tmp/real_screen_display_probe.png"
     if os.path.exists(probe):
         os.remove(probe)
@@ -99,10 +157,23 @@ def display_channel_state():
         brightest = max(vals) if vals else 0
         os.remove(probe)
         if brightest <= 8:
-            return False, "截图全黑（64x64 探针最亮像素=%d/255）⇒ 没有可采的显示输出" % brightest
+            region_ok = False
     except Exception as exc:
-        return False, "探针截图失败（%s）" % type(exc).__name__
-    return True, "显示器开着"
+        region_ok = False
+        print("DISPLAY_CHANNEL 区域探针抛了（%s）" % type(exc).__name__)
+
+    alive, code = classify_display_channel(power, owner, region_ok)
+    if alive:
+        return True, "显示器开着"
+    detail = "电源日志最近一条=%s；SecureInput 属主=%s；探针可截=%s（最亮=%s）" % (
+        power, owner, region_ok, brightest)
+    reasons = {
+        "display_off": "显示器关闭 ⇒ 锁屏/休眠时辅助功能看不到别的 App 的窗口（等它开，或换时段）",
+        "screen_locked": "会话被登录窗锁住（SecureInput 属主=loginwindow）⇒ 区域捕获被拒、"
+                         "别的 App 的窗口在辅助功能里不存在；这一格要**人**来解锁，尺不猜密码也不替用户解锁",
+        "capture_failed": "显示器开着、会话也没锁，但区域截图失败 ⇒ 通道/屏幕录制授权坏了，要查的是工具不是产品",
+    }
+    return False, reasons.get(code, "未知成因（code=%s）" % code) + "｜" + detail
 
 
 def main():

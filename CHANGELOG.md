@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 真机通道的「读不到」拆成三颗修法相反的缺席：display_off / screen_locked / capture_failed（R332 / U-1102…U-1104 · 产品 0 文件，判据账）
+
+- `scripts/real_screen_sidebar_icons.py` 新增 `secure_input_owner()`（只读 ioreg + ps，不截屏）与
+  `classify_display_channel(power, secure_owner, region_ok)`；`display_channel_state()` 改用它，
+  人话句里带上"电源日志/属主/探针"三项现读。
+- 现场：显示器现读 on、区域截图抛 CalledProcessError、SecureInput 属主现读 loginwindow ⇒ 分类 screen_locked。
+  旧句子"探针截图失败"读起来像通道坏了，而真因是会话锁着。
+- 判据卷 `scripts/tests/test_real_screen_probe.py` 现读 `Ran 8 tests` 全绿（新增 3 格：三成因真值表、
+  属主非 loginwindow 不许算锁屏、分类器只读元数据）；刀 `mutate_r332.py` `CAUGHT=2/2, RESTORE_CLEAN=yes`（逐臂 M963, M964）。
+- 393 的真机那一半因此挡住，开成 395；四腿 Swift 验证本轮没有对象（0 个 Swift/界面文件、帧未重捕），
+  写成 NOT-RUN 而不是通过。
+- 针预检 tables=120 covered=103 bad=0、名册 files=214 arms=831 dupes=0；脚本电池 `Ran 622（skipped=4）`。
+
 ### 391 的方向改由系统参照臂印：暗档 系统 差=+26.0 对 自家 −16.0，而「压轨道」那一发被它自己红起来的过程证人否掉并回滚（R331 / U-1098…U-1101 · 产品 0 文件，参照臂账）
 
 - 新夹具两张：`sysref-segmented-selected-left` / `-right`（200×60，与 `sysref-button-*` 同族），
