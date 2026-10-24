@@ -24,7 +24,13 @@ enum DetailPreviewKind: Hashable {
         case .text(let text):
             // 渲染态与原文态是**两个不同的视图**（属性串 vs 纯文本），
             // 点那颗切换控件时整块会换掉 —— 所以它们是两种类型，不是同一种。
-            self = MarkdownRenderingAffordance.renders(text: text, in: markdownMode) ? .renderedText : .rawText
+            //
+            // R335 起这里问的是**同一处决定**（`DetailRenderPolicy`，带载荷），不再是
+            // "只有 Markdown 才有渲染态"。注意 case 名字**没加 `.renderedHtml`**：
+            // HTML 渲染进的是同一块属性串视图，没有整块子视图被插入/移除，
+            // 多一个 case 就是多一条永远不会执行的承诺（这个枚举开头立的规矩）。
+            let decision = DetailRenderPolicy.decide(text: text, htmlPayload: entry.richText?.html)
+            self = (markdownMode == .rendered && decision.resolved() != nil) ? .renderedText : .rawText
         case .image:
             self = .image
         case .file:

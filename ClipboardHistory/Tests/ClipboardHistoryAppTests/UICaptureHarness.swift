@@ -4931,6 +4931,19 @@ final class UICaptureTests: XCTestCase {
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
         })
 
+        // R335：HTML 预览同样拍**一对**。单拍渲染那一侧的话，"切换有效"这件事只剩控件标题
+        // 一个证据；两帧相减还能把"标签字面量没了、正文一个字没少"量成像素差。
+        results.append(Fixture("detail-html-rendered", NSSize(width: 720, height: 520)) {
+            let target = self.makeHtmlStore()
+            self.assertHtmlFixturePremise(target, role: "detail-html-rendered")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        results.append(Fixture("detail-html-source", NSSize(width: 720, height: 520)) {
+            let target = self.makeHtmlStore()
+            self.assertHtmlFixturePremise(target, role: "detail-html-source")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
+        })
+
         results.append(Fixture("glass-pill", NSSize(width: 120, height: 232), contentMustFit: true) {
             AnyView(
                 GlassPill(isFavorite: false, favoriteAction: {},
@@ -8153,6 +8166,185 @@ final class UICaptureTests: XCTestCase {
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
         return store
+    }
+
+    /// 夹具前提：这条记录按策略确实走 **HTML 渲染器**（不是 Markdown、不是"没有入口"），
+    /// 而且喂进去的那一份已经消毒干净。前提不成立时两帧会是同一张照片，
+    /// 而那张名字叫 `detail-html-rendered` 的帧看着像证据，其实什么都没说（D-038 那一族）。
+    private func assertHtmlFixturePremise(_ store: HistoryStore, role: String,
+                                          file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：HTML 夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let decision = DetailRenderPolicy.decide(text: body, htmlPayload: entry.richText?.html)
+        guard let (renderer, source) = decision.resolved() else {
+            XCTFail("\(role)：这条记录根本没有渲染入口 ⇒ 帧名在说谎", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(renderer, .html, "\(role)：走的不是 HTML 渲染器：\(renderer)", file: file, line: line)
+        XCTAssertTrue(body.contains("<h1>季度报告"), "\(role)：正文里没有 HTML 标记，两帧会是同一张照片",
+                      file: file, line: line)
+        XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(source), [],
+                       "\(role)：喂给渲染器的那一份里还有可加载的东西", file: file, line: line)
+    }
+
+    private func makeHtmlStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.htmlFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.html", "public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Safari", sourceAppName: "Safari"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// 一份"从浏览器里复制下来"的 HTML：结构（h1 / p / ul / a）+ 会被消毒吃掉的东西
+    /// （script / style / img / link / iframe / 内联 url()）。**刻意不含任何用户内容**。
+    static let htmlFixtureBody = """
+    <!DOCTYPE html>
+    <html><head>
+      <meta charset="utf-8">
+      <link rel="stylesheet" href="https://cdn.example/style.css">
+      <style>body { background: url(https://tracker.example/bg.png); }</style>
+      <script>fetch('https://tracker.example/beacon')</script>
+    </head>
+    <body onload="steal()">
+      <h1>季度报告</h1>
+      <p style="color:#0a0">一段带<b>内联样式</b>与<em>强调</em>的正文，读起来应该像页面而不像源码。</p>
+      <ul><li>甲项</li><li>乙项</li></ul>
+      <img src="https://tracker.example/pixel.gif" width="1" height="1">
+      <p foo-src="https://tracker.example/unnamed">属性名不在名单里的那一种</p>
+      <p>结尾一句：<a href="https://example.com/doc">参考文档</a></p>
+    </body></html>
+    """
+
+    /// 渲染态与原文态**必须看得见地不同**（R335）。
+    ///
+    /// 为什么还要一格像素判据：`HtmlPreviewTests` 已经证明属性串里没有标签字面量了，
+    /// 但那证的是"喂进去的东西对"，不是"屏幕上换了"。这一族缺陷有名字 ——
+    /// **判定对了、视图没换**（缓存键没带渲染器身份、或代表视图把新参数吞了），
+    /// 两种情况下属性串的断言全绿而屏幕上一次切换都没发生。刀 M975 打的就是那一行。
+    func testHtmlRenderedPairDiffersOnTheSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r335-html-pair-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var retained = [NSBitmapImageRep]()
+
+        func bytes(_ fixtureName: String, _ appearance: NSAppearance.Name)
+            -> (data: UnsafeBufferPointer<UInt8>, width: Int, height: Int, stride: Int)? {
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == fixtureName }) else {
+                XCTFail("找不到夹具 " + fixtureName + " ⇒ 这一臂没有对象（HTML 夹具被改名或删掉了）")
+                return nil
+            }
+            let file = scratch.appendingPathComponent("\(fixtureName)-\(appearance.rawValue).png")
+            do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                XCTFail(fixtureName + "：渲染失败 " + String(describing: error)); return nil
+            }
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(fixtureName + "：读不回 " + file.lastPathComponent); return nil
+            }
+            retained.append(rep)
+            return (UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh),
+                    rep.pixelsWide, rep.pixelsHigh, rep.bytesPerRow)
+        }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            guard let r = bytes("detail-html-rendered", appearance),
+                  let s = bytes("detail-html-source", appearance) else { continue }
+            let d = Self.pairDelta(bytesA: r.data, bytesB: s.data, width: r.width, height: r.height,
+                                   bytesPerRow: r.stride, x0: 0, x1: r.width)
+            let total = r.width * r.height
+            let pct = Int((Double(d.changed) / Double(total) * 1000).rounded())
+            CaptureReadings.emit("HTML_PAIR_PROOF \(tag) 变=\(d.changed)颗/\(total) "
+                                 + "千分比=\(pct) 整块平均|Δ|=\(d.meanAbs) 变颗平均|Δ|=\(d.changedMeanAbs) "
+                                 + "带符号=\(d.signedMean) 峰|Δ|=\(d.maxAbs)")
+            XCTAssertGreaterThan(d.changed, 0,
+                tag + "：渲染态与原文态逐像素相减为 0 颗 ⇒ 切换在屏幕上没发生（判定对了、视图没换）")
+            XCTAssertGreaterThan(pct, 10,
+                tag + "：两帧只差 \(pct)‰（不到整帧的 1%）⇒ 这一「渲染」其实什么都没画出来，"
+                + "只有标题那颗控件变了字")
+            XCTAssertNotEqual(d.signedMean, 0, tag + "：整块平均带符号差为 0 ⇒ 上面那条「有差别」只是几颗噪声")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没跑完 ⇒ 这一格没有对象")
+    }
+
+    /// HTML 渲染态那一列正文**必须读得出来**（R335 看图腿量出来的缺陷，量纲是对比度）。
+    ///
+    /// 这一格是补上来的，而它补的是一个真实存在过的假绿：`testHtmlRenderedPairDiffersOnTheSurface`
+    /// 证明"屏幕上换了"，`testRenderedHtmlInkFollowsTheAppearance` 证明"属性串里每段都有跟着外观变的墨"，
+    /// 两句相加看着像"能读"，其实谁都没量过**像素**。第一版暗档帧实测：正文列里有
+    /// **8779 颗 RGB(0,0,0)** 落在 luma=30 的表面上 ⇒ 对比 **1.26:1**（结构全对、人读不到），
+    /// 而同一卷里 Markdown 正文同一块区域是 12.27:1。
+    ///
+    /// 两把尺一起用，是因为单用哪一把都会漏（R29d / R28 那一族）：
+    /// ① `inkContrast` 只看"偏离最远的那 2%"，它报得出"淡"，报不出"淡还是反"（黑字与浅灰字在暗底上
+    ///    都能被读成低对比）；② `inkSideCounts` 按侧数**全量**，它报得出"墨在错的那一侧"，
+    ///    但报不出"在的那一侧够不够浓"。所以①配地板、②配"反侧必须为 0"。
+    /// 框只圈正文列（左轴贴着 gutter），因为整幅里住着侧栏与卡片描边，那些不属于这一条契约。
+    func testHtmlRenderedBodyInkIsReadable() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r335-html-ink-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let gutter = Double(DetailTypography.containerGutter)
+        // 正文列：从左轴起、宽 340pt（夹具 720pt 宽，渲染列 68 字符在 14pt 下排不满 340，
+        // 而右半边住着滚动条与卡片描边 ⇒ 那些不是正文契约的对象）。
+        let bodyRect = CGRect(x: gutter, y: 112, width: 340, height: 268)
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            for fixtureName in ["detail-html-rendered", "detail-markdown-rendered"] {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == fixtureName }) else {
+                    return XCTFail("找不到 \(fixtureName) ⇒ 这一格失去了对象")
+                }
+                let file = scratch.appendingPathComponent("\(fixtureName)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("读不回刚拍出来的 \(file.lastPathComponent)")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let (ratio, coverage) = Self.inkContrast(bytes: base, width: rep.pixelsWide,
+                                                         height: rep.pixelsHigh,
+                                                         bytesPerRow: rep.bytesPerRow,
+                                                         rect: bodyRect, scale: scale)
+                let sides = Self.inkSideCounts(bytes: base, width: rep.pixelsWide,
+                                               height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                               rect: bodyRect, scale: scale)
+                // 反侧：暗档里"比表面还暗的墨"，亮档里"比表面还亮的墨" —— 那正是烤死色的形状。
+                let wrong = appearance == .darkAqua ? sides.darker : sides.brighter
+                let right = appearance == .darkAqua ? sides.brighter : sides.darker
+                let shortName = fixtureName.replacingOccurrences(of: "detail-", with: "")
+                emit("HTML_INKREAD \(tag) 夹具=\(shortName) 比=\(String(format: "%.2f", ratio)) "
+                    + "覆盖率=\(String(format: "%.4f", coverage)) 正侧=\(right)颗 反侧=\(wrong)颗")
+                guard fixtureName == "detail-html-rendered" else { continue }
+                judged += 1
+                XCTAssertGreaterThan(right, 200,
+                    tag + "：正文列里属于正文那一侧的墨只有 " + String(right) + " 颗 ⇒ 那一列根本没画上字，"
+                    + "下面的对比度读数是在给空帧打分（R140 空对账）")
+                XCTAssertEqual(wrong, 0,
+                    tag + "：正文列里有 " + String(wrong) + " 颗墨落在表面的**错侧**（暗档比表面更暗 / "
+                    + "亮档比表面更亮）⇒ 那一段的墨没跟着表面走，这一族叫「烤死色」")
+                XCTAssertGreaterThanOrEqual(ratio, 4.5,
+                    tag + "：HTML 正文对比 " + String(format: "%.2f", ratio) + ":1，低于 4.5:1（AA 正文线）"
+                    + "⇒ 结构画对了但人读不出来；同一帧同一块区域的 Markdown 是上面那条 HTML_INKREAD 读数")
+            }
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没判 ⇒ 这一格没有对象")
     }
 
     /// internal 是刻意的：`detail-text-highlight` 这类夹具的**前提**需要被另一套用例断言

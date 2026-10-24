@@ -637,10 +637,12 @@ final class Round4MarkdownTests: XCTestCase {
 
     func testDetailViewRoutesMarkdownToTheRendererAndBack() throws {
         let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
-        XCTAssertTrue(detail.contains("MarkdownRenderingAffordance.renders(text: text, in: markdownMode)"),
+        // R335：判定层从"只有 Markdown"换成 `DetailRenderPolicy`（Markdown 与 HTML 共用一处决定），
+        // 所以锚点跟着换 —— 要求本身一个字没松：**必须走判定层**、**渲染分支必须建富文本视图**。
+        XCTAssertTrue(detail.contains("renderDecision(for: entry).resolved()"),
                       "文本条目没有走判定层，等于开关形同虚设")
-        XCTAssertTrue(detail.contains("ChineseSelectableAttributedTextView(source: text,"),
-                      "渲染分支根本没建富文本视图 —— 判定对了、视图没换，缺陷还在")
+        XCTAssertTrue(detail.contains("ChineseSelectableAttributedTextView(source: source, renderer: renderer,"),
+                      "渲染分支根本没建富文本视图，或建了但没把渲染器身份传下去（HTML 会画成 Markdown）")
         XCTAssertTrue(detail.contains("ChineseSelectableTextView("),
                       "「原文」那条路被删了：渲染器一旦出错用户没有退路")
         // R211 之后这颗调用变成两行（多了 `freezeLoadingForCapture:`），整行字面量匹配不到 ⇒
@@ -656,12 +658,14 @@ final class Round4MarkdownTests: XCTestCase {
                       "「原文 / 渲染」那颗开关没接到文件预览上")
         XCTAssertTrue(detail.contains("MultiFileDetailView(urls: urls, markdownMode: markdownMode)"),
                       "多文件里展开的 Markdown 不受开关控制")
-        XCTAssertTrue(detail.contains("MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode))"),
-                      "头部那颗控件没接上标题")
+        XCTAssertTrue(fileCall.contains("MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode), helpText: renderHelp(for: entry))"),
+                      "头部那颗控件没接上标题，或提示语没跟着条目走（R335：HTML 条目上写 Markdown 是假话）")
         XCTAssertTrue(detail.contains("markdownMode = markdownMode.toggled()"),
                       "控件的动作没走 toggled()：标题与翻转方向会各说各话")
-        XCTAssertTrue(detail.contains("helpLabel(MarkdownPreviewMode.controlHelp)"),
+        XCTAssertTrue(detail.contains("helpLabel(helpText)"),
                       "控件只有视觉没有无障碍标签（R-54 那一族的规矩）")
+        XCTAssertTrue(detail.contains("var helpText: String = MarkdownPreviewMode.controlHelp"),
+                      "提示语的默认值被删 ⇒ 除 DetailView 之外的调用点（捕获夹具）会静默丢掉无障碍标签")
         // R32：同 Round3 那条 —— 渲染分支走的是 `.detailReadableColumn()`，
         // 上限在那一处定义里。这里判"渲染分支自己有没有接上"，用调用点计数而不是字符串存在性。
         let renderedWired = detail.components(separatedBy: ".detailReadableColumn()").count - 1
@@ -672,10 +676,10 @@ final class Round4MarkdownTests: XCTestCase {
 
     func testFilePreviewRoutesMarkdownFilesToTheRenderer() throws {
         let views = codeOnly(try productSource(named: "Views/DetailPreviewViews.swift"))
-        XCTAssertTrue(views.contains("MarkdownRenderingAffordance.renders(url: url, in: markdownMode)"),
-                      "Markdown 文件没走判定层")
-        XCTAssertTrue(views.contains("ChineseSelectableAttributedTextView(source: content)"),
-                      "文件预览的渲染分支没建富文本视图")
+        XCTAssertTrue(views.contains("DetailRenderPolicy.decide(fileContent: content, url: url)"),
+                      "Markdown / HTML 文件没走判定层")
+        XCTAssertTrue(views.contains("ChineseSelectableAttributedTextView(source: source, renderer: renderer)"),
+                      "文件预览的渲染分支没建富文本视图，或没把渲染器传下去")
         XCTAssertTrue(views.contains("ChineseSelectableTextView(text: content, font: .monospacedSystemFont"),
                       "非 Markdown 文本文件的等宽预览被顺手改掉了")
     }
@@ -684,13 +688,17 @@ final class Round4MarkdownTests: XCTestCase {
         let textView = codeOnly(try productSource(named: "Views/ChineseTextContextMenu.swift"))
         XCTAssertTrue(textView.contains("func updateMarkdown(source: String, highlightQuery: String) -> Int"),
                       "富文本正文没有唯一写入口")
-        XCTAssertTrue(textView.contains("if source != appliedMarkdownSource, let textStorage"),
+        XCTAssertTrue(textView.contains("if key != appliedRenderKey, let textStorage"),
                       "没有「源码变了才重建」这个条件 —— 搜索框每敲一个字都会重排整篇")
+        // R335：键里必须带**渲染器身份**。只按文本判重的话，同一段字节从 Markdown 换成 HTML
+        // 会被当成"没变"而留着上一份属性串 —— 屏幕上那一次切换是空操作，而它看起来像成功了。
+        XCTAssertTrue(textView.contains("let key = renderer.cacheKeyPrefix + source"),
+                      "缓存键没带渲染器身份 ⇒ 换渲染器时切了个空操作（刀 M975 的靶）")
         XCTAssertTrue(textView.contains("readOnlyBodyScrollView(font: nil)"),
                       "富文本正文没共用装配，列宽/内缩/右键菜单会和纯文本那条路分叉")
-        XCTAssertTrue(textView.contains("textView.updateMarkdown(source: source, highlightQuery: highlightQuery)"),
+        XCTAssertTrue(textView.contains("textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)"),
                       "updateNSView 没接到渲染入口")
-        XCTAssertTrue(textView.contains("appliedMarkdownSource = nil"),
+        XCTAssertTrue(textView.contains("appliedRenderKey = nil"),
                       "纯文本入口没作废渲染缓存：同一实例先渲染过 Markdown 会留着属性串")
         // 装配只允许有一份。这个数字是**单调量**：将来有人复制粘贴第二套配置，这里立刻红。
         XCTAssertEqual(textView.components(separatedBy: "widthTracksTextView = true").count - 1, 1,

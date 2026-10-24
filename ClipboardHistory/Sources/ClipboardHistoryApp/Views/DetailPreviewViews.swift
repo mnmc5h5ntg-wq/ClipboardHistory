@@ -365,8 +365,11 @@ struct DetailFileView: View {
         // Markdown **文件**走渲染（扩展名就是作者的意图，没有歧义所以默认给渲染结果），
         // 并且和详情正文共用同一个可读列：切到「原文」时列宽不动，只有排版变。
         // 其它文本文件保持原来的等宽显示 —— 那是代码和日志，本来就要数着字符看。
-        if MarkdownRenderingAffordance.renders(url: url, in: markdownMode) {
-            ChineseSelectableAttributedTextView(source: content)
+        // R335：`.html` / `.htm` 以前落在最后那一支（等宽显示源码）—— 也就是**没有预览**。
+        // 现在它与 Markdown 走同一块属性串视图，只是渲染器不同；等宽那一支留给代码与日志。
+        let decision = DetailRenderPolicy.decide(fileContent: content, url: url)
+        if markdownMode == .rendered, let (renderer, source) = decision.resolved() {
+            ChineseSelectableAttributedTextView(source: source, renderer: renderer)
                 .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
         } else {

@@ -318,14 +318,19 @@ struct ChineseSelectableTextView: NSViewRepresentable {
 /// 滚动与文本视图的配置共用 `readOnlyBodyScrollView`，因此列宽、内缩、右键菜单、
 /// 选中色和纯文本那条路**逐字节相同** —— 切「原文 / 渲染」时正文列不会跳。
 struct ChineseSelectableAttributedTextView: NSViewRepresentable {
-    /// Markdown 源码。视图自己解析并只在它变化时重建属性串。
+    /// **已经决定好的那一份源文本**（Markdown 源码或已消毒的 HTML）。
+    /// 消毒不在这里做：它是 `DetailRenderDecision.renderedSource()` 的一部分，
+    /// 因为判据要能在**没有视图**的情况下问到"喂进去的那一份到底消毒了没有"
+    /// （视图层做净化 = 只有把视图跑起来才测得到，而帧只拍得到结果拍不到过程）。
     let source: String
+    /// 用哪一种渲染器画它。默认 Markdown，所以 R335 之前的三个调用点一个字都不用改。
+    var renderer: DetailRenderer = .markdown
     var highlightQuery: String = ""
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = readOnlyBodyScrollView(font: nil)
         if let textView = scrollView.documentView as? ChineseSelectableNSTextView {
-            textView.updateMarkdown(source: source, highlightQuery: highlightQuery)
+            textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)
         }
         return scrollView
     }
@@ -333,7 +338,7 @@ struct ChineseSelectableAttributedTextView: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
         textView.autoresizingMask = [.width]
-        textView.updateMarkdown(source: source, highlightQuery: highlightQuery)
+        textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)
         textView.applyReadOnlyMenuBehavior()
     }
 }
@@ -435,15 +440,17 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
         self.font = font
         // 走纯文本这条路时，富文本那份的"已经应用过什么"必须作废：
         // 否则同一个视图实例先渲染过 Markdown、后被当普通文本用，属性串就赖在存储里不走。
-        appliedMarkdownSource = nil
+        appliedRenderKey = nil
         return applySearchHighlight(query: highlightQuery)
     }
 
-    /// 已经渲染过的 Markdown 源码。
+    /// 已经渲染过的那一份正文，**连同渲染器身份**（`DetailRenderer.cacheKeyPrefix`）。
     ///
     /// 用它而不是比较属性串来决定"要不要重建"：`NSAttributedString` 的相等比较是
     /// 逐字符逐属性的 O(n)，而这里真正的问题只是"内容换了没有"。
-    private var appliedMarkdownSource: String?
+    /// 键里带渲染器是 R335 新加的：同一段字节从 Markdown 换成 HTML 时"内容"没换，
+    /// 只按文本判重就会留着上一份属性串 —— 屏幕上那一次切换是**空操作**，而它看起来像成功了。
+    private var appliedRenderKey: String?
 
     /// 渲染态正文的唯一写入口：只在源码变化时重建属性串，然后照旧打高亮。
     ///
@@ -451,14 +458,29 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     /// 而**搜索框每敲一个字**都会求值一次。把解析和构建绑在"源码变了"这个条件上，
     /// 输入搜索词就只剩打高亮那点开销（临时属性，不动文本存储）。
     @discardableResult
-    func updateMarkdown(source: String, highlightQuery: String) -> Int {
-        if source != appliedMarkdownSource, let textStorage {
-            textStorage.setAttributedString(
-                MarkdownPresentation.attributedString(for: MarkdownParser.parse(source))
-            )
-            appliedMarkdownSource = source
+    func updateRendered(source: String, renderer: DetailRenderer, highlightQuery: String) -> Int {
+        // 缓存键必须**同时**含源文本与渲染器身份。只按源文本判重的话，"同一段字节换了一种渲染"
+        // 会被当成"没变"而留着上一份属性串 —— 而它在屏幕上长得完全像一次成功的切换
+        // （正文换了排版方式这件事只有像素知道）。R335 的刀 M975 钉的就是这一行。
+        let key = renderer.cacheKeyPrefix + source
+        if key != appliedRenderKey, let textStorage {
+            let attributed: NSAttributedString
+            switch renderer {
+            case .markdown:
+                attributed = MarkdownPresentation.attributedString(for: MarkdownParser.parse(source))
+            case .html:
+                attributed = HtmlRendering.attributedString(source)
+                    ?? NSAttributedString(string: source)
+            }
+            textStorage.setAttributedString(attributed)
+            appliedRenderKey = key
         }
         return applySearchHighlight(query: highlightQuery)
+    }
+
+    /// 旧名字留着给"只关心 Markdown"的调用点与判据用（它现在只是 `updateRendered` 的一个特例）。
+    func updateMarkdown(source: String, highlightQuery: String) -> Int {
+        updateRendered(source: source, renderer: .markdown, highlightQuery: highlightQuery)
     }
 
     /// 给当前正文里的搜索命中加底色，返回命中标了几段。

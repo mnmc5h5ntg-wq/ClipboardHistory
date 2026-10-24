@@ -43,7 +43,12 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* |^HOVER_[A-Z_]+ ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* |^HOVER_[A-Z_]+ |^HTML_[A-Z_]+ ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   # R335：`HTML_` 整族第一次进搬运名单（本轮新通道打出的六支：`HTML_PAIR_PROOF` 两档、
+                   # `HTML_INK`、`HTML_AUTHCOLOR`、`HTML_RENDER_COST`、`HTML_SANITIZE`、
+                   # `HTML_INKREAD` 两档×两夹具）。这是**本轮新发明的读数族**，
+                   # 按"接进它被打印的那一步"的规矩在同一笔里接上 ——
+                   # 不许重演 R334 那一朵：`HOVER_` 打了 100 多轮而名单里没有它。
                    # R334：`HOVER_` 整族第一次进搬运名单。这一族的七行（`HOVER_DIRECT_READ_PROOF` 两档、
                    # `HOVER_RUNG_WINDOW` 两档 —— 本轮新装的"可行窗口"尺：暗档 59…63 / 亮档空集、
                    # `HOVER_PILL_PROOF` / `HOVER_LADDER_PROBE` / `HOVER_MODE_CHIP_PROOF` /

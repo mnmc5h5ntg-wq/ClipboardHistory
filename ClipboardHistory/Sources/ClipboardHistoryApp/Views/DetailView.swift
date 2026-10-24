@@ -192,7 +192,8 @@ struct DetailView: View {
                 // 控件只在"这条内容真的有两种看法"时出现。给一条图片或者纯文本
                 // 摆一颗「原文」按钮，是让用户去点一个什么都不会发生的东西。
                 if offersMarkdownRendering(for: entry) {
-                    MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode)) {
+                    MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode),
+                                       helpText: renderHelp(for: entry)) {
                         markdownMode = markdownMode.toggled()
                     }
                 }
@@ -217,7 +218,28 @@ struct DetailView: View {
     /// 两边默认都是渲染态 —— 但这一层只改**看法**：存档、搜索、"再次复制"走的仍是原始字节，
     /// 而顶部这颗控件就是退回原始字节的那一步。
     private func offersMarkdownRendering(for entry: HistoryStore.Entry) -> Bool {
-        MarkdownRenderingAffordance.offers(for: entry.content)
+        // 载荷必须一起问进去：只有"没有载荷时"的那一份答案会把带 HTML 表示的条目
+        // 答成 Markdown 那一种（R335 第一版就是这样，而它只错在提示语上，帧上看不出来）。
+        !DetailRenderPolicy.renderers(for: entry.content, htmlPayload: entry.richText?.html).isEmpty
+    }
+
+    /// 这条记录的渲染决定（R335 新立的一处，Markdown 与 HTML 共用）。
+    ///
+    /// 只管**文本**条目：文件那一路的字节要异步读，而读的人就是 `DetailFileView` 自己 ——
+    /// 它问的是同一个 `DetailRenderPolicy`，所以不会出现"头部说有渲染、展开之后没有"。
+    /// 第一版这里给文件条目返回过 `.rendered(.markdown, source: "")`：那个空串是**假字节**
+    /// （`DetailRenderDecision.source` 的文档写着"喂给渲染器的那一份"），今天没人用它，
+    /// 明天就会有人拿它去渲染出一张空页。
+    private func renderDecision(for entry: HistoryStore.Entry) -> DetailRenderDecision {
+        guard case .text(let text) = entry.content else { return .plain }
+        return DetailRenderPolicy.decide(text: text, htmlPayload: entry.richText?.html)
+    }
+
+    /// 那颗控件的提示语。HTML 条目上写"Markdown 原文"就是假话，而 `.helpLabel`
+    /// 同时喂 `.help` 与 `accessibilityLabel` ⇒ VoiceOver 会把这句错话念出来。
+    /// 措辞的唯一出处在策略里（视图这里不拼句子）：刀 M983 钉的是"退回一个常量"那种坏法。
+    private func renderHelp(for entry: HistoryStore.Entry) -> String {
+        DetailRenderPolicy.controlHelp(for: entry.content, htmlPayload: entry.richText?.html)
     }
 
     /// 「原文 / 渲染」那颗控件。
@@ -227,6 +249,11 @@ struct DetailView: View {
     /// 标题说"点下去会变成什么"，不说"现在是什么"（`MarkdownPreviewMode.controlTitle`）。
     struct MarkdownModeButton: View {
         let title: String
+        /// 提示语由**条目**决定（R335：Markdown 与 HTML 两种渲染器各说一句），默认那句是 Markdown 的。
+        /// 带默认值是为了让捕获夹具仍然只给 title/action —— 它测的是排版与悬停那一档，不是文案。
+        /// 位置在 `action` **之前**是必要的：Swift 的尾闭包只能绑到最后一个参数，
+        /// 把带默认值的属性排在末尾就会让所有 `MarkdownModeButton(title:…){…}` 的调用点报标签错。
+        var helpText: String = MarkdownPreviewMode.controlHelp
         let action: () -> Void
         @State private var isHovered = false
         /// 色档由这个视图自己问（`PressedLabel` / `FilterSegmentButton` 同一条规矩：
@@ -270,7 +297,7 @@ struct DetailView: View {
             }
             .pressedStyle(in: VisualShape.rounded(VisualRadius.chip))
             .fixedSize()
-            .helpLabel(MarkdownPreviewMode.controlHelp)
+            .helpLabel(helpText)
             .onHover { hovering in
                 withAnimation(MotionCatalog.animation(for: .hover)) {
                     isHovered = hovering
@@ -286,8 +313,11 @@ struct DetailView: View {
             // 正文限一个可读列（U-4）：以前它无限宽，700pt 的详情区一行能排 100+ 字符，
             // 而且带一条横向滚动条 —— 读长文本要来回扫视和横向滚动。
             // 列宽由字体推进推出来（68ch），字号一改列宽自己跟着改。
-            if MarkdownRenderingAffordance.renders(text: text, in: markdownMode) {
-                ChineseSelectableAttributedTextView(source: text,
+            // 渲染态：源文本由决定给出（HTML 那一路给的是**已消毒**的那一份），
+            // 渲染器身份跟着一起下去 —— 两者都从同一处来，所以不会出现
+            // "消毒在视图里、判据问不到"（`ChineseSelectableAttributedTextView` 的注释记了这条）。
+            if markdownMode == .rendered, let (renderer, source) = renderDecision(for: entry).resolved() {
+                ChineseSelectableAttributedTextView(source: source, renderer: renderer,
                                                     highlightQuery: historyStore.searchText)
                     .detailReadableColumn()
             } else {
