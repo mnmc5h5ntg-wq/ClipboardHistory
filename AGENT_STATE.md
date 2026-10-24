@@ -50,6 +50,8 @@ RUN=40086526381 ↔ `c3fdc02` ⇒ failure 在 STEP[9] `LEDGER_TOKENS books=7 str
 
 ⓪ R332 开场要先读的（成对：run id ↔ commit，现读自 gh run list --json databaseId,headSha,status,conclusion）：RUN=40097837516 ↔ `6935e1b`（本笔 push 的那一跑，回填时 status=in_progress / 未读 ⇒ 只登记不轮询）；RUN=40091830006 ↔ `cdc3b64` ⇒ completed/**success**（R330 的追记那一跑，本轮开场还没读到，现在结掉了）；RUN=40091469060 ↔ `4e9e59a` ⇒ completed/**success**；RUN=40086526381 ↔ `c3fdc02` ⇒ failure 在 STEP[9] LEDGER_TOKENS books=7 stray=1（R329 漏下的占位符，R330 已修，本轮不再复现）。这一跑要盯的三件事：① 新读数族 `SEGREF_POLARITY` 有没有在 runner 上印出来 —— 它现在在 §8 的搬运名单里（`--must-include` 声明=1 缺=0 是**本机**的读数），runner 上一行都没有就要分清是走了具名出口 `sysref_seg_fill_not_drawn` 还是这一格根本没跑（394 判的就是这一格，别把它读成回归）；② 全量卷 `Executed` 那三格在 runner 上是否仍是 984/47/0 这一族（本机现读），红名单归因要用改动**之前**那一跑做对照；③ 帧基线在 runner 上 `COMPARED` 必须非 0（本机 178），`COMPARED=0` 时的 `CHANGED=0` 是空对账。
 
+⓪-b 这三件事本轮追记二就读了答案（RUN=40097837516 ↔ `6935e1b` 现读 completed/**success**）：① `SEGREF_POLARITY` 在 runner 上**印出来了**，两档各一行、两档都 `AB=两臂镜像一致`，没走具名出口⇒ 参照臂跨机器成立（394 结案）；② runner 全量卷 `Executed 984 / skipped=56 / failures=0`、`MOTION_FLOOR_SUITE_CLEAN=0 这一卷没有红用例（汇总行也没说有）｜机器=github-runner`；③ 帧基线 `CAPTURED 178`、`COMPARED=178`（非 0 ⇒ 分母在）、`CHANGED=62 MISSING=6 ADDED=116`（对 v1.4.8 那一格是 report-only 的历史对照，不是本轮的闸）。**但答案里有一条改判**：runner 亮档 系统 差=+31.0 与本机亮档 -30.0 **反号**，暗档两边同号 ⇒ 393 的硬断言只立暗档同侧，亮档继续只印数（D-325）。
+
 下一轮（R332）的靶，按顺序：① **393**：391 的落地只剩①—— 药丸换成 `unemphasizedSelectedContentBackgroundColor`
 （参照臂量出的分母），并把 `pillRun` 的"药丸=与页底同档"重基成"药丸=两帧之间变了的那一档"（极性无关），
 D-318/D-319 的改前改后四数 + 按档各立的同侧断言（D-323）+ R327…R329 那几张表的针重钉重跑；
