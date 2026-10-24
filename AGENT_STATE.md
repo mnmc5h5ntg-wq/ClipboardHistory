@@ -12,6 +12,63 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R326 状态（2026-10-24 · 本地 · 第 325 轮 / Round 323）：R325 那份「12 颗不必钉」的尺读的是采样通道 —— 分类器换成三颗通道无关的量（产品 0 文件，动效主线）
+
+本轮做了什么：① **⓪ 读 R325 那一跑并逐条兑现**：RUN=40057803215 ↔ 929c084 全绿，
+`ASSERTION_RED` 整跑 **0 行**，两朵命名出口都在 runner 上响了自己那格
+（`pill-slide-arms-indistinguishable`、`pill-ramp-no-intermediate`），§8 的 `MOTION_FLOOR_SUITE_CLEAN=0`
+⇒ R324 那朵 STEP[19] 的红修完了。② **但同一跑给了本机一个相反的分类**：
+runner `敏感=2`（noticeBanner / noticeBannerDismiss）对 本机 `敏感=0`，而两台那一跑的胶片帧数同为 30
+⇒ 决定"要不要钉"的那颗峰值是采样通道的量（`noticeBanner` 本机 0.2598 对 runner 0.7208）。
+③ **修**：新增三颗通道无关的尺（首末面积 / 动过的并集 / 首末墨量差）并取较大者判，
+峰值降为只印不判（`_CHANNEL` 两行保留给对账）；分界与前提抽成共用纯函数（否则"敏感"这条线会有两份字面量，
+这一点是被 R325 的 M938/M940 命中 2 次当场抓到的）；通道同一性拆两格（像素尺寸严格相等 / 粒度容差 25% 或 1 帧）；
+只印不判的 MAGNITUDE 那格配了会红的分母同一性断言。④ **本机重测三份口径**：
+三颗口径 `同=1 漂=3 敏感=8 换对象=0 粒度不可比=0`、面积两颗 `同=12 漂=0 敏感=0 换对象=0`、峰值 `同=9 漂=3 敏感=0 换对象=0 判定不同=9`，
+墨量那颗带系统偏移（`有变化=11 亮臂更大=11 暗臂更大=0 比值暗除亮=0.11…0.94`，11 颗全是亮臂更大）⇒ **本轮不据 敏感=8 去钉 8 颗**，
+新开 387（阈值在新尺上的出处），并把 R325 那句"不钉是判断"公开更正（383 的追记）。
+
+验证读数（全部现读，不手抄）：构建 ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests；全量卷 Executed 976 tests, with 47 tests skipped and 0 failures；重捕 CAPTURED 174 -> /tmp/r326_rv/frames；
+帧基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=976 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r326_rv；判据卷 `MotionPillRampTests` 27 格全绿（本轮新增 4 格：采样粒度、面积盲区、并集分母同一性、粒度容差；分类器那格从 6 条加到 7 条）；
+胶片卷 Executed 2 tests, with 0 tests skipped and 0 failures（开 CLIPBOARD_HISTORY_UI_MOTION 跑 testFilmScenario 那两格）；色档 A/B 探针两行汇总 MOTION_SCENARIO_AB_SUMMARY 场景=12 同=1 漂=3 敏感=8 换对象=0 粒度不可比=0（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉） / MOTION_SCENARIO_AB_SUMMARY_CHANNEL 峰值口径 同=9 漂=3 敏感=0 换对象=0 与通道无关口径判定不同=9（这一格只印不判：峰值随采样通道走，R326 / 本机 0.2598 对 runner 0.7208）；
+变异表 CAUGHT=6/6, RESTORE_CLEAN=yes（逐臂 M943 CAUGHT；M944 CAUGHT；M945 CAUGHT；M946 CAUGHT；M947 CAUGHT；M948 CAUGHT）；针预检 tables=114 covered=97 bad=0、
+名册 arms=815 / files=208（含 R326 新表 mutate_r326）；
+读数族 `READINGS_MUST_INCLUDE 声明=6 缺=0`；脚本电池 `Ran 611（skipped=4）`；
+产品文件 0 个，连续零改动 **7** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for 325`，`--check` 同形；上一轮 6）。
+
+两处 NOT-RUN（不许省略）：
+① **新口径在 runner 上会不会给出同一份分类**：本轮的修法只能在下一跑的 CI 里被第二台机器验，
+   本机签不了那一半（记进下面 ⓪ 的第①条，Runner=R327 第一件事就是读它）；
+② **墨量那颗尺读的是 rgb 还是 alpha**：它按 `max(rgb, alpha)` 逐像素取大（与 R77 的三轴规矩同一形状），
+   本轮没有按轴切片打读数，所以"亮臂大 11/11 是墨的深浅还是透明度在动"这一格是**未分家的**，
+   要 387 的标定那一步顺手切片，否则①那条派生法（减偏移）会减在混合轴上。
+
+看图腿（本轮真看了）：本轮看图看的不是产品，是**本轮那把新尺读的对象**（两条独立通道对上了同一件事）⇒ ① 用 PIL（与 Swift 胶片完全不同的另一条通道）把 R326 那三颗尺要量的东西，在**已入库的帧**上按"两端点之间：动过的像素占比 / 动过的平均级差"重算一遍：`content-empty-750x560` 对 `content-with-history-750x560`（emptyState 同族）亮档 占比 0.0719 / 级差 194.5，暗档 占比 0.0693 / 级差 49.2；`content-with-history` 对 `content-no-results`（searchReflow 同族）亮 0.0733 / 190.3，暗 0.0706 / 57.0；`detail-0-text` 对 `detail-2-file`（detailKindChange 同族）亮 0.0373 / 65.0，暗 0.0380 / 54.5 ⇒ **面积两颗在两档里几乎不动（最大差 4%），墨量那颗差 1.2–4.0 倍且每一颗都是亮档更深** —— 这正是 U-1077 与 U-1078 的结构：哪些像素在动与色档无关，动了多少级随色档走、而且带同一个方向。② 眼睛看到的与数一致：暗档那张 `content-with-notice-750x560-dark.png` 里横幅的红图标、"知道了"按钮、正文都还在（形状与亮档那张同一份），但整条横幅压在 30–37 这一档底上，亮档同一区域从 54 走到 255 ⇒ "暗档里同样的动、动的级差小得多"不是抽象结论，是看得见的。③ 一次差点开错的单：同一张暗档帧里侧栏四行列表标题几乎黑底黑字，第一反应是产品缺陷，先搜台账才看见 D-090（R30）已写明"vibrant 列的文字极性是故意反的、`cacheDisplay` 不做合成那一步 ⇒ 拍到的是合成前像素"，且 `darkSidebarTextBlindSpots` 名册在册 ⇒ 那是登记的通道盲区，不是新缺陷，本轮没为它起新名字（同一族 R325 差点为那块 #000 黑块开单，两次都是"先看图、先量数、后查重"的顺序救回来的）。④ 本轮产品 0 文件，帧基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0 ⇒ 上面那些图与 R325 那一批是同一张图，看图腿没有靠旧图替新东西作证。
+
+⓪ R327 开场要先读的（成对：run id ↔ commit）：本轮 push 之后拿到的 RUN / sha 见本轮提交之后的追记；
+要读的三件事：
+   ① **新口径的 runner 分类**：`MOTION_SCENARIO_AB_SUMMARY` 在 runner 上读成什么，
+      与 runner 上那份旧峰值分类（敏感=2）对得上没有；`MOTION_SCENARIO_AB_MAGNITUDE` 的
+      「亮臂更大=多少 / 有变化=多少」在 1× 那台机器上是不是也全在一侧 —— 那是 387 的第二个数据点，
+      如果 runner 出现"两侧都有"，本机那条系统偏移就不是色档级而是本机级；
+   ② **粒度容差那条**：`粒度不可比` 在 runner 上应当是 0；读到 >0 就先看是不是那台机器把某一臂饿死了
+      （不许顺手把容差放宽，先归因）；
+   ③ 两朵 pill 命名出口继续在 runner 上响（`pill-slide-arms-indistinguishable` / `pill-ramp-no-intermediate`）
+      —— 它们从"红"变成"有名字的未覆盖"这件事不能在本轮之后悄悄变回去。
+
+① R327 的靶：① **384（回到有对象的动效面）**：字墨把洞切成两半 ⇒ 斜坡尺只放行胶囊上沿那几 pt
+   （候选修法①：把字墨列并入洞，收藏星那族墨尺有先例）—— 它有现读对象、有修法、不需要真机，
+   而且连着 7 轮零产品文件这一维一直在垫底，R327 该动它；
+   ② 387 的①（减偏移再判）：本机数据现在就能算，算完才谈 12 颗要不要钉；
+   ③ 376 剩下那一半（那台机器上有没有一条能动的通道）；
+   ④ 367 迁移 / 360 最后一批 / 361 合并 / 364 六把抽不出的刀；
+   ⑤ 真机眼那一批（347 / 305 / 373① / 368）—— 用户已明确暂时做不了，不排进轮次。
+
+最后更新：2026-10-24（本地 · R326 / 第 325 轮 / Round 323）：**色档 A/B 的统计量从采样通道换成三颗通道无关的尺 —— R325 那份「12 颗不必钉」被公开更正**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 976 tests, with 47 tests skipped and 0 failures`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=976 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r326_rv`；变异表 `CAUGHT=6/6, RESTORE_CLEAN=yes`；
+探针 `MOTION_SCENARIO_AB_SUMMARY 场景=12 同=1 漂=3 敏感=8 换对象=0 粒度不可比=0（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）`；`MOTION_SCENARIO_AB_MAGNITUDE 有变化=11 亮臂更大=11 暗臂更大=0 比值暗除亮=0.11…0.94（全在同一侧 ⇒ 墨量这颗尺带一个色档级系统偏移，5%/25% 在它身上没有出处：BACKLOG 387）`；脚本电池 `Ran 611（skipped=4）`；针预检 bad=0、名册 arms=815。
+连续零改动那一格只写在上面「验证读数」段里一次（`test_product_streak_cell` 数的是同一格里的候选数）。
+
 ## R325 状态（2026-10-24 · 本地 · 第 324 轮 / Round 322）：一句没有数的推测换成 12 颗读数，并接住 R324 在 runner 上换形的那朵红（产品 0 文件，动效主线）
 
 本轮做了什么：① **R324 那句"其余 12 颗与色档弱相关"付账**：新增 `Scenario.pinned(to:)` +

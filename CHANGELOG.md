@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 色档 A/B 的分类器从"峰值"换成三颗通道无关的量：R325 那份「12 颗都不必钉」的结论被公开更正，runner 的 敏感=2 有了成因（R326 / U-1076…U-1081 · 产品 0 文件，动效主线）
+
+- 新增 `endpointChangedFraction` / `everChangedFraction` / `endpointInkDifference` 三颗通道无关的尺，
+  `appearanceDependenceVerdict` 改收这三颗并取较大相对差；`peakVerdict` 保留为**只印不判**的对照
+  （`MOTION_SCENARIO_AB_CHANNEL` + `_SUMMARY_CHANNEL`，本机现读 与通道无关口径判定不同=9）。
+- 本机现读（三颗口径）MOTION_SCENARIO_AB_SUMMARY 场景=12 同=1 漂=3 敏感=8 换对象=0 粒度不可比=0（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）；只留面积两颗时 MOTION_SCENARIO_AB_SUMMARY 场景=12 同=12 漂=0 敏感=0 换对象=0（口径=首末差∪并集取较大；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉，同 ⇒ 有数了才写不依赖）；
+  墨量那颗带色档级系统偏移 MOTION_SCENARIO_AB_MAGNITUDE 有变化=11 亮臂更大=11 暗臂更大=0 比值暗除亮=0.11…0.94（全在同一侧 ⇒ 墨量这颗尺带一个色档级系统偏移，5%/25% 在它身上没有出处：BACKLOG 387） ⇒ 本轮**不据 敏感=8 去钉**，新开 387（阈值在新尺上的出处）。
+- 通道同一性拆成两格：像素尺寸严格相等（红），采样粒度 `samplingComparable`（差 1 帧豁免或 ≤25%，
+  不可比打 `MOTION_SCENARIO_AB_NOT_COMPARABLE` 并在汇总数一格 `粒度不可比=0`）。
+- 分界与前提各抽成一份共用纯函数（`verdictFromRelativeDifference` / `flippedAppearanceWord`），
+  否则"敏感"这条线会有两份字面量 —— 新加 `peakVerdict` 时真的把 R325 的 M938/M940 顶成了命中 2 次。
+- 判据卷 27 格全绿（本轮新增 4 格：采样粒度、面积盲区、并集分母同一性、粒度容差；分类器那格从 6 条加到 7 条）；本轮变异表 CAUGHT=6/6, RESTORE_CLEAN=yes（M943…M948）；帧 CAPTURED 174 -> /tmp/r326_rv/frames、基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0。
+
 ### 色档依赖逐颗量完（12 颗：同=10 漂=2 敏感=0 换对象=0），并接住 R324 在 runner 上换形的那朵红：出口谓词换成判据自己的量，一步跳变不再发"单调"的证（R325 / U-1070…U-1075 · 产品 0 文件，动效主线）
 
 R324 数出"13 颗工厂只有 1 颗钉了色档"，并把"其余 12 颗与色档弱相关"写成了一句**没有数**的理由。

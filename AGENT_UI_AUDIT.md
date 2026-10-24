@@ -376,6 +376,72 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 变异腿：NOT-RUN —— R256 没插刀；本轮不替它补证（旧代码上得到的 CAUGHT 不能替新代码作证）。
 未做（逐条）：① 301；② 302；③ 297/298/300 在判据能跑之前根本没有资格谈结案。
 
+## 第 325 轮（R326 · U-1076…U-1081 · 2026-10-24）：R325 那句「12 颗里 0 颗敏感」是拿一把读采样通道的尺量的 —— 分类器换成三颗通道无关的量，峰值降为只印不判，runner 的 敏感=2 由此得到解释（U-1076…U-1081 · 产品 0 文件，动效主线）
+
+R325 把「其余 12 颗场景与色档弱相关」这句推测换成逐颗读数，本机读到 `同=10 漂=2 敏感=0 换对象=0`，
+并把「不钉」登记成判断。本轮 ⓪ 读那一跑的 CI（RUN=40057803215 ↔ 929c084，全绿）时拿到的是另一份分类：
+**同一笔 commit，runner 读 `敏感=2`**（`noticeBanner`、`noticeBannerDismiss`），
+而两台机器那一跑的**胶片帧数都是 30**（runner 现读 `MOTION_GRAB … 帧数=`）。动作相反不是数不好看：那两条判据在 R325 的规则里写着「敏感 ⇒ 该钉」。
+
+- **U-1076：色档 A/B 那颗「峰值」量的是采样通道，不是色档 ⇒ 决定动作的分类器不能收它。**
+  逐颗对照（runner 那一跑的旧口径行 ↔ 本机这一跑的只印不判行；本机这一跑两臂各 27/28 帧，
+  帧数本身就随跑动 —— 那是"这颗尺在读通道"的另一半证据）：
+  noticeBanner：runner 暗峰值=0.7208 亮峰值=0.4758 判敏感，本机同颗 暗峰值=0.3273 亮峰值=0.2988 判漂；noticeBannerDismiss：runner 暗峰值=0.3290 亮峰值=0.4391 判敏感，本机同颗 暗峰值=0.2611 亮峰值=0.2556 判同。夹具是同一份代码画的 ⇒ 那个数说的是"这台机器的钟一步跨多大"，
+  不是"这条判据会不会因为换档说不同的话"。
+  本轮把它降为**只印不判**（`MOTION_SCENARIO_AB_CHANNEL`，逐颗 + `_SUMMARY_CHANNEL` 汇总），
+  R325 的结论留在打印里可以对账，但它不再决定任何动作。
+- **U-1077：三颗通道无关的量替它上岗，且必须取较大者：首末面积 / 动过的并集 / 首末墨量差。**
+  首末面积（`endpointChangedFraction`）与并集（`everChangedFraction`）只看**哪些像素动过**，
+  对"动了多少级"是盲的；本轮先只加了这两颗，本机当场读成 `同=12 敏感=0` ——
+  那正是"把判据换窄到它恰好看不见的那一半"。补上第三颗墨量差（`endpointInkDifference`，
+  端点上每个采样像素的最大通道差取平均）之后，同一批场景读成 `同=1 漂=3 敏感=8 换对象=0`。
+  证人：`testEndpointAreaIsBlindToInkMagnitudeButTheVerdictIsNot`（面积全等、只有深浅不同时判定必须是敏感）。
+- **U-1078：三颗尺里有一颗带**色档级系统偏移**，5% / 25% 那两条线在它身上没有出处 ⇒ 本轮不据它钉 8 颗。**
+  现读 `MOTION_SCENARIO_AB_MAGNITUDE 有变化=11 亮臂更大=11 暗臂更大=0 比值暗除亮=0.11…0.94`
+  —— 十一颗有变化的场景**每一颗都是亮臂的墨量差更大**，比值横跨 0.11…0.94。
+  这不是十一条「这条判据随色档走」的证据，而是一条"这颗尺整体偏移"的证据：
+  那两条线是在**没有这个偏移的峰值口径**上拍的（BACKLOG 386 记的就是它没有出处），
+  搬到带偏移的尺上就把 8 颗推过了线。所以本轮把动作压住、把这条开成 387，
+  并把"样本不许偷偷缩小"钉成断言（`ratios.count == changedBoth`，刀 M948 打的就是这一格）。
+- **U-1079：两臂的采样粒度「必须相等」是判据自己变窄，不是通道坏了 —— 容差换成 25% 或 1 帧。**
+  本轮第一次把通道同一性写成 `帧数必须相等`，`blank` 那颗当场红在 **暗 27 / 亮 28** 上，
+  而帧数是墙上时钟决定的（同一进程里两臂各采各的）。改成 `samplingComparable`
+  （差 1 帧豁免，或相对差 ≤25%）并配 6 格证人：放行抖动、拦住"一臂塌到 3 帧 / 0 帧"。
+  不可比不再红产品事实，而是打 `MOTION_SCENARIO_AB_NOT_COMPARABLE` 并在汇总里数一格
+  `粒度不可比=0`（有名字的未覆盖，不静默）。像素尺寸那一半仍是严格相等 —— 那是"两臂是不是同一块画面"。
+- **U-1080：同一句「敏感」在文件里只能有一个字面量：分界与前提各抽成一颗共用纯函数。**
+  新增只印不判的 `peakVerdict` 时，`if rel > 0.25 { return "敏感" }` 与 `if changedDark != changedLight { return "换对象" }`
+  各自变成两处 ⇒ 针预检当场把 R325 的 M938 / M940 报成「命中 2 次」（那两把刀会静默变 NOT_RUN）。
+  修法不是放宽查重，是抽 `verdictFromRelativeDifference` 与 `flippedAppearanceWord` 各一份，
+  并把 M940 的锚点重钉到新那一处（意图没变：让"换对象"永远不响，证人必须红）。
+- **U-1081：本轮的证人形状 —— 每颗新尺都要能自己造反例，而不是只测正则。**
+  `testAppearanceStatisticsSurviveASamplingChange`：同一份"从左到右亮满 70 列"的过渡，
+  粗采样 5 步 vs 细采样 11 步 ⇒ 三颗通道无关尺必须给出**同一个数**（面积 1.0 / 并集 1.0 / 墨量相等），
+  峰值必须**明显更大**（`peakChangedFraction` 粗对细 > 2 倍），并且旧口径必须在这对合成帧上判成「敏感」而新口径判成「同」。
+  四个方向缺一不可：只证"新尺不动"可能那把尺是瞎的，只证"旧尺乱动"是给要被推翻的口径作证。
+  夹具的底是**不透明黑**而不是全透明：透明的底会让墨量那颗尺只看 alpha 通道就顶到 1.0，
+  于是 200 级与 120 级读不出差别 —— 夹具要像被量的东西，不像最容易构造的东西。
+
+验证读数（全部现读）：ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests；全量卷 Executed 976 tests, with 47 tests skipped and 0 failures；重捕 CAPTURED 174 -> /tmp/r326_rv/frames；帧基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0；四件套 ROUND_VERIFY build_warnings=0 swift_executed=976 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r326_rv；
+判据卷 `MotionPillRampTests` 27 格全绿（本轮新增 4 格：采样粒度、面积盲区、并集分母同一性、粒度容差；分类器那格从 6 条加到 7 条）；胶片卷 Executed 2 tests, with 0 tests skipped and 0 failures（开 CLIPBOARD_HISTORY_UI_MOTION 跑 testFilmScenario 那两格）；
+色档 A/B（三颗口径，作数的那一口）MOTION_SCENARIO_AB_SUMMARY 场景=12 同=1 漂=3 敏感=8 换对象=0 粒度不可比=0（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）；
+同一次运行的面积两颗（不加墨量会得到什么）MOTION_SCENARIO_AB_SUMMARY 场景=12 同=12 漂=0 敏感=0 换对象=0（口径=首末差∪并集取较大；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉，同 ⇒ 有数了才写不依赖）；
+峰值口径（只印不判）MOTION_SCENARIO_AB_SUMMARY_CHANNEL 峰值口径 同=9 漂=3 敏感=0 换对象=0 与通道无关口径判定不同=9（这一格只印不判：峰值随采样通道走，R326 / 本机 0.2598 对 runner 0.7208）；
+点名器 MOTION_SCENARIO_APPEAR 工厂=13 钉了=1 没钉=12 钉了名单=filterPillSlide 没钉名单=blank,detailEmptyToContent,detailKindChange,detailSameKind,emptyState,heatFirstRecord,listInsertNewRecord,noticeBanner,noticeBannerDismiss,promotionToTop,searchReflow,toggleFavoriteInRow；
+本轮变异表 CAUGHT=6/6, RESTORE_CLEAN=yes（逐臂 M943 CAUGHT；M944 CAUGHT；M945 CAUGHT；M946 CAUGHT；M947 CAUGHT；M948 CAUGHT）；针预检 tables=114 covered=97 bad=0、
+名册 arms=815 / files=208；搬运名单 `READINGS_MUST_INCLUDE 声明=6 缺=0`；
+脚本电池 `Ran 611（skipped=4）`。
+
+看图腿：本轮看图看的不是产品，是**本轮那把新尺读的对象**（两条独立通道对上了同一件事）⇒ ① 用 PIL（与 Swift 胶片完全不同的另一条通道）把 R326 那三颗尺要量的东西，在**已入库的帧**上按"两端点之间：动过的像素占比 / 动过的平均级差"重算一遍：`content-empty-750x560` 对 `content-with-history-750x560`（emptyState 同族）亮档 占比 0.0719 / 级差 194.5，暗档 占比 0.0693 / 级差 49.2；`content-with-history` 对 `content-no-results`（searchReflow 同族）亮 0.0733 / 190.3，暗 0.0706 / 57.0；`detail-0-text` 对 `detail-2-file`（detailKindChange 同族）亮 0.0373 / 65.0，暗 0.0380 / 54.5 ⇒ **面积两颗在两档里几乎不动（最大差 4%），墨量那颗差 1.2–4.0 倍且每一颗都是亮档更深** —— 这正是 U-1077 与 U-1078 的结构：哪些像素在动与色档无关，动了多少级随色档走、而且带同一个方向。② 眼睛看到的与数一致：暗档那张 `content-with-notice-750x560-dark.png` 里横幅的红图标、"知道了"按钮、正文都还在（形状与亮档那张同一份），但整条横幅压在 30–37 这一档底上，亮档同一区域从 54 走到 255 ⇒ "暗档里同样的动、动的级差小得多"不是抽象结论，是看得见的。③ 一次差点开错的单：同一张暗档帧里侧栏四行列表标题几乎黑底黑字，第一反应是产品缺陷，先搜台账才看见 D-090（R30）已写明"vibrant 列的文字极性是故意反的、`cacheDisplay` 不做合成那一步 ⇒ 拍到的是合成前像素"，且 `darkSidebarTextBlindSpots` 名册在册 ⇒ 那是登记的通道盲区，不是新缺陷，本轮没为它起新名字（同一族 R325 差点为那块 #000 黑块开单，两次都是"先看图、先量数、后查重"的顺序救回来的）。④ 本轮产品 0 文件，帧基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0 ⇒ 上面那些图与 R325 那一批是同一张图，看图腿没有靠旧图替新东西作证。
+
+⓪ R325 那一跑（RUN=40057803215 ↔ 929c084）的兑现，逐条读到的：
+① 两朵命名出口都在 runner 上响了自己该响的那格 —— `MOTION_NOT_RUN=pill-slide-arms-indistinguishable`
+   与 `MOTION_NOT_RUN=pill-ramp-no-intermediate`，而 `ASSERTION_RED` 在整跑里 **0 行**
+   ⇒ R324 那朵 STEP[19] 的红修完了，红没被"出口"洗掉，是换成了有名字的未覆盖；
+② runner 的胶囊行带 `行带=52.0…58.0pt、色档=胶片暗/机器亮` ⇒ R323 的带子定位在第二台机器上也落在胶囊那一行；
+③ runner 的色档分类 `场景=12 同=9 漂=1 敏感=2 换对象=0（峰值口径）`（峰值口径）—— 就是 U-1076 那条矛盾的原始形状；
+④ §8 的 `MOTION_FLOOR_SUITE_CLEAN=0`（这一卷没有红用例）⇒ R325 第 ⓪ 条③那一格归零。
+
 ## 第 324 轮（R325 · U-1070…U-1075 · 2026-10-24）：把"12 颗没钉色档"从缺席计数变成逐颗读数（同=10 漂=2 敏感=0 换对象=0），并接住 R324 在 runner 上换了一朵红继续红的那一半（U-1070…U-1075 · 产品 0 文件，动效主线）
 
 R324 数出"13 颗场景工厂里只有 1 颗钉了色档"，并明确写下"其余 12 颗今天不钉，
