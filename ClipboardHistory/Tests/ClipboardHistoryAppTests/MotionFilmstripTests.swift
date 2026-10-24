@@ -1794,6 +1794,37 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// 造一卷「**从左到右一根一根亮起来**」的合成帧（R326 的采样粒度证人）。
+    ///
+    /// 为什么不能复用上面那份纯色帧：纯色帧每一步都让**全部**像素变，于是粗采样与细采样
+    /// 读出的峰值都是 1.0 —— 那正好是我要证伪的那个 confound 的反例，用它当证人等于没有证人。
+    /// 这里每一步只亮一部分列，峰值才会随采样粒度走（粗的一卷每步亮得多 ⇒ 峰值大），
+    /// 而首末差与并集只认"两端各是什么画面"，与中间采了几次无关。
+    ///
+    /// 尺寸取 70 不是随手来的：那两条尺都按 stride 7 采样，70 让 10 列各被采到一个像素，
+    /// "亮 35 列" 恰好等于 "50% 的采样像素" —— 证人要的数能手算。
+    static func syntheticRevealFilm(revealedColumns: [Int], width: Int = 70,
+                                    height: Int = 70, ink: UInt8 = 200) -> [CGImage] {
+        revealedColumns.map { revealed in
+            var pixels = [UInt8](repeating: 0, count: width * height * 4)
+            // 底是**不透明黑**而不是全透明：窗口抓帧的 alpha 整幅都是 255，
+            // 透明的底会让"墨量差"那一颗尺只看 alpha 通道就顶到 1.0（200 与 120 读不出差别），
+            // 于是它看不见自己本该看见的那一格 —— 夹具要像被量的东西，不像最容易构造的东西。
+            for index in stride(from: 3, to: pixels.count, by: 4) { pixels[index] = 255 }
+            for y in 0..<height {
+                for x in 0..<width where x < revealed {
+                    let p = (y * width + x) * 4
+                    pixels[p] = ink; pixels[p + 1] = ink; pixels[p + 2] = ink
+                }
+            }
+            let space = CGColorSpace(name: CGColorSpace.sRGB)!
+            let context = CGContext(data: &pixels, width: width, height: height, bitsPerComponent: 8,
+                                    bytesPerRow: width * 4, space: space,
+                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            return context.makeImage()!
+        }
+    }
+
     /// 证人自己要先上台：夹具必须真的动，读数必须每轮都在（R66 / BACKLOG 100）。
     ///
     /// 为什么单独立一条，而不是等阳性对照掉到 0.15 以下时顺带跑到：本机横幅的残余是 0.974，
@@ -5794,35 +5825,71 @@ final class MotionFilmstripTests: XCTestCase {
             + " ⇒ 前提⓪要拦的那件事就在这儿：亮档里轨道与药丸只差 3 级，尺没有对象")
     }
 
-    /// 纯函数：把"同一颗场景在两档色档里的读数"归成四格词表（R325 / BACKLOG 383）。
+    /// 纯函数：把"同一颗场景在两档色档里的读数"归成四格词表（R325 立，R326 换统计量 / BACKLOG 383、386）。
     ///
     /// 为什么要抽成纯函数而不直接在探针里写 if：不抽出来，这四格词表就只活在一次真机跑里，
     /// 没人能证明"漂"与"敏感"的分界真的在 5% / 25%，也没人能证明"换对象"优先于相对差
     /// （R146 那一族：写死在探针里的分类法等于没有分类法）。
+    ///
+    /// R326 改的是**收哪几个数**：R325 收的是两臂**峰值**，而峰值是采样通道的量（见
+    /// `endpointChangedFraction` 的注释），于是同一个 commit 在本机给"敏感=0"、在 runner 给
+    /// "敏感=2" —— 两台机器对同一份代码做出**相反的动作**。现在收三颗通道无关的量：
+    /// **首末面积**（哪些像素动了）、**动过的并集**（整卷里动过多少像素，补"动了又回来"）、
+    /// **首末墨量差**（同样的面积在暗档里差 170 级、亮档里差 65 级时它要能看见），
+    /// 取三者较大的相对差：任何一颗单独都可能恰好看不见，而"选哪一颗"不能由答案决定。
+    /// 阈值 5% / 25% 本轮**一个字没动** —— 它们该不该在这儿是 BACKLOG 386 的问题，
+    /// 本轮没有资格顺手重标；换统计量之后重测出来的分布才是 386 能拿来定线的数。
+    ///
     /// 顺序是承重的：`换对象` 排在相对差之前 —— 一档看得见、另一档看不见时，
     /// 相对差再小也是**前提**翻了脸，那与"数值漂了一点"是修法相反的两件事。
-    static func appearanceDependenceVerdict(peakDark: Double, peakLight: Double,
+    static func appearanceDependenceVerdict(endpointDark: Double, endpointLight: Double,
+                                            unionDark: Double, unionLight: Double,
+                                            inkDark: Double, inkLight: Double,
                                             changedDark: Bool, changedLight: Bool) -> String {
-        if changedDark != changedLight { return "换对象" }
-        let denom = Swift.max(peakDark, peakLight, 0.001)
-        let rel = Swift.abs(peakDark - peakLight) / denom
+        if let flipped = Self.flippedAppearanceWord(changedDark: changedDark, changedLight: changedLight) {
+            return flipped
+        }
+        let rel = Swift.max(Self.relativeDifference(endpointDark, endpointLight),
+                            Self.relativeDifference(unionDark, unionLight),
+                            Self.relativeDifference(inkDark, inkLight))
+        return Self.verdictFromRelativeDifference(rel)
+    }
+
+    /// 前提那一格只住一处（R326）：两口径共用。写两遍就会有两根可以各自腐烂的针 ——
+    /// 本轮新加 `peakVerdict` 时正是这样把 R325 的 M940 顶成了"锚点命中 2 次"，
+    /// 那一格当场报 NOT_RUN（刀没下），所以这不是洁癖，是被抓过的形状。
+    static func flippedAppearanceWord(changedDark: Bool, changedLight: Bool) -> String? {
+        changedDark != changedLight ? "换对象" : nil
+    }
+
+    /// 两条分界也只住一处，理由同上：`敏感` 与 `漂` 的字面量若有两份，
+    /// 改一份留下另一份，"这两条线在哪"就又是注释里的分类法了（BACKLOG 386 要的正是能一次改对）。
+    static func verdictFromRelativeDifference(_ rel: Double) -> String {
         if rel > 0.25 { return "敏感" }
         if rel > 0.05 { return "漂" }
         return "同"
     }
 
+    /// 相对差：分母取两臂里较大的那个，两臂都是 0 时读 0（空白对照那类不许变 NaN）。
+    static func relativeDifference(_ a: Double, _ b: Double) -> Double {
+        let denom = Swift.max(a, b, 0.001)
+        return Swift.abs(a - b) / denom
+    }
+
     /// R325 / BACKLOG 383：把"12 颗没钉色档"从**缺席计数**变成**逐颗读数**。
     ///
-    /// 同一颗场景在暗档与亮档里各拍一卷，比的是**它自己那把尺的读数**（整幅逐帧变化的峰值，
-    /// 以及前提"画面到底换没换"）。四格分类：
+    /// 同一颗场景在暗档与亮档里各拍一卷，比的是**它自己那把尺的读数**，四格分类：
     ///   `换对象` = 一档看得见变化、另一档看不见 ⇒ 这条判据的**前提**随色档翻脸，必须钉；
-    ///   `敏感`   = 两边都看得见，但峰值相对差 > 25% ⇒ 读数随色档走，钉；
+    ///   `敏感`   = 两边都看得见，但通道无关读数的相对差 > 25% ⇒ 读数随色档走，钉；
     ///   `漂`     = 相对差 5–25% ⇒ 登记，本轮不钉（钉了就要重测那条判据的历史读数）；
     ///   `同`     = 相对差 < 5% ⇒ **有数了**才许写"不依赖色档"，而不是"猜它不依赖"。
-    /// 这一格判的是尺，不是产品；它自己不红任何产品事实，除了下面两条通道前提。
+    /// 这一格判的是尺，不是产品；它自己不红任何产品事实，除了下面三条通道前提。
     ///
-    /// 两条通道前提为什么是红的：两臂若其实拍在同一档里，"读数相同"就是两卷同一张图的同义反复，
-    /// 那句"同 ⇒ 不钉"就成了假绿（R38 / R161 那一族：出口的前提必须由同一次运行量出来）。
+    /// 三条通道前提为什么是红的：
+    /// ① 两臂若其实拍在同一档里，"读数相同"就是两卷同一张图的同义反复（R38 / R161 那一族）；
+    /// ② 两臂的**帧数或像素尺寸**若不同，"同一个统计量"就是两份不同的画面，比不得；
+    /// ③ 峰值那一口径本轮起**只印不判**，但仍要印 —— 它是 R325 那两格结论的出处，
+    ///    读者要能看见"换统计量把哪几颗的判定改了"，否则这条更正本身就成了新的一句推测。
     func testFilmScenarioAppearanceDependenceIsMeasuredPerScenario() throws {
         try skipUnlessEnabledAndCapable()
         let subjects = Scenario.unpinnedAppearanceProbe()
@@ -5836,6 +5903,18 @@ final class MotionFilmstripTests: XCTestCase {
         var driftCount = 0
         var sensitiveCount = 0
         var flippedCount = 0
+        var peakSame = 0
+        var peakDrift = 0
+        var peakSensitive = 0
+        var peakFlipped = 0
+        var verdictMismatch = 0
+        var granularityGap = 0
+        // 全局方向那一格（R326 实测逼出来的）：墨量差在 11 颗有变化的场景里**每一颗都是亮臂更大**。
+        // 那不是 11 条"这条判据随色档走"的证据，那是一条"这颗尺带着一整个色档的系统偏移"的证据 ——
+        // 而 25% 那条线当初是在**没有这个偏移的峰值口径**上拍的。所以这一格必须印出来：
+        // 它是"本轮不许拿 敏感=8 去钉 8 颗"那句话的读数，不是注释里的推测。
+        var ratios: [Double] = []
+        var changedBoth = 0
         for subject in subjects {
             let dark = record(subject.scenario.pinned(to: .darkAqua))
             let light = record(subject.scenario.pinned(to: .aqua))
@@ -5843,34 +5922,128 @@ final class MotionFilmstripTests: XCTestCase {
                 "探针说在暗档、胶片实际拍在「\(dark.appearanceNameAtRecord)」⇒ 两臂对照不成立（\(subject.factory)）")
             XCTAssertEqual(light.appearanceNameAtRecord, "亮",
                 "探针说在亮档、胶片实际拍在「\(light.appearanceNameAtRecord)」⇒ 两臂对照不成立（\(subject.factory)）")
+            // 通道同一性（两件事，别混）：①**画面**必须是同一块 —— 像素尺寸严格相等；
+            // ②采样**粒度**要可比 —— 帧数由墙上时钟决定，同一进程里两臂差 1 帧是常态
+            //   （本轮实测：`blank` 暗 27 / 亮 28 ⇒ 第一版写成"帧数必须相等"当场红，
+            //   那是判据自己变窄，不是通道坏了）。所以这里判的是 25% 的容差，
+            //   而它之所以还值得判：三颗通道无关的统计量只要求"过程被采到过"，
+            //   一臂塌到零帧就再没什么"通道无关"可言 —— 那用得上，就不能当噪声放行。
+            let comparable = Self.samplingComparable(dark.motionFrames.count, light.motionFrames.count)
+            XCTAssertEqual(dark.motionFrames.first.map(Self.pixelSizeText) ?? "空",
+                           light.motionFrames.first.map(Self.pixelSizeText) ?? "空",
+                           "两臂像素尺寸不同 ⇒ 亮的那一臂拍的是另一块画面（\(subject.factory)）")
+            if !comparable {
+                granularityGap += 1
+                emit("MOTION_SCENARIO_AB_NOT_COMPARABLE " + subject.factory
+                     + " 帧数暗=" + String(dark.motionFrames.count)
+                     + " 帧数亮=" + String(light.motionFrames.count)
+                     + " ⇒ 这一颗的两臂采样粒度差到不能比，判定不许当'不依赖色档'的证据（也不红产品事实）")
+            }
             let peakDark = Self.peak(Self.deltas(dark.motionFrames, band: nil))
             let peakLight = Self.peak(Self.deltas(light.motionFrames, band: nil))
+            let endpointDark = Self.endpointChangedFraction(dark.motionFrames)
+            let endpointLight = Self.endpointChangedFraction(light.motionFrames)
+            let unionDark = Self.everChangedFraction(dark.motionFrames)
+            let unionLight = Self.everChangedFraction(light.motionFrames)
+            let inkDark = Self.endpointInkDifference(dark.motionFrames)
+            let inkLight = Self.endpointInkDifference(light.motionFrames)
             let changedDark = Self.premisePictureChanged(dark.motionFrames, band: nil)
             let changedLight = Self.premisePictureChanged(light.motionFrames, band: nil)
-            let denom = max(peakDark, peakLight, 0.001)
-            let rel = abs(peakDark - peakLight) / denom
+            if endpointDark > 0, endpointLight > 0 {
+                changedBoth += 1
+                if inkLight > 0 { ratios.append(inkDark / inkLight) }
+            }
             // 分类走纯尺（与证人同一颗尺子，R68）：探针自己 if 一遍，证人就只是在证它自己抄的那份。
-            let verdict = Self.appearanceDependenceVerdict(peakDark: peakDark, peakLight: peakLight,
-                                                           changedDark: changedDark,
-                                                           changedLight: changedLight)
+            let verdict = Self.appearanceDependenceVerdict(endpointDark: endpointDark,
+                                                           endpointLight: endpointLight,
+                                                           unionDark: unionDark, unionLight: unionLight,
+                                                           inkDark: inkDark, inkLight: inkLight,
+                                                           changedDark: changedDark, changedLight: changedLight)
+            let peakVerdict = Self.peakVerdict(peakDark: peakDark, peakLight: peakLight,
+                                               changedDark: changedDark, changedLight: changedLight)
+            if verdict != peakVerdict { verdictMismatch += 1 }
             switch verdict {
             case "换对象": flippedCount += 1
             case "敏感": sensitiveCount += 1
             case "漂": driftCount += 1
             default: sameCount += 1
             }
-            let changedDarkText = changedDark ? "是" : "否"
-            let changedLightText = changedLight ? "是" : "否"
-            emit("MOTION_SCENARIO_AB " + subject.factory + " 暗峰值=" + String(format: "%.4f", peakDark)
-                 + " 亮峰值=" + String(format: "%.4f", peakLight)
-                 + " 相对差=" + String(format: "%.1f", rel * 100.0) + "%"
-                 + " 暗换档=" + changedDarkText + " 亮换档=" + changedLightText
-                 + " 判定=" + verdict)
+            switch peakVerdict {
+            case "换对象": peakFlipped += 1
+            case "敏感": peakSensitive += 1
+            case "漂": peakDrift += 1
+            default: peakSame += 1
+            }
+            emit("MOTION_SCENARIO_AB " + subject.factory + " 判定=" + verdict
+                 + " 首末暗=" + String(format: "%.4f", endpointDark)
+                 + " 首末亮=" + String(format: "%.4f", endpointLight)
+                 + " 并集暗=" + String(format: "%.4f", unionDark)
+                 + " 并集亮=" + String(format: "%.4f", unionLight)
+                 + " 墨暗=" + String(format: "%.4f", inkDark)
+                 + " 墨亮=" + String(format: "%.4f", inkLight)
+                 + " 暗换档=" + (changedDark ? "是" : "否") + " 亮换档=" + (changedLight ? "是" : "否"))
+            // 只印不判的那一口：R325 的结论就是从这颗峰值来的，留着它读者才能对账。
+            emit("MOTION_SCENARIO_AB_CHANNEL " + subject.factory
+                 + " 峰值口径判定=" + peakVerdict
+                 + " 峰值暗=" + String(format: "%.4f", peakDark)
+                 + " 峰值亮=" + String(format: "%.4f", peakLight)
+                 + " 峰值相对差=" + String(format: "%.1f", Self.relativeDifference(peakDark, peakLight) * 100.0) + "%"
+                 + " 帧数=" + String(dark.motionFrames.count))
         }
+        // 分母同一性（R326）：`亮臂更大=11/11` 那句是本轮"不拿 敏感=8 去钉 8 颗"的**读数**，
+        // 所以它不能只是打出来 —— 打出来的数要有一个它会红的地方。这里钉的是：
+        // 凡是两臂面积都读到变化的场景，墨量那颗尺必须也在样本里（少一颗就是尺瞎了一半，
+        // 而瞎掉的那一半正好会让"全是同一侧"这句话变成挑出来的样本）。
+        XCTAssertEqual(ratios.count, changedBoth,
+            "两臂面积都有变化的场景是 \(changedBoth) 颗，而墨量比值只收了 \(ratios.count) 颗 ⇒ "
+                + "比值那一格的样本被悄悄缩小了，'亮臂更大=N' 不能代表全部有变化的场景")
+        XCTAssertGreaterThan(changedBoth, 1,
+            "只有 \(changedBoth) 颗场景在两臂里都读到了画面变化 ⇒ 对象表里全是空胶片，"
+                + "A/B 分类没有可判的东西（这条要红，不许让'同=12'那种数糊过去）")
+        let sortedRatios = ratios.sorted()
+        emit("MOTION_SCENARIO_AB_MAGNITUDE 有变化=" + String(ratios.count)
+             + " 亮臂更大=" + String(sortedRatios.filter { $0 < 1.0 }.count)
+             + " 暗臂更大=" + String(sortedRatios.filter { $0 > 1.0 }.count)
+             + " 比值暗除亮=" + (sortedRatios.isEmpty ? "无"
+                 : String(format: "%.2f…%.2f", sortedRatios.first!, sortedRatios.last!))
+             + "（全在同一侧 ⇒ 墨量这颗尺带一个色档级系统偏移，5%/25% 在它身上没有出处：BACKLOG 387）")
         emit("MOTION_SCENARIO_AB_SUMMARY 场景=" + String(subjects.count)
              + " 同=" + String(sameCount) + " 漂=" + String(driftCount)
              + " 敏感=" + String(sensitiveCount) + " 换对象=" + String(flippedCount)
-             + "（钉档判据：换对象/敏感 ⇒ 该钉；漂 ⇒ 登记不钉；同 ⇒ 有数了才写不依赖）")
+             + " 粒度不可比=" + String(granularityGap)
+             + "（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）")
+        emit("MOTION_SCENARIO_AB_SUMMARY_CHANNEL 峰值口径 同=" + String(peakSame)
+             + " 漂=" + String(peakDrift) + " 敏感=" + String(peakSensitive)
+             + " 换对象=" + String(peakFlipped)
+             + " 与通道无关口径判定不同=" + String(verdictMismatch)
+             + "（这一格只印不判：峰值随采样通道走，R326 / 本机 0.2598 对 runner 0.7208）")
+    }
+
+    /// R326：R325 那一版口径（比峰值）保留成**只印不判**的对照，好让读者看见换了统计量之后
+    /// 哪几颗的判定改了。它不再决定"要不要钉"，所以它不该被当成第二把尺子引用 ——
+    /// 分界与前提两格都复用同一颗纯函数（`verdictFromRelativeDifference` / `flippedAppearanceWord`），
+    /// 这样"敏感"这条线在文件里只有一个字面量：两份线就能被各自改一次而没人发现。
+    static func peakVerdict(peakDark: Double, peakLight: Double,
+                            changedDark: Bool, changedLight: Bool) -> String {
+        if let flipped = Self.flippedAppearanceWord(changedDark: changedDark, changedLight: changedLight) {
+            return flipped
+        }
+        return Self.verdictFromRelativeDifference(Self.relativeDifference(peakDark, peakLight))
+    }
+
+    /// 一张帧的像素尺寸文本（通道同一性那条断言用它比"两臂拍的是不是同一块画面"）。
+    static func pixelSizeText(_ image: CGImage) -> String {
+        "\(image.width)×\(image.height)"
+    }
+
+    /// 两臂的**采样粒度**是否可比（R326）。写成纯函数是因为这条容差必须能被证伪：
+    /// 差 1 帧要放行（时钟抖动，本机实测），一臂塌到 3 帧要拦住（那卷根本没拍到过程）。
+    /// 形状：允许 25% 的相对差，另外再给 1 帧的绝对豁免 —— 没有后者，7 帧对 8 帧这种
+    /// 小样本会被相对差判死，而那是同一种拍法。
+    static func samplingComparable(_ a: Int, _ b: Int) -> Bool {
+        let gap = Swift.abs(a - b)
+        let denom = Swift.max(a, b, 1)
+        return gap <= 1 || Double(gap) / Double(denom) <= 0.25
     }
 
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
@@ -7597,6 +7770,121 @@ final class MotionFilmstripTests: XCTestCase {
         let bitmaps = frames.map(raster)
         guard !bitmaps.isEmpty else { return [] }
         return (1..<bitmaps.count).map { changedFraction(bitmaps[$0 - 1], bitmaps[$0], band: band) }
+    }
+
+    /// **首末两态差**（R326）：只比第一帧与最后一帧，中间采了几个样本与它无关。
+    ///
+    /// 为什么本轮要新造这一颗而不是接着用峰值：`peak(deltas(…))` 是"单步最大变化"，
+    /// 它的分母是**那台机器的钟**，不是画面。本机与 runner 在**两臂帧数都是 30** 的条件下，
+    /// 同一颗 `noticeBanner` 的峰值读成 0.2598（本机）与 0.7208（runner）—— 2.8 倍，
+    /// 而夹具是同一份代码画的 ⇒ 拿它去判"这条判据的读数随不随色档走"，
+    /// 量到的是采样粒度。后果不是"数不好看"而是**动作相反**：R325 那份分类在本机是
+    /// 敏感=0（ ⇒ 12 颗都不钉），在 runner 是 敏感=2（ ⇒ 那两颗该钉）。
+    /// 首末差是端点比较：粗采样与细采样对同一份"从 A 态到 B 态"给出同一个数
+    /// （证人：`testAppearanceStatisticsSurviveASamplingChange`）。
+    static func endpointChangedFraction(_ frames: [CGImage], band: CGRect? = nil) -> Double {
+        guard frames.count > 1, let first = frames.first, let last = frames.last else { return 0 }
+        return changedFraction(raster(first), raster(last), band: band)
+    }
+
+    /// **动过的并集**（R326）：一整卷里至少变过一次的那些采样像素占比。
+    ///
+    /// 它补的是首末差看不见的那一格：一段"动了又回来"的过程（抖一下、闪一下）首末差读 0，
+    /// 而它在两档色档里可以完全不一样。分母与 `changedFraction` 同一套（同一条 stride-7 采样、
+    /// 同一个 band 映射），所以两个相对差可以取较大者一起判 —— 这条同一性由
+    /// `testEverChangedUsesTheSameDenominatorAsChangedFraction` 钉住（两帧的胶片必须读出同一个数）。
+    static func everChangedFraction(_ frames: [CGImage], band: CGRect? = nil) -> Double {
+        guard frames.count > 1 else { return 0 }
+        let bitmaps = frames.map(raster)
+        guard let first = bitmaps.first, first.width > 0, first.height > 0,
+              bitmaps.allSatisfy({ $0.width == first.width && $0.height == first.height
+                    && $0.pixels.count == first.pixels.count }) else { return 0 }
+        let width = first.width, height = first.height
+        let xStart, xEnd, yStart, yEnd: Int
+        if let band {
+            xStart = max(0, Int(band.minX * CGFloat(width)))
+            xEnd = min(width, Int(band.maxX * CGFloat(width)))
+            yStart = max(0, Int(band.minY * CGFloat(height)))
+            yEnd = min(height, Int(band.maxY * CGFloat(height)))
+        } else {
+            xStart = 0; xEnd = width; yStart = 0; yEnd = height
+        }
+        guard xEnd > xStart, yEnd > yStart else { return 0 }
+        var sampled = 0
+        var everChanged = Set<Int>()
+        var y = yStart
+        while y < yEnd {
+            var x = xStart
+            while x < xEnd {
+                sampled += 1
+                for index in 1..<bitmaps.count {
+                    let a = bitmaps[index - 1].pixels, b = bitmaps[index].pixels
+                    let p = (y * width + x) * 4
+                    let rgb = max(abs(Int(a[p]) - Int(b[p])),
+                                 max(abs(Int(a[p + 1]) - Int(b[p + 1])),
+                                     abs(Int(a[p + 2]) - Int(b[p + 2]))))
+                    let alpha = abs(Int(a[p + 3]) - Int(b[p + 3]))
+                    if rgb > 8 || alpha > 8 {
+                        everChanged.insert(y * width + x)
+                        break
+                    }
+                }
+                x += 7
+            }
+            y += 7
+        }
+        return Double(everChanged.count) / Double(max(sampled, 1))
+    }
+
+    /// 一卷帧的**单步最大变化**（峰值口径）。R326 起它在色档 A/B 里只印不判，
+    /// 但仍然是别的判据在用的量；留成 internal 是为了证人能替"这颗尺随采样粒度走"那句话说话
+    /// —— 不能替自己造反例的更正，只是一句新的断言。
+    static func peakChangedFraction(_ frames: [CGImage], band: CGRect? = nil) -> Double {
+        peak(deltas(frames, band: band))
+    }
+
+    /// **首末两态的墨量差**（R326）：端点上每个采样像素"最大通道差"的平均值，归一到 0…1。
+    ///
+    /// 为什么三颗里还要这一颗：首末差与并数都只回答**哪些像素动过**，它们对"动了多少"是盲的 ——
+    /// 同一块面积在暗档里从 30 走到 200（差 170 级），在亮档里从 255 走到 190（差 65 级），
+    /// 那两颗尺读出来一模一样，而逐行电平尺（`MOTION_PILL_RAMP_GEOM` 那类）的读数会差好几倍。
+    /// 少了这一颗，本轮的修法就只是"把判据换窄到它恰好看不见的那一半"（R326 自查时抓到的）。
+    /// 证人：`testEndpointAreaIsBlindToInkMagnitudeButTheVerdictIsNot`。
+    static func endpointInkDifference(_ frames: [CGImage], band: CGRect? = nil) -> Double {
+        guard frames.count > 1, let first = frames.first, let last = frames.last else { return 0 }
+        let a = raster(first), b = raster(last)
+        guard a.width == b.width, a.height == b.height, a.width > 0, a.height > 0,
+              a.pixels.count == b.pixels.count, a.pixels.count == a.width * a.height * 4 else { return 0 }
+        let width = a.width, height = a.height
+        let xStart, xEnd, yStart, yEnd: Int
+        if let band {
+            xStart = max(0, Int(band.minX * CGFloat(width)))
+            xEnd = min(width, Int(band.maxX * CGFloat(width)))
+            yStart = max(0, Int(band.minY * CGFloat(height)))
+            yEnd = min(height, Int(band.maxY * CGFloat(height)))
+        } else {
+            xStart = 0; xEnd = width; yStart = 0; yEnd = height
+        }
+        guard xEnd > xStart, yEnd > yStart else { return 0 }
+        var total = 0.0
+        var sampled = 0
+        var y = yStart
+        while y < yEnd {
+            var x = xStart
+            while x < xEnd {
+                let p = (y * width + x) * 4
+                let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),
+                              max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),
+                                  abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))
+                let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))
+                total += Double(Swift.max(rgb, alpha))
+                sampled += 1
+                x += 7
+            }
+            y += 7
+        }
+        guard sampled > 0 else { return 0 }
+        return total / Double(sampled) / 255.0
     }
 
     /// 一张帧的像素。`width`/`height` 必须跟着走：没有它们就没法在二维上框区域，

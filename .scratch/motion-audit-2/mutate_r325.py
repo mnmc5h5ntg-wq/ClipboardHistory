@@ -57,8 +57,11 @@ NEEDLE_939 = u'             ("emptyState", emptyState()),\n'
 REPL_939 = u""
 
 # ④ "换对象"写成两臂都看得见变化 ⇒ 这一格永远不响。
-NEEDLE_940 = u'        if changedDark != changedLight { return "换对象" }\n'
-REPL_940 = u'        if changedDark && changedLight { return "换对象" }\n'
+#    R326 重钉：这一针原来落在 `appearanceDependenceVerdict` 的函数体里，而 R326 把这一格
+#    抽成了共用的 `flippedAppearanceWord`（两处字面量就能被各自改一次），旧锚点因此命中 0 次。
+#    意图没变：让"换对象"永远不响，分类器证人必须红。
+NEEDLE_940 = u'        changedDark != changedLight ? "换对象" : nil\n'
+REPL_940 = u'        changedDark && changedLight ? "换对象" : nil\n'
 
 # ⑤ 出口谓词丢掉"峰值全等"那一半 ⇒ 合成证人必须红（这就是 runner 那一跑漏放行朵红的形状）。
 NEEDLE_941 = u"        spanA == spanB && spanB == spanOff && peakA == peakB && peakB == peakOff\n"

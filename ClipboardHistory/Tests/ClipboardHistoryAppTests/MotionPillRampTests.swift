@@ -418,35 +418,188 @@ final class MotionPillRampTests: XCTestCase {
             + " `commentedOut` 与 `-> [Scenario]` 那种形状都不该进来）")
     }
 
-    // MARK: - 色档依赖分类器（R325）：四格词表与两条分界都必须有牙
+    // MARK: - 色档依赖分类器（R325 立 / R326 换统计量）：四格词表、两条分界、通道无关性都要有牙
 
     /// R325 / BACKLOG 383 的探针把 12 颗场景归成 同 / 漂 / 敏感 / 换对象 四格。
     /// 探针自己活在真机跑里，这四格的分界就得由这一格钉住 ——
     /// 否则"漂"与"敏感"是哪两条线、"换对象"为什么优先，都只是注释里的分类法（R146 那一族）。
+    ///
+    /// R326 换的是**收哪几个数**（首末面积 + 动过并集 + 首末墨量，取较大的相对差），阈值一个字没动，
+    /// 所以这些格子改的是参数而不是形状：5% 那条线仍然"等于算同、超过算漂"。
     func testAppearanceDependenceVerdictWordsAndBoundaries() {
-        // ① 换对象优先于相对差：两臂峰值**完全相同**，但一档看得见变化、另一档看不见 ⇒ 前提翻了脸。
-        XCTAssertEqual("换对象",
-                       MotionFilmstripTests.appearanceDependenceVerdict(peakDark: 0.10, peakLight: 0.10,
-                                                                        changedDark: true, changedLight: false),
+        // 只是打包参数，不做任何判断：判定仍然只可能来自产品侧那颗纯函数。
+        func verdict(endpoint: (Double, Double) = (0.10, 0.10),
+                     union: (Double, Double) = (0.10, 0.10),
+                     ink: (Double, Double) = (0.10, 0.10),
+                     changed: (Bool, Bool) = (true, true)) -> String {
+            MotionFilmstripTests.appearanceDependenceVerdict(
+                endpointDark: endpoint.0, endpointLight: endpoint.1,
+                unionDark: union.0, unionLight: union.1,
+                inkDark: ink.0, inkLight: ink.1,
+                changedDark: changed.0, changedLight: changed.1)
+        }
+        // ① 换对象优先于相对差：两臂读数**完全相同**，但一档看得见变化、另一档看不见 ⇒ 前提翻了脸。
+        XCTAssertEqual("换对象", verdict(changed: (true, false)),
                        "相对差 0% 就把'前提翻脸'读成'同' ⇒ 那正是 R324 在亮档里撞上的形状")
         // ② 5% 那条线：等于 5% 还算同，超过才算漂（分界要能被钉在某一侧，不许两头都算）。
-        XCTAssertEqual("同", MotionFilmstripTests.appearanceDependenceVerdict(
-            peakDark: 0.100, peakLight: 0.105, changedDark: true, changedLight: true),
-            "相对差正好 5% ⇒ 不许升成漂（升了就等于把地板往下挪）")
-        XCTAssertEqual("漂", MotionFilmstripTests.appearanceDependenceVerdict(
-            peakDark: 0.100, peakLight: 0.106, changedDark: true, changedLight: true),
-            "相对差 5.7% ⇒ 必须点名，否则'漂'那一格永远读不出来")
-        // ③ 25% 那条线：同上，两条线各自可钉。
-        XCTAssertEqual("漂", MotionFilmstripTests.appearanceDependenceVerdict(
-            peakDark: 0.20, peakLight: 0.25, changedDark: true, changedLight: true),
-            "相对差 20%（0.05/0.25）⇒ 仍是漂，不许提前升成敏感 —— 本机三颗漂里最大那颗就是 22.3%")
-        XCTAssertEqual("敏感", MotionFilmstripTests.appearanceDependenceVerdict(
-            peakDark: 0.20, peakLight: 0.28, changedDark: true, changedLight: true),
-            "相对差 >25% ⇒ 这条判据的读数随色档走，必须与'漂'分开（修法相反：一个要钉，一个只要登记）")
+        XCTAssertEqual("同", verdict(endpoint: (0.100, 0.105), union: (0.100, 0.105),
+                                     ink: (0.100, 0.105)),
+                       "相对差正好 5% ⇒ 不许升成漂（升了就等于把地板往下挪）")
+        XCTAssertEqual("漂", verdict(endpoint: (0.100, 0.106), union: (0.100, 0.106),
+                                     ink: (0.100, 0.106)),
+                       "相对差 5.7% ⇒ 必须点名，否则'漂'那一格永远读不出来")
+        // ③ 25% 那条线：同上，两条线各自可钉。三颗都给同一个数 —— 判定取较大者，
+        // 任何一颗单独过线都会把这一格抬到另一侧，所以这格要问的是"这条线本身在哪一侧"。
+        XCTAssertEqual("漂", verdict(endpoint: (0.20, 0.25), union: (0.20, 0.25), ink: (0.20, 0.25)),
+                       "相对差 20%（0.05/0.25）⇒ 仍是漂，不许提前升成敏感")
+        XCTAssertEqual("敏感", verdict(endpoint: (0.20, 0.28), union: (0.20, 0.28), ink: (0.20, 0.28)),
+                       "相对差 >25% ⇒ 这条判据的读数随色档走，必须与'漂'分开（修法相反：一个要钉，一个只要登记）")
         // ④ 两臂都是 0（空白对照那类）不许算出 NaN 或除零。
+        XCTAssertEqual("同", verdict(endpoint: (0, 0), union: (0, 0), ink: (0, 0),
+                                     changed: (false, false)),
+                       "两臂都读不到变化 ⇒ 是'同'（空白对照），不是 NaN，也不是'换对象'")
+        // ⑤ 取较大者这一半：一颗看不见、另一颗看得见时，不许因为"用的那颗恰好是 0"就判同。
+        XCTAssertEqual("敏感", verdict(endpoint: (0.100, 0.101), union: (0.100, 0.167)),
+                       "首末面积只有 1% 但并集差 40% ⇒ 取 min 或只读面积都会把它洗成'同'")
+        // ⑥ 墨量那一颗必须**自己**就能把判定抬起来：面积与并集全等，只有"动了多少级"不同。
+        // 这一格是本轮的自证：少了它，"换成通道无关统计量"就等于把判据换窄到它恰好看不见的那一半。
+        XCTAssertEqual("敏感", verdict(ink: (0.6667, 0.4000)),
+                       "面积/并集两臂全等而墨量差 40% ⇒ 只读像素集合的尺看不见'同样的动、不同的深浅'，"
+                           + "而这正是逐行电平尺的对象")
+        // ⑦ 三颗都压在线上但都没过 ⇒ 同。这一格是为了钉"取较大者"不会自己变成加分项：
+        // 第一版这里给的是 union=(0.20, 0.215)（6.98%），判据当场回给我"漂" —— 那是它对，我错。
+        XCTAssertEqual("同", verdict(endpoint: (0.20, 0.21), union: (0.20, 0.21), ink: (0.30, 0.315)))
+    }
+
+    /// R326 的核心证词：**同一份过渡，粗采样与细采样必须在三颗通道无关的尺上给出同一个判定，
+    /// 而在峰值那颗尺上给出不同判定。** 两个方向都要证，缺一个都不算：
+    /// 只证"首末差不随采样变"，可能那把尺本来就什么都读不出来（分母坏、恒为 0）；
+    /// 只证"峰值随采样变"，是给要被推翻的旧口径作证，不是给修法作证。
+    func testAppearanceStatisticsSurviveASamplingChange() {
+        // 同一件事实：画面从左到右亮满 70 列。粗的那卷 5 步跳完，细的那卷 11 步亮完。
+        let coarse = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 20, 35, 50, 70])
+        let fine = MotionFilmstripTests.syntheticRevealFilm(
+            revealedColumns: [0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70])
+        // ① 通道无关的三颗：必须各读满（面积 1.0 / 墨量同一值），且两卷相同。
+        XCTAssertEqual(1.0, MotionFilmstripTests.endpointChangedFraction(coarse), accuracy: 0.0001,
+            "首末面积读不到满幅（0→70 列亮满）⇒ 这颗尺瞎了，它给的'同'不能作数")
+        XCTAssertEqual(1.0, MotionFilmstripTests.endpointChangedFraction(fine), accuracy: 0.0001,
+            "细采样那卷的首末面积与粗采样不同 ⇒ 首末面积并不像我说的那样与采样次数无关，本轮的修法前提没了")
+        XCTAssertEqual(1.0, MotionFilmstripTests.everChangedFraction(coarse), accuracy: 0.0001,
+            "并集读不到满幅 ⇒ 同样的瞎尺问题")
+        XCTAssertEqual(1.0, MotionFilmstripTests.everChangedFraction(fine), accuracy: 0.0001,
+            "两卷的并集不同 ⇒ 并集也随采样粒度走了")
+        XCTAssertEqual(MotionFilmstripTests.endpointInkDifference(coarse),
+                       MotionFilmstripTests.endpointInkDifference(fine), accuracy: 0.0001,
+                       "墨量差在两卷之间不同 ⇒ 它也读采样通道，那三颗里就有两颗不成立")
+        XCTAssertGreaterThan(MotionFilmstripTests.endpointInkDifference(coarse), 0.5,
+            "墨量差读不到 0.5 以上（0→200 级应该接近 0.78）⇒ 这颗尺也瞎了")
+        // ② 峰值那颗：粗采样每步亮得多，峰值必须**明显更大** —— 这就是 confound 本身。
+        let peakCoarse = MotionFilmstripTests.peakChangedFraction(coarse)
+        let peakFine = MotionFilmstripTests.peakChangedFraction(fine)
+        XCTAssertGreaterThan(peakCoarse, peakFine * 2.0,
+            "粗采样峰值 \(peakCoarse) 没有明显大于细采样 \(peakFine) ⇒ 这台机器上造不出粒度差，"
+                + "下面的对照是空的（不许据此说峰值没问题）")
+        // ②b 前提臂也要在这对合成帧上成立：否则"换对象"那一格只是我编的布尔值。
+        XCTAssertTrue(MotionFilmstripTests.premisePictureChanged(coarse),
+                      "粗采样那卷 premise 读不到'画面变了' ⇒ 夹具没动，证人不能替任何人说话")
+        XCTAssertTrue(MotionFilmstripTests.premisePictureChanged(fine),
+                      "细采样那卷 premise 读不到'画面变了' ⇒ 同上")
+        // ③ 两口径各自的判定：峰值把同一件事判成敏感，通道无关口径判成同。
+        XCTAssertEqual("敏感", MotionFilmstripTests.peakVerdict(peakDark: peakCoarse, peakLight: peakFine,
+                                                                changedDark: true, changedLight: true),
+            "旧口径在这对合成帧上都不肯翻脸 ⇒ 我没换统计量，换的是一句没有反例的说法")
         XCTAssertEqual("同", MotionFilmstripTests.appearanceDependenceVerdict(
-            peakDark: 0, peakLight: 0, changedDark: false, changedLight: false),
-            "两臂都读不到变化 ⇒ 是'同'（空白对照），不是 NaN，也不是'换对象'")
+            endpointDark: MotionFilmstripTests.endpointChangedFraction(coarse),
+            endpointLight: MotionFilmstripTests.endpointChangedFraction(fine),
+            unionDark: MotionFilmstripTests.everChangedFraction(coarse),
+            unionLight: MotionFilmstripTests.everChangedFraction(fine),
+            inkDark: MotionFilmstripTests.endpointInkDifference(coarse),
+            inkLight: MotionFilmstripTests.endpointInkDifference(fine),
+            changedDark: true, changedLight: true),
+            "换了口径之后这对合成帧还判得出差别 ⇒ 新尺仍然在读采样粒度，本轮的修法没成立")
+    }
+
+    /// 面积那两颗对"动了多少级"是**盲**的，而墨量那一颗必须自己能把判定抬起来。
+    ///
+    /// 这一格是给"别把判据换窄"装的牙：R326 差点只留首末面积 + 并集就交差，而那两颗
+    /// 只看像素**集合** —— 同一批像素在暗档里动 200 级、在亮档里动 120 级，它们读出来一模一样，
+    /// 于是"这条判据的读数随色档走"这句话恰好被换成了它看不见的那一半（逐行电平尺量的就是这个）。
+    func testEndpointAreaIsBlindToInkMagnitudeButTheVerdictIsNot() {
+        let strong = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 70], ink: 200)
+        let weak = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 70], ink: 120)
+        // ① 两颗面积尺：动的像素集合完全相同 ⇒ 必须读成相等（这就是它们的盲区，要能被拍下来）。
+        XCTAssertEqual(MotionFilmstripTests.endpointChangedFraction(strong),
+                       MotionFilmstripTests.endpointChangedFraction(weak), accuracy: 0.0001,
+                       "面积尺分得开'深浅'了？那本轮登记的盲区是假的，得重看这三颗的分工")
+        XCTAssertEqual(MotionFilmstripTests.everChangedFraction(strong),
+                       MotionFilmstripTests.everChangedFraction(weak), accuracy: 0.0001,
+                       "并集分得开深浅 ⇒ 同上")
+        // ② 墨量那颗必须读出 40% 的差别（200 对 120）。
+        let inkStrong = MotionFilmstripTests.endpointInkDifference(strong)
+        let inkWeak = MotionFilmstripTests.endpointInkDifference(weak)
+        XCTAssertGreaterThan(inkStrong, inkWeak, "墨量差读不出深浅 ⇒ 这颗尺只是面积尺的别名")
+        XCTAssertEqual(0.4, MotionFilmstripTests.relativeDifference(inkStrong, inkWeak), accuracy: 0.01,
+                       "200 级与 120 级的相对差应该接近 40%，实测 "
+                           + String(format: "%.3f", MotionFilmstripTests.relativeDifference(inkStrong, inkWeak)))
+        // ③ 判定：面积与并集全等、只有墨量差 40% ⇒ 敏感。少了②那一颗，这里会得到"同"。
+        XCTAssertEqual("敏感", MotionFilmstripTests.appearanceDependenceVerdict(
+            endpointDark: MotionFilmstripTests.endpointChangedFraction(strong),
+            endpointLight: MotionFilmstripTests.endpointChangedFraction(weak),
+            unionDark: MotionFilmstripTests.everChangedFraction(strong),
+            unionLight: MotionFilmstripTests.everChangedFraction(weak),
+            inkDark: inkStrong, inkLight: inkWeak,
+            changedDark: true, changedLight: true),
+            "面积全等而墨量差 40% 却判成'同' ⇒ 本轮的修法是拿窄的尺换掉旧的尺，不是修它")
+    }
+
+    /// 两臂采样粒度的容差（R326）：这条线是本轮**被红逼出来的**，不是设计出来的 ——
+    /// 第一版把它写成"帧数必须相等"，`blank` 那颗粒刻当场红在 暗 27 / 亮 28 上，
+    /// 而帧数是墙上时钟决定的，同一进程里差 1 帧是常态。
+    /// 放行抖动、拦住"一臂塌了"，两半都要有格子。
+    func testSamplingComparableToleranceAdmitsJitterButNotACollapsedArm() {
+        XCTAssertTrue(MotionFilmstripTests.samplingComparable(27, 28),
+                      "差 1 帧就判不可比 ⇒ 这条闸在拦时钟抖动，不是在拦坏通道（本机实测的正是 27/28）")
+        XCTAssertTrue(MotionFilmstripTests.samplingComparable(7, 8),
+                      "小样本的 1 帧豁免也要成立：7/8 的相对差 12.5% 本来就够，别让它靠四舍五入过线")
+        XCTAssertTrue(MotionFilmstripTests.samplingComparable(20, 25),
+                      "20 对 25（20%）应当可比 ⇒ 容差不该窄到只放行 1 帧，那样一整批场景会被误判成没对照物")
+        XCTAssertFalse(MotionFilmstripTests.samplingComparable(30, 3),
+                       "一臂只剩 3 帧（10%）还说'可比' ⇒ 这格等于没有：那条胶片根本没拍到过程")
+        XCTAssertFalse(MotionFilmstripTests.samplingComparable(30, 0),
+                       "一臂 0 帧必须拦住")
+        XCTAssertTrue(MotionFilmstripTests.samplingComparable(1, 1),
+                      "1/1 这种退化输入不许判成不可比（不许把它当成塌了）")
+    }
+
+    /// 并集与首末差**必须共用同一套分母**（同一条 stride-7 采样、同一个 band 映射）。
+    ///
+    /// 为什么单独钉：两臂取较大相对差的前提是"这两个数可比"。并集那份循环是我照着 `axisPair`
+    /// 手抄的第二份采样几何 —— 手抄的几何会漂（BACKLOG 80 那一族就是映射漂），而它一漂，
+    /// "首末差读整窗、并集读半窗"这种数就会安静地混进同一格里。
+    /// 两帧的胶片是这两颗尺的**同一点**：那时两个数必须逐格相等。
+    func testEverChangedUsesTheSameDenominatorAsChangedFraction() {
+        // ① 整窗：两帧的胶片 ⇒ 并集 = 首末差。
+        let half = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 35])
+        XCTAssertEqual(MotionFilmstripTests.endpointChangedFraction(half),
+                       MotionFilmstripTests.everChangedFraction(half), accuracy: 0.0001,
+                       "两帧的胶片上并集与首末差不等 ⇒ 两颗尺的分母不是同一套，取较大者没有意义")
+        XCTAssertEqual(0.5, MotionFilmstripTests.everChangedFraction(half), accuracy: 0.0001,
+                       "亮满一半列应该读 0.5（70 宽、stride 7 ⇒ 10 个采样列）实测 "
+                           + "\(MotionFilmstripTests.everChangedFraction(half)) ⇒ 分母不是采样像素数")
+        // ② 带内：带子盖住**亮了的那半边**（x 0…0.4 ⇒ 采样列 0,7,14,21 全在亮区内）⇒ 两个数都该读满。
+        let leftBand = CGRect(x: 0.0, y: 0.0, width: 0.4, height: 1.0)
+        XCTAssertEqual(MotionFilmstripTests.endpointChangedFraction(half, band: leftBand),
+                       MotionFilmstripTests.everChangedFraction(half, band: leftBand), accuracy: 0.0001,
+                       "带内两个数不等 ⇒ 并集那份循环的 band 映射与 axisPair 不是同一套")
+        XCTAssertGreaterThan(MotionFilmstripTests.everChangedFraction(half, band: leftBand), 0.9,
+                             "带子盖住亮着的那半边却读不到满幅 ⇒ 带映射朝向漂了（BACKLOG 80 那一族）")
+        // ③ 带子挪到**没亮的那半边** ⇒ 两个数都该读 0（正对照：同一颗尺要能分出两侧）。
+        let rightBand = CGRect(x: 0.6, y: 0.0, width: 0.4, height: 1.0)
+        XCTAssertEqual(0.0, MotionFilmstripTests.everChangedFraction(half, band: rightBand), accuracy: 0.0001,
+                       "没亮的那半边读出了非 0 ⇒ 这两颗尺里的带子不是同一个位置")
+        XCTAssertEqual(0.0, MotionFilmstripTests.endpointChangedFraction(half, band: rightBand), accuracy: 0.0001,
+                       "首末差在没亮的那半边读出非 0 ⇒ 带映射两侧都不可信")
     }
 
     // MARK: - ⑦ 亮度口径与捕获卷那颗尺同源
