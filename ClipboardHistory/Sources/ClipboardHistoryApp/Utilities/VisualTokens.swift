@@ -455,9 +455,26 @@ enum VisualMaterial {
     /// macOS SDK 里不存在（写上去编不过，实测），几种厚薄都是同一个 `Material` 的静态成员。
     static let glass: Material = .ultraThinMaterial
 
-    /// 筛选滑块的底：`.ultraThickMaterial` —— 它要在一块 `.quaternary` 轨道上"凸起来"，
-    /// 材质比玻璃控件更实，才读得出前后关系。
-    static let sliderPill: Material = .ultraThickMaterial
+    /// 分段控件里**被选中那一颗**的底。
+    ///
+    /// 为什么不是材质（R333 / BACKLOG 391、393）：这里原来站的是 `sliderPill = .ultraThickMaterial`，
+    /// 它的注释写的意图正是"要在一块 `.quaternary` 轨道上凸起来"—— 但**意图没有被量过**。
+    /// 三条通道现读到的都是反的：离屏胶片 轨道 51.9 / 药丸 36.0 / 页底 30.0（差 **−15.9**）、
+    /// 组件帧暗档 −16.0、真机屏幕 页底 51.0 / 轨道 81.0 / 选中 48.0（差 **−33.0**）——
+    /// 选中那颗是亮轨道上挖出的一个暗洞，而 377 在屏幕上判掉了它不是通道的锅。
+    ///
+    /// 为什么是这一枚色：391 给了两条方向相反的出路，②（把轨道压到页底之下）已经**被现场否掉** ——
+    /// `underPageBackgroundColor` 在暗档现读 40.0，比 vibrancy 材料的页底（30.0）还亮，
+    /// 压不下去只能把整颗胶囊洗淡（分离 15.9→4.0，红的是过程证人）。于是只剩①。
+    /// 而①的令牌不由我挑：R331 把系统自己的分段控件搬进同一条夹具通道量了一遍，
+    /// 它选中那一半在两档现读 **74.0（暗）／205.0（亮）**，
+    /// 与 `unemphasizedSelectedContentBackgroundColor` 的解析值 **70／220** 同档 ——
+    /// 这就是系统画"选中"用的那一枚，不是我调出来的数。
+    ///
+    /// 用 `Color` 而不是 `Material`：材质会把底下那层混进来，于是"选中那颗多亮"变成
+    /// "它底下恰好压着什么" —— 判据要的是一枚**自己就在那一档**的填充（不透明填充"渲染电平==解析电平"
+    /// 这座桥在 R331 当场验过：`underPageBackgroundColor` 解析 40.0 ⇒ 离屏现读也是 40.0）。
+    static let selectedSegment: Color = Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
 
     /// 轨道与小方块的底：`.quaternary`，四级弱化色。它是"这里有个控件"，不是"这里有个面板"。
     /// 缩略图的类型占位符也用它：两颗 16pt 方块并排时，占位符必须比旁边的真图更退一步。

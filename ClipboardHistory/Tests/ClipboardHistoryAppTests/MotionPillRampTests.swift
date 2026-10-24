@@ -1,5 +1,5 @@
-// 不覆盖管线：本文件钉的是**斜坡尺的四颗纯尺**（列中位数剖面、轨道范围、洞的切分、
-// 会动的洞所在的行带，以及把中心序列归成四格词表的那颗），输入全是合成字节缓冲。
+// 不覆盖管线：本文件钉的是**斜坡尺的几颗纯尺**（列中位数剖面、轨道范围、由两臂镜像定档的
+// 药丸切分、会动的洞所在的行带，以及把中心序列归成四格词表的那颗），输入全是合成字节缓冲。
 // 管线级判据在捕获卷：`MotionFilmstripTests.testFilterPillRampIsMonotone`
 // —— 它走 `Scenario.filterPillSlide()`（`HistorySidebarView` 真视图）、逐帧抓 `cacheDisplay`、
 // 再按这些纯函数读每一帧的药丸中心，两臂各判一次；行带与轨道范围都由那一卷自己量出来。
@@ -87,30 +87,87 @@ final class MotionPillRampTests: XCTestCase {
             "宽度地板要真的拦得住：8 比 2..<9 的宽度大 ⇒ 必须读不出，不许硬给一根")
     }
 
-    // MARK: - ③ 洞 = 与页底同档的那一段（不是亮的那一段）
+    // MARK: - ③ 药丸那一档由**两臂镜像**定，不由"与页底同档"定（R333 重基）
 
-    /// 锚是"两帧之间没动的那一档"（轨道），不是"页底那一档"：
-    /// 暗档里药丸 36 恰好与页底 30 同档（R323 据此写死了锚），亮档里药丸 255 比轨道 230 **更亮** ——
-    /// 同一句"药丸与页底同档"在两个时刻一个是真的一个是假的（本机 09:07 复跑就是后者）。
-    func testPillRunIsTheHoleThatReadsLikeThePage() {
-        let values: [Double] = [30, 30, 52, 52, 36, 36, 36, 52, 52, 30]
-        let run = MotionFilmstripTests.pillRun(profile: values, margin: 30, delta: 8,
-                                               extent: 2..<9, minPillPixels: 2)
-        XCTAssertNotNil(run, "轨道里有一颗与页底同档的洞 ⇒ 必须读出来")
+    /// R333 的更正（BACKLOG 393）：这一格原来叫 `testPillRunIsTheHoleThatReadsLikeThePage`，
+    /// 钉的是"洞 = 与页底同档的那一段"。那句话在 377 那个缺陷画法的帧上是真的（药丸 36 恰好落在
+    /// 页底 30 那一档），所以**这把尺一直把缺陷的画法当成定义** —— 修法①一落地它就失去对象，
+    /// 而失去对象的形状是 skip 不是红（见 `MotionFilmstripTests` 里那段更正）。
+    ///
+    /// 现在 `pillRun` 收的是 `pillLevel` / `trackLevel`（由 `settledPillTrackLevels` 从两臂量出），
+    /// 极性无关：药丸比轨道暗、还是比轨道亮，都读得到。下面两格一格钉"亮的那档也能认"，
+    /// 一格钉"两档分不开时不许猜"。
+    func testPillRunFollowsTheLevelGivenByTheMirrorNotThePage() {
+        // 修法①之后的形状：页底 30 / 轨道 52 / 选中那颗 74（比轨道**亮**）。
+        let values: [Double] = [30, 30, 52, 52, 74, 74, 74, 52, 52, 30]
+        let run = MotionFilmstripTests.pillRun(profile: values, pillLevel: 74, trackLevel: 52,
+                                               delta: 8, extent: 2..<9, minPillPixels: 2)
         XCTAssertEqual(run?.range, 4..<7,
-            "洞的下界是 4 不是 2：把「亮的那一段」当成药丸就会读到轨道两端（本机极性 轨道 52 / 药丸 36 / 页底 30）")
-        XCTAssertEqual(run?.pillLuma ?? -1, 36, accuracy: 0.001)
+            "药丸抬到轨道之上之后，那一颗仍然是 4..<7 —— 旧的『与页底同档』在这里会读出**没有洞**")
+        XCTAssertEqual(run?.pillLuma ?? -1, 74, accuracy: 0.001)
         XCTAssertEqual(run?.trackLuma ?? -1, 52, accuracy: 0.001)
+        // 同一颗尺、旧的暗档形状（药丸 36 落在轨道之下）必须同样读得出，否则"极性无关"是句空话。
+        let dark: [Double] = [30, 30, 52, 52, 36, 36, 36, 52, 52, 30]
+        XCTAssertEqual(MotionFilmstripTests.pillRun(profile: dark, pillLevel: 36, trackLevel: 52,
+                                                    delta: 8, extent: 2..<9, minPillPixels: 2)?.range,
+                       4..<7, "反方向（药丸比轨道暗）必须走同一颗尺、读同一段")
     }
 
     func testPillRunRefusesSubFloorHole() {
         let values: [Double] = [52, 52, 36, 36, 52, 52, 52, 52]
-        XCTAssertNil(MotionFilmstripTests.pillRun(profile: values, margin: 30, delta: 8,
-                                                  extent: 0..<8, minPillPixels: 3),
+        XCTAssertNil(MotionFilmstripTests.pillRun(profile: values, pillLevel: 36, trackLevel: 52,
+                                                  delta: 8, extent: 0..<8, minPillPixels: 3),
             "两颗像素的洞不够地板 ⇒ 必须 nil，不许把噪声当成药丸")
-        XCTAssertEqual(MotionFilmstripTests.pillRun(profile: values, margin: 30, delta: 8,
-                                                    extent: 0..<8, minPillPixels: 2)?.range,
+        XCTAssertEqual(MotionFilmstripTests.pillRun(profile: values, pillLevel: 36, trackLevel: 52,
+                                                    delta: 8, extent: 0..<8, minPillPixels: 2)?.range,
                        2..<4, "同一颗尺，地板降到 2 就该选中那两颗 —— 拦的是宽度不是极性")
+        // 两档本身分不开（`|pill − track| < delta`）⇒ 这一格**没有对象**，必须 nil。
+        // 这是 R333 那条"洗淡了不许读成看不见"的闸：退回猜一档就是那条路。
+        XCTAssertNil(MotionFilmstripTests.pillRun(profile: values, pillLevel: 50, trackLevel: 52,
+                                                  delta: 8, extent: 0..<8, minPillPixels: 2),
+            "药丸档与轨道档只差 2 级（< delta=8）⇒ 尺不许在噪声里框出一颗药丸")
+    }
+
+    /// `settledPillTrackLevels` 真值表（R333）：两档是**量**出来的，镜像是它的证人。
+    func testSettledLevelsNamePillByMirrorAndCarrySign() {
+        // 暗档缺陷形状：首帧左半 36（选中那颗画在页底那一档）、右半 52；末帧互换。
+        let old = MotionFilmstripTests.settledPillTrackLevels(firstLeft: 36, firstRight: 52,
+                                                              lastLeft: 52, lastRight: 36, delta: 8)
+        XCTAssertEqual(old.pill, 36, accuracy: 0.001, "药丸 = 首帧左半（末帧右半给镜像背书）")
+        XCTAssertEqual(old.track, 52, accuracy: 0.001)
+        XCTAssertEqual(old.separation, -16, accuracy: 0.001, "差是**带符号的读数**，不是绝对值")
+        XCTAssertTrue(old.mirror)
+        // 修法①之后的形状：符号翻正，同一个函数、同一条镜像。
+        let fixed = MotionFilmstripTests.settledPillTrackLevels(firstLeft: 74, firstRight: 52,
+                                                                lastLeft: 52, lastRight: 74, delta: 8)
+        XCTAssertEqual(fixed.pill, 74, accuracy: 0.001)
+        XCTAssertEqual(fixed.separation, 22, accuracy: 0.001,
+            "『选中那颗比轨道亮 22 级』这一句现在是量出来的；旧定义里它根本不可读")
+        XCTAssertTrue(fixed.mirror)
+        // 两臂没换边 ⇒ 镜像不成立，两档没有对照物。
+        let still = MotionFilmstripTests.settledPillTrackLevels(firstLeft: 36, firstRight: 52,
+                                                                lastLeft: 36, lastRight: 52, delta: 8)
+        XCTAssertFalse(still.mirror, "末帧与首帧同向 ⇒ 没有'走过'，不许假装量到了两档")
+        // 镜像只回答"两半换边了没有"，**不**回答"两档分得开吗"：delta 抬到 16（≥ 分离度）时
+        // 换边照样成立（|36−36|=0 < 16），所以"分不开"必须由 `pillRun` 的 `|pill−track| >= delta` 那道拦
+        // （上一版我把这条写成"delta 大了镜像就判不成"，那是错的猜测，被这一格当场回掉）。
+        let wide = MotionFilmstripTests.settledPillTrackLevels(firstLeft: 36, firstRight: 52,
+                                                               lastLeft: 52, lastRight: 36, delta: 16)
+        XCTAssertTrue(wide.mirror,
+            "镜像是'换边'的证人，不是'分得开'的证人：容差放宽只让它更宽松，不许把它当成第二道分离度闸")
+        XCTAssertEqual(wide.separation, -16, accuracy: 0.001, "分离度是两档之差，与 delta 无关")
+    }
+
+    /// `halfLevels` 的形状闸：范围太窄 / 越界都不许给数（R333）。
+    func testHalfLevelsRefusesAnExtentTooNarrowToSplit() {
+        let values: [Double] = [30, 52, 52, 74, 74, 52, 30]
+        let halves = MotionFilmstripTests.halfLevels(profile: values, extent: 1..<6)
+        XCTAssertEqual(halves?.left ?? -1, 52, accuracy: 0.001, "左半 = 1..<3")
+        XCTAssertEqual(halves?.right ?? -1, 74, accuracy:0.001, "右半 = 3..<6（整数平分偏一列也算右半）")
+        XCTAssertNil(MotionFilmstripTests.halfLevels(profile: values, extent: 1..<4),
+            "不足 4 列 ⇒ 平分出来有一边是空的，不许给'两半'的数")
+        XCTAssertNil(MotionFilmstripTests.halfLevels(profile: values, extent: 3..<9),
+            "越界 ⇒ nil：这把尺不许读到剖面外面去")
     }
 
     /// 亮档形状的**反向**证人（R324）：本机自动外观转到亮档之后，同一卷读到的三档是
@@ -199,7 +256,8 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Set(pairs.map { $0.bin }).count, 3,
             "分档少于一颗胶囊该有的三档（洞 / 轨道 / 字墨），它没在读对象：" + dump)
         XCTAssertNotNil(pairs.first(where: { $0.bin == 0 }),
-            "第 0 箱就是判据认的洞；它不在清单里 ⇒ 这一格与那颗闸读的不是同一件事：" + dump)
+            "第 0 箱（与页底同档那一箱）不在清单里 ⇒ 这条剖面根本没扫到对象**外面**，"
+            + "分档答的不是'那里住着几档'：" + dump)
         XCTAssertNotNil(pairs.first(where: { $0.bin >= 8 }),
             "读不到远高于轨道的那一级（夹具画了 200 级 = 第 21 箱）⇒ 字墨没进分档：" + dump)
     }
@@ -222,8 +280,10 @@ final class MotionPillRampTests: XCTestCase {
         let profile = [30.0, 36.0, 52.0, 204.0, 52.0, 36.0, 30.0]
         XCTAssertEqual("0×4,2×2,21×1",
                        MotionFilmstripTests.levelHistogram(profile: profile, margin: 30, delta: 8),
-                       "分箱结果与'第 0 箱=洞、第 2 箱=轨道、第 21 箱=字墨'的读法不符（页底 30 与洞 36 同箱是**对的**，"
-                       + "因为判据认的洞就是'与页底同档'那一级）")
+                       "分箱结果与'第 0 箱=与页底同档那一箱、第 2 箱=轨道、第 21 箱=字墨'的读法不符。"
+                       + "页底 30 与 36 同箱是**对的**（|36−30| < delta）；R333 之前这一格写的是"
+                       + "'第 0 箱就是判据认的洞'，那句借的是旧定义（药丸=与页底同档），重基之后洞由两臂定档，"
+                       + "第 0 箱只回答'那里有没有页底那一档'")
         let text = MotionFilmstripTests.levelHistogram(profile: profile, margin: 30, delta: 8)
         let counts = text.split(separator: ",").compactMap { Int($0.split(separator: "×")[1]) }
         XCTAssertEqual(counts.reduce(0, +), profile.count, "各箱列数之和不等于剖面长度：" + text)
@@ -283,12 +343,34 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertTrue(got.report.range(of: "纵向覆盖=\\d+/\\d+px=\\d+%", options: .regularExpression) != nil,
                       "报告没带纵向覆盖那一格：" + got.report)
         let cell = got.report.split(separator: " ").first(where: { $0.hasPrefix("纵向覆盖=") }) ?? ""
-        let nums = String(cell).components(separatedBy: CharacterSet.decimalDigits.inverted)
-            .compactMap { Int($0) }
-        XCTAssertEqual(nums.count, 3, "那一格不是 分子/分母=百分比 三段：" + String(cell))
+        let nums = MotionFilmstripTests.verticalCoverageCells(report: got.report)
+        XCTAssertEqual(nums?.count ?? -1, 3, "那一格不是 分子/分母=百分比 三段：" + String(cell))
+        // R333：下面三行原来直接按 `nums[0]`/`nums[1]` 取数。上一格红的时候它们是空的，
+        // 于是整卷 **SIGTRAP（Index out of range）** —— 而崩比红坏得多：红只损失一格，
+        // 崩把后面所有格的结论行一起带走（本轮 M966 那把刀就是这样被读成 NOT_RUN 的）。
+        // 现在解析住在尺那一边（`verticalCoverageCells`），"读不出"是 nil 不是一次越界。
+        guard let nums = nums else { return }
         XCTAssertLessThan(nums[0], nums[1],
             "取用带等于整条纵向跨度 ⇒ 这一格没在说「盖不住」，夹具或真帧里没被截断：" + String(cell))
         XCTAssertGreaterThan(nums[1], 0, "分母为 0：" + String(cell))
+    }
+
+    /// 那颗解析器的真值表（R333）：三种"读不出"必须都成 nil，而不是崩或者造一个数。
+    ///
+    /// 为什么单独一格：上一格只在"有带子"的路上走；这一格走的是**没有带子**的那条路 ——
+    /// 而崩掉的那一发正是从这里来的。三格都短，但它们各拦一种坏法：
+    /// 没有那一格 / 那一格写的是"无" / 形状漂了（两段或四段）。
+    func testVerticalCoverageCellsRefusesEveryShapeItCannotRead() {
+        XCTAssertEqual([14, 48, 29],
+                       MotionFilmstripTests.verticalCoverageCells(
+                           report: "行=520 取用=y102..116px 纵向覆盖=14/48px=29%") ?? [],
+                       "有带子时必须原样读回三个数（分子/分母/百分比）")
+        XCTAssertNil(MotionFilmstripTests.verticalCoverageCells(report: "行=520 取用=无"),
+            "报告里根本没有那一格 ⇒ nil，不许给 0 或空数组（空数组在调用方就是下一次越界）")
+        XCTAssertNil(MotionFilmstripTests.verticalCoverageCells(report: "行=520 纵向覆盖=无"),
+            "那一格写的是「无」（没有取用带）⇒ nil：这正是本轮崩掉的那条路")
+        XCTAssertNil(MotionFilmstripTests.verticalCoverageCells(report: "行=520 纵向覆盖=14/48px"),
+            "形状漂了（少了百分比那一段）⇒ nil，不许把两段的数补成三段")
     }
 
     // MARK: - ④ 行带定位：洞要**会走**，还要**长得像那颗胶囊**
@@ -330,11 +412,66 @@ final class MotionPillRampTests: XCTestCase {
         let pill = pillFrames()
         XCTAssertNil(reading(pill.a, pill.a, y: 2),
             "两帧同一颗洞停在同一处 ⇒ 这不是「走过」，不许当行带证人（否则静止的一行会被读成位移）。"
-            + "注意它还有一层意思：两帧不动时亮区的并集就是轨道那半段，洞整个落在并集之外 ⇒ 连候选都不是")
+            + "R333 之后它还有一层意思：两帧不动时两臂**不互为镜像**，连定档的资格都没有")
         let both = reading(pill.a, pill.b, y: 2)
         XCTAssertEqual(both?.gate, "过", "正对照：贴端走过、宽度稳定的那颗洞必须被判成候选（六闸全过）")
         XCTAssertEqual(both?.holeA, 4..<16, "首帧的洞必须读成贴左端那 12 列")
         XCTAssertEqual(both?.holeB, 24..<36, "末帧的洞必须读成贴右端那 12 列")
+        // R333：重基之后"必须会走"这道闸被**镜像蕴含**了 —— 两半要互换，药丸就得跨过中线。
+        // 这件事当场把 M925 那把刀照成 PASSED（`move >= 0` 无人认领），所以这道闸换一种证人：
+        // 把地板抬到这次位移之上（0.7 > 实测 20/32=62.5%）必须拦，压到它之下（0.6）必须放。
+        // 两格一起才说明这条闸读的是"走了多远"，而不是"有没有换边"。
+        XCTAssertNil(reading(pill.a, pill.b, y: 2, minMove: 0.7),
+            "地板抬到实际位移之上还放行 ⇒ 这道闸已经不读位移了（它被镜像顶替了）")
+        XCTAssertNotNil(reading(pill.a, pill.b, y: 2, minMove: 0.6),
+            "地板压到位移之下却仍拒 ⇒ 上一格是靠『永远拒收』赢的，不是靠读位移")
+    }
+
+    /// R333 的主证（BACKLOG 393）：**修法之后的形状**必须仍然是候选。
+    ///
+    /// 为什么单独钉这一格：旧定义把"药丸 = 与页底同档"写进尺里，而 391 的修法①恰恰是把选中那颗
+    /// 抬到轨道**之上** —— 于是同一套闸在"修好了"的帧上读出 `候选行=0`，两条判据一起掉进
+    /// `no-band` 出口。那是本仓库最怕的绿：产品变了，证人安静退场，账上只留一句"这台看不见"。
+    /// 这一格就是那种坏法的反例：极性翻过来，六闸照样全过，读出的还是那 12 列。
+    func testReadingAcceptsTheFixedPolarityPillAboveTheTrack() {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        a.paint(xRange: 4..<16, yRange: 0..<6, grey: 74)   // 选中那颗比轨道**亮** 22 级
+        b.paint(xRange: 24..<36, yRange: 0..<6, grey: 74)
+        let got = reading(a, b, y: 2)
+        XCTAssertEqual(got?.gate, "过",
+            "药丸抬到轨道之上之后重基失败 ⇒ 产品变了被读成'这台机器看不见'：" + String(describing: got?.gate))
+        XCTAssertEqual(got?.holeA, 4..<16, "亮的那一颗必须读成 4..<16，而不是轨道那两端")
+        XCTAssertEqual(got?.holeB, 24..<36)
+    }
+
+    /// 两臂的**选中档不是同一级** ⇒ 点名"不镜像"（R333 的新闸，`settledPillTrackLevels` 的产物侧证人）。
+    ///
+    /// 为什么这道闸只在小失配时才走得到：`pill` 与 `track` 是两条对角线的平均，
+    /// 两臂完全没换边（40/90 对 40/90）时两个平均数会**撞成同一个值** ⇒ `pillRun` 的
+    /// `|pill−track| >= delta` 先返回 nil，这一行是"非候选"（下一格钉那条）。
+    /// 这里给的是"换了边、但两臂的选中档差 12 级"的形状 —— 也就是末帧还在半途里、
+    /// 或者第二臂被别的档（悬停/失焦）染了一层的典型坏法。它必须被点名，不许被拿去定档。
+    func testReadingNamesArmsThatDoNotSwap() {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 90)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 90)
+        a.paint(xRange: 4..<16, yRange: 0..<6, grey: 40)    // 臂首的选中档 = 40
+        b.paint(xRange: 24..<36, yRange: 0..<6, grey: 52)   // 臂末的选中档 = 52（差 12 ≥ delta）
+        let got = reading(a, b, y: 2)
+        XCTAssertEqual(got?.gate, "不镜像",
+            "两臂的选中档对不上 ⇒ 必须说'不镜像'，不许拿一对没有对照物的档去框药丸："
+            + String(describing: got?.gate))
+        XCTAssertEqual(got?.holeA, 4..<16, "它仍然框得出段（46±8 认得 40），所以只能靠镜像这道闸拦")
+        // 完全没换边 ⇒ 两个平均数撞车 ⇒ 连候选都不是（两道出口各管一种失配）。
+        var c = Frame(width: 40, height: 6, grey: 30)
+        c.paint(xRange: 4..<36, yRange: 0..<6, grey: 90)
+        c.paint(xRange: 4..<16, yRange: 0..<6, grey: 40)
+        XCTAssertNil(reading(a, c, y: 2),
+            "两臂同向 ⇒ pill 与 track 撞成 65，`|pill−track|>=delta` 先拦下 ⇒ 非候选")
     }
 
     func testMovingHoleReadingRejectsARowReplacedWholesale() {
@@ -373,15 +510,46 @@ final class MotionPillRampTests: XCTestCase {
             "把宽度容差放宽到 60% 就该放行 —— 每道闸只管自己那一条，不许互相顶替")
     }
 
+    /// 「至少一段之宽」这道闸仍然咬得住**真帧上那一种窄**：字墨把一颗本来 55% 宽的洞截成 22%。
+    ///
+    /// R333 换了夹具，理由是诚实而不是洁癖：旧夹具画的是"整行只有 4 列的缝"，那种形状在重基之后
+    /// **走不到这道闸**（见下一格），所以这一格如果继续用它，就是在给一道已经不可达的分支作证。
+    /// 现在用的是本机 R327 量到的那个形状：轨道 36 列、洞本来跨两端、被 6 列字墨截断。
     func testMovingHoleReadingRejectsASlitTooNarrowForASegment() {
+        let width = 44, height = 8
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
+        b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
+        a.paint(xRange: 12..<18, yRange: 3..<6, grey: 200)   // 字墨只在 y=3..5 那几行
+        b.paint(xRange: 28..<34, yRange: 3..<6, grey: 200)
+        XCTAssertEqual(reading(a, b, y: 4)?.gate, "洞太窄",
+            "字缝也能贴边 —— 所以「至少一段之宽」这一道不能省（这一行里最长的那截 8/36=22% < 地板 25%）")
+        XCTAssertEqual(reading(a, b, y: 1)?.gate, "过",
+            "同一颗尺、同一对帧，没有字墨的那一行必须放行 —— 拦的是那一行的宽度，不是整卷")
+    }
+
+    /// 重基的**代价**，写成会红的格子（R333）：窄到搬不动半区中位的缝，现在根本定不出两档。
+    ///
+    /// 旧定义（药丸=与页底同档）能给这种形状一个词："洞太窄"。新定义由两半的中位定档，
+    /// 而 4/32 的一列缝搬不动任何一半的中位 ⇒ 两档相等 ⇒ `pillRun` 先返回 nil ⇒ 这一行是"非候选"。
+    /// 结论没变（照样被拒），**点名方式**变了：报告里那一段不再出现"洞太窄×N"，而是并入"非候选×N"。
+    /// 这一格钉的就是这个变化本身 —— 不许把它写成"闸还在"，也不许留成一条没人认领的沉默。
+    func testASlitTooNarrowToMoveTheHalfMedianHasNoObjectAtAll() {
         var a = Frame(width: 40, height: 6, grey: 30)
         var b = Frame(width: 40, height: 6, grey: 30)
         a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
         b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
         a.paint(xRange: 4..<8, yRange: 0..<6, grey: 36)
         b.paint(xRange: 32..<36, yRange: 0..<6, grey: 36)   // 4/32 = 12.5%：贴两端但太窄
-        XCTAssertEqual(reading(a, b, y: 2)?.gate, "洞太窄",
-            "字缝也能贴边 —— 所以「至少一段之宽」这一道不能省")
+        XCTAssertNil(reading(a, b, y: 2),
+            "12.5% 的缝搬不动半区中位 ⇒ 两档同为 52 ⇒ 没有药丸可框。它被拒的方式从"
+            + "『洞太窄』变成『非候选』，这一格就是那条变化的证人")
+        // 把同一条闸的地板降到 10%（此时中位仍读不出分离）依然 nil ⇒ 证明这一格不是靠地板赢的。
+        XCTAssertNil(reading(a, b, y: 2, minHole: 0.10),
+            "如果放宽 minHoleFraction 就能放行，那这一格读的仍是地板而不是定档；它必须仍然没有对象")
     }
 
     func testMovingHoleBandChoosesThePillRowNotTheListRow() {

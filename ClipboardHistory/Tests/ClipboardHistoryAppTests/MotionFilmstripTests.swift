@@ -5320,8 +5320,13 @@ final class MotionFilmstripTests: XCTestCase {
     /// 纯函数：单行上的"轨道 + 会动的洞"读数（首末两帧一起看）。
     ///
     /// 三道**结构**闸决定"这一行是不是候选"（不成立 ⇒ nil）：
-    /// ① 有一段与页底不同档的轨道；② 轨道里有一段与页底同档的洞（= 药丸）；
+    /// ① 有一段与页底不同档的轨道；② 两臂的左右两半**互为镜像**，由它们量出药丸档与轨道档，
+    /// 且轨道里要有一段处在药丸那一档（R333 重基：旧写法是"与页底同档的那一段"，
+    /// 那句话把 377 的缺陷画法当成了定义，修法一落地就失去对象 —— 见 `halfLevels` 上面的更正）；
     /// ③ 这个洞在两帧之间**走了**至少 `minMoveFraction` 个轨道宽。
+    ///    （R333：② 一旦要求两半互换，③ 就被它**蕴含**了 —— 药丸跨过中线才会让两半换档。
+    ///    这条闸留着不删（删守卫是放宽），但它的证人从"静止的一行给 nil"换成了
+    ///    "地板本身有牙"：`minMove=0.7` 必须拦、`minMove=0.6` 必须放，见 `MotionPillRampTests`。）
     /// 三道**形状**闸决定"这颗候选是不是那颗胶囊"（成立但形状不对 ⇒ 非 nil，`gate` 点名为什么不对）：
     /// ④ 两帧里洞的宽度必须差不多（`widthToleranceFraction`）—— 胶囊是刚体，字缝不是；
     /// ⑤ 洞必须贴在轨道的**一端**，而两帧贴在**异端**（`edgeFlushFraction`）—— 静止态里药丸占满一整段，
@@ -5358,10 +5363,16 @@ final class MotionFilmstripTests: XCTestCase {
         let extent = Range<Int>(uncheckedBounds: (lower: Swift.min(extA.lowerBound, extB.lowerBound),
                                                   upper: Swift.max(extA.upperBound, extB.upperBound)))
         guard extent.count >= minTrackPixels,
-              let holeA = pillRun(profile: rowA, margin: margin, delta: delta, extent: extent,
-                                  minPillPixels: minHolePixels),
-              let holeB = pillRun(profile: rowB, margin: margin, delta: delta, extent: extent,
-                                  minPillPixels: minHolePixels) else { return nil }
+              let halvesA = halfLevels(profile: rowA, extent: extent),
+              let halvesB = halfLevels(profile: rowB, extent: extent) else { return nil }
+        // R333：药丸那一档由**两臂镜像**量出来（为什么不再锚"与页底同档"，见 `halfLevels` 上面那段更正）。
+        let levels = settledPillTrackLevels(firstLeft: halvesA.left, firstRight: halvesA.right,
+                                            lastLeft: halvesB.left, lastRight: halvesB.right,
+                                            delta: delta)
+        guard let holeA = pillRun(profile: rowA, pillLevel: levels.pill, trackLevel: levels.track,
+                                  delta: delta, extent: extent, minPillPixels: minHolePixels),
+              let holeB = pillRun(profile: rowB, pillLevel: levels.pill, trackLevel: levels.track,
+                                  delta: delta, extent: extent, minPillPixels: minHolePixels) else { return nil }
         let width = Double(extent.count)
         guard Double(holeA.range.count) / width <= maxHoleFraction,
               Double(holeB.range.count) / width <= maxHoleFraction else { return nil }
@@ -5379,7 +5390,9 @@ final class MotionFilmstripTests: XCTestCase {
         let bLeft = Double(holeB.range.lowerBound - extent.lowerBound) <= edge
         let bRight = Double(extent.upperBound - holeB.range.upperBound) <= edge
         let oppositeEnds = (aLeft && bRight) || (aRight && bLeft)
-        if narrow {
+        if !levels.mirror {
+            gate = "不镜像"
+        } else if narrow {
             gate = "洞太窄"
         } else if abs(wA - wB) > tol {
             gate = "宽度不稳"
@@ -5506,6 +5519,23 @@ final class MotionFilmstripTests: XCTestCase {
         return "纵向覆盖=" + String(taken.count) + "/" + String(total) + "px=" + String(pct) + "%"
     }
 
+    /// 纯函数：把报告里那一格 `纵向覆盖=A/Bpx=P%` 解析回三个数；读不出（没有这一格、
+    /// 或它是"无"、或形状不是三段）一律给 nil。
+    ///
+    /// 为什么解析要住在尺这一边而不是证人里（R333）：证人原本自己 `split` 完就直接按下标取，
+    /// 于是"没有带子"那一发把整卷打成 **SIGTRAP（Index out of range）** —— 崩掉比红坏得多：
+    /// 红只损失一格，崩把后面所有格的结论行一起带走（变异表因此读成 NOT_RUN，
+    /// 而 NOT_RUN 与"这一环没有证人"在账上是两件事）。格式由打印它的那颗尺负责解析，
+    /// 于是"读不出"是返回值里的一个 nil，不是一次下标越界。
+    static func verticalCoverageCells(report: String) -> [Int]? {
+        guard let cell = report.split(separator: " ").first(where: { $0.hasPrefix("纵向覆盖=") })
+        else { return nil }
+        let nums = String(cell.dropFirst("纵向覆盖=".count))
+            .components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .filter { !$0.isEmpty }.compactMap { Int($0) }
+        return nums.count == 3 ? nums : nil
+    }
+
     /// 纯函数：剖面上"与页底**不同档**"的第一列到最后一次出现的那一列 = 轨道的横向范围（剖面索引）。
     ///
     /// 为什么范围要**整卷取并**而不是逐帧自算：药丸停在某一段时，亮区只剩轨道的另一半，
@@ -5529,8 +5559,10 @@ final class MotionFilmstripTests: XCTestCase {
     /// 为什么分箱用 `delta` 而不是另挑一个量化宽度：自己挑的宽度会把答案变成假设 ——
     /// 第一版我按 8 级一档做 run-length，结果 36 与 40 落进同一箱，而洞/轨道的分界正好是 38，
     /// 于是那格转储把它声称要回答的那一问抹平了（这是"形容词不是读数"的仪器版）。
-    /// 用 `floor((v − margin) / delta)` 之后：**第 0 箱就是判据认的洞**、第 2 箱上下是轨道、
+    /// 用 `floor((v − margin) / delta)` 之后：**第 0 箱就是与页底同档的那一级**、第 2 箱上下是轨道、
     /// 更高的箱是字墨，而这一格不引入任何新常数。形状：`-1×22,0×236,2×119,21×8`（按箱号升序）。
+    /// R333 更正：这一句原来写的是"第 0 箱就是判据认的洞"——那是旧定义（药丸=与页底同档）留下的话，
+    /// 重基之后洞由两臂定档，第 0 箱只回答"这条剖面扫到页底了没有"。
     /// 空剖面或 delta≤0 给"无"，不许给空串（空串在报告里读起来像被截断）。
     static func levelHistogram(profile: [Double], margin: Double, delta: Double) -> String {
         guard delta > 0, !profile.isEmpty else { return "无" }
@@ -5542,28 +5574,76 @@ final class MotionFilmstripTests: XCTestCase {
             .joined(separator: ",")
     }
 
-    /// 纯函数：轨道范围内**与页底同档**的最长连续段 = 药丸；连两级亮度一起交出来当前提读数。
+    // ── R333 / BACKLOG 393 的公开更正：药丸的定义不再锚"与页底同档" ──────────────
+    //
+    // 上面那段注释（R324 写的）说的是一件**当时真实、但不是产品语义**的事：暗档实测
+    // 页底 30 / 轨道 52 / 药丸 36 ⇒ 药丸恰好与页底同档。那句话之所以能用，是因为产品
+    // 当时把"选中"画成了轨道上的一个暗洞 —— 也就是 377 在屏幕上判掉的那个缺陷。
+    // 换句话说：**这把尺一直把缺陷的画法当成定义**。
+    //
+    // 所以 391 的修法①（把选中那颗抬到轨道之上）一落地，它就失去对象：本机现读
+    // `行=520 候选行=0 判定分布=非候选×520 候选段=无 取用=无`，而斜坡尺与过程证人两格
+    // 不是红、是 **skip**（`MOTION_NOT_RUN=pill-ramp-no-band` / `pill-band-unmeasured`）。
+    // 那是这仓库最怕的一种绿：产品变了，证人安静地退场。
+    //
+    // 新的定义（`halfLevels` + `settledPillTrackLevels` + 这一颗 `pillRun`）极性无关：
+    // 药丸那一档由两臂的**镜像**背书量出来，而不是由"它等于页底"猜出来。
+    // R324 那次试过又放弃的 `staticLevel` 为什么现在又能用：它当时失败在"取没动的列的众数"
+    // —— 轨道范围内没有一列不动；而这里不取众数，取的是**两半各自的电平**再要求两臂互换，
+    // 恰好绕开了那一格失败。
+    /// 纯函数：把轨道范围**左右平分**，各取一档电平（先按列取中位，再对半区取中位）。
     ///
-    /// 这一版锚回"页底"是 R324 的**公开更正**：本轮先换成过"没动的就是底"（`staticLevel`，
-    /// 两帧之间没动的列取众数档），想用掉极性；它在真窗口上被量死了 ——
-    /// 一颗在两段之间走的药丸，**轨道范围内没有一列是不动的**（A 帧盖住的那一半正是 B 帧露出来的那一半），
-    /// 于是 `staticLevel` 在胶囊行上恒为 nil：落刀前的本机读数 `候选行=5`，
-    /// 而那 5 行恰好是胶囊上下沿的抗锯齿边（高 6px 与 4px，都过不了形状闸）⇒ 判据全部走"找不到带子"出口。
-    /// 页底锚不讲究极性，它讲究的是"这一档里材质怎么落"：暗档实测 页底 30 / 轨道 52 / 药丸 36
-    /// ⇒ 药丸与页底同档（差 6 < delta 8）、轨道差 22 ⇒ 分得开。这句话只在**钉住的色档**里成立，
-    /// 所以它必须与 `Scenario.appearance` 一起读，单看就是又一次"把当天早上的电平当永恒"。
-    static func pillRun(profile: [Double], margin: Double, delta: Double, extent: Range<Int>,
-                        minPillPixels: Int)
+    /// 为什么允许平分：两段的宽度相等是**这条控件的语义**，而它不是被抄进来的常量 ——
+    /// `settledPillTrackLevels` 会拿"两臂互为镜像"去验它：如果两半不等宽或药丸没换边，
+    /// 镜像就不成立，那一行就被判成"不镜像"而不是被硬框出一条带子。
+    static func halfLevels(profile: [Double], extent: Range<Int>) -> (left: Double, right: Double)? {
+        guard extent.lowerBound >= 0, extent.upperBound <= profile.count,
+              extent.count >= 4 else { return nil }
+        let mid = (extent.lowerBound + extent.upperBound) / 2
+        let left = Array(profile[extent.lowerBound..<mid])
+        let right = Array(profile[mid..<extent.upperBound])
+        guard !left.isEmpty, !right.isEmpty else { return nil }
+        return (Self.median(left), Self.median(right))
+    }
+
+    /// 纯函数：从**两个 settled 臂**量出"哪一档是选中那颗、哪一档是轨道"（R333 / BACKLOG 393）。
+    ///
+    /// 为什么不再用"与页底同档"当药丸的定义：那句是**照着缺陷画法**写的（R323 立它的时候，
+    /// 药丸本来就画在页底那一档）。391 把选中那颗抬到轨道之上之后，轨道范围里再也没有
+    /// "与页底同档"的那一段 ⇒ 旧定义当场失去对象（本机现读：行=520 候选行=0，
+    /// 而那两格不是红、是 skip —— 一朵尺子瞎掉长得跟"这台机器看不见"一模一样）。
+    ///
+    /// 新定义**极性无关**：药丸那一档 = 首帧左半的电平，轨道那一档 = 首帧右半的电平，
+    /// 而它们必须由另一臂的镜像来背书（臂末的右半 == 臂首的左半、臂末的左半 == 臂首的右半）。
+    /// 于是"选中那颗比轨道亮还是暗"是一个**读出来的符号**，不再是一条写死的假设；
+    /// 两半不等宽、药丸没换边、或者只有一臂在动，都会让镜像不成立而被点名。
+    static func settledPillTrackLevels(firstLeft: Double, firstRight: Double,
+                                       lastLeft: Double, lastRight: Double, delta: Double)
+        -> (pill: Double, track: Double, separation: Double, mirror: Bool) {
+        let mirror = abs(firstLeft - lastRight) < delta && abs(firstRight - lastLeft) < delta
+        let pill = (firstLeft + lastRight) / 2.0
+        let track = (firstRight + lastLeft) / 2.0
+        return (pill, track, pill - track, mirror)
+    }
+
+    /// 纯函数：在轨道范围里找出**处在药丸那一档**的最长连续列段。
+    ///
+    /// `pillLevel` / `trackLevel` 由 `settledPillTrackLevels` 从两臂量出来；
+    /// 两档本身分不开（`|pill − track| < delta`）时这一格**没有对象**，直接给 nil ——
+    /// 不许退回去猜一个（那是把"洗淡了"读成"看不见"的那条路）。
+    static func pillRun(profile: [Double], pillLevel: Double, trackLevel: Double,
+                        delta: Double, extent: Range<Int>, minPillPixels: Int)
         -> (range: Range<Int>, pillLuma: Double, trackLuma: Double)? {
         guard extent.lowerBound >= 0, extent.upperBound <= profile.count,
-              !extent.isEmpty, minPillPixels > 0 else { return nil }
-        let hole = extent.map { abs(profile[$0] - margin) < delta }
+              !extent.isEmpty, minPillPixels > 0,
+              abs(pillLevel - trackLevel) >= delta else { return nil }
+        let isPill = extent.map { abs(profile[$0] - pillLevel) < delta }
         var best = (-1, -1)
         var start = -1
         var pillSum = 0.0, pillN = 0, trackSum = 0.0, trackN = 0
-        for (i, isHole) in hole.enumerated() {
+        for (i, hit) in isPill.enumerated() {
             let value = profile[extent.lowerBound + i]
-            if isHole {
+            if hit {
                 pillSum += value
                 pillN += 1
                 if start < 0 { start = i }
@@ -5576,7 +5656,7 @@ final class MotionFilmstripTests: XCTestCase {
                 }
             }
         }
-        if start >= 0, hole.count - start > best.1 - best.0 { best = (start, hole.count) }
+        if start >= 0, isPill.count - start > best.1 - best.0 { best = (start, isPill.count) }
         guard best.1 - best.0 >= minPillPixels, pillN > 0, trackN > 0 else { return nil }
         return (Range<Int>(uncheckedBounds: (lower: extent.lowerBound + best.0,
                                              upper: extent.lowerBound + best.1)),
@@ -5793,14 +5873,24 @@ final class MotionFilmstripTests: XCTestCase {
             throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-track")
         }
         let extent = extLo..<extHi
-        // 参照档 = **页底那一档**（轨道之外那几列的中位数）：药丸在暗档里落到 36、页底 30、轨道 52，
-        // 所以"与页底同档的那一段"就是药丸。本轮先试过"两帧之间没动的列 = 底"（`staticLevel`），
-        // 它被真窗口的帧量死了 —— 两段之间的药丸一移动，轨道范围里就**没有一列是不动的**
-        // （本机读数 `候选行=5`，而那 5 行是胶囊上下沿的抗锯齿边）。理由写在 `pillRun` 上面。
+        // R333 / BACKLOG 393：药丸那一档**不再由页底定义**（旧写法把 377 那个缺陷的画法当成了尺的定义，
+        // 修法一落地这把尺就安静地 skip 掉 —— 全在 `halfLevels` 上面那段更正里）。
+        // 现在两档由**首末两个 settled 臂的镜像**量出来：药丸 = 首帧左半（= 末帧右半），
+        // 轨道 = 首帧右半（= 末帧左半）。逐帧的中间态不参与定档，只被这两个数去认。
         let minPillPixels = max(4, Int((12.0 * scale).rounded()))
+        let firstHalves = Self.halfLevels(profile: profilesA[0], extent: extent)
+        let lastHalves = Self.halfLevels(profile: profilesA[profilesA.count - 1], extent: extent)
+        guard let fh = firstHalves, let lh = lastHalves else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-halves 轨道范围=\(extent.lowerBound)..\(extent.upperBound)"
+                + " 在这台机器上分不出左右半（剖面列数不足 4）⇒ 两档无从量出")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-halves")
+        }
+        let levels = Self.settledPillTrackLevels(firstLeft: fh.left, firstRight: fh.right,
+                                                 lastLeft: lh.left, lastRight: lh.right, delta: 8)
         func centers(_ profiles: [[Double]]) -> [Double] {
             profiles.map { values in
-                guard let run = Self.pillRun(profile: values, margin: margin, delta: 8, extent: extent,
+                guard let run = Self.pillRun(profile: values, pillLevel: levels.pill,
+                                             trackLevel: levels.track, delta: 8, extent: extent,
                                              minPillPixels: minPillPixels) else { return -1 }
                 return Double((run.range.lowerBound + run.range.upperBound) / 2 + xRange.lowerBound) / scale
             }
@@ -5808,9 +5898,10 @@ final class MotionFilmstripTests: XCTestCase {
         let cA = centers(profilesA), cB = centers(profilesB)
         // 分离度前提：轨道档与药丸档必须分得开（本机实测 52 对 36）。分不开就不是"没动"，
         // 是这台机器的材质把那两级洗成了同一档 ⇒ 具名出口，不许把它读成"胶囊不动"。
-        let settledRun = Self.pillRun(profile: profilesA[profilesA.count - 1], margin: margin,
-                                      delta: 8, extent: extent, minPillPixels: minPillPixels)
-        let separation = settledRun.map { abs($0.trackLuma - $0.pillLuma) } ?? -1
+        let settledRun = Self.pillRun(profile: profilesA[profilesA.count - 1], pillLevel: levels.pill,
+                                      trackLevel: levels.track, delta: 8, extent: extent,
+                                      minPillPixels: minPillPixels)
+        let separation = abs(levels.pill - levels.track)
         let trackWidthPt = Double(extent.count) / scale
         let tolerance = max(2.0, trackWidthPt * 0.02)
         emit("MOTION_PILL_RAMP_GEOM filter-pill-slide 行带=\(String(format: "%.1f", Double(band.lowerBound) / scale))"
@@ -5819,10 +5910,22 @@ final class MotionFilmstripTests: XCTestCase {
             + "…\(String(format: "%.1f", Double(extent.upperBound + xRange.lowerBound) / scale))pt"
             + " 倍率=\(String(format: "%.2f", scale)) 页底=\(String(format: "%.1f", margin))"
             + " 色档=胶片" + filmA.appearanceNameAtRecord + "/机器" + Self.appearanceName()
-            + " 轨道=\(String(format: "%.1f", settledRun?.trackLuma ?? -1))"
-            + " 药丸=\(String(format: "%.1f", settledRun?.pillLuma ?? -1))"
-            + " 分离=\(String(format: "%.1f", separation)) 容差=\(String(format: "%.1f", tolerance))pt"
+            + " 轨道=\(String(format: "%.1f", levels.track))"
+            + " 药丸=\(String(format: "%.1f", levels.pill))"
+            + " 分离=\(String(format: "%.1f", separation)) 镜像=\(levels.mirror ? "是" : "否")"
+            + " 末帧药丸宽=\(settledRun.map { $0.range.count } ?? -1)"
+            + " 容差=\(String(format: "%.1f", tolerance))pt"
             + " 定位=\(bandReport)")
+        // 前提①（R333）：两档必须由**镜像**背书，否则 `levels` 里"哪一档是选中那颗"是猜的。
+        // 首末两半没互换 ⇒ 要么这两帧不是两个稳定态（触发没生效），要么轨道不是那颗胶囊；
+        // 两种都不是"斜坡走得平不平"的证据，也不许被读成产品缺陷 ⇒ 具名出口（D-305 同一形状）。
+        guard levels.mirror else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-mirror 首帧左/右=\(String(format: "%.1f", fh.left))"
+                + "/\(String(format: "%.1f", fh.right)) 末帧左/右=\(String(format: "%.1f", lh.left))"
+                + "/\(String(format: "%.1f", lh.right))（delta=8）"
+                + " ⇒ 两臂没互换，药丸档与轨道档没有对照物，逐帧中心不作数")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-mirror")
+        }
         guard separation >= 8 else {
             emit("MOTION_NOT_RUN=pill-ramp-low-separation 轨道与药丸两档之差=\(String(format: "%.1f", separation))"
                 + " < 8 ⇒ 这一台的通道分不开这两级，斜坡品质无从逐帧判（分离度是量出来的，不是假设）")

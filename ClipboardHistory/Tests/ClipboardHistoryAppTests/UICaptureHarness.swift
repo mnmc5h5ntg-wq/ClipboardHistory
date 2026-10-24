@@ -6457,7 +6457,28 @@ final class UICaptureTests: XCTestCase {
             // 符号约定：**正 = 选中那颗比未选那颗亮**（负 = 选中是一颗暗洞，就是 377 在屏幕上看到的那颗）。
             let sysDiffL = leftArmSelectedHalf - leftArmOther
             let sysDiffR = rightArmSelectedHalf - rightArmOther
-            let sameSide = ((sysDiffL + sysDiffR >= 0) == (ownSelected >= ownUnselected)) ? "是" : "否"
+            let ownDiff = ownSelected - ownUnselected
+            let sysDiff = (sysDiffL + sysDiffR) / 2.0
+            let sameSide = ((ownDiff >= 0) == (sysDiff >= 0)) ? "是" : "否"
+
+            // R333 / D-325：**暗档把"同侧"从读数升成门，亮档继续只印**。
+            // 为什么不是两档一起升：runner（1×）与本机（2×）现读同一格 ——
+            // 暗档 系统 +49.0／+26.0 同号、自家 −14.0／−16.0 同号 ⇒ "自家与系统异侧"在两机上都成立，
+            // 那是**产品事实**，所以它有资格红；亮档 系统 +31.0／−30.0 **反号** ⇒
+            // 同一条断言会在一台红一台绿，读起来像"产品在一台机器上坏了"，而那既不是产品事实也不是通道事实。
+            // 这条门的牙在 391 修法之前咬得住（本机 差=−16.0 vs 系统 +26.0 ⇒ 异侧 ⇒ 红），
+            // 修法之后放行（差=+18.0 vs +26.0 ⇒ 同侧），所以它钉的是"方向对不对"，不是"跑没跑通"。
+            if tag == "dark" {
+                XCTAssertEqual(sameSide, "是",
+                    "暗档里自家与系统的极性不同侧：自家 选中=" + String(format: "%.1f", ownSelected)
+                        + " 未选=" + String(format: "%.1f", ownUnselected)
+                        + " 差=" + String(format: "%+.1f", ownDiff)
+                        + "，系统 差=" + String(format: "%+.1f", sysDiff)
+                        + "（两臂 " + String(format: "%+.1f", sysDiffL) + "／"
+                        + String(format: "%+.1f", sysDiffR) + "）"
+                        + "⇒ 377 那个缺陷又回来了：选中的那颗画在轨道之下，而平台在暗档把它抬在轨道之上"
+                        + "（D-323：这条符号随色档翻向，所以只有暗档能立门）")
+            }
 
             emit("SEGREF_POLARITY " + tag
                  + "｜系统 页底=" + String(format: "%.1f", sysMargin)
@@ -6471,7 +6492,9 @@ final class UICaptureTests: XCTestCase {
                  + " AB=两臂镜像一致（跟着 selection 搬的就是这两档）"
                  + "｜" + ownLine
                  + "｜同侧=" + sameSide
-                 + "（R331 只印不判：地板与「自家必须与系统同侧」那条断言与 391 的修法同一笔落地，D-274）")
+                 + (tag == "dark"
+                    ? "（暗档：R333 已按 D-325 升成门，自家差与系统差必须同号）"
+                    : "（亮档：只印不判 —— 两机反号 " + String(format: "%+.1f", sysDiff) + "，D-325）"))
         }
     }
 

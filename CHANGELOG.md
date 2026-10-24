@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 选中那颗站到轨道之上（393 的①），而离屏尺的定义重基：药丸档由两臂镜像量出来（R333 / U-1105…U-1109 · 产品 2 文件，动效主线）
+
+- 产品：`VisualMaterial.sliderPill: Material = .ultraThickMaterial` →
+  `VisualMaterial.selectedSegment: Color = Color(nsColor: .unemphasizedSelectedContentBackgroundColor)`
+  （`HistorySidebarView` 的 `slidingPill` 取用点跟着换；旧令牌只有一个用点，一并撤掉）。
+- 现读（同一运行、同一颗尺）：暗档 页底 30.0／轨道 52.0／选中 36.0→**70.0**／差 −16.0→**+18.0**，
+  系统参照臂差=+26.0 ⇒ 同侧；亮档 页底 255.0／未选 230.0／选中 233.0→**220.0**／差 +3.0→**-10.0**，参照臂差=-30.0。
+  暗档"同侧"本轮升成门（D-325），亮档继续只印。
+- 判据：`pillRun` 的定义重基（`halfLevels` + `settledPillTrackLevels` + 新 `pillRun`，极性无关），
+  新增 4 格合成帧证人（镜像定档、亮档形状仍过闸、12.5% 窄缝改为"没有对象"、半区下限）；
+  斜坡尺与过程证人重新有对象：`候选行=24 判定分布=洞太窄×11,过×13,非候选×496 轨道=52.0 药丸=70.0 分离=18.0 镜像=是 纵向覆盖=14/48px=29%`，
+  `单调 位移=137.0pt 最大倒退=0.0pt 帧数=27`。
+- 三处自伤与一处崩（都当场照出来）：M925 报 PASSED（镜像蕴含了"必须会走"）⇒ 证人换成
+  `minMove` 0.7/0.6 两格边界；M933 重钉时漏改 repl ⇒ 少一个花括号，表按规矩打 NOT_RUN；
+  证人格按下标取数把整卷打成 SIGTRAP ⇒ 解析搬进尺本体 `verticalCoverageCells` + 四格真值表。
+- 新开 396：选中档 70 与"悬停未选"档 66 只差 4.0 级（改前 30 级），数由已提交的
+  `HOVER_DIRECT_READ_PROOF` 打印；本轮只登记不发明地板（D-321）。
+- 新开 397：§8 的搬运口读的 12 个键名（`BUILD_EXIT=` 一族）现在**没有任何脚本打印**
+  （`grep -rl BUILD_EXIT scripts/ .github/` 现读零个文件）⇒ 本轮跑它现读 `ROWS_MISSING=12/13`，
+  而声明的三族读数 `SEGREF_POLARITY` / `MOTION_PILL_RAMP_GEOM` / `MOTION_PILL_SLIDE` 缺=0。
+  没有为了绿而放宽它：那 12 格在台账里就写成洞。
+- 验证：`ROUND_VERIFY build_warnings=0 swift_executed=990 swift_skipped=47 swift_failures=0 frames=178 baseline_compared=178 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 目录=/tmp/r333_rv`；判据卷 合成帧 `Executed 40`、胶片 `Executed 67（skipped=3）`、
+  捕获 `Executed 95（skipped=4）`；六张变异表 `mutate_r323 6/6（M925, M926, M927, M928, M929, M930）；mutate_r327 3/3（M949, M950, M951）；mutate_r328 3/3（M952, M953, M954）；mutate_r329 2/2（M955, M956）；mutate_r333 5/5（M965, M966, M967, M968, M969）；mutate_r324 5/6（M931, M933, M934, M935, M936）`（另 M932 PASSED（表自己写明：只有机器处在亮档时它才咬得住，本轮机器在暗档））；
+  针预检 tables=121 covered=104 bad=0、名册 files=215 arms=836 dupes=0；
+  清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；脚本电池 `Ran 622（skipped=4）`。
+
 ### 真机通道的「读不到」拆成三颗修法相反的缺席：display_off / screen_locked / capture_failed（R332 / U-1102…U-1104 · 产品 0 文件，判据账）
 
 - `scripts/real_screen_sidebar_icons.py` 新增 `secure_input_owner()`（只读 ioreg + ps，不截屏）与

@@ -387,7 +387,7 @@ fileprivate extension View {
 /// **为什么不是 `private`**（R230 / BACKLOG 251）：要一张"只有这一段被点亮"的帧，
 /// 只能把它单独放进夹具 —— 挂在整条侧栏上拍的话，同一枚取证键会同时点亮列表里每一颗星标，
 /// 那张帧替证的就不是"悬停的那一层灰"，而是"指针同时出现在八个地方"这种产品里不存在的样子。
-/// 表面没换：这颗胶囊自己画底（`VisualMaterial.track` + `sliderPill`），所以单独放它出来
+/// 表面没换：这颗胶囊自己画底（`VisualMaterial.track` + `selectedSegment`），所以单独放它出来
 /// 读到的就是产品里那片底（R24 那条"组件帧必须与产品对齐"判的是同一件事）。
 /// 放开可见性的先例是 R45 / R229 的 `RowFavoriteButton`。
 struct SegmentedFilterPicker: View {
@@ -440,7 +440,7 @@ struct SegmentedFilterPicker: View {
                 count: allCases.count,
                 index: idx)
             VisualShape.rounded(VisualRadius.control)
-                .fill(VisualMaterial.sliderPill)
+                .fill(VisualMaterial.selectedSegment)
                 .frame(width: rect.width, height: rect.height)
                 .position(x: rect.midX, y: rect.midY)
                 .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: selection)

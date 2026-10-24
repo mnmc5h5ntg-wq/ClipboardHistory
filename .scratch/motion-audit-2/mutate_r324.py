@@ -53,8 +53,10 @@ NEEDLE_923_932 = (u"            NSApplication.shared.appearance = requested\n"
 REPL_932 = u"            _ = requested\n"
 
 # ③④⑤ 三道形状闸：闸条件恒假 ⇒ 变量仍然被用（不引入告警），但不再拦任何东西。
-NEEDLE_933 = u"        if narrow {\n"
-REPL_933 = u"        if narrow && false {\n"
+# R333 重钉：药丸档改由两臂镜像定之后，"不镜像"成了第一道分支，`narrow` 退到 `} else if` ——
+# 针跟着换，刀的意思不变。
+NEEDLE_933 = u"        } else if narrow {\n"
+REPL_933 = u"        } else if narrow && false {\n"
 NEEDLE_934 = u"        } else if abs(wA - wB) > tol {\n"
 REPL_934 = u"        } else if abs(wA - wB) > tol && false {\n"
 NEEDLE_935 = u"        } else if !oppositeEnds {\n"

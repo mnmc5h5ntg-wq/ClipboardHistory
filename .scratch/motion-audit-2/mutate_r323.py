@@ -12,7 +12,7 @@
 证人写出来不等于有牙。六把刀各拆一环，被拆的那一环必须红在**指名它的用例**上：
 
   M925 拆掉"洞必须会走"这道闸      ⇒ 停在原处的一行会被当成位移证人
-  M926 把洞的极性翻过来            ⇒ 尺会去量轨道而不是胶囊（本机 轨道 52 / 药丸 36）
+  M926 把药丸档与轨道档翻过来      ⇒ 尺会去量轨道而不是药丸（R333 重钉：本机 轨道 52 / 药丸 70）
   M927 列中位数换成均值            ⇒ 字墨把洞抬起来，中心一路读到字上
   M928 三臂相同少比一遍开臂        ⇒ 出口会把真有差异的一跑洗成绿（最坏的一种自伤）
   M929 回头的容差乘十              ⇒ MC-1 禁止的过冲读不出来
@@ -40,9 +40,12 @@ REPL_925 = u"guard move >= 0 else { return nil }"
 EXPECT_925 = u"testMovingHoleReadingRejectsAHoleThatStaysPut"
 
 # ② 洞的极性：把"与页底同档"换成"与页底不同档" ⇒ 量的是轨道两段的外包，不是胶囊。
-NEEDLE_926 = u"let hole = extent.map { abs(profile[$0] - margin) < delta }"
-REPL_926 = u"let hole = extent.map { abs(profile[$0] - margin) >= delta }"
-EXPECT_926 = u"testPillRunIsTheHoleThatReadsLikeThePage"
+# R333 重钉：这一针原来锚的是旧定义那行（`hole` 与页底比），重基之后那颗尺读的是
+# `pillLevel`（由两臂镜像量出来），所以针与期望用例名一起换 —— 刀的意思没变：
+# 把"哪一档是药丸"翻成"另一档"，证人必须红。
+NEEDLE_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) < delta }"
+REPL_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) >= delta }"
+EXPECT_926 = u"testPillRunFollowsTheLevelGivenByTheMirrorNotThePage"
 
 # ③ 列剖面：中位数换成均值 ⇒ 少数行的字墨抬进中心。
 NEEDLE_927 = u"out.append(Self.median(col))"
