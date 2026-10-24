@@ -36,7 +36,7 @@ NOT-RUN（三种缺席分开写，不许省略）：① **本轮没有对象**�
 ② **只在人身上判得了**的：393 的改前/改后真机四数（会话锁着，尺不猜密码也不替用户解锁）⇒ 开成 395；
 ③ **命令没跑成**的：本轮没有 —— CI 对平留到 R333 第 ⓪ 条现读。
 
-下一轮（R333）的靶，按顺序：⓪ 读 CI 配对（本轮 push 的 run↔commit 成对写回）→
+下一轮（R333）的靶，按顺序：⓪ 读 CI 配对（成对：run id ↔ commit，现读自 gh run list）：RUN=40101699619 ↔ `3c9ab58`（回填时 status=in_progress / 未读 ⇒ 只登记不轮询）；上一轮 R331 那一跑 `40097837516 ↔ 6935e1b` 已读 completed/success，三件待看事项的答案与那条改判在 R331 的追记二里。这一跑要盯的一件事：本轮把真机缺席拆成三颗 ⇒ 若 CI 里出现 `REALSCREEN_NOT_RUN screen_locked` 或 `display_off`，那是**环境**缺席（要人或要等），不是回归；而 `capture_failed` 才是要查工具的哪一种。
 ① **393**：391 的落地只剩①—— 药丸换成 `unemphasizedSelectedContentBackgroundColor`
 （参照臂量出的分母：解析 70／220 ≈ 系统实测 74.0／205.0），并把 `pillRun` 的
 "药丸=与页底同档"重基成"药丸=两帧之间变了的那一档"（极性无关、不抄 `FilterPillGeometry`）；
