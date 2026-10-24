@@ -48,6 +48,8 @@ RUN=40086526381 ↔ `c3fdc02` ⇒ failure 在 STEP[9] `LEDGER_TOKENS books=7 str
 （/tmp 日志缺失 + 没有已构建的 .app），R330 新增的 8 格 python 判据**没有**进 skip 名册 ⇒ 上一轮那条担心
 被现读结案；② `REALSCREEN_*` 这一族不进 CI（要一块醒着的屏幕），那一跑没有它的读数 ≠ 没跑成。
 
+⓪ R332 开场要先读的（成对：run id ↔ commit，现读自 gh run list --json databaseId,headSha,status,conclusion）：RUN=40097837516 ↔ `6935e1b`（本笔 push 的那一跑，回填时 status=in_progress / 未读 ⇒ 只登记不轮询）；RUN=40091830006 ↔ `cdc3b64` ⇒ completed/**success**（R330 的追记那一跑，本轮开场还没读到，现在结掉了）；RUN=40091469060 ↔ `4e9e59a` ⇒ completed/**success**；RUN=40086526381 ↔ `c3fdc02` ⇒ failure 在 STEP[9] LEDGER_TOKENS books=7 stray=1（R329 漏下的占位符，R330 已修，本轮不再复现）。这一跑要盯的三件事：① 新读数族 `SEGREF_POLARITY` 有没有在 runner 上印出来 —— 它现在在 §8 的搬运名单里（`--must-include` 声明=1 缺=0 是**本机**的读数），runner 上一行都没有就要分清是走了具名出口 `sysref_seg_fill_not_drawn` 还是这一格根本没跑（394 判的就是这一格，别把它读成回归）；② 全量卷 `Executed` 那三格在 runner 上是否仍是 984/47/0 这一族（本机现读），红名单归因要用改动**之前**那一跑做对照；③ 帧基线在 runner 上 `COMPARED` 必须非 0（本机 178），`COMPARED=0` 时的 `CHANGED=0` 是空对账。
+
 下一轮（R332）的靶，按顺序：① **393**：391 的落地只剩①—— 药丸换成 `unemphasizedSelectedContentBackgroundColor`
 （参照臂量出的分母），并把 `pillRun` 的"药丸=与页底同档"重基成"药丸=两帧之间变了的那一档"（极性无关），
 D-318/D-319 的改前改后四数 + 按档各立的同侧断言（D-323）+ R327…R329 那几张表的针重钉重跑；
