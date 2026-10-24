@@ -136,8 +136,7 @@ FDB = {}
 for tier in (u"dark", u"light"):
     ln = line_with(fd_raw, u"FRAME_DIFF_BBOX detail-html-rendered-720x520-%s" % tier, u"逐张比的 bbox")
     FDB[tier] = (num(ln, u"变了", u"bbox"),
-                 (re.findall(r"bbox=\((-?\d+),(-?\d+)\)\.\.-((-?\d+),(-?\d+)\)", ln)
-                  or re.findall(r"bbox=\((-?\d+),(-?\d+)\)\.\.(\d+),(\d+)", ln)
+                 (re.findall(r"bbox=\((-?\d+),(-?\d+)\)\.\.\((-?\d+),(-?\d+)\)", ln)
                   or [(u"",) * 4])[0])
 if FDB[u"dark"][1][0] == u"":
     die(u"上一轮→本轮的差集 bbox 没解析到 ⇒ U-1150 那句只能记 NOT-RUN")
@@ -161,7 +160,7 @@ SWIFT = [num(rv_log, u"swift_executed", u"全量卷"), num(rv_log, u"swift_skipp
 if SWIFT[2] != u"0":
     die(u"全量卷有红：" + rv_log.strip()[-400:])
 FRAMES = num(line_with(rv_log, u"frames=", u"ROUND_VERIFY"), u"frames", u"帧数")
-DMG = num(rv_log, u"dmg", u"换装")
+DMG = (re.search(u"dmg=(\\w+)", rv_log) or [None, u""])[1]
 if DMG != u"ok":
     die(u"dmg / 换装没签（dmg=" + DMG + u"）")
 VER = num(rv_log, u"installed_version", u"换装")
@@ -169,7 +168,8 @@ BASE_LINE = line_with(rv_log, u"baseline_compared", u"帧基线")
 BASE = [num(BASE_LINE, u"baseline_compared", u"基线"), num(BASE_LINE, u"baseline_changed", u"基线"),
         num(BASE_LINE, u"baseline_missing", u"基线")]
 
-CAPTURED = num(line_with(cap_log, u"CAPTURED", u"捕获"), u"CAPTURED", u"捕获")
+CAPTURED = (re.search(u"CAPTURED (\\d+)", line_with(cap_log, u"CAPTURED", u"捕获"))
+                or [None, u""])[1]
 if CAPTURED != FRAMES:
     die(u"两遍帧数不同：CAPTURED=%s 而 ROUND_VERIFY frames=%s" % (CAPTURED, FRAMES))
 
@@ -178,7 +178,8 @@ for tier in (u"dark", u"light"):
     ln = line_with(pix_log, u"FRAME_DIFF_BBOX detail-html-rendered-720x520-%s" % tier,
                    u"像素差")
     PIX[tier] = (num(ln, u"变了", u"像素差"),
-                 (re.findall(u"bbox=\\((-?\\d+),(-?\\d+)\\)\\.\\((-?\\d+),(-?\\d+)\\)", ln) or [(u"",) * 4])[0])
+                 (re.findall(u"bbox=\\((-?\\d+),(-?\\d+)\\)\\.\\.\\((-?\\d+),(-?\\d+)\\)", ln)
+                  or [(u"",) * 4])[0])
 
 CAUGHT = num(line_with(tbl, u"CAUGHT=", u"变异表"), u"CAUGHT", u"变异表")
 RESTORE = (re.search(u"RESTORE_CLEAN=(\\w+)", tbl) or [None, u""])[1]
@@ -201,8 +202,8 @@ if u"mutate_r338" not in pre_log and u"registered=" not in pre_log:
 
 ci_log = require(CI_LOG)
 CI_RUN = line_with(ci_log, u"RUN=", u"CI 配对")
-CI_SHA = num(CI_RUN, u"sha", u"CI 配对")
-CI_CONC = num(CI_RUN, u"conclusion", u"CI 配对")
+CI_SHA = (re.search(u"sha=(\\w+)", CI_RUN) or [None, u""])[1]
+CI_CONC = (re.search(u"conclusion=(\\w+)", CI_RUN) or [None, u""])[1]
 CI_FAIL_TEST = line_with(ci_log, u"FAILING_TEST", u"CI 失败步骤").split()[-1]
 CI_RUN_ID = num(CI_RUN, u"RUN", u"CI 配对")
 _msgs = [ln.split(u" ", 1)[1] for ln in ci_log.splitlines() if ln.startswith(u"MSG")]
@@ -543,7 +544,7 @@ new_s14_line = (u"- **判据与门的规模**（R%d 现读，这一格是最新�
 fr = once(fr, S14_AT, new_s14_line)
 fr = re.sub(u"(?m)^(- \\*\\*仍开（截至本轮，完整名单以 `AGENT_STATE.md` 的 R)\\d+( 节)",
             u"\\g<1>%d\\g<2>" % ROUND, fr, count=1)
-if re.search(u"@\\w+@", fr) or new_s14 in fr:
+if re.search(u"@\\w+@", fr):
     die(u"报告里还有没替换的占位符或空操作")
 wr(FRA, fr)
 

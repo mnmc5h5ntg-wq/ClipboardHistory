@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 屏幕上那句"图的说明"差点是埋点属性写的：取 alt 换成扫属性对（R338 / U-1147…U-1153 · 产品 1 文件）
+
+- `<img>` 的 alt 不再用 `\balt\s*=` 在整段标签里搜（ICU 的词边界把 `data-alt` 里那个 `alt` 也算起点）。
+  现在扫「属性名 + 值」成对，名字整段等于 alt 才算；重复 alt 取第一个（与 HTML 一致），单双引号都认。
+- 新判据 `testAltIsTakenFromTheTagsOwnAttributeNotFromAPrefixedNameOrAnotherValue`：
+  前缀属性 / 别人的值里含 `alt="…"` / 重复属性 / 单引号 四种形状，五颗读数
+  `HTML_ALT_SOURCE 前缀属性没抢=true 值里的假alt没抢=true 带引号的值没抢=true 重复取第一个=true 单引号认=true`。
+- 刀 M993/M994/M995 三把（后缀匹配 / 倒序取最后一个 / 只认双引号），现读 `3/3`。
+- 产物证人：同一份夹具两份构建各拍一遍，两档渲染帧的 alt 那一行差 4637（暗）/ 4409（亮）个像素，
+  别处一个点没动；改前那一跑由捕获卷自己报红两格。基线同一笔更新（`COMPARED=182 CHANGED=0`）。
+- 新开 410（这条通道没有真正的解析器：404 / R338 / 无引号 alt 三族合账），404 收到一条追记。
+
+
 ### 三本账第一次被按全长度扫了一遍；看图这条腿量到自己会美化（R337 / U-1137…U-1146 · 产品 0 文件，回顾轮）
 
 - 新增电池守卫 `scripts/tests/test_ledger_citations.py` 三格：`BACKLOG` 引用必须落到 `ITEM` 认得的条目、
