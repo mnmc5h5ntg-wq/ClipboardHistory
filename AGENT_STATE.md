@@ -34,7 +34,7 @@ R328 表在新代码上复跑 CAUGHT=3/3, RESTORE_CLEAN=yes，针预检 bad=0。
 针预检 tables=117 covered=100 bad=0、名册 arms=823 / files=211；
 搬运名单 `READINGS_MUST_INCLUDE 声明=3 缺=0`；脚本电池 `Ran 611（skipped=4）`；CI 对平：RUN=40084527261 sha=215d815 status=completed conclusion=success title=R328 追记（把 push 之后的 run↔commit 成对写回 STATE 的 R329 第 ⓪ 条：RUN=40 workflow=CI。
 
-⓪ R330 开场要先读的（成对：run id ↔ commit）：本轮 push 之后拿到的 RUN / sha 见本轮提交之后的追记；
+⓪ R330 开场要先读的（成对：run id ↔ commit）：**RUN=40086499268 ↔ d21eceb**（本笔追记时仍在 `in_progress` ⇒ 成对号先记，三件事的读数下一轮再抄）。另外 @RPREVTAG@ 那一跑已经签完：**RUN=40084527261 ↔ 215d815 = completed / success**（本轮 ⓪ 的分档读数就是从它取的）；
 要读的三件事：① `纵向覆盖` 那一格在 runner 上印不印得出、百分比与本机是否同形（那台 1× ⇒ px 数减半，
 比值应当不变 —— 变了就是分母随倍率漂）；② 两朵 pill 命名出口继续响；③ `MOTION_FLOOR_SUITE_CLEAN` 仍为 0。
 
