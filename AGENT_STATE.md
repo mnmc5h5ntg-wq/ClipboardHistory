@@ -12,6 +12,50 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R325 状态（2026-10-24 · 本地 · 第 324 轮 / Round 322）：一句没有数的推测换成 12 颗读数，并接住 R324 在 runner 上换形的那朵红（产品 0 文件，动效主线）
+
+本轮做了什么：① **R324 那句"其余 12 颗与色档弱相关"付账**：新增 `Scenario.pinned(to:)` +
+纯函数 `appearanceDependenceVerdict`（同 / 漂 / 敏感 / 换对象 四格）+ 逐颗 A/B 探针
+`testFilmScenarioAppearanceDependenceIsMeasuredPerScenario`；对象表与 R324 的点名器对账成同一份，
+两臂各自证明拍在哪一档。② **本机读数**：同=10 漂=2 敏感=0 换对象=0 ⇒ 没有一颗像胶囊那样在亮档里丢掉对象，
+"不钉"升成判断；2 颗漂登记进 383 的追记，两条分界的出处新开 386
+（同一份代码、同一台机器跑两遍：第一遍 同=9 漂=3，第二遍 同=10 漂=2，分类翻面了）。
+③ **⓪ 读 R324 那一跑并接住换形的红**：带子从 346…352pt 回到 **y52.0…58.0pt**、
+`色档=胶片暗/机器亮` ⇒ 两半**兑现**；过程证人红因换了（三臂 1 帧 / 峰值 0.925 全等，
+而数组不全等）⇒ 出口谓词从"逐字节相同"换成"判据自己用的那两个数"（D-311），
+并补上"一步跳变不许发单调的证"（`intermediateCount` 排在词表之前）。
+
+验证读数（全部现读，不手抄）：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 972 tests, with 47 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r325_rv/frames`；
+帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`（本轮没改夹具也没改像素）；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=972 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r325_rv`；
+判据卷 `MotionPillRampTests` 23 格全绿（分类器 6 格 + 出口谓词 4 格 + 中间样本 5 格 + R324 那 8 格）；胶片卷整卷 `Executed 67 tests, with 3 tests skipped and 0 failures（整卷开 CLIPBOARD_HISTORY_UI_MOTION）`；
+变异表 `CAUGHT=6/6, RESTORE_CLEAN=yes`（M937…M942，逐臂 M937 CAUGHT；M938 CAUGHT；M939 CAUGHT；M940 CAUGHT；M941 CAUGHT；M942 CAUGHT）；
+针预检 tables=113 covered=96 bad=0、名册 arms=809 files=207；
+读数族 `READINGS_MUST_INCLUDE 声明=3 缺=0`；脚本电池 `Ran 611（skipped=4）`；
+产品文件 0 个，连续零改动 **6** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for 324`，`--check` 同形；上一轮 5）。
+
+看图腿（本轮真看了）：看了本轮两件事的图。① **色档 A/B 的量的是哪张图**：`/tmp/r324_rv/frames/sidebar-history-300x520-light.png` 与同尺寸 `-dark.png`（本轮重捕 174 帧与工作基线逐张相同，CHANGED=0，所以探针与这两张是同一张图）。亮档那张，搜索框下面那一行「全部 / 收藏」的**药丸肉眼几乎不可辨**——轨道与页底同一档，只剩字重差别；暗档那张药丸是一整块明显的浅色圆角 ⇒ 探针那句"亮档里没有对象"有第二条独立通道，不是只有像素数。② **一次差点开错的单**：同一张帧里列表底部那一整块纯黑圆角矩形，我第一反应是"亮档里选中行画成黑底黑字"，先查重才看见 `UICaptureHarness.materialBlindSpotFixtures` 里 `sidebar-history` 从 R18 就登记着（系统 `List` 的选中高亮是材质，没上过屏的窗口没有可合成背景层 ⇒ #000，亮暗都一样）⇒ 不是新缺陷、不是产品事实，没起新名字。但本轮给那条登记补了一个读数：黑块内**文字列**里亮度 >60 的像素，亮档帧只占 0.06%（字被一起吃掉）、暗档帧占 10.3%（字还在）⇒ 名册那句"亮色暗色都一样"只对"底色是 #000"成立，不对"字看不看得见"成立，这一句要留给下一次读这块盲区的人。③ 本轮产品 0 文件，基线那一侧没有新东西可看；真机眼那一批（347 / 305 / 373① / 368）用户已明确暂时做不了，不排进轮次。
+
+⓪ R326 开场要先读的（成对：run id ↔ commit）：本轮 push 之后那一跑的 id **未取**（合法中间态，由追记那一笔回填）；
+本轮已读的是 R324 那一跑 —— RUN=40053805112 sha=3ccaaf2（conclusion=failure，红因与处置见 U-1073 / U-1074）。要读的：
+   ① **本轮的修法在 runner 上兑现没有**：`testFilterPillSlideIsAProcessNotATeleport` 必须从红变成
+      `MOTION_NOT_RUN=pill-slide-arms-indistinguishable`，而 `testFilterPillRampIsMonotone` 必须变成
+      `MOTION_NOT_RUN=pill-ramp-no-intermediate` —— 若仍红在断言上，先读它红在哪一条，别改判据；
+   ② `MOTION_SCENARIO_AB_SUMMARY` 在 runner 上是不是同一份分类（那台机器本来就在亮档，
+      它是"两臂不同档"这条前提的第二台证人）；读到 `换对象>0` 或 `敏感>0` 就说明本机 12 颗里
+      有一颗在别的机器上会丢对象 ⇒ 那颗必须钉（383 的追记要改写）；
+   ③ §8 里 `MOTION_FLOOR_SUITE_RED` 那一格本轮应当归零；没归零就先读名单。
+
+① R326 的靶：① 384（字墨把洞切成两半，带子只剩上沿 7pt：把墨列并入洞 vs 接受半颗药丸）；
+   ② 386 的派生法③（相对差分类换成"两臂判定词是否相同"）；
+   ③ 376 剩下那一半（那台机器上有没有一条能动的通道 —— 与 `app-not-active` 同一族，先量再判）；
+   ④ 367 迁移 / 360 最后一批 / 361 合并 / 364 六把抽不出的刀；
+   ⑤ 真机眼那一批（347 / 305 / 373① / 368）—— 用户已明确暂时做不了，不排进轮次。
+
+最后更新：2026-10-24（本地 · R325 / 第 324 轮 / Round 322）：**色档依赖逐颗量完（12 颗：同=10 漂=2 敏感=0 换对象=0）+ 接住 runner 上换形的那朵红**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 972 tests, with 47 tests skipped and 0 failures`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=972 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r325_rv`；变异表 `CAUGHT=6/6, RESTORE_CLEAN=yes`；
+探针 `MOTION_SCENARIO_AB_SUMMARY 场景=12 同=10 漂=2 敏感=0 换对象=0（钉档判据：换对象/敏感 ⇒ 该钉；漂 ⇒ 登记不钉；同 ⇒ 有数了才写不依赖）`；脚本电池 `Ran 611（skipped=4）`；针预检 bad=0、名册 arms=809。
+连续零改动那一格只写在上面「验证读数」段里一次（`test_product_streak_cell` 数的是同一格里的候选数）。
+
 ## R324 状态（2026-10-24 · 本地 · 第 323 轮 / Round 321）：一把"找错对象还报结论"的尺修回有对象 —— 三道形状闸 + 胶片场景钉死色档（产品 0 文件，动效主线）
 
 本轮做了什么：① **交 R323 那两朵 runner 红的账**（RUN=40032708615 / sha=28c8510）：
