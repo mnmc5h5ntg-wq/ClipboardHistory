@@ -405,6 +405,7 @@ final class UICaptureTests: XCTestCase {
                       "DailyCopyHeatmapTests.swift", "OffscreenSymbolInkProbeTests.swift",
                       "PerfBudgetTests.swift", "Round4MarkdownTests.swift",
                       "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",
+                      "HtmlPreviewTests.swift",
                       "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
                       "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",
                       "MotionDriverTests.swift", "MotionFilmstripTests.swift",
