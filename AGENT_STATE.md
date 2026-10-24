@@ -41,8 +41,9 @@ run↔commit 的配对留到 R331 第 ⓪ 条现读。
 CI 对平：本轮写盘之前无新 run；R330 要读的那一跑（RUN=40086499268 ↔ d21eceb，R329 账半）
 现读时网络 `EOF` ⇒ 记「未读」，不记「绿」。
 
-⓪ R331 开场要先读的（成对：run id ↔ commit）：**RUN=40086499268 ↔ d21eceb**（结论未读，
-`python3 scripts/ci_read.py latest` 现读 `EOF`）+ 本笔 push 的那一跑（sha 见 `git log` 首行，id 未读）。
+⓪ R331 开场要先读的（成对：run id ↔ commit，三笔现读自 `gh run list --json databaseId,headSha,status,conclusion`）：
+**RUN=40086499268 ↔ d21eceb = completed / success**（R329 账半）；**RUN=40086526381 ↔ c3fdc02 = completed / failure**（R329 追记 —— 那一跑红在 STEP[9] Release script tests，正文现读 `LEDGER_TOKENS books=7 chars=3198474 stray=1` ⇒ 就是 R329 漏下的那个「at 号夹着 RPREVTAG」的占位符（它自己也被这一格抓过一次：正文里照抄那个形状同样会红），本笔 R330 已修掉并落进台账；于是「这一跑为什么红」不用再猜，而「报告里写的读数有没有被机器读过」这件事第一次有了一个 runner 证人）；
+**RUN=40091469060 ↔ 4e9e59a**（本笔 R330 真机账，回填时仍 `in_progress` ⇒ id 已配、结论未读）。这一跑要特别看两件事：① 脚本电池在 runner 上的 `Ran` 与 skip 数 —— 本机现读 `Ran 619（skipped=4）`，而 runner 上一跑是 `Ran 611（skipped=2）`，本轮新增的 8 格是 PIL-gated，若 runner 缺 PIL 就会进 skip 名册 ⇒ 那要按 252 那一族具名，不许读成绿（`test_skip_roster` 会先响）；② `REALSCREEN_*` 这一族不进 CI（它要一块醒着的屏幕），所以那一跑不会有它的读数 —— 没有 ≠ 没跑成，别把它记成回归。
 要读的三件事：① 那一跑的 `MOTION_FLOOR_SUITE_CLEAN` 与两朵 pill 命名出口；
 ② `纵向覆盖` 在 runner（1×）上印出的比值与本机是否同形（那台是 1× ⇒ px 数减半，比值应当不变）；
 ③ 脚本电池在 runner 上是否也 `Ran 619`（本轮新增 8 格 python 判据，
