@@ -363,7 +363,13 @@ enum FilterPillMotion {
     static func hoverFill(isHovered: Bool, isSelected: Bool, dark: Bool) -> Double {
         // 选中的那一段下面就是那颗胶囊，再叠一层悬停底会糊成两块。
         guard isHovered, !isSelected else { return 0 }
-        return HoverInk.opacity(level: VisualFill.controlHover, dark: dark)
+        // R334 / BACKLOG 396：**暗档走胶囊自己那一档**（`VisualFill.pillHover`，比全局的
+        // `controlHover` 轻），因为 393 把选中那颗抬到 70 之后，共用 0.08 画出的 66 与它只差 4 级
+        // —— 悬停把选中复现了一遍。亮档继续走共享换算：它的空闲 230 与选中 220 之间
+        // 只剩 1.099 的距离，放不下"与两边都看得见地不同"的第三档，要修得换一条轴（BACKLOG 399）。
+        // 两档不再同源于一个数，所以理由必须留在调用点上，不许只写在令牌里。
+        return dark ? VisualFill.pillHover
+                    : HoverInk.opacity(level: VisualFill.controlHover, dark: dark)
     }
 }
 

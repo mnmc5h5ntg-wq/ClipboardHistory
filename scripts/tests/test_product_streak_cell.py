@@ -118,7 +118,10 @@ class ProductStreakCellTests(unittest.TestCase):
         rows = [(u"shaA", 299, u"aaa1111", u"2026-10-23", u"R300 代码半"),
                 (u"shaB", 289, u"2f8b1e0", u"2026-10-21", u"R290 代码半"),
                 (u"shaC", 263, u"15c6a56", u"2026-10-21", u"R263 代码半")]
-        self.assertEqual((0, u"last=aaa1111 last_round=299"), ps.streak_at(299, rows))
+        # R334 改口径：分界取**严格小于**本轮的最后一笔产品提交 ⇒ 本轮自己那一笔不算分界。
+        # 于是 shaA（第 299 轮自己）被跳过，答案 298 − 289 = 10（旧口径在这里答 0，
+        # 而"0"要等 commit 落盘才出现 —— 同一格在提交前后答两个数，就是 R334 撞上的那朵持久红）。
+        self.assertEqual((10, u"last=2f8b1e0 last_round=289"), ps.streak_at(299, rows))
         self.assertEqual((9, u"last=2f8b1e0 last_round=289"), ps.streak_at(298, rows))
         # 期望值一律**手算给死**再写进测试（R298 那一课：心算出来的期望会把对的代码判成错的）
         self.assertEqual((8, u"last=2f8b1e0 last_round=289"), ps.streak_at(297, rows))
@@ -127,8 +130,60 @@ class ProductStreakCellTests(unittest.TestCase):
         noisy = [(u"shaD", None, u"ddd0000", u"2026-10-23", u"没有轮次标签的一笔"),
                  (u"shaB", 289, u"2f8b1e0", u"2026-10-21", u"R290 代码半")]
         self.assertEqual(9, ps.streak_at(298, noisy)[0])
-        self.assertEqual((None, u"标签 ≤ 第 300 轮的产品提交一笔都没有（跳过 0 笔标签多义/缺失的）"),
+        self.assertEqual((None, u"标签 < 第 300 轮的产品提交一笔都没有（跳过 0 笔标签多义/缺失的）"),
                          ps.streak_at(300, [(u"shaE", 400, u"eee", u"2026-12-31", u"未来的笔")]))
+
+    def test_the_answer_does_not_depend_on_commit_shape(self):
+        """同一轮在"本轮那一笔落盘之前 / 之后"必须答同一个数（R334 改口径的理由）。
+
+        仓库里两种提交形状并存：代码半 + 账半两笔（R329…），以及整轮一笔（`117f45d`）。
+        旧口径（`≤`）下，两笔形状的轮在写账时本轮那一笔**已在** git ⇒ 答 0；
+        一笔形状的轮写账时本轮那一笔**还没在** ⇒ 答 14。于是 R333 那格在它的 commit 落盘之后
+        被同一颗尺改判成 0 —— 电池里 12 朵红，而那一句账并没有写错。
+        这一格钉的就是"红的原因是口径，不是账"：把本轮自己那一笔拿掉再问，答案不许变。
+        """
+        with_own = [(u"shaA", 331, u"aaa1111", u"2026-10-25", u"第 331 轮 代码半"),
+                    (u"shaB", 318, u"84c5468", u"2026-10-24", u"第 318 轮 代码半")]
+        without_own = with_own[1:]
+        self.assertEqual(ps.streak_at(331, with_own), ps.streak_at(331, without_own),
+                         u"本轮自己那一笔落没落盘改变了答案 ⇒ 口径又依赖提交形状了")
+        self.assertEqual((13, u"last=84c5468 last_round=318"), ps.streak_at(331, with_own))
+        # 而**下一轮**的分界就是本轮 —— 这一半证明 `<` 不是"永远往前看一格"的偏移错误：
+        self.assertEqual((1, u"last=aaa1111 last_round=331"), ps.streak_at(332, with_own))
+
+    def test_the_second_label_source_is_a_derivation_not_a_roster(self):
+        """标签的第二个来源：subject 缺「第 N 轮」时，用台账节标题里同一段 U 区间**派生**。
+
+        为什么不是 sha→轮次的手抄表（D-329）：表只买"不红"，买不到"数对" ——
+        `product_streak` 会跳过没有标签的那一笔、拿更早的提交当分界，于是 `--streak-for 333`
+        在只有豁免的版本里答 **15**，而真值是 **1**（`117f45d` 就是第 332 轮）。
+        四种歧义各给 None（不许猜），且真台账必须真的能命中那一笔。
+        """
+        table = {(1105, 1109): {332}}
+        ok = u"Round 330: 选中那颗站到轨道之上（U-1105…U-1109 · 产品 2 文件，动效主线）"
+        self.assertEqual(332, ps.round_from_uranges(ok, table))
+        self.assertIsNone(ps.round_from_uranges(u"没有 U 区间的 subject", table),
+                          u"区间都没有就不许编一个轮次")
+        self.assertIsNone(ps.round_from_uranges(u"引用 U-100…U-109 与 U-1105…U-1109 两段", table),
+                          u"两段区间 ⇒ 读者不知道哪一段是本轮的，宁可不答")
+        self.assertIsNone(ps.round_from_uranges(ok, {(1105, 1109): {332, 300}}),
+                          u"同一区间命中两节 ⇒ 台账自己重复了，不许挑一节")
+        self.assertIsNone(ps.round_from_uranges(ok, {}), u"台账里没有那一节 ⇒ 引用悬空")
+        # 真台账的证人：`117f45d` 的区间确实唯一命中第 332 轮，且这一笔被标成"补自台账"。
+        real = ps.ledger_round_by_urange()
+        self.assertEqual({332}, real.get((1105, 1109)),
+                         u"真台账里 U-1105…U-1109 应当唯一命中第 332 轮，实得 %s" % (real.get((1105, 1109)),))
+        hit = [r for r in ps.product_commits() if r[2] == u"117f45d"]
+        self.assertEqual(1, len(hit), u"git 里读不到 117f45d ⇒ 这一格没有对象")
+        self.assertEqual(332, hit[0][1], u"第二个来源没把它补成第 332 轮")
+        self.assertTrue(ps.label_came_from_ledger(hit[0][4], hit[0][1]),
+                        u"来源没标出来 ⇒ 派生会变成静默的（derive 必须印 标签补自台账=N）")
+        # 反方向的证人：把第二个来源关掉，同一轮的答案就是那个"看起来像结论的错数"。
+        rows_no_source = [(s, None if sh == u"117f45d" else l, sh, d, su)
+                          for (s, l, sh, d, su) in ps.product_commits()]
+        self.assertEqual(1, ps.streak_at(333, ps.product_commits())[0])
+        self.assertEqual(15, ps.streak_at(333, rows_no_source)[0],
+                         u"没有第二个来源时 333 轮答 15 —— 这一格是 D-329 的证人：豁免不改变数，派生才改变")
 
     def test_subject_label_parser_rejects_ambiguous_and_missing(self):
         # derive() 的两条拒绝路径靠这两种输入成立：无标签 / 多标签都不许变成一个数。

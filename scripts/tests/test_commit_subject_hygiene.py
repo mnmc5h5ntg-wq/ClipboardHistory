@@ -82,6 +82,19 @@ AHEAD_ROSTER = {
     # 同笔已补写 R323 的 identity 行并要求 R324 起必带；这条豁免按 sha 键，扫描窗滑过就必须删（test_roster_must_retire）。
     u"07acf2e": u"R324 代码半先于轮次账（根因：R323 的 STATE 节缺 identity 行，BACKLOG 382）",
 }
+# 在册例外（**第二张**）：已 push、历史改不了的"subject 里根本没有轮次标签"。
+# 为什么不并进 `AHEAD_ROSTER`：那张只给"标签比台账新"这一类（代码半先于轮次账），
+# 混在一张里，"这条豁免只买得到代码半"那句约束就没了 —— 两类违规的**退场条件**也不同：
+# 超前标签在台账落地后自动消失，而无标签的笔只能等扫描窗滑过。
+# R334 现读：117f45d（R333 代码半）照的是 Skill 里那份过期形状 `Round 330: …`，
+# 既没有 `R<NNN>` 也没有「第 N 轮」⇒ `COMMIT_SUBJECT_NO_ROUND` + `product_streak` 同时红。
+# 已 push ⇒ 不许 amend、不许 force-push（那是替别人重写历史）⇒ 只能登记（BACKLOG 398）。
+NO_LABEL_ROSTER = {
+    u"117f45d": u"R333 代码半的 subject 没有轮次标签（照的是 Skill 里过期的 `Round <r>:` 形状）；"
+                u"已 push 不能改历史 ⇒ 登记豁免，BACKLOG 398。"
+                u"退场：扫描窗滑过这笔之后必须删（`product_streak` 那一半由下一笔产品提交自动治好）",
+}
+
 # 名单已清空（R298 台账落地 ⇒ 当前轮就是 R298，那两笔超前标签不再需要豁免）。
 # 这一格要求：名单为空时 `test_recent_subjects_are_clean` 仍必须真扫到提交（它扫的是区间里的每一笔，
 # 不是「名单空 ⇒ 跳过」），否则清空名单就等于把门一起关掉。
@@ -132,6 +145,10 @@ def check(messages, rounds, window=2, ahead_allowed=1):
                                  u"subject 里有 heredoc 残渣「%s」：%s" % (needle, subject[:80])))
         m = re.search(u"R(\\d{2,4})", subject)
         if not m:
+            # 只有**登记过**的 sha 能走这条路（`test_roster_entries_must_be_registered_in_the_ledger`
+            # 要求每条都在 BACKLOG 里查得到，而正对照 `cafe1234` 不在任何名单里、照样红）。
+            if sha in NO_LABEL_ROSTER:
+                continue
             problems.append((sha, u"COMMIT_SUBJECT_NO_ROUND",
                              u"subject 里没有轮次标签 R<NNN>：" + subject[:80]))
             continue
@@ -186,22 +203,32 @@ class CommitSubjectHygiene(unittest.TestCase):
         放宽不许留着不退场（R74：放宽要成对）—— 否则扫描窗口滑过去之后，这一格会变成
         一条永久有效的空白豁免，下一笔超前标签就能借它蒙过去。
         """
-        if not AHEAD_ROSTER:
+        if not AHEAD_ROSTER and not NO_LABEL_ROSTER:
             return
         args = scan_args()
         self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 豁免退场判据没有对象")
         out, rc = git(u"log", u"--format=%h", args[-1])
         self.assertEqual(0, rc, out[-200:])
         in_range = set(out.split()) | {birth_short()}
-        stale = sorted(set(AHEAD_ROSTER) - in_range)
+        stale = sorted((set(AHEAD_ROSTER) | set(NO_LABEL_ROSTER)) - in_range)
         self.assertEqual([], stale,
-                         u"这些 sha 已不在最近 15 笔里，豁免要删掉：" + ", ".join(stale))
+                         u"这些 sha 已不在扫描范围里，豁免要删掉：" + ", ".join(stale))
 
     def test_roster_entries_must_be_registered_in_the_ledger(self):
         """每一条豁免都要在 `AGENT_BACKLOG.md` 里查得到 —— 名单是我自己写的，不能自我批准。"""
         backlog = io.open(os.path.join(ROOT, "AGENT_BACKLOG.md"), encoding="utf-8").read()
         self.assertEqual([], roster_problems(AHEAD_ROSTER, backlog),
                          u"在册豁免没在账里登记：放宽必须留下人类会读的那份痕迹（R74 / D-279）")
+        self.assertEqual([], roster_problems(NO_LABEL_ROSTER, backlog),
+                         u"第二张名单里的豁免没在账里登记 ⇒ 同一件事（R334 现读 117f45d 走的就是这张）")
+        # 每条理由都必须**指得回一个真条目**：只写 sha 不算登记（下一轮没人知道该由谁补账）。
+        for roster in (AHEAD_ROSTER, NO_LABEL_ROSTER):
+            for sha, why in roster.items():
+                cited = re.findall(u"BACKLOG (\\d{2,4})", why)
+                self.assertTrue(cited, u"%s 的豁免理由没引用 BACKLOG 条目：%s" % (sha, why[:60]))
+                for n in cited:
+                    self.assertIn(u"**%s. " % n, backlog,
+                                  u"%s 的豁免引用了 BACKLOG %s，可账上没有这一条" % (sha, n))
         # 正对照：造一条没登记的豁免 ⇒ 必须被点名（名单为空时这一格仍然有牙）
         forged = {u"deadbeef": u"伪造的豁免"}
         found = roster_problems(forged, backlog)

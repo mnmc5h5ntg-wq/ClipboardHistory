@@ -6768,13 +6768,59 @@ final class UICaptureTests: XCTestCase {
             let pillHover = modal("glass-pill-hover", appearance, rectPt: circleColumn, framePtWidth: 120)
             let pillRatio = Self.contrastRatio(pillIdle.grey, pillHover.grey)
 
+            // R334 / BACKLOG 396：**悬停那一档与选中那一档之间也必须"看得见地不同"**。
+            // 这一对以前没人量：这条判据只管"空闲↔悬停看得见"（下面那条 `minimum` 地板），
+            // 而 393 把选中那颗抬到轨道之上之后，"鼠标停在另一段上"与"这一段被选中"落到了几乎同一档。
+            // **地板不是我拍的**：用的就是同一格里已有的那条可见性线（暗 1.10 / 亮 1.20，
+            // R220 骨架条带与 R225 浮层悬停同一族），只是把它第一次对准了"悬停↔选中"这一对（D-321）。
+            // 落地之前它是红的：现读暗档 contrast(66,70)=1.065、亮档 contrast(207,220)=1.136。
+            //
+            // 但**门只立在暗档**（与 D-325 同一条规矩，理由是算术不是口味）：亮档的空闲 230 与
+            // 选中 220 之间只有 1.099，"与两边都过线"的可行集只剩"比按下那一档还深"与"接近纯白"
+            // 两支，前者撞 R14 拦过的 `hover→pressed` 地板、后者要换刷子（= 换轴）。
+            // 所以亮档继续**只印不判**，欠的那一事开成 BACKLOG 399（两支候选与各自的代价都在里面）。
+            let selVsHover = Self.contrastRatio(segHovR.grey, segIdleL.grey)
+            let selVsIdle = Self.contrastRatio(segIdleR.grey, segIdleL.grey)
+
             emit("HOVER_DIRECT_READ_PROOF \(tag) "
                  + "段按钮 空闲底=\(segIdleR.grey) 悬停=\(segHovR.grey) 比值=\(String(format: "%.3f", segRatio)) "
                  + "像素=\(segHovR.pixels) 选中段 空闲=\(segIdleL.grey) 悬停=\(segHovL.grey) "
+                 + "| 悬停↔选中=\(String(format: "%.3f", selVsHover)) "
+                 + "选中↔空闲=\(String(format: "%.3f", selVsIdle)) "
+                 + (appearance == .darkAqua ? "（门）" : "（只印不判：同向且更弱的可行集是空集，见 399）")
                  + "| 玻璃圆 空闲底=\(pillIdle.grey) 悬停=\(pillHover.grey) "
                  + "比值=\(String(format: "%.3f", pillRatio)) 像素=\(pillHover.pixels) 下界=\(minimum)")
 
-            // R246 / BACKLOG 277：这里原来是 `hover.pixels > 400`（众数绝对颗数）。
+            // 算术证人（R334 / 399）：可行集**按档**算一遍，用实测的那两个数当边界。
+            let choices = Self.hoverRungChoices(idle: segIdleR.grey, selected: segIdleL.grey, floor: minimum)
+            let window = choices.isEmpty ? "空集" : "\(choices.first!)…\(choices.last!)灰阶"
+            emit("HOVER_RUNG_WINDOW \(tag) 空闲=\(segIdleR.grey) 选中=\(segIdleL.grey) 线=\(minimum)"
+                 + " 可行=\(window) 产品画在=\(segHovR.grey)"
+                 + " 判定=" + (choices.contains(segHovR.grey) ? "在窗口内"
+                    : (choices.isEmpty ? "可行集空（该换轴，399）" : "越界（该修产品）")))
+            if appearance == .darkAqua {
+                // 暗档：可行集非空，而且产品画的那一档必须在里面 —— 这条断言拦的是
+                // "把灰阶挪出窗口却仍然过门"（门只量悬停↔选中，窗口量的是两边一起）。
+                XCTAssertFalse(choices.isEmpty, "\(tag)：这一档的可行集空了 ⇒ 门没有对象")
+                XCTAssertTrue(choices.contains(segHovR.grey),
+                    "\(tag)：可行集是 \(window)，而产品把悬停画在 \(segHovR.grey) ⇒ 落在窗口外面")
+            }
+            // 亮档**不**按这条门断言（只印）。理由是一条可算的秩序，不是口味：
+            // "悬停与选中同向且比选中弱"这条约束下，亮档的可行集是**空集** ——
+            // 空闲 230 与选中 220 之间只有 1.099，放不下两个都要 ≥1.20 的台阶（`hoverRungChoices`
+            // 那一格把它算成断言）。要保住"看得见"就得让悬停**越过**选中（比选中还浓），
+            // 而那会把"按下比悬停重"的梯子压平（亮档 pressed 换算到同一片底上就是 201 灰阶）
+            // —— 正是 R14 当年拦下 0.10 的那个形状。所以亮档欠的是**换一条轴**，开成 BACKLOG 399。
+            if appearance == .darkAqua {
+                XCTAssertGreaterThanOrEqual(selVsHover, minimum,
+                    "\(tag)：胶囊上『未选中但被悬停』那一档（\(segHovR.grey)）与『选中』那一档"
+                    + "（\(segIdleL.grey)）的对比只有 \(String(format: "%.3f", selVsHover))，"
+                    + "低于仓库自己那条可见性线 \(minimum) ⇒ 鼠标一停，两颗看起来都被选中了"
+                    + "（BACKLOG 396）。空闲档=\(segIdleR.grey)：悬停必须落在与两边都过线的那一段里，"
+                    + "或者换成亮度之外的另一条轴")
+            }
+
+                // R246 / BACKLOG 277：这里原来是 `hover.pixels > 400`（众数绝对颗数）。
             // 换成一件事的两半：① 同一帧自己 ↔ 自己必须 0 颗（尺还灵不灵）；② 分母地板（空对账，R140）。
             // 变化颗数与占比**先只印不判**：本机的地板要等这一跑读出来，而 runner 的地板按 D-227 不许拿本机数顶。
             for (site, idleName, hoverName, rect, ptW, idle, hover, ratio) in [
@@ -6817,6 +6863,39 @@ final class UICaptureTests: XCTestCase {
                               + "上面那两条断言因此都不成立（先查坐标，再查产品）")
         }
     }
+
+    /// `hoverRungChoices` 的真值表（R334）：那条『只立暗档』的门背后的算术，必须是一格能红的判据，
+    /// 不是一段注释。三件事各拦一种坏法：
+    /// ① 暗档的窗口非空且**边界就是 WCAG 算出来的那五个灰阶**（改公式或改线都会红）；
+    /// ② 亮档在"与选中同向且比选中弱"这条秩序下可行集**是空集**（空闲↔选中只有 1.099）——
+    ///    而"越过选中去保可见"会把 `hover→pressed` 压平，所以它欠的是换轴，不是换数（BACKLOG 399）；
+    /// ③ 线越松、窗口越大（单调），线拉到 21 就必须什么都不许可行 —— 拦『把地板调成恒真』。
+    func testHoverRungChoicesIsTheArithmeticBehindTheDarkOnlyGate() {
+        let dark = Self.hoverRungChoices(idle: 52, selected: 70, floor: 1.10)
+        XCTAssertEqual(Array(59...63), dark,
+            "暗档的可行窗口必须由对比公式算出来；边界漂了就是线或公式漂了（产品实测画在 60）")
+        XCTAssertTrue(dark.contains(60), "正对照：产品现在那一档要在窗口里，否则上面那条门是空门")
+        let light = Self.hoverRungChoices(idle: 230, selected: 220, floor: 1.20)
+        XCTAssertTrue(light.isEmpty,
+            "亮档在『与选中同向且比选中弱』这条秩序下必须算成空集（空闲 230 与选中 220 之间只剩 1.099）"
+            + " —— 这一句就是『门为什么只立暗档』的算术，不许退回一句注释")
+        // 把秩序撤掉（允许悬停越过选中）之后解就出现了，而它正是 R14 拦过的那种修法：
+        // 比按下那一档（同一片底上换算到 201 灰阶）还浓 ⇒ `hover→pressed` 台阶被压平。
+        let withoutOrder = (0...255).filter {
+            Self.contrastRatio(230, $0) >= 1.20 && Self.contrastRatio($0, 220) >= 1.20
+        }
+        XCTAssertFalse(withoutOrder.isEmpty,
+            "撤掉秩序之后亮档必须有解 —— 否则上面那句『空集』是解析写错了，不是几何没有位置")
+        XCTAssertTrue(withoutOrder.allSatisfy { $0 <= 201 || $0 >= 245 },
+            "亮档越序的解要么比按下还深（撞 `hover→pressed` 的 4/255 地板）、要么亮到接近纸（≥245，"
+            + "`Color.primary` 在亮档是黑的，画不出来 = 要换刷子/换轴）")
+        let loose = Self.hoverRungChoices(idle: 52, selected: 70, floor: 1.05)
+        XCTAssertGreaterThanOrEqual(loose.count, dark.count,
+            "线放松 ⇒ 窗口只许变大；反过来就是解析写错了")
+        XCTAssertTrue(Self.hoverRungChoices(idle: 52, selected: 70, floor: 21.0).isEmpty,
+            "线拉到最大对比 21 ⇒ 什么都不许可行（恒真的反面，拦『地板被调成没门』）")
+    }
+
 
     /// **设置侧栏那一行的悬停层：底来自同一坐标的空闲帧，不来自令牌**（R231 / BACKLOG 258）。
     ///
@@ -8548,6 +8627,24 @@ final class UICaptureTests: XCTestCase {
         let inkLuma = ink.map { $0.1 }.reduce(0, +) / ink.count
         let coverage = Double(luma.filter { abs($0 - background) > 16 }.count) / Double(luma.count)
         return (Self.contrastRatio(inkLuma, background), coverage)
+    }
+
+    /// 纯函数：一条亮度通道上，能同时与"空闲"和"选中"两边都保持 ≥ `floor` 对比的**全部灰阶**。
+    ///
+    /// 为什么要它（R334 / BACKLOG 399）：上面那条门只立暗档，而"亮档无解"如果只是一句注释，
+    /// 它就与"我不想修"同形 —— D-321 说的是同一件事：豁免必须能被红推翻。
+    /// 这一格把那句话换成算术：把 0…255 每一档都试一遍，可行集**空不空**是一个读数。
+    /// 空 ⇒ 这一家在这个色档上必须换一条轴（提亮、描边、字重），把灰阶挪来挪去是修不好的；
+    /// 非空 ⇒ 产品画的那一档必须落在里面（调用点拿实测值来对，不许抄这里的数）。
+    static func hoverRungChoices(idle: Int, selected: Int, floor: Double) -> [Int] {
+        // 悬停必须与选中**同向、且比它弱**：它是"往选中的方向先走一步"，不是另一种身份。
+        // 少了这条秩序，可行集会一大把地把"比选中还浓"与"接近纯白"都算成合法答案 ——
+        // 那不是可行域，那是没有约束。
+        let lo = min(idle, selected), hi = max(idle, selected)
+        guard lo != hi else { return [] }
+        return ((lo + 1)...(hi - 1)).filter {
+            contrastRatio(idle, $0) >= floor && contrastRatio($0, selected) >= floor
+        }
     }
 
     /// WCAG 2.x 的亮度比（1…21）。同色=1，纯黑/纯白=21。

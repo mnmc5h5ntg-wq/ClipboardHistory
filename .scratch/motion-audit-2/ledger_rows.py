@@ -43,7 +43,16 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* |^HOVER_[A-Z_]+ ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   # R334：`HOVER_` 整族第一次进搬运名单。这一族的七行（`HOVER_DIRECT_READ_PROOF` 两档、
+                   # `HOVER_RUNG_WINDOW` 两档 —— 本轮新装的"可行窗口"尺：暗档 59…63 / 亮档空集、
+                   # `HOVER_PILL_PROOF` / `HOVER_LADDER_PROBE` / `HOVER_MODE_CHIP_PROOF` /
+                   # `HOVER_SETTINGS_ROW_PROOF` / `HOVER_TWO_STATE_*`）从 R230 起就在打，
+                   # 却**从来没有一行进过 §8**（`git log -S HOVER_PILL_PROOF` 现读：这一族诞生于 `a7e3154`
+                   # = Round 229 / R230 那一轮，而白名单到今天都没有 `HOVER_` 这一支）
+                   # —— 那是 R107 那一族的另一向：不是名单里有名字而日志不打，
+                   # 是日志在打而名单里没有它（登记进 BACKLOG 397 的追记，因为它与 397 同一颗病：名单与现场不对账）。
+                   # 按整族前缀补，理由与 R323 把 `MOTION_PILL_RAMP*` 换成整族同一颗：下一轮再加一行不必再来补名单。
                    # R324：缺席点名那一行 `MOTION_SCENARIO_APPEAR 工厂=13 钉了=1 没钉=12 名单…` ——
                    # 它不是一句散文，是本轮登记 BACKLOG 379 的那颗数，所以必须在搬运名单里
                    # （R107 / U-339 同一课：新读数族接进它被打印的那一步）。

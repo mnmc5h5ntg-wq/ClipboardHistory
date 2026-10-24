@@ -609,6 +609,14 @@ final class PressFeedbackTests: XCTestCase {
             Ladder(name: "control", size: NSSize(width: 22, height: 22),
                    steps: [("idle", 0), ("controlHover", VisualFill.controlHover),
                            ("pressed", VisualFill.pressed)]),
+            // R334 / BACKLOG 396：胶囊（「全部 / 收藏」）那一族**自己的**梯子。它的悬停档与
+            // `controlHover` 不再是同一个数（暗档 0.045 对 0.08），因为它右边多了一个邻居：
+            // 393 抬起来的那颗选中（暗档实测 70 灰阶）。左右两个邻居的台阶都由这条量：
+            // `idle→pillHover` 问"悬停还看得见吗"，`pillHover→pressed` 问"按得下去这一步被压平了吗"
+            // —— 后者正是 R14 当年拦下 0.10 的那一格。
+            Ladder(name: "pill", size: NSSize(width: 22, height: 22),
+                   steps: [("idle", 0), ("pillHover", VisualFill.pillHover),
+                           ("pressed", VisualFill.pressed)]),
             Ladder(name: "field", size: NSSize(width: 280, height: 28),
                    steps: [("fieldIdle", VisualFill.fieldIdle),
                            ("fieldActive", VisualFill.fieldActive)])

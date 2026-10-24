@@ -34,7 +34,10 @@ ARMS = [
      "        guard level > 0 else { return 0 }\n",
      ""),
     ('M773', u'段按钮那一层回到两档共用一个数（亮档不抬）', SIDEBAR,
-     "        return HoverInk.opacity(level: VisualFill.controlHover, dark: dark)",
+     # R334 重钉：胶囊那一层从"共用 controlHover + 抬量"改成"暗档走 pillHover、亮档仍走共享换算"，
+     # 旧 needle 在盘上命中 0 次（预检当场报 bad=1）。刀的意思没变：让两档回到同一个数。
+     ("        return dark ? VisualFill.pillHover\n"
+      "                    : HoverInk.opacity(level: VisualFill.controlHover, dark: dark)"),
      "        return VisualFill.controlHover"),
     ('M774', u'玻璃圆的档位改成 0（接错了：令牌对、屏幕上没有这一层）', GLASS,
      "        .pressedStyle(in: Circle(), hoverLevel: VisualFill.controlHover)",

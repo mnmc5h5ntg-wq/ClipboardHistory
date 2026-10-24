@@ -40,11 +40,19 @@ final class FilterPillMotionTests: XCTestCase {
     /// 屏幕上的那一半不在这里证 —— 见 `UICaptureHarness` 的 `segmented-filter-hover` 帧判据。
     func testHoverKeepsANonMotionSubstituteWhenReducingMotion() {
         XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: true),
-                       VisualFill.controlHover,
-                       "暗档 = 令牌原值：这一轮没有动暗档的任何一个数（R229 同一条规矩）")
+                       VisualFill.pillHover,
+                       "R334 / BACKLOG 396：暗档改走胶囊自己那一档 —— 继续共用 `controlHover` 画出来的"
+                       + "悬停档（实测灰阶 66）与选中那颗（70）只差 4 级，鼠标一停两颗看起来都被选中")
         XCTAssertEqual(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: false),
                        VisualFill.controlHover + VisualFillLift.hover,
-                       "亮档 = 令牌 + 抬量：这一层以前两档共用一个数（R230 / BACKLOG 251）")
+                       "亮档 = 令牌 + 抬量（R230 / BACKLOG 251 那一族，这一发**没动**）："
+                       + "亮档空闲 230 与选中 220 之间只剩 1.099，放不下第三条能过线的档 ⇒ 要修得换轴，"
+                       + "记在 BACKLOG 399")
+        XCTAssertLessThan(VisualFill.pillHover, VisualFill.controlHover,
+                          "pillHover 必须比全局那一档轻 —— 它存在的全部理由就是『离选中那颗远一点』；"
+                          + "写成 ≥ 就是把 396 又请回来了")
+        XCTAssertGreaterThan(VisualFill.pressed, VisualFill.pillHover,
+                             "按下必须比悬停重：梯子的次序（R14 / R256 同一条），换档不许把它倒过来")
         XCTAssertGreaterThan(FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: false),
                              FilterPillMotion.hoverFill(isHovered: true, isSelected: false, dark: true),
                              "亮档必须比暗档重：primary 在亮档是 85% 黑、暗档是 85% 白，同一 alpha 下亮档天然更淡")
