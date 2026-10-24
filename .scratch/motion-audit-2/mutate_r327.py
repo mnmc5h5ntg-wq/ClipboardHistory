@@ -45,8 +45,10 @@ NEEDLE_950 = u"Double(Swift.max(1, r.extent.count))"
 REPL_950 = u"Double(Swift.max(1, r.holeA.count))"
 
 # ③ 报告里不印那一格。
-NEEDLE_951 = (u"                + \" 洞宽=\" + (g.hole < 0 ? \"无\" : String(format: \"%.0f%%\", g.hole * 100.0)))\n")
-REPL_951 = u"                )\n"
+# R328 重钉：R328 把 parts.append(...) 改成了 `var line = ...` 的分段拼接，旧 needle（结尾带 `))`）
+# 当场腐烂 —— 针预检 bad=1 抓到的就是这一根。**改代码的那一轮要连带重钉旧刀，不许放宽查重。**
+NEEDLE_951 = (u"                + \" 洞宽=\" + (g.hole < 0 ? \"无\" : String(format: \"%.0f%%\", g.hole * 100.0))\n")
+REPL_951 = u"\n"
 
 ARMS = [
     ("M949", u"尺：洞宽那一格恒读不出 ⇒ 证人必须红", FILM,

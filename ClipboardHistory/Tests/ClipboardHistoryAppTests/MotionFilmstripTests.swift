@@ -5450,9 +5450,21 @@ final class MotionFilmstripTests: XCTestCase {
             // "过了形状闸但高度不够"也必须是读数：否则报告只会说"候选段=无"，
             // 而真相是"候选找到了、被 minRows 掉了" —— 这两种坏的修法相反。
             let label = (g.gate == "过" && g.to - g.from < minRows) ? "过但太短" : g.gate
-            parts.append("y" + String(g.from) + ".." + String(g.to) + "px 高"
+            var line = "y" + String(g.from) + ".." + String(g.to) + "px 高"
                 + String(g.to - g.from) + "px 判=" + label
-                + " 洞宽=" + (g.hole < 0 ? "无" : String(format: "%.0f%%", g.hole * 100.0)))
+                + " 洞宽=" + (g.hole < 0 ? "无" : String(format: "%.0f%%", g.hole * 100.0))
+            // R328 / BACKLOG 388：**被拒**的那一段要带逐列转储。
+            // 为什么只给被拒的：通过段没有待答的问题，给它的转储只会把这一行变长；
+            // 而被拒段的那句"洞太窄"在 R327 之前分不出"地板高了"与"对象没框全"，
+            // 加了洞宽之后又分不出"那里有几档" —— 384 连着两轮改定义都卡在这个不知道上。
+            if g.gate != "过" {
+                let row = Swift.max(0, Swift.min(height - 1, (g.from + g.to) / 2))
+                let profile = (0..<xRange.count)
+                    .map { lumaAt(pixelsA, bytesPerRow, xRange.lowerBound + $0, row) }
+                let margin = Self.median(Array(profile.prefix(Swift.max(1, marginWindow))))
+                line += " 分档=" + Self.levelHistogram(profile: profile, margin: margin, delta: delta)
+            }
+            parts.append(line)
         }
         var taken = "无"
         var band: Range<Int>?
@@ -5482,6 +5494,26 @@ final class MotionFilmstripTests: XCTestCase {
         }
         guard first >= 0, last - first >= minTrackPixels else { return nil }
         return first..<(last + 1)
+    }
+
+    /// 纯函数：把一行的逐列电平按**尺自己那两个数**（`margin` 与 `delta`）分箱，给"第几箱×列数"的清单。
+    ///
+    /// 为什么要它（R328 / BACKLOG 388）：384 连着两轮改"洞的定义"而读数不变，缺的不是阈值是**对象**——
+    /// 那一行里到底住着几级电平，之前只有我拿 /tmp 的临时尺看过一次，而那次没留档。
+    /// 为什么分箱用 `delta` 而不是另挑一个量化宽度：自己挑的宽度会把答案变成假设 ——
+    /// 第一版我按 8 级一档做 run-length，结果 36 与 40 落进同一箱，而洞/轨道的分界正好是 38，
+    /// 于是那格转储把它声称要回答的那一问抹平了（这是"形容词不是读数"的仪器版）。
+    /// 用 `floor((v − margin) / delta)` 之后：**第 0 箱就是判据认的洞**、第 2 箱上下是轨道、
+    /// 更高的箱是字墨，而这一格不引入任何新常数。形状：`-1×22,0×236,2×119,21×8`（按箱号升序）。
+    /// 空剖面或 delta≤0 给"无"，不许给空串（空串在报告里读起来像被截断）。
+    static func levelHistogram(profile: [Double], margin: Double, delta: Double) -> String {
+        guard delta > 0, !profile.isEmpty else { return "无" }
+        var bins: [Int: Int] = [:]
+        for value in profile {
+            bins[Int(((value - margin) / delta).rounded(.down)), default: 0] += 1
+        }
+        return bins.keys.sorted().map { String($0) + "×" + String(bins[$0] ?? 0) }
+            .joined(separator: ",")
     }
 
     /// 纯函数：轨道范围内**与页底同档**的最长连续段 = 药丸；连两级亮度一起交出来当前提读数。

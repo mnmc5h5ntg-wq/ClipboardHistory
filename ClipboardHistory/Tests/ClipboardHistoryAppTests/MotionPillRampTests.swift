@@ -162,6 +162,77 @@ final class MotionPillRampTests: XCTestCase {
                       "洞太窄 那一格的数必须落在地板(25%)以下，否则这一格没在读它声称的那个量：" + got.report)
     }
 
+    /// 被拒的那一段除了"差多少"，还要能说出"那里有几档"（R328 / BACKLOG 388）。
+    ///
+    /// 为什么单独钉这一格：384 连着两轮改"洞的定义"而读数不变，缺的不是阈值是**对象**——
+    /// 那一行里到底住着几级电平，之前只有我拿 /tmp 的临时尺看过一次，而那次没留档（D-314 的教训）。
+    /// 现在分档由仓库尺自己打印，所以证人必须能被打红：删掉那一格、或把它做成只有一档，都要红。
+    func testRejectedSegmentCarriesItsColumnLevelDump() {
+        let width = 44, height = 8
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
+        b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        let got = band(a, b, width: width, height: height)
+        // 报告的形状是 `行=N … 判定分布=… 候选段=<段> | <段> | …`：判定分布那一格里也写着"洞太窄×2"，
+        // 所以必须找带 `判=` 的那一段，不能拿整条报告去找第一个词（本轮第一次就踩了这个）。
+        guard let line = got.report.split(separator: "|").first(where: { $0.contains("判=洞太窄") }) else {
+            XCTFail("夹具没造出被拒段，证人没有对象：" + got.report); return
+        }
+        XCTAssertTrue(line.range(of: "分档=-?[0-9]+×[0-9]+", options: .regularExpression) != nil,
+                      "被拒段没带分档那一格 ⇒ 388 问的'那里有几档'仍然只能靠临时尺：" + String(line))
+        let dump = String(line.split(separator: " ").first(where: { $0.hasPrefix("分档=") }) ?? "")
+        let pairs = dump.replacingOccurrences(of: "分档=", with: "").split(separator: ",")
+            .compactMap { part -> (bin: Int, count: Int)? in
+                let bits = part.split(separator: "×")
+                guard bits.count == 2, let b = Int(bits[0]), let c = Int(bits[1]) else { return nil }
+                return (b, c)
+            }
+        XCTAssertEqual(pairs.count, dump.replacingOccurrences(of: "分档=", with: "")
+            .split(separator: ",").count, "分档清单里有一项解析不出来（形状漂了）：" + dump)
+        XCTAssertEqual(pairs.reduce(0) { $0 + $1.count }, width,
+            "各箱列数之和必须等于剖面长度（少了就是丢列，多了就是造列）：" + dump)
+        XCTAssertGreaterThanOrEqual(Set(pairs.map { $0.bin }).count, 3,
+            "分档少于一颗胶囊该有的三档（洞 / 轨道 / 字墨），它没在读对象：" + dump)
+        XCTAssertNotNil(pairs.first(where: { $0.bin == 0 }),
+            "第 0 箱就是判据认的洞；它不在清单里 ⇒ 这一格与那颗闸读的不是同一件事：" + dump)
+        XCTAssertNotNil(pairs.first(where: { $0.bin >= 8 }),
+            "读不到远高于轨道的那一级（夹具画了 200 级 = 第 21 箱）⇒ 字墨没进分档：" + dump)
+    }
+
+    /// 分档只挂在**被拒**的那一段上（R328）。这一格是上一格的负半：
+    /// 如果每一段都带分档，那"带分档"这件事就不携带任何信息，也白让报告每轮长一截。
+    func testAcceptedSegmentDoesNotCarryADump() {
+        let pill = pillFrames()
+        let got = band(pill.a, pill.b, width: 40, height: 6)
+        XCTAssertNotNil(got.band, "夹具本身坏了：这颗胶囊应当能过闸，过不了下面那句就是空话：" + got.report)
+        XCTAssertFalse(got.report.contains("分档="),
+            "通过段也带分档 ⇒ 这一格不再区分'有待答问题的那一段'：" + got.report)
+    }
+
+    /// 纯函数真值表：分箱的宽度**就是尺自己的 delta**，所以第 0 箱必须与"洞"的定义重合。
+    ///
+    /// 为什么不写"随便挑一个量化宽度都行"：第一版我按 8 级一档做 run-length，36 与 40 落进同一箱，
+    /// 而洞/轨道的分界正好是 38 ⇒ 那格转储把它声称要回答的那一问抹平了。这一格钉的就是这件事。
+    func testLevelHistogramBinsByTheRulersOwnDelta() {
+        let profile = [30.0, 36.0, 52.0, 204.0, 52.0, 36.0, 30.0]
+        XCTAssertEqual("0×4,2×2,21×1",
+                       MotionFilmstripTests.levelHistogram(profile: profile, margin: 30, delta: 8),
+                       "分箱结果与'第 0 箱=洞、第 2 箱=轨道、第 21 箱=字墨'的读法不符（页底 30 与洞 36 同箱是**对的**，"
+                       + "因为判据认的洞就是'与页底同档'那一级）")
+        let text = MotionFilmstripTests.levelHistogram(profile: profile, margin: 30, delta: 8)
+        let counts = text.split(separator: ",").compactMap { Int($0.split(separator: "×")[1]) }
+        XCTAssertEqual(counts.reduce(0, +), profile.count, "各箱列数之和不等于剖面长度：" + text)
+        XCTAssertEqual("无", MotionFilmstripTests.levelHistogram(profile: [], margin: 30, delta: 8),
+                       "空剖面必须明写'无'，不许给空串（空串在报告里读起来像被截断）")
+        XCTAssertEqual("无", MotionFilmstripTests.levelHistogram(profile: profile, margin: 30, delta: 0),
+                       "delta=0 会让分箱除零 ⇒ 走同一句'无'，不许崩也不许输出 0×7")
+    }
+
     // MARK: - ④ 行带定位：洞要**会走**，还要**长得像那颗胶囊**
 
     /// 三道结构闸 + 三道形状闸的参数表（与判据侧 `measuredMovingHoleBand` 同一组数）。
