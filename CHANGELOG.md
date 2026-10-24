@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 悬停不再冒充选中：胶囊有了自己那一档，而『门只立暗档』是被算出来的（R334 / U-1110…U-1117 · 产品 2 文件，动效主线）
+
+- 产品：新增 `VisualFill.pillHover = 0.045`；`FilterPillMotion.hoverFill` 暗档分支改走它
+  （亮档继续 `controlHover + VisualFillLift.hover`）。393 把选中抬到 70 之后，共用 0.08 画出的
+  悬停（66）与它只差 4 级 ⇒ 鼠标一停，两颗看起来都被选中（BACKLOG 396）。
+- 现读（同一运行、同一颗尺）：暗档 空闲 52／悬停 66→**60**／选中 70／『悬停↔选中』1.065→**1.169**（线 1.10）；
+  可行窗口 `59…63灰阶`，产品画在 60 ⇒ 判定=在窗口内。亮档 230／207／220 未动，可行集（含秩序）= 空集 ⇒ 开 399。
+- 判据：新门用**已有**的可见性线（暗 1.10 / 亮 1.20）第一次对准"悬停↔选中"（改前红 ⇒ D-321 兑现）；
+  新纯函数 `hoverRungChoices` + 真值表一格（窗口边界、秩序撤掉之后的两支解、地板单调、线=21 必空）；
+  `HOVER_RUNG_WINDOW` 新族已接进 `ledger_rows.py` 的白名单并 `--must-include` 声明（缺=0）。
+- 收口的第二版（判据面）：登记式豁免只买"不红"、买不到"数对" —— `product_streak.py` 在 subject 缺
+  「第 N 轮」时会跳过那一笔、拿更早的提交当分界（关掉第二个来源的探针现读本轮那一格 = 15，开着 = 1）。
+  本轮加两件事：① 标签的**第二个来源**（subject 的 U 区间 ↔ 台账节标题的 U 区间，唯一命中才算，
+  歧义一律 None），现读 8 笔补上且 `标签补自台账=N(名单)` 原样印出（不静默）；
+  ② 分界从 `≤` 换成 `<` ⇒ 同一格不再在 commit 前后答两个数（U-1116 / U-1117 / D-329）。
+- 梯子守卫红了一次并补上：`pill` 一族 `idle→pillHover 9.33/8.39`、`pillHover→pressed 14.92/13.06`（地板 4/255）。
+- 工具（§8 名单的**反方向**）：`ledger_rows.py` 的 `READINGS` 从来没有 `HOVER_` 这一支 ⇒ 悬停那一族
+  （现读 7 个名字 / 本跑 18 行）从 R230 的 `a7e3154` 起一行都没进过 §8，本轮按整族前缀补上（397 追记 / U-1115）。
+- R333 的 subject 持久红收口：新增第二张登记式豁免 `NO_LABEL_ROSTER`（理由必须引用真 BACKLOG 条目、
+  出窗必删）+ 398 登记 + D-328；Skill 里那条消息形状已改成守卫认的那一份。
+- 变异：`mutate_r334 3/3（M970, M971, M972）；mutate_r230 4/4（M771, M772, M773, M774）；mutate_r333 5/5（M965, M966, M967, M968, M969）`；`mutate_r230` 的 M773 被本轮改动弄腐烂 ⇒ 重钉重跑（预检 bad=0）。
+- 验证：`ROUND_VERIFY build_warnings=0 swift_executed=991 swift_skipped=47 swift_failures=0 frames=178 baseline_compared=178 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 目录=/tmp/r334_rv`；判据卷 梯子 `Executed 14`／捕获 `Executed 96（skipped=4）`；
+  胶片重基之后仍有对象 `候选行=24 轨道=52.0 药丸=70.0 分离=18.0 镜像=是 纵向覆盖=14/48px=29%`；
+  针预检 tables=122 covered=105 bad=0、名册 files=216 arms=839 dupes=0；
+  清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；脚本电池 `Ran 624（skipped=4）`。
+
 ### 选中那颗站到轨道之上（393 的①），而离屏尺的定义重基：药丸档由两臂镜像量出来（R333 / U-1105…U-1109 · 产品 2 文件，动效主线）
 
 - 产品：`VisualMaterial.sliderPill: Material = .ultraThickMaterial` →
