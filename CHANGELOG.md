@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 384 的修法①（把字墨并回洞）被现读证伪并撤回；带子定位的报告补上"洞宽=NN%"（R327 / U-1082…U-1085 · 产品 0 文件，动效主线）
+
+- 试过两版轨道档估计（非页底列众数 / 两帧同列且离页底最近），被拒段洞宽两次都是 21%
+  （通过段 49%）⇒ 字墨不是把洞切开的主因；第二版还把取用带子从 14px 弄成"无"
+  ⇒ **改动全部撤回**，384 继续开着，成因假设收窄成 U-1084。
+- 留下的一格：`MOTION_PILL_RAMP_GEOM … 候选段=y…px 高22px 判=洞太窄 洞宽=21% | … 判=过 洞宽=49%`
+  —— 被拒的段现在带"差多少"，两种修法（降地板 / 修对象）分得开了。
+- 证人 `testRejectedSegmentCarriesItsHoleWidth`（含"分母不许是洞自己"那条恒真防句）；
+  判据卷 28 格全绿（本轮新增 1 格：被拒段必须带洞宽，且分母不许是洞自己）；本轮变异表 CAUGHT=3/3, RESTORE_CLEAN=yes（M949…M951）。
+- ⓪ 交账：R326 那一跑在 runner 上读到 MOTION_SCENARIO_AB_SUMMARY 场景=12 同=5 漂=6 敏感=1 换对象=0 粒度不可比=0（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）、MOTION_SCENARIO_AB_MAGNITUDE 有变化=11 亮臂更大=11 暗臂更大=0 比值暗除亮=0.72…0.99（全在同一侧 ⇒ 墨量这颗尺带一个色档级系统偏移，5%/25% 在它身上没有出处：BACKLOG 387）、`粒度不可比=0`，
+  两朵 pill 命名出口仍在（`ASSERTION_RED` 0 行）⇒ 387 的"阈值没有出处"被第二台机器加强。
+
 ### 色档 A/B 的分类器从"峰值"换成三颗通道无关的量：R325 那份「12 颗都不必钉」的结论被公开更正，runner 的 敏感=2 有了成因（R326 / U-1076…U-1081 · 产品 0 文件，动效主线）
 
 - 新增 `endpointChangedFraction` / `everChangedFraction` / `endpointInkDifference` 三颗通道无关的尺，
