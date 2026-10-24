@@ -233,6 +233,64 @@ final class MotionPillRampTests: XCTestCase {
                        "delta=0 会让分箱除零 ⇒ 走同一句'无'，不许崩也不许输出 0×7")
     }
 
+    /// 纯函数真值表：取用带占"这条纵向跨度"的几成（R329 / BACKLOG 388 剩下那半格的出处）。
+    ///
+    /// 钉的是一句会被读错的话：报告里 `取用=y102..116px` 看着像"胶囊那一行"，
+    /// 而 R328 的分档证明那颗胶囊纵向跨三段（过 / 洞太窄 / 过），取用带只是最上面一段。
+    /// 没有这一格，"盖住了几成"要读者自己去加三段 —— 而它决定下一轮修什么。
+    func testVerticalCoverageSumsOnlyAdjacentGroups() {
+        let groups: [(gate: String, from: Int, to: Int, hole: Double)] = [
+            ("过", 0, 3, 0.49), ("洞太窄", 3, 6, 0.21), ("过", 6, 9, 0.49),
+            ("过", 20, 25, 0.49),      // 不相邻：不许被合进来
+        ]
+        XCTAssertEqual("纵向覆盖=3/9px=33%",
+                       MotionFilmstripTests.verticalCoverage(groups: groups, taken: 0..<3),
+                       "相邻三段合计 9px、取用 3px ⇒ 33%；不相邻那 5px 进来就是算错对象")
+        // 从**中间那段**出发：两头都要走到。只往一个方向扩会得到 3/6=50% ⇒ 分母偏小、覆盖被高估。
+        XCTAssertEqual("纵向覆盖=3/9px=33%",
+                       MotionFilmstripTests.verticalCoverage(groups: Array(groups.prefix(3)), taken: 3..<6),
+                       "从被拒那段出发，纵向跨度也必须是三段之和（9px）")
+
+    }
+
+    /// 取用为空时那一格必须说"无"，不许说 0%（R329）。
+    ///
+    /// 为什么单独一格：`纵向覆盖=0/0px=0%` 与 `纵向覆盖=14/48px=29%` 在报告里同形
+    /// —— 前者是"没找到带子"（两条判据一起掉进 no-band 出口，R327 的实验版就是这样），
+    /// 后者是"找到了但盖不住"。这两种坏的修法相反，靠一个 0 分不出来。
+    func testVerticalCoverageWithoutABandSaysNoneNotZero() {
+        let groups: [(gate: String, from: Int, to: Int, hole: Double)] =
+            [("洞太窄", 0, 3, 0.21), ("洞太窄", 3, 6, 0.21)]
+        XCTAssertEqual("纵向覆盖=无",
+                       MotionFilmstripTests.verticalCoverage(groups: groups, taken: nil),
+                       "没有取用带时不许给 0%（0% 读起来像「盖不住」，真相是「没找到带子」）")
+        XCTAssertFalse(MotionFilmstripTests.verticalCoverage(groups: groups, taken: nil).contains("0%"),
+                       "那一格里出现了 0% ⇒ 两种坏法被洗成同形")
+    }
+
+    /// 整跑那一格：被字墨截断的胶囊，取用带必须**盖不住**整颗（<100%），且分母就是三段之和。
+    func testRejectedPillRowReportsPartialVerticalCoverage() {
+        let width = 44, height = 8
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
+        b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        let got = band(a, b, width: width, height: height)
+        XCTAssertTrue(got.report.range(of: "纵向覆盖=\\d+/\\d+px=\\d+%", options: .regularExpression) != nil,
+                      "报告没带纵向覆盖那一格：" + got.report)
+        let cell = got.report.split(separator: " ").first(where: { $0.hasPrefix("纵向覆盖=") }) ?? ""
+        let nums = String(cell).components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .compactMap { Int($0) }
+        XCTAssertEqual(nums.count, 3, "那一格不是 分子/分母=百分比 三段：" + String(cell))
+        XCTAssertLessThan(nums[0], nums[1],
+            "取用带等于整条纵向跨度 ⇒ 这一格没在说「盖不住」，夹具或真帧里没被截断：" + String(cell))
+        XCTAssertGreaterThan(nums[1], 0, "分母为 0：" + String(cell))
+    }
+
     // MARK: - ④ 行带定位：洞要**会走**，还要**长得像那颗胶囊**
 
     /// 三道结构闸 + 三道形状闸的参数表（与判据侧 `measuredMovingHoleBand` 同一组数）。

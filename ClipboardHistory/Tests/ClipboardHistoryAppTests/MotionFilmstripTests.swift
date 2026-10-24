@@ -5477,7 +5477,33 @@ final class MotionFilmstripTests: XCTestCase {
         let head = "行=" + String(verdicts.count) + " 候选行=" + String(candidateRows)
             + " 判定分布=" + Dictionary(grouping: verdicts, by: { $0 })
                 .map { $0.key + "×" + String($0.value.count) }.sorted().joined(separator: ",")
-        return (band, head + " 候选段=" + joined + " 取用=" + taken)
+        return (band, head + " 候选段=" + joined + " 取用=" + taken
+            + " " + Self.verticalCoverage(groups: groups, taken: band))
+    }
+
+    /// 纯函数：取用带占"这条纵向跨度"的几成（R329 / BACKLOG 388 剩下那半格的出处）。
+    ///
+    /// 为什么要它：R328 的分档证明了被拒那一段是胶囊下半 + 标签的字，
+    /// 于是报告里那三段（过 / 洞太窄 / 过）**首尾相接**，合起来才是那颗胶囊的纵向范围。
+    /// 之前只有三段各自的高，"取用带盖住了胶囊的几成"要读者自己去加 ——
+    /// 而这一格决定下一轮修什么：盖得住就只需要开一条形状闸，盖不住就得先修带子的纵向定义。
+    /// 只合**进了报告的**候选段（"非候选"没资格参与）；取用为空给"纵向覆盖=无"，不许给 0%。
+    static func verticalCoverage(groups: [(gate: String, from: Int, to: Int, hole: Double)],
+                                 taken: Range<Int>?) -> String {
+        guard let taken = taken, taken.upperBound > taken.lowerBound else { return "纵向覆盖=无" }
+        var low = taken.lowerBound, high = taken.upperBound
+        var moved = true
+        while moved {
+            moved = false
+            for g in groups {
+                if g.to == low, g.from < low { low = g.from; moved = true }
+                if g.from == high, g.to > high { high = g.to; moved = true }
+            }
+        }
+        let total = high - low
+        guard total > 0 else { return "纵向覆盖=无" }
+        let pct = Int((Double(taken.count) / Double(total) * 100.0).rounded())
+        return "纵向覆盖=" + String(taken.count) + "/" + String(total) + "px=" + String(pct) + "%"
     }
 
     /// 纯函数：剖面上"与页底**不同档**"的第一列到最后一次出现的那一列 = 轨道的横向范围（剖面索引）。
