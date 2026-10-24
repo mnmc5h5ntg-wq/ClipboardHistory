@@ -1,0 +1,48 @@
+diff --git a/ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift b/ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift
+index ad071f0..3508851 100644
+--- a/ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift
++++ b/ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift
+@@ -462,4 +462,21 @@ enum VisualMaterial {
+     /// 轨道与小方块的底：`.quaternary`，四级弱化色。它是"这里有个控件"，不是"这里有个面板"。
+     /// 缩略图的类型占位符也用它：两颗 16pt 方块并排时，占位符必须比旁边的真图更退一步。
+     static let track: HierarchicalShapeStyle = .quaternary
++
++    /// 分段控件那条轨道：一个**凹进去的槽**，不是"比页底亮的一层"。
++    ///
++    /// 为什么不复用上面那颗 `track`（R331 / BACKLOG 391）：真机现读 页底 51.0 / 轨道 81.0 /
++    /// 选中那颗 48.0 ⇒ 差 **−33.0** —— 在这台机器的屏幕上，"选中"是亮轨道上挖出的一个**暗洞**，
++    /// 与 macOS 分段控件"选中那颗更亮"的惯例正好相反。离屏那卷胶片同向（轨道 51.9 / 药丸 36.0 /
++    /// 页底 30.0，差 −15.9），组件帧也是（暗档 −16.0、亮档只有 +3.0），所以这是**产品画法**，不是通道的锅。
++    ///
++    /// 391 给了两条修法：① 把选中那颗抬到轨道之上；② 把轨道压到页底之下（洞还在，但选中变成唯一的正形）。
++    /// 本轮取 ②，理由不是"②更容易过闸"：① 会把离屏那把尺的"洞 = 与页底同档"这条定义一起换掉
++    /// （R323 的斜坡尺与 R328 的分档都建在它上面，两把尺要重标），而 ② 只动轨道一档 ——
++    /// 药丸仍然与页底同档，定义、读数、上一轮的结论全部保持可比。**换定义要连带换尺，换档位不用。**
++    ///
++    /// 用 `underPageBackgroundColor` 而不是自己调一个黑色透明度：它是系统里"页底下面那层"的语义色，
++    /// 两档都由系统给值（亮档比白页底暗、暗档比窗口底暗），而"手调一个 alpha"正是这仓库反对的
++    /// "近似糊弄"（用户标准：要原生，不要手搓）。
++    static let trackWell: Color = Color(nsColor: .underPageBackgroundColor)
+ }
+diff --git a/ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift b/ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift
+index c34e7ec..957fa33 100644
+--- a/ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift
++++ b/ClipboardHistory/Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift
+@@ -387,7 +387,7 @@ fileprivate extension View {
+ /// **为什么不是 `private`**（R230 / BACKLOG 251）：要一张"只有这一段被点亮"的帧，
+ /// 只能把它单独放进夹具 —— 挂在整条侧栏上拍的话，同一枚取证键会同时点亮列表里每一颗星标，
+ /// 那张帧替证的就不是"悬停的那一层灰"，而是"指针同时出现在八个地方"这种产品里不存在的样子。
+-/// 表面没换：这颗胶囊自己画底（`VisualMaterial.track` + `sliderPill`），所以单独放它出来
++/// 表面没换：这颗胶囊自己画底（`VisualMaterial.trackWell` + `sliderPill`），所以单独放它出来
+ /// 读到的就是产品里那片底（R24 那条"组件帧必须与产品对齐"判的是同一件事）。
+ /// 放开可见性的先例是 R45 / R229 的 `RowFavoriteButton`。
+ struct SegmentedFilterPicker: View {
+@@ -404,7 +404,7 @@ struct SegmentedFilterPicker: View {
+     var body: some View {
+         ZStack {
+             VisualShape.rounded(VisualRadius.track)
+-                .fill(VisualMaterial.track)
++                .fill(VisualMaterial.trackWell)
+ 
+             slidingPill
+ 

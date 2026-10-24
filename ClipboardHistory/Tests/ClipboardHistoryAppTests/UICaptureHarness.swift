@@ -4751,6 +4751,30 @@ final class UICaptureTests: XCTestCase {
                                               copyAction: {}, deleteAction: {})
                 .environment(\.hoveredForCapture, true), width: 120, height: 232))
         })
+        // ── 391 的分母：分段控件的**系统参照臂**（R331 / BACKLOG 391、393）──────────────
+        //
+        // 377 判的是"自家这颗：跟着选中搬的是**暗**块"（真机现读 页底 51.0 / 轨道 81.0 / 选中 48.0，
+        // 差 **−33.0**）。391 给了两条方向相反的出路：把选中那颗抬到轨道之上，或把轨道压到页底之下。
+        // 上一轮先试了后者（新令牌 `trackWell = underPageBackgroundColor`），离屏那卷现读
+        // 页底 30.0 / 轨道 **40.0** / 药丸 36.0 ⇒ 分离从 15.9 掉到 **4.0**，而红起来的是那条**过程证人**
+        // （`testFilterPillSlideIsAProcessNotATeleport`：开臂带内一个像素都没变，峰值=0.000 地板=0.005）——
+        // 胶囊被洗到与轨道同档之后，连"它到底有没有移动"都没有对象了。
+        // 它也没把轨道压到页底之下（暗档的页底就是 vibrancy 材料本身，比系统里任何一枚语义填充都暗），
+        // 只是把整颗胶囊洗淡了。⇒ ②在这台机器上画不出"槽"，只能画出"看不见"。
+        //
+        // 于是"该往哪边改"不能由我记性里的 macOS 惯例定。D-274 的规矩是：**参照没被证明存在之前，
+        // 一条地板都不加**。这两张与 `sysref-button-*` 同族 —— 同一条 render、同一个 probeFrame、
+        // 同一颗尺，所以参照臂与自家臂的读数允许互相比较（D-269）。选中左 / 选中右各一张：
+        // "跟着选中搬的是亮块还是暗块"由这两张自己印出来，不由我宣布。
+        // 这是**尺的对照物，不是产品证据** ⇒ `contentMustFit: false`（与 sysref-button 同一处置）。
+        results.append(Fixture("sysref-segmented-selected-left", NSSize(width: 200, height: 60),
+                               contentMustFit: false) {
+            AnyView(self.probeFrame(SystemSegmentedProbe(selected: 0), width: 200, height: 60))
+        })
+        results.append(Fixture("sysref-segmented-selected-right", NSSize(width: 200, height: 60),
+                               contentMustFit: false) {
+            AnyView(self.probeFrame(SystemSegmentedProbe(selected: 1), width: 200, height: 60))
+        })
 
         // R231 / BACKLOG 258：**设置侧栏那一行悬停第一次有帧**（两态各一张，R77 的规矩）。
         // 这一家不走 `pressedStyle` 的悬停层判定吗？它**走** —— 第 900 行那颗 `.pressedStyle(in:scale:false)`
@@ -6111,6 +6135,31 @@ final class UICaptureTests: XCTestCase {
     /// 342 的参照物：一颗**系统的**图标按钮，按下态用 `cell.isHighlighted` 点亮。
     /// 它不是产品代码，也不许被当成产品证据 —— 它是尺的对照物（与 `cardprobe-*` 同族），
     /// 存在的唯一理由是给"自家按下那一档该有多大"一个**外部的**分母（D-269）。
+    /// 系统自己的分段控件 —— **391 的参照臂**（R331）。
+    ///
+    /// 为什么是 `NSSegmentedControl` 而不是 SwiftUI 的 `Picker(...).pickerStyle(.segmented)`：
+    /// 第一版写的就是后者，而这条离屏通道给它出的是一张**整幅页底色**（现读 亮档 min=max=255.0、
+    /// 暗档 min=max=30.0，出档列数 0/400，两臂、两档都是）—— 那是"压根没画"，
+    /// 不是"画了但与页底同档"。同一条通道上 `SystemPressProbe`（NSButton）是能画的 ⇒
+    /// 参照对象换成 AppKit 那颗真控件。产品本来就是照着系统分段控件画的这颗胶囊，
+    /// 所以参照与被测是同一个物种，只是画法各归各的系统。
+    private struct SystemSegmentedProbe: NSViewRepresentable {
+        let selected: Int
+
+        func makeNSView(context: Context) -> NSSegmentedControl {
+            let control = NSSegmentedControl(labels: ["全部", "收藏"], trackingMode: .selectOne,
+                                             target: nil, action: nil)
+            // 不写 `segmentStyle`：`.automatic` 才是"这台系统上分段控件长什么样"的那个样子。
+            control.selectedSegment = selected
+            control.refusesFirstResponder = true
+            return control
+        }
+
+        func updateNSView(_ control: NSSegmentedControl, context: Context) {
+            control.selectedSegment = selected
+        }
+    }
+
     private struct SystemPressProbe: NSViewRepresentable {
         let highlighted: Bool
 
@@ -6215,6 +6264,215 @@ final class UICaptureTests: XCTestCase {
                  + "（342 只判存在；亮档按下读到 0 颗是**带窗上界 Δ<60 把它整块排除**（无界尺读到块且 |Δ|≥60），见 346，不是系统没画按下）")
         }
         XCTAssertEqual(judged, 2, "两档里有一档没跑完参照臂 ⇒ 判据没有对象")
+    }
+
+    /// **391 的分母**：系统自己的分段控件画在同一条夹具通道上，"跟着选中搬"的是**亮块**还是**暗块**。
+    ///
+    /// 只判存在 + 印数，**一条地板都不加**（D-274 / D-275）。这一格欠的是"系统的 选中−未选
+    /// 有多大、往哪一边"这个数；而"自家必须与系统同侧"那条断言要与 391 的修法落在**同一笔**提交里，
+    /// 否则 CI 推出去的就是一朵已知会红的红。
+    ///
+    /// 为什么要有这一格：377 判掉"跟着选中搬的是暗块"之后，391 给了两条**方向相反**的出路
+    /// （抬选中 / 压轨道）。上一轮先试后者（`VisualMaterial.trackWell = underPageBackgroundColor`），
+    /// 离屏那卷现读 页底 30.0 / 轨道 **40.0** / 药丸 36.0 ⇒ 分离 15.9 → **4.0**，而红起来的是那条
+    /// **过程证人**（`testFilterPillSlideIsAProcessNotATeleport` 峰值=0.000 < 地板=0.005）：
+    /// 药丸与轨道糊成一档之后，带子里"有没有东西在动"这件事失去了对象。
+    /// 轨道也没被压到页底之下（暗档的页底就是 vibrancy 材料本身，比系统里任何一枚语义填充都暗），
+    /// 只是整颗胶囊被洗淡了。所以方向不能再由我记性里的 macOS 惯例定 ⇒ 拿系统那颗自己印。
+    ///
+    /// 读法（D-320：参照物必须从被测对象**外面**取，这里一个字都不抄 `FilterPillGeometry`）：
+    /// 页底 = 取景框**顶部三行**（probeFrame 把内容贴着下沿排 ⇒ 顶部是对象之外；第一版取"控件外的
+    /// 左右各 6 列"被现读证伪 —— 自家那颗胶囊满幅，x=0 就是轨道，页底被读成了 52.0）；
+    /// 对象纵向范围 = 逐行中位离页底 ≥delta 的首末行，取样带 = 它的**中段三分之一**（上下沿是抗锯齿）；
+    /// 轨道范围 = `trackExtent`（与页底不同档，**两臂取并** —— 药丸停在某一段时亮区只剩轨道的另一半，
+    /// 逐臂自算会让范围跟着跳，与胶片那卷同一个理由）；范围取中点切成两半 ⇒ 每臂读"左半档 / 右半档"。
+    /// 两臂只差 selection，所以**该看到的形状是镜像**：臂左的左半档 == 臂右的右半档、臂左的右半档
+    /// == 臂右的左半档。这两条同时成立才说明"跟着选中搬"的是档而不是噪声（真机 `AB_VERDICT` 的对应物），
+    /// 而"选中比未选亮还是暗"就是 391 要的符号。
+    ///
+    /// 现读（R331 · 本机 2× 离屏 · 同一颗尺 · 两臂镜像一致）：
+    /// **暗档** 系统那颗 选中 74.0 / 未选 48.0 ⇒ 差 **+26.0**；自家同一取景 36.0 / 52.0 ⇒ 差 **−16.0**
+    /// ⇒ 391 的方向在暗档被钉成①（把选中那颗抬到轨道之上），而②（把轨道压到页底之下）
+    /// 上一发已经被自己的闸否掉一次（分离 15.9→4.0）。
+    /// **亮档** 系统那颗 205.0 / 235.0 ⇒ 差 **−30.0**，而看图腿（两张 200×60 真帧，
+    /// `/tmp/r331_rv/frames_after/sysref-segmented-selected-left-200x60-light.png`）确认那颗
+    /// 选中是**中性灰**、不是强调色 tint —— 也就是说"选中比未选暗"在亮档**就是系统的画法**。
+    /// 两档合起来读：平台的极性**随色档翻向**（暗档选中抬亮、亮档选中压暗），
+    /// 所以"同侧"这条判据不许写成一条全局符号，只能按档分别立（D-323）。
+    /// 顺带把 393 的令牌也量出来了：系统两档的选中电平 74.0／205.0，与
+    /// `unemphasizedSelectedContentBackgroundColor` 的解析值 70／220 同档（不透明填充"渲染电平==解析电平"
+    /// 这一座桥由本轮另一发现场验过：`underPageBackgroundColor` 解析 40.0 ⇒ 离屏现读也是 40.0）。
+    func testSystemSegmentedReferenceSaysWhichHalfTracksSelection() throws {
+        let delta = 8.0
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let left = rawFrame("sysref-segmented-selected-left", appearance)
+            let right = rawFrame("sysref-segmented-selected-right", appearance)
+            let own = rawFrame("segmented-filter-idle", appearance)
+            XCTAssertGreaterThan(left.w, 0, tag + "：参照臂左臂没读回像素 ⇒ 通道断在渲染与读回之间")
+            XCTAssertEqual(left.w, right.w, tag + "：两臂宽度不同 ⇒ 同一颗尺没有同一个对象")
+
+            func topPage(_ f: (buf: [UInt8], w: Int, h: Int, bpr: Int)) -> Double? {
+                // 页底从取景框**最上面三行**取。第一版按"控件外的左右各 6 列"取，被现读当场证伪：
+                // 自家那颗胶囊是**满幅**的（y=95 现读 x=0 就是轨道 52.0），于是"页底"读成了轨道，
+                // `trackExtent` 的范围退化成整幅、两半的切点落到取景框中线上 —— 数字全都错位。
+                // 顶部三行是对象**外面**（probeFrame 把内容贴着下沿排），且必须自己声明它干净：
+                // 顶行档差 ≥delta 就说明对象顶到了框顶 ⇒ 返回 nil，让调用方走出口而不是拿脏参照算。
+                guard f.h > 8, f.w > 0 else { return nil }
+                var vals: [Double] = []
+                for y in 0..<3 {
+                    for x in stride(from: 0, to: f.w, by: 2) {
+                        vals.append(MotionFilmstripTests.lumaAt(f.buf, f.bpr, x, y))
+                    }
+                }
+                guard let lo = vals.min(), let hi = vals.max(), hi - lo < delta else { return nil }
+                return MotionFilmstripTests.median(vals)
+            }
+            func objectRows(_ f: (buf: [UInt8], w: Int, h: Int, bpr: Int), _ page: Double) -> Range<Int>? {
+                guard f.h > 6, f.w > 0 else { return nil }
+                var first = -1, last = -1
+                for y in 0..<f.h {
+                    var vals: [Double] = []
+                    for x in stride(from: 0, to: f.w, by: 2) {
+                        vals.append(MotionFilmstripTests.lumaAt(f.buf, f.bpr, x, y))
+                    }
+                    if Swift.abs(MotionFilmstripTests.median(vals) - page) >= delta {
+                        if first < 0 { first = y }
+                        last = y
+                    }
+                }
+                guard first >= 0, last - first >= 6 else { return nil }
+                let span = last - first
+                return (first + span / 3) ..< (first + span * 2 / 3 + 1)
+            }
+            func profile(of f: (buf: [UInt8], w: Int, h: Int, bpr: Int), _ page: Double) -> [Double] {
+                guard let band = objectRows(f, page) else { return [] }
+                return MotionFilmstripTests.columnMedianProfile(
+                    pixels: f.buf, bytesPerRow: f.bpr, yRange: band, xRange: 0..<f.w)
+            }
+            func level(_ v: [Double], _ rg: Range<Int>) -> Double {
+                MotionFilmstripTests.median(Array(v[rg]))
+            }
+            func extent(_ v: [Double], _ margin: Double) -> Range<Int>? {
+                MotionFilmstripTests.trackExtent(profile: v, margin: margin, delta: delta,
+                                                 minTrackPixels: 8)
+            }
+
+            guard let sysPage = topPage(left) else {
+                XCTFail(tag + "：参照臂的取景顶部不干净（顶三行的档差 ≥ " + String(format: "%.0f", delta)
+                        + "）⇒ 页底没有'对象之外'的参照可取，这一格的任何差都不作数")
+                continue
+            }
+            guard let ownPage = topPage(own) else {
+                XCTFail(tag + "：自家那帧的取景顶部不干净 ⇒ 正对照没有页底参照")
+                continue
+            }
+            XCTAssertEqual(sysPage, ownPage, accuracy: 1.0,
+                tag + "：参照臂与自家帧的页底相差 " + String(format: "%.1f", abs(sysPage - ownPage))
+                + " 灰阶（系统 " + String(format: "%.1f", sysPage)
+                + "／自家 " + String(format: "%.1f", ownPage)
+                + "）⇒ 两张帧不在同一片底上，差不能互比（D-269）")
+
+            let pl = profile(of: left, sysPage), pr = profile(of: right, sysPage)
+            let po = profile(of: own, ownPage)
+            XCTAssertFalse(pl.isEmpty, tag + "：参照臂读不出剖面 ⇒ 夹具没画出系统控件")
+            XCTAssertFalse(po.isEmpty, tag + "：自家那颗读不出剖面 ⇒ 对照没有对象")
+            guard !pl.isEmpty, !pr.isEmpty, !po.isEmpty else { continue }
+
+            // ① **正对照先行**（D-320 的反面用法）：同一颗尺、同一个 200×60 取景、同一条 render，
+            //   必须能在**自家**那颗上读出轨道范围。读不出就说明坏的是尺或取景，
+            //   那时候参照臂的"没有范围"就不能被说成"系统没画"。
+            guard let eo = extent(po, ownPage) else {
+                XCTFail(tag + "：正对照先坏了 —— 自家那颗胶囊在同一颗尺下也读不出轨道范围"
+                        + "（页底=" + String(format: "%.1f", ownPage)
+                        + " 剖面 min=" + String(format: "%.1f", po.min() ?? -1)
+                        + " max=" + String(format: "%.1f", po.max() ?? -1) + "）"
+                        + "⇒ 取景/尺坏了，参照臂的任何读数都不作数")
+                continue
+            }
+            let ownMid = (eo.lowerBound + eo.upperBound) / 2
+            let ownSelected = level(po, eo.lowerBound..<ownMid)   // fixture 选中的是**左**段
+            let ownUnselected = level(po, ownMid..<eo.upperBound)
+            let ownLine = "自家 页底=" + String(format: "%.1f", ownPage)
+                + " 范围=" + String(eo.lowerBound) + ".." + String(eo.upperBound)
+                + " 选中=" + String(format: "%.1f", ownSelected)
+                + " 未选=" + String(format: "%.1f", ownUnselected)
+                + " 差=" + String(format: "%+.1f", ownSelected - ownUnselected)
+
+            let sysMargin = sysPage
+            let eL = extent(pl, sysMargin), eR = extent(pr, sysMargin)
+            if eL == nil || eR == nil {
+                // 参照臂读不出范围 ⇒ 三种成因在"没有范围"这一件事上同形：
+                // 真没画、画了但与页底同档、画了但不在取样带里。分开它们用的是**整幅**的档外像素行数：
+                // 有行而范围无 = 画了别的东西（本轮实测是**字形**画得出、**填充**画不出）；一行都没有 = 真没画。
+                var rowsWithInk = 0
+                for y in 0..<left.h {
+                    for x in stride(from: 0, to: left.w, by: 2) {
+                        if abs(MotionFilmstripTests.lumaAt(left.buf, left.bpr, x, y) - sysMargin) >= delta {
+                            rowsWithInk += 1; break
+                        }
+                    }
+                }
+                XCTAssertGreaterThan(rowsWithInk, 0,
+                    tag + "：参照臂整幅一行档外像素都没有 ⇒ 系统控件真的没被这条通道画出来"
+                    + "（夹具坏或文件缺失，这一格必须红；它不是「填充与页底同档」）")
+                emit("SEGREF_POLARITY " + tag
+                     + "｜系统 页底=" + String(format: "%.1f", sysMargin)
+                     + " 范围=读不出 出档行=" + String(rowsWithInk) + "/" + String(left.h)
+                     + " 中带剖面 min=" + String(format: "%.1f", pl.min() ?? -1)
+                     + " max=" + String(format: "%.1f", pl.max() ?? -1)
+                     + "｜" + ownLine
+                     + "｜出口=sysref_seg_fill_not_drawn（字形画得出" + String(rowsWithInk)
+                     + " 行而填充读不出范围 —— 与 R100 那族「通道不合成这层材质」同一形状。"
+                     + "本机**不是**这一档：同一条尺现读暗档 差=+26.0，所以这条出口是给"
+                     + "另一台机器（runner 不合成材质）留的，不是给这台的结论）")
+                continue
+            }
+            let lo = Swift.min(eL!.lowerBound, eR!.lowerBound)
+            let hi = Swift.max(eL!.upperBound, eR!.upperBound)
+            let mid = (lo + hi) / 2
+            XCTAssertGreaterThan(mid - lo, 8, tag + "：轨道范围太窄（" + String(lo) + ".." + String(hi)
+                + "）⇒ 半颗都不够，选中/未选两档分不开")
+
+            let leftArmSelectedHalf = level(pl, lo..<mid), leftArmOther = level(pl, mid..<hi)
+            let rightArmSelectedHalf = level(pr, mid..<hi), rightArmOther = level(pr, lo..<mid)
+            let dLeft = abs(leftArmSelectedHalf - rightArmOther)
+            let dRight = abs(leftArmOther - rightArmSelectedHalf)
+            // 存在性闸门（不是地板）：两臂必须**互为镜像** —— 臂左的左半档要等于臂右的右半档，
+            // 臂左的右半档要等于臂右的左半档。这两条一起成立才叫"选中换了边、画的东西跟着搬"，
+            // 单独"有一处变了"不够：噪声也能变一处，而搬错方向的画法也能变一处。
+            XCTAssertLessThan(abs(leftArmSelectedHalf - rightArmSelectedHalf), delta,
+                tag + "：两臂不镜像（臂左选中半=" + String(format: "%.1f", leftArmSelectedHalf)
+                    + " 臂右选中半=" + String(format: "%.1f", rightArmSelectedHalf)
+                    + "）⇒ 跟着 selection 搬的不是同一档，参照臂没有两态")
+            XCTAssertLessThan(abs(leftArmOther - rightArmOther), delta,
+                tag + "：两臂的**未选**半读成两档（臂左=" + String(format: "%.1f", leftArmOther)
+                    + " 臂右=" + String(format: "%.1f", rightArmOther) + "）⇒ 同上")
+            XCTAssertGreaterThan(Swift.max(dLeft, dRight), delta,
+                tag + "：两臂在同一颗尺下不可分（左半|Δ|=" + String(format: "%.1f", dLeft)
+                    + " 右半|Δ|=" + String(format: "%.1f", dRight)
+                    + "）⇒ selection 没换出任何东西，拿它定方向没有意义")
+
+            // 符号约定：**正 = 选中那颗比未选那颗亮**（负 = 选中是一颗暗洞，就是 377 在屏幕上看到的那颗）。
+            let sysDiffL = leftArmSelectedHalf - leftArmOther
+            let sysDiffR = rightArmSelectedHalf - rightArmOther
+            let sameSide = ((sysDiffL + sysDiffR >= 0) == (ownSelected >= ownUnselected)) ? "是" : "否"
+
+            emit("SEGREF_POLARITY " + tag
+                 + "｜系统 页底=" + String(format: "%.1f", sysMargin)
+                 + " 范围=" + String(lo) + ".." + String(hi)
+                 + " 左臂选中=" + String(format: "%.1f", leftArmSelectedHalf)
+                 + " 左臂未选=" + String(format: "%.1f", leftArmOther)
+                 + " 右臂选中=" + String(format: "%.1f", rightArmSelectedHalf)
+                 + " 右臂未选=" + String(format: "%.1f", rightArmOther)
+                 + " 差(左臂)=" + String(format: "%+.1f", sysDiffL)
+                 + " 差(右臂)=" + String(format: "%+.1f", sysDiffR)
+                 + " AB=两臂镜像一致（跟着 selection 搬的就是这两档）"
+                 + "｜" + ownLine
+                 + "｜同侧=" + sameSide
+                 + "（R331 只印不判：地板与「自家必须与系统同侧」那条断言与 391 的修法同一笔落地，D-274）")
+        }
     }
 
     /// R295（305 的分母来源 + 342 的参照臂搬进同一条 render）：自家行与系统参照按钮的

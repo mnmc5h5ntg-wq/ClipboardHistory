@@ -43,7 +43,7 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^MOTION_SCENARIO_[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=
                    # R324：缺席点名那一行 `MOTION_SCENARIO_APPEAR 工厂=13 钉了=1 没钉=12 名单…` ——
                    # 它不是一句散文，是本轮登记 BACKLOG 379 的那颗数，所以必须在搬运名单里
                    # （R107 / U-339 同一课：新读数族接进它被打印的那一步）。
