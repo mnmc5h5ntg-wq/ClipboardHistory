@@ -12,6 +12,52 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R324 状态（2026-10-24 · 本地 · 第 323 轮 / Round 321）：一把"找错对象还报结论"的尺修回有对象 —— 三道形状闸 + 胶片场景钉死色档（产品 0 文件，动效主线）
+
+本轮做了什么：① **交 R323 那两朵 runner 红的账**（RUN=40032708615 / sha=28c8510）：
+带子量到的是列表里的一行（y346.0…352.0pt、页底 236.0 ⇒ 那台机器在亮档），
+两朵红都是"框错了地方还报结论"；② **三道形状闸**（宽度稳 / 贴两端 / 至少一段之宽）+ 被拒候选报名字的报告（D-309）；
+③ **胶片场景第一次能钉色档**（`Scenario.appearance`，NSApp/window/host 三处一起改），
+并把"请求==要求 / 胶片==要求 / 两遍同档"写成三条红前提压在出口之前（D-308）；
+④ **一处公开更正**：本轮为"去掉极性"设计的 `staticLevel` 锚被真窗口的帧量死了
+（两段之间走的药丸 ⇒ 轨道范围里没有一列不动；本机读数 `候选行=5`，而那 5 行是胶囊上下沿的抗锯齿边），
+已撤回并锚回页底；⑤ **缺席点名**：`MOTION_SCENARIO_APPEAR 工厂=13 钉了=1 没钉=12 钉了名单=filterPillSlide 没钉名单=blank,detailEmptyToContent,detailKindChange,detailSameKind,emptyState,heatFirstRecord,listInsertNewRecord,noticeBanner,noticeBannerDismiss,promotionToTop,searchReflow,toggleFavoriteInRow` ⇒ 新开 383。
+
+验证读数（全部现读，不手抄）：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 968 tests, with 46 tests skipped and 0 failures`；重捕帧 `CAPTURED 174 -> /tmp/r324_rv/frames`；
+帧基线 `FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0`（本轮没改夹具也没改像素）；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=968 swift_skipped=46 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r324_rv`；
+判据卷 `MotionPillRampTests` 20 格全绿（含本轮新写的缺席点名正对照与亮档反向证人），
+`MotionFilmstripTests` 66 格 3 skip 0 红；胶囊两卷改后 `Executed 23 tests, with 0 failures（两卷一起跑，skip=0）`；
+变异表本轮 `CAUGHT=6/6, RESTORE_CLEAN=yes`（M931…M936，逐臂 M931 CAUGHT；M932 CAUGHT；M933 CAUGHT；M934 CAUGHT；M935 CAUGHT；M936 CAUGHT）；
+针预检 tables=112 covered=95 bad=0、名册 arms=803 files=206；
+读数族 `READINGS_MUST_INCLUDE 声明=6 缺=0`；脚本电池 `Ran 611（skipped=4）`；
+产品文件 0 个，连续零改动 **5** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for 323`，`--check` 同形；上一轮 4）。
+
+看图腿（本轮真看了）：看了本轮那三张条带图（`/tmp/r324_rv/motion/filter-pill-slide-{开A,开B,关}-strip.png`，各 27 格、6 列排布，末三格是没帧可放的画布底色）。① **钉色档这件事肉眼可证**：本机此刻在亮档，而三张条带通体是暗档底（页底 30 那一档）⇒ `NSApp/window/host` 三处一起改真的落进了胶片，这正是前提⓪那个数的第二条独立通道（`色档=胶片暗/机器亮`）。② **两臂的差别肉眼看得见**：关臂第 2 格就已经是末态（胶囊在右、列表换成"暂无收藏"），开臂第 2、3 格胶囊仍在左、第 4 格才到位 ⇒ 与读数 `开A 帧数=3 / 关 帧数=1` 同向，不是同一卷胶片。③ **尺框到的确实是胶囊那一行**：条带里那颗药丸在搜索框下方那一行，与 `MOTION_PILL_BAND y51.0…58.0pt`（整窗 520pt）一致；R323 在 runner 上量到的 346…352pt 那一行，在同样排布的条带里对应的是列表行而不是这一行 ⇒ "框错了地方还报结论"这一眼能复核。④ 没写成结论的那一眼：开臂走完最后几 pt 用了十几格，这一句不升成判据（形容词不是读数），要判它得先有逐帧速度的尺。看图腿的边界照旧：本轮产品 0 文件、174 帧与工作基线逐张相同（CHANGED=0），基线那一侧没有新东西可看；hover 提示与真机档位那批（347 / 305 / 373① / 368 / 384）用户已明确暂时做不了，仍压着。
+
+⓪ R325 开场要先读的（成对：run id ↔ commit）：本轮 push 之后那一跑的 id **未取**（合法中间态，由追记那一笔回填）；
+本轮已读的是 R323 那一跑 —— RUN=40032708615 sha=28c8510（status=completed conclusion=failure，
+红因与处置见 U-1065），本轮代码半 sha=0119b24。要读的：
+   ① **`MOTION_PILL_BAND` 在 runner 上必须落在胶囊那一行**（本机现读 y51.0…58.0pt，
+      暗档；R323 那一跑读到的 y346.0…352.0pt 是列表行）—— 若它仍报别的行，先读报告里的
+      `判定分布=`，别改判据；
+   ② **`MOTION_PILL_RAMP_GEOM` 的 `色档=胶片暗/机器…` 那一格**：若 `色档=胶片亮`，
+      说明钉色档在那台机器上没生效（前提⓪会当场红在"请求没落进胶片"上），这是 385 要的第二条腿；
+   ③ `MOTION_SCENARIO_APPEAR` 在 runner 上必须与本机同读（工厂=13 钉了=1 没钉=12）
+      —— 它是源码级读数，两机不同就是有人在中间开了单。
+
+① R325 的靶：① **真机眼批次**（用户已明确"暂时还不能做"，现在压着六格：347 亮档按下、305 台阶地板、
+      373① 浮层强调色、368 产物级通道、384 字墨切洞要不要并、R323 的 384 前置那一格 377）
+      —— 需要用户先退出正在跑的 App，一次跑完比一轮跑一格省；
+   ② 383（其余 12 颗工厂逐颗问"要不要钉"，先量分离度再决定）；
+   ③ 动效主线继续：354 第五步（观察窗口成本）与 376 的第二条通道；
+   ④ 367 迁移 / 360 最后一批 / 361 合并 / 364 六把抽不出的刀 / 385。
+
+最后更新：2026-10-24（本地 · R324 / 第 323 轮 / Round 321）：**逐行像素尺修回有对象：三道形状闸 + 胶片场景第一次钉色档**（产品 0 文件，判据轮）
+现读：构建 `ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests`；全量卷 `Executed 968 tests, with 46 tests skipped and 0 failures`；四件套 `ROUND_VERIFY build_warnings=0 swift_executed=968 swift_skipped=46 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r324_rv`；变异表 `CAUGHT=6/6, RESTORE_CLEAN=yes`；
+缺席点名 `MOTION_SCENARIO_APPEAR 工厂=13 钉了=1 没钉=12 钉了名单=filterPillSlide 没钉名单=blank,detailEmptyToContent,detailKindChange,detailSameKind,emptyState,heatFirstRecord,listInsertNewRecord,noticeBanner,noticeBannerDismiss,promotionToTop,searchReflow,toggleFavoriteInRow`；脚本电池 `Ran 611（skipped=4）`；针预检 bad=0、名册 arms=803；
+连续零改动那一格**只写在上面的「验证读数」段里一次**（`test_product_streak_cell` 数的是同一格里的候选数）。
+这一行是 R324 起**必带**的那一格：R323 那一节漏了它 ⇒ 当前轮静默停一轮（BACKLOG 382 / sha 0119b24）。
+
 ## R323 状态（2026-10-24 · 本地 · 第 322 轮 / Round 320）：斜坡尺第一次读出那颗胶囊走的路（单调、倒退 0.0pt），三处自曝落在盘之前（产品 0 文件，动效主线）
 
 本轮做了什么：① **产品面主线** —— 给全仓唯一那条位移档（`.slider`）装上**斜坡尺**：
