@@ -5028,6 +5028,15 @@ final class MotionFilmstripTests: XCTestCase {
             "A/B 开关没落进胶片（开A=\(onFilmA.animationsEnabledAtRecord)"
             + " 开B=\(onFilmB.animationsEnabledAtRecord) 关=\(offFilm.animationsEnabledAtRecord)）"
             + " ⇒ 两臂其实是同一臂，『有没有过程』这一判据根本没在演")
+        // 前提②'（R324）：**三臂必须拍在同一档色档里，而且是尺有对象的那一档**。
+        // 这一条对跨臂比较比对单臂更硬：两臂若在不同档位下拍，"开臂中间态比关臂多"量的
+        // 就是两种材质而不是动效开关。亮档里轨道与药丸只差 3 级 ⇒ 带子根本框不住胶囊。
+        for (arm, film) in [("开A", onFilmA), ("开B", onFilmB), ("关", offFilm)] {
+            XCTAssertEqual(Self.pillRampRequiredAppearanceName, film.appearanceNameAtRecord,
+                "臂「\(arm)」拍在了\(film.appearanceNameAtRecord)档（这条尺要求"
+                + Self.pillRampRequiredAppearanceName + "档）⇒ 三臂不同档或请求没落进胶片，"
+                + "跨臂比较不成立（MOTION_GRAB 那行会印出每臂的 色档= 与 请求=）")
+        }
         // R323 更正：带子改回**从这一卷量**。R322 那一版写的是 `y 66…92pt`，来源是
         // 组件帧 `/tmp/r321_rv/frames/sidebar-history-300x520-light.png` 逐行扫出来的那一条 ——
         // 那张帧里胶囊确实在 66…92pt，可本卷是**真窗口**（`HistorySidebarView` 直接进帧），
@@ -5165,6 +5174,77 @@ final class MotionFilmstripTests: XCTestCase {
     // 而斜坡尺要的是**中心**：中心不能拿半颗胶囊量
     // （R107 / R108 那一族：尺读的是不是它声称的那个对象）。
 
+    /// 色档名（只用于把"这一卷是在哪一档外观下拍的"印进读数）：胶片场景以前不钉外观，
+    /// macOS 的"自动"会在白天/夜里换档 —— 同一份判据在两个时刻量的不是同一张画面（R324 现读）。
+    /// 一个**请求**的色档 → 名字（`nil` = 这一卷没钉；"其他" = 钉了这把尺不认识的档）。
+    static func appearanceName(forRequested requested: NSAppearance.Name?) -> String {
+        guard let requested = requested else { return "未钉" }
+        if requested == .aqua { return "亮" }
+        if requested == .darkAqua { return "暗" }
+        return "其他"
+    }
+
+    /// 读的是**传进来的那棵树**实际解析到的档位，不是"我请求了哪一档"。
+    static func appearanceName(of appearance: NSAppearance) -> String {
+        appearanceName(forRequested: appearance.bestMatch(from: [.aqua, .darkAqua]))
+    }
+
+    static func appearanceName() -> String {
+        appearanceName(of: NSApp.effectiveAppearance)
+    }
+
+    /// 斜坡尺 / 过程证人**要求**的色档名（R324 现读，不是审美选择）：
+    /// 暗档 轨道−页底 = 22 级、药丸−轨道 = 16 级；亮档三档实测 230 / 230 / 233 —— 只剩 **3** 级，
+    /// 低于这把尺的 `delta=8`，于是"那颗会走的洞"在亮档里连一个候选行都读不出来（本机 `候选行=0`）。
+    /// 场景请求哪一档写在 `Scenario.filterPillSlide` 里，尺需要哪一档写在这里 ——
+    /// **两边各自成文再断言相等**：合抄成一处就没有第二只眼，漂了没人红（R38 的同一课，
+    /// 但"要什么"与"给了什么"本来就是两个量，不许共享一份权威）。
+    static let pillRampRequiredAppearanceName = "暗"
+
+    /// 从一行里认出"这是一颗场景工厂"（`static func 名字() -> Scenario {`），认不出返回 nil。
+    static func scenarioFactoryName(from line: String) -> String? {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("static func "), trimmed.hasSuffix("-> Scenario {") else { return nil }
+        let head = String(trimmed.dropFirst("static func ".count))
+        guard let paren = head.firstIndex(of: "(") else { return nil }
+        let name = String(head[..<paren])
+        return name.isEmpty ? nil : name
+    }
+
+    /// 点名式数一遍：哪些场景工厂**钉了**色档、哪些没钉（R324 的缺席计数，纯函数）。
+    ///
+    /// 为什么要数而不是"本轮顺手把胶囊那条钉上就完事"：没钉色档这个毛病是**整卷级别**的，
+    /// 只修一处就把它当成了个案；而"其余场景要不要钉"在量出来缺席之前不许登记成已判（D-305 的同一课）。
+    /// 数法只认工厂签名与它自己那段正文里的 `appearance:`，注释行先剥掉 ——
+    /// 台账式注释里满篇都写着 `appearance:`，算进去就是守卫的假阳性（R143 那一族）。
+    /// 收尾只认 8 空格那一行 `}`：工厂正文都在 12 空格以上，所以内层闭包的 `}` 不会提前收口。
+    static func scenarioPinCensus(code: String) -> (pinned: [String], unpinned: [String]) {
+        let lines = code.components(separatedBy: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+        var pinned: [String] = []
+        var unpinned: [String] = []
+        var current: String?
+        var sawPin = false
+        func close() {
+            guard let name = current else { return }
+            if sawPin { pinned.append(name) } else { unpinned.append(name) }
+            current = nil
+            sawPin = false
+        }
+        for line in lines {
+            if let name = scenarioFactoryName(from: line) {
+                close()
+                current = name
+                continue
+            }
+            guard current != nil else { continue }
+            if line.contains("appearance:") { sawPin = true }
+            if line == "        }" { close() }
+        }
+        close()
+        return (pinned, unpinned)
+    }
+
     /// 纯函数：一个像素的 Rec.709 亮度（与 `UICaptureHarness.ArmRGB.luma` 同一组系数，
     /// 两把尺不许各抄一份系数表 —— R68：证人要与它作证的判据同一颗尺子）。
     static func lumaAt(_ pixels: [UInt8], _ bytesPerRow: Int, _ x: Int, _ y: Int) -> Double {
@@ -5196,19 +5276,34 @@ final class MotionFilmstripTests: XCTestCase {
         return out
     }
 
-    /// 纯函数：单行上的"轨道 + 会动的洞"读数（首末两帧一起看）。三条都不成立 ⇒ nil：
-    /// ① 这一行有一段与页底**不同档**的轨道；② 轨道里有一段与页底**同档**的洞（= 药丸）；
-    /// ③ 这个洞在两帧之间**走了**至少 `minMoveFraction` 个轨道宽。
+    /// 纯函数：单行上的"轨道 + 会动的洞"读数（首末两帧一起看）。
     ///
-    /// 为什么不用"哪些行在变"来定位（本轮自曝的第一版）：换档会**重排整个列表**，
+    /// 三道**结构**闸决定"这一行是不是候选"（不成立 ⇒ nil）：
+    /// ① 有一段与页底不同档的轨道；② 轨道里有一段与页底同档的洞（= 药丸）；
+    /// ③ 这个洞在两帧之间**走了**至少 `minMoveFraction` 个轨道宽。
+    /// 三道**形状**闸决定"这颗候选是不是那颗胶囊"（成立但形状不对 ⇒ 非 nil，`gate` 点名为什么不对）：
+    /// ④ 两帧里洞的宽度必须差不多（`widthToleranceFraction`）—— 胶囊是刚体，字缝不是；
+    /// ⑤ 洞必须贴在轨道的**一端**，而两帧贴在**异端**（`edgeFlushFraction`）—— 静止态里药丸占满一整段，
+    ///    所以它必然挨着轨道的某一边；列表行里那颗"会走的洞"走在中间，两端都不贴；
+    /// ⑥ 洞至少要有一段之宽（`minHoleFraction`）—— 字缝远窄于此。
+    ///
+    /// 为什么不用"哪些行在变"来定位（R323 自曝的第一版）：换档会**重排整个列表**，
     /// 本机量出来列表那一片（y≈128…520pt）逐行都在变，比胶囊那 26pt 大一个数量级 ⇒
-    /// "最长连续变化行带"选到的是列表，不是胶囊（读数：行带=126…520pt 那一版）。
-    /// "一颗宽度稳定、位置会走的洞"才是胶囊的形状；重排后的列表读不出这种东西。
+    /// "最长连续变化行带"选到的是列表（读数：行带=126…520pt 那一版）。
+    ///
+    /// 为什么 ④⑤⑥ 是 R324 补的而不是洁癖：runner 那一跑（RUN=40032708615）用三道结构闸
+    /// 量出来的行带是 `346.0…352.0pt 轨道范围=25.0…299.0pt`（6pt 高、一直顶到扫描右界），
+    /// 那是列表里的一行，不是胶囊 —— 于是斜坡尺判成"回头"、过程证人判成"峰值相等"，
+    /// **一朵尺子红长得和产品缺陷一模一样**。
+    /// 为什么 ⑤ 用"贴端"而不是"贴段中心"：段中心要把段的**数量**抄进尺（产品常量），
+    /// 而"静止时药丸挨着轨道的一端"是这条位移档自己的语义，不需要知道一共几段。
     static func movingHoleRowReading(pixelsA: [UInt8], pixelsB: [UInt8], bytesPerRow: Int, y: Int,
                                      xRange: Range<Int>, marginWindow: Int, delta: Double,
                                      minTrackPixels: Int, minHolePixels: Int,
-                                     maxHoleFraction: Double, minMoveFraction: Double)
-        -> (extent: Range<Int>, holeA: Range<Int>, holeB: Range<Int>, margin: Double)? {
+                                     maxHoleFraction: Double, minMoveFraction: Double,
+                                     minHoleFraction: Double, edgeFlushFraction: Double,
+                                     widthToleranceFraction: Double)
+        -> (extent: Range<Int>, holeA: Range<Int>, holeB: Range<Int>, margin: Double, gate: String)? {
         guard !xRange.isEmpty, y >= 0, marginWindow > 0 else { return nil }
         let rowA = (0..<xRange.count).map { lumaAt(pixelsA, bytesPerRow, xRange.lowerBound + $0, y) }
         let rowB = (0..<xRange.count).map { lumaAt(pixelsB, bytesPerRow, xRange.lowerBound + $0, y) }
@@ -5232,43 +5327,95 @@ final class MotionFilmstripTests: XCTestCase {
         let move = abs(Double(holeB.range.lowerBound + holeB.range.upperBound
                               - holeA.range.lowerBound - holeA.range.upperBound) / 2.0)
         guard move >= minMoveFraction * width else { return nil }
-        return (extent, holeA.range, holeB.range, margin)
+        // 形状闸（R324）：三道都过才叫"过"，第一道不过就点名。
+        var gate = "过"
+        let wA = Double(holeA.range.count), wB = Double(holeB.range.count)
+        let tol = Swift.max(1.0, widthToleranceFraction * Swift.min(wA, wB))
+        let narrow = wA / width < minHoleFraction || wB / width < minHoleFraction
+        let edge = Swift.max(1.0, edgeFlushFraction * width)
+        let aLeft = Double(holeA.range.lowerBound - extent.lowerBound) <= edge
+        let aRight = Double(extent.upperBound - holeA.range.upperBound) <= edge
+        let bLeft = Double(holeB.range.lowerBound - extent.lowerBound) <= edge
+        let bRight = Double(extent.upperBound - holeB.range.upperBound) <= edge
+        let oppositeEnds = (aLeft && bRight) || (aRight && bLeft)
+        if narrow {
+            gate = "洞太窄"
+        } else if abs(wA - wB) > tol {
+            gate = "宽度不稳"
+        } else if !oppositeEnds {
+            gate = "不贴两端"
+        }
+        return (extent, holeA.range, holeB.range, margin, gate)
     }
 
-    /// 纯函数：逐行跑 `movingHoleRowReading`，返回**最长的一段连续通过行**（px，自上往下）。
-    /// 一段都不够 `minRows` ⇒ nil；调用方必须把它写成具名出口。
+    /// 纯函数：逐行跑 `movingHoleRowReading`，返回**最长的一段连续"过"行**（px，自上往下），
+    /// 并把被拒的候选段一起交回 —— 定位失败时"为什么失败"必须是**读数**，
+    /// 不能只留一句"读不出"（R323 那一版在 runner 上找错对象，而账上只看得见一个红）。
     static func movingHoleBand(pixelsA: [UInt8], pixelsB: [UInt8], bytesPerRow: Int, height: Int,
                                xRange: Range<Int>, marginWindow: Int, delta: Double,
                                minTrackPixels: Int, minHolePixels: Int, maxHoleFraction: Double,
-                               minMoveFraction: Double, yStride: Int, minRows: Int) -> Range<Int>? {
-        guard height > 0, yStride > 0, !xRange.isEmpty else { return nil }
-        var passing: [Bool] = []
+                               minMoveFraction: Double, minHoleFraction: Double,
+                               edgeFlushFraction: Double, widthToleranceFraction: Double,
+                               yStride: Int, minRows: Int) -> (band: Range<Int>?, report: String) {
+        guard height > 0, yStride > 0, !xRange.isEmpty else {
+            return (nil, "参数不成立(height=\(height) yStride=\(yStride) xRange=\(xRange))")
+        }
+        var verdicts: [String] = []
         var y = 0
         while y < height {
-            passing.append(movingHoleRowReading(pixelsA: pixelsA, pixelsB: pixelsB,
-                                                bytesPerRow: bytesPerRow, y: y, xRange: xRange,
-                                                marginWindow: marginWindow, delta: delta,
-                                                minTrackPixels: minTrackPixels,
-                                                minHolePixels: minHolePixels,
-                                                maxHoleFraction: maxHoleFraction,
-                                                minMoveFraction: minMoveFraction) != nil)
+            if let r = movingHoleRowReading(pixelsA: pixelsA, pixelsB: pixelsB,
+                                            bytesPerRow: bytesPerRow, y: y, xRange: xRange,
+                                            marginWindow: marginWindow, delta: delta,
+                                            minTrackPixels: minTrackPixels,
+                                            minHolePixels: minHolePixels,
+                                            maxHoleFraction: maxHoleFraction,
+                                            minMoveFraction: minMoveFraction,
+                                            minHoleFraction: minHoleFraction,
+                                            edgeFlushFraction: edgeFlushFraction,
+                                            widthToleranceFraction: widthToleranceFraction) {
+                verdicts.append(r.gate)
+            } else {
+                verdicts.append("非候选")
+            }
             y += yStride
         }
-        var best = (-1, -1)
-        var start = -1
-        for (i, ok) in passing.enumerated() {
-            if ok {
-                if start < 0 { start = i }
-            } else if start >= 0 {
-                if (i - start) * yStride > best.1 - best.0 { best = (start * yStride, i * yStride) }
-                start = -1
+        // 连续同判定的行段（"非候选"不进报告：它不是候选，没什么可解释的）
+        var groups: [(gate: String, from: Int, to: Int)] = []
+        var i = 0
+        while i < verdicts.count {
+            var j = i
+            while j + 1 < verdicts.count, verdicts[j + 1] == verdicts[i] { j += 1 }
+            if verdicts[i] != "非候选" {
+                groups.append((verdicts[i], i * yStride, Swift.min(height, (j + 1) * yStride)))
             }
+            i = j + 1
         }
-        if start >= 0, (passing.count - start) * yStride > best.1 - best.0 {
-            best = (start * yStride, Swift.min(height, passing.count * yStride))
+        let accepted: [(gate: String, from: Int, to: Int)] =
+            groups.filter { $0.gate == "过" && $0.to - $0.from >= minRows }
+        let best: (gate: String, from: Int, to: Int)? =
+            accepted.max { ($0.to - $0.from) < ($1.to - $1.from) }
+        let ranked: [(gate: String, from: Int, to: Int)] =
+            groups.sorted { ($0.to - $0.from) > ($1.to - $1.from) }
+        var parts: [String] = []
+        for g in ranked.prefix(4) {
+            // "过了形状闸但高度不够"也必须是读数：否则报告只会说"候选段=无"，
+            // 而真相是"候选找到了、被 minRows 掉了" —— 这两种坏的修法相反。
+            let label = (g.gate == "过" && g.to - g.from < minRows) ? "过但太短" : g.gate
+            parts.append("y" + String(g.from) + ".." + String(g.to) + "px 高"
+                + String(g.to - g.from) + "px 判=" + label)
         }
-        guard best.1 - best.0 >= minRows, best.1 > best.0 else { return nil }
-        return best.0..<best.1
+        var taken = "无"
+        var band: Range<Int>?
+        if let b = best {
+            taken = "y" + String(b.from) + ".." + String(b.to) + "px"
+            band = Range<Int>(uncheckedBounds: (lower: b.from, upper: b.to))
+        }
+        let joined = parts.isEmpty ? "无" : parts.joined(separator: " | ")
+        let candidateRows = verdicts.filter { $0 != "非候选" }.count
+        let head = "行=" + String(verdicts.count) + " 候选行=" + String(candidateRows)
+            + " 判定分布=" + Dictionary(grouping: verdicts, by: { $0 })
+                .map { $0.key + "×" + String($0.value.count) }.sorted().joined(separator: ",")
+        return (band, head + " 候选段=" + joined + " 取用=" + taken)
     }
 
     /// 纯函数：剖面上"与页底**不同档**"的第一列到最后一次出现的那一列 = 轨道的横向范围（剖面索引）。
@@ -5287,14 +5434,16 @@ final class MotionFilmstripTests: XCTestCase {
         return first..<(last + 1)
     }
 
-    /// 纯函数：轨道范围里"与页底同档"的最长连续段 = 药丸；连两级亮度一起交出来当前提读数。
+    /// 纯函数：轨道范围内**与页底同档**的最长连续段 = 药丸；连两级亮度一起交出来当前提读数。
     ///
-    /// 为什么"药丸 = 与页底同档"而不是"药丸 = 亮的那一段"：本机这一卷量出来
-    /// 轨道 52、药丸 36、页底 30 —— `VisualMaterial.sliderPill` 是 `.ultraThickMaterial`，
-    /// 材质在离屏捕获里落到**页底那一档**，于是胶囊读起来是轨道上的一个洞
-    /// （三个数都印在 `MOTION_PILL_RAMP` 那行，不许让这句话只活在注释里）。
-    /// 这不影响产品画了什么，但它决定尺该找哪一段：写死"亮的那段是药丸"会把洞当成轨道，
-    /// 中心就永远读到轨道两端去了（R33 那一族：探针的前提要先成立）。
+    /// 这一版锚回"页底"是 R324 的**公开更正**：本轮先换成过"没动的就是底"（`staticLevel`，
+    /// 两帧之间没动的列取众数档），想用掉极性；它在真窗口上被量死了 ——
+    /// 一颗在两段之间走的药丸，**轨道范围内没有一列是不动的**（A 帧盖住的那一半正是 B 帧露出来的那一半），
+    /// 于是 `staticLevel` 在胶囊行上恒为 nil：落刀前的本机读数 `候选行=5`，
+    /// 而那 5 行恰好是胶囊上下沿的抗锯齿边（高 6px 与 4px，都过不了形状闸）⇒ 判据全部走"找不到带子"出口。
+    /// 页底锚不讲究极性，它讲究的是"这一档里材质怎么落"：暗档实测 页底 30 / 轨道 52 / 药丸 36
+    /// ⇒ 药丸与页底同档（差 6 < delta 8）、轨道差 22 ⇒ 分得开。这句话只在**钉住的色档**里成立，
+    /// 所以它必须与 `Scenario.appearance` 一起读，单看就是又一次"把当天早上的电平当永恒"。
     static func pillRun(profile: [Double], margin: Double, delta: Double, extent: Range<Int>,
                         minPillPixels: Int)
         -> (range: Range<Int>, pillLuma: Double, trackLuma: Double)? {
@@ -5364,16 +5513,25 @@ final class MotionFilmstripTests: XCTestCase {
     }
 
     /// 两处调用共用的一颗参数表（写两遍就会漂：R38 那一族，同一个阈值不许有两个权威）。
-    private func measuredMovingHoleBand(_ a: Bitmap, _ b: Bitmap, scale: Double) -> Range<Int>? {
+    private func measuredMovingHoleBand(_ a: Bitmap, _ b: Bitmap, scale: Double)
+        -> (band: Range<Int>?, report: String) {
         let xLo = max(0, Int((1.0 * scale).rounded()))
         let xHi = min(a.width, Int((299.0 * scale).rounded()))
-        guard xHi - xLo >= 16, a.height == b.height, a.width == b.width else { return nil }
+        guard xHi - xLo >= 16, a.height == b.height, a.width == b.width else {
+            return (nil, "尺寸不成立(w=\(a.width) h=\(a.height) vs w=\(b.width) h=\(b.height))")
+        }
+        // 三道形状闸的参数都是**比例**，不写 px：2× 与 1× 上同一条 276pt 是两个像素数（R58 那一族）。
+        // 0.25 = "至少一段之宽"（两段的控件里一段占 50%，字缝远窄于此）；
+        // 0.04 ≈ 11pt@276pt 轨道 —— 药丸停在段里时与轨道端的间隙只有那 2pt 内缩；
+        // 0.15 = 刚体允许被抗锯齿吃掉一成宽。
         return Self.movingHoleBand(pixelsA: a.pixels, pixelsB: b.pixels, bytesPerRow: a.width * 4,
                                    height: a.height, xRange: xLo..<xHi,
                                    marginWindow: max(2, Int((6.0 * scale).rounded())),
                                    delta: 8, minTrackPixels: max(8, Int((20.0 * scale).rounded())),
                                    minHolePixels: max(4, Int((12.0 * scale).rounded())),
                                    maxHoleFraction: 0.8, minMoveFraction: 0.1,
+                                   minHoleFraction: 0.25, edgeFlushFraction: 0.04,
+                                   widthToleranceFraction: 0.15,
                                    yStride: 2, minRows: max(4, Int((6.0 * scale).rounded())))
     }
 
@@ -5387,7 +5545,9 @@ final class MotionFilmstripTests: XCTestCase {
         let scale = Double(a.height) / 520.0
         let xLo = max(0, Int((1.0 * scale).rounded()))
         let xHi = min(a.width, Int((299.0 * scale).rounded()))
-        guard xHi - xLo >= 16, let band = measuredMovingHoleBand(a, b, scale: scale) else { return nil }
+        guard xHi - xLo >= 16 else { return nil }
+        let (bandOpt, _) = measuredMovingHoleBand(a, b, scale: scale)
+        guard let band = bandOpt else { return nil }
         let xRange = xLo..<xHi
         let profileA = Self.columnMedianProfile(pixels: a.pixels, bytesPerRow: a.width * 4,
                                                 yRange: band, xRange: xRange)
@@ -5424,6 +5584,27 @@ final class MotionFilmstripTests: XCTestCase {
         let scenario = Scenario.filterPillSlide()
         let filmA = record(scenario)
         let filmB = record(scenario)
+        // 前提⓪（R324，排在帧数与带子之前）：这一卷**拍在哪一档外观里**必须是这把尺有对象的那一档。
+        // 三条各拦不同的坏法，合抄成一条就分不清是谁坏的：
+        //   · 场景请求的 == 尺要求的   ⇒ 拦"场景改档改错了"（M931 那一刀的靶）
+        //   · 胶片实际解析到的 == 尺要求的 ⇒ 拦"请求没落进胶片"（只改 NSApp / 只改 host 那一族）
+        //   · 两遍同一档               ⇒ 拦"第二遍跑到别的档里"（同臂两遍必须比同一个词）
+        // 为什么这条是红的、而不是出口：亮档里轨道与药丸只差 3 级（暗档 16–22 级），
+        // "带子找不到"在这两种情况下长得一模一样，而只有"档位对了仍然看不见"才是通道极限。
+        // 与 R323 给 A/B 开关立的那条前置同一形状：出口不许替一把没生效的请求说话。
+        XCTAssertEqual(Self.pillRampRequiredAppearanceName,
+                       Self.appearanceName(forRequested: scenario.appearance),
+                       "斜坡尺要求的色档是「\(Self.pillRampRequiredAppearanceName)」，而场景请求的是「"
+                       + Self.appearanceName(forRequested: scenario.appearance)
+                       + "」⇒ 逐行像素尺在没有对象的那一档里跑（亮档分离度只有 3 级）")
+        XCTAssertEqual(Self.pillRampRequiredAppearanceName, filmA.appearanceNameAtRecord,
+                       "这一卷实际拍在了「\(filmA.appearanceNameAtRecord)」档（请求「"
+                       + Self.appearanceName(forRequested: scenario.appearance)
+                       + "」没落进胶片）⇒ NSApp / window / host 三处里至少一处没跟上，"
+                       + "后面的带子读数与色档无关的那半条结论都作废")
+        XCTAssertEqual(filmA.appearanceNameAtRecord, filmB.appearanceNameAtRecord,
+                       "同臂两遍拍在不同色档里（A=\(filmA.appearanceNameAtRecord)"
+                       + " B=\(filmB.appearanceNameAtRecord)）⇒ 两遍比的不是同一张画面")
         guard filmA.motionFrames.count > 3, filmB.motionFrames.count > 3 else {
             emit("MOTION_NOT_RUN=too-few-frames pill-ramp A=\(filmA.motionFrames.count)"
                 + " B=\(filmB.motionFrames.count) ⇒ 斜坡无从逐帧判")
@@ -5446,9 +5627,10 @@ final class MotionFilmstripTests: XCTestCase {
         let scale = Double(head.height) / 520.0
         let xRange = max(0, Int((1.0 * scale).rounded()))
             ..< min(head.width, Int((299.0 * scale).rounded()))
-        guard let band = measuredMovingHoleBand(head, tail, scale: scale) else {
-            emit("MOTION_NOT_RUN=pill-ramp-no-band pill-slide-ramp 首末帧里读不出一颗'宽度稳定、位置会走'的洞"
-                + " ⇒ 这一台看不见那颗胶囊走过（不写产品事实，D-305）")
+        let (bandOpt, bandReport) = measuredMovingHoleBand(head, tail, scale: scale)
+        guard let band = bandOpt else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-band pill-slide-ramp 首末帧之间没有一段'结构成立、形状也像那颗胶囊'"
+                + "的连续行带 ⇒ 这一台看不见胶囊走过（不写产品事实，D-305）。为什么找不到：\(bandReport)")
             throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-band")
         }
         func profile(of image: CGImage) -> [Double] {
@@ -5477,10 +5659,15 @@ final class MotionFilmstripTests: XCTestCase {
             throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-track")
         }
         let extent = extLo..<extHi
+        // 参照档 = **页底那一档**（轨道之外那几列的中位数）：药丸在暗档里落到 36、页底 30、轨道 52，
+        // 所以"与页底同档的那一段"就是药丸。本轮先试过"两帧之间没动的列 = 底"（`staticLevel`），
+        // 它被真窗口的帧量死了 —— 两段之间的药丸一移动，轨道范围里就**没有一列是不动的**
+        // （本机读数 `候选行=5`，而那 5 行是胶囊上下沿的抗锯齿边）。理由写在 `pillRun` 上面。
+        let minPillPixels = max(4, Int((12.0 * scale).rounded()))
         func centers(_ profiles: [[Double]]) -> [Double] {
             profiles.map { values in
                 guard let run = Self.pillRun(profile: values, margin: margin, delta: 8, extent: extent,
-                                             minPillPixels: max(4, Int((12.0 * scale).rounded()))) else { return -1 }
+                                             minPillPixels: minPillPixels) else { return -1 }
                 return Double((run.range.lowerBound + run.range.upperBound) / 2 + xRange.lowerBound) / scale
             }
         }
@@ -5488,8 +5675,7 @@ final class MotionFilmstripTests: XCTestCase {
         // 分离度前提：轨道档与药丸档必须分得开（本机实测 52 对 36）。分不开就不是"没动"，
         // 是这台机器的材质把那两级洗成了同一档 ⇒ 具名出口，不许把它读成"胶囊不动"。
         let settledRun = Self.pillRun(profile: profilesA[profilesA.count - 1], margin: margin,
-                                      delta: 8, extent: extent,
-                                      minPillPixels: max(4, Int((12.0 * scale).rounded())))
+                                      delta: 8, extent: extent, minPillPixels: minPillPixels)
         let separation = settledRun.map { abs($0.trackLuma - $0.pillLuma) } ?? -1
         let trackWidthPt = Double(extent.count) / scale
         let tolerance = max(2.0, trackWidthPt * 0.02)
@@ -5498,9 +5684,11 @@ final class MotionFilmstripTests: XCTestCase {
             + " 轨道范围=\(String(format: "%.1f", Double(extent.lowerBound + xRange.lowerBound) / scale))"
             + "…\(String(format: "%.1f", Double(extent.upperBound + xRange.lowerBound) / scale))pt"
             + " 倍率=\(String(format: "%.2f", scale)) 页底=\(String(format: "%.1f", margin))"
+            + " 色档=胶片" + filmA.appearanceNameAtRecord + "/机器" + Self.appearanceName()
             + " 轨道=\(String(format: "%.1f", settledRun?.trackLuma ?? -1))"
             + " 药丸=\(String(format: "%.1f", settledRun?.pillLuma ?? -1))"
-            + " 分离=\(String(format: "%.1f", separation)) 容差=\(String(format: "%.1f", tolerance))pt")
+            + " 分离=\(String(format: "%.1f", separation)) 容差=\(String(format: "%.1f", tolerance))pt"
+            + " 定位=\(bandReport)")
         guard separation >= 8 else {
             emit("MOTION_NOT_RUN=pill-ramp-low-separation 轨道与药丸两档之差=\(String(format: "%.1f", separation))"
                 + " < 8 ⇒ 这一台的通道分不开这两级，斜坡品质无从逐帧判（分离度是量出来的，不是假设）")
@@ -5532,6 +5720,29 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(vA.label, "单调",
             "药丸的横移读成了「\(vA.label)」：\(vA.detail) ⇒ MC-1 说程序触发的位移不给过冲，"
             + "而『回头』正是过冲的像素形状 —— 这是产品事实，改曲线，不是改这条判据。")
+    }
+
+    /// R324 / 缺席计数：这一卷的场景工厂**有几颗钉了色档**，没钉的报名字。
+    ///
+    /// 本轮的靶是逐行像素尺（胶囊），它已经被 `testFilterPillRampIsMonotone` 的前提⓪钉住了；
+    /// 剩下那些工厂今天仍跟着系统的"自动"走 —— 它们的读数（帧数、峰值、比例带）与色档**弱**相关，
+    /// 所以本轮不把它们一起钉上（那会在同一笔提交里改动十几条判据的读数而一条也没重测）。
+    /// 这条不写"已判不做"，它写的是**数出来的缺席**：名字、颗数、以及"哪一颗必须钉着"那颗棘轮。
+    func testFilmScenarioAppearancePinCensusNamesEveryAbsence() throws {
+        let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        let census = Self.scenarioPinCensus(code: text)
+        let total = census.pinned.count + census.unpinned.count
+        let unpinnedList = census.unpinned.sorted().joined(separator: ",")
+        emit("MOTION_SCENARIO_APPEAR 工厂=\(total) 钉了=\(census.pinned.count)"
+            + " 没钉=\(census.unpinned.count)"
+            + " 钉了名单=\(census.pinned.sorted().joined(separator: ","))"
+            + " 没钉名单=\(unpinnedList.isEmpty ? "无" : unpinnedList)")
+        XCTAssertGreaterThanOrEqual(total, 10,
+            "只认出 \(total) 颗场景工厂（这台文件里 grep `-> Scenario {` 是十几颗）"
+            + " ⇒ 点名器瞎了，下面那句『没钉名单』不能算读数")
+        XCTAssertTrue(census.pinned.contains("filterPillSlide"),
+            "胶囊那两颗判据（斜坡尺 / 过程证人）用的工厂 `filterPillSlide` 没钉色档"
+            + " ⇒ 前提⓪要拦的那件事就在这儿：亮档里轨道与药丸只差 3 级，尺没有对象")
     }
 
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
@@ -6677,10 +6888,22 @@ final class MotionFilmstripTests: XCTestCase {
         /// 所以用它必须同时被 `testBandCaptureIsCheaperAndStillSeesTheMotion` 钉住
         /// "裁掉的那部分里没有被测的动效"。
         let captureRect: (@MainActor (NSView) -> NSRect)?
+        /// 这一卷**钉死**在哪一档外观里拍（R324）。`nil` = 不钉，跟着系统的"自动"走。
+        ///
+        /// 为什么要有这一层，而且它不是风格偏好：以前所有胶片场景都不钉，于是同一份判据
+        /// 在本机"自动"色档下**白天与夜里量的不是同一张画面**。R324 现读同一卷 `filter-pill-slide`：
+        /// 暗档 页底 30 / 轨道 52 / 药丸 36（两档相差 16–22 级），
+        /// 亮档 页底 230 / 轨道 230 / 药丸 233（只差 **3** 级，低于这把尺的 `delta=8`）
+        /// ⇒ 亮档里那条"会走的洞"一个候选行都读不出来（`候选行=0`），
+        /// 而这不是产品事实，是尺在同一台机器上换了对象。
+        /// 判据用的时间戳、帧数、峰值全都与色档无关，唯独**逐行像素尺**与材质档强相关 ——
+        /// 所以钉色档的不是审美，是"这一把尺今天量的是哪张图"。
+        let appearance: NSAppearance.Name?
 
         init(name: String, size: NSSize,
              prepare: (@MainActor (HistoryStore) -> Void)? = nil,
              declaredDurationMilliseconds: Double = 0,
+             appearance: NSAppearance.Name? = nil,
              root: (@MainActor (HistoryStore) -> AnyView)? = nil,
              storeFactory: (@MainActor () -> HistoryStore)? = nil,
              captureRect: (@MainActor (NSView) -> NSRect)? = nil,
@@ -6692,6 +6915,7 @@ final class MotionFilmstripTests: XCTestCase {
             self.root = root
             self.storeFactory = storeFactory
             self.captureRect = captureRect
+            self.appearance = appearance
             self.trigger = trigger
         }
 
@@ -6927,6 +7151,11 @@ final class MotionFilmstripTests: XCTestCase {
             Scenario(name: "filter-pill-slide", size: NSSize(width: 300, height: 520),
                      prepare: { store in store.perform(.updateFilter(.all)) },
                      declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000,
+                     // R324：这两条判据（斜坡尺 / 过程证人）都是**逐行像素尺**，而亮档里
+                     // 轨道与药丸只差 3 级（暗档 16–22 级）⇒ 不钉色档就等于把尺的对象交给时钟。
+                     // 钉的是"尺有对象的那一档"，不是"好看的那一档"；理由写在 `Scenario` 的
+                     // `appearance` 字段上面（页底/轨道/药丸三档的现读数以那个字段为准）。
+                     appearance: .darkAqua,
                      root: { store in
                          AnyView(
                              HistorySidebarView(historyStore: store)
@@ -6985,6 +7214,14 @@ final class MotionFilmstripTests: XCTestCase {
         /// 没有这个数，出口就会把一把坏开关读成"这台机器判不了" —— 那是把真红洗成 skip。
         /// M923 那一刀（把 `animationsEnabled = false` 删掉）今天正是被这条抓回来的。
         var animationsEnabledAtRecord: Bool = true
+
+        /// 抓这一卷时**实际解析到**的色档（"亮" / "暗" / "未知" / "未记录"，R324）。
+        ///
+        /// 与场景请求的那一档分开记，理由和 `animationsEnabledAtRecord` 一模一样：
+        /// "我请求了暗档"与"胶片真的拍在暗档里"在两棵不同的树上会长得一样，
+        /// 而出口（"这一台的材质把两档洗成同一档"）只许替后者说话，不许替一把没生效的请求说话。
+        /// 默认值是 `"未记录"` 而不是 `"暗"`：忘了赋值就一定会红在前提上，不会被读成通过。
+        var appearanceNameAtRecord: String = "未记录"
 
         /// 这一卷抓帧成本的**中位数**（ms）。−1 = 没量。
         ///
@@ -7098,10 +7335,22 @@ final class MotionFilmstripTests: XCTestCase {
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: scenario.size.width, height: scenario.size.height),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         let host = NSHostingView(rootView: scenario.root?(store) ?? AnyView(ContentView(historyStore: store)))
+        // R324：场景钉了色档就**三处一起钉**。`UICaptureHarness` 顶上第 3 条规矩记过同一件事：
+        // 只注入视图层，AppKit 承载的控件（List / NSScrollView 的底）仍按 aqua 取色，
+        // 于是"请求了"与"钉住了"是两回事 —— 而判据信的是后者（见 `Film.appearanceNameAtRecord`）。
+        let previousAppAppearance = NSApplication.shared.appearance
+        if let requested = scenario.appearance.map({ NSAppearance(named: $0) }) {
+            NSApplication.shared.appearance = requested
+            window.appearance = requested
+            host.appearance = requested
+        }
         window.contentView = host
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        defer { window.orderOut(nil) }
+        defer {
+            NSApplication.shared.appearance = previousAppAppearance
+            window.orderOut(nil)
+        }
         RunLoop.main.run(until: Date().addingTimeInterval(0.45))
 
         // R57 / BACKLOG 77 路 a：只抓被测元素那一条带。`fullCapture` 是 A/B 的另一臂。
@@ -7158,14 +7407,19 @@ final class MotionFilmstripTests: XCTestCase {
         // 若 N 是 runloop 没醒，那两条都白做（而 `clock-coarse-in-window` 只会一遍遍报"N 太大"）。
         // 这一行是**证据**，不是判据：它不决定红绿，决定的是 BACKLOG 77 那三条候选路该走哪条。
         let pixels = grabber.frames.first.map { "\($0.width)×\($0.height)px" } ?? "无帧"
+        // R324：每一卷都把自己的**实际**色档印出来 —— 逐行像素尺的读数离开这一格就没有解释。
+        // （同一台机器 亮档 页底/轨道/药丸 = 230/230/233、暗档 = 30/52/36，差 5 倍的分离度。）
+        let resolvedAppearance = Self.appearanceName(of: host.effectiveAppearance)
         emit(String(format: "MOTION_GRAB %@ 帧数=%d 抓帧中位=%.1fms 抓帧最慢=%.1fms "
-                     + "视图=%.0f×%.0fpt 像素=%@ 声明=%dms",
+                     + "视图=%.0f×%.0fpt 像素=%@ 声明=%dms 色档=%@ 请求=%@",
                      scenario.name, grabber.frames.count, grabber.medianGrabMilliseconds,
                      grabber.worstGrabMilliseconds, host.bounds.width, host.bounds.height, pixels,
-                     Int(scenario.declaredDurationMilliseconds)))
+                     Int(scenario.declaredDurationMilliseconds), resolvedAppearance,
+                     Self.appearanceName(forRequested: scenario.appearance)))
         return Film(frames: grabber.frames, stamps: grabber.stamps,
                     triggerFrame: triggerFrame, clockIsWarm: clockIsWarm,
                     animationsEnabledAtRecord: MotionCatalog.animationsEnabled,
+                    appearanceNameAtRecord: resolvedAppearance,
                     medianGrabMilliseconds: grabber.medianGrabMilliseconds,
                     worstGrabMilliseconds: grabber.worstGrabMilliseconds)
     }

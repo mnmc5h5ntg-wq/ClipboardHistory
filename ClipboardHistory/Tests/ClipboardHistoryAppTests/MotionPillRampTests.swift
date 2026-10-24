@@ -89,6 +89,9 @@ final class MotionPillRampTests: XCTestCase {
 
     // MARK: - ③ 洞 = 与页底同档的那一段（不是亮的那一段）
 
+    /// 锚是"两帧之间没动的那一档"（轨道），不是"页底那一档"：
+    /// 暗档里药丸 36 恰好与页底 30 同档（R323 据此写死了锚），亮档里药丸 255 比轨道 230 **更亮** ——
+    /// 同一句"药丸与页底同档"在两个时刻一个是真的一个是假的（本机 09:07 复跑就是后者）。
     func testPillRunIsTheHoleThatReadsLikeThePage() {
         let values: [Double] = [30, 30, 52, 52, 36, 36, 36, 52, 52, 30]
         let run = MotionFilmstripTests.pillRun(profile: values, margin: 30, delta: 8,
@@ -110,31 +113,75 @@ final class MotionPillRampTests: XCTestCase {
                        2..<4, "同一颗尺，地板降到 2 就该选中那两颗 —— 拦的是宽度不是极性")
     }
 
-    // MARK: - ④ 行带定位：洞必须**会走**
+    /// 亮档形状的**反向**证人（R324）：本机自动外观转到亮档之后，同一卷读到的三档是
+    /// 页底 230 / 轨道 230 / 药丸 233（本轮临时逐列转储读出来的；那把临时尺用完就撤了，
+    /// 所以这里复现的是**那个形状**，不是那天的绝对数）。按这把尺的 `delta=8`：
+    /// 轨道与页底同档 ⇒ `trackExtent` 找不到轨道 ⇒ 一个候选都没有。
+    /// 这一格存在的理由是那条钉色档的前提不是审美：亮档里这把尺**没有对象**，
+    /// 于是"胶囊走过没有"会被读成"看不见"，而那既是错的结论也是错的归因。
+    func testBandLocatorHasNoObjectInTheMeasuredLightAppearance() {
+        let width = 300, height = 30
+        var a = Frame(width: width, height: height, grey: 230)
+        var b = Frame(width: width, height: height, grey: 230)
+        a.paint(xRange: 14..<286, yRange: 4..<20, grey: 230)
+        b.paint(xRange: 14..<286, yRange: 4..<20, grey: 230)
+        a.paint(xRange: 16..<146, yRange: 4..<20, grey: 233)
+        b.paint(xRange: 154..<286, yRange: 4..<20, grey: 233)
+        let got = band(a, b, width: width, height: height)
+        XCTAssertNil(got.band, "亮档那三档只差 3 级 ⇒ 这把尺必须说'没有对象'，"
+            + "不许硬框出一条带子替它作证：" + got.report)
+        XCTAssertTrue(got.report.contains("候选行=0"),
+            "报告必须点名'一个候选都没有'（否则判据只能干说一句找不到）：" + got.report)
+    }
 
-    private func reading(_ a: Frame, _ b: Frame, y: Int, minMove: Double = 0.1)
-        -> (extent: Range<Int>, holeA: Range<Int>, holeB: Range<Int>, margin: Double)? {
+    // MARK: - ④ 行带定位：洞要**会走**，还要**长得像那颗胶囊**
+
+    /// 三道结构闸 + 三道形状闸的参数表（与判据侧 `measuredMovingHoleBand` 同一组数）。
+    /// 写两遍就会漂：R38 那一族（同一个阈值不许有两个权威）—— 所以这里也走同一组常量。
+    private func reading(_ a: Frame, _ b: Frame, y: Int, minMove: Double = 0.1,
+                         minHole: Double = 0.25, edgeFlush: Double = 0.04,
+                         widthTol: Double = 0.15)
+        -> (extent: Range<Int>, holeA: Range<Int>, holeB: Range<Int>, margin: Double, gate: String)? {
         MotionFilmstripTests.movingHoleRowReading(
             pixelsA: a.bytes, pixelsB: b.bytes, bytesPerRow: a.bytesPerRow, y: y,
             xRange: 0..<a.width, marginWindow: 3, delta: 8, minTrackPixels: 5,
-            minHolePixels: 3, maxHoleFraction: 0.8, minMoveFraction: minMove)
+            minHolePixels: 3, maxHoleFraction: 0.8, minMoveFraction: minMove,
+            minHoleFraction: minHole, edgeFlushFraction: edgeFlush, widthToleranceFraction: widthTol)
+    }
+
+    private func band(_ a: Frame, _ b: Frame, width: Int, height: Int, minRows: Int = 2)
+        -> (band: Range<Int>?, report: String) {
+        MotionFilmstripTests.movingHoleBand(
+            pixelsA: a.bytes, pixelsB: b.bytes, bytesPerRow: a.bytesPerRow, height: height,
+            xRange: 0..<width, marginWindow: 3, delta: 8, minTrackPixels: 5, minHolePixels: 3,
+            maxHoleFraction: 0.8, minMoveFraction: 0.1, minHoleFraction: 0.25,
+            edgeFlushFraction: 0.04, widthToleranceFraction: 0.15, yStride: 1, minRows: minRows)
+    }
+
+    /// 合成一张"胶囊行"：轨道 4..<36，洞从**贴左端**走到**贴右端**（静止态药丸占满一整段）。
+    private func pillFrames() -> (a: Frame, b: Frame) {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        a.paint(xRange: 4..<16, yRange: 0..<6, grey: 36)
+        b.paint(xRange: 24..<36, yRange: 0..<6, grey: 36)
+        return (a, b)
     }
 
     func testMovingHoleReadingRejectsAHoleThatStaysPut() {
-        var a = Frame(width: 40, height: 6, grey: 30)
-        a.paint(xRange: 4..<36, yRange: 2..<3, grey: 52)
-        a.paint(xRange: 5..<17, yRange: 2..<3, grey: 36)
-        let b = a
-        XCTAssertNil(reading(a, b, y: 2),
-            "两帧同一颗洞停在同一处 ⇒ 这不是「走过」，不许当行带证人（否则静止的一行会被读成位移）")
-        XCTAssertEqual(reading(a, b, y: 2, minMove: 0.0)?.holeA, 5..<17,
-            "把走量要求降到 0 就该读出那 12 列 —— 拦的是「会不会走」，不是形状")
+        let pill = pillFrames()
+        XCTAssertNil(reading(pill.a, pill.a, y: 2),
+            "两帧同一颗洞停在同一处 ⇒ 这不是「走过」，不许当行带证人（否则静止的一行会被读成位移）。"
+            + "注意它还有一层意思：两帧不动时亮区的并集就是轨道那半段，洞整个落在并集之外 ⇒ 连候选都不是")
+        let both = reading(pill.a, pill.b, y: 2)
+        XCTAssertEqual(both?.gate, "过", "正对照：贴端走过、宽度稳定的那颗洞必须被判成候选（六闸全过）")
+        XCTAssertEqual(both?.holeA, 4..<16, "首帧的洞必须读成贴左端那 12 列")
+        XCTAssertEqual(both?.holeB, 24..<36, "末帧的洞必须读成贴右端那 12 列")
     }
 
     func testMovingHoleReadingRejectsARowReplacedWholesale() {
-        var a = Frame(width: 40, height: 6, grey: 30)
-        a.paint(xRange: 4..<36, yRange: 2..<3, grey: 52)
-        a.paint(xRange: 5..<17, yRange: 2..<3, grey: 36)
+        let (a, _) = pillFrames()
         var b = Frame(width: 40, height: 6, grey: 30)
         // 整行换内容、没有洞：这是"列表重排"那一类的形状。
         b.paint(xRange: 4..<36, yRange: 2..<3, grey: 60)
@@ -143,27 +190,96 @@ final class MotionPillRampTests: XCTestCase {
             + "但那里没有一颗宽度稳定、位置会走的洞")
     }
 
+    /// R324 的主证：runner 那一跑找到的就是这种"走在中间"的洞（列表里的一行）。
+    func testMovingHoleReadingRejectsAHoleThatWandersInTheMiddle() {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        // 洞在中间走：10..<22 → 18..<30 —— 两端都不贴（静止的胶囊必然占满一整段）。
+        a.paint(xRange: 10..<22, yRange: 0..<6, grey: 36)
+        b.paint(xRange: 18..<30, yRange: 0..<6, grey: 36)
+        XCTAssertEqual(reading(a, b, y: 2)?.gate, "不贴两端",
+            "结构闸全过、形状闸必须点名 —— 这一格就是 runner 上那朵假红的形状（RUN=40032708615）")
+    }
+
+    func testMovingHoleReadingRejectsAStretchingHole() {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        a.paint(xRange: 4..<16, yRange: 0..<6, grey: 36)
+        b.paint(xRange: 26..<36, yRange: 0..<6, grey: 36)   // 10 列 vs 12 列：刚体不许拉长
+        XCTAssertEqual(reading(a, b, y: 2)?.gate, "宽度不稳",
+            "两帧里洞的宽度差两列（>15%）⇒ 那不是同一颗胶囊在走，是两处不同的东西各自成了洞")
+        XCTAssertEqual(reading(a, b, y: 2, widthTol: 0.6)?.gate, "过",
+            "把宽度容差放宽到 60% 就该放行 —— 每道闸只管自己那一条，不许互相顶替")
+    }
+
+    func testMovingHoleReadingRejectsASlitTooNarrowForASegment() {
+        var a = Frame(width: 40, height: 6, grey: 30)
+        var b = Frame(width: 40, height: 6, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        a.paint(xRange: 4..<8, yRange: 0..<6, grey: 36)
+        b.paint(xRange: 32..<36, yRange: 0..<6, grey: 36)   // 4/32 = 12.5%：贴两端但太窄
+        XCTAssertEqual(reading(a, b, y: 2)?.gate, "洞太窄",
+            "字缝也能贴边 —— 所以「至少一段之宽」这一道不能省")
+    }
+
     func testMovingHoleBandChoosesThePillRowNotTheListRow() {
         let width = 40, height = 30
         var a = Frame(width: width, height: height, grey: 30)
         var b = Frame(width: width, height: height, grey: 30)
-        // 胶囊：第 4…9 行，轨道 52，洞从 5..<17 走到 22..<34。
-        a.paint(xRange: 4..<36, yRange: 4..<10, grey: 52)
-        a.paint(xRange: 5..<17, yRange: 4..<10, grey: 36)
-        b.paint(xRange: 4..<36, yRange: 4..<10, grey: 52)
-        b.paint(xRange: 22..<34, yRange: 4..<10, grey: 36)
-        // 列表：第 12…29 行整片换内容（比胶囊那 6 行高一整倍）。
+        // 胶囊：第 0…5 行，轨道 52，洞从**贴左端** 4..<16 走到**贴右端** 24..<36。
+        a.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<6, grey: 52)
+        a.paint(xRange: 4..<16, yRange: 0..<6, grey: 36)
+        b.paint(xRange: 24..<36, yRange: 0..<6, grey: 36)
+        // 列表行（runner 那一跑的真实形状）：底色 90 两帧都不动，底上一块内容从左中走到右中。
         a.paint(xRange: 4..<36, yRange: 12..<30, grey: 90)
-        b.paint(xRange: 4..<36, yRange: 12..<30, grey: 60)
-        let band = MotionFilmstripTests.movingHoleBand(
-            pixelsA: a.bytes, pixelsB: b.bytes, bytesPerRow: a.bytesPerRow, height: height,
-            xRange: 0..<width, marginWindow: 3, delta: 8, minTrackPixels: 5, minHolePixels: 3,
-            maxHoleFraction: 0.8, minMoveFraction: 0.1, yStride: 1, minRows: 2)
-        XCTAssertEqual(band, 4..<10,
-            "行带必须是那颗会走的洞所在的 6 行。本机第一版按「哪些行在变」定位，"
+        b.paint(xRange: 4..<36, yRange: 12..<30, grey: 90)
+        a.paint(xRange: 10..<22, yRange: 12..<18, grey: 30)
+        b.paint(xRange: 18..<30, yRange: 12..<18, grey: 30)
+        let got = band(a, b, width: width, height: height)
+        XCTAssertEqual(got.band, 0..<6,
+            "行带必须是那颗贴端走过的洞所在的 6 行。本机第一版按「哪些行在变」定位，"
             + "量出来是 126…520pt（列表那一片），比胶囊大一个数量级的一段直接赢掉了定位")
-        XCTAssertFalse((12..<30).overlaps(band ?? 0..<0),
-            "列表那一块不许进带：它整片在变，但没有一颗位置会走的洞")
+        XCTAssertTrue(got.report.contains("不贴两端"),
+            "被拒的候选要能被点名（runner 那一跑就是缺这个才只留下一朵红）：\(got.report)")
+    }
+
+    func testMovingHoleBandDeclinesWithAReportInsteadOfSilence() {
+        var a = Frame(width: 40, height: 12, grey: 30)
+        var b = Frame(width: 40, height: 12, grey: 30)
+        a.paint(xRange: 4..<36, yRange: 0..<12, grey: 52)
+        b.paint(xRange: 4..<36, yRange: 0..<12, grey: 52)
+        a.paint(xRange: 10..<22, yRange: 0..<12, grey: 36)
+        b.paint(xRange: 18..<30, yRange: 0..<12, grey: 36)
+        let got = band(a, b, width: 40, height: 12)
+        XCTAssertNil(got.band, "整幅都是那颗「走在中间」的洞 ⇒ 一段都不能取")
+        XCTAssertTrue(got.report.contains("候选段=y0..12px"),
+            "报告要给出被拒的段在哪：\(got.report)")
+        XCTAssertTrue(got.report.contains("取用=无"), "取用了什么必须一起印：\(got.report)")
+    }
+
+    /// 2× 尺度下的正对照：把本机量出来的那套数（页底 30 / 轨道 52 / 药丸 36、
+    /// 轨道 28..<572px、药丸 32..<292 → 308..<572、行带 102..<150）原样合成一遍，
+    /// 用**判据侧同一组参数**跑一次 —— 这一格红就说明尺自己坏了，而不是那台机器的画面变了。
+    func testBandLocatorFindsTheLocalScalePill() {
+        let width = 600, height = 200
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 28..<572, yRange: 102..<150, grey: 52)
+        b.paint(xRange: 28..<572, yRange: 102..<150, grey: 52)
+        a.paint(xRange: 32..<292, yRange: 102..<150, grey: 36)
+        b.paint(xRange: 308..<572, yRange: 102..<150, grey: 36)
+        let got = MotionFilmstripTests.movingHoleBand(
+            pixelsA: a.bytes, pixelsB: b.bytes, bytesPerRow: width * 4, height: height,
+            xRange: 2..<598, marginWindow: 12, delta: 8, minTrackPixels: 40, minHolePixels: 24,
+            maxHoleFraction: 0.8, minMoveFraction: 0.1, minHoleFraction: 0.25,
+            edgeFlushFraction: 0.04, widthToleranceFraction: 0.15, yStride: 2, minRows: 12)
+        XCTAssertEqual(got.band, 102..<150, "本机尺度下那颗贴端走过的洞必须被取用：\(got.report)")
     }
 
     // MARK: - ⑤ 三臂相同这条**出口**自己要有正对照（出口最容易变成洗红的水）
@@ -223,6 +339,43 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertTrue(detail.contains("位移=138.0"), "结论行要能复查：\(detail)")
         XCTAssertTrue(detail.contains("容差=5.0"), "容差得跟着印出来，不然读者无法判它松紧：\(detail)")
         XCTAssertTrue(detail.contains("帧数=2"), "帧数也要印：\(detail)")
+    }
+
+    // MARK: - 缺席点名器的正对照（R324）：先证明它数得对，才有资格报「没钉的有几颗」
+
+    /// `MotionFilmstripTests.scenarioPinCensus` 读的是**自己那本文件**，所以它没有第二只眼。
+    /// 这一格就是那只第二只眼：喂一段合成源码，三颗工厂一颗钉了、两颗没钉，
+    /// 外加一条注释里也写着 `appearance:` 与一颗注释掉的工厂 —— 那两条都不许进名单。
+    /// 没有这一格，本机那句"没钉=N 颗"就只是又一次"我又敲错了一扇门"。
+    ///
+    /// 两条注释各拦一种坏法，别混成一条：注释里那颗 `static func … -> Scenario {` 是被
+    /// **签名样式**认不出的（行首是 `//`），所以它不进名单与剥注释无关；而正文里那条写着
+    /// `appearance:` 的注释**只有靠剥注释**才不会把没钉的 `plainOne` 说成钉了 —— M936 那一刀打的正是后者。
+    func testScenarioPinCensusSeparatesPinnedFromUnpinnedAndSkipsComments() {
+        let code = [
+            "struct Holder {",
+            "    // static func commentedOut() -> Scenario {   ← 注释里的一颗，被签名样式认不出",
+            "        static func pinnedOne() -> Scenario {",
+            "            Scenario(name: \"a\", appearance: .darkAqua) { _ in }",
+            "        }",
+            "        static func plainOne() -> Scenario {",
+            "            // 这一行注释里写着 appearance: ，它不算钉了（剥注释那一格就红在这里）",
+            "            Scenario(name: \"b\") { _ in }",
+            "        }",
+            "        static func deepOne() -> Scenario {",
+            "            Scenario(name: \"c\",",
+            "                     root: { store in AnyView(Text(\"x\")) }) { _ in }",
+            "        }",
+            "    static func otherShape() -> [Scenario] { [] }",
+            "}"
+        ].joined(separator: "\n")
+        let census = MotionFilmstripTests.scenarioPinCensus(code: code)
+        XCTAssertEqual(["pinnedOne"], census.pinned.sorted(),
+            "钉了色档的名单读成了 \(census.pinned) ⇒ 要么把注释里的 `appearance:` 数进来了，"
+            + "要么把真钉了的认成了没钉（两条都会让本机那句『没钉=N 颗』是假的）")
+        XCTAssertEqual(["deepOne", "plainOne"], census.unpinned.sorted(),
+            "没钉的名单读成了 \(census.unpinned) ⇒ 点名器漏认工厂（注释里那颗"
+            + " `commentedOut` 与 `-> [Scenario]` 那种形状都不该进来）")
     }
 
     // MARK: - ⑦ 亮度口径与捕获卷那颗尺同源
