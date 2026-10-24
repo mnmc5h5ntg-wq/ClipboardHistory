@@ -43,12 +43,13 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
 400（CJK 强调的墨量尺）本轮**仍然没量**。
 
 下一轮（R339）的靶：⓪ 读 CI 配对（成对：run id ↔ commit，现读自 `scripts/ci_read.py latest`）——
+**R338 追记现读**：RUN=40143510717 ↔ 526e8d7（账半，回填时 status=in_progress / conclusion 空 ⇒ 只登记不轮询，R140）；代码半 d8e6486 的 run id 现读未取（`ci_read latest` 只给 tip 那一跑）。
 **R337 那一跑已读完**：`RUN=40140745366 sha=3954d1d conclusion=failure`，失败步骤两格（STEP[15] 全量卷 / STEP[17] 捕获闸），
 三朵红全在 `testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces` 这一格上（「dark：可行集是 空集，而产品把悬停画在 77 ⇒ 落在窗口外面」/「两段读到同一个灰阶（70）⇒ 矩形没打在胶囊上」）—— 本机同一卷 0 failures ⇒ 它是**按机器才判得了**那一类，
 而它在三本账里没有名字 ⇒ 第一件事是 411：先决定"按机器的具名出口"还是"在 runner 上重新标定"，
 两条修法相反，不许用"CI 一直是红的"糊过去。R337 代码半 b232c9a 的 run id 按 sha 逐笔问。
 这一跑还要答：⓪a 新守卫 `test_ledger_citations.py` 三格在 runner 上签不签（它读台账本身 ⇒ 该同数）；
-⓪b 本轮新基线（`CHANGED=0` 那四张）在 runner 上是不是 changed；⓪c 电池例数两机对账（本机现读 629）。
+⓪b 本轮随基线更新的那几张（与上一轮逐张比：比了 182 张、变了 4 张，全是 HTML 两档 × 渲染/原文）在 runner 上会不会被判成 changed —— 基线**更新之后**再对才是 CHANGED=0，两个数不是一件事；⓪c 电池例数两机对账（本机现读 629）。
 → ① **BACKLOG 405**：把"标题里那半句产品 K 文件"立成定义并变成电池里会红的门
   （回顾尺现读 `扫了=865 笔 / 44 轮 内部不一致=2`；R334/R335 走显式豁免）。它比动效那一串便宜，而且是审计链自己的可读性。
 → ② 动效主线仍排队：399（亮档悬停换轴，先量系统那颗的方向）、390 的 before/after、389 的时长、

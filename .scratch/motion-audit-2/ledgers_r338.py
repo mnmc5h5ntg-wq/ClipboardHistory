@@ -460,7 +460,7 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
 而它在三本账里没有名字 ⇒ 第一件事是 %d：先决定"按机器的具名出口"还是"在 runner 上重新标定"，
 两条修法相反，不许用"CI 一直是红的"糊过去。R%d 代码半 b232c9a 的 run id 按 sha 逐笔问。
 这一跑还要答：⓪a 新守卫 `test_ledger_citations.py` 三格在 runner 上签不签（它读台账本身 ⇒ 该同数）；
-⓪b 本轮新基线（`CHANGED=%s` 那四张）在 runner 上是不是 changed；⓪c 电池例数两机对账（本机现读 %s）。
+⓪b 本轮随基线更新的那几张（与上一轮逐张比：比了 %s 张、变了 %s 张，全是 HTML 两档 × 渲染/原文）在 runner 上会不会被判成 changed —— 基线**更新之后**再对才是 CHANGED=0，两个数不是一件事；⓪c 电池例数两机对账（本机现读 %s）。
 → ① **BACKLOG 405**：把"标题里那半句产品 K 文件"立成定义并变成电池里会红的门
   （回顾尺现读 `%s`；R334/R335 走显式豁免）。它比动效那一串便宜，而且是审计链自己的可读性。
 → ② 动效主线仍排队：399（亮档悬停换轴，先量系统那颗的方向）、390 的 before/after、389 的时长、
@@ -480,7 +480,7 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
        ARM_TOTAL[0], ARM_TOTAL[1], GATE_LINE, BATT, BATT_SKIP, STREAK_N, AUDIT_N,
        FD[1], B_TOKENIZER,
        ROUND + 1, ROUND - 1, CI_RUN_ID, CI_SHA, CI_CONC, CI_FAIL_TEST, CI_MSG1, CI_MSG2,
-       B_RUNNER, ROUND - 1, BASE[1], BATT, CLAIMS_SHORT, u"1.23")
+       B_RUNNER, ROUND - 1, FD[0], FD[1], BATT, CLAIMS_SHORT, u"1.23")
 
 sta2 = rd(STA)
 pos = sta2.index(line_with(sta2, u"## R%d 状态" % (ROUND - 1), u"STATE 上一轮节标题"))
