@@ -8231,7 +8231,7 @@ final class UICaptureTests: XCTestCase {
       <h1>季度报告</h1>
       <p style="color:#0a0">一段带<b>内联样式</b>与<em>强调</em>的正文，读起来应该像页面而不像源码。</p>
       <ul><li>甲项</li><li>乙项</li></ul>
-      <img src="https://tracker.example/chart.png" alt="季度趋势图（图片未加载）">
+      <img src="https://tracker.example/chart.png" data-alt="埋点属性写的假说明" alt="季度趋势图（图片未加载）">
       <img src="https://tracker.example/pixel.gif" width="1" height="1">
       <p foo-src="https://tracker.example/unnamed">属性名不在名单里的那一种</p>
       <p>结尾一句：<a href="https://example.com/doc">参考文档</a></p>

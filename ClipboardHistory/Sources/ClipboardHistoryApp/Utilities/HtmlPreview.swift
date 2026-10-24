@@ -149,10 +149,14 @@ enum HtmlSanitizer {
         + "(\"[^\"]*(?://|data:|url\\()[^\"]*\"|'[^']*(?://|data:|url\\()[^']*')",
         [.caseInsensitive])
     private static let styleAttrs = regex("\\s+style\\s*=\\s*(\"([^\"]*)\"|'([^']*)')", [.caseInsensitive])
-    /// `<img>` 本体与它的 `alt`（R336 / BACKLOG 401）。
+    /// `<img>` 本体与它的 `alt`（R336 / BACKLOG 401；取属性那一步在 R338 换掉，见 `altAttribute`）。
     private static let imgTag = regex("<img\\b[^>]*/?>", [.caseInsensitive, .dotMatchesLineSeparators])
-    private static let altAttr = regex("\\balt\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')",
-                                       [.caseInsensitive, .dotMatchesLineSeparators])
+    /// 一个标签里的「属性名 = 值」对。名字必须从**串首或空白**开始，且整段是一个合法属性名
+    /// ⇒ `data-alt` 的名字是 `data-alt`（不是 `alt`），而 `title='… alt="x" …'` 的名字是 `title`。
+    /// R338：这是把 `\balt\s*=` 换掉的唯一理由 —— 词边界与空白都挡不住"名字前缀"和"别人的值"。
+    private static let tagAttrs = regex(
+        "(?:\\A|\\s)([a-zA-Z_:][-a-zA-Z0-9_:.]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')",
+        [.caseInsensitive, .dotMatchesLineSeparators])
     private static let urlDeclaration = regex("[^;]*url\\s*\\([^)]*\\)[^;]*;?", [.caseInsensitive])
     private static let jsHref = regex("\\s+href\\s*=\\s*(\"|')\\s*javascript:[^\"']*\\1", [.caseInsensitive])
     private static let nsResidue = regex("(xmlns(:[a-z0-9._-]+)?|xlink:href|kml:href)\\s*=\\s*(\"[^\"]*\"|'[^']*')", [.caseInsensitive])
@@ -261,13 +265,10 @@ enum HtmlSanitizer {
             out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
             last = m.range.location + m.range.length
             let whole = ns.substring(with: m.range)
-            guard let alt = altAttr else { continue }
-            let inner = alt.firstMatch(in: whole, range: NSRange(location: 0, length: (whole as NSString).length))
-            guard let hit = inner else { continue }
-            // 两个捕获组（双引号 / 单引号）只有一支会命中，取非空那一支。
-            let group = hit.range(at: 1).location != NSNotFound ? hit.range(at: 1) : hit.range(at: 2)
-            guard group.location != NSNotFound else { continue }
-            let raw = (whole as NSString).substring(with: group)
+            // R338：取 alt 换成"按属性对扫"（`altValue`）。原来那支 `\balt\s*=` 会把
+            // `data-alt="…"` 里的 `alt` 当成属性名（ICU 的词边界在 `-` 后面成立），
+            // 于是屏幕上留下作者没打算给人读的那一句 —— 与规则 ① 的方向正好相反。
+            guard let raw = altValue(in: whole) else { continue }
             let cleaned = raw.unicodeScalars.filter { $0 != "<" && $0 != ">" }
                 .reduce(into: "") { $0.append(Character($1) == "\n" ? " " : Character($1)) }
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -276,6 +277,29 @@ enum HtmlSanitizer {
         }
         out += ns.substring(from: last)
         return out
+    }
+
+    /// 这个 `<img …>` 标签**自己那个** `alt` 的值；没有就返回 nil（⇒ 整块删）。
+    ///
+    /// 为什么不能拿一支"搜 alt"的正则了事：
+    /// ① `\balt` 在 `data-alt` 里也成立（`-` 是非词字符）⇒ 前缀属性抢走真 alt；
+    /// ② 退一步要求"前面是空白"也不够 ⇒ `title='见 alt="假的"'` 里那个空格会喂饱它。
+    /// 所以这里扫**属性对**：一次取出「名字 + 值」，名字整段（不区分大小写）等于 alt 才算，
+    /// 重复属性取第一个（与 HTML 一致）。值里剩下的尖括号由调用方按规则 ③ 剥掉。
+    /// 无引号的写法（`alt=foo`）两种实现都不认 ⇒ 行为不变，不记在这条规矩的账上。
+    private static func altValue(in tag: String) -> String? {
+        guard let attrs = tagAttrs else { return nil }
+        let ns = tag as NSString
+        for m in attrs.matches(in: tag, range: NSRange(location: 0, length: ns.length)) {
+            let nameRange = m.range(at: 1)
+            guard nameRange.location != NSNotFound,
+                  ns.substring(with: nameRange).lowercased() == "alt" else { continue }
+            // 双引号 / 单引号两支只有一支命中；都没命中就是 alt 后面没有值 ⇒ 等同空 alt。
+            let valueRange = m.range(at: 2).location != NSNotFound ? m.range(at: 2) : m.range(at: 3)
+            guard valueRange.location != NSNotFound else { return "" }
+            return ns.substring(with: valueRange)
+        }
+        return nil
     }
 
     /// 这张图是不是**独占一行**：它前面（到上一个 `>` 为止）与后面（到下一个 `<` 为止）都只剩空白。

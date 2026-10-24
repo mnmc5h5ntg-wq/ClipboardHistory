@@ -282,6 +282,57 @@ final class HtmlSanitizerTests: XCTestCase {
             + "尖括号剥掉=\(!hostile.lowercased().contains("<script"))")
     }
 
+    /// `alt` 必须是**这个标签自己那个** alt —— R337 复盘时从源码读出来的形状，R338 量到并修。
+    ///
+    /// 第一版取 alt 用的是 `\balt\s*=`，而 ICU 的词边界把 `data-alt` 里那个 `alt` 也算起点
+    /// （`-` 是非词字符），于是 `<img data-alt="埋点说明" alt="真说明">` 取到的是**埋点属性**的文字。
+    /// 那是"屏幕上出现作者没打算给人读的一句话"，与 D-332 的方向正好相反：
+    /// 这条通道只该留作者为"图加载不了"准备的那一份。
+    /// 同族第二种形状更隐蔽：`title="见 alt=假的"` 里那个空格会喂饱 `\s` ⇒
+    /// 光要求"前面是空白"不够，必须按**属性对**扫、名字整段等于 alt 才算。
+    func testAltIsTakenFromTheTagsOwnAttributeNotFromAPrefixedNameOrAnotherValue() {
+        let prefixed = HtmlSanitizer.sanitize(
+            "<p>前</p><img src=\"https://x/1.png\" data-alt=\"埋点说明\" alt=\"真说明\"><p>后</p>")
+        XCTAssertTrue(prefixed.contains("真说明"),
+                      "作者写的那个 alt 被前缀属性抢走了：\(prefixed)")
+        XCTAssertFalse(prefixed.contains("埋点说明"),
+                       "屏幕上出现了作者没打算给人读的一句（data-alt 的值）：\(prefixed)")
+        XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(prefixed), [],
+                       "为了抢回 alt 不许把可加载构造带回来：\(prefixed)")
+
+        let insideValue = HtmlSanitizer.sanitize(
+            "<p>前</p><img src=\"https://x/2.png\" title=\"见 alt=假的\" alt=\"真说明\"><p>后</p>")
+        XCTAssertTrue(insideValue.contains("真说明"),
+                      "值里那个假 alt 把真 alt 挤掉了：\(insideValue)")
+        XCTAssertFalse(insideValue.contains("假的"),
+                       "别的属性的**值**里含 alt= 时不许被当成 alt：\(insideValue)")
+
+        // 上面那一格在**旧实现**下恰好是绿的（`alt=假的` 后面没有引号，旧正则要引号才认）。
+        // 所以这一格把值换成带引号的形状：旧实现会从这里爬出"假的"，
+        // 而按属性对扫的实现认得 title 的名字 ⇒ 不许靠巧合过关。
+        let quotedInside = HtmlSanitizer.sanitize(
+            "<p>前</p><img src=\"https://x/5.png\" title='见 alt=\"假的\"' alt=\"真说明\"><p>后</p>")
+        XCTAssertTrue(quotedInside.contains("真说明"),
+                      "单引号 title 里那个带引号的 alt= 抢走了真 alt：\(quotedInside)")
+        XCTAssertFalse(quotedInside.contains("假的"),
+                       "别的属性的值里含 alt=\"…\" 时不许被当成 alt：\(quotedInside)")
+
+        // 名字整段相等才算 ⇒ 重复属性取第一个（与 HTML 一致），单引号照样要认。
+        let duplicated = HtmlSanitizer.sanitize(
+            "<img src=\"https://x/3.png\" alt=\"第一个\" alt=\"第二个\"><p>后</p>")
+        XCTAssertTrue(duplicated.contains("第一个") && !duplicated.contains("第二个"),
+                      "重复 alt 的取舍必须与规范一致（第一个作数）：\(duplicated)")
+        let singleQuoted = HtmlSanitizer.sanitize(
+            "<img src='https://x/4.png' alt='单引号说明'><p>后</p>")
+        XCTAssertTrue(singleQuoted.contains("单引号说明"),
+                      "单引号属性值必须照样认：\(singleQuoted)")
+        CaptureReadings.emit("HTML_ALT_SOURCE 前缀属性没抢=\(prefixed.contains("真说明")) "
+            + "值里的假alt没抢=\(insideValue.contains("真说明") && !insideValue.contains("假的")) "
+            + "带引号的值没抢=\(quotedInside.contains("真说明") && !quotedInside.contains("假的")) "
+            + "重复取第一个=\(duplicated.contains("第一个") && !duplicated.contains("第二个")) "
+            + "单引号认=\(singleQuoted.contains("单引号说明"))")
+    }
+
     /// 图被撤之后那句说明**落在哪个块里**（R336 / 规则 ④）。
     ///
     /// 上一格只保证"文字留下"，而屏幕上量到的是：留下的是裸行内文字时，它会并进上一个块的行节奏
