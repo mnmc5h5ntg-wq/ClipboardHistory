@@ -45,7 +45,7 @@ runner `敏感=2`（noticeBanner / noticeBannerDismiss）对 本机 `敏感=0`�
 
 看图腿（本轮真看了）：本轮看图看的不是产品，是**本轮那把新尺读的对象**（两条独立通道对上了同一件事）⇒ ① 用 PIL（与 Swift 胶片完全不同的另一条通道）把 R326 那三颗尺要量的东西，在**已入库的帧**上按"两端点之间：动过的像素占比 / 动过的平均级差"重算一遍：`content-empty-750x560` 对 `content-with-history-750x560`（emptyState 同族）亮档 占比 0.0719 / 级差 194.5，暗档 占比 0.0693 / 级差 49.2；`content-with-history` 对 `content-no-results`（searchReflow 同族）亮 0.0733 / 190.3，暗 0.0706 / 57.0；`detail-0-text` 对 `detail-2-file`（detailKindChange 同族）亮 0.0373 / 65.0，暗 0.0380 / 54.5 ⇒ **面积两颗在两档里几乎不动（最大差 4%），墨量那颗差 1.2–4.0 倍且每一颗都是亮档更深** —— 这正是 U-1077 与 U-1078 的结构：哪些像素在动与色档无关，动了多少级随色档走、而且带同一个方向。② 眼睛看到的与数一致：暗档那张 `content-with-notice-750x560-dark.png` 里横幅的红图标、"知道了"按钮、正文都还在（形状与亮档那张同一份），但整条横幅压在 30–37 这一档底上，亮档同一区域从 54 走到 255 ⇒ "暗档里同样的动、动的级差小得多"不是抽象结论，是看得见的。③ 一次差点开错的单：同一张暗档帧里侧栏四行列表标题几乎黑底黑字，第一反应是产品缺陷，先搜台账才看见 D-090（R30）已写明"vibrant 列的文字极性是故意反的、`cacheDisplay` 不做合成那一步 ⇒ 拍到的是合成前像素"，且 `darkSidebarTextBlindSpots` 名册在册 ⇒ 那是登记的通道盲区，不是新缺陷，本轮没为它起新名字（同一族 R325 差点为那块 #000 黑块开单，两次都是"先看图、先量数、后查重"的顺序救回来的）。④ 本轮产品 0 文件，帧基线 FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0 ⇒ 上面那些图与 R325 那一批是同一张图，看图腿没有靠旧图替新东西作证。
 
-⓪ R327 开场要先读的（成对：run id ↔ commit）：本轮 push 之后拿到的 RUN / sha 见本轮提交之后的追记；
+⓪ R327 开场要先读的（成对：run id ↔ commit）：本轮两笔都已 push —— 代码半 sha=bd084e3（推在账半之前，同一跑里）、账半 sha=255354f ↔ **RUN=40076227591**（写这一行时 status=in_progress ⇒ 结论还没读，R327 第一件事就是读它）；
 要读的三件事：
    ① **新口径的 runner 分类**：`MOTION_SCENARIO_AB_SUMMARY` 在 runner 上读成什么，
       与 runner 上那份旧峰值分类（敏感=2）对得上没有；`MOTION_SCENARIO_AB_MAGNITUDE` 的
