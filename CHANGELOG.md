@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 391 的方向改由系统参照臂印：暗档 系统 差=+26.0 对 自家 −16.0，而「压轨道」那一发被它自己红起来的过程证人否掉并回滚（R331 / U-1098…U-1101 · 产品 0 文件，参照臂账）
+
+- 新夹具两张：`sysref-segmented-selected-left` / `-right`（200×60，与 `sysref-button-*` 同族），
+  新判据 `testSystemSegmentedReferenceSaysWhichHalfTracksSelection` —— 页底从取景顶部三行取、
+  对象纵向范围逐行找、取样带取中段三分之一、两臂必须互为镜像；现读 暗档 系统 +26.0／自家 −16.0，
+  亮档 系统 −30.0／自家 +3.0。
+- ②那一发（`VisualMaterial.trackWell = underPageBackgroundColor`）落进产品后离屏现读
+  轨道 51.9→40.0、分离 15.9→4.0，红在 `testFilterPillSlideIsAProcessNotATeleport`
+  （峰值=0.000 地板=0.005）⇒ 整发回滚，现场留 `.scratch/motion-audit-2/r331_attempt_two_trackwell.patch`。
+- 自曝两次「尺读错对象」（写死的取样带 38%…62% 落在对象之外；页底从"控件外的列"取而自家胶囊满幅），
+  第二次一度把结论写成"这条通道不画系统控件的填充"—— 那是**错的归因**，本轮公开更正。
+- 刀 `mutate_r331.py`：CAUGHT=3/3, RESTORE_CLEAN=yes（逐臂 M960, M961, M962）；针预检 tables=119 covered=102 bad=0、名册 files=213 arms=829 dupes=0；
+  读数族 `SEGREF_POLARITY` 接进 §8 搬运名单（`READINGS_MUST_INCLUDE 声明=1 缺=0`）。
+- 七本一起落：U-1098…U-1101、D-323…D-324、391 追记 + 新开 393/394、STATE 轮换、报告计数器；
+  帧名单 174→178（同一笔 `frame_baseline.py update`）。
+
 ### 侧栏筛选胶囊在真机上判成暗洞：377 结案为产品缺陷，新增一把带判据卷与三把刀的真机尺（R330 / U-1094…U-1097 · 产品 0 文件，真机账）
 
 - 真机现读 `PILL_ROW y=120pt 轨道宽=320pt(x0起) 洞宽=168pt(x2..170, 占 52%) 页底=51.0 轨道档=81.0 药丸档=48.0 差=-33.0 实心=0.46` → `pill_darker`；点另一颗之后洞搬到右半（`AB_SUMMARY A: 洞 x2..170 差=-33.0 | B: 洞 x172..240 差=-32.0 | 洞搬了=yes 两臂都比轨道暗=yes`）。

@@ -363,6 +363,38 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 330 轮（R331 · U-1098…U-1101 · 2026-10-24）：391 的方向不再由记性定 —— 系统参照臂进夹具通道，暗档现读 系统 +26.0 / 自家 -16.0；同一轮里「压轨道」那一发被它自己红起来的过程证人否掉（U-1098…U-1101 · 产品 0 文件，参照臂账）
+
+- **U-1098：分段控件的系统参照臂第一次进夹具通道** —— 两张 200×60（`sysref-segmented-selected-left` /
+  `-right`，与 `sysref-button-*` 同族：同一条 render、同一个 probeFrame、同一颗尺，所以参照与自家可比，D-269），
+  判据卷 `UICaptureTests/testSystemSegmentedReferenceSaysWhichHalfTracksSelection` 现读：
+  暗档 系统 页底=255.0 选中半=74.0 未选半=48.0 ⇒ 差 **+26.0**，两臂**镜像一致**；
+  自家同一取景 页底=30.0 选中=36.0 未选=52.0 ⇒ 差 **-16.0** ⇒ 391 的方向在暗档定成①（把选中那颗抬到轨道之上）。
+  原文：`SEGREF_POLARITY dark｜…`（捕获卷日志，§8 已接 `--must-include SEGREF_POLARITY`，
+  现读 `READINGS_MUST_INCLUDE 声明=1 缺=0`）。
+- **U-1099：391 的另一条出路（②把轨道压到页底之下）被现场否掉，并已回滚** ——
+  新令牌 `VisualMaterial.trackWell = underPageBackgroundColor` 落进产品之后，离屏那卷现读
+  页底 30.0 / 轨道 **40.0**（改前 51.9）/ 药丸 36.0（改前 36.0）/ 分离 **4.0**（改前 15.9）：
+  轨道没进页底之下（暗档的页底就是 vibrancy 材料本身，比系统里任何一枚语义填充都暗），
+  而红起来的是**过程证人** `testFilterPillSlideIsAProcessNotATeleport`
+  （`/Users/wangziyi/Codex_Project0/ClipboardHistory/Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift:5113: error: -[ClipboardHistoryAppTests.Moti`，Executed=None 红=None）—— 药丸与轨道糊成一档之后，带子里连"有没有东西在动"都没有对象了。
+  不放宽那条判据、不留着这版令牌：整发回滚，现场留在 `.scratch/motion-audit-2/r331_attempt_two_trackwell.patch`。
+- **U-1100：极性的系统证人自己推翻了「同侧」这条全局判据** —— 亮档现读 系统 差 **-30.0**
+  （选中半 205.0 比未选半 235.0 暗）而看图腿确认那颗是**中性灰**、不是强调色 tint ⇒
+  平台在两档里的方向**相反**（暗档抬、亮档压）。所以"自家必须与系统同侧"只能按档分别立（D-323），
+  而 393 的令牌顺带量出来了：系统两档的选中电平 74.0／205.0 与
+  `unemphasizedSelectedContentBackgroundColor` 的解析值 70／220 同档
+  （不透明填充"渲染电平==解析电平"这座桥当场验过：`underPageBackgroundColor` 解析 40.0 ⇒ 离屏现读 40.0）。
+- **U-1101：这把新尺在同一轮里两次读错对象，两次都变成闸与刀** ——
+  ① 取样带写死 38%…62%，而 probeFrame 的内容贴着**下沿**排（现读对象行带 66…120）⇒ 剖面 min==max==页底，
+  第一版据此下了"这条通道不画系统控件的填充"的**错结论**；② 页底改按"控件外的左右各 6 列"取，
+  而自家那颗胶囊是**满幅**的（y=95 现读 x=0 就是轨道 52.0）⇒ 页底被读成轨道、范围退化成整幅。
+  现在的形状：页底只从取景**顶部三行**取且顶行必须自身干净（档差 ≥delta 就拒绝），
+  对象纵向范围逐行找、取样带取其中段三分之一，两臂必须**互为镜像**。
+  刀 `CAUGHT=3/3, RESTORE_CLEAN=yes`（逐臂 M960, M961, M962）：M960 两臂同一个 selection、M961 `updateNSView` 吞掉入参、
+  M962 页底退回从对象自己身上取 —— 三把都红在本格，包括那把复现本轮第一次翻车的。
+
+
 ## 第 329 轮（R330 · U-1094…U-1097 · 2026-10-24）：377 在屏幕上判掉了 —— 侧栏那颗选中的胶囊**比轨道暗** 33.0 级，而且暗的那一块跟着选中搬（U-1094…U-1097 · 产品 0 文件，真机账）
 
 - **U-1094：真机现读（本机 2× / dark）侧栏筛选胶囊：轨道 81.0 档、选中那颗 48.0 档、页底 51.0 档 ⇒ 差 -33.0 级**
