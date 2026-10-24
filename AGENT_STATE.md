@@ -43,10 +43,17 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
 ③ **这条通道看不见**的：`<img>` 与 `style` 里的 url() 被消毒撤掉之后**屏幕上没有东西可看**，
 残留只能由 `residualFetchableReferences` 那格判，帧不替它作证。
 
-下一轮（R336）的靶：⓪ 把本轮 push 之后的 run id↔commit 成对写回这里，并读 runner 那一跑
-（新门在 runner 上签不签、`HTML_` 那族在 runner 的日志里打几行）→
-① 报告里"最后一次动到 `Sources/` 的那一轮"那一格由 `scripts/report_sources_cell.py --write` 刷新
-（R334 那朵 runner 红欠的就是这一格，本轮已写脚本、还没 --write 之前它照旧红）→
+下一轮（R336）的靶：⓪ 读 CI 配对（成对：run id ↔ commit，现读自 `scripts/ci_read.py latest`）：
+**RUN=40130086757 ↔ `283a063`**（账半那一笔，回填时 status=in_progress / conclusion 空 ⇒ 只登记不轮询，R140）；
+代码半 `2e29c0e` 与代码半补 `f3f2027` 两笔的 run id **未读**（`latest` 只给 tip 那一跑）——
+读它们之前不许说"三笔都签了"。这一跑要答的三件事：
+① 新装的像素门 `testHtmlRenderedBodyInkIsReadable` 在 runner 上签不签 —— 它判的"反侧必须 0 颗"
+   依赖这台机器的回落字面，runner 的字族/抗锯齿不同就可能换数（这一族有先例：R321 的 SELARM）；
+② `HTML_` 那族在 runner 的日志里打几行（本机现读 8 个名字 / 12 行，两条腿各打一半）；
+③ 判据卷从 22 格涨到 24 格之后，`Executed` 的分母与 §8 的搬运行数在两机副本上是否同数。
+→ ① 报告里"最后一次动到 `Sources/` 的那一轮"那一格**本轮已刷新**：
+`SOURCES_CELL 账上=R335/`2e29c0e` git=R335/`2e29c0e` 一致=是`（R334 那朵 runner 红就此收口，
+脚本 `scripts/report_sources_cell.py` 已进仓库并接进生成器 —— 下一轮不必再手工想它）→
 ② 回到动效主线那批还开着的：399（亮档悬停要换轴）、397 的反方向已结、390 的 before/after、
 389 的时长、384 的横向、387①、376、367/360/361/364 → ③ 本轮开出来的四条里
 最便宜的一条先量缺席：402（Markdown 那条的耗时随大小怎么长 —— 一次现读就能定它要不要上限）。
