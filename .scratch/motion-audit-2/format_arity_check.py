@@ -13,13 +13,21 @@ u"""台账生成器的**格式串 arity 预检**：占位符个数与参数个�
 用法：`python3 .scratch/motion-audit-2/format_arity_check.py <生成器.py> [...]`
 退出码：0=每个格式串的占位符都对得上；1=有至少一处不等（打印文件:行号 + 串的前 60 字）。
 只判 `字面量 % (...)` 这一种形状；`%(name)s` 那种带键的走 dict，条数对不上是常态，**不判**。
+
+已知的两种**假警报**（R336 现读到过，两种都已在尺里处理，正对照 f/g 两行钉着）：
+① `u"%s %s（%s）" % r`（r 是元组变量，隐式解包）—— 语法层问不出条数 ⇒ **跳过**，不报；
+② `u"%.1f" % v`（带精度/宽度的转换符）—— 占位符正则原来要求 `%` 后面紧跟 s/d/r/i/f，
+   于是 `%.1f` 被数成 0 个 ⇒ 现在正则吃 `[-+ #0]*\d*(\.\d+)?`。
+两种以前都对着一行**正确**的代码报警，而尺报错的代价是人会去"修"那段没错的代码。
 """
 import ast
 import io
 import re
 import sys
 
-PLACEHOLDER = re.compile(r"%\((?P<key>\w+)\)?[sdrif]|%(?P<plain>[sdrif])")
+PLACEHOLDER = re.compile(r"%\((?P<key>\w+)\)?[-+ #0]*\d*(?:\.\d+)?[sdrif]"
+                         r"|%%(?P<esc>)"
+                         r"|%(?P<plain>[-+ #0]*\d*(?:\.\d+)?[sdrif])")
 
 
 def check(path):
@@ -31,22 +39,25 @@ def check(path):
                 and isinstance(node.left, ast.Str)):
             continue
         text = node.left.s
-        ph = PLACEHOLDER.findall(text)
-        if any(k for k, _ in ph):        # %(name)s 形状：参数是一个 dict，条数不对是常态
+        ph = PLACEHOLDER.findall(text)      # 三元组：(key, esc, plain)
+        if any(e[0] for e in ph):           # %(name)s 形状：参数是一个 dict，条数不对是常态
             continue
-        kinds = [c for _, c in ph]
+        # `%%` 不是占位符（它自己吃掉两个字符），所以 kinds 里要把空串剔掉。
+        kinds = [e[2] for e in ph if e[2]]
         right = node.right
-        if isinstance(right, ast.Tuple):
-            args = right.elts
-        else:
-            args = [right]
+        if not isinstance(right, ast.Tuple):
+            # 参数是个变量（`u"%s %s" % r` 这种隐式解包）或单个非元组表达式：
+            # 条数在语法层问不出来 ⇒ **跳过**，不报。R336 之前这里把它算成"1 个参数"，
+            # 于是对着一行完全正确的代码报警 —— 尺报错了，人就会去"修"那段没错的代码。
+            continue
+        args = right.elts
         if len(kinds) != len(args):
             bad.append((node.lineno, u"占位符 %d 个（%s）vs 参数 %d 个：%s"
                         % (len(kinds), u"".join(kinds), len(args), text[:60])))
             continue
         # 类型对不上也在这一格判：%d 收到字符串字面量 = R334 那一朵 `a number is required, not str`
         for kind, arg in zip(kinds, args):
-            if kind == u"d" and isinstance(arg, ast.Str):
+            if kind.endswith(u"d") and isinstance(arg, ast.Str):
                 bad.append((node.lineno, u"%%d 收到字符串字面量 %r" % (arg.s[:30],)))
     return bad
 
@@ -62,7 +73,9 @@ def self_check():
            u"b = u'%s %s %d' % (1, 2)\n"                    # 少一个参数
            u"c = u'--for %d' % ('333',)\n"                  # %d 收到字符串
            u"d = u'%(x)s' % {'x': 1}\n"                     # 带键，不判
-           u"e = u'100%% 是真的 %s' % (u'ok',)\n")          # 转义的 %% 不许算成占位符
+           u"e = u'100%% 是真的 %s' % (u'ok',)\n"           # 转义的 %% 不许算成占位符
+           u"f = u'%.1f 对 %.2f' % v\n"                     # 精度串 + 非元组参数 ⇒ 不判
+           u"g = u'%s %s（%s）' % r\n")                     # 隐式解包（r 是元组变量）⇒ 不判
     h = tempfile.NamedTemporaryFile(u"w", suffix=u".py", delete=False, encoding=u"utf-8")
     h.write(src)
     h.close()

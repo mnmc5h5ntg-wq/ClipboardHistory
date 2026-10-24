@@ -8188,6 +8188,19 @@ final class UICaptureTests: XCTestCase {
                       file: file, line: line)
         XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(source), [],
                        "\(role)：喂给渲染器的那一份里还有可加载的东西", file: file, line: line)
+        // R336 / BACKLOG 401 的前提：这张夹具**同时**带一张有 alt 的图与一张没有 alt 的埋点像素。
+        // 前提不成立 ⇒ "alt 留下来了"那格只是在给一张没有图片的帧打分（R140 的空对账）。
+        XCTAssertTrue(body.contains("alt=\"季度趋势图"),
+                      "\(role)：夹具里那只有 alt 的 <img> 不见了 ⇒ 这一帧证不了『图被撤、说明留下』",
+                      file: file, line: line)
+        XCTAssertTrue(body.contains("pixel.gif"),
+                      "\(role)：夹具里那只**没有** alt 的埋点像素不见了 ⇒ 反证那一半没了",
+                      file: file, line: line)
+        XCTAssertTrue(source.contains("季度趋势图"),
+                      "\(role)：消毒之后 alt 就没了 ⇒ 渲染态里那句话不会出现，而它正是本轮的产物",
+                      file: file, line: line)
+        XCTAssertFalse(source.lowercased().contains("<img"),
+                       "\(role)：标签本体没删干净：\(source)", file: file, line: line)
     }
 
     private func makeHtmlStore() -> HistoryStore {
@@ -8218,6 +8231,7 @@ final class UICaptureTests: XCTestCase {
       <h1>季度报告</h1>
       <p style="color:#0a0">一段带<b>内联样式</b>与<em>强调</em>的正文，读起来应该像页面而不像源码。</p>
       <ul><li>甲项</li><li>乙项</li></ul>
+      <img src="https://tracker.example/chart.png" alt="季度趋势图（图片未加载）">
       <img src="https://tracker.example/pixel.gif" width="1" height="1">
       <p foo-src="https://tracker.example/unnamed">属性名不在名单里的那一种</p>
       <p>结尾一句：<a href="https://example.com/doc">参考文档</a></p>
@@ -8343,6 +8357,89 @@ final class UICaptureTests: XCTestCase {
                 XCTAssertGreaterThanOrEqual(ratio, 4.5,
                     tag + "：HTML 正文对比 " + String(format: "%.2f", ratio) + ":1，低于 4.5:1（AA 正文线）"
                     + "⇒ 结构画对了但人读不出来；同一帧同一块区域的 Markdown 是上面那条 HTML_INKREAD 读数")
+            }
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没判 ⇒ 这一格没有对象")
+    }
+
+    /// 行内距与段落距的分界（pt）。**不是拍的**：同一张帧里两群实测
+    /// 行内距 20.0 / 19.5，段落距 32.0 / 32.5 ⇒ 取两群中间那一段（(20+32)/2）。
+    /// 下面还有一条断言钉"两群真的分得开"（间距差 ≥ 6pt）—— 分不开就是这一格失去了判据。
+    static let paragraphGapFloor: Double = 26.0
+
+    /// 图被撤之后那句 alt 说明**必须自成一段**（R336 / 规则 ④ 的像素那一半）。
+    ///
+    /// 为什么属性串那一格不够：`testStandaloneImageBecomesItsOwnParagraph…` 证的是
+    /// "消毒吐出的串里出现了 `<p>图一</p>`"，而"有一个 `<p>`"与"屏幕上真的多出一段空隙"之间
+    /// 还隔着 `NSAttributedString(html:)` 的排版。仓库外的 spike 现读：**包 `<div>` 不产生段落距**
+    /// （裸文字 17.0、`<p>` 29.0、`<div>` 17.0）—— 也就是说"加了个块级标签"完全可能等于"什么都没加"。
+    /// 这一族有名字：**判定对了、屏幕没换**（R14 / R335 的 `testHtmlRenderedPairDiffersOnTheSurface` 同一族）。
+    ///
+    /// 尺不新造：用这一卷已有的 `rowTierProfile` + `textBands`（R107 的规矩 —— 新读数要接在
+    /// 已经被别的判据用过的那把尺上，否则"新尺"本身还得先验一次）。
+    ///
+    /// 读数是**相邻文字带起点的间距**。"有几处紧挨着的两行"是一个可数的量，
+    /// 而它的期望值来自夹具的分块结构，不是拍的：
+    /// ① 列表内部那一档（甲→乙）；② 列表→紧跟它的那一块（这个渲染器不给 `<ul>` 下边距，
+    ///    R336 现读 20.0pt = 行内距，而两个 `<p>` 之间是 31.5/32.5）—— ② 是一条**已登记的现状**
+    ///    （BACKLOG 406），修掉它这一格会红，改的人必须同时去改那条。
+    /// 规则 ④ 管的是第三处：alt 那句与**它下面那一段**之间。修之前现读 3 处
+    /// （甲→乙、乙→alt、alt→下一段，全是 20.0），修之后必须是 2 处。
+    func testHtmlAltLineIsItsOwnParagraphOnTheSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r336-alt-para-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let gutter = Double(DetailTypography.containerGutter)
+        // 正文列（y 从标题之上到最后一句之下）：右半边住着滚动条与那颗动作条 ⇒ 不是这段契约的对象。
+        let bodyRect = CGRect(x: gutter, y: 60, width: 600, height: 270)
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-html-rendered" }) else {
+                return XCTFail("找不到 detail-html-rendered ⇒ 这一格失去了对象")
+            }
+            let file = scratch.appendingPathComponent("html-rendered-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("读不回刚拍出来的 \(file.lastPathComponent)")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let bands = Self.textBands(rows: Self.rowTierProfile(bytes: base, width: rep.pixelsWide,
+                                                                height: rep.pixelsHigh,
+                                                                bytesPerRow: rep.bytesPerRow,
+                                                                rect: bodyRect, scale: scale),
+                                       scale: scale)
+            XCTAssertGreaterThanOrEqual(bands.count, 7,
+                tag + "：正文列里只数出 " + String(bands.count) + " 条文字带 ⇒ 帧没画上这段正文，"
+                + "下面的间距读数是在给空帧打分（R140 空对账）")
+            let starts = bands.map { $0.startPt }
+            var gaps: [Double] = []
+            for i in 1..<starts.count { gaps.append(starts[i] - starts[i - 1]) }
+            let tight = gaps.filter { $0 < Self.paragraphGapFloor }
+            let wide = gaps.filter { $0 >= Self.paragraphGapFloor }
+            let text = gaps.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            emit("HTML_ALT_PARA \(tag) 带=\(bands.count) 间距=\(text) 紧挨=\(tight.count) "
+                + "行内距=\(String(format: "%.1f", tight.min() ?? -1)) "
+                + "段距=\(String(format: "%.1f", wide.min() ?? -1))")
+            judged += 1
+            XCTAssertEqual(tight.count, 2,
+                tag + "：数出 " + String(tight.count) + " 处紧挨着的两行（间距=\(text)）。"
+                + "期望 2 处：① 列表内部（甲→乙）；② 列表→紧跟它的那一块 —— 那条是已登记的现状"
+                + "（BACKLOG 406：这个渲染器不给 `<ul>` 下边距）。第 3 处就是 alt 那句被并进了"
+                + "上一个块的行节奏 ⇒ 规则 ④ 没生效（修之前现读 3 处，全是 20.0，而段距是 31.5/32.5）")
+            // 两群必须分得开，否则上面那条阈值是猜的：唯一那处行内距要明显小于最小段距。
+            if let linePitch = tight.min(), let paraGap = wide.min() {
+                XCTAssertLessThan(linePitch + 6, paraGap,
+                    tag + "：行内距 " + String(format: "%.1f", linePitch) + " 与最小段距 "
+                    + String(format: "%.1f", paraGap) + " 差不到 6pt ⇒ 这把尺分不开两群，"
+                    + "阈值必须重量（不许把地板挪到能过的地方）")
+            } else {
+                XCTFail(tag + "：两群里有一群是空的（紧挨=\(tight.count) 跨块=\(wide.count)）⇒ 分群本身没成立")
             }
         }
         XCTAssertEqual(judged, 2, "两档里有一档没判 ⇒ 这一格没有对象")

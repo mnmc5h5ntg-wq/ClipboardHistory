@@ -246,6 +246,85 @@ final class PerfBudgetTests: XCTestCase {
         let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
         return try XCTUnwrap(StoredImage(pngData: png))
     }
+    // MARK: - R336 / BACKLOG 402：Markdown 那条通道的耗时随条目大小怎么长
+
+    /// 语料：重复的 Markdown 行（标题 / 列表 / 粗体 / 行内码各占一档），**刻意不含任何用户内容**。
+    /// 为什么要写成"造到指定字符数"而不是复制一段真文档进来：判据要问的是
+    /// "耗时随**大小**怎么长"，那大小就必须是一个能报出来的数，而不是一段"差不多长"的文本。
+    private func markdownCorpus(_ characters: Int) -> String {
+        let line = "## 标题\n\n- 一项**加粗**与`代码`的列表项\n\n> 引用一行\n\n"
+        var out = ""
+        out.reserveCapacity(characters)
+        while out.count < characters { out += line }
+        return String(out.prefix(characters))
+    }
+
+    /// Markdown 渲染在**存档自己允许的最大条目**上要多少毫秒（R336 / BACKLOG 402）。
+    ///
+    /// 为什么现在才量：R335 给 HTML 那条装了字节上限（128KB，由现读斜率推出来，
+    /// 超预算就整条入口都不给），而 Markdown 那条一直没有 —— 于是"Markdown 不需要上限"
+    /// 这句从来是**没证据的默认**，不是结论。这一格把它换成读数。
+    ///
+    /// 前提用产品自己的上限：`ClipboardIntake.maxTextCharacters`（一条文本能被存进来的最大字符数，
+    /// 超过会被截断并留标记），而不是我随手挑的一个 1MB —— 问"最大的那条要多久"，
+    /// "最大"必须来自被问的那个系统。
+    ///
+    /// 两条断言，方向相反，各钉一种坏法：
+    /// ① **不能超线性爆炸**：cap/16k 的耗时比不超过字符比的 3 倍（解析器里藏一个 O(n²)
+    ///    就是这一条先红，而且它红的时候不需要任何绝对阈值）；
+    /// ② **cap 那一档必须在预算内**：预算是仓库自己那条 `MotionCatalog.maximumDuration`
+    ///    （详情正文是主线程画的）。不签 ⇒ 本轮就得给 Markdown 也装上限，
+    ///    而不是把阈值抬到能过（D-321：地板由红来改，不是由绿来改）。
+    func testMarkdownRenderCostAtTheArchiveCap() throws {
+        let cap = ClipboardIntake.maxTextCharacters
+        XCTAssertGreaterThan(cap, 16_000, "上限比对照档还小 ⇒ 这一格没有对象")
+        let small = markdownCorpus(16_000)
+        let big = markdownCorpus(cap)
+        XCTAssertEqual(big.count, cap, "语料没造到上限 ⇒ 下面那句『cap 那一档』量的不是 cap")
+
+        // 热身：第一次调用会带上 lazy 的字体/颜色装配，那一次不是这条通道稳态的代价。
+        _ = MarkdownPresentation.attributedString(for: MarkdownParser.parse(small))
+
+        func fastest(_ source: String) throws -> Double {
+            var samples: [Double] = []
+            for _ in 0..<3 {
+                let start = Date()
+                _ = MarkdownPresentation.attributedString(for: MarkdownParser.parse(source))
+                samples.append(Date().timeIntervalSince(start) * 1000)
+            }
+            return try report(samples: samples, threshold: budgetMs,
+                              what: "字符数=\(source.count)")
+        }
+        let budgetMs = MotionCatalog.maximumDuration * 1000
+        let smallMs = try fastest(small)
+        let bigMs = try fastest(big)
+        // 分解成"固定开销 + 边际斜率"再报：平均斜率（cap ÷ 总耗时）会把固定那一份摊到
+        // 每一 KB 上，于是"16k 要 14ms"这种**启动成本**被读成"这条通道很慢"，
+        // 而真正决定"最大的那条要不要装上限"的是**边际**那一份。
+        let kbSmall = Double(small.count) / 1024.0
+        let kbBig = Double(big.count) / 1024.0
+        let marginal = (bigMs - smallMs) / max(kbBig - kbSmall, 0.001)
+        let fixed = smallMs - marginal * kbSmall
+        CaptureReadings.emit("MD_RENDER_COST 16k=\(String(format: "%.2f", smallMs))ms "
+            + "cap=\(String(format: "%.2f", bigMs))ms cap字符=\(cap) "
+            + "边际=\(String(format: "%.3f", marginal))ms/KB 固定=\(String(format: "%.2f", fixed))ms "
+            + "平均=\(String(format: "%.3f", bigMs / kbBig))ms/KB "
+            + "预算=\(String(format: "%.0f", budgetMs))ms 上限=无 判定="
+            + (bigMs <= budgetMs ? "在预算内" : "超预算"))
+        XCTAssertGreaterThan(marginal, 0,
+            "边际斜率不大于 0 ⇒ 这一档的样本分辨不了大小对耗时的影响（那 ②那条『在预算内』就是空对账）")
+        // ① 超线性：字符比是 32 倍，耗时比允许到 3 倍于它（96）。
+        XCTAssertLessThanOrEqual(bigMs / max(smallMs, 0.01),
+                                (Double(cap) / 16_000.0) * 3.0,
+                                "耗时比超过字符比的 3 倍 ⇒ 这条通道不是线性的，先查解析器")
+        // ② 预算：这一条**故意**留成会红的形状 —— 它红了就去装上限，不许改这一行的阈值。
+        XCTAssertLessThanOrEqual(bigMs, budgetMs,
+            "最大的那条文本要 \(String(format: "%.2f", bigMs))ms，超过仓库自己那条 \(String(format: "%.0f", budgetMs))ms 预算"
+            + " ⇒ Markdown 这条也需要一个由斜率推出来的上限（照 HTML 那一族的办法），而不是把这里改松")
+    }
+
+
+
 }
 
 /// 派生缓存的一致性：任何一次写入都必须让 filteredEntries 立刻反映，
@@ -299,6 +378,5 @@ final class FilteredCacheCoherenceTests: XCTestCase {
         store.perform(.updateFilter(.all))
         XCTAssertEqual(store.filteredEntries.count, 2)
     }
-
 
 }

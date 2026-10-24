@@ -184,7 +184,11 @@ final class FrameIntervalBudgetTests: XCTestCase {
             "SettingsFailureReceiptTests.swift": ["FEEDBACK_EXPORT_RECEIPT_TRUTH_TABLE",
                                                   "EXPORT_FEEDBACK_CHANNEL", "ARCHIVE_TRANSFER_RECEIPT",
                                                   "ARCHIVE_ACTION_CHANNEL", "RECEIPT_FIXTURE_COPY"],
-            "PerfBudgetTests.swift": ["PERF", "PERF["],
+            // R336：`MD_RENDER_COST` 当场登记在这张表里，而不是让它先红一轮再说"那就去改名册"。
+            // 这一格问的是「这些读数有没有名字」，与它走哪条通道无关 —— 新增一行 emit 而名册不动，
+            // 就是 R143/U-473 那一族（未登记的读数不许存在）。它同时把这张表的行数从 3 抬到 4，
+            // 与下面 `counts` / `total` 两格**同一笔**改到现读（分两笔改会让中间那一跑是红的）。
+            "PerfBudgetTests.swift": ["PERF", "PERF[", "MD_RENDER_COST"],
         ]
         let counts: [String: Int] = [
             "UIInteractionProbeTests.swift": 53,
@@ -194,7 +198,7 @@ final class FrameIntervalBudgetTests: XCTestCase {
             "MotionDriverTests.swift": 3,
             "PressFeedbackTests.swift": 5,
             "SettingsFailureReceiptTests.swift": 5,
-            "PerfBudgetTests.swift": 3,
+            "PerfBudgetTests.swift": 4,
         ]
         let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         // R304：搬进 emit 的文件变成一张表（不是单个 if）—— 每搬一份就要在这里换一次通道，
@@ -232,7 +236,7 @@ final class FrameIntervalBudgetTests: XCTestCase {
             XCTAssertEqual((measured[name] ?? []).count, counts[name] ?? -1,
                 "\(name) 的行数与登记不符（多一行/少一行）⇒ 名册那份计数过期，请连理由一起改")
         }
-        XCTAssertEqual(total, 77,
+        XCTAssertEqual(total, 78,   // R336 现读 78（原 77 + `MD_RENDER_COST` 一行）
             "这张名册覆盖的探针文件里裸 stdout 读数总数变了 ⇒ 要么 360 搬走了一批（那就把上面两张表"
                 + "一起改到现读，并把搬空的文件留在名单里登记为空），要么新写了只走 stdout 的读数")
     }

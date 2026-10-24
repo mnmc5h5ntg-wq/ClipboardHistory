@@ -149,6 +149,10 @@ enum HtmlSanitizer {
         + "(\"[^\"]*(?://|data:|url\\()[^\"]*\"|'[^']*(?://|data:|url\\()[^']*')",
         [.caseInsensitive])
     private static let styleAttrs = regex("\\s+style\\s*=\\s*(\"([^\"]*)\"|'([^']*)')", [.caseInsensitive])
+    /// `<img>` 本体与它的 `alt`（R336 / BACKLOG 401）。
+    private static let imgTag = regex("<img\\b[^>]*/?>", [.caseInsensitive, .dotMatchesLineSeparators])
+    private static let altAttr = regex("\\balt\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')",
+                                       [.caseInsensitive, .dotMatchesLineSeparators])
     private static let urlDeclaration = regex("[^;]*url\\s*\\([^)]*\\)[^;]*;?", [.caseInsensitive])
     private static let jsHref = regex("\\s+href\\s*=\\s*(\"|')\\s*javascript:[^\"']*\\1", [.caseInsensitive])
     private static let nsResidue = regex("(xmlns(:[a-z0-9._-]+)?|xlink:href|kml:href)\\s*=\\s*(\"[^\"]*\"|'[^']*')", [.caseInsensitive])
@@ -167,6 +171,12 @@ enum HtmlSanitizer {
         replace(comments)
         for (_, re) in pairedDrop { replace(re) }
         for (_, re) in blockDrop { replace(re) }
+        // ①′ `<img>` 先换成它的 alt 文本，再让 voidDrop 把标签本体删掉（R336 / BACKLOG 401）。
+        //     为什么不能直接删：一张以图为主的页面复制下来，渲染态会是一块**空白**，
+        //     而屏幕上没有任何一句话解释"这里原本有东西"——那是把消毒的代价静默转嫁给用户。
+        //     `alt` 正是 HTML 自己为这件事准备的字段（图加载不了时该显示什么），
+        //     用它不是发明，是照抄规范。
+        s = imagesReplacedWithAlt(s)
         for (_, re) in voidDrop { replace(re) }
         replace(jsHref)
         replace(eventAttrs)
@@ -221,6 +231,76 @@ enum HtmlSanitizer {
             hits.append("on*=…")
         }
         return hits
+    }
+
+    /// 把每个 `<img …>` 换成它的 `alt` 文本；**没有 alt 或 alt 是空的就整块删掉**。
+    ///
+    /// 三条规则，各自有出处，不是"顺手"：
+    /// ① 有 alt ⇒ 留那句文字。图被消毒撤掉之后，alt 是这张页面里**本来就准备给人读**的那一份
+    ///    （HTML 规范里 `alt` 就是"图加载不了时显示什么"），撤掉它等于把作者的说明也一起撤了。
+    /// ② `alt=""` 或没有 alt ⇒ 整块删，**不发明占位文字**。空 alt 在规范里是作者明确声明
+    ///    "这是装饰图"；而 1×1 的埋点像素通常根本没有 alt —— 给这两种写出"〔图片〕"
+    ///    等于替追踪像素在屏幕上占一个位置，那是另一种泄漏（它告诉用户"这里有一张图"，
+    ///    而那张图本来就是用来数他的）。
+    /// ③ alt 值里的 `<` 与 `>` 一律删掉：属性值会变成**正文**，不剥尖括号就是
+    ///    `alt="<script>alert(1)</script>"` 这种"从属性里爬回文档"的通道。
+    ///    （这一条与"注释里藏的 script 不许被救活"同一族：顺序会改变另一支规则的输入。）
+    /// ④ **独占一行**的图 ⇒ alt 自成一段（包成 `<p>`）；**句中**的图 ⇒ 就地换成文字。
+    ///    这一条是 R336 自己踩出来的：只做 ①〜③ 时，说明文字是裸的行内文本，
+    ///    `NSAttributedString(html:)` 把它并进上一个块的行节奏 —— 真帧现读它与下一段之间
+    ///    是 20.0pt（= 列表自己的行内距），而两个 `<p>` 之间是 32.0pt；
+    ///    屏幕上"图的说明"和下一段挤成同一段，读起来像列表漏了一颗项目符号。
+    ///    仓库外的 spike 同一条量到 17.0 对 29.0，并且**包 `<div>` 没有这个效果**（与不包同数）
+    ///    ⇒ 选 `<p>` 不是"随便挑一个块级标签"，是量出来的。
+    static func imagesReplacedWithAlt(_ html: String) -> String {
+        guard let tag = imgTag else { return html }
+        let ns = html as NSString
+        var out = ""
+        var last = 0
+        for m in tag.matches(in: html, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            last = m.range.location + m.range.length
+            let whole = ns.substring(with: m.range)
+            guard let alt = altAttr else { continue }
+            let inner = alt.firstMatch(in: whole, range: NSRange(location: 0, length: (whole as NSString).length))
+            guard let hit = inner else { continue }
+            // 两个捕获组（双引号 / 单引号）只有一支会命中，取非空那一支。
+            let group = hit.range(at: 1).location != NSNotFound ? hit.range(at: 1) : hit.range(at: 2)
+            guard group.location != NSNotFound else { continue }
+            let raw = (whole as NSString).substring(with: group)
+            let cleaned = raw.unicodeScalars.filter { $0 != "<" && $0 != ">" }
+                .reduce(into: "") { $0.append(Character($1) == "\n" ? " " : Character($1)) }
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty else { continue }   // 装饰图 / 埋点像素：整块删
+            out += isStandaloneBlock(ns, at: m.range) ? "<p>" + cleaned + "</p>" : cleaned
+        }
+        out += ns.substring(from: last)
+        return out
+    }
+
+    /// 这张图是不是**独占一行**：它前面（到上一个 `>` 为止）与后面（到下一个 `<` 为止）都只剩空白。
+    ///
+    /// 两个方向都要问：只问一边会把句中的图判成独占 ——
+    /// `<p>见图 <img alt="图一"> 说明</p>` 里那张图后面紧跟标签边界，"后面是空白"这一半成立，
+    /// 而前面是"见图"两个字。判成独占就会把一句话劈成三段。
+    private static func isStandaloneBlock(_ ns: NSString, at range: NSRange) -> Bool {
+        let before = ns.substring(with: NSRange(location: 0, length: range.location))
+        let tailStart = range.location + range.length
+        let after = ns.substring(with: NSRange(location: tailStart, length: ns.length - tailStart))
+        let headSlice: Substring
+        if let gt = before.range(of: ">", options: .backwards) {
+            headSlice = before[gt.upperBound...]
+        } else {
+            headSlice = Substring(before)   // 整串之前没有标签：这段文字本来就在文档最前面
+        }
+        guard headSlice.allSatisfy(\.isWhitespace) else { return false }
+        let tailSlice: Substring
+        if let lt = after.firstIndex(of: "<") {
+            tailSlice = after[..<lt]
+        } else {
+            tailSlice = Substring(after)
+        }
+        return tailSlice.allSatisfy(\.isWhitespace)
     }
 
     /// 渲染前的最后一道闸：**只**喂消毒过的串。

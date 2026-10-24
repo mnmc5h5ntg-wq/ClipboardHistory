@@ -221,6 +221,99 @@ final class HtmlSanitizerTests: XCTestCase {
         XCTAssertFalse(js.contains("javascript:"), "伪协议不是链接，是脚本")
     }
 
+    /// `<img>` 被撤掉之后，**它自己的说明文字必须留下**（R336 / BACKLOG 401）。
+    ///
+    /// 为什么这一格值得存在：R335 的消毒把 `<img>` 整块删掉是对的（产品零出网，
+    /// 加载别人的图 = 替用户出网），但**后果**没人登记：一张以图为主的页面复制下来，
+    /// 切到"渲染"会看到一块空白，而屏幕上没有任何一句话说明"这里原本有东西"。
+    /// 修法不是发明一个占位符，而是照抄 HTML 自己的字段 —— `alt` 就是
+    /// "这张图加载不了时该显示什么"。三条规则各自钉一发：有 alt 留文字、
+    /// 空/缺 alt 整块删（装饰图与 1×1 埋点像素不配在屏幕上占位）、
+    /// alt 里的尖括号必须剥掉（属性值会变成正文，不剥就是"从属性里爬回文档"）。
+    func testImageAltTextSurvivesWhileTheImageItselfDoesNot() {
+        let withAlt = HtmlSanitizer.sanitize(
+            "<p>前</p><img src=\"https://tracker.example/chart.png\" alt=\"季度趋势图\"><p>后</p>")
+        XCTAssertTrue(withAlt.contains("季度趋势图"), "有 alt 的图被撤掉之后，那一句说明也没了：\(withAlt)")
+        XCTAssertFalse(withAlt.lowercased().contains("<img"), "标签本体必须删干净：\(withAlt)")
+        XCTAssertFalse(withAlt.contains("https://"), "src 不许以文字或属性留下：\(withAlt)")
+        XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(withAlt), [],
+                       "为了留 alt 而把可加载构造带回来 ⇒ 这一族的修法本身成了缺陷")
+
+        let decorative = HtmlSanitizer.sanitize(
+            "<p>前</p><img src=\"https://tracker.example/p.gif\" alt=\"\"><p>后</p>")
+        XCTAssertFalse(decorative.contains("图片") || decorative.contains("图像"),
+                       "空 alt 是作者声明的装饰图，不许替它发明占位文字：\(decorative)")
+        XCTAssertEqual(decorative.replacingOccurrences(of: "<p>", with: "")
+            .replacingOccurrences(of: "</p>", with: ""), "前后",
+            "装饰图那一块应当**静默**消失：\(decorative)")
+        let noAlt = HtmlSanitizer.sanitize("<p>前</p><img src=\"https://x/1.png\"><p>后</p>")
+        XCTAssertFalse(noAlt.contains("img"), "没有 alt 的图（多半是埋点像素）整块删：\(noAlt)")
+
+        // 反例要挑**能走到这一行**的形状：`<img … alt="a>b">` 里那个 `>` 会让标签正则
+        // 先截断（`<img[^>]*/?>` 到第一个 `>` 就停），alt 根本不会被捕获 —— 那是另一条已知
+        // 限制（BACKLOG 404 记的就是它），不是这一格要钉的东西。这里用只含 `<` 不含 `>` 的 alt。
+        let hostile = HtmlSanitizer.sanitize(
+            "<img src=\"https://x/1.png\" alt=\"甲<script乙\"><p>后</p>")
+        XCTAssertFalse(hostile.lowercased().contains("<script"),
+                       "alt 里的尖括号没剥掉 ⇒ 属性值爬回了文档：\(hostile)")
+        XCTAssertTrue(hostile.contains("甲") && hostile.contains("乙"),
+                       "剥掉尖括号之后那句说明还是要留：\(hostile)")
+        XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(hostile), [])
+
+        // **已知限制的现状断言**（BACKLOG 404）：`alt` 里含 `>` 会让标签正则先截断
+        // （`<img[^>]*/?>` 到第一个 `>` 就停），于是 alt 没被捕获、剩下的属性文字漏进正文。
+        // 这里断言的是"今天就是这样"，不是"这样对"：将来有人把它修掉，这一格会红，
+        // 而他必须同时去改 404 —— 一条被钉住的限制不会悄悄变成"从来没存在过"。
+        let gtLeak = HtmlSanitizer.sanitize("<img src=\"https://x/1.png\" alt=\"a>b\"><p>后</p>")
+        XCTAssertTrue(gtLeak.contains("b\">"),
+                      "现状变了 ⇒ 先回 BACKLOG 404 更正，再改这一格：\(gtLeak)")
+        XCTAssertFalse(gtLeak.lowercased().contains("<img"),
+                       "标签本体仍然要删干净：\(gtLeak)")
+        XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(gtLeak), [],
+                       "这条限制不许顺带打开一条出网通道：\(gtLeak)")
+
+        // 幂等：替换之后不再有 `<img>`，第二遍必须一个字节都不动。
+        for sample in [withAlt, decorative, noAlt, hostile] {
+            XCTAssertEqual(HtmlSanitizer.sanitize(sample), sample,
+                           "第二遍又改了东西 ⇒ 第一遍留下了会被再处理的半成品")
+        }
+        CaptureReadings.emit("HTML_ALT 有alt保留=\(withAlt.contains("季度趋势图")) "
+            + "空alt静默=\(!decorative.contains("图片")) 无alt删净=\(!noAlt.contains("img")) "
+            + "尖括号剥掉=\(!hostile.lowercased().contains("<script"))")
+    }
+
+    /// 图被撤之后那句说明**落在哪个块里**（R336 / 规则 ④）。
+    ///
+    /// 上一格只保证"文字留下"，而屏幕上量到的是：留下的是裸行内文字时，它会并进上一个块的行节奏
+    /// —— 真帧现读它与下一段之间 20.0pt（= 列表自己的行内距），两个 `<p>` 之间是 32.0pt。
+    /// 也就是说 ①〜③ 做对了，读起来仍然像"列表漏了一颗项目符号"。
+    /// 两半都要钉，因为两种坏法在屏幕上是相反的：从不包段 ⇒ 说明与下一段挤成一段；
+    /// 永远包段 ⇒ 句子里的图把一句话劈成三段。
+    func testStandaloneImageBecomesItsOwnParagraphWhileInlineImageStaysInline() {
+        let standalone = HtmlSanitizer.sanitize(
+            "<ul><li>甲</li></ul>\n  <img src=\"https://x/1.png\" alt=\"图一\">\n  <p>下一段</p>")
+        XCTAssertTrue(standalone.contains("<p>图一</p>"),
+                      "独占一行的图被撤之后，那句说明必须自成一段：\(standalone)")
+
+        let inline = HtmlSanitizer.sanitize(
+            "<p>见图 <img src=\"https://x/2.png\" alt=\"图一\"> 说明</p>")
+        XCTAssertFalse(inline.contains("<p>图一</p>"),
+                       "句中的图不许被升格成段落 —— 那会把一句话劈成三段：\(inline)")
+        XCTAssertTrue(inline.contains("见图") && inline.contains("说明"),
+                      "就地替换之后前后文字仍要在同一句里：\(inline)")
+        XCTAssertFalse(inline.lowercased().contains("<img"), "标签本体仍然删干净：\(inline)")
+
+        for sample in [standalone, inline] {
+            XCTAssertEqual(HtmlSanitizer.sanitize(sample), sample,
+                           "包出来的 <p> 会被第二遍再处理 ⇒ 幂等破了：\(sample)")
+            XCTAssertEqual(HtmlSanitizer.residualFetchableReferences(sample), [],
+                           "为了排版加一个块级标签，不许顺带把可加载构造带回来：\(sample)")
+        }
+        CaptureReadings.emit("HTML_ALT_BLOCK 独占成段=\(standalone.contains("<p>图一</p>")) "
+            + "句中不包=\(!inline.contains("<p>图一</p>")) "
+            + "句中同句=\(inline.contains("见图") && inline.contains("说明"))")
+    }
+
     func testCommentHidingAScriptDoesNotReviveIt() {
         // 两支规则谁先跑都会改变另一支的输入 ⇒ 顺序是判据，不是实现细节。
         let tricky = "<!-- <img src=\"https://x/1.png\"> --><p>正文</p><scri<!-- -->pt>alert(1)</scri<!-- -->pt>"
