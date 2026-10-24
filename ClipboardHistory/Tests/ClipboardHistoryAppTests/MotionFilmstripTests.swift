@@ -5093,14 +5093,24 @@ final class MotionFilmstripTests: XCTestCase {
         // 出口的前提在本机是**相反方向**量过的（R161 的规矩）：本机同一卷 开=0.277 对 关=0.939、
         // 帧数 3 对 1 ⇒ 这条出口放掉的是通道，不是产品；产品侧留下一格**有名字的未覆盖**（BACKLOG 376）。
         let armsIdentical = Self.armsAreIdentical(onA: dA, onB: dB, off: dOff)
-        guard !armsIdentical else {
+        // R325 / D-311：出口谓词换成**判据自己用的那两个数**（过渡帧数、峰值）。
+        // RUN=40053805112 是这一改的证人：那一跑三臂 帧数=1/1/1、峰值=0.925/0.925/0.925，
+        // 而数组别的位置各不相同 ⇒ 上一版"逐字节相同"没响，红砸在产品断言上（读起来像"这条位移是瞬移"）。
+        // 本机给的是相反方向的证据（开 3 帧 / 关 1 帧、峰值 0.266 对 0.949）⇒ 这条出口放掉的是通道，不是产品。
+        let indistinguishable = Self.armsIndistinguishable(spanA: spanA, spanB: spanB, spanOff: spanOff,
+                                                           peakA: Self.peak(dA), peakB: Self.peak(dB),
+                                                           peakOff: Self.peak(dOff))
+        guard !armsIdentical && !indistinguishable else {
             let resolvableOnThisMachine = Self.resolvableFrames(durationMilliseconds: duration,
                                                                  sampleMilliseconds: interval)
-            emit("MOTION_NOT_RUN=pill-slide-arms-identical filter-pill-slide 开A/开B/关 三臂的逐帧差数组完全相同"
-                + "（帧数=\(spanOff) 峰值=\(String(format: "%.4f", Self.peak(dOff)))"
-                + " 采样≈\(interval)ms 可分帧=\(resolvableOnThisMachine)）"
+            let which = armsIdentical ? "逐字节相同" : "帧数与峰值全等（数组别处不同）"
+            emit("MOTION_NOT_RUN=pill-slide-arms-indistinguishable filter-pill-slide 三臂不可分（\(which)"
+                + "：开A 帧数=\(spanA) 峰值=\(String(format: "%.4f", Self.peak(dA)))"
+                + " 开B 帧数=\(spanB) 峰值=\(String(format: "%.4f", Self.peak(dB)))"
+                + " 关 帧数=\(spanOff) 峰值=\(String(format: "%.4f", Self.peak(dOff)))）"
+                + " 采样≈\(interval)ms 可分帧=\(resolvableOnThisMachine)"
                 + " ⇒ 这一台的胶片里这段位移只占一帧且开关不可分，『有没有过程』这一半没有对照物")
-            throw XCTSkip("MOTION_NOT_RUN=pill-slide-arms-identical")
+            throw XCTSkip("MOTION_NOT_RUN=pill-slide-arms-indistinguishable")
         }
 
         // ③ 落定耗时**上限**（"没跑飞"）—— 这一半与采样粒度无关，任何一台都判。
@@ -5475,6 +5485,32 @@ final class MotionFilmstripTests: XCTestCase {
                 pillLuma: pillSum / Double(pillN), trackLuma: trackSum / Double(trackN))
     }
 
+    /// 纯函数：三臂在**判据自己用的那两个数**上是否全等（R325 / 决定 D-311）。
+    ///
+    /// 为什么不是"数组逐字节相同"：`armsAreIdentical` 是这条出口在 R324 的形状，
+    /// 而 RUN=40053805112 证明它**太严**——三臂的过渡帧数（1/1/1）与峰值（0.925/0.925/0.925）全等，
+    /// 数组别的位置却因为噪声各不相同 ⇒ 出口不响，红落在"开臂帧数必须大于关臂"这条产品断言上，
+    /// 读起来像"这条位移是瞬移"。判据比的就是 (span, peak) 这两个数，
+    /// 所以"没有对照物"必须写成这两个数的全等；逐字节相同是它的一个子集（仍然算）。
+    static func armsIndistinguishable(spanA: Int, spanB: Int, spanOff: Int,
+                                      peakA: Double, peakB: Double, peakOff: Double) -> Bool {
+        spanA == spanB && spanB == spanOff && peakA == peakB && peakB == peakOff
+    }
+
+    /// 纯函数：中心序列里**既不在起点档、也不在终点档**的样本数（R325）。
+    ///
+    /// 这条存在的全部理由：runner 那一卷的中心序列是 `80.0, 219.0, 219.0, …` —— 一步跳变，
+    /// 而斜坡尺照样判成"单调、最大倒退 0.0pt"。**没有中间样本就没有斜坡可判**，
+    /// 那张证是空转出来的（词表默认输入里至少有一颗中间态）。
+    /// 方向无关：药丸往左走还是往右走都算，端点按 `tolerance` 让开（抗锯齿与容差同量级）。
+    static func intermediateCount(_ centers: [Double], tolerance: Double) -> Int {
+        guard let first = centers.first, let last = centers.last else { return 0 }
+        let lo = Swift.min(first, last)
+        let hi = Swift.max(first, last)
+        if hi - lo <= 2 * tolerance { return 0 }
+        return centers.filter { $0 > lo + tolerance && $0 < hi - tolerance }.count
+    }
+
     /// 纯函数：三臂的逐帧差数组是否**完全相同** —— 也就是这台机器的胶片里"开"与"关"不可分。
     ///
     /// 这条单独抽出来是因为它是**出口**，而出口最容易变成洗红的水：
@@ -5694,6 +5730,19 @@ final class MotionFilmstripTests: XCTestCase {
                 + " < 8 ⇒ 这一台的通道分不开这两级，斜坡品质无从逐帧判（分离度是量出来的，不是假设）")
             throw XCTSkip("MOTION_NOT_RUN=pill-ramp-low-separation")
         }
+        // R325 / D-311：**退化采样不许升成品质结论**。词表（单调 / 回头 / 没动 / 无对象）默认输入里
+        // 至少有一颗中间样本。RUN=40053805112 那一卷的中心序列是 `80.0, 219.0, 219.0, …`——
+        // 一步跳变照样被判成"单调、最大倒退 0.0pt"，那张证是空转出来的。
+        // 本机给相反方向的证据（中间样本 4 颗，见 MOTION_PILL_RAMP 的 中心= 序列）⇒ 这条出口放掉的是通道。
+        let interA = Self.intermediateCount(cA, tolerance: tolerance)
+        let interB = Self.intermediateCount(cB, tolerance: tolerance)
+        guard interA > 0 && interB > 0 else {
+            emit("MOTION_NOT_RUN=pill-ramp-no-intermediate filter-pill-slide 两遍的中间样本 A=\(interA)"
+                + " B=\(interB)（容差 \(String(format: "%.1f", tolerance))pt、首末 \(cA.first ?? -1)"
+                + "→\(cA.last ?? -1)）⇒ 这一台的采样里这条位移是一步跳变，"
+                + "『走得平不平』没有可判的东西（不写产品事实，D-305 同一形状）")
+            throw XCTSkip("MOTION_NOT_RUN=pill-ramp-no-intermediate")
+        }
         let vA = Self.rampVerdict(cA, tolerance: tolerance)
         let vB = Self.rampVerdict(cB, tolerance: tolerance)
         emit("MOTION_PILL_RAMP filter-pill-slide A 判定=\(vA.label) \(vA.detail)"
@@ -5743,6 +5792,85 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertTrue(census.pinned.contains("filterPillSlide"),
             "胶囊那两颗判据（斜坡尺 / 过程证人）用的工厂 `filterPillSlide` 没钉色档"
             + " ⇒ 前提⓪要拦的那件事就在这儿：亮档里轨道与药丸只差 3 级，尺没有对象")
+    }
+
+    /// 纯函数：把"同一颗场景在两档色档里的读数"归成四格词表（R325 / BACKLOG 383）。
+    ///
+    /// 为什么要抽成纯函数而不直接在探针里写 if：不抽出来，这四格词表就只活在一次真机跑里，
+    /// 没人能证明"漂"与"敏感"的分界真的在 5% / 25%，也没人能证明"换对象"优先于相对差
+    /// （R146 那一族：写死在探针里的分类法等于没有分类法）。
+    /// 顺序是承重的：`换对象` 排在相对差之前 —— 一档看得见、另一档看不见时，
+    /// 相对差再小也是**前提**翻了脸，那与"数值漂了一点"是修法相反的两件事。
+    static func appearanceDependenceVerdict(peakDark: Double, peakLight: Double,
+                                            changedDark: Bool, changedLight: Bool) -> String {
+        if changedDark != changedLight { return "换对象" }
+        let denom = Swift.max(peakDark, peakLight, 0.001)
+        let rel = Swift.abs(peakDark - peakLight) / denom
+        if rel > 0.25 { return "敏感" }
+        if rel > 0.05 { return "漂" }
+        return "同"
+    }
+
+    /// R325 / BACKLOG 383：把"12 颗没钉色档"从**缺席计数**变成**逐颗读数**。
+    ///
+    /// 同一颗场景在暗档与亮档里各拍一卷，比的是**它自己那把尺的读数**（整幅逐帧变化的峰值，
+    /// 以及前提"画面到底换没换"）。四格分类：
+    ///   `换对象` = 一档看得见变化、另一档看不见 ⇒ 这条判据的**前提**随色档翻脸，必须钉；
+    ///   `敏感`   = 两边都看得见，但峰值相对差 > 25% ⇒ 读数随色档走，钉；
+    ///   `漂`     = 相对差 5–25% ⇒ 登记，本轮不钉（钉了就要重测那条判据的历史读数）；
+    ///   `同`     = 相对差 < 5% ⇒ **有数了**才许写"不依赖色档"，而不是"猜它不依赖"。
+    /// 这一格判的是尺，不是产品；它自己不红任何产品事实，除了下面两条通道前提。
+    ///
+    /// 两条通道前提为什么是红的：两臂若其实拍在同一档里，"读数相同"就是两卷同一张图的同义反复，
+    /// 那句"同 ⇒ 不钉"就成了假绿（R38 / R161 那一族：出口的前提必须由同一次运行量出来）。
+    func testFilmScenarioAppearanceDependenceIsMeasuredPerScenario() throws {
+        try skipUnlessEnabledAndCapable()
+        let subjects = Scenario.unpinnedAppearanceProbe()
+        let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
+        let census = Self.scenarioPinCensus(code: text)
+        let probeNames = subjects.map { $0.factory }.sorted()
+        XCTAssertEqual(probeNames, census.unpinned.sorted(),
+            "色档 A/B 的对象表与点名器数出来的『没钉名单』不是同一份 ⇒ 探针会静默漏掉某一颗场景"
+            + "（漏掉的那颗正是「我们以为量过了」的那颗）")
+        var sameCount = 0
+        var driftCount = 0
+        var sensitiveCount = 0
+        var flippedCount = 0
+        for subject in subjects {
+            let dark = record(subject.scenario.pinned(to: .darkAqua))
+            let light = record(subject.scenario.pinned(to: .aqua))
+            XCTAssertEqual(dark.appearanceNameAtRecord, "暗",
+                "探针说在暗档、胶片实际拍在「\(dark.appearanceNameAtRecord)」⇒ 两臂对照不成立（\(subject.factory)）")
+            XCTAssertEqual(light.appearanceNameAtRecord, "亮",
+                "探针说在亮档、胶片实际拍在「\(light.appearanceNameAtRecord)」⇒ 两臂对照不成立（\(subject.factory)）")
+            let peakDark = Self.peak(Self.deltas(dark.motionFrames, band: nil))
+            let peakLight = Self.peak(Self.deltas(light.motionFrames, band: nil))
+            let changedDark = Self.premisePictureChanged(dark.motionFrames, band: nil)
+            let changedLight = Self.premisePictureChanged(light.motionFrames, band: nil)
+            let denom = max(peakDark, peakLight, 0.001)
+            let rel = abs(peakDark - peakLight) / denom
+            // 分类走纯尺（与证人同一颗尺子，R68）：探针自己 if 一遍，证人就只是在证它自己抄的那份。
+            let verdict = Self.appearanceDependenceVerdict(peakDark: peakDark, peakLight: peakLight,
+                                                           changedDark: changedDark,
+                                                           changedLight: changedLight)
+            switch verdict {
+            case "换对象": flippedCount += 1
+            case "敏感": sensitiveCount += 1
+            case "漂": driftCount += 1
+            default: sameCount += 1
+            }
+            let changedDarkText = changedDark ? "是" : "否"
+            let changedLightText = changedLight ? "是" : "否"
+            emit("MOTION_SCENARIO_AB " + subject.factory + " 暗峰值=" + String(format: "%.4f", peakDark)
+                 + " 亮峰值=" + String(format: "%.4f", peakLight)
+                 + " 相对差=" + String(format: "%.1f", rel * 100.0) + "%"
+                 + " 暗换档=" + changedDarkText + " 亮换档=" + changedLightText
+                 + " 判定=" + verdict)
+        }
+        emit("MOTION_SCENARIO_AB_SUMMARY 场景=" + String(subjects.count)
+             + " 同=" + String(sameCount) + " 漂=" + String(driftCount)
+             + " 敏感=" + String(sensitiveCount) + " 换对象=" + String(flippedCount)
+             + "（钉档判据：换对象/敏感 ⇒ 该钉；漂 ⇒ 登记不钉；同 ⇒ 有数了才写不依赖）")
     }
 
     /// 位移档的**真实时长**（MC-2 的像素那一半），用毫秒表达。
@@ -7177,6 +7305,38 @@ final class MotionFilmstripTests: XCTestCase {
         /// 空白对照：同一个窗口、同一个夹具，什么都不触发。
         static func blank() -> Scenario {
             Scenario(name: "blank", size: NSSize(width: 760, height: 560)) { _ in }
+        }
+
+        /// 把同一颗场景改钉到某一档色档里再拍一遍（R325 的色档 A/B 探针专用）。
+        ///
+        /// 为什么要有这一层而不是在探针里自己拼 `Scenario(...)`：场景有九格参数（含四颗闭包），
+        /// 手拼一遍就会在下一格加进 `Scenario` 时**静默漏抄**（R38 那一族：同一个东西不许有两份定义）。
+        func pinned(to appearance: NSAppearance.Name?) -> Scenario {
+            Scenario(name: name, size: size, prepare: prepare,
+                     declaredDurationMilliseconds: declaredDurationMilliseconds,
+                     appearance: appearance, root: root, storeFactory: storeFactory,
+                     captureRect: captureRect, trigger)
+        }
+
+        /// R325 / BACKLOG 383：逐颗量"色档换了，这条判据的读数换不换"的**对象表**。
+        ///
+        /// 这份名单与 `scenarioPinCensus` 数出来的"没钉名单"**必须由判据自己对账成同一份**
+        /// （`testFilmScenarioAppearanceDependenceIsMeasuredPerScenario` 第一条断言就是这件事）：
+        /// 手写一遍就会在有人新加场景、或有人把某一颗钉上档之后**静默漏掉一颗**，
+        /// 而漏掉的那颗正是"我们以为量过了"的那颗。
+        static func unpinnedAppearanceProbe() -> [(factory: String, scenario: Scenario)] {
+            [("blank", blank()),
+             ("detailEmptyToContent", detailEmptyToContent()),
+             ("detailKindChange", detailKindChange()),
+             ("detailSameKind", detailSameKind()),
+             ("emptyState", emptyState()),
+             ("heatFirstRecord", heatFirstRecord()),
+             ("listInsertNewRecord", listInsertNewRecord()),
+             ("noticeBanner", noticeBanner()),
+             ("noticeBannerDismiss", noticeBannerDismiss()),
+             ("promotionToTop", promotionToTop()),
+             ("searchReflow", searchReflow()),
+             ("toggleFavoriteInRow", toggleFavoriteInRow())]
         }
     }
 

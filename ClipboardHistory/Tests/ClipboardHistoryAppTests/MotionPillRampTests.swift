@@ -341,6 +341,46 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertTrue(detail.contains("帧数=2"), "帧数也要印：\(detail)")
     }
 
+    // MARK: - 出口谓词与退化采样（R325 / D-311）：两处"只印不判"各配一颗证人
+
+    /// 出口的谓词必须钉在**判据自己用的那两个数**上（过渡帧数、峰值）。
+    /// runner 那一跑（RUN=40053805112）是三臂 1/1/1 帧、峰值 0.925 全等，而数组别处各不相同 ——
+    /// 上一版要求"逐字节相同"，于是出口没响、红落在产品断言上。这一格就是那个形状的反例。
+    func testArmsIndistinguishableUsesTheNumbersTheJudgeActuallyCompares() {
+        XCTAssertTrue(MotionFilmstripTests.armsIndistinguishable(spanA: 1, spanB: 1, spanOff: 1,
+                                                                 peakA: 0.925, peakB: 0.925,
+                                                                 peakOff: 0.925),
+            "runner 那一跑的形状：三臂的帧数与峰值全等 ⇒ 必须判成没有对照物（数组别处不同不算有对照物）")
+        XCTAssertFalse(MotionFilmstripTests.armsIndistinguishable(spanA: 3, spanB: 3, spanOff: 1,
+                                                                   peakA: 0.266, peakB: 0.266,
+                                                                   peakOff: 0.949),
+            "本机那一跑的形状：开臂 3 帧对关臂 1 帧 ⇒ 开关分得开，这条判据在真判，不许被出口放行")
+        XCTAssertFalse(MotionFilmstripTests.armsIndistinguishable(spanA: 1, spanB: 1, spanOff: 1,
+                                                                   peakA: 0.925, peakB: 0.925,
+                                                                   peakOff: 0.900),
+            "峰值差 0.025 就是**有**对照物：谓词不许带容差，否则把'差一点'洗成'全等'")
+        XCTAssertFalse(MotionFilmstripTests.armsIndistinguishable(spanA: 1, spanB: 2, spanOff: 1,
+                                                                   peakA: 0.925, peakB: 0.925,
+                                                                   peakOff: 0.925),
+            "同一台机器两遍开臂自己都不一致 ⇒ 那不是'开关不可分'，是通道在抖，得让它红")
+    }
+
+    /// 词表默认输入里至少有一颗中间样本；一步跳变不许发"走得平稳"的证。
+    func testIntermediateCountRefusesToCertifyATeleport() {
+        XCTAssertEqual(0, MotionFilmstripTests.intermediateCount([80.0, 219.0, 219.0, 219.0],
+                                                                 tolerance: 5.5),
+            "runner 那一卷的序列：首帧之后直接是末态 ⇒ 中间样本必须是 0（斜坡无从判）")
+        let ramp: [Double] = [80.5, 93.0, 124.5, 158.0, 178.5, 193.0, 202.5, 209.0, 212.5, 219.0]
+        XCTAssertGreaterThan(MotionFilmstripTests.intermediateCount(ramp, tolerance: 5.5), 3,
+            "本机那一卷的序列：中间态必须数得出来，否则本机也走不出'单调'这张证")
+        XCTAssertEqual(MotionFilmstripTests.intermediateCount([219.0, 158.0, 80.0], tolerance: 5.5), 1,
+            "方向无关：往左走的斜坡同样有中间样本（端点按容差让开）")
+        XCTAssertEqual(0, MotionFilmstripTests.intermediateCount([100.0, 100.0, 100.0], tolerance: 5.5),
+            "首末同档（没动）⇒ 中间样本 0，不许因为'都在区间内'就数出东西来")
+        XCTAssertEqual(0, MotionFilmstripTests.intermediateCount([], tolerance: 5.5),
+            "空序列 ⇒ 0，不是崩溃也不是 -1")
+    }
+
     // MARK: - 缺席点名器的正对照（R324）：先证明它数得对，才有资格报「没钉的有几颗」
 
     /// `MotionFilmstripTests.scenarioPinCensus` 读的是**自己那本文件**，所以它没有第二只眼。
@@ -376,6 +416,37 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertEqual(["deepOne", "plainOne"], census.unpinned.sorted(),
             "没钉的名单读成了 \(census.unpinned) ⇒ 点名器漏认工厂（注释里那颗"
             + " `commentedOut` 与 `-> [Scenario]` 那种形状都不该进来）")
+    }
+
+    // MARK: - 色档依赖分类器（R325）：四格词表与两条分界都必须有牙
+
+    /// R325 / BACKLOG 383 的探针把 12 颗场景归成 同 / 漂 / 敏感 / 换对象 四格。
+    /// 探针自己活在真机跑里，这四格的分界就得由这一格钉住 ——
+    /// 否则"漂"与"敏感"是哪两条线、"换对象"为什么优先，都只是注释里的分类法（R146 那一族）。
+    func testAppearanceDependenceVerdictWordsAndBoundaries() {
+        // ① 换对象优先于相对差：两臂峰值**完全相同**，但一档看得见变化、另一档看不见 ⇒ 前提翻了脸。
+        XCTAssertEqual("换对象",
+                       MotionFilmstripTests.appearanceDependenceVerdict(peakDark: 0.10, peakLight: 0.10,
+                                                                        changedDark: true, changedLight: false),
+                       "相对差 0% 就把'前提翻脸'读成'同' ⇒ 那正是 R324 在亮档里撞上的形状")
+        // ② 5% 那条线：等于 5% 还算同，超过才算漂（分界要能被钉在某一侧，不许两头都算）。
+        XCTAssertEqual("同", MotionFilmstripTests.appearanceDependenceVerdict(
+            peakDark: 0.100, peakLight: 0.105, changedDark: true, changedLight: true),
+            "相对差正好 5% ⇒ 不许升成漂（升了就等于把地板往下挪）")
+        XCTAssertEqual("漂", MotionFilmstripTests.appearanceDependenceVerdict(
+            peakDark: 0.100, peakLight: 0.106, changedDark: true, changedLight: true),
+            "相对差 5.7% ⇒ 必须点名，否则'漂'那一格永远读不出来")
+        // ③ 25% 那条线：同上，两条线各自可钉。
+        XCTAssertEqual("漂", MotionFilmstripTests.appearanceDependenceVerdict(
+            peakDark: 0.20, peakLight: 0.25, changedDark: true, changedLight: true),
+            "相对差 20%（0.05/0.25）⇒ 仍是漂，不许提前升成敏感 —— 本机三颗漂里最大那颗就是 22.3%")
+        XCTAssertEqual("敏感", MotionFilmstripTests.appearanceDependenceVerdict(
+            peakDark: 0.20, peakLight: 0.28, changedDark: true, changedLight: true),
+            "相对差 >25% ⇒ 这条判据的读数随色档走，必须与'漂'分开（修法相反：一个要钉，一个只要登记）")
+        // ④ 两臂都是 0（空白对照那类）不许算出 NaN 或除零。
+        XCTAssertEqual("同", MotionFilmstripTests.appearanceDependenceVerdict(
+            peakDark: 0, peakLight: 0, changedDark: false, changedLight: false),
+            "两臂都读不到变化 ⇒ 是'同'（空白对照），不是 NaN，也不是'换对象'")
     }
 
     // MARK: - ⑦ 亮度口径与捕获卷那颗尺同源
