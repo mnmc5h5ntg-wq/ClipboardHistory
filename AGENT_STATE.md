@@ -12,6 +12,49 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R329 状态（2026-10-24 · 本地 · 第 328 轮 / Round 326）：取用带第一次报出自己盖不住那颗胶囊（产品 0 文件，动效主线）
+
+最后更新：2026-10-24（本地 · R329 / 第 328 轮 / Round 326）：报告新增 `纵向覆盖` 一格，
+真帧现读 纵向覆盖=14/48px=29% ⇒ 斜坡尺与过程证人一直用的是胶囊顶部的一条切片（未留档的逐行表独立复核到同一个高度）
+（产品 0 文件 · 判据账 · 合计 89/105）
+
+本轮做了什么：① **⓪ 读 R328 那一跑**：RUN=40084527261 ↔ 215d815；分档在 runner 上印得出（runner 现读 分档=0×138,2×120,4×4,5×3,6×5,10×1,12×3,13…（本轮新加的 纵向覆盖 那一格这一跑还没有，下一跑才签）），
+新读数出厂第一跑就在两台机器上都有数；build-and-test	Motion filmstrip (report-only)	2026-10-24T10:17:55.0081190Z MOT；两朵 pill 出口 pill-ramp-no-intermediate,pill-slide-arms-indistinguishable；`MOTION_FLOOR_SUITE_CLEAN=0`。
+② **388 的最后一问交了数**：取用带占那颗胶囊纵向范围的 29%，中间 22px 是标签行 ⇒ 结构上盖不住。
+③ **两格证人 + 两把刀**：CAUGHT=2/2, RESTORE_CLEAN=yes（M955 只往一个方向扩、M956 把"无"印成 0%），
+R328 表在新代码上复跑 CAUGHT=3/3, RESTORE_CLEAN=yes，针预检 bad=0。
+④ 看图腿：逐行走了一遍胶囊的纵向范围（临时尺，配方写在正文里），并新登记一格没有参照臂的 1pt 内缩。
+
+本轮**没有**改带子的纵向定义，也没有改产品：两条修法（承认切片 / 跨行并集）都要同一运行里改前改后的
+四个数，按 D-319 不许只改一边 ⇒ 开成 390。产品面连续零改动 **10** 轮（唯一取数口 `python3 scripts/product_streak.py --streak-for 328`，`--check` 同形；上一轮那一格是 9）。
+
+验证读数（现读）：ROUND_VERIFY build_warnings=0 swift_executed=983 swift_skipped=47 swift_failures=0 frames=174 baseline_compared=174 baseline_changed=0 baseline_missing=0 dmg=ok installed_version=1.4.8 dir=/tmp/r329_rv；ROUND_WARNING_GATE warnings=0 incremental=0 cold=0 target=build-tests；Executed 983 tests, with 47 tests skipped and 0 failures；CAPTURED 174 -> /tmp/r329_rv/frames；FRAME_BASELINE_COMPARED=174 CHANGED=0 MISSING=0；
+判据卷 `MotionPillRampTests` 33 格全绿（本轮新增 1 格：被拒段必须带洞宽，且分母不许是洞自己）；胶囊两把判据整跑 Executed 2 tests, with 0 tests skipped and 0 failures（testFilterPill 两格，开 CLIPBOARD_HISTORY_UI_MOTION）；
+带子 `行带=51.0…58.0pt 候选段里被拒那一段 高22px 洞宽=21%，通过那一段 高14px 洞宽=49% 取用=y102..116px 纵向覆盖=14/48px=29%`；本轮刀 CAUGHT=2/2, RESTORE_CLEAN=yes；
+针预检 tables=117 covered=100 bad=0、名册 arms=823 / files=211；
+搬运名单 `READINGS_MUST_INCLUDE 声明=3 缺=0`；脚本电池 `Ran 611（skipped=4）`；CI 对平：RUN=40084527261 sha=215d815 status=completed conclusion=success title=R328 追记（把 push 之后的 run↔commit 成对写回 STATE 的 R329 第 ⓪ 条：RUN=40 workflow=CI。
+
+⓪ R330 开场要先读的（成对：run id ↔ commit）：本轮 push 之后拿到的 RUN / sha 见本轮提交之后的追记；
+要读的三件事：① `纵向覆盖` 那一格在 runner 上印不印得出、百分比与本机是否同形（那台 1× ⇒ px 数减半，
+比值应当不变 —— 变了就是分母随倍率漂）；② 两朵 pill 命名出口继续响；③ `MOTION_FLOOR_SUITE_CLEAN` 仍为 0。
+
+① R330 的靶：① **390 的 before/after**：先写判法（并集之后中段洞宽必须从 21% 涨到接近
+49%，涨不到就是并集没生效），再实现，再给同一次运行里改前改后的 洞宽 / 位移 / 倒退 / 纵向覆盖 四个数；
+② 389 的时长（把胶囊位移与内容淡出量成 ms 并对 `MotionCatalog` 的档）；
+③ 384 的横轴那半（轨道档按分箱取，不许再用众数）；④ 387 的①（墨量那颗不进 max()）；
+⑤ 376 剩下那一半；⑥ 367 迁移 / 360 最后一批 / 361 合并 / 364 六把抽不出的刀。
+**R330 要落一次产品面**：连续 10 轮零产品文件，这一维一直在垫底；
+能落的四条（347 / 305 / 373① / 377）全被真机普查挡着 ⇒ 若 ① 指向"看得见的东西"优先做它，
+否则照实写"本轮仍未落"，不许为破纪录加动效。
+
+② 仍开：390（新）、389、388、384、387、347、305、364、354 的第五步、360、361、362、359、
+348 的"数字对不对"、349、350 第二步、351、344、341 的 CI 契约半、339、312、304、296、291；
+用户闸门 220 路 A / 228② / 265；真机普查（用户推迟）：347 / 305 / 373① / 377。
+
+NOT-RUN 三格：① 真机肉眼验收（上面那道闸门，含本轮新登记的 1pt 内缩没有原生参照臂）；
+② (a)/(b) 两条修法的 before/after 都没跑 ⇒ 本轮只交读数；③ 逐行表来自一次性 PIL、脚本未入库 ⇒ 未留档，
+复查配方：按 300×520 切格、列电平取 luma 加权、页底 30 / delta 8 / extent 12..287pt、逐行取最长连续洞。
+
 ## R328 状态（2026-10-24 · 本地 · 第 327 轮 / Round 325）：388 的转储搬进仓库尺 + 两处公开更正（产品 0 文件，动效主线）
 
 最后更新：2026-10-24（本地 · R328 / 第 327 轮 / Round 325）：**逐列分档进 `movingHoleBand` 的报告（第 0 箱=判据认的洞），被拒那 22px 现读三档同现 ⇒ "洞太窄"改判为判据判对了；同轮更正上一轮两处（"字墨不是主因"→估计量被抢、"文字同时变淡"→淡的是列表内容）**（产品 0 文件 · 判据账 · 自评合计 88/105）
