@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 侧栏筛选胶囊在真机上判成暗洞：377 结案为产品缺陷，新增一把带判据卷与三把刀的真机尺（R330 / U-1094…U-1097 · 产品 0 文件，真机账）
+
+- 真机现读 `PILL_ROW y=120pt 轨道宽=320pt(x0起) 洞宽=168pt(x2..170, 占 52%) 页底=51.0 轨道档=81.0 药丸档=48.0 差=-33.0 实心=0.46` → `pill_darker`；点另一颗之后洞搬到右半（`AB_SUMMARY A: 洞 x2..170 差=-33.0 | B: 洞 x172..240 差=-32.0 | 洞搬了=yes 两臂都比轨道暗=yes`）。
+- 新尺 `scripts/real_screen_filter_pill.py`：列电平取中位、页底两趟外取、第四道闸是纵向实心度（地板 0.20），四条具名出口。
+- 新判据卷 `scripts/tests/test_real_screen_filter_pill.py` `Ran 8 tests`；刀 `CAUGHT=3/3, RESTORE_CLEAN=yes`（M957, M958, M959）。
+
 ### 取用带第一次报出自己盖不住那颗胶囊：`纵向覆盖=14/48px=29%`（R329 / U-1090…U-1093 · 产品 0 文件，动效主线）
 
 - `movingHoleBand` 的报告新增一格：分母 = 与取用带**首尾相接**的候选段之和（那颗胶囊的纵向范围），分子 = 取用带自己。
