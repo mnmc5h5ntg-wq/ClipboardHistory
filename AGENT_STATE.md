@@ -33,7 +33,7 @@ runner ⓪ `build-and-test	Motion filmstrip (report-only)	2026-10-24T09:12:27.90
 名册 arms=821 / files=210；搬运名单 `READINGS_MUST_INCLUDE 声明=3 缺=0`；
 脚本电池 `Ran 611（skipped=4）`；腐烂针尺 `HIDDEN_ARMS 表=204 可判=753 rot=33 抽不出=6 已声明表=2 已声明死针=0 上界 rot=33 抽不出=6 已声明死针=0 已声明表=2 处置=ok`；CI 对平：RUN=40080135189 sha=eeb9058 status=completed conclusion=success title=R327 追记（把 push 之后的 run↔commit 成对写回 STATE 的 R328 第 ⓪ 条：RUN=40 workflow=CI。
 
-⓪ R329 开场要先读的（成对：run id ↔ commit）：本轮 push 之后拿到的 RUN / sha 见本轮提交之后的追记；
+⓪ R329 开场要先读的（成对：run id ↔ commit）：**RUN=40084505594 ↔ 81cd712**（本笔追记时那一跑仍 `status=in_progress` ⇒ 成对号先记，三件事的读数下一轮再抄；`ci_read.py latest` 现读，标题对得上本笔账半）；
 要读的三件事：① 分档那一格在 runner 上印不印得出（`判=洞太窄 洞宽=NN% 分档=…`，那台 1× ⇒
 第 0 箱与第 2 箱应当仍然分得开，读到"只有一箱"就是那台的 delta 把两档洗成一档）；
 ② 两朵 pill 命名出口继续响（不许悄悄变回断言红）；③ §8 的 `MOTION_FLOOR_SUITE_CLEAN` 仍为 0。
