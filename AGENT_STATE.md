@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R374 / 第 373 轮 / Round 371）：`strayLines(in:)` + 合成样本正对照落地，守卫 0.029 秒通过；r56 的 M278/M279/M281 重钉、CI 预检 `Ran 1 test` → `Ran \d+ tests`，两路预检 OK；刀腿 NOT-RUN（M278 臂 xctest 挂 6:29、两次强杀、两次残留 MUTANT 已还原）；全量 1031 格 0 失败、电池 Ran 670（skipped=4）OK（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c` 仍在队里；只登记不轮询。
+① ⓪ CI：`a17bc6a`（R373 追记）已 **success**；本轮 `357a763 ↔ 40209810666`（queued、同 workflow 前面=0）。更早的几跑已结案；只登记不轮询。
 ② 守卫洞：扫描来源提成 `strayLines(in:)`，同一函数喂合成样本必须抓到 1 条。
 ③ r56 重钉（M278→CaptureReadings.emit、M279→appendLocked、M281→strayLines）+ CI 预检写法修掉。
 ④ 刀腿挂起 → NOT-RUN；rot 29→27（针活了）且上界同笔降；开 433（崩溃安全还原 + swift 腿硬超时 + M278 挂起成因）。
