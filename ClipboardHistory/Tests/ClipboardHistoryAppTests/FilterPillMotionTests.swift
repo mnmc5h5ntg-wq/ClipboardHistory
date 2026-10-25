@@ -168,10 +168,14 @@ final class FilterPillMotionTests: XCTestCase {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"),
             encoding: .utf8)
-        XCTAssertTrue(src.contains(".animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"),
-                      "空态淡出必须跟药丸同一个动画（R348）：换成 contentFade 会让内容先落定 0.16 而药丸还在走 0.20")
+        XCTAssertTrue(src.contains(".animation(MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"),
+                      "空态淡出必须跟药丸同一个**节奏**（R348），但走的是目录的 `.slider` 动画（R355）："
+                      + "0.20 在减弱动态下退化成淡入，而不是时长归零")
+        XCTAssertFalse(src.contains(".animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"),
+                       "`slideAnimation` 是药丸的瞬移快捷方式：reduce 下它返回 .linear(duration: 0)，"
+                       + "拿它驱动内容淡入 ⇒ reduce 用户看到一帧硬切（BACKLOG 429；runner 从 R348 起 empty-state 只变 1 帧）")
         XCTAssertFalse(src.contains(".animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)"),
-                       "这一行是本轮改掉的那一行；它回来 = 389 回来")
+                       "这一行是 R348 改掉的那一行；它回来 = 389 回来")
         // 胶片那一侧也要跟着：场景声明的时长必须是**同一支**（R350 / BACKLOG 425）。
         let film = try String(contentsOf: here
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -188,6 +192,33 @@ final class FilterPillMotionTests: XCTestCase {
                       "空态场景的声明必须读药丸那一支（.slider）：读 .contentFade 就是第三份权威，胶片测不到产品")
         XCTAssertFalse(scene.contains("MotionCatalog.duration(for: .contentFade)"),
                        "空态场景又去声明 contentFade(160ms) 了 ⇒ 胶片测不到产品的 0.20")
+    }
+
+    /// R355 / BACKLOG 429：空态借药丸的**节奏**，但不能借它的**瞬移**。
+    ///
+    /// 这不是口味题，是 runner 上量出来的产品事实：R348 把空态驱动换成 `slideAnimation` 之后，
+    /// 同一臂在 runner 上从 3 帧（run 40186459168 ↔ 2f47243）掉到 **1 帧/36ms**
+    /// （`MOTION_NOT_RUN=witness-snaps-here empty-state`，run 40187450120 起六连）。
+    /// 成因就在 `slideAnimation` 的第一行：`shape.slides == .none`（reduce 下恒为真）⇒ `.linear(duration: 0)`。
+    /// 对药丸成立（位置就是它的内容），对淡入就是硬切 —— 而目录里 `.slider` 的动画在 reduce 下
+    /// 仍是 0.20 的淡入（`shape(for:)` 的"时长一律不归零"）。这一格把两条值钉死在**调用点会走的那两档**上。
+    func testEmptyStateFadeKeepsItsDurationWhenMotionIsReduced() {
+        let reduced = MotionCatalog.animation(for: .slider, reduceMotion: true)
+        XCTAssertNotEqual(reduced, .linear(duration: 0),
+                          "reduce 下给内容喂 0 时长 = 硬切；药丸的瞬移不适用于内容淡入")
+        XCTAssertNotEqual(reduced, FilterPillMotion.slideAnimation(reduceMotion: true),
+                          "这一格就是 R348 的形状：slideAnimation 在 reduce 下是瞬移，内容不能走它")
+        XCTAssertEqual(MotionCatalog.curve(for: .slider, reduceMotion: true).seconds,
+                       MotionCatalog.duration(for: .slider), accuracy: 1e-9,
+                       "时长仍是药丸那一档（0.20），只是滑入换成淡入")
+        XCTAssertEqual(MotionCatalog.shape(for: .slider, reduceMotion: true).slides, .none,
+                       "reduce 下没有位移：淡入是替换，不是删除")
+        // 正对照：不降级那一档仍是弹簧（0.20），说明上面那格量的是"降级"而不是"两支本来就是同一个动画"。
+        XCTAssertEqual(MotionCatalog.curve(for: .slider, reduceMotion: false).seconds,
+                       MotionCatalog.duration(for: .slider), accuracy: 1e-9)
+        XCTAssertNotEqual(MotionCatalog.animation(for: .slider, reduceMotion: false),
+                          MotionCatalog.animation(for: .slider, reduceMotion: true),
+                          "两支相同 ⇒ 这一格根本没量到降级那一档")
     }
 
     func testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken() {

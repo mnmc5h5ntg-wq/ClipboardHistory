@@ -83,6 +83,26 @@ class MutateArmRegistryTests(unittest.TestCase):
                 out.update(tool.arm_ids(path))
         return out
 
+    def test_four_digit_arm_ids_are_not_invisible_to_the_needle_precheck(self):
+        """R355 / BACKLOG 430：`MID` 以前只认三位（`M\\d{3}`）⇒ 从 R345 起的 M1001… 整张表
+        被预检读成「静态抽不出 needle」，**针从来没查过**（R355 自己的 M1005 就是这么发现隐形的）。
+
+        正对照的形状必须是人造表：用仓库里现存的五位来测，一旦哪天全删掉它就会空跑。
+        """
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write_table(directory, u"mutate_r912", [
+                u"ARMS = [",
+                u'    ("M1006", u"四位数", "/tmp/a.swift", "needle-text", "repl-text"),',
+                u"]",
+            ])
+            spec = importlib.util.spec_from_file_location(u"four_digit_under_test", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            sites = tool.needles(module)
+        self.assertEqual([(u"M1006", u"/tmp/a.swift", [u"needle-text"])], sites,
+                         u"四位数刀号在 needle 预检里隐形 ⇒ 那一批刀既没查过针，也不在 covered 里")
+
     def test_duplicate_arm_id_across_two_tables_is_found(self):
         tool = load_tool()
         with tempfile.TemporaryDirectory() as directory:

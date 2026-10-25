@@ -2389,6 +2389,14 @@ final class MotionFilmstripTests: XCTestCase {
         // 每条臂问的本来是同一句话 —— 问两遍会给出两个答案，那才是新的抖动源。
         var witness: FadeClockReading?
 
+        // R355 / BACKLOG 429：先把这台机器「减弱动态」的三个来源打出来。
+        // runner 上 `empty-state` 从 R348 起只变 1 帧，而开关的任一来源为真就会走归零分支 ——
+        // 不打出这几个布尔值，下一轮读 CI 仍只能猜「大概是 reduce」。
+        emit("MOTION_REDUCE_SOURCES setting=\(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) "
+            + "voiceOver=\(NSWorkspace.shared.isVoiceOverEnabled) "
+            + "catalog=\(MotionCatalog.motionShouldBeReduced) "
+            + "override=\(MotionCatalog.overrideReduceMotion.map { $0 ? "true" : "false" } ?? "nil")")
+
         for scenario in Scenario.all() {
             let film = record(scenario)
             let frames = film.motionFrames
@@ -2527,6 +2535,61 @@ final class MotionFilmstripTests: XCTestCase {
         guard judged > 0 else {
             throw XCTSkip("MOTION_NOT_RUN=clock-too-coarse：\(notRun.count) 个场景全都分辨不了（采样比整段过渡还粗），这一条今天没有内容")
         }
+    }
+
+    /// R355 / BACKLOG 429：**减弱动态下的空态仍然淡** —— runner 上那朵红的本机复现。
+    ///
+    /// 为什么必须在本机用注入开关跑：这台 Mac 的 reduce-motion 是关的，所以上面那条主卷
+    /// 永远走不到 `slideAnimation` 的归零分支；而 runner 从 R348 起就走在那里
+    /// （`MOTION_NOT_RUN=witness-snaps-here empty-state`、本臂只变 36ms/1 帧，
+    /// 改前 run 40186459168 同一臂是 3 帧）。那一支是**产品事实**：开了「减弱动态效果」的用户
+    /// 看到的是内容一帧硬切，不是"这台机器看不见"。注入 `overrideReduceMotion = true` 之后，
+    /// 产品读到的就是用户打开那个开关时的那条路径。
+    ///
+    /// 这条判据的牙：落刀把产品那一行改回 `FilterPillMotion.slideAnimation` ⇒ 本卷必须红（1 帧）；
+    /// 还原 ⇒ 必须绿（≥3 帧）。它不读源码，只读这一卷的逐帧变化。
+    func testEmptyStateStillFadesWhenMotionIsReduced() throws {
+        try skipUnlessEnabledAndCapable()
+        let saved = MotionCatalog.overrideReduceMotion
+        MotionCatalog.overrideReduceMotion = true
+        defer { MotionCatalog.overrideReduceMotion = saved }
+
+        let scenario = Scenario.emptyState()
+        let film = record(scenario)
+        defer { writeStrip("empty-state-reduce", film.motionFrames) }
+        emit("MOTION_REDUCE empty-state 注入=overrideReduceMotion=true "
+            + "声明=\(Int(scenario.declaredDurationMilliseconds))ms 帧数=\(film.motionFrames.count)")
+        XCTAssertGreaterThan(film.motionFrames.count, 4,
+                             "\(scenario.name)：只抓到 \(film.motionFrames.count) 帧，判据没有对照物")
+        guard film.clockIsWarm else {
+            emit("MOTION_REDUCE_SKIP=clock-not-warm empty-state(reduce)：注入那一卷采样还是冷的 ⇒ 不判产品")
+            throw XCTSkip("MOTION_REDUCE_SKIP=clock-not-warm empty-state(reduce)：这一卷的钟没热，量不到过程")
+        }
+        let fractions = Self.deltas(film.motionFrames)
+        let span = Self.transitionFrameCount(fractions)
+        let elapsed = Self.changedSpanElapsedMilliseconds(stamps: film.motionStamps, fractions: fractions)
+        let runGaps = Self.intervalsInsideChangedRun(stamps: film.motionStamps, fractions: fractions)
+        let clockInRun = runGaps.isEmpty ? -1 : Self.percentileMilliseconds(runGaps, 0.75)
+        emit("MOTION_REDUCE empty-state 过渡帧数=\(span) "
+            + "变化段时长=\(elapsed.map { String(format: "%.0f", $0) } ?? "无")ms "
+            + "事件内P75=\(clockInRun < 0 ? "无" : String(format: "%.0f", clockInRun))ms "
+            + "逐帧=[\(fractions.map { String(format: "%.3f", $0) }.joined(separator: " "))]")
+        guard let elapsed, clockInRun > 0 else {
+            throw XCTSkip("MOTION_REDUCE_SKIP=no-changed-run empty-state(reduce)：这一卷里读不出变化段")
+        }
+        // 判法与主卷**同一颗**（`judgeMotion`）：读时长与事件内 P75，不读帧数。
+        let verdict = Self.judgeMotion(elapsedMilliseconds: elapsed,
+                                       clockIntervalMilliseconds: clockInRun,
+                                       declaredDurationMilliseconds: scenario.declaredDurationMilliseconds,
+                                       changedFrames: span)
+        guard verdict != .clockTooCoarse else {
+            throw XCTSkip("MOTION_REDUCE_SKIP=clock-coarse-in-window empty-state(reduce)：P75=\(String(format: "%.0f", clockInRun))ms")
+        }
+        XCTAssertEqual(verdict, .transition,
+                       "减弱动态效果下空态只变了 \(String(format: "%.0f", elapsed))ms（\(span) 帧，P75="
+                       + "\(String(format: "%.0f", clockInRun))ms）⇒ 判成跳变或没在演。"
+                       + "R348 用 `slideAnimation` 当驱动，而它在 reduce 下返回 .linear(duration: 0)；"
+                       + "runner 从 R348 起就是这样（1 帧/36ms，BACKLOG 429）")
     }
 
     /// R11 开的那条；R47 把它从"判帧数"改成"判时长 + 同臂抓两遍"。

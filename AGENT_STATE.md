@@ -12,6 +12,38 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R355 状态（2026-10-25 · 本地 · 第 354 轮 / Round 352）：runner 六连红结案 —— reduce 下空态淡入被归零（产品 1 文件，判据账）
+
+最后更新：2026-10-25（本地 · R355 / 第 354 轮 / Round 352）：六跑全 failure、唯一红在 `Motion coverage floor`
+的 `empty-state`（从 R348 起）；成因是产品的 `slideAnimation` 在 reduce 下归零 ⇒ 换成目录 `.slider` 动画
+（reduce 下 0.20 淡入）；本机同注入 A/B 1 帧/26ms ↔ 3 帧/103ms，M1005 `CAUGHT=1/1`；
+顺带把针预检的刀号帽从三位放宽到四位（covered 110→113、bad=0）并重钉 r348 旧针（产品 1 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ 读六跑 + 上两跑 + R347 绿色对照：六跑唯一失败步骤是 STEP[19]，红从 R348 的 40187450120 起。
+② 归因：`MOTION_NOT_RUN=witness-snaps-here empty-state` 的 1 帧/36ms，与同机药丸 1 帧并列；
+   旧 helper 只在 `reduceMotion == true` 时归零 ⇒ 那台机器的 `shouldReduce` 是真，产品把淡入变成硬切。
+③ 产品修：`HistorySidebarView` 的空态驱动改走 `MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce)`；
+   值级守卫（reduce 分支不等于 `.linear(0)`）+ 源码形状守卫（不许回 `slideAnimation`、不许回 `contentFade`）。
+④ 行为判据：`MotionFilmstripTests.testEmptyStateStillFadesWhenMotionIsReduced`（注入 override，按主卷同一颗 `judgeMotion`）；
+   M1005 落刀 = 1 帧/26ms 红，还原 = 3 帧/103ms 绿。
+⑤ 尺的洞：针预检 `MID` 三位帽让 M1001 起隐形 ⇒ 放宽到四位 + 人造正对照（M1006）；r348 旧针重钉。
+⑥ 新读数：胶片里打 `MOTION_REDUCE_SOURCES setting=… voiceOver=… catalog=…`，下一跑 CI 用来归因开关来源。
+
+验证读数（现读）：全量卷 `Executed 1027 tests, with 48 tests skipped and 0 failures`；
+胶片 `Executed 68 tests, with 3 tests skipped and 0 failures`、`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`；
+基线 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`（182 帧）；
+换装 `INSTALL_RESULT=ok` / `INSTALL_SHA_MATCH=1` / `INSTALL_ENTRIES_BEFORE=380 AFTER=380`；
+清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；
+脚本电池 `Ran 649（skipped=4）OK`；产品面连续零改动 **7** 轮（`python3 scripts/product_streak.py --streak-for 354` 现读，口径差一挂 412；本轮动了 1 个产品文件 ⇒ 下一轮这一格从 0 重新数）。
+
+NOT-RUN（分开写）：① runner 对 R355 修复的验收要等下一跑（`empty-state` 是否回到 judged、`MOTION_REDUCE_SOURCES` 的三源）；
+② 视图层 `@Environment(\.accessibilityReduceMotion)` 的直接读数没做（系统三源读数已加，见 429）；③ 真机腿（reduce 开关下看一眼）没跑。
+
+下一轮（R356）的靶：⓪ 读 R355 的 run（成对写；先看 `judged` 与 `MOTION_REDUCE_SOURCES`）→
+① 384（胶囊带纵向覆盖 29%）→ ② 387① / 376 / 367 → ③ 426 的退场（刀的 diff 判法）与 428（`ci_read.py queue`）→
+④ 若用户解锁屏幕：395 的同一运行 before（临时关抬量、换装、抓、还原）。
+
 ## R354 状态（2026-10-25 · 本地 · 第 353 轮 / Round 351）：尺进仓库，390 收窄到 1–2 帧（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R354 / 第 353 轮 / Round 351）：`scripts/filmstrip_frames.py` 落地（网格自动识别 +

@@ -363,6 +363,41 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 354 轮（R355 · 2026-10-25 · U-1242…U-1246）：runner 六连红是**产品事实** —— reduce 下空态淡入被归零（U-1242…U-1246 · 产品 1 文件，判据账）
+
+- **U-1242：六跑全部结案，唯一失败步骤是 STEP[19] `Motion coverage floor`，第一朵红正好在 R348。**
+  现读 `gh run list`：`40190253857↔25ffd99 / 40189907611↔bdc9b8b / 40189811041↔7824207 / 40189703485↔2b47f57 /
+  40189562764↔f467d3e / 40189415641↔010aca0` —— 六跑 `failure`，`steps` 都只有 `STEP[19]` 一条；
+  再上两跑 `40189129121↔1cf904b`、`40188680378↔0968549`、`40187823526↔4fe06c2` 同红。
+  **R347 的 `40186459168↔2f47243` 是绿的**：`MOTION_SUMMARY notice-banner=2 notice-banner-dismiss=3 detail-kind-change=4 empty-state=3`
+  与 `MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`。红的第一跑是 R348 的 `40187450120↔4b8f014`。
+  红的内容逐字相同：`MOTION_FLOOR_BAD_REASON empty-state 的理由是 witness-snaps-here，而登记过的是 无`；
+  R350/R351 两跑还叠一朵 `MOTION_FLOOR_UNDERCOVERED judged=2/4 低于地板 3`（notice-banner 那天也没判到，
+  是另一条随采样漂的形状，不并入这一单）。
+- **U-1243：成因是**产品**，不是通道 —— R348 借了药丸的「瞬移」。**
+  R348 把空态驱动换成 `FilterPillMotion.slideAnimation(reduceMotion: shouldReduce)`，而它在 reduce 下
+  返回 `.linear(duration: 0)`（`shape(for: .slider, reduceMotion:)` 的 `slides == .none` 那一支）。
+  对药丸成立（位移就是它的全部内容），对内容淡入就是**一帧硬切**。runner 的自证人：
+  `MOTION_GRAB empty-state 帧数=30 抓帧中位=1.4ms … 声明=200ms`、`MOTION_NOT_RUN=witness-snaps-here empty-state：本臂只变了 36ms（1 帧）`；
+  同一台机器的 `MOTION_PILL_SLIDE filter-pill-slide 开A 帧数=1`（药丸也走归零分支），
+  而走目录曲线的 `notice-banner-dismiss=3` 与 `detail-kind-change=3` 照常有过渡。
+  三条读在一起：那台机器的 `shouldReduce` 是真，且只有经 `slideAnimation` 的调用点归零。
+- **U-1244：修法是一行：换成目录的 `.slider` 动画（reduce 下是 0.20 的淡入，不归零）。**
+  `MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce)`：正常态仍是 0.20 弹簧（与 R348 同一条曲线），
+  reduce 下按 `curve(for:)` 退化成 0.20 的 timing curve —— 「滑入 → 淡入、时长一律不归零」那条规第一次在调用点落地。
+  同一台机器、同一注入的 A/B（M1005）：**落刀 `过渡帧数=1 变化段时长=26ms P75=26ms` ⇒ 判跳变；
+  还原 `过渡帧数=3 变化段时长=103ms P75=40ms` ⇒ 判过渡**（`CAUGHT=1/1, RESTORE_CLEAN=yes`）。
+  看图腿（`empty-state-reduce-strip.png`，27 帧）：侧栏空态图标峰值逐帧 `31 / 31 / 116 / 234 / 255`（帧 2→6）
+  ⇒ 淡入是真的，不是列表退出冒充的。
+- **U-1245：第二处红的是尺：`MID` 只认三位刀号，M1001 起整张表从针预检里隐形。**
+  `mutate_needle_precheck.MID = ^M\d{3}[a-z]?$` 把 r345(M1001/M1002)、r348(M1003)、r355(M1005) 读成
+  「静态抽不出 needle」⇒ 它们**既不查针、也不进 covered 的数**（改前 `covered=110`，改后 `covered=113 arms=373`）。
+  修法：边界往后长成 `^M\d{3,4}[a-z]?$`，并在 `test_mutate_arm_registry` 加一条人造表正对照（M1006 必须被抽出来）。
+  现读 `NEEDLE_PRECHECK tables=130 covered=113 arms=373 bad=0`、`ARM_TOTAL files=224 arms=865 dupes=0 repeats=0`。
+- **U-1246：r348 的 M1003 针在 R355 之后命中 0 —— 按 R262 重钉，不删历史。**
+  旧针指 `slideAnimation` 那一行，R355 把它换掉了；重钉到新行，替换串仍是 `contentFade`，
+  断言的问题不变（不许回到 contentFade）。预检现读 `mutate_r348 M1003 ok`。
+
 ## 第 353 轮（R354 · 2026-10-25 · U-1237…U-1241）：尺进了仓库，390 的落点差第一次可复核 —— 1–2 帧（U-1237…U-1241 · 产品 0 文件，判据账）
 
 - **U-1237：`scripts/filmstrip_frames.py` 进了仓库（427 的兑现）。** 拼贴网格**不写死**：按场景宽高比在

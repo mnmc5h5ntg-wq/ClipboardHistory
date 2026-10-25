@@ -6,8 +6,11 @@ R348 把 `HistorySidebarView` 里那格空态淡出从 `contentFade`(0.16) 换�
 —— 切筛选把列表切空/切回时，内容与药丸是同一个手势的两半，落点差 1–2 格（R328 的 6–7 对 12）。
 这一刀把那行换回去：源码形状守卫必须红。
 
-· M1003 把 `.animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), …isEmpty)` 换回 `contentFade`
-  ⇒ `testEmptyStateFadeSharesThePillRhythm` 必须红（两条断言都会红：缺正的、出现反的）。
+· M1003 把这行换回 `contentFade` ⇒ `testEmptyStateFadeSharesThePillRhythm` 必须红（缺正的、出现反的）。
+  **R355 重钉**：R355 把驱动从 `slideAnimation` 换成了 `MotionCatalog.animation(for: .slider, reduceMotion:)`
+  （slideAnimation 在 reduce 下返回 .linear(duration: 0)，内容会硬切，BACKLOG 429）——
+  旧针指的字符串已经不存在了，按 R262「腐烂针重钉」把针移到新那一行，断言的问题不变：
+  **不许换回 contentFade(0.16)**。
 
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r348.py [M1003]
 """
@@ -38,7 +41,7 @@ PURE_RED = u"testEmptyStateFadeSharesThePillRhythm"
 FILM = os.path.join(ROOT, "ClipboardHistory", "Tests", "ClipboardHistoryAppTests", "MotionFilmstripTests.swift")
 NEEDLE_DECL = '                     declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000) { store in'
 REPL_1004 = '                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000) { store in'
-NEEDLE_RHYTHM = u"        .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"
+NEEDLE_RHYTHM = u"        .animation(MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"
 REPL_1003 = u"        .animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)"
 
 ARMS = [

@@ -53,7 +53,14 @@ struct HistorySidebarView: View {
         // —— 切筛选把列表切空（或切回来）时，内容 0.16 就落定了，药丸还要再走一小段（外加弹簧尾巴）。
         // 两件事是**同一个手势的两半**，必须同一个节奏：这里改成和药丸同一个动画。
         // 只有时长变了，过渡本身仍是 `.opacity`（"空态是停"那条不动）。
-        .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)
+        //
+        // R355 / BACKLOG 429：**不能**用 `FilterPillMotion.slideAnimation` 来借这个节奏 ——
+        // 那是药丸的瞬移快捷方式（reduce 下 `shape.slides == .none` ⇒ 返回 `.linear(duration: 0)`），
+        // 对"位置就是内容"的胶囊成立，对内容淡入就是**一帧硬切**：
+        // runner 从 R348 起读到的 `MOTION_NOT_RUN=witness-snaps-here empty-state`（本臂只变 36ms/1 帧）
+        // 就是它 —— 改前同一臂在 runner 上是 3 帧（run 40186459168 ↔ 2f47243）。
+        // 目录里的 `.slider` 动画本身在 reduce 下**不归零**：滑入换成 0.20 的淡入（`curve(for:)` 那条规）。
+        .animation(MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

@@ -8546,3 +8546,32 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     `scripts/ci_read.py latest` 只打 status/conclusion，没有"它在队里排第几 / 已经等了多久"这两格；
     于是台账里只有"未读"一个词，读的人分不清是"还没轮到"还是"跑了一半挂了"。要做：`ci_read.py` 增 `queue`
     子命令（status + createdAt + 同 workflow 排在它前面的跑数），并在账上把三态写死：`queued` / `in_progress` / `concluded`。
+
+**429. reduce-motion 下空态淡入被 `slideAnimation` 归零：内容从淡入变成一帧硬切**（R355 开，R355 结案）
+    runner 从 R348 起六连红（`MOTION_FLOOR_BAD_REASON empty-state … witness-snaps-here`），
+    而 R347 同一臂是 3 帧（run `40186459168`）；同一台机器的药丸 `开A/开B` 也是 1 帧，走目录曲线的两条臂照常演。
+    成因：`FilterPillMotion.slideAnimation` 在 reduce 下返回 `.linear(duration: 0)`（对药丸成立，对内容淡入是硬切）。
+    修法：`MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce)`（reduce 下 0.20 淡入，时长不归零）。
+    本机同注入 A/B（M1005 落刀/还原）：1 帧/26ms ↔ 3 帧/103ms；`CAUGHT=1/1`。
+    验收（下一跑 CI）：`MOTION_SUMMARY … empty-state≥2` 且 `judged=4/4 not-run=-`；并读
+    `MOTION_REDUCE_SOURCES setting=… voiceOver=… catalog=…` —— 若三源全 false 而修复前仍归零，
+    那么 `shouldReduce` 来自视图层 `@Environment`（修法同样覆盖），缺的是它的**直接读数**。
+    没跑的腿：真机把「减弱动态效果」打开看一眼（与 395 同一条出口）。
+
+**430. 针预检的刀号边界停在三位：M1001 起整张表从覆盖里隐形**（R355 开，R355 结案）
+    `mutate_needle_precheck.MID = ^M\d{3}[a-z]?$`；r345/r348/r355 被读成「静态抽不出 needle」⇒ 不查针、不计数。
+    仓库从 R345 起就在用四位数刀号 ⇒ 那批刀从来没被针预检看过（R262 那一族可以重新长出来而报表一片绿）。
+    修法：`^M\d{3,4}[a-z]?$` + `test_mutate_arm_registry` 的人造正对照（M1006）；
+    现读 `covered=113 arms=373 bad=0`（改前 `covered=110 arms=369`）。
+    `roster_gap` 的 75 表 / 423 臂未变（它读的是另一条正则）—— 这一条只补 needle 那一半。
+    **留给后来**：历史 ledger 生成器里的 `M\d{3}` 旧正则不追改（只用于回填旧账）；新工具一律用 `\d{3,4}`。
+
+**431. runner 的动效环境是「reduce-on」：以后读 runner 上任何 slide 档的 1 帧，先看这一格**（R355 开）
+    证据：R348 起 runner 的 `empty-state` 只变 1 帧/36ms，而药丸 `filter-pill-slide` 的 `开A/开B` 也是 1 帧，
+    同时走目录曲线的 `notice-banner-dismiss`（120ms）与 `detail-kind-change`（160ms）照常有 2–3 帧过渡；
+    旧 `slideAnimation` 只在 `reduceMotion == true` 时返回零时长 ⇒ 那台机器的 `shouldReduce` 是真。
+    这条不是缺陷，是**解释权**：① 不许把 runner 上 slide 档的一帧读数当产品瞬移（例如 390 的落点）；
+    ② 反过来，reduce 分支的产品行为在 runner 上是**可被真跑的**，这是一条免费的验收通道。
+    下一步读数：下一跑的 `MOTION_REDUCE_SOURCES setting=… voiceOver=… catalog=…` 说明它来自系统哪一源；
+    三源全 false 而行为仍归零 ⇒ 来自视图层 `@Environment`（修法已覆盖，读数还欠）。
+
