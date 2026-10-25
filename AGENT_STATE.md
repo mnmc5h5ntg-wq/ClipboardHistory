@@ -31,6 +31,7 @@ R381 追记（同日）：r49 整表跑全 —— `M240/M241/M242/M243/M244` 全
 R381 追记二（同日）：r42 整表 4/5 —— `M194…M197` 全部 `CAUGHT`（同红在 `MotionDriverTests testEveryReceiptLineCallSiteIsDriven`）；**M198 `BROKEN-MUTATION`**（注入后编译不过，`showExportAlert` 已不在源码里）⇒ 刀坏待重钉，不是判据问题。
 R381 追记三（同日）：r54 整表 5/5 —— `M264`（产品侧梯子第 1 级压平）与 `M265/M267` 红在 `testAdjacentHeatLevelsAreSeparableOnTheRightAxis`，`M266/M268` 红在 `testAdjacentLevelRulersAreATruthTable`，五臂还原干净；热图相邻档的「分得开」在 产品/尺子/夹具 三侧都有牙。
 R381 追记四（同日）：M198 重钉 —— 旧锚点 `if showExportAlert {` 已被 R43 删掉（刀坏），换到当前导出回执分支前插一条未登记回执、期望串改成名单末项 `"true"]`；现读 `CAUGHT 红得对=True`，r42 整表 **5/5 CAUGHT**。
+R381 追记五（同日）：r53 整表 4/4 —— `M260/M261/M262/M263` 全红在 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`、还原干净（结论行先于 skip、`region()` 不命中守卫自己、`notAnimated` 必须判红）。
 
 ## R379 状态（2026-10-26 · 本地 · 第 378 轮 / Round 376）：r56 十臂全表第一次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（产品 0 文件，判据账）
 

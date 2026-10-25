@@ -8737,5 +8737,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     R381 现读（第二批）：r42 **4/5 CAUGHT** —— M194/M195 红在 `MotionDriverTests testEveryReceiptLineCallSiteIsDriven`，M196/M197 同格同红；**M198 记 `BROKEN-MUTATION`**（注入后编译不过）：它把 `if showExportAlert { ReceiptLine… }` 插在 `if let archiveMessage` 前，而那个符号已经不在当前源码里 ⇒ 刀坏，不是判据没牙。下一批先把 M198 的锚点换到当前的回执分支，再谈它该红在哪一格。
     R381 现读（第三批）：r54 **5/5 CAUGHT** —— M264（产品侧：梯子第 1 级压到与空格子几乎相同）红在 `testAdjacentHeatLevelsAreSeparableOnTheRightAxis`；M265/M267 同格同红；M266/M268 红在 `testAdjacentLevelRulersAreATruthTable`（尺子与夹具两侧）；五臂还原干净。⇒ 热图相邻档「分得开」这条判据的产品侧、尺子侧、夹具侧都有牙。
     R381 现读（第四批·M198）：旧锚点 `if showExportAlert {` 在 R43 就被删了 ⇒ 注入后编译不过。换成在当前导出回执分支前插一条 `if true { ReceiptLine(text: "MUTANT：未登记的回执") {} }`，并把期望串改成守卫自己打印的名单末项 `"true"]`。现读 `M198 ⇒ CAUGHT 红得对=True`（红在 `testEveryReceiptLineCallSiteIsDriven`）、还原干净 ⇒ r42 整表现在 **5/5 CAUGHT**。
+    R381 现读（第五批）：r53 **4/4 CAUGHT** —— M260（删结论行）/M261（删 skip 闸）/M262（`region()` 退回 `contains`、会命中守卫自己）/M263（`notAnimated` 从判红改成只打印）四臂都红在 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`，还原干净 ⇒「结论行先于 skip 闸」这条形状在三面都有牙。
 
 367 追记（R379）：r56 全表十臂第一次一次跑全 —— `10/10 CAUGHT`、十臂还原干净、复跑 `ESCAPED`、`EXIT=0`；M282 的「红在 []」现读为 **CI 自检样张那种有效红**（命中「夹具替换没有落地」），与另外九臂的 XCTest 红分开记。
