@@ -37,6 +37,16 @@ NOT-RUN（分开写）：① runner 上的 A/B 同格读数（下一跑 CI）；
 R356 的 `MOTION_PILL_RAMP_GEOM` 行带/覆盖）→ ① 376 的第二通道或 367（表自己声明针）→ ② 426（刀的 diff 判法）→
 ③ 若有 runner 同格：386 的两条线标定。
 
+**R358 追记（runner 验收，现读）**：`40195884862 ↔ 6a0258a` **success**（自 R347 以来第一跑绿）。
+- R355 修复被 runner 签下：`MOTION_SUMMARY … empty-state=3`、`MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner`
+  （notice-banner 是登记过的 witness-snaps-here，地板=3 通过）；注入 reduce 的那卷也跑了：
+  `MOTION_REDUCE empty-state 过渡帧数=3 变化段时长=101ms 事件内P75=25ms`。
+- R356 的 384 在 runner 上成立：`MOTION_PILL_RAMP_GEOM … 行带=52.0…76.0pt … 判定分布=过×12,非候选×248 候选段=y52..76px 高24px 判=过 洞宽=49% 取用=y52..76px 纵向覆盖=24/24px=100%`。
+- **新洞**：`MOTION_REDUCE_SOURCES` 在 runner 日志里**一行都没有** —— 不是没打印，是 CI 那步只
+  `grep -E "^MOTION_" | head -120`，而 `MOTION_LINES=328`；这行排在后面的测试里，被截掉了。
+  读数族必须接进**它被打印的那一步**（Skill 的规矩），R355 只加了 emit、没加专用 grep。
+  ⇒ R359 的第一件事：在 `ci.yml` 的 filmstrip 步里给它一条专用 grep，并加一条"登记过的读数族必须在 CI 里被打印"的守卫。
+
 ## R357 状态（2026-10-25 · 本地 · 第 356 轮 / Round 354）：读 CI 的第三态有名字了 —— queue 子命令（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R357 / 第 356 轮 / Round 354）：`scripts/ci_read.py queue` 落地 ——
