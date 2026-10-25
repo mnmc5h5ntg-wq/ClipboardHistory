@@ -8730,3 +8730,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 367 追记（R378）：r40 四把（M185…M188）跟着 `CopyThenPaste.decide(failure:)` 的新签名重钉、r42 两把（M194/M195）从「注释 + 动作」缩到**动作那一行**重钉 —— 六臂全 CAUGHT，rot **27→21**，`ROT_CEILING` 同笔降到 21，`处置=ok`。
     M188 的第一版反向变异编译不过（`guard failure == nil else` 之后仍读可选型的 `.message`）⇒ 记 BROKEN-MUTATION；改成「成功也判取消」后可编译且 CAUGHT。r40 表同笔接上 knife_guard。
     **没动的**：r49 的 M244（钉「目录快照永远是空」，而快照探针已被重写、旧针没有对象）与其余 20 条腐烂针 —— 下一批先给新探针写同义坏法再重钉，不许拿一把空刀冒充覆盖面。
+    R378 追记：M244 的重钉**试过一次，ESCAPED** —— 同义坏法改成「`HistoryStore.persist()` 里不调 `persistence.save(entries)`」，其余不变，对照组（放开闸门后 `history.json` 必须出现）**仍然绿** ⇒ `add` 的落盘还有第二条路（我没定位到）。刀没收，rot 仍 21；下一批先找出那条路再钉，不许把一把 ESCAPED 的刀塞回表里当已修。
