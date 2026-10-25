@@ -8611,3 +8611,12 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     `scripts/tests/test_ci_motion_print_wiring.py` 把四族必印名单（SUMMARY / RESOLVE / NOT_RUN / REDUCE_SOURCES）钉住。
     **仍欠**：下一跑 runner 日志里出现 `MOTION_REDUCE_SOURCES setting=… voiceOver=… catalog=…`（接线只在 CI 上才算验收）。
 
+
+376 追记（R360）：三臂不可分的出口按**成因**分叉 —— `pillSlideExitReason`：
+    reduce 真 ⇒ `reduce-motion-on`（药丸按 431 归零是**产品行为**，具名未覆盖）；
+    reduce 关 ⇒ `pill-slide-arms-indistinguishable`（通道那一半，仍欠第二通道）。
+    catalog=off 时 detail 明写"reduce 可能来自视图层，这一格看不见"。
+    本机（reduce 关、三臂可分）照常判过程；M1008 对调两原因 ⇒ 分叉证人红（CAUGHT 1/1）。
+    **收口条件**：下一跑 runner 日志里二选一 —— 出现 `reduce-motion-on` 即按产品行为结案；
+    若仍是 `pill-slide-arms-indistinguishable` 且 `catalog=off`，第二通道那条欠账继续挂着。
+

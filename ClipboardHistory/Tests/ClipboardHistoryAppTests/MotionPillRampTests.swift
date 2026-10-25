@@ -744,6 +744,21 @@ final class MotionPillRampTests: XCTestCase {
             "同一台机器两遍开臂自己都不一致 ⇒ 那不是'开关不可分'，是通道在抖，得让它红")
     }
 
+    /// R360 / BACKLOG 376：三臂不可分时，原因是 reduce-on（产品行为）还是通道，必须在**同一个纯函数**里分叉。
+    /// runner 从 R323 起把"产品按 reduce 瞬移"读成"这台机器看不见过程"（REDUCE 的证据见 431）。
+    func testPillSlideExitReasonSeparatesReduceOnFromChannel() {
+        XCTAssertEqual("reduce-motion-on",
+                       MotionFilmstripTests.pillSlideExitReason(armsIndistinguishable: true, reduceMotion: true),
+                       "reduce 真而三臂不可分 ⇒ 这是产品行为（431），不许记成通道")
+        XCTAssertEqual("pill-slide-arms-indistinguishable",
+                       MotionFilmstripTests.pillSlideExitReason(armsIndistinguishable: true, reduceMotion: false),
+                       "reduce 关而三臂不可分 ⇒ 才是通道那一半")
+        XCTAssertNil(MotionFilmstripTests.pillSlideExitReason(armsIndistinguishable: false, reduceMotion: true),
+                     "三臂可分就不该有任何 not-run 原因（reduce 时也照常判）")
+        XCTAssertNil(MotionFilmstripTests.pillSlideExitReason(armsIndistinguishable: false, reduceMotion: false),
+                     "同上：没有出口条件时不许给一个原因")
+    }
+
     /// 词表默认输入里至少有一颗中间样本；一步跳变不许发"走得平稳"的证。
     func testIntermediateCountRefusesToCertifyATeleport() {
         XCTAssertEqual(0, MotionFilmstripTests.intermediateCount([80.0, 219.0, 219.0, 219.0],

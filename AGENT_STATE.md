@@ -12,6 +12,28 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R360 状态（2026-10-25 · 本地 · 第 359 轮 / Round 357）：376 出口先分叉 —— reduce-on 记产品行为（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R360 / 第 359 轮 / Round 357）：`pillSlideExitReason` 把「三臂不可分」分成
+`reduce-motion-on`（产品按 431 归零）与通道那一半；catalog=off 时 detail 写明视图层来源看不见；
+四格测试 + M1008 对调两原因（CAUGHT 1/1）；全量 1031/48skip/0、电池 659（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`queue` 现读 R359 一跑 queued（前面=2）、R358 两跑在跑；R356 追记绿跑已签下 R355/R356 的验收（见 R358 追记）。
+② 376：出口原因收进 `pillSlideExitReason(armsIndistinguishable:reduceMotion:)`；reduce 真 → `reduce-motion-on`。
+③ catalog=off 的 detail 明写「reduce 可能来自视图层，这一格看不见」—— 没量到的来源不许写成已知。
+④ 四格测试 + M1008（两原因对调）⇒ CAUGHT 1/1；本机 reduce 关、三臂可分，过程照常判。
+
+验证读数（现读）：全量卷 `Executed 1031 tests, with 48 tests skipped and 0 failures`；构建 0 告警；
+预检 `tables=133 covered=116 arms=376 bad=0`、`files=227 arms=865`；电池 `Ran 659（skipped=4）OK`；
+本轮无产品/尺的渲染改动 ⇒ 基线/胶片沿用 R356（182 帧 / 68 格）；产品面连续零改动 **5** 轮（`python3 scripts/product_streak.py --streak-for 359` 现读）。
+
+NOT-RUN（分开写）：① 下一跑 runner 的出口二选一（`reduce-motion-on` 或 `pill-slide-arms-indistinguishable` + `catalog=off`）；
+② `MOTION_REDUCE_SOURCES` 的接线验收（R359 的下一跑）；③ 真机腿没跑。
+
+下一轮（R361）的靶：⓪ 读 R359/R360 两跑（`MOTION_REDUCE_SOURCES` 三源 + 376 的出口文本）→
+① 367（表自己声明针）或 426（刀的 diff 判法）→ ② 若 runner 仍报通道那一半：376 的第二通道。
+
 ## R359 状态（2026-10-25 · 本地 · 第 358 轮 / Round 356）：必印族专用 grep —— `MOTION_REDUCE_SOURCES` 不再被 head 截掉（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R359 / 第 358 轮 / Round 356）：`ci.yml` 的 filmstrip 步加 `MOTION_REDUCE_SOURCES` 专用 grep +

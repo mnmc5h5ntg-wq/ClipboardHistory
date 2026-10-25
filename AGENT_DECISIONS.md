@@ -7230,3 +7230,15 @@ R359 给 filmstrip 步加专用 grep，并把四族必印名单写进 `test_ci_m
 不许用 `for prefix in …; do grep "$prefix"`（循环变量让"打印过哪几族"不再能从文本里读出来，守卫也就无从对账）。
 缺行时打 `MOTION_PRINT_MISSING=<族名>`，让缺席有名字。
 
+
+### D-359（360）同一句"三臂不可分"要先分成因，再决定是产品行为还是通道限制
+
+药丸的过程证人在 runner 上从 R323 起报 `pill-slide-arms-indistinguishable`，读起来像"这台机器看不见过程"；
+而 reduce 下 `slideAnimation` 本来就是 0 时长（位移就是药丸的内容 ⇒ 瞬移是产品语义），三臂必然一模一样。
+R360 把出口原因收进 `pillSlideExitReason`：reduce 真 → `reduce-motion-on`（产品行为，具名未覆盖）；
+reduce 关 → 通道那一半；catalog=off 时明写视图层来源看不见。
+**Why**：两种成因的修法相反 —— 一种要结案，一种要补第二通道；共用一句话会让下一轮去修一个不存在的通道问题，
+或者反过来把通道限制洗成产品行为。
+**How to apply**：出口谓词只要同时可能由"产品语义"与"通道/采样"造成，就必须先量出一个能分开它们的自变量
+（这里是 `MotionCatalog.motionShouldBeReduced`），并在文本里写明"没量到的那一源"；不许用一个笼统的 not-run 名。
+

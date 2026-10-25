@@ -363,6 +363,24 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 359 轮（R360 · 2026-10-25 · U-1261…U-1263）：376 —— 三臂不可分先分叉：reduce-on 是产品行为，不是「这台机器看不见」（U-1261…U-1263 · 产品 0 文件，判据账）
+
+- **U-1261：同一句读数有两种修法相反的成因。** 药丸的过程证人从 R323 起在 runner 上报
+  `pill-slide-arms-indistinguishable`（开A/开B/关 帧数=1、峰值全等），读起来像"这台机器看不见过程"；
+  但 `slideAnimation` 在 reduce 下返回 `.linear(duration: 0)`（位移就是药丸的全部内容 ⇒ 瞬移是**产品行为**），
+  三臂自然一模一样，而 R355/R356 已经证明那台机器的 `shouldReduce` 是真（空态在 R348–R354 被归零）。
+  R360 把出口原因收进一个纯函数 `pillSlideExitReason(armsIndistinguishable:reduceMotion:)`：
+  reduce 真 ⇒ `reduce-motion-on`（具名未覆盖，产品行为）；reduce 关 ⇒ 才报通道那一半。
+  catalog=off 时 detail 明写"reduce 若来自视图层这一格看不见"—— 没量到的来源不许写成量到了。
+- **U-1262：判据与刀。** 新格 `testPillSlideExitReasonSeparatesReduceOnFromChannel`（四格：reduce→产品、
+  非 reduce→通道、可分→nil 两格）；刀 `M1008` 把两个原因对调 ⇒ 该格红，`CAUGHT=1/1`。
+  本机（reduce 关、三臂可分）照常判过程，不产生任何 not-run。
+  全量卷 `Executed 1031 tests, with 48 tests skipped and 0 failures`；构建 0 告警；电池 `Ran 659`。
+- **U-1263：376 的收口形状。** 它不再是"缺第二条通道"的悬案：runner 的这一跑若 `catalog=true`，
+  下一份日志会直接出现 `MOTION_NOT_RUN=reduce-motion-on filter-pill-slide …`（产品行为，收口）；
+  若 `catalog=false` 而三臂仍不可分，detail 会点明"可能来自视图层"，通道那一半**仍然成立**、仍欠第二通道。
+  两种都写死在出口文本里，下一轮读日志即可二选一，不需要再猜。
+
 ## 第 358 轮（R359 · 2026-10-25 · U-1258…U-1260）：必印族必须有专用 grep —— `MOTION_REDUCE_SOURCES` 在 runner 上被 head 截掉（U-1258…U-1260 · 产品 0 文件，判据账）
 
 - **U-1258：`MOTION_REDUCE_SOURCES` 在绿跑里一行都没有。** `40195884862 ↔ 6a0258a` 是绿的、`MOTION_LINES=328`，

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 药丸过程证的出口先分叉：reduce-on 记产品行为（431），reduce 关才记通道（376 追记）（R360 / U-1261…U-1263 · 产品 0 文件，判据账）
+
 ### 必印族补接线：`MOTION_REDUCE_SOURCES` 不再被 head -120 截掉，缺行会打 MOTION_PRINT_MISSING（R359 / U-1258…U-1260 · 产品 0 文件，判据账）
 
 ### 色档 A/B 的判词收回两颗面积尺：墨量只印不判，敏感=8 → 同=11 / 漂=1（387① 结案）（R358 / U-1255…U-1257 · 产品 0 文件，判据账）

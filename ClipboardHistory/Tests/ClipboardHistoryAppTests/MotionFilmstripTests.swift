@@ -5194,17 +5194,23 @@ final class MotionFilmstripTests: XCTestCase {
         let indistinguishable = Self.armsIndistinguishable(spanA: spanA, spanB: spanB, spanOff: spanOff,
                                                            peakA: Self.peak(dA), peakB: Self.peak(dB),
                                                            peakOff: Self.peak(dOff))
-        guard !armsIdentical && !indistinguishable else {
+        // R360 / BACKLOG 376：原因先分叉（reduce-on 是产品行为，通道那一半才是"看不见"）。
+        let reduceOn = MotionCatalog.motionShouldBeReduced
+        if let reason = Self.pillSlideExitReason(armsIndistinguishable: armsIdentical || indistinguishable,
+                                                 reduceMotion: reduceOn) {
             let resolvableOnThisMachine = Self.resolvableFrames(durationMilliseconds: duration,
                                                                  sampleMilliseconds: interval)
             let which = armsIdentical ? "逐字节相同" : "帧数与峰值全等（数组别处不同）"
-            emit("MOTION_NOT_RUN=pill-slide-arms-indistinguishable filter-pill-slide 三臂不可分（\(which)"
+            let why = reduceOn
+                ? "reduce=on（catalog 真）⇒ 药丸按 431 归零是**产品行为**，这一半在 reduce 机器上判不了"
+                : "reduce catalog=off ⇒ 若 reduce 来自视图层，这一格看不见；否则就是开关/采样不可分"
+            emit("MOTION_NOT_RUN=\(reason) filter-pill-slide 三臂不可分（\(which)"
                 + "：开A 帧数=\(spanA) 峰值=\(String(format: "%.4f", Self.peak(dA)))"
                 + " 开B 帧数=\(spanB) 峰值=\(String(format: "%.4f", Self.peak(dB)))"
                 + " 关 帧数=\(spanOff) 峰值=\(String(format: "%.4f", Self.peak(dOff)))）"
                 + " 采样≈\(interval)ms 可分帧=\(resolvableOnThisMachine)"
-                + " ⇒ 这一台的胶片里这段位移只占一帧且开关不可分，『有没有过程』这一半没有对照物")
-            throw XCTSkip("MOTION_NOT_RUN=pill-slide-arms-indistinguishable")
+                + " ⇒ \(why)")
+            throw XCTSkip("MOTION_NOT_RUN=\(reason)")
         }
 
         // ③ 落定耗时**上限**（"没跑飞"）—— 这一半与采样粒度无关，任何一台都判。
@@ -5748,6 +5754,19 @@ final class MotionFilmstripTests: XCTestCase {
     static func armsIndistinguishable(spanA: Int, spanB: Int, spanOff: Int,
                                       peakA: Double, peakB: Double, peakOff: Double) -> Bool {
         spanA == spanB && spanB == spanOff && peakA == peakB && peakB == peakOff
+    }
+
+    /// R360 / BACKLOG 376：三臂不可分时，**先问是不是 reduce 把动效归零了**。
+    ///
+    /// runner 从 R323 起一直报 `pill-slide-arms-indistinguishable`，读起来像"这台机器看不见过程"。
+    /// 而药丸的 `slideAnimation` 在 reduce 下返回 `.linear(duration: 0)`（位移就是它的全部内容 ⇒ 瞬移是产品行为），
+    /// 三臂自然一模一样；R355/R356 又证明那台机器的 `shouldReduce` 是真（空态在 R348–R354 被归零）。
+    /// 同一句读数必须分成两种成因：`reduce-motion-on`（产品行为，具名未覆盖）与
+    /// `pill-slide-arms-indistinguishable`（开关/采样不可分，通道那一半）。catalog=false 时仍报后者，
+    /// 并在 detail 里写明"reduce 若来自视图层这一格看不见" —— 不许把没量到的来源写成量到了。
+    static func pillSlideExitReason(armsIndistinguishable: Bool, reduceMotion: Bool) -> String? {
+        guard armsIndistinguishable else { return nil }
+        return reduceMotion ? "reduce-motion-on" : "pill-slide-arms-indistinguishable"
     }
 
     /// 纯函数：中心序列里**既不在起点档、也不在终点档**的样本数（R325）。
