@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R371 / 第 370 轮 / Round 368）：r53 四臂 `4/4 CAUGHT`、`还原不干净=0`；`ROT_CEILING` 33→32，`test_hidden_arms` **8/8 OK**；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：五跑（`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c`）仍在队里；只登记不轮询。
+① ⓪ CI：`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c` 仍在队里；本轮 `5b83633 ↔ 40205111275`（queued、同 workflow 前面=3，只登记不轮询）。
 ② 367 第一根：M260 的针从 `print(` 重钉到 `emit(`（R355 换的行）。
 ③ 四臂重跑：M260…M263 全 CAUGHT，还原干净，复跑基线绿。
 ④ rot 33→32、`ROT_CEILING` 同笔降；`HIDDEN_ARMS` 现读 `处置=ok`。
