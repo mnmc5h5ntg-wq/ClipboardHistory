@@ -10,7 +10,9 @@
 · M903 双向：只判"不许超过"⇒ 正对照里"变少也要响"那一半必须红
 · M904 常量传播不许摘（摘掉 ⇒ 变量里的针看不见 ⇒ 数就漂）
 · M905 路径型候选的过滤不许摘（摘掉 ⇒ 死刀被路径命中洗活 ⇒ 数漂回 30/5）
-· M906 合成夹具不许进语料（进了 ⇒ 死针在夹具自己里命中 ⇒ 正对照失效）
+· ~~M906 合成夹具不许进语料~~ **R368 退役**：把排除项从 fixtures 改成 fixtures_x 之后
+  `HIDDEN_ARMS` 的三组数（rot=33 / 抽不出=6 / 已声明=6）**一个都没动** ⇒ 这条排除对今天的语料
+  没有作用，刀已无牙。退役理由与读数见 BACKLOG 426 的 R368 追记；宁可不登记，也不留一把空刀。
 · M907 抽不出候选的臂不许静默丢掉（那就是 364 原本的形状）
 
 判定按失败正文（D-244）；没有结论行一律 NOT_RUN（D-243）；未落刀先跑基线；根由 `__file__` 推。
@@ -20,6 +22,8 @@ import os
 import re
 import subprocess
 import sys
+
+from readback import single_substitution_lands
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET = "scripts/hidden_arms.py"
@@ -43,8 +47,6 @@ ARMS = [
     ("M903", u"双向棘轮：变少也要响", TARGET, N_DOWN, R_DOWN, GUARD, u"变少不响"),
     ("M904", u"常量传播有牙（摘掉就数漂）", TARGET, N_PROP, R_PROP, GUARD, u"与上界不符"),
     ("M905", u"路径型候选的过滤有牙", TARGET, N_PATH, R_PATH, GUARD, u"与上界不符"),
-    ("M906", u"合成夹具不许进语料（否则正对照失效）", TARGET, N_FIXT, R_FIXT, GUARD,
-     u"只许死针那一臂算腐烂"),
     ("M907", u"抽不出候选的臂必须被登记", TARGET, N_OPAQ, R_OPAQ, GUARD, u"不许静默丢掉"),
 ]
 
@@ -108,8 +110,9 @@ def run_arm(arm_id, why, target, needle, repl, _filter, expect_text):
     try:
         write(target, original.replace(needle, repl, 1))
         after = read(target)
-        if (after.count(repl) != 1) if repl else (after.count(needle) != 0):
-            print("%s NOT_RUN 落刀后回读磁盘与预期不符" % arm_id, flush=True)
+        # R368 / 426：判「盘上恰好等于预期 diff」（删臂也成立），不判替换串出现几次。
+        if not single_substitution_lands(original, needle, repl, after):
+            print("%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm_id, flush=True)
             return "NOT_RUN"
         code, n_ran, n_fail, names, text = run_guard()
     finally:

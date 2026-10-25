@@ -22,6 +22,8 @@ import re
 import subprocess
 import sys
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GATE = 'scripts/motion_floor_gate.py'
 PY_GATE = 'scripts.tests.test_motion_floor_gate'
@@ -78,8 +80,8 @@ def run_arm(arm_id, why, target, needle, repl, want_fail, want_text):
         return 'NOT_RUN'
     try:
         write(target, original.replace(needle, repl, 1))
-        if read(target).count(repl) != 1:
-            print('%s NOT_RUN 落刀后回读不是那一刀' % arm_id, flush=True)
+        if not single_substitution_lands(original, needle, repl, read(target)):  # R368 / 426：diff 判法
+            print('%s NOT_RUN 落刀后回读与预期 diff 不一致' % arm_id, flush=True)
             return 'NOT_RUN'
         ran, fails, text = run_py(PY_GATE)
     finally:

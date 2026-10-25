@@ -23,6 +23,8 @@ import re
 import subprocess
 import sys
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET = 'scripts/ledger_readings.py'
 GUARD = u'python:scripts.tests.test_ledger_readings'
@@ -113,8 +115,9 @@ def run_arm(arm_id, why, target, needle, repl, _filter, expect_text):
     try:
         write(target, original.replace(needle, repl, 1))
         after = read(target)
-        if (after.count(repl) != 1) if repl else (after.count(needle) != 0):
-            print('%s NOT_RUN 落刀后回读磁盘与预期不符' % arm_id, flush=True)
+        # R368 / 426：判「盘上恰好等于预期 diff」（删臂也成立），不判替换串出现几次。
+        if not single_substitution_lands(original, needle, repl, after):
+            print('%s NOT_RUN 落刀后回读与预期 diff 不一致' % arm_id, flush=True)
             return 'NOT_RUN'
         code, n_ran, n_fail, names, text = run_guard()
     finally:

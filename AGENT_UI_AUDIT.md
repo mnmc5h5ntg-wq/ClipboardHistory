@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 367 轮（R368 · 2026-10-25 · U-1285…U-1287）：426 第六批 —— r307/r309/r310 迁到 diff 回读；r310 的一把空刀退役（U-1285…U-1287 · 产品 0 文件，判据账）
+
+- **U-1285：r307（四把门刀）与 r309（六把读数刀）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R307_MUTATE 刀=4 CAUGHT=4`、`R309_MUTATE 刀=6 CAUGHT=6`，两表 `RESTORE_CLEAN=yes`。
+- **U-1286：r310 迁完先跑出 5/6 —— M906 ESCAPED。** 落刀后 `HIDDEN_ARMS` 的三组数（rot=33 / 抽不出=6 / 已声明=6）**一个都没动**：把语料排除项 `fixtures` 改成 `fixtures_x` 对今天的扫描没有作用，这条针已经没有对象。
+- **U-1287：M906 退役，不改期望。** 退役登记写进表头与 BACKLOG 426 的追记（理由 + 读数）；r310 重跑 `刀=5 CAUGHT=5 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。刀号总数 377→376（预检 `arms=376`）、全仓 865→864 —— 退役让计数变少，这是诚实的减少，不是把红洗成绿。
+
 ## 第 366 轮（R367 · 2026-10-25 · U-1282…U-1284）：426 第五批 —— r313/r337 迁到 diff 回读，七臂全 CAUGHT（U-1282…U-1284 · 产品 0 文件，判据账）
 
 - **U-1282：r313（三把 Python 守卫刀）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R313_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`，基线 `跑=8 失败=0`。

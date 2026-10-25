@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 426 第六批：r307/r309 迁到 diff 回读；r310 的 M906 落刀后三组数一个没动 ⇒ 空刀退役（R368 / U-1285…U-1287 · 产品 0 文件，判据账）
+
 ### 426 第五批：r313/r337 迁到 diff 回读（Python 侧的刀同样成立），七臂全 CAUGHT（R367 / U-1282…U-1284 · 产品 0 文件，判据账）
 
 ### 426 第四批：r312 迁到 diff 回读，三臂全 CAUGHT（含两把删臂的新等式）（R366 / U-1279…U-1281 · 产品 0 文件，判据账）
