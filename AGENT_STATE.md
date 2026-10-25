@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R372 / 第 371 轮 / Round 369）：r54 整表 `5/5 CAUGHT`、`还原不干净=0`；M266 的期望串跟上措辞；`ROT_CEILING` 32→31，`test_hidden_arms` 8/8；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：五跑仍在队里（`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c`）；只登记不轮询。
+① ⓪ CI：`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c` 仍在队里；本轮 `791ef02 ↔ 40205487744`（queued、同 workflow 前面=3，只登记不轮询）。
 ② 367 第二根：M264 的针从 `[0.18, 0.34, 0.56, 0.85]` 重钉到 `…0.92`。
 ③ M266 的期望串过期：红已在对的格（正文「填充带压到了描边上…」），补串后单跑通过。
 ④ rot 32→31、`ROT_CEILING` 同笔降；`HIDDEN_ARMS` 现读 `处置=ok`。
