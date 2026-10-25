@@ -32,6 +32,35 @@ SOURCES = os.path.join("ClipboardHistory", "Sources")
 # 那一格的形状（守卫认的是 `**R<NNN>**（commit `<sha>`）`，所以重写必须保持同一形状）。
 CELL = re.compile(u"(?m)^\\| 最后一次动到 `Sources/` 的轮次 \\|(.*)\\|$")
 BADGE = re.compile(u"^R(\\d{2,4})\\b")
+# 第二个来源：subject 自己写的 U 区间 ↔ 台账节标题里的同一区间（与 product_streak 同源规矩）。
+LEDGER = os.path.join(ROOT, "AGENT_UI_AUDIT.md")
+U_RANGE = re.compile(u"U-(\\d{3,4})…U-(\\d{3,4})")
+SECTION_TITLE = re.compile(u"(?m)^## 第 \\d+ 轮（R(\\d+) ·[^\\n]*$")
+
+
+def round_from_ledger(subject):
+    u"""subject 里没有 `R<NNN>` 时的**第二个来源**：拿它自己写的 U 区间去台账里找那一节。
+
+    为什么这一格也需要它（R340 现读）：`test_commit_subject_hygiene` 的 `NO_LABEL_ROSTER`
+    只买"那一格不红"，**买不到"数对"**（D-329 那条规矩的第三次应验）。一笔缺标签的产品提交
+    在这里派生出 `rnd=None`，于是 `build_row` 写出 `**R0**`，而 复核 比的是 `0 == None` ⇒
+    **那一格连 --write 都写不成**，报告里"最近一次动源码"从此停在错的数上。
+    规则与 `product_streak.round_from_uranges` 同源：区间恰好一段、且台账里恰好命中一节才算；
+    多段 / 命中 0 节 / 命中多节一律 None（不许猜）。轮次号直接读那一节标题里的 `R<NNN>`，
+    不用「第 N 轮 + 1」的算术 —— 那是第二份权威。
+    """
+    ranges = sorted(set(U_RANGE.findall(subject)))
+    if len(ranges) != 1:
+        return None
+    try:
+        text = io.open(LEDGER, encoding=u"utf-8").read()
+    except (IOError, OSError):
+        return None
+    hits = set()
+    for m in SECTION_TITLE.finditer(text):
+        if ranges[0] in set(U_RANGE.findall(m.group(0))):
+            hits.add(int(m.group(1)))
+    return list(hits)[0] if len(hits) == 1 else None
 
 
 def git_rows(limit=5):
@@ -46,7 +75,8 @@ def git_rows(limit=5):
             continue
         sha, subject = parts
         m = BADGE.match(subject)
-        rows.append((sha, int(m.group(1)) if m else None, subject))
+        rnd = int(m.group(1)) if m else round_from_ledger(subject)
+        rows.append((sha, rnd, subject))
     return rows
 
 

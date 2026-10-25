@@ -122,7 +122,21 @@ def round_from_subject(subject):
     """
     m = (re.match(u'^R(\\d+)', subject) or re.search(u'（R(\\d+)', subject)
          or re.search(u'\\bR(\\d+)', subject))
-    return int(m.group(1)) if m else None
+    if m:
+        return int(m.group(1))
+    # 第二来源**不在这里复制**：调那一格的取数口（`report_sources_cell`）。
+    # 为什么（R340 现读）：上一轮那笔产品提交的 subject 缺 `R<NNN>`，走了
+    # `test_commit_subject_hygiene` 的登记豁免之后那一格不红，但这里读不出轮次 ⇒
+    # 它退回去拿**上一笔能归因的**提交（d8e6486 / R338）判账，于是报告里被写成 R339 的那格
+    # 与这把尺各说各话 —— 两份派生就是两份权威。豁免只买"不红"，买不到"数对"（D-329 第三次应验）。
+    # 认不出仍返回 None：不许猜。
+    import sys
+    sys.path.insert(0, os.path.join(REPO, 'scripts'))
+    try:
+        from report_sources_cell import round_from_ledger
+    except ImportError:
+        return None
+    return round_from_ledger(subject)
 
 
 def live_sources(n=1, repo=None):

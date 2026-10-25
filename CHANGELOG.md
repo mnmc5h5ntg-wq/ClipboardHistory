@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 回顾尺第二次升成窗口守卫，而它第一次跑就点到我自己那笔提交（R340 / U-1163…U-1170 · 产品 0 文件，判据账）
+
+- D-336：标题里那半句「产品 K 文件」是**轮次级**的数 —— 本轮每一笔重复它，写不出同一个数就不写这一格。
+- 门：`scripts/tests/test_round_claim_consistency.py` 五格接进电池（现读 `Ran 637`，上一轮 629）。
+- 尺补两个洞：只认一种 subject 开头 ⇒ 老形状的笔静默消失（漏扫）；现在 cutoff 之前不扫、
+  cutoff 不在历史里抛错、认不出的笔一律打印成 `未识别=K`（K>0 就红）。
+- 正对照四条钉住豁免名单：登记一条不能放过另一条、sha 打错一位必须照样红、
+  引用查无 BACKLOG 号必须红、没写退场条件必须红。
+- 现读：`扫了=17 笔 / 6 轮 内部不一致=2 未识别=1 窗起=5d1c246`；
+  R334 / R335（405）与 fb2cea0（416）都在带退场条件的名单里。
+- 新开 417：追记那一笔该不该写 K —— 本轮的门看不见 R339 那处矛盾（它只数到一笔），靠人读出来才登记。
+
 ### runner 连挂 8 跑的那朵红判成了产品事实：暗档选中那颗塌在漂来的轨道上（R339 / U-1155…U-1162 · 产品 3 文件）
 
 - 现象：runner 上 `testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces` 暗档三条断言连挂 8 跑
