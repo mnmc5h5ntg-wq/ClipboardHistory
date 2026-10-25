@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R367 / 第 366 轮 / Round 364）：两张表只换落刀后的回读那一行；`3/3`、`4/4` 全 CAUGHT、`RESTORE_CLEAN=yes`；电池 Ran 664（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；迁移面 11 张（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：`563c0ed`（R365）已 success（24/24=100%，见上轮追记）；`452f5a3`、`cc9eb1e`、`7ad22cf` 仍在队里（只登记不轮询）。
+① ⓪ CI：`563c0ed`（R365）已 success（24/24=100%，见上轮追记）；`452f5a3`、`cc9eb1e`、`7ad22cf` 仍在队里；本轮 `19f91e2 ↔ 40203273064`（in_progress、同 workflow 前面=3，只登记不轮询）。
 ② 426 第五批：r313（守卫三刀）、r337（台账引用四刀）迁 `single_substitution_lands`。
 ③ 七臂重跑：M911…M913、M989…M992 全 CAUGHT；两表 RESTORE_CLEAN。
 ④ 读数：两张表都是 Python 侧的刀 ⇒ diff 判法不依赖语言。
