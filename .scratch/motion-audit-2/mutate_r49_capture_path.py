@@ -12,6 +12,11 @@
   M243 样本数 40 → 5                              ⇒ 地板那条该红（p95 退化成最大值）
   M244 目录快照永远是空（探针坏掉）                ⇒ 对照组那条该红（不许"没写盘"靠"没接上盘"来绿）
 
+**R380 已知洞（跑这张表会红，别当成新坏法）**：M244 现在打的是 `HistoryStore.persist()` 里的
+`persistence.save(entries)`，但拿掉它之后对照组（文件出现 + 里面含 add 的文本）**仍然绿** ⇒
+`add` 的落盘还有第三条我们没看见的路（构造期那次快照已被内容断言排除，因为写出来的**带着** add 的文本）。
+刀没收，M244 记 NOT_VERIFIED；钉它之前先把那条路找出来。
+
 needle 一律从 --measure 那一遍的失败消息原文里抄。
 """
 import os
@@ -29,7 +34,11 @@ RECORD = ("        counts[key, default: 0] += 1\n"
 INTERP = "        return sorted[lower] * (1 - fraction) + sorted[upper] * fraction"
 EMPTY = "        guard !values.isEmpty else { return .nan }"
 COUNT = "    static let sampleCount = 40"
-WALK = "        for case let url as URL in walked {"
+# R380：旧针钉的是「目录快照永远是空」，那个探针早已被重写；同义的坏法换成**根本不落盘**。
+STORE = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Managers/HistoryStore.swift")
+WALK = ("    private func persist() {\n"
+        "        do {\n"
+        "            try persistence.save(entries)\n")
 
 MUTATIONS = [
     ("M240", "产品侧：recordCopy 同步写盘", LEDGER, RECORD,
@@ -46,9 +55,9 @@ MUTATIONS = [
     ("M243", "样本数掉到 5", TESTS, COUNT,
      "    static let sampleCount = 5   // MUTANT",
      ['样本掉到']),
-    ("M244", "目录快照永远是空", TESTS, WALK,
-     "        for case let url as URL in [] as [URL] {   // MUTANT",
-     ['对照组里盘上仍然一个字节没多']),
+    ("M244", "根本不落盘（对照组的探针看不见内容）", STORE, WALK,
+     WALK + "            _ = entries   // MUTANT：不落盘\n",
+     ['里面没有这次 add 的内容']),
 ]
 
 

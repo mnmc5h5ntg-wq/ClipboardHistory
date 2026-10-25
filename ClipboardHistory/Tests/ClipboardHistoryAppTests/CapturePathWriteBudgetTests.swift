@@ -182,6 +182,13 @@ final class CapturePathWriteBudgetTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: historyURL.path),
                       "放开闸门之后存档仍然没出现 ⇒ 上面那两条「没写盘」是因为根本没接上盘，"
                       + "不是因为有去抖。这条判据就成了一条恒真的空话")
+        // R380 / BACKLOG 367：文件出现还不够 —— 它也可能是**构造期或别处**排的那一次保存写的。
+        // 归因到这次 `add`：盘上那份必须包含刚加进去的文本。M244 的 ESCAPED 正是绿在前一句、
+        // 而写出来的其实是构造期排的那份空快照。
+        let persistedText = (try? String(contentsOf: historyURL, encoding: .utf8)) ?? ""
+        XCTAssertTrue(persistedText.contains("采集路径不该同步写盘的那一条"),
+                      "存档出现了，但里面没有这次 add 的内容 ⇒ 它是构造期/别处排的保存写的，"
+                      + "这条对照组归因不到 `add`（M244 的 ESCAPED 就绿在这一层）")
         // 账本走的是"去抖 + 后台队列"，所以它必须**晚一点**才出现；这里只要求它最终出现。
         let ledgerDeadline = Date().addingTimeInterval(3.0)
         while !FileManager.default.fileExists(atPath: ledgerURL.path), Date() < ledgerDeadline {

@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R380 状态（2026-10-26 · 本地 · 第 379 轮 / Round 377）：M244 的对照组补「归因到 add」；刀仍 ESCAPED、针活了≠刀验过；本机换装 ok（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R380 / 第 379 轮 / Round 377）：`testAddingACopyWritesNothingOnTheMainThread` 多判一句「盘上那份必须含刚加进去的文本」（未变异 0.452s 通过）；把 `persist()` 的 `save` 拿掉后文件**仍带着 add 的文本**出现 ⇒ 第三条落盘路（不是构造期、不是 persist()），M244 记 `NOT_VERIFIED`；rot 21→20 只是针活了，`ROT_CEILING` 同笔降并分开两轴；`scripts/install_local.sh --yes` 现读 `INSTALL_RESULT=ok  版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=381  INSTALL_ENTRIES_AFTER=381`；build `--build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`a84cb73`（R377）与 `a63dcf5`（R378）success、`3ef8c59`/`fbf2508`/`dfe411a` 已推；只登记不轮询。
+② 对照组归因：文件出现 → 文件出现**且含 add 的文本**；未变异仍全绿。
+③ M244 再跑：仍 ESCAPED（写出的带着 add 文本）⇒ 第三条落盘路；刀记 NOT_VERIFIED，表头写明会红。
+④ 本机换装一遍（`--yes`）：ok、SHA 匹配、条目 381=381。
+
+验证读数（现读）：未变异 `testAddingACopyWritesNothingOnTheMainThread passed (0.452 seconds)`；`M244 ⇒ ESCAPED`；`HIDDEN_ARMS 表=222 可判=805 rot=20 … 处置=ok`；`swift build --build-tests` 告警 0；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 `Ran 682（skipped=4）OK`；产品面连续零改动 **25** 轮（`python3 scripts/product_streak.py --streak-for 379` 现读）。
+
+NOT-RUN（分开写）：① 真机腿没跑；② 帧基线没更新（本轮无产品/夹具改动）；③ 第三条落盘路没定位（M244 未验成）；④ 其余 20 条 rot 未重钉。
+
+下一轮（R381）的靶：⓪ 读队列（`3ef8c59`/`fbf2508`/`dfe411a` 与本轮的结论）；① 找出 add 的第三条落盘路（从 `entries` 的 didSet / Combine 订阅 / `reconcileSelection` 三条线查）；② **回产品动效面点一个真实位**（已连续 25 轮零产品改动，这一维必须动）。
+
 ## R379 状态（2026-10-26 · 本地 · 第 378 轮 / Round 376）：r56 十臂全表第一次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（产品 0 文件，判据账）
 
 最后更新：2026-10-26（本地 · R379 / 第 378 轮 / Round 376）：r56 整表十臂一次跑全 —— `M277…M281` 红在守卫各自那句、`M282` 命中「夹具替换没有落地」（`红在 []` 的有效红）、`M283/M284` 红在两个恢复场景、`M285` 红在 partial 那一格、`M1010` 命中 `READOUT_CHANNEL_BLOCKED`；十臂 `还原干净=True`、复跑 `ESCAPED`、`EXIT=0`；M244 的重钉尝试 ESCAPED（`persist()` 的 save 不是唯一落盘路）已撤回，rot 仍 21；全量沿用 R377（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）

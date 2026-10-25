@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### M244 的对照组补上「归因到 add」的内容断言（未变异全绿、刀仍 ESCAPED）；rot 21→20 与刀验分开记；本机换装 ok（R380 / U-1325…U-1327 · 产品 0 文件，判据账）
+
 ### r56 十臂全表首次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（R379 / U-1322…U-1324 · 产品 0 文件，判据账）
 
 ### 367 第三批：r40/r42 六把腐烂针重钉（六臂 CAUGHT），rot 27→21、上界同笔降；M188 旧刀编译不过记刀坏（R378 / U-1318…U-1321 · 产品 0 文件，判据账）
