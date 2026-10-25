@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 365 轮（R366 · 2026-10-25 · U-1279…U-1281）：426 第四批 —— r312 迁到 diff 回读，三臂全 CAUGHT（U-1279…U-1281 · 产品 0 文件，判据账）
+
+- **U-1279：r312 的三把刀迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；needle / 替换文 / 期望格子一字未动。重跑 `R312_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。
+- **U-1280：删臂的回读从此也有一条等式。** 旧判法对 `repl == ''` 走的是 `count(needle) == 0`，它只证明了「针没了」，不证明「没有多改别处」；diff 判法对删臂同样是 `after == before.replace(needle, '')`。r312 的两把删臂（M908 / M909）就是这条的现场。
+- **U-1281：迁移后的红还在原位。** M908 / M909 红在 `HeatmapHoverEvidenceTests.swift:895`、M910 红在 `:881`，都在期望格子 `testAdjacentHeatLevelsAreSeparableOnTheRightAxis` 上；基线 `R312_BASELINE OK（判据卷 13 格全绿）`。换判法没有改变刀的结论。
+
 ## 第 364 轮（R365 · 2026-10-25 · U-1276…U-1278）：384 的修法有了自己的地板 —— 取用带纵向覆盖 ≥90%，两机 100%、回退到 29% 会红（U-1276…U-1278 · 产品 0 文件，判据账）
 
 - **U-1276：把「并墨后 100%」从读数升成地板。** `pillBandCoverageFloor = 0.90` 落在 `testFilterPillRampIsMonotone` 的 GEOM 之后：`取用带只盖住候选跨度的 covered/total px` 低于 0.90 即红。本机现读 `纵向覆盖=48/48px=100%`；runner 的同一行（`9d2c8a8` 那一跑）是 `24/24px=100%`。读不出这一格时走具名出口 `MOTION_NOT_RUN=pill-coverage-unreadable` —— 没有对象就不发证，不冒充「覆盖够了」。
