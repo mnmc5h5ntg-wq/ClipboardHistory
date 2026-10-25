@@ -17,7 +17,7 @@
 最后更新：2026-10-26（本地 · R387 / 第 386 轮 / Round 384）：新胶片场景 `settings-reset-fade`（只拍按钮带）先证伪 R385 的 `.animation(value:)` —— 0.12s 只有 2 个过渡帧，是死动画；给两颗「恢复默认」外层加显式 `.opacity(isDefault ? 0.55 : 1)` + `.animation(for: .selection)` 后，现读 2x `帧数=27 过渡帧数=3 峰值=0.0542`、1x `帧数=27 过渡帧数=4 峰值=0.0230`，strip 逐帧由深到浅；端态 182 张帧 `same=170 changed=12`，12 张只动重置按钮列。M406 重钉到 changedFraction 的唯一块（旧针命中 2），r77 **整表 10/10 CAUGHT**；`HIDDEN_ARMS … rot=0 … 上界 rot=0 … 处置=ok`。435：`captionDrawability` 拆三态 + 负半真值表，M1018 `CAUGHT`；caption tier 守卫本机仍绿。`swift build --build-tests` 告警 **0**；全量 `Executed 1039 tests, with 49 tests skipped and 0 failures`（新增胶片采样臂在无环境键时具名 skip）；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **2** 轮（现读 `python3 scripts/product_streak.py --streak-for 386` 的 streak）。
 
 本轮做了什么：
-① ⓪ 网络：1 次同形探测 `api=000` / `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；未推送，CI 三跑未读。
+① ⓪ 网络：本轮上限内 2 次同形探测（07:06 / 07:45）都是 `api=000` / `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；本地 ahead=7，未推送，CI 三跑未读。
 ② 产品位：胶片证伪 R385 死动画；显式 opacity 修复；2x/1x 各 ≥2 帧；端态 12 张帧只动按钮列。
 ③ 判据：`testResetFadeSamplerReadsBothScales` + 源守卫更新；M1016/M1017 CAUGHT。
 ④ 367：M406 重钉，r77 整表 10/10；rot 0/0。
@@ -26,7 +26,7 @@
 
 验证读数（现读）：`RESET_FADE_SCALE` 2x `27/3/0.0542`、1x `27/4/0.0230`；`MOTION settings-reset-fade 过渡帧数=3`；`M1016/M1017`、`M1018` 都 CAUGHT；r77 `抓到=10 逃掉=0`；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=6（`5166a2b`、`479dfaa`、`bb5be1b`、`559cadb` 与本轮两笔）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ R387 的胶片在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 `49` skip 的一部分），不是没红。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=7（`5166a2b`、`479dfaa`、`bb5be1b`、`559cadb`、本轮主笔 `53e1ef7`、追记 `6e76888`、追记二 `9644168`）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ R387 的胶片在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 `49` skip 的一部分），不是没红。
 
 下一轮（R388）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与本次推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R387 的过渡若要再验，跑 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 `testResetFadeSamplerReadsBothScales`。
 
