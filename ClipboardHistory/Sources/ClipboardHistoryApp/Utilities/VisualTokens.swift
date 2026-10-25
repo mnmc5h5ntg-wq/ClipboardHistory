@@ -539,6 +539,13 @@ enum VisualMaterial {
     /// 而亮档欠的是换一条轴（BACKLOG 399）。
     static let selectedSegmentLiftWhite: Double = 0.20
 
+    /// 0.12：**亮档**选中那颗的发丝边（R345 / BACKLOG 399 · 421）。
+    ///
+    /// 亮档的空闲 230 与选中 220 只差 10 级（1.099）：悬停要"对自己那片底看得见"就得 ≥1.20 ⇒ 掉到 ≤207，
+    /// 比选中还深（R334 的 1.136）；抬到 251 才够 1.20 又要换刷子。所以身份换轴：**选中靠边界**，亮度让给悬停。
+    /// R344 现读（1pt × 0.12，沿避开字墨的一列）：`轨道=154 / 边=198 / 填充=220` —— 边比填充暗 22 级。
+    static let selectedSegmentEdge: Double = 0.12
+
     /// 轨道与小方块的底：`.quaternary`，四级弱化色。它是"这里有个控件"，不是"这里有个面板"。
     /// 缩略图的类型占位符也用它：两颗 16pt 方块并排时，占位符必须比旁边的真图更退一步。
     static let track: HierarchicalShapeStyle = .quaternary

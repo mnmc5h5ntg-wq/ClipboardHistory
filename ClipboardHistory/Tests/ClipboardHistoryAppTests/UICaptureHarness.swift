@@ -6820,6 +6820,39 @@ final class UICaptureTests: XCTestCase {
             // 所以亮档继续**只印不判**，欠的那一事开成 BACKLOG 399（两支候选与各自的代价都在里面）。
             let selVsHover = Self.contrastRatio(segHovR.grey, segIdleL.grey)
             let selVsIdle = Self.contrastRatio(segIdleR.grey, segIdleL.grey)
+            // R345 / 399·421：亮档选中那颗的**发丝边**。存在性判据必须同时说出**对象**并用次序钉住它：
+            // 亮档 `页面 > 填充 > 边 > 轨道`；暗档没有边 ⇒ 轨道与填充之间没有再夹一档。
+            // 取样列避开标签字墨（段左起 8pt）；页面取控件上方那一行，轨道取控件最外那一档。
+            let edgeFrame = rawFrame("segmented-filter-idle", appearance)
+            let edgeScale = CGFloat(edgeFrame.w) / 200.0
+            let probePill = FilterPillGeometry.pillRect(in: CGRect(x: 8, y: 35, width: 168, height: 22),
+                                                        count: 2, index: 0)
+            let probeX = Int((probePill.minX + 8) * edgeScale)
+            var column: [Int] = []
+            for yPt in 30...60 {
+                let y = Int(CGFloat(yPt) * edgeScale)
+                if y < edgeFrame.h && probeX < edgeFrame.w {
+                    let o = y * edgeFrame.bpr + probeX * 4
+                    column.append(max(Int(edgeFrame.buf[o]), Int(edgeFrame.buf[o + 1]), Int(edgeFrame.buf[o + 2])))
+                }
+            }
+            let pageLevel = column.first ?? 0
+            let fillLevel = column.sorted()[column.count / 2]
+            let darkest = column.min() ?? fillLevel
+            // 对象靠**"最深那一格是不是页面"**分开：亮档页面 255、边 198、填充 220；
+            // 暗档页面 30 就是整列最深 ⇒ 没有边。（上一版把"第一档非页面"当轨道 ⇒ 把边当成了轨道，
+            // 于是永远读不到边 —— R345 第二次撞的同一个坑。）
+            emit("SEG_EDGE \(tag) 页面=\(pageLevel) 填充=\(fillLevel) 最深=\(darkest)"
+                 + " 填充−最深=\(fillLevel - darkest) 最深是页面=\(darkest == pageLevel)")
+            if appearance == .aqua {
+                XCTAssertNotEqual(darkest, pageLevel,
+                    "亮档整列最深那一格就是页面（\(pageLevel)）⇒ 选中的填充分明没被边围住，读错了对象")
+                XCTAssertGreaterThanOrEqual(fillLevel - darkest, 8,
+                    "亮档选中那颗的发丝边只有 \(fillLevel - darkest) 级（填充 \(fillLevel) / 最深 \(darkest)）"
+                    + " ⇒ 边界这根轴没有读者，399 的 A 案不成立")
+            }
+            // 暗档不断言像素：`SegmentEdge.width(dark: true)` 是 nil 已由令牌真值表钉住；
+            // 像素级的"暗档没有边"要两臂帧才证得了，本轮不假称证过（D-341）。
 
             emit("HOVER_DIRECT_READ_PROOF \(tag) "
                  + "段按钮 空闲底=\(segIdleR.grey) 悬停=\(segHovR.grey) 比值=\(String(format: "%.3f", segRatio)) "

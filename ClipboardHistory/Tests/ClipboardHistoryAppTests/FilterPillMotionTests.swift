@@ -135,6 +135,19 @@ final class FilterPillMotionTests: XCTestCase {
     /// ③ α 的两条边界必须是**实测**数夹出来的区间，写成会红的算术而不是注释（下面那一格）。
     /// 屏幕上那一半不在这里证：`UICaptureHarness.testSelectedPillStaysAboveItsTrackOnEveryBacking`
     /// （同一条夹具通道铺三档人造页底，逐档量「选中 − 轨道」）。
+    /// R345 / 399·421：选中那颗的身份换到**边界**这条轴 —— 亮档画一根发丝边，暗档不画。
+    func testSegmentEdgeIsLightOnlyAndWithinTheHairlineRange() {
+        XCTAssertNil(SegmentEdge.width(dark: true), "暗档不画这根边：它的身份已经在抬量那条轴上")
+        XCTAssertNil(SegmentEdge.alpha(dark: true))
+        XCTAssertEqual(SegmentEdge.width(dark: false), 1)
+        XCTAssertEqual(SegmentEdge.alpha(dark: false), VisualMaterial.selectedSegmentEdge)
+        XCTAssertGreaterThan(VisualMaterial.selectedSegmentEdge, 0.0, "0 = 没有这根边")
+        XCTAssertLessThan(VisualMaterial.selectedSegmentEdge, 0.30, "发丝边不是描边装饰")
+        // 同一条形状的两支不许互相顶替：亮档两根都画、或哪一档两根都不画，都是换档换出了洞
+        XCTAssertNil(SegmentKnob.liftAlpha(dark: false))
+        XCTAssertEqual(SegmentKnob.liftAlpha(dark: true), VisualMaterial.selectedSegmentLiftWhite)
+    }
+
     func testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken() {
         XCTAssertEqual(SegmentKnob.liftAlpha(dark: true), VisualMaterial.selectedSegmentLiftWhite,
                        "暗档必须盖那一层：不透明基准停在解析值 70，而轨道跟着页底漂（30→52、50→70、真机 51→81）"

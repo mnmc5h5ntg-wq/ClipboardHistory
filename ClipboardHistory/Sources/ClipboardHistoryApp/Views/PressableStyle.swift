@@ -97,6 +97,13 @@ enum SelectedInk {
 /// 叠加的差 = α(255−轨道) 在轨道已经发白的地方自己先归零，而这条离屏通道在侧栏里不平滑那层材质、
 /// 暗档轨道现读 **255** ⇒ 两态帧之间一个字都没差，`FILTER_PILL_BAND` 那条"换 filter 画面必须动"红了。
 /// 亮档不盖：抬量压在 230 的亮轨道上会把选中推出纸白，而亮档欠的是换一条轴（BACKLOG 399）。
+/// 亮档选中那颗的**发丝边**（R345）：暗档 `nil` = 不画。宽度与 alpha 分成两格，
+/// 好让"只画亮档"与"画多重"各自能被刀指住。
+enum SegmentEdge {
+    static func width(dark: Bool) -> CGFloat? { dark ? nil : 1 }
+    static func alpha(dark: Bool) -> Double? { dark ? nil : VisualMaterial.selectedSegmentEdge }
+}
+
 enum SegmentKnob {
     /// 暗档盖在基准之上的白色叠加量；**亮档是 `nil`** = "不盖"。
     ///

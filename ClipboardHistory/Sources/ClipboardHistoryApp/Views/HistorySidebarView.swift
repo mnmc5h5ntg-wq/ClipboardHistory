@@ -451,6 +451,12 @@ struct SegmentedFilterPicker: View {
             ZStack {
                 VisualShape.rounded(VisualRadius.control)
                     .fill(VisualMaterial.selectedSegment)
+                // R345 / 399：亮档选中那颗补一根发丝边 —— 身份从"亮度"换到"边界"，亮度频道让给悬停。
+                if let w = SegmentEdge.width(dark: colorScheme == .dark),
+                   let a = SegmentEdge.alpha(dark: colorScheme == .dark) {
+                    VisualShape.rounded(VisualRadius.control)
+                        .strokeBorder(Color.primary.opacity(a), lineWidth: w)
+                }
                 if let lift = SegmentKnob.liftAlpha(dark: colorScheme == .dark) {
                     // **同一颗形状再盖一层**，而不是换一种颜色：抬量必须压在 R333 那枚语义基准之上，
                     // 这样"平台惯例那一枚"与"盖掉轨道漂移的那一点量"是两件事，各自能被刀指着改。
