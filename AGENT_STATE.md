@@ -56,10 +56,13 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
 ③ 新尺三档在 runner 上**与本机逐字同数**：`SEG_PILL_BACKING dark 页底=30 轨道=52 选中=107 差=55`、
 `页底=50 轨道=70 差=37`、`页底=80 轨道=97 差=10` ⇒ **人造底是两机可比的自变量**，
 这一句是 BACKLOG 413 的地基（它说明「把漂移量做成输入」这条路走得通，不必按机器切片）。
-另：`RUN=40149824166 ↔ 7873fd9`（R340 账半，回填时 in_progress ⇒ 只登记不轮询，R140）；
-这一跑要答的是新门在 runner 上的两件事：`test_round_claim_consistency` 读的是 git 历史，
-而 runner 是**浅历史**（BACKLOG 278 那一族）⇒ 它可能走 skip 出口，那不算验收；
-`test_sources_cell_second_source` 的「最近一笔源码提交必须能派生出轮次」同一族风险。
+另：`RUN=40149824166 ↔ 7873fd9 completed/success`、`RUN=40150030547 ↔ 2615c58 completed/success`（R340 两笔都签了）。
+**R340 追记现读**：runner 那一跑正文里 `Ran 637 tests … OK (skipped=2)`（例数与本机同，skip 少 2 条是 PIL 那一族，已知形状），
+而新门要答的两件事**当场有答案**：① `SOURCES_CELL_HISTORY 浅=False 对照数=40 头笔=fb2cea0 as_of第340轮=fb2cea0 处置=judge`
+⇒ runner 的 checkout 不是浅历史（`fetch-depth: 0` 之后一直是全的），所以『浅历史上不许定罪』那族出口这一跑**没被触发**，
+第二来源（提交自己写的 U 区间 ↔ 台账节标题里的 `R<NNN>`）在 runner 上同样把 `fb2cea0` 认成 R339 —— 这一句就是 R340 那格修复的验收；
+② `test_round_claim_consistency` 五格与 `test_sources_cell_second_source` 三格都在 637 里**跑过**（不是 skip）。
+下一轮仍要盯的：skip 数两机差 2（本机 4 / runner 2）是 PIL 那一族的既有形状；哪天差到 0 或反向，先查 `SCRIPT_SKIPS` 那一行再谈别的。
 → ① **BACKLOG 413**：backing 从三档常量换成名册（每档标实测/外推），并给「降低透明度 / 增加对比」
   各拍一帧 —— 那两档直接改材质合成结果，是 R339 那条链上最可能的下一个坑。
 → ② 412（`--streak-for` 差一）：修它要在同一笔里重算窗口内所有格。
