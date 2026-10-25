@@ -5838,6 +5838,17 @@ final class UICaptureTests: XCTestCase {
     /// `glass-pill-*` 夹具（120×232pt）里那四颗 44pt 圆所在的竖条（实测像素 x 76…164 / y 80…446）。
     static let circleColumnRect = CGRect(x: 38, y: 40, width: 44, height: 185)
 
+    /// "两档其实是同一档"的那条线（R339 / BACKLOG 411）：**8/255**。
+    ///
+    /// **不是我拍的数**：它就是真机那把尺 `scripts/real_screen_filter_pill.py` 里的 `DELTA`，
+    /// 那颗尺的判法原文是 `|药丸 − 轨道| < 8 ⇒ indistinguishable（这台机器上两档分不开）`，
+    /// 而 377 就是靠它判掉的（真机现读 差=−33.0 ⇒ 不是 indistinguishable）。
+    /// 这里复用同一个数，是为了让**离屏那卷与真机那一尺说同一句话**：
+    /// 393 的修法在离屏 差=+18 过线、在 runner 差=+0.0 不线，正是这颗尺会说"分不开"的那一档。
+    /// （仓库里另有 `PressFeedbackTests.perceptibleStep255 = 4`，那是**相邻两级梯子**的台阶线，
+    /// 比这条松；"这一块与那一块是不是同一档"用的是 8，不是 4。）
+    static let indistinguishableStep255 = 8
+
     /// `settingsrow-hover-*` 夹具（300×96pt）里那一层悬停填充（R231 / BACKLOG 258）。
     ///
     /// 两块矩形都是**量出来的**，不是按"行高居中在 96pt 框里"算的：两帧逐像素相减得到差异带
@@ -6483,6 +6494,20 @@ final class UICaptureTests: XCTestCase {
             // 这条门的牙在 391 修法之前咬得住（本机 差=−16.0 vs 系统 +26.0 ⇒ 异侧 ⇒ 红），
             // 修法之后放行（差=+18.0 vs +26.0 ⇒ 同侧），所以它钉的是"方向对不对"，不是"跑没跑通"。
             if tag == "dark" {
+                // R339 / BACKLOG 411：**这条门原来只管符号，不管大小**。
+                // `sameSide` 的算法是 `(ownDiff >= 0) == (sysDiff >= 0)` ⇒ 差=+0.0 也算"同侧"，
+                // 于是 runner 那 8 跑里 `SEGREF_POLARITY dark｜自家 选中=70.0 未选=70.0 差=+0.0`
+                // 一路被判成"同侧=是" —— 两档读成同一个灰阶这件事**没有一条判据替它说话**，
+                // 红的是隔壁那卷的可行集，而那三行红字要读者自己去发现"空闲=选中"是什么意思。
+                // 补上量级地板（同一颗 `indistinguishableStep255`，真机那把尺里的 `DELTA`），
+                // 这条门才第一次能单独抓住"塌成一档"，不必再借另一卷的红。
+                XCTAssertGreaterThanOrEqual(ownDiff, Double(Self.indistinguishableStep255),
+                    "暗档自家那颗的分离只有 " + String(format: "%+.1f", ownDiff) + "/255，低于『分不开』线 "
+                    + String(Self.indistinguishableStep255) + "（选中="
+                    + String(format: "%.1f", ownSelected) + " 未选=" + String(format: "%.1f", ownUnselected)
+                    + "，同跑系统那颗 差=" + String(format: "%+.1f", sysDiff) + "）"
+                    + " ⇒ 符号对而大小为 0：屏幕上两颗是同一个灰阶，"
+                    + "『同侧』这句话替不了读者（BACKLOG 411）")
                 XCTAssertEqual(sameSide, "是",
                     "暗档里自家与系统的极性不同侧：自家 选中=" + String(format: "%.1f", ownSelected)
                         + " 未选=" + String(format: "%.1f", ownUnselected)
@@ -6878,6 +6903,99 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// **页底是这一格的自变量，不是两台的偶然**（R339 / BACKLOG 411）。
+    ///
+    /// 起因：runner 从 `117f45d` 起连续 8 跑红，STEP[15]+STEP[17] 那三条断言全在
+    /// `testDirectReadHoverLayersAreVisibleOnTheirOwnSurfaces` 的暗档，红给出的数是
+    /// `HOVER_RUNG_WINDOW dark 空闲=70 选中=70 … 可行=空集`。同一跑、同一条 render、同一颗尺里的
+    /// **系统参照臂**现读 `SEGREF_POLARITY dark｜系统 页底=50.0 … 差=+49.0｜自家 页底=50.0
+    /// 选中=70.0 未选=70.0 差=+0.0` ⇒ "这台机器画不出分段控件的选中档"当场不成立：
+    /// 它画得出系统那颗，只画不出自家那颗。所以这一格**不是**通道限制，也就不能按出口处理。
+    ///
+    /// 机制是两层叠加的算术：轨道 = `.quaternary` 叠在页面底色上 ⇒ 它跟着页底漂
+    /// （本机离屏页底 30 → 轨道 52、runner 离屏页底 50 → 轨道 70、R330 真机页底 51 → 轨道 81）；
+    /// 而 R333 把选中那颗定成**不透明**语义色（暗档解析 70，两机同读、不随页底动）。
+    /// 于是 差 = 70 −（页底 + 轨道叠加）：页底 30 时 +18，页底 50 时 **0**，
+    /// 真机那条 81 的轨道上是 **−11** ⇒ 393 的修法只在"页底恰好 30"的那台机器上成立，
+    /// 而那台是本机的离屏通道，不是用户那块屏幕（这一句是对 R333 那格结论的**公开更正**）。
+    ///
+    /// 这一格把页底变成能点名的自变量：同一条夹具通道铺三档**不透明**人造底，逐档量「选中 − 轨道」。
+    /// 两颗地板都是从仓库里已有的数拿的，不是这一轮新发明的：
+    /// ① `Self.indistinguishableStep255` = 8/255（真机那把尺的 `DELTA`，判法原文「< 8 ⇒ 分不开」）；
+    /// ② 1.10 = 这一族暗档自己那条可见性线（`HOVER_DIRECT_READ_PROOF` 的 `minimum`）。
+    /// 三档里前两档是**实测**页底（本机 30 / runner 50），第三档 80 是**外推**（比真机 R330 那条
+    /// 轨道 81.0 更亮的一档），读数里逐条标出来 —— 外推那一档不许冒充"实测"。
+    ///
+    /// 亮档继续**只印不判**（D-325：亮档的极性在两机上反号 —— 本机 差=−10、runner 差=+7，
+    /// 同一条断言会在一台红一台绿，那既不是产品事实也不是通道事实；欠的那一事在 399）。
+    func testSelectedPillStaysAboveItsTrackOnEveryBacking() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r339-backing-ladder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let backings: [(level: Int, provenance: String)] = [
+            (30, "实测=本机离屏页底"),
+            (50, "实测=runner离屏页底"),
+            (80, "外推=比真机R330那条轨道81.0更亮一档"),
+        ]
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            for backing in backings {
+                let fixture = Fixture("segmented-filter-backing-\(backing.level)",
+                                      NSSize(width: 200, height: 60), contentMustFit: true) {
+                    AnyView(self.probeFrame(SegmentedFilterPicker(selection: .constant(.all)),
+                                            width: 200, height: 60,
+                                            backingLevel: CGFloat(backing.level)))
+                }
+                let file = scratch.appendingPathComponent("seg-\(tag)-\(backing.level).png")
+                do { _ = try render(fixture, appearance: appearance, to: file) } catch {
+                    XCTFail("\(tag) 页底 \(backing.level)：渲染失败 \(error)"); continue
+                }
+                // 看图腿（与 `CLIPBOARD_HISTORY_UI_SHOTS` 同一族，用完即走、不进基线名单）：
+                // 这三档人造页底是本判据的**对象**，只给数字不给像素，就等于让读者相信我的尺。
+                // 默认什么都不做 —— 不指环境变量就没有第二份产物。
+                if let keep = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_R339_LADDER_SHOTS"] {
+                    let dir = URL(fileURLWithPath: keep, isDirectory: true)
+                    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                    try? FileManager.default.copyItem(at: file, to: dir.appendingPathComponent("seg-\(tag)-\(backing.level).png"))
+                }
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    XCTFail("\(tag) 页底 \(backing.level)：读不回 \(file.lastPathComponent)"); continue
+                }
+                let buf = UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)
+                let track = Self.bandModal(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow,
+                                           rectPt: Self.segmentRectRight, framePtWidth: 200)
+                let pill = Self.bandModal(bytes: buf, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                          bytesPerRow: rep.bytesPerRow,
+                                          rectPt: Self.segmentRectLeft, framePtWidth: 200)
+                let step = pill.grey - track.grey
+                let contrast = Self.contrastRatio(track.grey, pill.grey)
+                emit("SEG_PILL_BACKING \(tag) 页底=\(backing.level) 来源=\(backing.provenance)"
+                     + " 轨道=\(track.grey) 选中=\(pill.grey) 差=\(step)"
+                     + " 对比=\(String(format: "%.3f", contrast))"
+                     + " 线=差≥\(Self.indistinguishableStep255)且对比≥1.100"
+                     + (appearance == .darkAqua ? "（门）"
+                        : "（只印不判：亮档极性两机反号，见 D-325/BACKLOG 399）"))
+                guard appearance == .darkAqua else { continue }
+                XCTAssertGreaterThanOrEqual(step, Self.indistinguishableStep255,
+                    "暗档 页底=\(backing.level)（\(backing.provenance)）：选中那颗只比轨道亮 \(step)/255，"
+                    + "低于真机那把尺的『分不开』线 \(Self.indistinguishableStep255)"
+                    + "（轨道=\(track.grey) 选中=\(pill.grey)）⇒ 这一档在屏幕上看不出哪颗被选中。"
+                    + "轨道跟着页底漂而不透明那颗不漂，所以这一格必须按 backing 判，"
+                    + "不能只按本机那一档判（BACKLOG 411）")
+                XCTAssertGreaterThanOrEqual(contrast, 1.100,
+                    "暗档 页底=\(backing.level)（\(backing.provenance)）：选中↔轨道 的亮度比只有 "
+                    + "\(String(format: "%.3f", contrast))，低于这一族自己那条暗档可见性线 1.100"
+                    + "（轨道=\(track.grey) 选中=\(pill.grey) 差=\(step)）")
+            }
+        }
+    }
+
     /// `hoverRungChoices` 的真值表（R334）：那条『只立暗档』的门背后的算术，必须是一格能红的判据，
     /// 不是一段注释。三件事各拦一种坏法：
     /// ① 暗档的窗口非空且**边界就是 WCAG 算出来的那五个灰阶**（改公式或改线都会红）；
@@ -7134,6 +7252,22 @@ final class UICaptureTests: XCTestCase {
         view
             .frame(width: width, height: height, alignment: .center)
             .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    /// 与 `probeFrame` 同一条通路，只把**页面底色交给调用方**（R339 / BACKLOG 411）。
+    ///
+    /// 为什么要有这一颗：`windowBackgroundColor` 在两机上解析成 **30**（本机离屏）与 **50**
+    /// （runner 离屏，同一格 `SEGREF_POLARITY dark 页底=50.0` 现读），真机那一屏是 **51**
+    /// （R330：页底 51.0 / 轨道 81.0）。而"选中那颗比轨道亮多少"正是这两个数之差 ⇒
+    /// 页底不进自变量，"在页底更亮的机器上会不会塌"这一格本地就永远判不了，只能等另一台机器红。
+    ///
+    /// 铺的是**不透明**灰，不是第二层材质：这一格要的是"同一个自变量之下的差"，
+    /// 再引一层 vibrancy 等于把要量的那个漂移源又乘一遍。
+    private func probeFrame<V: View>(_ view: V, width: CGFloat, height: CGFloat,
+                                     backingLevel: CGFloat) -> some View {
+        view
+            .frame(width: width, height: height, alignment: .center)
+            .background(Color(nsColor: NSColor(white: backingLevel / 255.0, alpha: 1.0)))
     }
 
     private func rowFrame<V: View>(_ view: V) -> some View {

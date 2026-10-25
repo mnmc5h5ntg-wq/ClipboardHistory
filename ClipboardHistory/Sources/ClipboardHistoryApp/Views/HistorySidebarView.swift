@@ -399,6 +399,9 @@ fileprivate extension View {
 struct SegmentedFilterPicker: View {
     @Binding var selection: HistoryStore.Filter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 色档由**这个视图自己**问，不从调用点传（`FilterSegmentButton` / `PressedLabel` 同一条规矩：
+    /// 传进来就等于允许调用方 —— 包括夹具 —— 替产品决定"这一档该多亮"）。
+    @Environment(\.colorScheme) private var colorScheme
 
     /// 两个来源**取或**（R12）。这一段以前只读系统开关，而全仓其他地方读的是
     /// `MotionCatalog.motionShouldBeReduced`（系统开关 ∪ VoiceOver）⇒
@@ -445,10 +448,18 @@ struct SegmentedFilterPicker: View {
                 in: CGRect(origin: .zero, size: geo.size),
                 count: allCases.count,
                 index: idx)
-            VisualShape.rounded(VisualRadius.control)
-                .fill(VisualMaterial.selectedSegment)
-                .frame(width: rect.width, height: rect.height)
-                .position(x: rect.midX, y: rect.midY)
+            ZStack {
+                VisualShape.rounded(VisualRadius.control)
+                    .fill(VisualMaterial.selectedSegment)
+                if let lift = SegmentKnob.liftAlpha(dark: colorScheme == .dark) {
+                    // **同一颗形状再盖一层**，而不是换一种颜色：抬量必须压在 R333 那枚语义基准之上，
+                    // 这样"平台惯例那一枚"与"盖掉轨道漂移的那一点量"是两件事，各自能被刀指着改。
+                    VisualShape.rounded(VisualRadius.control)
+                        .fill(Color.white.opacity(lift))
+                }
+            }
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
                 .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: selection)
         }
     }

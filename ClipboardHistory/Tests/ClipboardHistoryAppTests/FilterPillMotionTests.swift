@@ -124,4 +124,54 @@ final class FilterPillMotionTests: XCTestCase {
             source.components(separatedBy: "FilterPillMotion.hoverFill(isHovered:").count - 1, 1,
             "悬停底色没人读 ⇒ 减弱动态时这一段又回到'只有缩放'，也就是零反馈")
     }
+
+    /// 选中那颗的**抬量**按色档分叉（R339 / BACKLOG 411）：暗档在语义基准之上再盖一层白色，
+    /// 亮档不盖。三句话各拦一种坏法：
+    /// ① 暗档必须真的读到那个令牌（`liftAlpha(dark: true)` 改成 `nil` = 把本轮的修法删掉，
+    ///    而它在**本机像素上不会红** —— 本机页底 30 时轨道 52、那颗 70 仍然差 +18，
+    ///    这正是 runner 那 8 跑的盲区：绝对电平只在"页底恰好 30"的那台机器上成立）；
+    /// ② 亮档必须是 `nil`（"顺手两档都盖"会把亮档的选中推出纸白 —— 230 的亮轨道再抬 25%
+    ///    就顶到 255，选中与空白分不开，而亮档欠的是换一条轴，记在 BACKLOG 399）；
+    /// ③ α 的两条边界必须是**实测**数夹出来的区间，写成会红的算术而不是注释（下面那一格）。
+    /// 屏幕上那一半不在这里证：`UICaptureHarness.testSelectedPillStaysAboveItsTrackOnEveryBacking`
+    /// （同一条夹具通道铺三档人造页底，逐档量「选中 − 轨道」）。
+    func testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken() {
+        XCTAssertEqual(SegmentKnob.liftAlpha(dark: true), VisualMaterial.selectedSegmentLiftWhite,
+                       "暗档必须盖那一层：不透明基准停在解析值 70，而轨道跟着页底漂（30→52、50→70、真机 51→81）"
+                       + " ⇒ 在页底 50 的机器上两者读成同一个灰阶，『哪颗被选中』就没有读者了（BACKLOG 411）")
+        XCTAssertNil(SegmentKnob.liftAlpha(dark: false),
+                     "亮档不许被顺手统一成叠加：白色压在 230 的亮轨道上会把选中顶到纸白，"
+                     + "选中与空白又分不开（亮档欠的是换轴，见 BACKLOG 399）")
+    }
+
+    /// **α=0.20 是两条实测边界夹出来的区间中位**，不是试出来的数。
+    /// 两头都有牙：往下调撞①（盖不过已测到最亮那条轨道），往上调撞②（超过平台自己那颗选中）。
+    func testSelectedSegmentLiftAlphaIsTheSandwichSolvedFromMeasuredTracks() {
+        let alpha = VisualMaterial.selectedSegmentLiftWhite
+        let base = 70.0              // R331/R333 现读的解析值，两机同读（不随页底动）
+        let brightestTrack = 97.0    // 本轮 `SEG_PILL_BACKING` 三档里最亮那条轨道（页底 80 那档）
+        let systemKnob = 109.0       // 同一轮 `SEGREF_POLARITY dark` 在 runner 现读的系统那颗
+        let pill = base + alpha * (255.0 - base)
+        XCTAssertGreaterThan(pill, base, "叠加必须让那颗更亮，不然这一格量的是一条恒等式")
+        // ① 下界：盖过最亮那条实测轨道 + 仓库自己的『分不开』线 8/255（真机那把尺的 DELTA）。
+        XCTAssertGreaterThanOrEqual(pill - brightestTrack, 8.0,
+            "抬量之后那颗只算到 " + String(format: "%.1f", pill) + "，比最亮那条轨道（"
+                + String(format: "%.0f", brightestTrack) + "）只高 "
+                + String(format: "%.1f", pill - brightestTrack) + "，低于『分不开』线 8"
+                + " ⇒ 那一档页底上还是看不出哪颗被选中")
+        // ② 上界：不许比平台自己那颗选中更亮（参照臂现读 109）。
+        XCTAssertLessThanOrEqual(pill, systemKnob,
+            "抬完算到 " + String(format: "%.1f", pill) + "，已经盖过系统那颗现读的 "
+                + String(format: "%.0f", systemKnob) + " ⇒ 越过了参照臂，选中变成一块我自己的颜色")
+        // 区间不是单点：三个两位小数可用，取正中那个 —— 这一条拦『把边界说成唯一解』的措辞。
+        let candidates = (10...40).map { Double($0) / 100.0 }.filter {
+            let p = base + $0 * (255.0 - base)
+            return p - brightestTrack >= 8.0 && p <= systemKnob
+        }
+        XCTAssertGreaterThanOrEqual(candidates.count, 2,
+            "边界只该有一个候选时说明我把区间写窄了（现数出来 "
+                + String(candidates.count) + " 个：" + candidates.map { String($0) }.joined(separator: " ") + "）")
+        XCTAssertEqual(alpha, candidates[candidates.count / 2],
+                       "α 必须取那一段可行两位小数的中位（现取 " + String(alpha) + "）")
+    }
 }

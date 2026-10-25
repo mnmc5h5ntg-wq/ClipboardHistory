@@ -43,7 +43,7 @@ ROWS = [
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。
 READINGS = re.compile(r"^(CARD_[A-Z_]+|HEATMAP_[A-Z_]+|PROBE_[A-Z_]+|LUMA_[A-Z_]+)="
-                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* |^HOVER_[A-Z_]+ |^HTML_[A-Z_]+ |^MD_RENDER_COST ")   # R103：证人那一行是空格分隔的读数，不是 key=
+                   r"|^CARD_PROBE_[A-Z_]+ |^QUICKPICK_|^SELECTION_|^MENUBAR_GLYPH |^MENU_LIVE_REFRESH |^SIDEBAR_ICON_[A-Z_]+ |^TEXT_SIDE[A-Z_]* |^SIDEBAR_ROSTER[A-Z_]* |^MOTION_PILL_[A-Z_]+ |^SEGREF_[A-Z_]* |^MOTION_SCENARIO_[A-Z_]* |^HOVER_[A-Z_]+ |^HTML_[A-Z_]+ |^MD_RENDER_COST |^SEG_PILL_[A-Z_]* ")   # R103：证人那一行是空格分隔的读数，不是 key=；R339：`SEG_PILL_BACKING` 同一形状，不补进来 §8 就一行都没有
                    # R336：`MD_RENDER_COST` 第一次进名单 —— 它是「402 判不装上限量」那一格的**唯一数**，
                    # 判据卷打印（不在捕获卷），所以搬运口必须同时吃得下两本日志（R336 的 §8 就是合并读）。
                    # 为什么不写成 `^MD_`：这一族今天只有这一支，按前缀整族补会让将来任何一行

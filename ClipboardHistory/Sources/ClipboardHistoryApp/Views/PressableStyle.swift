@@ -85,6 +85,29 @@ enum SelectedInk {
     }
 }
 
+/// 分段控件里**被选中那一颗**的画法（R339 / BACKLOG 411）。
+///
+/// 为什么住在这里而不写进视图：`SelectedInk` / `HoverInk` 同一族规矩 —— 换算留在纯函数里，
+/// 视图只留"照着放"那一句，于是"暗档要盖、亮档不盖"这一支选择能被真值表逐格点名
+/// （`FilterPillMotionTests.testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken`）。
+///
+/// 为什么要盖一层：基准那枚语义色停在解析值 70，而它要压的轨道是 `.quaternary` 叠在页面底色上的，
+/// 会跟着页底漂（本机离屏 52 / runner 70 / R330 真机 81）⇒ 差 70−轨道 在页底 50 的机器上正好归零，
+/// runner 连挂 8 跑的那朵红就是它。为什么**不是**整颗改成叠加（本轮第一版，被另一条判据当场否掉）：
+/// 叠加的差 = α(255−轨道) 在轨道已经发白的地方自己先归零，而这条离屏通道在侧栏里不平滑那层材质、
+/// 暗档轨道现读 **255** ⇒ 两态帧之间一个字都没差，`FILTER_PILL_BAND` 那条"换 filter 画面必须动"红了。
+/// 亮档不盖：抬量压在 230 的亮轨道上会把选中推出纸白，而亮档欠的是换一条轴（BACKLOG 399）。
+enum SegmentKnob {
+    /// 暗档盖在基准之上的白色叠加量；**亮档是 `nil`** = "不盖"。
+    ///
+    /// 为什么摊成 `Double?` 而不是直接给 `Color`：`Color` 的相等比较在 SDK 里不可靠
+    /// （`opacity` 包的是提供方，两次数值相同的颜色不必判等），于是"亮档不许被顺手统一成叠加"
+    /// 这句话在真值表里就没有能红的形状。摊成一个可选数，它才是一格判据。
+    static func liftAlpha(dark: Bool) -> Double? {
+        dark ? VisualMaterial.selectedSegmentLiftWhite : nil
+    }
+}
+
 /// 按钮样式：把 `configuration.isPressed` 翻成缩放 + 底色。
 ///
 /// 形状由调用方给，因为这一家的按钮形状本来就不一样（圆图标、圆角矩形行、胶囊里的段）。
