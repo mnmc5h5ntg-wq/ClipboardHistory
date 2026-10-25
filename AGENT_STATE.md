@@ -14,7 +14,7 @@
 
 ## R384 状态（2026-10-26 · 本地 · 第 383 轮 / Round 381）：R383 两跑分诊 + 能力闸门；登录项失败回执改为错误色（产品 1 文件，动效主线）
 
-最后更新：2026-10-26（本地 · R384 / 第 383 轮 / Round 381）：`40228710640 ↔ 02e89cf`、`40228793715 ↔ 0f408a8` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；R382 的权重判据已过（runner `288/115` 对 `607/195`），R383 的快捷键判据在 runner 上整页平涂（`SHORTCUT_RESET_STATE 默认 0/2` 对 `0/2`）⇒ 加内容区墨能力闸门（本机 62696/64756；不足走 `SHORTCUT_RESET_NOT_RUN=flat-page`），本机判据全绿，重推复验留给下一轮。产品位：登录失败回执与「不支持」说明同色，加 `lastActionFailed` + 动态错误色（亮纯红 / 暗 `1.0,0.48,0.44`；纯红暗档 2.87 低于 caption 地板、深红亮档 9.88 高于天花板，三跑才落带内）；182 张帧 `same=180 changed=2`，两张只动失败回执行。`M1015` CAUGHT；`M177` 因本轮产品改动重钉并 CAUGHT；r78 M417 重钉 6/6 ⇒ `HIDDEN_ARMS … rot=4 … 上界 rot=4 … 处置=ok`（5→4）。真机隔离启动判掉 `content-empty` 图标夹子的离屏裁切（真机完整，未改产品）。`swift build --build-tests` 告警 **0**；全量 `Executed 1034 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 383` 现读）。
+最后更新：2026-10-26（本地 · R384 / 第 383 轮 / Round 381）：`40228710640 ↔ 02e89cf`、`40228793715 ↔ 0f408a8` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；R382 的权重判据已过（runner `288/115` 对 `607/195`），R383 的快捷键判据在 runner 上整页平涂（`SHORTCUT_RESET_STATE 默认 0/2` 对 `0/2`）⇒ 加内容区墨能力闸门（本机 62696/64756；不足走 `SHORTCUT_RESET_NOT_RUN=flat-page`），本机判据全绿，重推复验留给下一轮。产品位：登录失败回执与「不支持」说明同色，加 `lastActionFailed` + 动态错误色（亮纯红 / 暗 `1.0,0.48,0.44`；纯红暗档 2.87 低于 caption 地板、深红亮档 9.88 高于天花板，三跑才落带内）；182 张帧 `same=180 changed=2`，两张只动失败回执行。`M1015` CAUGHT；`M177` 因本轮产品改动重钉并 CAUGHT；r78 M417 重钉 6/6 ⇒ `HIDDEN_ARMS … rot=4 … 上界 rot=4 … 处置=ok`（5→4）。真机隔离启动判掉 `content-empty` 图标夹子的离屏裁切（真机完整，未改产品）。`swift build --build-tests` 告警 **0**；全量 `Executed 1034 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 383` 现读）。
 
 本轮做了什么：
 ① ⓪ CI 分诊：两跑 failure；全部失败步骤 + 步骤名直方图 + 按步骤取正文 + 改动前 success 对照 ⇒ R382 权重判据已过、R383 快捷键判据是平涂能力缺席。
@@ -27,7 +27,7 @@
 
 NOT-RUN（分开写）：① **重推后的 runner 复验**没读（这一笔推送之后那一跑要下一轮 ⓪）；② runner 的快捷键判据在能力闸门下会走具名 `SHORTCUT_RESET_NOT_RUN=flat-page`，不是判绿；③ 亮档真机腿仍没跑（系统外观=dark；本轮的隔离真机只看了暗档空态）；④ 剩 4 根 rot 未重钉（r33 M147、r64 M340/M341、r77 M411）。
 
-下一轮（R385）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回；确认 `Swift tests` / `Capture gate` 两朵消失或具名 NOT-RUN）；① 继续 367（从 r64 M340/M341 或 r77 M411 起，先看 `HIDDEN_ROT`）；② 回产品动效面再点一个真实位。
+下一轮（R385）的靶：⓪ 读队列（`d38ea10 ↔ 40234023212` 状态=in_progress；确认 `Swift tests` / `Capture gate` 两朵消失或走具名 `SHORTCUT_RESET_NOT_RUN=flat-page`；`02e89cf ↔ 40228710640`、`0f408a8 ↔ 40228793715` 两跑的 failure 已按流程读完 —— 权重判据已过、快捷键判据是平涂页无读数；`43ff699 ↔ 40221947072` 是改动前 success；in_progress 是第三种态，不许读成「没红」）；① 继续 367（从 r64 M340/M341 或 r77 M411 起，先看 `HIDDEN_ROT`）；② 回产品动效面再点一个真实位。
 
 ## R383 状态（2026-10-26 · 本地 · 第 382 轮 / Round 380）：CI 两跑分诊 + 快捷键三颗「恢复默认」禁用态；367 rot 8→5（产品 1 文件，动效主线）
 
