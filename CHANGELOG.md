@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 426 第七批：r308 迁到 diff 回读，六臂全 CAUGHT；空刀探测开单 432（读数口径 0/134，暂不硬造）（R369 / U-1288…U-1290 · 产品 0 文件，判据账）
+
 ### 426 第六批：r307/r309 迁到 diff 回读；r310 的 M906 落刀后三组数一个没动 ⇒ 空刀退役（R368 / U-1285…U-1287 · 产品 0 文件，判据账）
 
 ### 426 第五批：r313/r337 迁到 diff 回读（Python 侧的刀同样成立），七臂全 CAUGHT（R367 / U-1282…U-1284 · 产品 0 文件，判据账）

@@ -28,6 +28,8 @@ import re
 import subprocess
 import sys
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TOKENS = 'ClipboardHistory/Sources/ClipboardHistoryApp/Utilities/VisualTokens.swift'
 CELL = 'ClipboardHistory/Sources/ClipboardHistoryApp/Views/DailyCopyHeatmapView.swift'
@@ -131,11 +133,9 @@ def run_arm(arm_id, why, target, needle, repl, want_fail, want_text):
     try:
         write(target, original.replace(needle, repl, 1))
         after = read(target)
-        # 回读自证：删臂（替换串为空）时 `"abc".count("")` 不是 0 而是 len+1 ⇒ 会把一次真落刀
-        # 读成"回读不是那一刀"。删臂要判的是**needle 没了**，不是"替换串出现一次"。
-        ok = (after.count(repl) == 1) if repl else (after.count(needle) == 0)
-        if not ok or after == original:
-            print('%s NOT_RUN 落刀后回读不是那一刀' % arm_id, flush=True)
+        # R369 / 426：判「盘上恰好等于预期 diff」（删臂也成立），不判替换串出现几次。
+        if not single_substitution_lands(original, needle, repl, after):
+            print('%s NOT_RUN 落刀后回读与预期 diff 不一致' % arm_id, flush=True)
             return 'NOT_RUN'
         ran, fails, text = run_swift()
     finally:

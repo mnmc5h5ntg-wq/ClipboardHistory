@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 368 轮（R369 · 2026-10-25 · U-1288…U-1290）：426 第七批 —— r308 迁到 diff 回读，六臂全 CAUGHT；空刀探测开单 432（U-1288…U-1290 · 产品 0 文件，判据账）
+
+- **U-1288：r308（六把热图悬停刀，Swift 侧）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R308_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`，红线落在 `testHoverLeavesTheDataPixelsUntouched` / `testHoverChangesOnlyTheRingBand` / `testHoverIsNotLouderThanOneDataStep` / `testRingBandSelectorIsATruthTable` / `testGridCellsRouteThroughTheProductCellView` 这几个期望格子上（跑=13）。
+- **U-1289：迁移面现读 15 张。**（r308/r312/r313/r337/r338/r339/r345/r348/r355/r356/r358/r360/r307/r309/r310）；其中 Swift 侧从三张扩到四张 —— diff 判法在两门语言上都兑现。
+- **U-1290：空刀探测今天造不出来，开 432。** 通用探测需要每张表声明一个读数口径（落刀前后各跑一次、数不变即点名）；现读声明数 **0/134** ⇒ 不是「不愿造」，是没有对象先声明，硬造只会得到一把恒绿的尺。M906 的现场（R368）是它第一个证人，设计写进 BACKLOG 432。
+
 ## 第 367 轮（R368 · 2026-10-25 · U-1285…U-1287）：426 第六批 —— r307/r309/r310 迁到 diff 回读；r310 的一把空刀退役（U-1285…U-1287 · 产品 0 文件，判据账）
 
 - **U-1285：r307（四把门刀）与 r309（六把读数刀）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R307_MUTATE 刀=4 CAUGHT=4`、`R309_MUTATE 刀=6 CAUGHT=6`，两表 `RESTORE_CLEAN=yes`。

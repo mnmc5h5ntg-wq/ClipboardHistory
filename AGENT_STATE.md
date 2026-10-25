@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R369 状态（2026-10-25 · 本地 · 第 368 轮 / Round 366）：426 第七批 —— r308 迁到 diff 回读；空刀探测开单 432（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R369 / 第 368 轮 / Round 366）：r308 只换落刀后的回读那一行；`刀=6 CAUGHT=6 NOT_RUN=0 RESTORE_CLEAN=yes`；电池 Ran 664（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；迁移面 15 张（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`452f5a3`、`cc9eb1e` 两跑 success；`7ad22cf`、`19f91e2`、`f9df01e`、`3c84fc8` 仍在队里（只登记不轮询）。
+② 426 第七批：r308（六把热图悬停刀，Swift 侧）迁 `single_substitution_lands`。
+③ 六臂全 CAUGHT，红线在五个热图悬停用例上（跑=13）。
+④ 空刀探测：不硬造 —— 需要 134 张表各有 `READOUT` 声明，现读 0 张；判断与形状写进 BACKLOG 432。
+
+验证读数（现读）：`R308_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R366 日志）；脚本电池 `Ran 664（skipped=4）OK`；产品面连续零改动 **14** 轮（`python3 scripts/product_streak.py --streak-for 368` 现读）。
+
+NOT-RUN（分开写）：① 全量卷没重跑（只动 .scratch 一张表）；② 432 的探测器未实现（0/134 无对象）；③ 真机腿没跑。
+
+下一轮（R370）的靶：⓪ 读队列四跑；① 给 hidden_arms 家族三张表声明 `READOUT` 并实现 432 的第四态（先只对这三张生效）；② 426 第八批（r306 这类 mixed 表）。
+
 ## R368 状态（2026-10-25 · 本地 · 第 367 轮 / Round 365）：426 第六批 —— r307/r309 迁到 diff 回读；r310 一把空刀退役（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R368 / 第 367 轮 / Round 365）：r307 `4/4`、r309 `6/6`；r310 先跑出 `5/6`（M906 落刀后 `HIDDEN_ARMS` 三组数一个没动）⇒ 退役后重跑 `5/5`；电池 Ran 664（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
