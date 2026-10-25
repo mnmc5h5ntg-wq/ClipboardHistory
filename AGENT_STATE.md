@@ -40,6 +40,14 @@ NOT-RUN（分开写）：① runner 对 R355 修复与 R356 尺改动的读数�
 下一轮（R357）的靶：⓪ 读 CI（`5515daf` / `da5f8a7` 两跑）→ ① 387① / 376 / 367 → ② 426（刀的 diff 判法）与 428（`ci_read.py queue`）→
 ③ 若 runner 的 `MOTION_PILL_RAMP_GEOM` 到位：给覆盖率定地板（两机同数之后）。
 
+**R356 追记（读 R355 两跑，现读）**：`40194321798 ↔ 5515daf` 与 `40194348175 ↔ da5f8a7` 都 `failure`，
+**但红的不是动效那一步**：`STEP[9] Release script tests` 先红 —— `FINAL_REPORT_SOURCES_CELL_STALE`（那一格还写 R348/`4b8f014`，
+而 `5515daf` 动了 Sources）。STEP[10…] 因此全部 skipped ⇒ **R355 的 reduce 修复在 runner 上还没有被读过**。
+成因是提交顺序：Sources 格在提交前刷、而它比对的是 git HEAD，产品提交一落地那格就过期；
+R348 的追记当年刷过，R355 的追记漏了。R356 这笔已把 Sources 格刷到 R355/`5515daf`（本机电池绿），
+`40195807519 ↔ df35274` 才是第一次能走到 `Motion coverage floor` 的一跑；下一轮第 ⓪ 条读它。
+教训：**产品提交之后的追记必须重跑 `scripts/report_sources_cell.py --write` 再推**。
+
 ## R355 状态（2026-10-25 · 本地 · 第 354 轮 / Round 352）：runner 六连红结案 —— reduce 下空态淡入被归零（产品 1 文件，判据账）
 
 最后更新：2026-10-25（本地 · R355 / 第 354 轮 / Round 352）：六跑全 failure、唯一红在 `Motion coverage floor`
