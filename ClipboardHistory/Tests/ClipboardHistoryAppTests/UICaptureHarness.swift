@@ -7013,7 +7013,7 @@ final class UICaptureTests: XCTestCase {
                      + " 对比=\(String(format: "%.3f", contrast))"
                      + " 线=差≥\(Self.indistinguishableStep255)且对比≥1.100"
                      + (appearance == .darkAqua ? "（门）"
-                        : "（只印不判：亮档极性两机反号，见 D-325/BACKLOG 399）"))
+                        : "（只印不判：亮档极性两机反号，见 D-325；399 已于 R347 结案 —— 身份搬到了边界那一轴）"))
                 guard appearance == .darkAqua else { continue }
                 XCTAssertGreaterThanOrEqual(step, Self.indistinguishableStep255,
                     "暗档 页底=\(backing.level)（\(backing.provenance)）：选中那颗只比轨道亮 \(step)/255，"
