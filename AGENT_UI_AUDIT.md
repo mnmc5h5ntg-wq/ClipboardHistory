@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 366 轮（R367 · 2026-10-25 · U-1282…U-1284）：426 第五批 —— r313/r337 迁到 diff 回读，七臂全 CAUGHT（U-1282…U-1284 · 产品 0 文件，判据账）
+
+- **U-1282：r313（三把 Python 守卫刀）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R313_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`，基线 `跑=8 失败=0`。
+- **U-1283：r337（四把台账引用刀）也迁到同一判法。** `MUTATE_TABLE n=4 caught=4 escaped=0 not_run=0 RESTORE_CLEAN=yes`（表自己印的旧形状汇总行与 `CAUGHT=4/4` 同时成立）；M992 的红分两格（引用格 + ITEM 同一颗尺），与入账时一致。
+- **U-1284：迁移面现读 11 张。** 单针与多针表里已有 11 张在 diff 判法上（r312/r313/r337/r338/r339/r345/r348/r355/r356/r358/r360）；剩下的历史表与多针表未动。本轮两张表都是 **Python 侧**的刀 —— 回读判法与语言无关，换的是「盘上是不是那一份」这句话。
+
 ## 第 365 轮（R366 · 2026-10-25 · U-1279…U-1281）：426 第四批 —— r312 迁到 diff 回读，三臂全 CAUGHT（U-1279…U-1281 · 产品 0 文件，判据账）
 
 - **U-1279：r312 的三把刀迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；needle / 替换文 / 期望格子一字未动。重跑 `R312_MUTATE 刀=3 CAUGHT=3 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`。

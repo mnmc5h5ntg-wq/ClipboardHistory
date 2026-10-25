@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R367 状态（2026-10-25 · 本地 · 第 366 轮 / Round 364）：426 第五批 —— r313/r337 迁到 diff 回读（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R367 / 第 366 轮 / Round 364）：两张表只换落刀后的回读那一行；`3/3`、`4/4` 全 CAUGHT、`RESTORE_CLEAN=yes`；电池 Ran 664（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；迁移面 11 张（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`563c0ed`（R365）已 success（24/24=100%，见上轮追记）；`452f5a3`、`cc9eb1e`、`7ad22cf` 仍在队里（只登记不轮询）。
+② 426 第五批：r313（守卫三刀）、r337（台账引用四刀）迁 `single_substitution_lands`。
+③ 七臂重跑：M911…M913、M989…M992 全 CAUGHT；两表 RESTORE_CLEAN。
+④ 读数：两张表都是 Python 侧的刀 ⇒ diff 判法不依赖语言。
+
+验证读数（现读）：`R313_MUTATE 刀=3 CAUGHT=3`、`MUTATE_TABLE n=4 caught=4`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R366 日志）；脚本电池 `Ran 664（skipped=4）OK`；产品面连续零改动 **12** 轮（`python3 scripts/product_streak.py --streak-for 366` 现读）。
+
+NOT-RUN（分开写）：① 全量卷没重跑（本轮只动 .scratch 两张表，Swift 一行未改；读数取自 R366 日志）；② 多针表与其余历史表的迁移；③ 真机腿没跑。
+
+下一轮（R368）的靶：⓪ 读 `452f5a3` / `cc9eb1e` / `7ad22cf` 的跑；① 426 第六批（r306–r310 那几张四到六臂的表），或先把多针表的 diff 形状写成 helper；② 367 的下一批要先重钉死针再声明。
+
 ## R366 状态（2026-10-25 · 本地 · 第 365 轮 / Round 363）：426 第四批 —— r312 迁到 diff 回读（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R366 / 第 365 轮 / Round 363）：r312 只换落刀后的回读那一行；三臂重跑 `CAUGHT=3 NOT_RUN=0 RESTORE_CLEAN=yes`；全量 1031 格 0 失败、电池 Ran 664（skipped=4）OK；单针表 9 张在新判法上（产品 0 文件 · 判据账）

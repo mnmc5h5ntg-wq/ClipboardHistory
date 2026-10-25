@@ -24,6 +24,8 @@ import re
 import subprocess
 import sys
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET = u"scripts/tests/test_ledger_citations.py"
 MODULE = u"scripts.tests.test_ledger_citations"
@@ -91,8 +93,8 @@ def run_arm(arm_id, why, target, needle, repl, want_fail, want_text, module):
         return u"NOT_RUN"
     try:
         write(target, original.replace(needle, repl, 1))
-        if read(target).count(repl) != 1:
-            print(u"%s NOT_RUN 落刀后回读不是那一刀" % arm_id, flush=True)
+        if not single_substitution_lands(original, needle, repl, read(target)):  # R367 / 426：diff 判法
+            print(u"%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm_id, flush=True)
             return u"NOT_RUN"
         ran, fails, text = run_py(module)
     finally:
