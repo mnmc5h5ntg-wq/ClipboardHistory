@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 376 轮（R377 · 2026-10-26 · U-1314…U-1317）：434 结案 —— 读数通道装上有界等待（M1010 CAUGHT）；r56 十把刀第一次进针预检（U-1314…U-1317 · 产品 0 文件，判据账）
+
+- **U-1314：`boundedChannelProbe` 落地。** 守卫里「发两行 + 读回全文」那一段以前跑在主线程上 ——通道一死锁，判据就不是变红而是挂住（R374 的 6:29）。现在整段放进后台队列，主线程最多等 5 秒；超时走具名出口 `READOUT_CHANNEL_BLOCKED`（不是「没变化」）。**正对照同一格**：合成一个闸门永不打开的动作、给 50ms 截止，必须判超时**且**不交回半个结果（断言完再放行闸门）。第一版用的是 `Thread.sleep(0.3)` —— 电池里 `wait_scan` 名册当场点名「未登记的固定挂钟等待」，连带的 `skip_roster` 内层汇总也一起红（内层那一卷读不到结论行）⇒ 换成确定性闸门。守卫现读 `passed (0.090 seconds)`；`swift build --build-tests` 告警 **0**。
+- **U-1315：M1010 把「阻塞」变成可判的红。** 新刀在 `CaptureReadings.emit(_:to:)` 里 sleep 30s（写文件之前就返回不了），现读 `CAUGHT 红得对=True 命中=['READOUT_CHANNEL_BLOCKED'] 还原干净=True`、表尾 `还原后复跑（Swift 守卫）：ESCAPED`、`EXIT=0`。这把刀与 M278 分得开：M278 是「写不进去」（读文件那一格红），M1010 是「写之前就不返回」（只有 deadline 能救）。
+- **U-1316：r56 的十把刀第一次进针预检。** 三处一起漏：① 表**没登记**进 `TABLES`（`TABLE_ROSTER` 一直点名 `mutate_r56_readings_channel(9)`）；② 抽取器不认识它的五元组形状`(编号, 说明, 文件, kind, 原文, 变异文, filter, heads)`，把 kind 当 needle；③ `.yml` 不算源文件 ⇒ 打在 `ci.yml` 上的四把刀连「抽不出来」都不算。三处都修后现读 `mutate_r56_readings_channel M1010 ok；M277 ok；…；M285 ok`、`NEEDLE_PRECHECK tables=135 covered=118 arms=386 bad=0`；未登记缺口 75/423 → **74/414**（`test_the_roster_gap_is_pinned_to_the_measured_number` 的地板同笔改，红话写明「改账之前先看清是哪张表」）。
+- **U-1317：守卫头上那段注释写了两遍。** 92–95 行是同一段（含同一条 BACKLOG 79 理由）复制了两份 ——这次改动落在它紧邻的位置才看见，同笔去重；不动任何断言。
+
 ## 第 375 轮（R376 · 2026-10-26 · U-1310…U-1313）：M278 的挂点是刀文自己 —— return 吞掉 lock.lock()；433 结案、超时补杀子孙树（U-1310…U-1313 · 产品 0 文件，判据账）
 
 - **U-1310：M278 的挂点抓到了，不在产品里，在刀文里。** 落刀后 30s `sample <pid>` 连抓三跑，栈都停在 `CaptureReadings.swift:76 lock.lock()`；编译器同一份合成文本给出的原文是 `warning: expression following 'return' is treated as an argument of the 'return'`。旧刀文是「针 + 一行 `return   // MUTANT`」，而针后面紧跟着 `lock.lock()` ⇒ Swift 把它解析成 `return lock.lock()`：第一刀**真的把 NSLock 拿走了**，然后直接返回，`defer { lock.unlock() }` 永不执行 ⇒ 同一进程第二次 `emit` 死等。R374 的 6:29 与 R375 的 180s 超时都是这一条；它既不是产品缺陷，也不是守卫没牙。

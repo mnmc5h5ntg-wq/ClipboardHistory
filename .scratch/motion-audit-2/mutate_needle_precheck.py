@@ -45,7 +45,8 @@ TABLES = [
             "mutate_r356",
             "mutate_r358",
             "mutate_r360",
-            "mutate_r365"]
+            "mutate_r365",
+            "mutate_r56_readings_channel"]
 # R355 / BACKLOG 430：这一格以前只认 **三位** 刀号（`M\d{3}`），而仓库从 R345 起已经在用四位
 # （M1001…）：`arm_sites` 认不出 id ⇒ 整张表被读成「静态抽不出 needle」⇒ 那几把刀**从来没被针预检查过**
 # （R355 自己那把 M1005 就是这么发现隐形的；同一次把 r348 的旧针重钉了）。四位只许往后长，不再加第二位边界。
@@ -113,7 +114,9 @@ def is_source(path):
     """
     # R296：门本体的刀住在 bash 里（mutate_r296 的 M863 改的是 scripts/warning_gate.sh），
     # 白名单漏 .sh ⇒ 那把针恒报「命中 0」，预检 exit 1 —— 尺看不见不等于针不存在。
-    return path.endswith((".swift", ".py", ".sh"))
+    # R377：r56 有四把刀打在 `ci.yml` 的并集整段上。`.yml` 不算源文件时，那四根针
+    # 连"抽不出来"都不算，直接从覆盖面里消失（printed 行里只出现 6 把，而不是 10 把）。
+    return path.endswith((".swift", ".py", ".sh", ".yml", ".yaml"))
 
 
 
@@ -139,6 +142,12 @@ def arm_sites(arm, default_path):
     third, fourth = arm[2], arm[3]
     if isinstance(third, str) and is_source(third):
         path = third
+        # 第五种形状（R377 现读 r56）：`(编号, 说明, 文件, kind, 原文, 变异文, filter, heads)`。
+        # 旧版把 kind 那一格当 needle（"swift"），于是它命中 0 次 —— 而 r56 从来没登记进 TABLES，
+        # 这条错从来没有被打印出来（R377 补登记时才发现）。
+        if isinstance(fourth, str) and fourth in ("swift", "python", "ci", "recapture", "bash") \
+                and len(arm) > 4 and isinstance(arm[4], str):
+            return (mid, path, [arm[4]])
         if isinstance(fourth, str):
             return (mid, path, [fourth])
         if isinstance(fourth, (list, tuple)):

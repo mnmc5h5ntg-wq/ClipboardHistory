@@ -239,7 +239,10 @@ class MutateArmRegistryTests(unittest.TestCase):
                              u"写死绝对路径的正对照没被点名 ⇒ 上面那条守卫是恒真的")
 
     def test_the_roster_gap_is_pinned_to_the_measured_number(self):
-        """BACKLOG 310 的地板（R264 现读）：**75 张表声明了臂却没登记进 `TABLES`，共 423 把刀**。
+        """BACKLOG 310 的地板（R377 现读）：**74 张表声明了臂却没登记进 `TABLES`，共 414 把刀**。
+        （R264 是 75 / 423；R377 把 `mutate_r56_readings_channel` 真的登记进去、并让抽取器认得它的
+        五元组形状与 `.yml` 目标 —— 它那 10 把刀此前**从来没被针预检覆盖过**，其中 6 把连着两次
+        CAUGHT 的正是 R376 修的那把 M278。）
 
         撞号查重按 glob 扫全部表，而 needle 预检只走手写名册 ⇒ 未登记的表**静默不覆盖**：
         锚点腐烂（286 那一族）可以在它们身上重新长出来而报表一片绿。
@@ -253,11 +256,11 @@ class MutateArmRegistryTests(unittest.TestCase):
         arms = sum(n for _, n in gaps)
         detail = u"未登记表=%d 隐藏臂=%d；前几名 %s" % (
             tables, arms, u"、".join(u"%s(%d)" % (n, k) for n, k in sorted(gaps)[:6]))
-        self.assertEqual(75, tables,
-                         u"登记表与实存表的缺口变了（R264 现读 75）⇒ 要么有新表静默不覆盖，"
+        self.assertEqual(74, tables,
+                         u"登记表与实存表的缺口变了（R377 现读 74）⇒ 要么有新表静默不覆盖，"
                          u"要么真登记掉了 —— 两种都要改账。" + detail)
-        self.assertEqual(423, arms,
-                         u"缺口里的臂数变了（R264 现读 423）⇒ 同上，改账之前先看清是哪张表。" + detail)
+        self.assertEqual(414, arms,
+                         u"缺口里的臂数变了（R377 现读 414）⇒ 同上，改账之前先看清是哪张表。" + detail)
 
     def test_an_unregistered_table_that_declares_arms_is_named(self):
         """正对照：人造一张"声明了臂但没登记"的表 ⇒ 必须被点名（否则上面那个地板是在数空气）。"""

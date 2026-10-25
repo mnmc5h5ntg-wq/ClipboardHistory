@@ -118,6 +118,15 @@ MUTATIONS = [
      '            cat "$readings" >> /tmp/m.merged.log\n'
      "            mv /tmp/m.merged.log /tmp/motion.log\n",
      None, ["partial_stdout_loss_recovers_resolve"]),
+    # R377 / BACKLOG 434：通道阻塞的替身。守卫必须**变红**（有界等待），不许把整卷挂死。
+    # 这一支和 M278 的区别：M278 是「写不进去」，这一支是「写之前就不返回」——
+    # 前者读文件时红，后者只有 deadline 能救。
+    ("M1010", "emit 阻塞 30s（读数通道死锁的替身）", CAPTURE, "swift",
+     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n        lock.lock()\n",
+     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n"
+     "        Thread.sleep(forTimeInterval: 30)   // MUTANT: 通道阻塞 30s（死锁替身）\n"
+     "        lock.lock()\n",
+     GUARD, ["READOUT_CHANNEL_BLOCKED"]),
 ]
 
 

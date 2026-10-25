@@ -89,8 +89,29 @@ final class MotionFilmstripTests: XCTestCase {
     /// 而 44 处读数散在两种语境里 —— 与其到处写 `Self.emit`，不如让两条语境共用一个名字。
     private func emit(_ line: String) { Self.emit(line) }
 
-    /// 打一行读数，**并且**把它记进文件通道。所有 `MOTION_*` 行都必须走这里
-    /// （`testMotionReadingsUseTheFileChannel` 钉着这条规矩）。
+    /// 有界等待（R377 / BACKLOG 434）：把可能阻塞的通道动作放到后台，主线程最多等 `deadline` 秒。
+    ///
+    /// 为什么需要它：R374–R376 的现场是 xctest 在 `CaptureReadings.emit` 的锁上死等 ——
+    /// 6 分 29 秒没人收尸；换成 CI 就是整卷挂到 6 小时上限。判据在这里必须**变红**，
+    /// 而不是「看起来还在跑」。代价是通道动作挪到后台线程：所以返回的只许是**一份完整结果或 nil**，
+    /// 不许把半个字符串交回去当读数（超时那一路的断言就钉这一条）。
+    static func boundedChannelProbe(deadline: TimeInterval,
+                                    _ body: @escaping @Sendable () -> String?) -> (text: String?, timedOut: Bool) {
+        final class Box: @unchecked Sendable {
+            var text: String?
+            let done = DispatchSemaphore(value: 0)
+        }
+        let box = Box()
+        DispatchQueue.global(qos: .userInitiated).async {
+            box.text = body()
+            box.done.signal()
+        }
+        if box.done.wait(timeout: .now() + deadline) == .timedOut {
+            return (nil, true)
+        }
+        return (box.text, false)
+    }
+
     /// 打一行读数，**并且**把它记进文件通道。所有 `MOTION_*` 行都必须走这里
     /// （`testMotionReadingsUseTheFileChannel` 钉着这条规矩）。
     ///
@@ -3991,13 +4012,36 @@ final class MotionFilmstripTests: XCTestCase {
         //    这条判据就只是在读"有人写过这个文件"。
         let marker = "MOTION_SELFTEST_\(UUID().uuidString.prefix(8))"
         let second = marker + "-2"
-        emit(marker)
-        emit(second)
-        let text: String
-        do {
-            text = try String(contentsOf: Self.readingsURL, encoding: .utf8)
-        } catch {
-            XCTFail("文件通道没写出来（\(Self.readingsURL.path)）⇒ `emit` 只剩 print，BACKLOG 79 没修")
+        // R377 / BACKLOG 434：通道要在**有界等待**里跑。R374/R376 的现场是 xctest 在一把没被释放的锁上
+        // 死等 6:29 —— 那种坏法不该把整卷挂到 CI 的 6 小时上限，它应该红在这一格。
+        // 正对照：合成一个必然迟到的通道动作，有界等待必须判超时且**不交回半个结果**。
+        // 合成样本用**闸门**而不是挂钟（R377 现读）：固定 sleep 会被 wait-scan 名册当场点名，
+        // 而且它让「后台到底卡没卡住」取决于调度。闸门是确定性的：断言完再放行，线程不会留在闸上。
+        final class Gate: @unchecked Sendable {
+            let open = DispatchSemaphore(value: 0)
+        }
+        let gate = Gate()
+        let control = Self.boundedChannelProbe(deadline: 0.05) {
+            gate.open.wait()
+            return "迟到的结果"
+        }
+        XCTAssertTrue(control.timedOut,
+            "有界等待在合成的阻塞样本上没有超时 ⇒ 下面那句「通道没把判据挂死」什么都没说")
+        XCTAssertNil(control.text, "超时的那一路不许返回半个结果（否则上位判据会把它当完整读数）")
+        gate.open.signal()
+        let url = Self.readingsURL
+        let probe = Self.boundedChannelProbe(deadline: 5) {
+            CaptureReadings.emit(marker, to: url)
+            CaptureReadings.emit(second, to: url)
+            return try? String(contentsOf: url, encoding: .utf8)
+        }
+        guard !probe.timedOut else {
+            XCTFail("READOUT_CHANNEL_BLOCKED 文件通道 5s 内没有返回 ⇒ 整卷会被它挂死（BACKLOG 434）；"
+                + "R374 的 6:29 与 R376 的锁等待都是这个形状")
+            return
+        }
+        guard let text = probe.text else {
+            XCTFail("文件通道没写出来（\(url.path)）⇒ `emit` 只剩 print，BACKLOG 79 没修")
             return
         }
         let lines = text.split(separator: "\n").map(String.init)

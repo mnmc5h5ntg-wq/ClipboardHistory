@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 读数通道装上 5s 有界等待（超时具名 READOUT_CHANNEL_BLOCKED）+ M1010 证人；r56 十把刀首次进针预检，434 结案（R377 / U-1314…U-1317 · 产品 0 文件，判据账）
+
 ### M278 的挂点是刀文自己（return 吞掉 lock.lock()）；刀文自检 + 超时补杀子孙树，433 结案（R376 / U-1310…U-1313 · 产品 0 文件，判据账）
 
 ### 433 第一半：刀的崩溃安全还原 + 进程组硬超时；r56 两臂 CAUGHT、M278 以 180s 超时具名（R375 / U-1307…U-1309 · 产品 0 文件，判据账）

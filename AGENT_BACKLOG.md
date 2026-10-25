@@ -8723,3 +8723,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **434. 读数通道一旦阻塞，整卷会挂死而不是变红**（R376）
     症状（R374–R376 的真实样本）：xctest 在 `emit` 的锁上死等 6:29；强杀父进程后它被 launchd 收养，又活了 9 分钟；三次 `sample` 同栈。今天这条路径被「刀文自检」堵住了入口，但**读数通道本身没有超时**：任何一次真死锁都会让 `swift test` 挂到 CI 的 6 小时上限，而不是红一格。
     修法（下一格）：守卫里给 `emit` + 读文件加有界等待（后台队列 + 超时 `XCTFail`，超时要具名），并用一支 `sleep` 注入（在 emit 里 sleep 30s）作证「超时后变红而不是挂住」；本机可复现，前提是注入不改 `return`/锁的不变式。
+
+    434 追记（R377 · 结案）：`MotionFilmstripTests.boundedChannelProbe(deadline:)` 落地 —— 「emit 两行 + 读回全文」整段进后台队列，主线程最多等 5s，超时走具名出口 `READOUT_CHANNEL_BLOCKED`（不是「没变化」）。同一格的正对照：合成闸门（断言完再放行）+ 50ms 截止 ⇒ 必须超时且不交回半个结果；守卫现读 `passed (0.090 seconds)`。
+    证人 M1010（emit 写盘前 sleep 30s）：现读 `CAUGHT 红得对=True 命中=['READOUT_CHANNEL_BLOCKED'] 还原干净=True`、复跑 `ESCAPED`、表 `EXIT=0`。与 M278 的分界：M278 是「写不进去」，M1010 是「写之前就不返回」——前者读文件那格红，后者只有 deadline 能救。
