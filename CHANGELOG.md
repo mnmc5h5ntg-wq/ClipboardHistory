@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### r56 十臂全表首次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（R379 / U-1322…U-1324 · 产品 0 文件，判据账）
+
 ### 367 第三批：r40/r42 六把腐烂针重钉（六臂 CAUGHT），rot 27→21、上界同笔降；M188 旧刀编译不过记刀坏（R378 / U-1318…U-1321 · 产品 0 文件，判据账）
 
 ### 读数通道装上 5s 有界等待（超时具名 READOUT_CHANNEL_BLOCKED）+ M1010 证人；r56 十把刀首次进针预检，434 结案（R377 / U-1314…U-1317 · 产品 0 文件，判据账）
