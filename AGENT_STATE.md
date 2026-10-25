@@ -17,7 +17,7 @@
 最后更新：2026-10-26（本地 · R375 / 第 374 轮 / Round 372）：`knife_guard.py` + 6 格测试；r56 接线（启动恢复、逐臂备份、180s 进程组超时、CI 判词读汇总行）；三臂 `M279 CAUGHT / M281 CAUGHT / M278 NOT_RUN_TIMEOUT`，三臂还原干净、复跑守卫 ESCAPED；全量沿用 R374（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 676（skipped=4）OK（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：`357a763`（R374）已 success；`a17bc6a`（R373 追记）success；只登记不轮询。
+① ⓪ CI：`357a763`（R374）已 success；`a17bc6a`（R373 追记）success；本轮 `2ffc6d0 ↔ 40210881173`（queued、同 workflow 前面=2）与 `84e4381`（R374 追记）仍在队里；只登记不轮询。
 ② 433 第一半：备份/启动恢复/进程组超时 + 6 格正对照（`sleep 5` 对 1s 超时）。
 ③ r56 接线：预检前恢复、逐臂备份、`NOT_RUN_TIMEOUT`、CI 判词读汇总行（不读末行）。
 ④ 三臂现读；M278 挂起**可复现**（180s），下一格用 `sample` 抓栈。
