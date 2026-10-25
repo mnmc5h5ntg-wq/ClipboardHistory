@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R386 状态（2026-10-26 · 本地 · 第 385 轮 / Round 383）：最后两根腐烂针重钉，rot 2→0；M147 旧目标被重构掉、同义坏法换 `prefix(0)`（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R386 / 第 385 轮 / Round 383）：r77 `M411` 重钉到两行整块（R80 的 lowercased）⇒ `CAUGHT`；r33 `M147` 的旧目标 `gate: 8` 调用已被重构成 `inkContrast`（无 gate 参数），盘上同名 gate 抬到 250 只会 skip ⇒ 同义坏法换成「探针循环 `prefix(0)`」⇒ `CAUGHT`（`judged=0` 那条地板）；`HIDDEN_ARMS 表=227 可判=811 rot=0 … 处置=ok`，`ROT_CEILING` 2→0；r77 整表 9/10、**M406 NOT-APPLIED**（新腐烂针，已记 367）；全量沿用 R385（本轮没动 Swift）：`Executed 1036 tests, with 48 tests skipped and 0 failures`；电池 Ran 683（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：GitHub 链路断（`api=000` / apple=200，IPv4/IPv6 均断）⇒ `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R385 那一跑的 conclusion 全部 **NOT-RUN（网络）**；本地 ahead=4（`5166a2b`、`479dfaa`、补登记生成器那笔、本轮）。
+② 367 收口：M411 与 M147 重钉并各自 CAUGHT；rot 2→0、上界同笔降。
+③ 新发现：tier-profile 的墨 gate 抬高只会 skip（skip 吞掉「尺坏了」）⇒ 开 BACKLOG 435；r77 M406 锚点失效。
+④ 补登记 R381–R385 五支台账生成器（此前只在本机未跟踪），并把两笔提交 subject 修到守卫能读的形状。
+
+验证读数（现读）：`M411 CAUGHT`（`testEveryTwoStateRulerReadsBothAxes`）；`M147 CAUGHT`（`("0") is less than ("3") - light 档 18 条说明段探针一条都没判成`）；r77 整表 `抓到=9 未落地=1`（M406）；`HIDDEN_ARMS 表=227 可判=811 rot=0 抽不出=6 上界 rot=0 … 处置=ok`；全量 `Executed 1036 tests, with 48 tests skipped and 0 failures`（沿用 R385 日志）；电池 `Ran 683（skipped=4）OK`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 385` 现读）。
+
+NOT-RUN（分开写）：① CI 三跑结论未读（网络）；② 真机腿没跑；③ R385 那颗 `.selection` 过渡的过程仍无胶片证人；④ M406 未重钉；⑤ 435（skip 吞红）只开单未修。
+
+下一轮（R387）的靶：⓪ 网络恢复后先 `git push origin main`，再读 `40234023212`/`40234058148` 与本次推送那一跑的全部失败步骤，把 run id↔commit 成对写回本行；① 重钉 M406；② 收口 R385 过渡：造只拍按钮带的胶片场景（≥2 样本、1x/2x），并按 435 给 skip 出口加负半证人。
+
 ## R385 状态（2026-10-26 · 本地 · 第 384 轮 / Round 382）：两颗「恢复默认」的禁用切换接上 .selection 过渡 + 源形状守卫；367 再钉 r64 两根（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R385 / 第 384 轮 / Round 382）：R382/R383 的禁用态在默认↔动过之间硬切；给权重页与快捷键页两颗按钮挂 `MotionCatalog.animation(for: .selection)`（键分别是 `store.weights == .default` / `shortcut == settings.action.defaultShortcut`）。端态 182 张帧 `same=182 changed=0` ⇒ 过渡不改静态落点；**过程没有胶片证人 ⇒ 具名 NOT-RUN**（D-373），不把接线写成演过。源形状守卫 `testResetButtonDisabledTransitionsAreDriven` + 真值表；`M1016`/`M1017` 都 `CAUGHT`、还原干净。367：r64 M340/M341 重钉到 `appendLocked`（整表 6/6 CAUGHT），`HIDDEN_ARMS … rot=2 … 上界 rot=2 … 处置=ok`（4→2；剩 M147/M411）。`swift build --build-tests` 告警 **0**；全量 `Executed 1036 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 384` 的 streak）。

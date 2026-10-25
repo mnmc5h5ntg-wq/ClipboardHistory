@@ -133,8 +133,10 @@ MUTATIONS = [
              "⇒ 正对照 C（读了不用那一格）必须红。这一刀钉的是**修法本身**有牙 —— "
              "M407 第一次跑就是 ESCAPED，靠的就是这条被放宽掉的判据",
      MFT,
-     '            let alphaInVerdict = body.contains { $0.contains(axisMarker) && $0.contains(comparisonMarker) }\n',
-     '            let alphaInVerdict = body.contains { $0.contains(axisMarker) }  // R77 变异：提过就算\n'),
+# R386：这一行改成两行了（R80 加了 lowercased）⇒ 旧针烂。改钉当前两行整块。
+     '            let alphaInVerdict = body.contains { $0.lowercased().contains(axisMarker)\n'
+     '                && $0.contains(comparisonMarker) }\n',
+     '            let alphaInVerdict = body.contains { $0.lowercased().contains(axisMarker) }  // R77 变异：提过就算\n'),
 
     ("M412", "第二刀的元层版：把『扫之前剥掉行尾注释』这一步撤掉"
              "⇒ 正对照 D（注释里提一句 alpha 那一格）必须红。"

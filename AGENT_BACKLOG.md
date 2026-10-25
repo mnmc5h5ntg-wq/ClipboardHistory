@@ -8748,3 +8748,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 367 追记（R381）：本批八根 —— r131 M642/M643（重钉到 `evidence_problems` 当前的两个落点，整表 3/3 CAUGHT）、r137 M652 与 r140 M659（针本来就活着，是语料整批排除 `.scratch` 把生成器目标误报；只把 `make_surface_ledger.py` 这一份非表工具纳入语料）、r140 M657/M658（`% 变量` 拼装改成字面整串，3/3 CAUGHT）、r60 M309（`inRows && inCols` 改成 `||`，两格同红）、r67 M366（`hoverFillAlpha(dark:)` 的整行改成死白，整表 9/9 CAUGHT）。rot **20→12**、`ROT_CEILING` 同笔降；八根都重跑过刀（D-368 两轴分开）。
     **台账标签更正**：BACKLOG 尾部此前五条「R381 现读」（r49 / r42 / r54 / r53 那批）对应的提交 `0264a63`/`e8228a8`/`ef45e65`/`fb641e7`/`9678d9c` 的 subject 都是 **R380** —— 那是 R380 追记批次的标签笔误；本节的「R381」属于第 380 轮（Round 378），两批不是同一轮，按提交号区分。
+
+367 追记（R386）：M411 重钉到两行整块（R80 的 `lowercased`）⇒ CAUGHT；M147 的旧目标（`gate: 8` 调用）已被重构成 `inkContrast`（无 gate 参数），盘上同名 gate 抬到 250 只会让 tier-profile **skip** ⇒ 同义坏法换成「探针循环 `prefix(0)`」⇒ CAUGHT（judged=0）。rot **2→0**，`ROT_CEILING` 同笔降；`HIDDEN_ARMS 表=227 可判=811 rot=0 … 处置=ok`。
+    **新开**：r77 整表 9/10，**M406 NOT-APPLIED**（锚点不在盘上）——下一批先重钉它。
+
+**435. tier-profile 的墨 gate 抬高只会 skip：skip 把「尺坏了」和「机器画不出」压成同形**（R386 现读）
+    现场：把 `testSettingsCaptionRowTierProfileDiagnostic` 里那次 `inkSideCounts(..., gate: 8)` 抬到 250，测试**全绿跳过**（`ROWTIER_NOT_RUN`），不是红。也就是说这条探针的「这台机器画不出」出口没有负半证人：真的把读数阈值弄坏，也会从同一个出口溜走。
+    修法：给 skip 出口加一个**反向**前提——同一张帧上必须存在至少一处能读出的墨（例如页眉或开关标签），否则不是「整页平涂」而是「尺坏了」，必须红；并用一支把 gate 抬到 250 的刀作证它红。这与 174 / 331 那族「出口要能说不」同源。

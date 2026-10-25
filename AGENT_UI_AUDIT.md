@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 385 轮（R386 · 2026-10-26 · U-1352…U-1354）：最后两根腐烂针重钉，rot 2→0；M147 的旧目标被重构掉、同义坏法换成「一条都不判」（U-1352…U-1354 · 产品 0 文件，判据账）
+
+- **U-1352：r77 M411 重钉。** 守卫那句已经改成两行（R80 给轴名加了 `lowercased`）⇒ 旧单行针命中 0。针改成两行整块后现读 `M411 CAUGHT`（红在 `testEveryTwoStateRulerReadsBothAxes`）；同一次整表跑 9/10，**M406 记 NOT-APPLIED**（锚点不在盘上）——新的腐烂针，记进 BACKLOG 367 追记。
+- **U-1353：M147 的旧目标**（`… scale: scale, gate: 8)` 那次调用）**已被重构掉**：`inkContrast` 现在没有 gate 参数。盘上唯一剩下的 `gate: 8` 属于另一条 tier-profile 探针，把它抬到 250 只会让那条测试 **skip**、不会红（实测 ESCAPED）⇒ 同名调用点不等于同一个对象（D-374）。同义坏法换成「探针循环取 `prefix(0)`」，judged 停在 0；现读 `M147 CAUGHT`，红在 `XCTAssertGreaterThanOrEqual failed: ("0") is less than ("3") - light 档 18 条说明段探针**一条都没判成**`。
+- **U-1354：rot 2→0 且上界同笔降到 0。** `HIDDEN_ARMS 表=227 可判=811 rot=0 抽不出=6 … 处置=ok`。两个新发现：① tier-profile 把整列墨 gate 抬高只会走 skip，skip 把「尺坏了」和「机器画不出」压成同形（BACKLOG 435）；② M406 的锚点失效（367 追记）。**网络**：GitHub 侧链路断（`api=000` / apple=200），本地领先 4 笔未推，`40234023212`/`40234058148` 与 R385 那一跑的结论全部 NOT-RUN（网络），不写成没红。
+
 ## 第 384 轮（R385 · 2026-10-26 · U-1348…U-1351）：两颗「恢复默认」的禁用切换接上 .selection 过渡 + 源形状守卫；367 再钉 r64 两根，rot 4→2（U-1348…U-1351 · 产品 1 文件，动效主线）
 
 - **U-1348：产品位（过渡）。** R382/R383 把「恢复默认」画成了禁用态，但默认↔动过是**硬切** —— 状态变了，画面一帧就换完。给两颗按钮挂 `MotionCatalog.animation(for: .selection)`（权重页 `value: store.weights == .default`、快捷键页 `value: shortcut == settings.action.defaultShortcut`）。端态逐字节不变：182 张帧 `same=182 changed=0` ⇒ 过渡没有改任何静态落点。**过程本身没有胶片证人**（静态帧只拍端态，本轮没造新场景）⇒ 具名 NOT-RUN，不把「接线了」写成「演过了」。

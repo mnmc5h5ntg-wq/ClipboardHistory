@@ -79,9 +79,18 @@ MUTATIONS = [
      "                               tierSplit: Int = 150) -> [(yPx: Int, maxDeviation: Int,",
      "                               tierSplit: Int = 110) -> [(yPx: Int, maxDeviation: Int,",
      TRUTH, "冒出"),
-    ("M147", "NOT-RUN 判别臂的 gate 抬到 250（整帧永远读不到墨）", "harness",
-     "                                               scale: scale, gate: 8)",
-     "                                               scale: scale, gate: 250)",
+    # R386：`gate: 8` 那次调用早已被重构成 `inkContrast`（没有 gate 参数），
+    # 盘上剩下的唯一 `gate: 8` 属于另一条 tier-profile 探针，抬到 250 只会让它 **skip**、不会红 ——
+    # 同义坏法换成「探针一条都不判」：judged 停在 0，`judged >= 3` 那条地板必须红。
+    ("M147", "NOT-RUN 判别臂一条都不判（循环取 prefix(0)）", "harness",
+     "            for probe in Self.captionInkProbes {\n"
+     "                guard let fixture = fixtures(appearance: appearance)\n"
+     "                    .first(where: { $0.name == probe.fixture }) else {\n"
+     '                    return XCTFail("找不到夹具 \\(probe.fixture) ⇒ \\(probe.what) 这条探针没有对象")\n',
+     "            for probe in Self.captionInkProbes.prefix(0) {   // MUTANT：一条都不判\n"
+     "                guard let fixture = fixtures(appearance: appearance)\n"
+     "                    .first(where: { $0.name == probe.fixture }) else {\n"
+     '                    return XCTFail("找不到夹具 \\(probe.fixture) ⇒ \\(probe.what) 这条探针没有对象")\n',
      TIER, "一条都没判成"),
 ]
 

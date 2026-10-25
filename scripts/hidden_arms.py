@@ -71,7 +71,9 @@ EXTRA_FILES = (os.path.join(".scratch", "motion-audit-2", "make_surface_ledger.p
 # r142 的 M674 **退役**（「print→emit」已是现状；改名方向实测 PASSED ⇒ 没对象）⇒ rot 6→5。
 # R384：r78 的 M417 重钉到当前 `spanWidthPt && textOnlyInk` 那一行（整表 6/6 CAUGHT）⇒ rot 5→4。
 # R385：r64 的 M340/M341 重钉到当前 `appendLocked`（整表 6/6 CAUGHT）⇒ rot 4→2。
-ROT_CEILING = 2
+# R386：最后两把腐烂针重钉——r77 M411（针改成两行整块）与 r33 M147（gate 参数早已不存在，
+# 同义坏法换成「探针循环取 prefix(0)」）都真跑出 CAUGHT ⇒ rot=0，上界同笔降。
+ROT_CEILING = 0
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
 DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 最后两根腐烂针重钉（M411/M147 均 CAUGHT），rot 2→0、上界同笔降；新开 435（skip 吞掉「尺坏了」）；网络断，本地领先 4 笔未推（R386 / U-1352…U-1354 · 产品 0 文件，判据账）
+
 ### 两颗「恢复默认」的禁用切换接上 .selection 过渡（源形状守卫 + M1016/M1017）；367 再钉 r64 两根、rot 4→2（R385 / 第 384 轮 / U-1348…U-1351 · 产品 1 文件，动效主线）
 
 
