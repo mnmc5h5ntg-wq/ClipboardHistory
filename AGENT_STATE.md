@@ -34,6 +34,11 @@ NOT-RUN（分开写）：① 下一跑 runner 的出口二选一（`reduce-motio
 下一轮（R361）的靶：⓪ 读 R359/R360 两跑（`MOTION_REDUCE_SOURCES` 三源 + 376 的出口文本）→
 ① 367（表自己声明针）或 426（刀的 diff 判法）→ ② 若 runner 仍报通道那一半：376 的第二通道。
 
+**R360 追记（`queue` 现读）**：`40198846541 ↔ d317d31` 现读 `in_progress`、同 workflow 前面=3
+（`c1077b6`、`753fa5d`、`f975be8` 都还在跑）—— 四跑在队、零跑结案；上一跑绿是 `6a0258a`（已签 R355/R356）。
+下一轮第 ⓪ 条读这四跑：二选一看 376 的出口文本（`reduce-motion-on` 或通道 + `catalog=off`），
+并确认 `MOTION_REDUCE_SOURCES` 三源第一次出现在日志里。
+
 ## R359 状态（2026-10-25 · 本地 · 第 358 轮 / Round 356）：必印族专用 grep —— `MOTION_REDUCE_SOURCES` 不再被 head 截掉（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R359 / 第 358 轮 / Round 356）：`ci.yml` 的 filmstrip 步加 `MOTION_REDUCE_SOURCES` 专用 grep +
