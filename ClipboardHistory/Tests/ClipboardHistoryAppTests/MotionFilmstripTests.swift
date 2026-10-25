@@ -5571,6 +5571,11 @@ final class MotionFilmstripTests: XCTestCase {
     /// 于是报告里那三段（过 / 洞太窄 / 过）**首尾相接**，合起来才是那颗胶囊的纵向范围。
     /// 之前只有三段各自的高，"取用带盖住了胶囊的几成"要读者自己去加 ——
     /// 而这一格决定下一轮修什么：盖得住就只需要开一条形状闸，盖不住就得先修带子的纵向定义。
+    /// R365 / BACKLOG 384：取用带至少要盖住候选纵向跨度的 90%。
+    /// 两台机器现读都是 100%（本机 48/48、runner 24/24）；把"并墨"关掉时它掉到 29%（14/48）——
+    /// 这是"带子被切碎"的地板，不是"胶囊真实高度"的判据（分母是首尾相接的候选段总高）。
+    static let pillBandCoverageFloor = 0.90
+
     /// 只合**进了报告的**候选段（"非候选"没资格参与）；取用为空给"纵向覆盖=无"，不许给 0%。
     static func verticalCoverage(groups: [(gate: String, from: Int, to: Int, hole: Double)],
                                  taken: Range<Int>?) -> String {
@@ -6010,6 +6015,15 @@ final class MotionFilmstripTests: XCTestCase {
             + " 末帧药丸宽=\(settledRun.map { $0.range.count } ?? -1)"
             + " 容差=\(String(format: "%.1f", tolerance))pt"
             + " 定位=\(bandReport)")
+        // R365 / BACKLOG 384：覆盖地板（两机现读 100%）—— 并墨回退时这里掉到 29%，必须红。
+        guard let coverage = Self.verticalCoverageCells(report: bandReport), coverage.count == 3,
+              coverage[1] > 0 else {
+            emit("MOTION_NOT_RUN=pill-coverage-unreadable filter-pill-slide 读不出纵向覆盖那一格 ⇒ 新地板没有对象")
+            throw XCTSkip("MOTION_NOT_RUN=pill-coverage-unreadable")
+        }
+        XCTAssertGreaterThanOrEqual(Double(coverage[0]) / Double(coverage[1]), Self.pillBandCoverageFloor,
+            "取用带只盖住候选跨度的 \(coverage[0])/\(coverage[1])px ⇒ 带子被切碎（R356 的并墨修法回退了？）\n"
+            + bandReport)
         // 前提①（R333）：两档必须由**镜像**背书，否则 `levels` 里"哪一档是选中那颗"是猜的。
         // 首末两半没互换 ⇒ 要么这两帧不是两个稳定态（触发没生效），要么轨道不是那颗胶囊；
         // 两种都不是"斜坡走得平不平"的证据，也不许被读成产品缺陷 ⇒ 具名出口（D-305 同一形状）。

@@ -8656,3 +8656,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     ② 空态在 R355 的修复走的是目录 `.slider` 的 0.20 timing curve，runner 上 `empty-state=3` 就是那一支；
     ③ 430 的刀号帽、431 的接线、429 的修复都在**同一台 reduce-on 机器**上被验过。
     仍欠：R360 之后的跑要出现 `reduce-motion-on`（376 的收口读数）；以及视图层 `@Environment` 那一源仍无直接读数。
+- **384 追记（R365 · 地板）**：并墨修法的覆盖已经写成会红的地板 `pillBandCoverageFloor = 0.90`（本机 48/48、runner 24/24；关掉并墨 14/48=29%）。地板在 `testFilterPillRampIsMonotone` 里，M1009 的红线是 6024 行的原文（U-1277）。结案 ≠ 钉住 —— 这一格现在两样都有。

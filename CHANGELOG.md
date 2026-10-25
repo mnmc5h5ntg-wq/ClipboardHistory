@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 384 的修法有了自己的地板：取用带纵向覆盖 ≥90%，两机 100%、关掉并墨 29% 会红（R365 / U-1276…U-1278 · 产品 0 文件，判据账）
+
 ### 426 第三批：r356/r338/r339 迁到 diff 回读，七臂全 CAUGHT（R364 / U-1273…U-1275 · 产品 0 文件，判据账）
 
 ### 426 第二批：r345/r348/r355 迁到 diff 回读，五臂重跑全 CAUGHT（R363 / U-1270…U-1272 · 产品 0 文件，判据账）
