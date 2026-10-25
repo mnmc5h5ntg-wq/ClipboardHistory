@@ -8683,3 +8683,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现场：R368 的 M906 落刀后 `HIDDEN_ARMS rot=33 抽不出=6 已声明=6` 一个数都没动 —— 刀没牙，而旧判法只看「测试红没红」。
     形状（下一批做）：表里加 `READOUT = (命令, 正则)`；回放时落刀前后各跑一次，**两次数完全相等**即判 `EMPTY_KNIFE`（与 CAUGHT/PASSED 并列的第四态），并把两行读数一起打出来。
     缺席计数：现读声明 `READOUT` 的表 **0 / 134** ⇒ 通用探测器今天没有对象；先给 M906 所属的 hidden_arms 家族三张表声明，再谈全仓。
+
+432 追记（R370 · 第一刀）：`readout_probe.py` 落地（`capture` / `four_state` / `summarize`），四态里多出 `EMPTY_KNIFE` 与 `READOUT_BLIND`；
+    r310 / r313 已声明 `READOUT`（`python3 scripts/hidden_arms.py` 的 `HIDDEN_ARMS` 行）⇒ 声明面 **2 / 134**。
+    现读：r310 `CAUGHT=4 BLIND=1 EMPTY=0`、r313 `CAUGHT=2 BLIND=1 EMPTY=0`、两表 `RESTORE_CLEAN=yes`；
+    正对照把 M906 临时加回：`M906 EMPTY_KNIFE`，前后两行 `HIDDEN_ARMS` 一字不差；撤销后 r310 回到 5 臂。
+    BLIND 的现读两把是 M903 / M913 —— 它们红在判定式上，`HIDDEN_ARMS` 那行不动；只印不判死。

@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 369 轮（R370 · 2026-10-25 · U-1291…U-1293）：432 第一刀 —— 空刀探测落进两张 hidden_arms 表，正对照 M906 当场读出 EMPTY_KNIFE（U-1291…U-1293 · 产品 0 文件，判据账）
+
+- **U-1291：`readout_probe.py` 的四态。** `capture` 取一条读数、`four_state` 把它折成`EMPTY_KNIFE`（没红且读数全等）/ `READOUT_BLIND`（红了但读数全等，只印不判死）；读数拿不到时原样退回旧判词。`scripts/tests/test_mutation_readout.py` **6 格**（含「拿不到读数不许冒充没变化」）。
+- **U-1292：r310 / r313 接线后的现读。** `R310_MUTATE 刀=5 CAUGHT=4 EMPTY=0 BLIND=1 RESTORE_CLEAN=yes`、`R313_MUTATE 刀=3 CAUGHT=2 EMPTY=0 BLIND=1 RESTORE_CLEAN=yes` —— 两张表各有一把「红了但读数全等」的刀：M903（双向棘轮改成只判上界）与 M913（已声明死针只判一个方向），它们红在判定式而不是 `HIDDEN_ARMS` 那行上。BLIND **仍算过关**（刀咬住了别的判据），只是不再沉默。
+- **U-1293：正对照 —— 把 M906 临时加回 r310，只跑它。** 输出 `M906 EMPTY_KNIFE …` 并把前后两行 `HIDDEN_ARMS 表=222 可判=805 rot=33 抽不出=6 已声明表=6 已声明死针=0 …` 原样打出来（一字不差）；跑完立刻撤掉，r310 回到 5 臂、`EMPTY=0`。这把尺第一次对**已知空刀**兑现。
+
 ## 第 368 轮（R369 · 2026-10-25 · U-1288…U-1290）：426 第七批 —— r308 迁到 diff 回读，六臂全 CAUGHT；空刀探测开单 432（U-1288…U-1290 · 产品 0 文件，判据账）
 
 - **U-1288：r308（六把热图悬停刀，Swift 侧）迁到 `single_substitution_lands`。** 只换落刀后的回读那一行；重跑 `R308_MUTATE 刀=6 CAUGHT=6 ESCAPED=0 NOT_RUN=0 RESTORE_CLEAN=yes`，红线落在 `testHoverLeavesTheDataPixelsUntouched` / `testHoverChangesOnlyTheRingBand` / `testHoverIsNotLouderThanOneDataStep` / `testRingBandSelectorIsATruthTable` / `testGridCellsRouteThroughTheProductCellView` 这几个期望格子上（跑=13）。

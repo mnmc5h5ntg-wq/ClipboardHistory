@@ -17,6 +17,7 @@ import subprocess
 import sys
 
 from readback import single_substitution_lands
+from readout_probe import capture, four_state, summarize
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TARGET = "scripts/hidden_arms.py"
@@ -24,6 +25,10 @@ GUARD = u"python:scripts.tests.test_hidden_arms"
 
 TARGET = "scripts/hidden_arms.py"
 GUARD = u"python:scripts.tests.test_hidden_arms"
+# R370 / BACKLOG 432：这张表的读数口径（空刀探测用）。拿不到读数时会原样退回旧判词。
+READOUT_CMD = [sys.executable, os.path.join(ROOT, "scripts", "hidden_arms.py")]
+READOUT_KEY = u"HIDDEN_ARMS"
+READOUT = {"before": None}
 
 # 三把刀各钉本轮新写的那一条轴（D-244：判定看失败的用例名 + 正文里的串，不看退出码）。
 # 每一根针都必须**恰好命中一次**，所以它们钉的是 R313 改完之后的形状，不是 R310 的。
@@ -106,6 +111,7 @@ def run_arm(arm_id, why, target, needle, repl, _filter, expect_text):
     if hits != 1:
         print("%s NOT_RUN needle 命中 %d 次（要恰好 1）" % (arm_id, hits), flush=True)
         return "NOT_RUN"
+    readout_after = None
     try:
         write(target, original.replace(needle, repl, 1))
         after = read(target)
@@ -114,6 +120,7 @@ def run_arm(arm_id, why, target, needle, repl, _filter, expect_text):
             print("%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm_id, flush=True)
             return "NOT_RUN"
         code, n_ran, n_fail, names, text = run_guard()
+        readout_after = capture(READOUT_CMD, READOUT_KEY, cwd=ROOT, env=base_env())
     finally:
         write(target, original)
         if read(target) != original:
@@ -124,13 +131,25 @@ def run_arm(arm_id, why, target, needle, repl, _filter, expect_text):
               % (arm_id, "\n".join(text.strip().splitlines()[-3:])), flush=True)
         return "NOT_RUN"
     if n_fail and names and any(expect_text in ln for ln in text.splitlines()):
+        verdict = four_state("CAUGHT", READOUT["before"], readout_after)
         print("%s CAUGHT  %s ｜ 红在 %s（跑=%d 失败=%d exit=%d）"
               % (arm_id, why, ", ".join(names), n_ran, n_fail, code), flush=True)
-        return "CAUGHT"
+        if verdict == "READOUT_BLIND":
+            print("%s READOUT_BLIND 红不是这条读数引起的：落刀前后 HIDDEN_ARMS 全等（只印，不判死）"
+                  % arm_id, flush=True)
+        return verdict
+    verdict = four_state("ESCAPED" if not n_fail else "WRONG_CELL",
+                        READOUT["before"], readout_after)
+    if verdict == "EMPTY_KNIFE":
+        print("%s EMPTY_KNIFE 落刀前后 HIDDEN_ARMS 一字不差 ⇒ 这行代码对今天的语料没有作用"
+              % arm_id, flush=True)
+        print("    前=%s" % READOUT["before"], flush=True)
+        print("    后=%s" % readout_after, flush=True)
+        return verdict
     print("%s %s ｜ 红在 %s（跑=%d 失败=%d）⇒ 期望正文含「%s」"
           % (arm_id, "ESCAPED" if not n_fail else "WRONG_CELL", names, n_ran, n_fail,
              expect_text), flush=True)
-    return "ESCAPED" if not n_fail else "WRONG_CELL"
+    return verdict
 
 
 def main():
@@ -146,18 +165,24 @@ def main():
         return 1
     print("R313_MUTATE BASELINE 跑=%d 失败=0 exit=%d ⇒ 后面的 CAUGHT 才有意义"
           % (ran0, code0), flush=True)
+    READOUT["before"] = capture(READOUT_CMD, READOUT_KEY, cwd=ROOT, env=base_env())
+    if READOUT["before"] is None:
+        print("R313_MUTATE READOUT_NOT_RUN 读数命令没有 HIDDEN_ARMS 行 ⇒ 四态退回旧判词", flush=True)
+    else:
+        print("R313_MUTATE READOUT before=%s" % READOUT["before"], flush=True)
     arms = [a for a in ARMS if not only or a[0] in only]
     if not arms:
         print("R313_MUTATE ARG_ERROR 一臂都没选中", flush=True)
         return 2
     kinds = [run_arm(*a) for a in arms]
-    caught = kinds.count("CAUGHT")
-    escaped = sum(1 for k in kinds if k in ("ESCAPED", "WRONG_CELL"))
-    not_run = sum(1 for k in kinds if k in ("NOT_RUN", "RESTORE_FAILED"))
+    counts = summarize(kinds)
+    caught, empty, not_run = counts["caught"], counts["empty"], counts["not_run"]
+    escaped, blind = counts["escaped"], counts["blind"]
     clean = "no" if "RESTORE_FAILED" in kinds else "yes"
-    print("R313_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d RESTORE_CLEAN=%s"
-          % (len(arms), caught, escaped, not_run, clean), flush=True)
-    return 0 if (caught == len(arms) and clean == "yes") else 1
+    print("R313_MUTATE 刀=%d CAUGHT=%d ESCAPED=%d NOT_RUN=%d EMPTY=%d BLIND=%d RESTORE_CLEAN=%s"
+          % (len(arms), caught, escaped, not_run, empty, blind, clean), flush=True)
+    # READOUT_BLIND 仍然算过关：刀咬住了别的判据，只是这条读数看不见它（只印不判死）。
+    return 0 if (caught + blind == len(arms) and clean == "yes" and empty == 0) else 1
 
 
 if __name__ == "__main__":
