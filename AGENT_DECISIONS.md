@@ -7252,3 +7252,14 @@ reduce 关 → 通道那一半；catalog=off 时明写视图层来源看不见�
 **How to apply**：每加一张声明表，同时改 `DECLARED_TABLES_CEILING` 并**重抄** rot / 抽不出两箱；
 两箱没动就照实写"没动"。下一批要改的表由 `HIDDEN_ROT` / `HIDDEN_OPAQUE` 的点名清单给，按箱走。
 
+
+### D-361（362）落刀回读判「盘上恰好等于预期」，不判替换串的全局出现次数
+
+R350 的刀没落下去，因为 `read(path).count(repl) == 1` 不成立 —— 而 repl 在该文件别处本来就有。
+"repl 唯一"既不必要（替换串可以合法地已经在别处出现）也不充分（它不排除顺手改了别处）。
+R362 立的判法：`before.count(needle) == 1` 且 `after == before.replace(needle, repl)` 且 `after != before`。
+**Why**：刀要证的是"文件变成了我预期的那一份"，不是"替换串出现了几次"；后者是同一个估计量的两面，
+一面会假红（R350）、一面会漏掉"多改一处"。
+**How to apply**：迁移一张表时只换回读那一行，不动 needle/repl/期望；多针表要另立形状（逐针各一条 diff），
+不许把它硬塞进单替换的判据里。
+

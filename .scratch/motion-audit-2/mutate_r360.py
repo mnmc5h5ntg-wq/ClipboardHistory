@@ -7,6 +7,8 @@ u"""R360 的变异表（第 359 轮 / Round 357）：三臂不可分的原因要
 跑法：PYTHONUTF8=1 python3 .scratch/motion-audit-2/mutate_r360.py [M1008]
 """
 import os, re, subprocess, sys, time
+
+from readback import single_substitution_lands
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FILM = os.path.join(ROOT, "ClipboardHistory", "Tests", "ClipboardHistoryAppTests", "MotionFilmstripTests.swift")
 PKG = os.path.join(ROOT, "ClipboardHistory")
@@ -53,8 +55,8 @@ def main(argv):
         if text.count(needle) != 1:
             print(u"%s NOT_RUN 命中=%d" % (arm, text.count(needle))); continue
         wr(path, text.replace(needle, repl))
-        if rd(path).count(repl) != 1:
-            print(u"%s NOT_RUN 回读不匹配" % arm); wr(path, text); continue
+        if not single_substitution_lands(text, needle, repl, rd(path)):  # R362 / 426：diff 判法
+            print(u"%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm); wr(path, text); continue
         st = os.path.getmtime(path)
         if st <= last: os.utime(path, (time.time()+2, time.time()+2))
         last = os.path.getmtime(path)

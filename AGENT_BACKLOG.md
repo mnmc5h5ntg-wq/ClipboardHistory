@@ -8627,3 +8627,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     **重要读数**：rot / 抽不出一个都没动（33/6）—— 那四把针本来就是活的；声明把"已判"从下界变成确数，
     不替人修死针。下一步按 `HIDDEN_ROT` / `HIDDEN_OPAQUE` 两箱点名到表去改，不再按"最新的表"改。
 
+
+426 追记（R362）：第一步 —— `.scratch/motion-audit-2/readback.py` 的 `single_substitution_lands`：
+    needle 恰好一次 + `after == before.replace(needle, repl)` + 非空刀；**不要求 repl 全局唯一**
+    （R350 的现场：repl 在别处本来就有 ⇒ 旧判法假红）。5 格测试；r358 / r360 迁到新判法，
+    M1007 / M1008 重跑各 `CAUGHT=1/1, RESTORE_CLEAN=yes`；电池 664。
+    **仍欠**：其余一百多张表（按"最近动过的表"先迁）；多针表（ARMS 的 needle 是 list）形状不同，
+    要"逐针各改一处"的 diff，不许混用；以及"预期打靶"不由 diff 判法负责（那是 needle/expect 的事）。
+
