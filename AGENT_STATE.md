@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R369 / 第 368 轮 / Round 366）：r308 只换落刀后的回读那一行；`刀=6 CAUGHT=6 NOT_RUN=0 RESTORE_CLEAN=yes`；电池 Ran 664（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；迁移面 15 张（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：`452f5a3`、`cc9eb1e` 两跑 success；`7ad22cf`、`19f91e2`、`f9df01e`、`3c84fc8` 仍在队里（只登记不轮询）。
+① ⓪ CI：`452f5a3`、`cc9eb1e` 两跑 success；`7ad22cf`、`19f91e2`、`f9df01e`、`3c84fc8` 仍在队里；本轮 `d44797c ↔ 40204000448`（queued、同 workflow 前面=3，只登记不轮询）。
 ② 426 第七批：r308（六把热图悬停刀，Swift 侧）迁 `single_substitution_lands`。
 ③ 六臂全 CAUGHT，红线在五个热图悬停用例上（跑=13）。
 ④ 空刀探测：不硬造 —— 需要 134 张表各有 `READOUT` 声明，现读 0 张；判断与形状写进 BACKLOG 432。
