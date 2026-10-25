@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R373 / 第 372 轮 / Round 370）：`GrabAttribution.classify` 与调用点改名的两根针重钉；`M271 / M272` 各 CAUGHT、`还原不干净=0`；`ROT_CEILING` 31→29，`test_hidden_arms` 8/8；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：五跑仍在队里（`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c`）；只登记不轮询。
+① ⓪ CI：`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c` 仍在队里；本轮 `ec65950 ↔ 40205804191`（queued、同 workflow 前面=2，只登记不轮询）。
 ② 367 第三批：M271（`worstIntervalMilliseconds` → `clockIntervalMilliseconds`）+ M272（调用点同改）。
 ③ 两臂重跑各 CAUGHT；红线在真值表与接线守卫上。
 ④ rot 31→29、`ROT_CEILING` 同笔降；`HIDDEN_ARMS` 现读 `处置=ok`。
