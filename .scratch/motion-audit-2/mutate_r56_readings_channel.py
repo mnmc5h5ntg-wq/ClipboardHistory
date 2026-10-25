@@ -35,7 +35,8 @@ import re
 import subprocess
 import sys
 
-from knife_guard import backup, clear_backup, restore_if_stale, run as guarded_run
+from knife_guard import (backup, clear_backup, restore_if_stale, run as guarded_run,
+                         swallowed_return_lines)
 
 ROOT = "/Users/wangziyi/Codex_Project0"
 REPO = os.path.join(ROOT, "ClipboardHistory")
@@ -67,9 +68,25 @@ MUTATIONS = [
      '        print("MOTION_SUMMARY " + rows.map',
      GUARD, ["只走 stdout"]),
     # R374：emit 的实现在 CaptureReadings（本文件那层壳只转发），针跟着搬；两种红都合法（文件在⇒marker 不在；文件不在⇒没写出来）。
+    # R376 / BACKLOG 433：原来那版替换文是「针 + 一行 `return   // MUTANT`」，而针后面紧跟着 `lock.lock()`
+    # ⇒ Swift 把它解析成 `return lock.lock()`（编译器另给 warning）。刀实际做的是「拿走 NSLock 不解锁」，
+    # 于是第二次 emit 死等那把锁 —— R374/R375 记录的「M278 可复现挂起」全是这一条，不是产品、也不是守卫。
+    # 现在改成**整段替换**：文件那条腿整块删掉，不留任何 `return` 悬念。
     ("M278", "emit 只 print 不落盘", CAPTURE, "swift",
-     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n",
-     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n        return   // MUTANT: 只 stdout，不落盘\n",
+     "    static func emit(_ line: String, to url: URL) {\n"
+     "        writeStdoutLine(line)\n"
+     "        lock.lock()\n"
+     "        defer { lock.unlock() }\n"
+     "        do {\n"
+     "            try appendLocked(line, to: url)\n"
+     "        } catch {\n"
+     "            channelBroken(error)\n"
+     "        }\n"
+     "    }\n",
+     "    static func emit(_ line: String, to url: URL) {\n"
+     "        writeStdoutLine(line)\n"
+     "        _ = url   // MUTANT: 只 stdout，不落盘\n"
+     "    }\n",
      GUARD, ["文件里没有这一遍的 marker", "文件通道没写出来"]),
     # R374 / BACKLOG 367：追加逻辑搬进 `CaptureReadings.appendLocked`（R302/R358），旧针随 `readingsOpened` 一起消失。
     ("M279", "每次都整份重写（不追加）", CAPTURE, "swift",
@@ -141,8 +158,15 @@ def apply(path, old, new):
     n = text.count(old)
     if n != 1:
         raise SystemExit("注入中止：那段话出现 %d 次，不是 1 次 —— 电池与代码脱节\n  %s" % (n, old[:160]))
+    mutated = text.replace(old, new)
+    # R376 / BACKLOG 433：`return` 换行 + 下一行是调用 ⇒ Swift 解析成 `return expr`。
+    # 这不是风格检查：M278 的旧刀文就这么把 NSLock 拿走再返回，守卫挂死而不是变红。
+    traps = swallowed_return_lines(mutated)
+    if traps:
+        raise SystemExit("注入中止：这次替换会造出「return 吞掉下一行」⇒ 刀下的不是它声称的那一刀\n  %s"
+                         % (traps,))
     with open(path, "w", encoding="utf-8") as writer:
-        writer.write(text.replace(old, new))
+        writer.write(mutated)
     return text
 
 

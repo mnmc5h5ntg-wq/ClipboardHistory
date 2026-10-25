@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### M278 的挂点是刀文自己（return 吞掉 lock.lock()）；刀文自检 + 超时补杀子孙树，433 结案（R376 / U-1310…U-1313 · 产品 0 文件，判据账）
+
 ### 433 第一半：刀的崩溃安全还原 + 进程组硬超时；r56 两臂 CAUGHT、M278 以 180s 超时具名（R375 / U-1307…U-1309 · 产品 0 文件，判据账）
 
 ### 读数通道守卫补上「来源」证人（同一函数喂合成样本）；r56 三根针重钉 + CI 预检写法修掉，刀腿 NOT-RUN 并开 433（R374 / U-1303…U-1306 · 产品 0 文件，判据账）

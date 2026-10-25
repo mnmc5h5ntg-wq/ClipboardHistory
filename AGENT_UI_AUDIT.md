@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 375 轮（R376 · 2026-10-26 · U-1310…U-1313）：M278 的挂点是刀文自己 —— return 吞掉 lock.lock()；433 结案、超时补杀子孙树（U-1310…U-1313 · 产品 0 文件，判据账）
+
+- **U-1310：M278 的挂点抓到了，不在产品里，在刀文里。** 落刀后 30s `sample <pid>` 连抓三跑，栈都停在 `CaptureReadings.swift:76 lock.lock()`；编译器同一份合成文本给出的原文是 `warning: expression following 'return' is treated as an argument of the 'return'`。旧刀文是「针 + 一行 `return   // MUTANT`」，而针后面紧跟着 `lock.lock()` ⇒ Swift 把它解析成 `return lock.lock()`：第一刀**真的把 NSLock 拿走了**，然后直接返回，`defer { lock.unlock() }` 永不执行 ⇒ 同一进程第二次 `emit` 死等。R374 的 6:29 与 R375 的 180s 超时都是这一条；它既不是产品缺陷，也不是守卫没牙。
+- **U-1311：刀改成整段替换，M278 第一次拿到 CAUGHT。** 把 `emit(_:to:)` 的文件腿整块删掉（不留 `return` 悬念），现读 `M278 ⇒ CAUGHT 红得对=True 命中=['文件里没有这一遍的 marker'] 还原干净=True`；表尾 `还原后复跑（Swift 守卫）：ESCAPED`、`EXIT=0`。
+- **U-1312：这种刀文在落盘之前就拦下。** `knife_guard.swallowed_return_lines` 认「`return` 独占一行 + 下一非空行是调用表达式」，r56 的 `apply` 在写盘前调用它（命中即 `SystemExit`，文件不动）；4 格测试（M278 原形必须抓到 / `}` / `case` / `return ()` 三种必须不抓）。按「替换文以 return 结尾」扫全部 222 张表，现读 `HITS=0` ⇒ 这个形状在仓库里只有 M278 一支，已修。
+- **U-1313：硬超时补杀子孙树。** R375 超时那一刀的 `xctest` 没死：它被 launchd 收养（ppid=1）又活了 9 分钟，只 `killpg` 杀不到。现在超时前先快照整棵子孙树，杀完进程组再逐个 SIGKILL；2 格测试：孙进程**自开会话**也必须消失（`pgrep` 现读空），以及快照必须真看见活的孙进程（正对照）。
+
 ## 第 374 轮（R375 · 2026-10-26 · U-1307…U-1309）：433 第一半 —— 崩溃安全还原 + 硬超时；M279/M281 CAUGHT、M278 以 180s 超时具名（U-1307…U-1309 · 产品 0 文件，判据账）
 
 - **U-1307：`knife_guard.py` 落地。** `backup` / `restore_if_stale` / `clear_backup` 负责「落刀前备份、表启动时把没被还原的那一刀恢复」；`run` 用 POSIX 进程组 + 硬超时，超时只杀整组。`scripts/tests/test_knife_guard.py` **6 格**（含 `sleep 5` 对 1s 超时必须 timed_out）。

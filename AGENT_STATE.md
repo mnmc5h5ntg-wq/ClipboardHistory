@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R376 状态（2026-10-26 · 本地 · 第 375 轮 / Round 373）：M278 的挂点是刀文自己 —— return 吞掉 lock.lock()；433 结案、超时补杀子孙树（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R376 / 第 375 轮 / Round 373）：`sample` 三跑同栈抓到 M278 的挂点（`return` 换行被解析成 `return lock.lock()`，第一刀拿走 NSLock 不解锁）；刀文改成整段替换 ⇒ `M278 CAUGHT`、还原干净、复跑 `ESCAPED`、表 EXIT=0；`swallowed_return_lines` + 4 格测试 + 落刀前拦截（222 张表按「替换文以 return 结尾」现读 0 支）；超时补杀子孙树 + 2 格测试；全量沿用 R374（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`a17bc6a`（R373 追记）success；`357a763`/`84e4381`/`2ffc6d0`/`187ffaf` 四跑仍在队里（`187ffaf ↔ 40210952259`、`2ffc6d0 ↔ 40210881173`）；只登记不轮询。
+② 433 第二半：落刀后 30s `sample` 三跑同栈 + 编译器 warning ⇒ 挂点=刀文，不是产品/守卫。
+③ 刀文改整段替换；`swallowed_return_lines` 在 `apply` 里落盘前拦截；M278 现读 CAUGHT。
+④ 超时补杀子孙树（R375 的 xctest 被 launchd 收养又活 9 分钟）；祖先快照 + 逐个 SIGKILL。
+
+验证读数（现读）：`M278 ⇒ CAUGHT 红得对=True 命中=['文件里没有这一遍的 marker'] 还原干净=True`、`还原后复跑（Swift 守卫）：ESCAPED`、表 `EXIT=0`；`test_knife_guard` **12 格**全绿（含自开会话的孙进程）；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R374 日志）；脚本电池 `Ran 682（skipped=4）OK`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；预检 `tables=134 covered=117 arms=376 bad=0`；`HIDDEN_ARMS 表=222 可判=804 rot=27`；产品面连续零改动 **21** 轮（`python3 scripts/product_streak.py --streak-for 375` 现读）。
+
+NOT-RUN（分开写）：① 真机腿没跑；② 全量卷没重跑（本轮没动 Swift，沿用 R374 日志）；③ 434（读数通道无超时）只留下症状样本，修法与 witness 尚未落地。
+
+下一轮（R377）的靶：⓪ 读队列；① 434 的有界等待 + `sleep` 注入作证；② 367 继续（rot 27）。
+
 ## R375 状态（2026-10-26 · 本地 · 第 374 轮 / Round 372）：433 第一半 —— 崩溃安全还原 + 硬超时；M279/M281 CAUGHT、M278 以 180s 超时具名（产品 0 文件，判据账）
 
 最后更新：2026-10-26（本地 · R375 / 第 374 轮 / Round 372）：`knife_guard.py` + 6 格测试；r56 接线（启动恢复、逐臂备份、180s 进程组超时、CI 判词读汇总行）；三臂 `M279 CAUGHT / M281 CAUGHT / M278 NOT_RUN_TIMEOUT`，三臂还原干净、复跑守卫 ESCAPED；全量沿用 R374（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 676（skipped=4）OK（产品 0 文件 · 判据账）

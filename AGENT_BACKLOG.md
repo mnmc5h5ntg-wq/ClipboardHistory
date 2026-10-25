@@ -8715,3 +8715,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     **M278 可复现**：不是被杀的管道造成的假象。下一格：落刀后 30s 用 `sample <pid>` 抓栈，判定挂在 `String(contentsOf:)` / `FileHandle` / 退出路径哪一处。
 
 367 追记（R375）：M279/M281 两臂 CAUGHT（「不在末尾两格」/「扫描函数在合成样本上抓不到」）；M278 记 NOT_RUN_TIMEOUT（刀没验成，针本来就活着，rot 仍 27）。
+
+433 追记（R376 · 结案）：挂点抓到了 —— **刀文自己**。旧替换文是「针 + 一行 `return  // MUTANT`」，而针后面紧跟 `lock.lock()`，Swift 解析成 `return lock.lock()`（编译器原文 `expression following 'return' is treated as an argument of the 'return'`）：第一刀把 NSLock 拿走再返回，`defer { lock.unlock() }` 永不执行 ⇒ 第二次 emit 死等。
+    证据：`sample <pid>` 连抓三跑，栈都停在 `CaptureReadings.swift:76 lock.lock()`；R374 的 6:29 与 R375 的 180s 超时同因。
+    修法：① 刀文改成整段替换（删掉文件腿整块）⇒ `M278 CAUGHT`（命中「文件里没有这一遍的 marker」）、还原干净、复跑守卫 `ESCAPED`、表 `EXIT=0`；② `knife_guard.swallowed_return_lines` + 4 格测试，r56 的 `apply` 在写盘前拦截（命中即 `SystemExit`，文件不动）；按「替换文以 return 结尾」扫 222 张表，现读 0 支；③ 硬超时补杀子孙树（R375 的 xctest 被 launchd 收养又活 9 分钟）——2 格测试，含孙进程自开会话也必须消失。
+
+**434. 读数通道一旦阻塞，整卷会挂死而不是变红**（R376）
+    症状（R374–R376 的真实样本）：xctest 在 `emit` 的锁上死等 6:29；强杀父进程后它被 launchd 收养，又活了 9 分钟；三次 `sample` 同栈。今天这条路径被「刀文自检」堵住了入口，但**读数通道本身没有超时**：任何一次真死锁都会让 `swift test` 挂到 CI 的 6 小时上限，而不是红一格。
+    修法（下一格）：守卫里给 `emit` + 读文件加有界等待（后台队列 + 超时 `XCTFail`，超时要具名），并用一支 `sleep` 注入（在 emit 里 sleep 30s）作证「超时后变红而不是挂住」；本机可复现，前提是注入不改 `return`/锁的不变式。
