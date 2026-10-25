@@ -109,6 +109,9 @@ final class LoginItemSettings: ObservableObject {
 
     @Published private(set) var isEnabled: Bool
     @Published private(set) var message: String?
+    /// R384：这条 message 是**做失败了**，还是「本机不支持」的静态说明？
+    /// 两者的视觉语言不能一样 —— 失败是当下要重试的事，说明是这一屏的能力边界。
+    @Published private(set) var lastActionFailed = false
 
     private let manager: LoginItemManaging
 
@@ -127,9 +130,11 @@ final class LoginItemSettings: ObservableObject {
             try manager.setEnabled(enabled)
             isEnabled = manager.isEnabled
             message = nil
+            lastActionFailed = false
         } catch {
             isEnabled = manager.isEnabled
             message = enabled ? "开机启动开启失败，请稍后重试。" : "开机启动关闭失败，请稍后重试。"
+            lastActionFailed = true
         }
     }
 

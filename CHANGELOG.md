@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### R384：R383 判据的能力闸门（runner 平涂页走具名 NOT-RUN）+ 登录项失败回执改为错误色（过 caption 上下界）；M1015、M177 重钉、r78 6/6、rot 5→4（R384 / 第 383 轮 / U-1343…U-1347 · 产品 1 文件，动效主线）
+
+
 ### CI 分诊（R382 判据取样机器依赖：改语义带 + maxDev 判两态差）+ 快捷键三颗「恢复默认」禁用态；367 rot 8→5、M674 退役（R383 / 第 382 轮 / U-1338…U-1342 · 产品 1 文件，动效主线）
 
 

@@ -34,10 +34,18 @@ FILTER = ("UICaptureTests/(testDisabledToggleAndFailureReceiptAreVisible"
           "|testSettingsDrawabilityTruthTable"
           "|testCaptionTextStaysOnTheSecondaryTier)|LoginItemSettingsTests")
 
+# R384 重钉：失败回执改用 `lastActionFailed` 决定颜色，整块针跟着当前源码走。
 RECEIPT_BLOCK = """                        if let message = loginItemSettings.message {
                             Text(message)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                // R384：失败回执用错误色，与「本机不支持」的静态说明分开
+                                // （快捷键页的非法录制回执也是红字；同一套状态语言）。
+                                // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
+                                .foregroundStyle(loginItemSettings.lastActionFailed
+                                                 ? AnyShapeStyle(colorScheme == .dark
+                                                     ? Color(red: 1.0, green: 0.48, blue: 0.44)
+                                                     : Color.red)
+                                                 : AnyShapeStyle(.secondary))
                         }"""
 DISABLED_SEAM = "                            .disabled(!loginItemSettings.isSupported)"
 CATCH_MESSAGE = '            message = enabled ? "开机启动开启失败，请稍后重试。" : "开机启动关闭失败，请稍后重试。"'

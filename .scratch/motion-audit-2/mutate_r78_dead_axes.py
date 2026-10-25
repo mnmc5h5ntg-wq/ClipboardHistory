@@ -102,8 +102,10 @@ MUTATIONS = [
     ("M417", "存在性闸门恒说\'这一格没画\'⇒ 本机 2× 必须红（\'永远 NOT_RUN\'不能免费）。"
              "这一格拦的是最省事的那种修法：把判据降级成 skip 就当作修好了",
      UCH,
-     '            let placeholderDrawn = inkUnfocused >= 20\n',
-     '            let placeholderDrawn = inkUnfocused >= 100000  // R78 变异：永远说没画\n'),
+     # R384 重钉：R80 之后这条存在性闸门改成 `spanWidthPt && textOnlyInk` 两个前提。
+     # 针钉当前那一行，刀仍把「有没有画」压成恒 false。
+     '            let placeholderDrawn = spanWidthPt >= Self.placeholderMinSpanPoints && textOnlyInk >= 20\n',
+     '            let placeholderDrawn = spanWidthPt >= Self.placeholderMinSpanPoints && textOnlyInk >= 100000  // R78 变异：永远说没画\n'),
 
     ("M418", "把存在性尺的地板从 8/255 抬到 250/250 ⇒ 它什么都读不到 ⇒ 闸门在 2× 上误判成\'没画\'而红。"
              "钉的是那把新尺子**承重**：它不是给日志多加一列",

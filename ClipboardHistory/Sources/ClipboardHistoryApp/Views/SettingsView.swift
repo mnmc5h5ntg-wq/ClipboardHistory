@@ -109,6 +109,8 @@ struct SettingsView: View {
     /// 存档体积翻几倍，而 RTF 里还常带着来源元数据。
     @AppStorage(RichTextPolicy.enabledKey) private var preserveRichText = false
     @State private var newExcludedBundleID = ""
+    /// R384：登录项回执的颜色要看外观（系统红在暗档的离屏帧里只有 2.87:1，低于说明文字档）。
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(OCRPolicy.modeKey) private var ocrModeRaw = OCRPolicy.StorageMode.persisted.rawValue
     @State private var exportMessage: String?
     /// 「按 App 排除」名单增删的回执（R8 / 审计 B-P2）。
@@ -363,7 +365,14 @@ struct SettingsView: View {
                         if let message = loginItemSettings.message {
                             Text(message)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                // R384：失败回执用错误色，与「本机不支持」的静态说明分开
+                                // （快捷键页的非法录制回执也是红字；同一套状态语言）。
+                                // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
+                                .foregroundStyle(loginItemSettings.lastActionFailed
+                                                 ? AnyShapeStyle(colorScheme == .dark
+                                                     ? Color(red: 1.0, green: 0.48, blue: 0.44)
+                                                     : Color.red)
+                                                 : AnyShapeStyle(.secondary))
                         }
                     }
 

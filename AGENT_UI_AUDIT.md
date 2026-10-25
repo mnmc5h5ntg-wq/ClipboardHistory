@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 383 轮（R384 · 2026-10-26 · U-1343…U-1347）：R383 两跑分诊（新判据在 runner 平涂页上没读数）+ 快捷键判据能力闸门；登录项失败回执改为错误色 + M1015（U-1343…U-1347 · 产品 1 文件，动效主线）
+
+- **U-1343：CI 分诊（全部失败步骤）。** `40228710640 ↔ 02e89cf`、`40228793715 ↔ 0f408a8` 两跑 `conclusion=failure`；`ci_read.py steps` 只有 `STEP[15] Swift tests (executed-count gate)` 与 `STEP[17] Capture gate`。步骤名可解析。R382 的权重判据**已过**（runner `WEIGHTS_RESET_STATE light 默认 墨=288 最大偏离=115 | 动过 墨=607 最大偏离=195`）——R383 的语义带修法有效。仍红的是 R383 新判据：runner 上 `SHORTCUT_RESET_STATE light 默认 墨=0 最大偏离=2 | 改过 墨=0 最大偏离=2` ⇒ 整页平涂、按钮一个墨都没有；`Executed 1033 tests, with 56 tests skipped and 4 failures`、`CAPTURE_GATE_CASES passed=89 skipped=12 failed=1`（**更正**：初版生成器用了第一处 `Executed` 套件行 102/12/4；全量那一行是 1033/56/4 —— 解析器已改成取 executed 最大的一行）。改动前 `43ff699 ↔ 40221947072` success。
+- **U-1344：能力闸门（判据侧）。** R383 的教训写成代码：快捷键判据先量**内容区**墨（x≥260pt、全高）；本机 `SHORTCUT_RESET_CAPABILITY light 整页墨=62696 / dark=64756`，判；墨 <100 的机器走具名 `SHORTCUT_RESET_NOT_RUN=flat-page`，不把「没画」读成「禁用态没画」。登录回执判据同样带 flat-page 出口。本机判据全绿；重推后的 runner 复验留给下一轮 ⓪。
+- **U-1345：产品位（登录项失败回执）。** 「开机启动开启失败」与「当前系统不支持」两条回执在视图里都是 `.secondary` ⇒ 失败与能力边界同色。给 `LoginItemSettings` 加 `lastActionFailed`（成功清 false、catch 置 true），失败回执用动态错误色：亮档 `Color.red`、暗档 `Color(red:1.0,green:0.48,blue:0.44)`。**颜色是被既有判据逼出来的**：纯红在暗档只有 2.87:1（低于 caption 地板），深红在亮档 9.88:1（高于天花板）——三跑之后才落在 [地板, 天花板] 内。182 张帧 `same=180 changed=2`，两张变化都只在失败回执那一行（bbox 354..640×278..299）。
+- **U-1346：判据与刀。** 新判据 `testLoginFailureReceiptIsVisuallyDistinctFromTheUnsupportedNote` 数整帧**红占优**像素（坐标无关）：失败帧 `light 红=2370 / dark 红=2116`、说明帧 `0/0`；`M1015`（失败也灰）`CAUGHT`。我们的产品改动打断了 r39 的 M177 块针（自己造成的 rot）⇒ 重钉到当前 `if let message` 块并单臂 `CAUGHT`；r78 的 M417 重钉到 `spanWidthPt && textOnlyInk` 那一行，整表 **6/6 CAUGHT**。`HIDDEN_ARMS 表=226 可判=809 rot=4 … 上界 rot=4 … 处置=ok`（5→4）。
+- **U-1347：真机判掉的一处「疑似缺陷」（不加）。** 离屏 `content-empty` 侧栏的 `clipboard` 图标顶部夹子看起来被裁（探针：ContentView 墨带 117px、独立容器 123px）。用**隔离数据目录**真机启动（空历史、暗档）截图：图标夹子完整 ⇒ 这是 `NavigationSplitView` 侧栏的离屏通道伪影，**不是产品**；`EmptyStateView` 一行未改（实验已撤）。这条与 R381 的白色图标不同：那次真机是产品，这次真机完整。
+
 ## 第 382 轮（R383 · 2026-10-26 · U-1338…U-1342）：CI 两跑分诊（R382 新判据在 runner 上取样机器依赖）+ 快捷键三颗「恢复默认」禁用态 + M1014；367 rot 8→5、退役一刀（U-1338…U-1342 · 产品 1 文件，动效主线）
 
 - **U-1338：CI 分诊（成对 run↔commit）。** `40224259064 ↔ c59b292`、`40224280654 ↔ e9b1f83` 两跑 `conclusion=failure`；`ci_read.py steps` 列出**全部**失败步骤：`STEP[15] Swift tests (executed-count gate)` 与 `STEP[17] Capture gate (unregistered reds must be zero)`（只有这两步）。日志步骤名可解析（`field2` 直方图 4649 行 Release script tests / 3575 行 Swift tests，无 `UNKNOWN STEP`）⇒ 允许按步骤名切片。正文：六朵红全在 R382 新判据 `testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault`（`13467/13469/13473` × 两档），runner 读数 `WEIGHTS_RESET_STATE light 默认 fill=230 墨=0 最大偏离=23 | 动过 同`、暗档同形 ⇒ 1x 上与字体度量变化让**那枚 72×22pt 的小取样矩形**没压住标签。改动前那一跑 `40221947072 ↔ 43ff699` 是 success ⇒ 这一朵是 R382 引入的回归。

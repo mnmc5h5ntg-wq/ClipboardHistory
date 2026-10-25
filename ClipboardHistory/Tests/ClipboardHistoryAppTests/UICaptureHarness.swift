@@ -13547,10 +13547,44 @@ final class UICaptureTests: XCTestCase {
             return bitmap
         }
 
+        // R384：整页墨能力闸门。R383 的 runner（1x、settings 页平涂）上这条带读到
+        // `墨=0 最大偏离=2`，而产品/判据都没坏 —— 是这台机器拍不出这一页（同 `CARD_BAND
+        // settings-shortcuts light 墨行=0`）。能力不足时按 D-371 的规矩走**具名 NOT-RUN**，
+        // 不许把「没画」读成「禁用态没画」。
+        func pageInk(_ rep: NSBitmapImageRep) -> Int {
+            guard let base = rep.bitmapData else { return 0 }
+            let w = rep.pixelsWide, h = rep.pixelsHigh
+            let scale = Double(w) / 720.0
+            // 只量**内容区**（x≥260pt）：侧栏那六行标签在 runner 上可能还画得出来，
+            // 而这一页的卡片文字是平涂（`CARD_BAND settings-shortcuts light 墨行=0`）。
+            // 能力位要问「这一页的内容画出来了吗」，与 `SIDEBAR_ICON` 的内容区能力同一条界线。
+            let x0 = Int(260 * scale), y0 = Int(60 * scale)
+            func lum(_ x: Int, _ y: Int) -> Int {
+                let o = y * rep.bytesPerRow + x * 4
+                return Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                            + 0.0722 * Double(base[o + 2])).rounded())
+            }
+            var hist: [Int: Int] = [:]
+            for y in y0..<h { for x in min(x0, w - 1)..<w { hist[lum(x, y) / 4, default: 0] += 1 } }
+            let paper = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+            var ink = 0
+            for y in y0..<h { for x in min(x0, w - 1)..<w { if abs(lum(x, y) - paper) > 20 { ink += 1 } } }
+            return ink
+        }
+
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .aqua ? "light" : "dark"
-            let off = reading(try rep("r383-shortcuts-default", appearance, nil))
-            let on = reading(try rep("r383-shortcuts-adjusted", appearance, .defaultQuickPickShortcut))
+            let offRep = try rep("r383-shortcuts-default", appearance, nil)
+            let onRep = try rep("r383-shortcuts-adjusted", appearance, .defaultQuickPickShortcut)
+            let capability = pageInk(onRep)
+            emit("SHORTCUT_RESET_CAPABILITY \(tag) 整页墨=\(capability)")
+            if capability < 100 {
+                throw XCTSkip("SHORTCUT_RESET_NOT_RUN=flat-page：\(tag) 这台机器拍不出快捷键设置页"
+                              + "（整页墨=\(capability)）⇒ 两态按钮判不了；这是通道能力，不是产品。"
+                              + "R383 的 runner 就是这一档。")
+            }
+            let off = reading(offRep)
+            let on = reading(onRep)
             emit("SHORTCUT_RESET_STATE \(tag) 默认 fill=\(off.fill) 墨=\(off.ink) 最大偏离=\(off.maxDev)"
                  + " | 改过 fill=\(on.fill) 墨=\(on.ink) 最大偏离=\(on.maxDev)")
             XCTAssertGreaterThan(on.ink, 0,
@@ -13561,6 +13595,55 @@ final class UICaptureTests: XCTestCase {
                                      + "或者有人把 `HotKeySettingsRow` 的 `.disabled(...)` 拿掉了")
             XCTAssertLessThanOrEqual(off.ink, on.ink,
                                      "\(tag)：默认页标签墨 \(off.ink) 多于改过页 \(on.ink) ⇒ 取样带压错对象")
+        }
+    }
+
+    /// R384：「开机启动失败」的回执必须是**错误色**，不能与「本机不支持」的静态说明同色。
+    /// 判据坐标无关：只数整帧里**红占优**的文字像素。失败帧有红色回执，说明帧一个都没有；
+    /// 通道拍不出这一页（runner 的 settings 平涂）时走具名 NOT-RUN，不把「没画」读成「没红」。
+    func testLoginFailureReceiptIsVisuallyDistinctFromTheUnsupportedNote() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r384-login-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func inkStats(_ rep: NSBitmapImageRep) -> (contentInk: Int, red: Int) {
+            guard let base = rep.bitmapData else { return (0, 0) }
+            let w = rep.pixelsWide, h = rep.pixelsHigh
+            let scale = Double(w) / 720.0
+            let contentX = Int(260 * scale)
+            var contentInk = 0, red = 0
+            for y in 0..<h {
+                for x in 0..<w {
+                    let o = y * rep.bytesPerRow + x * 4
+                    let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
+                    let lum = Int((0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)).rounded())
+                    if x >= contentX && lum < 200 { contentInk += 1 }
+                    if r - max(g, b) > 40 && r > 120 { red += 1 }
+                }
+            }
+            return (contentInk, red)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            guard let failed = renderFixtureRep("settings-general-login-failed", appearance, scratch),
+                  let note = renderFixtureRep("settings-general-login-unsupported", appearance, scratch) else {
+                return XCTFail("\(tag)：login 两帧读不回 ⇒ 这条判据没有对象")
+            }
+            let f = inkStats(failed), n = inkStats(note)
+            emit("LOGIN_RECEIPT_STATE \(tag) 失败帧 内容墨=\(f.contentInk) 红=\(f.red)"
+                 + " | 说明帧 内容墨=\(n.contentInk) 红=\(n.red)")
+            if f.contentInk < 100 && n.contentInk < 100 {
+                throw XCTSkip("LOGIN_RECEIPT_NOT_RUN=flat-page：\(tag) 这台机器拍不出通用页"
+                              + "（失败帧内容墨=\(f.contentInk)、说明帧=\(n.contentInk)）⇒ 颜色判不了；"
+                              + "这是通道能力，不是产品。")
+            }
+            XCTAssertGreaterThan(f.red, 20,
+                                 "\(tag)：失败回执在整帧里没有红占优的文字像素（红=\(f.red)）"
+                                     + " ⇒ 它又被画成了和静态说明一样的次级灰")
+            XCTAssertEqual(n.red, 0,
+                           "\(tag)：说明帧出现了 \(n.red) 个红占优像素 ⇒ 别把「不支持」也染成错误色")
         }
     }
 
