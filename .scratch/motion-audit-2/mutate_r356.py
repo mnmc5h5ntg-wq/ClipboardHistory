@@ -34,6 +34,9 @@ NEEDLE = (u"        guard let holeA = pillRun(profile: rowA, pillLevel: levels.p
           u"                                  mergeInk: true) else { return nil }")
 REPL = NEEDLE.replace(u"mergeInk: true", u"mergeInk: false")
 
+# R361 / BACKLOG 367：表自己声明针（rot 做成上界只有这一条路）。值与 ARMS 里用的是同一份常量。
+NEEDLES = {'M1006': [NEEDLE]}
+
 ARMS = [
     ("M1006", u"调用点：两处 mergeInk 改回 false ⇒ 被标签墨劈开的行必须重新判洞太窄",
      FILM,

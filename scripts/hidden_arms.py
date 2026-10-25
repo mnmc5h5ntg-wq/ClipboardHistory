@@ -45,7 +45,9 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 ROT_CEILING = 33
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
-DECLARED_TABLES_CEILING = 2  # R313 现读：mutate_r308 与 mutate_r312 已声明 NEEDLES
+DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。
+# R361 的一条读数：把四张表从"启发式判活"改成"自己声明"之后，rot 与抽不出**一个数都没动**（33 / 6）——
+# 因为那四把针本来就是活的；声明的收益是"已判"从下界变成确数（declared_dead 可加总），不是让 rot 变小。
 # 注：这里**必须**单反斜杠。R310 交付时它写的是 `r"M\\d{3,4}"` —— 在 raw 字符串里那是
 # 「反斜杠 + d」，正则永远不命中，于是刀号归因静默退化成「臂#N」整整三轮，
 # 直到 R313 的声明对账格（NEEDLES 的键要靠刀号匹配）把它撞出来。

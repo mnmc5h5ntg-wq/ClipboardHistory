@@ -16,6 +16,9 @@ CELL = u"MotionPillRampTests/testPillSlideExitReasonSeparatesReduceOnFromChannel
 RED = u"testPillSlideExitReasonSeparatesReduceOnFromChannel"
 NEEDLE = u'        return reduceMotion ? "reduce-motion-on" : "pill-slide-arms-indistinguishable"'
 REPL = u'        return reduceMotion ? "pill-slide-arms-indistinguishable" : "reduce-motion-on"'
+# R361 / BACKLOG 367：表自己声明针（rot 做成上界只有这一条路）。值与 ARMS 里用的是同一份常量。
+NEEDLES = {'M1008': [NEEDLE]}
+
 ARMS = [("M1008", u"原因对调（reduce→通道）⇒ 分叉证人必须红", FILM, NEEDLE, REPL, RED, CELL)]
 S = {}
 def sh(cmd):

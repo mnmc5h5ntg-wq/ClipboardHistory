@@ -12,6 +12,27 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R361 状态（2026-10-25 · 本地 · 第 360 轮 / Round 358）：367 第一步 —— 四张新表声明 NEEDLES（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R361 / 第 360 轮 / Round 358）：r355/r356/r358/r360 各加 `NEEDLES = {刀号: [NEEDLE]}`；
+`hidden_arms` 现读 已声明表=6 / 死针=0 / rot=33 / 抽不出=6，棘轮 2→6；**rot 没动**（那四把针本来就活着，声明把下界变确数）；
+`test_hidden_arms` 8/8、电池 `Ran 659（skipped=4）OK`（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`queue` 现读 R357–R360 四跑仍在队里（queued/in_progress），只登记不轮询。
+② 367：四张新表声明 NEEDLES（值与 ARMS 同一常量）；`hidden_arms.py` 处置=ok。
+③ 棘轮：`DECLARED_TABLES_CEILING` 2→6，注释写明"rot/抽不出 一个数都没动"的原因。
+④ 测试：`test_hidden_arms` 8/8；本机不动 Swift/产品 ⇒ 全量/胶片/基线沿用。
+
+验证读数（现读）：`HIDDEN_ARMS 表=221 可判=804 rot=33 抽不出=6 已声明表=6 已声明死针=0 上界 … 处置=ok`；
+脚本电池 `Ran 659（skipped=4）OK`；产品面连续零改动 **6** 轮（`python3 scripts/product_streak.py --streak-for 360` 现读）。
+
+NOT-RUN（分开写）：① 下一批 33 + 6 个臂的声明（按两箱点名，未做）；② 工具不判"声明值是不是这一臂真用的那根"
+（只有 `test_hidden_arms` 的合成对账）；③ runner 的 R357–R360 四跑（下一轮读）；④ 真机腿没跑。
+
+下一轮（R362）的靶：⓪ 读四跑（`MOTION_REDUCE_SOURCES` 三源 + 376 的出口文本）；
+① 367 下一批：按 `HIDDEN_ROT` / `HIDDEN_OPAQUE` 的点名表挑 2–3 张声明；② 426（刀的 diff 判法）。
+
 ## R360 状态（2026-10-25 · 本地 · 第 359 轮 / Round 357）：376 出口先分叉 —— reduce-on 记产品行为（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R360 / 第 359 轮 / Round 357）：`pillSlideExitReason` 把「三臂不可分」分成

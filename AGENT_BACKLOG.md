@@ -8620,3 +8620,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     **收口条件**：下一跑 runner 日志里二选一 —— 出现 `reduce-motion-on` 即按产品行为结案；
     若仍是 `pill-slide-arms-indistinguishable` 且 `catalog=off`，第二通道那条欠账继续挂着。
 
+
+367 追记（R361）：第一步 —— r355/r356/r358/r360 各声明 `NEEDLES = {刀号: [NEEDLE]}`，
+    `hidden_arms` 现读 `表=221 可判=804 rot=33 抽不出=6 已声明表=6 已声明死针=0 处置=ok`；
+    棘轮 `DECLARED_TABLES_CEILING` 2→6，`test_hidden_arms` 8/8。
+    **重要读数**：rot / 抽不出一个都没动（33/6）—— 那四把针本来就是活的；声明把"已判"从下界变成确数，
+    不替人修死针。下一步按 `HIDDEN_ROT` / `HIDDEN_OPAQUE` 两箱点名到表去改，不再按"最新的表"改。
+

@@ -32,6 +32,9 @@ REPL = (u"        let rel = Swift.max(Self.relativeDifference(endpointDark, endp
         u"                            Self.relativeDifference(unionDark, unionLight),\n"
         u"                            Self.relativeDifference(inkDark, inkLight))")
 
+# R361 / BACKLOG 367：表自己声明针（rot 做成上界只有这一条路）。值与 ARMS 里用的是同一份常量。
+NEEDLES = {'M1007': [NEEDLE]}
+
 ARMS = [
     ("M1007", u"判词：把墨量差塞回 max（恢复 R326）⇒ 墨量抬判定的两格必须红",
      FILM,

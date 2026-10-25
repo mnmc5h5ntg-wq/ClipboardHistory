@@ -32,6 +32,9 @@ RED_NAME = u"testEmptyStateStillFadesWhenMotionIsReduced"
 NEEDLE = u"        .animation(MotionCatalog.animation(for: .slider, reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"
 REPL = u"        .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"
 
+# R361 / BACKLOG 367：表自己声明针（rot 做成上界只有这一条路）。值与 ARMS 里用的是同一份常量。
+NEEDLES = {'M1005': [NEEDLE]}
+
 ARMS = [
     ("M1005", u"产品：空态淡出改回 slideAnimation（reduce 下 = .linear(duration: 0)）⇒ reduce 播放必须红",
      VIEW,
