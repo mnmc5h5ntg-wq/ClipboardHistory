@@ -25,20 +25,13 @@ from pathlib import Path
 # 每一格 = (台账里的行名, 从日志里抓什么的正则)。正则必须**只**匹配电池自己打出的键，
 # 不匹配任何我可能手写进日志的说明文字（所以全部锚定行首）。
 ROWS = [
-    ("构建", r"^BUILD_EXIT=\d+ BUILD_WARNING_LINES=\d+"),
-    ("全量测试", r"^TEST_EXIT=\d+ .*"),
-    ("在屏那一卷", r"^PROBE_EXIT=\d+ .*"),
-    ("捕获卷", r"^CAPTURE_EXIT=\d+ .*"),
-    ("帧基线", r"^FRAMES_EXIT=\d+ .*"),
-    ("脚本电池", r"^PY_EXIT=\d+ .*"),
-    ("变异表", r"^MUT_EXIT=\d+ .*"),
-    ("台账编号守卫", r"^LEDGER_EXIT=\d+ .*"),
-    ("曲线仪器", r"^VIS_EXIT=\d+ .*"),
-    # R103：断言/读数包含对账进了电池（`CONTAIN_EXIT`）⇒ §8 也要能解析它，
-    # 否则这一格的值只能靠我手抄，而"手抄"正是这个脚本存在的理由（U-264 那一族）。
-    ("断言包含对账", r"^CONTAIN_EXIT=\d+ .*"),
-    ("摘要缺值", r"^SUMMARY_MISSING=\d+"),
-    ("总结论", r"^VERIFY_OK=\d+"),
+    # R352 / BACKLOG 397：这十二格以前要 `BUILD_EXIT` / `TEST_EXIT` / … / `VERIFY_OK` 十二个键，
+    # 而现在的 `scripts/round_verify.sh` 只打**一行**（`ROUND_VERIFY build_warnings=… swift_executed=…
+    # swift_failures=… frames=… baseline_changed=… dmg=… installed_version=… dir=…`）。
+    # 于是 §8 长期挂着 12 个"!! 日志里没有这一格"——**洞是真的**，但成因是那份旧的多步验证器已经不在。
+    # 处置是**退役**那十二格（不是放宽判据）：§8 只搬这一行，键名与 `round_verify.sh` 的单一来源
+    # 由 `scripts/tests/test_ledger_rows_keys.py` 对账（键不在那一行里就红）。
+    ("验证流水线", r"^ROUND_VERIFY .*"),
 ]
 
 # 本轮读数：把这些前缀的行原样搬进表格（不重排、不改数字）。

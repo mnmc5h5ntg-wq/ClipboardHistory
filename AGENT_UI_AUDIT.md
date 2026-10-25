@@ -363,6 +363,22 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 351 轮（R352 · 2026-10-25 · U-1229…U-1232）：§8 的十二个洞是退役验证器留下的 —— 退役它们，留出处（U-1229…U-1232 · 产品 0 文件，判据账）
+
+- **U-1229：十二格的成因找到了。** `ledger_rows.py` 的 ROWS 要 `BUILD_EXIT` / `TEST_EXIT` / `PROBE_EXIT` /
+  `CAPTURE_EXIT` / `FRAMES_EXIT` / `PY_EXIT` / `MUT_EXIT` / `LEDGER_EXIT` / `VIS_EXIT` / `CONTAIN_EXIT` /
+  `SUMMARY_MISSING` / `VERIFY_OK` 十二个键；而现在的 `scripts/round_verify.sh` 只打**一行**
+  `ROUND_VERIFY build_warnings=… swift_executed=… swift_failures=… frames=… baseline_changed=… dmg=… installed_version=… dir=…`。
+  那套多步验证器已经不在了 ⇒ 十二格长期是"!! 日志里没有这一格"。**洞是真的，但成因不是手抄偷懒。**
+- **U-1230：处置是退役（不是放宽）。** ROWS 换成一行 `("验证流水线", r"^ROUND_VERIFY .*")`，并在表上方写明
+  这十二格为什么退役、出处是 BACKLOG 397。§8 从此每一格都有真读数 —— 格少了，但没有一格是洞。
+- **U-1231：新守卫（`test_ledger_rows_keys`）两次读错对象，都是它自己红出来的。** ① 先要求"`echo ROUND_VERIFY`
+  恰好一处"，可早退那一行（`ABORTED_AT_WARNING_GATE`）也算一处 ⇒ 读到 2；改成取**最后**一处。
+  ② 又把 `key=$VAR` 用负向前瞻排除掉了 —— 验证器打的全是 `key=$变量` 形状 ⇒ 读到 **0** 个键，红线是"太少了"。
+  两处都是"尺没对上对象"（D-341 一族），不是判据没牙。
+- **U-1232：电池与全量。** 脚本电池 `Ran 648（skipped=4）OK`（比上一轮多 2 格：本守卫两格）；
+  这一轮没有产品代码改动（`swift` 侧未跑 —— 上一轮的 1025 格仍是本树最近一次全量证据）。
+
 ## 第 350 轮（R351 · 2026-10-25 · U-1224…U-1228）：413 结案 —— 名册早就在，两档无障碍状态只能当输入（U-1224…U-1228 · 产品 0 文件，判据账）
 
 - **U-1224：六格 backing 读数现读（2 外观 × 3 档，每档带来源）。**
