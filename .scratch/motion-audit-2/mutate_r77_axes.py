@@ -95,8 +95,18 @@ MUTATIONS = [
     ("M406", "alpha 用 signed 差、不取绝对值 ⇒ 『变淡』与『变浓』读出两个数，"
              "而淡出那一臂正好是变淡。极性那一格必须红",
      MFT,
-     '                let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))\n',
-     '                let alpha = Int(b.pixels[p + 3]) - Int(a.pixels[p + 3])  // R77 变异\n'),
+     # R387 重钉：同一行在盘上出现 **两处**（均值器与 changedFraction），旧针命中 2 ⇒ NOT-APPLIED。
+     # 带上下文钉到 changedFraction 那一处（后面紧跟 changedRgb/changedAlpha 计数）。
+     '                let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),\n'
+     '                              max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),\n'
+     '                                  abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))\n'
+     '                let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))\n'
+     '                if rgb > 8 { changedRgb += 1 }\n',
+     '                let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),\n'
+     '                              max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),\n'
+     '                                  abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))\n'
+     '                let alpha = Int(b.pixels[p + 3]) - Int(a.pixels[p + 3])  // R77 变异\n'
+     '                if rgb > 8 { changedRgb += 1 }\n'),
 
     ("M407", "把 `PressInteractionProbeTests.changedFraction` 改回只读三根通道（本轮修前的样子）"
              "⇒ 守卫必须点名这条未登记的盲区尺",

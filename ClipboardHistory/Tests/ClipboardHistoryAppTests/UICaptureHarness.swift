@@ -13853,6 +13853,14 @@ final class UICaptureTests: XCTestCase {
     /// **刻度是这张图里唯一被读的东西**，它没有理由待在比控件更淡的一档。
     ///
     /// 自己拍自己量（R20 立的规矩），且不依赖 `CLIPBOARD_HISTORY_UI_SHOTS` ⇒ CI 上真的跑。
+    func testCaptionDrawabilityHasANegativeHalf() {
+        XCTAssertEqual(Self.captionDrawability(columnPixels: 12, pagePixels: 0), .drawable)
+        XCTAssertEqual(Self.captionDrawability(columnPixels: 0, pagePixels: 0), .machineFlat,
+                       "页也 0 墨才是「这台机器画不出」")
+        XCTAssertEqual(Self.captionDrawability(columnPixels: 0, pagePixels: 5000), .rulerBroken,
+                       "页有墨而探针列没有 ⇒ 尺坏了，必须红，不许 skip 吞掉（BACKLOG 435）")
+    }
+
     func testCaptionTextStaysOnTheSecondaryTier() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r27-caption-\(UUID().uuidString)", isDirectory: true)
@@ -13894,9 +13902,24 @@ final class UICaptureTests: XCTestCase {
                 let columnInk = Self.textInkMass(bytes: base, width: rep.pixelsWide,
                                                  height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
                                                  rect: column, scale: scale)
-                if !Self.columnIsDrawable(textInkPixels: columnInk.pixels) {
+                let pageRect = CGRect(x: 260, y: 0,
+                                      width: max(1, fixture.size.width - 260),
+                                      height: fixture.size.height)
+                let pageInk = Self.textInkMass(bytes: base, width: rep.pixelsWide,
+                                               height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                               rect: pageRect, scale: scale)
+                switch Self.captionDrawability(columnPixels: columnInk.pixels,
+                                               pagePixels: pageInk.pixels) {
+                case .drawable:
+                    break
+                case .machineFlat:
                     emit("CAPTION_NOT_RUN \(probe.fixture)/\(probe.what) \(tag) "
-                          + "探针所在列 \(column) 读到 0 个文字墨像素")
+                          + "探针所在列 \(column) 读到 0 个文字墨像素（页内容区也 0）")
+                    continue
+                case .rulerBroken:
+                    XCTFail("\(tag)：探针框坏了 —— 页内容区有 \(pageInk.pixels) 个文字墨像素，"
+                            + "而探针列 \(column) 一个都没有 ⇒ 框搬走了/尺坏了，"
+                            + "这不是「这台机器画不出」；不许走 CAPTION_NOT_RUN 把它 skip 掉（BACKLOG 435）")
                     continue
                 }
                 judged += 1
@@ -13997,6 +14020,21 @@ final class UICaptureTests: XCTestCase {
     /// 于是三条设置页探针全部走进"有墨却贴到空白"的红分支。
     /// 判据要问的区域**必须就是它自己要读的那块区域**（R34）。
     static func columnIsDrawable(textInkPixels: Int) -> Bool { textInkPixels > 0 }
+
+    /// R387 / BACKLOG 435：出口要能说「不」。探针列 0 墨有两种完全不同的成因：
+    /// 整页平涂（机器画不出）与**框搬走了/尺坏了**。只看探针列会把第二种也 skip 掉。
+    /// 负半：列 0 墨但**页内容区有墨** ⇒ 必须红；正半：页也 0 墨 ⇒ 才是机器画不出。
+    enum CaptionDrawability: Equatable {
+        case drawable
+        case machineFlat
+        case rulerBroken
+    }
+
+    static func captionDrawability(columnPixels: Int, pagePixels: Int,
+                                   pageFloor: Int = 50) -> CaptionDrawability {
+        if columnPixels > 0 { return .drawable }
+        return pagePixels >= pageFloor ? .rulerBroken : .machineFlat
+    }
 
     /// 三张同源帧的"内容列有没有墨"折成一个决定（R39b）。
     ///

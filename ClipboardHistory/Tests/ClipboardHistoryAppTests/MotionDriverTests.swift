@@ -119,29 +119,31 @@ final class MotionDriverTests: XCTestCase {
     /// 纯源码形状判据（过渡的过程不进静态帧 —— 那条记在胶片 NOT-RUN 里）；这里钉的是
     /// 「声明还在、键就是禁用条件」这件事，配 M1016/M1017 两把刀各删一处。
     static func resetFadeIsDriven(in code: String, key: String) -> Bool {
-        code.contains(".animation(MotionCatalog.animation(for: .selection), value: \(key))")
+        code.contains(".opacity(\(key) ? 0.55 : 1)")
+            && code.contains(".animation(MotionCatalog.animation(for: .selection), value: \(key))")
     }
 
+    /// R387 更正 R385：只挂 `.animation(value:)` 时按钮上没有可动画属性，胶片只掉两帧。
+    /// 显式给一个随状态变化的 opacity，并让 `.selection` 的键就是禁用条件；这一格钉两件事
+    /// 在**同一处**（只查「有动画」会把别的动画也算进来）。
     func testResetButtonDisabledTransitionsAreDriven() throws {
         let settings = Self.stripCommentLines(try productSource(named: "Views/SettingsView.swift"))
         XCTAssertTrue(Self.resetFadeIsDriven(in: settings,
                                              key: "shortcut == settings.action.defaultShortcut"),
-                      "快捷键页「恢复默认」的禁用切换没有 `.selection` 过渡驱动 ⇒ 默认↔动过会硬切；"
-                          + "要把 `.animation(MotionCatalog.animation(for: .selection), value: shortcut == settings.action.defaultShortcut)` 加回按钮上")
+                      "快捷键页「恢复默认」没有显式 opacity + `.selection` 过渡 ⇒ 默认↔动过会硬切")
         let weights = Self.stripCommentLines(try productSource(named: "Views/RecommendationWeightsView.swift"))
         XCTAssertTrue(Self.resetFadeIsDriven(in: weights, key: "store.weights == .default"),
-                      "权重页「恢复默认」的禁用切换没有 `.selection` 过渡驱动 ⇒ 默认↔动过会硬切；"
-                          + "要把 `.animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)` 加回按钮上")
+                      "权重页「恢复默认」没有显式 opacity + `.selection` 过渡 ⇒ 默认↔动过会硬切")
     }
 
     func testResetFadeScanIsATruthTable() {
-        let live = ".animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)"
+        let live = ".opacity(store.weights == .default ? 0.55 : 1)\n.animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)"
         XCTAssertTrue(Self.resetFadeIsDriven(in: live, key: "store.weights == .default"))
         XCTAssertFalse(Self.resetFadeIsDriven(in: live, key: "shortcut == settings.action.defaultShortcut"),
                        "拿另一个键去问同一行必须说没有 ⇒ 否则这条尺只认前缀、不认键")
-        XCTAssertFalse(Self.resetFadeIsDriven(in: "view.animation(.easeInOut, value: store.weights == .default)",
+        XCTAssertFalse(Self.resetFadeIsDriven(in: ".animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)",
                                               key: "store.weights == .default"),
-                       "换成别的动画也算驱动 ⇒ 判据把『有动画』当成了『有这支过渡』")
+                       "只有 animation 没有可动画属性 ⇒ R385 的死法，必须判没有")
     }
 
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。

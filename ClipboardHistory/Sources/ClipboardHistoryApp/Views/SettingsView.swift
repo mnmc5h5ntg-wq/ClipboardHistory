@@ -821,15 +821,18 @@ private struct HotKeySettingsRow: View {
                 )
                 .frame(width: 128, height: 28)
 
-                Button("恢复默认") {
-                    settings.reset()
-                    shortcut = settings.shortcut
-                }
+                HStack(spacing: 0) {
+                    Button("恢复默认") {
+                        settings.reset()
+                        shortcut = settings.shortcut
+                    }
                 // R383：快捷键已是默认值时这颗按钮点了不产生任何变化 —— 与 R382 的权重页同一条规矩，
                 // 禁用态是它唯一诚实的呈现。判据读的是**整页两态**渲染出的按钮标签墨
                 // （`testShortcutResetButtonsAreDisabledWhenShortcutsAreDefault`）。
                 .disabled(shortcut == settings.action.defaultShortcut)
-                // R385：与权重页同一支过渡，默认↔动过不硬切。
+                // R387：与权重页同一条显式 opacity 过渡（R385 的 `.animation` 没有可动画属性）。
+                }
+                .opacity(shortcut == settings.action.defaultShortcut ? 0.55 : 1)
                 .animation(MotionCatalog.animation(for: .selection), value: shortcut == settings.action.defaultShortcut)
             }
 

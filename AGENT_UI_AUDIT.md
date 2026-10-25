@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 386 轮（R387 · 2026-10-26 · U-1355…U-1359）：R385 的过渡被胶片证明是死的 —— 显式 opacity 修复 + 1x/2x 两倍率正对证；M406 重钉整表 10/10；435 负半证人（U-1355…U-1359 · 产品 1 文件，动效主线）
+
+- **U-1355：胶片把 R385 的「过渡」判成死的。** 新场景 `settings-reset-fade`（只拍右列卡头 x 70..98%、顶部 200pt 的按钮带）第一版 `captureRect` 按 `height-260` 取带，落在下方滑杆区 ⇒ 30 帧全等（`premise-not-visible`）——那是**探针取错坐标**（NSHostingView 是 flipped），不是产品；按 `isFlipped` 取顶部后现读 `MOTION settings-reset-fade … 过渡帧数=3`。但 R385 的 `.animation(value:)` 只有 2 个过渡帧 ⇒ 0.12s 的声明是**死动画**（按钮上没有可动画属性）。
+- **U-1356：产品修复（显式 opacity）。** 两颗「恢复默认」外层加 `HStack(spacing: 0)` wrapper，挂 `.opacity(isDefault ? 0.55 : 1)` + `.animation(MotionCatalog.animation(for: .selection), value: isDefault)`；`disabled` 仍管命中/语义。胶片现读 2x `帧数=27 过渡帧数=3 峰值=0.0542`、1x `帧数=27 过渡帧数=4 峰值=0.0230`（声明 120ms）——两倍率都 ≥2，且 strip 逐帧看得到由深到浅。端态 182 张帧 `same=170 changed=12`，12 张变化全在重置按钮区（bbox 只在 `weights`/`settings-recommendations*`/`settings-shortcuts*`/`settings-min` 的按钮列），`weights-adjusted` 与 enabled 态不动；帧基线同笔 update。
+- **U-1357：M406 重钉。** 旧针 `let alpha = abs(...)` 在盘上命中 **2 次**（均值器与 changedFraction）⇒ NOT-APPLIED。带上下文钉到 changedFraction 那一块（后跟 `if rgb > 8 { changedRgb += 1 }`）；r77 **整表 10/10 CAUGHT**（M403–M412，含 M406），`HIDDEN_ARMS … rot=0 上界=0 处置=ok`。
+- **U-1358：435 的负半证人。** `captionDrawability(columnPixels:pagePixels:)` 把「探针列 0 墨」拆成 `.drawable` / `.machineFlat`（页也 0 墨 ⇒ NOT-RUN）/ `.rulerBroken`（页有墨而列没有 ⇒ **红**）；真值表 `testCaptionDrawabilityHasANegativeHalf` 三格；`M1018`（rulerBroken→machineFlat）`CAUGHT`；caption tier 守卫本机仍绿（41.25s）。
+- **U-1359：⓪ 网络与 CI。** 本轮只做 1 次同形探测：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；`40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R385/R386 本地提交的跑结论全部**未读**。本地 ahead 在 R387 两笔后为 **6**；不写已推送。恢复后先 push、复核 ahead=0，再读三跑全部失败步骤并把 run↔commit 写回下一轮 ⓪。
+
 ## 第 385 轮（R386 · 2026-10-26 · U-1352…U-1354）：最后两根腐烂针重钉，rot 2→0；M147 的旧目标被重构掉、同义坏法换成「一条都不判」（U-1352…U-1354 · 产品 0 文件，判据账）
 
 - **U-1352：r77 M411 重钉。** 守卫那句已经改成两行（R80 给轴名加了 `lowercased`）⇒ 旧单行针命中 0。针改成两行整块后现读 `M411 CAUGHT`（红在 `testEveryTwoStateRulerReadsBothAxes`）；同一次整表跑 9/10，**M406 记 NOT-APPLIED**（锚点不在盘上）——新的腐烂针，记进 BACKLOG 367 追记。

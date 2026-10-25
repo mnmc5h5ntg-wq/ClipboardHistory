@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R387 状态（2026-10-26 · 本地 · 第 386 轮 / Round 384）：R385 死过渡被胶片证伪 → 显式 opacity；1x/2x 正对证；M406 重钉；435 负半（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R387 / 第 386 轮 / Round 384）：新胶片场景 `settings-reset-fade`（只拍按钮带）先证伪 R385 的 `.animation(value:)` —— 0.12s 只有 2 个过渡帧，是死动画；给两颗「恢复默认」外层加显式 `.opacity(isDefault ? 0.55 : 1)` + `.animation(for: .selection)` 后，现读 2x `帧数=27 过渡帧数=3 峰值=0.0542`、1x `帧数=27 过渡帧数=4 峰值=0.0230`，strip 逐帧由深到浅；端态 182 张帧 `same=170 changed=12`，12 张只动重置按钮列。M406 重钉到 changedFraction 的唯一块（旧针命中 2），r77 **整表 10/10 CAUGHT**；`HIDDEN_ARMS … rot=0 … 上界 rot=0 … 处置=ok`。435：`captionDrawability` 拆三态 + 负半真值表，M1018 `CAUGHT`；caption tier 守卫本机仍绿。`swift build --build-tests` 告警 **0**；全量 `Executed 1039 tests, with 49 tests skipped and 0 failures`（新增胶片采样臂在无环境键时具名 skip）；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **2** 轮（现读 `python3 scripts/product_streak.py --streak-for 386` 的 streak）。
+
+本轮做了什么：
+① ⓪ 网络：1 次同形探测 `api=000` / `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；未推送，CI 三跑未读。
+② 产品位：胶片证伪 R385 死动画；显式 opacity 修复；2x/1x 各 ≥2 帧；端态 12 张帧只动按钮列。
+③ 判据：`testResetFadeSamplerReadsBothScales` + 源守卫更新；M1016/M1017 CAUGHT。
+④ 367：M406 重钉，r77 整表 10/10；rot 0/0。
+⑤ 435：captionDrawability 三态 + 负半真值表 + M1018 CAUGHT；caption tier 仍绿。
+⑥ 验证：构建 0 告警；全量 `1039/49/0`；捕获 `CAPTURED 182 -> /tmp/r387_shots2`；帧基线 `COMPARED=182 CHANGED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；清账表 162=162；预检 `tables=141 covered=124 arms=394 bad=0`、全仓 234 文件 / 878 把。
+
+验证读数（现读）：`RESET_FADE_SCALE` 2x `27/3/0.0542`、1x `27/4/0.0230`；`MOTION settings-reset-fade 过渡帧数=3`；`M1016/M1017`、`M1018` 都 CAUGHT；r77 `抓到=10 逃掉=0`；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=6（`5166a2b`、`479dfaa`、`bb5be1b`、`559cadb` 与本轮两笔）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ R387 的胶片在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 `49` skip 的一部分），不是没红。
+
+下一轮（R388）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与本次推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R387 的过渡若要再验，跑 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 `testResetFadeSamplerReadsBothScales`。
+
 ## R386 状态（2026-10-26 · 本地 · 第 385 轮 / Round 383）：最后两根腐烂针重钉，rot 2→0；M147 旧目标被重构掉、同义坏法换 `prefix(0)`（产品 0 文件，判据账）
 
 最后更新：2026-10-26（本地 · R386 / 第 385 轮 / Round 383）：r77 `M411` 重钉到两行整块（R80 的 lowercased）⇒ `CAUGHT`；r33 `M147` 的旧目标 `gate: 8` 调用已被重构成 `inkContrast`（无 gate 参数），盘上同名 gate 抬到 250 只会 skip ⇒ 同义坏法换成「探针循环 `prefix(0)`」⇒ `CAUGHT`（`judged=0` 那条地板）；`HIDDEN_ARMS 表=227 可判=811 rot=0 … 处置=ok`，`ROT_CEILING` 2→0；r77 整表 9/10、**M406 NOT-APPLIED**（新腐烂针，已记 367）；全量沿用 R385（本轮没动 Swift）：`Executed 1036 tests, with 48 tests skipped and 0 failures`；电池 Ran 683（skipped=4）OK（产品 0 文件 · 判据账）

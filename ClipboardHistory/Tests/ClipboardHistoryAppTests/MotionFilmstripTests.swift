@@ -2400,6 +2400,27 @@ final class MotionFilmstripTests: XCTestCase {
         emit("CLOCK_GATE_P75 干净=[50 51 52 53] 离群=[50 51 52 81] 两个 P75 相同而最大值差 28ms")
     }
 
+    /// R387：同一 `settings-reset-fade` 场景在 2× 与 1× 下都必须读到 ≥2 个过渡帧。
+    /// 只拍按钮带（场景自己的 `captureRect`）；读不到就红，不把「尺在这个倍率上瞎了」写成没动。
+    func testResetFadeSamplerReadsBothScales() throws {
+        try skipUnlessEnabledAndCapable()
+        let scenario = Scenario.resetDefaultFade()
+        for scale in [2.0, 1.0] {
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            emit("RESET_FADE_SCALE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            XCTAssertGreaterThanOrEqual(span, 2,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 这把采样器在这个倍率上读不到过程；"
+                                            + "先查捕获带宽/倍率，别把「读不到」写成「产品没动」")
+        }
+    }
+
     func testTransitionsAreActuallyRunning() throws {
         try skipUnlessEnabledAndCapable()
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
@@ -7585,7 +7606,37 @@ final class MotionFilmstripTests: XCTestCase {
         /// `testListRowsDoNotAnimateAndNothingClaimsTheyDo` 与
         /// `testDetailPreviewCrossfadesOnlyWhenTheKindChanges` 里反向钉着。
         static func all() -> [Scenario] {
-            [noticeBanner(), noticeBannerDismiss(), detailKindChange(), emptyState()]
+            [noticeBanner(), noticeBannerDismiss(), detailKindChange(), emptyState(), resetDefaultFade()]
+        }
+
+        /// R387：R385 的「恢复默认」禁用切换接的是 `.animation(value:)`，但按钮上没有可动画属性 ⇒
+        /// 胶片里只掉两帧。这个场景只拍**按钮带**（右列卡头），把"过渡到底演没演"变成逐帧读数。
+        /// 1×/2× 两倍率的正对证在 `testResetFadeSamplerReadsBothScales` 里另跑。
+        static func resetDefaultFade() -> Scenario {
+            Scenario(name: "settings-reset-fade", size: NSSize(width: 520, height: 880),
+                     prepare: { store in
+                         var w = store.weightsStore.weights
+                         w[.recency] = 1.6
+                         store.weightsStore.weights = w
+                     },
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .selection) * 1000,
+                     appearance: .aqua,
+                     root: { store in
+                         AnyView(RecommendationWeightsView(store: store.weightsStore)
+                             .padding(20)
+                             .frame(width: 520, height: 880)
+                             .background(Color(nsColor: .windowBackgroundColor)))
+                     },
+                     captureRect: { host in
+                         let b = host.bounds
+                         // NSHostingView 是 flipped（y 从上往下）；按 isFlipped 取**顶部**的按钮带，
+                         // 否则 y=height-260 会落到下方滑杆区，整卷 0 变化（本轮第一版就这样）。
+                         let y = host.isFlipped ? 40 : b.height - 260
+                         return NSRect(x: b.width * 0.70, y: y,
+                                       width: b.width * 0.28, height: 200)
+                     }) { store in
+                store.weightsStore.restoreDefaults()
+            }
         }
 
         /// 提示条**撤走**那一臂（R22 / U-44）。
@@ -7996,13 +8047,14 @@ final class MotionFilmstripTests: XCTestCase {
     /// 一条带与整窗各跑一遍）。默认 `false` = 用场景自己声明的捕获区域。
     /// 为什么不是"改场景再跑"：那会让两臂的 store/prepare 也一起变，
     /// 差值就不只属于"捕获区域"这一个变量（本仓库 A/B 的规矩：同一台机器同一段时间，只动一件事）。
-    private func record(_ scenario: Scenario, fullCapture: Bool = false) -> Film {
+    private func record(_ scenario: Scenario, fullCapture: Bool = false, scale: Double? = nil) -> Film {
         let store = scenario.storeFactory?() ?? makeStore()
         scenario.prepare?(store)
-        return recordFrames(scenario, store: store, fullCapture: fullCapture)
+        return recordFrames(scenario, store: store, fullCapture: fullCapture, scale: scale)
     }
 
-    private func recordFrames(_ scenario: Scenario, store: HistoryStore, fullCapture: Bool = false) -> Film {
+    private func recordFrames(_ scenario: Scenario, store: HistoryStore, fullCapture: Bool = false,
+                              scale: Double? = nil) -> Film {
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: 140, y: 140, width: scenario.size.width, height: scenario.size.height),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
@@ -8027,7 +8079,7 @@ final class MotionFilmstripTests: XCTestCase {
 
         // R57 / BACKLOG 77 路 a：只抓被测元素那一条带。`fullCapture` 是 A/B 的另一臂。
         let capture = fullCapture ? nil : scenario.captureRect?(host)
-        let grabber = Grabber(view: host, limit: 30, rect: capture)
+        let grabber = Grabber(view: host, limit: 30, rect: capture, scale: scale)
 
         // 抓帧的时钟就是**这个自旋循环本身**：runloop 每醒一次抓一张。
         //
@@ -8575,11 +8627,14 @@ private final class Grabber: NSObject {
     /// 默认 `nil` 而不是必填：那四处探针（扫光、对照臂…）量的是**整窗**的东西，
     /// 强行给它们一个带等于把它们的视野偷换掉。
     let rect: NSRect?
+    /// R387：`nil` = 跟随屏幕倍率；`1` = 强制把这一带画进 1× 像素的 rep（跨倍率正对证用）。
+    let scale: Double?
 
-    init(view: NSView, limit: Int, rect: NSRect? = nil) {
+    init(view: NSView, limit: Int, rect: NSRect? = nil, scale: Double? = nil) {
         self.view = view
         self.limit = limit
         self.rect = rect
+        self.scale = scale
         super.init()
     }
 
@@ -8588,7 +8643,19 @@ private final class Grabber: NSObject {
         let began = DispatchTime.now()
         if let view {
             let target = rect ?? view.bounds
-            if let rep = view.bitmapImageRepForCachingDisplay(in: target) {
+            if let scale, scale <= 1.01 {
+                let w = max(1, Int(target.width)), h = max(1, Int(target.height))
+                if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                                              bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                              isPlanar: false, colorSpaceName: .deviceRGB,
+                                              bytesPerRow: 0, bitsPerPixel: 0) {
+                    view.cacheDisplay(in: target, to: rep)
+                    if let cg = rep.cgImage {
+                        frames.append(cg)
+                        stamps.append(ProcessInfo.processInfo.systemUptime)
+                    }
+                }
+            } else if let rep = view.bitmapImageRepForCachingDisplay(in: target) {
                 view.cacheDisplay(in: target, to: rep)
                 if let cg = rep.cgImage {
                     frames.append(cg)

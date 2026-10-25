@@ -44,14 +44,18 @@ struct RecommendationWeightsView: View {
 
                     Spacer()
 
-                    Button("恢复默认") {
-                        store.restoreDefaults()
-                    }
+                    HStack(spacing: 0) {
+                        Button("恢复默认") {
+                            store.restoreDefaults()
+                        }
                     // R382：权重全默认时这颗按钮点了不产生任何变化 —— 禁用态是它唯一诚实的呈现。
                     // 判据不是「有没有写 .disabled」，而是同一颗按钮在默认/动过两帧里的**标签墨**
                     // 必须读得出差别（`testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault`）。
                     .disabled(store.weights == .default)
-                    // R385：默认↔动过是一次状态变更，不该硬切；与设置页的选中/悬停同一支目录动画。
+                    // R387：R385 只挂了 `.animation(value:)`，按钮上没有可动画属性 ⇒ 只掉两帧。
+                    // 显式给一个 opacity（1→0.55），让 `.selection` 有东西可演；disabled 仍管命中/语义。
+                    }
+                    .opacity(store.weights == .default ? 0.55 : 1)
                     .animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
