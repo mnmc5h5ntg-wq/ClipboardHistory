@@ -1,4 +1,4 @@
-# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R383，384 节自评）
+# 最终报告 · 目标模式两阶段（阶段一 每日复制热图 / 阶段二 全面独立动效与视觉审计 R9–R384，385 节自评）
 
 > 标题这一格曾经停在 **R46** 而账本已经写到 R99 —— 那是 U-264 记的那族「报告格子停在旧数」里最显眼的一处（同一族还有 D 行停在 D-149、判据行停在 796 例、帧行停在 112、变异行停在 M509、脚本行停在 127 条）。R99 起这几格跟着 pass-2 的日志一起刷新，出处写在每一格末尾。
 
@@ -17,7 +17,7 @@
 | 项 | 状态 | 证据 |
 |---|---|---|
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
-| 阶段二 **376 轮**审计（R9–R383；以 `curve_from_ledger.py` 的 `PHASE2 n=376` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 383 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
+| 阶段二 **377 轮**审计（R9–R384；以 `curve_from_ledger.py` 的 `PHASE2 n=377` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 384 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
 | 视觉台账 | U-31 … U-1359（R387 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R385**（commit `5166a2b`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R385 那一节为准。上一笔动 `Sources/` 的是 R384（`8197d90`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R387**（commit `53e1ef7`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R387 那一节为准。上一笔动 `Sources/` 的是 R385（`5166a2b`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
