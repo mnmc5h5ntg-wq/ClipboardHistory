@@ -70,7 +70,7 @@ def run_suite():
                           cwd=os.path.join(ROOT, "ClipboardHistory"), env=ENV,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out = proc.stdout.decode("utf-8", "replace")
-    executed = [int(m.group(1)) for m in re.finditer(r"Executed (\d+) tests", out)]
+    executed = [int(m.group(1)) for m in re.finditer(r"Executed (\d+) tests?", out)]
     n = max(executed) if executed else 0
     summary = re.findall(r"Executed \d+ tests?, with (?:\d+ tests? skipped and )?(\d+) failures?", out)
     failures = sum(int(v) for v in summary) if summary else -1

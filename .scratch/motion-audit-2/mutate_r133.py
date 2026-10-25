@@ -48,7 +48,7 @@ def run():
                           cwd=os.path.join(ROOT, "ClipboardHistory"), env=ENV,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out = proc.stdout.decode("utf-8", "replace")
-    ran = re.search(r"Executed (\d+) test", out)
+    ran = re.search(r"Executed (\d+) test?", out)
     if not ran or int(ran.group(1)) == 0:
         return "DID-NOT-RUN", out
     if re.search(r"error: -\[", out):

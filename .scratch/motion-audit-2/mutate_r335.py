@@ -166,7 +166,7 @@ def run_cell(filter_name):
     这一族有名字：**结果通道本身会坏**（读到的字符串不等于结论）。
     """
     out = sh(["env", "-u", "SDKROOT", "swift", "test", "--filter", filter_name])
-    executed = re.findall(r"Executed (\d+) tests, with (\d+) failures", out)
+    executed = re.findall(r"Executed (\d+) tests?, with (\d+) failures?", out)
     if not executed:
         return (True, "?", out)                      # 一行汇总都没有 ⇒ 编译没过 / 根本没跑
     n, fails = executed[-1]

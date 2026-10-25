@@ -87,7 +87,7 @@ def run_suite():
                           cwd=os.path.join(ROOT, "ClipboardHistory"), env=ENV,
                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     out = proc.stdout.decode("utf-8", "replace")
-    executed = [int(m.group(1)) for m in re.finditer(r"Executed (\d+) tests", out)]
+    executed = [int(m.group(1)) for m in re.finditer(r"Executed (\d+) tests?", out)]
     n = max(executed) if executed else 0
     # 红与否只准读**汇总行的失败数**：xctest 打的是
     #   Test Case '-[Target.Class testName]' failed

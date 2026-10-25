@@ -103,7 +103,7 @@ def run_cell(filter_name):
     产品自己会往 stderr 倒系统噪声（`CoreData: error: …AddressBook…`，本机每次跑都有）。
     """
     out = sh(["env", "-u", "SDKROOT", "swift", "test", "--filter", filter_name])
-    executed = re.findall(r"Executed (\d+) tests, with (\d+) failures", out)
+    executed = re.findall(r"Executed (\d+) tests?, with (\d+) failures?", out)
     if not executed:
         return (True, u"?", out)                      # 一行汇总都没有 ⇒ 编译没过 / 根本没跑
     n, fails = executed[-1]
