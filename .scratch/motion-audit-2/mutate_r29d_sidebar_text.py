@@ -19,25 +19,19 @@ SHOTS = "/tmp/r29d-mut-shots"
 GUARD = "UICaptureTests/testDarkSettingsSidebarTextIsACountedBlindSpot"
 TRUTH = "UICaptureTests/testInkDirectionTruthTable"
 
+# R382 重钉：名单已长到 13 张并夹了注释，旧的全表字面量不再命中。
+# 同一行在视图树探针那张表里也出现（10492 行），所以针带上 `static let` 那一行做上下文。
 LIST_NEEDLE = """    static let darkSidebarTextBlindSpots: Set<String> = [
-        "settings-general", "settings-shortcuts", "settings-privacy",
-        "settings-recommendations", "settings-data", "settings-stats",
-        "settings-min", "settings-privacy-excluded", "settings-stats-populated",
-    ]"""
+        "settings-general", "settings-shortcuts", "settings-privacy","""
 LIST_MUTANT = """    static let darkSidebarTextBlindSpots: Set<String> = [
-        "settings-shortcuts", "settings-privacy",
-        "settings-recommendations", "settings-data", "settings-stats",
-        "settings-min", "settings-privacy-excluded", "settings-stats-populated",
-    ]"""
+        "settings-shortcuts", "settings-privacy","""
 
-BOX_NEEDLE = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)"
+BOX_NEEDLE = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)"
 BOX_MUTANT = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 2, height: 4)"
 
-LIST2_NEEDLE = """        \"settings-min\", \"settings-privacy-excluded\", \"settings-stats-populated\",
-    ]"""
-LIST2_MUTANT = """        \"settings-min\", \"settings-privacy-excluded\", \"settings-stats-populated\",
-        \"content-empty\",
-    ]"""
+# R382 重钉：名单尾部两行现在是 tall 那一对；往后面塞一张非 vibrant 的帧。
+LIST2_NEEDLE = '        "settings-privacy-tall", "settings-recommendations-tall",'
+LIST2_MUTANT = '        "settings-privacy-tall", "settings-recommendations-tall",\n        "content-empty",'
 
 VIB_NEEDLE = """            let name = view.effectiveAppearance.name.rawValue
             if name.contains("Vibrant"), view.convert(view.bounds, to: nil).intersects(column) {"""
@@ -50,8 +44,10 @@ SWAP_MUTANT = "if signed > gate { darker += 1 } else if signed < -gate { brighte
 MUTATIONS = [
     ("M132", "盲区名单里摘掉 settings-general", LIST_NEEDLE, LIST_MUTANT, GUARD,
      "落在错误一侧"),
+    # R382：框缩成 2x4 之后，守卫今天红在 `TEXT_SIDE_ROSTER_GONE`（那一批帧"现在落在期望侧"，
+    # 因为框根本没压住字）—— 红落在对的那一格，旧串「尺没压住字」是措辞过期，不是判据没牙。
     ("M133", "量尺的框缩到压不住任何字", BOX_NEEDLE, BOX_MUTANT, GUARD,
-     "尺没压住字"),
+     "TEXT_SIDE_ROSTER_GONE"),
     ("M134", "对调 inkSideCounts 的两侧计数", SWAP_NEEDLE, SWAP_MUTANT, GUARD,
      "现在落在期望侧了"),
     # R30：名单改成由"侧栏子树是不是 vibrant"这条**前提**决定，于是动前提也要能红。

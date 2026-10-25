@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 381 轮（R382 · 2026-10-26 · U-1334…U-1337）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（U-1334…U-1337 · 产品 1 文件，动效主线）
+
+- **U-1334：看图看出来的状态缺席。** `weights`（权重全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧里，「恢复默认」按钮的标签墨**一模一样**（亮档最大偏离 62 对 62、暗档 51 对 51）；默认时点它不产生任何变化。它不是样式问题，是**禁用态从未存在**。
+- **U-1335：最小修法。** `RecommendationWeightsView` 的按钮加 `.disabled(store.weights == .default)`（`RecommendationWeights` 本来就是 `Equatable`，`.default` 是现成的常量）。修后 `WEIGHTS_RESET_STATE light 默认 最大偏离=62 / 动过 195`、`dark 默认 51 / 动过 170`；新旧 182 张帧差分 `same=176 changed=6`，6 张变化的边界全部只在按钮矩形（`weights` 838..990×204..252、`settings-recommendations*` 1230..1382×247..295），`weights-adjusted` 逐字节不变 ⇒ 动过的状态没有被误伤。
+- **U-1336：像素证人与刀。** 新判据 `testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault` 同尺寸渲染两帧、读按钮标签相对填充的最大偏离；正对照是「动过」那一帧必须 >0 墨。`M1013`（把 `.disabled(...)` 换成 `.disabled(false)`）现读 `CAUGHT`、复跑 `ESCAPED`、还原干净。**表形状自伤**：第一版写成自写 main + 两个模块常量，`mutate_needle_precheck` 与 `hidden_arms` 都看不见 M1013（`covered=119`、`可判=807`）；改成 `MUTATIONS` 七元组后 `covered=120 arms=389`、`可判=808`，M1013 第一次进名册。
+- **U-1337：367 再钉五根。** r29d 的 M132/M133/M135 按今天的盲区名单重钉（名单长到 13 张、量尺框 y=60/h=192），整表 **5/5 CAUGHT**（M133 的期望串随守卫措辞改成 `TEXT_SIDE_ROSTER_GONE`）；r76 的 M402 重钉到当前方向断言，整表 **5/5 CAUGHT**。`HIDDEN_ARMS 表=224 可判=808 rot=8 … 上界 rot=8 … 处置=ok`（12→8），五根都重跑过刀。
+
 ## 第 380 轮（R381 · 2026-10-26 · U-1329…U-1333）：设置侧栏图标亮档白压白（4/255）—— 动态 labelColor 修复 + 无墨格升会红 + 两把刀（U-1329…U-1333 · 产品 1 文件，动效主线）
 
 - **U-1329：看帧看出来的真实缺陷。** 亮档 `settings-*` 整页帧里，未选中行侧栏图标是 **255 白**、底是 **251**（对比 4/255 ⇒ 等于看不见）；同一份代码的单行组件帧 `settingsrow-hover-idle-light` 图标是黑的。新旧 182 张帧逐字节差分：152 张相同；30 张变化的边界全部只在 **x 34–68**（图标列）与六行 y 带内 ⇒ 没有布局位移。

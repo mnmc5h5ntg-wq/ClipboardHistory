@@ -63,7 +63,10 @@ EXTRA_FILES = (os.path.join(".scratch", "motion-audit-2", "make_surface_ledger.p
 # `% 变量` 拼装改成字面整串；四把的刀都重跑过 CAUGHT（D-368 两轴分开）。rot 20→14。
 # ③ r60 的 M309 重钉到 `inRows && inCols ? ink : nil`（整组两格红）→ 14；④ r67 的 M366 重钉到
 # `hoverFillAlpha(dark:)` 之后的整行，整表 9/9 CAUGHT → 13、12。
-ROT_CEILING = 12
+# R382：r29d 的 M132/M133/M135 按今天的盲区名单重钉（名单长到 13 张、量尺框 y=60/h=192），
+# 整表 5/5 CAUGHT（M133 的期望串随守卫措辞改成 TEXT_SIDE_ROSTER_GONE）；r76 的 M402 重钉到当前
+# 方向断言（整表 5/5 CAUGHT）⇒ rot 12→8，八根都验过刀。
+ROT_CEILING = 8
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
 DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。

@@ -12,6 +12,23 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R382 状态（2026-10-26 · 本地 · 第 381 轮 / Round 379）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R382 / 第 381 轮 / Round 379）：对比 `weights`（全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧，「恢复默认」标签墨完全相同 ⇒ 禁用态从未存在；加 `.disabled(store.weights == .default)` 后 `WEIGHTS_RESET_STATE light 默认 62 / 动过 195`、`dark 默认 51 / 动过 170`；182 张帧 `same=176 changed=6`，6 张只动按钮矩形、`weights-adjusted` 逐字节不变。新判据 + `M1013` 现读 `CAUGHT`、复跑 `ESCAPED`；第一版表写成自写 main、对 `mutate_needle_precheck` / `hidden_arms` 隐形，改成 `MUTATIONS` 后 `covered=120 arms=389`、`可判=808`。367 再钉 r29d（5/5）与 r76 M402（5/5），`HIDDEN_ARMS … rot=8 … 上界 rot=8 … 处置=ok`（12→8）。`swift build --build-tests` 告警 **0**；全量 `Executed 1032 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 381` 现读，口径是「本轮之前的连读轮数」）。
+
+本轮做了什么：
+① ⓪ CI：登记 `4255109 ↔ 40221926024`、`43ff699 ↔ 40221947072`（均 in_progress）；`9678d9c ↔ 40216535782`、`fb641e7 ↔ 40216344972`、`ef45e65 ↔ 40216188878`、`e8228a8 ↔ 40216027769` 已 success；只登记不轮询。
+② 产品位：默认/动过两帧同一颗按钮像素相同 ⇒ 禁用态缺席；加 `.disabled(store.weights == .default)`；帧差分区只在按钮。
+③ 判据：新像素判据读两态标签墨 + M1013 CAUGHT；表形状改成 `MUTATIONS` 让两个静态名册看见它。
+④ rot：r29d M132/M133/M135 + r76 M402 重钉，两表整表 5/5 CAUGHT；rot 12→8、上界同笔降。
+⑤ 验证：构建 0 告警；全量 `1032/48/0`；捕获 `CAPTURED 182 -> /tmp/r382_shots`；帧基线 `COMPARED=182 CHANGED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；清账表 162=162。
+
+验证读数（现读）：`WEIGHTS_RESET_STATE` 两档 `62/195`、`51/170`；`R382_MUTATE 刀=1 CAUGHT=1 红得不对=0 RESTORE_CLEAN=yes`；r29d `CAUGHT=5/5`、r76 `抓到=5 逃掉=0`；`NEEDLE_PRECHECK tables=137 covered=120 arms=389 bad=0`；`ARM_TOTAL files=230 arms=874 dupes=0 repeats=0`。
+
+NOT-RUN（分开写）：① 亮档真机腿仍没跑（当前系统外观=dark；R382 的按钮禁用态没有走真机通道，只有离屏两态帧）。② 剩 8 根 rot 未重钉（r142 M674、r303 M876、r33 M147、r64 M340/M341、r77 M411、r78 M417、r94 M518）。③ `weights-*` 与 `settings-recommendations*` 的帧基线已同一笔更新，不是 NOT-RUN。
+
+下一轮（R383）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回）；① 继续 367（从 r303/r94 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位（本轮的最弱维仍是「只深审一个位点」）。
+
 ## R381 状态（2026-10-26 · 本地 · 第 380 轮 / Round 378）：设置侧栏图标亮档白压白 —— 动态 labelColor 修复 + 无墨格升会红；367 再钉八根（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R381 / 第 380 轮 / Round 378）：亮档设置侧栏未选中图标实测 **255 白压在 251 底上（对比 4/255）**，旧尺数成「无墨」；单行组件帧黑、整页 `NavigationSplitView` 白 ⇒ 侧栏材质 vibrancy 把 `.primary` 解析成白色。图标改用动态系统色 `Color(nsColor: .labelColor)`（亮 76 / 暗 232），文字仍 `.primary`；修后 `SIDEBAR_ICON_COVERAGE light 有墨行=84 无墨行=0 反侧行=0 | dark 84/0/0`（修前亮档无墨 65/78）；新旧帧差分 152 张逐字节同、30 张只动 x 34–68。新守卫 `SIDEBAR_ICON_BLANK` 把无墨格升成会红，`M1011`（改回 `.primary`）/`M1012`（写死黑）两臂 `CAUGHT`；367 再钉八根（r131/r137/r140/r60/r67），`HIDDEN_ARMS … rot=12 … 上界 rot=12 … 处置=ok`（20→12），八根都重跑过刀；`swift build --build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`（`/tmp/r381_py2.log`，EXIT=0）；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **26** 轮（`python3 scripts/product_streak.py --streak-for 380` 现读，口径是「本轮之前的连读轮数」）。

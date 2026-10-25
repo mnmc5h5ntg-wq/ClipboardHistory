@@ -13422,6 +13422,60 @@ final class UICaptureTests: XCTestCase {
                              "同一张合成帧里黑柱读不出'偏暗' ⇒ 尺坏了（两端的差别没了）")
     }
 
+    /// R382：「恢复默认」在权重全默认时必须是**禁用态**；同一颗按钮在 `weights-adjusted`
+    /// （动过两项）里必须仍是启用态。两帧同尺寸、同偏移，所以差别只能来自禁用这一层。
+    ///
+    /// 读的是按钮标签的墨，不是源码里的 `.disabled` —— 源码断言只能证明"写了这行"，
+    /// 证明不了 SwiftUI 有没有真的把禁用态画出来。`maxDev` = 标签像素相对按钮填充的最大偏离。
+    func testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r382-reset-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        struct Reading { let fill: Int; let ink: Int; let maxDev: Int }
+        func reading(_ rep: NSBitmapImageRep) -> Reading {
+            let scale = Double(rep.pixelsWide) / 520.0
+            let rect = CGRect(x: 438, y: 108, width: 72, height: 22)
+            let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+            let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0) }
+            var values: [Int] = []
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * rep.bytesPerRow + x * 4
+                    values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                       + 0.0722 * Double(base[o + 2])).rounded()))
+                }
+            }
+            var hist: [Int: Int] = [:]
+            for v in values { hist[v / 4, default: 0] += 1 }
+            let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+            let devs = values.map { abs($0 - fill) }
+            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            guard let off = renderFixtureRep("weights", appearance, scratch),
+                  let on = renderFixtureRep("weights-adjusted", appearance, scratch) else {
+                return XCTFail("\(tag)：weights 两帧读不回 ⇒ 这条判据没有对象")
+            }
+            let disabled = reading(off), active = reading(on)
+            emit("WEIGHTS_RESET_STATE \(tag) 默认 fill=\(disabled.fill) 墨=\(disabled.ink) 最大偏离=\(disabled.maxDev)"
+                 + " | 动过 fill=\(active.fill) 墨=\(active.ink) 最大偏离=\(active.maxDev)")
+            XCTAssertGreaterThan(active.ink, 0,
+                                 "\(tag)：动过权重那一帧的「恢复默认」标签一个墨都没读到 ⇒ 正对照没有对象")
+            XCTAssertGreaterThan(active.maxDev, disabled.maxDev + 20,
+                                 "\(tag)：默认与动过两帧的「恢复默认」标签最大偏离只差 "
+                                     + "\(active.maxDev - disabled.maxDev)（要 >20）⇒ 禁用态没有画出来，"
+                                     + "或者有人把 `.disabled(store.weights == .default)` 拿掉了")
+            XCTAssertLessThan(disabled.ink, active.ink,
+                              "\(tag)：默认帧的标签墨 \(disabled.ink) 不少于动过帧 \(active.ink)"
+                                  + " ⇒ 禁用态与启用态在像素上没有差别")
+        }
+    }
+
     /// 尺的算术本身要有判据：一把没人验算过的尺，报出来的数字没有意义。
     /// 这一条**不覆盖管线**（它判的是纯函数），管线级判据是下面那条 `testActionableInk...`。
     func testContrastRulerArithmetic() {

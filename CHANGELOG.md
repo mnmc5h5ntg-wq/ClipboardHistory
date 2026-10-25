@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 「恢复默认」在权重全默认时画成禁用态（两态像素证人 + M1013）；367 再钉五根、rot 12→8（R382 / 第 381 轮 / U-1334…U-1337 · 产品 1 文件，动效主线）
+
+
 ### 设置侧栏图标亮档白压白修复（动态 labelColor）+ 无墨格升会红；367 再钉八根、rot 20→12（R381 / 第 380 轮 / U-1329…U-1333 · 产品 1 文件，动效主线）
 
 

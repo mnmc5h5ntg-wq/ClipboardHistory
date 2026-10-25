@@ -47,6 +47,10 @@ struct RecommendationWeightsView: View {
                     Button("恢复默认") {
                         store.restoreDefaults()
                     }
+                    // R382：权重全默认时这颗按钮点了不产生任何变化 —— 禁用态是它唯一诚实的呈现。
+                    // 判据不是「有没有写 .disabled」，而是同一颗按钮在默认/动过两帧里的**标签墨**
+                    // 必须读得出差别（`testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault`）。
+                    .disabled(store.weights == .default)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 

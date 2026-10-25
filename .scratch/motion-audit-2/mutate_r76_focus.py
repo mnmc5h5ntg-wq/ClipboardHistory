@@ -78,8 +78,10 @@ MUTATIONS = [
     ("M402", "判据侧：把方向断言翻过来（要求聚焦那一格反而更**响**）"
              "⇒ 该红：'焦点让占位符退后'与'焦点把框叫响'是两种设计，这一格钉的是前者",
      HARNESS, BOTH,
-     '            XCTAssertLessThanOrEqual(alphaFocused, alphaUnfocused - 2.0,',
-     '            XCTAssertGreaterThanOrEqual(alphaFocused, alphaUnfocused - 2.0,'),
+     # R382 重钉：R80 把「绝对掉 2.0」的地板拆成方向断言之后，旧针里的 `- 2.0` 没了。
+     # 同义坏法：把方向翻过来（要求聚焦那一格反而更响）。
+     '            XCTAssertLessThanOrEqual(alphaFocused, alphaUnfocused,',
+     '            XCTAssertGreaterThanOrEqual(alphaFocused, alphaUnfocused,'),
 ]
 
 
