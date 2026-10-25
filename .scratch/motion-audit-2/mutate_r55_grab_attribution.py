@@ -56,11 +56,14 @@ MUTATIONS = [
      "            return .outsideTheGrab(explainedRatio: explained, overshootMilliseconds: overshoot)   // MUTANT",
      TABLE, ["grabDominates"]),
     ("M271", "分档侧：间隔≤0 那道 guard 摘掉", TESTS, BASE_ENV,
-     "            guard worstGrabMilliseconds >= 0, worstIntervalMilliseconds > 0 else { return .unknown }",
+     # R373 / BACKLOG 367：classify 挪进 `GrabAttribution` 之后参数名从 worstInterval 改成 clockInterval，
+     # 旧针命中 0 ⇒ rot。重钉到今天的 guard。
+     "            guard worstGrabMilliseconds >= 0, clockIntervalMilliseconds > 0 else { return .unknown }",
      "            guard worstGrabMilliseconds >= 0 else { return .unknown }   // MUTANT",
      TABLE, ["unknown"]),
     ("M272", "接线侧：结论行里的归因换成空串", TESTS, BASE_ENV,
-     "                    + Self.grabAttributionLabel(worstIntervalMilliseconds: worstInRun,\n"
+     # R373：调用点的参数名同样改成 clockIntervalMilliseconds。
+     "                    + Self.grabAttributionLabel(clockIntervalMilliseconds: worstInRun,\n"
      "                                                worstGrabMilliseconds: film.worstGrabMilliseconds))",
      "                    + (\"\" /* MUTANT: 归因从结论行摘掉 */))",
      WIRE, ["只接了 0 次归因"]),

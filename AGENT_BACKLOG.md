@@ -8697,3 +8697,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 367 追记（R372 · 第二根）：`mutate_r54_adjacent_levels.py` 的 M264 重钉 —— 梯子顶档 0.85→0.92，整表 `5/5 CAUGHT`、`还原不干净=0`。
     M266 的期望串过期：红已在 `testAdjacentLevelRulersAreATruthTable`，正文是「填充带压到了描边上…」；补串后单跑通过。
     `ROT_CEILING` 同笔 **32→31**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=31 抽不出=6 已声明表=6 已声明死针=0 上界 rot=31 … 处置=ok`，`test_hidden_arms` 8/8。
+
+367 追记（R373 · 第三批）：`mutate_r55_grab_attribution.py` 的 M271/M272 重钉 —— `GrabAttribution.classify` 与调用点的参数名从 `worstIntervalMilliseconds` 改成 `clockIntervalMilliseconds`，两根旧针命中 0。
+    重钉后两臂各 CAUGHT（真值表「unknown」/ 接线守卫「只接了 0 次归因」），`ROT_CEILING` 同笔 **31→29**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=29 抽不出=6 已声明表=6 已声明死针=0 上界 rot=29 … 处置=ok`。

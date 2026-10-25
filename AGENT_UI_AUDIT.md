@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 372 轮（R373 · 2026-10-25 · U-1300…U-1302）：367 第三批 —— r55 的 M271/M272 重钉（参数名改名），rot 31→29（U-1300…U-1302 · 产品 0 文件，判据账）
+
+- **U-1300：M271 重钉。** `GrabAttribution.classify` 的参数从 `worstIntervalMilliseconds` 改成 `clockIntervalMilliseconds`，旧针命中 0 ⇒ rot；重钉到今天的 guard `guard worstGrabMilliseconds >= 0, clockIntervalMilliseconds > 0 else { return .unknown }`，落刀后 `testGrabAttributionIsATruthTable` 红（期望串「unknown」）。
+- **U-1301：M272 重钉。** 调用点同样改名；重钉后 `testGrabAttributionIsWiredIntoTheCoarseNotRunLines` 红，正文含「只接了 0 次归因」—— 这是 M269–M271 都测不到的接线坏法（函数还在、没人调）。
+- **U-1302：rot 31→29，上界同笔降。** `ROT_CEILING` 31→29；`HIDDEN_ARMS 表=222 可判=804 rot=29 抽不出=6 已声明表=6 已声明死针=0 上界 rot=29 … 处置=ok`；`test_hidden_arms` 8/8。两把刀的红都落在期望格上、还原干净。
+
 ## 第 371 轮（R372 · 2026-10-25 · U-1297…U-1299）：367 第二根 —— M264 重钉（梯子顶档 0.85→0.92），rot 32→31（U-1297…U-1299 · 产品 0 文件，判据账）
 
 - **U-1297：M264 重钉。** `VisualTokens.swift` 的梯子顶档从 0.85 抬到 0.92 之后，r54 的针还停在 0.85 上 ⇒ 腐烂。重钉后整张表重跑 `M264…M268 CAUGHT 5/5`、`还原不干净=0`、复跑基线绿。
