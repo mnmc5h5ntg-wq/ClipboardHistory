@@ -8645,3 +8645,14 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 426 追记（R364）：第三批 —— r356 / r338 / r339 只换回读那一行，七臂重跑 `1/1 / 3/3 / 3/3` 全 CAUGHT、
     三张表 `RESTORE_CLEAN=yes`。单针表里已有 **8 张**在新判法上；历史表与多针表未动。
 
+
+387① runner 验收（R364 追记）：`ff3deba` 绿跑现读 `MOTION_SCENARIO_AB_SUMMARY 场景=12 同=11 漂=1 敏感=0`，
+    与本机逐字相同 ⇒ 收掉墨量那一轴之后，判词在两台机器上一致；墨量方向仍只当读数（runner 10/1、本机 11/11）。
+    **这一单的判据面到此收口**；386 的 5%/25% 两条线仍没有出处，但今天没有一颗"敏感"样本，标定继续挂着。
+
+431 结案（R364 追记）：`753fa5d` 绿跑现读 `MOTION_REDUCE_SOURCES setting=true voiceOver=false catalog=true override=nil`
+    —— 读数族接线生效，且证实 runner **系统级**开着「减弱动态效果」（setting=true）。因此：
+    ① 药丸 `slideAnimation` 归零是产品行为（376 按 reduce-motion-on 记）；
+    ② 空态在 R355 的修复走的是目录 `.slider` 的 0.20 timing curve，runner 上 `empty-state=3` 就是那一支；
+    ③ 430 的刀号帽、431 的接线、429 的修复都在**同一台 reduce-on 机器**上被验过。
+    仍欠：R360 之后的跑要出现 `reduce-motion-on`（376 的收口读数）；以及视图层 `@Environment` 那一源仍无直接读数。

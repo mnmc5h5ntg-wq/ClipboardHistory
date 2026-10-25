@@ -32,6 +32,16 @@ NOT-RUN（分开写）：① 多针表与其余历史单针表的迁移；② R3
 下一轮（R365）的靶：⓪ 读七跑（`MOTION_REDUCE_SOURCES` 三源 + 376 的出口文本）；
 ① 426 第四批或 367 下一批（按两箱点名）；② 若 runner 报 376 通道那一半：第二通道。
 
+**R364 追记（runner 读数，现读）**：`ff3deba`（R358）与 `753fa5d`（R359）都已 **success**：
+- **387① 两机同数**：runner `MOTION_SCENARIO_AB_SUMMARY 场景=12 同=11 漂=1 敏感=0 换对象=0 粒度不可比=0`，
+  与本机逐字相同（`MOTION_SCENARIO_AB_MAGNITUDE 有变化=11 亮臂更大=10 暗臂更大=1 比值 0.72…1.00` 仍只当读数）。
+  ⇒ 墨量那一轴拿掉之后，色档分类不再由偏移决定，两台机器给出同一组判词。
+- **431 接线验收 + 机器事实**：`MOTION_REDUCE_SOURCES setting=true voiceOver=false catalog=true override=nil`
+  —— 这一行第一次出现在 runner 日志里（R359 的专用 grep 生效），并直接回答：**那台机器系统级开了「减弱动态效果」**
+  （setting=true），所以 `slideAnimation` 归零分支是真；同跑的 `judged=4/4 not-run=-`。
+- 376 的出口在 `753fa5d`（R360 之前）仍是旧的 `pill-slide-arms-indistinguishable`；R360 的 `d317d31` 还在跑，
+  下一跑应出现 `reduce-motion-on` —— 那才是 376 的收口读数。
+
 ## R363 状态（2026-10-25 · 本地 · 第 362 轮 / Round 360）：426 第二批 —— 三张表迁到 diff 回读（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R363 / 第 362 轮 / Round 360）：r345/r348/r355 迁移到 `single_substitution_lands`，

@@ -1096,3 +1096,6 @@ R199 那八跑连红如果继续被推到"下一轮再读"，就会有一张免�
   五臂重跑 `2/2、1/1、1/1` 全 CAUGHT、RESTORE_CLEAN=yes；单针表 5 张在新判法上，多针表未动。
 - **R364 续（判据账）**：426 第三批 —— r356/r338/r339 迁到 `single_substitution_lands`（只换回读那一行），
   七臂重跑 `1/1、3/3、3/3` 全 CAUGHT、RESTORE_CLEAN=yes；单针表 8 张在新判法上，多针表与历史表未动。
+- **R364 追记（runner）**：`ff3deba` / `753fa5d` 两跑绿 —— 387① 的 A/B 在 runner 上与本机逐字同数
+  （`同=11 漂=1 敏感=0`）；`MOTION_REDUCE_SOURCES setting=true voiceOver=false catalog=true override=nil`
+  第一次出现在日志里，证实 runner 系统级 reduce-on（431 收口），同跑 `judged=4/4`。
