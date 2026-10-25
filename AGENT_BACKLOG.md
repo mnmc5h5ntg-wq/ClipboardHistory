@@ -8539,3 +8539,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 427 结案（R354）：`scripts/filmstrip_frames.py` 进了仓库 —— 网格按场景比自动选、INK/PILL 两条序列、
 两条正对照（关臂落点 ≤2、开/开B 前 8 帧 PILL 不同）。R353 那两卷读不出来的原因分别写进了 U-1233/U-1234；
 现在同一批文件用这支尺能读，且 `FILMSTRIP_FRAMES_RESULT=ok`。
+
+**428. `gh run list` 的第三个状态「排队中」要进读 CI 的那一步：五跑同时在队里时，「未读」与「没跑」是两件事**（R355 现读）
+    现读 `gh run list --limit 4`：`40189703485 ↔ 2b47f57`、`40189562764 ↔ f467d3e`、`40189415641 ↔ 010aca0`、`40189129121 ↔ 1cf904b`
+    全部 `in_progress`，而本笔 `40189811041 ↔ 7824207` 直接 `queued`。**零跑结案**。
+    `scripts/ci_read.py latest` 只打 status/conclusion，没有"它在队里排第几 / 已经等了多久"这两格；
+    于是台账里只有"未读"一个词，读的人分不清是"还没轮到"还是"跑了一半挂了"。要做：`ci_read.py` 增 `queue`
+    子命令（status + createdAt + 同 workflow 排在它前面的跑数），并在账上把三态写死：`queued` / `in_progress` / `concluded`。
