@@ -8475,3 +8475,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     但"格"仍是采样绑定的量：下一轮先 `grep -n "case .slider\|contentFade" ClipboardHistory/Sources` 找到胶片场景
     真正挂 `.animation` 的那个视图（本轮按文件名猜 `HistoryListView.swift`，盘上没有这个文件），
     再决定是"内容跟胶囊同速"还是"胶囊提速"。两条都要 before/after 同批帧。
+
+389 结案（R348）：`HistorySidebarView` 的空态淡出与药丸现在共用 `FilterPillMotion.slideAnimation`（0.20）。
+    这一单开了二十轮：R328 只把"6–7 格对 12 格"当采样现象挂起；R347 把两个时长读成两个数（0.16 / 0.20）；
+    R348 把它改成一个动画对象，并用源码形状守卫 + 一把刀（M1003）钉住。胶片场景的 after 曲线仍欠
+    （`MotionFilmstripTests` 24 格 skip，要环境键），所以"落点差 1–2 格"这句话本轮**没有**再量。
+
+424 结案（R348，与 389 同一件事）：接线点找到了 —— 不在列表视图里，而在 `HistorySidebarView` 的
+    `.animation(…, value: historyStore.filteredEntries.isEmpty)` 那一行（空态淡入淡出的驱动）。
+    已改成药丸同一支动画；后续若要动"内容换页"的其它位点，先看 `MotionCatalog` 的 `.contentFade` 那几处
+    （DetailView / SettingsView / QuickPick），它们各自有对象，不许一并改。

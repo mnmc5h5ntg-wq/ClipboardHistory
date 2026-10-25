@@ -363,6 +363,23 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 347 轮（R348 · 2026-10-25 · U-1210…U-1213）：空态淡出与药丸换成同一个节奏 —— 389 结案（U-1210…U-1213 · 产品 1 文件，动效主线）
+
+- **U-1210：同一个手势的两半现在共用一个动画。** `HistorySidebarView` 里"空态出现/消失"那一格以前走
+  `contentFade`（0.16），而药丸走 `slider`（0.20）—— 切筛选把列表切空（或切回）时，内容先落定、药丸还在走。
+  本轮把它改成 `FilterPillMotion.slideAnimation(reduceMotion: shouldReduce)`（并给这个视图补了
+  `@Environment(\.accessibilityReduceMotion)` 与 `shouldReduce`）；`VisualFill` 与几何一字未动，过渡仍是 `.opacity`。
+- **U-1211：守卫是源码形状 + 一把刀。** `testEmptyStateFadeSharesThePillRhythm` 钉两件事：
+  那一行必须是 `slideAnimation`，且**不许**再出现 `contentFade` 那一行。`mutate_r348.py` M1003 把它换回去
+  ⇒ `CAUGHT=1/1, RESTORE_CLEAN=yes`；预检 `tables=129`。
+- **U-1212：既有的"恰好一处"契约被本轮撞红，判据改得更严而不是更松。** `testSidebarConsumesTheMotionPolicy…`
+  原来数 `slideAnimation` 恰好出现 1 次 —— 本轮合理地多了第二处消费（空态淡出），那个"1"就不再是契约。
+  改成：**每一处写死动画写法都不许出现**（`.spring(` / `.easeIn(` / `.easeOut(`；`.linear(duration: 0)` 是策略
+  自己的减少动态分支，排除），并保留"至少一处由策略给出"。比原来盯着一个数更严。
+- **U-1213：胶片场景的 after 曲线没拿到。** `swift test --filter MotionFilmstripTests` 现读 67 格 **24 格 skip**
+  （胶片捕获要环境键），没有 `MOTION_PILL_SLIDE` 那种逐格序列 ⇒ 这一轮只有"同一个动画对象"的源码证据与刀，
+  没有像素级的落点曲线。写成 NOT-RUN，不冒充。
+
 ## 第 346 轮（R347 · 2026-10-25 · U-1205…U-1209）：399 结案 —— 两条判据现在同时成立，而它们原来互相排斥（U-1205…U-1209 · 产品 0 文件，判据账）
 
 - **U-1205：结案条件逐条对上现门。** 亮档"悬停对它那片底看得见"= `segRatio ≥ 1.20`（现读 1.238，在缝里断言）；

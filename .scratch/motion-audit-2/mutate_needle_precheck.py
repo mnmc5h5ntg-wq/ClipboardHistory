@@ -39,7 +39,8 @@ TABLES = [
             "mutate_r337",
             "mutate_r338",
             "mutate_r339",
-            "mutate_r345"]
+            "mutate_r345",
+            "mutate_r348"]
 MID = re.compile(r"^M\d{3}[a-z]?$")
 
 

@@ -12,6 +12,29 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R348 状态（2026-10-25 · 本地 · 第 347 轮 / Round 345）：空态淡出与药丸同节奏（产品 1 文件，动效主线）
+
+最后更新：2026-10-25（本地 · R348 / 第 347 轮 / Round 345）：把空态淡出从 `contentFade`(0.16) 换成药丸那支
+`slideAnimation`(0.20)，389 结案；既有"恰好一处"契约随之改成"没有写死动画写法"（产品 1 文件 · 动效主线）
+
+本轮做了什么：
+① ⓪ CI：`RUN=40185881194 ↔ 8d375b3` 与 `RUN=… ↔ 0307c43` 均首读 in_progress（只登记不轮询，R140）。
+② 产品：`HistorySidebarView` 空态那一格改用 `FilterPillMotion.slideAnimation`，并补 `reduceMotion` / `shouldReduce`。
+③ 判据：新增 `testEmptyStateFadeSharesThePillRhythm`（源码形状两断言）；刀 `mutate_r348` M1003 `CAUGHT=1/1`。
+④ 既有 `testSidebarConsumesTheMotionPolicy…` 的"恰好一处"被撞红 ⇒ 改成"禁写死动画写法"（更严）。
+⑤ 全量卷 `Executed 1025 tests, with 47 skipped and 0 failures`；构建 0 告警；换装 `INSTALL_RESULT=ok`。
+
+验证读数（现读）：`M1003 CAUGHT=1/1, RESTORE_CLEAN=yes`；预检 `tables=129 covered=110 arms=369 bad=0`；
+脚本电池 `Ran 646（skipped=4）OK`；帧 182（时长改动不影响静态帧，未重捕）；
+产品面连续零改动 **3** 轮（`python3 scripts/product_streak.py --streak-for 347` 现读，口径差一挂 412）。
+
+NOT-RUN（分开写）：① 胶片场景的 after 逐格曲线：`MotionFilmstripTests` 67 格 **24 skip**（要环境键），
+本轮只有"同一个动画对象"的源码证据与刀；② 真机腿没跑（改的是时长，屏幕那半边要另一次捕获）；③ 无第二把刀
+（这一刀已经把"换回去"钉住）。
+
+下一轮（R349）的靶：⓪ 读三跑 CI 配对 → ① 用环境键重跑胶片，把 after 的落点差量出来（补 389 的最后一句）
+→ ② 413（backing 名册）→ ③ 动效主线 397 / 390 / 384 / 387① / 376 / 367。
+
 ## R347 状态（2026-10-25 · 本地 · 第 346 轮 / Round 344）：399 结案，389 的成因第一次写成两个数（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R347 / 第 346 轮 / Round 344）：亮档悬停可见 1.238 与选中边界 22 级现在**同时被断言**，

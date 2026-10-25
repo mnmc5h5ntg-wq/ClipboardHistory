@@ -48,8 +48,17 @@ struct HistorySidebarView: View {
             }
         }
         // 空态出现/消失（审计 §3："空态是停，不该演"⇒ 只淡入，不滑不缩）。
-        .animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)
+        //
+        // R348 / BACKLOG 389·424：这一层以前走 `contentFade`（0.16），而同一时刻那颗药丸走 `slider`（0.20）
+        // —— 切筛选把列表切空（或切回来）时，内容 0.16 就落定了，药丸还要再走一小段（外加弹簧尾巴）。
+        // 两件事是**同一个手势的两半**，必须同一个节奏：这里改成和药丸同一个动画。
+        // 只有时长变了，过渡本身仍是 `.opacity`（"空态是停"那条不动）。
+        .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)
     }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 同 `SegmentedFilterPicker.shouldReduce`：系统开关 ∪ VoiceOver。
+    private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
 
     private var header: some View {
         HStack {

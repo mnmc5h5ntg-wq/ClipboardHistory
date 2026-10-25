@@ -102,10 +102,19 @@ final class FilterPillMotionTests: XCTestCase {
         // 旧值整族都不许回来：只禁 `.spring(response: 0.38` 会放过"把 0.38/0.72 挪到别处写"。
         XCTAssertFalse(code.contains("0.38") || code.contains("0.72"),
                        "0.38 / 0.72 这两个旧字面量还在侧栏的代码里 ⇒ 目录那一档改了这里也不会跟着改")
-        XCTAssertEqual(
-            source.components(separatedBy: "FilterPillMotion.slideAnimation(reduceMotion:").count - 1, 1,
-            "滑块动画应当恰好在一处由策略给出"
-        )
+        // R348：这一格以前数"恰好一处"。R348 让**空态淡出**也走同一个策略（同一个手势的两半），
+        // 于是"一处"这个数不再是契约 —— 契约是**每一处动画都经由策略**（不许在任何一处写死时长/弹簧），
+        // 而且策略至少被用到一次。比原来更严：原来只盯着滑块那一处。
+        XCTAssertGreaterThan(
+            code.components(separatedBy: "FilterPillMotion.slideAnimation(reduceMotion:").count - 1, 0,
+            "滑块动画至少要有一处由策略给出")
+        // 契约不是"几处"，而是"**没有一处**写死动画写法"：四族裸写法各查一遍。
+        // `.linear(duration: 0)` 是策略自己在"减少动态"那一支里的替代（`slideAnimation` 体内），不算写死。
+        for literal in [".spring(", ".easeIn(", ".easeOut("] {
+            XCTAssertFalse(code.contains(literal),
+                           "侧栏里出现了写死的动画写法 \(literal) ⇒ 必须走 FilterPillMotion / MotionCatalog，"
+                           + "否则减少动态的门控会被绕过")
+        }
         XCTAssertEqual(
             source.components(separatedBy: "FilterPillMotion.hoverScale(isHovered:").count - 1, 1,
             "hover 放大应当恰好在一处由策略给出"
@@ -146,6 +155,23 @@ final class FilterPillMotionTests: XCTestCase {
         // 同一条形状的两支不许互相顶替：亮档两根都画、或哪一档两根都不画，都是换档换出了洞
         XCTAssertNil(SegmentKnob.liftAlpha(dark: false))
         XCTAssertEqual(SegmentKnob.liftAlpha(dark: true), VisualMaterial.selectedSegmentLiftWhite)
+    }
+
+    /// R348 / BACKLOG 389·424：空态淡出与药丸滑动是**同一个手势的两半**，必须共用同一个动画。
+    ///
+    /// 这一格读源码的形状（与 `testHistoryStoreStaysThin` 同一族）：改回 `contentFade` 会红。
+    /// 为什么不用像素判：两条曲线的落点差只有 1–2 格，而"格"随采样率走（R326）；时长是不是同一个对象，
+    /// 在源码里是**可以钉死**的。
+    func testEmptyStateFadeSharesThePillRhythm() throws {
+        let here = URL(fileURLWithPath: #filePath)
+        let src = try String(contentsOf: here
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"),
+            encoding: .utf8)
+        XCTAssertTrue(src.contains(".animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"),
+                      "空态淡出必须跟药丸同一个动画（R348）：换成 contentFade 会让内容先落定 0.16 而药丸还在走 0.20")
+        XCTAssertFalse(src.contains(".animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)"),
+                       "这一行是本轮改掉的那一行；它回来 = 389 回来")
     }
 
     func testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken() {
