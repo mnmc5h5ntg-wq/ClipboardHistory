@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 色档 A/B 的判词收回两颗面积尺：墨量只印不判，敏感=8 → 同=11 / 漂=1（387① 结案）（R358 / U-1255…U-1257 · 产品 0 文件，判据账）
+
 ### 读 CI 的第三态有名字了：`queue` 子命令（queued / in_progress / concluded + 未知点名；已等与同 workflow 前面分开）（R357 / U-1252…U-1253 · 产品 0 文件，判据账）
 
 ### 384 结案：标签墨不再把胶囊劈成两半 —— 带子 7pt→24pt、纵向覆盖 29%→100%，斜坡仍单调（R356 / U-1247…U-1250 · 产品 0 文件，判据账）

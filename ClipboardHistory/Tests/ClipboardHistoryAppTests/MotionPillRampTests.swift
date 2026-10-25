@@ -840,11 +840,16 @@ final class MotionPillRampTests: XCTestCase {
         // ⑤ 取较大者这一半：一颗看不见、另一颗看得见时，不许因为"用的那颗恰好是 0"就判同。
         XCTAssertEqual("敏感", verdict(endpoint: (0.100, 0.101), union: (0.100, 0.167)),
                        "首末面积只有 1% 但并集差 40% ⇒ 取 min 或只读面积都会把它洗成'同'")
-        // ⑥ 墨量那一颗必须**自己**就能把判定抬起来：面积与并集全等，只有"动了多少级"不同。
-        // 这一格是本轮的自证：少了它，"换成通道无关统计量"就等于把判据换窄到它恰好看不见的那一半。
-        XCTAssertEqual("敏感", verdict(ink: (0.6667, 0.4000)),
-                       "面积/并集两臂全等而墨量差 40% ⇒ 只读像素集合的尺看不见'同样的动、不同的深浅'，"
-                           + "而这正是逐行电平尺的对象")
+        // ⑥ R358 / BACKLOG 387①：墨量那一颗**不许**再把判词抬起来（面积与并集全等、只有深浅不同）。
+        // 这不是抹掉读数：它仍逐颗印（MOTION_SCENARIO_AB 的 墨暗/墨亮 与全局 MAGNITUDE 行）；
+        // 只是它带着一个色档级系统偏移（本机 11/11、runner 11/11 亮臂更大），让它进 max 等于让"偏移大小"决定判词。
+        XCTAssertEqual("同", verdict(ink: (0.6667, 0.4000)),
+                       "面积/并集两臂全等而墨量差 40% ⇒ 判词必须是'同'；墨量只作读数（387①）")
+        // ⑥b 现场形状（本机 R356 的 detailSameKind）：面积 4.7%、并集 4.4%、墨量 89.1% ⇒ 同。
+        // 这一格是 387① 的**兑现**：修之前它读成"敏感"，而那颗场景的两颗面积尺本来就在"同"这一档。
+        XCTAssertEqual("同", verdict(endpoint: (0.0709, 0.0742), union: (0.0709, 0.0742),
+                                     ink: (0.0077, 0.0696)),
+                       "墨量差 89% 不许把一颗'面积两臂差 4.7%'的场景抬成敏感")
         // ⑦ 三颗都压在线上但都没过 ⇒ 同。这一格是为了钉"取较大者"不会自己变成加分项：
         // 第一版这里给的是 union=(0.20, 0.215)（6.98%），判据当场回给我"漂" —— 那是它对，我错。
         XCTAssertEqual("同", verdict(endpoint: (0.20, 0.21), union: (0.20, 0.21), ink: (0.30, 0.315)))
@@ -899,12 +904,13 @@ final class MotionPillRampTests: XCTestCase {
             "换了口径之后这对合成帧还判得出差别 ⇒ 新尺仍然在读采样粒度，本轮的修法没成立")
     }
 
-    /// 面积那两颗对"动了多少级"是**盲**的，而墨量那一颗必须自己能把判定抬起来。
+    /// 面积那两颗对"动了多少级"是**盲**的；墨量那一颗能看见深浅，但它**不进判词**（R358 / 387①）。
     ///
-    /// 这一格是给"别把判据换窄"装的牙：R326 差点只留首末面积 + 并集就交差，而那两颗
-    /// 只看像素**集合** —— 同一批像素在暗档里动 200 级、在亮档里动 120 级，它们读出来一模一样，
-    /// 于是"这条判据的读数随色档走"这句话恰好被换成了它看不见的那一半（逐行电平尺量的就是这个）。
-    func testEndpointAreaIsBlindToInkMagnitudeButTheVerdictIsNot() {
+    /// R326 的版本是"墨量必须自己能把判定抬起来"，理由是"别把判据换窄"。R328 推翻的是**用途**而不是读数：
+    /// 墨量带一个色档级系统偏移（本机 11/11、runner 11/11 亮臂更大，偏移大小随机器走，runner 两跑自己翻一格），
+    /// 让它决定判词 = 让"这颗尺带多少偏移"决定分类。现在它只当读数（仍逐颗印、仍有全局方向行），
+    /// 判词只由两颗面积尺做；这一格把"盲区还在"与"判词不再吃它"同时钉住。
+    func testEndpointAreaIsBlindToInkMagnitudeAndTheVerdictNoLongerUsesIt() {
         let strong = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 70], ink: 200)
         let weak = MotionFilmstripTests.syntheticRevealFilm(revealedColumns: [0, 70], ink: 120)
         // ① 两颗面积尺：动的像素集合完全相同 ⇒ 必须读成相等（这就是它们的盲区，要能被拍下来）。
@@ -921,8 +927,9 @@ final class MotionPillRampTests: XCTestCase {
         XCTAssertEqual(0.4, MotionFilmstripTests.relativeDifference(inkStrong, inkWeak), accuracy: 0.01,
                        "200 级与 120 级的相对差应该接近 40%，实测 "
                            + String(format: "%.3f", MotionFilmstripTests.relativeDifference(inkStrong, inkWeak)))
-        // ③ 判定：面积与并集全等、只有墨量差 40% ⇒ 敏感。少了②那一颗，这里会得到"同"。
-        XCTAssertEqual("敏感", MotionFilmstripTests.appearanceDependenceVerdict(
+        // ③ 判定：面积与并集全等、只有墨量差 40% ⇒ **同**（387①：墨量只印不判）。
+        // ② 那一颗证明"墨量确实读出了深浅"；这一格证明"读出深浅不等于让深浅决定判词"。
+        XCTAssertEqual("同", MotionFilmstripTests.appearanceDependenceVerdict(
             endpointDark: MotionFilmstripTests.endpointChangedFraction(strong),
             endpointLight: MotionFilmstripTests.endpointChangedFraction(weak),
             unionDark: MotionFilmstripTests.everChangedFraction(strong),

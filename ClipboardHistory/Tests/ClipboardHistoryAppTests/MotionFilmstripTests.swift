@@ -6070,7 +6070,7 @@ final class MotionFilmstripTests: XCTestCase {
             + " ⇒ 前提⓪要拦的那件事就在这儿：亮档里轨道与药丸只差 3 级，尺没有对象")
     }
 
-    /// 纯函数：把"同一颗场景在两档色档里的读数"归成四格词表（R325 立，R326 换统计量 / BACKLOG 383、386）。
+    /// 纯函数：把"同一颗场景在两档色档里的读数"归成四格词表（R325 立，R326 换统计量 / BACKLOG 383、386、387）。
     ///
     /// 为什么要抽成纯函数而不直接在探针里写 if：不抽出来，这四格词表就只活在一次真机跑里，
     /// 没人能证明"漂"与"敏感"的分界真的在 5% / 25%，也没人能证明"换对象"优先于相对差
@@ -6080,10 +6080,16 @@ final class MotionFilmstripTests: XCTestCase {
     /// `endpointChangedFraction` 的注释），于是同一个 commit 在本机给"敏感=0"、在 runner 给
     /// "敏感=2" —— 两台机器对同一份代码做出**相反的动作**。现在收三颗通道无关的量：
     /// **首末面积**（哪些像素动了）、**动过的并集**（整卷里动过多少像素，补"动了又回来"）、
-    /// **首末墨量差**（同样的面积在暗档里差 170 级、亮档里差 65 级时它要能看见），
-    /// 取三者较大的相对差：任何一颗单独都可能恰好看不见，而"选哪一颗"不能由答案决定。
-    /// 阈值 5% / 25% 本轮**一个字没动** —— 它们该不该在这儿是 BACKLOG 386 的问题，
-    /// 本轮没有资格顺手重标；换统计量之后重测出来的分布才是 386 能拿来定线的数。
+    /// **首末墨量差**（同样的面积在暗档里差 170 级、亮档里差 65 级时它要能看见）。
+    ///
+    /// **R358 / BACKLOG 387①：判只由前两颗做；墨量只印不判。** R326 把三颗一起取 max，
+    /// 但 R326→R328 的读数证明墨量那颗带着一个**色档级系统偏移**（本机 11/11、runner 11/11 都是亮臂更大，
+    /// 而偏移大小随机器走：比值区间 0.11…0.94 对 0.72…0.99，runner 自己两跑还会翻一格）。
+    /// 让它进 max 等于"分类几乎完全由这颗尺带多少偏移决定" —— 于是 8 颗被抬成"敏感"，
+    /// 而它们的两颗面积尺读的是"同"。处置按 R328 的①：墨量**不进 max，只单独印**（下面每颗的
+    /// `墨暗/墨亮` 与全局 `MOTION_SCENARIO_AB_MAGNITUDE` 都保留）。这不是把判据换窄：
+    /// 面积两颗对"同样的面积、不同的深浅"本来就读不出来，而那一半今天**没有可减的偏移**
+    /// （R327/R328 已证：常数偏移在两跑之间不成立），所以它只能当读数、不能当判词。
     ///
     /// 顺序是承重的：`换对象` 排在相对差之前 —— 一档看得见、另一档看不见时，
     /// 相对差再小也是**前提**翻了脸，那与"数值漂了一点"是修法相反的两件事。
@@ -6094,9 +6100,11 @@ final class MotionFilmstripTests: XCTestCase {
         if let flipped = Self.flippedAppearanceWord(changedDark: changedDark, changedLight: changedLight) {
             return flipped
         }
+        // 墨量两个参数收在这里只为**保持调用点与打印同源**（它们仍在 MOTION_SCENARIO_AB 上逐颗印）；
+        // 判词不许读它们 —— BACKLOG 387① 的全部内容就是这一句。
+        _ = (inkDark, inkLight)
         let rel = Swift.max(Self.relativeDifference(endpointDark, endpointLight),
-                            Self.relativeDifference(unionDark, unionLight),
-                            Self.relativeDifference(inkDark, inkLight))
+                            Self.relativeDifference(unionDark, unionLight))
         return Self.verdictFromRelativeDifference(rel)
     }
 
@@ -6256,7 +6264,7 @@ final class MotionFilmstripTests: XCTestCase {
              + " 同=" + String(sameCount) + " 漂=" + String(driftCount)
              + " 敏感=" + String(sensitiveCount) + " 换对象=" + String(flippedCount)
              + " 粒度不可比=" + String(granularityGap)
-             + "（口径=首末面积∪动过并集∪首末墨量 取较大者，一颗不许替另一颗说话；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）")
+             + "（口径=首末面积∪动过并集 取较大者；墨量只印不判（R358 / BACKLOG 387①：它带一个色档级系统偏移）；钉档判据：换对象/敏感 ⇒ 该钉，漂 ⇒ 登记不钉）")
         emit("MOTION_SCENARIO_AB_SUMMARY_CHANNEL 峰值口径 同=" + String(peakSame)
              + " 漂=" + String(peakDrift) + " 敏感=" + String(peakSensitive)
              + " 换对象=" + String(peakFlipped)

@@ -14,7 +14,7 @@
 
   M943 让首末面积变成峰值的别名                     ⇒ 采样粒度证人必须红
        （这一刀就是本轮要被推翻的那颗旧尺：证人要是放得过它，说明新尺没换掉东西）
-  M944 分类器只读首末面积、丢掉并集与墨量           ⇒ 词表与分界证人必须红
+  M944 分类器只读首末面积、丢掉并集（R358 重钉：墨量已只印不判）           ⇒ 词表与分界证人必须红
        （取较大者这一半没有牙的话，"换统计量"就等于挑一颗恰好看不见问题的尺）
   M945 墨量那颗退化成"变没变"的计数                 ⇒ 面积盲区证人必须红
        （深浅读不出来的尺只是面积尺的别名 —— 这条是防本轮自己把判据换窄）
@@ -57,8 +57,7 @@ REPL_943 = u"        return peak(deltas(frames, band: band))\n"
 
 # ② 只读首末面积：并集与墨量两颗被摘掉 ⇒ 取较大者这一半没牙。
 NEEDLE_944 = (u"        let rel = Swift.max(Self.relativeDifference(endpointDark, endpointLight),\n"
-              u"                            Self.relativeDifference(unionDark, unionLight),\n"
-              u"                            Self.relativeDifference(inkDark, inkLight))\n")
+              u"                            Self.relativeDifference(unionDark, unionLight))")
 REPL_944 = u"        let rel = Self.relativeDifference(endpointDark, endpointLight)\n"
 
 # ③ 墨量退化成"变没变"的计数 ⇒ 深浅读不出来，只剩面积。
