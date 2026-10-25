@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R375 状态（2026-10-26 · 本地 · 第 374 轮 / Round 372）：433 第一半 —— 崩溃安全还原 + 硬超时；M279/M281 CAUGHT、M278 以 180s 超时具名（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R375 / 第 374 轮 / Round 372）：`knife_guard.py` + 6 格测试；r56 接线（启动恢复、逐臂备份、180s 进程组超时、CI 判词读汇总行）；三臂 `M279 CAUGHT / M281 CAUGHT / M278 NOT_RUN_TIMEOUT`，三臂还原干净、复跑守卫 ESCAPED；全量沿用 R374（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 676（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`357a763`（R374）已 success；`a17bc6a`（R373 追记）success；只登记不轮询。
+② 433 第一半：备份/启动恢复/进程组超时 + 6 格正对照（`sleep 5` 对 1s 超时）。
+③ r56 接线：预检前恢复、逐臂备份、`NOT_RUN_TIMEOUT`、CI 判词读汇总行（不读末行）。
+④ 三臂现读；M278 挂起**可复现**（180s），下一格用 `sample` 抓栈。
+
+验证读数（现读）：`M279 CAUGHT`（命中「不在末尾两格」）、`M281 CAUGHT`（命中「扫描函数在合成样本上抓不到」）、`M278 NOT_RUN_TIMEOUT`；三臂 `还原干净=yes`、复跑 `ESCAPED`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R374 日志）；脚本电池 `Ran 676（skipped=4）OK`；产品面连续零改动 **20** 轮（`python3 scripts/product_streak.py --streak-for 374` 现读）。
+
+NOT-RUN（分开写）：① M278 的 CAUGHT 仍没有读数（可复现超时）；② 全量卷没重跑（本轮没动 Swift）；③ 真机腿没跑。
+
+下一轮（R376）的靶：⓪ 读队列；① 433 第二半：M278 落刀后 30s `sample <pid>` 抓栈，定位挂点；② 再回到 367（rot 27）。
+
 ## R374 状态（2026-10-25 · 本地 · 第 373 轮 / Round 371）：读数通道守卫补上「来源」证人；r56 三根针重钉，刀腿 NOT-RUN（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R374 / 第 373 轮 / Round 371）：`strayLines(in:)` + 合成样本正对照落地，守卫 0.029 秒通过；r56 的 M278/M279/M281 重钉、CI 预检 `Ran 1 test` → `Ran \d+ tests`，两路预检 OK；刀腿 NOT-RUN（M278 臂 xctest 挂 6:29、两次强杀、两次残留 MUTANT 已还原）；全量 1031 格 0 失败、电池 Ran 670（skipped=4）OK（产品 0 文件 · 判据账）

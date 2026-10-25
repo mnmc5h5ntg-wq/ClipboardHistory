@@ -35,6 +35,8 @@ import re
 import subprocess
 import sys
 
+from knife_guard import backup, clear_backup, restore_if_stale, run as guarded_run
+
 ROOT = "/Users/wangziyi/Codex_Project0"
 REPO = os.path.join(ROOT, "ClipboardHistory")
 TESTS = os.path.join(REPO, "Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift")
@@ -107,9 +109,10 @@ def run(kind, filter_name):
         argv, cwd = ["swift", "test", "--filter", filter_name], REPO
     else:
         argv, cwd = SELFTEST, ROOT
-    proc = subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
-                          env=BASE_ENV, timeout=1800)
-    out = proc.stdout + proc.stderr
+    # R375 / BACKLOG 433：硬超时 + 进程组 KILL（超时记 NOT_RUN_TIMEOUT，不再挂住整张表）。
+    code, out, timed_out = guarded_run(argv, cwd=cwd, env=BASE_ENV, timeout_seconds=180)
+    if timed_out:
+        return "NOT_RUN_TIMEOUT", out, []
     if kind == "swift":
         verdicts = [l for l in out.splitlines()
                     if "Test Case" in l and ("passed" in l or " failed" in l)]
@@ -118,13 +121,19 @@ def run(kind, filter_name):
         failed = [l.split("]")[0].replace("Test Case '-[", "") for l in verdicts if " failed" in l]
         if "error:" in out and not failed:
             return "BROKEN-MUTATION", out, []
-        return ("CAUGHT" if proc.returncode != 0 else "ESCAPED"), out, failed
+        return ("CAUGHT" if code != 0 else "ESCAPED"), out, failed
     # R374：自检从 1 格长到 5 格之后，写死的 "Ran 1 test" 把整张表卡在 BROKEN-MUTATION（预检就先死）。
     # 判的是「跑起来了没有」，不是「跑了几格」——格数是自检自己的事。
     if not re.search(r"^Ran \d+ tests?", out, re.M):
         return "BROKEN-MUTATION", out, []
+    # R375：判词只认 unittest 的**汇总行**，不读最后一行 —— 自检在 OK 之后还会打样张行，
+    # 读最后一行会把「OK」读成 CAUGHT（预检就此失败）。两行都找不到才算 BROKEN。
+    ok_line = re.search(r"^OK( \(skipped=\d+\))?$", out, re.M)
+    failed_line = re.search(r"^FAILED \(", out, re.M)
+    if not ok_line and not failed_line:
+        return "BROKEN-MUTATION", out, []
     names = [l.split()[0] + "/" + l.split()[1] for l in out.splitlines() if " FAIL" in l]
-    return ("ESCAPED" if out.strip().splitlines()[-1].startswith("OK") else "CAUGHT"), out, names
+    return ("ESCAPED" if ok_line else "CAUGHT"), out, names
 
 
 def apply(path, old, new):
@@ -144,6 +153,10 @@ def restore(path, original):
 
 
 def main():
+    # R375：上一次落刀若没被还原（进程被杀），这里先恢复再预检。
+    for path, tag in ((TESTS, u"TESTS"), (CAPTURE, u"CAPTURE"), (CI, u"CI")):
+        if restore_if_stale(path, tag):
+            print("KNIFE_RESTORED_FROM_BACKUP " + tag)
     measure = "--measure" in sys.argv
     wanted = {a for a in sys.argv[1:] if not a.startswith("--")}
     for mid, desc, path, kind, old, new, filter_name, needles in MUTATIONS:
@@ -159,11 +172,14 @@ def main():
     for mid, desc, path, kind, old, new, filter_name, needles in MUTATIONS:
         if wanted and mid not in wanted:
             continue
+        backup(path, mid)
         original = apply(path, old, new)
         try:
             code, out, failed = run(kind, filter_name)
         finally:
             ok = restore(path, original)
+            if ok:
+                clear_backup(path, mid)
         hit = [needle for needle in needles if needle in out]
         right = code == "CAUGHT" and len(hit) >= 1
         results.append((mid, code, "yes" if right else "NO", "yes" if ok else "NO"))

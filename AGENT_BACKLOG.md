@@ -8709,3 +8709,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现场：`mutate_r56_readings_channel.py M278` 让 `CaptureReadings.emit` 提前 return；守卫本应 0.029 秒内红，实际 xctest 跑到 6:29 仍未结束，第一次 10 分钟包装超时后还出现「管道读者先死 ⇒ xctest 写 stdout 阻塞」的二次挂起。
     第二个现场：强杀后 `CaptureReadings.swift` 两次留下 `return   // MUTANT: 只 stdout，不落盘` —— `finally` 不执行。两次都由 `git diff` 在提交前发现并还原。
     修法（下一轮）：① 刀跑之前先把目标文件备份到 `.scratch` 并在**表启动时**校验/恢复未完成的落刀；② 给 swift 那一腿加一个硬超时（例如 180s，超时记 `NOT_RUN 超时` 而不是挂住）；③ 再查 M278 为什么会挂 —— 先怀疑 `emit` 提前 return 后守卫的读文件分支与 `FileHandle` 生命周期。
+
+433 追记（R375 · 第一半落地）：`knife_guard.py`（备份 / 启动时恢复 / 进程组硬超时）+ 6 格测试；r56 已接线，CI 判词改读 unittest 汇总行。
+    三臂现读：`M279 CAUGHT`、`M281 CAUGHT`、`M278 NOT_RUN_TIMEOUT`（180s 到点；R374 是 6:29 挂死）——三臂 `还原干净=yes`、复跑守卫 `ESCAPED`。
+    **M278 可复现**：不是被杀的管道造成的假象。下一格：落刀后 30s 用 `sample <pid>` 抓栈，判定挂在 `String(contentsOf:)` / `FileHandle` / 退出路径哪一处。
+
+367 追记（R375）：M279/M281 两臂 CAUGHT（「不在末尾两格」/「扫描函数在合成样本上抓不到」）；M278 记 NOT_RUN_TIMEOUT（刀没验成，针本来就活着，rot 仍 27）。

@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 374 轮（R375 · 2026-10-26 · U-1307…U-1309）：433 第一半 —— 崩溃安全还原 + 硬超时；M279/M281 CAUGHT、M278 以 180s 超时具名（U-1307…U-1309 · 产品 0 文件，判据账）
+
+- **U-1307：`knife_guard.py` 落地。** `backup` / `restore_if_stale` / `clear_backup` 负责「落刀前备份、表启动时把没被还原的那一刀恢复」；`run` 用 POSIX 进程组 + 硬超时，超时只杀整组。`scripts/tests/test_knife_guard.py` **6 格**（含 `sleep 5` 对 1s 超时必须 timed_out）。
+- **U-1308：r56 接线 + 两处读数判法修正。** 预检前先 `restore_if_stale`（被杀过就打印 `KNIFE_RESTORED_FROM_BACKUP`）；每臂落刀前备份、还原干净后清备份；swift 那一腿 180s 超时记 `NOT_RUN_TIMEOUT`；CI 那一侧不再读「最后一行」，只认 unittest 的汇总行（自检在 `OK` 之后还会打样张行，读末行会把 OK 读成 CAUGHT —— 这正是它上一轮预检失败的原因）。
+- **U-1309：三臂现读。** `M279 CAUGHT`（红在 `testMotionReadingsUseTheFileChannel`，命中「不在末尾两格」）、`M281 CAUGHT`（命中「扫描函数在合成样本上抓不到」）、`M278 NOT_RUN_TIMEOUT`（180s 到点被杀；R374 它是 6 分 29 秒无人收尸）——三臂 `还原干净=yes`，复跑守卫 `ESCAPED`。⇒ M278 的挂起**可复现**，下一格用 `sample` 抓栈；rot 不动（27，M278 的针本来就活着）。
+
 ## 第 373 轮（R374 · 2026-10-25 · U-1303…U-1306）：读数通道守卫补上「来源」证人；r56 三根针重钉，刀腿 NOT-RUN（U-1303…U-1306 · 产品 0 文件，判据账）
 
 - **U-1303：`testMotionReadingsUseTheFileChannel` 的扫描来源第一次有证人。** 旧形状只验「谓词抓不抓得到」（四条合成行、应抓 3 条），而 `strays` 那一边可以被改成恒空、谓词照样过 —— R56 的 M281「扫描列表清空」正是这种坏法。现在把扫描提成 `strayLines(in:)`，**同一函数**再喂一段已知有一条游离读数的合成源码，必须恰好抓到 1 条；真源码走同一个函数。守卫单跑 `passed (0.029 seconds)`。
