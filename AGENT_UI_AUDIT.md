@@ -363,6 +363,22 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 358 轮（R359 · 2026-10-25 · U-1258…U-1260）：必印族必须有专用 grep —— `MOTION_REDUCE_SOURCES` 在 runner 上被 head 截掉（U-1258…U-1260 · 产品 0 文件，判据账）
+
+- **U-1258：`MOTION_REDUCE_SOURCES` 在绿跑里一行都没有。** `40195884862 ↔ 6a0258a` 是绿的、`MOTION_LINES=328`，
+  而 CI 那一步只 `grep -E "^MOTION_" | head -120`；这一行由 `testTransitionsAreActuallyRunning` 打，
+  排在它前面的测试已经占满了 120 行 ⇒ **不是没打印，是被截掉**。读数族必须接进它被打印的那一步（Skill 的规矩），
+  R355 只加了 emit、没加专用 grep。
+- **U-1259：接线 + 守卫，守卫当场抓到我的第一版。** `ci.yml` 的 filmstrip 步加一条
+  `grep -E "^MOTION_REDUCE_SOURCES" … || echo MOTION_PRINT_MISSING=…`；
+  新守卫 `scripts/tests/test_ci_motion_print_wiring.py` 四格：真步里四族都有**专用 grep**（SUMMARY / RESOLVE / NOT_RUN / REDUCE_SOURCES）、
+  合成步缺两族必须点名、**光 echo 族名不算打印**、模式都能编译。
+  第一版我写成 `for prefix in …; do grep -E "$prefix"`，守卫判它没打印 —— 那是守卫对：**字面 grep** 才是这条规矩要的形状（循环变量让"打印过哪几族"不再能从文本里读出来）。
+- **U-1260：R355/R356 的 runner 验收读数（同一次绿跑）。** `MOTION_SUMMARY … empty-state=3`、
+  `MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner`；`MOTION_PILL_RAMP_GEOM … 行带=52.0…76.0pt
+  候选段=y52..76px 高24px 判=过 洞宽=49% 纵向覆盖=24/24px=100%`；注入 reduce 的那卷 `过渡帧数=3 变化段时长=101ms`。
+  ⇒ 429 的验收成立、384 在两机上成立；431 还欠"三源"那一行（本轮的接线要等下一跑）。
+
 ## 第 357 轮（R358 · 2026-10-25 · U-1255…U-1257）：387① 落地 —— 墨量只印不判，色档 A/B 从「敏感=8」收到「同=11 / 漂=1」（U-1255…U-1257 · 产品 0 文件，判据账）
 
 - **U-1255：判词只由两颗面积尺做，墨量差仍逐颗印。** `appearanceDependenceVerdict` 的 `rel` 从

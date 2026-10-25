@@ -12,6 +12,30 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R359 状态（2026-10-25 · 本地 · 第 358 轮 / Round 356）：必印族专用 grep —— `MOTION_REDUCE_SOURCES` 不再被 head 截掉（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R359 / 第 358 轮 / Round 356）：`ci.yml` 的 filmstrip 步加 `MOTION_REDUCE_SOURCES` 专用 grep +
+`MOTION_PRINT_MISSING` 点名；新守卫 `test_ci_motion_print_wiring` 四格钉住必印名单；电池 `Ran 659（skipped=4）OK`（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ 读绿跑 `40195884862 ↔ 6a0258a`：R355 修复被签下（`empty-state=3`、`judged=3/4 not-run=notice-banner`）、
+   R356 的 384 在 runner 上 100%（`行带=52…76pt`、`纵向覆盖=24/24px`）、注入 reduce 那卷 `3 帧/101ms`。
+② 发现 `MOTION_REDUCE_SOURCES` 一行都没有：`MOTION_LINES=328` 而被 `head -120` 截掉。
+③ 接线：filmstrip 步加**字面**专用 grep；缺行打 `MOTION_PRINT_MISSING=^MOTION_REDUCE_SOURCES`。
+④ 新守卫四格（真步/合成正对照/光 echo 不算/正则可编译）；它抓到第一版的 for-loop 写法并逼成字面 grep。
+⑤ 本机不动产品、不动尺：全量/基线/胶片沿用 R358 的数，本轮只改 CI 接线与脚本守卫。
+
+验证读数（现读）：脚本电池 `Ran 659（skipped=4）OK`；`test_ci_motion_print_wiring` 4/4；
+runner 验收（同一次绿跑）`empty-state=3` / `judged=3/4 not-run=notice-banner` / `纵向覆盖=24/24px=100%` / `MOTION_REDUCE 3 帧 101ms`；
+产品面连续零改动 **4** 轮（`python3 scripts/product_streak.py --streak-for 358` 现读）。
+
+NOT-RUN（分开写）：① 接线在 runner 上的验收（下一跑日志里要出现 `MOTION_REDUCE_SOURCES setting=…`）；
+② 真机腿没跑；③ 本轮无 Swift 改动 ⇒ 全量卷/胶片/基线没有重跑（沿用 R358 的 1030/68/182）。
+
+下一轮（R360）的靶：⓪ 读 `ff3deba` / `f975be8` 与下一跑（重点：`MOTION_REDUCE_SOURCES` 三源 +
+R357/R358 的 STEP[9] 是否不再红）→ ① 376（第二通道）或 367（表自己声明针）→ ② 426（刀的 diff 判法）→
+③ 若两机同格：386 的两条线标定。
+
 ## R358 状态（2026-10-25 · 本地 · 第 357 轮 / Round 355）：387① 落地 —— 墨量只印不判，色档 A/B 收到 同=11/漂=1（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R358 / 第 357 轮 / Round 355）：`appearanceDependenceVerdict` 的判词收回两颗面积尺，

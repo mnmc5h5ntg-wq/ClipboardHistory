@@ -302,6 +302,12 @@ jobs:
           # 闸门（下一步）读的是文件，不受这里影响；这一步负责让人**看见**。
           echo "---- not-run 的理由（全量，不截断） ----"
           grep -E "MOTION_NOT_RUN=" /tmp/motion.log || true
+          # R359 / BACKLOG 431：**必印族**被 `head -120` 截掉过一次（`MOTION_REDUCE_SOURCES`：
+          # run 40195884862 的 `MOTION_LINES=328`，而它在排在后面的测试里 ⇒ 日志里一行都没有）。
+          # 规矩：凡"必须能在 runner 日志里被看见"的读数族，都有一条**专用且不截断**的 grep；
+          # 族名册由 `scripts/tests/test_ci_motion_print_wiring.py` 钉住，漏一条就红。
+          echo "---- 必印族（专用，不截断） ----"
+          grep -E "^MOTION_REDUCE_SOURCES" /tmp/motion.log || echo "MOTION_PRINT_MISSING=^MOTION_REDUCE_SOURCES"
           echo "---- 红的用例 ----"
           # 两级过滤而不是一个 ERE：macOS 的 BSD grep 里 `]`（以及 `\]`）在 ERE 中不可靠 ——
           # `test[A-Za-z]+'\] failed` 对着真实那行返回 0 命中，而 `grep -F "]' failed"` 命中。

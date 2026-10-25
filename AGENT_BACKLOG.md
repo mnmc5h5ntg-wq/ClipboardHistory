@@ -8604,3 +8604,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     ② 386 的"5%/25% 两条线该在哪"仍未标定（现在输入不再带偏移，但它仍是拍上去的线）；
     ③ emptyState 的 7.2% 是面积的色档差还是阈值附近的计数差，没拆（要逐帧像素对照）。
 
+
+431 追记（R359）：`MOTION_REDUCE_SOURCES` 的**接线**补上了 —— 绿跑 `40195884862` 里 `MOTION_LINES=328`，
+    而 CI 只打 `head -120`，这一族排在后面的测试里 ⇒ 一行都没有（不是没打印）。
+    现在 filmstrip 步里有专用 `grep -E "^MOTION_REDUCE_SOURCES"`，缺了会打 `MOTION_PRINT_MISSING=…`；
+    `scripts/tests/test_ci_motion_print_wiring.py` 把四族必印名单（SUMMARY / RESOLVE / NOT_RUN / REDUCE_SOURCES）钉住。
+    **仍欠**：下一跑 runner 日志里出现 `MOTION_REDUCE_SOURCES setting=… voiceOver=… catalog=…`（接线只在 CI 上才算验收）。
+
