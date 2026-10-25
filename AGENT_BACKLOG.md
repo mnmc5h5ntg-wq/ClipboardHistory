@@ -8493,3 +8493,14 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     修法（下一轮）：场景的声明改成 `Int(MotionCatalog.duration(for: .slider) * 1000)`，同一笔里重跑胶片，
     要读到 `声明=200ms`、`judged=4/4` 不掉、`MOTION_AXIS` 的四条峰值仍在同一量级；
     若某条判定因此变红，先看它是不是把"160"当成了期望值（那同样是一份抄来的常量）。
+
+425 结案（R350）：胶片空态场景的声明从 `.contentFade`(160ms) 改成 `.slider`(200ms)，与产品接线一致；
+    三次抓取现读 `MOTION_GRAB empty-state … 声明=200ms`（暗/亮/未钉），`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`。
+    守卫 `testEmptyStateFadeSharesThePillRhythm` 现在同时读产品那一行与胶片那一块（按块切片，见 U-1221）。
+
+**426. 变异刀的**替换串**也必须在文件里唯一：只查 needle 唯一是不够的**（R350 现读）
+    R350 想给 425 配一把刀（把胶片声明换回 `.contentFade`），落刀后回读得到 `不匹配` —— 因为替换串
+    （`.contentFade) * 1000) { store in`）在这个文件里**别的场景本来就有**，`read(path).count(repl)==1` 不成立，
+    刀根本落不下去（跑器打 `NOT_RUN 落刀后回读不匹配`）。现有的六条规矩只要求**原文 needle 恰好命中一次**；
+    这一轮补上第七条的候选：**替换串也要恰好一次**，否则"落刀成功"与"文件本来就这样"分不开。
+    退场条件：等把两张表改成"替换后再 dump 出一份 diff"的判法（diff 里必须恰好一行变化），就可以只查 diff。

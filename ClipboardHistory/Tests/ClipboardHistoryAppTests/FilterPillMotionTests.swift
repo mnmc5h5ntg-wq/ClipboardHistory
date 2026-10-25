@@ -172,6 +172,22 @@ final class FilterPillMotionTests: XCTestCase {
                       "空态淡出必须跟药丸同一个动画（R348）：换成 contentFade 会让内容先落定 0.16 而药丸还在走 0.20")
         XCTAssertFalse(src.contains(".animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)"),
                        "这一行是本轮改掉的那一行；它回来 = 389 回来")
+        // 胶片那一侧也要跟着：场景声明的时长必须是**同一支**（R350 / BACKLOG 425）。
+        let film = try String(contentsOf: here
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift"),
+            encoding: .utf8)
+        // 只看 `emptyState()` 那一块：`.contentFade` 在**别的场景**里合法存在（详情换类型那一场就是它）。
+        // 不切片的话这条判据一上来就把别人的声明判成违规 —— R350 第一版就是这么红的。
+        guard let start = film.range(of: "static func emptyState()"),
+              let end = film.range(of: "static func searchReflow()", range: start.upperBound..<film.endIndex) else {
+            return XCTFail("胶片里找不到 emptyState() 那一块 ⇒ 这一格没有对象")
+        }
+        let scene = String(film[start.lowerBound..<end.lowerBound])
+        XCTAssertTrue(scene.contains("declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000)"),
+                      "空态场景的声明必须读药丸那一支（.slider）：读 .contentFade 就是第三份权威，胶片测不到产品")
+        XCTAssertFalse(scene.contains("MotionCatalog.duration(for: .contentFade)"),
+                       "空态场景又去声明 contentFade(160ms) 了 ⇒ 胶片测不到产品的 0.20")
     }
 
     func testSegmentKnobLiftSplitsByAppearanceAndReadsTheToken() {

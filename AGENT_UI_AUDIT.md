@@ -363,6 +363,23 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 349 轮（R350 · 2026-10-25 · U-1219…U-1223）：胶片的空态声明改读药丸那一支 —— 425 结案（U-1219…U-1223 · 产品 0 文件，判据账）
+
+- **U-1219：胶片的声明从 `.contentFade` 改成 `.slider`，三次抓取都读 `声明=200ms`。**
+  `MOTION_GRAB empty-state … 声明=200ms`（暗 / 亮 / 未钉三档各一条，帧数 30、抓帧中位 19.2/19.5/19.1ms、最慢 58.0/43.6/52.9ms）；
+  `MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-` —— 四场判定一条没掉。425 到此结案：
+  R348 接的那条 0.20 现在**胶片也看得见**。
+- **U-1220：新守卫把"产品的接线"与"胶片的声明"钉在同一格。** `testEmptyStateFadeSharesThePillRhythm` 除了读
+  `HistorySidebarView` 那一行，还读 `MotionFilmstripTests` 的 `emptyState()` 块：声明必须是 `.slider`、不许回到 `.contentFade`。
+- **U-1221：守卫第一版把别的场景判成违规。** 全文搜 `MotionCatalog.duration(for: .contentFade) * 1000` 会命中
+  `detail-kind-change` 那一场（它本来就该用 contentFade）⇒ 当场红。改成**按块切片**（从 `static func emptyState()` 到
+  下一个 `static func`）之后才对。**同一条字面量在不同场景里合法与否不同**，判据必须带作用域。
+- **U-1222：想给这条配第二把刀，没落成。** 把声明换回 160ms 的那一刀在 `落刀后回读不匹配` — 因为替换串
+  （`.contentFade) * 1000) { store in`）在文件里**不唯一**（别的场景本来就有）。这一刀记 **NOT-RUN**，并从表里撤掉
+  （留着它会让"CAUGHT=0/1"读成判据没牙，其实是刀没落下）。开 426。
+- **U-1223：全量卷与电池。** `Executed 1025 tests, with 47 skipped and 0 failures`；脚本电池 `Ran 646（skipped=4）OK`；
+  本轮唯一的刀 M1003 复跑 `CAUGHT=1/1, RESTORE_CLEAN=yes`。
+
 ## 第 348 轮（R349 · 2026-10-25 · U-1214…U-1218）：胶片第一次跑全 —— 而它测的不是产品那条 0.20（U-1214…U-1218 · 产品 0 文件，判据账）
 
 - **U-1214：胶片在环境键下第一次跑全。** `CLIPBOARD_HISTORY_UI_MOTION=1` + `CLIPBOARD_HISTORY_MOTION_OUT=<dir>` ⇒

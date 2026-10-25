@@ -7581,9 +7581,11 @@ final class MotionFilmstripTests: XCTestCase {
         /// 清空 → 空态：整块列表被"没有记录"换掉。
         static func emptyState() -> Scenario {
             Scenario(name: "empty-state", size: NSSize(width: 380, height: 520),
-                     // 侧栏的空态 ↔ 列表那一层 `.transition` 声明在 `.contentFade` 上
-                     // （`HistorySidebarView.swift` 里 EmptyStateView 那一段）。
-                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000) { store in
+                     // 侧栏的空态 ↔ 列表那一层现在跟**药丸**同一个动画（R348 起：`FilterPillMotion.slideAnimation`
+                     // ⇒ `MotionCatalog.duration(for: .slider)`）。这里以前声明的是 `.contentFade`（160ms）——
+                     // 产品早就改成 0.20 了，胶片却还在按 160 摆帧，"改了胶片不动"就是这么来的（BACKLOG 425）。
+                     // 声明与接线的一致性由 `FilterPillMotionTests.testEmptyStateFadeSharesThePillRhythm` 钉住。
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000) { store in
                 store.perform(.clear)
             }
         }

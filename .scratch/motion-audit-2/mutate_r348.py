@@ -35,6 +35,9 @@ CELL = PURE_CELL + u"|" + PIXEL_CELL
 PIXEL_RED = u"testEmptyStateFadeSharesThePillRhythm"
 PURE_RED = u"testEmptyStateFadeSharesThePillRhythm"
 
+FILM = os.path.join(ROOT, "ClipboardHistory", "Tests", "ClipboardHistoryAppTests", "MotionFilmstripTests.swift")
+NEEDLE_DECL = '                     declaredDurationMilliseconds: MotionCatalog.duration(for: .slider) * 1000) { store in'
+REPL_1004 = '                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000) { store in'
 NEEDLE_RHYTHM = u"        .animation(FilterPillMotion.slideAnimation(reduceMotion: shouldReduce), value: historyStore.filteredEntries.isEmpty)"
 REPL_1003 = u"        .animation(MotionCatalog.animation(for: .contentFade), value: historyStore.filteredEntries.isEmpty)"
 

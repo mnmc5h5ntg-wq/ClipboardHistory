@@ -12,6 +12,28 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R350 状态（2026-10-25 · 本地 · 第 349 轮 / Round 347）：胶片改用产品的 0.20，425 结案（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R350 / 第 349 轮 / Round 347）：胶片空态声明从 `.contentFade`(160) 改成 `.slider`(200)，
+三次抓取 `声明=200ms`、`judged=4/4`；守卫按块切片钉住两边（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`RUN=40185881194 ↔ 8d375b3`、`↔ 0307c43`、`↔ 4fe06c2` 均按首读登记（只登记不轮询，R140）。
+② 夹具：`MotionFilmstripTests.emptyState()` 的 `declaredDurationMilliseconds` 改成 `MotionCatalog.duration(for: .slider) * 1000`。
+③ 守卫：`testEmptyStateFadeSharesThePillRhythm` 扩到胶片侧，**按 `emptyState()` 块切片**（`.contentFade` 在别的场景合法）。
+④ 重跑胶片（两个环境键 + 输出目录）：`MOTION_GRAB empty-state … 声明=200ms` ×3、`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`。
+⑤ 想配第二把刀（声明换回 160）没落成：替换串不唯一 ⇒ `NOT_RUN 落刀后回读不匹配`，撤表并开 426。
+
+验证读数（现读）：胶片三档 `声明=200ms`（帧数 30、中位 19.1–19.5ms、最慢 43.6–58.0ms）；
+全量卷 `Executed 1025 tests, with 47 skipped and 0 failures`；脚本电池 `Ran 646（skipped=4）OK`；
+M1003 复跑 `CAUGHT=1/1, RESTORE_CLEAN=yes`；产品面连续零改动 **2** 轮（`python3 scripts/product_streak.py --streak-for 349` 现读，口径差一挂 412）。
+
+NOT-RUN（分开写）：① 第二把刀（夹具声明换回 160ms）没落成：替换串不唯一（426）；② 胶片未逐张看图；
+③ 真机腿没跑（本轮改的是夹具声明）。
+
+下一轮（R351）的靶：⓪ 读三跑 CI 配对 → ① 413（backing 名册 + 两档材质帧）→ ② 动效主线 397 / 390 / 384 / 387① / 376 / 367
+→ ③ 426 的退场（把两张表改成 diff 判法）。
+
 ## R349 状态（2026-10-25 · 本地 · 第 348 轮 / Round 346）：胶片跑全了，却发现它测的是自己的 160ms（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R349 / 第 348 轮 / Round 346）：环境键下胶片 67 格 3 skip / 0 fail、四场 judged=4/4；
