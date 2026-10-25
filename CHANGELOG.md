@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 读 CI 的第三态有名字了：`queue` 子命令（queued / in_progress / concluded + 未知点名；已等与同 workflow 前面分开）（R357 / U-1252…U-1253 · 产品 0 文件，判据账）
+
 ### 384 结案：标签墨不再把胶囊劈成两半 —— 带子 7pt→24pt、纵向覆盖 29%→100%，斜坡仍单调（R356 / U-1247…U-1250 · 产品 0 文件，判据账）
 
 ### reduce 下空态淡入被归零：runner 六连红是产品事实，修回 0.20 淡入；针预检纳入四位刀号（R355 / U-1242…U-1246 · 产品 1 文件，判据账）

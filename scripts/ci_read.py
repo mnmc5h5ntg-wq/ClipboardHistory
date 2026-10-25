@@ -17,8 +17,10 @@
   python3 scripts/ci_read.py latest [--workflow UI]
   python3 scripts/ci_read.py steps   <run-id>
   python3 scripts/ci_read.py readings <run-id> [通道前缀 …]
+  python3 scripts/ci_read.py queue   [--workflow CI] [--limit 10]
 退出码：0=拿到并打印了；1=要求的 run/日志取不到；2=用法错。
 """
+import datetime
 import json
 import re
 import subprocess
@@ -68,6 +70,93 @@ def steps(run_id):
                 print("    STEP[%s] %s ⇒ %s" % (st.get("number"), st.get("name"),
                                                 st.get("conclusion")))
     return data
+
+
+# ── 428 / R357：第三态「排队中」 ──────────────────────────────────────────────
+# 起因（R354 追记二）：五跑同时在队里、零跑结案，而 `latest` 只打 status/conclusion，
+# 台账里只剩「未读」一个词，读的人分不清「还没轮到」与「跑了一半挂了」。
+# 三种状态写死在这里；认不出的状态**点名**（unknown:<status>），不许静默归到任一边。
+QUEUE_STATES = {
+    "queued": "queued",
+    "in_progress": "in_progress",
+    "completed": "concluded",
+}
+
+
+def queue_state(status):
+    return QUEUE_STATES.get(status or "", "unknown:" + str(status))
+
+
+def parse_created_at(value):
+    """GitHub 的 createdAt 是 `2026-10-25T11:46:15Z`；读不出给 None（不猜当前时间）。"""
+    try:
+        return datetime.datetime.strptime(value or "", "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None
+
+
+def queue_rows(runs, now):
+    """每跑一行：(run, 三态, 已等秒, 同 workflow 排在它前面的未结案跑数)。
+
+    「前面」= created 更早、且仍未结案（queued / in_progress）。已结案的不算排队，
+    不同 workflow 的不在同一条队里。时间读不出的那一跑：已等=-1、前面=0，
+    并在调用方由 `queue_summary` 单独计数 —— 读不到要做减法，不许给它一个像结论的 0。
+    """
+    rows = []
+    for run in runs:
+        state = queue_state(run.get("status"))
+        created = parse_created_at(run.get("createdAt"))
+        waited = int((now - created).total_seconds()) if created else -1
+        ahead = 0
+        if state in ("queued", "in_progress") and created:
+            for other in runs:
+                if other is run or (other.get("workflowName") != run.get("workflowName")):
+                    continue
+                if queue_state(other.get("status")) not in ("queued", "in_progress"):
+                    continue
+                other_created = parse_created_at(other.get("createdAt"))
+                if other_created and other_created < created:
+                    ahead += 1
+        rows.append((run, state, waited, ahead))
+    return rows
+
+
+def queue_summary(rows):
+    out = {"queued": 0, "in_progress": 0, "concluded": 0, "unknown": 0, "unread_time": 0}
+    for _run, state, waited, _ahead in rows:
+        if state in out:
+            out[state] += 1
+        else:
+            out["unknown"] += 1
+        if waited < 0:
+            out["unread_time"] += 1
+    return out
+
+
+def queue(workflow=None, limit=10):
+    cmd = ["run", "list", "--limit", str(limit), "--json",
+           "databaseId,headSha,status,conclusion,createdAt,workflowName,displayTitle"]
+    out = gh(*cmd)
+    if out is None:
+        return 1
+    runs = json.loads(out)
+    if workflow:
+        runs = [r for r in runs if workflow.lower() in (r.get("workflowName") or "").lower()]
+    now = datetime.datetime.now(datetime.timezone.utc)
+    rows = queue_rows(runs, now)
+    for run, state, waited, ahead in rows:
+        print("QUEUE run=%s sha=%s 状态=%s 结论=%s 已等=%ss 同workflow前面=%d workflow=%s title=%s"
+              % (run.get("databaseId"), (run.get("headSha") or "")[:7], state,
+                 run.get("conclusion") or "无", "?" if waited < 0 else waited, ahead,
+                 run.get("workflowName"), (run.get("displayTitle") or "")[:60]))
+    summary = queue_summary(rows)
+    print("QUEUE_SUMMARY 共=%d queued=%d in_progress=%d concluded=%d 未知=%d 时间读不出=%d"
+          % (len(rows), summary["queued"], summary["in_progress"], summary["concluded"],
+             summary["unknown"], summary["unread_time"]))
+    if not rows:
+        print("QUEUE_EMPTY=1 这一段没有匹配的 run ⇒ 不是「都结案了」")
+    return 0
 
 
 def log_text(run_id):
@@ -156,7 +245,7 @@ def main():
     if args and args[0] in ("-h", "--help"):
         print(__doc__)
         return 0
-    if len(args) < 1 or args[0] not in ("latest", "steps", "readings"):
+    if len(args) < 1 or args[0] not in ("latest", "steps", "readings", "queue"):
         print(__doc__)
         return 2
     if args[0] == "latest":
@@ -168,6 +257,15 @@ def main():
               % (r["databaseId"], (r.get("headSha") or "")[:7], r.get("status"),
                  r.get("conclusion"), (r.get("displayTitle") or "")[:60], r.get("workflowName")))
         return 0
+    if args[0] == "queue":
+        wf = args[args.index("--workflow") + 1] if "--workflow" in args else None
+        limit = args[args.index("--limit") + 1] if "--limit" in args else "10"
+        try:
+            limit_n = int(limit)
+        except ValueError:
+            sys.stderr.write("--limit 要一个整数：%s\n" % limit)
+            return 2
+        return queue(wf, limit_n)
     if args[0] == "steps":
         return 0 if steps(args[1]) else 1
     return readings(args[1], args[2:] or list(DEFAULT_CHANNELS))

@@ -8585,3 +8585,12 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     **仍欠**：① runner 上同一行 `MOTION_PILL_RAMP_GEOM` 的读数（下一跑 CI）；
     ② 覆盖率的**地板**未钉 —— 本机 100% 不足以当门，等 runner 的同格读数再定（R38 的老规矩）。
 
+
+428 结案（R357）：`scripts/ci_read.py queue` 落地 —— 三态（queued / in_progress / concluded）+ `unknown:<status>` 点名；
+    每跑两列独立读数：`已等=Ns`（createdAt→现在）与 `同workflow前面=N`（更早且仍未结案）；
+    时间读不出 ⇒ 已等=-1、不参与排序、单独计数（不做减法就是猜顺序）。
+    6 格测试：三态词表 / 前面只数同 workflow 未结案 / 已结案不排队 / 时间读不出 / 未知状态单独数 / `--limit` 非整数在触网前退 2。
+    本机现读：`QUEUE_SUMMARY 共=5 queued=0 in_progress=2 concluded=3 未知=0 时间读不出=0`。
+    **仍欠**：`gh` 本身失败那条路（`queue()` 返回 1、stderr 有名字）没有单测 —— 它要替身 `gh`，
+    代价比这一单本身大；先用"取不到时返回 1 且不打印任何 QUEUE 行"当约定，下一轮若要接进轮次开场必须补上。
+
