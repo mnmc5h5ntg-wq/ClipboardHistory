@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 377 轮（R378 · 2026-10-26 · U-1318…U-1321）：367 第三批 —— 七把腐烂针重钉，rot 27→21；M188 的旧刀编译不过被当场判成刀坏（U-1318…U-1321 · 产品 0 文件，判据账）
+
+- **U-1318：r40 的四把针跟着 API 改。** R40 写它们时决策函数是 `decide(copyErrorMessage:)`，后来变成 `decide(failure: ClipboardWriteFailure?)`，针里又把两行注释一起带着 ⇒ 盘上一个都不命中。针改到 switch 整块（含新签名）后四臂现读 `M185/M186/M187/M188 CAUGHT`，红在各自主张的那两格（闸门缺失 / 方向反 / 只取消不说话 / 决策表把成功也判成取消），且四臂 `还原干净=yes`。
+- **U-1319：M188 的第一版「反向」变异**编译不过 —— `guard failure == nil else` 之后还要读 `failure.message`，可选型没解开 ⇒ `BROKEN-MUTATION`。**这是刀坏，不是判据没牙**：改成「`guard let failure else { return .cancel(...) }`（成功也判取消）」之后能编译，现读 CAUGHT、红在 `testCopyThenPasteTruthTable` 与 `testCopySuccessIsNotBlockedByTheNewGate` 两格。同时把 r40 表接上 `knife_guard`（落刀前备份、启动时恢复、600s 进程组超时）。
+- **U-1320：r42 的两把针从「注释 + 动作」缩成「动作那一行」。** 旧针把三段解释性注释一起钉住，注释后来改写过 ⇒ 针烂，而真正的对象（`.animation(... value: exportMessage == nil)`）一直活着。改针后 `M194/M195 CAUGHT`，红在 `MotionDriverTests testEveryReceiptLineCallSiteIsDriven`。⇒ 判据的针只许钉**被驱动的对象**，注释不是对象（D-366）。
+- **U-1321：rot 27→21。** 六把（r40 ×4、r42 ×2）重钉后 `HIDDEN_ARMS 表=222 可判=805 rot=21 … 处置=ok`，`ROT_CEILING` 同笔 27→21（`:17` 那条「两个方向都有牙」的红话仍是硬的）。剩下 21 条里 r49 的 M244 这次**没有**重钉：它钉的是「目录快照永远是空」，而那个快照探针已被重写、旧针在盘上没有对应对象 —— 要重钉得先给新探针写一支同义的坏法，留到下一批。
+
 ## 第 376 轮（R377 · 2026-10-26 · U-1314…U-1317）：434 结案 —— 读数通道装上有界等待（M1010 CAUGHT）；r56 十把刀第一次进针预检（U-1314…U-1317 · 产品 0 文件，判据账）
 
 - **U-1314：`boundedChannelProbe` 落地。** 守卫里「发两行 + 读回全文」那一段以前跑在主线程上 ——通道一死锁，判据就不是变红而是挂住（R374 的 6:29）。现在整段放进后台队列，主线程最多等 5 秒；超时走具名出口 `READOUT_CHANNEL_BLOCKED`（不是「没变化」）。**正对照同一格**：合成一个闸门永不打开的动作、给 50ms 截止，必须判超时**且**不交回半个结果（断言完再放行闸门）。第一版用的是 `Thread.sleep(0.3)` —— 电池里 `wait_scan` 名册当场点名「未登记的固定挂钟等待」，连带的 `skip_roster` 内层汇总也一起红（内层那一卷读不到结论行）⇒ 换成确定性闸门。守卫现读 `passed (0.090 seconds)`；`swift build --build-tests` 告警 **0**。

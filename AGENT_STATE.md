@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R378 状态（2026-10-26 · 本地 · 第 377 轮 / Round 375）：367 第三批 —— 七把腐烂针重钉、rot 27→21；M188 旧刀编译不过判成刀坏（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R378 / 第 377 轮 / Round 375）：r40 四把针跟着 `CopyThenPaste.decide(failure:)` 重钉、r42 两把从「注释 + 动作」缩到动作那一行 —— 六臂全 CAUGHT、还原干净；M188 第一版反向变异编译不过记 `BROKEN-MUTATION`，改「成功也判取消」后 CAUGHT；`HIDDEN_ARMS 表=222 可判=805 rot=21 … 处置=ok`，`ROT_CEILING` 同笔 27→21；全量沿用 R377（本轮没动 Swift）：`Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`1ff9d11`（R376）与 `187ffaf`/`2ffc6d0`（R375）已 success；本轮 `a84cb73 ↔ 40213511314`（in_progress、前面=0）；只登记不轮询。
+② r40 四臂重钉 + 接 knife_guard（备份 / 启动恢复 / 600s 进程组超时）→ 4/4 CAUGHT。
+③ M188 旧写法编译不过 ⇒ 记刀坏并换写法（成功也判取消）→ CAUGHT（真值表 + 成功不许被挡两格）。
+④ r42 两臂缩针到动作那一行 → 2/2 CAUGHT；rot 27→21、上界同笔降；r49 M244 明确留待下一批。
+
+验证读数（现读）：`M185…M188 CAUGHT`（各红在主张的两格）、`M194/M195 CAUGHT`（`MotionDriverTests testEveryReceiptLineCallSiteIsDriven`）；六臂 `还原干净=yes`；`HIDDEN_ARMS 表=222 可判=805 rot=21 抽不出=6 已声明表=6 已声明死针=0 上界 rot=21 … 处置=ok`；预检 `tables=135 covered=118 arms=386 bad=0`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R377 日志）；电池 `Ran 682（skipped=4）OK`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **23** 轮（`python3 scripts/product_streak.py --streak-for 377` 现读）。
+
+NOT-RUN（分开写）：① 真机腿没跑；② 全量卷没重跑（本轮没动 Swift，沿用 R377 日志）；③ r49 M244 与其余 20 条腐烂针**没重钉**（旧针的对象已被重写，要先给新探针写同义坏法）。
+
+下一轮（R379）的靶：⓪ 读队列（含 `a84cb73` 的结论）；① r49 M244 的新同义坏法 + 再钉一批 rot；② 回到产品动效面点一个真实位（连续判据账之后优先）。
+
 ## R377 状态（2026-10-26 · 本地 · 第 376 轮 / Round 374）：434 结案 —— 读数通道 5s 有界等待（M1010 CAUGHT）；r56 十把刀第一次进针预检（产品 0 文件，判据账）
 
 最后更新：2026-10-26（本地 · R377 / 第 376 轮 / Round 374）：守卫里「emit 两行 + 读回全文」挪进 `boundedChannelProbe(deadline: 5)`，超时具名 `READOUT_CHANNEL_BLOCKED`，同格合成正对照（闸门 / 50ms 截止）；新刀 M1010（emit 写盘前 sleep 30s）现读 CAUGHT、命中该名字、还原干净、复跑 ESCAPED、表 EXIT=0；r56 真登记进针预检名册并认五元组形状 + `.yml` 源文件 ⇒ `covered=118 arms=386 bad=0`，缺口 75/423→74/414（地板同笔改）；`swift build --build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）

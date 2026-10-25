@@ -24,12 +24,10 @@ SETTINGS = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/SettingsView.sw
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "MotionDriverTests"
 
-EXPORT_DRIVER = """                // 键取"有没有回执"这一个布尔，与 `clearReceipt` 那条同一套写法（见 :659 的注释）：
-                // 连续两次导出换文案不该再演一次，从无到有才需要被看见。
-                .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)"""
-ARCHIVE_DRIVER = """            // R42 / BACKLOG 53：同上，这一条也没有驱动（导出/导入历史那两条回执）。
-            // 键同样是"有没有回执"，不是消息内容：连续两次导入换文案不该再演一次。
-            .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)"""
+# R378：这两条驱动现在住在更深的缩进里，旧针把注释也带上了（注释后来被改写 ⇒ 针腐烂）。
+# 针改成**动作那一行**：它才是"驱动在不在"的唯一对象，注释不是。
+EXPORT_DRIVER = """                    .animation(MotionCatalog.animation(for: .contentFade), value: exportMessage == nil)"""
+ARCHIVE_DRIVER = """                    .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)"""
 EXCLUSION_DRIVER = """                    .animation(MotionCatalog.animation(for: .contentFade),
                                value: exclusionReceipt == nil)"""
 ARCHIVE_GATE = "                if let archiveMessage {"

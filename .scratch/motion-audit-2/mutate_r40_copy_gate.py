@@ -15,6 +15,8 @@ import os
 import subprocess
 import sys
 
+from knife_guard import backup, clear_backup, restore_if_stale, run as guarded_run
+
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 SHELL = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Managers/ApplicationShell.swift")
 POLICY = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Utilities/CopyThenPaste.swift")
@@ -22,7 +24,7 @@ BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 FILTER = "PasteFailureVisibilityTests"
 
-GATE = """        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.clipboardWriteErrorMessage) {
+GATE = """        switch CopyThenPaste.decide(failure: historyStore?.clipboardWriteFailure) {
         case .pasteNow:
             break
         case .cancel(let reason):
@@ -30,34 +32,38 @@ GATE = """        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.cl
             return
         }"""
 GATE_REMOVED = "        // MUTANT：闸门整段拿掉（回到 R40 之前：复制失败也照样切前台、照样按键）"
-GATE_INVERTED = """        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.clipboardWriteErrorMessage) {
+GATE_INVERTED = """        switch CopyThenPaste.decide(failure: historyStore?.clipboardWriteFailure) {
         case .pasteNow:
             return  // MUTANT：方向反了 ⇒ 成功的不许粘
         case .cancel(let reason):
             reportPasteOutcome(reason)  // MUTANT：失败的反而放行
         }"""
-GATE_SILENT = """        switch CopyThenPaste.decide(copyErrorMessage: historyStore?.clipboardWriteErrorMessage) {
+GATE_SILENT = """        switch CopyThenPaste.decide(failure: historyStore?.clipboardWriteFailure) {
         case .pasteNow:
             break
         case .cancel(let reason):
             _ = reason  // MUTANT：只取消，不说话
             return
         }"""
-DECIDE = """        guard let copyErrorMessage else { return .pasteNow }"""
-DECIDE_INVERTED = """        guard copyErrorMessage == nil else { return .pasteNow }  // MUTANT：方向反了"""
+DECIDE = """        guard let failure else { return .pasteNow }"""
+# R378：`guard failure == nil else` 编译不过（下面要用 `failure.message`，可选型没解开）。
+# 改成「成功那一格也判取消」：同样的坏方向，且能编译 —— 真值表那格必须红在「必须放行」。
+DECIDE_INVERTED = """        guard let failure else { return .cancel(reason: "MUTANT：成功反被挡") }"""
 
 MUTATIONS = [
     ("M185", "闸门整段拿掉", SHELL, GATE, GATE_REMOVED, "仍然注入了"),
     ("M186", "闸门方向反了（成功挡掉、失败放行）", SHELL, GATE, GATE_INVERTED, "正常路径被闸门误挡"),
     ("M187", "只取消、不说话", SHELL, GATE, GATE_SILENT, "复制失败必须浮到界面"),
-    ("M188", "决策表本身方向反了", POLICY, DECIDE, DECIDE_INVERTED, "必须放行"),
+    ("M188", "决策表把成功也判成取消（方向反）", POLICY, DECIDE, DECIDE_INVERTED, "必须放行"),
 ]
 
 
 def run():
-    proc = subprocess.run(["swift", "test", "--filter", FILTER],
-                          cwd=ROOT, capture_output=True, text=True, env=BASE_ENV, timeout=2400)
-    out = proc.stdout + proc.stderr
+    # R378 / BACKLOG 433：硬超时 + 进程组/子孙树 KILL，超时记 NOT_RUN_TIMEOUT。
+    code, out, timed_out = guarded_run(["swift", "test", "--filter", FILTER],
+                                       cwd=ROOT, env=BASE_ENV, timeout_seconds=600)
+    if timed_out:
+        return "NOT_RUN_TIMEOUT", out, []
     if "Test Case" not in out:
         return ("BROKEN-MUTATION" if "error:" in out else "DID-NOT-RUN"), out, []
     verdicts = [l for l in out.splitlines() if "Test Case" in l and ("passed" in l or " failed" in l)]
@@ -66,7 +72,7 @@ def run():
     failed = [l.split("]")[0].replace("Test Case '-[", "") for l in verdicts if " failed" in l]
     if "error:" in out and not failed:
         return "BROKEN-MUTATION", out, []
-    return ("CAUGHT" if proc.returncode != 0 else "ESCAPED"), out, failed
+    return ("CAUGHT" if code != 0 else "ESCAPED"), out, failed
 
 
 def apply(path, old, new):
@@ -86,6 +92,10 @@ def restore(path, original):
 
 
 def main():
+    # R378：上一次落刀若没被还原（进程被杀），先恢复再预检。
+    for path, tag in ((SHELL, "SHELL"), (POLICY, "POLICY")):
+        if restore_if_stale(path, tag):
+            print("KNIFE_RESTORED_FROM_BACKUP " + tag)
     wanted = set(sys.argv[1:])
     code, out, _ = run()
     if code != "ESCAPED":
@@ -95,10 +105,15 @@ def main():
     for mid, desc, path, old, new, needle in MUTATIONS:
         if wanted and mid not in wanted:
             continue
+        backup(path, mid)
         original = apply(path, old, new)
-        code, out, failed = run()
+        try:
+            code, out, failed = run()
+        finally:
+            ok = restore(path, original)
+            if ok:
+                clear_backup(path, mid)
         right = needle in out
-        ok = restore(path, original)
         results.append((mid, code, "yes" if right else "NO", "yes" if ok else "NO",
                         ",".join(f.split(".")[-1] for f in failed)))
         print("%s %s ⇒ %s 红得对=%s 红在 %s" % (mid, desc, code, right, failed))

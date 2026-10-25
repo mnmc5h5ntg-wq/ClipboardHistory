@@ -48,7 +48,9 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 # R373 / BACKLOG 367：r55 的 M271/M272 重钉（参数名 worstInterval→clockInterval）后 rot 31→29 —— 修好就降。
 # R374 / BACKLOG 367：r56 的 M278/M279/M281 重钉后针都能命中 ⇒ rot 29→27。
 # 注意：这一格数的是**针活没活**，不是「刀咬没咬住」（后者要跑臂，M278 臂今天挂起、记 NOT-RUN）。
-ROT_CEILING = 27
+# R378：r40 的四把（M185…M188，针跟着 `CopyThenPaste.decide(failure:)` 改）与 r42 的两把
+# （M194/M195，针改成驱动那一行、不再带注释）重钉后现读 rot=21；M244（r49 的目录快照）仍腐烂。
+ROT_CEILING = 21
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
 DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。

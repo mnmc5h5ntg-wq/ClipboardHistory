@@ -8726,3 +8726,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
     434 追记（R377 · 结案）：`MotionFilmstripTests.boundedChannelProbe(deadline:)` 落地 —— 「emit 两行 + 读回全文」整段进后台队列，主线程最多等 5s，超时走具名出口 `READOUT_CHANNEL_BLOCKED`（不是「没变化」）。同一格的正对照：合成闸门（断言完再放行）+ 50ms 截止 ⇒ 必须超时且不交回半个结果；守卫现读 `passed (0.090 seconds)`。
     证人 M1010（emit 写盘前 sleep 30s）：现读 `CAUGHT 红得对=True 命中=['READOUT_CHANNEL_BLOCKED'] 还原干净=True`、复跑 `ESCAPED`、表 `EXIT=0`。与 M278 的分界：M278 是「写不进去」，M1010 是「写之前就不返回」——前者读文件那格红，后者只有 deadline 能救。
+
+367 追记（R378）：r40 四把（M185…M188）跟着 `CopyThenPaste.decide(failure:)` 的新签名重钉、r42 两把（M194/M195）从「注释 + 动作」缩到**动作那一行**重钉 —— 六臂全 CAUGHT，rot **27→21**，`ROT_CEILING` 同笔降到 21，`处置=ok`。
+    M188 的第一版反向变异编译不过（`guard failure == nil else` 之后仍读可选型的 `.message`）⇒ 记 BROKEN-MUTATION；改成「成功也判取消」后可编译且 CAUGHT。r40 表同笔接上 knife_guard。
+    **没动的**：r49 的 M244（钉「目录快照永远是空」，而快照探针已被重写、旧针没有对象）与其余 20 条腐烂针 —— 下一批先给新探针写同义坏法再重钉，不许拿一把空刀冒充覆盖面。
