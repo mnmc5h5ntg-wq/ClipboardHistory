@@ -12,6 +12,23 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R385 状态（2026-10-26 · 本地 · 第 384 轮 / Round 382）：两颗「恢复默认」的禁用切换接上 .selection 过渡 + 源形状守卫；367 再钉 r64 两根（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R385 / 第 384 轮 / Round 382）：R382/R383 的禁用态在默认↔动过之间硬切；给权重页与快捷键页两颗按钮挂 `MotionCatalog.animation(for: .selection)`（键分别是 `store.weights == .default` / `shortcut == settings.action.defaultShortcut`）。端态 182 张帧 `same=182 changed=0` ⇒ 过渡不改静态落点；**过程没有胶片证人 ⇒ 具名 NOT-RUN**（D-373），不把接线写成演过。源形状守卫 `testResetButtonDisabledTransitionsAreDriven` + 真值表；`M1016`/`M1017` 都 `CAUGHT`、还原干净。367：r64 M340/M341 重钉到 `appendLocked`（整表 6/6 CAUGHT），`HIDDEN_ARMS … rot=2 … 上界 rot=2 … 处置=ok`（4→2；剩 M147/M411）。`swift build --build-tests` 告警 **0**；全量 `Executed 1036 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 384` 的 streak）。
+
+本轮做了什么：
+① ⓪ CI：`40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 两跑 in_progress（>1000s），只登记不轮询；R384 能力闸门的 runner 复验仍欠。
+② 产品位：两颗重置按钮的禁用切换接 `.selection` 过渡；端态帧 182/0。
+③ 判据：源形状守卫 + 真值表；M1016/M1017 CAUGHT；过程 NOT-RUN。
+④ 367：r64 M340/M341 重钉，整表 6/6；rot 4→2、上界同笔降。
+⑤ 验证：构建 0 告警；全量 `1036/48/0`；捕获 `CAPTURED 182 -> /tmp/r385_shots`；帧基线 `COMPARED=182 CHANGED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；清账表 162=162；预检 `tables=140 covered=123 arms=393 bad=0`、全仓 233 文件 / 877 把。
+
+验证读数（现读）：`FRAMEDIFF same=182 changed=0`；`R385_MUTATE 刀=2 CAUGHT=2`；r64 `CAUGHT=6`；`HIDDEN_ARMS … rot=2 … 处置=ok`；`NEEDLE_PRECHECK tables=140 covered=123 arms=393 bad=0`。
+
+NOT-RUN（分开写）：① **过渡过程**没有胶片/时间证人（静态帧只签端态），记 `NOT-RUN=no-timeline-witness`；② `40234023212`/`40234058148` 两跑仍 in_progress —— CI 结论未读，不许写成没红；③ 亮档真机腿仍没跑；④ 剩 2 根 rot 未重钉（r33 M147、r77 M411）。
+
+下一轮（R386）的靶：⓪ 读队列（先读 `40234023212`/`40234058148` 的全部失败步骤；本笔 run id 待 push 后成对写回）；① 继续 367（r33 M147 或 r77 M411）；② 回产品动效面再点一个真实位；若收口这颗过渡，先造只拍按钮带的胶片场景（≥2 样本/两倍率）。
+
 ## R384 状态（2026-10-26 · 本地 · 第 383 轮 / Round 381）：R383 两跑分诊 + 能力闸门；登录项失败回执改为错误色（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R384 / 第 383 轮 / Round 381）：`40228710640 ↔ 02e89cf`、`40228793715 ↔ 0f408a8` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；R382 的权重判据已过（runner `288/115` 对 `607/195`），R383 的快捷键判据在 runner 上整页平涂（`SHORTCUT_RESET_STATE 默认 0/2` 对 `0/2`）⇒ 加内容区墨能力闸门（本机 62696/64756；不足走 `SHORTCUT_RESET_NOT_RUN=flat-page`），本机判据全绿，重推复验留给下一轮。产品位：登录失败回执与「不支持」说明同色，加 `lastActionFailed` + 动态错误色（亮纯红 / 暗 `1.0,0.48,0.44`；纯红暗档 2.87 低于 caption 地板、深红亮档 9.88 高于天花板，三跑才落带内）；182 张帧 `same=180 changed=2`，两张只动失败回执行。`M1015` CAUGHT；`M177` 因本轮产品改动重钉并 CAUGHT；r78 M417 重钉 6/6 ⇒ `HIDDEN_ARMS … rot=4 … 上界 rot=4 … 处置=ok`（5→4）。真机隔离启动判掉 `content-empty` 图标夹子的离屏裁切（真机完整，未改产品）。`swift build --build-tests` 告警 **0**；全量 `Executed 1034 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 383` 现读）。

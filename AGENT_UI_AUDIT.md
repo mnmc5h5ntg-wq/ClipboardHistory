@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 384 轮（R385 · 2026-10-26 · U-1348…U-1351）：两颗「恢复默认」的禁用切换接上 .selection 过渡 + 源形状守卫；367 再钉 r64 两根，rot 4→2（U-1348…U-1351 · 产品 1 文件，动效主线）
+
+- **U-1348：产品位（过渡）。** R382/R383 把「恢复默认」画成了禁用态，但默认↔动过是**硬切** —— 状态变了，画面一帧就换完。给两颗按钮挂 `MotionCatalog.animation(for: .selection)`（权重页 `value: store.weights == .default`、快捷键页 `value: shortcut == settings.action.defaultShortcut`）。端态逐字节不变：182 张帧 `same=182 changed=0` ⇒ 过渡没有改任何静态落点。**过程本身没有胶片证人**（静态帧只拍端态，本轮没造新场景）⇒ 具名 NOT-RUN，不把「接线了」写成「演过了」。
+- **U-1349：源形状守卫 + 两把刀。** `MotionDriverTests.testResetButtonDisabledTransitionsAreDriven` 读两份产品源码，要求**键就是禁用条件**那一行在；真值表 `testResetFadeScanIsATruthTable` 证明「另一个键」与「别的动画」都判 false。`M1016`（删权重页过渡）/`M1017`（删快捷键页过渡）现读 `CAUGHT=2 红得不对=0 RESTORE_CLEAN=yes`，各自红在对应的断言。
+- **U-1350：367 r64。** M340/M341 重钉到 R377 后的 `appendLocked`（M340 在写盘前整段返回；M341 去掉第一次整份重写），整表 **6/6 CAUGHT**。`HIDDEN_ARMS 表=227 可判=811 rot=2 … 上界 rot=2 … 处置=ok`（4→2；剩 r33 M147 与 r77 M411）。
+- **U-1351：⓪ CI（只登记）。** `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 两跑 `status=in_progress`、`conclusion=无`（已等 >1000s）⇒ **未读**，不许读成「没红」；R384 的能力闸门在 runner 上到底走判据还是具名 NOT-RUN，要等这两跑 concluded 后下一轮按 read-own-ci-run 读。
+
 ## 第 383 轮（R384 · 2026-10-26 · U-1343…U-1347）：R383 两跑分诊（新判据在 runner 平涂页上没读数）+ 快捷键判据能力闸门；登录项失败回执改为错误色 + M1015（U-1343…U-1347 · 产品 1 文件，动效主线）
 
 - **U-1343：CI 分诊（全部失败步骤）。** `40228710640 ↔ 02e89cf`、`40228793715 ↔ 0f408a8` 两跑 `conclusion=failure`；`ci_read.py steps` 只有 `STEP[15] Swift tests (executed-count gate)` 与 `STEP[17] Capture gate`。步骤名可解析。R382 的权重判据**已过**（runner `WEIGHTS_RESET_STATE light 默认 墨=288 最大偏离=115 | 动过 墨=607 最大偏离=195`）——R383 的语义带修法有效。仍红的是 R383 新判据：runner 上 `SHORTCUT_RESET_STATE light 默认 墨=0 最大偏离=2 | 改过 墨=0 最大偏离=2` ⇒ 整页平涂、按钮一个墨都没有；`Executed 1033 tests, with 56 tests skipped and 4 failures`、`CAPTURE_GATE_CASES passed=89 skipped=12 failed=1`（**更正**：初版生成器用了第一处 `Executed` 套件行 102/12/4；全量那一行是 1033/56/4 —— 解析器已改成取 executed 最大的一行）。改动前 `43ff699 ↔ 40221947072` success。

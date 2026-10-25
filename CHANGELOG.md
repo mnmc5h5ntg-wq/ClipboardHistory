@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 两颗「恢复默认」的禁用切换接上 .selection 过渡（源形状守卫 + M1016/M1017）；367 再钉 r64 两根、rot 4→2（R385 / 第 384 轮 / U-1348…U-1351 · 产品 1 文件，动效主线）
+
+
 ### R384：R383 判据的能力闸门（runner 平涂页走具名 NOT-RUN）+ 登录项失败回执改为错误色（过 caption 上下界）；M1015、M177 重钉、r78 6/6、rot 5→4（R384 / 第 383 轮 / U-1343…U-1347 · 产品 1 文件，动效主线）
 
 

@@ -115,6 +115,35 @@ final class MotionDriverTests: XCTestCase {
         CaptureReadings.emit("RECEIPT_DRIVE 调用点 \(gates.count) 个，无驱动 \(undriven.count) 个，键总数=\(keys.count)")
     }
 
+    /// R385：两颗「恢复默认」在默认↔动过之间必须有过渡驱动，不许硬切。
+    /// 纯源码形状判据（过渡的过程不进静态帧 —— 那条记在胶片 NOT-RUN 里）；这里钉的是
+    /// 「声明还在、键就是禁用条件」这件事，配 M1016/M1017 两把刀各删一处。
+    static func resetFadeIsDriven(in code: String, key: String) -> Bool {
+        code.contains(".animation(MotionCatalog.animation(for: .selection), value: \(key))")
+    }
+
+    func testResetButtonDisabledTransitionsAreDriven() throws {
+        let settings = Self.stripCommentLines(try productSource(named: "Views/SettingsView.swift"))
+        XCTAssertTrue(Self.resetFadeIsDriven(in: settings,
+                                             key: "shortcut == settings.action.defaultShortcut"),
+                      "快捷键页「恢复默认」的禁用切换没有 `.selection` 过渡驱动 ⇒ 默认↔动过会硬切；"
+                          + "要把 `.animation(MotionCatalog.animation(for: .selection), value: shortcut == settings.action.defaultShortcut)` 加回按钮上")
+        let weights = Self.stripCommentLines(try productSource(named: "Views/RecommendationWeightsView.swift"))
+        XCTAssertTrue(Self.resetFadeIsDriven(in: weights, key: "store.weights == .default"),
+                      "权重页「恢复默认」的禁用切换没有 `.selection` 过渡驱动 ⇒ 默认↔动过会硬切；"
+                          + "要把 `.animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)` 加回按钮上")
+    }
+
+    func testResetFadeScanIsATruthTable() {
+        let live = ".animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)"
+        XCTAssertTrue(Self.resetFadeIsDriven(in: live, key: "store.weights == .default"))
+        XCTAssertFalse(Self.resetFadeIsDriven(in: live, key: "shortcut == settings.action.defaultShortcut"),
+                       "拿另一个键去问同一行必须说没有 ⇒ 否则这条尺只认前缀、不认键")
+        XCTAssertFalse(Self.resetFadeIsDriven(in: "view.animation(.easeInOut, value: store.weights == .default)",
+                                              key: "store.weights == .default"),
+                       "换成别的动画也算驱动 ⇒ 判据把『有动画』当成了『有这支过渡』")
+    }
+
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
     func testReceiptGateScanIsATruthTable() {
         // ① `if let 局部 = 状态 {` ⇒ 门控里认的是**状态**；局部名当键是**假驱动**。

@@ -53,16 +53,27 @@ MUTATIONS = [
      '            if let range = trimmed.range(of: "//") {',
      '            if let range = trimmed.range(of: "//NOT-A-COMMENT-MARKER-R64") {'),
 
+    # R385 重钉：R377 之后文件腿搬到 `appendLocked`（锁内、首次整份重写、随后 seek+write）。
+    # M340 仍在写盘前整段返回（只 stdout）；M341 仍去掉「第一次整份重写」。
     ("M340", "通道只 print、不落盘 ⇒ ④ marker 那一格必须红（这就是 BACKLOG 96 没修的状态）",
      READINGS,
-     "        print(line)\n        let payload",
-     "        print(line)\n        return\n        let payload"),
+     "    static func appendLocked(_ line: String, to url: URL) throws {\n"
+     "        let payload = (line + \"\\n\").data(using: .utf8) ?? Data()\n",
+     "    static func appendLocked(_ line: String, to url: URL) throws {\n"
+     "        if true { return }  // MUTANT：只 stdout，不落盘\n"
+     "        let payload = (line + \"\\n\").data(using: .utf8) ?? Data()\n"),
 
     ("M341", "去掉『第一次整份重写』⇒ 第一次写变成对**已存在**的文件 append。"
              "读数文件已先删掉，所以这一刀必须红在 ④（旧版本里它逃过，因为旧文件还在）",
      READINGS,
-     "            if !opened {\n                opened = true\n                try payload.write(to: url)\n                return\n            }",
-     "            if !opened {\n                opened = true\n            }"),
+     "        if !openedURLs.contains(url) {\n"
+     "            openedURLs.insert(url)\n"
+     "            try payload.write(to: url)\n"
+     "            return\n"
+     "        }",
+     "        if !openedURLs.contains(url) {\n"
+     "            openedURLs.insert(url)\n"
+     "        }  // MUTANT：不再整份重写"),
 
     ("M342", "把 readingsURL 换成一个必然写不进去的目录 ⇒ 通道坏时判据必须**红**而不是崩，"
              "也不许悄悄变成绿（这一格测 do/catch 的处置）",
