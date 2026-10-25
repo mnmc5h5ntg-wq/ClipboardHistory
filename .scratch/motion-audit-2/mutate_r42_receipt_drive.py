@@ -30,7 +30,9 @@ EXPORT_DRIVER = """                    .animation(MotionCatalog.animation(for: .
 ARCHIVE_DRIVER = """                    .animation(MotionCatalog.animation(for: .contentFade), value: archiveMessage == nil)"""
 EXCLUSION_DRIVER = """                    .animation(MotionCatalog.animation(for: .contentFade),
                                value: exclusionReceipt == nil)"""
-ARCHIVE_GATE = "                if let archiveMessage {"
+# R381：旧锚点 `if showExportAlert {` 在 R43 就被删了（那处 alert 早已改成 ReceiptLine），
+# 所以 M198 注入后编译不过。改成在**当前**的导出回执分支前插一条未登记的回执。
+ARCHIVE_GATE = "                        if let message = exportMessage {"
 
 # needle：**从 --measure 的失败消息原文里抄**（跑法见文件末注），不许从代码里推。
 # 实测到的四支 XCTAssertTrue 全部红在 MotionDriverTests.swift:107，
@@ -38,7 +40,8 @@ ARCHIVE_GATE = "                if let archiveMessage {"
 M194_NEEDLE = '键里：["let message = exportMessage"]'
 M195_NEEDLE = '键里：["let archiveMessage"]'
 M196_NEEDLE = '键里：["let exclusionReceipt"]'
-M198_NEEDLE = '"showExportAlert"]'   # 实际名单排过序，这一串是它的最后一项（顺序稳定）
+# R381：守卫把 `if true` 里那条回执的门控式子读成 "true"（名单排过序，它是最后一项）。
+M198_NEEDLE = '"true"]' 
 MUTATIONS = [
     ("M194", "导出反馈那条回执的驱动被删掉", SETTINGS, EXPORT_DRIVER, "/* MUTANT */",
      [M194_NEEDLE]),
@@ -50,9 +53,9 @@ MUTATIONS = [
      EXPORT_DRIVER.replace("value: exportMessage == nil", "value: archiveMessage == nil"),
      [M194_NEEDLE]),
     ("M198", "冒出一条没登记、也没驱动的回执", SETTINGS, ARCHIVE_GATE,
-     '                if showExportAlert {\n'
-     '                    ReceiptLine(text: "MUTANT") {}\n'
-     '                }\n' + ARCHIVE_GATE,
+     '                        if true {\n'
+     '                            ReceiptLine(text: "MUTANT：未登记的回执") {}\n'
+     '                        }\n' + ARCHIVE_GATE,
      [M198_NEEDLE]),
 ]
 
