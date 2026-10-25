@@ -8693,3 +8693,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 367 追记（R371 · 第一根）：`mutate_r53_print_order.py` 的 M260 重钉 —— 针从 `print(` 搬到 `emit(`（R355 换的行），四臂 `4/4 CAUGHT`、`还原不干净=0`。
     `ROT_CEILING` 同笔 **33→32**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=32 抽不出=6 已声明表=6 已声明死针=0 上界 rot=32 … 处置=ok`，`test_hidden_arms` 8/8。
     归因更正：过滤串**本来没坏**（`testNativeMove` 匹配守卫 `testNativeMoveVerdictPrints…`）；我先改到探针上跑出 4 臂全 ESCAPED，那是 0 格被读成「没红」。
+
+367 追记（R372 · 第二根）：`mutate_r54_adjacent_levels.py` 的 M264 重钉 —— 梯子顶档 0.85→0.92，整表 `5/5 CAUGHT`、`还原不干净=0`。
+    M266 的期望串过期：红已在 `testAdjacentLevelRulersAreATruthTable`，正文是「填充带压到了描边上…」；补串后单跑通过。
+    `ROT_CEILING` 同笔 **32→31**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=31 抽不出=6 已声明表=6 已声明死针=0 上界 rot=31 … 处置=ok`，`test_hidden_arms` 8/8。

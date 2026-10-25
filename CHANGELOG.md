@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 367 第二根：M264 重钉（梯子顶档 0.92）、M266 期望串跟上措辞，rot 32→31（R372 / U-1297…U-1299 · 产品 0 文件，判据账）
+
 ### 367 第一根：M260 重钉到 emit、rot 33→32 且上界同笔降（含一次归因自伤的自曝）（R371 / U-1294…U-1296 · 产品 0 文件，判据账）
 
 ### 432 第一刀：空刀探测落进两张 hidden_arms 表（四态 + 正对照 M906 读出 EMPTY_KNIFE）（R370 / U-1291…U-1293 · 产品 0 文件，判据账）

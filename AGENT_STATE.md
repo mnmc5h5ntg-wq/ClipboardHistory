@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R372 状态（2026-10-25 · 本地 · 第 371 轮 / Round 369）：367 第二根 —— M264 重钉（梯子顶档 0.85→0.92），rot 32→31（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R372 / 第 371 轮 / Round 369）：r54 整表 `5/5 CAUGHT`、`还原不干净=0`；M266 的期望串跟上措辞；`ROT_CEILING` 32→31，`test_hidden_arms` 8/8；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：五跑仍在队里（`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c`）；只登记不轮询。
+② 367 第二根：M264 的针从 `[0.18, 0.34, 0.56, 0.85]` 重钉到 `…0.92`。
+③ M266 的期望串过期：红已在对的格（正文「填充带压到了描边上…」），补串后单跑通过。
+④ rot 32→31、`ROT_CEILING` 同笔降；`HIDDEN_ARMS` 现读 `处置=ok`。
+
+验证读数（现读）：`HIDDEN_ARMS 表=222 可判=804 rot=31 抽不出=6 已声明表=6 已声明死针=0 上界 rot=31 … 处置=ok`；r54 `5/5 CAUGHT`；`test_hidden_arms` 8/8；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`（沿用 R366 日志）；脚本电池 `Ran 670（skipped=4）OK`；产品面连续零改动 **17** 轮（`python3 scripts/product_streak.py --streak-for 371` 现读）。
+
+NOT-RUN（分开写）：① 全量卷没重跑（本轮没动 Swift）；② 其余 31 根烂针未重钉；③ 真机腿没跑。
+
+下一轮（R373）的靶：⓪ 读队列五跑；① 367 第三根（`mutate_r55_grab_attribution.py` 的 M271/M272，候选各 4 个）；② 或给 r312 家族声明 READOUT。
+
 ## R371 状态（2026-10-25 · 本地 · 第 370 轮 / Round 368）：367 第一根 —— M260 重钉到 emit，rot 33→32 且上界同笔降（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R371 / 第 370 轮 / Round 368）：r53 四臂 `4/4 CAUGHT`、`还原不干净=0`；`ROT_CEILING` 33→32，`test_hidden_arms` **8/8 OK**；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）

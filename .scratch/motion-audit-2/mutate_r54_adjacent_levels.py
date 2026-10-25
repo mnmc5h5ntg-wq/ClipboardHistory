@@ -34,8 +34,9 @@ TABLE = "HeatmapHoverEvidenceTests.testAdjacentLevelRulersAreATruthTable"
 
 MUTATIONS = [
     ("M264", "产品侧：梯子第 1 级压到与空格子几乎相同", TOKENS,
-     "    static let ladder: [Double] = [0.18, 0.34, 0.56, 0.85]",
-     "    static let ladder: [Double] = [0.06, 0.34, 0.56, 0.85]   // MUTANT",
+     # R372 / BACKLOG 367：顶档从 0.85 抬到 0.92 之后针就腐烂了（M264 在 rot 名单上）。
+     "    static let ladder: [Double] = [0.18, 0.34, 0.56, 0.92]",
+     "    static let ladder: [Double] = [0.06, 0.34, 0.56, 0.92]   // MUTANT",
      JUDGE, ['低于地板']),
     ("M265", "尺子侧：最大通道差换成均值通道差", TESTS,
      "                    let maxDelta = Self.meanMaxChannelDelta(renders[i - 1], renders[i], over: band, size: size)",
@@ -44,7 +45,9 @@ MUTATIONS = [
     ("M266", "尺子侧：填充带返回描边带", TESTS,
      "                guard sdf < -strokePx - allowance else { continue }",
      "                guard sdf >= -strokePx - allowance, sdf <= 0.5 else { continue }   // MUTANT",
-     TABLE, ['重叠', '漏了太多格子像素']),
+     # R372：这条断言今天的正文是「填充带压到了描边上 ⇒ 两档之差会被那一圈的抗锯齿污染」，
+     # 旧的两根期望串（重叠 / 漏了太多格子像素）已随措辞一起过期 —— 红本来就落在对的那格。
+     TABLE, ['压到了描边上', '重叠', '漏了太多格子像素']),
     ("M267", "判据侧：1× 那一臂不再量", TESTS,
      "            for scale in [1, 2] {\n                // 每一档画一次",
      "            for scale in [2] {   // MUTANT\n                // 每一档画一次",
