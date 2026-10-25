@@ -14,7 +14,7 @@
 
 ## R383 状态（2026-10-26 · 本地 · 第 382 轮 / Round 380）：CI 两跑分诊 + 快捷键三颗「恢复默认」禁用态；367 rot 8→5（产品 1 文件，动效主线）
 
-最后更新：2026-10-26（本地 · R383 / 第 382 轮 / Round 380）：`40224259064 ↔ c59b292`、`40224280654 ↔ e9b1f83` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；六朵红全在 R382 新判据 —— runner（1x）上 72×22pt 取样矩形没压住标签（`WEIGHTS_RESET_STATE … 墨=0 最大偏离=23` 两态同形）⇒ 取样几何机器依赖。改成语义带（x 380..520、y 60..230）+ 两态差只由 `maxDev` 判，本机现读 light 122/211、dark 119/193，M1013 复跑 `CAUGHT`。产品位：快捷键页三颗「恢复默认」在默认值下从未画禁用态（修前整页两态完全相同 `3792/211`），加 `.disabled(shortcut == settings.action.defaultShortcut)` 后 `2817/70` 对 `3142/211`；182 张帧 `same=176 changed=6`，6 张只动快捷键页右列。`M1014` `CAUGHT`；367：r94 整表 7/7、M876 单臂 CAUGHT、M674 退役（改名方向无牙）⇒ `HIDDEN_ARMS … rot=5 … 上界 rot=5 … 处置=ok`（8→5）。`swift build --build-tests` 告警 **0**；全量 `Executed 1033 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 382` 现读）。
+最后更新：2026-10-26（本地 · R383 / 第 382 轮 / Round 380）：`40224259064 ↔ c59b292`、`40224280654 ↔ e9b1f83` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；六朵红全在 R382 新判据 —— runner（1x）上 72×22pt 取样矩形没压住标签（`WEIGHTS_RESET_STATE … 墨=0 最大偏离=23` 两态同形）⇒ 取样几何机器依赖。改成语义带（x 380..520、y 60..230）+ 两态差只由 `maxDev` 判，本机现读 light 122/211、dark 119/193，M1013 复跑 `CAUGHT`。产品位：快捷键页三颗「恢复默认」在默认值下从未画禁用态（修前整页两态完全相同 `3792/211`），加 `.disabled(shortcut == settings.action.defaultShortcut)` 后 `2817/70` 对 `3142/211`；182 张帧 `same=176 changed=6`，6 张只动快捷键页右列。`M1014` `CAUGHT`；367：r94 整表 7/7、M876 单臂 CAUGHT、M674 退役（改名方向无牙）⇒ `HIDDEN_ARMS … rot=5 … 上界 rot=5 … 处置=ok`（8→5）。`swift build --build-tests` 告警 **0**；全量 `Executed 1033 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 382` 现读）。
 
 本轮做了什么：
 ① ⓪ CI 分诊：两跑 failure；`ci_read.py steps` 全部失败步骤 + 步骤名直方图（无 UNKNOWN STEP）+ 按步骤取正文 + 改动前 `43ff699` 那一跑 success 做对照 ⇒ 判成 R382 引入的判据几何回归。
@@ -27,7 +27,7 @@
 
 NOT-RUN（分开写）：① **重推后的 CI 复验**没读 —— 这一笔推送之后的那一跑要下一轮 ⓪ 读（本轮不轮询）；② 亮档真机腿仍没跑（当前系统外观=dark）；③ 剩 5 根 rot 未重钉（r33 M147、r64 M340/M341、r77 M411、r78 M417）。
 
-下一轮（R384）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回；并确认 `Swift tests` 与 `Capture gate` 两朵是否消失）；① 继续 367（从 r78 M417 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位。
+下一轮（R384）的靶：⓪ 读队列（`02e89cf ↔ 40228710640` 状态=in_progress；确认 `Swift tests (executed-count gate)` 与 `Capture gate` 两朵是否消失；`c59b292 ↔ 40224259064`、`e9b1f83 ↔ 40224280654` 两跑的 failure 已按 read-own-ci-run 读完、`43ff699 ↔ 40221947072` 是改动前那一跑 success；in_progress 是第三种态，不许读成「没红」）；① 继续 367（从 r78 M417 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位。
 
 ## R382 状态（2026-10-26 · 本地 · 第 381 轮 / Round 379）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（产品 1 文件，动效主线）
 
