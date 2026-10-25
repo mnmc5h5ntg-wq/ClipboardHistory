@@ -8689,3 +8689,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现读：r310 `CAUGHT=4 BLIND=1 EMPTY=0`、r313 `CAUGHT=2 BLIND=1 EMPTY=0`、两表 `RESTORE_CLEAN=yes`；
     正对照把 M906 临时加回：`M906 EMPTY_KNIFE`，前后两行 `HIDDEN_ARMS` 一字不差；撤销后 r310 回到 5 臂。
     BLIND 的现读两把是 M903 / M913 —— 它们红在判定式上，`HIDDEN_ARMS` 那行不动；只印不判死。
+
+367 追记（R371 · 第一根）：`mutate_r53_print_order.py` 的 M260 重钉 —— 针从 `print(` 搬到 `emit(`（R355 换的行），四臂 `4/4 CAUGHT`、`还原不干净=0`。
+    `ROT_CEILING` 同笔 **33→32**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=32 抽不出=6 已声明表=6 已声明死针=0 上界 rot=32 … 处置=ok`，`test_hidden_arms` 8/8。
+    归因更正：过滤串**本来没坏**（`testNativeMove` 匹配守卫 `testNativeMoveVerdictPrints…`）；我先改到探针上跑出 4 臂全 ESCAPED，那是 0 格被读成「没红」。

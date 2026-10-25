@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 367 第一根：M260 重钉到 emit、rot 33→32 且上界同笔降（含一次归因自伤的自曝）（R371 / U-1294…U-1296 · 产品 0 文件，判据账）
+
 ### 432 第一刀：空刀探测落进两张 hidden_arms 表（四态 + 正对照 M906 读出 EMPTY_KNIFE）（R370 / U-1291…U-1293 · 产品 0 文件，判据账）
 
 ### 426 第七批：r308 迁到 diff 回读，六臂全 CAUGHT；空刀探测开单 432（读数口径 0/134，暂不硬造）（R369 / U-1288…U-1290 · 产品 0 文件，判据账）

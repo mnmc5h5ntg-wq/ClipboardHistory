@@ -25,9 +25,15 @@ import sys
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILM = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
-FILTER = "MotionFilmstripTests.(testNativeMove|testFadeAB)"
+# R371 / BACKLOG 367：旧名 `testNativeMove` 早已改成 `testNativeRowMoveIsVisibleToTheRuler`，
+# 过滤串不跟着改 ⇒ 一整张表跑出 0 格（当年就是「没跑」被读成「没红」）。
+# R371 更正：原过滤串 `testNativeMove` **本来就**匹配守卫的真名
+# `testNativeMoveVerdictPrintsBeforeTheSkipGuards`，它不是腐烂源（我第一次归因错了，
+# 一度把它改到探针 `testNativeRowMove…` 上，那一遍 4 臂全 ESCAPED —— 0 格被读成"没红"）。
+# 真正的腐烂只有 M260：R355 把结论行从 `print(` 换成 `emit(`，针没跟着搬。
+FILTER = "MotionFilmstripTests.(testNativeMoveVerdictPrints|testFadeAB)"
 
-VERDICT_PRINT = ('        print("MOTION_NATIVE_MOVE 判定=\\(verdictLabel) 峰值容差="\n'
+VERDICT_PRINT = ('        emit("MOTION_NATIVE_MOVE 判定=\\(verdictLabel) 峰值容差="\n'
                  '            + String(format: "%.3f", Self.nativeMovePeakTolerance)\n'
                  '            + "（同一卷的 insert 读数在上一行：insert 能看见多帧 ⇒ 通道不瞎）"\n'
                  '            + "；这一行只说读数怎么读，产品结论要过下面两道 skip 才算")\n')

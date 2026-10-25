@@ -42,7 +42,9 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 # R313 起 rot 这一箱**只数未声明的臂**：表里写了 `NEEDLES = {刀号: [针, …]}` 的那些臂改走
 # 「逐根判」那一箱（declared_dead），因为对已声明的针，"第几根死了"是可加总的真数；
 # 未声明的仍然只配当下界（`any(候选命中)` 的漏报形状见 BACKLOG 366）。
-ROT_CEILING = 33
+# R371 / BACKLOG 367：把 mutate_r53_print_order.py 的 M260 重钉到 `emit(` 之后，rot 33→32 ——
+# 修好一根就**当场降上界**，这一格的两个方向才有牙（写回 33 会让下一次真腐烂看不出来）。
+ROT_CEILING = 32
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
 DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。

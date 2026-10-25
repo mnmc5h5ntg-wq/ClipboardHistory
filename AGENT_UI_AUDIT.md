@@ -363,6 +363,12 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 370 轮（R371 · 2026-10-25 · U-1294…U-1296）：367 第一根 —— M260 重钉到 emit，rot 33→32，上界同笔降（U-1294…U-1296 · 产品 0 文件，判据账）
+
+- **U-1294：M260 重钉。** `mutate_r53_print_order.py` 的针还停在 `print("MOTION_NATIVE_MOVE 判定=` 上，而 R355 把结论行换成了 `emit(` ⇒ 针腐烂。重钉后四臂重跑 `M260…M263 CAUGHT 4/4`、`还原不干净=0`、还原后复跑 `ESCAPED`（基线仍绿）。
+- **U-1295：一次归因自伤（照实记账）。** 第一版把 `FILTER` 改到探针 `testNativeRowMoveIsVisibleToTheRuler` 上，那一遍 4 臂全 `ESCAPED` —— 探针在无 UI 环境会 skip，**0 格被读成「没红」**；守卫的真名是 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`（原过滤串 `testNativeMove` 本来就匹配它）。改回后 4/4。
+- **U-1296：rot 33→32，上界同笔降。** `scripts/hidden_arms.py` 的 `ROT_CEILING` 从 33 降到 32；`HIDDEN_ARMS 表=222 可判=804 rot=32 抽不出=6 已声明表=6 已声明死针=0 上界 rot=32 … 处置=ok`；`test_hidden_arms` **8/8 OK**（双向棘轮两格都在）。声明面 6 张没动 —— 这一根是「重新钉活」，不是新声明。
+
 ## 第 369 轮（R370 · 2026-10-25 · U-1291…U-1293）：432 第一刀 —— 空刀探测落进两张 hidden_arms 表，正对照 M906 当场读出 EMPTY_KNIFE（U-1291…U-1293 · 产品 0 文件，判据账）
 
 - **U-1291：`readout_probe.py` 的四态。** `capture` 取一条读数、`four_state` 把它折成`EMPTY_KNIFE`（没红且读数全等）/ `READOUT_BLIND`（红了但读数全等，只印不判死）；读数拿不到时原样退回旧判词。`scripts/tests/test_mutation_readout.py` **6 格**（含「拿不到读数不许冒充没变化」）。
