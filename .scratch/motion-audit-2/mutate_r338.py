@@ -25,6 +25,8 @@ import subprocess
 import sys
 import time
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SANITIZER = os.path.join(ROOT, "ClipboardHistory", "Sources", "ClipboardHistoryApp",
                          "Utilities", "HtmlPreview.swift")
@@ -118,8 +120,8 @@ def main(argv):
             continue
         write(path, text.replace(needle, repl))
         # 回读磁盘自证：落下去的就是这一刀（改了又被换回去 ⇒ NOT_RUN，不许记 CAUGHT）
-        if read(path).count(repl) != 1:
-            print(u"%s NOT_RUN 落刀后回读不匹配" % arm)
+        if not single_substitution_lands(text, needle, repl, read(path)):  # R364 / 426：diff 判法
+            print(u"%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm)
             write(path, text)
             continue
         # mtime 必须**严格递增**：同长度变异 + 同一秒还原，工具链会继续执行旧字节码。

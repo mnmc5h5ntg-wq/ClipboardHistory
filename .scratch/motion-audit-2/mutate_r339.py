@@ -34,6 +34,8 @@ import subprocess
 import sys
 import time
 
+from readback import single_substitution_lands
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KNOB = os.path.join(ROOT, "ClipboardHistory", "Sources", "ClipboardHistoryApp",
                     "Views", "PressableStyle.swift")
@@ -139,8 +141,8 @@ def main(argv):
             print(u"%s NOT_RUN 锚点命中 %d 次（要 1 次）：%s" % (arm, hits, path))
             continue
         write(path, text.replace(needle, repl))
-        if read(path).count(repl) != 1:
-            print(u"%s NOT_RUN 落刀后回读不匹配" % arm)
+        if not single_substitution_lands(text, needle, repl, read(path)):  # R364 / 426：diff 判法
+            print(u"%s NOT_RUN 落刀后回读与预期 diff 不一致" % arm)
             write(path, text)
             continue
         stamp = os.path.getmtime(path)

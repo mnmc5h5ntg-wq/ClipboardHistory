@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 426 第三批：r356/r338/r339 迁到 diff 回读，七臂全 CAUGHT（R364 / U-1273…U-1275 · 产品 0 文件，判据账）
+
 ### 426 第二批：r345/r348/r355 迁到 diff 回读，五臂重跑全 CAUGHT（R363 / U-1270…U-1272 · 产品 0 文件，判据账）
 
 ### 426 第一步：落刀回读改判预期 diff（单针表），repl 在别处出现不再假红（R362 / U-1267…U-1269 · 产品 0 文件，判据账）
