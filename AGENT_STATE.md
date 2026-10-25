@@ -14,7 +14,7 @@
 
 ## R382 状态（2026-10-26 · 本地 · 第 381 轮 / Round 379）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（产品 1 文件，动效主线）
 
-最后更新：2026-10-26（本地 · R382 / 第 381 轮 / Round 379）：对比 `weights`（全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧，「恢复默认」标签墨完全相同 ⇒ 禁用态从未存在；加 `.disabled(store.weights == .default)` 后 `WEIGHTS_RESET_STATE light 默认 62 / 动过 195`、`dark 默认 51 / 动过 170`；182 张帧 `same=176 changed=6`，6 张只动按钮矩形、`weights-adjusted` 逐字节不变。新判据 + `M1013` 现读 `CAUGHT`、复跑 `ESCAPED`；第一版表写成自写 main、对 `mutate_needle_precheck` / `hidden_arms` 隐形，改成 `MUTATIONS` 后 `covered=120 arms=389`、`可判=808`。367 再钉 r29d（5/5）与 r76 M402（5/5），`HIDDEN_ARMS … rot=8 … 上界 rot=8 … 处置=ok`（12→8）。`swift build --build-tests` 告警 **0**；全量 `Executed 1032 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 381` 现读，口径是「本轮之前的连读轮数」）。
+最后更新：2026-10-26（本地 · R382 / 第 381 轮 / Round 379）：对比 `weights`（全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧，「恢复默认」标签墨完全相同 ⇒ 禁用态从未存在；加 `.disabled(store.weights == .default)` 后 `WEIGHTS_RESET_STATE light 默认 62 / 动过 195`、`dark 默认 51 / 动过 170`；182 张帧 `same=176 changed=6`，6 张只动按钮矩形、`weights-adjusted` 逐字节不变。新判据 + `M1013` 现读 `CAUGHT`、复跑 `ESCAPED`；第一版表写成自写 main、对 `mutate_needle_precheck` / `hidden_arms` 隐形，改成 `MUTATIONS` 后 `covered=120 arms=389`、`可判=808`。367 再钉 r29d（5/5）与 r76 M402（5/5），`HIDDEN_ARMS … rot=8 … 上界 rot=8 … 处置=ok`（12→8）。`swift build --build-tests` 告警 **0**；全量 `Executed 1032 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 381` 现读，口径是「本轮之前的连读轮数」）。
 
 本轮做了什么：
 ① ⓪ CI：登记 `4255109 ↔ 40221926024`、`43ff699 ↔ 40221947072`（均 in_progress）；`9678d9c ↔ 40216535782`、`fb641e7 ↔ 40216344972`、`ef45e65 ↔ 40216188878`、`e8228a8 ↔ 40216027769` 已 success；只登记不轮询。
@@ -27,7 +27,7 @@
 
 NOT-RUN（分开写）：① 亮档真机腿仍没跑（当前系统外观=dark；R382 的按钮禁用态没有走真机通道，只有离屏两态帧）。② 剩 8 根 rot 未重钉（r142 M674、r303 M876、r33 M147、r64 M340/M341、r77 M411、r78 M417、r94 M518）。③ `weights-*` 与 `settings-recommendations*` 的帧基线已同一笔更新，不是 NOT-RUN。
 
-下一轮（R383）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回）；① 继续 367（从 r303/r94 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位（本轮的最弱维仍是「只深审一个位点」）。
+下一轮（R383）的靶：⓪ 读队列（`c59b292 ↔ 40224259064` 状态=in_progress；`4255109 ↔ 40221926024`、`43ff699 ↔ 40221947072` 均已 success；in_progress 是第三种态，不许读成「没红」）；① 继续 367（从 r303/r94 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位（本轮的最弱维仍是「只深审一个位点」）。
 
 ## R381 状态（2026-10-26 · 本地 · 第 380 轮 / Round 378）：设置侧栏图标亮档白压白 —— 动态 labelColor 修复 + 无墨格升会红；367 再钉八根（产品 1 文件，动效主线）
 
