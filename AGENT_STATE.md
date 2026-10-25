@@ -17,7 +17,7 @@
 最后更新：2026-10-25（本地 · R370 / 第 369 轮 / Round 367）：`readout_probe.py` 四态 + 6 格测试；r310 `CAUGHT=4 BLIND=1 EMPTY=0`、r313 `CAUGHT=2 BLIND=1 EMPTY=0`，两表 `RESTORE_CLEAN=yes`；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）
 
 本轮做了什么：
-① ⓪ CI：`7ad22cf`、`19f91e2`、`f9df01e`、`3c84fc8`、`d44797c` 仍在队里（只登记不轮询）。
+① ⓪ CI：`7ad22cf`、`19f91e2`、`f9df01e`、`3c84fc8`、`d44797c` 仍在队里；本轮 `9d9cf9a ↔ 40204535459`（queued、同 workflow 前面=5，只登记不轮询）。
 ② 432 第一刀：`capture` / `four_state` / `summarize` + `test_mutation_readout.py` 6 格。
 ③ r310 / r313 声明 `READOUT`（`hidden_arms.py` 的 `HIDDEN_ARMS` 行）⇒ 声明面 2/134。
 ④ 正对照：M906 临时加回 → `EMPTY_KNIFE`（前后两行一字不差），撤销后 r310 回到 5 臂。
