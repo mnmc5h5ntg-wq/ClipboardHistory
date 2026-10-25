@@ -28,6 +28,7 @@ NOT-RUN（分开写）：① 真机腿没跑；② 帧基线没更新（本轮�
 
 下一轮（R381）的靶：⓪ 读队列（`3ef8c59`/`fbf2508`/`dfe411a` 与本轮的结论）；① 找出 add 的第三条落盘路（从 `entries` 的 didSet / Combine 订阅 / `reconcileSelection` 三条线查）；② **回产品动效面点一个真实位**（已连续 25 轮零产品改动，这一维必须动）。
 R381 追记（同日）：r49 整表跑全 —— `M240/M241/M242/M243/M244` 全部 `CAUGHT`、五臂还原干净；M240 是「recordCopy 里同步写盘」的产品侧刀，红在 `testAddingACopyWritesNothingOnTheMainThread`，「采集路径上不许有同步磁盘写」第一次有整表读数。rot 仍 20。
+R381 追记二（同日）：r42 整表 4/5 —— `M194…M197` 全部 `CAUGHT`（同红在 `MotionDriverTests testEveryReceiptLineCallSiteIsDriven`）；**M198 `BROKEN-MUTATION`**（注入后编译不过，`showExportAlert` 已不在源码里）⇒ 刀坏待重钉，不是判据问题。
 
 ## R379 状态（2026-10-26 · 本地 · 第 378 轮 / Round 376）：r56 十臂全表第一次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（产品 0 文件，判据账）
 
