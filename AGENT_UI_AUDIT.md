@@ -363,10 +363,11 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 379 轮（R380 · 2026-10-26 · U-1325…U-1327）：M244 的对照组补上「归因到 add」；刀仍 ESCAPED、针活了≠刀验过；本机换装 ok（U-1325…U-1327 · 产品 0 文件，判据账）
+## 第 379 轮（R380 · 2026-10-26 · U-1325…U-1328）：M244 的对照组补上「归因到 add」；第一版刀文只加一行、真删后 CAUGHT；本机换装 ok（U-1325…U-1328 · 产品 0 文件，判据账）
 
 - **U-1325：对照组补内容断言。** 旧对照组只判「`history.json` 出现了」——R379 的 ESCAPED 说明这可以是构造期/别处排的一次保存写的。现在多判一句：盘上那份必须**含刚加进去的文本**。把这条断言加进 `testAddingACopyWritesNothingOnTheMainThread` 后，未变异的卷仍全绿（`testAddingACopyWritesNothingOnTheMainThread passed (0.452 seconds)`）。
 - **U-1326：M244 仍然 ESCAPED —— 但这次排除了一支。** 拿掉 `persist()` 的 `persistence.save` 后，文件照样出现**且带着 add 的文本** ⇒ 既不是构造期的空快照，也不是 `persist()`；`add` 还有第三条落盘路（未定位）。刀记 `NOT_VERIFIED`，r49 表头写明「跑这张表会红，别当成新坏法」。**两轴分开**：M244 的针换到 `persist()` 后是**活的**，`HIDDEN_ARMS … rot=20`，但「针活着」不等于「刀验过」——`ROT_CEILING` 同笔降到 20 并把这个区分写在注释里。
+- **U-1328（同日更正）：M244 的 ESCAPED 是刀坏，不是第三条落盘路。** 第一版变异文写成「WALK + 一行 `_ = entries`」——那是**接在 `try persistence.save(entries)` 后面**，save 照跑，刀根本没下（与 M278 的 `return` 同族）。真把那一行换掉后现读 `M244 ⇒ CAUGHT`（红在 `testAddingACopyWritesNothingOnTheMainThread` 与 `testAddingACopyWithANearlyFullArchiveStaysInsideBudget` 两格）、`还原干净=True`。⇒ 仓库里没有第三条落盘路；U-1325 的内容断言仍然留着（它把「文件出现」的归因钉死了），只是这一刀从来不需要它来抓。
 - **U-1327：本机换装 ok。** `scripts/install_local.sh --yes` 现读 `INSTALL_RESULT=ok  版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=381  INSTALL_ENTRIES_AFTER=381`；`swift build --build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`。
 
 ## 第 378 轮（R379 · 2026-10-26 · U-1322…U-1324）：r56 十臂全表第一次跑全（10/10 CAUGHT）；M244 的重钉尝试 ESCAPED 并撤回（U-1322…U-1324 · 产品 0 文件，判据账）

@@ -14,12 +14,12 @@
 
 ## R380 状态（2026-10-26 · 本地 · 第 379 轮 / Round 377）：M244 的对照组补「归因到 add」；刀仍 ESCAPED、针活了≠刀验过；本机换装 ok（产品 0 文件，判据账）
 
-最后更新：2026-10-26（本地 · R380 / 第 379 轮 / Round 377）：`testAddingACopyWritesNothingOnTheMainThread` 多判一句「盘上那份必须含刚加进去的文本」（未变异 0.452s 通过）；把 `persist()` 的 `save` 拿掉后文件**仍带着 add 的文本**出现 ⇒ 第三条落盘路（不是构造期、不是 persist()），M244 记 `NOT_VERIFIED`；rot 21→20 只是针活了，`ROT_CEILING` 同笔降并分开两轴；`scripts/install_local.sh --yes` 现读 `INSTALL_RESULT=ok  版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=381  INSTALL_ENTRIES_AFTER=381`；build `--build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）
+最后更新：2026-10-26（本地 · R380 / 第 379 轮 / Round 377）：`testAddingACopyWritesNothingOnTheMainThread` 多判一句「盘上那份必须含刚加进去的文本」（未变异 0.452s 通过）；第一版变异文把 `_ = entries` 接在 save **后面**（刀没下）⇒ 看着像「第三条落盘路」；真替换那一行后 `M244 ⇒ CAUGHT`（两格同红）、还原干净 ⇒ 没有第三条路，`add` 的落盘就在 `persist()`；rot 21→20 是针活了，这一刀现在也验过了；`scripts/install_local.sh --yes` 现读 `INSTALL_RESULT=ok  版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=381  INSTALL_ENTRIES_AFTER=381`；build `--build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）
 
 本轮做了什么：
 ① ⓪ CI：`a84cb73`（R377）与 `a63dcf5`（R378）success、`3ef8c59`/`fbf2508`/`dfe411a` 已推；只登记不轮询。
 ② 对照组归因：文件出现 → 文件出现**且含 add 的文本**；未变异仍全绿。
-③ M244 再跑：仍 ESCAPED（写出的带着 add 文本）⇒ 第三条落盘路；刀记 NOT_VERIFIED，表头写明会红。
+③ M244 再跑：第一版刀文只加了一行、save 照跑 ⇒ ESCAPED；改成真删那一行后 **CAUGHT**（两格同红）、还原干净。
 ④ 本机换装一遍（`--yes`）：ok、SHA 匹配、条目 381=381。
 
 验证读数（现读）：未变异 `testAddingACopyWritesNothingOnTheMainThread passed (0.452 seconds)`；`M244 ⇒ ESCAPED`；`HIDDEN_ARMS 表=222 可判=805 rot=20 … 处置=ok`；`swift build --build-tests` 告警 0；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 `Ran 682（skipped=4）OK`；产品面连续零改动 **25** 轮（`python3 scripts/product_streak.py --streak-for 379` 现读）。

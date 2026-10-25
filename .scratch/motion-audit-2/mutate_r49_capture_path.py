@@ -12,10 +12,8 @@
   M243 样本数 40 → 5                              ⇒ 地板那条该红（p95 退化成最大值）
   M244 目录快照永远是空（探针坏掉）                ⇒ 对照组那条该红（不许"没写盘"靠"没接上盘"来绿）
 
-**R380 已知洞（跑这张表会红，别当成新坏法）**：M244 现在打的是 `HistoryStore.persist()` 里的
-`persistence.save(entries)`，但拿掉它之后对照组（文件出现 + 里面含 add 的文本）**仍然绿** ⇒
-`add` 的落盘还有第三条我们没看见的路（构造期那次快照已被内容断言排除，因为写出来的**带着** add 的文本）。
-刀没收，M244 记 NOT_VERIFIED；钉它之前先把那条路找出来。
+**R380 更正**：上一版刀文写成「WALK + `_ = entries`」，那是接在 save **后面**、save 照跑 —— 刀没下。
+真替换掉 `try persistence.save(entries)` 之后 `M244 ⇒ CAUGHT`（两格同红），没有第三条落盘路。
 
 needle 一律从 --measure 那一遍的失败消息原文里抄。
 """
@@ -55,8 +53,11 @@ MUTATIONS = [
     ("M243", "样本数掉到 5", TESTS, COUNT,
      "    static let sampleCount = 5   // MUTANT",
      ['样本掉到']),
+    # R380 更正：第一版把变异文写成「WALK + 一行 `_ = entries`」——那是**接在 save 后面**，
+    # save 照跑，刀根本没下（与 M278 的 `return` 同族：刀文没做成它声称的那件事）。
+    # 现在真把那一行换掉。
     ("M244", "根本不落盘（对照组的探针看不见内容）", STORE, WALK,
-     WALK + "            _ = entries   // MUTANT：不落盘\n",
+     WALK.replace("try persistence.save(entries)", "_ = entries   // MUTANT：不落盘"),
      ['里面没有这次 add 的内容']),
 ]
 
