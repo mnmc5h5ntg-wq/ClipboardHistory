@@ -8700,3 +8700,12 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 367 追记（R373 · 第三批）：`mutate_r55_grab_attribution.py` 的 M271/M272 重钉 —— `GrabAttribution.classify` 与调用点的参数名从 `worstIntervalMilliseconds` 改成 `clockIntervalMilliseconds`，两根旧针命中 0。
     重钉后两臂各 CAUGHT（真值表「unknown」/ 接线守卫「只接了 0 次归因」），`ROT_CEILING` 同笔 **31→29**：现读 `HIDDEN_ARMS 表=222 可判=804 rot=29 抽不出=6 已声明表=6 已声明死针=0 上界 rot=29 … 处置=ok`。
+
+367 追记（R374）：`mutate_r56_readings_channel.py` 的 M278/M279/M281 按今天的实现重钉（CaptureReadings.emit / appendLocked / strayLines），CI 预检的 `"Ran 1 test"` 改成 `Ran \d+ tests`；两路预检 OK。
+    **刀腿 NOT-RUN**：M278 臂上 xctest 6 分 29 秒未结束（同一守卫单独 0.029 秒），两次强杀、两次残留 MUTANT（已还原）。
+    rot **29→27** 是针活了的静态事实，`ROT_CEILING` 同笔降到 27，现读 `处置=ok` —— 它不等于三把刀都被验过。
+
+**433. 刀在 M278 臂上挂住 xctest；且 SIGKILL 绕过 `finally` 留下 MUTANT 行**（R374 开）
+    现场：`mutate_r56_readings_channel.py M278` 让 `CaptureReadings.emit` 提前 return；守卫本应 0.029 秒内红，实际 xctest 跑到 6:29 仍未结束，第一次 10 分钟包装超时后还出现「管道读者先死 ⇒ xctest 写 stdout 阻塞」的二次挂起。
+    第二个现场：强杀后 `CaptureReadings.swift` 两次留下 `return   // MUTANT: 只 stdout，不落盘` —— `finally` 不执行。两次都由 `git diff` 在提交前发现并还原。
+    修法（下一轮）：① 刀跑之前先把目标文件备份到 `.scratch` 并在**表启动时**校验/恢复未完成的落刀；② 给 swift 那一腿加一个硬超时（例如 180s，超时记 `NOT_RUN 超时` 而不是挂住）；③ 再查 M278 为什么会挂 —— 先怀疑 `emit` 提前 return 后守卫的读文件分支与 `FileHandle` 生命周期。

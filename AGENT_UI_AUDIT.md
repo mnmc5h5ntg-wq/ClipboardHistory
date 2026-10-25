@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 373 轮（R374 · 2026-10-25 · U-1303…U-1306）：读数通道守卫补上「来源」证人；r56 三根针重钉，刀腿 NOT-RUN（U-1303…U-1306 · 产品 0 文件，判据账）
+
+- **U-1303：`testMotionReadingsUseTheFileChannel` 的扫描来源第一次有证人。** 旧形状只验「谓词抓不抓得到」（四条合成行、应抓 3 条），而 `strays` 那一边可以被改成恒空、谓词照样过 —— R56 的 M281「扫描列表清空」正是这种坏法。现在把扫描提成 `strayLines(in:)`，**同一函数**再喂一段已知有一条游离读数的合成源码，必须恰好抓到 1 条；真源码走同一个函数。守卫单跑 `passed (0.029 seconds)`。
+- **U-1304：r56 三根针按今天的实现重钉 + CI 预检的写法修掉。** M278 搬 `CaptureReadings.emit(_:to:)`、M279 搬 `appendLocked` 的首次整份重写分支、M281 换成清空 `strayLines` 的来源；CI 那一侧把写死的 `"Ran 1 test"` 改成 `Ran \d+ tests` —— 自检从 1 格长到 5 格之后，整张表在预检就报 `BROKEN-MUTATION`（预检先死）。修后两路预检都 `OK`（`预检 OK MotionFilmstripTests.testMotionReadingsUseTheFileChannel`、`预检 OK ci_report_selftest`）。
+- **U-1305：刀腿 NOT-RUN，rot 不降。** M278 臂上 `xctest` 跑到 **6 分 29 秒**仍未结束（同一个守卫单独跑 0.029 秒），两次都被强杀；强杀绕过 `finally`，两次都在 `CaptureReadings.swift` 留下 `return   // MUTANT` 一行 —— 都在提交前由 `git diff` 发现并还原，**没有进任何提交**。因此 M278/M279/M281 的 CAUGHT **没有读数**，另开 BACKLOG 433。
+- **U-1306：rot 29→27 是**静态事实**，不是「刀被验过了」。** 三根针重钉后都能命中 ⇒ 盘点器现读 `rot=27`、上界同笔降到 27（这一格数的是**针活没活**）；三把刀的 CAUGHT 仍记 NOT-RUN —— 两件事分开记。
+
 ## 第 372 轮（R373 · 2026-10-25 · U-1300…U-1302）：367 第三批 —— r55 的 M271/M272 重钉（参数名改名），rot 31→29（U-1300…U-1302 · 产品 0 文件，判据账）
 
 - **U-1300：M271 重钉。** `GrabAttribution.classify` 的参数从 `worstIntervalMilliseconds` 改成 `clockIntervalMilliseconds`，旧针命中 0 ⇒ rot；重钉到今天的 guard `guard worstGrabMilliseconds >= 0, clockIntervalMilliseconds > 0 else { return .unknown }`，落刀后 `testGrabAttributionIsATruthTable` 红（期望串「unknown」）。

@@ -31,12 +31,14 @@ R56 做的事是"让证据不再依赖一条已知会整次消失的通道"。�
 用法：`python3 .scratch/motion-audit-2/mutate_r56_readings_channel.py [--measure] [M277 …]`
 """
 import os
+import re
 import subprocess
 import sys
 
 ROOT = "/Users/wangziyi/Codex_Project0"
 REPO = os.path.join(ROOT, "ClipboardHistory")
 TESTS = os.path.join(REPO, "Tests/ClipboardHistoryAppTests/MotionFilmstripTests.swift")
+CAPTURE = os.path.join(REPO, "Tests/ClipboardHistoryAppTests/CaptureReadings.swift")
 CI = os.path.join(ROOT, ".github/workflows/ci.yml")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
@@ -62,23 +64,26 @@ MUTATIONS = [
      '        emit("MOTION_SUMMARY " + rows.map',
      '        print("MOTION_SUMMARY " + rows.map',
      GUARD, ["只走 stdout"]),
-    ("M278", "emit 只 print 不落盘", TESTS, "swift",
-     "    static func emit(_ line: String) {\n        print(line)\n",
-     "    static func emit(_ line: String) {\n        print(line)\n        return\n",
-     GUARD, ["文件里没有这一遍的 marker"]),
-    ("M279", "每次都整份重写（不追加）", TESTS, "swift",
-     "            if !readingsOpened {",
-     "            if true {   // MUTANT",
+    # R374：emit 的实现在 CaptureReadings（本文件那层壳只转发），针跟着搬；两种红都合法（文件在⇒marker 不在；文件不在⇒没写出来）。
+    ("M278", "emit 只 print 不落盘", CAPTURE, "swift",
+     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n",
+     "    static func emit(_ line: String, to url: URL) {\n        writeStdoutLine(line)\n        return   // MUTANT: 只 stdout，不落盘\n",
+     GUARD, ["文件里没有这一遍的 marker", "文件通道没写出来"]),
+    # R374 / BACKLOG 367：追加逻辑搬进 `CaptureReadings.appendLocked`（R302/R358），旧针随 `readingsOpened` 一起消失。
+    ("M279", "每次都整份重写（不追加）", CAPTURE, "swift",
+     "        if !openedURLs.contains(url) {",
+     "        if true {   // MUTANT: 每次都整份重写",
      GUARD, ["不在末尾两格"]),
     ("M280", "读数文件挪到别处", TESTS, "swift",
      '        filmsDirectory.appendingPathComponent("motion-readings.log")',
      '        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)\n'
      '            .appendingPathComponent("motion-readings.log")   // MUTANT',
      GUARD, ["CI 那一步找不到它"]),
+    # R374：扫描改成「同一函数喂真源码 + 合成样本」，M281 改成清空那个函数的来源。
     ("M281", "扫描列表清空", TESTS, "swift",
-     NEEDLES_DECL,
-     "        let needles: [String] = []   // MUTANT",
-     GUARD, ["正对照只抓到"]),
+     "            text.components(separatedBy: \"\\n\").filter { line in",
+     "            [].filter { line in   // MUTANT: 扫描列表清空",
+     GUARD, ["扫描函数在合成样本上抓不到"]),
     ("M282", "删掉 CI 的并集整段", CI, "ci", CI_BLOCK, "", None, ["夹具替换没有落地"]),
     ("M283", "并集永远不触发（文件通道成了摆设）", CI, "ci",
      '          if [ -s "$readings" ]; then',
@@ -114,7 +119,9 @@ def run(kind, filter_name):
         if "error:" in out and not failed:
             return "BROKEN-MUTATION", out, []
         return ("CAUGHT" if proc.returncode != 0 else "ESCAPED"), out, failed
-    if "Ran 1 test" not in out:
+    # R374：自检从 1 格长到 5 格之后，写死的 "Ran 1 test" 把整张表卡在 BROKEN-MUTATION（预检就先死）。
+    # 判的是「跑起来了没有」，不是「跑了几格」——格数是自检自己的事。
+    if not re.search(r"^Ran \d+ tests?", out, re.M):
         return "BROKEN-MUTATION", out, []
     names = [l.split()[0] + "/" + l.split()[1] for l in out.splitlines() if " FAIL" in l]
     return ("ESCAPED" if out.strip().splitlines()[-1].startswith("OK") else "CAUGHT"), out, names

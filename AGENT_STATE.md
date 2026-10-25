@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R374 状态（2026-10-25 · 本地 · 第 373 轮 / Round 371）：读数通道守卫补上「来源」证人；r56 三根针重钉，刀腿 NOT-RUN（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R374 / 第 373 轮 / Round 371）：`strayLines(in:)` + 合成样本正对照落地，守卫 0.029 秒通过；r56 的 M278/M279/M281 重钉、CI 预检 `Ran 1 test` → `Ran \d+ tests`，两路预检 OK；刀腿 NOT-RUN（M278 臂 xctest 挂 6:29、两次强杀、两次残留 MUTANT 已还原）；全量 1031 格 0 失败、电池 Ran 670（skipped=4）OK（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`7ad22cf`/`19f91e2`/`f9df01e`/`3c84fc8`/`d44797c` 仍在队里；只登记不轮询。
+② 守卫洞：扫描来源提成 `strayLines(in:)`，同一函数喂合成样本必须抓到 1 条。
+③ r56 重钉（M278→CaptureReadings.emit、M279→appendLocked、M281→strayLines）+ CI 预检写法修掉。
+④ 刀腿挂起 → NOT-RUN；rot 29→27（针活了）且上界同笔降；开 433（崩溃安全还原 + swift 腿硬超时 + M278 挂起成因）。
+
+验证读数（现读）：`testMotionReadingsUseTheFileChannel passed (0.029 seconds)`；`预检 OK MotionFilmstripTests.testMotionReadingsUseTheFileChannel`、`预检 OK ci_report_selftest`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；脚本电池 `Ran 670（skipped=4）OK`；产品面连续零改动 **19** 轮（`python3 scripts/product_streak.py --streak-for 373` 现读）；`HIDDEN_ARMS 表=222 可判=804 rot=27 抽不出=6 已声明表=6 已声明死针=0 上界 rot=27 … 处置=ok`。
+
+NOT-RUN（分开写）：① M278/M279/M281 的 CAUGHT 没有读数（M278 臂挂起，两次强杀）—— rot 不降；② 真机腿没跑。
+
+下一轮（R375）的靶：⓪ 读队列五跑；① 先做 433 的崩溃安全还原与硬超时，再重跑 r56 三臂；② 之后才谈 367 的下一根。
+
 ## R373 状态（2026-10-25 · 本地 · 第 372 轮 / Round 370）：367 第三批 —— r55 的 M271/M272 重钉（参数名改名），rot 31→29（产品 0 文件，判据账）
 
 最后更新：2026-10-25（本地 · R373 / 第 372 轮 / Round 370）：`GrabAttribution.classify` 与调用点改名的两根针重钉；`M271 / M272` 各 CAUGHT、`还原不干净=0`；`ROT_CEILING` 31→29，`test_hidden_arms` 8/8；电池 Ran 670（skipped=4）OK；全量卷沿用 R366（Swift 未动）：`Executed 1031 tests, with 48 tests skipped and 0 failures`（产品 0 文件 · 判据账）

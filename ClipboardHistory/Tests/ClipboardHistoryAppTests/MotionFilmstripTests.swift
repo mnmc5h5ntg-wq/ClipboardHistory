@@ -3974,9 +3974,16 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertEqual(caught.count, 3,
             "正对照只抓到 \(caught.count)/3 种写法 ⇒ 这条扫描本身是坏的（第 4 条是 emit，必须**不**被抓到），"
                 + "下面那句\"没有游离读数\"因此什么都没说")
-        let strays = source.components(separatedBy: "\n").filter { line in
-            line.contains(printCall) && line.contains(quote + readingPrefix)
+        // R374 / BACKLOG 367：扫描的**来源**也要有正对照。只验谓词不够 ——
+        // `strays` 那一边可以被改成恒空而谓词照样过（R56 的 M281「扫描列表清空」就是这种坏法）。
+        func strayLines(in text: String) -> [String] {
+            text.components(separatedBy: "\n").filter { line in
+                line.contains(printCall) && line.contains(quote + readingPrefix)
+            }
         }
+        XCTAssertEqual(strayLines(in: "let a = 1\n  " + printCall + quote + readingPrefix + "_LEAK 1)\n").count, 1,
+                       "扫描函数在合成样本上抓不到那条游离读数 ⇒ 下面那句「没有游离读数」什么都没说")
+        let strays = strayLines(in: source)
         XCTAssertTrue(strays.isEmpty,
             "有 \(strays.count) 行读数只走 stdout：\(strays.prefix(3).map { String($0.trimmingCharacters(in: .whitespaces).prefix(48)) })"
                 + " ⇒ 通道丢一次的那天，这些读数一条都不剩（BACKLOG 79）。改走 `emit`")
