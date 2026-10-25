@@ -57,6 +57,18 @@ NOT-RUN（三种缺席分开写，不许省略）：① **只在人身上判得�
 `页底=50 轨道=70 差=37`、`页底=80 轨道=97 差=10` ⇒ **人造底是两机可比的自变量**，
 这一句是 BACKLOG 413 的地基（它说明「把漂移量做成输入」这条路走得通，不必按机器切片）。
 另：`RUN=40149824166 ↔ 7873fd9 completed/success`、`RUN=40150030547 ↔ 2615c58 completed/success`（R340 两笔都签了）。
+**R340 追记二（2026-10-25 本地 · 本机全程没离开锁屏）**：
+① CI 配对（现读自 `gh run view --json`，不手抄）：`RUN=40151598572 ↔ 7baaa8c completed/success` ——
+  这是 R340 的第三笔（追记本身），它只动台账，没有新的判据；两笔追记的 subject 都带 `产品 0 文件`，
+  与 D-336 的轮次级定义一致（`ROUND_CLAIM_REVIEW` 现读窗内不一致仍只有 R334 / R335 那两轮，都在名单里）。
+② 真机腿**又试了一次**（原样抄尺自己打印的那一行）：
+  `REALSCREEN_NOT_RUN display_channel（会话被登录窗锁住（SecureInput 属主=loginwindow）⇒ 区域捕获被拒、
+  别的 App 的窗口在辅助功能里不存在；这一格要**人**来解锁，尺不猜密码也不替用户解锁｜电源日志最近一条=on；
+  SecureInput 属主=loginwindow；探针可截=False（最亮=None））`
+  ⇒ 395 的 after 本轮**仍然没跑**（不是「跑了没红」）；`pgrep` 现读产品进程在跑（pid 33535），
+  所以缺席只有一颗名字：`display_channel`。同名出口第二次现场点名（R332 开单、R333 追记、本轮再验），
+  修法不变也不需要改尺：等人解锁。
+
 **R340 追记现读**：runner 那一跑正文里 `Ran 637 tests … OK (skipped=2)`（例数与本机同，skip 少 2 条是 PIL 那一族，已知形状），
 而新门要答的两件事**当场有答案**：① `SOURCES_CELL_HISTORY 浅=False 对照数=40 头笔=fb2cea0 as_of第340轮=fb2cea0 处置=judge`
 ⇒ runner 的 checkout 不是浅历史（`fetch-depth: 0` 之后一直是全的），所以『浅历史上不许定罪』那族出口这一跑**没被触发**，
