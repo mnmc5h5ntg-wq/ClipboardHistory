@@ -8485,3 +8485,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     `.animation(…, value: historyStore.filteredEntries.isEmpty)` 那一行（空态淡入淡出的驱动）。
     已改成药丸同一支动画；后续若要动"内容换页"的其它位点，先看 `MotionCatalog` 的 `.contentFade` 那几处
     （DetailView / SettingsView / QuickPick），它们各自有对象，不许一并改。
+
+**425. 胶片的空态场景自己声明 `160ms`：同一个时长产品一处、夹具一处，胶片因此测不到产品的接线**（R349 现读）
+    现读 `MOTION_GRAB empty-state … 声明=160ms`，而产品那一支是 `MotionCatalog.duration(for: .slider) = 0.20`。
+    R348 把空态淡出接到药丸那支动画之后，胶片的读数**一个字没变** —— 因为场景按自己的 160ms 摆帧。
+    这不是"改动无效"，是**夹具没接线**：判据想作证的那件事，它读的是另一份权威（记忆里同族：判据不许抄产品常量）。
+    修法（下一轮）：场景的声明改成 `Int(MotionCatalog.duration(for: .slider) * 1000)`，同一笔里重跑胶片，
+    要读到 `声明=200ms`、`judged=4/4` 不掉、`MOTION_AXIS` 的四条峰值仍在同一量级；
+    若某条判定因此变红，先看它是不是把"160"当成了期望值（那同样是一份抄来的常量）。

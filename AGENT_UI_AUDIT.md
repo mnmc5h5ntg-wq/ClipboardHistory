@@ -363,6 +363,25 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 348 轮（R349 · 2026-10-25 · U-1214…U-1218）：胶片第一次跑全 —— 而它测的不是产品那条 0.20（U-1214…U-1218 · 产品 0 文件，判据账）
+
+- **U-1214：胶片在环境键下第一次跑全。** `CLIPBOARD_HISTORY_UI_MOTION=1` + `CLIPBOARD_HISTORY_MOTION_OUT=<dir>` ⇒
+  `Executed 67 tests, with 3 skipped and 0 failures`（161.9 秒）；不设键时是 **24 格 skip**。四场都判了：
+  `MOTION_SUMMARY notice-banner=11 notice-banner-dismiss=8 detail-kind-change=3 empty-state=2`、
+  `MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`。
+- **U-1215：空态场景自己声明 `160ms`。** `MOTION_GRAB empty-state 帧数=30 抓帧中位=19.5ms 抓帧最慢=53.1ms
+  视图=380×552pt 像素=760×1104px 声明=160ms 色档=暗 请求=未钉` —— 这 160 是**夹具自己写死的**，
+  不是 `MotionCatalog` 那一档。也就是说 R348 把产品的空态淡出改成 0.20 之后，**胶片这一格不会跟着变**：
+  它测的是场景自己的声明，不是产品的接线。**第三方权威**（产品 token / 胶片声明）同一个量两份数。
+- **U-1216："改了但胶片不动"不是没改，是胶片没接线。** 这一点必须写清楚，否则下一轮看到 `声明=160ms`
+  会以为 R348 白改了。产品的源码形状守卫（`testEmptyStateFadeSharesThePillRhythm`）与刀 M1003 才是那半边的证人；
+  胶片那半边要等 425。
+- **U-1217：这一场景的过渡确实在动，而且不是只动 alpha。** `MOTION_AXIS empty-state 帧对=26 亮度峰值=0.1089
+  alpha峰值=0.1063 并集峰值=0.1089 仅alpha在动=0/26` —— 26 帧对里没有一帧是"只动 alpha"，
+  说明这条过渡在亮度与 alpha 两条轴上同时走（不是一条空转的淡入）。
+- **U-1218：开 425。** 要胶片为 389 作证，得把场景的 `声明=160ms` 改成从 `MotionCatalog.duration(for:)` 读
+  （一处权威），并在同一笔里重跑胶片、确认 `声明=200ms` 且四场判定不掉。在那之前，胶片**不许**替 389 说话。
+
 ## 第 347 轮（R348 · 2026-10-25 · U-1210…U-1213）：空态淡出与药丸换成同一个节奏 —— 389 结案（U-1210…U-1213 · 产品 1 文件，动效主线）
 
 - **U-1210：同一个手势的两半现在共用一个动画。** `HistorySidebarView` 里"空态出现/消失"那一格以前走

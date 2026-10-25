@@ -12,6 +12,28 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R349 状态（2026-10-25 · 本地 · 第 348 轮 / Round 346）：胶片跑全了，却发现它测的是自己的 160ms（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R349 / 第 348 轮 / Round 346）：环境键下胶片 67 格 3 skip / 0 fail、四场 judged=4/4；
+但空态场景 `声明=160ms` 是夹具自己写死的 ⇒ 它测不到 R348 接的那条 0.20（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：`RUN=40185881194 ↔ 8d375b3`、`↔ 0307c43` 首读 in_progress（只登记不轮询，R140）。
+② 用 `CLIPBOARD_HISTORY_UI_MOTION=1` + `CLIPBOARD_HISTORY_MOTION_OUT=/tmp/r349_motion` 重跑胶片。
+③ 读数：`MOTION_SUMMARY …`、`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`、
+   `MOTION_GRAB empty-state … 声明=160ms`、`MOTION_AXIS empty-state 帧对=26 … 仅alpha在动=0/26`。
+④ 结论：胶片与产品是两份权威；"改了但胶片不动"是接线问题。开 BACKLOG 425（让声明读 `MotionCatalog`）。
+
+验证读数（现读）：`Executed 67 tests, with 3 skipped and 0 failures`（161.9 秒；不设键时 24 skip）；
+`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`；脚本电池 `Ran 646（skipped=4）OK`；帧 182（未重捕）；
+产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 348` 现读，口径差一挂 412）。
+
+NOT-RUN（分开写）：① 425 的修法没做（本轮只把"两份权威"这件事钉住）；② 胶片未逐张看图（只读它自己打印的峰值）；
+③ 真机腿没跑（这一轮改的是夹具侧的账）。
+
+下一轮（R350）的靶：⓪ 读三跑 CI 配对 → ① **425**（声明读 `MotionCatalog` + 同笔重跑胶片，确认 `声明=200ms`、
+四场不掉）→ ② 413（backing 名册）→ ③ 动效主线 397 / 390 / 384 / 387① / 376 / 367。
+
 ## R348 状态（2026-10-25 · 本地 · 第 347 轮 / Round 345）：空态淡出与药丸同节奏（产品 1 文件，动效主线）
 
 最后更新：2026-10-25（本地 · R348 / 第 347 轮 / Round 345）：把空态淡出从 `contentFade`(0.16) 换成药丸那支
