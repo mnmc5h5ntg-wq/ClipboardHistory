@@ -50,8 +50,10 @@ ARMS = [
     # 就还是 R142 那个形状 —— 台账说全改了，代码只改了一行，而守卫照绿）。
     ("M673", PROBE, [(u'        emit("FPS-BASELINE n=',
                      u'        print("FPS-BASELINE n=')], "CAUGHT"),
-    ("M674", PROBE, [(u'        print("RINGVIEWS 总数=',
-                     u'        emit("RINGVIEWS 总数=')], "CAUGHT"),
+    # R383 退役 M674：R303 把这条读数搬进 `emit` 之后，「把 print 转成 emit」这个坏法就是现状；
+# 同义坏法试过**改名**（RINGVIEWS → RINGVIEWS 总量）——实测 PASSED：名册只按「每文件条数 +
+# 通道」判，不按「登记的标记是否还出现」判。⇒ 这一刀今天没有对象，退役并点名：
+# 未登记的 stdout 由 M673 那道方向继续钉；「登记过期」这一格今天确实没有牙，写进 BACKLOG 367 追记。
 ]
 
 

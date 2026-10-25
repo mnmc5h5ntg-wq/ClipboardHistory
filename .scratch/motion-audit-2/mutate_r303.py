@@ -43,8 +43,11 @@ if not _ceil:
     sys.exit(1)
 CEIL_NOW = int(_ceil.group(1))
 
-NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = %d' % CEIL_NOW
-REPL_CEIL = u'BARE_PRINT_LINE_CEILING = %d' % (CEIL_NOW + 1)
+# R383 重钉：`%` 拼出来的针 static 不可解（hidden_arms 把 M876 报成 rot，盘上其实是活的）。
+# 改成**字面量针**，并在 main 里加一条漂移断言：登记值一变就当场报「重新钉 M876」而不是静默腐烂。
+NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 15'
+REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 16'
+EXPECT_CEIL = u'登记值是 16'
 
 NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
 REPL_ROSTER = u'                      "UICaptureHarness.swift"]'
@@ -53,7 +56,7 @@ ARMS = [
     ('M875', u'把一行搬好的读数改回裸 stdout = 上界有牙', PROBE,
      NEEDLE_LINE, REPL_LINE, GUARD_PY, u'盘上有 %d 行' % (CEIL_NOW + 1)),
     ('M876', u'把登记值抬去容纳现状 = 下界有牙（放宽要成对）', GUARD_FILE,
-     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, u'登记值是 %d' % (CEIL_NOW + 1)),
+     NEEDLE_CEIL, REPL_CEIL, GUARD_PY, EXPECT_CEIL),
     ('M877', u'刚进名册的名字被删掉 = 未纳管必须红', HARNESS,
      NEEDLE_ROSTER, REPL_ROSTER, GUARD_PY, u'未纳管'),
 ]
@@ -166,6 +169,10 @@ def run_arm(arm_id, why, target, needle, repl, filter_name, expect_text):
 
 
 def main():
+    if CEIL_NOW != 15:
+        print('R303_MUTATE PRECHECK_FAILED BARE_PRINT_LINE_CEILING 漂到 %d ⇒ 重钉 M876'
+              '（needle / mutant / 期望三处）' % CEIL_NOW, flush=True)
+        return 1
     only = set(sys.argv[1:])
     arms = [a for a in ARMS if not only or a[0] in only]
     if only - set(a[0] for a in ARMS):

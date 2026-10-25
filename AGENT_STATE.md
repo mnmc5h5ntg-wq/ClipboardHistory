@@ -12,6 +12,23 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R383 状态（2026-10-26 · 本地 · 第 382 轮 / Round 380）：CI 两跑分诊 + 快捷键三颗「恢复默认」禁用态；367 rot 8→5（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R383 / 第 382 轮 / Round 380）：`40224259064 ↔ c59b292`、`40224280654 ↔ e9b1f83` 两跑 failure，全部失败步骤只有 `Swift tests (executed-count gate)` 与 `Capture gate`；六朵红全在 R382 新判据 —— runner（1x）上 72×22pt 取样矩形没压住标签（`WEIGHTS_RESET_STATE … 墨=0 最大偏离=23` 两态同形）⇒ 取样几何机器依赖。改成语义带（x 380..520、y 60..230）+ 两态差只由 `maxDev` 判，本机现读 light 122/211、dark 119/193，M1013 复跑 `CAUGHT`。产品位：快捷键页三颗「恢复默认」在默认值下从未画禁用态（修前整页两态完全相同 `3792/211`），加 `.disabled(shortcut == settings.action.defaultShortcut)` 后 `2817/70` 对 `3142/211`；182 张帧 `same=176 changed=6`，6 张只动快捷键页右列。`M1014` `CAUGHT`；367：r94 整表 7/7、M876 单臂 CAUGHT、M674 退役（改名方向无牙）⇒ `HIDDEN_ARMS … rot=5 … 上界 rot=5 … 处置=ok`（8→5）。`swift build --build-tests` 告警 **0**；全量 `Executed 1033 tests, with 48 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 382` 现读）。
+
+本轮做了什么：
+① ⓪ CI 分诊：两跑 failure；`ci_read.py steps` 全部失败步骤 + 步骤名直方图（无 UNKNOWN STEP）+ 按步骤取正文 + 改动前 `43ff699` 那一跑 success 做对照 ⇒ 判成 R382 引入的判据几何回归。
+② 判据修复：语义带 + `maxDev` 两态差；M1013 复跑 CAUGHT。
+③ 产品位：快捷键页三颗 `恢复默认` 加禁用条件；两态整页渲染修前相同、修后分开；帧差分只动按钮列。
+④ 367：r94 M518 单字面量（7/7）、r303 M876 字面量 + 漂移断言、r142 M674 退役；rot 8→5、上界同笔降。
+⑤ 验证：构建 0 告警；全量 `1033/48/0`；捕获 `CAPTURED 182 -> /tmp/r383_shots`；帧基线 `COMPARED=182 CHANGED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；清账表 162=162；预检 `tables=138 covered=121 arms=390 bad=0`、全仓 231 文件 / 874 把。
+
+验证读数（现读）：`SHORTCUT_RESET_STATE` 修前 `3792/211`、修后 `2817/70`（亮）与 `4152/186`→`2976/60`（暗）；`WEIGHTS_RESET_STATE` `122/211`、`119/193`；`M1013`/`M1014` 各 `CAUGHT=1/1 RESTORE_CLEAN=yes`；r94 `MUTATE_TABLE n=7 caught=7`；r142 `CAUGHT=5/5`；`ARM_TOTAL files=231 arms=874 dupes=0`。
+
+NOT-RUN（分开写）：① **重推后的 CI 复验**没读 —— 这一笔推送之后的那一跑要下一轮 ⓪ 读（本轮不轮询）；② 亮档真机腿仍没跑（当前系统外观=dark）；③ 剩 5 根 rot 未重钉（r33 M147、r64 M340/M341、r77 M411、r78 M417）。
+
+下一轮（R384）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回；并确认 `Swift tests` 与 `Capture gate` 两朵是否消失）；① 继续 367（从 r78 M417 或 r64 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位。
+
 ## R382 状态（2026-10-26 · 本地 · 第 381 轮 / Round 379）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R382 / 第 381 轮 / Round 379）：对比 `weights`（全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧，「恢复默认」标签墨完全相同 ⇒ 禁用态从未存在；加 `.disabled(store.weights == .default)` 后 `WEIGHTS_RESET_STATE light 默认 62 / 动过 195`、`dark 默认 51 / 动过 170`；182 张帧 `same=176 changed=6`，6 张只动按钮矩形、`weights-adjusted` 逐字节不变。新判据 + `M1013` 现读 `CAUGHT`、复跑 `ESCAPED`；第一版表写成自写 main、对 `mutate_needle_precheck` / `hidden_arms` 隐形，改成 `MUTATIONS` 后 `covered=120 arms=389`、`可判=808`。367 再钉 r29d（5/5）与 r76 M402（5/5），`HIDDEN_ARMS … rot=8 … 上界 rot=8 … 处置=ok`（12→8）。`swift build --build-tests` 告警 **0**；全量 `Executed 1032 tests, with 48 tests skipped and 0 failures`；电池 `Ran 683 tests` + `OK (skipped=4)`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 381` 现读，口径是「本轮之前的连读轮数」）。

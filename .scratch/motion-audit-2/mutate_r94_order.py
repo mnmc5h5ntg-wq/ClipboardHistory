@@ -34,7 +34,9 @@ SWIFT_REL = 'ClipboardHistory/Tests/ClipboardHistoryAppTests/UIInteractionProbeT
 MODULES = ['scripts.tests.test_probe_coverage_gate', 'scripts.tests.test_ui_probe_report']
 
 # 锚点全部用「运行期才出现的形状」，不拿注释当锚：那样一改文档串就会 NOT-RUN。
-PRINT_OPEN = 'f"未闭口={reading[' + "'open_not_closed'" + ']} "'
+# R383 重钉：旧写法是两块字面量用 `+` 拼的，`ast.literal_eval` 解不出来 ⇒ hidden_arms 把 M518
+# 报成 rot（盘上其实命中 1 次）。改成单个字面量，值一字不变。
+PRINT_OPEN = '''f"未闭口={reading['open_not_closed']} '''
 QUEUED_FIELD = '        "queued": queued,'
 DICT_ANCHOR = '    reading = {\n'
 TALLY = ('        if kind != "started.":\n            concluded[name] = True\n'
@@ -92,7 +94,10 @@ MUTATIONS = [
                                            'prefix = None if not order else True', "M516"), 'RED'),
     ("M517", "露面顺序被排序", lambda t: sub_once(t, "    return order, concluded",
                                                  "    return sorted(order), concluded", "M517"), 'RED'),
-    ("M518", "打印里的未闭口写死成 0", lambda t: sub_once(t, PRINT_OPEN, 'f"未闭口=0"', "M518"), 'RED'),
+    # R383：针的值不带源码的收尾引号（源码是 `f"...} "`），所以变异文也不能带 ——
+    # 旧写法替换出 `f"未闭口=0""`（多一个引号）⇒ 语法错、被读成 ERROR。去掉收尾引号后
+    # 源码行才是 `f"未闭口=0"`，与「读数与字段脱钩」的坏法一字不差。
+    ("M518", "打印里的未闭口写死成 0", lambda t: sub_once(t, PRINT_OPEN, 'f"未闭口=0', "M518"), 'RED'),
     ("M519", "两种缺席又被缝成一种", lambda t: sub_once(t, QUEUED_FIELD,
                                                      '        "queued": absent_hack,', "M519"), 'RED'),
     ("M520", "空洞的真话冒充结论", lambda t: sub_once(t, PREFIX_HEAD,

@@ -816,6 +816,10 @@ private struct HotKeySettingsRow: View {
                     settings.reset()
                     shortcut = settings.shortcut
                 }
+                // R383：快捷键已是默认值时这颗按钮点了不产生任何变化 —— 与 R382 的权重页同一条规矩，
+                // 禁用态是它唯一诚实的呈现。判据读的是**整页两态**渲染出的按钮标签墨
+                // （`testShortcutResetButtonsAreDisabledWhenShortcutsAreDefault`）。
+                .disabled(shortcut == settings.action.defaultShortcut)
             }
 
             if let message = settings.message {

@@ -7346,9 +7346,11 @@ final class UICaptureTests: XCTestCase {
 
     private func makeSettingsView(store: HistoryStore,
                                   initialCategory: SettingsCategory? = .shortcuts,
-                                  loginItem: LoginItemSettings? = nil) -> some View {
+                                  loginItem: LoginItemSettings? = nil,
+                                  showMainWindowShortcut: HotKeyShortcut? = nil) -> some View {
         SettingsView(
-            showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+            showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow,
+                                                          shortcut: showMainWindowShortcut),
             repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
             loginItemSettings: loginItem
                 ?? LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
@@ -13436,7 +13438,11 @@ final class UICaptureTests: XCTestCase {
         struct Reading { let fill: Int; let ink: Int; let maxDev: Int }
         func reading(_ rep: NSBitmapImageRep) -> Reading {
             let scale = Double(rep.pixelsWide) / 520.0
-            let rect = CGRect(x: 438, y: 108, width: 72, height: 22)
+            // R383：不能拿一枚小矩形钉按钮 —— runner（1x、字体度量不同）上那枚矩形两边都读 0 墨
+            // （2026-10-26 的 40224259064：两条 WEIGHTS_RESET_STATE 全是 墨=0 最大偏离=23）。
+            // 改成**语义带**：卡片头部的右列（x 380..520、y 60..230）。标题与说明在 x<380，
+            // 第一条滑杆的「默认」在 y≈250 以下 ⇒ 这条带里唯一的墨就是按钮标签。
+            let rect = CGRect(x: 380, y: 60, width: 140, height: 170)
             let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
             let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
             guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0) }
@@ -13470,9 +13476,91 @@ final class UICaptureTests: XCTestCase {
                                  "\(tag)：默认与动过两帧的「恢复默认」标签最大偏离只差 "
                                      + "\(active.maxDev - disabled.maxDev)（要 >20）⇒ 禁用态没有画出来，"
                                      + "或者有人把 `.disabled(store.weights == .default)` 拿掉了")
-            XCTAssertLessThan(disabled.ink, active.ink,
-                              "\(tag)：默认帧的标签墨 \(disabled.ink) 不少于动过帧 \(active.ink)"
-                                  + " ⇒ 禁用态与启用态在像素上没有差别")
+            XCTAssertLessThanOrEqual(disabled.ink, active.ink,
+                              "\(tag)：默认帧的标签墨 \(disabled.ink) 多于动过帧 \(active.ink)"
+                                  + " ⇒ 两条带里的墨量方向反了，先查取样带是不是压错了对象")
+        }
+    }
+
+    /// R383：快捷键页三颗「恢复默认」与 R382 的权重页同一族 —— 快捷键已是默认值时点了无事发生，
+    /// 但从来没画成禁用态。判据渲染**整页两次**（默认值 vs 第一行改成 ⌃⌥⇧V），读右列按钮标签墨。
+    ///
+    /// 为什么不用固定夹具：这页的三颗按钮都靠 `HotKeySettings` 的当前值决定，而现有帧
+    /// （`settings-shortcuts` / `-recording`）都不含"改过快捷键"的状态 ⇒ 用新夹具会牵动
+    /// 帧名单/盲区名册；这里改成同一台测试里现渲染两态，不动帧集合。
+    func testShortcutResetButtonsAreDisabledWhenShortcutsAreDefault() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r383-shortcuts-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        // 把三个动作的持久化值清空（拍完还原）：默认态那一渲染必须真的是默认值，
+        // 不能吃这台机器上真实用过的快捷键（否则两态会一起变亮，差别消失）。
+        let keys = [HotKeyAction.showMainWindow.preferenceKey,
+                    HotKeyAction.repeatCopy.preferenceKey,
+                    HotKeyAction.quickPick.preferenceKey]
+        let saved = keys.map { UserDefaults.standard.data(forKey: $0) }
+        for key in keys { UserDefaults.standard.removeObject(forKey: key) }
+        defer {
+            for (key, data) in zip(keys, saved) {
+                if let data { UserDefaults.standard.set(data, forKey: key) }
+                else { UserDefaults.standard.removeObject(forKey: key) }
+            }
+        }
+
+        struct Reading { let fill: Int; let ink: Int; let maxDev: Int }
+        func reading(_ rep: NSBitmapImageRep) -> Reading {
+            let scale = Double(rep.pixelsWide) / 720.0
+            // 语义带：右侧按钮列（x 600..700、y 100..310）。快捷录制器在 x≈480..545，
+            // 说明文字在 x<560 ⇒ 这条带里只有三颗「恢复默认」的标签。
+            let rect = CGRect(x: 600, y: 100, width: 100, height: 210)
+            let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+            let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0) }
+            var values: [Int] = []
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * rep.bytesPerRow + x * 4
+                    values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                       + 0.0722 * Double(base[o + 2])).rounded()))
+                }
+            }
+            var hist: [Int: Int] = [:]
+            for v in values { hist[v / 4, default: 0] += 1 }
+            let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+            let devs = values.map { abs($0 - fill) }
+            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0)
+        }
+
+        func rep(_ name: String, _ appearance: NSAppearance.Name, _ custom: HotKeyShortcut?) throws -> NSBitmapImageRep {
+            let store = makePopulatedStore()
+            let fixture = Fixture(name, NSSize(width: 720, height: 540)) {
+                AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts,
+                                              showMainWindowShortcut: custom))
+            }
+            let file = scratch.appendingPathComponent(name + "-" + appearance.rawValue + ".png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let bitmap = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()) else {
+                throw NSError(domain: "r383", code: 1)
+            }
+            return bitmap
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let off = reading(try rep("r383-shortcuts-default", appearance, nil))
+            let on = reading(try rep("r383-shortcuts-adjusted", appearance, .defaultQuickPickShortcut))
+            emit("SHORTCUT_RESET_STATE \(tag) 默认 fill=\(off.fill) 墨=\(off.ink) 最大偏离=\(off.maxDev)"
+                 + " | 改过 fill=\(on.fill) 墨=\(on.ink) 最大偏离=\(on.maxDev)")
+            XCTAssertGreaterThan(on.ink, 0,
+                                 "\(tag)：改过快捷键那一页里三颗「恢复默认」一个墨都没读到 ⇒ 正对照没有对象")
+            XCTAssertGreaterThan(on.maxDev, off.maxDev + 20,
+                                 "\(tag)：默认页与改过页的按钮标签最大偏离只差 \(on.maxDev - off.maxDev)"
+                                     + "（要 >20）⇒ 默认值下三颗按钮没有画成禁用态，"
+                                     + "或者有人把 `HotKeySettingsRow` 的 `.disabled(...)` 拿掉了")
+            XCTAssertLessThanOrEqual(off.ink, on.ink,
+                                     "\(tag)：默认页标签墨 \(off.ink) 多于改过页 \(on.ink) ⇒ 取样带压错对象")
         }
     }
 

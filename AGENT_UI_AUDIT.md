@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 382 轮（R383 · 2026-10-26 · U-1338…U-1342）：CI 两跑分诊（R382 新判据在 runner 上取样机器依赖）+ 快捷键三颗「恢复默认」禁用态 + M1014；367 rot 8→5、退役一刀（U-1338…U-1342 · 产品 1 文件，动效主线）
+
+- **U-1338：CI 分诊（成对 run↔commit）。** `40224259064 ↔ c59b292`、`40224280654 ↔ e9b1f83` 两跑 `conclusion=failure`；`ci_read.py steps` 列出**全部**失败步骤：`STEP[15] Swift tests (executed-count gate)` 与 `STEP[17] Capture gate (unregistered reds must be zero)`（只有这两步）。日志步骤名可解析（`field2` 直方图 4649 行 Release script tests / 3575 行 Swift tests，无 `UNKNOWN STEP`）⇒ 允许按步骤名切片。正文：六朵红全在 R382 新判据 `testRestoreDefaultsButtonIsDisabledWhenWeightsAreDefault`（`13467/13469/13473` × 两档），runner 读数 `WEIGHTS_RESET_STATE light 默认 fill=230 墨=0 最大偏离=23 | 动过 同`、暗档同形 ⇒ 1x 上与字体度量变化让**那枚 72×22pt 的小取样矩形**没压住标签。改动前那一跑 `40221947072 ↔ 43ff699` 是 success ⇒ 这一朵是 R382 引入的回归。
+- **U-1339：修法（判据侧）。** 取样从「按钮小矩形」改成**语义带**（卡片头部右列 x 380..520、y 60..230；标题/说明在 x<380、第一条滑杆在 y>240 ⇒ 带里只有按钮标签）；第三格断言从 `<` 放宽成 `<=`（两态差由 `maxDev` 判、墨量只作正对照）。本机现读 `WEIGHTS_RESET_STATE light 默认 122/动过 211`、`dark 119/193`；`M1013` 复跑 `CAUGHT`。runner 上的复验要等这一笔推送之后那一跑（本轮不轮询）。
+- **U-1340：产品位（快捷键页三颗「恢复默认」）。** 与 R382 权重页同一条规矩：快捷键已是默认值时这三颗点了无事发生，而禁用态从未画出来。整页两态现渲染（默认值 vs 第一行改成 ⌃⌥⇧V）修前**完全相同**：light `墨=3792 最大偏离=211` 对 `墨=3792 最大偏离=211`、dark `4152/186` 对 `4152/186`。加 `.disabled(shortcut == settings.action.defaultShortcut)` 后 light `2817/70` 对 `3142/211`、dark `2976/60` 对 `3368/186`；182 张帧差分 `same=176 changed=6`，6 张全在快捷键页右列（`settings-shortcuts*`、`settings-min`），逐张看图三颗按钮都已禁用。
+- **U-1341：判据与刀。** 新判据 `testShortcutResetButtonsAreDisabledWhenShortcutsAreDefault` 在同一台测试里现渲染**整页两态**（不新增帧、不动盲区名册）：正对照要求「改过」页有墨、两页最大偏离差 >20。`M1014`（`.disabled(...)` 换成 `.disabled(false)`）现读 `CAUGHT`、复跑 `ESCAPED`、还原干净。
+- **U-1342：367 三笔。** r94 的 M518 针从 `+` 拼装改成单字面量（`ast.literal_eval` 原先解不出 ⇒ 活针被报 rot；刀文同时修掉「多一个引号」的 ERROR 形状）⇒ 整表 **7/7 CAUGHT**；r303 的 M876 改成字面量针 + 漂移断言（单臂 CAUGHT）；r142 的 M674 **退役** —— 「print→emit」已是现状，同义坏法「改名 RINGVIEWS」实测 `PASSED`（名册只按每文件条数 + 通道判，不按登记标记是否还出现）⇒ 那一格今天没有牙，退役并点名 M673 继续管未登记 stdout。`HIDDEN_ARMS 表=225 可判=808 rot=5 … 上界 rot=5 … 处置=ok`（8→5）。
+
 ## 第 381 轮（R382 · 2026-10-26 · U-1334…U-1337）：默认权重下「恢复默认」没有禁用态 —— 两态像素证人 + M1013；367 再钉五根（U-1334…U-1337 · 产品 1 文件，动效主线）
 
 - **U-1334：看图看出来的状态缺席。** `weights`（权重全默认）与 `weights-adjusted`（近因 160% / 收藏 40%）两帧里，「恢复默认」按钮的标签墨**一模一样**（亮档最大偏离 62 对 62、暗档 51 对 51）；默认时点它不产生任何变化。它不是样式问题，是**禁用态从未存在**。
