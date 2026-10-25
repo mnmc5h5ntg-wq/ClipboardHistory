@@ -886,10 +886,19 @@ struct SettingsSidebarRow: View {
 
     var body: some View {
         Button(action: action) {
-            Label(category.title, systemImage: category.icon)
-                // 不显式上色的话，未选中行的 SF Symbol 会按系统弱化色渲染，
-                // 在浅色主题下几乎看不见（离屏渲染验收时发现的真实缺陷）
-                .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+            // **R381**：图标与文字分开上色。外观由 `NavigationSplitView` 侧栏材质承载时，
+            // `.primary` 在亮档被 vibrancy 解析成白色（本机整页帧：图标 255/255/255 压在 251 的底上，
+            // 对比 4/255 ⇒ 等于看不见；同一份 `.primary` 在单行组件帧里是黑的）。
+            // `Color(nsColor: .labelColor)` 是**动态系统色**（随外观翻转，不是写死的灰），
+            // 它不进 vibrancy 的重映射：亮档现读 76、暗档 232。文字仍走 `.primary`，选中仍走 accent。
+            Label {
+                Text(category.title)
+            } icon: {
+                Image(systemName: category.icon)
+                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)
+                                                : AnyShapeStyle(Color(nsColor: .labelColor)))
+            }
+            .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
                 // R122：这里从 `.hierarchical` 换成 `.monochrome`，理由不是审美，是逐行读数。
                 // 上一轮装好的永久仪器（`SIDEBAR_ICON_ROW` / `SIDEBAR_ICON_BY_SYMBOL`）在同一批帧上量到：
                 //   dark 有墨行=78 无墨行=0 **反侧行=22**，而反侧的两枚恰好是 `wand.and.stars`（推荐）

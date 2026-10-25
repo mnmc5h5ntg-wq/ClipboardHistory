@@ -11527,15 +11527,27 @@ final class UICaptureTests: XCTestCase {
                         + "先查 `SettingsSidebarRow` 的 `.symbolRenderingMode` / `.foregroundStyle`，"
                         + "不要改这条断言的 0，也不要用固定色去讨好它（那会在真机上把颜色写死）。")
             }
-            // 另一侧的账也要有名字：亮档有 65/78 行图标**一个墨都没画**，而这不是本轮改出来的
-            // （改之前是 43/78）。它是离屏通道对 `.primary` 的解析盲区（审计第二轮 1.9 的原始发现），
-            // 与"反侧"是两种病 —— 反侧会红，无墨登记。写成会红就会诱使下一轮拿固定色去填它。
+            // 另一侧的账也要有名字。**R381 更正了 R122 的定性**：亮档那些行不是"通道不画墨"，
+            // 而是图标被侧栏材质解析成 **255 白**压在 251 的底上（对比 4/255，低于墨的读取地板
+            // ⇒ 旧读数把它数成「无墨」）。同一份 `.primary` 在单行组件帧里是黑的、在整页
+            // `NavigationSplitView` 里变白 ⇒ 这是**图标上色**的问题，不是 Image 通道画不出来。
+            // 修法用**动态系统色** `Color(nsColor: .labelColor)`（随外观翻转），不是固定色；
+            // 修后亮档 84 行全部有墨、无墨 0。所以这一格从"登记"升成会红：
+            // 谁把图标改回 `.primary` 或写死成白/黑，blank 立刻回来。
+            for tag in ["light", "dark"] {
+                XCTAssertEqual(blank[tag] ?? 0, 0,
+                    "SIDEBAR_ICON_BLANK \(tag)：有 \(blank[tag] ?? 0) 行侧栏图标一个墨都没读到"
+                        + "（同档有墨=\(inked[tag] ?? 0) 反侧=\(inverted[tag] ?? 0)）。"
+                        + "R381 之前亮档是 65/78——不是通道不画，是图标 255 白压在 251 的底上；"
+                        + "先查 `SettingsSidebarRow` 图标那一层是不是又被 `.primary` 的 vibrancy 解析吃掉了。"
+                        + "修法必须是动态系统色（如 `Color(nsColor: .labelColor)`），不许写死颜色。")
+            }
             emit("SIDEBAR_ICON_BLIND_SPOT light 无墨行=\(blank["light"] ?? 0)"
                  + " 有墨行=\(inked["light"] ?? 0) 反侧行=\(inverted["light"] ?? 0)"
                  + " | dark 无墨行=\(blank["dark"] ?? 0) 有墨行=\(inked["dark"] ?? 0)"
-                 + "（亮档无墨=通道对语义色的解析盲区，R122 实测：`.hierarchical`→`.monochrome`"
-                 + " 让 dark 反侧 22→0 同时让 light 期望 35→13 ⇒ 两档要的是相反的解析，"
-                 + "这一格只登记不判产品；真机那一半见人工批次 86.1）")
+                 + "（R381 起这一格与 SIDEBAR_ICON_BLANK 一起判零：亮档无墨的成因已定位为"
+                 + "图标被 vibrancy 解析成白色（255/251），不是通道盲区；修法是动态 labelColor。"
+                 + "R122 的 `.hierarchical`→`.monochrome` 让 dark 反侧 22→0 这条结论不变）")
         }
         for symbol in bySymbol.keys.sorted() {
             let cell = bySymbol[symbol]!
@@ -13362,48 +13374,52 @@ final class UICaptureTests: XCTestCase {
                       "空框不是反相，是'框贴到空白'，那是另一条地板的职责")
     }
 
-    /// **正对照来自一张真的坏帧**：`settings-general` 亮色里，
-    /// 未选中行的图标列是已知的反相面（R28：整列 255 对 248），
-    /// 而同一行右侧的标题是正常墨。同一把尺、同一张帧、两个相反的读数 ——
-    /// 一把只会说"过"的尺不能靠这种对照立起来，只有能同时读出"这侧/那侧"的才行。
+    /// **两端的正对照来自一张合成帧**（R381 改）：同一块背景上，一条白光柱 + 一条黑光柱。
+    ///
+    /// 旧版本用的是 `settings-general` 亮色帧里未选中行的图标列（R28：整列 255 对 248），
+    /// 那是**产品缺陷本身** —— R381 把图标改成动态 `labelColor` 之后那一列变成正常墨，
+    /// 这条守卫当场红在「读不出偏亮」。拿 bug 当正对照就是把缺陷钉成契约：
+    /// 修好产品反而要改测试。合成帧不依赖产品像素，仍然同时喂给同一把尺两个相反的方向；
+    /// 真实捕获路径由 `testSettingsSidebarIconsAreMeasuredRowByRow` 与帧基线管。
     func testInkDirectionRulerReadsBothEnds() throws {
-        let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("r29-direction-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: scratch) }
-        guard let fixture = fixtures(appearance: .aqua).first(where: { $0.name == "settings-general" }) else {
-            return XCTFail("找不到 settings-general ⇒ 这条正对照没有对象")
-        }
-        let file = scratch.appendingPathComponent("settings-general.png")
-        _ = try render(fixture, appearance: .aqua, to: file)
-        guard let image = NSImage(contentsOf: file),
-              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+        // 直接写位图缓冲：四通道取同一个灰度值 ⇒ 无论 rep 的实际字节序是 RGBA/ARGB，亮度不变。
+        // （第一版用 NSImage.lockFocus 画背景，TIFF 回读的模态底色是 0 ⇒ 黑柱也被读成「偏亮」，
+        //   红在的是合成帧自己，不是尺；这条注释留给下一个想用画布造样本的人。）
+        let width = 200, height = 40, bpr = width * 4
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                                         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                         isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: bpr, bitsPerPixel: 32),
               let base = rep.bitmapData else {
-            return XCTFail("读不回刚拍的帧")
+            return XCTFail("合成帧分配不出位图 ⇒ 这条正对照没有对象")
         }
-        let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
-        // 第一行「快捷键」的图标列（x 15..37，y 66..86 —— R28 从帧上量的）。
+        for y in 0..<height {
+            for x in 0..<width {
+                // 柱宽 4pt：必须让**背景**在每一块采样矩形里占多数，否则众数会取到墨色，
+                // 方向就反了（第一版白柱 12/22 宽 ⇒ 白成了模态 ⇒ 白柱被读成「偏暗」）。
+                // 底色取 251 而不是 248：`inkTailSplit` 的背景是 8 级量化众数 +4（251→252，偏差 -1），
+                // 白墨 255 的偏差是 +3 —— 与真实缺陷帧同一组数。底色 248 会量化到 252、背景自己
+                // 变成「更暗」的尾巴（偏差 -4 > 白墨 +3），尺会把白墨读成偏暗，那是样本的错。
+                let v: UInt8 = (20..<24).contains(x) ? 255 : ((60..<64).contains(x) ? 39 : 251)
+                let o = y * bpr + x * 4
+                base[o] = v; base[o + 1] = v; base[o + 2] = v; base[o + 3] = 255
+            }
+        }
         let icon = Self.inkTailSplit(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                      bytesPerRow: rep.bytesPerRow,
-                                     rect: CGRect(x: 15, y: 66, width: 22, height: 20), scale: scale)
-        // 同一行的标题文字列（x 46..120）。
+                                     rect: CGRect(x: 15, y: 0, width: 22, height: 40), scale: 1)
         let title = Self.inkTailSplit(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                       bytesPerRow: rep.bytesPerRow,
-                                      rect: CGRect(x: 46, y: 66, width: 74, height: 20), scale: scale)
-        emit("INK_SIDE 图标列 亮\(icon.brighter)/暗\(icon.darker) 标题列 亮\(title.brighter)/暗\(title.darker)")
-        // 守卫要用"读到几个偏离像素"，不能用 `total` —— `total` 是尾墨切片的大小，
-        // 它被 `max(1, …)` 兜过底，**永远不可能等于 0**。第一版就写错在这里：
-        // CI 上这条 NOT-RUN 没生效，两条断言直接红（run 38454852737）。
+                                      rect: CGRect(x: 46, y: 0, width: 74, height: 40), scale: 1)
+        emit("INK_SIDE 合成帧 白柱列 亮\(icon.brighter)/暗\(icon.darker) 黑柱列 亮\(title.brighter)/暗\(title.darker)")
         if icon.brighter + icon.darker == 0 && title.brighter + title.darker == 0 {
-            emit("INK_SIDE_NOT_RUN aqua")
-            throw XCTSkip("INK_SIDE_NOT_RUN：这台机器拍不出 settings-general（两列都读到 0 个偏离像素）⇒ "
-                          + "两端对照记为未运行，不算通过（见 BACKLOG 43）")
+            return XCTFail("合成帧两列都读到 0 个偏离像素 ⇒ 这把尺的输入通道坏了，不是产品问题")
         }
         XCTAssertGreaterThan(icon.brighter, icon.darker * 2,
-                             "已知反相的那一列现在读不出'偏亮' ⇒ 这把方向尺坏了，"
+                             "合成帧里的白柱现在读不出'偏亮' ⇒ 这把方向尺坏了，"
                              + "R28 记下的那个伪影会重新伪装成'产品太淡'")
         XCTAssertGreaterThan(title.darker, title.brighter * 2,
-                             "同一张帧里正常墨的那一列读不出'偏暗' ⇒ 尺坏了（两端的差别没了）")
+                             "同一张合成帧里黑柱读不出'偏暗' ⇒ 尺坏了（两端的差别没了）")
     }
 
     /// 尺的算术本身要有判据：一把没人验算过的尺，报出来的数字没有意义。

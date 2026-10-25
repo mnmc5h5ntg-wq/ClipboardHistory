@@ -12,6 +12,23 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R381 状态（2026-10-26 · 本地 · 第 380 轮 / Round 378）：设置侧栏图标亮档白压白 —— 动态 labelColor 修复 + 无墨格升会红；367 再钉八根（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R381 / 第 380 轮 / Round 378）：亮档设置侧栏未选中图标实测 **255 白压在 251 底上（对比 4/255）**，旧尺数成「无墨」；单行组件帧黑、整页 `NavigationSplitView` 白 ⇒ 侧栏材质 vibrancy 把 `.primary` 解析成白色。图标改用动态系统色 `Color(nsColor: .labelColor)`（亮 76 / 暗 232），文字仍 `.primary`；修后 `SIDEBAR_ICON_COVERAGE light 有墨行=84 无墨行=0 反侧行=0 | dark 84/0/0`（修前亮档无墨 65/78）；新旧帧差分 152 张逐字节同、30 张只动 x 34–68。新守卫 `SIDEBAR_ICON_BLANK` 把无墨格升成会红，`M1011`（改回 `.primary`）/`M1012`（写死黑）两臂 `CAUGHT`；367 再钉八根（r131/r137/r140/r60/r67），`HIDDEN_ARMS … rot=12 … 上界 rot=12 … 处置=ok`（20→12），八根都重跑过刀；`swift build --build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池读数见下一节；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **26** 轮（`python3 scripts/product_streak.py --streak-for 380` 现读，口径是「本轮之前的连读轮数」）。
+
+本轮做了什么：
+① ⓪ CI：`9678d9c ↔ 40216535782`（in_progress）、`fb641e7 ↔ 40216344972`（in_progress）、`ef45e65 ↔ 40216188878`、`e8228a8 ↔ 40216027769`、`0264a63 ↔ 40215895770`、`39189c2 ↔ 40215694974`、`947cd29 ↔ 40215439140`、`dfe411a ↔ 40214501796`（concluded=success）；只登记不轮询。
+② 产品位：看图 → 量像素（4/255）→ 单行/整页对照定因（材质 vibrancy）→ 图标改动态系统色；帧差分确认只动图标列。
+③ 判据：`SIDEBAR_ICON_BLANK` 两档判零；方向尺的反相正对照改成合成位图（先红两次，成因写进注释）。
+④ rot：八根重钉并跑刀；语料补 `make_surface_ledger.py`；`ARM_LINE` 放宽到四位并加正对照。
+⑤ 验证：构建 0 告警；全量 `1031/48/0`；捕获 `CAPTURED 182 -> /tmp/r381_shots2`；帧基线 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；清账表 162=162。
+
+验证读数（现读）：`SIDEBAR_ICON_COVERAGE` 两档 `84/0/0` 与 `84/0/0`；`R381_MUTATE 刀=2 CAUGHT=2 红得不对=0 RESTORE_CLEAN=yes`；`MUTATE_TABLE n=3 caught=3`（r131）、`n=1 caught=1`（r137）、`CAUGHT=3/3`（r140）；`NEEDLE_PRECHECK tables=136 covered=119 arms=388 bad=0`；`ARM_TOTAL files=229 arms=873 dupes=0 repeats=0`；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`。
+
+NOT-RUN（分开写）：① **亮档真机腿**没跑：当前系统外观是 dark，`real_screen_sidebar_icons.py` 只能读当前外观；暗档真机通道已跑通（`REALSCREEN_VERDICT=ok 外观=dark`、六枚图标可辨），亮档这一半的证据仍是离屏整页帧。② 剩 12 根 rot 未重钉（r142 M674、r29d M132/M133/M135、r303 M876、r33 M147、r64 M340/M341、r76 M402、r77 M411、r78 M417、r94 M518）。③ `settings-*` 的帧基线已同一笔更新，不是 NOT-RUN；`capture-readings.log` 与全量日志留在 `/tmp` 不入库。
+
+下一轮（R382）的靶：⓪ 读队列（本笔 run id 待 push 后成对写回）；① 继续 367（从 r29d 或 r76 起，先看 `HIDDEN_ROT` 现读名单）；② 回产品动效面再点一个真实位（本轮的最弱维仍是「只深审了一个位点」）。
+
 ## R380 状态（2026-10-26 · 本地 · 第 379 轮 / Round 377）：M244 的对照组补「归因到 add」；刀仍 ESCAPED、针活了≠刀验过；本机换装 ok（产品 0 文件，判据账）
 
 最后更新：2026-10-26（本地 · R380 / 第 379 轮 / Round 377）：`testAddingACopyWritesNothingOnTheMainThread` 多判一句「盘上那份必须含刚加进去的文本」（未变异 0.452s 通过）；第一版变异文把 `_ = entries` 接在 save **后面**（刀没下）⇒ 看着像「第三条落盘路」；真替换那一行后 `M244 ⇒ CAUGHT`（两格同红）、还原干净 ⇒ 没有第三条路，`add` 的落盘就在 `persist()`；rot 21→20 是针活了，这一刀现在也验过了；`scripts/install_local.sh --yes` 现读 `INSTALL_RESULT=ok  版本=1.4.8→1.4.8`、`INSTALL_SHA_MATCH=1`、`INSTALL_ENTRIES_BEFORE=381  INSTALL_ENTRIES_AFTER=381`；build `--build-tests` 告警 **0**；全量 `Executed 1031 tests, with 48 tests skipped and 0 failures`；电池 Ran 682（skipped=4）OK（产品 0 文件 · 判据账）

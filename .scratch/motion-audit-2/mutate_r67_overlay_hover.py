@@ -56,8 +56,8 @@ MUTATIONS = [
 
     ("M366", "把墨写成死白（不跟外观翻面）⇒ 亮档必须红在极性那一格",
      QPC, BOTH,
-     "        NSColor.labelColor.withAlphaComponent(QuickPickController.hoverFillAlpha).setFill()",
-     "        NSColor.white.withAlphaComponent(QuickPickController.hoverFillAlpha).setFill()"),
+     "        NSColor.labelColor.withAlphaComponent(QuickPickController.hoverFillAlpha(dark: dark)).setFill()",
+     "        NSColor.white.withAlphaComponent(QuickPickController.hoverFillAlpha(dark: dark)).setFill()"),
 
     ("M367", "取消内缩（灰铺满整格，与选中药丸两种宽度）⇒ 必须红在宽度那一格",
      QPC, BOTH,

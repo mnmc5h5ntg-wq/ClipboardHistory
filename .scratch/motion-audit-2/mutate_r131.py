@@ -28,10 +28,14 @@ TESTS = "test_motion_surface_gate.py"
 ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 ARMS = [
+    # R381 重钉：旧针（`if resolve(path, root) is None:` / `if token in text:`）在 R208 改判法时就被重写，
+    # 盘上现在没有它们。M642 的刀挪到 evidence_problems 的落点（指针检查的**调用处**），
+    # M643 的刀挪到标识符边界的缺席判据那一行 —— 两者都仍是「让判据恒过」，同义坏法。
     ("M642", "摘掉「指针指向的文件必须存在」=> 形状合法但点不开的指针重新算证据",
-     "        if resolve(path, root) is None:", "        if False:", "CAUGHT"),
+     "        got = path_problem(path, root)\n        if got is not None:",
+     "        got = path_problem(path, root)\n        if False:", "CAUGHT"),
     ("M643", "让缺席断言恒过 => 写着「文件里没有这个词」而词就在里面，也没人报了",
-     "        if token in text:", "        if False:", "CAUGHT"),
+     "        if absence_pattern(token).search(text):", "        if False:", "CAUGHT"),
     ("M644", "解析只认仓库根（去掉 ClipboardHistory/ 那一层候选）=> 整张真表被判成假",
      '    for base in (root, os.path.join(root, "ClipboardHistory")):',
      "    for base in (root,):", "CAUGHT"),

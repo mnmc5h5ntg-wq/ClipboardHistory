@@ -31,12 +31,14 @@ QP = "Sources/ClipboardHistoryApp/Managers/QuickPickController.swift"
 SV = "Sources/ClipboardHistoryApp/Views/SettingsView.swift"
 
 ARMS = [
+    # R381：M657/M658 原来的针写成 `u"缺席:%s=disabled" % QP` / `… % SV`，静态尺只看得见
+    # 左边的模板（`缺席:%s=disabled`），于是两根**活**针被报成 rot。改成字面整串，语义不变。
     ("M657", TABLE,
-     u"缺席:%s=disabled" % QP,
-     u"缺席:%s=emptyLabel" % QP, "CAUGHT"),
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=disabled",
+     u"缺席:Sources/ClipboardHistoryApp/Managers/QuickPickController.swift=emptyLabel", "CAUGHT"),
     ("M658", GEN,
-     u'"%s 的 `SettingsCategory`（allCases 常量）"' % SV,
-     u'"%s 的 `SettingsCategory`（allCases 常量）" % SV', "CAUGHT"),
+     u'"Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsCategory`（allCases 常量）"',
+     u'"Sources/ClipboardHistoryApp/Views/SettingsView.swift 的 `SettingsCategory`（allCases 常量）" % SV', "CAUGHT"),
     ("M659", GEN,
      u'("主窗口/侧栏", "选中", "kept",',
      u'("主窗口/侧栏列", "选中", "kept",', "CAUGHT"),

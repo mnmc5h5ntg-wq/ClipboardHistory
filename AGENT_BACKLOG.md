@@ -8740,3 +8740,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     R381 现读（第五批）：r53 **4/4 CAUGHT** —— M260（删结论行）/M261（删 skip 闸）/M262（`region()` 退回 `contains`、会命中守卫自己）/M263（`notAnimated` 从判红改成只打印）四臂都红在 `testNativeMoveVerdictPrintsBeforeTheSkipGuards`，还原干净 ⇒「结论行先于 skip 闸」这条形状在三面都有牙。
 
 367 追记（R379）：r56 全表十臂第一次一次跑全 —— `10/10 CAUGHT`、十臂还原干净、复跑 `ESCAPED`、`EXIT=0`；M282 的「红在 []」现读为 **CI 自检样张那种有效红**（命中「夹具替换没有落地」），与另外九臂的 XCTest 红分开记。
+
+172 追记（R381 · 产品半修复；亮档真机腿仍欠）：亮档侧栏图标的「无墨」不是通道盲区，是**画成了白色**。整页帧实测图标 255/255/255、底 251（对比 4/255，低于读墨地板 ⇒ 旧尺数成无墨）；同一份 `.primary` 在单行组件帧 `settingsrow-hover-idle-light` 里是黑的 ⇒ 差异来自 `NavigationSplitView` 侧栏材质对 `.primary` 的 vibrancy 解析。
+    修法：图标单独上色，用动态系统色 `Color(nsColor: .labelColor)`（亮 76 / 暗 232），文字仍 `.primary`、选中仍 accent。修后 `SIDEBAR_ICON_COVERAGE 能力=可判 产品行数=6 行带总数=168 | light 有墨行=84 无墨行=0 反侧行=0 | dark 有墨行=84 无墨行=0 反侧行=0`（修前亮档无墨 65/78）。守卫新增 `SIDEBAR_ICON_BLANK`（两档都判零），M1011（改回 `.primary`）/M1012（写死黑）两臂 `CAUGHT`、还原干净。真机通道本轮在 **dark** 跑通：`REALSCREEN_VERDICT=ok 外观=dark`、`REALSCREEN_RATIO 图标列墨=379 文字列墨=3965 比值=0.096`（六枚图标全部可辨）⇒ 暗档无回归。**仍欠**：亮档真机腿（未替用户切系统外观）。R122 的「通道不画」定性就此更正。
+
+430 追记（R381）：`ARM_LINE` 也停在三位刀号（只剩 `MID` 放宽过），所以 r56 的 M1010 与 R381 的 M1011/M1012 在**跨表查重**里一直隐形。已改成 `M\d{3,4}`，并加人造正对照 `test_four_digit_arm_ids_are_not_invisible_to_the_cross_table_dedup`（两张人造表各一把 M1007 ⇒ 必须点名）；`test_mutate_arm_registry` 现读 13 格全绿，仓库现状 `dupes=0 repeats=0`。
+
+367 追记（R381）：本批八根 —— r131 M642/M643（重钉到 `evidence_problems` 当前的两个落点，整表 3/3 CAUGHT）、r137 M652 与 r140 M659（针本来就活着，是语料整批排除 `.scratch` 把生成器目标误报；只把 `make_surface_ledger.py` 这一份非表工具纳入语料）、r140 M657/M658（`% 变量` 拼装改成字面整串，3/3 CAUGHT）、r60 M309（`inRows && inCols` 改成 `||`，两格同红）、r67 M366（`hoverFillAlpha(dark:)` 的整行改成死白，整表 9/9 CAUGHT）。rot **20→12**、`ROT_CEILING` 同笔降；八根都重跑过刀（D-368 两轴分开）。
+    **台账标签更正**：BACKLOG 尾部此前五条「R381 现读」（r49 / r42 / r54 / r53 那批）对应的提交 `0264a63`/`e8228a8`/`ef45e65`/`fb641e7`/`9678d9c` 的 subject 都是 **R380** —— 那是 R380 追记批次的标签笔误；本节的「R381」属于第 380 轮（Round 378），两批不是同一轮，按提交号区分。

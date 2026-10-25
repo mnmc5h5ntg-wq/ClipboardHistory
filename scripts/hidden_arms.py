@@ -36,6 +36,11 @@ TABLE_DIR = os.path.join(ROOT, ".scratch", "motion-audit-2")
 MIN_LEN = 12
 LIST_NAMES = ("ARMS", "MUTATIONS", "CASES", "TABLE")
 SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "docs", ".github")
+# R381：变异表的目标不一定住在语料根里 —— r137/r140 有刀落在 `.scratch/motion-audit-2/`
+# 的台账生成器上，而语料整批排除 `.scratch`（否则每根针都被它自己的表「洗活」）。
+# 只把**这一份非表工具文件**加进来：rot 问的是「针在盘上还找不找得到」，不是「目标碰巧住在哪」。
+# 不许把整个 `.scratch/motion-audit-2` 加进来 —— 那会把 mutate_r*.py 也塞进语料，rot 当场归零。
+EXTRA_FILES = (os.path.join(".scratch", "motion-audit-2", "make_surface_ledger.py"),)
 
 # 双向棘轮：这三个数**必须**等于现读值（R313 现读）。
 # 注：过滤掉「路径型候选」之前测得 30 / 5 —— 那 3 把是被路径命中洗活的死刀（见 arm_candidates 的注释）。
@@ -52,7 +57,13 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 # （M194/M195，针改成驱动那一行、不再带注释）重钉后 rot 27→21。
 # R380：M244 的针换到 `HistoryStore.persist()`（旧对象已被重写）—— 针**活了**，rot 静态读数降到 20；
 # 但刀仍是 ESCAPED（拿掉 save 后对照组照样绿且带着内容），所以这一把只是"针活着"，**不是刀验过**。
-ROT_CEILING = 20
+# R381：① r131 的 M642/M643 重钉到 `evidence_problems` 当前的两个落点（两面各 CAUGHT）；
+# ② 语料补上 `.scratch/motion-audit-2/make_surface_ledger.py` 这一份**非表工具** —— r137 M652 /
+# r140 M659 的目标住在那里，此前被「整批排除 .scratch」误报成腐烂；③ r140 M657/M658 的针从
+# `% 变量` 拼装改成字面整串；四把的刀都重跑过 CAUGHT（D-368 两轴分开）。rot 20→14。
+# ③ r60 的 M309 重钉到 `inRows && inCols ? ink : nil`（整组两格红）→ 14；④ r67 的 M366 重钉到
+# `hoverFillAlpha(dark:)` 之后的整行，整表 9/9 CAUGHT → 13、12。
+ROT_CEILING = 12
 OPAQUE_CEILING = 6
 DECLARED_DEAD_CEILING = 0
 DECLARED_TABLES_CEILING = 6  # R313 现读 2（r308/r312）→ R361 现读 6：r355/r356/r358/r360 也声明了 NEEDLES。
@@ -85,7 +96,7 @@ def _is_pathish(c):
     return u"/" in c or c.endswith((".swift", ".py", ".json", ".md", ".yml", ".sh", ".txt"))
 
 
-def corpus(roots=SCAN_ROOTS, repo=ROOT):
+def corpus(roots=SCAN_ROOTS, repo=ROOT, extra=EXTRA_FILES):
     """可能被落刀的文本文件，一次读进内存（本仓库源码体量小，够用）。"""
     blob = []
     for rel in roots:
@@ -103,6 +114,12 @@ def corpus(roots=SCAN_ROOTS, repo=ROOT):
                         blob.append(h.read())
                 except OSError:
                     pass
+    for rel in extra:
+        try:
+            with io.open(os.path.join(repo, rel), encoding="utf-8", errors="replace") as h:
+                blob.append(h.read())
+        except OSError:
+            pass
     return u"\n\x00\n".join(blob)
 
 

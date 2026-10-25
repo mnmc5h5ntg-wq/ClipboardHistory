@@ -46,7 +46,8 @@ TABLES = [
             "mutate_r358",
             "mutate_r360",
             "mutate_r365",
-            "mutate_r56_readings_channel"]
+            "mutate_r56_readings_channel",
+            "mutate_r381_sidebar_icon"]
 # R355 / BACKLOG 430：这一格以前只认 **三位** 刀号（`M\d{3}`），而仓库从 R345 起已经在用四位
 # （M1001…）：`arm_sites` 认不出 id ⇒ 整张表被读成「静态抽不出 needle」⇒ 那几把刀**从来没被针预检查过**
 # （R355 自己那把 M1005 就是这么发现隐形的；同一次把 r348 的旧针重钉了）。四位只许往后长，不再加第二位边界。
@@ -57,7 +58,11 @@ MID = re.compile(r"^M\d{3,4}[a-z]?$")
 # 用 `('M6NN', …` 写 ARMS（r94/r96、r208…r230、r22–r28 那几批），它们对跨表查重**完全隐形** ——
 # 与 306 结掉的那半个洞同源，只是这次坏在引号上而不是坏在语言上。
 # 用反向引用锁"两边引号必须同种"，免得 `("M123',` 这种不合法写法也被抽成一个号。
-ARM_LINE = re.compile(r'^\s*\(?\s*(["\'])(M\d{3}[a-z]?)\1\s*,')
+# R381 / BACKLOG 430 的同一个洞在**跨表查重**这一侧还开着：`MID` 早已放宽到四位，
+# 而下面这把 `ARM_LINE` 仍是 `M\d{3}` ⇒ M1001… 那批刀（含 r56 的 M1010）从来没进过跨表名册，
+# 撞号在写的时候没人看得见。这里与 `MID` 对齐；正对照见
+# `test_four_digit_arm_ids_are_not_invisible_to_the_cross_table_dedup`。
+ARM_LINE = re.compile(r'^\s*\(?\s*(["\'])(M\d{3,4}[a-z]?)\1\s*,')
 
 
 def arm_ids(path):

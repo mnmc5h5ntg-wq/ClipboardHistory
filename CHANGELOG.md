@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置侧栏图标亮档白压白修复（动态 labelColor）+ 无墨格升会红；367 再钉八根、rot 20→12（R381 / 第 380 轮 / U-1329…U-1333 · 产品 1 文件，动效主线）
+
+
 ### M244 的对照组补上「归因到 add」的内容断言；第一版刀文只加一行（save 照跑）⇒ 真删后 CAUGHT，没有第三条落盘路；rot 21→20 且刀已验；本机换装 ok（R380 / U-1325…U-1328 · 产品 0 文件，判据账）
 
 ### r56 十臂全表首次跑全（10/10 CAUGHT）；M244 重钉尝试 ESCAPED 并撤回（R379 / U-1322…U-1324 · 产品 0 文件，判据账）

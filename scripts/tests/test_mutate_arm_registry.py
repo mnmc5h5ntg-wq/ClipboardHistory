@@ -103,6 +103,26 @@ class MutateArmRegistryTests(unittest.TestCase):
         self.assertEqual([(u"M1006", u"/tmp/a.swift", [u"needle-text"])], sites,
                          u"四位数刀号在 needle 预检里隐形 ⇒ 那一批刀既没查过针，也不在 covered 里")
 
+    def test_four_digit_arm_ids_are_not_invisible_to_the_cross_table_dedup(self):
+        """R381：`MID` 放宽到四位只治了 needle 那一侧；`ARM_LINE` 还是 `M\\d{3}`。
+
+        ⇒ r56 的 M1010 与 R381 的 M1011/M1012 在**跨表查重**里隐形：撞号不会有人发现。
+        正对照是人造的两张表（各一把 M1007），尺必须点名它们；只测仓库现状会随刀号漂走。
+        """
+        tool = load_tool()
+        with tempfile.TemporaryDirectory() as directory:
+            for table in (u"mutate_r913", u"mutate_r914"):
+                self.write_table(directory, table, [
+                    u"ARMS = [",
+                    u'    ("M1007", u"四位数", "/tmp/a.swift", "needle-text", "repl-text", "CAUGHT"),',
+                    u"]",
+                ])
+            _files, dupes, repeats, total = tool.cross_table_ids(directory)
+        self.assertEqual(2, total, u"四位数刀号没被扫描器看见 ⇒ 跨表查重对 M1001… 整批失效")
+        self.assertEqual([u"mutate_r913", u"mutate_r914"], dupes.get(u"M1007"),
+                         u"四位数撞号必须被点名（与三位数同一个判据）")
+        self.assertEqual({}, repeats)
+
     def test_duplicate_arm_id_across_two_tables_is_found(self):
         tool = load_tool()
         with tempfile.TemporaryDirectory() as directory:
