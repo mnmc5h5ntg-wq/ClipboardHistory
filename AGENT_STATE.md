@@ -12,6 +12,34 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R356 状态（2026-10-25 · 本地 · 第 355 轮 / Round 353）：384 结案 —— 带子 7pt→24pt、覆盖 29%→100%（产品 0 文件，判据账）
+
+最后更新：2026-10-25（本地 · R356 / 第 355 轮 / Round 353）：`pillRun` 加 `mergeInk`（只并字墨列），
+行读数打开 ⇒ 真帧行带 51.0…58pt → 51.0…75pt、纵向覆盖 14/48px=29% → 48/48px=100%，判定分布 洞太窄×11,过×13 → 过×24；
+五格夹具改用轨道级的缝、M926 旧针重钉，M1006 `CAUGHT=1/1`（产品 0 文件 · 判据账）
+
+本轮做了什么：
+① ⓪ CI：R355 的两跑 `40194321798 ↔ 5515daf`、`40194348175 ↔ da5f8a7` 现读都 `in_progress`（第三态，登记不轮询）。
+② 384 的修法：`pillRun(..., mergeInk:)`，只并"两边都 ≥ delta"的列；`movingHoleRowReading` 传 true。
+③ 真帧读数：行带 7pt→24pt、判定分布 洞太窄×11,过×13 → 过×24、覆盖 29%→100%、`MOTION_PILL_BAND` y51…75pt。
+④ 反向正对照：隔轨不许桥接；电平仍只由药丸列算（纯测试钉 74）。
+⑤ 夹具迁移：五格改用轨道级的缝造窄洞（断言与地板不动）；分档格留一列 200 级墨。
+⑥ 针：M926 因 `isPill` 行变化重钉（语义不变，CAUGHT）；M1006 改回 `mergeInk:false` ⇒ 新行为判据红。
+
+验证读数（现读）：全量卷 `Executed 1030 tests, with 48 tests skipped and 0 failures`；
+胶片 `Executed 68 tests, with 3 tests skipped and 0 failures`、`MOTION_RESOLVE_SUMMARY judged=4/4 not-run=-`；
+`MOTION_PILL_RAMP_GEOM` 行带=51.0…75.0pt、`纵向覆盖=48/48px=100%`；斜坡 A `判定=单调 首=81.0 末=219.0 位移=138.0 最大倒退=0.0`；
+基线 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`（沿用 R355 重捕的 182 帧，本轮产品 0 文件未重捕）；
+清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；
+脚本电池 `Ran 649（skipped=4）OK`；产品面连续零改动 **1** 轮（`python3 scripts/product_streak.py --streak-for 355` 现读）。
+
+NOT-RUN（分开写）：① runner 对 R355 修复与 R356 尺改动的读数（下一跑 CI；先看 `empty-state` 与 `MOTION_PILL_RAMP_GEOM`）；
+② 覆盖率的**地板**没钉（只有本机 100%，没有 runner 同格读数；R38：一台的数不许当门）；
+③ 真机腿（reduce 开关 / 395）没跑；④ 静态帧未重捕（产品 0 文件；沿用 R355 的 182 帧，`ls` 数过）。
+
+下一轮（R357）的靶：⓪ 读 CI（`5515daf` / `da5f8a7` 两跑）→ ① 387① / 376 / 367 → ② 426（刀的 diff 判法）与 428（`ci_read.py queue`）→
+③ 若 runner 的 `MOTION_PILL_RAMP_GEOM` 到位：给覆盖率定地板（两机同数之后）。
+
 ## R355 状态（2026-10-25 · 本地 · 第 354 轮 / Round 352）：runner 六连红结案 —— reduce 下空态淡入被归零（产品 1 文件，判据账）
 
 最后更新：2026-10-25（本地 · R355 / 第 354 轮 / Round 352）：六跑全 failure、唯一红在 `Motion coverage floor`

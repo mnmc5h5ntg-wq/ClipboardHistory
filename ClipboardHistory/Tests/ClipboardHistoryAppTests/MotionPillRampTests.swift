@@ -113,6 +113,56 @@ final class MotionPillRampTests: XCTestCase {
                        4..<7, "反方向（药丸比轨道暗）必须走同一颗尺、读同一段")
     }
 
+    /// R356 / BACKLOG 384：**标签墨不许把胶囊劈成两半**。
+    ///
+    /// 现场（R328/R329）：被拒那 22px 的洞宽只有 21%，而上下两段通过的是 49% ——
+    /// 差异就是选中那颗上的文字把同一颗胶囊切成了两半。这里只并"既不接近药丸档、
+    /// 也不接近轨道档"的列，并墨之后电平仍只由药丸档的列算（不然均值会被墨拉下去）。
+    func testPillRunMergesLabelInkOnlyWhenAsked() {
+        // 选中那颗 74，中间两道 30 的标签墨；不并墨时最长段只有前半。
+        let values: [Double] = [30, 30, 52, 52, 74, 74, 30, 74, 74, 52, 52, 30]
+        let extent = 2..<11
+        XCTAssertEqual(MotionFilmstripTests.pillRun(profile: values, pillLevel: 74, trackLevel: 52,
+                                                    delta: 8, extent: extent, minPillPixels: 2)?.range,
+                       4..<6, "不并墨：标签把它劈成两半，最长只有前半")
+        let merged = MotionFilmstripTests.pillRun(profile: values, pillLevel: 74, trackLevel: 52,
+                                                  delta: 8, extent: extent, minPillPixels: 2,
+                                                  mergeInk: true)
+        XCTAssertEqual(merged?.range, 4..<9, "并墨后才是一整颗（左边缘到右边缘）")
+        XCTAssertEqual(merged?.pillLuma ?? -1, 74, accuracy: 0.001,
+                       "并墨不许改电平：均值仍只由药丸档的列算")
+    }
+
+    /// 正对照的反面：药丸之外另有一块墨，中间隔着轨道 ⇒ 并墨也不许把两段连起来。
+    func testPillRunDoesNotBridgeAcrossTrackWithInk() {
+        let values: [Double] = [52, 52, 74, 74, 52, 52, 30, 30, 52, 52]
+        let run = MotionFilmstripTests.pillRun(profile: values, pillLevel: 74, trackLevel: 52,
+                                               delta: 8, extent: 0..<10, minPillPixels: 2,
+                                               mergeInk: true)
+        XCTAssertEqual(run?.range, 2..<4, "轨道把两段隔开 ⇒ 最长段仍是左边那颗药丸")
+    }
+
+    /// 现场形状（R328/R329 真帧：被拒 21% 对通过 49%）：**标签墨在胶囊里面**，洞宽只剩一半。
+    /// 这一夹具按 20/36 画（22% 对 56%），断言的是"被拒段变成通过段"这件事；
+    /// 把调用点改回 `mergeInk: false`（M1006）必须红。
+    func testLabelInkInsideThePillDoesNotNarrowTheHole() {
+        let width = 44, height = 8
+        var a = Frame(width: width, height: height, grey: 30)
+        var b = Frame(width: width, height: height, grey: 30)
+        a.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
+        a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
+        b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        let got = band(a, b, width: width, height: height)
+        XCTAssertNotNil(got.band, "并墨之后这一卷应当有带子：" + got.report)
+        XCTAssertFalse(got.report.contains("洞太窄"),
+                       "标签墨还在把胶囊劈成两半 ⇒ 并墨没接进行读数：" + got.report)
+        XCTAssertTrue(got.report.range(of: "洞宽=(4[5-9]|5[0-9]|60)%", options: .regularExpression) != nil,
+                      "洞宽必须回到整颗胶囊那一档（这一夹具 20/36=56%），而不是 22% 的碎片：" + got.report)
+    }
+
     func testPillRunRefusesSubFloorHole() {
         let values: [Double] = [52, 52, 36, 36, 52, 52, 52, 52]
         XCTAssertNil(MotionFilmstripTests.pillRun(profile: values, pillLevel: 36, trackLevel: 52,
@@ -203,10 +253,11 @@ final class MotionPillRampTests: XCTestCase {
         b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
         a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
         b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
-        // 字墨吃六列：把 20 列的洞切成 8 + 6 ⇒ 最长 8 列 / 轨道 36 列 = 22% < 0.25 ⇒ 判"洞太窄"
+        // R356 / BACKLOG 384：200 级字墨现在会被并回洞 ⇒ 窄洞的证人换成**轨道级的一道缝**（并墨管不到它）。
+        // 缝吃六列：把 20 列的洞切成 8 + 6 ⇒ 最长 8 列 / 轨道 36 列 = 22% < 0.25 ⇒ 判"洞太窄"
         // （第一版只切三列，剩下的那截刚好 25% 压在线上，判据回我"不贴两端"—— 那是它对，我错）
-        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
-        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 52)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 52)
         let got = band(a, b, width: width, height: height)
         XCTAssertTrue(got.report.range(of: "洞太窄 洞宽=[0-9]+%", options: .regularExpression) != nil,
                       "被拒段没带洞宽那一格（或这一段根本没被判洞太窄）：" + got.report)
@@ -232,8 +283,10 @@ final class MotionPillRampTests: XCTestCase {
         b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
         a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
         b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
-        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
-        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 52)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 52)
+        // 分档那一格需要"远高于轨道的一级"仍有对象：在轨道最右画一列 200 级字墨（离胶囊很远，不会被并进来）。
+        a.paint(xRange: 38..<39, yRange: 3..<5, grey: 200)
         let got = band(a, b, width: width, height: height)
         // 报告的形状是 `行=N … 判定分布=… 候选段=<段> | <段> | …`：判定分布那一格里也写着"洞太窄×2"，
         // 所以必须找带 `判=` 的那一段，不能拿整条报告去找第一个词（本轮第一次就踩了这个）。
@@ -337,8 +390,9 @@ final class MotionPillRampTests: XCTestCase {
         b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
         a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
         b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
-        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 200)
-        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 200)
+        a.paint(xRange: 12..<18, yRange: 3..<5, grey: 52)
+        b.paint(xRange: 28..<34, yRange: 3..<5, grey: 52)
+        // R356：200 级字墨会被并回洞，纵向覆盖就不再"盖不住"；被拒的那几行改用轨道级的缝。
         let got = band(a, b, width: width, height: height)
         XCTAssertTrue(got.report.range(of: "纵向覆盖=\\d+/\\d+px=\\d+%", options: .regularExpression) != nil,
                       "报告没带纵向覆盖那一格：" + got.report)
@@ -523,10 +577,10 @@ final class MotionPillRampTests: XCTestCase {
         b.paint(xRange: 4..<40, yRange: 1..<7, grey: 52)
         a.paint(xRange: 4..<24, yRange: 1..<7, grey: 36)
         b.paint(xRange: 20..<40, yRange: 1..<7, grey: 36)
-        a.paint(xRange: 12..<18, yRange: 3..<6, grey: 200)   // 字墨只在 y=3..5 那几行
-        b.paint(xRange: 28..<34, yRange: 3..<6, grey: 200)
+        a.paint(xRange: 12..<18, yRange: 3..<6, grey: 52)   // 轨道级的缝只在 y=3..5 那几行
+        b.paint(xRange: 28..<34, yRange: 3..<6, grey: 52)
         XCTAssertEqual(reading(a, b, y: 4)?.gate, "洞太窄",
-            "字缝也能贴边 —— 所以「至少一段之宽」这一道不能省（这一行里最长的那截 8/36=22% < 地板 25%）")
+            "缝也能贴边 —— 所以「至少一段之宽」这一道不能省（这一行里最长的那截 8/36=22% < 地板 25%）")
         XCTAssertEqual(reading(a, b, y: 1)?.gate, "过",
             "同一颗尺、同一对帧，没有字墨的那一行必须放行 —— 拦的是那一行的宽度，不是整卷")
     }

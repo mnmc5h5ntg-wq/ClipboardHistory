@@ -5433,9 +5433,11 @@ final class MotionFilmstripTests: XCTestCase {
                                             lastLeft: halvesB.left, lastRight: halvesB.right,
                                             delta: delta)
         guard let holeA = pillRun(profile: rowA, pillLevel: levels.pill, trackLevel: levels.track,
-                                  delta: delta, extent: extent, minPillPixels: minHolePixels),
+                                  delta: delta, extent: extent, minPillPixels: minHolePixels,
+                                  mergeInk: true),
               let holeB = pillRun(profile: rowB, pillLevel: levels.pill, trackLevel: levels.track,
-                                  delta: delta, extent: extent, minPillPixels: minHolePixels) else { return nil }
+                                  delta: delta, extent: extent, minPillPixels: minHolePixels,
+                                  mergeInk: true) else { return nil }
         let width = Double(extent.count)
         guard Double(holeA.range.count) / width <= maxHoleFraction,
               Double(holeB.range.count) / width <= maxHoleFraction else { return nil }
@@ -5695,20 +5697,30 @@ final class MotionFilmstripTests: XCTestCase {
     /// 两档本身分不开（`|pill − track| < delta`）时这一格**没有对象**，直接给 nil ——
     /// 不许退回去猜一个（那是把"洗淡了"读成"看不见"的那条路）。
     static func pillRun(profile: [Double], pillLevel: Double, trackLevel: Double,
-                        delta: Double, extent: Range<Int>, minPillPixels: Int)
+                        delta: Double, extent: Range<Int>, minPillPixels: Int,
+                        mergeInk: Bool = false)
         -> (range: Range<Int>, pillLuma: Double, trackLuma: Double)? {
         guard extent.lowerBound >= 0, extent.upperBound <= profile.count,
               !extent.isEmpty, minPillPixels > 0,
               abs(pillLevel - trackLevel) >= delta else { return nil }
-        let isPill = extent.map { abs(profile[$0] - pillLevel) < delta }
+        // R356 / BACKLOG 384：标签墨不许把胶囊劈成两半。
+        // 只并"既不接近药丸档、也不接近轨道档"的列（两边都 ≥ delta）—— 那是字墨；
+        // 轨道（离药丸远、离轨道近）仍然断开，所以不会把相隔的两段连起来。
+        // 并墨只改"哪一段算洞"，不改电平：pillLuma 仍只由药丸档的列平均（否则均值会被墨拉下去）。
+        func isInk(_ value: Double) -> Bool {
+            mergeInk && abs(value - pillLevel) >= delta && abs(value - trackLevel) >= delta
+        }
+        let isPill = extent.map { abs(profile[$0] - pillLevel) < delta || isInk(profile[$0]) }
         var best = (-1, -1)
         var start = -1
         var pillSum = 0.0, pillN = 0, trackSum = 0.0, trackN = 0
         for (i, hit) in isPill.enumerated() {
             let value = profile[extent.lowerBound + i]
             if hit {
-                pillSum += value
-                pillN += 1
+                if !isInk(value) {
+                    pillSum += value
+                    pillN += 1
+                }
                 if start < 0 { start = i }
             } else {
                 trackSum += value

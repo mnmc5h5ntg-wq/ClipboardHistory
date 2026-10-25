@@ -43,8 +43,9 @@ EXPECT_925 = u"testMovingHoleReadingRejectsAHoleThatStaysPut"
 # R333 重钉：这一针原来锚的是旧定义那行（`hole` 与页底比），重基之后那颗尺读的是
 # `pillLevel`（由两臂镜像量出来），所以针与期望用例名一起换 —— 刀的意思没变：
 # 把"哪一档是药丸"翻成"另一档"，证人必须红。
-NEEDLE_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) < delta }"
-REPL_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) >= delta }"
+# R356 重钉：`pillRun` 多了 `mergeInk` 分支，旧针已不在盘上；极性翻面这一刀的语义不变。
+NEEDLE_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) < delta || isInk(profile[$0]) }"
+REPL_926 = u"let isPill = extent.map { abs(profile[$0] - pillLevel) >= delta || isInk(profile[$0]) }"
 EXPECT_926 = u"testPillRunFollowsTheLevelGivenByTheMirrorNotThePage"
 
 # ③ 列剖面：中位数换成均值 ⇒ 少数行的字墨抬进中心。
