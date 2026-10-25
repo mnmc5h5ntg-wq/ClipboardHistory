@@ -8733,5 +8733,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     R378 追记：M244 的重钉**试过一次，ESCAPED** —— 同义坏法改成「`HistoryStore.persist()` 里不调 `persistence.save(entries)`」，其余不变，对照组（放开闸门后 `history.json` 必须出现）**仍然绿** ⇒ `add` 的落盘还有第二条路（我没定位到）。刀没收，rot 仍 21；下一批先找出那条路再钉，不许把一把 ESCAPED 的刀塞回表里当已修。
     R379 线索：`HistoryStore` 构造期可能自己排了一次保存（`self.persist()` 在某个 async 块里），闸门放开后它照样把 `history.json` 写出来 ⇒ 对照组绿得**不归因于 `add`**。若属实，这条对照组本身就是一把「会为错的原因变绿」的尺；钉 M244 之前先把对照组改成只认 `add` 那一次写（例如先等构造期那次落定、清盘、再 add），否则任何「add 不写盘」的刀都会被它放过。
     R380 现读：给对照组补了**内容断言**（盘上那份必须含这次 add 的文本）。第一版刀文把 `_ = entries` **接在** `try persistence.save(entries)` 后面 ⇒ save 照跑，看上去像「第三条落盘路」，其实是刀没下。改成真替换那一行后 `M244 ⇒ CAUGHT`（`testAddingACopyWritesNothingOnTheMainThread` 与 `testAddingACopyWithANearlyFullArchiveStaysInsideBudget` 两格同红）、还原干净。⇒ 没有第三条路；`add` 的落盘就在 `persist()` 这一处。rot 21→20 是针活了，这一刀现在**也验过了**。
+    R381 现读：r49 **整表 5/5 CAUGHT** —— M240（recordCopy 同步写盘）红在 `testAddingACopyWritesNothingOnTheMainThread`、M241/M242 红在 `testPercentileIsATruthTable`、M243 红在两条预算格、M244 红在两条落盘格；五臂 `还原干净=yes`。这是本仓库唯一把「产品侧同步写盘」写成刀的一组，「采集路径上不许有同步磁盘写」因此第一次有整表读数。
 
 367 追记（R379）：r56 全表十臂第一次一次跑全 —— `10/10 CAUGHT`、十臂还原干净、复跑 `ESCAPED`、`EXIT=0`；M282 的「红在 []」现读为 **CI 自检样张那种有效红**（命中「夹具替换没有落地」），与另外九臂的 XCTest 红分开记。
