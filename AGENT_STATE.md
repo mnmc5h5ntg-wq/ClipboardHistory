@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R391 状态（2026-10-26 · 本地 · 第 390 轮 / Round 388）：自绘「恢复默认」补回按下态（启用 20/16 级 / 禁用 0 级，M1025/M1026 CAUGHT）；M1023 随填充表达式重钉；436 无新 runner 读数（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R391 / 第 390 轮 / Round 388）：R388 的自绘按钮按下只缩 2%，底色不动。R391 在 `ResetDefaultButtonBody` 加 `@Environment(\.pressedForCapture)` + `isEnabled` 闸门，按下填充 `0.08 → 0.17`，缩放也走 `isPressedForDrawing`。两态帧现读：亮档 启用 idle **230** → pressed **210**（差 **20**），暗档 **54 → 70**（差 **16**）；禁用态亮 **238/238**、暗 **46/46**（差 **0/0**，负半）；能力闸门 卡片 246/38。R390 悬停复验仍读亮 `230→222`（差 8）、暗 `54→62`（差 8），禁用两半仍 0。源守卫 + 四格真值表；`M1025`/`M1026` CAUGHT；改填充表达式让 R390 的 M1023 命中 0（预检 bad=1），重钉到三分支整块后 r390 整表 2/2 CAUGHT。按下/悬停的 `.hover` 过渡过程未进胶片（BACKLOG 330）⇒ 只签端态，过程记 NOT-RUN。BACKLOG 436：无新的 runner motion 读数；R390 本地完整卷 `MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-` 与闸门 exit 1（UNLISTED）的复现仍成立，**不关单、不改 JSON/自测、不猜 must_judge**。`swift build --build-tests` 告警 **0**；全量 `Executed 1047 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r391_shots`，与 R390 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=233 可判=820 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=146 covered=129 arms=402 bad=0`、全仓 239 文件 / 886 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 390`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；未推送，CI 多跑未读；未能 fetch 确认远端也写明。
+② 产品位：自绘「恢复默认」补回按下态（0.08→0.17，禁用不动）；8 张两态帧落 /tmp/r391_press。
+③ 判据：源守卫 + 四格真值表 + M1025/M1026；按下过程 NOT-RUN；M1023 重钉并复跑 r390 整表。
+④ 436：无新 runner 读数，本地 5 臂复现仍成立；不关单、不猜 must_judge。
+⑤ 367：hidden 表 233 / 可判 820 / rot 0 / 上界 0；预检 146/129/402/0。
+⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162。
+
+验证读数（现读）：`RESET_PRESS_STATE` 亮 启用 `230→210`（差 20）/ 禁用 `238/238`（差 0）；暗 `54→70`（差 16）/ 禁用 `46/46`（差 0）；`RESET_HOVER_STATE` 亮 `230→222` / 暗 `54→62`；`M1025/M1026` 与 `M1023/M1024` 全 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=17（R391 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R390 本地提交的 conclusion **未读**（网络）；③ 悬停/按下的 `.hover` 过渡过程未进胶片（BACKLOG 330），只签端态；④ 亮档真机腿仍没跑；⑤ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测。
+
+下一轮（R392）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R391 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R391 的按下端态可用 `UICaptureTests/testResetDefaultButtonShowsPressedOnlyWhenEnabled` 复跑。
+
 ## R390 状态（2026-10-26 · 本地 · 第 389 轮 / Round 387）：自绘「恢复默认」补回悬停（启用 8 级 / 禁用 0 级，M1023/M1024 CAUGHT）；436 本地复现 UNLISTED、runner 未读不猜 must_judge（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R390 / 第 389 轮 / Round 387）：R388 的 `ResetDefaultButtonStyle` 把系统 bordered 按钮的悬停反馈丢了。R390 在 `ResetDefaultButtonBody` 加 `@Environment(\.hoveredForCapture)` + `.onHover` + `isEnabled` 闸门，悬停填充 `0.08 → 0.13`，过渡 `.hover`。两态帧现读：亮档 启用 idle **230** → hover **222**（差 **8**），暗档 **54 → 62**（差 **8**）；禁用态亮 **238/238**、暗 **46/46**（差 **0/0**，负半）；能力闸门 卡片 246/38、标签墨 >0。源守卫 + 四格真值表；`M1023`（填充退回 idle）/`M1024`（摘 isEnabled 闸门）都 CAUGHT；悬停**过程**未进胶片（BACKLOG 330）⇒ 只签端态，过程记 NOT-RUN。BACKLOG 436：完整 motion 卷 `Executed 70/3/0`，`MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`，`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-`；现有 4 臂登记跑 `motion_floor_gate.py` ⇒ exit 1，唯一红 `MOTION_FLOOR_UNLISTED_SCENARIO … settings-reset-fade` ⇒ 成因本地复现。**仍未结案**：runner 未读，不猜 `must_judge`，JSON/自测一字未改。R389 滑块场景复验 2x `27/5/0.0188`、1x `27/14/0.0123`。`swift build --build-tests` 告警 **0**；全量 `Executed 1044 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r390_shots`，与 R389 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=232 可判=818 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=145 covered=128 arms=400 bad=0`、全仓 238 文件 / 884 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 389`）。

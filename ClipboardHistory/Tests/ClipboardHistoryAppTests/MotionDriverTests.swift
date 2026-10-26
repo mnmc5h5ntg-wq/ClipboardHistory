@@ -223,6 +223,41 @@ final class MotionDriverTests: XCTestCase {
                        "换错动画档也算接好 ⇒ 悬停过渡用的不是 `.hover`")
     }
 
+    /// R391：自绘按钮的按下态要有自己的填充与缩放，且同样只在启用态生效。
+    static func resetPressIsWired(in code: String) -> Bool {
+        let compact = code.split(whereSeparator: \.isWhitespace).joined()
+        return code.contains("@Environment(\\.pressedForCapture)")
+            && compact.contains("isEnabled&&(configuration.isPressed||(pressedForCapture??false))")
+            && compact.contains("isPressedForDrawing?0.17")
+            && compact.contains(".scaleEffect(isPressedForDrawing?0.98:1)")
+            && compact.contains(".animation(MotionCatalog.animation(for:.hover),value:isPressedForDrawing)")
+    }
+
+    func testResetButtonPressIsWiredAndGated() throws {
+        let style = Self.stripCommentLines(try productSource(named: "Views/PressableStyle.swift"))
+        XCTAssertTrue(Self.resetPressIsWired(in: style),
+                      "`ResetDefaultButtonBody` 的按下态没有填充/缩放/闸门 ⇒ R388 的自绘按钮按下时只有裸缩放")
+    }
+
+    func testResetButtonPressScanIsATruthTable() {
+        let live = #"""
+            @Environment(\.isEnabled) private var isEnabled
+            @Environment(\.pressedForCapture) private var pressedForCapture
+            private var isPressedForDrawing: Bool { isEnabled && (configuration.isPressed || (pressedForCapture ?? false)) }
+            .fill(Color.primary.opacity(isPressedForDrawing ? 0.17 : 0.08))
+            .scaleEffect(isPressedForDrawing ? 0.98 : 1)
+            .animation(MotionCatalog.animation(for: .hover), value: isPressedForDrawing)
+            """#
+        XCTAssertTrue(Self.resetPressIsWired(in: live))
+        XCTAssertFalse(Self.resetPressIsWired(in: live.replacingOccurrences(of: "isEnabled && ", with: "")),
+                       "禁用闸门被摘掉也算接好 ⇒ 禁用按钮会在按下时亮起来")
+        XCTAssertFalse(Self.resetPressIsWired(in: live.replacingOccurrences(of: "0.17", with: "0.08")),
+                       "按下填充与 idle 相同也算接好 ⇒ 按下去只有 2% 缩放")
+        XCTAssertFalse(Self.resetPressIsWired(in: live.replacingOccurrences(
+            of: "isPressedForDrawing ? 0.98 : 1", with: "1")),
+                       "缩放不跟按下态也算接好 ⇒ 按下帧量不到那 2%")
+    }
+
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
     func testReceiptGateScanIsATruthTable() {
         // ① `if let 局部 = 状态 {` ⇒ 门控里认的是**状态**；局部名当键是**假驱动**。

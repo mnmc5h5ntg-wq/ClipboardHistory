@@ -18,8 +18,13 @@ STYLE = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/PressableStyle.swi
 FILTER = "testResetDefaultButtonShowsHoverOnlyWhenEnabled"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-NEEDLE_FILL = "                    .fill(Color.primary.opacity(isHoveredForDrawing ? 0.13 : (isEnabled ? 0.08 : 0.035)))\n"
-MUTANT_FILL = "                    .fill(Color.primary.opacity(isEnabled ? 0.08 : 0.035))\n"
+NEEDLE_FILL = """                    .fill(Color.primary.opacity(isPressedForDrawing ? 0.17
+                                                : (isHoveredForDrawing ? 0.13
+                                                   : (isEnabled ? 0.08 : 0.035))))
+"""
+MUTANT_FILL = """                    .fill(Color.primary.opacity(isPressedForDrawing ? 0.17
+                                                : (isEnabled ? 0.08 : 0.035)))
+"""
 NEEDLE_GATE = "        isEnabled && (isHovered || (hoveredForCapture ?? false))\n"
 MUTANT_GATE = "        (isHovered || (hoveredForCapture ?? false))\n"
 

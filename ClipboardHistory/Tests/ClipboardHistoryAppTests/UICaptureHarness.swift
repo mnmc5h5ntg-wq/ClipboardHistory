@@ -13590,6 +13590,98 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R391：R388 的自绘按钮按下时只缩 2%，底色不动；系统 bordered 会再深一档。
+    /// 与 R390 的悬停同一条通道（`pressedForCapture` 只加在绘制侧），负半同样是禁用态。
+    func testResetDefaultButtonShowsPressedOnlyWhenEnabled() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r391-reset-press-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+
+        struct Reading { let fill: Int; let ink: Int }
+        func stats(_ rep: NSBitmapImageRep, rect: CGRect) -> Reading {
+            let scale = Double(rep.pixelsWide) / 520.0
+            let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+            let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0) }
+            var values: [Int] = []
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * rep.bytesPerRow + x * 4
+                    values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                       + 0.0722 * Double(base[o + 2])).rounded()))
+                }
+            }
+            var hist: [Int: Int] = [:]
+            for v in values { hist[v / 4, default: 0] += 1 }
+            let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+            return Reading(fill: fill, ink: values.filter { abs($0 - fill) > 40 }.count)
+        }
+
+        func rep(enabled: Bool, pressed: Bool, _ appearance: NSAppearance.Name) throws -> NSBitmapImageRep {
+            let key = "RecommendationWeights.store"
+            let original = UserDefaults.standard.data(forKey: key)
+            defer {
+                if let original { UserDefaults.standard.set(original, forKey: key) }
+                else { UserDefaults.standard.removeObject(forKey: key) }
+            }
+            let store = RecommendationWeightsStore()
+            if enabled {
+                var weights = store.weights
+                weights[.recency] = 1.6
+                weights[.favorite] = 0.4
+                store.weights = weights
+            } else {
+                store.weights = .default
+            }
+            let name = "r391-reset-\(enabled ? "enabled" : "disabled")-\(pressed ? "pressed" : "idle")-\(appearance.rawValue)"
+            let fixture = Fixture(name, NSSize(width: 520, height: 880)) {
+                AnyView(RecommendationWeightsView(store: store)
+                    .padding(20)
+                    .frame(width: 520, height: 880)
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .environment(\.hoveredForCapture, false)
+                    .environment(\.pressedForCapture, pressed))
+            }
+            let file = scratch.appendingPathComponent(name + ".png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let bitmap = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()) else {
+                throw NSError(domain: "r391", code: 1)
+            }
+            emit("RESET_PRESS_PNG \(name) -> \(file.path)")
+            return bitmap
+        }
+
+        let buttonRect = CGRect(x: 432, y: 106, width: 60, height: 16)
+        let cardRect = CGRect(x: 380, y: 106, width: 40, height: 16)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let idleRep = try rep(enabled: true, pressed: false, appearance)
+            let idle = stats(idleRep, rect: buttonRect)
+            let pressed = stats(try rep(enabled: true, pressed: true, appearance), rect: buttonRect)
+            let disabledIdle = stats(try rep(enabled: false, pressed: false, appearance), rect: buttonRect)
+            let disabledPressed = stats(try rep(enabled: false, pressed: true, appearance), rect: buttonRect)
+            let card = stats(idleRep, rect: cardRect)
+            let enabledDelta = abs(pressed.fill - idle.fill)
+            let disabledDelta = abs(disabledPressed.fill - disabledIdle.fill)
+            emit("RESET_PRESS_STATE \(tag) 启用 idle=\(idle.fill) pressed=\(pressed.fill) 差=\(enabledDelta)"
+                 + " | 禁用 idle=\(disabledIdle.fill) pressed=\(disabledPressed.fill) 差=\(disabledDelta)"
+                 + " 卡片=\(card.fill) 墨=\(idle.ink)/\(pressed.ink)")
+            let capable = abs(idle.fill - card.fill) >= 4 && idle.ink > 0
+            if !capable {
+                throw XCTSkip("RESET_PRESS_NOT_RUN=button-band-flat：\(tag) 按钮带填充=\(idle.fill)"
+                              + " 卡片=\(card.fill) 墨=\(idle.ink) ⇒ 这条通道拍不出按钮，"
+                              + "不是「按下没画」")
+            }
+            XCTAssertGreaterThanOrEqual(enabledDelta, 6,
+                                        "\(tag)：启用态按下只差 \(enabledDelta) 级（要 ≥6）⇒ 自绘按钮没有按下反馈")
+            XCTAssertLessThanOrEqual(disabledDelta, 2,
+                                     "\(tag)：禁用态按下也变了 \(disabledDelta) 级 ⇒ 「不能点」被画成了「可以点」")
+            XCTAssertGreaterThan(pressed.ink, 0,
+                                 "\(tag)：按下帧的按钮标签一个墨都没读到 ⇒ 取样带压错了对象")
+        }
+    }
+
     /// R383：快捷键页三颗「恢复默认」与 R382 的权重页同一族 —— 快捷键已是默认值时点了无事发生，
     /// 但从来没画成禁用态。判据渲染**整页两次**（默认值 vs 第一行改成 ⌃⌥⇧V），读右列按钮标签墨。
     ///

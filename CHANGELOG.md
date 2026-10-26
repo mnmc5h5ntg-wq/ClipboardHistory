@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 自绘「恢复默认」补回按下态（启用 20/16 级 / 禁用 0 级，M1025/M1026 CAUGHT）；M1023 随填充表达式重钉；436 无新 runner 读数未结案（R391 / 第 390 轮 / Round 388 / U-1375…U-1379 · 产品 1 文件，动效主线）
+
+
 ### 自绘「恢复默认」补回悬停（启用 8 级 / 禁用 0 级，M1023/M1024 CAUGHT）；436 本地复现 UNLISTED，runner 未读不猜 must_judge（R390 / 第 389 轮 / Round 387 / U-1370…U-1374 · 产品 1 文件，动效主线）
 
 

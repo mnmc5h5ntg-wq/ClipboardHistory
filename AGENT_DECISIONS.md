@@ -7375,3 +7375,9 @@ R390 现读：R388 的 `ResetDefaultButtonStyle` 把系统 bordered 按钮的悬
 R390 现读：完整本机 motion 卷 `MOTION_SUMMARY … settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5`；拿现有 4 臂登记跑 `motion_floor_gate.py` ⇒ exit 1，唯一红 `MOTION_FLOOR_UNLISTED_SCENARIO`。436 的成因由此在本地复现，但 runner 的 motion 卷仍 NOT-RUN（网络断）。
 **Why**：`must_judge` 是「这台机器必须判到」的承诺；用本机读数替 runner 写 true，就是拿一台机器的能力给另一台签字；写 false 又需要 runner 的 run 号作证据。两者都会把「没读」洗成「已决定」。
 **How to apply**：① 本地完整卷只能证明「红会长什么样」，不能关单；② runner 未读时只记账，JSON/自测一字不改；③ push 恢复后先读 `MOTION_SUMMARY` 与 `MOTION_RESOLVE_SUMMARY`，再一次性改登记与自测；④ 不删场景、不让闸门忽略清单外臂来消红。
+
+### D-380（391）补一态会改同一处视觉表达式；既有刀针必须同轮重钉并整表复跑
+
+R391 现读：给 `ResetDefaultButtonBody` 加按下分支后，R390 的 M1023 针（旧的 hover/idle 两分支填充）命中 **0**，预检 `bad=1` 当场点名；把 M1023 重钉到含 pressed/hover/disabled 三分支的整块后，r390 整表 **2/2 CAUGHT**，R391 的 M1025/M1026 也 2/2 CAUGHT。
+**Why**：交互状态矩阵的多个刀针常钉在同一行填充/缩放的表达式上；每加一个状态，表达式形状就变，旧针不是被产品改坏，而是被**同一条产品线的演进**弄断。预检的 `bad` 是唯一在构建前就能看到这件事的读数。
+**How to apply**：① 改同一处视觉表达式之后，先跑 `mutate_needle_precheck.py`，`bad>0` 不进入下一步；② 旧针重钉到**包含所有分支的整块**，不要只钉新增的那一支；③ 重钉后把受影响的整张表重跑，不只看被改的那一把；④ 新状态的刀各自钉自己的分支，避免同表多刀共享一个过窄锚点。
