@@ -22,11 +22,11 @@
 ③ 判据：源守卫 + 四格真值表 + M1025/M1026；按下过程 NOT-RUN；M1023 重钉并复跑 r390 整表。
 ④ 436：无新 runner 读数，本地 5 臂复现仍成立；不关单、不猜 must_judge。
 ⑤ 367：hidden 表 233 / 可判 820 / rot 0 / 上界 0；预检 146/129/402/0。
-⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162。
+⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162；电池 `Ran 683 / OK (skipped=4)`。
 
 验证读数（现读）：`RESET_PRESS_STATE` 亮 启用 `230→210`（差 20）/ 禁用 `238/238`（差 0）；暗 `54→70`（差 16）/ 禁用 `46/46`（差 0）；`RESET_HOVER_STATE` 亮 `230→222` / 暗 `54→62`；`M1025/M1026` 与 `M1023/M1024` 全 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=17（R391 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R390 本地提交的 conclusion **未读**（网络）；③ 悬停/按下的 `.hover` 过渡过程未进胶片（BACKLOG 330），只签端态；④ 亮档真机腿仍没跑；⑤ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=20（R391 主笔 + 两笔追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R390 本地提交的 conclusion **未读**（网络）；③ 悬停/按下的 `.hover` 过渡过程未进胶片（BACKLOG 330），只签端态；④ 亮档真机腿仍没跑；⑤ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测。
 
 下一轮（R392）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R391 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R391 的按下端态可用 `UICaptureTests/testResetDefaultButtonShowsPressedOnlyWhenEnabled` 复跑。
 
