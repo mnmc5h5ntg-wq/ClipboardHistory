@@ -26,7 +26,7 @@
 
 验证读数（现读）：`LABEL_BAND old light=1.76 dark=2.13 / new light=2.84 dark=4.38`（x195..255/y118..135pt）；`WRONG_BAND old light=2.81 dark=4.33`（x380..700/y225..275pt，假绿对照）；`LOGIN_UNSUPPORTED_FRAME light 墨=984 对比=2.84`、`dark 墨=1080 对比=4.38`；`M1033/M1034` 双 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=31（R396 主笔前，提交后 32）；② 旧的两跑与 R387–R395 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=31（R396 主笔前，两次追记后 34）；② 旧的两跑与 R387–R395 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
 
 下一轮（R397）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；一次 push 只为 head 生成新 run，另外旧的两跑仍要单独按步骤读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources；③ 436 待 runner motion 读数恢复后再决定第五臂 `must_judge`，本轮仍不动 JSON/自测。
 
