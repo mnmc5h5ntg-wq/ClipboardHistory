@@ -118,32 +118,31 @@ final class MotionDriverTests: XCTestCase {
     /// R385：两颗「恢复默认」在默认↔动过之间必须有过渡驱动，不许硬切。
     /// 纯源码形状判据（过渡的过程不进静态帧 —— 那条记在胶片 NOT-RUN 里）；这里钉的是
     /// 「声明还在、键就是禁用条件」这件事，配 M1016/M1017 两把刀各删一处。
-    static func resetFadeIsDriven(in code: String, key: String) -> Bool {
-        code.contains(".opacity(\(key) ? 0.55 : 1)")
-            && code.contains(".animation(MotionCatalog.animation(for: .selection), value: \(key))")
+    static func resetFadeIsDriven(in code: String) -> Bool {
+        code.contains(".buttonStyle(ResetDefaultButtonStyle())")
     }
 
-    /// R387 更正 R385：只挂 `.animation(value:)` 时按钮上没有可动画属性，胶片只掉两帧。
-    /// 显式给一个随状态变化的 opacity，并让 `.selection` 的键就是禁用条件；这一格钉两件事
-    /// 在**同一处**（只查「有动画」会把别的动画也算进来）。
+    /// R388 更正 R385/R387：只有 `.animation(value:)`（无属性）是死动画；wrapper opacity 又把
+    /// 禁用标签压到 1.88（比系统 disabled 的 2.9 更淡）。真正的过程由 `ResetDefaultButtonStyle`
+    /// 读 `isEnabled`、在 primary↔secondary 之间过渡；这里同时钉两颗按钮用了它、且样式里确有那条过渡。
     func testResetButtonDisabledTransitionsAreDriven() throws {
         let settings = Self.stripCommentLines(try productSource(named: "Views/SettingsView.swift"))
-        XCTAssertTrue(Self.resetFadeIsDriven(in: settings,
-                                             key: "shortcut == settings.action.defaultShortcut"),
-                      "快捷键页「恢复默认」没有显式 opacity + `.selection` 过渡 ⇒ 默认↔动过会硬切")
+        XCTAssertTrue(Self.resetFadeIsDriven(in: settings),
+                      "快捷键页「恢复默认」没用 `ResetDefaultButtonStyle` ⇒ 禁用切换没有可动画的驱动")
         let weights = Self.stripCommentLines(try productSource(named: "Views/RecommendationWeightsView.swift"))
-        XCTAssertTrue(Self.resetFadeIsDriven(in: weights, key: "store.weights == .default"),
-                      "权重页「恢复默认」没有显式 opacity + `.selection` 过渡 ⇒ 默认↔动过会硬切")
+        XCTAssertTrue(Self.resetFadeIsDriven(in: weights),
+                      "权重页「恢复默认」没用 `ResetDefaultButtonStyle` ⇒ 禁用切换没有可动画的驱动")
+        let style = Self.stripCommentLines(try productSource(named: "Views/PressableStyle.swift"))
+        XCTAssertTrue(style.contains(".animation(MotionCatalog.animation(for: .selection), value: isEnabled)"),
+                      "ResetDefaultButtonStyle 没把 `isEnabled` 接进 `.selection` 过渡 ⇒ 样式只是换了个长相")
     }
 
     func testResetFadeScanIsATruthTable() {
-        let live = ".opacity(store.weights == .default ? 0.55 : 1)\n.animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)"
-        XCTAssertTrue(Self.resetFadeIsDriven(in: live, key: "store.weights == .default"))
-        XCTAssertFalse(Self.resetFadeIsDriven(in: live, key: "shortcut == settings.action.defaultShortcut"),
-                       "拿另一个键去问同一行必须说没有 ⇒ 否则这条尺只认前缀、不认键")
-        XCTAssertFalse(Self.resetFadeIsDriven(in: ".animation(MotionCatalog.animation(for: .selection), value: store.weights == .default)",
-                                              key: "store.weights == .default"),
-                       "只有 animation 没有可动画属性 ⇒ R385 的死法，必须判没有")
+        XCTAssertTrue(Self.resetFadeIsDriven(in: #"Button("恢复默认") {}.buttonStyle(ResetDefaultButtonStyle())"#))
+        XCTAssertFalse(Self.resetFadeIsDriven(in: #"Button("恢复默认") {}.buttonStyle(.bordered)"#),
+                       "换成别的按钮样式也算驱动 ⇒ 判据只认前缀、不认样式")
+        XCTAssertFalse(Self.resetFadeIsDriven(in: #"Text("恢复默认")"#),
+                       "根本没有按钮也被判成驱动 ⇒ 尺在量错对象")
     }
 
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。

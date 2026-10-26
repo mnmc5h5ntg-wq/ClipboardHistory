@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 387 轮（R388 · 2026-10-26 · U-1360…U-1364）：禁用标签被 R387 的 opacity 压到看不见 —— 自绘 primary↔secondary 样式 + 2.2 对比地板；两颗按钮同一支样式；M1019 咬住地板（U-1360…U-1364 · 产品 3 文件，动效主线）
+
+- **U-1360：R387 的「禁用」把标签压成了「看不见」。** R387 给「恢复默认」外层挂 `.opacity(isDefault ? 0.55 : 1)`（快捷键页 0.70），整颗按钮连同标签一起变淡。把 WCAG 对比度量表接到权重页两态帧上：改前那版在亮档读出 **1.88 / 1.98**（中转读数，未入基线）；目标地板定为 2.2。修复不是继续调 opacity，而是让按钮**自己画状态**：新增 `ResetDefaultButtonStyle`（`PressableStyle.swift`），读 `@Environment(\.isEnabled)`，标签 `primary ↔ secondary`、底色 `primary.opacity(0.08 / 0.035)`，`.selection` 过渡挂在 `isEnabled` 上，按下仍 0.98。两颗按钮都改用同一支样式。现读亮档 禁用 **2.77** / 动过 **5.48**，暗档 禁用 **4.21** / 动过 **8.06**（禁用仍明显淡于动过，且都在 2.2 以上）。
+- **U-1361：判据从「有没有动画」改成「有没有这支样式 + 样式里有没有那条过渡」。** `MotionDriverTests.resetFadeIsDriven` 改为在 `SettingsView` 与 `RecommendationWeightsView` 里各找 `.buttonStyle(ResetDefaultButtonStyle())`，并在 `PressableStyle` 里找 `.animation(MotionCatalog.animation(for: .selection), value: isEnabled)`；真值表三格（换别的样式 / 纯 Text / 只有按钮）都不算驱动。`M1016`/`M1017` 分别删两处的样式 ⇒ 都 CAUGHT；`M1019` 把样式禁用前景 `secondary → tertiary` ⇒ 2.2 地板红（`R388_MUTATE 刀=1 CAUGHT=1`）。
+- **U-1362：胶片复验（同一场景、两个倍率）。** `settings-reset-fade` 现读 2x `帧数=27 过渡帧数=3 峰值=0.0123`、1x `帧数=27 过渡帧数=4 峰值=0.0181`（声明 120ms），通用场景 `MOTION … 过渡帧数=3`；`MOTION_AXIS … 帧对=26 亮度峰值=0.0123 alpha峰值=0.0000 并集峰值=0.0123` ⇒ 动的是标签/底色的像素，不是 alpha 独走。strip 逐帧看得到标签由浅到深。端态 182 帧：`same=168 changed=14`；weights / weights-adjusted 的 bbox 只在按钮列 `x=838..990`、settings-recommendations 两页在 `x=1230..1382`，settings-min / shortcuts / shortcuts-recording 五页因按钮自绘尺寸变化导致行内说明重排，bbox 覆盖内容区（`354..1382`），没有窗口/侧栏/背景位移。帧基线同笔 update，复验 `COMPARED=182 CHANGED=0`。
+- **U-1363：八步验证现读。** build **0** 告警；全量 `Executed 1038 tests, with 49 tests skipped and 0 failures`；捕获卷 `CAPTURED 182 -> /tmp/r388_shots`（104 条捕获测试 0 失败）；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；预检 `tables=142 covered=125 arms=395 bad=0`、全仓 `235` 文件 / `879` 把；`HIDDEN_ARMS … rot=0 … 上界 rot=0 … 处置=ok`；r77 **整表 10/10**（含重钉后的 M406）。
+- **U-1364：⓪ 网络与 CI。** 本轮第 1 次同形探测在改代码前：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200` ⇒ GitHub 侧仍断；第 2 次在提交后按同一形状再探。本地 ahead 在 R388 主笔后为 **9**；**不写已推送**。`40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387 三笔本地提交的跑结论全部**未读**。恢复后先 push、复核 ahead=0，再读全部失败步骤并把 run↔commit 写回下一轮 ⓪。
+
 ## 第 386 轮（R387 · 2026-10-26 · U-1355…U-1359）：R385 的过渡被胶片证明是死的 —— 显式 opacity 修复 + 1x/2x 两倍率正对证；M406 重钉整表 10/10；435 负半证人（U-1355…U-1359 · 产品 1 文件，动效主线）
 
 - **U-1355：胶片把 R385 的「过渡」判成死的。** 新场景 `settings-reset-fade`（只拍右列卡头 x 70..98%、顶部 200pt 的按钮带）第一版 `captureRect` 按 `height-260` 取带，落在下方滑杆区 ⇒ 30 帧全等（`premise-not-visible`）——那是**探针取错坐标**（NSHostingView 是 flipped），不是产品；按 `isFlipped` 取顶部后现读 `MOTION settings-reset-fade … 过渡帧数=3`。但 R385 的 `.animation(value:)` 只有 2 个过渡帧 ⇒ 0.12s 的声明是**死动画**（按钮上没有可动画属性）。

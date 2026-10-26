@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 禁用「恢复默认」不再被 opacity 压成看不见 —— 自绘 primary↔secondary 样式 + 2.2 对比地板；M1019 咬地板（R388 / 第 387 轮 / Round 385 / U-1360…U-1364 · 产品 3 文件，动效主线）
+
+
 ### R385 死过渡纠正：显式 opacity + 1x/2x 胶片正对证；M406 重钉整表 10/10；435 补负半证人（R387 / 第 386 轮 / U-1355…U-1359 · 产品 1 文件，动效主线）
 
 

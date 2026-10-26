@@ -830,10 +830,9 @@ private struct HotKeySettingsRow: View {
                 // 禁用态是它唯一诚实的呈现。判据读的是**整页两态**渲染出的按钮标签墨
                 // （`testShortcutResetButtonsAreDisabledWhenShortcutsAreDefault`）。
                 .disabled(shortcut == settings.action.defaultShortcut)
-                // R387：与权重页同一条显式 opacity 过渡（R385 的 `.animation` 没有可动画属性）。
+                // R388：与权重页同一支样式（标签色过渡，禁用停在可读的 secondary）。
+                .buttonStyle(ResetDefaultButtonStyle())
                 }
-                .opacity(shortcut == settings.action.defaultShortcut ? 0.55 : 1)
-                .animation(MotionCatalog.animation(for: .selection), value: shortcut == settings.action.defaultShortcut)
             }
 
             if let message = settings.message {

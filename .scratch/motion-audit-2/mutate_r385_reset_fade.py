@@ -23,16 +23,16 @@ SETTINGS = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/SettingsView.sw
 FILTER = "MotionDriverTests"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-W_NEEDLE = "                    .opacity(store.weights == .default ? 0.55 : 1)\n"
-W_MUTANT = "                    // MUTANT：权重页 opacity 过渡撤掉\n"
-S_NEEDLE = "                .opacity(shortcut == settings.action.defaultShortcut ? 0.55 : 1)\n"
-S_MUTANT = "                // MUTANT：快捷键页 opacity 过渡撤掉\n"
+W_NEEDLE = "                    .buttonStyle(ResetDefaultButtonStyle())\n"
+W_MUTANT = "                    // MUTANT：权重页样式撤掉\n"
+S_NEEDLE = "                .buttonStyle(ResetDefaultButtonStyle())\n"
+S_MUTANT = "                // MUTANT：快捷键页样式撤掉\n"
 
 MUTATIONS = [
     ("M1016", "删权重页恢复默认的过渡", WEIGHTS, W_NEEDLE, W_MUTANT, FILTER,
-     ["权重页「恢复默认」没有显式 opacity"]),
+     ["权重页「恢复默认」没用"]),
     ("M1017", "删快捷键页恢复默认的过渡", SETTINGS, S_NEEDLE, S_MUTANT, FILTER,
-     ["快捷键页「恢复默认」没有显式 opacity"]),
+     ["快捷键页「恢复默认」没用"]),
 ]
 
 

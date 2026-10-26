@@ -274,3 +274,33 @@ extension View {
 /// 剩下的真实缺口是"筛选段按钮与设置行拿不到任何焦点提示"，那需要先把
 /// `List` 的行代理结构量清楚（已知红 `testSidebarListFocusRingAfterClick` 就在这一带），
 /// 所以它单独成一轮，而不是在这里装一个没人用的环。
+
+/// R388：「恢复默认」的禁用切换。R385 只挂 `.animation(value:)`（无可动画属性 ⇒ 死），
+/// R387 给整个按钮加 0.55 opacity（把禁用标签压到 1.88，比系统 disabled 的 2.9 更淡 ⇒ 看不见）。
+/// 这个样式**自己画**标签色（primary ↔ secondary）与底色，避免系统 disabled 的额外调暗：
+/// 禁用标签停在可读的 secondary（本机现读亮 2.77 / 暗 4.21），过程由 `.selection` 过渡演出来。
+struct ResetDefaultButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        ResetDefaultButtonBody(configuration: configuration)
+    }
+}
+
+private struct ResetDefaultButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .font(.system(size: VisualFont.body))
+            .foregroundStyle(isEnabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                VisualShape.rounded(VisualRadius.control)
+                    .fill(Color.primary.opacity(isEnabled ? 0.08 : 0.035))
+            )
+            .animation(MotionCatalog.animation(for: .selection), value: isEnabled)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(MotionCatalog.animation(for: .hover), value: configuration.isPressed)
+    }
+}

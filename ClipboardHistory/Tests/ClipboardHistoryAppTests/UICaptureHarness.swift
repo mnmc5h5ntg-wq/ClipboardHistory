@@ -13435,7 +13435,7 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
-        struct Reading { let fill: Int; let ink: Int; let maxDev: Int }
+        struct Reading { let fill: Int; let ink: Int; let maxDev: Int; let contrast: Double }
         func reading(_ rep: NSBitmapImageRep) -> Reading {
             let scale = Double(rep.pixelsWide) / 520.0
             // R383：不能拿一枚小矩形钉按钮 —— runner（1x、字体度量不同）上那枚矩形两边都读 0 墨
@@ -13445,7 +13445,7 @@ final class UICaptureTests: XCTestCase {
             let rect = CGRect(x: 380, y: 60, width: 140, height: 170)
             let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
             let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
-            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0) }
+            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0, contrast: 0) }
             var values: [Int] = []
             for y in y0..<y1 {
                 for x in x0..<x1 {
@@ -13458,7 +13458,18 @@ final class UICaptureTests: XCTestCase {
             for v in values { hist[v / 4, default: 0] += 1 }
             let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
             let devs = values.map { abs($0 - fill) }
-            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0)
+            // R388：禁用标签也要读得出来。取偏离最大的 1% 当笔画，与填充算 WCAG 对比度；
+            // 0.55 的 wrapper opacity 把它压到 1.89（亮），这不是「更禁用」，是「看不见」。
+            let inkValues = values.filter { abs($0 - fill) > 40 }
+            let meanInk = inkValues.isEmpty ? fill : inkValues.reduce(0, +) / inkValues.count
+            func rel(_ v: Int) -> Double {
+                let x = Double(v) / 255
+                return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+            }
+            let a = rel(meanInk), b = rel(fill)
+            let contrast = (max(a, b) + 0.05) / (min(a, b) + 0.05)
+            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0,
+                           contrast: contrast)
         }
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
@@ -13468,8 +13479,8 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("\(tag)：weights 两帧读不回 ⇒ 这条判据没有对象")
             }
             let disabled = reading(off), active = reading(on)
-            emit("WEIGHTS_RESET_STATE \(tag) 默认 fill=\(disabled.fill) 墨=\(disabled.ink) 最大偏离=\(disabled.maxDev)"
-                 + " | 动过 fill=\(active.fill) 墨=\(active.ink) 最大偏离=\(active.maxDev)")
+            emit("WEIGHTS_RESET_STATE \(tag) 默认 fill=\(disabled.fill) 墨=\(disabled.ink) 最大偏离=\(disabled.maxDev) 对比=\(String(format: "%.2f", disabled.contrast))"
+                 + " | 动过 fill=\(active.fill) 墨=\(active.ink) 最大偏离=\(active.maxDev) 对比=\(String(format: "%.2f", active.contrast))")
             XCTAssertGreaterThan(active.ink, 0,
                                  "\(tag)：动过权重那一帧的「恢复默认」标签一个墨都没读到 ⇒ 正对照没有对象")
             XCTAssertGreaterThan(active.maxDev, disabled.maxDev + 20,
@@ -13479,6 +13490,10 @@ final class UICaptureTests: XCTestCase {
             XCTAssertLessThanOrEqual(disabled.ink, active.ink,
                               "\(tag)：默认帧的标签墨 \(disabled.ink) 多于动过帧 \(active.ink)"
                                   + " ⇒ 两条带里的墨量方向反了，先查取样带是不是压错了对象")
+            XCTAssertGreaterThanOrEqual(disabled.contrast, 2.2,
+                                        "\(tag)：禁用态标签对填充只有 \(String(format: "%.2f", disabled.contrast)):1"
+                                            + "（地板 2.2）⇒ 过渡把它压成了「看不见」，不是「更禁用」；"
+                                            + "调 `.opacity` 时同时守住这条地板")
         }
     }
 
