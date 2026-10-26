@@ -22,11 +22,11 @@
 ③ 产品：只加只读 `categoryOverride` 缝；试过三组视觉改法均无效，全部回退，不留未验证改动。
 ④ 判据：分类缝源守卫 + M1032 CAUGHT；过渡的通道闸门写成具名 NOT-RUN。
 ⑤ 367：hidden 表 237 / 可判 826 / rot 0 / 上界 0；预检 150/133/408/0。
-⑥ 验证：build 0 告警；全量 `1054/52/0`；捕获 182 帧、默认零变化；换装 ok；清账表 162=162。
+⑥ 验证：build 0 告警；全量 `1054/52/0`；捕获 182 帧、默认零变化；换装 ok；清账表 162=162；电池 `Ran 683 / OK (skipped=4)`。
 
 验证读数（现读）：`SETTINGS_CATEGORY_FADE` 2x `23/2/0.1441`、1x `27/2/0.1533`；`MOTION_GRAB` 2x 抓帧中位 `121ms`；`M1032` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=28（R395 主笔前）；② `40234023212`/`40234058148` 与 R387–R394 本地提交的 conclusion **未读**（网络）；③ **`SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse` / `duration-under-resolved`**：整页 2x 采样 121–132ms、1x 只剩 2 帧，无法判 160ms 过程；④ BACKLOG 436 的 runner motion 卷未读；⑤ 亮档真机腿仍没跑；⑥ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=31（R395 主笔 + 两笔追记）；② `40234023212`/`40234058148` 与 R387–R394 本地提交的 conclusion **未读**（网络）；③ **`SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse` / `duration-under-resolved`**：整页 2x 采样 121–132ms、1x 只剩 2 帧，无法判 160ms 过程；④ BACKLOG 436 的 runner motion 卷未读；⑤ 亮档真机腿仍没跑；⑥ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
 
 下一轮（R396）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读三跑全部失败步骤并写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② **必须回到产品视觉并落 Sources**（本轮产品视觉 0 改动）；若要再判分类过渡，先把整页帧换成目标带宽，或给该过渡一个低成本的端态/过程通道，否则仍然 NOT-RUN。
 
