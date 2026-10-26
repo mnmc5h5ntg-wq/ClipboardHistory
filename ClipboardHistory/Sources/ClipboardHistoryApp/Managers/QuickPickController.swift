@@ -27,9 +27,12 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 空结果时的可见下一步（R407）。主窗口的同款空态有「清除搜索」按钮，
     /// 浮层只有一句“按 Esc 清空” —— 同一个处境在两个表面给两套答案。
     private var emptyAction: NSButton?
-    /// 空句 + CTA 的容器：主 stack 里只占**列表那一格**，否则多出的 arranged subview
-    /// 会把句子挤离搜索框（R408 runner 现读 gap 33pt）。
+    /// 空句 + CTA 的容器：独立钉在 content 上，不占主 stack 的 arranged subviews
+    /// （R408 runner 上多一项会把句子挤离搜索框，gap 33pt；R409 改为直钉）。
     private var emptyBox: NSStackView?
+    /// R409：主输入框的悬停边界。旧面板里它是一行裸文字，
+    /// 和主窗口的 `SearchField` 不是同一套语言；只在悬停时出现，静置保持原样。
+    private var searchBackdrop: QuickPickSearchBackdrop?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
 
@@ -90,7 +93,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 不许拿一张空白窗当"这就是浮层"（那种帧看着像证据，其实什么都没说）。
     /// 与 `SettingsView.initialCategory` / `DetailView.initialMarkdownMode` 同一手法：
     /// 产品路径一行都不改，只是把"拍得到"这件事变成可能。
-    func windowForCapture(query: String = "", hoveredRow: Int? = nil) -> NSWindow? {
+    func windowForCapture(query: String = "", hoveredRow: Int? = nil,
+                          searchHovered: Bool = false) -> NSWindow? {
         let panel = ensurePanel()
         refreshEntries()
         model.reset()
@@ -100,6 +104,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         model.index = 0
         selectCurrentRow()
         rowHoveredForCapture = hoveredRow
+        searchBackdrop?.hoveredForCapture = searchHovered
+        searchBackdrop?.needsDisplay = true
+        searchBackdrop?.displayIfNeeded()
         return panel
     }
 
@@ -273,8 +280,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         clear.isHidden = true
         clear.wantsLayer = true
 
-        // 空句与 CTA 放进同一个容器：容器是主 stack 的**一个** arranged subview，
-        // 句子的宽度 = 容器宽度 = stack 宽度，长查询词才能被压缩出省略号。
+        // 空句与 CTA 放进一个独立容器，直接钉在 content 上：主 stack 只留 field+table。
+        // 不放进 stack 的 arranged subviews —— runner 上多一项会被分配/压成按钮宽，
+        // 空句 gap 33pt、长句 56pt（R408 的 CI 现读）；这里用固定 leading/trailing 与
+        // top=field 底+8，跨机不再依赖 NSStackView 的分配策略。
         let emptyBox = NSStackView(views: [empty, clear])
         emptyBox.orientation = .vertical
         emptyBox.spacing = 8
@@ -284,7 +293,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         emptyBox.isHidden = true
         empty.widthAnchor.constraint(equalTo: emptyBox.widthAnchor).isActive = true
 
-        let stack = NSStackView(views: [field, emptyBox, scroll])
+        let stack = NSStackView(views: [field, scroll])
         // R63 把这句话从"表格下面"挪到"表格上面"。**改的是我自己钉过的决定**（R7 的原文：
         // "空结果那一句放在表格下面而不是盖在上面：盖上去要自己算居中，而 stack 已经管好了间距与宽度"），
         // 所以理由要留在这里：那三条理由是**实现便利**，不是观感判断；而这一轮第一次把这个浮层拍出来
@@ -312,12 +321,15 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         // 而是写成 stack 自己贴边的那四个常量 —— 一条轴只有一个地方能改它。
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         content.addSubview(stack)
+        content.addSubview(emptyBox)
         NSLayoutConstraint.activate([
+            emptyBox.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            emptyBox.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
+            emptyBox.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 8),
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
-            emptyBox.widthAnchor.constraint(equalTo: stack.widthAnchor),
             // 就这四条，一条都不多写。本轮曾经给三个子视图各写"等宽 = 面板减内缩"
             // （六行）+ 两行 hugging/抗压缩，然后被变异对照逐条审：
             //   M330 撤滚动视图那两条 → 绿   M331 撤搜索框那两条 → 绿
@@ -338,12 +350,26 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         // `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 的长查询那一档。
         empty.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        let backdrop = QuickPickSearchBackdrop()
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(backdrop, positioned: .below, relativeTo: stack)
+        NSLayoutConstraint.activate([
+            backdrop.leadingAnchor.constraint(equalTo: field.leadingAnchor, constant: -8),
+            backdrop.trailingAnchor.constraint(equalTo: field.trailingAnchor, constant: 8),
+            backdrop.topAnchor.constraint(equalTo: field.topAnchor, constant: -4),
+            backdrop.bottomAnchor.constraint(equalTo: field.bottomAnchor, constant: 4),
+        ])
+        field.onHoverChange = { [weak backdrop] hovering in
+            backdrop?.hovered = hovering
+        }
+
         self.panel = panel
         self.field = field
         self.table = table
         self.emptyLabel = empty
         self.emptyAction = clear
         self.emptyBox = emptyBox
+        self.searchBackdrop = backdrop
         return panel
     }
 
@@ -867,6 +893,22 @@ final class HoverFillView: NSView {
 /// 会在主窗口打字时也跟着吃掉方向键；命中视图自己决定才是最窄的作用域。
 final class QuickPickSearchField: NSTextField {
     var forwarding: ((NSEvent) -> Bool)?
+    /// R409：悬停只用来点亮搜索框的边界，不改输入行为。
+    var onHoverChange: ((Bool) -> Void)?
+    private var tracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero,
+                                  options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { onHoverChange?(true) }
+    override func mouseExited(with event: NSEvent) { onHoverChange?(false) }
 
     /// 文本左内缩走 cell，不走约束：这颗字段是 `NSStackView` 的 arranged subview，
     /// 它的前缘已经被 stack 以 required 优先级钉死，再加一条 leading 只会与它打架
@@ -879,6 +921,28 @@ final class QuickPickSearchField: NSTextField {
     override func keyDown(with event: NSEvent) {
         if forwarding?(event) == true { return }
         super.keyDown(with: event)
+    }
+}
+
+/// R409：QuickPick 搜索框的悬停边界。主窗口 `SearchField` 有底/描边这一层，
+/// 浮层的主输入框却一直是一行裸文字；这里只在悬停时补边界，静置保持原样。
+final class QuickPickSearchBackdrop: NSView {
+    var hovered = false { didSet { if hovered != oldValue { needsDisplay = true } } }
+    /// 取证键：`nil` 才读产品 hover；`true/false` 时完全替代它。
+    var hoveredForCapture: Bool? = nil { didSet { if hoveredForCapture != oldValue { needsDisplay = true } } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard hoveredForCapture ?? hovered else { return }
+        let fill = NSColor.labelColor.withAlphaComponent(0.10)
+        let stroke = NSColor.labelColor.withAlphaComponent(0.22)
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+                                xRadius: VisualRadius.card,
+                                yRadius: VisualRadius.card)
+        fill.setFill()
+        path.fill()
+        stroke.setStroke()
+        path.lineWidth = 1
+        path.stroke()
     }
 }
 

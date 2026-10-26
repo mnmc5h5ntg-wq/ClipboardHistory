@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QuickPick 搜索框补悬停边界（静置 255/30 → 悬停 235/47.5，带变化 62.9%）；R408 CTA 布局改用 content 直钉（gap 33→8）（R409 / 第 408 轮 / Round 406 / U-1468…U-1472 · 产品 3 文件，悬停反馈位）
+
+
 ### 拖入目标补「松手加入剪贴板历史」（拖放带 0/0 → 708/797）；R407 CTA 布局回归用容器修回（gap 33→8）（R408 / 第 407 轮 / Round 405 / U-1463…U-1467 · 产品 2 文件，拖放反馈位）
 
 

@@ -8779,3 +8779,5 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 437 追记（R407 · 仍开）：本轮补的是浮层空态 CTA；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
 
 437 追记（R408 · 仍开）：本轮补的是拖放反馈与空态 CTA 布局；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+437 追记（R409 · 仍开）：本轮补的是 QuickPick 搜索框悬停边界与空态布局；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。

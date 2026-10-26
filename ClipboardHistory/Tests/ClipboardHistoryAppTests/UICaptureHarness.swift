@@ -2759,6 +2759,109 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
     }
 
+    /// R409：主输入框静置有边界，悬停时边界/填充抬一档。
+    func testQuickPickSearchFieldHoverLiftsItsChrome() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r409-search-chrome-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-list" }),
+                  let hoverFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-search-hover" }) else {
+                return XCTFail("\(tag)：idle/hover 两帧缺一张 ⇒ 像素判据没有对象")
+            }
+            let idleFile = scratch.appendingPathComponent("idle-\(tag).png")
+            let hoverFile = scratch.appendingPathComponent("hover-\(tag).png")
+            _ = try render(idleFixture, appearance: appearance, to: idleFile)
+            _ = try render(hoverFixture, appearance: appearance, to: hoverFile)
+            guard let id = try? Data(contentsOf: idleFile),
+                  let ir = NSBitmapImageRep(data: id), let idle = ir.bitmapData,
+                  let hd = try? Data(contentsOf: hoverFile),
+                  let hr = NSBitmapImageRep(data: hd), let hover = hr.bitmapData,
+                  ir.pixelsWide == hr.pixelsWide, ir.pixelsHigh == hr.pixelsHigh else {
+                return XCTFail("\(tag)：两帧读不回来或尺寸不一致 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(ir.pixelsWide) / 420.0
+            func meanLuma(_ bytes: UnsafeMutablePointer<UInt8>, rect: CGRect, bpr: Int, spp: Int) -> Double {
+                let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+                let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+                var sum = 0.0, n = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let o = y * bpr + x * spp
+                        sum += (Double(bytes[o]) + Double(bytes[o + 1]) + Double(bytes[o + 2])) / 3.0
+                        n += 1
+                    }
+                }
+                return n > 0 ? sum / Double(n) : -1
+            }
+            let fillRect = CGRect(x: 300, y: 12, width: 100, height: 28)
+            let outside = CGRect(x: 300, y: 60, width: 100, height: 20)
+            let idleMean = meanLuma(idle, rect: fillRect, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
+            let hoverMean = meanLuma(hover, rect: fillRect, bpr: hr.bytesPerRow, spp: hr.samplesPerPixel)
+            let outsideMean = meanLuma(idle, rect: outside, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
+            let x0 = Int(10 * scale), x1 = Int(410 * scale)
+            let y0 = Int(10 * scale), y1 = Int(45 * scale)
+            var changed = 0, total = 0
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * ir.bytesPerRow + x * ir.samplesPerPixel
+                    let d = max(abs(Int(idle[o]) - Int(hover[o])),
+                                max(abs(Int(idle[o + 1]) - Int(hover[o + 1])),
+                                    abs(Int(idle[o + 2]) - Int(hover[o + 2]))))
+                    if d > 5 { changed += 1 }
+                    total += 1
+                }
+            }
+            let fraction = total > 0 ? Double(changed) / Double(total) : 0
+            emit("QUICKPICK_SEARCH_CHROME \(tag) 静置均值=\(String(format: "%.1f", idleMean))"
+                 + " 悬停均值=\(String(format: "%.1f", hoverMean))"
+                 + " 框外均值=\(String(format: "%.1f", outsideMean))"
+                 + " 变化=\(changed)/\(total) 比例=\(String(format: "%.3f", fraction))")
+            XCTAssertGreaterThan(abs(hoverMean - outsideMean), 3,
+                                 "\(tag)：悬停框内与框外均值只差 \(String(format: "%.1f", abs(hoverMean - outsideMean)))"
+                                 + " ⇒ 悬停边界没画出来")
+            XCTAssertGreaterThan(abs(idleMean - hoverMean), 5,
+                                 "\(tag)：静置与悬停框内均值只差 \(String(format: "%.1f", abs(idleMean - hoverMean)))"
+                                 + " ⇒ 悬停没有抬边界/填充")
+            XCTAssertGreaterThan(fraction, 0.01,
+                                 "\(tag)：静置/悬停框带变化只有 \(String(format: "%.1f", fraction * 100))% ⇒ 两档太接近")
+        }
+    }
+
+    /// R409：QuickPick 主输入框的悬停/焦点边界必须真的接到产品面板上。
+    func testQuickPickSearchHoverSeamReachesTheBackdrop() throws {
+        _ = NSApplication.shared
+        let build = QuickPickCapturePanel.builder(store: makePopulatedStore(), query: "",
+                                                  searchHovered: true)
+        guard let panel = build(), let content = panel.contentView else {
+            return XCTFail("浮层建不出来 ⇒ 这条判据没有对象")
+        }
+        guard let backdrop = Self.firstView(ofType: QuickPickSearchBackdrop.self, in: content) else {
+            return XCTFail("面板里没有搜索框边界视图 ⇒ 悬停/焦点这一档没有对象")
+        }
+        XCTAssertEqual(backdrop.hoveredForCapture, true,
+                       "取证键写了 searchHovered=true，但 backdrop 仍是静置态 ⇒ 状态没进产品视图")
+        panel.orderOut(nil)
+        let idleBuild = QuickPickCapturePanel.builder(store: makePopulatedStore(), query: "",
+                                                      searchHovered: false)
+        guard let idlePanel = idleBuild(), let idleContent = idlePanel.contentView,
+              let idleBackdrop = Self.firstView(ofType: QuickPickSearchBackdrop.self, in: idleContent) else {
+            return XCTFail("静置面板里没有搜索框边界视图 ⇒ 负对照没有对象")
+        }
+        XCTAssertEqual(idleBackdrop.hoveredForCapture, false, "静置捕获帧被写成了悬停态")
+        idlePanel.orderOut(nil)
+        let source = Self.codeOnly(try productSource(named: "Managers/QuickPickController.swift"))
+        XCTAssertTrue(source.contains("QuickPickSearchBackdrop"),
+                      "搜索框边界视图被删了")
+        XCTAssertTrue(source.contains("field.onHoverChange"),
+                      "真实 hover 没有接到边界视图")
+    }
+
     /// R408：拖放目标必须说清“松手会发生什么”，不只画一圈虚线。
     ///
     /// 两帧同尺寸：`sidebar-drop-target` 是产品视图 + 取证键；`sidebar-history` 是不带
@@ -5288,6 +5391,10 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-hover", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", hoveredRow: 3)))
+        // R409：主输入框的悬停/焦点边界。产品路径由真实 hover/焦点供，这颗键只给夹具。
+        results.append(Fixture("quickpick-search-hover", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", searchHovered: true)))
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -16396,14 +16503,16 @@ final class UICaptureTests: XCTestCase {
         /// 而产品侧走的是**与鼠标同一条赋值**（`QuickPickRowView.setHoveredForCapture`）。
         /// 默认 `nil` ⇒ 其余浮层帧逐字节不变，这是它们能继续当基线的前提。
         static func builder(store: HistoryStore, query: String,
-                            hoveredRow: Int? = nil) -> @MainActor () -> NSWindow? {
+                            hoveredRow: Int? = nil,
+                            searchHovered: Bool = false) -> @MainActor () -> NSWindow? {
             var kept: QuickPickController?
             return {
                 if kept == nil {
                     kept = QuickPickController(historyStore: { store }, commit: { _ in })
                 }
                 guard let controller = kept else { return nil }
-                return controller.windowForCapture(query: query, hoveredRow: hoveredRow)
+                return controller.windowForCapture(query: query, hoveredRow: hoveredRow,
+                                                   searchHovered: searchHovered)
             }
         }
     }

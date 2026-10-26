@@ -7501,3 +7501,9 @@ R407 现读：QuickPick 空结果态只有一句“按 Esc 清空”，而主窗
 R408 现读：拖入时只有虚线框/光，没有一句“松手会发生什么”。新增 `dropTargetedForCapture` 取证键 + 底部「松手加入剪贴板历史」；无拖放帧同带 0/0，拖放帧 708/797，列表校准 6838/7256；M1057/M1058 双 CAUGHT。⓪ `40332222297` 的 2 个失败步骤（`Swift tests` + `Capture gate`）都来自同一测试：R407 把 CTA 作为主栈第三项，runner 上空句 gap 33pt、长句宽 56pt；收进 `emptyBox` 后本机 gap 8、长句 400，R406 的 visibleRect 守卫不再红。
 **Why**：拖放只画边界回答“这里能放”，没有回答“松手后会发生什么”；而给空态加 CTA 时把它塞进主栈会增加一个 arranged subview，改变既有槽位几何——修一个空态不该重排整个浮层。
 **How to apply**：① 拖放目标给可见下一步文案，并让文案与边框同属一个绘制判定；② 给既有 stack 加控件时先收进一个容器，容器只占原来的那一格，再量 gap/压缩；③ 复用视图/跨机断言读被观察视图自己的可见原点；④ 源与像素各配一刀，红得对连失败消息一起核。
+
+### D-401（409）主输入框要有悬停边界；跨机布局不要依赖 NSStackView 的分配
+
+R409 现读：QuickPick 主输入框是一行裸文字，和主窗口 `SearchField` 不是一套语言。新增 `QuickPickSearchBackdrop` + 真实 hover tracking，只在悬停时画圆角边界/淡填充；静置/焦点保持原样。框内均值静置 255.0/30.0 → 悬停 235.0/47.5，框带变化 62.9%；M1059/M1060 双 CAUGHT。⓪ `40340793989` 的 2 个失败步骤（Swift tests + Capture gate）同源于 R408 的 emptyBox 仍在主 stack：runner gap 33>24、长句 56>44；改成 emptyBox 直钉 content（top=field 底+8）后本机 gap 8、长句 400。
+**Why**：主输入没有边界与悬停反馈，用户不知道这一行是控件；而给既有 stack 加第二个容器会改变分配策略，runner 的字体/布局差异把本机绿变成跨机红。悬停-only 还避免把焦点/幻影选中的旧读数污染。
+**How to apply**：① 主输入框至少要有可识别的边界，悬停再抬一档；② 需要和既有 stack 并存的浮层（空态、提示）直接钉 content，不塞进 arranged subviews；③ 跨机断言读被观察视图自己的量（均值/带变化），不读容器分配常数；④ 真实 hover 与离屏 alpha 中间帧读不到就具名 NOT-RUN，不拿合成帧当产品。
