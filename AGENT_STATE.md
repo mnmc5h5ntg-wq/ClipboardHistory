@@ -22,11 +22,11 @@
 ③ 判据：新增帧级 `RECORDER_FRAME_RING`（差集/录制侧蓝/静置蓝/平涂 NOT-RUN）；组件入口 2924 仍绿。
 ④ 436：无新 runner 读数，本地 5 臂复现仍成立；不关单、不猜 must_judge。
 ⑤ 367：hidden 表 233 / 可判 820 / rot 0 / 上界 0；预检 146/129/402/0。
-⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、2 张录制帧更新并复验 0；换装 ok；清账表 162=162。
+⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、2 张录制帧更新并复验 0；换装 ok；清账表 162=162；电池 `Ran 683 / OK (skipped=4)`。
 
 验证读数（现读）：`RECORDER_FRAME_RING` 亮 变化 `4097` / 蓝 `1794` / 静置 `0`，暗 `4245` / `1780` / `0`；`RECORDER_ENTRY … 静置高色度=0 点击后高色度=2924`；`RECORDER_OVERLAY_SETTLE waited_ms=313/315`；帧差分 `180 同 / 2 变`；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=20（R392 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R391 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑；⑤ 录制圈的 **淡入过程**仍未进胶片（只签端态；解 `button.layer` 等待之后整页帧能拍到端态）。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=22（R392 主笔 + 本追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R391 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑；⑤ 录制圈的 **淡入过程**仍未进胶片（只签端态；解 `button.layer` 等待之后整页帧能拍到端态）。
 
 下一轮（R393）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R392 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位（本轮产品 0 文件，下一轮必须落 Sources）。
 
