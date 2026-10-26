@@ -17,7 +17,7 @@
 最后更新：2026-10-26（本地 · R388 / 第 387 轮 / Round 385）：R387 的 wrapper `.opacity(0.55/0.70)` 会把禁用标签连同底色压暗；把 WCAG 对比尺接到两态帧后，改前那版亮档读到 1.88 / 1.98（中转读数，未入基线）。产品改成 `ResetDefaultButtonStyle`（`PressableStyle.swift`）：`@Environment(\.isEnabled)` 驱动 `primary ↔ secondary` 与 `primary.opacity(0.08/0.035)`，`.selection` 过渡挂在 `isEnabled` 上，按下仍 0.98；快捷键页与权重页共用。现读亮档禁用 **2.77** / 动过 **5.48**，暗档禁用 **4.21** / 动过 **8.06**；`M1019`（secondary→tertiary）被 2.2 地板抓住，`M1016`/`M1017` 删样式都 CAUGHT。胶片复验：2x `帧数=27 过渡帧数=3 峰值=0.0123`、1x `帧数=27 过渡帧数=4 峰值=0.0181`（声明 120ms），通用场景 `过渡帧数=3`；端态 182 帧 `same=168 changed=14`，帧基线 `COMPARED=182 CHANGED=0`。`swift build --build-tests` 告警 **0**；全量 `Executed 1038 tests, with 49 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；预检 `tables=142 covered=125 arms=395 bad=0`、全仓 235 文件 / 879 把；`HIDDEN_ARMS … rot=0 上界=0 处置=ok`；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 387` 的 streak，口径差一仍挂 BACKLOG 412）。
 
 本轮做了什么：
-① ⓪ 网络：第 1 次同形探测 `api=000` / `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；未推送，CI 多跑未读。
+① ⓪ 网络：两次同形探测（改代码前与提交后 08:40）都是 `api=000` / `apple=200` ⇒ GitHub 侧仍断，`PUSH_BLOCKED=network`；未推送，CI 多跑未读。
 ② 产品位：R387 的 0.55/0.70 opacity 让禁用标签不可读；改成自绘状态样式，亮/暗两档都过 2.2；两颗按钮共用。
 ③ 判据：对比地板 + 两态墨差 + 样式源守卫；M1019/M1016/M1017 CAUGHT。
 ④ 胶片：2x/1x 各 ≥2 帧；端态 14 张变化只在按钮相关的行内区域；帧基线 182/0。
@@ -26,7 +26,7 @@
 
 验证读数（现读）：`WEIGHTS_RESET_STATE` 亮 禁用 `2.77` / 动过 `5.48`、暗 禁用 `4.21` / 动过 `8.06`；`RESET_FADE_SCALE` 2x `27/3/0.0123`、1x `27/4/0.0181`；`M1019`、`M1016/M1017` 都 CAUGHT；r77 `抓到=10 逃掉=0`；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：`api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=9（R388 主笔后，追记前的数）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387 本地三笔的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ 胶片采样臂在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（49 skip 的一部分），本轮的 2x/1x 读数来自单独开的 motion 卷。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：改前探测与提交后 08:40 的第 2 次同形探测都是 `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=11（R388 主笔 + 两笔追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387 本地三笔的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ 胶片采样臂在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（49 skip 的一部分），本轮的 2x/1x 读数来自单独开的 motion 卷。
 
 下一轮（R389）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387/R388 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R388 的样式若要再验，跑 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 `testResetFadeSamplerReadsBothScales`。
 
