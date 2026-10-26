@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R416 状态（2026-10-27 · 本地 · 第 415 轮 / Round 413）：复制回执补文字胶囊（回执带旧 0/0 → 已复制 8792/0、失败 9936/355）；R415 run 全绿 → 设置 8 红消失（2 条具名能力 skip）、焦点 236.1/217.6、滚动 reduce=true override=false（产品 1 文件，复制回执位）
+
+最后更新：2026-10-27（本地 · R416 / 第 415 轮 / Round 413）：复制成功/失败以前只换第三颗按钮的图标（R394 给了失败红），窄药丸里没有一句人话。新 `CopyReceiptPresentation`（失败优先真值表）+ `CopyReceiptView`（图标 + 「已复制」/「复制失败」的玻璃胶囊）挂在药丸上方外侧，`.emphasis` 驱动 opacity+move(bottom) 过渡，`fixedSize` 防折行，`allowsHitTesting(false)`。真看图亮/暗三态：静置无回执，成功白勾、失败红感叹号；同带旧 **0/0** → 亮 **8792/0、9936/355**；暗 **5257/0、6094/356**。新增 6 帧、既有 200 帧逐字节不变、基线 **206/0/0/0**。胶片出现 2x 27/6/0.0800、1x 27/4/0.0889；消失 2x 27/7/0.0429、1x 27/6/0.0889。`M1084–M1087` **4/4 CAUGHT**（M1084 三态全 0/0），RESTORE_CLEAN=yes。R415 run `40416557136 ↔ 7d8a0b7` **success**、失败步骤 **0 个**（21/21 step success）：**R414 的 8 条设置内容红消失**（probes/disabled passed；rowtier 走 `ROWTIER_NOT_RUN light`、card 走 `CARD_RHYTHM_SHADE_NOT_RUN=1` 两条具名能力 skip）；**焦点 runner 读数** 亮 236.1/217.6/207.6、暗 50.1/66.3/84.2；**滚动** `SCROLL_REVEAL_PLAN reduce=true override=Optional(false)`、6 采样/2 中间值/首 365/末 1430、OFFSET 0→457→1430、INSTANT 50→50。全量 **1100/54/0**；捕获 **206/124/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 259/878 rot=0；预检 172/154/460 bad=0；产品面连续零改动 **1** 轮（as-of 415，现读 `python3 scripts/product_streak.py --streak-for 415`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R415 runner 全绿：失败步骤 0；8 条设置内容红消失（2 passed + 2 条具名能力 skip）；焦点亮 236.1/217.6/207.6；滚动 reduce=true override=false、6/2/365→1430。
+② 产品：详情区复制回执补文字胶囊，旧 0/0 → 新亮 8792/0、9936/355（暗 5257/0、6094/356），新增 6 帧。
+③ 判据：纯真值表 + 源 5 条 + 像素三态 + 胶片；M1084–M1087 4/4 CAUGHT；precheck 172/154/460/0；hidden rot 0。
+④ 436：judged=5/5、REDS=0、OK=5/5、notice-banner 放行；UNLISTED 通道缺行记 NOT-RUN。
+⑤ 367：hidden 表 259 / 可判 878 / rot 0 / 上界 0；ARM 265 文件 / 944 把。
+⑥ 全量 1100/54/0；捕获 206/124/4/0；换装 ok；清账 162=162；帧基线 206/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① runner 的真在屏 `REVEAL`/`INTAKE_READING` 通道没有行（On-screen 步看门狗 240s 收掉、R3-D9 已知边界；本地绿）；② `MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 通道缺行；③ 产品 NSTableView 滚动中段像素帧 `table-lazy-rows`；④ 回执只有组件帧与胶片作证，真机整窗与失败触发面仍缺（442）；⑤ 亮档真机腿仍没跑；⑥ macOS 12 紧凑详情头仍走旧截断；⑦ 设置内容帧能力闸门仍隐式（441）；⑧ 437/438/439/440/441/442 仍开；⑨ R416 新跑待 push 后读。
+
+下一轮（R417）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R416 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看回执 6 帧在 runner 上是否仍绿、新增 `COPY_RECEIPT_TOAST` 是否有行。① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R415 状态（2026-10-27 · 本地 · 第 414 轮 / Round 412）：QuickPick 搜索框补焦点边界（静置 255/30 → 焦点 235/47.5）；R414 run 的设置内容红由撤 settle 修、R413 滚动两红已绿（reduce=true）（产品 1 文件，面板搜索焦点位）
 
 最后更新：2026-10-27（本地 · R415 / 第 414 轮 / Round 412）：QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打开字段就是第一响应者，焦点没有可见边界。新增 `QuickPickSearchField` 的 `become/resignFirstResponder` → `onFocusChange`；`QuickPickSearchBackdrop` 的 `focused/focusedForCapture`；`show()` 只在 `makeFirstResponder(field)` 成功时点亮、`hide()` 收回；夹具 `windowForCapture(searchFocused:)`。真看图：静置裸文字，焦点/悬停同档圆角底与描边；同带静置 **255.0/30.0** → 焦点 **235.0/47.5**，框外 194.3/94.7。新增 `quickpick-search-focus` 亮暗 2 帧；既有 198 帧逐字节不变；基线 **200/0/0/0**。`M1080–M1083` **4/4 CAUGHT**；焦点改动把 R409 `M1060` 与 R76 `M399` 两张旧表弄空，已重钉并整表重跑 **2/2**、**5/5 CAUGHT**，HIDDEN rot 1→0。R414 run `40408685273 ↔ 65514d4` failure：失败步骤 2 个（Swift tests + Capture gate）；**R412 两红消失**；**R413 滚动两红已绿**（`SCROLL_REVEAL_PLAN reduce=true override=false`、首=199/末=1430/2 中间值）；新红 8 条全在 settings 内容帧，成因是 R414 整页 settings 夹具的 0.1s settle 让 runner 帧落在 vibrant/contentFade 中段；撤 settle 后本地 200 帧逐字节不变。胶囊组件在 runner 1x 33.5/49.5/65.5（2x 35.8/51.2/67.5）。全量 **1096/53/0**；捕获 **200/123/4/0**、final3 200/0；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 258/874 rot=0；预检 171/153/456 bad=0；产品面连续零改动 **1** 轮（as-of 414，现读 `python3 scripts/product_streak.py --streak-for 414`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

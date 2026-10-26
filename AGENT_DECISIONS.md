@@ -7578,3 +7578,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：0.1s 既不够过 contentFade（0.16），又足以让 runner 的设置内容不再全空白；同一条 settle 既没帮上胶囊（PreferenceKey 当次布局已回填），又把隐式能力闸门打破。不新增/放宽任何判据阈值。
 - 兼容性/迁移：只改测试夹具；产品与帧内容不变。
 - 回滚：恢复 0.1s settle 即可；或 `git revert` 本轮提交。
+
+## D-411 复制回执用一颗药丸外的文字胶囊，失败优先（R416）
+
+- 背景：复制成功/失败只换第三颗按钮的图标与 help 文案（R394 给了失败红）；药丸本体只有约 64pt 宽，把「已复制」塞进去会被折成竖排（R416 首拍真折过）。用户要盯住 14pt 符号才知道刚才复制成了没有。
+- 决定：`CopyReceiptPresentation.receipt(copyConfirmed:copyFailed:)` 把两态压成一句话，失败优先（真值表把两态同真写成会红的规矩：`showCopyFailure` 会先清 `copyConfirmed`，但规矩不靠调用方记得）；`CopyReceiptView` 挂在药丸上方外侧的 overlay，图标 + 人话，`.emphasis` 驱动 opacity + move(bottom) 过渡，`.fixedSize` 防折行，`allowsHitTesting(false)`；overlay 不参与药丸布局 ⇒ 静置帧与旧帧逐字节相同。
+- 理由：回执是「刚才发生了什么」的短暂陈述，需要药丸之外自己的位置；失败优先把「不能把失败说成已复制」写成会红的一格；挂在 overlay 上让既有 200 帧零变化，不把新说明塞进药丸的布局预算。
+- 兼容性/迁移：仅详情区药丸；`GlassPill` 的入参已有 `copyConfirmed/copyFailed`，无新增产品状态；既有帧不变。
+- 回滚：删 `CopyReceiptPresentation`/`CopyReceiptView` 与 GlassPill 的 receipt overlay 即可；或 `git revert` 本轮提交。
+

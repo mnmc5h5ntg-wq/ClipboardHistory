@@ -1,5 +1,5 @@
 {
-  "count": 200,
+  "count": 206,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -65,6 +65,12 @@
     "empty-state-320x160-light.png": "bc05ceb5cc29efec743f8ac56b7ae4e575d09f2df6e11ec43c798016b655500b",
     "glass-pill-120x232-dark.png": "b340728988510dae8ae31877cf1b24df406303fda1bb5e28a9c105dd26810200",
     "glass-pill-120x232-light.png": "1e4315c341fa488b30e242eeb878b8530ea1c010351c6b4f91e71395cb3ea789",
+    "glass-pill-copy-receipt-confirmed-120x300-dark.png": "ea9fbc3eef451ab68c060a5baca713feb4691d307683f171f35fd4e2e7b73832",
+    "glass-pill-copy-receipt-confirmed-120x300-light.png": "6580a9497c2ee64369f7414dea83935026458b6637cc60e93c5b4ba95101435b",
+    "glass-pill-copy-receipt-failed-120x300-dark.png": "82557c20e00e89c12f53fbb1362c2f5db413675138f8090898c59d552a850a59",
+    "glass-pill-copy-receipt-failed-120x300-light.png": "f3cde3fa0f58f4a1e8468acbfd86da2d6afae331d2ae71fadc91773ed3059e50",
+    "glass-pill-copy-receipt-idle-120x300-dark.png": "af5a68e92a726cd1fbabfda6981e8870e428929546e19cb2152ac7e0d587d0a1",
+    "glass-pill-copy-receipt-idle-120x300-light.png": "b8af0dd5a59b8620b76829de176b41ca32ba89f04857be9f277b8ba388049e62",
     "glass-pill-hover-120x232-dark.png": "1e9cd9ce74e41118df8d2d16209014a2189d79a18d46347146b594281ad55930",
     "glass-pill-hover-120x232-light.png": "354bd9b348ec04d9179839bda718fbf8da8fe4ab774b61bde29ea01507dcc3e8",
     "glass-pill-states-120x232-dark.png": "c683867ad5ef63cb1e00d79faab6b8d4ae45245909cb8239e6231860ca1d84c8",

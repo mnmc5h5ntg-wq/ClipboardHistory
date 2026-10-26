@@ -8808,3 +8808,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **441. settings 内容帧在 runner 上的能力闸门是隐式的（空白才 skip），一条 settle 就能把它打破**（R415 读 `40408685273`）
     现象：R414 给整页 settings 夹具加 0.1s settle 后，runner 1x 的设置帧从空白变成 vibrant/半绘制，`testProbesDoNotSitOnVibrantColumns`/`testRowTierProfile...`/`testSettingsCardVerticalRhythm...`/`testDisabledToggle...` 8 条一起红；撤 settle 即恢复。此前"这台机器画不出设置页"是靠**恰好空白**被 skip 的，而不是一条显式能力出口。
     修法（下一轮）：给 settings 内容帧一条显式能力闸门（读内容列墨/未绘制比例，和 `CAPTURE_CAPABILITY` 同口径），机器画不出时打具名 NOT-RUN；不要让夹具的等待时长决定判据跑不跑。
+
+437 追记（R416 · 仍开）：本轮补的是详情区复制回执文字胶囊与 R415 runner 签收；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+**442. 复制回执只有组件帧与胶片作证：真机整窗没有一张带回执的帧，失败路径也没有产品内可触发面**（R416 观察）
+    现象：回执的三态像素读数来自 `glass-pill-copy-receipt-*` 组件夹具（120×300），过程来自 `MotionFilmstripTests` 的专用场景；详情区真机面板上没有抓过一张带回执的整窗帧。失败路径只在剪贴板写入失败时出现，产品里没有可点的入口（夹具直接设 `copyFailed`）。
+    修法（下一轮若需要）：① 给详情区加一张带回执的整窗捕获帧（组合状态，用 `copyConfirmed/copyFailed` 的取证键）；② 给失败路径一个测试专用注入点（或构造一个写入必失败的 pasteboard stub），让失败回执也能从产品入口走到；不要在正包装面里放一个「制造失败」的按钮。
+

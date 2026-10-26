@@ -2467,6 +2467,32 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R416：复制回执文字的出现与消失都必须在 2×/1× 读到 ≥2 个过渡帧。
+    /// 只拍药丸上方那条带；场景不进 `Scenario.all()`（不改 motion floor 的臂名单）。
+    func testCopyReceiptAppearsAndDismissesWithAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scenarioFactory in [Scenario.copyReceiptAppear, Scenario.copyReceiptDismiss] {
+            for scale in [2.0, 1.0] {
+                // 每个倍率新建场景：driver 是场景私有的，跑到 1x 时上一次已经 toggle 过了。
+                let scenario = scenarioFactory()
+                let film = record(scenario, scale: scale)
+                let frames = film.motionFrames
+                let fractions = Self.deltas(frames)
+                let span = Self.transitionFrameCount(fractions)
+                let peak = fractions.max() ?? 0
+                writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+                emit("COPY_RECEIPT_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
+                     + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
+                     + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+                XCTAssertGreaterThan(frames.count, 4,
+                                     "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+                XCTAssertGreaterThanOrEqual(span, 2,
+                                            "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 回执是硬切；"
+                                                + "先查回执带是否装在药丸上方、`.transition`/`.animation(value:)` 是否还在")
+            }
+        }
+    }
+
     /// R400：「原文/渲染」按钮标签必须和正文一样有过渡，不能内容在演、控件名一帧硬换。
     func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
@@ -7632,6 +7658,30 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R416：复制回执文字的出现/消失驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
+    @MainActor private final class CopyReceiptDriver: ObservableObject {
+        @Published var confirmed: Bool
+
+        init(confirmed: Bool = false) {
+            self.confirmed = confirmed
+        }
+    }
+
+    private struct CopyReceiptHarness: View {
+        @ObservedObject var driver: CopyReceiptDriver
+
+        var body: some View {
+            GlassPill(isFavorite: false, favoriteAction: {},
+                      isPinned: false, pinAction: {},
+                      copyConfirmed: driver.confirmed,
+                      copyAction: {}, deleteAction: {})
+                .padding(16)
+                .padding(.bottom, 24)
+                .frame(width: 120, height: 300, alignment: .bottom)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+
     /// R400：「原文/渲染」标签切换的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
     @MainActor private final class MarkdownModeDriver: ObservableObject {
         @Published var rendered = true
@@ -7850,6 +7900,33 @@ final class MotionFilmstripTests: XCTestCase {
                     driver.failed = true
                 }
             }
+        }
+
+        /// R416：复制回执文字的出现/消失。只拍药丸上方那条带（回执就画在那里），
+        /// 触发/撤销都走 `.emphasis` 的同一档；场景不进 `Scenario.all()`。
+        @MainActor private static func copyReceiptScenario(name: String, from confirmed: Bool) -> Scenario {
+            let driver = CopyReceiptDriver(confirmed: confirmed)
+            return Scenario(name: name, size: NSSize(width: 120, height: 300),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .emphasis) * 1000,
+                     appearance: .aqua,
+                     root: { _ in AnyView(CopyReceiptHarness(driver: driver)) },
+                     captureRect: { host in
+                         let b = host.bounds
+                         let y = host.isFlipped ? 0 : b.height - 70
+                         return NSRect(x: 0, y: y, width: b.width, height: 70)
+                     }) { _ in
+                withAnimation(MotionCatalog.animation(for: .emphasis)) {
+                    driver.confirmed.toggle()
+                }
+            }
+        }
+
+        @MainActor static func copyReceiptAppear() -> Scenario {
+            copyReceiptScenario(name: "glass-pill-copy-receipt-appear", from: false)
+        }
+
+        @MainActor static func copyReceiptDismiss() -> Scenario {
+            copyReceiptScenario(name: "glass-pill-copy-receipt-dismiss", from: true)
         }
 
         /// R400：只拍「原文/渲染」这颗按钮；驱动从 rendered 切到 source。

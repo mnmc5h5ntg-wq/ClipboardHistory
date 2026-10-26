@@ -1,5 +1,62 @@
 import SwiftUI
 
+/// 复制回执的可见文字（R416）。
+///
+/// 以前成功/失败只换第三颗按钮的图标与 help 文案：用户要盯住那颗 14pt 的符号才知道
+/// "刚才到底复制了没有"；失败也只换图标（R394 补了红色，但仍是图标）。这颗小胶囊把同一句
+/// 人话放到药丸上方，出现/消失各有一档 `.emphasis` 过渡；图标仍保留，读屏仍走原来的播报。
+enum CopyReceiptPresentation {
+    enum Tone: Equatable {
+        case success
+        case failure
+    }
+
+    struct Receipt: Equatable {
+        let text: String
+        let tone: Tone
+    }
+
+    /// 失败优先：两态同时为 true 时只可能是失败路径（`showCopyFailure` 会先清 `copyConfirmed`），
+    /// 但真值表把这条写成会红的规矩，免得以后两条状态各写各的。
+    static func receipt(copyConfirmed: Bool, copyFailed: Bool) -> Receipt? {
+        if copyFailed { return Receipt(text: "复制失败", tone: .failure) }
+        if copyConfirmed { return Receipt(text: "已复制", tone: .success) }
+        return nil
+    }
+}
+
+struct CopyReceiptView: View {
+    let receipt: CopyReceiptPresentation.Receipt
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: receipt.tone == .failure ? "exclamationmark.circle" : "checkmark.circle")
+                .font(.system(size: VisualGlyph.badge, weight: .semibold))
+            Text(receipt.text)
+                .font(.system(size: VisualFont.meta, weight: .semibold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        // 药丸本体只有约 64pt 宽；回执不能跟着它折行（R416 首拍「已复制」被拆成竖排）。
+        .fixedSize(horizontal: true, vertical: false)
+        .foregroundStyle(receipt.tone == .failure
+            ? AnyShapeStyle(colorScheme == .dark
+                ? Color(red: 1.0, green: 0.62, blue: 0.58)
+                : Color(red: 0.72, green: 0.0, blue: 0.0))
+            : AnyShapeStyle(.primary))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(VisualShape.rounded(VisualRadius.control).fill(VisualMaterial.glass))
+        .overlay(
+            VisualShape.rounded(VisualRadius.control)
+                .stroke(Color.primary.opacity(VisualTint.hoverStroke),
+                        lineWidth: VisualHairline.edge)
+        )
+        .allowsHitTesting(false)
+    }
+}
+
 struct GlassPill: View {
     @Environment(\.colorScheme) private var colorScheme
     let isFavorite: Bool
@@ -18,6 +75,10 @@ struct GlassPill: View {
     var copyFailed: Bool = false
     let copyAction: () -> Void
     let deleteAction: () -> Void
+
+    private var receipt: CopyReceiptPresentation.Receipt? {
+        CopyReceiptPresentation.receipt(copyConfirmed: copyConfirmed, copyFailed: copyFailed)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -84,6 +145,16 @@ struct GlassPill: View {
         .background(VisualMaterial.glass, in: Capsule())
         .clipShape(Capsule())
         .overlay(GlassBorder(shape: Capsule()))
+        // 回执是**药丸外面的上半圈**：不参与药丸布局，所以静置帧与没有这层时逐像素相同。
+        .overlay(alignment: .top) {
+            if let receipt {
+                CopyReceiptView(receipt: receipt)
+                    .offset(y: -28)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .zIndex(1)
+            }
+        }
+        .animation(MotionCatalog.animation(for: .emphasis), value: receipt)
         // 分组合成不在这里写：`visualShadow` 按 `VisualShadow.raised` 的规定自己加 ——
         // "材质必须先合成一次再打阴影"是这条投影定义的一部分，留给调用方就一定会被漏
         // （R0 审计在视频控件那处抓到的就是漏了它）。

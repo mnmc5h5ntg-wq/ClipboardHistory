@@ -2837,6 +2837,74 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R416：复制回执文字的成功/失败两态必须真的出现在药丸上方；静置带必须为空。
+    /// 旧实现只有第三颗按钮的图标，回执带 0 → 新成功/失败带都有文字，失败还有红字。
+    func testCopyReceiptToastAppearsForSuccessAndFailure() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r416-copy-receipt-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            var reps: [String: NSBitmapImageRep] = [:]
+            for state in ["idle", "confirmed", "failed"] {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == "glass-pill-copy-receipt-\(state)" }) else {
+                    return XCTFail("\(tag)：缺 \(state) 夹具 ⇒ 这条判据没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(state)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(state) 帧读不回来")
+                }
+                reps[state] = rep
+            }
+            guard let idle = reps["idle"], let confirmed = reps["confirmed"], let failed = reps["failed"],
+                  idle.pixelsWide == confirmed.pixelsWide, idle.pixelsWide == failed.pixelsWide,
+                  idle.pixelsHigh == confirmed.pixelsHigh, idle.pixelsHigh == failed.pixelsHigh else {
+                return XCTFail("\(tag)：三帧尺寸不一致")
+            }
+            let scale = Double(idle.pixelsWide) / 120.0
+            let band = CGRect(x: 0, y: 0, width: 120, height: 70)
+            func reading(_ rep: NSBitmapImageRep) -> (ink: Int, red: Int) {
+                let x0 = Int(band.minX * scale), x1 = Int(band.maxX * scale)
+                let y0 = Int(band.minY * scale), y1 = Int(band.maxY * scale)
+                var ink = 0, red = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        guard let a = rep.colorAt(x: x, y: y), let b = idle.colorAt(x: x, y: y) else { continue }
+                        let dr = abs(a.redComponent - b.redComponent)
+                        let dg = abs(a.greenComponent - b.greenComponent)
+                        let db = abs(a.blueComponent - b.blueComponent)
+                        if dr + dg + db > 0.01 { ink += 1 }
+                        if a.redComponent > a.greenComponent + 0.12 && a.redComponent > a.blueComponent + 0.12 {
+                            red += 1
+                        }
+                    }
+                }
+                return (ink, red)
+            }
+            let idleRead = reading(idle)
+            let confirmedRead = reading(confirmed)
+            let failedRead = reading(failed)
+            emit("COPY_RECEIPT_TOAST \(tag) 静置=\(idleRead.ink)/\(idleRead.red) "
+                 + "已复制=\(confirmedRead.ink)/\(confirmedRead.red) "
+                 + "失败=\(failedRead.ink)/\(failedRead.red)")
+            XCTAssertLessThanOrEqual(idleRead.ink, 5,
+                                     "\(tag)：静置回执带已经有 \(idleRead.ink) 个墨点 ⇒ 回执在没有复制时也在画")
+            XCTAssertGreaterThan(confirmedRead.ink, 100,
+                                 "\(tag)：成功回执带只有 \(confirmedRead.ink) 个墨点 ⇒ 文字回执没画出来")
+            XCTAssertGreaterThan(failedRead.ink, 100,
+                                 "\(tag)：失败回执带只有 \(failedRead.ink) 个墨点 ⇒ 文字回执没画出来")
+            XCTAssertGreaterThan(failedRead.red, 20,
+                                 "\(tag)：失败回执没有红字/红图标（红点=\(failedRead.red)）")
+            XCTAssertEqual(confirmedRead.red, 0,
+                           "\(tag)：成功回执里读到 \(confirmedRead.red) 个红点 ⇒ 成功被画成了失败色")
+        }
+    }
+
     /// R415：焦点边界。面板一打开字段就是第一响应者，但这条状态以前没有帧可看；
     /// 与 hover 同一档视觉、不同的触发。旧的「只在悬停点亮」在这条判据下 focus=idle（红）。
     func testQuickPickSearchFieldFocusLiftsItsChrome() throws {
@@ -6010,6 +6078,45 @@ final class UICaptureTests: XCTestCase {
                           copyAction: {}, deleteAction: {})
                     .padding(16)
                     .frame(width: 120, height: 232)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+
+        // R416：复制回执的可见文字（成功/失败）第一次进帧。药丸贴底、回执在它上方的留白里；
+        // 静置帧用来证明"没有回执时这块是空的"。
+        let receiptFrame = NSSize(width: 120, height: 300)
+        results.append(Fixture("glass-pill-copy-receipt-idle", receiptFrame, contentMustFit: true) {
+            AnyView(
+                GlassPill(isFavorite: false, favoriteAction: {},
+                          isPinned: false, pinAction: {},
+                          copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .padding(.bottom, 24)
+                    .frame(width: receiptFrame.width, height: receiptFrame.height, alignment: .bottom)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        results.append(Fixture("glass-pill-copy-receipt-confirmed", receiptFrame, contentMustFit: true) {
+            AnyView(
+                GlassPill(isFavorite: false, favoriteAction: {},
+                          isPinned: false, pinAction: {},
+                          copyConfirmed: true,
+                          copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .padding(.bottom, 24)
+                    .frame(width: receiptFrame.width, height: receiptFrame.height, alignment: .bottom)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        results.append(Fixture("glass-pill-copy-receipt-failed", receiptFrame, contentMustFit: true) {
+            AnyView(
+                GlassPill(isFavorite: false, favoriteAction: {},
+                          isPinned: false, pinAction: {},
+                          copyFailed: true,
+                          copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .padding(.bottom, 24)
+                    .frame(width: receiptFrame.width, height: receiptFrame.height, alignment: .bottom)
                     .background(Color(nsColor: .windowBackgroundColor))
             )
         })

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 复制回执补文字胶囊（回执带旧 0/0 → 已复制 8792/0、失败 9936/355）；R415 run 全绿 → 设置 8 红消失（2 条具名能力 skip）、焦点 236.1/217.6、滚动 reduce=true override=false（R416 / 第 415 轮 / Round 413 / U-1503…U-1507 · 产品 1 文件，复制回执位）
+
+
 ### QuickPick 搜索框补焦点边界（静置 255/30 → 焦点 235/47.5）；R414 run 的设置内容红由撤 settle 修、R413 滚动两红已绿（reduce=true）（R415 / 第 414 轮 / Round 412 / U-1498…U-1502 · 产品 1 文件，面板搜索焦点位）
 
 
