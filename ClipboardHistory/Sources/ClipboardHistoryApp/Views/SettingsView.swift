@@ -132,7 +132,17 @@ struct SettingsView: View {
     /// 因为 `SettingsView` 在两个窗口里都会重建，不该直接持有 store。
     private let exportHistoryAction: ((URL) -> String?)?
     private let importHistoryAction: ((URL) -> String?)?
-    @State private var selectedCategory: SettingsCategory?
+    @State private var selectedCategoryState: SettingsCategory?
+    /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
+    private let categoryOverride: Binding<SettingsCategory?>?
+
+    private var selectedCategory: SettingsCategory? {
+        categoryOverride?.wrappedValue ?? selectedCategoryState
+    }
+
+    private var selectedCategoryBinding: Binding<SettingsCategory?> {
+        categoryOverride ?? $selectedCategoryState
+    }
 
     init(
         showMainWindowHotKeySettings: HotKeySettings,
@@ -148,8 +158,10 @@ struct SettingsView: View {
         clearHistoryAction: (() -> String?)? = nil,
         exportHistoryAction: ((URL) -> String?)? = nil,
         importHistoryAction: ((URL) -> String?)? = nil,
-        initialCategory: SettingsCategory? = .shortcuts
+        initialCategory: SettingsCategory? = .shortcuts,
+        categoryOverride: Binding<SettingsCategory?>? = nil
     ) {
+        self.categoryOverride = categoryOverride
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.repeatCopyHotKeySettings = repeatCopyHotKeySettings
         self.quickPickHotKeySettings = quickPickHotKeySettings
@@ -168,7 +180,7 @@ struct SettingsView: View {
         // 默认值与改动前的字面量初值一致：调用方不传就是"快捷键"页。
         // 存在的唯一理由：离屏窗口的无障碍树不会被 SwiftUI 建立，
         // 视觉验收没法用点击切分类，只能让初值可注入（见 AGENT_UI_AUDIT.md）。
-        _selectedCategory = State(initialValue: initialCategory)
+        _selectedCategoryState = State(initialValue: initialCategory)
     }
 
     private func exportHistory() {
@@ -259,7 +271,7 @@ struct SettingsView: View {
     private var settingsContent: some View {
         if #available(macOS 13, *) {
             NavigationSplitView {
-                SettingsSidebarView(selectedCategory: $selectedCategory)
+                SettingsSidebarView(selectedCategory: selectedCategoryBinding)
                     .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
                                                       ideal: SettingsViewLayout.sidebarWidth,
                                                       max: 180)
@@ -271,7 +283,7 @@ struct SettingsView: View {
                 sidebarMinWidth: SettingsViewLayout.sidebarWidth,
                 sidebarIdealWidth: SettingsViewLayout.sidebarWidth
             ) {
-                SettingsSidebarView(selectedCategory: $selectedCategory)
+                SettingsSidebarView(selectedCategory: selectedCategoryBinding)
             } detail: {
                 detailScrollView
             }

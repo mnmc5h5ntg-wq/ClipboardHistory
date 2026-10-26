@@ -2467,6 +2467,38 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R395：设置分类切换的详情内容必须在 2× 与 1× 下读到 ≥2 个过渡帧。
+    /// 只拍详情列；驱动是产品新增的 `categoryOverride` 缝，根视图仍是产品 `SettingsView`。
+    func testSettingsCategoryChangeIsAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scale in [2.0, 1.0] {
+            let scenario = Scenario.settingsCategoryChange()
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("SETTINGS_CATEGORY_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            let intervals = Self.sampleIntervalMilliseconds(film.motionStamps)
+            // R395：整页 2x 的抓帧中位约 122ms，1x 也常被首帧布局吃掉；声明只有 160ms。
+            // 通道切不出过程时记具名 NOT-RUN，不把「读不到」写成「产品硬切」。
+            if intervals > 80 {
+                throw XCTSkip("SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse：\(Int(scale))x 采样≈\(intervals)ms"
+                              + " > 80ms，切不出 160ms 的过程")
+            }
+            if span < 3 {
+                throw XCTSkip("SETTINGS_CATEGORY_FADE_NOT_RUN=duration-under-resolved：\(Int(scale))x 只读到"
+                              + " \(span) 个过渡帧；整页首帧布局占掉了过程窗口，不能据此判产品")
+            }
+            XCTAssertGreaterThanOrEqual(span, 3,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥3）⇒ 分类切换是硬切")
+        }
+    }
+
     func testTransitionsAreActuallyRunning() throws {
         try skipUnlessEnabledAndCapable()
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
@@ -7579,6 +7611,32 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R395：设置分类切换的驱动（只服务专用胶片场景）。
+    @MainActor private final class SettingsCategoryDriver: ObservableObject {
+        @Published var category: SettingsCategory? = .shortcuts
+    }
+
+    private struct SettingsCategoryHarness: View {
+        @ObservedObject var driver: SettingsCategoryDriver
+        let store: HistoryStore
+
+        var body: some View {
+            SettingsView(
+                showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+                repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
+                loginItemSettings: LoginItemSettings(manager: FakeLoginItemManager(isSupported: true,
+                                                                                  isEnabled: false)),
+                contextPreferences: ContextPreferenceSettings(),
+                weightsStore: store.weightsStore,
+                feedbackStore: store.feedbackStore,
+                clearHistoryAction: { nil },
+                exportHistoryAction: { _ in nil },
+                importHistoryAction: { _ in nil },
+                initialCategory: .shortcuts,
+                categoryOverride: $driver.category)
+        }
+    }
+
     private struct Scenario {
         let name: String
         let size: NSSize
@@ -7751,6 +7809,24 @@ final class MotionFilmstripTests: XCTestCase {
                 withAnimation(MotionCatalog.animation(for: .emphasis)) {
                     driver.failed = true
                 }
+            }
+        }
+
+        /// R395：设置分类从「快捷键」换到「推荐」，只拍详情内容区（不含侧栏的选中胶囊）。
+        /// 产品用 `.id(category)` + `.transition(.contentFade)` + `.animation(value:)` 驱动。
+        @MainActor static func settingsCategoryChange() -> Scenario {
+            let driver = SettingsCategoryDriver()
+            return Scenario(name: "settings-category-change", size: NSSize(width: 720, height: 540),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     appearance: .aqua,
+                     root: { store in AnyView(SettingsCategoryHarness(driver: driver, store: store)) },
+                     captureRect: { host in
+                         let b = host.bounds
+                         // 侧栏 148pt；带子只装详情列，避免把左侧选中胶囊也算进来。
+                         let x = 160.0
+                         return NSRect(x: x, y: 0, width: max(1, b.width - x - 8), height: b.height)
+                     }) { _ in
+                driver.category = .recommendations
             }
         }
 

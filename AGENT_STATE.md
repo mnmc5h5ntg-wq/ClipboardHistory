@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R395 状态（2026-10-26 · 本地 · 第 394 轮 / Round 392）：设置分类切换的过渡被判 NOT-RUN（2x 采样≈121ms / 1x 2 帧）；只加只读分类缝与源守卫（产品 1 文件（绑定缝），判据账）
+
+最后更新：2026-10-26（本地 · R395 / 第 394 轮 / Round 392）：设置分类切换有 `.id` + `.transition(.contentFade)` + `.animation(value:)`，但从未有整页过程读数。加只读 `categoryOverride` 缝，用产品真实 `SettingsView` 驱动 快捷键→推荐；2x 抓帧中位 **121ms**、过渡 **2** 帧，1x 过渡 **2** 帧（峰值 `0.1441`/`0.1533`，声明 160ms）。首帧/采样成本吞掉 160ms 窗口 ⇒ 按 D-385 记具名 **NOT-RUN**，不判产品硬切；试过 Group 动画、变更点 withAnimation、去 `.id`，均无变化并已回退。分类缝源守卫 + `M1032` CAUGHT；默认 182 帧 `变了=0`，帧基线 182/0。**本轮产品视觉 0 改动**，下一轮必须回产品视觉。BACKLOG 436 无新 runner 读数，仍未结案。全量 `Executed 1054 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=237 可判=826 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=150 covered=133 arms=408 bad=0`、全仓 243 文件 / 892 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 394`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；未推送。
+② 新位点：设置分类切换；2x/1x 都只有 2 个过渡帧，采样/首帧成本超过声明一半 ⇒ 具名 NOT-RUN。
+③ 产品：只加只读 `categoryOverride` 缝；试过三组视觉改法均无效，全部回退，不留未验证改动。
+④ 判据：分类缝源守卫 + M1032 CAUGHT；过渡的通道闸门写成具名 NOT-RUN。
+⑤ 367：hidden 表 237 / 可判 826 / rot 0 / 上界 0；预检 150/133/408/0。
+⑥ 验证：build 0 告警；全量 `1054/52/0`；捕获 182 帧、默认零变化；换装 ok；清账表 162=162。
+
+验证读数（现读）：`SETTINGS_CATEGORY_FADE` 2x `23/2/0.1441`、1x `27/2/0.1533`；`MOTION_GRAB` 2x 抓帧中位 `121ms`；`M1032` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=28（R395 主笔前）；② `40234023212`/`40234058148` 与 R387–R394 本地提交的 conclusion **未读**（网络）；③ **`SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse` / `duration-under-resolved`**：整页 2x 采样 121–132ms、1x 只剩 2 帧，无法判 160ms 过程；④ BACKLOG 436 的 runner motion 卷未读；⑤ 亮档真机腿仍没跑；⑥ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+
+下一轮（R396）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读三跑全部失败步骤并写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② **必须回到产品视觉并落 Sources**（本轮产品视觉 0 改动）；若要再判分类过渡，先把整页帧换成目标带宽，或给该过渡一个低成本的端态/过程通道，否则仍然 NOT-RUN。
+
 ## R394 状态（2026-10-26 · 本地 · 第 393 轮 / Round 391）：复制失败那一颗终于变红（成功 0 / 失败 145·132 颗）；胶片 2x 12 帧 / 1x 16 帧；M1029–M1031 CAUGHT（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R394 / 第 393 轮 / Round 391）：`GlassPill` 的失败态原来只把图标换成感叹号、前景仍是主色，成功/失败在颜色上完全一样。R394 给失败态上动态错误红（亮 `Color.red` / 暗 `1.0,0.48,0.44`），成功仍主色。静态现读：亮 成功红 **0** / 失败红 **145** / 失败对比 **4.57**，暗 **0** / **132** / **4.70**（控件地板 3.0；系统红暗档只有 2.69，动态红过）。胶片新场景只拍第三颗 copy 按钮：2x `帧数=27 过渡帧数=12 峰值=0.0585`、1x `27/16/0.0778`（声明 160ms），strip 逐帧看到 黑 doc → 红 doc → 红感叹号。判据：静态颜色/对比 + 两倍率胶片 + DetailView 接线；`M1029`/`M1030`/`M1031` 全 CAUGHT。**自伤**：第一版多靶表用全局 original 还原，把 GlassControls 全文写进 DetailView，构建报 `invalid redeclaration`；已 `git checkout -- DetailView.swift` 还原并拆成单靶表（D-384）。静态 182 帧 `变了=0`，帧基线 182/0；全量 `Executed 1052 tests, with 51 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=236 可判=825 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=149 covered=132 arms=407 bad=0`、全仓 242 文件 / 891 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 393`）。

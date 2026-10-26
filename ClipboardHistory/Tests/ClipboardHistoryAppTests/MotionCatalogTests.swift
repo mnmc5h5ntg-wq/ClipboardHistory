@@ -454,6 +454,19 @@ final class MotionCatalogTests: XCTestCase {
                       "GlassPill 的失败色没有走动态错误红 ⇒ 暗档会掉到 3:1 以下（R394 现读 2.69）")
     }
 
+    /// R395：分类切换的只读绑定缝必须真的接到两个侧栏构造点上；产品路径仍是 nil。
+    func testSettingsCategoryOverrideSeamIsWired() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        let uses = settings.components(separatedBy: "SettingsSidebarView(selectedCategory: selectedCategoryBinding)").count - 1
+        XCTAssertEqual(uses, 2, "两个分支（13+/12）里应各有一处用它，实得 \(uses)")
+        XCTAssertTrue(settings.contains("categoryOverride: Binding<SettingsCategory?>? = nil"),
+                      "分类缝的参数不在 ⇒ 胶片无法驱动产品真实切换")
+        XCTAssertTrue(settings.contains("categoryOverride ?? $selectedCategoryState"),
+                      "缝被绕过 ⇒ 产品永远读内部 state，测试驱动的是另一条路")
+        XCTAssertTrue(settings.contains("_selectedCategoryState = State(initialValue: initialCategory)"),
+                      "初值仍要进 state ⇒ 不传缝时行为与之前一致")
+    }
+
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。
     /// 12/13 那一档 API 不存在（编译器实测 macOS 14 起），所以断言跟着 `isSupported` 走 ——
     /// 不是把缺口判成绿，而是"这一档发不出去"这件事本身被钉住。

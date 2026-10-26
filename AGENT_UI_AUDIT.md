@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 394 轮（R395 · 2026-10-26 · U-1395…U-1399）：设置分类切换的过渡被通道判成 NOT-RUN —— 2x 采样≈121ms / 1x 只 2 帧；只加只读分类缝与源守卫（U-1395…U-1399 · 产品 1 文件（绑定缝），判据账）
+
+- **U-1395：⓪ 网络与 CI。** 12:14 `git push origin main` 被 SSH 拒（`Connection closed by 20.205.243.166 port 22`），同分钟 `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200` ⇒ GitHub 侧仍断；`PUSH_BLOCKED=network`，本地 ahead=28（R394 之后、R395 落笔前），**不写已推送**。`origin/main` 本地 ref 仍 `5c7814e`；网络不可达无法 fetch 确认远端是否被推进（push 在连接阶段失败，未用 force）。恢复后先 push、复核 ahead=0，再读 `40234023212`/`40234058148` 与 R387–R395 推送跑的全部失败步骤。
+- **U-1396：新位点 —— 设置分类切换的详情过渡。** 产品有 `.id(category)` + `.transition(.contentFade)` + `.animation(value:)`，但从未有整页帧判过过程。R395 给 `SettingsView` 加只读 `categoryOverride` 缝，用产品真实视图树驱动 快捷键→推荐；胶片只拍详情列。现读：2x `抓帧中位=121ms`、`帧数=23 过渡帧数=2 峰值=0.1441`；1x `帧数=27 过渡帧数=2 峰值=0.1533`（声明 160ms）。**这不是产品缺陷读数**：2x 首帧/采样就已超过声明的一半（121ms > 80ms），1x 也只剩 2 个过渡帧；按 D-385 记 `SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse` / `duration-under-resolved`，不把通道限制写成硬切。试过把 `.animation` 挪到 Group、在变更点 `withAnimation`、去掉 `.id`，两倍率都仍是 2 帧，已全部回退，未留未验证的产品改动。
+- **U-1397：判据与刀。** 新增 `MotionCatalogTests.testSettingsCategoryOverrideSeamIsWired`：两个侧栏构造点都走 `selectedCategoryBinding`、缝参数存在、无 override 时初值仍进 `_selectedCategoryState`；`M1032`（把缝绕过）**CAUGHT**、还原干净。**产品视觉 0 改动**：本轮只增加只读缝，不为了凑产品改动去动分类样式；下一轮必须回到产品视觉。
+- **U-1398：BACKLOG 436 处置（仍未结案）。** 无新 runner motion 读数；R390 本地完整卷 `Executed 70 tests, with 3 tests skipped and 0 failures`、`MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-` 与闸门 exit 1（UNLISTED `settings-reset-fade`）的本地复现仍成立。**不关单、不改 JSON/自测、不猜 `must_judge`**；runner 卷继续记具名 NOT-RUN。
+- **U-1399：① 367 rot 与八步。** `HIDDEN_ARMS 表=237 可判=826 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=150 covered=133 arms=408 bad=0`、全仓 243 文件 / 892 把；`M1032` CAUGHT。build **0** 告警；全量 `Executed 1054 tests, with 52 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r395_shots`，与 R394 逐张比 `变了=0`（默认路径完全不变），帧基线 `COMPARED=182 CHANGED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 394`）。
+
 ## 第 393 轮（R394 · 2026-10-26 · U-1390…U-1394）：复制失败那一颗终于变红 —— 成功 0 / 失败 145·132 颗，胶片 2x 12 帧 / 1x 16 帧；M1029–M1031 CAUGHT（U-1390…U-1394 · 产品 1 文件，动效主线）
 
 - **U-1390：⓪ 网络与 CI。** 11:36 `git push origin main` 被 SSH 拒（`Connection closed by 20.205.243.166 port 22`），同分钟 `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200` ⇒ GitHub 侧仍断；`PUSH_BLOCKED=network`，本地 ahead=28（R394 主笔 + 两笔追记），**不写已推送**。`origin/main` 本地 ref 仍 `5c7814e`；网络不可达无法 fetch 确认远端是否被推进（push 在连接阶段失败，未用 force）。恢复后先 push、复核 ahead=0，再读 `40234023212`/`40234058148` 与 R387–R394 推送跑的全部失败步骤。

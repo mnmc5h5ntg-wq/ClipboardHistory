@@ -8765,3 +8765,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     436 追记（R392 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 `judged=5/5` 与现有 4 臂登记跑闸门 exit 1（UNLISTED `settings-reset-fade`）的复现仍成立。未改 JSON/自测、未猜 `must_judge`。R392 的产品 0 文件，只修了整页录制帧的 fixture 落定等待与帧级判据，不改变 motion 卷的臂形状。
     436 追记（R393 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 `judged=5/5` 与现有 4 臂登记跑闸门 exit 1（UNLISTED `settings-reset-fade`）的复现仍成立。未改 JSON/自测、未猜 `must_judge`。R393 是详情头部视觉修复，不改 motion 卷的臂形状。
     436 追记（R394 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 `judged=5/5` 与现有 4 臂登记跑闸门 exit 1（UNLISTED `settings-reset-fade`）的复现仍成立。未改 JSON/自测、未猜 `must_judge`。R394 是复制失败反馈色，不改 motion 卷的臂形状。
+    436 追记（R395 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 judged=5/5 与现有 4 臂登记跑闸门 exit 1（UNLISTED settings-reset-fade）的复现仍成立。R395 是分类切换的通道探测（2 帧，时钟/首帧延迟不足，记 NOT-RUN）与只读绑定缝，不改 motion 卷的臂形状；不关单、不猜 must_judge。

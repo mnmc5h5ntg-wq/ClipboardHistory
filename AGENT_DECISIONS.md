@@ -7405,3 +7405,9 @@ R393 现读：600pt 窗口里完整 meta 放不下，旧的 middle 截断显示 
 R394 现读：第一版把 M1029/M1030（靶 `GlassControls.swift`）与 M1031（靶 `DetailView.swift`）放进同一张表；restore 用全局 `original`（GlassControls 全文）写回每个 path ⇒ `struct GlassPill` 被写进 DetailView，构建报 `invalid redeclaration of 'GlassPill'`。`git checkout -- DetailView.swift` 还原后，把接线刀拆成 `mutate_r394_copy_wiring.py` 单靶表，三臂全部 CAUGHT。
 **Why**：表级 `original` 是单靶表的隐含假设；第二个靶一旦出现，restore 就不再是"还原"，而是"把第一靶的全文复制到第二靶"。这类坏法在构建时才会响，但若第二个靶不是编译单元（json/md），它会安静地把账写坏。
 **How to apply**：① 一张变异表只准一个文件靶；要钉两个文件就拆两张表（R178 的老规矩，R394 又犯一次）；② restore 若必须多靶，按 path 各存原文，并在收尾断言 `被改过的文件集合 ⊆ 本表声明过的靶集合`；③ 新表登记进预检，且用标准 `MUTATIONS` 形状（lambda/自定义 main 会从静态覆盖里隐形）；④ 事故要写进台账，不把"构建替我发现"写成"流程本来就有门"。
+
+### D-385（395）整页过渡的首帧/采样成本会吞掉短过渡；分辨率不足时只能记 NOT-RUN
+
+R395 现读：设置分类切换声明 `.contentFade` 160ms；2x 抓帧中位 **{cat2_median}ms**、只读到 2 个过渡帧；1x 采样 23.4ms 但仍只有 2 帧。把 `.animation` 挪到 Group、在变更点 `withAnimation`、去掉 `.id` 都没有改变 2 帧 ⇒ 整页首帧布局/抓帧成本占掉了过程窗口，这把尺无法分辨 160ms。按规矩记 `SETTINGS_CATEGORY_FADE_NOT_RUN=clock-coarse` / `duration-under-resolved`，不判产品硬切。
+**Why**：整页帧的抓帧成本随面积走（2x 1104×1144px 中位 121–132ms），而声明的过渡只有 160ms；用这样的采样去判「有没有过程」等于用秒表量毫秒。把「读不到」写成「产品没动」会误改正确的产品（R393 的 cacheDisplay 已演过一次）。
+**How to apply**：① 先用**同一次运行**的采样间隔与首帧延迟过闸门（>0.5×声明 ⇒ NOT-RUN）；② 过渡判据优先收窄捕获带到目标元素（R57），整页帧只做端态；③ 读不到时写具名 NOT-RUN，并记录试过哪些产品改法、为何回退；④ 不为让通道好看去改产品视觉。
