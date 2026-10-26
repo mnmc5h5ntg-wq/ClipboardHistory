@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 跨视口长跳补滚动到位动画（0→203→1438；旧瞬移 0/15 中间值）；R412 录制描边 runner 红修复（纵向 0 + 强调隔离）（R413 / 第 412 轮 / Round 410 / U-1488…U-1492 · 产品 1 文件，滚动到位位）
+
+
 ### 设置快捷键行补「正在录制」行级描边（行带旧 0/0 → 新 4040/3990，邻行 0）；R411 空态句 identifier 在 runner 上生效（R412 / 第 411 轮 / Round 409 / U-1483…U-1487 · 产品 2 文件，设置行录制态位）
 
 

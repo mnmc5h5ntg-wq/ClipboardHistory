@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R413 状态（2026-10-27 · 本地 · 第 412 轮 / Round 410）：跨视口长跳补滚动到位动画（0→203→1438；旧瞬移 0/15 中间值）；R412 录制描边 runner 红修复（纵向 0 + 强调隔离）（产品 1 文件，滚动到位位）
+
+最后更新：2026-10-27（本地 · R413 / 第 412 轮 / Round 410）：旧的揭示是一次 `scrollRowToVisible` 瞬移。新 `SelectionRevealMotion.plan` 只在距离 > 一屏且非减弱动态时演 0.20s（`.slider`），instant 与 animated 共用系统最小滚动目标。真在屏抓到两版自伤：纯 bounds 动画滚到位（origin 1977）但 List 选中集 **[]**；只把系统滚动放前面、目标在物化前读会让 2191 跳 3211。最终：先系统滚 + layout + 再滚读物化后目标，回起点演到该目标，完成时再物化落点。真在屏：选中 [60]、在屏 true、origin 3211；臂3 滚开后收藏/撤收藏仍 0；drift 3143→0；intake 0→159、选中 [4]。离屏：17 采样/7 中间值，首 68、末 1438、目标 1438；慢放 0→203→1438。像素通道：静态文档 111729/148800；产品表格滚动后新行不被 cacheDisplay 画出 ⇒ 产品像素中段具名 NOT-RUN `table-lazy-rows`。R412 的 runner 红：`40385615419 ↔ 130be12` **failure**，2 个失败步骤；节奏 15/10/9、邻行 20740/0；描边纵向 −2→0，邻行隔离改判强调；本地亮 4016/3958、暗 4016/3956、邻行 0/0，基线 192/0；runner 复验等下一跑。M1070–M1075 **5/5 CAUGHT**；M1065–M1069 重跑 5/5；HIDDEN 256/866 rot=0；预检 169/151/448 bad=0；全量 **1091/53/0**（一次 Perf 瞬态 262.9/269.86ms >250，单跑 148.02ms，复跑 0；阈值未改）；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；产品面连续零改动 **1** 轮（as-of 412，现读 `python3 scripts/product_streak.py --streak-for 412`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R412 头跑 failure：2 个失败步骤，节奏 15/10/9 + 邻行 20740/0；定位为描边纵向 −2 侵入行距 + runner 整页 1 级底色；产品纵向 0、邻行改判强调，本地复验绿；第二次同码捕获四张 hash 全等。
+② 产品：跨视口长跳滚动到位动画，真在屏选中/可见/不回拉/采集揭示四格全过；离屏 7/17 中间值、末=目标。
+③ 判据：纯计划 + 源守卫 + 真 NSScrollView 行为 + 静态通道正对照 + 三探针；M1070–M1075 5/5 CAUGHT。
+④ 436：judged=5/5、REDS=0、UNLISTED 登记 ok、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 256 / 可判 866 / rot 0 / 上界 0；预检 169/151/448/0。
+⑥ 全量 1091/53/0；换装 ok；清账 162=162；帧基线 192/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① 产品 NSTableView 滚动后的中段/落点像素帧空白（`table-lazy-rows`；静态文档正对照已证明通道可拍）；② `MOTION_FLOOR_UNLISTED` 与 `SCROLL_FAILURE_COUNT` 通道本跑没有行；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断；⑤ 主列表与浮层来源搜索语言未统一（437）；⑥ 设置卡其它行族没有行级状态（438）；⑦ 离屏滚动帧通道边界记 439；⑧ R413 新跑待 push 后读；⑨ R412 runner 的节奏/邻行复验等 R413 新跑。
+
+下一轮（R414）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R413 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 R412 的 15/10/9 与 20740/0 是否在 runner 上消失、滚动动画三探针是否绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R412 状态（2026-10-27 · 本地 · 第 411 轮 / Round 409）：设置快捷键行补「正在录制」行级描边（行带旧 0/0 → 新 4040/3990，邻行 0）；R411 空态句 identifier 在 runner 上生效（产品 2 文件，设置行录制态位）
 
 最后更新：2026-10-27（本地 · R412 / 第 411 轮 / Round 409）：快捷键设置卡的录制态只亮 128×28 录音器自己那圈；三行快捷键里行标题/说明没有「这一行在吃键」的标记。修法：`HotKeyRecorderView` 增加只读 `onRecordingChange`，`HotKeySettingsRow` 录制时给整行画 1.5pt accent 圆角描边（纵向外扩 2pt、横向不扩），`.emphasis` 驱动；数值走 `SettingsRowEmphasis`。同带旧/新（x=175..480、y=224..298pt）：旧 **0/0** → 新 **4040/3990**（亮）、**4039/3979**（暗）；邻行 **0/0**；录音器环亮 1794 / 暗 1780 不回退。`settings-shortcuts-recording` 亮暗 2 帧变化；另把 R411 的 `sidebar-row-hover` 夹具补落定等待（侦察快照中间相 220.84 → **212.06**，等于已提交基线与 R411 台账的 212.1；邻行不变）—— 基线里该帧 hash 本就是最终态，已提交基线只改 recording 两帧；基线 192/0/0/0。源/纯函数/像素三守卫：跨倍率 1× 276 / 2× 1104，真实行 4834 强调 / 静置 0；M1065–M1069 **5/5 CAUGHT**（M1068 变化 4846、强调 0 ⇒ 抓可见性）。⓪ `40370566410 ↔ a8ebbaf` **success**、22 步全绿；`QUICKPICK_EMPTY_FIELD 句子长=30 其它字段=1`（旧 33/56 消失，不是改门槛）；行 hover 两守卫与 `ControlHoverLadderTests` 绿；`SCROLL_FAILURE_COUNT` 缺行记具名 NOT-RUN；sources R411/2b0ef71 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1084 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账表 162=162；`HIDDEN_ARMS 表=255 可判=861 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=168 covered=150 arms=443 bad=0`、全仓 261 文件 / 927 把；产品面连续零改动 **1** 轮（as-of 411，现读 `python3 scripts/product_streak.py --streak-for 411`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

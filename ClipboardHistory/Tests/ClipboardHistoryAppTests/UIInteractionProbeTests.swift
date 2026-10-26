@@ -638,6 +638,22 @@ final class UIInteractionProbeTests: XCTestCase {
                 RunLoop.main.run(until: Date().addingTimeInterval(0.1))
                 pumped += 0.1
             }
+            // R413：跨视口揭示现在是 0.20s 的 bounds 动画。上面等的是**选中集**（目标行一物化就到），
+            // 而"该行在可视区"要等过程走完才成立；只等选中会在中段按快门（实测 origin 768.5 / 目标 2191）。
+            // 这里再等 origin 连续两次不动（上限仍 2.0s），等的是**画面落定**，不是改产品的任何门槛。
+            var lastOrigin = originY()
+            var stable = 0
+            while pumped < 2.0 && stable < 2 {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+                pumped += 0.1
+                let current = originY()
+                if abs(current - lastOrigin) < 0.5 {
+                    stable += 1
+                } else {
+                    stable = 0
+                    lastOrigin = current
+                }
+            }
             let set = Array(table.selectedRowIndexes.sorted())
             let primary = table.selectedRow
             let storeOK = store.selectedEntryIDs == [wanted]

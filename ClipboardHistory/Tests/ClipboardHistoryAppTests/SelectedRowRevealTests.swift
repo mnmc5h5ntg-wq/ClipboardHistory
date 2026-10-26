@@ -61,8 +61,46 @@ final class SelectedRowRevealTests: XCTestCase {
                            "揭示器里出现了 \(forbidden) ⇒ 它变成选中的第二个作者了（D-1 修法③）。"
                              + "本轮实测：把行滚进视口之后 SwiftUI 自己会把选中补上，这里不需要写选中")
         }
-        XCTAssertTrue(source.contains("scrollRowToVisible"),
+        XCTAssertTrue(source.contains("setBoundsOrigin"),
                       "揭示器不再滚动了 ⇒ BACKLOG 61 的修法本体没了，回来重读正文")
+        XCTAssertTrue(source.contains("scroll.reflectScrolledClipView"),
+                      "瞬移分支改了 bounds 却没 reflect ⇒ 表格的可见行不会跟着更新")
+    }
+
+    /// R413：揭示的**运动**是模型值。跨视口才演、近步与减弱动态瞬移；时长走 `.slider`。
+    func testSelectionRevealMotionTruthTable() {
+        XCTAssertEqual(SelectionRevealMotion.plan(distance: 100, viewportHeight: 300, reduceMotion: false),
+                       .init(isAnimated: false, duration: 0),
+                       "近步也演 ⇒ 方向键连翻会变成一帧一帧的滑动，按键像粘住")
+        XCTAssertEqual(SelectionRevealMotion.plan(distance: 301, viewportHeight: 300, reduceMotion: false),
+                       .init(isAnimated: true, duration: MotionCatalog.duration(for: .slider)),
+                       "跨视口长跳没有过程 ⇒ 这一格又回到瞬移")
+        XCTAssertEqual(SelectionRevealMotion.plan(distance: 900, viewportHeight: 300, reduceMotion: true),
+                       .init(isAnimated: false, duration: 0),
+                       "减弱动态仍演 ⇒ 这一档没有降级出口")
+        XCTAssertEqual(SelectionRevealMotion.plan(distance: 900, viewportHeight: 0, reduceMotion: false),
+                       .init(isAnimated: false, duration: 0),
+                       "视口高 0 还演 ⇒ 没有可插值的距离，动画不是信息")
+        XCTAssertEqual(SelectionRevealMotion.plan(distance: 300, viewportHeight: 300, reduceMotion: false),
+                       .init(isAnimated: false, duration: 0),
+                       "门槛是严格大于：刚好一屏不算长跳")
+    }
+
+    /// 接线守卫：模型值必须真的接到 AppKit 的 bounds 动画上，且 instant 分支仍走系统最小滚动。
+    func testRevealAnimationIsWiredIntoTheRevealer() throws {
+        let source = codeOnly(try productSourceText(named: "Views/SelectedRowRevealer.swift"))
+        XCTAssertTrue(source.contains("SelectionRevealMotion.plan("),
+                      "揭示器没有问运动计划 ⇒ 上面的真值表测的是没人用的替身")
+        XCTAssertTrue(source.contains("table.scrollRowToVisible(row)"),
+                      "没有先让系统物化/选中目标行 ⇒ 纯 bounds 动画会让 List 的选中集停在空集（R413 在屏探针）")
+        XCTAssertTrue(source.contains("NSAnimationContext.runAnimationGroup"),
+                      "没有 AppKit 动画 ⇒ `isAnimated` 只是一个名字")
+        XCTAssertTrue(source.contains("clip.animator().setBoundsOrigin"),
+                      "没有把 bounds 交给 animator ⇒ 过程不会发生")
+        XCTAssertTrue(source.contains("clip.setBoundsOrigin(start)"),
+                      "动画前没有回到起点 ⇒ 中段读到的会是落点（瞬移）")
+        XCTAssertTrue(source.contains("revealDurationOverride ?? plan.duration"),
+                      "产品路径没有走计划时长 ⇒ 真值表里的 duration 不承重")
     }
 
     /// 声明守卫（与 R61 那条实测一一对应）：侧栏里不许留着"用 SwiftUI 的 scrollTo 跟随选中"这句话。

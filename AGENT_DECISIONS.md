@@ -7527,3 +7527,20 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：整行底色会把行内文字留白也读成墨，卡片节奏尺从 14.5 掉到 0.0；横向外扩会把卡片左沿第一墨列从 5 拉到 3/0。描边只落在行边界，行距、卡片内缩与节奏三条既有尺都不用改；它也与录音器那圈是同一句话的两种范围。状态不押在动画上：减弱动态只是不淡入，描边照样在。
 - 兼容性/迁移：产品调用点签名不变（回调带默认值）；`HotKeySettingsRow` 从 private 放开到 internal，只给测试搭同一棵组件帧，不扩张外部 API。
 - 回滚：删除回调、`@State isRecording` 与 `.background` 描边即可；或 `git revert` 本轮提交。产品其余行为不变。
+
+## D-405 跨视口长跳的滚动到位动画（R413）
+
+- 背景：`SelectedRowRevealer` 在选中项落在视口外时，延后一回合直接 `scrollRowToVisible`；方向键近步与几十行长跳同一条瞬移。长跳没有空间连续性，用户只看到"跳过去了"。
+- 决定：`SelectionRevealMotion.plan(distance:viewportHeight:reduceMotion:)` 只在**距离严格大于一屏**且非减弱动态时返回 animated，时长取 `MotionCatalog.duration(for: .slider)`=0.20；近步/减弱动态仍瞬移。animated 路径：先 `table.scrollRowToVisible(row)` 让 List 物化/选中目标行，`layout` 后再滚一次读**物化后的系统目标**，回起点，用 `NSAnimationContext` + `animator().setBoundsOrigin` 以 easeInOut 演到该目标；完成时 `setBoundsOrigin` + `reflectScrolledClipView` + 再 `scrollRowToVisible(row)` 物化落点。instant 路径直接调系统滚动。
+- 理由：纯 bounds 动画不会替 SwiftUI List 物化行 —— 真在屏探针读到 origin 1977、选中集 `[]`；把系统滚动放前面但不等于物化后的目标，会让 2191→3211 在末尾跳。系统滚动先做、目标在 layout 后读，选中与落点都真实；近步不演避免方向键粘滞；减弱动态不演，视口照样到目标。
+- 兼容性/迁移：只动 `SelectedRowRevealer`，不改选中作者（仍禁 `selectRowIndexes`）；`revealDurationOverride` 只给单测慢放，产品路径 nil。
+- 回滚：删 `SelectionRevealMotion` 与动画分支、恢复单一 `scrollRowToVisible` 即可；或 `git revert` 本轮提交。
+
+
+## D-406 录制行描边纵向不外扩，邻行隔离改判强调色（R413）
+
+- 背景：R412 的录制行描边在 runner 1x 上把 `settings-shortcuts-recording` 的卡片节奏读成 15/10/9（差 6.0 > 4.5），`RECORDER_ROW_EDGE` 邻行 `changed=20740` 而 `accent=0`（亮/暗同）。原文指向两件事：描边纵向 −2 侵入行距；runner 的 idle/recording 帧有整页 1 级底色差，不是描边泄漏。
+- 决定：描边 `.padding(.vertical, -2)` 改为**不外扩**（与行内容同边）；`RECORDER_ROW_EDGE` 的邻行判据从"任意变化=0"改判**强调色=0**，任意变化只作读数；补合成真值表（0.82 灰底色被忽略、强调泄漏被抓）。行带强调阈值 400、`SettingsRowEmphasis` 数值与产品调用点不变。
+- 理由：邻行 20740/0 是窗口焦点导致的整页底色，不是行级状态；隔离要认"强调"这个状态本身。描边纵向 0 不再减少行距；本地最终捕获亮 4016/3958、暗 4016/3956、邻行 0/0，节奏尺与捕获套件绿。
+- 兼容性/迁移：只改描边背景的绘制范围与一条像素判据的对象；产品状态/回调/行高不变。
+- 回滚：恢复 `.padding(.vertical, -2)` 与任意变化断言即可；或 `git revert` 本轮提交。runner 侧 15/10/9 与 20740/0 的复验在下一跑。

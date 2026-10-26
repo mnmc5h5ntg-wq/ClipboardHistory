@@ -832,6 +832,11 @@ struct SettingsView: View {
 ///（`testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` 当场读 3.0）；
 /// 纵向再多会把行距吃掉超过 4.5pt。纵向 2pt 既避开字形，又留在节奏尺的容差内。
 ///
+/// **R413 更正**：runner 1x 上纵向 −2 仍把行距从 14 压到 10/9（节奏尺 15/10/9 红），
+/// 而整页录制帧的邻行只是**1 级底色差**（邻行强调 0）不是描边泄漏。所以描边改成
+/// **纵向不外扩**（与行内容同边）：行距原样，邻行隔离由“任意变化”改判“强调色”。
+/// R412 的 `SCROLL_REVEAL`/`RECORDER_ROW_EDGE` 两条 runner 红就是这两件事。
+///
 /// 值仍然是模型值：静置恒 0（静置帧逐像素不变），录制时非 0；减弱动态只是不淡入，
 /// 描边照样在（状态不许押在动画上，沿用 `HotKeyRecorderEmphasis` 的同一条规矩）。
 enum SettingsRowEmphasis {
@@ -904,15 +909,13 @@ struct HotKeySettingsRow: View {
                 .buttonStyle(ResetDefaultButtonStyle())
                 }
             }
-            // 描边**只画在行边界上**：纵向外扩 2pt，横向不扩（横向一扩就把卡片左沿的第一墨列从 5 拉到 3，
-            // `testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` 当场读 3.0）。
-            // 底色或更大的外扩会把卡片底边/行距改写成墨（R412 首拍与二拍各红了一条布局尺）。
+            // 描边**与行内容同边**：横向不扩（一扩就把卡片左沿第一墨列从 5 拉到 3），
+            // 纵向也不外扩（R412 的 −2 在 runner 1x 把行距压成 10/9，节奏尺红）。
             .background(
                 VisualShape.rounded(VisualRadius.panel)
                     .strokeBorder(Color.accentColor.opacity(
                         SettingsRowEmphasis.recordingStrokeOpacity(isRecording: isRecording)),
                                   lineWidth: SettingsRowEmphasis.recordingStrokeWidth(isRecording: isRecording))
-                    .padding(.vertical, -2)
             )
             .animation(MotionCatalog.animation(for: .emphasis), value: isRecording)
 

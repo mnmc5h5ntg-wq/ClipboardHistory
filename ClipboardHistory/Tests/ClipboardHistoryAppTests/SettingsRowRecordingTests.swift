@@ -149,9 +149,29 @@ final class SettingsRowRecordingTests: XCTestCase {
         return rep
     }
 
+    /// 邻行隔离的尺必须分得开「整页底色差」与「真的强调描边泄漏」：
+    /// runner 1x 的 idle/recording 帧邻行 changed=100%、accent=0（窗口焦点导致的底色），
+    /// 而真的泄漏会带强调色。这条是 R412 那格 20740/0 的负对照。
+    func testNeighborIsolationIgnoresTintButSeesAccentLeak() throws {
+        let band = CGRect(x: 0, y: 0, width: 100, height: 40)
+        let idle = try syntheticFrame(scale: 2, accent: false)
+        let tint = try syntheticFrame(scale: 2, accent: false, tint: 0.82)
+        let tintRead = RecorderRowEdgeRuler.read(recording: tint, idle: idle,
+                                                 bandPoints: band, frameWidthPoints: 100)
+        XCTAssertGreaterThan(tintRead.changed, 0,
+                             "灰底色差没有被 changed 读到 ⇒ 这条负对照自己没对象")
+        XCTAssertEqual(tintRead.accentChanged, 0,
+                       "灰底色差被 accent 读成 \(tintRead.accentChanged) 颗 ⇒ 隔离判据会把焦点底色当泄漏")
+        let accent = try syntheticFrame(scale: 2, accent: true)
+        let accentRead = RecorderRowEdgeRuler.read(recording: accent, idle: idle,
+                                                   bandPoints: band, frameWidthPoints: 100)
+        XCTAssertGreaterThan(accentRead.accentChanged, 0,
+                             "真的强调描边泄漏没有被 accent 读到 ⇒ 上面那条负对照是恒真")
+    }
+
     /// 合成图的 y 坐标按 `NSBitmapImageRep.colorAt` 的读取方向直接写，
     /// 不依赖绘制上下文的翻转约定 —— 这条尺只负责读，不负责替渲染器定义坐标。
-    private func syntheticFrame(scale: Int, accent: Bool) throws -> NSBitmapImageRep {
+    private func syntheticFrame(scale: Int, accent: Bool, tint: CGFloat = 0.8) throws -> NSBitmapImageRep {
         let width = 100 * scale
         let height = 40 * scale
         let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil,
@@ -159,7 +179,7 @@ final class SettingsRowRecordingTests: XCTestCase {
                                                  bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
                                                  isPlanar: false, colorSpaceName: .deviceRGB,
                                                  bytesPerRow: 0, bitsPerPixel: 0))
-        let background = NSColor(calibratedWhite: 0.8, alpha: 1)
+        let background = NSColor(calibratedRed: tint, green: tint, blue: tint, alpha: 1)
         let blue = NSColor(calibratedRed: 0, green: 0.48, blue: 1, alpha: 1)
         let border = max(1, scale)
         for y in 0..<height {

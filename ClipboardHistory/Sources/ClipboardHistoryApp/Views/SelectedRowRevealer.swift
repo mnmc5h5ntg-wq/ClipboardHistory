@@ -32,6 +32,30 @@ enum SelectionRevealPlan {
     }
 }
 
+/// 揭示的**运动**（R413）：跨视口长跳才有过程，近步与减弱动态仍瞬移。
+///
+/// 为什么要有阈值而不是"每次都演"：方向键是一行一行走的，一次按键的位移只有一行高。
+/// 给这种零位移反馈套 0.20s 的滑动，读起来不是"移过去了"，而是"按键粘住了"。
+/// 长跳（新记录落在固定块之后、程序化选中视口外几十行）才是需要空间连续性的那一格 ——
+/// 中间帧要让眼睛看见"我从哪来"。
+///
+/// 时长取 `.slider`（0.20）而不是 `.selection`（0.12）：目录里 `.slider` 的注释写的是
+/// "位移越长，时长越要跟上，否则读起来像它跳过去了"；这一格正是位移，不是底色淡入。
+/// 判据不押在动画上：`isAnimated` 是模型值，减弱动态时只是 instant，视口照样到目标。
+enum SelectionRevealMotion {
+    struct Plan: Equatable {
+        let isAnimated: Bool
+        let duration: TimeInterval
+    }
+
+    static func plan(distance: CGFloat, viewportHeight: CGFloat, reduceMotion: Bool) -> Plan {
+        guard !reduceMotion, viewportHeight > 0, distance > viewportHeight else {
+            return Plan(isAnimated: false, duration: 0)
+        }
+        return Plan(isAnimated: true, duration: MotionCatalog.duration(for: .slider))
+    }
+}
+
 /// 挂在侧栏 `List` 上的透明宿主视图：它的唯一动作是 `scrollRowToVisible`。
 struct SelectedRowRevealer: NSViewRepresentable {
     /// **选中项的 id** —— 闸门按它判，不按行号判（见 `SelectionRevealHostView` 的注释）。
@@ -57,6 +81,10 @@ final class SelectionRevealHostView: NSView {
     /// 所以这里记的是 id：**选中变了才滚，行号漂了不滚。**
     private var lastRevealedKey: AnyHashable?
     private weak var table: NSTableView?
+    /// 每次揭示递增；动画完成回调只认自己那一代（新选中把旧回调作废）。
+    private var revealGeneration = 0
+    /// 只给单测把动画放慢到足以拍中段；产品路径恒 nil，时长仍来自 `SelectionRevealMotion`。
+    var revealDurationOverride: TimeInterval?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -73,14 +101,15 @@ final class SelectionRevealHostView: NSView {
         if key == lastRevealedKey { return }
         if table == nil { resolveTable() }
         guard let table, row >= 0, row < table.numberOfRows else { return }
-        // `scrollRowToVisible` 本身就是"最小滚动"（可见时不动），这里仍自己判一次：
-        // 判据要能被读出来（注释与日志同一件事），而且不给系统留"顺手滚半行"的空间。
+        // 已经可见 ⇒ 不动。判据要能被读出来（注释与日志同一件事）。
         if let scroll = table.enclosingScrollView,
            scroll.documentVisibleRect.intersects(table.rect(ofRow: row)) {
             lastRevealedKey = key
             return
         }
         lastRevealedKey = key
+        revealGeneration += 1
+        let generation = revealGeneration
         // **推迟一个回合再滚**，这一句是本轮实测逼出来的：
         // 在 `updateNSView` 里同步滚，视口先动、SwiftUI 的选中后落地，于是上一行（此时已被滚出视口、
         // 单元格已回收）的**取消选中没被写进表格** —— 实测读到 `selectedRowIndexes = [2, 60]`
@@ -89,7 +118,48 @@ final class SelectionRevealHostView: NSView {
         // SwiftUI 就把选中给它 —— 这条是同轮臂 3 读出来的：只滚不动选中，集合自己从 [] 变 [60]）。
         DispatchQueue.main.async { [weak self, weak table] in
             guard let self, let table, self.lastRevealedKey == key else { return }
+            guard let scroll = table.enclosingScrollView else { return }
+            let clip = scroll.contentView
+            let start = clip.bounds.origin
+            // **先让系统滚一次**：List 的选中是在目标行被物化之后补回来的（本文件开头的实测），
+            // 纯 bounds 动画不会替它物化行 —— R413 的真在屏探针就是在这里读到 origin 到位、
+            // 选中集仍是 []。这一次调用同时把「系统最小滚动」的目标量出来；随后回起点、
+            // 演到同一个目标，于是 instant 与 animated 的落点一致，选中也不会丢。
             table.scrollRowToVisible(row)
+            // List 的行高是物化后才定下来的：第一次滚只能拿到旧估计，目标会在 layout 后跳
+            // （R413 在屏：2191 → 3211）。先 layout 再滚一次，读**物化后的**系统目标。
+            table.layoutSubtreeIfNeeded()
+            table.scrollRowToVisible(row)
+            scroll.layoutSubtreeIfNeeded()
+            let target = clip.bounds.origin
+            guard abs(target.y - start.y) > 0.5 else { return }
+            let plan = SelectionRevealMotion.plan(
+                distance: abs(target.y - start.y),
+                viewportHeight: scroll.documentVisibleRect.height,
+                reduceMotion: MotionCatalog.motionShouldBeReduced)
+            guard plan.isAnimated else {
+                // 近步 / 减弱动态：系统已经落位；不重置、不演。
+                return
+            }
+            clip.setBoundsOrigin(start)
+            scroll.reflectScrolledClipView(clip)
+            let duration = self.revealDurationOverride ?? plan.duration
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = duration
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                clip.animator().setBoundsOrigin(target)
+            }, completionHandler: { [weak self, weak scroll, weak clip, weak table] in
+                // 完成回调不在主线程 ⇒ AppKit 状态回主线程改。
+                DispatchQueue.main.async {
+                    guard let self, let scroll, let clip, let table,
+                          self.revealGeneration == generation else { return }
+                    clip.setBoundsOrigin(target)
+                    scroll.reflectScrolledClipView(clip)
+                    // 动画只移动 bounds，不会替 List 物化目标行；完成时再叫一次系统滚动，
+                    // 让 row view/visibleRect 在目标处落定（R413 在屏探针：origin 到了、rect 仍为空）。
+                    table.scrollRowToVisible(row)
+                }
+            })
         }
     }
 
