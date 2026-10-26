@@ -504,6 +504,15 @@ final class MotionCatalogTests: XCTestCase {
                       "StatePresentation 没有 pane 墨档 ⇒ 空态没有可判的来源")
     }
 
+    /// R402：排除名单的「添加」在空白输入下必须禁用 —— 否则按下去只会收到一条「没加成」的回执。
+    func testAddExcludedAppButtonIsDisabledOnBlankInput() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        XCTAssertTrue(settings.contains(".disabled(newExcludedBundleID"),
+                      "空输入时「添加」仍是可点的 ⇒ 按下去只会收到一条「没加成」的回执")
+        XCTAssertTrue(settings.contains(".trimmingCharacters(in: .whitespacesAndNewlines).isEmpty"),
+                      "「添加」的禁用条件没把纯空格算成空 ⇒ 空格输入仍会得到回执")
+    }
+
     /// 详情加载态也只有这一句话：它和空态共用 pane 的 AA 墨档，不能退回 `.secondary`。
     func testDetailLoadingMessageUsesTheAAInkSeam() throws {
         let detail = codeOnly(try productSource(named: "Views/DetailPreviewViews.swift"))

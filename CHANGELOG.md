@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 空输入时「添加」可点 → 禁用（添加/移除文字亮度差 7/5 → 96/93）；R401 长正文测试的 runner band-empty 改具名 NOT-RUN（R402 / 第 401 轮 / Round 399 / U-1431…U-1435 · 产品 1 文件，交互状态位）
+
+
 ### 680/700/720 缩放下长正文仍排进浮动药丸；阈值 400→460 + 三刀（R401 / 第 400 轮 / Round 398 / U-1426…U-1430 · 产品 1 文件，窗口缩放位）
 
 

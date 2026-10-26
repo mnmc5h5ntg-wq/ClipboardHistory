@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R402 状态（2026-10-26 · 本地 · 第 401 轮 / Round 399）：空输入时「添加」可点 → 禁用（添加/移除文字亮度差 7/5 → 96/93）；R401 长正文测试的 runner band-empty 改具名 NOT-RUN（产品 1 文件，交互状态位）
+
+最后更新：2026-10-26（本地 · R402 / 第 401 轮 / Round 399）：排除名单输入框为空时，「添加」仍是启用态，按下去只会得到一条「没加成」的回执。`SettingsView` 加 `.disabled(newExcludedBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)`。同帧相对读数（「添加」vs 启用态「移除」文字）：亮档旧 **7** → 新 **96**，暗档旧 **5** → 新 **93**；四张 privacy 帧变化，基线同笔 update 后 182/0。源守卫 + `ADD_DISABLED_STATE` 像素判据；M1044/M1045 双 CAUGHT、RESTORE_CLEAN=yes。R401 三跑的 Swift/Capture 红已归因为长正文测试 `band-empty`（1x 离屏拍不出该页），R402 改成具名 `LONG_TEXT_PILL_NOT_RUN`；436 的 motion floor 现读 `judged=4/5 not-run=notice-banner`、`settings-reset-fade=2`、`REDS=0`，保持结案。全量 `Executed 1062 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=244 可判=839 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=157 covered=140 arms=421 bad=0`、全仓 250 文件 / 905 把；产品面连续零改动 **1** 轮（as-of 401，现读 `python3 scripts/product_streak.py --streak-for 401`；本轮交互状态已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R400 ed3a30d success / 41c76cc 仅 Release script 红；R401 三跑 Swift/Capture 红是长正文测试 band-empty（1x 拍不出），R402 改成具名 NOT-RUN；642e4a7 的 Release 红仍是 sources 格旧伤。
+② 交互状态：空输入「添加」启用 → 禁用；同帧添加/移除文字差 7/5 → 96/93。
+③ 判据：源禁用条件 + 同帧相对亮度像素判据；M1044/M1045 双 CAUGHT。
+④ 436：R401 run `judged=4/5`（notice-banner 放行）、`settings-reset-fade=2`、`REDS=0`，保持结案。
+⑤ 367：hidden 表 244 / 可判 839 / rot 0 / 上界 0；预检 157/140/421/0。
+⑥ 验证：build 0 告警；全量 `1062/53/0`；捕获 182 帧、4 张变化、基线 182/0；换装 ok；清账表 162=162；电池待复跑。
+
+NOT-RUN / 阻塞（分开写）：① **R402 新跑未落地**（主笔+追记一次 push 后待读）；② **R401 长正文测试在 runner 1x 仍 band-empty**（`LONG_TEXT_PILL_NOT_RUN`，本机四档照判）；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
+
+下一轮（R403）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R402 主笔+追记的 head 跑全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R401 状态（2026-10-26 · 本地 · 第 400 轮 / Round 398）：680/700/720 缩放下长正文仍排进浮动药丸；阈值 400→460 + 三刀（产品 1 文件，窗口缩放位）
 
 最后更新：2026-10-26（本地 · R401 / 第 400 轮 / Round 398）：R399 的尾距只在详情列 <400pt 施加，680/700/720 窗口的 400–440pt 详情列仍让长正文排到右下角 `GlassPill`。四档实测旧最右墨列 **529.5 / 646.5 / 674.0 / 688.0pt**（上限 `宽-80`=520/600/620/640），阈值改 **460** 后新 **479.5 / 568.0 / 590.5 / 604.5pt**（余量 40.5/32.0/29.5/35.5pt）。纯函数新增 440pt 必须 >0，像素判据改四档 600/680/700/720；M1039/M1041/M1043 三刀全 CAUGHT、RESTORE_CLEAN=yes。静态 182 帧零变化，基线复验 182/0；全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=243 可判=837 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=419 bad=0`、全仓 249 文件 / 903 把；产品面连续零改动 **1** 轮（as-of 400，现读 `python3 scripts/product_streak.py --streak-for 400`；本轮产品缩放已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

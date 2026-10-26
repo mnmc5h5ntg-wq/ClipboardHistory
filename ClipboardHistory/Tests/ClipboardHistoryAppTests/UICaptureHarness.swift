@@ -4041,6 +4041,55 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+        // R402：空输入时「添加」必须是禁用态 —— 与同帧启用态的「移除」比文字亮度：
+        // 亮档启用=近黑、禁用=灰（差 ≥20）；暗档启用=近白、禁用=灰（差仍是 ≥20）。
+        // 只读文字自己那两条带；带空写具名 NOT-RUN。
+        do {
+            func loadAddFrame(_ name: String) -> NSBitmapImageRep? {
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url) else { return nil }
+                return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+            }
+            func bandMean(_ rep: NSBitmapImageRep, x0p: Int, x1p: Int, y0p: Int, y1p: Int) -> (Int, Int) {
+                let scale = Double(rep.pixelsWide) / 720.0
+                let x0 = Int(Double(x0p) * scale), x1 = Int(Double(x1p) * scale)
+                let y0 = Int(Double(y0p) * scale), y1 = Int(Double(y1p) * scale)
+                guard let base = rep.bitmapData else { return (0, 0) }
+                var values: [Int] = []
+                for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+                    for x in x0..<min(rep.pixelsWide, x1) {
+                        let o = y * rep.bytesPerRow + x * 4
+                        values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                           + 0.0722 * Double(base[o + 2])).rounded()))
+                    }
+                }
+                var hist: [Int: Int] = [:]
+                for v in values { hist[v / 4, default: 0] += 1 }
+                let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+                let inks = values.filter { abs($0 - fill) > 40 }
+                return (fill, inks.isEmpty ? fill : inks.reduce(0, +) / inks.count)
+            }
+            for tag in ["light", "dark"] {
+                let name = "settings-privacy-excluded-720x1040-\(tag).png"
+                guard let rep = loadAddFrame(name) else {
+                    XCTFail("ADD_DISABLED_STATE_FRAME_MISSING：\(tag) 帧不在捕获目录")
+                    continue
+                }
+                let add = bandMean(rep, x0p: 455, x1p: 481, y0p: 633, y1p: 645)
+                let remove = bandMean(rep, x0p: 662, x1p: 685, y0p: 575, y1p: 590)
+                emit("ADD_DISABLED_STATE \(tag) 添加fill=\(add.0) 添加墨=\(add.1)"
+                     + " 移除fill=\(remove.0) 移除墨=\(remove.1)"
+                     + " 墨差=\(abs(add.1 - remove.1))")
+                if add.1 == add.0 || remove.1 == remove.0 {
+                    emit("ADD_DISABLED_STATE_NOT_RUN=band-empty：\(tag)")
+                    continue
+                }
+                XCTAssertGreaterThanOrEqual(abs(add.1 - remove.1), 20,
+                                            "\(tag)：空输入下「添加」与启用态「移除」的文字亮度只差 "
+                                                + "\(abs(add.1 - remove.1)) ⇒ 「添加」不是禁用态")
+            }
+        }
+
         // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，
@@ -13884,7 +13933,11 @@ final class UICaptureTests: XCTestCase {
                 }
             }
             guard ink > 0 else {
-                return XCTFail("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 的正文带里一个墨都没有")
+                // R402 CI 归因：runner 的 1x 离屏把长正文页拍成整带零墨（同一次日志里
+                // `TEXT_INK_NOT_RUN light 720=0 640=0`）⇒ 这是这台机器判不了的那一条，
+                // 记具名 NOT-RUN 而不是红；本机四档照判。
+                emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)")
+                continue
             }
             let maxPt = Double(maxX) / scale
             let limit = Double(width) - 80.0

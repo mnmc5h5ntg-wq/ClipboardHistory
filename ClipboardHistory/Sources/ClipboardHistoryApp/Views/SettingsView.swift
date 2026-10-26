@@ -546,6 +546,10 @@ struct SettingsView: View {
                                 // 没加成的时候把词留着，用户可以照着回执改。
                                 if case .added = result.outcome { newExcludedBundleID = "" }
                             }
+                            // R402：空输入按下去只会得到一条"没加成"的回执 —— 那颗按钮
+                            // 在最该不可点的时刻是可点的。空白/纯空格输入下直接禁用。
+                            .disabled(newExcludedBundleID
+                                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         }
                         if let exclusionReceipt {
                             ReceiptLine(text: exclusionReceipt) { self.exclusionReceipt = nil }
