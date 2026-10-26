@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 409 轮（R410 · 2026-10-27 · U-1473…U-1477）：菜单栏空态补「打开时间剪史」（CTA 带旧 0/0 → 新 1166/1382）；空态容器改普通 NSView、滚动守卫改读可见原点（U-1473…U-1477 · 产品 2 文件，菜单空态 CTA 位）
+
+- **U-1473：⓪ `40350180209 ↔ 83bed7a` 的失败步骤。** 失败步骤 **2 个**：`Swift tests` + `Capture gate`；红的是两件事：① `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 在 runner 上仍 gap **33>24**、长句宽 **56>44**（R409 的 emptyBox 仍是 NSStackView，runner 把它压成按钮宽）；② `DetailScrollResetTests` 读到 `afterVisible=0` 而 `topVisible=11`，守卫把初始可见原点当成了常数。修法：emptyBox 改**普通 NSView + 显式四边约束**；滚动守卫改断言“换选后可见原点 ≤1”（旧行为 2357 仍会红）。R406 的 visibleRect 思路保留，不再钉 11/0 的跨机差。sources `R409/7426d05` 一致、全量计数 92-vs-934 反向对照 ok。
+- **U-1474：② 菜单栏空态 CTA。** `menubar-empty` 只有“暂无推荐”，没有下一步。修法：空态分支加「打开时间剪史」菜单项，走产品已有的 `.showMainWindowHotKeyPressed` 通知，不另造打开窗口路径。真看图：旧帧只有消息，新帧消息下出现图标+文案。像素现读（x=120..290、y=78..102pt）：旧 **0/0** → 新 **1166/1382**（亮/暗）；消息带旧 330/347、新 910/1032。`menubar-empty` 与 `menubar-refreshing` 亮暗 **4 帧**变化（同一空态分支），基线同笔 190/0。
+- **U-1475：判据与刀。** 源守卫 `testMenuBarEmptyStateOffersOpenAppAction` 钉文案与通知通道；像素守卫 `testMenuBarEmptyStateOpenAppCTAIsVisible` 钉消息带 + CTA 带。`M1061`（源）/`M1062`（像素）双 **CAUGHT**、红得对=2、`RESTORE_CLEAN=yes`；M1053/M1054 在滚动守卫改读可见原点后重跑仍双 CAUGHT。`PressFeedbackTests` 的菜单按钮精确计数从 2 更新到 **3**（推荐项 + 收尾 + 空态 CTA），不是放宽集合。
+- **U-1476：③ 436 只读新跑。** `MOTION_FLOOR_FACTS judged=5/5 executed=73 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2 红的用例=- 汇总行报红=0`、`MOTION_FLOOR_REDS=0`、`UNLISTED_COUNT=0`；`notice-banner` 是登记放行臂，未重猜 `must_judge`，保持结案。
+- **U-1477：① 367 rot 与八步。** `HIDDEN_ARMS 表=253 可判=854 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=166 covered=148 arms=436 bad=0`、全仓 259 文件 / 920 把；`M1061/M1062` 与 M1053/M1054 全 CAUGHT。build **0** 告警；全量 `Executed 1078 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 190 -> /tmp/r410_shots2`（120 条判据 / 4 skip / 0 失败），与 R409 比 `变了=4`（menubar-empty/refreshing 亮暗），基线同笔 `UPDATED=190`、复验 `COMPARED=190 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 409；本轮已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 409`）。电池 `Ran 683 / OK (skipped=4)`。
+- **具名 NOT-RUN**：真实菜单展开/关闭仍只能人工验；离屏 alpha 动画采样不到中间帧（mid=1.0），弹层淡入不签产品结论。
+
 ## 第 408 轮（R409 · 2026-10-26 · U-1468…U-1472）：QuickPick 搜索框补悬停边界（静置 255/30 → 悬停 235/47.5，带变化 62.9%）；R408 CTA 布局改用 content 直钉（gap 33→8）（U-1468…U-1472 · 产品 3 文件，悬停反馈位）
 
 - **U-1468：⓪ `40340793989 ↔ 6bef5ab` 的失败步骤。** 失败步骤 **2 个**：`Swift tests` + `Capture gate`；同一测试 `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 两条断言：空句 gap **33pt > 24**、长句宽 **56pt > 44**。R408 的 `emptyBox` 仍在主 `NSStackView` 里，runner 上被压成按钮宽/多出 25pt；本机却过。修法：主栈只留 field+table，`emptyBox` 直接钉 content（leading/trailing 固定、top=field 底+8），跨机不再依赖 stack 分配。本机修后 gap **8**、长句 **400**。R406 的 visibleRect 守卫在这一跑仍绿。sources `R408/a642dc0` 一致、全量计数 92-vs-934 反向对照 ok。

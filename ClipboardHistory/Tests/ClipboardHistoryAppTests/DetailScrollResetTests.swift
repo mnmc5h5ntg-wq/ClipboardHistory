@@ -86,9 +86,9 @@ final class DetailScrollResetTests: XCTestCase {
                              + " 旧偏移=\(Int(before)) 换选后=\(Int(after))"
                              + " 顶部可见=\(Int(topVisible)) 换选可见=\(Int(afterVisible))"
                              + " docOrigin=\(Int(document.frame.origin.y))")
-        XCTAssertEqual(afterVisible, topVisible, accuracy: 0.5,
-                       "换选后正文可见原点是 \(Int(afterVisible))，而顶部参照是 \(Int(topVisible))"
-                       + "（clip 偏移 \(Int(topOffset))→\(Int(after))，可滚高 \(Int(maxOffset))）⇒ 新记录从中间开始读，"
-                       + "用户分不清这是新记录的开头还是旧记录的位置")
+        XCTAssertLessThanOrEqual(afterVisible, 1.0,
+                                 "换选后正文可见原点是 \(Int(afterVisible))（顶部参照 \(Int(topVisible))，"
+                                 + "clip 偏移 \(Int(topOffset))→\(Int(after))，可滚高 \(Int(maxOffset))）"
+                                 + " ⇒ 新记录从中间开始读，用户分不清这是新记录的开头还是旧记录的位置")
     }
 }

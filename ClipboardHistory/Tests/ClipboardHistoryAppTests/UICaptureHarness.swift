@@ -2862,6 +2862,51 @@ final class UICaptureTests: XCTestCase {
                       "真实 hover 没有接到边界视图")
     }
 
+    /// R410：菜单栏空态必须有可见下一步「打开时间剪史」。
+    func testMenuBarEmptyStateOffersOpenAppAction() throws {
+        let source = Self.codeOnly(try productSource(named: "Views/MenuBarRecommendationsView.swift"))
+        XCTAssertTrue(source.contains("打开时间剪史"),
+                      "菜单栏空态没有「打开时间剪史」这一步")
+        XCTAssertTrue(source.contains(".showMainWindowHotKeyPressed"),
+                      "这一步没有走产品已有的呼出主窗口通道 ⇒ 另造了一条路径")
+    }
+
+    /// R410 的像素那一半：空态菜单里那句话和 CTA 都真的画出来了。
+    func testMenuBarEmptyStateOpenAppCTAIsVisible() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r410-menubar-cta-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "menubar-empty" }) else {
+                return XCTFail("\(tag)：找不到 `menubar-empty` ⇒ 像素判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("menubar-empty-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`menubar-empty` 读不回字节")
+            }
+            let scale = Double(rep.pixelsWide) / 320.0
+            let message = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow,
+                                           rect: CGRect(x: 10, y: 45, width: 140, height: 22),
+                                           scale: scale)
+            let cta = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                       bytesPerRow: rep.bytesPerRow,
+                                       rect: CGRect(x: 120, y: 78, width: 170, height: 24),
+                                       scale: scale)
+            emit("MENUBAR_EMPTY_CTA_BAND \(tag) 消息带墨=\(message.pixels) CTA带墨=\(cta.pixels)")
+            XCTAssertGreaterThan(message.pixels, 100,
+                                 "\(tag)：空态消息带没有字 ⇒ 这一页没画出来，CTA 带读 0 不能记成产品缺陷")
+            XCTAssertGreaterThan(cta.pixels, 20,
+                                 "\(tag)：空态 CTA 带只有 \(cta.pixels) 个墨像素 ⇒ 「打开时间剪史」没画出来")
+        }
+    }
+
     /// R408：拖放目标必须说清“松手会发生什么”，不只画一圈虚线。
     ///
     /// 两帧同尺寸：`sidebar-drop-target` 是产品视图 + 取证键；`sidebar-history` 是不带

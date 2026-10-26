@@ -119,8 +119,8 @@ final class PressFeedbackTests: XCTestCase {
         XCTAssertEqual(Set(found), Set(["MenuBarRecommendationsView.swift"]),
                        "这些文件还在用没有按压反馈的 .plain：接上 `.pressedStyle(in:)`，"
                            + "或把不接的理由写进代码旁边并加进白名单。现在扫到 \(found.sorted())")
-        XCTAssertEqual(found.count, 2,
-                       "菜单栏应当恰好两处（推荐项 + 收尾按钮）：\(found.sorted())")
+        XCTAssertEqual(found.count, 3,
+                       "菜单栏应当恰好三处（推荐项 + 收尾按钮 + R410 空态「打开时间剪史」）：\(found.sorted())")
     }
 
     /// 悬停那一档必须**真的可达**。R13 抓到的一条：`PressedStyle.makeBody` 里硬写着

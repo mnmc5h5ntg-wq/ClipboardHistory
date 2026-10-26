@@ -44,6 +44,16 @@ struct MenuBarRecommendationsView: View {
                 let kind: StatePresentation.Kind = historyStore.isRefreshingPredictions ? .loading : .empty
                 StateLine(kind: kind,
                           message: historyStore.isRefreshingPredictions ? "正在整理推荐…" : "暂无推荐")
+                // R410：空态菜单也要有下一步。`showMainWindowHotKeyPressed` 是产品已有的
+                // 呼出主窗口通道（`AppDelegate` 观察它），不另造一条打开窗口的路径。
+                Button {
+                    NotificationCenter.default.post(name: .showMainWindowHotKeyPressed, object: nil)
+                } label: {
+                    Label("打开时间剪史", systemImage: "macwindow")
+                        .font(.system(size: VisualFont.meta))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
                     // 刻意**不挂** `.transition`（R5 删掉了原来那条）：这个文件里没有任何动画事务
                     // （`grep -c "animation(" = 0`），而 `MenuBarExtraStyle.menu` 的内容会被编译成真的
                     // `NSMenu`（账本 D-055 / M15 实测），SwiftUI 的过渡在那一层根本不执行。

@@ -29,7 +29,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     private var emptyAction: NSButton?
     /// 空句 + CTA 的容器：独立钉在 content 上，不占主 stack 的 arranged subviews
     /// （R408 runner 上多一项会把句子挤离搜索框，gap 33pt；R409 改为直钉）。
-    private var emptyBox: NSStackView?
+    private var emptyBox: NSView?
     /// R409：主输入框的悬停边界。旧面板里它是一行裸文字，
     /// 和主窗口的 `SearchField` 不是同一套语言；只在悬停时出现，静置保持原样。
     private var searchBackdrop: QuickPickSearchBackdrop?
@@ -284,14 +284,25 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         // 不放进 stack 的 arranged subviews —— runner 上多一项会被分配/压成按钮宽，
         // 空句 gap 33pt、长句 56pt（R408 的 CI 现读）；这里用固定 leading/trailing 与
         // top=field 底+8，跨机不再依赖 NSStackView 的分配策略。
-        let emptyBox = NSStackView(views: [empty, clear])
-        emptyBox.orientation = .vertical
-        emptyBox.spacing = 8
-        emptyBox.alignment = .centerX
-        emptyBox.detachesHiddenViews = true
+        // 普通 NSView，不用 NSStackView：runner 上后者的 hugging 会把容器压成按钮宽，
+        // 句子跟着只有 56pt、gap 33pt（R409 的 CI 现读）。这里把 empty 的四边直接钉死。
+        let emptyBox = NSView()
         emptyBox.translatesAutoresizingMaskIntoConstraints = false
         emptyBox.isHidden = true
-        empty.widthAnchor.constraint(equalTo: emptyBox.widthAnchor).isActive = true
+        empty.translatesAutoresizingMaskIntoConstraints = false
+        clear.translatesAutoresizingMaskIntoConstraints = false
+        emptyBox.addSubview(empty)
+        emptyBox.addSubview(clear)
+        NSLayoutConstraint.activate([
+            empty.leadingAnchor.constraint(equalTo: emptyBox.leadingAnchor),
+            empty.trailingAnchor.constraint(equalTo: emptyBox.trailingAnchor),
+            empty.topAnchor.constraint(equalTo: emptyBox.topAnchor),
+            clear.topAnchor.constraint(equalTo: empty.bottomAnchor, constant: 8),
+            clear.centerXAnchor.constraint(equalTo: emptyBox.centerXAnchor),
+            clear.bottomAnchor.constraint(equalTo: emptyBox.bottomAnchor),
+            clear.leadingAnchor.constraint(greaterThanOrEqualTo: emptyBox.leadingAnchor),
+            clear.trailingAnchor.constraint(lessThanOrEqualTo: emptyBox.trailingAnchor),
+        ])
 
         let stack = NSStackView(views: [field, scroll])
         // R63 把这句话从"表格下面"挪到"表格上面"。**改的是我自己钉过的决定**（R7 的原文：

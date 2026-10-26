@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R410 状态（2026-10-27 · 本地 · 第 409 轮 / Round 407）：菜单栏空态补「打开时间剪史」（CTA 带旧 0/0 → 新 1166/1382）；空态容器改普通 NSView、滚动守卫改读可见原点（产品 2 文件，菜单空态 CTA 位）
+
+最后更新：2026-10-27（本地 · R410 / 第 409 轮 / Round 407）：菜单栏空态只有“暂无推荐”，没有下一步。空态分支加「打开时间剪史」菜单项，走已有 `.showMainWindowHotKeyPressed` 通知；旧/新 CTA 带 **0/0 → 1166/1382**（消息带 330/347→910/1032），menubar-empty 与 menubar-refreshing 亮暗 **4 帧**变化，基线同笔 190/0/0/0。源/像素两刀 `M1061/M1062` 双 CAUGHT。⓪ `40350180209 ↔ 83bed7a` **completed / failure**，失败步骤 **2 个**（`Swift tests` + `Capture gate`），两件事：① 空态在 runner 上仍 gap **33>24**、长句 **56>44**（emptyBox 还是 NSStackView）；② `DetailScrollResetTests` 的 `afterVisible=0` vs `topVisible=11`（初始可见原点被当常数）。修法：emptyBox 改**普通 NSView + 显式四边约束**；滚动守卫改断言“换选后可见原点 ≤1”（旧行为 2357 仍红）；`PressFeedbackTests` 菜单按钮精确计数 2→3。sources `R409/7426d05` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1078 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=253 可判=854 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=166 covered=148 arms=436 bad=0`、全仓 259 文件 / 920 把；产品面连续零改动 **1** 轮（as-of 409，现读 `python3 scripts/product_streak.py --streak-for 409`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R409 头跑 failure：2 个失败步骤，空态 33/56 + 滚动可见原点 0 vs 11；两处都已按 runner 原文修。
+② 产品：菜单栏空态补「打开时间剪史」，旧/新 CTA 带 0/0→1166/1382；4 帧变化。
+③ 判据：源 + 像素双带；M1061/M1062 双 CAUGHT；M1053/M1054 重跑仍 CAUGHT。
+④ 436：judged=5/5、REDS=0、UNLISTED=0、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 253 / 可判 854 / rot 0 / 上界 0；预检 166/148/436/0。
+⑥ 全量 1078/53/0；换装 ok；清账表 162=162。
+
+NOT-RUN / 阻塞（分开写）：① 真实菜单展开/关闭仍只能人工验；② 离屏 alpha 动画采样不到中间帧（mid=1.0）⇒ 弹层淡入不签产品结论；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断；⑤ 主列表与浮层来源搜索语言未统一（437）；⑥ R410 新跑待 push 后读。
+
+下一轮（R411）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R410 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R409 状态（2026-10-26 · 本地 · 第 408 轮 / Round 406）：QuickPick 搜索框补悬停边界（静置 255/30 → 悬停 235/47.5，带变化 62.9%）；R408 CTA 布局改用 content 直钉（gap 33→8）（产品 3 文件，悬停反馈位）
 
 最后更新：2026-10-26（本地 · R409 / 第 408 轮 / Round 406）：QuickPick 主输入框原来是一行裸文字，和主窗口 `SearchField` 的框不是同一套语言。新增 `QuickPickSearchBackdrop` + 真实 hover tracking，只在悬停时画圆角边界/淡填充；静置/焦点保持原样。像素现读（框内 x=300..400、y=12..40pt）：静置 **255.0/30.0** → 悬停 **235.0/47.5**（亮/暗），框带变化 **35200/56000=62.9%**，框外相邻带 194.3/94.7 作对照。仅 hover 亮暗 2 帧新增，既有 188 帧逐字节不变，基线同笔 190/0/0/0。源/像素两刀 `M1059/M1060` 双 CAUGHT。⓪ `40340793989 ↔ 6bef5ab` **completed / failure**，失败步骤 **2 个**（`Swift tests` + `Capture gate`），同源于 R408 的 `emptyBox` 仍在主 `NSStackView`：runner 空句 gap **33>24**、长句宽 **56>44**；改成 `emptyBox` 直钉 content（top=field 底+8）后本机 gap **8**、长句 **400**。R406 的 visibleRect 守卫在这一跑仍绿。`Release script tests` success：sources `R408/a642dc0` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1076 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=252 可判=852 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=165 covered=147 arms=434 bad=0`、全仓 258 文件 / 918 把；产品面连续零改动 **1** 轮（as-of 408，现读 `python3 scripts/product_streak.py --streak-for 408`）。电池 `Ran 683 / OK (skipped=4)`。

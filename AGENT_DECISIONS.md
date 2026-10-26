@@ -7507,3 +7507,9 @@ R408 现读：拖入时只有虚线框/光，没有一句“松手会发生什�
 R409 现读：QuickPick 主输入框是一行裸文字，和主窗口 `SearchField` 不是一套语言。新增 `QuickPickSearchBackdrop` + 真实 hover tracking，只在悬停时画圆角边界/淡填充；静置/焦点保持原样。框内均值静置 255.0/30.0 → 悬停 235.0/47.5，框带变化 62.9%；M1059/M1060 双 CAUGHT。⓪ `40340793989` 的 2 个失败步骤（Swift tests + Capture gate）同源于 R408 的 emptyBox 仍在主 stack：runner gap 33>24、长句 56>44；改成 emptyBox 直钉 content（top=field 底+8）后本机 gap 8、长句 400。
 **Why**：主输入没有边界与悬停反馈，用户不知道这一行是控件；而给既有 stack 加第二个容器会改变分配策略，runner 的字体/布局差异把本机绿变成跨机红。悬停-only 还避免把焦点/幻影选中的旧读数污染。
 **How to apply**：① 主输入框至少要有可识别的边界，悬停再抬一档；② 需要和既有 stack 并存的浮层（空态、提示）直接钉 content，不塞进 arranged subviews；③ 跨机断言读被观察视图自己的量（均值/带变化），不读容器分配常数；④ 真实 hover 与离屏 alpha 中间帧读不到就具名 NOT-RUN，不拿合成帧当产品。
+
+### D-402（410）菜单空态要有可见下一步；空态容器用显式约束，滚动守卫读“可见原点 ≤1”
+
+R410 现读：菜单栏空态只有“暂无推荐”。加「打开时间剪史」菜单项，走已有 `.showMainWindowHotKeyPressed` 通知；CTA 带旧 0/0 → 新 1166/1382，menubar-empty/refreshing 亮暗 4 帧变化；M1061/M1062 双 CAUGHT。⓪ `40350180209` 的 2 个失败步骤是 Swift tests + Capture gate：① 空态在 runner 上仍 gap 33/长句 56（emptyBox 还是 NSStackView）；② DetailScrollReset 的初始可见原点被当常数（runner 11 vs 本机 0，换选后 0）。修法：emptyBox 改普通 NSView + 四边约束；滚动守卫改断言“换选后可见原点 ≤1”（旧行为 2357 仍红）；PressFeedback 菜单按钮精确计数 2→3。
+**Why**：空态菜单若不给出下一步，用户只能退出菜单自己找主窗口；而 NSStackView 的 hugging/分配在不同机器上会把容器压成按钮宽，本机绿不代表 runner 绿。初始可见原点也不是常数（内边距/字体差），把 0/11 当契约会制造假红。
+**How to apply**：① 菜单/弹层空态给可执行下一步，并复用已有动作通道；② 需要精确几何的容器用普通 NSView + 显式四边/宽度约束，不依赖 stack 的 hugging；③ 滚动/位置守卫读被观察视图自己的可见原点并给“顶部 ≤1”的绝对出口；④ 精确计数守卫可随合法新增更新数字，但必须仍是精确相等。
