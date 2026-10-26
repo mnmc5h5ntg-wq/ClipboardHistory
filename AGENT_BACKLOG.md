@@ -8766,3 +8766,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     436 追记（R393 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 `judged=5/5` 与现有 4 臂登记跑闸门 exit 1（UNLISTED `settings-reset-fade`）的复现仍成立。未改 JSON/自测、未猜 `must_judge`。R393 是详情头部视觉修复，不改 motion 卷的臂形状。
     436 追记（R394 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 `judged=5/5` 与现有 4 臂登记跑闸门 exit 1（UNLISTED `settings-reset-fade`）的复现仍成立。未改 JSON/自测、未猜 `must_judge`。R394 是复制失败反馈色，不改 motion 卷的臂形状。
     436 追记（R395 · 仍开）：本轮无新的 runner motion 读数；R390 本地完整卷 5 臂 judged=5/5 与现有 4 臂登记跑闸门 exit 1（UNLISTED settings-reset-fade）的复现仍成立。R395 是分类切换的通道探测（2 帧，时钟/首帧延迟不足，记 NOT-RUN）与只读绑定缝，不改 motion 卷的臂形状；不关单、不猜 must_judge。
+
+
+436 结案（R399 · runner 读数到手）：`40280951026 ↔ cfbcec7` 现读 `MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2` ⇒ 第五臂 `settings-reset-fade` 在 runner 上真的判到。已把 `settings-reset-fade` 写进 `scripts/motion_floor_expectations.json`（`must_judge=true`、`stale_if_judged=false`、无 allowed_not_run_reasons），并同步 `scripts/tests/test_motion_floor_gate.py`（SUMMARY 五臂、地板 4、R46 旧日志预期多一格 MISSING_KEY）；把同一组 runner 行重放进闸门 `MOTION_FLOOR_OK=5/5 REDS=0`、50/50 OK。**这一单不是拿本地 `judged=5/5` 关的，是 runner 自己判到的。** `40280864844 ↔ ae202dd` 仍 in_progress，未拿它替这一单签字。

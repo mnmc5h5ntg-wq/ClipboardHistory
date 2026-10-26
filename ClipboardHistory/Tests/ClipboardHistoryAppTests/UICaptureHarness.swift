@@ -3821,10 +3821,18 @@ final class UICaptureTests: XCTestCase {
                     let r = c.redComponent, g = c.greenComponent, b = c.blueComponent
                     return b > r + 0.08 && b > g + 0.04 && b > 0.31
                 }
+                // R399 CI 归因：runner 的录制/静置整页帧布局会不同，whole-page diff 把
+                // 侧栏强调蓝也卷进来（现读 idleBlue=4284/465，bbox 覆盖整页），
+                // 于是这条只数**产品那颗录制控件自己的带**。坐标来自 R392 的环 bbox
+                // (966,503)..(1221,550)@2x ⇒ x 470..620、y 240..285pt；band 是判据的取样窗，
+                // 不是产品几何。平涂页仍走上面的具名 NOT-RUN。
+                let scale = Double(w) / 720.0
+                let bx0 = Int(470 * scale), bx1 = min(w, Int(620 * scale))
+                let by0 = Int(240 * scale), by1 = min(h, Int(285 * scale))
                 var diff = 0, recBlue = 0, idleBlue = 0
                 var minX = w, minY = h, maxX = -1, maxY = -1
-                for y in 0..<h {
-                    for x in 0..<w {
+                for y in by0..<by1 {
+                    for x in bx0..<bx1 {
                         guard let a = recording.colorAt(x: x, y: y),
                               let b = idle.colorAt(x: x, y: y) else { continue }
                         let changed = (a.redComponent, a.greenComponent, a.blueComponent)
@@ -13823,6 +13831,63 @@ final class UICaptureTests: XCTestCase {
                                         "\(tag)：失败红对底色只有 \(String(format: "%.2f", failure.contrast)):1"
                                             + "（控件地板 3.0）⇒ 红是红的，但读不出来")
         }
+    }
+
+    /// R399：最窄窗里长正文必须给右下角浮动操作栏让位，不能排到药丸下面。
+    ///
+    /// 这是唯一能把 R399 的窄列状态拍出来的入口：现有 182 张基线帧里没有
+    /// 「600pt + 长正文」这一格。帧自己拍自己量，不依赖 `CLIPBOARD_HISTORY_UI_SHOTS`。
+    /// 指标是正文最右墨列：旧布局在 x≈530pt（排到药丸左沿下面），
+    /// 新布局在 x≈484pt；上限取 500pt，两边都离边界 ≥15pt。
+    func testLongTextAtMinimumWidthDoesNotRunUnderTheFloatingPill() throws {
+        let store = makePopulatedStore()
+        let long = String(repeating: "这是一段足够长的正文，用来观察详情区的浮动操作栏会不会压住文字。", count: 8)
+        store.add(ClipboardIntake.Entry(
+            content: .text(long), thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Safari", sourceAppName: "Safari"
+        ), timestamp: Self.referenceDate.addingTimeInterval(-10))
+        guard let longEntry = store.entries.first,
+              case .text(let text) = longEntry.content,
+              text.hasPrefix("这是一段足够长") else {
+            return XCTFail("长文本条目没有排到列表最前 ⇒ 探针选不中对象")
+        }
+        store.perform(.selectOnly(longEntry))
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r399-long-text-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let fixture = Fixture("r399-long-text-min", NSSize(width: 600, height: 440)) {
+            AnyView(ContentView(historyStore: store))
+        }
+        let file = scratch.appendingPathComponent("r399-long-text-min.png")
+        _ = try render(fixture, appearance: .aqua, to: file)
+        let image = try XCTUnwrap(NSImage(contentsOf: file))
+        let rep = try XCTUnwrap(NSBitmapImageRep(data: image.tiffRepresentation ?? Data()))
+        let base = try XCTUnwrap(rep.bitmapData)
+        let scale = Double(rep.pixelsWide) / 600.0
+        let x0 = Int(280 * scale), x1 = Int(530 * scale)
+        let y0 = Int(90 * scale), y1 = Int(420 * scale)
+        var maxX = -1
+        var ink = 0
+        for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+            for x in x0..<min(rep.pixelsWide, x1) {
+                let o = y * rep.bytesPerRow + x * 4
+                let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                    + 0.0722 * Double(base[o + 2])
+                if luma < 120 {
+                    ink += 1
+                    maxX = max(maxX, x)
+                }
+            }
+        }
+        guard ink > 0 else {
+            return XCTFail("LONG_TEXT_PILL_NOT_RUN=band-empty：正文带里一个墨都没有")
+        }
+        let maxPt = Double(maxX) / scale
+        emit("LONG_TEXT_PILL_CLEAR maxX=\(String(format: "%.1f", maxPt))pt 墨=\(ink) 上限=500.0pt")
+        XCTAssertLessThanOrEqual(maxPt, 500.0,
+                                 "长正文最右墨列 \(String(format: "%.1f", maxPt))pt 越过了 500pt 上限 "
+                                     + "⇒ 正文排进了右下角浮动操作栏下面（R399 实拍）")
     }
 
     func testResetDefaultButtonShowsHoverOnlyWhenEnabled() throws {

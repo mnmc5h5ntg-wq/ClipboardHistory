@@ -12,6 +12,32 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R399 状态（2026-10-26 · 本地 · 第 398 轮 / Round 396）：600pt 最窄窗长正文排进浮动操作栏（529.5 → 484.0pt）；窄列尾距 + 三刀（产品 2 文件，布局状态位）
+
+最后更新：2026-10-26（本地 · R399 / 第 398 轮 / Round 396）：真看图——600×440 最窄窗 + 长正文时，正文最后几行从右下角 `GlassPill` 左侧伸进去、被药丸盖住。按正文最右墨列量：旧 **529.5pt**（阈值 500）、新 **484.0pt**。产品改法：`DetailTypography.previewTrailingInset(forDetailWidth:)` 只在详情列 <400pt 时给 88pt 尾距；`DetailView` 用 `GeometryReader` 把列宽交给策略，并只给 `preview` 加尾距。默认 182 帧里 18 张变化（4 张 600pt 布局帧 + 空态/加载墨档 14 张），基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1060 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=242 可判=835 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=155 covered=138 arms=417 bad=0`、全仓 248 文件 / 901 把；产品面连续零改动 **1** 轮（as-of 398，现读 `python3 scripts/product_streak.py --streak-for 398`；本轮产品布局已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ 网络恢复：fetch 确认 origin 仍 5c7814e，push `5c7814e..ae202dd` 成功、ahead=0；旧两跑与对照均 success 无失败步骤；两次新跑 in_progress 记具名 NOT-RUN。
+② 看图找到布局缺陷：600pt 最窄窗长正文排进右下角浮动药丸（529.5pt → 484.0pt）。
+③ 修 Sources：窄列条件尾距 + GeometryReader 接线；宽列 68ch 不动。
+④ 判据：纯策略 + 接线 + 自拍自量像素；M1039/M1040/M1041 三刀全 CAUGHT、RESTORE_CLEAN=yes。
+⑤ 367：hidden 表 242 / 可判 835 / rot 0 / 上界 0；预检 155/138/417/0。
+⑥ 验证：build 0 告警；全量 `1060/52/0`；捕获 182 帧、18 帧变化、基线 update 后 182/0；换装 ok；清账表 162=162。
+
+验证读数（现读）：`LONG_TEXT_PILL_CLEAR maxX=484.0pt 墨=50438 上限=500.0pt`；旧帧同尺 529.5pt；`M1039/M1040/M1041` 三刀 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **CI 新跑未读**：`40280864844 ↔ ae202dd`、`40280951026 ↔ cfbcec7` 均 in_progress（`conclusion` 空、0 字节日志）；R399 主笔推送后的新跑在 R400 ⓪ 按全部失败步骤补读；② **BACKLOG 436 的 runner motion 卷未读**（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；③ 亮档真机腿仍没跑；④ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+
+下一轮（R400）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40280864844`/`40280951026` 与 R399 主笔推送跑的全部失败步骤（成对 run↔commit），新跑没有落地就继续记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 拿到 runner motion 读数后按实测决定第五臂 `must_judge`，没有就继续具名 NOT-RUN。
+
+### R399 追记：CI 40280951026 三步红与 436 结案（2026-10-26）
+
+`40280951026 ↔ cfbcec7` 现读 failure，三个失败步骤逐条：`STEP[15] Swift tests`、`STEP[17] Capture gate`、`STEP[19] Motion coverage floor`。Swift 卷 `Executed 1057 / skipped 64 / failures 2`：复制失败红在 runner 亮 2.90 / 暗 2.55（地板 3.0）；`testCaptureKeyViews` 的录制环 idleBlue=4284/465，以及 R398 加载句 3.75（0.85 墨档在 runner 1x 字体平滑下不够）。Capture gate 的 2 条红有名字；Motion floor 唯一红是 UNLISTED `settings-reset-fade`。旧两跑 `40234023212↔d38ea10` / `40234058148↔5c7814e` / 对照 `40221947072↔43ff699` 均 success ⇒ 红来自 R392/R394/R398 在 runner 上的首次执行，不是 R399 布局位；本轮已修：录制环只数控件带、pane 墨档抬到 primary、失败红亮 0.72,0,0 / 暗 1.0,0.62,0.58。修后本地：copy 测试通过、capture 182 帧通过、全量 `1060/52/0`、电池 `683/4`。
+
+**436 结案**：`40280951026` 的 `MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=-`，`settings-reset-fade=2` 真的判到；已把第五臂写进 `motion_floor_expectations.json`（`must_judge=true`）并同步 `test_motion_floor_gate.py`（SUMMARY 五臂、地板 4、旧日志多一格 MISSING_KEY）；重放同一组 runner 行 `MOTION_FLOOR_OK=5/5 REDS=0`。`40280864844 ↔ ae202dd` 仍 in_progress 未读。
+
+**R400 ⓪ 目标**：push R399 后读新 run 全部失败步骤（尤其确认三条修复在 runner 上通过）；补读 40280864844；若新 run 仍红，按步骤名逐条落账，不用 0 字节日志猜绿。
+
 ## R398 状态（2026-10-26 · 本地 · 第 397 轮 / Round 395）：详情加载唯一那句话亮档 2.86:1 → 4.84（暗 4.52 → 6.53）；pane 墨档接进加载态 + 双刀（产品 2 文件，视觉主线）
 
 最后更新：2026-10-26（本地 · R398 / 第 397 轮 / Round 395）：先真看 `detail-loading-720x520-{light,dark}` 的「正在加载预览…」：旧 `.secondary` 在亮档偏灰。按字墨 bbox 定位后只读 x 18..115 / y 102..120pt：旧亮 **2.86** / 暗 **4.52:1**（暗档刚好贴 4.5 线，亮档低于 AA），新 pane 墨档亮 **4.84** / 暗 **6.53:1**。产品改法：`DetailLoadingView` 的句子改走 `StatePresentation.paneMessageInkStyle`；三根骨架与 inline `StateLine` 的 `.subdued` 保持不动。判据：源接线守卫 + 捕获帧像素守卫；M1037/M1038 双 CAUGHT、还原后双 ESCAPED。detail-loading / detail-loading-composed / detail-2-file 亮暗 6 张变化，其余 176 张不变；基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1057 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=240 可判=832 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=153 covered=136 arms=414 bad=0`、全仓 246 文件 / 898 把；产品面连续零改动 **1** 轮（as-of 397，现读 `python3 scripts/product_streak.py --streak-for 397`；本轮产品视觉已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

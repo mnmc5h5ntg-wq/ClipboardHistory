@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 600pt 最窄窗长正文排进浮动操作栏（529.5 → 484.0pt）；窄列尾距 + 三刀（R399 / 第 398 轮 / Round 396 / U-1415…U-1419 · 产品 2 文件，布局状态位）
+
+
 ### 详情加载唯一那句话亮档 2.86:1 → 4.84（暗 4.52 → 6.53）；pane 墨档接进加载态 + 双刀（R398 / 第 397 轮 / Round 395 / U-1410…U-1414 · 产品 2 文件，视觉主线）
 
 

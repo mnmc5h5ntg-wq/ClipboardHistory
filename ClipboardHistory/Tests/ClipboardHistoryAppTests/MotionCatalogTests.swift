@@ -450,8 +450,10 @@ final class MotionCatalogTests: XCTestCase {
         let glass = codeOnly(try productSource(named: "Views/GlassControls.swift"))
         XCTAssertTrue(glass.contains("copyFailed")
                       && glass.contains("colorScheme == .dark")
-                      && glass.contains("Color(red: 1.0, green: 0.48, blue: 0.44)"),
-                      "GlassPill 的失败色没有走动态错误红 ⇒ 暗档会掉到 3:1 以下（R394 现读 2.69）")
+                      && glass.contains("Color(red: 1.0, green: 0.62, blue: 0.58)")
+                      && glass.contains("Color(red: 0.72, green: 0.0, blue: 0.0)"),
+                      "GlassPill 的失败色没有走动态错误红 ⇒ R399 CI 现读亮 2.90 / 暗 2.55"
+                          + "（地板 3.0）；必须是压深亮档 + 提亮暗档这一对")
     }
 
     /// R395：分类切换的只读绑定缝必须真的接到两个侧栏构造点上；产品路径仍是 nil。

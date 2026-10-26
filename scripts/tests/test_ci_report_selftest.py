@@ -157,7 +157,7 @@ MOTION_NORMAL = (NORMAL
 FLOOR_SUMMARY = ("MOTION_SHIMMER_STATE 判定=ok 原因=-\n"
                  "MOTION_SHIMMER_BAND_STATE 判定=ok 原因=-\n"
                  "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 "
-                 "detail-kind-change=3 empty-state=4")
+                 "detail-kind-change=3 empty-state=4 settings-reset-fade=2")
 
 # (步骤, 形状) → (日志正文, 必须出现的结论片段, 期望退出码, 额外替换)
 #
@@ -270,8 +270,8 @@ EXPECT = {
     #      而 `MOTION_NORMAL` 是三条判据那一辈的 —— 拿它喂新的地板会红在 MISSING_KEY，
     #      那不是这一格要判的事，所以这里各写各的。
     ("motion_floor", "enough_coverage"): (
-        NORMAL + FLOOR_SUMMARY + "\nMOTION_RESOLVE_SUMMARY judged=4/4 not-run=-\n",
-        ["MOTION_FLOOR_FACTS", "MOTION_FLOOR_OK=4/4"], 0, []),
+        NORMAL + FLOOR_SUMMARY + "\nMOTION_RESOLVE_SUMMARY judged=5/5 not-run=-\n",
+        ["MOTION_FLOOR_FACTS", "MOTION_FLOOR_OK=5/5"], 0, []),
     # R44 的真实形状：掉了一臂，但理由登记过 ⇒ 放行，**且必须把这条打印出来**。
     # 旧版这一步在这里连"掉了谁"都不说，所以我是靠人肉对比 run 日志发现的。
     # 这一格跟着清单改过两次期望：R57 收紧到四臂必须判到 ⇒ 同一条日志是红；
@@ -291,9 +291,9 @@ EXPECT = {
     ("motion_floor", "witness_snaps_here_is_named_uncoverage"): (
         NORMAL + FLOOR_SUMMARY + "\n"
         + "MOTION_NOT_RUN=witness-snaps-here notice-banner：证人采样≈32ms 可分数段=4 合格=是 判定=拍成跳变\n"
-        + "MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner\n",
-        ["MOTION_FLOOR_FACTS judged=3/4", "not-run=notice-banner",
-         "MOTION_FLOOR_OK=3/4", "MOTION_FLOOR_REDS=0"], 0, []),
+        + "MOTION_RESOLVE_SUMMARY judged=4/5 not-run=notice-banner\n",
+        ["MOTION_FLOOR_FACTS judged=4/5", "not-run=notice-banner",
+         "MOTION_FLOOR_OK=4/5", "MOTION_FLOOR_REDS=0"], 0, []),
     # 掉了同一臂，但这次没人说为什么 ⇒ 红。"没测到"可以接受，"没测到且说不清"不行。
     ("motion_floor", "drift_without_reason"): (
         NORMAL + FLOOR_SUMMARY + "\n"

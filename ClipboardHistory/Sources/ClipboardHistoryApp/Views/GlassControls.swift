@@ -52,10 +52,13 @@ struct GlassPill: View {
                             // R394：失败只换图标不够 —— 成功/失败两态在颜色上原本完全一样，
                             // 用户要读第二眼才知道「刚才没写进剪贴板」。错误色跟随系统红，
                             // 与横幅/登录失败回执用同一套语言；成功仍是主色，不新造绿色。
+                            // R399 CI：R394 的 `Color.red` / 1.0,0.48,0.44 在 runner 的 1x
+                            // 字体平滑下只有亮 2.90 / 暗 2.55（地板 3.0）。亮档压深、暗档提亮，
+                            // 仍用错误红，不改判据地板。
                             foregroundStyle: copyFailed
                                 ? AnyShapeStyle(colorScheme == .dark
-                                    ? Color(red: 1.0, green: 0.48, blue: 0.44)
-                                    : Color.red)
+                                    ? Color(red: 1.0, green: 0.62, blue: 0.58)
+                                    : Color(red: 0.72, green: 0.0, blue: 0.0))
                                 : AnyShapeStyle(.primary),
                             // 图标换了要说"换过了"，不是"闪了一下"：14+ 用系统的符号替换过渡，
                             // 12/13 退化成交叉淡入（见 `SymbolMotion`）。

@@ -50,8 +50,10 @@ struct DetailView: View {
             // 两臂都挂同一档 ⇒ 才是真的交叉淡：旧的一直在，直到新的完全显形。
             // 注意这**不是**把 M4 翻回来：M4 反对的是"换选（A→B）整块淡"，
             // 那条仍然由下面按 `DetailPreviewKind` 供电的软交接管着（同类之间不演）。
-            selectedEntryView(entry)
-                .transition(MotionCatalog.transition(for: .contentFade))
+            GeometryReader { proxy in
+                selectedEntryView(entry, detailWidth: proxy.size.width)
+            }
+            .transition(MotionCatalog.transition(for: .contentFade))
         } else {
             EmptyStateView(
                 systemName: "doc.on.clipboard",
@@ -72,11 +74,13 @@ struct DetailView: View {
                    value: historyStore.selectedEntry == nil)
     }
 
-    private func selectedEntryView(_ entry: HistoryStore.Entry) -> some View {
+    private func selectedEntryView(_ entry: HistoryStore.Entry, detailWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
             header(for: entry)
             Divider()
             preview(for: entry)
+                // R399：窄列里正文会排到右下角浮动操作栏下面，给药丸留一条尾距。
+                .padding(.trailing, DetailTypography.previewTrailingInset(forDetailWidth: detailWidth))
                 .transition(MotionCatalog.transition(for: .contentFade))
         }
         // 详情区换页的两条规则，都是量出来的（动效审计 M4，账本 U-20 / D-055）：

@@ -74,7 +74,7 @@ def _machine_here():
 
 HERE = _machine_here()
 
-SUMMARY = "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 detail-kind-change=3 empty-state=4"
+SUMMARY = "MOTION_SUMMARY notice-banner=3 notice-banner-dismiss=3 detail-kind-change=3 empty-state=4 settings-reset-fade=2"
 EXECUTED = "\t Executed 24 tests, with 5 tests skipped and 0 failures (0 unexpected) in 76.171 seconds"
 
 
@@ -162,15 +162,15 @@ class MotionFloorGateTests(unittest.TestCase):
         而"证人明明看得见却报这条"的矛盾今天由判据自己守（`jumpAdjudication` 只在证人 snap 时才放行），
         闸门层的那道冗余检查记在 BACKLOG 107。
         """
-        text = log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner",
+        text = log("MOTION_RESOLVE_SUMMARY judged=4/5 not-run=notice-banner",
                    extra="MOTION_NOT_RUN=witness-snaps-here notice-banner：证人采样≈32ms 可分数段=4 合格=是 判定=拍成跳变")
         facts = parse(text)
         reds = [m for m, red in markers(facts) if red]
         self.assertEqual(reds, [], "登记过的 witness-snaps-here 仍然红 ⇒ 这条放行等于没登记")
         self.assertIn("notice-banner", facts["not_run"])
-        self.assertEqual(facts["judged"], 3)
+        self.assertEqual(facts["judged"], 4)
         # 少了那行理由 ⇒ 仍然要红在 REASONLESS 上（"没测到"可以，"没测到且说不清"不行）。
-        speechless = parse(log("MOTION_RESOLVE_SUMMARY judged=3/4 not-run=notice-banner"))
+        speechless = parse(log("MOTION_RESOLVE_SUMMARY judged=4/5 not-run=notice-banner"))
         self.assertIn("MOTION_FLOOR_REASONLESS", [m for m, red in markers(speechless) if red],
                       "缺席却没带一行理由就放行 ⇒ 这就是 BACKLOG 49 说的那种免检牌")
 
@@ -347,6 +347,9 @@ class MotionFloorGateTests(unittest.TestCase):
         reds = [m for m, red in markers(facts) if red]
         self.assertEqual(sorted(reds),
                          sorted(["MOTION_FLOOR_UNDERCOVERED", "MOTION_FLOOR_SUITE_NAMELESS_RED=1",
+                                 # R399：这份 R46 的真日志早于第五臂 settings-reset-fade 的登记，
+                                 # 所以今天它还会多红一格 MISSING_KEY —— 这不是回归，是旧日志缺新臂。
+                                 "MOTION_FLOOR_MISSING_KEY",
                                  # R85 / BACKLOG 118：这份 R46 的真日志早于状态行 ⇒ 它顺带成了
                                  # LOOP_SILENT 的正对照（"这一族整行没说一句话"就是它这个样子）。
                                  "MOTION_FLOOR_LOOP_SILENT=skeleton-loop",
@@ -449,8 +452,8 @@ class MotionFloorGateTests(unittest.TestCase):
             self.assertTrue(EXPECTATIONS["arms"][arm]["must_judge"],
                             "%s 被放宽了 ⇒ R75 只准动 notice-banner 一臂" % arm)
         required = [a for a, s in EXPECTATIONS["arms"].items() if s["must_judge"]]
-        self.assertEqual(len(required), 3,
-                         "地板不是 3 ⇒ 有人动清单却没动这一格（放宽要么留 run 号要么回来）")
+        self.assertEqual(len(required), 4,
+                         "地板不是 4 ⇒ 有人动清单却没动这一格（R399 加第五臂后应为 4；放宽要么留 run 号要么回来）")
         banner = EXPECTATIONS["arms"]["notice-banner"]
         self.assertFalse(banner["must_judge"],
                          "notice-banner 又变回 must_judge 了？那可以，但先把 runner 那两遍红/绿的读数反驳掉")
@@ -518,7 +521,10 @@ class MotionSuiteRedTests(unittest.TestCase):
                         "夹具里没有 XCTAssert 原文 ⇒ 这一层的'红的理由'无从测起")
         # R85：这份 R66 的真夹具早于状态行 ⇒ 补上两行，让这一层继续只测它测的那件事
         # （红有没有名字）。"状态行缺席"另有专门的用例，不在这里混进来。
-        self.lines = self.lines + LOOP_LINES
+        # R399：夹具自己的四臂 SUMMARY 必须换掉，不是追加 —— 解析器只认第一行
+        # `MOTION_SUMMARY`（结论行只有一条）。保留原 resolve 行作"臂一级全绿"的证据。
+        self.lines = [line for line in self.lines if not line.startswith("MOTION_SUMMARY")]
+        self.lines = self.lines + [SUMMARY] + LOOP_LINES
         self.facts = parse("\n".join(self.lines))
         # 夹具自己必须成立：臂一级**全绿**，这正是旧闸门放走它的原因。
         self.assertEqual(self.facts["judged"], 4)

@@ -77,10 +77,11 @@ enum StatePresentation {
     /// `StateLine` 的 inline 状态（菜单栏"暂无推荐"、热图空态）留在 `.subdued` 是对的：
     /// 它旁边还有内容，句子只是背景。但整块面板只剩这句话时，同一档 `.secondary`
     /// 在亮档实测只有 **2.90:1**（空态）/ **2.86:1**（加载态），连 AA 正文线都不到 ——
-    /// 这不是"安静"，是"唯一的信息读不清"。pane 这一档单独抬到 0.85（0.72 实测亮档
-    /// 仍只有 3.71:1，差值不是文字边缘能补的），仍比正文轻，但必须过 4.5。
+    /// 这不是"安静"，是"唯一的信息读不清"。pane 这一档单独抬到 `.primary`：0.85 在
+    /// 本机够、但 runner 的 1x 字体平滑把它压到 **3.75:1**（R399 CI 现读）；
+    /// 这条句子是空态/加载态唯一的信息，不能再靠本地色号赌 runner。
     static var paneMessageInkStyle: AnyShapeStyle {
-        AnyShapeStyle(Color.primary.opacity(0.85))
+        AnyShapeStyle(.primary)
     }
 
     /// 对齐规则（纯函数，可断言）。

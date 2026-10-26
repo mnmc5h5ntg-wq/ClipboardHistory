@@ -252,6 +252,30 @@ final class Round3DetailTypographyTests: XCTestCase {
                       "正文容器的内缩没引用同一个常数")
     }
 
+    /// R399：窄详情列的正文要给右下角浮动操作栏让位，宽列不动。
+    func testPreviewTrailingInsetOnlyAppliesToNarrowDetailColumns() {
+        XCTAssertEqual(DetailTypography.previewTrailingInset(forDetailWidth: 720), 0,
+                       "宽详情列的 68ch 可读列不该被浮动药丸再缩窄")
+        XCTAssertEqual(DetailTypography.previewTrailingInset(forDetailWidth: 470), 0,
+                       "750pt 窗口的详情列仍放得下正文与药丸之间的间隔")
+        let narrow = DetailTypography.previewTrailingInset(forDetailWidth: 320)
+        XCTAssertGreaterThanOrEqual(narrow, 80,
+                                    "窄详情列的尾距没有给药丸让位 ⇒ 正文会排到药丸下面（R399 实拍）")
+        XCTAssertLessThanOrEqual(narrow, 120,
+                                 "尾距大过药丸本身一个量级 ⇒ 窄列会被无谓缩窄")
+        XCTAssertEqual(DetailTypography.previewTrailingInset(forDetailWidth: 0), 0,
+                       "非正宽度不该凭空加尾距")
+    }
+
+    /// 接线：`DetailView` 必须把详情列宽交给这条策略，不能只让纯函数自证。
+    func testDetailViewAppliesTheNarrowDetailInset() throws {
+        let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
+        XCTAssertTrue(detail.contains("DetailTypography.previewTrailingInset(forDetailWidth:"),
+                      "DetailView 没有把详情列宽交给尾距策略 ⇒ R399 的窄列让位只活在纯函数里")
+        XCTAssertTrue(detail.contains("GeometryReader"),
+                      "DetailView 没有测量详情列宽 ⇒ 尾距无法按宽度条件化")
+    }
+
     private func codeOnly(_ source: String) -> String {
         source.components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }

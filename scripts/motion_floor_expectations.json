@@ -16,7 +16,8 @@
     "notice-banner",
     "notice-banner-dismiss",
     "detail-kind-change",
-    "empty-state"
+    "empty-state",
+    "settings-reset-fade"
   ],
   "arms": {
     "notice-banner": {
@@ -48,6 +49,12 @@
       "stale_if_judged": false,
       "allowed_not_run_reasons": [],
       "note": "R42/R44 都判到 ⇒ 要求判到。"
+    },
+    "settings-reset-fade": {
+      "must_judge": true,
+      "stale_if_judged": false,
+      "allowed_not_run_reasons": [],
+      "note": "R399 / BACKLOG 436：R389 加进 Scenario.all() 的第五臂。R399 的 run 40280951026（cfbcec7）现读 MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2 ⇒ runner 真的判到了这一臂，按实测登记 must_judge=true；不再用本地读数替 runner 许愿。"
     }
   },
   "thin_warnings": [],
