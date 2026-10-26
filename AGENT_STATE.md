@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R407 状态（2026-10-26 · 本地 · 第 406 轮 / Round 404）：QuickPick 空结果态补可见「清除搜索」CTA（按钮带旧 0/0 → 新 934/1114）；R406 守卫在 runner 上红的假设被修正（产品 1 文件，空态 CTA 位）
+
+最后更新：2026-10-26（本地 · R407 / 第 406 轮 / Round 404）：QuickPick 空结果态只有一句“按 Esc 清空”，而主窗口同类空态有「清除搜索」按钮。修法：查询词非空且无候选时显示 `NSButton(title:"清除搜索")`，点击清空搜索框、恢复候选并把焦点还给搜索框；空历史/无查询词不显示。像素现读（x=170..250、y=55..85pt）：旧 **0/0** → 新 **934/1114**；同帧消息带 3693/4346 作校准。仅 `quickpick-empty` 亮暗 2 帧变化，基线同笔 186/0/0/0。源/像素两刀 `M1055/M1056` 双 CAUGHT。⓪ `40326547579 ↔ f7852d0` **completed / failure**，唯一失败步骤 `Swift tests`：R406 守卫拿 clip bounds origin 当顶部参照（runner −46 / 本机 −57）；已改为断言 `document.visibleRect.origin.y`（旧行为 2357 → 顶部参照 0），M1053 重跑仍 CAUGHT。`Release script tests` success：sources `R406/cb2bd4c` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1072 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=250 可判=848 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=163 covered=145 arms=430 bad=0`、全仓 256 文件 / 914 把；产品面连续零改动 **1** 轮（as-of 406，现读 `python3 scripts/product_streak.py --streak-for 406`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R406 头跑 failure：唯一失败步骤 Swift tests，R406 守卫的 clip inset 假设被 runner 驳回；修正为 visibleRect 原点，M1053 仍 CAUGHT。
+② 产品：QuickPick 空态补「清除搜索」CTA，旧/新按钮带 0/0→934/1114；只 quickpick-empty 两帧变化。
+③ 判据：源（真按钮点击读回）+ 像素（双带）；M1055/M1056 双 CAUGHT。
+④ 436：judged=5/5、REDS=0、UNLISTED=0、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 250 / 可判 848 / rot 0 / 上界 0；预检 163/145/430/0。
+⑥ 全量 1072/53/0；换装 ok；清账表 162=162。
+
+NOT-RUN / 阻塞（分开写）：① 亮档真机腿仍没跑；② macOS 12 紧凑详情头仍走旧截断；③ 主列表与浮层的来源搜索语言未统一（437）；④ R407 新跑待 push 后读。
+
+下一轮（R408）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R407 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R406 状态（2026-10-26 · 本地 · 第 405 轮 / Round 403）：换选记录后详情正文回到顶部（旧 2300→2300、像素差 15.37/15.96% → 0/0）；R405 头跑全绿签收（产品 3 文件，滚动到位位）
 
 最后更新：2026-10-26（本地 · R406 / 第 405 轮 / Round 403）：详情正文的 `NSScrollView` 被下一条记录复用。把 A 滚到 300pt 后换选 B，旧代码把偏移留给 B（旧帧从 B-20 起，顶部帧从 B-0 起）。行为读数：可滚高 2300、旧偏移 2300 → **换选后仍 2300**；像素同带与「新选即顶部」参照帧差 亮 **15.37%** / 暗 **15.96%**。修法：正文 representable 增加 `resetKey`（记录 id），身份变了才调 `scrollToBeginningOfDocument`（只改 clip bounds 不够，文本视图 frame origin 会留成 −57），首次挂载只记身份不滚。新行为：顶部参照 −57 → 换选后 −57、`docVisible=0`；像素 亮/暗 **0/439200 = 0.00%**；新增 4 帧、既有 182 帧逐字节不变、基线同笔 186/0/0/0。行为/像素两刀 `M1053/M1054` 双 CAUGHT。⓪ `40316586448 ↔ 2e80585` **success**、22 步全 success、`FAILED_STEP_COUNT=0`；sources `R405/2e6998f` 一致；全量计数解析的 92-vs-934 负对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1070 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=249 可判=846 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=162 covered=144 arms=428 bad=0`、全仓 255 文件 / 912 把；产品面连续零改动 **1** 轮（as-of 405，现读 `python3 scripts/product_streak.py --streak-for 405`）。电池 `Ran 683 / OK (skipped=4)`。

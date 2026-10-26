@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 406 轮（R407 · 2026-10-26 · U-1458…U-1462）：QuickPick 空结果态补可见「清除搜索」CTA（按钮带旧 0/0 → 新 934/1114）；R406 守卫在 runner 上红的假设被修正（U-1458…U-1462 · 产品 1 文件，空态 CTA 位）
+
+- **U-1458：⓪ `40326547579 ↔ f7852d0` 的唯一失败步骤。** 失败步骤 **1 个**：`Swift tests (executed-count gate)`；正文 `DetailScrollResetTests.swift:85 XCTAssertEqualWithAccuracy ("-57.0") != ("-46.0")`。成因是 R406 守卫拿 clip bounds 的 origin 当“顶部参照”，而它随文本内边距在机器间差 11pt（runner −46 / 本机 −57）；产品行为本身是“文本视口回到顶部”。修法：断言 `document.visibleRect.origin.y`（本机顶部 0 → 换选 0；旧行为 2357），M1053 重跑仍 CAUGHT。`Release script tests` success：`SOURCES_CELL 账上=R406/cb2bd4c git=R406/cb2bd4c 一致=是`，全量计数 92-vs-934 反向对照 ok。R407 新跑待 push 后签收。
+- **U-1459：② 空态 CTA —— QuickPick 搜不到时只有一句“按 Esc 清空”。** 主窗口同类空态有「清除搜索」按钮，浮层只有文字；同一个处境两个表面两套答案。真看图：旧 `quickpick-empty` 消息下是空白，新帧消息下出现「清除搜索」胶囊。修法：`QuickPickController` 在空态且查询词非空时显示 `NSButton(title:"清除搜索")`，点击清空搜索框、恢复候选并把焦点还给搜索框；空历史/无查询词时不显示（点了没意义）。像素现读（x=170..250、y=55..85pt）：旧 **0/0** → 新 **934/1114**；同帧消息带 3693/4346 不变（校准证明确实画了这一页）。仅 `quickpick-empty` 亮暗 **2 帧**变化，基线同笔 186/0。
+- **U-1460：判据与刀。** 源守卫 `testQuickPickEmptyStateHasAVisibleClearSearchAction` 从真面板读按钮标题/可见性，点击后读搜索框与表格行数（必须恢复 5 条），并以“无查询词时树里/隐藏态没有可用按钮”为负对照；像素守卫 `testQuickPickEmptyStateCTAIsVisibleInTheFrame` 用按钮带 + 消息带双读数。`M1055`（源）/`M1056`（像素）双 **CAUGHT**、红得对=2、`RESTORE_CLEAN=yes`；R406 的 M1053/M1054 在修正后重跑仍双 CAUGHT。
+- **U-1461：③ 436 只读新跑。** `MOTION_FLOOR_FACTS judged=5/5 executed=73 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2 红的用例=- 汇总行报红=0`、`MOTION_FLOOR_REDS=0`、`UNLISTED_COUNT=0`；`notice-banner` 是登记放行臂，未重猜 `must_judge`，保持结案。
+- **U-1462：① 367 rot 与八步。** `HIDDEN_ARMS 表=250 可判=848 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=163 covered=145 arms=430 bad=0`、全仓 256 文件 / 914 把；`M1055/M1056` 与修正后的 M1053/M1054 全 CAUGHT。build **0** 告警；全量 `Executed 1072 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 186 -> /tmp/r407_shots`（114 条判据 / 4 skip / 0 失败），与 R406 比 `变了=2`（quickpick-empty 亮暗），基线同笔 `UPDATED=186`、复验 `COMPARED=186 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 406；本轮已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 406`）。电池 `Ran 683 / OK (skipped=4)`。
+
 ## 第 405 轮（R406 · 2026-10-26 · U-1452…U-1457）：换选记录后详情正文回到顶部（旧 2300→2300、像素差 15.37/15.96% → 0/0）；`40316586448` 全绿签收（U-1452…U-1457 · 产品 3 文件，滚动到位位）
 
 - **U-1452：⓪ R405 头跑签收。** `40316586448 ↔ 2e80585` **completed / success**，22 步全 success、`FAILED_STEP_COUNT=0`；`SOURCES_CELL 账上=R405/2e6998f git=R405/2e6998f 一致=是`；全量计数解析的负对照（把全量卷写成捕帧卷的 92 而日志另有 934 ⇒ 恒等式必须响）现读 **ok**，说明不是套件级读数。R406 新跑待 push 后读。

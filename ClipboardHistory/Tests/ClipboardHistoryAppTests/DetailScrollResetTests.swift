@@ -67,6 +67,9 @@ final class DetailScrollResetTests: XCTestCase {
             return XCTFail("正文只有 \(Int(document.frame.height))pt 高而视口 \(Int(scroll.contentView.bounds.height))pt"
                            + " ⇒ 这一条根本没得滚，先修夹具再加判据")
         }
+        // 断言的对象是**文本视图自己的可见原点**，不是 clip bounds 的 origin：
+        // 后者会随文本内边距/字体在机器间差 11pt（runner 顶部 −46、本机 −57，R406 的 CI 红）。
+        let topVisible = document.visibleRect.origin.y
         let topOffset = scroll.contentView.bounds.origin.y
         scroll.contentView.scroll(to: NSPoint(x: 0, y: maxOffset))
         scroll.reflectScrolledClipView(scroll.contentView)
@@ -78,13 +81,14 @@ final class DetailScrollResetTests: XCTestCase {
         host.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         let after = scroll.contentView.bounds.origin.y
+        let afterVisible = document.visibleRect.origin.y
         CaptureReadings.emit("DETAIL_SCROLL_RESET 可滚高=\(Int(maxOffset)) 顶部参照=\(Int(topOffset))"
                              + " 旧偏移=\(Int(before)) 换选后=\(Int(after))"
-                             + " docOrigin=\(Int(document.frame.origin.y))"
-                             + " docVisible=\(Int(document.visibleRect.origin.y))")
-        XCTAssertEqual(after, topOffset, accuracy: 0.5,
-                       "换选后正文停在 y=\(Int(after))，而这条记录的顶部参照是 \(Int(topOffset))"
-                       + "（可滚高 \(Int(maxOffset))）⇒ 新记录从中间开始读，"
+                             + " 顶部可见=\(Int(topVisible)) 换选可见=\(Int(afterVisible))"
+                             + " docOrigin=\(Int(document.frame.origin.y))")
+        XCTAssertEqual(afterVisible, topVisible, accuracy: 0.5,
+                       "换选后正文可见原点是 \(Int(afterVisible))，而顶部参照是 \(Int(topVisible))"
+                       + "（clip 偏移 \(Int(topOffset))→\(Int(after))，可滚高 \(Int(maxOffset))）⇒ 新记录从中间开始读，"
                        + "用户分不清这是新记录的开头还是旧记录的位置")
     }
 }

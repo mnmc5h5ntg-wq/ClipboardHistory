@@ -24,6 +24,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     private var table: NSTableView?
     /// 空结果时那一句（R7 / 审计 B-P2）。以前是一片空白。
     private var emptyLabel: NSTextField?
+    /// 空结果时的可见下一步（R407）。主窗口的同款空态有「清除搜索」按钮，
+    /// 浮层只有一句“按 Esc 清空” —— 同一个处境在两个表面给两套答案。
+    private var emptyAction: NSButton?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
 
@@ -260,7 +263,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         // 真把帧拍出来之后亮暗两档的这句话都还是要过对比度判据。
         empty.wantsLayer = true
 
-        let stack = NSStackView(views: [field, empty, scroll])
+        // R407：空态 CTA。只清查询词，不关面板；文案与主窗口的「清除搜索」同一句。
+        let clear = NSButton(title: "清除搜索", target: self, action: #selector(clearQueryTapped(_:)))
+        clear.bezelStyle = .rounded
+        clear.controlSize = .small
+        clear.isHidden = true
+        clear.wantsLayer = true
+
+        let stack = NSStackView(views: [field, empty, clear, scroll])
         // R63 把这句话从"表格下面"挪到"表格上面"。**改的是我自己钉过的决定**（R7 的原文：
         // "空结果那一句放在表格下面而不是盖在上面：盖上去要自己算居中，而 stack 已经管好了间距与宽度"），
         // 所以理由要留在这里：那三条理由是**实现便利**，不是观感判断；而这一轮第一次把这个浮层拍出来
@@ -317,7 +327,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         self.field = field
         self.table = table
         self.emptyLabel = empty
+        self.emptyAction = clear
         return panel
+    }
+
+    @objc private func clearQueryTapped(_ sender: Any?) {
+        field?.stringValue = ""
+        queryChanged("")
+        panel?.makeFirstResponder(field)
     }
 
     /// 把模型的下标画到表上。`selectRow(at:anchors:scrollTo:notify:)` 是 `NSOutlineView` 的方法，
@@ -346,6 +363,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         guard let emptyLabel else { return }
         let message = model.emptyMessage
         let shouldShow = message != nil
+        // 空历史（没词可清）时不摆「清除搜索」：那会是一个点了没用的按钮。
+        let canClear = !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let showAction = shouldShow && canClear
         if let message, emptyLabel.stringValue != message {
             emptyLabel.stringValue = message
         }
@@ -353,6 +373,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         if MotionCatalog.motionShouldBeReduced {
             emptyLabel.isHidden = !shouldShow
             emptyLabel.alphaValue = shouldShow ? 1 : 0
+            emptyAction?.isHidden = !showAction
+            emptyAction?.alphaValue = showAction ? 1 : 0
             return
         }
         if shouldShow {
@@ -373,6 +395,30 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             }, completionHandler: { [weak emptyLabel] in
                 // 完成回调不在主线程；`isHidden` 是 AppKit 状态，必须回主线程改。
                 DispatchQueue.main.async { emptyLabel?.isHidden = true }
+            })
+        }
+        fadeEmptyAction(emptyAction, visible: showAction, duration: duration)
+    }
+
+    /// 空态 CTA 的显隐跟随那句话：同一档时长、同一个图层通道。
+    private func fadeEmptyAction(_ view: NSView?, visible: Bool, duration: TimeInterval) {
+        guard let view else { return }
+        if visible {
+            if view.isHidden {
+                view.isHidden = false
+                view.alphaValue = 0
+            }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = duration
+                context.allowsImplicitAnimation = false
+                view.animator().alphaValue = 1
+            }
+        } else if !view.isHidden {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = duration
+                view.animator().alphaValue = 0
+            }, completionHandler: { [weak view] in
+                DispatchQueue.main.async { view?.isHidden = true }
             })
         }
     }

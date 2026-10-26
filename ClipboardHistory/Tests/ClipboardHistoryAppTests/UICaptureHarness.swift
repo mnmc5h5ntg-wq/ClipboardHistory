@@ -2756,6 +2756,97 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
     }
 
+    /// R407：空结果态必须有**可见的下一步**，而不是只叫用户记住 Esc。
+    ///
+    /// 主窗口的「无匹配结果」有「清除搜索」按钮；浮层同款处境只有一句文案。
+    /// 这条从产品入口建出真面板，找到那颗按钮、点它，再读回搜索框与表格。
+    func testQuickPickEmptyStateHasAVisibleClearSearchAction() throws {
+        _ = NSApplication.shared
+        let store = makePopulatedStore()
+        // 必须保住 builder 闭包：它持有控制器；只拿 `builder(...)()` 的话控制器会释放，
+        // 表格的 dataSource 与按钮的 target 都是弱引用，点击会安静地什么都不做。
+        let build = QuickPickCapturePanel.builder(store: store, query: "zzz 不存在")
+        guard let panel = build(), let content = panel.contentView else {
+            return XCTFail("浮层建不出来 ⇒ 这条判据没有对象")
+        }
+        panel.setFrameOrigin(NSPoint(x: -20012, y: -20012))
+        panel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        defer { panel.orderOut(nil) }
+        guard let field = Self.firstView(ofType: QuickPickSearchField.self, in: content) else {
+            return XCTFail("空态面板里找不到搜索框 ⇒ 这条判据没有对象")
+        }
+        guard let button = Self.firstView(ofType: NSButton.self, in: content) else {
+            return XCTFail("空态面板里找不到按钮 ⇒ 这条判据没有对象（CTA 没建出来或被 stack 拆了）")
+        }
+        XCTAssertEqual(button.title, "清除搜索",
+                       "空结果态没有「清除搜索」按钮 ⇒ 下一步只活在用户的记忆里")
+        XCTAssertFalse(button.isHidden, "「清除搜索」按钮存在但被藏起来了 ⇒ 等于没有")
+        // 空态下 `detachesHiddenViews` 把表格从树里拆走，所以表格只能在点击之后找；
+        // 空态本身由“搜索框非空 + 可见按钮”来认定。
+        XCTAssertFalse(field.stringValue.isEmpty, "空态面板的搜索框里没有查询词 ⇒ 判的不是空结果")
+        button.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertEqual(field.stringValue, "", "点了「清除搜索」搜索框里还留着查询词")
+        guard let table = Self.productTable(in: content) else {
+            return XCTFail("清空查询后产品表格没有回到视图树 ⇒ 候选没有恢复")
+        }
+        XCTAssertEqual(table.numberOfRows, store.entries.count,
+                       "点了「清除搜索」候选没有回来（\(table.numberOfRows)/\(store.entries.count)）")
+        XCTAssertTrue(button.isHidden, "查询清空后按钮还留着 ⇒ 它没有跟着空态退场")
+
+        // 负对照：没有查询词时这颗按钮不该出现（空历史时点它没有意义）。
+        // 隐藏项会被 `detachesHiddenViews` 拆出树 ⇒ 断言“树里没有按钮”比断言 isHidden 更贴近产品。
+        let allBuild = QuickPickCapturePanel.builder(store: store, query: "")
+        guard let allPanel = allBuild(), let allContent = allPanel.contentView else {
+            return XCTFail("无查询词的面板建不出来 ⇒ 负对照没有对象")
+        }
+        allPanel.setFrameOrigin(NSPoint(x: -20012, y: -20012))
+        allPanel.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        allPanel.orderOut(nil)
+        // 拆出树与留在树里但 hidden 都算“不可见”；产品语义只要求后者不出现。
+        let allButton = Self.firstView(ofType: NSButton.self, in: allContent)
+        XCTAssertTrue(allButton?.isHidden ?? true,
+                      "没有查询词时「清除搜索」仍然可见 ⇒ 它没有跟着空态条件退场")
+    }
+
+    /// R407 的像素那一半：同上一条帧，按钮真的画出来了。
+    func testQuickPickEmptyStateCTAIsVisibleInTheFrame() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r407-cta-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-empty" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-empty` ⇒ 像素判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-empty-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`quickpick-empty` 读不回字节")
+            }
+            let scale = Double(rep.pixelsWide) / 420.0
+            let message = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow,
+                                           rect: CGRect(x: 40, y: 25, width: 340, height: 22),
+                                           scale: scale)
+            let button = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                          bytesPerRow: rep.bytesPerRow,
+                                          rect: CGRect(x: 170, y: 55, width: 80, height: 30),
+                                          scale: scale)
+            emit("QUICKPICK_EMPTY_CTA_BAND \(tag) 消息带墨=\(message.pixels) 按钮带墨=\(button.pixels)")
+            XCTAssertGreaterThan(message.pixels, 100,
+                                 "\(tag)：消息带没有字 ⇒ 这一页没画出来，按钮带读 0 不能记成产品缺陷")
+            XCTAssertGreaterThan(button.pixels, 20,
+                                 "\(tag)：按钮带读到 \(button.pixels) 个墨像素 ⇒ 空态 CTA 没有画出来")
+        }
+    }
+
     /// R406：换选到另一条记录时，正文必须回到顶部。
     ///
     /// `detail-scroll-top` 是 B 的顶部参照；`detail-scroll-after-switch` 先滚 300pt 再换选 B。

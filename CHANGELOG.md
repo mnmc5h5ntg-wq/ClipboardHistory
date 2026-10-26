@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QuickPick 空结果态补可见「清除搜索」CTA（按钮带旧 0/0 → 新 934/1114）；R406 守卫在 runner 上红的假设被修正（R407 / 第 406 轮 / Round 404 / U-1458…U-1462 · 产品 1 文件，空态 CTA 位）
+
+
 ### 换选记录后详情正文回到顶部（旧 2300→2300、像素差 15.37/15.96% → 0/0）；R405 头跑全绿签收（R406 / 第 405 轮 / Round 403 / U-1452…U-1457 · 产品 3 文件，滚动到位位）
 
 

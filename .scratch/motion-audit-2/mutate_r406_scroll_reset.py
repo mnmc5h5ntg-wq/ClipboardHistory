@@ -23,7 +23,7 @@ MUTANT = '''        lastResetKey = key
 MUTATIONS = [
     ("M1053", "换选正文不归顶（行为判据）", TEXT, NEEDLE, MUTANT,
      "DetailScrollResetTests/testSelectingAnotherEntryBringsTheBodyBackToTheTop",
-     ["换选后正文停在"]),
+     ["换选后正文可见原点"]),
     ("M1054", "换选正文不归顶（像素判据）", TEXT, NEEDLE, MUTANT,
      "UICaptureTests/testDetailScrollReturnsToTopWhenSelectionChanges",
      ["新记录没有回到顶部"]),
