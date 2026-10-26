@@ -28,6 +28,10 @@ NOT-RUN / 阻塞（分开写）：① **R402 新跑未落地**（主笔+追记�
 
 下一轮（R403）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R402 主笔+追记的 head 跑全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
 
+### R402 追记：R401 的 band-empty 改成 XCTSkip + 负半证人（2026-10-26）
+
+R401 三跑 `40291975941↔642e4a7`、`40291993402↔8b4c763`、`40292114337↔18f2f44` 均 failure；Swift/Capture 红名都是 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`，同跑 `TEXT_INK_NOT_RUN light 720=0 640=0` ⇒ runner 1x 拍不出长正文页。R402 第一版只 emit+continue（假通过）；现在 `longTextBandOutcome(ink:witnessInk:)` 三态：目标带空但同帧 detail meta 带（x300..width / y38..48pt）有墨 ⇒ `XCTSkip` + 具名 `LONG_TEXT_PILL_NOT_RUN`；证人带也 0 ⇒ `LONG_TEXT_PILL_RULER_BROKEN` 红。真值表 3 格 + M1046 CAUGHT；本机全量 1063/53/0。`642e4a7` 额外有 Release script 红（sources 格旧伤）；R400 `40288846355↔ed3a30d` success、`40288830013↔41c76cc` 仅 Release script 红。R402 head `40296891274↔a274d4a` 仍 in_progress；新 commit 的 runner 跑待补读。
+
 ## R401 状态（2026-10-26 · 本地 · 第 400 轮 / Round 398）：680/700/720 缩放下长正文仍排进浮动药丸；阈值 400→460 + 三刀（产品 1 文件，窗口缩放位）
 
 最后更新：2026-10-26（本地 · R401 / 第 400 轮 / Round 398）：R399 的尾距只在详情列 <400pt 施加，680/700/720 窗口的 400–440pt 详情列仍让长正文排到右下角 `GlassPill`。四档实测旧最右墨列 **529.5 / 646.5 / 674.0 / 688.0pt**（上限 `宽-80`=520/600/620/640），阈值改 **460** 后新 **479.5 / 568.0 / 590.5 / 604.5pt**（余量 40.5/32.0/29.5/35.5pt）。纯函数新增 440pt 必须 >0，像素判据改四档 600/680/700/720；M1039/M1041/M1043 三刀全 CAUGHT、RESTORE_CLEAN=yes。静态 182 帧零变化，基线复验 182/0；全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=243 可判=837 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=419 bad=0`、全仓 249 文件 / 903 把；产品面连续零改动 **1** 轮（as-of 400，现读 `python3 scripts/product_streak.py --streak-for 400`；本轮产品缩放已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

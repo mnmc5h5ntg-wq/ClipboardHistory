@@ -7459,3 +7459,9 @@ R401 现读：R399 的 `previewTrailingInset` 只在详情列 <400pt 施加；68
 R402 现读：排除名单输入框为空时，「添加」仍是启用态；同帧启用态「移除」文字与「添加」文字的亮度差亮档 **7**、暗档 **5**，远低于 20 —— 两个状态的表达几乎相同。加 `.disabled(newExcludedBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)` 后差 **96 / 93**；空白/纯空格都不再可点。
 **Why**：一个按下去只会得到「没加成」回执的按钮，等于用错误回执替代了禁用态；用户先被允许点、再被拒绝，比一开始就不可点更贵。禁用态必须有可见差异，而同一帧里的启用态控件是比阈值更稳的证人（同机器、同底色、同通道）。
 **How to apply**：① 输入为空/纯空格时禁用提交按钮，条件用 trim 后的空串；② 像素判据优先用同帧启用态作相对证人（差 ≥20），不用跨帧绝对灰阶；③ 若 runner 拍不出整页（band-empty），把测试记具名 `*_NOT_RUN`，不把通道能力写成产品红；④ 主笔与 sources 追记一次 push，避免主笔那跑的 sources 格必红。
+
+### D-394（403）能力出口必须先是 XCTSkip，并带同帧负半证人；证人也没墨就是尺坏
+
+R401 三跑的 Swift/Capture 红名是长正文测试 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`（runner 1x 的 `TEXT_INK_NOT_RUN light 720=0 640=0`）。R402 第一版只 emit + continue，仍把能力缺口当通过；R403 改成三态 `measured / capabilityAbsent(witness) / rulerBroken`：目标带空而同帧详情 meta 带（x300..width / y38..48pt）有墨 ⇒ 具名 `XCTSkip`；证人带也 0 ⇒ `LONG_TEXT_PILL_RULER_BROKEN` 红。
+**Why**：没有证人的空带分不清“这台机器画不出这一条”和“尺装错了/整页没画”；前者是能力出口，后者必须红。emit 后 continue 会让测试保持绿，等于把未覆盖洗成通过。
+**How to apply**：① 能力出口用 `XCTSkip`，并在同一帧上取一个**必须**有墨的证人带；② 证人也空 ⇒ 红，不 skip；③ 三态写成纯函数并配真值表与刀（M1046）；④ 记录 runner 的具名 NOT-RUN，不把红说成绿。

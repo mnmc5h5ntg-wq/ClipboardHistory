@@ -13882,6 +13882,27 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    enum LongTextBandOutcome: Equatable {
+        case measured
+        case capabilityAbsent(witnessInk: Int)
+        case rulerBroken
+    }
+
+    /// 空带的三态：先证明同帧另一处有墨，再决定是能力出口还是尺坏。
+    static func longTextBandOutcome(ink: Int, witnessInk: Int) -> LongTextBandOutcome {
+        if ink > 0 { return .measured }
+        return witnessInk == 0 ? .rulerBroken : .capabilityAbsent(witnessInk: witnessInk)
+    }
+
+    func testLongTextBandEmptyNeedsANonEmptyWitness() {
+        XCTAssertEqual(Self.longTextBandOutcome(ink: 10, witnessInk: 0), .measured)
+        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 12),
+                       .capabilityAbsent(witnessInk: 12),
+                       "同帧另一处有墨 ⇒ 这是具名能力出口，不是尺坏")
+        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 0), .rulerBroken,
+                       "目标带与证人带都空 ⇒ 尺/整页坏了，必须红，不许 skip")
+    }
+
     /// R399：最窄窗里长正文必须给右下角浮动操作栏让位，不能排到药丸下面。
     ///
     /// 这是唯一能把 R399 的窄列状态拍出来的入口：现有 182 张基线帧里没有
@@ -13932,12 +13953,31 @@ final class UICaptureTests: XCTestCase {
                     }
                 }
             }
-            guard ink > 0 else {
-                // R402 CI 归因：runner 的 1x 离屏把长正文页拍成整带零墨（同一次日志里
-                // `TEXT_INK_NOT_RUN light 720=0 640=0`）⇒ 这是这台机器判不了的那一条，
-                // 记具名 NOT-RUN 而不是红；本机四档照判。
-                emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)")
+            // 负半证人：同一帧的详情 meta 带（y 38..48pt，x 300..width）必须先读到墨。
+            // 它证明"这一页被画出来了"；目标带空而证人非空 ⇒ 这台机器拍不出这一条，记
+            // 具名能力出口并 XCTSkip；证人也没有墨 ⇒ 尺/整页坏了，必须红，不许 skip。
+            let wx0 = Int(300 * scale), wx1 = rep.pixelsWide
+            let wy0 = Int(38 * scale), wy1 = Int(48 * scale)
+            var witnessInk = 0
+            for y in max(0, wy0)..<min(rep.pixelsHigh, wy1) {
+                for x in wx0..<wx1 {
+                    let o = y * rep.bytesPerRow + x * 4
+                    let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                        + 0.0722 * Double(base[o + 2])
+                    if luma < 120 { witnessInk += 1 }
+                }
+            }
+            switch Self.longTextBandOutcome(ink: ink, witnessInk: witnessInk) {
+            case .measured:
+                break
+            case .rulerBroken:
+                XCTFail("LONG_TEXT_PILL_RULER_BROKEN：\(width) 的正文带空，"
+                            + "同帧 detail-witness 也 0 颗墨 ⇒ 尺/整页没画，不能 skip")
                 continue
+            case .capabilityAbsent(let witness):
+                emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)（detail-witness=\(witness)）")
+                throw XCTSkip("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 正文带空，"
+                               + "但同帧 detail-witness=\(witness) 有墨 ⇒ 这台机器拍不出这一条")
             }
             let maxPt = Double(maxX) / scale
             let limit = Double(width) - 80.0
