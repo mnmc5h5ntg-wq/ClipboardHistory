@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R396 状态（2026-10-26 · 本地 · 第 395 轮 / Round 393）：不支持登录项的标签被禁用 Toggle 一起压暗（1.76/2.13 → 2.84/4.38）；修 Sources 并补捕获帧像素守卫（产品 1 文件，视觉主线）
+
+最后更新：2026-10-26（本地 · R396 / 第 395 轮 / Round 393）：先真看 `settings-general-login-unsupported` 亮/暗帧：不支持登录项时「开机启动」标签比同组其它标签明显浅。按字墨 bbox 定位（旧 `198.5..248.0 × 120.5..132.0pt`）后只读标签带（x 195..255、y 118..135pt）：旧结构亮 **1.76** / 暗 **2.13:1**（低于禁用标签地板 2.2），新结构亮 **2.84** / 暗 **4.38:1**。产品改法：`Toggle` 加 `.labelsHidden()`，标签移出禁用控件成独立 `Text`（不支持 `.secondary` / 支持 `.primary`，`accessibilityHidden(true)`，支持时仍可点），复选框仍禁用。**自伤**：第一版捕捉守卫的带子（x 380..700/y 225..275）量到第三行「识别截图文字」，旧结构也读 2.81/4.33（假绿）；按 bbox 重钉后 M1033/M1034 双 CAUGHT。默认 182 帧里设置通用 6 帧变化；帧基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1055 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=238 可判=828 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=151 covered=134 arms=410 bad=0`、全仓 244 文件 / 894 把；产品面连续零改动 **1** 轮（as-of 395，现读 `python3 scripts/product_streak.py --streak-for 395`；本轮产品视觉已落 Sources）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；ahead=31，未推送；未 force。
+② 看图找到真缺陷：不支持登录项时标签被禁用 Toggle 一起压暗（旧 1.76/2.13，地板 2.2），修 Sources 后 2.84/4.38。
+③ 判据：源形状守卫 + 真实捕获帧像素守卫；M1033/M1034 双 CAUGHT、还原后双 ESCAPED。
+④ 自伤：第一版像素带量到第三行，旧结构也 2.81/4.33；按字墨 bbox 重钉到 x195..255/y118..135。
+⑤ 367：hidden 表 238 / 可判 828 / rot 0 / 上界 0；预检 151/134/410/0。
+⑥ 验证：build 0 告警；全量 `1055/52/0`；捕获 182 帧、6 帧变化、基线 update 后 182/0；换装 ok；清账表 162=162。
+
+验证读数（现读）：`LABEL_BAND old light=1.76 dark=2.13 / new light=2.84 dark=4.38`（x195..255/y118..135pt）；`WRONG_BAND old light=2.81 dark=4.33`（x380..700/y225..275pt，假绿对照）；`LOGIN_UNSUPPORTED_FRAME light 墨=984 对比=2.84`、`dark 墨=1080 对比=4.38`；`M1033/M1034` 双 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=31（R396 主笔前，提交后 32）；② 旧的两跑与 R387–R395 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+
+下一轮（R397）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；一次 push 只为 head 生成新 run，另外旧的两跑仍要单独按步骤读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources；③ 436 待 runner motion 读数恢复后再决定第五臂 `must_judge`，本轮仍不动 JSON/自测。
+
 ## R395 状态（2026-10-26 · 本地 · 第 394 轮 / Round 392）：设置分类切换的过渡被判 NOT-RUN（2x 采样≈121ms / 1x 2 帧）；只加只读分类缝与源守卫（产品 1 文件（绑定缝），判据账）
 
 最后更新：2026-10-26（本地 · R395 / 第 394 轮 / Round 392）：设置分类切换有 `.id` + `.transition(.contentFade)` + `.animation(value:)`，但从未有整页过程读数。加只读 `categoryOverride` 缝，用产品真实 `SettingsView` 驱动 快捷键→推荐；2x 抓帧中位 **121ms**、过渡 **2** 帧，1x 过渡 **2** 帧（峰值 `0.1441`/`0.1533`，声明 160ms）。首帧/采样成本吞掉 160ms 窗口 ⇒ 按 D-385 记具名 **NOT-RUN**，不判产品硬切；试过 Group 动画、变更点 withAnimation、去 `.id`，均无变化并已回退。分类缝源守卫 + `M1032` CAUGHT；默认 182 帧 `变了=0`，帧基线 182/0。**本轮产品视觉 0 改动**，下一轮必须回产品视觉。BACKLOG 436 无新 runner 读数，仍未结案。全量 `Executed 1054 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=237 可判=826 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=150 covered=133 arms=408 bad=0`、全仓 243 文件 / 892 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 394`）。

@@ -467,6 +467,29 @@ final class MotionCatalogTests: XCTestCase {
                       "初值仍要进 state ⇒ 不传缝时行为与之前一致")
     }
 
+    /// R396：不支持登录项时，标签必须留在被禁用的 Toggle 之外（否则整颗标签被系统压暗）。
+    func testUnsupportedLoginLabelStaysOutsideDisabledToggle() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        // 结构判据：Toggle 与独立 Text 之间必须真的藏着 `.labelsHidden()`。
+        // 只查 `.contains(".labelsHidden()")` 不够 —— 把标签搬回 Toggle 里再删掉 Text，
+        // 那句 still 在别处能命中；这里把「隐藏」钉在**这颗 Toggle 自己身上**。
+        let toggle = settings.range(of: #"Toggle("开机启动", isOn: $launchAtLogin)"#)
+        let label = settings.range(of: #"Text("开机启动")"#)
+        if let toggle, let label, toggle.upperBound < label.lowerBound {
+            let between = settings[toggle.upperBound..<label.lowerBound]
+            XCTAssertTrue(between.contains(".labelsHidden()"),
+                          "标签仍在被禁用的 Toggle 内 ⇒ R396 的结构修复被撤回")
+        } else {
+            XCTFail("标签仍在被禁用的 Toggle 内 ⇒ R396 的结构修复被撤回")
+        }
+        XCTAssertTrue(settings.contains(#"Text("开机启动")"#),
+                      "没有独立的标签 ⇒ 又回到 Toggle 内部、被 disabled 一起压暗")
+        XCTAssertTrue(settings.contains(".accessibilityHidden(true)"),
+                      "独立标签没有从无障碍树里去掉 ⇒ VoiceOver 会读两遍")
+        XCTAssertTrue(settings.contains(".onTapGesture"),
+                      "独立标签不可点 ⇒ 点文字不再切换开关")
+    }
+
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。
     /// 12/13 那一档 API 不存在（编译器实测 macOS 14 起），所以断言跟着 `isSupported` 走 ——
     /// 不是把缺口判成绿，而是"这一档发不出去"这件事本身被钉住。

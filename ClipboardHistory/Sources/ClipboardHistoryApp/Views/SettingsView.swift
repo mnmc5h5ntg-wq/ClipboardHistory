@@ -365,8 +365,24 @@ struct SettingsView: View {
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
-                        Toggle("开机启动", isOn: $launchAtLogin)
-                            .disabled(!loginItemSettings.isSupported)
+                        // R396：不支持时整颗 Toggle（含标签）被系统额外压暗，标签实测
+                        // 亮 1.76 / 暗 2.13:1，低于禁用标签地板 2.2。把标签移出被禁用的
+                        // 控件，复选框仍禁用；标签在支持时仍可直接点。
+                        HStack(spacing: 6) {
+                            Toggle("开机启动", isOn: $launchAtLogin)
+                                .labelsHidden()
+                                .toggleStyle(.checkbox)
+                                .disabled(!loginItemSettings.isSupported)
+                            Text("开机启动")
+                                .foregroundStyle(loginItemSettings.isSupported
+                                                 ? AnyShapeStyle(.primary)
+                                                 : AnyShapeStyle(.secondary))
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if loginItemSettings.isSupported { launchAtLogin.toggle() }
+                                }
+                                .accessibilityHidden(true)
+                        }
                         // 这条回执讲的是**开机启动**这一颗（`loginItemSettings` 的失败原因），
                         // 原来它排在整组最后：中间隔着三个开关与两段说明，
                         // 读起来像在解释上面那段富文本。R33 把它挪回自己那颗下面。

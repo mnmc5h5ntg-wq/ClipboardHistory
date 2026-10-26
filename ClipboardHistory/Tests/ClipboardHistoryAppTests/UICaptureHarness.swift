@@ -3860,6 +3860,69 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+        // R396：不支持登录项时，复选框可以禁用，但「开机启动」标签必须仍可读。
+        // 整页 captured frame 的旧结构实测 亮 1.76 / 暗 2.13:1（低于禁用标签地板 2.2）；
+        // 新结构 2.84 / 4.38。只读第一行标签自己的语义带（x 195..255、y 118..135pt）——
+        // 先按字墨 bbox 定位再看图：R396 第一版写成 x 380..700 / y 225..275，
+        // 实际量的是第三行「识别截图文字」，旧结构也能读 2.81（假绿）。
+        // 捕获产物是 top-left，不做上/下二选一。
+        if settingsFamilyIsBlank {
+            emit("LOGIN_UNSUPPORTED_FRAME_NOT_RUN=flat-page：settings 族整体空白")
+        } else {
+            func loadFrame(_ name: String) -> NSBitmapImageRep? {
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url) else { return nil }
+                return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+            }
+            func reading(_ rep: NSBitmapImageRep, flipped: Bool) -> (fill: Int, ink: Int, contrast: Double) {
+                let scale = Double(rep.pixelsWide) / 720.0
+                let x0 = Int(195 * scale), x1 = Int(255 * scale)
+                let y0p = Int(118 * scale), y1p = Int(135 * scale)
+                let y0 = flipped ? rep.pixelsHigh - y1p : y0p
+                let y1 = flipped ? rep.pixelsHigh - y0p : y1p
+                guard let base = rep.bitmapData else { return (0, 0, 0) }
+                var values: [Int] = []
+                for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+                    for x in x0..<min(rep.pixelsWide, x1) {
+                        let o = y * rep.bytesPerRow + x * 4
+                        values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                           + 0.0722 * Double(base[o + 2])).rounded()))
+                    }
+                }
+                var hist: [Int: Int] = [:]
+                for v in values { hist[v / 4, default: 0] += 1 }
+                let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+                let inks = values.filter { abs($0 - fill) > 40 }
+                let mean = inks.isEmpty ? fill : inks.reduce(0, +) / inks.count
+                func rel(_ v: Int) -> Double {
+                    let x = Double(v) / 255
+                    return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+                }
+                let a = rel(mean), b = rel(fill)
+                return (fill, inks.count, (max(a, b) + 0.05) / (min(a, b) + 0.05))
+            }
+            for tag in ["light", "dark"] {
+                let name = "settings-general-login-unsupported-720x540-\(tag).png"
+                guard let rep = loadFrame(name) else {
+                    XCTFail("LOGIN_UNSUPPORTED_FRAME_MISSING：\(tag) 帧不在捕获目录")
+                    continue
+                }
+                // 捕获产物是 top-left（与 /tmp 帧逐像素对过）；不做「上下二选一」，
+                // 否则下半张卡里的说明文字会顶替标签、把 1.76 读成 2.8（M1033 第一版）。
+                let r = reading(rep, flipped: false)
+                emit("LOGIN_UNSUPPORTED_FRAME \(tag) fill=\(r.fill) 墨=\(r.ink)"
+                     + " 对比=\(String(format: "%.2f", r.contrast))")
+                if r.ink == 0 {
+                    emit("LOGIN_UNSUPPORTED_FRAME_NOT_RUN=band-empty：\(tag)")
+                    continue
+                }
+                XCTAssertGreaterThanOrEqual(r.contrast, 2.2,
+                                            "\(tag)：不支持登录项时标签对卡片只有 "
+                                                + "\(String(format: "%.2f", r.contrast)):1（地板 2.2）"
+                                                + " ⇒ 禁用复选框把解释标签一起压没了")
+            }
+        }
+
         // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，
