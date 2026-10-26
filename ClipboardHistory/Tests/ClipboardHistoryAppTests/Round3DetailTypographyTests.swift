@@ -258,6 +258,8 @@ final class Round3DetailTypographyTests: XCTestCase {
                        "宽详情列的 68ch 可读列不该被浮动药丸再缩窄")
         XCTAssertEqual(DetailTypography.previewTrailingInset(forDetailWidth: 470), 0,
                        "750pt 窗口的详情列仍放得下正文与药丸之间的间隔")
+        XCTAssertGreaterThan(DetailTypography.previewTrailingInset(forDetailWidth: 440), 0,
+                             "680/700/720 窗口的 440pt 详情列仍会让长正文排进药丸（R401 实拍）")
         let narrow = DetailTypography.previewTrailingInset(forDetailWidth: 320)
         XCTAssertGreaterThanOrEqual(narrow, 80,
                                     "窄详情列的尾距没有给药丸让位 ⇒ 正文会排到药丸下面（R399 实拍）")

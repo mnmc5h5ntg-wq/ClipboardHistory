@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R401 状态（2026-10-26 · 本地 · 第 400 轮 / Round 398）：680/700/720 缩放下长正文仍排进浮动药丸；阈值 400→460 + 三刀（产品 1 文件，窗口缩放位）
+
+最后更新：2026-10-26（本地 · R401 / 第 400 轮 / Round 398）：R399 的尾距只在详情列 <400pt 施加，680/700/720 窗口的 400–440pt 详情列仍让长正文排到右下角 `GlassPill`。四档实测旧最右墨列 **529.5 / 646.5 / 674.0 / 688.0pt**（上限 `宽-80`=520/600/620/640），阈值改 **460** 后新 **479.5 / 568.0 / 590.5 / 604.5pt**（余量 40.5/32.0/29.5/35.5pt）。纯函数新增 440pt 必须 >0，像素判据改四档 600/680/700/720；M1039/M1041/M1043 三刀全 CAUGHT、RESTORE_CLEAN=yes。静态 182 帧零变化，基线复验 182/0；全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=243 可判=837 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=419 bad=0`、全仓 249 文件 / 903 把；产品面连续零改动 **1** 轮（as-of 400，现读 `python3 scripts/product_streak.py --streak-for 400`；本轮产品缩放已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R400 两跑 `41c76cc`/`ed3a30d` 仍 in_progress ⇒ NOT-RUN；R399 修复由 073fd6e/9641073 success 签收。
+② 缩放位：R399 阈值 <400 漏掉 680/700/720；旧四档全部越限，阈值改 460 后全部在上限内。
+③ 判据：纯策略 440>0 + 四档自拍自量像素；M1039/M1041/M1043 三刀 CAUGHT。
+④ 436：新跑无新 facts，保持 R399 结案；不重猜 must_judge。
+⑤ 367：hidden 表 243 / 可判 837 / rot 0 / 上界 0；预检 156/139/419/0。
+⑥ 验证：build 0 告警；全量 `1061/53/0`；捕获 182 帧、0 变化、基线 182/0；换装 ok；清账表 162=162；电池待复跑。
+
+NOT-RUN / 阻塞（分开写）：① **R400 两跑 in_progress**（`40288830013`/`40288846355`），R402 ⓪ 补读；② **R401 新跑未落地**；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
+
+下一轮（R402）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R400/R401 推送跑的全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R400 状态（2026-10-26 · 本地 · 第 399 轮 / Round 397）：「原文/渲染」标签不再一帧硬换（1x 0→5 过渡帧）；R399 三条 CI 修复在 runner 签收；436 复核（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R400 / 第 399 轮 / Round 397）：正文在「原文/渲染」间走 `.contentFade`，按钮标签原来一帧硬换。`DetailView.MarkdownModeButton` 的 `Text(title)` 加 `.id(title)` + `.transition(.opacity)` + `.animation(for: .contentFade, value: title)`。胶片现读 1x 旧 **0** → 新 **5** 个过渡帧（峰值 0.0048→0.0097）；2x 旧 10 / 新 7（2x 不能单独判过程，以 1x 为判据）。M1042 拆过渡 ⇒ CAUGHT、还原干净、复跑 ESCAPED；静态 182 帧零变化，基线复验 182/0。全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=243 可判=836 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=418 bad=0`、全仓 249 文件 / 902 把；产品面连续零改动 **1** 轮（as-of 399，现读 `python3 scripts/product_streak.py --streak-for 399`；本轮产品动效已落 Sources）。

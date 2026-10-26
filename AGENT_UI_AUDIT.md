@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 400 轮（R401 · 2026-10-26 · U-1426…U-1430）：680/700/720 缩放下长正文仍排进浮动药丸（600/680/700/720 四档均越界 → 全部让位）；阈值 400→460 + 三刀（U-1426…U-1430 · 产品 1 文件，窗口缩放位）
+
+- **U-1426：⓪ R400 队列。** `40288830013 ↔ 41c76cc`、`40288846355 ↔ ed3a30d` 现读都 **in_progress**（`conclusion` 空、0 字节日志不算读数）⇒ 具名 NOT-RUN；`40285533750 ↔ 9641073`、`40285152509 ↔ 073fd6e` success 继续作为 R399 修复的签收；旧两跑/对照 success。R401 新 push 的 run 待落地，R402 ⓪ 补读。**436**：新跑无新 `MOTION_FLOOR_FACTS` 可读，保持 R399 的 runner `judged=5/5`、`MOTION_FLOOR_OK=5/5`、`REDS=0` 结案，不重新猜 `must_judge`。
+- **U-1427：② 窗口缩放位 —— R399 的 <400 阈值漏掉 680/700/720。** 真看图：600/680/700/720 四个窗宽 + 长正文时，正文最右墨列分别旧 **529.5 / 646.5 / 674.0 / 688.0pt**，全部越过 `宽-80`（520/600/620/640）；R399 只在详情列 <400 时让位，680–720 的 400–440pt 详情列因此仍把正文排进右下角 `GlassPill`。修法：`DetailTypography.previewTrailingInset` 的阈值 **400→460**（仍是 88pt 尾距）；750 的 470pt 列不动。新读数 **479.5 / 568.0 / 590.5 / 604.5pt**，四档均 ≤ 上限（余量 40.5/32.0/29.5/35.5pt）。产品 1 文件。
+- **U-1428：判据与刀。** 纯函数新增 440pt 必须 >0；自拍自量像素判据 `testLongTextAtMinimumWidthDoesNotRunUnderTheFloatingPill` 改为四档 600/680/700/720（读正文前几行 y80..220pt 的最右墨列，药丸在下方不参与）。`M1039`（策略置零）、`M1041`（像素）、`M1043`（阈值退回 400）三刀全 **CAUGHT**、红得不对=0、RESTORE_CLEAN=yes；一张表只写 `DetailTypography.swift` 一个文件靶。R400 的 M1042 标签过渡刀仍 CAUGHT。
+- **U-1429：③ 436 复核。** 新跑 in_progress，无新 motion facts；保持 R399 结案（`judged=5/5`、`MOTION_FLOOR_OK=5/5`、`REDS=0`），不重开、不猜 `must_judge`；只有新跑出现新 unlisted 才带事实重开。
+- **U-1430：① 367 rot 与八步。** `HIDDEN_ARMS 表=243 可判=837 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=419 bad=0`、全仓 249 文件 / 903 把；`M1039/M1041/M1043` 全 CAUGHT。build **0** 告警；全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r401_shots`，与 R400 逐张比 `变了=0`（缩放修复只改窄列状态，182 张默认帧不动），帧基线复验 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 400；本轮产品缩放已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 400`）。电池 `Ran 683 / OK (skipped=4)`。
+
 ## 第 399 轮（R400 · 2026-10-26 · U-1421…U-1425）：「原文/渲染」标签不再一帧硬换（1x 0→5 过渡帧）；R399 三条 CI 修复在 runner 签收；436 复核（U-1421…U-1425 · 产品 1 文件，动效主线）
 
 - **U-1421：⓪ R399 队列与三条修复的 runner 签收。** `40285533750 ↔ 9641073` / completed / **success**；`40285152509 ↔ 073fd6e` / completed / **success**；`40285128902 ↔ c0091fb` / completed / **failure**，唯一失败步骤 `STEP[9] Release script tests`（`test_the_sources_cell_agrees_with_git` + `test_the_cell_agrees_with_its_own_source`：c0091fb 这一笔里报告 sources 格还写 `ab2da31`；`test_the_skip_roster` 在同一次嵌套卷里没拿到结论行）——这是报告格未随主笔同提交，不是产品红；紧随的 `073fd6e`/`9641073` 两跑 success 把产品三条修复签掉。runner 现读：copy 失败红 **亮 5.18 / 暗 3.34**（地板 3.0，R399 修复生效）；录制环 **light 568 / dark 568，idle 0**（修复生效）；详情加载句 **亮 4.73 / 暗 5.78**（修复生效）；空态 hint 仍 `EMPTY_STATE_HINT_NOT_RUN=band-empty`（具名未覆盖，不写成绿）。新 R400 push 的 run 待落地，见 R401 ⓪。

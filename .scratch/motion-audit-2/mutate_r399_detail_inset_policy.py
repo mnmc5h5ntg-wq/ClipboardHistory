@@ -11,15 +11,20 @@ import time
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 TYPO = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Utilities/DetailTypography.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
-NEEDLE = """        width > 0 && width < 400 ? floatingPillReserve : 0"""
+NEEDLE = """        width > 0 && width < 460 ? floatingPillReserve : 0"""
+THRESHOLD = """        width > 0 && width < 460 ? floatingPillReserve : 0"""
 MUTANT = """        0"""
 MUTATIONS = [
     ("M1039", "窄列尾距策略置零（源判据）", TYPO, NEEDLE, MUTANT,
      "Round3DetailTypographyTests/testPreviewTrailingInsetOnlyAppliesToNarrowDetailColumns",
-     ["窄详情列的尾距没有给药丸让位"]),
+     ["440pt 详情列仍会让长正文排进药丸"]),
     ("M1041", "窄列尾距策略置零（像素判据）", TYPO, NEEDLE, MUTANT,
      "UICaptureTests/testLongTextAtMinimumWidthDoesNotRunUnderTheFloatingPill",
-     ["越过了 500pt 上限"]),
+     ["越过了"]),
+    ("M1043", "窄列阈值退回 400（缩放档漏让位）", TYPO, THRESHOLD,
+     """        width > 0 && width < 400 ? floatingPillReserve : 0""",
+     "UICaptureTests/testLongTextAtMinimumWidthDoesNotRunUnderTheFloatingPill",
+     ["680pt：长正文最右墨列"]),
 ]
 
 

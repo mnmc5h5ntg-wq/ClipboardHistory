@@ -13853,41 +13853,48 @@ final class UICaptureTests: XCTestCase {
         }
         store.perform(.selectOnly(longEntry))
         let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("r399-long-text-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("r401-long-text-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
-        let fixture = Fixture("r399-long-text-min", NSSize(width: 600, height: 440)) {
-            AnyView(ContentView(historyStore: store))
-        }
-        let file = scratch.appendingPathComponent("r399-long-text-min.png")
-        _ = try render(fixture, appearance: .aqua, to: file)
-        let image = try XCTUnwrap(NSImage(contentsOf: file))
-        let rep = try XCTUnwrap(NSBitmapImageRep(data: image.tiffRepresentation ?? Data()))
-        let base = try XCTUnwrap(rep.bitmapData)
-        let scale = Double(rep.pixelsWide) / 600.0
-        let x0 = Int(280 * scale), x1 = Int(530 * scale)
-        let y0 = Int(90 * scale), y1 = Int(420 * scale)
-        var maxX = -1
-        var ink = 0
-        for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
-            for x in x0..<min(rep.pixelsWide, x1) {
-                let o = y * rep.bytesPerRow + x * 4
-                let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
-                    + 0.0722 * Double(base[o + 2])
-                if luma < 120 {
-                    ink += 1
-                    maxX = max(maxX, x)
+        // R401：600/680/700/720 四个窗宽；680–720 是 R399 的 <400 阈值漏掉的缩放档。
+        // 只读正文前几行（y 80..220pt）的最右墨列 —— 这一段在药丸上方，不会把药丸图标算成文字。
+        for width in [600, 680, 700, 720] {
+            let fixture = Fixture("r401-long-text-\(width)", NSSize(width: CGFloat(width), height: 440)) {
+                AnyView(ContentView(historyStore: store))
+            }
+            let file = scratch.appendingPathComponent("r401-long-text-\(width).png")
+            _ = try render(fixture, appearance: .aqua, to: file)
+            let image = try XCTUnwrap(NSImage(contentsOf: file))
+            let rep = try XCTUnwrap(NSBitmapImageRep(data: image.tiffRepresentation ?? Data()))
+            let base = try XCTUnwrap(rep.bitmapData)
+            let scale = Double(rep.pixelsWide) / Double(width)
+            let x0 = Int(280 * scale)
+            let y0 = Int(80 * scale), y1 = Int(220 * scale)
+            var maxX = -1
+            var ink = 0
+            for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+                for x in x0..<rep.pixelsWide {
+                    let o = y * rep.bytesPerRow + x * 4
+                    let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                        + 0.0722 * Double(base[o + 2])
+                    if luma < 120 {
+                        ink += 1
+                        maxX = max(maxX, x)
+                    }
                 }
             }
+            guard ink > 0 else {
+                return XCTFail("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 的正文带里一个墨都没有")
+            }
+            let maxPt = Double(maxX) / scale
+            let limit = Double(width) - 80.0
+            emit("LONG_TEXT_PILL_CLEAR width=\(width) maxX=\(String(format: "%.1f", maxPt))pt "
+                 + "墨=\(ink) 上限=\(String(format: "%.1f", limit))pt")
+            XCTAssertLessThanOrEqual(maxPt, limit,
+                                     "\(width)pt：长正文最右墨列 \(String(format: "%.1f", maxPt))pt "
+                                         + "越过了 \(String(format: "%.1f", limit))pt 上限 "
+                                         + "⇒ 正文排进了右下角浮动操作栏下面（R401 缩放档实拍）")
         }
-        guard ink > 0 else {
-            return XCTFail("LONG_TEXT_PILL_NOT_RUN=band-empty：正文带里一个墨都没有")
-        }
-        let maxPt = Double(maxX) / scale
-        emit("LONG_TEXT_PILL_CLEAR maxX=\(String(format: "%.1f", maxPt))pt 墨=\(ink) 上限=500.0pt")
-        XCTAssertLessThanOrEqual(maxPt, 500.0,
-                                 "长正文最右墨列 \(String(format: "%.1f", maxPt))pt 越过了 500pt 上限 "
-                                     + "⇒ 正文排进了右下角浮动操作栏下面（R399 实拍）")
     }
 
     func testResetDefaultButtonShowsHoverOnlyWhenEnabled() throws {

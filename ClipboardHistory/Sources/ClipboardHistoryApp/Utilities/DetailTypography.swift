@@ -27,11 +27,12 @@ enum DetailTypography {
     ///
     /// 600×440 最窄窗里详情列只有约 320pt，长正文会一直排到右下角，
     /// 被 `GlassPill` 压住（实测：正文最后几行从药丸左侧伸进去）。
-    /// 88 = 药丸约 66 + 外距 12 + 与正文的 10pt 间隔；只在详情列 <400pt 施加，
-    /// 宽窗口的 68ch 可读列不动。
+    /// 88 = 药丸约 66 + 外距 12 + 与正文的 10pt 间隔。R401 把阈值从 400 收到 **460**：
+    /// 680/700/720 窗口的详情列 400–440pt 仍会让长正文排进药丸（1x 实测），
+    /// 460 以下一律让位；750 窗口的 470pt 列不动。
     static let floatingPillReserve: CGFloat = 88
     static func previewTrailingInset(forDetailWidth width: CGFloat) -> CGFloat {
-        width > 0 && width < 400 ? floatingPillReserve : 0
+        width > 0 && width < 460 ? floatingPillReserve : 0
     }
 
     static var bodyFont: NSFont { .monospacedSystemFont(ofSize: bodyFontSize, weight: .regular) }
