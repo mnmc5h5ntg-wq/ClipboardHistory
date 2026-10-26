@@ -73,7 +73,11 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         selectCurrentRow()
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        panel.makeFirstResponder(field)
+        if panel.makeFirstResponder(field) {
+            // 面板一出来字段就是第一响应者：这是「可以打字」的真实承诺，焦点边界要跟着亮。
+            // 拿不到第一响应者就不亮 —— 与 R141 录制环同一条规矩，别画假承诺。
+            searchBackdrop?.focused = true
+        }
     }
 
     /// 只给离屏帧夹具用（`UICaptureTests`）：把面板建出来、按 `query` 填好行，
@@ -94,7 +98,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 与 `SettingsView.initialCategory` / `DetailView.initialMarkdownMode` 同一手法：
     /// 产品路径一行都不改，只是把"拍得到"这件事变成可能。
     func windowForCapture(query: String = "", hoveredRow: Int? = nil,
-                          searchHovered: Bool = false) -> NSWindow? {
+                          searchHovered: Bool = false,
+                          searchFocused: Bool = false) -> NSWindow? {
         let panel = ensurePanel()
         refreshEntries()
         model.reset()
@@ -105,6 +110,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         selectCurrentRow()
         rowHoveredForCapture = hoveredRow
         searchBackdrop?.hoveredForCapture = searchHovered
+        searchBackdrop?.focusedForCapture = searchFocused
         searchBackdrop?.needsDisplay = true
         searchBackdrop?.displayIfNeeded()
         return panel
@@ -130,6 +136,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     }
 
     func hide() {
+        searchBackdrop?.focused = false
         panel?.orderOut(nil)
     }
 
@@ -373,6 +380,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         ])
         field.onHoverChange = { [weak backdrop] hovering in
             backdrop?.hovered = hovering
+        }
+        field.onFocusChange = { [weak backdrop] focused in
+            backdrop?.focused = focused
         }
 
         self.panel = panel
@@ -907,7 +917,22 @@ final class QuickPickSearchField: NSTextField {
     var forwarding: ((NSEvent) -> Bool)?
     /// R409：悬停只用来点亮搜索框的边界，不改输入行为。
     var onHoverChange: ((Bool) -> Void)?
+    /// R415：焦点边界。面板一出现字段就是第一响应者，这条路要能自己报出来；
+    /// 产品只在 `makeFirstResponder` 真的成功时点亮（`show()` 那边同一句话）。
+    var onFocusChange: ((Bool) -> Void)?
     private var tracking: NSTrackingArea?
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted { onFocusChange?(true) }
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { onFocusChange?(false) }
+        return resigned
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -940,11 +965,15 @@ final class QuickPickSearchField: NSTextField {
 /// 浮层的主输入框却一直是一行裸文字；这里只在悬停时补边界，静置保持原样。
 final class QuickPickSearchBackdrop: NSView {
     var hovered = false { didSet { if hovered != oldValue { needsDisplay = true } } }
+    /// R415：面板打开后字段就是第一响应者，焦点边界与悬停共用同一档视觉。
+    var focused = false { didSet { if focused != oldValue { needsDisplay = true } } }
     /// 取证键：`nil` 才读产品 hover；`true/false` 时完全替代它。
     var hoveredForCapture: Bool? = nil { didSet { if hoveredForCapture != oldValue { needsDisplay = true } } }
+    /// R415：焦点态的取证键；与 hover 的键分开，夹具才能只点亮焦点。
+    var focusedForCapture: Bool? = nil { didSet { if focusedForCapture != oldValue { needsDisplay = true } } }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard hoveredForCapture ?? hovered else { return }
+        guard (focusedForCapture ?? focused) || (hoveredForCapture ?? hovered) else { return }
         let fill = NSColor.labelColor.withAlphaComponent(0.10)
         let stroke = NSColor.labelColor.withAlphaComponent(0.22)
         let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),

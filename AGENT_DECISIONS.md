@@ -7561,3 +7561,20 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：把"机器要求瞬移"与"产品没有动画"分开；runner 的下一次读数能直接看到 reduce/override。不是改门槛，也不是把红写成绿：产品的 reduce 分支仍由 `SelectionRevealMotion` 真值表守着。
 - 兼容性/迁移：仅测试可设；产品路径未变。
 - 回滚：删 override 与测试设置即可；或 `git revert` 本轮提交。
+
+## D-409 QuickPick 搜索框的焦点边界（R415）
+
+- 背景：面板搜索框是 `isBordered=false`、`drawsBackground=false` 的裸字段；R409 只在悬停点亮边界；而 `show()` 一出来字段就是第一响应者，焦点没有任何可见边界，用户不知道"可以打字"的承诺落在哪。
+- 决定：`QuickPickSearchField` 重写 `becomeFirstResponder/resignFirstResponder` 并回调 `onFocusChange`；`QuickPickSearchBackdrop` 增加 `focused` 与 `focusedForCapture`；焦点与悬停共用同一档 active chrome；`show()` 只在 `makeFirstResponder(field)` 成功时点亮，`hide()` 收回；`windowForCapture(searchFocused:)` 只给夹具。
+- 理由：焦点是真实状态（面板打开即有），不是悬停的替代；同一档视觉让"这个框是活的"只有一种说法；拿不到第一响应者就不亮，避免假承诺；焦点帧可在离屏确定性渲染。
+- 兼容性/迁移：仅 QuickPick 面板内部；`windowForCapture` 新增默认参数，既有调用点/帧不变。
+- 回滚：删 focus 回调/backdrop 的 focused 与 show/hide 两句即可；或 `git revert` 本轮提交。
+
+
+## D-410 撤掉整页 settings 夹具的 settle，保留组件胶囊帧的 settle（R415）
+
+- 背景：R414 为了让侧栏胶囊的 PreferenceKey 回填，给整页 settings 夹具加了 0.1s settle；runner 1x 因此从"空白帧（能力闸门 skip）"变成 vibrant/contentFade 中段，probes/rowtier/card/disabled 8 条红；R412 两红已消失、R413 滚动两红已绿（reduce=true）。
+- 决定：撤掉整页 settings 的 settle；`settingssidebar-selection-*` 组件帧保留 0.1s；整页静置帧回到捕获管线的原状态，组件帧继续作为胶囊证据。本地撤前后 200 帧逐字节相同（既有 192 不变）。
+- 理由：0.1s 既不够过 contentFade（0.16），又足以让 runner 的设置内容不再全空白；同一条 settle 既没帮上胶囊（PreferenceKey 当次布局已回填），又把隐式能力闸门打破。不新增/放宽任何判据阈值。
+- 兼容性/迁移：只改测试夹具；产品与帧内容不变。
+- 回滚：恢复 0.1s settle 即可；或 `git revert` 本轮提交。

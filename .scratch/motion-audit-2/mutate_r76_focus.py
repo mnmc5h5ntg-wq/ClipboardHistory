@@ -55,12 +55,12 @@ MUTATIONS = [
      '        field.drawsBackground = false\n',
      '        field.focusRingType = .none\n        field.drawsBackground = false  // R76 变异\n'),
 
-    ("M399", "产品侧：把 `show()` 里那句 `makeFirstResponder(field)` 删掉"
+    ("M399", "产品侧：把 `show()` 的焦点接收对象换成 nil（产品不聚焦）"
              "⇒ 只有源码守卫该红（①②③④全绿，因为夹具那条路径自己会聚焦）"
              "⇒ 钉的是'产品不聚焦'这一族回归在帧与行为判据里都没有影子，只有这条守卫抓得到",
      QPC, BOTH,
-     '        panel.makeFirstResponder(field)\n',
-     '        // R76 变异：焦点没人给了\n'),
+     '        if panel.makeFirstResponder(field) {\n',
+     '        if panel.makeFirstResponder(nil) {\n'),
 
     ("M400", "判据侧：拿 `focused` 减它自己（**本轮真实犯过的那一次**，U-131）"
              "⇒ ②该红：'两态必须不同'那格正对照仍然绿（响应者确实被换掉了），"

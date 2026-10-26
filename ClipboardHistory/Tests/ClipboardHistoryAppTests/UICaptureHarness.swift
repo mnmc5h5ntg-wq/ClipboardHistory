@@ -2837,6 +2837,64 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R415：焦点边界。面板一打开字段就是第一响应者，但这条状态以前没有帧可看；
+    /// 与 hover 同一档视觉、不同的触发。旧的「只在悬停点亮」在这条判据下 focus=idle（红）。
+    func testQuickPickSearchFieldFocusLiftsItsChrome() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r415-search-focus-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-list" }),
+                  let focusFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-search-focus" }) else {
+                return XCTFail("\(tag)：idle/focus 两帧缺一张 ⇒ 像素判据没有对象")
+            }
+            let idleFile = scratch.appendingPathComponent("idle-\(tag).png")
+            let focusFile = scratch.appendingPathComponent("focus-\(tag).png")
+            _ = try render(idleFixture, appearance: appearance, to: idleFile)
+            _ = try render(focusFixture, appearance: appearance, to: focusFile)
+            guard let id = try? Data(contentsOf: idleFile),
+                  let ir = NSBitmapImageRep(data: id), let idle = ir.bitmapData,
+                  let fd = try? Data(contentsOf: focusFile),
+                  let fr = NSBitmapImageRep(data: fd), let focus = fr.bitmapData,
+                  ir.pixelsWide == fr.pixelsWide, ir.pixelsHigh == fr.pixelsHigh else {
+                return XCTFail("\(tag)：两帧读不回来或尺寸不一致 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(ir.pixelsWide) / 420.0
+            func meanLuma(_ bytes: UnsafeMutablePointer<UInt8>, rect: CGRect, bpr: Int, spp: Int) -> Double {
+                let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+                let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+                var sum = 0.0, n = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let o = y * bpr + x * spp
+                        sum += (Double(bytes[o]) + Double(bytes[o + 1]) + Double(bytes[o + 2])) / 3.0
+                        n += 1
+                    }
+                }
+                return n > 0 ? sum / Double(n) : -1
+            }
+            let fillRect = CGRect(x: 300, y: 12, width: 100, height: 28)
+            let outside = CGRect(x: 300, y: 60, width: 100, height: 20)
+            let idleMean = meanLuma(idle, rect: fillRect, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
+            let focusMean = meanLuma(focus, rect: fillRect, bpr: fr.bytesPerRow, spp: fr.samplesPerPixel)
+            let outsideMean = meanLuma(idle, rect: outside, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
+            emit("QUICKPICK_SEARCH_FOCUS \(tag) 静置均值=\(String(format: "%.1f", idleMean))"
+                 + " 焦点均值=\(String(format: "%.1f", focusMean))"
+                 + " 框外均值=\(String(format: "%.1f", outsideMean))")
+            XCTAssertGreaterThan(abs(focusMean - outsideMean), 3,
+                                 "\(tag)：焦点框内与框外只差 \(String(format: "%.1f", abs(focusMean - outsideMean)))"
+                                 + " ⇒ 焦点边界没画出来")
+            XCTAssertGreaterThan(abs(idleMean - focusMean), 5,
+                                 "\(tag)：静置与焦点框内只差 \(String(format: "%.1f", abs(idleMean - focusMean)))"
+                                 + " ⇒ 焦点没有抬边界/填充")
+        }
+    }
+
     /// R409：QuickPick 主输入框的悬停/焦点边界必须真的接到产品面板上。
     func testQuickPickSearchHoverSeamReachesTheBackdrop() throws {
         _ = NSApplication.shared
@@ -5617,6 +5675,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-search-hover", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", searchHovered: true)))
+        // R415：焦点边界。面板打开时字段就是第一响应者，但这条状态以前没有帧可看；
+        // 与 hover 同一档视觉，取证键分开（只点亮焦点）。
+        results.append(Fixture("quickpick-search-focus", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", searchFocused: true)))
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -6032,12 +6095,11 @@ final class UICaptureTests: XCTestCase {
         // 离屏窗口又不会建无障碍树（试过：BFS 只能走到根节点），
         // 所以用 initialCategory 注入，而不是靠"点一下"。
         for category in SettingsCategory.allCases {
-            results.append(Fixture("settings-\(category.rawValue)", NSSize(width: 720, height: 540),
-                                   settle: {
-                // R414：选中胶囊的行 frame 走 PreferenceKey 回填；给它一个落定回合，
-                // 否则整页帧可能在胶囊还没挂上时就按快门（选中行会少一层底）。
-                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-            }) {
+            // R415：这里**不再加 settle**。R414 为了让侧栏胶囊的 PreferenceKey 回填而等了 0.1s，
+            // 但 runner 1x 的设置内容帧因此从"空白（能力闸门→skip）"变成"半绘制/vibrant"，
+            // probes/rowtier/card/disabled 四族一起红（run 40408685273）。胶囊的组件帧有自己的
+            // 0.1s settle；整页静置帧仍交给捕获管线（本地既有 192 帧逐像素不变）。
+            results.append(Fixture("settings-\(category.rawValue)", NSSize(width: 720, height: 540)) {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
@@ -16752,7 +16814,8 @@ final class UICaptureTests: XCTestCase {
         /// 默认 `nil` ⇒ 其余浮层帧逐字节不变，这是它们能继续当基线的前提。
         static func builder(store: HistoryStore, query: String,
                             hoveredRow: Int? = nil,
-                            searchHovered: Bool = false) -> @MainActor () -> NSWindow? {
+                            searchHovered: Bool = false,
+                            searchFocused: Bool = false) -> @MainActor () -> NSWindow? {
             var kept: QuickPickController?
             return {
                 if kept == nil {
@@ -16760,7 +16823,8 @@ final class UICaptureTests: XCTestCase {
                 }
                 guard let controller = kept else { return nil }
                 return controller.windowForCapture(query: query, hoveredRow: hoveredRow,
-                                                   searchHovered: searchHovered)
+                                                   searchHovered: searchHovered,
+                                                   searchFocused: searchFocused)
             }
         }
     }

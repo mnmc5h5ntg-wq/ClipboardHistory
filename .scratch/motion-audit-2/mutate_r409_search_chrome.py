@@ -9,13 +9,13 @@ HOVER_NEEDLE = '''        field.onHoverChange = { [weak backdrop] hovering in
             backdrop?.hovered = hovering
         }'''
 HOVER_MUTANT = '''        // MUTANT: 产品 hover/焦点不再接到边界'''
-ACTIVE_NEEDLE = '        guard hoveredForCapture ?? hovered else { return }'
+ACTIVE_NEEDLE = '        guard (focusedForCapture ?? focused) || (hoveredForCapture ?? hovered) else { return }'
 ACTIVE_MUTANT = '        guard false else { return }'
 MUTATIONS = [
     ("M1059", "产品 hover/焦点不接边界（源判据）", CTRL, HOVER_NEEDLE, HOVER_MUTANT,
      "UICaptureTests/testQuickPickSearchHoverSeamReachesTheBackdrop",
      ["真实 hover 没有接到边界视图"]),
-    ("M1060", "悬停不抬边界（像素判据）", CTRL, ACTIVE_NEEDLE, ACTIVE_MUTANT,
+    ("M1060", "悬停/焦点不抬边界（像素判据）", CTRL, ACTIVE_NEEDLE, ACTIVE_MUTANT,
      "UICaptureTests/testQuickPickSearchFieldHoverLiftsItsChrome",
      ["悬停没有抬边界/填充"]),
 ]

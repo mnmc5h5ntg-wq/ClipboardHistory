@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QuickPick 搜索框补焦点边界（静置 255/30 → 焦点 235/47.5）；R414 run 的设置内容红由撤 settle 修、R413 滚动两红已绿（reduce=true）（R415 / 第 414 轮 / Round 412 / U-1498…U-1502 · 产品 1 文件，面板搜索焦点位）
+
+
 ### 设置侧栏选中胶囊滑动（静置/中点/落定 35.8→51.2→67.5pt）；R412 两红在 runner 消失、滚动行为两红由 reduce-motion 测试 seam 修（R414 / 第 413 轮 / Round 411 / U-1493…U-1497 · 产品 1 文件，设置侧栏选择滑移位）
 
 

@@ -18467,3 +18467,21 @@ QuickPick 主输入框一直是一行裸文字，和主窗口 `SearchField` 的�
 | 可复核性 | 15/15 | 三态中心/计数、六张帧、静态 192 差 0、四把刀、M818 18 变、precheck/rot/CI 原文都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 412 · R415（第 414 轮 · 2026-10-27）：QuickPick 搜索框补焦点边界（静置 255/30 → 焦点 235/47.5）；R414 run 的设置内容红由撤 settle 修、R413 滚动两红已绿（reduce=true）（产品 1 文件，面板搜索焦点位）
+
+QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打开字段就是第一响应者，焦点没有可见边界。新：`QuickPickSearchField` 的 `become/resignFirstResponder` 回调 `onFocusChange`；`QuickPickSearchBackdrop` 增加 `focused/focusedForCapture`，焦点与悬停同档；`show()` 只在 `makeFirstResponder(field)` 成功时点亮，`hide()` 收回；夹具 `windowForCapture(searchFocused:)`。真看图：静置裸文字，焦点/悬停圆角底与描边；同带 255/30 → 235/47.5，框外 194.3/94.7。新增焦点 2 帧，既有 198 帧不变，基线 200。M1080–M1083 4/4 CAUGHT；R409 M1060 重钉后 2/2、R76 M399 重钉后 5/5，HIDDEN rot 1→0。R414 run：2 个失败步骤，R412 两红消失；R413 滚动两红已绿（reduce=true override=false、首=199/末=1430/2 中间值）；新红是 R414 给整页 settings 加的 0.1s settle 让 runner 帧落在 vibrant/contentFade 中段（probes/rowtier/card/disabled 8 条），撤掉 settle 后本地 200 帧逐字节不变。胶囊组件 1x 33.5/49.5/65.5（2x 35.8/51.2/67.5）。全量 1096/53/0；换装 ok；清账 162=162；HIDDEN 258/874 rot=0；预检 171/153/456；电池 683/4。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 真看静置/焦点/悬停三张亮帧：静置裸文字、焦点与悬停同档圆角边界；暗档读数同带。 |
+| 判据有效性 | 15/15 | 源守卫钉 first responder 出口/backdrop/show/hide + 像素框内均值/框外对照；M1080–M1083 4/4；旧表重钉后 2/2、5/5。 |
+| 假绿防御 | 15/15 | 静置 255/30 vs 焦点 235/47.5；M1080 焦点=静置 30.0；既有 198 帧 0 变；框外对照在。 |
+| 产品面推进 | 14/15 | 真落 Sources 1 文件；补的是面板搜索焦点；扣 1：焦点视觉与悬停同档，只换了触发，runner 新帧待下一跑。 |
+| 台账一致性 | 15/15 | U-1498…U-1502、D-409/D-410、436、R414 跑、R409/R76 重钉都从日志/CI 解析。 |
+| 交付诚实性 | 15/15 | R414 runner 8 条设置红原文落账，撤 settle 而非改阈值；R413 滚动 fix 由 runner 的 reduce/override 读数签收；探针通道缺行记 NOT-RUN。 |
+| 可复核性 | 15/15 | 旧/新均值、框外、两张新帧、四把刀、两张旧表重跑、precheck/rot/CI 原文都在。 |
+
+均分 = 104/105 ≈ 14.9/15（99）。

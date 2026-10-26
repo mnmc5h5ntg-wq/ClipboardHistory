@@ -8802,3 +8802,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **440. runner 的 `REVEAL`/`INTAKE_READING` 通道在这跑没有行：三条真在屏探针仍未在 CI 签收**（R414 读 `40400010978`）
     现象：同一个 run 的 `Swift tests` 里有滚动离屏读数和静态通道，但 `REVEAL` 通道只匹配到 `SCROLL_REVEAL_*`，没有 `REVEAL 臂…`；`INTAKE_READING` 也没有行。`On-screen interaction probes` 是 report-only 且在这台 runner 上没跑/没落盘。
     修法（下一轮）：给 On-screen step 的输入/输出各加一行身份读数（环境变量、是否 skipped、捕获目录），并让 `REVEAL`/`INTAKE_READING` 以唯一前缀打印；否则"探针绿"仍然只能由本地/人工签，不能写成 runner 已验。
+
+437 追记（R415 · 仍开）：本轮补的是 QuickPick 搜索焦点边界与 settings 夹具 settle 回归；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+**441. settings 内容帧在 runner 上的能力闸门是隐式的（空白才 skip），一条 settle 就能把它打破**（R415 读 `40408685273`）
+    现象：R414 给整页 settings 夹具加 0.1s settle 后，runner 1x 的设置帧从空白变成 vibrant/半绘制，`testProbesDoNotSitOnVibrantColumns`/`testRowTierProfile...`/`testSettingsCardVerticalRhythm...`/`testDisabledToggle...` 8 条一起红；撤 settle 即恢复。此前"这台机器画不出设置页"是靠**恰好空白**被 skip 的，而不是一条显式能力出口。
+    修法（下一轮）：给 settings 内容帧一条显式能力闸门（读内容列墨/未绘制比例，和 `CAPTURE_CAPABILITY` 同口径），机器画不出时打具名 NOT-RUN；不要让夹具的等待时长决定判据跑不跑。

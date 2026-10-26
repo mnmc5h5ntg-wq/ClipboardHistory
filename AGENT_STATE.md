@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R415 状态（2026-10-27 · 本地 · 第 414 轮 / Round 412）：QuickPick 搜索框补焦点边界（静置 255/30 → 焦点 235/47.5）；R414 run 的设置内容红由撤 settle 修、R413 滚动两红已绿（reduce=true）（产品 1 文件，面板搜索焦点位）
+
+最后更新：2026-10-27（本地 · R415 / 第 414 轮 / Round 412）：QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打开字段就是第一响应者，焦点没有可见边界。新增 `QuickPickSearchField` 的 `become/resignFirstResponder` → `onFocusChange`；`QuickPickSearchBackdrop` 的 `focused/focusedForCapture`；`show()` 只在 `makeFirstResponder(field)` 成功时点亮、`hide()` 收回；夹具 `windowForCapture(searchFocused:)`。真看图：静置裸文字，焦点/悬停同档圆角底与描边；同带静置 **255.0/30.0** → 焦点 **235.0/47.5**，框外 194.3/94.7。新增 `quickpick-search-focus` 亮暗 2 帧；既有 198 帧逐字节不变；基线 **200/0/0/0**。`M1080–M1083` **4/4 CAUGHT**；焦点改动把 R409 `M1060` 与 R76 `M399` 两张旧表弄空，已重钉并整表重跑 **2/2**、**5/5 CAUGHT**，HIDDEN rot 1→0。R414 run `40408685273 ↔ 65514d4` failure：失败步骤 2 个（Swift tests + Capture gate）；**R412 两红消失**；**R413 滚动两红已绿**（`SCROLL_REVEAL_PLAN reduce=true override=false`、首=199/末=1430/2 中间值）；新红 8 条全在 settings 内容帧，成因是 R414 整页 settings 夹具的 0.1s settle 让 runner 帧落在 vibrant/contentFade 中段；撤 settle 后本地 200 帧逐字节不变。胶囊组件在 runner 1x 33.5/49.5/65.5（2x 35.8/51.2/67.5）。全量 **1096/53/0**；捕获 **200/123/4/0**、final3 200/0；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 258/874 rot=0；预检 171/153/456 bad=0；产品面连续零改动 **1** 轮（as-of 414，现读 `python3 scripts/product_streak.py --streak-for 414`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R414 runner：R412 两红消失、R413 滚动两红已绿（reduce=true、2 中间值）；新红 8 条是整页 settings 的 0.1s settle 打破隐式能力闸门；撤 settle。
+② 产品：QuickPick 搜索框补焦点边界，静置 255/30 → 焦点 235/47.5，新增 2 帧。
+③ 判据：焦点源/像素 + M1080–M1083 4/4；R409 M1060 / R76 M399 重钉后 2/2、5/5；hidden rot 0。
+④ 436：judged=5/5、REDS=0、notice-banner 放行；无新 unlisted。
+⑤ 367：hidden 表 258 / 可判 874 / rot 0 / 上界 0；预检 171/153/456/0。
+⑥ 全量 1096/53/0；换装 ok；清账 162=162；帧基线 200/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① runner 的真在屏 `REVEAL`/`INTAKE_READING` 通道没有行（本地绿）；② 产品 NSTableView 滚动中段像素帧 `table-lazy-rows`；③ `MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 通道缺行；④ R414 run 的设置内容红靠撤 settle 回隐式能力闸门，runner 复验等 R415 新跑；⑤ 亮档真机腿仍没跑；⑥ macOS 12 紧凑详情头仍走旧截断；⑦ 437/438/439/440/441 仍开；⑧ R415 新跑待 push 后读。
+
+下一轮（R416）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R415 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 settings 内容帧是否恢复能力闸门、焦点帧在 runner 上的读数；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R414 状态（2026-10-27 · 本地 · 第 413 轮 / Round 411）：设置侧栏选中胶囊滑动（静置/中点/落定 35.8→51.2→67.5pt）；R412 两红在 runner 消失、滚动行为两红由 reduce-motion 测试 seam 修（产品 1 文件，设置侧栏选择滑移位）
 
 最后更新：2026-10-27（本地 · R414 / 第 413 轮 / Round 411）：设置侧栏原来每行各自淡入淡出选中底，切换分类是两行交叉淡，没有空间连续性。新 `SettingsSidebarSelectionPlan` 按行 frame（左右内缩 6）给出胶囊矩形与两行间插值；`SettingsSidebarView` 用 PreferenceKey 收六行位置，在行后画**唯一一颗**胶囊，`.selection` 驱动，行内选中底清空；既有 192 帧逐像素不变，新增六帧三态，基线 198。真看图：静置/中点/落定中心 **35.8/51.2/67.5pt**（x=8..13，计数 588/586/598），亮暗同。M1076–M1079 4/4 CAUGHT；旧 M818 重钉到胶囊填充行并整臂重跑（198 帧/18 变/14 设置窗口、CAUGHT；M817 也 CAUGHT）。R413 runner `40400010978 ↔ 2e02c4d` **failure**：只有 Swift tests 两条滚动行为红（0.15s 中段=目标；4 采样/0 中间值），静态通道绿；R412 两红（节奏 15/10/9、邻行 20740/0）**已消失**（Capture gate 绿、邻行 accent 0）；三条真在屏探针在 runner 的 `REVEAL`/`INTAKE_READING` 通道**没有行** ⇒ 具名 NOT-RUN（本地绿）。修法：单测专用 `revealReduceMotionOverride=false`（产品默认仍读系统 reduce-motion），下一跑用 `SCROLL_REVEAL_PLAN reduce/override` 读。全量 **1094/53/0**；捕获 198/122/4/0、final2 198/0；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 256/866 rot=0；预检 170/152/452 bad=0；产品面连续零改动 **1** 轮（as-of 413，现读 `python3 scripts/product_streak.py --streak-for 413`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
