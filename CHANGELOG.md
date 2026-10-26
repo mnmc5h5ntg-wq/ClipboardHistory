@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 整页录制帧第一次真的拍到强调圈（亮 1794 / 暗 1780 颗）；fixture 补 overlay 落定与帧级判据（R392 / 第 391 轮 / Round 389 / U-1380…U-1384 · 产品 0 文件，判据账）
+
+
 ### 自绘「恢复默认」补回按下态（启用 20/16 级 / 禁用 0 级，M1025/M1026 CAUGHT）；M1023 随填充表达式重钉；436 无新 runner 读数未结案（R391 / 第 390 轮 / Round 388 / U-1375…U-1379 · 产品 1 文件，动效主线）
 
 

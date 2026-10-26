@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R392 状态（2026-10-26 · 本地 · 第 391 轮 / Round 389）：整页录制帧第一次真的拍到强调圈（亮 1794 / 暗 1780 颗）；fixture 补 overlay 落定与帧级判据（产品 0 文件，判据账）
+
+最后更新：2026-10-26（本地 · R392 / 第 391 轮 / Round 389）：`settings-shortcuts-recording` 与静置帧的差集只覆盖标题文字、控件四周 0 颗高色度像素，而组件级判据一直读到 1844/1820。成因是 R273 的 fixture 等 `button.layer?.animationKeys()` 清空，而强调圈是 SwiftUI overlay，0.16s 淡入不在 NSButton 层；本机 `134ms / 动画键=0` 就按了快门。补 300ms 上限的 overlay 落定 + `displayIfNeeded` 后，现读 `RECORDER_OVERLAY_SETTLE waited_ms=313/315`；亮 变化 **4097** / 录制侧蓝 **1794** / 静置蓝 **0**，暗 **4245** / **1780** / **0**，差集 bbox 正好控件四边。新增帧级判据：差集 >100、录制侧蓝 ≥200、静置侧 0，settings 族平涂走具名 `RECORDER_FRAME_RING_NOT_RUN=flat-page`。两张录制帧进基线（`UPDATED=182`），复验 `COMPARED=182 CHANGED=0`。**本轮产品 0 文件**：环本来就在画，坏的是取证帧的等待条件；不为了凑产品改动去动正确的 Sources。BACKLOG 436 无新 runner 读数，仍未结案。`swift build --build-tests` 告警 **0**；全量 `Executed 1047 tests, with 50 tests skipped and 0 failures`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=233 可判=820 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=146 covered=129 arms=402 bad=0`、全仓 239 文件 / 886 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 391`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；未推送，CI 多跑未读。
+② 取证：发现整页录制帧只拍到文字、四周 0 圈；修 fixture 的 overlay 落定等待；修后 1794/1780 颗。
+③ 判据：新增帧级 `RECORDER_FRAME_RING`（差集/录制侧蓝/静置蓝/平涂 NOT-RUN）；组件入口 2924 仍绿。
+④ 436：无新 runner 读数，本地 5 臂复现仍成立；不关单、不猜 must_judge。
+⑤ 367：hidden 表 233 / 可判 820 / rot 0 / 上界 0；预检 146/129/402/0。
+⑥ 验证：build 0 告警；全量 `1047/50/0`；捕获 182 帧、2 张录制帧更新并复验 0；换装 ok；清账表 162=162。
+
+验证读数（现读）：`RECORDER_FRAME_RING` 亮 变化 `4097` / 蓝 `1794` / 静置 `0`，暗 `4245` / `1780` / `0`；`RECORDER_ENTRY … 静置高色度=0 点击后高色度=2924`；`RECORDER_OVERLAY_SETTLE waited_ms=313/315`；帧差分 `180 同 / 2 变`；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=20（R392 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R391 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑；⑤ 录制圈的 **淡入过程**仍未进胶片（只签端态；解 `button.layer` 等待之后整页帧能拍到端态）。
+
+下一轮（R393）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R392 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位（本轮产品 0 文件，下一轮必须落 Sources）。
+
 ## R391 状态（2026-10-26 · 本地 · 第 390 轮 / Round 388）：自绘「恢复默认」补回按下态（启用 20/16 级 / 禁用 0 级，M1025/M1026 CAUGHT）；M1023 随填充表达式重钉；436 无新 runner 读数（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R391 / 第 390 轮 / Round 388）：R388 的自绘按钮按下只缩 2%，底色不动。R391 在 `ResetDefaultButtonBody` 加 `@Environment(\.pressedForCapture)` + `isEnabled` 闸门，按下填充 `0.08 → 0.17`，缩放也走 `isPressedForDrawing`。两态帧现读：亮档 启用 idle **230** → pressed **210**（差 **20**），暗档 **54 → 70**（差 **16**）；禁用态亮 **238/238**、暗 **46/46**（差 **0/0**，负半）；能力闸门 卡片 246/38。R390 悬停复验仍读亮 `230→222`（差 8）、暗 `54→62`（差 8），禁用两半仍 0。源守卫 + 四格真值表；`M1025`/`M1026` CAUGHT；改填充表达式让 R390 的 M1023 命中 0（预检 bad=1），重钉到三分支整块后 r390 整表 2/2 CAUGHT。按下/悬停的 `.hover` 过渡过程未进胶片（BACKLOG 330）⇒ 只签端态，过程记 NOT-RUN。BACKLOG 436：无新的 runner motion 读数；R390 本地完整卷 `MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-` 与闸门 exit 1（UNLISTED）的复现仍成立，**不关单、不改 JSON/自测、不猜 must_judge**。`swift build --build-tests` 告警 **0**；全量 `Executed 1047 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r391_shots`，与 R390 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=233 可判=820 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=146 covered=129 arms=402 bad=0`、全仓 239 文件 / 886 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 390`）。

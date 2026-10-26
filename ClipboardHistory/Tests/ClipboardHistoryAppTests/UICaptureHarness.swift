@@ -3799,6 +3799,67 @@ final class UICaptureTests: XCTestCase {
                   + "  bottomInk=\(String(format: "%.1f", item.metrics.bottomInkFraction * 100))%")
         }
 
+        // R392：整页录制帧必须真的拍到那一圈强调色。R273 的 fixture 只等
+        // `button.layer` 的动画键，而强调圈是 SwiftUI overlay、动画不在那层 ⇒
+        // 快门落在圈还透明的时候：录制帧与静置帧的差集只覆盖标题文字，控件四周
+        // 0 个高色度像素。修好等待之后本机现读 亮 1794 / 暗 1788 颗，差集 bbox
+        // 正好是控件四边 (966,503)..(1221,550)。这条判据只看颜色/差分，不钉矩形几何；
+        // 平涂页走既有能力闸门，记具名 NOT-RUN，不把「没画」读成「产品没画」。
+        if settingsFamilyIsBlank {
+            emit("RECORDER_FRAME_RING_NOT_RUN=flat-page：settings 族整体空白（本机最低未绘制 "
+                 + String(format: "%.1f", settingsLowestBlank * 100) + "%）⇒ 整页录制帧判不了")
+        } else {
+            func loadFrame(_ name: String) -> NSBitmapImageRep? {
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url) else { return nil }
+                return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+            }
+            func ringReading(_ recording: NSBitmapImageRep, _ idle: NSBitmapImageRep) -> (diff: Int, recBlue: Int, idleBlue: Int, box: CGRect) {
+                let w = min(recording.pixelsWide, idle.pixelsWide)
+                let h = min(recording.pixelsHigh, idle.pixelsHigh)
+                func blue(_ c: NSColor) -> Bool {
+                    let r = c.redComponent, g = c.greenComponent, b = c.blueComponent
+                    return b > r + 0.08 && b > g + 0.04 && b > 0.31
+                }
+                var diff = 0, recBlue = 0, idleBlue = 0
+                var minX = w, minY = h, maxX = -1, maxY = -1
+                for y in 0..<h {
+                    for x in 0..<w {
+                        guard let a = recording.colorAt(x: x, y: y),
+                              let b = idle.colorAt(x: x, y: y) else { continue }
+                        let changed = (a.redComponent, a.greenComponent, a.blueComponent)
+                            != (b.redComponent, b.greenComponent, b.blueComponent)
+                        guard changed else { continue }
+                        diff += 1
+                        if blue(a) { recBlue += 1 }
+                        if blue(b) { idleBlue += 1 }
+                        minX = min(minX, x); maxX = max(maxX, x)
+                        minY = min(minY, y); maxY = max(maxY, y)
+                    }
+                }
+                return (diff, recBlue, idleBlue,
+                        maxX >= minX ? CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1) : .zero)
+            }
+            for tag in ["light", "dark"] {
+                let recName = "settings-shortcuts-recording-720x540-\(tag).png"
+                let idleName = "settings-shortcuts-720x540-\(tag).png"
+                guard let rec = loadFrame(recName), let idle = loadFrame(idleName) else {
+                    XCTFail("RECORDER_FRAME_RING_MISSING：\(tag) 录制/静置帧不在捕获目录 ⇒ 这条判据没有对象")
+                    continue
+                }
+                let r = ringReading(rec, idle)
+                emit("RECORDER_FRAME_RING \(tag) 变化=\(r.diff) 录制侧蓝=\(r.recBlue) 静置侧蓝=\(r.idleBlue)"
+                     + " bbox=(\(Int(r.box.minX)),\(Int(r.box.minY)))..(\(Int(r.box.maxX)),\(Int(r.box.maxY)))")
+                XCTAssertGreaterThan(r.diff, 100,
+                                     "\(tag)：录制帧与静置帧几乎相同（变化=\(r.diff)）⇒ 这一帧没拍到录制态")
+                XCTAssertGreaterThanOrEqual(r.recBlue, 200,
+                                            "\(tag)：录制帧里只有 \(r.recBlue) 颗强调蓝（要 ≥200）"
+                                                + " ⇒ 整页帧把「我在听」那一圈拍丢了；先查 fixture 等的是不是只有 button.layer")
+                XCTAssertEqual(r.idleBlue, 0,
+                               "\(tag)：静置帧在变化处也读到 \(r.idleBlue) 颗强调蓝 ⇒ 那一圈在没录制时也在画")
+            }
+        }
+
         // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，
@@ -5090,6 +5151,19 @@ final class UICaptureTests: XCTestCase {
             CaptureReadings.emit("RECORDER_SETTLE waited_ms="
                                  + String(Int(Date().timeIntervalSince(settleStart) * 1000))
                                  + " 动画键=" + String(keysLeft) + " 上限_ms=1500")
+            // R392：上面等的是**按钮自己那一层**的动画键，而强调圈是 SwiftUI overlay，
+            // 它的 0.16s 淡入不在 `button.layer` 上。R273 把固定泵换成这条条件之后，
+            // 整页帧在圈还透明时就按了快门 —— 帧里只剩标题变化（R392 逐像素：录制帧与静置帧
+            // 的差集只覆盖文字 bbox，控件四周 0 个高色度像素）。这里补一段**有上限**的
+            // overlay 落定等待，并把等到的时长单独打出来；不是回退到无条件的 0.35s。
+            let overlayStart = Date()
+            while Date().timeIntervalSince(overlayStart) < 0.3 {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
+            }
+            window.contentView?.displayIfNeeded()
+            CaptureReadings.emit("RECORDER_OVERLAY_SETTLE waited_ms="
+                                 + String(Int(Date().timeIntervalSince(overlayStart) * 1000))
+                                 + " 上限_ms=300")
             XCTAssert(window.firstResponder === button,
                       "点下去之后第一响应者不是那颗录制器 ⇒ 这一帧拍不到录制态"
                           + "（要么 F7 那道守卫拒了，要么夹具与产品不同形）")
