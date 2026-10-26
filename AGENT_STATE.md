@@ -24,7 +24,7 @@
 ⑤ 367：hidden 表 243 / 可判 837 / rot 0 / 上界 0；预检 156/139/419/0。
 ⑥ 验证：build 0 告警；全量 `1061/53/0`；捕获 182 帧、0 变化、基线 182/0；换装 ok；清账表 162=162；电池待复跑。
 
-NOT-RUN / 阻塞（分开写）：① **R400 两跑 in_progress**（`40288830013`/`40288846355`），R402 ⓪ 补读；② **R401 新跑未落地**；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
+NOT-RUN / 阻塞（分开写）：① **R400 的 ed3a30d success / 41c76cc 只在 Release script tests 红**（sources 格未随主笔同提交，不是产品红）；**R401 新跑 `642e4a7`/`8b4c763` 仍 in_progress**，R402 ⓪ 补读；主笔+追记下次一次 push，避免 main run 的 sources 格必红；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
 
 下一轮（R402）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R400/R401 推送跑的全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
 
