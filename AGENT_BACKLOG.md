@@ -8769,3 +8769,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 
 436 结案（R399 · runner 读数到手）：`40280951026 ↔ cfbcec7` 现读 `MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2` ⇒ 第五臂 `settings-reset-fade` 在 runner 上真的判到。已把 `settings-reset-fade` 写进 `scripts/motion_floor_expectations.json`（`must_judge=true`、`stale_if_judged=false`、无 allowed_not_run_reasons），并同步 `scripts/tests/test_motion_floor_gate.py`（SUMMARY 五臂、地板 4、R46 旧日志预期多一格 MISSING_KEY）；把同一组 runner 行重放进闸门 `MOTION_FLOOR_OK=5/5 REDS=0`、50/50 OK。**这一单不是拿本地 `judged=5/5` 关的，是 runner 自己判到的。** `40280864844 ↔ ae202dd` 仍 in_progress，未拿它替这一单签字。
+
+**437. 主列表与 QuickPick 是两套搜索语言：前者不吃来源 App，后者吃**（R405 现读）
+    `QuickPickModel.filtered` 会按 `sourceAppName` 命中，`HistoryStore.filteredEntries` 只查预览/文件名/OCR。用户在浮层搜「访达」出两条，在主列表搜同一个词却是 0 条。R405 只修了「浮层能搜到就要看得见理由」，没有顺手改主列表语义：那要先决定主列表行是否也显示来源、300pt 侧栏放不放得下。
+    修法（下一轮或用户定）：先量 300pt 行里「时间 · 来源」是否与现有文本列争宽；若放不下，考虑只在搜索命中来源时把来源替到时间前面，或给主列表补来源匹配但用同一套理由后缀。无论选哪条，源守卫要同时读两个入口，别只改一处。

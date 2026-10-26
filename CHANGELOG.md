@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QuickPick 搜到来源 App 时行上写出「来自 X」（旧结尾后墨 0→1006/1109）；R404 头跑全绿签收、band-empty 成具名 XCTSkip（R405 / 第 404 轮 / Round 402 / U-1447…U-1451 · 产品 2 文件，搜索交互位）
+
+
 ### 详情「删除」改成错误红（红 0→701/662）；band-empty 三态翻正（证人也空 ⇒ 具名 XCTSkip）（R404 / 第 403 轮 / Round 401 / U-1442…U-1446 · 产品 1 文件，破坏性反馈位）
 
 

@@ -35,16 +35,35 @@ struct QuickPickModel {
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return entries }
         return entries.filter { entry in
-            if entry.shortPreview.localizedCaseInsensitiveContains(needle) { return true }
+            if matchesNonSource(entry, needle: needle) { return true }
             if let name = entry.sourceAppName, name.localizedCaseInsensitiveContains(needle) { return true }
-            switch entry.content {
-            case .file(let url):
-                return url.lastPathComponent.localizedCaseInsensitiveContains(needle)
-            case .files(let urls):
-                return urls.contains { $0.lastPathComponent.localizedCaseInsensitiveContains(needle) }
-            case .text, .image:
-                return false
-            }
+            return false
+        }
+    }
+
+    /// 只按来源 App 命中时，行上必须写得出「为什么这条在这儿」。
+    ///
+    /// 行的可见内容只有预览与时间；查询词命中来源时，这两个字段里都不会出现那个词。
+    /// 用户看到的是「搜了访达，出来两条看不出跟访达有关的记录」——匹配成立，理由不可见。
+    /// 非来源字段已经命中时返回 nil：那时行里本来就看得见命中词，再补一句来源是噪音。
+    static func sourceMatchReason(for entry: ClipboardEntry, query: String) -> String? {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return nil }
+        guard let name = entry.sourceAppName, !name.isEmpty,
+              name.localizedCaseInsensitiveContains(needle),
+              !matchesNonSource(entry, needle: needle) else { return nil }
+        return name
+    }
+
+    private static func matchesNonSource(_ entry: ClipboardEntry, needle: String) -> Bool {
+        if entry.shortPreview.localizedCaseInsensitiveContains(needle) { return true }
+        switch entry.content {
+        case .file(let url):
+            return url.lastPathComponent.localizedCaseInsensitiveContains(needle)
+        case .files(let urls):
+            return urls.contains { $0.lastPathComponent.localizedCaseInsensitiveContains(needle) }
+        case .text, .image:
+            return false
         }
     }
 

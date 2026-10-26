@@ -384,7 +384,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 输入时"候选变少 / 清空后重新匹配上"因此有了可读的"被抽走 / 补进来"，
     /// 而不是整块文字闪一下。
     private func rebuildRows() {
-        let next = model.visible.map { Row(entry: $0, title: Self.rowTitle(for: $0)) }
+        let next = model.visible.map { Row(entry: $0, title: Self.rowTitle(for: $0, query: model.query)) }
         let plan = QuickPickRowDiff.plan(oldIDs: rows.map(\.entry.id), oldTitles: rows.map(\.title),
                                          newIDs: next.map(\.entry.id), newTitles: next.map(\.title))
         let previous = rows
@@ -451,13 +451,19 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     /// 行文案：**预览在前，元信息在后**。用户在浮层里是靠认内容选条目的，
     /// 时间和来源只是消歧用的次要信息（与侧栏同一套优先级）。
-    static func rowTitle(for entry: HistoryStore.Entry) -> String {
+    static func rowTitle(for entry: HistoryStore.Entry, query: String = "") -> String {
         let preview = entry.shortPreview
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
         let time = ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp)
         let pinned = entry.isPinned ? "置顶 " : ""
-        return "\(pinned)\(preview.isEmpty ? "（空）" : preview)  ·  \(time)"
+        var pieces = ["\(pinned)\(preview.isEmpty ? "（空）" : preview)"]
+        // 来源只按来源命中时补；放在时间之前，截断先吃时间而不是先吃掉命中理由。
+        if let reason = QuickPickModel.sourceMatchReason(for: entry, query: query) {
+            pieces.append("来自 \(reason)")
+        }
+        pieces.append(time)
+        return pieces.joined(separator: "  ·  ")
     }
 
     /// 行首那一列的 SF Symbol 名（R65 / BACKLOG 94、97）。

@@ -56,6 +56,27 @@ final class Round3QuickPickTests: XCTestCase {
         XCTAssertEqual(QuickPickModel.filtered(entries, query: "不存在的东西").count, 0)
     }
 
+    func testSourceOnlyMatchNamesItsReasonWhileOtherMatchesStayBare() {
+        let sourceOnly = entry("合同 终版 v3.pdf", bundleID: "com.apple.finder", name: "访达")
+        let titleMatch = entry("访达里的文件", bundleID: "com.apple.finder", name: "访达")
+        XCTAssertEqual(QuickPickModel.sourceMatchReason(for: sourceOnly, query: "访达"), "访达",
+                       "查询词只命中来源 App 时拿不到理由 ⇒ 行上没有任何可见的命中依据")
+        XCTAssertNil(QuickPickModel.sourceMatchReason(for: titleMatch, query: "访达"),
+                     "预览里已经看得见「访达」，再补一句来源就是噪音")
+        XCTAssertNil(QuickPickModel.sourceMatchReason(for: sourceOnly, query: ""),
+                     "没在搜索时不该给每一行加来源后缀")
+        XCTAssertNil(QuickPickModel.sourceMatchReason(for: sourceOnly, query: "合同"),
+                     "命中的是文件名而不是来源，理由不该写成来源")
+        let sourceTitle = QuickPickController.rowTitle(for: sourceOnly, query: "访达")
+        XCTAssertTrue(sourceTitle.contains("来自 访达"),
+                      "产品行文案里没有命中理由：\(sourceTitle)")
+        let unqueried = QuickPickController.rowTitle(for: sourceOnly)
+        XCTAssertTrue(unqueried.hasPrefix("合同 终版 v3.pdf  ·  "),
+                      "没有查询词时行文案的前半段必须保持原样：\(unqueried)")
+        XCTAssertFalse(unqueried.contains("来自"),
+                       "没有查询词时不该出现来源后缀：\(unqueried)")
+    }
+
     func testUnfilteredListingIsCappedButSearchingIsNot() {
         let many = (1...40).map { entry("记录 \($0)", at: TimeInterval($0)) }
         let model = QuickPickModel(all: many)

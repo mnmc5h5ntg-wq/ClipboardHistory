@@ -2755,6 +2755,107 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
     }
 
+    /// R405：查询词只命中来源 App 时，行上必须出现「来自 X」这个命中理由。
+    ///
+    /// 缺陷形状：`quickpick-typed` 搜「访达」出两条文件记录，而行文案只有
+    /// 「预览 · 时间」—— 那个词在预览、文件名、时间里都不存在。匹配成立，理由不可见。
+    /// 修法是产品行文案在**来源是唯一命中依据**时补一段「来自 X」，并把它放在时间之前：
+    /// 行被截断时先吃时间，不先吃掉理由。
+    ///
+    /// 源/管线守卫：从产品入口 `windowForCapture(query:)` 建出真表格，读每一行 cell 的
+    /// `stringValue`。来源命中必须带理由；无查询、预览/文件名命中必须**不带**（负对照）。
+    /// 像素那一半在 `testQuickPickSourceMatchReasonExtendsTheTypedRow`：它不读文案，
+    /// 只判"旧结尾之后有没有可见文字"，免得两条判据读同一句话。
+    func testQuickPickSourceOnlyMatchCarriesItsReason() throws {
+        _ = NSApplication.shared
+        let store = makePopulatedStore()
+
+        func titles(query: String) -> [String] {
+            let build = QuickPickCapturePanel.builder(store: store, query: query)
+            guard let panel = build(), let content = panel.contentView else { return [] }
+            panel.setFrameOrigin(NSPoint(x: -20011, y: -20011))
+            panel.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+            defer { panel.orderOut(nil) }
+            guard let table = Self.productTable(in: content) else { return [] }
+            table.layoutSubtreeIfNeeded()
+            return (0..<table.numberOfRows).compactMap { row in
+                (table.view(atColumn: 0, row: row, makeIfNecessary: true) as? NSTableCellView)?
+                    .textField?.stringValue
+            }
+        }
+
+        let sourceOnly = titles(query: "访达")
+        let noQuery = titles(query: "")
+        let titleMatch = titles(query: "合同")
+        let latinSource = titles(query: "Safari")
+        let withReason = sourceOnly.filter { $0.contains("来自 访达") }.count
+        emit("QUICKPICK_MATCH_REASON 源命中=\(sourceOnly.count) 带理由=\(withReason) "
+              + "无查询=\(noQuery.count) 无查询带理由=\(noQuery.filter { $0.contains("来自") }.count) "
+              + "文件名命中=\(titleMatch.count) 文件名带理由=\(titleMatch.filter { $0.contains("来自") }.count) "
+              + "Safari命中=\(latinSource.count) Safari带理由=\(latinSource.filter { $0.contains("来自 Safari") }.count)")
+        XCTAssertEqual(sourceOnly.count, 2,
+                       "「访达」在夹具里应该只命中两条文件记录；读到 \(sourceOnly.count) 条 ⇒ 这条判据换了对象")
+        XCTAssertEqual(withReason, sourceOnly.count,
+                       "来源是唯一命中依据的行没有把理由写出来：\(sourceOnly)")
+        XCTAssertFalse(noQuery.contains { $0.contains("来自") },
+                       "没有搜索时每一行都多一段来源后缀：\(noQuery)")
+        XCTAssertEqual(titleMatch.count, 1,
+                       "「合同」应该只命中文件名那一条；读到 \(titleMatch.count) 条 ⇒ 负对照失去对象")
+        XCTAssertFalse(titleMatch.contains { $0.contains("来自") },
+                       "命中的是文件名，理由不该写成来源：\(titleMatch)")
+        XCTAssertEqual(latinSource.count, 1,
+                       "「Safari」应该只命中来源那一条；读到 \(latinSource.count) 条 ⇒ 负对照失去对象")
+        XCTAssertTrue(latinSource.allSatisfy { $0.contains("来自 Safari") },
+                      "拉丁来源名没有出现在行文案里：\(latinSource)")
+    }
+
+    /// R405 的像素那一半：**旧结尾之后有没有可见文字**。
+    ///
+    /// 这一条刻意不读 `stringValue` —— 文案身份由 `testQuickPickSourceOnlyMatchCarriesItsReason`
+    /// 钉住。这里只判帧上看得见的位移：旧 `quickpick-typed` 第 1 行文字在 x=246.5pt 结束
+    ///（逐 run 读数：预览 110.5–146.0、时间 166.5–246.5），x=250..410pt 当时是整条空白；
+    /// 新行把理由放在时间之前，同一段里出现 968/1077 个墨像素。
+    ///
+    /// 校准带取同一行 x=120..246pt：它没墨说明这台机器根本没画这一行，
+    /// 那时扩展带读到 0 是"拍不到"，不能记成产品缺陷。
+    func testQuickPickSourceMatchReasonExtendsTheTypedRow() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r405-match-reason-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == "quickpick-typed" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-typed` ⇒ 像素判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-typed-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`quickpick-typed` 读不回字节 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 420.0
+            let control = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow,
+                                           rect: CGRect(x: 120, y: 57, width: 126, height: 13),
+                                           scale: scale)
+            let extensionBand = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                                 bytesPerRow: rep.bytesPerRow,
+                                                 rect: CGRect(x: 250, y: 57, width: 160, height: 13),
+                                                 scale: scale)
+            emit("QUICKPICK_MATCH_REASON_BAND \(tag) 校准带墨=\(control.pixels) 扩展带墨=\(extensionBand.pixels)")
+            XCTAssertGreaterThan(control.pixels, 100,
+                                 "\(tag)：第 1 行左半段没有字 ⇒ 这一行在这台机器上没画出来，"
+                                 + "扩展带读 0 不能记成产品缺陷")
+            XCTAssertGreaterThan(extensionBand.pixels, 20,
+                                 "\(tag)：旧文字在 x=246.5pt 结束，而 x=250..410pt 读到 "
+                                 + "\(extensionBand.pixels) 个墨像素 ⇒ 行没有在旧结尾之后延伸，"
+                                 + "来源理由没有画出来（不是尺坏了：校准带已经证明确实有字）")
+        }
+    }
+
     /// R74 / U-115：浮层那一档悬停**不加淡入** —— 这条决定从今天起有读数，不是"我觉得"。
     ///
     /// 判的问题：给那层灰配一条 100ms 的淡入，用户打字时看到的是"过渡走完然后停住"，
