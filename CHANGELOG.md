@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 600pt 详情头不再截掉「复制」：完整/紧凑 meta 先试再退，四张最小窗帧只动头部（R393 / 第 392 轮 / Round 390 / U-1385…U-1389 · 产品 2 文件，视觉主线）
+
+
 ### 整页录制帧第一次真的拍到强调圈（亮 1794 / 暗 1780 颗）；fixture 补 overlay 落定与帧级判据（R392 / 第 391 轮 / Round 389 / U-1380…U-1384 · 产品 0 文件，判据账）
 
 

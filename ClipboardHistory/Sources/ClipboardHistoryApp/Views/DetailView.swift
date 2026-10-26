@@ -177,11 +177,33 @@ struct DetailView: View {
         // 居中元信息的问题不是"不好看"，是它把时间、大小这类次要信息抬到了和正文同一视觉层级，
         // 而读者要先判断"这两行属于谁"；来源 App 以前干脆没在详情里露出（B-2 已经把它持久化了）。
         HStack(spacing: 8) {
-                Text(DetailTypography.metaText(
-                    copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
-                    size: entry.content.sizeDescription,
-                    sourceAppName: entry.sourceAppName
-                ))
+                // R393：最小窗口（600pt）里头部一行放不下完整的「时间 复制 · 大小 · 来源」，
+                // 原来的 middle 截断会把「复制」吃掉。先试完整文案，放不下再退到去掉冗余「复制」
+                // 的紧凑版 —— 时间/大小/来源一个不丢，行高也不变；宽度够时仍是完整文案。
+                // `ViewThatFits` 是 macOS 13+；12 上保留原来的单行截断（不引新 API）。
+                Group {
+                    if #available(macOS 13.0, *) {
+                        ViewThatFits(in: .horizontal) {
+                            Text(DetailTypography.metaText(
+                                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+                                size: entry.content.sizeDescription,
+                                sourceAppName: entry.sourceAppName
+                            ))
+                            Text(DetailTypography.metaText(
+                                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+                                size: entry.content.sizeDescription,
+                                sourceAppName: entry.sourceAppName,
+                                includeCopyVerb: false
+                            ))
+                        }
+                    } else {
+                        Text(DetailTypography.metaText(
+                            copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+                            size: entry.content.sizeDescription,
+                            sourceAppName: entry.sourceAppName
+                        ))
+                    }
+                }
                 .font(.system(size: DetailTypography.metaFontSize))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

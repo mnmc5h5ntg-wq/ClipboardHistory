@@ -127,6 +127,33 @@ final class Round3DetailTypographyTests: XCTestCase {
         XCTAssertFalse(emptyApp.hasSuffix("·"), "空来源不该留下一个孤零零的分隔符：\(emptyApp)")
     }
 
+    /// R393：最小窗口里退到紧凑版，只去掉冗余的「复制」，时间/大小/来源一个不丢，
+    /// 而且必须真的比完整版窄 —— 否则 `ViewThatFits` 不会选它，截断照旧。
+    func testCompactMetaDropsOnlyTheCopyVerbAndIsNarrower() {
+        let copiedAt = "2025-10-09 16:38:20"
+        let full = DetailTypography.metaText(copiedAt: copiedAt, size: "40 个字符", sourceAppName: "终端")
+        let compact = DetailTypography.metaText(copiedAt: copiedAt, size: "40 个字符",
+                                                sourceAppName: "终端", includeCopyVerb: false)
+        XCTAssertFalse(compact.contains("复制"), "紧凑版只剩时间/大小/来源：\(compact)")
+        XCTAssertTrue(compact.contains(copiedAt))
+        XCTAssertTrue(compact.contains("40 个字符"))
+        XCTAssertTrue(compact.contains("来自 终端"))
+        let font = NSFont.systemFont(ofSize: DetailTypography.metaFontSize)
+        func width(_ s: String) -> CGFloat { (s as NSString).size(withAttributes: [.font: font]).width }
+        XCTAssertLessThan(width(compact), width(full),
+                          "紧凑版并不比完整版窄（\(width(compact)) vs \(width(full))）⇒ ViewThatFits 不会选中它")
+    }
+
+    func testNarrowDetailHeaderFallsBackToCompactMeta() throws {
+        let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
+        XCTAssertTrue(detail.contains("ViewThatFits(in: .horizontal)"),
+                      "详情头部没有 ViewThatFits ⇒ 600pt 窗口只能走 middle 截断，丢掉「复制」")
+        XCTAssertTrue(detail.contains("includeCopyVerb: false"),
+                      "没有紧凑版这一臂 ⇒ ViewThatFits 只有一份文案可挑，退不回去")
+        XCTAssertTrue(detail.contains("truncationMode(.middle)"),
+                      "两条文案仍要保留 middle 截断兜底")
+    }
+
     // MARK: - 组件层：高亮真的打上了、能清掉、不改文本
 
     private func makeTextView() -> ChineseSelectableNSTextView {
