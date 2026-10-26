@@ -22,11 +22,11 @@
 ③ 判据：静态颜色/对比、2x/1x 胶片、接线守卫；M1029–M1031 CAUGHT。
 ④ 自伤：多靶表 restore 写坏 DetailView，构建报错；已还原并拆表，记 D-384。
 ⑤ 367：hidden 表 236 / 可判 825 / rot 0 / 上界 0；预检 149/132/407/0。
-⑥ 验证：build 0 告警；全量 `1052/51/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162。
+⑥ 验证：build 0 告警；全量 `1052/51/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162；电池 `Ran 683 / OK (skipped=4)`。
 
 验证读数（现读）：`COPY_FAIL_RED` 亮 成功 `0` / 失败 `145` / 对比 `4.57`，暗 `0` / `132` / `4.70`；`COPY_FAIL_FADE` 2x `27/12/0.0585`、1x `27/16/0.0778`；`M1029–M1031` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=25（R394 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R393 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=28（R394 主笔 + 两笔追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R393 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑。
 
 下一轮（R395）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R394 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位。
 
