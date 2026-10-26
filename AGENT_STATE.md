@@ -28,7 +28,7 @@
 
 NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=36（R398 主笔前，追记后 38）；② 旧的两跑与 R387–R397 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
 
-下一轮（R399）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；一次 push 只为 head 生成新 run，旧两跑仍要单独按步骤读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources；③ 436 待 runner motion 读数恢复后再决定第五臂 `must_judge`，本轮仍不动 JSON/自测。
+下一轮（R399）的靶：⓪ CI 队列（R399 现读，2026-10-26）：`40234023212 ↔ d38ea10` / completed / **success**（全部失败步骤=无）；`40234058148 ↔ 5c7814e` / completed / **success**（无）；`40221947072 ↔ 43ff699` / completed / **success**（改动前归因对照）；`40280864844 ↔ ae202dd` / **in_progress / 未读**（0 字节日志不算读数，等它落地后再按全部失败步骤补账）。push 已完成 `5c7814e..ae202dd`、ahead=0；一次 push 只为 head 生成新 run，旧两跑已单独读。① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别（动效/过渡/反馈或布局状态，不再做 secondary 文字对比度）；③ 436 待 `40280864844` 的 motion 卷落地后按实测决定第五臂 `must_judge`，没有 motion 卷就写具名 NOT-RUN，不许猜。
 
 ## R397 状态（2026-10-26 · 本地 · 第 396 轮 / Round 394）：空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（产品 2 文件，视觉主线）
 
