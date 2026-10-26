@@ -22,11 +22,11 @@
 ③ 判据：纯函数宽度 + 源守卫 + M1027/M1028；帧差分 4 张只动头部。
 ④ 436：无新 runner 读数，本地 5 臂复现仍成立；不关单、不猜 must_judge。
 ⑤ 367：hidden 表 234 / 可判 822 / rot 0 / 上界 0；预检 147/130/404/0。
-⑥ 验证：build 0 告警；全量 `1049/50/0`；捕获 182 帧、四张头部帧更新并复验 0；换装 ok；清账表 162=162。
+⑥ 验证：build 0 告警；全量 `1049/50/0`；捕获 182 帧、四张头部帧更新并复验 0；换装 ok；清账表 162=162；电池 `Ran 683 / OK (skipped=4)`。
 
-验证读数（现读）：帧差分 `178 同 / 4 变`；首张变化 `2371`、bbox `(829,73)..(1100,93)`；`M1027/M1028` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`；产品面连续零改动 **2** 轮（`scripts/product_streak.py --streak-for 392`）。
+验证读数（现读）：帧差分 `178 同 / 4 变`；首张变化 `2371`、bbox `(829,73)..(1100,93)`；`M1027/M1028` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=22（R393 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R392 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑；⑤ macOS 12 上仍是旧的单行截断（`ViewThatFits` 13+）—— 本轮没有 12 的可执行环境，按具名限制记账。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=25（R393 主笔 + 两笔追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R392 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑；⑤ macOS 12 上仍是旧的单行截断（`ViewThatFits` 13+）—— 本轮没有 12 的可执行环境，按具名限制记账。
 
 下一轮（R394）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R393 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位。
 
