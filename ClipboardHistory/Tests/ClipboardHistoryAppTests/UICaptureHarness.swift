@@ -4090,6 +4090,41 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+// R403：「移除」是破坏性动作，必须读到错误红；同一带里先要读到字（否则不是产品）。
+        do {
+            for tag in ["light", "dark"] {
+                let name = "settings-privacy-excluded-720x1040-\(tag).png"
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    XCTFail("REMOVE_RED_FRAME_MISSING：\(tag) 帧不在捕获目录")
+                    continue
+                }
+                let scale = Double(rep.pixelsWide) / 720.0
+                let x0 = Int(662 * scale), x1 = Int(685 * scale)
+                let y0 = Int(575 * scale), y1 = Int(590 * scale)
+                var red = 0, ink = 0
+                for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+                    for x in x0..<min(rep.pixelsWide, x1) {
+                        let o = y * rep.bytesPerRow + x * 4
+                        let r = Double(base[o]) / 255, g = Double(base[o + 1]) / 255
+                        let b = Double(base[o + 2]) / 255
+                        if r > g + 0.08 && r > b + 0.08 && r > 0.31 { red += 1 }
+                        if (0.2126 * r + 0.7152 * g + 0.0722 * b) < 0.55 { ink += 1 }
+                    }
+                }
+                emit("REMOVE_RED \(tag) 红=\(red) 字墨=\(ink)")
+                if ink == 0 {
+                    emit("REMOVE_RED_NOT_RUN=band-empty：\(tag)")
+                    continue
+                }
+                XCTAssertGreaterThanOrEqual(red, 20,
+                                            "\(tag)：「移除」只读到 \(red) 颗错误红（要 ≥20）"
+                                                + " ⇒ 破坏性动作和普通行文本同色")
+            }
+        }
+
         // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，
@@ -13956,17 +13991,26 @@ final class UICaptureTests: XCTestCase {
             // 负半证人：同一帧的详情 meta 带（y 38..48pt，x 300..width）必须先读到墨。
             // 它证明"这一页被画出来了"；目标带空而证人非空 ⇒ 这台机器拍不出这一条，记
             // 具名能力出口并 XCTSkip；证人也没有墨 ⇒ 尺/整页坏了，必须红，不许 skip。
-            let wx0 = Int(300 * scale), wx1 = rep.pixelsWide
-            let wy0 = Int(38 * scale), wy1 = Int(48 * scale)
-            var witnessInk = 0
-            for y in max(0, wy0)..<min(rep.pixelsHigh, wy1) {
-                for x in wx0..<wx1 {
-                    let o = y * rep.bytesPerRow + x * 4
-                    let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
-                        + 0.0722 * Double(base[o + 2])
-                    if luma < 120 { witnessInk += 1 }
+            func bandInk(_ x0p: Int, _ x1p: Int, _ y0p: Int, _ y1p: Int) -> Int {
+                let bx0 = Int(Double(x0p) * scale), bx1 = Int(Double(x1p) * scale)
+                let by0 = Int(Double(y0p) * scale), by1 = Int(Double(y1p) * scale)
+                var count = 0
+                for y in max(0, by0)..<min(rep.pixelsHigh, by1) {
+                    for x in max(0, bx0)..<min(rep.pixelsWide, bx1) {
+                        let o = y * rep.bytesPerRow + x * 4
+                        let luma = 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                            + 0.0722 * Double(base[o + 2])
+                        if luma < 120 { count += 1 }
+                    }
                 }
+                return count
             }
+            // 证人不要求在同一栏：详情页在 runner 1x 上可能整页不合成，而侧栏仍画。
+            // detail meta 与侧栏各取一条；任一有墨 ⇒ 这一帧确实被拍了，band-empty 走能力出口；
+            // 两条都 0 ⇒ 整页/尺坏，红。
+            let detailWitness = bandInk(300, width, 38, 48)
+            let sidebarWitness = bandInk(20, 260, 90, 160)
+            let witnessInk = max(detailWitness, sidebarWitness)
             switch Self.longTextBandOutcome(ink: ink, witnessInk: witnessInk) {
             case .measured:
                 break
@@ -13975,7 +14019,8 @@ final class UICaptureTests: XCTestCase {
                             + "同帧 detail-witness 也 0 颗墨 ⇒ 尺/整页没画，不能 skip")
                 continue
             case .capabilityAbsent(let witness):
-                emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)（detail-witness=\(witness)）")
+                emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)（detail-witness=\(detailWitness) "
+                     + "sidebar-witness=\(sidebarWitness)）")
                 throw XCTSkip("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 正文带空，"
                                + "但同帧 detail-witness=\(witness) 有墨 ⇒ 这台机器拍不出这一条")
             }

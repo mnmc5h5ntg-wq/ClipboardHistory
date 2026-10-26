@@ -7465,3 +7465,9 @@ R402 现读：排除名单输入框为空时，「添加」仍是启用态；同
 R401 三跑的 Swift/Capture 红名是长正文测试 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`（runner 1x 的 `TEXT_INK_NOT_RUN light 720=0 640=0`）。R402 第一版只 emit + continue，仍把能力缺口当通过；R403 改成三态 `measured / capabilityAbsent(witness) / rulerBroken`：目标带空而同帧详情 meta 带（x300..width / y38..48pt）有墨 ⇒ 具名 `XCTSkip`；证人带也 0 ⇒ `LONG_TEXT_PILL_RULER_BROKEN` 红。
 **Why**：没有证人的空带分不清“这台机器画不出这一条”和“尺装错了/整页没画”；前者是能力出口，后者必须红。emit 后 continue 会让测试保持绿，等于把未覆盖洗成通过。
 **How to apply**：① 能力出口用 `XCTSkip`，并在同一帧上取一个**必须**有墨的证人带；② 证人也空 ⇒ 红，不 skip；③ 三态写成纯函数并配真值表与刀（M1046）；④ 记录 runner 的具名 NOT-RUN，不把红说成绿。
+
+### D-395（403）破坏性行内动作要用错误红；band-empty 的证人要取“这台机器真的画了”的那块
+
+R403 现读：排除名单的「移除」和普通 App 标识一样是黑字，而批量删除/清空都是错误红；加错误红后红像素 **0/0 → 591/605**，字墨 447/954 仍在。band-empty 在 runner 上连 detail meta 也是 0（`LONG_TEXT_PILL_RULER_BROKEN`），把证人扩成 detail ∪ sidebar 后，侧栏有墨 ⇒ 具名 XCTSkip；两条都 0 才红。
+**Why**：破坏性动作没有颜色信号时，用户只能靠读文字判断后果；而 band-empty 的证人若和被量对象同处一条不合成的通道，就分不清“机器画不出这一条”和“尺/整页坏了”。
+**How to apply**：① 行内删除用与复制失败同一对动态错误红，并用同帧像素证明字仍在；② 能力出口的证人要在**这台机器确实会画**的那块取（本例侧栏），同一帧任一证人非空才许 skip；③ 证人必须写成会红的三态函数并配刀（M1046）；④ 不把 `notice-banner` 的登记放行误判成新 unlisted。

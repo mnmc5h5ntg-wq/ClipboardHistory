@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（R403 / 第 402 轮 / Round 400 / U-1437…U-1441 · 产品 1 文件，破坏性反馈位）
+
+
 ### 空输入时「添加」可点 → 禁用（添加/移除文字亮度差 7/5 → 96/93）；R401 长正文测试的 runner band-empty 改具名 NOT-RUN（R402 / 第 401 轮 / Round 399 / U-1431…U-1435 · 产品 1 文件，交互状态位）
 
 

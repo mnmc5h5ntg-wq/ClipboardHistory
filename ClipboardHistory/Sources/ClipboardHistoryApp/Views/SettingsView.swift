@@ -524,6 +524,12 @@ struct SettingsView: View {
                                 // R13：`.borderless` 换成有按压/悬停的一档（同一轮把三处一起收，
                                 // 见 `PressableStyle` 里 `isHovered: false` 那条）。
                                 // 这是一颗**破坏性**按钮，"按到了"最不该省。
+                                // R403：同一句也适用于颜色 —— 它原来和普通行文本一样黑，
+                                // 而全 App 的破坏性动作（批量删除/清空）都是错误红。
+                                // 用 R399 压过 runner 的一对红，避免暗档掉回 3:1 以下。
+                                .foregroundStyle(colorScheme == .dark
+                                                 ? AnyShapeStyle(Color(red: 1.0, green: 0.62, blue: 0.58))
+                                                 : AnyShapeStyle(Color(red: 0.72, green: 0.0, blue: 0.0)))
                                 .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
                                               hoverLevel: VisualFill.controlHover,
                                               labelPadding: 4)

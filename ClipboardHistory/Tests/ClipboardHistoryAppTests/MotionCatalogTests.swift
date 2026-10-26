@@ -504,6 +504,15 @@ final class MotionCatalogTests: XCTestCase {
                       "StatePresentation 没有 pane 墨档 ⇒ 空态没有可判的来源")
     }
 
+    /// R403：排除名单的「移除」是破坏性动作，必须用错误红，不能和普通行文本一样黑。
+    func testExcludedAppRemoveButtonUsesErrorRed() throws {
+        let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))
+        XCTAssertTrue(settings.contains("Color(red: 0.72, green: 0.0, blue: 0.0)"),
+                      "「移除」亮档仍是普通文字色 ⇒ 破坏性动作没有视觉信号")
+        XCTAssertTrue(settings.contains("Color(red: 1.0, green: 0.62, blue: 0.58)"),
+                      "「移除」暗档没有走 R399 压过的错误红 ⇒ 暗档会掉回 3:1 附近")
+    }
+
     /// R402：排除名单的「添加」在空白输入下必须禁用 —— 否则按下去只会收到一条「没加成」的回执。
     func testAddExcludedAppButtonIsDisabledOnBlankInput() throws {
         let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))

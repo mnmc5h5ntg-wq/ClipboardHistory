@@ -12,6 +12,23 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R403 状态（2026-10-26 · 本地 · 第 402 轮 / Round 400）：「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（产品 1 文件，破坏性反馈位）
+
+最后更新：2026-10-26（本地 · R403 / 第 402 轮 / Round 400）：排除名单的「移除」和普通 App 标识一样黑字，而批量删除/清空都用错误红。给「移除」加与复制失败同一对动态错误红（亮 0.72,0,0 / 暗 1.0,0.62,0.58）：红像素旧 **0/0** → 新 **591/605**，字墨 447/954 仍在；两张 privacy-excluded 帧变化，基线同笔 update 后 182/0。M1047/M1048 双 CAUGHT。band-empty：R402 的 detail meta 证人在 runner 也 0，R403 改为 detail ∪ sidebar 证人（任一有墨 ⇒ 具名 XCTSkip；两条都 0 ⇒ `RULER_BROKEN` 红）；真值表 3 格 + M1046 CAUGHT。436 的 a274d4a 现读 judged=5/5、REDS=0，保持结案。全量 `Executed 1064 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=246 可判=841 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=159 covered=141 arms=423 bad=0`、全仓 252 文件 / 907 把；产品面连续零改动 **1** 轮（as-of 402；本轮破坏性反馈已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 402`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R402 a274d4a success（motion 5/5），03825d6/02cd2f7 failure（band-empty RULER_BROKEN）；R400 41c76cc 仅 Release script 红。
+② 破坏性反馈：移除从黑字改为错误红，红 0/0→591/605，字墨仍在；2 张帧变化。
+③ 判据：源守卫 + 像素红；M1047/M1048 双 CAUGHT。
+④ band-empty：detail meta 证人在 runner 也 0，改为 detail ∪ sidebar；任一有墨 skip，两条 0 才红；M1046 CAUGHT。
+⑤ 436：a274d4a 5/5、REDS=0，保持结案；notice-banner 的 4/5 是登记放行，不误判。
+⑥ 367：hidden 表 246 / 可判 841 / rot 0 / 上界 0；预检 159/141/423/0。
+⑦ 验证：build 0 告警；全量 `1064/53/0`；捕获 182 帧、2 张变化、基线 182/0；换装 ok；清账表 162=162；电池待复跑。
+
+NOT-RUN / 阻塞（分开写）：① **R403 新跑未落地**；② **R402 的 03825d6/02cd2f7 仍 band-empty 红**，新侧栏证人是否让 runner 转 skip 待签收；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
+
+下一轮（R404）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R403 主笔+追记 head 跑全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R402 状态（2026-10-26 · 本地 · 第 401 轮 / Round 399）：空输入时「添加」可点 → 禁用（添加/移除文字亮度差 7/5 → 96/93）；R401 长正文测试的 runner band-empty 改具名 NOT-RUN（产品 1 文件，交互状态位）
 
 最后更新：2026-10-26（本地 · R402 / 第 401 轮 / Round 399）：排除名单输入框为空时，「添加」仍是启用态，按下去只会得到一条「没加成」的回执。`SettingsView` 加 `.disabled(newExcludedBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)`。同帧相对读数（「添加」vs 启用态「移除」文字）：亮档旧 **7** → 新 **96**，暗档旧 **5** → 新 **93**；四张 privacy 帧变化，基线同笔 update 后 182/0。源守卫 + `ADD_DISABLED_STATE` 像素判据；M1044/M1045 双 CAUGHT、RESTORE_CLEAN=yes。R401 三跑的 Swift/Capture 红已归因为长正文测试 `band-empty`（1x 离屏拍不出该页），R402 改成具名 `LONG_TEXT_PILL_NOT_RUN`；436 的 motion floor 现读 `judged=4/5 not-run=notice-banner`、`settings-reset-fade=2`、`REDS=0`，保持结案。全量 `Executed 1062 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=244 可判=839 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=157 covered=140 arms=421 bad=0`、全仓 250 文件 / 905 把；产品面连续零改动 **1** 轮（as-of 401，现读 `python3 scripts/product_streak.py --streak-for 401`；本轮交互状态已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

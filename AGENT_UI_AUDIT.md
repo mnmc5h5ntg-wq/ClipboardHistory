@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 402 轮（R403 · 2026-10-26 · U-1437…U-1441）：「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（U-1437…U-1441 · 产品 1 文件，破坏性反馈位）
+
+- **U-1437：⓪ R402 队列。** `40296891274 ↔ a274d4a` success（运动 floor `judged=5/5`、`REDS=0`）；`40298315386 ↔ 03825d6`、`40298351973 ↔ 02cd2f7` failure，`Swift tests / Capture gate`，红名 `LONG_TEXT_PILL_RULER_BROKEN：600/680/700/720` —— detail meta 证人在 runner 1x 也 0，按规则先红；R403 把证人扩展为 detail meta ∪ 侧栏（任一有墨 ⇒ 具名 `XCTSkip`，两条都 0 ⇒ 仍 `RULER_BROKEN` 红）。R400 `40288846355↔ed3a30d` success、`40288830013↔41c76cc` 仅 Release script 红（sources 格旧伤）。R403 新跑待落地，R404 ⓪ 补读。
+- **U-1438：② 破坏性反馈位 —— 「移除」和普通行文本同色。** 真看图：排除名单的「移除」是唯一会删用户配置的行内动作，却和上面的 App 标识一样是黑字；全 App 的批量删除/清空都是错误红。修法：给「移除」加与复制失败同一对错误红（亮 `0.72,0,0` / 暗 `1.0,0.62,0.58`）。像素现读：旧红 **0 / 0**，新红 **591 / 605**（字墨 447 / 954 仍在，不是把字藏了）；帧差分 2 张（privacy-excluded 亮暗），基线同笔 update 后 182/0。
+- **U-1439：判据与刀。** 源守卫 `testExcludedAppRemoveButtonUsesErrorRed` + 捕获帧 `REMOVE_RED`（红 ≥20，字墨=0 记 NOT-RUN）；`M1047`（源）/`M1048`（像素）双 **CAUGHT**、RESTORE_CLEAN=yes。band-empty 的 `longTextBandOutcome` 真值表 3 格 + `M1046` CAUGHT；证人从 detail meta 扩成 detail ∪ sidebar（runner 1x 详情整页不合成，侧栏仍有墨 ⇒ 具名 skip；两条都 0 才红）。本机四档照判。
+- **U-1440：③ 436 复核。** `a274d4a` 现读 `MOTION_FLOOR_FACTS judged=5/5 executed=73 not-run=-`、`settings-reset-fade=3`、`MOTION_FLOOR_OK=5/5`、`MOTION_FLOOR_REDS=0`；`notice-banner` 在 R401 的 4/5 里是登记放行臂，不误判红；没有新 unlisted，保持结案。
+- **U-1441：① 367 rot 与八步。** `HIDDEN_ARMS 表=246 可判=841 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=159 covered=141 arms=423 bad=0`、全仓 252 文件 / 907 把；`M1047/M1048` 全 CAUGHT。build **0** 告警；全量 `Executed 1064 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r403_shots`，与 R402 逐张比 `变了=2`（privacy-excluded 两张），帧基线同笔 `UPDATED=182`、复验 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 402；本轮破坏性反馈已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 402`）。电池 `Ran 683 / OK (skipped=4)`。
+
 ## 第 401 轮（R402 · 2026-10-26 · U-1431…U-1436）：空输入时「添加」可点 → 禁用（添加/移除文字亮度差 7/5 → 96/93）；R401 长正文测试的 runner band-empty 改具名 NOT-RUN（U-1431…U-1436 · 产品 1 文件，交互状态位）
 
 - **U-1431：⓪ R400/R401 队列。** `40288846355 ↔ ed3a30d` success；`40288830013 ↔ 41c76cc` failure 只在 `STEP[9] Release script tests`（sources 格未随主笔同提交 + skip roster 连带），不是产品红。R401 三跑全 failure：`642e4a7` 的失败步骤 `Release script tests / Swift tests / Capture gate`；`8b4c763`、`18f2f44` 的 `Swift tests / Capture gate`。Swift 红名是 `testLongTextAtMinimumWidthDoesNotRunUnderTheFloatingPill` 的 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`，Capture gate 也只有这一条；同跑 `TEXT_INK_NOT_RUN light 720=0 640=0` ⇒ runner 的 1x 离屏拍不出长正文页，**不是产品缺陷**。R402 已把这条 band-empty 从 XCTFail 改成 `emit(LONG_TEXT_PILL_NOT_RUN) + continue`（本机四档照判；runner 记具名 NOT-RUN）。642e4a7 的 Release 红仍是 sources 格主笔/追记分两次 push 的旧伤；R402 起主笔+追记一次 push。R402 新跑待落地，R403 ⓪ 补读。
