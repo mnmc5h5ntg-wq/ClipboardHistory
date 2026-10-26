@@ -26,7 +26,7 @@
 
 验证读数（现读）：`LONG_TEXT_PILL_CLEAR maxX=484.0pt 墨=50438 上限=500.0pt`；旧帧同尺 529.5pt；`M1039/M1040/M1041` 三刀 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **CI 新跑未读**：`40280864844 ↔ ae202dd`、`40280951026 ↔ cfbcec7` 均 in_progress（`conclusion` 空、0 字节日志）；R399 主笔推送后的新跑在 R400 ⓪ 按全部失败步骤补读；② **BACKLOG 436 的 runner motion 卷未读**（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；③ 亮档真机腿仍没跑；④ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+NOT-RUN / 阻塞（分开写）：① **CI 新跑都红**：`40280864844 ↔ ae202dd`、`40280951026 ↔ cfbcec7` 均 completed/failure，三步完全相同（Swift tests / Capture gate / Motion coverage floor），逐条见 U-1420；R399 主笔 c0091fb 与追记 073fd6e 的新跑仍 in_progress，R400 ⓪ 补读；② **BACKLOG 436 已结案**（runner `judged=5/5`、JSON/自测已改；旧 in_progress 读数不再用作许愿）；③ 亮档真机腿仍没跑；④ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
 
 下一轮（R400）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40280864844`/`40280951026` 与 R399 主笔推送跑的全部失败步骤（成对 run↔commit），新跑没有落地就继续记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 拿到 runner motion 读数后按实测决定第五臂 `must_judge`，没有就继续具名 NOT-RUN。
 
@@ -34,7 +34,7 @@ NOT-RUN / 阻塞（分开写）：① **CI 新跑未读**：`40280864844 ↔ ae2
 
 `40280951026 ↔ cfbcec7` 现读 failure，三个失败步骤逐条：`STEP[15] Swift tests`、`STEP[17] Capture gate`、`STEP[19] Motion coverage floor`。Swift 卷 `Executed 1057 / skipped 64 / failures 2`：复制失败红在 runner 亮 2.90 / 暗 2.55（地板 3.0）；`testCaptureKeyViews` 的录制环 idleBlue=4284/465，以及 R398 加载句 3.75（0.85 墨档在 runner 1x 字体平滑下不够）。Capture gate 的 2 条红有名字；Motion floor 唯一红是 UNLISTED `settings-reset-fade`。旧两跑 `40234023212↔d38ea10` / `40234058148↔5c7814e` / 对照 `40221947072↔43ff699` 均 success ⇒ 红来自 R392/R394/R398 在 runner 上的首次执行，不是 R399 布局位；本轮已修：录制环只数控件带、pane 墨档抬到 primary、失败红亮 0.72,0,0 / 暗 1.0,0.62,0.58。修后本地：copy 测试通过、capture 182 帧通过、全量 `1060/52/0`、电池 `683/4`。
 
-**436 结案**：`40280951026` 的 `MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=-`，`settings-reset-fade=2` 真的判到；已把第五臂写进 `motion_floor_expectations.json`（`must_judge=true`）并同步 `test_motion_floor_gate.py`（SUMMARY 五臂、地板 4、旧日志多一格 MISSING_KEY）；重放同一组 runner 行 `MOTION_FLOOR_OK=5/5 REDS=0`。`40280864844 ↔ ae202dd` 仍 in_progress 未读。
+**436 结案**：`40280951026` 的 `MOTION_FLOOR_FACTS judged=5/5 executed=72 not-run=-`，`settings-reset-fade=2` 真的判到；已把第五臂写进 `motion_floor_expectations.json`（`must_judge=true`）并同步 `test_motion_floor_gate.py`（SUMMARY 五臂、地板 4、旧日志多一格 MISSING_KEY）；重放同一组 runner 行 `MOTION_FLOOR_OK=5/5 REDS=0`。`40280864844 ↔ ae202dd` 也 failure，motion `judged=4/5 not-run=notice-banner`，但 settings-reset-fade 判到。
 
 **R400 ⓪ 目标**：push R399 后读新 run 全部失败步骤（尤其确认三条修复在 runner 上通过）；补读 40280864844；若新 run 仍红，按步骤名逐条落账，不用 0 字节日志猜绿。
 
@@ -54,7 +54,7 @@ NOT-RUN / 阻塞（分开写）：① **CI 新跑未读**：`40280864844 ↔ ae2
 
 NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=36（R398 主笔前，追记后 38）；② 旧的两跑与 R387–R397 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
 
-下一轮（R399）的靶：⓪ CI 队列（R399 现读，2026-10-26）：`40234023212 ↔ d38ea10` / completed / **success**（全部失败步骤=无）；`40234058148 ↔ 5c7814e` / completed / **success**（无）；`40221947072 ↔ 43ff699` / completed / **success**（改动前归因对照）；`40280864844 ↔ ae202dd` / **in_progress / 未读**（0 字节日志不算读数，等它落地后再按全部失败步骤补账）。push 已完成 `5c7814e..ae202dd`、ahead=0；一次 push 只为 head 生成新 run，旧两跑已单独读。① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别（动效/过渡/反馈或布局状态，不再做 secondary 文字对比度）；③ 436 待 `40280864844` 的 motion 卷落地后按实测决定第五臂 `must_judge`，没有 motion 卷就写具名 NOT-RUN，不许猜。
+下一轮（R399）的靶：⓪ CI 队列（R399 现读，2026-10-26）：`40234023212 ↔ d38ea10` / completed / **success**（全部失败步骤=无）；`40234058148 ↔ 5c7814e` / completed / **success**（无）；`40221947072 ↔ 43ff699` / completed / **success**（改动前归因对照）；`40280864844 ↔ ae202dd` / completed / **failure**（三步同 cfbcec7；motion `judged=4/5 not-run=notice-banner`，第五臂判到）。push 已完成 `5c7814e..ae202dd`、ahead=0；一次 push 只为 head 生成新 run，旧两跑已单独读。① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别（动效/过渡/反馈或布局状态，不再做 secondary 文字对比度）；③ 436 待 `40280864844` 的 motion 卷落地后按实测决定第五臂 `must_judge`，没有 motion 卷就写具名 NOT-RUN，不许猜。
 
 ## R397 状态（2026-10-26 · 本地 · 第 396 轮 / Round 394）：空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（产品 2 文件，视觉主线）
 
