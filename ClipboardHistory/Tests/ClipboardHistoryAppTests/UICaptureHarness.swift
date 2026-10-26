@@ -13575,6 +13575,83 @@ final class UICaptureTests: XCTestCase {
     /// 两态各渲染一次（`hoveredForCapture` 只加在绘制侧）：启用态悬停必须抬一档底色；
     /// 禁用态悬停必须**不动**（否则「不能点」会被画成「可以点」）。读数取按钮内那一块
     /// （x 432..492、y 106..122pt）的众数填充；卡片同一行右侧那块做能力闸门。
+    /// R394：复制失败那一档只换图标不换颜色 ⇒ 用户要读第二眼才知道「没写进剪贴板」。
+    /// 两态各渲染一次：成功态不许出现错误红，失败态必须有红且对底色的对比度过控制件地板。
+    func testCopyFailurePillTurnsRedAndSuccessDoesNot() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r394-copyfail-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+
+        struct Reading { let red: Int; let ink: Int; let contrast: Double }
+        func stats(_ rep: NSBitmapImageRep) -> Reading {
+            guard let base = rep.bitmapData else { return Reading(red: 0, ink: 0, contrast: 0) }
+            var values: [Int] = []
+            var reds: [Int] = []
+            for y in 0..<rep.pixelsHigh {
+                for x in 0..<rep.pixelsWide {
+                    let o = y * rep.bytesPerRow + x * 4
+                    let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
+                    let lum = Int((0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)).rounded())
+                    values.append(lum)
+                    if r > g + 20 && r > b + 20 && r > 80 { reds.append(lum) }
+                }
+            }
+            var hist: [Int: Int] = [:]
+            for v in values { hist[v / 4, default: 0] += 1 }
+            let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+            func rel(_ v: Int) -> Double {
+                let x = Double(v) / 255
+                return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+            }
+            let meanRed = reds.isEmpty ? fill : reds.reduce(0, +) / reds.count
+            let a = rel(meanRed), b = rel(fill)
+            return Reading(red: reds.count, ink: values.filter { abs($0 - fill) > 40 }.count,
+                           contrast: (max(a, b) + 0.05) / (min(a, b) + 0.05))
+        }
+
+        func rep(failed: Bool, _ appearance: NSAppearance.Name) throws -> NSBitmapImageRep {
+            let name = "r394-copy-\(failed ? "failed" : "success")-\(appearance.rawValue)"
+            let fixture = Fixture(name, NSSize(width: 120, height: 232)) {
+                AnyView(GlassPill(isFavorite: false, favoriteAction: {},
+                                  isPinned: false, pinAction: {},
+                                  copyFailed: failed,
+                                  copyAction: {}, deleteAction: {})
+                    .padding(16)
+                    .frame(width: 120, height: 232)
+                    .background(Color(nsColor: .windowBackgroundColor)))
+            }
+            let file = scratch.appendingPathComponent(name + ".png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let bitmap = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()) else {
+                throw NSError(domain: "r394", code: 1)
+            }
+            emit("COPY_FAIL_RED_PNG \(name) -> \(file.path)")
+            return bitmap
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .aqua ? "light" : "dark"
+            let success = stats(try rep(failed: false, appearance))
+            let failure = stats(try rep(failed: true, appearance))
+            emit("COPY_FAIL_RED \(tag) 成功红=\(success.red) 失败红=\(failure.red)"
+                 + " 失败对比=\(String(format: "%.2f", failure.contrast)) 墨=\(success.ink)/\(failure.ink)")
+            let capable = success.ink > 0 && failure.ink > 0
+            if !capable {
+                throw XCTSkip("COPY_FAIL_RED_NOT_RUN=flat-pill：\(tag) 胶囊没有墨（成功 \(success.ink) / 失败 \(failure.ink)）"
+                              + " ⇒ 这条通道拍不出这颗控件，不是「失败没变红」")
+            }
+            XCTAssertEqual(success.red, 0,
+                           "\(tag)：成功态读到 \(success.red) 颗错误红 ⇒ 失败色泄进了正常态")
+            XCTAssertGreaterThanOrEqual(failure.red, 30,
+                                        "\(tag)：失败态只有 \(failure.red) 颗错误红（要 ≥30）"
+                                            + " ⇒ 失败只换了图标、没有换颜色")
+            XCTAssertGreaterThanOrEqual(failure.contrast, 3.0,
+                                        "\(tag)：失败红对底色只有 \(String(format: "%.2f", failure.contrast)):1"
+                                            + "（控件地板 3.0）⇒ 红是红的，但读不出来")
+        }
+    }
+
     func testResetDefaultButtonShowsHoverOnlyWhenEnabled() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r390-reset-hover-\(UUID().uuidString)", isDirectory: true)

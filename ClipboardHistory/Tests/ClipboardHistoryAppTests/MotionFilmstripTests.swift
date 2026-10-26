@@ -2443,6 +2443,30 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R394：复制失败的颜色/符号切换在 2× 与 1× 下都必须读到 ≥2 个过渡帧。
+    /// 只拍 copy 那颗按钮（场景自己的 `captureRect`）；读不到就红，不把通道问题写成没动。
+    func testCopyFailureColorSwapIsAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scale in [2.0, 1.0] {
+            // 每个倍率新建场景：driver 是场景私有的，跑完 2x 后它已经是 failed=true，
+            // 复用同一个场景会让 1x 的触发变成 no-op（第一版实测 1x 过渡帧=0）。
+            let scenario = Scenario.copyFailure()
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("COPY_FAIL_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            XCTAssertGreaterThanOrEqual(span, 2,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 失败色/符号是硬切；"
+                                            + "先查带子是否装在第三颗按钮上，别把「读不到」写成「产品没动」")
+        }
+    }
+
     func testTransitionsAreActuallyRunning() throws {
         try skipUnlessEnabledAndCapable()
         var rows: [(name: String, span: Int)] = []      // 每个场景都进 MOTION_SUMMARY，形状不许因为"看不见"而少一项
@@ -7536,6 +7560,25 @@ final class MotionFilmstripTests: XCTestCase {
 
     // MARK: - 场景
 
+    /// R394：复制失败那一档的驱动。只服务专用胶片场景（不在 `Scenario.all()` 里）。
+    @MainActor private final class CopyFailureDriver: ObservableObject {
+        @Published var failed = false
+    }
+
+    private struct CopyFailureHarness: View {
+        @ObservedObject var driver: CopyFailureDriver
+
+        var body: some View {
+            GlassPill(isFavorite: false, favoriteAction: {},
+                      isPinned: false, pinAction: {},
+                      copyFailed: driver.failed,
+                      copyAction: {}, deleteAction: {})
+                .padding(16)
+                .frame(width: 120, height: 232)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+
     private struct Scenario {
         let name: String
         let size: NSSize
@@ -7688,6 +7731,26 @@ final class MotionFilmstripTests: XCTestCase {
                          return NSRect(x: 20, y: y, width: b.width - 40, height: 140)
                      }) { store in
                 RecommendationWeightsView.resetDefaults(in: store.weightsStore)
+            }
+        }
+
+        /// R394：复制失败那一颗只换图标不换色时，用户要读第二眼；产品改成错误红之后，
+        /// 这个场景只拍第三颗按钮（copy）那一小段，看颜色/符号的切换有没有过程。
+        @MainActor static func copyFailure() -> Scenario {
+            let driver = CopyFailureDriver()
+            return Scenario(name: "glass-pill-copy-failure", size: NSSize(width: 120, height: 232),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .emphasis) * 1000,
+                     appearance: .aqua,
+                     root: { _ in AnyView(CopyFailureHarness(driver: driver)) },
+                     captureRect: { host in
+                         let b = host.bounds
+                         // 第三颗 copy 按钮在 232pt 高的胶囊中部偏下（16pt padding + 4pt 胶囊头）。
+                         let y = host.isFlipped ? 100 : b.height - 160
+                         return NSRect(x: 28, y: y, width: b.width - 56, height: 60)
+                     }) { _ in
+                withAnimation(MotionCatalog.animation(for: .emphasis)) {
+                    driver.failed = true
+                }
             }
         }
 

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct GlassPill: View {
+    @Environment(\.colorScheme) private var colorScheme
     let isFavorite: Bool
     let favoriteAction: () -> Void
     /// 固定态与固定动作（§5 F-5）。单条记录的固定入口放在这里而不是行上：
@@ -48,6 +49,14 @@ struct GlassPill: View {
                                                : (copyConfirmed ? "checkmark" : "doc.on.doc"),
                             helpText: copyFailed ? "复制失败：没能写进剪贴板"
                                 : (copyConfirmed ? "已复制到剪贴板" : "再次复制"),
+                            // R394：失败只换图标不够 —— 成功/失败两态在颜色上原本完全一样，
+                            // 用户要读第二眼才知道「刚才没写进剪贴板」。错误色跟随系统红，
+                            // 与横幅/登录失败回执用同一套语言；成功仍是主色，不新造绿色。
+                            foregroundStyle: copyFailed
+                                ? AnyShapeStyle(colorScheme == .dark
+                                    ? Color(red: 1.0, green: 0.48, blue: 0.44)
+                                    : Color.red)
+                                : AnyShapeStyle(.primary),
                             // 图标换了要说"换过了"，不是"闪了一下"：14+ 用系统的符号替换过渡，
                             // 12/13 退化成交叉淡入（见 `SymbolMotion`）。
                             replaceSymbol: true,

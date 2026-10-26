@@ -440,6 +440,20 @@ final class MotionCatalogTests: XCTestCase {
                        "复制是每天上百次的动作，频率闸门判它不该弹（报告红线 0）")
     }
 
+    /// R394：失败色必须真的从 `DetailView` 流到 `GlassPill`；只测组件帧会漏掉接线断开。
+    func testCopyFailureStateIsWiredFromDetailViewToTheRedPill() throws {
+        let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
+        XCTAssertTrue(detail.contains("copyFailed: copyFailed"),
+                      "DetailView 没有把 copyFailed 传给 GlassPill ⇒ 失败永远画成正常色")
+        XCTAssertTrue(detail.contains("withAnimation(MotionCatalog.animation(for: .emphasis)) { copyFailed = true }"),
+                      "失败态没有 `.emphasis` 事务 ⇒ 红/图标是硬切（与成功态同一条驱动）")
+        let glass = codeOnly(try productSource(named: "Views/GlassControls.swift"))
+        XCTAssertTrue(glass.contains("copyFailed")
+                      && glass.contains("colorScheme == .dark")
+                      && glass.contains("Color(red: 1.0, green: 0.48, blue: 0.44)"),
+                      "GlassPill 的失败色没有走动态错误红 ⇒ 暗档会掉到 3:1 以下（R394 现读 2.69）")
+    }
+
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。
     /// 12/13 那一档 API 不存在（编译器实测 macOS 14 起），所以断言跟着 `isSupported` 走 ——
     /// 不是把缺口判成绿，而是"这一档发不出去"这件事本身被钉住。

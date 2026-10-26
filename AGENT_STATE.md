@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R394 状态（2026-10-26 · 本地 · 第 393 轮 / Round 391）：复制失败那一颗终于变红（成功 0 / 失败 145·132 颗）；胶片 2x 12 帧 / 1x 16 帧；M1029–M1031 CAUGHT（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R394 / 第 393 轮 / Round 391）：`GlassPill` 的失败态原来只把图标换成感叹号、前景仍是主色，成功/失败在颜色上完全一样。R394 给失败态上动态错误红（亮 `Color.red` / 暗 `1.0,0.48,0.44`），成功仍主色。静态现读：亮 成功红 **0** / 失败红 **145** / 失败对比 **4.57**，暗 **0** / **132** / **4.70**（控件地板 3.0；系统红暗档只有 2.69，动态红过）。胶片新场景只拍第三颗 copy 按钮：2x `帧数=27 过渡帧数=12 峰值=0.0585`、1x `27/16/0.0778`（声明 160ms），strip 逐帧看到 黑 doc → 红 doc → 红感叹号。判据：静态颜色/对比 + 两倍率胶片 + DetailView 接线；`M1029`/`M1030`/`M1031` 全 CAUGHT。**自伤**：第一版多靶表用全局 original 还原，把 GlassControls 全文写进 DetailView，构建报 `invalid redeclaration`；已 `git checkout -- DetailView.swift` 还原并拆成单靶表（D-384）。静态 182 帧 `变了=0`，帧基线 182/0；全量 `Executed 1052 tests, with 51 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=236 可判=825 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=149 covered=132 arms=407 bad=0`、全仓 242 文件 / 891 把；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 393`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；未推送，CI 多跑未读。
+② 产品位：复制失败从「只换字形」变成「动态错误红 + 字形」；静态 0/145·132、对比 4.57/4.70。
+③ 判据：静态颜色/对比、2x/1x 胶片、接线守卫；M1029–M1031 CAUGHT。
+④ 自伤：多靶表 restore 写坏 DetailView，构建报错；已还原并拆表，记 D-384。
+⑤ 367：hidden 表 236 / 可判 825 / rot 0 / 上界 0；预检 149/132/407/0。
+⑥ 验证：build 0 告警；全量 `1052/51/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162。
+
+验证读数（现读）：`COPY_FAIL_RED` 亮 成功 `0` / 失败 `145` / 对比 `4.57`，暗 `0` / `132` / `4.70`；`COPY_FAIL_FADE` 2x `27/12/0.0585`、1x `27/16/0.0778`；`M1029–M1031` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=25（R394 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387–R393 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测；④ 亮档真机腿仍没跑。
+
+下一轮（R395）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R394 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位。
+
 ## R393 状态（2026-10-26 · 本地 · 第 392 轮 / Round 390）：600pt 详情头不再截掉「复制」—— 完整/紧凑 meta 先试再退，四张最小窗帧只动头部（产品 2 文件，视觉主线）
 
 最后更新：2026-10-26（本地 · R393 / 第 392 轮 / Round 390）：`content-min-600x440` 的详情头只显示 `2025-10-09 16:38:20… 40 个字符 · 来自 终端`，middle 截断把「复制」吃掉；750pt 的同一记录是完整一行。`DetailTypography.metaText` 增加 `includeCopyVerb`（默认 true），详情头用 `ViewThatFits` 先试完整、放不下再退到去掉冗余「复制」的紧凑版；时间/大小/来源一个不丢，行高不变；macOS 12 用显式 `if #available` 保留旧截断（`ViewThatFits` 是 13+）。修后 600pt 帧现读完整 `2025-10-09 16:38:20 · 40 个字符 · 来自 终端`，750pt 不变。纯函数宽度 + 源守卫；`M1027`（紧凑臂写回 true）/`M1028`（ViewThatFits 换 Group）都 CAUGHT。BACKLOG 436 无新 runner 读数，仍未结案。`swift build --build-tests` 告警 **0**；全量 `Executed 1049 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r393_shots`，与 R392 逐张比 `变了=4`（四张 600pt 帧的差集都在头部，首张 2371 颗、bbox=(829,73)..(1100,93)），帧基线 `UPDATED=182`，复验 `COMPARED=182 CHANGED=0`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=234 可判=822 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=147 covered=130 arms=404 bad=0`、全仓 240 文件 / 888 把；产品面连续零改动 **2** 轮（现读 `python3 scripts/product_streak.py --streak-for 392`）。

@@ -7399,3 +7399,9 @@ R392 现读：`HotKeyRecorderEvidenceTests` 的组件入口一直读到点击后
 R393 现读：600pt 窗口里完整 meta 放不下，旧的 middle 截断显示 `2025-10-09 16:38:20… 40 个字符 · 来自 终端`，把「复制」吃掉；同一时刻 750pt 是完整一行。紧凑版只去掉冗余「复制」（11pt 系统字体实测 271.7 → 246.6pt），`ViewThatFits` 在 600pt 选紧凑、750pt 仍选完整；四张 600pt 帧的差集 bbox 都在头部，750pt 帧不变。
 **Why**：截断中间的一段是「信息被删」，而时间/大小/来源是这一行的主语与限定；「复制」只说明时间戳的语义，在剪贴板详情里是冗余。与其让截断随机吃掉一个片段，不如显式定义「放不下时删哪一段」。
 **How to apply**：① 窄窗口的文案先试完整、再用明确的紧凑变体兜底，不要靠 middle 截断随机删；② 紧凑变体只去掉冗余词，主语/限定必须保留；③ `ViewThatFits` 是 macOS 13+，低版本用显式 `if #available` 保留旧行为，不引新 API；④ 配纯函数宽度断言、源守卫与「两臂同文/去掉 ViewThatFits」两把刀；⑤ 帧差分要证明宽档帧不变、窄档只动目标行。
+
+### D-384（394）一张变异表只准一个靶；restore 的 `original` 必须与每一臂的 path 同源
+
+R394 现读：第一版把 M1029/M1030（靶 `GlassControls.swift`）与 M1031（靶 `DetailView.swift`）放进同一张表；restore 用全局 `original`（GlassControls 全文）写回每个 path ⇒ `struct GlassPill` 被写进 DetailView，构建报 `invalid redeclaration of 'GlassPill'`。`git checkout -- DetailView.swift` 还原后，把接线刀拆成 `mutate_r394_copy_wiring.py` 单靶表，三臂全部 CAUGHT。
+**Why**：表级 `original` 是单靶表的隐含假设；第二个靶一旦出现，restore 就不再是"还原"，而是"把第一靶的全文复制到第二靶"。这类坏法在构建时才会响，但若第二个靶不是编译单元（json/md），它会安静地把账写坏。
+**How to apply**：① 一张变异表只准一个文件靶；要钉两个文件就拆两张表（R178 的老规矩，R394 又犯一次）；② restore 若必须多靶，按 path 各存原文，并在收尾断言 `被改过的文件集合 ⊆ 本表声明过的靶集合`；③ 新表登记进预检，且用标准 `MUTATIONS` 形状（lambda/自定义 main 会从静态覆盖里隐形）；④ 事故要写进台账，不把"构建替我发现"写成"流程本来就有门"。

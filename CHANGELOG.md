@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 复制失败那一颗终于变红（成功 0 / 失败 145·132 颗）；胶片 2x 12 帧 / 1x 16 帧；M1029–M1031 CAUGHT，多靶表自伤已拆（R394 / 第 393 轮 / Round 391 / U-1390…U-1394 · 产品 1 文件，动效主线）
+
+
 ### 600pt 详情头不再截掉「复制」：完整/紧凑 meta 先试再退，四张最小窗帧只动头部（R393 / 第 392 轮 / Round 390 / U-1385…U-1389 · 产品 2 文件，视觉主线）
 
 
