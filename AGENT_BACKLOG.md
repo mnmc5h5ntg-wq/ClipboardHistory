@@ -8796,3 +8796,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **439. 离屏 NSTableView 滚动后新物化行不进 `cacheDisplay`**（R413 观察）
     现象：真 NSTableView 在离屏窗口里滚动后，中段/落点 `cacheDisplay` 帧是空白（起→中变化有、中→落 0）；同一套 AppKit bounds 动画在静态文档视图上三帧两两不同（111729/148800）。⇒ 滚动动效的产品像素中段只能记具名 NOT-RUN `table-lazy-rows`，产品运动由 `documentVisibleRect.origin` 逐时读数作证。
     修法（下一轮若需要产品中段图）：先给 NSTableView 做快照/逐行合成（`rowView.cacheDisplay` 拼到目标 y），或把滚动动效的可视证据改到真在屏探针的 CGWindow 截图；不要在空白帧上硬判。
+
+437 追记（R414 · 仍开）：本轮补的是设置侧栏选中胶囊滑动与滚动动画的 reduce-motion 测试 seam；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+**440. runner 的 `REVEAL`/`INTAKE_READING` 通道在这跑没有行：三条真在屏探针仍未在 CI 签收**（R414 读 `40400010978`）
+    现象：同一个 run 的 `Swift tests` 里有滚动离屏读数和静态通道，但 `REVEAL` 通道只匹配到 `SCROLL_REVEAL_*`，没有 `REVEAL 臂…`；`INTAKE_READING` 也没有行。`On-screen interaction probes` 是 report-only 且在这台 runner 上没跑/没落盘。
+    修法（下一轮）：给 On-screen step 的输入/输出各加一行身份读数（环境变量、是否 skipped、捕获目录），并让 `REVEAL`/`INTAKE_READING` 以唯一前缀打印；否则"探针绿"仍然只能由本地/人工签，不能写成 runner 已验。

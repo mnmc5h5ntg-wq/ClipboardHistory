@@ -53,8 +53,8 @@ if [ "$RC" -ne 0 ] && [ "$NAMED" -ge 1 ] && [ "$LIGHTONLY" = "$NAMED" ]; then ec
 cp "$BAK_TOK" "$TOK"; cmp -s "$BAK_TOK" "$TOK" && echo "M817_RESTORE=clean" || echo "M817_RESTORE=DIRTY"
 
 echo "########## M818：产物轴（调用点绕开 SelectedInk → 重捕帧）##########"
-insert "$SV" 'if isSelected { return SelectedInk.opacity(dark: colorScheme == .dark) }' \
-             'if isSelected { return VisualFill.selected }' M818 || exit 3
+insert "$SV" '                    .fill(Color.accentColor.opacity(SelectedInk.opacity(dark: colorScheme == .dark)))' \
+             '                    .fill(Color.accentColor.opacity(VisualFill.selected))' M818 || exit 3
 rm -rf "$FR"; mkdir -p "$FR"
 ( cd "$ROOT/ClipboardHistory" && CLIPBOARD_HISTORY_UI_SHOTS="$FR" swift test --filter UICaptureTests ) > /tmp/r260_arm_capture.log 2>&1
 CAP=$?

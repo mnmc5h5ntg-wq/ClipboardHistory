@@ -4472,6 +4472,40 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+        // R414：设置侧栏选中胶囊的三态。静置/中点/落定各一帧，x 带取胶囊左缘与文字之间，
+        // 中心必须从起点走到中点再到落点；旧的每行各自淡入淡出在中点会停在落点（红）。
+        func loadSidebarSelectionFrame(_ name: String) -> NSBitmapImageRep? {
+            let url = directory.appendingPathComponent(name)
+            guard let image = NSImage(contentsOf: url) else { return nil }
+            return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+        }
+        for tag in ["light", "dark"] {
+            let names = ["idle", "mid", "end"].map {
+                "settingssidebar-selection-\($0)-300x200-\(tag).png"
+            }
+            guard let idle = loadSidebarSelectionFrame(names[0]),
+                  let mid = loadSidebarSelectionFrame(names[1]),
+                  let end = loadSidebarSelectionFrame(names[2]) else {
+                XCTFail("SETTINGS_SIDEBAR_SELECTION_MISSING：\(tag) 三态帧不在捕获目录 ⇒ 这条判据没有对象")
+                continue
+            }
+            let idleRead = SettingsSidebarCapsuleRuler.center(recording: idle, frameWidthPoints: 300)
+            let midRead = SettingsSidebarCapsuleRuler.center(recording: mid, frameWidthPoints: 300)
+            let endRead = SettingsSidebarCapsuleRuler.center(recording: end, frameWidthPoints: 300)
+            emit("SETTINGS_SIDEBAR_SELECTION_CAPSULE \(tag) 静置=\(String(format: "%.1f", idleRead.centerY))pt/\(idleRead.count) "
+                 + "中点=\(String(format: "%.1f", midRead.centerY))pt/\(midRead.count) "
+                 + "落定=\(String(format: "%.1f", endRead.centerY))pt/\(endRead.count)")
+            XCTAssertGreaterThan(idleRead.count, 20, "\(tag)：静置帧没有读到胶囊底色")
+            XCTAssertGreaterThan(midRead.count, 20, "\(tag)：中点帧没有读到胶囊底色")
+            XCTAssertGreaterThan(endRead.count, 20, "\(tag)：落定帧没有读到胶囊底色")
+            XCTAssertGreaterThan(midRead.centerY, idleRead.centerY + 5,
+                                 "\(tag)：中点没有离开起点（\(midRead.centerY) vs \(idleRead.centerY)）⇒ 胶囊在跳")
+            XCTAssertLessThan(midRead.centerY, endRead.centerY - 5,
+                              "\(tag)：中点已经到落点（\(midRead.centerY) vs \(endRead.centerY)）⇒ 中段帧替瞬移作证")
+            XCTAssertGreaterThan(endRead.centerY, idleRead.centerY + 20,
+                                 "\(tag)：起点与落定没有拉开一行 ⇒ 夹具/尺坏了")
+        }
+
         // R396：不支持登录项时，复选框可以禁用，但「开机启动」标签必须仍可读。
         // 整页 captured frame 的旧结构实测 亮 1.76 / 暗 2.13:1（低于禁用标签地板 2.2）；
         // 新结构 2.84 / 4.38。只读第一行标签自己的语义带（x 195..255、y 118..135pt）——
@@ -5998,10 +6032,36 @@ final class UICaptureTests: XCTestCase {
         // 离屏窗口又不会建无障碍树（试过：BFS 只能走到根节点），
         // 所以用 initialCategory 注入，而不是靠"点一下"。
         for category in SettingsCategory.allCases {
-            results.append(Fixture("settings-\(category.rawValue)", NSSize(width: 720, height: 540)) {
+            results.append(Fixture("settings-\(category.rawValue)", NSSize(width: 720, height: 540),
+                                   settle: {
+                // R414：选中胶囊的行 frame 走 PreferenceKey 回填；给它一个落定回合，
+                // 否则整页帧可能在胶囊还没挂上时就按快门（选中行会少一层底）。
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            }) {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R414：设置侧栏选中胶囊的三态（静置 / 滑到中点 / 落定）。组件帧只拍侧栏本身，
+        // 不把整页的设置卡片卷进来；名字不带 `settings-` 前缀（那 7 处按整页收集的尺）。
+        let selectionPreview = SettingsSelectionPreview(from: .shortcuts,
+                                                        to: .general,
+                                                        progress: 0.5)
+        results.append(Fixture("settingssidebar-selection-idle", NSSize(width: 300, height: 200),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }) {
+            AnyView(self.probeFrame(SettingsSidebarView(selectedCategory: .constant(.shortcuts)),
+                                    width: 300, height: 200))
+        })
+        results.append(Fixture("settingssidebar-selection-mid", NSSize(width: 300, height: 200),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }) {
+            AnyView(self.probeFrame(SettingsSidebarView(selectedCategory: .constant(.general))
+                .environment(\.settingsSelectionPreview, selectionPreview),
+                width: 300, height: 200))
+        })
+        results.append(Fixture("settingssidebar-selection-end", NSSize(width: 300, height: 200),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }) {
+            AnyView(self.probeFrame(SettingsSidebarView(selectedCategory: .constant(.general)),
+                                    width: 300, height: 200))
+        })
         // R145 / BACKLOG 177：**录制态第一次进帧基线**（136 → 138）。
         // 为什么非拍不可：这颗按钮会吃掉所有按键，而它最重要的那一档状态在 136 张帧里一张都没有 ——
         // R141 加上那一圈描边之后，"它在屏幕上长什么样"只有组件级渲染与一次性的真机截图作过证。

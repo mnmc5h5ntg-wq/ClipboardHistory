@@ -1,1 +1,1 @@
-        if isSelected { return VisualFill.selected }
+                    .fill(Color.accentColor.opacity(VisualFill.selected))

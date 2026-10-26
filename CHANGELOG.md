@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置侧栏选中胶囊滑动（静置/中点/落定 35.8→51.2→67.5pt）；R412 两红在 runner 消失、滚动行为两红由 reduce-motion 测试 seam 修（R414 / 第 413 轮 / Round 411 / U-1493…U-1497 · 产品 1 文件，设置侧栏选择滑移位）
+
+
 ### 跨视口长跳补滚动到位动画（0→203→1438；旧瞬移 0/15 中间值）；R412 录制描边 runner 红修复（纵向 0 + 强调隔离）（R413 / 第 412 轮 / Round 410 / U-1488…U-1492 · 产品 1 文件，滚动到位位）
 
 

@@ -85,6 +85,10 @@ final class SelectionRevealHostView: NSView {
     private var revealGeneration = 0
     /// 只给单测把动画放慢到足以拍中段；产品路径恒 nil，时长仍来自 `SelectionRevealMotion`。
     var revealDurationOverride: TimeInterval?
+    /// 只给单测强制走动画路径；产品路径恒 nil，默认仍读系统的减弱动态开关。
+    /// R413 的 runner 卷首=末=目标、0 个中间值 ⇒ 先证这台机器的 reduce-motion 值，
+    /// 而不是把「机器要求瞬移」记成产品缺陷。
+    var revealReduceMotionOverride: Bool?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -136,7 +140,7 @@ final class SelectionRevealHostView: NSView {
             let plan = SelectionRevealMotion.plan(
                 distance: abs(target.y - start.y),
                 viewportHeight: scroll.documentVisibleRect.height,
-                reduceMotion: MotionCatalog.motionShouldBeReduced)
+                reduceMotion: self.revealReduceMotionOverride ?? MotionCatalog.motionShouldBeReduced)
             guard plan.isAnimated else {
                 // 近步 / 减弱动态：系统已经落位；不重置、不演。
                 return

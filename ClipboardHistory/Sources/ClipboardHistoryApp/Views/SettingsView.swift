@@ -930,6 +930,56 @@ struct HotKeySettingsRow: View {
 
 // MARK: - Unified Settings Sidebar (matches main window hover style)
 
+/// 捕获夹具用的选中滑移中间态（R414）：产品路径永远是 nil。
+struct SettingsSelectionPreview: Equatable {
+    let from: SettingsCategory
+    let to: SettingsCategory
+    let progress: Double
+}
+
+private struct SettingsSelectionPreviewKey: EnvironmentKey {
+    static let defaultValue: SettingsSelectionPreview? = nil
+}
+
+extension EnvironmentValues {
+    var settingsSelectionPreview: SettingsSelectionPreview? {
+        get { self[SettingsSelectionPreviewKey.self] }
+        set { self[SettingsSelectionPreviewKey.self] = newValue }
+    }
+}
+
+/// 设置侧栏那颗选中胶囊的**几何**（R414）。
+///
+/// 为什么要有纯计划：中间态要能被夹具**确定地**画一次（与 R411/R412 的取证键同一手法），
+/// 而"两行之间走到 0.5"是一个数，不该只存在于 SwiftUI 的插值器里。
+/// 真实产品路径仍由 `.animation(value: selectedCategory)` 驱动；夹具只在 progress 处取一帧。
+enum SettingsSidebarSelectionPlan {
+    /// 行 frame 是整个 `SettingsSidebarRow`（含左右各 6pt 外边距）；旧的行内选中底色
+    /// 画在按钮内容框上，等价于行 frame 左右各内缩 6pt。胶囊用同一个矩形，静置帧才逐像素不变。
+    static func capsuleRect(rowFrame: CGRect, horizontalInset: CGFloat = 6) -> CGRect {
+        CGRect(x: rowFrame.minX + horizontalInset,
+               y: rowFrame.minY,
+               width: max(0, rowFrame.width - horizontalInset * 2),
+               height: max(0, rowFrame.height))
+    }
+
+    static func interpolatedCapsuleRect(from: CGRect, to: CGRect, progress: Double) -> CGRect {
+        let t = CGFloat(min(1, max(0, progress)))
+        return CGRect(x: from.minX + (to.minX - from.minX) * t,
+                      y: from.minY + (to.minY - from.minY) * t,
+                      width: from.width + (to.width - from.width) * t,
+                      height: from.height + (to.height - from.height) * t)
+    }
+}
+
+private struct SettingsSidebarRowFramesKey: PreferenceKey {
+    static let defaultValue: [SettingsCategory: CGRect] = [:]
+    static func reduce(value: inout [SettingsCategory: CGRect],
+                       nextValue: () -> [SettingsCategory: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 /// 设置窗口左列。
 ///
 /// **R102 起从 `private` 放开到 internal**，唯一原因是判据那边要能拿它搭**与产品同一棵容器树**的
@@ -939,19 +989,60 @@ struct HotKeySettingsRow: View {
 /// 对 app 的外部使用者没有任何变化。
 struct SettingsSidebarView: View {
     @Binding var selectedCategory: SettingsCategory?
+    @Environment(\.settingsSelectionPreview) private var selectionPreview
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var rowFrames: [SettingsCategory: CGRect] = [:]
+
+    private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
+
+    private var capsuleRect: CGRect? {
+        if let preview = selectionPreview,
+           let from = rowFrames[preview.from],
+           let to = rowFrames[preview.to] {
+            return SettingsSidebarSelectionPlan.interpolatedCapsuleRect(
+                from: SettingsSidebarSelectionPlan.capsuleRect(rowFrame: from),
+                to: SettingsSidebarSelectionPlan.capsuleRect(rowFrame: to),
+                progress: preview.progress)
+        }
+        guard let selectedCategory, let frame = rowFrames[selectedCategory] else { return nil }
+        return SettingsSidebarSelectionPlan.capsuleRect(rowFrame: frame)
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(SettingsCategory.allCases) { category in
-                SettingsSidebarRow(
-                    category: category,
-                    isSelected: selectedCategory == category,
-                    action: { selectedCategory = category }
-                )
+        ZStack(alignment: .topLeading) {
+            // 选中胶囊只有**一颗**：它从旧行滑到新行，而不是每行各自淡入淡出。
+            // 颜色/矩形与旧的行内选中底一致，静置帧逐像素不变；过程由 `.selection` 驱动。
+            if let rect = capsuleRect {
+                VisualShape.rounded(VisualRadius.panel)
+                    .fill(Color.accentColor.opacity(SelectedInk.opacity(dark: colorScheme == .dark)))
+                    .frame(width: rect.width, height: rect.height)
+                    .offset(x: rect.minX, y: rect.minY)
+                    .allowsHitTesting(false)
             }
-            Spacer()
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(SettingsCategory.allCases) { category in
+                    SettingsSidebarRow(
+                        category: category,
+                        isSelected: selectedCategory == category,
+                        action: { selectedCategory = category }
+                    )
+                    .background(
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: SettingsSidebarRowFramesKey.self,
+                                value: [category: proxy.frame(in: .named("settingsSidebar"))])
+                        }
+                    )
+                }
+                Spacer()
+            }
+            .padding(.top, 8)
         }
-        .padding(.top, 8)
+        .coordinateSpace(name: "settingsSidebar")
+        .onPreferenceChange(SettingsSidebarRowFramesKey.self) { rowFrames = $0 }
+        .animation(MotionCatalog.animation(for: .selection, reduceMotion: shouldReduce),
+                   value: selectedCategory)
     }
 }
 
@@ -975,7 +1066,9 @@ struct SettingsSidebarRow: View {
     private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
     private var backgroundOpacity: Double {
-        if isSelected { return SelectedInk.opacity(dark: colorScheme == .dark) }
+        // R414：选中底已经搬到**一颗**滑动胶囊（`SettingsSidebarView`）；这里再画一层会把
+        // 静置帧的选中行叠深，也会让"谁在滑"变成两层各演各的。选中行只保留悬停以外的样式。
+        guard !isSelected else { return 0 }
         // R231 / BACKLOG 256 的原话是：`selected` 那一格**不接**悬停那条共享换算 —— 它是选中态
         // 不是悬停态，抬量长在悬停上会把"选中的那一行"和"指针所在的那一行"糊成同一档。
         // R260 更正：这条前提被后来的抬量挪走了。亮档下面两级抬到 0.12 / 0.15 之后，
@@ -1022,7 +1115,7 @@ struct SettingsSidebarRow: View {
         .pressedStyle(in: VisualShape.rounded(VisualRadius.panel), scales: false)
         .background(
             VisualShape.rounded(VisualRadius.panel)
-                .fill(isSelected ? Color.accentColor.opacity(backgroundOpacity) : Color.primary.opacity(backgroundOpacity))
+                .fill(Color.primary.opacity(backgroundOpacity))
         )
         .font(.system(size: VisualFont.body, weight: isSelected ? .semibold : .regular))
         .padding(.horizontal, 6)

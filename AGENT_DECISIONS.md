@@ -7544,3 +7544,20 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：邻行 20740/0 是窗口焦点导致的整页底色，不是行级状态；隔离要认"强调"这个状态本身。描边纵向 0 不再减少行距；本地最终捕获亮 4016/3958、暗 4016/3956、邻行 0/0，节奏尺与捕获套件绿。
 - 兼容性/迁移：只改描边背景的绘制范围与一条像素判据的对象；产品状态/回调/行高不变。
 - 回滚：恢复 `.padding(.vertical, -2)` 与任意变化断言即可；或 `git revert` 本轮提交。runner 侧 15/10/9 与 20740/0 的复验在下一跑。
+
+## D-407 设置侧栏的选中底收成一颗滑动胶囊（R414）
+
+- 背景：`SettingsSidebarRow` 每行各自画选中底，切换分类时两行一起淡入/淡出；选中状态没有位移过程。选中胶囊与筛选药丸是同一套"选择在空间里移动"的语言，但侧栏是另一张表面。
+- 决定：`SettingsSidebarSelectionPlan` 定义胶囊矩形（行 frame 左右内缩 6，与旧行内选中底等价）与两行间的线性插值；`SettingsSidebarView` 用 `PreferenceKey` 收集六行 frame，在行后画**唯一一颗**胶囊；`.animation(for: .selection, reduceMotion:)` 驱动；行内选中底清空，未选中 hover 保留。捕获夹具用 `settingsSelectionPreview` 在 0.5 处取一帧。
+- 理由：选中底只有一个作者；静置像素与旧实现逐像素相同（既有 192 帧 0 变），过程由一颗胶囊位移表达；行内不再叠第二层；reduce-motion 走 `MotionCatalog` 的零动画。
+- 兼容性/迁移：只动设置侧栏；组件名/外部 API 不变；新环境键只在夹具写入。
+- 回滚：删 `SettingsSidebarSelectionPlan`/胶囊与 preference，恢复行内选中底；或 `git revert` 本轮提交。
+
+
+## D-408 滚动动画行为测试用测试专用 reduce-motion seam（R414）
+
+- 背景：R413 的 runner 卷只有两条滚动行为测试红：0.15s 中段=目标、4 采样/0 中间值；同跑静态文档通道有 36k/42k 变化，R412 两红已消失。产品在系统 reduce-motion 下**应当**瞬移；测试却假定一定会演。
+- 决定：`SelectionRevealHostView` 增加 `revealReduceMotionOverride: Bool?`（产品默认 nil，仍读 `MotionCatalog.motionShouldBeReduced`）；`SelectionRevealAnimationTests` 的产品世界设 false，并在产品时长测试里打印 `SCROLL_REVEAL_PLAN reduce/override`。产品 reduce-motion 行为不变，真值表仍判。
+- 理由：把"机器要求瞬移"与"产品没有动画"分开；runner 的下一次读数能直接看到 reduce/override。不是改门槛，也不是把红写成绿：产品的 reduce 分支仍由 `SelectionRevealMotion` 真值表守着。
+- 兼容性/迁移：仅测试可设；产品路径未变。
+- 回滚：删 override 与测试设置即可；或 `git revert` 本轮提交。

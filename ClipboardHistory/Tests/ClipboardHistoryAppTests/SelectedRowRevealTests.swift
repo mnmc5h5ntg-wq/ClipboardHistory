@@ -101,6 +101,8 @@ final class SelectedRowRevealTests: XCTestCase {
                       "动画前没有回到起点 ⇒ 中段读到的会是落点（瞬移）")
         XCTAssertTrue(source.contains("revealDurationOverride ?? plan.duration"),
                       "产品路径没有走计划时长 ⇒ 真值表里的 duration 不承重")
+        XCTAssertTrue(source.contains("revealReduceMotionOverride ?? MotionCatalog.motionShouldBeReduced"),
+                      "减弱动态的默认来源被改掉 ⇒ 系统开关不再是产品路径的唯一默认；单测 seam 只能覆盖测试")
     }
 
     /// 声明守卫（与 R61 那条实测一一对应）：侧栏里不许留着"用 SwiftUI 的 scrollTo 跟随选中"这句话。

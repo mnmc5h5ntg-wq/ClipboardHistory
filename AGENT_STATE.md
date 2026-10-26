@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R414 状态（2026-10-27 · 本地 · 第 413 轮 / Round 411）：设置侧栏选中胶囊滑动（静置/中点/落定 35.8→51.2→67.5pt）；R412 两红在 runner 消失、滚动行为两红由 reduce-motion 测试 seam 修（产品 1 文件，设置侧栏选择滑移位）
+
+最后更新：2026-10-27（本地 · R414 / 第 413 轮 / Round 411）：设置侧栏原来每行各自淡入淡出选中底，切换分类是两行交叉淡，没有空间连续性。新 `SettingsSidebarSelectionPlan` 按行 frame（左右内缩 6）给出胶囊矩形与两行间插值；`SettingsSidebarView` 用 PreferenceKey 收六行位置，在行后画**唯一一颗**胶囊，`.selection` 驱动，行内选中底清空；既有 192 帧逐像素不变，新增六帧三态，基线 198。真看图：静置/中点/落定中心 **35.8/51.2/67.5pt**（x=8..13，计数 588/586/598），亮暗同。M1076–M1079 4/4 CAUGHT；旧 M818 重钉到胶囊填充行并整臂重跑（198 帧/18 变/14 设置窗口、CAUGHT；M817 也 CAUGHT）。R413 runner `40400010978 ↔ 2e02c4d` **failure**：只有 Swift tests 两条滚动行为红（0.15s 中段=目标；4 采样/0 中间值），静态通道绿；R412 两红（节奏 15/10/9、邻行 20740/0）**已消失**（Capture gate 绿、邻行 accent 0）；三条真在屏探针在 runner 的 `REVEAL`/`INTAKE_READING` 通道**没有行** ⇒ 具名 NOT-RUN（本地绿）。修法：单测专用 `revealReduceMotionOverride=false`（产品默认仍读系统 reduce-motion），下一跑用 `SCROLL_REVEAL_PLAN reduce/override` 读。全量 **1094/53/0**；捕获 198/122/4/0、final2 198/0；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 256/866 rot=0；预检 170/152/452 bad=0；产品面连续零改动 **1** 轮（as-of 413，现读 `python3 scripts/product_streak.py --streak-for 413`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R413 runner failure：只有两条滚动行为红；R412 两红消失、Capture gate 绿；在屏探针暂无通道行记 NOT-RUN；加 reduce-motion 测试 seam。
+② 产品：设置侧栏选中胶囊滑动，三态中心 35.8/51.2/67.5；既有 192 帧不变，新增 6 帧。
+③ 判据：纯计划 + 源 + 跨倍率中心尺 + 捕获三态；M1076–M1079 4/4；M818 重钉整臂 CAUGHT。
+④ 436：judged=5/5、REDS=0、notice-banner 放行；无新 unlisted。
+⑤ 367：hidden 表 256 / 可判 866 / rot 0 / 上界 0；预检 170/152/452/0。
+⑥ 全量 1094/53/0；换装 ok；清账 162=162；帧基线 198/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① runner 的真在屏 `REVEAL`/`INTAKE_READING` 通道没有行（本地三探针绿）；② 产品 NSTableView 滚动中段像素帧 `table-lazy-rows`；③ `MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 通道缺行；④ R413 滚动两红由 reduce-motion seam 修，runner 复验等 R414 新跑；⑤ 亮档真机腿仍没跑；⑥ macOS 12 紧凑详情头仍走旧截断；⑦ 437/438/439 仍开；⑧ R414 新跑待 push 后读。
+
+下一轮（R415）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R414 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R413 状态（2026-10-27 · 本地 · 第 412 轮 / Round 410）：跨视口长跳补滚动到位动画（0→203→1438；旧瞬移 0/15 中间值）；R412 录制描边 runner 红修复（纵向 0 + 强调隔离）（产品 1 文件，滚动到位位）
 
 最后更新：2026-10-27（本地 · R413 / 第 412 轮 / Round 410）：旧的揭示是一次 `scrollRowToVisible` 瞬移。新 `SelectionRevealMotion.plan` 只在距离 > 一屏且非减弱动态时演 0.20s（`.slider`），instant 与 animated 共用系统最小滚动目标。真在屏抓到两版自伤：纯 bounds 动画滚到位（origin 1977）但 List 选中集 **[]**；只把系统滚动放前面、目标在物化前读会让 2191 跳 3211。最终：先系统滚 + layout + 再滚读物化后目标，回起点演到该目标，完成时再物化落点。真在屏：选中 [60]、在屏 true、origin 3211；臂3 滚开后收藏/撤收藏仍 0；drift 3143→0；intake 0→159、选中 [4]。离屏：17 采样/7 中间值，首 68、末 1438、目标 1438；慢放 0→203→1438。像素通道：静态文档 111729/148800；产品表格滚动后新行不被 cacheDisplay 画出 ⇒ 产品像素中段具名 NOT-RUN `table-lazy-rows`。R412 的 runner 红：`40385615419 ↔ 130be12` **failure**，2 个失败步骤；节奏 15/10/9、邻行 20740/0；描边纵向 −2→0，邻行隔离改判强调；本地亮 4016/3958、暗 4016/3956、邻行 0/0，基线 192/0；runner 复验等下一跑。M1070–M1075 **5/5 CAUGHT**；M1065–M1069 重跑 5/5；HIDDEN 256/866 rot=0；预检 169/151/448 bad=0；全量 **1091/53/0**（一次 Perf 瞬态 262.9/269.86ms >250，单跑 148.02ms，复跑 0；阈值未改）；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；产品面连续零改动 **1** 轮（as-of 412，现读 `python3 scripts/product_streak.py --streak-for 412`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

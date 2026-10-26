@@ -69,6 +69,8 @@ final class SelectionRevealAnimationTests: XCTestCase {
         let world = try makeWorld()
         defer { world.window.orderOut(nil) }
         let target = try systemTarget(world, row: 80)
+        CaptureReadings.emit("SCROLL_REVEAL_PLAN reduce=\(MotionCatalog.motionShouldBeReduced) "
+                             + "override=\(String(describing: world.host.revealReduceMotionOverride))")
         world.host.revealIfSelectionChanged(key: "row-80", row: 80)
         var samples: [CGFloat] = []
         let begun = Date()
@@ -196,6 +198,8 @@ final class SelectionRevealAnimationTests: XCTestCase {
         scroll.backgroundColor = .white
         scroll.documentView = table
         let host = SelectionRevealHostView(frame: NSRect(x: 0, y: 0, width: 1, height: 1))
+        // 单测要验「动画路径」；产品的默认仍读系统减弱动态开关，见 revealReduceMotionOverride 的注释。
+        host.revealReduceMotionOverride = false
         table.addSubview(host)
 
         let window = NSWindow(contentRect: scroll.frame, styleMask: [.titled],
