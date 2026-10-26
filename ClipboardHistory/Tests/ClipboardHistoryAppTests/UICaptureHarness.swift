@@ -417,6 +417,7 @@ final class UICaptureTests: XCTestCase {
                       "MotionDriverTests.swift", "MotionFilmstripTests.swift",
                       "DetailScrollResetTests.swift",
                       "PressFeedbackTests.swift", "SettingsFailureReceiptTests.swift",
+                      "SettingsRowRecordingTests.swift",
                       "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]
         var strays: [String] = []
         for name in roster {
@@ -4425,6 +4426,49 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+        // R412：行级录制态（描边）必须**只落在正在录制的那一行**，邻行不动。
+        // 与上面的环判据分开取样：那条量的是 128×28 的录音器，这条量的是它左边的标题/说明带
+        // （环的 bbox 从 x≈470pt 起，这条带止于 480pt，两把尺不互相借证据）。
+        if settingsFamilyIsBlank {
+            emit("RECORDER_ROW_EDGE_NOT_RUN=flat-page：settings 族整体空白（本机最低未绘制 "
+                 + String(format: "%.1f", settingsLowestBlank * 100) + "%）⇒ 行级录制帧判不了")
+        } else {
+            func loadFrame(_ name: String) -> NSBitmapImageRep? {
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url) else { return nil }
+                return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+            }
+            // 点是捕获帧的 pt 坐标；行带覆盖第三行标题/说明与描边的上/下/左边，
+            // 邻行带取第二行同一列。两带都要先过能力闸门，平涂页走上面的具名 NOT-RUN。
+            let rowBand = CGRect(x: 175, y: 224, width: 305, height: 74)
+            let neighborBand = CGRect(x: 175, y: 150, width: 305, height: 68)
+            for tag in ["light", "dark"] {
+                let recName = "settings-shortcuts-recording-720x540-\(tag).png"
+                let idleName = "settings-shortcuts-720x540-\(tag).png"
+                guard let rec = loadFrame(recName), let idle = loadFrame(idleName) else {
+                    XCTFail("RECORDER_ROW_EDGE_MISSING：\(tag) 录制/静置帧不在捕获目录 ⇒ 这条判据没有对象")
+                    continue
+                }
+                let scale = Double(rec.pixelsWide) / 720.0
+                let row = RecorderRowEdgeRuler.read(recording: rec, idle: idle,
+                                                    bandPoints: rowBand, frameWidthPoints: 720)
+                let neighbor = RecorderRowEdgeRuler.read(recording: rec, idle: idle,
+                                                          bandPoints: neighborBand, frameWidthPoints: 720)
+                emit("RECORDER_ROW_EDGE \(tag) 缩放=\(String(format: "%.1f", scale))x "
+                     + "行带变化=\(row.changed) 行带强调=\(row.accentChanged) 行带总数=\(row.total) "
+                     + "邻行变化=\(neighbor.changed) 邻行强调=\(neighbor.accentChanged)")
+                XCTAssertGreaterThanOrEqual(row.changed, 500,
+                                            "\(tag)：录制/静置在行带里只差 \(row.changed) 个像素 ⇒ 行级描边没画上")
+                XCTAssertGreaterThanOrEqual(row.accentChanged, 400,
+                                            "\(tag)：行带里只有 \(row.accentChanged) 颗强调色（要 ≥400）"
+                                                + " ⇒ 行级状态没有可读的形状")
+                XCTAssertEqual(neighbor.changed, 0,
+                               "\(tag)：邻行也变了 \(neighbor.changed) 个像素 ⇒ 描边漏到了没在录制的行")
+                XCTAssertEqual(neighbor.accentChanged, 0,
+                               "\(tag)：邻行读到 \(neighbor.accentChanged) 颗强调色 ⇒ 行级状态画到了错误的行")
+            }
+        }
+
         // R396：不支持登录项时，复选框可以禁用，但「开机启动」标签必须仍可读。
         // 整页 captured frame 的旧结构实测 亮 1.76 / 暗 2.13:1（低于禁用标签地板 2.2）；
         // 新结构 2.84 / 4.38。只读第一行标签自己的语义带（x 195..255、y 118..135pt）——
@@ -5478,7 +5522,12 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
         })
         // R411：整行悬停帧。选第 2 条（不是选中行），避免与系统选中材质混在一起。
-        results.append(Fixture("sidebar-row-hover", NSSize(width: 300, height: 520)) {
+        // R412 补 settle：悬停底是 `.hover`（0.16s）淡入，而环境键在第一次布局时就把
+        // 目标值设成 true ⇒ 不落定时快门落在淡入中途，相位由机器负载决定（同代码两次捕获
+        // 目标行均值 218 / 209，其余像素完全相同）。这条只等画面落定，不改产品那一帧的含义。
+        results.append(Fixture("sidebar-row-hover", NSSize(width: 300, height: 520), settle: {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store))
                 .environment(\.hoveredEntryIDForCapture, store.entries[1].id))
         })

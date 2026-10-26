@@ -54,6 +54,9 @@ struct HotKeyRecorderRing: View {
 struct HotKeyRecorderView: View {
     @Binding var shortcut: HotKeyShortcut
     let onInvalidShortcut: () -> Void
+    /// R412：**只报告**按钮自己翻出来的那个状态，不另立一份真值 ——
+    /// 设置行拿它画「这一行正在吃键」，状态的所有权仍在按钮。
+    var onRecordingChange: (Bool) -> Void = { _ in }
     /// 由按钮自己翻，不让调用方再持一份：快捷键页有三行，多一处真值就会与按钮不一致。
     @State private var isRecording = false
 
@@ -64,6 +67,7 @@ struct HotKeyRecorderView: View {
                                 // `@State.wrappedValue` 的 setter 是 nonmutating，
                                 // 所以在逃逸闭包里赋值是合法的。
                                 isRecording = recording
+                                onRecordingChange(recording)
                             })
             .overlay(HotKeyRecorderRing(isRecording: isRecording))
             // `.emphasis`（0.16s）：进入录制是用户自己点出来的，反馈要"立刻在"，

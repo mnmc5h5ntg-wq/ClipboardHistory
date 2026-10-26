@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置快捷键行补「正在录制」行级描边（行带旧 0/0 → 新 4040/3990，邻行 0）；R411 空态句 identifier 在 runner 上生效（R412 / 第 411 轮 / Round 409 / U-1483…U-1487 · 产品 2 文件，设置行录制态位）
+
+
 ### 主列表整行补悬停反馈（目标行 232.5/47.9 → 212.1/59.6，邻行 0）；空态句改用 identifier 精确选取（R411 / 第 410 轮 / Round 408 / U-1478…U-1482 · 产品 3 文件，列表行悬停位）
 
 

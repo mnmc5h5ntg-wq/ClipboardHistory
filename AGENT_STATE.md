@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R412 状态（2026-10-27 · 本地 · 第 411 轮 / Round 409）：设置快捷键行补「正在录制」行级描边（行带旧 0/0 → 新 4040/3990，邻行 0）；R411 空态句 identifier 在 runner 上生效（产品 2 文件，设置行录制态位）
+
+最后更新：2026-10-27（本地 · R412 / 第 411 轮 / Round 409）：快捷键设置卡的录制态只亮 128×28 录音器自己那圈；三行快捷键里行标题/说明没有「这一行在吃键」的标记。修法：`HotKeyRecorderView` 增加只读 `onRecordingChange`，`HotKeySettingsRow` 录制时给整行画 1.5pt accent 圆角描边（纵向外扩 2pt、横向不扩），`.emphasis` 驱动；数值走 `SettingsRowEmphasis`。同带旧/新（x=175..480、y=224..298pt）：旧 **0/0** → 新 **4040/3990**（亮）、**4039/3979**（暗）；邻行 **0/0**；录音器环亮 1794 / 暗 1780 不回退。`settings-shortcuts-recording` 亮暗 2 帧变化；另把 R411 的 `sidebar-row-hover` 夹具补落定等待（侦察快照中间相 220.84 → **212.06**，等于已提交基线与 R411 台账的 212.1；邻行不变）—— 基线里该帧 hash 本就是最终态，已提交基线只改 recording 两帧；基线 192/0/0/0。源/纯函数/像素三守卫：跨倍率 1× 276 / 2× 1104，真实行 4834 强调 / 静置 0；M1065–M1069 **5/5 CAUGHT**（M1068 变化 4846、强调 0 ⇒ 抓可见性）。⓪ `40370566410 ↔ a8ebbaf` **success**、22 步全绿；`QUICKPICK_EMPTY_FIELD 句子长=30 其它字段=1`（旧 33/56 消失，不是改门槛）；行 hover 两守卫与 `ControlHoverLadderTests` 绿；`SCROLL_FAILURE_COUNT` 缺行记具名 NOT-RUN；sources R411/2b0ef71 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1084 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账表 162=162；`HIDDEN_ARMS 表=255 可判=861 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=168 covered=150 arms=443 bad=0`、全仓 261 文件 / 927 把；产品面连续零改动 **1** 轮（as-of 411，现读 `python3 scripts/product_streak.py --streak-for 411`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R411 头跑 success：空态句 30/1、33/56 消失；行 hover 两守卫与 ControlHoverLadder 绿；缺行通道记 NOT-RUN。
+② 产品：快捷键设置行录制态补整行描边，行带 0/0 → 4040/3990，邻行 0。
+③ 判据：纯函数 + 源 + 跨倍率像素尺 + 真实行 + 整页邻行；M1065–M1069 5/5 CAUGHT。
+④ 436：judged=5/5、REDS=0、UNLISTED=0、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 255 / 可判 861 / rot 0 / 上界 0；预检 168/150/443/0。
+⑥ 全量 1084/53/0；换装 ok；清账表 162=162；帧基线 192/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① `SCROLL_FAILURE_COUNT` 本跑没有行，记具名 NOT-RUN；② 真实指针不在录制态触发路径上，真机合成器里的描边仍只由离屏帧作证；③ 离屏 alpha 动画采样不到中间帧（mid=1.0）⇒ 弹层淡入不签产品结论；④ 亮档真机腿仍没跑；⑤ macOS 12 紧凑详情头仍走旧截断；⑥ 主列表与浮层来源搜索语言未统一（437）；⑦ 设置卡其它行族没有行级状态（438）；⑧ R412 新跑待 push 后读。
+
+下一轮（R413）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R412 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R411 状态（2026-10-27 · 本地 · 第 410 轮 / Round 408）：主列表整行补悬停反馈（目标行 232.5/47.9 → 212.1/59.6，邻行 0）；空态句改用 identifier 精确选取（产品 3 文件，列表行悬停位）
 
 最后更新：2026-10-27（本地 · R411 / 第 410 轮 / Round 408）：主列表行可点可选中，但整行没有悬停反馈。`HistoryRowButton` 接真实 `onHover` + 按 entry id 的 `hoveredEntryIDForCapture`，悬停底色走共享 `HoverInk.opacity(level:dark:)`。像素现读（目标行 x=20..280、y=222..265pt）：亮 **232.5 → 212.1**、暗 **47.9 → 59.6**；目标行变化 **43733/44720=97.8%** / **43708/44720=97.7%**；邻行 **0/31200=0.0%**。新增 `sidebar-row-hover` 亮暗 2 帧，既有 190 帧不变，基线同笔 192/0/0/0。源/像素两刀 `M1063/M1064` 双 CAUGHT（源守卫第一版被星标自己的 onHover 喂饱，已收窄到行级整行）。⓪ `40358291786 ↔ 9a5b70a` **completed / failure**，失败步骤 **2 个**（`Swift tests` + `Capture gate`），只有空态句两条（gap **33>24**、长句宽 **56>44**）；`SCROLL_FAILURE_COUNT=0` ⇒ R410 的可见原点守卫已过。R411 查明 33/56 来自**测试抓错 NSTextField**（固有宽 44 的短字段），给空态句加 `identifier=quickPickEmptyMessage` 精确选取并输出其它字段诊断。`Release script tests` success：sources `R410/61da3be` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1080 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=254 可判=856 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=167 covered=149 arms=438 bad=0`、全仓 260 文件 / 922 把；产品面连续零改动 **1** 轮（as-of 410，现读 `python3 scripts/product_streak.py --streak-for 410`）。电池 `Ran 683 / OK (skipped=4)`。

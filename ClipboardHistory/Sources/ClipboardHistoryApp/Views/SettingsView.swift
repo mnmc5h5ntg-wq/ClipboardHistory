@@ -818,9 +818,40 @@ struct SettingsView: View {
 
 // MARK: - HotKey Row
 
-private struct HotKeySettingsRow: View {
+/// 录制态在**整行**上的那一层（R412）。
+///
+/// 为什么不是只靠录音器自己那圈描边：那一圈只圈住 128×28 的按钮，而这一行真正要读的是
+/// 「哪个动作正在吃键」—— 标题与说明在按钮左边，常被眼睛先扫到。三行快捷键里只看按钮，
+/// 得先找到那圈蓝再回头读标题；行级描边把「这一行」和「正在听」绑在同一处。
+///
+/// 为什么是**描边**而不是整行底色（R412 首拍）：底色会把行内文字之间的留白也涂成墨，
+/// 卡片节奏尺读到的段落间距从 14.5 掉到 0.0（`testSettingsCardVerticalRhythmIsOneNumber`）——
+/// 那条尺量的是布局，不应被一个状态底色改写。描边只落在行边界上，行内留白与行距原样。
+///
+/// 为什么只纵向外扩 2pt：横向一扩就把卡片左沿的第一墨列从 5 拉到 3
+///（`testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` 当场读 3.0）；
+/// 纵向再多会把行距吃掉超过 4.5pt。纵向 2pt 既避开字形，又留在节奏尺的容差内。
+///
+/// 值仍然是模型值：静置恒 0（静置帧逐像素不变），录制时非 0；减弱动态只是不淡入，
+/// 描边照样在（状态不许押在动画上，沿用 `HotKeyRecorderEmphasis` 的同一条规矩）。
+enum SettingsRowEmphasis {
+    /// 描边不透明度。静置恒 0：这一帧逐像素等于不存在，静置帧基线不动。
+    static func recordingStrokeOpacity(isRecording: Bool) -> Double {
+        isRecording ? 0.9 : 0
+    }
+
+    /// 与录音器自己那圈同宽（`VisualStroke.highlight`）：两边是同一句话的两种范围。
+    static func recordingStrokeWidth(isRecording: Bool) -> CGFloat {
+        isRecording ? VisualStroke.highlight : 0
+    }
+}
+
+/// **R412 起从 `private` 放开到 internal**：唯一原因是判据要搭一行**与产品同一棵**的组件帧
+/// （真实的 `HotKeyRecorderButton` → 回调 → 行描边）。产品调用点不经过这条可见性变化。
+struct HotKeySettingsRow: View {
     @ObservedObject var settings: HotKeySettings
     @Binding var shortcut: HotKeyShortcut
+    @State private var isRecording = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -855,7 +886,8 @@ private struct HotKeySettingsRow: View {
                     shortcut: $shortcut,
                     onInvalidShortcut: {
                         settings.recordInvalidShortcut()
-                    }
+                    },
+                    onRecordingChange: { isRecording = $0 }
                 )
                 .frame(width: 128, height: 28)
 
@@ -872,6 +904,17 @@ private struct HotKeySettingsRow: View {
                 .buttonStyle(ResetDefaultButtonStyle())
                 }
             }
+            // 描边**只画在行边界上**：纵向外扩 2pt，横向不扩（横向一扩就把卡片左沿的第一墨列从 5 拉到 3，
+            // `testSettingsCardHorizontalInsetIsMeasuredAgainstTheSystemGroupBox` 当场读 3.0）。
+            // 底色或更大的外扩会把卡片底边/行距改写成墨（R412 首拍与二拍各红了一条布局尺）。
+            .background(
+                VisualShape.rounded(VisualRadius.panel)
+                    .strokeBorder(Color.accentColor.opacity(
+                        SettingsRowEmphasis.recordingStrokeOpacity(isRecording: isRecording)),
+                                  lineWidth: SettingsRowEmphasis.recordingStrokeWidth(isRecording: isRecording))
+                    .padding(.vertical, -2)
+            )
+            .animation(MotionCatalog.animation(for: .emphasis), value: isRecording)
 
             if let message = settings.message {
                 Text(message)
