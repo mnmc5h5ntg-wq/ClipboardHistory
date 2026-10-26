@@ -5,6 +5,9 @@ struct HistorySidebarView: View {
     @ObservedObject var historyStore: HistoryStore
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
+    /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
+    @Environment(\.dropTargetedForCapture) private var dropTargetedForCapture
+    private var isDropTargetedForDrawing: Bool { isDropTargeted || (dropTargetedForCapture ?? false) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -219,7 +222,8 @@ struct HistorySidebarView: View {
             acceptDroppedFileProviders(providers)
         }
         .overlay {
-            if isDropTargeted {
+            if isDropTargetedForDrawing {
+                ZStack(alignment: .bottom) {
                 VisualShape.rounded(VisualRadius.panel)
                     .strokeBorder(Color.accentColor.opacity(VisualTint.dropTargetStroke),
                                   style: StrokeStyle(lineWidth: VisualStroke.highlight,
@@ -241,9 +245,23 @@ struct HistorySidebarView: View {
                         .allowsHitTesting(false)
                         .transition(MotionCatalog.transition(for: .contentFade))
                 }
+                Text("松手加入剪贴板历史")
+                    .font(.system(size: VisualFont.meta, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        VisualShape.rounded(VisualRadius.control)
+                            .fill(Color(nsColor: .windowBackgroundColor).opacity(0.86))
+                    )
+                    .padding(.bottom, 18)
+                    .allowsHitTesting(false)
+                    .transition(MotionCatalog.transition(for: .contentFade))
+                }
+                .allowsHitTesting(false)
             }
         }
-        .animation(MotionCatalog.animation(for: .dropTarget), value: isDropTargeted)
+        .animation(MotionCatalog.animation(for: .dropTarget), value: isDropTargetedForDrawing)
         // 系统的 `List` 在自己拿到焦点时也会画一圈焦点环；鼠标点一下不该留下它（D-030 那圈蓝框），
         // 键盘导航要留着，所以只关"效果"不关"可聚焦"。`focusEffectDisabled()` 是 macOS 14+，
         // 12/13 没有对应 API ⇒ 那两版上环会留着，是平台限制不是漏了。

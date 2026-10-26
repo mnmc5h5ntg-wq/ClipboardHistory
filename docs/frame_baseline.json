@@ -1,5 +1,5 @@
 {
-  "count": 186,
+  "count": 188,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -89,8 +89,8 @@
     "modechip-hover-lit-200x60-light.png": "26af09e4577eaeac442890a1771bf9a597f9bd3638fcd3c434ae23d3e0d0de07",
     "notice-banner-560x170-dark.png": "376d3a84fcb77ae64b48ec7689b3f0280d035fffb4b6a82cfd48f56f483e7d54",
     "notice-banner-560x170-light.png": "9904597535967a106164acd08d4bf818e76cb527df9dc19efe137340eea032b7",
-    "quickpick-empty-420x300-dark.png": "321227dc4e4ed62ae055380ed46b47fe68b7d9ed3ba05e1a4f4c95ed26dc7b05",
-    "quickpick-empty-420x300-light.png": "7233e4ba7e4c0aa86d39e31789684d7f75455312488bce97a755d551a250a0b7",
+    "quickpick-empty-420x300-dark.png": "94246b919d0c3244f1c42d92b51eec994d2b4a89867f7afc4fa9eef4900acd6a",
+    "quickpick-empty-420x300-light.png": "a6b081724d16443e04475dabf8df2e4086168a6ce33be9bc097d7faf98fb4205",
     "quickpick-hover-420x300-dark.png": "c92d1f819a6570e94d545829e76e9165031ef780a19df81d0a2c5749e44c45a7",
     "quickpick-hover-420x300-light.png": "3f95b649fe50b7de26df05e95064a4c7d34fd4a6b7aaedda559725c1c03ea9f9",
     "quickpick-list-420x300-dark.png": "97d705e064a01b3fe335ab40dd679a851b77f9d35bbd7febe23dd74c902adce4",
@@ -163,6 +163,8 @@
     "settingsrow-hover-idle-300x96-light.png": "88cd026c882f833b7064e1546280b7abf4228ec68c6dc08b78688c119895ac0d",
     "settingsrow-hover-lit-300x96-dark.png": "22ff69d401b167dc0b80a99b29ca2b9d9647902300ea90ccb89540a3b682dff0",
     "settingsrow-hover-lit-300x96-light.png": "98e9f2882602265c49ddd281759e57d0cb678a98e32bcd5321b7a21307899908",
+    "sidebar-drop-target-300x520-dark.png": "34148e57652b63e5ecb76afc71d053dcf8b68c3d290df1e95f5a909340f86501",
+    "sidebar-drop-target-300x520-light.png": "e9ce45b495dd0a693d53fe075e4f692f87781a9ac3c4bb74df24417e86a81d18",
     "sidebar-favorites-300x520-dark.png": "64ffaad5714fa072f489326c131c147c00df0aa92076942c36819f0234453cae",
     "sidebar-favorites-300x520-light.png": "7c24be94c84d9077c86394250c02adf498155b8fb9e6d69c310f3bb225a33ffa",
     "sidebar-history-300x520-dark.png": "f4e5ef6771a4243491a7c535f24435ae32c4b3556f417da2fdd3c7d67e5ce727",

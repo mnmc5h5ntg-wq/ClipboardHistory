@@ -236,6 +236,12 @@ private struct PressedForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// R408：拖放目标那一档也要能离线拍。产品路径只由真实拖放事件点亮，
+/// 离屏捕获送不进 drag session ⇒ 没有这颗键，提示文案在帧里永远不存在。
+private struct DropTargetedForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
@@ -254,6 +260,12 @@ extension EnvironmentValues {
     var pressedForCapture: Bool? {
         get { self[PressedForCaptureKey.self] }
         set { self[PressedForCaptureKey.self] = newValue }
+    }
+
+    /// 取证用的拖放目标覆盖。`nil` = 不覆盖（产品路径仍由 `isDropTargeted` 供）。
+    var dropTargetedForCapture: Bool? {
+        get { self[DropTargetedForCaptureKey.self] }
+        set { self[DropTargetedForCaptureKey.self] = newValue }
     }
 }
 

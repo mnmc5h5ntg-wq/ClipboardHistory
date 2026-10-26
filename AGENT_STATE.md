@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R408 状态（2026-10-26 · 本地 · 第 407 轮 / Round 405）：拖入目标补「松手加入剪贴板历史」（拖放带 0/0 → 708/797）；R407 CTA 布局回归用容器修回（gap 33→8）（产品 2 文件，拖放反馈位）
+
+最后更新：2026-10-26（本地 · R408 / 第 407 轮 / Round 405）：拖入时只有虚线框/光，没有一句“松手会发生什么”。新增 `dropTargetedForCapture` 取证键 + 底部「松手加入剪贴板历史」；无拖放帧同带 **0/0** → 拖放帧 **708/797**，列表校准 **6838/7256**；新增 2 帧、2 张 `quickpick-empty` 随 CTA 容器布局修正，基线同笔 188/0/0/0。源/像素两刀 `M1057/M1058` 双 CAUGHT。⓪ `40332222297 ↔ d9bfa83` **completed / failure**，失败步骤 **2 个**（`Swift tests` + `Capture gate`），同源于 R407 把 CTA 直接塞进主 `NSStackView`：runner 空句 gap **33pt>24**、长句宽 **56pt>44pt**；收进 `emptyBox` 后本机 gap **8pt**、长句 **400pt**，R406 的 visibleRect 守卫在这一跑不再红。`Release script tests` success：sources `R407/13c24c8` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1074 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=251 可判=850 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=164 covered=146 arms=432 bad=0`、全仓 257 文件 / 916 把；产品面连续零改动 **1** 轮（as-of 407，现读 `python3 scripts/product_streak.py --streak-for 407`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R407 头跑 failure：2 个失败步骤同源于 CTA 布局；容器化后 gap 8/长句 400，visibleRect 守卫不再红。
+② 产品：拖放目标补「松手加入剪贴板历史」，旧/无拖放 0/0 → 新 708/797。
+③ 判据：源 + 像素三读数；M1057/M1058 双 CAUGHT；R407 的 M1055/M1056 重跑仍 CAUGHT。
+④ 436：judged=5/5、REDS=0、UNLISTED=0、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 251 / 可判 850 / rot 0 / 上界 0；预检 164/146/432/0。
+⑥ 全量 1074/53/0；换装 ok；清账表 162=162。
+
+NOT-RUN / 阻塞（分开写）：① 真实 drag session 仍只能人工验；② 亮档真机腿仍没跑；③ macOS 12 紧凑详情头仍走旧截断；④ 主列表与浮层的来源搜索语言未统一（437）；⑤ R408 新跑待 push 后读。
+
+下一轮（R409）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R408 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R407 状态（2026-10-26 · 本地 · 第 406 轮 / Round 404）：QuickPick 空结果态补可见「清除搜索」CTA（按钮带旧 0/0 → 新 934/1114）；R406 守卫在 runner 上红的假设被修正（产品 1 文件，空态 CTA 位）
 
 最后更新：2026-10-26（本地 · R407 / 第 406 轮 / Round 404）：QuickPick 空结果态只有一句“按 Esc 清空”，而主窗口同类空态有「清除搜索」按钮。修法：查询词非空且无候选时显示 `NSButton(title:"清除搜索")`，点击清空搜索框、恢复候选并把焦点还给搜索框；空历史/无查询词不显示。像素现读（x=170..250、y=55..85pt）：旧 **0/0** → 新 **934/1114**；同帧消息带 3693/4346 作校准。仅 `quickpick-empty` 亮暗 2 帧变化，基线同笔 186/0/0/0。源/像素两刀 `M1055/M1056` 双 CAUGHT。⓪ `40326547579 ↔ f7852d0` **completed / failure**，唯一失败步骤 `Swift tests`：R406 守卫拿 clip bounds origin 当顶部参照（runner −46 / 本机 −57）；已改为断言 `document.visibleRect.origin.y`（旧行为 2357 → 顶部参照 0），M1053 重跑仍 CAUGHT。`Release script tests` success：sources `R406/cb2bd4c` 一致、全量计数 92-vs-934 反向对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1072 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=250 可判=848 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=163 covered=145 arms=430 bad=0`、全仓 256 文件 / 914 把；产品面连续零改动 **1** 轮（as-of 406，现读 `python3 scripts/product_streak.py --streak-for 406`）。电池 `Ran 683 / OK (skipped=4)`。

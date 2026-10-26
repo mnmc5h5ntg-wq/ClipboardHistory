@@ -101,6 +101,9 @@ final class UICaptureTests: XCTestCase {
         // 横幅本身完好（红底、两行、"知道了"垂直居中、无截断），黑的是左下侧栏那一行。
         "content-with-copy-failure-notice",
         "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
+        // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
+        // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
+        "sidebar-drop-target",
     ]
 
     /// 「这张帧天生就是稀的」名单（R63）—— 与上面那份同一族：**尺的假设名单**，不是缺陷名单。
@@ -2756,6 +2759,68 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
     }
 
+    /// R408：拖放目标必须说清“松手会发生什么”，不只画一圈虚线。
+    ///
+    /// 两帧同尺寸：`sidebar-drop-target` 是产品视图 + 取证键；`sidebar-history` 是不带
+    /// 拖放目标的同一列表。目标带取底部 x=80..220、y=470..505pt：没有拖放时那里是空白，
+    /// 有拖放时出现「松手加入剪贴板历史」。
+    func testDropTargetHintIsVisibleAndOnlyInTheTargetedFrame() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r408-drop-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let targetFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-drop-target" }),
+                  let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-history" }) else {
+                return XCTFail("\(tag)：drop/idle 两帧缺一张 ⇒ 像素判据没有对象")
+            }
+            let targetFile = scratch.appendingPathComponent("drop-\(tag).png")
+            let idleFile = scratch.appendingPathComponent("idle-\(tag).png")
+            _ = try render(targetFixture, appearance: appearance, to: targetFile)
+            _ = try render(idleFixture, appearance: appearance, to: idleFile)
+            guard let td = try? Data(contentsOf: targetFile),
+                  let tr = NSBitmapImageRep(data: td), let target = tr.bitmapData,
+                  let idd = try? Data(contentsOf: idleFile),
+                  let ir = NSBitmapImageRep(data: idd), let idle = ir.bitmapData,
+                  tr.pixelsWide == ir.pixelsWide, tr.pixelsHigh == ir.pixelsHigh else {
+                return XCTFail("\(tag)：两帧读不回来或尺寸不一致 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(tr.pixelsWide) / 300.0
+            let hintRect = CGRect(x: 80, y: 470, width: 140, height: 35)
+            let rowRect = CGRect(x: 20, y: 180, width: 260, height: 80)
+            let hint = Self.textInkMass(bytes: target, width: tr.pixelsWide, height: tr.pixelsHigh,
+                                        bytesPerRow: tr.bytesPerRow, rect: hintRect, scale: scale)
+            let idleHint = Self.textInkMass(bytes: idle, width: ir.pixelsWide, height: ir.pixelsHigh,
+                                            bytesPerRow: ir.bytesPerRow, rect: hintRect, scale: scale)
+            let rows = Self.textInkMass(bytes: target, width: tr.pixelsWide, height: tr.pixelsHigh,
+                                        bytesPerRow: tr.bytesPerRow, rect: rowRect, scale: scale)
+            emit("DROP_TARGET_HINT_BAND \(tag) 拖放带墨=\(hint.pixels) 无拖放带墨=\(idleHint.pixels)"
+                 + " 列表校准墨=\(rows.pixels)")
+            XCTAssertGreaterThan(rows.pixels, 100,
+                                 "\(tag)：列表行带没有字 ⇒ 这一页没画出来，拖放带读 0 不能记成产品缺陷")
+            XCTAssertGreaterThan(hint.pixels, 20,
+                                 "\(tag)：拖放目标带只有 \(hint.pixels) 个墨像素 ⇒ 「松手加入剪贴板历史」没画出来")
+            XCTAssertLessThan(idleHint.pixels, 5,
+                              "\(tag)：没有拖放目标时底部也读到 \(idleHint.pixels) 个墨像素 ⇒ "
+                              + "这条提示不是拖放态独有的")
+        }
+    }
+
+    /// R408 的结构那一半：提示文案与取证键必须真的在产品视图里。
+    func testDropTargetHintIsWiredIntoTheSidebarView() throws {
+        let text = Self.codeOnly(try productSource(named: "Views/HistorySidebarView.swift"))
+        XCTAssertTrue(text.contains("松手加入剪贴板历史"),
+                      "拖放目标只画了虚线/光，没有说清松手会发生什么")
+        XCTAssertTrue(text.contains("dropTargetedForCapture"),
+                      "拖放提示没有取证键 ⇒ 这一档在离屏帧里永远不存在")
+        XCTAssertTrue(text.contains("isDropTargetedForDrawing"),
+                      "产品拖放状态没有和取证键汇到同一个绘制判定 ⇒ 帧与产品会分家")
+    }
+
     /// R407：空结果态必须有**可见的下一步**，而不是只叫用户记住 Esc。
     ///
     /// 主窗口的「无匹配结果」有「清除搜索」按钮；浮层同款处境只有一句文案。
@@ -5177,6 +5242,12 @@ final class UICaptureTests: XCTestCase {
 
         results.append(Fixture("sidebar-history", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
+        })
+        // R408：拖放目标那一档第一次可拍。离屏捕获送不进 drag session，
+        // 所以这里只写取证键；产品路径仍由 `isDropTargeted` 供。
+        results.append(Fixture("sidebar-drop-target", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store))
+                .environment(\.dropTargetedForCapture, true))
         })
         results.append(Fixture("sidebar-multi-select", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected)))

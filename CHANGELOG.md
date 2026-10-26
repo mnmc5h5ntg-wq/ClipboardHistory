@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 拖入目标补「松手加入剪贴板历史」（拖放带 0/0 → 708/797）；R407 CTA 布局回归用容器修回（gap 33→8）（R408 / 第 407 轮 / Round 405 / U-1463…U-1467 · 产品 2 文件，拖放反馈位）
+
+
 ### QuickPick 空结果态补可见「清除搜索」CTA（按钮带旧 0/0 → 新 934/1114）；R406 守卫在 runner 上红的假设被修正（R407 / 第 406 轮 / Round 404 / U-1458…U-1462 · 产品 1 文件，空态 CTA 位）
 
 

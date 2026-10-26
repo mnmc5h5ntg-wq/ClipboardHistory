@@ -27,6 +27,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// 空结果时的可见下一步（R407）。主窗口的同款空态有「清除搜索」按钮，
     /// 浮层只有一句“按 Esc 清空” —— 同一个处境在两个表面给两套答案。
     private var emptyAction: NSButton?
+    /// 空句 + CTA 的容器：主 stack 里只占**列表那一格**，否则多出的 arranged subview
+    /// 会把句子挤离搜索框（R408 runner 现读 gap 33pt）。
+    private var emptyBox: NSStackView?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
 
@@ -270,7 +273,18 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         clear.isHidden = true
         clear.wantsLayer = true
 
-        let stack = NSStackView(views: [field, empty, clear, scroll])
+        // 空句与 CTA 放进同一个容器：容器是主 stack 的**一个** arranged subview，
+        // 句子的宽度 = 容器宽度 = stack 宽度，长查询词才能被压缩出省略号。
+        let emptyBox = NSStackView(views: [empty, clear])
+        emptyBox.orientation = .vertical
+        emptyBox.spacing = 8
+        emptyBox.alignment = .centerX
+        emptyBox.detachesHiddenViews = true
+        emptyBox.translatesAutoresizingMaskIntoConstraints = false
+        emptyBox.isHidden = true
+        empty.widthAnchor.constraint(equalTo: emptyBox.widthAnchor).isActive = true
+
+        let stack = NSStackView(views: [field, emptyBox, scroll])
         // R63 把这句话从"表格下面"挪到"表格上面"。**改的是我自己钉过的决定**（R7 的原文：
         // "空结果那一句放在表格下面而不是盖在上面：盖上去要自己算居中，而 stack 已经管好了间距与宽度"），
         // 所以理由要留在这里：那三条理由是**实现便利**，不是观感判断；而这一轮第一次把这个浮层拍出来
@@ -303,6 +317,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
+            emptyBox.widthAnchor.constraint(equalTo: stack.widthAnchor),
             // 就这四条，一条都不多写。本轮曾经给三个子视图各写"等宽 = 面板减内缩"
             // （六行）+ 两行 hugging/抗压缩，然后被变异对照逐条审：
             //   M330 撤滚动视图那两条 → 绿   M331 撤搜索框那两条 → 绿
@@ -328,6 +343,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         self.table = table
         self.emptyLabel = empty
         self.emptyAction = clear
+        self.emptyBox = emptyBox
         return panel
     }
 
@@ -363,6 +379,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         guard let emptyLabel else { return }
         let message = model.emptyMessage
         let shouldShow = message != nil
+        emptyBox?.isHidden = !shouldShow
         // 空历史（没词可清）时不摆「清除搜索」：那会是一个点了没用的按钮。
         let canClear = !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let showAction = shouldShow && canClear
