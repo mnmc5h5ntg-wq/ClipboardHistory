@@ -30,7 +30,7 @@ NOT-RUN / 阻塞（分开写）：① **R402 新跑未落地**（主笔+追记�
 
 ### R402 追记：R401 的 band-empty 改成 XCTSkip + 负半证人（2026-10-26）
 
-R401 三跑 `40291975941↔642e4a7`、`40291993402↔8b4c763`、`40292114337↔18f2f44` 均 failure；Swift/Capture 红名都是 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`，同跑 `TEXT_INK_NOT_RUN light 720=0 640=0` ⇒ runner 1x 拍不出长正文页。R402 第一版只 emit+continue（假通过）；现在 `longTextBandOutcome(ink:witnessInk:)` 三态：目标带空但同帧 detail meta 带（x300..width / y38..48pt）有墨 ⇒ `XCTSkip` + 具名 `LONG_TEXT_PILL_NOT_RUN`；证人带也 0 ⇒ `LONG_TEXT_PILL_RULER_BROKEN` 红。真值表 3 格 + M1046 CAUGHT；本机全量 1063/53/0。`642e4a7` 额外有 Release script 红（sources 格旧伤）；R400 `40288846355↔ed3a30d` success、`40288830013↔41c76cc` 仅 Release script 红。R402 head `40296891274↔a274d4a` 仍 in_progress；新 commit 的 runner 跑待补读。
+R401 三跑 `40291975941↔642e4a7`、`40291993402↔8b4c763`、`40292114337↔18f2f44` 均 failure；Swift/Capture 红名都是 `LONG_TEXT_PILL_NOT_RUN=band-empty：600`，同跑 `TEXT_INK_NOT_RUN light 720=0 640=0` ⇒ runner 1x 拍不出长正文页。R402 第一版只 emit+continue（假通过）；现在 `longTextBandOutcome(ink:witnessInk:)` 三态：目标带空但同帧 detail meta 带（x300..width / y38..48pt）有墨 ⇒ `XCTSkip` + 具名 `LONG_TEXT_PILL_NOT_RUN`；证人带也 0 ⇒ `LONG_TEXT_PILL_RULER_BROKEN` 红。真值表 3 格 + M1046 CAUGHT；本机全量 1063/53/0。`642e4a7` 额外有 Release script 红（sources 格旧伤）；R400 `40288846355↔ed3a30d` success、`40288830013↔41c76cc` 仅 Release script 红。R402 head `40296891274↔a274d4a` 仍 in_progress；`40298315386↔03825d6` 现读 queued / 未读。
 
 ## R401 状态（2026-10-26 · 本地 · 第 400 轮 / Round 398）：680/700/720 缩放下长正文仍排进浮动药丸；阈值 400→460 + 三刀（产品 1 文件，窗口缩放位）
 
