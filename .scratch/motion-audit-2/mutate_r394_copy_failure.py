@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 """R394 变异对照：复制失败那一颗必须变成错误红，成功态不许沾红。
 
-产品位：失败态原来只换图标不换色；R394 用动态错误红（亮 Color.red / 暗 1.0,0.48,0.44）。
+产品位：失败态原来只换图标不换色；R394 用动态错误红，R399 按 runner 1x 读数
+把亮档压深为 0.72,0,0、暗档提亮为 1.0,0.62,0.58（本地 8.38/6.45）。
 两把刀：
   M1029 失败色退回 primary ⇒ 失败态红像素 0
   M1030 成功态也涂红 ⇒ 成功态红像素 >0（负半）
@@ -19,8 +20,8 @@ BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 NEEDLE_COLOR = """                            foregroundStyle: copyFailed
                                 ? AnyShapeStyle(colorScheme == .dark
-                                    ? Color(red: 1.0, green: 0.48, blue: 0.44)
-                                    : Color.red)
+                                    ? Color(red: 1.0, green: 0.62, blue: 0.58)
+                                    : Color(red: 0.72, green: 0.0, blue: 0.0))
                                 : AnyShapeStyle(.primary),
 """
 MUTANT_NO_RED = """                            foregroundStyle: AnyShapeStyle(.primary),

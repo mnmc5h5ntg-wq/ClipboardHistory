@@ -306,6 +306,12 @@ struct DetailView: View {
                     // 不够一个**要点的东西**用（WCAG 1.4.3 对小字要求 4.5:1）。
                     // 这一档是全 App 的次要文字问题，单独记在 backlog，不在这里顺手改。
                     .foregroundStyle(.primary)
+                    // R400：正文在「原文/渲染」之间是 `.contentFade` 交叉淡入，按钮标签原来
+                    // 一帧硬换 —— 同一次点击里内容在演、控件名字已经落地，读起来像两个时刻。
+                    // `id(title)` 让两个标签各自插入/退出，过渡与正文同一档。
+                    .id(title)
+                    .transition(.opacity)
+                    .animation(MotionCatalog.animation(for: .contentFade), value: title)
                     .padding(.horizontal, 6)
                     // 刻意**不加纵向 padding**：这颗控件的高度必须与 11pt 的 meta 文字同高，
                     // 否则"这条记录有没有第二种看法"会顺带改变头部高度，

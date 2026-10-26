@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 「原文/渲染」标签不再一帧硬换（1x 0→5 过渡帧）；R399 三条 CI 修复在 runner 签收；436 复核（R400 / 第 399 轮 / Round 397 / U-1421…U-1425 · 产品 1 文件，动效主线）
+
+
 ### 600pt 最窄窗长正文排进浮动操作栏（529.5 → 484.0pt）；窄列尾距 + 三刀（R399 / 第 398 轮 / Round 396 / U-1415…U-1419 · 产品 2 文件，布局状态位）
 
 

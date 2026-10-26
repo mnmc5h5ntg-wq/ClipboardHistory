@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R400 状态（2026-10-26 · 本地 · 第 399 轮 / Round 397）：「原文/渲染」标签不再一帧硬换（1x 0→5 过渡帧）；R399 三条 CI 修复在 runner 签收；436 复核（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R400 / 第 399 轮 / Round 397）：正文在「原文/渲染」间走 `.contentFade`，按钮标签原来一帧硬换。`DetailView.MarkdownModeButton` 的 `Text(title)` 加 `.id(title)` + `.transition(.opacity)` + `.animation(for: .contentFade, value: title)`。胶片现读 1x 旧 **0** → 新 **5** 个过渡帧（峰值 0.0048→0.0097）；2x 旧 10 / 新 7（2x 不能单独判过程，以 1x 为判据）。M1042 拆过渡 ⇒ CAUGHT、还原干净、复跑 ESCAPED；静态 182 帧零变化，基线复验 182/0。全量 `Executed 1061 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=243 可判=836 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=156 covered=139 arms=418 bad=0`、全仓 249 文件 / 902 把；产品面连续零改动 **1** 轮（as-of 399，现读 `python3 scripts/product_streak.py --streak-for 399`；本轮产品动效已落 Sources）。
+
+本轮做了什么：
+① ⓪ R399 队列：`9641073`/`073fd6e` success，`c0091fb` failure 只在 `STEP[9] Release script tests`（sources 格未随主笔同提交 + skip roster 嵌套没拿到结论）；产品三条修复由两跑 success 签收。
+② 动效位：「原文/渲染」标签从一帧硬换改成与正文同一 `.contentFade`；1x 0→5、2x 10→7。
+③ 判据：胶片 2x/1x 均 ≥2 过渡帧；M1042 拆过渡 CAUGHT、还原干净。
+④ 436：两跑 `judged=5/5`、`MOTION_FLOOR_OK=5/5`、`REDS=0`，无新 unlisted，保持结案。
+⑤ 367：hidden 表 243 / 可判 836 / rot 0 / 上界 0；预检 156/139/418/0；R394 的 M1029/M1030 按新红重钉 2/2。
+⑥ 验证：build 0 告警；全量 `1061/53/0`；捕获 182 帧、0 变化、基线 182/0；换装 ok；清账表 162=162。电池 `Ran 683 / OK (skipped=4)`。
+
+NOT-RUN / 阻塞（分开写）：① **R400 新跑未落地**（push 后待读）；② **`EMPTY_STATE_HINT` 在 runner 上 band-empty**（具名 NOT-RUN，不写成绿；空态墨档的本地读数仍是 6.73/8.31）；③ 亮档真机腿仍没跑；④ macOS 12 的紧凑详情头仍走旧截断。
+
+下一轮（R401）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R400 主笔推送跑的全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress 未读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`，出现新 unlisted 才带事实重开。
+
 ## R399 状态（2026-10-26 · 本地 · 第 398 轮 / Round 396）：600pt 最窄窗长正文排进浮动操作栏（529.5 → 484.0pt）；窄列尾距 + 三刀（产品 2 文件，布局状态位）
 
 最后更新：2026-10-26（本地 · R399 / 第 398 轮 / Round 396）：真看图——600×440 最窄窗 + 长正文时，正文最后几行从右下角 `GlassPill` 左侧伸进去、被药丸盖住。按正文最右墨列量：旧 **529.5pt**（阈值 500）、新 **484.0pt**。产品改法：`DetailTypography.previewTrailingInset(forDetailWidth:)` 只在详情列 <400pt 时给 88pt 尾距；`DetailView` 用 `GeometryReader` 把列宽交给策略，并只给 `preview` 加尾距。默认 182 帧里 18 张变化（4 张 600pt 布局帧 + 空态/加载墨档 14 张），基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1060 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=242 可判=835 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=155 covered=138 arms=417 bad=0`、全仓 248 文件 / 901 把；产品面连续零改动 **1** 轮（as-of 398，现读 `python3 scripts/product_streak.py --streak-for 398`；本轮产品布局已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

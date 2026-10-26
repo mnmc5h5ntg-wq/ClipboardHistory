@@ -2467,6 +2467,27 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R400：「原文/渲染」按钮标签必须和正文一样有过渡，不能内容在演、控件名一帧硬换。
+    func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scale in [2.0, 1.0] {
+            let scenario = Scenario.markdownModeLabel()
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            XCTAssertGreaterThanOrEqual(span, 2,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 按钮标签是硬切；"
+                                            + "先查 `.id(title)`/`.transition` 是否还在 Button label 里")
+        }
+    }
+
     /// R395：设置分类切换的详情内容必须在 2× 与 1× 下读到 ≥2 个过渡帧。
     /// 只拍详情列；驱动是产品新增的 `categoryOverride` 缝，根视图仍是产品 `SettingsView`。
     func testSettingsCategoryChangeIsAVisibleProcess() throws {
@@ -7611,6 +7632,25 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R400：「原文/渲染」标签切换的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
+    @MainActor private final class MarkdownModeDriver: ObservableObject {
+        @Published var rendered = true
+    }
+
+    private struct MarkdownModeHarness: View {
+        @ObservedObject var driver: MarkdownModeDriver
+
+        var body: some View {
+            DetailView.MarkdownModeButton(title: driver.rendered ? "原文" : "渲染",
+                                          helpText: "切换渲染/原文") {
+                driver.rendered.toggle()
+            }
+            .padding(20)
+            .frame(width: 160, height: 60)
+            .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+
     /// R395：设置分类切换的驱动（只服务专用胶片场景）。
     @MainActor private final class SettingsCategoryDriver: ObservableObject {
         @Published var category: SettingsCategory? = .shortcuts
@@ -7808,6 +7848,20 @@ final class MotionFilmstripTests: XCTestCase {
                      }) { _ in
                 withAnimation(MotionCatalog.animation(for: .emphasis)) {
                     driver.failed = true
+                }
+            }
+        }
+
+        /// R400：只拍「原文/渲染」这颗按钮；驱动从 rendered 切到 source。
+        @MainActor static func markdownModeLabel() -> Scenario {
+            let driver = MarkdownModeDriver()
+            return Scenario(name: "markdown-mode-label", size: NSSize(width: 160, height: 60),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     appearance: .aqua,
+                     root: { _ in AnyView(MarkdownModeHarness(driver: driver)) },
+                     captureRect: { host in host.bounds }) { _ in
+                withAnimation(MotionCatalog.animation(for: .contentFade)) {
+                    driver.rendered.toggle()
                 }
             }
         }
