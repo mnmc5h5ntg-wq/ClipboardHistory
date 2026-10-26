@@ -26,7 +26,7 @@
 
 验证读数（现读）：`WEIGHTS_RESET_SCALE` 2x `27/5/0.0201`、1x `27/13/0.0123`；`RESET_FADE_SCALE` 2x `27/3/0.0123`、1x `27/4/0.0181`；`SHORTCUT_RESET_STATE` 亮 禁用 `2.92` / 暗 `4.38`；`M1020/M1021/M1022` 全 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
 
-NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=11；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387/R388 本地提交的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ 胶片采样臂在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 50 skip 的一部分），本轮的 2x/1x 读数来自单独开的 motion 卷；⑤ BACKLOG 436：`settings-reset-fade` 未进 motion 地板名册，下一次带 motion 的 CI 会报 `MOTION_FLOOR_UNLISTED_SCENARIO`，本轮无 runner 读数不修。
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=14（R389 主笔 + 两笔追记）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387/R388 本地提交的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ 胶片采样臂在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 50 skip 的一部分），本轮的 2x/1x 读数来自单独开的 motion 卷；⑤ BACKLOG 436：`settings-reset-fade` 未进 motion 地板名册，下一次带 motion 的 CI 会报 `MOTION_FLOOR_UNLISTED_SCENARIO`，本轮无 runner 读数不修。
 
 下一轮（R390）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387/R388/R389 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R389 的复位过程可用 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 `testWeightsResetSliderSamplerReadsBothScales` 复跑。
 
