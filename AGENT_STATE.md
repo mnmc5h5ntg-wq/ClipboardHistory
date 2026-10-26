@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R390 状态（2026-10-26 · 本地 · 第 389 轮 / Round 387）：自绘「恢复默认」补回悬停（启用 8 级 / 禁用 0 级，M1023/M1024 CAUGHT）；436 本地复现 UNLISTED、runner 未读不猜 must_judge（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R390 / 第 389 轮 / Round 387）：R388 的 `ResetDefaultButtonStyle` 把系统 bordered 按钮的悬停反馈丢了。R390 在 `ResetDefaultButtonBody` 加 `@Environment(\.hoveredForCapture)` + `.onHover` + `isEnabled` 闸门，悬停填充 `0.08 → 0.13`，过渡 `.hover`。两态帧现读：亮档 启用 idle **230** → hover **222**（差 **8**），暗档 **54 → 62**（差 **8**）；禁用态亮 **238/238**、暗 **46/46**（差 **0/0**，负半）；能力闸门 卡片 246/38、标签墨 >0。源守卫 + 四格真值表；`M1023`（填充退回 idle）/`M1024`（摘 isEnabled 闸门）都 CAUGHT；悬停**过程**未进胶片（BACKLOG 330）⇒ 只签端态，过程记 NOT-RUN。BACKLOG 436：完整 motion 卷 `Executed 70/3/0`，`MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`，`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-`；现有 4 臂登记跑 `motion_floor_gate.py` ⇒ exit 1，唯一红 `MOTION_FLOOR_UNLISTED_SCENARIO … settings-reset-fade` ⇒ 成因本地复现。**仍未结案**：runner 未读，不猜 `must_judge`，JSON/自测一字未改。R389 滑块场景复验 2x `27/5/0.0188`、1x `27/14/0.0123`。`swift build --build-tests` 告警 **0**；全量 `Executed 1044 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r390_shots`，与 R389 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；`HIDDEN_ARMS 表=232 可判=818 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=145 covered=128 arms=400 bad=0`、全仓 238 文件 / 884 把；产品面连续零改动 **1** 轮（现读 `product_streak --streak-for 389`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；未推送，CI 多跑未读；未能 fetch 确认远端也写明。
+② 产品位：自绘「恢复默认」补回悬停（启用 0.08→0.13，禁用不动）；8 张两态帧落 /tmp/r390_hover。
+③ 判据：源守卫 + 四格真值表 + M1023/M1024；悬停过程 NOT-RUN。
+④ 436：完整本地 motion 卷 5 臂、judged=5/5；现有登记跑闸门 exit 1（UNLISTED）⇒ 成因本地复现；runner 未读，不猜 must_judge。
+⑤ 367：hidden 表 232 / 可判 818 / rot 0 / 上界 0；预检 145/128/400/0。
+⑥ 验证：build 0 告警；全量 `1044/50/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162。
+
+验证读数（现读）：`RESET_HOVER_STATE` 亮 启用 `230→222`（差 8）/ 禁用 `238/238`（差 0）；暗 启用 `54→62`（差 8）/ 禁用 `46/46`（差 0）；`MOTION_SUMMARY … settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5`；motion 闸门 exit 1 UNLISTED；`M1023/M1024` CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=14（R390 主笔前）；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387/R388/R389 本地提交的 conclusion **未读**（网络）；③ 悬停 `.hover` 过渡过程未进胶片（BACKLOG 330 的通道限制），本条只签端态；④ 亮档真机腿仍没跑；⑤ BACKLOG 436 的 runner motion 卷未读（本地复现不能关单），不改 JSON/自测。
+
+下一轮（R391）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387–R390 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R390 的悬停端态可用 `UICaptureTests/testResetDefaultButtonShowsHoverOnlyWhenEnabled` 复跑。
+
 ## R389 状态（2026-10-26 · 本地 · 第 388 轮 / Round 386）：权重复位九根滑杆走同一条 .slider 路径（2x 5 帧 / 1x 13 帧）；快捷键页自量禁用对比 2.92/4.38；M1020–M1022 CAUGHT（产品 1 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R389 / 第 388 轮 / Round 386）：权重复位原来只有按钮色变在演，九根滑杆瞬移。产品新增 `RecommendationWeightsView.resetDefaults(in:)`：把 `store.restoreDefaults()` 包进 `withAnimation(MotionCatalog.animation(for: .slider))`，按钮调它；直接拖滑杆不经过这条动画。新胶片场景 `settings-weights-reset-sliders` 只拍两行滑杆（按钮色变不在带里）：2x `帧数=27 过渡帧数=5 峰值=0.0201`、1x `27/13/0.0123`（声明 200ms；960×280 / 480×140px），strip 逐帧可见「收藏 40% → 默认」与滑块右移。R388 自评扣的快捷键页对比地板补成读数：亮 禁用 **2.92** / 改过 **3.81**、暗 禁用 **4.38** / 改过 **5.38**（地板 2.2）。M1020/M1021/M1022 全 CAUGHT、还原干净；`HIDDEN_ARMS 表=231 可判=816 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=144 covered=127 arms=398 bad=0`、全仓 237 文件 / 882 把。`swift build --build-tests` 告警 **0**；全量 `Executed 1041 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r389_shots`，与 R388 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 388`）。

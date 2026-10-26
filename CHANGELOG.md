@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 自绘「恢复默认」补回悬停（启用 8 级 / 禁用 0 级，M1023/M1024 CAUGHT）；436 本地复现 UNLISTED，runner 未读不猜 must_judge（R390 / 第 389 轮 / Round 387 / U-1370…U-1374 · 产品 1 文件，动效主线）
+
+
 ### 权重复位九根滑杆走同一条 .slider 路径（2x 5 帧 / 1x 13 帧）；快捷键页自量禁用对比 2.92/4.38；M1020–M1022 CAUGHT（R389 / 第 388 轮 / Round 386 / U-1365…U-1369 · 产品 1 文件，动效主线）
 
 

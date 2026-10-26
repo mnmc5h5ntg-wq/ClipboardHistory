@@ -186,6 +186,43 @@ final class MotionDriverTests: XCTestCase {
                        "根本没有按钮也被判成复位 ⇒ 尺在量错对象")
     }
 
+    /// R390：自绘「恢复默认」的悬停只准在启用态亮；禁用态不参与。
+    static func resetHoverIsWired(in code: String) -> Bool {
+        let compact = code.split(whereSeparator: \.isWhitespace).joined()
+        return code.contains("@Environment(\\.hoveredForCapture)")
+            && compact.contains("isEnabled&&(isHovered||(hoveredForCapture??false))")
+            && compact.contains("isHoveredForDrawing?0.13:(isEnabled?0.08:0.035)")
+            && compact.contains(".animation(MotionCatalog.animation(for:.hover),value:isHoveredForDrawing)")
+            && compact.contains(".onHover{isHovered=$0}")
+    }
+
+    func testResetButtonHoverIsWiredAndGated() throws {
+        let style = Self.stripCommentLines(try productSource(named: "Views/PressableStyle.swift"))
+        XCTAssertTrue(Self.resetHoverIsWired(in: style),
+                      "`ResetDefaultButtonBody` 没有把 hover 接进填充/过渡，或没把 `isEnabled` 放进闸门"
+                          + " ⇒ R388 的自绘按钮又丢了系统按钮的悬停反馈")
+    }
+
+    func testResetButtonHoverScanIsATruthTable() {
+        let live = #"""
+            @Environment(\.isEnabled) private var isEnabled
+            @Environment(\.hoveredForCapture) private var hoveredForCapture
+            @State private var isHovered = false
+            private var isHoveredForDrawing: Bool { isEnabled && (isHovered || (hoveredForCapture ?? false)) }
+            .fill(Color.primary.opacity(isHoveredForDrawing ? 0.13 : (isEnabled ? 0.08 : 0.035)))
+            .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
+            .onHover { isHovered = $0 }
+            """#
+        XCTAssertTrue(Self.resetHoverIsWired(in: live))
+        XCTAssertFalse(Self.resetHoverIsWired(in: live.replacingOccurrences(of: "isEnabled && ", with: "")),
+                       "禁用闸门被摘掉也算接好 ⇒ 禁用按钮会在悬停时亮起来")
+        XCTAssertFalse(Self.resetHoverIsWired(in: live.replacingOccurrences(of: "0.13", with: "0.08")),
+                       "悬停填充与 idle 相同也算接好 ⇒ 画出来根本看不出悬停")
+        XCTAssertFalse(Self.resetHoverIsWired(in: live.replacingOccurrences(
+            of: "MotionCatalog.animation(for: .hover)", with: "MotionCatalog.animation(for: .selection)")),
+                       "换错动画档也算接好 ⇒ 悬停过渡用的不是 `.hover`")
+    }
+
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
     func testReceiptGateScanIsATruthTable() {
         // ① `if let 局部 = 状态 {` ⇒ 门控里认的是**状态**；局部名当键是**假驱动**。

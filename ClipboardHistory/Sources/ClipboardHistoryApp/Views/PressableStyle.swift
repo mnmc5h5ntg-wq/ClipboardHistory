@@ -288,6 +288,14 @@ struct ResetDefaultButtonStyle: ButtonStyle {
 private struct ResetDefaultButtonBody: View {
     let configuration: ButtonStyleConfiguration
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+    @State private var isHovered = false
+
+    /// R390：系统 bordered 按钮有悬停反馈，R388 的自绘样式把它丢了。
+    /// 禁用态不参与悬停（否则「不能点」会被画成「可以点」）；取证键只加在绘制这一侧。
+    private var isHoveredForDrawing: Bool {
+        isEnabled && (isHovered || (hoveredForCapture ?? false))
+    }
 
     var body: some View {
         configuration.label
@@ -297,9 +305,11 @@ private struct ResetDefaultButtonBody: View {
             .padding(.vertical, 4)
             .background(
                 VisualShape.rounded(VisualRadius.control)
-                    .fill(Color.primary.opacity(isEnabled ? 0.08 : 0.035))
+                    .fill(Color.primary.opacity(isHoveredForDrawing ? 0.13 : (isEnabled ? 0.08 : 0.035)))
             )
             .animation(MotionCatalog.animation(for: .selection), value: isEnabled)
+            .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
+            .onHover { isHovered = $0 }
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(MotionCatalog.animation(for: .hover), value: configuration.isPressed)
     }
