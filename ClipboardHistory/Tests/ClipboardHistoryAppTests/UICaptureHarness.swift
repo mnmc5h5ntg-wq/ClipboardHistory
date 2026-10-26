@@ -3978,6 +3978,61 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
+        // R398：详情加载态也只有一句话，必须过 AA 正文线（4.5:1）。
+        // 旧 `.secondary` 在同一带亮 2.86 / 暗 4.52；新 pane 墨档亮/暗都要 ≥4.5。
+        // 带子按字墨 bbox 定位：detail-loading-720x520 的句子在 x 18..115、y 102..120pt；
+        // 上面的三根骨架在 y≈75pt，不会顶替；带空写具名 NOT-RUN。
+        do {
+            func loadLoadingFrame(_ name: String) -> NSBitmapImageRep? {
+                let url = directory.appendingPathComponent(name)
+                guard let image = NSImage(contentsOf: url) else { return nil }
+                return NSBitmapImageRep(data: image.tiffRepresentation ?? Data())
+            }
+            func readLoadingBand(_ rep: NSBitmapImageRep) -> (fill: Int, ink: Int, contrast: Double) {
+                let scale = Double(rep.pixelsWide) / 720.0
+                let x0 = Int(18 * scale), x1 = Int(115 * scale)
+                let y0 = Int(102 * scale), y1 = Int(120 * scale)
+                guard let base = rep.bitmapData else { return (0, 0, 0) }
+                var values: [Int] = []
+                for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
+                    for x in x0..<min(rep.pixelsWide, x1) {
+                        let o = y * rep.bytesPerRow + x * 4
+                        values.append(Int((0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1])
+                                           + 0.0722 * Double(base[o + 2])).rounded()))
+                    }
+                }
+                var hist: [Int: Int] = [:]
+                for v in values { hist[v / 4, default: 0] += 1 }
+                let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
+                let inks = values.filter { abs($0 - fill) > 40 }
+                let mean = inks.isEmpty ? fill : inks.reduce(0, +) / inks.count
+                func rel(_ v: Int) -> Double {
+                    let x = Double(v) / 255
+                    return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+                }
+                let a = rel(mean), b = rel(fill)
+                return (fill, inks.count, (max(a, b) + 0.05) / (min(a, b) + 0.05))
+            }
+            for tag in ["light", "dark"] {
+                let name = "detail-loading-720x520-\(tag).png"
+                guard let rep = loadLoadingFrame(name) else {
+                    XCTFail("DETAIL_LOADING_HINT_FRAME_MISSING：\(tag) 帧不在捕获目录")
+                    continue
+                }
+                let r = readLoadingBand(rep)
+                emit("DETAIL_LOADING_HINT \(tag) fill=\(r.fill) 墨=\(r.ink)"
+                     + " 对比=\(String(format: "%.2f", r.contrast))")
+                if r.ink == 0 {
+                    emit("DETAIL_LOADING_HINT_NOT_RUN=band-empty：\(tag)")
+                    continue
+                }
+                XCTAssertGreaterThanOrEqual(r.contrast, 4.5,
+                                            "\(tag)：详情加载句只有 "
+                                                + "\(String(format: "%.2f", r.contrast)):1（AA 正文线 4.5）"
+                                                + " ⇒ 加载态唯一的信息读不清")
+            }
+        }
+
         // **夹具不许裁自己的内容**（R22 / BACKLOG 32）。名单见 `Fixture.contentMustFit`。
         // 这条是 M76 那支"知道会漏还故意放"的变异终于被抓回去的一次：
         // 以前把 `weights` 的框改小回去**不会有任何测试红**，

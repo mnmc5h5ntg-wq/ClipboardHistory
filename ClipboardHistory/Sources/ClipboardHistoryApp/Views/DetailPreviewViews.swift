@@ -232,7 +232,9 @@ struct DetailLoadingView: View {
                 .frame(height: 44)
             Text("正在加载预览…")
                 .font(.system(size: StatePresentation.messageFontSize))
-                .foregroundStyle(.secondary)
+                // R398：加载态整块面板也只有这句话；`.secondary` 在亮档实测 2.86:1，
+                // 低于 AA 正文线 4.5 ⇒ 走 pane 墨档（与空态同一来源）。
+                .foregroundStyle(StatePresentation.paneMessageInkStyle)
             Spacer(minLength: 0)
         }
         // 左右内缩取**详情栏那一条现成的轴**，不是新造一个数：

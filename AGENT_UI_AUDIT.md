@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 397 轮（R398 · 2026-10-26 · U-1410…U-1414）：详情加载唯一那句话亮档 2.86:1 → 4.84（暗 4.52 → 6.53）；pane 墨档接进加载态 + 双刀（U-1410…U-1414 · 产品 2 文件，视觉主线）
+
+- **U-1410：⓪ 网络与 CI。** 本轮开场 `git push origin main` 被 SSH 拒（`Connection closed by 20.205.243.166 port 22`），同分钟 `api=000` / `apple=200` ⇒ `PUSH_BLOCKED=network`；本地 ahead=36（R397 两次提交之后），不写已推送。`origin/main` 本地 ref 仍 `5c7814e`；未 force，网络不可达无法 fetch 确认远端是否被推进。2 次同形探测额度已用完。恢复后一次 push 只为 head 生成新 run；此前未读的旧两跑仍要单独按步骤读。
+- **U-1411：② 产品视觉位 —— 详情加载态的唯一一句话读不清。** 先看图：`detail-loading-720x520-{light,dark}` 里「正在加载预览…」是整块加载面板唯一的人话。按字墨 bbox 定位后只读 x 18..115 / y 102..120pt 的句子带：旧 `.secondary` 亮 **2.86** / 暗 **4.52:1**（暗档刚好贴 4.5 线，亮档低于 AA）；新 pane 墨档亮 **4.84** / 暗 **6.53:1**。修法：`DetailLoadingView` 的句子改走 R397 已立的 `StatePresentation.paneMessageInkStyle`；三根骨架不动，inline `StateLine` 的 `.subdued` 也不动。产品 2 文件（DetailPreviewViews 接线 + StatePresentation 的 pane 注释扩展到加载态）。
+- **U-1412：判据与刀。** `MotionCatalogTests.testDetailLoadingMessageUsesTheAAInkSeam` 钉加载句的接线：`Text("正在加载预览…")` 之后 240 字符内不得出现硬写 `.secondary`，必须出现 `StatePresentation.paneMessageInkStyle`；`testCaptureKeyViews` 在真实 182 帧里读同一条句子带（带空写具名 NOT-RUN）。`M1037`（源接线）/`M1038`（捕获帧像素）双 **CAUGHT**、红得对=2、红得不对=0、还原干净、还原后双 ESCAPED；一张表只写 `DetailPreviewViews.swift` 一个文件靶（D-384）。**带子身份**：旧/新读数都在同一条由 bbox 推出的带上，旧亮 2.86 先量到、再修。
+- **U-1413：BACKLOG 436 处置（仍未结案）。** 本轮无新的 runner motion 读数；R390 本地完整卷仍是 `Executed 70 tests, with 3 tests skipped and 0 failures`、`MOTION_SUMMARY notice-banner=10 notice-banner-dismiss=7 detail-kind-change=3 empty-state=6 settings-reset-fade=3`、`MOTION_RESOLVE_SUMMARY judged=5/5 not-run=-`，现有 4 臂登记跑 `motion_floor_gate.py` 的 exit 1（UNLISTED `settings-reset-fade`）本地复现仍成立。**不关单、不改 JSON/自测、不猜 `must_judge`**；runner 卷继续记具名 NOT-RUN。
+- **U-1414：① 367 rot 与八步。** `HIDDEN_ARMS 表=240 可判=832 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=153 covered=136 arms=414 bad=0`、全仓 246 文件 / 898 把；`M1037/M1038` 全 CAUGHT。build **0** 告警；全量 `Executed 1057 tests, with 52 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r398_shots`，与 R397 逐张比 `变了=6`（detail-loading / detail-loading-composed / detail-2-file 亮暗各一张；其余默认路径不变），帧基线同一笔 `UPDATED=182`、复验 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 397；本轮产品视觉已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 397`）。电池 `Ran 683 / OK (skipped=4)`。
+
 ## 第 396 轮（R397 · 2026-10-26 · U-1405…U-1409）：空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（U-1405…U-1409 · 产品 2 文件，视觉主线）
 
 - **U-1405：⓪ 网络与 CI。** 本轮开场 `git push origin main` 被 SSH 拒（`Connection closed by 20.205.243.166 port 22`），同分钟 `api=000` / `apple=200` ⇒ `PUSH_BLOCKED=network`；本地 ahead=34（R396 三次提交之后），不写已推送。`origin/main` 本地 ref 仍 `5c7814e`；未 force，网络不可达无法 fetch 确认远端是否被推进。2 次同形探测额度已用完。恢复后一次 push 只为 head 生成新 run；此前未读的旧两跑仍要单独按步骤读，不能拿新 run 代账。

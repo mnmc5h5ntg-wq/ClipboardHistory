@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R398 状态（2026-10-26 · 本地 · 第 397 轮 / Round 395）：详情加载唯一那句话亮档 2.86:1 → 4.84（暗 4.52 → 6.53）；pane 墨档接进加载态 + 双刀（产品 2 文件，视觉主线）
+
+最后更新：2026-10-26（本地 · R398 / 第 397 轮 / Round 395）：先真看 `detail-loading-720x520-{light,dark}` 的「正在加载预览…」：旧 `.secondary` 在亮档偏灰。按字墨 bbox 定位后只读 x 18..115 / y 102..120pt：旧亮 **2.86** / 暗 **4.52:1**（暗档刚好贴 4.5 线，亮档低于 AA），新 pane 墨档亮 **4.84** / 暗 **6.53:1**。产品改法：`DetailLoadingView` 的句子改走 `StatePresentation.paneMessageInkStyle`；三根骨架与 inline `StateLine` 的 `.subdued` 保持不动。判据：源接线守卫 + 捕获帧像素守卫；M1037/M1038 双 CAUGHT、还原后双 ESCAPED。detail-loading / detail-loading-composed / detail-2-file 亮暗 6 张变化，其余 176 张不变；基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1057 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=240 可判=832 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=153 covered=136 arms=414 bad=0`、全仓 246 文件 / 898 把；产品面连续零改动 **1** 轮（as-of 397，现读 `python3 scripts/product_streak.py --streak-for 397`；本轮产品视觉已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；ahead=36，未推送；未 force。
+② 看图找到真缺陷：详情加载态唯一那句话亮档 2.86、暗 4.52；修 Sources 后 4.84/6.53。
+③ 判据：源接线守卫 + 捕获帧像素守卫；M1037/M1038 双 CAUGHT、还原后双 ESCAPED。
+④ 带子身份：按字墨 bbox 钉 x18..115/y102..120；旧/新都在同带读数，没有假绿。
+⑤ 367：hidden 表 240 / 可判 832 / rot 0 / 上界 0；预检 153/136/414/0。
+⑥ 验证：build 0 告警；全量 `1057/52/0`；捕获 182 帧、6 帧变化、基线 update 后 182/0；换装 ok；清账表 162=162。
+
+验证读数（现读）：`DETAIL_LOADING old light=2.86 dark=4.52 / new light=4.84 dark=6.53`（x18..115/y102..120pt）；捕获 `DETAIL_LOADING_HINT light 墨=1546 对比=4.84`、`dark 墨=1681 对比=6.53`；`M1037/M1038` 双 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=36（R398 主笔前，追记后 38）；② 旧的两跑与 R387–R397 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+
+下一轮（R399）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；一次 push 只为 head 生成新 run，旧两跑仍要单独按步骤读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources；③ 436 待 runner motion 读数恢复后再决定第五臂 `must_judge`，本轮仍不动 JSON/自测。
+
 ## R397 状态（2026-10-26 · 本地 · 第 396 轮 / Round 394）：空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（产品 2 文件，视觉主线）
 
 最后更新：2026-10-26（本地 · R397 / 第 396 轮 / Round 394）：先真看 `content-empty-750x560-{light,dark}` 右栏提示：旧 `.secondary` 在亮档明显偏灰。按字墨 bbox 定位后只读 x 445..585 / y 325..357pt：旧亮 **2.90** / 暗 **4.52:1**（暗档刚好贴 4.5 线，亮档低于 AA），新 pane 墨档亮 **4.84** / 暗 **6.45:1**。产品改法：`StatePresentation.paneMessageInkStyle`（primary 0.85）+ `EmptyStateView` 标题走它；inline `StateLine` 的 `.subdued` 保持不动。判据：源接线守卫 + 捕获帧像素守卫；M1035/M1036 双 CAUGHT、还原后双 ESCAPED。四组空态帧亮暗 8 张变化，其余 174 张不变；基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1056 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=239 可判=830 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=152 covered=135 arms=412 bad=0`、全仓 245 文件 / 896 把；产品面连续零改动 **1** 轮（as-of 396，现读 `python3 scripts/product_streak.py --streak-for 396`；本轮产品视觉已落 Sources）。电池 `Ran 683 / OK (skipped=4)`。

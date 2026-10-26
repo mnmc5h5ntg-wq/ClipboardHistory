@@ -502,6 +502,18 @@ final class MotionCatalogTests: XCTestCase {
                       "StatePresentation 没有 pane 墨档 ⇒ 空态没有可判的来源")
     }
 
+    /// 详情加载态也只有这一句话：它和空态共用 pane 的 AA 墨档，不能退回 `.secondary`。
+    func testDetailLoadingMessageUsesTheAAInkSeam() throws {
+        let detail = codeOnly(try productSource(named: "Views/DetailPreviewViews.swift"))
+        let after = try XCTUnwrap(
+            detail.components(separatedBy: #"Text("正在加载预览…")"#).dropFirst().first,
+            "找不到「正在加载预览…」这行 ⇒ 判据没有对象")
+        XCTAssertFalse(after.prefix(240).contains(".foregroundStyle(.secondary)"),
+                       "加载句又硬写了 `.secondary` ⇒ pane 空态/加载态重新分成两档墨")
+        XCTAssertTrue(after.prefix(240).contains("StatePresentation.paneMessageInkStyle"),
+                      "加载句没有走 pane 墨档 ⇒ 又回到亮档 2.86:1 的 `.secondary`")
+    }
+
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。
     /// 12/13 那一档 API 不存在（编译器实测 macOS 14 起），所以断言跟着 `isSupported` 走 ——
     /// 不是把缺口判成绿，而是"这一档发不出去"这件事本身被钉住。

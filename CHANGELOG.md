@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情加载唯一那句话亮档 2.86:1 → 4.84（暗 4.52 → 6.53）；pane 墨档接进加载态 + 双刀（R398 / 第 397 轮 / Round 395 / U-1410…U-1414 · 产品 2 文件，视觉主线）
+
+
 ### 空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（R397 / 第 396 轮 / Round 394 / U-1405…U-1409 · 产品 2 文件，视觉主线）
 
 

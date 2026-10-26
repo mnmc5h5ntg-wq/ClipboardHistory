@@ -7423,3 +7423,9 @@ R396 现读：`Toggle("开机启动")` 在 `.disabled` 时整颗控件（含标�
 R397 现读：`EmptyStateView` 的标题旧用 `.secondary`，提示带（x 445..585、y 325..357pt）亮 **2.90:1**、暗 **4.52:1**；亮档低于 AA 正文线 4.5。改走 `StatePresentation.paneMessageInkStyle`（primary 0.85）后亮 **4.84** / 暗 **6.45**。inline `StateLine` 的 `.subdued` 保持不变：菜单栏"暂无推荐"与热图空态旁边还有内容，一起抬会把背景状态喊得比内容响。
 **Why**：`StatePresentation.messageInk(for: .empty) == .subdued` 的决定来自"空态不抢戏"；但整块面板只剩一句话时，"不抢戏"不能等于"读不清"。同一条 `.secondary` 在 inline 与 pane 两种表面承担的信息量不同，必须分开取墨，不能用一个档位覆盖两种职责。
 **How to apply**：① 整块 pane 的空态/加载句要按正文线 4.5 量，inline 状态仍可按 subdued；② 修法只改 pane 的取墨缝，不把 `messageInk(for:)` 的 inline 真值表改绿；③ 像素判据先按字墨 bbox 钉住那句提示，旧/新都在同一条带上读出两个数，再配源接线刀与捕获帧像素刀（R397 M1035/M1036）。
+
+### D-388（398）加载态也是 pane-only 的一句话：走同一档 AA 墨，inline 状态不跟着抬
+
+R398 现读：`DetailLoadingView` 的「正在加载预览…」旧用 `.secondary`，句子带（x 18..115、y 102..120pt）亮 **2.86:1**、暗 **4.52:1**；亮档低于 AA 正文线 4.5。改走 `StatePresentation.paneMessageInkStyle` 后亮 **4.84** / 暗 **6.53**。三根骨架与 inline `StateLine` 的 `.subdued` 都不动。
+**Why**：加载态和空态一样，整块面板只剩这句话；但它是短暂状态，容易被"反正马上就走"放过。暗档旧值 4.52 只是刚好贴线，不能把"临界通过"写成"暗档也失败"。同一 `.secondary` 在 inline 与 pane 两种表面承担的信息量不同，必须分表面取墨。
+**How to apply**：① 加载/空态的 pane-only 句子按 4.5 量，inline 状态仍按 subdued；② 修法只改 pane 的取墨缝，不把 `messageInk(for:)` 的 inline 真值表改绿；③ 像素判据先按字墨 bbox 钉住句子，旧/新同带读数；④ 源接线刀与捕获帧像素刀分开（R398 M1037/M1038）。
