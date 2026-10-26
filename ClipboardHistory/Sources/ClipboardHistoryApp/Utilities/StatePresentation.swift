@@ -72,6 +72,17 @@ enum StatePresentation {
         }
     }
 
+    /// 整块 pane 空态的那一句墨（R397）。
+    ///
+    /// `StateLine` 的 inline 空态（菜单栏"暂无推荐"、热图空态）留在 `.subdued` 是对的：
+    /// 它旁边还有内容，句子只是背景。但 `EmptyStateView` 是**整块面板只剩这一句话**，
+    /// 同一档 `.secondary` 在亮档实测只有 **2.90:1**（暗 4.52，刚好贴线），连 AA 正文线都不到 ——
+    /// 这不是"安静"，是"唯一的信息读不清"。pane 这一档单独抬到 0.85（0.72 实测亮档
+    /// 仍只有 3.71:1，差值不是文字边缘能补的），仍比正文轻，但必须过 4.5。
+    static var paneMessageInkStyle: AnyShapeStyle {
+        AnyShapeStyle(Color.primary.opacity(0.85))
+    }
+
     /// 对齐规则（纯函数，可断言）。
     ///
     /// 审计写的是"统一左对齐"，但**整块面板里的空态居中是 macOS 的既有语言**

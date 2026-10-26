@@ -24,8 +24,9 @@ struct EmptyStateView: View {
                 .accessibilityHidden(true)
             Text(title)
                 .font(.system(size: titleSize))
-                // 空状态里这句话就是全部信息，不能压到 tertiary（暗色实测 2.2:1）
-                .foregroundStyle(.secondary)
+                // 空状态里这句话就是全部信息：`.secondary` 在亮档只有 2.90:1（暗 4.52 刚好贴线），
+                // 低于 AA 正文线 4.5；pane 这一档单独取墨（R397 / StatePresentation）。
+                .foregroundStyle(StatePresentation.paneMessageInkStyle)
                 .multilineTextAlignment(.center)
 
             if let actionTitle, let action {

@@ -490,6 +490,18 @@ final class MotionCatalogTests: XCTestCase {
                       "独立标签不可点 ⇒ 点文字不再切换开关")
     }
 
+    /// 整块 pane 空态只有这一句话：它必须走 pane 的 AA 墨档，不能和 inline 空态共用 `.secondary`。
+    func testPaneEmptyStateMessageUsesTheAAInkSeam() throws {
+        let empty = codeOnly(try productSource(named: "Views/EmptyStateView.swift"))
+        XCTAssertTrue(empty.contains("StatePresentation.paneMessageInkStyle"),
+                      "空态提示没有走 pane 墨档 ⇒ 又回到全屏唯一信息读不清的 `.secondary`")
+        XCTAssertFalse(empty.contains(".foregroundStyle(.secondary)"),
+                       "EmptyStateView 里还有硬写的 `.secondary` ⇒ pane 空态和 inline 空态又被压成一档")
+        let state = codeOnly(try productSource(named: "Utilities/StatePresentation.swift"))
+        XCTAssertTrue(state.contains("paneMessageInkStyle"),
+                      "StatePresentation 没有 pane 墨档 ⇒ 空态没有可判的来源")
+    }
+
     /// 读屏回执：能播就必须真的播出去，且 `DetailView` 必须调用它。
     /// 12/13 那一档 API 不存在（编译器实测 macOS 14 起），所以断言跟着 `isSupported` 走 ——
     /// 不是把缺口判成绿，而是"这一档发不出去"这件事本身被钉住。

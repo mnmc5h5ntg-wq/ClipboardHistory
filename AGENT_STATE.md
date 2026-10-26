@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R397 状态（2026-10-26 · 本地 · 第 396 轮 / Round 394）：空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（产品 2 文件，视觉主线）
+
+最后更新：2026-10-26（本地 · R397 / 第 396 轮 / Round 394）：先真看 `content-empty-750x560-{light,dark}` 右栏提示：旧 `.secondary` 在亮档明显偏灰。按字墨 bbox 定位后只读 x 445..585 / y 325..357pt：旧亮 **2.90** / 暗 **4.52:1**（暗档刚好贴 4.5 线，亮档低于 AA），新 pane 墨档亮 **4.84** / 暗 **6.45:1**。产品改法：`StatePresentation.paneMessageInkStyle`（primary 0.85）+ `EmptyStateView` 标题走它；inline `StateLine` 的 `.subdued` 保持不动。判据：源接线守卫 + 捕获帧像素守卫；M1035/M1036 双 CAUGHT、还原后双 ESCAPED。四组空态帧亮暗 8 张变化，其余 174 张不变；基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1056 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=239 可判=830 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=152 covered=135 arms=412 bad=0`、全仓 245 文件 / 896 把；产品面连续零改动 **1** 轮（as-of 396，现读 `python3 scripts/product_streak.py --streak-for 396`；本轮产品视觉已落 Sources）。电池在台账落盘后复跑，读数写进本笔追记。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒 + `api=000`/`apple=200` ⇒ `PUSH_BLOCKED=network`；ahead=34，未推送；未 force。
+② 看图找到真缺陷：整块 pane 空态的唯一那句话亮档 2.90、暗 4.52；修 Sources 后 4.84/6.45。
+③ 判据：源接线守卫 + 捕获帧像素守卫；M1035/M1036 双 CAUGHT、还原后双 ESCAPED。
+④ 带子身份：按字墨 bbox 钉 x445..585/y325..357；旧/新都在同带读数，没有假绿。
+⑤ 367：hidden 表 239 / 可判 830 / rot 0 / 上界 0；预检 152/135/412/0。
+⑥ 验证：build 0 告警；全量 `1056/52/0`；捕获 182 帧、8 帧变化、基线 update 后 182/0；换装 ok；清账表 162=162。
+
+验证读数（现读）：`EMPTY_PANE old light=2.90 dark=4.52 / new light=4.84 dark=6.45`（x445..585/y325..357pt）；捕获 `EMPTY_STATE_HINT light 墨=2715 对比=4.84`、`dark 墨=2974 对比=6.45`；`M1035/M1036` 双 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`/`apple=200`；本地 ahead=34（R397 主笔前，追记后 36）；② 旧的两跑与 R387–R396 本地提交的 conclusion **未读**（网络）；③ BACKLOG 436 的 runner motion 卷未读（本地 5/5、UNLISTED `settings-reset-fade` 仍可复现）；④ 亮档真机腿仍没跑；⑤ macOS 12 的紧凑详情头仍走旧截断（13+ 才有 ViewThatFits）。
+
+下一轮（R398）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；一次 push 只为 head 生成新 run，旧两跑仍要单独按步骤读；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources；③ 436 待 runner motion 读数恢复后再决定第五臂 `must_judge`，本轮仍不动 JSON/自测。
+
 ## R396 状态（2026-10-26 · 本地 · 第 395 轮 / Round 393）：不支持登录项的标签被禁用 Toggle 一起压暗（1.76/2.13 → 2.84/4.38）；修 Sources 并补捕获帧像素守卫（产品 1 文件，视觉主线）
 
 最后更新：2026-10-26（本地 · R396 / 第 395 轮 / Round 393）：先真看 `settings-general-login-unsupported` 亮/暗帧：不支持登录项时「开机启动」标签比同组其它标签明显浅。按字墨 bbox 定位（旧 `198.5..248.0 × 120.5..132.0pt`）后只读标签带（x 195..255、y 118..135pt）：旧结构亮 **1.76** / 暗 **2.13:1**（低于禁用标签地板 2.2），新结构亮 **2.84** / 暗 **4.38:1**。产品改法：`Toggle` 加 `.labelsHidden()`，标签移出禁用控件成独立 `Text`（不支持 `.secondary` / 支持 `.primary`，`accessibilityHidden(true)`，支持时仍可点），复选框仍禁用。**自伤**：第一版捕捉守卫的带子（x 380..700/y 225..275）量到第三行「识别截图文字」，旧结构也读 2.81/4.33（假绿）；按 bbox 重钉后 M1033/M1034 双 CAUGHT。默认 182 帧里设置通用 6 帧变化；帧基线同笔 `UPDATED=182`，复验 182/0/0/0。全量 `Executed 1055 tests, with 52 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=238 可判=828 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=151 covered=134 arms=410 bad=0`、全仓 244 文件 / 894 把；产品面连续零改动 **1** 轮（as-of 395，现读 `python3 scripts/product_streak.py --streak-for 395`；本轮产品视觉已落 Sources）。

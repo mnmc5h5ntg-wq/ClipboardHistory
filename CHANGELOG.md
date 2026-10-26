@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 空态唯一那句话亮档 2.90:1 → 4.84（暗 4.52 → 6.45）；pane 墨档 + 双刀（R397 / 第 396 轮 / Round 394 / U-1405…U-1409 · 产品 2 文件，视觉主线）
+
+
 ### 不支持登录项的标签被禁用 Toggle 一起压暗（1.76/2.13 → 2.84/4.38）；修 Sources 并补捕获帧像素守卫（R396 / 第 395 轮 / Round 393 / U-1400…U-1404 · 产品 1 文件，视觉主线）
 
 
