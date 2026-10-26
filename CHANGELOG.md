@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 换选记录后详情正文回到顶部（旧 2300→2300、像素差 15.37/15.96% → 0/0）；R405 头跑全绿签收（R406 / 第 405 轮 / Round 403 / U-1452…U-1457 · 产品 3 文件，滚动到位位）
+
+
 ### QuickPick 搜到来源 App 时行上写出「来自 X」（旧结尾后墨 0→1006/1109）；R404 头跑全绿签收、band-empty 成具名 XCTSkip（R405 / 第 404 轮 / Round 402 / U-1447…U-1451 · 产品 2 文件，搜索交互位）
 
 

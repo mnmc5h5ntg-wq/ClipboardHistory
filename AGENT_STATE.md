@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R406 状态（2026-10-26 · 本地 · 第 405 轮 / Round 403）：换选记录后详情正文回到顶部（旧 2300→2300、像素差 15.37/15.96% → 0/0）；R405 头跑全绿签收（产品 3 文件，滚动到位位）
+
+最后更新：2026-10-26（本地 · R406 / 第 405 轮 / Round 403）：详情正文的 `NSScrollView` 被下一条记录复用。把 A 滚到 300pt 后换选 B，旧代码把偏移留给 B（旧帧从 B-20 起，顶部帧从 B-0 起）。行为读数：可滚高 2300、旧偏移 2300 → **换选后仍 2300**；像素同带与「新选即顶部」参照帧差 亮 **15.37%** / 暗 **15.96%**。修法：正文 representable 增加 `resetKey`（记录 id），身份变了才调 `scrollToBeginningOfDocument`（只改 clip bounds 不够，文本视图 frame origin 会留成 −57），首次挂载只记身份不滚。新行为：顶部参照 −57 → 换选后 −57、`docVisible=0`；像素 亮/暗 **0/439200 = 0.00%**；新增 4 帧、既有 182 帧逐字节不变、基线同笔 186/0/0/0。行为/像素两刀 `M1053/M1054` 双 CAUGHT。⓪ `40316586448 ↔ 2e80585` **success**、22 步全 success、`FAILED_STEP_COUNT=0`；sources `R405/2e6998f` 一致；全量计数解析的 92-vs-934 负对照 ok。436 `judged=5/5 executed=73`、`REDS=0`、UNLISTED=0，`notice-banner` 放行，保持结案。全量 `Executed 1070 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=249 可判=846 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=162 covered=144 arms=428 bad=0`、全仓 255 文件 / 912 把；产品面连续零改动 **1** 轮（as-of 405，现读 `python3 scripts/product_streak.py --streak-for 405`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R405 头跑 success、22 步全绿；sources 同笔；全量计数解析反证 ok。
+② 产品：换选记录时正文归顶（旧 2300→2300；新顶部 −57；像素 15.37/15.96% → 0/0），新增 4 帧、老 182 帧不变。
+③ 判据：行为 + 像素两层；M1053/M1054 双 CAUGHT；Round4 字面量守卫按新形状更新并加钉 `resetKey`。
+④ 436：judged=5/5、REDS=0、UNLISTED=0、notice-banner 放行，保持结案。
+⑤ 367：hidden 表 249 / 可判 846 / rot 0 / 上界 0；预检 162/144/428/0。
+⑥ BACKLOG 437 仍开：主列表与浮层仍是两套来源搜索语言；本轮未动。
+
+NOT-RUN / 阻塞（分开写）：① 亮档真机腿仍没跑；② macOS 12 紧凑详情头仍走旧截断；③ 主列表与浮层的来源搜索语言未统一（437）；④ R406 新跑待 push 后读。
+
+下一轮（R407）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R406 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R405 状态（2026-10-26 · 本地 · 第 404 轮 / Round 402）：QuickPick 搜到来源 App 时行上写出「来自 X」（旧结尾后墨 0→1006/1109）；R404 头跑全绿签收（产品 2 文件，搜索交互位）
 
 最后更新：2026-10-26（本地 · R405 / 第 404 轮 / Round 402）：QuickPick 的过滤按来源 App 命中，而行文案只有「预览 · 时间」——搜「访达」出两条文件记录，行上看不出为什么命中。`QuickPickModel.sourceMatchReason` 只在来源是唯一命中依据时返回 App 名，`QuickPickController.rowTitle` 把「来自 X」放在时间之前。像素现读（旧第 1 行结尾 x=246.5pt 之后的扩展带）：旧 **0/0** → 新 **1006/1109**（校准带 1445/1640）；仅 `quickpick-typed` 亮暗 2 帧变化，基线同笔 update 后 182/0。⓪ `40309568444 ↔ 1e78ca9` **success**、22 步全 success、`FAILED_STEP_COUNT=0`；band-empty 现读 `LONG_TEXT_PILL_NOT_RUN=band-empty：600（detail-witness=0 sidebar-witness=0）` + `Test skipped`，RULER_BROKEN=0；REMOVE_RED=0、TRASH_RED 亮 217/146 暗 194/806。REMOVE_RED 退役核对：源 M1047 今天重跑仍 CAUGHT、RESTORE_CLEAN=yes；像素臂 M1048 与 `REMOVE_RED` 捕获守卫已不在表/仓内。436 `judged=5/5 executed=73`、`REDS=0`，`notice-banner` 放行，保持结案。全量 `Executed 1068 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=248 可判=844 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=161 covered=143 arms=426 bad=0`、全仓 254 文件 / 910 把；产品面连续零改动 **1** 轮（as-of 404，现读 `python3 scripts/product_streak.py --streak-for 404`）。电池 `Ran 683 / OK (skipped=4)`。

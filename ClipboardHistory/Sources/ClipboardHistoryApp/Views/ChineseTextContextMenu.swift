@@ -294,6 +294,9 @@ struct ChineseSelectableTextView: NSViewRepresentable {
     /// 字符串本身一个字都不改 —— 用 `NSAttributedString` 把命中写成黄色 runs 的话，
     /// 用户选中一段复制出来就带上富文本，而且 `isRichText = false` 的只读区会被迫改成富文本。
     var highlightQuery: String = ""
+    /// 换记录时用来判定"正文换人了"的身份。同一个 `NSScrollView` 会被下一条记录复用，
+    /// 不重置就会把上一条的滚动偏移留给新记录（R406 实测旧偏移 2300 换选后仍是 2300）。
+    var resetKey: AnyHashable? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = readOnlyBodyScrollView(font: font)
@@ -307,6 +310,7 @@ struct ChineseSelectableTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
         textView.autoresizingMask = [.width]
         textView.updateBody(text: text, font: font, highlightQuery: highlightQuery)
+        textView.resetScrollIfIdentityChanged(resetKey)
         textView.applyReadOnlyMenuBehavior()
     }
 }
@@ -326,6 +330,8 @@ struct ChineseSelectableAttributedTextView: NSViewRepresentable {
     /// 用哪一种渲染器画它。默认 Markdown，所以 R335 之前的三个调用点一个字都不用改。
     var renderer: DetailRenderer = .markdown
     var highlightQuery: String = ""
+    /// 见 `ChineseSelectableTextView.resetKey`。
+    var resetKey: AnyHashable? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = readOnlyBodyScrollView(font: nil)
@@ -339,6 +345,7 @@ struct ChineseSelectableAttributedTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
         textView.autoresizingMask = [.width]
         textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)
+        textView.resetScrollIfIdentityChanged(resetKey)
         textView.applyReadOnlyMenuBehavior()
     }
 }
@@ -476,6 +483,34 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
             appliedRenderKey = key
         }
         return applySearchHighlight(query: highlightQuery)
+    }
+
+    /// 换记录时把视口带回正文顶部。
+    ///
+    /// 这个 `NSScrollView` 由 SwiftUI 按视图身份复用：正文换了人，滚动偏移却还留着，
+    /// 于是新记录从中间开始读。只在身份**变了**时重置；搜索高亮（同一个 `resetKey`）
+    /// 不重置，否则每敲一个字视口就跳回顶部。
+    private var lastResetKey: AnyHashable?
+
+    func resetScrollIfIdentityChanged(_ key: AnyHashable?) {
+        guard let key else { return }
+        // 首次挂载时文本视图本来就在顶部；这时也调用归顶会把既有的所有详情帧
+        // 从 0 挪到文本内边距那一档（-57），是一次没有用户的回归。只记身份，不滚。
+        guard let previous = lastResetKey else { lastResetKey = key; return }
+        guard key != previous, let scroll = enclosingScrollView else { return }
+        lastResetKey = key
+        func backToTop() {
+            // 只改 clip bounds 不够：NSTextView 会把自己的 frame origin 留成负值
+            //（R406 夹具现读 docOrigin=-57），画面仍从第 2 行开始。
+            // 走文本视图自己的入口，让它把内部滚动状态一起归零。
+            scrollToBeginningOfDocument(nil)
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
+        backToTop()
+        // 换文本之后 AppKit 还会按旧的选中/布局再滚一次；归顶必须落在那一轮之后。
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollToBeginningOfDocument(nil)
+        }
     }
 
     /// 旧名字留着给"只关心 Markdown"的调用点与判据用（它现在只是 `updateRendered` 的一个特例）。

@@ -371,11 +371,14 @@ struct DetailFileView: View {
         // 现在它与 Markdown 走同一块属性串视图，只是渲染器不同；等宽那一支留给代码与日志。
         let decision = DetailRenderPolicy.decide(fileContent: content, url: url)
         if markdownMode == .rendered, let (renderer, source) = decision.resolved() {
-            ChineseSelectableAttributedTextView(source: source, renderer: renderer)
+            ChineseSelectableAttributedTextView(source: source, renderer: renderer,
+                                                resetKey: url)
                 .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
         } else {
-            ChineseSelectableTextView(text: content, font: .monospacedSystemFont(ofSize: 13, weight: .regular))
+            ChineseSelectableTextView(text: content,
+                                      font: .monospacedSystemFont(ofSize: 13, weight: .regular),
+                                      resetKey: url)
         }
     }
 

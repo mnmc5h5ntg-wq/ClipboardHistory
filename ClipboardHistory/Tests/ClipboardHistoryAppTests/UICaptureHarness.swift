@@ -409,6 +409,7 @@ final class UICaptureTests: XCTestCase {
                       "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
                       "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",
                       "MotionDriverTests.swift", "MotionFilmstripTests.swift",
+                      "DetailScrollResetTests.swift",
                       "PressFeedbackTests.swift", "SettingsFailureReceiptTests.swift",
                       "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]
         var strays: [String] = []
@@ -2753,6 +2754,71 @@ final class UICaptureTests: XCTestCase {
                           "「访达」命中了全部 \(all) 条 ⇒ typed 与 list 两张帧是同一张，"
                           + "过滤这件事仍然没有帧可看。换一条只命中一部分的词")
         XCTAssertEqual(none, 0, "「zzz 不存在」应该命中 0 条，否则 `quickpick-empty` 拍的不是空结果态")
+    }
+
+    /// R406：换选到另一条记录时，正文必须回到顶部。
+    ///
+    /// `detail-scroll-top` 是 B 的顶部参照；`detail-scroll-after-switch` 先滚 300pt 再换选 B。
+    /// 旧代码把 300pt 的偏移遗留下去，两张帧的正文带完全不同；修后两帧只该差滚动条/抗锯齿。
+    /// 像素带取 y=70..250pt（标题之下、正文前 10 行）：两张帧都有字才算这条判据有对象。
+    func testDetailScrollReturnsToTopWhenSelectionChanges() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r406-scroll-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let topFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-scroll-top" }),
+                  let afterFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-scroll-after-switch" }) else {
+                return XCTFail("\(tag)：两张 scroll 夹具缺一张 ⇒ 像素判据没有对象")
+            }
+            let topFile = scratch.appendingPathComponent("top-\(tag).png")
+            let afterFile = scratch.appendingPathComponent("after-\(tag).png")
+            _ = try render(topFixture, appearance: appearance, to: topFile)
+            _ = try render(afterFixture, appearance: appearance, to: afterFile)
+            guard let topData = try? Data(contentsOf: topFile),
+                  let topRep = NSBitmapImageRep(data: topData), let top = topRep.bitmapData,
+                  let afterData = try? Data(contentsOf: afterFile),
+                  let afterRep = NSBitmapImageRep(data: afterData), let after = afterRep.bitmapData,
+                  topRep.pixelsWide == afterRep.pixelsWide, topRep.pixelsHigh == afterRep.pixelsHigh else {
+                return XCTFail("\(tag)：两张帧读不回来或尺寸不一致 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(topRep.pixelsWide) / 720.0
+            let band = CGRect(x: 40, y: 70, width: 610, height: 180)
+            let topInk = Self.textInkMass(bytes: top, width: topRep.pixelsWide, height: topRep.pixelsHigh,
+                                          bytesPerRow: topRep.bytesPerRow, rect: band, scale: scale)
+            let afterInk = Self.textInkMass(bytes: after, width: afterRep.pixelsWide, height: afterRep.pixelsHigh,
+                                            bytesPerRow: afterRep.bytesPerRow, rect: band, scale: scale)
+            let x0 = Int(band.minX * scale), x1 = Int(band.maxX * scale)
+            let y0 = Int(band.minY * scale), y1 = Int(band.maxY * scale)
+            var changed = 0, total = 0
+            let bpr = topRep.bytesPerRow, spp = topRep.samplesPerPixel
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * bpr + x * spp
+                    let d = max(abs(Int(top[o]) - Int(after[o])),
+                                max(abs(Int(top[o + 1]) - Int(after[o + 1])),
+                                    abs(Int(top[o + 2]) - Int(after[o + 2]))))
+                    if d > 12 { changed += 1 }
+                    total += 1
+                }
+            }
+            let fraction = total > 0 ? Double(changed) / Double(total) : 1
+            emit("DETAIL_SCROLL_PIXEL \(tag) 顶部墨=\(topInk.pixels) 换选墨=\(afterInk.pixels)"
+                 + " 变化=\(changed)/\(total) 比例=\(String(format: "%.4f", fraction))")
+            XCTAssertGreaterThan(topInk.pixels, 1000,
+                                 "\(tag)：顶部参照帧的正文带只有 \(topInk.pixels) 个墨像素 ⇒ 这条带没落在正文上，"
+                                 + "换选帧读到 0 也不能记成产品缺陷")
+            XCTAssertGreaterThan(afterInk.pixels, 1000,
+                                 "\(tag)：换选帧的正文带只有 \(afterInk.pixels) 个墨像素 ⇒ 正文没画出来")
+            XCTAssertLessThan(fraction, 0.02,
+                              "\(tag)：换选后正文顶部带与「新选即顶部」参照帧差 "
+                              + "\(String(format: "%.1f", fraction * 100))%（\(changed)/\(total) 像素，阈值 2%）"
+                              + " ⇒ 新记录没有回到顶部")
+        }
     }
 
     /// R405：查询词只命中来源 App 时，行上必须出现「来自 X」这个命中理由。
@@ -5925,6 +5991,30 @@ final class UICaptureTests: XCTestCase {
                 DetailView(historyStore: loadingComposedStore, freezeLoadingForCapture: true)
                     .frame(width: 720, height: 520)
             )
+        })
+
+        // R406：换选后正文必须回到顶部。两张同尺寸帧：
+        // · `detail-scroll-top` 是 B 的顶部参照；
+        // · `detail-scroll-after-switch` 先把 A 滚 300pt，再走产品入口 `perform(.selectOnly(B))`。
+        // 旧代码把 A 的偏移留给 B，两张帧的文字带位置不同；修后 after 帧应与 top 帧同带。
+        // 固定 300pt 而不是"滚到底"：夹具 interact 时 clip view 还没定高，算 maxY 会得到 39。
+        let scrollTopStore = makeDetailScrollStore(selecting: "B-0")
+        results.append(Fixture("detail-scroll-top", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: scrollTopStore))
+        })
+        let scrollAfterStore = makeDetailScrollStore(selecting: "A-0")
+        results.append(Fixture("detail-scroll-after-switch", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: scrollAfterStore))
+        }.withInteract { window in
+            guard let content = window.contentView,
+                  let scroll = Self.bodyScrollView(in: content) else { return }
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: 300))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            if let target = scrollAfterStore.entries.first(where: { $0.shortPreview.contains("B-0") }) {
+                scrollAfterStore.perform(.selectOnly(target))
+            }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            CaptureReadings.emit("DETAIL_SCROLL_FIXTURE offset=\(Int(scroll.contentView.bounds.origin.y))")
         })
 
         // 行为证人的**不冻臂**住在判据里而不是夹具名单里（R217 / BACKLOG 240）：
@@ -9119,6 +9209,41 @@ final class UICaptureTests: XCTestCase {
             store.perform(.selectOnly(store.entries[index]))
         }
         return store
+    }
+
+    /// R406：两条长正文的夹具。`detail-scroll-top` 拍"B 在顶部"，
+    /// `detail-scroll-after-switch` 先滚 300pt 再换选 B —— 旧代码会把 300pt 的偏移留给 B。
+    func makeDetailScrollStore(selecting marker: String) -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        let longA = (0..<160).map { "A-\($0) 这是第一条记录的第 \($0) 行正文" }.joined(separator: "\n")
+        let longB = (0..<160).map { "B-\($0) 这是第二条记录的第 \($0) 行正文" }.joined(separator: "\n")
+        store.add(ClipboardIntake.Entry(content: .text(longA), thumbnail: nil,
+                                        sourceUTIs: ["public.utf8-plain-text"],
+                                        sourceAppBundleID: "com.apple.TextEdit", sourceAppName: "文本编辑"),
+                  timestamp: Self.referenceDate.addingTimeInterval(-10))
+        store.add(ClipboardIntake.Entry(content: .text(longB), thumbnail: nil,
+                                        sourceUTIs: ["public.utf8-plain-text"],
+                                        sourceAppBundleID: "com.apple.TextEdit", sourceAppName: "文本编辑"),
+                  timestamp: Self.referenceDate)
+        if let target = store.entries.first(where: { $0.shortPreview.contains(marker) }) {
+            store.perform(.selectOnly(target))
+        }
+        return store
+    }
+
+    private static func bodyScrollView(in view: NSView) -> NSScrollView? {
+        if let scroll = view as? NSScrollView,
+           scroll.documentView is ChineseSelectableNSTextView {
+            return scroll
+        }
+        for sub in view.subviews {
+            if let hit = bodyScrollView(in: sub) { return hit }
+        }
+        return nil
     }
 
     /// 判据自己拍的那张帧叫什么。它带着尺寸段，所以夹具改框时这里对不上就会红

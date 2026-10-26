@@ -678,10 +678,16 @@ final class Round4MarkdownTests: XCTestCase {
         let views = codeOnly(try productSource(named: "Views/DetailPreviewViews.swift"))
         XCTAssertTrue(views.contains("DetailRenderPolicy.decide(fileContent: content, url: url)"),
                       "Markdown / HTML 文件没走判定层")
-        XCTAssertTrue(views.contains("ChineseSelectableAttributedTextView(source: source, renderer: renderer)"),
+        // R406：调用多了 `resetKey: url`（换文件时正文归顶），所以这里不能再钉右括号；
+        // 两段分开判，语义没有松：富文本必须建、渲染器必须传、原文等宽那条必须还在。
+        XCTAssertTrue(views.contains("ChineseSelectableAttributedTextView(source: source, renderer: renderer,"),
                       "文件预览的渲染分支没建富文本视图，或没把渲染器传下去")
-        XCTAssertTrue(views.contains("ChineseSelectableTextView(text: content, font: .monospacedSystemFont"),
+        XCTAssertTrue(views.contains("resetKey: url"),
+                      "文件预览没有把文件身份传给正文视图 ⇒ 换文件时滚动位置会留给下一份")
+        XCTAssertTrue(views.contains("ChineseSelectableTextView(text: content"),
                       "非 Markdown 文本文件的等宽预览被顺手改掉了")
+        XCTAssertTrue(views.contains("font: .monospacedSystemFont(ofSize: 13, weight: .regular)"),
+                      "非 Markdown 文本文件不再走等宽那一档字体")
     }
 
     func testBothReadOnlyBodiesShareOneAssembly() throws {

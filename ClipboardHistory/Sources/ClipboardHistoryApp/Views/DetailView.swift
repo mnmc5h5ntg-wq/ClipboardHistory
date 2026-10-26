@@ -350,13 +350,15 @@ struct DetailView: View {
             // "消毒在视图里、判据问不到"（`ChineseSelectableAttributedTextView` 的注释记了这条）。
             if markdownMode == .rendered, let (renderer, source) = renderDecision(for: entry).resolved() {
                 ChineseSelectableAttributedTextView(source: source, renderer: renderer,
-                                                    highlightQuery: historyStore.searchText)
+                                                    highlightQuery: historyStore.searchText,
+                                                    resetKey: entry.id)
                     .detailReadableColumn()
             } else {
                 ChineseSelectableTextView(
                     text: text,
                     font: DetailTypography.bodyFont,
-                    highlightQuery: historyStore.searchText
+                    highlightQuery: historyStore.searchText,
+                    resetKey: entry.id
                 )
                 .detailReadableColumn()
             }
