@@ -257,6 +257,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         // 状态文案那一档由 `StatePresentation.messageFontSize` 定过一次（= `VisualFont.body`），
         // 这里原来是重抄的一个 13 ⇒ 两处各写一个数就是"三处对齐"散掉的老路（R3 那一族）。
         empty.font = .systemFont(ofSize: VisualFont.body)
+        empty.identifier = NSUserInterfaceItemIdentifier("quickPickEmptyMessage")
         empty.textColor = .secondaryLabelColor
         empty.alignment = .center
         empty.lineBreakMode = .byTruncatingTail

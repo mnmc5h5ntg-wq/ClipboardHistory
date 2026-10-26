@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 410 轮（R411 · 2026-10-27 · U-1478…U-1482）：主列表整行补悬停反馈（目标行 232.5/47.9 → 212.1/59.6，邻行 0）；空态句改用 identifier 精确选取（U-1478…U-1482 · 产品 3 文件，列表行悬停位）
+
+- **U-1478：⓪ `40358291786 ↔ 9a5b70a` 的失败步骤。** 失败步骤 **2 个**：`Swift tests` + `Capture gate`；只有 `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 两条（gap **33>24**、长句宽 **56>44**）；`SCROLL_FAILURE_COUNT=0` ⇒ R410 的“换选后可见原点 ≤1”已经在 runner 上通过。R410 的 emptyBox 普通 NSView 仍报同样的 33/56；R411 查明这两条来自**测试抓错了 NSTextField**（固有宽 44、实际 56 的短字段，不是长空句）。修法：给空态句加 `identifier=quickPickEmptyMessage`，测试只认它，并输出其它字段计数作为诊断。sources `R410/61da3be` 一致、全量计数 92-vs-934 反向对照 ok。
+- **U-1479：② 列表行悬停。** 主列表行可点可选中，但整行没有悬停反馈（只有星标自己会亮）。修法：`HistoryRowButton` 接真实 `onHover` + `hoveredEntryIDForCapture`（按 entry id，不按行号），悬停底色走共享 `HoverInk.opacity(level: .hover, dark:)`。真看图：第二行出现圆角淡底，邻行不变。像素现读（目标行 x=20..280、y=222..265pt）：亮 **232.5 → 212.1**、暗 **47.9 → 59.6**；目标行变化 **43733/44720=97.8%** / **43708/44720=97.7%**；邻行 **0/31200=0.0%**（两档）。新增 `sidebar-row-hover` 亮暗 2 帧，既有 190 帧不变，基线同笔 192/0。
+- **U-1480：判据与刀。** 源守卫 `testSidebarRowHoverIsWiredIntoTheRow` 钉行级 `.onHover { hovering in isHovered = hovering }`（第一版只查 `onHover`，被星标那颗自己的 onHover 喂饱，M1063 ESCAPED；已收窄）；像素守卫 `testSidebarRowHoverLiftsOnlyTheHoveredRow` 用目标行 + 邻行隔离。`M1063`（源）/`M1064`（像素）双 **CAUGHT**、红得对=2、`RESTORE_CLEAN=yes`。共享换算守卫 `ControlHoverLadderTests` 绿（行 hover 没走裸 `VisualFill.hover`）。
+- **U-1481：③ 436 只读新跑。** `MOTION_FLOOR_FACTS judged=5/5 executed=73 not-run=- summary=detail-kind-change=4 empty-state=3 notice-banner=2 notice-banner-dismiss=3 settings-reset-fade=2 红的用例=- 汇总行报红=0`、`MOTION_FLOOR_REDS=0`、`UNLISTED_COUNT=0`；`notice-banner` 是登记放行臂，未重猜 `must_judge`，保持结案。
+- **U-1482：① 367 rot 与八步。** `HIDDEN_ARMS 表=254 可判=856 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=167 covered=149 arms=438 bad=0`、全仓 260 文件 / 922 把；`M1063/M1064` 双 CAUGHT。build **0** 告警；全量 `Executed 1080 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 192 -> /tmp/r411_shots3`（122 条判据 / 4 skip / 0 失败），新增 `ADDED=2`（row-hover 亮暗），基线同笔 `UPDATED=192`、复验 `COMPARED=192 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 410；本轮已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 410`）。电池 `Ran 683 / OK (skipped=4)`。
+- **具名 NOT-RUN**：真实指针悬停仍只能人工验（捕获帧由 `hoveredEntryIDForCapture` 点亮）；离屏 alpha 动画中间帧采样不到（mid=1.0），弹层淡入不签产品结论。
+
 ## 第 409 轮（R410 · 2026-10-27 · U-1473…U-1477）：菜单栏空态补「打开时间剪史」（CTA 带旧 0/0 → 新 1166/1382）；空态容器改普通 NSView、滚动守卫改读可见原点（U-1473…U-1477 · 产品 2 文件，菜单空态 CTA 位）
 
 - **U-1473：⓪ `40350180209 ↔ 83bed7a` 的失败步骤。** 失败步骤 **2 个**：`Swift tests` + `Capture gate`；红的是两件事：① `testQuickPickEmptyStateSentenceIsCommittedAndSitsInTheListSlot` 在 runner 上仍 gap **33>24**、长句宽 **56>44**（R409 的 emptyBox 仍是 NSStackView，runner 把它压成按钮宽）；② `DetailScrollResetTests` 读到 `afterVisible=0` 而 `topVisible=11`，守卫把初始可见原点当成了常数。修法：emptyBox 改**普通 NSView + 显式四边约束**；滚动守卫改断言“换选后可见原点 ≤1”（旧行为 2357 仍会红）。R406 的 visibleRect 思路保留，不再钉 11/0 的跨机差。sources `R409/7426d05` 一致、全量计数 92-vs-934 反向对照 ok。

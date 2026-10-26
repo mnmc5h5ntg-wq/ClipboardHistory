@@ -7513,3 +7513,9 @@ R409 现读：QuickPick 主输入框是一行裸文字，和主窗口 `SearchFie
 R410 现读：菜单栏空态只有“暂无推荐”。加「打开时间剪史」菜单项，走已有 `.showMainWindowHotKeyPressed` 通知；CTA 带旧 0/0 → 新 1166/1382，menubar-empty/refreshing 亮暗 4 帧变化；M1061/M1062 双 CAUGHT。⓪ `40350180209` 的 2 个失败步骤是 Swift tests + Capture gate：① 空态在 runner 上仍 gap 33/长句 56（emptyBox 还是 NSStackView）；② DetailScrollReset 的初始可见原点被当常数（runner 11 vs 本机 0，换选后 0）。修法：emptyBox 改普通 NSView + 四边约束；滚动守卫改断言“换选后可见原点 ≤1”（旧行为 2357 仍红）；PressFeedback 菜单按钮精确计数 2→3。
 **Why**：空态菜单若不给出下一步，用户只能退出菜单自己找主窗口；而 NSStackView 的 hugging/分配在不同机器上会把容器压成按钮宽，本机绿不代表 runner 绿。初始可见原点也不是常数（内边距/字体差），把 0/11 当契约会制造假红。
 **How to apply**：① 菜单/弹层空态给可执行下一步，并复用已有动作通道；② 需要精确几何的容器用普通 NSView + 显式四边/宽度约束，不依赖 stack 的 hugging；③ 滚动/位置守卫读被观察视图自己的可见原点并给“顶部 ≤1”的绝对出口；④ 精确计数守卫可随合法新增更新数字，但必须仍是精确相等。
+
+### D-403（411）列表行 hover 走共享换算并按 id 取证；量一句话前先证明抓到的是那一句
+
+R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`HistoryRowButton` 接真实 `onHover` + 按 entry id 的 `hoveredEntryIDForCapture`，悬停底色走共享 `HoverInk.opacity(level:dark:)`；目标行亮 232.5→212.1、暗 47.9→59.6，邻行 0/0；M1063/M1064 双 CAUGHT。⓪ `40358291786` 的 2 个失败步骤只有空态句 33/56，而 `SCROLL_FAILURE_COUNT=0`（R410 可见原点守卫已过）；R411 查明 33/56 是测试抓错 NSTextField（固有宽 44、实际 56 的短字段），给空态句加 identifier 精确选取。
+**Why**：行 hover 若绕过共享 HoverInk，会在亮/暗两档给出两套音量；按行号取证会在新增/筛选后指错行。而“量一句话”的判据若不先证明抓到的是那一句，跨机遍历顺序会把另一个短字段当成它——33/56 连续三跑一模一样就是“主语错了”的读数。
+**How to apply**：① 行级状态按不可漂移的身份（entry id）取证；② 悬停/按下量走共享换算，不直接叠裸 VisualFill；③ 文本判据先按 identifier/内容锁定对象，并输出候选诊断，读不到就红在“没有对象”；④ 源守卫要钉到**行级那一整行**，不能被同文件里别的 onHover 喂饱。

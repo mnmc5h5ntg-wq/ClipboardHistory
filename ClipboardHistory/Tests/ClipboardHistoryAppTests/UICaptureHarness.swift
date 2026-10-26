@@ -104,6 +104,9 @@ final class UICaptureTests: XCTestCase {
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
+        // R411：行悬停帧是同一个 `HistorySidebarView` + 同一批选中行；黑带仍是系统 List
+        // 选中材质（不是新画的 hover 底）。目标行 hover 已单独量过。
+        "sidebar-row-hover",
     ]
 
     /// 「这张帧天生就是稀的」名单（R63）—— 与上面那份同一族：**尺的假设名单**，不是缺陷名单。
@@ -2862,6 +2865,80 @@ final class UICaptureTests: XCTestCase {
                       "真实 hover 没有接到边界视图")
     }
 
+    /// R411：主列表整行 hover 反馈必须只抬被指的那一行。
+    func testSidebarRowHoverLiftsOnlyTheHoveredRow() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r411-row-hover-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-history" }),
+                  let hoverFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-row-hover" }) else {
+                return XCTFail("\(tag)：idle/hover 两帧缺一张 ⇒ 像素判据没有对象")
+            }
+            let idleFile = scratch.appendingPathComponent("idle-\(tag).png")
+            let hoverFile = scratch.appendingPathComponent("hover-\(tag).png")
+            _ = try render(idleFixture, appearance: appearance, to: idleFile)
+            _ = try render(hoverFixture, appearance: appearance, to: hoverFile)
+            guard let id = try? Data(contentsOf: idleFile),
+                  let ir = NSBitmapImageRep(data: id), let idle = ir.bitmapData,
+                  let hd = try? Data(contentsOf: hoverFile),
+                  let hr = NSBitmapImageRep(data: hd), let hover = hr.bitmapData,
+                  ir.pixelsWide == hr.pixelsWide, ir.pixelsHigh == hr.pixelsHigh else {
+                return XCTFail("\(tag)：两帧读不回来或尺寸不一致 ⇒ 像素判据没有对象")
+            }
+            let scale = Double(ir.pixelsWide) / 300.0
+            func band(_ rect: CGRect) -> (oldMean: Double, newMean: Double, changed: Int, total: Int) {
+                let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
+                let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
+                var so = 0.0, sn = 0.0, changed = 0, total = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let o = y * ir.bytesPerRow + x * ir.samplesPerPixel
+                        let p = (Double(idle[o]) + Double(idle[o + 1]) + Double(idle[o + 2])) / 3
+                        let q = (Double(hover[o]) + Double(hover[o + 1]) + Double(hover[o + 2])) / 3
+                        so += p; sn += q
+                        let d = max(abs(Int(idle[o]) - Int(hover[o])),
+                                    max(abs(Int(idle[o + 1]) - Int(hover[o + 1])),
+                                        abs(Int(idle[o + 2]) - Int(hover[o + 2]))))
+                        if d > 5 { changed += 1 }
+                        total += 1
+                    }
+                }
+                return (so / Double(total), sn / Double(total), changed, total)
+            }
+            let target = band(CGRect(x: 20, y: 222, width: 260, height: 43))
+            let neighbour = band(CGRect(x: 20, y: 270, width: 260, height: 30))
+            let fraction = Double(target.changed) / Double(max(1, target.total))
+            let neighbourFraction = Double(neighbour.changed) / Double(max(1, neighbour.total))
+            emit("SIDEBAR_ROW_HOVER_BAND \(tag) 目标行旧=\(String(format: "%.1f", target.oldMean))"
+                 + " 新=\(String(format: "%.1f", target.newMean))"
+                 + " 变化=\(target.changed)/\(target.total)=\(String(format: "%.3f", fraction))"
+                 + " 邻行变化=\(neighbour.changed)/\(neighbour.total)=\(String(format: "%.3f", neighbourFraction))")
+            XCTAssertGreaterThan(abs(target.newMean - target.oldMean), 3,
+                                 "\(tag)：被指的那一行均值只差 \(String(format: "%.1f", abs(target.newMean - target.oldMean))) ⇒ 行 hover 没画出来")
+            XCTAssertGreaterThan(fraction, 0.05,
+                                 "\(tag)：被指的那一行只有 \(String(format: "%.1f", fraction * 100))% 像素变化 ⇒ 反馈太弱")
+            XCTAssertLessThan(neighbourFraction, 0.01,
+                              "\(tag)：邻行也变了 \(String(format: "%.1f", neighbourFraction * 100))% ⇒ hover 漏到别的行")
+        }
+    }
+
+    /// R411 的结构那一半：行 hover 必须接到 `HistoryRowButton`。
+    func testSidebarRowHoverIsWiredIntoTheRow() throws {
+        let source = Self.codeOnly(try productSource(named: "Views/HistoryRowViews.swift"))
+        XCTAssertTrue(source.contains(".onHover { hovering in isHovered = hovering }"),
+                      "HistoryRowButton 没有接真实 hover（别被星标那颗自己的 onHover 喂饱）")
+        XCTAssertTrue(source.contains("hoveredEntryIDForCapture"),
+                      "行 hover 没有取证键 ⇒ 离屏帧里这一档不存在")
+        XCTAssertTrue(source.contains("isHoveredForDrawing"),
+                      "产品的 hover 与取证键没有汇到同一个绘制判定")
+    }
+
     /// R410：菜单栏空态必须有可见下一步「打开时间剪史」。
     func testMenuBarEmptyStateOffersOpenAppAction() throws {
         let source = Self.codeOnly(try productSource(named: "Views/MenuBarRecommendationsView.swift"))
@@ -4092,17 +4169,26 @@ final class UICaptureTests: XCTestCase {
 
         var field: NSTextField?
         var sentence: NSTextField?
+        var otherFields: [String] = []
         func find(_ view: NSView) {
             if let tf = view as? NSTextField {
-                if tf is QuickPickSearchField { field = tf }
-                else if !tf.stringValue.isEmpty { sentence = tf }
+                if tf is QuickPickSearchField {
+                    field = tf
+                } else if tf.identifier?.rawValue == "quickPickEmptyMessage" {
+                    sentence = tf
+                } else if !tf.stringValue.isEmpty {
+                    otherFields.append("len=\(tf.stringValue.count) id=\(tf.identifier?.rawValue ?? "-")")
+                }
             }
             view.subviews.forEach(find)
         }
         find(content)
         guard let sentence else {
-            return XCTFail("浮层里没有「没有匹配…」那句话 ⇒ 空结果态什么都没有说（审计 B-P2 那一族回归）")
+            return XCTFail("浮层里没有「没有匹配…」那句话（identifier=quickPickEmptyMessage）"
+                           + " ⇒ 空结果态什么都没有说；非搜索框的其它 NSTextField：\(otherFields)")
         }
+        emit("QUICKPICK_EMPTY_FIELD 句子长=\(sentence.stringValue.count) "
+             + "其它字段=\(otherFields.count)")
         XCTAssertFalse(sentence.isHidden, "那句话被藏起来了 ⇒ 空结果时浮层是一片空白")
         XCTAssertEqual(sentence.alphaValue, 1, accuracy: 0.001,
                        "那句话的模型值是 \(sentence.alphaValue) ⇒ 它的可见性被压在「淡入动画跑完」上。"
@@ -4153,7 +4239,7 @@ final class UICaptureTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         var longSentence: NSTextField?
         func findLong(_ view: NSView) {
-            if let tf = view as? NSTextField, !(tf is QuickPickSearchField), !tf.stringValue.isEmpty {
+            if let tf = view as? NSTextField, tf.identifier?.rawValue == "quickPickEmptyMessage" {
                 longSentence = tf
             }
             view.subviews.forEach(findLong)
@@ -5390,6 +5476,11 @@ final class UICaptureTests: XCTestCase {
 
         results.append(Fixture("sidebar-history", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
+        })
+        // R411：整行悬停帧。选第 2 条（不是选中行），避免与系统选中材质混在一起。
+        results.append(Fixture("sidebar-row-hover", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store))
+                .environment(\.hoveredEntryIDForCapture, store.entries[1].id))
         })
         // R408：拖放目标那一档第一次可拍。离屏捕获送不进 drag session，
         // 所以这里只写取证键；产品路径仍由 `isDropTargeted` 供。

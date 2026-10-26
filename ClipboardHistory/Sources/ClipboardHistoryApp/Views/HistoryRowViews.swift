@@ -16,6 +16,12 @@ struct HistoryRowButton: View {
     let copyAction: () -> Void
     /// 点行首星标 = 收藏/取消收藏。
     let favoriteAction: () -> Void
+    @State private var isHovered = false
+    @Environment(\.hoveredEntryIDForCapture) private var hoveredEntryIDForCapture
+    @Environment(\.colorScheme) private var colorScheme
+    private var isHoveredForDrawing: Bool {
+        isHovered || hoveredEntryIDForCapture == entry.id
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -30,6 +36,14 @@ struct HistoryRowButton: View {
             RowTextColumn(entry: entry)
         }
         .padding(.vertical, 6)
+        .background(
+            VisualShape.rounded(VisualRadius.panel)
+                .fill(Color.primary.opacity(
+                    isHoveredForDrawing
+                        ? HoverInk.opacity(level: VisualFill.hover, dark: colorScheme == .dark)
+                        : 0
+                ))
+        )
         .contentShape(Rectangle())
         // 双击必须用 `simultaneousGesture(TapGesture(count: 2))`，**不能**用 `.onTapGesture(count: 2)`。
         // 用户真机反馈：换成 onTapGesture 之后"点一行到显示已选中"有可感知的延迟 ——
@@ -49,6 +63,8 @@ struct HistoryRowButton: View {
         .modifier(EntryDragModifier(content: entry.content))
         // 提示语为空时整个 modifier 都不挂：`.help("")` 在 macOS 上会弹出一个空气泡。
         .modifier(RowDragHelpModifier(content: entry.content))
+        .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)
+        .onHover { hovering in isHovered = hovering }
     }
 }
 

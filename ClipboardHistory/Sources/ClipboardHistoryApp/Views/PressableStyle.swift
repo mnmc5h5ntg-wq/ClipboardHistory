@@ -242,6 +242,12 @@ private struct DropTargetedForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// R411：列表行整行悬停的取证键。行在 `List` 里，离屏送不进指针事件；
+/// 用条目 id 而不是行号：行会因新增/筛选漂移，id 才是这一行的身份。
+private struct HoveredEntryIDForCaptureKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
@@ -266,6 +272,12 @@ extension EnvironmentValues {
     var dropTargetedForCapture: Bool? {
         get { self[DropTargetedForCaptureKey.self] }
         set { self[DropTargetedForCaptureKey.self] = newValue }
+    }
+
+    /// 取证用的整行悬停覆盖。`nil` = 不覆盖；等于某条 id = 只有那一条按悬停画。
+    var hoveredEntryIDForCapture: UUID? {
+        get { self[HoveredEntryIDForCaptureKey.self] }
+        set { self[HoveredEntryIDForCaptureKey.self] = newValue }
     }
 }
 

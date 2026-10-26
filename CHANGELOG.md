@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主列表整行补悬停反馈（目标行 232.5/47.9 → 212.1/59.6，邻行 0）；空态句改用 identifier 精确选取（R411 / 第 410 轮 / Round 408 / U-1478…U-1482 · 产品 3 文件，列表行悬停位）
+
+
 ### 菜单栏空态补「打开时间剪史」（CTA 带旧 0/0 → 新 1166/1382）；空态容器改普通 NSView、滚动守卫改读可见原点（R410 / 第 409 轮 / Round 407 / U-1473…U-1477 · 产品 2 文件，菜单空态 CTA 位）
 
 
