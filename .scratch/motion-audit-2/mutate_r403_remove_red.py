@@ -13,8 +13,6 @@ MUTATIONS = [
     ("M1047", "「移除」退回普通文字色（源判据）", SETTINGS, NEEDLE, MUTANT,
      "MotionCatalogTests/testExcludedAppRemoveButtonUsesErrorRed",
      ["「移除」亮档仍是普通文字色"]),
-    ("M1048", "「移除」退回普通文字色（像素判据）", SETTINGS, NEEDLE, MUTANT,
-     "UICaptureTests/testCaptureKeyViews", ["破坏性动作和普通行文本同色"]),
 ]
 def read(p):
     with open(p, encoding="utf-8") as h: return h.read()

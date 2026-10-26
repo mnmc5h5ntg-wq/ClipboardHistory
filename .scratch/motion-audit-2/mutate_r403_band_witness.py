@@ -5,7 +5,7 @@ import os, subprocess, sys, time
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 TARGET = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
-NEEDLE = "        return witnessInk == 0 ? .rulerBroken : .capabilityAbsent(witnessInk: witnessInk)"
+NEEDLE = "        return witnessInk > 0 ? .rulerBroken : .capabilityAbsent(witnessInk: witnessInk)"
 MUTANT = "        return .capabilityAbsent(witnessInk: witnessInk)"
 FILTER = "UICaptureTests/testLongTextBandEmptyNeedsANonEmptyWitness"
 def read(p):
@@ -31,7 +31,7 @@ def main():
     finally:
         open(TARGET,"w",encoding="utf-8").write(original)
         os.utime(TARGET,(stamp+1,stamp+1))
-    hit = "必须红，不许 skip" in out
+    hit = "证人非空但目标带空" in out
     right = code=="CAUGHT" and hit
     print("M1046 空带忽略证人 ⇒ %s 红得对=%s 命中=%s 红在 %s 还原干净=%s" % (code,right,hit,failed,read(TARGET)==original))
     code2,out2,_=run()

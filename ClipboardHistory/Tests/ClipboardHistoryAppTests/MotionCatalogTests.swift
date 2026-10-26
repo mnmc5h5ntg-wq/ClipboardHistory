@@ -504,6 +504,17 @@ final class MotionCatalogTests: XCTestCase {
                       "StatePresentation 没有 pane 墨档 ⇒ 空态没有可判的来源")
     }
 
+    /// R404：详情浮动操作栏的「删除」也是破坏性动作，必须和批量删除/移除用同一套错误红。
+    func testDetailTrashButtonUsesErrorRed() throws {
+        let glass = codeOnly(try productSource(named: "Views/GlassControls.swift"))
+        XCTAssertTrue(glass.contains("GlassPillButton(symbol: \"trash\""),
+                      "找不到详情删除按钮 ⇒ 判据没有对象")
+        XCTAssertTrue(glass.contains("foregroundStyle: AnyShapeStyle(colorScheme == .dark"),
+                      "详情删除按钮没有走动态错误红 ⇒ 和普通图标同色")
+        XCTAssertTrue(glass.contains("Color(red: 0.72, green: 0.0, blue: 0.0)"),
+                      "详情删除按钮亮档没有用压深的错误红")
+    }
+
     /// R403：排除名单的「移除」是破坏性动作，必须用错误红，不能和普通行文本一样黑。
     func testExcludedAppRemoveButtonUsesErrorRed() throws {
         let settings = codeOnly(try productSource(named: "Views/SettingsView.swift"))

@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 403 轮（R404 · 2026-10-26 · U-1442…U-1446）：详情「删除」改成错误红（红 0→701/662）；band-empty 三态翻正（证人也空 ⇒ 具名 XCTSkip）（U-1442…U-1446 · 产品 1 文件，破坏性反馈位）
+
+- **U-1442：⓪ R403 队列。** `40303435118 ↔ 137921e` failure，失败步骤 `Swift tests / Capture gate`：Swift 4 条 `LONG_TEXT_PILL_RULER_BROKEN：600/680/700/720`（detail meta 证人在 runner 1x 也 0），Capture gate 另有 `REMOVE_RED` 红（light 红=0字墨=0；dark 红=0字墨=345）。R402 `40296891274 ↔ a274d4a` success；`03825d6`/`02cd2f7` 仍 failure（band-empty detail 证人 0）；R400 `ed3a30d` success、`41c76cc` 仅 Release script 红。R404 新跑待落地，R405 ⓪ 补读。
+- **U-1443：② 破坏性反馈位 —— 详情浮动操作栏的「删除」仍是普通图标色。** 真看图：批量删除是红、设置「移除」也是红，但详情胶囊第四颗 trash 仍是灰黑。修法：给 `GlassPillButton(symbol:"trash")` 加与复制失败同一对动态错误红（亮 0.72,0,0 / 暗 1.0,0.62,0.58）。像素现读：旧红 **0 / 0**，新红 **701 / 662**（图标墨 527/3141 仍在）；帧差分 **48** 张（所有带详情胶囊的帧），基线同笔 update 后 182/0。
+- **U-1444：band-empty 三态翻正 + REMOVE_RED 守卫退役。** 按监督者口径：目标有墨 ⇒ measured；目标空 + 证人有墨 ⇒ `RULER_BROKEN` 红；目标与证人都 0 ⇒ `capabilityAbsent` → emit `LONG_TEXT_PILL_NOT_RUN` + **XCTSkip**。证人取 detail meta ∪ sidebar；真值表 3 格 + M1046（忽略证人）CAUGHT。`REMOVE_RED` 像素守卫在 runner 上 dark 红=0/字墨=345（设置页 1x 部分合成），无法区分产品色与通道；已退役该像素守卫，保留源守卫 M1047（CAUGHT），本地新旧红读数仍入账。
+- **U-1445：③ 436 复核。** `137921e` 与 `a274d4a` 现读 `MOTION_FLOOR_FACTS judged=5/5 executed=73 not-run=-`、`settings-reset-fade=2/3`、`MOTION_FLOOR_OK=5/5`、`MOTION_FLOOR_REDS=0`；`notice-banner` 的 4/5 是登记放行臂，不误判；没有新 unlisted，保持结案。
+- **U-1446：① 367 rot 与八步。** `HIDDEN_ARMS 表=247 可判=842 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 处置=ok`；预检 `tables=160 covered=142 arms=424 bad=0`、全仓 253 文件 / 908 把；`M1049/M1050` 与 M1046 全 CAUGHT。build **0** 告警；全量 `Executed 1065 tests, with 53 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r404_shots`，与 R403 逐张比 `变了=48`（所有详情胶囊帧），帧基线同笔 `UPDATED=182`、复验 `COMPARED=182 CHANGED=0 MISSING=0 ADDED=0`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 `381=381`；清账表 `表面=18 状态=9 格子=162 已清账=162 未清账=0 地板=162`；产品面连续零改动 **1** 轮（as-of 403；本轮破坏性反馈已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 403`）。电池 `Ran 683 / OK (skipped=4)`。
+
 ## 第 402 轮（R403 · 2026-10-26 · U-1437…U-1441）：「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（U-1437…U-1441 · 产品 1 文件，破坏性反馈位）
 
 - **U-1437：⓪ R402 队列。** `40296891274 ↔ a274d4a` success（运动 floor `judged=5/5`、`REDS=0`）；`40298315386 ↔ 03825d6`、`40298351973 ↔ 02cd2f7` failure，`Swift tests / Capture gate`，红名 `LONG_TEXT_PILL_RULER_BROKEN：600/680/700/720` —— detail meta 证人在 runner 1x 也 0，按规则先红；R403 把证人扩展为 detail meta ∪ 侧栏（任一有墨 ⇒ 具名 `XCTSkip`，两条都 0 ⇒ 仍 `RULER_BROKEN` 红）。R400 `40288846355↔ed3a30d` success、`40288830013↔41c76cc` 仅 Release script 红（sources 格旧伤）。R403 新跑待落地，R404 ⓪ 补读。

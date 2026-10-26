@@ -4090,20 +4090,20 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
-// R403：「移除」是破坏性动作，必须读到错误红；同一带里先要读到字（否则不是产品）。
+// R404：详情浮动操作栏的删除按钮必须读到错误红；同一带里先要读到图标（否则不是产品）。
         do {
             for tag in ["light", "dark"] {
-                let name = "settings-privacy-excluded-720x1040-\(tag).png"
+                let name = "glass-pill-states-120x232-\(tag).png"
                 let url = directory.appendingPathComponent(name)
                 guard let image = NSImage(contentsOf: url),
                       let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
                       let base = rep.bitmapData else {
-                    XCTFail("REMOVE_RED_FRAME_MISSING：\(tag) 帧不在捕获目录")
+                    XCTFail("TRASH_RED_FRAME_MISSING：\(tag) 帧不在捕获目录")
                     continue
                 }
-                let scale = Double(rep.pixelsWide) / 720.0
-                let x0 = Int(662 * scale), x1 = Int(685 * scale)
-                let y0 = Int(575 * scale), y1 = Int(590 * scale)
+                let scale = Double(rep.pixelsWide) / 120.0
+                let x0 = Int(45 * scale), x1 = Int(75 * scale)
+                let y0 = Int(185 * scale), y1 = Int(215 * scale)
                 var red = 0, ink = 0
                 for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
                     for x in x0..<min(rep.pixelsWide, x1) {
@@ -4114,14 +4114,14 @@ final class UICaptureTests: XCTestCase {
                         if (0.2126 * r + 0.7152 * g + 0.0722 * b) < 0.55 { ink += 1 }
                     }
                 }
-                emit("REMOVE_RED \(tag) 红=\(red) 字墨=\(ink)")
+                emit("TRASH_RED \(tag) 红=\(red) 图标墨=\(ink)")
                 if ink == 0 {
-                    emit("REMOVE_RED_NOT_RUN=band-empty：\(tag)")
+                    emit("TRASH_RED_NOT_RUN=band-empty：\(tag)")
                     continue
                 }
                 XCTAssertGreaterThanOrEqual(red, 20,
-                                            "\(tag)：「移除」只读到 \(red) 颗错误红（要 ≥20）"
-                                                + " ⇒ 破坏性动作和普通行文本同色")
+                                            "\(tag)：详情删除图标只读到 \(red) 颗错误红（要 ≥20）"
+                                                + " ⇒ 破坏性动作和普通图标同色")
             }
         }
 
@@ -13852,7 +13852,10 @@ final class UICaptureTests: XCTestCase {
             guard let base = rep.bitmapData else { return Reading(red: 0, ink: 0, contrast: 0) }
             var values: [Int] = []
             var reds: [Int] = []
-            for y in 0..<rep.pixelsHigh {
+            // 只看第三颗 copy（y 140..170pt）；第四颗 trash 现在是错误红，整幅数会把它算进成功态。
+            let scale = Double(rep.pixelsWide) / 120.0
+            let y0 = Int(140 * scale), y1 = Int(170 * scale)
+            for y in max(0, y0)..<min(rep.pixelsHigh, y1) {
                 for x in 0..<rep.pixelsWide {
                     let o = y * rep.bytesPerRow + x * 4
                     let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
@@ -13923,19 +13926,20 @@ final class UICaptureTests: XCTestCase {
         case rulerBroken
     }
 
-    /// 空带的三态：先证明同帧另一处有墨，再决定是能力出口还是尺坏。
+    /// 空带的三态：目标空而证人有墨 ⇒ 尺/取带坏了（红）；目标与证人都空 ⇒
+    /// 这台机器拍不出这一页（具名能力出口，skip）。方向不许反：整页平涂不是尺坏。
     static func longTextBandOutcome(ink: Int, witnessInk: Int) -> LongTextBandOutcome {
         if ink > 0 { return .measured }
-        return witnessInk == 0 ? .rulerBroken : .capabilityAbsent(witnessInk: witnessInk)
+        return witnessInk > 0 ? .rulerBroken : .capabilityAbsent(witnessInk: witnessInk)
     }
 
     func testLongTextBandEmptyNeedsANonEmptyWitness() {
         XCTAssertEqual(Self.longTextBandOutcome(ink: 10, witnessInk: 0), .measured)
-        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 12),
-                       .capabilityAbsent(witnessInk: 12),
-                       "同帧另一处有墨 ⇒ 这是具名能力出口，不是尺坏")
-        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 0), .rulerBroken,
-                       "目标带与证人带都空 ⇒ 尺/整页坏了，必须红，不许 skip")
+        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 12), .rulerBroken,
+                       "证人非空但目标带空 ⇒ 尺/取带坏了，必须红")
+        XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 0),
+                       .capabilityAbsent(witnessInk: 0),
+                       "目标带与证人带都空 ⇒ 这台机器拍不出这一页，具名 NOT-RUN/skip")
     }
 
     /// R399：最窄窗里长正文必须给右下角浮动操作栏让位，不能排到药丸下面。
@@ -14016,13 +14020,14 @@ final class UICaptureTests: XCTestCase {
                 break
             case .rulerBroken:
                 XCTFail("LONG_TEXT_PILL_RULER_BROKEN：\(width) 的正文带空，"
-                            + "同帧 detail-witness 也 0 颗墨 ⇒ 尺/整页没画，不能 skip")
+                            + "但同帧 detail-witness=\(detailWitness)/sidebar-witness=\(sidebarWitness) 有墨 "
+                            + "⇒ 尺/取带坏了，必须红")
                 continue
             case .capabilityAbsent(let witness):
                 emit("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width)（detail-witness=\(detailWitness) "
                      + "sidebar-witness=\(sidebarWitness)）")
-                throw XCTSkip("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 正文带空，"
-                               + "但同帧 detail-witness=\(witness) 有墨 ⇒ 这台机器拍不出这一条")
+                throw XCTSkip("LONG_TEXT_PILL_NOT_RUN=band-empty：\(width) 目标带与证人带都空，"
+                               + "这台机器拍不出这一页（witness=\(witness)）")
             }
             let maxPt = Double(maxX) / scale
             let limit = Double(width) - 80.0

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情「删除」改成错误红（红 0→701/662）；band-empty 三态翻正（证人也空 ⇒ 具名 XCTSkip）（R404 / 第 403 轮 / Round 401 / U-1442…U-1446 · 产品 1 文件，破坏性反馈位）
+
+
 ### 「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（R403 / 第 402 轮 / Round 400 / U-1437…U-1441 · 产品 1 文件，破坏性反馈位）
 
 

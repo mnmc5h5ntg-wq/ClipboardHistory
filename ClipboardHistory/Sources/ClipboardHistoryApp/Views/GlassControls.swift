@@ -67,7 +67,12 @@ struct GlassPill: View {
 
             GlassPillDivider()
 
-            GlassPillButton(symbol: "trash", helpText: "删除", action: deleteAction)
+            GlassPillButton(symbol: "trash", helpText: "删除",
+                            // R404：详情浮动操作栏的删除也是破坏性动作，和批量删除/移除同一套错误红。
+                            foregroundStyle: AnyShapeStyle(colorScheme == .dark
+                                ? Color(red: 1.0, green: 0.62, blue: 0.58)
+                                : Color(red: 0.72, green: 0.0, blue: 0.0)),
+                            action: deleteAction)
         }
         // 收藏与固定是"状态被改了"：这两条事务是 `symbolMotion` 那两臂唯一的供电来源。
         // 以前整个文件只有 hover 一处 `withAnimation`（`:105`），于是 14+ 的符号替换过渡与

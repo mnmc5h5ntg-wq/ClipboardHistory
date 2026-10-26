@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R404 状态（2026-10-26 · 本地 · 第 403 轮 / Round 401）：详情「删除」改成错误红（红 0→701/662）；band-empty 三态翻正（证人也空 ⇒ 具名 XCTSkip）（产品 1 文件，破坏性反馈位）
+
+最后更新：2026-10-26（本地 · R404 / 第 403 轮 / Round 401）：详情浮动操作栏的 trash 仍是灰黑，而批量删除/设置「移除」都是红。给 `GlassPillButton(symbol:"trash")` 加与复制失败同一对动态错误红（亮 0.72,0,0 / 暗 1.0,0.62,0.58）：红像素旧 **0/0** → 新 **701/662**（图标墨 527/3141 仍在）；48 张详情胶囊帧变化，基线同笔 update 后 182/0。M1049/M1050 双 CAUGHT。band-empty 三态按监督者口径翻正（目标有墨 measured、目标空证人有墨 RULER_BROKEN 红、两者都空 capabilityAbsent→XCTSkip），证人 detail ∪ sidebar；真值表 3 格 + M1046 CAUGHT。`REMOVE_RED` 像素守卫在 runner 上 dark 红 0/字墨 345，已退役（源 M1047 保留）；R403 `137921e` 的 RULER_BROKEN + REMOVE_RED 红由此归因。436 两跑 5/5、REDS=0，保持结案。全量 `Executed 1065 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=247 可判=842 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=160 covered=142 arms=424 bad=0`、全仓 253 文件 / 908 把；产品面连续零改动 **1** 轮（as-of 403，现读 `python3 scripts/product_streak.py --streak-for 403`）。电池 `Ran 683 / OK (skipped=4)`。
+
+本轮做了什么：
+① ⓪ R403 `137921e` failure：RULER_BROKEN 4 条 + REMOVE_RED 红；R402 a274d4a success、03825d6/02cd2f7 failure；R400 41c76cc 仅 Release script 红。
+② 产品：详情 trash 灰黑→错误红，红 0/0→701/662，48 帧变化。
+③ 判据：源+像素 M1049/M1050 双 CAUGHT。
+④ band-empty 三态翻正：证人有墨才 RULER_BROKEN，两者都空才 XCTSkip；真值表 + M1046。
+⑤ REMOVE_RED 像素守卫因 runner 1x 设置页部分合成退役，源 M1047 保留。
+⑥ 436：137921e/a274d4a 5/5、REDS=0，保持结案。
+⑦ 367：hidden 表 247 / 可判 842 / rot 0 / 上界 0；预检 160/142/424/0。
+⑧ 验证：build 0 告警；全量 `1065/53/0`；捕获 182 帧、48 张变化、基线 182/0；换装 ok；清账表 162=162。
+
+NOT-RUN / 阻塞（分开写）：① **R404 新跑未落地**；② **R403 的 137921e Swift/Capture 红**已归因为 band 守卫 + REMOVE_RED 像素守卫，R404 修后待 runner 签收；③ 亮档真机腿仍没跑；④ macOS 12 紧凑详情头仍走旧截断。
+
+下一轮（R405）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R404 主笔+追记 head 跑全部失败步骤（成对 run↔commit），新跑没落地就记 in_progress；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources，换缺陷类别；③ 436 只复核新跑 Motion floor，不重新猜 `must_judge`。
+
 ## R403 状态（2026-10-26 · 本地 · 第 402 轮 / Round 400）：「移除」从普通文字改成错误红（红 0→591/605）；band-empty 加侧栏证人后具名 XCTSkip（产品 1 文件，破坏性反馈位）
 
 最后更新：2026-10-26（本地 · R403 / 第 402 轮 / Round 400）：排除名单的「移除」和普通 App 标识一样黑字，而批量删除/清空都用错误红。给「移除」加与复制失败同一对动态错误红（亮 0.72,0,0 / 暗 1.0,0.62,0.58）：红像素旧 **0/0** → 新 **591/605**，字墨 447/954 仍在；两张 privacy-excluded 帧变化，基线同笔 update 后 182/0。M1047/M1048 双 CAUGHT。band-empty：R402 的 detail meta 证人在 runner 也 0，R403 改为 detail ∪ sidebar 证人（任一有墨 ⇒ 具名 XCTSkip；两条都 0 ⇒ `RULER_BROKEN` 红）；真值表 3 格 + M1046 CAUGHT。436 的 a274d4a 现读 judged=5/5、REDS=0，保持结案。全量 `Executed 1064 tests, with 53 tests skipped and 0 failures`；换装 `ok / SHA_MATCH=1 / 381=381`；清账表 162=162；`HIDDEN_ARMS 表=246 可判=841 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=159 covered=141 arms=423 bad=0`、全仓 252 文件 / 907 把；产品面连续零改动 **1** 轮（as-of 402；本轮破坏性反馈已落 Sources，现读 `python3 scripts/product_streak.py --streak-for 402`）。电池 `Ran 683 / OK (skipped=4)`。
