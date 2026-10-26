@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 权重复位九根滑杆走同一条 .slider 路径（2x 5 帧 / 1x 13 帧）；快捷键页自量禁用对比 2.92/4.38；M1020–M1022 CAUGHT（R389 / 第 388 轮 / Round 386 / U-1365…U-1369 · 产品 1 文件，动效主线）
+
+
 ### 禁用「恢复默认」不再被 opacity 压成看不见 —— 自绘 primary↔secondary 样式 + 2.2 对比地板；M1019 咬地板（R388 / 第 387 轮 / Round 385 / U-1360…U-1364 · 产品 3 文件，动效主线）
 
 

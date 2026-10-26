@@ -12,6 +12,24 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R389 状态（2026-10-26 · 本地 · 第 388 轮 / Round 386）：权重复位九根滑杆走同一条 .slider 路径（2x 5 帧 / 1x 13 帧）；快捷键页自量禁用对比 2.92/4.38；M1020–M1022 CAUGHT（产品 1 文件，动效主线）
+
+最后更新：2026-10-26（本地 · R389 / 第 388 轮 / Round 386）：权重复位原来只有按钮色变在演，九根滑杆瞬移。产品新增 `RecommendationWeightsView.resetDefaults(in:)`：把 `store.restoreDefaults()` 包进 `withAnimation(MotionCatalog.animation(for: .slider))`，按钮调它；直接拖滑杆不经过这条动画。新胶片场景 `settings-weights-reset-sliders` 只拍两行滑杆（按钮色变不在带里）：2x `帧数=27 过渡帧数=5 峰值=0.0201`、1x `27/13/0.0123`（声明 200ms；960×280 / 480×140px），strip 逐帧可见「收藏 40% → 默认」与滑块右移。R388 自评扣的快捷键页对比地板补成读数：亮 禁用 **2.92** / 改过 **3.81**、暗 禁用 **4.38** / 改过 **5.38**（地板 2.2）。M1020/M1021/M1022 全 CAUGHT、还原干净；`HIDDEN_ARMS 表=231 可判=816 rot=0 … 上界 rot=0 处置=ok`；预检 `tables=144 covered=127 arms=398 bad=0`、全仓 237 文件 / 882 把。`swift build --build-tests` 告警 **0**；全量 `Executed 1041 tests, with 50 tests skipped and 0 failures`；捕获 `CAPTURED 182 -> /tmp/r389_shots`，与 R388 逐张比 `变了=0`，帧基线 `COMPARED=182 CHANGED=0`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；换装 `INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条目 381=381；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 388`）。
+
+本轮做了什么：
+① ⓪ 网络：push 被 SSH 拒，同分钟 `api=000` / `apple=200` ⇒ `PUSH_BLOCKED=network`；未推送，CI 多跑未读。
+② 产品位：复位九根滑杆收进 `withAnimation(.slider)` 的产品 helper；按钮与胶片同一条路。
+③ 判据：源守卫 + 真值表 + M1020/M1021；两倍率胶片 ≥2 帧；strip 两张。
+④ 对比：快捷键页直接量到亮 2.92 / 暗 4.38，M1022 咬地板；R388 的 M1019 仍咬权重页。
+⑤ 367：hidden 表 231 / 可判 816 / rot 0 / 上界 0；预检 144/127/398/0。
+⑥ 验证：build 0 告警；全量 `1041/50/0`；捕获 182 帧、静态零变化；换装 ok；清账表 162=162；新开 BACKLOG 436。
+
+验证读数（现读）：`WEIGHTS_RESET_SCALE` 2x `27/5/0.0201`、1x `27/13/0.0123`；`RESET_FADE_SCALE` 2x `27/3/0.0123`、1x `27/4/0.0181`；`SHORTCUT_RESET_STATE` 亮 禁用 `2.92` / 暗 `4.38`；`M1020/M1021/M1022` 全 CAUGHT；`HIDDEN_ARMS … rot=0 … 处置=ok`。
+
+NOT-RUN / 阻塞（分开写）：① **`PUSH_BLOCKED=network`**：push 被 SSH 拒 + `api=000`（LibreSSL SSL_ERROR_SYSCALL）/ `apple=200`；本地 ahead=11；② `40234023212 ↔ d38ea10`、`40234058148 ↔ 5c7814e` 与 R387/R388 本地提交的 conclusion **未读**（网络）；③ 亮档真机腿仍没跑；④ 胶片采样臂在无 `CLIPBOARD_HISTORY_UI_MOTION=1` 的卷里具名 skip（全量 50 skip 的一部分），本轮的 2x/1x 读数来自单独开的 motion 卷；⑤ BACKLOG 436：`settings-reset-fade` 未进 motion 地板名册，下一次带 motion 的 CI 会报 `MOTION_FLOOR_UNLISTED_SCENARIO`，本轮无 runner 读数不修。
+
+下一轮（R390）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 `40234023212`/`40234058148` 与 R387/R388/R389 推送那一跑的**全部失败步骤**，把 run↔commit 成对写回本行；按 BACKLOG 436 先读 CI motion 卷，再决定第五臂 `must_judge` 并一次性改 JSON 与自测；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 回产品动效面再点一个真实位；R389 的复位过程可用 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 `testWeightsResetSliderSamplerReadsBothScales` 复跑。
+
 ## R388 状态（2026-10-26 · 本地 · 第 387 轮 / Round 385）：禁用「恢复默认」被 R387 的 opacity 压到 1.88 → 自绘 primary↔secondary 样式（亮 2.77 / 暗 4.21）；两支按钮同一样式；M1019 咬地板（产品 3 文件，动效主线）
 
 最后更新：2026-10-26（本地 · R388 / 第 387 轮 / Round 385）：R387 的 wrapper `.opacity(0.55/0.70)` 会把禁用标签连同底色压暗；把 WCAG 对比尺接到两态帧后，改前那版亮档读到 1.88 / 1.98（中转读数，未入基线）。产品改成 `ResetDefaultButtonStyle`（`PressableStyle.swift`）：`@Environment(\.isEnabled)` 驱动 `primary ↔ secondary` 与 `primary.opacity(0.08/0.035)`，`.selection` 过渡挂在 `isEnabled` 上，按下仍 0.98；快捷键页与权重页共用。现读亮档禁用 **2.77** / 动过 **5.48**，暗档禁用 **4.21** / 动过 **8.06**；`M1019`（secondary→tertiary）被 2.2 地板抓住，`M1016`/`M1017` 删样式都 CAUGHT。胶片复验：2x `帧数=27 过渡帧数=3 峰值=0.0123`、1x `帧数=27 过渡帧数=4 峰值=0.0181`（声明 120ms），通用场景 `过渡帧数=3`；端态 182 帧 `same=168 changed=14`，帧基线 `COMPARED=182 CHANGED=0`。`swift build --build-tests` 告警 **0**；全量 `Executed 1038 tests, with 49 tests skipped and 0 failures`；清账表 `MOTION_LEDGER 表面=18 状态=9 格子=162 行数=162 已清账=162 未清账=0 地板=162`；预检 `tables=142 covered=125 arms=395 bad=0`、全仓 235 文件 / 879 把；`HIDDEN_ARMS … rot=0 上界=0 处置=ok`；产品面连续零改动 **1** 轮（现读 `python3 scripts/product_streak.py --streak-for 387` 的 streak，口径差一仍挂 BACKLOG 412）。

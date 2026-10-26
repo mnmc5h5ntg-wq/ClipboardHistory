@@ -145,6 +145,47 @@ final class MotionDriverTests: XCTestCase {
                        "根本没有按钮也被判成驱动 ⇒ 尺在量错对象")
     }
 
+    /// R389：权重复位必须走 `resetDefaults(in:)` 那一条路 —— 按钮和胶片都调它，
+    /// 而它把 `store.restoreDefaults()` 包在 `.slider` 位移档里。直接调 store 会让九根滑杆瞬移。
+    static func weightsResetIsAnimated(in code: String) -> Bool {
+        let compact = code.split(whereSeparator: \.isWhitespace).joined()
+        let helper = "staticfuncresetDefaults(instore:RecommendationWeightsStore){"
+            + "withAnimation(MotionCatalog.animation(for:.slider)){store.restoreDefaults()}}"
+        let call = #"Button("恢复默认"){Self.resetDefaults(in:store)}"#
+        let direct = "store.restoreDefaults()"
+        let occurrences = compact.components(separatedBy: direct).count - 1
+        return compact.contains(helper) && compact.contains(call) && occurrences == 1
+    }
+
+    func testWeightsResetGoesThroughOneAnimatedPath() throws {
+        let weights = Self.stripCommentLines(try productSource(named: "Views/RecommendationWeightsView.swift"))
+        XCTAssertTrue(Self.weightsResetIsAnimated(in: weights),
+                      "权重复位没有走 `Self.resetDefaults(in:)`（或那条路没包 `withAnimation(.slider)`）"
+                          + " ⇒ 九根滑杆会在按钮色变时瞬移")
+    }
+
+    func testWeightsResetPathScanIsATruthTable() {
+        let helper = """
+            static func resetDefaults(in store: RecommendationWeightsStore) {
+                withAnimation(MotionCatalog.animation(for: .slider)) {
+                    store.restoreDefaults()
+                }
+            }
+            """
+        let button = #"Button("恢复默认") { Self.resetDefaults(in: store) }"#
+        XCTAssertTrue(Self.weightsResetIsAnimated(in: helper + "\n" + button))
+        XCTAssertFalse(Self.weightsResetIsAnimated(in: """
+            static func resetDefaults(in store: RecommendationWeightsStore) {
+                store.restoreDefaults()
+            }
+            """ + "\n" + button),
+                       "helper 里没有 `withAnimation` 也算动画 ⇒ 这条尺只认名字、不认过程")
+        XCTAssertFalse(Self.weightsResetIsAnimated(in: helper + "\n" + #"Button("恢复默认") { store.restoreDefaults() }"#),
+                       "按钮绕过 helper 直接改 store 也算过 ⇒ 胶片与产品就不再是同一条路")
+        XCTAssertFalse(Self.weightsResetIsAnimated(in: #"Text("恢复默认")"#),
+                       "根本没有按钮也被判成复位 ⇒ 尺在量错对象")
+    }
+
     /// 上面那两条尺自己的真值表（不门控、不开窗口 ⇒ CI 每轮都跑）。
     func testReceiptGateScanIsATruthTable() {
         // ① `if let 局部 = 状态 {` ⇒ 门控里认的是**状态**；局部名当键是**假驱动**。

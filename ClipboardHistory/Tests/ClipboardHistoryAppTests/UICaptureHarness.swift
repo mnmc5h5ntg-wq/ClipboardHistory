@@ -13523,7 +13523,7 @@ final class UICaptureTests: XCTestCase {
             }
         }
 
-        struct Reading { let fill: Int; let ink: Int; let maxDev: Int }
+        struct Reading { let fill: Int; let ink: Int; let maxDev: Int; let contrast: Double }
         func reading(_ rep: NSBitmapImageRep) -> Reading {
             let scale = Double(rep.pixelsWide) / 720.0
             // 语义带：右侧按钮列（x 600..700、y 100..310）。快捷录制器在 x≈480..545，
@@ -13531,7 +13531,7 @@ final class UICaptureTests: XCTestCase {
             let rect = CGRect(x: 600, y: 100, width: 100, height: 210)
             let x0 = Int(rect.minX * scale), x1 = Int(rect.maxX * scale)
             let y0 = Int(rect.minY * scale), y1 = Int(rect.maxY * scale)
-            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0) }
+            guard let base = rep.bitmapData else { return Reading(fill: 0, ink: 0, maxDev: 0, contrast: 0) }
             var values: [Int] = []
             for y in y0..<y1 {
                 for x in x0..<x1 {
@@ -13544,7 +13544,18 @@ final class UICaptureTests: XCTestCase {
             for v in values { hist[v / 4, default: 0] += 1 }
             let fill = (hist.max { $0.value < $1.value }?.key ?? 0) * 4 + 2
             let devs = values.map { abs($0 - fill) }
-            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0)
+            // R389：R388 的 2.2 地板只量了权重页；这一页三颗按钮共用同一支样式，
+            // 但材质底不同 ⇒ 直接量。默认页三颗都禁用，读到的是**禁用标签**的对比。
+            let inkValues = values.filter { abs($0 - fill) > 40 }
+            let meanInk = inkValues.isEmpty ? fill : inkValues.reduce(0, +) / inkValues.count
+            func rel(_ v: Int) -> Double {
+                let x = Double(v) / 255
+                return x <= 0.03928 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+            }
+            let a = rel(meanInk), b = rel(fill)
+            let contrast = (max(a, b) + 0.05) / (min(a, b) + 0.05)
+            return Reading(fill: fill, ink: devs.filter { $0 > 40 }.count, maxDev: devs.max() ?? 0,
+                           contrast: contrast)
         }
 
         func rep(_ name: String, _ appearance: NSAppearance.Name, _ custom: HotKeyShortcut?) throws -> NSBitmapImageRep {
@@ -13600,8 +13611,8 @@ final class UICaptureTests: XCTestCase {
             }
             let off = reading(offRep)
             let on = reading(onRep)
-            emit("SHORTCUT_RESET_STATE \(tag) 默认 fill=\(off.fill) 墨=\(off.ink) 最大偏离=\(off.maxDev)"
-                 + " | 改过 fill=\(on.fill) 墨=\(on.ink) 最大偏离=\(on.maxDev)")
+            emit("SHORTCUT_RESET_STATE \(tag) 默认 fill=\(off.fill) 墨=\(off.ink) 最大偏离=\(off.maxDev) 对比=\(String(format: "%.2f", off.contrast))"
+                 + " | 改过 fill=\(on.fill) 墨=\(on.ink) 最大偏离=\(on.maxDev) 对比=\(String(format: "%.2f", on.contrast))")
             XCTAssertGreaterThan(on.ink, 0,
                                  "\(tag)：改过快捷键那一页里三颗「恢复默认」一个墨都没读到 ⇒ 正对照没有对象")
             XCTAssertGreaterThan(on.maxDev, off.maxDev + 20,
@@ -13610,6 +13621,9 @@ final class UICaptureTests: XCTestCase {
                                      + "或者有人把 `HotKeySettingsRow` 的 `.disabled(...)` 拿掉了")
             XCTAssertLessThanOrEqual(off.ink, on.ink,
                                      "\(tag)：默认页标签墨 \(off.ink) 多于改过页 \(on.ink) ⇒ 取样带压错对象")
+            XCTAssertGreaterThanOrEqual(off.contrast, 2.2,
+                                        "\(tag)：快捷键页禁用标签对按钮底只有 \(String(format: "%.2f", off.contrast)):1"
+                                            + "（地板 2.2）⇒ 三颗按钮共用的 `ResetDefaultButtonStyle` 在这一页读不出禁用标签")
         }
     }
 

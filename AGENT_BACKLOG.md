@@ -8755,3 +8755,8 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **435. tier-profile 的墨 gate 抬高只会 skip：skip 把「尺坏了」和「机器画不出」压成同形**（R386 现读）
     现场：把 `testSettingsCaptionRowTierProfileDiagnostic` 里那次 `inkSideCounts(..., gate: 8)` 抬到 250，测试**全绿跳过**（`ROWTIER_NOT_RUN`），不是红。也就是说这条探针的「这台机器画不出」出口没有负半证人：真的把读数阈值弄坏，也会从同一个出口溜走。
     修法：给 skip 出口加一个**反向**前提——同一张帧上必须存在至少一处能读出的墨（例如页眉或开关标签），否则不是「整页平涂」而是「尺坏了」，必须红；并用一支把 gate 抬到 250 的刀作证它红。这与 174 / 331 那族「出口要能说不」同源。
+
+**436. 新胶片场景没进地板登记：CI 的 Motion coverage floor 会对 settings-reset-fade 报 UNLISTED**（R389 现读）
+    现场：R387 把 `settings-reset-fade` 加进 `Scenario.all()`，于是完整 motion 卷的 `MOTION_SUMMARY` 有 5 个臂；而 `scripts/motion_floor_expectations.json` 的 `scenarios` / `arms` 仍停在 4 个 ⇒ `motion_floor_gate.py` 的 `MOTION_FLOOR_UNLISTED_SCENARIO` 会在下一次带 `CLIPBOARD_HISTORY_UI_MOTION=1` 的 CI 上报红。网络断以来没有 runner 卷，所以这件事没被看见。
+    为什么本轮不直接修：把登记扩到 5 臂要同步改 `test_motion_floor_gate.py` 的 `SUMMARY`、地板 3→4、以及历史夹具（缺新臂会多出 `MISSING_KEY`）三处；而第五臂的 `must_judge` 还没有 runner 读数。现在把它写成 `true` 是拿本机读数替 runner 许愿，写成 `false` 又得编一个不存在的 run 号。
+    修法（下一轮，push 恢复后）：先读 CI motion 卷的 `MOTION_SUMMARY` 与 `MOTION_RESOLVE_SUMMARY`，按实测给第五臂定 `must_judge`，再一次性改 JSON 与自测；**不许**用删场景或让闸门忽略清单外臂来消红。R389 的 `settings-weights-reset-sliders` 只跑专用两倍率判据、暂不进 `Scenario.all()`，同一个理由。

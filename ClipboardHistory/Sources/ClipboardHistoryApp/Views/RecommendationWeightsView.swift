@@ -46,7 +46,7 @@ struct RecommendationWeightsView: View {
 
                     HStack(spacing: 0) {
                         Button("恢复默认") {
-                            store.restoreDefaults()
+                            Self.resetDefaults(in: store)
                         }
                     // R382：权重全默认时这颗按钮点了不产生任何变化 —— 禁用态是它唯一诚实的呈现。
                     // 判据不是「有没有写 .disabled」，而是同一颗按钮在默认/动过两帧里的**标签墨**
@@ -89,6 +89,15 @@ struct RecommendationWeightsView: View {
                 }
             }
             .settingsCardInset()
+        }
+    }
+
+    /// R389：一次复位会同时搬动九根滑杆。按钮自己那点色变已经在演，滑杆却瞬移 ⇒
+    /// 两件事说的是「一次操作」和「九次跳变」。把复位收进同一条位移档：胶片现读 2x 过渡 5 帧、
+    /// 1x 过渡 13 帧（声明 200ms），直接拖滑杆不走这条路、不会拖出延迟。
+    static func resetDefaults(in store: RecommendationWeightsStore) {
+        withAnimation(MotionCatalog.animation(for: .slider)) {
+            store.restoreDefaults()
         }
     }
 }
