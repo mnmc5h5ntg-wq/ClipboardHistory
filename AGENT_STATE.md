@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R423 状态（2026-10-27 · 本地 · 第 422 轮 / Round 420）：搜索无结果态补放大镜与查询词（新标题带词、旧「无匹配结果」；组件带 7790→8841 墨、128→264 宽）；R422 跑全绿（静态对照 28800、空态 4 帧 151/16→1279/28）；本地全量 5 条滚动红具名会话/顺序 NOT-RUN（产品 2 文件，搜索无结果态）
+
+最后更新：2026-10-27（本地 · R423 / 第 422 轮 / Round 420）：搜索无结果态以前画剪贴板、只说「无匹配结果」。新 `SearchNoResultsPresentation`：真 miss 画 `magnifyingglass`、标题「没有找到「查询词」」（空白归一、24 字截断）；收藏空仍「暂无收藏」+剪贴板、无历史仍「暂无剪贴板历史」；R407 的「清除搜索」CTA 不动；侧栏只消费 policy，旧 `emptyTitle` 删除。真看图 `sidebar-no-results` 是放大镜+查询词+清除搜索；组件旧/新 250×220：旧墨 **7790/8030**、新 **8841/9234**、变化 **9360/9880**、墨宽 **128→264**（2x）。产品 `content-no-results`/`sidebar-no-results` 亮暗 **4 帧变化** + 组件 4 帧新增，基线 **226/0/0/0**。`M1115–M1118` **4/4 CAUGHT**（M1115 图标恒剪贴板；M1116 不写词；M1117 不截断；M1118 侧栏硬编码）；一次给滚动测试加 key 窗口的自伤已整段回滚（`SelectionRevealAnimationTests.swift` 零 diff）。R422 run `40453992908 ↔ 4123793` **success、失败步骤 0**：静态对照 `起→中=28800 中→落=14510 重抓=no`、空态 4 帧 `151/16→1279/28`（runner 1x）、floor `judged=4/5 executed=76 not-run=notice-banner`、`SUITE_CLEAN=0`、无 unlisted ⇒ **436 REDS=0**。本地全量 **1127/57/5**：5 条全在 `SelectionRevealAnimationTests`，同一份代码单跑（caffeinate -u 唤醒后）8 中间值/末 1438、静态通过，R422 CI 绿 ⇒ 具名 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449，不改门槛）；捕获 **226/131/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 270/909 rot=0；预检 183/165/491 bad=0；产品面连续零改动 **1** 轮（as-of 422，现读 `python3 scripts/product_streak.py --streak-for 422`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R422 跑全绿（静态对照 28800、重抓=no；空态 4 帧 151/16→1279/28；floor judged=4/5 executed=76；无 unlisted）。
+② 产品：搜索无结果态补放大镜+查询词（组件 7790→8841 墨、128→264 宽），产品 4 帧变化 + 组件 4 帧，基线 226。
+③ 判据：M1115–M1118 4/4；precheck 183/165/491；hidden rot 0；key 窗口自伤已回滚。
+④ 436：judged=4/5 executed=76、SUITE_CLEAN=0、notice-banner 放行；REDS=0。
+⑤ 367：hidden 表 270 / 可判 909 / rot 0 / 上界 0；ARM 276 文件 / 975 把。
+⑥ 捕获 226/131/4/0；换装 ok；清账 162=162；帧基线 226/0/0/0；本地全量 1127/57/5（5 条滚动红具名会话/顺序 NOT-RUN）。
+
+NOT-RUN / 阻塞（分开写）：① 本地全量的 5 条滚动/动画红（`LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`；单跑与 R422 CI 绿，449）；② markdown 2x / sidebar 2x / receipt 消失臂在 extended；③ 真机/多屏面板落点无截屏（447）；④ skeleton 套件内偶发；⑤ 真菜单栏表面、12 实时腿；⑥ `REVEAL`/`INTAKE_READING`、`MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 缺行；⑦ `table-lazy-rows`；⑧ 设置能力闸门仍隐式（441）；⑨ 437–449 仍开；⑩ R423 新跑待 push 后读。
+
+下一轮（R424）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R423 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看搜索无结果 4 帧与旧/新组件在 runner 上、floor REDS=0、以及滚动测试在 CI 是否全绿（本地整卷红是会话/顺序，449）；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R422 状态（2026-10-27 · 本地 · 第 421 轮 / Round 419）：列表空态补叠卡插画（字形 482 墨/28px → 插画 4649 墨/52px；content-empty 2 帧变化 + 新增 4 帧，基线 222）；R421 跑唯一红＝静态文档滚动正对照中段帧抢在重绘前（249/24000），重抓 + 具名 NOT-RUN，地板不动（产品 2 文件，列表空态插画位）
 
 最后更新：2026-10-27（本地 · R422 / 第 421 轮 / Round 419）：侧栏「暂无剪贴板历史」以前是一颗 28pt 字形。新 `EmptyStateIllustration`：背卡右上错开 9pt、前卡玻璃 + 发丝边、内嵌剪贴板字形；`EmptyStateView` 增加 `illustration: Bool = false`，侧栏只在 `historyStore.entries.isEmpty` 时传 true（无匹配/收藏空保持字形）；空态无动画。真看图：组件与 `content-empty` 产品帧都显示叠卡 + 标题。同带（250×220 上半 110pt）字形 **482/483 墨、盒高 28px**；插画 **4649 墨、盒高 52px**（9.6×，盒高 +12pt）。新增 4 帧 + `content-empty` 2 帧变化，基线 **222/0/0/0**。`M1113/M1114` **2/2 CAUGHT**；三条令牌守卫抓了第一版（hover 令牌直读 / 硬写 `.secondary` / 就地字号），已改为 `VisualTint.chipStroke` 派生、`StatePresentation.iconStyle(for: .empty)`、`VisualGlyph.emptyCompact * 0.72`。R421 run `40448188618 ↔ 8dbfa54` **failure**，失败步骤 **1 个**（`Swift tests`）：**Motion floor 绿**（`judged=5/5 executed=76`、`OK=5/5`、`SUITE_CLEAN=0`；markdown 1x=2；`markdown-2x`/`receipt-dismiss-CI` 具名；`PANEL_ORIGIN 旧=(0,59) 新=(290,200)` 在 CI 执行并绿）；唯一红是静态文档滚动**正对照**中段帧抢在重绘前：`起→中=249 中→落=24000`（原点 0→80→600，地板 500）⇒ 中段低于地板时在动画中段重抓一次；重抓仍低则具名 `STATIC_SCROLL_CHANNEL_NOT_RUN=mid-frame-race`（地板不动）。全量 **1123/56/0**；捕获 **222/130/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 268/905 rot=0；预检 181/163/487 bad=0；产品面连续零改动 **1** 轮（as-of 421，现读 `python3 scripts/product_streak.py --streak-for 421`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

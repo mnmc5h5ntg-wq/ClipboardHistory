@@ -7644,3 +7644,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：`content-empty` 两帧变化、新增 4 帧组件帧；基线 222。其它空态不变。
 - 回滚：删 `EmptyStateIllustration` 与 `illustration` 参数即可；或 `git revert` 本轮提交。
 
+## D-419 搜索无结果态用放大镜并把查询词写进标题（R423）
+
+- 背景：所有空态共用 `clipboard` 图标与「无匹配结果」；搜不到时画剪贴板、也不告诉用户哪个词没找到。
+- 决定：`SearchNoResultsPresentation` 纯函数：真 miss（有记录、非收藏空、查询词非空）→ `magnifyingglass` + 「没有找到「查询词」」；查询词两端空白归一、超过 24 字截断加省略号；收藏为空仍「暂无收藏」+ 剪贴板，无历史仍「暂无剪贴板历史」；侧栏只消费 policy，旧 `emptyTitle` 删除。R407 的「清除搜索」CTA 不变。
+- 理由：无结果是"搜不到"，不是"还没有"；把词写回去用户才知道是哪个词；截断防止 250pt 侧栏标题挤出多行；收藏空是状态，不该被查询词改写。
+- 兼容性/迁移：`content-no-results`/`sidebar-no-results` 亮暗 4 帧变化，新增组件 4 帧，基线 226；其它空态（无历史插画、详情空态）不变。
+- 回滚：删 `SearchNoResultsPresentation` 并恢复 `emptyTitle` 即可；或 `git revert` 本轮提交。
+

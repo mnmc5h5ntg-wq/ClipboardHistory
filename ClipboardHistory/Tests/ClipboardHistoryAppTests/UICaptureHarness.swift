@@ -3236,6 +3236,81 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R423：搜索无结果态必须画放大镜并把查询词写进标题：
+    /// 旧臂（剪贴板 + 无匹配结果）与新臂同一尺寸、同一 CTA ⇒ 差全来自图标与标题。
+    func testSearchNoResultsShowsTheQueryAndAMagnifier() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r423-search-empty-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let beforeFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "search-empty-before" }),
+                  let afterFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "search-empty-after" }) else {
+                return XCTFail("\(tag)：search-empty-before/after 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [beforeFixture, afterFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let before = reps["search-empty-before"], let after = reps["search-empty-after"],
+                  before.pixelsWide == after.pixelsWide, before.pixelsHigh == after.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let corner = before.colorAt(x: 0, y: 0)
+            var beforeInk = 0, afterInk = 0, changed = 0
+            var beforeBox = (minX: Int.max, minY: Int.max, maxX: -1, maxY: -1)
+            var afterBox = (minX: Int.max, minY: Int.max, maxX: -1, maxY: -1)
+            for y in 0..<before.pixelsHigh {
+                for x in 0..<before.pixelsWide {
+                    guard let a = before.colorAt(x: x, y: y),
+                          let b = after.colorAt(x: x, y: y),
+                          let c = corner else { continue }
+                    let da = abs(a.redComponent - c.redComponent)
+                        + abs(a.greenComponent - c.greenComponent)
+                        + abs(a.blueComponent - c.blueComponent)
+                    if da > 0.01 {
+                        beforeInk += 1
+                        beforeBox.minX = min(beforeBox.minX, x); beforeBox.maxX = max(beforeBox.maxX, x)
+                        beforeBox.minY = min(beforeBox.minY, y); beforeBox.maxY = max(beforeBox.maxY, y)
+                    }
+                    let db = abs(b.redComponent - c.redComponent)
+                        + abs(b.greenComponent - c.greenComponent)
+                        + abs(b.blueComponent - c.blueComponent)
+                    if db > 0.01 {
+                        afterInk += 1
+                        afterBox.minX = min(afterBox.minX, x); afterBox.maxX = max(afterBox.maxX, x)
+                        afterBox.minY = min(afterBox.minY, y); afterBox.maxY = max(afterBox.maxY, y)
+                    }
+                    let d = abs(a.redComponent - b.redComponent)
+                        + abs(a.greenComponent - b.greenComponent)
+                        + abs(a.blueComponent - b.blueComponent)
+                    if d > 0.01 { changed += 1 }
+                }
+            }
+            let beforeWidth = beforeBox.maxX - beforeBox.minX + 1
+            let afterWidth = afterBox.maxX - afterBox.minX + 1
+            let scale = Double(before.pixelsWide) / 250.0
+            emit("SEARCH_NO_RESULTS \(tag) 前墨=\(beforeInk) 后墨=\(afterInk) 变化=\(changed) "
+                 + "前宽=\(beforeWidth) 后宽=\(afterWidth)")
+            XCTAssertGreaterThan(beforeInk, 50, "\(tag)：旧臂没有墨 ⇒ 这一格没有对象")
+            XCTAssertGreaterThan(afterInk, beforeInk, "\(tag)：新臂墨不比旧臂多 ⇒ 查询词没排进标题")
+            XCTAssertGreaterThan(changed, Int(200 * scale * scale),
+                                 "\(tag)：两臂只差 \(changed) 像素 ⇒ 图标/标题没有换")
+            XCTAssertGreaterThan(afterWidth, beforeWidth + Int(20 * scale),
+                                 "\(tag)：新标题没有更宽（\(afterWidth) vs \(beforeWidth)）⇒ 查询词没写进去")
+        }
+    }
+
     /// R418：13+ 菜单栏标签的暂停斜杠只在暂停时出现；glyph 本身两态都在。
     /// 真菜单栏由系统合成，这一格拍的是**标签视图本身**（真表面具名 NOT-RUN）。
     func testMenuBarPauseMarkAppearsOnlyWhenPaused() throws {
@@ -6097,6 +6172,27 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("empty-state-illustration", NSSize(width: 250, height: 220)) {
             AnyView(EmptyStateView(systemName: "clipboard", title: "暂无剪贴板历史",
                                    illustration: true)
+                .frame(width: 250, height: 220)
+                .background(Color(nsColor: .windowBackgroundColor)))
+        })
+
+        // R423：搜索无结果态的旧/新对照。旧臂是历史文案（剪贴板图标 + 无匹配结果），
+        // 新臂走产品 policy（放大镜 + 「没有找到「查询词」」），CTA 两臂相同。
+        results.append(Fixture("search-empty-before", NSSize(width: 250, height: 220)) {
+            AnyView(EmptyStateView(systemName: "clipboard", title: "无匹配结果",
+                                   actionTitle: "清除搜索", action: {})
+                .frame(width: 250, height: 220)
+                .background(Color(nsColor: .windowBackgroundColor)))
+        })
+        results.append(Fixture("search-empty-after", NSSize(width: 250, height: 220)) {
+            let query = "不存在的词"
+            return AnyView(EmptyStateView(
+                systemName: SearchNoResultsPresentation.iconName(
+                    entriesEmpty: false, isFavoritesFilter: false,
+                    favoriteCount: 0, searchText: query),
+                title: SearchNoResultsPresentation.title(entriesEmpty: false, isFavoritesFilter: false,
+                                                         favoriteCount: 0, searchText: query),
+                actionTitle: "清除搜索", action: {})
                 .frame(width: 250, height: 220)
                 .background(Color(nsColor: .windowBackgroundColor)))
         })

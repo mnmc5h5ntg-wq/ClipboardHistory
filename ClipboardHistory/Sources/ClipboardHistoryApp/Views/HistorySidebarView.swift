@@ -34,8 +34,16 @@ struct HistorySidebarView: View {
 
             if historyStore.filteredEntries.isEmpty {
                 EmptyStateView(
-                    systemName: "clipboard",
-                    title: emptyTitle,
+                    systemName: SearchNoResultsPresentation.iconName(
+                        entriesEmpty: historyStore.entries.isEmpty,
+                        isFavoritesFilter: historyStore.filter == .favorites,
+                        favoriteCount: historyStore.favoriteCount,
+                        searchText: historyStore.searchText),
+                    title: SearchNoResultsPresentation.title(
+                        entriesEmpty: historyStore.entries.isEmpty,
+                        isFavoritesFilter: historyStore.filter == .favorites,
+                        favoriteCount: historyStore.favoriteCount,
+                        searchText: historyStore.searchText),
                     illustration: historyStore.entries.isEmpty,
                     // "无匹配结果"必须给下一步（审计 §4 U-5 的那句"说清发生了什么 + 说清下一步"）：
                     // 用户搜不出东西时，最该出现的不是"这里空着"，而是"把搜索词清掉"。
@@ -182,16 +190,6 @@ struct HistorySidebarView: View {
         } else {
             base
         }
-    }
-
-    private var emptyTitle: String {
-        if historyStore.entries.isEmpty {
-            return "暂无剪贴板历史"
-        }
-        if historyStore.filter == .favorites {
-            return historyStore.favoriteCount == 0 ? "暂无收藏" : "无匹配结果"
-        }
-        return "无匹配结果"
     }
 
     /// 历史列表（第三轮审计 D-1，最终形态见账本 D-034）。
