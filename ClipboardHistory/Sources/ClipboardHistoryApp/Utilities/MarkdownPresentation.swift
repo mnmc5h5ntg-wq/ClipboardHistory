@@ -97,6 +97,13 @@ enum MarkdownPresentation {
     /// 从字形几何反推"这是引用"会把列表续行认成引用（两类缩进本来就不是一件事）。
     static let quoteDepthAttribute = NSAttributedString.Key("ClipboardHistory.markdownQuoteDepth")
 
+    /// 代码块的行数（只打在块正文上，不含块后的分隔空行）：正文视图按它在左侧槽里画行号。
+    static let codeBlockLineCountAttribute = NSAttributedString.Key("ClipboardHistory.markdownCodeLineCount")
+
+    static func blockText(_ block: MarkdownBlock) -> String {
+        block.runs.map(\.text).joined()
+    }
+
     /// 段落首行缩进：引用层数 × 引用缩进 + 列表深度 × 项目符宽度。
     static func firstLineHeadIndent(for block: MarkdownBlock) -> CGFloat {
         CGFloat(block.quoteDepth) * quoteIndent
@@ -312,16 +319,25 @@ enum MarkdownPresentation {
                                         range: NSRange(location: start, length: header.length))
                 }
             }
+            // R441：代码块的行数只打在块正文上（不含分隔空行），正文视图按它在左槽里画行号。
+            if case .codeBlock = block.kind {
+                let content = (result.string as NSString).substring(with: NSRange(location: start,
+                                                                                 length: blockContentLength))
+                let lineCount = CodeBlockLineNumbers.lineCount(in: content)
+                if lineCount > 0 {
+                    result.addAttribute(codeBlockLineCountAttribute, value: lineCount,
+                                        range: NSRange(location: start, length: blockContentLength))
+                }
+            }
             // 导引线属性与段落缩进覆盖同一个范围（含块后的分隔空行）：
             // 相邻两个同级引用块因此天然连成一条线，空白行不会把线切断。
             if block.quoteDepth > 0 {
                 result.addAttribute(quoteDepthAttribute, value: block.quoteDepth, range: range)
             }
-            if appliesWideContentBackground(to: block), range.length > 1 {
-                // 灰底止于内容最后一行：分隔用的那个空行不涂，否则两个宽内容块会连成一块灰斑。
-                result.addAttribute(.backgroundColor, value: codeBackground,
-                                    range: NSRange(location: range.location, length: range.length - 1))
-            }
+            // R441：宽底不再由属性串背。`.backgroundColor` 是按字形段画的，代码块的最后一行
+            // 没有换行符时底色只到最后一个字（帧上是锯齿灰带）；改由正文视图按行片段画**通栏**，
+            // 见 `ChineseSelectableNSTextView.drawCodeBlockBackgrounds`。谓词
+            // `appliesWideContentBackground` 仍是"这一块要不要宽底"的唯一策略。
         }
         if document.isTruncated {
             let start = result.length

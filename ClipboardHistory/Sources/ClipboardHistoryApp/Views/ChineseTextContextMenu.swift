@@ -441,7 +441,93 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     /// 留的正是这一层（`NSTextView` 的 `draw(_:)` 先调它，再画字形与选区）。
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
+        drawCodeBlockBackgrounds(in: rect)
         drawQuoteRules(in: rect)
+        drawCodeLineNumbers(in: rect)
+    }
+
+    /// 代码块的通栏底色：按每个行片段铺满正文列宽，**止于最后一行**（不再涂块后的分隔空行）。
+    /// 这件事不能再交给属性串的 `.backgroundColor`：它是按字形段画的，最后一行没有换行符时
+    /// 只涂到最后一个字，帧上是一条锯齿灰带（R441 的 `detail-code` 实拍）。
+    private func drawCodeBlockBackgrounds(in rect: NSRect) {
+        guard let layoutManager, let textContainer, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let width = textContainer.size.width
+        guard width.isFinite, width > 0 else { return }
+        MarkdownPresentation.codeBackground.setFill()
+        let all = NSRange(location: 0, length: textStorage.length)
+        textStorage.enumerateAttribute(MarkdownPresentation.codeBlockLineCountAttribute, in: all) { value, range, _ in
+            guard let lineCount = value as? Int, lineCount > 0 else { return }
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { lineRect, _, _, _, _ in
+                let fillRect = CGRect(x: origin.x,
+                                      y: origin.y + lineRect.minY,
+                                      width: width,
+                                      height: lineRect.height)
+                let clipped = fillRect.intersection(rect)
+                guard !clipped.isNull, !clipped.isEmpty else { return }
+                clipped.fill()
+            }
+        }
+    }
+
+    /// 代码块左侧外边距里的行号。正文照旧从容器原点起排，行号右对齐到原点左 3pt；
+    /// 行号不进文本存储，复制/搜索都拿不到这些数字。
+    ///
+    /// 每个代码块整块枚举一次（不按可见段切）：行号必须从 1 数起，
+    /// 而"可见段从第几行开始"要先知道块起点；块的排版本来就在画这一屏时做过了。
+    /// 逻辑行起点靠"前一个字符是换行"判定 —— 自动折行的续片不占一个新行号。
+    private func drawCodeLineNumbers(in rect: NSRect) {
+        guard let layoutManager, let textContainer, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let all = NSRange(location: 0, length: textStorage.length)
+        textStorage.enumerateAttribute(MarkdownPresentation.codeBlockLineCountAttribute, in: all) { value, range, _ in
+            guard let lineCount = value as? Int, lineCount > 0 else { return }
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let blockRect = layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            guard blockRect.intersects(rect) else { return }
+            let font = CodeBlockLineNumbers.font(forLineCount: lineCount)
+            let numberAttributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: CodeBlockLineNumbers.color
+            ]
+            var line = 0
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { lineRect, _, _, glyphRange, _ in
+                let charRange = layoutManager.characterRange(forGlyphRange: glyphRange,
+                                                             actualGlyphRange: nil)
+                let isLogicalStart: Bool
+                if charRange.location == range.location {
+                    isLogicalStart = true
+                } else if charRange.location > range.location {
+                    let previous = (textStorage.string as NSString).character(at: charRange.location - 1)
+                    isLogicalStart = previous == 0x0A
+                } else {
+                    isLogicalStart = false
+                }
+                guard isLogicalStart else { return }
+                line += 1
+                let numberText = "\(line)" as NSString
+                let numberHeight = numberText.size(withAttributes: numberAttributes).height
+                let point = CodeBlockLineNumbers.numberOrigin(
+                    containerOriginX: origin.x,
+                    line: line,
+                    font: font,
+                    lineTop: origin.y + lineRect.minY,
+                    lineHeight: lineRect.height,
+                    numberHeight: numberHeight
+                )
+                let numberWidth = numberText.size(withAttributes: numberAttributes).width
+                let numberRect = CGRect(x: point.x,
+                                        y: origin.y + lineRect.minY,
+                                        width: numberWidth,
+                                        height: lineRect.height)
+                guard numberRect.intersects(rect) else { return }
+                numberText.draw(at: point, withAttributes: numberAttributes)
+            }
+        }
     }
 
     /// 只枚举**可见字符**：`boundingRect(forGlyphRange:)` 会强制那一截排版，

@@ -425,24 +425,28 @@ final class Round4MarkdownTests: XCTestCase {
                       "代码块的灰底是它唯一的块边界，撤掉就没有边界了")
         XCTAssertFalse(MarkdownPresentation.appliesWideContentBackground(to: table),
                        "表格又吃灰底 ⇒ 和代码块同形，渲染模式把数据表说成源码")
-        // 谓词说了不算：读**真产物**上那一行的 `.backgroundColor`。
+        // R441 起，宽底不再由属性串的 `.backgroundColor` 背：`.backgroundColor` 按字形段画，
+        // 代码块最后一行没换行符时只涂到字尾（帧上是锯齿灰带）⇒ 改由正文视图
+        // `drawCodeBlockBackgrounds` 按行片段画通栏。属性串现在只带"这是代码块、几行"的标记；
+        // 像素证人换成 `UICaptureTests.testCodeBlocksShowLineNumbers`（灰底覆盖三行 = 100%）。
         let doc = MarkdownDocument(blocks: [code, table], isTruncated: false)
         let out = MarkdownPresentation.attributedString(for: doc)
-        var sawCodeBackground = false
-        var sawTableWithoutBackground = false
-        out.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: out.length)) { value, range, _ in
+        var sawCodeMarker = false
+        var sawTableWithoutMarker = false
+        out.enumerateAttribute(MarkdownPresentation.codeBlockLineCountAttribute,
+                               in: NSRange(location: 0, length: out.length)) { value, range, _ in
             let text = (out.string as NSString).substring(with: range)
             if text.contains("let x = 1") {
-                XCTAssertEqual(value as? NSColor, MarkdownPresentation.codeBackground,
-                               "代码块那一行没拿到灰底 ⇒ 这条断言没在判它说的事")
-                sawCodeBackground = true
+                XCTAssertEqual(value as? Int, 1,
+                               "代码块那一行没拿到行数标记 ⇒ 视图不会给它画宽底")
+                sawCodeMarker = true
             }
             if text.contains("| 名称 | 数量 |") {
-                XCTAssertNil(value, "表格那一行仍被涂了底色 ⇒ 和代码块同形")
-                sawTableWithoutBackground = true
+                XCTAssertNil(value, "表格那一行仍带代码块标记 ⇒ 视图会给它涂灰底")
+                sawTableWithoutMarker = true
             }
         }
-        XCTAssertTrue(sawCodeBackground && sawTableWithoutBackground,
+        XCTAssertTrue(sawCodeMarker && sawTableWithoutMarker,
                       "两行都没在产物里露面 ⇒ 这一格是空判（枚举没覆盖到被测文本）")
         XCTAssertTrue(MarkdownPresentation.fontPlan(for: MarkdownInline(text: "| 名称 | 数量 |"), in: table)
                         .isMonospaced,

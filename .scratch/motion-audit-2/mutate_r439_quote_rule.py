@@ -12,8 +12,7 @@ MARK_NEEDLE='''            if block.quoteDepth > 0 {
                 result.addAttribute(quoteDepthAttribute, value: block.quoteDepth, range: range)
             }'''
 SIZE_NEEDLE='    static let leadingOffset: CGFloat = 5'
-DRAW_NEEDLE='''        super.drawBackground(in: rect)
-        drawQuoteRules(in: rect)'''
+DRAW_NEEDLE='        drawQuoteRules(in: rect)'
 MUTATIONS=[
  ("M1203","引用深度属性整块不写（线没有对象）",PRES,MARK_NEEDLE,
   '''            if block.quoteDepth > 0 {
@@ -22,7 +21,7 @@ MUTATIONS=[
  ("M1204","导引线右移到文字里（leadingOffset 5→25）",RULE,SIZE_NEEDLE,
   '    static let leadingOffset: CGFloat = 25',["MARKDOWN_QUOTE_RULE","没画出来"]),
  ("M1205","背景层不再调绘制（枚举一次都不跑）",VIEW,DRAW_NEEDLE,
-  '''        super.drawBackground(in: rect)''',["MARKDOWN_QUOTE_RULE","没画出来"]),
+  '        // 导引线不画',["MARKDOWN_QUOTE_RULE","没画出来"]),
 ]
 def read(p):
     with open(p,encoding="utf-8") as h: return h.read()

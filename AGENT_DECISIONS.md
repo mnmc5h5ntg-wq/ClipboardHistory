@@ -7805,3 +7805,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：字重差在极小字号/低分屏上可能更弱；runner 1x 读数待新跑（R441 ⓪）。
 - 回滚：删 `attributedString` 里的表头字体 post-pass 即可恢复旧帧；或 `git revert`。
 
+## D-437 代码块行号放正文列外侧，灰底改由视图画通栏（R441）
+
+- 背景：代码块没有行号，长脚本无法定位；属性串 `.backgroundColor` 按字形段画，最后一行无换行符时灰底只到字尾（锯齿带）。
+- 决定：新 `CodeBlockLineNumbers`（行数、右对齐、99 行内 11pt / 三位数 9pt）；行号画在正文列左外侧 20pt 外边距，右沿 = 容器原点 − 3pt，**正文不缩进**；灰底改由 `ChineseSelectableNSTextView.drawCodeBlockBackgrounds` 按行片段铺满正文列宽、止于最后一行；`MarkdownPresentation` 不再给代码块打 `.backgroundColor`，只留行数属性作为"这块要宽底 + 要行号"的标记。
+- 理由：外边距是详情列本来就有的空白，行号放那里不动正文、不改代码块的排版；行号不进文本存储，复制/搜索拿不到；视图画底可以做到通栏且止于最后一行。
+- 兼容性/迁移：只影响 Markdown 渲染路径；HTML 代码块没有行号（468）；三位数档只在纯函数里验（467）；帧变化 2 张旧帧 + 2 张新帧，基线 242→244。
+- 边界：行号的选中/滚动两态没有帧（469）；1000+ 行会超出 20pt 外边距。
+- 回滚：删 `drawCodeLineNumbers`/`drawCodeBlockBackgrounds` 两个调用即可恢复旧帧；或 `git revert`。
+

@@ -46,8 +46,8 @@ MUTATIONS = [
      "                .frame(maxWidth: .infinity, alignment: .center)",
      AXIS, "左轴最宽差"),
     ("M140", "正文带切掉首行（重犯我第一版的错）", "harness",
-     '("detail-0-text", "正文（原文）", CGRect(x: 0, y: 100, width: 720, height: 400))',
-     '("detail-0-text", "正文（原文）", CGRect(x: 0, y: 112, width: 720, height: 388))',
+     '("detail-0-text", "正文（原文）", CGRect(x: 19, y: 100, width: 701, height: 400))',
+     '("detail-0-text", "正文（原文）", CGRect(x: 19, y: 112, width: 701, height: 388))',
      AXIS, "那一块不在内容列上"),
 ]
 

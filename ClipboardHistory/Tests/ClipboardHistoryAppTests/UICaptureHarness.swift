@@ -4392,6 +4392,126 @@ final class UICaptureTests: XCTestCase {
     }
 
 
+    /// R441：代码块左侧行号槽。
+    ///
+    /// 判据用两块只会由行号槽产生的几何：
+    /// ① 行号带（28..42pt）里应有 **3 个墨带**（三行代码各一个数字）；旧形状 0；
+    /// ② 左垫带（20..30pt）里应为 **0 个墨带**（正文已右移到 45pt 起排）；旧形状 3（正文首字）。
+    /// 两块都从代码块自己的灰色背景带取纵向范围，段落/标题不会混进来；行号是背景层画的，
+    /// 所以复制出来的代码里没有数字 —— 这条判据只看帧，不看文本。
+    func testCodeBlocksShowLineNumbers() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let expectedLines = 3
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-code" }) else {
+                return XCTFail("\(tag)：找不到 `detail-code` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-code-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-code` 读不回字节 ⇒ 这条判据没有对象")
+                return
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+
+            /// 代码块的三行正文就是内容区里最后三条墨带（夹具只有 h1 + 三行代码）。
+            /// 不用灰底定位：最后一行没有换行符，`.backgroundColor` 只涂到最后一个字形，
+            /// 600..650pt 的采样列在第三行上是白的（R441 第二版实测）——
+            /// 拿灰底当对象会把第三行漏掉，行号带就只剩 2 个。
+            let textX0 = Int((20.0 * scale).rounded())
+            let textX1 = Int((300.0 * scale).rounded())
+            var textBands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int((60.0 * scale))..<min(height, Int((520.0 * scale))) {
+                var has = false
+                for x in textX0..<textX1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { textBands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { textBands.append((top, min(height, Int((520.0 * scale))) - 1)) }
+            let codeBands = Array(textBands.suffix(expectedLines))
+            guard codeBands.count == expectedLines else {
+                emit("CODE_LINE_NUMBERS_NOT_RUN=runner-detail-frame-plain \(tag) 正文带=\(textBands.count)"
+                     + " ⇒ 找不到三行代码，判据没有对象")
+                continue
+            }
+            let codeTop = codeBands.first!.top
+            let codeBottom = codeBands.last!.bottom
+            // 灰底覆盖：在正文/浮层都够不着的 600..650pt 采样，代码块的三行都应被灰底覆盖。
+            // 旧形状最后一行只涂到最后一个字 ⇒ 这一列在第三行上是白的（覆盖率 ~2/3）。
+            let tintX0 = Int((600.0 * scale).rounded())
+            let tintX1 = Int((650.0 * scale).rounded())
+            func tintMean(_ y: Int) -> Double {
+                var sum = 0.0
+                for x in tintX0..<tintX1 { sum += luma(x, y) }
+                return sum / Double(max(tintX1 - tintX0, 1))
+            }
+            let paneTop = Int((60.0 * scale).rounded())
+            let paneBottom = Int((68.0 * scale).rounded())
+            let pane = (paneTop..<paneBottom).map(tintMean).reduce(0, +)
+                / Double(max(paneBottom - paneTop, 1))
+            var tintedRows = 0
+            for y in codeTop...codeBottom where abs(tintMean(y) - pane) >= 6 {
+                tintedRows += 1
+            }
+            let coverage = Double(tintedRows) / Double(codeBottom - codeTop + 1)
+
+            func inkBandCount(x0Pt: Double, x1Pt: Double) -> Int {
+                let x0 = Int((x0Pt * scale).rounded())
+                let x1 = Int((x1Pt * scale).rounded())
+                var count = 0
+                var inBand = false
+                for y in codeTop...codeBottom {
+                    var has = false
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && !inBand { count += 1; inBand = true }
+                    if !has { inBand = false }
+                }
+                return count
+            }
+            let numberBands = inkBandCount(x0Pt: 2, x1Pt: 18)
+            var codeTextLeft = Double.nan
+            search: for x in Int((19.0 * scale).rounded())..<Int((400.0 * scale).rounded()) {
+                for y in codeTop...codeBottom where isInk(luma(x, y)) {
+                    codeTextLeft = Double(x) / scale
+                    break search
+                }
+            }
+            emit("CODE_LINE_NUMBERS \(tag) 代码带=\(String(format: "%.1f", Double(codeBottom - codeTop + 1) / scale))pt"
+                 + " 行号带=\(numberBands) 正文左=\(String(format: "%.1f", codeTextLeft))pt"
+                 + " 带覆盖=\(String(format: "%.0f", coverage * 100))%")
+            XCTAssertEqual(numberBands, expectedLines,
+                           "\(tag)：行号带 \(numberBands) 个（应为 \(expectedLines)）⇒ 行号没画或没按行画")
+            XCTAssertGreaterThanOrEqual(codeTextLeft, 19.0,
+                                        "\(tag)：正文左沿跑到 \(codeTextLeft)pt ⇒ 行号把正文挤走了")
+            XCTAssertLessThanOrEqual(codeTextLeft, 22.0,
+                                     "\(tag)：正文左沿跑到 \(codeTextLeft)pt ⇒ 行号槽动了正文")
+            XCTAssertGreaterThanOrEqual(coverage, 0.85,
+                                        "\(tag)：灰底只覆盖了三行的 \(Int(coverage * 100))%"
+                                        + " ⇒ 最后一行只涂到字尾（锯齿底）")
+        }
+    }
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
@@ -7443,6 +7563,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-table", NSSize(width: 720, height: 520)) {
             let target = self.makeTableStore()
             self.assertTableFixturePremise(target, role: "detail-table")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R441：代码块左侧行号槽。正文从槽右缘起排，行号只画在背景层；
+        // 三行代码给判据三个行号带，正文左移让"左垫带"归零。
+        results.append(Fixture("detail-code", NSSize(width: 720, height: 520)) {
+            let target = self.makeCodeStore()
+            self.assertCodeFixturePremise(target, role: "detail-code")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
 
@@ -11449,6 +11576,48 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.tableFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R441 代码块夹具：三行代码，行号槽里应有 1/2/3 三个数字。
+    static let codeFixtureBody = """
+    # 代码
+
+    ```swift
+    let a = 1
+    let b = 2
+    let c = a + b
+    ```
+    """
+
+    private func assertCodeFixturePremise(_ store: HistoryStore, role: String,
+                                          file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：代码夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: entry.content),
+                      "\(role)：选中的这条按策略不该给渲染入口 ⇒ 帧名在说谎")
+        let blocks = MarkdownParser.parse(body).blocks
+        guard let code = blocks.first(where: { if case .codeBlock = $0.kind { return true } else { return false } }) else {
+            XCTFail("\(role)：解析结果里没有代码块 ⇒ 这条判据没有对象", file: file, line: line)
+            return
+        }
+        let lines = MarkdownPresentation.blockText(code).components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 3, "\(role)：代码块不是三行（实际 \(lines.count)）", file: file, line: line)
+    }
+
+    private func makeCodeStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.codeFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
@@ -18851,9 +19020,12 @@ final class UICaptureTests: XCTestCase {
         /// 它的左轴属于行列表那一族（侧栏同理），不是正文列。
         let probes: [(String, String, CGRect)] = [
             ("detail-0-text", "头部 meta", CGRect(x: 0, y: 80, width: 720, height: 18)),
-            ("detail-0-text", "正文（原文）", CGRect(x: 0, y: 100, width: 720, height: 400)),
-            ("detail-markdown-rendered", "正文（渲染）", CGRect(x: 0, y: 100, width: 720, height: 400)),
-            ("detail-markdown-source", "正文（退回原文）", CGRect(x: 0, y: 100, width: 720, height: 400)),
+            // R441：代码块的行号画在正文列左外侧的边注里（x<gutter），它不参与"正文单左轴"；
+            // 带从 gutter-1 起扫，轴仍是正文第一笔（20pt）。边注本身由
+            // `testCodeBlocksShowLineNumbers` 判（行号带 3、正文左沿未被挤动）。
+            ("detail-0-text", "正文（原文）", CGRect(x: 19, y: 100, width: 701, height: 400)),
+            ("detail-markdown-rendered", "正文（渲染）", CGRect(x: 19, y: 100, width: 701, height: 400)),
+            ("detail-markdown-source", "正文（退回原文）", CGRect(x: 19, y: 100, width: 701, height: 400)),
             ("detail-loading", "骨架条带＋那一句", CGRect(x: 0, y: 80, width: 720, height: 80)),
         ]
         let gutter = Double(DetailTypography.containerGutter)
