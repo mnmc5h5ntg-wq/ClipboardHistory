@@ -577,22 +577,31 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         (reduceMotion || !animationsEnabled) ? [] : .effectFade
     }
 
-    /// 行文案：**预览在前，元信息在后**。用户在浮层里是靠认内容选条目的，
-    /// 时间和来源只是消歧用的次要信息（与侧栏同一套优先级）。
+    /// 行文案：**只有预览与命中理由**。时间不再拼进来（R430）——
+    /// 它与预览共用一条可截断字符串时，长标题会把时间整段吃掉（`quickpick-list` 第 0/4 行）。
+    /// 时间由右侧定宽列单独画（`rowTime`）。
     static func rowTitle(for entry: HistoryStore.Entry, query: String = "") -> String {
         let preview = entry.shortPreview
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
-        let time = ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp)
         let pinned = entry.isPinned ? "置顶 " : ""
         var pieces = ["\(pinned)\(preview.isEmpty ? "（空）" : preview)"]
-        // 来源只按来源命中时补；放在时间之前，截断先吃时间而不是先吃掉命中理由。
         if let reason = QuickPickModel.sourceMatchReason(for: entry, query: query) {
             pieces.append("来自 \(reason)")
         }
-        pieces.append(time)
         return pieces.joined(separator: "  ·  ")
     }
+
+    /// R430：右侧时间列的文字。与侧栏行同一个 formatter，一行里只有一套时间语言。
+    static func rowTime(for entry: HistoryStore.Entry) -> String {
+        ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp)
+    }
+
+    static let timeFieldIdentifier = NSUserInterfaceItemIdentifier("quickPickTime")
+    /// 标题与时间列之间的最小空隙。
+    static let timeGap: CGFloat = 8
+    /// 时间列右沿到行右沿的留白（与标题列左沿的 6pt 对称）。
+    static let timeTrailingInset: CGFloat = 6
 
     /// 行首那一列的 SF Symbol 名（R65 / BACKLOG 94、97）。
     ///
@@ -627,7 +636,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let identifier = NSUserInterfaceItemIdentifier("quickPickCell")
-        let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView) ?? {
+        let cell = (tableView.makeView(withIdentifier: identifier, owner: self) as? QuickPickRowCell) ?? {
             let text = NSTextField(labelWithString: "")
             text.lineBreakMode = .byTruncatingTail
             // R71 / BACKLOG 99：行标签原来是字面量 13，而**同一条记录的标题**在
@@ -650,25 +659,47 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             // 再让读屏念一遍符号名就是噪音（与侧栏 `ThumbnailSymbol` 的 `.accessibilityHidden` 同一条理由）。
             symbol.setAccessibilityElement(false)
             symbol.translatesAutoresizingMaskIntoConstraints = false
-            let cell = NSTableCellView()
+            // R430：时间从标题串里拆出来，改成右侧**定宽列**（同一根右沿）。
+            // 以前时间与预览共用一条可截断的字符串：长标题先吃掉时间，`quickpick-list`
+            // 第 0/4 行就是整行都没有时间；短标题的时间又各自停在自己文字后面，右沿是参差的。
+            // 时间不再参与截断预算 ⇒ 标题再长也截标题，时间永远在右边。
+            let time = NSTextField(labelWithString: "")
+            time.font = .systemFont(ofSize: VisualFont.meta)
+            time.textColor = .secondaryLabelColor
+            time.alignment = .right
+            time.lineBreakMode = .byClipping
+            time.identifier = QuickPickController.timeFieldIdentifier
+            time.setContentCompressionResistancePriority(.required, for: .horizontal)
+            time.setContentHuggingPriority(.required, for: .horizontal)
+            time.setAccessibilityLabel("时间")
+            let cell = QuickPickRowCell()
             cell.addSubview(symbol)
             cell.addSubview(text)
+            cell.addSubview(time)
             cell.textField = text
             cell.imageView = symbol
+            cell.timeField = time
             text.translatesAutoresizingMaskIntoConstraints = false
+            time.translatesAutoresizingMaskIntoConstraints = false
+            text.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             NSLayoutConstraint.activate([
                 symbol.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
                 symbol.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 symbol.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 symbol.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 text.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
-                text.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -6),
+                text.trailingAnchor.constraint(equalTo: time.leadingAnchor,
+                                               constant: -QuickPickController.timeGap),
                 text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                time.trailingAnchor.constraint(equalTo: cell.trailingAnchor,
+                                               constant: -QuickPickController.timeTrailingInset),
+                time.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
             return cell
         }()
         let entry = rows[row].entry
         cell.textField?.stringValue = rows[row].title
+        cell.timeField?.stringValue = Self.rowTime(for: entry)
         cell.imageView?.image = Self.rowSymbol(for: entry.content)
         return cell
     }
@@ -792,6 +823,12 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         let index = table.selectedRow
         if index >= 0 { model.index = index }
     }
+}
+
+/// R430：带右侧时间列的行格。`NSTableCellView` 只认 `textField` / `imageView` 两个槽，
+/// 时间那一格要复用时得有个自己的引用点。
+private final class QuickPickRowCell: NSTableCellView {
+    var timeField: NSTextField?
 }
 
 /// 浮层的一行，多出来的只有一件事：**悬停那一档**（R67）。

@@ -3857,15 +3857,17 @@ final class UICaptureTests: XCTestCase {
                       "拉丁来源名没有出现在行文案里：\(latinSource)")
     }
 
-    /// R405 的像素那一半：**旧结尾之后有没有可见文字**。
+    /// R405 的像素那一半：**来源理由真的多画了一段文字**。
     ///
     /// 这一条刻意不读 `stringValue` —— 文案身份由 `testQuickPickSourceOnlyMatchCarriesItsReason`
-    /// 钉住。这里只判帧上看得见的位移：旧 `quickpick-typed` 第 1 行文字在 x=246.5pt 结束
-    ///（逐 run 读数：预览 110.5–146.0、时间 166.5–246.5），x=250..410pt 当时是整条空白；
-    /// 新行把理由放在时间之前，同一段里出现 968/1077 个墨像素。
+    /// 钉住。R430 把时间从标题串里拆走后，原来那条「旧结尾之后有没有字」的带子失效了
+    /// （旧读数 250..410 的墨其实是时间；收窄到 306 之后读 0）。
+    /// 现在改**跨帧同一条目**：同一次渲染里，`quickpick-typed`（查询「访达」）的行 0 与
+    /// `quickpick-list`（无查询）的行 2 是同一条「合同 终版 v3.pdf」，前者带「来自 访达」，
+    /// 后者不带 ⇒ 两帧标题墨段的右端差就是理由的宽度。修之前两者都带时间、右端相同 ⇒ 差 ≈0。
     ///
-    /// 校准带取同一行 x=120..246pt：它没墨说明这台机器根本没画这一行，
-    /// 那时扩展带读到 0 是"拍不到"，不能记成产品缺陷。
+    /// 校准带取同一行 x=38..200：它没墨说明这台机器根本没画这一行，
+    /// 那时差值读到 0 是"拍不到"，不能记成产品缺陷。
     func testQuickPickSourceMatchReasonExtendsTheTypedRow() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r405-match-reason-\(UUID().uuidString)", isDirectory: true)
@@ -3874,32 +3876,120 @@ final class UICaptureTests: XCTestCase {
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == "quickpick-typed" }) else {
-                return XCTFail("\(tag)：找不到 `quickpick-typed` ⇒ 像素判据没有对象")
+            func titleEnd(_ name: String, row: Int) throws -> (end: Double, control: Int)? {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 像素判据没有对象")
+                    return nil
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 像素判据没有对象")
+                    return nil
+                }
+                let scale = Double(rep.pixelsWide) / 420.0
+                let control = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                               bytesPerRow: rep.bytesPerRow,
+                                               rect: CGRect(x: 38, y: 57 + 34 * row, width: 162, height: 14),
+                                               scale: scale)
+                // 标题列：38…306（时间列从 311 起），取最后一段。
+                let runs = Self.inkRuns(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow,
+                                        rect: CGRect(x: 38, y: 56 + 34 * row, width: 268, height: 15),
+                                        scale: scale, gap: 10)
+                return (runs.last?.end ?? 0, control.pixels)
             }
-            let file = scratch.appendingPathComponent("quickpick-typed-\(tag).png")
+            guard let typed = try titleEnd("quickpick-typed", row: 0),
+                  let list = try titleEnd("quickpick-list", row: 2) else { continue }
+            emit("QUICKPICK_MATCH_REASON_RUN \(tag) typed 行0 止=\(String(format: "%.1f", typed.end)) "
+                  + "校准=\(typed.control) list 行2 止=\(String(format: "%.1f", list.end)) 校准=\(list.control) "
+                  + "差=\(String(format: "%.1f", typed.end - list.end))")
+            XCTAssertGreaterThan(typed.control, 100,
+                                 "\(tag)：typed 行 0 左半段没有字 ⇒ 这一行在这台机器上没画出来")
+            XCTAssertGreaterThan(list.control, 100,
+                                 "\(tag)：list 行 2 左半段没有字 ⇒ 对照行在这台机器上没画出来")
+            XCTAssertGreaterThan(typed.end - list.end, 40,
+                                 "\(tag)：带理由的行比不带理由的同一行只多出 "
+                                 + "\(String(format: "%.1f", typed.end - list.end))pt ⇒ 来源理由没有画出来"
+                                 + "（不是尺坏了：两行的校准带都已证明有字）")
+        }
+    }
+
+    /// R430：浮层每一行的右侧必须有一列**时间**，且五行的右沿是同一根轴。
+    ///
+    /// 缺陷形状（修之前 `quickpick-list` 亮/暗现读）：时间与预览共用一条 `.byTruncatingTail`
+    /// 的字符串 —— 第 0 行（长文本）与第 4 行（密钥）整行没有时间，第 1–3 行的时间
+    /// 各自停在自己文字后面（右沿参差）。修法：标题只留预览与命中理由，时间走右侧定宽列。
+    ///
+    /// 量法只读帧：每行的墨段按列投影、间隙 ≥10pt 断开（时间串内部的空格约 6pt，不会把列切开），**最后一段**就是时间列。
+    /// 两条断言分开：① 最后一段宽度 40…140pt（短了=只剩省略号/没有时间，长了=标题连在一起）；
+    /// ② 五行的最后一段起止极差 ≤2pt（同一根轴）。校准带：每行左半段必须先有字。
+    func testQuickPickRowsEndOnOneTimeColumn() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r430-time-column-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-list" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-list` ⇒ 时间列判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-list-\(tag).png")
             _ = try render(fixture, appearance: appearance, to: file)
             guard let data = try? Data(contentsOf: file),
                   let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
-                return XCTFail("\(tag)：`quickpick-typed` 读不回字节 ⇒ 像素判据没有对象")
+                return XCTFail("\(tag)：`quickpick-list` 读不回字节 ⇒ 时间列判据没有对象")
             }
             let scale = Double(rep.pixelsWide) / 420.0
-            let control = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                           bytesPerRow: rep.bytesPerRow,
-                                           rect: CGRect(x: 120, y: 57, width: 126, height: 13),
-                                           scale: scale)
-            let extensionBand = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                                 bytesPerRow: rep.bytesPerRow,
-                                                 rect: CGRect(x: 250, y: 57, width: 160, height: 13),
-                                                 scale: scale)
-            emit("QUICKPICK_MATCH_REASON_BAND \(tag) 校准带墨=\(control.pixels) 扩展带墨=\(extensionBand.pixels)")
-            XCTAssertGreaterThan(control.pixels, 100,
-                                 "\(tag)：第 1 行左半段没有字 ⇒ 这一行在这台机器上没画出来，"
-                                 + "扩展带读 0 不能记成产品缺陷")
-            XCTAssertGreaterThan(extensionBand.pixels, 20,
-                                 "\(tag)：旧文字在 x=246.5pt 结束，而 x=250..410pt 读到 "
-                                 + "\(extensionBand.pixels) 个墨像素 ⇒ 行没有在旧结尾之后延伸，"
-                                 + "来源理由没有画出来（不是尺坏了：校准带已经证明确实有字）")
+            var widths: [Double] = []
+            var starts: [Double] = []
+            var ends: [Double] = []
+            var calibration: [Int] = []
+            for row in 0..<5 {
+                let band = CGRect(x: 38, y: 57 + 34 * row, width: 368, height: 14)
+                let left = CGRect(x: 38, y: 57 + 34 * row, width: 160, height: 14)
+                let control = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                               bytesPerRow: rep.bytesPerRow, rect: left, scale: scale)
+                calibration.append(control.pixels)
+                let runs = Self.inkRuns(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow, rect: band, scale: scale, gap: 10)
+                emit("QUICKPICK_TIME_RUNS \(tag) 行\(row) "
+                      + runs.map { String(format: "%.1f..%.1f", $0.start, $0.end) }.joined(separator: " | "))
+                guard let last = runs.last else { continue }
+                widths.append(last.width)
+                starts.append(last.start)
+                ends.append(last.end)
+            }
+            let widthText = widths.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            let startText = starts.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            let endText = ends.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            emit("QUICKPICK_TIME_COLUMN \(tag) 末段宽=[\(widthText)] 起=[\(startText)] "
+                  + "止=[\(endText)] 校准=\(calibration)")
+            XCTAssertEqual(5, widths.count,
+                           "\(tag)：只读到 \(widths.count) 行的末段（校准=\(calibration)）"
+                           + " ⇒ 这一格没有对象，不许当成通过")
+            for (row, control) in calibration.enumerated() {
+                XCTAssertGreaterThan(control, 100,
+                                     "\(tag)：第 \(row) 行左半段没有字 ⇒ 这一行在这台机器上没画出来")
+            }
+            for (row, width) in widths.enumerated() {
+                XCTAssertTrue(width >= 40 && width <= 140,
+                              "\(tag)：第 \(row) 行末段宽 \(String(format: "%.1f", width))pt"
+                              + " ⇒ 时间没有独立成一列（太短=被标题挤掉，太长=标题还连在一起）")
+            }
+            if let lo = starts.min(), let hi = starts.max() {
+                XCTAssertLessThanOrEqual(hi - lo, 2.0,
+                                         "\(tag)：五行时间列的起点极差 \(String(format: "%.1f", hi - lo))pt"
+                                         + " ⇒ 时间还在跟着各自标题漂")
+            }
+            if let lo = ends.min(), let hi = ends.max() {
+                XCTAssertLessThanOrEqual(hi - lo, 2.0,
+                                         "\(tag)：五行时间列的右沿极差 \(String(format: "%.1f", hi - lo))pt"
+                                         + " ⇒ 右沿参差，不是同一根轴")
+            }
         }
     }
 
@@ -10115,6 +10205,7 @@ final class UICaptureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         var judged = 0
+        var namedNotRun = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let positive = renderFixtureRep("settings-general", appearance, scratch),
@@ -10128,6 +10219,24 @@ final class UICaptureTests: XCTestCase {
             let negativeBands = sidebarInkBands(negative, pointWidth: 720)
             let minBands = sidebarInkBands(minPositive, pointWidth: 640)
             let minFlatBands = sidebarInkBands(minNegative, pointWidth: 640)
+            // R430 修 R429 的红：runner 是 1x，且与 2x 的产物形状不同 ——
+            // 实测 light 720 的 7/6 对得上，但「末带」在 runner 上是**最上面**那条导航行
+            //（y 方向相反：515..524 与负臂 512..524 重叠，脚注其实在另一端）；
+            // light 640 读 6/6（窄窗下这一列的带数分不开），dark 两档都是 1/1
+            //（暗档整列同极性，正是 `darkSidebarTextBlindSpots` 那族）。
+            // 这三档不是产品缺陷，是**这台机器的 1x 产物没有可判的带**：
+            // 具名 NOT-RUN，读数照打；像素断言只在 2x 本机跑。
+            let density = Double(positive.pixelsWide) / 720.0
+            if density < 1.5 {
+                namedNotRun += 1
+                emit("SETTINGS_FOOTER_BAND_NOT_RUN=runner-1x-band-geometry " + tag
+                     + " 720带=\(positiveBands.count)/\(negativeBands.count)"
+                     + " 640带=\(minBands.count)/\(minFlatBands.count)"
+                     + " 末带=\(positiveBands.last.map { String(format: "%.1f..%.1f", $0.y0, $0.y1) } ?? "-")"
+                     + " 负末带=\(negativeBands.last.map { String(format: "%.1f..%.1f", $0.y0, $0.y1) } ?? "-")"
+                     + " ⇒ 1x 上暗档整列同极性 / light 最小窗带数不可分 / y 方向与 2x 相反；本机 2x 才判 7/6 与 y 序")
+                continue
+            }
             guard let footer = positiveBands.last, let lastRow = negativeBands.last,
                   let minFooter = minBands.last, let minLastRow = minFlatBands.last else {
                 XCTFail(tag + "：有一臂一条墨带都没有 ⇒ 尺没有对象")
@@ -10156,7 +10265,10 @@ final class UICaptureTests: XCTestCase {
                                  tag + "：640 的版本行没有落在最后一条导航行之下")
             judged += 1
         }
-        XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
+        XCTAssertEqual(judged + namedNotRun, 2,
+                       "两档里有一档既没判也没登记 ⇒ 这条判据没有免检出口")
+        XCTAssertTrue(judged == 2 || namedNotRun == 2,
+                      "同一台机器上两档必须走同一条路（判了 \(judged)、具名 NOT-RUN \(namedNotRun)）")
     }
 
     /// 侧栏列（x 0..145pt）里的连续墨带：正/负两帧的带数差一条，就是新加的脚注。
@@ -16753,6 +16865,57 @@ final class UICaptureTests: XCTestCase {
     ///
     /// 背景取这块矩形自己的众数（16 级量化，与 `noticeBands` 同一个写法），
     /// 所以亮暗两臂不需要传不同的阈值。
+    /// R430：把一条行带切成「连续墨段」（按列投影；间隙小于 `gap` pt 的并成一段）。
+    /// 返回每段的 (起点, 终点, 宽度)，单位 pt、原点是传入 rect 的 minX。
+    /// 用途：右侧时间列在帧上是一段**独立的短墨段**；时间被拼进可截断标题时，
+    /// 长标题那一行的墨段会一直连到省略号（或者只剩一小截省略号）。
+    static func inkRuns(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                        bytesPerRow: Int, rect: CGRect, scale: Double,
+                        gap: Double) -> [(start: Double, end: Double, width: Double)] {
+        let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))
+        let y0 = max(0, Int(rect.minY * scale)), y1 = min(height, Int(rect.maxY * scale))
+        guard x1 > x0, y1 > y0 else { return [] }
+        var counts: [Int: Int] = [:]
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let o = y * bytesPerRow + x * 4
+                let key = ((Int(bytes[o]) / 16) << 8) | ((Int(bytes[o + 1]) / 16) << 4) | (Int(bytes[o + 2]) / 16)
+                counts[key, default: 0] += 1
+            }
+        }
+        let best = counts.max { $0.value < $1.value }?.key ?? 0
+        let bg = ((best >> 8) * 16 + 8, ((best >> 4) & 15) * 16 + 8, (best & 15) * 16 + 8)
+        var inked = [Bool](repeating: false, count: x1 - x0)
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let o = y * bytesPerRow + x * 4
+                let d = max(abs(Int(bytes[o]) - bg.0),
+                            max(abs(Int(bytes[o + 1]) - bg.1), abs(Int(bytes[o + 2]) - bg.2)))
+                if isTextInk(delta: d) { inked[x - x0] = true }
+            }
+        }
+        var runs: [(Double, Double, Double)] = []
+        var start: Int?
+        var lastInk = -1_000_000
+        func flush() {
+            guard let s = start else { return }
+            runs.append((Double(s) / scale + rect.minX,
+                         Double(lastInk + 1) / scale + rect.minX,
+                         Double(lastInk + 1 - s) / scale))
+        }
+        for (i, has) in inked.enumerated() where has {
+            if start == nil {
+                start = i
+            } else if Double(i - lastInk) > gap * scale {
+                flush()
+                start = i
+            }
+            lastInk = i
+        }
+        flush()
+        return runs
+    }
+
     static func textInkMass(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
                             bytesPerRow: Int, rect: CGRect, scale: Double) -> (pixels: Int, fraction: Double) {
         let x0 = max(0, Int(rect.minX * scale)), x1 = min(width, Int(rect.maxX * scale))

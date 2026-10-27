@@ -15,11 +15,13 @@ MODEL_MUTANT = '''        guard let name = entry.sourceAppName, !name.isEmpty,
               !matchesNonSource(entry, needle: needle) else { return nil }
         // MUTANT: 来源命中不再给理由
         return nil'''
-CTRL_NEEDLE = '''        // 来源只按来源命中时补；放在时间之前，截断先吃时间而不是先吃掉命中理由。
-        if let reason = QuickPickModel.sourceMatchReason(for: entry, query: query) {
+# R430 重钉：时间从标题串里拆走后，旧针依赖的那行注释也改了位置；
+# 针改钉「理由 append + 紧接着的 return」这一整段（M1052 的变异是删掉理由）。
+CTRL_NEEDLE = '''        if let reason = QuickPickModel.sourceMatchReason(for: entry, query: query) {
             pieces.append("来自 \\(reason)")
-        }'''
-CTRL_MUTANT = '''        // MUTANT: 理由不进入行文案'''
+        }
+        return pieces.joined(separator: "  ·  ")'''
+CTRL_MUTANT = '''        return pieces.joined(separator: "  ·  ")'''
 MUTATIONS = [
     ("M1051", "来源命中不再给出理由（源/管线判据）", MODEL, MODEL_NEEDLE, MODEL_MUTANT,
      "UICaptureTests/testQuickPickSourceOnlyMatchCarriesItsReason",

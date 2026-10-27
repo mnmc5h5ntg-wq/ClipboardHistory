@@ -71,10 +71,32 @@ final class Round3QuickPickTests: XCTestCase {
         XCTAssertTrue(sourceTitle.contains("来自 访达"),
                       "产品行文案里没有命中理由：\(sourceTitle)")
         let unqueried = QuickPickController.rowTitle(for: sourceOnly)
-        XCTAssertTrue(unqueried.hasPrefix("合同 终版 v3.pdf  ·  "),
-                      "没有查询词时行文案的前半段必须保持原样：\(unqueried)")
+        XCTAssertEqual(unqueried, "合同 终版 v3.pdf",
+                       "没有查询词时行文案必须只剩预览（R430：时间改到右侧定宽列）：\(unqueried)")
         XCTAssertFalse(unqueried.contains("来自"),
                        "没有查询词时不该出现来源后缀：\(unqueried)")
+        XCTAssertEqual(QuickPickController.rowTime(for: sourceOnly),
+                       ClipboardDateFormatters.sidebarTime.string(from: sourceOnly.timestamp),
+                       "右侧时间列没有沿用侧栏那一套 formatter ⇒ 同一件时间在浮层里换了一种写法")
+        XCTAssertFalse(unqueried.contains(ClipboardDateFormatters.sidebarTime
+                                            .string(from: sourceOnly.timestamp)),
+                       "时间仍然拼在可截断的标题串里：\(unqueried)")
+    }
+
+    /// R430：长标题不许把时间挤出画布。
+    ///
+    /// 修之前 `rowTitle` 把预览与时间拼成一条 `.byTruncatingTail` 的字符串 ——
+    /// `quickpick-list` 第 0/4 行（长文本、密钥）整行都没有时间。现在时间只走右侧列。
+    func testRowTimeSurvivesTheLongestTitle() {
+        let long = entry(String(repeating: "长标题", count: 40), at: 9)
+        let title = QuickPickController.rowTitle(for: long)
+        let time = ClipboardDateFormatters.sidebarTime.string(from: long.timestamp)
+        XCTAssertFalse(title.contains(time),
+                       "时间又回到了标题串里 ⇒ 长标题会把它截掉：\(title)")
+        XCTAssertEqual(QuickPickController.rowTime(for: long), time,
+                       "右侧时间列拿到的不是这条记录的时间")
+        XCTAssertFalse(QuickPickController.rowTime(for: entry("x", at: 9)).isEmpty,
+                       "时间列允许为空 ⇒ 短标题行会少一格，右沿重新变参差")
     }
 
     func testUnfilteredListingIsCappedButSearchingIsNot() {

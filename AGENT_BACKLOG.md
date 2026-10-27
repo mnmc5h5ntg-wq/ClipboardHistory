@@ -8943,3 +8943,21 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`SidebarSectionPlan.displayRowIndex` 在头部存在时 +1，`SelectedRowRevealer` 经它换算；本机 `testPinnedSectionHeaderAddsExactlyOneTableRow` 只证表格行数 6/5 与选中 [2]/[1]，`M1173` 只证源接线。选中一条固定条目后**滚动到位**的视口偏移没有独立判据（现有滚动三臂用的是无头夹具）。
     修法（下一轮若需要）：加一条带固定条目的 reveal 用例，在同一进程里读 `NSScrollView` 的 `contentView.bounds.origin` 与目标行 `rect(ofRow:)`，判落点贴边；或把现有 `SelectionRevealAnimationTests` 的夹具扩出一组固定条目，保持 reduce=true 的确定性路径。
 
+437 追记（R430 · 仍开）：本轮补的是浮层候选行的时间列；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+449 追记（R430 · 仍开）：R429 CI 跑里 `SelectionRevealAnimationTests` 4/4 passed（CHANNEL 0→125→600、TIME 7/1/0/1430），本机全量仍 5 断言红（3 条用例）、单跑 4/4 绿（TIME 18/8、79→1438）⇒ 会话/顺序再次坐实；不改门槛。
+
+451 追记（R430 · 仍开）：macOS 12 的详情头部阈值本轮未动；浮层时间列不涉及它。
+
+452 追记（R430 · 仍开，口径收紧）：脚注带扫描在 runner 1x 上判不了（暗档 1/1、light 640 6/6、y 反向）⇒ 1x 具名 `SETTINGS_FOOTER_BAND_NOT_RUN`，像素断言只在 2x 本机跑；版本行布局本轮未动。
+
+453 追记（R430 · 仍开）：真实系统拖拽会话仍无自动化验收；本轮只动了浮层行格。
+
+454 追记（R430 · 仍开）：R429 跑的 `MENU_ITEM_SHORTCUT_PIXEL_NOT_RUN` 同样 **grep 0 命中** —— 连续两跑确认它只是台账散文，不是机器通道；菜单 5/5 仍由真实 NSMenu 用例作证。
+
+455 追记（R430 · 仍开）：R429 跑在 1x 上 `PINNED_SECTION_ROWS 6/5 选中 [2]/[1]` 通过，分区带 13/12 与 11/10 也稳；缺的仍是固定条目**滚动到位**的独立偏移验收。
+
+**456. 浮层/侧栏的时间格式 `M月d日 HH:mm` 不带年份：跨年记录分不清**（R430 观察）
+    现象：`ClipboardDateFormatters.sidebarTime` 固定 `M月d日 HH:mm`。R430 把时间固定到浮层右侧列以后，一年前的记录与今年的同月同日会显示成同一串；详情头虽然用 `yyyy-MM-dd HH:mm:ss`，但列表/浮层是选条目时唯一看得见的时间。
+    修法（下一轮若需要）：按「今天/今年/更早」分档（今天 `HH:mm`、今年 `M月d日`、更早 `yyyy年M月d日`），或在悬停/选中时补年份；改之前先给两侧各拍一张跨年夹具帧，确认列宽不被更长字符串顶开（现有末段宽 71.5–74.5pt 的读数就是地板）。
+

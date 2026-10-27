@@ -7706,3 +7706,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：固定块的揭示行号在真实滚动里的像素/偏移还没有独立验收（455）；分区头不做折叠/计数。
 - 回滚：删 `SidebarSectionPlan.swift`、`SidebarSectionHeader.swift` 与 `HistorySidebarView` 的 Section 分支即可；或 `git revert` 本轮提交。
 
+## D-426 浮层时间改成右侧定宽列；脚注带在 1x 上只登记不冒充（R430）
+
+- 背景：浮层候选行把预览、命中理由、时间拼成一条 `.byTruncatingTail` 字符串；长标题会把时间整段截掉（`quickpick-list` 第 0/4 行），短标题的时间又停在各自文字后面，右沿参差。R429 的脚注带扫描在 runner 1x 上读到 dark 1/1、light 640 6/6，且 y 方向与本机相反。
+- 决定：① `rowTitle` 只留预览与「来自 X」；时间走 `rowTime(for:)`（沿用 `ClipboardDateFormatters.sidebarTime`）与行内右侧定宽标签（11pt `secondaryLabelColor`、trailing −6、标题 trailing 收到时间 leading −8、标题压缩优先级 `.defaultLow`、时间 `.required`）。② 脚注像素带只在 2x 判；1x 打 `SETTINGS_FOOTER_BAND_NOT_RUN=runner-1x-band-geometry` 并带读数，不把机器差异记成产品缺陷，也不改带扫描阈值。
+- 理由：时间与标题抢同一条截断预算时，被牺牲的永远是排在后面的信息；拆成两列后，标题截标题、时间恒在。像素断言只在本机能复现的产物上判，runner 的 1x 产物用既有 `*_NOT_RUN` 契约登记（与 `SOURCE_APP_BADGE_MIN_TEXT_NOT_RUN` 同一条路）。
+- 兼容性/迁移：浮层行高、图标列、左轴、命中理由都未动；只有行文案少了时间、右侧多一列。10 张 QuickPick 行帧变化，基线仍 238；`quickpick-empty` 无行、帧不变。
+- 边界：时间格式沿用侧栏的 `M月d日 HH:mm`，跨年记录没有年份（456）；1x runner 上时间列的断言仍是同一套点坐标（等下一跑签收）。
+- 回滚：删 `rowTime`/时间标签与两条约束、把时间拼回 `rowTitle` 即可；或 `git revert` 本轮提交。
+
