@@ -25,8 +25,8 @@ DETAILS = 'ClipboardHistory/Sources/ClipboardHistoryApp/Views/DetailView.swift'
 HARNESS = 'ClipboardHistory/Tests/ClipboardHistoryAppTests/UICaptureHarness.swift'
 SECTION = 'UICaptureTests/testDetailSectionRuleSpansTheWholePane'
 
-N_LINE = u'            header(for: entry)\n            Divider()\n'
-R_LINE = u'            header(for: entry)\n            Divider()\n                .padding(.leading, 20)\n'
+N_LINE = u'            header(for: entry, detailWidth: detailWidth)\n            Divider()\n'
+R_LINE = u'            header(for: entry, detailWidth: detailWidth)\n            Divider()\n                .padding(.leading, 20)\n'
 N_SORT = '.sorted { $0.y0 < $1.y0 }'
 N_GUARD = 'guard thin.count >= 2, let line = thin.first else {'
 

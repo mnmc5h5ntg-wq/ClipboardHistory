@@ -76,7 +76,7 @@ struct DetailView: View {
 
     private func selectedEntryView(_ entry: HistoryStore.Entry, detailWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
-            header(for: entry)
+            header(for: entry, detailWidth: detailWidth)
             Divider()
             preview(for: entry)
                 // R399：窄列里正文会排到右下角浮动操作栏下面，给药丸留一条尾距。
@@ -176,36 +176,31 @@ struct DetailView: View {
         }
     }
 
-    private func header(for entry: HistoryStore.Entry) -> some View {
+    private func header(for entry: HistoryStore.Entry, detailWidth: CGFloat) -> some View {
         // U-4：两行居中 meta → 一条左对齐，并且和正文**共用同一个可读列**。
         // 居中元信息的问题不是"不好看"，是它把时间、大小这类次要信息抬到了和正文同一视觉层级，
         // 而读者要先判断"这两行属于谁"；来源 App 以前干脆没在详情里露出（B-2 已经把它持久化了）。
         HStack(spacing: 8) {
-                // R393：最小窗口（600pt）里头部一行放不下完整的「时间 复制 · 大小 · 来源」，
-                // 原来的 middle 截断会把「复制」吃掉。先试完整文案，放不下再退到去掉冗余「复制」
-                // 的紧凑版 —— 时间/大小/来源一个不丢，行高也不变；宽度够时仍是完整文案。
-                // `ViewThatFits` 是 macOS 13+；12 上保留原来的单行截断（不引新 API）。
+                // R425：来源图标与 meta 文案一起参与 `ViewThatFits` 的取舍。
+                // 600pt 最小窗口里连「图标 + 紧凑文案」都放不下时，先丢图标、不丢时间/来源；
+                // 720pt 才是「图标 + 完整文案」。两档各有一帧：`content-min-600x440` 与 `detail-0-text`。
                 Group {
                     if #available(macOS 13.0, *) {
                         ViewThatFits(in: .horizontal) {
-                            Text(DetailTypography.metaText(
-                                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
-                                size: entry.content.sizeDescription,
-                                sourceAppName: entry.sourceAppName
-                            ))
-                            Text(DetailTypography.metaText(
-                                copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
-                                size: entry.content.sizeDescription,
-                                sourceAppName: entry.sourceAppName,
-                                includeCopyVerb: false
-                            ))
+                            headerMeta(entry, includeIcon: true, includeCopyVerb: true)
+                            headerMeta(entry, includeIcon: true, includeCopyVerb: false)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: true)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: false)
                         }
                     } else {
-                        Text(DetailTypography.metaText(
-                            copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
-                            size: entry.content.sizeDescription,
-                            sourceAppName: entry.sourceAppName
-                        ))
+                        // 12 没有 `ViewThatFits`：退回按详情宽度判，阈值由紧凑文案 + 图标 + 按钮推出来。
+                        HStack(spacing: 8) {
+                            if SourceAppBadgePolicy.isVisible(sourceAppName: entry.sourceAppName,
+                                                             detailWidth: detailWidth) {
+                                SourceAppBadge(sourceAppBundleID: entry.sourceAppBundleID)
+                            }
+                            Text(metaText(entry, includeCopyVerb: true))
+                        }
                     }
                 }
                 .font(.system(size: DetailTypography.metaFontSize))
@@ -234,6 +229,28 @@ struct DetailView: View {
         .padding(.top, chrome.detailContentTopInset)
         .padding(.bottom, 10)
         .background(VisualMaterial.glass)
+    }
+
+    /// 状态条的一档候选：图标可有可无、文案可有「复制」。
+    /// 它是 `ViewThatFits` 的候选，不是最终选择 —— 宽度不够时下一档会接手。
+    private func headerMeta(_ entry: HistoryStore.Entry,
+                            includeIcon: Bool,
+                            includeCopyVerb: Bool) -> some View {
+        HStack(spacing: 8) {
+            if includeIcon && SourceAppBadgePolicy.isVisible(sourceAppName: entry.sourceAppName) {
+                SourceAppBadge(sourceAppBundleID: entry.sourceAppBundleID)
+            }
+            Text(metaText(entry, includeCopyVerb: includeCopyVerb))
+        }
+    }
+
+    private func metaText(_ entry: HistoryStore.Entry, includeCopyVerb: Bool) -> String {
+        DetailTypography.metaText(
+            copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+            size: entry.content.sizeDescription,
+            sourceAppName: entry.sourceAppName,
+            includeCopyVerb: includeCopyVerb
+        )
     }
 
     /// 这条记录到底有没有"渲染 / 原文"之分。

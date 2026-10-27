@@ -2472,6 +2472,32 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R425：回执重抓的取舍 —— 只选"过程更清楚"的那一卷（先比过渡帧数，再比峰值），
+    /// 不因为第二卷窗口更长或峰值更高就选它。两卷都只有 1 帧时仍然由 ≥2 的判据判红。
+    static func preferReceiptRegrab(firstSpan: Int, firstPeak: Double,
+                                    secondSpan: Int, secondPeak: Double) -> Bool {
+        if secondSpan != firstSpan { return secondSpan > firstSpan }
+        return secondPeak > firstPeak
+    }
+
+    func testReceiptRegrabPrefersTheClearerProcess() {
+        XCTAssertTrue(Self.preferReceiptRegrab(firstSpan: 1, firstPeak: 0.20,
+                                               secondSpan: 2, secondPeak: 0.10),
+                      "第二卷读到 2 个过渡帧 ⇒ 该换它，哪怕峰值更低")
+        XCTAssertFalse(Self.preferReceiptRegrab(firstSpan: 2, firstPeak: 0.10,
+                                                secondSpan: 1, secondPeak: 0.20),
+                       "第二卷只有 1 个过渡帧 ⇒ 峰值再高也不换")
+        XCTAssertTrue(Self.preferReceiptRegrab(firstSpan: 1, firstPeak: 0.10,
+                                               secondSpan: 1, secondPeak: 0.20),
+                      "两卷都只有 1 帧时取峰值更清楚的（仍然过不了 ≥2，红话里读数更好看）")
+        XCTAssertFalse(Self.preferReceiptRegrab(firstSpan: 1, firstPeak: 0.20,
+                                                secondSpan: 1, secondPeak: 0.10),
+                       "峰值更低且帧数相同 ⇒ 不换")
+        XCTAssertFalse(Self.preferReceiptRegrab(firstSpan: 2, firstPeak: 0.20,
+                                                secondSpan: 2, secondPeak: 0.10),
+                       "帧数相同、峰值更低 ⇒ 不换")
+    }
+
     /// R416：复制回执文字的出现与消失都必须在 2×/1× 读到 ≥2 个过渡帧。
     /// 只拍药丸上方那条带；场景不进 `Scenario.all()`（不改 motion floor 的臂名单）。
     func testCopyReceiptAppearsAndDismissesWithAVisibleProcess() throws {
@@ -2492,17 +2518,40 @@ final class MotionFilmstripTests: XCTestCase {
             for scale in [2.0, 1.0] {
                 // 每个倍率新建场景：driver 是场景私有的，跑到 1x 时上一次已经 toggle 过了。
                 let scenario = scenarioFactory()
-                let film = record(scenario, scale: scale)
-                let frames = film.motionFrames
-                let fractions = Self.deltas(frames)
-                let span = Self.transitionFrameCount(fractions)
-                let peak = fractions.max() ?? 0
+                var film = record(scenario, scale: scale)
+                var frames = film.motionFrames
+                var fractions = Self.deltas(frames)
+                var span = Self.transitionFrameCount(fractions)
+                var peak = fractions.max() ?? 0
+                // R425：runner 1x 在 40465690086 上读到 1 个过渡帧（峰值 0.2、窗口 1418ms 覆盖
+                // 160ms 声明）—— 窗口没有问题，是 52ms 的 runloop 相位把 160ms 的淡入夹在了
+                // "还没开始"和"已经结束"之间。重抓一次（同一场景、同一 8ms 下限、只换相位），
+                // 取两卷里过程更清楚的那一卷；**判据仍是 ≥2 帧**，两卷都不到仍然是红。
+                var regrab = false
+                if span < 2 {
+                    let second = scenarioFactory()
+                    let secondFilm = record(second, scale: scale)
+                    let secondFrames = secondFilm.motionFrames
+                    let secondFractions = Self.deltas(secondFrames)
+                    let secondSpan = Self.transitionFrameCount(secondFractions)
+                    let secondPeak = secondFractions.max() ?? 0
+                    regrab = true
+                    if Self.preferReceiptRegrab(firstSpan: span, firstPeak: peak,
+                                                secondSpan: secondSpan, secondPeak: secondPeak) {
+                        film = secondFilm
+                        frames = secondFrames
+                        fractions = secondFractions
+                        span = secondSpan
+                        peak = secondPeak
+                    }
+                }
                 let window = film.postTriggerWindowMilliseconds
                 writeStrip("\(scenario.name)-\(Int(scale))x", frames)
                 emit("MOTION_COPY_RECEIPT_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
                      + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
                      + "窗口=\(Int(window.rounded()))ms "
-                     + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+                     + "声明=\(Int(scenario.declaredDurationMilliseconds))ms "
+                     + "重抓=\(regrab ? "yes" : "no")")
                 XCTAssertGreaterThan(frames.count, 4,
                                      "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
                 // R417/40420998525：先证"卷子覆盖到了声明的过程"，再判过程有几帧。

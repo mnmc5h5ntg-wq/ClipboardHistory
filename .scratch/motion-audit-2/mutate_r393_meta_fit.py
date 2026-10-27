@@ -18,8 +18,14 @@ DETAIL = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/DetailView.swift"
 FILTER = "Round3DetailTypographyTests/testNarrowDetailHeaderFallsBackToCompactMeta"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-NEEDLE_COMPACT = "                        includeCopyVerb: false"
-MUTANT_COMPACT = "                        includeCopyVerb: true"
+NEEDLE_COMPACT = """                            headerMeta(entry, includeIcon: true, includeCopyVerb: false)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: true)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: false)
+"""
+MUTANT_COMPACT = """                            headerMeta(entry, includeIcon: true, includeCopyVerb: true)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: true)
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: true)
+"""
 NEEDLE_FITS = "                        ViewThatFits(in: .horizontal)"
 MUTANT_FITS = "                        Group"
 

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情状态条补来源 App 图标（720pt 真实图标彩色 0→327、带右沿 298→320pt；600pt 最小窗口 ViewThatFits 先丢图标、帧逐字节不变）；R424 跑唯一红＝回执 1x 只 1 帧（窗口 1418ms 覆盖）⇒ 相位重抓、闸门 ≥2 未动（R425 / 第 424 轮 / Round 422 / U-1548…U-1552 · 产品 3 文件，状态条来源图标位）
+
+
 ### Dock 图标状态补「未读剪辑」角标（后台新到 3 条 → `dockTile.badgeLabel` 旧 nil/新「3」、激活清零；像素通道由 WindowServer 画 ⇒ 具名 NOT-RUN）；R423 跑 success、20/20 步、失败 0（搜索 4 行 2025→2411/宽 64→134；滚动 4/4 绿）；本地全量 5 条滚动红由 CI 绿证伪为会话/顺序（R424 / 第 423 轮 / Round 421 / U-1543…U-1547 · 产品 3 文件，Dock 图标状态）
 
 

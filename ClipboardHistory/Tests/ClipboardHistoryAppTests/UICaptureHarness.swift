@@ -6521,6 +6521,12 @@ final class UICaptureTests: XCTestCase {
             })
         }
 
+        // R425：来源 App 图标的负臂 —— 同一条正文、去掉来源字段。
+        // 正臂用 `detail-0-text`（来源 Safari）；两帧的头部状态条只差那一颗图标。
+        results.append(Fixture("detail-no-source", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: self.makeNoSourceDetailStore()))
+        })
+
         // R251 / BACKLOG 290：多文件详情（`.files` ⇒ `MultiFileDetailView` ⇒ `MultiFileRow`）的两态帧。
         // 为什么只有 index 3 有 hover 版：只有它是那一族行的载体，其余三格详情里没有 `MultiFileRow`。
         // 帧名形状 `detail-3-files-hover-<尺寸>-<档>` 与静置态 `detail-3-files-<尺寸>-<档>` 由
@@ -9959,6 +9965,90 @@ final class UICaptureTests: XCTestCase {
                         + "但「没量到」本身也是失败：这条判据没有免检出口")
     }
 
+    /// R425：详情状态条左边的来源 App 图标。正臂是有来源的 `detail-0-text`（Safari），
+    /// 负臂是同正文去掉来源字段的 `detail-no-source`。
+    ///
+    /// 为什么用**彩色像素**判正臂：解析不到应用时视图会退回灰色 `app` 符号 —— 那一格照样有墨，
+    /// 只数"墨>0"的尺会把退回档读成"真实图标在"。Safari 的图标是彩色的，灰阶文字没有彩色分量。
+    /// 负臂的 x=20…34 那一格里是时间戳的头两个字（同一条正文），彩色必须为 0：
+    /// 它证明"这一格里的彩色只可能来自图标"，不是窗口底色或文字抗锯齿。
+    func testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r425-sourcebadge-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        guard SourceAppIconProvider.icon(forBundleID: "com.apple.Safari") != nil else {
+            emit("SOURCE_APP_BADGE_NOT_RUN=no-safari-icon 这台机器上解析不到 com.apple.Safari ⇒ "
+                 + "正臂没有真实图标可量（负臂与纯策略仍在）")
+            throw XCTSkip("SOURCE_APP_BADGE_NOT_RUN=no-safari-icon：正臂没有对象")
+        }
+
+        let badgeBox = CGRect(x: 20, y: 36, width: 14, height: 14)
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let withSource = renderFixtureRep("detail-0-text", appearance, scratch),
+                  let withoutSource = renderFixtureRep("detail-no-source", appearance, scratch),
+                  let minWindow = renderFixtureRep("content-min", appearance, scratch) else {
+                XCTFail(tag + "(渲染或读回失败 ⇒ 尺没有对象，不许当成通过)")
+                continue
+            }
+            let positive = sourceBadgePixels(withSource, rect: badgeBox)
+            let negative = sourceBadgePixels(withoutSource, rect: badgeBox)
+            let minBadge = sourceBadgePixels(minWindow, rect: CGRect(x: 300, y: 36, width: 14, height: 14),
+                                             pointWidth: 600)
+            let density = Double(withSource.pixelsWide) / 720.0
+            emit("SOURCE_APP_BADGE " + tag
+                 + " 有来源彩色=" + String(positive.colored)
+                 + " 有来源墨=" + String(positive.ink)
+                 + " 无来源彩色=" + String(negative.colored)
+                 + " 无来源墨=" + String(negative.ink)
+                 + " 最小窗彩色=" + String(minBadge.colored)
+                 + " 最小窗墨=" + String(minBadge.ink)
+                 + " 档=" + String(format: "%.2f", density) + "px/pt")
+            XCTAssertGreaterThan(positive.colored, 40,
+                                 tag + "：有来源那一臂的图标格只读到 " + String(positive.colored)
+                                  + " 颗彩色像素 ⇒ 画出来的不是真实应用图标（或根本没画）")
+            XCTAssertEqual(negative.colored, 0,
+                           tag + "：没有来源字段那一臂的同一格读到了 " + String(negative.colored)
+                            + " 颗彩色像素 ⇒ 彩色不是图标带来的，这条尺的负臂不成立")
+            XCTAssertEqual(minBadge.colored, 0,
+                           tag + "：600pt 最小窗口里图标格仍有 " + String(minBadge.colored)
+                            + " 颗彩色像素 ⇒ 拟合没有先丢图标，时间戳被挤成省略号（R393 的回归）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2,
+                       "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
+    }
+
+    /// 在给定点空间框里数「墨」与「彩色」。纸取左缘 8 列的众数（与 `paperMode` 同一约定）。
+    private func sourceBadgePixels(_ rep: NSBitmapImageRep, rect: CGRect, pointWidth: CGFloat = 720)
+        -> (ink: Int, colored: Int) {
+        let bytes = Self.buffer(of: rep)
+        let width = rep.pixelsWide
+        let height = rep.pixelsHigh
+        let density = Double(width) / Double(pointWidth)
+        let x0 = max(0, Int((rect.minX * density).rounded(.down)))
+        let x1 = min(width, Int((rect.maxX * density).rounded(.up)))
+        let y0 = max(0, Int((rect.minY * density).rounded(.down)))
+        let y1 = min(height, Int((rect.maxY * density).rounded(.up)))
+        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
+                                   bytesPerRow: rep.bytesPerRow)
+        var ink = 0
+        var colored = 0
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = y * rep.bytesPerRow + x * 4
+                let r = Int(bytes[i]), g = Int(bytes[i + 1]), b = Int(bytes[i + 2])
+                let luma = Int((0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)).rounded())
+                if abs(luma - paper) > 24 { ink += 1 }
+                if max(r, max(g, b)) - min(r, min(g, b)) > 40 { colored += 1 }
+            }
+        }
+        return (ink, colored)
+    }
+
     /// 热图夹具的数据。`today` 固定 ⇒ 这张帧**永远长一样**。
     ///
     /// 为什么不让它跟着真实日期走：帧基线是逐字节比的，用"今天"当锚点的话
@@ -10461,6 +10551,22 @@ final class UICaptureTests: XCTestCase {
             store.perform(.selectOnly(store.entries[index]))
         }
         return store
+    }
+
+    /// R425：来源 App 图标那一格的负臂 —— 与 `detail-0-text` 同一条正文，只是没有来源字段。
+    /// 必须走**存档载入**而不是 `store.add`：`add` 会经 `SystemContextCollector` 把当前前台应用
+    /// 记成来源（测试进程里读到 `loginwindow`），负臂会自己长出「来自 loginwindow」。
+    func makeNoSourceDetailStore() -> HistoryStore {
+        let entry = makeClipboardEntry(
+            content: .text("这是一段用于视觉验收的普通文本记录，包含足够长度以便观察截断与换行表现 abcdefghijklmnop"),
+            timestamp: Self.referenceDate.addingTimeInterval(-30),
+            sourceUTIs: ["public.utf8-plain-text"]
+        )
+        return HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
     }
 
     /// R406：两条长正文的夹具。`detail-scroll-top` 拍"B 在顶部"，
