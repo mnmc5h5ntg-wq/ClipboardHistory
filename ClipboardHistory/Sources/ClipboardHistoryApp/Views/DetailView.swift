@@ -26,10 +26,14 @@ struct DetailView: View {
     /// 默认 false ⇒ 产品路径不变。
     var freezeLoadingForCapture: Bool = false
 
+    /// R437：多文件列表的取证入口 —— 展开哪一行由夹具指定（产品路径默认 nil）。
+    private let initialExpandedFileIndex: Int?
+
     init(historyStore: HistoryStore, initialMarkdownMode: MarkdownPreviewMode = .rendered,
-         freezeLoadingForCapture: Bool = false) {
+         freezeLoadingForCapture: Bool = false, initialExpandedFileIndex: Int? = nil) {
         self.historyStore = historyStore
         self.freezeLoadingForCapture = freezeLoadingForCapture
+        self.initialExpandedFileIndex = initialExpandedFileIndex
         // 私有 @State 用注入参数的老手法（和 `SettingsView.initialCategory` 同一套）：
         // 离屏窗口建不出无障碍树，"点一下那颗控件"在夹具里做不到，
         // 而**没有夹具的两种状态就等于没有验收**。默认值不变，产品路径一行都没多。
@@ -385,7 +389,8 @@ struct DetailView: View {
             DetailFileView(url: url, thumbnail: entry.thumbnail, markdownMode: markdownMode,
                            freezeLoadingForCapture: freezeLoadingForCapture)
         case .files(let urls):
-            MultiFileDetailView(urls: urls, markdownMode: markdownMode)
+            MultiFileDetailView(urls: urls, markdownMode: markdownMode,
+                                initialExpandedIndex: initialExpandedFileIndex)
         }
     }
 }
@@ -395,6 +400,14 @@ private struct MultiFileDetailView: View {
     /// 与详情头部同一份视图态：多文件里展开的每条 `.md` 跟着一起切换。
     let markdownMode: MarkdownPreviewMode
     @State private var expandedURL: URL?
+
+    init(urls: [URL], markdownMode: MarkdownPreviewMode, initialExpandedIndex: Int? = nil) {
+        self.urls = urls
+        self.markdownMode = markdownMode
+        _expandedURL = State(initialValue: initialExpandedIndex.flatMap {
+            urls.indices.contains($0) ? urls[$0] : nil
+        })
+    }
 
     var body: some View {
         ScrollView {
@@ -476,6 +489,14 @@ enum MultiFilePreviewLayout {
     /// 所以左端改成**由这几列导出**的文字左沿：`rowTextLeading`。改完之后"左=文字轴、
     /// 右=药丸右沿"才是它本来声称的那套自洽坐标，而这两条轴都不再是裸字面量。
     static let rowContentHorizontalPadding: CGFloat = 12
+    /// 展开预览那一块的左右内缩（`CollapsibleFilePreview` 的圆角框）。
+    static let previewHorizontalInset: CGFloat = 20
+    /// R437：展开后的内容要**站在所属行的文字轴上**。以前它从窗口的 `containerGutter` 起，
+    /// 而同一行文件名从 `rowTextLeading` 起 —— 两者差 42pt，展开块看起来不属于那一行。
+    /// 只补左侧，不动右侧（右沿仍按圆角框的 20pt 收）。
+    static var expandedContentLeadingInset: CGFloat {
+        max(0, rowTextLeading - previewHorizontalInset - DetailTypography.containerGutter)
+    }
     static let rowDisclosureColumn: CGFloat = 12
     static let rowTypeIconColumn: CGFloat = 18
     static let rowColumnSpacing: CGFloat = 10
@@ -603,6 +624,7 @@ private struct CollapsibleFilePreview<Content: View>: View {
 
             if isExpanded || keepsContentMounted {
                 content()
+                    .padding(.leading, MultiFilePreviewLayout.expandedContentLeadingInset)
                     .frame(maxWidth: .infinity)
                     .frame(height: targetHeight, alignment: .top)
                     .clipShape(VisualShape.rounded(VisualRadius.card))
@@ -616,7 +638,7 @@ private struct CollapsibleFilePreview<Content: View>: View {
                     .frame(height: isExpanded ? targetHeight : 0, alignment: .top)
                     .clipped()
                     .allowsHitTesting(isExpanded)
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, MultiFilePreviewLayout.previewHorizontalInset)
                     .padding(.bottom, isExpanded ? 12 : 0)
             }
         }

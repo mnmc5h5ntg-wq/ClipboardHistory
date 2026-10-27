@@ -4202,6 +4202,59 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R437：多文件行展开后的预览必须**站在所属行的文字轴上**。
+    ///
+    /// 缺陷形状（修之前 `detail-3-files-expanded` 亮档现读）：展开的骷髅条从窗口的
+    /// `containerGutter`（20pt）+ 圆角框 20pt 起 ⇒ **40.0pt**，而同一行文件名从
+    /// `rowTextLeading` 起 ⇒ **82.0pt**；差 42pt，展开块看起来不属于那一行。
+    /// 修法：`expandedContentLeadingInset = rowTextLeading − previewHorizontalInset − containerGutter`，
+    /// 只补左侧。判据只读帧：第 0 行文件名左沿 vs 展开内容（骷髅条/那句说明）左沿，差 ≤2.5pt。
+    func testExpandedFilePreviewSitsOnTheRowTextAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r437-expanded-axis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-3-files-expanded" }) else {
+                return XCTFail("\(tag)：找不到 `detail-3-files-expanded` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("expanded-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`detail-3-files-expanded` 读不回字节 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            func firstInk(fromX: CGFloat, y0: Int, y1: Int) -> Double? {
+                for x in Int(fromX * scale)..<Int(600 * scale) {
+                    for y in Int(Double(y0) * scale)..<Int(Double(y1) * scale) {
+                        let o = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
+                        let bg: (Int, Int, Int) = appearance == .darkAqua ? (50, 50, 50) : (255, 255, 255)
+                        if max(abs(r - bg.0), max(abs(g - bg.1), abs(b - bg.2))) > 60 {
+                            return Double(x) / scale
+                        }
+                    }
+                }
+                return nil
+            }
+            // 第 0 行文件名在 y 84..100pt；x 从 76 起跳过 34pt 的箭头与 54..72 的类型图标。
+            guard let rowText = firstInk(fromX: 76, y0: 84, y1: 100),
+                  let content = firstInk(fromX: 20, y0: 120, y1: 220) else {
+                return XCTFail("\(tag)：行文字或展开内容读不到 ⇒ 这一屏没画出来")
+            }
+            emit("EXPANDED_PREVIEW_AXIS \(tag) 行文字左=\(String(format: "%.1f", rowText))pt "
+                  + "展开内容左=\(String(format: "%.1f", content))pt 差=\(String(format: "%.1f", abs(rowText - content)))pt")
+            XCTAssertGreaterThan(rowText, 60, "\(tag)：行文字左沿读不到（小于 60pt）⇒ 尺没有对象")
+            XCTAssertLessThanOrEqual(abs(rowText - content), 2.5,
+                                     "\(tag)：展开内容左沿 \(String(format: "%.1f", content))pt 对行文字 "
+                                     + "\(String(format: "%.1f", rowText))pt ⇒ 展开块没有站在所属行的文字轴上")
+        }
+    }
+
     /// R435：浮层搜索框有字时右侧必须出现一颗清除按钮；空查询时它必须收起来。
     ///
     /// 缺陷形状：主窗口的 `SearchField` 早就有 ×，浮层的主输入框一直没有 —— 打错一个字
@@ -7083,6 +7136,13 @@ final class UICaptureTests: XCTestCase {
             let target = self.makePopulatedStore(selectingIndex: 3)
             return AnyView(DetailView(historyStore: target)
                 .environment(\.hoveredRowForCapture, 0))
+        })
+
+        // R437：多文件列表的**展开态**第一次有帧（以前只有收起态；展开内容 `CollapsibleFilePreview`
+        // → `DetailFileView` 从未被任何帧覆盖）。产品路径默认不展开，展开行号只由夹具注入。
+        results.append(Fixture("detail-3-files-expanded", NSSize(width: 720, height: 520)) {
+            let target = self.makePopulatedStore(selectingIndex: 3)
+            return AnyView(DetailView(historyStore: target, initialExpandedFileIndex: 0))
         })
 
         // 一颗浮层药丸一张帧。以前两张挤在 200pt 高的框里（四颗按钮 + 分隔线 + padding 实际

@@ -7769,3 +7769,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：0.18 是就地数、未提成令牌（462）；只在 side bar 的多选头上加，设置页没有同类动作栏。
 - 回滚：删 `Rectangle` 三行即可；或 `git revert` 本轮提交。
 
+## D-433 展开的预览站在所属行的文字轴上；取证入口只由夹具注入（R437）
+
+- 背景：多文件列表的展开态从未有帧；新增帧后量到展开内容左沿 40.0pt、同行文件名 83.0pt（差 43），展开块看起来不属于那一行。
+- 决定：① `MultiFilePreviewLayout.previewHorizontalInset = 20` 提成常量；② `expandedContentLeadingInset = rowTextLeading − previewHorizontalInset − containerGutter`，只补左侧，右边仍按圆角框收；③ `DetailView` / `MultiFileDetailView` 加 `initialExpandedFileIndex`（默认 nil），展开行号只由夹具注入；④ 源守卫从整行匹配改成折行形状匹配，并钉住「参数接属性不是死值」。
+- 理由：展开的内容属于那一行，左轴必须同一条；产品默认不展开，取证入口不改变产品路径。守卫更新是签名变化的连带更正，不放松要求（仍要求 markdownMode 接上）。
+- 兼容性/迁移：只影响展开态；折叠态帧逐字节不变；新增 2 帧，基线 238→240。
+- 边界：只覆盖 loading 分支（DetailFileView 异步读不到文件）；已加载的图片/文本展开态仍无帧（463）。
+- 回滚：删 inset 与两个 `initialExpandedFileIndex` 形参、恢复守卫整行匹配；或 `git revert` 本轮提交。
+

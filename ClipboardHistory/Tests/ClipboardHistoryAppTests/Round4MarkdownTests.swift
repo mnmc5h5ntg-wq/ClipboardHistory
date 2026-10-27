@@ -656,8 +656,10 @@ final class Round4MarkdownTests: XCTestCase {
                       "文件预览没接到当前模式，或没把冻结开关原样传下去")
         XCTAssertTrue(fileCall.contains("markdownMode: markdownMode"),
                       "「原文 / 渲染」那颗开关没接到文件预览上")
-        XCTAssertTrue(detail.contains("MultiFileDetailView(urls: urls, markdownMode: markdownMode)"),
-                      "多文件里展开的 Markdown 不受开关控制")
+        // R437：这颗调用多了取证用的 `initialExpandedIndex:`（产品默认 nil）⇒ 用折行形状匹配，
+        // 并额外钉住它接的是**属性**而不是死值（写死 0 会让产品一进详情就展开第一行）。
+        XCTAssertTrue(fileCall.contains("MultiFileDetailView(urls: urls, markdownMode: markdownMode, initialExpandedIndex: initialExpandedFileIndex)"),
+                      "多文件里展开的 Markdown 不受开关控制，或展开行号的取证参数被写死")
         XCTAssertTrue(fileCall.contains("MarkdownModeButton(title: MarkdownPreviewMode.controlTitle(for: markdownMode), helpText: renderHelp(for: entry))"),
                       "头部那颗控件没接上标题，或提示语没跟着条目走（R335：HTML 条目上写 Markdown 是假话）")
         XCTAssertTrue(detail.contains("markdownMode = markdownMode.toggled()"),
