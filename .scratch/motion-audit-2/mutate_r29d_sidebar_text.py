@@ -24,10 +24,8 @@ TRUTH = "UICaptureTests/testInkDirectionTruthTable"
 # R426 重钉（第二次）：两档负臂现在同一行（`settings-general-no-footer`, `settings-min-no-footer`），
 # 下一行才是 settings-general。针以这两行为上下文，避免命中视图树探针里的同名行。
 LIST_NEEDLE = """        "settings-general-no-footer", "settings-min-no-footer",
-        "settings-general-footer-marker", "settings-min-footer-marker",
         "settings-general", "settings-shortcuts", "settings-privacy","""
 LIST_MUTANT = """        "settings-general-no-footer", "settings-min-no-footer",
-        "settings-general-footer-marker", "settings-min-footer-marker",
         "settings-shortcuts", "settings-privacy","""
 
 BOX_NEEDLE = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)"

@@ -6212,6 +6212,19 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-history", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
         })
+        // R429：固定条目分区头 —— 正臂（有头）、旧形状（无头）、取证标记三帧。
+        // 这三帧**不选行**：选中行的系统材质在离屏窗口里会画成纯黑（R18 那一族），
+        // 会进材质盲区名单；分区头本身不需要选中态来证明。选中行 + 行号偏移由
+        // `testPinnedSectionHeaderAddsExactlyOneTableRow` 的本地夹具另外证明。
+        let pinnedSidebar = self.makePinnedSidebarStore(selectingIndex: 0)
+        pinnedSidebar.perform(.setSelection([]))
+        results.append(Fixture("sidebar-pinned-section", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: pinnedSidebar)))
+        })
+        results.append(Fixture("sidebar-pinned-section-flat", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: pinnedSidebar))
+                .environment(\.sidebarSectionHeadersForCapture, false))
+        })
         // R411：整行悬停帧。选第 2 条（不是选中行），避免与系统选中材质混在一起。
         // R412 补 settle：悬停底是 `.hover`（0.16s）淡入，而环境键在第一次布局时就把
         // 目标值设成 true ⇒ 不落定时快门落在淡入中途，相位由机器负载决定（同代码两次捕获
@@ -6935,16 +6948,6 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("settings-min-no-footer", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store)
                 .environment(\.settingsSidebarFooterForCapture, false))
-        })
-        // R428：脚注像素尺的**单帧定位**标记（品红 2×2，只出现在夹具里）。
-        // runner 上两张整页帧会因材质/首帧状态整页不同，差集法不再可靠。
-        results.append(Fixture("settings-general-footer-marker", NSSize(width: 720, height: 540)) {
-            AnyView(self.makeSettingsView(store: store, initialCategory: .general)
-                .environment(\.settingsSidebarFooterMarkerForCapture, true))
-        })
-        results.append(Fixture("settings-min-footer-marker", NSSize(width: 640, height: 440)) {
-            AnyView(self.makeSettingsView(store: store)
-                .environment(\.settingsSidebarFooterMarkerForCapture, true))
         })
 
         // **禁用态与失败回执**（R39）。目标里那句"全部状态（空/加载/错误/成功/选中/悬停/按下/聚焦/禁用）"，
@@ -10103,91 +10106,91 @@ final class UICaptureTests: XCTestCase {
         return (ink, colored)
     }
 
-    /// R428：设置侧栏版本行 —— 用**同一帧里**的品红标记定位脚注，不再拿两张整页帧做差集
-    /// （runner 上两张设置页会因材质/首帧状态整页不同，差集读到 136×203 的整页差）。
+    /// R429：版本行用**侧栏墨带数**证明（R428 的品红标记在 runner 的 vibrant 侧栏里找不到）。
+    /// 正/负帧的带数差 1，多出来的是最下面那一条“时间剪史 1.4.8”；它必须在最后一条导航行之下。
     func testSettingsSidebarShowsTheVersionFooterOnlyInTheProductArm() throws {
         let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent("r428-footer-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("r429-footer-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         var judged = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            guard let positive = renderFixtureRep("settings-general-footer-marker", appearance, scratch),
-                  let minPositive = renderFixtureRep("settings-min-footer-marker", appearance, scratch),
+            guard let positive = renderFixtureRep("settings-general", appearance, scratch),
                   let negative = renderFixtureRep("settings-general-no-footer", appearance, scratch),
+                  let minPositive = renderFixtureRep("settings-min", appearance, scratch),
                   let minNegative = renderFixtureRep("settings-min-no-footer", appearance, scratch) else {
                 XCTFail(tag + "(渲染或读回失败 ⇒ 尺没有对象，不许当成通过)")
                 continue
             }
-            guard let marker = magentaMarker(positive, pointWidth: 720),
-                  let minMarker = magentaMarker(minPositive, pointWidth: 640) else {
-                XCTFail(tag + "：正臂里找不到脚注的品红标记 ⇒ 版本行没画出来")
+            let positiveBands = sidebarInkBands(positive, pointWidth: 720)
+            let negativeBands = sidebarInkBands(negative, pointWidth: 720)
+            let minBands = sidebarInkBands(minPositive, pointWidth: 640)
+            let minFlatBands = sidebarInkBands(minNegative, pointWidth: 640)
+            guard let footer = positiveBands.last, let lastRow = negativeBands.last,
+                  let minFooter = minBands.last, let minLastRow = minFlatBands.last else {
+                XCTFail(tag + "：有一臂一条墨带都没有 ⇒ 尺没有对象")
                 continue
             }
-            XCTAssertNil(magentaMarker(negative, pointWidth: 720),
-                         tag + "：关掉脚注那一臂里仍有品红标记 ⇒ 负臂不是关掉的")
-            XCTAssertNil(magentaMarker(minNegative, pointWidth: 640),
-                         tag + "：640 的负臂里仍有品红标记 ⇒ 负臂不是关掉的")
-            let band = CGRect(x: marker.maxX + 2, y: marker.midY - 10, width: 130, height: 20)
-            let minBand = CGRect(x: minMarker.maxX + 2, y: minMarker.midY - 10,
-                                 width: 130, height: 20)
-            let positiveInk = footerInk(positive, rect: band, pointWidth: 720)
-            let minimumInk = footerInk(minPositive, rect: minBand, pointWidth: 640)
-            func left(_ x: Double?) -> String { x.map { String(format: "%.1f", $0) } ?? "无" }
             emit("SETTINGS_FOOTER " + tag
-                 + " 标记=" + String(format: "%.0fx%.0f@%.0f,%.0f",
-                                     marker.width, marker.height, marker.minX, marker.minY)
-                 + " 有脚注墨=" + String(positiveInk.ink) + " 首=" + left(positiveInk.firstX)
-                 + " 最小窗墨=" + String(minimumInk.ink) + " 首=" + left(minimumInk.firstX))
-            XCTAssertGreaterThan(positiveInk.ink, 40,
-                                 tag + "：720 的脚注标记右侧只读到 " + String(positiveInk.ink)
-                                  + " 颗墨 ⇒ 版本行没画出来")
-            XCTAssertGreaterThan(minimumInk.ink, 40,
-                                 tag + "：640×440 的脚注标记右侧只读到 " + String(minimumInk.ink)
-                                  + " 颗墨 ⇒ 版本行在最小尺寸里被裁掉了")
-            XCTAssertLessThanOrEqual(marker.maxX, 148.5,
-                                     tag + "：720 的脚注标记右沿到了 " + String(format: "%.1f", marker.maxX)
-                                      + "pt ⇒ 越出侧栏列")
-            XCTAssertLessThanOrEqual(minMarker.maxX, 148.5,
-                                     tag + "：640 的脚注标记右沿到了 " + String(format: "%.1f", minMarker.maxX)
-                                      + "pt ⇒ 越出侧栏列")
-            if let first = positiveInk.firstX {
-                XCTAssertTrue((14.0...32.0).contains(first),
-                              tag + "：版本行首墨在 " + String(format: "%.1f", first)
-                               + "pt，不在侧栏内容左沿 16pt 附近")
-            } else {
-                XCTFail(tag + "：正臂没有首墨读数 ⇒ 尺没有对象")
-            }
+                 + " 720带=\(positiveBands.count)/\(negativeBands.count)"
+                 + " 末带=\(String(format: "%.1f..%.1f", footer.y0, footer.y1))墨=\(footer.ink)"
+                 + " 负末带=\(String(format: "%.1f..%.1f", lastRow.y0, lastRow.y1))墨=\(lastRow.ink)"
+                 + " 640带=\(minBands.count)/\(minFlatBands.count)"
+                 + " 最小末带=\(String(format: "%.1f..%.1f", minFooter.y0, minFooter.y1))墨=\(minFooter.ink)")
+            XCTAssertEqual(positiveBands.count, negativeBands.count + 1,
+                           tag + "：720 正/负侧栏墨带数 \(positiveBands.count)/\(negativeBands.count)"
+                            + " ⇒ 版本行没有恰好多出一条带")
+            XCTAssertEqual(minBands.count, minFlatBands.count + 1,
+                           tag + "：640 正/负侧栏墨带数 \(minBands.count)/\(minFlatBands.count)"
+                            + " ⇒ 版本行在最小尺寸里没有恰好多出一条带")
+            XCTAssertGreaterThan(footer.ink, 40,
+                                 tag + "：720 最后一条带只读到 " + String(footer.ink) + " 颗墨")
+            XCTAssertGreaterThan(minFooter.ink, 40,
+                                 tag + "：640 最后一条带只读到 " + String(minFooter.ink) + " 颗墨")
+            XCTAssertGreaterThan(footer.y0, lastRow.y1,
+                                 tag + "：720 的版本行没有落在最后一条导航行之下"
+                                  + "（末带 y=\(String(format: "%.1f", footer.y0)) 负末带 y1=\(String(format: "%.1f", lastRow.y1))）")
+            XCTAssertGreaterThan(minFooter.y0, minLastRow.y1,
+                                 tag + "：640 的版本行没有落在最后一条导航行之下")
             judged += 1
         }
         XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
     }
 
-    /// 单帧里的品红标记（2×2pt）包围盒；没有返回 nil。它就是脚注的定位锚点。
-    private func magentaMarker(_ rep: NSBitmapImageRep, pointWidth: CGFloat) -> CGRect? {
+    /// 侧栏列（x 0..145pt）里的连续墨带：正/负两帧的带数差一条，就是新加的脚注。
+    private func sidebarInkBands(_ rep: NSBitmapImageRep, pointWidth: CGFloat,
+                                 maxX: CGFloat = 145)
+        -> [(y0: Double, y1: Double, ink: Int)] {
         let bytes = Self.buffer(of: rep)
         let width = rep.pixelsWide
         let height = rep.pixelsHigh
         let density = Double(width) / Double(pointWidth)
-        var minX = Int.max, minY = Int.max, maxX = Int.min, maxY = Int.min
-        var found = 0
+        let xLimit = min(width, Int((maxX * density).rounded(.up)))
+        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
+                                   bytesPerRow: rep.bytesPerRow)
+        var bands: [(Int, Int, Int)] = []
+        var start: Int?
+        var ink = 0
         for y in 0..<height {
-            for x in 0..<width {
+            var rowInk = 0
+            for x in 0..<xLimit {
                 let i = y * rep.bytesPerRow + x * 4
-                let r = Int(bytes[i]), g = Int(bytes[i + 1]), b = Int(bytes[i + 2])
-                if r > 200 && b > 200 && g < 80 {
-                    found += 1
-                    minX = min(minX, x); maxX = max(maxX, x)
-                    minY = min(minY, y); maxY = max(maxY, y)
-                }
+                let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                + 0.0722 * Double(bytes[i + 2])).rounded())
+                if abs(luma - paper) > 24 { rowInk += 1 }
+            }
+            if rowInk > 0 {
+                if start == nil { start = y; ink = 0 }
+                ink += rowInk
+            } else if let s = start {
+                bands.append((s, y - 1, ink))
+                start = nil
             }
         }
-        guard found > 0 else { return nil }
-        return CGRect(x: Double(minX) / density, y: Double(minY) / density,
-                      width: Double(maxX - minX + 1) / density,
-                      height: Double(maxY - minY + 1) / density)
+        if let s = start { bands.append((s, height - 1, ink)) }
+        return bands.map { (Double($0.0) / density, Double($0.1) / density, $0.2) }
     }
 
     /// R427：正在拖出去的那一行内容降透明度；同一行的静置帧作正对照。
@@ -10231,6 +10234,94 @@ final class UICaptureTests: XCTestCase {
             judged += 1
         }
         XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
+    }
+
+    /// R429：固定条目分区头。正/负两帧的侧栏墨带数差一条，差出来的就是「已固定」；
+    /// 不靠颜色标记（runner 的 vibrant 侧栏会把自绘色重映射）。
+    func testPinnedSectionHeaderAppearsOnlyWhenHeadersAreOn() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r429-section-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let positive = renderFixtureRep("sidebar-pinned-section", appearance, scratch),
+                  let flat = renderFixtureRep("sidebar-pinned-section-flat", appearance, scratch) else {
+                XCTFail(tag + "(渲染或读回失败 ⇒ 尺没有对象，不许当成通过)")
+                continue
+            }
+            let positiveBands = sidebarInkBands(positive, pointWidth: 300)
+            let flatBands = sidebarInkBands(flat, pointWidth: 300)
+            var inserted: Int?
+            for index in 0..<min(positiveBands.count, flatBands.count) {
+                let a = positiveBands[index], b = flatBands[index]
+                if abs(a.y0 - b.y0) > 0.5 || a.ink != b.ink {
+                    inserted = index
+                    break
+                }
+            }
+            guard let index = inserted else {
+                XCTFail(tag + "：找不到分区头插入的那条带（两帧前几条带完全一样）")
+                continue
+            }
+            let header = positiveBands[index]
+            let displaced = flatBands[index]
+            emit("SIDEBAR_SECTION_HEADER " + tag
+                 + " 正带=\(positiveBands.count) 平带=\(flatBands.count)"
+                 + " 插入带#\(index)=\(String(format: "%.1f..%.1f", header.y0, header.y1))墨=\(header.ink)"
+                 + " 旧形状同带=\(String(format: "%.1f..%.1f", displaced.y0, displaced.y1))墨=\(displaced.ink)")
+            XCTAssertEqual(positiveBands.count, flatBands.count + 1,
+                           tag + "：有头/无头的侧栏墨带数 \(positiveBands.count)/\(flatBands.count)"
+                            + " ⇒ 分区头没有恰好多出一条带")
+            XCTAssertGreaterThan(header.ink, 20,
+                                 tag + "：插入的那条带只读到 " + String(header.ink)
+                                  + " 颗墨 ⇒ 「已固定」没画出来")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
+    }
+
+    /// R429：分区头在真 NSTableView 里必须恰好多一行；`SelectedRowRevealer` 的行号靠这一行。
+    func testPinnedSectionHeaderAddsExactlyOneTableRow() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r429-section-rows-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let pinned = makePinnedSidebarStore(selectingIndex: 0)
+        let positive = Fixture("tmp-section-positive", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: pinned)))
+        }
+        let negative = Fixture("tmp-section-flat", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: pinned))
+                .environment(\.sidebarSectionHeadersForCapture, false))
+        }
+        var positiveRows = -1, negativeRows = -1
+        var positiveSelected: [Int] = [], negativeSelected: [Int] = []
+        _ = try render(positive, appearance: .aqua,
+                       to: scratch.appendingPathComponent("positive.png")) { host in
+            guard let table = Self.firstTableView(in: host) else { return }
+            positiveRows = table.numberOfRows
+            positiveSelected = Array(table.selectedRowIndexes)
+        }
+        _ = try render(negative, appearance: .aqua,
+                       to: scratch.appendingPathComponent("negative.png")) { host in
+            guard let table = Self.firstTableView(in: host) else { return }
+            negativeRows = table.numberOfRows
+            negativeSelected = Array(table.selectedRowIndexes)
+        }
+        emit("PINNED_SECTION_ROWS 有头=\(positiveRows) 无头=\(negativeRows) "
+             + "选中=\(positiveSelected)/\(negativeSelected)")
+        XCTAssertGreaterThan(negativeRows, 0, "无头表格没建出行 ⇒ 这条判据没有对象")
+        XCTAssertEqual(positiveRows, negativeRows + 1,
+                       "有分区头的表格读了 \(positiveRows) 行、无头 \(negativeRows) 行 ⇒ 分区头没有多一行"
+                        + "（或多了不止一行），SelectedRowRevealer 的 +1 规划会错位")
+        if !positiveSelected.isEmpty, !negativeSelected.isEmpty {
+            XCTAssertEqual(positiveSelected, negativeSelected.map { $0 + 1 },
+                           "选中行没有跟着分区头下移一行 ⇒ 揭示会滚到上一行")
+        }
     }
 
     /// 只数给定点空间框里的墨与首墨 x（pt）。纸取左缘 8 列的众数。
@@ -10809,6 +10900,18 @@ final class UICaptureTests: XCTestCase {
             persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
             retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
         )
+    }
+
+    /// R429：带固定条目的侧栏夹具（两条固定 + 其余普通）。固定会把它们顶到最前。
+    func makePinnedSidebarStore(selectingIndex: Int? = nil) -> HistoryStore {
+        let store = makePopulatedStore(selectingIndex: selectingIndex)
+        if let first = store.entries.first {
+            store.perform(.togglePin(first))
+        }
+        if store.entries.count > 2 {
+            store.perform(.togglePin(store.entries[2]))
+        }
+        return store
     }
 
     /// R406：两条长正文的夹具。`detail-scroll-top` 拍"B 在顶部"，
@@ -12277,7 +12380,6 @@ final class UICaptureTests: XCTestCase {
         // 先看过 640×440 / 720×540 两档暗帧的侧栏列：五枚未选中标签仍在错误一侧；
         // 这不是脚注引入的新缺陷。
         "settings-general-no-footer", "settings-min-no-footer",
-        "settings-general-footer-marker", "settings-min-footer-marker",
         "settings-general", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
@@ -13828,8 +13930,7 @@ final class UICaptureTests: XCTestCase {
                 // 只量默认页 —— 最小窗与 `settings-min` 一样排除。
                 .filter { $0.name.hasPrefix("settings-")
                     && $0.name != "settings-min"
-                    && $0.name != "settings-min-no-footer"
-                    && $0.name != "settings-min-footer-marker" }
+                    && $0.name != "settings-min-no-footer" }
             guard !candidates.isEmpty else {
                 return XCTFail("\(tag)：一张 settings 夹具都没有 ⇒ 这条判据没有对象")
             }
@@ -18554,6 +18655,15 @@ final class UICaptureTests: XCTestCase {
         if let field = view as? NSTextField { return field }
         for sub in view.subviews {
             if let field = firstOverlayTextField(in: sub) { return field }
+        }
+        return nil
+    }
+
+    /// R429：按身份在树里找历史列表的 NSTableView（分区头是否真的多一行，由它数）。
+    static func firstTableView(in view: NSView) -> NSTableView? {
+        if let table = view as? NSTableView { return table }
+        for sub in view.subviews {
+            if let table = firstTableView(in: sub) { return table }
         }
         return nil
     }

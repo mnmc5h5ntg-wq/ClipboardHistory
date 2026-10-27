@@ -22,6 +22,12 @@ import XCTest
 final class UIInteractionProbeTests: XCTestCase {
     private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_INTERACTION"] == "1"
 
+    /// R429：有固定条目时侧栏多一行「已固定」；表格行号 = filtered 索引 + 1。
+    private func sectionRow(_ filteredIndex: Int, in store: HistoryStore) -> Int {
+        SidebarSectionPlan(pinnedCount: store.filteredEntries.filter(\.isPinned).count)
+            .displayRowIndex(forFilteredIndex: filteredIndex)
+    }
+
     /// R90 / BACKLOG 122 · **每条判据开头一行心跳**，写文件而不是写 stderr。
     ///
     /// 为什么要它：`swift test` 的 `Test Case … started.` 走的是驱动的管道，被看门狗 `kill -9`
@@ -828,7 +834,8 @@ final class UIInteractionProbeTests: XCTestCase {
             return
         }
 
-        let rowHeight = max(1, table.rect(ofRow: 0).height)
+        // R429：侧栏有固定条目时多一行「已固定」；用表格的 entry 行高，不拿第 0 行（可能是分区头）。
+        let rowHeight = max(1, table.rowHeight)
         let visibleRows = Int(view.documentVisibleRect.height / rowHeight)
         let pinCount = visibleRows + 2
         guard pinCount >= 2, store.filteredEntries.count > pinCount + 2 else {
@@ -868,19 +875,20 @@ final class UIInteractionProbeTests: XCTestCase {
             return
         }
         let landingIndex = store.filteredEntries.firstIndex { $0.id == newEntry.id }
+        let landingRow = landingIndex.map { sectionRow($0, in: store) }
         let storeSelected = store.selectedEntryIDs == [newEntry.id]
         let tableSet = Array(table.selectedRowIndexes.sorted())
-        let onScreen = landingIndex.map {
-            view.documentVisibleRect.intersects(table.rect(ofRow: $0)) && table.rect(ofRow: 0).height > 0
+        let onScreen = landingRow.map {
+            view.documentVisibleRect.intersects(table.rect(ofRow: $0)) && table.rect(ofRow: $0).height > 0
         } ?? false
         emit("INTAKE_READING 新记录落点=\(String(describing: landingIndex)) 在屏=\(onScreen) "
              + "store 选中它=\(storeSelected) 表格选中集合=\(tableSet) "
              + "originY \(String(format: "%.1f", originBefore))→\(String(format: "%.1f", view.documentVisibleRect.origin.y)) ⇒ "
              + (!storeSelected
                 ? "采集入口这次没把选中给新记录 ⇒ 机制段读错了，回到 reconcileSelection 重读"
-                : ((landingIndex ?? 0) <= visibleRows
+                : ((landingRow ?? 0) <= visibleRows
                     ? "新记录本来就落在视口内 ⇒ 这一格没造出「固定块顶开」，夹具要调（窗口高度或固定数）"
-                    : (tableSet == landingIndex.map { [$0] } && onScreen
+                    : (tableSet == landingRow.map { [$0] } && onScreen
                         ? "**无需点击**：一次普通复制之后，列表自己滚到新记录并把它亮出来 ⇒ 61 在这条路径上已修"
                         : "新记录在视口外而列表没亮它（集合=\(tableSet) 在屏=\(onScreen)）⇒ 采集路径上 61 还在"))))
         // 视觉取证：本轮的"真实视觉审查"就落在这一对帧上 —— 读数说列表滚过去了、
@@ -891,7 +899,7 @@ final class UIInteractionProbeTests: XCTestCase {
         try capture(window: window, to: shotsURL("reveal-after-320x300-light.png"), dark: false)
 
         XCTAssertTrue(storeSelected, "采集入口没把新记录设成选中 ⇒ 这条判的不是它声称的那件事")
-        XCTAssertEqual(tableSet, landingIndex.map { [$0] },
+        XCTAssertEqual(tableSet, landingRow.map { [$0] },
                        "一次普通复制把选中送到视口外、列表没有跟上 ⇒ BACKLOG 61 在采集路径上复发")
         XCTAssertTrue(onScreen, "表格说选中了但那一行不在可视区 ⇒ 高亮仍然看不见，症状没修掉")
     }

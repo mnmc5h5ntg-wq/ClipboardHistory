@@ -8,15 +8,15 @@ M312 去掉「已经在视口里就不滚」那道闸
 
 M313 闸门改按行号判（而不是按选中 id）
     期望被抓：臂5：选中项只是行号漂了，视口不许动
-    结果：CAUGHT（断言红：XCTAssertEqualWithAccuracy failed: ("2125.0") is not equal to ("0.0") +/- ("1.0") - 选中项只是**行号漂了**（id 没变、选中没变）视）
+    结果：CAUGHT（断言红：XCTAssertTrue failed - 那一行不在可视区 ⇒ 选中跟了、滚动没跟，61 的那个症状还在）
 
 M317 闸门整个拆掉（每次重算都滚）
     期望被抓：臂3 / 臂5（漂移那一臂在独立测试里 ⇒ filter 必须带两条）
-    结果：CAUGHT（断言红：XCTAssertEqualWithAccuracy failed: ("2125.0") is not equal to ("0.0") +/- ("1.0") - 选中项只是**行号漂了**（id 没变、选中没变）视）
+    结果：CAUGHT（断言红：XCTAssertTrue failed - 那一行不在可视区 ⇒ 选中跟了、滚动没跟，61 的那个症状还在）
 
 M314 同步滚（撤掉推迟一个回合）
     期望被抓：臂2：选中集合必须**只有**那一行（同步滚会留下 [2, 60]）
-    结果：CAUGHT（断言红：XCTAssertEqual failed: ("[2, 60]") is not equal to ("[60]") - 选中视口外那一行之后表格没有**只**选中它 ⇒ 要么揭示没发生（61 复发，先查 `Selec）
+    结果：BROKEN-MUTATION（原文没找到，这一刀根本没落下 ⇒ 结论不算数）
 
 M315 揭示器顺手把选中也写了（第二个作者）
     期望被抓：SelectedRowRevealTests/testRevealerOnlyScrollsAndNeverSelects

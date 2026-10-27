@@ -67,14 +67,10 @@ MUTATIONS = [
      "",
      "臂3 / 臂5（漂移那一臂在独立测试里 ⇒ filter 必须带两条）",
      DRIFT_FILTER),
-    ("M314", "同步滚（撤掉推迟一个回合）", REVEALER,
-     "        DispatchQueue.main.async { [weak self, weak table] in\n"
-     "            guard let self, let table, self.lastRevealedKey == key else { return }\n"
-     "            table.scrollRowToVisible(row)\n"
-     "        }",
-     "        table.scrollRowToVisible(row)",
-     "臂2：选中集合必须**只有**那一行（同步滚会留下 [2, 60]）",
-     "UIInteractionProbeTests/testOffScreenProgrammaticSelectionIsRevealedAndNotJumped"),
+    # M314（同步滚）在 R429 退役：它钉的 `DispatchQueue.main.async { … table.scrollRowToVisible(row) }`
+    # 已在 R413 被「记住起点 → 系统滚一次 → 回起点 → bounds 动画 → 完成时再物化」整段替换；
+    # 旧 needle 在盘上一个字都不命中，原刀只会报 BROKEN-MUTATION。揭示器的选中/行号/闸门
+    # 仍由 M311/M312/M313/M317/M315/M316 覆盖，退役不是放宽。
     ("M315", "揭示器顺手把选中也写了（第二个作者）", REVEALER,
      "            table.scrollRowToVisible(row)",
      "            table.scrollRowToVisible(row)\n"
@@ -87,7 +83,8 @@ MUTATIONS = [
      "                revealKey: (historyStore.selectedEntry?.id).map { AnyHashable($0) },\n"
      "                rowIndex: SelectionRevealPlan.rowIndex(\n"
      "                    of: historyStore.selectedEntry?.id,\n"
-     "                    in: historyStore.filteredEntries.map(\\.id)))\n"
+     "                    in: historyStore.filteredEntries.map(\\.id))\n"
+     "                    .map { sectionPlanForDrawing.displayRowIndex(forFilteredIndex: $0) })\n"
      "        )",
      "",
      "声明守卫 + 臂2（61 复发）",

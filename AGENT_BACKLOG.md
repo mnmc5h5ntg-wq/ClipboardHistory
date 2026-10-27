@@ -8925,3 +8925,21 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：12 的菜单由 `MenuBarController.populate` 建 `NSMenuItem`，测试能读真实标题（旧 4 项→新 5 项、⌃⌥V/⌃⌥⇧V）；13+ 的 `MenuBarExtraStyle.menu` 由系统把 SwiftUI label 编成 NSMenu，测试进程拿不到那张菜单，像素也没有（系绘制）。本轮具名 `MENU_ITEM_SHORTCUT_PIXEL_NOT_RUN=system-menu`。
     修法（下一轮若需要）：在 13+ 上要么用辅助功能在真机读菜单项标题（需要权限与真机），要么保持 `MenuShortcutPresentation` 的纯函数 + App.swift 源守卫，不把 12 的 NSMenu 读数冒充 13+ 证据；如将来跑真机点击，顺带验"快速选择菜单项点下会关菜单再开浮层"。
 
+437 追记（R429 · 仍开）：本轮补的是侧栏固定块的分区头；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+449 追记（R429 · 仍开）：R428 CI 跑里 `SelectionRevealAnimationTests` 4/4 passed（CHANNEL 0→41→600、TIME 4/1/1330/1430），本机全量仍 5 断言红（3 条用例）、单跑 4/4 绿（TIME 18/9、52.5→1438）⇒ 会话/顺序再次坐实；不改门槛。
+
+451 追记（R429 · 仍开）：macOS 12 的详情头部阈值本轮未动；侧栏分区不涉及它。
+
+452 追记（R429 · 仍开）：设置侧栏版本行仍是内容相对；本轮把它的像素尺从 marker 改成同帧带扫描（7/6、墨 1086/1284），布局未动。
+
+453 追记（R429 · 仍开）：真实系统拖拽会话仍无自动化验收；本轮没动拖拽源。
+
+454 追记（R429 · 仍开，且口径收紧）：R428 的 `MENU_ITEM_SHORTCUT_PIXEL_NOT_RUN=system-menu` 只写在台账里，R429 现读 runner 日志 **grep 0 命中** ⇒ 它既不是通道读数，也不进 Motion gate 的已登记标记表。下一轮要么在测试里显式打印它并登记通道，要么把这句从「具名通道」降级为账本观察，不许拿它当「已具名所以没问题」的证据。
+
+310 追记（R429 · 地板 414→413）：`mutate_r61_reveal` 的 M314 退役 —— 它钉的 `DispatchQueue.main.async { … table.scrollRowToVisible(row) }` 块已被 R413 的边界动画替换，锚点不存在；缺口臂数 -1。`test_mutate_arm_registry` 的 `assertEqual` 与 docstring 同笔改成 413（退役不是放宽：M311/M312/M313/M315/M316/M317 仍在）。
+
+**455. 固定块分区头把揭示行号 +1：真实滚动里的偏移只有源守卫与表格行数作证，缺一条像素/偏移验收**（R429 观察）
+    现象：`SidebarSectionPlan.displayRowIndex` 在头部存在时 +1，`SelectedRowRevealer` 经它换算；本机 `testPinnedSectionHeaderAddsExactlyOneTableRow` 只证表格行数 6/5 与选中 [2]/[1]，`M1173` 只证源接线。选中一条固定条目后**滚动到位**的视口偏移没有独立判据（现有滚动三臂用的是无头夹具）。
+    修法（下一轮若需要）：加一条带固定条目的 reveal 用例，在同一进程里读 `NSScrollView` 的 `contentView.bounds.origin` 与目标行 `rect(ofRow:)`，判落点贴边；或把现有 `SelectionRevealAnimationTests` 的夹具扩出一组固定条目，保持 reduce=true 的确定性路径。
+

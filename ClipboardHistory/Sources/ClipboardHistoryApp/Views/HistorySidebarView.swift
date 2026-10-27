@@ -78,6 +78,24 @@ struct HistorySidebarView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 同 `SegmentedFilterPicker.shouldReduce`：系统开关 ∪ VoiceOver。
     private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
+    /// R429：分区头取证键（`false` = 旧形状）；产品路径永远显示。
+    @Environment(\.sidebarSectionHeadersForCapture) private var sidebarSectionHeadersForCapture
+    private var sectionHeadersForDrawing: Bool { sidebarSectionHeadersForCapture ?? true }
+    private var pinnedEntries: [HistoryStore.Entry] { historyStore.filteredEntries.filter(\.isPinned) }
+    private var unpinnedEntries: [HistoryStore.Entry] { historyStore.filteredEntries.filter { !$0.isPinned } }
+    private var sectionPlanForDrawing: SidebarSectionPlan {
+        SidebarSectionPlan(pinnedCount: sectionHeadersForDrawing ? pinnedEntries.count : 0)
+    }
+
+    @ViewBuilder
+    private func historyRow(_ entry: HistoryStore.Entry) -> some View {
+        HistoryRowButton(
+            entry: entry,
+            // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
+            copyAction: { historyStore.perform(.copyAndPromote(entry)) },
+            favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
+        )
+    }
 
     private var header: some View {
         HStack {
@@ -204,13 +222,23 @@ struct HistorySidebarView: View {
     /// 选中交给单击 / shift / ⌘ / 方向键 —— 全部由系统 `List` 负责。
     private var historyList: some View {
         List(selection: selectionBinding) {
-            ForEach(historyStore.filteredEntries) { entry in
-                HistoryRowButton(
-                    entry: entry,
-                    // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
-                    copyAction: { historyStore.perform(.copyAndPromote(entry)) },
-                    favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
-                )
+            if sectionHeadersForDrawing, !pinnedEntries.isEmpty {
+                // R429：固定条目置顶，但以前与普通条目完全同形。给它们一行分区头，
+                // 只加一行、不拆分组；无固定条目时仍走原来的单个 ForEach（老帧不变）。
+                Section {
+                    ForEach(pinnedEntries) { entry in
+                        historyRow(entry)
+                    }
+                } header: {
+                    SidebarSectionHeader(title: SidebarSectionPlan.pinnedTitle)
+                }
+                ForEach(unpinnedEntries) { entry in
+                    historyRow(entry)
+                }
+            } else {
+                ForEach(historyStore.filteredEntries) { entry in
+                    historyRow(entry)
+                }
             }
         }
         // 行的增删/重排**没有**过渡，这里刻意不留 `.transition`（动效审计 M1，账本 U-20 / D-055）。
@@ -292,7 +320,8 @@ struct HistorySidebarView: View {
                 revealKey: (historyStore.selectedEntry?.id).map { AnyHashable($0) },
                 rowIndex: SelectionRevealPlan.rowIndex(
                     of: historyStore.selectedEntry?.id,
-                    in: historyStore.filteredEntries.map(\.id)))
+                    in: historyStore.filteredEntries.map(\.id))
+                    .map { sectionPlanForDrawing.displayRowIndex(forFilteredIndex: $0) })
         )
     }
 

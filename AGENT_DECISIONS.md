@@ -7697,3 +7697,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：13+ MenuBarExtra 是系统菜单，像素/标题通道具名 NOT-RUN（454）；快速选择菜单项点下会先关菜单再开浮层，未做真机点击验收。
 - 回滚：删 `MenuShortcutPresentation.swift`、命令目录里的 `.showQuickPick`、两个表面的标题调用即可；或 `git revert` 本轮提交。
 
+## D-425 固定块分区头只加一行、行号偏移集中在一个纯函数；取证 marker 退役改同帧带扫描（R429）
+
+- 背景：侧栏固定条目与普通条目同形；R428 的脚注品红标记在 runner 上亮暗两档都找不到（`SETTINGS_FOOTER` 无行），差集/标记两条路都不稳。
+- 决定：① `SidebarSectionPlan` 承载「有固定条目才显示头」与 `displayRowIndex` 的 +1，`HistorySidebarView` 只留薄接线；`SelectedRowRevealer` 的行号必须经 plan。② 取证不再依赖颜色标记：脚注与分区头都用 `sidebarInkBands` 在同一帧里数墨带（7/6、13/12），行数用真实 `NSTableView`（6/5、选中 [2]/[1]）；静态分区帧显式清空选区。
+- 理由：分区头只加一行、不拆分组，能保持列表选择/揭示/拖拽的既有语义；把偏移放在纯函数里才能用变异刀钉住。颜色标记依赖合成路径（runner vibrant 重映射），带扫描只依赖墨与几何，档位无关。
+- 兼容性/迁移：无固定条目时仍是原来的单个 ForEach（老帧不变）；4 张 marker 帧删除、4 张分区帧新增，基线仍 238；`settings-general-no-footer`/`settings-min-no-footer` 继续作脚注负臂。
+- 边界：固定块的揭示行号在真实滚动里的像素/偏移还没有独立验收（455）；分区头不做折叠/计数。
+- 回滚：删 `SidebarSectionPlan.swift`、`SidebarSectionHeader.swift` 与 `HistorySidebarView` 的 Section 分支即可；或 `git revert` 本轮提交。
+
