@@ -2480,15 +2480,54 @@ final class MotionFilmstripTests: XCTestCase {
                 let fractions = Self.deltas(frames)
                 let span = Self.transitionFrameCount(fractions)
                 let peak = fractions.max() ?? 0
+                let window = film.postTriggerWindowMilliseconds
                 writeStrip("\(scenario.name)-\(Int(scale))x", frames)
                 emit("COPY_RECEIPT_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
                      + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
+                     + "窗口=\(Int(window.rounded()))ms "
                      + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
                 XCTAssertGreaterThan(frames.count, 4,
                                      "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+                // R417/40420998525：先证"卷子覆盖到了声明的过程"，再判过程有几帧。
+                // 30 帧 × 1.7ms = 51ms 的卷子去判 160ms 的过渡，只能读出 1 帧 —— 那不是硬切。
+                XCTAssertGreaterThanOrEqual(window, scenario.declaredDurationMilliseconds * 0.8,
+                                            "\(Int(scale))x：卷子只覆盖 \(Int(window.rounded()))ms，"
+                                                + "声明 \(Int(scenario.declaredDurationMilliseconds))ms "
+                                                + "⇒ 采样窗口没覆盖到过程；先修采样，别把窗口当成硬切")
                 XCTAssertGreaterThanOrEqual(span, 2,
                                             "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 回执是硬切；"
                                                 + "先查回执带是否装在药丸上方、`.transition`/`.animation(value:)` 是否还在")
+            }
+        }
+    }
+
+    /// R417：暂停采集横幅的出现与消失都必须在 2×/1× 读到 ≥2 个过渡帧；
+    /// 卷子先要覆盖到声明时长（宽度 760×48 的带抓得快，30 帧不一定够）。
+    func testPauseBannerAppearsAndDismissesWithAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scenarioFactory in [Scenario.pauseBannerAppear, Scenario.pauseBannerDismiss] {
+            for scale in [2.0, 1.0] {
+                let scenario = scenarioFactory()
+                let film = record(scenario, scale: scale)
+                let frames = film.motionFrames
+                let fractions = Self.deltas(frames)
+                let span = Self.transitionFrameCount(fractions)
+                let peak = fractions.max() ?? 0
+                let window = film.postTriggerWindowMilliseconds
+                writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+                emit("PAUSE_BANNER_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
+                     + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
+                     + "窗口=\(Int(window.rounded()))ms "
+                     + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+                XCTAssertGreaterThan(frames.count, 4,
+                                     "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+                XCTAssertGreaterThanOrEqual(window, scenario.declaredDurationMilliseconds * 0.8,
+                                            "\(Int(scale))x：卷子只覆盖 \(Int(window.rounded()))ms，"
+                                                + "声明 \(Int(scenario.declaredDurationMilliseconds))ms "
+                                                + "⇒ 采样窗口没覆盖到过程；先修采样，别把窗口当成硬切")
+                XCTAssertGreaterThanOrEqual(span, 2,
+                                            "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 暂停横幅是硬切；"
+                                                + "先查签名那一位与 `.bannerIn/.bannerOut` 过渡是否还在")
             }
         }
     }
@@ -7682,6 +7721,25 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R417：暂停采集横幅的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
+    @MainActor private final class PauseBannerDriver: ObservableObject {
+        @Published var paused: Bool
+
+        init(paused: Bool) {
+            self.paused = paused
+        }
+    }
+
+    private struct PauseBannerHarness: View {
+        let store: HistoryStore
+        @ObservedObject var driver: PauseBannerDriver
+
+        var body: some View {
+            ContentView(historyStore: store)
+                .environment(\.pausedForCapture, driver.paused)
+        }
+    }
+
     /// R400：「原文/渲染」标签切换的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
     @MainActor private final class MarkdownModeDriver: ObservableObject {
         @Published var rendered = true
@@ -7760,6 +7818,13 @@ final class MotionFilmstripTests: XCTestCase {
         /// 所以用它必须同时被 `testBandCaptureIsCheaperAndStillSeesTheMotion` 钉住
         /// "裁掉的那部分里没有被测的动效"。
         let captureRect: (@MainActor (NSView) -> NSRect)?
+        /// 触发后每一帧之间至少隔多少毫秒（0 = 不设下限，沿用抓帧器自己的速度）。
+        ///
+        /// R417/40420998525：抓帧预算 30 帧，窄带抓一帧只要 1.7ms ⇒ 触发后只覆盖 41ms，
+        /// 而这条过渡声明 160ms。宽带的场景（横幅 760×48）抓一帧 5–10ms，30 帧自然覆盖到
+        /// 150–300ms，所以这个病只在"抓得特别快"的窄带上露出来。
+        /// 设下限不是放宽判据：判据仍是"≥2 个过渡帧"，这条只保证**卷子覆盖到被声明的那段过程**。
+        let minimumSampleSpacingMilliseconds: Double
         /// 这一卷**钉死**在哪一档外观里拍（R324）。`nil` = 不钉，跟着系统的"自动"走。
         ///
         /// 为什么要有这一层，而且它不是风格偏好：以前所有胶片场景都不钉，于是同一份判据
@@ -7779,6 +7844,7 @@ final class MotionFilmstripTests: XCTestCase {
              root: (@MainActor (HistoryStore) -> AnyView)? = nil,
              storeFactory: (@MainActor () -> HistoryStore)? = nil,
              captureRect: (@MainActor (NSView) -> NSRect)? = nil,
+             minimumSampleSpacingMilliseconds: Double = 0,
              _ trigger: @escaping @MainActor (HistoryStore) -> Void) {
             self.name = name
             self.size = size
@@ -7787,6 +7853,7 @@ final class MotionFilmstripTests: XCTestCase {
             self.root = root
             self.storeFactory = storeFactory
             self.captureRect = captureRect
+            self.minimumSampleSpacingMilliseconds = minimumSampleSpacingMilliseconds
             self.appearance = appearance
             self.trigger = trigger
         }
@@ -7914,7 +7981,10 @@ final class MotionFilmstripTests: XCTestCase {
                          let b = host.bounds
                          let y = host.isFlipped ? 0 : b.height - 70
                          return NSRect(x: 0, y: y, width: b.width, height: 70)
-                     }) { _ in
+                     },
+                     // 120×70pt 的带抓一帧只要 ~1.7ms：30 帧 = 51ms，卷子覆盖不到 160ms 的声明时长
+                     // （runner 40420998525 只读到 1 个过渡帧）。8ms × 24 帧 ≈ 192ms。
+                     minimumSampleSpacingMilliseconds: 8) { _ in
                 withAnimation(MotionCatalog.animation(for: .emphasis)) {
                     driver.confirmed.toggle()
                 }
@@ -7927,6 +7997,32 @@ final class MotionFilmstripTests: XCTestCase {
 
         @MainActor static func copyReceiptDismiss() -> Scenario {
             copyReceiptScenario(name: "glass-pill-copy-receipt-dismiss", from: true)
+        }
+
+        /// R417：暂停采集横幅的出现/消失（状态横幅进出位）。
+        /// 驱动走取证键（产品路径读 `@AppStorage("recordingPaused")`），拍的是产品 `ContentView`
+        /// 顶部那条带；场景不进 `Scenario.all()`（不改 motion floor 的臂名单）。
+        @MainActor private static func pauseBannerScenario(name: String, from paused: Bool) -> Scenario {
+            let driver = PauseBannerDriver(paused: paused)
+            return Scenario(name: name, size: NSSize(width: 760, height: 560),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: paused ? .bannerOut : .bannerIn) * 1000,
+                     // 760×48pt 的带抓一帧 ~5ms；8ms 下限保证 30 帧预算覆盖到 120/150ms 的整段过程。
+                     appearance: .aqua,
+                     root: { store in AnyView(PauseBannerHarness(store: store, driver: driver)) },
+                     // 胶片窗口的 hosting view 顶部就是横幅（整窗帧实测 y=0..76px 是琥珀带）；
+                     // 与组件夹具不同：那边多一条 48pt 的窗口 chrome，所以像素判据的带下移 48pt。
+                     captureRect: Scenario.bannerBand,
+                     minimumSampleSpacingMilliseconds: 8) { _ in
+                driver.paused.toggle()
+            }
+        }
+
+        @MainActor static func pauseBannerAppear() -> Scenario {
+            pauseBannerScenario(name: "pause-banner-appear", from: false)
+        }
+
+        @MainActor static func pauseBannerDismiss() -> Scenario {
+            pauseBannerScenario(name: "pause-banner-dismiss", from: true)
         }
 
         /// R400：只拍「原文/渲染」这颗按钮；驱动从 rendered 切到 source。
@@ -8246,6 +8342,18 @@ final class MotionFilmstripTests: XCTestCase {
             Array(stamps[min(max(triggerFrame - 1, 0), max(stamps.count - 1, 0))...])
         }
 
+        /// 触发帧之后这一卷实际覆盖的墙钟时长（ms）。
+        ///
+        /// R417/40420998525：回执那条带只有 120×70pt，抓帧中位 1.7ms ⇒ 30 帧的预算在
+        /// **触发后 41ms** 就用完了，而它声明的过渡是 160ms —— 卷子根本没覆盖到过程，
+        /// runner 只读到 1 个过渡帧。判据要能区分"过程看不见"与"过程不存在"，
+        /// 所以这一格必须先被读出来（不是门槛，是前提）。
+        var postTriggerWindowMilliseconds: Double {
+            guard stamps.count > 1 else { return 0 }
+            let start = min(max(triggerFrame, 0), stamps.count - 1)
+            return max(0, (stamps[stamps.count - 1] - stamps[start]) * 1000)
+        }
+
         /// 触发那一刻采样是否已经热到能看过程。`false` ⇒ 这一卷只能报 not-run，
         /// **不许**判产品"没有过渡"（R11 就是被这条救回来的：见 `recordFrames` 里那段实测）。
         /// 带默认值的存储属性（不是计算属性）：`record()` 的其它调用点不传它，
@@ -8443,9 +8551,18 @@ final class MotionFilmstripTests: XCTestCase {
         scenario.trigger(store)
         let triggerFrame = grabber.frames.count
         let deadline = Date().addingTimeInterval(3.0)
+        // R417：窄带抓得太快时，30 帧预算会在声明时长之前用完 ⇒ 卷子覆盖不到过程。
+        // 只给"自己要下限"的场景补时间，其它卷的采样一个字节都不动。
+        let spacing = scenario.minimumSampleSpacingMilliseconds / 1000
         while !grabber.finished, Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()
+            if spacing > 0, !grabber.finished, let last = grabber.stamps.last {
+                let elapsed = ProcessInfo.processInfo.systemUptime - last
+                if elapsed < spacing {
+                    RunLoop.main.run(until: Date(timeIntervalSinceNow: spacing - elapsed))
+                }
+            }
         }
         // R55 / BACKLOG 77：把"这一卷为什么分辨不了"拆成两半 ——
         // **抓帧器自己的像素成本**（`cacheDisplay` 那一段）与 **runloop 没醒的时间**。

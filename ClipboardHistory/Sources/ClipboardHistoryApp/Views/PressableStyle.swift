@@ -248,6 +248,12 @@ private struct HoveredEntryIDForCaptureKey: EnvironmentKey {
     static let defaultValue: UUID? = nil
 }
 
+/// R417：暂停采集的横幅要能离线拍。产品路径读 `@AppStorage("recordingPaused")`；
+/// 这颗键只给夹具/胶片用（默认 `nil` = 不覆盖），真实开关那一半仍由产品自己供。
+private struct PausedForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
@@ -278,6 +284,12 @@ extension EnvironmentValues {
     var hoveredEntryIDForCapture: UUID? {
         get { self[HoveredEntryIDForCaptureKey.self] }
         set { self[HoveredEntryIDForCaptureKey.self] = newValue }
+    }
+
+    /// 取证用的暂停状态覆盖。`nil` = 不覆盖（产品读 `@AppStorage("recordingPaused")`）。
+    var pausedForCapture: Bool? {
+        get { self[PausedForCaptureKey.self] }
+        set { self[PausedForCaptureKey.self] = newValue }
     }
 }
 

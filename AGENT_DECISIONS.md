@@ -7587,3 +7587,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：仅详情区药丸；`GlassPill` 的入参已有 `copyConfirmed/copyFailed`，无新增产品状态；既有帧不变。
 - 回滚：删 `CopyReceiptPresentation`/`CopyReceiptView` 与 GlassPill 的 receipt overlay 即可；或 `git revert` 本轮提交。
 
+## D-412 暂停采集用状态规范的第六个 kind，不借 warning（R417）
+
+- 背景：`recordingPaused` 只在设置页那颗开关上可见；主窗口里复制进不来，没有一句人话。直接复用 `.warning` 会让图标变成感叹号、动作默认成「知道了」—— 两件事都不是这个状态的意思。
+- 决定：`StatePresentation.Kind` 增加 `.paused`（`pause.circle.fill`、prominent 墨、橙色图标与 12% 底、动作默认「继续记录」）；`NoticeTone.paused` 映射到它；`ContentView` 用 `@AppStorage("recordingPaused")` 读与设置页/采集侧同一把钥匙，`noticeSignature` 加 `bits |= 32` 驱动 `bannerIn/bannerOut`，动作把开关关回去；取证键 `pausedForCapture` 只给夹具/胶片。
+- 理由：暂停是**持续状态**，需要一句可读的话和一个真能解决问题的动作（继续记录），不是一次性提示的「知道了」；把图标/墨/动作留给状态规范，横幅只是布局；横幅在 `ContentView` 的签名里有一位，进出才不会硬切。既有 206 帧逐字节不变。
+- 兼容性/迁移：只在暂停时多一条横幅；`Kind` 加了一个 case，所有 switch 都显式讨论它；`@AppStorage` 与设置页/采集侧同一个键，键名由源守卫钉住。
+- 回滚：删 `Kind.paused`/`NoticeTone.paused` 与 `ContentView` 的暂停分支即可；或 `git revert` 本轮提交。
+

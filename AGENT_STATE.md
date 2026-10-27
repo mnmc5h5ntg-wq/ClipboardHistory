@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R417 状态（2026-10-27 · 本地 · 第 416 轮 / Round 414）：暂停采集状态补主窗口横幅（旧 0 橙 → 新 434/386；默认键管线 0/0→434）；R416 run 唯一红＝回执胶片采样窗口，修采样不改门槛（产品 4 文件，暂停状态横幅位）
+
+最后更新：2026-10-27（本地 · R417 / 第 416 轮 / Round 414）：`recordingPaused` 以前只在设置页可见。新 `StatePresentation.Kind.paused`（pause.circle.fill、prominent 墨、橙图标/12% 底、动作「继续记录」）+ `NoticeTone.paused`；`ContentView` 用 `@AppStorage("recordingPaused")` 画第六条横幅，`noticeSignature` 加 `bits |= 32` 驱动 bannerIn/bannerOut，动作把开关关回去；取证键 `pausedForCapture`。真看图亮/暗整窗：琥珀带、橙色暂停图标、文案与动作完好。同带旧 **0 橙** → 新 **434/386 橙**（亮/暗），整带变化 141864/141880；只拨 defaults 的产品入口 **0→434**。新增 4 帧、既有 **206 帧逐字节不变**、基线 **210/0/0/0**。胶片出现 2x 27/5/0.5822/523ms、1x 27/5/0.5780/444ms；消失 2x 27/5/0.6550/568ms、1x 27/7/0.3539/476ms。`M1088–M1092` **5/5**、`M1093–M1095` **3/3 CAUGHT**（M1089/M1090 第一版被整文件 contains 放过，收窄到暂停分支后 CAUGHT）。R416 run `40420998525 ↔ a51de8d` **failure**：失败步骤 **1 个**（`Motion coverage floor`），红是 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess` 在 1x/2x 都只有 1 个过渡帧；定位 `MOTION_GRAB 30 帧/中位 1.7ms/声明 160ms` ⇒ 触发后窗口 ≈41ms，卷子没覆盖过程；修 `Scenario.minimumSampleSpacingMilliseconds`（回执 8ms）并打印/前置断言窗口，**门槛未动**。回执 6 帧像素在 runner 上绿（亮 0/0→2416/0、2724/187；暗 0/0→1738/0、1991/177）；`COPY_RECEIPT_FADE` 在 runner 无行记 NOT-RUN。全量 **1106/55/0**；捕获 **210/126/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 261/886 rot=0；预检 174/156/468 bad=0；产品面连续零改动 **1** 轮（as-of 416，现读 `python3 scripts/product_streak.py --streak-for 416`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R416 runner 唯一红是回执胶片；定位到 30 帧×1.7ms=41ms < 声明 160ms，修采样窗口（8ms 下限 + 窗口前置断言），门槛未动。
+② 产品：暂停采集补主窗口横幅（旧 0 橙 → 434/386），defaults 管线 0→434；新增 4 帧。
+③ 判据：纯/source/defaults/像素/胶片；M1088–M1095 8/8 CAUGHT；派生键守卫 6 调用点；precheck 174/156/468；hidden rot 0。
+④ 436：judged=5/5、REDS=1（红有名字：本轮回执胶片）、UNLISTED 缺行记 NOT-RUN；notice-banner 放行，未重猜 must_judge。
+⑤ 367：hidden 表 261 / 可判 886 / rot 0 / 上界 0；ARM 267 文件 / 952 把。
+⑥ 全量 1106/55/0；捕获 210/126/4/0；换装 ok；清账 162=162；帧基线 210/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① runner 的真在屏 `REVEAL`/`INTAKE_READING` 通道没有行（本地绿）；② `MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 通道缺行；③ `COPY_RECEIPT_FADE` 在 runner 没有行（stdout 丢）；④ 暂停横幅真机点击链与菜单栏状态缺证（443）；⑤ `table-lazy-rows`；⑥ 设置内容帧能力闸门仍隐式（441）；⑦ 亮档真机腿仍没跑；⑧ macOS 12 紧凑详情头仍走旧截断；⑨ 437/438/439/440/441/442/443 仍开；⑩ R417 新跑待 push 后读。
+
+下一轮（R418）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R417 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看回执胶片修后是否绿、`COPY_RECEIPT_FADE` 是否有行、暂停横幅 4 帧在 runner 上是否绿。① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R416 状态（2026-10-27 · 本地 · 第 415 轮 / Round 413）：复制回执补文字胶囊（回执带旧 0/0 → 已复制 8792/0、失败 9936/355）；R415 run 全绿 → 设置 8 红消失（2 条具名能力 skip）、焦点 236.1/217.6、滚动 reduce=true override=false（产品 1 文件，复制回执位）
 
 最后更新：2026-10-27（本地 · R416 / 第 415 轮 / Round 413）：复制成功/失败以前只换第三颗按钮的图标（R394 给了失败红），窄药丸里没有一句人话。新 `CopyReceiptPresentation`（失败优先真值表）+ `CopyReceiptView`（图标 + 「已复制」/「复制失败」的玻璃胶囊）挂在药丸上方外侧，`.emphasis` 驱动 opacity+move(bottom) 过渡，`fixedSize` 防折行，`allowsHitTesting(false)`。真看图亮/暗三态：静置无回执，成功白勾、失败红感叹号；同带旧 **0/0** → 亮 **8792/0、9936/355**；暗 **5257/0、6094/356**。新增 6 帧、既有 200 帧逐字节不变、基线 **206/0/0/0**。胶片出现 2x 27/6/0.0800、1x 27/4/0.0889；消失 2x 27/7/0.0429、1x 27/6/0.0889。`M1084–M1087` **4/4 CAUGHT**（M1084 三态全 0/0），RESTORE_CLEAN=yes。R415 run `40416557136 ↔ 7d8a0b7` **success**、失败步骤 **0 个**（21/21 step success）：**R414 的 8 条设置内容红消失**（probes/disabled passed；rowtier 走 `ROWTIER_NOT_RUN light`、card 走 `CARD_RHYTHM_SHADE_NOT_RUN=1` 两条具名能力 skip）；**焦点 runner 读数** 亮 236.1/217.6/207.6、暗 50.1/66.3/84.2；**滚动** `SCROLL_REVEAL_PLAN reduce=true override=Optional(false)`、6 采样/2 中间值/首 365/末 1430、OFFSET 0→457→1430、INSTANT 50→50。全量 **1100/54/0**；捕获 **206/124/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 259/878 rot=0；预检 172/154/460 bad=0；产品面连续零改动 **1** 轮（as-of 415，现读 `python3 scripts/product_streak.py --streak-for 415`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

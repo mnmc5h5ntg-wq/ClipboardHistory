@@ -1,5 +1,5 @@
 {
-  "count": 206,
+  "count": 210,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -15,6 +15,10 @@
     "content-min-with-copy-failure-notice-600x440-light.png": "368e9a0189249bbbd50888f293e58d1020b3a0831c4148cacb0480cd3862feb3",
     "content-no-results-750x560-dark.png": "62ca8b02b3ffb355e9b4996be018202a78e35997fc12705e02d1f2b9ddc5ac45",
     "content-no-results-750x560-light.png": "a1b712fd4c93124a4d4a624f224517bb1b5f8957c27302734228b3ccd872bc2e",
+    "content-paused-750x560-dark.png": "3363b8004746f416bb7f5a7ec6b151daad1d325502e6ac017c4c6b8fa36e8982",
+    "content-paused-750x560-light.png": "e108cbe771c15e56e50ee03220b7bbe7f7a1646f62eb8d0b0d4a8ec09c0cd9fd",
+    "content-paused-idle-750x560-dark.png": "b83b2be39529224d366289bc32afb2aafd42855dd4ab93911c0da0c795a6faf5",
+    "content-paused-idle-750x560-light.png": "b1f43b735d191ddb5d41394a6d36695f4064a4889c8e59c624496efd2df5ee32",
     "content-wide-1100x800-dark.png": "08b0cdd11af06833eda757bf5fc7d6667e113746148fc4c01e84913e81459c39",
     "content-wide-1100x800-light.png": "57958d682417ffc9df15ad32ca3fb1467c68a6e4bcbf47acfd4767911138ab99",
     "content-with-copy-failure-notice-750x560-dark.png": "e693ee5d1fe6e7680f07a9ac5c5f8156132eab8be4511eb0b08ab4a702a0fcb3",

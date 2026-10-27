@@ -3,13 +3,16 @@ import SwiftUI
 enum NoticeTone {
     case warning
     case error
+    /// R417：暂停采集是一个**持续状态**，横幅只在它成立期间存在，动作是「继续采集」。
+    case paused
 
-    /// 与状态规范同源：横幅只有这两种 tone，映射到 `StatePresentation.Kind` 之后，
+    /// 与状态规范同源：横幅的 tone 全部映射到 `StatePresentation.Kind` 之后，
     /// 图标、颜色、底色调都由规范决定，不再在这里各写一份（审计 §4 U-5）。
     var stateKind: StatePresentation.Kind {
         switch self {
         case .warning: return .warning
         case .error: return .error
+        case .paused: return .paused
         }
     }
 }

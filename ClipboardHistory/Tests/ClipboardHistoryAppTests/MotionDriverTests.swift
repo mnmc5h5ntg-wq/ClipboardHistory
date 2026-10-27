@@ -527,7 +527,7 @@ final class MotionDriverTests: XCTestCase {
         CaptureReadings.emit("DERIVED_KEY_EXPANSION 五格：展开认最后一段 / 没点到的仍算没电 / 读不懂不放行")
     }
 
-    /// 推广：`NoticeBanner` 那五个调用点，每个都必须被某条驱动**真的**推到。
+    /// 推广：`NoticeBanner` 那六个调用点，每个都必须被某条驱动**真的**推到。
     ///
     /// 这一条是 R42 那把尺换到第二个组件上跑 —— 而它同时是 BACKLOG 64 的验收：
     /// 如果派生键展开没做，这一条会**五条全红**（假阳性），所以它自己就是那件事的正对照。
@@ -553,6 +553,8 @@ final class MotionDriverTests: XCTestCase {
         "let dropped = historyStore.droppedFilesNotice",
         "let pasteFailure = historyStore.pasteFailureNotice",
         "let retention = historyStore.retentionNotice",
+        // R417：暂停采集是持续状态，驱动是 `noticeSignature` 的第六位（`bits |= 32`）。
+        "isPausedForDrawing",
     ]
 
     // MARK: - 扫描器

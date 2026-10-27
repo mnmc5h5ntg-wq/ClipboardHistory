@@ -107,6 +107,10 @@ final class UICaptureTests: XCTestCase {
         // R411：行悬停帧是同一个 `HistorySidebarView` + 同一批选中行；黑带仍是系统 List
         // 选中材质（不是新画的 hover 底）。目标行 hover 已单独量过。
         "sidebar-row-hover",
+        // R417：暂停横幅两帧走同一个 `ContentView` + 同一批选中行；黑带仍是系统 List 选中材质
+        // （不是横幅画黑的）。已看图：琥珀带、橙色暂停图标、文案与「继续记录」完好，
+        // 黑的是左下侧栏那一行（`content-paused` 黑带被横幅推下 48pt，`-idle` 与原版面同高）。
+        "content-paused", "content-paused-idle",
     ]
 
     /// 「这张帧天生就是稀的」名单（R63）—— 与上面那份同一族：**尺的假设名单**，不是缺陷名单。
@@ -2905,8 +2909,128 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
-    /// R415：焦点边界。面板一打开字段就是第一响应者，但这条状态以前没有帧可看；
-    /// 与 hover 同一档视觉、不同的触发。旧的「只在悬停点亮」在这条判据下 focus=idle（红）。
+    /// R417：暂停记录是持续状态，以前只在设置页那颗开关上可见。主窗口横幅只在暂停时出现；
+    /// 未暂停那一档的顶部带必须为空（横幅没漏画）。
+    func testPauseBannerAppearsOnlyWhenCaptureIsPaused() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r417-pause-banner-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "content-paused-idle" }),
+                  let pausedFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "content-paused" }) else {
+                return XCTFail("\(tag)：content-paused-idle/paused 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [idleFixture, pausedFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let idle = reps["content-paused-idle"], let paused = reps["content-paused"],
+                  idle.pixelsWide == paused.pixelsWide, idle.pixelsHigh == paused.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let scale = Double(idle.pixelsWide) / 750.0
+            // 横幅在标题栏/工具栏带**下面**（视图顶部 48pt 是系统 chrome，两者都有）。
+            // 这条带在静置帧里是搜索框那一行、暂停帧里是横幅 —— 橙色图标只在后者存在。
+            let band = CGRect(x: 0, y: 48, width: 750, height: 48)
+            let x0 = Int(band.minX * scale), x1 = Int(band.maxX * scale)
+            let y0 = Int(band.minY * scale), y1 = Int(band.maxY * scale)
+            var idleOrange = 0, changed = 0, orange = 0
+            for y in y0..<min(y1, idle.pixelsHigh) {
+                for x in x0..<min(x1, idle.pixelsWide) {
+                    guard let a = idle.colorAt(x: x, y: y),
+                          let b = paused.colorAt(x: x, y: y) else { continue }
+                    let d = abs(a.redComponent - b.redComponent)
+                        + abs(a.greenComponent - b.greenComponent)
+                        + abs(a.blueComponent - b.blueComponent)
+                    if d > 0.01 { changed += 1 }
+                    if a.redComponent > 0.7, a.redComponent - a.blueComponent > 0.25,
+                       a.greenComponent > 0.3 { idleOrange += 1 }
+                    if b.redComponent > 0.7, b.redComponent - b.blueComponent > 0.25,
+                       b.greenComponent > 0.3 { orange += 1 }
+                }
+            }
+            emit("PAUSE_BANNER_BAND \(tag) 静置橙=\(idleOrange) 暂停变化=\(changed) 暂停橙=\(orange)")
+            XCTAssertLessThanOrEqual(idleOrange, 5,
+                                     "\(tag)：未暂停时横幅带已有 \(idleOrange) 个橙点 ⇒ 暂停横幅在漏画")
+            XCTAssertGreaterThan(changed, 500,
+                                 "\(tag)：暂停帧与静置帧的横幅带只差 \(changed) 个像素 ⇒ 横幅没画出来")
+            XCTAssertGreaterThan(orange, 10,
+                                 "\(tag)：暂停横幅里读不到橙色暂停图标（橙点=\(orange)）")
+        }
+    }
+
+    /// R417：产品入口那一条 —— 不写取证键，只拨 `UserDefaults` 的同一个键，
+    /// 主窗口横幅必须自己出现（证明 `@AppStorage` 接的是采集侧读的那把钥匙）。
+    func testPauseBannerReadsTheDefaultsKeyCaptureReads() throws {
+        let key = "recordingPaused"
+        let saved = UserDefaults.standard.object(forKey: key)
+        defer {
+            if let saved { UserDefaults.standard.set(saved, forKey: key) }
+            else { UserDefaults.standard.removeObject(forKey: key) }
+        }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r417-pause-defaults-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let store = makePopulatedStore()
+        var reps: [String: NSBitmapImageRep] = [:]
+        for paused in [false, true] {
+            UserDefaults.standard.set(paused, forKey: key)
+            // 每一次都新建 ContentView：@AppStorage 在 body 求值时读钥匙。
+            let fixture = Fixture("content-paused-defaults-\(paused)",
+                                  NSSize(width: 750, height: 560)) {
+                AnyView(ContentView(historyStore: store))
+            }
+            let file = scratch.appendingPathComponent("paused-\(paused).png")
+            _ = try render(fixture, appearance: .aqua, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data) else {
+                return XCTFail("暂停=\(paused) 的帧读不回来")
+            }
+            reps["\(paused)"] = rep
+        }
+        guard let idle = reps["false"], let paused = reps["true"],
+              idle.pixelsWide == paused.pixelsWide, idle.pixelsHigh == paused.pixelsHigh else {
+            return XCTFail("两帧尺寸不一致")
+        }
+        let scale = Double(idle.pixelsWide) / 750.0
+        var idleOrange = 0, changed = 0, orange = 0
+        for y in Int(48 * scale)..<Int(96 * scale) {
+            for x in 0..<Int(750 * scale) {
+                guard let a = idle.colorAt(x: x, y: y),
+                      let b = paused.colorAt(x: x, y: y) else { continue }
+                let d = abs(a.redComponent - b.redComponent)
+                    + abs(a.greenComponent - b.greenComponent)
+                    + abs(a.blueComponent - b.blueComponent)
+                if d > 0.01 { changed += 1 }
+                if a.redComponent > 0.7, a.redComponent - a.blueComponent > 0.25,
+                   a.greenComponent > 0.3 { idleOrange += 1 }
+                if b.redComponent > 0.7, b.redComponent - b.blueComponent > 0.25,
+                   b.greenComponent > 0.3 { orange += 1 }
+            }
+        }
+        emit("PAUSE_BANNER_DEFAULTS light 静置橙=\(idleOrange) 暂停变化=\(changed) 暂停橙=\(orange)")
+        XCTAssertLessThanOrEqual(idleOrange, 5,
+                                 "钥匙=false 时横幅带已有 \(idleOrange) 个橙点 ⇒ 横幅没有跟着钥匙走")
+        XCTAssertGreaterThan(changed, 500,
+                             "钥匙=true 时横幅带只变了 \(changed) 个像素 ⇒ 横幅没读这把钥匙")
+        XCTAssertGreaterThan(orange, 10,
+                             "钥匙=true 时横幅带里读不到橙色暂停图标（橙点=\(orange)）")
+    }
+
+
     func testQuickPickSearchFieldFocusLiftsItsChrome() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r415-search-focus-\(UUID().uuidString)", isDirectory: true)
@@ -6559,6 +6683,18 @@ final class UICaptureTests: XCTestCase {
         twoNoticeStore.addDroppedFiles(urls: [URL(string: "https://example.com/远程图.png")!])
         results.append(Fixture("content-with-two-notices", NSSize(width: 750, height: 560)) {
             AnyView(ContentView(historyStore: twoNoticeStore))
+        })
+        // R417：暂停采集的**持续状态**第一次进帧基线。两臂是同一份 store，只差取证键 ——
+        // 产品路径读的是 `@AppStorage("recordingPaused")`（与设置页同一个键），
+        // 取证键只替"用户刚拨了那颗开关"这一步。旧带（未暂停）应当是空的。
+        let pausedStore = makePopulatedStore()
+        results.append(Fixture("content-paused-idle", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: pausedStore)
+                .environment(\.pausedForCapture, false))
+        })
+        results.append(Fixture("content-paused", NSSize(width: 750, height: 560)) {
+            AnyView(ContentView(historyStore: pausedStore)
+                .environment(\.pausedForCapture, true))
         })
         // R206 / BACKLOG 228① + 229：D-4 另一半那条回执**第一次进帧基线**。
         //

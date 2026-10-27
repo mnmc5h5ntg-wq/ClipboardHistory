@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 暂停采集状态补主窗口横幅（旧 0 橙 → 新 434/386；默认键管线 0/0→434）；R416 run 唯一红＝回执胶片采样窗口，修采样不改门槛（R417 / 第 416 轮 / Round 414 / U-1508…U-1512 · 产品 4 文件，暂停状态横幅位）
+
+
 ### 复制回执补文字胶囊（回执带旧 0/0 → 已复制 8792/0、失败 9936/355）；R415 run 全绿 → 设置 8 红消失（2 条具名能力 skip）、焦点 236.1/217.6、滚动 reduce=true override=false（R416 / 第 415 轮 / Round 413 / U-1503…U-1507 · 产品 1 文件，复制回执位）
 
 

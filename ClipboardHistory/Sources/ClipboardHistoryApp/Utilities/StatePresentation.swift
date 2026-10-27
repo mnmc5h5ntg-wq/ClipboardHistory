@@ -10,11 +10,14 @@ import SwiftUI
 /// 刻意只放**判定**，不放视图：视图各有布局（横幅有分隔线、空态占满整块），
 /// 但字号、图标色系、动作按钮文案、对齐规则必须同源。
 enum StatePresentation {
-    enum Kind {
+    enum Kind: Equatable {
         case loading
         case empty
         case warning
         case error
+        /// R417：「暂停记录」是一个**持续状态**，不是一次提示 —— 它没有自己的横幅之前
+        /// 只在设置页那一颗开关上可见，主窗口里复制进不来也没有一句话。
+        case paused
     }
 
     /// 落在什么表面上。对齐规则看这个，不看 kind。
@@ -59,7 +62,7 @@ enum StatePresentation {
 
     static func messageInk(for kind: Kind) -> MessageInk {
         switch kind {
-        case .warning, .error: return .prominent
+        case .warning, .error, .paused: return .prominent
         case .loading, .empty: return .subdued
         }
     }
@@ -105,6 +108,7 @@ enum StatePresentation {
         case .warning: return "exclamationmark.arrow.circlepath"
         case .error: return "exclamationmark.triangle.fill"
         case .empty: return "tray"
+        case .paused: return "pause.circle.fill"
         }
     }
 
@@ -114,7 +118,7 @@ enum StatePresentation {
     static func iconStyle(for kind: Kind) -> AnyShapeStyle {
         switch kind {
         case .loading, .empty: return AnyShapeStyle(.secondary)
-        case .warning: return AnyShapeStyle(Color.orange)
+        case .warning, .paused: return AnyShapeStyle(Color.orange)
         case .error: return AnyShapeStyle(Color.red)
         }
     }
@@ -123,7 +127,7 @@ enum StatePresentation {
     static func backgroundStyle(for kind: Kind) -> AnyShapeStyle {
         switch kind {
         case .error: return AnyShapeStyle(Color.red.opacity(0.10))
-        case .warning: return AnyShapeStyle(Color.orange.opacity(0.12))
+        case .warning, .paused: return AnyShapeStyle(Color.orange.opacity(0.12))
         case .loading, .empty: return AnyShapeStyle(Color.clear)
         }
     }
@@ -139,6 +143,8 @@ enum StatePresentation {
         case .loading: return nil
         case .empty: return provided
         case .warning, .error: return provided ?? dismissActionTitle
+        // 暂停状态的下一步不是「知道了」——知道没有用，要继续采集。
+        case .paused: return provided ?? "继续记录"
         }
     }
 }
