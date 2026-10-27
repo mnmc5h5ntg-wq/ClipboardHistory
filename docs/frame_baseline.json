@@ -1,5 +1,5 @@
 {
-  "count": 230,
+  "count": 234,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -125,6 +125,8 @@
     "receipt-line-430x72-light.png": "22098329d5c4b91502ab619554b827be7ab37ab6f2fc9d325efa6b8464dd3d06",
     "row-clipped-control-300x58-dark.png": "15370117b18171e608290825e99130ff51f210906c433c08f84f008ba3b9acfc",
     "row-clipped-control-300x58-light.png": "7191c02aebd8d47aa06d9a2411d308bed7d860e11f741aadfbe0878a6093cdc8",
+    "row-drag-source-active-300x74-dark.png": "a4544021e0f4a40bc603b858272cf7a0b20188429d14c1e93338bbffadcbbb62",
+    "row-drag-source-active-300x74-light.png": "bd8dfabb95c6c49272b94b5d1205cf92245d9cd79cbe8c59942f506763bf3609",
     "row-favorite-hover-60x56-dark.png": "c1532f87ed87e7c1fa078056ec59f1e9fa018139f19f866c27f2051fedc854ad",
     "row-favorite-hover-60x56-light.png": "ed7f0b145c22f91529ad8920c71324e464fb5704e5a9ee4f37cb4612a3ef93c9",
     "row-favorite-idle-60x56-dark.png": "9c978529f80f71aebed6db635ad1b902b72c582c5cd355a32eb4e6a898845fff",
@@ -171,6 +173,8 @@
     "settings-general-no-footer-720x540-light.png": "9d9c6da4520c34149462d816367c2af3a64df98cc35b1c7abebd2f4d81206e2c",
     "settings-min-640x440-dark.png": "b83a13e920819edb7d12595bcbe8898d640a2de775275e378039e8dc478ea7b2",
     "settings-min-640x440-light.png": "ec91164fce3b07a0c3239e5d641f6f82e151eb535cc00aecb0a82870b846567d",
+    "settings-min-no-footer-640x440-dark.png": "1877ca7b8088fe46e7c505f155d556ee4eee3dca07ee7c259016693d41e7b6a3",
+    "settings-min-no-footer-640x440-light.png": "1f44312a7ffc6313644a8f96c383ce0b800800063229d39fb0096c08848ac0c1",
     "settings-privacy-720x540-dark.png": "72c6005cd92a5b985d59a531f4e3cf4b7115302caf9531c4fbd003a5511430d8",
     "settings-privacy-720x540-light.png": "09558cb3c286ad10eb2fc85033d653120a78fa208f43dc3615533b5ad34fee5e",
     "settings-privacy-excluded-720x1040-dark.png": "8a34a2dcc20db8ce5ce14931854b203fb836e4e0c08694b44062fb5d0a524788",

@@ -170,8 +170,8 @@ final class SidebarListSelectionTests: XCTestCase {
     /// "只让行首可拖"在系统列表里做不到 —— 见 D-034 与用户真机反馈）。
     func testDragAffordanceIsExactlyOneAndLivesOnTheRow() throws {
         let source = codeOnly(try productSource(named: "Views/HistoryRowViews.swift"))
-        XCTAssertEqual(source.components(separatedBy: "EntryDragModifier(content:").count - 1, 1,
-                       "拖出入口应当恰好一处；多一处就意味着又出现两个候选")
+        XCTAssertEqual(source.components(separatedBy: "EntryDragModifier(entryID:").count - 1, 1,
+                       "拖出入口应当恰好一处（R427 起带 entryID）；多一处就意味着又出现两个候选")
         XCTAssertTrue(source.contains("RowLeadingVisual"), "行首视觉列不见了")
         XCTAssertFalse(source.contains("RowDragHandle"),
                        "旧的把手层还在 —— 那个设计已被真机否掉，别让它悄悄回来")

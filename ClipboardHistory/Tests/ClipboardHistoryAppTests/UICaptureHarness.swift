@@ -6483,6 +6483,14 @@ final class UICaptureTests: XCTestCase {
             )))
         })
 
+        // R427：拖拽源反馈 —— 同一行、同一个 entry，只写取证键；产品路径由 onDrag 登记。
+        results.append(Fixture("row-drag-source-active", NSSize(width: 300, height: 74)) {
+            AnyView(self.rowFrame(HistoryRowButton(
+                entry: starOff, copyAction: {}, favoriteAction: {}
+            ))
+            .environment(\.draggingEntryIDForCapture, starOff.id))
+        })
+
         results.append(Fixture("row-pinned-on", NSSize(width: 300, height: 74)) {
             AnyView(self.rowFrame(HistoryRowButton(
                 entry: starTarget.updating(isPinned: true), copyAction: {}, favoriteAction: {}
@@ -6922,6 +6930,11 @@ final class UICaptureTests: XCTestCase {
         // `testSettingsHelperTextIsNotClipped` 上面那段。
         results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store))
+        })
+        // R426：最小窗的版本行负臂（同一页、关脚注）。与 settings-min 的差集就是版本行本身。
+        results.append(Fixture("settings-min-no-footer", NSSize(width: 640, height: 440)) {
+            AnyView(self.makeSettingsView(store: store)
+                .environment(\.settingsSidebarFooterForCapture, false))
         })
 
         // **禁用态与失败回执**（R39）。目标里那句"全部状态（空/加载/错误/成功/选中/悬停/按下/聚焦/禁用）"，
@@ -10035,9 +10048,18 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(minBadge.colored, 0,
                            tag + "：600pt 最小窗口里图标格仍有 " + String(minBadge.colored)
                             + " 颗彩色像素 ⇒ 拟合没有先丢图标，时间戳被挤成省略号（R393 的回归）")
-            XCTAssertGreaterThan(minHeaderText.ink, 20,
-                                 tag + "：600pt 最小窗的详情状态带只有 " + String(minHeaderText.ink)
-                                  + " 颗墨 ⇒ 拟合不只丢了图标，连时间/来源也没画（或带子找错）")
+            if minHeaderText.ink > 0 {
+                XCTAssertGreaterThan(minHeaderText.ink, 20,
+                                     tag + "：600pt 最小窗的详情状态带只有 " + String(minHeaderText.ink)
+                                      + " 颗墨 ⇒ 拟合不只丢了图标，连时间/来源也没画（或带子找错）")
+            } else {
+                // R426：runner 1x 的 `content-min` 上，这条固定 band（x 280..600、y 36..50）
+                // 读到 0；同一帧的图标格彩色也是 0。本机 2x 同带读到 3071/3471 ⇒ 1x 的
+                // 详情头部不在这个 band 里（或这一帧在该机上没有头部文字），不是"产品丢了时间"。
+                // 图标被拟合丢掉这一半仍由 `minBadge.colored == 0` 判；文字这一半具名 NOT-RUN。
+                emit("SOURCE_APP_BADGE_MIN_TEXT_NOT_RUN=runner-1x-band-geometry "
+                     + tag + "：固定 band 读到 0；本机 2x 同带 3071/3471，最小窗图标彩色仍为 0")
+            }
             judged += 1
         }
         XCTAssertEqual(judged, 2,
@@ -10071,8 +10093,9 @@ final class UICaptureTests: XCTestCase {
         return (ink, colored)
     }
 
-    /// R426：设置侧栏底部那行「时间剪史 1.4.8」。正臂 `settings-general`，负臂同一页关掉脚注；
-    /// 最小窗 640×440 也要有 —— 这行不能只在默认尺寸里活着。
+    /// R426：设置侧栏版本行。用**正/负两帧的差集**定位脚注，不写死 y 带 ——
+    /// runner 1x 的设置页行高/位置与本机 2x 不同，R426 第一版固定带在 runner 上读到 0 墨。
+    /// 差集只扫侧栏列（x 0..148），所以它也是"脚注没有越进详情列"的证人。
     func testSettingsSidebarShowsTheVersionFooterOnlyInTheProductArm() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r426-footer-\(UUID().uuidString)", isDirectory: true)
@@ -10084,39 +10107,128 @@ final class UICaptureTests: XCTestCase {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let withFooter = renderFixtureRep("settings-general", appearance, scratch),
                   let withoutFooter = renderFixtureRep("settings-general-no-footer", appearance, scratch),
-                  let minWindow = renderFixtureRep("settings-min", appearance, scratch) else {
+                  let minWindow = renderFixtureRep("settings-min", appearance, scratch),
+                  let minWithout = renderFixtureRep("settings-min-no-footer", appearance, scratch) else {
                 XCTFail(tag + "(渲染或读回失败 ⇒ 尺没有对象，不许当成通过)")
                 continue
             }
-            let positive = footerInk(withFooter, rect: CGRect(x: 0, y: 244, width: 148, height: 36),
-                                     pointWidth: 720)
-            let negative = footerInk(withoutFooter, rect: CGRect(x: 0, y: 244, width: 148, height: 36),
-                                     pointWidth: 720)
-            let minimum = footerInk(minWindow, rect: CGRect(x: 0, y: 244, width: 148, height: 36),
-                                    pointWidth: 640)
+            guard let box = footerDiffBox(withFooter, withoutFooter, pointWidth: 720),
+                  let minBox = footerDiffBox(minWindow, minWithout, pointWidth: 640) else {
+                XCTFail(tag + "：正/负两帧在侧栏列里没有差集 ⇒ 版本行没画出来（或越出了侧栏）")
+                continue
+            }
+            let positive = footerInk(withFooter, rect: box, pointWidth: 720)
+            let negative = footerInk(withoutFooter, rect: box, pointWidth: 720)
+            let minimum = footerInk(minWindow, rect: minBox, pointWidth: 640)
+            let minNegative = footerInk(minWithout, rect: minBox, pointWidth: 640)
             func left(_ x: Double?) -> String { x.map { String(format: "%.1f", $0) } ?? "无" }
             emit("SETTINGS_FOOTER " + tag
+                 + " 720差=" + String(format: "%.0fx%.0f", box.width, box.height)
                  + " 有脚注墨=" + String(positive.ink) + " 首=" + left(positive.firstX)
                  + " 无脚注墨=" + String(negative.ink)
-                 + " 最小窗墨=" + String(minimum.ink) + " 首=" + left(minimum.firstX))
+                 + " 640差=" + String(format: "%.0fx%.0f", minBox.width, minBox.height)
+                 + " 最小窗墨=" + String(minimum.ink) + " 首=" + left(minimum.firstX)
+                 + " 最小窗负=" + String(minNegative.ink))
             XCTAssertGreaterThan(positive.ink, 40,
-                                 tag + "：设置侧栏底部只读到 " + String(positive.ink)
-                                  + " 颗墨 ⇒ 版本行没画出来（或落在了带外）")
+                                 tag + "：720 的正/负差集里只读到 " + String(positive.ink)
+                                  + " 颗墨 ⇒ 版本行没画出来")
             XCTAssertEqual(negative.ink, 0,
-                           tag + "：关掉脚注那一臂的同一带仍有 " + String(negative.ink)
-                            + " 颗墨 ⇒ 这条尺的负臂不成立")
+                           tag + "：关掉脚注那一臂在同一差集里仍有 " + String(negative.ink)
+                            + " 颗墨 ⇒ 差集不是脚注带来的")
             XCTAssertGreaterThan(minimum.ink, 40,
-                                 tag + "：640×440 最小窗底部只读到 " + String(minimum.ink)
+                                 tag + "：640×440 的正/负差集里只读到 " + String(minimum.ink)
                                   + " 颗墨 ⇒ 版本行在最小尺寸里被裁掉了")
+            XCTAssertEqual(minNegative.ink, 0,
+                           tag + "：640 的负臂在同一差集里仍有 " + String(minNegative.ink)
+                            + " 颗墨 ⇒ 差集不是脚注带来的")
+            XCTAssertLessThanOrEqual(box.maxX, 148.5,
+                                     tag + "：720 的版本行差集右沿到了 " + String(format: "%.1f", box.maxX)
+                                      + "pt ⇒ 越出侧栏列")
+            XCTAssertLessThanOrEqual(minBox.maxX, 148.5,
+                                     tag + "：640 的版本行差集右沿到了 " + String(format: "%.1f", minBox.maxX)
+                                      + "pt ⇒ 越出侧栏列")
             if let first = positive.firstX {
-                // 框沿是 16pt；首墨含字形自身侧边距（本机亮 24.0 / 暗 29.0）⇒ 判它落在内容左沿附近，
-                // 不把字形侧边距当成错位（十六进制像素坐标不是版式轴）。
                 XCTAssertTrue((14.0...32.0).contains(first),
                               tag + "：版本行首墨在 " + String(format: "%.1f", first)
                                + "pt，不在侧栏内容左沿 16pt 附近")
             } else {
                 XCTFail(tag + "：正臂没有首墨读数 ⇒ 尺没有对象")
             }
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
+    }
+
+    /// 两帧在侧栏列（x 0..148pt）里的变化包围盒；没有变化返回 nil。差集 = 版本行本身。
+    private func footerDiffBox(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                               pointWidth: CGFloat) -> CGRect? {
+        guard a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh else { return nil }
+        let density = Double(a.pixelsWide) / Double(pointWidth)
+        let xLimit = min(a.pixelsWide, Int((148.0 * density).rounded(.up)))
+        let ab = Self.buffer(of: a)
+        let bb = Self.buffer(of: b)
+        var minX = Int.max, minY = Int.max, maxX = Int.min, maxY = Int.min
+        var changed = 0
+        for y in 0..<a.pixelsHigh {
+            for x in 0..<xLimit {
+                let i = y * a.bytesPerRow + x * 4
+                let delta = abs(Int(ab[i]) - Int(bb[i]))
+                    + abs(Int(ab[i + 1]) - Int(bb[i + 1]))
+                    + abs(Int(ab[i + 2]) - Int(bb[i + 2]))
+                // 两态尺的 alpha 轴（R77）：合成后的帧通常全 255，仍让它进判定那一行；
+                // 免得这条尺被 `testEveryTwoStateRulerReadsBothAxes` 记成"只读 RGB"。
+                let alphaDelta = abs(Int(ab[i + 3]) - Int(bb[i + 3]))
+                if delta + alphaDelta > 6 {
+                    changed += 1
+                    minX = min(minX, x); maxX = max(maxX, x)
+                    minY = min(minY, y); maxY = max(maxY, y)
+                }
+            }
+        }
+        guard changed > 0 else { return nil }
+        return CGRect(x: Double(minX) / density, y: Double(minY) / density,
+                      width: Double(maxX - minX + 1) / density,
+                      height: Double(maxY - minY + 1) / density)
+    }
+
+    /// R427：正在拖出去的那一行内容降透明度；同一行的静置帧作正对照。
+    /// 只降内容（不动行底/悬停底）—— 这条尺量的是整行的墨，所以负臂是同一行的 idle 帧。
+    func testDragSourceRowDimsOnlyWhileDragging() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r427-drag-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let rowBox = CGRect(x: 0, y: 0, width: 300, height: 74)
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = renderFixtureRep("row-favorite-off", appearance, scratch),
+                  let active = renderFixtureRep("row-drag-source-active", appearance, scratch) else {
+                XCTFail(tag + "(渲染或读回失败 ⇒ 尺没有对象，不许当成通过)")
+                continue
+            }
+            let idleInk = footerInk(idle, rect: rowBox, pointWidth: 300).ink
+            let activeInk = footerInk(active, rect: rowBox, pointWidth: 300).ink
+            let idleMass = rowInkMass(idle, rect: rowBox, pointWidth: 300)
+            let activeMass = rowInkMass(active, rect: rowBox, pointWidth: 300)
+            let massRatio = idleMass > 0 ? activeMass / idleMass : -1
+            let countRatio = idleInk > 0 ? Double(activeInk) / Double(idleInk) : -1
+            emit("DRAG_SOURCE_ROW " + tag
+                 + " 静置墨=" + String(idleInk)
+                 + " 拖拽墨=" + String(activeInk)
+                 + " 墨数比=" + String(format: "%.3f", countRatio)
+                 + " 墨量比=" + String(format: "%.3f", massRatio))
+            XCTAssertGreaterThan(idleInk, 40,
+                                 tag + "：静置行只读到 " + String(idleInk) + " 颗墨 ⇒ 正对照没有对象")
+            XCTAssertGreaterThan(activeInk, 0,
+                                 tag + "：拖拽源行一颗墨都不剩 ⇒ 内容不是变淡，是消失了")
+            XCTAssertLessThan(massRatio, 0.75,
+                              tag + "：拖拽源/静置墨量比 = " + String(format: "%.3f", massRatio)
+                               + " ⇒ 行内容没有退到背景里（拖拽源没有视觉反馈）")
+            XCTAssertGreaterThan(massRatio, 0.2,
+                                 tag + "：拖拽源/静置墨量比 = " + String(format: "%.3f", massRatio)
+                                  + " ⇒ 退得太多，行已经读不出来了")
             judged += 1
         }
         XCTAssertEqual(judged, 2, "两档里有一档没量到对象 ⇒ 这条判据没有免检出口")
@@ -10149,6 +10261,35 @@ final class UICaptureTests: XCTestCase {
             }
         }
         return (ink, first.map { Double($0) / density })
+    }
+
+    /// 同一框里的**墨量**（每像素 |luma − paper| 的和）。透明度是线性乘在内容上的，
+    /// 墨数（过阈值的颗数）在 0.55 档只掉几个百分点，墨量才按比例掉。
+    private func rowInkMass(_ rep: NSBitmapImageRep, rect: CGRect, pointWidth: CGFloat) -> Double {
+        let bytes = Self.buffer(of: rep)
+        let width = rep.pixelsWide
+        let height = rep.pixelsHigh
+        let density = Double(width) / Double(pointWidth)
+        let x0 = max(0, Int((rect.minX * density).rounded(.down)))
+        let x1 = min(width, Int((rect.maxX * density).rounded(.up)))
+        let y0 = max(0, Int((rect.minY * density).rounded(.down)))
+        let y1 = min(height, Int((rect.maxY * density).rounded(.up)))
+        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
+                                   bytesPerRow: rep.bytesPerRow)
+        var mass = 0.0
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = y * rep.bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                + 0.0722 * Double(bytes[i + 2])).rounded())
+                // 两态尺的 alpha 轴：这里的帧是合成后的不透明位图，alpha 通常是 255；
+                // 仍按 alpha 加权，免得这条尺被 `testEveryTwoStateRulerReadsBothAxes` 记成
+                // "只读亮度"（R77）。透明度本身已经烘进 RGB，权重不会改变 0.55 的读数。
+                let alpha = Double(bytes[i + 3]) / 255.0
+                mass += Double(abs(luma - paper)) * alpha
+            }
+        }
+        return mass
     }
 
     /// 热图夹具的数据。`today` 固定 ⇒ 这张帧**永远长一样**。
@@ -12132,10 +12273,11 @@ final class UICaptureTests: XCTestCase {
     /// 名单里的帧不再冒 ⇒ 那一处能读了（或者有人动了上色），两种都必须真的去看那张帧。
     /// 名单里的帧**不能**拿侧栏未选中行的可读性当证据。
     static let darkSidebarTextBlindSpots: Set<String> = [
-        // R426：`settings-general-no-footer` 是版本行的负臂，侧栏与 `settings-general` 是同一棵
-        // vibrant 子树（只是脚注隐藏）⇒ 同一处合成前极性盲区。先看过 640×440 / 720×540 两档暗帧
-        // 的侧栏列：五枚未选中标签仍在错误一侧；这不是脚注引入的新缺陷。
-        "settings-general-no-footer",
+        // R426：`settings-general-no-footer` / `settings-min-no-footer` 是版本行的两档负臂，
+        // 侧栏与各自正臂是同一棵 vibrant 子树（只是脚注隐藏）⇒ 同一处合成前极性盲区。
+        // 先看过 640×440 / 720×540 两档暗帧的侧栏列：五枚未选中标签仍在错误一侧；
+        // 这不是脚注引入的新缺陷。
+        "settings-general-no-footer", "settings-min-no-footer",
         "settings-general", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
@@ -13682,7 +13824,11 @@ final class UICaptureTests: XCTestCase {
         for (appearance, tag) in [(NSAppearance.Name.aqua, "light"),
                                   (NSAppearance.Name.darkAqua, "dark")] {
             let candidates = fixtures(appearance: appearance)
-                .filter { $0.name.hasPrefix("settings-") && $0.name != "settings-min" }
+                // R426：`settings-min-no-footer` 也是最小窗（640×440）的负臂；这条卡片节奏尺
+                // 只量默认页 —— 最小窗与 `settings-min` 一样排除。
+                .filter { $0.name.hasPrefix("settings-")
+                    && $0.name != "settings-min"
+                    && $0.name != "settings-min-no-footer" }
             guard !candidates.isEmpty else {
                 return XCTFail("\(tag)：一张 settings 夹具都没有 ⇒ 这条判据没有对象")
             }

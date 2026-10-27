@@ -135,8 +135,8 @@ final class EntryDragPlannerTests: XCTestCase {
         guard let file else { throw XCTSkip("找不到 HistoryRowViews.swift") }
         let source = try String(contentsOf: file, encoding: .utf8)
         XCTAssertEqual(
-            source.components(separatedBy: "EntryDragModifier(content:").count - 1, 1,
-            "行视图应当恰好挂一次拖拽 modifier"
+            source.components(separatedBy: "EntryDragModifier(entryID:").count - 1, 1,
+            "行视图应当恰好挂一次拖拽 modifier（R427 起带 entryID）"
         )
     }
 }

@@ -7679,3 +7679,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：窗口下沿的版本行未成立（BACKLOG 452）；macOS 12 未真机验证（451）。
 - 回滚：删两个新文件与 SettingsSidebarView 里那三行即可；或 `git revert` 本轮提交。
 
+## D-423 拖拽源只降行内容透明度，并在 50ms 后用 `.common` 轮询松开（R427）
+
+- 背景：把一条记录拖出去时，系统有拖拽预览，但源行本身没有任何变化；用户看不出"手里这份是列表里的哪一条"。
+- 决定：`DragSourceFeedbackState` 按 entry ID 记录正在拖的条目；`EntryDragModifier` 在 `onDrag` 里 `beginAfterDelay(entryID)`（50ms，避开系统拖拽预览抓图），行内容 `.opacity(0.55)`（只降内容，不动行底/悬停底）；结束时用 `.common` runloop 的 50ms Timer 轮询 `NSEvent.pressedMouseButtons == 0` 清零。取证键 `draggingEntryIDForCapture` 只给夹具写。
+- 理由：透明度是"退到背景里"的单一语义，不需要边框/描边（那会与行选中语言打架）；延迟是为了不把拖拽预览也拍暗；`.common` 是拖拽 tracking 模式下 Timer 仍能跑的唯一模式。
+- 兼容性/迁移：新增 `row-drag-source-active` 亮暗 2 帧，基线 230→234；既有行帧逐字节不变；无动效、无胶片场景。
+- 边界：真实系统拖拽会话没有自动化验收（capture-env 帧只证视觉态，onDrag/结束由源守卫钉；BACKLOG 453）；如果 Timer 在某个系统版本上不触发，行可能停暗，下一次 begin/end 会重置。
+- 回滚：删 `DragSourceFeedback.swift`、`EntryDragModifier` 的 delay 与行的 `.opacity` 即可；或 `git revert` 本轮提交。
+

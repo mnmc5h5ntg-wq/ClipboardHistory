@@ -131,13 +131,17 @@ enum EntryDragGate {
 /// 有载荷才挂 `onDrag`。SwiftUI 没有"条件性 modifier"，所以分两条路径：
 /// 给没有载荷的条目挂一个返回空 provider 的 `onDrag`，会让用户拖起来毫无反应 —— 比不挂更糟。
 struct EntryDragModifier: ViewModifier {
+    let entryID: UUID
     let content: ClipboardEntryContent
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if EntryDragGate.offersDrag(for: self.content) {
             content.onDrag {
-                EntryDragPlanner.itemProvider(forContent: self.content) ?? NSItemProvider()
+                let provider = EntryDragPlanner.itemProvider(forContent: self.content) ?? NSItemProvider()
+                // R427：拖起来后登记源行；延迟 50ms 变暗，别把系统抓的拖拽预览也拍暗。
+                DragSourceFeedback.shared.beginAfterDelay(entryID)
+                return provider
             }
         } else {
             content

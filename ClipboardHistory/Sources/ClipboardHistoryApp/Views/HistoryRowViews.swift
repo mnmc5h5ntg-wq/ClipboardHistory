@@ -18,9 +18,15 @@ struct HistoryRowButton: View {
     let favoriteAction: () -> Void
     @State private var isHovered = false
     @Environment(\.hoveredEntryIDForCapture) private var hoveredEntryIDForCapture
+    @ObservedObject private var dragSourceFeedback = DragSourceFeedback.shared
+    @Environment(\.draggingEntryIDForCapture) private var draggingEntryIDForCapture
     @Environment(\.colorScheme) private var colorScheme
     private var isHoveredForDrawing: Bool {
         isHovered || hoveredEntryIDForCapture == entry.id
+    }
+    /// R427：这一条正在被拖出去 ⇒ 内容退到背景里，告诉用户"手里的东西就是它"。
+    private var isDraggingForDrawing: Bool {
+        dragSourceFeedback.state.isDragging(entry.id) || draggingEntryIDForCapture == entry.id
     }
 
     var body: some View {
@@ -35,6 +41,8 @@ struct HistoryRowButton: View {
 
             RowTextColumn(entry: entry)
         }
+        // R427：正在拖出去的那一条退到背景里（只降内容，不动行底/悬停底）。
+        .opacity(isDraggingForDrawing ? DragSourceFeedback.dimOpacity : 1)
         .padding(.vertical, 6)
         .background(
             VisualShape.rounded(VisualRadius.panel)
@@ -60,7 +68,7 @@ struct HistoryRowButton: View {
             }
         )
         // 有载荷才挂（判据 `EntryDragGate.offersDrag`）：多文件条目、网页链接、空文本不提供拖出。
-        .modifier(EntryDragModifier(content: entry.content))
+        .modifier(EntryDragModifier(entryID: entry.id, content: entry.content))
         // 提示语为空时整个 modifier 都不挂：`.help("")` 在 macOS 上会弹出一个空气泡。
         .modifier(RowDragHelpModifier(content: entry.content))
         .animation(MotionCatalog.animation(for: .hover), value: isHoveredForDrawing)

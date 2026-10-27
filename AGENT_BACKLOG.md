@@ -8899,3 +8899,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：把 `SettingsSidebarFooter` 挂成窗口/内容的 `.overlay(alignment: .bottomLeading)` 时，720×540 正常，640×440 最小窗整行 0 墨——`NavigationSplitView` 按设置内容的理想高度把根视图撑到 ~466pt（窗口只有 440），脚注落在被裁的 26pt 里；`GeometryReader` 与根 `.frame(maxHeight: .infinity)` 两版仍被理想高度顶出。最终改成导航行之后、Spacer 之前的内容相对摆放（640/720 都有 1086/1284 读数），并记下这个"没做成的事"。
     修法（下一轮若需要）：先量设置窗口根视图在 640×440 下的实际布局高度与安全区，找到能把内容压进窗口的容器（而不是靠 overlay 或 GeometryReader）；成功后再把版本行移回窗口下沿，并同时更新像素带与基线。不要为了"看起来在底部"把它绝对定位到窗口外。
 
+437 追记（R427 · 仍开）：本轮补的是拖拽源反馈；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+449 追记（R427 · 仍开）：R426 CI 跑里 `SelectionRevealAnimationTests` **4/4 passed**（CHANNEL 0→143→600、TIME 6 采样/3 中间值/末 1430），本机全量仍 5 断言红（3 条用例）、单跑 4/4 绿 ⇒ 会话/顺序再次坐实；不改门槛。
+
+451 追记（R427 · 仍开）：macOS 12 的详情头部阈值本轮未动；R427 只改拖拽源与测试带。
+
+452 追记（R427 · 仍开）：设置侧栏版本行仍是内容相对；本轮只把它的像素尺改成正/负差集（1x runner 的固定带不再可靠）。
+
+**453. 真实系统拖拽会话没有自动化验收：capture-env 只能证视觉态，onDrag/结束是源守卫**（R427 观察）
+    现象：`row-drag-source-active` 帧由取证键 `draggingEntryIDForCapture` 驱动，能证明"拖拽源态长什么样、墨量比 0.550/0.549"；但完整的系统拖拽（按下-移动-跨进程 drop）在本机/runner 都没有自动化的合成通道。`onDrag` 里的 `beginAfterDelay`、行的 `entry.id` 接线、`.common` 轮询都只有源码守卫，没有一条真实拖拽的运行时签名。
+    修法（下一轮若需要）：先用 CGEvent/辅助功能权限试一条最小拖拽（同进程内拖到另一个 NSView 或 Finder），把 `NSEvent.pressedMouseButtons` 的轮询结束与行变暗/复亮写成一条在屏探针；失败就把权限/环境原因具名记 NOT-RUN，不要用 capture-env 帧替代真实会话。另需量一次"Timer 在拖拽 tracking 模式下真的触发"的读数（本轮只有 `.common` 的源守卫，没有实物读数）。
+
