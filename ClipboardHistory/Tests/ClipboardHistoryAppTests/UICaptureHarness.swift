@@ -3030,6 +3030,71 @@ final class UICaptureTests: XCTestCase {
                              "钥匙=true 时横幅带里读不到橙色暂停图标（橙点=\(orange)）")
     }
 
+    /// R419：热图汇总行的数字变化必须在同一带里读到（999→1000 跨位数）；
+    /// 这一格只判"读数变了、没被裁掉"，过程在 `MotionFilmstripTests` 的 heat-summary 场景里判。
+    func testHeatmapSummaryCountChangeIsVisible() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r419-heat-summary-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let beforeFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "heatmap-summary-before" }),
+                  let afterFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "heatmap-summary-after" }) else {
+                return XCTFail("\(tag)：heatmap-summary-before/after 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [beforeFixture, afterFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let before = reps["heatmap-summary-before"], let after = reps["heatmap-summary-after"],
+                  before.pixelsWide == after.pixelsWide, before.pixelsHigh == after.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let bandHeight = min(before.pixelsHigh, Int(44 * Double(before.pixelsWide) / 430.0))
+            let corner = before.colorAt(x: 0, y: 0)
+            var beforeInk = 0, afterInk = 0, changed = 0
+            var beforeMaxX = -1, afterMaxX = -1
+            for y in 0..<bandHeight {
+                for x in 0..<before.pixelsWide {
+                    guard let a = before.colorAt(x: x, y: y),
+                          let b = after.colorAt(x: x, y: y) else { continue }
+                    if let c = corner {
+                        let da = abs(a.redComponent - c.redComponent)
+                            + abs(a.greenComponent - c.greenComponent)
+                            + abs(a.blueComponent - c.blueComponent)
+                        if da > 0.01 { beforeInk += 1; beforeMaxX = max(beforeMaxX, x) }
+                        let db = abs(b.redComponent - c.redComponent)
+                            + abs(b.greenComponent - c.greenComponent)
+                            + abs(b.blueComponent - c.blueComponent)
+                        if db > 0.01 { afterInk += 1; afterMaxX = max(afterMaxX, x) }
+                    }
+                    let d = abs(a.redComponent - b.redComponent)
+                        + abs(a.greenComponent - b.greenComponent)
+                        + abs(a.blueComponent - b.blueComponent)
+                    if d > 0.01 { changed += 1 }
+                }
+            }
+            emit("HEATMAP_SUMMARY_CHANGE \(tag) 变化=\(changed) 前墨=\(beforeInk) 后墨=\(afterInk) "
+                 + "前右沿=\(beforeMaxX) 后右沿=\(afterMaxX)")
+            XCTAssertGreaterThan(beforeInk, 20, "\(tag)：变化前汇总行没有字（\(beforeInk)）⇒ 这条判据没有对象")
+            XCTAssertGreaterThan(afterInk, 20, "\(tag)：变化后汇总行没有字（\(afterInk)）")
+            XCTAssertGreaterThan(changed, 20,
+                                 "\(tag)：999→1000 只改了 \(changed) 个像素 ⇒ 汇总行没有跟着变，或被裁在同一处")
+            XCTAssertGreaterThan(afterMaxX, beforeMaxX,
+                                 "\(tag)：后帧的墨右沿(\(afterMaxX)) 没越过前帧(\(beforeMaxX)) ⇒ 多出来那一位没有排进去")
+        }
+    }
+
     /// R418：13+ 菜单栏标签的暂停斜杠只在暂停时出现；glyph 本身两态都在。
     /// 真菜单栏由系统合成，这一格拍的是**标签视图本身**（真表面具名 NOT-RUN）。
     func testMenuBarPauseMarkAppearsOnlyWhenPaused() throws {
@@ -3083,8 +3148,13 @@ final class UICaptureTests: XCTestCase {
                 }
             }
             emit("MENUBAR_PAUSE_LABEL \(tag) 静置墨=\(idleInk) 暂停墨=\(pausedInk) 变化=\(changed)")
-            XCTAssertGreaterThan(idleInk, 100,
-                                 "\(tag)：静置标签只有 \(idleInk) 个墨点 ⇒ glyph 没画出来")
+            // R419：地板的单位是**像素**，会随捕获倍率变。本机 2x 读 286、runner 1x 读 92
+            // （40434583291 实测），原来写死的 100 在 runner 上是假红。改成按面积缩放的地板
+            // （2x → 80、1x → 20），仍能拦住"glyph 空白/掉成发丝"。
+            let scale = Double(idle.pixelsWide) / 64.0
+            let glyphFloor = Int(20.0 * scale * scale)
+            XCTAssertGreaterThan(idleInk, glyphFloor,
+                                 "\(tag)：静置标签只有 \(idleInk) 个墨点（倍率地板 \(glyphFloor)）⇒ glyph 没画出来")
             XCTAssertGreaterThan(pausedInk, idleInk,
                                  "\(tag)：暂停标签 \(pausedInk) 不比静置 \(idleInk) 多 ⇒ 斜杠没画")
             XCTAssertGreaterThan(changed, 10,
@@ -6620,6 +6690,32 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("heatmap-populated", NSSize(width: 430, height: 250), contentMustFit: true) {
             AnyView(
                 DailyCopyHeatmapView(counts: heatCounts, today: heatToday, calendar: heatCalendar)
+                    .padding(16)
+                    .frame(width: 430, height: 250, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        // R419：汇总行的数字滚动第一次进帧基线（999→1000，跨位数）。两臂同一 today/calendar，
+        // 只差"昨天多一次" ⇒ 总数与连续天数都变，而格子只多一格。
+        let summaryToday = Self.heatmapFixtureToday
+        let summaryCalendar = Self.heatmapFixtureCalendar()
+        let summaryKey = DailyCopyHeatPolicy.dayKey(for: summaryToday, calendar: summaryCalendar)
+        let summaryBefore = [summaryKey: 999]
+        var summaryAfter = summaryBefore
+        if let yesterday = summaryCalendar.date(byAdding: .day, value: -1, to: summaryToday) {
+            summaryAfter[DailyCopyHeatPolicy.dayKey(for: yesterday, calendar: summaryCalendar)] = 1
+        }
+        results.append(Fixture("heatmap-summary-before", NSSize(width: 430, height: 250), contentMustFit: true) {
+            AnyView(
+                DailyCopyHeatmapView(counts: summaryBefore, today: summaryToday, calendar: summaryCalendar)
+                    .padding(16)
+                    .frame(width: 430, height: 250, alignment: .topLeading)
+                    .background(Color(nsColor: .windowBackgroundColor))
+            )
+        })
+        results.append(Fixture("heatmap-summary-after", NSSize(width: 430, height: 250), contentMustFit: true) {
+            AnyView(
+                DailyCopyHeatmapView(counts: summaryAfter, today: summaryToday, calendar: summaryCalendar)
                     .padding(16)
                     .frame(width: 430, height: 250, alignment: .topLeading)
                     .background(Color(nsColor: .windowBackgroundColor))

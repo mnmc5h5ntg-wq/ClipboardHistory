@@ -8829,3 +8829,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`Motion filmstrip` 的看门狗是 `( sleep 200; kill -9 )`；R416 同一卷 23:48:03→23:51:12 ≈ 189s。R417 加了暂停横幅的 4 次 ContentView 录制 + 回执 8ms 间距后被杀在 200s，`MOTION_FLOOR_FACTS executed=0 not-run=notice-banner`、`suite-did-not-finish`。R418 已撤暂停胶片卷并把采样窗口改成按声明时长的自动下限，本地套件 183s。
     修法（下一轮）：不要先加看门狗时长；先给套件做一次**逐用例耗时账**，把最贵的几个整窗/ContentView 录制收窄或拆成第二个 CI 步；在预算回到 ≥30s 余量之前，新胶片场景一律先量本地套件总时长。
 
+437 追记（R419 · 仍开）：本轮补的是热图汇总行的数字滚动与胶片通道的软过渡正对照；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+444 追记（R419 · 仍开）：R418 的套件已经跑完（`executed=74`，没有被 200s 收掉）；R419 加了 probe + 热图场景后本地套件 **188.7s**（R416 189s），只剩约 11s 余量。下一步仍要先做逐用例耗时账，不要先加看门狗。
+
+**445. 离屏胶片通道对"透明度/数字滚动"这一类软过渡可能整台机器都读不到**（R419 观察）
+    现象：R418 的 runner 上回执/markdown 在窗口被 8ms 间距拉开后仍只有 1 个过渡帧（本地 2–4）；而窗口读数因为前缀不是 `MOTION_` 从没进过文件通道。R419 把两条改名并加了同跑软过渡正对照（`MOTION_SOFT_PROBE`）；本地 probe 6/7 帧，runner 尚未读。
+    修法（下一轮）：读 `MOTION_SOFT_PROBE`；若 runner 读不到 ≥2，回执/markdown 以 `SOFT_TRANSITION_NOT_RUN=channel-blind` 具名 NOT-RUN，不要改 ≥2；若要拿回 runner 裁决，需要一条真在屏/演示层（`layer.presentation()` 或 CGWindow）的通道，且先证明它看得见同一颗 probe。
+

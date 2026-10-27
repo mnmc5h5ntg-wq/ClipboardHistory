@@ -7603,3 +7603,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：13+ 的入口形状从 `systemImage:` 换成标签闭包；符号常量仍只在一处声明，两个调用点引用它；既有帧不变，新增 4 帧。12 的实时刷新只在本机 13+ 之外，未跑真机腿（具名 NOT-RUN，见 443）。
 - 回滚：删 `MenuBarStatusLabel`/`MenuBarStatusPresentation` 与 `makeStatusBarIcon(paused:)` 的暂停分支，把 `MenuBarExtra` 改回 `systemImage:` 即可；或 `git revert` 本轮提交。
 
+## D-414 热图汇总行用系统的数字滚动，只在 14+ 打开（R419）
+
+- 背景：热图格子按色档有 `.contentFade`，而汇总行「共 N 次 / 日均 X 次 / 连续 Y 天」是硬换 —— 同一张图里一半在演、一半在跳。
+- 决定：`DailyCopyHeatmapView.summaryText(line)` 在 macOS 14+ 用 `.contentTransition(.numericText())` + `.animation(MotionCatalog.animation(for: .contentFade), value: line)`；键是**整句**（一行三个数，拆开会各自起事务错拍）；12/13 保持原样（没有该 API）。
+- 理由：数字滚动是系统原生语义（读数变了，但不是状态变了）；14+ 才有 contentTransition，不能用 12/13 的 `.id` 硬切替代（R400 记过会先空一帧）；整句作键让三个数在同一个事务里滚。
+- 兼容性/迁移：只影响汇总行的动效；静态帧逐字节变化（那是本轮新增的 4 帧），既有 214 帧不变；`testSymbolReplacementHasOneAuthor` 收窄到 `.symbolEffect`（数字滚动不是换符号语言）。
+- 回滚：删 `summaryText` 的 14+ 分支即可；或 `git revert` 本轮提交。
+

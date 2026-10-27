@@ -123,7 +123,10 @@ final class OverlayStateTests: XCTestCase {
         var offenders: [String] = []
         for (file, source) in try productViewSources() {
             let code = Self.stripCommentLines(source)
-            guard code.contains(".contentTransition(") else { continue }
+            // R419：只认**符号**替换那一种（`.contentTransition(.symbolEffect…)`）。
+            // 热图汇总行的 `.contentTransition(.numericText())` 是数字滚动，不是第二套换符号语言；
+            // 原来这里拿裸 `.contentTransition(` 当针，会把任何新过渡族都判成"第二个作者"。
+            guard code.contains(".contentTransition(.symbolEffect") else { continue }
             if file == "MotionModifiers.swift" { continue }   // 唯一作者
             offenders.append("\(file) 自己写了 .contentTransition")
         }

@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R419 状态（2026-10-27 · 本地 · 第 418 轮 / Round 416）：热图汇总行补数字滚动（999→1000，变化 3872/4165、右沿 481→494）；R418 跑三红定位到值：标签地板 92<100（按倍率改地板）、回执/markdown 仍 1 帧（窗口行被非 MOTION_ 前缀丢掉）⇒ 加软过渡正对照与具名 NOT-RUN 出口（产品 1 文件，热图汇总行位）
+
+最后更新：2026-10-27（本地 · R419 / 第 418 轮 / Round 416）：热图格子按色档在演，汇总行的三个数一直硬换。新 `summaryText(line)` 在 macOS 14+ 挂 `.contentTransition(.numericText())` + `.animation(.contentFade, value: line)`（整句作键），12/13 不变。真看图：999→1000、连续 1→2 天，一格变两格、汇总行仍单行不裁。静态同带变化 **3872/4165**、墨 3696→3780/4151→4239、右沿 **481→494**；胶片 **17/15 帧**、窗口 876/841ms；新增 4 帧、既有 214 帧不变、基线 **218/0/0/0**。`M1103–M1105` **3/3 CAUGHT**（M1103 的证人是源守卫：宽度重排本身也会演，胶片分不出数字滚动与整行重排）。R418 run `40434583291 ↔ 9d65f41` **failure**，失败步骤 **3 个**（Swift tests / Capture gate / Motion coverage floor）：① 标签像素地板写死 100，runner 1x 读 **92**（本机 2x 286）⇒ 改成 `20×scale²`（runner 20、本机 80）；12 图仍 **891→1325（+434）**；② 套件跑完（`judged=5/5 executed=74`），`SUITE_RED=2`、`REDS=1`：回执/markdown 仍 1 帧，且 `COPY_RECEIPT_FADE` 无行 —— 原因是对数行前缀不是 `MOTION_`，文件通道从没搬过；已改名 `MOTION_COPY_RECEIPT_FADE`/`MOTION_MARKDOWN_MODE_FADE`，并加同跑软过渡正对照 `MOTION_SOFT_PROBE`（本地 6/7 帧、353/357ms；看不见就 `SOFT_TRANSITION_NOT_RUN=channel-blind` 具名 NOT-RUN）。本机回执 2–4 帧/323–478ms、markdown 4–5 帧；胶片套件 188.7s。另把 `testSymbolReplacementHasOneAuthor` 的裸 `.contentTransition(` 收窄到 `.symbolEffect`。全量 **1112/55/0**；捕获 **218/128/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 264/896 rot=0；预检 177/159/478 bad=0；产品面连续零改动 **1** 轮（as-of 418，现读 `python3 scripts/product_streak.py --streak-for 418`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R418 三红逐条定位：标签地板 92<100（按倍率改）；回执/markdown 1 帧且窗口行被非 MOTION_ 前缀丢掉 ⇒ 改名 + 软过渡正对照。
+② 产品：热图汇总行数字滚动（999→1000，变化 3872/4165、右沿 481→494）；胶片 17/15；新增 4 帧、基线 218。
+③ 判据：M1103–M1105 3/3；符号守卫收窄；precheck 177/159/478；hidden rot 0。
+④ 436：judged=5/5 executed=74、SUITE_RED=2、REDS=1（回执/markdown）、UNLISTED 缺行；未重猜。
+⑤ 367：hidden 表 264 / 可判 896 / rot 0 / 上界 0；ARM 270 文件 / 962 把。
+⑥ 全量 1112/55/0；捕获 218/128/4/0；换装 ok；清账 162=162；帧基线 218/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① R418 的两条 1 帧红在 runner 上没有窗口值（已改名，下一跑才可定位）；② 若 probe 在 runner 读不到 ≥2，回执/markdown 以 `SOFT_TRANSITION_NOT_RUN=channel-blind` 具名 NOT-RUN；③ `testSkeletonSweepIsOneBand` 套件内偶发（单跑通过）；④ 真菜单栏表面系统合成拍不到；⑤ 12 的实时刷新无真机腿；⑥ 暂停胶片卷已撤；⑦ `REVEAL`/`INTAKE_READING`、`MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 缺行；⑧ `table-lazy-rows`；⑨ 设置能力闸门仍隐式（441）；⑩ 437–445 仍开；⑪ R419 新跑待 push 后读。
+
+下一轮（R420）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R419 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 `MOTION_SOFT_PROBE` 是否可见、`MOTION_COPY_RECEIPT_FADE` 是否有行且窗口 ≥0.8×声明、回执/markdown 的裁决、热图 4 帧是否绿、436 是否 REDS=0；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R418 状态（2026-10-27 · 本地 · 第 417 轮 / Round 415）：菜单栏补暂停斜杠（12 图 892→1327 墨 +435；13+ 标签 286→425 Δ182）；R417 跑全步绿但胶片卷被 200s 看门狗收掉 ⇒ 胶片 NOT-RUN；修套件预算与采样窗口（产品 2 文件，菜单栏状态位）
 
 最后更新：2026-10-27（本地 · R418 / 第 417 轮 / Round 415）：主窗口有暂停横幅，但菜单栏那颗 `clipboard` 仍是静态符号。新 `MenuBarStatusPresentation`（斜杠端点 3.2→14.8、线宽 1.6、无障碍「时间剪史，已暂停记录」）+ `MenuBarStatusLabel`（13+ 标签闭包，同一符号叠斜杠，读 `@AppStorage("recordingPaused")`）+ `makeStatusBarIcon(paused:)`（12 模板图同斜杠）+ defaults 订阅（12 随开关重画）。真看图：13+ 亮/暗两态，静置完整剪贴板、暂停多一道斜杠且 glyph 仍在。读数：12 图 **892→1327（+435）**、包围盒不出 18×18；13+ 标签 **286→425（Δ182）**。新增 4 帧、既有 **210 帧逐字节不变**、基线 **214/0/0/0**。`M1096–M1102` **7/7 CAUGHT**；改入口形状弄空 R110 `M601` 与 R111 `M602`（与暂停桥重名），已重钉并整表重跑 **4/4、4/4 CAUGHT**。R417 run `40429334110 ↔ a6fc65a` **success（21/21 步）但胶片卷 NOT-RUN**：`MOTION_FLOOR_FACTS judged=4/5 executed=0 not-run=notice-banner`、`suite-did-not-finish`、`REDS=0`；R416 同卷 189s、R417 加场景后被 200s 看门狗收掉。**暂停 4 帧在 runner 上绿**（`PAUSE_BANNER_BAND` 亮 0→26250 变化/112 橙、暗 104 橙；defaults 0→112）；回执 6 帧像素绿（0/0→2416/0、2724/187；暗 1738/0、1991/177）；`COPY_RECEIPT_FADE` 无行。修：撤暂停胶片卷（状态已像素/源钉住）、把采样窗口推广为所有声明时长场景的自动下限（markdown 的 0.3ms×30=9ms 同病）；本地套件 **183s**、回执 2–4 帧/窗口 329–488ms、markdown 4–6 帧。全量 **1108/54/0**；捕获 **214/127/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 263/893 rot=0；预检 176/158/475 bad=0；产品面连续零改动 **1** 轮（as-of 417，现读 `python3 scripts/product_streak.py --streak-for 417`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

@@ -78,11 +78,27 @@ struct DailyCopyHeatmapView: View {
         Group {
             if let line = DailyCopyHeatPolicy.summaryLine(for: summary,
                                                           hasRecords: !counts.isEmpty) {
-                Text(line)
-                    .font(.system(size: VisualFont.meta))
-                    .foregroundStyle(.secondary)
+                summaryText(line)
                     .transition(MotionCatalog.transition(for: .contentFade))
             }
+        }
+    }
+
+    /// R419：汇总行的数字以前是硬换 —— 同一张图里的格子已经按档在演，读数却跳。
+    /// 14+ 走系统的数字滚动（999→1000 连位数变化也能演）；12/13 没有这个 API，保持原样。
+    /// 键是**整句**而不是某一个数：一行里有三个会变的数（总数 / 日均 / 连续），
+    /// 拆成三条动画只会让它们各自起事务、互相错拍。
+    @ViewBuilder
+    private func summaryText(_ line: String) -> some View {
+        let base = Text(line)
+            .font(.system(size: VisualFont.meta))
+            .foregroundStyle(.secondary)
+        if #available(macOS 14, *) {
+            base
+                .contentTransition(.numericText())
+                .animation(MotionCatalog.animation(for: .contentFade), value: line)
+        } else {
+            base
         }
     }
 

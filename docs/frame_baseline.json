@@ -1,5 +1,5 @@
 {
-  "count": 214,
+  "count": 218,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -87,6 +87,10 @@
     "heatmap-empty-430x150-light.png": "e5941efaa2b5d7cd16eab078280d6fd210f60ec1c1afef65ce0f06b3f9050602",
     "heatmap-populated-430x250-dark.png": "8331965b23c4dcba6c8de6c5e51b7f7ac2a586b6317a04e400832277431bd3d3",
     "heatmap-populated-430x250-light.png": "3db38c3c310b06f4e1ea27ade0ea1088e253aeb250f1a54728ca65f4110a9e6f",
+    "heatmap-summary-after-430x250-dark.png": "2429a94cea3837e412d1662fe39844694a9709484c1489fa4760cb275438cdfb",
+    "heatmap-summary-after-430x250-light.png": "a40d72e30b3e56099482559df87e76f7b5265f9b39707562eae28848cde8c9c5",
+    "heatmap-summary-before-430x250-dark.png": "bbec38bd44225b6360c0cfaf61918b7247f523b7803955fa5604665dc6511cb4",
+    "heatmap-summary-before-430x250-light.png": "43f671458b4036bc87bf39aed051b68d2c9790d64a9382ebb75969fdd389e5d0",
     "menubar-empty-320x120-dark.png": "93dbaacd3707fb51cc6a0e356909686edbb06ef2d8f348c3e1051fa9695336e1",
     "menubar-empty-320x120-light.png": "d2e5979e63c0f10836a2407b90249db56d5fd30bca331647d6194ae151ad6c15",
     "menubar-recommendations-320x320-dark.png": "26d1aff32e8e20126609a7dce4f02ff6808d2077e740f6099cad858b79d719aa",

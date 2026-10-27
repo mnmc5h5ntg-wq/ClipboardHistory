@@ -2471,6 +2471,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// 只拍药丸上方那条带；场景不进 `Scenario.all()`（不改 motion floor 的臂名单）。
     func testCopyReceiptAppearsAndDismissesWithAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
+        try requireSoftTransitionChannel()
         for scenarioFactory in [Scenario.copyReceiptAppear, Scenario.copyReceiptDismiss] {
             for scale in [2.0, 1.0] {
                 // 每个倍率新建场景：driver 是场景私有的，跑到 1x 时上一次已经 toggle 过了。
@@ -2482,7 +2483,7 @@ final class MotionFilmstripTests: XCTestCase {
                 let peak = fractions.max() ?? 0
                 let window = film.postTriggerWindowMilliseconds
                 writeStrip("\(scenario.name)-\(Int(scale))x", frames)
-                emit("COPY_RECEIPT_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
+                emit("MOTION_COPY_RECEIPT_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
                      + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
                      + "窗口=\(Int(window.rounded()))ms "
                      + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
@@ -2504,6 +2505,7 @@ final class MotionFilmstripTests: XCTestCase {
     /// R400：「原文/渲染」按钮标签必须和正文一样有过渡，不能内容在演、控件名一帧硬换。
     func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
+        try requireSoftTransitionChannel()
         for scale in [2.0, 1.0] {
             let scenario = Scenario.markdownModeLabel()
             let film = record(scenario, scale: scale)
@@ -2512,13 +2514,41 @@ final class MotionFilmstripTests: XCTestCase {
             let span = Self.transitionFrameCount(fractions)
             let peak = fractions.max() ?? 0
             writeStrip("\(scenario.name)-\(Int(scale))x", frames)
-            emit("MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+            emit("MOTION_MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
                  + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
             XCTAssertGreaterThan(frames.count, 4,
                                  "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
             XCTAssertGreaterThanOrEqual(span, 2,
                                         "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 按钮标签是硬切；"
                                             + "先查 `.id(title)`/`.transition` 是否还在 Button label 里")
+        }
+    }
+
+    /// R419：热图汇总行的数字 999→1000 必须在 2×/1× 读到 ≥2 个过渡帧，
+    /// 且卷子覆盖声明时长；带只装汇总行（格子在那条带下面）。
+    func testHeatSummaryNumberChangeIsAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        for scale in [2.0, 1.0] {
+            let scenario = Scenario.heatSummaryNumberChange()
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            let window = film.postTriggerWindowMilliseconds
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("MOTION_HEAT_SUMMARY scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 窗口=\(Int(window.rounded()))ms "
+                 + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            XCTAssertGreaterThanOrEqual(window, scenario.declaredDurationMilliseconds * 0.8,
+                                        "\(Int(scale))x：卷子只覆盖 \(Int(window.rounded()))ms，"
+                                            + "声明 \(Int(scenario.declaredDurationMilliseconds))ms "
+                                            + "⇒ 采样窗口没覆盖到过程")
+            XCTAssertGreaterThanOrEqual(span, 2,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 汇总行数字是硬切；"
+                                            + "先查 `.contentTransition(.numericText())` 与 `.animation(value: line)` 是否还在")
         }
     }
 
@@ -7690,6 +7720,91 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
+    /// R419：热图汇总行的数字滚动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
+    @MainActor private final class HeatSummaryDriver: ObservableObject {
+        @Published var counts: [String: Int]
+
+        init(counts: [String: Int]) {
+            self.counts = counts
+        }
+    }
+
+    private struct HeatSummaryHarness: View {
+        let today: Date
+        let calendar: Calendar
+        @ObservedObject var driver: HeatSummaryDriver
+
+        var body: some View {
+            DailyCopyHeatmapView(counts: driver.counts, today: today, calendar: calendar)
+                .padding(16)
+                .frame(width: 430, height: 150, alignment: .topLeading)
+                .background(Color(nsColor: .windowBackgroundColor))
+        }
+    }
+
+    /// R419：同一跑、同一条带的软过渡正对照（透明度 + 位移）。
+    /// 离屏通道看不见这类过渡时，回执/markdown 的「1 帧」不是产品裁决
+    /// （40434583291：窗口按 8ms 拉开后仍只读到 1 帧）。只录一次，结果缓存。
+    @MainActor private final class SoftTransitionProbeDriver: ObservableObject {
+        @Published var on = false
+    }
+
+    private struct SoftTransitionProbeView: View {
+        @ObservedObject var driver: SoftTransitionProbeDriver
+
+        var body: some View {
+            ZStack(alignment: .topLeading) {
+                Color(nsColor: .windowBackgroundColor)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.primary)
+                    .frame(width: 24, height: 24)
+                    .padding(16)
+                    .offset(x: driver.on ? 12 : 0, y: driver.on ? 12 : 0)
+                    .opacity(driver.on ? 1 : 0)
+                    .animation(MotionCatalog.animation(for: .contentFade), value: driver.on)
+            }
+            .frame(width: 120, height: 70)
+        }
+    }
+
+    @MainActor private static func softTransitionProbe() -> Scenario {
+        let driver = SoftTransitionProbeDriver()
+        return Scenario(name: "soft-transition-probe", size: NSSize(width: 120, height: 70),
+                 declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                 appearance: .aqua,
+                 root: { _ in AnyView(SoftTransitionProbeView(driver: driver)) },
+                 minimumSampleSpacingMilliseconds: 8) { _ in
+            driver.on.toggle()
+        }
+    }
+
+    nonisolated(unsafe) private static var softTransitionChannelVisible: Bool?
+
+    /// 先证明这台机器的离屏通道看得见"同一带、同一时长的透明度+位移"，
+    /// 再判回执/markdown。看不见 ⇒ 具名 NOT-RUN，不判产品，也不改 ≥2。
+    @MainActor private func requireSoftTransitionChannel() throws {
+        if let visible = Self.softTransitionChannelVisible {
+            if !visible {
+                throw XCTSkip("SOFT_TRANSITION_NOT_RUN=channel-blind（缓存）同一带的透明度+位移正对照读不到 ≥2 个过渡帧 ⇒ 不判产品")
+            }
+            return
+        }
+        var visible = true
+        for scale in [2.0, 1.0] {
+            let scenario = Self.softTransitionProbe()
+            let film = record(scenario, scale: scale)
+            let span = Self.transitionFrameCount(Self.deltas(film.motionFrames))
+            let window = film.postTriggerWindowMilliseconds
+            emit("MOTION_SOFT_PROBE scale=\(Int(scale))x 过渡帧数=\(span) "
+                 + "窗口=\(Int(window.rounded()))ms 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            if span < 2 { visible = false }
+        }
+        Self.softTransitionChannelVisible = visible
+        if !visible {
+            throw XCTSkip("SOFT_TRANSITION_NOT_RUN=channel-blind 同一带、同一时长的透明度+位移正对照读不到 ≥2 个过渡帧 ⇒ 这台机器的离屏通道看不见这类软过渡；不判产品，也不改门槛")
+        }
+    }
+
     /// R400：「原文/渲染」标签切换的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
     @MainActor private final class MarkdownModeDriver: ObservableObject {
         @Published var rendered = true
@@ -8081,6 +8196,31 @@ final class MotionFilmstripTests: XCTestCase {
                     thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
                     sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
                     timestamp: Date())
+            }
+        }
+
+        /// R419：汇总行的数字 999→1000（跨位数）。带只装顶部那条汇总行（44pt），
+        /// 格子在那条带下面 —— 这一卷不会把"某一格的色档变化"当成"数字在滚"。
+        @MainActor static func heatSummaryNumberChange() -> Scenario {
+            let today = UICaptureTests.heatmapFixtureToday
+            let calendar = UICaptureTests.heatmapFixtureCalendar()
+            let key = DailyCopyHeatPolicy.dayKey(for: today, calendar: calendar)
+            let driver = HeatSummaryDriver(counts: [key: 999])
+            return Scenario(name: "heat-summary-number-change", size: NSSize(width: 430, height: 150),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     appearance: .aqua,
+                     root: { _ in
+                         AnyView(HeatSummaryHarness(today: today, calendar: calendar, driver: driver))
+                     },
+                     captureRect: { host in
+                         let height = min(44, host.bounds.height)
+                         let y = host.isFlipped ? 0 : host.bounds.height - height
+                         return NSRect(x: 0, y: y, width: host.bounds.width, height: height)
+                     },
+                     minimumSampleSpacingMilliseconds: 8) { _ in
+                if let yesterday = calendar.date(byAdding: .day, value: -1, to: today) {
+                    driver.counts[DailyCopyHeatPolicy.dayKey(for: yesterday, calendar: calendar)] = 1
+                }
             }
         }
 
