@@ -7787,3 +7787,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：帮助气泡由系统画，像素侧具名 NOT-RUN；其它自绘控件的帮助文本未逐个审计（464）。
 - 回滚：删 `updateHelp()` 三处调用即可；或 `git revert`。
 
+## D-435 引用块用左侧竖线做结构标记（R439）
+
+- 背景：引用此前只靠 `quoteIndent` 的 18pt 缩进分层；列表续行也缩进，帧上分不出「引文」与「续行」。配色弱化的两条路（`secondaryLabelColor` 3.95:1、`withAlphaComponent` 暗档烤黑）在 `quoteColor` 的注释里已被否过，不能再走。
+- 决定：新增 `MarkdownQuoteRule` —— 宽 2pt、容器左偏 5pt、每嵌套一级按 `quoteIndent` 再进一条、圆角 1pt、`secondaryLabelColor` 动态色；`MarkdownPresentation` 给引用块（连同分隔空行）打 `quoteDepthAttribute`；正文视图在 `drawBackground(in:)` 里按可见字符枚举、每条引用画一条竖线。文字缩进与配色都不动。
+- 理由：竖线是 macOS（Mail/Notes/Pages）对引用的结构语言，不参与文字配色，所以不会重蹈两次对比度事故；与缩进叠加后，引用与列表续行在几何上分开。
+- 兼容性/迁移：纯 Markdown 渲染路径新增绘制；纯文本与 HTML 路径不受影响；帧变化只有 `detail-markdown-rendered` 亮/暗两张（基线 240 不变）。
+- 边界：HTML `<blockquote>` 路径没有这个属性（465）；滚动时只画可见段（性能取舍，滚动会带来新脏区）。
+- 回滚：删 `drawBackground` 里的 `drawQuoteRules` 调用即可恢复旧帧；或 `git revert`。
+

@@ -4169,6 +4169,137 @@ final class UICaptureTests: XCTestCase {
                                  + "\(String(format: "%.1f", markdown))pt ⇒ 同一个「渲染」档里两条通道的标题不同档")
     }
 
+    /// R439：Markdown 引用块必须在文字左侧有一条导引线。
+    ///
+    /// 旧形状（修之前 `detail-markdown-rendered` 亮/暗现读）：引用只有 18pt 缩进，
+    /// 规则带（24..27pt）里最长的连续竖墨是 **17.0pt** —— 那是 h1 的 `#`，不是线；
+    /// 同文档的源模式帧是 **14.5pt**（代码块行首字）。
+    ///
+    /// 为什么读**最长竖墨段**而不是规则带里的墨量：正文每一行的行首都从 20pt 起笔，
+    /// 规则带里的零散字形墨加起来比一条 2×57pt 的线还多（旧帧同带墨量 > 新帧），
+    /// 面积判据会把"线没画"读成通过。竖线是唯一在 y 方向上连续的东西。
+    /// 负对照用同一份文档的**源模式**帧（`detail-markdown-source`）：它逐字含 `>`，
+    /// 但没有任何一行该长出一条竖线。
+    func testMarkdownQuotesCarryALeadingRule() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r439-quote-rule-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        /// 规则带的横向范围（pt）：正文容器原点 20pt + 5pt 偏移，两侧各留 1pt 抗锯齿。
+        let bandLeftPt = 24.0
+        let bandRightPt = 27.0
+        /// 竖墨地板（pt，按长度换算）：旧形状最长 17pt，线高 57pt，取 30pt。
+        let ruleFloorPt = 30.0
+        /// 负对照的上界：旧源模式帧最长 14.5pt，留到 20pt。
+        let sourceCeilingPt = 20.0
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let renderedFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-markdown-rendered" }),
+                  let sourceFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-markdown-source" }) else {
+                return XCTFail("\(tag)：找不到 Markdown 两帧 ⇒ 这条判据没有对象")
+            }
+
+            func scan(_ fixture: Fixture) throws -> (runPt: Double, textLeftPt: Double, contentInk: Int)? {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(fixture.name)` 读不回字节 ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let scale = Double(rep.pixelsWide) / 720.0
+                let width = rep.pixelsWide, height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let o = y * bytesPerRow + x * 4
+                    return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+                }
+                // 两档各用一条能从**窗底色**与**代码块浅底**里分出墨的绝对线：
+                // 亮档正文/线都 ≤190、代码底 238；暗档正文 255、线 ~150、底 30。
+                let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+                let x0 = Int((bandLeftPt * scale).rounded())
+                let x1 = Int((bandRightPt * scale).rounded())
+                var best = 0
+                var current = 0
+                var bestTop = -1
+                var bestBottom = -1
+                for y in 0..<height {
+                    var hasBandInk = false
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        hasBandInk = true
+                        break
+                    }
+                    if hasBandInk {
+                        current += 1
+                        if current > best {
+                            best = current
+                            bestTop = y - current + 1
+                            bestBottom = y
+                        }
+                    } else {
+                        current = 0
+                    }
+                }
+                // 通道前提：正文区域里到底有没有墨。整帧平涂时把"读不到"报成具名 NOT-RUN，
+                // 而不是把 0 当"线没画"（那会让 runner 的通道限制变成一朵红）。
+                var contentInk = 0
+                let contentX0 = Int((30.0 * scale).rounded())
+                let contentX1 = Int((360.0 * scale).rounded())
+                let contentY0 = Int((70.0 * scale).rounded())
+                let contentY1 = min(height, Int((450.0 * scale).rounded()))
+                for y in stride(from: contentY0, to: contentY1, by: 2) {
+                    for x in stride(from: contentX0, to: contentX1, by: 2) where isInk(luma(x, y)) {
+                        contentInk += 1
+                    }
+                }
+                var textLeft = Double.nan
+                if bestTop >= 0 {
+                    let textX0 = Int((30.0 * scale).rounded())
+                    let textX1 = min(width, Int((360.0 * scale).rounded()))
+                    search: for x in textX0..<textX1 {
+                        for y in bestTop...bestBottom where isInk(luma(x, y)) {
+                            textLeft = Double(x) / scale
+                            break search
+                        }
+                    }
+                }
+                return (Double(best) / scale, textLeft, contentInk)
+            }
+
+            guard let rendered = try scan(renderedFixture),
+                  let source = try scan(sourceFixture) else { return }
+            guard rendered.contentInk > 0, source.contentInk > 0 else {
+                emit("MARKDOWN_QUOTE_RULE_NOT_RUN=runner-detail-frame-plain \(tag) "
+                     + "rendered=\(rendered.contentInk) source=\(source.contentInk)")
+                continue
+            }
+            emit("MARKDOWN_QUOTE_RULE \(tag) 带=\(String(format: "%.0f..%.0f", bandLeftPt, bandRightPt))pt "
+                 + "竖墨=\(String(format: "%.1f", rendered.runPt))pt "
+                 + "源=\(String(format: "%.1f", source.runPt))pt "
+                 + "文字左=\(String(format: "%.1f", rendered.textLeftPt))pt "
+                 + "净距=\(String(format: "%.1f", rendered.textLeftPt - bandRightPt))pt")
+            XCTAssertGreaterThanOrEqual(rendered.runPt, ruleFloorPt,
+                                        "\(tag)：引用帧规则带里最长竖墨只有 \(rendered.runPt)pt "
+                                        + "⇒ 导引线没画出来（地板 \(ruleFloorPt)pt）")
+            XCTAssertLessThanOrEqual(source.runPt, sourceCeilingPt,
+                                     "\(tag)：源模式帧规则带里也有 \(source.runPt)pt 的竖墨 "
+                                     + "⇒ 负对照不再干净（上界 \(sourceCeilingPt)pt）")
+            XCTAssertGreaterThanOrEqual(rendered.textLeftPt, 36.0,
+                                        "\(tag)：引用文字左沿只到 \(rendered.textLeftPt)pt "
+                                        + "⇒ 最长竖墨不是线（线左侧 25pt、文字应在 38pt 一线）")
+            XCTAssertLessThanOrEqual(rendered.textLeftPt, 42.0,
+                                     "\(tag)：引用文字左沿跑到 \(rendered.textLeftPt)pt "
+                                     + "⇒ 缩进变了，净距这条读数失去对象")
+            XCTAssertGreaterThanOrEqual(rendered.textLeftPt - bandRightPt, 8.0,
+                                        "\(tag)：线右沿到引用文字只隔 "
+                                        + "\(rendered.textLeftPt - bandRightPt)pt ⇒ 线和文字粘在一起")
+        }
+    }
+
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，

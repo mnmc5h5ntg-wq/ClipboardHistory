@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情 Markdown 引用块补左侧导引线（规则带最长竖墨 17.0 → 57.0pt、文字左沿 38.5pt、净距 11.5pt；2 张帧变化、基线 240）（R439 / 第 438 轮 / Round 436 / U-1618…U-1622 · 产品 3 文件，详情正文引用位）
+
+
 ### 快捷键录制按钮补帮助文本（静置「点一下重新录制；按 Esc 取消」/录制「请输入快捷键；按 Esc 取消」，toolTip + AX；帮助气泡系统画 ⇒ 像素具名 NOT-RUN）；R437 两跑与新跑读数本轮被 GitHub EOF 挡住 ⇒ 具名 CI_READ_BLOCKED（R438 / 第 437 轮 / Round 435 / U-1613…U-1617 · 产品 1 文件，录制按钮帮助位）
 
 

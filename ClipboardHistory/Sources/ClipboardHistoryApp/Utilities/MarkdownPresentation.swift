@@ -92,6 +92,11 @@ enum MarkdownPresentation {
     static let quoteIndent: CGFloat = 18
     static let maximumListDepth: Int = MarkdownParsingPolicy.maximumListDepth
 
+    /// 引用深度作为**属性**跟着整块走，正文视图按它画左侧导引线（`MarkdownQuoteRule`）。
+    /// 不复用段落缩进反推：缩进是 `CGFloat` 的排版结果，列表续行也占着它，
+    /// 从字形几何反推"这是引用"会把列表续行认成引用（两类缩进本来就不是一件事）。
+    static let quoteDepthAttribute = NSAttributedString.Key("ClipboardHistory.markdownQuoteDepth")
+
     /// 段落首行缩进：引用层数 × 引用缩进 + 列表深度 × 项目符宽度。
     static func firstLineHeadIndent(for block: MarkdownBlock) -> CGFloat {
         CGFloat(block.quoteDepth) * quoteIndent
@@ -296,6 +301,11 @@ enum MarkdownPresentation {
             // 段落属性覆盖到分隔符，块内所有行（含空行）才不会漏掉缩进与行距。
             let range = NSRange(location: start, length: result.length - start)
             result.addAttribute(.paragraphStyle, value: paragraphStyle(for: block), range: range)
+            // 导引线属性与段落缩进覆盖同一个范围（含块后的分隔空行）：
+            // 相邻两个同级引用块因此天然连成一条线，空白行不会把线切断。
+            if block.quoteDepth > 0 {
+                result.addAttribute(quoteDepthAttribute, value: block.quoteDepth, range: range)
+            }
             if appliesWideContentBackground(to: block), range.length > 1 {
                 // 灰底止于内容最后一行：分隔用的那个空行不涂，否则两个宽内容块会连成一块灰斑。
                 result.addAttribute(.backgroundColor, value: codeBackground,

@@ -436,6 +436,44 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
         ]
     }
 
+    /// 引用块的左侧导引线画在背景层：它必须压在正文下面、选中高亮下面，
+    /// 否则选中一段引文时线会把字盖住。`drawBackground(in:)` 是 `NSText` 给正文视图
+    /// 留的正是这一层（`NSTextView` 的 `draw(_:)` 先调它，再画字形与选区）。
+    override func drawBackground(in rect: NSRect) {
+        super.drawBackground(in: rect)
+        drawQuoteRules(in: rect)
+    }
+
+    /// 只枚举**可见字符**：`boundingRect(forGlyphRange:)` 会强制那一截排版，
+    /// 整篇扫一遍等于每次重绘都把长文档重排一次。可见段也够画 —— 滚动时脏区会带来新的可见段。
+    private func drawQuoteRules(in rect: NSRect) {
+        guard let layoutManager, let textContainer, let textStorage,
+              textStorage.length > 0 else { return }
+        let visibleGlyphs = layoutManager.glyphRange(forBoundingRect: rect, in: textContainer)
+        let visibleChars = layoutManager.characterRange(forGlyphRange: visibleGlyphs,
+                                                        actualGlyphRange: nil)
+        guard visibleChars.length > 0 else { return }
+        let origin = textContainerOrigin
+        MarkdownQuoteRule.color.setFill()
+        textStorage.enumerateAttribute(MarkdownPresentation.quoteDepthAttribute,
+                                       in: visibleChars) { value, range, _ in
+            guard let depth = value as? Int, depth > 0 else { return }
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range,
+                                                  actualCharacterRange: nil)
+            let span = layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer)
+                .offsetBy(dx: origin.x, dy: origin.y)
+            for rule in MarkdownQuoteRule.ruleRects(containerOriginX: origin.x,
+                                                    textSpan: span,
+                                                    quoteDepth: depth) {
+                let clipped = rule.intersection(rect)
+                guard !clipped.isNull, !clipped.isEmpty else { continue }
+                NSBezierPath(roundedRect: clipped,
+                             xRadius: MarkdownQuoteRule.cornerRadius,
+                             yRadius: MarkdownQuoteRule.cornerRadius).fill()
+            }
+        }
+    }
+
     /// 只读正文的唯一写入口：设文本、设字体、再打命中高亮。
     ///
     /// 顺序有意义：`string` 一赋值，旧的临时属性就跟着字形没了，所以高亮必须在设完文本之后打。
