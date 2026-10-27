@@ -7688,3 +7688,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：真实系统拖拽会话没有自动化验收（capture-env 帧只证视觉态，onDrag/结束由源守卫钉；BACKLOG 453）；如果 Timer 在某个系统版本上不触发，行可能停暗，下一次 begin/end 会重置。
 - 回滚：删 `DragSourceFeedback.swift`、`EntryDragModifier` 的 delay 与行的 `.opacity` 即可；或 `git revert` 本轮提交。
 
+## D-424 菜单项用文字显示全局快捷键；快速选择进菜单命令区（R428）
+
+- 背景：菜单栏菜单只有显示主窗口/设置/清空/退出，全局热键（⌃⌥V、⌃⌥⇧V）只在设置页可见；快速选择只能靠热键唤起。
+- 决定：`MenuShortcutPresentation` 在当前标题后追加 `HotKeyShortcut.displayString`；`AppCommandCatalog.menuBarCommands` 增 `.showQuickPick`（同一个 `AppCommand`，不造第二条粘贴/显示路径，`keyEquivalent` 仍为空）；`MenuBarController` 用活的 provider 在每次 `populate` 读取当前热键；`ApplicationShell` 传当前 `showMainWindowHotKeySettings` / `quickPickHotKeySettings`；13+ 的 `App.swift` 用 `AppDelegate.menuShortcutHint(for:)`。
+- 理由：热键是全局 Carbon 注册，不是本地 key equivalent；把组合写成菜单的 key equivalent 会造第二条路径（全局热键 + 菜单项同时触发）。文字提示既让命令可发现，又保持只有一条行为路径；provider 让用户改键后菜单跟着走。
+- 兼容性/迁移：12 的 NSMenu 命令区从 4 项变 5 项（加快速选择），`AppCommandTests` 顺序更新；既有帧不变，基线 234→238 是 R427 修复的 4 张脚注 marker 帧。
+- 边界：13+ MenuBarExtra 是系统菜单，像素/标题通道具名 NOT-RUN（454）；快速选择菜单项点下会先关菜单再开浮层，未做真机点击验收。
+- 回滚：删 `MenuShortcutPresentation.swift`、命令目录里的 `.showQuickPick`、两个表面的标题调用即可；或 `git revert` 本轮提交。
+

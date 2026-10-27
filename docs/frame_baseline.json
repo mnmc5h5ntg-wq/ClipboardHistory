@@ -1,5 +1,5 @@
 {
-  "count": 234,
+  "count": 238,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -165,6 +165,8 @@
     "settings-data-720x540-light.png": "a62b523c0d3c9e1f504bc683eec01732ace479db928badf0419a1f31bcfd7054",
     "settings-general-720x540-dark.png": "6e3a960501c5e71c9d366cf88d73cec5142cb5b4caa50038aee2836b33538831",
     "settings-general-720x540-light.png": "c6144593ac1e755ebfface48fd1f83f6fbec902766bab151a043a009c538f549",
+    "settings-general-footer-marker-720x540-dark.png": "fa15df8d46bfac7c24eed57a8a775a94ffd4d24ec6a3b5c8d6ccc60c9e7a27e7",
+    "settings-general-footer-marker-720x540-light.png": "215f7c4a4219fcaeeab3de8a1f65072d202707360160d3b6e846d4364ebe604b",
     "settings-general-login-failed-720x540-dark.png": "ca4cb70e44b7e758849304309b9875ca853270832ff909f1cd7727a23ea0dda2",
     "settings-general-login-failed-720x540-light.png": "e6bb8c4067a879844a86539c99acec2404eee4c2fa8ee6f7f2068b84890a855c",
     "settings-general-login-unsupported-720x540-dark.png": "379357253c92f2a87ca38f88d9bd54d7840aaca3466ea1a21b9ce56e248cec23",
@@ -173,6 +175,8 @@
     "settings-general-no-footer-720x540-light.png": "9d9c6da4520c34149462d816367c2af3a64df98cc35b1c7abebd2f4d81206e2c",
     "settings-min-640x440-dark.png": "b83a13e920819edb7d12595bcbe8898d640a2de775275e378039e8dc478ea7b2",
     "settings-min-640x440-light.png": "ec91164fce3b07a0c3239e5d641f6f82e151eb535cc00aecb0a82870b846567d",
+    "settings-min-footer-marker-640x440-dark.png": "4f10b5eddb59816118760486d4fa9b346d994a2e0c3e2ab357f09c0f94ed7f77",
+    "settings-min-footer-marker-640x440-light.png": "e0261578095dad5f7f67238e84cfffb9de7b3494672d8f08c51d774e6380f1ba",
     "settings-min-no-footer-640x440-dark.png": "1877ca7b8088fe46e7c505f155d556ee4eee3dca07ee7c259016693d41e7b6a3",
     "settings-min-no-footer-640x440-light.png": "1f44312a7ffc6313644a8f96c383ce0b800800063229d39fb0096c08848ac0c1",
     "settings-privacy-720x540-dark.png": "72c6005cd92a5b985d59a531f4e3cf4b7115302caf9531c4fbd003a5511430d8",

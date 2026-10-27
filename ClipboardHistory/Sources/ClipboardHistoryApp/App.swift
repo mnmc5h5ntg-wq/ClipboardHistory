@@ -28,7 +28,10 @@ struct ClipboardHistoryApp: App {
                 MenuBarRecommendationsView(historyStore: historyStore, appDelegate: appDelegate)
                 Divider()
                 ForEach(AppCommandCatalog.menuBarCommands.filter { $0 != .quit }, id: \.self) { command in
-                    Button(command.title) {
+                    Button(MenuShortcutPresentation.title(
+                        command.title,
+                        hint: appDelegate.menuShortcutHint(for: command)
+                    )) {
                         appDelegate.perform(command)
                     }
                 }

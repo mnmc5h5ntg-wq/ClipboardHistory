@@ -3,6 +3,7 @@ import SwiftUI
 /// 设置侧栏最底下那行：应用名 + 版本。只在设置窗口里出现，不参与布局分配（由外层 Spacer 顶到底部）。
 struct SettingsSidebarFooter: View {
     let text: String
+    @Environment(\.settingsSidebarFooterMarkerForCapture) private var markerForCapture
 
     var body: some View {
         HStack(spacing: 0) {
@@ -21,6 +22,15 @@ struct SettingsSidebarFooter: View {
         .padding(.trailing, 12)
         .padding(.top, 8)
         .padding(.bottom, 14)
+        .overlay(alignment: .leading) {
+            if markerForCapture {
+                Rectangle()
+                    .fill(Color(red: 1, green: 0, blue: 1))
+                    .frame(width: 2, height: 2)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 }
 
@@ -34,6 +44,12 @@ struct SettingsSidebarFooterForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// 取证通道（R428）：在脚注左缘画一颗 2×2 品红标记，让像素尺在**同一帧**里定位脚注，
+/// 不再拿两张整页帧做差集（runner 上两张设置页会因为材质/首帧状态整页不同）。
+struct SettingsSidebarFooterMarkerForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool = false
+}
+
 extension EnvironmentValues {
     var settingsSidebarVersionForCapture: String? {
         get { self[SettingsSidebarVersionForCaptureKey.self] }
@@ -43,5 +59,10 @@ extension EnvironmentValues {
     var settingsSidebarFooterForCapture: Bool? {
         get { self[SettingsSidebarFooterForCaptureKey.self] }
         set { self[SettingsSidebarFooterForCaptureKey.self] = newValue }
+    }
+
+    var settingsSidebarFooterMarkerForCapture: Bool {
+        get { self[SettingsSidebarFooterMarkerForCaptureKey.self] }
+        set { self[SettingsSidebarFooterMarkerForCaptureKey.self] = newValue }
     }
 }

@@ -25,20 +25,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// 菜单栏那颗图不是 SwiftUI 的，`@AppStorage` 不会替它重画 ⇒ 自己订阅 defaults 变化。
     private var pauseBridge: AnyCancellable?
 
-        private var statusItem: NSStatusItem?
+    private var statusItem: NSStatusItem?
     private var commandHandler: CommandHandler?
     private var pasteHandler: ((HistoryStore.Entry) -> Void)?
+    private var menuShortcutHints: () -> [AppCommand: String] = { [:] }
     weak var historyStore: HistoryStore?
 
     func configure(
         commandHandler: @escaping CommandHandler,
         historyStore: HistoryStore? = nil,
-        pasteHandler: ((HistoryStore.Entry) -> Void)? = nil
+        pasteHandler: ((HistoryStore.Entry) -> Void)? = nil,
+        menuShortcutHints: @escaping () -> [AppCommand: String] = { [:] }
     ) {
         LifecycleDebugLogger.log("MenuBarController.configure called")
         self.commandHandler = commandHandler
         self.historyStore = historyStore
         self.pasteHandler = pasteHandler
+        self.menuShortcutHints = menuShortcutHints
 
         if #available(macOS 13, *) {
             LifecycleDebugLogger.log("MenuBarController.configure skipped NSStatusItem on macOS 13+")
@@ -174,7 +177,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     private func menuItem(for command: AppCommand) -> NSMenuItem {
         let item = NSMenuItem(
-            title: command.title,
+            title: MenuShortcutPresentation.title(command.title,
+                                                  hint: menuShortcutHints()[command]),
             action: selector(for: command),
             keyEquivalent: command.keyEquivalent
         )

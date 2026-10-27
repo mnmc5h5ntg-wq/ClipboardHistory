@@ -8911,3 +8911,17 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`row-drag-source-active` 帧由取证键 `draggingEntryIDForCapture` 驱动，能证明"拖拽源态长什么样、墨量比 0.550/0.549"；但完整的系统拖拽（按下-移动-跨进程 drop）在本机/runner 都没有自动化的合成通道。`onDrag` 里的 `beginAfterDelay`、行的 `entry.id` 接线、`.common` 轮询都只有源码守卫，没有一条真实拖拽的运行时签名。
     修法（下一轮若需要）：先用 CGEvent/辅助功能权限试一条最小拖拽（同进程内拖到另一个 NSView 或 Finder），把 `NSEvent.pressedMouseButtons` 的轮询结束与行变暗/复亮写成一条在屏探针；失败就把权限/环境原因具名记 NOT-RUN，不要用 capture-env 帧替代真实会话。另需量一次"Timer 在拖拽 tracking 模式下真的触发"的读数（本轮只有 `.common` 的源守卫，没有实物读数）。
 
+437 追记（R428 · 仍开）：本轮补的是菜单项的快捷键提示与快速选择入口；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+449 追记（R428 · 仍开）：R427 CI 跑里 `SelectionRevealAnimationTests` 4/4 passed（CHANNEL 0→133→600、TIME 6/2/840/1430），本机全量仍 5 断言红（3 条用例）、单跑 4/4 绿 ⇒ 会话/顺序再次坐实；不改门槛。
+
+451 追记（R428 · 仍开）：macOS 12 的详情头部阈值本轮未动；菜单提示不涉及它。
+
+452 追记（R428 · 仍开）：设置侧栏版本行仍是内容相对；本轮只把它的像素尺从差集改成单帧 marker。
+
+453 追记（R428 · 仍开）：真实系统拖拽会话仍无自动化验收；本轮没动拖拽源。
+
+**454. 13+ MenuBarExtra 的系统菜单没有像素/标题通道：12 的 NSMenu 是真实 AppKit 证人，13+ 只有源守卫**（R428 观察）
+    现象：12 的菜单由 `MenuBarController.populate` 建 `NSMenuItem`，测试能读真实标题（旧 4 项→新 5 项、⌃⌥V/⌃⌥⇧V）；13+ 的 `MenuBarExtraStyle.menu` 由系统把 SwiftUI label 编成 NSMenu，测试进程拿不到那张菜单，像素也没有（系绘制）。本轮具名 `MENU_ITEM_SHORTCUT_PIXEL_NOT_RUN=system-menu`。
+    修法（下一轮若需要）：在 13+ 上要么用辅助功能在真机读菜单项标题（需要权限与真机），要么保持 `MenuShortcutPresentation` 的纯函数 + App.swift 源守卫，不把 12 的 NSMenu 读数冒充 13+ 证据；如将来跑真机点击，顺带验"快速选择菜单项点下会关菜单再开浮层"。
+

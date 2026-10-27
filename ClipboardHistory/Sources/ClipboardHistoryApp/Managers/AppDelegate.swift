@@ -236,6 +236,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shell.perform(command)
     }
 
+    /// R428：13+ 的 MenuBarExtra 菜单项文字里的全局快捷键提示（12 走 MenuBarController 的 NSMenu）。
+    func menuShortcutHint(for command: AppCommand) -> String? {
+        MenuShortcutPresentation.hint(for: command,
+                                      showMainWindow: showMainWindowHotKeySettings.shortcut,
+                                      quickPick: quickPickHotKeySettings.shortcut)
+    }
+
     func showSettings() {
         shell.showSettings()
     }

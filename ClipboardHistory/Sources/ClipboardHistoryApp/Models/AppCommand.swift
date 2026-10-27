@@ -49,6 +49,7 @@ enum AppCommand: CaseIterable, Equatable {
 enum AppCommandCatalog {
     static let menuBarCommands: [AppCommand] = [
         .showMainWindow,
+        .showQuickPick,
         .showSettings,
         .clearHistory,
         .quit

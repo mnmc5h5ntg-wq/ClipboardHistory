@@ -18701,3 +18701,21 @@ QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打�
 | 可复核性 | 15/15 | 静置/拖拽两读数、7 把刀 + r29d 5 把重钉、precheck/rot/CI 原文、基线 234、换装/清账读数都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 425 · R428（第 427 轮 · 2026-10-27）：菜单项补全局快捷键提示并把「快速选择…」挂进菜单（12 的 NSMenu 旧 4 项/无提示 → 新 5 项、显示主窗口 ⌃⌥V / 快速选择… ⌃⌥⇧V；13+ 系统菜单像素具名 NOT-RUN）；R427 跑失败步骤 2 个（版本行差集在 runner 上整页不同）⇒ 单帧品红标记定位、阈值未动（产品 7 文件，菜单项快捷键位）
+
+菜单栏菜单以前只有四项、全局热键只在设置页可见。新 `MenuShortcutPresentation` 把当前热键追加到标题；`AppCommandCatalog.menuBarCommands` 增 `.showQuickPick`（同一 AppCommand，不造第二条路径）；`MenuBarController` 用活 provider 在每次 populate 读当前键；`ApplicationShell` 传两份 HotKeySettings；13+ 的 App.swift 走 `appDelegate.menuShortcutHint`。12 真实 NSMenu 旧/新：`显示主窗口|设置|清空未收藏|退出`（4 项）→ `显示主窗口  ⌃⌥V|快速选择…  ⌃⌥⇧V|设置|清空未收藏|退出`（5 项）；自定义热键在 populate 时跟随（⌃⌥V→⌃⌥C）。13+ 系统菜单像素具名 NOT-RUN（454）；12 标题是真实 AppKit 证人。R427 run `40487018343 ↔ fb55ffc` **failure、失败步骤 2 个**：唯一红是版本行正/负差集在 runner 上整页不同（720 136×203、负臂 5725/23690）⇒ 改成**单帧 2×2 品红标记**定位，新增 4 张 marker 帧，本机 1086/1284、负臂无标记；基线 234→238；r29d 名册再重钉 5/5。其余：floor judged=5/5 executed=77 无红；源图标最小窗文字 NOT-RUN 4 行；拖拽 mass 0.549/0.550；搜索 4 行；滚动 4/4；`MOTION_COPY_RECEIPT` 无行 NOT-RUN。M1160–M1166 6/6；预检 201/183/533；HIDDEN 288/951 rot=0。全量 1154/57/5，5 断言全在 SelectionRevealAnimationTests；单跑 4/4（TIME 18/8、30.5→1438；CHANNEL 0→90.5→600）⇒ 具名 LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order（449）。捕获 134/4/0、238 帧；换装 ok/SHA_MATCH=1/381=381/SMOKE_OK=1；清账 162/63/0；电池 683/4。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 12/15 | 12 的 NSMenu 用真实 NSMenuItem 标题作证（旧 4 项/新 5 项、两枚热键提示、custom 键跟随）；13+ 的 MenuBarExtra 是系统菜单，像素/标题只走源守卫并具名 NOT-RUN。扣 3：没有一张菜单像素图。 |
+| 判据有效性 | 15/15 | 5 条呈现/真实菜单/动态源 + AppCommand 顺序 + MenuBarPopulation；M1160–M1166 6/6；quick pick 选同一个 AppCommand。 |
+| 假绿防御 | 15/15 | 菜单命令区顺序由测试钉住；提示读活 provider（改键后 populate 跟随）；13+ 系统菜单不冒充像素；`MOTION_COPY_RECEIPT` 无行记 NOT-RUN。 |
+| 产品面推进 | 14/15 | 真落 Sources 7 文件（菜单 6 + 脚注标记缝 1），补的是菜单项可发现性与快速选择入口；扣 1：13+ 菜单像素没有直接证据（454）。 |
+| 台账一致性 | 15/15 | U-1563…U-1567、D-424、436 的 judged=5/5/executed=77、R427 的 136×203/23690、拖拽 mass、R428 的旧/新标题都从日志/真实菜单解析。 |
+| 交付诚实性 | 15/15 | R427 差集红照实写并改仪器；13+ 系统菜单具名 NOT-RUN；真实拖拽/Dock/源图标最小窗各有具名 NOT-RUN；本地 5 条滚动红具名会话/顺序。 |
+| 可复核性 | 15/15 | 旧/新菜单标题、4 张 marker 帧、6 把刀 + r29d 5 把重钉、precheck/rot/CI 原文、基线 238、换装/清账读数都在。 |
+
+均分 = 101/105 ≈ 14.4/15（96）。

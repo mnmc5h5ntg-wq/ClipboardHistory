@@ -6,6 +6,9 @@ final class ApplicationShell {
     private weak var historyStore: HistoryStore?
     private let menuBarController = MenuBarController()
     private let settingsWindowController: SettingsWindowController
+    /// R428：菜单项的全局快捷键提示来自这两份设置（用户改键后菜单文字跟着走）。
+    private let showMainWindowHotKeySettings: HotKeySettings
+    private let quickPickHotKeySettings: HotKeySettings
     private let confirmation: DestructiveConfirming
     private let pasteKey: PasteKeyExecuting
     private var isConfigured = false
@@ -24,6 +27,8 @@ final class ApplicationShell {
         confirmation: DestructiveConfirming = SystemDestructiveConfirming(),
         pasteKey: PasteKeyExecuting = SystemEventsPasteKey()
     ) {
+        self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
+        self.quickPickHotKeySettings = quickPickHotKeySettings
         self.confirmation = confirmation
         self.pasteKey = pasteKey
         self.settingsWindowController = SettingsWindowController(
@@ -46,6 +51,13 @@ final class ApplicationShell {
             historyStore: historyStore,
             pasteHandler: { [weak self] entry in
                 self?.copyAndPasteEntry(entry)
+            },
+            menuShortcutHints: { [weak self] in
+                guard let self else { return [:] }
+                return [
+                    .showMainWindow: self.showMainWindowHotKeySettings.shortcut.displayString,
+                    .showQuickPick: self.quickPickHotKeySettings.shortcut.displayString
+                ]
             }
         )
         LifecycleDebugLogger.logAppState("after ApplicationShell.configure", menuBarController: menuBarController)
