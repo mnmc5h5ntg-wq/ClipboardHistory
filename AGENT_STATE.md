@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R422 状态（2026-10-27 · 本地 · 第 421 轮 / Round 419）：列表空态补叠卡插画（字形 482 墨/28px → 插画 4649 墨/52px；content-empty 2 帧变化 + 新增 4 帧，基线 222）；R421 跑唯一红＝静态文档滚动正对照中段帧抢在重绘前（249/24000），重抓 + 具名 NOT-RUN，地板不动（产品 2 文件，列表空态插画位）
+
+最后更新：2026-10-27（本地 · R422 / 第 421 轮 / Round 419）：侧栏「暂无剪贴板历史」以前是一颗 28pt 字形。新 `EmptyStateIllustration`：背卡右上错开 9pt、前卡玻璃 + 发丝边、内嵌剪贴板字形；`EmptyStateView` 增加 `illustration: Bool = false`，侧栏只在 `historyStore.entries.isEmpty` 时传 true（无匹配/收藏空保持字形）；空态无动画。真看图：组件与 `content-empty` 产品帧都显示叠卡 + 标题。同带（250×220 上半 110pt）字形 **482/483 墨、盒高 28px**；插画 **4649 墨、盒高 52px**（9.6×，盒高 +12pt）。新增 4 帧 + `content-empty` 2 帧变化，基线 **222/0/0/0**。`M1113/M1114` **2/2 CAUGHT**；三条令牌守卫抓了第一版（hover 令牌直读 / 硬写 `.secondary` / 就地字号），已改为 `VisualTint.chipStroke` 派生、`StatePresentation.iconStyle(for: .empty)`、`VisualGlyph.emptyCompact * 0.72`。R421 run `40448188618 ↔ 8dbfa54` **failure**，失败步骤 **1 个**（`Swift tests`）：**Motion floor 绿**（`judged=5/5 executed=76`、`OK=5/5`、`SUITE_CLEAN=0`；markdown 1x=2；`markdown-2x`/`receipt-dismiss-CI` 具名；`PANEL_ORIGIN 旧=(0,59) 新=(290,200)` 在 CI 执行并绿）；唯一红是静态文档滚动**正对照**中段帧抢在重绘前：`起→中=249 中→落=24000`（原点 0→80→600，地板 500）⇒ 中段低于地板时在动画中段重抓一次；重抓仍低则具名 `STATIC_SCROLL_CHANNEL_NOT_RUN=mid-frame-race`（地板不动）。全量 **1123/56/0**；捕获 **222/130/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 268/905 rot=0；预检 181/163/487 bad=0；产品面连续零改动 **1** 轮（as-of 421，现读 `python3 scripts/product_streak.py --streak-for 421`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R421 跑 floor 绿（executed=76、OK=5/5、markdown 1x=2、PANEL_ORIGIN 绿）；唯一红是静态文档正对照中段帧抢在重绘前（249/24000）⇒ 重抓 + 具名 NOT-RUN，地板不动。
+② 产品：列表空态叠卡插画（字形 482/28px → 插画 4649/52px），只在无历史时接上；新增 4 帧 + content-empty 2 帧变化，基线 222。
+③ 判据：M1113/M1114 2/2；三条令牌守卫的自伤已改；precheck 181/163/487；hidden rot 0。
+④ 436：judged=5/5 executed=76、OK=5/5、SUITE_CLEAN=0、无 unlisted；绿。
+⑤ 367：hidden 表 268 / 可判 905 / rot 0 / 上界 0；ARM 274 文件 / 971 把。
+⑥ 全量 1123/56/0；捕获 222/130/4/0；换装 ok；清账 162=162；帧基线 222/0/0/0。
+
+NOT-RUN / 阻塞（分开写）：① 静态文档中段帧的通道竞态（重抓仍低则具名 `mid-frame-race`）；② markdown 2x / sidebar 2x / receipt 消失臂在 extended；③ 真机/多屏面板落点无截屏（447）；④ skeleton 套件内偶发；⑤ 真菜单栏表面、12 实时腿；⑥ `REVEAL`/`INTAKE_READING`、`MOTION_FLOOR_UNLISTED`/`SCROLL_FAILURE_COUNT` 缺行；⑦ `table-lazy-rows`；⑧ 设置能力闸门仍隐式（441）；⑨ 437–448 仍开；⑩ R422 新跑待 push 后读。
+
+下一轮（R423）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R422 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看静态滚动正对照重抓/具名出口、空态 4 帧在 runner 上、floor REDS=0；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R421 状态（2026-10-27 · 本地 · 第 420 轮 / Round 418）：快速选择面板补屏幕落点（真面板旧 (0,89) → 新 (290,200)，纯策略居中+夹住）；R420 胶片套件跑完（executed=76）但 markdown 2x 只 1 帧 ⇒ CI 判 1x、2x 具名 extended（产品 2 文件，窗口落点位）
 
 最后更新：2026-10-27（本地 · R421 / 第 420 轮 / Round 418）：快速选择面板建在 (0,0) 后再没被摆过：真面板 frame 原点 **(0,89)**（屏幕左缘、Dock 之上），窗口位置从未进过任何帧或判据。新 `QuickPickPlacement.origin(panelSize:visibleFrame:)`：以 visibleFrame 居中并夹住（房间小则锚可见原点）；`show()` 在 `makeKeyAndOrderFront` 之前 `placePanel`，屏幕优先鼠标所在块、退主屏；`windowForCapture` 不读屏幕。真面板 **旧 (0,89) → 新 (290,200)**（可见 800×600、面板 420×300）；纯策略 1440×830→**(510,290)**、第二屏→**(2030,275)**、小房间→**(0,0)**。既有 **218 帧逐字节不变、基线不动**。`M1109/M1110` 2/2、`M1111/M1112` 2/2 CAUGHT；名册加新文件把 M871/M873/M877 弄空，重钉后 3/3；电池首跑 2 红（未纳管 + skip 级联）修后 683/4。R420 run `40444724766 ↔ f33e87b` **failure**，失败步骤 **1 个**（`Motion coverage floor`）：**套件跑完**（`judged=5/5 executed=76`），唯一红是 markdown **2x=1 帧**（1x=2、峰值 0.0193；probe 2x=2/1x=2 可见）⇒ 小墨量文字交换的 2x 采样边界；CI 判 1x、2x 进 extended 并具名 `markdown-2x`。回执出现 2/2（1260/1375ms）、侧栏 1x=2（2x NOT-RUN 未计红）、热图 4 帧绿（1255/1349、右沿 236→242/243）、菜单栏 92/137/63 与 12 图 891→1325。CI 模式胶片套件 **129.9s/76/4/0**。全量 **1121/56/0**；捕获 **218/129/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 267/903 rot=0；预检 180/162/485 bad=0；产品面连续零改动 **1** 轮（as-of 420，现读 `python3 scripts/product_streak.py --streak-for 420`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

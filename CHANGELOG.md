@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 列表空态补叠卡插画（字形 482 墨/28px → 插画 4649 墨/52px；content-empty 2 帧变化 + 新增 4 帧，基线 222）；R421 跑唯一红＝静态文档滚动正对照中段帧抢在重绘前（249/24000），重抓 + 具名 NOT-RUN，地板不动（R422 / 第 421 轮 / Round 419 / U-1533…U-1537 · 产品 2 文件，列表空态插画位）
+
+
 ### 快速选择面板补屏幕落点（真面板旧 (0,89) → 新 (290,200)，纯策略居中+夹住）；R420 胶片套件跑完（executed=76）但 markdown 2x 只 1 帧 ⇒ CI 判 1x、2x 具名 extended（R421 / 第 420 轮 / Round 418 / U-1528…U-1532 · 产品 2 文件，窗口落点位）
 
 

@@ -7636,3 +7636,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：捕获帧零变化（218 帧逐字节不变）；`placePanel` 只改窗口原点。
 - 回滚：删 show() 里的 placePanel 调用与 QuickPickPlacement 即可；或 `git revert` 本轮提交。
 
+## D-418 列表空态用"两张叠卡"的静态插画，只在无历史时替换字形（R422）
+
+- 背景：侧栏「暂无剪贴板历史」只有一颗 28pt 字形；这一屏的语义是"这里会积累一条条历史"，一颗字形读不出"一叠还没有的记录"。
+- 决定：`EmptyStateIllustration`：背卡右上错开 9pt、前卡玻璃 + 发丝边、内嵌剪贴板字形；`EmptyStateView` 增加 `illustration: Bool = false`，侧栏只在 `historyStore.entries.isEmpty` 时传 true；无匹配/收藏空保持原字形。空态是"停" ⇒ 无动画，动作仍由标题下可选按钮承担。颜色只用既有令牌（`VisualTint.chipStroke` 派生 / `VisualMaterial.glass` / `VisualHairline.edge`），字号用 `VisualGlyph.emptyCompact * 0.72`。
+- 理由：叠卡把"历史"画成可累积的东西，而不是再换一颗更大的符号；静态符合空态语义；只用既有令牌，避免"同一件安静"多出一种音量；默认 false 让既有调用点一字不改。
+- 兼容性/迁移：`content-empty` 两帧变化、新增 4 帧组件帧；基线 222。其它空态不变。
+- 回滚：删 `EmptyStateIllustration` 与 `illustration` 参数即可；或 `git revert` 本轮提交。
+

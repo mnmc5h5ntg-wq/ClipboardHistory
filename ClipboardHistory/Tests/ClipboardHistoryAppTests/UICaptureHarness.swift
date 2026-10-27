@@ -3160,6 +3160,82 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R422：列表空态的"还没有记录"用两张叠卡插画代替 28pt 字形；
+    /// 带只装空态的上半（字形/插画），标题在带下 —— 两边标题相同，差只可能来自插画。
+    func testEmptyStateIllustrationReplacesTheGlyphWithTwoCards() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r422-empty-illustration-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let glyphFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "empty-state-glyph" }),
+                  let illustrationFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "empty-state-illustration" }) else {
+                return XCTFail("\(tag)：empty-state-glyph/illustration 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [glyphFixture, illustrationFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let glyph = reps["empty-state-glyph"], let illustration = reps["empty-state-illustration"],
+                  glyph.pixelsWide == illustration.pixelsWide,
+                  glyph.pixelsHigh == illustration.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let scale = Double(glyph.pixelsWide) / 250.0
+            let bandHeight = Int(110 * scale)
+            let corner = glyph.colorAt(x: 0, y: 0)
+            var glyphInk = 0, illustrationInk = 0
+            var glyphBox = (minX: Int.max, minY: Int.max, maxX: -1, maxY: -1)
+            var illustrationBox = (minX: Int.max, minY: Int.max, maxX: -1, maxY: -1)
+            for y in 0..<min(bandHeight, glyph.pixelsHigh) {
+                for x in 0..<glyph.pixelsWide {
+                    guard let a = glyph.colorAt(x: x, y: y),
+                          let b = illustration.colorAt(x: x, y: y),
+                          let c = corner else { continue }
+                    let da = abs(a.redComponent - c.redComponent)
+                        + abs(a.greenComponent - c.greenComponent)
+                        + abs(a.blueComponent - c.blueComponent)
+                    if da > 0.01 {
+                        glyphInk += 1
+                        glyphBox.minX = min(glyphBox.minX, x); glyphBox.maxX = max(glyphBox.maxX, x)
+                        glyphBox.minY = min(glyphBox.minY, y); glyphBox.maxY = max(glyphBox.maxY, y)
+                    }
+                    let db = abs(b.redComponent - c.redComponent)
+                        + abs(b.greenComponent - c.greenComponent)
+                        + abs(b.blueComponent - c.blueComponent)
+                    if db > 0.01 {
+                        illustrationInk += 1
+                        illustrationBox.minX = min(illustrationBox.minX, x)
+                        illustrationBox.maxX = max(illustrationBox.maxX, x)
+                        illustrationBox.minY = min(illustrationBox.minY, y)
+                        illustrationBox.maxY = max(illustrationBox.maxY, y)
+                    }
+                }
+            }
+            let glyphHeight = glyphBox.maxY - glyphBox.minY + 1
+            let illustrationHeight = illustrationBox.maxY - illustrationBox.minY + 1
+            emit("EMPTY_STATE_ILLUSTRATION \(tag) 字形墨=\(glyphInk) 盒高=\(glyphHeight) "
+                 + "插画墨=\(illustrationInk) 盒高=\(illustrationHeight)")
+            XCTAssertGreaterThan(glyphInk, 20, "\(tag)：字形对照本身没有墨 ⇒ 这一格没有对象")
+            XCTAssertGreaterThan(illustrationInk, glyphInk * 2,
+                                 "\(tag)：插画墨 \(illustrationInk) 不到字形 \(glyphInk) 的两倍 ⇒ 叠卡没画出来")
+            // 本机实测（2x）：字形盒高 28px、插画 52px（+24px = 12pt；背卡错开 9pt）。
+            // 地板取 +10pt（按 scale 推）：拦住"只有前面那张卡"，又不会被 2x/1x 的取整打穿。
+            XCTAssertGreaterThan(illustrationHeight, glyphHeight + Int(10 * scale),
+                                 "\(tag)：插画盒高 \(illustrationHeight) 没有高过字形 \(glyphHeight)+10pt ⇒ 第二张卡没露出来")
+        }
+    }
+
     /// R418：13+ 菜单栏标签的暂停斜杠只在暂停时出现；glyph 本身两态都在。
     /// 真菜单栏由系统合成，这一格拍的是**标签视图本身**（真表面具名 NOT-RUN）。
     func testMenuBarPauseMarkAppearsOnlyWhenPaused() throws {
@@ -6009,6 +6085,20 @@ final class UICaptureTests: XCTestCase {
                 .frame(width: 64, height: 40)
                 .background(Color(nsColor: .windowBackgroundColor))
                 .ignoresSafeArea())
+        })
+
+        // R422：列表空态的插画（产品 `EmptyStateView` 的 `illustration` 档）与它的字形对照。
+        // 两张同标题、同尺寸，只差那一档 ⇒ 像素差就是"插画替掉了字形"。
+        results.append(Fixture("empty-state-glyph", NSSize(width: 250, height: 220)) {
+            AnyView(EmptyStateView(systemName: "clipboard", title: "暂无剪贴板历史")
+                .frame(width: 250, height: 220)
+                .background(Color(nsColor: .windowBackgroundColor)))
+        })
+        results.append(Fixture("empty-state-illustration", NSSize(width: 250, height: 220)) {
+            AnyView(EmptyStateView(systemName: "clipboard", title: "暂无剪贴板历史",
+                                   illustration: true)
+                .frame(width: 250, height: 220)
+                .background(Color(nsColor: .windowBackgroundColor)))
         })
 
         // 侧栏脱离分栏器单独拍：实测 NavigationSplitView 的 sidebar 列在离屏

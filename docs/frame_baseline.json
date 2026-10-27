@@ -1,5 +1,5 @@
 {
-  "count": 218,
+  "count": 222,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -7,8 +7,8 @@
     "cardprobe-scroll-groupbox-720x140-light.png": "6d42e4d7e9b3907127482f787cc4787a7a4362360778f284ae0be48d174935cf",
     "cardprobe-split-groupbox-720x600-dark.png": "9e26d995653cb9e07127dffed4ff91cfff5feecd182d09b51a42892035d8ea1e",
     "cardprobe-split-groupbox-720x600-light.png": "48380e19500ac83899b208cc2f87294b855ddc1b1f096d3409d5526b9014e9cc",
-    "content-empty-750x560-dark.png": "a9ac66e248706a2f4add61856af28ad76696f760f9847f1452467be7df706167",
-    "content-empty-750x560-light.png": "f9b4165031cf8ab21e15038c17f908aa0b7eb180700963accf74e532680f375e",
+    "content-empty-750x560-dark.png": "16fd2102274d64bfa5922fa901df0311aafe319ec98c092f0d3e05a5b17de7d7",
+    "content-empty-750x560-light.png": "aa608fc65db713989ab30c20d84abd2ef3f595820bb376bedf3b9bd3865420e8",
     "content-min-600x440-dark.png": "36e4bb8e2263e78eb6920296590be8456a990689f4a0efb744d1d3e8b8c315cd",
     "content-min-600x440-light.png": "4b0df1eaeda7f4e86486c751bfdaf2be22786371a3631a938dee585a4373bc61",
     "content-min-with-copy-failure-notice-600x440-dark.png": "12e76baf30525046bdb7ba17756f9112cd104ed140eff26f8bf6978d68b2ce0d",
@@ -67,6 +67,10 @@
     "detail-text-highlight-720x520-light.png": "13e029a44f10083a7c36b10cf113193bda1c7e1ea40ec437a93dd7d87b0c62b7",
     "empty-state-320x160-dark.png": "b997d67b20ab3276e0b0dd65c32090ee6eb98b632bf012b13b21bb5868c100b6",
     "empty-state-320x160-light.png": "bc05ceb5cc29efec743f8ac56b7ae4e575d09f2df6e11ec43c798016b655500b",
+    "empty-state-glyph-250x220-dark.png": "0bfe7d05cb478e1c1e1d5e783d747d42d4f52d1cf25bc3585361ba2b936c9006",
+    "empty-state-glyph-250x220-light.png": "57912cc5102d22fa85385e133823531ed046b3b1e629452fb723fa611eaf68fa",
+    "empty-state-illustration-250x220-dark.png": "6a3273b9e4026064256627048880dd6e8e97518d1c1b913e6a2e99ff0be33db6",
+    "empty-state-illustration-250x220-light.png": "14e895a975743cdba13088ce0e624472fa35cb176381baf847a31c8157f46900",
     "glass-pill-120x232-dark.png": "b340728988510dae8ae31877cf1b24df406303fda1bb5e28a9c105dd26810200",
     "glass-pill-120x232-light.png": "1e4315c341fa488b30e242eeb878b8530ea1c010351c6b4f91e71395cb3ea789",
     "glass-pill-copy-receipt-confirmed-120x300-dark.png": "ea9fbc3eef451ab68c060a5baca713feb4691d307683f171f35fd4e2e7b73832",
