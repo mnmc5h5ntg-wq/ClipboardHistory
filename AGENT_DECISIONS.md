@@ -7733,3 +7733,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：未安装 App 用虚线占位符（不伪造真实图标）；没有折叠/搜索/分组（458 之外的下一轮候选）；1x runner 上主窗口整帧不画，行首符号与名单的像素判据在 CI 上具名 NOT-RUN（458）。
 - 回滚：删 `ExcludedAppPresentation.swift` / `ExcludedAppRow.swift`，把默认名单改回 `Text("默认排除：\(id)")`；或 `git revert` 本轮提交。
 
+## D-429 详情大图补 1pt 中性边；贴合尺寸只缩不放（R433）
+
+- 背景：`ImagePreviewView` 直接画图，没有任何边/阴影；白底截图（或白底海报）在白底详情里与页面同色，图沿外 1–3pt 与页底色差 0.0/0.0，边界不可读。
+- 决定：① 新 `ImagePreviewLayout.fittedSize(image:available:)`：`scale = min(1, min(w/iw, h/ih))` —— 与旧 `scaledToFit` 一致，**只缩不放**；② 图外 `1pt` 的 `Color.primary.opacity(VisualTint.chipStroke)` 中性边，挂在贴合尺寸上（不是 `maxWidth/maxHeight` 那块上限框——那会画成一个空框）；③ 判据按 systemTeal 找图、量图沿外 1–3pt 与页底色的亮度差 >10。
+- 理由：图片预览的"边界"是内容的一部分（白底图没有边界等于没有预览）；边必须贴在图本身，否则框比图大一圈反而误导。1pt 中性边在亮/暗两档都能读（32.0/28.0），且不改变图的内容表现。
+- 兼容性/迁移：图尺寸与位置未变（240×140 仍在 480..959×440..719px），只有 2 张 `detail-1-image` 帧变化；`ImagePreviewLayout` 抽成纯函数后可单测"不放大"。
+- 边界：只有 1pt 边，没有阴影/圆角；深色图在白底上的边界靠边而不是阴影；真机未截图。
+- 回滚：删 `frame/padding/background` 三行与 `ImagePreviewLayout`，恢复 `scaledToFit`；或 `git revert` 本轮提交。
+

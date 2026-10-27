@@ -4069,13 +4069,87 @@ final class UICaptureTests: XCTestCase {
                       "同一台机器上两档必须走同一条路（判了 \(judged)、具名 NOT-RUN \(namedNotRun)）")
     }
 
+    /// R433：详情大图必须有一圈**可见的边**（白底图在白底详情里以前整张看不见）。
+    ///
+    /// 缺陷形状（修之前 `detail-1-image` 亮/暗现读）：大图周围直接是页面底色，
+    /// 图外 1–3pt 的带与 20pt 外的页面底色亮度相同（差 0–2）；白底截图完全看不出边界。
+    /// 修法：贴合尺寸 + 1pt 中性边（`Color.primary.opacity(VisualTint.chipStroke)`）。
+    /// 判据只读帧：先按**色度**找出青色的图片块，量它左沿外 1–3pt 的带与页面底色的亮度差；
+    /// 旧形状差 0，新形状 ≥10（亮/暗两档都读得出）。
+    func testDetailImagePreviewHasAVisibleEdge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r433-image-edge-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-1-image" }) else {
+                return XCTFail("\(tag)：找不到 `detail-1-image` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-1-image-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`detail-1-image` 读不回字节 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                return (Double(base[o]) + Double(base[o + 1]) + Double(base[o + 2])) / 3.0
+            }
+            // 青色块：只认夹具那张 systemTeal 大图；扫描从 y=150px（正文区）起，
+            // 把状态条左侧那颗彩色来源图标排除在外（否则 bbox 是两个块的并集）。
+            var minX = rep.pixelsWide, maxX = -1, minY = rep.pixelsHigh, maxY = -1
+            for y in min(rep.pixelsHigh, 150)..<rep.pixelsHigh {
+                for x in 0..<rep.pixelsWide {
+                    let o = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
+                    // 只认夹具那张 systemTeal 大图（26,188,196）：来源 App 小图标也是彩色，
+                    // 用宽泛色度条件会把状态条那颗图标一起圈进来（本轮第一版就这么错了）。
+                    if r < 90 && g > 150 && b > 150 {
+                        minX = min(minX, x); maxX = max(maxX, x)
+                        minY = min(minY, y); maxY = max(maxY, y)
+                    }
+                }
+            }
+            guard maxX > minX, maxY > minY else {
+                return XCTFail("\(tag)：帧里找不到青色图片块 ⇒ 这一屏没画出来，边判据没有对象")
+            }
+            let midY = (minY + maxY) / 2
+            var page = 0.0
+            for x in max(0, minX - Int(14 * scale))..<max(1, minX - Int(8 * scale)) {
+                page += luma(x, midY)
+            }
+            page /= Double(max(1, Int(6 * scale)))
+            var maxDelta = 0.0
+            for offset in 1...3 {
+                let x = max(0, minX - Int(Double(offset) * scale))
+                maxDelta = max(maxDelta, abs(luma(x, midY) - page))
+            }
+            emit("DETAIL_IMAGE_EDGE \(tag) 图框=\(minX)..\(maxX)×\(minY)..\(maxY)px "
+                  + "页底=\(String(format: "%.1f", page)) 边带最大差=\(String(format: "%.1f", maxDelta)) "
+                  + "档=\(String(format: "%.2f", scale))px/pt")
+            XCTAssertGreaterThan(page, 0, "\(tag)：页面底色的亮度读不出来 ⇒ 尺没有对象")
+            XCTAssertGreaterThan(maxDelta, 10,
+                                 "\(tag)：图沿外 1–3pt 与页面底色的最大亮度差只有 "
+                                 + "\(String(format: "%.1f", maxDelta)) ⇒ 图没有可见的边")
+        }
+    }
+
     /// R432：设置页「不记录这些 App 的复制」默认名单的行首必须是一枚**图标**，不是裸 ID 文本。
     ///
-    /// 缺陷形状（修之前 `settings-privacy-tall` 亮/暗现读）：九行都是 `默认排除：com.…`，
+    /// 缺陷形状（修之前亮/暗现读）：每行都是 `默认排除：com.…`，
     /// 行首第一段是**「默认排除：」五个字**（墨宽 **42.5pt**，逐行同值）；
     /// 用户认不出是哪个 App。修后行首是 10–14pt 的图标段。
     /// 修法：每行 = 16pt 图标 + 6pt 空隙 + 应用名 + bundle ID。判据只读帧：
     /// 每行第一段墨宽（间隙 5pt 断开）必须是图标那一段（≤30pt）；校准=该行有字。
+    ///
+    /// R433 修 R432 的红：高夹具（720×1040）在 runner 1x 上整帧不画（行数 0，同 1100pt 那族），
+    /// 于是这一格在 CI 上没有对象。改用 540 高的 `settings-privacy`（1x 能画、首屏约 5 行）：
+    /// 本机 2x 与 runner 1x 都读得到行首图标段，覆盖从"九行"降到"首屏三行以上"，
+    /// 换来的是 CI 上真有像素证人。
     func testExcludedAppsStartWithAnIconInsteadOfRawIDs() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r432-excluded-icon-\(UUID().uuidString)", isDirectory: true)
@@ -4085,21 +4159,21 @@ final class UICaptureTests: XCTestCase {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let fixture = fixtures(appearance: appearance)
-                .first(where: { $0.name == "settings-privacy-tall" }) else {
-                return XCTFail("\(tag)：找不到 `settings-privacy-tall` ⇒ 这条判据没有对象")
+                .first(where: { $0.name == "settings-privacy" }) else {
+                return XCTFail("\(tag)：找不到 `settings-privacy` ⇒ 这条判据没有对象")
             }
-            let file = scratch.appendingPathComponent("privacy-tall-\(tag).png")
+            let file = scratch.appendingPathComponent("privacy-\(tag).png")
             _ = try render(fixture, appearance: appearance, to: file)
             guard let data = try? Data(contentsOf: file),
                   let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
-                return XCTFail("\(tag)：`settings-privacy-tall` 读不回字节 ⇒ 这条判据没有对象")
+                return XCTFail("\(tag)：`settings-privacy` 读不回字节 ⇒ 这条判据没有对象")
             }
             let scale = Double(rep.pixelsWide) / 720.0
             let x0: CGFloat = 150, x1: CGFloat = 420
             // 行带：x 150..420、默认名单从 y≈390 起；先找有墨的连续像素行，再按 9 行取前几段。
             var bands: [ClosedRange<Double>] = []
             var start: Double?
-            for y in 394...650 {   // 394 之前是上面那句说明（旧读数第一行 395）
+            for y in 394...528 {   // 394 之前是上面那句说明；528 是 540 高窗口里最后一行可见位置
                 let rect = CGRect(x: x0, y: CGFloat(y), width: x1 - x0, height: 1)
                 let ink = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
                                            bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
@@ -4110,7 +4184,7 @@ final class UICaptureTests: XCTestCase {
                     start = nil
                 }
             }
-            if let s = start { bands.append(s...650) }
+            if let s = start { bands.append(s...528) }
             let judged = bands.prefix(6)
             var firstWidths: [Double] = []
             var inks: [Int] = []
@@ -4127,7 +4201,7 @@ final class UICaptureTests: XCTestCase {
             let widthText = firstWidths.map { String(format: "%.1f", $0) }.joined(separator: ",")
             emit("EXCLUDED_APP_ROW \(tag) 行数=\(bands.count) 判=\(judged.count) "
                   + "首段宽=[\(widthText)] 行墨=\(inks)")
-            XCTAssertGreaterThanOrEqual(judged.count, 6,
+            XCTAssertGreaterThanOrEqual(judged.count, 3,
                                         "\(tag)：只找到 \(bands.count) 行默认排除项 ⇒ 这一格没有对象")
             for (index, ink) in inks.enumerated() {
                 XCTAssertGreaterThan(ink, 20,
