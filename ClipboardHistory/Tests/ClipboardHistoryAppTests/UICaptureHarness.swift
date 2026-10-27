@@ -4130,6 +4130,78 @@ final class UICaptureTests: XCTestCase {
                                  + "\(String(format: "%.1f", markdown))pt ⇒ 同一个「渲染」档里两条通道的标题不同档")
     }
 
+    /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
+    ///
+    /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
+    /// 破坏性的垃圾桶只靠红色与其它四颗分开；分隔带里一笔墨都没有。
+    /// 判据只读帧：先按红色找到垃圾桶的最左列，再量它左侧 8..4pt 的窄带（分隔线应在那里）；
+    /// 旧形状 0 墨、新形状有墨；校准 = 垃圾桶本体的红像素数 > 地板。
+    func testBulkActionBarSeparatesTheDestructiveButton() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r436-bulk-sep-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-multi-select" }) else {
+                return XCTFail("\(tag)：找不到 `sidebar-multi-select` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("multi-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`sidebar-multi-select` 读不回字节 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 300.0
+            // 头部带：图标实际在 y 112..132pt（批量模式下「已选 N 条」那一行）。
+            var trashLeft: Int?
+            var redPixels = 0
+            for x in 40..<Int(300 * scale) {
+                var red = 0
+                for y in Int(112 * scale)..<Int(132 * scale) {
+                    let o = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let r = Int(base[o]), g = Int(base[o + 1]), b = Int(base[o + 2])
+                    if r > 140 && r > g + 40 && r > b + 40 { red += 1 }
+                }
+                if red > 0 {
+                    redPixels += red
+                    if trashLeft == nil { trashLeft = x }
+                }
+            }
+            guard let left = trashLeft else {
+                return XCTFail("\(tag)：找不到红色垃圾桶 ⇒ 这一屏没画出来")
+            }
+            // 分隔线是**发丝线**，不是文字；而侧栏材质本身有渐变（整段相对底色差可以到 20+），
+            // 所以不能拿"与远处底色的差"当读数 —— 要**局部对比**：每一列与左右各 4pt 列比，
+            // 线是一条窄而深的列，渐变在局部是平的。第一版用远处的底色，刀 M1197 撤掉线仍绿
+            // （材质渐变冒充了线），这一版把那条假绿堵上。
+            func columnLuma(_ x: Int) -> Double {
+                var sum = 0.0
+                for y in Int(112 * scale)..<Int(132 * scale) {
+                    let o = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    sum += (Double(base[o]) + Double(base[o + 1]) + Double(base[o + 2])) / 3
+                }
+                return sum / Double(max(1, Int(20 * scale)))
+            }
+            var separatorDelta = 0.0
+            for x in Int(258 * scale)..<Int(263 * scale) {
+                let nearL = columnLuma(x - Int(4 * scale))
+                let nearR = columnLuma(x + Int(4 * scale))
+                separatorDelta = max(separatorDelta, abs(columnLuma(x) - (nearL + nearR) / 2))
+            }
+            emit("BULK_ACTION_SEPARATOR \(tag) 红墨=\(redPixels) 垃圾桶左=\(String(format: "%.1f", Double(left) / scale))pt "
+                  + "分隔带最大差=\(String(format: "%.1f", separatorDelta)) 档=\(String(format: "%.2f", scale))px/pt")
+            XCTAssertGreaterThan(redPixels, Int(10 * scale * scale),
+                                 "\(tag)：垃圾桶的红像素太少 ⇒ 这一屏没画出来")
+            XCTAssertGreaterThan(separatorDelta, 8,
+                                 "\(tag)：垃圾桶左侧 12pt 内与底色最大差只有 "
+                                 + "\(String(format: "%.1f", separatorDelta)) ⇒ 破坏性动作没有分隔"
+                                 + "（发丝线在暗档材质上的局部对比现读 11.9；旧形状 0–1，地板 8 仍有 8 倍余量）")
+        }
+    }
+
     /// R435：浮层搜索框有字时右侧必须出现一颗清除按钮；空查询时它必须收起来。
     ///
     /// 缺陷形状：主窗口的 `SearchField` 早就有 ×，浮层的主输入框一直没有 —— 打错一个字
@@ -4144,7 +4216,7 @@ final class UICaptureTests: XCTestCase {
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            func ink(_ name: String) throws -> (button: Int, control: Int, scale: Double)? {
+            func ink(_ name: String) throws -> (button: Int, control: Int, rowControl: Int, scale: Double)? {
                 guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
                     XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
                     return nil
@@ -4162,7 +4234,8 @@ final class UICaptureTests: XCTestCase {
                                      bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
                 }
                 return (mass(CGRect(x: 384, y: 14, width: 22, height: 20)),
-                        mass(CGRect(x: 28, y: 14, width: 150, height: 20)), scale)
+                        mass(CGRect(x: 28, y: 14, width: 150, height: 20)),
+                        mass(CGRect(x: 40, y: 57, width: 160, height: 13)), scale)
             }
             guard let typed = try ink("quickpick-typed"), let list = try ink("quickpick-list") else { continue }
             let buttonFloor = Int(20.0 * typed.scale * typed.scale)
@@ -4170,8 +4243,10 @@ final class UICaptureTests: XCTestCase {
                   + "list 按钮带=\(list.button) 校准=\(list.control) 地板=\(buttonFloor)")
             XCTAssertGreaterThan(typed.control, buttonFloor,
                                  "\(tag)：typed 帧搜索框左半段没有字 ⇒ 这一屏没画出来")
-            XCTAssertGreaterThan(list.control, buttonFloor,
-                                 "\(tag)：list 帧搜索框左半段没有字 ⇒ 这一屏没画出来")
+            // R436 修 R435 的红：list 帧的**占位语**在 runner 1x 上读到 0（灰色占位没有墨），
+            // 不代表整帧没画 —— 改用同一帧第 0 行标题当校准（它在 1x 上一直是稳的）。
+            XCTAssertGreaterThan(list.rowControl, buttonFloor,
+                                 "\(tag)：list 帧第 0 行标题没有字 ⇒ 这一屏没画出来")
             XCTAssertGreaterThan(typed.button, buttonFloor,
                                  "\(tag)：有字时搜索框右端只读到 \(typed.button) 颗墨（地板 \(buttonFloor)）⇒ 清除按钮没画出来")
             XCTAssertLessThan(list.button, buttonFloor,

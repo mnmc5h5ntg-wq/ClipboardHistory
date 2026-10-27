@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R436 状态（2026-10-28 · 本地 · 第 435 轮 / Round 433）：批量操作栏补破坏性分隔线（删除与其余四颗之间 1pt 发丝；局部对比 light 13.7 / dark 11.9，旧 0–1；4 张多选帧变化、基线 238）；R435 跑失败步骤 2 个（list 占位语 1x 无墨被当校准、行插入动画采样 2<3）⇒ 修仪器/重抓、阈值未动（产品 1 文件，批量操作栏位）
+
+最后更新：2026-10-28（本地 · R436 / 第 435 轮 / Round 433）：批量操作栏的五颗按钮在 `spacing: 0` 的一排里，破坏性的垃圾桶只靠红色与其余四颗分开。修法：垃圾桶前插一条 1×14pt 的 `Rectangle().fill(Color.primary.opacity(0.18))`（`Divider()` 在这个离屏 HStack 里不落墨，第一版即它、帧上 0 读数，已换掉）。旧/新：垃圾桶左沿 265.5pt，其左侧 258..263pt 的**局部对比** 0–1 → light **13.7** / dark **11.9**；垃圾桶红墨 333/265 作校准。4 张多选帧变化（`sidebar-multi-select` 与 `-min` × 亮暗），基线 **238/0/0/0**。判据第一版用"与远处底色的差"，刀 M1197 撤线仍绿（侧栏材质渐变冒充）⇒ 改成局部对比、带收窄、地板 8；`M1197–M1198` **2/2 CAUGHT**。R435 run `40544941175 ↔ 1041d0f` **failure，失败步骤 2 个**（Swift tests / Capture gate）：① 清除 × 判据把 `quickpick-list` 的占位语当校准，1x 上占位语无墨（typed 正常）⇒ list 改读同一帧第 0 行标题；② 行插入动画 same 臂 2<3 ⇒ 只对该动的臂相位重抓（最多三次、取帧数最多），阈值未动。预检 **214/196/564 bad=0**、ARM **307 文件 / 1047 把**、HIDDEN **301/981 rot=0**。本地全量 **1180/57/5**：5 断言全在 `SelectionRevealAnimationTests`（3 条用例），单跑（caffeinate-u 后）**4/4 passed**（`TIME 18/9/43/1438`、`CHANNEL 0→83.5→600 变化 46073/112800 重抓=no`、`OFFSET 0/199.5/1438`）⇒ 具名 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449）。捕获 **143/4/0 / 238 帧**；基线 **238/0/0/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 `格=162 声明=63 不成立=0/63`；产品面连续零改动 **1** 轮（as-of 435，现读 `python3 scripts/product_streak.py --streak-for 435`）。电池 `Ran 683 / OK (skipped=5)`（台账后复跑；口径与 R435 一致，不回退成 4）。
+
+本轮做了什么：
+① ⓪ R435 跑 failure、失败步骤 2 个：清除 × 判据的 list 校准（占位语 1x 无墨）与行插入动画采样 2<3 ⇒ 换校准对象 + 相位重抓，阈值未动。
+② 产品：批量操作栏补破坏性分隔线（局部对比 0–1 → 13.7/11.9）。
+③ 判据：第一版假绿由刀证伪后换局部对比；M1197–M1198 2/2；precheck 214/196/564；hidden rot 0。
+④ 436：R434 跑 floor 5/5/77 无红（R435 跑日志被 EOF 挡住，通道未再取到；红已逐条读）。
+⑤ 367：hidden 表 301 / 可判 981 / rot 0。
+⑥ 捕获 143/4/0、238 帧；换装 ok；清账 162/63/0；帧基线 238/0/0/0；本地全量 1180/57/5（5 条滚动红具名会话/顺序 NOT-RUN，CI 4/4 绿）。
+
+NOT-RUN / 阻塞（分开写）：① 设置内容列 1x 平涂（`EXCLUDED_APP_ROW_NOT_RUN`，459）；② 设置脚注带 1x；③ 主窗口 content 帧 1x（458）；④ 高夹具 1x（459）；⑤ 13+ 菜单像素/标题（454）；⑥ 真实拖拽（453）；⑦ Dock 像素；⑧ 源图标最小窗文字 1x；⑨ 本地全量 5 条滚动红（449）；⑩ 2x/extended；⑪ 固定块揭示偏移（455）；⑫ 跨年时间（456）；⑬ 主列表暗档文字盲区（457）；⑭ 真机/多屏（447）；⑮ 真菜单栏、12 实时腿；⑯ `table-lazy-rows`；⑰ HTML 六档以上字号（460）；⑱ 清除按钮命中区 18pt（461）；⑲ 分隔线透明度未提令牌（462）；⑳ 437–462 仍开；㉑ R436 新跑待 push 后读。
+
+下一轮（R437）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R436 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 `BULK_ACTION_SEPARATOR` 两档局部对比（13.7/11.9）、清除 × 判据的 list 校准、`MOTION_SEQUENCE` 重抓后 same 臂 ≥3、`EXCLUDED_APP_ROW_NOT_RUN`、`DETAIL_IMAGE_EDGE`、`HTML_HEADING_LADDER`、理由带、时间列、脚注、分区、菜单、Dock/搜索/滚动是否仍绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R435 状态（2026-10-28 · 本地 · 第 434 轮 / Round 432）：浮层搜索框补清除按钮（有字才出现：typed 帧按钮带 405/410 墨、空查询 0；4 张浮层帧变化、基线 238）；R434 跑 `40535594620 ↔ 78a0cf5` success、失败步骤 0（产品 1 文件，浮层搜索框位）
 
 最后更新：2026-10-28（本地 · R435 / 第 434 轮 / Round 432）：主窗口的 `SearchField` 早有清除 ×，浮层的搜索框一直没有 —— 打错一个字只能全选重打。新：`QuickPickController` 在搜索框右端加一颗 18×18 无边框 ×（`xmark.circle.fill`、`secondaryLabelColor`、可访问名「清除搜索」、identifier `quickPickClearSearchButton`），可见性由 `showsClearButton(text:)` 决定（有字才出现）；`QuickPickSearchFieldCell` 的文本矩形右留 22pt 让位（左轴不动）；产品路径与取证路径共用 `updateClearButton`。旧/新帧读数：`QUICKPICK_CLEAR_BUTTON light typed 按钮带=405 校准=354 list 按钮带=0 校准=1232`、dark `410/408 / 0/1474`（地板 80 = 20·s²）。4 张浮层帧变化（typed/empty × 亮暗），基线 **238/0/0/0**。R434 run `40535594620 ↔ 78a0cf5` **success、20/20 步、失败步骤 0**：`EXCLUDED_APP_ROW_NOT_RUN=runner-1x-settings-content-plain` 按名生效、`DETAIL_IMAGE_EDGE` 1x 30/26、`HTML_HEADING_LADDER` 19/18、理由带 217/248 vs 0、时间列 `[74,71,74,74,74]`/`[74,72,74,74,74]`、脚注 NOT-RUN 按名出现、分区 13/12 与 11/10、表格 6/5、回执 2/2、滚动 4/4、拖拽 mass 0.549/0.550、floor 5/5/77 无红；**STATE ⓪ 已回写**（`00939fa` push）。`M1195–M1196` **2/2 CAUGHT**；预检 **213/195/562 bad=0**、ARM **306 文件 / 1045 把**、HIDDEN **300/979 rot=0**。本地全量 **1179/57/5**：5 断言全在 `SelectionRevealAnimationTests`（3 条用例），单跑（caffeinate-u 后）**4/4 passed**（`TIME 18/8/23.5/1438`、`CHANNEL 0→86.5→600 变化 76639/127200 重抓=no`、`OFFSET 0/194.5/1438`）⇒ 具名 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449）。捕获 **142/4/0 / 238 帧**；基线 **238/0/0/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 `格=162 声明=63 不成立=0/63`；产品面连续零改动 **1** 轮（as-of 434，现读 `python3 scripts/product_streak.py --streak-for 434`）。电池 首跑 1 红（本机 `/tmp` 被清后链日志判据合法跳过、`ROSTER['local']` 缺项）⇒ 补登后 `Ran 683 / OK (skipped=5)`（台账后复跑）。

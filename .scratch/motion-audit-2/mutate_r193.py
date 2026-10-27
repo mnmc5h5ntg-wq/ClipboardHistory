@@ -34,8 +34,8 @@ ARMS = [
      'emit("MOTION_NATIVE row-insert 开 帧数=\\(animatedSpan) 峰值=\\(String(format: "%.3f", Self.peak(animated))) '
      '采样≈\\(animatedInterval)ms")', WIRING),
     ("M724", "序列那处退回把 `recordProductSequence` 直接喂给差分 ⇒ 第一臂量到第二臂的钟", TEST,
-     "let sameRow = Self.deltas(sameFilm)",
-     "let sameRow = Self.deltas(probe.recordProductSequence(selectionChanges: false))", WIRING),
+     "var sameRow = Self.deltas(sameFilm)",
+     "var sameRow = Self.deltas(probe.recordProductSequence(selectionChanges: false))", WIRING),
     ("M725", "一臂退回只看帧数（站点只量了一臂的过程）", TEST,
      "let movedProcess = Self.armProcessInIntervals(stamps: movedStamps, fractions: moved)",
      "let movedProcess: (intervals: Double, run: ChangedRun)? = nil", WIRING),

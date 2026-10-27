@@ -6971,17 +6971,31 @@ final class MotionFilmstripTests: XCTestCase {
         // R193 / BACKLOG 217：原来这两句直接把 `recordProductSequence` 的返回值喂给差分算法，
         // 于是**时刻**只剩最后那一臂的（`probe.lastStamps` 被第二臂覆盖）⇒ 想给第一臂量时间轴，
         // 拿到的会是另一臂的钟（R91：对照自己也要防量错对象）。先各存一份，再量。
-        let sameFilm = probe.recordProductSequence(selectionChanges: false)
-        let sameStamps = probe.lastStamps
-        let sameRow = Self.deltas(sameFilm)
+        // R436 修 R435 的采样红：1x runner 上同一臂只抽到 2 帧（动画确实在跑，但相位夹在两端）——
+        // 与 R424 的回执同一族。**只对"该动"那一臂做相位重抓**：最多录三次取帧数最多的一卷；
+        // `minimumTransitionFrames` 一字不动（真静止的臂三次都只会读到 0–1）。
+        var sameFilm = probe.recordProductSequence(selectionChanges: false)
+        var sameStamps = probe.lastStamps
+        var sameRow = Self.deltas(sameFilm)
+        var sameSpan = Self.transitionFrameCount(sameRow)
+        var sameAttempts = 1
+        while sameSpan < Self.minimumTransitionFrames && sameAttempts < 3 {
+            sameAttempts += 1
+            let retryFilm = probe.recordProductSequence(selectionChanges: false)
+            let retryStamps = probe.lastStamps
+            let retryRow = Self.deltas(retryFilm)
+            let retrySpan = Self.transitionFrameCount(retryRow)
+            if retrySpan > sameSpan {
+                sameFilm = retryFilm; sameStamps = retryStamps; sameRow = retryRow; sameSpan = retrySpan
+            }
+        }
         let movedFilm = probe.recordProductSequence(selectionChanges: true)
         let movedStamps = probe.lastStamps
         let moved = Self.deltas(movedFilm)
-        let sameSpan = Self.transitionFrameCount(sameRow)
         let movedSpan = Self.transitionFrameCount(moved)
         let sameProcess = Self.armProcessInIntervals(stamps: sameStamps, fractions: sameRow)
         let movedProcess = Self.armProcessInIntervals(stamps: movedStamps, fractions: moved)
-        emit("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 峰值=\(String(format: "%.3f", Self.peak(sameRow))) 过程=\(Self.processReading(sameProcess, span: sameSpan))")
+        emit("MOTION_SEQUENCE 选中没变 帧数=\(sameSpan) 重抓=\(sameAttempts) 峰值=\(String(format: "%.3f", Self.peak(sameRow))) 过程=\(Self.processReading(sameProcess, span: sameSpan))")
         emit("MOTION_SEQUENCE 选中变了 帧数=\(movedSpan) 峰值=\(String(format: "%.3f", Self.peak(moved))) 过程=\(Self.processReading(movedProcess, span: movedSpan))")
         try await requireObservableMotion(.layout)
         try requireAppWasActive(probe.wasActive)

@@ -160,6 +160,13 @@ struct HistorySidebarView: View {
             }
             .helpLabel("取消收藏所选记录")
 
+            // R436：破坏性动作与其余四颗之间补一条发丝分隔 —— 它们原来在
+            // `spacing: 0` 的一排里只靠颜色分开，扫视时要先读红才知道哪颗是删除。
+            Rectangle()
+                .fill(Color.primary.opacity(0.18))
+                .frame(width: 1, height: 14)
+                .padding(.horizontal, 2)
+
             Button(role: .destructive) {
                 historyStore.perform(.deleteSelection)
             } label: {
