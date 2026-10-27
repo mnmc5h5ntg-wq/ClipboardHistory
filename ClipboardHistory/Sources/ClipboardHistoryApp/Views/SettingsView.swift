@@ -509,15 +509,14 @@ struct SettingsView: View {
                              + "排除只作用于自动采集 —— 你主动拖进历史的内容仍然会入库。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        // R432：默认名单从「默认排除：com.…」的纯文本流改成
+                        // 图标 + 应用名 + bundle ID 的行（用户认不出裸 ID 是哪个 App）。
                         ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \.self) { id in
-                            Text("默认排除：\(id)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            ExcludedAppRow(bundleID: id)
                         }
                         ForEach(Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)).sorted(), id: \.self) { id in
                             HStack {
-                                Text(id)
-                                Spacer()
+                                ExcludedAppRow(bundleID: id)
                                 Button("移除") {
                                     let result = ExcludedAppListPolicy.remove(id, from: excludedBundleIDsRaw)
                                     excludedBundleIDsRaw = result.raw

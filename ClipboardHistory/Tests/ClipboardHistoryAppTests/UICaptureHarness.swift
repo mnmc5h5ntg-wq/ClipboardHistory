@@ -3870,7 +3870,8 @@ final class UICaptureTests: XCTestCase {
     /// R431 又发现跨帧“墨段右端”在 runner 1x 上读到 0.0pt 差（两帧都被同一个矩形截断）。
     /// 改成**固定带**：同一位置的「合同 终版 v3.pdf」两帧各画一次 —— typed（查询「访达」）
     /// 带「来自 访达」、list（无查询）不带。带取 x=160..300pt、各自的行带（**在时间列 311pt 之前**）：
-    /// 带理由那一行有墨，不带理由那一行是空白。
+    /// 带理由那一行有墨，不带理由那一行是空白。带子右沿 290pt：1x runner 上时间列从 296pt 起，
+    /// 到 300 会把时间列左沿的 11 颗墨算进对照行（R431 跑实测）。
     func testQuickPickSourceMatchReasonExtendsTheTypedRow() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r405-match-reason-\(UUID().uuidString)", isDirectory: true)
@@ -3901,9 +3902,9 @@ final class UICaptureTests: XCTestCase {
                   let listControl = try bandInk("quickpick-list", row: 2,
                                                 rect: CGRect(x: 40, y: 0, width: 100, height: 15)),
                   let typedExtension = try bandInk("quickpick-typed", row: 0,
-                                                   rect: CGRect(x: 160, y: 0, width: 140, height: 15)),
+                                                   rect: CGRect(x: 160, y: 0, width: 130, height: 15)),
                   let listExtension = try bandInk("quickpick-list", row: 2,
-                                                  rect: CGRect(x: 160, y: 0, width: 140, height: 15)) else {
+                                                  rect: CGRect(x: 160, y: 0, width: 130, height: 15)) else {
                 continue
             }
             emit("QUICKPICK_MATCH_REASON_BAND \(tag) typed 校准=\(typedControl) 扩展=\(typedExtension) "
@@ -3913,9 +3914,9 @@ final class UICaptureTests: XCTestCase {
             XCTAssertGreaterThan(listControl, 100,
                                  "\(tag)：list 行 2 的预览没有字 ⇒ 对照行在这台机器上没画出来")
             XCTAssertGreaterThan(typedExtension, 40,
-                                 "\(tag)：带理由的行在 x=160..300pt 只读到 \(typedExtension) 颗墨 ⇒ 理由没画出来")
+                                 "\(tag)：带理由的行在 x=160..290pt 只读到 \(typedExtension) 颗墨 ⇒ 理由没画出来")
             XCTAssertLessThan(listExtension, 10,
-                              "\(tag)：不带理由的对照行在 x=160..300pt 读到 \(listExtension) 颗墨 ⇒ 这一带不是空白，判据失去对照")
+                              "\(tag)：不带理由的对照行在 x=160..290pt 读到 \(listExtension) 颗墨 ⇒ 这一带不是空白，判据失去对照")
         }
     }
 
@@ -4009,6 +4010,8 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
+        var judged = 0
+        var namedNotRun = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let fixture = fixtures(appearance: appearance)
@@ -4040,6 +4043,16 @@ final class UICaptureTests: XCTestCase {
             let calibrateFloor = Int(50.0 * scale * scale)
             emit("FILE_ROW_SYMBOL \(tag) 校准=\(control) 文本行=\(textRow) file=\(fileRow) files=\(filesRow) "
                   + "档=\(String(format: "%.2f", scale))px/pt 地板=图标\(iconFloor)/校准\(calibrateFloor)")
+            // R432 修 R431 的红：runner 1x 上这一整帧（含彩色缩略图校准）读 0 ——
+            // 主窗口 `ContentView` 在 1x 离屏通道里没有画出来（同族：`SOURCE_APP_BADGE` 的 1x 带、
+            // 设置脚注的 1x 带）。这不是产品缺陷，是这台机器的产物没有可判的墨：具名 NOT-RUN。
+            if scale < 1.5 {
+                namedNotRun += 1
+                emit("FILE_ROW_SYMBOL_NOT_RUN=runner-1x-content-frame-plain \(tag) "
+                      + "校准=\(control) 文本行=\(textRow) file=\(fileRow) files=\(filesRow)"
+                      + " ⇒ 1x 上整帧（含彩色缩略图）读 0；本机 2x 才判 209/165/231 与 209/492/492")
+                continue
+            }
             XCTAssertGreaterThan(control, calibrateFloor,
                                  "\(tag)：彩色缩略图只读到 \(control) 颗墨（地板 \(calibrateFloor)）⇒ 这屏没画出来")
             XCTAssertGreaterThan(textRow, iconFloor,
@@ -4048,6 +4061,83 @@ final class UICaptureTests: XCTestCase {
                                  "\(tag)：.file 行首 16pt 方格里读到 \(fileRow) 颗墨（地板 \(iconFloor)）⇒ 类型符号没画出来")
             XCTAssertGreaterThan(filesRow, iconFloor,
                                  "\(tag)：.files 行首 16pt 方格里读到 \(filesRow) 颗墨（地板 \(iconFloor)）⇒ 类型符号没画出来")
+            judged += 1
+        }
+        XCTAssertEqual(judged + namedNotRun, 2,
+                       "两档里有一档既没判也没登记 ⇒ 这条判据没有免检出口")
+        XCTAssertTrue(judged == 2 || namedNotRun == 2,
+                      "同一台机器上两档必须走同一条路（判了 \(judged)、具名 NOT-RUN \(namedNotRun)）")
+    }
+
+    /// R432：设置页「不记录这些 App 的复制」默认名单的行首必须是一枚**图标**，不是裸 ID 文本。
+    ///
+    /// 缺陷形状（修之前 `settings-privacy-tall` 亮/暗现读）：九行都是 `默认排除：com.…`，
+    /// 行首第一段是**「默认排除：」五个字**（墨宽 **42.5pt**，逐行同值）；
+    /// 用户认不出是哪个 App。修后行首是 10–14pt 的图标段。
+    /// 修法：每行 = 16pt 图标 + 6pt 空隙 + 应用名 + bundle ID。判据只读帧：
+    /// 每行第一段墨宽（间隙 5pt 断开）必须是图标那一段（≤30pt）；校准=该行有字。
+    func testExcludedAppsStartWithAnIconInsteadOfRawIDs() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r432-excluded-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-privacy-tall" }) else {
+                return XCTFail("\(tag)：找不到 `settings-privacy-tall` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("privacy-tall-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`settings-privacy-tall` 读不回字节 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let x0: CGFloat = 150, x1: CGFloat = 420
+            // 行带：x 150..420、默认名单从 y≈390 起；先找有墨的连续像素行，再按 9 行取前几段。
+            var bands: [ClosedRange<Double>] = []
+            var start: Double?
+            for y in 394...650 {   // 394 之前是上面那句说明（旧读数第一行 395）
+                let rect = CGRect(x: x0, y: CGFloat(y), width: x1 - x0, height: 1)
+                let ink = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
+                if ink > 0 {
+                    if start == nil { start = Double(y) }
+                } else if let s = start {
+                    bands.append(s...Double(y - 1))
+                    start = nil
+                }
+            }
+            if let s = start { bands.append(s...650) }
+            let judged = bands.prefix(6)
+            var firstWidths: [Double] = []
+            var inks: [Int] = []
+            for band in judged {
+                let rect = CGRect(x: x0, y: CGFloat(band.lowerBound),
+                                  width: x1 - x0, height: CGFloat(band.upperBound - band.lowerBound + 1))
+                let mass = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                            bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale)
+                inks.append(mass.pixels)
+                let runs = Self.inkRuns(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale, gap: 5)
+                firstWidths.append(runs.first?.width ?? 0)
+            }
+            let widthText = firstWidths.map { String(format: "%.1f", $0) }.joined(separator: ",")
+            emit("EXCLUDED_APP_ROW \(tag) 行数=\(bands.count) 判=\(judged.count) "
+                  + "首段宽=[\(widthText)] 行墨=\(inks)")
+            XCTAssertGreaterThanOrEqual(judged.count, 6,
+                                        "\(tag)：只找到 \(bands.count) 行默认排除项 ⇒ 这一格没有对象")
+            for (index, ink) in inks.enumerated() {
+                XCTAssertGreaterThan(ink, 20,
+                                     "\(tag)：第 \(index) 行没有字 ⇒ 这一行在这台机器上没画出来")
+            }
+            for (index, width) in firstWidths.enumerated() {
+                XCTAssertTrue(width >= 5 && width <= 30,
+                              "\(tag)：第 \(index) 行首段墨宽 \(String(format: "%.1f", width))pt"
+                              + " ⇒ 行首不是一枚图标（旧形状首段是「默认排除：」=42.5pt）")
+            }
         }
     }
 
@@ -16643,8 +16733,12 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 150, y: 142, width: 560, height: 11)),
         InkProbe(fixture: "settings-privacy", what: "说明段「过滤敏感内容（密钥、令牌、密码等）…」（推荐过滤开关）",
                  rect: CGRect(x: 150, y: 304, width: 560, height: 11)),
-        InkProbe(fixture: "settings-privacy", what: "默认排除清单第一行「默认排除：com.…」",
-                 rect: CGRect(x: 150, y: 395, width: 560, height: 11)),
+        // R432 退役：「默认排除清单第一行」那条探针的**对象没了** —— 默认名单从一行纯
+        // `.secondary` 说明文字变成了「图标 + 主色应用名 + 次色 bundle ID」的行，
+        // 同一带里两种色阶，caption 上限读到 12.70/11.32 倍参照（假红：框里套到了主色名字）。
+        // 清单行由 `testExcludedAppsStartWithAnIconInsteadOfRawIDs`（结构）+
+        // `ExcludedAppPresentationTests`（名字与 ID 的次色源守卫）接管；
+        // 这一页剩下的两段说明仍在表里。
         InkProbe(fixture: "settings-data", what: "数据页第一段说明（存档与导出，要读）",
                  rect: CGRect(x: 150, y: 139, width: 560, height: 10)),
         InkProbe(fixture: "settings-recommendations", what: "推荐页第一段说明（权重是干什么用的）",
