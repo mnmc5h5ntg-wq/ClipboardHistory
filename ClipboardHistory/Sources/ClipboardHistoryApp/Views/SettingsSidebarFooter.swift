@@ -34,6 +34,11 @@ struct SettingsSidebarFooterForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// 取证通道（R442）：关于页的 build 号；夹具注入固定值，产品路径读真实 bundle。
+struct SettingsAboutBuildForCaptureKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
 extension EnvironmentValues {
     var settingsSidebarVersionForCapture: String? {
         get { self[SettingsSidebarVersionForCaptureKey.self] }
@@ -43,5 +48,10 @@ extension EnvironmentValues {
     var settingsSidebarFooterForCapture: Bool? {
         get { self[SettingsSidebarFooterForCaptureKey.self] }
         set { self[SettingsSidebarFooterForCaptureKey.self] = newValue }
+    }
+
+    var settingsAboutBuildForCapture: String? {
+        get { self[SettingsAboutBuildForCaptureKey.self] }
+        set { self[SettingsAboutBuildForCaptureKey.self] = newValue }
     }
 }

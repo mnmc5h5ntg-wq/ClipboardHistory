@@ -27,7 +27,7 @@ ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 ARMS = [
     ("M610", "矩形改回本轮之前的 y 96 h 154 ⇒ 第一行又不在尺里",
-     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)",
+     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 224)",
      "static let settingsSidebarTextColumn = CGRect(x: 40, y: 96, width: 102, height: 154)", "CAUGHT"),
     ("M611", "树只给前五行 ⇒ 数量与下界差必须一起红",
      "            kept.append(r)\n        }\n        return kept",

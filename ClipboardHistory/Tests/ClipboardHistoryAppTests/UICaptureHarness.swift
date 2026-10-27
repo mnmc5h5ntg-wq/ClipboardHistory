@@ -4512,6 +4512,68 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R442：设置侧栏必须有「关于」这一行。
+    ///
+    /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：亮档数分区标签带，应为
+    /// `SettingsCategory.allCases.count`（7）；暗档是已知的暗侧栏文字盲区（亮暗两档的标签
+    /// 在离屏通道里只剩 1 条带）⇒ 具名 `SETTINGS_ABOUT_ROW_NOT_RUN=runner-dark-sidebar-text-blind`，
+    /// 不把"读不到"记成"没有这一行"。带的范围 y 60..285 排除底部署名行（y≈294）。
+    func testSettingsSidebarShowsTheAboutCategoryRow() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r442-about-row-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        XCTAssertTrue(SettingsCategory.allCases.contains(.about), "关于没进侧栏分区")
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-general" }) else {
+                return XCTFail("\(tag)：找不到 `settings-general` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-general-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`settings-general` 读不回字节 ⇒ 这条判据没有对象")
+                return
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            // 只数**主色/强调色**标签：底部那行署名是 `.secondary`（亮档 luma≈128），
+            // 用 ≤190 就会在"关于行被删掉、署名行上移"时把署名行当成第 7 条带（M1214 第一版
+            // 逃脱就是这么发生的）。主色标签 luma≈0、选中的强调色≈101，≤110 两者都进、署名行不进。
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 110 }
+            let x0 = Int((38.0 * scale).rounded())
+            let x1 = Int((120.0 * scale).rounded())
+            var bands = 0
+            var inBand = false
+            for y in Int((60.0 * scale))..<Int((285.0 * scale)) {
+                var has = false
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && !inBand { bands += 1; inBand = true }
+                if !has { inBand = false }
+            }
+            if appearance == .darkAqua && bands < SettingsCategory.allCases.count {
+                emit("SETTINGS_ABOUT_ROW_NOT_RUN=runner-dark-sidebar-text-blind \(tag) 带=\(bands)"
+                     + " ⇒ 暗侧栏标签在离屏通道读不出来（R457 同族），不当成没有这一行")
+                continue
+            }
+            emit("SETTINGS_ABOUT_ROW \(tag) 分区行=\(bands) 应为=\(SettingsCategory.allCases.count)")
+            XCTAssertEqual(bands, SettingsCategory.allCases.count,
+                           "\(tag)：分区标签带 \(bands) 条（应为 \(SettingsCategory.allCases.count)）"
+                           + " ⇒ 关于行没进侧栏或标签被截掉")
+        }
+    }
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
@@ -10173,6 +10235,7 @@ final class UICaptureTests: XCTestCase {
         )
         // R426：设置侧栏底部版本行的取证值 —— 产品读真实 bundle，帧用固定串才不会随版本号变形状。
         .environment(\.settingsSidebarVersionForCapture, "1.4.8")
+        .environment(\.settingsAboutBuildForCapture, "1")
     }
 
     // MARK: - 同一张帧里的两条右轴（R289 / BACKLOG 337）
@@ -13482,6 +13545,8 @@ final class UICaptureTests: XCTestCase {
         // 与 R29d/R30 同一机制（D-090：合成前的极性），所以记为盲区而不是缺陷。
         // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
         "settings-privacy-tall", "settings-recommendations-tall",
+        // R442：关于页与其余设置页同一棵 vibrant 子树；暗档未选中标签落在错误一侧（看过的同一机制）。
+        "settings-about",
     ]
 
     /// 盲区名单**按机器分键**（R124 / BACKLOG 171）。
@@ -13572,7 +13637,7 @@ final class UICaptureTests: XCTestCase {
     /// 它只盖住 5/6 行，而它喂的 `TEXT_SIDE` 与暗档盲区名单一路全绿（BACKLOG 169 / U-383）。
     /// 现在这条矩形与树给的行带由 `testSettingsSidebarRosterRectCoversEveryRow` 钉在一起：
     /// 布局再变而这里没跟着改，红的是这条守卫。
-    static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)
+    static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 224)
 
     /// **同一张帧的内容区**（x 160 起：侧栏宽 148 + 分栏线）。
     /// 这一块的用途不是判产品，是**分辨"这台机器拍不出这一页"和"我这把尺瞎了"** ——
@@ -17530,6 +17595,12 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 150, y: 200, width: 560, height: 12)),
         InkProbe(fixture: "settings-general", what: "说明段「打开后从 Word、Pages…」（富文本的代价，两行）",
                  rect: CGRect(x: 150, y: 241, width: 560, height: 26)),
+        // R442：关于页的定位句。带从 `settings-about` 帧上量的（亮档：页标题 78.5..90、
+        // 应用名 116..133.5、版本 149.5..161、定位句 175.5..187、版权 201..210.5），
+        // 框比带上下各留 0.5–1pt。设置内容列在 runner 1x 是平涂 ⇒ 这条在 CI 上是
+        // 具名 `CAPTION_NOT_RUN`；本机 2x 那一跑真正判它。
+        InkProbe(fixture: "settings-about", what: "定位句「轻量、离线、可回溯的剪贴板历史。」",
+                 rect: CGRect(x: 170, y: 179, width: 530, height: 13)),
         // R39：那颗开关的**回执**（`loginItemSettings.message`）。它原来在帧里永远量不到
         // —— 夹具不造 message，产品注释就写着"只进账本不进判据"（`SettingsView:329`）。
         // 现在两张夹具把 message 造出来（不支持 / 写盘没生效），带是从这两张帧的

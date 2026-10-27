@@ -7814,3 +7814,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：行号的选中/滚动两态没有帧（469）；1000+ 行会超出 20pt 外边距。
 - 回滚：删 `drawCodeLineNumbers`/`drawCodeBlockBackgrounds` 两个调用即可恢复旧帧；或 `git revert`。
 
+## D-438 设置新增「关于」分区：版本/build/定位/版权在一页（R442）
+
+- 背景：设置里只有侧栏底部的版本行，没有 build，也没有"这个应用是什么"；关于信息没有一个正式落点。
+- 决定：`SettingsCategory` 新增 `.about`（标题「关于」、图标 `info.circle`，排最后）；关于页用与其它页同一张 `GroupBox` 卡片（卡内 `.settingsCardInset()`、VStack spacing 12），放应用名（`.title3` semibold）、版本行「版本 1.4.8（build 1）」、定位句、版权；版本/build 由 `AboutPresentation` 统一，读不到不编占位；capture 缝注入固定版本/build。
+- 理由：macOS 应用的常规落点；一页说清版本、build、定位与版权；文案与版本规范化是纯函数，可单测。
+- 兼容性/迁移：设置分区 6→7，侧栏行与所有设置面帧随新行变化（2 新 + 40 变，基线 244→246）；关于页正文在 runner 1x 平涂（470），暗侧栏未选标签盲（471）。
+- 边界：无应用图标（文本型）；定位句与版权是常量（跨年稳定）。
+- 回滚：删 `.about` case/页/侧栏行即可恢复旧帧；或 `git revert`。
+

@@ -33,8 +33,8 @@ ARMS = [
      "static let settingsContentPane = CGRect(x: 700, y: 520, width: 8, height: 8)",
      "PASSED"),
     ("M615", "侧栏文字列的 x 带挪进分栏阴影（148..160，实测无内容）⇒ 新闸门必须自己报未运行",
-     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)",
-     "static let settingsSidebarTextColumn = CGRect(x: 152, y: 60, width: 6, height: 192)",
+     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 224)",
+     "static let settingsSidebarTextColumn = CGRect(x: 152, y: 60, width: 6, height: 224)",
      "SKIPPED"),
 ]
 

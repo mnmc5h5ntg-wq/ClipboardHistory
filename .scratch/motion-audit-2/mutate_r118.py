@@ -29,7 +29,7 @@ ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 ARMS = [
     ("M612", "台账矩形高度改回 154（五行时代）⇒ 高度对账必须红",
-     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)",
+     "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 224)",
      "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 154)",
      GUARD, "CAUGHT"),
     ("M613", "行带助手返回空 ⇒ 盲区名单静默变空，等式必须红",

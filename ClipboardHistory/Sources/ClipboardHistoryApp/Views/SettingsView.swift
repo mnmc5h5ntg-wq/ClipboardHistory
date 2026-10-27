@@ -49,6 +49,9 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     /// 每日复制热图（新功能 / 阶段一）。放在最后：它是"回头看"的一页，
     /// 不是任何人的第一次进入点。
     case stats
+    /// R442：关于页 —— 应用名/版本/build/定位/版权的唯一落点。
+    /// 放在最后：介绍自己不是任何人的第一次进入点（与统计同一条排序理由）。
+    case about
 
     var id: String { rawValue }
 
@@ -60,6 +63,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .recommendations: return "推荐"
         case .data: return "数据"
         case .stats: return "统计"
+        case .about: return "关于"
         }
     }
 
@@ -73,6 +77,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         // 描线系（与其余五枚同一套语言，D-8 那条判据管的就是这个）：
         // `chart.bar` 而不是 `chart.bar.fill`。
         case .stats: return "chart.bar"
+        case .about: return "info.circle"
         }
     }
 }
@@ -133,6 +138,9 @@ struct SettingsView: View {
     private let exportHistoryAction: ((URL) -> String?)?
     private let importHistoryAction: ((URL) -> String?)?
     @State private var selectedCategoryState: SettingsCategory?
+    /// R442：关于页的版本/build 注入缝（产品路径读真实 bundle）。
+    @Environment(\.settingsSidebarVersionForCapture) private var aboutVersionOverride
+    @Environment(\.settingsAboutBuildForCapture) private var aboutBuildOverride
     /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
     private let categoryOverride: Binding<SettingsCategory?>?
 
@@ -312,6 +320,8 @@ struct SettingsView: View {
                         dataSection
                     case .stats:
                         statsSection
+                    case .about:
+                        aboutSection
                     case .none:
                         EmptyView()
                     }
@@ -671,6 +681,40 @@ struct SettingsView: View {
     }
 
     // MARK: - Data Section
+
+    // MARK: - About Section (R442)
+
+    private var aboutVersionLine: String {
+        AboutPresentation.resolvedVersionLine(shortVersionOverride: aboutVersionOverride,
+                                              buildOverride: aboutBuildOverride)
+    }
+
+    /// 关于页：应用名、版本/build、一句定位、版权。版本与 build 都只做展示，读不到不编占位。
+    /// 这一页是设置里唯一"介绍自己"的地方 —— 侧栏底部那行只有应用名 + 版本。
+    private var aboutSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("关于")
+                .font(.headline)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(AboutPresentation.appName)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    Text(aboutVersionLine)
+                        .font(.system(size: VisualFont.body))
+                        .foregroundStyle(.secondary)
+                    Text(AboutPresentation.tagline)
+                        .font(.system(size: VisualFont.body))
+                        .foregroundStyle(.secondary)
+                    Text(AboutPresentation.copyright)
+                        .font(.system(size: VisualFont.meta))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .settingsCardInset()
+            }
+        }
+    }
 
     /// 「统计」这一页（新功能 / 阶段一；R101 起这一屏也守"卡片"那套语言，见 BACKLOG 131）。
     @ViewBuilder
