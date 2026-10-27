@@ -7796,3 +7796,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML `<blockquote>` 路径没有这个属性（465）；滚动时只画可见段（性能取舍，滚动会带来新脏区）。
 - 回滚：删 `drawBackground` 里的 `drawQuoteRules` 调用即可恢复旧帧；或 `git revert`。
 
+## D-436 表格表头用等宽 semibold 与表体分开（R440）
+
+- 背景：`MarkdownScanner.collectTable` 丢掉 `| --- |` 分隔行后，表头与表体在渲染里完全同形（同字号、同字重、同颜色）。R234 已决定不改列宽重排，但"表头是哪一行"是作者写下的结构意图，不该一起丢。
+- 决定：新增 `TableHeaderPresentation` —— 表头字体 = `monospacedSystemFont(codeFontSize, .semibold)`，`headerRange(in:)` 取表格块第一行；`MarkdownPresentation` 只给第一行换字体，其余行与段落不动。
+- 理由：等宽字体的 semibold 与 regular 推进宽度相同 ⇒ 不挪列、不需要重排；同帧两行（逐字相同的夹具）墨量比 light 1.40 / dark 1.25，旧形状 1.00。
+- 兼容性/迁移：只影响 Markdown 渲染路径；HTML 路径没有同档处理（466）；纯文本路径不受影响。帧变化 2 张旧帧 + 2 张新帧，基线 240→242。
+- 边界：字重差在极小字号/低分屏上可能更弱；runner 1x 读数待新跑（R441 ⓪）。
+- 回滚：删 `attributedString` 里的表头字体 post-pass 即可恢复旧帧；或 `git revert`。
+

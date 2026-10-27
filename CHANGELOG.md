@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情 Markdown 表格表头补等宽 semibold（同帧墨量比 light 1.40 / dark 1.25、左沿 23.0/23.5pt、行距 9.0pt；2 张旧帧变化 + 2 张新帧、基线 242）（R440 / 第 439 轮 / Round 437 / U-1623…U-1627 · 产品 3 文件，详情正文表格位）
+
+
 ### 详情 Markdown 引用块补左侧导引线（规则带最长竖墨 17.0 → 57.0pt、文字左沿 38.5pt、净距 11.5pt；2 张帧变化、基线 240）（R439 / 第 438 轮 / Round 436 / U-1618…U-1622 · 产品 3 文件，详情正文引用位）
 
 

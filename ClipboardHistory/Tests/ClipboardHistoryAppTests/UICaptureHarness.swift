@@ -4300,6 +4300,98 @@ final class UICaptureTests: XCTestCase {
     }
 
 
+    /// R440：表格表头的字重必须与表体分开（解析器丢了 `---` 行，两行同形）。
+    ///
+    /// 夹具 `detail-table` 的两行逐字相同（`| 甲 | 乙 |`），所以同帧、同字、同字号的
+    /// 墨量比就是"字重差"的读数：旧形状（两行 regular）≈1.00，新形状（表头 semibold）>1.0。
+    /// 判据不读绝对墨量 —— 那会跟机器/字体版本走；它读**同一帧里两行的比**与左沿是否同轴。
+    func testTableHeadersAreSemibold() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r440-table-header-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        /// 表头/表体墨量比的地板：旧形状 1.00，新形状本机实测会打印；
+        /// 地板取 1.08 —— 高于"字重噪声"，低于 semibold 的实测差。
+        let inkRatioFloor = 1.08
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-table" }) else {
+                return XCTFail("\(tag)：找不到 `detail-table` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-table-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-table` 读不回字节 ⇒ 这条判据没有对象")
+                return
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = Int((320.0 * scale).rounded())
+            let y0 = Int((60.0 * scale).rounded())
+            let y1 = min(height, Int((500.0 * scale).rounded()))
+
+            var bands: [(top: Int, bottom: Int, ink: Int, left: Int)] = []
+            var currentTop = -1
+            var currentInk = 0
+            var currentLeft = Int.max
+            for y in y0..<y1 {
+                var rowInk = 0
+                var rowLeft = Int.max
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    rowInk += 1
+                    if rowLeft == Int.max { rowLeft = x }
+                }
+                if rowInk > 0 {
+                    if currentTop < 0 {
+                        currentTop = y
+                        currentInk = 0
+                        currentLeft = Int.max
+                    }
+                    currentInk += rowInk
+                    currentLeft = min(currentLeft, rowLeft)
+                } else if currentTop >= 0 {
+                    bands.append((currentTop, y - 1, currentInk, currentLeft))
+                    currentTop = -1
+                }
+            }
+            if currentTop >= 0 {
+                bands.append((currentTop, y1 - 1, currentInk, currentLeft))
+            }
+            guard bands.count >= 3 else {
+                emit("TABLE_HEADER_NOT_RUN=runner-detail-frame-plain \(tag) 带=\(bands.count)"
+                     + " ⇒ 帧上没有 h1 + 两行表格，判据没有对象")
+                continue
+            }
+            let header = bands[bands.count - 2]
+            let body = bands[bands.count - 1]
+            let ratio = Double(header.ink) / Double(max(body.ink, 1))
+            let headerLeft = Double(header.left) / scale
+            let bodyLeft = Double(body.left) / scale
+            let rowGap = Double(body.top - header.bottom) / scale
+            emit("TABLE_HEADER \(tag) 带=\(bands.count) 表头墨=\(header.ink) 表体墨=\(body.ink) "
+                 + "比=\(String(format: "%.2f", ratio)) 左沿=\(String(format: "%.1f", headerLeft))"
+                 + "/\(String(format: "%.1f", bodyLeft))pt 行距=\(String(format: "%.1f", rowGap))pt")
+            XCTAssertLessThan(rowGap, 30.0,
+                              "\(tag)：最后两带的间距 \(rowGap)pt ⇒ 它们不是同一张表的两行")
+            XCTAssertGreaterThanOrEqual(ratio, inkRatioFloor,
+                                        "\(tag)：表头/表体墨量比只有 \(ratio)（地板 \(inkRatioFloor)）"
+                                        + " ⇒ 表头没有比表体重")
+            XCTAssertEqual(headerLeft, bodyLeft, accuracy: 1.0,
+                           "\(tag)：表头左沿 \(headerLeft)pt 与表体 \(bodyLeft)pt 不同轴 ⇒ 加粗挪了列")
+        }
+    }
+
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
@@ -7344,6 +7436,14 @@ final class UICaptureTests: XCTestCase {
             let target = self.makeMarkdownStore()
             self.assertMarkdownFixturePremise(target, role: "detail-markdown-source")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
+        })
+        // R440：表格表头字重。夹具的两行**逐字相同**（都是 `| 甲 | 乙 |`），
+        // 于是"表头比表体重多少"可以同帧、同字、同字号地量成墨量比；
+        // 旧形状两行一样重（`collectTable` 丢掉了 `---` 行），新形状表头 semibold。
+        results.append(Fixture("detail-table", NSSize(width: 720, height: 520)) {
+            let target = self.makeTableStore()
+            self.assertTableFixturePremise(target, role: "detail-table")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
 
         // R335：HTML 预览同样拍**一对**。单拍渲染那一侧的话，"切换有效"这件事只剩控件标题
@@ -11303,6 +11403,52 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.markdownFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R440 表格夹具的正文：两行表格**逐字相同**，只有第一行是表头。
+    /// 前面放一个 h1 是为了让 `offersRendering` 拿到两类语法信号，走渲染档。
+    static let tableFixtureBody = """
+    # 表
+
+    | 甲 | 乙 |
+    | --- | --- |
+    | 甲 | 乙 |
+    """
+
+    /// 夹具前提：这条记录走渲染档，并且解析结果里确实有一个**两行逐字相同**的表格块。
+    /// 前提不成立时那张 `detail-table` 帧就量不到"表头 vs 表体"这一组对照。
+    private func assertTableFixturePremise(_ store: HistoryStore, role: String,
+                                           file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：表格夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        XCTAssertTrue(MarkdownRenderingAffordance.offers(for: entry.content),
+                      "\(role)：选中的这条按策略不该给渲染入口 ⇒ 帧名在说谎")
+        let blocks = MarkdownParser.parse(body).blocks
+        guard let table = blocks.first(where: { if case .table = $0.kind { return true } else { return false } }) else {
+            XCTFail("\(role)：解析结果里没有表格块 ⇒ 这条判据没有对象", file: file, line: line)
+            return
+        }
+        let text = table.runs.map(\.text).joined()
+        let lines = text.components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 2, "\(role)：表格块不是两行（实际 \(lines.count)）", file: file, line: line)
+        XCTAssertEqual(lines.first, lines.last, "\(role)：表头与表体不是同一串字 ⇒ 墨量比没有对象",
+                       file: file, line: line)
+    }
+
+    private func makeTableStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.tableFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)

@@ -295,12 +295,23 @@ enum MarkdownPresentation {
             let start = result.length
             append(block, to: result)
             guard result.length > start else { continue }
+            let blockContentLength = result.length - start
             let separator = separator(after: block, before: document.blocks.indices.contains(offset + 1)
                 ? document.blocks[offset + 1] : nil)
             result.replaceCharacters(in: NSRange(location: result.length, length: 0), with: separator)
             // 段落属性覆盖到分隔符，块内所有行（含空行）才不会漏掉缩进与行距。
             let range = NSRange(location: start, length: result.length - start)
             result.addAttribute(.paragraphStyle, value: paragraphStyle(for: block), range: range)
+            // R440：表头（表格块第一行）用等宽 semibold 与表体分开。属性串这一层只换字体，
+            // 推进宽度不变，所以列不会挪；范围只到第一行，表体保持 regular。
+            if case .table = block.kind {
+                let content = (result.string as NSString).substring(with: NSRange(location: start,
+                                                                                 length: blockContentLength))
+                if let header = TableHeaderPresentation.headerRange(in: content) {
+                    result.addAttribute(.font, value: TableHeaderPresentation.headerFont,
+                                        range: NSRange(location: start, length: header.length))
+                }
+            }
             // 导引线属性与段落缩进覆盖同一个范围（含块后的分隔空行）：
             // 相邻两个同级引用块因此天然连成一条线，空白行不会把线切断。
             if block.quoteDepth > 0 {
