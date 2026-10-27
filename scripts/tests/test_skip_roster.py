@@ -52,6 +52,10 @@ ROSTER = {
         'test_every_real_pair_clears_the_floor_or_is_named_nonflat': '帧通道未给 CLIPBOARD_HISTORY_UI_SHOTS',
         'test_ci_exit_matches_this_machines_registered_profile': '帧目录不在盘上（本机没重捕帧时不承重）',
         'test_working_frames_still_satisfy_the_three_relations': '帧目录不在（本机 NOT-RUN）',
+        # R435：本机 /tmp 被清掉时，验证链日志不在盘上 ⇒ 这一格合法跳过（runner 那一侧
+        # 早就登记过；本机这边以前一直有文件所以没露面）。文件在就真跑，不承重时署名。
+        'test_the_round_chain_log_reads_as_the_ledger_claims':
+            '本机 /tmp 的验证链日志被清掉时不承重（文件在就真跑）',
     },
     'github-runner': {
         # 这一行原来是 R276 的**外推**（那一次只读到 `skipped=1` 这个数，没读到是谁），

@@ -7751,3 +7751,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：映射按字号排名，文档若有超过六级标题字号，后排会全落 12pt（460）；暗档详情帧整片同色，像素判据只在亮档判。
 - 回滚：把 `fitHeadingsToLadder` 从 `attributedString` 的调用链里摘掉即可；或 `git revert` 本轮提交。
 
+## D-431 浮层搜索框补清除按钮；可见性由纯函数决定（R435）
+
+- 背景：主窗口 `SearchField` 早有清除 ×，浮层的主输入框一直没有；打错一个字只能全选重打，空结果态的「清除搜索」只在 0 条时出现，不是输入中的清除手段。
+- 决定：① `QuickPickController.showsClearButton(text:) = !text.isEmpty` 做可见性真值表；② 面板里加一颗 18×18 无边框 ×（`xmark.circle.fill`、`secondaryLabelColor`、可访问名「清除搜索」、identifier `quickPickClearSearchButton`），trailing = 字段右沿 −4、centerY 对齐；③ `QuickPickSearchFieldCell` 的文本矩形右留 22pt 给按钮让位（左轴不动）；④ 产品路径（delegate → `queryChanged`）与取证路径（`windowForCapture`）共用 `updateClearButton`。
+- 理由：清除是输入框的一部分，应该和主窗口同一种语言（字段右侧的 ×，有字才出现），而不是只在空结果态给一颗大 CTA。可见性写成纯函数才能用真值表与刀钉住。
+- 兼容性/迁移：搜索框左轴、占位语、药丸宽度都不动；4 张浮层帧变化（typed/empty × 亮暗），基线仍 238。
+- 边界：× 的命中区 18pt，比主窗口搜索框的 22pt 小（461）；没有为 × 另配键盘快捷键（Esc 仍是关闭面板）。
+- 回滚：删 `clearButton` 的创建、`updateClearButton` 两处调用与 cell 的右留白即可；或 `git revert` 本轮提交。
+

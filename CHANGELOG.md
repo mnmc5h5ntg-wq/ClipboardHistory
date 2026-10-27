@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层搜索框补清除按钮（有字才出现：typed 帧按钮带 405/410 墨、空查询 0；4 张浮层帧变化、基线 238）；R434 跑 `40535594620 ↔ 78a0cf5` success、失败步骤 0（仪器全部按名/按读数签收）（R435 / 第 434 轮 / Round 432 / U-1598…U-1602 · 产品 1 文件，浮层搜索框位）
+
+
 ### HTML 渲染的标题档接到 Markdown 梯子（同一 h1：旧墨带 27.0pt → 新 20.0pt、与 Markdown 差 9.0→2.0；2 张 HTML 帧变化、基线 238）；R433 跑失败步骤 2 个（设置内容列在 1x 整列平涂 ⇒ 排除名单判据无对象）⇒ 具名 NOT-RUN、阈值未动（R434 / 第 433 轮 / Round 431 / U-1593…U-1597 · 产品 1 文件，HTML 标题排版位）
 
 

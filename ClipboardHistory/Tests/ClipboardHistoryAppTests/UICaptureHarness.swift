@@ -4130,6 +4130,55 @@ final class UICaptureTests: XCTestCase {
                                  + "\(String(format: "%.1f", markdown))pt ⇒ 同一个「渲染」档里两条通道的标题不同档")
     }
 
+    /// R435：浮层搜索框有字时右侧必须出现一颗清除按钮；空查询时它必须收起来。
+    ///
+    /// 缺陷形状：主窗口的 `SearchField` 早就有 ×，浮层的主输入框一直没有 —— 打错一个字
+    /// 只能全选重打（空结果态那颗「清除搜索」只在 0 条时才出现）。
+    /// 判据只读帧：`quickpick-typed`（查询「访达」）与 `quickpick-list`（空查询）在
+    /// 搜索框右端 384..406pt × 14..34pt 的墨量；校准带取同一字段左半段（两帧都必有字）。
+    func testQuickPickSearchFieldShowsAClearButtonOnlyWhenTyping() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r435-clear-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func ink(_ name: String) throws -> (button: Int, control: Int, scale: Double)? {
+                guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let scale = Double(rep.pixelsWide) / 420.0
+                func mass(_ rect: CGRect) -> Int {
+                    Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                     bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
+                }
+                return (mass(CGRect(x: 384, y: 14, width: 22, height: 20)),
+                        mass(CGRect(x: 28, y: 14, width: 150, height: 20)), scale)
+            }
+            guard let typed = try ink("quickpick-typed"), let list = try ink("quickpick-list") else { continue }
+            let buttonFloor = Int(20.0 * typed.scale * typed.scale)
+            emit("QUICKPICK_CLEAR_BUTTON \(tag) typed 按钮带=\(typed.button) 校准=\(typed.control) "
+                  + "list 按钮带=\(list.button) 校准=\(list.control) 地板=\(buttonFloor)")
+            XCTAssertGreaterThan(typed.control, buttonFloor,
+                                 "\(tag)：typed 帧搜索框左半段没有字 ⇒ 这一屏没画出来")
+            XCTAssertGreaterThan(list.control, buttonFloor,
+                                 "\(tag)：list 帧搜索框左半段没有字 ⇒ 这一屏没画出来")
+            XCTAssertGreaterThan(typed.button, buttonFloor,
+                                 "\(tag)：有字时搜索框右端只读到 \(typed.button) 颗墨（地板 \(buttonFloor)）⇒ 清除按钮没画出来")
+            XCTAssertLessThan(list.button, buttonFloor,
+                              "\(tag)：空查询时搜索框右端读到 \(list.button) 颗墨 ⇒ 清除按钮没有收起来")
+        }
+    }
+
     /// R433：详情大图必须有一圈**可见的边**（白底图在白底详情里以前整张看不见）。
     ///
     /// 缺陷形状（修之前 `detail-1-image` 亮/暗现读）：大图周围直接是页面底色，

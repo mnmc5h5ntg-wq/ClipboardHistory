@@ -33,6 +33,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     /// R409：主输入框的悬停边界。旧面板里它是一行裸文字，
     /// 和主窗口的 `SearchField` 不是同一套语言；只在悬停时出现，静置保持原样。
     private var searchBackdrop: QuickPickSearchBackdrop?
+    private var clearButton: NSButton?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
 
@@ -122,6 +123,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         model.reset()
         if !query.isEmpty { model.setQuery(query) }
         field?.stringValue = query
+        updateClearButton(for: query)
         rebuildRows()
         model.index = 0
         selectCurrentRow()
@@ -159,6 +161,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
 
     /// 输入变化：查询词进模型、刷新列表、下标夹住。
     func queryChanged(_ text: String) {
+        updateClearButton(for: text)
         model.setQuery(text)
         // rebuildRows 里已经有 reloadData —— 这里以前还再调一次，
         // 两次刷新会让表格在输入法的每个候选字上重排两遍（打字时肉眼可见的抖动）。
@@ -402,6 +405,27 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             backdrop?.focused = focused
         }
 
+        // R435：搜索框有字时补一颗清除按钮（主窗口的 SearchField 早就有）。
+        let clearSearch = NSButton()
+        clearSearch.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: VisualFont.row, weight: .medium))
+        clearSearch.isBordered = false
+        clearSearch.imagePosition = .imageOnly
+        clearSearch.target = self
+        clearSearch.action = #selector(clearQueryTapped(_:))
+        clearSearch.contentTintColor = .secondaryLabelColor
+        clearSearch.setAccessibilityLabel("清除搜索")
+        clearSearch.identifier = NSUserInterfaceItemIdentifier("quickPickClearSearchButton")
+        clearSearch.isHidden = true
+        clearSearch.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(clearSearch)
+        NSLayoutConstraint.activate([
+            clearSearch.trailingAnchor.constraint(equalTo: field.trailingAnchor, constant: -4),
+            clearSearch.centerYAnchor.constraint(equalTo: field.centerYAnchor),
+            clearSearch.widthAnchor.constraint(equalToConstant: 18),
+            clearSearch.heightAnchor.constraint(equalToConstant: 18),
+        ])
+        self.clearButton = clearSearch
         self.panel = panel
         self.field = field
         self.table = table
@@ -416,6 +440,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         field?.stringValue = ""
         queryChanged("")
         panel?.makeFirstResponder(field)
+    }
+
+    /// R435：有字才显示清除按钮。纯判定，真值表在单测里。
+    static func showsClearButton(text: String) -> Bool { !text.isEmpty }
+
+    /// 清除按钮的可见性只有这一个入口（产品路径与取证路径共用）。
+    private func updateClearButton(for text: String) {
+        clearButton?.isHidden = !Self.showsClearButton(text: text)
     }
 
     /// 把模型的下标画到表上。`selectRow(at:anchors:scrollTo:notify:)` 是 `NSOutlineView` 的方法，
@@ -1051,9 +1083,12 @@ final class QuickPickSearchBackdrop: NSView {
 final class QuickPickSearchFieldCell: NSTextFieldCell {
     private func insetted(_ rect: NSRect) -> NSRect {
         let inset = QuickPickController.searchFieldLeadingInset
-        guard inset > 0, rect.width > inset else { return rect }
+        // R435：右边给清除按钮留位（按钮有字才出现，但 insets 是静态的 —— 统一留 22pt，
+        // 长查询只是早一点截断，不会让左轴移动）。
+        let rightInset: CGFloat = 22
+        guard rect.width > inset + rightInset else { return rect }
         return NSRect(x: rect.minX + inset, y: rect.minY,
-                      width: rect.width - inset, height: rect.height)
+                      width: rect.width - inset - rightInset, height: rect.height)
     }
 
     override func drawingRect(forBounds rect: NSRect) -> NSRect {

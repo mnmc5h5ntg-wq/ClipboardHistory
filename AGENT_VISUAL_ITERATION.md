@@ -18827,3 +18827,21 @@ QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打�
 | 可复核性 | 15/15 | 帧名、两带墨高、基准/标题号、刀号与红在哪个用例、precheck/rot/CI 原文、基线 238、换装/清账都在。 |
 
 均分 = 102/105 ≈ 14.6/15（96）。
+
+## Round 432 · R435（第 434 轮 · 2026-10-28）：浮层搜索框补清除按钮（有字才出现：typed 帧按钮带 405/410 墨、空查询 0；4 张浮层帧变化、基线 238）；R434 跑 `40535594620 ↔ 78a0cf5` **success、失败步骤 0**（仪器全部按名/按读数签收）（产品 1 文件，浮层搜索框位）
+
+主窗口的 `SearchField` 早有清除 ×，浮层的搜索框一直没有 —— 打错一个字只能全选重打。新：`QuickPickController` 在搜索框右端加 18×18 无边框 ×（`xmark.circle.fill`、`secondaryLabelColor`、可访问名「清除搜索」、identifier `quickPickClearSearchButton`），可见性由 `showsClearButton(text:)` 决定（有字才出现），`QuickPickSearchFieldCell` 右留 22pt 让位，产品路径与取证路径共用 `updateClearButton`。旧/新：`QUICKPICK_CLEAR_BUTTON light typed 按钮带=405 校准=354 list 按钮带=0 校准=1232`、dark `410/408 / 0/1474`，地板 80（20·s²）。4 张浮层帧变化（typed/empty × 亮暗），基线 238/0/0/0。R434 run `40535594620 ↔ 78a0cf5` **success、20/20 步、失败步骤 0**：`EXCLUDED_APP_ROW_NOT_RUN=runner-1x-settings-content-plain` 按名生效、`DETAIL_IMAGE_EDGE` 1x 30/26、`HTML_HEADING_LADDER` 19/18、理由带 217/248 vs 0、时间列、脚注、分区、表格、回执 2/2、滚动 4/4、floor 5/5/77 全绿；STATE ⓪ 已回写（`00939fa`）。M1195–M1196 2/2；预检 213/195/562 bad=0；HIDDEN 300/979 rot=0。全量 1179/57/5（5 断言全在 SelectionRevealAnimationTests），单跑 4/4（TIME 18/8、23.5→1438；CHANNEL 0→86.5→600）⇒ 具名 LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order（449）。捕获 142/4/0、238 帧；换装 ok/SHA_MATCH=1/381=381/SMOKE_OK=1；清账 162/63/0；电池 683/5（首跑 skip 名册本机缺项、补登后）。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 13/15 | 真看 `quickpick-typed`/`quickpick-empty` 亮暗：× 出现在搜索框右上、与输入文字不重叠；empty 帧里 × 与「清除搜索」CTA 并存、职责可辨。扣 2：没有真机点击验收；18pt 命中区比主窗口 22pt 小（461）。 |
+| 判据有效性 | 15/15 | 真值表 + 真实面板按钮跟随查询（含 performClick 收起）+ 像素正/负两带；M1195–M1196 2/2。 |
+| 假绿防御 | 15/15 | 負臂（空查询）必须 0 墨、正臂两档都要有墨、校准带证明字段画出来了；地板按 s²；两档都判。 |
+| 产品面推进 | 14/15 | 真落 1 文件（浮层搜索框位），补的是"输入中不可清除"的真空档；扣 1：命中区 18pt 偏小、没有 Esc 清空的额外提示。 |
+| 台账一致性 | 15/15 | U-1598…U-1602、D-431、R434 的 success/0 步、R435 的 405/410 vs 0、1179 都从日志/帧/用例解析。 |
+| 交付诚实性 | 15/15 | push 曾 PUSH_BLOCKED（ahead=2）如实报，网络恢复后一次 push 并回写 STATE ⓪；各 NOT-RUN 分列。 |
+| 可复核性 | 15/15 | 帧名、两条墨带、identifier、刀号与红在哪个用例、precheck/rot/CI 原文、基线 238、换装/清账都在。 |
+
+均分 = 102/105 ≈ 14.6/15（96）。
