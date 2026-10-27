@@ -7628,3 +7628,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：只影响计数文本；218 帧逐字节不变；1x 胶片判过程，2x 采样边界具名 NOT-RUN。
 - 回滚：删 `countTextLabel` 的 14+ 分支即可；或 `git revert` 本轮提交。
 
+## D-417 快速选择面板按鼠标所在屏幕的 visibleFrame 居中并夹住（R421）
+
+- 背景：`ensurePanel()` 把 420×300 的面板建在 (0,0) 后再没摆过；真面板 frame 原点是 (0,89)（屏幕左缘、Dock 之上），而窗口位置从未进过任何内容帧/判据 —— 内容帧拍得再好也看不见它开在屏幕角落。
+- 决定：`QuickPickPlacement.origin(panelSize:visibleFrame:)` 纯策略，以 visibleFrame（排除菜单栏/Dock）居中并夹住四边（房间比面板小时锚在可见原点，不跑负坐标）；`show()` 在 `makeKeyAndOrderFront` 之前 `placePanel`，屏幕优先取鼠标所在那一块、退主屏；`windowForCapture` 不读屏幕、不改窗口位置。
+- 理由：热键呼出的面板应跟随工作区；窗口位置是**落点事实**，用真 `NSPanel.frame` 与纯策略判，而不是另拍一张合成桌面（面板会显示真实剪贴板内容，截屏触红线）。
+- 兼容性/迁移：捕获帧零变化（218 帧逐字节不变）；`placePanel` 只改窗口原点。
+- 回滚：删 show() 里的 placePanel 调用与 QuickPickPlacement 即可；或 `git revert` 本轮提交。
+

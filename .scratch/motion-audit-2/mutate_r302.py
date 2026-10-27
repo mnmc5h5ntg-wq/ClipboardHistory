@@ -44,8 +44,8 @@ REPL_POP = (u'import XCTest\n\n'
 # R306 重钉：这根针原本钉在 roster 的**头两行**，本轮按字母序往名单里插新文件名把头部挤走 ⇒ 命中 0 次。
 # 与 286 那一族同形（腐烂的不只有源码注释，刀表自己的锚点也腐烂）。改钉**最后一行**：
 # 字母序增长只会往上插，尾行只会在真的改名/删文件时动 —— 那才是这把刀要问的事。
-NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
-REPL_ROSTER = u'                      "UICaptureHarness.swift"]'
+NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift"]'
+REPL_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
 
 NEEDLE_EMIT = (u'    static func emit(_ line: String) {\n'
                u'        CaptureReadings.emit(line, to: readingsURL)\n'

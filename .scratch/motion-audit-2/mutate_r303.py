@@ -49,8 +49,8 @@ NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 15'
 REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 16'
 EXPECT_CEIL = u'登记值是 16'
 
-NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
-REPL_ROSTER = u'                      "UICaptureHarness.swift"]'
+NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift"]'
+REPL_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
 
 ARMS = [
     ('M875', u'把一行搬好的读数改回裸 stdout = 上界有牙', PROBE,

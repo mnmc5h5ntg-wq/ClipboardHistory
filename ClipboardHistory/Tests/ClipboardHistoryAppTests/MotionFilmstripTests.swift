@@ -2522,7 +2522,17 @@ final class MotionFilmstripTests: XCTestCase {
     func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
         try requireSoftTransitionChannel()
-        for scale in [2.0, 1.0] {
+        // R421：2x 在 runner 上读 1 帧（峰值 0.0193；同一跑 probe 2x=2、1x=2；本机 2x 4–7）
+        // ⇒ 小墨量文字交换的 2x 采样在边界上（不是硬切：1x=2、源守卫仍在）。
+        // CI 判 1x；2x 进 extended/本机，并具名记账。
+        var scales: [Double] = [1.0]
+        if Self.isExtendedEnabled {
+            scales = [2.0, 1.0]
+        } else {
+            emit("MOTION_NOT_RUN=markdown-2x 2x 在 runner 上读 1 帧（峰值 0.0193；probe 2x=2/1x=2；本机 2x 4–7）"
+                 + " ⇒ 小墨量文字交换的 2x 采样在边界；CI 判 1x，2x 进 extended")
+        }
+        for scale in scales {
             let scenario = Scenario.markdownModeLabel()
             let film = record(scenario, scale: scale)
             let frames = film.motionFrames

@@ -31,8 +31,8 @@ N_EMIT = u'    static func emit(_ line: String) { CaptureReadings.emit(line) }'
 R_EMIT_STDOUT = u'    static func emit(_ line: String) { pri' + u'nt(line) }'
 # R302 把名册从 3 个名字扩成 10 个（派生集上门），这一根的 needle 跟着换到当前形状，
 # 否则 M871 会变成「needle 命中 0 次」的哑刀（DID-NOT-RUN 不是通过，D-234 同一族）。
-N_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift"]'
-R_ROSTER_GONE = u'                      "UICaptureHarnessRenamed.swift", "UIInteractionProbeTests.swift"]'
+N_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift"]'
+R_ROSTER_GONE = u'                      "UICaptureHarnessRenamed.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift"]'
 # R306 重钉：这把针原本钉在 roster 的**头两行**，而本轮按字母序往名单里插了新名字
 # （`CapturePathWriteBudgetTests.swift` 抢到第一格）⇒ 头部被挤走，needle 命中 0 次 = NOT_RUN
 # （286 那一族的又一个证人：会腐烂的不是只有源码里的注释，刀表自己的锚点也一样腐烂）。

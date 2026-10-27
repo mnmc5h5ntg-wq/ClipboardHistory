@@ -8847,3 +8847,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：为了让主套件回到 66s 余量，`testFilmScenarioAppearanceDependenceIsMeasuredPerScenario`（54.7s）与回执消失臂搬进了 `CLIPBOARD_HISTORY_UI_MOTION_EXTENDED=1`；CI 只跑主套件，extended 一次也不跑。
     修法（下一轮）：给 extended 一个**独立的 report-only CI 步**（自己的 timeout 与日志通道），或者把 54.7s 的普查按 scenario 切片成可按需选择的子集；不要在 200s 看门狗上继续加时间。
 
+437 追记（R421 · 仍开）：本轮补的是快速选择面板的屏幕落点与 markdown 2x 的 extended 分流；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+446 追记（R421 · 仍开）：CI 套件 129.9s/76 条/0 失败（70s 余量）；extended 卷仍没有 CI 步。
+
+**447. 快速选择面板的运行时多屏落点没有真机签收：面板会显示真实剪贴板内容，截屏触红线**（R421）
+    现象：落点由纯策略 + 真 `NSPanel.frame` + 源守卫钉住（旧 (0,89) → 新 (290,200)），但"在多屏/带 Dock 的真机上，热键一按是否就在鼠标屏中央"没有屏幕证据 —— 任何全屏/窗口截图都会带出真实剪贴板文本。
+    修法（下一轮）：用**临时数据目录 + 合成条目**启动一个受控实例（`CLIPBOARD_HISTORY_DATA_DIR` 那一族），再走热键/菜单入口拍窗口级截图；先证明截图里只有合成文本，再让它进帧基线。拍不到就继续 NOT-RUN，不拿内容帧冒充落点。
+

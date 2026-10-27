@@ -71,6 +71,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         field?.stringValue = ""
         model.index = 0
         selectCurrentRow()
+        // R421：先放好再出场。以前建在 (0,0) 就再也没动过 —— 那是屏幕左下角，常常压在 Dock 上。
+        if let visible = screenForPresentation?.visibleFrame {
+            placePanel(in: visible)
+        }
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         if panel.makeFirstResponder(field) {
@@ -78,6 +82,19 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             // 拿不到第一响应者就不亮 —— 与 R141 录制环同一条规矩，别画假承诺。
             searchBackdrop?.focused = true
         }
+    }
+
+    /// R421：面板落点。屏幕优先取**鼠标所在**那一块（热键呼出跟随工作区），取不到再退回主屏。
+    /// 捕获路径（`windowForCapture`）**不读屏幕、不改窗口位置** —— 帧仍然只拍内容。
+    private var screenForPresentation: NSScreen? {
+        NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+    }
+
+    /// internal 只给单测拿真 `NSPanel.frame` 验落点；产品路径只从 `show()` 调。
+    func placePanel(in visibleFrame: CGRect) {
+        guard let panel else { return }
+        panel.setFrameOrigin(QuickPickPlacement.origin(panelSize: panel.frame.size,
+                                                      visibleFrame: visibleFrame))
     }
 
     /// 只给离屏帧夹具用（`UICaptureTests`）：把面板建出来、按 `query` 填好行，
