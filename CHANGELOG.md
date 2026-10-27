@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 快捷键录制按钮补帮助文本（静置「点一下重新录制；按 Esc 取消」/录制「请输入快捷键；按 Esc 取消」，toolTip + AX；帮助气泡系统画 ⇒ 像素具名 NOT-RUN）；R437 两跑与新跑读数本轮被 GitHub EOF 挡住 ⇒ 具名 CI_READ_BLOCKED（R438 / 第 437 轮 / Round 435 / U-1613…U-1617 · 产品 1 文件，录制按钮帮助位）
+
+
 ### 多文件行展开后的预览补到所属行的文字轴（旧展开内容 40.0pt vs 行文字 83.0pt、差 43 → 新 82.5 vs 83.0、差 0.5；2 张展开帧新增、基线 240）；R436 head 跑一绿一红（`40552595027 ↔ 204737c` success；`40552696188 ↔ 7298af9` 唯一红 on-screen 帧间隔 189.8ms>120）⇒ 原样重跑、阈值未动（R437 / 第 436 轮 / Round 434 / U-1608…U-1612 · 产品 1 文件，展开预览位）
 
 

@@ -18881,3 +18881,21 @@ QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打�
 | 可复核性 | 15/15 | 帧名、两档左沿、差值、刀号与红在哪个用例、precheck/rot/CI 原文、基线 240、换装/清账都在。 |
 
 均分 = 102/105 ≈ 14.6/15（96）。
+
+## Round 435 · R438（第 437 轮 · 2026-10-28）：快捷键录制按钮补帮助文本（静置「点一下重新录制；按 Esc 取消」/录制「请输入快捷键；按 Esc 取消」，toolTip + AX；帮助气泡系统画 ⇒ 像素具名 NOT-RUN）；R437 两跑与新跑读数本轮被 GitHub EOF 挡住 ⇒ 具名 CI_READ_BLOCKED（产品 1 文件，录制按钮帮助位）
+
+设置快捷键页的三颗灰键帽以前没有任何帮助文本 —— 看不出可点、也不知道 Esc 能取消。修法：`updateHelp()` 一个出口、随录制态换句，同时写 `toolTip` 与 `setAccessibilityHelp`。产品入口判据读真实 `SettingsView` 里的三颗 `HotKeyRecorderButton`（toolTip/AX 字符串 + `startRecording()` 后换句）；帮助气泡由系统画 ⇒ `RECORDER_HELP_PIXEL_NOT_RUN=system-tooltip`，帧集合与读数不变（CHANGED/MISSING/ADDED 全 0，基线 240）。M1201–M1202 2/2；预检 216/198/568 bad=0；HIDDEN 303/985 rot=0。⓪：网络 `api=000`/apple=200 ⇒ `PUSH_BLOCKED=network`（ahead=0）与 `CI_READ_BLOCKED=network`（40559949986 ↔ 5ee17a4、40552696188 重跑均 EOF）；最近已读两对为 40552595027 ↔ 204737c success、40552696188 ↔ 7298af9 failure 1 步（on-screen 189.8>120，原样重跑）。本地全量 1182/57/5（5 断言全在 SelectionRevealAnimationTests），单跑 4/4（TIME 18/8、71.5→1438；CHANNEL 0→82.5→600）⇒ 具名 LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order（449）。捕获 145/4/0、240 帧；换装 ok/SHA_MATCH=1/381=381/SMOKE_OK=1；清账 162/63/0；电池 683/5。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 12/15 | 走真实 `SettingsView` 读三颗按钮的帮助文案，并确认本轮没有任何帧变化（基线 240/0/0/0）。扣 3：帮助气泡是系统画的，没有任何像素证人（具名 NOT-RUN）。 |
+| 判据有效性 | 15/15 | 产品入口三颗按钮 + 状态换句；M1201–M1202 2/2；空字符串与不换句两条坏法都被咬住。 |
+| 假绿防御 | 15/15 | 帮助气泡不冒充像素；按钮数量与每颗文案都逐颗断言；toolTip 与 AX 两通道都读。 |
+| 产品面推进 | 13/15 | 真落 1 文件（录制按钮帮助位），补的是"灰键帽看不出可点、Esc 无人告知"的真空档；扣 2：只是帮助文本，没有可见的行内提示。 |
+| 台账一致性 | 15/15 | U-1613…U-1617、D-434、CI_READ_BLOCKED/PUSH_BLOCKED、1182/240 都从命令与测试解析。 |
+| 交付诚实性 | 15/15 | 断网与 EOF 都具名分列；on-screen 重跑与 1x 读数明确写"本轮未读"；帮助像素具名 NOT-RUN。 |
+| 可复核性 | 15/15 | 三颗按钮、两句帮助、刀号与红在哪个用例、precheck/rot、基线 240、换装/清账都在。 |
+
+均分 = 100/105 ≈ 14.3/15（95）。

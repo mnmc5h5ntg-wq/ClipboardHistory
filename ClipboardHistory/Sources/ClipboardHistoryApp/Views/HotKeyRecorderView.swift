@@ -132,6 +132,7 @@ final class HotKeyRecorderButton: NSButton {
             if !isRecording {
                 title = shortcut.displayString
             }
+            updateHelp()
         }
     }
     var onShortcutChange: ((HotKeyShortcut) -> Void)?
@@ -144,6 +145,16 @@ final class HotKeyRecorderButton: NSButton {
 
     override var acceptsFirstResponder: Bool { true }
 
+    /// R438：这颗按钮以前**没有任何帮助文本** —— 用户看不出灰键帽可点，也不知道 Esc 能取消。
+    /// 帮助随录制态换一句（同一处出口，避免两种状态各写一份）。
+    private func updateHelp() {
+        let text = isRecording
+            ? "请输入快捷键；按 Esc 取消"
+            : "点一下重新录制；按 Esc 取消"
+        toolTip = text
+        setAccessibilityHelp(text)
+    }
+
     func startRecording() {
         // 「我在听」这一圈是一个**承诺**：按下去的键会被这里吃掉。所以拿不到响应者链的时候
         // 不许亮 —— R143 的审查轮指出：原来 `makeFirstResponder` 的返回值被丢掉，
@@ -155,6 +166,7 @@ final class HotKeyRecorderButton: NSButton {
         }
         setRecording(true)
         title = "请输入快捷键"
+        updateHelp()
         window?.makeFirstResponder(self)
     }
 
@@ -204,6 +216,7 @@ final class HotKeyRecorderButton: NSButton {
     private func setRecording(_ next: Bool) {
         guard isRecording != next else { return }
         isRecording = next
+        updateHelp()
         onRecordingChange?(next)
     }
 }

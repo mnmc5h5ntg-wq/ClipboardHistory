@@ -562,6 +562,45 @@ final class UICaptureTests: XCTestCase {
     ///     而"stack 塌了"不再是可引用的解释（那条已经修掉了），必须去查新的原因；
     ///   · 判据里不写 420 / 300 这类字面量：约定是"内容占满面板"，不是"面板 420 宽"。
     ///     面板尺寸哪天改，这条判据不需要跟着改。
+    /// R438：快捷键录制按钮必须带帮助文本（点一下可重录、Esc 取消），且随录制态换句。
+    ///
+    /// 缺陷形状：这颗灰键帽以前**没有任何帮助文本** —— 看不出可点，也不知道 Esc 能取消。
+    /// 帮助气泡由系统画，离屏帧不含 ⇒ 像素侧具名 NOT-RUN；本格走产品入口（真实 SettingsView），
+    /// 读每个 `HotKeyRecorderButton` 的 toolTip 与可访问帮助。
+    func testShortcutRecorderButtonCarriesHelpText() throws {
+        _ = NSApplication.shared
+        let view = makeSettingsView(store: makePopulatedStore(), initialCategory: .shortcuts)
+        let host = NSHostingView(rootView: view)
+        host.frame = NSRect(x: 0, y: 0, width: 720, height: 540)
+        let window = NSWindow(contentRect: host.frame, styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.contentView = host
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        window.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        defer { window.orderOut(nil) }
+
+        func allSubviews(_ view: NSView) -> [NSView] {
+            [view] + view.subviews.flatMap { allSubviews($0) }
+        }
+        let buttons = allSubviews(host).compactMap { $0 as? HotKeyRecorderButton }
+        emit("RECORDER_HELP_PIXEL_NOT_RUN=system-tooltip buttons=\(buttons.count) "
+              + "「点一下重新录制；按 Esc 取消」⇒ 帮助气泡由系统画，离屏帧不含；本格只判 toolTip/AX 字符串")
+        XCTAssertEqual(buttons.count, 3, "设置快捷键页应当有三颗录制按钮，实际 \(buttons.count) 颗")
+        for (index, button) in buttons.enumerated() {
+            XCTAssertEqual(button.toolTip, "点一下重新录制；按 Esc 取消",
+                           "第 \(index) 颗录制按钮没有帮助文本 ⇒ 用户看不出灰键帽可点、也不知道 Esc 能取消")
+            XCTAssertEqual(button.accessibilityHelp(), "点一下重新录制；按 Esc 取消",
+                           "第 \(index) 颗录制按钮没有可访问帮助 ⇒ 读屏用户拿不到同一条提示")
+        }
+        guard let first = buttons.first else { return }
+        first.startRecording()
+        XCTAssertEqual(first.toolTip, "请输入快捷键；按 Esc 取消",
+                       "进入录制态后帮助文本没有换成「请输入快捷键」")
+        XCTAssertEqual(first.accessibilityHelp(), "请输入快捷键；按 Esc 取消",
+                       "进入录制态后可访问帮助没有跟着换")
+    }
+
     func testQuickPickOverlayFillsItsPanelAndCanBeCaptured() throws {
         let store = makePopulatedStore()
         let build = QuickPickCapturePanel.builder(store: store, query: "")
