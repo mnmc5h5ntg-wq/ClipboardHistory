@@ -28,7 +28,10 @@ struct ThumbnailSymbol: View {
     var body: some View {
         Image(systemName: systemName)
             .font(.system(size: VisualGlyph.chipSymbol, weight: .medium))
-            .foregroundStyle(.secondary)
+            // R431：`.secondary` 是**相对**环境前景的层级色，在这个带 `.quaternary` 底的
+            // 16pt 方块里被解析成白色 ⇒ 白底上等于没画（行首只剩一个空框）。
+            // 用绝对的动态 label 色，亮/暗两档都读得出来。
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
             .frame(width: 16, height: 16)
             .background(VisualMaterial.track)
             .clipShape(VisualShape.rounded(VisualRadius.chip))

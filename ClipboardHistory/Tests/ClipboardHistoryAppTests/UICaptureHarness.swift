@@ -2810,7 +2810,10 @@ final class UICaptureTests: XCTestCase {
                 return n > 0 ? sum / Double(n) : -1
             }
             let fillRect = CGRect(x: 300, y: 12, width: 100, height: 28)
-            let outside = CGRect(x: 300, y: 60, width: 100, height: 20)
+            // R431：框外带原来取 y 60..80（列表行区），R430 的时间列正好落在那一段 ⇒
+            // 焦点/悬停的均值被行内文字污染（runner 1x 读到 2.8 < 3.0 的假红）。
+            // 换成搜索框上方的面板留白（y 0..8），这一带只由面板底色决定。
+            let outside = CGRect(x: 300, y: 0, width: 100, height: 8)
             let idleMean = meanLuma(idle, rect: fillRect, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
             let hoverMean = meanLuma(hover, rect: fillRect, bpr: hr.bytesPerRow, spp: hr.samplesPerPixel)
             let outsideMean = meanLuma(idle, rect: outside, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
@@ -3420,7 +3423,10 @@ final class UICaptureTests: XCTestCase {
                 return n > 0 ? sum / Double(n) : -1
             }
             let fillRect = CGRect(x: 300, y: 12, width: 100, height: 28)
-            let outside = CGRect(x: 300, y: 60, width: 100, height: 20)
+            // R431：框外带原来取 y 60..80（列表行区），R430 的时间列正好落在那一段 ⇒
+            // 焦点/悬停的均值被行内文字污染（runner 1x 读到 2.8 < 3.0 的假红）。
+            // 换成搜索框上方的面板留白（y 0..8），这一带只由面板底色决定。
+            let outside = CGRect(x: 300, y: 0, width: 100, height: 8)
             let idleMean = meanLuma(idle, rect: fillRect, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
             let focusMean = meanLuma(focus, rect: fillRect, bpr: fr.bytesPerRow, spp: fr.samplesPerPixel)
             let outsideMean = meanLuma(idle, rect: outside, bpr: ir.bytesPerRow, spp: ir.samplesPerPixel)
@@ -3860,14 +3866,11 @@ final class UICaptureTests: XCTestCase {
     /// R405 的像素那一半：**来源理由真的多画了一段文字**。
     ///
     /// 这一条刻意不读 `stringValue` —— 文案身份由 `testQuickPickSourceOnlyMatchCarriesItsReason`
-    /// 钉住。R430 把时间从标题串里拆走后，原来那条「旧结尾之后有没有字」的带子失效了
-    /// （旧读数 250..410 的墨其实是时间；收窄到 306 之后读 0）。
-    /// 现在改**跨帧同一条目**：同一次渲染里，`quickpick-typed`（查询「访达」）的行 0 与
-    /// `quickpick-list`（无查询）的行 2 是同一条「合同 终版 v3.pdf」，前者带「来自 访达」，
-    /// 后者不带 ⇒ 两帧标题墨段的右端差就是理由的宽度。修之前两者都带时间、右端相同 ⇒ 差 ≈0。
-    ///
-    /// 校准带取同一行 x=38..200：它没墨说明这台机器根本没画这一行，
-    /// 那时差值读到 0 是"拍不到"，不能记成产品缺陷。
+    /// 钉住。R430 把时间从标题串里拆走后，原来那条「旧结尾之后有没有字」的带子失效了；
+    /// R431 又发现跨帧“墨段右端”在 runner 1x 上读到 0.0pt 差（两帧都被同一个矩形截断）。
+    /// 改成**固定带**：同一位置的「合同 终版 v3.pdf」两帧各画一次 —— typed（查询「访达」）
+    /// 带「来自 访达」、list（无查询）不带。带取 x=160..300pt、各自的行带（**在时间列 311pt 之前**）：
+    /// 带理由那一行有墨，不带理由那一行是空白。
     func testQuickPickSourceMatchReasonExtendsTheTypedRow() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r405-match-reason-\(UUID().uuidString)", isDirectory: true)
@@ -3876,7 +3879,7 @@ final class UICaptureTests: XCTestCase {
 
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            func titleEnd(_ name: String, row: Int) throws -> (end: Double, control: Int)? {
+            func bandInk(_ name: String, row: Int, rect: CGRect) throws -> Int? {
                 guard let fixture = fixtures(appearance: appearance).first(where: { $0.name == name }) else {
                     XCTFail("\(tag)：找不到 `\(name)` ⇒ 像素判据没有对象")
                     return nil
@@ -3889,30 +3892,30 @@ final class UICaptureTests: XCTestCase {
                     return nil
                 }
                 let scale = Double(rep.pixelsWide) / 420.0
-                let control = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                               bytesPerRow: rep.bytesPerRow,
-                                               rect: CGRect(x: 38, y: 57 + 34 * row, width: 162, height: 14),
-                                               scale: scale)
-                // 标题列：38…306（时间列从 311 起），取最后一段。
-                let runs = Self.inkRuns(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
-                                        bytesPerRow: rep.bytesPerRow,
-                                        rect: CGRect(x: 38, y: 56 + 34 * row, width: 268, height: 15),
-                                        scale: scale, gap: 10)
-                return (runs.last?.end ?? 0, control.pixels)
+                let band = CGRect(x: rect.minX, y: CGFloat(56 + 34 * row), width: rect.width, height: rect.height)
+                return Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow, rect: band, scale: scale).pixels
             }
-            guard let typed = try titleEnd("quickpick-typed", row: 0),
-                  let list = try titleEnd("quickpick-list", row: 2) else { continue }
-            emit("QUICKPICK_MATCH_REASON_RUN \(tag) typed 行0 止=\(String(format: "%.1f", typed.end)) "
-                  + "校准=\(typed.control) list 行2 止=\(String(format: "%.1f", list.end)) 校准=\(list.control) "
-                  + "差=\(String(format: "%.1f", typed.end - list.end))")
-            XCTAssertGreaterThan(typed.control, 100,
-                                 "\(tag)：typed 行 0 左半段没有字 ⇒ 这一行在这台机器上没画出来")
-            XCTAssertGreaterThan(list.control, 100,
-                                 "\(tag)：list 行 2 左半段没有字 ⇒ 对照行在这台机器上没画出来")
-            XCTAssertGreaterThan(typed.end - list.end, 40,
-                                 "\(tag)：带理由的行比不带理由的同一行只多出 "
-                                 + "\(String(format: "%.1f", typed.end - list.end))pt ⇒ 来源理由没有画出来"
-                                 + "（不是尺坏了：两行的校准带都已证明有字）")
+            guard let typedControl = try bandInk("quickpick-typed", row: 0,
+                                                 rect: CGRect(x: 40, y: 0, width: 100, height: 15)),
+                  let listControl = try bandInk("quickpick-list", row: 2,
+                                                rect: CGRect(x: 40, y: 0, width: 100, height: 15)),
+                  let typedExtension = try bandInk("quickpick-typed", row: 0,
+                                                   rect: CGRect(x: 160, y: 0, width: 140, height: 15)),
+                  let listExtension = try bandInk("quickpick-list", row: 2,
+                                                  rect: CGRect(x: 160, y: 0, width: 140, height: 15)) else {
+                continue
+            }
+            emit("QUICKPICK_MATCH_REASON_BAND \(tag) typed 校准=\(typedControl) 扩展=\(typedExtension) "
+                  + "list 校准=\(listControl) 扩展=\(listExtension)")
+            XCTAssertGreaterThan(typedControl, 100,
+                                 "\(tag)：typed 行 0 的预览没有字 ⇒ 这一行在这台机器上没画出来")
+            XCTAssertGreaterThan(listControl, 100,
+                                 "\(tag)：list 行 2 的预览没有字 ⇒ 对照行在这台机器上没画出来")
+            XCTAssertGreaterThan(typedExtension, 40,
+                                 "\(tag)：带理由的行在 x=160..300pt 只读到 \(typedExtension) 颗墨 ⇒ 理由没画出来")
+            XCTAssertLessThan(listExtension, 10,
+                              "\(tag)：不带理由的对照行在 x=160..300pt 读到 \(listExtension) 颗墨 ⇒ 这一带不是空白，判据失去对照")
         }
     }
 
@@ -3990,6 +3993,61 @@ final class UICaptureTests: XCTestCase {
                                          "\(tag)：五行时间列的右沿极差 \(String(format: "%.1f", hi - lo))pt"
                                          + " ⇒ 右沿参差，不是同一根轴")
             }
+        }
+    }
+
+    /// R431：主列表文件行首的**类型占位符号**必须真的画出来。
+    ///
+    /// 缺陷形状（修之前 `content-with-history` 亮/暗现读）：`.file` / `.files` 两行行首的
+    /// 16pt 方块里**一笔符号墨都没有**（只剩底、描边与阴影）—— `ThumbnailSymbol` 用的是
+    /// 相对环境的 `.secondary`，在这个带 `.quaternary` 底的方格里被解析成白色。
+    /// 修法：改用绝对的 `secondaryLabelColor`。判据只读帧：两行方块内部的墨量，
+    /// 外加第一行（文本）行首的 `doc.text` 作校准 —— 它必须一直有墨，否则说明这屏没画出来。
+    func testFileRowsShowTheirTypeSymbol() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r431-file-symbol-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "content-with-history" }) else {
+                return XCTFail("\(tag)：找不到 `content-with-history` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("content-with-history-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                return XCTFail("\(tag)：`content-with-history` 读不回字节 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / 750.0
+            func ink(_ rect: CGRect) -> Int {
+                Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                 bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
+            }
+            // 矩形按 **pt** 写：帧是 750×560pt（2x ⇒ 1500×1120px），
+            // 行首那一列在 x 48..66pt；文件行在 y 310..330 / 361..381。
+            // 校准用**同一帧的彩色缩略图**（y 259..279）：暗档这一列的文字在离屏帧里
+            // 本来就是黑底黑字（`darkSidebarTextBlindSpots` 同族），拿它当"这屏画出来了"会假红。
+            let control = ink(CGRect(x: 48, y: 259, width: 18, height: 20))
+            let textRow = ink(CGRect(x: 50, y: 203, width: 14, height: 16))
+            let fileRow = ink(CGRect(x: 48, y: 310, width: 18, height: 20))
+            let filesRow = ink(CGRect(x: 48, y: 361, width: 18, height: 20))
+            // 像素地板按 scale² 推（R431）：本机 2x 现读 492/209/165/231，1x 约为四分之一；
+            // 写成绝对值会在 runner 上把「画了」读成「没画」。
+            let iconFloor = Int(20.0 * scale * scale)
+            let calibrateFloor = Int(50.0 * scale * scale)
+            emit("FILE_ROW_SYMBOL \(tag) 校准=\(control) 文本行=\(textRow) file=\(fileRow) files=\(filesRow) "
+                  + "档=\(String(format: "%.2f", scale))px/pt 地板=图标\(iconFloor)/校准\(calibrateFloor)")
+            XCTAssertGreaterThan(control, calibrateFloor,
+                                 "\(tag)：彩色缩略图只读到 \(control) 颗墨（地板 \(calibrateFloor)）⇒ 这屏没画出来")
+            XCTAssertGreaterThan(textRow, iconFloor,
+                                 "\(tag)：.text 行首的 doc.text 读到 \(textRow) 颗墨（地板 \(iconFloor)）⇒ 类型符号没画出来")
+            XCTAssertGreaterThan(fileRow, iconFloor,
+                                 "\(tag)：.file 行首 16pt 方格里读到 \(fileRow) 颗墨（地板 \(iconFloor)）⇒ 类型符号没画出来")
+            XCTAssertGreaterThan(filesRow, iconFloor,
+                                 "\(tag)：.files 行首 16pt 方格里读到 \(filesRow) 颗墨（地板 \(iconFloor)）⇒ 类型符号没画出来")
         }
     }
 

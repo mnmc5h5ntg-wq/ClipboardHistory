@@ -7715,3 +7715,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：时间格式沿用侧栏的 `M月d日 HH:mm`，跨年记录没有年份（456）；1x runner 上时间列的断言仍是同一套点坐标（等下一跑签收）。
 - 回滚：删 `rowTime`/时间标签与两条约束、把时间拼回 `rowTitle` 即可；或 `git revert` 本轮提交。
 
+## D-427 行首类型符号用绝对 label 色；暗档离屏帧的文字盲区不拿来做校准（R431）
+
+- 背景：主列表 `.file` / `.files` 行首的 16pt 占位方块在亮/暗两档都只剩框（符号 0 墨），`.text` 行首在暗档同样 0 墨。Bisect 结论：`foregroundStyle(.secondary)` 是相对环境前景的层级色，被这一列的容器解析成与底同色的白/黑；红圆替身同样不显示，`secondaryLabelColor` 一换就出现。
+- 决定：① `ThumbnailSymbol` 与 `RowLeadingVisual` 的 `.text` 分支改用绝对的 `Color(nsColor: .secondaryLabelColor)`；② 像素判据的"这屏画出来了"校准改用同一帧的**彩色缩略图**，不用暗档列表文字（它在离屏帧里是黑底黑字，属 `darkSidebarTextBlindSpots` 同族的合成前极性）。
+- 理由：需要"看得见的图形线索"的位点不能依赖相对层级色 —— 相对色只在"环境前景正好是 label"时成立，而带 `.quaternary` 底的方块不是那个环境。校准必须是这台机器拍得到的东西，盲区里的文字不能拿来当"画了"的证据。
+- 兼容性/迁移：布局/行高/左轴一字未动，只改颜色解析；35 张含行帧变化，基线仍 238；`quickpick-empty` 等无行帧不变。
+- 边界：主列表暗档文字的离屏盲区仍未登记成名册（457）；真机暗档未截图。
+- 回滚：把两处 `Color(nsColor: .secondaryLabelColor)` 改回 `.secondary` 即可；或 `git revert` 本轮提交。
+

@@ -218,8 +218,12 @@ private struct RowLeadingVisual: View {
     var body: some View {
         switch entry.content {
         case .text:
+            // R431：同 `ThumbnailSymbol` —— 相对环境的 `.secondary` 在这一列会被解析成
+            // 与行底同色的白/黑（暗档整枚图标看不见），改用绝对的动态 label 色。
             Image(systemName: "doc.text")
-                .font(.system(size: VisualFont.row)).foregroundStyle(.secondary).frame(width: 16)
+                .font(.system(size: VisualFont.row))
+                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                .frame(width: 16)
         case .image(let stored):
             ThumbnailImage(nsImage: stored.nsImage)
         case .file:
