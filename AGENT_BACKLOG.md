@@ -8871,3 +8871,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`SelectionRevealAnimationTests` 的 4 条（5 个断言）在本机整卷里 origin 恒 0（动画没开始/完成回调不来），同一份代码单跑（`caffeinate -u` 唤醒后）读到 8 个中间值、末 1438、静态对照通过；R422 的 CI 卷全绿。试过给测试窗口加 `NSApp.activate + makeKeyAndOrderFront`，单跑反而把动画弄没（已回滚）。
     修法（下一轮）：先量「整卷跑到 SelectionReveal 时 app 的 `isActive/isHidden`、窗口 `isVisible`、runloop 模式」各一格，再决定是给夹具补自包含前提、还是给这两类测试一条具名的会话能力出口；不要靠 `caffeinate` 或加 sleep 蒙混，也不要改 reveal 的判据门槛。
 
+437 追记（R424 · 仍开）：本轮补的是 Dock 未读角标；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+449 追记（R424 · 仍开）：CI 卷 `SelectionRevealAnimationTests` **4/4 passed**（CHANNEL 中段=73、TIME 2 中间值/末 1430），本机全量仍是 5 个断言红（3 条用例）、单跑 4/4 绿 ⇒ 会话/顺序已坐实；下一步仍按本条修法先量 `isActive/isHidden/窗口可见/runloop 模式`，不改门槛。
+
+**450. Dock 角标的语义边界：只按 App 激活清零；主窗口关着但 App 仍前台时新到的剪辑不计；真机 Dock 像素通道仍缺**（R424 观察）
+    现象：`DockBadgeTracker` 的计数窗口是 `!isActive`，所以「主窗口关掉、App 仍是前台」的那段时间里新到的剪辑不会挂角标；反过来说，用户在别的 App 里复制时角标会一直累计到切回来为止。像素侧：Dock 图标由 WindowServer 画，进程里 `dockTile.contentView=none`，本轮的 226 张捕获帧里没有一张能看见角标（具名 `DOCK_BADGE_PIXEL_NOT_RUN=tile-rendered-by-window-server`）。
+    修法（下一轮若需要）：先用户验收「累计到切回」这个语义是否合适（可选改成只报"有未读"的点或只报收藏），再决定是否加"窗口可见性"而不仅是 App 激活；像素证据要么走真机屏幕录制（权限 + Dock 图标定位），要么继续诚实记 NOT-RUN，不要用自制视图冒充系统角标。
+

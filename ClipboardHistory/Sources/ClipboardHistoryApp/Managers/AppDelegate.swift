@@ -50,6 +50,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let quickPickHotKeySettings = HotKeySettings(action: .quickPick)
     private let loginItemSettings = LoginItemSettings()
     let contextPreferences = ContextPreferenceSettings()
+    /// R424：主窗口关掉之后，新到的剪辑只能在 Dock 上说话。角标读的是
+    /// `HistoryStore.entries` 的条数，前台时不计（列表当场可见）。
+    private var dockBadgeController: DockBadgeController?
     private lazy var shell = ApplicationShell(
         showMainWindowHotKeySettings: showMainWindowHotKeySettings,
         repeatCopyHotKeySettings: repeatCopyHotKeySettings,
@@ -61,6 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func configure() {
         historyStore.contextPreferences = contextPreferences
         shell.configure(historyStore: historyStore)
+        if dockBadgeController == nil {
+            dockBadgeController = DockBadgeController(store: historyStore)
+        }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -154,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidBecomeActive(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationDidBecomeActive called")
         shell.applicationDidBecomeActive()
+        dockBadgeController?.applicationDidBecomeActive()
         // macOS 12: 从隐藏状态恢复时重新显示窗口
         if NSApp.windows.allSatisfy({ $0.isVisible == false || $0.isMiniaturized }) {
             shell.showMainWindow()
@@ -163,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidResignActive(_ notification: Notification) {
         LifecycleDebugLogger.log("applicationDidResignActive called")
         shell.applicationDidResignActive()
+        dockBadgeController?.applicationDidResignActive()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

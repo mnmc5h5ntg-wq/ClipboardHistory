@@ -12,6 +12,22 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+## R424 状态（2026-10-27 · 本地 · 第 423 轮 / Round 421）：Dock 图标状态补「未读剪辑」角标（后台新到 3 条 → `dockTile.badgeLabel` 旧 nil/新「3」、激活清零；像素通道由 WindowServer 画 ⇒ 具名 NOT-RUN）；R423 跑 success、20/20 步、失败 0（搜索 4 行 2025→2411/宽 64→134；滚动 4/4 绿）；本地全量 5 条滚动红由 CI 绿证伪为会话/顺序（产品 3 文件，Dock 图标状态）
+
+最后更新：2026-10-27（本地 · R424 / 第 423 轮 / Round 421）：主窗口关掉/App 不在前台时，新到的剪辑此前在 Dock 上没有任何读数。新 `DockBadgePolicy`（0→nil、1…99→数字、>99→「99+」）+ `DockBadgeTracker`（前台不计、失活计增量、激活清零、缩水夹住）+ `DockBadgeController`（订阅 `HistoryStore.$entries`、两条激活边），`AppDelegate.configure()` 幂等建并接线。旧/新同一把尺（真实 `NSApplication.shared.dockTile.badgeLabel`）：旧 nil（控制器前攒 2 条）→ 新「3」（失活后 3 条）→ 激活 nil；纯读数 100→「99+」。像素通道具名 `DOCK_BADGE_PIXEL_NOT_RUN=tile-rendered-by-window-server inProcessContentView=none badgeAfterActivate=nil`；既有 226 帧逐字节不变、基线 **226/0/0/0**。`M1119–M1127` **9/9 CAUGHT**（policy 4 / controller 2 / wiring 3，RESTORE_CLEAN=yes）。R423 run `40460495274 ↔ 37f15d8` **success、20/20 步、失败步骤 0**：搜索无结果 4 行 `light 2025→2411 变化 2985 宽 64→134`、`dark 2021→2416 变化 3023 宽 64→134`（runner 1x）；floor `judged=5/5 executed=76 not-run=-`、`MOTION_FLOOR_OK=5/5`、`MOTION_FLOOR_REDS=0`、`SUITE_CLEAN=0`、无 unlisted ⇒ **436 REDS=0**；CI 滚动 4/4 passed（`CHANNEL 起点=0.0 中段=73.0 落点=600.0 变化=21138/32400 重抓=no`、`TIME 采样=5 中间值=2 首=590 末=1430`）。本地全量 **1132/57/5**：5 个断言全在 `SelectionRevealAnimationTests`（3 条用例），单跑（caffeinate -u 唤醒后）**4/4 passed**（`0→88→600`、变化 `88818/134400`、重抓=no）⇒ 具名 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449，不改门槛）。捕获 **226/131/4/0**；帧基线 **226/0/0/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 `格=162 声明=63 不成立=0/63`；HIDDEN **273/918 rot=0**；预检 **186/168/500 bad=0**、ARM **279 文件 / 984 把**；产品面连续零改动 **1** 轮（as-of 423，现读 `python3 scripts/product_streak.py --streak-for 423`；本轮动了 Sources 3 文件，计入下一轮分界）。电池首跑 **4 红**（streak 格写 0≠1 且缺 `scripts/product_streak.py` 引用、裸 stdout 16≠15、skip roster 级联）修后 `Ran 683 / OK (skipped=4)`（台账后复跑）。
+
+本轮做了什么：
+① ⓪ R423 head 跑 success、20/20 步、失败步骤 0；搜索 4 行、滚动 4/4、floor judged=5/5 executed=76 REDS=0、无 unlisted。
+② 产品：Dock 图标补未读角标（后台 3 条 → 「3」、激活 nil、100→「99+」）；像素通道具名 NOT-RUN；基线不动。
+③ 判据：M1119–M1127 9/9；precheck 186/168/500；hidden rot 0；ARM 279 文件/984 把。
+④ 436：judged=5/5 executed=76、OK=5/5、SUITE_CLEAN=0、无 unlisted；REDS=0。
+⑤ 367：hidden 表 273 / 可判 918 / rot 0 / 上界 0。
+⑥ 捕获 226/131/4/0；换装 ok；清账 162/63/0；帧基线 226/0/0/0；本地全量 1132/57/5（5 条滚动红具名会话/顺序 NOT-RUN，CI 4/4 绿）。
+
+NOT-RUN / 阻塞（分开写）：① Dock 角标像素/帧通道（`DOCK_BADGE_PIXEL_NOT_RUN=tile-rendered-by-window-server`）；② 本地全量的 5 条滚动/动画红（`LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`，CI 4/4 绿，449）；③ markdown 2x / sidebar 2x / receipt 消失臂在 extended；④ 真机/多屏面板落点无截屏（447）；⑤ 真菜单栏表面、12 实时腿；⑥ `table-lazy-rows`；⑦ 设置能力闸门仍隐式（441）；⑧ 437–450 仍开；⑨ R424 新跑待 push 后读。
+
+下一轮（R425）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R424 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 Dock 部署后 CI 是否仍全绿、搜索 4 行与滚动 4/4 是否稳定；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+
 ## R423 状态（2026-10-27 · 本地 · 第 422 轮 / Round 420）：搜索无结果态补放大镜与查询词（新标题带词、旧「无匹配结果」；组件带 7790→8841 墨、128→264 宽）；R422 跑全绿（静态对照 28800、空态 4 帧 151/16→1279/28）；本地全量 5 条滚动红具名会话/顺序 NOT-RUN（产品 2 文件，搜索无结果态）
 
 最后更新：2026-10-27（本地 · R423 / 第 422 轮 / Round 420）：搜索无结果态以前画剪贴板、只说「无匹配结果」。新 `SearchNoResultsPresentation`：真 miss 画 `magnifyingglass`、标题「没有找到「查询词」」（空白归一、24 字截断）；收藏空仍「暂无收藏」+剪贴板、无历史仍「暂无剪贴板历史」；R407 的「清除搜索」CTA 不动；侧栏只消费 policy，旧 `emptyTitle` 删除。真看图 `sidebar-no-results` 是放大镜+查询词+清除搜索；组件旧/新 250×220：旧墨 **7790/8030**、新 **8841/9234**、变化 **9360/9880**、墨宽 **128→264**（2x）。产品 `content-no-results`/`sidebar-no-results` 亮暗 **4 帧变化** + 组件 4 帧新增，基线 **226/0/0/0**。`M1115–M1118` **4/4 CAUGHT**（M1115 图标恒剪贴板；M1116 不写词；M1117 不截断；M1118 侧栏硬编码）；一次给滚动测试加 key 窗口的自伤已整段回滚（`SelectionRevealAnimationTests.swift` 零 diff）。R422 run `40453992908 ↔ 4123793` **success、失败步骤 0**：静态对照 `起→中=28800 中→落=14510 重抓=no`、空态 4 帧 `151/16→1279/28`（runner 1x）、floor `judged=4/5 executed=76 not-run=notice-banner`、`SUITE_CLEAN=0`、无 unlisted ⇒ **436 REDS=0**。本地全量 **1127/57/5**：5 条全在 `SelectionRevealAnimationTests`，同一份代码单跑（caffeinate -u 唤醒后）8 中间值/末 1438、静态通过，R422 CI 绿 ⇒ 具名 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449，不改门槛）；捕获 **226/131/4/0**；换装 `ok / SHA_MATCH=1 / 381=381 / SMOKE_OK=1`；清账 162=162；HIDDEN 270/909 rot=0；预检 183/165/491 bad=0；产品面连续零改动 **1** 轮（as-of 422，现读 `python3 scripts/product_streak.py --streak-for 422`）。电池 `Ran 683 / OK (skipped=4)`（台账后复跑）。

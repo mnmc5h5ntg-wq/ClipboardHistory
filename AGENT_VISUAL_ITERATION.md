@@ -18629,3 +18629,21 @@ QuickPick 搜索框是裸字段，R409 只在悬停点亮边界；面板一打�
 | 可复核性 | 15/15 | 组件旧/新四读数、四张新帧 + 四张变化帧、4 把刀、precheck/rot/CI 原文都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 421 · R424（第 423 轮 · 2026-10-27）：Dock 图标状态补「未读剪辑」角标（后台新到 3 条 → `dockTile.badgeLabel` 旧 nil/新「3」、激活清零；像素通道由 WindowServer 画 ⇒ 具名 NOT-RUN）；R423 跑 success、20/20 步、失败 0（搜索 4 行 2025→2411/宽 64→134；滚动 4/4 绿）；本地全量 5 条滚动红由 CI 绿证伪为会话/顺序（产品 3 文件，Dock 图标状态）
+
+主窗口关掉/App 不在前台时，新到的剪辑在 Dock 上没有任何读数。新 `DockBadgePolicy`（0→nil、1…99→数字、>99→「99+」）+ `DockBadgeTracker`（前台不计、失活计增量、激活清零、缩水夹住）+ `DockBadgeController`（订阅 `HistoryStore.$entries` + 两条激活边），`AppDelegate.configure()` 幂等建并接两条激活边。旧/新同一把尺（真实 `NSApplication.shared.dockTile.badgeLabel`）：旧 nil（控制器前攒 2 条）→ 新「3」（失活后 3 条）→ 激活 nil；纯读数 100→「99+」。像素通道具名 `DOCK_BADGE_PIXEL_NOT_RUN=tile-rendered-by-window-server inProcessContentView=none`；既有 226 帧不变、基线 226/0/0/0。M1119–M1127 9/9；预检 186/168/500；HIDDEN 273/918 rot=0。R423 run `40460495274 ↔ 37f15d8` success、20/20 步、失败 0：搜索 4 行 light 2025→2411/宽 64→134、dark 2021→2416/64→134；floor judged=5/5 executed=76、REDS=0、无 unlisted；CI 滚动 4/4 绿（CHANNEL 0→73→600、重抓=no；TIME 2 中间值/末 1430）。本地全量 1132/57/5，5 断言全在 SelectionRevealAnimationTests，单跑 4/4 绿（0→88→600、变化 88818/134400、重抓=no）⇒ 具名 LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order（449，不改门槛）。捕获 226/131/4/0；换装 ok/SHA_MATCH=1/381=381/SMOKE_OK=1；清账 162/63/0；电池首跑 4 红（streak 格 0≠1、裸 stdout 16≠15、skip roster 级联）修后 683/4。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 12/15 | Dock 图标本体由 WindowServer 画，进程内没有可截视图 ⇒ 像素通道具名 NOT-RUN（`contentView=none`）；本轮的视觉证人往下沉到真实 `dockTile.badgeLabel` 的旧/新读数（nil→「3」→nil）与 policy 真值表。扣 3：没有一张能看到角标的帧。 |
+| 判据有效性 | 15/15 | 产品入口测试用真实 `HistoryStore.add` 与真实 `dockTile.badgeLabel`；5 条用例覆盖策略/状态机/接线；M1119–M1127 9/9 CAUGHT。 |
+| 假绿防御 | 15/15 | 旧读数（控制器前 nil）与新读数在同一用例、同一把尺上量；两张表各钉一侧（状态机与接线）；源守卫窄到 configure 块与两条激活边；每一刀都 `RESTORE_CLEAN=yes`。 |
+| 产品面推进 | 14/15 | 真落 Sources 3 文件，补的是「主窗口关掉后新剪辑无可见读数」这一档；扣 1：语义只按 App 激活清零，主窗口关但 App 仍前台时不计（450）。 |
+| 台账一致性 | 15/15 | U-1543…U-1547、D-420、436 的 judged=5/5/executed=76、CI 滚动 4/4、搜索 4 行、本机隔离 4/4 都从日志解析。 |
+| 交付诚实性 | 15/15 | 像素通道具名 NOT-RUN 并给能力证据；本地 5 条滚动红照实写，CI 绿后按监督者口径坐实为会话/顺序；不把系统绘制说成产品像素。 |
+| 可复核性 | 15/15 | 旧/新 badgeLabel、policy 表、9 把刀、三张表互不混、precheck/rot/CI 原文、清账与换装读数都在。 |
+
+均分 = 101/105 ≈ 14.4/15（96）。

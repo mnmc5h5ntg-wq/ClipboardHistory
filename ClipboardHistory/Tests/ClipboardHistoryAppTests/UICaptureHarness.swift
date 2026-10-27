@@ -422,6 +422,7 @@ final class UICaptureTests: XCTestCase {
                       "DetailScrollResetTests.swift",
                       "PressFeedbackTests.swift", "SettingsFailureReceiptTests.swift",
                       "SettingsRowRecordingTests.swift", "SelectionRevealAnimationTests.swift",
+                      "DockBadgeTests.swift",
                       "UICaptureHarness.swift", "UIInteractionProbeTests.swift",
                       "QuickPickPlacementTests.swift"]
         var strays: [String] = []

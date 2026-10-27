@@ -7652,3 +7652,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：`content-no-results`/`sidebar-no-results` 亮暗 4 帧变化，新增组件 4 帧，基线 226；其它空态（无历史插画、详情空态）不变。
 - 回滚：删 `SearchNoResultsPresentation` 并恢复 `emptyTitle` 即可；或 `git revert` 本轮提交。
 
+## D-420 Dock 角标只数「App 不在前台时新到的剪辑」，回到前台清零（R424）
+
+- 背景：主窗口关掉后，采集仍在跑，但 Dock 图标对新到的剪辑没有任何读数；用户不知道后台攒了什么。
+- 决定：`DockBadgePolicy` 只把 >0 的未读数写成角标（1…99 数字、>99「99+」）；`DockBadgeTracker` 只在 `!isActive` 时按 entries 增量累计，`applicationDidBecomeActive` 清零；历史缩水时把未读夹到当前条数；`DockBadgeController` 订阅 `HistoryStore.$entries`，由 `AppDelegate` 在 configure 幂等创建并接两条激活边。
+- 理由：角标是"回来看看"的提示，不是计数器的第二份真值；前台时列表当场可见，再挂数字是噪音；系统画角标，进程里没有可截视图，所以像素证据要诚实降级成值读数 + 具名 NOT-RUN。
+- 兼容性/迁移：不改任何既有视图、不动帧基线（226/0/0/0）；角标在 App 退出时随图标消失。
+- 边界：只按 App 激活清零；主窗口关着但 App 仍前台时新到的剪辑不计（BACKLOG 450）。真机 Dock 截图的像素通道仍缺（屏幕录制权限 + 图标定位）。
+- 回滚：删两个新文件与 `AppDelegate` 的三处接线即可；或 `git revert` 本轮提交。
+
