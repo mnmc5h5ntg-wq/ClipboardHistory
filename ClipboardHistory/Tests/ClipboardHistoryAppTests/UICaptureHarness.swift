@@ -4069,6 +4069,67 @@ final class UICaptureTests: XCTestCase {
                       "同一台机器上两档必须走同一条路（判了 \(judged)、具名 NOT-RUN \(namedNotRun)）")
     }
 
+    /// R434：同一个「渲染」档里，HTML 的 h1 与 Markdown 的 h1 必须同一档字。
+    ///
+    /// 缺陷形状（修之前 `detail-html-rendered` 亮档现读）：HTML 的第一带墨高 **27.0pt**，
+    /// 而同一份语义的 Markdown h1 是 **18.0pt** —— 正文已经按字符数加权搬到 14pt，
+    /// 标题却跟着正文档被等比放大到 28pt。修法：`fitHeadingsToLadder` 把基准之上
+    /// （>1.1×）的字号按从大到小逐级落到 Markdown 的标题梯子（20/17/15.5…）。
+    /// 判据只读帧：两帧第一带墨高的差 ≤3.5pt（同一号字在两条通道里字族不同，
+    /// Times 20pt 的墨带比系统字 20pt 高约 2pt —— 差的是字族，不是字号；旧形状差 9pt）。
+    /// 暗档详情帧整片同色（既有盲区）⇒ 这一格只在亮档判。
+    func testHtmlHeadingsLandOnTheMarkdownLadder() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r434-html-ladder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let tag = "light"
+        func firstBandHeight(_ name: String) throws -> Double? {
+            guard let fixture = fixtures(appearance: .aqua).first(where: { $0.name == name }) else {
+                XCTFail("找不到 `\(name)` ⇒ 这条判据没有对象")
+                return nil
+            }
+            let file = scratch.appendingPathComponent("\(name).png")
+            _ = try render(fixture, appearance: .aqua, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                return nil
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            var start: Int?
+            var end: Int?
+            for y in 70...230 {
+                let rect = CGRect(x: 40, y: CGFloat(y), width: 560, height: 1)
+                let ink = Self.textInkMass(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                           bytesPerRow: rep.bytesPerRow, rect: rect, scale: scale).pixels
+                if ink > 0 {
+                    if start == nil { start = y }
+                    end = y
+                } else if start != nil {
+                    break
+                }
+            }
+            guard let s = start, let e = end else { return nil }
+            return Double(e - s + 1)
+        }
+        guard let markdown = try firstBandHeight("detail-markdown-rendered") else {
+            return XCTFail("\(tag)：Markdown 帧连第一带都没有 ⇒ 这一屏没画出来")
+        }
+        guard let html = try firstBandHeight("detail-html-rendered") else {
+            emit("HTML_HEADING_LADDER_NOT_RUN=html-frame-plain \(tag) markdown=\(markdown)"
+                  + " ⇒ HTML 帧这一带没有墨，没法比较（判据没有对象）")
+            return
+        }
+        emit("HTML_HEADING_LADDER \(tag) html=\(String(format: "%.1f", html))pt "
+              + "markdown=\(String(format: "%.1f", markdown))pt 差=\(String(format: "%.1f", abs(html - markdown)))pt")
+        XCTAssertGreaterThan(markdown, 8, "\(tag)：Markdown 第一带只有 \(markdown)pt ⇒ 尺没有对象")
+        XCTAssertLessThanOrEqual(abs(html - markdown), 3.5,
+                                 "\(tag)：HTML h1 墨高 \(String(format: "%.1f", html))pt 对 Markdown "
+                                 + "\(String(format: "%.1f", markdown))pt ⇒ 同一个「渲染」档里两条通道的标题不同档")
+    }
+
     /// R433：详情大图必须有一圈**可见的边**（白底图在白底详情里以前整张看不见）。
     ///
     /// 缺陷形状（修之前 `detail-1-image` 亮/暗现读）：大图周围直接是页面底色，
@@ -4156,6 +4217,8 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
+        var assertedTags = 0
+        var namedNotRun = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let fixture = fixtures(appearance: appearance)
@@ -4201,6 +4264,16 @@ final class UICaptureTests: XCTestCase {
             let widthText = firstWidths.map { String(format: "%.1f", $0) }.joined(separator: ",")
             emit("EXCLUDED_APP_ROW \(tag) 行数=\(bands.count) 判=\(judged.count) "
                   + "首段宽=[\(widthText)] 行墨=\(inks)")
+            // R434 修 R432/R433 的红：runner 1x 上**设置页内容列整列平涂**（不是这一屏特有 ——
+            // `CAPTION_JUDGED` 连续多跑都只有 6/17 条设置页探针判成，其余走 machineFlat），
+            // 所以列表行在这台机器的 1x 产物里没有墨可判。具名 NOT-RUN，2x 断言不动。
+            if scale < 1.5 {
+                namedNotRun += 1
+                emit("EXCLUDED_APP_ROW_NOT_RUN=runner-1x-settings-content-plain \(tag) "
+                      + "行数=\(bands.count) ⇒ 设置内容列在 1x 平涂（CAPTION_JUDGED 6/17 同证）；"
+                      + "本机 2x 才判 5 行、首段 10–14pt")
+                continue
+            }
             XCTAssertGreaterThanOrEqual(judged.count, 3,
                                         "\(tag)：只找到 \(bands.count) 行默认排除项 ⇒ 这一格没有对象")
             for (index, ink) in inks.enumerated() {
@@ -4212,7 +4285,12 @@ final class UICaptureTests: XCTestCase {
                               "\(tag)：第 \(index) 行首段墨宽 \(String(format: "%.1f", width))pt"
                               + " ⇒ 行首不是一枚图标（旧形状首段是「默认排除：」=42.5pt）")
             }
+            assertedTags += 1
         }
+        XCTAssertEqual(assertedTags + namedNotRun, 2,
+                       "两档里有一档既没判也没登记 ⇒ 这条判据没有免检出口")
+        XCTAssertTrue(assertedTags == 2 || namedNotRun == 2,
+                      "同一台机器上两档必须走同一条路（判了 \(assertedTags)、具名 NOT-RUN \(namedNotRun)）")
     }
 
     /// R74 / U-115：浮层那一档悬停**不加淡入** —— 这条决定从今天起有读数，不是"我觉得"。

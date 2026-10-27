@@ -190,7 +190,7 @@ enum HtmlRendering {
         // 两步各钉一把刀（M978 只抹不设 / M980 基准取错），顺序有意义：
         // 字号那一步要按**字符数**加权找基准，抹墨不改文本 ⇒ 先后都不影响结果，
         // 但"先设墨再换字体"会让第二步重建属性时把墨冲掉，所以这里定死"先字号后墨"。
-        return applySurfaceInk(fitToBodySize(raw))
+        return applySurfaceInk(fitHeadingsToLadder(fitToBodySize(raw)))
     }
 
     /// WebKit 的那一次解析，**不动墨** —— 单独露出来是为了让判据能问"抹之前有几处烤死的颜色"。
@@ -295,6 +295,50 @@ enum HtmlRendering {
             let scaled = NSFont(descriptor: font.fontDescriptor, size: font.pointSize * factor)
                 ?? font
             out.addAttribute(.font, value: scaled, range: range)
+        }
+        return out
+    }
+
+    /// R434：把 HTML 的**标题档**也接到产品那条梯子上。
+    ///
+    /// 正文那一档 R335 已经搬过了（`fitToBodySize` 按字符数加权找正文档、等比搬到 14pt），
+    /// 但标题是跟着正文档一起被**等比**放大的：24pt 的 `<h1>` 变成 28pt，而同一份内容走
+    /// Markdown 渲染器时 h1 是 20pt —— 同一个"渲染"档、同一级标题，两条通道差 8pt
+    /// （`detail-html-rendered` 与 `detail-markdown-rendered` 第一带现读 27.0 vs 18.0）。
+    ///
+    /// 做法：正文基准之上（>1.1×）的字号按**从大到小**排成梯队，逐级落到
+    /// `MarkdownPresentation.headingFontSize` 的前几级；字族与字重原样保留
+    /// （字族是页面的意图，字号与层级是产品的一致性 —— 与 `fitToBodySize` 同一条取舍）。
+    /// 基准读不到（0）或没有标题字号时原样返回：不猜。
+    static func fitHeadingsToLadder(_ attributed: NSAttributedString) -> NSAttributedString {
+        let base = fontBaseSize(attributed)
+        guard base > 0 else { return attributed }
+        let threshold = base * 1.1
+        let full = NSRange(location: 0, length: attributed.length)
+        var sizes = Set<CGFloat>()
+        attributed.enumerateAttribute(.font, in: full) { value, range, _ in
+            guard let font = value as? NSFont else { return }
+            let text = (attributed.string as NSString).substring(with: range)
+            guard text.trimmingCharacters(in: .whitespacesAndNewlines).count > 0 else { return }
+            if font.pointSize > threshold { sizes.insert(font.pointSize) }
+        }
+        guard !sizes.isEmpty else { return attributed }
+        let ladder = (1...6).map { MarkdownPresentation.headingFontSize(level: $0) }
+        let ranked = sizes.sorted(by: >)
+        var mapping: [CGFloat: CGFloat] = [:]
+        for (index, size) in ranked.enumerated() {
+            mapping[size] = ladder[min(index, ladder.count - 1)]
+        }
+        let out = NSMutableAttributedString(attributedString: attributed)
+        var runs: [(NSRange, NSFont)] = []
+        attributed.enumerateAttribute(.font, in: full) { value, range, _ in
+            if let font = value as? NSFont,
+               let target = mapping[font.pointSize] {
+                runs.append((range, NSFont(descriptor: font.fontDescriptor, size: target) ?? font))
+            }
+        }
+        for (range, font) in runs {
+            out.addAttribute(.font, value: font, range: range)
         }
         return out
     }

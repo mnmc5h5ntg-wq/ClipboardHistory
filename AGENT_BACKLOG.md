@@ -9027,3 +9027,29 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：R432 跑里 `settings-privacy-tall` 的 `EXCLUDED_APP_ROW light/dark 行数=0 判=0` —— 同一台机器上 540 高的 `settings-privacy` 能画（caption 探针 17 条全判、排除名单 540 帧 5 行有墨）。与 458 的 `content-with-history` 同族，但触发条件是**帧高度 >1000pt**（1100pt 宽那族 R28b 早已登记）。
     修法（下一轮若需要）：把依赖 tall 帧的判据全部改成"540 帧首屏"或"分段拼帧"，tall 帧只留在本机做整页节奏对照；或者给捕获通道加一条"超尺寸帧在 1x 上自动降级为分块拍摄"的实现（成本高，先登记）。
 
+437 追记（R434 · 仍开）：本轮只动 HTML 标题档；主列表仍不匹配 `sourceAppName`。
+
+449 追记（R434 · 仍开）：R433 CI 跑里 `SelectionRevealAnimationTests` 4/4 passed（CHANNEL 0→108→600、TIME 5/0/0/1430），本机全量仍 5 断言红（3 条用例）、单跑 4/4 绿（TIME 18/8、61→1438）⇒ 会话/顺序再次坐实；不改门槛。
+
+451 追记（R434 · 仍开）：macOS 12 的详情头部阈值本轮未动。
+
+452 追记（R434 · 仍开）：脚注 1x 具名 NOT-RUN 继续按名出现。
+
+453 追记（R434 · 仍开）：真实系统拖拽会话仍无自动化验收。
+
+454 追记（R434 · 仍开）：菜单具名标记仍未发射；菜单 5/5 由真实 NSMenu 用例作证。
+
+455 追记（R434 · 仍开）：固定条目滚动到位的独立偏移验收仍缺。
+
+456 追记（R434 · 仍开）：跨年记录仍无年份。
+
+457 追记（R434 · 仍开）：主列表暗档文字在离屏帧里仍是黑底黑字。
+
+458 追记（R434 · 仍开）：`FILE_ROW_SYMBOL_NOT_RUN` 已按名生效；CI 上的行首符号像素证人仍缺。
+
+459 追记（R434 · 口径更正）：R433 写「540 高的 settings-privacy 在 1x 能画」是错的 —— 真正的限制是**设置页内容列整列平涂**（R433 跑 `CAPTION_JUDGED 6/17`，所有 settings 探针 machineFlat），与帧高无关；因此排除名单判据在 1x 只能具名 `EXCLUDED_APP_ROW_NOT_RUN=runner-1x-settings-content-plain`。
+
+**460. HTML 标题映射按字号排名：文档若有超过六级标题字号，后排会全落 12pt**（R434 观察）
+    现象：`fitHeadingsToLadder` 把基准之上的字号从大到小排成梯队、逐级取 `MarkdownPresentation.headingFontSize`；超过六级的部分被 `min(index, ladder.count - 1)` 压到最小一级（12pt），而它们原本可能只是 15–16pt 的强调文本，压到 12pt 反而比正文小。
+    修法（下一轮若需要）：给超过梯子长度的字号保留下限（例如不映射、或映射到 13pt 而不是 12pt），并用一份含 7 种字号的合成 HTML 钉住；改之前先确认 `NSAttributedString(html:)` 真能产出那么多种字号（也需要一条现读）。
+

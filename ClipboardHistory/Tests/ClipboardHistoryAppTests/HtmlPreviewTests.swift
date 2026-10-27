@@ -591,9 +591,12 @@ final class HtmlPreviewPipelineTests: XCTestCase {
     /// 现读：`NSAttributedString(html:)` 给 `族=Times 字号=24pt/12pt`，而产品正文是
     /// `.AppleSystemUIFontMonospaced/14pt` ⇒ 同一个"渲染"档里两条通道差两号字，
     /// 用户点一下切换，正文从 12 跳到 14。这一族叫**同一档两种刻度**（R3 那一族是它的反面：
-    /// 层级漂了，而这里漂的是基准）。修法是**等比搬到正文那一档**，所以判据判两件事：
-    /// ① 正文档 == `DetailTypography.bodyFontSize`；② **层级不许被压平**（最大号 ÷ 正文档
-    /// 在缩放前后必须同一个数 —— 只把正文调大、标题不调，是另一种坏法）。
+    /// 层级漂了，而这里漂的是基准）。R335 的做法是**等比搬到正文那一档**；R434 更正了后半句：
+    /// 等比之后 h1 = 28pt，而同一份语义走 Markdown 渲染器时 h1 = 20pt —— 同一个「渲染」档里
+    /// 两条通道的**标题**差 8pt。产品自己的梯子（`MarkdownPresentation.headingFontSize`）
+    /// 才是这一档的权威，所以判据现在判两件事：
+    /// ① 正文档 == `DetailTypography.bodyFontSize`；② **标题档落在 Markdown 的同一条梯子上**
+    /// （老断言「层级比必须与浏览器一致」会把 24/12=2.0 钉成契约，那正是要修的不一致）。
     func testRenderedHtmlBodySitsOnTheAppTypeScale() throws {
         let decision = DetailRenderPolicy.decide(text: htmlFixture, htmlPayload: nil)
         guard let (renderer, source) = decision.resolved(), renderer == .html else {
@@ -603,21 +606,25 @@ final class HtmlPreviewPipelineTests: XCTestCase {
               let attr = HtmlRendering.attributedString(source) else { return XCTFail("渲染返回 nil") }
         let baseBefore = HtmlRendering.fontBaseSize(raw)
         let baseAfter = HtmlRendering.fontBaseSize(attr)
-        let maxBefore = distinctSizes(raw).max() ?? 0
-        let maxAfter = distinctSizes(attr).max() ?? 0
+        let headings = distinctSizes(attr).filter { $0 > baseAfter }.sorted(by: >)
+        let ladder = (1...6).map { MarkdownPresentation.headingFontSize(level: $0) }
         let target = DetailTypography.bodyFontSize
         CaptureReadings.emit("HTML_TYPE 基准前=\(baseBefore)pt 基准后=\(baseAfter)pt 产品档=\(target)pt "
-            + "最大前=\(maxBefore)pt 最大后=\(maxAfter)pt 层级比前=\(String(format: "%.3f", maxBefore / max(baseBefore, 1))) "
-            + "层级比后=\(String(format: "%.3f", maxAfter / max(baseAfter, 1)))")
+            + "标题后=\(headings.map { String(format: "%.1f", $0) }.joined(separator: ",")) "
+            + "梯子=\(ladder.map { String(format: "%.1f", $0) }.joined(separator: ","))")
         XCTAssertGreaterThan(baseBefore, 0, "读不到正文档 ⇒ 下面三条全是空对账")
         XCTAssertNotEqual(baseBefore, target,
             "缩放之前基准就已经是产品档 ⇒ 这一格没有对象（要么系统改了默认字号，要么夹具换了）")
         XCTAssertEqual(baseAfter, target, accuracy: 0.01,
             "渲染出来的正文档没落在产品那一档：\(baseAfter)pt ≠ \(target)pt ⇒ 同一个「渲染」档两条通道两种刻度")
-        XCTAssertGreaterThan(maxAfter, baseAfter, "最大号不大于正文档 ⇒ 标题被压平了")
-        XCTAssertEqual(maxAfter / baseAfter, maxBefore / baseBefore, accuracy: 0.02,
-            "等比被破坏（层级比 \(String(format: "%.3f", maxBefore / baseBefore)) → "
-            + "\(String(format: "%.3f", maxAfter / baseAfter))）⇒ 只搬了正文没搬标题，那是另一种坏法")
+        XCTAssertFalse(headings.isEmpty, "渲染结果里没有比正文大的字号 ⇒ 标题被压平了")
+        XCTAssertGreaterThan(headings.first ?? 0, baseAfter, "最大号不大于正文档 ⇒ 标题被压平了")
+        XCTAssertEqual(headings.first ?? 0, ladder[0], accuracy: 0.01,
+            "HTML 的 h1 没落到 Markdown 的 h1 那一档：\(headings.first ?? 0)pt ≠ \(ladder[0])pt")
+        for size in headings {
+            XCTAssertTrue(ladder.contains { abs($0 - size) < 0.01 },
+                          "标题字号 \(size)pt 不在 Markdown 梯子 \(ladder) 上 ⇒ 同一档还在用两套刻度")
+        }
     }
 
     /// 一份属性串里出现过的**不同**字号（按字符数加权只用于找基准，这里要的是集合）。

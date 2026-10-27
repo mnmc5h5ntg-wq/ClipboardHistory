@@ -7742,3 +7742,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：只有 1pt 边，没有阴影/圆角；深色图在白底上的边界靠边而不是阴影；真机未截图。
 - 回滚：删 `frame/padding/background` 三行与 `ImagePreviewLayout`，恢复 `scaledToFit`；或 `git revert` 本轮提交。
 
+## D-430 HTML 标题档落 Markdown 梯子，而不是跟着浏览器等比放大（R434）
+
+- 背景：R335 把 HTML 正文档按字符数加权搬到 14pt，标题跟着等比放大（h1 24→28）；同一份语义走 Markdown 渲染器时 h1 是 20pt，两条通道在同一个「渲染」档里差 8pt（帧上墨带 27.0 vs 18.0）。
+- 决定：`HtmlRendering.fitHeadingsToLadder` —— 正文基准之上（>1.1×）的字号按从大到小排成梯队，逐级落到 `MarkdownPresentation.headingFontSize`（20/17/15.5/14/13/12）；字族与字重原样保留。旧的 `testRenderedHtmlBodySitsOnTheAppTypeScale` 从「层级比与浏览器一致（2.0）」改成「标题在 Markdown 梯子上」。
+- 理由：字族是页面的排版意图（作者写 serif 就 serif），字号与层级是产品的一致性——同一条取舍在 `fitToBodySize` 里已经写过；只是上一轮只搬了正文，标题漏了。产品自己的梯子才是这一档的权威。
+- 兼容性/迁移：只有 `detail-html-rendered` 两帧变化，正文/列表/链接不动；基线仍 238。
+- 边界：映射按字号排名，文档若有超过六级标题字号，后排会全落 12pt（460）；暗档详情帧整片同色，像素判据只在亮档判。
+- 回滚：把 `fitHeadingsToLadder` 从 `attributedString` 的调用链里摘掉即可；或 `git revert` 本轮提交。
+
