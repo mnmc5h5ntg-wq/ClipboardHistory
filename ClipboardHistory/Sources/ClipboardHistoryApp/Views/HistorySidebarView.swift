@@ -85,10 +85,7 @@ struct HistorySidebarView: View {
                 bulkActionButtons
                     .transition(MotionCatalog.transition(for: .contentFade))
             } else {
-                Text(countText)
-                    .font(.system(size: VisualFont.body, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                countTextLabel
                     .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
@@ -165,6 +162,24 @@ struct HistorySidebarView: View {
             return "\(historyStore.filteredEntries.count) 条记录"
         case .favorites:
             return "\(historyStore.filteredEntries.count) 个收藏"
+        }
+    }
+
+    /// R420：搜索结果计数以前是硬换（同一个头里，列表已经按 0.16 淡，读数却跳）。
+    /// 14+ 走系统的数字滚动；12/13 保持原样。键是整句：筛选词与「条记录/个收藏」
+    /// 的后缀一起变，拆成两段动画会各自起事务错拍。
+    @ViewBuilder
+    private var countTextLabel: some View {
+        let base = Text(countText)
+            .font(.system(size: VisualFont.body, weight: .regular))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        if #available(macOS 14, *) {
+            base
+                .contentTransition(.numericText())
+                .animation(MotionCatalog.animation(for: .contentFade), value: countText)
+        } else {
+            base
         }
     }
 

@@ -7611,3 +7611,20 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：只影响汇总行的动效；静态帧逐字节变化（那是本轮新增的 4 帧），既有 214 帧不变；`testSymbolReplacementHasOneAuthor` 收窄到 `.symbolEffect`（数字滚动不是换符号语言）。
 - 回滚：删 `summaryText` 的 14+ 分支即可；或 `git revert` 本轮提交。
 
+## D-415 胶片套件的预算靠 extended 分流，不靠放宽 200s 看门狗（R420）
+
+- 背景：R417/R419 两次被 200s 收掉，R416 同卷已 189s。逐用例耗时账显示 `testFilmScenarioAppearanceDependenceIsMeasuredPerScenario` 一项 **54.7s**（29%），是色档诊断普查、不是 floor 的承重臂；回执消失臂在 runner 1x 窗口覆盖却只 1 个中间帧。
+- 决定：加 `CLIPBOARD_HISTORY_UI_MOTION_EXTENDED=1`；把色档普查与回执消失臂放进去。CI 只设 `CLIPBOARD_HISTORY_UI_MOTION=1`，跑承重场景。套件从 188.7s 降到 **134.8s**；承重臂（floor 的 5 条 + 回执出现 + markdown + 热图 + 侧栏计数 1x + 软过渡 probe）一条不少。
+- 理由：看门狗是挂死检测器，不是用来"再宽一点"的；先做逐用例账、再按"诊断 vs 承重"分流，是唯一不降低判据门的降本方式。消失 1x 与计数 2x 以具名 NOT-RUN 保留读数，不写绿。
+- 兼容性/迁移：本机全跑时两个 env 都设；CI 不设 extended。新增测试若也要 54s 级录制，必须先量套件总时长。
+- 回滚：删 extended 门与两处 skip 即可；或 `git revert` 本轮提交。
+
+
+## D-416 侧栏搜索结果计数用数字滚动，只在 14+ 打开（R420）
+
+- 背景：侧栏头部的「N 条记录 / N 个收藏」是硬换，而同一条头里列表随筛选在淡入淡出 —— 读数和内容不同一拍。
+- 决定：`HistorySidebarView.countTextLabel` 在 macOS 14+ 用 `.contentTransition(.numericText())` + `.animation(MotionCatalog.animation(for: .contentFade), value: countText)`；整句作键（数字与后缀一起变）；12/13 保持原样。
+- 理由：与热图汇总行同一档原生语义（R419/D-414）；计数不是状态，滚一下即可，不做滑入/缩放；静态帧零变化，只加事务。
+- 兼容性/迁移：只影响计数文本；218 帧逐字节不变；1x 胶片判过程，2x 采样边界具名 NOT-RUN。
+- 回滚：删 `countTextLabel` 的 14+ 分支即可；或 `git revert` 本轮提交。
+

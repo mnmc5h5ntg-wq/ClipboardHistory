@@ -8837,3 +8837,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：R418 的 runner 上回执/markdown 在窗口被 8ms 间距拉开后仍只有 1 个过渡帧（本地 2–4）；而窗口读数因为前缀不是 `MOTION_` 从没进过文件通道。R419 把两条改名并加了同跑软过渡正对照（`MOTION_SOFT_PROBE`）；本地 probe 6/7 帧，runner 尚未读。
     修法（下一轮）：读 `MOTION_SOFT_PROBE`；若 runner 读不到 ≥2，回执/markdown 以 `SOFT_TRANSITION_NOT_RUN=channel-blind` 具名 NOT-RUN，不要改 ≥2；若要拿回 runner 裁决，需要一条真在屏/演示层（`layer.presentation()` 或 CGWindow）的通道，且先证明它看得见同一颗 probe。
 
+437 追记（R420 · 仍开）：本轮补的是侧栏搜索结果计数的数字滚动与胶片套件的 extended 分流；主列表仍不匹配 `sourceAppName`，与 QuickPick 继续两套搜索语言。
+
+444 追记（R420 · 已分流，仍开）：逐用例耗时账落地 —— 色档普查 54.7s + 回执消失臂搬进 `CLIPBOARD_HISTORY_UI_MOTION_EXTENDED=1`，CI 套件 **134.8s**（66s 余量）。还剩的是结构：extended 卷现在没有 CI 步，诊断普查只在本地/手动跑。
+
+**445 追记（R420 · 仍有具名出口）**：`MOTION_SOFT_PROBE` 在 runner 上可见（2x 2/1980ms、1x 2/1838ms）⇒ 不触发 channel-blind；但回执**消失 1x** 在窗口 1446ms 覆盖下仍只 1 个中间帧（2x=2、本机 1x=2–3），已具名 `receipt-dismiss-CI` 并搬 extended。若要拿回 runner 裁决，需要一条能在 1x 上分辨 28pt 位移+淡出的通道（演示层/在屏），先证明同一 probe 在新通道更细。
+
+**446. extended 胶片卷没有 CI 步：诊断普查（54.7s）与两条边界臂只在本地/手动跑**（R420）
+    现象：为了让主套件回到 66s 余量，`testFilmScenarioAppearanceDependenceIsMeasuredPerScenario`（54.7s）与回执消失臂搬进了 `CLIPBOARD_HISTORY_UI_MOTION_EXTENDED=1`；CI 只跑主套件，extended 一次也不跑。
+    修法（下一轮）：给 extended 一个**独立的 report-only CI 步**（自己的 timeout 与日志通道），或者把 54.7s 的普查按 scenario 切片成可按需选择的子集；不要在 200s 看门狗上继续加时间。
+

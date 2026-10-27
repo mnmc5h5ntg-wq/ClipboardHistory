@@ -3095,6 +3095,70 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R420：侧栏搜索结果计数（5 条记录 → 1 个收藏）在同一带里可见；
+    /// 带只装头部右侧 90×40pt 的计数区，标题/列表都在带外。
+    func testSidebarResultCountChangeIsVisible() throws {
+        if #available(macOS 13, *) {} else { throw XCTSkip("侧栏夹具只在 13+ 的窗口树里拍") }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r420-sidebar-count-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let beforeFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-history" }),
+                  let afterFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-favorites" }) else {
+                return XCTFail("\(tag)：sidebar-history/sidebar-favorites 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [beforeFixture, afterFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let before = reps["sidebar-history"], let after = reps["sidebar-favorites"],
+                  before.pixelsWide == after.pixelsWide, before.pixelsHigh == after.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let scale = Double(before.pixelsWide) / 300.0
+            let x0 = Int(202 * scale), x1 = Int(292 * scale)
+            let y0 = Int(106 * scale), y1 = Int(146 * scale)
+            guard x1 > x0, y1 > y0, let corner = before.colorAt(x: x0, y: y0) else {
+                return XCTFail("\(tag)：计数带算出来是空的")
+            }
+            var beforeInk = 0, afterInk = 0, changed = 0
+            for y in y0..<min(y1, before.pixelsHigh) {
+                for x in x0..<min(x1, before.pixelsWide) {
+                    guard let a = before.colorAt(x: x, y: y),
+                          let b = after.colorAt(x: x, y: y) else { continue }
+                    let da = abs(a.redComponent - corner.redComponent)
+                        + abs(a.greenComponent - corner.greenComponent)
+                        + abs(a.blueComponent - corner.blueComponent)
+                    if da > 0.01 { beforeInk += 1 }
+                    let db = abs(b.redComponent - corner.redComponent)
+                        + abs(b.greenComponent - corner.greenComponent)
+                        + abs(b.blueComponent - corner.blueComponent)
+                    if db > 0.01 { afterInk += 1 }
+                    let d = abs(a.redComponent - b.redComponent)
+                        + abs(a.greenComponent - b.greenComponent)
+                        + abs(a.blueComponent - b.blueComponent)
+                    if d > 0.01 { changed += 1 }
+                }
+            }
+            emit("SIDEBAR_COUNT_BAND \(tag) 变化=\(changed) 前墨=\(beforeInk) 后墨=\(afterInk)")
+            XCTAssertGreaterThan(beforeInk, 20, "\(tag)：5 条记录那一档没有字（\(beforeInk)）")
+            XCTAssertGreaterThan(afterInk, 20, "\(tag)：1 个收藏那一档没有字（\(afterInk)）")
+            XCTAssertGreaterThan(changed, 20,
+                                 "\(tag)：5→1 只改了 \(changed) 个像素 ⇒ 计数没有跟着筛选变")
+        }
+    }
+
     /// R418：13+ 菜单栏标签的暂停斜杠只在暂停时出现；glyph 本身两态都在。
     /// 真菜单栏由系统合成，这一格拍的是**标签视图本身**（真表面具名 NOT-RUN）。
     func testMenuBarPauseMarkAppearsOnlyWhenPaused() throws {

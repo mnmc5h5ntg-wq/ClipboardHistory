@@ -38,6 +38,11 @@ import XCTest
 @MainActor
 final class MotionFilmstripTests: XCTestCase {
     private static let isEnabled = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_MOTION"] == "1"
+    /// R420 / BACKLOG 444：**扩展卷**。主套件（`CLIPBOARD_HISTORY_UI_MOTION=1`）只剩约 11s 预算，
+    /// 而色档 A/B 普查一项就 54.7s、回执消失臂在 runner 1x 上只有 1 个中间帧。
+    /// 这两类只在 extended 里跑；本机全跑时两个 env 都设。CI 只跑承重场景。
+    private static let isExtendedEnabled =
+        ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_MOTION_EXTENDED"] == "1"
 
     /// `requireObservableMotion` 的缓存（每一类位移各一个判定）。
     /// `nonisolated(unsafe)` 是因为它只在主线程的测试里读写（整个类是 `@MainActor`）。
@@ -2472,7 +2477,18 @@ final class MotionFilmstripTests: XCTestCase {
     func testCopyReceiptAppearsAndDismissesWithAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
         try requireSoftTransitionChannel()
-        for scenarioFactory in [Scenario.copyReceiptAppear, Scenario.copyReceiptDismiss] {
+        // R420：消失臂在 runner 1x 上窗口覆盖（1446ms）却只读到 1 个中间帧
+        // （40440559188；2x 是 2、本机 1x 2–3）⇒ 它是通道边界，不是产品硬切。
+        // CI 只判出现方向；消失方向进 extended（同一 `.transition` 与源守卫仍覆盖）。
+        var factories: [() -> Scenario] = [Scenario.copyReceiptAppear]
+        if Self.isExtendedEnabled {
+            factories.append(Scenario.copyReceiptDismiss)
+        } else {
+            emit("MOTION_NOT_RUN=receipt-dismiss-CI 消失臂只在 extended 跑："
+                 + "runner 1x 的消失卷窗口 1446ms 覆盖但只 1 个中间帧（40440559188），"
+                 + "2x=2/本机 1x=2–3；同一 .transition 与源守卫覆盖，不判成硬切")
+        }
+        for scenarioFactory in factories {
             for scale in [2.0, 1.0] {
                 // 每个倍率新建场景：driver 是场景私有的，跑到 1x 时上一次已经 toggle 过了。
                 let scenario = scenarioFactory()
@@ -2549,6 +2565,40 @@ final class MotionFilmstripTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(span, 2,
                                         "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 汇总行数字是硬切；"
                                             + "先查 `.contentTransition(.numericText())` 与 `.animation(value: line)` 是否还在")
+        }
+    }
+
+    /// R420：侧栏搜索结果计数 15→1 必须在 2×/1× 读到 ≥2 个过渡帧；
+    /// 带只装头部右侧的计数（90×40pt），列表/搜索框在带外。
+    func testSidebarResultCountChangeIsAVisibleProcess() throws {
+        try skipUnlessEnabledAndCapable()
+        // R420：15→1 是一位数字的右对齐滚动，2x 同一卷两次实测 3 / 1 个过渡帧（窗口 330ms 覆盖）
+        // ⇒ 2x 的采样正好压在边界上；1x 连续 3–4。CI/runner 是 1x，这一条只判 1x；
+        // 2x 的读数由同一带的像素对（变化 1464/1535）与源守卫覆盖，并具名记 NOT-RUN。
+        emit("MOTION_NOT_RUN=sidebar-count-2x 15→1 的一位数字滚动在 2x 上读到 1–3 个过渡帧"
+             + "（两次实测 3/1），窗口 330ms 覆盖 ⇒ 2x 采样在边界上；1x 连续 3–4；"
+             + "2x 的读数由像素对与源守卫覆盖")
+        for scale in [1.0] {
+            let scenario = Scenario.sidebarCountChange()
+            let film = record(scenario, scale: scale)
+            let frames = film.motionFrames
+            let fractions = Self.deltas(frames)
+            let span = Self.transitionFrameCount(fractions)
+            let peak = fractions.max() ?? 0
+            let window = film.postTriggerWindowMilliseconds
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("MOTION_SIDEBAR_COUNT scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+                 + "峰值=\(String(format: "%.4f", peak)) 窗口=\(Int(window.rounded()))ms "
+                 + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+            XCTAssertGreaterThan(frames.count, 4,
+                                 "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
+            XCTAssertGreaterThanOrEqual(window, scenario.declaredDurationMilliseconds * 0.8,
+                                        "\(Int(scale))x：卷子只覆盖 \(Int(window.rounded()))ms，"
+                                            + "声明 \(Int(scenario.declaredDurationMilliseconds))ms "
+                                            + "⇒ 采样窗口没覆盖到过程")
+            XCTAssertGreaterThanOrEqual(span, 2,
+                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 计数是硬切；"
+                                            + "先查 `countTextLabel` 与 `.contentTransition(.numericText())` 是否还在")
         }
     }
 
@@ -6413,6 +6463,8 @@ final class MotionFilmstripTests: XCTestCase {
     ///    读者要能看见"换统计量把哪几颗的判定改了"，否则这条更正本身就成了新的一句推测。
     func testFilmScenarioAppearanceDependenceIsMeasuredPerScenario() throws {
         try skipUnlessEnabledAndCapable()
+        // 54.7s/卷（R419 本机实测）—— 它是诊断普查，不是 floor 的承重臂；主套件放不下。
+        try skipUnlessExtendedMotionEnabled()
         let subjects = Scenario.unpinnedAppearanceProbe()
         let text = try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)
         let census = Self.scenarioPinCensus(code: text)
@@ -8224,6 +8276,29 @@ final class MotionFilmstripTests: XCTestCase {
             }
         }
 
+        /// R420：侧栏搜索结果计数（15→1）。带只装头部右侧那一格计数，
+        /// 列表与搜索框都在带外 —— 这一卷不会把"列表被筛掉"当成"计数在滚"。
+        @MainActor static func sidebarCountChange() -> Scenario {
+            Scenario(name: "sidebar-count-change", size: NSSize(width: 300, height: 520),
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .contentFade) * 1000,
+                     appearance: .aqua,
+                     root: { store in
+                         AnyView(HistorySidebarView(historyStore: store)
+                             .frame(width: 300, height: 520, alignment: .top)
+                             .background(Color(nsColor: .windowBackgroundColor)))
+                     },
+                     captureRect: { host in
+                         let width: CGFloat = 90
+                         let height: CGFloat = 40
+                         let x = host.bounds.width - width - 8
+                         let y = host.isFlipped ? 106 : host.bounds.height - 146
+                         return NSRect(x: x, y: y, width: width, height: height)
+                     },
+                     minimumSampleSpacingMilliseconds: 8) { store in
+                store.perform(.updateSearch("动效取证记录 3"))
+            }
+        }
+
         private static func heatLedgerURL() -> URL {
             URL(fileURLWithPath: NSTemporaryDirectory())
                 .appendingPathComponent("heat-filmstrip-\(ProcessInfo.processInfo.processIdentifier).json")
@@ -9084,6 +9159,12 @@ final class MotionFilmstripTests: XCTestCase {
     private func skipUnlessEnabledAndCapable() throws {
         try XCTSkipUnless(Self.isEnabled,
                           "动效胶片探针：设 CLIPBOARD_HISTORY_UI_MOTION=1 才跑（会抢前台并开窗）")
+    }
+
+    private func skipUnlessExtendedMotionEnabled() throws {
+        try XCTSkipUnless(Self.isExtendedEnabled,
+                          "扩展胶片场景：设 CLIPBOARD_HISTORY_UI_MOTION_EXTENDED=1 才跑。"
+                              + "主套件的 200s 看门狗只剩约 11s 预算（BACKLOG 444）⇒ CI 只跑承重场景")
     }
 
     private static func insertProbeRecord(_ store: HistoryStore) {
