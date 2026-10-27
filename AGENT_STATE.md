@@ -26,7 +26,7 @@
 
 NOT-RUN / 阻塞（分开写）：① 设置内容列 1x 平涂（`EXCLUDED_APP_ROW_NOT_RUN`，459）；② 设置脚注带 1x；③ 主窗口 content 帧 1x（458）；④ 高夹具 1x（459）；⑤ 13+ 菜单像素/标题（454）；⑥ 真实拖拽（453）；⑦ Dock 像素；⑧ 源图标最小窗文字 1x；⑨ 本地全量 5 条滚动红（449）；⑩ 2x/extended；⑪ 固定块揭示偏移（455）；⑫ 跨年时间（456）；⑬ 主列表暗档文字盲区（457）；⑭ 真机/多屏（447）；⑮ 真菜单栏、12 实时腿；⑯ `table-lazy-rows`；⑰ HTML 六档以上字号（460）；⑱ 清除按钮命中区 18pt（461）；⑲ 分隔线透明度未提令牌（462）；⑳ 437–462 仍开；㉑ R436 新跑待 push 后读。
 
-下一轮（R437）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；读 R436 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 `BULK_ACTION_SEPARATOR` 两档局部对比（13.7/11.9）、清除 × 判据的 list 校准、`MOTION_SEQUENCE` 重抓后 same 臂 ≥3、`EXCLUDED_APP_ROW_NOT_RUN`、`DETAIL_IMAGE_EDGE`、`HTML_HEADING_LADDER`、理由带、时间列、脚注、分区、菜单、Dock/搜索/滚动是否仍绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
+下一轮（R437）的靶：⓪ 先 `git push origin main`（禁 amend/force）并复核 ahead=0；**收口时 `PUSH_BLOCKED=network`（api=000 / apple=200；本地 `ccda826` 主笔 + `7714cb1` 追记、ahead=2）**，网络恢复后先只读 `git ls-remote` 复核 remote 仍等于本地 origin ref，再一次快进 push，并读 `40544941175 ↔ 1041d0f` 与 R436 head 新跑的全部失败步骤；读 R436 主笔+追记 head 跑全部失败步骤（成对 run↔commit），in_progress/0 字节不算绿；重点看 `BULK_ACTION_SEPARATOR` 两档局部对比（13.7/11.9）、清除 × 判据的 list 校准、`MOTION_SEQUENCE` 重抓后 same 臂 ≥3、`EXCLUDED_APP_ROW_NOT_RUN`、`DETAIL_IMAGE_EDGE`、`HTML_HEADING_LADDER`、理由带、时间列、脚注、分区、菜单、Dock/搜索/滚动是否仍绿；① 367 现读 rot=0，按 `HIDDEN_ROT` 查新腐烂；② 继续产品视觉位并落 Sources、换缺陷类别；③ 436 只复核新跑 Motion floor，不重猜 `must_judge`。
 
 ## R435 状态（2026-10-28 · 本地 · 第 434 轮 / Round 432）：浮层搜索框补清除按钮（有字才出现：typed 帧按钮带 405/410 墨、空查询 0；4 张浮层帧变化、基线 238）；R434 跑 `40535594620 ↔ 78a0cf5` success、失败步骤 0（产品 1 文件，浮层搜索框位）
 
