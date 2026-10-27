@@ -7670,3 +7670,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：macOS 12 的 400pt 阈值是推导值，未在 12 真机验证（BACKLOG 451）；解析不到应用时只给通用 `app` 符号，不猜应用。
 - 回滚：删两个新文件与 `DetailView` 的四档拟合即可；或 `git revert` 本轮提交。
 
+## D-422 设置侧栏版本行放在导航行之后，不追窗口下沿（R426）
+
+- 背景：设置页左列六个分类下面没有版本信息，窗口底左是大片空白；把脚注挂到窗口下沿是最直觉的做法。
+- 决定：新增 `SettingsSidebarFooterPolicy`（`时间剪史 <CFBundleShortVersionString>`；读不到版本只写应用名，不编假号）+ `SettingsSidebarFooter`（11pt `VisualFont.meta`、动态 `secondaryLabelColor`、左沿 16pt）。版本行放在侧栏导航行之后、尾部 `Spacer` 之前，由 `settingsSidebarFooterForCapture=false` 提供负臂；版本串可由夹具注入，产品读真实 bundle。
+- 理由：640×440 最小窗里 `NavigationSplitView` 把设置内容按理想高度撑到 ~466pt（窗口 440），挂窗口下沿的脚注落在被裁的 26pt 里（本机实测整行 0 墨；GeometryReader 与根 maxHeight 两版仍被理想高度顶出）。内容相对摆放让 640×440 与 720×540 都有读数，而 720 窗口的脚注仍紧随导航分组，读起来是"分类清单的版本脚注"。
+- 兼容性/迁移：28 张 settings 帧变化、新增 `settings-general-no-footer` 2 帧，基线 228→230；detail/content 与 cardprobe 不变；负臂进暗档侧栏盲区名册（同一棵 vibrant 子树）。
+- 边界：窗口下沿的版本行未成立（BACKLOG 452）；macOS 12 未真机验证（451）。
+- 回滚：删两个新文件与 SettingsSidebarView 里那三行即可；或 `git revert` 本轮提交。
+

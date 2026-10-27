@@ -269,23 +269,25 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var settingsContent: some View {
-        if #available(macOS 13, *) {
-            NavigationSplitView {
-                SettingsSidebarView(selectedCategory: selectedCategoryBinding)
-                    .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
-                                                      ideal: SettingsViewLayout.sidebarWidth,
-                                                      max: 180)
-            } detail: {
-                detailScrollView
-            }
-        } else {
-            CompatibleSplitView(
-                sidebarMinWidth: SettingsViewLayout.sidebarWidth,
-                sidebarIdealWidth: SettingsViewLayout.sidebarWidth
-            ) {
-                SettingsSidebarView(selectedCategory: selectedCategoryBinding)
-            } detail: {
-                detailScrollView
+        Group {
+            if #available(macOS 13, *) {
+                NavigationSplitView {
+                    SettingsSidebarView(selectedCategory: selectedCategoryBinding)
+                        .navigationSplitViewColumnWidth(min: SettingsViewLayout.sidebarWidth,
+                                                          ideal: SettingsViewLayout.sidebarWidth,
+                                                          max: 180)
+                } detail: {
+                    detailScrollView
+                }
+            } else {
+                CompatibleSplitView(
+                    sidebarMinWidth: SettingsViewLayout.sidebarWidth,
+                    sidebarIdealWidth: SettingsViewLayout.sidebarWidth
+                ) {
+                    SettingsSidebarView(selectedCategory: selectedCategoryBinding)
+                } detail: {
+                    detailScrollView
+                }
             }
         }
     }
@@ -990,11 +992,17 @@ private struct SettingsSidebarRowFramesKey: PreferenceKey {
 struct SettingsSidebarView: View {
     @Binding var selectedCategory: SettingsCategory?
     @Environment(\.settingsSelectionPreview) private var selectionPreview
+    @Environment(\.settingsSidebarVersionForCapture) private var versionForCapture
+    @Environment(\.settingsSidebarFooterForCapture) private var footerForCapture
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rowFrames: [SettingsCategory: CGRect] = [:]
 
     private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
+
+    private var footerText: String {
+        SettingsSidebarFooterPolicy.resolvedVersionText(override: versionForCapture)
+    }
 
     private var capsuleRect: CGRect? {
         if let preview = selectionPreview,
@@ -1034,6 +1042,11 @@ struct SettingsSidebarView: View {
                                 value: [category: proxy.frame(in: .named("settingsSidebar"))])
                         }
                     )
+                }
+                // R426：版本行跟在导航行之后（不放到窗口下沿）—— 最小窗里侧栏内容的
+                // 理想高度比窗口高，锚到窗口底会把这一行裁在框外；放在行后则在任何高度都可见。
+                if footerForCapture != false {
+                    SettingsSidebarFooter(text: footerText)
                 }
                 Spacer()
             }

@@ -21,9 +21,11 @@ TRUTH = "UICaptureTests/testInkDirectionTruthTable"
 
 # R382 重钉：名单已长到 13 张并夹了注释，旧的全表字面量不再命中。
 # 同一行在视图树探针那张表里也出现（10492 行），所以针带上 `static let` 那一行做上下文。
-LIST_NEEDLE = """    static let darkSidebarTextBlindSpots: Set<String> = [
+# R426 重钉：名单里新增了 `settings-general-no-footer` 负臂（在 settings-general 之前），
+# 旧针要求 `static let` 与 settings-general 相邻，已不成立；改以「负臂 + settings-general」两行定位。
+LIST_NEEDLE = """        "settings-general-no-footer",
         "settings-general", "settings-shortcuts", "settings-privacy","""
-LIST_MUTANT = """    static let darkSidebarTextBlindSpots: Set<String> = [
+LIST_MUTANT = """        "settings-general-no-footer",
         "settings-shortcuts", "settings-privacy","""
 
 BOX_NEEDLE = "static let settingsSidebarTextColumn = CGRect(x: 40, y: 60, width: 102, height: 192)"
