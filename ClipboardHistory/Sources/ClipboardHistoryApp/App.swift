@@ -24,7 +24,7 @@ struct ClipboardHistoryApp: App {
             // R110：符号名从 `MenuBarController.statusSymbolName` 引用，不在这里写字面量
             // —— 12 上那颗图标由 AppKit 自己画（`NSImage(systemSymbolName:)`），
             // 两处各写各的就会变成"同一个入口在两台机器上长得不一样"（BACKLOG 164）。
-            MenuBarExtra("时间剪史", systemImage: MenuBarController.statusSymbolName) {
+            MenuBarExtra {
                 MenuBarRecommendationsView(historyStore: historyStore, appDelegate: appDelegate)
                 Divider()
                 ForEach(AppCommandCatalog.menuBarCommands.filter { $0 != .quit }, id: \.self) { command in
@@ -36,6 +36,10 @@ struct ClipboardHistoryApp: App {
                 Button(AppCommand.quit.title) {
                     appDelegate.perform(.quit)
                 }
+            } label: {
+                // R418：暂停时菜单栏那颗图标要有一道斜杠（BACKLOG 443）。
+                // 标签视图自己引用 `MenuBarController.statusSymbolName`，与 12 那颗图同一个名字。
+                MenuBarStatusLabel()
             }
             // R109：这一行以前**没有**——`MenuBarRecommendationsView` 里那句
             // "这里挂 `.transition` 也不会执行，因为 `MenuBarExtraStyle.menu` 的内容会被编译成真的

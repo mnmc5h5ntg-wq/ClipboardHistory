@@ -32,8 +32,12 @@ WIRING = "MenuBarPopulationTests/testLiveRefreshIsWiredIntoTheMenuTheControllerB
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
 ARMS = [
+    # R418：同一行 `.receive(on:)` 在暂停桥里也出现了；针带上 refreshBridge 的上下文，
+    # 才只钉住 165 这条订阅（一表一文件，别让新桥替它作证）。
     ("M602", "摘掉 receive(on: .main) ⇒ 同步重填读到还没写候选的那一刻", MENU,
-     "            .receive(on: DispatchQueue.main)\n", "", BEHAVIOUR, "CAUGHT"),
+     "        refreshBridge = store.$isRefreshingPredictions\n            .removeDuplicates()\n            .receive(on: DispatchQueue.main)\n",
+     "        refreshBridge = store.$isRefreshingPredictions\n            .removeDuplicates()\n",
+     BEHAVIOUR, "CAUGHT"),
     ("M603", "摘掉 makeMenu 里的接线 ⇒ 机制有牙但产品不咬", MENU,
      "        attachLiveRefresh(to: menu, store: historyStore)\n", "", WIRING, "CAUGHT"),
     ("M604", "把「算完了才填」反成「开始算才填」", MENU,

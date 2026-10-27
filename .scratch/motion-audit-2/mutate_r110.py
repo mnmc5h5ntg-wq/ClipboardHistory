@@ -47,9 +47,11 @@ ARMS = [
      "            symbol.isTemplate = true",
      "            symbol.isTemplate = false",
      RUNTIME_JUDGE, "CAUGHT"),
-    ("M601", "调用点退回字面量 ⇒ 源码那一格必须红（两棵表面又能各写各的名字）", APP,
-     'MenuBarExtra("时间剪史", systemImage: MenuBarController.statusSymbolName) {',
-     'MenuBarExtra("时间剪史", systemImage: "clipboard") {',
+    # R418：13+ 的入口从 `MenuBarExtra(systemImage:)` 换成 `MenuBarStatusLabel`，
+    # 调用点搬到标签视图里；刀改成"标签退回字面量"，判据仍是同一条源守卫。
+    ("M601", "调用点退回字面量 ⇒ 源码那一格必须红（两棵表面又能各写各的名字）", MENU,
+     'Image(systemName: MenuBarController.statusSymbolName)',
+     'Image(systemName: "clipboard")',
      SOURCE_JUDGE, "CAUGHT"),
 ]
 

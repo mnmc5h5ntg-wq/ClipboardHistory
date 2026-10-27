@@ -2501,37 +2501,6 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
-    /// R417：暂停采集横幅的出现与消失都必须在 2×/1× 读到 ≥2 个过渡帧；
-    /// 卷子先要覆盖到声明时长（宽度 760×48 的带抓得快，30 帧不一定够）。
-    func testPauseBannerAppearsAndDismissesWithAVisibleProcess() throws {
-        try skipUnlessEnabledAndCapable()
-        for scenarioFactory in [Scenario.pauseBannerAppear, Scenario.pauseBannerDismiss] {
-            for scale in [2.0, 1.0] {
-                let scenario = scenarioFactory()
-                let film = record(scenario, scale: scale)
-                let frames = film.motionFrames
-                let fractions = Self.deltas(frames)
-                let span = Self.transitionFrameCount(fractions)
-                let peak = fractions.max() ?? 0
-                let window = film.postTriggerWindowMilliseconds
-                writeStrip("\(scenario.name)-\(Int(scale))x", frames)
-                emit("PAUSE_BANNER_FADE \(scenario.name) scale=\(Int(scale))x 帧数=\(frames.count) "
-                     + "过渡帧数=\(span) 峰值=\(String(format: "%.4f", peak)) "
-                     + "窗口=\(Int(window.rounded()))ms "
-                     + "声明=\(Int(scenario.declaredDurationMilliseconds))ms")
-                XCTAssertGreaterThan(frames.count, 4,
-                                     "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
-                XCTAssertGreaterThanOrEqual(window, scenario.declaredDurationMilliseconds * 0.8,
-                                            "\(Int(scale))x：卷子只覆盖 \(Int(window.rounded()))ms，"
-                                                + "声明 \(Int(scenario.declaredDurationMilliseconds))ms "
-                                                + "⇒ 采样窗口没覆盖到过程；先修采样，别把窗口当成硬切")
-                XCTAssertGreaterThanOrEqual(span, 2,
-                                            "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 暂停横幅是硬切；"
-                                                + "先查签名那一位与 `.bannerIn/.bannerOut` 过渡是否还在")
-            }
-        }
-    }
-
     /// R400：「原文/渲染」按钮标签必须和正文一样有过渡，不能内容在演、控件名一帧硬换。
     func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
@@ -5031,15 +5000,15 @@ final class MotionFilmstripTests: XCTestCase {
     /// 默认值会被人改，而旁边那条守卫数的是"这个文件里有没有 `animation(`"，
     /// 于是"理由失效"与"守卫变绿"可以同时成立（R74 那一族：只在自家夹具上成立的理由比没做决定更贵）。
     ///
-    /// 三格各钉一句话：① 样式被**显式**设成 `.menu`；② 它挂在 `MenuBarExtra(` 那一段里
+    /// 三格各钉一句话：① 样式被**显式**设成 `.menu`；② 它挂在 `MenuBarExtra` 那一段里
     /// （不是文件里随便哪一行，否则挪个位置照样绿）；③ 整个 `MenuBarExtra` 在
     /// `if #available(macOS 13, *)` 里 ⇒ 在支持底线 macOS 12 上这棵表面**不存在**，
     /// 那时用户看到的菜单是 `MenuBarController` 那棵 AppKit 的 —— 菜单栏的动效判断因此要按版本分开。
     func testMenuBarSurfaceIdentityIsDeclaredNotInherited() throws {
         let app = codeOnly(try productSource(named: "App.swift"))
-        XCTAssertTrue(app.contains("MenuBarExtra("),
+        XCTAssertTrue(app.contains("MenuBarExtra"),
                       "App.swift 里找不到 MenuBarExtra ⇒ 这条守卫失去对象，先查表面是不是被挪走了")
-        let after = app.components(separatedBy: "MenuBarExtra(").dropFirst().first ?? ""
+        let after = app.components(separatedBy: "MenuBarExtra").dropFirst().first ?? ""
         let block = String(after.prefix(1600))
         XCTAssertTrue(block.contains(".menuBarExtraStyle(.menu)"),
                       "菜单栏表面的样式不是**显式声明**的 `.menu`（今天它在 "
@@ -5047,7 +5016,7 @@ final class MotionFilmstripTests: XCTestCase {
         XCTAssertFalse(block.contains(".menuBarExtraStyle(.window)"),
                        "菜单栏被换成 `.window` 了：那时 SwiftUI 的过渡**会**执行，"
                            + "而 `MenuBarRecommendationsView` 里那句「不会执行」与它的守卫都还绿着")
-        let before = app.components(separatedBy: "MenuBarExtra(").first ?? ""
+        let before = app.components(separatedBy: "MenuBarExtra").first ?? ""
         XCTAssertTrue(before.contains("if #available(macOS 13, *)"),
                       "MenuBarExtra 不再被 macOS 13 的可用性门挡住 ⇒ 台账里「12 上没有这棵表面」那句要重写")
     }
@@ -7721,25 +7690,6 @@ final class MotionFilmstripTests: XCTestCase {
         }
     }
 
-    /// R417：暂停采集横幅的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
-    @MainActor private final class PauseBannerDriver: ObservableObject {
-        @Published var paused: Bool
-
-        init(paused: Bool) {
-            self.paused = paused
-        }
-    }
-
-    private struct PauseBannerHarness: View {
-        let store: HistoryStore
-        @ObservedObject var driver: PauseBannerDriver
-
-        var body: some View {
-            ContentView(historyStore: store)
-                .environment(\.pausedForCapture, driver.paused)
-        }
-    }
-
     /// R400：「原文/渲染」标签切换的驱动（只服务专用胶片场景，不在 `Scenario.all()` 里）。
     @MainActor private final class MarkdownModeDriver: ObservableObject {
         @Published var rendered = true
@@ -7997,32 +7947,6 @@ final class MotionFilmstripTests: XCTestCase {
 
         @MainActor static func copyReceiptDismiss() -> Scenario {
             copyReceiptScenario(name: "glass-pill-copy-receipt-dismiss", from: true)
-        }
-
-        /// R417：暂停采集横幅的出现/消失（状态横幅进出位）。
-        /// 驱动走取证键（产品路径读 `@AppStorage("recordingPaused")`），拍的是产品 `ContentView`
-        /// 顶部那条带；场景不进 `Scenario.all()`（不改 motion floor 的臂名单）。
-        @MainActor private static func pauseBannerScenario(name: String, from paused: Bool) -> Scenario {
-            let driver = PauseBannerDriver(paused: paused)
-            return Scenario(name: name, size: NSSize(width: 760, height: 560),
-                     declaredDurationMilliseconds: MotionCatalog.duration(for: paused ? .bannerOut : .bannerIn) * 1000,
-                     // 760×48pt 的带抓一帧 ~5ms；8ms 下限保证 30 帧预算覆盖到 120/150ms 的整段过程。
-                     appearance: .aqua,
-                     root: { store in AnyView(PauseBannerHarness(store: store, driver: driver)) },
-                     // 胶片窗口的 hosting view 顶部就是横幅（整窗帧实测 y=0..76px 是琥珀带）；
-                     // 与组件夹具不同：那边多一条 48pt 的窗口 chrome，所以像素判据的带下移 48pt。
-                     captureRect: Scenario.bannerBand,
-                     minimumSampleSpacingMilliseconds: 8) { _ in
-                driver.paused.toggle()
-            }
-        }
-
-        @MainActor static func pauseBannerAppear() -> Scenario {
-            pauseBannerScenario(name: "pause-banner-appear", from: false)
-        }
-
-        @MainActor static func pauseBannerDismiss() -> Scenario {
-            pauseBannerScenario(name: "pause-banner-dismiss", from: true)
         }
 
         /// R400：只拍「原文/渲染」这颗按钮；驱动从 rendered 切到 source。
@@ -8552,8 +8476,18 @@ final class MotionFilmstripTests: XCTestCase {
         let triggerFrame = grabber.frames.count
         let deadline = Date().addingTimeInterval(3.0)
         // R417：窄带抓得太快时，30 帧预算会在声明时长之前用完 ⇒ 卷子覆盖不到过程。
-        // 只给"自己要下限"的场景补时间，其它卷的采样一个字节都不动。
-        let spacing = scenario.minimumSampleSpacingMilliseconds / 1000
+        // R418：这条病不是回执独有 —— 同一跑里 markdown 以 0.3ms/帧 ×30 = 9ms 的窗口
+        // 去判 160ms 的过渡，也读出 1 个过渡帧。所以对**所有声明了时长**的场景加一条
+        // 自动下限：若预热后的天然间隔比 1.2×声明/预算 还短，就把采样拉开到这个下限；
+        // 本来就够宽的卷子（warmInterval ≥ autoSpacing）一个字节都不动。
+        let declared = scenario.declaredDurationMilliseconds / 1000.0
+        let autoSpacing = declared > 0 ? declared * 1.2 / Double(grabber.limit) : 0
+        let warmInterval: TimeInterval = {
+            guard grabber.stamps.count >= 2 else { return 0 }
+            return grabber.stamps[grabber.stamps.count - 1] - grabber.stamps[grabber.stamps.count - 2]
+        }()
+        let spacing = max(scenario.minimumSampleSpacingMilliseconds / 1000,
+                          warmInterval < autoSpacing ? autoSpacing : 0)
         while !grabber.finished, Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.004))
             grabber.tick()

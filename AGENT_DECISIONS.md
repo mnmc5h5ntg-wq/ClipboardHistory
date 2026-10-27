@@ -7595,3 +7595,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：只在暂停时多一条横幅；`Kind` 加了一个 case，所有 switch 都显式讨论它；`@AppStorage` 与设置页/采集侧同一个键，键名由源守卫钉住。
 - 回滚：删 `Kind.paused`/`NoticeTone.paused` 与 `ContentView` 的暂停分支即可；或 `git revert` 本轮提交。
 
+## D-413 菜单栏暂停状态用同一颗符号 + 一道斜杠，两棵表面共用记号（R418）
+
+- 背景：主窗口已有暂停横幅，但菜单栏那颗 `clipboard` 是静态的；13+ 的 `MenuBarExtra(systemImage:)` 不允许按状态换图，12 的 `NSStatusItem` 也只在安装时画一次。
+- 决定：`MenuBarStatusPresentation` 只写一次斜杠端点/线宽/无障碍文案；13+ 换成 `MenuBarExtra { … } label: { MenuBarStatusLabel() }`（同一颗 `statusSymbolName` 上叠斜杠，读 `@AppStorage("recordingPaused")`）；12 的 `makeStatusBarIcon(paused:)` 在同一张模板图上画同一道斜杠，安装时读当前状态，并订阅 `UserDefaults.didChangeNotification` 重画。
+- 理由：暂停是同一颗图标的状态，不是另一个入口（R110 的"两棵表面同一个入口"继续成立）；换符号会让它在菜单栏里变成另一个 App。斜杠是原生"停用"记号，模板染色下亮暗都成立；两棵表面共用一个记号常量，避免下一次分叉。
+- 兼容性/迁移：13+ 的入口形状从 `systemImage:` 换成标签闭包；符号常量仍只在一处声明，两个调用点引用它；既有帧不变，新增 4 帧。12 的实时刷新只在本机 13+ 之外，未跑真机腿（具名 NOT-RUN，见 443）。
+- 回滚：删 `MenuBarStatusLabel`/`MenuBarStatusPresentation` 与 `makeStatusBarIcon(paused:)` 的暂停分支，把 `MenuBarExtra` 改回 `systemImage:` 即可；或 `git revert` 本轮提交。
+

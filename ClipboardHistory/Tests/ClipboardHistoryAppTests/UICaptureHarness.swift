@@ -3030,6 +3030,68 @@ final class UICaptureTests: XCTestCase {
                              "钥匙=true 时横幅带里读不到橙色暂停图标（橙点=\(orange)）")
     }
 
+    /// R418：13+ 菜单栏标签的暂停斜杠只在暂停时出现；glyph 本身两态都在。
+    /// 真菜单栏由系统合成，这一格拍的是**标签视图本身**（真表面具名 NOT-RUN）。
+    func testMenuBarPauseMarkAppearsOnlyWhenPaused() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r418-menubar-label-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idleFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "statusitem-label-idle" }),
+                  let pausedFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "statusitem-label-paused" }) else {
+                return XCTFail("\(tag)：statusitem-label-idle/paused 缺一张 ⇒ 这条判据没有对象")
+            }
+            var reps: [String: NSBitmapImageRep] = [:]
+            for fixture in [idleFixture, pausedFixture] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data) else {
+                    return XCTFail("\(tag)：\(fixture.name) 帧读不回来")
+                }
+                reps[fixture.name] = rep
+            }
+            guard let idle = reps["statusitem-label-idle"], let paused = reps["statusitem-label-paused"],
+                  idle.pixelsWide == paused.pixelsWide, idle.pixelsHigh == paused.pixelsHigh else {
+                return XCTFail("\(tag)：两帧尺寸不一致")
+            }
+            let corner = idle.colorAt(x: 0, y: 0)
+            var idleInk = 0, pausedInk = 0, changed = 0
+            for y in 0..<idle.pixelsHigh {
+                for x in 0..<idle.pixelsWide {
+                    guard let a = idle.colorAt(x: x, y: y),
+                          let b = paused.colorAt(x: x, y: y) else { continue }
+                    if let c = corner {
+                        let da = abs(a.redComponent - c.redComponent)
+                            + abs(a.greenComponent - c.greenComponent)
+                            + abs(a.blueComponent - c.blueComponent)
+                        if da > 0.01 { idleInk += 1 }
+                        let db = abs(b.redComponent - c.redComponent)
+                            + abs(b.greenComponent - c.greenComponent)
+                            + abs(b.blueComponent - c.blueComponent)
+                        if db > 0.01 { pausedInk += 1 }
+                    }
+                    let d = abs(a.redComponent - b.redComponent)
+                        + abs(a.greenComponent - b.greenComponent)
+                        + abs(a.blueComponent - b.blueComponent)
+                    if d > 0.01 { changed += 1 }
+                }
+            }
+            emit("MENUBAR_PAUSE_LABEL \(tag) 静置墨=\(idleInk) 暂停墨=\(pausedInk) 变化=\(changed)")
+            XCTAssertGreaterThan(idleInk, 100,
+                                 "\(tag)：静置标签只有 \(idleInk) 个墨点 ⇒ glyph 没画出来")
+            XCTAssertGreaterThan(pausedInk, idleInk,
+                                 "\(tag)：暂停标签 \(pausedInk) 不比静置 \(idleInk) 多 ⇒ 斜杠没画")
+            XCTAssertGreaterThan(changed, 10,
+                                 "\(tag)：两态只差 \(changed) 个像素 ⇒ 暂停记号太弱或没画")
+        }
+    }
+
 
     func testQuickPickSearchFieldFocusLiftsItsChrome() throws {
         let scratch = FileManager.default.temporaryDirectory
@@ -5792,6 +5854,26 @@ final class UICaptureTests: XCTestCase {
                 .padding(9)
                 .frame(width: 160, height: 90, alignment: .leading)
             )
+        })
+
+        // R418 / BACKLOG 443：13+ 菜单栏标签的暂停斜杠第一次进帧基线。
+        // 名字同样不带 `menubar-` 前缀：这是**标签素材的特写**，不是菜单表面复刻；
+        // 真菜单栏由系统合成，离屏拍不到（具名 NOT-RUN）。
+        results.append(Fixture("statusitem-label-idle", NSSize(width: 64, height: 40)) {
+            AnyView(MenuBarStatusLabel()
+                .environment(\.pausedForCapture, false)
+                .padding(11)
+                .frame(width: 64, height: 40)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .ignoresSafeArea())
+        })
+        results.append(Fixture("statusitem-label-paused", NSSize(width: 64, height: 40)) {
+            AnyView(MenuBarStatusLabel()
+                .environment(\.pausedForCapture, true)
+                .padding(11)
+                .frame(width: 64, height: 40)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .ignoresSafeArea())
         })
 
         // 侧栏脱离分栏器单独拍：实测 NavigationSplitView 的 sidebar 列在离屏
@@ -12104,8 +12186,10 @@ final class UICaptureTests: XCTestCase {
             .components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
             .joined(separator: "\n")
-        XCTAssertTrue(appSource.contains("MenuBarExtra("),
-                      "产品里已经没有 `MenuBarExtra(` 了，但 `menubar-*` 这批帧还在拍 ⇒ 这些帧在拍一个不存在的表面")
+        // R418：入口从 `MenuBarExtra(systemImage:)` 换成标签闭包，形状是 `MenuBarExtra { … } label: { … }`；
+        // 仍然只认 `MenuBarExtra` 这个场景本身（不是注释、不是样式名）。
+        XCTAssertTrue(appSource.contains("MenuBarExtra"),
+                      "产品里已经没有 `MenuBarExtra` 了，但 `menubar-*` 这批帧还在拍 ⇒ 这些帧在拍一个不存在的表面")
         XCTAssertFalse(appSource.contains("menuBarExtraStyle(.window)"),
                        "产品已经把菜单栏内容换成 `.window` 风格 ⇒ 这些帧**就是产品本身**了："
                        + "把 `menuSurfaceReplicaFixtures` 缩掉，并且把宽度 / 截断 / 对齐这几条结论重新审一遍"

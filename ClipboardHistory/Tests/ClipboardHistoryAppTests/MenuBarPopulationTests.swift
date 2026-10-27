@@ -242,13 +242,95 @@ final class MenuBarPopulationTests: XCTestCase {
                              + "与参考=相同 模板=\(product.isTemplate)")
     }
 
+    // MARK: - R418 / BACKLOG 443：暂停状态在菜单栏那颗图标上
+
+    /// ① 12 那颗 `NSImage`：暂停图必须多出一道斜杠，且 glyph 仍在、仍出不了 18×18。
+    /// ② 13+ 的标签视图与 12 的图共用 `MenuBarStatusPresentation` 的端点/线宽。
+    func testPausedStatusImageAddsTheSlashAndKeepsTheGlyph() throws {
+        let controller = MenuBarController()
+        let idle = controller.makeStatusBarIcon(paused: false)
+        let paused = controller.makeStatusBarIcon(paused: true)
+        let side = 72
+        guard let a = rasterize(idle, side: side),
+              let b = rasterize(paused, side: side) else {
+            return XCTFail("画不出位图 ⇒ 这一格没有对象，不判（不是通过）")
+        }
+        XCTAssertEqual(idle.size, NSSize(width: 18, height: 18))
+        XCTAssertEqual(paused.size, NSSize(width: 18, height: 18),
+                       "暂停图换了占位那一格 ⇒ 菜单栏会跳一下")
+        XCTAssertTrue(idle.isTemplate, "静置图丢了模板位 ⇒ 暗色菜单栏里会是一块黑")
+        XCTAssertTrue(paused.isTemplate, "暂停图丢了模板位 ⇒ 暗色菜单栏里会是一块黑")
+        XCTAssertGreaterThan(a.ink, 400,
+                             "静置图只有 \(a.ink) 个墨像素（R110 实测 892）⇒ 素材掉成头发丝")
+        XCTAssertGreaterThan(b.ink, a.ink + 100,
+                             "暂停图只比静置多 \(b.ink - a.ink) 个墨像素 ⇒ 斜杠没画出来")
+        XCTAssertNotEqual(a.data, b.data, "两臂 PNG 相同 ⇒ 暂停与静置交出去的是同一张图")
+        for box in [a.box, b.box] {
+            XCTAssertGreaterThanOrEqual(box.minX, 2)
+            XCTAssertGreaterThanOrEqual(box.minY, 2)
+            XCTAssertLessThanOrEqual(box.maxX, side - 3)
+            XCTAssertLessThanOrEqual(box.maxY, side - 3)
+        }
+        XCTAssertEqual(MenuBarStatusPresentation.accessibilityLabel(paused: false), "时间剪史")
+        XCTAssertEqual(MenuBarStatusPresentation.accessibilityLabel(paused: true), "时间剪史，已暂停记录")
+        CaptureReadings.emit("MENUBAR_PAUSE_GLYPH 静置墨=\(a.ink) 暂停墨=\(b.ink) 增量=\(b.ink - a.ink) "
+                             + "斜杠线宽=\(MenuBarStatusPresentation.slashLineWidth)")
+    }
+
+    /// 接线那一格：标签读同一把钥匙、菜单入口挂的是标签视图、12 那条路也跟着暂停刷新。
+    func testMenuBarPauseLabelIsWiredToTheSharedKey() throws {
+        let app = codeOnly(try productSource(named: "App.swift"))
+        let controller = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
+        XCTAssertTrue(app.contains("label: {") && app.contains("MenuBarStatusLabel()"),
+                      "13+ 的菜单栏没有挂标签视图 ⇒ 暂停状态在菜单栏不可见")
+        // R418：**每一格都收窄到它自己的函数体**。整文件 contains 会被同名的另一处喂饱
+        // （R415/R417 各中过一次）：`isRecordingPaused` 在 install 与 refresh 各有一处，
+        // 拿整文件判 refresh 会把「refresh 不读状态」放过去。
+        func region(_ name: String, until endMarker: String) -> String? {
+            guard let start = controller.range(of: name),
+                  let end = controller.range(of: endMarker,
+                                             range: start.upperBound..<controller.endIndex) else { return nil }
+            return String(controller[start.lowerBound..<end.lowerBound])
+        }
+        guard let labelStart = controller.range(of: "struct MenuBarStatusLabel: View"),
+              let refresh = region("private func refreshStatusItemImage()",
+                                   until: "private static func drawnFallbackIcon"),
+              let bridge = region("private func attachPauseBridgeIfNeeded()",
+                                  until: "private func refreshStatusItemImage"),
+              let install = region("private func installStatusItemIfNeeded()",
+                                   until: "private func makeMenu()") else {
+            return XCTFail("读不到标签/refresh/bridge/install 的段 ⇒ 这条接线判据没有对象")
+        }
+        let label = String(controller[labelStart.lowerBound...])
+        XCTAssertTrue(label.contains("@AppStorage(\"recordingPaused\")"),
+                      "标签视图读的不是设置页/采集侧那把钥匙 ⇒ 两边会各说各话")
+        XCTAssertTrue(label.contains("Image(systemName: MenuBarController.statusSymbolName)"),
+                      "标签视图没有引用那颗符号常量 ⇒ 两棵表面各画各的")
+        XCTAssertTrue(label.contains("MenuBarStatusPresentation.slashFrom"),
+                      "暂停斜杠没有走共享端点 ⇒ 两棵表面会画成两个记号")
+        XCTAssertTrue(refresh.contains("historyStore?.isRecordingPaused"),
+                      "12 的 refresh 没读暂停状态 ⇒ 开关拨了图标不动")
+        XCTAssertTrue(refresh.contains("makeStatusBarIcon(paused: paused)"),
+                      "12 的 refresh 交的不是暂停变体 ⇒ 暂停记号永远不出现")
+        XCTAssertTrue(bridge.contains("UserDefaults.didChangeNotification"),
+                      "12 的图标没有订阅 defaults 变化 ⇒ 开关拨了图标不动")
+        XCTAssertTrue(install.contains("attachPauseBridgeIfNeeded()"),
+                      "install 没有挂订阅 ⇒ 订阅永远不会生效")
+        XCTAssertTrue(install.contains("makeStatusBarIcon(paused:"),
+                      "install 建状态项时没按当前暂停状态出图")
+    }
+
     /// 源码那一格：symbolName **只许出现一次**（在 `MenuBarController` 的声明里），
     /// 两个调用点都引用常量。写死字面量就是"两棵表面各画各的"的下一次开端。
     func testBothSurfacesReferenceTheOneSymbolName() throws {
         let app = codeOnly(try productSource(named: "App.swift"))
         let controllerSource = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
-        XCTAssertTrue(app.contains("systemImage: MenuBarController.statusSymbolName"),
-                      "13+ 的 `MenuBarExtra` 没引用那颗常量 ⇒ 两棵表面的图标又能各写各的了（BACKLOG 164）")
+        // R418：13+ 从 `systemImage:` 换成标签视图；符号常量仍然只在一处声明，
+        // 标签视图与 12 的 `NSImage(systemSymbolName:)` 两个调用点都引用它。
+        XCTAssertTrue(app.contains("label: {") && app.contains("MenuBarStatusLabel()"),
+                      "13+ 的 `MenuBarExtra` 没有挂 `MenuBarStatusLabel` ⇒ 菜单栏回到静态系统符号，暂停状态看不见")
+        XCTAssertTrue(controllerSource.contains("Image(systemName: MenuBarController.statusSymbolName)"),
+                      "标签视图没引用那颗常量 ⇒ 两棵表面的图标又能各写各的了（BACKLOG 164）")
         XCTAssertFalse(app.contains("systemImage: \""),
                        "App.swift 里又出现了写字面量的 `systemImage: \"…\"` ⇒ 请引用 `MenuBarController.statusSymbolName`")
         XCTAssertTrue(controllerSource.contains("static let statusSymbolName"),

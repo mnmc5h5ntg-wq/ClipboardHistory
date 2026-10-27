@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
@@ -20,6 +21,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// 165 的那根线：菜单开着时，异步刷新落地要有人重填。
     /// 只留一份 ⇒ 重复 attach 会顶掉旧的（不攒订阅）。
     private var refreshBridge: AnyCancellable?
+    /// R418 / BACKLOG 443：12 那颗状态项图标要跟着「暂停记录」换记号。
+    /// 菜单栏那颗图不是 SwiftUI 的，`@AppStorage` 不会替它重画 ⇒ 自己订阅 defaults 变化。
+    private var pauseBridge: AnyCancellable?
 
         private var statusItem: NSStatusItem?
     private var commandHandler: CommandHandler?
@@ -54,12 +58,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let image = makeStatusBarIcon()
-        item.button?.image = image
+        let paused = historyStore?.isRecordingPaused ?? false
+        item.button?.image = makeStatusBarIcon(paused: paused)
         item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = "时间剪史"
+        item.button?.toolTip = MenuBarStatusPresentation.accessibilityLabel(paused: paused)
         item.menu = makeMenu()
         statusItem = item
+        attachPauseBridgeIfNeeded()
         LifecycleDebugLogger.log("NSStatusItem created")
         logStatusItemState(context: "after installStatusItemIfNeeded")
     }
@@ -210,20 +215,66 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// （审计第二轮 09-08：拿不到的表面不是"不能判"，是要给判据留一个入口）。
     /// 这张图**不经过** `NSStatusItem`，所以材质、圆角、点击高亮仍然拍不到，
     /// 拍得到的是素材本身（笔画、留白、是否出框）。
-    func makeStatusBarIcon() -> NSImage {
+    func makeStatusBarIcon(paused: Bool = false) -> NSImage {
         // 首选系统符号：与 13+ 的 `MenuBarExtra` 同一个 symbolName ⇒ 同一个素材、
         // 同一套笔画权重（与相邻菜单栏图标对齐），模板渲染由系统按明暗档染色。
+        let base: NSImage
         if let symbol = NSImage(systemSymbolName: Self.statusSymbolName,
                                accessibilityDescription: "时间剪史") {
             symbol.isTemplate = true
             // 沿用这棵树一直占的那一格 18×18：改尺寸会把"换素材"变成"改几何"，
             // 两件事要能分开归因（帧里的墨包围盒会替我盯着有没有出框）。
             symbol.size = NSSize(width: 18, height: 18)
-            return symbol
+            base = symbol
+        } else {
+            // 只有系统符号拿不到时才走（deployment target 是 12，SF Symbols 在 11+ 就有；
+            // 这一支是"别把菜单栏留空"的兜底，不是第二条设计）。
+            base = Self.drawnFallbackIcon()
         }
-        // 只有系统符号拿不到时才走（deployment target 是 12，SF Symbols 在 11+ 就有；
-        // 这一支是"别把菜单栏留空"的兜底，不是第二条设计）。
-        return Self.drawnFallbackIcon()
+        // R418：暂停时两棵表面画同一个斜杠 —— 13+ 的 label 与 12 的这张图共用
+        // `MenuBarStatusPresentation` 的角度/线宽/文案，不许各写一个记号。
+        return paused ? Self.imageAddingPauseSlash(to: base) : base
+    }
+
+    /// 在 18×18 的模板图上加一道斜杠（R418）。模板图只有 alpha 有意义：
+    /// 黑色只是"这里有不透明像素"，菜单栏会按明暗档重新染色。
+    private static func imageAddingPauseSlash(to base: NSImage) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            base.draw(in: rect)
+            let path = NSBezierPath()
+            // SwiftUI 的坐标系 y 向下，AppKit 的 y 向上 ⇒ 端点翻转一次；
+            // 两棵表面画出来的仍是同一条左上→右下的斜杠。
+            path.move(to: NSPoint(x: MenuBarStatusPresentation.slashFrom.x,
+                                  y: rect.height - MenuBarStatusPresentation.slashFrom.y))
+            path.line(to: NSPoint(x: MenuBarStatusPresentation.slashTo.x,
+                                  y: rect.height - MenuBarStatusPresentation.slashTo.y))
+            path.lineWidth = MenuBarStatusPresentation.slashLineWidth
+            path.lineCapStyle = .round
+            NSColor.black.setStroke()
+            path.stroke()
+            return true
+        }
+        image.isTemplate = true
+        image.size = size
+        image.accessibilityDescription = MenuBarStatusPresentation.accessibilityLabel(paused: true)
+        return image
+    }
+
+    /// 12：订阅默认值变化，把「暂停记录」立刻画进状态项。
+    /// 13+ 不走这里（`MenuBarExtra` 的 label 自己读 `@AppStorage`）。
+    private func attachPauseBridgeIfNeeded() {
+        guard pauseBridge == nil else { return }
+        pauseBridge = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshStatusItemImage() }
+    }
+
+    private func refreshStatusItemImage() {
+        guard let statusItem else { return }
+        let paused = historyStore?.isRecordingPaused ?? false
+        statusItem.button?.image = makeStatusBarIcon(paused: paused)
+        statusItem.button?.toolTip = MenuBarStatusPresentation.accessibilityLabel(paused: paused)
     }
 
     /// 兜底那颗手画的剪贴板。**默认路径不画它**（上面拿到符号就直接返回）。
@@ -335,4 +386,49 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         perform(.quit)
     }
 
+}
+
+/// 菜单栏那颗图标的暂停状态（R418 / BACKLOG 443）。
+///
+/// 两棵表面（13+ 的 `MenuBarExtra` label 与 12 的 `NSStatusItem` 图）必须画同一个记号：
+/// 斜杠的端点、线宽、无障碍文案只在这里写一次。13+ 的菜单栏标签由系统合成，
+/// 离屏只能拍 `MenuBarStatusLabel` 本身（真菜单栏那条通道具名 NOT-RUN，见台账）。
+enum MenuBarStatusPresentation {
+    /// 斜杠在 18×18 格里的两个端点（SwiftUI 的 y 向下；AppKit 画的时候翻 y）。
+    static let slashFrom = CGPoint(x: 3.2, y: 3.2)
+    static let slashTo = CGPoint(x: 14.8, y: 14.8)
+    static let slashLineWidth: CGFloat = 1.6
+
+    static func accessibilityLabel(paused: Bool) -> String {
+        paused ? "时间剪史，已暂停记录" : "时间剪史"
+    }
+}
+
+/// 13+ 的 `MenuBarExtra` 标签：同一颗 `clipboard` 符号，暂停时多一道斜杠。
+///
+/// 为什么不是换一颗符号：R110 把「两棵表面同一个入口」立成了守卫；
+/// 暂停是**同一颗图标的状态**，不是另一个入口 —— 换符号会让它在菜单栏里变成另一个 App。
+/// 符号/斜杠/文案都从产品常量来；`pausedForCapture` 只给夹具，产品读 `@AppStorage`。
+struct MenuBarStatusLabel: View {
+    @AppStorage("recordingPaused") private var recordingPaused = false
+    @Environment(\.pausedForCapture) private var pausedForCapture
+
+    private var paused: Bool { pausedForCapture ?? recordingPaused }
+
+    var body: some View {
+        Image(systemName: MenuBarController.statusSymbolName)
+            .frame(width: 18, height: 18)
+            .overlay {
+                if paused {
+                    Path { path in
+                        path.move(to: MenuBarStatusPresentation.slashFrom)
+                        path.addLine(to: MenuBarStatusPresentation.slashTo)
+                    }
+                    .stroke(.primary,
+                            style: StrokeStyle(lineWidth: MenuBarStatusPresentation.slashLineWidth,
+                                               lineCap: .round))
+                }
+            }
+            .accessibilityLabel(MenuBarStatusPresentation.accessibilityLabel(paused: paused))
+    }
 }

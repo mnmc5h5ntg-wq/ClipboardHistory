@@ -1,5 +1,5 @@
 {
-  "count": 210,
+  "count": 214,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -199,6 +199,10 @@
     "sidebar-row-hover-300x520-light.png": "49d418df666c9750602a1824f14b61197667524598170b4571bb10e1ea275caa",
     "statusitem-glyph-160x90-dark.png": "136a265ebde28535ae30cdb40530ee0c8ad553f82fab4a53a9bb0da04b11d1f0",
     "statusitem-glyph-160x90-light.png": "e8aa8fb157c096a239b5a149c2512529a51285f87b7c303fca577994ff423158",
+    "statusitem-label-idle-64x40-dark.png": "6bbe17b2f2a66df156d96cdab26e64af121051bc45ccaa30045ea7c1b48ba353",
+    "statusitem-label-idle-64x40-light.png": "9dbe9f0a0b354e3b6ab8b3b7a315126c8c39784d9d9621648403e4a81c9ea22c",
+    "statusitem-label-paused-64x40-dark.png": "61d416b6ddd2542d3a56b1f1720aecd449181043e34fb8e34ab78ddee6229b69",
+    "statusitem-label-paused-64x40-light.png": "c42eb60ca73ee5c2aeca05a83ac265c9d8d08275eadf9650bb30117523d3f4a4",
     "sysref-button-idle-60x56-dark.png": "fb6823cc3823c4f92a1a4a008dfa6fffdbf23841f0e259d1adea677099f20d1e",
     "sysref-button-idle-60x56-light.png": "cbebffc5eea4025028774012fd47a202c74b6c2f73607c141a0d37ebc3ccca20",
     "sysref-button-press-60x56-dark.png": "3a3485778e6956a37e2797969597eb056a9b7e09f51902aedb59d09fe25effee",
