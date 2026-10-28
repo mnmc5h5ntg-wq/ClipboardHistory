@@ -27,15 +27,21 @@ enum InlineCodeBandChoice {
         let ink: Int
         /// 判据自己的对象：带内文字墨宽与带宽之差（pt）。
         let padding: Double
+        /// R470：同一行里**最长的一条带 run**（px）。一行若是 code-block 全宽底，
+        /// 这条会远大于 `maxSpan`，那么这一行上的短 run 只是块底的碎片，不是行内码的带。
+        let rowMaxBandRun: Int
         var span: Int { right - left + 1 }
     }
 
     /// 选**内边距最大**的候选：真带 6pt、假文字带 3pt、带内子段 1pt。
     /// 覆盖率 0.55 只作门槛（R461 用它排掉文字抗锯齿；R464 发现它单独会把真带切成子段）。
+    /// R470：**整行全宽块底的行整行排除**——runner dark 的 150/147/3.0 是 320pt code-block
+    /// 底里的一段，真带在同帧另一行（候选里 s20/p20 的碎片也是块底的一部分）。
     static func best(_ candidates: [Candidate], minSpan: Int, maxSpan: Int,
                      minCoverage: Double, minInk: Int) -> Candidate? {
         let valid = candidates.filter {
-            $0.span >= minSpan && $0.span <= maxSpan && $0.coverage >= minCoverage && $0.ink >= minInk
+            $0.span >= minSpan && $0.span <= maxSpan && $0.coverage >= minCoverage
+                && $0.ink >= minInk && $0.rowMaxBandRun <= maxSpan
         }
         return valid.max { a, b in
             if abs(a.padding - b.padding) > 0.01 { return a.padding < b.padding }
@@ -787,7 +793,8 @@ final class UICaptureTests: XCTestCase {
             guard let pill = Self.overlayPill(bytes: base, width: rep.pixelsWide,
                                               height: rep.pixelsHigh,
                                               bytesPerRow: rep.bytesPerRow,
-                                              pageLuma: page) else {
+                                              pageLuma: page,
+                                              maxGap: Int(24.0 * scale)) else {
                 return XCTFail("\(tag)：这张帧上读不到选中药丸（页底档=\(page)）⇒ 参照物不存在，"
                     + "先查捕获通道，不要把等式放宽")
             }
@@ -3980,9 +3987,9 @@ final class UICaptureTests: XCTestCase {
                   let listControl = try bandInk("quickpick-list", row: 2,
                                                 rect: CGRect(x: 40, y: 0, width: 100, height: 15)),
                   let typedExtension = try bandInk("quickpick-typed", row: 0,
-                                                   rect: CGRect(x: 160, y: 0, width: 130, height: 15)),
+                                                   rect: CGRect(x: 175, y: 0, width: 115, height: 15)),
                   let listExtension = try bandInk("quickpick-list", row: 2,
-                                                  rect: CGRect(x: 160, y: 0, width: 130, height: 15)) else {
+                                                  rect: CGRect(x: 175, y: 0, width: 115, height: 15)) else {
                 continue
             }
             emit("QUICKPICK_MATCH_REASON_BAND \(tag) typed 校准=\(typedControl) 扩展=\(typedExtension) "
@@ -3992,9 +3999,9 @@ final class UICaptureTests: XCTestCase {
             XCTAssertGreaterThan(listControl, 100,
                                  "\(tag)：list 行 2 的预览没有字 ⇒ 对照行在这台机器上没画出来")
             XCTAssertGreaterThan(typedExtension, 40,
-                                 "\(tag)：带理由的行在 x=160..290pt 只读到 \(typedExtension) 颗墨 ⇒ 理由没画出来")
+                                 "\(tag)：带理由的行在 x=175..290pt 只读到 \(typedExtension) 颗墨 ⇒ 理由没画出来")
             XCTAssertLessThan(listExtension, 10,
-                              "\(tag)：不带理由的对照行在 x=160..290pt 读到 \(listExtension) 颗墨 ⇒ 这一带不是空白，判据失去对照")
+                              "\(tag)：不带理由的对照行在 x=175..290pt 读到 \(listExtension) 颗墨 ⇒ 这一带不是空白，判据失去对照")
         }
     }
 
@@ -4129,6 +4136,102 @@ final class UICaptureTests: XCTestCase {
         if judged == 0 {
             throw XCTSkip("CROSS_YEAR_TIME_NOT_RUN：两种外观下都没读到浮层时间格")
         }
+    }
+
+    /// R470：浮层每一行要显示**来源 App 图标**（类型图标之后固定 16pt 槽；没有来源时留空）。
+    ///
+    /// 两条腿：① 从产品 cell 的 `NSImageView` 读 `image != nil` 的个数（5 行都有来源）；
+    /// ② 首行来源槽里必须有**彩色**像素（Safari 图标），负臂 `quickpick-no-source`
+    /// 的同一槽必须 0 彩度、来源图 nil —— 旧形状（没有这一列）两条都会露馅。
+    func testQuickPickRowsShowTheirSourceIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r470-source-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func coloredPixels(_ rep: NSBitmapImageRep, _ base: UnsafeMutablePointer<UInt8>,
+                           scale: Double) -> Int {
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            // 左列整段（类型 + 来源两枚图标）；本行里只有来源 App 图标是彩色的，
+            // 类型符号是 secondaryLabelColor、正文是灰/黑 ⇒ 彩色像素只会来自来源图标。
+            let x0 = Int((0.0 * scale).rounded()), x1 = Int((80.0 * scale).rounded())
+            let y0 = Int((57.0 * scale).rounded()), y1 = min(rep.pixelsHigh, Int((91.0 * scale).rounded()))
+            var count = 0
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let o = y * rep.bytesPerRow + x * spp
+                    let r = Int(base[o + rOff]), g = Int(base[o + rOff + 1]), b = Int(base[o + rOff + 2])
+                    if max(r, max(g, b)) - min(r, min(g, b)) > 20 { count += 1 }
+                }
+            }
+            return count
+        }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-list" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-list` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-source-\(tag).png")
+            var sourceImages = 0, typeImages = 0
+            _ = try render(fixture, appearance: appearance, to: file, inspect: { host in
+                var stack: [NSView] = [host]
+                while let view = stack.popLast() {
+                    if let image = view as? NSImageView,
+                       image.identifier?.rawValue == QuickPickController.sourceIconIdentifier.rawValue,
+                       image.image != nil { sourceImages += 1 }
+                    if let cell = view as? NSTableCellView, cell.imageView?.image != nil { typeImages += 1 }
+                    stack.append(contentsOf: view.subviews)
+                }
+            })
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：quickpick-list 帧读不回字节")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 420.0
+            let colored = coloredPixels(rep, base, scale: scale)
+            emit("QUICKPICK_SOURCE_ICON \(tag) 有图=\(sourceImages) 类型=\(typeImages) 首行彩度像素=\(colored)")
+            XCTAssertGreaterThanOrEqual(sourceImages, 5,
+                                        "\(tag)：5 行里只有 \(sourceImages) 个来源图标 ⇒ 来源列没画出来")
+            XCTAssertGreaterThanOrEqual(typeImages, 5,
+                                        "\(tag)：类型图标只剩 \(typeImages) 个 ⇒ 加来源列时把原列挤掉了")
+            XCTAssertGreaterThan(colored, 0,
+                                 "\(tag)：首行来源槽没有彩色像素 ⇒ 图标没真的画进去（或换成了灰色类型符号）")
+
+            guard let neg = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-no-source" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-no-source` ⇒ 负臂没有对象")
+            }
+            let negFile = scratch.appendingPathComponent("quickpick-no-source-\(tag).png")
+            var negSource = 0, negType = 0
+            _ = try render(neg, appearance: appearance, to: negFile, inspect: { host in
+                var stack: [NSView] = [host]
+                while let view = stack.popLast() {
+                    if let image = view as? NSImageView,
+                       image.identifier?.rawValue == QuickPickController.sourceIconIdentifier.rawValue,
+                       image.image != nil { negSource += 1 }
+                    if let cell = view as? NSTableCellView, cell.imageView?.image != nil { negType += 1 }
+                    stack.append(contentsOf: view.subviews)
+                }
+            })
+            guard let negData = try? Data(contentsOf: negFile),
+                  let negRep = NSBitmapImageRep(data: negData), let negBase = negRep.bitmapData else {
+                XCTFail("\(tag)：quickpick-no-source 帧读不回字节")
+                continue
+            }
+            let negColored = coloredPixels(negRep, negBase, scale: Double(negRep.pixelsWide) / 420.0)
+            emit("QUICKPICK_SOURCE_ICON_NEG \(tag) 来源图=\(negSource) 类型=\(negType) 彩度像素=\(negColored)")
+            XCTAssertEqual(negSource, 0, "\(tag)：没有来源的行不该有来源图标")
+            XCTAssertGreaterThanOrEqual(negType, 1, "\(tag)：没有来源的行仍要有类型图标")
+            XCTAssertEqual(negColored, 0, "\(tag)：没有来源时来源槽必须是空的（固定槽不画东西）")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("QUICKPICK_SOURCE_ICON_NOT_RUN：两种外观下都没有对象") }
     }
 
     /// R469：主列表跨年行的**时间行**也必须变宽（年份真的画进了行里，不只是浮层）。
@@ -6390,7 +6493,8 @@ final class UICaptureTests: XCTestCase {
                 for x in x0..<x1 {
                     prefix[x - x0 + 1] = prefix[x - x0] + (isInk(luma(x, y)) ? 1 : 0)
                 }
-                var out: [InlineCodeBandChoice.Candidate] = []
+                struct RawRun { let left: Int; let right: Int; let span: Int; let ink: Int; let coverage: Double }
+                var runs: [RawRun] = []
                 var i = 0
                 while i < xs.count {
                     var j = i + 1
@@ -6398,22 +6502,27 @@ final class UICaptureTests: XCTestCase {
                     let left = xs[i], right = xs[j - 1]
                     let span = right - left + 1
                     let ink = prefix[right - x0 + 1] - prefix[left - x0]
+                    runs.append(RawRun(left: left, right: right, span: span, ink: ink,
+                                       coverage: Double(j - i) / Double(span)))
+                    i = j
+                }
+                let rowMax = runs.map(\.span).max() ?? 0
+                return runs.map { run in
                     var inkLeft = Int.max, inkRight = -1
                     for yy in yLo...yHi {
-                        for xx in left...right where isInk(luma(xx, yy)) {
+                        for xx in run.left...run.right where isInk(luma(xx, yy)) {
                             inkLeft = min(inkLeft, xx)
                             inkRight = max(inkRight, xx)
                         }
                     }
                     let inkWidth = inkRight >= inkLeft
                         ? Double(inkRight - inkLeft + 1) / scale : 0
-                    out.append(InlineCodeBandChoice.Candidate(
-                        row: y, left: left, right: right,
-                        coverage: Double(j - i) / Double(span), ink: ink,
-                        padding: Double(span) / scale - inkWidth))
-                    i = j
+                    return InlineCodeBandChoice.Candidate(
+                        row: y, left: run.left, right: run.right,
+                        coverage: run.coverage, ink: run.ink,
+                        padding: Double(run.span) / scale - inkWidth,
+                        rowMaxBandRun: rowMax)
                 }
-                return out
             }
 
             // 1) 所有候选行里选**覆盖率最高**的 run（真带 padding 行 ~1.0；假文字带 ~0.55）。
@@ -6435,7 +6544,8 @@ final class UICaptureTests: XCTestCase {
             let topCandidates = candidates.sorted { $0.padding > $1.padding }.prefix(5)
                 .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
                     + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
-                    + ":p\(String(format: "%.1f", $0.padding))" }
+                    + ":p\(String(format: "%.1f", $0.padding))"
+                    + ":m\(String(format: "%.1f", Double($0.rowMaxBandRun) / scale))" }
                 .joined(separator: ",")
             emit("INLINE_CODE_DIAG \(tag) 选行=\(bandRow)"
                  + " 页=\(String(format: "%.0f", tones?.page ?? -1))"
@@ -8146,19 +8256,28 @@ final class UICaptureTests: XCTestCase {
 
     /// 不覆盖管线：这是选择器的纯函数契约；像素证人在 `testInlineCodeBackgroundHasPadding`。
     func testInlineCodeBandChoicePrefersTheCoveredRun() {
-        let trueBand = InlineCodeBandChoice.Candidate(row: 10, left: 40, right: 124, coverage: 0.9, ink: 80, padding: 6)
-        let falseBand = InlineCodeBandChoice.Candidate(row: 20, left: 20, right: 169, coverage: 0.55, ink: 147, padding: 3)
-        let subBand = InlineCodeBandChoice.Candidate(row: 15, left: 50, right: 128, coverage: 1.0, ink: 78, padding: 1)
+        let trueBand = InlineCodeBandChoice.Candidate(row: 10, left: 40, right: 124, coverage: 0.9, ink: 80, padding: 6, rowMaxBandRun: 85)
+        let falseBand = InlineCodeBandChoice.Candidate(row: 20, left: 20, right: 169, coverage: 0.55, ink: 147, padding: 3, rowMaxBandRun: 150)
+        let subBand = InlineCodeBandChoice.Candidate(row: 15, left: 50, right: 128, coverage: 1.0, ink: 78, padding: 1, rowMaxBandRun: 79)
         XCTAssertEqual(InlineCodeBandChoice.best([trueBand, falseBand, subBand], minSpan: 40, maxSpan: 150,
                                                  minCoverage: 0.55, minInk: 6)?.row, 10,
                        "假文字带（padding 3）与带内子段（padding 1）都不该盖过真带（padding 6）")
         XCTAssertNil(InlineCodeBandChoice.best([falseBand], minSpan: 40, maxSpan: 150,
                                                minCoverage: 0.56, minInk: 6),
                      "覆盖率不足的假带必须被排除（不是靠上界藏）")
-        let tooWide = InlineCodeBandChoice.Candidate(row: 30, left: 0, right: 159, coverage: 1.0, ink: 80, padding: 6)
+        let tooWide = InlineCodeBandChoice.Candidate(row: 30, left: 0, right: 159, coverage: 1.0, ink: 80, padding: 6, rowMaxBandRun: 160)
         XCTAssertNil(InlineCodeBandChoice.best([tooWide], minSpan: 40, maxSpan: 150,
                                                minCoverage: 0.55, minInk: 6),
                      "超过 150pt 的 run 不是行内码带")
+        // R470：runner dark 的 150/147/3.0 是 320pt code-block 底里的一段；它的 padding 20
+        // （块底无字）会压过真带的 6 ⇒ 必须靠「整行最长带 run > 150」把它整行排除。
+        let blockSegment = InlineCodeBandChoice.Candidate(row: 40, left: 30, right: 179, coverage: 1.0, ink: 147, padding: 20, rowMaxBandRun: 320)
+        XCTAssertEqual(InlineCodeBandChoice.best([blockSegment, trueBand], minSpan: 40, maxSpan: 150,
+                                                 minCoverage: 0.55, minInk: 6)?.row, 10,
+                       "全宽块底那一行上的 150pt 碎片必须被排除，真带（padding 6）胜出")
+        XCTAssertNil(InlineCodeBandChoice.best([blockSegment], minSpan: 40, maxSpan: 150,
+                                               minCoverage: 0.55, minInk: 6),
+                     "只剩全宽块底碎片时必须是 nil，不许拿它冒充行内码带")
     }
 
     func testCaptureKeyViews() throws {
@@ -9586,6 +9705,10 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-cross-year", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: self.makeCrossYearStore(), query: "")))
+        // R470：来源图标的负臂 —— 一条没有来源字段的记录；来源槽留空、标题轴不抖。
+        results.append(Fixture("quickpick-no-source", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makeNoSourceQuickPickStore(), query: "")))
         // R469：跨年时间的主列表行组件栈（不走 List：选中底在离屏通道是黑带，
         // 会盖住其中一行的时间行；这里只拍产品行本身 + timeReference）。
         results.append(Fixture("rows-cross-year", NSSize(width: 340, height: 160)) {
@@ -14856,6 +14979,20 @@ final class UICaptureTests: XCTestCase {
     /// R425：来源 App 图标那一格的负臂 —— 与 `detail-0-text` 同一条正文，只是没有来源字段。
     /// 必须走**存档载入**而不是 `store.add`：`add` 会经 `SystemContextCollector` 把当前前台应用
     /// 记成来源（测试进程里读到 `loginwindow`），负臂会自己长出「来自 loginwindow」。
+    /// R470：浮层来源图标的负臂 —— 一条没有来源字段的记录（走存档载入，避免 add 自动归因）。
+    func makeNoSourceQuickPickStore() -> HistoryStore {
+        let entry = makeClipboardEntry(
+            content: .text("没有来源的记录"),
+            timestamp: Self.referenceDate,
+            sourceUTIs: ["public.utf8-plain-text"]
+        )
+        return HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+    }
+
     func makeNoSourceDetailStore() -> HistoryStore {
         let entry = makeClipboardEntry(
             content: .text("这是一段用于视觉验收的普通文本记录，包含足够长度以便观察截断与换行表现 abcdefghijklmnop"),
@@ -16157,9 +16294,13 @@ final class UICaptureTests: XCTestCase {
     /// 暗档是 (70,70,70) 对 (30,30,30) ⇒ 差 40。R100 那把 python 尺用的是"与填充差 ≥40"，
     /// 于是它在**亮档整档读不到这一带**（门限落在一对悬崖上，BACKLOG 148 的 R102 追记 ①）。
     /// 12 这一档取在"两档都量到的最小差 35"与噪声之间；"宽度 ≥55%"把行内图标、文字这些短段全挡掉。
+    /// R470：`maxGap` 允许药丸材质带里出现**有界的**页色缺口 —— 来源 App 图标的白色像素
+    /// 与页底同档，严格 run 会在图标处断开，把浅色药丸的左沿读成图标后面那一截（25.0pt）。
+    /// 缺口 ≤24pt 视为"内容压在材质上"，不是"药丸结束"；默认 0 保持其余调用点原状。
     static func overlayPill(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
                             bytesPerRow: Int, pageLuma: Int,
-                            minDelta: Int = 12, minWidthShare: Double = 0.55)
+                            minDelta: Int = 12, minWidthShare: Double = 0.55,
+                            maxGap: Int = 0)
         -> (left: Int, top: Int, bottom: Int)? {
         guard width > 0, height > 0, minWidthShare > 0, minWidthShare <= 1 else { return nil }
         let minWidth = Int(Double(width) * minWidthShare)
@@ -16172,14 +16313,16 @@ final class UICaptureTests: XCTestCase {
         var lefts: [Int] = []
         var top = -1, bottom = -1
         for y in 0..<height {
-            var run = 0, best = 0, bestStart = 0, start = 0
+            var run = 0, best = 0, bestStart = 0, start = 0, gap = 0
             for x in 0..<width {
                 if abs(lumaAt(x, y) - pageLuma) >= minDelta {
                     if run == 0 { start = x }
                     run += 1
+                    gap = 0
                     if run > best { best = run; bestStart = start }
-                } else {
-                    run = 0
+                } else if run > 0 {
+                    gap += 1
+                    if gap > maxGap { run = 0; gap = 0 }
                 }
             }
             guard best >= minWidth else { continue }

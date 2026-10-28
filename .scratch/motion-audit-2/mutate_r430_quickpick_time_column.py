@@ -17,14 +17,14 @@ FILTER = ("testRowTimeSurvivesTheLongestTitle"
           "|testQuickPickSourceMatchReasonExtendsTheTypedRow"
           "|testQuickPickSourceOnlyMatchCarriesItsReason")
 
-CONSTRAINTS_NEEDLE = """                text.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
+CONSTRAINTS_NEEDLE = """                text.leadingAnchor.constraint(equalTo: sourceIcon.trailingAnchor, constant: 6),
                 text.trailingAnchor.constraint(equalTo: time.leadingAnchor,
                                                constant: -QuickPickController.timeGap),
                 text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 time.trailingAnchor.constraint(equalTo: cell.trailingAnchor,
                                                constant: -QuickPickController.timeTrailingInset),
 """
-CONSTRAINTS_MUTANT = """                text.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
+CONSTRAINTS_MUTANT = """                text.leadingAnchor.constraint(equalTo: sourceIcon.trailingAnchor, constant: 6),
                 text.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 time.leadingAnchor.constraint(equalTo: text.trailingAnchor,
                                               constant: QuickPickController.timeGap),
