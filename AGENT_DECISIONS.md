@@ -7922,3 +7922,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML 的 `<del>` 未接（484）；删除线本身由 AppKit 画，产品不自绘。
 - 回滚：把 `struck` 分支删掉即可；或 `git revert`。
 
+## D-450 弱化正文改用过 4.5:1 的动态色（R454）
+
+- 背景：R450 完成项、R453 删除线的弱化色 `secondaryLabelColor` 亮档实测 3.95:1，低于 14pt 正文 4.5:1；引用块早因同一原因拒绝过它。
+- 决定：新 `DeEmphasisPresentation.textColor` 动态色（亮黑 58%、暗白 62%）；完成项与删除线共用；仍比正文弱。
+- 理由：弱化是装饰，不能把内容画到读不清；两档都过 4.5:1。
+- 兼容性/迁移：detail-tasks/detail-strike/detail-markdown-rendered 共 6 张旧帧变化；基线名单 262 同 commit 更新。
+- 边界：选中/高亮底色上的对比度没有帧（485）；HTML `<del>` 未接（484）。
+- 回滚：颜色改回 secondaryLabelColor；或 `git revert`。
+

@@ -5447,6 +5447,103 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R454：弱化正文（完成项/删除线）的颜色必须过 14pt 正文的 4.5:1。
+    ///
+    /// R450/R453 用的 `secondaryLabelColor` 亮档实测 3.95:1；这里读 `detail-tasks` 帧上
+    /// 完成项文字的**核心色**（亮档最深的墨 / 暗档最亮的墨）与正文底色，算 sRGB 相对亮度比。
+    /// 旧形状亮档 3.95 会红；新动态弱化色两档都应 ≥4.5。
+    func testDeEmphasizedTextMeetsContrast() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r454-deemph-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        func channel(_ c: Double) -> Double {
+            c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        func relativeLuminance(_ r: Double, _ g: Double, _ b: Double) -> Double {
+            0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+        }
+        func contrast(_ a: Double, _ b: Double) -> Double {
+            let hi = max(a, b), lo = min(a, b)
+            return (hi + 0.05) / (lo + 0.05)
+        }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-tasks" }) else {
+                return XCTFail("\(tag)：找不到 `detail-tasks` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-tasks-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-tasks` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func rgb(_ x: Int, _ y: Int) -> (Double, Double, Double) {
+                let o = y * bytesPerRow + x * spp
+                return (Double(base[o + rOff]) / 255, Double(base[o + rOff + 1]) / 255,
+                        Double(base[o + rOff + 2]) / 255)
+            }
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let c = rgb(x, y)
+                return (0.299 * c.0 + 0.587 * c.1 + 0.114 * c.2) * 255
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = Int((300.0 * scale).rounded())
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int((60.0 * scale))..<min(height, Int((520.0 * scale))) {
+                var has = false
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, min(height, Int((520.0 * scale))) - 1)) }
+            let rows = Array(bands.suffix(2))
+            guard rows.count == 2 else {
+                emit("DEEMPHASIS_CONTRAST_NOT_RUN=runner-detail-frame-plain \(tag) 带=\(bands.count)")
+                continue
+            }
+            let checked = rows[0]
+            var core: (Double, Double, Double)?
+            var coreLuma = appearance == .darkAqua ? -1.0 : 999.0
+            for y in checked.top...checked.bottom {
+                for x in Int((40.0 * scale).rounded())..<x1 where isInk(luma(x, y)) {
+                    let value = luma(x, y)
+                    let better = appearance == .darkAqua ? value > coreLuma : value < coreLuma
+                    if better { coreLuma = value; core = rgb(x, y) }
+                }
+            }
+            guard let core else {
+                emit("DEEMPHASIS_CONTRAST_NOT_RUN=text-band-empty \(tag)")
+                continue
+            }
+            let bg = rgb(min(rep.pixelsWide - 1, Int((600.0 * scale).rounded())),
+                         (checked.top + checked.bottom) / 2)
+            let textLum = relativeLuminance(core.0, core.1, core.2)
+            let bgLum = relativeLuminance(bg.0, bg.1, bg.2)
+            let ratio = contrast(textLum, bgLum)
+            emit("DEEMPHASIS_CONTRAST \(tag) 文字=\(String(format: "%.0f", coreLuma))"
+                 + " 底色=\(String(format: "%.0f", bg.0 * 255))"
+                 + " 比=\(String(format: "%.2f", ratio))")
+            XCTAssertGreaterThanOrEqual(ratio, 4.5,
+                                        "\(tag)：弱化正文对比 \(String(format: "%.2f", ratio)):1"
+                                        + " 低于 14pt 正文 4.5:1（旧 secondary 亮档 3.95）")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为

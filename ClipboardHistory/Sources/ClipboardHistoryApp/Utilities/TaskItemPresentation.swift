@@ -8,6 +8,7 @@ import AppKit
 enum TaskItemPresentation {
     static func dimsText(_ state: MarkdownBlock.TaskState?) -> Bool { state == .checked }
 
-    /// 动态色：完成项文字用次要色；未完成/普通项不动。
-    static var completedTextColor: NSColor { .secondaryLabelColor }
+    /// 动态色：完成项文字降一档；未完成/普通项不动。
+    /// R454：从 `secondaryLabelColor` 换成过 4.5:1 的弱化色（旧色亮档 3.95:1）。
+    static var completedTextColor: NSColor { DeEmphasisPresentation.textColor }
 }

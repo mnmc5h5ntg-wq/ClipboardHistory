@@ -286,7 +286,8 @@ enum MarkdownPresentation {
 
     /// 删除线文字（R453）：作者用 `~~` 标记的删除内容，和完成项同一档次要色 ——
     /// 删除内容应该退到后一排，不该和仍然有效的正文抢视线。
-    static var struckTextColor: NSColor { .secondaryLabelColor }
+    /// R454：与完成项共用过 4.5:1 的弱化色（旧 secondary 亮档 3.95:1）。
+    static var struckTextColor: NSColor { DeEmphasisPresentation.textColor }
 
     /// 把 run 的样式算成具体属性。
     static func attributes(for run: MarkdownInline, in block: MarkdownBlock,
