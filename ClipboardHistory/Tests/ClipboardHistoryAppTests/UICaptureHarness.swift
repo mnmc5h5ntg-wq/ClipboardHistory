@@ -8345,6 +8345,108 @@ final class UICaptureTests: XCTestCase {
         if judged == 0 { throw XCTSkip("TRUNCATION_NOTE_NOT_RUN：两种外观下都没有对象") }
     }
 
+    /// R473：数据页也要说出保存位置（隐私卡里有，但用户找"存在哪"时在数据页）。
+    ///
+    /// 判据读帧：路径行是**Latin 密集**的一行。2x 数"窄字簇"（宽 ≤9pt，Latin 字形；
+    /// CJK 与正文说明的宽字簇不算），1x 字形会连成词 ⇒ 改数总词簇（路径有空格，CJK 说明没有）。
+    /// 阈值按倍率取（不把 2x 的 20 抄到 1x）：2x ≥20 个窄簇、1x ≥5 个词簇。
+    func testSettingsDataPageShowsTheStoragePath() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r473-data-path-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-data" }) else {
+                return XCTFail("\(tag)：找不到 `settings-data` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-data-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：settings-data 帧读不回字节")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let width = rep.pixelsWide, height = rep.pixelsHigh
+            let bytesPerRow = rep.bytesPerRow, spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let x0 = Int((SettingsViewLayout.sidebarWidth + 12) * scale)
+            let x1 = min(width, Int((fixture.size.width - 12) * scale))
+            var histogram: [Int: Int] = [:]
+            for y in stride(from: Int(80 * scale), to: height, by: 2) {
+                for x in stride(from: x0, to: x1, by: 2) { histogram[Int(luma(x, y)) / 4, default: 0] += 1 }
+            }
+            let page = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+            func isInk(_ x: Int, _ y: Int) -> Bool { abs(luma(x, y) - page) > 30 }
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int(80 * scale)..<height {
+                var has = false
+                for x in x0..<x1 where isInk(x, y) { has = true; break }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, height - 1)) }
+            // 路径行是**等宽**的：窄簇的起点间隔应围着产品 pathFont 的 advance 连跑。
+            // 旧帧里最密的那条是 CJK 导出说明（窄簇 37 个，但等距连跑只有 3）⇒ 不能只数簇。
+            let advance = ("0" as NSString).size(withAttributes: [.font: SettingsPathPresentation.pathFont]).width
+            var maxRun = 0, maxTotal = 0, best = ""
+            for band in bands {
+                var cols = [Bool](repeating: false, count: x1 - x0)
+                for y in band.top...band.bottom {
+                    for x in x0..<x1 where isInk(x, y) { cols[x - x0] = true }
+                }
+                var clusters: [(Int, Int)] = []
+                var start = -1
+                for i in 0..<cols.count {
+                    if cols[i] { if start < 0 { start = i } }
+                    else if start >= 0 { clusters.append((start, i - 1)); start = -1 }
+                }
+                if start >= 0 { clusters.append((start, cols.count - 1)) }
+                let narrow = clusters.filter { Double($0.1 - $0.0 + 1) / scale <= 9.0 }
+                var run = 0, bandRun = 0
+                var prev: Int?
+                for cluster in narrow {
+                    if let previous = prev {
+                        let delta = Double(cluster.0 - previous) / scale
+                        if abs(delta - advance) <= 1.0 { run += 1 } else { run = 1 }
+                    } else { run = 1 }
+                    bandRun = max(bandRun, run)
+                    prev = cluster.0
+                }
+                if bandRun > maxRun {
+                    maxRun = bandRun
+                    best = "y=\(band.top)..\(band.bottom) 簇=\(clusters.count) 窄=\(narrow.count) 等距连跑=\(bandRun)"
+                }
+                maxTotal = max(maxTotal, clusters.count)
+            }
+            emit("SETTINGS_DATA_PATH \(tag) 带数=\(bands.count) 最大等距连跑=\(maxRun) 最大总簇=\(maxTotal) advance=\(String(format: "%.1f", advance)) \(best)")
+            guard bands.count >= 5 else {
+                emit("SETTINGS_DATA_PATH_NOT_RUN=settings-content-blank \(tag) 带数=\(bands.count)")
+                continue
+            }
+            judged += 1
+            if scale >= 1.5 {
+                XCTAssertGreaterThanOrEqual(maxRun, 10,
+                    "\(tag)：数据页没有等宽路径行（最大等距连跑 \(maxRun)）⇒ 保存位置没画出来")
+            } else {
+                XCTAssertGreaterThanOrEqual(maxTotal, 5,
+                    "\(tag)：1x 上数据页没有带空格的路径行（最大词簇 \(maxTotal)）⇒ 保存位置没画出来")
+            }
+        }
+        if judged == 0 { throw XCTSkip("SETTINGS_DATA_PATH_NOT_RUN：两种外观下都没有设置内容") }
+    }
+
     func testCaptureKeyViews() throws {
         guard let directory = outputDirectory else {
             throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染")

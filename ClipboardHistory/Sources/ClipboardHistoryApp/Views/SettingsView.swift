@@ -801,6 +801,10 @@ struct SettingsView: View {
                         Text("剪贴板历史保存在本地，不会上传到任何服务器。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        // R473：数据页是用户找"存在哪"的地方，路径不该只藏在隐私卡里。
+                        SettingsPathText(text: "保存位置：~/Library/Application Support/时间剪史/")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     // R96：这一格 `.padding(.vertical, 4)` 被删掉了 —— 它是**三段里只有第一段有**的
