@@ -8280,6 +8280,73 @@ final class UICaptureTests: XCTestCase {
                      "只剩全宽块底碎片时必须是 nil，不许拿它冒充行内码带")
     }
 
+    /// R471：截断说明是**界面说明**，字号必须小于正文（不是最后一段内容）。
+    ///
+    /// 判据从产品渲染出的 NSTextView 读：说明出现次数、说明的 `.font` 与正文的 `.font`。
+    /// 相对量（说明 < 正文 −1pt），不抄产品字号常数。像素帧 `detail-markdown-truncated` 滚到底。
+    func testTruncationNoteSitsBelowTheBodyTier() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r471-truncation-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let parsed = MarkdownParser.parse(Self.truncatedFixtureBody)
+        let parsedText = MarkdownPresentation.attributedString(for: parsed)
+        emit("TRUNCATION_PARSE 截断=\(parsed.isTruncated) 块=\(parsed.blocks.count)"
+             + " 属性串长=\(parsedText.length) 含说明=\(parsedText.string.contains(MarkdownParsingPolicy.truncationNote))")
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-markdown-truncated" }) else {
+                return XCTFail("\(tag)：找不到 `detail-markdown-truncated` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("truncated-\(tag).png")
+            var noteSize: CGFloat = -1, bodySize: CGFloat = -1, noteCount = 0
+            var textFound = false, textLength = 0
+            var prefix = "", suffix = "", hasHeading = false, hasNoteText = false
+            _ = try render(fixture, appearance: appearance, to: file, inspect: { host in
+                var stack: [NSView] = [host]
+                var textView: ChineseSelectableNSTextView?
+                while let view = stack.popLast() {
+                    if let text = view as? ChineseSelectableNSTextView { textView = text; break }
+                    stack.append(contentsOf: view.subviews)
+                }
+                guard let text = textView else { return }
+                textFound = true
+                textLength = text.string.count
+                prefix = String(text.string.prefix(60))
+                suffix = String(text.string.suffix(80))
+                hasHeading = text.string.contains("# 截断")
+                hasNoteText = text.string.contains("后面的内容没有渲染")
+                let ns = text.string as NSString
+                let noteRange = ns.range(of: MarkdownParsingPolicy.truncationNote)
+                let bodyRange = ns.range(of: "这是一段用于截断提示验收的长文本")
+                guard noteRange.location != NSNotFound, bodyRange.location != NSNotFound else { return }
+                noteCount = ns.components(separatedBy: MarkdownParsingPolicy.truncationNote).count - 1
+                let attr = text.attributedString()
+                if let font = attr.attribute(.font, at: noteRange.location, effectiveRange: nil) as? NSFont {
+                    noteSize = font.pointSize
+                }
+                if let font = attr.attribute(.font, at: bodyRange.location, effectiveRange: nil) as? NSFont {
+                    bodySize = font.pointSize
+                }
+            })
+            emit("TRUNCATION_NOTE \(tag) 找到=\(textFound) 文长=\(textLength) 说明字号=\(noteSize) 正文字号=\(bodySize) 说明出现=\(noteCount)"
+                 + " 标题标记=\(hasHeading) 说明文本=\(hasNoteText) 首=\(prefix.debugDescription) 尾=\(suffix.debugDescription)")
+            guard noteSize > 0, bodySize > 0, noteCount == 1 else {
+                emit("TRUNCATION_NOTE_NOT_RUN=\(tag) 说明或正文没有读到")
+                continue
+            }
+            judged += 1
+            XCTAssertLessThan(noteSize, bodySize,
+                              "\(tag)：截断说明 \(noteSize)pt 不小于正文 \(bodySize)pt ⇒ 它会被读成最后一段内容")
+            XCTAssertLessThanOrEqual(noteSize, bodySize - 1.0,
+                                     "\(tag)：说明与正文字号只差 \(bodySize - noteSize)pt（<1）⇒ 层级没有拉开")
+        }
+        if judged == 0 { throw XCTSkip("TRUNCATION_NOTE_NOT_RUN：两种外观下都没有对象") }
+    }
+
     func testCaptureKeyViews() throws {
         guard let directory = outputDirectory else {
             throw XCTSkip("未设置 CLIPBOARD_HISTORY_UI_SHOTS，跳过离屏渲染")
@@ -10062,6 +10129,22 @@ final class UICaptureTests: XCTestCase {
             let target = self.makeMarkdownStore()
             self.assertMarkdownFixturePremise(target, role: "detail-markdown-source")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
+        })
+        // R471：超过 40k 的 Markdown 尾部会追加「后面的内容没有渲染」说明。
+        // 这条说明是**界面说明**，必须是 meta 字号；夹具渲染后滚到底，帧上能看到它。
+        results.append(Fixture("detail-markdown-truncated", NSSize(width: 720, height: 520), settle: {
+            RunLoop.current.run(until: Date().addingTimeInterval(2.0))
+        }) {
+            AnyView(DetailView(historyStore: self.makeTruncatedMarkdownStore(), initialMarkdownMode: .rendered))
+        }.withInteract { window in
+            var stack: [NSView] = window.contentView.map { [$0] } ?? []
+            var textView: ChineseSelectableNSTextView?
+            while let view = stack.popLast() {
+                if let text = view as? ChineseSelectableNSTextView { textView = text; break }
+                stack.append(contentsOf: view.subviews)
+            }
+            textView?.scrollToEndOfDocument(nil)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         })
         // R450：一勾一未勾、正文逐字相同的两行任务项 —— 完成项的文字应弱一档。
         results.append(Fixture("detail-tasks", NSSize(width: 720, height: 520)) {
@@ -14259,6 +14342,29 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.markdownFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R471：截断夹具的正文（测试也要直接 parse 它，分清产品展示层与视图源串）。
+    static let truncatedFixtureBody: String = {
+        let first = "这是一段用于截断提示验收的长文本，带 `inline` 与 [链接](https://example.com)。\n\n"
+        return "# 截断\n\n" + first
+            + String(repeating: "这是一段用于截断提示验收的长文本。\n\n", count: 2400)
+    }()
+
+    /// R471：截断夹具 —— 正文超过 `maximumRenderedCharacters`，尾部会追加界面说明。
+    private func makeTruncatedMarkdownStore() -> HistoryStore {
+        let body = Self.truncatedFixtureBody
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(body),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)

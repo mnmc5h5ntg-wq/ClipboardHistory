@@ -407,9 +407,11 @@ enum MarkdownPresentation {
             // `appliesWideContentBackground` 仍是"这一块要不要宽底"的唯一策略。
         }
         if document.isTruncated {
+            // R471：这句话是**界面说明**（"后面的没渲染，去原文看"），不是剪贴板正文。
+            // 用正文字号接在正文末尾时，它读起来像最后一段内容；降到 meta 字号让它明确退居说明层。
             let start = result.length
             result.append(NSAttributedString(string: MarkdownParsingPolicy.truncationNote,
-                                             attributes: [.font: bodyFont,
+                                             attributes: [.font: NSFont.systemFont(ofSize: DetailTypography.metaFontSize),
                                                           .foregroundColor: NSColor.secondaryLabelColor]))
             result.addAttribute(.paragraphStyle, value: paragraphStyle(for: MarkdownBlock(kind: .paragraph, runs: [])),
                                 range: NSRange(location: start, length: result.length - start))

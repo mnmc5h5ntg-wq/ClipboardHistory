@@ -8085,3 +8085,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner dark 的新选择器未跑（NOT-RUN）；`maxGap` 只在一条判据传 24，其余调用点默认 0。
 - 回滚：撤 `rowMaxBandRun` 条件与 `maxGap` 参数；或 `git revert`。
 
+## D-468 截断说明退到 meta 字号，明确它不是正文（R471）
+
+- 背景：正文超过 40k 时尾部的「后面的内容没有渲染」说明用正文字号 14pt 接在最后一段后；它是界面说明，却读起来像剪贴板内容的一部分。
+- 决定：说明改用 `DetailTypography.metaFontSize`（11pt），仍 secondary 色；不改变说明文案、不隐藏内容；正文照旧 40k 截断。
+- 理由：说明与正文必须是两个层级；11pt 与正文 14pt 相差 3pt，帧上能一眼分开。相对判据（说明 < 正文 −1pt）不抄产品常数。
+- 兼容性/迁移：只影响 `document.isTruncated` 的文档；既有 Markdown 帧 0 变化；2 张新帧、基线 286→288。
+- 边界：说明仍是 secondary 11pt（对比度 4.10:1，低于小字 4.5）；它是提示不是正文，先记录（BACKLOG 534）；runner 1x 的说明字号读数待读。
+- 回滚：改回 `bodyFont`；或 `git revert`。
+

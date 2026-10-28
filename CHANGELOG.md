@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情截断说明降到 meta 字号（11 vs 正文 14；2 张新帧、基线 288）（R471 / 第 470 轮 / Round 468 / U-1779…U-1784 · 产品 1 文件 + 判据）
+
+
 ### 浮层行补来源 App 图标（5/5 有图、首行 412 彩度；12 张旧帧变化 + 2 张新帧、基线 286）+ inline 全宽块底门与药丸 gap 容忍（R470 / 第 469 轮 / Round 467 / U-1773…U-1778 · 产品 1 文件 + 判据/仪器）
 
 
