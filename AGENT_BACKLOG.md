@@ -10405,3 +10405,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：首版 maxNarrow 37 在新帧过；旧帧（无路径）同一 CJK 导出说明也是 51/37 ⇒ 尺没读对象。
     修法：等宽行的判据用「等距连跑」或直接读字体结构量；窄簇数量只留诊断。
 
+**541. R473 补记与 R474 的跑仍未读（R474 观察）**
+    现象：`PUSH_BLOCKED=network`（HEAD=04a4022、origin/main=c3b8732、ahead=2）⇒ R473 的两笔补记没有跑、R474 的提交也还没建；`gh` EOF。
+    修法：网络恢复后先验 remote 再快进 push；随后读 R473/R474 全部失败步骤，`INLINE_CODE_DIAG dark` 拿到数据再改检测。
+
+**542. `QUICKPICK_LIST_RULE` 的 runner 1x 与空结果态未签收**（R474 观察）
+    现象：本机 2x 六帧均 `线数=1 y=71px 厚=2px 宽=792px`；1x 上 1pt 线可能只占 1px，空结果态的布局分支也不同。
+    修法：下一跑读 `QUICKPICK_LIST_RULE` 的两档与 quickpick-empty；读不到就具名 NOT-RUN，不改 90%/4pt 地板。
+
+**543. NSBox(separator) 的厚度/boxType 改不出「有/无」——两把空刀**（R474 观察）
+    现象：`height 1→0` 与 `boxType .custom` 都仍画一条 1pt 线，只有 `alphaValue=0` 能撤掉像素。
+    修法：以后要撤这条线用 alpha/隐藏或换控件；「改高度变粗」不作为视觉证人。
+

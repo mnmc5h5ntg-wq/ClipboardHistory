@@ -6,10 +6,12 @@ ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 HARNESS = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "testQuickPickSearchLineSharesTheRowsColumn"
-OLD = "                                              maxGap: Int(24.0 * scale)) else {"
+OLD = ("                                              maxGap: Int(24.0 * scale),\n"
+       "                                              minHeight: Int(6.0 * scale)) else {")
 MUTATIONS = [
     ("M1281", "撤掉药丸材料的 gap 容忍（回严格 run）", HARNESS, OLD,
-     "                                              maxGap: 0) else {",
+     ("                                              maxGap: 0,\n"
+      "                                              minHeight: Int(6.0 * scale)) else {"),
      ["药丸的左沿在"]),
 ]
 

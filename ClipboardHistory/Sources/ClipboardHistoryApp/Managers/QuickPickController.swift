@@ -361,6 +361,16 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         content.addSubview(stack)
         content.addSubview(emptyBox)
+        // R474：搜索框与列表之间的 1pt 分隔线。它**不占行高**（落在搜索框下方那 8pt 间距的
+        // 下沿、正好是候选列表的顶边），所以列表行几何与所有固定 y 判据一字未动；
+        // 只把"输入区"和"候选区"从一份留白里分开。命令面板的常见语言。
+        // 位置刻意取 `scroll.topAnchor` 而不是 `field.bottomAnchor`：搜索框获得焦点/悬停时
+        // 背后那层描边还要向下多出 4pt（`QuickPickSearchBackdrop` 的底边），贴在底边上的线
+        // 会从焦点环**里面**穿过去（R474 焦点帧直看）。
+        let listSeparator = NSBox()
+        listSeparator.boxType = .separator
+        listSeparator.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(listSeparator)
         // R449：底部键盘操作提示。它自己占一行高度，表格让出这一行（stack 底 = 提示顶 - 4）。
         let hint = NSTextField(labelWithString: QuickPickKeyboardHint.text)
         hint.font = QuickPickKeyboardHint.font
@@ -386,6 +396,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
+            listSeparator.leadingAnchor.constraint(equalTo: field.leadingAnchor),
+            listSeparator.trailingAnchor.constraint(equalTo: field.trailingAnchor),
+            listSeparator.topAnchor.constraint(equalTo: scroll.topAnchor),
+            listSeparator.heightAnchor.constraint(equalToConstant: 1),
             stack.bottomAnchor.constraint(equalTo: hint.topAnchor,
                                           constant: -QuickPickKeyboardHint.topSpacing),
             // 就这四条，一条都不多写。本轮曾经给三个子视图各写"等宽 = 面板减内缩"

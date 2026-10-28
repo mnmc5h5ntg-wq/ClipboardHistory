@@ -794,7 +794,8 @@ final class UICaptureTests: XCTestCase {
                                               height: rep.pixelsHigh,
                                               bytesPerRow: rep.bytesPerRow,
                                               pageLuma: page,
-                                              maxGap: Int(24.0 * scale)) else {
+                                              maxGap: Int(24.0 * scale),
+                                              minHeight: Int(6.0 * scale)) else {
                 return XCTFail("\(tag)：这张帧上读不到选中药丸（页底档=\(page)）⇒ 参照物不存在，"
                     + "先查捕获通道，不要把等式放宽")
             }
@@ -848,11 +849,17 @@ final class UICaptureTests: XCTestCase {
                               "\(tag)：参照物读到 \(String(format: "%.1f", pillPt))pt ⇒ 那已经不是药丸的左沿"
                               + "（更像行内图标那一列 35.5pt），参照点错了等式就不成立")
             // ③ 等式本身。
-            XCTAssertLessThanOrEqual(abs(ink - pill.left), 2,
-                "\(tag)：搜索那一行的第一个墨列在 \(ink)px（\(String(format: "%.1f", Double(ink) / scale))pt），"
-                + "而同一张帧上药丸的左沿在 \(pill.left)px（\(String(format: "%.1f", pillPt))pt）"
-                + "⇒ 差 \(abs(ink - pill.left))px。改之前实测差 19px（12.5pt 对 22.0pt）："
-                + "占位语比它正下方那一列的可见边往左突出，那一行字像贴在面板毛边上")
+            // R474：这段读数先算成普通量再拼字符串 —— 大文件 + 长插值在变异注入后的整模块
+            // 重编里撞过 type-check 超时（M578/M579 两臂 DID-NOT-RUN 的成因），不是判据本身红。
+            let inkPt = Double(ink) / scale
+            let inkGap = abs(ink - pill.left)
+            let axisMessage = "\(tag)：搜索那一行的第一个墨列在 \(ink)px"
+                + "（\(String(format: "%.1f", inkPt))pt），"
+                + "而同一张帧上药丸的左沿在 \(pill.left)px"
+                + "（\(String(format: "%.1f", pillPt))pt）"
+                + "⇒ 差 \(inkGap)px。改之前实测差 19px（12.5pt 对 22.0pt）："
+                + "占位语比它正下方那一列的可见边往左突出，那一行字像贴在面板毛边上"
+            XCTAssertLessThanOrEqual(inkGap, 2, axisMessage)
         }
         emit("QUICKPICK_AXIS_CAPABILITY 候选=\(candidates) 有对象=\(judged) 未判=\(declined.count)"
              + "（未判名单只在**这台机器画得出占位语**时才要求为空）")
@@ -867,6 +874,100 @@ final class UICaptureTests: XCTestCase {
         XCTAssertTrue(declined.isEmpty,
                       "这台机器**画得出**占位语（有对象=\(judged)），却有一档读不到 ⇒ 坏的是尺或那一档的通道，"
                       + "必须点名：\(declined.joined(separator: " "))")
+    }
+
+    // MARK: - R474 · 浮层输入区与候选区分界
+
+    /// R474 的产品位：搜索框与候选区之间一条 1pt 通栏分隔线。
+    ///
+    /// 判据读三件事，缺一不可：**恰好一条**（不能把药丸/悬停填充算进来）、**通栏**（≥80% 帧宽）、
+    /// **在药丸之上**（结构关系，不是写死 y）。三档夹具（列表 / 有查询 / 空结果）各判一次：
+    /// 输入区与内容区的边界不该随结果有无而消失。
+    func testQuickPickSearchAreaIsSeparatedFromTheList() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r474-rule-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            for name in ["quickpick-list", "quickpick-typed", "quickpick-empty"] {
+                guard let fixture = fixtures.first(where: { $0.name == name }) else {
+                    return XCTFail("\(tag)：找不到 `\(name)` 夹具 ⇒ 这条判据没有对象")
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                // 搜索框自己的底边（pt，自顶向下）：分隔线必须贴在这一条边上，
+                // 不能悬在半途、也不能穿过搜索框。坐标只在视图树里取，不写死 y。
+                var fieldBottomPt = Double.nan
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    guard let field = Self.firstOverlayTextField(in: host) else { return }
+                    let rect = field.convert(field.bounds, to: host)
+                    fieldBottomPt = host.isFlipped
+                        ? Double(rect.maxY)
+                        : Double(host.bounds.height - rect.minY)
+                }
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    return XCTFail("\(tag)/\(name)：读不回刚拍的帧")
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let maxThickness = max(1, Int(4.0 * scale))
+                let rules = Self.overlayRules(bytes: base, width: rep.pixelsWide,
+                                              height: rep.pixelsHigh,
+                                              bytesPerRow: rep.bytesPerRow,
+                                              pageLuma: page,
+                                              maxThickness: maxThickness)
+                let pill = Self.overlayPill(bytes: base, width: rep.pixelsWide,
+                                            height: rep.pixelsHigh,
+                                            bytesPerRow: rep.bytesPerRow,
+                                            pageLuma: page,
+                                            minHeight: Int(6.0 * scale))
+                let listing = rules.map {
+                    "y=\($0.top)px 厚=\($0.thickness)px 宽=\($0.width)px 左=\($0.left)px"
+                }.joined(separator: "；")
+                emit("QUICKPICK_LIST_RULE \(tag) \(name) 线数=\(rules.count)"
+                     + " 药丸顶=\(pill.map { "\($0.top)px" } ?? "没有") 页底档=\(page)"
+                     + " 搜索框底=\(fieldBottomPt.isFinite ? String(format: "%.1f", fieldBottomPt * scale) + "px" : "没有")"
+                     + " 宽容下限=\(Int(0.90 * Double(rep.pixelsWide)))px"
+                     + " 厚上限=\(maxThickness)px \(listing)")
+                XCTAssertEqual(rules.count, 1,
+                    "\(tag)/\(name)：读到 \(rules.count) 条发丝线（期望 1）⇒ "
+                    + "搜索框与候选区之间没有分开，或别的东西被读成了分隔线：\(listing)")
+                guard let rule = rules.first else { continue }
+                XCTAssertGreaterThanOrEqual(rule.width, Int(0.90 * Double(rep.pixelsWide)),
+                    "\(tag)/\(name)：分隔线宽 \(rule.width)px，不到帧宽的 90% ⇒ 不是通栏边界")
+                XCTAssertLessThanOrEqual(rule.thickness, maxThickness,
+                    "\(tag)/\(name)：分隔线厚 \(rule.thickness)px（上限 \(maxThickness)px）⇒ 那已经是一条带，不是发丝")
+                guard fieldBottomPt.isFinite else {
+                    return XCTFail("\(tag)/\(name)：视图树里找不到搜索框 ⇒ 分隔线的落点没有参照物")
+                }
+                // 落点必须**离开输入区**（焦点环还要向下多出 4pt，压在上面就是从环里穿过去），
+                // 也不能飘到候选行里去。上下界用 pt 比例写，与具体 y 无关。
+                let dropBelowField = Double(rule.top) - fieldBottomPt * scale
+                XCTAssertGreaterThanOrEqual(dropBelowField, 3.0 * scale,
+                    "\(tag)/\(name)：分隔线在 y=\(rule.top)px，搜索框底边在 "
+                    + "\(String(format: "%.1f", fieldBottomPt * scale))px ⇒ 只低了 "
+                    + "\(String(format: "%.1f", dropBelowField / scale))pt，压在输入区的焦点/悬停描边上")
+                XCTAssertLessThanOrEqual(dropBelowField, 12.0 * scale,
+                    "\(tag)/\(name)：分隔线比搜索框底边低 "
+                    + "\(String(format: "%.1f", dropBelowField / scale))pt ⇒ 它已经离开输入区与候选区的边界")
+                if name != "quickpick-empty" {
+                    guard let pill else {
+                        return XCTFail("\(tag)/\(name)：读不到选中药丸 ⇒ 没有结构参照，判不了分隔线在上还是在下")
+                    }
+                    XCTAssertLessThan(rule.top, pill.top,
+                        "\(tag)/\(name)：分隔线 y=\(rule.top)px 不在药丸顶 y=\(pill.top)px 之上 ⇒ "
+                        + "它没有分开输入区与候选区")
+                }
+                judged += 1
+            }
+        }
+        emit("QUICKPICK_LIST_RULE_CAPABILITY 帧=\(judged)/6")
+        XCTAssertEqual(judged, 6, "六档里只判成 \(judged) 档 ⇒ 有帧没拿到分隔线或参照物，按上面的具名读")
     }
 
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
@@ -1146,10 +1247,12 @@ final class UICaptureTests: XCTestCase {
             }
             let pageLuma = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
             guard let pill = Self.overlayPill(bytes: base, width: rep.pixelsWide,
                                               height: rep.pixelsHigh,
                                               bytesPerRow: rep.bytesPerRow,
-                                              pageLuma: pageLuma) else {
+                                              pageLuma: pageLuma,
+                                              minHeight: Int(6.0 * scale)) else {
                 return XCTFail("\(tag)：这张帧上读不到选中药丸（页底档=\(pageLuma)）"
                     + "⇒ 参照物不存在，先查捕获通道")
             }
@@ -1182,7 +1285,6 @@ final class UICaptureTests: XCTestCase {
             }
             // 页底参照：同一行带里**两块候选窗**（药丸左侧的前导留白、药丸右侧的 trailing 带），
             // 由 `choosePageArm` 挑一块。上一版只有右侧那一格，而它在 runner 上不是页底（见那里）。
-            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
             let bands = Self.pageBands(width: rep.pixelsWide, pillLeft: pill.left,
                                        pillRight: right, scale: scale)
             let pageProbes: [(label: String, probe: (rgb: ArmRGB, share: Int)?)] =
@@ -1500,6 +1602,11 @@ final class UICaptureTests: XCTestCase {
             let pageLuma = Double(page)
             var greyRows = 0, greyPixels = 0, widest = 0, widestX = "", inkRows = 0, greyNoInkRows = 0
             var widestGreyNoInk = 0, widestInk = 0
+            var widestGreyRow = 0
+            // R474：浮层在搜索框底边有 1pt 分隔线（全宽、纯灰、无墨）。它不是"字后面的填充"，
+            // 所以这一格判的是**块**：连续 ≥3 行的纯灰行才算一块填充；发丝线最多 2px。
+            // 旧读数（32 行 / 1115 像素）在新尺下仍是一整块，牙没变钝。
+            var greyNoInkRun = 0, greyNoInkRunWidest = 0
             // R108：R106 修完之后本机还剩 **1 个纯灰像素**，这一格只问一件事 —— 它在不在字形的足迹里。
             // 只测不判（判法写进 BACKLOG 161：`落在其x内=false` ⇒ 那不是抗锯齿，要回来开修；
             // `=true` ⇒ 结案成"字形自己的边"）。两台机器都要打这一行，下一跑 CI 给对面那个数。
@@ -1533,12 +1640,20 @@ final class UICaptureTests: XCTestCase {
                 // 而"灰像素总数"那种绝对量有（R38 那一课：别拿一台机器的读数当另一台的地板）。
                 if g > 0 && ink == 0 {
                     greyNoInkRows += 1
-                    widestGreyNoInk = max(widestGreyNoInk, g)
+                    widestGreyRow = max(widestGreyRow, g)
+                    greyNoInkRun += 1
+                    greyNoInkRunWidest = max(greyNoInkRunWidest, g)
                     if greyOnlyY < 0 {
                         greyOnlyY = y
                         greyOnlyFirst = first
                         greyOnlyLast = last
                     }
+                } else if greyNoInkRun > 0 {
+                    if greyNoInkRun >= 3 {
+                        widestGreyNoInk = max(widestGreyNoInk, greyNoInkRunWidest)
+                    }
+                    greyNoInkRun = 0
+                    greyNoInkRunWidest = 0
                 }
                 widestInk = max(widestInk, ink)
                 if g > widest {
@@ -1551,6 +1666,9 @@ final class UICaptureTests: XCTestCase {
                     inkRowFirst.append(inkFirst)
                     inkRowLast.append(inkLast)
                 }
+            }
+            if greyNoInkRun >= 3 {
+                widestGreyNoInk = max(widestGreyNoInk, greyNoInkRunWidest)
             }
             // R108：那 1 个纯灰像素**落在谁的字形足迹里**（判法写在 BACKLOG 161，本轮只测不判）。
             var residualGrey = "这一档没有纯灰行"
@@ -1571,8 +1689,8 @@ final class UICaptureTests: XCTestCase {
             }
             emit("QUICKPICK_GREY_BAND \(tag) 灰档行数=\(greyRows) 灰档像素=\(greyPixels) "
                  + "最宽一行=\(widest)px \(widestX) 纯灰行无墨=\(greyNoInkRows) "
-                 + "纯灰行最宽=\(widestGreyNoInk)px 最宽墨行=\(widestInk)px 墨档行数=\(inkRows) 页底档=\(page) "
-                 + "带子=顶部40pt 门限=8..45灰阶 残余灰=\(residualGrey)")
+                 + "纯灰行最宽=\(widestGreyRow)px 纯灰块最宽=\(widestGreyNoInk)px 最宽墨行=\(widestInk)px 墨档行数=\(inkRows) 页底档=\(page) "
+                 + "带子=顶部40pt 门限=8..45灰阶 块下限=3行 残余灰=\(residualGrey)")
             // —— 收场按 D-170：能力读数排在闸门与 skip 之前，未判要带成因数字。
             guard hasEditor else {
                 declined.append("\(tag)[原因=这台机器上那枚字段没有 field editor ⇒ "
@@ -1592,10 +1710,12 @@ final class UICaptureTests: XCTestCase {
             // 判据读的是**两个宽度的比**，不是灰像素的绝对数：倍率与底色在两台机器上都不一样（R38），
             // 而"填充比字宽"这件事在任何倍率下都成立 —— 改之前本机是 52px 对 37px，1x 下会等比缩。
             XCTAssertLessThanOrEqual(widestGreyNoInk, widestInk,
-                "\(tag)：有一条**只有灰、零个墨**的行宽 \(widestGreyNoInk)px，比最宽的那行墨（\(widestInk)px）还宽 ⇒ "
-                    + "字后面有一块比字还宽的填充。改之前本机实测 32 行 / 1115 像素 / 纯灰行最宽 52px "
+                "\(tag)：有一块**只有灰、零个墨**的填充（连续 ≥3 行）宽 \(widestGreyNoInk)px，"
+                    + "比最宽的那行墨（\(widestInk)px）还宽 ⇒ "
+                    + "字后面有一块比字还宽的填充。改之前本机实测 32 行 / 1115 像素 / 纯灰块最宽 52px "
                     + "对最宽墨行 37px —— 那就是 BACKLOG 159 的灰块（整条查询被选中，而窗口不是 key 所以底是灰的）。"
-                    + "残余的几像素是字形抗锯齿，它永远不可能比自己的那行墨更宽。")
+                    + "残余的几像素是字形抗锯齿，它永远不可能比自己的那行墨更宽。"
+                    + "（R474：单行/双行的全宽灰线是发丝分隔线，不是填充块，不进这个宽度。）")
         }
         emit("QUICKPICK_PHANTOM_CAPABILITY 候选=2 有对象=\(judged) 未判=\(declined.count)"
              + "（未判名单只在**这台机器装得出 field editor** 时才要求为空）")
@@ -2007,6 +2127,25 @@ final class UICaptureTests: XCTestCase {
             "把地板换成「这一条带自己的一半」之后，低对比那台也必须读到同一列（runner 那一档的出路）")
         XCTAssertEqual(lowWithFloor, highWithFloor,
             "两档对比度差一倍，读到的**列**必须相同 —— 这条判据量的是位置，不是强弱")
+
+        // ⑧ R474：1pt 通栏发丝线压在药丸上方时，`overlayPill` 仍必须认**药丸**（不是那条线）。
+        //    这一格钉的是新加的"连续行分组 + 取最高的通栏带"：旧逻辑会把 top 读成 40px，
+        //    于是左轴判据的中段取样落在空白里、`top < pill.top` 的结构关系也一起错。
+        //    宽度按 420pt 面板的真实比例画：通栏 840px（100%）、药丸 751px（89.4% < 90%）。
+        var ruled = buffer(255)
+        paint(&ruled, 0, 40, 840, 1, 235)
+        paint(&ruled, 44, 100, 751, 60, 220)
+        XCTAssertEqual(100, pill(ruled, page: 255)?.top,
+            "药丸上方有一条 1px 通栏线 ⇒ 药丸的顶仍必须读 100（不能被分隔线抢走身份）")
+        var ruleScan: [(top: Int, thickness: Int, width: Int, left: Int)] = []
+        var ruledCopy = ruled
+        ruledCopy.withUnsafeMutableBufferPointer { raw in
+            ruleScan = Self.overlayRules(bytes: raw.baseAddress!, width: width, height: height,
+                                         bytesPerRow: stride4, pageLuma: 255, maxThickness: 8)
+        }
+        XCTAssertEqual(ruleScan.count, 1, "合成帧里只该有一条发丝线（药丸是 60 行高的填充，不是线）")
+        XCTAssertEqual(40, ruleScan.first?.top)
+        XCTAssertEqual(1, ruleScan.first?.thickness)
     }
 
     func testQuickPickRowsShareOneIconColumnAndOneLabelAxis() throws {
@@ -16503,10 +16642,16 @@ final class UICaptureTests: XCTestCase {
     /// R470：`maxGap` 允许药丸材质带里出现**有界的**页色缺口 —— 来源 App 图标的白色像素
     /// 与页底同档，严格 run 会在图标处断开，把浅色药丸的左沿读成图标后面那一截（25.0pt）。
     /// 缺口 ≤24pt 视为"内容压在材质上"，不是"药丸结束"；默认 0 保持其余调用点原状。
+    ///
+    /// R474：`minHeight` 把"一整条**够厚**的带"与"一条 1pt 分隔线"分开。浮层在搜索框与列表
+    /// 之间加了一条全宽发丝线（R474 产品位），它与页底差 ≥12、宽度接近 100% ⇒ 严格按旧尺
+    /// 会被读成"药丸从分隔线就开始了"（top 落在分隔线上、中段取样落到空白里）。判据要的是
+    /// **被选中的那一行**，所以行必须在纵向上连续 ≥minHeight 才成为候选；默认 1 = 旧行为
+    /// （把所有合格行并成一条，供真值表与其余调用点逐字节对照）。
     static func overlayPill(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
                             bytesPerRow: Int, pageLuma: Int,
                             minDelta: Int = 12, minWidthShare: Double = 0.55,
-                            maxGap: Int = 0)
+                            maxGap: Int = 0, minHeight: Int = 1)
         -> (left: Int, top: Int, bottom: Int)? {
         guard width > 0, height > 0, minWidthShare > 0, minWidthShare <= 1 else { return nil }
         let minWidth = Int(Double(width) * minWidthShare)
@@ -16516,8 +16661,7 @@ final class UICaptureTests: XCTestCase {
             return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
                         + 0.0722 * Double(bytes[o + 2])).rounded())
         }
-        var lefts: [Int] = []
-        var top = -1, bottom = -1
+        var rowLefts: [(y: Int, left: Int)] = []
         for y in 0..<height {
             var run = 0, best = 0, bestStart = 0, start = 0, gap = 0
             for x in 0..<width {
@@ -16532,13 +16676,76 @@ final class UICaptureTests: XCTestCase {
                 }
             }
             guard best >= minWidth else { continue }
-            lefts.append(bestStart)
-            if top < 0 { top = y }
-            bottom = y
+            rowLefts.append((y, bestStart))
         }
-        guard !lefts.isEmpty else { return nil }
-        lefts.sort()
-        return (lefts[lefts.count / 2], top, bottom)
+        guard !rowLefts.isEmpty else { return nil }
+        // 连续行分组成"带"。minHeight ≤ 1 时并回旧行为：所有合格行算一条。
+        var bands: [[(y: Int, left: Int)]] = []
+        var current: [(y: Int, left: Int)] = []
+        for row in rowLefts {
+            if let last = current.last, row.y != last.y + 1 {
+                bands.append(current)
+                current = []
+            }
+            current.append(row)
+        }
+        if !current.isEmpty { bands.append(current) }
+        let eligible = minHeight <= 1 ? bands : bands.filter { $0.count >= minHeight }
+        guard let band = eligible.max(by: { $0.count < $1.count }) else { return nil }
+        let lefts = band.map(\.left).sorted()
+        return (lefts[lefts.count / 2], band.first!.y, band.last!.y)
+    }
+
+    /// 纯函数：一张浮层帧里**通栏发丝线**的位置（顶 / 厚 / 宽 / 左沿，px）。
+    ///
+    /// R474 的产品位要求在搜索框与候选区之间有一条 1pt 分隔线。判据要能区分三样东西：
+    /// ① 发丝线（连续行、宽度 ≥90% 帧宽、厚度 ≤4pt）；② 选中药丸/悬停填充（宽度够，但厚 30–60pt，
+    /// 且比通栏少两侧内缩）；③ 字墨（从不连续成 90% 宽的一条）。所以先按行取"最长连续偏离段"，
+    /// 再把**连续行**分组，只保留厚度落在上限以内的组 —— 药丸那一组会被自己的厚度/宽度排除，
+    /// 不需要写死 y（420pt 面板：通栏 792px=94.3%、药丸 752px=89.5%）。
+    static func overlayRules(bytes: UnsafePointer<UInt8>, width: Int, height: Int,
+                             bytesPerRow: Int, pageLuma: Int,
+                             minWidthShare: Double = 0.90, minDelta: Int = 6,
+                             maxThickness: Int)
+        -> [(top: Int, thickness: Int, width: Int, left: Int)] {
+        guard width > 0, height > 0, minWidthShare > 0, minWidthShare <= 1,
+              maxThickness >= 1 else { return [] }
+        let minWidth = Int(Double(width) * minWidthShare)
+        guard minWidth > 0 else { return [] }
+        func lumaAt(_ x: Int, _ y: Int) -> Int {
+            let o = y * bytesPerRow + x * 4
+            return Int((0.2126 * Double(bytes[o]) + 0.7152 * Double(bytes[o + 1])
+                        + 0.0722 * Double(bytes[o + 2])).rounded())
+        }
+        var rows: [(y: Int, left: Int, width: Int)] = []
+        for y in 0..<height {
+            var run = 0, best = 0, bestStart = 0, start = 0
+            for x in 0..<width {
+                if abs(lumaAt(x, y) - pageLuma) >= minDelta {
+                    if run == 0 { start = x }
+                    run += 1
+                    if run > best { best = run; bestStart = start }
+                } else {
+                    run = 0
+                }
+            }
+            guard best >= minWidth else { continue }
+            rows.append((y, bestStart, best))
+        }
+        var bands: [[(y: Int, left: Int, width: Int)]] = []
+        var current: [(y: Int, left: Int, width: Int)] = []
+        for row in rows {
+            if let last = current.last, row.y != last.y + 1 {
+                bands.append(current)
+                current = []
+            }
+            current.append(row)
+        }
+        if !current.isEmpty { bands.append(current) }
+        return bands.filter { $0.count <= maxThickness }.map { band in
+            let widest = band.max(by: { $0.width < $1.width })!
+            return (band.first!.y, band.count, widest.width, widest.left)
+        }
     }
 
     /// 纯函数：一条横向带子里**第一个有字的列**在哪一列（px）；一条都没有 ⇒ nil。

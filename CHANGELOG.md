@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层搜索框与候选区补 1pt 通栏分隔线（16 张浮层帧变化、基线 288）（R474 / 第 473 轮 / Round 471 / U-1797…U-1802 · 产品 1 文件 + 判据）
+
+
 ### 数据页补保存位置（等宽路径行；2 张数据帧变化、基线 288）（R473 / 第 472 轮 / Round 470 / U-1791…U-1796 · 产品 1 文件 + 判据）
 
 
