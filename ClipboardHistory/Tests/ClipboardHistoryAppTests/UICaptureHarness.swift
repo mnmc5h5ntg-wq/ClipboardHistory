@@ -5544,6 +5544,111 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R455：行内代码的底色带必须有**内边距**。
+    ///
+    /// 旧形状是属性串 `.backgroundColor`：底色带 94.5pt、字宽 92.0pt，左右各 ~1pt。
+    /// 判据：找一条 40..150pt 的**连续**带色行（文字抗锯齿是碎片，进不来）→ 带宽；
+    /// 取包含它的文字带高度 → 带内文字墨宽；带宽−字宽 ≥5pt。
+    /// 代码块的通栏带（>300pt）与 1pt 分隔线都不在范围里。
+    func testInlineCodeBackgroundHasPadding() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r455-inline-code-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-markdown-rendered" }) else {
+                return XCTFail("\(tag)：找不到 `detail-markdown-rendered` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-markdown-rendered-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-markdown-rendered` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let isBand: (Double) -> Bool = appearance == .darkAqua
+                ? { $0 >= 40 && $0 <= 90 } : { $0 >= 225 && $0 <= 250 }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 150 } : { $0 <= 150 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = Int((640.0 * scale).rounded())
+            let minWidth = Int((40.0 * scale).rounded())
+            let maxWidth = Int((150.0 * scale).rounded())
+
+            func longestBandRun(y: Int) -> (run: Int, left: Int, right: Int) {
+                var best = 0, bestLeft = 0, bestRight = -1
+                var run = 0, start = 0
+                for x in x0..<x1 {
+                    if isBand(luma(x, y)) {
+                        if run == 0 { start = x }
+                        run += 1
+                        if run > best { best = run; bestLeft = start; bestRight = x }
+                    } else {
+                        run = 0
+                    }
+                }
+                return (best, bestLeft, bestRight)
+            }
+
+            // 1) 找最长的 40..150pt 连续带色行 = 行内代码底色带（padding 行）。
+            var bandRow = -1
+            var bandLeft = 0, bandRight = 0, bandRun = 0
+            for y in Int((80.0 * scale))..<min(height, Int((400.0 * scale))) {
+                let hit = longestBandRun(y: y)
+                if hit.run >= minWidth && hit.run <= maxWidth && hit.run > bandRun {
+                    bandRun = hit.run
+                    bandRow = y
+                    bandLeft = hit.left
+                    bandRight = hit.right
+                }
+            }
+            guard bandRow >= 0 else {
+                XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
+                continue
+            }
+            // 2) 文字窗口：带顶 padding 与字形之间行距有空隙，不能用"连续墨行"扩；
+            //    在带的左右范围内取 bandRow ±20pt 的窗口找字墨（行内码就在带里）。
+            let bandTop = max(Int((80.0 * scale)), bandRow - Int((20.0 * scale).rounded()))
+            let bandBottom = min(min(height - 1, Int((400.0 * scale))),
+                                 bandRow + Int((20.0 * scale).rounded()))
+            // 3) 带内文字墨宽。
+            var inkLeft = Int.max, inkRight = -1
+            for y in bandTop...bandBottom {
+                for x in bandLeft...bandRight where isInk(luma(x, y)) {
+                    inkLeft = min(inkLeft, x)
+                    inkRight = max(inkRight, x)
+                }
+            }
+            guard inkRight >= inkLeft else {
+                emit("INLINE_CODE_PAD_NOT_RUN=text-empty \(tag)")
+                continue
+            }
+            let bandWidth = Double(bandRight - bandLeft + 1) / scale
+            let inkWidth = Double(inkRight - inkLeft + 1) / scale
+            let padding = bandWidth - inkWidth
+            emit("INLINE_CODE_PAD \(tag) 带宽=\(String(format: "%.1f", bandWidth))pt"
+                 + " 字宽=\(String(format: "%.1f", inkWidth))pt"
+                 + " 隙=\(String(format: "%.1f", padding))pt")
+            XCTAssertGreaterThanOrEqual(padding, 4.5,
+                                        "\(tag)：行内代码底色带只比字宽多 \(padding)pt"
+                                        + " ⇒ 没有内边距（旧形状 ~2.5pt）")
+            XCTAssertLessThanOrEqual(padding, 12.0,
+                                     "\(tag)：行内代码底色带比字宽多 \(padding)pt ⇒ 读到的是别的带")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为

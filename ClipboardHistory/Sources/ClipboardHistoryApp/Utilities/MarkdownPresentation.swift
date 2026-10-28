@@ -179,6 +179,10 @@ enum MarkdownPresentation {
     /// 表格块正文的逻辑行数（表头 + 体行；R448）：正文视图只在**体行之间**画发丝线。
     static let tableRowCountAttribute = NSAttributedString.Key("ClipboardHistory.markdownTableRowCount")
 
+    /// 行内代码的底色带（R455）：属性串不再背 `.backgroundColor`（它只涂到字尾、没有内边距），
+    /// 正文视图按这个属性在背景层画一条两端各加 3pt 的圆角带。
+    static let inlineCodeAttribute = NSAttributedString.Key("ClipboardHistory.markdownInlineCode")
+
     // MARK: - 中文强调：斜体还是字重
 
     enum EmphasisStyle: Equatable {
@@ -315,7 +319,7 @@ enum MarkdownPresentation {
             attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
         }
         if run.marks.contains(.code) {
-            attributes[.backgroundColor] = codeBackground
+            attributes[inlineCodeAttribute] = true
         }
         if let clickable {
             attributes[.link] = clickable

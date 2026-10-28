@@ -445,6 +445,7 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
         drawThematicBreaks(in: rect)
         drawCodeLanguageTags(in: rect)
         drawTableRowSeparators(in: rect)
+        drawInlineCodeBackgrounds(in: rect)
         drawQuoteRules(in: rect)
         drawCodeLineNumbers(in: rect)
     }
@@ -548,6 +549,60 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
                 let clipped = line.intersection(rect)
                 guard !clipped.isNull, !clipped.isEmpty else { return }
                 clipped.fill()
+            }
+        }
+    }
+
+    /// 行内代码的底色带（R455）：属性串的 `.backgroundColor` 只涂到字形段、没有内边距，
+    /// 这里按 run 的 advance 两端各加 3pt、上下各加 1pt 画圆角带；
+    /// x 范围用首末字形位置算（`boundingRect` 给的是行片段宽，R448 同族）。
+    private func drawInlineCodeBackgrounds(in rect: NSRect) {
+        guard let layoutManager, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let all = NSRange(location: 0, length: textStorage.length)
+        InlineCodeBackground.color.setFill()
+        let string = textStorage.string as NSString
+        func isWhitespace(_ scalar: unichar) -> Bool {
+            scalar == 0x20 || scalar == 0x09 || scalar == 0x0A || scalar == 0x0D
+        }
+        textStorage.enumerateAttribute(MarkdownPresentation.inlineCodeAttribute, in: all) { value, range, _ in
+            guard value != nil else { return }
+            let previousIsWhitespace = range.location == 0
+                || isWhitespace(string.character(at: range.location - 1))
+            let nextIsWhitespaceOrEnd = NSMaxRange(range) >= string.length
+                || isWhitespace(string.character(at: NSMaxRange(range)))
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { _, usedRect, _, glyphRange, _ in
+                let intersection = NSIntersectionRange(glyphRange, glyphs)
+                guard intersection.length > 0 else { return }
+                let isFirstFragment = intersection.location == glyphs.location
+                let isLastFragment = NSMaxRange(intersection) == NSMaxRange(glyphs)
+                let paddings = InlineCodeBackground.horizontalPaddings(
+                    previousIsWhitespace: isFirstFragment && previousIsWhitespace,
+                    nextIsWhitespaceOrEnd: isLastFragment && nextIsWhitespaceOrEnd)
+                let firstGlyph = intersection.location
+                let startPoint = layoutManager.location(forGlyphAt: firstGlyph)
+                let startX = startPoint.x
+                let afterEnd = NSMaxRange(intersection)
+                let endX: CGFloat
+                if afterEnd < layoutManager.numberOfGlyphs {
+                    let next = layoutManager.location(forGlyphAt: afterEnd)
+                    endX = abs(next.y - startPoint.y) < 0.01 ? next.x : usedRect.maxX
+                } else {
+                    endX = usedRect.maxX
+                }
+                let box = InlineCodeBackground.rect(lineRect: usedRect,
+                                                    startX: startX,
+                                                    endX: endX,
+                                                    leftPadding: paddings.left,
+                                                    rightPadding: paddings.right,
+                                                    containerOrigin: origin)
+                let clipped = box.intersection(rect)
+                guard !clipped.isNull, !clipped.isEmpty else { return }
+                NSBezierPath(roundedRect: clipped,
+                             xRadius: InlineCodeBackground.cornerRadius,
+                             yRadius: InlineCodeBackground.cornerRadius).fill()
             }
         }
     }

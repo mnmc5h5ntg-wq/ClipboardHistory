@@ -7931,3 +7931,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：选中/高亮底色上的对比度没有帧（485）；HTML `<del>` 未接（484）。
 - 回滚：颜色改回 secondaryLabelColor；或 `git revert`。
 
+## D-451 行内代码底色带只向空白侧加 padding（R455）
+
+- 背景：内联码底色由 `.backgroundColor` 涂，只到字形 advance（带 94.5pt、字 92.0pt、隙 2.5），行内码与正文挤在一起。
+- 决定：去掉属性底色，`InlineCodeBackground` 在背景层画圆角带（上下 1pt）；横向只在空白侧加 3pt（前一个是空格/行首、后一个是空格/行尾），紧贴标点时不加。
+- 理由：给行内码留出可读内边距，同时不把底色盖到后随标点上；纯策略可单测，Store 不动（1108/66）。
+- 兼容性/迁移：`detail-markdown-rendered` 亮/暗 2 张旧帧变化；基线 262 同 commit 更新；`Round4MarkdownTests` 的 `.backgroundColor` 断言改到 `inlineCodeAttribute`（机制换代，意图不变）。
+- 边界：两侧都是标点时横向 padding=0（486）；选中态无帧。
+- 回滚：恢复 `.backgroundColor` 并删绘制；或 `git revert`。
+

@@ -89,9 +89,14 @@ final class Round4MarkdownTests: XCTestCase {
         XCTAssertTrue(try isItalic(storage, containing: "emphasis"),
                       "拉丁 *斜体* 没有斜体，等于这个语法白解析了")
 
-        // 行内码要等宽 + 有底色。
+        // 行内码要等宽 + 可区分的底色。R455 把底色从属性串 `.backgroundColor`
+        //（只按字形 advance 涂、没有内边距）搬到背景层的自绘带；契约仍是"有底色"，
+        // 实现标记是 `inlineCodeAttribute`，像素证人见 `testInlineCodeBackgroundHasPadding`。
         let codeAttributes = try XCTUnwrap(attributes(in: storage, containing: "code"))
-        XCTAssertNotNil(codeAttributes[.backgroundColor], "行内码没有底色，和正文分不开")
+        XCTAssertTrue(codeAttributes[MarkdownPresentation.inlineCodeAttribute] != nil,
+                      "行内码没有底色标记，和正文分不开")
+        XCTAssertNil(codeAttributes[.backgroundColor],
+                     "行内码不应再由属性串背底色（自绘带才有内边距）")
         let codeFont = try XCTUnwrap(codeAttributes[.font] as? NSFont)
         XCTAssertEqual(codeFont.familyName, MarkdownPresentation.codeFont.familyName,
                        "行内码不是等宽字体：\(codeFont)")
