@@ -1,5 +1,5 @@
 {
-  "count": 260,
+  "count": 262,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -75,6 +75,8 @@
     "detail-scroll-after-switch-720x520-light.png": "117c0d1f70217e7b84cba688584751a77d7e385f3fef78638f2ff407a5723c5c",
     "detail-scroll-top-720x520-dark.png": "4b2b9c7c83de37564e673dfab291c6d478727307fd13cbfa93487e7b1926e8b2",
     "detail-scroll-top-720x520-light.png": "389720a32b29c81fb4d5d555b749cd153a6b5e97ff3ea8afc8291dadb9b90bd7",
+    "detail-strike-720x520-dark.png": "1e74348ebba18d818c2e02f94638e6f102c7886aea231bcfd37d562bf3b6ba7a",
+    "detail-strike-720x520-light.png": "d78fc2e9e5335bfb1ee5ae7c40b1a160f0c967fe6c9fe08c3d4b285e9ef3e01f",
     "detail-table-720x520-dark.png": "7369c4260af2340c69bc162b68372cc3037652dd8ea1ede82a92d3fd8af0e21b",
     "detail-table-720x520-light.png": "3ec05d45494792458416ab0369336ee5b7a64ac5f700662aa9e1a60a47de0b35",
     "detail-table-rows-720x520-dark.png": "c9b50807316ad789e203b0f4e42a1de80457490fd0168b93a93de6a9eb0ff520",

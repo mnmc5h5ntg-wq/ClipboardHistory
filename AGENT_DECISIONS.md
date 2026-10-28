@@ -7913,3 +7913,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：0%/200% 端点仍无标签（483）；设置内容列 1x 平涂时 runner 读数可能具名 NOT_RUN。
 - 回滚：删 overlay 即可；或 `git revert`。
 
+## D-449 删除线（`~~`）正文降一档，链接保留链接色（R453）
+
+- 背景：`~~` 标记的删除内容渲染后与正常正文同色同重，删除内容还和仍然有效的文字抢视线。
+- 决定：`attributes(for:in:dimmed:)` 里 `struck`（`.strikethrough` 且非链接）用 `secondaryLabelColor`；可点链接仍保留链接色。
+- 理由：删除内容是作者标记的"不再有效"；弱化让它在视觉上退后；链接可点性不能因弱化变假 affordance。
+- 兼容性/迁移：新夹具 `detail-strike`（2 帧，基线 260→262）；markdown 样例没有 `~~`，0 张旧帧变化。
+- 边界：HTML 的 `<del>` 未接（484）；删除线本身由 AppKit 画，产品不自绘。
+- 回滚：把 `struck` 分支删掉即可；或 `git revert`。
+

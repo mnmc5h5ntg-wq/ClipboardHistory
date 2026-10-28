@@ -284,6 +284,10 @@ enum MarkdownPresentation {
         font(for: fontPlan(for: run, in: block))
     }
 
+    /// 删除线文字（R453）：作者用 `~~` 标记的删除内容，和完成项同一档次要色 ——
+    /// 删除内容应该退到后一排，不该和仍然有效的正文抢视线。
+    static var struckTextColor: NSColor { .secondaryLabelColor }
+
     /// 把 run 的样式算成具体属性。
     static func attributes(for run: MarkdownInline, in block: MarkdownBlock,
                           dimmed: Bool = false) -> [NSAttributedString.Key: Any] {
@@ -292,8 +296,17 @@ enum MarkdownPresentation {
         // 否则屏幕上会出现"蓝色、下划线、点了没反应"的字 —— 那是假 affordance，
         // 比不给链接更坏。名单与理由在下面的 `linkURL(for:)`。
         let clickable = run.marks.contains(.link) ? linkURL(for: run.destination ?? "") : nil
-        // R450：已完成任务项的文字降一档；可点的链接仍保留链接色（假 affordance 比弱化更坏）。
-        let baseColor = dimmed ? TaskItemPresentation.completedTextColor : foregroundColor(for: block)
+        // R450：已完成任务项的文字降一档；R453：作者标了删除线的文字也降一档。
+        // 可点的链接仍保留链接色（假 affordance 比弱化更坏）。
+        let struck = run.marks.contains(.strikethrough)
+        let baseColor: NSColor
+        if dimmed {
+            baseColor = TaskItemPresentation.completedTextColor
+        } else if struck {
+            baseColor = struckTextColor
+        } else {
+            baseColor = foregroundColor(for: block)
+        }
         attributes[.foregroundColor] = clickable == nil ? baseColor : linkColor
         attributes[.font] = font(for: run, in: block)
 

@@ -5330,6 +5330,123 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R453：`~~` 删除线的正文必须比正常正文弱一档（删除线本身仍在）。
+    ///
+    /// 两段正文逐字相同（`同样的字`），只有前一段带删除线：
+    /// 墨像素平均灰度差——亮档删除段更亮、暗档更暗（差 ≥20）。
+    /// 删除线本身由 AppKit 的 `.strikethroughStyle` 画；最长连续墨只是**前提**
+    ///（证明这一行确实带线），新面是颜色差。
+    /// 旧形状两段同色 ⇒ 差约 0，由 M1240/M1241 的刀证明。
+    func testStruckTextIsDeEmphasized() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r453-strike-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-strike" }) else {
+                return XCTFail("\(tag)：找不到 `detail-strike` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-strike-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-strike` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = Int((300.0 * scale).rounded())
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int((60.0 * scale))..<min(height, Int((520.0 * scale))) {
+                var has = false
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, min(height, Int((520.0 * scale))) - 1)) }
+            let rows = Array(bands.suffix(2))
+            guard rows.count == 2 else {
+                emit("STRIKE_DIM_NOT_RUN=runner-detail-frame-plain \(tag) 带=\(bands.count)"
+                     + " ⇒ 找不到两段正文，判据没有对象")
+                continue
+            }
+            func stats(_ band: (top: Int, bottom: Int)) -> (mean: Double, count: Int) {
+                var sum = 0.0
+                var count = 0
+                for y in band.top...band.bottom {
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        sum += luma(x, y)
+                        count += 1
+                    }
+                }
+                return (count > 0 ? sum / Double(count) : .nan, count)
+            }
+            /// 每一列在该带里有没有墨（同一条正文的两段列宽一致）。
+            func columnInk(_ band: (top: Int, bottom: Int)) -> [Bool] {
+                var mask = [Bool](repeating: false, count: x1 - x0)
+                for y in band.top...band.bottom {
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        mask[x - x0] = true
+                    }
+                }
+                return mask
+            }
+            let struck = stats(rows[0])
+            let plain = stats(rows[1])
+            let diff = struck.mean - plain.mean
+            // 删除线证人：正常段的**字形间隙列**在删除段同一列被填上墨。
+            // 灰度差不能当线证人（灰字的抗锯齿会并成一条长墨），间隙列只有线会填。
+            let plainMask = columnInk(rows[1])
+            let struckMask = columnInk(rows[0])
+            let plainColumns = plainMask.indices.filter { plainMask[$0] }
+            var gapTotal = 0
+            var gapFilled = 0
+            if let first = plainColumns.first, let last = plainColumns.last, last > first + 2 {
+                for index in (first + 1)..<last where !plainMask[index] {
+                    gapTotal += 1
+                    if struckMask[index] { gapFilled += 1 }
+                }
+            }
+            emit("STRIKE_DIM \(tag) 删除=\(String(format: "%.1f", struck.mean))"
+                 + " 正常=\(String(format: "%.1f", plain.mean))"
+                 + " 差=\(String(format: "%.1f", diff))"
+                 + " 隙=\(gapFilled)/\(gapTotal)")
+            guard struck.count > 0, plain.count > 0 else {
+                emit("STRIKE_DIM_NOT_RUN=text-band-empty \(tag)")
+                continue
+            }
+            if appearance == .darkAqua {
+                XCTAssertLessThanOrEqual(diff, -20.0,
+                                         "\(tag)：删除线正文没有更暗（差 \(diff)）⇒ 删除内容还抢视线")
+            } else {
+                XCTAssertGreaterThanOrEqual(diff, 20.0,
+                                            "\(tag)：删除线正文没有更浅（差 \(diff)）⇒ 删除内容还抢视线")
+            }
+            XCTAssertGreaterThanOrEqual(gapTotal, 3,
+                                        "\(tag)：正常段的字形间隙只有 \(gapTotal) 列 ⇒ 这一行不是中文正文，前提不成立")
+            XCTAssertGreaterThanOrEqual(gapFilled, 1,
+                                        "\(tag)：正常段的 \(gapTotal) 个字形间隙列在删除段一个也没被填上"
+                                        + " ⇒ 删除线没画出来（颜色弱化不能替代线）")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -8642,6 +8759,12 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-list-wrap", NSSize(width: 720, height: 520)) {
             let target = self.makeListWrapStore()
             self.assertListWrapFixturePremise(target, role: "detail-list-wrap")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R453：两段逐字相同的正文，一段删除、一段正常 —— 删除段文字弱一档。
+        results.append(Fixture("detail-strike", NSSize(width: 720, height: 520)) {
+            let target = self.makeStrikeStore()
+            self.assertStrikeFixturePremise(target, role: "detail-strike")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
         // R440：表格表头字重。夹具的两行**逐字相同**（都是 `| 甲 | 乙 |`），
@@ -12688,6 +12811,51 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.listWrapFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R453 删除线夹具：两段**逐字相同**的正文，一段 `~~` 删除、一段正常。
+    /// 删除段的文字应弱一档，但删除线本身仍在。
+    static let strikeFixtureBody = """
+    # 删除线
+
+    ~~同样的字~~
+
+    同样的字
+    """
+
+    /// 夹具前提：两段正文逐字相同，前一段确实带 `.strikethrough`、后一段不带。
+    private func assertStrikeFixturePremise(_ store: HistoryStore, role: String,
+                                            file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：删除线夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let paragraphs = MarkdownParser.parse(body).blocks.filter {
+            if case .paragraph = $0.kind { return true } else { return false }
+        }
+        XCTAssertEqual(paragraphs.count, 2, "\(role)：段落不是两段（实际 \(paragraphs.count)）", file: file, line: line)
+        guard paragraphs.count == 2 else { return }
+        XCTAssertEqual(MarkdownPresentation.blockText(paragraphs[0]),
+                       MarkdownPresentation.blockText(paragraphs[1]),
+                       "\(role)：两段正文不是逐字相同 ⇒ 灰度差没有对象")
+        XCTAssertTrue(paragraphs[0].runs.contains { $0.marks.contains(.strikethrough) },
+                      "\(role)：第一段没有删除线标记")
+        XCTAssertFalse(paragraphs[1].runs.contains { $0.marks.contains(.strikethrough) },
+                       "\(role)：第二段不该有删除线标记")
+    }
+
+    private func makeStrikeStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.strikeFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
