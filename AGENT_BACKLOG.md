@@ -10381,3 +10381,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：说明是小字提示，secondary 在亮档实测 4.10:1，低于小字 4.5 的通用门槛。
     修法：先记录；若把它当正文级信息，需提对比度并补判据，不能只改色不补尺。
 
+**535. 路径字体的 runner 1x 读数未读**（R472 观察）
+    现象：`isFixedPitch` 纯判据不依赖机器；隐私长页帧在 runner 上可能平涂，像素证据未读。
+    修法：下一跑看 `settings-privacy-tall/-excluded` 是否被能力闸门点名；读不到就具名 NOT-RUN。
+
+**536. inline dark 的 DIAG 前移后仍无 runner 数据**（R472 观察）
+    现象：DIAG 已移到 `best` 之前、多打 `选中=`；R472 自身跑待读，dark 真带是否在候选仍未知。
+    修法：下一跑读 `INLINE_CODE_DIAG dark` 的页/带/候选/top；按数据改检测，不盲调选择器，4.5 地板不动。
+
+**537. `RUNNER_COPY_RECEIPT_MOTION_FLAKE`**（R472 观察）
+    现象：`40759325073 ↔ fa0db55` 的 Motion floor 红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（2x 1<2），同代码 `40759492283 ↔ 35f4bfd` 未红。
+    修法：采样 flake；原样重跑，不改门槛/不删登记；若再现成串再查回执药丸布局。
+

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置存储路径等宽（isFixedPitch；4 张隐私帧变化、基线 288）+ INLINE_CODE_DIAG 前移（R472 / 第 471 轮 / Round 469 / U-1785…U-1790 · 产品 1 文件 + 判据/仪器）
+
+
 ### 详情截断说明降到 meta 字号（11 vs 正文 14；2 张新帧、基线 288）（R471 / 第 470 轮 / Round 468 / U-1779…U-1784 · 产品 1 文件 + 判据）
 
 

@@ -6531,30 +6531,28 @@ final class UICaptureTests: XCTestCase {
                 guard let tones = bandLuma(row: y) else { continue }
                 candidates.append(contentsOf: candidateSpans(y: y, band: tones.band))
             }
-            guard let band = InlineCodeBandChoice.best(
+            let chosen = InlineCodeBandChoice.best(
                 candidates, minSpan: minWidth, maxSpan: maxWidth,
-                minCoverage: 0.55, minInk: max(6, Int(6.0 * scale * scale))) else {
-                XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
-                continue
-            }
-            let bandRow = band.row, bandLeft = band.left, bandRight = band.right
-            // R467：runner 上 dark 仍选到 150/147/3.0；先把"真带为什么不在候选"的证据打出来，
-            // 下一跑拿数据再改选择器（本轮不改、不降 4.5）。
-            let tones = bandLuma(row: bandRow)
+                minCoverage: 0.55, minInk: max(6, Int(6.0 * scale * scale)))
+            // R472：诊断必须先于 guard —— R470 的整行门把 runner dark 的假 150 带排掉后，
+            // guard 先红，DIAG 一行都没打出来。这里用"chosen 为 nil 时的第一条候选行"做诊断锚点。
+            let diagRow = chosen?.row ?? candidates.first?.row ?? -1
+            let diagTones = diagRow >= 0 ? bandLuma(row: diagRow) : nil
             let topCandidates = candidates.sorted { $0.padding > $1.padding }.prefix(5)
                 .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
                     + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
                     + ":p\(String(format: "%.1f", $0.padding))"
                     + ":m\(String(format: "%.1f", Double($0.rowMaxBandRun) / scale))" }
                 .joined(separator: ",")
-            emit("INLINE_CODE_DIAG \(tag) 选行=\(bandRow)"
-                 + " 页=\(String(format: "%.0f", tones?.page ?? -1))"
-                 + " 带=\(String(format: "%.0f", tones?.band ?? -1))"
-                 + " 候选=\(candidates.count) top=\(topCandidates)")
-            guard bandRow >= 0 else {
+            emit("INLINE_CODE_DIAG \(tag) 选行=\(diagRow)"
+                 + " 页=\(String(format: "%.0f", diagTones?.page ?? -1))"
+                 + " 带=\(String(format: "%.0f", diagTones?.band ?? -1))"
+                 + " 候选=\(candidates.count) 选中=\(chosen != nil) top=\(topCandidates)")
+            guard let band = chosen else {
                 XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
                 continue
             }
+            let bandRow = band.row, bandLeft = band.left, bandRight = band.right
             // 2) 文字窗口：带顶 padding 与字形之间行距有空隙，不能用"连续墨行"扩；
             //    在带的左右范围内取 bandRow ±20pt 的窗口找字墨（行内码就在带里）。
             let bandTop = max(Int((80.0 * scale)), bandRow - Int((20.0 * scale).rounded()))

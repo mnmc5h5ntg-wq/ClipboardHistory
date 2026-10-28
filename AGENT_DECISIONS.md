@@ -8094,3 +8094,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：说明仍是 secondary 11pt（对比度 4.10:1，低于小字 4.5）；它是提示不是正文，先记录（BACKLOG 534）；runner 1x 的说明字号读数待读。
 - 回滚：改回 `bodyFont`；或 `git revert`。
 
+## D-469 设置存储路径用等宽字体（R472）
+
+- 背景：隐私「数据与保留」卡里的保存路径整句用比例字体；路径是逐字符读的值，`i/l/1` 与斜杠步进不齐。
+- 决定：`SettingsPathPresentation.split` 在 "~/" 处拆前缀/路径；`SettingsPathText` 用 `pathFont`（`monospacedSystemFont`）画路径，前缀保持说明字体。判据读 `isFixedPitch`（旧比例字体 false → 新 true）与拆分；不抄字号。
+- 理由：路径是代码类值，等宽步进更易扫读/核对；前缀仍是说明文字，不改变卡片语言。
+- 兼容性/迁移：仅 storageLocation 一条 bullet 有 "~/"，其余四条原样；4 张隐私长页帧变化、基线 288 同笔更新。
+- 边界：runner 的设置内容列可能平涂；纯字体判据不依赖截图，像素帧仍会逐张看。
+- 回滚：删 `SettingsPathText` 调用；或 `git revert`。
+

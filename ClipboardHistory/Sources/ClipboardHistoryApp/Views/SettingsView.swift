@@ -53,6 +53,32 @@ extension View {
     }
 }
 
+/// R472：设置里的路径是**逐字符读**的值（`~/Library/...`），用比例字体时 `i/l/1` 与斜杠的
+/// 步进不齐。拆出 "~/" 之后的整段路径用等宽字体；前缀（"保存位置："）保持正文的说明字体。
+enum SettingsPathPresentation {
+    static func split(_ text: String) -> (prefix: String, path: String?) {
+        guard let range = text.range(of: "~/") else { return (text, nil) }
+        return (String(text[..<range.lowerBound]), String(text[range.lowerBound...]))
+    }
+
+    /// 判据读的就是这一枚字体：`isFixedPitch` 是字体自己的结构量，不是抄一个字号。
+    static var pathFont: NSFont {
+        .monospacedSystemFont(ofSize: VisualFont.meta, weight: .regular)
+    }
+}
+
+struct SettingsPathText: View {
+    let text: String
+
+    var body: some View {
+        let parts = SettingsPathPresentation.split(text)
+        if let path = parts.path {
+            return Text(parts.prefix) + Text(path).font(Font(SettingsPathPresentation.pathFont))
+        }
+        return Text(text)
+    }
+}
+
 enum SettingsCategory: String, CaseIterable, Identifiable {
     case shortcuts
     case general
@@ -634,7 +660,7 @@ struct SettingsView: View {
                         .font(.subheadline)
 
                     ForEach(Array(HistoryPrivacyCopy.settingsBullets.enumerated()), id: \.offset) { _, line in
-                        Text(line)
+                        SettingsPathText(text: line)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
