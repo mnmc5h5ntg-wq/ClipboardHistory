@@ -7895,3 +7895,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML 任务列表未接（481）。
 - 回滚：`dimmed:` 传 false 或删 `TaskItemPresentation` 即可；或 `git revert`。
 
+## D-447 列表项的显式制表位与 headIndent 同值（R451）
+
+- 背景：`headIndent` 是 16，但首行正文的 `\t` 走默认制表位 28 —— 折行列表项首行正文 28、续行 16，错开 12pt；现有夹具都是短项。
+- 决定：新 `ListHangingIndent`（max(16, 标记宽+2)）；`hangingIndent` 用标记字体量宽；列表块的 `paragraphStyle` 设一条显式制表位，位置 == headIndent；两三位数编号的列跟着变宽。
+- 理由：首行正文与续行必须同轴；宽度跟标记走，不靠默认 28；纯策略不碰 Store（1108/66）。
+- 兼容性/迁移：新夹具 `detail-list-wrap`；`detail-markdown-rendered`/`detail-tasks` 的列表文字从 48 移到 36；基线 258→260。
+- 边界：HTML 列表未接（482）；裸像素簇尺在这张 rep 上不可靠，判据读产品段落样式。
+- 回滚：删 `tabStops` 与 `hangingIndent` 的使用、恢复 `headIndent = firstLine + 16`；或 `git revert`。
+

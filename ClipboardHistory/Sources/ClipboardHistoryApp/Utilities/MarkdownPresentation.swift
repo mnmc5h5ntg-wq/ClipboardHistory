@@ -115,9 +115,30 @@ enum MarkdownPresentation {
     }
 
     /// 悬挂缩进的第二行起点：列表项要让续行对齐到正文而不是对齐到圆点下面。
+    /// R451：正文列跟标记宽度走（显式制表位与它同值），不再依赖默认制表位 28pt。
     static func headIndent(for block: MarkdownBlock) -> CGFloat {
         guard isListItem(block.kind) else { return firstLineHeadIndent(for: block) }
-        return firstLineHeadIndent(for: block) + listMarkerAdvance
+        return hangingIndent(for: block)
+    }
+
+    /// 列表项标记的纯文本（不含制表符）：项目符号/勾选符号/编号。
+    static func listMarkerText(for block: MarkdownBlock) -> String? {
+        switch block.kind {
+        case .unorderedItem(let depth, let task):
+            return taskGlyph(task) ?? bulletGlyph(depth: depth)
+        case .orderedItem(_, let number):
+            return "\(number)."
+        default:
+            return nil
+        }
+    }
+
+    /// 正文列相对段落原点的 x：首行制表位与续行 headIndent 共用这一个数。
+    static func hangingIndent(for block: MarkdownBlock) -> CGFloat {
+        let base = firstLineHeadIndent(for: block)
+        guard let marker = listMarkerText(for: block) else { return base }
+        let width = (marker as NSString).size(withAttributes: [.font: markerFont(for: block)]).width
+        return ListHangingIndent.advance(firstLineIndent: base, markerWidth: width)
     }
 
     static func listDepth(of kind: MarkdownBlock.Kind) -> CGFloat {
@@ -413,6 +434,10 @@ enum MarkdownPresentation {
         let style = NSMutableParagraphStyle()
         style.firstLineHeadIndent = firstLineHeadIndent(for: block)
         style.headIndent = headIndent(for: block)
+        // R451：列表项的 `\t` 必须停在与 headIndent 同一条竖轴上（默认制表位 28 会错开 12pt）。
+        if isListItem(block.kind) {
+            style.tabStops = [NSTextTab(textAlignment: .left, location: hangingIndent(for: block))]
+        }
         style.lineSpacing = lineSpacing(for: block)
         style.paragraphSpacingBefore = paragraphSpacingBefore(for: block)
         // 正文左对齐：详情区是读东西的地方，不是排海报的地方。

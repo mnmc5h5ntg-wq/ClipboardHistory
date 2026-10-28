@@ -5144,6 +5144,61 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R451：列表项折行后，**续行必须回到首行正文的同一条竖轴**。
+    ///
+    /// 缺陷形状：`headIndent` 是 16，但首行正文靠**默认制表位** 28 —— 首行正文 28、续行 16，
+    /// 多行列表项一折行就错开 12pt。判据读产品文本视图里那一段的 `NSParagraphStyle`：
+    /// ① 必须有一个显式制表位；② 制表位位置 == headIndent（首行正文与续行同轴）；
+    /// ③ headIndent > firstLineHeadIndent（续行的缩进仍存在）。
+    /// 旧形状没有 tabStops（默认 28）⇒ ① 直接红。帧仍拍（`detail-list-wrap`），看图在账里。
+    func testWrappedListItemsAlignTheirContinuation() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r451-list-hang-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-list-wrap" }) else {
+                return XCTFail("\(tag)：找不到 `detail-list-wrap` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-list-wrap-\(tag).png")
+            var tabCount = -1
+            var tabLocation = CGFloat.nan
+            var headIndent = CGFloat.nan
+            var firstLineIndent = CGFloat.nan
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func allSubviews(_ view: NSView) -> [NSView] {
+                    [view] + view.subviews.flatMap(allSubviews)
+                }
+                guard let textView = allSubviews(host).compactMap({ $0 as? NSTextView }).first,
+                      let storage = textView.textStorage else { return }
+                let text = storage.string as NSString
+                let range = text.range(of: "这是一条")
+                guard range.location != NSNotFound else { return }
+                guard let style = storage.attribute(.paragraphStyle, at: range.location,
+                                                    effectiveRange: nil) as? NSParagraphStyle else { return }
+                tabCount = style.tabStops.count
+                tabLocation = style.tabStops.first?.location ?? .nan
+                headIndent = style.headIndent
+                firstLineIndent = style.firstLineHeadIndent
+            }
+            emit("LIST_HANG_STYLE \(tag) 制表位数=\(tabCount)"
+                 + " 制表位=\(String(format: "%.1f", tabLocation))"
+                 + " 续行=\(String(format: "%.1f", headIndent))"
+                 + " 首行=\(String(format: "%.1f", firstLineIndent))pt")
+            XCTAssertEqual(tabCount, 1,
+                           "\(tag)：折行列表项没有显式制表位（读到 \(tabCount) 个）"
+                           + " ⇒ 首行正文还走默认制表位 28，续行在 16")
+            XCTAssertEqual(tabLocation, headIndent, accuracy: 0.01,
+                           "\(tag)：制表位 \(tabLocation) 与 headIndent \(headIndent) 不同轴"
+                           + " ⇒ 首行正文与续行会错开")
+            XCTAssertGreaterThan(headIndent, firstLineIndent + 4,
+                                 "\(tag)：续行缩进 \(headIndent) 没有大于首行缩进 \(firstLineIndent)")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -8450,6 +8505,12 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-tasks", NSSize(width: 720, height: 520)) {
             let target = self.makeTaskStore()
             self.assertTaskFixturePremise(target, role: "detail-tasks")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R451：两条必须折行的列表项 —— 续行应回到首行正文的同一条竖轴。
+        results.append(Fixture("detail-list-wrap", NSSize(width: 720, height: 520)) {
+            let target = self.makeListWrapStore()
+            self.assertListWrapFixturePremise(target, role: "detail-list-wrap")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
         // R440：表格表头字重。夹具的两行**逐字相同**（都是 `| 甲 | 乙 |`），
@@ -12453,6 +12514,49 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.taskFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R451 列表续行夹具：两条**必须折行**的列表项。
+    /// 旧形状首行正文走默认制表位 28pt、续行走 headIndent 16pt，折行后错开 12pt。
+    static let listWrapFixtureBody = """
+    # 列表
+
+    - 这是一条很长的列表项正文，长到必须在渲染列里折成第二行，才能看出续行与首行正文是否对齐，所以再补一些字把它撑到第二行。
+    - 第二条也写长一点，保证它同样折行，这样两条的续行都参与判断，而不是只有一条碰巧对上；再补一句把它撑过渲染列，确保第二行真的出现。
+    """
+
+    /// 夹具前提：两条无序列表项，正文都够长（≥40 字），渲染列里必须折行。
+    private func assertListWrapFixturePremise(_ store: HistoryStore, role: String,
+                                              file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：列表续行夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let blocks = MarkdownParser.parse(body).blocks
+        let items = blocks.compactMap { block -> String? in
+            guard case .unorderedItem = block.kind else { return nil }
+            return MarkdownPresentation.blockText(block)
+        }
+        XCTAssertEqual(items.count, 2, "\(role)：列表项不是两条（实际 \(items.count)）", file: file, line: line)
+        for (index, text) in items.enumerated() {
+            XCTAssertGreaterThanOrEqual(text.count, 40,
+                                        "\(role)：第 \(index + 1) 条正文只有 \(text.count) 字 ⇒ 撑不到第二行",
+                                        file: file, line: line)
+        }
+    }
+
+    private func makeListWrapStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.listWrapFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
