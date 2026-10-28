@@ -19097,3 +19097,21 @@ QuickPick 的 ↑/↓、↵、esc 全靠猜，面板底部一直是空白（旧 
 | 可复核性 | 15/15 | 0→1566/1848、提示顶/表底 22/26、12 帧名单、刀号与 precheck 227/209/592、rot 314/1009、基线 256 都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 447 · R450（第 449 轮 · 2026-10-28）：已完成任务项的正文弱一档（逐字相同的两行：亮 148.3 vs 85.1、暗 136.0 vs 184.7；2 张新帧 + 2 张旧帧变化、基线 256→258）
+
+勾选态只落在 ☑/☐ 小字形上，正文与未完成项同色。新 `TaskItemPresentation`（只有 checked 弱化、`secondaryLabelColor`）；`attributes(for:in:dimmed:)` 对完成项文字降一档，链接仍保留链接色；`.unorderedItem` 只在 checked 时 dimmed。夹具 `detail-tasks`（一勾一未勾、正文逐字相同）：`TASK_DIM light 勾选=148.3 未勾选=85.1 差=+63.2 墨数=1149/1269`、`dark 136.0/184.7 差=-48.7 墨数=1287/1393`；标记与 visibleText 不动。2 张新帧 + 2 张旧帧变化（detail-markdown-rendered 的「解析层完成」也变灰），基线 258/0/0/0；已看亮/暗。M1234/M1235 2/2。⓪：push 224b8ee..9743379 success、ahead=0；107f2b3 跑 success（TABLE_ROW_LINES 3/0/108.0/102.0/1.0、THEMATIC_RULE 597/1/1、CODE_LANGUAGE 116/126、HISTORY_SEARCH_SOURCE 1/3 + dark NOT_RUN、HISTORY_ROW_SOURCE 139/74、SETTINGS_ABOUT_ROW 7/7、CODE_LINE_NUMBERS 54/3/21/100%、TABLE_HEADER 1.10、PROBE_DOMAIN 44/20）；0737460 跑 failure 仅 Motion floor（testMarkdownModeLabelChange 1<2）；40632882239/40634880705 in_progress 后 gh EOF ⇒ NOT-RUN。全量 1234/57/5（滚动具名）；捕获 258；换装 ok/SHA_MATCH=1/381=381；电池 683/5。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 亮/暗 detail-tasks 与 markdown 样例逐张看过：完成项退后、未完成项保持主色；不是只看数字。 |
+| 判据有效性 | 15/15 | 两行逐字相同、只比正文墨像素平均灰度（亮 +、暗 −），墨数比 ≤1.25；标记与 visibleText 契约另有单测；M1234/M1235 2/2。 |
+| 假绿防御 | 15/15 | 墨数比排除"少画字"；链接不弱化防假 affordance；旧形状（不弱化/都弱化）由两把刀钉住。 |
+| 产品面推进 | 14/15 | 完成态第一次在正文上可见；Store 不动；扣 1：HTML 任务列表未覆盖（481）。 |
+| 台账一致性 | 15/15 | U-1673…U-1677、D-446、push 9743379、258 帧/1234、STORE-SIZE 1108/66 都从命令与测试解析。 |
+| 交付诚实性 | 15/15 | 两新跑 in_progress/EOF 具名；0737460 的 Motion 红原文（markdown 模式标签 1<2）照记；107f2b3 success 与采样红未复现并列写。 |
+| 可复核性 | 15/15 | 148.3/85.1/+63.2、136.0/184.7/−48.7、墨数 1149/1269、刀号与 precheck 228/210/594、rot 314/1009、基线 258 都在。 |
+
+均分 = 104/105 ≈ 14.9/15（99）。

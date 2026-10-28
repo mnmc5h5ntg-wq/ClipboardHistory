@@ -7886,3 +7886,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：只说明三组键；1x runner 读数本轮因 gh 断网未读（480）。
 - 回滚：删 label 与两条约束、stack 底边恢复 content 底部即可；或 `git revert`。
 
+## D-446 已完成任务项的文字降一档，标记保留（R450）
+
+- 背景：勾选态只落在 ☑/☐ 两个小字形上，正文与未完成项同色同重，扫清单分不出做完的。
+- 决定：`TaskItemPresentation.dimsText(.checked)`；`attributes(for:in:dimmed:)` 把完成项文字降到 `secondaryLabelColor`；可点链接仍保留链接色；☑/☐ 与 `visibleText` 不动。
+- 理由：完成态是任务项的主要内容状态；弱化正文让已完成项退后；链接可点性不能因弱化变假 affordance。
+- 兼容性/迁移：新夹具 `detail-tasks`；`detail-markdown-rendered` 亮/暗因已完成项变灰而更新；基线 256→258。
+- 边界：HTML 任务列表未接（481）。
+- 回滚：`dimmed:` 传 false 或删 `TaskItemPresentation` 即可；或 `git revert`。
+

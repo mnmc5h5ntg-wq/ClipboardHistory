@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 已完成任务项的正文弱一档（逐字相同的两行：亮 148.3 vs 85.1、暗 136.0 vs 184.7；2 张新帧 + 2 张旧帧变化、基线 258）（R450 / 第 449 轮 / Round 447 / U-1673…U-1677 · 产品 2 文件，任务项完成态位）
+
+
 ### QuickPick 底部补键盘操作提示（旧帧底部 26pt 带 0 墨 → 新 1566/1848；提示在表格可见区下方 4pt；12 张 QuickPick 帧变化、基线 256）（R449 / 第 448 轮 / Round 446 / U-1668…U-1672 · 产品 3 文件，浮层键盘提示位）
 
 

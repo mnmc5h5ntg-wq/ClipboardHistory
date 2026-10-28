@@ -5052,6 +5052,98 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R450：Markdown 已完成任务项的**正文**必须比未完成项弱一档。
+    ///
+    /// 两行任务项的正文逐字相同（`待办事项`），只有 `[x]`/`[ ]` 不同：
+    /// ① 正文文字区（x 40..300，排除标记字形）的墨像素平均灰度，勾选行在亮档应更亮、
+    ///    暗档应更暗（次要色），差 ≥20；
+    /// ② 两行的墨像素数相差 ≤25%（证明差来自颜色而不是少画了字）。
+    /// 旧形状两行同色 ⇒ 差约 0，由 M1234/M1235 的刀证明。
+    func testCheckedTasksDimTheirText() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r450-task-dim-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-tasks" }) else {
+                return XCTFail("\(tag)：找不到 `detail-tasks` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-tasks-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-tasks` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            let bandX0 = Int((20.0 * scale).rounded())
+            let bandX1 = Int((400.0 * scale).rounded())
+            let textX0 = Int((40.0 * scale).rounded())
+            let textX1 = Int((300.0 * scale).rounded())
+
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int((60.0 * scale))..<min(height, Int((520.0 * scale))) {
+                var has = false
+                for x in bandX0..<bandX1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, min(height, Int((520.0 * scale))) - 1)) }
+            let rows = Array(bands.suffix(2))
+            guard rows.count == 2 else {
+                emit("TASK_DIM_NOT_RUN=runner-detail-frame-plain \(tag) 带=\(bands.count)"
+                     + " ⇒ 找不到两行任务项，判据没有对象")
+                continue
+            }
+
+            func stats(_ band: (top: Int, bottom: Int)) -> (mean: Double, count: Int) {
+                var sum = 0.0
+                var count = 0
+                for y in band.top...band.bottom {
+                    for x in textX0..<textX1 where isInk(luma(x, y)) {
+                        sum += luma(x, y)
+                        count += 1
+                    }
+                }
+                return (count > 0 ? sum / Double(count) : .nan, count)
+            }
+            let checked = stats(rows[0])
+            let unchecked = stats(rows[1])
+            let diff = checked.mean - unchecked.mean
+            emit("TASK_DIM \(tag) 勾选=\(String(format: "%.1f", checked.mean))"
+                 + " 未勾选=\(String(format: "%.1f", unchecked.mean))"
+                 + " 差=\(String(format: "%.1f", diff))"
+                 + " 墨数=\(checked.count)/\(unchecked.count)")
+            guard checked.count > 0, unchecked.count > 0 else {
+                emit("TASK_DIM_NOT_RUN=text-band-empty \(tag) 墨数=\(checked.count)/\(unchecked.count)")
+                continue
+            }
+            if appearance == .darkAqua {
+                XCTAssertLessThanOrEqual(diff, -20.0,
+                                         "\(tag)：完成项正文没有更暗（差 \(diff)）⇒ 完成态只在标记上")
+            } else {
+                XCTAssertGreaterThanOrEqual(diff, 20.0,
+                                            "\(tag)：完成项正文没有更浅（差 \(diff)）⇒ 完成态只在标记上")
+            }
+            let ratio = Double(max(checked.count, unchecked.count)) / Double(max(min(checked.count, unchecked.count), 1))
+            XCTAssertLessThanOrEqual(ratio, 1.25,
+                                     "\(tag)：两行墨数相差 \(ratio) 倍 ⇒ 差来自少画了字，不是颜色")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -8353,6 +8445,12 @@ final class UICaptureTests: XCTestCase {
             let target = self.makeMarkdownStore()
             self.assertMarkdownFixturePremise(target, role: "detail-markdown-source")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
+        })
+        // R450：一勾一未勾、正文逐字相同的两行任务项 —— 完成项的文字应弱一档。
+        results.append(Fixture("detail-tasks", NSSize(width: 720, height: 520)) {
+            let target = self.makeTaskStore()
+            self.assertTaskFixturePremise(target, role: "detail-tasks")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
         // R440：表格表头字重。夹具的两行**逐字相同**（都是 `| 甲 | 乙 |`），
         // 于是"表头比表体重多少"可以同帧、同字、同字号地量成墨量比；
@@ -12318,6 +12416,48 @@ final class UICaptureTests: XCTestCase {
     参考 [官方文档](https://example.com/doc) 与 <https://bare.example>。
     中文的 *强调* 不能用合成斜体。
     """
+
+    /// R450 任务项夹具：一行已完成、一行未完成，**正文逐字相同**（`待办事项`）。
+    /// 于是"勾选行的正文比未勾选行浅多少"可以在同一帧、同一句话上量。
+    static let taskFixtureBody = """
+    # 任务
+
+    - [x] 待办事项
+    - [ ] 待办事项
+    """
+
+    /// 夹具前提：解析结果里确实有两条任务项，状态一勾一未勾，正文逐字相同。
+    private func assertTaskFixturePremise(_ store: HistoryStore, role: String,
+                                          file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：任务项夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let blocks = MarkdownParser.parse(body).blocks
+        let tasks = blocks.compactMap { block -> (MarkdownBlock.TaskState?, String)? in
+            guard case .unorderedItem(_, let state) = block.kind, state != nil else { return nil }
+            return (state, MarkdownPresentation.blockText(block))
+        }
+        XCTAssertEqual(tasks.count, 2, "\(role)：任务项不是两条（实际 \(tasks.count)）", file: file, line: line)
+        XCTAssertEqual(tasks.first?.0, .checked, "\(role)：第一条不是已完成", file: file, line: line)
+        XCTAssertEqual(tasks.last?.0, .unchecked, "\(role)：第二条不是未完成", file: file, line: line)
+        XCTAssertEqual(tasks.first?.1, tasks.last?.1,
+                       "\(role)：两条正文不是逐字相同 ⇒ 墨量/灰度差没有对象", file: file, line: line)
+    }
+
+    private func makeTaskStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.taskFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
 
     /// R447 主题分隔线夹具：一条 `---` 夹在两段之间。
     /// 旧形状这条线是 24 个 `─` 字符（比正文窄、比行高厚、复制会带出字符）；

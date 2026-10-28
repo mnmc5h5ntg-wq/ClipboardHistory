@@ -1,5 +1,5 @@
 {
-  "count": 256,
+  "count": 258,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -61,8 +61,8 @@
     "detail-loading-720x520-light.png": "3aa9635bbe39f6caadd284ba5d86f65c41858fa26019f4f868412dd6f3390658",
     "detail-loading-composed-720x520-dark.png": "6233523dd8944996c7fedb5d1d92a1a558f31ba980c2014b09eb5d1ee9d58383",
     "detail-loading-composed-720x520-light.png": "152192032c61719044f748606f9fa1c7d1489b55b2296657bf720bc50dfd8e12",
-    "detail-markdown-rendered-720x520-dark.png": "53c7ef2eeb55a3c4c1f66fe210cf8505a03161012e65aac62d315d9af9821ee9",
-    "detail-markdown-rendered-720x520-light.png": "1bc2652defda52ec8f2a86d151c1324b5ada23b6980c10914b928d2273fe32f6",
+    "detail-markdown-rendered-720x520-dark.png": "434c1a1eab2112e7084f260c89cb50f1b4c955edf674e93f19fbd80c0a4d7266",
+    "detail-markdown-rendered-720x520-light.png": "a2b4b45f4c0f3cf54550a7099f74d9da65f53c600a05ee0e7c9a40babc3f454c",
     "detail-markdown-source-720x520-dark.png": "f705b66464fbab2f5c3712bc45fc03f6fe6bfd485e54719414d49ec728c51171",
     "detail-markdown-source-720x520-light.png": "64a7ed7685447e521106bbf1a77cf109234c819ad145346f263a3caf17d1ce2a",
     "detail-no-source-720x520-dark.png": "6679a60018eddb5a640b729edaa39104ba9b20d9b7f9b8b3f26a044757bd9a2f",
@@ -77,6 +77,8 @@
     "detail-table-720x520-light.png": "3ec05d45494792458416ab0369336ee5b7a64ac5f700662aa9e1a60a47de0b35",
     "detail-table-rows-720x520-dark.png": "c9b50807316ad789e203b0f4e42a1de80457490fd0168b93a93de6a9eb0ff520",
     "detail-table-rows-720x520-light.png": "8a0c9a6b317c6dbd3408601fdc35328ce66ecb95825f03fe3c541967215def2a",
+    "detail-tasks-720x520-dark.png": "58b8051154f4f4136ef67ee0ca93272c53d3dd8e8839f6427e7b276438e8a3fc",
+    "detail-tasks-720x520-light.png": "4b734124a129e695aea633db73638c6d479b724c67435d9a97f699be9e0ddbc6",
     "detail-text-highlight-720x520-dark.png": "974f09b46d3c9d14209161c97c9569d3847348867265cdb51b0de953384ba798",
     "detail-text-highlight-720x520-light.png": "651277adc3b3ab67f443a9a8c97570604a72ae51ae2728310256172a69fc876c",
     "empty-state-320x160-dark.png": "b997d67b20ab3276e0b0dd65c32090ee6eb98b632bf012b13b21bb5868c100b6",

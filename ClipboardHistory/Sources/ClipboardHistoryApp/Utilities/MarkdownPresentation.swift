@@ -264,13 +264,16 @@ enum MarkdownPresentation {
     }
 
     /// 把 run 的样式算成具体属性。
-    static func attributes(for run: MarkdownInline, in block: MarkdownBlock) -> [NSAttributedString.Key: Any] {
+    static func attributes(for run: MarkdownInline, in block: MarkdownBlock,
+                          dimmed: Bool = false) -> [NSAttributedString.Key: Any] {
         var attributes: [NSAttributedString.Key: Any] = [:]
         // **颜色与可点必须同现同缺**：链接色只在真的能点时给。
         // 否则屏幕上会出现"蓝色、下划线、点了没反应"的字 —— 那是假 affordance，
         // 比不给链接更坏。名单与理由在下面的 `linkURL(for:)`。
         let clickable = run.marks.contains(.link) ? linkURL(for: run.destination ?? "") : nil
-        attributes[.foregroundColor] = clickable == nil ? foregroundColor(for: block) : linkColor
+        // R450：已完成任务项的文字降一档；可点的链接仍保留链接色（假 affordance 比弱化更坏）。
+        let baseColor = dimmed ? TaskItemPresentation.completedTextColor : foregroundColor(for: block)
+        attributes[.foregroundColor] = clickable == nil ? baseColor : linkColor
         attributes[.font] = font(for: run, in: block)
 
         if run.marks.contains(.strikethrough) {
@@ -425,7 +428,9 @@ enum MarkdownPresentation {
         case .unorderedItem(let depth, let task):
             let glyph = taskGlyph(task) ?? bulletGlyph(depth: depth)
             appendMarker(glyph + "\t", to: result, block: block)
-            appendRuns(block.runs, to: result, block: block)
+            // R450：完成项的文字降一档（标记保留），未完成项不动。
+            appendRuns(block.runs, to: result, block: block,
+                       dimmed: TaskItemPresentation.dimsText(task))
         case .orderedItem(_, let number):
             // 编号是内容：`3. 第三步` 只排成"第三步"等于把顺序弄丢了。
             appendMarker("\(number).\t", to: result, block: block)
@@ -453,9 +458,10 @@ enum MarkdownPresentation {
     }
 
     private static func appendRuns(_ runs: [MarkdownInline], to result: NSMutableAttributedString,
-                                   block: MarkdownBlock) {
+                                   block: MarkdownBlock, dimmed: Bool = false) {
         for run in runs {
-            result.append(NSAttributedString(string: run.text, attributes: attributes(for: run, in: block)))
+            result.append(NSAttributedString(string: run.text,
+                                             attributes: attributes(for: run, in: block, dimmed: dimmed)))
         }
     }
 
