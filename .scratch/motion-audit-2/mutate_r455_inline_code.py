@@ -12,7 +12,7 @@ POLICY = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Utilities/InlineCodeBac
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "InlineCodeBackgroundTests|testInlineCodeBackgroundHasPadding"
 DRAW_NEEDLE = '        drawInlineCodeBackgrounds(in: rect)'
-PAD_NEEDLE = '    static let horizontalPadding: CGFloat = 3'
+PAD_NEEDLE = '    static let horizontalPadding: CGFloat = 4'
 MUTATIONS = [
     ("M1246", "不画行内代码底色带（属性串底已撤）", VIEW, DRAW_NEEDLE,
      '        // 行内代码底色带不画',

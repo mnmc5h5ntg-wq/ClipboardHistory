@@ -7,7 +7,7 @@ import AppKit
 /// 改成背景层自绘：只向**空白侧**各让 3pt（前一个是空格/行首、后一个是空格/行尾）——
 /// 紧贴标点时不让，否则底色会盖到后随的“。”上。上下各 1pt，圆角 2pt。
 enum InlineCodeBackground {
-    static let horizontalPadding: CGFloat = 3
+    static let horizontalPadding: CGFloat = 4
     static let verticalPadding: CGFloat = 1
     static let cornerRadius: CGFloat = 2
     static var color: NSColor { MarkdownPresentation.codeBackground }

@@ -5902,7 +5902,9 @@ final class UICaptureTests: XCTestCase {
                     let span = right - left + 1
                     let ink = prefix[right - x0 + 1] - prefix[left - x0]
                     if span >= minWidth, span <= maxWidth,
-                       Double(j - i) / Double(span) >= 0.35,
+                       // R461：1x 下文字抗锯齿会凑出假带（runner dark 150/147/3.0 顶到上限）。
+                       // 真带的 tint 在每个字行都占大半；抗锯齿零头覆盖不到一半。
+                       Double(j - i) / Double(span) >= 0.55,
                        ink >= max(6, Int(6.0 * scale * scale)) {
                         if best == nil || span > best!.span { best = (span, left, right) }
                     }
