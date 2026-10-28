@@ -126,6 +126,15 @@ private struct WeightSliderRow: View {
                 .lineLimit(1)
 
             Slider(value: $value, in: 0...2.0, step: 0.05)
+                // R452：0–200% 的量程里，100% 默认位没有可见参照（原生只有一排 1pt 小点）。
+                // 中心下方加一条 1×5pt 的短刻度，滑杆移开后仍能看到"默认在哪"。
+                .overlay(alignment: .center) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.55))
+                        .frame(width: 1, height: 5)
+                        .offset(y: 9)
+                        .allowsHitTesting(false)
+                }
         }
     }
 

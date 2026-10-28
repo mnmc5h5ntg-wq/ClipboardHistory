@@ -5199,6 +5199,137 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R452：推荐权重滑块的 **100% 中心刻度**。
+    ///
+    /// 0–200% 的量程里，默认位（100%）原先只有一排 1pt 原生小点，没有更强的参照。
+    /// 判据在 `weights` 组件帧上：先按"长灰条"找到每条滑轨，再量滑轨下方
+    /// 中心列与 ±20pt 邻列的**最长竖墨段**；中心列应有 1×5pt 刻度（≥3.5pt），
+    /// 邻列只有原生小点（≤2pt）。旧形状中心列与邻列一样只有小点。
+    func testWeightSlidersMarkTheDefaultCenter() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r452-weight-tick-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "weights" }) else {
+                return XCTFail("\(tag)：找不到 `weights` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("weights-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`weights` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let width = rep.pixelsWide, height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            // 滑轨：长灰条（亮档 180..235 / 暗档 55..85），至少 300pt 长。
+            let isTrack: (Double) -> Bool = appearance == .darkAqua
+                ? { $0 >= 55 && $0 <= 85 } : { $0 >= 180 && $0 <= 235 }
+            // 刻度/小点：离背景足够远（亮 ≤210 / 暗 ≥70）。
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = min(width, Int((Double(fixture.size.width) - 20.0) * scale))
+            let minTrack = Int((150.0 * scale).rounded())
+
+            /// 滑轨在 100% 被白色旋钮截成两段：取该行首末轨像素的**跨度**，
+            /// 中心仍落在旋钮（100%）处；分隔线只有 1pt 高，后面按带高过滤。
+            func trackSpan(y: Int) -> (count: Int, left: Int, right: Int) {
+                var count = 0, left = Int.max, right = -1
+                for x in x0..<x1 where isTrack(luma(x, y)) {
+                    count += 1
+                    left = min(left, x)
+                    right = max(right, x)
+                }
+                return (count, left, right)
+            }
+            var tracks: [(top: Int, bottom: Int, left: Int, right: Int)] = []
+            var trackTop = -1
+            var trackLeft = 0, trackRight = 0
+            for y in Int((40.0 * scale))..<min(height, Int((Double(fixture.size.height) - 20.0) * scale)) {
+                let hit = trackSpan(y: y)
+                if hit.count >= minTrack {
+                    if trackTop < 0 {
+                        trackTop = y
+                        trackLeft = hit.left
+                        trackRight = hit.right
+                    } else {
+                        trackLeft = min(trackLeft, hit.left)
+                        trackRight = max(trackRight, hit.right)
+                    }
+                } else if trackTop >= 0 {
+                    tracks.append((trackTop, y - 1, trackLeft, trackRight))
+                    trackTop = -1
+                }
+            }
+            if trackTop >= 0 {
+                tracks.append((trackTop, min(height, Int((Double(fixture.size.height) - 20.0) * scale)) - 1,
+                               trackLeft, trackRight))
+            }
+            tracks = tracks.filter { Double($0.bottom - $0.top + 1) / scale >= 2.5 }
+            guard tracks.count >= 5 else {
+                emit("WEIGHT_CENTER_TICK_NOT_RUN=runner-settings-content-flat \(tag) 轨=\(tracks.count)"
+                     + " ⇒ 找不到权重滑轨，判据没有对象")
+                continue
+            }
+
+            func longestVerticalRun(x: Int, from y0: Int, to y1: Int) -> Int {
+                var best = 0, run = 0
+                for y in y0..<y1 {
+                    if isInk(luma(x, y)) {
+                        run += 1
+                        best = max(best, run)
+                    } else {
+                        run = 0
+                    }
+                }
+                return best
+            }
+
+            var judged = 0
+            var worstCenter = 0.0
+            var worstSide = 0.0
+            for track in tracks {
+                let center = (track.left + track.right) / 2
+                // 窗口只取轨道下方 4..14pt：旋钮的阴影贴着轨道，不进入这一带；
+                // 中心的 1×5pt 刻度落在其中，邻列只有原生小点。
+                let y0 = track.bottom + Int((4.0 * scale).rounded())
+                let y1 = min(height, y0 + Int((10.0 * scale).rounded()))
+                let centerRun = longestVerticalRun(x: center, from: y0, to: y1)
+                var sideRun = 0
+                for side in [center - Int((20.0 * scale).rounded()),
+                             center + Int((20.0 * scale).rounded())] where side > x0 && side < x1 {
+                    sideRun = max(sideRun, longestVerticalRun(x: side, from: y0, to: y1))
+                }
+                let centerPt = Double(centerRun) / scale
+                let sidePt = Double(sideRun) / scale
+                worstCenter = max(worstCenter, centerPt)
+                worstSide = max(worstSide, sidePt)
+                judged += 1
+                XCTAssertGreaterThanOrEqual(centerPt, 3.5,
+                                            "\(tag)：第 \(judged) 条滑轨中心列只有 \(centerPt)pt 竖墨"
+                                            + " ⇒ 100% 中心刻度没画出来（旧形状与旁边小点一样高）")
+                XCTAssertLessThanOrEqual(sidePt, 2.0,
+                                         "\(tag)：第 \(judged) 条滑轨邻列竖墨 \(sidePt)pt（应 ≤2pt）"
+                                         + " ⇒ 中心列没有比邻列更强")
+            }
+            emit("WEIGHT_CENTER_TICK \(tag) 轨=\(judged)"
+                 + " 中心最高=\(String(format: "%.1f", worstCenter))pt"
+                 + " 邻列最高=\(String(format: "%.1f", worstSide))pt")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为

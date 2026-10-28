@@ -7904,3 +7904,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML 列表未接（482）；裸像素簇尺在这张 rep 上不可靠，判据读产品段落样式。
 - 回滚：删 `tabStops` 与 `hangingIndent` 的使用、恢复 `headIndent = firstLine + 16`；或 `git revert`。
 
+## D-448 权重滑块补 100% 中心刻度（R452）
+
+- 背景：0–200% 量程里默认位（100%）只有一排 1pt 原生小点，滑杆移开后没有"默认在哪"的参照。
+- 决定：`WeightSliderRow` 在 Slider 上叠 1×5pt `Capsule`（`Color.secondary.opacity(0.55)`、中心对齐、下移 9pt、不挡点击）。
+- 理由：中心是默认位；刻度比原生点更强但不抢眼；view-only，不碰 Store。
+- 兼容性/迁移：8 张推荐面帧变化、0 新增；基线 260 同 commit 更新。
+- 边界：0%/200% 端点仍无标签（483）；设置内容列 1x 平涂时 runner 读数可能具名 NOT_RUN。
+- 回滚：删 overlay 即可；或 `git revert`。
+
