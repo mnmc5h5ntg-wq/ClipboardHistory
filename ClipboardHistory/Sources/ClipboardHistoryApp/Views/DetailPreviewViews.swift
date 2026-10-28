@@ -376,9 +376,14 @@ struct DetailFileView: View {
                 .frame(maxWidth: DetailTypography.columnWidth(), alignment: .leading)
                 .frame(maxWidth: .infinity, alignment: .center)
         } else {
+            // R460：纯文本文件也是正文，按**它自己的 13pt 字体**算 68ch 可读列
+            // （U-4 当年漏了这条支路；直接套 14pt 的列会让 13pt 的一行排到 ~83ch）。
+            let fileFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
             ChineseSelectableTextView(text: content,
                                       font: .monospacedSystemFont(ofSize: 13, weight: .regular),
                                       resetKey: url)
+                .frame(maxWidth: DetailTypography.columnWidth(font: fileFont), alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

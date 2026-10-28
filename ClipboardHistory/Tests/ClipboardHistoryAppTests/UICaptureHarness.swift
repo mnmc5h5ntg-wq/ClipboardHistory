@@ -4626,6 +4626,49 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R460：纯文本文件预览必须和 Markdown/正文一样受 68ch 可读列约束。
+    ///
+    /// 旧形状：`DetailFileView.textPreview` 的 else 分支直接 `ChineseSelectableTextView`，
+    /// 没有 `.detailReadableColumn()` —— 1100 窗口里一行铺满整个详情列（约 820pt），
+    /// 而 Markdown 正文是 611pt 的可读列。
+    func testPlainTextFilePreviewUsesTheReadableColumn() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r460-file-text-shots-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let fileFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        let column = DetailTypography.columnWidth(font: fileFont)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-text-wide" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-text-wide` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-file-text-wide-\(tag).png")
+            var width: Double?
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                    if let text = view as? ChineseSelectableNSTextView { return text }
+                    for sub in view.subviews {
+                        if let text = findTextView(sub) { return text }
+                    }
+                    return nil
+                }
+                if let textView = findTextView(host) {
+                    width = Double(textView.frame.width)
+                }
+            }
+            guard let width else {
+                emit("FILE_TEXT_PREVIEW_NOT_RUN=load-timeout \(tag)")
+                continue
+            }
+            emit("FILE_TEXT_PREVIEW \(tag) 正文宽=\(String(format: "%.1f", width))pt 可读列=\(String(format: "%.1f", column))pt")
+            XCTAssertLessThanOrEqual(width, column + 1.0,
+                                     "\(tag)：纯文本文件预览宽 \(width)pt，超过可读列 \(column)pt")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -9396,6 +9439,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(DetailView(historyStore: self.makeHeadingsStore(),
                                initialMarkdownMode: .rendered))
         })
+        // R460：纯文本文件预览 —— 长行应被 68ch 可读列收窄。
+        results.append(Fixture("detail-file-text-wide", NSSize(width: 1100, height: 800),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
+            AnyView(DetailView(historyStore: self.makeFileTextStore()))
+        })
         // R447：主题分隔线。线前/线后各一段，帧上只应出现**一条**通栏长线；
         // 旧形状是 24 个 `─` 字符（行内最多一截短线，没有通栏长线）。
         // R459：宽表 —— 行宽超过可读列时横向滚动，不在行中折开。
@@ -13708,6 +13756,31 @@ final class UICaptureTests: XCTestCase {
 
     - 列表项（让解析器认得出这是可渲染的 Markdown）
     """
+
+    /// R460：纯文本文件预览的长行（超过 68ch），用来量它有没有可读列。
+    static let fileTextFixtureBody = """
+    R460 纯文本文件预览的列宽对照
+    这一行足够长，用来判断纯文本文件预览有没有按 68ch 的可读列收窄：abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz
+    第二行短一些。
+    """
+
+    private func makeFileTextStore() -> HistoryStore {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r460-file-text", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("notes.txt")
+        try? Self.fileTextFixtureBody.write(to: url, atomically: true, encoding: .utf8)
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .file(url), thumbnail: nil, sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
 
     private func assertCodeFixturePremise(_ store: HistoryStore, role: String,
                                           file: StaticString = #filePath, line: UInt = #line) {
