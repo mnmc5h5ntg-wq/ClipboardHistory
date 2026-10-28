@@ -19550,7 +19550,7 @@ U-4 的 68ch 可读列只接在 Markdown/正文分支，纯文本文件预览在
 
 ## Round 472 · R475（第 474 轮 · 2026-10-29）：图片行补「可搜索文字」标记（2 张新帧、基线 290）+ INLINE_CODE_DIAG 四门分桶
 
-OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTextColumn` 的时间行改成 HStack，`entry.ocrText` 非空时在来源后补一枚 `text.viewfinder`（11pt、secondaryLabelColor、helpLabel + accessibilityLabel）；标在时间行末尾，行标题截断宽度未动。**2 张新帧、0 张既有帧变化**，基线 **288→290**；2 张逐张看过。`ROW_OCR_BADGE`：负臂末列 421px → 正臂 455px（差 34px=17pt）、墨 +106（两档同形）。新判据用成对帧（同内容/时间/来源/缩略图，只差 ocrText），M1291（恒 false）/M1292（恒 true）**2/2**；M1220 重钉后 R444 表 **2/2**。**INLINE_CODE_DIAG 四门分桶**已加：本机 light 299/35/35/9/9、dark 281/35/35/9/9，选中=true（light PAD 98.5/92.5/6.0、dark 99/92.5/6.5）；runner 分桶未读到 ⇒ 检测修复仍 NOT-RUN、未改选择器、4.5 地板未动。全量 1286/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ `git push` no-op、ahead=0；R474 两跑 in_progress ⇒ NOT-RUN。
+OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTextColumn` 的时间行改成 HStack，`entry.ocrText` 非空时在来源后补一枚 `text.viewfinder`（11pt、secondaryLabelColor、helpLabel + accessibilityLabel）；标在时间行末尾，行标题截断宽度未动。**2 张新帧、0 张既有帧变化**，基线 **288→290**；2 张逐张看过。`ROW_OCR_BADGE`：负臂末列 421px → 正臂 455px（差 34px=17pt）、墨 +106（两档同形）。新判据用成对帧（同内容/时间/来源/缩略图，只差 ocrText），M1291（恒 false）/M1292（恒 true）**2/2**；M1220 重钉后 R444 表 **2/2**。**INLINE_CODE_DIAG 四门分桶**已加：本机 light 299/35/35/9/9、dark 281/35/35/9/9，选中=true（light PAD 98.5/92.5/6.0、dark 99/92.5/6.5）；runner 分桶未读到 ⇒ 检测修复仍 NOT-RUN、未改选择器、4.5 地板未动。全量 1286/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ 开工 `git push` no-op、ahead=0；收口两次 push 被拒（access rights/network）⇒ `PUSH_BLOCKED=network`（HEAD=`c0b716a`、origin/main=`348e75e`、ahead=1；补记后 2）；R474 两跑 in_progress ⇒ NOT-RUN。
 
 **七维度自评**（恰七行，每格 n/15）：
 

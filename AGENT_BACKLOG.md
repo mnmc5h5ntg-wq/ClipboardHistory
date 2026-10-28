@@ -10417,9 +10417,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`height 1→0` 与 `boxType .custom` 都仍画一条 1pt 线，只有 `alphaValue=0` 能撤掉像素。
     修法：以后要撤这条线用 alpha/隐藏或换控件；「改高度变粗」不作为视觉证人。
 
-**544. R474/R475 的跑仍未读（R475 观察）**
-    现象：R474 跑 `40780110804 ↔ d70cc57` 与补记跑 `40780464933 ↔ 348e75e` 读时 in_progress（结论空）；R475 自身跑随提交创建。
-    修法：收口后先读这两跑与 R475 跑的全部失败步骤；`INLINE_CODE_GATES` 拿到分桶后先定位长带死在哪一门。
+**544. R474/R475 的跑与 push 仍未完成（R475 观察）**
+    现象：R474 跑 `40780110804 ↔ d70cc57` 与补记跑 `40780464933 ↔ 348e75e` 读时 in_progress（结论空）；R475 提交 `c0b716a` 后两次 push 被拒 ⇒ `PUSH_BLOCKED=network`（HEAD=c0b716a、origin=348e75e、ahead=1；补记后 2）。
+    修法：网络恢复后先验 remote 仍 348e75e，一次快进 push；再读 R474/R475 跑的全部失败步骤，`INLINE_CODE_GATES` 拿到分桶后先定位长带死在哪一门。
 
 **545. `INLINE_CODE_GATES` 的 runner 分桶未读，长带死因未定**（R475 观察）
     现象：本机 light 候选 299（span 35 / coverage 35 / ink 9 / rowMax 9）、dark 281（35/35/9/9），选中=true；runner dark 旧 DIAG 选中=false、top 全是 s20 短碎片。
