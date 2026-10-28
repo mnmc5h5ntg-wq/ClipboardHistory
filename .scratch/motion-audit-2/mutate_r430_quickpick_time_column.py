@@ -40,18 +40,18 @@ REASON_MUTANT = """        if let reason = QuickPickModel.sourceMatchReason(for:
         }
 """
 
-ROW_TIME_NEEDLE = """    static func rowTime(for entry: HistoryStore.Entry) -> String {
-        ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp)
+ROW_TIME_NEEDLE = """    static func rowTime(for entry: HistoryStore.Entry, reference: Date? = nil) -> String {
+        ClipboardDateFormatters.sidebarTime(for: entry.timestamp, reference: reference)
     }
 """
-ROW_TIME_MUTANT = """    static func rowTime(for entry: HistoryStore.Entry) -> String {
+ROW_TIME_MUTANT = """    static func rowTime(for entry: HistoryStore.Entry, reference: Date? = nil) -> String {
         ""
     }
 """
 
 MUTATIONS = [
     ("M1174", "时间列永远空字符串", FILE,
-     "        cell.timeField?.stringValue = Self.rowTime(for: entry)\n",
+     "        cell.timeField?.stringValue = Self.rowTime(for: entry,\n                                                   reference: rows.map(\.entry.timestamp).max())\n",
      "        cell.timeField?.stringValue = \"\"\n",
      ["testQuickPickRowsEndOnOneTimeColumn"]),
     ("M1175", "时间列不再钉在右沿、改为跟着标题走", FILE,

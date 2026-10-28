@@ -644,8 +644,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     }
 
     /// R430：右侧时间列的文字。与侧栏行同一个 formatter，一行里只有一套时间语言。
-    static func rowTime(for entry: HistoryStore.Entry) -> String {
-        ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp)
+    /// R469：参照是**当前候选里最新的一条**；与它不同年才带年份。
+    static func rowTime(for entry: HistoryStore.Entry, reference: Date? = nil) -> String {
+        ClipboardDateFormatters.sidebarTime(for: entry.timestamp, reference: reference)
     }
 
     static let timeFieldIdentifier = NSUserInterfaceItemIdentifier("quickPickTime")
@@ -750,7 +751,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         }()
         let entry = rows[row].entry
         cell.textField?.stringValue = rows[row].title
-        cell.timeField?.stringValue = Self.rowTime(for: entry)
+        cell.timeField?.stringValue = Self.rowTime(for: entry,
+                                                   reference: rows.map(\.entry.timestamp).max())
         cell.imageView?.image = Self.rowSymbol(for: entry.content)
         return cell
     }

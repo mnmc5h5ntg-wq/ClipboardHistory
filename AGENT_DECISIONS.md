@@ -8057,3 +8057,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x 的设置内容列可能是平涂 ⇒ 判据具名 `SETTINGS_HELPER_AXIS_NOT_RUN=settings-content-blank`；`CARD_INSET_CONTROL_FIRST` 的 runner 读数未读。
 - 回滚：删 `.settingsHelperAxis()` 与 `controlFirstCells`；或 `git revert`。
 
+## D-465 跨年时间以「当前列表最新一条」为参照，不按挂钟（R469）
+
+- 背景：主列表/浮层都用 `M月d日 HH:mm`，2025 与 2026 的同月同日看起来一样；挂钟参照会让所有旧记录一起变宽（夹具 2025 记录在 2026 全带年份），而"同一份历史里最早那条是哪一年"才是扫读时会混的地方。
+- 决定：新增 `TimestampYearPolicy.showsYear(for:relativeTo:)`，参照=当前列表/候选里最新的一条；不同年才用 `yyyy年M月d日 HH:mm`。接 `ClipboardDateFormatters`、QuickPick、`HistoryRowView`、`HistorySidebarView` 四处。
+- 理由：同一年的历史保持紧凑；跨年边界唯一需要年份。参照按过滤后的集合走，搜索到只剩同一年时不继续跟看不见的记录。
+- 兼容性/迁移：4 张新帧（quickpick/rows 亮暗）、0 变化；基线 280→284；旧表 M1174/M1177/M1220 重钉复跑。
+- 边界：runner 的 1x 设置内容列仍平涂（与时间无关）；主列表整页的选中黑带使"两行都可见"的整页帧不可得 ⇒ 用两行组件栈作像素证人。
+- 回滚：删 `TimestampYearPolicy` 与三处接线；或 `git revert`。
+

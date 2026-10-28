@@ -1,5 +1,5 @@
 {
-  "count": 280,
+  "count": 284,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -143,6 +143,8 @@
     "modechip-hover-lit-200x60-light.png": "26af09e4577eaeac442890a1771bf9a597f9bd3638fcd3c434ae23d3e0d0de07",
     "notice-banner-560x170-dark.png": "376d3a84fcb77ae64b48ec7689b3f0280d035fffb4b6a82cfd48f56f483e7d54",
     "notice-banner-560x170-light.png": "9904597535967a106164acd08d4bf818e76cb527df9dc19efe137340eea032b7",
+    "quickpick-cross-year-420x300-dark.png": "d65439550803442511cc26ab18162b8432000d1cbfcb9e42d040fc6f1448f061",
+    "quickpick-cross-year-420x300-light.png": "64132517ab93bebf96658f14fd23d4005b25cf9fee6da19aba7cfa523488dd2a",
     "quickpick-empty-420x300-dark.png": "155169bd1618ff346abff0dda6687c9345d93db7f3fcadcef112c162352f7216",
     "quickpick-empty-420x300-light.png": "8b2a4cacf0c8450c714887a24c9fefd07bf79fe70990ab7c552d41ab6758f5e3",
     "quickpick-hover-420x300-dark.png": "916bdd973e02398de63f6644329d6baf4a7f632f993cc966204b314919091c6f",
@@ -185,6 +187,8 @@
     "row-pinned-on-300x74-light.png": "9bf1abf9f57e9d14a5115972db330e69e9d6dab3ca02b61ba3bd14ce8117e600",
     "row-text-300x74-dark.png": "82f3c11f525d614dea4ae0694a9a456ebd4c6a7c5b3eebaca09a669b5f6606c3",
     "row-text-300x74-light.png": "c9c80257c672b98e22cefddfba5bc623500a289450c84861e0bdffcf2984e448",
+    "rows-cross-year-340x160-dark.png": "44da8fcd7c661291ae91aecbe21a66716b278c3c9c6948cafc34032c35cad919",
+    "rows-cross-year-340x160-light.png": "bc98e3ef9e59c4e0419d2e84578bb8a1c2ef6ad6ff26d763b839ec592f08a3c9",
     "search-empty-after-250x220-dark.png": "912f168abc431bbd845cb613b05b5b1b7b29f01d23af700841fda61fa58d6ae6",
     "search-empty-after-250x220-light.png": "449cf5184816c1314fec165a5a13d4ff77b78ca2ad6703b7edabfcc9bb65745b",
     "search-empty-before-250x220-dark.png": "bf015fd71b211c4b018eab8e05b5d9fefc43b4652d3bcb842b1a016e8d67646c",

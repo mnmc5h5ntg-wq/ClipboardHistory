@@ -19,6 +19,9 @@ struct HistoryRowButton: View {
     /// R456：侧栏当前的搜索词。只用来给**行里可见的文字**标命中片段；
     /// 空串表示没有搜索，所有行原样（不编高亮）。默认值留给直接构造行的夹具。
     var searchQuery: String = ""
+    /// R469：当前列表里最新的一条。跨年那几条的时间行要带年份（见 `TimestampYearPolicy`）；
+    /// 直接构造行的夹具不传 ⇒ 保持紧凑形状。
+    var timeReference: Date? = nil
     @State private var isHovered = false
     @Environment(\.hoveredEntryIDForCapture) private var hoveredEntryIDForCapture
     @ObservedObject private var dragSourceFeedback = DragSourceFeedback.shared
@@ -42,7 +45,7 @@ struct HistoryRowButton: View {
 
             RowPinnedBadge(isPinned: entry.isPinned)
 
-            RowTextColumn(entry: entry, searchQuery: searchQuery)
+            RowTextColumn(entry: entry, searchQuery: searchQuery, timeReference: timeReference)
         }
         // R427：正在拖出去的那一条退到背景里（只降内容，不动行底/悬停底）。
         .opacity(isDraggingForDrawing ? DragSourceFeedback.dimOpacity : 1)
@@ -250,6 +253,8 @@ private struct RowTextColumn: View {
     let entry: HistoryStore.Entry
     /// R456：命中高亮只落在可见文字上 —— 标题/文件名按搜索词标，来源行只标 App 名。
     let searchQuery: String
+    /// R469：跨年参照（当前列表最新一条）；nil = 紧凑形状。
+    let timeReference: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -270,7 +275,8 @@ private struct RowTextColumn: View {
             // 时间在前、来源在后：行宽不够时先截断来源，时间不丢；来源 nil 时只显示时间。
             // R456：搜索命中的 App 名带高亮；时间不参与匹配，所以不标时间。
             Text(HistoryRowMatchHighlight.sourceLine(
-                time: ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp),
+                time: ClipboardDateFormatters.sidebarTime(for: entry.timestamp,
+                                                         reference: timeReference),
                 sourceAppName: entry.sourceAppName,
                 query: searchQuery))
                 // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限

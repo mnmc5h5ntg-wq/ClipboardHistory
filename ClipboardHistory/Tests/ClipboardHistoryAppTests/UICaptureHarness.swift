@@ -4075,6 +4075,150 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R469：跨年记录的时间行必须带年份（参照=当前候选里最新一条）。
+    ///
+    /// 缺陷形状：两条同月同日、只差一年的记录，旧形状都读「6月15日 12:00」——
+    /// 同一份历史里最早那条是哪一年，屏幕上没有答案。修法：只有与最新一条不同年才加「yyyy年」。
+    /// 这里从产品浮层的 `NSTextField`（`quickPickTime`）读**真字符串**；像素帧另拍。
+    func testCrossYearTimesCarryTheYear() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r469-cross-year-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-cross-year" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-cross-year` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-cross-year-\(tag).png")
+            var times: [String] = []
+            _ = try render(fixture, appearance: appearance, to: file, inspect: { host in
+                var stack: [NSView] = [host]
+                while let view = stack.popLast() {
+                    if let field = view as? NSTextField,
+                       field.identifier?.rawValue == QuickPickController.timeFieldIdentifier.rawValue {
+                        times.append(field.stringValue)
+                    }
+                    stack.append(contentsOf: view.subviews)
+                }
+            })
+            guard !times.isEmpty else {
+                emit("CROSS_YEAR_TIME_NOT_RUN=panel-cells \(tag) 读到=[]")
+                continue
+            }
+            let withYear = times.filter { $0.contains("年") }
+            let compact = times.filter { !$0.contains("年") }
+            emit("CROSS_YEAR_TIME \(tag) 时间格=\(times) 带年=\(withYear) 紧凑=\(compact)")
+            judged += 1
+            XCTAssertEqual(times.count, 2,
+                           "\(tag)：浮层应有 2 个时间格，读到 \(times.count) 个 ⇒ 夹具没画出两行")
+            XCTAssertEqual(withYear.count, 1,
+                           "\(tag)：带年份的时间格应恰好 1 个（实得 \(withYear)）⇒ 旧记录仍分不清年份")
+            XCTAssertEqual(compact.count, 1,
+                           "\(tag)：不带年份的时间格应恰好 1 个（实得 \(compact)）⇒ 新年份串溢出到了最新的那条")
+            if let old = withYear.first {
+                XCTAssertTrue(old.contains("2025年"), "\(tag)：旧记录必须是 2025 年，实得 \(old)")
+            }
+            if let new = compact.first {
+                XCTAssertTrue(new.contains("6月15日"), "\(tag)：紧凑串丢了月日，实得 \(new)")
+            }
+        }
+        if judged == 0 {
+            throw XCTSkip("CROSS_YEAR_TIME_NOT_RUN：两种外观下都没读到浮层时间格")
+        }
+    }
+
+    /// R469：主列表跨年行的**时间行**也必须变宽（年份真的画进了行里，不只是浮层）。
+    ///
+    /// 两条同月同日、只差一年的记录：旧行的时间行多「2025年」，所以整行最右墨比新行远。
+    /// 夹具是**两行组件栈**（产品 `HistoryRowButton` + `timeReference`），不走 List 选中底。
+    /// 量最后两个文本行组的最右墨；差 ≥20pt 才算年份落进了产品行。暗档侧栏文字在 runner
+    /// 1x 上是已知盲区 ⇒ 读不到行组时具名 NOT-RUN，不降门槛。
+    func testMainRowsCrossYearTimeLineWidens() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r469-rows-cross-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "rows-cross-year" }) else {
+                return XCTFail("\(tag)：找不到 `rows-cross-year` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("rows-cross-year-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：rows-cross-year 帧读不回字节")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 340.0
+            let width = rep.pixelsWide, height = rep.pixelsHigh
+            let bytesPerRow = rep.bytesPerRow, spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            var histogram: [Int: Int] = [:]
+            for y in stride(from: 0, to: height, by: 2) {
+                for x in stride(from: 0, to: width, by: 2) { histogram[Int(luma(x, y)) / 4, default: 0] += 1 }
+            }
+            let page = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+            func isInk(_ x: Int, _ y: Int) -> Bool { abs(luma(x, y) - page) > 30 }
+            var bands: [(Int, Int)] = []
+            var top = -1
+            for y in 0..<height {
+                var has = false
+                for x in 0..<width where isInk(x, y) { has = true; break }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, height - 1)) }
+            var groups: [[(Int, Int)]] = []
+            for band in bands {
+                if let last = groups.last?.last, Double(band.0 - last.1) / scale <= 12.0 {
+                    groups[groups.count - 1].append(band)
+                } else {
+                    groups.append([band])
+                }
+            }
+            guard groups.count >= 2 else {
+                emit("MAIN_ROWS_CROSS_YEAR_NOT_RUN=row-bands \(tag) 行组=\(groups.count)")
+                continue
+            }
+            let rows = Array(groups.suffix(2))
+            var maxes: [Double] = []
+            for group in rows {
+                var maxX = -1
+                for band in group {
+                    for y in band.0...band.1 {
+                        for x in 0..<width where isInk(x, y) { maxX = max(maxX, x) }
+                    }
+                }
+                maxes.append(Double(maxX) / scale)
+            }
+            let delta = maxes[1] - maxes[0]
+            emit("MAIN_ROWS_CROSS_YEAR \(tag) 新行右=\(String(format: "%.1f", maxes[0]))"
+                 + " 旧行右=\(String(format: "%.1f", maxes[1]))"
+                 + " 差=\(String(format: "%.1f", delta))")
+            judged += 1
+            XCTAssertGreaterThanOrEqual(delta, 20.0,
+                "\(tag)：旧行时间行只比新行远 \(String(format: "%.1f", delta))pt（<20）"
+                + " ⇒ 年份没有落进主列表行")
+        }
+        if judged == 0 {
+            throw XCTSkip("MAIN_ROWS_CROSS_YEAR_NOT_RUN：两种外观下都读不到行组")
+        }
+    }
+
     /// R431：主列表文件行首的**类型占位符号**必须真的画出来。
     ///
     /// 缺陷形状（修之前 `content-with-history` 亮/暗现读）：`.file` / `.files` 两行行首的
@@ -9438,6 +9582,27 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-search-focus", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "", searchFocused: true)))
+        // R469：跨年时间 —— 两条同月同日、只差一年的记录；旧形状两条都读「6月15日 12:00」。
+        results.append(Fixture("quickpick-cross-year", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makeCrossYearStore(), query: "")))
+        // R469：跨年时间的主列表行组件栈（不走 List：选中底在离屏通道是黑带，
+        // 会盖住其中一行的时间行；这里只拍产品行本身 + timeReference）。
+        results.append(Fixture("rows-cross-year", NSSize(width: 340, height: 160)) {
+            let crossStore = self.makeCrossYearStore()
+            let newest = crossStore.entries.map(\.timestamp).max()
+            return AnyView(VStack(spacing: 0) {
+                ForEach(crossStore.entries) { entry in
+                    HistoryRowButton(entry: entry,
+                                     copyAction: {},
+                                     favoriteAction: {},
+                                     timeReference: newest)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color(nsColor: .windowBackgroundColor)))
+        })
 
         results.append(Fixture("sidebar-favorites", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
@@ -14661,6 +14826,29 @@ final class UICaptureTests: XCTestCase {
         ), timestamp: Self.referenceDate.addingTimeInterval(-900))
         if let index, index < store.entries.count {
             store.perform(.selectOnly(store.entries[index]))
+        }
+        return store
+    }
+
+    /// R469：跨年夹具 —— 两条**同月同日同时刻、只差一年**的记录。
+    /// 选 6 月 15 日而不是 12 月 31 日：本地时区偏移不会把其中一条推到另一年；
+    /// 年份边界仍在（2025 vs 2026），且紧凑串长度相同 ⇒ 时间行宽差只来自年份。
+    func makeCrossYearStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        let calendar = Calendar(identifier: .gregorian)
+        func date(_ year: Int) -> Date {
+            calendar.date(from: DateComponents(year: year, month: 6, day: 15, hour: 12, minute: 0))!
+        }
+        for (year, suffix) in [(2025, "A"), (2026, "B")] {
+            store.add(ClipboardIntake.Entry(
+                content: .text("跨年记录 \(suffix)"),
+                thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+            ), timestamp: date(year))
         }
         return store
     }

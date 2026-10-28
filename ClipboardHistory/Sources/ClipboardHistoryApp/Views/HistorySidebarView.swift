@@ -87,6 +87,12 @@ struct HistorySidebarView: View {
         SidebarSectionPlan(pinnedCount: sectionHeadersForDrawing ? pinnedEntries.count : 0)
     }
 
+    /// R469：跨年参照 —— 当前过滤结果里最新的一条。取过滤后的集合而不是全量：
+    /// 搜索到只剩同一年的记录时，年份不该继续跟着看不见的那些记录走。
+    private var newestTimestamp: Date? {
+        historyStore.filteredEntries.map(\.timestamp).max()
+    }
+
     @ViewBuilder
     private func historyRow(_ entry: HistoryStore.Entry) -> some View {
         HistoryRowButton(
@@ -95,7 +101,9 @@ struct HistorySidebarView: View {
             copyAction: { historyStore.perform(.copyAndPromote(entry)) },
             favoriteAction: { historyStore.perform(.toggleFavorite(entry)) },
             // R456：行里标出命中片段 —— 过滤匹配正文与来源 App 名，列表必须说清"为什么这行在"。
-            searchQuery: historyStore.searchText
+            searchQuery: historyStore.searchText,
+            // R469：跨年的那几条时间行带年份。
+            timeReference: newestTimestamp
         )
     }
 
