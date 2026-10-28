@@ -970,6 +970,72 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 6, "六档里只判成 \(judged) 档 ⇒ 有帧没拿到分隔线或参照物，按上面的具名读")
     }
 
+    // MARK: - R475 · 图片行的「可搜索文字」标记
+
+    /// R475：OCR 已经落地的图片，时间行末尾要有一枚 `text.viewfinder`。
+    ///
+    /// 判据是**跨帧**的：`row-image` 与 `row-image-ocr` 内容/时间/来源/缩略图逐项相同，
+    /// 只差 `ocrText`。因此两帧的墨量差就是那枚标记；再看它的**末列**确实越过负臂文字
+    /// 的最后一列 —— 而不是把标题/来源文字变长冒充标记。两个方向都判，缺一条就会
+    /// 把"字变多"读成"标记出现了"。
+    func testImageRowsCarryASearchableBadgeWhenOCRLanded() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r475-ocr-badge-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negative = fixtures.first(where: { $0.name == "row-image" }),
+                  let positive = fixtures.first(where: { $0.name == "row-image-ocr" }) else {
+                return XCTFail("\(tag)：找不到 row-image / row-image-ocr 夹具 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (last: Int, ink: Int, width: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "ROW_OCR_BADGE", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var last = -1, ink = 0
+                // 只看下半行（时间行）。上半行的标题/缩略图两臂完全相同，不参与这条判据。
+                for y in Int(Double(rep.pixelsHigh) * 0.45)..<rep.pixelsHigh {
+                    for x in 0..<rep.pixelsWide {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let luma = 0.2126 * Double(base[i + rOff])
+                            + 0.7152 * Double(base[i + rOff + 1])
+                            + 0.0722 * Double(base[i + rOff + 2])
+                        if abs(Int(luma.rounded()) - page) >= 60 {
+                            ink += 1
+                            last = max(last, x)
+                        }
+                    }
+                }
+                return (last, ink, rep.pixelsWide, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            emit("ROW_OCR_BADGE \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px"
+                 + " 末列差=\(pos.last - neg.last)px 负臂墨=\(neg.ink) 正臂墨=\(pos.ink)"
+                 + " 墨差=\(pos.ink - neg.ink) 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(pos.last - neg.last, Int(3.0 * scale),
+                "\(tag)：正臂最后一列墨只比负臂多 \(pos.last - neg.last)px ⇒ 时间行末尾没有出现标记")
+            XCTAssertGreaterThan(pos.ink - neg.ink, Int(10.0 * scale),
+                "\(tag)：正臂比负臂只多 \(pos.ink - neg.ink) 个墨像素 ⇒ 标记没有画出来（或只是文字变长）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -6673,6 +6739,25 @@ final class UICaptureTests: XCTestCase {
             let chosen = InlineCodeBandChoice.best(
                 candidates, minSpan: minWidth, maxSpan: maxWidth,
                 minCoverage: 0.55, minInk: max(6, Int(6.0 * scale * scale)))
+            // R475：四门分桶 —— 只看 top-by-padding 时，长带若被某一门砍掉就只剩短碎片，
+            // 分不清是 span 太短、覆盖率太低、ink 不够，还是同一行有全宽块底。
+            // 这里逐门数一遍（门与 `best` 同一组常量），下一跑就能回答"长带死在哪一门"。
+            let minInk = max(6, Int(6.0 * scale * scale))
+            let spanOK = candidates.filter { $0.span >= minWidth && $0.span <= maxWidth }
+            let coverageOK = spanOK.filter { $0.coverage >= 0.55 }
+            let inkOK = coverageOK.filter { $0.ink >= minInk }
+            let rowMaxOK = inkOK.filter { $0.rowMaxBandRun <= maxWidth }
+            emit("INLINE_CODE_GATES \(tag) 候选=\(candidates.count)"
+                 + " 过span=\(spanOK.count) 过coverage=\(coverageOK.count)"
+                 + " 过ink=\(inkOK.count) 过rowMax=\(rowMaxOK.count)"
+                 + " 门=span[\(minWidth),\(maxWidth)]px coverage≥0.55 ink≥\(minInk) rowMax≤\(maxWidth)px")
+            let topSpan = candidates.sorted { $0.span > $1.span }.prefix(6)
+                .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
+                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
+                    + ":p\(String(format: "%.1f", $0.padding))"
+                    + ":m\(String(format: "%.1f", Double($0.rowMaxBandRun) / scale))" }
+                .joined(separator: ",")
+            emit("INLINE_CODE_TOP_SPAN \(tag) \(topSpan)")
             // R472：诊断必须先于 guard —— R470 的整行门把 runner dark 的假 150 带排掉后，
             // guard 先红，DIAG 一行都没打出来。这里用"chosen 为 nil 时的第一条候选行"做诊断锚点。
             let diagRow = chosen?.row ?? candidates.first?.row ?? -1
@@ -10063,6 +10148,31 @@ final class UICaptureTests: XCTestCase {
                     entry: captured, copyAction: {}, favoriteAction: {}
                 )))
             })
+        }
+        // R475：带 OCR 文字的图片行 —— 与 `row-image` 同一条内容/时间/来源，只多 ocrText。
+        // 成对出帧：负臂（上面的 row-image）没有标记，正臂在时间行末尾多一枚 text.viewfinder。
+        do {
+            let ocrImage = try makeStoredImage(color: .systemTeal, size: NSSize(width: 240, height: 140))
+            let ocrEntry = ClipboardEntry(
+                content: .image(ocrImage),
+                timestamp: Self.referenceDate.addingTimeInterval(-120),
+                thumbnail: ocrImage,
+                sourceURL: nil,
+                sourceUTIs: ["public.png"],
+                sourceAppBundleID: "com.apple.Preview",
+                sourceAppName: "预览",
+                ocrText: "识别出来的文字")
+            let ocrStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(entriesToLoad: [ocrEntry]),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+            results.append(Fixture("row-image-ocr", NSSize(width: 300, height: 74)) {
+                AnyView(self.rowFrame(HistoryRowButton(
+                    entry: ocrStore.entries[0], copyAction: {}, favoriteAction: {}
+                )))
+            })
+        } catch {
+            // 夹具建不出来就不加这一帧：下一轮的缺失会被帧基线名单抓住，不在这里装成功。
         }
 
         // **一把故意裁自己的行**（R37 / U-60）：同一颗 `HistoryRowButton`、同样 300pt 宽，

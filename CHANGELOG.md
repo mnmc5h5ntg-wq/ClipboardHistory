@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 图片行补「可搜索文字」标记（2 张新帧、基线 290）（R475 / 第 474 轮 / Round 472 / U-1803…U-1808 · 产品 1 文件 + 判据 + 诊断）
+
+
 ### 浮层搜索框与候选区补 1pt 通栏分隔线（16 张浮层帧变化、基线 288）（R474 / 第 473 轮 / Round 471 / U-1797…U-1802 · 产品 1 文件 + 判据）
 
 

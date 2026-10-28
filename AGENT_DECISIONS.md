@@ -8121,3 +8121,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：NSBox 的 `separator`/`custom` 自绘 1pt 线，改高度或 boxType 都撤不掉像素（空刀已登记）；runner 的 1x 与空结果态尚未签收。
 - 回滚：删分隔线与判据；`overlayPill` 的 `minHeight`/分组可保留（默认 1 等于旧行为）。
 
+## D-472 图片行的「可搜索文字」标记放时间行末尾；inline 检测先打四门分桶（R475）
+
+- 背景：OCR 已落地的图片与普通图片在主列表里同形；用户搜到一张图时看不出"这张图有可搜索的文字"。inline dark 的旧 DIAG 只按 padding 打 top5，长带被某一门砍掉时只剩短碎片，无法归因。
+- 决定：`RowTextColumn` 时间行改 HStack，`entry.ocrText` 非空时在来源后补 `text.viewfinder`（11pt、secondaryLabelColor、helpLabel + accessibilityLabel）；标在时间行末尾，不占固定宽度。`testInlineCodeBackgroundHasPadding` 增加 `INLINE_CODE_GATES`（span/coverage/ink/rowMax 逐门计数）与 `INLINE_CODE_TOP_SPAN`。
+- 理由：时间行短，标在末尾不会改标题截断宽度；成对帧（只差 ocrText）让"标记"与"文字变长"分开。四门分桶直接回答"长带死在哪一门"，比按 padding 排序的 top5 更接近被判定属性。
+- 兼容性/迁移：2 张新帧、0 张既有帧变化；基线 288→290；无 Store/存档变化。M1220 因时间行包 HStack 重钉并 2/2。
+- 边界：OCR 标记在 runner 的暗档/1x 尚未签收；inline 的四门分桶只有本机读数，runner 未读到 ⇒ 检测修复仍 NOT-RUN。
+- 回滚：删标记与判据；四门诊断可保留（只影响日志，不影响断言）。
+

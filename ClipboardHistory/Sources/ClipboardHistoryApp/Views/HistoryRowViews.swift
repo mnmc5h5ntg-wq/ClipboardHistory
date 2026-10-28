@@ -274,16 +274,28 @@ private struct RowTextColumn: View {
             // R444：时间行补「· 来自 <来源 App>」—— 主列表第一次有来源（此前只有详情头部有）。
             // 时间在前、来源在后：行宽不够时先截断来源，时间不丢；来源 nil 时只显示时间。
             // R456：搜索命中的 App 名带高亮；时间不参与匹配，所以不标时间。
-            Text(HistoryRowMatchHighlight.sourceLine(
-                time: ClipboardDateFormatters.sidebarTime(for: entry.timestamp,
-                                                         reference: timeReference),
-                sourceAppName: entry.sourceAppName,
-                query: searchQuery))
-                // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
-                // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
-                .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            // R475：有 OCR 文字的图片补一枚 `text.viewfinder` 小标记 —— 用户搜到一张图时，
+            // 行里要能看见"这张图有可搜索的文字"，而不是只能靠回忆设置里开过识别。
+            // 标在时间行末尾而不是行尾：时间行短、不占固定宽度，行标题的截断宽度一字未动。
+            HStack(spacing: 4) {
+                Text(HistoryRowMatchHighlight.sourceLine(
+                    time: ClipboardDateFormatters.sidebarTime(for: entry.timestamp,
+                                                             reference: timeReference),
+                    sourceAppName: entry.sourceAppName,
+                    query: searchQuery))
+                    // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
+                    // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
+                    .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if entry.ocrText?.isEmpty == false {
+                    Image(systemName: "text.viewfinder")
+                        .font(.system(size: VisualFont.meta, weight: .regular))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .helpLabel("这张图片里有可搜索的文字")
+                        .accessibilityLabel("这张图片里有可搜索的文字")
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
