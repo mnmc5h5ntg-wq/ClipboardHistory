@@ -44,6 +44,17 @@ enum InlineCodeBandChoice {
     }
 }
 
+/// R467：**产品有意**的纯黑底（不是离屏材质盲区）。它们允许黑带，但**不**参与
+/// "这一台见过黑带"的判定 —— 否则会把旧名册帧在另一台机器上"黑带消失"的方向误开。
+/// 文件级（非 MainActor）常量：`CaptureCapability.measure` 是非隔离的纯函数。
+enum UICaptureBlackBands {
+    static let intentional: Set<String> = [
+        // R465：播放器面 `.background(Color.black)` 是产品实底；AVPlayerLayer 离屏不画，
+        // 黑底正好是"第一帧未到"的表面。已逐张看过：控件胶囊/时间/滑杆/静音都在。
+        "detail-file-video-controls",
+    ]
+}
+
 @MainActor
 final class UICaptureTests: XCTestCase {
     /// 夹具时间戳的固定参考时刻（账本 R2-19）。
@@ -132,10 +143,6 @@ final class UICaptureTests: XCTestCase {
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
-        // R465：`detail-file-video-controls` 的黑带是**产品有意的播放器黑底**（R465 加的
-        // `.background(Color.black)`），不是离屏材质坏；AVPlayerLayer 在这条离屏通道不画，
-        // 黑底正好是"第一帧未到"的实底。已肉眼审过那张帧：控件胶囊/时间/滑杆/静音都在。
-        "detail-file-video-controls",
         // R411：行悬停帧是同一个 `HistorySidebarView` + 同一批选中行；黑带仍是系统 List
         // 选中材质（不是新画的 hover 底）。目标行 hover 已单独量过。
         "sidebar-row-hover",
@@ -4965,6 +4972,55 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R467：视频进度滑杆的轨道必须在胶囊底上看得见（系统轨道近页色，seek 范围像没有）。
+    /// 量控件行里滑杆那一段（x 120..410、y 400..420）对胶囊底的**最大亮度偏离**；
+    /// 旧系统轨道约 20，新加的自绘轨道 ≥60（≈3:1）。
+    func testVideoSeekTrackIsVisible() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r467-seek-track-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-video-controls" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-video-controls` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("seek-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：video-controls 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            // thumb 停在 0 位（x≈112..130），采样从 160 起，只量轨道段。
+            let x0 = Int((160.0 * scale).rounded()), x1 = Int((410.0 * scale).rounded())
+            let y0 = Int((400.0 * scale).rounded()), y1 = min(height, Int((420.0 * scale).rounded()))
+            var histogram: [Int: Int] = [:]
+            for y in y0..<y1 { for x in x0..<x1 { histogram[Int(luma(x, y)) / 4, default: 0] += 1 } }
+            let mode = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+            var maxDeviation = 0.0
+            for y in y0..<y1 {
+                for x in x0..<x1 { maxDeviation = max(maxDeviation, abs(luma(x, y) - mode)) }
+            }
+            emit("VIDEO_SEEK \(tag) 底=\(String(format: "%.0f", mode)) 最大偏离=\(String(format: "%.0f", maxDeviation))")
+            XCTAssertGreaterThanOrEqual(maxDeviation, 60.0,
+                                        "\(tag)：滑杆轨道对胶囊底只偏离 \(String(format: "%.0f", maxDeviation))"
+                                        + "（<60）⇒ seek 范围几乎看不见")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -6229,6 +6285,18 @@ final class UICaptureTests: XCTestCase {
                 continue
             }
             let bandRow = band.row, bandLeft = band.left, bandRight = band.right
+            // R467：runner 上 dark 仍选到 150/147/3.0；先把"真带为什么不在候选"的证据打出来，
+            // 下一跑拿数据再改选择器（本轮不改、不降 4.5）。
+            let tones = bandLuma(row: bandRow)
+            let topCandidates = candidates.sorted { $0.padding > $1.padding }.prefix(5)
+                .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
+                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
+                    + ":p\(String(format: "%.1f", $0.padding))" }
+                .joined(separator: ",")
+            emit("INLINE_CODE_DIAG \(tag) 选行=\(bandRow)"
+                 + " 页=\(String(format: "%.0f", tones?.page ?? -1))"
+                 + " 带=\(String(format: "%.0f", tones?.band ?? -1))"
+                 + " 候选=\(candidates.count) top=\(topCandidates)")
             guard bandRow >= 0 else {
                 XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
                 continue
@@ -8004,6 +8072,7 @@ final class UICaptureTests: XCTestCase {
         // 现在三条前提各自独立、全部是**在这台机器上量出来的**，没有一条靠"这是 CI"这种身份判断。
         let readings = report.map { item in
             CaptureCapability.Reading(
+                fixture: Self.fixtureName(fromFile: item.name),
                 family: Self.fixtureName(fromFile: item.name).components(separatedBy: "-").first ?? "",
                 transparent: item.metrics.transparent,
                 blackBandPt: item.metrics.blackBandPt,
@@ -8658,6 +8727,7 @@ final class UICaptureTests: XCTestCase {
                             .filter { $0.1 > 0 }
                             .map { $0.0 })
         let extra = blind.subtracting(Self.materialBlindSpotFixtures)
+            .subtracting(UICaptureBlackBands.intentional)
         let gone = Self.materialBlindSpotFixtures.subtracting(blind)
         XCTAssert(extra.isEmpty,
                   "这些帧第一次出现纯黑填充带：\(extra.sorted()) ⇒ 有一处材质在离屏下画成了黑，"
@@ -8680,13 +8750,13 @@ final class UICaptureTests: XCTestCase {
 
     /// settings 族的一行读数（其余两条前提只看族外，这里给个"没裁到底"的正常值）。
     private static func settingsReading(_ transparent: Double) -> CaptureCapability.Reading {
-        CaptureCapability.Reading(family: "settings", transparent: transparent,
+        CaptureCapability.Reading(fixture: "", family: "settings", transparent: transparent,
                                   blackBandPt: 0, bottomInkFraction: 0.794)
     }
 
     private static func otherReading(_ family: String, transparent: Double = 0,
                                      band: Double = 0, ink: Double = 0) -> CaptureCapability.Reading {
-        CaptureCapability.Reading(family: family, transparent: transparent,
+        CaptureCapability.Reading(fixture: "", family: family, transparent: transparent,
                                   blackBandPt: band, bottomInkFraction: ink)
     }
 
@@ -14974,6 +15044,7 @@ final class UICaptureTests: XCTestCase {
         /// 一帧的读数。`family` 只取帧名的第一段（settings / sidebar / content / …），
         /// 因为"这一族在这台机器上画不画得出来"判的是族，不是某一张帧。
         struct Reading {
+            let fixture: String
             let family: String
             let transparent: Double
             let blackBandPt: Double
@@ -14995,7 +15066,9 @@ final class UICaptureTests: XCTestCase {
             return CaptureCapability(
                 settingsFamilyIsBlank: settings.count >= 2
                     && settings.allSatisfy { $0.transparent > InkFloor.captureFamilyBlankFraction },
-                bandsSeenHere: readings.contains { $0.blackBandPt > 0 },
+                bandsSeenHere: readings.contains {
+                    $0.blackBandPt > 0 && !UICaptureBlackBands.intentional.contains($0.fixture)
+                },
                 settingsLowestBlank: settings.map { $0.transparent }.min() ?? 0)
         }
     }
@@ -16803,6 +16876,7 @@ final class UICaptureTests: XCTestCase {
                 vibrant = Self.vibrantAppearanceCovering(host, column: probe.rect)
             }
             capabilityReadings.append(CaptureCapability.Reading(
+                fixture: fixture.name,
                 family: fixture.name.components(separatedBy: "-").first ?? "",
                 transparent: metrics.transparent, blackBandPt: metrics.blackBandPt,
                 bottomInkFraction: metrics.bottomInkFraction))

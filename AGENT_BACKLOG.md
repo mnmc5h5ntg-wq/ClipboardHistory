@@ -10321,3 +10321,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：时间码随秒数变化可能有宽度抖动；未拍 0:09/0:10 两态。
     修法：加 `.monospacedDigit()` 并做两态帧；先记录。
 
+**520. inline dark 的候选诊断要等 runner 数据**（R467 观察）
+    现象：`INLINE_CODE_DIAG` 已在本地打印选行/页带 luma/top5；runner 上还没跑过。
+    修法：下一跑读 DIAG，先看真带是否进候选（span/coverage/ink/padding），再改选择器；地板 4.5 不动。
+
+**521. 自绘 seek 轨道的 thumb 仍是系统滑杆**（R467 观察）
+    现象：轨道可见了，但 thumb/拖动仍由系统 Slider 画；thumb 在胶囊底上的对比未单独判。
+    修法：若要统一，做自定义 thumb 并补帧；先记录。
+
+**522. 有意黑底名单的"gone"方向未单独判**（R467 观察）
+    现象：intentional 名单只影响 `bandsSeenHere`/`extra`；如果某一帧的有意黑底消失（改成非黑），没有判据。
+    修法：补一条"intentional 帧仍有黑带"的正面判据，或在帧上判底色的结构量。
+

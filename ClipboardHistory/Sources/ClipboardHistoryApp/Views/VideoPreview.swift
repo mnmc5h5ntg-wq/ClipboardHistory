@@ -255,13 +255,20 @@ private struct VideoPlaybackControls: View {
                 .minimumScaleFactor(0.85)
                 .frame(width: 46, alignment: .trailing)
 
-            Slider(
-                value: Binding(
-                    get: { playback.currentTime },
-                    set: { playback.seek(to: $0) }
-                ),
-                in: 0...max(playback.duration, 1)
-            )
+            ZStack {
+                // R467：系统滑杆的轨道只在胶囊底上偏离 20/5 级，seek 范围几乎看不见；
+                // 在它下面垫一条 10pt 的实色胶囊（系统轨道 4pt，上下各露 3pt 边）。
+                Capsule()
+                    .fill(Color.primary.opacity(0.45))
+                    .frame(height: 10)
+                Slider(
+                    value: Binding(
+                        get: { playback.currentTime },
+                        set: { playback.seek(to: $0) }
+                    ),
+                    in: 0...max(playback.duration, 1)
+                )
+            }
             .frame(minWidth: VideoPlaybackMetrics.minimumTimelineWidth)
             .helpLabel("调整播放进度")
 

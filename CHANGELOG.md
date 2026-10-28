@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 视频 seek 轨道可见（旧 20/5 → 新 96/90；2 张旧帧变化、基线 280）+ 捕获守卫拆有意黑底 + inline 候选诊断（R467 / 第 466 轮 / Round 464 / U-1758…U-1762 · 产品 1 文件 + 判据）
+
+
 ### 视频播放器与控件胶囊右缘对齐（旧差 63.0pt → 新 13.0pt；2 张旧帧变化、基线 280）（R466 / 第 465 轮 / Round 463 / U-1753…U-1757 · 产品 1 文件，播放器/控件对齐位）
 
 

@@ -8039,3 +8039,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：视频真实播放帧仍无帧（514）；时间码/滑杆另开（515）。
 - 回滚：播放器回 `.padding(.horizontal, 20)`；或 `git revert`。
 
+## D-463 seek 轨道自绘胶囊、有意黑底与盲区分表（R467）
+
+- 背景：系统滑杆轨道对胶囊底只偏离 light 20/dark 5，seek 范围几乎看不见；R465 的有意播放器黑底又让捕获守卫的"黑带消失"方向误开（旧 15 帧）。
+- 决定：Slider 下垫 10pt `primary 0.45` 胶囊（系统轨道 4pt，上下露 3pt）；捕获守卫新增 `UICaptureBlackBands.intentional`，`extra`/`bandsSeenHere` 排除；`Reading` 增 `fixture`。inline 判据加 `INLINE_CODE_DIAG`。
+- 理由：seek 范围是非文本控件，3:1 要有；"产品有意黑底"不是"离屏材质盲区"，两者不能共用一张名单的语义。
+- 兼容性/迁移：video-controls 亮/暗 2 张旧帧变化；基线 280 同 commit 更新；捕获守卫/Reading 结构变化已跑旧表与捕获卷。
+- 边界：inline dark 的候选诊断待 runner；seek 轨道的暗档 90 差已过 60。
+- 回滚：删轨道胶囊与 intentional 名单；或 `git revert`。
+
