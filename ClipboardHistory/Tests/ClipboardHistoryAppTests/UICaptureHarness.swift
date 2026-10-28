@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
@@ -131,6 +132,10 @@ final class UICaptureTests: XCTestCase {
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
+        // R465：`detail-file-video-controls` 的黑带是**产品有意的播放器黑底**（R465 加的
+        // `.background(Color.black)`），不是离屏材质坏；AVPlayerLayer 在这条离屏通道不画，
+        // 黑底正好是"第一帧未到"的实底。已肉眼审过那张帧：控件胶囊/时间/滑杆/静音都在。
+        "detail-file-video-controls",
         // R411：行悬停帧是同一个 `HistorySidebarView` + 同一批选中行；黑带仍是系统 List
         // 选中材质（不是新画的 hover 底）。目标行 hover 已单独量过。
         "sidebar-row-hover",
@@ -4849,6 +4854,55 @@ final class UICaptureTests: XCTestCase {
             emit("VIDEO_UNAVAILABLE \(tag) 状态带=\(bands)")
             XCTAssertGreaterThanOrEqual(bands, 4,
                                         "\(tag)：视频不可读态只有 \(bands) 条带（图标/说明/按钮）⇒ 没说出文件名")
+        }
+    }
+
+    /// R465：视频播放器区必须有实底（黑），不能是空白页色 —— 第一帧未到时"像没有视频"。
+    func testVideoPlayerHasASolidBackingSurface() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r465-video-surface-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-video-controls" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-video-controls` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("video-controls-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：video-controls 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            func mean(x0Pt: Double, x1Pt: Double, y0Pt: Double, y1Pt: Double) -> Double {
+                let x0 = Int((x0Pt * scale).rounded()), x1 = Int((x1Pt * scale).rounded())
+                let y0 = Int((y0Pt * scale).rounded()), y1 = min(height, Int((y1Pt * scale).rounded()))
+                var sum = 0.0, count = 0
+                for y in y0..<y1 { for x in x0..<x1 { sum += luma(x, y); count += 1 } }
+                return count > 0 ? sum / Double(count) : -1
+            }
+            // 播放器区（x 100..500、y 120..360）与页底（x 4..16，播放器从 x=20 起）。
+            let player = mean(x0Pt: 100, x1Pt: 500, y0Pt: 120, y1Pt: 360)
+            let page = mean(x0Pt: 4, x1Pt: 16, y0Pt: 120, y1Pt: 160)
+            let delta = page - player
+            emit("VIDEO_SURFACE \(tag) 播放器=\(String(format: "%.0f", player))"
+                 + " 页底=\(String(format: "%.0f", page)) 差=\(String(format: "%.0f", delta))")
+            XCTAssertGreaterThanOrEqual(delta, 20.0,
+                                        "\(tag)：播放器区只比页底暗 \(String(format: "%.0f", delta))"
+                                        + " ⇒ 第一帧前是一块空白页色，像没有视频")
         }
     }
 
@@ -9659,6 +9713,11 @@ final class UICaptureTests: XCTestCase {
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
             AnyView(DetailView(historyStore: self.makeFallbackNoThumbStore()))
         })
+        // R465：视频播放控件 —— 真实 .mov 走播放器。
+        results.append(Fixture("detail-file-video-controls", NSSize(width: 600, height: 440),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.5)) }) {
+            AnyView(DetailView(historyStore: self.makeVideoControlsStore()))
+        })
         // R464：视频分辨率不可读态 —— 状态里要说出是哪个文件。
         results.append(Fixture("detail-file-video-unavailable", NSSize(width: 600, height: 440),
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
@@ -13983,6 +14042,41 @@ final class UICaptureTests: XCTestCase {
     """
 
     /// R462：不支持类型的 fallback 预览 —— 长文件名在 720 窗口里怎么排。
+    private static func sampleVideoURL() -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("r465-sample.mov")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+        let writer = try! AVAssetWriter(outputURL: url, fileType: .mov)
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: 64, AVVideoHeightKey: 36])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input,
+                                                           sourcePixelBufferAttributes: nil)
+        writer.add(input)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 64, 36, kCVPixelFormatType_32ARGB, nil, &buffer)
+        if let buffer { adaptor.append(buffer, withPresentationTime: .zero) }
+        let sem = DispatchSemaphore(value: 0)
+        writer.finishWriting { sem.signal() }
+        sem.wait()
+        return url
+    }
+
+    private func makeVideoControlsStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .file(Self.sampleVideoURL()), thumbnail: nil,
+            sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
     private func makeVideoUnavailableStore() -> HistoryStore {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("r464-video-unavailable", isDirectory: true)

@@ -8021,3 +8021,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：padding 选择器在 runner 1x 的复验待下一跑；视频状态只覆盖信息不可读态，播放控件仍无帧（510）。
 - 回滚：删文件名行、还原选择器；或 `git revert`。
 
+## D-461 视频播放器面用实底黑（R465）
+
+- 背景：`VideoPlayerSurface` 无底；第一帧未到时播放器区是空白页色（亮/暗与页底差 0），看起来像没有视频。
+- 决定：给播放器面 `.background(Color.black)`；视频帧覆盖其上；黑带登记进 `materialBlindSpotFixtures`（有意的产品黑底，不是材质盲区）。
+- 理由：播放器需要自己的表面；AVPlayerLayer 在离屏通道不画时，黑底正好是"第一帧未到"的实底，不再伪装成空白页。
+- 兼容性/迁移：新增真实 .mov 夹具 `detail-file-video-controls`（600×440）亮/暗 2 张帧；旧帧 0 变化；基线 278→280 同 commit 更新。
+- 边界：真实视频播放（AVPlayerLayer 在屏）仍未拍；播放控件的时间码等宽/滑杆轨道另开（512/513 族）。
+- 回滚：删 `.background(Color.black)` 与名册行；或 `git revert`。
+
