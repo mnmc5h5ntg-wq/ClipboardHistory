@@ -4669,6 +4669,60 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R462：不支持类型的 fallback 预览里，长文件名必须留在窗格内（不许单行跑出右缘/压浮层）。
+    func testFallbackFileNameStaysInsideThePane() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r462-fallback-shots-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-fallback-longname" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-fallback-longname` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("fallback-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：fallback 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            // 只看缩略图左边那条窄列（x 0..200pt）：缩略图从 236pt 起、浮层从 540pt 起，都不进这里。
+            let x0 = 0, x1 = Int((200.0 * scale).rounded())
+            let y0 = Int((120.0 * scale).rounded()), y1 = min(height, Int((400.0 * scale).rounded()))
+            var leftmost = Int.max
+            var bands = 0
+            var inBand = false
+            for y in y0..<y1 {
+                var has = false
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    has = true
+                    leftmost = min(leftmost, x)
+                }
+                if has && !inBand { bands += 1 }
+                inBand = has
+            }
+            let left = leftmost == Int.max ? -1.0 : Double(leftmost) / scale
+            emit("FALLBACK_NAME \(tag) 文件名左沿=\(String(format: "%.1f", left))pt 行带=\(bands)")
+            XCTAssertGreaterThanOrEqual(left, 60.0,
+                                        "\(tag)：fallback 文件名左沿 \(left)pt（<60）⇒ 长文件名跑出窗格/压浮层")
+            XCTAssertGreaterThanOrEqual(bands, 1, "\(tag)：fallback 里没有文件名墨带 ⇒ 判据没有对象")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -5866,7 +5920,9 @@ final class UICaptureTests: XCTestCase {
             let x0 = Int((20.0 * scale).rounded())
             let x1 = Int((640.0 * scale).rounded())
             let minWidth = Int((40.0 * scale).rounded())
-            let maxWidth = Int((150.0 * scale).rounded())
+            // R462：runner dark 的假带正好卡在 150pt 上限（147 墨/150，文字抗锯齿）。
+            // 真带 ~85..99pt；上限收到 120 只拒绝假 run，地板 4.5 不动。
+            let maxWidth = Int((120.0 * scale).rounded())
             let gapPx = max(3, Int((3.0 * scale).rounded()))
             // 页面底 = 该行众数；底色带 = 相对页面底 4…48 的**第二众数**。
             // 只认第二众数的像素（容差 6），避免把相邻正文的抗锯齿算进带宽。
@@ -9440,6 +9496,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-headings", NSSize(width: 720, height: 520)) {
             AnyView(DetailView(historyStore: self.makeHeadingsStore(),
                                initialMarkdownMode: .rendered))
+        })
+        // R462：不支持类型的 fallback 预览 —— 长文件名。
+        results.append(Fixture("detail-file-fallback-longname", NSSize(width: 600, height: 440),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
+            AnyView(DetailView(historyStore: self.makeFallbackStore()))
         })
         // R460：纯文本文件预览 —— 长行应被 68ch 可读列收窄。
         results.append(Fixture("detail-file-text-wide", NSSize(width: 1100, height: 800),
@@ -13758,6 +13819,27 @@ final class UICaptureTests: XCTestCase {
 
     - 列表项（让解析器认得出这是可渲染的 Markdown）
     """
+
+    /// R462：不支持类型的 fallback 预览 —— 长文件名在 720 窗口里怎么排。
+    private func makeFallbackStore() -> HistoryStore {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r462-fallback", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let name = String(repeating: "很长文件名-", count: 8) + "终稿.xyz"
+        let url = dir.appendingPathComponent(name)
+        try? Data(repeating: 0x41, count: 64).write(to: url)
+        let thumb = try! makeStoredImage(color: .systemIndigo, size: NSSize(width: 200, height: 150))
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .file(url), thumbnail: thumb, sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
 
     /// R460：纯文本文件预览的长行（超过 68ch），用来量它有没有可读列。
     static let fileTextFixtureBody = """

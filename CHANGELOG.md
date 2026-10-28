@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 不支持文件 fallback 的长文件名留在窗格内（旧左沿 7.0pt、2 带 → 新 83.0pt、2 带；2 张新帧、基线 272→274）（R462 / 第 461 轮 / Round 459 / U-1733…U-1737 · 产品 1 文件，fallback 文件名位）
+
+
 ### 行内码内边距 3→4pt + 1x 假带门槛（本地 98.5/92.5/6.0、99.0/92.5/6.5；2 张旧帧变化、基线 272）（R461 / 第 460 轮 / Round 458 / U-1728…U-1732 · 靶指定修复轮）
 
 

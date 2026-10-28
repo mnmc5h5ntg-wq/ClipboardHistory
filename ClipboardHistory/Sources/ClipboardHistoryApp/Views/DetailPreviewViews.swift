@@ -434,6 +434,11 @@ struct DetailFileView: View {
             }
             Text(preview.url.lastPathComponent)
                 .font(.system(size: VisualFont.title))
+                // R462：长文件名不再从窗格左/右缘跑出去（也不再压右下角浮层）。
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .truncationMode(.middle)
+                .padding(.horizontal, 80)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

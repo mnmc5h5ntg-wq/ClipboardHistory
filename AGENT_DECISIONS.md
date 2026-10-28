@@ -7994,3 +7994,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：覆盖率门槛的 runner 复验待下一跑（本地 2x 分不开）；下一轮必须换新类别（本轮为靶指定修复）。
 - 回滚：padding 4→3、覆盖率 0.55→0.35；或 `git revert`。
 
+## D-458 fallback 文件名限两行并在 80pt 内边距内居中（R462）
+
+- 背景：`DetailPreviewViews.fallbackView` 的文件名无行数/截断/内边距；600×440 里长名从 7.0pt 跑到右缘、压浮层。
+- 决定：`lineLimit(2)` + `multilineTextAlignment(.center)` + `truncationMode(.middle)` + `padding(.horizontal, 80)`。
+- 理由：文件名的可读性靠两行 + 中间省略；两侧内边距同时避开右下角浮层，不靠"运气没撞上"。
+- 兼容性/迁移：新增真实 `.xyz` 夹具 `detail-file-fallback-longname`（600×440）亮/暗 2 张帧；旧帧 0 变化；基线 272→274 同 commit 更新。
+- 边界：极长无分隔符的文件名由中间省略处理；缩略图缺失时走 `doc.fill`，本轮未单独拍。
+- 回滚：删四个修饰；或 `git revert`。
+
