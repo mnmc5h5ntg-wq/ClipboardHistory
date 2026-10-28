@@ -30,12 +30,14 @@ TRUTH = "UICaptureTests/testRowTierProfileSeparatesCaptionFromTitle"
 
 CAPTION_BLOCK = """                        Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
                             .font(.caption)
-                            .foregroundStyle(.secondary)"""
+                            .foregroundStyle(.secondary)
+                            .settingsHelperAxis()"""
 OCR_GROUP = """                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
                         Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .settingsHelperAxis()
                     }"""
 RTF_GROUP = """                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("保留富文本格式（RTF / HTML）", isOn: $preserveRichText)
@@ -45,12 +47,14 @@ RTF_GROUP = """                    VStack(alignment: .leading, spacing: Settings
                             .font(.system(size: VisualFont.meta))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                            .settingsHelperAxis()
                     }"""
 # RTF 组去掉收尾那行 `}`，好把 OCR 的说明段插进组内（M145 的变异体要的是"合法但错"的代码）
 RTF_HEAD = "\n".join(RTF_GROUP.split("\n")[:-1])
 OCR_TEXT = """                        Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
                             .font(.caption)
-                            .foregroundStyle(.secondary)"""
+                            .foregroundStyle(.secondary)
+                            .settingsHelperAxis()"""
 M145_MUTANT = RTF_HEAD + "\n" + OCR_TEXT + "\n                    }\n" \
     + '                    Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)'
 

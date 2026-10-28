@@ -8048,3 +8048,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：inline dark 的候选诊断待 runner；seek 轨道的暗档 90 差已过 60。
 - 回滚：删轨道胶囊与 intentional 名单；或 `git revert`。
 
+## D-464 设置说明文字回到控件标签轴；首墨是复选框的卡片走有界替代判据（R468）
+
+- 背景：说明段是 `VStack` 里独立 `Text`，从复选框左沿起排；标签从复选框右侧起排 ⇒ 同一组「开关—说明」两条左轴（200.0 vs 179.0，差 21.0pt）。改轴后通用卡片的**第一处墨**从说明文字换成复选框，卡片内缩尺读到 8.0pt（对文字参照 +2.5/+3.0），而卡片内缩本身未变。
+- 决定：`SettingsViewLayout.helperAxisIndent = 21`（复选框 14pt + 标签间距 7pt），`.settingsHelperAxis()` 接 6 处说明；判据比标签/说明最左墨（≤4pt）。卡片内缩尺新增 `controlFirstCells`（8 格）与有界替代 [+2.0,+4.0]、开关 `CLIPBOARD_HISTORY_CONTROL_FIRST_ROSTER`；不放宽等式、不把这一族记成未判。
+- 理由：说明与标签同轴是版式；复选框的墨从框内 3pt 起是**图标类 bearing**，与既有「图标首墨」同一形状；等式只对文字首墨有定义。
+- 兼容性/迁移：14 张 settings 帧变化；基线 280 同 commit 更新；旧表 M566 重跑仍咬，M1274 钉住新开关。
+- 边界：runner 1x 的设置内容列可能是平涂 ⇒ 判据具名 `SETTINGS_HELPER_AXIS_NOT_RUN=settings-content-blank`；`CARD_INSET_CONTROL_FIRST` 的 runner 读数未读。
+- 回滚：删 `.settingsHelperAxis()` 与 `controlFirstCells`；或 `git revert`。
+

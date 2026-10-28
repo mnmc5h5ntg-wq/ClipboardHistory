@@ -19048,13 +19048,45 @@ final class UICaptureTests: XCTestCase {
         let iconFirstRosterMode = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_ICON_FIRST_ROSTER"] ?? "on"
         let useIconFirstRoster = iconFirstRosterMode == "on"
         let iconFirstCells: Set<String> = ["settings-stats light", "settings-stats dark"]
+        // R468：通用页的说明文字改到开关标签轴上之后，卡片里**第一处墨**从说明文字换成了
+        // 复选框本身（复选框 14pt 框的墨从框内 3pt 起，文字参照在框外 0pt 起）。这张尺问的是
+        // "卡片左沿到第一处墨"，所以它跟着对象换了：复选框首墨的侧边距是 **+2.5…+3.0pt**
+        // （亮 8.0 对 5.0 / 暗 8.0 对 5.5），不是产品的卡片内缩变了。给这一族一条
+        // **有界**的替代判据（[+2.0,+4.0]），与图标首墨那格同一形状；名册一旦首墨变回文字，
+        // 下界会红，逼下一次把这一格从名册里删掉。**不是免检牌**：M1274 把开关关掉 ⇒ 等式必红。
+        let controlFirstRosterMode = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_CONTROL_FIRST_ROSTER"] ?? "on"
+        let useControlFirstRoster = controlFirstRosterMode == "on"
+        let controlFirstCells: Set<String> = [
+            "settings-general light", "settings-general dark",
+            "settings-general-no-footer light", "settings-general-no-footer dark",
+            "settings-general-login-unsupported light", "settings-general-login-unsupported dark",
+            "settings-general-login-failed light", "settings-general-login-failed dark",
+        ]
         emit("CARD_INSET_ROSTER_SWITCH 开关=\(useIconFirstRoster ? "on" : "off")"
              + " 名册=\(iconFirstCells.sorted().joined(separator: " "))"
              + "（M566 钉的是上面那个开关，不是这份名单 ⇒ 增删名册不再弄死刀）")
+        emit("CARD_INSET_CONTROL_FIRST_SWITCH 开关=\(useControlFirstRoster ? "on" : "off")"
+             + " 名册=\(controlFirstCells.sorted().joined(separator: " "))"
+             + "（M1274 钉的是这个开关）")
         for (key, inset) in measured.keys.sorted().map({ ($0, measured[$0]!) }) {
             let tag = key.hasSuffix("dark") ? "dark" : "light"
             guard let want = control[tag] else {
                 XCTFail("\(key)：参照缺席（\(tag) 档没量到）⇒ 这一格没有资格报干净")
+                continue
+            }
+            if useControlFirstRoster, controlFirstCells.contains(key) {
+                let delta = inset - want
+                XCTAssertGreaterThanOrEqual(delta, 2.0,
+                                            "\(key) 的首墨是复选框，量到 \(inset)pt 对文字参照 "
+                                            + "\(want)pt = \(String(format: "%+.1f", delta))pt，"
+                                            + "低于 +2.0 ⇒ 首墨已经不再是复选框（或尺又瞎了）："
+                                            + "先把这一格从复选框名册里删掉，再决定改哪一边")
+                XCTAssertLessThanOrEqual(delta, 4.0,
+                                         "\(key) 的首墨是复选框，量到 \(inset)pt 对文字参照 "
+                                         + "\(want)pt = \(String(format: "%+.1f", delta))pt，高于 +4.0"
+                                         + " ⇒ 卡片内缩或复选框 bearing 不再是这一档：先读 CARD_INSET")
+                emit("CARD_INSET_CONTROL_FIRST \(key) 内缩=\(String(format: "%.1f", inset))"
+                     + " 文字参照=\(String(format: "%.1f", want)) 侧边距=\(String(format: "%+.1f", delta))")
                 continue
             }
             if useIconFirstRoster, iconFirstCells.contains(key) {
@@ -20640,6 +20672,135 @@ final class UICaptureTests: XCTestCase {
             }
         }
         return (pixels, Double(pixels) / Double(x1 - x0) / Double(y1 - y0))
+    }
+
+    /// R468：设置页里「开关—说明」必须共用一条文字左轴。
+    ///
+    /// 旧形状：说明段是独立 `Text`，从复选框左沿起排；标签从复选框右侧起排。
+    /// `settings-general` 帧量到标签左 **200.0pt**、说明左 **179.0pt**，差 **21.0pt**。
+    /// 判据按行分类：控件行（左侧有复选框墨、192..198pt 是空档、199pt 之后有标签墨）
+    /// 与说明行（有 199pt 之后的墨、但不是控件行）；比较两者的最左墨。
+    /// 期望差 ≤4pt（旧 21.0pt）。
+    func testSettingsHelperTextSharesTheToggleLabelAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r468-settings-axis-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-general" }) else {
+                return XCTFail("\(tag)：找不到 `settings-general` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("settings-axis-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：settings-general 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let width = rep.pixelsWide, height = rep.pixelsHigh
+            let bytesPerRow = rep.bytesPerRow, spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let x0 = Int((SettingsViewLayout.sidebarWidth + 8) * scale)
+            let x1 = min(width, Int((fixture.size.width - 8) * scale))
+            var histogram: [Int: Int] = [:]
+            for y in stride(from: Int(60 * scale), to: height, by: 2) {
+                for x in stride(from: x0, to: x1, by: 2) {
+                    histogram[Int(luma(x, y)) / 4, default: 0] += 1
+                }
+            }
+            let page = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+            func isInk(_ x: Int, _ y: Int) -> Bool { abs(luma(x, y) - page) > 30 }
+            func clusters(_ y: Int) -> [(start: Int, end: Int)] {
+                var runs: [(Int, Int)] = []
+                var start = -1
+                for x in x0..<x1 {
+                    if isInk(x, y) {
+                        if start < 0 { start = x }
+                    } else if start >= 0 {
+                        runs.append((start, x - 1))
+                        start = -1
+                    }
+                }
+                if start >= 0 { runs.append((start, x1 - 1)) }
+                var merged: [(Int, Int)] = []
+                for run in runs {
+                    if let last = merged.last, run.0 - last.1 <= Int(3 * scale) {
+                        merged[merged.count - 1].1 = run.1
+                    } else {
+                        merged.append(run)
+                    }
+                }
+                return merged
+            }
+            func firstInk(_ y: Int) -> Int? {
+                for x in x0..<x1 where isInk(x, y) { return x }
+                return nil
+            }
+            func firstInkAtOrAfter(_ y: Int, _ px: Int) -> Int? {
+                for x in max(x0, px)..<x1 where isInk(x, y) { return x }
+                return nil
+            }
+            let gapStart = Int(193.0 * scale), gapEnd = Int(198.0 * scale)
+            let labelStart = Int(199.0 * scale)
+            // 复选框占据 175..192pt；卡片左边框是 1pt 竖线，不能算成复选框。
+            let boxStart = Int(175.0 * scale), boxEnd = Int(192.0 * scale)
+            var labelColumns: [Int] = []
+            var helperColumns: [Int] = []
+            var sawControl = false
+            for y in Int(80 * scale)..<height {
+                guard firstInk(y) != nil else { continue }
+                let runs = clusters(y)
+                var hasGap = false, hasLabel = false
+                for x in x0..<x1 where isInk(x, y) {
+                    if x >= gapStart && x < gapEnd { hasGap = true }
+                    if x >= labelStart { hasLabel = true }
+                }
+                let boxRuns = runs.filter { $0.start >= boxStart && $0.start < boxEnd }
+                let hasCheckbox = boxRuns.contains { $0.end - $0.start >= Int(6 * scale) }
+                    || boxRuns.count >= 2
+                if hasCheckbox && !hasGap, let label = firstInkAtOrAfter(y, labelStart) {
+                    sawControl = true
+                    labelColumns.append(label)
+                } else if sawControl && hasLabel && !hasCheckbox {
+                    // 说明文字起笔的那个「宽簇」；卡片 1pt 左边框不算。
+                    if let wide = runs.first(where: { $0.end - $0.start >= Int(6 * scale) }) {
+                        helperColumns.append(wide.start)
+                    }
+                }
+            }
+            guard labelColumns.count >= 3, let helper = helperColumns.min() else {
+                emit("SETTINGS_HELPER_AXIS_NOT_RUN=settings-content-blank \(tag)"
+                     + " 控件行=\(labelColumns.count) 说明行=\(helperColumns.count)"
+                     + " ⇒ 这一台拍不出设置内容列，判据没有对象")
+                continue
+            }
+            let sorted = labelColumns.sorted()
+            let label = sorted[sorted.count / 2]
+            let labelPt = Double(label) / scale, helperPt = Double(helper) / scale
+            let delta = helperPt - labelPt
+            emit("SETTINGS_HELPER_AXIS \(tag) 标签左=\(String(format: "%.1f", labelPt))"
+                 + " 说明左=\(String(format: "%.1f", helperPt))"
+                 + " 差=\(String(format: "%.1f", delta))"
+                 + " 控件行=\(labelColumns.count) 说明行=\(helperColumns.count)")
+            judged += 1
+            XCTAssertLessThanOrEqual(abs(delta), 4.0,
+                "\(tag)：说明文字与开关标签差 \(String(format: "%.1f", abs(delta)))pt（>4）"
+                + " ⇒ 同一组「开关—说明」的左边断成两条轴")
+        }
+        if judged == 0 {
+            throw XCTSkip("SETTINGS_HELPER_AXIS_NOT_RUN：设置内容列在两种外观下都没有字 ⇒ 判据未运行")
+        }
     }
 
     /// **说明文字必须画全**（R28 / U-50 / D-087；R28b 把参照臂从"更宽"换成"更窄"）。

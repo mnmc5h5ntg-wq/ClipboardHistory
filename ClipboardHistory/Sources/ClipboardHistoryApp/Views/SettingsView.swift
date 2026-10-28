@@ -26,6 +26,14 @@ enum SettingsViewLayout {
     /// 而 GroupBox 自带 ~7pt ⇒ 再补 7 落在 14.5 / 13.5，与内侧那一档差 ≤1pt。
     /// 判据在帧上：`testSettingsCardVerticalRhythmIsOneNumber`。
     static let cardEdgeInset: CGFloat = 7
+    /// 开关/单选控件的说明文字与**控件标签**共用一条文字轴。
+    ///
+    /// 旧形状：说明段是 `VStack` 里独立的 `Text`，于是它从左沿（复选框的左沿）起排，
+    /// 而标签从复选框右侧起排 —— `settings-general` 帧量到标签左 **200.0pt**、
+    /// 说明左 **179.0pt**，差 **21.0pt**，同一组"开关—说明"的左边读成两条轴。
+    /// 21 = 系统复选框 14pt + 复选框与标签的间距 7pt（帧上量的，不是抄的）。
+    /// 判据在帧上：`testSettingsHelperTextSharesTheToggleLabelAxis` 读标签行与说明行的最左墨。
+    static let helperAxisIndent: CGFloat = 21
     static let clearButtonTitle = "清空"
 }
 
@@ -37,6 +45,11 @@ extension View {
     /// 在文件里还长在别的地方（卡片内部的小节就有一处），数它会数错。
     func settingsCardInset() -> some View {
         padding(.vertical, SettingsViewLayout.cardEdgeInset)
+    }
+
+    /// 说明文字与它解释的那颗开关/单选控件共用一条文字轴（见 `SettingsViewLayout.helperAxisIndent`）。
+    func settingsHelperAxis() -> some View {
+        padding(.leading, SettingsViewLayout.helperAxisIndent)
     }
 }
 
@@ -413,6 +426,7 @@ struct SettingsView: View {
                                                      ? Color(red: 1.0, green: 0.48, blue: 0.44)
                                                      : Color.red)
                                                  : AnyShapeStyle(.secondary))
+                                .settingsHelperAxis()
                         }
                     }
 
@@ -424,6 +438,7 @@ struct SettingsView: View {
                         Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .settingsHelperAxis()
                     }
 
                     // R33 / U-55：这两组原来写成"两个开关连着、两段说明连着"，
@@ -437,6 +452,7 @@ struct SettingsView: View {
                         Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .settingsHelperAxis()
                     }
 
                     VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
@@ -447,6 +463,7 @@ struct SettingsView: View {
                             .font(.system(size: VisualFont.meta))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                            .settingsHelperAxis()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -503,6 +520,7 @@ struct SettingsView: View {
                     Text("过滤敏感内容（密钥、令牌、密码等），防止其进入推荐。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .settingsHelperAxis()
 
                     Divider()
 
@@ -601,6 +619,7 @@ struct SettingsView: View {
                              + "代价是每次启动要重新识别一遍。")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .settingsHelperAxis()
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -46,6 +46,7 @@ RECEIPT_BLOCK = """                        if let message = loginItemSettings.me
                                                      ? Color(red: 1.0, green: 0.48, blue: 0.44)
                                                      : Color.red)
                                                  : AnyShapeStyle(.secondary))
+                                .settingsHelperAxis()
                         }"""
 DISABLED_SEAM = "                            .disabled(!loginItemSettings.isSupported)"
 CATCH_MESSAGE = '            message = enabled ? "开机启动开启失败，请稍后重试。" : "开机启动关闭失败，请稍后重试。"'

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置开关说明文字与标签同轴（旧 21.0pt → 新 −2.0pt；14 张 settings 帧变化、基线 280）+ 卡片内缩复选框首墨名册（R468 / 第 467 轮 / Round 465 / U-1763…U-1767 · 产品 1 文件 + 判据）
+
+
 ### 视频 seek 轨道可见（旧 20/5 → 新 96/90；2 张旧帧变化、基线 280）+ 捕获守卫拆有意黑底 + inline 候选诊断（R467 / 第 466 轮 / Round 464 / U-1758…U-1762 · 产品 1 文件 + 判据）
 
 
