@@ -7859,3 +7859,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：长首行不画（476 无帧）；HTML 代码块不走这条（477）；标签是元信息，用 `secondaryLabelColor`，不抢代码。
 - 回滚：删 `drawCodeLanguageTags` 调用与 `codeLanguageAttribute` 两处即可；或 `git revert`。
 
+## D-443 主题分隔线由字符改为背景层通栏 1pt 线（R447）
+
+- 背景：`thematicBreakText` 把 `---` 渲染成 24 个 `─`：长度由字数决定、墨带是一行字高、复制渲染结果会带出 24 个字符。
+- 决定：新 `ThematicBreakRule` 纯策略（1pt、`secondaryLabelColor`、通栏居中、占位空格）；属性串只留一个占位空格（保住行高），背景层按列宽画线；标签不进文本存储。
+- 理由：主题分隔线是装饰不是内容；线长应跟列宽；复制语义可用单测钉住；纯策略不碰 Store（1108/66）。
+- 兼容性/迁移：新夹具 `detail-rule`（2 帧，基线 252→254）；现有夹具都没有主题分隔线，0 张旧帧变化。
+- 边界：HTML 预览的 `<hr>` 不走这条（478）；线色用 `secondaryLabelColor`，暗档动态。
+- 回滚：恢复 `thematicBreakText` 与 `append` 的字符分支、删绘制调用即可；或 `git revert`。
+

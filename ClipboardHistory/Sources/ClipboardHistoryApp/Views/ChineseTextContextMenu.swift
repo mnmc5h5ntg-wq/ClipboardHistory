@@ -442,6 +442,7 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
         drawCodeBlockBackgrounds(in: rect)
+        drawThematicBreaks(in: rect)
         drawCodeLanguageTags(in: rect)
         drawQuoteRules(in: rect)
         drawCodeLineNumbers(in: rect)
@@ -467,6 +468,38 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
                                       width: width,
                                       height: lineRect.height)
                 let clipped = fillRect.intersection(rect)
+                guard !clipped.isNull, !clipped.isEmpty else { return }
+                clipped.fill()
+            }
+        }
+    }
+
+    /// Markdown 主题分隔线（R447）。旧形状是 24 个 `─` 字符：比正文窄、比行高厚，
+    /// 而且会被复制进剪贴板。现在文本里只有一个占位空格，线画在背景层：
+    /// 通栏、1pt、落在块那一行的中间（`ThematicBreakRule`）。
+    private func drawThematicBreaks(in rect: NSRect) {
+        guard let layoutManager, let textContainer, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let width = textContainer.size.width
+        guard width.isFinite, width > 0 else { return }
+        let all = NSRange(location: 0, length: textStorage.length)
+        ThematicBreakRule.color.setFill()
+        textStorage.enumerateAttribute(MarkdownPresentation.thematicBreakAttribute, in: all) { value, range, _ in
+            guard value != nil else { return }
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var drawn = false
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { lineRect, _, _, _, stop in
+                guard !drawn else {
+                    stop.pointee = true
+                    return
+                }
+                drawn = true
+                let rule = ThematicBreakRule.rect(containerOriginX: origin.x,
+                                                  containerWidth: width,
+                                                  lineTop: origin.y + lineRect.minY,
+                                                  lineHeight: lineRect.height)
+                let clipped = rule.intersection(rect)
                 guard !clipped.isNull, !clipped.isEmpty else { return }
                 clipped.fill()
             }

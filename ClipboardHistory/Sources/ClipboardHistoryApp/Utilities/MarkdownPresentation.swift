@@ -150,10 +150,10 @@ enum MarkdownPresentation {
         return state == .checked ? "☑" : "☐"
     }
 
-    /// 分隔线用一根横线字符画。属性串里没有"画一条线"这种原语，
-    /// 而插入一个 `NSTextAttachment` 会让只读区的复制结果带上附件、
-    /// 并给 VoiceOver 多一个没有语义的元素。字符线是唯一"看起来是线、复制出来是空"的选择。
-    static let thematicBreakText = String(repeating: "─", count: 24)
+    /// 主题分隔线：属性串里只留一个占位空格（保住这一行的高度），
+    /// 线由正文视图按列宽画（`ThematicBreakRule`）。旧形状是 24 个 `─` 字符 ——
+    /// 长度由字数决定、还会被复制进剪贴板（R447）。
+    static let thematicBreakAttribute = NSAttributedString.Key("ClipboardHistory.markdownThematicBreak")
 
     // MARK: - 中文强调：斜体还是字重
 
@@ -339,6 +339,12 @@ enum MarkdownPresentation {
                                         range: NSRange(location: start, length: blockContentLength))
                 }
             }
+            // R447：主题分隔线的线不进文本存储；属性串这一层只标范围，
+            // 正文视图按 `ThematicBreakRule` 的通栏几何画。
+            if case .thematicBreak = block.kind {
+                result.addAttribute(thematicBreakAttribute, value: true,
+                                    range: NSRange(location: start, length: blockContentLength))
+            }
             // 导引线属性与段落缩进覆盖同一个范围（含块后的分隔空行）：
             // 相邻两个同级引用块因此天然连成一条线，空白行不会把线切断。
             if block.quoteDepth > 0 {
@@ -405,7 +411,7 @@ enum MarkdownPresentation {
     private static func append(_ block: MarkdownBlock, to result: NSMutableAttributedString) {
         switch block.kind {
         case .thematicBreak:
-            result.append(NSAttributedString(string: thematicBreakText,
+            result.append(NSAttributedString(string: ThematicBreakRule.placeholder,
                                              attributes: [.font: bodyFont, .foregroundColor: markerColor]))
         case .unorderedItem(let depth, let task):
             let glyph = taskGlyph(task) ?? bulletGlyph(depth: depth)

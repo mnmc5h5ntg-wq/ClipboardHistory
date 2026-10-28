@@ -4709,6 +4709,97 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R447：Markdown 主题分隔线必须画成**通栏一条线**，而不是 24 个 `─` 字符。
+    ///
+    /// 判据只看帧：在正文区（避开详情头部那条分隔线）逐行找最长的连续墨行。
+    /// 新形状：一条 ≥450pt、厚度 ≤4pt 的长线，且正文区里只有这一条；
+    /// 旧形状（24 个 `─`）：每一段只有几 pt，拼不出 450pt，墨带高也是一行字（>4pt）。
+    /// 复制语义那一半在 `ThematicBreakRuleTests`：属性串里不许再出现 `─`。
+    func testThematicBreaksAreDrawnAsALine() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r447-rule-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-rule" }) else {
+                return XCTFail("\(tag)：找不到 `detail-rule` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-rule-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-rule` 读不回字节 ⇒ 这条判据没有对象")
+                return
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            // 用"离背景足够远"而不是绝对墨阈值：1pt 线在 1x 可能被摊到相邻两行，
+            // 半覆盖那一行读不到纯色的深，但它仍然明显比窗口底色深/亮。
+            let isRuleInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            let x0 = Int((20.0 * scale).rounded())
+            let x1 = Int((700.0 * scale).rounded())
+            let y0 = Int((70.0 * scale).rounded())
+            let y1 = min(height, Int((500.0 * scale).rounded()))
+
+            func longestRun(y: Int) -> Int {
+                var best = 0
+                var current = 0
+                for x in x0..<x1 {
+                    if isRuleInk(luma(x, y)) {
+                        current += 1
+                        best = max(best, current)
+                    } else {
+                        current = 0
+                    }
+                }
+                return best
+            }
+
+            let floorPx = 450.0 * scale
+            var bands: [(top: Int, bottom: Int, run: Int)] = []
+            var top = -1
+            var runInBand = 0
+            for y in y0..<y1 {
+                let run = longestRun(y: y)
+                let isLong = Double(run) >= floorPx
+                if isLong {
+                    if top < 0 { top = y }
+                    runInBand = max(runInBand, run)
+                } else if top >= 0 {
+                    bands.append((top, y - 1, runInBand))
+                    top = -1
+                    runInBand = 0
+                }
+            }
+            if top >= 0 { bands.append((top, y1 - 1, runInBand)) }
+
+            let longest = bands.map { $0.run }.max() ?? 0
+            let longestPt = Double(longest) / scale
+            let bandHeightPt = bands.first.map { Double($0.bottom - $0.top + 1) / scale } ?? 0
+            emit("THEMATIC_RULE \(tag) 长线=\(String(format: "%.1f", longestPt))pt"
+                 + " 带高=\(String(format: "%.1f", bandHeightPt))pt 带数=\(bands.count)")
+
+            XCTAssertEqual(bands.count, 1,
+                           "\(tag)：正文区里读到 \(bands.count) 条通栏长线（应为 1）"
+                           + " ⇒ 多出来的那条是谁？这条判据量错了对象")
+            guard let band = bands.first else { continue }
+            XCTAssertGreaterThanOrEqual(longestPt, 450.0,
+                                        "\(tag)：分隔线只有 \(longestPt)pt 长"
+                                        + " ⇒ 它还是按字数画的字符线，不是通栏线")
+            let thickness = Double(band.bottom - band.top + 1) / scale
+            XCTAssertLessThanOrEqual(thickness, 4.0,
+                                     "\(tag)：分隔线厚 \(thickness)pt（应 ≤4pt）"
+                                     + " ⇒ 读到的是字高不是线厚")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -8031,6 +8122,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-code-plain", NSSize(width: 720, height: 520)) {
             let target = self.makeCodeStore(body: Self.codePlainFixtureBody)
             self.assertCodeFixturePremise(target, role: "detail-code-plain")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R447：主题分隔线。线前/线后各一段，帧上只应出现**一条**通栏长线；
+        // 旧形状是 24 个 `─` 字符（行内最多一截短线，没有通栏长线）。
+        results.append(Fixture("detail-rule", NSSize(width: 720, height: 520)) {
+            let target = self.makeRuleStore()
+            self.assertRuleFixturePremise(target, role: "detail-rule")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
 
@@ -11962,6 +12060,19 @@ final class UICaptureTests: XCTestCase {
     中文的 *强调* 不能用合成斜体。
     """
 
+    /// R447 主题分隔线夹具：一条 `---` 夹在两段之间。
+    /// 旧形状这条线是 24 个 `─` 字符（比正文窄、比行高厚、复制会带出字符）；
+    /// 新形状是通栏 1pt 线，文本里只剩一个占位空格。
+    static let ruleFixtureBody = """
+    # 分隔线
+
+    上面一段。
+
+    ---
+
+    下面一段。
+    """
+
     /// 夹具前提：这一帧拍的那条记录，按策略确实有渲染入口，正文里也确实带 Markdown 标记。
     /// 前提不成立时必须**红** —— 一张名字叫 `detail-markdown-rendered` 却拍着普通文本的帧
     /// 看着像证据，其实什么都没说（D-038 那一族；`detail-text-highlight` 同样有这条前置断言）。
@@ -11992,6 +12103,36 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.markdownFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R447：夹具里必须真有**一条**主题分隔线，且线前/线后各有一段正文 ——
+    /// 否则"帧上出现一条通栏长线"可能来自别的块，判据就量错了对象。
+    private func assertRuleFixturePremise(_ store: HistoryStore, role: String,
+                                          file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：分隔线夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let blocks = MarkdownParser.parse(body).blocks
+        let breaks = blocks.filter { if case .thematicBreak = $0.kind { return true } else { return false } }
+        XCTAssertEqual(breaks.count, 1, "\(role)：分隔线不是一条（实际 \(breaks.count)）", file: file, line: line)
+        let paragraphs = blocks.filter { if case .paragraph = $0.kind { return true } else { return false } }
+        XCTAssertEqual(paragraphs.count, 2, "\(role)：线前后的正文不是两段（实际 \(paragraphs.count)）",
+                       file: file, line: line)
+    }
+
+    private func makeRuleStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.ruleFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)

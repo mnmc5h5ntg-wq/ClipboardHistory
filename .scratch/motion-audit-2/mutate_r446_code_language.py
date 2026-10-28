@@ -14,12 +14,11 @@ VIEW = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/ChineseTextContextM
 TAG = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Utilities/CodeLanguageTag.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "CodeLanguageTagTests|testCodeBlocksShowTheirLanguage"
-DRAW_NEEDLE = '''        drawCodeBlockBackgrounds(in: rect)
-        drawCodeLanguageTags(in: rect)'''
+DRAW_NEEDLE = '        drawCodeLanguageTags(in: rect)'
 FITS_NEEDLE = '        return codeRightEdge + minimumGap <= containerWidth - rightInset - width(of: label)'
 MUTATIONS = [
     ("M1226", "背景层不再画语言标签（调用被删）", VIEW, DRAW_NEEDLE,
-     '        drawCodeBlockBackgrounds(in: rect)',
+     '        // 语言标签不画',
      ["testCodeBlocksShowTheirLanguage", "没有把围栏里的语言"]),
     ("M1227", "放不下也画（fits 恒真）", TAG, FITS_NEEDLE,
      '        return true',
