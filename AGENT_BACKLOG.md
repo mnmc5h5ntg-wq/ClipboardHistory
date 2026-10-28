@@ -10405,9 +10405,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：首版 maxNarrow 37 在新帧过；旧帧（无路径）同一 CJK 导出说明也是 51/37 ⇒ 尺没读对象。
     修法：等宽行的判据用「等距连跑」或直接读字体结构量；窄簇数量只留诊断。
 
-**541. R473 补记与 R474 的跑仍未读（R474 观察）**
-    现象：`PUSH_BLOCKED=network`（HEAD=04a4022、origin/main=c3b8732、ahead=2）⇒ R473 的两笔补记没有跑、R474 的提交也还没建；`gh` EOF。
-    修法：网络恢复后先验 remote 再快进 push；随后读 R473/R474 全部失败步骤，`INLINE_CODE_DIAG dark` 拿到数据再改检测。
+**541. R474 自身跑与 inline dark 的长带分桶（R474 观察）**
+    现象：收口网络恢复后 push `c3b8732..d70cc57` success（ahead=0）；R474 跑 `40780110804 ↔ d70cc57` queued。R473/R472/R471 四跑已读，`INLINE_CODE_DIAG dark` 均为 `选中=false`、top 全是 s20 高 padding 短碎片。
+    修法：下一跑先打印候选的「span / 覆盖率 / ink / rowMax」四门分桶，找出长带被哪道门砍掉，再改检测；4.5 地板不动。
 
 **542. `QUICKPICK_LIST_RULE` 的 runner 1x 与空结果态未签收**（R474 观察）
     现象：本机 2x 六帧均 `线数=1 y=71px 厚=2px 宽=792px`；1x 上 1pt 线可能只占 1px，空结果态的布局分支也不同。

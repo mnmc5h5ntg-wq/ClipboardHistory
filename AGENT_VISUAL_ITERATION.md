@@ -19532,7 +19532,7 @@ U-4 的 68ch 可读列只接在 Markdown/正文分支，纯文本文件预览在
 
 ## Round 471 · R474（第 473 轮 · 2026-10-29）：浮层搜索框与候选区补 1pt 通栏分隔线（16 张浮层帧变化、基线 288）+ 药丸尺加连续行分组
 
-搜索框和候选列表之间只有 8pt 留白，输入区与内容区同属一块。`QuickPickController` 加 `NSBox(.separator)`：宽=搜索框宽（左右各 12pt 内缩）、厚 1pt、顶钉 `scroll.topAnchor`（8pt 间距下沿，不占行高）；不能钉 `field.bottomAnchor` —— 焦点/悬停描边向下多出 4pt，贴底边的线会从焦点环里穿过去（焦点帧直看后改）。8 个浮层夹具 × 亮暗 **16 张帧变化**、0 新增/缺失，基线 288/0/0/0；16 张逐张看过。同帧读数：`线数=1 y=71px 厚=2px 宽=792px 左=24px`（840px 帧 ⇒ 94.3%），搜索框底 56px、药丸顶 92px；旧产品帧同判据 **0 条**。判据先按 85% 宽度把药丸自身窄带误收为第二条线，提到 90% 后 6/6；`overlayPill` 新增连续行分组 + `minHeight`，真值表第 ⑧ 格钉住分隔线不抢药丸身份。M1288/M1289/M1290 **3/3**（height 1→0 与 boxType .custom 是空刀，登记）；r104 重锚 **4/4**、M1281 重锚 **CAUGHT**。全量 1285/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ 两次探测 remote closed + gh EOF ⇒ `PUSH_BLOCKED=network`（HEAD=04a4022、origin=c3b8732、ahead=2）＋ `CI_READ_BLOCKED`；`INLINE_CODE_DIAG dark` 仍未读到 ⇒ 靶修复具名 NOT-RUN、不盲调。
+搜索框和候选列表之间只有 8pt 留白，输入区与内容区同属一块。`QuickPickController` 加 `NSBox(.separator)`：宽=搜索框宽（左右各 12pt 内缩）、厚 1pt、顶钉 `scroll.topAnchor`（8pt 间距下沿，不占行高）；不能钉 `field.bottomAnchor` —— 焦点/悬停描边向下多出 4pt，贴底边的线会从焦点环里穿过去（焦点帧直看后改）。8 个浮层夹具 × 亮暗 **16 张帧变化**、0 新增/缺失，基线 288/0/0/0；16 张逐张看过。同帧读数：`线数=1 y=71px 厚=2px 宽=792px 左=24px`（840px 帧 ⇒ 94.3%），搜索框底 56px、药丸顶 92px；旧产品帧同判据 **0 条**。判据先按 85% 宽度把药丸自身窄带误收为第二条线，提到 90% 后 6/6；`overlayPill` 新增连续行分组 + `minHeight`，真值表第 ⑧ 格钉住分隔线不抢药丸身份。M1288/M1289/M1290 **3/3**（height 1→0 与 boxType .custom 是空刀，登记）；r104 重锚 **4/4**、M1281 重锚 **CAUGHT**。全量 1285/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ 开工两探受阻，收口前恢复 ⇒ 一次快进 push `c3b8732..d70cc57` success（ahead=0）；四跑已读：inline dark 同形、R473 追记 code-tab 字典崩溃、R471 追记 Motion 回执 1<2；`INLINE_CODE_DIAG dark` 现读 `选中=false`（top 全是 s20 短碎片），长带四门分桶未打印 ⇒ 检测修复仍 NOT-RUN、不盲调。
 
 **七维度自评**（恰七行，每格 n/15）：
 
