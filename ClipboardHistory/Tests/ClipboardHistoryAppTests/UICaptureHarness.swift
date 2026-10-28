@@ -5886,6 +5886,120 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R456：搜索命中必须在**行里**看得出来（标题或来源行）。
+    ///
+    /// 旧形状：过滤用了 query，行里却一个字都不标 —— 只命中来源 App 名的行（R445）整行没有线索，
+    /// 正文命中落在两行截断之外时同样没有。新形状：命中的可见片段带
+    /// `DetailTypography.highlightColor` 底。判据用**黄像素落在哪一条文字带**回答：
+    /// 来源查询帧 → 标题带 0、来源带 > 0；正文查询帧 → 标题带 > 0、来源带 0；
+    /// 无查询帧 → 两处都 0。地板 40×scale²（1x 源词约 40×11pt、扣掉字形仍有 ~290 颗）。
+    func testSidebarSearchRowsShowWhyTheyMatched() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r456-row-match-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func read(_ name: String) throws -> (title: Int, source: Int, rowBands: Int, scale: Double) {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    return (-1, -1, -1, 1)
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                    return (-1, -1, -1, 1)
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+                let spp = rep.samplesPerPixel
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let o = y * bytesPerRow + x * spp
+                    return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                        + 0.114 * Double(base[o + rOff + 2])
+                }
+                func isYellow(_ x: Int, _ y: Int) -> Bool {
+                    let o = y * bytesPerRow + x * spp
+                    let r = Double(base[o + rOff])
+                    let g = Double(base[o + rOff + 1])
+                    let b = Double(base[o + rOff + 2])
+                    return r - b >= 40 && g - b >= 25 && r >= 80
+                }
+                let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+                let x0 = Int((96.0 * scale).rounded())
+                let x1 = Int((285.0 * scale).rounded())
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in Int((140.0 * scale))..<min(height, Int((260.0 * scale))) {
+                    var has = false
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && top < 0 { top = y }
+                    if !has && top >= 0 {
+                        bands.append((top, y - 1))
+                        top = -1
+                    }
+                    if bands.count >= 3 { break }
+                }
+                if top >= 0 && bands.count < 3 {
+                    bands.append((top, min(height, Int((260.0 * scale))) - 1))
+                }
+                func yellow(_ band: (top: Int, bottom: Int)?) -> Int {
+                    guard let band else { return -1 }
+                    var count = 0
+                    for y in band.top...band.bottom {
+                        for x in x0..<x1 where isYellow(x, y) { count += 1 }
+                    }
+                    return count
+                }
+                let rowBands = bands.count
+                let title = (rowBands >= 3 ? yellow(bands[0]) : -1)
+                    + (rowBands >= 3 ? yellow(bands[1]) : -1)
+                let source = rowBands >= 3 ? yellow(bands[2]) : -1
+                return (title, source, rowBands, scale)
+            }
+            let sourceQuery = try read("sidebar-search-source")
+            let contentQuery = try read("sidebar-search-content")
+            let neutral = try read("sidebar-history")
+            emit("HISTORY_ROW_MATCH \(tag) 来源查询 标题黄=\(sourceQuery.title) 来源黄=\(sourceQuery.source)"
+                 + " 行带=\(sourceQuery.rowBands)"
+                 + " ｜正文查询 标题黄=\(contentQuery.title) 来源黄=\(contentQuery.source)"
+                 + " ｜无查询 标题黄=\(neutral.title) 来源黄=\(neutral.source)")
+            // runner 1x 的暗档侧栏行文字是盲区（R444/R445 同族）：读不到三条带就不判像素，
+            // 具名 NOT-RUN；亮档读得到时照红，门槛不动。
+            if sourceQuery.rowBands < 3 || contentQuery.rowBands < 3 || neutral.rowBands < 3 {
+                emit("HISTORY_ROW_MATCH_NOT_RUN=runner-1x-sidebar-plain \(tag)"
+                     + " 行带=\(sourceQuery.rowBands)/\(contentQuery.rowBands)/\(neutral.rowBands)"
+                     + " ⇒ 侧栏行文字没画出来（1x 通道），像素证人记未运行")
+                continue
+            }
+            let scale = sourceQuery.scale
+            let floor = Int((40.0 * scale * scale).rounded())
+            XCTAssertEqual(neutral.title, 0,
+                           "\(tag)：没有查询却读到 \(neutral.title) 颗黄底 ⇒ 高亮漏电")
+            XCTAssertEqual(neutral.source, 0,
+                           "\(tag)：没有查询却读到 \(neutral.source) 颗来源黄底 ⇒ 高亮漏电")
+            XCTAssertEqual(sourceQuery.title, 0,
+                           "\(tag)：只命中来源的查询把标题也标了 \(sourceQuery.title) 颗黄 ⇒ 高亮落错字段")
+            XCTAssertGreaterThanOrEqual(sourceQuery.source, floor,
+                                        "\(tag)：只命中来源的行来源带只有 \(sourceQuery.source) 颗黄"
+                                        + "（地板 \(floor)）⇒ 行里看不出为什么命中")
+            XCTAssertGreaterThanOrEqual(contentQuery.title, floor,
+                                        "\(tag)：正文命中的行标题只有 \(contentQuery.title) 颗黄"
+                                        + "（地板 \(floor)）⇒ 命中没进列表")
+            XCTAssertEqual(contentQuery.source, 0,
+                           "\(tag)：正文查询把来源带标了 \(contentQuery.source) 颗黄 ⇒ 高亮落错字段")
+        }
+    }
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
@@ -8637,6 +8751,14 @@ final class UICaptureTests: XCTestCase {
         sourceSearch.perform(.setSelection([]))
         results.append(Fixture("sidebar-search-source", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: sourceSearch)))
+        })
+        // R456：只命中**正文**的查询 —— "视觉验收"只出现在第一行的正文里，不在来源字段里。
+        // 与上面那张来源查询帧配成两臂：命中高亮该落在哪一段，由同帧的黄像素位置回答。
+        let contentSearch = makePopulatedStore()
+        contentSearch.perform(.updateSearch("视觉验收"))
+        contentSearch.perform(.setSelection([]))
+        results.append(Fixture("sidebar-search-content", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: contentSearch)))
         })
 
         for entry in store.entries.prefix(4) {            let captured = entry

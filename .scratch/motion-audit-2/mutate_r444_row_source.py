@@ -7,9 +7,10 @@ VIEW=os.path.join(ROOT,"Sources/ClipboardHistoryApp/Views/HistoryRowViews.swift"
 POLICY=os.path.join(ROOT,"Sources/ClipboardHistoryApp/Utilities/HistoryRowSourceLine.swift")
 BASE_ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 FILTER="testHistoryRowsShowTheirSourceAppName|HistoryRowSourceLineTests"
-ROW_NEEDLE='''            Text(HistoryRowSourceLine.text(
+ROW_NEEDLE='''            Text(HistoryRowMatchHighlight.sourceLine(
                 time: ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp),
-                sourceAppName: entry.sourceAppName))'''
+                sourceAppName: entry.sourceAppName,
+                query: searchQuery))'''
 MUTATIONS=[
  ("M1220","行退回纯时间（来源没进时间行）",VIEW,ROW_NEEDLE,
   '            Text(ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp))',

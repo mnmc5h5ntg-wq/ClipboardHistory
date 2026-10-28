@@ -16,6 +16,9 @@ struct HistoryRowButton: View {
     let copyAction: () -> Void
     /// 点行首星标 = 收藏/取消收藏。
     let favoriteAction: () -> Void
+    /// R456：侧栏当前的搜索词。只用来给**行里可见的文字**标命中片段；
+    /// 空串表示没有搜索，所有行原样（不编高亮）。默认值留给直接构造行的夹具。
+    var searchQuery: String = ""
     @State private var isHovered = false
     @Environment(\.hoveredEntryIDForCapture) private var hoveredEntryIDForCapture
     @ObservedObject private var dragSourceFeedback = DragSourceFeedback.shared
@@ -39,7 +42,7 @@ struct HistoryRowButton: View {
 
             RowPinnedBadge(isPinned: entry.isPinned)
 
-            RowTextColumn(entry: entry)
+            RowTextColumn(entry: entry, searchQuery: searchQuery)
         }
         // R427：正在拖出去的那一条退到背景里（只降内容，不动行底/悬停底）。
         .opacity(isDraggingForDrawing ? DragSourceFeedback.dimOpacity : 1)
@@ -245,27 +248,31 @@ private struct RowLeadingVisual: View {
 /// 标题 + 复制时间两行。
 private struct RowTextColumn: View {
     let entry: HistoryStore.Entry
+    /// R456：命中高亮只落在可见文字上 —— 标题/文件名按搜索词标，来源行只标 App 名。
+    let searchQuery: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             switch entry.content {
             case .file(let url):
-                FileNameText(url: url)
+                FileNameText(url: url, searchQuery: searchQuery)
                     .font(.system(size: VisualFont.row))
             case .files(let urls):
-                MultiFileTitle(urls: urls)
+                MultiFileTitle(urls: urls, searchQuery: searchQuery)
                     .font(.system(size: VisualFont.row))
             default:
-                Text(entry.shortPreview)
+                Text(HistoryRowMatchHighlight.highlighted(entry.shortPreview, query: searchQuery))
                     .font(.system(size: VisualFont.row))
                     .lineLimit(2)
                     .truncationMode(.tail)
             }
             // R444：时间行补「· 来自 <来源 App>」—— 主列表第一次有来源（此前只有详情头部有）。
             // 时间在前、来源在后：行宽不够时先截断来源，时间不丢；来源 nil 时只显示时间。
-            Text(HistoryRowSourceLine.text(
+            // R456：搜索命中的 App 名带高亮；时间不参与匹配，所以不标时间。
+            Text(HistoryRowMatchHighlight.sourceLine(
                 time: ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp),
-                sourceAppName: entry.sourceAppName))
+                sourceAppName: entry.sourceAppName,
+                query: searchQuery))
                 // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
                 // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
                 .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
@@ -278,6 +285,7 @@ private struct RowTextColumn: View {
 
 private struct FileNameText: View {
     let url: URL
+    var searchQuery: String = ""
 
     private var fileNameParts: EntryPresentation.FileNameParts {
         EntryPresentation.fileNameParts(for: url)
@@ -285,13 +293,15 @@ private struct FileNameText: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Text(fileNameParts.displayBaseName)
+            Text(HistoryRowMatchHighlight.highlighted(fileNameParts.displayBaseName,
+                                                      query: searchQuery))
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .layoutPriority(0)
 
             if !fileNameParts.fileExtension.isEmpty {
-                Text(".\(fileNameParts.fileExtension)")
+                Text(HistoryRowMatchHighlight.highlighted(".\(fileNameParts.fileExtension)",
+                                                          query: searchQuery))
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .layoutPriority(1)
@@ -302,11 +312,12 @@ private struct FileNameText: View {
 
 private struct MultiFileTitle: View {
     let urls: [URL]
+    var searchQuery: String = ""
 
     var body: some View {
         if let firstURL = urls.first {
             HStack(spacing: 0) {
-                FileNameText(url: firstURL)
+                FileNameText(url: firstURL, searchQuery: searchQuery)
                     .layoutPriority(0)
                 Text(" 等 \(urls.count) 个")
                     .foregroundStyle(.secondary)

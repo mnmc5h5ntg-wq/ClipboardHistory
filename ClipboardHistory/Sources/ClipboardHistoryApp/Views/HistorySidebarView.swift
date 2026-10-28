@@ -93,7 +93,9 @@ struct HistorySidebarView: View {
             entry: entry,
             // 双击行 = 详情区浮层那颗"再次复制"，同一个动作同一个语义（会把这条顶到最前）。
             copyAction: { historyStore.perform(.copyAndPromote(entry)) },
-            favoriteAction: { historyStore.perform(.toggleFavorite(entry)) }
+            favoriteAction: { historyStore.perform(.toggleFavorite(entry)) },
+            // R456：行里标出命中片段 —— 过滤匹配正文与来源 App 名，列表必须说清"为什么这行在"。
+            searchQuery: historyStore.searchText
         )
     }
 

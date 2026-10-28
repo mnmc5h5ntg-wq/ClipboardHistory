@@ -7940,3 +7940,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：两侧都是标点时横向 padding=0（486）；选中态无帧。
 - 回滚：恢复 `.backgroundColor` 并删绘制；或 `git revert`。
 
+## D-452 行内命中高亮只标可见且参与匹配的片段（R456）
+
+- 背景：侧栏过滤匹配正文与来源 App 名，行里不标高亮 —— 只命中来源的行没有任何线索，正文命中在截断之外时也一样。
+- 决定：`HistoryRowMatchHighlight` 复用 `MatchHighlighting` 的切分（与过滤同源）；标题/文件名标命中片段，来源行只标 App 名；时间不标（不参与过滤）；空查询/无命中不编高亮；颜色沿用 `DetailTypography.highlightColor`。
+- 理由：高亮是「为什么这行在」的答案，亮的位置必须与过滤谓词对齐；同源切分避免两套语义。
+- 兼容性/迁移：`sidebar-search-source` 亮/暗 2 张旧帧变化，新增 `sidebar-search-content` 亮/暗；基线 262→264 同 commit 更新。
+- 边界：命中在截断之外/OCR（487）、多文件第 2/3 个文件名（488）、选中底上的高亮对比（489）。
+- 回滚：删 `HistoryRowMatchHighlight` 的接线；或 `git revert`。
+
