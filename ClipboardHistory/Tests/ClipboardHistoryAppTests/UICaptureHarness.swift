@@ -4481,6 +4481,71 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R458：Markdown 的六级标题不能比正文小（旧 h4/h5/h6 = 14/13/12，正文 14）。
+    ///
+    /// 从**产品渲染出来的 NSTextView** 读每一级标题与正文的 `.font` 字号：
+    /// 六级必须严格递减，且每一级都 ≥ 正文（14pt）。像素帧只做眼睛复核。
+    func testHeadingLevelsAreNeverSmallerThanBody() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r458-headings-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-headings" }) else {
+                return XCTFail("\(tag)：找不到 `detail-headings` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-headings-\(tag).png")
+            var sizes: [Int: Double] = [:]
+            var bodySize: Double?
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                    if let text = view as? ChineseSelectableNSTextView { return text }
+                    for sub in view.subviews {
+                        if let text = findTextView(sub) { return text }
+                    }
+                    return nil
+                }
+                guard let textView = findTextView(host), let storage = textView.textStorage else {
+                    XCTFail("\(tag)：`detail-headings` 里找不到正文 NSTextView ⇒ 这条判据没有对象")
+                    return
+                }
+                let text = storage.string as NSString
+                for level in 1...6 {
+                    let needle = ["一", "二", "三", "四", "五", "六"][level - 1] + "级标题"
+                    let range = text.range(of: needle)
+                    guard range.location != NSNotFound,
+                          let font = storage.attribute(.font, at: range.location,
+                                                       effectiveRange: nil) as? NSFont else { continue }
+                    sizes[level] = Double(font.pointSize)
+                }
+                if let bodyRange = text.range(of: "这是一行正文") as NSRange?,
+                   bodyRange.location != NSNotFound,
+                   let font = storage.attribute(.font, at: bodyRange.location,
+                                                effectiveRange: nil) as? NSFont {
+                    bodySize = Double(font.pointSize)
+                }
+            }
+            guard sizes.count == 6, let bodySize else {
+                XCTFail("\(tag)：六级标题或正文没有全读到（\(sizes.count)/6）⇒ 判据没有对象")
+                continue
+            }
+            let ladder = (1...6).map { String(format: "%.1f", sizes[$0] ?? -1) }.joined(separator: "/")
+            emit("HEADING_LADDER \(tag) h1..h6=\(ladder) 正文=\(String(format: "%.1f", bodySize))")
+            for level in 1...6 {
+                XCTAssertGreaterThanOrEqual(sizes[level]!, bodySize,
+                                            "\(tag)：h\(level) 字号 \(sizes[level]!)pt 小于正文 \(bodySize)pt")
+            }
+            for level in 2...6 {
+                XCTAssertLessThan(sizes[level]!, sizes[level - 1]!,
+                                  "\(tag)：h\(level) 与 h\(level - 1) 的字号没有递减"
+                                  + "（\(sizes[level]!)/\(sizes[level - 1]!)）")
+            }
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -5656,41 +5721,80 @@ final class UICaptureTests: XCTestCase {
             let spp = rep.samplesPerPixel
             let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
             let rOff = alphaFirst ? 1 : 0
+            let nonPremultiplied = rep.bitmapFormat.contains(.alphaNonpremultiplied)
+            let alphaOff = spp == 4 ? (alphaFirst ? 0 : 3) : -1
+            // runner 的详情帧约 76% 透明：底色带是以 alpha 画在透明底上的，直接读 RGB 会读到
+            // 预乘后的近黑值（R458 现读：light/dark 都“找不到带”）。先按页面底合成，再量**相对**
+            // 页面底的小色差（不抄产品的绝对色）：页面底由该行的众数自己给出，所以两档都成立。
+            let pageBase = appearance == .darkAqua ? 30.0 : 255.0
             func luma(_ x: Int, _ y: Int) -> Double {
                 let o = y * bytesPerRow + x * spp
-                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
-                    + 0.114 * Double(base[o + rOff + 2])
+                func channel(_ index: Int) -> Double {
+                    let value = Double(base[o + index])
+                    guard alphaOff >= 0 else { return value }
+                    let alpha = Double(base[o + alphaOff]) / 255.0
+                    return nonPremultiplied ? value * alpha + pageBase * (1 - alpha)
+                                            : value + pageBase * (1 - alpha)
+                }
+                return 0.299 * channel(rOff) + 0.587 * channel(rOff + 1)
+                    + 0.114 * channel(rOff + 2)
             }
-            let isBand: (Double) -> Bool = appearance == .darkAqua
-                ? { $0 >= 40 && $0 <= 90 } : { $0 >= 225 && $0 <= 250 }
             let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 150 } : { $0 <= 150 }
             let x0 = Int((20.0 * scale).rounded())
             let x1 = Int((640.0 * scale).rounded())
             let minWidth = Int((40.0 * scale).rounded())
             let maxWidth = Int((150.0 * scale).rounded())
-
-            func longestBandRun(y: Int) -> (run: Int, left: Int, right: Int) {
-                var best = 0, bestLeft = 0, bestRight = -1
-                var run = 0, start = 0
+            let gapPx = max(3, Int((3.0 * scale).rounded()))
+            // 页面底 = 该行众数；底色带 = 相对页面底 4…48 的**第二众数**。
+            // 只认第二众数的像素（容差 6），避免把相邻正文的抗锯齿算进带宽。
+            func bandLuma(row y: Int) -> (page: Double, band: Double)? {
+                var bins: [Int: Int] = [:]
+                for x in x0..<x1 { bins[Int(luma(x, y)) / 8, default: 0] += 1 }
+                guard let pageBin = bins.max(by: { $0.value < $1.value })?.key else { return nil }
+                let page = Double(pageBin * 8 + 4)
+                let threshold = max(8, Int(8.0 * scale * scale))
+                let bandBin = bins.filter {
+                    let value = Double($0.key * 8 + 4)
+                    return abs(value - page) >= 4 && abs(value - page) <= 48
+                        && $0.value >= threshold
+                }.max(by: { $0.value < $1.value })?.key
+                guard let bandBin else { return nil }
+                return (page, Double(bandBin * 8 + 4))
+            }
+            func candidateSpan(y: Int, band: Double) -> (span: Int, left: Int, right: Int)?
+            {
+                var xs: [Int] = []
+                for x in x0..<x1 where abs(luma(x, y) - band) <= 6 { xs.append(x) }
+                guard !xs.isEmpty else { return nil }
+                var prefix = [Int](repeating: 0, count: x1 - x0 + 2)
                 for x in x0..<x1 {
-                    if isBand(luma(x, y)) {
-                        if run == 0 { start = x }
-                        run += 1
-                        if run > best { best = run; bestLeft = start; bestRight = x }
-                    } else {
-                        run = 0
-                    }
+                    prefix[x - x0 + 1] = prefix[x - x0] + (isInk(luma(x, y)) ? 1 : 0)
                 }
-                return (best, bestLeft, bestRight)
+                var best: (span: Int, left: Int, right: Int)?
+                var i = 0
+                while i < xs.count {
+                    var j = i + 1
+                    while j < xs.count, xs[j] - xs[j - 1] <= gapPx { j += 1 }
+                    let left = xs[i], right = xs[j - 1]
+                    let span = right - left + 1
+                    let ink = prefix[right - x0 + 1] - prefix[left - x0]
+                    if span >= minWidth, span <= maxWidth,
+                       Double(j - i) / Double(span) >= 0.35,
+                       ink >= max(6, Int(6.0 * scale * scale)) {
+                        if best == nil || span > best!.span { best = (span, left, right) }
+                    }
+                    i = j
+                }
+                return best
             }
 
-            // 1) 找最长的 40..150pt 连续带色行 = 行内代码底色带（padding 行）。
+            // 1) 找最长的 40..150pt 带色段 = 行内代码底色带（不再要求单行连续：1x 会被字形打断）。
             var bandRow = -1
             var bandLeft = 0, bandRight = 0, bandRun = 0
             for y in Int((80.0 * scale))..<min(height, Int((400.0 * scale))) {
-                let hit = longestBandRun(y: y)
-                if hit.run >= minWidth && hit.run <= maxWidth && hit.run > bandRun {
-                    bandRun = hit.run
+                guard let tones = bandLuma(row: y) else { continue }
+                if let hit = candidateSpan(y: y, band: tones.band), hit.span > bandRun {
+                    bandRun = hit.span
                     bandRow = y
                     bandLeft = hit.left
                     bandRight = hit.right
@@ -9206,6 +9310,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-code-tabs", NSSize(width: 720, height: 520)) {
             let target = self.makeCodeStore(body: Self.codeTabsFixtureBody)
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R458：六级标题同屏 —— 五/六级不能比正文小。
+        results.append(Fixture("detail-headings", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: self.makeHeadingsStore(),
+                               initialMarkdownMode: .rendered))
         })
         // R447：主题分隔线。线前/线后各一段，帧上只应出现**一条**通栏长线；
         // 旧形状是 24 个 `─` 字符（行内最多一截短线，没有通栏长线）。
@@ -13487,6 +13596,20 @@ final class UICaptureTests: XCTestCase {
     ```
     """
 
+    /// R458：六级标题同屏 —— 五/六级不能比正文小（旧 13/12 < 正文 14）。
+    static let headingsFixtureBody = """
+    # 一级标题
+    ## 二级标题
+    ### 三级标题
+    #### 四级标题
+    ##### 五级标题
+    ###### 六级标题
+
+    这是一行正文，用来对照标题与正文的字号。
+
+    - 列表项（让解析器认得出这是可渲染的 Markdown）
+    """
+
     private func assertCodeFixturePremise(_ store: HistoryStore, role: String,
                                           file: StaticString = #filePath, line: UInt = #line) {
         guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
@@ -13516,6 +13639,10 @@ final class UICaptureTests: XCTestCase {
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
         return store
+    }
+
+    private func makeHeadingsStore() -> HistoryStore {
+        makeCodeStore(body: Self.headingsFixtureBody)
     }
 
     /// 夹具前提：这条记录按策略确实走 **HTML 渲染器**（不是 Markdown、不是"没有入口"），

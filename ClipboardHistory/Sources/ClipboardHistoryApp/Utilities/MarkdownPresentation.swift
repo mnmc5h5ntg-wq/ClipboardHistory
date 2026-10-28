@@ -27,9 +27,9 @@ enum MarkdownPresentation {
         case 1: return 20
         case 2: return 17
         case 3: return 15.5
-        case 4: return 14
-        case 5: return 13
-        default: return 12
+        case 4: return 15
+        case 5: return 14.5
+        default: return 14
         }
     }
 
