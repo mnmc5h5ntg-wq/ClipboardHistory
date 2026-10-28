@@ -444,6 +444,7 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
         drawCodeBlockBackgrounds(in: rect)
         drawThematicBreaks(in: rect)
         drawCodeLanguageTags(in: rect)
+        drawTableRowSeparators(in: rect)
         drawQuoteRules(in: rect)
         drawCodeLineNumbers(in: rect)
     }
@@ -500,6 +501,51 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
                                                   lineTop: origin.y + lineRect.minY,
                                                   lineHeight: lineRect.height)
                 let clipped = rule.intersection(rect)
+                guard !clipped.isNull, !clipped.isEmpty else { return }
+                clipped.fill()
+            }
+        }
+    }
+
+    /// Markdown 表格**体行之间**的发丝线（R448）。表头已由 R440 的字重区分，
+    /// 所以只在第 2 行之后、最后一行之前画；单行表体的表一帧不变。
+    /// 宽度取表格文字的外接宽度，不是正文列宽 —— 窄表只在自己的文字下方画线。
+    private func drawTableRowSeparators(in rect: NSRect) {
+        guard let layoutManager, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let string = textStorage.string as NSString
+        let all = NSRange(location: 0, length: textStorage.length)
+        TableRowSeparators.color.setFill()
+        textStorage.enumerateAttribute(MarkdownPresentation.tableRowCountAttribute, in: all) { value, range, _ in
+            guard let totalRows = value as? Int, totalRows > 2 else { return }
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            // `boundingRect(forGlyphRange:)` 给的是整行片段宽（≈正文列宽），
+            // 不是表格文字自己的宽度；线要跟字，得用每一行的 usedRect 取外接。
+            var usedMinX = CGFloat.greatestFiniteMagnitude
+            var usedMaxX = -CGFloat.greatestFiniteMagnitude
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { _, usedRect, _, _, _ in
+                usedMinX = min(usedMinX, usedRect.minX)
+                usedMaxX = max(usedMaxX, usedRect.maxX)
+            }
+            let tableWidth = usedMaxX - usedMinX
+            guard tableWidth.isFinite, tableWidth > 0 else { return }
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { lineRect, _, _, glyphRange, _ in
+                let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+                guard charRange.length > 0, charRange.location >= range.location else { return }
+                let rowEnd = charRange.location + charRange.length
+                // 行片段的字符范围**含行尾换行**（R448 实测）：逻辑行尾要看 rowEnd-1。
+                let isRowEnd = rowEnd >= range.location + range.length
+                    || string.character(at: rowEnd - 1) == 0x0A
+                guard isRowEnd else { return }
+                let prefix = string.substring(with: NSRange(location: range.location,
+                                                            length: charRange.location - range.location))
+                let row = prefix.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
+                guard TableRowSeparators.shouldDraw(afterRow: row, totalRows: totalRows) else { return }
+                let line = TableRowSeparators.rect(containerOriginX: origin.x + usedMinX,
+                                                   width: tableWidth,
+                                                   lineBottom: origin.y + lineRect.maxY)
+                let clipped = line.intersection(rect)
                 guard !clipped.isNull, !clipped.isEmpty else { return }
                 clipped.fill()
             }

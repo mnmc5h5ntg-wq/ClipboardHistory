@@ -7868,3 +7868,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML 预览的 `<hr>` 不走这条（478）；线色用 `secondaryLabelColor`，暗档动态。
 - 回滚：恢复 `thematicBreakText` 与 `append` 的字符分支、删绘制调用即可；或 `git revert`。
 
+## D-444 表格体行分隔线只画在体行之间（R448）
+
+- 背景：R440 用 semibold 分开表头之后，多行体行之间仍无线；四五行数值并排时容易串行。
+- 决定：新 `TableRowSeparators` 纯策略：`shouldDraw(afterRow:totalRows:)` 只在第 2 行之后、最后一行之前画；1pt、`tertiaryLabelColor`；`rect` 贴行底；宽度取表格各行 `usedRect` 的外接（不是正文列宽）。
+- 理由：表头已由字重区分，再在表头下画线是重复；单行体行的表（`detail-table`）一帧不变；纯策略不碰 Store（1108/66）。
+- 兼容性/迁移：新夹具 `detail-table-rows`（2 帧，基线 254→256）；`detail-table` 逐字节不变。
+- 边界：HTML 表格体行不走这条（479）。
+- 回滚：删绘制调用与 `tableRowCountAttribute` 两处即可；或 `git revert`。
+

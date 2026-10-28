@@ -6,20 +6,14 @@ ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILE=os.path.join(ROOT,"Sources/ClipboardHistoryApp/Utilities/MarkdownPresentation.swift")
 BASE_ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 FILTER="UICaptureTests/testTableHeadersAreSemibold"
-DRAW_NEEDLE='''            if case .table = block.kind {
-                let content = (result.string as NSString).substring(with: NSRange(location: start,
-                                                                                 length: blockContentLength))
-                if let header = TableHeaderPresentation.headerRange(in: content) {
+DRAW_NEEDLE='''                if let header = TableHeaderPresentation.headerRange(in: content) {
                     result.addAttribute(.font, value: TableHeaderPresentation.headerFont,
                                         range: NSRange(location: start, length: header.length))
-                }
-            }'''
+                }'''
 RANGE_NEEDLE='                    result.addAttribute(.font, value: TableHeaderPresentation.headerFont,\n                                        range: NSRange(location: start, length: header.length))'
 MUTATIONS=[
  ("M1206","表头字体整块不写（两行回到 regular）",FILE,DRAW_NEEDLE,
-  '''            if case .table = block.kind {
-                _ = blockContentLength
-            }''',["TABLE_HEADER","表头没有比表体重"]),
+  '''                _ = content''',["TABLE_HEADER","表头没有比表体重"]),
  ("M1207","表头字体打到整块（两行都 semibold）",FILE,RANGE_NEEDLE,
   '''                    result.addAttribute(.font, value: TableHeaderPresentation.headerFont,
                                         range: NSRange(location: start, length: blockContentLength))''',

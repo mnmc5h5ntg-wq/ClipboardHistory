@@ -155,6 +155,9 @@ enum MarkdownPresentation {
     /// 长度由字数决定、还会被复制进剪贴板（R447）。
     static let thematicBreakAttribute = NSAttributedString.Key("ClipboardHistory.markdownThematicBreak")
 
+    /// 表格块正文的逻辑行数（表头 + 体行；R448）：正文视图只在**体行之间**画发丝线。
+    static let tableRowCountAttribute = NSAttributedString.Key("ClipboardHistory.markdownTableRowCount")
+
     // MARK: - 中文强调：斜体还是字重
 
     enum EmphasisStyle: Equatable {
@@ -321,6 +324,12 @@ enum MarkdownPresentation {
                 if let header = TableHeaderPresentation.headerRange(in: content) {
                     result.addAttribute(.font, value: TableHeaderPresentation.headerFont,
                                         range: NSRange(location: start, length: header.length))
+                }
+                // R448：体行之间的发丝线只画在 ≥2 行体行的表上；行数进属性，视图不猜。
+                let rows = TableRowSeparators.lineCount(in: content)
+                if rows > 1 {
+                    result.addAttribute(tableRowCountAttribute, value: rows,
+                                        range: NSRange(location: start, length: blockContentLength))
                 }
             }
             // R441：代码块的行数只打在块正文上（不含分隔空行），正文视图按它在左槽里画行号。

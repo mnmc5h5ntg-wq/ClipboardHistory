@@ -4800,6 +4800,185 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R448：Markdown 表格**体行之间**必须有发丝分隔线。
+    ///
+    /// 正臂 `detail-table-rows`（表头 + 四行体行）→ 体行之间 **3** 条；
+    /// 负臂 `detail-table`（表头 + 一行体行）→ **0** 条（表头之后与最后一行之后都不画）。
+    /// 判据只看帧：在表格行带范围里找"长于表宽 80%"的连续墨行；
+    /// 线必须 ① 正臂恰好 3 条 ② 厚 ≤2pt ③ 起止与表格文字外接宽度对齐（±6pt）。
+    func testMarkdownTablesSeparateTheirBodyRows() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r448-table-rows-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        enum FrameError: Error { case unreadable }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+
+            func load(_ name: String) throws -> (rep: NSBitmapImageRep,
+                                                 base: UnsafeMutablePointer<UInt8>,
+                                                 scale: Double) {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    throw FrameError.unreadable
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data),
+                      let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                    throw FrameError.unreadable
+                }
+                return (rep, base, Double(rep.pixelsWide) / 720.0)
+            }
+
+            let rowsFrame = try load("detail-table-rows")
+            let oneFrame = try load("detail-table")
+            let scale = rowsFrame.scale
+
+            func luma(_ frame: (rep: NSBitmapImageRep,
+                                base: UnsafeMutablePointer<UInt8>,
+                                scale: Double), _ x: Int, _ y: Int) -> Double {
+                let o = y * frame.rep.bytesPerRow + x * 4
+                return 0.299 * Double(frame.base[o]) + 0.587 * Double(frame.base[o + 1])
+                    + 0.114 * Double(frame.base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            let isLineInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            let textX0 = Int((20.0 * scale).rounded())
+            let textX1 = Int((300.0 * scale).rounded())
+
+            /// 文本行带（高度 ≥5pt）：分隔线自己只有 1pt，不能混进行带里。
+            func textBands(_ frame: (rep: NSBitmapImageRep,
+                                     base: UnsafeMutablePointer<UInt8>,
+                                     scale: Double)) -> [(top: Int, bottom: Int)] {
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in Int((60.0 * scale))..<min(frame.rep.pixelsHigh, Int((520.0 * scale))) {
+                    var has = false
+                    for x in textX0..<textX1 where isInk(luma(frame, x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && top < 0 { top = y }
+                    if !has && top >= 0 {
+                        if y - top >= Int((5.0 * scale).rounded()) { bands.append((top, y - 1)) }
+                        top = -1
+                    }
+                }
+                if top >= 0,
+                   min(frame.rep.pixelsHigh, Int((520.0 * scale))) - top >= Int((5.0 * scale).rounded()) {
+                    bands.append((top, min(frame.rep.pixelsHigh, Int((520.0 * scale))) - 1))
+                }
+                return bands
+            }
+
+            let rowsText = Array(textBands(rowsFrame).suffix(5))
+            let oneText = Array(textBands(oneFrame).suffix(2))
+            guard rowsText.count == 5, oneText.count == 2 else {
+                emit("TABLE_ROW_LINES_NOT_RUN=runner-detail-frame-plain \(tag)"
+                     + " 正臂行带=\(textBands(rowsFrame).count) 负臂行带=\(textBands(oneFrame).count)"
+                     + " ⇒ 找不到表格行，判据没有对象")
+                continue
+            }
+
+            func span(_ frame: (rep: NSBitmapImageRep,
+                                base: UnsafeMutablePointer<UInt8>,
+                                scale: Double),
+                      bands: [(top: Int, bottom: Int)]) -> (left: Int, right: Int) {
+                var left = Int.max, right = -1
+                for band in bands {
+                    for y in band.top...band.bottom {
+                        for x in textX0..<textX1 where isInk(luma(frame, x, y)) {
+                            left = min(left, x)
+                            right = max(right, x)
+                        }
+                    }
+                }
+                return (left, right)
+            }
+
+            /// 表格纵向范围里，长于表宽 80% 的连续墨行 = 分隔线。
+            func separatorBands(_ frame: (rep: NSBitmapImageRep,
+                                          base: UnsafeMutablePointer<UInt8>,
+                                          scale: Double),
+                                top: Int, bottom: Int, minRun: Int) -> [(top: Int, bottom: Int, left: Int, right: Int)] {
+                let scanX0 = Int((10.0 * scale).rounded())
+                let scanX1 = min(frame.rep.pixelsWide, Int((500.0 * scale).rounded()))
+                var bands: [(top: Int, bottom: Int, left: Int, right: Int)] = []
+                var bandTop = -1
+                var bandLeft = Int.max, bandRight = -1
+                for y in top...bottom {
+                    var run = 0, best = 0, runStart = 0, bestStart = 0
+                    for x in scanX0..<scanX1 {
+                        if isLineInk(luma(frame, x, y)) {
+                            if run == 0 { runStart = x }
+                            run += 1
+                            if run > best { best = run; bestStart = runStart }
+                        } else {
+                            run = 0
+                        }
+                    }
+                    let isLong = best >= minRun
+                    if isLong {
+                        if bandTop < 0 { bandTop = y }
+                        bandLeft = min(bandLeft, bestStart)
+                        bandRight = max(bandRight, bestStart + best - 1)
+                    } else if bandTop >= 0 {
+                        bands.append((bandTop, y - 1, bandLeft, bandRight))
+                        bandTop = -1
+                        bandLeft = Int.max
+                        bandRight = -1
+                    }
+                }
+                if bandTop >= 0 { bands.append((bandTop, bottom, bandLeft, bandRight)) }
+                return bands
+            }
+
+            let rowsSpan = span(rowsFrame, bands: rowsText)
+            let oneSpan = span(oneFrame, bands: oneText)
+            let tableWidthPx = rowsSpan.right - rowsSpan.left + 1
+            let minRun = Int((Double(tableWidthPx) * 0.8).rounded())
+            let oneMinRun = Int((Double(oneSpan.right - oneSpan.left + 1) * 0.8).rounded())
+            let rowsTop = rowsText.first!.top, rowsBottom = rowsText.last!.bottom
+            let separators = separatorBands(rowsFrame, top: rowsTop, bottom: rowsBottom, minRun: minRun)
+            let oneSeparators = separatorBands(oneFrame, top: oneText.first!.top,
+                                              bottom: oneText.last!.bottom, minRun: oneMinRun)
+
+            let thicknessPt = separators.first.map {
+                Double($0.bottom - $0.top + 1) / scale
+            } ?? 0
+            let lineWidthPt = separators.first.map { Double($0.right - $0.left + 1) / scale } ?? 0
+            let textWidthPt = Double(tableWidthPx) / scale
+            emit("TABLE_ROW_LINES \(tag) 线数=\(separators.count) 负臂=\(oneSeparators.count)"
+                 + " 线宽=\(String(format: "%.1f", lineWidthPt))pt 表宽=\(String(format: "%.1f", textWidthPt))pt"
+                 + " 厚=\(String(format: "%.1f", thicknessPt))pt")
+
+            XCTAssertEqual(separators.count, 3,
+                           "\(tag)：体行之间读到 \(separators.count) 条线（应为 3）"
+                           + " ⇒ 四行体行没有分隔或画错了行")
+            XCTAssertEqual(oneSeparators.count, 0,
+                           "\(tag)：单行体行臂也画了 \(oneSeparators.count) 条线 ⇒ 表头后/末行后不该画")
+            for separator in separators {
+                let thickness = Double(separator.bottom - separator.top + 1) / scale
+                XCTAssertLessThanOrEqual(thickness, 2.0,
+                                         "\(tag)：分隔线厚 \(thickness)pt（应 ≤2pt）")
+                let leftPt = Double(separator.left) / scale
+                let rightPt = Double(separator.right) / scale
+                let textLeftPt = Double(rowsSpan.left) / scale
+                let textRightPt = Double(rowsSpan.right) / scale
+                XCTAssertEqual(leftPt, textLeftPt, accuracy: 6.0,
+                               "\(tag)：线左沿 \(leftPt)pt 与表格文字 \(textLeftPt)pt 不同轴")
+                XCTAssertEqual(rightPt, textRightPt, accuracy: 6.0,
+                               "\(tag)：线右沿 \(rightPt)pt 与表格文字 \(textRightPt)pt 不同轴")
+            }
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -8108,6 +8287,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-table", NSSize(width: 720, height: 520)) {
             let target = self.makeTableStore()
             self.assertTableFixturePremise(target, role: "detail-table")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R448：表头 + 四行体行。体行之间应有三条发丝线；
+        // `detail-table`（表头 + 一行体行）是负臂 —— 一帧都不该变。
+        results.append(Fixture("detail-table-rows", NSSize(width: 720, height: 520)) {
+            let target = self.makeTableRowsStore()
+            self.assertTableRowsFixturePremise(target, role: "detail-table-rows")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
         // R441：代码块左侧行号槽。正文从槽右缘起排，行号只画在背景层；
@@ -12179,6 +12365,53 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text(Self.tableFixtureBody),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R448 表格体行夹具：表头 + **四行**体行（值各不相同，才看得出串行）。
+    /// 体行之间应有三条发丝线；表头之后与最后一行之后都不画。
+    static let tableRowsFixtureBody = """
+    # 表
+
+    | 名称 | 数量 |
+    | --- | --- |
+    | 苹果 | 3 |
+    | 梨 | 5 |
+    | 桃 | 8 |
+    | 杏 | 13 |
+    """
+
+    /// 夹具前提：解析结果里确实有一个**表头 + 四行体行**的表格块。
+    /// 前提不成立时，`detail-table-rows` 帧上的"三条线"就没有对象。
+    private func assertTableRowsFixturePremise(_ store: HistoryStore, role: String,
+                                               file: StaticString = #filePath, line: UInt = #line) {
+        guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
+            XCTFail("\(role)：表格体行夹具没有选中的文本条目", file: file, line: line)
+            return
+        }
+        let blocks = MarkdownParser.parse(body).blocks
+        guard let table = blocks.first(where: { if case .table = $0.kind { return true } else { return false } }) else {
+            XCTFail("\(role)：解析结果里没有表格块 ⇒ 这条判据没有对象", file: file, line: line)
+            return
+        }
+        let lines = MarkdownPresentation.blockText(table).components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 5, "\(role)：表格块不是表头+四行（实际 \(lines.count) 行）",
+                       file: file, line: line)
+        XCTAssertEqual(Set(lines.dropFirst()).count, 4, "\(role)：体行不是四种不同内容 ⇒ 串行看不出来",
+                       file: file, line: line)
+    }
+
+    private func makeTableRowsStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.tableRowsFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
