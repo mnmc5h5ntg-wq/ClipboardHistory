@@ -398,6 +398,12 @@ struct DetailFileView: View {
             Text("无法读取这段视频的分辨率信息")
                 .font(.system(size: StatePresentation.messageFontSize))
                 .foregroundStyle(.secondary)
+            // R464：状态里要说出是哪个文件（头部 meta 可能已被截断）。
+            Text(url.lastPathComponent)
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
             Button("在 Finder 中显示") {
                 NSWorkspace.shared.activateFileViewerSelecting([url])
             }

@@ -16,6 +16,33 @@ import XCTest
 /// 2. 比例超过 95% 直接判失败：那意味着整帧基本没画出来，不能当验收证据。
 /// 3. 拍暗色时把 NSApp.appearance 一起改掉。只注入 `colorScheme` 的话，
 ///    List 这类 AppKit 承载控件仍按 aqua 取色，会拍出"深底黑字"的假不可读帧。
+/// R464：行内码底色带的候选选择（纯函数；像素证人在 `testInlineCodeBackgroundHasPadding`）。
+enum InlineCodeBandChoice {
+    struct Candidate {
+        let row: Int
+        let left: Int
+        let right: Int
+        let coverage: Double
+        let ink: Int
+        /// 判据自己的对象：带内文字墨宽与带宽之差（pt）。
+        let padding: Double
+        var span: Int { right - left + 1 }
+    }
+
+    /// 选**内边距最大**的候选：真带 6pt、假文字带 3pt、带内子段 1pt。
+    /// 覆盖率 0.55 只作门槛（R461 用它排掉文字抗锯齿；R464 发现它单独会把真带切成子段）。
+    static func best(_ candidates: [Candidate], minSpan: Int, maxSpan: Int,
+                     minCoverage: Double, minInk: Int) -> Candidate? {
+        let valid = candidates.filter {
+            $0.span >= minSpan && $0.span <= maxSpan && $0.coverage >= minCoverage && $0.ink >= minInk
+        }
+        return valid.max { a, b in
+            if abs(a.padding - b.padding) > 0.01 { return a.padding < b.padding }
+            return a.span < b.span
+        }
+    }
+}
+
 @MainActor
 final class UICaptureTests: XCTestCase {
     /// 夹具时间戳的固定参考时刻（账本 R2-19）。
@@ -4776,6 +4803,55 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R464：视频分辨率不可读态要在状态里说出文件名（旧状态只有图标/说明/按钮，无身份）。
+    func testVideoUnavailableStateNamesTheFile() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r464-video-state-shots-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-video-unavailable" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-video-unavailable` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("video-state-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：video-unavailable 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            let x0 = Int((100.0 * scale).rounded()), x1 = Int((500.0 * scale).rounded())
+            var bands = 0
+            var inBand = false
+            for y in Int((120.0 * scale))..<min(height, Int((380.0 * scale))) {
+                var has = false
+                for x in x0..<x1 where isInk(luma(x, y)) {
+                    has = true
+                    break
+                }
+                if has && !inBand { bands += 1 }
+                inBand = has
+            }
+            emit("VIDEO_UNAVAILABLE \(tag) 状态带=\(bands)")
+            XCTAssertGreaterThanOrEqual(bands, 4,
+                                        "\(tag)：视频不可读态只有 \(bands) 条带（图标/说明/按钮）⇒ 没说出文件名")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -5973,9 +6049,7 @@ final class UICaptureTests: XCTestCase {
             let x0 = Int((20.0 * scale).rounded())
             let x1 = Int((640.0 * scale).rounded())
             let minWidth = Int((40.0 * scale).rounded())
-            // R462：runner dark 的假带正好卡在 150pt 上限（147 墨/150，文字抗锯齿）。
-            // 真带 ~85..99pt；上限收到 120 只拒绝假 run，地板 4.5 不动。
-            let maxWidth = Int((120.0 * scale).rounded())
+            let maxWidth = Int((150.0 * scale).rounded())
             let gapPx = max(3, Int((3.0 * scale).rounded()))
             // 页面底 = 该行众数；底色带 = 相对页面底 4…48 的**第二众数**。
             // 只认第二众数的像素（容差 6），避免把相邻正文的抗锯齿算进带宽。
@@ -5993,16 +6067,17 @@ final class UICaptureTests: XCTestCase {
                 guard let bandBin else { return nil }
                 return (page, Double(bandBin * 8 + 4))
             }
-            func candidateSpan(y: Int, band: Double) -> (span: Int, left: Int, right: Int)?
-            {
+            func candidateSpans(y: Int, band: Double) -> [InlineCodeBandChoice.Candidate] {
+                let yLo = max(0, y - Int((20.0 * scale).rounded()))
+                let yHi = min(height - 1, y + Int((20.0 * scale).rounded()))
                 var xs: [Int] = []
                 for x in x0..<x1 where abs(luma(x, y) - band) <= 6 { xs.append(x) }
-                guard !xs.isEmpty else { return nil }
+                guard !xs.isEmpty else { return [] }
                 var prefix = [Int](repeating: 0, count: x1 - x0 + 2)
                 for x in x0..<x1 {
                     prefix[x - x0 + 1] = prefix[x - x0] + (isInk(luma(x, y)) ? 1 : 0)
                 }
-                var best: (span: Int, left: Int, right: Int)?
+                var out: [InlineCodeBandChoice.Candidate] = []
                 var i = 0
                 while i < xs.count {
                     var j = i + 1
@@ -6010,30 +6085,37 @@ final class UICaptureTests: XCTestCase {
                     let left = xs[i], right = xs[j - 1]
                     let span = right - left + 1
                     let ink = prefix[right - x0 + 1] - prefix[left - x0]
-                    if span >= minWidth, span <= maxWidth,
-                       // R461：1x 下文字抗锯齿会凑出假带（runner dark 150/147/3.0 顶到上限）。
-                       // 真带的 tint 在每个字行都占大半；抗锯齿零头覆盖不到一半。
-                       Double(j - i) / Double(span) >= 0.55,
-                       ink >= max(6, Int(6.0 * scale * scale)) {
-                        if best == nil || span > best!.span { best = (span, left, right) }
+                    var inkLeft = Int.max, inkRight = -1
+                    for yy in yLo...yHi {
+                        for xx in left...right where isInk(luma(xx, yy)) {
+                            inkLeft = min(inkLeft, xx)
+                            inkRight = max(inkRight, xx)
+                        }
                     }
+                    let inkWidth = inkRight >= inkLeft
+                        ? Double(inkRight - inkLeft + 1) / scale : 0
+                    out.append(InlineCodeBandChoice.Candidate(
+                        row: y, left: left, right: right,
+                        coverage: Double(j - i) / Double(span), ink: ink,
+                        padding: Double(span) / scale - inkWidth))
                     i = j
                 }
-                return best
+                return out
             }
 
-            // 1) 找最长的 40..150pt 带色段 = 行内代码底色带（不再要求单行连续：1x 会被字形打断）。
-            var bandRow = -1
-            var bandLeft = 0, bandRight = 0, bandRun = 0
+            // 1) 所有候选行里选**覆盖率最高**的 run（真带 padding 行 ~1.0；假文字带 ~0.55）。
+            var candidates: [InlineCodeBandChoice.Candidate] = []
             for y in Int((80.0 * scale))..<min(height, Int((400.0 * scale))) {
                 guard let tones = bandLuma(row: y) else { continue }
-                if let hit = candidateSpan(y: y, band: tones.band), hit.span > bandRun {
-                    bandRun = hit.span
-                    bandRow = y
-                    bandLeft = hit.left
-                    bandRight = hit.right
-                }
+                candidates.append(contentsOf: candidateSpans(y: y, band: tones.band))
             }
+            guard let band = InlineCodeBandChoice.best(
+                candidates, minSpan: minWidth, maxSpan: maxWidth,
+                minCoverage: 0.55, minInk: max(6, Int(6.0 * scale * scale))) else {
+                XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
+                continue
+            }
+            let bandRow = band.row, bandLeft = band.left, bandRight = band.right
             guard bandRow >= 0 else {
                 XCTFail("\(tag)：找不到行内代码的短底色带 ⇒ 底色带没画出来（夹具保证这一行有行内码）")
                 continue
@@ -7735,6 +7817,23 @@ final class UICaptureTests: XCTestCase {
                       + "\(Int(longLabel.intrinsicContentSize.width))pt ⇒ 它没有被压过。"
                       + "那说明这一档要么在靠面板变宽让位（上面那条同宽判据该红），"
                       + "要么根本没截出省略号 —— 两种都等于这一档什么都没判")
+    }
+
+    /// 不覆盖管线：这是选择器的纯函数契约；像素证人在 `testInlineCodeBackgroundHasPadding`。
+    func testInlineCodeBandChoicePrefersTheCoveredRun() {
+        let trueBand = InlineCodeBandChoice.Candidate(row: 10, left: 40, right: 124, coverage: 0.9, ink: 80, padding: 6)
+        let falseBand = InlineCodeBandChoice.Candidate(row: 20, left: 20, right: 169, coverage: 0.55, ink: 147, padding: 3)
+        let subBand = InlineCodeBandChoice.Candidate(row: 15, left: 50, right: 128, coverage: 1.0, ink: 78, padding: 1)
+        XCTAssertEqual(InlineCodeBandChoice.best([trueBand, falseBand, subBand], minSpan: 40, maxSpan: 150,
+                                                 minCoverage: 0.55, minInk: 6)?.row, 10,
+                       "假文字带（padding 3）与带内子段（padding 1）都不该盖过真带（padding 6）")
+        XCTAssertNil(InlineCodeBandChoice.best([falseBand], minSpan: 40, maxSpan: 150,
+                                               minCoverage: 0.56, minInk: 6),
+                     "覆盖率不足的假带必须被排除（不是靠上界藏）")
+        let tooWide = InlineCodeBandChoice.Candidate(row: 30, left: 0, right: 159, coverage: 1.0, ink: 80, padding: 6)
+        XCTAssertNil(InlineCodeBandChoice.best([tooWide], minSpan: 40, maxSpan: 150,
+                                               minCoverage: 0.55, minInk: 6),
+                     "超过 150pt 的 run 不是行内码带")
     }
 
     func testCaptureKeyViews() throws {
@@ -9559,6 +9658,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-file-fallback-nothumb", NSSize(width: 600, height: 440),
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
             AnyView(DetailView(historyStore: self.makeFallbackNoThumbStore()))
+        })
+        // R464：视频分辨率不可读态 —— 状态里要说出是哪个文件。
+        results.append(Fixture("detail-file-video-unavailable", NSSize(width: 600, height: 440),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
+            AnyView(DetailView(historyStore: self.makeVideoUnavailableStore()))
         })
         // R460：纯文本文件预览 —— 长行应被 68ch 可读列收窄。
         results.append(Fixture("detail-file-text-wide", NSSize(width: 1100, height: 800),
@@ -13879,6 +13983,24 @@ final class UICaptureTests: XCTestCase {
     """
 
     /// R462：不支持类型的 fallback 预览 —— 长文件名在 720 窗口里怎么排。
+    private func makeVideoUnavailableStore() -> HistoryStore {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r464-video-unavailable", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("clip.mov")
+        try? Data(repeating: 0x43, count: 64).write(to: url)
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .file(url), thumbnail: nil, sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
     private func makeFallbackNoThumbStore() -> HistoryStore {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("r463-fallback-nothumb", isDirectory: true)
