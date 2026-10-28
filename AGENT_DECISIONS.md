@@ -7850,3 +7850,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：bundle ID 未搜（475）；长来源截断无帧（474）；QuickPick 已有来源理由带（R430）。
 - 回滚：Store 恢复原 switch 即可；或 `git revert`。
 
+## D-442 代码块语言标签画在首行右侧、放不下就不画（R446）
+
+- 背景：解析层从围栏信息串认出 `language`（`MarkdownBlock.Kind.codeBlock(language:)`），呈现层只用了行数；` ```swift ` 与 ` ```python ` 在详情里没有区别。
+- 决定：新 `CodeLanguageTag` 纯策略归一化标签（别名表 + 未知大写截 12；`text/plaintext`/非 ASCII 不标）；标签画在代码块**第一行**右侧、右沿内缩 10pt；`fits` 要求首行正文右沿 + 24pt ≤ 标签左沿，否则不画。标签不进文本存储。
+- 理由：语言是作者写下的内容，不能丢；画在背景层不挤动代码与行号；长行省略比遮字诚实；纯策略可单测，Store 不动（1108/66）。
+- 兼容性/迁移：新夹具 `detail-code-plain`（与 `detail-code` 三行逐字相同，只差围栏信息串）；基线 250→252；`detail-markdown-rendered` 也因一行 swift 块变化。
+- 边界：长首行不画（476 无帧）；HTML 代码块不走这条（477）；标签是元信息，用 `secondaryLabelColor`，不抢代码。
+- 回滚：删 `drawCodeLanguageTags` 调用与 `codeLanguageAttribute` 两处即可；或 `git revert`。
+

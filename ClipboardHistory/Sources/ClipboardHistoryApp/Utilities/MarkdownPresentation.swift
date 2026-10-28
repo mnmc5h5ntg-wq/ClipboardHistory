@@ -100,6 +100,10 @@ enum MarkdownPresentation {
     /// 代码块的行数（只打在块正文上，不含块后的分隔空行）：正文视图按它在左侧槽里画行号。
     static let codeBlockLineCountAttribute = NSAttributedString.Key("ClipboardHistory.markdownCodeLineCount")
 
+    /// 代码块的归一化语言标签（已由 `CodeLanguageTag.label(for:)` 转成短标签）。
+    /// 没有语言、或语言不给标签，就不打这个属性 —— 视图层不会自己再猜。
+    static let codeLanguageAttribute = NSAttributedString.Key("ClipboardHistory.markdownCodeLanguage")
+
     static func blockText(_ block: MarkdownBlock) -> String {
         block.runs.map(\.text).joined()
     }
@@ -320,12 +324,18 @@ enum MarkdownPresentation {
                 }
             }
             // R441：代码块的行数只打在块正文上（不含分隔空行），正文视图按它在左槽里画行号。
-            if case .codeBlock = block.kind {
+            // R446：语言标签同样只打在这段正文上；没有语言或语言不给标签时**不打**，
+            // 视图层按属性有没有值决定画不画，不二次推断围栏。
+            if case .codeBlock(let language) = block.kind {
                 let content = (result.string as NSString).substring(with: NSRange(location: start,
                                                                                  length: blockContentLength))
                 let lineCount = CodeBlockLineNumbers.lineCount(in: content)
                 if lineCount > 0 {
                     result.addAttribute(codeBlockLineCountAttribute, value: lineCount,
+                                        range: NSRange(location: start, length: blockContentLength))
+                }
+                if let tag = CodeLanguageTag.label(for: language) {
+                    result.addAttribute(codeLanguageAttribute, value: tag,
                                         range: NSRange(location: start, length: blockContentLength))
                 }
             }

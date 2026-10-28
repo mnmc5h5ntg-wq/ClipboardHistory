@@ -4512,6 +4512,203 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R446：代码块语言标签。
+    ///
+    /// 两臂是**逐字相同**的三行代码，只差围栏信息串（`swift` vs 空）：
+    /// ① 有语言那一帧，第一行代码带右区应有标签墨（地板 12·scale²，1x/2x 各自成立）；
+    ///    空语言那一帧同区必须为 0 —— 右区的墨只可能来自标签；
+    /// ② 两臂的代码正文左沿与行号带数必须相同：标签没挤动代码、也没顶掉行号槽；
+    /// ③ 第二行右区两臂都为 0：标签只画第一行，不是通栏水印。
+    /// 标签不进文本存储，所以这条判据只看帧（复制出来的代码不带标签）。
+    func testCodeBlocksShowTheirLanguage() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r446-code-language-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        enum FrameError: Error { case unreadable }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let taggedFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-code" }),
+                let plainFixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-code-plain" }) else {
+                return XCTFail("\(tag)：找不到 `detail-code` / `detail-code-plain` ⇒ 这条判据没有对象")
+            }
+
+            func load(_ fixture: Fixture) throws -> (rep: NSBitmapImageRep,
+                                                     base: UnsafeMutablePointer<UInt8>,
+                                                     scale: Double) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data),
+                      let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(fixture.name)` 读不回字节 ⇒ 这条判据没有对象")
+                    throw FrameError.unreadable
+                }
+                return (rep, base, Double(rep.pixelsWide) / 720.0)
+            }
+
+            let tagged = try load(taggedFixture)
+            let plain = try load(plainFixture)
+            let scale = tagged.scale
+
+            func luma(_ frame: (rep: NSBitmapImageRep,
+                                base: UnsafeMutablePointer<UInt8>,
+                                scale: Double), _ x: Int, _ y: Int) -> Double {
+                let o = y * frame.rep.bytesPerRow + x * 4
+                return 0.299 * Double(frame.base[o]) + 0.587 * Double(frame.base[o + 1])
+                    + 0.114 * Double(frame.base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+
+            /// 代码块的三行正文 = 内容区最后三条墨带（夹具只有 h1 + 三行代码），
+            /// 与 `testCodeBlocksShowLineNumbers` 取同一批带。
+            func textBands(_ frame: (rep: NSBitmapImageRep,
+                                     base: UnsafeMutablePointer<UInt8>,
+                                     scale: Double)) -> [(top: Int, bottom: Int)] {
+                let textX0 = Int((20.0 * scale).rounded())
+                let textX1 = Int((300.0 * scale).rounded())
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in Int((60.0 * scale))..<min(frame.rep.pixelsHigh, Int((520.0 * scale))) {
+                    var has = false
+                    for x in textX0..<textX1 where isInk(luma(frame, x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && top < 0 { top = y }
+                    if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+                }
+                if top >= 0 {
+                    bands.append((top, min(frame.rep.pixelsHigh, Int((520.0 * scale))) - 1))
+                }
+                return bands
+            }
+
+            func inkBandCount(_ frame: (rep: NSBitmapImageRep,
+                                       base: UnsafeMutablePointer<UInt8>,
+                                       scale: Double),
+                              codeTop: Int, codeBottom: Int, x0Pt: Double, x1Pt: Double) -> Int {
+                let x0 = Int((x0Pt * scale).rounded())
+                let x1 = Int((x1Pt * scale).rounded())
+                var count = 0
+                var inBand = false
+                for y in codeTop...codeBottom {
+                    var has = false
+                    for x in x0..<x1 where isInk(luma(frame, x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && !inBand { count += 1; inBand = true }
+                    if !has { inBand = false }
+                }
+                return count
+            }
+
+            func codeTextLeft(_ frame: (rep: NSBitmapImageRep,
+                                        base: UnsafeMutablePointer<UInt8>,
+                                        scale: Double),
+                              codeTop: Int, codeBottom: Int) -> Double {
+                for x in Int((19.0 * scale).rounded())..<Int((400.0 * scale).rounded()) {
+                    for y in codeTop...codeBottom where isInk(luma(frame, x, y)) {
+                        return Double(x) / scale
+                    }
+                }
+                return .nan
+            }
+
+            let taggedBands = textBands(tagged)
+            let plainBands = textBands(plain)
+            let taggedCode = Array(taggedBands.suffix(3))
+            let plainCode = Array(plainBands.suffix(3))
+            guard taggedCode.count == 3, plainCode.count == 3 else {
+                emit("CODE_LANGUAGE_NOT_RUN=runner-detail-frame-plain \(tag)"
+                     + " 有语言带=\(taggedBands.count) 无语言带=\(plainBands.count)"
+                     + " ⇒ 找不到三行代码，判据没有对象")
+                continue
+            }
+
+            /// 代码带右沿从**第二行**扫描：标签在第一行，第二行的右区只有灰底，
+            /// 扫到的右沿才是底色本身的右沿，不会被标签墨拉短。
+            let paneTop = Int((60.0 * scale).rounded())
+            let paneBottom = Int((68.0 * scale).rounded())
+            func paneMean(_ frame: (rep: NSBitmapImageRep,
+                                    base: UnsafeMutablePointer<UInt8>,
+                                    scale: Double)) -> Double {
+                var sum = 0.0
+                var n = 0
+                for y in paneTop..<paneBottom {
+                    for x in Int((600.0 * scale).rounded())..<Int((650.0 * scale).rounded()) {
+                        sum += luma(frame, x, y)
+                        n += 1
+                    }
+                }
+                return sum / Double(max(n, 1))
+            }
+            let secondBandMid = (plainCode[1].top + plainCode[1].bottom) / 2
+            let pane = paneMean(plain)
+            var bandRight = Int((650.0 * scale).rounded())
+            for x in Int((300.0 * scale).rounded())..<min(plain.rep.pixelsWide, Int((710.0 * scale).rounded())) {
+                if abs(luma(plain, x, secondBandMid) - pane) >= 6 { bandRight = x }
+            }
+            let regionX0 = max(Int((300.0 * scale).rounded()), bandRight - Int((140.0 * scale).rounded()))
+            let regionX1 = max(regionX0 + 1, bandRight - Int((4.0 * scale).rounded()))
+
+            func inkMass(_ frame: (rep: NSBitmapImageRep,
+                                   base: UnsafeMutablePointer<UInt8>,
+                                   scale: Double),
+                         band: (top: Int, bottom: Int)) -> Int {
+                let y0 = max(0, band.top - Int((2.0 * scale).rounded()))
+                let y1 = min(frame.rep.pixelsHigh - 1, band.bottom + Int((2.0 * scale).rounded()))
+                var count = 0
+                for y in y0...y1 {
+                    for x in regionX0..<regionX1 where isInk(luma(frame, x, y)) {
+                        count += 1
+                    }
+                }
+                return count
+            }
+
+            let taggedInk = inkMass(tagged, band: taggedCode[0])
+            let plainInk = inkMass(plain, band: plainCode[0])
+            let taggedSecondInk = inkMass(tagged, band: taggedCode[1])
+            let plainSecondInk = inkMass(plain, band: plainCode[1])
+            let taggedNumbers = inkBandCount(tagged, codeTop: taggedCode[0].top,
+                                             codeBottom: taggedCode[2].bottom, x0Pt: 2, x1Pt: 18)
+            let plainNumbers = inkBandCount(plain, codeTop: plainCode[0].top,
+                                            codeBottom: plainCode[2].bottom, x0Pt: 2, x1Pt: 18)
+            let taggedLeft = codeTextLeft(tagged, codeTop: taggedCode[0].top,
+                                          codeBottom: taggedCode[2].bottom)
+            let plainLeft = codeTextLeft(plain, codeTop: plainCode[0].top,
+                                         codeBottom: plainCode[2].bottom)
+            let inkFloor = Int((12.0 * scale * scale).rounded())
+
+            emit("CODE_LANGUAGE \(tag) 右区="
+                 + String(format: "%.0f..%.0fpt", Double(regionX0) / scale, Double(regionX1) / scale)
+                 + " 标签墨=\(taggedInk) 无语言臂=\(plainInk) 第二行=\(taggedSecondInk)/\(plainSecondInk)"
+                 + " 行号带=\(taggedNumbers)/\(plainNumbers)"
+                 + " 正文左=\(String(format: "%.1f", taggedLeft))/\(String(format: "%.1f", plainLeft))pt")
+
+            XCTAssertGreaterThanOrEqual(taggedInk, inkFloor,
+                                        "\(tag)：语言标签在右区只有 \(taggedInk) 个墨点（地板 \(inkFloor)）"
+                                        + " ⇒ 代码块没有把围栏里的语言画出来")
+            XCTAssertEqual(plainInk, 0,
+                           "\(tag)：无语言臂右区也有 \(plainInk) 个墨点 ⇒ 右区的墨不全来自标签，"
+                           + "这条判据量错了对象")
+            XCTAssertEqual(taggedSecondInk, 0,
+                           "\(tag)：第二行右区有 \(taggedSecondInk) 个墨点 ⇒ 标签画成了通栏/多行")
+            XCTAssertEqual(plainSecondInk, 0,
+                           "\(tag)：无语言臂第二行右区有 \(plainSecondInk) 个墨点")
+            XCTAssertEqual(taggedNumbers, 3, "\(tag)：有语言臂的行号带 \(taggedNumbers) 个（应为 3）⇒ 标签挤掉了行号")
+            XCTAssertEqual(plainNumbers, 3, "\(tag)：无语言臂的行号带 \(plainNumbers) 个（应为 3）")
+            XCTAssertEqual(taggedLeft, plainLeft, accuracy: 0.5,
+                           "\(tag)：两臂正文左沿 \(taggedLeft)/\(plainLeft)pt 不同 ⇒ 标签挪了代码")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
@@ -7821,6 +8018,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("detail-code", NSSize(width: 720, height: 520)) {
             let target = self.makeCodeStore()
             self.assertCodeFixturePremise(target, role: "detail-code")
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
+        // R446：语言标签的对照臂。同一份代码、只差围栏信息串，
+        // 于是"第一行右区有墨"只可能来自语言标签（代码正文在左，两臂逐字相同）。
+        results.append(Fixture("detail-code-plain", NSSize(width: 720, height: 520)) {
+            let target = self.makeCodeStore(body: Self.codePlainFixtureBody)
+            self.assertCodeFixturePremise(target, role: "detail-code-plain")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
 
@@ -11845,6 +12049,18 @@ final class UICaptureTests: XCTestCase {
     ```
     """
 
+    /// R446：与 `codeFixtureBody` **逐字相同**，只把围栏信息串 `swift` 去掉。
+    /// 语言标签判据的两臂靠它把"右区的墨来自标签"变成可对照的事。
+    static let codePlainFixtureBody = """
+    # 代码
+
+    ```
+    let a = 1
+    let b = 2
+    let c = a + b
+    ```
+    """
+
     private func assertCodeFixturePremise(_ store: HistoryStore, role: String,
                                           file: StaticString = #filePath, line: UInt = #line) {
         guard let entry = store.selectedEntry, case .text(let body) = entry.content else {
@@ -11862,14 +12078,14 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(lines.count, 3, "\(role)：代码块不是三行（实际 \(lines.count)）", file: file, line: line)
     }
 
-    private func makeCodeStore() -> HistoryStore {
+    private func makeCodeStore(body: String = UICaptureTests.codeFixtureBody) -> HistoryStore {
         let store = HistoryStore(
             clipboardWriter: TestClipboardWriter(),
             persistence: RecordingHistoryPersistence(),
             retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
         )
         store.add(ClipboardIntake.Entry(
-            content: .text(Self.codeFixtureBody),
+            content: .text(body),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
@@ -14471,11 +14687,18 @@ final class UICaptureTests: XCTestCase {
         for (probe, vibrant) in pendingControl where eligible(probe) {
             if vibrant != nil { controlVibrant.insert("\(probe.fixture)/\(probe.what)") }
         }
-        // R442/R444：`notRun` 只收"说明段在 settings 族空白时放行"的那批；而控件探针里
-        // 不可判的那几条（同一族、同一个 `eligible` 判断）在循环里被 `where eligible` 跳过了，
-        // 却仍然被 `checked - notRun.count` 算进 judged —— runner 上于是读出 judged 22 /
-        // mustJudge 20（R442 的 CI 红）。判过 = 真的进了循环的那批：把不可判的控件也扣掉。
-        judged = checked - notRun.count - pendingControl.filter { !eligible($0.probe) }.count
+        // R442/R444/R446：`notRun` 只收"说明段在 settings 族空白**且 vibrant!=nil**"的那批；
+        // 而两类不可判的探针没进 notRun 却仍被 `checked - notRun.count` 算进 judged：
+        //   ① 控件里不可判的（`where eligible` 直接跳过）；
+        //   ② 说明段里不可判、且 `vibrant == nil` 的（`guard let vibrant else { continue }`
+        //      在 eligible 判断之前就跳了 —— R444 只扣了 ①，runner 于是仍读 judged 22 / mustJudge 20，
+        //      `40613782362` 的红就是这 2 条）。
+        // 判过 = 真的该判且进了判断的那批：两类都扣掉。
+        let ineligibleCaptionWithNilVibrant = pendingCaption.filter {
+            !eligible($0.probe) && $0.vibrant == nil
+        }.count
+        judged = checked - notRun.count - ineligibleCaptionWithNilVibrant
+            - pendingControl.filter { !eligible($0.probe) }.count
         XCTAssert(checked >= 40, "只问了 \(checked) 条探针的颜色域 ⇒ 两张贴表的遍历本身坏了")
         // 地板**从表推导**，不写死数字。runner 第一次真跑（run 38485603211）：40 条里放行 20、判成 20 ——
         // 恰好压在写死的 20 上。那种"刚好过"的地板既拦不住未来（再多一族画不出来就悄悄归零），

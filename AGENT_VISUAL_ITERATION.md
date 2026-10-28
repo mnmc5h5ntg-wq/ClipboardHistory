@@ -19025,3 +19025,21 @@ R381 只修了图标，文字仍 `.primary` ⇒ 暗档 2x 离屏侧栏整列黑�
 | 可复核性 | 15/15 | 行数 1/无表 0、行带 3、策略 4 条、刀号与 precheck/rot、基线 250、换装/清账都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 443 · R446（第 445 轮 · 2026-10-28）：代码块补语言标签（解析层已有语言、渲染层从未显示；首行右侧标签墨 316/381、无语言臂 0；同文对照帧 + 2 张新帧、基线 250→252）
+
+解析层从围栏信息串认出语言（`codeBlock(language:)`），呈现层只用了行数。新 `CodeLanguageTag` 纯策略：别名归一化（python/py→PYTHON、js→JS、c++→C++…）、未知原样大写截 12、`text/plaintext` 与非 ASCII 不标；`fits` 要求首行正文右沿与标签间至少 24pt，否则不画（长行宁可没有标签也不遮代码）；9pt semibold、右沿内缩 10pt。`codeLanguageAttribute` 只打在代码块正文，`drawCodeLanguageTags` 在 `drawBackground` 的首行右侧画；标签不进文本存储。夹具 `detail-code`（```swift）与新 `detail-code-plain`（```，三行逐字相同）；读数 `CODE_LANGUAGE light 标签墨=316 无语言臂=0 第二行=0/0 行号带=3/3 正文左=21.0/21.0`、dark 381。2 张新帧 + 4 张旧帧变化（detail-markdown-rendered 也有一行 swift 块），基线 252/0/0/0。M1226/M1227 2/2（M1226 首次 needle 漏「有」字，修后复跑红得对）。⓪：push eeccad0..fe956e3 success、ahead=0；40613782362 failure 唯一红＝vibrant judged 22≠20（2 条 nil-vibrant 不可判说明段被漏扣，已修）；HISTORY_SEARCH_SOURCE 在 eeccad0 上 test-not-in-commit ⇒ NOT-RUN；40605228813 failure 2 步（同一 vibrant + 设置关于行 0≠7，后者 R443 已修）；head 跑 40617745753 in_progress ⇒ NOT-RUN。全量 1218/57/5（滚动具名）；捕获 252；换装 ok/SHA_MATCH=1/381=381；清账 `格=162 声明=63 不成立=0/63`；电池 `Ran 683 / OK (skipped=5)`。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 逐张看了 detail-code 亮/暗（首行右缘 SWIFT）、detail-code-plain（无标签）、detail-markdown-rendered（一行 swift 块也有 SWIFT），不是只看数字。 |
+| 判据有效性 | 15/15 | 同文两臂（仅围栏信息串不同）+ 右区墨量、第二行 0、行号带 3/3、正文左同轴；单测钉标签文本与放不下不画；M1226/M1227 2/2。 |
+| 假绿防御 | 15/15 | 无语言臂同区 0 才证明右区墨来自标签；标签不进文本存储；1x 地板按 scale²（12）；M1226 首次漏字被如实记下并修 needle。 |
+| 产品面推进 | 14/15 | 真把解析层已认出的语言接到可见处（代码块身份第一次可读）；Store 不动；扣 1：长首行省略标签无帧（476）、HTML 代码块未覆盖（477）。 |
+| 台账一致性 | 15/15 | U-1653…U-1657、D-442、push fe956e3、252 帧/1218、STORE-SIZE 1108/66 都从命令与测试解析。 |
+| 交付诚实性 | 15/15 | in_progress 与 test-not-in-commit 都具名；vibrant 22≠20 的 -2 成因写明；M1226 首跑命中失败照记。 |
+| 可复核性 | 15/15 | 右区=492..628pt、标签墨 316/381、无语言臂 0、行号带 3/3、正文左 21.0/21.0、刀号与 precheck/rot、基线 252 都在。 |
+
+均分 = 104/105 ≈ 14.9/15（99）。

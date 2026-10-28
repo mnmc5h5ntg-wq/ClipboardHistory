@@ -442,6 +442,7 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
         drawCodeBlockBackgrounds(in: rect)
+        drawCodeLanguageTags(in: rect)
         drawQuoteRules(in: rect)
         drawCodeLineNumbers(in: rect)
     }
@@ -468,6 +469,49 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
                 let clipped = fillRect.intersection(rect)
                 guard !clipped.isNull, !clipped.isEmpty else { return }
                 clipped.fill()
+            }
+        }
+    }
+
+    /// 代码块第一行右侧的语言标签（R446）。解析层认出的语言在这里才第一次可见。
+    ///
+    /// 只画第一行、只在该行正文与右沿之间放得下时画（`CodeLanguageTag.fits`）：
+    /// 长行代码会把整行排满，标签压上去就是糊成一团；宁可没有标签，也不遮代码。
+    /// 标签不进文本存储，复制代码不会多出 "SWIFT" 这几个字母。
+    private func drawCodeLanguageTags(in rect: NSRect) {
+        guard let layoutManager, let textContainer, let textStorage,
+              textStorage.length > 0 else { return }
+        let origin = textContainerOrigin
+        let containerWidth = textContainer.size.width
+        guard containerWidth.isFinite, containerWidth > 0 else { return }
+        let all = NSRange(location: 0, length: textStorage.length)
+        textStorage.enumerateAttribute(MarkdownPresentation.codeLanguageAttribute, in: all) { value, range, _ in
+            guard let label = value as? String else { return }
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: CodeLanguageTag.font,
+                .foregroundColor: CodeLanguageTag.color
+            ]
+            let size = (label as NSString).size(withAttributes: attributes)
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var handledFirstLine = false
+            layoutManager.enumerateLineFragments(forGlyphRange: glyphs) { lineRect, usedRect, _, _, stop in
+                guard !handledFirstLine else {
+                    stop.pointee = true
+                    return
+                }
+                handledFirstLine = true
+                guard CodeLanguageTag.fits(codeRightEdge: usedRect.maxX,
+                                           containerWidth: containerWidth,
+                                           label: label) else { return }
+                let point = CGPoint(
+                    x: origin.x + CodeLanguageTag.originX(containerWidth: containerWidth, label: label),
+                    y: origin.y + CodeLanguageTag.originY(lineTop: lineRect.minY,
+                                                          lineHeight: lineRect.height,
+                                                          tagHeight: size.height)
+                )
+                let box = CGRect(origin: point, size: size)
+                guard box.intersects(rect) else { return }
+                (label as NSString).draw(at: point, withAttributes: attributes)
             }
         }
     }

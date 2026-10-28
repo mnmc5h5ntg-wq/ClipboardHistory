@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 代码块补语言标签（解析层已有语言、渲染层从未显示；首行右侧 SWIFT 墨 316/381、无语言臂 0；同文对照帧 + 2 张新帧、基线 252）（R446 / 第 445 轮 / Round 443 / U-1653…U-1657 · 产品 3 文件，代码块语言标识位）
+
+
 ### 侧栏搜索补匹配来源 App 名（只命中来源的查询 0 行→1 行；新 `HistorySearchPolicy` + Store 收薄到 1108 行/最长 66；2 张新帧、基线 250）（R445 / 第 444 轮 / Round 442 / U-1648…U-1652 · 产品 3 文件，侧栏搜索来源位）
 
 
