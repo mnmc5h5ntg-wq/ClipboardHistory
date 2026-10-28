@@ -8003,3 +8003,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：极长无分隔符的文件名由中间省略处理；缩略图缺失时走 `doc.fill`，本轮未单独拍。
 - 回滚：删四个修饰；或 `git revert`。
 
+## D-459 fallback 无缩略图的占位图标取 secondary（R463）
+
+- 背景：无缩略图的 fallback 用 `doc.fill` + `.quaternary`，亮/暗只有 1.25/1.34:1，状态图标几乎看不见。
+- 决定：改 `Color(nsColor: .secondaryLabelColor)`（3.95/5.92:1）；仍是"空占位"，不是可交互控件。
+- 理由：非文本图形 3:1 是地板；图标是这一屏唯一的视觉身份，不能装死。
+- 兼容性/迁移：新增真实 `.xyz` 无缩略图夹具 `detail-file-fallback-nothumb`（600×440）亮/暗 2 张帧；旧帧 0 变化；基线 274→276 同 commit 更新。
+- 边界：有缩略图的 fallback 上一轮已做文件名；无缩略图的极长文件名未单独拍（507 同族）。
+- 回滚：`secondaryLabelColor` → `.quaternary`；或 `git revert`。
+

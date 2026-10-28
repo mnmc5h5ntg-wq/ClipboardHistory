@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### fallback 无缩略图的占位图标可见（旧 1.25/1.34:1 → 新 3.95/5.92:1；2 张新帧、基线 274→276）（R463 / 第 462 轮 / Round 460 / U-1738…U-1742 · 产品 1 文件，fallback 占位图标位）
+
+
 ### 不支持文件 fallback 的长文件名留在窗格内（旧左沿 7.0pt、2 带 → 新 83.0pt、2 带；2 张新帧、基线 272→274）（R462 / 第 461 轮 / Round 459 / U-1733…U-1737 · 产品 1 文件，fallback 文件名位）
 
 

@@ -4723,6 +4723,59 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R463：不支持文件且没有缩略图时，占位图标（doc.fill）必须看得见（非文本对比 ≥3:1）。
+    func testFallbackPlaceholderIconIsVisible() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r463-fallback-nothumb-shots-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-fallback-nothumb" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-fallback-nothumb` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("nothumb-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：nothumb 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            // 占位图标在窗格中央偏上（600 宽：x 260..340；y 150..250），标题在 284pt 之下；
+            // 区域只取图标那一块，页底取左侧空白列。
+            var darkest = appearance == .darkAqua ? -1.0 : 999.0
+            for y in Int((150.0 * scale))..<min(height, Int((250.0 * scale))) {
+                for x in Int((260.0 * scale))..<min(rep.pixelsWide, Int((340.0 * scale))) {
+                    let value = luma(x, y)
+                    darkest = appearance == .darkAqua ? max(darkest, value) : min(darkest, value)
+                }
+            }
+            let page = luma(Int((40.0 * scale)), Int((140.0 * scale)))
+            func rel(_ v: Double) -> Double {
+                let s = v / 255.0
+                return s <= 0.03928 ? s / 12.92 : pow((s + 0.055) / 1.055, 2.4)
+            }
+            let a = rel(darkest), b = rel(page)
+            let ratio = (max(a, b) + 0.05) / (min(a, b) + 0.05)
+            emit("FALLBACK_ICON \(tag) 图标=\(String(format: "%.0f", darkest)) 页底=\(String(format: "%.0f", page))"
+                 + " 比=\(String(format: "%.2f", ratio))")
+            XCTAssertGreaterThanOrEqual(ratio, 3.0,
+                                        "\(tag)：fallback 占位图标对比只有 \(String(format: "%.2f", ratio)):1（<3）⇒ 状态图标看不见")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -9502,6 +9555,11 @@ final class UICaptureTests: XCTestCase {
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
             AnyView(DetailView(historyStore: self.makeFallbackStore()))
         })
+        // R463：不支持文件且**没有缩略图** —— 占位图标必须看得见。
+        results.append(Fixture("detail-file-fallback-nothumb", NSSize(width: 600, height: 440),
+                               settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
+            AnyView(DetailView(historyStore: self.makeFallbackNoThumbStore()))
+        })
         // R460：纯文本文件预览 —— 长行应被 68ch 可读列收窄。
         results.append(Fixture("detail-file-text-wide", NSSize(width: 1100, height: 800),
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
@@ -13821,6 +13879,24 @@ final class UICaptureTests: XCTestCase {
     """
 
     /// R462：不支持类型的 fallback 预览 —— 长文件名在 720 窗口里怎么排。
+    private func makeFallbackNoThumbStore() -> HistoryStore {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r463-fallback-nothumb", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("notes.xyz")
+        try? Data(repeating: 0x42, count: 64).write(to: url)
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .file(url), thumbnail: nil, sourceUTIs: ["public.file-url"],
+            sourceAppBundleID: "com.apple.finder", sourceAppName: "访达"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
     private func makeFallbackStore() -> HistoryStore {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("r462-fallback", isDirectory: true)

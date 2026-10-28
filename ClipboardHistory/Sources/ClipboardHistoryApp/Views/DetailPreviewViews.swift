@@ -430,7 +430,9 @@ struct DetailFileView: View {
             } else {
                 Image(systemName: "doc.fill")
                     .font(.system(size: VisualGlyph.placeholder))
-                    .foregroundStyle(.quaternary)
+                    // R463：quaternary 在亮/暗只有 1.25/1.34:1，占位图标等于没有；
+                    // 非文本图形取 secondary（3.95/5.9:1），仍是"空占位"但不装死。
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
             }
             Text(preview.url.lastPathComponent)
                 .font(.system(size: VisualFont.title))
