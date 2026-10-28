@@ -153,7 +153,9 @@ struct VideoPreview: View {
                     .aspectRatio(aspectRatio, contentMode: .fit)
                     // R465：第一帧到达前不能是一块空白页色；播放器面是实底黑。
                     .background(Color.black)
-                    .padding(.horizontal, 20)
+                    // R466：和控件胶囊同一条左右缘（控件给右下角浮层留了 80pt）。
+                    .padding(.leading, VideoPlaybackMetrics.controlsLeadingPadding)
+                    .padding(.trailing, VideoPlaybackMetrics.controlsTrailingPadding)
                     .padding(.top, 16)
                     .padding(.bottom, 10)
             }

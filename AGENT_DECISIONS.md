@@ -8030,3 +8030,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：真实视频播放（AVPlayerLayer 在屏）仍未拍；播放控件的时间码等宽/滑杆轨道另开（512/513 族）。
 - 回滚：删 `.background(Color.black)` 与名册行；或 `git revert`。
 
+## D-462 视频播放器与控件胶囊共用左右缘（R466）
+
+- 背景：播放器只留 20pt，控件 trailing 是 80pt（给浮层让位）⇒ 播放器右缘多 63pt、黑区伸到浮层下。
+- 决定：播放器用 `VideoPlaybackMetrics.controlsLeadingPadding`（12）与 `controlsTrailingPadding`（80）。
+- 理由：播放器和它的控件是同一条横向轴；给浮层的让位必须两边都做，不能只有控件让。
+- 兼容性/迁移：`detail-file-video-controls` 亮/暗 2 张旧帧变化；基线 280 同 commit 更新。
+- 边界：视频真实播放帧仍无帧（514）；时间码/滑杆另开（515）。
+- 回滚：播放器回 `.padding(.horizontal, 20)`；或 `git revert`。
+

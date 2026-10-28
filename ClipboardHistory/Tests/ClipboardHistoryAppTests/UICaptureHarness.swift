@@ -4906,6 +4906,65 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R466：视频播放器的右缘应和控件胶囊对齐（播放器留 20pt、控件留 80pt ⇒ 差 60pt；
+    /// 播放器还伸到右下角浮层下面）。量播放器顶部黑带的右缘与控件行最右墨的差。
+    func testVideoPlayerAlignsWithItsControls() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r466-video-align-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-video-controls" }) else {
+                return XCTFail("\(tag)：找不到 `detail-file-video-controls` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("video-align-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：video-controls 帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 600.0
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            let spp = rep.samplesPerPixel
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * spp
+                return 0.299 * Double(base[o + rOff]) + 0.587 * Double(base[o + rOff + 1])
+                    + 0.114 * Double(base[o + rOff + 2])
+            }
+            // 播放器顶部黑带（y 120..200，浮层从 y 240pt 起）的最右黑列。
+            var playerRight = -1
+            for y in Int((120.0 * scale))..<min(height, Int((200.0 * scale))) {
+                for x in 0..<rep.pixelsWide where luma(x, y) <= 10 {
+                    playerRight = max(playerRight, x)
+                }
+            }
+            // 控件行（y 395..430）在 x<535（浮层从 540 起）的最右墨列。
+            let muteInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+            var controlsRight = -1
+            for y in Int((395.0 * scale))..<min(height, Int((430.0 * scale))) {
+                for x in 0..<min(rep.pixelsWide, Int((535.0 * scale))) where muteInk(luma(x, y)) {
+                    controlsRight = max(controlsRight, x)
+                }
+            }
+            guard playerRight >= 0, controlsRight >= 0 else {
+                XCTFail("\(tag)：读不到播放器黑带或控件墨 ⇒ 判据没有对象")
+                continue
+            }
+            let gap = Double(playerRight - controlsRight) / scale
+            emit("VIDEO_ALIGN \(tag) 播放器右=\(String(format: "%.1f", Double(playerRight) / scale))pt"
+                 + " 控件右=\(String(format: "%.1f", Double(controlsRight) / scale))pt 差=\(String(format: "%.1f", gap))pt")
+            XCTAssertLessThanOrEqual(gap, 30.0,
+                                     "\(tag)：播放器右缘比控件右缘多出 \(String(format: "%.1f", gap))pt"
+                                     + " ⇒ 播放器和控件不齐、还伸到浮层下面")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
