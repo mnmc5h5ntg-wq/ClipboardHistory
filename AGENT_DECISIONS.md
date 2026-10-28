@@ -7949,3 +7949,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：命中在截断之外/OCR（487）、多文件第 2/3 个文件名（488）、选中底上的高亮对比（489）。
 - 回滚：删 `HistoryRowMatchHighlight` 的接线；或 `git revert`。
 
+## D-453 代码块制表符按 4 个空格定宽（R457）
+
+- 背景：代码块保留源码制表符，`paragraphStyle` 不设代码块制表位 ⇒ TextKit 默认 28pt 一跳；13pt 等宽字体的 4 个空格是 32.14pt（一级差 4.14、两级差 8.29）。
+- 决定：对 `.codeBlock` 清掉默认显式制表位并设 `defaultTabInterval = 4 × codeFont 字形推进`；列表项/表格分支不动。
+- 理由：缩进是代码的语义，制表符与 4 空格必须同轴；宽度由字体推进算出，不写死 32。
+- 兼容性/迁移：新增 `detail-code-tabs` 亮/暗 2 张帧；旧帧 0 变化；基线 264→266 同 commit 更新。
+- 边界：纯文本文件预览仍是 28pt（490）；Markdown 表格单元格（491）；8 空格制表位源码（492）。
+- 回滚：删 `paragraphStyle` 里的 codeBlock 分支；或 `git revert`。
+

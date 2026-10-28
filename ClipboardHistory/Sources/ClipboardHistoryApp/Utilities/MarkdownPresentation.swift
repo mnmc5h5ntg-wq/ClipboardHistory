@@ -456,6 +456,14 @@ enum MarkdownPresentation {
         if isListItem(block.kind) {
             style.tabStops = [NSTextTab(textAlignment: .left, location: hangingIndent(for: block))]
         }
+        // R457：代码块里的制表符必须等于 4 个空格。旧形状把制表位留给 TextKit 的默认 28pt
+        // 一跳，而 13pt 等宽字体的 4 个空格是 32.14pt ⇒ 一级缩进差 4.14pt、两级差 8.29pt。
+        // 默认那 12 个显式停止位会压过 `defaultTabInterval`，所以两者都要清/设。
+        if case .codeBlock = block.kind {
+            let advance = ("0" as NSString).size(withAttributes: [.font: codeFont]).width
+            style.tabStops = []
+            style.defaultTabInterval = advance * 4
+        }
         style.lineSpacing = lineSpacing(for: block)
         style.paragraphSpacingBefore = paragraphSpacingBefore(for: block)
         // 正文左对齐：详情区是读东西的地方，不是排海报的地方。

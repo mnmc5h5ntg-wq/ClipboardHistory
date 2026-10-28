@@ -4399,6 +4399,88 @@ final class UICaptureTests: XCTestCase {
     /// ② 左垫带（20..30pt）里应为 **0 个墨带**（正文已右移到 45pt 起排）；旧形状 3（正文首字）。
     /// 两块都从代码块自己的灰色背景带取纵向范围，段落/标题不会混进来；行号是背景层画的，
     /// 所以复制出来的代码里没有数字 —— 这条判据只看帧，不看文本。
+    /// R457：代码块里的制表符必须与 4 个空格落在同一条竖轴上。
+    ///
+    /// 旧形状：`paragraphStyle` 不碰代码块的制表位，TextKit 默认 28pt 一跳，
+    /// 而 13pt 等宽字体的 4 个空格是 32.14pt ⇒ 一级缩进差 4.14pt、两级差 8.29pt。
+    /// 判据从**产品渲染出来的 NSTextView**读布局（不是像素）：同一段代码里
+    /// `\tif x {` 与 `    if x {` 的起始 x、`\t\tlog(1)` 与 `        log(1)` 的起始 x。
+    func testCodeBlockTabsMatchFourSpaces() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r457-code-tabs-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let advance = Double(("0" as NSString).size(withAttributes: [.font: MarkdownPresentation.codeFont]).width)
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-code-tabs" }) else {
+                return XCTFail("\(tag)：找不到 `detail-code-tabs` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-code-tabs-\(tag).png")
+            var reading: (tabIf: Double, spaceIf: Double, tabPrint: Double, spacePrint: Double,
+                          interval: Double, stops: Int)?
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                    if let text = view as? ChineseSelectableNSTextView { return text }
+                    for sub in view.subviews {
+                        if let text = findTextView(sub) { return text }
+                    }
+                    return nil
+                }
+                guard let textView = findTextView(host),
+                      let layout = textView.layoutManager,
+                      let storage = textView.textStorage else {
+                    XCTFail("\(tag)：`detail-code-tabs` 里找不到正文 NSTextView ⇒ 这条判据没有对象")
+                    return
+                }
+                let text = storage.string as NSString
+                var searchStart = 0
+                var firstIfLocation: Int?
+                func x(of needle: String) -> Double? {
+                    let range = text.range(of: needle, options: [],
+                                            range: NSRange(location: searchStart, length: text.length - searchStart))
+                    guard range.location != NSNotFound else { return nil }
+                    if needle == "if x {", firstIfLocation == nil { firstIfLocation = range.location }
+                    searchStart = NSMaxRange(range)
+                    let glyph = layout.glyphIndexForCharacter(at: range.location)
+                    return Double(layout.location(forGlyphAt: glyph).x)
+                }
+                guard let tabIf = x(of: "if x {"), let tabPrint = x(of: "log(1)"),
+                      let spaceIf = x(of: "if x {"), let spacePrint = x(of: "log(1)") else {
+                    XCTFail("\(tag)：夹具里找不到两对同形行 ⇒ 这条判据没有对象")
+                    return
+                }
+                let styleLocation = firstIfLocation ?? 0
+                let style = storage.attribute(.paragraphStyle, at: styleLocation,
+                                              effectiveRange: nil) as? NSParagraphStyle
+                reading = (tabIf, spaceIf, tabPrint, spacePrint,
+                           Double(style?.defaultTabInterval ?? -1), style?.tabStops.count ?? -1)
+            }
+            guard let reading else {
+                XCTFail("\(tag)：`detail-code-tabs` 没有交出布局读数")
+                continue
+            }
+            emit("CODE_TAB_STOP \(tag) 制表符一级=\(String(format: "%.2f", reading.tabIf))pt"
+                 + " 四空格一级=\(String(format: "%.2f", reading.spaceIf))pt"
+                 + " 差=\(String(format: "%.2f", reading.tabIf - reading.spaceIf))pt"
+                 + " ｜二级=\(String(format: "%.2f", reading.tabPrint))/\(String(format: "%.2f", reading.spacePrint))"
+                 + " 差=\(String(format: "%.2f", reading.tabPrint - reading.spacePrint))pt"
+                 + " ｜间隔=\(String(format: "%.2f", reading.interval))pt 制表位=\(reading.stops)")
+            XCTAssertEqual(reading.tabIf, reading.spaceIf, accuracy: 0.5,
+                           "\(tag)：制表符一级缩进在 \(reading.tabIf)pt、四个空格在 \(reading.spaceIf)pt"
+                           + " ⇒ 代码缩进不同轴")
+            XCTAssertEqual(reading.tabPrint, reading.spacePrint, accuracy: 0.5,
+                           "\(tag)：制表符二级缩进在 \(reading.tabPrint)pt、八个空格在 \(reading.spacePrint)pt"
+                           + " ⇒ 代码缩进不同轴")
+            XCTAssertEqual(reading.interval, advance * 4, accuracy: 0.01,
+                           "\(tag)：代码块的制表间隔是 \(reading.interval)pt，应为 4×\(advance)pt")
+            XCTAssertEqual(reading.stops, 0,
+                           "\(tag)：代码块还留着 \(reading.stops) 个显式制表位 ⇒ 间隔不会生效")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -9120,6 +9202,11 @@ final class UICaptureTests: XCTestCase {
             self.assertCodeFixturePremise(target, role: "detail-code-plain")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
+        // R457：代码块里的制表符 —— 与 4 个空格同轴的对照臂。
+        results.append(Fixture("detail-code-tabs", NSSize(width: 720, height: 520)) {
+            let target = self.makeCodeStore(body: Self.codeTabsFixtureBody)
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
         // R447：主题分隔线。线前/线后各一段，帧上只应出现**一条**通栏长线；
         // 旧形状是 24 个 `─` 字符（行内最多一截短线，没有通栏长线）。
         results.append(Fixture("detail-rule", NSSize(width: 720, height: 520)) {
@@ -13378,6 +13465,25 @@ final class UICaptureTests: XCTestCase {
     let a = 1
     let b = 2
     let c = a + b
+    ```
+    """
+
+    /// R457：代码块制表位夹具 —— 同一段缩进分别用制表符与 4 个空格写。
+    /// 期望两条 `if` / `print` 落在同一条竖轴上（一个制表符 = 4 个空格）。
+    static let codeTabsFixtureBody = """
+    # 制表位
+
+    ```swift
+    func a() {
+    \tif x {
+    \t\tlog(1)
+    \t}
+    }
+    func b() {
+        if x {
+            log(1)
+        }
+    }
     ```
     """
 
