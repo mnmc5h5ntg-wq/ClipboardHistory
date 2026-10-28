@@ -4979,6 +4979,79 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R449：QuickPick 底部必须有键盘操作提示。
+    ///
+    /// 缺陷形状：面板底部一直是空白（旧帧最后一行以下没有墨），↑/↓ 选择、↵ 粘贴、
+    /// esc 关闭全靠用户猜。判据两头：① 产品视图树里存在提示标签、文本是 policy 的那一句、
+    /// 且**在表格可见区下方**（不压候选行）；② 帧的底部 26pt 带里有墨（旧帧同带 = 0），
+    /// 地板 12·scale²（1x 12 / 2x 48）。
+    func testQuickPickShowsKeyboardHints() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r449-qp-hint-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "quickpick-list" }) else {
+                return XCTFail("\(tag)：找不到 `quickpick-list` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("quickpick-list-\(tag).png")
+            var foundHint = false
+            var hintText: String?
+            var hintTop = CGFloat.nan
+            var tableBottom = CGFloat.nan
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func allSubviews(_ view: NSView) -> [NSView] {
+                    [view] + view.subviews.flatMap(allSubviews)
+                }
+                if let hint = allSubviews(host).first(where: {
+                    $0.identifier?.rawValue == QuickPickKeyboardHint.identifier
+                }) {
+                    foundHint = true
+                    hintText = (hint as? NSTextField)?.stringValue
+                    hintTop = host.convert(hint.bounds, from: hint).maxY
+                }
+                if let table = Self.firstTableView(in: host) {
+                    tableBottom = host.convert(table.visibleRect, from: table).minY
+                }
+            }
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`quickpick-list` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            let x0 = Int((QuickPickKeyboardHint.horizontalInset * scale).rounded())
+            let x1 = min(rep.pixelsWide, Int(((Double(fixture.size.width) - QuickPickKeyboardHint.horizontalInset) * scale).rounded()))
+            let y0 = Int(((Double(fixture.size.height) - 26.0) * scale).rounded())
+            var ink = 0
+            for y in y0..<height {
+                for x in x0..<x1 where isInk(luma(x, y)) { ink += 1 }
+            }
+            let floor = Int((12.0 * scale * scale).rounded())
+            emit("QUICKPICK_HINT \(tag) 底部墨=\(ink) 地板=\(floor)"
+                 + " 文本=\(hintText ?? "nil") 提示顶=\(String(format: "%.1f", hintTop))"
+                 + " 表底=\(String(format: "%.1f", tableBottom))")
+            XCTAssertTrue(foundHint, "\(tag)：找不到 `quickPickKeyboardHint` 标签 ⇒ 提示没接进真实面板")
+            XCTAssertEqual(hintText, QuickPickKeyboardHint.text,
+                           "\(tag)：底部提示文本不对 ⇒ ↑↓/↵/esc 的说明没进产品")
+            XCTAssertGreaterThanOrEqual(ink, floor,
+                                        "\(tag)：底部 26pt 带只有 \(ink) 个墨点（地板 \(floor)）"
+                                        + " ⇒ 提示没画出来（旧帧同带 = 0）")
+            XCTAssertLessThanOrEqual(hintTop, tableBottom + 2.0,
+                                     "\(tag)：提示顶 \(hintTop) 压到表格可见区底 \(tableBottom)"
+                                     + " ⇒ 提示与候选行重叠")
+        }
+    }
+
     /// R442：设置侧栏必须有「关于」这一行。
     ///
     /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为

@@ -7877,3 +7877,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：HTML 表格体行不走这条（479）。
 - 回滚：删绘制调用与 `tableRowCountAttribute` 两处即可；或 `git revert`。
 
+## D-445 QuickPick 底部键盘提示占一行、表格让出这一行（R449）
+
+- 背景：QuickPick 的 ↑/↓、↵、esc 全靠猜；面板底部一直是空白（旧帧底部 26pt 带 0 墨）。
+- 决定：新 `QuickPickKeyboardHint`（固定文案、11pt、`tertiaryLabelColor`、16pt 高）；控制器底部加 label，表格 stack 底边钉到提示顶 −4pt。
+- 理由：键盘操作是 QuickPick 的核心交互，提示必须在面板里常驻；提示与候选行分开（视图树断言不压行），不挤掉可见行（仍 ≥2 行契约）。
+- 兼容性/迁移：12 张 QuickPick 帧变化、0 新增/缺失；基线名单 256 同 commit 更新。
+- 边界：只说明三组键；1x runner 读数本轮因 gh 断网未读（480）。
+- 回滚：删 label 与两条约束、stack 底边恢复 content 底部即可；或 `git revert`。
+

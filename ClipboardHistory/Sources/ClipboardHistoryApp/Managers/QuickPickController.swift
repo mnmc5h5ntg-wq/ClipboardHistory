@@ -361,6 +361,24 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         content.addSubview(stack)
         content.addSubview(emptyBox)
+        // R449：底部键盘操作提示。它自己占一行高度，表格让出这一行（stack 底 = 提示顶 - 4）。
+        let hint = NSTextField(labelWithString: QuickPickKeyboardHint.text)
+        hint.font = QuickPickKeyboardHint.font
+        hint.textColor = QuickPickKeyboardHint.color
+        hint.alignment = .center
+        hint.lineBreakMode = .byTruncatingTail
+        hint.identifier = NSUserInterfaceItemIdentifier(QuickPickKeyboardHint.identifier)
+        hint.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(hint)
+        NSLayoutConstraint.activate([
+            hint.leadingAnchor.constraint(equalTo: content.leadingAnchor,
+                                          constant: QuickPickKeyboardHint.horizontalInset),
+            hint.trailingAnchor.constraint(equalTo: content.trailingAnchor,
+                                           constant: -QuickPickKeyboardHint.horizontalInset),
+            hint.bottomAnchor.constraint(equalTo: content.bottomAnchor,
+                                         constant: -QuickPickKeyboardHint.bottomInset),
+            hint.heightAnchor.constraint(equalToConstant: QuickPickKeyboardHint.height),
+        ])
         NSLayoutConstraint.activate([
             emptyBox.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
             emptyBox.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
@@ -368,7 +386,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
             stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -12),
             stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 12),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
+            stack.bottomAnchor.constraint(equalTo: hint.topAnchor,
+                                          constant: -QuickPickKeyboardHint.topSpacing),
             // 就这四条，一条都不多写。本轮曾经给三个子视图各写"等宽 = 面板减内缩"
             // （六行）+ 两行 hugging/抗压缩，然后被变异对照逐条审：
             //   M330 撤滚动视图那两条 → 绿   M331 撤搜索框那两条 → 绿

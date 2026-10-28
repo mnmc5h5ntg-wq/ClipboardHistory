@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### QuickPick 底部补键盘操作提示（旧帧底部 26pt 带 0 墨 → 新 1566/1848；提示在表格可见区下方 4pt；12 张 QuickPick 帧变化、基线 256）（R449 / 第 448 轮 / Round 446 / U-1668…U-1672 · 产品 3 文件，浮层键盘提示位）
+
+
 ### Markdown 表格体行之间补发丝分隔线（表头+四行体行 3 条、单行体行 0 条；线宽 108.0/107.5 对表宽 101.5、厚 1.0；2 张新帧、基线 256）（R448 / 第 447 轮 / Round 445 / U-1663…U-1667 · 产品 3 文件，表格体行分隔位）
 
 

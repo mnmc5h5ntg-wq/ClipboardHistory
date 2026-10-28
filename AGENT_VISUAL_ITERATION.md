@@ -19079,3 +19079,21 @@ R440 把表头用 semibold 分开之后，多行体行之间仍无线。新 `Tab
 | 可复核性 | 15/15 | 3/0、108.0/101.5/1.0、usedRect、y 行带、刀号与 precheck 226/208/590、rot 313/1007、基线 256 都在。 |
 
 均分 = 104/105 ≈ 14.9/15（99）。
+
+## Round 446 · R449（第 448 轮 · 2026-10-28）：QuickPick 底部补键盘操作提示（旧帧底部 26pt 带 0 墨 → 新 1566/1848；提示在表格可见区下方 4pt；12 张 QuickPick 帧变化、基线 256）
+
+QuickPick 的 ↑/↓、↵、esc 全靠猜，面板底部一直是空白（旧 `quickpick-list` 底部 26pt 带 0 墨）。新 `QuickPickKeyboardHint` 纯策略（`↑↓ 选择 · ↵ 粘贴 · esc 关闭`、11pt、tertiaryLabelColor、16pt 高、下内缩 6、上间距 4）；控制器底部加 label（identifier `quickPickKeyboardHint`），表格 stack 底边改钉到提示顶 −4。读数：`QUICKPICK_HINT light 底部墨=1566（旧 0）、dark 1848（旧 0）`；视图树文本逐字相等、提示顶 22.0 ≤ 表格可见区底 26.0。12 张 QuickPick 帧变化、0 新增/缺失，基线名单 256（同 commit 更新）；已看亮/暗提示居中、不压候选。M1232/M1233 2/2；第一次 0 告警门咬到测试里 `allSubviews` 的 MainActor 隔离，加 `@MainActor` 后冷编 0。⓪：开工 no-op push（remote 107f2b3、ahead=0）；40629776895/40629867848 读时 in_progress、随后 gh EOF ⇒ CI_READ_BLOCKED；ecb8e69 仅 Motion floor 采样红（testCopyReceipt 1<2）；436 最后已知 judged=5/5 executed=77。全量 1230/57/5（滚动具名）；捕获 256；换装 ok/SHA_MATCH=1/381=381；电池 683/5。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 亮/暗 quickpick-list 逐张看过：提示居中在底部空白区、不压候选行；不是只看数字。 |
+| 判据有效性 | 15/15 | 视图树文本+位置（不压行）与帧底部 26pt 带墨量两头钉；旧帧同带 0；M1232/M1233 2/2。 |
+| 假绿防御 | 15/15 | 位置断言防"提示压表"；底部带 x 限定去掉面板边缘；旧帧 0 作对照；第一次 0 告警红照记。 |
+| 产品面推进 | 14/15 | 第一次把 QuickPick 的键盘操作写进产品；Store 不动；扣 1：1x runner 读数未读（gh 断）。 |
+| 台账一致性 | 15/15 | U-1668…U-1672、D-445、no-op push/ahead=0、256 帧/1230、STORE-SIZE 1108/66 都从命令与测试解析。 |
+| 交付诚实性 | 15/15 | 两跑 in_progress/EOF 具名；ecb8e69 的 Motion floor 采样红与 receipt 1<2 原文照记；0 告警红照记。 |
+| 可复核性 | 15/15 | 0→1566/1848、提示顶/表底 22/26、12 帧名单、刀号与 precheck 227/209/592、rot 314/1009、基线 256 都在。 |
+
+均分 = 104/105 ≈ 14.9/15（99）。
