@@ -7823,3 +7823,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：无应用图标（文本型）；定位句与版权是常量（跨年稳定）。
 - 回滚：删 `.about` case/页/侧栏行即可恢复旧帧；或 `git revert`。
 
+## D-439 设置侧栏文字与图标同用显式动态色（R443）
+
+- 背景：R381 只把设置侧栏的**图标**换成 `Color(nsColor: .labelColor)`，文字仍 `.primary`；暗档 2x 的离屏侧栏里文字落在背景错误一侧（raw 位图 max=28，R457/471），`SETTINGS_ABOUT_ROW` 的暗档只能记 NOT-RUN。
+- 决定：文字也换成 `Color(nsColor: .labelColor)`（动态系统色，随外观翻转、不进 vibrancy 重映射）；选中仍 accent；图标不变。
+- 理由：与 R381 图标、R426 页脚同一处修法；暗档标签可读，盲区从"名册 17"变"名册 0 + 实测 0"，判据由 NOT-RUN 变真读数。
+- 兼容性/迁移：产品外观语义不变（labelColor 即标准文字色）；36 张设置面帧变化（17 夹具 + cardprobe-split，亮暗）、基线 246；本机 2x 盲区名册归零；`darkSidebarTextBlindSpots` 集合仍是 vibrant 子树的前提。
+- 边界：真机 vibrant 合成下的外观没有同屏对照（473）；主列表暗档文字（457）是另一处，仍开。
+- 回滚：文字换回 `.primary` 即可恢复旧帧；或 `git revert`。
+

@@ -24,13 +24,36 @@ VIEW = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/SettingsView.swift"
 FILTER = "testSettingsSidebarIconsAreMeasuredRowByRow"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-NEEDLE = "AnyShapeStyle(Color(nsColor: .labelColor))"
+# R443：文字也用了同一个动态色，而且**外层文字的 foregroundStyle 会给内层图标的
+# `.primary` 提供环境** —— 只退图标（内层）不再坏（M1011 第一版就这样逃脱）。针改成
+# 图标 + 文字两段 foregroundStyle 的整块，M1011 一起退回 `.primary`（R381/R443 之前的形状）。
+NEEDLE = "\n".join([
+    '                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+    '                                                : AnyShapeStyle(Color(nsColor: .labelColor)))',
+    '            }',
+    '            .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+    '                                        : AnyShapeStyle(Color(nsColor: .labelColor)))',
+])
 
 MUTATIONS = [
-    ("M1011", "产品侧：图标改回 .primary（侧栏材质会把它解析成白色）", VIEW,
-     NEEDLE, "AnyShapeStyle(.primary)", ["SIDEBAR_ICON_BLANK", "一个墨都没读到"]),
-    ("M1012", "产品侧：动态色换成写死黑（亮档讨好、暗档看不见）", VIEW,
-     NEEDLE, "AnyShapeStyle(Color.black)", ["SIDEBAR_ICON_INVERTED", "SIDEBAR_ICON_BLANK", "落在**背景那一边**"]),
+    ("M1011", "图标与文字一起退回 .primary（R381/R443 之前的形状：亮档图标变白）", VIEW,
+     NEEDLE, "\n".join([
+         '                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+         '                                                : AnyShapeStyle(.primary))',
+         '            }',
+         '            .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+         '                                        : AnyShapeStyle(.primary))',
+     ]),
+     ["SIDEBAR_ICON_BLANK", "一个墨都没读到"]),
+    ("M1012", "图标动态色换成写死黑（亮档讨好、暗档看不见；文字保持动态色）", VIEW,
+     NEEDLE, "\n".join([
+         '                    .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+         '                                                : AnyShapeStyle(Color.black))',
+         '            }',
+         '            .foregroundStyle(isSelected ? AnyShapeStyle(Color.accentColor)',
+         '                                        : AnyShapeStyle(Color(nsColor: .labelColor)))',
+     ]),
+     ["SIDEBAR_ICON_INVERTED", "SIDEBAR_ICON_BLANK", "落在**背景那一边**"]),
 ]
 
 

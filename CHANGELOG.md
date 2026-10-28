@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置侧栏文字补显式动态色（`.primary` → `Color(nsColor: .labelColor)`；暗档 2x 反侧 0/17、`SETTINGS_ABOUT_ROW dark 7`、盲区名册 17→0；36 张设置面帧、基线 246）（R443 / 第 442 轮 / Round 440 / U-1638…U-1642 · 产品 1 文件，设置侧栏文字位）
+
+
 ### 设置新增「关于」分区与关于页（应用名 / 版本+build / 定位句 / 版权；侧栏 6→7 行、tagline caption 1.01/0.95、18/18、覆盖 7/7；2 张新帧 + 40 张设置面帧、基线 246）（R442 / 第 441 轮 / Round 439 / U-1633…U-1637 · 产品 4 文件，设置关于页位）
 
 

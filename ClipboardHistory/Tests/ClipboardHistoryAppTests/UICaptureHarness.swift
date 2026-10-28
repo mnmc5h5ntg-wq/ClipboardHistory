@@ -13576,7 +13576,10 @@ final class UICaptureTests: XCTestCase {
     /// 它同样要被 `gone`/`extra` 两格钉住 —— 所以加一行之前必须真的去看那张帧。
     static let darkSidebarTextBlindSpotsByMachine: [String: Set<String>] = [
         // 本机（Retina 2x）：R29d / R30 / R39 / R98 一路看帧登记的 13 张。
-        "arm64/macOS 27.0/2x": darkSidebarTextBlindSpots,
+        // R443：文字补了显式动态色（与 R381 的图标同一处）⇒ 本机 2x 的暗档侧栏文字不再反侧；
+        // 空集是一条声明。`darkSidebarTextBlindSpots` 仍是 "vibrant 子树" 那一份前提（见上），
+        // 不再是"这一台会反侧的帧"。
+        "arm64/macOS 27.0/2x": [],
         // CI runner（GitHub macos-15，arm64、非 Retina）：**空集是一条声明，不是一行占位**。
         // 键与空集都不是我猜的 —— 来自 R124 那一跑自己印出来的两行：
         //   `TEXT_SIDE_ROSTER_KEY arm64/macOS 15.7/1x 本机登记=-1 实测反侧=0 判了 13/13 个夹具`
