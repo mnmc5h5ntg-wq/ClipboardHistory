@@ -370,9 +370,17 @@ struct DetailView: View {
             // 渲染器身份跟着一起下去 —— 两者都从同一处来，所以不会出现
             // "消毒在视图里、判据问不到"（`ChineseSelectableAttributedTextView` 的注释记了这条）。
             if markdownMode == .rendered, let (renderer, source) = renderDecision(for: entry).resolved() {
+                let column = DetailTypography.columnWidth()
+                let wide = renderer == .markdown
+                    ? WideMarkdownDocument.width(
+                        source: source, columnWidth: column,
+                        font: MarkdownPresentation.codeFont,
+                        gutter: DetailTypography.containerGutter)
+                    : column
                 ChineseSelectableAttributedTextView(source: source, renderer: renderer,
                                                     highlightQuery: historyStore.searchText,
-                                                    resetKey: entry.id)
+                                                    resetKey: entry.id,
+                                                    documentWidth: wide > column + 0.5 ? wide : nil)
                     .detailReadableColumn()
             } else {
                 ChineseSelectableTextView(

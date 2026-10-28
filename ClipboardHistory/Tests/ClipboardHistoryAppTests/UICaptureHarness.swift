@@ -4546,6 +4546,86 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R459：宽表格行不许在可读列里折开。
+    ///
+    /// 旧形状：`readOnlyBodyScrollView` 固定 `widthTracksTextView = true`、横向滚动关掉，
+    /// 一行 90ch 的表格在 440pt 的详情列里折成两三行，列就对不上了。
+    /// 新形状：表格/代码块的最宽行超过可读列时，文档宽到最宽行、横向滚动；正文列（视图宽）不变。
+    /// 判据从产品渲染出的 NSTextView 读：`widthTracksTextView`、容器宽、以及每个表格行的行片段数。
+    func testWideTablesKeepEachRowOnOneLine() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r459-wide-table-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func read(_ name: String) throws -> (tracks: Bool, width: Double, fragments: [Int], scroller: Bool)? {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                var result: (Bool, Double, [Int], Bool)?
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                        if let text = view as? ChineseSelectableNSTextView { return text }
+                        for sub in view.subviews {
+                            if let text = findTextView(sub) { return text }
+                        }
+                        return nil
+                    }
+                    guard let textView = findTextView(host),
+                          let layout = textView.layoutManager,
+                          let container = textView.textContainer,
+                          let storage = textView.textStorage else {
+                        XCTFail("\(tag)：`\(name)` 里找不到正文 NSTextView ⇒ 这条判据没有对象")
+                        return
+                    }
+                    let text = storage.string as NSString
+                    var fragments: [Int] = []
+                    var cursor = 0
+                    for line in text.components(separatedBy: "\n") where line.hasPrefix("|") {
+                        let range = text.range(of: line, options: [],
+                                               range: NSRange(location: cursor, length: text.length - cursor))
+                        guard range.location != NSNotFound else { continue }
+                        cursor = NSMaxRange(range)
+                        let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                        var count = 0
+                        layout.enumerateLineFragments(forGlyphRange: glyphs) { _, _, _, _, _ in count += 1 }
+                        fragments.append(count)
+                    }
+                    result = (container.widthTracksTextView, Double(container.containerSize.width),
+                              fragments, textView.enclosingScrollView?.hasHorizontalScroller ?? false)
+                }
+                return result.map { ($0.0, $0.1, $0.2, $0.3) }
+            }
+            guard let wide = try read("detail-table-wide") else {
+                XCTFail("\(tag)：宽表帧没有交出布局读数")
+                continue
+            }
+            guard let short = try read("detail-table") else {
+                XCTFail("\(tag)：短表对照没有交出布局读数")
+                continue
+            }
+            emit("WIDE_TABLE \(tag) 宽表 跟踪视图=\(wide.tracks) 容器宽=\(String(format: "%.1f", wide.width))pt"
+                 + " 行片段=\(wide.fragments) 滚动条=\(wide.scroller)"
+                 + " ｜短表 跟踪视图=\(short.tracks) 行片段=\(short.fragments) 滚动条=\(short.scroller)")
+            XCTAssertFalse(wide.tracks, "\(tag)：宽表仍在跟踪视图宽度 ⇒ 没有横向滚动的宽度来源")
+            XCTAssertGreaterThan(wide.width, 611,
+                                 "\(tag)：宽表容器只有 \(wide.width)pt ⇒ 没有宽过可读列")
+            XCTAssertFalse(wide.fragments.isEmpty, "\(tag)：宽表里没有表格行 ⇒ 判据没有对象")
+            XCTAssertEqual(wide.fragments, Array(repeating: 1, count: wide.fragments.count),
+                           "\(tag)：宽表的表格行折开了（行片段=\(wide.fragments)）⇒ 列会散")
+            XCTAssertTrue(short.tracks, "\(tag)：短表也被切到横向滚动 ⇒ 可读列（U-4）被无差别撤掉")
+            XCTAssertTrue(wide.scroller, "\(tag)：宽表没有横向滚动条 ⇒ 右侧列没有到达方式")
+            XCTAssertEqual(short.fragments, Array(repeating: 1, count: short.fragments.count),
+                           "\(tag)：短表行折开了（行片段=\(short.fragments)）")
+            XCTAssertFalse(short.scroller, "\(tag)：短表也开了横向滚动条 ⇒ U-4 被无差别撤掉")
+        }
+    }
+
     func testCodeBlocksShowLineNumbers() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r441-code-gutter-\(UUID().uuidString)", isDirectory: true)
@@ -9318,6 +9398,11 @@ final class UICaptureTests: XCTestCase {
         })
         // R447：主题分隔线。线前/线后各一段，帧上只应出现**一条**通栏长线；
         // 旧形状是 24 个 `─` 字符（行内最多一截短线，没有通栏长线）。
+        // R459：宽表 —— 行宽超过可读列时横向滚动，不在行中折开。
+        results.append(Fixture("detail-table-wide", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: self.makeWideTableStore(),
+                               initialMarkdownMode: .rendered))
+        })
         results.append(Fixture("detail-rule", NSSize(width: 720, height: 520)) {
             let target = self.makeRuleStore()
             self.assertRuleFixturePremise(target, role: "detail-rule")
@@ -13505,6 +13590,20 @@ final class UICaptureTests: XCTestCase {
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
         return store
+    }
+
+    /// R459 宽表夹具：一行宽过 68ch 可读列；表格行不许在中间折开。
+    static let wideTableFixtureBody = """
+    # 宽表
+
+    | 名称 | 数量 | 说明 | 来源应用 | 记录时间 | 备注 |
+    | --- | --- | --- | --- | --- | --- |
+    | 苹果 | 3 | 这是一段很长的说明文字，用来把表格撑到可读列之外 | 备忘录 | 2026-10-09 16:53:20 | 第一条 |
+    | 香蕉 | 5 | 同样很长的一段说明文字，确保表格行宽超过六十八个字符 | 备忘录 | 2026-10-09 16:54:00 | 第二条 |
+    """
+
+    private func makeWideTableStore() -> HistoryStore {
+        makeCodeStore(body: Self.wideTableFixtureBody)
     }
 
     /// R448 表格体行夹具：表头 + **四行**体行（值各不相同，才看得出串行）。

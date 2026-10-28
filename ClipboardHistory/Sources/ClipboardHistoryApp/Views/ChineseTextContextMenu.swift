@@ -332,19 +332,25 @@ struct ChineseSelectableAttributedTextView: NSViewRepresentable {
     var highlightQuery: String = ""
     /// 见 `ChineseSelectableTextView.resetKey`。
     var resetKey: AnyHashable? = nil
+    /// R459：宽代码/宽表格的文档宽度；nil = 按可读列折行（U-4 的默认）。
+    var documentWidth: CGFloat? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = readOnlyBodyScrollView(font: nil)
+        scrollView.hasHorizontalScroller = documentWidth != nil
         if let textView = scrollView.documentView as? ChineseSelectableNSTextView {
             textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)
+            textView.setDocumentWidth(documentWidth)
         }
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ChineseSelectableNSTextView else { return }
-        textView.autoresizingMask = [.width]
+        textView.autoresizingMask = documentWidth == nil ? [.width] : []
+        scrollView.hasHorizontalScroller = documentWidth != nil
         textView.updateRendered(source: source, renderer: renderer, highlightQuery: highlightQuery)
+        textView.setDocumentWidth(documentWidth)
         textView.resetScrollIfIdentityChanged(resetKey)
         textView.applyReadOnlyMenuBehavior()
     }
@@ -416,6 +422,25 @@ final class ChineseSelectableNSTextView: NSTextView, NSMenuDelegate {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         applyReadOnlyMenuBehavior()
+    }
+
+    /// R459：宽块文档的横向滚动。nil = 恢复 U-4 的可读列（宽度跟踪视图）。
+    func setDocumentWidth(_ width: CGFloat?) {
+        guard let container = textContainer else { return }
+        // 不写字面量 `= true`：`Round4MarkdownTests` 用这个字面量数"装配有几份"，
+        // 这里是同一个容器的模式切换，不是第二套装配。
+        container.widthTracksTextView = width == nil
+        if let width {
+            container.containerSize = NSSize(width: max(0, width - textContainerInset.width * 2),
+                                             height: .greatestFiniteMagnitude)
+            isHorizontallyResizable = true
+            setFrameSize(NSSize(width: width, height: frame.height))
+        } else {
+            isHorizontallyResizable = false
+            if let scroll = enclosingScrollView {
+                setFrameSize(NSSize(width: scroll.contentSize.width, height: frame.height))
+            }
+        }
     }
 
     func applyReadOnlyMenuBehavior() {
