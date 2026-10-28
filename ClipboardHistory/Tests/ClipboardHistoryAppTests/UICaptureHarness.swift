@@ -4514,10 +4514,12 @@ final class UICaptureTests: XCTestCase {
 
     /// R442：设置侧栏必须有「关于」这一行。
     ///
-    /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：亮档数分区标签带，应为
-    /// `SettingsCategory.allCases.count`（7）；暗档是已知的暗侧栏文字盲区（亮暗两档的标签
-    /// 在离屏通道里只剩 1 条带）⇒ 具名 `SETTINGS_ABOUT_ROW_NOT_RUN=runner-dark-sidebar-text-blind`，
-    /// 不把"读不到"记成"没有这一行"。带的范围 y 60..285 排除底部署名行（y≈294）。
+    /// 1x 可画的是侧栏（设置内容列在 runner 上是平涂）：数分区标签带，应为
+    /// `SettingsCategory.allCases.count`（7）。行带**从视图树取**（`sidebarTextBands`）：
+    /// R118 量过同一份设置帧在 runner 上整列下移 282pt，绝对 y 60..285 在那里一条都盖不住
+    ///（R442 的 CI 就是这么红的：light 读到 0 条）；树给的带与被判的东西同源（D-166）。
+    /// 暗档若读不到 7 条带 ⇒ 具名 `SETTINGS_ABOUT_ROW_NOT_RUN=runner-dark-sidebar-text-blind`，
+    /// 不把"读不到"记成"没有这一行"。
     func testSettingsSidebarShowsTheAboutCategoryRow() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r442-about-row-\(UUID().uuidString)", isDirectory: true)
@@ -4533,7 +4535,10 @@ final class UICaptureTests: XCTestCase {
                 return XCTFail("\(tag)：找不到 `settings-general` ⇒ 这条判据没有对象")
             }
             let file = scratch.appendingPathComponent("settings-general-\(tag).png")
-            _ = try render(fixture, appearance: appearance, to: file)
+            var rowBands: [CGRect] = []
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                rowBands = Self.sidebarTextBands(in: host)
+            }
             guard let data = try? Data(contentsOf: file),
                   let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
                 XCTFail("\(tag)：`settings-general` 读不回字节 ⇒ 这条判据没有对象")
@@ -4551,16 +4556,23 @@ final class UICaptureTests: XCTestCase {
             let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 110 }
             let x0 = Int((38.0 * scale).rounded())
             let x1 = Int((120.0 * scale).rounded())
+            // 逐条**树给的**行带数：一条带里标签列有墨就算这一行有标签。底部那行署名不在
+            // 树的行带里，不会被当成第 8 条（M1214 第一版逃脱的那一格也因此不会再发生）。
             var bands = 0
-            var inBand = false
-            for y in Int((60.0 * scale))..<Int((285.0 * scale)) {
+            for band in rowBands {
+                let y0 = max(0, Int((band.minY * scale).rounded()))
+                let y1 = min(rep.pixelsHigh, Int((band.maxY * scale).rounded()))
                 var has = false
-                for x in x0..<x1 where isInk(luma(x, y)) {
-                    has = true
-                    break
+                if y1 > y0 {
+                    for y in y0..<y1 {
+                        for x in x0..<x1 where isInk(luma(x, y)) {
+                            has = true
+                            break
+                        }
+                        if has { break }
+                    }
                 }
-                if has && !inBand { bands += 1; inBand = true }
-                if !has { inBand = false }
+                if has { bands += 1 }
             }
             if appearance == .darkAqua && bands < SettingsCategory.allCases.count {
                 emit("SETTINGS_ABOUT_ROW_NOT_RUN=runner-dark-sidebar-text-blind \(tag) 带=\(bands)"
@@ -4571,6 +4583,85 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(bands, SettingsCategory.allCases.count,
                            "\(tag)：分区标签带 \(bands) 条（应为 \(SettingsCategory.allCases.count)）"
                            + " ⇒ 关于行没进侧栏或标签被截掉")
+        }
+    }
+
+    /// R444：主列表行的时间行必须带来源 App 名（时间在前、来源在后；nil 只显示时间）。
+    ///
+    /// 两帧同一段正文/时间，只差来源字段：`sidebar-history` 第一行（Safari）对
+    /// `sidebar-no-source` 第一行（来源 nil）。读第一行最后一条文字带（时间行）的墨宽，
+    /// 来源行应比无来源行宽出来源那一段；左沿相同（时间不因来源挪位）。
+    /// 1x 通道：侧栏行文字在 runner 上画得出来（R431 的同一批帧）；若整列无墨则具名 NOT-RUN。
+    func testHistoryRowsShowTheirSourceAppName() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r444-row-source-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func timeLine(_ name: String) throws -> (width: Double, left: Double)? {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                    return nil
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let o = y * bytesPerRow + x * 4
+                    return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+                }
+                let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+                let x0 = Int((96.0 * scale).rounded())
+                let x1 = Int((285.0 * scale).rounded())
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in Int((140.0 * scale))..<min(height, Int((230.0 * scale))) {
+                    var has = false
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && top < 0 { top = y }
+                    if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+                }
+                if top >= 0 { bands.append((top, min(height, Int((230.0 * scale))) - 1)) }
+                guard bands.count >= 3 else { return nil }
+                let timeBand = bands[2]                // 标题/预览两行之后是时间行
+                var leftmost = Int.max
+                var rightmost = -1
+                for y in timeBand.top...timeBand.bottom {
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        leftmost = min(leftmost, x)
+                        rightmost = max(rightmost, x)
+                    }
+                }
+                guard rightmost >= 0 else { return nil }
+                return (Double(rightmost - leftmost + 1) / scale, Double(leftmost) / scale)
+            }
+            guard let source = try timeLine("sidebar-history"),
+                  let noSource = try timeLine("sidebar-no-source") else {
+                emit("HISTORY_ROW_SOURCE_NOT_RUN=runner-1x-sidebar-plain \(tag)"
+                     + " ⇒ 侧栏行文字没画出来（1x 通道），这条判据没有对象")
+                continue
+            }
+            emit("HISTORY_ROW_SOURCE \(tag) 来源行宽=\(String(format: "%.1f", source.width))pt"
+                 + " 无来源行宽=\(String(format: "%.1f", noSource.width))pt"
+                 + " 差=\(String(format: "%.1f", source.width - noSource.width))pt"
+                 + " 左沿=\(String(format: "%.1f", source.left))/\(String(format: "%.1f", noSource.left))pt")
+            XCTAssertGreaterThanOrEqual(source.width - noSource.width, 25.0,
+                                        "\(tag)：来源行只比无来源行宽 \(source.width - noSource.width)pt"
+                                        + " ⇒ 来源 App 名没有进时间行")
+            XCTAssertEqual(source.left, noSource.left, accuracy: 1.0,
+                           "\(tag)：来源行左沿 \(source.left)pt 与无来源 \(noSource.left)pt 不同 ⇒ 时间被挪了")
         }
     }
 
@@ -7222,6 +7313,16 @@ final class UICaptureTests: XCTestCase {
 
         results.append(Fixture("sidebar-history", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
+        })
+        // R444：来源行负臂 —— 与 `sidebar-history` 第一行**同一段正文/时间**，只是来源为 nil。
+        // 必须走存档载入（`makeNoSourceDetailStore`）：`store.add` 会被上下文采集器补成
+        // `loginwindow`，负臂就自己长出「来自 loginwindow」。
+        results.append(Fixture("sidebar-no-source", NSSize(width: 300, height: 520)) {
+            // 单条 store 会被 List 默认选中，而选中行的系统材质在离屏窗口里画成纯黑
+            //（R18 那一族的已登记盲区）⇒ 整行一条黑带。负臂不选行，时间行才是干净的 3 条带。
+            let noSource = self.makeNoSourceDetailStore()
+            noSource.perform(.setSelection([]))
+            return AnyView(self.sidebarFrame(HistorySidebarView(historyStore: noSource)))
         })
         // R429：固定条目分区头 —— 正臂（有头）、旧形状（无头）、取证标记三帧。
         // 这三帧**不选行**：选中行的系统材质在离屏窗口里会画成纯黑（R18 那一族），
@@ -14282,7 +14383,11 @@ final class UICaptureTests: XCTestCase {
         for (probe, vibrant) in pendingControl where eligible(probe) {
             if vibrant != nil { controlVibrant.insert("\(probe.fixture)/\(probe.what)") }
         }
-        judged = checked - notRun.count
+        // R442/R444：`notRun` 只收"说明段在 settings 族空白时放行"的那批；而控件探针里
+        // 不可判的那几条（同一族、同一个 `eligible` 判断）在循环里被 `where eligible` 跳过了，
+        // 却仍然被 `checked - notRun.count` 算进 judged —— runner 上于是读出 judged 22 /
+        // mustJudge 20（R442 的 CI 红）。判过 = 真的进了循环的那批：把不可判的控件也扣掉。
+        judged = checked - notRun.count - pendingControl.filter { !eligible($0.probe) }.count
         XCTAssert(checked >= 40, "只问了 \(checked) 条探针的颜色域 ⇒ 两张贴表的遍历本身坏了")
         // 地板**从表推导**，不写死数字。runner 第一次真跑（run 38485603211）：40 条里放行 20、判成 20 ——
         // 恰好压在写死的 20 上。那种"刚好过"的地板既拦不住未来（再多一族画不出来就悄悄归零），

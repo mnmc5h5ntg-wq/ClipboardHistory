@@ -261,11 +261,16 @@ private struct RowTextColumn: View {
                     .lineLimit(2)
                     .truncationMode(.tail)
             }
-            Text(ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp))
-                // 复制时间是行内唯一的时间信息，tertiary 在暗色下实测 2.2:1，读不出来。
-                // 字号也从 10pt 提到 11pt：10pt 低于 HIG 的正文下限，而这一行没有别的冗余信息
-                // 可以让它更小（审计第二轮 1.2 / 账本 R2-13）。
+            // R444：时间行补「· 来自 <来源 App>」—— 主列表第一次有来源（此前只有详情头部有）。
+            // 时间在前、来源在后：行宽不够时先截断来源，时间不丢；来源 nil 时只显示时间。
+            Text(HistoryRowSourceLine.text(
+                time: ClipboardDateFormatters.sidebarTime.string(from: entry.timestamp),
+                sourceAppName: entry.sourceAppName))
+                // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
+                // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
                 .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主列表行时间行补「· 来自 <来源 App>」（时间在前；nil 只显示时间；来源行 140.5pt vs 无来源 73.5pt、差 67.0；57 张行帧变化 + 2 张负臂、基线 248）（R444 / 第 443 轮 / Round 441 / U-1643…U-1647 · 产品 2 文件，主列表行来源位）
+
+
 ### 设置侧栏文字补显式动态色（`.primary` → `Color(nsColor: .labelColor)`；暗档 2x 反侧 0/17、`SETTINGS_ABOUT_ROW dark 7`、盲区名册 17→0；36 张设置面帧、基线 246）（R443 / 第 442 轮 / Round 440 / U-1638…U-1642 · 产品 1 文件，设置侧栏文字位）
 
 
