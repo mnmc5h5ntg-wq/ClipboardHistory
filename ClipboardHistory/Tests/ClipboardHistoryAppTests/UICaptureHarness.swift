@@ -4665,6 +4665,84 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R445：侧栏搜索必须匹配**来源 App 名**（R437 的欠账；R444 已把来源显示在行里）。
+    ///
+    /// 查询 "Safari" 不在任何一行的正文里，只在第一行的来源字段里：
+    /// `sidebar-search-source` 的表行数应为 1（新口径），`sidebar-no-results`（不存在的词）为 0。
+    /// 旧口径下前者会退化成 0 —— 表行数是结构量，1x runner 上也成立；行带墨是"这一行真画出来了"的像素证人。
+    func testSidebarSearchMatchesTheSourceAppName() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r445-search-source-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            func read(_ name: String) throws -> (tableFound: Bool, rows: Int, rowBands: Int) {
+                guard let fixture = fixtures(appearance: appearance)
+                    .first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：找不到 `\(name)` ⇒ 这条判据没有对象")
+                    return (false, -1, -1)
+                }
+                let file = scratch.appendingPathComponent("\(name)-\(tag).png")
+                var rows = -1
+                var tableFound = false
+                _ = try render(fixture, appearance: appearance, to: file) { host in
+                    if let table = Self.firstTableView(in: host) {
+                        tableFound = true
+                        rows = table.numberOfRows
+                    }
+                }
+                guard let data = try? Data(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                    XCTFail("\(tag)：`\(name)` 读不回字节 ⇒ 这条判据没有对象")
+                    return (tableFound, rows, -1)
+                }
+                let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let height = rep.pixelsHigh, bytesPerRow = rep.bytesPerRow
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let o = y * bytesPerRow + x * 4
+                    return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+                }
+                let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 90 } : { $0 <= 190 }
+                let x0 = Int((96.0 * scale).rounded())
+                let x1 = Int((285.0 * scale).rounded())
+                var bands = 0
+                var top = -1
+                for y in Int((140.0 * scale))..<min(height, Int((260.0 * scale))) {
+                    var has = false
+                    for x in x0..<x1 where isInk(luma(x, y)) {
+                        has = true
+                        break
+                    }
+                    if has && top < 0 { top = y }
+                    if !has && top >= 0 { bands += 1; top = -1 }
+                }
+                if top >= 0 { bands += 1 }
+                return (tableFound, rows, bands)
+            }
+            let source = try read("sidebar-search-source")
+            let empty = try read("sidebar-no-results")
+            emit("HISTORY_SEARCH_SOURCE \(tag) 来源查询行数=\(source.rows)（行带=\(source.rowBands)）"
+                 + " 无结果查询行数=\(empty.rows)（行带=\(empty.rowBands)）")
+            if source.rowBands == 0 {
+                emit("HISTORY_SEARCH_SOURCE_NOT_RUN=runner-1x-sidebar-plain \(tag)"
+                     + " ⇒ 侧栏行文字没画出来（1x 通道），像素证人记未运行")
+            }
+            // 无结果态会把列表换成那句"没有匹配"，**没有 NSTableView**：无表 = 0 行。
+            XCTAssertTrue(!empty.tableFound || empty.rows == 0,
+                          "\(tag)：不存在的词却留下了表 \(empty.rows) 行 ⇒ 负对照不成立")
+            XCTAssertTrue(source.tableFound,
+                          "\(tag)：来源查询没有 NSTableView ⇒ 这一屏没有列表可判")
+            XCTAssertEqual(source.rows, 1,
+                           "\(tag)：只命中来源名的查询搜出 \(source.rows) 行（应为 1）"
+                           + " ⇒ 侧栏搜索没匹配 `sourceAppName`")
+            XCTAssertGreaterThanOrEqual(source.rowBands, 3,
+                                        "\(tag)：货源查询那一行只画出 \(source.rowBands) 条带"
+                                        + " ⇒ 行没画出来（表行数对但像素无证）")
+        }
+    }
+
     /// R436：批量操作栏里「删除」与其余四颗之间必须有一条发丝分隔。
     ///
     /// 缺陷形状（修之前 `sidebar-multi-select` 亮/暗现读）：五颗在 `spacing: 0` 的一排里，
@@ -7406,6 +7484,16 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: favorited)))
         })
         results.append(Fixture("sidebar-no-results", NSSize(width: 300, height: 520)) {            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: searching)))
+        })
+        // R445：只命中**来源 App 名**的查询 —— "Safari" 不在任何一行的正文里，
+        // 只在第一行的来源字段里。旧口径 0 行（与 sidebar-no-results 同形）；新口径 1 行。
+        let sourceSearch = makePopulatedStore()
+        sourceSearch.perform(.updateSearch("Safari"))
+        // 过滤后只剩一行时 List 会把它当成选中行，离屏下选中材质画成纯黑（R18 的已登记盲区）——
+        // 亮档黑底黑字，行带只剩一条。这里清掉选中，露出来的是未被选中的行（正常文字色）。
+        sourceSearch.perform(.setSelection([]))
+        results.append(Fixture("sidebar-search-source", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: sourceSearch)))
         })
 
         for entry in store.entries.prefix(4) {            let captured = entry

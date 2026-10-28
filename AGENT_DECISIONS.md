@@ -7841,3 +7841,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：长来源的截断没有帧（474）；搜索仍不匹配来源名（437）。
 - 回滚：时间行回退到 `ClipboardDateFormatters.sidebarTime` 即可恢复旧帧；或 `git revert`。
 
+## D-441 侧栏搜索匹配来源 App 名（R445）
+
+- 背景：R437 起记着"主列表搜索不匹配 `sourceAppName`"；R444 已把来源显示在每行（`时间 · 来自 <来源>`）——看得见、搜不到。
+- 决定：新 `HistorySearchPolicy.matches`：来源名与内容/OCR/文件**并列**（不是替换；空来源/空查询不编匹配）；`HistoryStore.computeFilteredEntries` 收成一行调用（Store 只减不加）。
+- 理由：来源是剪贴板历史的核心元信息；策略纯函数可单测；行帧在 1x 可画，来源查询的行数 0→1 是结构量。
+- 兼容性/迁移：新夹具 `sidebar-search-source`（2 帧，基线 248→250）；无结果态无 NSTableView（负臂=无表 0 行）；过滤单行会被 List 默认选中（离屏黑块）⇒ 夹具清空选中。
+- 边界：bundle ID 未搜（475）；长来源截断无帧（474）；QuickPick 已有来源理由带（R430）。
+- 回滚：Store 恢复原 switch 即可；或 `git revert`。
+

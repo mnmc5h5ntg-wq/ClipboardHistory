@@ -1,5 +1,5 @@
 {
-  "count": 248,
+  "count": 250,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -231,6 +231,8 @@
     "sidebar-pinned-section-flat-300x520-light.png": "7739d2715876ed885e3013304ebfa3822d78a9e196773862ccf161b24230c92a",
     "sidebar-row-hover-300x520-dark.png": "de0a1710a172b9f4ec1831cf799226c81d24a425d5b9e8723cd0e69bf5d85839",
     "sidebar-row-hover-300x520-light.png": "270e740940bb2ef12f47cfa7949d3ddad40087b6e6be2aa4d8f9d179018e75f0",
+    "sidebar-search-source-300x520-dark.png": "42cc909b52163bf9d77c19de45110e837fa71b06c9d2ffacd8e34fe91ccfb407",
+    "sidebar-search-source-300x520-light.png": "cb3840f0f9edad44ceed95d70fbb48ad84813b2a7f117269695a5f78bf182725",
     "statusitem-glyph-160x90-dark.png": "136a265ebde28535ae30cdb40530ee0c8ad553f82fab4a53a9bb0da04b11d1f0",
     "statusitem-glyph-160x90-light.png": "e8aa8fb157c096a239b5a149c2512529a51285f87b7c303fca577994ff423158",
     "statusitem-label-idle-64x40-dark.png": "6bbe17b2f2a66df156d96cdab26e64af121051bc45ccaa30045ea7c1b48ba353",

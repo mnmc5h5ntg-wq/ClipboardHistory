@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 侧栏搜索补匹配来源 App 名（只命中来源的查询 0 行→1 行；新 `HistorySearchPolicy` + Store 收薄到 1108 行/最长 66；2 张新帧、基线 250）（R445 / 第 444 轮 / Round 442 / U-1648…U-1652 · 产品 3 文件，侧栏搜索来源位）
+
+
 ### 主列表行时间行补「· 来自 <来源 App>」（时间在前；nil 只显示时间；来源行 140.5pt vs 无来源 73.5pt、差 67.0；57 张行帧变化 + 2 张负臂、基线 248）（R444 / 第 443 轮 / Round 441 / U-1643…U-1647 · 产品 2 文件，主列表行来源位）
 
 

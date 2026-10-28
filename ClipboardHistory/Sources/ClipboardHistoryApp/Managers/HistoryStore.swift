@@ -154,21 +154,9 @@ final class HistoryStore: ObservableObject {
 
         let ordered = EntryOrdering.ordered(entriesForFilter)
         guard !searchText.isEmpty else { return ordered }
-        return ordered.filter { entry in
-            switch entry.content {
-            case .text(let string):
-                return string.localizedCaseInsensitiveContains(searchText)
-            case .image:
-                if "图片".localizedCaseInsensitiveContains(searchText) { return true }
-                if OCRPolicy.matches(entry: entry, index: ocrIndex, query: searchText) { return true }
-                return false
-            case .file(let url):
-                if url.lastPathComponent.localizedCaseInsensitiveContains(searchText) { return true }
-                if OCRPolicy.matches(entry: entry, index: ocrIndex, query: searchText) { return true }
-                return false
-            case .files(let urls):
-                return urls.contains { $0.lastPathComponent.localizedCaseInsensitiveContains(searchText) }
-            }
+        // R445：内容 + 来源 App 名的匹配收进纯函数（来源名 R444 起已显示在行里）。
+        return ordered.filter {
+            HistorySearchPolicy.matches(entry: $0, query: searchText, ocrIndex: ocrIndex)
         }
     }
 
