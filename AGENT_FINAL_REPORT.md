@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R487**（commit `d44e16d`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R487 那一节为准。上一笔动 `Sources/` 的是 R486（`dfbf6f6`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R488**（commit `9487c0f`）—— 本轮是**产品轮**（`Sources/` 3 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R488 那一节为准。上一笔动 `Sources/` 的是 R487（`d44e16d`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1392,5 +1392,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R487（Markdown 表格竖线位）**：表格在渲染态仍原样带 `|`，R440/R448 只改表头字重与体行线。新 `MarkdownTablePresentation.renderedRow` 把每个竖线换成同宽空格并只裁首尾空白，`collectTable` 用它组装表格块；列起点不挪、源码态不变。**8 张旧帧变化、基线 306 不变**；`TABLE_PIPES` 表格块竖线 0、表格区墨 4251/3731；M1319/M1320 **2/2**。重锚两把旧尺（宽表认 `tableRowCountAttribute`、表头针改 `甲   乙`），宽表容器 752.1→720.0pt、表头墨比 1.40→1.17/1.19，均仍过旧地板。⓪ 开工 push no-op、ahead=0；收口两次 push 失败 ⇒ PUSH_BLOCKED=network（d44e16d、ahead=1）；R487 跑未创建 ⇒ NOT-RUN；R486 主跑唯一红是 Release 3 条非产品、补记跑 success；DATA_ACTION_ICONS/HEATMAP_TODAY 的 1x NOT_RUN 出口签收。全量 **1303/56/0**（504.4s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R488（表格列宽随内容对齐位）**：R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪（修前 269/254/260px、第三列 353/350/356px）。`renderedContent` 只保留 `\t` 分列；`columnStops` 按每列最大实宽（表头/表体各自字体）算绝对制表位；`paragraphStyle` 给表格块设 tabStops；`WideMarkdownDocument` 按最后一列右沿量宽。**8 张旧帧 + 2 张新帧**，基线 **306→308**；`TABLE_COLUMNS` 制表位=2、第二列 [245,246,246] 极差 1px、第三列 [321,321,321] 极差 0px；M1321/M1322 2/2，R487 M1319/M1320 重锚后 2/2。宽表 690.1pt（>611）、行片段 [1,1,1]；表头墨比 1.16/1.19（>1.08）。⓪ push 04cc517..519b22b success、ahead=0；R487 跑 success（TABLE_PIPES 1x 0/1158/1074、WIDE_TABLE 719.8、表头 1.11/1.18）；R486 主跑唯一红是 Release 3 条非产品。全量 **1304/56/0**（506.7s）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R488（表格列宽随内容对齐位）**：R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪（修前 269/254/260px、第三列 353/350/356px）。`renderedContent` 只保留 `\t` 分列；`columnStops` 按每列最大实宽（表头/表体各自字体）算绝对制表位；`paragraphStyle` 给表格块设 tabStops；`WideMarkdownDocument` 按最后一列右沿量宽。**8 张旧帧 + 2 张新帧**，基线 **306→308**；`TABLE_COLUMNS` 制表位=2、第二列 [245,246,246] 极差 1px、第三列 [321,321,321] 极差 0px；M1321/M1322 2/2，R487 M1319/M1320 重锚后 2/2。宽表 690.1pt（>611）、行片段 [1,1,1]；表头墨比 1.16/1.19（>1.08）。⓪ push 04cc517..519b22b success、ahead=0；R487 跑 success（TABLE_PIPES 1x 0/1158/1074、WIDE_TABLE 719.8、表头 1.11/1.18）；R486 主跑唯一红是 Release 3 条非产品；R488 跑 40851078685 in_progress ⇒ NOT-RUN。全量 **1304/56/0**（506.7s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
