@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R484**（commit `6454a93`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R484 那一节为准。上一笔动 `Sources/` 的是 R483（`a59956c`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R485**（commit `35ad21a`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R485 那一节为准。上一笔动 `Sources/` 的是 R484（`6454a93`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1386,5 +1386,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R484（热图今天角标位）**：热图靠文字让用户自己找今天，今天格与别的格同形。`DailyCopyHeatmapCell.isToday`（默认 false）+ 今天格右上角 4pt labelColor 圆点；`DailyCopyHeatmapView` 用 `calendar.isDate` 判定，加捕获缝。**8 张旧帧变化 + 2 张新帧**，基线 **300→302**；`HEATMAP_TODAY` 两臂差 60 像素、bbox 1108,408–1115,415；M1313/M1314 **2/2**；负向帧补 vibrant 名册（首遍全量红 1 条，修后 1300/56/0）。⓪ no-op push、ahead=0；R481 跑签收 ROW_LINK_BADGE 19/18 与 Capture gate 红 0；R483 跑 in_progress ⇒ NOT-RUN。全量 **1300/56/0**（494.7s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R485（浮层候选行收藏星标位）**：浮层的置顶/来源/时间都有标记，唯独收藏没有；同一条记录在主列表有星标，浮层里零可见（修前 `quickpick-favorite` 与 `quickpick-no-source` 逐像素同形）。`QuickPickRowCell` 加 `favoriteBadge`（9pt star.fill，类型符号右上角，与图钉右下角错开），颜色与主列表同源；读屏标签加「收藏 」。**2 张新帧、0 旧帧变化**，基线 **302→304**；`QUICKPICK_FAVORITE` light 215→328（+113）、首墨行 115→105；dark 233→348（+115）、上移 9px；标题末列差 0px；M1315/M1316 **2/2**。⓪ 网络两探失败 ⇒ **PUSH_BLOCKED=network（2eadacf、ahead=1）**、CI_READ_BLOCKED；R484 跑未读 ⇒ NOT-RUN；R483 跑唯一红是 Release 3 条非产品。全量 **1301/56/0**（467.8s）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R485（浮层候选行收藏星标位）**：浮层的置顶/来源/时间都有标记，唯独收藏没有；同一条记录在主列表有星标，浮层里零可见（修前 `quickpick-favorite` 与 `quickpick-no-source` 逐像素同形）。`QuickPickRowCell` 加 `favoriteBadge`（9pt star.fill，类型符号右上角，与图钉右下角错开），颜色与主列表同源；读屏标签加「收藏 」。**2 张新帧、0 旧帧变化**，基线 **302→304**；`QUICKPICK_FAVORITE` light 215→328（+113）、首墨行 115→105；dark 233→348（+115）、上移 9px；标题末列差 0px；M1315/M1316 **2/2**。⓪ 开工网络两探失败 ⇒ PUSH_BLOCKED=network（2eadacf、ahead=1）；收口网络恢复，**push 6454a93..35ad21a success、ahead=0**；R485 跑 40832860076 in_progress ⇒ NOT-RUN；R484 跑 40826572977 failure 3 步（Release/Swift/Capture），日志 EOF ⇒ 红名未读；R483 跑唯一红是 Release 3 条非产品。全量 **1301/56/0**（467.8s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
