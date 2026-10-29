@@ -1020,6 +1020,9 @@ struct HotKeySettingsRow: View {
     @ObservedObject var settings: HotKeySettings
     @Binding var shortcut: HotKeyShortcut
     @State private var isRecording = false
+    /// R493：「恢复默认」按钮图标的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.settingsResetButtonIconsForCapture) private var resetButtonIconsForCapture
+    private var resetButtonIconsVisible: Bool { resetButtonIconsForCapture ?? true }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1060,9 +1063,15 @@ struct HotKeySettingsRow: View {
                 .frame(width: 128, height: 28)
 
                 HStack(spacing: 0) {
-                    Button("恢复默认") {
+                    Button {
                         settings.reset()
                         shortcut = settings.shortcut
+                    } label: {
+                        if resetButtonIconsVisible {
+                            Label("恢复默认", systemImage: "arrow.counterclockwise")
+                        } else {
+                            Text("恢复默认")
+                        }
                     }
                 // R383：快捷键已是默认值时这颗按钮点了不产生任何变化 —— 与 R382 的权重页同一条规矩，
                 // 禁用态是它唯一诚实的呈现。判据读的是**整页两态**渲染出的按钮标签墨
@@ -1572,5 +1581,17 @@ extension EnvironmentValues {
     var loginFailureIconForCapture: Bool? {
         get { self[LoginFailureIconForCaptureKey.self] }
         set { self[LoginFailureIconForCaptureKey.self] = newValue }
+    }
+}
+
+/// R493：「恢复默认」按钮图标的负向帧缝（产品默认 nil ⇒ 画）。
+struct SettingsResetButtonIconsForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsResetButtonIconsForCapture: Bool? {
+        get { self[SettingsResetButtonIconsForCaptureKey.self] }
+        set { self[SettingsResetButtonIconsForCaptureKey.self] = newValue }
     }
 }

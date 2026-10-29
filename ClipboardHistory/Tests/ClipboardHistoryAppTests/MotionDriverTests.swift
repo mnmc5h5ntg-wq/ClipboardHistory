@@ -151,7 +151,7 @@ final class MotionDriverTests: XCTestCase {
         let compact = code.split(whereSeparator: \.isWhitespace).joined()
         let helper = "staticfuncresetDefaults(instore:RecommendationWeightsStore){"
             + "withAnimation(MotionCatalog.animation(for:.slider)){store.restoreDefaults()}}"
-        let call = #"Button("恢复默认"){Self.resetDefaults(in:store)}"#
+        let call = "Button{Self.resetDefaults(in:store)}label:{"
         let direct = "store.restoreDefaults()"
         let occurrences = compact.components(separatedBy: direct).count - 1
         return compact.contains(helper) && compact.contains(call) && occurrences == 1
@@ -172,7 +172,7 @@ final class MotionDriverTests: XCTestCase {
                 }
             }
             """
-        let button = #"Button("恢复默认") { Self.resetDefaults(in: store) }"#
+        let button = #"Button { Self.resetDefaults(in: store) } label: { Text("恢复默认") }"#
         XCTAssertTrue(Self.weightsResetIsAnimated(in: helper + "\n" + button))
         XCTAssertFalse(Self.weightsResetIsAnimated(in: """
             static func resetDefaults(in store: RecommendationWeightsStore) {

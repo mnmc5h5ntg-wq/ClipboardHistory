@@ -1328,6 +1328,70 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R493 · 恢复默认按钮图标
+
+    /// R493：数据页的导出/导入已有图标，快捷键页的「恢复默认」仍纯文字。
+    /// 成对帧 `settings-shortcuts` / `settings-shortcuts-no-reset-icon`：
+    /// 读右侧按钮列的墨量差（三颗恢复默认按钮各添一枚图标）。
+    func testShortcutResetButtonsCarryAResetIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r493-reset-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-shortcuts" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-shortcuts-no-reset-icon" }) else {
+                return XCTFail("\(tag)：找不到 shortcuts 两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "RESET_ICON", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                var ink = 0
+                for y in Int(Double(rep.pixelsHigh) * 0.15)..<Int(Double(rep.pixelsHigh) * 0.85) {
+                    for x in Int(Double(rep.pixelsWide) * 0.84)..<Int(Double(rep.pixelsWide) * 0.98)
+                        where isInk(x, y) { ink += 1 }
+                }
+                return (ink, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("RESET_ICON_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            let diff = pos.ink - neg.ink
+            emit("RESET_ICON \(tag) 负臂右列墨=\(neg.ink) 正臂右列墨=\(pos.ink)"
+                 + " 差=\(diff) 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂右列一个墨都没有 ⇒ 恢复默认按钮没画出来，尺没有对象")
+            XCTAssertGreaterThan(diff, Int(40.0 * scale * scale),
+                "\(tag)：正臂只多出 \(diff) 个右列墨像素 ⇒ 恢复默认没有图标")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("RESET_ICON_NOT_RUN：两档都没有设置内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R492 · 开机启动失败回执图标
 
     /// R492：失败回执只有红字，没有错误图标（横幅/回执都有）。
@@ -12117,6 +12181,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .data)
                 .environment(\.settingsDataActionIconsForCapture, false))
         })
+        // R493：快捷键页「恢复默认」按钮图标的负向臂（只关图标，其余与 settings-shortcuts 同）。
+        results.append(Fixture("settings-shortcuts-no-reset-icon", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts)
+                .environment(\.settingsResetButtonIconsForCapture, false))
+        })
         // R476：快捷键冲突臂 —— 第一行被设成与第二行完全相同的 ⌃⌥C。
         // 只多这一张成对帧：正常页没有冲突提示（既有 settings-shortcuts 逐字节不变）。
         results.append(Fixture("settings-shortcuts-conflict", NSSize(width: 720, height: 540)) {
@@ -18502,7 +18571,7 @@ final class UICaptureTests: XCTestCase {
         "settings-shortcuts-conflict",
         // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
         "settings-data-no-title-icon", "settings-data-no-action-icons",
-        "settings-privacy-no-default-badge",
+        "settings-privacy-no-default-badge", "settings-shortcuts-no-reset-icon",
         // R484：热图今天角标的负向臂也是同一棵 settings 侧栏 vibrant 子树。
         "settings-stats-populated-no-today",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：

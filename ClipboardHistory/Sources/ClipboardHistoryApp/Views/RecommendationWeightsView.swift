@@ -2,6 +2,9 @@ import SwiftUI
 
 struct RecommendationWeightsView: View {
     @ObservedObject var store: RecommendationWeightsStore
+    /// R493：「恢复默认」按钮图标的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.settingsResetButtonIconsForCapture) private var resetButtonIconsForCapture
+    private var resetButtonIconsVisible: Bool { resetButtonIconsForCapture ?? true }
 
     /// R99 / BACKLOG 142：二级标题那一行与说明段**搬进卡片**（只动容器，一行行为都没改）。
     ///
@@ -45,8 +48,14 @@ struct RecommendationWeightsView: View {
                     Spacer()
 
                     HStack(spacing: 0) {
-                        Button("恢复默认") {
+                        Button {
                             Self.resetDefaults(in: store)
+                        } label: {
+                            if resetButtonIconsVisible {
+                                Label("恢复默认", systemImage: "arrow.counterclockwise")
+                            } else {
+                                Text("恢复默认")
+                            }
                         }
                     // R382：权重全默认时这颗按钮点了不产生任何变化 —— 禁用态是它唯一诚实的呈现。
                     // 判据不是「有没有写 .disabled」，而是同一颗按钮在默认/动过两帧里的**标签墨**

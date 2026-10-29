@@ -8274,3 +8274,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x/dark 未读；图标与文字同色，颜色不作独立通道。
 - 回滚：删图标/捕获缝/新帧与判据，回执恢复纯 Text。
 
+## D-489 「恢复默认」按钮补 counterclockwise 图标；权重复位尺按 closure-label 重锚（R493）
+
+- 背景：数据页导出/导入已带图标，快捷键/推荐两处「恢复默认」仍纯文字；同一设置窗口的动作图标语言分裂。
+- 决定：两处改用 `Label("恢复默认", systemImage: "arrow.counterclockwise")`，标签不改；加捕获缝 `settingsResetButtonIconsForCapture`。
+- 理由：同一动作组的图标语言要一致；图标放标签左，按钮宽度增长由布局吸收，禁用态文字仍可读。
+- 兼容性/迁移：18 张旧帧变化 + 2 张新帧，基线 316→318；MotionDriver 的 `weightsResetIsAnimated` 从 `Button("恢复默认")` 改成 closure-label 的正对照，产品调用仍唯一。
+- 边界：runner 1x/dark 未读。
+- 回滚：两处 Label 改回 Text，删捕获缝/新帧与判据，MotionDriver 正对照改回旧字面量。
+
