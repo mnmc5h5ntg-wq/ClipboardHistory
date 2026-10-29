@@ -764,11 +764,21 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             favoriteBadge.translatesAutoresizingMaskIntoConstraints = false
             favoriteBadge.isHidden = true
             favoriteBadge.identifier = NSUserInterfaceItemIdentifier("quickPickFavoriteBadge")
+            // R491：主列表的链接/富文本/OCR 都有小标记，浮层一行只说标题。
+            // 内容标记叠在类型符号左上角（与收藏右上、图钉右下错开），只占叠层。
+            let contentBadge = NSImageView()
+            contentBadge.imageScaling = .scaleProportionallyDown
+            contentBadge.contentTintColor = .secondaryLabelColor
+            contentBadge.setAccessibilityElement(false)
+            contentBadge.translatesAutoresizingMaskIntoConstraints = false
+            contentBadge.isHidden = true
+            contentBadge.identifier = NSUserInterfaceItemIdentifier("quickPickContentBadge")
             let cell = QuickPickRowCell()
             cell.addSubview(symbol)
             cell.addSubview(sourceIcon)
             cell.addSubview(pinnedBadge)
             cell.addSubview(favoriteBadge)
+            cell.addSubview(contentBadge)
             cell.addSubview(text)
             cell.addSubview(time)
             cell.textField = text
@@ -776,6 +786,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             cell.sourceIcon = sourceIcon
             cell.pinnedBadge = pinnedBadge
             cell.favoriteBadge = favoriteBadge
+            cell.contentBadge = contentBadge
             cell.timeField = time
             text.translatesAutoresizingMaskIntoConstraints = false
             time.translatesAutoresizingMaskIntoConstraints = false
@@ -793,6 +804,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
                 favoriteBadge.topAnchor.constraint(equalTo: symbol.topAnchor, constant: -3),
                 favoriteBadge.widthAnchor.constraint(equalToConstant: 9),
                 favoriteBadge.heightAnchor.constraint(equalToConstant: 9),
+                contentBadge.leadingAnchor.constraint(equalTo: symbol.leadingAnchor, constant: -2),
+                contentBadge.topAnchor.constraint(equalTo: symbol.topAnchor, constant: -3),
+                contentBadge.widthAnchor.constraint(equalToConstant: 9),
+                contentBadge.heightAnchor.constraint(equalToConstant: 9),
                 sourceIcon.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
                 sourceIcon.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 sourceIcon.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
@@ -813,6 +828,15 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         var accessibilityLabel = rows[row].title
         if entry.isPinned { accessibilityLabel = "置顶 " + accessibilityLabel }
         if entry.isFavorite { accessibilityLabel = "收藏 " + accessibilityLabel }
+        let contentKind: (symbol: String, label: String)? = {
+            if case .text(let text) = entry.content, EntryPresentation.looksLikeLink(text) {
+                return ("link", "链接")
+            }
+            if entry.richText?.isEmpty == false { return ("textformat", "富文本") }
+            if entry.ocrText?.isEmpty == false { return ("text.viewfinder", "可搜索文字") }
+            return nil
+        }()
+        if let contentKind { accessibilityLabel = contentKind.label + " " + accessibilityLabel }
         cell.textField?.setAccessibilityLabel(accessibilityLabel)
         cell.pinnedBadge?.isHidden = !entry.isPinned
         cell.pinnedBadge?.image = entry.isPinned
@@ -824,6 +848,11 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             ? NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
             : nil
+        cell.contentBadge?.isHidden = contentKind == nil
+        cell.contentBadge?.image = contentKind.flatMap {
+            NSImage(systemSymbolName: $0.symbol, accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
+        }
         cell.timeField?.stringValue = Self.rowTime(for: entry,
                                                    reference: rows.map(\.entry.timestamp).max())
         cell.imageView?.image = Self.rowSymbol(for: entry.content)
@@ -962,6 +991,8 @@ private final class QuickPickRowCell: NSTableCellView {
     var pinnedBadge: NSImageView?
     /// R485：收藏徽标（叠在类型符号右上角，与图钉错开）。
     var favoriteBadge: NSImageView?
+    /// R491：内容徽标（链接/富文本/OCR，叠在类型符号左上角）。
+    var contentBadge: NSImageView?
 }
 
 /// 浮层的一行，多出来的只有一件事：**悬停那一档**（R67）。

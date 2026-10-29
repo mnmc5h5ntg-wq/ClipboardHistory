@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层候选行补内容标记（4 张新帧、基线 314）（R491 / 第 490 轮 / Round 488 / U-1905…U-1910 · 产品 1 文件 + 判据）
+
+
 ### 主列表来源行补来源 App 图标（70 张旧帧变化、基线 310）（R490 / 第 489 轮 / Round 487 / U-1899…U-1904 · 产品 1 文件 + 判据）
 
 

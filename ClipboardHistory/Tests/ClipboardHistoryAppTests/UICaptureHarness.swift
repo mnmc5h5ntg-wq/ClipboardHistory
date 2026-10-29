@@ -1328,6 +1328,70 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R491 · 浮层候选行内容标记
+
+    /// R491：主列表的链接/富文本/OCR 都有小标记，浮层一行只说标题。
+    /// 成对帧 `quickpick-plain` / `quickpick-link-badge`：同一条时间、只差是否链接；
+    /// 读类型符号那一列的墨量差（内容徽标叠在左上角）。
+    func testQuickPickLinkRowsCarryAContentBadge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r491-content-badge-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negative = fixtures.first(where: { $0.name == "quickpick-plain" }),
+                  let positive = fixtures.first(where: { $0.name == "quickpick-link-badge" }) else {
+                return XCTFail("\(tag)：找不到 quickpick-plain / quickpick-link-badge ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "QUICKPICK_CONTENT", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                let y0 = Int(45.0 * scale), y1 = min(rep.pixelsHigh, Int(100.0 * scale))
+                let x0 = Int(20.0 * scale), x1 = Int(60.0 * scale)
+                var ink = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 where isInk(x, y) { ink += 1 }
+                }
+                return (ink, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("QUICKPICK_CONTENT_BADGE_NOT_RUN=blank \(tag)")
+                continue
+            }
+            emit("QUICKPICK_CONTENT_BADGE \(tag) 负臂类型列墨=\(neg.ink) 正臂类型列墨=\(pos.ink)"
+                 + " 差=\(pos.ink - neg.ink) 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂类型符号那一列一个墨都没有 ⇒ 尺没有对象")
+            XCTAssertGreaterThan(pos.ink - neg.ink, Int(8.0 * scale * scale),
+                "\(tag)：正臂只多出 \(pos.ink - neg.ink) 个墨像素 ⇒ 链接内容徽标没有画出来")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("QUICKPICK_CONTENT_BADGE_NOT_RUN：两档都没有面板内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R490 · 主列表来源图标
 
     /// R490：详情头部与浮层都有来源 App 图标，主列表只有「来自 X」文字。
@@ -11273,6 +11337,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-favorite", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: self.makeFavoriteQuickPickStore(), query: "")))
+        // R491：浮层内容标记的正/负臂（同一条时间，只差「是不是链接」）。
+        results.append(Fixture("quickpick-plain", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makePlainQuickPickStore(), query: "")))
+        results.append(Fixture("quickpick-link-badge", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makeLinkQuickPickStore(), query: "")))
         // R469：跨年时间的主列表行组件栈（不走 List：选中底在离屏通道是黑带，
         // 会盖住其中一行的时间行；这里只拍产品行本身 + timeReference）。
         results.append(Fixture("rows-cross-year", NSSize(width: 340, height: 160)) {
@@ -16730,6 +16801,30 @@ final class UICaptureTests: XCTestCase {
             sourceURL: nil,
             sourceUTIs: ["public.utf8-plain-text"],
             isPinned: true
+        )
+        return HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+    }
+
+    /// R491：浮层内容标记的负臂（普通文本）与正臂（链接），同一条时间。
+    func makePlainQuickPickStore() -> HistoryStore {
+        quickPickStore(text: "这是一段普通文本记录")
+    }
+
+    func makeLinkQuickPickStore() -> HistoryStore {
+        quickPickStore(text: "https://example.com/page")
+    }
+
+    private func quickPickStore(text: String) -> HistoryStore {
+        let entry = ClipboardEntry(
+            content: .text(text),
+            timestamp: Self.referenceDate,
+            thumbnail: nil,
+            sourceURL: nil,
+            sourceUTIs: ["public.utf8-plain-text"]
         )
         return HistoryStore(
             clipboardWriter: TestClipboardWriter(),

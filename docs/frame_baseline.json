@@ -1,5 +1,5 @@
 {
-  "count": 310,
+  "count": 314,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -155,12 +155,16 @@
     "quickpick-favorite-420x300-light.png": "6b562769e58abb5b63365b88ae19c022be30878e8bf19e42d033e57edba0166c",
     "quickpick-hover-420x300-dark.png": "15c8efc4c6c4edad5032131981ddb0e6f01faedc004e7a249368e534a154ed96",
     "quickpick-hover-420x300-light.png": "e673110cba24fcd951f036130fd4ae3d1f2e0a832c9b66e748d2deb3c028fce8",
+    "quickpick-link-badge-420x300-dark.png": "cbf4e04fff58b6ebcefaba39daa131787393470ff3f79ba93bd969dfa14e3ce9",
+    "quickpick-link-badge-420x300-light.png": "809a20c87fdbd84f5a4a02cd33e27b072d01faa43f2394c09c640e77236a3817",
     "quickpick-list-420x300-dark.png": "dc23f3bf596e3c6808c0578c379d77c5a513eb55e32f182dc725dae8e84a94eb",
     "quickpick-list-420x300-light.png": "0916bec7076a69efa8e44865240131e14ac652ce7303f251e2dffeff9994fb76",
     "quickpick-no-source-420x300-dark.png": "b9f9efe2d6b6cab7733db61e0cbf286258dbc1f03c7afd4e00716b43bd8a8678",
     "quickpick-no-source-420x300-light.png": "742c386cf47e9fc9c2219e50c661bf8d2be5eea6d857a506d74e7dea5a675a3b",
     "quickpick-pinned-420x300-dark.png": "67c693f108b9dcc55f23d9dd0115961e88b93b0b181ec631706de75477889ae3",
     "quickpick-pinned-420x300-light.png": "72b1ee81a0f71a28050323e49a58eb51a9c79cbe08bc77f2ca8bb6d4afa309cd",
+    "quickpick-plain-420x300-dark.png": "066466cd4924921479cdef5acc764b984f0e37a71d6306cef45d7fc077c80b46",
+    "quickpick-plain-420x300-light.png": "bcaee77c9b3128209efc2afdc88694024595dca7bc78289ed6b123bb4a3d00b6",
     "quickpick-search-focus-420x300-dark.png": "28a8a6b23f4bf07c93a464071d2d22c02c2c5c67c569366ea5c1fc23406921f0",
     "quickpick-search-focus-420x300-light.png": "c76468cddfa8bc476148709ed95a56cdde3cc9adbb83107a51cb19fdb2d6d5b2",
     "quickpick-search-hover-420x300-dark.png": "28a8a6b23f4bf07c93a464071d2d22c02c2c5c67c569366ea5c1fc23406921f0",
