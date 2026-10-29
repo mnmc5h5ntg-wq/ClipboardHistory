@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R496**（commit `3c64394`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R496 那一节为准。上一笔动 `Sources/` 的是 R495（`9e72947`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R497**（commit `a98e65d`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R497 那一节为准。上一笔动 `Sources/` 的是 R496（`3c64394`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1410,5 +1410,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R496（浮层命中高亮位）**：主列表/侧栏命中加黄底，浮层同一查询只过滤不高亮——来源命中时「来自 访达」是唯一理由却无标记。新增 `QuickPickTitlePresentation`（复用 spans + highlightColor），只在命中段非空时走 attributed；缝 `titleHighlightEnabled`（默认 true）。**2 张旧帧 + 2 张新帧**，基线 **322→324**；`QUICKPICK_MATCH_HIGHLIGHT` 正臂尾黄 2115/2148、头 0，负臂 0/0；M1339/M1340 2/2。⓪ push `bbfe31c..2e7828f` success、ahead=0；R495 跑 success（1311/80/0；MAIN_TITLE_ICON 1x 签收 +72/+87 ⇒ 587 结案）；R494 主跑 Release 3 条、补记跑 Motion 1 条；R493 跑 2 步红；收口 `PUSH_BLOCKED=network`（HEAD=`3c64394`、origin/main=`2e7828f`、ahead=1）、`CI_READ_BLOCKED=network`，R496 跑未创建 ⇒ NOT-RUN。全量 1312/56/1（PerfBudget 306.4ms 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R497（搜索占位符省略号位）**：全仓动作文案十余处用单「…」，只有主侧栏搜索占位符写「搜索历史……」两个省略号。改「搜索历史…」，加缝 `searchPlaceholderForCapture`。**44 张旧帧 + 2 张新帧**，基线 **324→326**；`SEARCH_PLACEHOLDER` 正臂 60.5pt、负臂 71.0pt、差 10.5pt；M1341/M1342 2/2。⓪ push `2e7828f..1d3179a` success、ahead=0；R496 跑 queued ⇒ NOT-RUN；R495 跑 success（1311/80/0）。全量 1313/56/1（PerfBudget 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R497（搜索占位符省略号位）**：全仓动作文案十余处用单「…」，只有主侧栏搜索占位符写「搜索历史……」两个省略号。改「搜索历史…」，加缝 `searchPlaceholderForCapture`。**44 张旧帧 + 2 张新帧**，基线 **324→326**；`SEARCH_PLACEHOLDER` 正臂 60.5pt、负臂 71.0pt、差 10.5pt；M1341/M1342 2/2。⓪ push `2e7828f..1d3179a` success、ahead=0；R496 跑 success（1312/80/0；QUICKPICK_MATCH_HIGHLIGHT 1x 签收 ⇒ 592 结案）；R497 跑 queued ⇒ NOT-RUN；R495 跑 success（1311/80/0）。全量 1313/56/1（PerfBudget 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。
 

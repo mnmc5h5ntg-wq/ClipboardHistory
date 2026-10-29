@@ -10609,9 +10609,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：R495 跑 `40920092629` success，但该判据 `SETTINGS_HELPER_FONT_NOT_RUN=scale-too-low` 两档（runner 设置帧 1.0x，10/11pt 差 1px）。
     修法：若要在 runner 判，需换结构量（如 helper 行数/折行位置）或要求 ≥2x 捕获；**不许**把 1.5 倍率门槛降下来。
 
-**592. QUICKPICK_MATCH_HIGHLIGHT 的 runner 1x 黄底像素地板未读**（R496 观察）
-    现象：本机 2x 正臂尾黄 2115/2148、负臂 0；runner 1x 跑尚未创建（R496 自身跑 in_progress）。
-    修法：下一跑读该通道；1x 尾黄若低于 200·s²，先查 1x 下黄底是否落墨，不降地板。
+**592. QUICKPICK_MATCH_HIGHLIGHT 的 runner 1x 已签收（R497 结案）**
+    现象：R496 跑 `40932022750 ↔ 1d3179a` success 里 `QUICKPICK_MATCH_HIGHLIGHT` 1x light 尾 290/头 25、dark 尾 245/头 5、负臂 0/0。
+    修法：无（1x 签收）；若后续改高亮段/底色，重跑该通道。
 
 **587 结案**（R496）：R495 跑 `40920092629 ↔ bbfe31c` success 里 `MAIN_TITLE_ICON` light 478→550（+72）、dark 3733→3820（+87），1x 签收。
 

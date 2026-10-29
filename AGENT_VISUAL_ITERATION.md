@@ -19946,7 +19946,7 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ## Round 494 · R497（第 496 轮 · 2026-10-30）：主侧栏搜索占位符省略号统一（44 旧帧 + 2 新帧、基线 326）
 
-全仓动作文案十余处用单「…」，只有主侧栏搜索占位符写「搜索历史……」两个省略号。改成「搜索历史…」，加缝 `searchPlaceholderForCapture`。44 张旧帧变化（22 content-* + 20 sidebar-* + 2 search-field-*）+ 2 张新帧，基线 324→326；`SEARCH_PLACEHOLDER` 正臂 60.5pt、负臂 71.0pt、差 10.5pt（两档同值）；M1341/M1342 2/2。预检 278/255/684、rot 365/1110、ARM 371/1171。全量 1313/56/1（PerfBudget 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `2e7828f..1d3179a` success、ahead=0；R496 跑 queued ⇒ NOT-RUN；R495 跑 success（1311/80/0）。
+全仓动作文案十余处用单「…」，只有主侧栏搜索占位符写「搜索历史……」两个省略号。改成「搜索历史…」，加缝 `searchPlaceholderForCapture`。44 张旧帧变化（22 content-* + 20 sidebar-* + 2 search-field-*）+ 2 张新帧，基线 324→326；`SEARCH_PLACEHOLDER` 正臂 60.5pt、负臂 71.0pt、差 10.5pt（两档同值）；M1341/M1342 2/2。预检 278/255/684、rot 365/1110、ARM 371/1171。全量 1313/56/1（PerfBudget 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `2e7828f..1d3179a` success、ahead=0；R496 跑 success（1312/80/0；QUICKPICK_MATCH_HIGHLIGHT 1x 签收 ⇒ 592 结案）；R497 跑 queued ⇒ NOT-RUN；R495 跑 success（1311/80/0）。
 
 **七维度自评**（恰七行，每格 n/15）：
 
