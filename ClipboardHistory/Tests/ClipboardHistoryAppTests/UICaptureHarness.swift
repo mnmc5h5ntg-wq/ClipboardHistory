@@ -175,7 +175,8 @@ final class UICaptureTests: XCTestCase {
         // ⇒ 同一处离屏伪影（侧栏选中行画成一整块纯黑），不是新缺陷。加名单前先看了那张帧：
         // 横幅本身完好（红底、两行、"知道了"垂直居中、无截断），黑的是左下侧栏那一行。
         "content-with-copy-failure-notice",
-        "sidebar-history", "sidebar-no-title-icon", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
+        "sidebar-history", "sidebar-no-title-icon", "sidebar-search-placeholder-legacy",
+        "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -1455,6 +1456,80 @@ final class UICaptureTests: XCTestCase {
             judged += 1
         }
         if judged == 0 { throw XCTSkip("RESET_ICON_NOT_RUN：两档都没有设置内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
+    // MARK: - R497 · 搜索占位符省略号
+
+    /// R497：全仓动作文案都用单「…」（导出历史…/查找…/正在加载预览…），
+    /// 主侧栏搜索占位符原来写「搜索历史……」两个省略号。
+    /// 成对帧 `sidebar-history` / `sidebar-search-placeholder-legacy`：
+    /// 量占位文字的总墨宽，两臂只差一个省略号字形（6–16pt）。
+    func testSearchPlaceholderUsesTheSingleEllipsis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r497-search-placeholder-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "sidebar-history" }),
+                  let negative = fixtures.first(where: { $0.name == "sidebar-search-placeholder-legacy" }) else {
+                return XCTFail("\(tag)：找不到占位符两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func placeholderWidth(_ fixture: Fixture) throws -> Double {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "SEARCH_PLACEHOLDER", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    return 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                }
+                let x0 = Int(35 * scale), x1 = Int(280 * scale)
+                let y0 = Int(34 * scale), y1 = Int(50 * scale)
+                // 搜索框自己的底色（与卡片底不同色）当页底。
+                var histogram: [Int: Int] = [:]
+                for y in y0..<min(y1, rep.pixelsHigh) {
+                    for x in x0..<min(x1, rep.pixelsWide) { histogram[Int(luma(x, y)) / 4, default: 0] += 1 }
+                }
+                let page = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+                var first = Int.max, last = -1
+                for y in y0..<min(y1, rep.pixelsHigh) {
+                    for x in x0..<min(x1, rep.pixelsWide) where abs(luma(x, y) - page) >= 25 {
+                        first = min(first, x); last = max(last, x)
+                    }
+                }
+                return last >= first ? Double(last - first + 1) / scale : 0
+            }
+            guard let pos = try? placeholderWidth(positive), let neg = try? placeholderWidth(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if pos == 0 || neg == 0 {
+                emit("SEARCH_PLACEHOLDER_NOT_RUN=search-field-blank \(tag) 正臂宽=\(pos) 负臂宽=\(neg)")
+                continue
+            }
+            let diff = neg - pos
+            emit("SEARCH_PLACEHOLDER \(tag) 正臂宽=\(String(format: "%.1f", pos))pt"
+                 + " 负臂宽=\(String(format: "%.1f", neg))pt 差=\(String(format: "%.1f", diff))pt"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(diff, 6.0,
+                "\(tag)：两臂只差 \(diff)pt ⇒ 正臂还没有省掉那个省略号字形（旧形态仍在）")
+            XCTAssertLessThanOrEqual(diff, 16.0,
+                "\(tag)：两臂差 \(diff)pt（>16）⇒ 差的不是一个省略号字形，占位文案不止这一处变化")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("SEARCH_PLACEHOLDER_NOT_RUN：两档都没有可判占位文字") }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
@@ -11612,6 +11687,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-no-title-icon", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)
                 .environment(\.mainSidebarTitleIconForCapture, false)))
+        })
+        // R497：搜索占位文案的负向臂（旧「……」两个省略号，其余与 sidebar-history 同）。
+        results.append(Fixture("sidebar-search-placeholder-legacy", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)
+                .environment(\.searchPlaceholderForCapture, "搜索历史……")))
         })
         // R444：来源行负臂 —— 与 `sidebar-history` 第一行**同一段正文/时间**，只是来源为 nil。
         // 必须走存档载入（`makeNoSourceDetailStore`）：`store.add` 会被上下文采集器补成

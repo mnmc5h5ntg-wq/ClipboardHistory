@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主侧栏搜索占位符省略号与全 App 统一（44 张旧帧变化 + 2 张新帧、基线 326）（R497 / 第 496 轮 / Round 494 / U-1941…U-1946 · 产品 1 文件 + 判据）
+
+
 ### 浮层候选行补搜索命中高亮（2 张旧帧变化 + 2 张新帧、基线 324）（R496 / 第 495 轮 / Round 493 / U-1935…U-1940 · 产品 1 文件 + 判据）
 
 

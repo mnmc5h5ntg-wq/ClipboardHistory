@@ -7,6 +7,11 @@ struct SearchField: View {
     /// 原来直接读裸 `isHovered`，离屏渲染里恒 false ⇒ 两态帧拍不到这两条画法（"拍不到"被记成"没问题"）。
     /// 键在产品路径永远是 nil，不参与悬停语义。
     @Environment(\.hoveredForCapture) private var hoveredForCapture
+    /// R497：占位文案的负向帧缝（产品默认 nil ⇒ 用单省略号形态）。
+    @Environment(\.searchPlaceholderForCapture) private var searchPlaceholderForCapture
+    /// 全仓十余处动作文案都用单「…」（导出历史…/查找…/正在加载预览…），
+    /// 只有这里原来写「搜索历史……」两个省略号 —— 同一 App 两种省略号形态。
+    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史…" }
     /// 一层判定只留一处：图标墨与清除按钮共用它。
     private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 
@@ -20,7 +25,7 @@ struct SearchField: View {
                 .font(.system(size: VisualFont.body, weight: .medium))
                 .foregroundStyle(isActive ? .primary : .secondary)
 
-            ChineseEditableTextField(text: $text, placeholder: "搜索历史……")
+            ChineseEditableTextField(text: $text, placeholder: placeholderText)
                 // 高度从 17 抬到 22（R20）：**这一列才是这一行的定高者**。
                 // 不这么做的话，命中区加宽的那颗 ×（14+8=22pt）会在有文字时把整颗框顶高，
                 // 空框与有字的框差 5pt —— 打字时搜索框自己跳一下，
@@ -80,5 +85,17 @@ struct SearchField: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+/// R497：主侧栏搜索占位文案的负向帧缝（产品默认 nil ⇒ 单省略号）。
+struct SearchPlaceholderForCaptureKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var searchPlaceholderForCapture: String? {
+        get { self[SearchPlaceholderForCaptureKey.self] }
+        set { self[SearchPlaceholderForCaptureKey.self] = newValue }
     }
 }
