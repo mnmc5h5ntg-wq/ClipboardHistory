@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R486**（commit `dfbf6f6`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R486 那一节为准。上一笔动 `Sources/` 的是 R485（`35ad21a`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R487**（commit `d44e16d`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R487 那一节为准。上一笔动 `Sources/` 的是 R486（`dfbf6f6`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1390,5 +1390,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R486（数据页导出/导入图标位）**：同一组数据动作里清空有垃圾桶、导出/导入还是纯文字。两颗按钮改用 Label + square.and.arrow.up/down，标签一字不改；加捕获缝。**4 张旧帧变化 + 2 张新帧**，基线 **304→306**；`DATA_ACTION_ICONS` light 末列 698→788（右伸 90px）、墨 2020→2499（+479）、导出差 +240/导入差 +239；dark 2261→2738（+477）、+239/+238；按每颗按钮自己的窗读墨；M1317/M1318 **2/2**。同轮修 `HEATMAP_TODAY` 的 runner 1x 出口（R484 跑两档 0 像素是设置内容平涂 ⇒ 内容墨证人 + 具名 NOT_RUN）。⓪ push 35ad21a..f04eaef success、ahead=0；R484 跑三朵红已读清；R485 跑 40832860076 failure 4 步已读：QUICKPICK_FAVORITE 1x 签收（54→71/+17、4px；50→63/+13、4px；标题 0），HEATMAP_TODAY 仍红待 R486 跑；R486 跑 40836764232 queued ⇒ NOT-RUN。全量 **1302/56/0**（476.3s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R487（Markdown 表格竖线位）**：表格在渲染态仍原样带 `|`，R440/R448 只改表头字重与体行线。新 `MarkdownTablePresentation.renderedRow` 把每个竖线换成同宽空格并只裁首尾空白，`collectTable` 用它组装表格块；列起点不挪、源码态不变。**8 张旧帧变化、基线 306 不变**；`TABLE_PIPES` 表格块竖线 0、表格区墨 4251/3731；M1319/M1320 **2/2**。重锚两把旧尺（宽表认 `tableRowCountAttribute`、表头针改 `甲   乙`），宽表容器 752.1→720.0pt、表头墨比 1.40→1.17/1.19，均仍过旧地板。⓪ push no-op、ahead=0；R486 主跑唯一红是 Release 3 条非产品、补记跑 success；DATA_ACTION_ICONS/HEATMAP_TODAY 的 1x NOT_RUN 出口签收。全量 **1303/56/0**（504.4s）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R487（Markdown 表格竖线位）**：表格在渲染态仍原样带 `|`，R440/R448 只改表头字重与体行线。新 `MarkdownTablePresentation.renderedRow` 把每个竖线换成同宽空格并只裁首尾空白，`collectTable` 用它组装表格块；列起点不挪、源码态不变。**8 张旧帧变化、基线 306 不变**；`TABLE_PIPES` 表格块竖线 0、表格区墨 4251/3731；M1319/M1320 **2/2**。重锚两把旧尺（宽表认 `tableRowCountAttribute`、表头针改 `甲   乙`），宽表容器 752.1→720.0pt、表头墨比 1.40→1.17/1.19，均仍过旧地板。⓪ 开工 push no-op、ahead=0；收口两次 push 失败 ⇒ PUSH_BLOCKED=network（d44e16d、ahead=1）；R487 跑未创建 ⇒ NOT-RUN；R486 主跑唯一红是 Release 3 条非产品、补记跑 success；DATA_ACTION_ICONS/HEATMAP_TODAY 的 1x NOT_RUN 出口签收。全量 **1303/56/0**（504.4s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
