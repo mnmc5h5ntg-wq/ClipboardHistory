@@ -19928,7 +19928,7 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ## Round 493 · R496（第 495 轮 · 2026-10-30）：浮层候选行补搜索命中高亮（2 旧帧 + 2 新帧、基线 324）
 
-主列表/侧栏命中会给匹配片段加黄底，浮层同一查询只过滤不高亮——来源命中时「来自 访达」是这行唯一的理由，却无任何标记。新增 `QuickPickTitlePresentation`（复用 `MatchHighlighting.spans` + `DetailTypography.highlightColor`），只在命中段非空时走 attributed；捕获缝 `titleHighlightEnabled`（默认 true，负向帧 false）。2 张旧帧变化 + 2 张新帧，基线 322→324；`QUICKPICK_MATCH_HIGHLIGHT` 正臂头 0/尾 2115（light）、0/2148（dark），负臂 0/0；M1339/M1340 2/2。预检 277/254/682、rot 364/1108、ARM 370/1169。全量 1312/56/1（PerfBudget 306.4ms 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `bbfe31c..2e7828f` success、ahead=0；R495 跑 success（1311/80/0；MAIN_TITLE_ICON 1x 签收 +72/+87 ⇒ 587 结案）；R494 主跑 Release 3 条、补记跑 Motion 1 条；R493 跑 2 步红。
+主列表/侧栏命中会给匹配片段加黄底，浮层同一查询只过滤不高亮——来源命中时「来自 访达」是这行唯一的理由，却无任何标记。新增 `QuickPickTitlePresentation`（复用 `MatchHighlighting.spans` + `DetailTypography.highlightColor`），只在命中段非空时走 attributed；捕获缝 `titleHighlightEnabled`（默认 true，负向帧 false）。2 张旧帧变化 + 2 张新帧，基线 322→324；`QUICKPICK_MATCH_HIGHLIGHT` 正臂头 0/尾 2115（light）、0/2148（dark），负臂 0/0；M1339/M1340 2/2。预检 277/254/682、rot 364/1108、ARM 370/1169。全量 1312/56/1（PerfBudget 306.4ms 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `bbfe31c..2e7828f` success、ahead=0；R495 跑 success（1311/80/0；MAIN_TITLE_ICON 1x 签收 +72/+87 ⇒ 587 结案）；R494 主跑 Release 3 条、补记跑 Motion 1 条；R493 跑 2 步红；收口 `PUSH_BLOCKED=network`（HEAD=`3c64394`、origin/main=`2e7828f`、ahead=1）、`CI_READ_BLOCKED=network`，R496 跑未创建 ⇒ NOT-RUN。
 
 **七维度自评**（恰七行，每格 n/15）：
 
