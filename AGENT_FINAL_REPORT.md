@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R493**（commit `67cb683`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R493 那一节为准。上一笔动 `Sources/` 的是 R492（`a90b074`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R494**（commit `590ead8`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R494 那一节为准。上一笔动 `Sources/` 的是 R493（`67cb683`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1404,5 +1404,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R493（恢复默认按钮图标位）**：数据页按钮已有图标，快捷键/推荐「恢复默认」仍纯文字。两处改用 `Label("恢复默认", systemImage: "arrow.counterclockwise")`，标签不改，加捕获缝。**18 张旧帧 + 2 张新帧**，基线 **316→318**；`RESET_ICON` light 3057→3507（+450）、dark 3636→4101（+465）；M1331/M1332 2/2；MotionDriver 权重复位尺按 closure-label 重锚后通过。⓪ 开工 push no-op、ahead=0；收口 push e754cf7..67cb683 success、ahead=0；R493 跑 40887758385 in_progress ⇒ NOT-RUN；R492 两跑均 failure（主跑 Release 3 条 + Motion 2 条；补记跑仅 Motion 2 条）；LOGIN_FAILURE_ICON NOT_RUN=no-red-channel。全量 **1309/56/0**（525.8s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R494（主侧栏标题图标位）**：设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字。`HistorySidebarView.header` 在标题前加 `clock.arrow.circlepath`（title 字号 semibold、secondary、读屏隐藏），加捕获缝。**48 张旧帧 + 2 张新帧**，基线 **318→320**；`MAIN_TITLE_ICON` light 1772→2050（+278）、dark 14213→14487（+274）；M1335/M1336 2/2。⓪ PUSH_BLOCKED=network（HEAD=`0e461b7`、origin/main=`67cb683`、ahead=1）；CI_READ_BLOCKED；R493 跑 in_progress ⇒ NOT-RUN。全量 1310/56/0；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R494（主侧栏标题图标位）**：设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字。`HistorySidebarView.header` 在标题前加 `clock.arrow.circlepath`（title 字号 semibold、secondary、读屏隐藏），加捕获缝。**48 张旧帧 + 2 张新帧**，基线 **318→320**；`MAIN_TITLE_ICON` light 1772→2050（+278）、dark 14213→14487（+274）；M1335/M1336 2/2。⓪ 开工 PUSH_BLOCKED=network（HEAD=`0e461b7`、origin/main=`67cb683`、ahead=1）、CI_READ_BLOCKED；收口 push `67cb683..590ead8` success、ahead=0；R493 跑 in_progress、R494 跑 `40895877246` queued ⇒ NOT-RUN。全量 1310/56/0；build 0 告警；换装 ok/397=397；电池 683/5。
 

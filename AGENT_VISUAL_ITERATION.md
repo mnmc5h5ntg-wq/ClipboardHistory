@@ -19892,7 +19892,7 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ## Round 491 · R494（第 493 轮 · 2026-10-29）：主侧栏标题补时钟图标（48 旧帧 + 2 新帧、基线 320）
 
-设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字。`HistorySidebarView.header` 在标题前加 `clock.arrow.circlepath`（title 字号 semibold、secondary、读屏隐藏），加捕获缝。48 张旧帧变化 + 2 张新帧，基线 318→320；`MAIN_TITLE_ICON` light 1772→2050（+278）、dark 14213→14487（+274）；M1335/M1336 2/2。预检 275/252/678、rot 362/1105、ARM 368/1166。全量 1310/56/0；build 0 告警；换装 ok/397=397；电池 683/5。⓪ PUSH_BLOCKED=network（HEAD=`0e461b7`、origin/main=`67cb683`、ahead=1）；CI_READ_BLOCKED；R493 跑 in_progress ⇒ NOT-RUN。
+设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字。`HistorySidebarView.header` 在标题前加 `clock.arrow.circlepath`（title 字号 semibold、secondary、读屏隐藏），加捕获缝。48 张旧帧变化 + 2 张新帧，基线 318→320；`MAIN_TITLE_ICON` light 1772→2050（+278）、dark 14213→14487（+274）；M1335/M1336 2/2。预检 275/252/678、rot 362/1105、ARM 368/1166。全量 1310/56/0；build 0 告警；换装 ok/397=397；电池 683/5。⓪ 开工 PUSH_BLOCKED=network（HEAD=`0e461b7`、origin/main=`67cb683`、ahead=1）、CI_READ_BLOCKED；收口 push `67cb683..590ead8` success、ahead=0；R493 跑 in_progress、R494 跑 `40895877246` queued ⇒ NOT-RUN。
 
 **七维度自评**（恰七行，每格 n/15）：
 
