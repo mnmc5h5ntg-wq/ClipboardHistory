@@ -10605,3 +10605,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：现行守卫在框压不住字时走具名 NOT_RUN（不是静默绿）；缩框/扩框都改不动 roster 判定（框被侧栏视图裁剪）⇒ 这一臂已无法咬。
     修法：按"空刀不凑数"退役，保留 TEXT_SIDE_CAPABILITY 与 NOT_RUN 出口接管其职责；若将来守卫改回静默绿，重开。
 
+**591. SETTINGS_HELPER_FONT 在 runner 1x 不可判**（R496 现读）
+    现象：R495 跑 `40920092629` success，但该判据 `SETTINGS_HELPER_FONT_NOT_RUN=scale-too-low` 两档（runner 设置帧 1.0x，10/11pt 差 1px）。
+    修法：若要在 runner 判，需换结构量（如 helper 行数/折行位置）或要求 ≥2x 捕获；**不许**把 1.5 倍率门槛降下来。
+
+**592. QUICKPICK_MATCH_HIGHLIGHT 的 runner 1x 黄底像素地板未读**（R496 观察）
+    现象：本机 2x 正臂尾黄 2115/2148、负臂 0；runner 1x 跑尚未创建（R496 自身跑 in_progress）。
+    修法：下一跑读该通道；1x 尾黄若低于 200·s²，先查 1x 下黄底是否落墨，不降地板。
+
+**587 结案**（R496）：R495 跑 `40920092629 ↔ bbfe31c` success 里 `MAIN_TITLE_ICON` light 478→550（+72）、dark 3733→3820（+87），1x 签收。
+

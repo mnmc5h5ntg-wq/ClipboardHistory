@@ -1458,6 +1458,81 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R496 · 浮层候选行命中高亮
+
+    /// R496：主列表/侧栏命中都给匹配片段加底色，浮层同一查询只过滤不高亮 ——
+    /// 「为什么这行在」在来源命中时只能靠读「来自 访达」。
+    /// 成对帧 `quickpick-typed` / `quickpick-typed-no-highlight`（同一查询「访达」）：
+    /// 数标题带里的黄底像素；头段（x<200pt）必须干净，命中都在尾段。
+    func testQuickPickTypedRowsHighlightTheMatchedReason() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r496-quickpick-highlight-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "quickpick-typed" }),
+                  let negative = fixtures.first(where: { $0.name == "quickpick-typed-no-highlight" }) else {
+                return XCTFail("\(tag)：找不到 typed 两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (head: Int, tail: Int, ink: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "QUICKPICK_MATCH_HIGHLIGHT", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                let x0 = Int(100 * scale), x1 = Int(390 * scale)
+                let y0 = Int(45 * scale), y1 = Int(110 * scale)
+                let split = Int(200 * scale)
+                let page = Double(Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                                 xRange: x0..<x1, yRange: y0..<y1))
+                var head = 0, tail = 0, ink = 0
+                for y in y0..<min(y1, rep.pixelsHigh) {
+                    for x in x0..<min(x1, rep.pixelsWide) {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Double(base[i + rOff])
+                        let g = Double(base[i + rOff + 1])
+                        let b = Double(base[i + rOff + 2])
+                        let luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+                        if abs(luma - page) >= 60 { ink += 1 }
+                        // 命中底色 = systemYellow α0.32 合成后的淡黄；中性灰/白/黑都没有这个色度。
+                        if (r + g) / 2 - b > 25, r > 120 {
+                            if x < split { head += 1 } else { tail += 1 }
+                        }
+                    }
+                }
+                return (head, tail, ink)
+            }
+            guard let pos = try? scan(positive), let neg = try? scan(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            emit("QUICKPICK_MATCH_HIGHLIGHT \(tag) 正臂头黄=\(pos.head) 尾黄=\(pos.tail) 标题墨=\(pos.ink)"
+                 + " 负臂头黄=\(neg.head) 尾黄=\(neg.tail) 标题墨=\(neg.ink)"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            if pos.ink == 0 || neg.ink == 0 {
+                emit("QUICKPICK_MATCH_HIGHLIGHT_NOT_RUN=quickpick-blank \(tag)")
+                continue
+            }
+            XCTAssertLessThanOrEqual(pos.head, Int(40.0 * scale * scale),
+                "\(tag)：正臂头段也有 \(pos.head) 个黄底像素 ⇒ 高亮越过了命中片段")
+            XCTAssertGreaterThanOrEqual(pos.tail, Int(200.0 * scale * scale),
+                "\(tag)：正臂尾段只有 \(pos.tail) 个黄底像素 ⇒ 命中没有高亮")
+            XCTAssertEqual(neg.head + neg.tail, 0,
+                "\(tag)：负臂（关高亮）仍有黄底像素 ⇒ 读到的不是高亮")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("QUICKPICK_MATCH_HIGHLIGHT_NOT_RUN：两档都没有可判候选") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R495 · 通用页说明字号
 
     /// R495：通用页四条说明里，回执/暂停/OCR 三条是 `.caption`（10pt），
@@ -11605,6 +11680,10 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-typed", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "访达")))
+        // R496：命中高亮的负向臂（同一查询、只关高亮）。
+        results.append(Fixture("quickpick-typed-no-highlight", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "访达", highlight: false)))
         results.append(Fixture("quickpick-empty", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: store, query: "zzz 不存在")))
@@ -24599,13 +24678,15 @@ final class UICaptureTests: XCTestCase {
         static func builder(store: HistoryStore, query: String,
                             hoveredRow: Int? = nil,
                             searchHovered: Bool = false,
-                            searchFocused: Bool = false) -> @MainActor () -> NSWindow? {
+                            searchFocused: Bool = false,
+                            highlight: Bool? = nil) -> @MainActor () -> NSWindow? {
             var kept: QuickPickController?
             return {
                 if kept == nil {
                     kept = QuickPickController(historyStore: { store }, commit: { _ in })
                 }
                 guard let controller = kept else { return nil }
+                if let highlight { controller.titleHighlightEnabled = highlight }
                 return controller.windowForCapture(query: query, hoveredRow: hoveredRow,
                                                    searchHovered: searchHovered,
                                                    searchFocused: searchFocused)

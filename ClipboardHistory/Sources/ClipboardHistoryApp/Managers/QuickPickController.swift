@@ -36,6 +36,8 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
     private var clearButton: NSButton?
     private var model = QuickPickModel(all: [])
     private var rows: [Row] = []
+    /// R496：命中高亮的负向帧缝（产品默认 true；夹具置 false 拍旧形状）。
+    var titleHighlightEnabled = true
 
     private let historyStore: () -> HistoryStore?
     /// 提交一条。生产接的是 `ApplicationShell.copyAndPasteEntry`（复制 + 粘回原应用）。
@@ -823,7 +825,14 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             return cell
         }()
         let entry = rows[row].entry
-        cell.textField?.stringValue = rows[row].title
+        let title = rows[row].title
+        let spans = MatchHighlighting.spans(in: title, query: model.query)
+        if titleHighlightEnabled, !spans.isEmpty, let field = cell.textField {
+            field.attributedStringValue = QuickPickTitlePresentation.attributed(
+                title: title, spans: spans, font: field.font ?? .systemFont(ofSize: VisualFont.row))
+        } else {
+            cell.textField?.stringValue = title
+        }
         // R477/R485：标题里不再有「置顶」「收藏」两个字，读屏仍要听见它们（图形徽标对读屏是噪音）。
         var accessibilityLabel = rows[row].title
         if entry.isPinned { accessibilityLabel = "置顶 " + accessibilityLabel }
@@ -978,6 +987,26 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         guard let table else { return }
         let index = table.selectedRow
         if index >= 0 { model.index = index }
+    }
+}
+
+/// R496：浮层候选行的搜索命中高亮。
+///
+/// 主列表与侧栏命中时都会给匹配片段加底色（`HistoryRowMatchHighlight`），
+/// 而浮层同一查询只过滤不高亮 —— 「为什么这行在」在来源命中时还要靠读「来自 访达」。
+/// 这里复用同一份 `MatchHighlighting.spans` 与同一枚 `DetailTypography.highlightColor`。
+enum QuickPickTitlePresentation {
+    static func attributed(title: String, spans: [MatchHighlighting.Span], font: NSFont) -> NSAttributedString {
+        let base: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.labelColor,
+        ]
+        let result = NSMutableAttributedString(string: title, attributes: base)
+        for span in spans {
+            result.addAttribute(.backgroundColor, value: DetailTypography.highlightColor,
+                                range: NSRange(location: span.location, length: span.length))
+        }
+        return result
     }
 }
 

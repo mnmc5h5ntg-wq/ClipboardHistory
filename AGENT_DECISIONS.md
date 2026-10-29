@@ -8301,3 +8301,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x/2x 未读；批量态标题完整性没有稳定像素判据（BACKLOG 589）。
 - 回滚：三条 `settingsHelperFont` 改回 `.caption`、RTF 不变；标题图标恢复无条件；删缝/新帧/判据/两刀，基线回 320。
 
+## D-492 浮层候选行补搜索命中高亮；只在命中段非空时改 attributed（R496）
+
+- 背景：主列表与侧栏命中时给匹配片段加底色，浮层同一查询只过滤不高亮；来源命中时「来自 访达」是这行唯一理由，却无标记。
+- 决定：新增 `QuickPickTitlePresentation`（复用 `MatchHighlighting.spans` 与 `DetailTypography.highlightColor`）；只在命中段非空时写 `attributedStringValue`，空查询保持 `stringValue`（帧逐字节不变）；捕获缝 `titleHighlightEnabled`（产品默认 true）。
+- 理由：同一查询在三种列表里应当给同一个答案；只改有命中的行，避免全局改色（第一版无条件 attributed 让 10 张空查询帧全变）。
+- 兼容性/迁移：2 张旧帧变化 + 2 张新帧，基线 322→324；既有 stringValue 读取者（来源理由判据）不受影响。
+- 边界：runner 1x 的黄底像素地板未读（本地 2x）；SETTINGS_HELPER_FONT 在 runner 1x 仍不可判。
+- 回滚：删 `QuickPickTitlePresentation`、恢复 `stringValue`、删缝/新帧/判据/两刀，基线回 322。
+
