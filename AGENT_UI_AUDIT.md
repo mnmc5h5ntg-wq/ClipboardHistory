@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 480 轮（R481 · 2026-10-29 · U-1851…U-1856）：主列表补链接条目标记（2 张新帧、基线 300；M1308/M1309 2/2）+ 设置标题图标的 runner NOT-RUN 修复（产品 1 文件 + 判据）
+
+- **U-1851：⓪ push 与 CI。** 开工一次快进 push **`59b63c1..2d54488` success**（两笔：60d65a4/2d54488）、HEAD=origin/main=`2d54488`、**ahead=0**。R479 跑 `40805576917 ↔ 225e6f8` failure 3 步已读：Release script（sources 时序）、Swift/Capture（**唯一测试红是 `SETTINGS_TITLE_ICON` 0 墨**，设置内容列在 runner 平涂）、Motion `5/5 executed=77 reds=0`；同跑签收 `FALLBACK_PATH` 1x **113pt**、`INLINE_CODE_PAD light 99/6.0、dark 102/5.0`、幻影块 **0**、`QUICKPICK_PIN` **+20/标题末列 0**。R480 跑（2d54488）与 R479/R478/R477 其余跑读时 in_progress/未读 ⇒ NOT-RUN；436 R479 跑 reds=0。
+- **U-1852：① 腐烂与预检。** `HIDDEN_ARMS 表=350 可判=1081 rot=0 抽不出=6 已声明死针=0 处置=ok`；`NEEDLE_PRECHECK tables=263 covered=243 arms=660 bad=0`、`ARM_TOTAL files=356 arms=1144`。
+- **U-1853：② 产品：主列表补链接条目标记。** 缺陷形状：URL 文本行与普通文本行同形，用户看不出这是一条链接。修法：新纯函数 `EntryPresentation.looksLikeLink`（只认 http/https、无空白）；`RowTextColumn` 时间行在富文本标记前补 `link`（11pt、secondaryLabelColor、helpLabel + accessibilityLabel），仅链接文本出现。旧/新：**2 张新帧**（`row-link-text` 亮暗）、**0 张既有帧变化**、0 缺失；基线 **298→300**；2 张逐张看过：链形标记在来源后、时间行同一行。读数：最下一条墨带（时间行）末列 light/dark **441→476px（+35px=17.5pt）**。
+- **U-1854：③ 判据与刀。** 新判据 `testLinkRowsCarryALinkBadge` 用 `row-text` / `row-link-text`：两臂最下一条墨带都是时间行（同一串时间/来源），正臂末列必须右移 ≥8pt·s（+35px 实测）；不读标题末列（标题不同）。刀 `M1308`（永不画）/`M1309`（永远画）**2/2 CAUGHT**、RESTORE_CLEAN。`SETTINGS_TITLE_ICON` 判据补 `SETTINGS_TITLE_ICON_NOT_RUN=settings-content-blank` 的 skip（R479 跑在置空 runner 上把它当红，本轮修）；本机仍 2/2。
+- **U-1855：④ 既有面。** R480 的富文本标记、R479 的标题图标、R478 兜底路径、R477 图钉、R476–R477 的 inline/幻影/冲突均未改；R479 跑的 `SETTINGS_TITLE_ICON` 0 墨归到机器前提，不记产品回归。
+- **U-1856：⑤ 八步与电池。** build **0 告警**（arm64+x86_64）；捕获卷 **300 帧**、`CHANGED=0 ADDED=2 MISSING=0`，更新后 `300/0/0/0`；全量 **1298/56/0**（512.8s，轻载；新增 1 条链接标记判据）；换装 `ok / SHA_MATCH=1 / 397=397`（版本 1.4.8，现读口径）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **1** 轮（as-of 480，`python3 scripts/product_streak.py --streak-for 480`，last=60d65a4）；清账 `格=162 声明=63 不成立=0/63`；§1 已刷新（尾轮 478 / 479 节）；电池 **Ran 683 / OK skipped=5**；清账 162/63/0。**具名 NOT-RUN**：① R480 自身跑；② 链接标记的 runner 1x/dark；③ `SETTINGS_TITLE_ICON` 的 runner（置空 ⇒ 预期 NOT-RUN）；④ `FALLBACK_PATH`/`INLINE_CODE_PAD`/幻影/图钉/冲突的 runner 复核；⑤ `SETTINGS_DATA_PATH`；⑥ 既有 runner 复核；⑦ Capture MATERIAL_BLIND_NOT_RUN；⑧ 已知 Motion 采样红；⑨ 437–562 的其余未结项仍开。
+
 ## 第 479 轮（R480 · 2026-10-29 · U-1845…U-1850）：主列表补富文本格式标记（2 张新帧、基线 298；M1306/M1307 2/2）（产品 1 文件 + 判据）
 
 - **U-1845：⓪ push 与 CI。** 开工网络被监督者实测为不可达（api=000、`git ls-remote` remote closed）；本轮先本地完成；收口两次 `git push` 均报 `Please make sure you have the correct access rights and the repository exists.` ⇒ **`PUSH_BLOCKED=network`（HEAD=`60d65a4`、origin/main=`59b63c1`、ahead=1；本补记后 ahead=2）**；`gh` 随后 EOF ⇒ `CI_READ_BLOCKED`。sources 格派生到 R480/`60d65a4`。R479 跑 `40805576917 ↔ 225e6f8`、R478 两跑 `40801850707 ↔ b64682e`/`40802042660 ↔ 7f21720`、R477 两跑读时均为 in_progress 或未读 ⇒ **NOT-RUN**；R477 主跑的 inline/幻影/图钉读数沿用 R479 账；436 无新跑（最后 facts 5/5/77）。

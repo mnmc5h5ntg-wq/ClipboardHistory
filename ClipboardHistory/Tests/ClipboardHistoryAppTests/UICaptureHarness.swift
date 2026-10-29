@@ -1364,12 +1364,19 @@ final class UICaptureTests: XCTestCase {
             guard let pos = try? scan(positive), let neg = try? scan(negative) else {
                 return XCTFail("\(tag)：两臂帧读不回来")
             }
+            if pos.ink == 0 && neg.ink == 0 {
+                emit("SETTINGS_TITLE_ICON_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
             emit("SETTINGS_TITLE_ICON \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px"
                  + " 差=\(pos.last - neg.last)px 负臂墨=\(neg.ink) 正臂墨=\(pos.ink) 页底=\(neg.page)")
             XCTAssertGreaterThan(neg.ink, 0, "\(tag)：负臂标题行没有墨 ⇒ 尺没有对象")
             XCTAssertGreaterThan(pos.last - neg.last, Int(8.0 * scale),
                 "\(tag)：正臂标题末列只比负臂多 \(pos.last - neg.last)px ⇒ 标题图标没有画出来")
             judged += 1
+        }
+        if judged == 0 {
+            throw XCTSkip("SETTINGS_TITLE_ICON_NOT_RUN=settings-content-blank：两档内容列都没有墨 ⇒ 判据未运行")
         }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
@@ -1418,6 +1425,65 @@ final class UICaptureTests: XCTestCase {
             emit("ROW_RICH_BADGE \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px 差=\(pos.last - neg.last)px 负墨=\(neg.ink) 正墨=\(pos.ink) 页底=\(neg.page)")
             XCTAssertGreaterThan(pos.ink - neg.ink, Int(8.0 * scale * scale),
                 "\(tag)：正臂只多 \(pos.ink - neg.ink) 个墨像素 ⇒ 标记没画")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2)
+    }
+
+    // MARK: - R481 · 链接条目标记
+
+    /// R481：URL 文本行补 `link` 标记；成对帧的**最下一条墨带**是时间行（两臂文字相同），
+    /// 正臂在它末尾多一枚标记 ⇒ 末列必须右移。
+    func testLinkRowsCarryALinkBadge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r481-link-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negF = fixtures.first(where: { $0.name == "row-text" }),
+                  let posF = fixtures.first(where: { $0.name == "row-link-text" }) else {
+                return XCTFail("\(tag)：找不到 row-text / row-link-text")
+            }
+            func scan(_ f: Fixture) throws -> (last: Int, scale: Double) {
+                let file = scratch.appendingPathComponent("\(f.name)-\(tag).png")
+                _ = try render(f, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "LINK", code: 1) }
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff]) + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                var bands: [(top: Int, bottom: Int)] = []
+                var start = -1
+                for y in 0..<rep.pixelsHigh {
+                    let has = (0..<rep.pixelsWide).contains { isInk($0, y) }
+                    if has && start < 0 { start = y }
+                    if !has && start >= 0 { bands.append((start, y - 1)); start = -1 }
+                }
+                if start >= 0 { bands.append((start, rep.pixelsHigh - 1)) }
+                guard let last = bands.last else {
+                    throw NSError(domain: "LINK_BANDS", code: 2)
+                }
+                var lastCol = -1
+                for y in last.top...last.bottom {
+                    for x in 0..<rep.pixelsWide where isInk(x, y) { lastCol = max(lastCol, x) }
+                }
+                return (lastCol, Double(rep.pixelsWide) / Double(f.size.width))
+            }
+            guard let neg = try? scan(negF), let pos = try? scan(posF) else { return XCTFail("\(tag)：读不回帧") }
+            emit("ROW_LINK_BADGE \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px 差=\(pos.last - neg.last)px 倍率=\(String(format: "%.1f", pos.scale))x")
+            XCTAssertGreaterThan(pos.last - neg.last, Int(8.0 * pos.scale),
+                "\(tag)：时间行末列只多 \(pos.last - neg.last)px ⇒ 链接标记没有画出来")
             judged += 1
         }
         XCTAssertEqual(judged, 2)
@@ -10594,6 +10660,24 @@ final class UICaptureTests: XCTestCase {
             results.append(Fixture("row-\(rowKind(captured))", NSSize(width: 300, height: 74)) {
                 AnyView(self.rowFrame(HistoryRowButton(
                     entry: captured, copyAction: {}, favoriteAction: {}
+                )))
+            })
+        }
+        // R481：URL 文本行 —— 与 row-text 同时间/来源，标题不同，时间行相同。
+        do {
+            let link = ClipboardEntry(
+                content: .text("https://example.com/very/long/path?q=1"),
+                timestamp: Self.referenceDate.addingTimeInterval(-30),
+                thumbnail: nil, sourceURL: nil,
+                sourceUTIs: ["public.utf8-plain-text"],
+                sourceAppBundleID: "com.apple.Safari", sourceAppName: "Safari")
+            let linkStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(entriesToLoad: [link]),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+            results.append(Fixture("row-link-text", NSSize(width: 300, height: 74)) {
+                AnyView(self.rowFrame(HistoryRowButton(
+                    entry: linkStore.entries[0], copyAction: {}, favoriteAction: {}
                 )))
             })
         }

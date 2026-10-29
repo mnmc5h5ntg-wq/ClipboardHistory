@@ -1,5 +1,5 @@
 {
-  "count": 298,
+  "count": 300,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -189,6 +189,8 @@
     "row-image-300x74-light.png": "ec7233c58fe2a590831add6684899b700aa2c8926e2acbd3bb6fba50563486a5",
     "row-image-ocr-300x74-dark.png": "f19026cd42fe14b808b7766d232d679fc1d36d811e61f9a34538639466591f20",
     "row-image-ocr-300x74-light.png": "ad885a239465d8ae9e22af64783794affc726e741caed5ca8c907bb08af49fe0",
+    "row-link-text-300x74-dark.png": "477011e994f541216dd777815e31bf4f0a84a2d265e9e2fd77f7ac772866081c",
+    "row-link-text-300x74-light.png": "e0ba2d6cdbce9a5874cae570a0374e213bd80710d0c504838e8ff608e5464036",
     "row-pinned-off-300x74-dark.png": "82f3c11f525d614dea4ae0694a9a456ebd4c6a7c5b3eebaca09a669b5f6606c3",
     "row-pinned-off-300x74-light.png": "c9c80257c672b98e22cefddfba5bc623500a289450c84861e0bdffcf2984e448",
     "row-pinned-on-300x74-dark.png": "e45ac11283c32fedeae79f76f71030e0693b8b72673afe81e3484a7ba8511d11",

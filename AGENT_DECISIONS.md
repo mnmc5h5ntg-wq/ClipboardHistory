@@ -8175,3 +8175,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x/dark 未签收；上一轮标题图标/兜底路径的 runner 读数仍未读到。
 - 回滚：删标记与判据；外缘线不保留。
 
+## D-478 链接文本要有行内标记；设置标题图标在置空 runner 上 NOT-RUN（R481）
+
+- 背景：URL 文本行与普通文本行同形；R479 跑在 runner 的设置内容整列平涂上把标题图标判据当红。
+- 决定：`EntryPresentation.looksLikeLink` + 时间行 `link` 标记（仅 http/https、无空白）；`SETTINGS_TITLE_ICON` 两臂 0 墨时打 `SETTINGS_TITLE_ICON_NOT_RUN=settings-content-blank` 并 skip。
+- 理由：链接是内容类型而不是装饰；置空机器没有对象，红/绿都不成立。
+- 兼容性/迁移：2 张新帧、0 旧帧变化，基线 298→300；无 Store 变化。
+- 边界：链接标记 runner 1x/dark 未签收；R480 跑未读。
+- 回滚：删标记/策略/判据；标题图标 NOT-RUN 分支保留。
+

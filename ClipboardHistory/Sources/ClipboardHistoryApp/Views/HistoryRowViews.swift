@@ -297,6 +297,13 @@ private struct RowTextColumn: View {
                 }
                 // R480：富文本保真开着时，这一条除了纯文本还存了格式表示。
                 // 用一个「格式」小标记说出来；它不改变任何文字/行高。
+                if case .text(let text) = entry.content, EntryPresentation.looksLikeLink(text) {
+                    Image(systemName: "link")
+                        .font(.system(size: VisualFont.meta, weight: .regular))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .helpLabel("这条记录是一个链接")
+                        .accessibilityLabel("这条记录是一个链接")
+                }
                 if entry.richText?.isEmpty == false {
                     Image(systemName: "textformat")
                         .font(.system(size: VisualFont.meta, weight: .regular))

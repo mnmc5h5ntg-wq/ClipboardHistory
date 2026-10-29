@@ -117,6 +117,13 @@ enum EntryPresentation {
         return String(title.prefix(maxLength - 1)) + "…"
     }
 
+    /// R481：文本条目是不是一条链接（只认 http/https、无空白）。纯函数，行内标记用它。
+    static func looksLikeLink(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") else { return false }
+        return !trimmed.contains(" ") && !trimmed.contains("\n")
+    }
+
     static func fileNameParts(for url: URL) -> FileNameParts {
         let fileName = url.lastPathComponent
         let fileExtension = url.pathExtension
