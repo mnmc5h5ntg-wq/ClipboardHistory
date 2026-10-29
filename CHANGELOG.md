@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层置顶行改用主列表同一枚图钉（2 张新帧、基线 294）+ inline padding 池/幻影 8 行/冲突 NOT-RUN（R477 / 第 476 轮 / Round 474 / U-1827…U-1832 · 产品 1 文件 + 判据 + 检测）
+
+
 ### 设置快捷键补冲突提示（2 张新帧、基线 292）+ inline 检测按四门分桶改 ink 门/对象 + 幻影填充块下限按倍率（R476 / 第 475 轮 / Round 473 / U-1815…U-1820 · 产品 2 文件 + 判据 + 检测）
 
 

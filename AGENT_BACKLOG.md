@@ -10441,3 +10441,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：R474 主笔 `40780110804 ↔ d70cc57` 的 Release script tests 3 条红（`FINAL_REPORT_SOURCES_CELL_STALE`、跳过名册无结论、第二来源），补记跑 `40780464933 ↔ 348e75e` 该步通过 ⇒ 不是产品缺陷，是"格子在补记里才派生"的时序。
     修法：读账时把主笔跑的这一步标成 `SOURCES_CELL_PENDING_ADDENDUM`，不要记成回归；要消除噪音只能在主笔提交前就把 sources 格写成该笔 SHA（需要先 commit 再 amend，不可取），或接受补记跑作准。
 
+**550. R477 跑对三处修复的复验（inline padding 池 / 幻影 8 行 / 图钉）**（R477 观察）
+    现象：本机 inline 恢复 98.5/92.5/6.0 与 99/92.5/6.5；幻影 8 行下限本机通过；图钉本机 215→319/233→338。R477 跑随提交创建。
+    修法：读 R477 跑的 `INLINE_CODE_PAD`（light 应 85/5.0 或至少 ≥4.5）、`QUICKPICK_GREY_BAND`（块下限 4 行? 等 1x 应 8 行）、`QUICKPICK_PIN`；仍红按读数继续，4.5 不动、150 不放开。
+
+**551. 冲突提示在 runner 1x 设置内容平涂时是 NOT-RUN**（R477 观察）
+    现象：R476 跑两档 `SHORTCUT_CONFLICT 负臂末墨行=-1 正臂=-1 下方墨=0`，整列内容没画；改判据为 `SHORTCUT_CONFLICT_NOT_RUN=settings-content-blank` 并 skip。
+    修法：这属于已登记的 runner 设置内容列平涂（同 `SETTINGS_DATA_PATH_NOT_RUN`）；哪天内容画出来再读 `SHORTCUT_CONFLICT`，不要把 NOT-RUN 记成绿。
+
+**552. inline 的 `best` 现在带 4.5pt padding 池；旧阅读者要按新对象解释 PAD**（R477 观察）
+    现象：同一帧里 102/101/1.0 的宽带与 85/80/5.0 的真带并存；池外选最宽会报 1.0，池内选最宽报 5.0。
+    修法：读 `INLINE_CODE_PAD` 时先确认 `best` 的池；若 PAD<4.5 说明真带也不合格（缺陷），不是"宽带被选中"。
+

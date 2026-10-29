@@ -59,13 +59,19 @@ enum InlineCodeBandChoice {
     /// 不是被字形切碎后某个 padding 虚高的碎片（local dark 曾因此从 99/92.5/6.5 变成 83/75.5/7.5）。
     /// 覆盖率 ≥0.9 先筛"实心"，再取最宽，最后才用 padding 破平 —— 假文字带 0.55 进不了这一池。
     static func best(_ candidates: [Candidate], minSpan: Int, maxSpan: Int,
-                     minCoverage: Double, minInk: Int) -> Candidate? {
+                     minCoverage: Double, minInk: Int,
+                     minPadding: Double = 4.5) -> Candidate? {
         let valid = candidates.filter {
             $0.span >= minSpan && $0.span <= maxSpan && $0.coverage >= minCoverage
                 && $0.verticalInk >= minInk && $0.rowMaxBandRun <= maxSpan
         }
-        let solid = valid.filter { $0.coverage >= 0.90 }
-        let pool = solid.isEmpty ? valid : solid
+        // R477：先只留**已经过 4.5pt 地板**的候选，再在这个池里取最宽实心带。
+        // runner light 上有一条 102/101/1.0 的宽带 —— 只按"最宽"会把它当成行内码带；
+        // 真带 85/80/5.0 在池里。若一个过地板的都没有（真缺陷），退回 valid 把读数打出来。
+        let padded = valid.filter { $0.padding >= minPadding }
+        let floorPool = padded.isEmpty ? valid : padded
+        let solid = floorPool.filter { $0.coverage >= 0.90 }
+        let pool = solid.isEmpty ? floorPool : solid
         return pool.max { a, b in
             if a.span != b.span { return a.span < b.span }
             if abs(a.padding - b.padding) > 0.01 { return a.padding < b.padding }
@@ -1113,6 +1119,12 @@ final class UICaptureTests: XCTestCase {
             guard let neg = try? scan(normal), let pos = try? scan(conflict) else {
                 return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
             }
+            // runner 1x 的设置内容列可能是整列平涂（已知机器前提）：两臂都读不到任何墨时
+            // 这条判据没有对象，必须具名 NOT-RUN，不许把"没画"记成"警告没画"。
+            if neg.last < 0 && pos.last < 0 {
+                emit("SHORTCUT_CONFLICT_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
             // 正臂在负臂最后墨行之下（+10pt）多出来的东西。
             let file = scratch.appendingPathComponent("\(conflict.name)-\(tag).png")
             _ = try render(conflict, appearance: appearance, to: file)
@@ -1151,6 +1163,81 @@ final class UICaptureTests: XCTestCase {
             XCTAssertEqual(neg.orange, 0,
                 "\(tag)：正常臂里出现了橙像素 \(neg.orange) ⇒ 警告在无冲突时也画了，判据失去负臂")
             judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
+    // MARK: - R477 · 浮层行的置顶图钉
+
+    /// R477：浮层置顶行改用与主列表同一枚图钉，不再把「置顶」两个字塞进标题。
+    ///
+    /// 成对帧：`quickpick-no-source`（同内容/同时间、未置顶）与 `quickpick-pinned`（只打开 isPinned）。
+    /// 三句话一起判：① 负臂类型符号那一列本来就有墨（尺不是瞎的）；② 正臂在**类型符号那一列**
+    /// 多出图钉墨；③ 标题末列不动 —— 若前缀「置顶」还在，标题会变长，③ 会红。
+    func testQuickPickPinnedRowsUseTheMainListPinGlyph() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r477-pin-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negative = fixtures.first(where: { $0.name == "quickpick-no-source" }),
+                  let positive = fixtures.first(where: { $0.name == "quickpick-pinned" }) else {
+                return XCTFail("\(tag)：找不到 quickpick-no-source / quickpick-pinned 夹具 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (leading: Int, titleLast: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "QUICKPICK_PIN", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                // 行带：搜索框与分隔线之下、时间列之前。
+                let y0 = Int(45.0 * scale), y1 = min(rep.pixelsHigh, Int(100.0 * scale))
+                // 类型符号在行内容缩进之后（实测 28..44pt），图钉叠在它右下角（到 ~50pt）。
+                // 0..30pt 是面板留白，量不到任何东西 —— 第一版就死在这里。
+                let leadingX0 = Int(20.0 * scale), leadingX1 = Int(60.0 * scale)
+                let titleX0 = Int(65.0 * scale), titleX1 = Int(250.0 * scale)
+                var leading = 0, titleLast = -1
+                for y in y0..<y1 {
+                    for x in leadingX0..<leadingX1 where isInk(x, y) { leading += 1 }
+                    for x in titleX0..<titleX1 where isInk(x, y) { titleLast = max(titleLast, x) }
+                }
+                return (leading, titleLast, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            emit("QUICKPICK_PIN \(tag) 负臂类型列墨=\(neg.leading) 正臂类型列墨=\(pos.leading)"
+                 + " 差=\(pos.leading - neg.leading) 负臂标题末列=\(neg.titleLast)px"
+                 + " 正臂标题末列=\(pos.titleLast)px 差=\(pos.titleLast - neg.titleLast)px"
+                 + " 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.leading, 0,
+                "\(tag)：负臂类型符号那一列一个墨都没有 ⇒ 尺没有对象，先查捕获通道")
+            XCTAssertGreaterThan(pos.leading - neg.leading, Int(8.0 * scale * scale),
+                "\(tag)：正臂只多出 \(pos.leading - neg.leading) 个墨像素 ⇒ 置顶图钉没有画在类型符号那一列")
+            XCTAssertLessThanOrEqual(abs(pos.titleLast - neg.titleLast), Int(3.0 * scale),
+                "\(tag)：标题末列差 \(pos.titleLast - neg.titleLast)px ⇒ 「置顶」两个字还在标题里（或图钉挤了标题）")
+            judged += 1
+        }
+        if judged == 0 {
+            throw XCTSkip("SHORTCUT_CONFLICT_NOT_RUN=settings-content-blank：两档内容列都没有墨 ⇒ 判据未运行")
         }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
@@ -1782,11 +1869,12 @@ final class UICaptureTests: XCTestCase {
             }
             let page = Self.modalLuma(bytes: bytes, bytesPerRow: rep.bytesPerRow,
                                       xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
-            // R476：块下限按倍率走。1x 上 1pt 分隔线会渲染成 3px 的抗锯齿带，
-            // 而 R474 的「连续 ≥3 行」把它读成了填充块（runner 两档 396px > 墨 25/28px）。
-            // 真实的选中填充有 30+ 行；下限 4px（1x）/7px（2x）只挡发丝线，不挡旧缺陷（32 行）。
+            // R477：块下限按倍率走。runner 1x 的 1pt 分隔线渲染成 5 行灰带（R476 的 4 行下限
+            // 仍把它读成填充块：396px > 墨 25/28px）；真实填充 30+ 行。
             let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
-            let greyBlockFloor = max(4, Int(3.5 * scale))
+            // R477：runner 1x 实测 1pt 分隔线渲染成 **5 行**灰带（纯灰行无墨=5、396px）；
+            // 4 行下限不够。真实填充有 30+ 行，8px（1x）/16px（2x）只挡发丝线。
+            let greyBlockFloor = max(8, Int(8.0 * scale))
             // `modalLuma` 给的是 Int，而下面每一项都是 Double：混着写会让类型检查炸掉
             // （本机实测：`unable to type-check this expression in reasonable time`）。先换算成普通量。
             let pageLuma = Double(page)
@@ -8663,6 +8751,17 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(InlineCodeBandChoice.best([narrowRich, wideBand], minSpan: 40, maxSpan: 300,
                                                  minCoverage: 0.55, minInk: 24)?.row, 1,
                        "实心带里取最宽的那条：碎片 padding 9 不能把整条 99pt 带的 6.0 挤掉")
+        // R477：runner light 上有一条 102/101/1.0 的宽带，真带 85/80/5.0。
+        // 先过 4.5 地板再取最宽 —— 否则宽带会把没有内边距的那条顶上来。
+        let wideNoPadding = InlineCodeBandChoice.Candidate(
+            row: 3, left: 20, right: 121, coverage: 1.0, ink: 0,
+            padding: 1.0, rowMaxBandRun: 102, verticalInk: 80)
+        let truePadded = InlineCodeBandChoice.Candidate(
+            row: 4, left: 20, right: 104, coverage: 1.0, ink: 0,
+            padding: 5.0, rowMaxBandRun: 85, verticalInk: 80)
+        XCTAssertEqual(InlineCodeBandChoice.best([wideNoPadding, truePadded], minSpan: 40, maxSpan: 300,
+                                                 minCoverage: 0.55, minInk: 24)?.row, 4,
+                       "102/1.0 的宽带不过 4.5 地板，真带 85/5.0 必须胜出")
     }
 
     /// R471：截断说明是**界面说明**，字号必须小于正文（不是最后一段内容）。
@@ -10263,6 +10362,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-no-source", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: self.makeNoSourceQuickPickStore(), query: "")))
+        // R477：同一条内容、同一个时间，只把 isPinned 打开 —— 与 quickpick-no-source 成对，
+        // 用来证「置顶」从标题里的两个字变成类型符号右下角的图钉，标题不再被前缀吃掉。
+        results.append(Fixture("quickpick-pinned", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makePinnedQuickPickStore(), query: "")))
         // R469：跨年时间的主列表行组件栈（不走 List：选中底在离屏通道是黑带，
         // 会盖住其中一行的时间行；这里只拍产品行本身 + timeReference）。
         results.append(Fixture("rows-cross-year", NSSize(width: 340, height: 160)) {
@@ -15609,6 +15713,23 @@ final class UICaptureTests: XCTestCase {
             content: .text("没有来源的记录"),
             timestamp: Self.referenceDate,
             sourceUTIs: ["public.utf8-plain-text"]
+        )
+        return HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+    }
+
+    /// R477：与 `makeNoSourceQuickPickStore` 同内容/同时间，只把 isPinned 打开。
+    func makePinnedQuickPickStore() -> HistoryStore {
+        let entry = ClipboardEntry(
+            content: .text("没有来源的记录"),
+            timestamp: Self.referenceDate,
+            thumbnail: nil,
+            sourceURL: nil,
+            sourceUTIs: ["public.utf8-plain-text"],
+            isPinned: true
         )
         return HistoryStore(
             clipboardWriter: TestClipboardWriter(),

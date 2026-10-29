@@ -218,12 +218,16 @@ final class Round3QuickPickTests: XCTestCase {
         XCTAssertTrue(committed.isEmpty, "搜不到时回车不许提交任何东西（更不能提交旧的第一条）")
     }
 
-    func testRowTitleFlattensNewlinesMarksPinnedAndNeverBlank() {
+    func testRowTitleFlattensNewlinesLeavesPinnedToTheGlyphAndNeverBlank() {
         let multiline = entry("第一行\n第二行", at: 5)
         let title = QuickPickController.rowTitle(for: multiline)
         XCTAssertFalse(title.contains("\n"), "行文案里带换行：34pt 的行高会被撑开")
         XCTAssertTrue(title.contains("第一行"))
-        XCTAssertTrue(QuickPickController.rowTitle(for: entry("x", pinned: true, at: 6)).hasPrefix("置顶"))
+        // R477：置顶不再写成标题里的「置顶」两个字（那会吃掉标题的截断预算）；
+        // 视觉标记是类型符号右下角的图钉，像素证人在 `testQuickPickPinnedRowsUseTheMainListPinGlyph`。
+        let pinned = QuickPickController.rowTitle(for: entry("x", pinned: true, at: 6))
+        XCTAssertFalse(pinned.contains("置顶"), "置顶状态不许再回到标题文本里")
+        XCTAssertEqual(pinned, "x")
         XCTAssertTrue(QuickPickController.rowTitle(for: entry("   ", at: 7)).contains("（空）"),
                       "空预览也要有个说法，不能画一行只有时间的东西")
     }

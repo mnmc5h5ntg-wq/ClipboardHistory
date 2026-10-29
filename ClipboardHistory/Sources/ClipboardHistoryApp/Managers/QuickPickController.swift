@@ -649,8 +649,9 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         let preview = entry.shortPreview
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
-        let pinned = entry.isPinned ? "置顶 " : ""
-        var pieces = ["\(pinned)\(preview.isEmpty ? "（空）" : preview)"]
+        // R477：置顶状态改用与主列表同一枚图钉徽标（见 `pinnedBadge`），不再把「置顶」两个字
+        // 塞进标题 —— 那两个字会吃掉标题的截断预算，而主列表早就在用图形说同一件事。
+        var pieces = [preview.isEmpty ? "（空）" : preview]
         if let reason = QuickPickModel.sourceMatchReason(for: entry, query: query) {
             pieces.append("来自 \(reason)")
         }
@@ -746,14 +747,24 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             time.setContentCompressionResistancePriority(.required, for: .horizontal)
             time.setContentHuggingPriority(.required, for: .horizontal)
             time.setAccessibilityLabel("时间")
+            // R477：置顶徽标叠在类型符号的右下角 —— 不占任何固定槽，未置顶的行几何一字未动。
+            let pinnedBadge = NSImageView()
+            pinnedBadge.imageScaling = .scaleProportionallyDown
+            pinnedBadge.contentTintColor = .secondaryLabelColor
+            pinnedBadge.setAccessibilityElement(false)
+            pinnedBadge.translatesAutoresizingMaskIntoConstraints = false
+            pinnedBadge.isHidden = true
+            pinnedBadge.identifier = NSUserInterfaceItemIdentifier("quickPickPinnedBadge")
             let cell = QuickPickRowCell()
             cell.addSubview(symbol)
             cell.addSubview(sourceIcon)
+            cell.addSubview(pinnedBadge)
             cell.addSubview(text)
             cell.addSubview(time)
             cell.textField = text
             cell.imageView = symbol
             cell.sourceIcon = sourceIcon
+            cell.pinnedBadge = pinnedBadge
             cell.timeField = time
             text.translatesAutoresizingMaskIntoConstraints = false
             time.translatesAutoresizingMaskIntoConstraints = false
@@ -763,6 +774,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
                 symbol.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 symbol.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 symbol.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                pinnedBadge.trailingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 2),
+                pinnedBadge.bottomAnchor.constraint(equalTo: symbol.bottomAnchor, constant: 3),
+                pinnedBadge.widthAnchor.constraint(equalToConstant: 9),
+                pinnedBadge.heightAnchor.constraint(equalToConstant: 9),
                 sourceIcon.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
                 sourceIcon.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 sourceIcon.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
@@ -779,6 +794,13 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         }()
         let entry = rows[row].entry
         cell.textField?.stringValue = rows[row].title
+        // R477：标题里不再有「置顶」两个字，读屏仍要听见它（图形徽标对读屏是噪音）。
+        cell.textField?.setAccessibilityLabel(entry.isPinned ? "置顶 \(rows[row].title)" : rows[row].title)
+        cell.pinnedBadge?.isHidden = !entry.isPinned
+        cell.pinnedBadge?.image = entry.isPinned
+            ? NSImage(systemSymbolName: "pin.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
+            : nil
         cell.timeField?.stringValue = Self.rowTime(for: entry,
                                                    reference: rows.map(\.entry.timestamp).max())
         cell.imageView?.image = Self.rowSymbol(for: entry.content)
@@ -913,6 +935,8 @@ private final class QuickPickRowCell: NSTableCellView {
     var timeField: NSTextField?
     /// R470：来源 App 图标的固定槽（没有来源时留空，标题轴不抖）。
     var sourceIcon: NSImageView?
+    /// R477：置顶徽标（叠在类型符号右下角，不占固定槽）。
+    var pinnedBadge: NSImageView?
 }
 
 /// 浮层的一行，多出来的只有一件事：**悬停那一档**（R67）。
