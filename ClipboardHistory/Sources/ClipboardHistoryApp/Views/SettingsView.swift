@@ -871,8 +871,10 @@ struct SettingsView: View {
 
                             Spacer()
 
-                            Button(SettingsViewLayout.clearButtonTitle, role: .destructive) {
+                            Button(role: .destructive) {
                                 showClearHistoryConfirmation = true
+                            } label: {
+                                Label(SettingsViewLayout.clearButtonTitle, systemImage: "trash")
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(.red)

@@ -363,6 +363,19 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 482 轮（R483 · 2026-10-29 · U-1857…U-1862）：设置数据页清空按钮补垃圾桶图标（4 张旧帧变化、基线 300；M1311/M1312 2/2）（产品 1 文件 + 判据）
+
+- **U-1857：⓪ push 与 CI。** 开工两次 `git push` 均报 `Please make sure you have the correct access rights and the repository exists.`、`gh` 不可达 ⇒ **`PUSH_BLOCKED=network`（HEAD=`54af93a`、ahead=0）**、**`CI_READ_BLOCKED=network`**；R481 跑 `40812979165 ↔ 2770bfe`、R480 跑、R478 两跑 `40801850707`/`40802042660`、R477 两跑等**均未读到 ⇒ NOT-RUN**；R479 跑的签收读数沿用 R481 账（FALLBACK_PATH 113、INLINE 99/6.0 与 102/5.0、幻影 0、图钉 +20）。436 无新跑。
+- **U-1858：① 腐烂与预检。** `HIDDEN_ARMS 表=351 可判=1083 rot=0 抽不出=6 已声明死针=0 处置=ok`；`NEEDLE_PRECHECK tables=264 covered=243 arms=660 bad=0`、`ARM_TOTAL files=357 arms=1145`。
+- **U-1859：② 产品：设置数据页清空按钮补垃圾桶图标。** 缺陷形状（`settings-data` 直看）：主窗口批量栏/详情浮层都用垃圾桶说破坏性动作，设置数据页这颗「清空」只有文字；而夹具又注入 `clearHistoryAction: nil`，基线钉住的是用户永远看不到的禁用灰态。修法：Sources 把按钮改成 `Label("清空", systemImage:"trash")`（**标签仍保持「清空」**——旧契约 `testSettingsClearButtonUsesShortDestructiveLabel` 钉着短标签，不改旧期望）；夹具注入非 nil 回执，让启用的售出态进帧。旧/新：**4 张旧帧变化**（settings-data 与 settings-data-no-title-icon 各亮暗）、0 新增/缺失；基线 **300/0/0/0**；逐张看过：垃圾桶在标签左、按钮未压卡片。读数（`CLEAR_LABEL`）：标签墨宽 light **46.0pt**、dark **46.5pt**（旧「清空」文字约 33pt）；**启用红态在离屏 `.borderedProminent` 无彩色通道（红像素 0）⇒ 具名 NOT-RUN，不拿颜色当证人**。
+- **U-1860：③ 判据与刀。** 新判据 `testClearHistoryButtonCarriesItsFullDestructiveLabel` 读右下角按钮标签的墨宽（阈值 45pt；内容平涂时打 `CLEAR_LABEL_NOT_RUN` 并 skip）。刀 `M1311`（Label→Text）/`M1312`（labelStyle titleOnly）**2/2 CAUGHT**。第一版把标签改成「清空未收藏」（85.5pt），被旧契约测试当场红 ⇒ **撤回长标签、保留短标签+图标**，不改旧期望。
+- **U-1861：④ 既有面。** 既有 `testSettingsClearButtonUsesShortDestructiveLabel` 保持绿；settings-data 的卡片节奏/标题图标/路径行未因按钮变宽而溢出。启用红态的像素通道具名 NOT-RUN。
+- **U-1862：⑤ 八步与电池。** build **0 告警**（arm64+x86_64）；捕获卷 **300 帧**、`CHANGED=4 ADDED=0 MISSING=0`，更新后 `300/0/0/0`；全量 **1299/56/0**（489.7s，轻载；首遍长标签被旧契约红 1 条，撤回后干净）；换装 `ok / SHA_MATCH=1 / 397=397`；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **1** 轮（as-of 481，`python3 scripts/product_streak.py --streak-for 481`，last=2770bfe）；清账 `格=162 声明=63 不成立=0/63`；§1 已刷新（尾轮 479 / 480 节）；电池 **Ran 683 / OK skipped=5**；清账 162/63/0。**具名 NOT-RUN**：① R481/R480/R478/R477 的跑（CI_READ_BLOCKED）；② 清空按钮启用红态（离屏无彩色通道）；③ 垃圾桶图标的 runner 1x/dark；④ `ROW_LINK_BADGE`/`SETTINGS_TITLE_ICON`/`FALLBACK_PATH`/inline/幻影/图钉/冲突的 runner 复核；⑤ `SETTINGS_DATA_PATH`；⑥ 既有 runner 复核；⑦ Capture MATERIAL_BLIND_NOT_RUN；⑧ 已知 Motion 采样红；⑨ 437–566 的其余未结项仍开。
+
+## 第 481 轮（R482 · 2026-10-29 · 空轮）：无产品变更（清空按钮启用色离屏无通道，未验证的 Sources 改动已撤回；不记完成）
+
+- ⓪ push no-op、ahead=0；R479 跑签收 FALLBACK_PATH 113/INLINE 99/6.0 与 102/5.0/幻影 0/图钉 +20；R481 跑 in_progress。② 尝试「清空未收藏」启用态：夹具注入后帧仍无彩色填充（`CLEAR_BUTTON_NOT_RUN=no-red-fill`），离屏 `.borderedProminent` 启用红态不可判 ⇒ 具名 NOT-RUN，未验证的 Sources 改动全部撤回；未改旧期望、未提交。
+
 ## 第 480 轮（R481 · 2026-10-29 · U-1851…U-1856）：主列表补链接条目标记（2 张新帧、基线 300；M1308/M1309 2/2）+ 设置标题图标的 runner NOT-RUN 修复（产品 1 文件 + 判据）
 
 - **U-1851：⓪ push 与 CI。** 开工一次快进 push **`59b63c1..2d54488` success**（两笔：60d65a4/2d54488）、HEAD=origin/main=`2d54488`、**ahead=0**。R479 跑 `40805576917 ↔ 225e6f8` failure 3 步已读：Release script（sources 时序）、Swift/Capture（**唯一测试红是 `SETTINGS_TITLE_ICON` 0 墨**，设置内容列在 runner 平涂）、Motion `5/5 executed=77 reds=0`；同跑签收 `FALLBACK_PATH` 1x **113pt**、`INLINE_CODE_PAD light 99/6.0、dark 102/5.0`、幻影块 **0**、`QUICKPICK_PIN` **+20/标题末列 0**。R480 跑（2d54488）与 R479/R478/R477 其余跑读时 in_progress/未读 ⇒ NOT-RUN；436 R479 跑 reds=0。

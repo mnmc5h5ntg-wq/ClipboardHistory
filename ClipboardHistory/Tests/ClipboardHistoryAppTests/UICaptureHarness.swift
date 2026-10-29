@@ -1489,6 +1489,57 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2)
     }
 
+    // MARK: - R483 · 破坏性清空按钮的完整文案/图标
+
+    /// R483：设置「清空」按钮补垃圾桶与「未收藏」范围词；判据量按钮标签的墨宽
+    /// （旧「清空」约 46pt，新「垃圾桶 + 清空未收藏」约 85pt）。启用红态在离屏帧无彩色通道
+    /// ⇒ 具名 NOT-RUN，不拿颜色当证人。
+    func testClearHistoryButtonCarriesItsFullDestructiveLabel() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r483-clear-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-data" }) else { return XCTFail("\(tag)：找不到 settings-data") }
+            let file = scratch.appendingPathComponent("clear-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else { return XCTFail("\(tag)：读不回帧") }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            var minX = Int.max, maxX = -1, ink = 0
+            for y in Int(Double(rep.pixelsHigh) * 0.50)..<rep.pixelsHigh {
+                for x in Int(Double(rep.pixelsWide) * 0.60)..<rep.pixelsWide {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff]) + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    if abs(Int(luma.rounded()) - page) >= 60 {
+                        ink += 1; minX = min(minX, x); maxX = max(maxX, x)
+                    }
+                }
+            }
+            if ink == 0 {
+                emit("CLEAR_LABEL_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            let width = Double(maxX - minX + 1) / scale
+            let red = 0 // 离屏 .borderedProminent 无彩色通道；只登记，不判
+            emit("CLEAR_LABEL \(tag) 标签宽=\(String(format: "%.1f", width))pt 墨=\(ink) 红像素=\(red) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(width, 45.0,
+                "\(tag)：清空按钮标签只有 \(String(format: "%.1f", width))pt ⇒ 垃圾桶图标没有画出来")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("CLEAR_LABEL_NOT_RUN=settings-content-blank：设置内容列未画出来") }
+        XCTAssertEqual(judged, 2)
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -13742,7 +13793,7 @@ final class UICaptureTests: XCTestCase {
                 fileURL: FileManager.default.temporaryDirectory
                     .appendingPathComponent("capture-ledger-empty.json"),
                 debounceSeconds: 3600),
-            clearHistoryAction: { nil },
+            clearHistoryAction: { "已清空 1 条" },
             // R28：这两根接缝产品侧（`SettingsWindowController:87,97`）**永远注入**，
             // 而视图里它们是 `.disabled(exportHistoryAction == nil)` 的开关
             // （`SettingsView.swift:584,586`）。夹具不传 ⇒ 「数据」页那两张帧里
