@@ -80,6 +80,8 @@ struct HistorySidebarView: View {
     private var shouldReduce: Bool { reduceMotion || MotionCatalog.motionShouldBeReduced }
     /// R429：分区头取证键（`false` = 旧形状）；产品路径永远显示。
     @Environment(\.sidebarSectionHeadersForCapture) private var sidebarSectionHeadersForCapture
+    /// R494：主侧栏标题图标的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.mainSidebarTitleIconForCapture) private var mainSidebarTitleIconForCapture
     private var sectionHeadersForDrawing: Bool { sidebarSectionHeadersForCapture ?? true }
     private var pinnedEntries: [HistoryStore.Entry] { historyStore.filteredEntries.filter(\.isPinned) }
     private var unpinnedEntries: [HistoryStore.Entry] { historyStore.filteredEntries.filter { !$0.isPinned } }
@@ -109,6 +111,14 @@ struct HistorySidebarView: View {
 
     private var header: some View {
         HStack {
+            // R494：设置页标题与侧栏分类都有图标，主窗口这张标题却只有一行字。
+            // 补一枚时钟/回溯符号，作为同一个身份锚点；纯装饰，读屏不重复念。
+            if mainSidebarTitleIconForCapture ?? true {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: VisualFont.title, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
             Text(headerTitle)
                 .font(.system(size: VisualFont.title, weight: .semibold))
                 .foregroundStyle(.secondary)
@@ -624,5 +634,17 @@ private struct FilterSegmentButton: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+/// R494：主侧栏标题图标的负向帧缝（产品默认 nil ⇒ 画）。
+struct MainSidebarTitleIconForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var mainSidebarTitleIconForCapture: Bool? {
+        get { self[MainSidebarTitleIconForCaptureKey.self] }
+        set { self[MainSidebarTitleIconForCaptureKey.self] = newValue }
     }
 }

@@ -175,7 +175,7 @@ final class UICaptureTests: XCTestCase {
         // ⇒ 同一处离屏伪影（侧栏选中行画成一整块纯黑），不是新缺陷。加名单前先看了那张帧：
         // 横幅本身完好（红底、两行、"知道了"垂直居中、无截断），黑的是左下侧栏那一行。
         "content-with-copy-failure-notice",
-        "sidebar-history", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
+        "sidebar-history", "sidebar-no-title-icon", "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -1326,6 +1326,72 @@ final class UICaptureTests: XCTestCase {
         }
         if judged == 0 { throw XCTSkip("TABLE_PIPES_NOT_RUN：两档都没有表格内容") }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
+    }
+
+    // MARK: - R494 · 主侧栏标题图标
+
+    /// R494：设置页标题与侧栏分类都有图标，主窗口标题「时间剪史」只有一行字。
+    /// 成对帧 `sidebar-history` / `sidebar-no-title-icon`：读标题带的左沿与墨量。
+    func testMainSidebarTitleCarriesAnIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r494-title-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "sidebar-history" }),
+                  let negative = fixtures.first(where: { $0.name == "sidebar-no-title-icon" }) else {
+                return XCTFail("\(tag)：找不到 sidebar 标题两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, first: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "MAIN_TITLE_ICON", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                var ink = 0, first = Int.max
+                for y in Int(Double(rep.pixelsHigh) * 0.12)..<Int(Double(rep.pixelsHigh) * 0.30) {
+                    for x in 0..<Int(Double(rep.pixelsWide) * 0.50) where isInk(x, y) {
+                        ink += 1
+                        first = min(first, x)
+                    }
+                }
+                return (ink, first, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("MAIN_TITLE_ICON_NOT_RUN=sidebar-blank \(tag)")
+                continue
+            }
+            let shift = neg.first - pos.first
+            emit("MAIN_TITLE_ICON \(tag) 负臂标题墨=\(neg.ink) 正臂标题墨=\(pos.ink)"
+                 + " 负臂首墨=\(neg.first) 正臂首墨=\(pos.first) 左移=\(shift)px"
+                 + " 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂标题带一个墨都没有 ⇒ 标题没画出来，尺没有对象")
+            XCTAssertGreaterThan(pos.ink, neg.ink,
+                "\(tag)：正臂标题带墨量没有增加 ⇒ 标题图标没有画出来")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("MAIN_TITLE_ICON_NOT_RUN：两档都没有侧栏标题") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
     // MARK: - R493 · 恢复默认按钮图标
@@ -11358,6 +11424,11 @@ final class UICaptureTests: XCTestCase {
 
         results.append(Fixture("sidebar-history", NSSize(width: 300, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)))
+        })
+        // R494：主侧栏标题图标的负向臂（只关图标，其余与 sidebar-history 同）。
+        results.append(Fixture("sidebar-no-title-icon", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store)
+                .environment(\.mainSidebarTitleIconForCapture, false)))
         })
         // R444：来源行负臂 —— 与 `sidebar-history` 第一行**同一段正文/时间**，只是来源为 nil。
         // 必须走存档载入（`makeNoSourceDetailStore`）：`store.add` 会被上下文采集器补成

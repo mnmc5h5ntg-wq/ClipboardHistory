@@ -8283,3 +8283,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x/dark 未读。
 - 回滚：两处 Label 改回 Text，删捕获缝/新帧与判据，MotionDriver 正对照改回旧字面量。
 
+## D-490 主侧栏标题补 clock.arrow.circlepath 图标；图标占旧左沿时判据只数墨量（R494）
+
+- 背景：设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字；同一窗口的身份锚点少一枚。
+- 决定：`HistorySidebarView.header` 在标题前加 `Image(systemName: "clock.arrow.circlepath")`（`VisualFont.title` semibold、`.secondary`、`accessibilityHidden(true)`），加捕获缝 `mainSidebarTitleIconForCapture`（产品默认 nil 画）。
+- 理由：图标与标题同字号同字重，作为身份锚点；读屏不重复念；纯装饰不抢计数与批量按钮。
+- 兼容性/迁移：48 张旧帧变化 + 2 张新帧，基线 318→320；标题右移但行的左沿由图标接住，判据不拿左移作证。
+- 边界：`MAIN_TITLE_ICON` 在 runner 1x/2x 未签收；content-* 侧栏的暗色仍属已登记盲区，只看几何。
+- 回滚：删 Image 与捕获缝、删新夹具/判据/两刀，基线回 318。
+

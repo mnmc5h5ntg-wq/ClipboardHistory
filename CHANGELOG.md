@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主侧栏标题补时钟图标（48 张旧帧变化 + 2 张新帧、基线 320）（R494 / 第 493 轮 / Round 491 / U-1923…U-1928 · 产品 1 文件 + 判据）
+
+
 ### 设置「恢复默认」按钮补图标（18 张旧帧变化 + 2 张新帧、基线 318）（R493 / 第 492 轮 / Round 490 / U-1917…U-1922 · 产品 2 文件 + 判据）
 
 
