@@ -10525,3 +10525,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：星在类型符号右上、图钉在右下，几何上不重叠（星 9pt、图钉 9pt、16pt 符号），但没有同时置顶+收藏的帧。
     修法：需要时加一张 `quickpick-favorite-pinned` 成对帧，量两枚徽标的行带与标题轴；不加就先不声明视觉已验证。
 
+**571. DATA_ACTION_ICONS 的 runner 1x/dark 未签收**（R486 观察）
+    现象：本机 2x 两窗墨差 +240/+239；runner 1x 设置内容整列平涂时两窗都无墨（预期 NOT_RUN），未读。
+    修法：下一跑读 `DATA_ACTION_ICONS` 两档；若 1x 有内容但墨差低于 20·s²，先查捕获通道，不降地板。
+
+**572. HEATMAP_TODAY 的 1x NOT_RUN 出口未在 runner 上复验**（R486 观察）
+    现象：R484 跑两档差异 0 像素（设置内容平涂）被判红；本轮加内容墨证人 + 具名 NOT_RUN，但只在本机 2x 验过。
+    修法：下一跑读 `HEATMAP_TODAY_NOT_RUN=settings-content-blank` 是否出现；本机 2x 仍须是 60 像素。
+

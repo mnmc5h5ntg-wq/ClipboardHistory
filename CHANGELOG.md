@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置数据页导出/导入补图标（4 张旧帧变化 + 2 张新帧、基线 306）（R486 / 第 485 轮 / Round 483 / U-1875…U-1880 · 产品 1 文件 + 判据）
+
+
 ### 浮层候选行补「已收藏」星标（2 张新帧、基线 304）（R485 / 第 484 轮 / Round 482 / U-1869…U-1874 · 产品 1 文件 + 判据）
 
 

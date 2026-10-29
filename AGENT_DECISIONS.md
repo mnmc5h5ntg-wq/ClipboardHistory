@@ -8211,3 +8211,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：收藏+置顶同时出现没有帧；runner 1x/dark 未签收（首墨行 9pt 小图在 1x 可能只余 4–5px）。
 - 回滚：删 favoriteBadge/两个锚点/读屏前缀/新帧与判据。
 
+## D-482 数据页导出/导入补图标；两枚图标分窗判墨（R486）
+
+- 背景：同一组数据动作里清空已有垃圾桶图标，导出/导入还是纯文字，三颗按钮的图标语言分裂。
+- 决定：导出/导入改用 `Label` + `square.and.arrow.up` / `square.and.arrow.down`，标签一字不改；加捕获缝 `settingsDataActionIconsForCapture`（产品默认 nil 画图标）。
+- 理由：同一动作组的图标语言要一致；按钮内容居中，图标只把文字往右推，不能按左沿判，改为按每颗按钮自己的窗读墨。
+- 兼容性/迁移：4 张旧帧变化 + 2 张新帧，基线 304→306；清空按钮与卡片几何未动。
+- 边界：runner 1x 设置内容平涂时两窗都无墨 ⇒ 具名 `DATA_ACTION_ICONS_NOT_RUN=settings-content-blank`，不降地板。
+- 回滚：删两枚 Label 图标/捕获缝/新帧与判据。
+

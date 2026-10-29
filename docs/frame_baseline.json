@@ -1,5 +1,5 @@
 {
-  "count": 304,
+  "count": 306,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -215,10 +215,12 @@
     "segmented-filter-idle-200x60-light.png": "9b3562646fa156bd921d2b1e5fec18e08b8fb9ae3591ee6c67795730946cd7e4",
     "settings-about-720x540-dark.png": "063b46c29a05412fb472d75a8770edf3db1b2a3c4d455f36a6ae39f6c3e188f1",
     "settings-about-720x540-light.png": "3039d519f897b0bc22621e2fe1f2a764d6134601071370e1a19bbe1841a24a01",
-    "settings-data-720x540-dark.png": "2461502eb1ab7a80386b25c674991f159e0e2a5a66281a46190c5b625ef3bdda",
-    "settings-data-720x540-light.png": "1606a2a400b17f03cdf45df33cfcc585ef814941355878f655b3c185e7365258",
-    "settings-data-no-title-icon-720x540-dark.png": "65a73c664fb0fc4189e28cf356757a8508035b202d396614830892fb7ca39734",
-    "settings-data-no-title-icon-720x540-light.png": "c2391d3baec3549091e1994d137df499079676fd16a409b8e87e31be7e09f15e",
+    "settings-data-720x540-dark.png": "1b0af8375c6b111a6f5d5e43e866ae3fc90cf47b93fc3c0705ca2d8e841bf7e5",
+    "settings-data-720x540-light.png": "ddc4d8141509cb8ceef7ebf02dc4a51e04bb47932448297ed957ffbaec8242bb",
+    "settings-data-no-action-icons-720x540-dark.png": "2461502eb1ab7a80386b25c674991f159e0e2a5a66281a46190c5b625ef3bdda",
+    "settings-data-no-action-icons-720x540-light.png": "1606a2a400b17f03cdf45df33cfcc585ef814941355878f655b3c185e7365258",
+    "settings-data-no-title-icon-720x540-dark.png": "5187003dfa26f81f02dc9f90566d169c53092b92fdfe5910e4c009de67c87a37",
+    "settings-data-no-title-icon-720x540-light.png": "8d1b324bf0066992d2d85bd639370fe55c729ea21b5abbf3477e22fca5dee528",
     "settings-general-720x540-dark.png": "37f7b19feec711be3797eaf4d7277b6747715a9a652d7fdfb8e02af7ae3fbabc",
     "settings-general-720x540-light.png": "1a14e3b15a2fb3e8edc966d8dea8fb615271019f79df9d1c3363978ea699f2e7",
     "settings-general-login-failed-720x540-dark.png": "7334ae21e352f6a4c0ac518f28e17262c2704a01776e408fe0e10b72fe34562c",

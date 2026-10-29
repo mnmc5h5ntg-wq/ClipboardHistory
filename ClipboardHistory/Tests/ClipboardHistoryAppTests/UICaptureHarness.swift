@@ -1242,6 +1242,95 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R486 · 数据页导出/导入按钮的图标语言
+
+    /// R486：同一组数据动作里，清空已经有垃圾桶图标，导出/导入却还是纯文字 ——
+    /// 三颗按钮的图标语言分裂。成对帧 `settings-data` / `settings-data-no-action-icons`
+    /// 只差这两枚图标：正臂左沿被图标推到更左、墨量更多；标签文字不改。
+    /// 设置内容整列平涂时（runner 1x）两臂都读不到墨 ⇒ 具名 NOT_RUN，不降地板。
+    func testDataPageExportImportButtonsCarryIcons() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r486-data-icons-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-data" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-data-no-action-icons" }) else {
+                return XCTFail("\(tag)：找不到 settings-data(-no-action-icons) ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, exportInk: Int, importInk: Int, first: Int, last: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "DATA_ACTION_ICONS", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                // 按钮那一行实测在 525..548（720×540 的 2x 帧）；取它上下各留一点。
+                let y0 = Int(Double(rep.pixelsHigh) * 0.48)
+                let y1 = Int(Double(rep.pixelsHigh) * 0.52)
+                // 两段窗：导出按钮 0.24..0.39、导入按钮 0.39..0.56。
+                // 按钮内容居中，图标只把文字往右推、左沿不动 ⇒ 必须按**每颗按钮自己的窗**对墨，
+                // 否则撤掉一枚图标仍会被另一枚的墨差盖过去（第一版就是这么写、两刀都会漏）。
+                let x0 = Int(Double(rep.pixelsWide) * 0.24)
+                let split = Int(Double(rep.pixelsWide) * 0.39)
+                let x1 = Int(Double(rep.pixelsWide) * 0.56)
+                var ink = 0, exportInk = 0, importInk = 0, first = Int.max, last = -1
+                for y in y0..<y1 {
+                    for x in x0..<x1 where isInk(x, y) {
+                        ink += 1
+                        if x < split { exportInk += 1 } else { importInk += 1 }
+                        first = min(first, x)
+                        last = max(last, x)
+                    }
+                }
+                return (ink, exportInk, importInk, first, last, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("DATA_ACTION_ICONS_NOT_RUN=settings-content-blank \(tag) 两臂按钮行都无墨")
+                continue
+            }
+            // 按钮内容居中：图标把按钮撑宽、却不改第一颗的左沿 ⇒ 证人分到**每颗按钮自己的窗**。
+            let widen = pos.last - neg.last
+            let exportDiff = pos.exportInk - neg.exportInk
+            let importDiff = pos.importInk - neg.importInk
+            emit("DATA_ACTION_ICONS \(tag) 负臂末列=\(neg.last) 正臂末列=\(pos.last)"
+                 + " 右伸=\(widen)px 负臂墨=\(neg.ink) 正臂墨=\(pos.ink) 差=\(pos.ink - neg.ink)"
+                 + " 导出差=\(exportDiff) 导入差=\(importDiff)"
+                 + " 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂按钮行一个墨都没有 ⇒ 尺没有对象，先查捕获通道")
+            XCTAssertGreaterThanOrEqual(exportDiff, Int(20.0 * scale * scale),
+                "\(tag)：导出按钮只多出 \(exportDiff) 个墨像素 ⇒ 导出没有图标（撤掉它这一格要红）")
+            XCTAssertGreaterThanOrEqual(importDiff, Int(20.0 * scale * scale),
+                "\(tag)：导入按钮只多出 \(importDiff) 个墨像素 ⇒ 导入没有图标（撤掉它这一格要红）")
+            XCTAssertGreaterThan(pos.ink - neg.ink, Int(40.0 * scale * scale),
+                "\(tag)：正臂只多出 \(pos.ink - neg.ink) 个墨像素 ⇒ 图标没有画出来")
+            XCTAssertLessThan(pos.last, Int(Double(positive.size.width) * 0.95 * scale),
+                "\(tag)：正臂按钮行末列 \(pos.last) 贴到卡片右缘 ⇒ 标签被图标挤到截断")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("DATA_ACTION_ICONS_NOT_RUN：两档都没有设置内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R485 · 浮层候选行的已收藏状态
 
     /// R485：主列表每行都用星标说「已收藏」，浮层候选行却什么都不说 —— 同一条记录在两种列表里
@@ -1657,13 +1746,37 @@ final class UICaptureTests: XCTestCase {
                 }
             }
             let scale = Double(pos.w) / Double(posF.size.width)
-            emit("HEATMAP_TODAY \(tag) 差异像素=\(diff) bbox=\(minX),\(minY)-\(maxX),\(maxY) 倍率=\(String(format: "%.1f", scale))x")
+            // R486：runner 1x 的设置内容整列平涂时两臂逐像素相同（R484 跑实测 0 像素），
+            // 那是"这台机器拍不出统计页"，不是"角标没画"。先用热图区的墨作内容证人；
+            // 证人也没有 ⇒ 具名 NOT_RUN，不把通道缺席读成产品缺陷。
+            let page = pos.bytes.withUnsafeBufferPointer { buffer in
+                Self.modalLuma(bytes: buffer.baseAddress!, bytesPerRow: pos.bpr,
+                               xRange: 0..<pos.w, yRange: 0..<pos.h)
+            }
+            func contentIsInk(_ x: Int, _ y: Int) -> Bool {
+                let i = y * pos.bpr + x * pos.spp
+                let luma = 0.2126 * Double(pos.bytes[i + rOff])
+                    + 0.7152 * Double(pos.bytes[i + rOff + 1])
+                    + 0.0722 * Double(pos.bytes[i + rOff + 2])
+                return abs(Int(luma.rounded()) - page) >= 60
+            }
+            var contentInk = 0
+            for y in Int(Double(pos.h) * 0.30)..<Int(Double(pos.h) * 0.85) {
+                for x in Int(Double(pos.w) * 0.45)..<Int(Double(pos.w) * 0.95)
+                    where contentIsInk(x, y) { contentInk += 1 }
+            }
+            if contentInk < Int(50.0 * scale * scale) {
+                emit("HEATMAP_TODAY_NOT_RUN=settings-content-blank \(tag) 内容墨=\(contentInk) 差异像素=\(diff)")
+                continue
+            }
+            emit("HEATMAP_TODAY \(tag) 差异像素=\(diff) bbox=\(minX),\(minY)-\(maxX),\(maxY) 倍率=\(String(format: "%.1f", scale))x 内容墨=\(contentInk)")
             XCTAssertGreaterThanOrEqual(diff, Int(8.0 * scale * scale),
                 "\(tag)：两臂差异只有 \(diff) 像素 ⇒ 今天格角标没有画出来")
             XCTAssertLessThan(diff, Int(4000.0 * scale * scale),
                 "\(tag)：两臂差异 \(diff) 像素 ⇒ 不只是角标（其它控件也变了）")
             judged += 1
         }
+        if judged == 0 { throw XCTSkip("HEATMAP_TODAY_NOT_RUN：两档都没有设置内容") }
         XCTAssertEqual(judged, 2)
     }
 
@@ -11496,6 +11609,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .data)
                 .environment(\.settingsPageTitleIconForCapture, false))
         })
+        // R486：数据页导出/导入按钮图标的负向臂（只关这两枚，其余与 settings-data 同）。
+        results.append(Fixture("settings-data-no-action-icons", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .data)
+                .environment(\.settingsDataActionIconsForCapture, false))
+        })
         // R476：快捷键冲突臂 —— 第一行被设成与第二行完全相同的 ⌃⌥C。
         // 只多这一张成对帧：正常页没有冲突提示（既有 settings-shortcuts 逐字节不变）。
         results.append(Fixture("settings-shortcuts-conflict", NSSize(width: 720, height: 540)) {
@@ -17824,7 +17942,7 @@ final class UICaptureTests: XCTestCase {
         // R476：冲突臂是同一棵 settings 侧栏 vibrant 子树（只是内容列多一行警告）⇒ 同一处盲区。
         "settings-shortcuts-conflict",
         // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
-        "settings-data-no-title-icon",
+        "settings-data-no-title-icon", "settings-data-no-action-icons",
         // R484：热图今天角标的负向臂也是同一棵 settings 侧栏 vibrant 子树。
         "settings-stats-populated-no-today",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：

@@ -180,6 +180,9 @@ struct SettingsView: View {
     /// R442：关于页的版本/build 注入缝（产品路径读真实 bundle）。
     @Environment(\.settingsSidebarVersionForCapture) private var aboutVersionOverride
     @Environment(\.settingsAboutBuildForCapture) private var aboutBuildOverride
+    /// R486：数据页导出/导入两颗按钮的图标缝（产品默认 nil ⇒ 画图标）。
+    @Environment(\.settingsDataActionIconsForCapture) private var dataActionIconsForCapture
+    private var dataActionIconsVisible: Bool { dataActionIconsForCapture ?? true }
     /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
     private let categoryOverride: Binding<SettingsCategory?>?
 
@@ -844,10 +847,24 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 10) {
-                            Button("导出历史…") { exportHistory() }
-                                .disabled(exportHistoryAction == nil)
-                            Button("导入历史…") { importHistory() }
-                                .disabled(importHistoryAction == nil)
+                            // R486：同一组里清空已有垃圾桶图标，导出/导入却还是纯文字 ——
+                            // 三颗动作的图标语言分裂。补系统箭头符号，标签一字不改。
+                            Button { exportHistory() } label: {
+                                if dataActionIconsVisible {
+                                    Label("导出历史…", systemImage: "square.and.arrow.up")
+                                } else {
+                                    Text("导出历史…")
+                                }
+                            }
+                            .disabled(exportHistoryAction == nil)
+                            Button { importHistory() } label: {
+                                if dataActionIconsVisible {
+                                    Label("导入历史…", systemImage: "square.and.arrow.down")
+                                } else {
+                                    Text("导入历史…")
+                                }
+                            }
+                            .disabled(importHistoryAction == nil)
                         }
                         if let archiveMessage {
                             ReceiptLine(text: archiveMessage) { self.archiveMessage = nil }
@@ -1489,5 +1506,17 @@ extension EnvironmentValues {
     var settingsPageTitleIconForCapture: Bool? {
         get { self[SettingsPageTitleIconForCaptureKey.self] }
         set { self[SettingsPageTitleIconForCaptureKey.self] = newValue }
+    }
+}
+
+/// R486：数据页导出/导入按钮图标的负向帧缝（产品默认 nil ⇒ 画图标）。
+struct SettingsDataActionIconsForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsDataActionIconsForCapture: Bool? {
+        get { self[SettingsDataActionIconsForCaptureKey.self] }
+        set { self[SettingsDataActionIconsForCaptureKey.self] = newValue }
     }
 }
