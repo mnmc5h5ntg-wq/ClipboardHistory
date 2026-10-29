@@ -183,6 +183,9 @@ struct SettingsView: View {
     /// R486：数据页导出/导入两颗按钮的图标缝（产品默认 nil ⇒ 画图标）。
     @Environment(\.settingsDataActionIconsForCapture) private var dataActionIconsForCapture
     private var dataActionIconsVisible: Bool { dataActionIconsForCapture ?? true }
+    /// R489：默认排除项尾部「默认」标记的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.settingsDefaultExcludedBadgeForCapture) private var defaultExcludedBadgeForCapture
+    private var defaultExcludedBadgeVisible: Bool { defaultExcludedBadgeForCapture ?? true }
     /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
     private let categoryOverride: Binding<SettingsCategory?>?
 
@@ -592,7 +595,18 @@ struct SettingsView: View {
                         // R432：默认名单从「默认排除：com.…」的纯文本流改成
                         // 图标 + 应用名 + bundle ID 的行（用户认不出裸 ID 是哪个 App）。
                         ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \.self) { id in
-                            ExcludedAppRow(bundleID: id)
+                            // R489：默认项没有「移除」，尾部补一个「默认」身份标记，
+                            // 让"为什么这一行不能删"在界面上有答案。
+                            HStack(spacing: 6) {
+                                ExcludedAppRow(bundleID: id)
+                                if defaultExcludedBadgeVisible {
+                                    Text("默认")
+                                        .font(.system(size: VisualFont.meta))
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .accessibilityLabel("默认排除项，不可移除")
+                                }
+                            }
                         }
                         ForEach(Array(CapturePolicy.decodeUserExcluded(excludedBundleIDsRaw)).sorted(), id: \.self) { id in
                             HStack {
@@ -1518,5 +1532,17 @@ extension EnvironmentValues {
     var settingsDataActionIconsForCapture: Bool? {
         get { self[SettingsDataActionIconsForCaptureKey.self] }
         set { self[SettingsDataActionIconsForCaptureKey.self] = newValue }
+    }
+}
+
+/// R489：默认排除项「默认」标记的负向帧缝（产品默认 nil ⇒ 画）。
+struct SettingsDefaultExcludedBadgeForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsDefaultExcludedBadgeForCapture: Bool? {
+        get { self[SettingsDefaultExcludedBadgeForCaptureKey.self] }
+        set { self[SettingsDefaultExcludedBadgeForCaptureKey.self] = newValue }
     }
 }

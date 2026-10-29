@@ -1328,6 +1328,70 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R489 · 默认排除项的身份标记
+
+    /// R489：默认排除项不能移除，自定义项有「移除」；两类行原来只靠按钮有无区分。
+    /// 正臂在默认项尾部多一枚「默认」，负臂只关这枚标记。判据读右列墨量差：
+    /// 两臂都有自定义行的「移除」，差出来的就是默认项标记。
+    func testDefaultExcludedRowsCarryADefaultBadge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r489-default-badge-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-privacy-excluded" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-privacy-no-default-badge" }) else {
+                return XCTFail("\(tag)：找不到 privacy excluded 两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "DEFAULT_BADGE", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                var ink = 0
+                for y in Int(Double(rep.pixelsHigh) * 0.30)..<Int(Double(rep.pixelsHigh) * 0.80) {
+                    for x in Int(Double(rep.pixelsWide) * 0.80)..<Int(Double(rep.pixelsWide) * 0.98)
+                        where isInk(x, y) { ink += 1 }
+                }
+                return (ink, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("DEFAULT_BADGE_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            let diff = pos.ink - neg.ink
+            emit("DEFAULT_BADGE \(tag) 负臂右列墨=\(neg.ink) 正臂右列墨=\(pos.ink)"
+                 + " 差=\(diff) 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂右列一个墨都没有 ⇒ 自定义行的「移除」没拍到，尺没有对象")
+            XCTAssertGreaterThan(diff, Int(80.0 * scale * scale),
+                "\(tag)：正臂只多出 \(diff) 个右列墨像素 ⇒ 默认项没有身份标记")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("DEFAULT_BADGE_NOT_RUN：两档都没有设置内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R488 · 表格列随内容对齐
 
     /// R488：`detail-table-uneven` 的三行源码竖线没有对齐；渲染后第二/第三列的起点
@@ -12177,6 +12241,14 @@ final class UICaptureTests: XCTestCase {
                                                                         "com.example.design"]))) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .privacy))
         })
+        // R489：默认排除项尾部「默认」标记的负向臂（只关标记，其余与 privacy-excluded 同）。
+        results.append(Fixture("settings-privacy-no-default-badge", NSSize(width: 720, height: 1040),
+                               seed: (CapturePolicy.userExcludedKey,
+                                      CapturePolicy.encodeUserExcluded(["com.example.writer",
+                                                                        "com.example.design"]))) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .privacy)
+                .environment(\.settingsDefaultExcludedBadgeForCapture, false))
+        })
         // 高度 56 → **72**：换成产品自己那句话之后 `contentMustFit` 当场打红
         // （底行 18.4% / 20.2% 有墨 ⇒ 56pt 放不下两行）。这不是"把断言关掉"，是这张帧
         // 一直在裁自己展示的内容 —— 被裁掉的那半行从来没有进过基线，也就从来没有被审过。
@@ -18193,6 +18265,7 @@ final class UICaptureTests: XCTestCase {
         "settings-shortcuts-conflict",
         // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
         "settings-data-no-title-icon", "settings-data-no-action-icons",
+        "settings-privacy-no-default-badge",
         // R484：热图今天角标的负向臂也是同一棵 settings 侧栏 vibrant 子树。
         "settings-stats-populated-no-today",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
@@ -20218,16 +20291,34 @@ final class UICaptureTests: XCTestCase {
                 // 尺会把"种子画出来了"报成"画多了"，而这条判据要的恰恰是能被信任的计数。
                 let found = Self.inkRunCount(column: rightEdge, minRunHeight: 4,
                                              mergeGap: Int(8 * scale))
+                // R489：默认项尾部多了灰色的「默认」标记，右边缘不再只有自定义行的红色「移除」。
+                // 种子守卫数的是"自定义行画出来了" ⇒ 只数**红**段；默认标记不进这段。
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var redColumn: [Bool] = []
+                for y in Int(120 * scale)..<Int(960 * scale) {
+                    var red = 0
+                    for x in Int(684 * scale)..<Int(706 * scale) {
+                        let p = y * rep.bytesPerRow + x * 4
+                        let r = Int(base[p + rOff])
+                        let g = Int(base[p + rOff + 1])
+                        let b = Int(base[p + rOff + 2])
+                        if r >= 120 && r - max(g, b) >= 30 { red += 1 }
+                    }
+                    redColumn.append(red >= 1)
+                }
+                let foundRed = Self.inkRunCount(column: redColumn, minRunHeight: 4,
+                                                mergeGap: Int(8 * scale))
                 emit("SEED_GUARD \(fixture.name) \(tag) 期望=\(expected) 右边缘墨带=\(found)"
-                     + " 整页墨带=\(drawn) 填充=\(fill)")
+                     + " 红段=\(foundRed) 整页墨带=\(drawn) 填充=\(fill)")
                 guard drawn > 0 else {
                     emit("SEED_GUARD_NOT_RUN \(fixture.name) \(tag)（整页零墨 ⇒ 这台机器拍不出这一页，"
                          + "不算通过也不算盲区）")
                     continue
                 }
                 judged += 1
-                XCTAssertEqual(found, expected,
-                               "\(fixture.name) \(tag)：右边缘那一列读到 \(found) 段墨，而夹具声明的种子有 "
+                XCTAssertEqual(foundRed, expected,
+                               "\(fixture.name) \(tag)：右边缘那一列读到 \(foundRed) 段红墨，而夹具声明的种子有 "
                                + "\(expected) 条 ⇒ 判据量的**不是**交付的那一页。"
                                + "`render` 有没有应用 `fixture.seed` 是这里唯一的解释路径"
                                + "（R98：上一版它没有，于是这张帧比交付帧少 60pt 的两行，"

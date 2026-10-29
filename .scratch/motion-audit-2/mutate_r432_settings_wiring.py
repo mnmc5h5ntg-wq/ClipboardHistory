@@ -13,25 +13,28 @@ FILE = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/SettingsView.swift"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "UICaptureTests/testExcludedAppsStartWithAnIconInsteadOfRawIDs"
 
-NEEDLE = """                        ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \\.self) { id in
-                            ExcludedAppRow(bundleID: id)
-                        }
+NEEDLE = """                            HStack(spacing: 6) {
+                                ExcludedAppRow(bundleID: id)
+                                if defaultExcludedBadgeVisible {
+                                    Text("默认")
+                                        .font(.system(size: VisualFont.meta))
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .accessibilityLabel("默认排除项，不可移除")
+                                }
+                            }
 """
 MUTATIONS = [
     ("M1187", "默认名单接回带前缀的纯文本", FILE, NEEDLE,
-     """                        ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \\.self) { id in
-                            Text("默认排除：\\(id)")
+     """                            Text("默认排除：\\(id)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
 """,
      ["行首不是一枚图标"]),
     ("M1188", "默认名单接回裸 ID 文本", FILE, NEEDLE,
-     """                        ForEach(Array(CapturePolicy.defaultExcludedBundleIDs.sorted()), id: \\.self) { id in
-                            Text(id)
+     """                            Text(id)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        }
 """,
      ["行首不是一枚图标"]),
 ]

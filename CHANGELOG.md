@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 默认排除项补「默认」身份标记（6 张旧帧变化 + 2 张新帧、基线 310）（R489 / 第 488 轮 / Round 486 / U-1893…U-1898 · 产品 1 文件 + 判据）
+
+
 ### 表格列宽随内容对齐（制表位；8 张旧帧变化 + 2 张新帧、基线 308）（R488 / 第 487 轮 / Round 485 / U-1887…U-1892 · 产品 3 文件 + 判据）
 
 
