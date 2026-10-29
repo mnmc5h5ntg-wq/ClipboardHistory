@@ -8157,3 +8157,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：兜底路径的 runner 1x/dark 未签收；R477 的 inline/phantom/pin/conflict runner 复验仍未读到。
 - 回滚：删路径行、判据与捕获缝；R462 表恢复 M1260 为 CAUGHT 会回到"刀被掩蔽却假装有牙"。
 
+## D-476 设置页标题与侧栏共用图标；捕获缝给负向帧；名册随新帧同笔（R479）
+
+- 背景：侧栏有分类图标，内容页标题只有一行字；新帧如果不进 vibrant 盲区名册，全量会红在名册而不是产品。
+- 决定：新 `SettingsPageTitle`（category.icon + 标题，同字号、secondary、a11y 隐藏）接入 7 页；加 `settingsPageTitleIconForCapture` 捕获缝（产品默认 nil 画图标，夹具 false 拍负向帧）；负向帧进 `darkSidebarTextBlindSpots`。
+- 理由：图标是换页后的视觉锚点，与侧栏同一语言；成对帧只差图标，标题末墨 +52px 是可复核的对象；名册必须与新帧同笔，否则红的是账不是产品。
+- 兼容性/迁移：36 张旧帧变化 + 2 张新帧，基线 294→296；无 Store/存档变化。
+- 边界：标题图标的 runner 1x/dark 未签收；R478 两跑仍 in_progress。
+- 回滚：删 `SettingsPageTitle` 与捕获缝、恢复 7 处 Text；负向帧与名册一并撤。
+

@@ -387,8 +387,7 @@ struct SettingsView: View {
 
     private var shortcutsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("快捷键")
-                .font(.headline)
+            SettingsPageTitle("快捷键", category: .shortcuts)
 
             GroupBox {
                 VStack(spacing: 12) {
@@ -436,8 +435,7 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("通用")
-                .font(.headline)
+            SettingsPageTitle("通用", category: .general)
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 8) {
@@ -530,8 +528,7 @@ struct SettingsView: View {
 
     private var privacySection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("隐私")
-                .font(.headline)
+            SettingsPageTitle("隐私", category: .privacy)
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
@@ -702,8 +699,7 @@ struct SettingsView: View {
 
     private var recommendationsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("推荐")
-                .font(.headline)
+            SettingsPageTitle("推荐", category: .recommendations)
 
             RecommendationWeightsView(store: weightsStore)
 
@@ -764,8 +760,7 @@ struct SettingsView: View {
     /// 这一页是设置里唯一"介绍自己"的地方 —— 侧栏底部那行只有应用名 + 版本。
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("关于")
-                .font(.headline)
+            SettingsPageTitle("关于", category: .about)
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(AboutPresentation.appName)
@@ -805,8 +800,7 @@ struct SettingsView: View {
     /// 因为只有那一层观察账本 ⇒ 见下面那段注释。
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("数据")
-                .font(.headline)
+            SettingsPageTitle("数据", category: .data)
 
             // R92 / 分组语言对账（本机量出来的，见 .scratch/motion-audit-2/r92_data_readings.log）：
             // 同一个设置窗口里五种分区用了四套分组语法 ——
@@ -1346,8 +1340,7 @@ struct DailyCopyStatsSection: View {
             // 标题为什么在**卡片之上**而不是卡片里面：见 `DailyCopyHeatmapView.header` 的注释
             // （整块包进卡片那一版会让这一屏变成全窗口唯一"标题在卡片内"的一屏，
             // 而它自己那条 `CARD_ABOVE` 红当场把这件事报了回来）。
-            Text("每日复制")
-                .font(.system(size: VisualFont.title, weight: .semibold))
+            SettingsPageTitle("每日复制", category: .stats, font: .system(size: VisualFont.title, weight: .semibold))
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
                     // `today` 也来自账本：见 `DailyCopyLedger.today` 的注释 ——
@@ -1454,5 +1447,45 @@ struct ReceiptLine: View {
             .helpLabel("收起这条提示")
         }
         .transition(MotionCatalog.transition(for: .contentFade))
+    }
+}
+
+
+/// R479：设置页标题与侧栏共用同一枚图标 —— 换页后标题不再只是一行字。
+struct SettingsPageTitle: View {
+    let title: String
+    let category: SettingsCategory
+    var font: Font = .headline
+    @Environment(\.settingsPageTitleIconForCapture) private var pageTitleIconForCapture
+
+    init(_ title: String, category: SettingsCategory, font: Font = .headline) {
+        self.title = title
+        self.category = category
+        self.font = font
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if pageTitleIconForCapture ?? true {
+                Image(systemName: category.icon)
+                    .font(font)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
+            Text(title)
+                .font(font)
+        }
+    }
+}
+
+/// R479：设置页标题图标的负向帧缝（产品默认 nil ⇒ 画图标）。
+struct SettingsPageTitleIconForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsPageTitleIconForCapture: Bool? {
+        get { self[SettingsPageTitleIconForCaptureKey.self] }
+        set { self[SettingsPageTitleIconForCaptureKey.self] = newValue }
     }
 }

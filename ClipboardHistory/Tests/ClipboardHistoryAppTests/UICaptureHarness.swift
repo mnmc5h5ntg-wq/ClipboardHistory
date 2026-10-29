@@ -1318,6 +1318,62 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到图标带")
     }
 
+    // MARK: - R479 · 设置页标题图标
+
+    /// R479：设置页标题与侧栏共用同一枚图标；成对帧只差这一枚。
+    /// 读标题行的**末墨列**：图标把标题文字推右 ~20pt；旧标题行没有这枚图标。
+    func testSettingsPageTitlesCarryTheCategoryIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r479-title-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-data" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-data-no-title-icon" }) else {
+                return XCTFail("\(tag)：找不到 settings-data(-no-title-icon) ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (last: Int, ink: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "TITLE_ICON", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var last = -1, ink = 0
+                for y in Int(60.0 * scale)..<Int(100.0 * scale) {
+                    for x in Int(150.0 * scale)..<Int(500.0 * scale) {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let luma = 0.2126 * Double(base[i + rOff])
+                            + 0.7152 * Double(base[i + rOff + 1])
+                            + 0.0722 * Double(base[i + rOff + 2])
+                        if abs(Int(luma.rounded()) - page) >= 60 {
+                            ink += 1; last = max(last, x)
+                        }
+                    }
+                }
+                return (last, ink, page)
+            }
+            guard let pos = try? scan(positive), let neg = try? scan(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来")
+            }
+            emit("SETTINGS_TITLE_ICON \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px"
+                 + " 差=\(pos.last - neg.last)px 负臂墨=\(neg.ink) 正臂墨=\(pos.ink) 页底=\(neg.page)")
+            XCTAssertGreaterThan(neg.ink, 0, "\(tag)：负臂标题行没有墨 ⇒ 尺没有对象")
+            XCTAssertGreaterThan(pos.last - neg.last, Int(8.0 * scale),
+                "\(tag)：正臂标题末列只比负臂多 \(pos.last - neg.last)px ⇒ 标题图标没有画出来")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -11098,6 +11154,11 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R479：设置页标题图标的负向臂（只关图标，其余与 settings-data 同）。
+        results.append(Fixture("settings-data-no-title-icon", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .data)
+                .environment(\.settingsPageTitleIconForCapture, false))
+        })
         // R476：快捷键冲突臂 —— 第一行被设成与第二行完全相同的 ⌃⌥C。
         // 只多这一张成对帧：正常页没有冲突提示（既有 settings-shortcuts 逐字节不变）。
         results.append(Fixture("settings-shortcuts-conflict", NSSize(width: 720, height: 540)) {
@@ -17393,6 +17454,8 @@ final class UICaptureTests: XCTestCase {
         "settings-shortcuts-recording",
         // R476：冲突臂是同一棵 settings 侧栏 vibrant 子树（只是内容列多一行警告）⇒ 同一处盲区。
         "settings-shortcuts-conflict",
+        // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
+        "settings-data-no-title-icon",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
         // 先看了那张帧（`/tmp/r39-crops/r39-settings-general-login-unsupported-dark-sidebar.png`）：
         // 暗档侧栏里"快捷键 / 隐私 / 推荐 / 数据 / 统计"五枚标签**黑字黑底看不见**，

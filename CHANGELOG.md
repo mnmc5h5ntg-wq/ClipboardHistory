@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置页标题补分类图标（36 张旧帧变化 + 2 张新帧、基线 296）（R479 / 第 478 轮 / Round 476 / U-1839…U-1844 · 产品 1 文件 + 判据）
+
+
 ### 文件兜底态补父目录路径（4 张旧帧变化、基线 294）+ 捕获路径缝 + R462/R463 旧表重锚（R478 / 第 477 轮 / Round 475 / U-1833…U-1838 · 产品 1 文件 + 判据）
 
 
