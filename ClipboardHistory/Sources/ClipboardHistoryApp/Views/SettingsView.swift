@@ -189,6 +189,8 @@ struct SettingsView: View {
     /// R492：开机启动失败回执图标的负向帧缝（产品默认 nil ⇒ 画）。
     @Environment(\.loginFailureIconForCapture) private var loginFailureIconForCapture
     private var loginFailureIconVisible: Bool { loginFailureIconForCapture ?? true }
+    /// R498：RTF 说明段断行形态的负向帧缝（产品默认 nil ⇒ 用不断开「文本。」的写法）。
+    @Environment(\.settingsRtfHelperCopyForCapture) private var rtfHelperCopyForCapture
     /// R495：通用页说明文字的负向帧缝（产品默认 nil ⇒ 11pt `meta` 下限）。
     @Environment(\.settingsHelperFontForCapture) private var settingsHelperFontForCapture
     private var settingsHelperFont: Font {
@@ -536,9 +538,16 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("保留富文本格式（RTF / HTML）", isOn: $preserveRichText)
-                        Text("打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
-                            + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
-                            + "导出与导入只带纯文本。")
+                        // R498：640pt 最小窗下最后一行只剩「本。」（孤字行，末行墨宽 ~18pt）。
+                        // 用 U+00A0 把「文本。」绑成一个不断开的单元，末行回到三字宽；
+                        // 这不是改文案，读者看到的仍是同一句话。
+                        Text(rtfHelperCopyForCapture == false
+                             ? "打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
+                               + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
+                               + "导出与导入只带纯文本。"
+                             : "打开后从 Word、Pages、邮件里复制的文字会连格式一起存，粘回去保留加粗与链接。"
+                               + "代价是历史存档明显变大（单条最多 384KB），默认关闭；"
+                               + "导出与导入只带纯文\u{00A0}本。")
                             .font(.system(size: VisualFont.meta))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -1612,5 +1621,17 @@ extension EnvironmentValues {
     var settingsResetButtonIconsForCapture: Bool? {
         get { self[SettingsResetButtonIconsForCaptureKey.self] }
         set { self[SettingsResetButtonIconsForCaptureKey.self] = newValue }
+    }
+}
+
+/// R498：RTF 说明段断行形态的负向帧缝（产品默认 nil ⇒ 用不断开「文本。」的写法）。
+struct SettingsRtfHelperCopyForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsRtfHelperCopyForCapture: Bool? {
+        get { self[SettingsRtfHelperCopyForCaptureKey.self] }
+        set { self[SettingsRtfHelperCopyForCaptureKey.self] = newValue }
     }
 }

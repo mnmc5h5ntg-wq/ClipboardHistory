@@ -1459,6 +1459,92 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R498 · 通用页最小窗孤字行
+
+    /// R498：640pt 最小窗下 RTF 说明段最后一行只剩「本。」（末行墨宽 14pt）—— 孤字行。
+    /// 成对帧 `settings-min-general`（绑「文本。」）/ `settings-min-general-legacy-wrap`（旧断行）：
+    /// 读卡片最后一条文字带的墨宽。
+    func testRtfHelperLastLineIsNotAnOrphan() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r498-orphan-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "general-min-orphan" }),
+                  let negative = fixtures.first(where: { $0.name == "general-min-orphan-legacy" }) else {
+                return XCTFail("\(tag)：找不到最小窗通用页两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func lastLineWidth(_ fixture: Fixture) throws -> Double {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "RTF_HELPER_ORPHAN", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func luma(_ x: Int, _ y: Int) -> Double {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    return 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                }
+                let x0 = Int(170 * scale), x1 = Int(615 * scale)
+                let y0 = Int(150 * scale), y1 = Int(330 * scale)
+                var histogram: [Int: Int] = [:]
+                for y in y0..<min(y1, rep.pixelsHigh) {
+                    for x in x0..<min(x1, rep.pixelsWide) { histogram[Int(luma(x, y)) / 4, default: 0] += 1 }
+                }
+                let page = Double((histogram.max { $0.value < $1.value }?.key ?? 0) * 4 + 2)
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in y0..<min(y1, rep.pixelsHigh) {
+                    var has = false
+                    for x in x0..<min(x1, rep.pixelsWide) where abs(luma(x, y) - page) >= 30 {
+                        has = true; break
+                    }
+                    if has {
+                        if top < 0 { top = y }
+                    } else if top >= 0 {
+                        bands.append((top, y - 1)); top = -1
+                    }
+                }
+                if top >= 0 { bands.append((top, y1 - 1)) }
+                guard let last = bands.last else { return 0 }
+                var first = Int.max, end = -1
+                for y in last.top...last.bottom {
+                    for x in x0..<min(x1, rep.pixelsWide) where abs(luma(x, y) - page) >= 30 {
+                        first = min(first, x); end = max(end, x)
+                    }
+                }
+                return end >= first ? Double(end - first + 1) / scale : 0
+            }
+            guard let pos = try? lastLineWidth(positive), let neg = try? lastLineWidth(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if pos == 0 || neg == 0 {
+                emit("RTF_HELPER_ORPHAN_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            emit("RTF_HELPER_ORPHAN \(tag) 正臂末行宽=\(String(format: "%.1f", pos))pt"
+                 + " 负臂末行宽=\(String(format: "%.1f", neg))pt"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(pos, 22.0,
+                "\(tag)：正臂末行只有 \(pos)pt ⇒「文本。」仍被拆成孤字行")
+            XCTAssertLessThanOrEqual(neg, 18.0,
+                "\(tag)：负臂末行 \(neg)pt（>18）⇒ 旧断行形态没复现，这条判据没有证人")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("RTF_HELPER_ORPHAN_NOT_RUN：两档都没有可判说明") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R497 · 搜索占位符省略号
 
     /// R497：全仓动作文案都用单「…」（导出历史…/查找…/正在加载预览…），
@@ -12714,6 +12800,15 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("settings-min", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store))
         })
+        // R498：通用页在最小窗下的完整度（R495 说明加高后的回归检查）。
+        results.append(Fixture("general-min-orphan", NSSize(width: 640, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general))
+        })
+        // R498：RTF 说明段断行形态的负向臂（旧文案不绑「文本。」，末行只剩「本。」）。
+        results.append(Fixture("general-min-orphan-legacy", NSSize(width: 640, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general)
+                .environment(\.settingsRtfHelperCopyForCapture, false))
+        })
         // R426：最小窗的版本行负臂（同一页、关脚注）。与 settings-min 的差集就是版本行本身。
         results.append(Fixture("settings-min-no-footer", NSSize(width: 640, height: 440)) {
             AnyView(self.makeSettingsView(store: store)
@@ -18905,7 +19000,8 @@ final class UICaptureTests: XCTestCase {
         "settings-general-no-footer", "settings-min-no-footer",
         "settings-general", "settings-general-legacy-helper-font", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
-        "settings-min", "settings-privacy-excluded", "settings-stats-populated",
+        "settings-min",
+        "settings-privacy-excluded", "settings-stats-populated",
         // R315：`settings-stats-empty` 随那一臂一起撤掉（它与 `settings-stats` 逐字节相同）。
         // R145：录制态那张新帧也在 vibrancy 子树里 ⇒ 同一处合成前极性盲区（闸门实测把它点名，
         // 不是"顺手补名单"：`TEXT_SIDE_ROSTER_EXTRA` 的 vibrant 前提里有它）。

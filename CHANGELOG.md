@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 通用页 RTF 说明段最小窗孤字行（12 张旧帧变化 + 4 张新帧、基线 330）（R498 / 第 497 轮 / Round 495 / U-1947…U-1952 · 产品 1 文件 + 判据）
+
+
 ### 主侧栏搜索占位符省略号与全 App 统一（44 张旧帧变化 + 2 张新帧、基线 326）（R497 / 第 496 轮 / Round 494 / U-1941…U-1946 · 产品 1 文件 + 判据）
 
 
