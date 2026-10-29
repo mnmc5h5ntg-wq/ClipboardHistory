@@ -8193,3 +8193,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x/dark 与启用红态未签收；R481/R480/R478/R477 跑未读。
 - 回滚：恢复纯文字按钮；判据与刀一并撤。
 
+## D-480 热图今天格加右上角标；负向帧缝只给成对判据用（R484）
+
+- 背景：热图靠文字让用户自己找今天，今天格与别的格同形；今天没有复制时尤其找不到。
+- 决定：`DailyCopyHeatmapCell.isToday`（默认 false）+ 右上角 4pt labelColor 圆点；`DailyCopyHeatmapView` 用 `calendar.isDate` 判定；捕获缝 `heatmapTodayMarkerForCapture` 只给负向帧。判据逐像素差（≥8·s²、<4000·s²），M1313/M1314 2/2；负向帧补 vibrant 名册。
+- 理由：角标不占布局、不压数据色块；成对帧把差异锁在单格内；新帧名册必须同笔补。
+- 兼容性/迁移：8 张旧帧变化 + 2 张新帧，基线 300→302；组件默认 false 保持原组件帧。
+- 边界：runner 1x/dark 未签收；今天若在窗口右缘，角标可能贴边。
+- 回滚：删 isToday/圆点/捕获缝/新帧与判据。
+

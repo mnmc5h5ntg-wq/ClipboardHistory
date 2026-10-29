@@ -10509,3 +10509,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：改成「清空未收藏」被 `testSettingsClearButtonUsesShortDestructiveLabel` 当场红。
     修法：破坏性按钮的可见文案改动要先看契约；不许为新产品位改旧期望。
 
+**567. R483/R480/R478/R477 的跑仍未读**（R484 观察）
+    现象：R483 跑 40821834371 in_progress，R480/R478/R477 跑未读；HEATMAP_TODAY 的 runner 1x/dark 未签收。
+    修法：下一跑成对读全部失败步骤与 HEATMAP_TODAY/CLEAR_LABEL/ROW_LINK_BADGE。
+
+**568. 热图今天角标在窗口右缘可能贴边**（R484 观察）
+    现象：今天在最后一列时角标贴格子右上角，距热图右缘 1pt padding。
+    修法：下一帧看右缘是否被裁；若裁，按格子内缩不改判据地板。
+

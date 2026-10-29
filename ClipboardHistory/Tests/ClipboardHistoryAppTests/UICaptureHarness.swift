@@ -1540,6 +1540,55 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2)
     }
 
+    // MARK: - R484 · 热图今天格角标
+
+    /// R484：今天那一格右上角 3pt 角标；成对帧只差这一枚，逐像素差必须落在今天格附近。
+    func testHeatmapTodaysCellCarriesACornerMarker() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r484-today-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let posF = fixtures.first(where: { $0.name == "settings-stats-populated" }),
+                  let negF = fixtures.first(where: { $0.name == "settings-stats-populated-no-today" }) else {
+                return XCTFail("\(tag)：找不到 stats populated 两臂")
+            }
+            func scan(_ f: Fixture) throws -> (bytes: [UInt8], rep: NSBitmapImageRep, w: Int, h: Int, bpr: Int, spp: Int) {
+                let file = scratch.appendingPathComponent("\(f.name)-\(tag).png")
+                _ = try render(f, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "TODAY", code: 1) }
+                return (Array(UnsafeBufferPointer(start: base, count: rep.bytesPerRow * rep.pixelsHigh)),
+                        rep, rep.pixelsWide, rep.pixelsHigh, rep.bytesPerRow, rep.samplesPerPixel)
+            }
+            guard let pos = try? scan(posF), let neg = try? scan(negF) else { return XCTFail("\(tag)：读不回帧") }
+            var diff = 0, minX = Int.max, maxX = -1, minY = Int.max, maxY = -1
+            let alphaFirst = pos.rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            for y in 0..<pos.h {
+                for x in 0..<pos.w {
+                    let i = y * pos.bpr + x * pos.spp
+                    let d = abs(Int(pos.bytes[i + rOff]) - Int(neg.bytes[i + rOff]))
+                        + abs(Int(pos.bytes[i + rOff + 1]) - Int(neg.bytes[i + rOff + 1]))
+                        + abs(Int(pos.bytes[i + rOff + 2]) - Int(neg.bytes[i + rOff + 2]))
+                    if d >= 30 { diff += 1; minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y) }
+                }
+            }
+            let scale = Double(pos.w) / Double(posF.size.width)
+            emit("HEATMAP_TODAY \(tag) 差异像素=\(diff) bbox=\(minX),\(minY)-\(maxX),\(maxY) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(diff, Int(8.0 * scale * scale),
+                "\(tag)：两臂差异只有 \(diff) 像素 ⇒ 今天格角标没有画出来")
+            XCTAssertLessThan(diff, Int(4000.0 * scale * scale),
+                "\(tag)：两臂差异 \(diff) 像素 ⇒ 不只是角标（其它控件也变了）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2)
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -11723,6 +11772,21 @@ final class UICaptureTests: XCTestCase {
                 initialCategory: .stats
             ))
         })
+        // R484：同一屏、只关今天格角标的负向帧（其余构造逐字相同）。
+        results.append(Fixture("settings-stats-populated-no-today", NSSize(width: 720, height: 540)) {
+            AnyView(SettingsView(
+                showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+                repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
+                loginItemSettings: LoginItemSettings(manager: FakeLoginItemManager(isSupported: true, isEnabled: false)),
+                contextPreferences: ContextPreferenceSettings(),
+                weightsStore: store.weightsStore,
+                feedbackStore: store.feedbackStore,
+                dailyCopyLedger: populatedLedger,
+                clearHistoryAction: { nil },
+                initialCategory: .stats
+            )
+            .environment(\.heatmapTodayMarkerForCapture, false))
+        })
         // R315 · 撤掉 R314 补的 `settings-stats-empty` 臂（BACKLOG 370 的出口①）。
         //
         // 为什么撤：那一臂与**既有**的 `settings-stats` 两档 md5 全等
@@ -17661,6 +17725,8 @@ final class UICaptureTests: XCTestCase {
         "settings-shortcuts-conflict",
         // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
         "settings-data-no-title-icon",
+        // R484：热图今天角标的负向臂也是同一棵 settings 侧栏 vibrant 子树。
+        "settings-stats-populated-no-today",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
         // 先看了那张帧（`/tmp/r39-crops/r39-settings-general-login-unsupported-dark-sidebar.png`）：
         // 暗档侧栏里"快捷键 / 隐私 / 推荐 / 数据 / 统计"五枚标签**黑字黑底看不见**，

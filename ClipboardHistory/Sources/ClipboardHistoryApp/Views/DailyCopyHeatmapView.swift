@@ -7,6 +7,8 @@ import SwiftUI
 /// 这个文件只负责把它们画出来。理由与仓库里每一张"图"一样：
 /// 判据要能在不开窗口的情况下断言，而审美决定必须有唯一作者。
 struct DailyCopyHeatmapView: View {
+    /// R484：今天格的角标负向帧缝（产品默认 nil ⇒ 画角标）。
+    @Environment(\.heatmapTodayMarkerForCapture) private var todayMarkerForCapture
     /// 日键 → 条数。视图不持有任何计数逻辑。
     let counts: [String: Int]
     /// "今天"。生产里是 `Date()`，测试里注入固定时刻 ——
@@ -190,6 +192,8 @@ struct DailyCopyHeatmapView: View {
             DailyCopyHeatmapCell(
                 cell: cell,
                 isHovered: hovered?.dayKey == cell.dayKey,
+                isToday: (todayMarkerForCapture ?? true)
+                    && (cell.date.map { calendar.isDate($0, inSameDayAs: today) } ?? false),
                 calendar: calendar
             ) { inside in
                 // 事务挂在**变更点**上，而不是靠下游一条 `.animation(value:)`：
@@ -267,6 +271,8 @@ struct DailyCopyHeatmapView: View {
 struct DailyCopyHeatmapCell: View {
     let cell: DailyCopyHeatPolicy.Cell
     let isHovered: Bool
+    /// R484：今天那一格右上角的 3pt 角标（新品位；默认 false 保持组件帧原状）。
+    var isToday: Bool = false
     /// tooltip 文案由 policy 现算，**不从外面传字符串**：
     /// 传进来就等于允许调用方（包括夹具）替产品决定"这一格该说什么" ——
     /// R43 那条"夹具不许手写回执文案"判据抓的是同一件事。
@@ -307,6 +313,15 @@ struct DailyCopyHeatmapCell: View {
                             lineWidth: VisualHeat.hoverStroke)
                     .padding(-VisualHeat.hoverRingGap)
             )
+            .overlay(alignment: .topTrailing) {
+                if isToday {
+                    Circle()
+                        .fill(Color(nsColor: .labelColor))
+                        .frame(width: 4, height: 4)
+                        .padding(1)
+                        .accessibilityHidden(true)
+                }
+            }
             .contentShape(Rectangle())
             .onHover(perform: onHover)
             .accessibilityElement()
@@ -321,5 +336,18 @@ private extension Array {
     /// 网格标签那几处会按行号取元素；越界必须是"没有"，不是崩溃。
     subscript(safe index: Int) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+
+/// R484：热图今天格角标的负向帧缝（产品默认 nil ⇒ 画）。
+struct HeatmapTodayMarkerForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var heatmapTodayMarkerForCapture: Bool? {
+        get { self[HeatmapTodayMarkerForCaptureKey.self] }
+        set { self[HeatmapTodayMarkerForCaptureKey.self] = newValue }
     }
 }

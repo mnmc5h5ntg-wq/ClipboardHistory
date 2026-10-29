@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 483 轮（R484 · 2026-10-29 · U-1863…U-1868）：热图「今天」格补右上角标（8 张旧帧变化 + 2 张新帧、基线 302；M1313/M1314 2/2）（产品 1 文件 + 判据）
+
+- **U-1863：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`dbceebe`、**ahead=0**。R481 跑 `40812979165 ↔ 2770bfe` 已读（日志全 `UNKNOWN STEP`）：`ROW_LINK_BADGE light 218→237px（差 19）、dark 219→237px（差 18）` **1x 签收**；`SETTINGS_TITLE_ICON_NOT_RUN=settings-content-blank` 两档已登记、Capture gate 该用例 **skipped 不再是红**；`CAPTURE_GATE_CASES passed=167 skipped=21 failed=0 NOT_RUN=117`、`CAPTURE_GATE_RESULT=ok 红=0`；Motion `5/5 executed=77 reds=0`；失败步骤只剩 Release script（sources 格主笔跑未派生）。R483 跑 `40821834371 ↔ a59956c` 读时 **in_progress ⇒ NOT-RUN**；R480、R478 两跑、R477 两跑未读 ⇒ NOT-RUN。436：R481 跑 `judged=5/5 executed=77 reds=0`。
+- **U-1864：① 腐烂与预检。** `HIDDEN_ARMS 表=352 可判=1085 rot=0 抽不出=6 已声明死针=0 处置=ok`；`NEEDLE_PRECHECK tables=265 covered=243 arms=660 bad=0`、`ARM_TOTAL files=358 arms=1146`。
+- **U-1865：② 产品：热图「今天」格补右上角标。** 缺陷形状（`settings-stats-populated` 直看）：热图靠"右下角是今天"的文字说明让用户自己找今天，而今天那格与别的格子同形；今天恰好没有复制时尤其找不到。修法：`DailyCopyHeatmapCell` 加 `isToday`（默认 false 保持组件帧原状），今天格右上角 4pt `labelColor` 圆点；`DailyCopyHeatmapView` 用 `calendar.isDate(cell.date, inSameDayAs: today)` 判定，加捕获缝 `heatmapTodayMarkerForCapture`（产品默认 nil 画）。旧/新：**8 张旧帧变化**（settings-stats-populated、heatmap-populated、heatmap-summary-after 等 ×亮暗）+ **2 张新帧**（`settings-stats-populated-no-today` 亮暗）、0 缺失；基线 **300→302**；逐张看过：角标在今天格右上角、不压数据色块。读数（`HEATMAP_TODAY`）：两臂差异 **60 像素**、bbox **1108,408–1115,415**（2x），1x 待 runner。
+- **U-1866：③ 判据与刀。** 新判据 `testHeatmapTodaysCellCarriesACornerMarker` 用成对帧（populated / 只关角标）逐像素差：≥8·s² 且 <4000·s²（证明只差角标）；刀 `M1313`（永不画）/`M1314`（圆点透明）**2/2 CAUGHT**。新帧 `settings-stats-populated-no-today` 补进 vibrant 盲区名册（首遍全量正因漏它红 1 条，补名册后 1300/56/0）。
+- **U-1867：④ 既有面。** 热图悬停描边/图例/工具提示/空态未动；`heatmap-populated` 与 `heatmap-summary-after` 的变化只来自今天角标；设置统计页其它卡片未动。
+- **U-1868：⑤ 八步与电池。** build **0 告警**（arm64+x86_64）；捕获卷 **302 帧**、`CHANGED=8 ADDED=2 MISSING=0`，更新后 `302/0/0/0`；全量 **1300/56/0**（494.7s，轻载；首遍 vibrant 名册漏新帧红 1 条，补后重跑）；换装 `ok / SHA_MATCH=1 / 397=397`；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **2** 轮（as-of 484，`python3 scripts/product_streak.py --streak-for 484`，last=a59956c）；清账 `格=162 声明=63 不成立=0/63`；§1 已刷新（尾轮 480 / 481 节）；电池 **Ran 683 / OK skipped=5**；清账 162/63/0。**具名 NOT-RUN**：① R483/R480/R478/R477 跑；② 今天角标的 runner 1x/dark；③ `CLEAR_LABEL`/`ROW_LINK_BADGE`/`SETTINGS_TITLE_ICON`/`FALLBACK_PATH`/inline/幻影/图钉/冲突复核；④ `SETTINGS_DATA_PATH`；⑤ 既有 runner 复核；⑥ Capture MATERIAL_BLIND_NOT_RUN；⑦ 已知 Motion 采样红；⑧ 437–568 的其余未结项仍开。
+
 ## 第 482 轮（R483 · 2026-10-29 · U-1857…U-1862）：设置数据页清空按钮补垃圾桶图标（4 张旧帧变化、基线 300；M1311/M1312 2/2）（产品 1 文件 + 判据）
 
 - **U-1857：⓪ push 与 CI。** 开工两次 `git push` 均报 `Please make sure you have the correct access rights and the repository exists.`、`gh` 不可达 ⇒ **`PUSH_BLOCKED=network`（HEAD=`54af93a`、ahead=0）**、**`CI_READ_BLOCKED=network`**；R481 跑 `40812979165 ↔ 2770bfe`、R480 跑、R478 两跑 `40801850707`/`40802042660`、R477 两跑等**均未读到 ⇒ NOT-RUN**；R483 跑 `40821834371 ↔ a59956c` 读时 in_progress ⇒ NOT-RUN；sources 格 R483/`a59956c`；R479 跑的签收读数沿用 R481 账（FALLBACK_PATH 113、INLINE 99/6.0 与 102/5.0、幻影 0、图钉 +20）。436 无新跑。
