@@ -278,16 +278,16 @@ private struct RowTextColumn: View {
             // 行里要能看见"这张图有可搜索的文字"，而不是只能靠回忆设置里开过识别。
             // 标在时间行末尾而不是行尾：时间行短、不占固定宽度，行标题的截断宽度一字未动。
             HStack(spacing: 4) {
-                Text(HistoryRowMatchHighlight.sourceLine(
-                    time: ClipboardDateFormatters.sidebarTime(for: entry.timestamp,
-                                                             reference: timeReference),
-                    sourceAppName: entry.sourceAppName,
-                    query: searchQuery))
-                    // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
-                    // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
-                    .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                // R490：时间与来源分开排，来源名前补一枚 App 图标（详情/浮层都有，主列表没有）。
+                // 图标放不下时（250pt 最小窗）退回无图标分支，来源名不能被挤没。
+                if #available(macOS 13, *) {
+                    ViewThatFits(in: .horizontal) {
+                        sourceLine(showsIcon: true)
+                        sourceLine(showsIcon: false)
+                    }
+                } else {
+                    sourceLine(showsIcon: false)
+                }
                 if entry.ocrText?.isEmpty == false {
                     Image(systemName: "text.viewfinder")
                         .font(.system(size: VisualFont.meta, weight: .regular))
@@ -314,6 +314,36 @@ private struct RowTextColumn: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func sourceLine(showsIcon: Bool) -> some View {
+        let time = ClipboardDateFormatters.sidebarTime(for: entry.timestamp, reference: timeReference)
+        let name = entry.sourceAppName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        HStack(spacing: 0) {
+            Text(time)
+                // tertiary 在暗色下实测 2.2:1，读不出来；字号 10pt 低于 HIG 的正文下限
+                // （审计第二轮 1.2 / 账本 R2-13），所以这一行是 11pt secondary。
+                .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            if !name.isEmpty {
+                Text(" · 来自 ")
+                    .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: true, vertical: false)
+                if showsIcon, let icon = SourceAppIconProvider.icon(forBundleID: entry.sourceAppBundleID) {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 11, height: 11)
+                        .accessibilityHidden(true)
+                }
+                Text(HistoryRowMatchHighlight.highlighted(name, query: searchQuery))
+                    .font(.system(size: VisualFont.meta)).foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
     }
 }
 

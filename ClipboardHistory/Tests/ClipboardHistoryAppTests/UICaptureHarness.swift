@@ -1328,6 +1328,75 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R490 · 主列表来源图标
+
+    /// R490：详情头部与浮层都有来源 App 图标，主列表只有「来自 X」文字。
+    /// 成对帧 `sidebar-history` / `sidebar-no-source`：正臂的来源行有彩色 App 图标，
+    /// 负臂没有来源字段。判据数**文字列里的彩色像素**（来源名/时间都是灰字，缩略图在更左边）。
+    func testMainListSourceRowsCarryTheSourceAppIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r490-source-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "sidebar-history" }),
+                  let negative = fixtures.first(where: { $0.name == "sidebar-no-source" }) else {
+                return XCTFail("\(tag)：找不到 sidebar-history / sidebar-no-source ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (colored: Int, controlColored: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "SOURCE_ICON", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var colored = 0, controlColored = 0
+                for y in Int(Double(rep.pixelsHigh) * 0.15)..<Int(Double(rep.pixelsHigh) * 0.95) {
+                    for x in Int(Double(rep.pixelsWide) * 0.30)..<Int(Double(rep.pixelsWide) * 0.95) {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[i + rOff]), g = Int(base[i + rOff + 1]), b = Int(base[i + rOff + 2])
+                        if max(r, max(g, b)) - min(r, min(g, b)) >= 30, max(r, max(g, b)) >= 80 { colored += 1 }
+                    }
+                    for x in Int(Double(rep.pixelsWide) * 0.05)..<Int(Double(rep.pixelsWide) * 0.20) {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[i + rOff]), g = Int(base[i + rOff + 1]), b = Int(base[i + rOff + 2])
+                        if max(r, max(g, b)) - min(r, min(g, b)) >= 30, max(r, max(g, b)) >= 80 { controlColored += 1 }
+                    }
+                }
+                return (colored, controlColored, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            // 彩色通道证人：正臂缩略图列有彩 ⇒ 通道在；此时文字列没彩就是图标没画，不能 skip。
+            if pos.controlColored == 0 {
+                emit("HISTORY_SOURCE_ICON_NOT_RUN=no-color-channel \(tag) 缩略图列彩色=0")
+                continue
+            }
+            let diff = pos.colored - neg.colored
+            emit("HISTORY_SOURCE_ICON \(tag) 负臂彩色=\(neg.colored) 正臂彩色=\(pos.colored)"
+                 + " 正臂缩略图彩色=\(pos.controlColored) 差=\(diff)"
+                 + " 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(pos.colored, 0,
+                "\(tag)：正臂文字列一个彩色像素都没有 ⇒ 来源图标没有画出来")
+            XCTAssertEqual(neg.colored, 0,
+                "\(tag)：无来源的负臂文字列出现 \(neg.colored) 个彩色像素 ⇒ 图标被画给了没有来源的行")
+            XCTAssertGreaterThan(diff, Int(40.0 * scale * scale),
+                "\(tag)：正臂只多出 \(diff) 个彩色像素 ⇒ 来源 App 图标没有画进文字列")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("HISTORY_SOURCE_ICON_NOT_RUN：两档都没有彩色通道") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R489 · 默认排除项的身份标记
 
     /// R489：默认排除项不能移除，自定义项有「移除」；两类行原来只靠按钮有无区分。

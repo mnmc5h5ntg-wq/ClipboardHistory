@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主列表来源行补来源 App 图标（70 张旧帧变化、基线 310）（R490 / 第 489 轮 / Round 487 / U-1899…U-1904 · 产品 1 文件 + 判据）
+
+
 ### 默认排除项补「默认」身份标记（6 张旧帧变化 + 2 张新帧、基线 310）（R489 / 第 488 轮 / Round 486 / U-1893…U-1898 · 产品 1 文件 + 判据）
 
 
