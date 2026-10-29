@@ -8292,3 +8292,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：`MAIN_TITLE_ICON` 在 runner 1x/2x 未签收；content-* 侧栏的暗色仍属已登记盲区，只看几何。
 - 回滚：删 Image 与捕获缝、删新夹具/判据/两刀，基线回 318。
 
+## D-491 设置通用页说明统一 11pt；批量态标题图标只在非批量画（R495）
+
+- 背景：同一页四条说明里三条 10pt `.caption`、最长一条 11pt `meta`；`VisualFont.meta` 注释写明 11 是 App 下限。R494 的标题图标在 250pt 批量态把「已选 3 条」挤成「已选…」。
+- 决定：三条说明改用 `settingsHelperFont`（默认 `VisualFont.meta`=11，捕获缝 false 退回 10 作负向臂），RTF 保持 11；`HistorySidebarView.header` 只在 `selectedCount <= 1` 时画标题图标。
+- 理由：同页同角色同字号；11pt 是可读下限；批量态标题是状态不是应用名，图标语义不对且挤占最小窗。
+- 兼容性/迁移：14 张旧帧变化 + 2 张新帧，基线 320→322；暂停说明在 720pt 折成两行，卡片长高由卡片留白吸收；caption-tier 三条探针按新带重锚。
+- 边界：runner 1x/2x 未读；批量态标题完整性没有稳定像素判据（BACKLOG 589）。
+- 回滚：三条 `settingsHelperFont` 改回 `.caption`、RTF 不变；标题图标恢复无条件；删缝/新帧/判据/两刀，基线回 320。
+

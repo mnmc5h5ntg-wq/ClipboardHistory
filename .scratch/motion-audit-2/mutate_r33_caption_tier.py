@@ -29,13 +29,13 @@ HUG = "UICaptureTests/testSettingsCaptionSitsCloserToItsOwnToggle"
 TRUTH = "UICaptureTests/testRowTierProfileSeparatesCaptionFromTitle"
 
 CAPTION_BLOCK = """                        Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
-                            .font(.caption)
+                            .font(settingsHelperFont)
                             .foregroundStyle(.secondary)
                             .settingsHelperAxis()"""
 OCR_GROUP = """                    VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
                         Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
-                            .font(.caption)
+                            .font(settingsHelperFont)
                             .foregroundStyle(.secondary)
                             .settingsHelperAxis()
                     }"""
@@ -52,16 +52,17 @@ RTF_GROUP = """                    VStack(alignment: .leading, spacing: Settings
 # RTF 组去掉收尾那行 `}`，好把 OCR 的说明段插进组内（M145 的变异体要的是"合法但错"的代码）
 RTF_HEAD = "\n".join(RTF_GROUP.split("\n")[:-1])
 OCR_TEXT = """                        Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
-                            .font(.caption)
+                            .font(settingsHelperFont)
                             .foregroundStyle(.secondary)
                             .settingsHelperAxis()"""
 M145_MUTANT = RTF_HEAD + "\n" + OCR_TEXT + "\n                    }\n" \
     + '                    Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)'
 
 MUTATIONS = [
+    # R495：说明统一 11pt 后这一框从 y=200 下移到 218.5（带随折行下移）；针跟着当前源码走。
     ("M141", "说明段探针的框挪到开关标签那一行", "harness",
-     'rect: CGRect(x: 150, y: 200, width: 560, height: 12))',
-     'rect: CGRect(x: 150, y: 141, width: 560, height: 12))',
+     'rect: CGRect(x: 150, y: 218.5, width: 560, height: 12))',
+     'rect: CGRect(x: 150, y: 197, width: 560, height: 12))',
      TIER, "只可能是框套到了标题/正文那一档上"),
     ("M142", "产品把一段说明提到 .primary", "settings",
      CAPTION_BLOCK,

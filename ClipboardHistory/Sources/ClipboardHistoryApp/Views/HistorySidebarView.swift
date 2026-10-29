@@ -113,7 +113,9 @@ struct HistorySidebarView: View {
         HStack {
             // R494：设置页标题与侧栏分类都有图标，主窗口这张标题却只有一行字。
             // 补一枚时钟/回溯符号，作为同一个身份锚点；纯装饰，读屏不重复念。
-            if mainSidebarTitleIconForCapture ?? true {
+            // R495：批量态标题是「已选 N 条」而不是应用名，时钟图标语义不对；
+            // 250pt 最小宽下它还把选中数挤成「已选…」（R493 帧可见完整文案）。
+            if historyStore.selectedCount <= 1, mainSidebarTitleIconForCapture ?? true {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: VisualFont.title, weight: .semibold))
                     .foregroundStyle(.secondary)

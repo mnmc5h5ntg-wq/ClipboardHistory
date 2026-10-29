@@ -1458,6 +1458,114 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R495 · 通用页说明字号
+
+    /// R495：通用页四条说明里，回执/暂停/OCR 三条是 `.caption`（10pt），
+    /// 最长那条 RTF 是 `meta`（11pt）—— 同一页、同一角色两种字号，而
+    /// `VisualFont.meta` 的注释写明 11 是 App 的下限。成对帧
+    /// `settings-general` / `settings-general-legacy-helper-font`：读每条说明的墨带高度。
+    func testSettingsHelperFontsShareOneSize() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r495-helper-font-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-general" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-general-legacy-helper-font" }) else {
+                return XCTFail("\(tag)：找不到 general 两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func helperHeights(_ fixture: Fixture) throws -> [Double] {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "SETTINGS_HELPER_FONT", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 30
+                }
+                // 内容列从侧栏右沿起（复选框在 195pt 左侧，不进阶）。
+                // 标签行与说明行都可能从同一左沿起，所以不用左沿分；
+                // 用块内/块间行距分：标签与自己的说明相距 ≤6.5pt，块与块 ≥11.5pt。
+                let x0 = Int((SettingsViewLayout.sidebarWidth + 47) * scale)
+                let x1 = min(rep.pixelsWide, Int(700 * scale))
+                let y0 = Int(110 * scale), y1 = min(rep.pixelsHigh, Int(300 * scale))
+                var bands: [(top: Int, bottom: Int)] = []
+                var top = -1
+                for y in y0..<y1 {
+                    var has = false
+                    for x in x0..<x1 where isInk(x, y) { has = true; break }
+                    if has {
+                        if top < 0 { top = y }
+                    } else if top >= 0 {
+                        bands.append((top, y - 1)); top = -1
+                    }
+                }
+                if top >= 0 { bands.append((top, y1 - 1)) }
+                // 分块：块首是标签，块内其余带是说明（含 RTF 的两行）。
+                var blocks: [[(top: Int, bottom: Int)]] = []
+                var lastBottom: Int?
+                for band in bands {
+                    if let last = lastBottom, band.top - last <= Int(9.0 * scale) {
+                        blocks[blocks.count - 1].append(band)
+                    } else {
+                        blocks.append([band])
+                    }
+                    lastBottom = band.bottom
+                }
+                return blocks
+                    .filter { $0.count >= 2 }
+                    .flatMap { $0.dropFirst() }
+                    .map { Double($0.bottom - $0.top + 1) / scale }
+            }
+            guard let pos = try? helperHeights(positive), let neg = try? helperHeights(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if scale < 1.5 {
+                emit("SETTINGS_HELPER_FONT_NOT_RUN=scale-too-low \(tag) 倍率=\(String(format: "%.1f", scale))x")
+                continue
+            }
+            guard pos.count >= 3, neg.count >= 3 else {
+                emit("SETTINGS_HELPER_FONT_NOT_RUN=settings-content-blank \(tag)"
+                     + " 正臂说明带=\(pos.count) 负臂说明带=\(neg.count)")
+                continue
+            }
+            let posSpread = pos.max()! - pos.min()!
+            let negSpread = neg.max()! - neg.min()!
+            func fmt(_ xs: [Double]) -> String {
+                xs.map { String(format: "%.1f", $0) }.joined(separator: "/")
+            }
+            emit("SETTINGS_HELPER_FONT \(tag) 正臂说明带=\(pos.count) 高=\(fmt(pos))"
+                 + " 负臂说明带=\(neg.count) 高=\(fmt(neg))"
+                 + " 正臂极差=\(String(format: "%.1f", posSpread))"
+                 + " 负臂极差=\(String(format: "%.1f", negSpread))"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(pos.min()!, 10.4,
+                "\(tag)：正臂说明带只有 \(pos.min()!)pt ⇒ 还没到 11pt 下限")
+            XCTAssertLessThanOrEqual(posSpread, 0.6,
+                "\(tag)：正臂同页说明高度极差 \(posSpread)pt（>0.6）⇒ 两种字号仍混用")
+            XCTAssertGreaterThanOrEqual(negSpread, 0.8,
+                "\(tag)：负臂极差 \(negSpread)pt（<0.8）⇒ 尺分不出 10pt 与 11pt，判据没有证人")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("SETTINGS_HELPER_FONT_NOT_RUN：两档都没有可判说明") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R492 · 开机启动失败回执图标
 
     /// R492：失败回执只有红字，没有错误图标（横幅/回执都有）。
@@ -12268,6 +12376,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .general)
                 .environment(\.settingsSidebarFooterForCapture, false))
         })
+        // R495：通用页说明字号的负向臂（只把回执/暂停/OCR 三条退回 10pt，RTF 仍 11pt）。
+        results.append(Fixture("settings-general-legacy-helper-font", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general)
+                .environment(\.settingsHelperFontForCapture, false))
+        })
         // R414：设置侧栏选中胶囊的三态（静置 / 滑到中点 / 落定）。组件帧只拍侧栏本身，
         // 不把整页的设置卡片卷进来；名字不带 `settings-` 前缀（那 7 处按整页收集的尺）。
         let selectionPreview = SettingsSelectionPreview(from: .shortcuts,
@@ -18631,7 +18744,7 @@ final class UICaptureTests: XCTestCase {
         // 先看过 640×440 / 720×540 两档暗帧的侧栏列：五枚未选中标签仍在错误一侧；
         // 这不是脚注引入的新缺陷。
         "settings-general-no-footer", "settings-min-no-footer",
-        "settings-general", "settings-shortcuts", "settings-privacy",
+        "settings-general", "settings-general-legacy-helper-font", "settings-shortcuts", "settings-privacy",
         "settings-recommendations", "settings-data", "settings-stats",
         "settings-min", "settings-privacy-excluded", "settings-stats-populated",
         // R315：`settings-stats-empty` 随那一臂一起撤掉（它与 `settings-stats` 逐字节相同）。
@@ -21561,6 +21674,7 @@ final class UICaptureTests: XCTestCase {
         let useControlFirstRoster = controlFirstRosterMode == "on"
         let controlFirstCells: Set<String> = [
             "settings-general light", "settings-general dark",
+            "settings-general-legacy-helper-font light", "settings-general-legacy-helper-font dark",
             "settings-general-no-footer light", "settings-general-no-footer dark",
             "settings-general-login-unsupported light", "settings-general-login-unsupported dark",
             "settings-general-login-failed light", "settings-general-login-failed dark",
@@ -22778,12 +22892,16 @@ final class UICaptureTests: XCTestCase {
         // 带边界从帧上量（`CAPTION_HUG` 那几行就是同一把尺打的：亮 161.0..170.5 /
         // 201.5..211.0 / 241.5..266.0，暗 160.5..170.5 / 201.0..211.0 / 241.5..266.0），
         // 框比带各留 0.5–1pt，两档外观共用一套坐标。
+        // R495：说明统一到 11pt 后，这一段在 720pt 宽下折成两行（旧 10pt 是一行）；
+        // 带从新帧量：亮 164.0..188.5（两行），框留 1pt 边。
         InkProbe(fixture: "settings-general", what: "说明段「暂停时仍在推进…」（恢复后会不会补记旧内容）",
-                 rect: CGRect(x: 150, y: 160, width: 560, height: 12)),
+                 rect: CGRect(x: 150, y: 163, width: 560, height: 26)),
+        // R495：整列随上一段折行下移；新带亮 219.5..230.5。
         InkProbe(fixture: "settings-general", what: "说明段「关闭后不再对新入库的图片…」（截图文字识别）",
-                 rect: CGRect(x: 150, y: 200, width: 560, height: 12)),
+                 rect: CGRect(x: 150, y: 218.5, width: 560, height: 12)),
+        // R495：新带亮 261.0..286.0（两行）。
         InkProbe(fixture: "settings-general", what: "说明段「打开后从 Word、Pages…」（富文本的代价，两行）",
-                 rect: CGRect(x: 150, y: 241, width: 560, height: 26)),
+                 rect: CGRect(x: 150, y: 260, width: 560, height: 27)),
         // R442：关于页的定位句。带从 `settings-about` 帧上量的（亮档：页标题 78.5..90、
         // 应用名 116..133.5、版本 149.5..161、定位句 175.5..187、版权 201..210.5），
         // 框比带上下各留 0.5–1pt。设置内容列在 runner 1x 是平涂 ⇒ 这条在 CI 上是

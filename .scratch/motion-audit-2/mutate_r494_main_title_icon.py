@@ -5,7 +5,7 @@ import os, subprocess, sys
 ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"; FILE="Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}; TEST="UICaptureTests/testMainSidebarTitleCarriesAnIcon"
 ARMS=[
-      ("M1335","标题图标永不画",'            if mainSidebarTitleIconForCapture ?? true {','            if false {'),
+      ("M1335","标题图标永不画",'            if historyStore.selectedCount <= 1, mainSidebarTitleIconForCapture ?? true {','            if false {'),
       ("M1336","标题图标透明",'                Image(systemName: "clock.arrow.circlepath")\n                    .font(.system(size: VisualFont.title, weight: .semibold))','                Image(systemName: "clock.arrow.circlepath")\n                    .font(.system(size: VisualFont.title, weight: .semibold))\n                    .opacity(0)')]
 def run():
     p=subprocess.run(["swift","test","--filter",TEST],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)

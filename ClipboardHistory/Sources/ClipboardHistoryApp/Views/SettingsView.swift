@@ -189,6 +189,13 @@ struct SettingsView: View {
     /// R492：开机启动失败回执图标的负向帧缝（产品默认 nil ⇒ 画）。
     @Environment(\.loginFailureIconForCapture) private var loginFailureIconForCapture
     private var loginFailureIconVisible: Bool { loginFailureIconForCapture ?? true }
+    /// R495：通用页说明文字的负向帧缝（产品默认 nil ⇒ 11pt `meta` 下限）。
+    @Environment(\.settingsHelperFontForCapture) private var settingsHelperFontForCapture
+    private var settingsHelperFont: Font {
+        (settingsHelperFontForCapture ?? true)
+            ? .system(size: VisualFont.meta)
+            : .system(size: 10)
+    }
     /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
     private let categoryOverride: Binding<SettingsCategory?>?
 
@@ -490,7 +497,7 @@ struct SettingsView: View {
                                         .foregroundStyle(loginFailureStyle)
                                 }
                                 Text(message)
-                                    .font(.caption)
+                                    .font(settingsHelperFont)
                                     // R384：失败回执用错误色，与「本机不支持」的静态说明分开
                                     // （快捷键页的非法录制回执也是红字；同一套状态语言）。
                                     // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
@@ -508,7 +515,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("暂停记录剪贴板（暂时不想被记录时）", isOn: $recordingPaused)
                         Text("暂停时仍在推进系统剪贴板的变更计数，所以恢复后不会补记一条暂停期间的旧内容；已入库的历史不受影响。")
-                            .font(.caption)
+                            .font(settingsHelperFont)
                             .foregroundStyle(.secondary)
                             .settingsHelperAxis()
                     }
@@ -522,7 +529,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: SettingsViewLayout.captionGap) {
                         Toggle("识别截图文字用于搜索", isOn: ocrSearchEnabled)
                         Text("关闭后不再对新入库的图片做文字识别，历史里已有的识别结果保持不变。")
-                            .font(.caption)
+                            .font(settingsHelperFont)
                             .foregroundStyle(.secondary)
                             .settingsHelperAxis()
                     }
@@ -1581,6 +1588,18 @@ extension EnvironmentValues {
     var loginFailureIconForCapture: Bool? {
         get { self[LoginFailureIconForCaptureKey.self] }
         set { self[LoginFailureIconForCaptureKey.self] = newValue }
+    }
+}
+
+/// R495：通用页说明字号的负向帧缝（产品默认 nil ⇒ 11pt `meta`）。
+struct SettingsHelperFontForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsHelperFontForCapture: Bool? {
+        get { self[SettingsHelperFontForCaptureKey.self] }
+        set { self[SettingsHelperFontForCaptureKey.self] = newValue }
     }
 }
 

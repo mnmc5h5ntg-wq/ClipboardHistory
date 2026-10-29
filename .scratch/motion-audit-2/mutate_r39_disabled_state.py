@@ -45,7 +45,7 @@ RECEIPT_BLOCK = """                        if let message = loginItemSettings.me
                                         .foregroundStyle(loginFailureStyle)
                                 }
                                 Text(message)
-                                    .font(.caption)
+                                    .font(settingsHelperFont)
                                     // R384：失败回执用错误色，与「本机不支持」的静态说明分开
                                     // （快捷键页的非法录制回执也是红字；同一套状态语言）。
                                     // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置通用页说明统一到 11pt 下限（14 张旧帧变化 + 2 张新帧、基线 322）（R495 / 第 494 轮 / Round 492 / U-1929…U-1934 · 产品 2 文件 + 判据）
+
+
 ### 主侧栏标题补时钟图标（48 张旧帧变化 + 2 张新帧、基线 320）（R494 / 第 493 轮 / Round 491 / U-1923…U-1928 · 产品 1 文件 + 判据）
 
 
