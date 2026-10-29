@@ -10478,7 +10478,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     修法：下一轮读 install 的 entries；若不等于 388 再查，不把 387 手抄进新账。
 
 **559. R479/R478/R477 的跑仍未读**（R480 观察）
-    现象：R479 跑 40805576917、R478 两跑 40801850707/40802042660、R477 两跑均 in_progress/未读；SETTINGS_TITLE_ICON/FALLBACK_PATH 的 runner 读数没有。
+    现象：R479 跑 40805576917、R478 两跑 40801850707/40802042660、R477 两跑均 in_progress/未读；SETTINGS_TITLE_ICON/FALLBACK_PATH 的 runner 读数没有。R480 主笔 60d65a4 收口两次 push 报 correct access rights ⇒ PUSH_BLOCKED=network（origin 59b63c1、ahead=1）。
     修法：网络恢复后先读这些跑的全部失败步骤；仍红按读数继续。
 
 **560. 富文本格式标记的 runner 1x/dark 未签收**（R480 观察）

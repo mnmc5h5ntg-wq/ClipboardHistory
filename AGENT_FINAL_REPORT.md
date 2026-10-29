@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R479**（commit `225e6f8`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R479 那一节为准。上一笔动 `Sources/` 的是 R478（`b64682e`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R480**（commit `60d65a4`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R480 那一节为准。上一笔动 `Sources/` 的是 R479（`225e6f8`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1378,5 +1378,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R479（设置页标题图标位）**：侧栏有分类图标，内容页标题只有一行字。新 `SettingsPageTitle`（标题左侧同形图标、同字号、secondary、a11y 隐藏）接入 7 页；捕获缝 `settingsPageTitleIconForCapture` 给负向帧。**36 张旧帧变化 + 2 张新帧**，基线 **294→296**；`SETTINGS_TITLE_ICON` 标题行末墨 393→445px（+26pt）、墨 +327/+329；M1302/M1303 **2/2**；负向帧补进 vibrant 名册（首遍全量红 1 条，修名册后 1296/56/0）。⓪ no-op push、ahead=0；R477 补记跑冲突红是 skip 位置（7a79987 未含 7f21720 修正）；R478 两跑 in_progress ⇒ NOT-RUN；R477 主跑 inline/幻影/图钉签收。全量 **1296/56/0**（468.3s）；build 0 告警；换装 ok/SHA_MATCH=1/388=388；电池 683/5。
 
-- **R480（富文本格式标记位）**：打开「保留富文本格式」后 `Entry.richText` 已保存，但列表行看不出。`RowTextColumn` 时间行在 OCR 标记后再补 `textformat`（11pt、secondary、helpLabel + accessibilityLabel），仅 richText 非空出现。**2 张新帧、0 张既有帧变化**，基线 **296→298**；`ROW_RICH_BADGE` 负臂→正臂墨 9363→9593（+230）、10477→10727（+250）；M1306/M1307 **2/2**。第一版「浮层外缘线」让 18 条旧 QuickPick 判据红 ⇒ 当场撤回，不改旧期望。⓪ 网络不可达，收口 push 探针见补记；R479/R478/R477 的跑 NOT-RUN。全量 **1297/56/0**（499.4s）；build 0 告警；换装 ok/SHA_MATCH=1/395=395；电池 683/5。
+- **R480（富文本格式标记位）**：打开「保留富文本格式」后 `Entry.richText` 已保存，但列表行看不出。`RowTextColumn` 时间行在 OCR 标记后再补 `textformat`（11pt、secondary、helpLabel + accessibilityLabel），仅 richText 非空出现。**2 张新帧、0 张既有帧变化**，基线 **296→298**；`ROW_RICH_BADGE` 负臂→正臂墨 9363→9593（+230）、10477→10727（+250）；M1306/M1307 **2/2**。第一版「浮层外缘线」让 18 条旧 QuickPick 判据红 ⇒ 当场撤回，不改旧期望。⓪ 收口两次 push 报 correct access rights ⇒ `PUSH_BLOCKED=network`（HEAD=60d65a4、origin=59b63c1、ahead=1；补记后 2）；R479/R478/R477 的跑 NOT-RUN。全量 **1297/56/0**（499.4s）；build 0 告警；换装 ok/SHA_MATCH=1/395=395；电池 683/5。
 

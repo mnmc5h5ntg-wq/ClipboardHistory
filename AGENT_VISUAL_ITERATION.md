@@ -19640,7 +19640,7 @@ OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTex
 
 ## Round 477 · R480（第 479 轮 · 2026-10-29）：主列表补富文本格式标记（2 张新帧、基线 298）
 
-打开「保留富文本格式」后，`Entry.richText` 已保存但行里看不出。`RowTextColumn` 时间行在 OCR 标记后再补 `textformat`（11pt、secondary、helpLabel + accessibilityLabel），只有 richText 非空才出现。2 张新帧、0 张既有帧变化，基线 296→298；`ROW_RICH_BADGE` 负臂→正臂墨 9363→9593（+230）、10477→10727（+250）；M1306/M1307 2/2。第一版「浮层外缘线」让 18 个旧 QuickPick 判据红 ⇒ 当场撤回，不改旧期望迁就。预检 262/243/660、rot 349/1079、ARM 355/1144。全量 1297/56/0；build 0 告警；换装 ok/395=395；电池 683/5。⓪ 网络不可达，push 探针与最终 SHA 见补记。
+打开「保留富文本格式」后，`Entry.richText` 已保存但行里看不出。`RowTextColumn` 时间行在 OCR 标记后再补 `textformat`（11pt、secondary、helpLabel + accessibilityLabel），只有 richText 非空才出现。2 张新帧、0 张既有帧变化，基线 296→298；`ROW_RICH_BADGE` 负臂→正臂墨 9363→9593（+230）、10477→10727（+250）；M1306/M1307 2/2。第一版「浮层外缘线」让 18 个旧 QuickPick 判据红 ⇒ 当场撤回，不改旧期望迁就。预检 262/243/660、rot 349/1079、ARM 355/1144。全量 1297/56/0；build 0 告警；换装 ok/395=395；电池 683/5。⓪ 网络不可达；收口两次 push 报 correct access rights ⇒ `PUSH_BLOCKED=network`（HEAD=60d65a4、origin=59b63c1、ahead=1；补记后 2）；gh EOF。
 
 **七维度自评**（恰七行，每格 n/15）：
 
