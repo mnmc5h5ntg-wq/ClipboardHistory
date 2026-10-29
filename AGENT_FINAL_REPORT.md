@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R489**（commit `d8b0712`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R489 那一节为准。上一笔动 `Sources/` 的是 R488（`9487c0f`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R490**（commit `c0c08c7`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R490 那一节为准。上一笔动 `Sources/` 的是 R489（`d8b0712`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1396,5 +1396,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R489（默认排除项身份标记位）**：默认排除项不能移除、自定义项有红色「移除」，两类行原来只靠按钮有无区分。默认行尾部补 `Text("默认")`（meta/secondary/fixedSize + accessibilityLabel），自定义行不动；加捕获缝。**6 张旧帧 + 2 张新帧**，基线 **308→310**；`DEFAULT_BADGE` light 2704→5548（差 2844）、dark 3132→6723（差 3591）；M1323/M1324 2/2；重锚 R432 M1187/M1188 2/2；种子守卫改数红段（右缘墨带 11→红段 2）。⓪ push no-op、ahead=0；R488 主跑唯一红是 Release 3 条 + Motion 已知 1<2、补记跑 success；TABLE_COLUMNS 1x 制表位=2、第二列极差 1px、第三列 0px；R489 跑 40858253532 queued ⇒ NOT-RUN。全量 **1305/56/0**（513.6s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R490（主列表来源图标位）**：详情/浮层都有来源图标，主列表只有「来自 X」文字。`RowTextColumn` 拆时间与来源，在「 · 来自 」后补 11pt App 图标，来源名仍走搜索高亮；macOS 13+ 用 `ViewThatFits`，250pt 最小窗退回无图标分支、源名不被挤没。**70 张旧帧变化、基线 310 不变**；`HISTORY_SOURCE_ICON` light 负臂 0→807、dark 789，缩略图对照 680、负臂必须 0；M1325/M1326 2/2；R444 M1220 重锚后 2/2。第一版两刀被静默 skip 逃过，补对照/负臂 0 才红。⓪ push d8b0712..3d4a03a success、ahead=0；R489 两跑 NOT-RUN；R488 主跑 Release+Motion 已知、补记跑 success。全量 **1306/56/0**（489.3s）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R490（主列表来源图标位）**：详情/浮层都有来源图标，主列表只有「来自 X」文字。`RowTextColumn` 拆时间与来源，在「 · 来自 」后补 11pt App 图标，来源名仍走搜索高亮；macOS 13+ 用 `ViewThatFits`，250pt 最小窗退回无图标分支、源名不被挤没。**70 张旧帧变化、基线 310 不变**；`HISTORY_SOURCE_ICON` light 负臂 0→807、dark 789，缩略图对照 680、负臂必须 0；M1325/M1326 2/2；R444 M1220 重锚后 2/2。第一版两刀被静默 skip 逃过，补对照/负臂 0 才红。⓪ push d8b0712..3d4a03a success、ahead=0；R489 主跑唯一红是 Release 3 条非产品（DEFAULT_BADGE/种子守卫 NOT_RUN）、补记跑 success；R490 跑 40865789755 in_progress ⇒ NOT-RUN；R488 主跑 Release+Motion 已知、补记跑 success。全量 **1306/56/0**（489.3s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
