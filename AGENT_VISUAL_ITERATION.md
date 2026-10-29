@@ -19964,7 +19964,7 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ## Round 495 · R498（第 497 轮 · 2026-10-30）：通用页 RTF 说明段最小窗孤字行（12 旧帧 + 4 新帧、基线 330）
 
-640pt 最小窗下 RTF 说明段最后一行只剩「本。」（末行墨宽 14pt）。把「文本。」用 U+00A0 绑成不断开的单元，加捕获缝 `settingsRtfHelperCopyForCapture`（默认新写法，负向帧旧文案）。12 张旧帧 + 4 张新帧（组件帧名 `general-min-orphan*`，避开整页尺），基线 326→330；`RTF_HELPER_ORPHAN` 正臂 28.5/29.0pt、负臂 14.0/15.0pt；M1343/M1344 2/2。预检 279/256/686、rot 366/1112、ARM 372/1173。全量 1314/56/1；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `a98e65d..c9d8d6c` success、ahead=0；gh EOF ⇒ CI_READ_BLOCKED；R496 跑 success（QUICKPICK 1x 签收、592 结案）；R497 跑 queued ⇒ NOT-RUN。
+640pt 最小窗下 RTF 说明段最后一行只剩「本。」（末行墨宽 14pt）。把「文本。」用 U+00A0 绑成不断开的单元，加捕获缝 `settingsRtfHelperCopyForCapture`（默认新写法，负向帧旧文案）。12 张旧帧 + 4 张新帧（组件帧名 `general-min-orphan*`，避开整页尺），基线 326→330；`RTF_HELPER_ORPHAN` 正臂 28.5/29.0pt、负臂 14.0/15.0pt；M1343/M1344 2/2。预检 279/256/686、rot 366/1112、ARM 372/1173。全量 1314/56/1；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push `a98e65d..c9d8d6c` success、ahead=0；gh EOF ⇒ CI_READ_BLOCKED；R496 跑 success（QUICKPICK 1x 签收、592 结案）；R497 跑 queued ⇒ NOT-RUN；收口 `PUSH_BLOCKED=network`（HEAD=`05771dc`、origin/main=`c9d8d6c`、ahead=1）、`CI_READ_BLOCKED=network`，R498 跑未创建 ⇒ NOT-RUN。
 
 **七维度自评**（恰七行，每格 n/15）：
 
