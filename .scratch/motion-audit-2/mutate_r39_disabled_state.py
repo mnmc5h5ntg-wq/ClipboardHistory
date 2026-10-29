@@ -36,17 +36,24 @@ FILTER = ("UICaptureTests/(testDisabledToggleAndFailureReceiptAreVisible"
 
 # R384 重钉：失败回执改用 `lastActionFailed` 决定颜色，整块针跟着当前源码走。
 RECEIPT_BLOCK = """                        if let message = loginItemSettings.message {
-                            Text(message)
-                                .font(.caption)
-                                // R384：失败回执用错误色，与「本机不支持」的静态说明分开
-                                // （快捷键页的非法录制回执也是红字；同一套状态语言）。
-                                // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
-                                .foregroundStyle(loginItemSettings.lastActionFailed
-                                                 ? AnyShapeStyle(colorScheme == .dark
-                                                     ? Color(red: 1.0, green: 0.48, blue: 0.44)
-                                                     : Color.red)
-                                                 : AnyShapeStyle(.secondary))
-                                .settingsHelperAxis()
+                            // R492：失败回执只有红字，没有错误图标；横幅/回执都有图标，
+                            // 这一行补一枚警示三角，正常的不支持说明不加。
+                            HStack(spacing: 4) {
+                                if loginItemSettings.lastActionFailed, loginFailureIconVisible {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: VisualGlyph.badge, weight: .semibold))
+                                        .foregroundStyle(loginFailureStyle)
+                                }
+                                Text(message)
+                                    .font(.caption)
+                                    // R384：失败回执用错误色，与「本机不支持」的静态说明分开
+                                    // （快捷键页的非法录制回执也是红字；同一套状态语言）。
+                                    // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
+                                    .foregroundStyle(loginItemSettings.lastActionFailed
+                                                     ? loginFailureStyle
+                                                     : AnyShapeStyle(.secondary))
+                            }
+                            .settingsHelperAxis()
                         }"""
 DISABLED_SEAM = "                            .disabled(!loginItemSettings.isSupported)"
 CATCH_MESSAGE = '            message = enabled ? "开机启动开启失败，请稍后重试。" : "开机启动关闭失败，请稍后重试。"'
@@ -63,8 +70,13 @@ MUTATIONS = [
     ("M177", "产品：那句回执整段不画", VIEW, RECEIPT_BLOCK,
      "                        // MUTANT：回执不画（原来在 `if let message` 后面）",
      "要么没画"),
-    ("M178", "产品：那颗开关不再 `.disabled`", VIEW, DISABLED_SEAM,
-     "                            // MUTANT：去掉 .disabled ⇒ 禁用与启用一个样",
+    ("M178", "产品：禁用标签颜色也恒 primary", VIEW,
+     """                            Text("开机启动")
+                                .foregroundStyle(loginItemSettings.isSupported
+                                                 ? AnyShapeStyle(.primary)
+                                                 : AnyShapeStyle(.secondary))""",
+     """                            Text("开机启动")
+                                .foregroundStyle(AnyShapeStyle(.primary))  // MUTANT：禁用也主色""",
      "淡得不够"),
     ("M179", "产品：失败时把 message 置 nil（回到“什么都不说”）", MODEL, CATCH_MESSAGE,
      "            message = nil  // MUTANT",

@@ -1,5 +1,5 @@
 {
-  "count": 314,
+  "count": 316,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -229,8 +229,10 @@
     "settings-data-no-title-icon-720x540-light.png": "8d1b324bf0066992d2d85bd639370fe55c729ea21b5abbf3477e22fca5dee528",
     "settings-general-720x540-dark.png": "37f7b19feec711be3797eaf4d7277b6747715a9a652d7fdfb8e02af7ae3fbabc",
     "settings-general-720x540-light.png": "1a14e3b15a2fb3e8edc966d8dea8fb615271019f79df9d1c3363978ea699f2e7",
-    "settings-general-login-failed-720x540-dark.png": "7334ae21e352f6a4c0ac518f28e17262c2704a01776e408fe0e10b72fe34562c",
-    "settings-general-login-failed-720x540-light.png": "f5817807f1f18d6b07fe52146021cc661a0c4a4b2c2bbd9a202a96cc924721ab",
+    "settings-general-login-failed-720x540-dark.png": "4d2c92f8a164bde292d87a153680b853b78642cfb72ef39988bcbb1f20398da1",
+    "settings-general-login-failed-720x540-light.png": "fd1cd5fc4ad41f6d0f414cb4e104b1e9f7516ee732563b32f6259501d3bc58cd",
+    "settings-general-login-failed-no-icon-720x540-dark.png": "7334ae21e352f6a4c0ac518f28e17262c2704a01776e408fe0e10b72fe34562c",
+    "settings-general-login-failed-no-icon-720x540-light.png": "f5817807f1f18d6b07fe52146021cc661a0c4a4b2c2bbd9a202a96cc924721ab",
     "settings-general-login-unsupported-720x540-dark.png": "b84f2ee3e1d4b350cb3a9fcb3f9db0c1fdb02b23bf6f7209c8c08defad8e5927",
     "settings-general-login-unsupported-720x540-light.png": "4b39ec679f310affbd23ea7d16cf49f7c753a8d9b2c62c0eee4c29656548f1ef",
     "settings-general-no-footer-720x540-dark.png": "4e7109bb260a411b719d226659196448378f82631694ae6c53156baba26f5dd6",

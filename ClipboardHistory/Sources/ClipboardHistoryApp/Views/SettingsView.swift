@@ -186,8 +186,17 @@ struct SettingsView: View {
     /// R489：默认排除项尾部「默认」标记的负向帧缝（产品默认 nil ⇒ 画）。
     @Environment(\.settingsDefaultExcludedBadgeForCapture) private var defaultExcludedBadgeForCapture
     private var defaultExcludedBadgeVisible: Bool { defaultExcludedBadgeForCapture ?? true }
+    /// R492：开机启动失败回执图标的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.loginFailureIconForCapture) private var loginFailureIconForCapture
+    private var loginFailureIconVisible: Bool { loginFailureIconForCapture ?? true }
     /// R395：只读的分类绑定缝。产品路径永远是 nil；测试用它驱动真实的分类切换。
     private let categoryOverride: Binding<SettingsCategory?>?
+
+    private var loginFailureStyle: AnyShapeStyle {
+        AnyShapeStyle(colorScheme == .dark
+            ? Color(red: 1.0, green: 0.48, blue: 0.44)
+            : Color.red)
+    }
 
     private var selectedCategory: SettingsCategory? {
         categoryOverride?.wrappedValue ?? selectedCategoryState
@@ -472,17 +481,24 @@ struct SettingsView: View {
                         // `-failed`），于是这条有像素判据：说明档探针两条 +
                         // `testDisabledToggleAndFailureReceiptAreVisible` 的跨帧差值对照。
                         if let message = loginItemSettings.message {
-                            Text(message)
-                                .font(.caption)
-                                // R384：失败回执用错误色，与「本机不支持」的静态说明分开
-                                // （快捷键页的非法录制回执也是红字；同一套状态语言）。
-                                // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
-                                .foregroundStyle(loginItemSettings.lastActionFailed
-                                                 ? AnyShapeStyle(colorScheme == .dark
-                                                     ? Color(red: 1.0, green: 0.48, blue: 0.44)
-                                                     : Color.red)
-                                                 : AnyShapeStyle(.secondary))
-                                .settingsHelperAxis()
+                            // R492：失败回执只有红字，没有错误图标；横幅/回执都有图标，
+                            // 这一行补一枚警示三角，正常的不支持说明不加。
+                            HStack(spacing: 4) {
+                                if loginItemSettings.lastActionFailed, loginFailureIconVisible {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: VisualGlyph.badge, weight: .semibold))
+                                        .foregroundStyle(loginFailureStyle)
+                                }
+                                Text(message)
+                                    .font(.caption)
+                                    // R384：失败回执用错误色，与「本机不支持」的静态说明分开
+                                    // （快捷键页的非法录制回执也是红字；同一套状态语言）。
+                                    // 判据是坐标无关的：失败帧里有红色文字像素、说明帧里没有。
+                                    .foregroundStyle(loginItemSettings.lastActionFailed
+                                                     ? loginFailureStyle
+                                                     : AnyShapeStyle(.secondary))
+                            }
+                            .settingsHelperAxis()
                         }
                     }
 
@@ -1544,5 +1560,17 @@ extension EnvironmentValues {
     var settingsDefaultExcludedBadgeForCapture: Bool? {
         get { self[SettingsDefaultExcludedBadgeForCaptureKey.self] }
         set { self[SettingsDefaultExcludedBadgeForCaptureKey.self] = newValue }
+    }
+}
+
+/// R492：开机启动失败回执图标的负向帧缝（产品默认 nil ⇒ 画）。
+struct LoginFailureIconForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var loginFailureIconForCapture: Bool? {
+        get { self[LoginFailureIconForCaptureKey.self] }
+        set { self[LoginFailureIconForCaptureKey.self] = newValue }
     }
 }

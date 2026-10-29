@@ -1328,6 +1328,69 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R492 · 开机启动失败回执图标
+
+    /// R492：失败回执只有红字，没有错误图标（横幅/回执都有）。
+    /// 成对帧 `settings-general-login-failed` / `...-no-icon`：只关图标；
+    /// 读红像素数与最左红像素（图标在文字左侧）。
+    func testLoginFailureReceiptCarriesAnErrorIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r492-login-icon-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-general-login-failed" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-general-login-failed-no-icon" }) else {
+                return XCTFail("\(tag)：找不到登录失败两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (red: Int, first: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "LOGIN_ICON", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var red = 0, first = Int.max
+                for y in Int(Double(rep.pixelsHigh) * 0.15)..<Int(Double(rep.pixelsHigh) * 0.95) {
+                    for x in Int(Double(rep.pixelsWide) * 0.18)..<Int(Double(rep.pixelsWide) * 0.95) {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[i + rOff]), g = Int(base[i + rOff + 1]), b = Int(base[i + rOff + 2])
+                        if r >= 120, r - max(g, b) >= 40 {
+                            red += 1
+                            first = min(first, x)
+                        }
+                    }
+                }
+                return (red, first)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.red == 0 && pos.red == 0 {
+                emit("LOGIN_FAILURE_ICON_NOT_RUN=no-red-channel \(tag)")
+                continue
+            }
+            let diff = pos.red - neg.red
+            let shift = neg.first - pos.first
+            emit("LOGIN_FAILURE_ICON \(tag) 负臂红=\(neg.red) 正臂红=\(pos.red) 差=\(diff)"
+                 + " 负臂首红=\(neg.first) 正臂首红=\(pos.first) 左移=\(shift)px"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.red, 0,
+                "\(tag)：负臂没有红字 ⇒ 失败回执没画出来，尺没有对象")
+            XCTAssertGreaterThan(diff, Int(30.0 * scale * scale),
+                "\(tag)：正臂只多出 \(diff) 个红像素 ⇒ 失败回执没有错误图标")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("LOGIN_FAILURE_ICON_NOT_RUN：两档都没有红色通道") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R491 · 浮层候选行内容标记
 
     /// R491：主列表的链接/富文本/OCR 都有小标记，浮层一行只说标题。
@@ -12270,6 +12333,16 @@ final class UICaptureTests: XCTestCase {
                 return settings
             }()))
         })
+        // R492：失败回执图标的负向臂（同一失败态，只关图标）。
+        results.append(Fixture("settings-general-login-failed-no-icon", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general, loginItem: {
+                let manager = FakeLoginItemManager(isSupported: true, isEnabled: false)
+                manager.error = LoginItemSettings.Error.loginItemNotApplied
+                let settings = LoginItemSettings(manager: manager)
+                settings.setEnabled(true)
+                return settings
+            }()).environment(\.loginFailureIconForCapture, false))
+        })
 
         // 每日复制热图（新功能 / 阶段一）：组件级两张 —— 有数据与没数据。
         // 固定 `today` 与固定计数 ⇒ 这两张帧不随日期变。
@@ -18439,6 +18512,7 @@ final class UICaptureTests: XCTestCase {
         // 与 R29d/R30 那张是同一个机制（D-090：合成前的极性），所以记为盲区而不是缺陷。
         // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
         "settings-general-login-unsupported", "settings-general-login-failed",
+        "settings-general-login-failed-no-icon",
         // R98 新增的两张高夹具（BACKLOG 140 结案那一半）也进名单 —— 同样不是"顺手补名单"：
         // 先看了那张帧（`/tmp/r98_tall_dark_sidebar.png`，`settings-privacy-tall` 暗档侧栏那一列），
         // 「快捷键 / 通用 / 推荐 / 数据 / 统计」五枚标签黑字黑底几乎看不见，
@@ -18819,6 +18893,7 @@ final class UICaptureTests: XCTestCase {
         "settings-stats-populated", "sidebar-history", "detail-0-text",
         // R39：禁用态与失败回执那两张 —— 放框要从帧上量，不照抄别处的 y
         "settings-general-login-unsupported", "settings-general-login-failed",
+        "settings-general-login-failed-no-icon",
         // 快速选择浮层**不在这里**：102 张基线里一张 `quickpick-*` 都没有（已记的账 BACKLOG 30 /
         // U-39 / U-41 —— 那是 AppKit 自建的 NSPanel，R19 试过把 contentView 搬进别的窗口，
         // 搬过去就塌成空壳）。列一个不存在的夹具名只会让这条诊断红成"找不到对象"，
@@ -21349,6 +21424,7 @@ final class UICaptureTests: XCTestCase {
             "settings-general-no-footer light", "settings-general-no-footer dark",
             "settings-general-login-unsupported light", "settings-general-login-unsupported dark",
             "settings-general-login-failed light", "settings-general-login-failed dark",
+            "settings-general-login-failed-no-icon light", "settings-general-login-failed-no-icon dark",
         ]
         emit("CARD_INSET_ROSTER_SWITCH 开关=\(useIconFirstRoster ? "on" : "off")"
              + " 名册=\(iconFirstCells.sorted().joined(separator: " "))"

@@ -21,8 +21,14 @@ VIEW = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/SettingsView.swift"
 FILTER = "testLoginFailureReceiptIsVisuallyDistinctFromTheUnsupportedNote"
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 
-NEEDLE = "                                .foregroundStyle(loginItemSettings.lastActionFailed\n                                                 ? AnyShapeStyle(colorScheme == .dark\n                                                     ? Color(red: 1.0, green: 0.48, blue: 0.44)\n                                                     : Color.red)\n                                                 : AnyShapeStyle(.secondary))"
-MUTANT = "                                .foregroundStyle(AnyShapeStyle(.secondary))  // R384 变异：失败也灰"
+NEEDLE = """    private var loginFailureStyle: AnyShapeStyle {
+        AnyShapeStyle(colorScheme == .dark
+            ? Color(red: 1.0, green: 0.48, blue: 0.44)
+            : Color.red)
+    }"""
+MUTANT = """    private var loginFailureStyle: AnyShapeStyle {
+        AnyShapeStyle(.secondary)  // R384 变异：失败也灰
+    }"""
 
 MUTATIONS = [
     ("M1015", "把失败回执的颜色改回恒 secondary", VIEW,
