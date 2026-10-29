@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 479 轮（R480 · 2026-10-29 · U-1845…U-1850）：主列表补富文本格式标记（2 张新帧、基线 298；M1306/M1307 2/2）（产品 1 文件 + 判据）
+
+- **U-1845：⓪ push 与 CI。** 开工网络被监督者实测为不可达（api=000、`git ls-remote` remote closed）；本轮先本地完成，收口探针与最终 ahead/SHA 见补记。R479 跑 `40805576917 ↔ 225e6f8`、R478 两跑 `40801850707 ↔ b64682e`/`40802042660 ↔ 7f21720`、R477 两跑读时均为 in_progress 或未读 ⇒ **NOT-RUN**；R477 主跑的 inline/幻影/图钉读数沿用 R479 账；436 无新跑（最后 facts 5/5/77）。
+- **U-1846：① 腐烂与预检。** `HIDDEN_ARMS 表=349 可判=1079 rot=0 抽不出=6 已声明死针=0 处置=ok`；`NEEDLE_PRECHECK tables=262 covered=243 arms=660 bad=0`、`ARM_TOTAL files=355 arms=1144`。
+- **U-1847：② 产品：主列表补富文本格式标记。** 缺陷形状（打开「保留富文本格式」后）：`Entry.richText` 已经保存，但列表行与普通文本行一模一样，用户看不出这条除了纯文本还存了格式。修法：`RowTextColumn` 的时间行在 OCR 标记之后再补一枚 `textformat`（11pt、secondaryLabelColor、helpLabel + accessibilityLabel），只有 `richText` 非空才出现。旧/新：**2 张新帧**（`row-rich-text` 亮暗）、**0 张既有帧变化**、0 缺失；基线 **296→298**；2 张逐张看过：标记在时间行末尾、与来源同一行。读数（`ROW_RICH_BADGE`）：负臂墨 9363→正臂 9593（**+230**）、dark 10477→10727（+250）；标题/行高未动。
+- **U-1848：③ 判据与刀。** 新判据 `testRowsWithRichTextCarryAFormatBadge` 用成对帧（`row-text` / `row-rich-text`，同内容/时间/来源，只多 richText）：正臂下半行墨量必须多 ≥8pt·s²；不读"末列"（标题第二行会遮住标记的末列，第一版因此假红，当场改成墨差）。刀 `M1306`（标记永不画）/`M1307`（负向帧也画）**2/2 CAUGHT**、RESTORE_CLEAN。
+- **U-1849：④ 自伤与撤回。** 本轮第一版产品位是「浮层外缘 1pt 发丝线」，全量当场 **18 个既有 QuickPick 判据红**（外缘线被药丸/选区尺读进对象）⇒ 撤回产品与判据，不用改 18 条旧期望来迁就它；随后换成富文本标记。`row-rich-text` 是新帧，未改任何旧帧。
+- **U-1850：⑤ 八步与电池。** build **0 告警**（arm64+x86_64）；捕获卷 **298 帧**、`CHANGED=0 ADDED=2 MISSING=0`，更新后 `298/0/0/0`；全量 **1297/56/0**（499.4s，轻载；新增 1 条富文本标记判据）；换装 `ok / SHA_MATCH=1 / 395=395`（版本 1.4.8；本轮起安装条目以现读为准）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **1** 轮（as-of 479，`python3 scripts/product_streak.py --streak-for 479`）；清账 `格=162 声明=63 不成立=0/63`；§1 已刷新（尾轮 477 / 478 节）；电池 **Ran 683 / OK skipped=5**；清账 162/63/0。**具名 NOT-RUN**：① R479/R478/R477 的 in_progress 跑；② 富文本标记的 runner 1x/dark；③ `SETTINGS_TITLE_ICON`/`FALLBACK_PATH`/`INLINE_CODE_PAD`/幻影/图钉/冲突的 runner 复验；④ `SETTINGS_DATA_PATH` 两档；⑤ 既有 runner 复核（无新跑）；⑥ Capture MATERIAL_BLIND_NOT_RUN；⑦ 已知 Motion 采样红；⑧ `LOCAL_PERF_BUDGET_FLAKE=load`（本跑未触发）；⑨ 437–561 的其余未结项仍开。
+
 ## 第 478 轮（R479 · 2026-10-29 · U-1839…U-1844）：设置页标题补分类图标（36 张旧帧变化 + 2 张新帧、基线 296；M1302/M1303 2/2）（产品 1 文件 + 判据）
 
 - **U-1839：⓪ push 与 CI。** 开工 `git push` **Everything up-to-date**、HEAD=origin/main=`7f21720`、**ahead=0**。R477 补记跑 `40797866181 ↔ 7a79987` 收口已读 **failure 2 步**（Swift/Capture）：冲突判据仍是 `0 != 2` —— 7a79987 还没有 R478 补记的 skip 修正（该修正只在 `7f21720`）；`SHORTCUT_CONFLICT_NOT_RUN` 两档已打。R478 主跑 `40801850707 ↔ b64682e` 与补记跑 `40802042660 ↔ 7f21720` 读时 **in_progress ⇒ NOT-RUN**；R477 主跑已读（inline 99/6.0 与 102/5.0、幻影块 0、图钉 +20 签收）；R476/R475/R474/R473/R472/R471 沿用。R479 跑 `40805576917 ↔ 225e6f8` 读时 in_progress ⇒ NOT-RUN。436 无 R479 新跑；R477 主跑 Motion 红 = markdown 标签 1<2（已知采样）。

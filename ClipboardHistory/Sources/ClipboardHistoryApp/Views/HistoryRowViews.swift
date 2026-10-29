@@ -295,6 +295,15 @@ private struct RowTextColumn: View {
                         .helpLabel("这张图片里有可搜索的文字")
                         .accessibilityLabel("这张图片里有可搜索的文字")
                 }
+                // R480：富文本保真开着时，这一条除了纯文本还存了格式表示。
+                // 用一个「格式」小标记说出来；它不改变任何文字/行高。
+                if entry.richText?.isEmpty == false {
+                    Image(systemName: "textformat")
+                        .font(.system(size: VisualFont.meta, weight: .regular))
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .helpLabel("这条记录保留了富文本格式")
+                        .accessibilityLabel("这条记录保留了富文本格式")
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

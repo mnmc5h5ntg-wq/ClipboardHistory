@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主列表补富文本格式标记（2 张新帧、基线 298）（R480 / 第 479 轮 / Round 477 / U-1845…U-1850 · 产品 1 文件 + 判据）
+
+
 ### 设置页标题补分类图标（36 张旧帧变化 + 2 张新帧、基线 296）（R479 / 第 478 轮 / Round 476 / U-1839…U-1844 · 产品 1 文件 + 判据）
 
 

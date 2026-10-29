@@ -1374,6 +1374,55 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R480 · 富文本格式标记
+
+    /// R480：开了富文本保真后，行里要能看见「这条还存了格式」。
+    /// 成对帧：row-text（同内容/时间/来源）vs row-rich-text（只多 richText）。
+    func testRowsWithRichTextCarryAFormatBadge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r480-rich-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negF = fixtures.first(where: { $0.name == "row-text" }),
+                  let posF = fixtures.first(where: { $0.name == "row-rich-text" }) else {
+                return XCTFail("\(tag)：找不到 row-text / row-rich-text")
+            }
+            func scan(_ f: Fixture) throws -> (last: Int, ink: Int, page: Int, scale: Double) {
+                let file = scratch.appendingPathComponent("\(f.name)-\(tag).png")
+                _ = try render(f, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "RICH", code: 1) }
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                var last = -1, ink = 0
+                for y in Int(Double(rep.pixelsHigh) * 0.45)..<rep.pixelsHigh {
+                    for x in 0..<rep.pixelsWide {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let luma = 0.2126 * Double(base[i + rOff])
+                            + 0.7152 * Double(base[i + rOff + 1])
+                            + 0.0722 * Double(base[i + rOff + 2])
+                        if abs(Int(luma.rounded()) - page) >= 60 { ink += 1; last = max(last, x) }
+                    }
+                }
+                return (last, ink, page, Double(rep.pixelsWide) / Double(f.size.width))
+            }
+            guard let neg = try? scan(negF), let pos = try? scan(posF) else { return XCTFail("\(tag)：读不回帧") }
+            let scale = pos.scale
+            emit("ROW_RICH_BADGE \(tag) 负臂末列=\(neg.last)px 正臂末列=\(pos.last)px 差=\(pos.last - neg.last)px 负墨=\(neg.ink) 正墨=\(pos.ink) 页底=\(neg.page)")
+            XCTAssertGreaterThan(pos.ink - neg.ink, Int(8.0 * scale * scale),
+                "\(tag)：正臂只多 \(pos.ink - neg.ink) 个墨像素 ⇒ 标记没画")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2)
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -10545,6 +10594,27 @@ final class UICaptureTests: XCTestCase {
             results.append(Fixture("row-\(rowKind(captured))", NSSize(width: 300, height: 74)) {
                 AnyView(self.rowFrame(HistoryRowButton(
                     entry: captured, copyAction: {}, favoriteAction: {}
+                )))
+            })
+        }
+        // R480：同一条文本、同时间/来源，只多一份富文本表示 —— 与 row-text 成对。
+        do {
+            let rich = ClipboardEntry(
+                content: .text("这是一段用于视觉验收的普通文本记录，包含足够长度以便观察截断与换行表现 abcdefghijklmnop"),
+                timestamp: Self.referenceDate.addingTimeInterval(-30),
+                thumbnail: nil,
+                sourceURL: nil,
+                sourceUTIs: ["public.utf8-plain-text"],
+                sourceAppBundleID: "com.apple.Safari",
+                sourceAppName: "Safari",
+                richText: RichTextPayload(rtf: Data("{\\rtf1 x}".utf8), html: nil))
+            let richStore = HistoryStore(
+                clipboardWriter: TestClipboardWriter(),
+                persistence: RecordingHistoryPersistence(entriesToLoad: [rich]),
+                retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil))
+            results.append(Fixture("row-rich-text", NSSize(width: 300, height: 74)) {
+                AnyView(self.rowFrame(HistoryRowButton(
+                    entry: richStore.entries[0], copyAction: {}, favoriteAction: {}
                 )))
             })
         }

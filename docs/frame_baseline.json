@@ -1,5 +1,5 @@
 {
-  "count": 296,
+  "count": 298,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -193,6 +193,8 @@
     "row-pinned-off-300x74-light.png": "c9c80257c672b98e22cefddfba5bc623500a289450c84861e0bdffcf2984e448",
     "row-pinned-on-300x74-dark.png": "e45ac11283c32fedeae79f76f71030e0693b8b72673afe81e3484a7ba8511d11",
     "row-pinned-on-300x74-light.png": "9bf1abf9f57e9d14a5115972db330e69e9d6dab3ca02b61ba3bd14ce8117e600",
+    "row-rich-text-300x74-dark.png": "4f705a2e9d0da81e056d436000d3e4f56764d1432763d37f4f460f66a9336bc6",
+    "row-rich-text-300x74-light.png": "84e18c45e015169a9063f9311483c41d3c43f98e0b6b6bf9bbdfc7d41b749b00",
     "row-text-300x74-dark.png": "82f3c11f525d614dea4ae0694a9a456ebd4c6a7c5b3eebaca09a669b5f6606c3",
     "row-text-300x74-light.png": "c9c80257c672b98e22cefddfba5bc623500a289450c84861e0bdffcf2984e448",
     "rows-cross-year-340x160-dark.png": "44da8fcd7c661291ae91aecbe21a66716b278c3c9c6948cafc34032c35cad919",
