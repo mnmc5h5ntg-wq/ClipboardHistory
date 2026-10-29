@@ -19586,7 +19586,7 @@ OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTex
 
 ## Round 474 · R477（第 476 轮 · 2026-10-29）：浮层置顶行改用主列表同一枚图钉（2 张新帧、基线 294）+ 按 R476 跑加 inline padding 池/幻影 8 行/冲突 NOT-RUN
 
-主列表早已用 `pin.fill` 说“已固定”，浮层却把「置顶」两个字写进标题。`rowTitle` 去掉前缀，`QuickPickRowCell` 在类型符号右下角叠 9pt 图钉（不占固定槽）；读屏标签保留「置顶」。2 张新帧、0 张既有帧变化，基线 292→294；`QUICKPICK_PIN` 类型列墨 215→319 / 233→338（+104/+105），标题末列 320→320（前缀没回来）；M1297/M1298 2/2。按 R476 跑分桶继续修检测：dark 442/12/12/12/11，light 选中了 102/101/1.0 的宽带 ⇒ `best` 先只留 padding≥4.5 的候选再取最宽实心带（本机恢复 98.5/92.5/6.0 与 99/92.5/6.5，M1299 CAUGHT）；幻影块下限 4→8 行（runner 1x 分隔线是 5 行 396px）；冲突提示在设置内容平涂时改具名 `SHORTCUT_CONFLICT_NOT_RUN`。预检 259/241/656、rot 346/1073、ARM 352/1139。全量 1294/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ push 599ec98..3339baf success、ahead=0；R476 跑 failure 3 步（sources 时序 + inline light 1.0 + 幻影 396 + 冲突平涂）已读；QUICKPICK_LIST_RULE 1x 6/6、ROW_OCR_BADGE 1x 签收；436 5/5/77 reds=0。
+主列表早已用 `pin.fill` 说“已固定”，浮层却把「置顶」两个字写进标题。`rowTitle` 去掉前缀，`QuickPickRowCell` 在类型符号右下角叠 9pt 图钉（不占固定槽）；读屏标签保留「置顶」。2 张新帧、0 张既有帧变化，基线 292→294；`QUICKPICK_PIN` 类型列墨 215→319 / 233→338（+104/+105），标题末列 320→320（前缀没回来）；M1297/M1298 2/2。按 R476 跑分桶继续修检测：dark 442/12/12/12/11，light 选中了 102/101/1.0 的宽带 ⇒ `best` 先只留 padding≥4.5 的候选再取最宽实心带（本机恢复 98.5/92.5/6.0 与 99/92.5/6.5，M1299 CAUGHT）；幻影块下限 4→8 行（runner 1x 分隔线是 5 行 396px）；冲突提示在设置内容平涂时改具名 `SHORTCUT_CONFLICT_NOT_RUN`。预检 259/241/656、rot 346/1073、ARM 352/1139。全量 1294/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ push 599ec98..3339baf success、ahead=0；R476 跑 failure 3 步（sources 时序 + inline light 1.0 + 幻影 396 + 冲突平涂）已读；R477 跑 40797827495↔0fd3ec0 in_progress ⇒ NOT-RUN；QUICKPICK_LIST_RULE 1x 6/6、ROW_OCR_BADGE 1x 签收；436 5/5/77 reds=0。
 
 **七维度自评**（恰七行，每格 n/15）：
 
