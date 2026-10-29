@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置快捷键补冲突提示（2 张新帧、基线 292）+ inline 检测按四门分桶改 ink 门/对象 + 幻影填充块下限按倍率（R476 / 第 475 轮 / Round 473 / U-1815…U-1820 · 产品 2 文件 + 判据 + 检测）
+
+
 ### 图片行补「可搜索文字」标记（2 张新帧、基线 290）（R475 / 第 474 轮 / Round 472 / U-1803…U-1808 · 产品 1 文件 + 判据 + 诊断）
 
 

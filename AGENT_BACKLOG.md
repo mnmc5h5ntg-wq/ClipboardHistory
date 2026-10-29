@@ -10429,3 +10429,15 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：本机两档 `ROW_OCR_BADGE` 末列 421→455、墨 +106；runner 的 row 帧与 1x 缩放下图标可能小于 1pt 笔画。
     修法：下一跑读 `ROW_OCR_BADGE`；读不到就具名 NOT-RUN，不改 3pt/10pt 地板。
 
+**547. inline dark 与幻影 1x 的 runner 复验未做**（R476 观察）
+    现象：本机 inline 已恢复 98.5/92.5/6.0 与 99/92.5/6.5（四门 35/35/35/35）；幻影块下限改为 1x 4 行/2x 7 行，本机通过。R475 跑仍是修前代码（dark 442/12/12/1/0、幻影 396px）。
+    修法：读 R476 跑的 `INLINE_CODE_GATES`、`INLINE_CODE_PAD`、`QUICKPICK_GREY_BAND`；仍有红就按新的四门读数继续，4.5 地板不动。
+
+**548. 快捷键冲突提示的 runner 1x/dark 未签收**（R476 观察）
+    现象：本机亮暗两档 `SHORTCUT_CONFLICT` 均 582→660px、橙 221/230、负臂橙 0；runner 的 1x 橙图标可能小于 10px²。
+    修法：读新跑的 `SHORTCUT_CONFLICT`；读不到就具名 NOT-RUN，不改 10pt/30px² 地板。
+
+**549. 主笔跑的 Release script tests 因 sources 格在补记才派生而红**（R476 观察）
+    现象：R474 主笔 `40780110804 ↔ d70cc57` 的 Release script tests 3 条红（`FINAL_REPORT_SOURCES_CELL_STALE`、跳过名册无结论、第二来源），补记跑 `40780464933 ↔ 348e75e` 该步通过 ⇒ 不是产品缺陷，是"格子在补记里才派生"的时序。
+    修法：读账时把主笔跑的这一步标成 `SOURCES_CELL_PENDING_ADDENDUM`，不要记成回归；要消除噪音只能在主笔提交前就把 sources 格写成该笔 SHA（需要先 commit 再 amend，不可取），或接受补记跑作准。
+

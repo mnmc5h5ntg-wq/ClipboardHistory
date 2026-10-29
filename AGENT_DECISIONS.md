@@ -8130,3 +8130,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：OCR 标记在 runner 的暗档/1x 尚未签收；inline 的四门分桶只有本机读数，runner 未读到 ⇒ 检测修复仍 NOT-RUN。
 - 回滚：删标记与判据；四门诊断可保留（只影响日志，不影响断言）。
 
+## D-473 快捷键冲突要在设置页说话；inline 的 ink 门读垂直窗口、对象取最宽实心带；幻影块下限按倍率（R476）
+
+- 背景：三行快捷键可以设成同一组键，系统只递一个，另一行动作静默失效；inline dark 的 runner 四门分桶是 442/12/12/1/0 —— 真带只在文字上下的 padding 行（本行 ink=0），文字行被字形切短，旧 ink 门把真带整族砍掉；R474 的 1pt 分隔线在 runner 1x 渲染成 3 行灰带，被幻影填充判据的"连续 ≥3 行"读成填充块（396px>25/28px）。
+- 决定：新增 `ShortcutConflictPolicy` 纯函数 + `SettingsView` 卡片下方橙色警告（成对帧判据 + 2 把刀）；`InlineCodeBandChoice.Candidate` 加 `verticalInk`（带上下 ±20pt 窗口墨），ink 门改读它；`best` 先取 coverage≥0.90 的实心池再取最宽，padding 只破平；幻影块下限 `max(4, Int(3.5*scale))`。
+- 理由：冲突是"两组都注册、只一个生效"的事实，必须在设置页说清；inline 的门问的是"这条带里有没有字"而不是"这一行有没有字"；对象必须是整条带，碎片 padding 虚高会把缺陷藏起来；1pt 发丝线的渲染厚度随倍率变，固定 3 行会把尺的对象换掉。
+- 兼容性/迁移：冲突 2 张新帧、0 张既有帧变化，基线 290→292；inline/幻影是测试侧检测，产品二进制不变；4.5 地板与 150 上限未动。
+- 边界：冲突警告的 runner 1x/dark、inline 与幻影的 runner 复验都未做（R476 跑随提交）⇒ 具名 NOT-RUN；`SETTINGS_DATA_PATH` 在 runner 仍平涂。
+- 回滚：删冲突策略/警告与判据；inline 的 verticalInk/最宽实心带可单独回退（回到旧 ink 门与 padding 优先）；幻影下限回到固定 3 行会重新误报 1x 分隔线。
+

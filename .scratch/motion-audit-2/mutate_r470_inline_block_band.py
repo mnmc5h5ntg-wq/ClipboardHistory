@@ -6,13 +6,13 @@ ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 VIEW = os.path.join(ROOT, "Tests/ClipboardHistoryAppTests/UICaptureHarness.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "testInlineCodeBandChoicePrefersTheCoveredRun|testInlineCodeBackgroundHasPadding"
-OLD = "                && $0.ink >= minInk && $0.rowMaxBandRun <= maxSpan"
+OLD = "                && $0.verticalInk >= minInk && $0.rowMaxBandRun <= maxSpan"
 MUTATIONS = [
     ("M1277", "撤掉整行最长带 run 门", VIEW, OLD,
-     "                && $0.ink >= minInk",
+     "                && $0.verticalInk >= minInk",
      ["全宽块底那一行上的 150pt 碎片必须被排除"]),
     ("M1278", "整行最长带 run 门恒假（所有行都被排除）", VIEW, OLD,
-     "                && $0.ink >= minInk && $0.rowMaxBandRun <= 0",
+     "                && $0.verticalInk >= minInk && $0.rowMaxBandRun <= 0",
      ["找不到行内代码的短底色带"]),
 ]
 

@@ -375,6 +375,16 @@ struct SettingsView: View {
 
     // MARK: - Shortcuts Section
 
+    /// R476：三行快捷键两两对账。冲突不是"设置没保存"——两组键都真的注册过，
+    /// 但系统只会把热键递给其中一个，因此界面必须说清另一组按下去不会响。
+    private var shortcutConflicts: [ShortcutConflictPolicy.Conflict] {
+        ShortcutConflictPolicy.conflicts([
+            (name: "呼出主窗口", shortcut: showMainWindowShortcut),
+            (name: "再次复制", shortcut: repeatCopyShortcut),
+            (name: "快速选择并粘贴", shortcut: quickPickShortcut),
+        ])
+    }
+
     private var shortcutsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("快捷键")
@@ -402,6 +412,22 @@ struct SettingsView: View {
                     )
                 }
                 .settingsCardInset()
+            }
+
+            // R476：冲突提示放在卡片外、页标题那一列 —— 它说的是"这三行之间的关系"，
+            // 不属于某一行，塞进任一行的说明里都会被读成那一行自己的问题。
+            ForEach(Array(shortcutConflicts.enumerated()), id: \.offset) { _, conflict in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color(nsColor: .systemOrange))
+                    Text("「\(conflict.firstName)」与「\(conflict.secondName)」都设为 \(conflict.shortcut)"
+                         + " —— 同一组键只会触发其中一个，请改开一个。")
+                        .foregroundStyle(.primary)
+                }
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("shortcutConflictWarning")
             }
         }
     }

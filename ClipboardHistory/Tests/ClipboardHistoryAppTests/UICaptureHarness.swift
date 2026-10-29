@@ -25,27 +25,51 @@ enum InlineCodeBandChoice {
         let right: Int
         let coverage: Double
         let ink: Int
+        /// R476：同一行**上下 ±20pt 窗口**里的墨像素数。长带的文字行会把带 run 切短，
+        /// 完整 99pt 的带通常只在文字上下的 padding 行上出现（那种行自身 ink=0）——
+        /// runner dark 的 `过span=12 → 过ink=1 → 过rowMax=0` 就死在这里。门的对象应是
+        /// "这条带里有没有字"，不是"这一行有没有字"。
+        let verticalInk: Int
         /// 判据自己的对象：带内文字墨宽与带宽之差（pt）。
         let padding: Double
         /// R470：同一行里**最长的一条带 run**（px）。一行若是 code-block 全宽底，
         /// 这条会远大于 `maxSpan`，那么这一行上的短 run 只是块底的碎片，不是行内码的带。
         let rowMaxBandRun: Int
         var span: Int { right - left + 1 }
+
+        init(row: Int, left: Int, right: Int, coverage: Double, ink: Int,
+             padding: Double, rowMaxBandRun: Int, verticalInk: Int? = nil) {
+            self.row = row
+            self.left = left
+            self.right = right
+            self.coverage = coverage
+            self.ink = ink
+            self.verticalInk = verticalInk ?? ink
+            self.padding = padding
+            self.rowMaxBandRun = rowMaxBandRun
+        }
     }
 
     /// 选**内边距最大**的候选：真带 6pt、假文字带 3pt、带内子段 1pt。
     /// 覆盖率 0.55 只作门槛（R461 用它排掉文字抗锯齿；R464 发现它单独会把真带切成子段）。
     /// R470：**整行全宽块底的行整行排除**——runner dark 的 150/147/3.0 是 320pt code-block
     /// 底里的一段，真带在同帧另一行（候选里 s20/p20 的碎片也是块底的一部分）。
+    /// R476：ink 门改读 `verticalInk`（带上下窗口里的墨），不再要求"这一行有字"。
+    /// 同时把对象钉成**实心带里最宽的那一条**：R455 要量的是整条底色带与字宽的差，
+    /// 不是被字形切碎后某个 padding 虚高的碎片（local dark 曾因此从 99/92.5/6.5 变成 83/75.5/7.5）。
+    /// 覆盖率 ≥0.9 先筛"实心"，再取最宽，最后才用 padding 破平 —— 假文字带 0.55 进不了这一池。
     static func best(_ candidates: [Candidate], minSpan: Int, maxSpan: Int,
                      minCoverage: Double, minInk: Int) -> Candidate? {
         let valid = candidates.filter {
             $0.span >= minSpan && $0.span <= maxSpan && $0.coverage >= minCoverage
-                && $0.ink >= minInk && $0.rowMaxBandRun <= maxSpan
+                && $0.verticalInk >= minInk && $0.rowMaxBandRun <= maxSpan
         }
-        return valid.max { a, b in
+        let solid = valid.filter { $0.coverage >= 0.90 }
+        let pool = solid.isEmpty ? valid : solid
+        return pool.max { a, b in
+            if a.span != b.span { return a.span < b.span }
             if abs(a.padding - b.padding) > 0.01 { return a.padding < b.padding }
-            return a.span < b.span
+            return false
         }
     }
 }
@@ -1036,6 +1060,101 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R476 · 快捷键冲突提示
+
+    /// R476：三行快捷键里有两行是同一组键时，卡片下方必须出现一行警告；
+    /// 正常页（三组键互不相同）一个墨点都不许多。
+    ///
+    /// 判据用成对帧：`settings-shortcuts` 是正常臂，`settings-shortcuts-conflict`
+    /// 把第一行设成与第二行相同的 ⌃⌥C。先读负臂的**最后墨行**，再要求正臂在那行之下
+    /// 多出文字墨与橙色图标墨 —— 只多一句话不能冒充，图标颜色是第二道身份。
+    func testSettingsShortcutConflictIsSurfaced() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r476-conflict-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let normal = fixtures.first(where: { $0.name == "settings-shortcuts" }),
+                  let conflict = fixtures.first(where: { $0.name == "settings-shortcuts-conflict" }) else {
+                return XCTFail("\(tag)：找不到 settings-shortcuts(-conflict) 夹具 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (last: Int, ink: Int, orange: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "SHORTCUT_CONFLICT", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                let x0 = Int(160.0 * scale)   // 只看内容列，排除设置侧栏
+                var last = -1, ink = 0, orange = 0
+                for y in 0..<rep.pixelsHigh {
+                    for x in x0..<rep.pixelsWide {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[i + rOff]), g = Int(base[i + rOff + 1]), b = Int(base[i + rOff + 2])
+                        let luma = 0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)
+                        guard abs(Int(luma.rounded()) - page) >= 60 else { continue }
+                        ink += 1
+                        last = max(last, y)
+                        if max(r, max(g, b)) - min(r, min(g, b)) >= 20 { orange += 1 }
+                    }
+                }
+                return (last, ink, orange)
+            }
+            guard let neg = try? scan(normal), let pos = try? scan(conflict) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            // 正臂在负臂最后墨行之下（+10pt）多出来的东西。
+            let file = scratch.appendingPathComponent("\(conflict.name)-\(tag).png")
+            _ = try render(conflict, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：正臂帧读不回来")
+            }
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            let x0 = Int(160.0 * scale)
+            let threshold = neg.last + Int(10.0 * scale)
+            var belowInk = 0, belowOrange = 0
+            for y in max(0, threshold)..<rep.pixelsHigh {
+                for x in x0..<rep.pixelsWide {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let r = Int(base[i + rOff]), g = Int(base[i + rOff + 1]), b = Int(base[i + rOff + 2])
+                    let luma = 0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)
+                    guard abs(Int(luma.rounded()) - page) >= 60 else { continue }
+                    belowInk += 1
+                    if max(r, max(g, b)) - min(r, min(g, b)) >= 20 { belowOrange += 1 }
+                }
+            }
+            emit("SHORTCUT_CONFLICT \(tag) 负臂末墨行=\(neg.last)px 正臂末墨行=\(pos.last)px"
+                 + " 差=\(pos.last - neg.last)px 下方文字墨=\(belowInk) 下方橙像素=\(belowOrange)"
+                 + " 负臂橙=\(neg.orange) 正臂橙=\(pos.orange) 页底=\(page)"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(pos.last - neg.last, Int(10.0 * scale),
+                "\(tag)：冲突臂没有在卡片下方多出一行（末墨行差 \(pos.last - neg.last)px）")
+            XCTAssertGreaterThan(belowInk, Int(30.0 * scale * scale),
+                "\(tag)：下方只多出 \(belowInk) 个墨像素 ⇒ 警告没有画出来")
+            XCTAssertGreaterThan(belowOrange, Int(10.0 * scale * scale),
+                "\(tag)：下方橙像素 \(belowOrange) ⇒ 警告的图标没有画出来（只有文字不算）")
+            XCTAssertEqual(neg.orange, 0,
+                "\(tag)：正常臂里出现了橙像素 \(neg.orange) ⇒ 警告在无冲突时也画了，判据失去负臂")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -1663,6 +1782,11 @@ final class UICaptureTests: XCTestCase {
             }
             let page = Self.modalLuma(bytes: bytes, bytesPerRow: rep.bytesPerRow,
                                       xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            // R476：块下限按倍率走。1x 上 1pt 分隔线会渲染成 3px 的抗锯齿带，
+            // 而 R474 的「连续 ≥3 行」把它读成了填充块（runner 两档 396px > 墨 25/28px）。
+            // 真实的选中填充有 30+ 行；下限 4px（1x）/7px（2x）只挡发丝线，不挡旧缺陷（32 行）。
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let greyBlockFloor = max(4, Int(3.5 * scale))
             // `modalLuma` 给的是 Int，而下面每一项都是 Double：混着写会让类型检查炸掉
             // （本机实测：`unable to type-check this expression in reasonable time`）。先换算成普通量。
             let pageLuma = Double(page)
@@ -1715,7 +1839,7 @@ final class UICaptureTests: XCTestCase {
                         greyOnlyLast = last
                     }
                 } else if greyNoInkRun > 0 {
-                    if greyNoInkRun >= 3 {
+                    if greyNoInkRun >= greyBlockFloor {
                         widestGreyNoInk = max(widestGreyNoInk, greyNoInkRunWidest)
                     }
                     greyNoInkRun = 0
@@ -1733,7 +1857,7 @@ final class UICaptureTests: XCTestCase {
                     inkRowLast.append(inkLast)
                 }
             }
-            if greyNoInkRun >= 3 {
+            if greyNoInkRun >= greyBlockFloor {
                 widestGreyNoInk = max(widestGreyNoInk, greyNoInkRunWidest)
             }
             // R108：那 1 个纯灰像素**落在谁的字形足迹里**（判法写在 BACKLOG 161，本轮只测不判）。
@@ -1756,7 +1880,7 @@ final class UICaptureTests: XCTestCase {
             emit("QUICKPICK_GREY_BAND \(tag) 灰档行数=\(greyRows) 灰档像素=\(greyPixels) "
                  + "最宽一行=\(widest)px \(widestX) 纯灰行无墨=\(greyNoInkRows) "
                  + "纯灰行最宽=\(widestGreyRow)px 纯灰块最宽=\(widestGreyNoInk)px 最宽墨行=\(widestInk)px 墨档行数=\(inkRows) 页底档=\(page) "
-                 + "带子=顶部40pt 门限=8..45灰阶 块下限=3行 残余灰=\(residualGrey)")
+                 + "带子=顶部40pt 门限=8..45灰阶 块下限=\(greyBlockFloor)行 残余灰=\(residualGrey)")
             // —— 收场按 D-170：能力读数排在闸门与 skip 之前，未判要带成因数字。
             guard hasEditor else {
                 declined.append("\(tag)[原因=这台机器上那枚字段没有 field editor ⇒ "
@@ -1776,7 +1900,7 @@ final class UICaptureTests: XCTestCase {
             // 判据读的是**两个宽度的比**，不是灰像素的绝对数：倍率与底色在两台机器上都不一样（R38），
             // 而"填充比字宽"这件事在任何倍率下都成立 —— 改之前本机是 52px 对 37px，1x 下会等比缩。
             XCTAssertLessThanOrEqual(widestGreyNoInk, widestInk,
-                "\(tag)：有一块**只有灰、零个墨**的填充（连续 ≥3 行）宽 \(widestGreyNoInk)px，"
+                "\(tag)：有一块**只有灰、零个墨**的填充（连续 ≥\(greyBlockFloor) 行）宽 \(widestGreyNoInk)px，"
                     + "比最宽的那行墨（\(widestInk)px）还宽 ⇒ "
                     + "字后面有一块比字还宽的填充。改之前本机实测 32 行 / 1115 像素 / 纯灰块最宽 52px "
                     + "对最宽墨行 37px —— 那就是 BACKLOG 159 的灰块（整条查询被选中，而窗口不是 key 所以底是灰的）。"
@@ -6713,9 +6837,10 @@ final class UICaptureTests: XCTestCase {
                 }
                 let rowMax = runs.map(\.span).max() ?? 0
                 return runs.map { run in
-                    var inkLeft = Int.max, inkRight = -1
+                    var inkLeft = Int.max, inkRight = -1, inkInWindow = 0
                     for yy in yLo...yHi {
                         for xx in run.left...run.right where isInk(luma(xx, yy)) {
+                            inkInWindow += 1
                             inkLeft = min(inkLeft, xx)
                             inkRight = max(inkRight, xx)
                         }
@@ -6726,7 +6851,8 @@ final class UICaptureTests: XCTestCase {
                         row: y, left: run.left, right: run.right,
                         coverage: run.coverage, ink: run.ink,
                         padding: Double(run.span) / scale - inkWidth,
-                        rowMaxBandRun: rowMax)
+                        rowMaxBandRun: rowMax,
+                        verticalInk: inkInWindow)
                 }
             }
 
@@ -6745,7 +6871,7 @@ final class UICaptureTests: XCTestCase {
             let minInk = max(6, Int(6.0 * scale * scale))
             let spanOK = candidates.filter { $0.span >= minWidth && $0.span <= maxWidth }
             let coverageOK = spanOK.filter { $0.coverage >= 0.55 }
-            let inkOK = coverageOK.filter { $0.ink >= minInk }
+            let inkOK = coverageOK.filter { $0.verticalInk >= minInk }
             let rowMaxOK = inkOK.filter { $0.rowMaxBandRun <= maxWidth }
             emit("INLINE_CODE_GATES \(tag) 候选=\(candidates.count)"
                  + " 过span=\(spanOK.count) 过coverage=\(coverageOK.count)"
@@ -6753,7 +6879,7 @@ final class UICaptureTests: XCTestCase {
                  + " 门=span[\(minWidth),\(maxWidth)]px coverage≥0.55 ink≥\(minInk) rowMax≤\(maxWidth)px")
             let topSpan = candidates.sorted { $0.span > $1.span }.prefix(6)
                 .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
-                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
+                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink):v\($0.verticalInk)"
                     + ":p\(String(format: "%.1f", $0.padding))"
                     + ":m\(String(format: "%.1f", Double($0.rowMaxBandRun) / scale))" }
                 .joined(separator: ",")
@@ -6764,7 +6890,7 @@ final class UICaptureTests: XCTestCase {
             let diagTones = diagRow >= 0 ? bandLuma(row: diagRow) : nil
             let topCandidates = candidates.sorted { $0.padding > $1.padding }.prefix(5)
                 .map { "r\($0.row):s\(String(format: "%.1f", Double($0.span) / scale))"
-                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink)"
+                    + ":c\(String(format: "%.2f", $0.coverage)):i\($0.ink):v\($0.verticalInk)"
                     + ":p\(String(format: "%.1f", $0.padding))"
                     + ":m\(String(format: "%.1f", Double($0.rowMaxBandRun) / scale))" }
                 .joined(separator: ",")
@@ -8500,6 +8626,43 @@ final class UICaptureTests: XCTestCase {
         XCTAssertNil(InlineCodeBandChoice.best([blockSegment], minSpan: 40, maxSpan: 150,
                                                minCoverage: 0.55, minInk: 6),
                      "只剩全宽块底碎片时必须是 nil，不许拿它冒充行内码带")
+    }
+
+    /// R476：ink 门读**带上下窗口**里的墨，不读"这一行有没有字"。
+    ///
+    /// runner dark 的四门分桶是 `过span=12 → 过coverage=12 → 过ink=1 → 过rowMax=0`：
+    /// 完整 99pt 的带只出现在文字上下的 padding 行（那一行自身 ink=0），文字行则被字形
+    /// 切短并落在 320pt 块底那一行（被 rowMax 排掉）。所以"这一行有字"这道门把真带整族砍掉。
+    /// 这一格用三个合成件钉住新语义：padding 行（本行 ink=0、窗口有字）必须能当选；
+    /// 窗口里也没有字的 padding 行必须仍被拒；文字行碎片不能凭 padding 抢走它。
+    func testInlineCodeBandChoiceReadsInkInTheVerticalWindow() {
+        let paddingRow = InlineCodeBandChoice.Candidate(
+            row: 10, left: 40, right: 159, coverage: 1.0, ink: 0,
+            padding: 6, rowMaxBandRun: 120, verticalInk: 80)
+        let textFragment = InlineCodeBandChoice.Candidate(
+            row: 11, left: 40, right: 79, coverage: 0.8, ink: 80,
+            padding: 2, rowMaxBandRun: 120)
+        XCTAssertEqual(InlineCodeBandChoice.best([paddingRow, textFragment],
+                                                 minSpan: 80, maxSpan: 300,
+                                                 minCoverage: 0.55, minInk: 24)?.row, 10,
+                       "完整带只在 padding 行上（ink=0、verticalInk=80）⇒ 它必须能当选，"
+                       + "不能被同一条带被字形切碎后的短 run 抢走")
+        let emptyPadding = InlineCodeBandChoice.Candidate(
+            row: 20, left: 40, right: 159, coverage: 1.0, ink: 0,
+            padding: 6, rowMaxBandRun: 120, verticalInk: 0)
+        XCTAssertNil(InlineCodeBandChoice.best([emptyPadding], minSpan: 80, maxSpan: 300,
+                                               minCoverage: 0.55, minInk: 24),
+                     "窗口里也没有字的 padding 行仍必须被拒 —— 这道门不是「有带就放行」")
+        // R476：对象是**整条带**，不是被字形切碎后 padding 虚高的碎片。
+        let wideBand = InlineCodeBandChoice.Candidate(
+            row: 1, left: 20, right: 118, coverage: 1.0, ink: 0,
+            padding: 6.0, rowMaxBandRun: 99, verticalInk: 80)
+        let narrowRich = InlineCodeBandChoice.Candidate(
+            row: 2, left: 20, right: 62, coverage: 1.0, ink: 0,
+            padding: 9.0, rowMaxBandRun: 99, verticalInk: 80)
+        XCTAssertEqual(InlineCodeBandChoice.best([narrowRich, wideBand], minSpan: 40, maxSpan: 300,
+                                                 minCoverage: 0.55, minInk: 24)?.row, 1,
+                       "实心带里取最宽的那条：碎片 padding 9 不能把整条 99pt 带的 6.0 挤掉")
     }
 
     /// R471：截断说明是**界面说明**，字号必须小于正文（不是最后一段内容）。
@@ -10753,6 +10916,12 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R476：快捷键冲突臂 —— 第一行被设成与第二行完全相同的 ⌃⌥C。
+        // 只多这一张成对帧：正常页没有冲突提示（既有 settings-shortcuts 逐字节不变）。
+        results.append(Fixture("settings-shortcuts-conflict", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .shortcuts,
+                                          showMainWindowShortcut: .defaultRepeatCopyShortcut))
+        })
         // R426：侧栏底部版本行的负臂 —— 同一页、同一个 store，只关掉底部那行。
         results.append(Fixture("settings-general-no-footer", NSSize(width: 720, height: 540)) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .general)
@@ -17023,6 +17192,8 @@ final class UICaptureTests: XCTestCase {
         // R145：录制态那张新帧也在 vibrancy 子树里 ⇒ 同一处合成前极性盲区（闸门实测把它点名，
         // 不是"顺手补名单"：`TEXT_SIDE_ROSTER_EXTRA` 的 vibrant 前提里有它）。
         "settings-shortcuts-recording",
+        // R476：冲突臂是同一棵 settings 侧栏 vibrant 子树（只是内容列多一行警告）⇒ 同一处盲区。
+        "settings-shortcuts-conflict",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：
         // 先看了那张帧（`/tmp/r39-crops/r39-settings-general-login-unsupported-dark-sidebar.png`）：
         // 暗档侧栏里"快捷键 / 隐私 / 推荐 / 数据 / 统计"五枚标签**黑字黑底看不见**，
@@ -18927,9 +19098,16 @@ final class UICaptureTests: XCTestCase {
                            + "（推荐屏多出来那两段是二级标题+按钮、说明段）。"
                            + "两种都不许靠改这条的期望数收场（段的位置在 CARD_ABOVE 那几行）")
         }
+        // R476：冲突提示是**有意**挂在卡片外的（它说的是三行之间的关系，不属于某一行）。
+        // 只对这一屏、只允许 1 段；其余屏仍然必须 0 段 —— 这不是把期望放宽到"有几段都行"。
+        let intentionalBelow: [String: Int] = [
+            "settings-shortcuts-conflict light": 1,
+            "settings-shortcuts-conflict dark": 1,
+        ]
         for key in belowRoster.keys.sorted() {
-            XCTAssertEqual(0, belowRoster[key]!,
-                           "\(key)：最后一张卡片之下、窗口底之上还读到 \(belowRoster[key]!) 段墨"
+            let expected = intentionalBelow[key] ?? 0
+            XCTAssertEqual(expected, belowRoster[key]!,
+                           "\(key)：最后一张卡片之下、窗口底之上读到 \(belowRoster[key]!) 段墨，期望 \(expected)"
                            + " ⇒ 卡片外面还压着裸内容（推荐屏那条 `Divider()` + "
                            + "「推荐反馈数据」标题 + 按钮就是这个形状）。"
                            + "上面「卡片之上必须恰好 1 段」这一格同时是这条的**正对照**："
