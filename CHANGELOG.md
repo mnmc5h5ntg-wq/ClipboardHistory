@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 文件兜底态补父目录路径（4 张旧帧变化、基线 294）+ 捕获路径缝 + R462/R463 旧表重锚（R478 / 第 477 轮 / Round 475 / U-1833…U-1838 · 产品 1 文件 + 判据）
+
+
 ### 浮层置顶行改用主列表同一枚图钉（2 张新帧、基线 294）+ inline padding 池/幻影 8 行/冲突 NOT-RUN（R477 / 第 476 轮 / Round 474 / U-1827…U-1832 · 产品 1 文件 + 判据 + 检测）
 
 

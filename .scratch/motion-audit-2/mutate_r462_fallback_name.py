@@ -6,20 +6,20 @@ ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 VIEW = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/DetailPreviewViews.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "testFallbackFileNameStaysInsideThePane"
-BLOCK = '''            Text(preview.url.lastPathComponent)
-                .font(.system(size: VisualFont.title))
-                // R462：长文件名不再从窗格左/右缘跑出去（也不再压右下角浮层）。
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .truncationMode(.middle)
-                .padding(.horizontal, 80)'''
+BLOCK = '''                Text(preview.url.lastPathComponent)
+                    .font(.system(size: VisualFont.title))
+                    // R462：长文件名不再从窗格左/右缘跑出去（也不再压右下角浮层）。
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .truncationMode(.middle)'''
 MUTATIONS = [
-    ("M1260", "撤掉文件名四修饰（回单行贴边）", VIEW, BLOCK,
-     '''            Text(preview.url.lastPathComponent)
-                .font(.system(size: VisualFont.title))''',
+    ("M1260", "负向证人：文件名四修饰已不是窗格边的承重墙（撤掉仍不越界；R478 的 VStack padding 掩蔽了它）",
+     VIEW, BLOCK,
+     '''                Text(preview.url.lastPathComponent)
+                    .font(.system(size: VisualFont.title))''',
      ["文件名左沿"]),
     ("M1261", "只撤内边距（名字仍贴边）", VIEW,
-     '                .padding(.horizontal, 80)',
+     '            .padding(.horizontal, 80)',
      '                .padding(.horizontal, 0)',
      ["文件名左沿"]),
 ]
@@ -64,7 +64,8 @@ def main():
     if code != "ESCAPED":
         raise SystemExit("预检失败 %s %s\n%s" % (FILTER, code, out[-1500:]))
     print("预检 OK " + FILTER)
-    caught = wrong = 0
+    matched = wrong = 0
+    expectations = {"M1260": "ESCAPED", "M1261": "CAUGHT"}
     for mid, desc, path, old, new, needles in MUTATIONS:
         stamp = time.time() + 2
         original = originals[path]
@@ -76,18 +77,20 @@ def main():
         finally:
             open(path, "w", encoding="utf-8").write(original)
             os.utime(path, (stamp + 1, stamp + 1))
+        expected = expectations.get(mid, "CAUGHT")
         hit = all(any(n in l for l in failed) or n in out for n in needles)
-        right = code == "CAUGHT" and hit and landed
-        caught += 1 if code == "CAUGHT" else 0
+        right = landed and ((expected == "CAUGHT" and code == "CAUGHT" and hit)
+                            or (expected == "ESCAPED" and code == "ESCAPED"))
+        matched += 1 if right else 0
         wrong += 0 if right else 1
-        print("%s %s ⇒ %s 红得对=%s 命中=%s 红在 %s 还原干净=%s"
-              % (mid, desc, code, right, hit, failed, read(path) == original))
+        print("%s %s ⇒ %s 期望=%s 命中=%s 红在 %s 还原干净=%s"
+              % (mid, desc, code, expected, hit, failed, read(path) == original))
     clean = all(read(p) == originals[p] for p in originals)
     code, _, _ = run(FILTER)
     print("还原后复跑：%s=%s" % (FILTER, code))
-    print("R462_FALLBACK_NAME_MUTATE 刀=%d CAUGHT=%d 红得不对=%d RESTORE_CLEAN=%s"
-          % (len(MUTATIONS), caught, wrong, "yes" if clean else "NO"))
-    return 0 if (caught == len(MUTATIONS) and wrong == 0 and clean and code == "ESCAPED") else 1
+    print("R462_FALLBACK_NAME_MUTATE 臂=%d 符合期望=%d 红得不对=%d RESTORE_CLEAN=%s"
+          % (len(MUTATIONS), matched, wrong, "yes" if clean else "NO"))
+    return 0 if (matched == len(MUTATIONS) and wrong == 0 and clean and code == "ESCAPED") else 1
 
 
 if __name__ == "__main__":

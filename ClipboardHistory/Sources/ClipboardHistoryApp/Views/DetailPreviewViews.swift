@@ -249,6 +249,9 @@ struct DetailLoadingView: View {
 }
 
 struct DetailFileView: View {
+    /// R478：帧基线用的显示路径（产品路径永远由 `url` 派生）；夹具用稳定的用户路径，
+    /// 否则捕获目录的 `/var/folders/...` 会把每一跑都写成不同的帧。
+    @Environment(\.fallbackParentPathForCapture) private var fallbackParentPathForCapture
     let url: URL
     let thumbnail: StoredImage?
     /// 详情头部那颗「原文 / 渲染」的当前值。
@@ -440,13 +443,24 @@ struct DetailFileView: View {
                     // 非文本图形取 secondary（3.95/5.9:1），仍是"空占位"但不装死。
                     .foregroundStyle(Color(nsColor: .secondaryLabelColor))
             }
-            Text(preview.url.lastPathComponent)
-                .font(.system(size: VisualFont.title))
-                // R462：长文件名不再从窗格左/右缘跑出去（也不再压右下角浮层）。
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .truncationMode(.middle)
-                .padding(.horizontal, 80)
+            VStack(spacing: 4) {
+                Text(preview.url.lastPathComponent)
+                    .font(.system(size: VisualFont.title))
+                    // R462：长文件名不再从窗格左/右缘跑出去（也不再压右下角浮层）。
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .truncationMode(.middle)
+                // R478：兜底态不再只重复一遍文件名（头部已经有一份）—— 补上"它在哪"。
+                // 长路径中间截断，保持文件名完整；与文件名同一条中轴。
+                Text(fallbackParentPathForCapture
+                     ?? preview.url.deletingLastPathComponent().path)
+                    .font(.system(size: VisualFont.meta))
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 80)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -481,5 +495,18 @@ struct DetailFileView: View {
         guard !Task.isCancelled, generation == loadGeneration else { return }
         previewState = result
         loadingHandle = nil
+    }
+}
+
+
+/// R478：兜底态父目录的**帧基线显示值**。产品路径永远从 `url` 派生；只有夹具写这个键。
+struct FallbackParentPathForCaptureKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var fallbackParentPathForCapture: String? {
+        get { self[FallbackParentPathForCaptureKey.self] }
+        set { self[FallbackParentPathForCaptureKey.self] = newValue }
     }
 }

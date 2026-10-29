@@ -6,12 +6,24 @@ ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 VIEW = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Views/DetailPreviewViews.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "testFallbackPlaceholderIconIsVisible"
-NEEDLE = "                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))"
+NEEDLE = ("                Image(systemName: \"doc.fill\")\n"
+          "                    .font(.system(size: VisualGlyph.placeholder))\n"
+          "                    // R463：quaternary 在亮/暗只有 1.25/1.34:1，占位图标等于没有；\n"
+          "                    // 非文本图形取 secondary（3.95/5.9:1），仍是\"空占位\"但不装死。\n"
+          "                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))")
 MUTATIONS = [
     ("M1262", "占位图标回 quaternary（1.25/1.34:1）", VIEW, NEEDLE,
-     "                    .foregroundStyle(.quaternary)", ["占位图标对比"]),
+     ("                Image(systemName: \"doc.fill\")\n"
+      "                    .font(.system(size: VisualGlyph.placeholder))\n"
+      "                    // R463：quaternary 在亮/暗只有 1.25/1.34:1，占位图标等于没有；\n"
+      "                    // 非文本图形取 secondary（3.95/5.9:1），仍是\"空占位\"但不装死。\n"
+      "                    .foregroundStyle(.quaternary)"), ["占位图标对比"]),
     ("M1263", "占位图标降 tertiary", VIEW, NEEDLE,
-     "                    .foregroundStyle(.tertiary)", ["占位图标对比"]),
+     ("                Image(systemName: \"doc.fill\")\n"
+      "                    .font(.system(size: VisualGlyph.placeholder))\n"
+      "                    // R463：quaternary 在亮/暗只有 1.25/1.34:1，占位图标等于没有；\n"
+      "                    // 非文本图形取 secondary（3.95/5.9:1），仍是\"空占位\"但不装死。\n"
+      "                    .foregroundStyle(.tertiary)"), ["占位图标对比"]),
 ]
 
 

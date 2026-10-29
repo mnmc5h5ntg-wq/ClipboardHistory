@@ -1242,6 +1242,82 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R478 · 文件兜底态的所在路径
+
+    /// R478：非视频文件的兜底态不再只重复文件名（详情头部已经有一份），要说出**它在哪**。
+    ///
+    /// 判据读同一张帧：先找图标带，再在它下面找**最宽的一行墨**——文件名 `notes.xyz` 约 60pt，
+    /// 父目录 `/Users/tester/Desktop` 约 120pt+。旧形状里这一行不存在，最宽行就是文件名本身。
+    /// 刀把路径那一段删掉/置空，这一格会红；它不靠"多了一行"数行数（4pt 间距在 1x 可能粘行）。
+    func testFallbackFileShowsWhereTheFileLives() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r478-fallback-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-file-fallback-nothumb" }) else {
+                return XCTFail("\(tag)：找不到 detail-file-fallback-nothumb ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("fallback-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：读不回刚拍的帧")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func isInk(_ x: Int, _ y: Int) -> Bool {
+                let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                let luma = 0.2126 * Double(base[i + rOff])
+                    + 0.7152 * Double(base[i + rOff + 1])
+                    + 0.0722 * Double(base[i + rOff + 2])
+                return abs(Int(luma.rounded()) - page) >= 60
+            }
+            let x0 = Int(Double(rep.pixelsWide) * 0.10)
+            let x1 = Int(Double(rep.pixelsWide) * 0.90)
+            // 图标带：从 10% 高度起的第一段连续墨行。
+            var iconBottom = -1
+            var seenIcon = false, inBand = false
+            for y in Int(Double(rep.pixelsHigh) * 0.10)..<rep.pixelsHigh {
+                let has = (x0..<x1).contains { isInk($0, y) }
+                if has { inBand = true; seenIcon = true; iconBottom = y }
+                else if inBand && seenIcon { break }
+            }
+            guard seenIcon else {
+                emit("FALLBACK_PATH_NOT_RUN=icon-band-empty \(tag)")
+                continue
+            }
+            var widest = 0, widestY = -1
+            for y in (iconBottom + Int(2.0 * scale))..<rep.pixelsHigh {
+                var first = -1, last = -1
+                for x in x0..<x1 where isInk(x, y) {
+                    if first < 0 { first = x }
+                    last = x
+                }
+                if first >= 0 && last - first + 1 > widest {
+                    widest = last - first + 1
+                    widestY = y
+                }
+            }
+            let widestPt = Double(widest) / scale
+            emit("FALLBACK_PATH \(tag) 图标底=\(iconBottom)px 下方最宽行 y=\(widestY)px"
+                 + " 宽=\(String(format: "%.1f", widestPt))pt 页底=\(page)"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(widestPt, 90.0,
+                "\(tag)：图标下方最宽的一行只有 \(String(format: "%.1f", widestPt))pt ⇒ "
+                + "兜底态没有画出父目录（旧形状里这一行就是文件名本身，约 60pt）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到图标带")
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
@@ -10822,12 +10898,14 @@ final class UICaptureTests: XCTestCase {
         // R462：不支持类型的 fallback 预览 —— 长文件名。
         results.append(Fixture("detail-file-fallback-longname", NSSize(width: 600, height: 440),
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
-            AnyView(DetailView(historyStore: self.makeFallbackStore()))
+            AnyView(DetailView(historyStore: self.makeFallbackStore())
+                .environment(\.fallbackParentPathForCapture, "/Users/tester/Desktop"))
         })
         // R463：不支持文件且**没有缩略图** —— 占位图标必须看得见。
         results.append(Fixture("detail-file-fallback-nothumb", NSSize(width: 600, height: 440),
                                settle: { RunLoop.current.run(until: Date().addingTimeInterval(1.2)) }) {
-            AnyView(DetailView(historyStore: self.makeFallbackNoThumbStore()))
+            AnyView(DetailView(historyStore: self.makeFallbackNoThumbStore())
+                .environment(\.fallbackParentPathForCapture, "/Users/tester/Desktop"))
         })
         // R465：视频播放控件 —— 真实 .mov 走播放器。
         results.append(Fixture("detail-file-video-controls", NSSize(width: 600, height: 440),

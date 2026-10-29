@@ -8148,3 +8148,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：三处修复的 runner 复验未做（R477 跑随提交）⇒ NOT-RUN；冲突提示在平涂的 runner 上预期 skip。
 - 回滚：删图钉徽标/恢复 rowTitle 前缀；inline 去掉 padding 池会退回 102/1.0 的假对象；幻影下限回 4 会重新误报 1x 分隔线。
 
+## D-475 文件兜底态补父目录；帧里不许出现捕获目录的临时路径；旧刀被新 padding 掩蔽时退役为负向证人（R478）
+
+- 背景：兜底态只重复文件名（头部已有一份），用户看不到文件在哪；第一版直接用 `url` 父目录，帧里出现 `/var/folders/...`，每一跑都不同，无法基线化；R478 把文件名包进 VStack 后，R462 的 M1260（撤四修饰）不再越界。
+- 决定：`DetailFileView.fallbackView` 在文件名下补父目录（11pt、secondaryLabelColor、单行中间截断、同中轴）；加捕获缝 `fallbackParentPathForCapture`（产品默认 nil 读真实路径，夹具写 `/Users/tester/Desktop`）；R462 的 M1260 期望改为 ESCAPED 并注明被 VStack padding 掩蔽，M1261 仍 CAUGHT；R463 M1262/M1263 重锚到带图标的整段。
+- 理由：位置是兜底态唯一缺的信息；帧基线必须确定（临时路径不可入帧）；刀不咬时不能硬凑 CAUGHT，要么换被测对象，要么诚实退役。
+- 兼容性/迁移：4 张旧帧变化、0 新增，基线 294 同笔更新；捕获缝只在夹具写，产品路径不变。
+- 边界：兜底路径的 runner 1x/dark 未签收；R477 的 inline/phantom/pin/conflict runner 复验仍未读到。
+- 回滚：删路径行、判据与捕获缝；R462 表恢复 M1260 为 CAUGHT 会回到"刀被掩蔽却假装有牙"。
+
