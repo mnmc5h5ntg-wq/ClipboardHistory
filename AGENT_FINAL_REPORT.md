@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R492**（commit `a90b074`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R492 那一节为准。上一笔动 `Sources/` 的是 R491（`83e2087`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R493**（commit `67cb683`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R493 那一节为准。上一笔动 `Sources/` 的是 R492（`a90b074`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1402,5 +1402,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R492（开机启动失败回执图标位）**：失败回执只有红字，横幅/回执都有图标。`if let message` 改 HStack，`lastActionFailed` 时在文字左侧加 11pt `exclamationmark.triangle.fill`（同错误色），不支持说明不加；加捕获缝。**2 张旧帧 + 2 张新帧**，基线 **314→316**；`LOGIN_FAILURE_ICON` light 2374→2631（+257）、dark 2119→2366（+247）；M1329/M1330 2/2；R384 M1015 重锚 CAUGHT；R39 表 M177/M178 重锚后 8/8。第一版“最左红左移”断言实测 0/-1px ⇒ 删掉、只数红像素；新负向帧补进复选框首墨名册。⓪ push no-op、ahead=0；R490 主跑仅 Release 3 条 + HISTORY_SOURCE_ICON 1x 签收、补记跑 success；R491 主跑仅 Release 3 条 + Motion 已知 1<1、补记跑 success（QUICKPICK_CONTENT_BADGE 1x 54→72/50→66 签收）；R492 跑 40880105650 in_progress ⇒ NOT-RUN。全量 **1308/56/0**（568.7s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R493（恢复默认按钮图标位）**：数据页按钮已有图标，快捷键/推荐「恢复默认」仍纯文字。两处改用 `Label("恢复默认", systemImage: "arrow.counterclockwise")`，标签不改，加捕获缝。**18 张旧帧 + 2 张新帧**，基线 **316→318**；`RESET_ICON` light 3057→3507（+450）、dark 3636→4101（+465）；M1331/M1332 2/2；MotionDriver 权重复位尺按 closure-label 重锚后通过。⓪ push no-op、ahead=0；R492 两跑均 failure（主跑 Release 3 条 + Motion 2 条；补记跑仅 Motion 2 条）；LOGIN_FAILURE_ICON NOT_RUN=no-red-channel。全量 **1309/56/0**（525.8s）；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R493（恢复默认按钮图标位）**：数据页按钮已有图标，快捷键/推荐「恢复默认」仍纯文字。两处改用 `Label("恢复默认", systemImage: "arrow.counterclockwise")`，标签不改，加捕获缝。**18 张旧帧 + 2 张新帧**，基线 **316→318**；`RESET_ICON` light 3057→3507（+450）、dark 3636→4101（+465）；M1331/M1332 2/2；MotionDriver 权重复位尺按 closure-label 重锚后通过。⓪ 开工 push no-op、ahead=0；收口 push e754cf7..67cb683 success、ahead=0；R493 跑 40887758385 in_progress ⇒ NOT-RUN；R492 两跑均 failure（主跑 Release 3 条 + Motion 2 条；补记跑仅 Motion 2 条）；LOGIN_FAILURE_ICON NOT_RUN=no-red-channel。全量 **1309/56/0**（525.8s）；build 0 告警；换装 ok/397=397；电池 683/5。
 
