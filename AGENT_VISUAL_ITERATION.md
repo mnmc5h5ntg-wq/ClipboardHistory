@@ -19568,7 +19568,7 @@ OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTex
 
 ## Round 473 · R476（第 475 轮 · 2026-10-29）：设置快捷键补冲突提示（2 张新帧、基线 292）+ inline ink 门改读垂直窗口、选择器取最宽实心带 + 幻影填充块下限按倍率
 
-设置页三行快捷键可以设成同一组键，两组都真的注册过而系统只递一个 —— 另一行按下去没有反应，界面不说。新纯函数 `ShortcutConflictPolicy.conflicts` 两两对账，`SettingsView` 在卡片下方画橙色警告（图标 + 一句话，accessibilityIdentifier）。2 张新帧、0 张既有帧变化，基线 290→292；`SHORTCUT_CONFLICT` 负臂末墨行 582→660px、下方橙像素 221/230、负臂橙 0；M1293/M1294 2/2。靶指定的 inline 检测按 R475 跑四门分桶（dark 442/12/12/1/0）定位：真带只在文字上下 padding 行（本行 ink=0），旧 ink 门把整族砍掉 ⇒ `verticalInk` 门 + "实心带里取最宽"（local dark 恢复 99/92.5/6.5，四门 35/35/35/35），M1295/M1296 2/2。幻影填充下限按倍率（1x 4 行/2x 7 行）修 R474 分隔线在 1x 的 396px 误报。预检 257/239/653、rot 344/1070、ARM 350/1136。全量 1292/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ push 348e75e..638eeff success、ahead=0；R475 跑 failure 3 步（inline/phantom + Motion 回执 1<2），QUICKPICK_LIST_RULE 1x 6/6、ROW_OCR_BADGE 1x 签收。
+设置页三行快捷键可以设成同一组键，两组都真的注册过而系统只递一个 —— 另一行按下去没有反应，界面不说。新纯函数 `ShortcutConflictPolicy.conflicts` 两两对账，`SettingsView` 在卡片下方画橙色警告（图标 + 一句话，accessibilityIdentifier）。2 张新帧、0 张既有帧变化，基线 290→292；`SHORTCUT_CONFLICT` 负臂末墨行 582→660px、下方橙像素 221/230、负臂橙 0；M1293/M1294 2/2。靶指定的 inline 检测按 R475 跑四门分桶（dark 442/12/12/1/0）定位：真带只在文字上下 padding 行（本行 ink=0），旧 ink 门把整族砍掉 ⇒ `verticalInk` 门 + "实心带里取最宽"（local dark 恢复 99/92.5/6.5，四门 35/35/35/35），M1295/M1296 2/2。幻影填充下限按倍率（1x 4 行/2x 7 行）修 R474 分隔线在 1x 的 396px 误报。预检 257/239/653、rot 344/1070、ARM 350/1136。全量 1292/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ 开工 push 348e75e..638eeff success、ahead=0；收口 push 638eeff..599ec98 success、ahead=0；R475 跑 failure 3 步（inline/phantom + Motion 回执 1<2），QUICKPICK_LIST_RULE 1x 6/6、ROW_OCR_BADGE 1x 签收；R476 跑 40791382232↔599ec98 in_progress ⇒ NOT-RUN。
 
 **七维度自评**（恰七行，每格 n/15）：
 
