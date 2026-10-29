@@ -1,5 +1,5 @@
 {
-  "count": 302,
+  "count": 304,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -149,6 +149,8 @@
     "quickpick-cross-year-420x300-light.png": "dadf3a5c5d0520a630a03be0b84940d7809b9229129f8c9122182e8f5511fa76",
     "quickpick-empty-420x300-dark.png": "24902051c0bd74e9410b9f6de54913e9614dd48f2335d31497e8bc9ea2f9f66f",
     "quickpick-empty-420x300-light.png": "edf0294afbb5cc4f8e5577eb53a1d5cdf768f6fe528f13747139c7cc33193f50",
+    "quickpick-favorite-420x300-dark.png": "50652e7a93c81ebbb8dcb5243d40dd5ea85ba198ad823d15013f16eaa0f6f9eb",
+    "quickpick-favorite-420x300-light.png": "6b562769e58abb5b63365b88ae19c022be30878e8bf19e42d033e57edba0166c",
     "quickpick-hover-420x300-dark.png": "15c8efc4c6c4edad5032131981ddb0e6f01faedc004e7a249368e534a154ed96",
     "quickpick-hover-420x300-light.png": "e673110cba24fcd951f036130fd4ae3d1f2e0a832c9b66e748d2deb3c028fce8",
     "quickpick-list-420x300-dark.png": "dc23f3bf596e3c6808c0578c379d77c5a513eb55e32f182dc725dae8e84a94eb",

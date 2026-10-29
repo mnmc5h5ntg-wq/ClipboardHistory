@@ -1242,6 +1242,84 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R485 · 浮层候选行的已收藏状态
+
+    /// R485：主列表每行都用星标说「已收藏」，浮层候选行却什么都不说 —— 同一条记录在两种列表里
+    /// 有两种可见性（置顶、来源、时间都有标记，唯独收藏没有）。成对帧
+    /// `quickpick-no-source` / `quickpick-favorite` 同内容、同时间、同来源，只差 isFavorite。
+    /// 判据：① 负臂类型列有墨（尺有对象）；② 正臂多出星形墨（≥8·s²）；
+    /// ③ 正臂首墨行比负臂高（星在类型符号**上方**，不是又一颗图钉或标题前缀）；
+    /// ④ 标题末列不动（叠层不占布局）。颜色不作证：只数墨。
+    func testQuickPickFavoriteRowsCarryAStarBadge() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r485-favorite-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let negative = fixtures.first(where: { $0.name == "quickpick-no-source" }),
+                  let positive = fixtures.first(where: { $0.name == "quickpick-favorite" }) else {
+                return XCTFail("\(tag)：找不到 quickpick-no-source / quickpick-favorite 夹具 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, top: Int, titleLast: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else {
+                    throw NSError(domain: "QUICKPICK_FAVORITE", code: 1)
+                }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                let y0 = Int(45.0 * scale), y1 = min(rep.pixelsHigh, Int(100.0 * scale))
+                let leadingX0 = Int(20.0 * scale), leadingX1 = Int(60.0 * scale)
+                let titleX0 = Int(65.0 * scale), titleX1 = Int(250.0 * scale)
+                var ink = 0, top = rep.pixelsHigh, titleLast = -1
+                for y in y0..<y1 {
+                    for x in leadingX0..<leadingX1 where isInk(x, y) {
+                        ink += 1
+                        top = min(top, y)
+                    }
+                    for x in titleX0..<titleX1 where isInk(x, y) {
+                        titleLast = max(titleLast, x)
+                    }
+                }
+                return (ink, top, titleLast, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            let rise = neg.top - pos.top
+            emit("QUICKPICK_FAVORITE \(tag) 负臂类型列墨=\(neg.ink) 正臂类型列墨=\(pos.ink)"
+                 + " 差=\(pos.ink - neg.ink) 负臂首墨行=\(neg.top) 正臂首墨行=\(pos.top)"
+                 + " 上移=\(rise)px 标题末列差=\(pos.titleLast - neg.titleLast)px"
+                 + " 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂类型符号那一列一个墨都没有 ⇒ 尺没有对象，先查捕获通道")
+            XCTAssertGreaterThan(pos.ink - neg.ink, Int(8.0 * scale * scale),
+                "\(tag)：正臂只多出 \(pos.ink - neg.ink) 个墨像素 ⇒ 已收藏的星标没有画在类型符号那一列")
+            XCTAssertGreaterThanOrEqual(rise, Int(2.0 * scale),
+                "\(tag)：正臂首墨行只上移 \(rise)px ⇒ 星不在类型符号上方（可能画成了第二颗图钉或标题前缀）")
+            XCTAssertLessThanOrEqual(abs(pos.titleLast - neg.titleLast), Int(3.0 * scale),
+                "\(tag)：标题末列差 \(pos.titleLast - neg.titleLast)px ⇒ 星标挤了标题（叠层不许占布局）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R478 · 文件兜底态的所在路径
 
     /// R478：非视频文件的兜底态不再只重复文件名（详情头部已经有一份），要说出**它在哪**。
@@ -10714,6 +10792,11 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("quickpick-pinned", NSSize(width: 420, height: 300)) {
             AnyView(EmptyView())
         }.withAppKit(QuickPickCapturePanel.builder(store: self.makePinnedQuickPickStore(), query: "")))
+        // R485：同一条内容、同一个时间，只把 isFavorite 打开 —— 与 quickpick-no-source 成对。
+        // 主列表每行都用星标说「已收藏」，浮层以前没有这一格；这张帧就是那条状态的证人。
+        results.append(Fixture("quickpick-favorite", NSSize(width: 420, height: 300)) {
+            AnyView(EmptyView())
+        }.withAppKit(QuickPickCapturePanel.builder(store: self.makeFavoriteQuickPickStore(), query: "")))
         // R469：跨年时间的主列表行组件栈（不走 List：选中底在离屏通道是黑带，
         // 会盖住其中一行的时间行；这里只拍产品行本身 + timeReference）。
         results.append(Fixture("rows-cross-year", NSSize(width: 340, height: 160)) {
@@ -16138,6 +16221,23 @@ final class UICaptureTests: XCTestCase {
             sourceURL: nil,
             sourceUTIs: ["public.utf8-plain-text"],
             isPinned: true
+        )
+        return HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(entriesToLoad: [entry]),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+    }
+
+    /// R485：与 `makeNoSourceQuickPickStore` 同内容/同时间，只把 isFavorite 打开。
+    func makeFavoriteQuickPickStore() -> HistoryStore {
+        let entry = ClipboardEntry(
+            content: .text("没有来源的记录"),
+            timestamp: Self.referenceDate,
+            thumbnail: nil,
+            sourceURL: nil,
+            isFavorite: true,
+            sourceUTIs: ["public.utf8-plain-text"]
         )
         return HistoryStore(
             clipboardWriter: TestClipboardWriter(),

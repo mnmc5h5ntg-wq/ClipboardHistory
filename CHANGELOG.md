@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层候选行补「已收藏」星标（2 张新帧、基线 304）（R485 / 第 484 轮 / Round 482 / U-1869…U-1874 · 产品 1 文件 + 判据）
+
+
 ### 热图「今天」格补右上角标（8 张旧帧变化 + 2 张新帧、基线 302）（R484 / 第 483 轮 / Round 481 / U-1863…U-1868 · 产品 1 文件 + 判据）
 
 

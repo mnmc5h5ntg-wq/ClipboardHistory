@@ -755,16 +755,27 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             pinnedBadge.translatesAutoresizingMaskIntoConstraints = false
             pinnedBadge.isHidden = true
             pinnedBadge.identifier = NSUserInterfaceItemIdentifier("quickPickPinnedBadge")
+            // R485：主列表每一行都用星标说「已收藏」，浮层以前一个字都不说。
+            // 与图钉分占类型符号的右上/右下两角：两枚都是叠层，不占固定槽、不挤标题与时间。
+            let favoriteBadge = NSImageView()
+            favoriteBadge.imageScaling = .scaleProportionallyDown
+            favoriteBadge.contentTintColor = FavoriteTogglePresentation.favoriteNSColor
+            favoriteBadge.setAccessibilityElement(false)
+            favoriteBadge.translatesAutoresizingMaskIntoConstraints = false
+            favoriteBadge.isHidden = true
+            favoriteBadge.identifier = NSUserInterfaceItemIdentifier("quickPickFavoriteBadge")
             let cell = QuickPickRowCell()
             cell.addSubview(symbol)
             cell.addSubview(sourceIcon)
             cell.addSubview(pinnedBadge)
+            cell.addSubview(favoriteBadge)
             cell.addSubview(text)
             cell.addSubview(time)
             cell.textField = text
             cell.imageView = symbol
             cell.sourceIcon = sourceIcon
             cell.pinnedBadge = pinnedBadge
+            cell.favoriteBadge = favoriteBadge
             cell.timeField = time
             text.translatesAutoresizingMaskIntoConstraints = false
             time.translatesAutoresizingMaskIntoConstraints = false
@@ -778,6 +789,10 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
                 pinnedBadge.bottomAnchor.constraint(equalTo: symbol.bottomAnchor, constant: 3),
                 pinnedBadge.widthAnchor.constraint(equalToConstant: 9),
                 pinnedBadge.heightAnchor.constraint(equalToConstant: 9),
+                favoriteBadge.trailingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 2),
+                favoriteBadge.topAnchor.constraint(equalTo: symbol.topAnchor, constant: -3),
+                favoriteBadge.widthAnchor.constraint(equalToConstant: 9),
+                favoriteBadge.heightAnchor.constraint(equalToConstant: 9),
                 sourceIcon.leadingAnchor.constraint(equalTo: symbol.trailingAnchor, constant: 6),
                 sourceIcon.widthAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
                 sourceIcon.heightAnchor.constraint(equalToConstant: QuickPickController.symbolSide),
@@ -794,11 +809,19 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
         }()
         let entry = rows[row].entry
         cell.textField?.stringValue = rows[row].title
-        // R477：标题里不再有「置顶」两个字，读屏仍要听见它（图形徽标对读屏是噪音）。
-        cell.textField?.setAccessibilityLabel(entry.isPinned ? "置顶 \(rows[row].title)" : rows[row].title)
+        // R477/R485：标题里不再有「置顶」「收藏」两个字，读屏仍要听见它们（图形徽标对读屏是噪音）。
+        var accessibilityLabel = rows[row].title
+        if entry.isPinned { accessibilityLabel = "置顶 " + accessibilityLabel }
+        if entry.isFavorite { accessibilityLabel = "收藏 " + accessibilityLabel }
+        cell.textField?.setAccessibilityLabel(accessibilityLabel)
         cell.pinnedBadge?.isHidden = !entry.isPinned
         cell.pinnedBadge?.image = entry.isPinned
             ? NSImage(systemSymbolName: "pin.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
+            : nil
+        cell.favoriteBadge?.isHidden = !entry.isFavorite
+        cell.favoriteBadge?.image = entry.isFavorite
+            ? NSImage(systemSymbolName: "star.fill", accessibilityDescription: nil)?
                 .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 8, weight: .semibold))
             : nil
         cell.timeField?.stringValue = Self.rowTime(for: entry,
@@ -937,6 +960,8 @@ private final class QuickPickRowCell: NSTableCellView {
     var sourceIcon: NSImageView?
     /// R477：置顶徽标（叠在类型符号右下角，不占固定槽）。
     var pinnedBadge: NSImageView?
+    /// R485：收藏徽标（叠在类型符号右上角，与图钉错开）。
+    var favoriteBadge: NSImageView?
 }
 
 /// 浮层的一行，多出来的只有一件事：**悬停那一档**（R67）。

@@ -33,6 +33,10 @@ enum FavoriteTogglePresentation {
     /// 两边都过"可交互控件 ≥3:1"。深浅两态共用一个色值，因为这一版在两种底色下都达标 ——
     /// 换底色或换行高时要重新量，别把这个数当常数。
     static var favoriteColor: Color { Color(red: 0.86, green: 0.45, blue: 0.0) }
+
+    /// AppKit 的浮层行徽标（R485）与 SwiftUI 的行内星标必须是同一个色值。
+    /// 两个数各写一份的话，改一处忘一处，浮层与主列表会慢慢变成两种橙。
+    static var favoriteNSColor: NSColor { NSColor(favoriteColor) }
 }
 
 /// 固定（置顶且不参与清理）的呈现。行内徽标、详情浮层按钮、表头批量按钮共用一份符号与文案 ——
