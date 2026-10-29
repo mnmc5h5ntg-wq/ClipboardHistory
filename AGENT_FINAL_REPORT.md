@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R494**（commit `590ead8`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R494 那一节为准。上一笔动 `Sources/` 的是 R493（`67cb683`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R495**（commit `9e72947`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R495 那一节为准。上一笔动 `Sources/` 的是 R494（`590ead8`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1406,5 +1406,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R494（主侧栏标题图标位）**：设置页标题与设置分类行都有图标，主窗口侧栏标题「时间剪史」只有一行字。`HistorySidebarView.header` 在标题前加 `clock.arrow.circlepath`（title 字号 semibold、secondary、读屏隐藏），加捕获缝。**48 张旧帧 + 2 张新帧**，基线 **318→320**；`MAIN_TITLE_ICON` light 1772→2050（+278）、dark 14213→14487（+274）；M1335/M1336 2/2。⓪ 开工 PUSH_BLOCKED=network（HEAD=`0e461b7`、origin/main=`67cb683`、ahead=1）、CI_READ_BLOCKED；收口 push `67cb683..590ead8` success、ahead=0；R493 跑 in_progress、R494 跑 `40895877246` queued ⇒ NOT-RUN。全量 1310/56/0；build 0 告警；换装 ok/397=397；电池 683/5。
 
-- **R495（通用页说明字号位）**：回执/暂停/OCR 三条 10pt `.caption`、RTF 11pt `meta`，同页同角色两种字号。三条改 `settingsHelperFont`（默认 11，缝 false=10），RTF 保持 11；并修 R494 批量态标题图标挤占（250pt 恢复「已选 3 条」）。**14 张旧帧 + 2 张新帧**，基线 **320→322**；`SETTINGS_HELPER_FONT` 正臂极差 0.5、负臂 1.0/1.5；M1337/M1338 2/2；重锚 M1335/M132/M177/M141 ⇒ R494 2/2、R29d 4/4（M133 退役）、R39 8/8、R33 7/7。⓪ push no-op、ahead=0；R493 跑 2 步红；R494 两跑 NOT-RUN；收口 CI_READ_BLOCKED=network。全量 1311/56/0；build 0 告警；换装 ok/397=397；电池 683/5。
+- **R495（通用页说明字号位）**：回执/暂停/OCR 三条 10pt `.caption`、RTF 11pt `meta`，同页同角色两种字号。三条改 `settingsHelperFont`（默认 11，缝 false=10），RTF 保持 11；并修 R494 批量态标题图标挤占（250pt 恢复「已选 3 条」）。**14 张旧帧 + 2 张新帧**，基线 **320→322**；`SETTINGS_HELPER_FONT` 正臂极差 0.5、负臂 1.0/1.5；M1337/M1338 2/2；重锚 M1335/M132/M177/M141 ⇒ R494 2/2、R29d 4/4（M133 退役）、R39 8/8、R33 7/7。⓪ push no-op、ahead=0；R493 跑 2 步红；R494 两跑 NOT-RUN；收口 CI_READ_BLOCKED=network、PUSH_BLOCKED=network（HEAD=`9e72947`、origin/main=`e05b13c`、ahead=1）。全量 1311/56/0；build 0 告警；换装 ok/397=397；电池 683/5。
 

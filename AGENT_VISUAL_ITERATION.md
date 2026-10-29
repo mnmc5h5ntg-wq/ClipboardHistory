@@ -19910,7 +19910,7 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ## Round 492 · R495（第 494 轮 · 2026-10-30）：通用页说明统一 11pt（14 旧帧 + 2 新帧、基线 322）
 
-同一页四条说明：回执/暂停/OCR 是 10pt `.caption`，RTF 是 11pt `meta`，而 11 是 App 下限。三条改 `settingsHelperFont`（默认 meta=11，缝 false=10 作负向臂），RTF 保持 11。14 张旧帧变化 + 2 张新帧，基线 320→322；`SETTINGS_HELPER_FONT` light 正臂极差 0.5 / 负臂 1.0、dark 0.5 / 1.5；M1337/M1338 2/2。同时修 R494 批量态标题图标挤占（250pt 恢复「已选 3 条」）。重锚 M1335/M132/M177/M141 并复跑 R494 2/2、R29d 4/4（M133 退役）、R39 8/8、R33 7/7。预检 276/253/680、rot 363/1106、ARM 369/1167。全量 1311/56/0；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push no-op、ahead=0；R493 跑 2 步红（Release 3 条 + 采样 1 条）；R494 两跑 NOT-RUN；收口 `CI_READ_BLOCKED=network`。
+同一页四条说明：回执/暂停/OCR 是 10pt `.caption`，RTF 是 11pt `meta`，而 11 是 App 下限。三条改 `settingsHelperFont`（默认 meta=11，缝 false=10 作负向臂），RTF 保持 11。14 张旧帧变化 + 2 张新帧，基线 320→322；`SETTINGS_HELPER_FONT` light 正臂极差 0.5 / 负臂 1.0、dark 0.5 / 1.5；M1337/M1338 2/2。同时修 R494 批量态标题图标挤占（250pt 恢复「已选 3 条」）。重锚 M1335/M132/M177/M141 并复跑 R494 2/2、R29d 4/4（M133 退役）、R39 8/8、R33 7/7。预检 276/253/680、rot 363/1106、ARM 369/1167。全量 1311/56/0；build 0 告警；换装 ok/397=397；电池 683/5。⓪ push no-op、ahead=0；R493 跑 2 步红（Release 3 条 + 采样 1 条）；R494 两跑 NOT-RUN；收口 `CI_READ_BLOCKED=network`、`PUSH_BLOCKED=network`（HEAD=`9e72947`、origin/main=`e05b13c`、ahead=1）。
 
 **七维度自评**（恰七行，每格 n/15）：
 
