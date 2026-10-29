@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R477**（commit `0fd3ec0`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R477 那一节为准。上一笔动 `Sources/` 的是 R476（`599ec98`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R478**（commit `b64682e`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R478 那一节为准。上一笔动 `Sources/` 的是 R477（`0fd3ec0`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1366,7 +1366,7 @@ R199 那八跑连红如果继续被推到"下一轮再读"，就会有一张免�
 
 - **R477（浮层置顶图钉位 + 按 R476 跑修检测）**：主列表早已用 `pin.fill` 说“已固定”，浮层却把「置顶」写进标题。`rowTitle` 去前缀，类型符号右下角叠 9pt 图钉（不占固定槽）；**2 张新帧、0 张既有帧变化**，基线 **292→294**；`QUICKPICK_PIN` 类型列墨 215→319 / 233→338（+104/+105），标题末列 320→320；M1297/M1298 **2/2**。按 R476 跑分桶（dark 442/12/12/12/11）修检测：light 选中 102/101/1.0 的宽带 ⇒ `best` 先留 padding≥4.5 的候选再取最宽实心带（本机恢复 98.5/92.5/6.0 与 99/92.5/6.5；M1299 CAUGHT）；幻影块下限 4→8 行（1x 分隔线 5 行 396px）；冲突提示在设置内容平涂时改 `SHORTCUT_CONFLICT_NOT_RUN`。⓪ push `599ec98..3339baf` success、ahead=0；R476 跑 failure 3 步已读；R477 跑 `40797827495↔0fd3ec0` in_progress ⇒ NOT-RUN；QUICKPICK_LIST_RULE 1x 6/6、ROW_OCR_BADGE 1x 签收；436 5/5/77 reds=0。全量 **1294/56/0**（472.2s）；build 0 告警；换装 ok/SHA_MATCH=1/387=387；电池 683/5。
 
-- **R478（兜底态所在路径位）**：兜底态只重复文件名（详情头部已有一份），用户看不到文件在哪。`DetailFileView.fallbackView` 在文件名下补一行父目录（11pt、secondary、单行中间截断、同中轴）。**4 张旧帧变化**、0 新增/缺失，基线 **294/0/0/0**；`FALLBACK_PATH` 图标下最宽行 **113pt**（旧形状是文件名约 60pt）。第一版帧里出现捕获目录 `/var/folders/...` ⇒ 每跑都不同，加 `fallbackParentPathForCapture` 捕获缝后重捕。判据读图标下最宽行（≥90pt）；M1300/M1301 **2/2**。R462 M1260 被新 VStack padding 掩蔽 ⇒ 退役为负向证人（ESCAPED），M1261 仍 CAUGHT；R463 M1262/M1263 重锚 **2/2**。⓪ no-op push、ahead=0；R477 两跑 in_progress ⇒ NOT-RUN；inline/phantom/pin/conflict 的 runner 复验仍未读到。全量 **1295/56/0**（453.6s）；build 0 告警；换装 ok/SHA_MATCH=1/387=387；电池 683/5。
+- **R478（兜底态所在路径位）**：兜底态只重复文件名（详情头部已有一份），用户看不到文件在哪。`DetailFileView.fallbackView` 在文件名下补一行父目录（11pt、secondary、单行中间截断、同中轴）。**4 张旧帧变化**、0 新增/缺失，基线 **294/0/0/0**；`FALLBACK_PATH` 图标下最宽行 **113pt**（旧形状是文件名约 60pt）。第一版帧里出现捕获目录 `/var/folders/...` ⇒ 每跑都不同，加 `fallbackParentPathForCapture` 捕获缝后重捕。判据读图标下最宽行（≥90pt）；M1300/M1301 **2/2**。R462 M1260 被新 VStack padding 掩蔽 ⇒ 退役为负向证人（ESCAPED），M1261 仍 CAUGHT；R463 M1262/M1263 重锚 **2/2**。⓪ no-op push、ahead=0；R477 跑收口已读 failure 4 步：inline 99/6.0 与 102/5.0、幻影块 0、图钉 +20/标题末列不动均签收；冲突判据的 skip 放错测试（本补记移回）；Motion markdown 标签 1<2 已知。全量 **1295/56/0**（453.6s）；build 0 告警；换装 ok/SHA_MATCH=1/387=387；电池 683/5。
 
 ## 18. R458 → R478 这一段（R478 补写；第 477 轮 / Round 475）
 

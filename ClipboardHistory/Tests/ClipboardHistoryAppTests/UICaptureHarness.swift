@@ -1164,6 +1164,9 @@ final class UICaptureTests: XCTestCase {
                 "\(tag)：正常臂里出现了橙像素 \(neg.orange) ⇒ 警告在无冲突时也画了，判据失去负臂")
             judged += 1
         }
+        if judged == 0 {
+            throw XCTSkip("SHORTCUT_CONFLICT_NOT_RUN=settings-content-blank：两档内容列都没有墨 ⇒ 判据未运行")
+        }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
@@ -1235,9 +1238,6 @@ final class UICaptureTests: XCTestCase {
             XCTAssertLessThanOrEqual(abs(pos.titleLast - neg.titleLast), Int(3.0 * scale),
                 "\(tag)：标题末列差 \(pos.titleLast - neg.titleLast)px ⇒ 「置顶」两个字还在标题里（或图钉挤了标题）")
             judged += 1
-        }
-        if judged == 0 {
-            throw XCTSkip("SHORTCUT_CONFLICT_NOT_RUN=settings-content-blank：两档内容列都没有墨 ⇒ 判据未运行")
         }
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }

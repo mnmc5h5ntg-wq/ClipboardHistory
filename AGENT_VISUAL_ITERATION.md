@@ -19604,7 +19604,7 @@ OCR 已落地的图片与普通图片在主列表里长得一模一样。`RowTex
 
 ## Round 475 · R478（第 477 轮 · 2026-10-29）：文件兜底态补父目录路径（4 张旧帧变化、基线 294）+ R462/R463 旧表重锚
 
-兜底态只重复一遍文件名（头部已有一份），用户看不到文件在哪。`DetailFileView.fallbackView` 在文件名下补一行父目录（11pt、secondary、单行中间截断、同中轴）；4 张旧帧变化、0 新增，基线 294/0/0/0；`FALLBACK_PATH` 图标下最宽行 113pt（旧形状是文件名约 60pt）。第一版直接用捕获临时路径，帧每跑都不同 ⇒ 加 `fallbackParentPathForCapture` 捕获缝（产品读真实路径、夹具写 `/Users/tester/Desktop`）后重捕。M1300（删）/M1301（置空）2/2；R462 M1260 在新 VStack padding 下不再越界 ⇒ 退役为负向证人，M1261 仍 CAUGHT；R463 M1262/M1263 因共享色行重锚后 2/2。预检 260/242/658、rot 347/1075、ARM 353/1141。全量 1295/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ no-op push、ahead=0；R477 两跑 in_progress ⇒ NOT-RUN；R477 的 inline/phantom/pin/conflict 复验仍未读到。
+兜底态只重复一遍文件名（头部已有一份），用户看不到文件在哪。`DetailFileView.fallbackView` 在文件名下补一行父目录（11pt、secondary、单行中间截断、同中轴）；4 张旧帧变化、0 新增，基线 294/0/0/0；`FALLBACK_PATH` 图标下最宽行 113pt（旧形状是文件名约 60pt）。第一版直接用捕获临时路径，帧每跑都不同 ⇒ 加 `fallbackParentPathForCapture` 捕获缝（产品读真实路径、夹具写 `/Users/tester/Desktop`）后重捕。M1300（删）/M1301（置空）2/2；R462 M1260 在新 VStack padding 下不再越界 ⇒ 退役为负向证人，M1261 仍 CAUGHT；R463 M1262/M1263 因共享色行重锚后 2/2。预检 260/242/658、rot 347/1075、ARM 353/1141。全量 1295/56/0；build 0 告警；换装 ok/387=387；电池 683/5。⓪ no-op push、ahead=0；R477 跑收口已读 failure 4 步：inline 99/6.0 与 102/5.0、幻影块 0、图钉 +20/标题末列不动均签收；冲突判据的 skip 放错测试（本补记移回）；Motion markdown 标签 1<2 已知。
 
 **七维度自评**（恰七行，每格 n/15）：
 
