@@ -25,19 +25,73 @@ enum TableHeaderPresentation {
     }
 }
 
-/// R487：渲染态不显示表格源码的竖线。
+/// R487/R488：渲染态表格去源码竖线，并按列最大实宽用制表位对齐。
 ///
 /// `collectTable` 把原始行（含 `|`）直接交给正文字体，于是"渲染"出来的表格
-/// 仍是一段带竖线的源码；R440/R448 只给表头和体行加了样式，没有去掉语法字符。
-/// 修法把每个 `|` 换成**同宽空格**（表格是等宽字体），列的起点因此一字不挪 ——
-/// R234 的"列重排刻意不做"仍然成立；首尾空白只裁一次，所有行同步左移。
+/// 仍是一段带竖线的源码。R487 先去掉语法字符；R488 发现只把竖线换空格时，
+/// 列起点仍跟着作者源码里的空格走，长单元格会把第二列推歪 —— 于是改成
+/// `\t` 分列 + 绝对制表位（表头 semibold、表体 regular 各用自己的字体量宽）。
+/// R234 的"列重排刻意不做"仍然成立：这是对齐到列最大实宽，不是重排内容。
 enum MarkdownTablePresentation {
+    /// 单行去竖线（不做列对齐）：给只需要"没有源码语法"的调用与判据用。
     static func renderedRow(_ row: String) -> String {
-        row.replacingOccurrences(of: "|", with: " ")
-            .trimmingCharacters(in: .whitespaces)
+        cells(in: row).joined(separator: "  ")
     }
 
+    /// R488：列之间只用 `\t` 分隔；列起点由 `MarkdownPresentation` 给表格块设的
+    /// `tabStops` 绝对对齐。表头 semibold 与表体 regular 的 CJK 实宽不同，
+    /// 用空格补宽会在表头/表体之间残留一两格的漂移，制表位不吃这个差。
     static func renderedContent(_ rows: [String]) -> String {
-        rows.map(renderedRow).joined(separator: "\n")
+        rows.map { cells(in: $0).joined(separator: "\t") }.joined(separator: "\n")
+    }
+
+    /// 每列之间留 12pt；返回第二列起每个制表位的绝对位置。
+    static func columnStops(in content: String) -> [NSTextTab] {
+        // 这里拿到的是**已渲染**的 tab 行（没有竖线），按 tab 切列。
+        let parsed = content.components(separatedBy: "\n")
+            .map { $0.components(separatedBy: "\t") }
+        guard let columnCount = parsed.map(\.count).max(), columnCount > 1 else { return [] }
+        let fonts = parsed.indices.map { $0 == 0 ? TableHeaderPresentation.headerFont : MarkdownPresentation.codeFont }
+        var widths = [CGFloat](repeating: 0, count: columnCount)
+        for (rowIndex, row) in parsed.enumerated() {
+            for (column, cell) in row.enumerated() {
+                widths[column] = max(widths[column], width(of: cell, font: fonts[rowIndex]))
+            }
+        }
+        var stops: [NSTextTab] = []
+        var position: CGFloat = 0
+        for column in 0..<(columnCount - 1) {
+            position += widths[column] + 12
+            stops.append(NSTextTab(textAlignment: .left, location: position))
+        }
+        return stops
+    }
+
+    /// 渲染后表格的总宽（最长一行的最后一列右沿），给宽表文档宽度用。
+    static func measuredWidth(in content: String) -> CGFloat {
+        let parsed = content.components(separatedBy: "\n")
+            .map { $0.components(separatedBy: "\t") }
+        guard let columnCount = parsed.map(\.count).max(), columnCount > 0 else { return 0 }
+        let fonts = parsed.indices.map { $0 == 0 ? TableHeaderPresentation.headerFont : MarkdownPresentation.codeFont }
+        let stops = columnStops(in: content)
+        var widest: CGFloat = 0
+        for (rowIndex, row) in parsed.enumerated() {
+            let lastStart = stops.last?.location ?? 0
+            let lastCell = row.last ?? ""
+            widest = max(widest, lastStart + width(of: lastCell, font: fonts[rowIndex]))
+        }
+        return widest
+    }
+
+    private static func width(of text: String, font: NSFont) -> CGFloat {
+        (text as NSString).size(withAttributes: [.font: font]).width
+    }
+
+    private static func cells(in row: String) -> [String] {
+        var parts = row.components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        while parts.first?.isEmpty == true { parts.removeFirst() }
+        while parts.last?.isEmpty == true { parts.removeLast() }
+        return parts
     }
 }

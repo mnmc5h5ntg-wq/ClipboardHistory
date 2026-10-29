@@ -5,8 +5,9 @@ import os, subprocess, sys
 ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"; FILE="Sources/ClipboardHistoryApp/Utilities/TableHeaderPresentation.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}; TEST="UICaptureTests/testRenderedTablesHideSourcePipes"
 ARMS=[
-      ("M1319","不剥竖线",'        rows.map(renderedRow).joined(separator: "\\n")','        rows.joined(separator: "\\n")'),
-      ("M1320","只剥表头",'        rows.map(renderedRow).joined(separator: "\\n")','        rows.enumerated().map { $0.offset == 0 ? renderedRow($0.element) : $0.element }.joined(separator: "\\n")')]
+      ("M1319","不剥竖线",'''        var parts = row.components(separatedBy: "|")
+            .map { $0.trimmingCharacters(in: .whitespaces) }''','        var parts = [row]'),
+      ("M1320","只剥表头",'        rows.map { cells(in: $0).joined(separator: "\\t") }.joined(separator: "\\n")','        rows.enumerated().map { $0.offset == 0 ? cells(in: $0.element).joined(separator: "\\t") : $0.element }.joined(separator: "\\n")')]
 def run():
     p=subprocess.run(["swift","test","--filter",TEST],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)
     out=p.stdout+p.stderr

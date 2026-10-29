@@ -12,11 +12,15 @@ enum WideMarkdownDocument {
         var widest: CGFloat = 0
         for block in MarkdownParser.parse(source).blocks {
             switch block.kind {
-            case .codeBlock, .table:
+            case .codeBlock:
                 for line in MarkdownPresentation.blockText(block).components(separatedBy: "\n") {
                     let measured = (line as NSString).size(withAttributes: [.font: font]).width
                     widest = max(widest, measured)
                 }
+            case .table:
+                // R488：表格行现在用 tab 停靠；总宽必须按最后一列右沿量，不能量源码行。
+                widest = max(widest, MarkdownTablePresentation.measuredWidth(
+                    in: MarkdownPresentation.blockText(block)))
             default:
                 continue
             }

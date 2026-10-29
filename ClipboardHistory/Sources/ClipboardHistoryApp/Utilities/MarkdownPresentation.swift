@@ -466,6 +466,10 @@ enum MarkdownPresentation {
             style.tabStops = []
             style.defaultTabInterval = advance * 4
         }
+        // R488：表格行的 `\t` 停在按每列最大实宽算出的绝对制表位上，列起点对齐。
+        if case .table = block.kind {
+            style.tabStops = MarkdownTablePresentation.columnStops(in: blockText(block))
+        }
         style.lineSpacing = lineSpacing(for: block)
         style.paragraphSpacingBefore = paragraphSpacingBefore(for: block)
         // 正文左对齐：详情区是读东西的地方，不是排海报的地方。

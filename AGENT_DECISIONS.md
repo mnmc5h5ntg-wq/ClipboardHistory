@@ -8229,3 +8229,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x detail 内容平涂时 TABLE_PIPES 预期 NOT_RUN；源码态的竖线仍可见（有意）。
 - 回滚：删 MarkdownTablePresentation，`collectTable` 改回 `collected.joined`，恢复两把旧尺的针。
 
+## D-484 表格列用绝对制表位对齐，列宽按每列最大实宽；源码态不变（R488）
+
+- 背景：R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪。
+- 决定：`MarkdownTablePresentation.renderedContent` 只保留 `\t` 分列；`columnStops(in:)` 按每列最大实宽（表头 semibold、表体 regular 各用自己的字体）计算 12pt 间距的绝对制表位；`MarkdownPresentation.paragraphStyle` 给表格块设置 `tabStops`；`WideMarkdownDocument` 的表格宽度按最后一列右沿量。
+- 理由：空格式补宽离不开字体实宽与取整，表头/表体字重差会残留 5–15px；tabStops 是绝对位置，不吃这个差。
+- 兼容性/迁移：8 张旧帧变化 + 2 张新帧，基线 306→308；宽表 690.1pt（仍 >611）、行片段 [1,1,1]；表头墨比 1.16/1.19（>1.08）。
+- 边界：runner 1x/dark 未读；源码态保留作者源码中的原样空格。
+- 回滚：删 columnStops/tabStops/measuredWidth，renderedContent 改回空格拼接。
+

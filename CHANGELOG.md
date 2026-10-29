@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 表格列宽随内容对齐（制表位；8 张旧帧变化 + 2 张新帧、基线 308）（R488 / 第 487 轮 / Round 485 / U-1887…U-1892 · 产品 3 文件 + 判据）
+
+
 ### Markdown 渲染态表格去掉源码竖线（8 张旧帧变化、基线 306）（R487 / 第 486 轮 / Round 484 / U-1881…U-1886 · 产品 2 文件 + 判据）
 
 

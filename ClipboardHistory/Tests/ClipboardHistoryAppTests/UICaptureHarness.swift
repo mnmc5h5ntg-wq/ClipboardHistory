@@ -1328,6 +1328,135 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
     }
 
+    // MARK: - R488 · 表格列随内容对齐
+
+    /// R488：`detail-table-uneven` 的三行源码竖线没有对齐；渲染后第二/第三列的起点
+    /// 必须落在同一条竖轴上。判据在帧上按每个文字行的**列 run 起点**读：
+    /// 第二列起点极差 ≤2·s、第三列 ≤2·s；表格区无墨 ⇒ 具名 NOT_RUN。
+    func testTableColumnsAlignAcrossRows() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r488-table-cols-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-table-uneven" }) else {
+                return XCTFail("\(tag)：找不到 detail-table-uneven ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("uneven-\(tag).png")
+            var tabStopCount = -1
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                    if let text = view as? ChineseSelectableNSTextView { return text }
+                    for sub in view.subviews {
+                        if let text = findTextView(sub) { return text }
+                    }
+                    return nil
+                }
+                guard let textView = findTextView(host), let storage = textView.textStorage,
+                      storage.length > 0 else { return }
+                storage.enumerateAttribute(MarkdownPresentation.tableRowCountAttribute,
+                                           in: NSRange(location: 0, length: storage.length)) { value, range, stop in
+                    guard value != nil else { return }
+                    if let style = storage.attribute(.paragraphStyle, at: range.location,
+                                                     effectiveRange: nil) as? NSParagraphStyle {
+                        tabStopCount = style.tabStops.count
+                    }
+                    stop.pointee = true
+                }
+            }
+            if tabStopCount < 0 {
+                emit("TABLE_COLUMNS_NOT_RUN=detail-content-blank \(tag)")
+                continue
+            }
+            XCTAssertEqual(tabStopCount, 2,
+                "\(tag)：表格块段落的制表位=\(tabStopCount)（三列应有 2 个）⇒ 列对齐没有结构依据")
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else { return XCTFail("\(tag)：读不回刚拍的帧") }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func isInk(_ x: Int, _ y: Int) -> Bool {
+                let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                let luma = 0.2126 * Double(base[i + rOff])
+                    + 0.7152 * Double(base[i + rOff + 1])
+                    + 0.0722 * Double(base[i + rOff + 2])
+                return abs(Int(luma.rounded()) - page) >= 60
+            }
+            let x0 = Int(Double(rep.pixelsWide) * 0.02)
+            let x1 = Int(Double(rep.pixelsWide) * 0.70)
+            let y0 = Int(Double(rep.pixelsHigh) * 0.25)
+            let y1 = Int(Double(rep.pixelsHigh) * 0.50)
+            var ink = 0
+            var bands: [(top: Int, bottom: Int)] = []
+            for y in y0..<y1 {
+                let has = (x0..<x1).contains { isInk($0, y) }
+                if has {
+                    ink += 1
+                    if let last = bands.last, y == last.bottom + 1 {
+                        bands[bands.count - 1].bottom = y
+                    } else {
+                        bands.append((y, y))
+                    }
+                }
+            }
+            let textBands = bands.filter { $0.bottom - $0.top >= 3 }
+            if ink == 0 || textBands.isEmpty {
+                emit("TABLE_COLUMNS_NOT_RUN=detail-content-blank \(tag)")
+                continue
+            }
+            var second: [Int] = [], third: [Int] = []
+            let gap = Int(8.0 * scale)
+            for band in textBands.prefix(3) {
+                var runs: [(Int, Int)] = []
+                var current: (Int, Int)?
+                for x in x0..<x1 {
+                    let has = (band.top...band.bottom).contains { isInk(x, $0) }
+                    if has {
+                        if let cur = current { current = (cur.0, x) } else { current = (x, x) }
+                    } else if let cur = current {
+                        runs.append(cur); current = nil
+                    }
+                }
+                if let cur = current { runs.append(cur) }
+                var merged: [(Int, Int)] = []
+                for run in runs {
+                    if let last = merged.last, run.0 - last.1 < gap {
+                        merged[merged.count - 1].1 = run.1
+                    } else {
+                        merged.append(run)
+                    }
+                }
+                guard merged.count >= 3 else {
+                    XCTFail("\(tag)：行 \(band.top) 只读出 \(merged.count) 个列段 ⇒ 列塌了/没对齐，不能当 NOT_RUN")
+                    continue
+                }
+                second.append(merged[1].0)
+                third.append(merged[2].0)
+            }
+            guard second.count == 3, third.count == 3 else {
+                XCTFail("\(tag)：没有拿到三行完整列段（第二列=\(second) 第三列=\(third)）⇒ 表格内容还在，不能当 NOT_RUN")
+                continue
+            }
+            let secondSpread = second.max()! - second.min()!
+            let thirdSpread = third.max()! - third.min()!
+            emit("TABLE_COLUMNS \(tag) 制表位=\(tabStopCount) 第二列=\(second) 极差=\(secondSpread)px"
+                 + " 第三列=\(third) 极差=\(thirdSpread)px 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertLessThanOrEqual(secondSpread, Int(2.0 * scale),
+                "\(tag)：第二列起点极差 \(secondSpread)px ⇒ 长单元格把列推歪了")
+            XCTAssertLessThanOrEqual(thirdSpread, Int(2.0 * scale),
+                "\(tag)：第三列起点极差 \(thirdSpread)px ⇒ 备注列没对齐")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("TABLE_COLUMNS_NOT_RUN：两档都没有表格内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
+    }
+
     // MARK: - R486 · 数据页导出/导入按钮的图标语言
 
     /// R486：同一组数据动作里，清空已经有垃圾桶图标，导出/导入却还是纯文字 ——
@@ -11478,6 +11607,12 @@ final class UICaptureTests: XCTestCase {
             self.assertTableRowsFixturePremise(target, role: "detail-table-rows")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
         })
+        // R488：列宽随内容自适应 —— 源码三行的竖线**没有对齐**（作者按内容随手写），
+        // 长单元格会把第二列推歪；旧形状只把竖线换空格，列仍跟着源码走。
+        results.append(Fixture("detail-table-uneven", NSSize(width: 720, height: 520)) {
+            let target = self.makeUnevenTableStore()
+            return AnyView(DetailView(historyStore: target, initialMarkdownMode: .rendered))
+        })
         // R441：代码块左侧行号槽。正文从槽右缘起排，行号只画在背景层；
         // 三行代码给判据三个行号带，正文左移让"左垫带"归零。
         results.append(Fixture("detail-code", NSSize(width: 720, height: 520)) {
@@ -15791,6 +15926,20 @@ final class UICaptureTests: XCTestCase {
 
     private func makeWideTableStore() -> HistoryStore {
         makeCodeStore(body: Self.wideTableFixtureBody)
+    }
+
+    /// R488：三行竖线没有对齐的表格；长名称/长备注把列撑歪是这张帧要量的缺陷。
+    static let unevenTableFixtureBody = """
+    # 表
+
+    | 名称 | 数量 | 备注 |
+    | --- | --- | --- |
+    | 很长很长的名称 | 3 | 短 |
+    | 梨 | 500 | 这是一段较长的备注 |
+    """
+
+    private func makeUnevenTableStore() -> HistoryStore {
+        makeCodeStore(body: Self.unevenTableFixtureBody)
     }
 
     /// R448 表格体行夹具：表头 + **四行**体行（值各不相同，才看得出串行）。

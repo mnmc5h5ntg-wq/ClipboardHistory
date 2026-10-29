@@ -50,8 +50,8 @@ final class TableHeaderPresentationTests: XCTestCase {
             return attributed.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
         }
 
-        // R487：渲染态已把 `|` 换成同宽空格 ⇒ 表格行的新形状是 `甲   乙`。
-        let tableRow = "甲   乙"
+        // R488：表格行用 `\t` 分列（R487 的竖线已去掉）。
+        let tableRow = "甲\t乙"
         let firstRange = text.range(of: tableRow)
         guard firstRange.location != NSNotFound else {
             return XCTFail("属性串里找不到表格首行 ⇒ 这条判据没有对象")
