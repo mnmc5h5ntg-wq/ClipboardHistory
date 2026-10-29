@@ -50,13 +50,15 @@ final class TableHeaderPresentationTests: XCTestCase {
             return attributed.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont
         }
 
-        let firstRange = text.range(of: "甲 | 乙")
+        // R487：渲染态已把 `|` 换成同宽空格 ⇒ 表格行的新形状是 `甲   乙`。
+        let tableRow = "甲   乙"
+        let firstRange = text.range(of: tableRow)
         guard firstRange.location != NSNotFound else {
             return XCTFail("属性串里找不到表格首行 ⇒ 这条判据没有对象")
         }
         let first = firstRange.location
-        guard let header = font(at: "甲 | 乙", from: first),
-              let body = font(at: "甲 | 乙", from: first + 1),
+        guard let header = font(at: tableRow, from: first),
+              let body = font(at: tableRow, from: first + 1),
               let paragraph = font(at: "正文段落") else {
             return XCTFail("属性串里找不到表头/表体/段落 ⇒ 这条判据没有对象")
         }

@@ -8220,3 +8220,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 边界：runner 1x 设置内容平涂时两窗都无墨 ⇒ 具名 `DATA_ACTION_ICONS_NOT_RUN=settings-content-blank`，不降地板。
 - 回滚：删两枚 Label 图标/捕获缝/新帧与判据。
 
+## D-483 渲染态表格去源码竖线，列起点不挪；源码态保留（R487）
+
+- 背景：表格在渲染态仍原样带 `|`；R440/R448 只给表头字重与体行线，源码语法一直在正文里。
+- 决定：新 `MarkdownTablePresentation.renderedRow` 把每个 `|` 换成同宽空格并只裁首尾空白，`renderedContent` 逐行套用；`MarkdownScanning.collectTable` 用它组装表格块。源码态仍走原始字符串。
+- 理由：等宽字体下竖线与空格同宽，列的起点一字不挪，不需要重排列宽（R234 的列重排仍不做）；只去语法字符，不改内容。
+- 兼容性/迁移：8 张旧帧变化，基线 306 不变；宽表容器 752.1→720.0pt（仍 >611）、表头墨比 1.40→1.17/1.19（仍 >1.08），旧地板未降。
+- 边界：runner 1x detail 内容平涂时 TABLE_PIPES 预期 NOT_RUN；源码态的竖线仍可见（有意）。
+- 回滚：删 MarkdownTablePresentation，`collectTable` 改回 `collected.joined`，恢复两把旧尺的针。
+

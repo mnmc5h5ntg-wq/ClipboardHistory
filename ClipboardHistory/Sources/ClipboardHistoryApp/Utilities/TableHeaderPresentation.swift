@@ -24,3 +24,20 @@ enum TableHeaderPresentation {
         return NSRange(location: 0, length: length)
     }
 }
+
+/// R487：渲染态不显示表格源码的竖线。
+///
+/// `collectTable` 把原始行（含 `|`）直接交给正文字体，于是"渲染"出来的表格
+/// 仍是一段带竖线的源码；R440/R448 只给表头和体行加了样式，没有去掉语法字符。
+/// 修法把每个 `|` 换成**同宽空格**（表格是等宽字体），列的起点因此一字不挪 ——
+/// R234 的"列重排刻意不做"仍然成立；首尾空白只裁一次，所有行同步左移。
+enum MarkdownTablePresentation {
+    static func renderedRow(_ row: String) -> String {
+        row.replacingOccurrences(of: "|", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    static func renderedContent(_ rows: [String]) -> String {
+        rows.map(renderedRow).joined(separator: "\n")
+    }
+}

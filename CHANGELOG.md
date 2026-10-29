@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Markdown 渲染态表格去掉源码竖线（8 张旧帧变化、基线 306）（R487 / 第 486 轮 / Round 484 / U-1881…U-1886 · 产品 2 文件 + 判据）
+
+
 ### 设置数据页导出/导入补图标（4 张旧帧变化 + 2 张新帧、基线 306）（R486 / 第 485 轮 / Round 483 / U-1875…U-1880 · 产品 1 文件 + 判据）
 
 

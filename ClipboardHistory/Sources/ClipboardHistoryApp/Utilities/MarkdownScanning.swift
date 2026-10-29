@@ -280,7 +280,8 @@ enum MarkdownScanner {
             if cursor != index + 1 { collected.append(text) }
             cursor += 1
         }
-        let content = collected.joined(separator: "\n")
+        // R487：渲染态去掉表格源码竖线；源码态走原始字符串，不受影响。
+        let content = MarkdownTablePresentation.renderedContent(collected)
         return (MarkdownBlock(kind: .table, runs: MarkdownBlock.literalRuns(content)), cursor)
     }
 

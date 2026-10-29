@@ -1242,6 +1242,92 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R487 · 渲染态表格不再带源码竖线
+
+    /// R487：表格在渲染态仍原样带着 `|`（R440/R448 只改了表头字重与体行线）。
+    /// 判据两腿：① 纯函数把每一行的 `|` 换成等宽空格、首尾只裁一次；
+    /// ② 产品帧的表格块文本里 `|` 必须为 0，且表格区有墨（证明表格真的画出来了）。
+    /// 源码态不走这条渲染路径，`detail-markdown-source` 里的 `|` 保留。
+    func testRenderedTablesHideSourcePipes() throws {
+        let header = MarkdownTablePresentation.renderedRow("| 名称 | 数量 |")
+        let body = MarkdownTablePresentation.renderedRow("| 苹果 | 3 |")
+        XCTAssertFalse(header.contains("|"), "表头渲染态仍带源码竖线：\(header)")
+        XCTAssertFalse(body.contains("|"), "表体渲染态仍带源码竖线：\(body)")
+        let content = MarkdownTablePresentation.renderedContent(["| 名称 | 数量 |", "| 苹果 | 3 |"])
+        XCTAssertEqual(content.components(separatedBy: "\n").count, 2,
+                       "表格行数在去竖线时被改了：\(content)")
+        XCTAssertFalse(content.contains("|"), "表格块里还有竖线：\(content)")
+
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r487-table-pipes-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-table-rows" }) else {
+                return XCTFail("\(tag)：找不到 detail-table-rows ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("table-\(tag).png")
+            var blockText: String?
+            _ = try render(fixture, appearance: appearance, to: file) { host in
+                @MainActor func findTextView(_ view: NSView) -> ChineseSelectableNSTextView? {
+                    if let text = view as? ChineseSelectableNSTextView { return text }
+                    for sub in view.subviews {
+                        if let text = findTextView(sub) { return text }
+                    }
+                    return nil
+                }
+                guard let textView = findTextView(host), let storage = textView.textStorage,
+                      storage.length > 0 else { return }
+                storage.enumerateAttribute(MarkdownPresentation.tableRowCountAttribute,
+                                           in: NSRange(location: 0, length: storage.length)) { value, range, stop in
+                    if value != nil {
+                        blockText = (storage.string as NSString).substring(with: range)
+                        stop.pointee = true
+                    }
+                }
+            }
+            guard let block = blockText else {
+                return XCTFail("\(tag)：帧里没有表格块属性 ⇒ 这条判据没有对象")
+            }
+            XCTAssertFalse(block.contains("|"), "\(tag)：渲染态表格块仍带竖线：\(block)")
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else { return XCTFail("\(tag)：读不回刚拍的帧") }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func isInk(_ x: Int, _ y: Int) -> Bool {
+                let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                let luma = 0.2126 * Double(base[i + rOff])
+                    + 0.7152 * Double(base[i + rOff + 1])
+                    + 0.0722 * Double(base[i + rOff + 2])
+                return abs(Int(luma.rounded()) - page) >= 60
+            }
+            var ink = 0
+            for y in Int(Double(rep.pixelsHigh) * 0.25)..<Int(Double(rep.pixelsHigh) * 0.50) {
+                for x in Int(Double(rep.pixelsWide) * 0.02)..<Int(Double(rep.pixelsWide) * 0.35)
+                    where isInk(x, y) { ink += 1 }
+            }
+            emit("TABLE_PIPES \(tag) 表格行=\(block.components(separatedBy: "\n").count)"
+                 + " 竖线=\(block.filter { $0 == "|" }.count) 表格区墨=\(ink)"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            if ink == 0 {
+                emit("TABLE_PIPES_NOT_RUN=detail-content-blank \(tag)")
+                continue
+            }
+            XCTAssertGreaterThan(ink, Int(300.0 * scale * scale),
+                "\(tag)：表格区只有 \(ink) 个墨像素 ⇒ 这一格读的不是表格")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("TABLE_PIPES_NOT_RUN：两档都没有表格内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
+    }
+
     // MARK: - R486 · 数据页导出/导入按钮的图标语言
 
     /// R486：同一组数据动作里，清空已经有垃圾桶图标，导出/导入却还是纯文字 ——
@@ -5825,11 +5911,26 @@ final class UICaptureTests: XCTestCase {
                         return
                     }
                     let text = storage.string as NSString
+                    // R487：渲染态不再带源码竖线 ⇒ 不能再用 `hasPrefix("|")` 认表格行。
+                    // 表格块自己带 `tableRowCountAttribute`（R448），按它的范围取行。
+                    var tableRange: NSRange?
+                    if storage.length > 0 {
+                        storage.enumerateAttribute(MarkdownPresentation.tableRowCountAttribute,
+                                                   in: NSRange(location: 0, length: storage.length)) { value, range, stop in
+                            if value != nil { tableRange = range; stop.pointee = true }
+                        }
+                    }
+                    guard let blockRange = tableRange else {
+                        XCTFail("\(tag)：`\(name)` 里没有表格块属性 ⇒ 这条判据没有对象")
+                        return
+                    }
                     var fragments: [Int] = []
-                    var cursor = 0
-                    for line in text.components(separatedBy: "\n") where line.hasPrefix("|") {
+                    var cursor = blockRange.location
+                    let blockText = text.substring(with: blockRange)
+                    for line in blockText.components(separatedBy: "\n") where !line.isEmpty {
                         let range = text.range(of: line, options: [],
-                                               range: NSRange(location: cursor, length: text.length - cursor))
+                                               range: NSRange(location: cursor,
+                                                              length: NSMaxRange(blockRange) - cursor))
                         guard range.location != NSNotFound else { continue }
                         cursor = NSMaxRange(range)
                         let glyphs = layout.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
