@@ -93,6 +93,11 @@ struct WindowConfigurator: NSViewRepresentable {
             //（R502 实拍：title 覆盖在来源图标上方）；title 字符串仍保留给 Mission Control/读屏。
             window.title = "时间剪史"
             window.titleVisibility = .hidden
+            // R502：透明标题栏是自定义 chrome，系统那条通栏分隔线在真窗口帧里是一条孤立的亮线
+            //（y≈59pt、整行亮度 76.7 vs 底 39.0）；去掉它，标题栏与内容连续。
+            if #available(macOS 11.0, *) {
+                window.titlebarSeparatorStyle = .none
+            }
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = [.managed, .fullScreenNone]
             window.setContentSize(NSSize(width: 750, height: 560))

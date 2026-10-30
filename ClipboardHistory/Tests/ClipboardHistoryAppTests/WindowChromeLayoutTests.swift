@@ -162,6 +162,10 @@ final class WindowChromeLayoutTests: XCTestCase {
                        "主窗口是自定义标题栏：标题栏里的 title 必须显式隐藏（否则会压到详情头部）")
         XCTAssertEqual(window.title, "时间剪史",
                        "窗口名要保留给 Mission Control/读屏")
+        if #available(macOS 11.0, *) {
+            XCTAssertEqual(window.titlebarSeparatorStyle, .none,
+                           "透明自定义标题栏不再画系统分隔线（真窗口里它是一条孤立亮线）")
+        }
     }
 
     func testDetailViewConsumesThePublishedInset() throws {

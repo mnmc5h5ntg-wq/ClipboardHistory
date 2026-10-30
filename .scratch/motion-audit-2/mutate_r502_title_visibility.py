@@ -11,6 +11,9 @@ ARMS=[
   ("M1348","窗口名清空（Mission Control/读屏无据）",
    '''            window.title = "时间剪史"''',
    '''            window.title = ""'''),
+  ("M1349","分隔线恢复系统默认",
+   '''                window.titlebarSeparatorStyle = .none''',
+   '''                window.titlebarSeparatorStyle = .line'''),
 ]
 def run():
     p=subprocess.run(["swift","test","--filter",TEST],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)
