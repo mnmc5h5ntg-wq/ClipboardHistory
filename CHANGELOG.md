@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 状态菜单补标准快捷键列（设置 ⌘, / 退出 ⌘Q 可见）（R505 / 第 504 轮 / Round 502 / U-1988…U-1993 · 产品 1 文件 + 判据）
+
+
 ### 设置侧栏补身份头（62 张旧帧变化 + 2 张新帧、基线 332）（R504 / 第 503 轮 / Round 501 / U-1982…U-1987 · 产品 1 文件 + 判据）
 
 

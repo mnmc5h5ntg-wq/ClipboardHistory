@@ -8374,3 +8374,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：设置侧栏墨带 8→9（light 首带 70.5..82.0 → 71.5..85.5、dark 70.0..82.0 → 72.0..85.5）；62 张旧帧变化 + 2 张新帧、基线 330→332；真窗口 `screencapture -l` 身份头 90.0..103.5pt 在首条导航 121.5..133.0pt 之上。
 - 边界：暗档侧栏在离屏通道走 vibrant 合成前极性（D-090），未选中文字结构上看不到；新负向臂已按实测登记进 vibrant 名册，不把它读成产品缺陷。
 
+## D-501 状态菜单的标准快捷键交给系统右对齐列，全局热键保留行内提示（R505）
+
+- 背景：macOS 13+ 的状态菜单是 SwiftUI `MenuBarExtra`（`.menu`）。真窗口 `screencapture -l` 读数：菜单 194×318pt 里只有两条行内热键提示（`显示主窗口  ⌘S`、`快速选择…  ⌃⌥⇧V`），标准键 ⌘, / ⌘Q 右侧列**一个墨点都没有**（设置行最右墨 40.5pt、退出行 92.0pt，内容宽 193.5pt）。
+- 决定：新增 `MenuCommandShortcutPresentation.keyEquivalent(for:)`，只给 `.showSettings`（`,`）与 `.quit`（`q`）返回键；`App.swift` 的命令区与退出项挂 `.modifier(MenuCommandShortcutModifier(command:))`，由系统画右对齐列。全局热键**不挂** `.keyboardShortcut`，继续用 `MenuShortcutPresentation.title` 的行内提示。
+- 理由：标准键是菜单的 key equivalent，系统列才是它们该在的位置；全局热键走 Carbon，给它们再挂本地键会造出第二条触发路径（同一组合双触发）。after 菜单 241×318pt、⌘ token 左沿两行同为 201.5pt。
+- 兼容性/迁移：离屏帧 0 变化（状态菜单不进夹具）；真窗口约 194→241pt；新增值+接线判据与 M1354–M1356。
+- 边界：状态菜单像素通道在 CI 不可判（system-menu，608）；后续改菜单必须在真窗口重拍前后帧，不能拿离屏帧替代。
+
