@@ -76,7 +76,11 @@ def _roster_problems(roster, field, backlog_text):
 
 
 def _real_window():
-    log = subprocess.run([u"git", u"log", u"-n", u"400", u"--format=%H%x09%s"],
+    # R501：扫描窗原来写死 `-n 400`，本轮累计提交把 cutoff（R334 的 5d1c246）挤出了窗外，
+    # 于是 `slice_since` 抛「cutoff 不在 git log 里」。窗必须**由 cutoff 派生**而不是猜一个笔数：
+    # 从 cutoff 的父提交到 HEAD 的闭区间，既保证起点可见，也不会把 cutoff 之前的老形状放进来。
+    cutoff = R.SHAPE_CUTOFF
+    log = subprocess.run([u"git", u"log", u"%s^..HEAD" % cutoff, u"--format=%H%x09%s"],
                          cwd=ROOT, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT).stdout.decode(u"utf-8", u"replace")
     window = R.slice_since(log)
@@ -134,7 +138,8 @@ class RoundClaimConsistency(unittest.TestCase):
                          u"现行 subject 形状之后仍有轮次自我打脸，或带 K 却认不出身份的笔")
 
     def test_the_cutoff_is_a_real_commit_and_a_bogus_one_raises(self):
-        log = subprocess.run([u"git", u"log", u"-n", u"400", u"--format=%H%x09%s"],
+        # R501：与 `_real_window` 同一个窗源（cutoff^..HEAD），不再用写死的笔数。
+        log = subprocess.run([u"git", u"log", u"%s^..HEAD" % R.SHAPE_CUTOFF, u"--format=%H%x09%s"],
                              cwd=ROOT, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT).stdout.decode(u"utf-8", u"replace")
         window = R.slice_since(log)
