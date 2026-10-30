@@ -20102,6 +20102,8 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 状态菜单（macOS 13+ `MenuBarExtra`）此前未进任何帧。真窗口 `screencapture -l` 读数：菜单 194×318pt，只有两条行内热键提示，⌘, / ⌘Q 的右侧列一个墨点都没有（设置行最右墨 40.5pt、退出 92.0pt，内容宽 193.5pt）。修法：`MenuCommandShortcutPresentation` 只给标准键返回 `,`/`q`，`App.swift` 挂 `.modifier(MenuCommandShortcutModifier(command:))`；全局热键保持行内提示，不挂本地键（避免第二条触发路径）。after 菜单 241×318pt、设置右墨 218.5、退出 222.0、⌘ token 左沿同为 201.5pt。判据 `testStandardShortcutsAreVisibleInTheSwiftUIMenu`（值 + 接线），M1354–M1356 3/3。捕获 332 帧、89 张噪声不吸收、0 合法变化、基线保持 332。预检 284/261/698、ARM 377/1185、HIDDEN 371/1124 rot=0。全量 1319/56/0；build 0 告警；换装 ok/419=419；电池 683/5。⓪ push no-op（HEAD=origin=e46c29f、ahead=0）；三跑 NOT-RUN；旧跑 Motion/probe 两条采样红、Release 4 条已由 31b21a6 修。
 
+⑥ R504 判据修复：runner `41093593814 ↔ 800a45a` 的 dark 臂 正 10 / 负 1（首带 0.0..248.0 / 282.0..539.0 整列材质带）⇒ 暗档负臂 <3 带具名 `NOT_RUN=sidebar-vibrant`，light 照判；本机 2x 仍 2/2；修复笔 `e3eb62b`。
+
 **七维度自评**（恰七行，每格 n/15）：
 
 | 维度 | 分 | 依据 |

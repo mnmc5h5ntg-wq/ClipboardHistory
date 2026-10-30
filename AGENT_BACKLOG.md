@@ -10683,3 +10683,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`MenuBarExtra` 的菜单由系统绘制，离屏夹具拍不到；本轮前后读数（194→241pt、⌘ token 左沿 201.5pt）只存在于 `screencapture -l` 真窗口帧。
     修法：下一轮若再动状态菜单，先走同一通道拍前后帧并读右侧键列；CI 里只认值轴（`MenuCommandShortcutPresentation`）与接线轴（`App.swift` 的 modifier），不把「runner 绿」当成菜单像素已验收。
 
+**609. runner 1x 的暗档设置侧栏整列被读成材质带**（R505 现读）
+    现象：`sidebarInkBands` 在 runner dark 帧上得到 `0.0..248.0` / `282.0..539.0` 的整列带，负向臂只剩 1 条；身份头判据的暗档臂没有对象（D-502）。
+    修法：暗档负臂 <3 带 ⇒ 具名 `NOT_RUN=sidebar-vibrant`，light 档照判；若要把暗档纳入门，先换列内纸面估计的尺（另立仪器 + 刀），不许直接放宽等式。
+

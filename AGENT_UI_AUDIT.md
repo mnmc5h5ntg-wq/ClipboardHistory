@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-1993）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-1994）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -390,6 +390,8 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-1991：③ 判据与刀。** 新判据 `MenuShortcutPresentationTests/testStandardShortcutsAreVisibleInTheSwiftUIMenu`：值轴断言设置/退出各拿到 `,`/`q`、其余命令为 nil（全局热键不许有本地等价物）；结构轴读 `App.swift` 源码，要求命令区与退出项各有一处 `.modifier(MenuCommandShortcutModifier(...))`。刀 `M1354`（设置映射改 nil）/`M1355`（退出映射成 `w`）/`M1356`（退出项删掉修饰器）**3/3 CAUGHT**、`RESTORE_CLEAN=yes`。
 - **U-1992：④ 帧卷。** 捕获卷 **332 帧**、`COMPARED=332 CHANGED=89 MISSING=0 ADDED=0`：89 张仍为源 App 图标栅格噪声（16×16、≤7/255，bbox 尺 `变了=0`）⇒ **不吸收**（`FRAME_BASELINE_ENV_NOISE=source-icon-raster`；601），**0 张合法变化**，基线保持 **332**。状态菜单不进离屏帧 ⇒ 它的像素通道具名 `NOT_RUN=system-menu`（见 608）；本轮真窗口前后帧 `/tmp/r505_menu.png` / `/tmp/r505_menu_final.png` 已逐张看过。
 - **U-1993：⑤ 八步与电池。** build **0 告警**（`scripts/warning_gate.sh` 增量=0、冷编=0）；预检 `NEEDLE_PRECHECK tables=284 covered=261 arms=698 bad=0`、`ARM_TOTAL files=377 arms=1185`、`HIDDEN_ARMS 表=371 可判=1124 rot=0`；全量 **1319/56/0**（749.2s）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497；本笔 as-of 504 = 1，last=`800a45a`/last_round=503）；清账 162/63/0；§1 刷新在生成器后复跑；电池在台账后复跑（683/OK skipped=5）。产品笔 `f7ea8b4` 已推（HEAD=origin、ahead=0）。**具名 NOT-RUN**：① `f7ea8b4` 自身跑（推送后取）；② 状态菜单像素通道（system-menu，仅真窗口可判，608）；③ 三跑 `800a45a`/`79336c7`/`e46c29f`（in_progress/queued）；④ `RTF_HELPER_ORPHAN`（settings-content-blank/595）；⑤ `SETTINGS_IDENTITY_HEADER` runner 1x、`RECORDING_REREAD` 1x；⑥ 已知在屏/Motion 采样 flake；⑦ 601 噪声与其余未结项仍开。
+
+- **U-1994：⑥ R504 判据修复（runner 暗档 vibrant 具名 NOT_RUN）。** `41093593814 ↔ 800a45a` 的 Swift/Capture 双红都指向 R504 的 `testSettingsSidebarCarriesTheAppIdentity`：runner dark **正臂 10 带 / 负臂 1 带**（正首带 **0.0..248.0**、负首带 **282.0..539.0** —— 整列材质带，不是文字行），light 正 **9** / 负 **8** 通过。⇒ runner 1x 的暗档侧栏走 vibrant 合成前极性（D-090），负向臂的文字行结构上看不到，带数塌到 1；等式在那一臂没有对象。修法：负臂 <3 带 ⇒ 具名 `SETTINGS_IDENTITY_HEADER_NOT_RUN=sidebar-vibrant`，light 档必须照判（新增 `SETTINGS_IDENTITY_HEADER_CAPABILITY judged=… light=… vibrant_not_run=…` 行），本机 2x 仍 **2/2**（9/8、9/8）。没有放宽 light 档等式，也没有把整列材质带当文字带。修复笔 `e3eb62b`。
 
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 
