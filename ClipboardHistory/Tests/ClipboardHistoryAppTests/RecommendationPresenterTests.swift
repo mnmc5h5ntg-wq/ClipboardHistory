@@ -89,6 +89,34 @@ final class RecommendationPresenterTests: XCTestCase {
         XCTAssertTrue(reason(bundleID: "com.apple.Safari", content: .text("https://example.com")).contains("常用链接"))
     }
 
+    /// R507：类型词只出现一次 —— 内容类型标签已经说「常用文本/常用链接」时，
+    /// 不再在前面补一个裸「文本/链接」（与来源 App 名去重同一条规矩）。
+    func testContentTypeWordAppearsOnlyOnce() {
+        func reason(_ content: ClipboardEntryContent, features: [RecommendationFeature: Double]) -> String {
+            RecommendationPresenter.reason(
+                for: candidate(features: features),
+                entry: textEntry("x", content: content),
+                context: context(),
+                currentAppName: nil,
+                reuseCount: 0
+            )
+        }
+        func mentions(_ haystack: String, _ needle: String) -> Int {
+            haystack.components(separatedBy: needle).count - 1
+        }
+        for (content, word) in [(ClipboardEntryContent.text("普通文本"), "文本"),
+                                (.text("https://example.com"), "链接")] {
+            let text = reason(content, features: [.contentTypeAffinity: 0.1])
+            XCTAssertEqual(mentions(text, word), 1,
+                           "「\(word)」在理由里出现了 \(mentions(text, word)) 次：\(text)")
+            XCTAssertTrue(text.contains("常用" + word),
+                          "去掉重复时不许把「常用」信息一起丢：\(text)")
+        }
+        // 没有内容类型标签时，孤立的类型词是唯一的类型信息，不能被一起去掉。
+        let plain = reason(.text("普通文本"), features: [:])
+        XCTAssertTrue(plain.hasPrefix("文本"), plain)
+    }
+
     func testAppAffinityLabels() {
         func mentions(_ haystack: String, _ needle: String) -> Int {
             haystack.components(separatedBy: needle).count - 1

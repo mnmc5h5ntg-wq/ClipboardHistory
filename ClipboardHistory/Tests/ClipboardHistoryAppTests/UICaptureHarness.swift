@@ -19807,24 +19807,28 @@ final class UICaptureTests: XCTestCase {
                                                        rect: rowTwoBand, scale: scale, minDelta: 60) else {
             return XCTFail("第二行推荐里读不到墨 ⇒ 负向臂没有对象（先量带，别改阈值）")
         }
-        XCTAssertGreaterThanOrEqual(trailing, fixture.size.width - 16.0,
+        // R507：绝对带 `帧宽−16` 是按 2x 的省略号留白（5.5pt）定的；runner 1x 的留白是 25pt
+        // （首行 295/320）⇒ 改成**按比例的有界带**，并用第二行（249/320）当负向臂。
+        let truncationFloor = fixture.size.width * 0.9
+        XCTAssertGreaterThanOrEqual(trailing, truncationFloor,
                     "复刻里第一行的最右墨在 \(String(format: "%.1f", trailing))pt，而帧宽 "
                     + "\(String(format: "%.0f", fixture.size.width))pt ⇒ 这一行没有进截断带"
-                    + "（带下界 = 帧宽−16）。两种可能：①有人给行加了右边距/宽度约束（那这些帧"
-                    + "也许已经能判截断，重新判一次并把 `menuSurfaceReplicaFixtures` 收掉）；"
-                    + "②布局又漂了（那先确认漂在哪）。两种都不许只把这条断言放宽。")
+                    + "（带下界 = 帧宽×0.9 = \(String(format: "%.1f", truncationFloor))pt）。"
+                    + "两种可能：①有人给行加了右边距/宽度约束（那这些帧也许已经能判截断，"
+                    + "重新判一次并把 `menuSurfaceReplicaFixtures` 收掉）；②布局又漂了（那先确认漂在哪）。"
+                    + "两种都不许只把这条断言放宽。")
         XCTAssertLessThanOrEqual(trailing, fixture.size.width - 1.0,
                     "第一行最右墨 \(String(format: "%.1f", trailing))pt 顶到了帧宽−1 ⇒ "
                     + "截断省略号的留白消失，先确认这是不是另一套布局")
-        XCTAssertLessThan(trailingTwo, fixture.size.width - 16.0,
+        XCTAssertLessThan(trailingTwo, truncationFloor,
                     "第二行最右墨 \(String(format: "%.1f", trailingTwo))pt 也进了截断带"
-                    + "（帧宽 \(String(format: "%.0f", fixture.size.width))pt）⇒ 这条带不再能"
+                    + "（下界 \(String(format: "%.1f", truncationFloor))pt）⇒ 这条带不再能"
                     + "区分「被截断的那一行」，负向臂失效，先换一条更短的行")
         emit("MENUBAR_REPLICA menubar-recommendations 第一行最右墨="
               + String(format: "%.1f", trailing) + " 第二行最右墨="
               + String(format: "%.1f", trailingTwo) + " / 帧宽 "
               + String(format: "%.0f", fixture.size.width)
-              + " ⇒ 截断带=帧宽−16..帧宽−1；产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐")
+              + " ⇒ 截断带=帧宽×0.9..帧宽−1；产品是 NSMenu（.menu 风格）⇒ 这批帧不判宽度/截断/对齐")
     }
 
     /// 已经知道"压在 vibrant 子树上"的**控件**探针（R35 逐条量出来的，不是推的）。

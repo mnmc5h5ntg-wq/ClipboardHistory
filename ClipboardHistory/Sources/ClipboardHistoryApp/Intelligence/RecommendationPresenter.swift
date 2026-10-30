@@ -73,8 +73,10 @@ enum RecommendationPresenter {
         if reuseCount > 0 {
             tags.append("复用\(reuseCount)次")
         }
-        if (features[.contentTypeAffinity] ?? 0) > 0 {
-            tags.append(contentTypeTag(for: entry))
+        let contentTypeTagText = (features[.contentTypeAffinity] ?? 0) > 0
+            ? contentTypeTag(for: entry) : nil
+        if let contentTypeTagText {
+            tags.append(contentTypeTagText)
         }
         if let appAffinityTag {
             tags.append(appAffinityTag)
@@ -96,7 +98,11 @@ enum RecommendationPresenter {
             tags.append("已降权")
         }
 
-        var parts: [String] = [kindLabel(for: entry)]
+        // R507：类型词只出现一次 —— 内容类型标签已经说「常用文本/常用链接」时，
+        // 不再在前面补一个裸「文本/链接」（与来源 App 名去重同一条规矩）。
+        let kind = kindLabel(for: entry)
+        let showKind = !(contentTypeTagText?.contains(kind) ?? false)
+        var parts: [String] = showKind ? [kind] : []
         if !tags.isEmpty { parts.append(tags.joined(separator: " · ")) }
         // 以前这里直接拼 `Int(score*100)%`（如 "24%"）。把内部指标原样端给用户是三件坏事：
         // ① 它不是概率，用户会按概率读；② 它让一行中文里混进一个数字噪声；
