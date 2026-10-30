@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// R508：两处搜索入口（主侧栏与快速选择浮层）共用同一个占位文案 ——
+/// 同一个动作在两个入口写两句话，用户在同一个 App 里会看到两种搜索语言。
+enum SearchPlaceholder {
+    static let text = "搜索历史…"
+}
+
 struct SearchField: View {
     @Binding var text: String
     @State private var isHovered = false
@@ -11,7 +17,7 @@ struct SearchField: View {
     @Environment(\.searchPlaceholderForCapture) private var searchPlaceholderForCapture
     /// 全仓十余处动作文案都用单「…」（导出历史…/查找…/正在加载预览…），
     /// 只有这里原来写「搜索历史……」两个省略号 —— 同一 App 两种省略号形态。
-    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史…" }
+    private var placeholderText: String { searchPlaceholderForCapture ?? SearchPlaceholder.text }
     /// 一层判定只留一处：图标墨与清除按钮共用它。
     private var isHoveredForDrawing: Bool { isHovered || (hoveredForCapture ?? false) }
 

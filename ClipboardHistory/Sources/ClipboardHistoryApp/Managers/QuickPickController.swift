@@ -247,7 +247,7 @@ final class QuickPickController: NSObject, NSTableViewDataSource, NSTableViewDel
             // 返回 true = 这一键被浮层吃掉了（↑↓↩⎋）；false = 交回正常文本编辑（打字、退格、输入法）。
             return self.handle(keyEvent: event) != .passThrough
         }
-        field.placeholderString = "搜索历史记录…"
+        field.placeholderString = SearchPlaceholder.text
         // R71 / BACKLOG 99：这里原来是字面量 14，而主窗口那颗搜索框
         // （`SearchField.swift:14`）用的是 `VisualFont.body`(13) ⇒ **同一个控件在两个表面响一档**。
         // 浮层没有理由比主窗口更响：它是"快"，不是"大"。

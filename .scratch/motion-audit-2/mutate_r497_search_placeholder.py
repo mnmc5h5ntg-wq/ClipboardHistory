@@ -6,10 +6,10 @@ ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"; FILE="Sources/ClipboardH
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}; TEST="UICaptureTests/testSearchPlaceholderUsesTheSingleEllipsis"
 ARMS=[
   ("M1341","占位符回到两个省略号",
-   '''    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史…" }''',
+   '''    private var placeholderText: String { searchPlaceholderForCapture ?? SearchPlaceholder.text }''',
    '''    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史……" }'''),
   ("M1342","占位符去掉省略号",
-   '''    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史…" }''',
+   '''    private var placeholderText: String { searchPlaceholderForCapture ?? SearchPlaceholder.text }''',
    '''    private var placeholderText: String { searchPlaceholderForCapture ?? "搜索历史" }'''),
 ]
 def run():
