@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2001）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2002）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -401,6 +401,8 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2000：⑤ 八步与电池。** build **0 告警**（增量=0、冷编=0）；预检 `NEEDLE_PRECHECK tables=285 covered=262 arms=701 bad=0`、`ARM_TOTAL files=378 arms=1188`、`HIDDEN_ARMS 表=372 可判=1127 rot=0`；全量 **1321/56/0（783.2s）**（含 2 条新判据）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497；本笔 as-of 505 = 1，last=`f7ea8b4`/last_round=504）；清账 162/63/0；§1 刷新在生成器后复跑；电池在台账后复跑（683/OK skipped=5）。产品笔 `0beac05` 已推（HEAD=origin、ahead=0）。**具名 NOT-RUN**：① `0beac05` 自身跑（推送后取）；② 四跑 `e3eb62b`/`6543959`/`3d20a02`/`f9b8733`（in_progress/queued）；③ 状态菜单像素通道（system-menu，610）；④ `RTF_HELPER_ORPHAN`（settings-content-blank/595）；⑤ `RECORDING_REREAD` 1x、`SETTINGS_IDENTITY_HEADER` 修复后 runner 1x；⑥ 已知在屏/Motion 采样 flake；⑦ 601 噪声与其余未结项仍开。
 
 - **U-2001：⑥ 轮次一致性守卫的已推历史出口。** 电池首跑红 `ROUND_K_CONTRADICTION 498`：`05771dc`（第 497 轮 K=1）、`52f4172`（第 502 轮 K=1）与 `0beac05`（第 505 轮 K=2）被 `SUBJECT` 的前导 `R498` 并成一组。**根因不是本轮把 K 写错**，而是 parser 拿 AGENT_STATE 的锚点当轮次身份；已 push 不能改历史 ⇒ 按 `CONTRADICTION_ROSTER` 的既有出口登记 498，并开 BACKLOG 611（退场：`parse_rows` 改读「第 N 轮」后删除并复跑正对照）。不许改 subject 的 K 去凑组、也不许删 K 让 product_streak 失明。登记后电池 **683/OK skipped=5**。
+
+- **U-2002：⑦ runner 签收（R504 修复与 R505 两跑）。** `41105579968 ↔ e3eb62b` **success**、`41105861197 ↔ 6543959` **success**：同跑 `SETTINGS_IDENTITY_HEADER light 正 9 / 负 8`（照判）、`dark SETTINGS_IDENTITY_HEADER_NOT_RUN=sidebar-vibrant 负臂带=1`、`CAPABILITY judged=1/2 light=1 vibrant_not_run=1`；`RECORDING_REREAD light/dark diff_px=0`（1x）、`RTF_HELPER_ORPHAN_NOT_RUN=settings-content-blank` 两档 ⇒ 修复与既有 NOT_RUN 均被 runner 签收。`41106240358 ↔ 3d20a02` failure **仅** `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime`（已知采样 flake；同跑身份头读数同上、Motion floor clean）；`41106548360 ↔ f9b8733` failure **仅** `STEP[19] Motion coverage floor` 的 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess` 1<2（已知采样 flake；同跑身份头 NOT_RUN 在）。`41112041111 ↔ 0beac05`（R506 产品）与 `41112999388 ↔ 938fc4f`（R506 台账）读时 **in_progress/queued ⇒ NOT-RUN**。
 
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 

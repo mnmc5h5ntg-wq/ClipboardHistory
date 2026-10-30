@@ -20124,6 +20124,8 @@ R487 去竖线后列仍跟作者源码空格走，长单元格把第二列推歪
 
 ⑥ 轮次一致性守卫的已推历史出口：`ROUND_K_CONTRADICTION 498` = 前导 R498 锚点把第 497/502/505 轮并组（K=1/1/2）；登记 498 + BACKLOG 611（退场：parser 改读「第 N 轮」后删），电池复跑 683/OK skipped=5。
 
+⑦ runner 签收：`e3eb62b`/`6543959` success（light 9/8 照判、dark NOT_RUN=sidebar-vibrant 负臂带=1、RECORDING_REREAD diff=0、RTF 两档 NOT_RUN）；`3d20a02` 仅 SelectionReveal 采样 flake、`f9b8733` 仅 Motion testCopyReceipt 1<2；R506 两跑 NOT-RUN。
+
 **七维度自评**（恰七行，每格 n/15）：
 
 | 维度 | 分 | 依据 |
