@@ -60,6 +60,9 @@ UNPARSED_ROSTER = {
                 u"带着 K 却没有可解析的轮次身份 ⇒ 本尺看不见它（同一处自伤的第二次，"
                 u"另一面记在 test_commit_subject_hygiene 的 NO_LABEL_ROSTER）。"
                 u"登记理由：BACKLOG 416。退场：扫描窗滑过之后必须删。",
+    u"3ebc7fc": u"R510 的产品笔标题中段带空格（`策略 + 最小窗…`），`SUBJECT` 的 `(\S+?)` 跨不过 ⇒ "
+                u"带 K 却认不出轮次；已 push 不能改历史。登记理由：BACKLOG 616。"
+                u"退场：`SUBJECT` 中段改成 `(.+?)` 并复跑合成正对照之后必须删这一条。",
 }
 
 
