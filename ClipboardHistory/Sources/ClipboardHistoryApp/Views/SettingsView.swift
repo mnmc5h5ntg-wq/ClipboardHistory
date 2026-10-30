@@ -1180,6 +1180,8 @@ struct SettingsSidebarView: View {
     @Environment(\.settingsSelectionPreview) private var selectionPreview
     @Environment(\.settingsSidebarVersionForCapture) private var versionForCapture
     @Environment(\.settingsSidebarFooterForCapture) private var footerForCapture
+    /// R504：设置侧栏身份头的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.settingsSidebarIdentityForCapture) private var settingsSidebarIdentityForCapture
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rowFrames: [SettingsCategory: CGRect] = [:]
@@ -1215,6 +1217,23 @@ struct SettingsSidebarView: View {
                     .allowsHitTesting(false)
             }
             VStack(alignment: .leading, spacing: 0) {
+                // R504：主侧栏标题有身份头（时钟图标 + 应用名），设置侧栏只有分类行；
+                // 补同一枚身份头，两扇窗口的侧栏顶都有"我在哪"的锚点。
+                if settingsSidebarIdentityForCapture ?? true {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: VisualFont.title, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                        Text("时间剪史")
+                            .font(.system(size: VisualFont.title, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
+                }
                 ForEach(SettingsCategory.allCases) { category in
                     SettingsSidebarRow(
                         category: category,
@@ -1633,5 +1652,17 @@ extension EnvironmentValues {
     var settingsRtfHelperCopyForCapture: Bool? {
         get { self[SettingsRtfHelperCopyForCaptureKey.self] }
         set { self[SettingsRtfHelperCopyForCaptureKey.self] = newValue }
+    }
+}
+
+/// R504：设置侧栏身份头的负向帧缝（产品默认 nil ⇒ 画）。
+struct SettingsSidebarIdentityForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsSidebarIdentityForCapture: Bool? {
+        get { self[SettingsSidebarIdentityForCaptureKey.self] }
+        set { self[SettingsSidebarIdentityForCaptureKey.self] = newValue }
     }
 }

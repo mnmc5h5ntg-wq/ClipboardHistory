@@ -12682,6 +12682,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .general)
                 .environment(\.settingsSidebarFooterForCapture, false))
         })
+        // R504：设置侧栏身份头的负向臂（只关身份头，其余与 settings-general 同）。
+        results.append(Fixture("settings-general-no-identity", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .general)
+                .environment(\.settingsSidebarIdentityForCapture, false))
+        })
         // R495：通用页说明字号的负向臂（只把回执/暂停/OCR 三条退回 10pt，RTF 仍 11pt）。
         results.append(Fixture("settings-general-legacy-helper-font", NSSize(width: 720, height: 540)) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .general)
@@ -16078,6 +16083,43 @@ final class UICaptureTests: XCTestCase {
         return (ink, colored)
     }
 
+    /// R504：主侧栏标题有身份头（时钟图标 + 应用名），设置侧栏只有分类行。
+    /// 成对帧 `settings-general` / `settings-general-no-identity`：侧栏墨带数正臂应多 1 条，
+    /// 且那条在首条导航行之上。
+    func testSettingsSidebarCarriesTheAppIdentity() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r504-identity-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let positive = renderFixtureRep("settings-general", appearance, scratch),
+                  let negative = renderFixtureRep("settings-general-no-identity", appearance, scratch) else {
+                XCTFail(tag + "：两臂读不回来 ⇒ 这条判据没有对象")
+                continue
+            }
+            let pos = sidebarInkBands(positive, pointWidth: 720)
+            let neg = sidebarInkBands(negative, pointWidth: 720)
+            emit("SETTINGS_IDENTITY_HEADER \(tag) 正臂带=\(pos.count) 负臂带=\(neg.count)"
+                 + " 正首带=\(pos.first.map { String(format: "%.1f..%.1f", $0.y0, $0.y1) } ?? "-")"
+                 + " 负首带=\(neg.first.map { String(format: "%.1f..%.1f", $0.y0, $0.y1) } ?? "-")")
+            if pos.isEmpty && neg.isEmpty {
+                emit("SETTINGS_IDENTITY_HEADER_NOT_RUN=sidebar-blank \(tag)")
+                continue
+            }
+            XCTAssertEqual(pos.count, neg.count + 1,
+                           "\(tag)：正臂侧栏墨带 \(pos.count) 条、负臂 \(neg.count) 条 ⇒ 身份头没有多出一条")
+            if pos.count >= 2 {
+                XCTAssertLessThan(pos[0].y0, pos[1].y0,
+                                  "\(tag)：身份头不在首条导航行之上")
+            }
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("SETTINGS_IDENTITY_HEADER_NOT_RUN：两档都没有侧栏墨带") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     /// R429：版本行用**侧栏墨带数**证明（R428 的品红标记在 runner 的 vibrant 侧栏里找不到）。
     /// 正/负帧的带数差 1，多出来的是最下面那一条“时间剪史 1.4.8”；它必须在最后一条导航行之下。
     func testSettingsSidebarShowsTheVersionFooterOnlyInTheProductArm() throws {
@@ -19103,6 +19145,9 @@ final class UICaptureTests: XCTestCase {
         "settings-privacy-tall", "settings-recommendations-tall",
         // R442：关于页与其余设置页同一棵 vibrant 子树；暗档未选中标签落在错误一侧（看过的同一机制）。
         "settings-about",
+        // R504：身份头的负向臂与 `settings-general` 是同一棵 settings 侧栏 vibrant 子树
+        //（只关身份头）⇒ 同一处合成前极性盲区；这条由判据的 vibrant 前提实测点名（不是顺手补名单）。
+        "settings-general-no-identity",
     ]
 
     /// 盲区名单**按机器分键**（R124 / BACKLOG 171）。
@@ -22006,6 +22051,7 @@ final class UICaptureTests: XCTestCase {
         let useControlFirstRoster = controlFirstRosterMode == "on"
         let controlFirstCells: Set<String> = [
             "settings-general light", "settings-general dark",
+            "settings-general-no-identity light", "settings-general-no-identity dark",
             "settings-general-legacy-helper-font light", "settings-general-legacy-helper-font dark",
             "settings-general-no-footer light", "settings-general-no-footer dark",
             "settings-general-login-unsupported light", "settings-general-login-unsupported dark",
