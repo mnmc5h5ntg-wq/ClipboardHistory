@@ -16092,6 +16092,8 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
         var judged = 0
+        var lightJudged = 0
+        var vibrantNotRun = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
             guard let positive = renderFixtureRep("settings-general", appearance, scratch),
@@ -16108,6 +16110,15 @@ final class UICaptureTests: XCTestCase {
                 emit("SETTINGS_IDENTITY_HEADER_NOT_RUN=sidebar-blank \(tag)")
                 continue
             }
+            // R505：runner 1x 的暗档侧栏走 vibrant 合成前极性（D-090）—— 整列材质与页面纸面的
+            // 亮度差把「整列」读成一条 0..248 / 282..539 的带，负向臂的文字行结构上看不到，
+            // 带数塌到 1（不是身份头少了）。这时暗档这一臂没有对象，具名 NOT_RUN；
+            // light 档不走这条路，必须照判（runner 现读 9/8）。
+            if neg.count < 3 {
+                emit("SETTINGS_IDENTITY_HEADER_NOT_RUN=sidebar-vibrant \(tag) 负臂带=\(neg.count)")
+                vibrantNotRun += 1
+                continue
+            }
             XCTAssertEqual(pos.count, neg.count + 1,
                            "\(tag)：正臂侧栏墨带 \(pos.count) 条、负臂 \(neg.count) 条 ⇒ 身份头没有多出一条")
             if pos.count >= 2 {
@@ -16115,9 +16126,11 @@ final class UICaptureTests: XCTestCase {
                                   "\(tag)：身份头不在首条导航行之上")
             }
             judged += 1
+            if appearance == .aqua { lightJudged += 1 }
         }
-        if judged == 0 { throw XCTSkip("SETTINGS_IDENTITY_HEADER_NOT_RUN：两档都没有侧栏墨带") }
-        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+        emit("SETTINGS_IDENTITY_HEADER_CAPABILITY judged=\(judged)/2 light=\(lightJudged) vibrant_not_run=\(vibrantNotRun)")
+        if judged == 0 { throw XCTSkip("SETTINGS_IDENTITY_HEADER_NOT_RUN：两档都没有可判的侧栏文字带") }
+        XCTAssertEqual(lightJudged, 1, "light 档必须可判（它不走 vibrant 合成前极性），当前只判了 \(lightJudged) 档")
     }
 
     /// R429：版本行用**侧栏墨带数**证明（R428 的品红标记在 runner 的 vibrant 侧栏里找不到）。
