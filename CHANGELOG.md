@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置窗口标题栏与主窗口统一（真窗口表面；产品 1 文件 + 判据）（R503 / 第 502 轮 / U-1976…U-1981）
+
+
 ### 主窗口标题栏：title 保留、标题显式隐藏、去掉通栏分隔线（R502 / 第 501 轮 / U-1970…U-1975 · 产品 1 文件 + 判据）
 
 

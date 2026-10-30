@@ -8358,3 +8358,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：像素不变；新增真窗口值判据 `testMainWindowHidesItsTitlebarTitleButKeepsTheName` 与 M1347/M1348。
 - 边界：实拍通道在屏幕被占用时不可用；后续用 `screencapture -l` 或先确认 App 在前台，不截非 App 区域。
 
+## D-499 设置窗口与主窗口共用同一套自定义标题栏（R503）
+
+- 背景：主窗口已是自定义 chrome（title 保留不画、无系统分隔线）；设置窗口仍画「设置」标题和通栏分隔线（真窗口实拍：标题带墨 1915、有分隔线）。
+- 决定：`SettingsWindowController` 设 `titleVisibility = .hidden`、`titlebarAppearsTransparent = true`、`titlebarSeparatorStyle = .none`，title 保留给 Mission Control/读屏。
+- 理由：同一 App 的两扇窗口要一套标题栏语言；设置页自己的标题（快捷键/通用/…）已提供层级，窗口标题是重复信息。
+- 兼容性/迁移：离屏帧不变；新增真窗口值判据 + M1350/M1351；after 标题带墨 1915→1210（余下为红绿灯）。
+- 边界：真窗口实拍须用 `-l <windowID>`（R502/R503 教训）；屏幕被占时不要截非 App 区域。
+

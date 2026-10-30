@@ -55,6 +55,13 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: makeSettingsView())
         let window = NSWindow(contentViewController: hostingController)
         window.title = "设置"
+        // R503：主窗口是自定义 chrome（title 保留但不画、无系统分隔线）；设置窗口原来还画着
+        // 「设置」标题和一条通栏分隔线 —— 同一 App 的两扇窗口两套标题栏语言。这里统一。
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        if #available(macOS 11.0, *) {
+            window.titlebarSeparatorStyle = .none
+        }
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: SettingsViewLayout.windowContentSize.width, height: SettingsViewLayout.windowContentSize.height))

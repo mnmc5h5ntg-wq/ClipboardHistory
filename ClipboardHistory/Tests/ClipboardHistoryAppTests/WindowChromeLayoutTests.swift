@@ -176,6 +176,37 @@ final class WindowChromeLayoutTests: XCTestCase {
                       "没观察窗口的几何变化：首帧之后窗口变了，头部也不会跟着让")
     }
 
+    /// R503：设置窗口与主窗口共用同一套自定义标题栏：title 保留（读屏/Mission Control），
+    /// 但不画标题、不画系统分隔线。主窗口这条已在 R502 钉住；这里是第二扇窗口。
+    func testSettingsWindowUsesTheSameCustomChromeAsTheMainWindow() throws {
+        _ = NSApplication.shared
+        let controller = SettingsWindowController(
+            showMainWindowHotKeySettings: HotKeySettings(action: .showMainWindow),
+            repeatCopyHotKeySettings: HotKeySettings(action: .repeatCopy),
+            loginItemSettings: LoginItemSettings())
+        controller.show()
+        defer {
+            NSApplication.shared.windows
+                .filter { $0.title == "设置" }
+                .forEach { $0.orderOut(nil) }
+        }
+        let deadline = Date().addingTimeInterval(3.0)
+        var settingsWindow: NSWindow?
+        while Date() < deadline {
+            settingsWindow = NSApplication.shared.windows.first {
+                $0.contentViewController is NSHostingController<SettingsView>
+            }
+            if settingsWindow != nil { break }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        let window = try XCTUnwrap(settingsWindow, "找不到设置窗口 ⇒ 这条判据没有对象")
+        XCTAssertEqual(window.title, "设置", "窗口名保留给 Mission Control/读屏")
+        XCTAssertEqual(window.titleVisibility, .hidden, "设置窗口与主窗口一样不画标题")
+        if #available(macOS 11.0, *) {
+            XCTAssertEqual(window.titlebarSeparatorStyle, .none, "设置窗口也不画系统分隔线")
+        }
+    }
+
     // MARK: - 侧栏不可收起（系统设置那样永远在）
 
     /// A/B 两半都要：
