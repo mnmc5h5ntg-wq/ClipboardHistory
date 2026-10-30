@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 状态菜单推荐理由类型词去重（真窗口 533.5→499.5pt；R507 / 第 506 轮 / Round 504 / U-2003…U-2008 · 产品 1 文件 + 判据）
+
+
 ### 状态菜单推荐行恢复推荐理由（真窗口 240.5→533.5pt；R506 / 第 505 轮 / Round 503 / U-1995…U-2000 · 产品 2 文件 + 判据）
 
 
