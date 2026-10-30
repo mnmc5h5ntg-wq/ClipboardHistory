@@ -34,6 +34,18 @@ final class TimestampYearPolicyTests: XCTestCase {
                                                      calendar: calendar))
     }
 
+    /// R509：详情头的时间戳与列表用同一种日期语言（年月日），不是 ISO 短横线。
+    func testDetailTimestampUsesTheSameDateLanguageAsTheList() {
+        let at = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30,
+                                                    hour: 21, minute: 9, second: 55))!
+        let detail = ClipboardDateFormatters.detailTimestamp.string(from: at)
+        let list = ClipboardDateFormatters.sidebarTimeWithYear.string(from: at)
+        XCTAssertEqual(detail, "2026年10月30日 21:09:55", detail)
+        XCTAssertEqual(list, "2026年10月30日 21:09", list)
+        XCTAssertFalse(detail.contains("-"), "详情时间戳又回到 ISO 短横线语言：\(detail)")
+        XCTAssertFalse(list.contains("-"), "列表时间戳又回到 ISO 短横线语言：\(list)")
+    }
+
     func testFormatterUsesYearOnlyAcrossTheBoundary() {
         let old = date(year: 2025), new = date(year: 2026)
         let compact = ClipboardDateFormatters.sidebarTime(for: old, reference: old)
