@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 状态菜单推荐行恢复推荐理由（真窗口 240.5→533.5pt；R506 / 第 505 轮 / Round 503 / U-1995…U-2000 · 产品 2 文件 + 判据）
+
+
 ### 状态菜单补标准快捷键列（设置 ⌘, / 退出 ⌘Q 可见）（R505 / 第 504 轮 / Round 502 / U-1988…U-1993 · 产品 1 文件 + 判据）
 
 

@@ -8389,3 +8389,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：vibrant 合成前极性（D-090）让暗档未选中文字在离屏通道不可见，整列材质与页面纸面的差被尺读成一条带 —— 那不是产品缺陷，也不能当身份头证据。
 - 边界：若未来要把暗档纳入 runner 门，先给 `sidebarInkBands` 立**列内纸面估计**的替代仪器（配刀），不许直接把 <3 的出口删掉或放宽 light 等式。
 
+## D-503 状态菜单的推荐理由并进同一个 Text（R506）
+
+- 背景：macOS 13+ 的状态菜单是 SwiftUI `MenuBarExtra`（`.menu`），菜单项标签会被拍平成单个文本。推荐行原来 HStack 两列（标题 + 右侧理由），真窗口 `screencapture -l` 只留下标题：菜单 240.5×318pt、三条推荐最右墨 147/176/159pt，而 `RecommendationPresenter.reason` 至少返回类型标签 ⇒ 理由整段不可见。
+- 决定：新增 `MenuRecommendationPresentation.reasonSuffix`，推荐行改为单个 `Text(label) + Text(reasonSuffix)`（理由 `VisualFont.meta` + secondary）；不再用 HStack/Spacer 做第二列。
+- 理由：真实菜单的拍平行为是系统边界，不是布局偏好；把理由并进同一个可被拍平的文本，是唯一既保住信息又不改菜单语义的写法。
+- 兼容性/迁移：真窗口菜单 240.5→533.5pt；离屏 `menubar-recommendations` 两帧变化（HStack 右列 → 行内），基线同提交 update；既有 replica 判据从「顶到 0 边」重锚为截断带 + 负向臂（314.5/256 对 320）。
+- 边界：离屏帧**拍不到**这次缺陷（它渲染的是 SwiftUI 视图，HStack 第二列会画出来）⇒ 验收必须走真窗口通道；帧基线只证明布局变化，不证明菜单行为（610）。
+
