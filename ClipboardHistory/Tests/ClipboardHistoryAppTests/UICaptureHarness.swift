@@ -1459,6 +1459,67 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R501 · 录制帧重复渲染确定性
+
+    /// R501：录制态卡片曾在 runner 上同跑两读 30/0 与 12/11（R499 补了有界布局落定）。
+    /// 这条判据把「同一夹具两次渲染必须逐像素一致」变成会红的读数：
+    /// 任何一次快门打在动画/布局未落定的相位，都会在这里以 `diff_px > 0` 具名。
+    func testRecordingCardFrameIsDeterministicAcrossRenders() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r501-recording-reread-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "settings-shortcuts-recording" }) else {
+                return XCTFail("\(tag)：找不到录制态夹具 ⇒ 这条判据没有对象")
+            }
+            let first = scratch.appendingPathComponent("one-\(tag).png")
+            let second = scratch.appendingPathComponent("two-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: first)
+            _ = try render(fixture, appearance: appearance, to: second)
+            guard let image1 = NSImage(contentsOf: first),
+                  let rep1 = NSBitmapImageRep(data: image1.tiffRepresentation ?? Data()),
+                  let base1 = rep1.bitmapData,
+                  let image2 = NSImage(contentsOf: second),
+                  let rep2 = NSBitmapImageRep(data: image2.tiffRepresentation ?? Data()),
+                  let base2 = rep2.bitmapData,
+                  rep1.pixelsWide == rep2.pixelsWide, rep1.pixelsHigh == rep2.pixelsHigh else {
+                return XCTFail("\(tag)：两次渲染读不回来/尺寸不同 ⇒ 这条判据没有对象")
+            }
+            let page = Self.modalLuma(bytes: base1, bytesPerRow: rep1.bytesPerRow,
+                                      xRange: 0..<rep1.pixelsWide, yRange: 0..<rep1.pixelsHigh)
+            let alphaFirst = rep1.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            var diff = 0, ink = 0
+            for y in 0..<rep1.pixelsHigh {
+                for x in 0..<rep1.pixelsWide {
+                    let i = y * rep1.bytesPerRow + x * rep1.samplesPerPixel
+                    if base1[i] != base2[i] || base1[i + 1] != base2[i + 1]
+                        || base1[i + 2] != base2[i + 2] || base1[i + 3] != base2[i + 3] {
+                        diff += 1
+                    }
+                    let luma = 0.2126 * Double(base1[i + rOff])
+                        + 0.7152 * Double(base1[i + rOff + 1])
+                        + 0.0722 * Double(base1[i + rOff + 2])
+                    if abs(luma - Double(page)) >= 30 { ink += 1 }
+                }
+            }
+            emit("RECORDING_REREAD \(tag) diff_px=\(diff) 墨=\(ink)"
+                 + " 倍率=\(String(format: "%.1f", Double(rep1.pixelsWide) / Double(fixture.size.width)))x")
+            if ink == 0 {
+                emit("RECORDING_REREAD_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            XCTAssertEqual(diff, 0, "\(tag)：同一夹具两次渲染差 \(diff)px ⇒ 录制帧不确定（快门相位/布局）")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("RECORDING_REREAD_NOT_RUN：两档都没有可判录制帧") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到两次渲染")
+    }
+
     // MARK: - R498 · 通用页最小窗孤字行
 
     /// R498：640pt 最小窗下 RTF 说明段最后一行只剩「本。」（末行墨宽 14pt）—— 孤字行。
