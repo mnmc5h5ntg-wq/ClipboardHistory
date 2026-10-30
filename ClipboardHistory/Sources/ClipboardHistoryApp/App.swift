@@ -34,11 +34,13 @@ struct ClipboardHistoryApp: App {
                     )) {
                         appDelegate.perform(command)
                     }
+                    .modifier(MenuCommandShortcutModifier(command: command))
                 }
                 Divider()
                 Button(AppCommand.quit.title) {
                     appDelegate.perform(.quit)
                 }
+                .modifier(MenuCommandShortcutModifier(command: .quit))
             } label: {
                 // R418：暂停时菜单栏那颗图标要有一道斜杠（BACKLOG 443）。
                 // 标签视图自己引用 `MenuBarController.statusSymbolName`，与 12 那颗图同一个名字。

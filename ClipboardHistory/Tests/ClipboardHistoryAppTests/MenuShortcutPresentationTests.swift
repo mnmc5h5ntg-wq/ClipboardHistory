@@ -116,6 +116,24 @@ final class MenuShortcutPresentationTests: XCTestCase {
                       "快速选择没有进菜单命令区")
     }
 
+    /// R505：状态菜单（macOS 13+ 的 SwiftUI MenuBarExtra）里，两条标准快捷键
+    /// （⌘, / ⌘Q）之前一个字都不画 —— Button 不挂 `.keyboardShortcut` 时菜单没有右对齐那一列。
+    /// 全局热键（⌃⌥V / ⌃⌥⇧V）仍走标题里的行内提示：给它们挂本地键等于造第二条触发路径。
+    func testStandardShortcutsAreVisibleInTheSwiftUIMenu() throws {
+        XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .showSettings), ",")
+        XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .quit), "q")
+        for command in [AppCommand.showMainWindow, .showQuickPick, .refreshHistory,
+                        .clearHistory, .dismissAllRecommendations] {
+            XCTAssertNil(MenuCommandShortcutPresentation.keyEquivalent(for: command),
+                         "\(command) 是全局热键或没有快捷键 ⇒ 不许挂本地等价物：会造出第二条触发路径")
+        }
+        let app = codeOnly(try productSource(named: "App.swift"))
+        XCTAssertTrue(app.contains(".modifier(MenuCommandShortcutModifier(command: command))"),
+                      "命令区没有把标准快捷键修饰器挂上去 ⇒ 菜单里仍然看不到 ⌘, / ⌘Q")
+        XCTAssertTrue(app.contains(".modifier(MenuCommandShortcutModifier(command: .quit))"),
+                      "退出项没有把标准快捷键修饰器挂上去")
+    }
+
     private func codeOnly(_ source: String) -> String {
         source.components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
