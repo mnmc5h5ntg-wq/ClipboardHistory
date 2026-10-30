@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 设置侧栏补身份头（62 张旧帧变化 + 2 张新帧、基线 332）（R504 / 第 503 轮 / Round 501 / U-1982…U-1987 · 产品 1 文件 + 判据）
+
+
 ### 设置窗口标题栏与主窗口统一（真窗口表面；产品 1 文件 + 判据）（R503 / 第 502 轮 / U-1976…U-1981）
 
 
