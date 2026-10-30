@@ -151,13 +151,7 @@ struct WindowConfigurator: NSViewRepresentable {
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
             // Aggressive follow-up: SwiftUI may recreate the toggle across several frames
-            for delay in [0.0, 0.02, 0.08, 0.2, 0.5, 1.0] {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self, let window = self.configuredWindow else { return }
-                    self.removeSidebarToolbarButton(from: window)
-                    self.pinSidebarVisible(in: window)
-                }
-            }
+            scheduleSidebarCleanup(for: window)
         }
 
         func windowDidBecomeKey(_ notification: Notification) {
@@ -179,12 +173,14 @@ struct WindowConfigurator: NSViewRepresentable {
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            scheduleSidebarCleanup(for: window)
         }
 
         func windowDidEndLiveResize(_ notification: Notification) {
             guard let window = notification.object as? NSWindow else { return }
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            scheduleSidebarCleanup(for: window)
         }
 
         func windowDidMove(_ notification: Notification) {
@@ -241,11 +237,56 @@ struct WindowConfigurator: NSViewRepresentable {
         }
 
         private func removeSidebarToolbarButton(from window: NSWindow) {
-            guard let toolbar = window.toolbar else { return }
-            for index in toolbar.items.indices.reversed() {
-                let item = toolbar.items[index]
-                if isSidebarToolbarItem(item) {
-                    toolbar.removeItem(at: index)
+            if let toolbar = window.toolbar {
+                for index in toolbar.items.indices.reversed() {
+                    let item = toolbar.items[index]
+                    if isSidebarToolbarItem(item) {
+                        toolbar.removeItem(at: index)
+                    }
+                }
+            }
+            // R510：窄窗时 SwiftUI 会把侧栏开关作为**标题栏里的按钮**重新放回来，
+            // 它不在 `window.toolbar` 里（AX 读作 `AXButton desc=[隐藏边栏]`），
+            // 旧的工具栏清理抓不到它。这里按可访问文案/提示在视图树里把它藏起来。
+            hideSidebarToggleControls(in: window)
+        }
+
+        private func hideSidebarToggleControls(in window: NSWindow) {
+            for root in [window.contentView, window.contentView?.superview] {
+                guard let root else { continue }
+                hideSidebarToggleControls(in: root)
+            }
+        }
+
+        private func hideSidebarToggleControls(in view: NSView) {
+            if let button = view as? NSButton, isSidebarToggleControl(button) {
+                button.isHidden = true
+            }
+            for subview in view.subviews {
+                hideSidebarToggleControls(in: subview)
+            }
+        }
+
+        private func isSidebarToggleControl(_ button: NSButton) -> Bool {
+            let fields = [
+                button.title,
+                button.toolTip ?? "",
+                button.accessibilityLabel() ?? "",
+                button.identifier?.rawValue ?? ""
+            ].map { $0.localizedLowercase }
+            return fields.contains { field in
+                field.contains("边栏") || field.contains("sidebar")
+            }
+        }
+
+        /// R510：resize 之后再补几轮清理 —— SwiftUI 的标题栏开关是异步放回来的，
+        /// 只在 `windowDidResize` 当场摘一次会漏（最小窗复现：当场 AX 无工具栏，稍后按钮出现）。
+        private func scheduleSidebarCleanup(for window: NSWindow) {
+            for delay in [0.0, 0.05, 0.15, 0.4, 0.9] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak window] in
+                    guard let self, let window else { return }
+                    self.removeSidebarToolbarButton(from: window)
+                    self.pinSidebarVisible(in: window)
                 }
             }
         }

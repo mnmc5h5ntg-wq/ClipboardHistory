@@ -46,6 +46,21 @@ final class TimestampYearPolicyTests: XCTestCase {
         XCTAssertFalse(list.contains("-"), "列表时间戳又回到 ISO 短横线语言：\(list)")
     }
 
+    /// R510：详情头沿用列表的年份策略 —— 同年省年、跨年带年，秒始终保留。
+    func testDetailTimestampUsesTheYearPolicyLikeTheList() {
+        let at = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30,
+                                                    hour: 21, minute: 9, second: 55))!
+        let sameYear = calendar.date(from: DateComponents(year: 2026, month: 12, day: 1))!
+        let nextYear = calendar.date(from: DateComponents(year: 2027, month: 1, day: 1))!
+        let compact = ClipboardDateFormatters.detailTimestamp(for: at, reference: sameYear)
+        let withYear = ClipboardDateFormatters.detailTimestamp(for: at, reference: nextYear)
+        XCTAssertEqual(compact, "10月30日 21:09:55", compact)
+        XCTAssertEqual(withYear, "2026年10月30日 21:09:55", withYear)
+        XCTAssertFalse(compact.contains("年"), compact)
+        XCTAssertTrue(withYear.hasPrefix("2026年"), withYear)
+        XCTAssertTrue(compact.contains(":55") && withYear.contains(":55"), "秒必须保留")
+    }
+
     func testFormatterUsesYearOnlyAcrossTheBoundary() {
         let old = date(year: 2025), new = date(year: 2026)
         let compact = ClipboardDateFormatters.sidebarTime(for: old, reference: old)

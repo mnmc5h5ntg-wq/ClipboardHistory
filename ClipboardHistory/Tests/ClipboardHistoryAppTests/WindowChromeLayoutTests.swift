@@ -376,6 +376,51 @@ final class WindowChromeLayoutTests: XCTestCase {
                        "删多了：\(ids)")
     }
 
+    /// R510：窄窗时 SwiftUI 会把侧栏开关作为**标题栏里的按钮**放回来（不在 `window.toolbar` 里）。
+    /// 产品配置入口必须把这条视图树里的按钮一并藏掉。
+    func testConfiguringAWindowHidesTitlebarSidebarToggleControls() throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        defer { window.orderOut(nil) }
+        let savedInset = WindowChromeMetrics.shared.detailContentTopInset
+        defer { WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedInset) }
+        let toggle = NSButton(title: "", target: nil, action: nil)
+        toggle.toolTip = "隐藏边栏"
+        toggle.frame = NSRect(x: 300, y: 500, width: 40, height: 24)
+        window.contentView?.addSubview(toggle)
+        window.makeKeyAndOrderFront(nil)
+        XCTAssertFalse(toggle.isHidden, "夹具前提：进配置之前这颗按钮是可见的")
+
+        let coordinator = WindowConfigurator().makeCoordinator()
+        coordinator.configure(window: window)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        XCTAssertTrue(toggle.isHidden, "标题栏里的「隐藏边栏」按钮没被藏起来 ⇒ 最小窗又会出现侧栏开关")
+    }
+
+    /// R510：resize 之后 SwiftUI 才把按钮放回来 ⇒ resize 的延迟清理必须能抓到它。
+    func testAResizeScheduleHidesASidebarToggleThatAppearsLate() throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 492),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        defer { window.orderOut(nil) }
+        let savedInset = WindowChromeMetrics.shared.detailContentTopInset
+        defer { WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedInset) }
+        window.makeKeyAndOrderFront(nil)
+        let coordinator = WindowConfigurator().makeCoordinator()
+        coordinator.windowDidResize(Notification(name: NSWindow.didResizeNotification, object: window))
+
+        let late = NSButton(title: "", target: nil, action: nil)
+        late.toolTip = "隐藏边栏"
+        late.frame = NSRect(x: 280, y: 460, width: 40, height: 24)
+        window.contentView?.addSubview(late)
+        XCTAssertFalse(late.isHidden, "夹具前提：resize 之后放回来的按钮是可见的")
+        RunLoop.main.run(until: Date().addingTimeInterval(1.1))
+        XCTAssertTrue(late.isHidden, "resize 的延迟清理没抓到之后才出现的侧栏开关")
+    }
+
     /// 把"拖不动"这件事变成可复算的数，而不是"关了 canCollapse 应该就拖不动了"的推断。
     /// 量两个量：① `minPossiblePositionOfDivider(at: 0)` —— 分隔条**能去的最左位置**，
     /// 也就是用户能拖到的极限；② 真的把 `setPosition`（拖拽走的正是这个方法）按到 0 与 80，

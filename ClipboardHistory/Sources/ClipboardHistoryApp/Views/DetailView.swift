@@ -250,7 +250,9 @@ struct DetailView: View {
 
     private func metaText(_ entry: HistoryStore.Entry, includeCopyVerb: Bool) -> String {
         DetailTypography.metaText(
-            copiedAt: ClipboardDateFormatters.detailTimestamp.string(from: entry.timestamp),
+            copiedAt: ClipboardDateFormatters.detailTimestamp(
+                for: entry.timestamp,
+                reference: historyStore.filteredEntries.map(\.timestamp).max()),
             size: entry.content.sizeDescription,
             sourceAppName: entry.sourceAppName,
             includeCopyVerb: includeCopyVerb

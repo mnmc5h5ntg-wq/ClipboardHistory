@@ -40,4 +40,19 @@ enum ClipboardDateFormatters {
         formatter.dateFormat = "yyyy年M月d日 HH:mm:ss"
         return formatter
     }()
+
+    /// R510：同年省年 —— 详情头沿用列表的年份策略（参照 = 当前列表最新一条）。
+    /// 最小窗里全长日期会把时间与「N 个字符」截掉（2026年10月30日…），同年省年后时间还在。
+    static let detailTimestampCompact: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日 HH:mm:ss"
+        return formatter
+    }()
+
+    static func detailTimestamp(for date: Date, reference: Date?) -> String {
+        TimestampYearPolicy.showsYear(for: date, relativeTo: reference)
+            ? detailTimestamp.string(from: date)
+            : detailTimestampCompact.string(from: date)
+    }
 }
