@@ -77,19 +77,16 @@ struct MenuBarRecommendationsView: View {
                         // 第三轮审计 U-1：macOS 菜单项一律左对齐、不画自绘底、不把内部指标端出来。
                         // 旧写法是"标题\n理由"两行居中卡片，理由还带着 24% 这种原始分数。
                         // 现在：标题在左、理由在右且更弱色，一行读完，与系统菜单同一套语言。
-                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        // R506：菜单项标签会被 SwiftUI 拍平成单个文本 —— HStack 的第二列
+                        //（推荐理由）整段消失。并进同一个 Text，理由用弱一档的字号与颜色。
+                        (
                             Text(label)
-                                .lineLimit(1)
-                            Spacer(minLength: 12)
-                            if !reasonText.isEmpty {
-                                Text(reasonText)
-                                    .font(.system(size: VisualFont.meta))
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                    .layoutPriority(-1)
-                            }
-                        }
+                            + Text(MenuRecommendationPresentation.reasonSuffix(reasonText))
+                                .font(.system(size: VisualFont.meta))
+                                .foregroundColor(.secondary)
+                        )
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                     }
