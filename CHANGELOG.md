@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 两处搜索入口共用占位文案（QuickPick「搜索历史记录…」→「搜索历史…」；R508 / 第 507 轮 / Round 505 / U-2009…U-2014 · 产品 2 文件 + 判据）
+
+
 ### 状态菜单推荐理由类型词去重（真窗口 533.5→499.5pt；R507 / 第 506 轮 / Round 504 / U-2003…U-2008 · 产品 1 文件 + 判据）
 
 
