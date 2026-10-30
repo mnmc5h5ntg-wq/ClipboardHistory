@@ -8350,3 +8350,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：把捕获相位问题变成会红的读数，比再写一条散文更接近根因；噪声哈希不 update，避免把环境噪声洗成产品基线。
 - 边界：新判据的 runner 1x 读数待下一跑；源图标噪声若持续需在基线工具里立噪声通道。
 
+## D-498 主窗口标题栏：title 保留、标题显式隐藏（R502）
+
+- 背景：真窗口帧里标题栏空白；临时显式画出 title 后，它与详情头部来源图标重叠（实拍可见）。
+- 决定：`WindowConfigurator` 显式 `title = "时间剪史"`、`titleVisibility = .hidden`，把自定义标题栏写成契约；title 字符串留给 Mission Control/读屏。
+- 理由：空白标题栏是设计（应用名在侧栏标题），不是缺字；显式隐藏可防系统默认/未来 OS 把 title 画出来压住详情。
+- 兼容性/迁移：像素不变；新增真窗口值判据 `testMainWindowHidesItsTitlebarTitleButKeepsTheName` 与 M1347/M1348。
+- 边界：实拍通道在屏幕被占用时不可用；后续用 `screencapture -l` 或先确认 App 在前台，不截非 App 区域。
+

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主窗口标题栏标题策略：title 保留、标题显式隐藏（R502 / 第 501 轮 / U-1970…U-1975 · 产品 1 文件 + 判据）
+
+
 ### 通用页 RTF 说明段最小窗孤字行（12 张旧帧变化 + 4 张新帧、基线 330）（R498 / 第 497 轮 / Round 495 / U-1947…U-1952 · 产品 1 文件 + 判据）
 
 

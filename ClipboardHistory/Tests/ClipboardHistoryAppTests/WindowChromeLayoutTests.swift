@@ -140,6 +140,30 @@ final class WindowChromeLayoutTests: XCTestCase {
                                     + " —— 详情头部会压在交通灯上")
     }
 
+    /// R502：主窗口标题栏的标题策略。真窗口帧里标题栏是空的（应用名在侧栏标题里），
+    /// 而 title 字符串仍要保留给 Mission Control/读屏。把「标题不画」写成显式契约：
+    /// 一旦系统默认把 title 画出来，它会与详情头部撞在一起（R502 实拍：title 覆盖来源图标上方）。
+    func testMainWindowHidesItsTitlebarTitleButKeepsTheName() throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        defer { window.orderOut(nil) }
+        window.titlebarAppearsTransparent = true
+        let host = NSHostingView(rootView: AnyView(WindowConfigurator().frame(width: 1, height: 1)))
+        host.frame = NSRect(x: 0, y: 0, width: 750, height: 560)
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        let deadline = Date().addingTimeInterval(3.0)
+        while Date() < deadline, window.titleVisibility != .hidden {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        XCTAssertEqual(window.titleVisibility, .hidden,
+                       "主窗口是自定义标题栏：标题栏里的 title 必须显式隐藏（否则会压到详情头部）")
+        XCTAssertEqual(window.title, "时间剪史",
+                       "窗口名要保留给 Mission Control/读屏")
+    }
+
     func testDetailViewConsumesThePublishedInset() throws {
         let source = try productSource(named: "Views/DetailView.swift")
         XCTAssertTrue(source.contains(".padding(.top, chrome.detailContentTopInset)"),

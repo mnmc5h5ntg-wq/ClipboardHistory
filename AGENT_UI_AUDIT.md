@@ -363,6 +363,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-1975）：主窗口标题栏标题策略（真窗口表面；产品 1 文件 + 判据）
+
+- **U-1970：⓪ push 与 CI。** 开工 `git push` no-op（HEAD=origin/main=`ec299eb`、ahead=0）。`41068373712 ↔ dac7e17` 读时 in_progress（STEP[9] 已红）⇒ NOT-RUN；`41062934158 ↔ 79eb4fb` failure Release 2 条（hygiene + 内层 skip roster，已由 817a014 修）；`41063726929 ↔ 817a014` failure 仅 Motion `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（已知采样 flake；Swift/Capture 绿：15.8 键一致、录制帧 12/11）。436 沿用 R481 跑 reds=0。
+- **U-1971：① 真实窗口表面与读数。** 走产品入口（⌘S「显示主窗口」）打开主窗口，用 `screencapture -R` 只截该窗口矩形：**标题栏是空的**（窗口 `title="时间剪史"` 但未画出，应用名只在侧栏标题）。为验证「画出 title 会怎样」，临时把 `titleVisibility` 设为 `.visible` 并换装实拍：title 出现在窗口中央、**压在详情头部来源图标上方**（实拍可见），说明这个空白不是缺字，而是自定义标题栏的设计。
+- **U-1972：② 产品：把「标题不画」写成显式契约。** 修法：`WindowConfigurator` 显式 `window.title = "时间剪史"` + `window.titleVisibility = .hidden`（title 字符串保留给 Mission Control/读屏；像素与此前一致，但不再依赖系统默认）。产品 1 文件；离屏帧不变。
+- **U-1973：③ 判据与刀。** 新 `testMainWindowHidesItsTitlebarTitleButKeepsTheName`（挂产品 `WindowConfigurator` 的真窗口）：断言 `titleVisibility == .hidden`、`title == "时间剪史"`。刀 `M1347`（改 `.visible`）/`M1348`（title 清空）**2/2 CAUGHT**、`RESTORE_CLEAN=yes`。
+- **U-1974：④ 帧卷与实拍边界。** 捕获卷 **330 帧**、89 张 changed 仍为源图标栅格噪声（16×16px、最大差 7/255）⇒ **不入基线**；第二次实拍时屏幕被其他应用占据，**未截取非 App 区域**，改用早前同构帧（title 隐藏）作最终态证据。
+- **U-1975：⑤ 八步与电池。** build **0 告警**（arm64 冷编）；预检 **281/258/690 bad=0**、ARM **374/1177**、HIDDEN **368/1116 rot=0**；全量 **1316/56/0**（678.0s）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库 419 条，非产品增删）；电池在台账后复跑；清账 162/63/0。收口 push 见补记。
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 
 - **U-1964：⓪ push 与 CI。** 开工 `git push` no-op（Everything up-to-date）、HEAD=origin/main=`817a014`、**ahead=0**。成对读数：`41062934158 ↔ 79eb4fb` failure Release 2 条（commit-subject hygiene + 内层 skip roster，已由 817a014 的 AHEAD_ROSTER 登记修复）；`41063726929 ↔ 817a014` failure 仅 Motion `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（已知采样 flake；Swift/Capture 绿）；`41068373712 ↔ dac7e17` in_progress ⇒ NOT-RUN；`41057812582 ↔ 4963281` failure 仅 `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime` 1 条采样 flake（同跑 15.8 键登记 0、录制帧 12/11）；`41058094730 ↔ eae195b` success（1314/81/0，同读数）；`41051398635 ↔ d87d258` failure 仅 15.8 UNKEYED（已修）；`40941281838 ↔ c9d8d6c` failure 仅 Capture（30/0，同跑后读 12/11）。436 沿用 R481 跑 reds=0。

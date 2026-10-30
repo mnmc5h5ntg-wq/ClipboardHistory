@@ -88,6 +88,11 @@ struct WindowConfigurator: NSViewRepresentable {
             window.identifier = WindowManager.mainWindowIdentifier
             WindowManager.registerMainWindow(window)
             window.titlebarAppearsTransparent = true
+            // R502：透明标题栏 + fullSizeContentView 是自定义标题栏（应用名在侧栏标题里）。
+            // 把「标题不画」写成显式契约：真窗口帧里若让系统画 title，它会与详情头部撞在一起
+            //（R502 实拍：title 覆盖在来源图标上方）；title 字符串仍保留给 Mission Control/读屏。
+            window.title = "时间剪史"
+            window.titleVisibility = .hidden
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = [.managed, .fullScreenNone]
             window.setContentSize(NSSize(width: 750, height: 560))
