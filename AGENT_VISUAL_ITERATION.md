@@ -20180,6 +20180,8 @@ QuickPick 浮层真窗口（`screencapture -l`，420×300）的搜索框 AX 占�
 
 真窗口同一屏里，列表行 `10月30日 21:09`、详情头 `2026-10-30 21:09:55` —— 同一时间戳两种日期语言。修法：`ClipboardDateFormatters.detailTimestamp` 从 `yyyy-MM-dd HH:mm:ss` 改成 `yyyy年M月d日 HH:mm:ss`（列表已是年月日；秒与年份都保留）。after 真窗口 `2026年10月30日 21:09:55`、离屏 `2025年10月9日 16:52:50`；90 张 content/detail 帧同笔变化。判据 `TimestampYearPolicyTests`（固定日期 + 都不含 `-`），M1364/M1365 2/2。捕获 332 帧、CHANGED=132 = 90 结构 + 42 噪声（39 张重叠），基线更新 90 张（332）、复核 CHANGED=42。预检 288/265/707、ARM 381/1194、HIDDEN 375/1133 rot=0。全量 **1324/56/0（739.2s）**；build 0 告警；换装 ok/419=419；电池 683/5。⓪ push no-op（HEAD=origin=b3d7c49、ahead=0）；两跑 NOT-RUN、20cf54d 仅 Release 时序、1654292 success。另：最小窗曾偶现「隐藏边栏」按钮，未复现（614，NOT-RUN）。
 
+⑥ R508 两跑签收：`133fcc5` 仅 Release 时序（Swift/Capture 全绿、replica 295/217）、`b3d7c49` success；R509 两跑 in_progress ⇒ NOT-RUN。
+
 **七维度自评**（恰七行，每格 n/15）：
 
 | 维度 | 分 | 依据 |
