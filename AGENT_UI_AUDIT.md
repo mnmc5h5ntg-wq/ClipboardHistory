@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 502 轮（R503 · 2026-10-30 · U-1976…U-1981）：设置窗口标题栏与主窗口统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-1981）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -371,8 +371,6 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-1979：③ 复拍/判据/刀。** after 只截设��窗口：标题带墨 **1915 → 1210**（余下 1210 是红绿灯本体，标题文字 bbox 消失），通栏分隔线不再出现。新判据 `testSettingsWindowUsesTheSameCustomChromeAsTheMainWindow`（构造产品 `SettingsWindowController` 并 `show()`）：title=设置、titleVisibility hidden、separator none。刀 `M1350`（visible）/`M1351`（separator .line）**2/2 CAUGHT**、`RESTORE_CLEAN=yes`。
 - **U-1980：④ 帧卷。** 捕获卷 **330 帧**、89 张 changed 仍为源图标栅格噪声（16×16、差 7/255）⇒ **不入基线**。
 - **U-1981：⑤ 八步与电池。** build **0 告警**（arm64 冷编）；预检 **282/259/693 bad=0**、ARM **375/1180**、HIDDEN **369/1119 rot=0**；全量 **1317/56/0**（711.7s）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库）；电池在台账后复跑；清账 162/63/0。收口 push 见补记。
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-1975）：主窗口标题栏标题策略（真窗口表面；产品 1 文件 + 判据）
-
 - **U-1970：⓪ push 与 CI。** 开工 `git push` no-op（HEAD=origin/main=`ec299eb`、ahead=0）。`41068373712 ↔ dac7e17` 读时 in_progress（STEP[9] 已红）⇒ NOT-RUN；`41062934158 ↔ 79eb4fb` failure Release 2 条（hygiene + 内层 skip roster，已由 817a014 修）；`41063726929 ↔ 817a014` failure 仅 Motion `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（已知采样 flake；Swift/Capture 绿：15.8 键一致、录制帧 12/11）。436 沿用 R481 跑 reds=0。
 - **U-1971：① 真实窗口表面与读数。** 走产品入口（⌘S「显示主窗口」）打开主窗口，用 `screencapture -R`/`-l <windowID>` 只截该窗口：**标题栏是空的**（窗口 `title="时间剪史"` 但未画出，应用名只在侧栏标题）。为验证「画出 title 会怎样」，临时把 `titleVisibility` 设为 `.visible` 并换装实拍：title 出现在窗口中央、**压在详情头部来源图标上方**（实拍可见），说明这个空白不是缺字，而是自定义标题栏的设计。另：透明标题栏下 59pt 处还有一条**通栏分隔线**（真窗口帧内容行 118，整行亮度 **77.4** vs 底 **39.0**），在自定义 chrome 里是一条孤立的亮线。
 - **U-1972：② 产品：把「标题不画」写成显式契约。** 修法：`WindowConfigurator` 显式 `window.title = "时间剪史"` + `window.titleVisibility = .hidden`（title 字符串保留给 Mission Control/读屏），并 `titlebarSeparatorStyle = .none` 去掉那条通栏亮线。产品 1 文件；离屏帧不变。真窗口 `-l` 复拍：标题栏带内不再有亮度 >41 的整行（before 77.4）⇒ 分隔线消失、标题仍不画。
