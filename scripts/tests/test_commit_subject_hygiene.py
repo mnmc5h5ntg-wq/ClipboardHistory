@@ -81,6 +81,11 @@ AHEAD_ROSTER = {
     # 于是 current_round() 静默停了一轮，把这一笔从「超前 1（设计允许）」推成「超前 2（该红）」。
     # 同笔已补写 R323 的 identity 行并要求 R324 起必带；这条豁免按 sha 键，扫描窗滑过就必须删（test_roster_must_retire）。
     u"07acf2e": u"R324 代码半先于轮次账（根因：R323 的 STATE 节缺 identity 行，BACKLOG 382）",
+    # R500 现读：79eb4fb 是 R500（第 499 轮 / Round 497）的**无产品变更记录**；R499 是空轮，
+    # STATE 故意不把空轮写成“当前轮”（否则 valid 轮对/迭代节会红）⇒ 这一笔自己的 STATE 仍报 R498，
+    # subject 写 R500 就是超前 2。它不是手抄错，是“空轮不记完成”的既有形状；已 push 不能改历史。
+    # 退场：扫描窗滑过这一笔之后必须删（`test_roster_must_retire`）。
+    u"79eb4fb": u"R500 无产品变更（空轮不记完成）；STATE 当前轮仍 R498 ⇒ subject 超前 2（BACKLOG 597/R500 记录）",
 }
 # 在册例外（**第二张**）：已 push、历史改不了的"subject 里根本没有轮次标签"。
 # 为什么不并进 `AHEAD_ROSTER`：那张只给"标签比台账新"这一类（代码半先于轮次账），
