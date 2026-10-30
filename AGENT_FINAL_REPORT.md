@@ -19,7 +19,7 @@
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
 | 阶段二 **488 轮**审计（R9–R495；以 `curve_from_ledger.py` 的 `PHASE2 n=488` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 495 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-1952（R498 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-1956（R499 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -1413,4 +1413,6 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 - **R497（搜索占位符省略号位）**：全仓动作文案十余处用单「…」，只有主侧栏搜索占位符写「搜索历史……」两个省略号。改「搜索历史…」，加缝 `searchPlaceholderForCapture`。**44 张旧帧 + 2 张新帧**，基线 **324→326**；`SEARCH_PLACEHOLDER` 正臂 60.5pt、负臂 71.0pt、差 10.5pt；M1341/M1342 2/2。⓪ push `2e7828f..1d3179a` success、ahead=0；R496 跑 success（1312/80/0；QUICKPICK_MATCH_HIGHLIGHT 1x 签收 ⇒ 592 结案）；R497 跑 queued ⇒ NOT-RUN；R495 跑 success（1311/80/0）。全量 1313/56/1（PerfBudget 本机 flake，单跑过）；build 0 告警；换装 ok/397=397；电池 683/5。
 
 - **R498（RTF 说明孤字行位）**：640pt 最小窗下 RTF 说明段最后一行只剩「本。」（末行墨宽 14pt）。把「文本。」用 U+00A0 绑成不断开的单元，加缝 `settingsRtfHelperCopyForCapture`。**12 张旧帧 + 4 张新帧**，基线 **326→330**；`RTF_HELPER_ORPHAN` 正臂 28.5/29.0pt、负臂 14.0/15.0pt；M1343/M1344 2/2。⓪ push `a98e65d..c9d8d6c` success、ahead=0；gh EOF ⇒ CI_READ_BLOCKED；R496 跑 success（QUICKPICK 1x 签收、592 结案）；R497 跑 queued ⇒ NOT-RUN；收口 `PUSH_BLOCKED=network`（HEAD=`05771dc`、origin/main=`c9d8d6c`、ahead=1）、`CI_READ_BLOCKED=network`，R498 跑未创建 ⇒ NOT-RUN。全量 1314/56/1；build 0 告警；换装 ok/397=397；电池 683/5。
+
+- **R499（空轮 Round=0，不记完成）**：候选位逐个排除——无序列表「•」放大字号会把行距撑高 3pt（已撤回）；复选框边界 1.2:1 是非活动窗口灰化（捕获事实）；列表正文列同 36.5pt；关于页版本行已全角括号；其余均为已完成类别。无产品变更。⓪ 网络恢复，remote main=`d87d258`、ahead=0；R497 跑 failure 仅 Release（Swift 1313/80/0 绿；SEARCH_PLACEHOLDER 1x 签收 ⇒ 593 结案）；R498 跑 in_progress ⇒ NOT-RUN。
 
