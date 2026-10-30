@@ -363,6 +363,21 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 498 轮续一（R499 续 · 2026-10-30 · U-1957…U-1959）：录制帧底留白的相位分诊
+
+- **U-1957：① 录制帧底留白红的分诊。** run `40941281838 ↔ c9d8d6c` 的 Capture gate 四条断言对象是 `settings-shortcuts-recording light`（内侧 `…/30.0/0.0`、底留白 1.0pt）。**但同一次跑稍后重读同一张帧是 `…/12.0/11.0`**（日志 19:44 vs 20:03），本机 2x 恒为 `14.0/14.5/14.0/12.0`；⇒ 这是快门打在 SwiftUI 布局尚未落定的相位，不是稳定的产品布局缺陷。没有据此盲改产品布局（本机复现不出 30/0）。
+- **U-1958：① 修复与复验。** 在录制夹具的 overlay 等待之后补一次**有界**布局落定：三轮 `layoutSubtreeIfNeeded + displayIfNeeded`（每轮泵 0.05s），并打 `RECORDER_LAYOUT_SETTLE waited_ms/轮=3`；不动任何期望值。复跑 `testSettingsCardVerticalRhythmIsOneNumber` 通过、录制帧仍 `14.0/14.5/14.0/12.0`；捕获卷 330 帧 **0 变化**（基线不变）。**没有登记新刀**：删掉这段等待在本机 2x 不产生可判读数变化，按“抓不到的刀不登记”。若 runner 新跑仍读到 30/0，则按 U-1959 当产品问题重开。
+- **U-1959：① 边界。** runner 1x 帧无法在本机复现（离屏窗口 2x）；settle 后若仍红，需要下一次跑把 1x 帧存档/用 `CARD_ABOVE` 的六段定位是哪一行，不许再拿同跑另一读掩盖。
+
+## 第 498 轮续二（R499 续 · 2026-10-30 · U-1960…U-1961）：sources 格时序与内层汇总
+
+- **U-1960：② sources 格时序红。** run `40937242846 ↔ a98e65d` 的 Release 三条红里，`FINAL_REPORT_SOURCES_CELL_STALE` 是**主笔跑早于补记**：那一笔的格还指 `R496/3c64394`，而 git 说 `a98e65d`。补记 `c9d8d6c` 的跑 `40941281838` **Release 已绿（唯一红是 Capture）** ⇒ 时序已被既有流程吸收；现读 `report_sources_cell.py` 账上=git=`R498/05771dc`。**未放宽任何守卫**。
+- **U-1961：② 内层无汇总的根因。** `skip_roster` 的“内层没有结论行”不是 flake：空轮 STATE 的「最后更新」行里带了下一轮三口径 `R500 / 第 499 轮`，`current_round()` 读成 (R500,第499)，`test_round_batch_consistency` 找不到对应审计节 ⇒ 内层 `FAILED` 而非 `OK (skipped=N)`。修法：空轮节改「记录（空轮，不记完成）」、下一轮编号改括号写法 `R500（第 499 轮 / Round 497）`；复跑 `test_round_batch_consistency` 3/3 + `test_skip_roster` **6/6 OK**。
+
+## 第 498 轮续三（R499 续 · 2026-10-30 · U-1962…U-1963）：runner 机器键与八步
+
+- **U-1962：③ runner 机器键。** run `40922562716 ↔ 2e7828f` 的 Swift gate 红在 `TEXT_SIDE_ROSTER_UNKEYED arm64/macOS 15.8/1x`（实测反侧 **0** 张）。按 R124 / BACKLOG 171 的既有出口登记这一台自己的空集声明：`"arm64/macOS 15.8/1x": []`，注释写自己的 run 来源与测法（同跑 27/27 夹具判完）；**没有复制 15.7 那行的措辞**，15.7 留旧账。本机 27.0/2x 复跑 `TEXT_SIDE_ROSTER_KEY 判了 25/25 ⇒ 一致`。
+- **U-1963：④ 八步与电池。** build **0 告警**（`scripts/warning_gate.sh` arm64 冷编）；捕获卷 **330 帧**、`CHANGED=0 ADDED=0 MISSING=0`；全量 **1314/56/1**（唯一红 PerfBudget 本机负载 flake，单跑原样复验）；**无产品文件 ⇒ 不换装**（具名 skip：本轮无 Sources 改动，397 保持 R498 装好的那份）；电池 **683/OK skipped=5**；清账 `格=162 声明=63 不成立=0/63`；工作树仅本轮测试/台账文件。收口 push 见补记。
 ## 第 498 轮（R499 · 2026-10-30 · 空轮 Round=0 · U-1953…U-1956）：无产品变更（候选位逐个排除；未验证改动已撤回；不记完成）
 
 - **U-1953：⓪ push 与 CI。** 开工网络已恢复：`git ls-remote` 读到 remote main=`d87d258`、HEAD=origin/main、**ahead=0**（R498 两笔主笔/补记已在 remote，无需再推）。`gh` 可读：R497 跑 `40937242846 ↔ a98e65d` **failure 仅 `STEP[9] Release script tests`**（Swift 1313/80/0 绿；sources 格为补记前形态）；同跑 `SEARCH_PLACEHOLDER` **1x 签收**（light 正臂 60.0 / 负臂 70.0、dark 61.0/71.0，差 10.0pt ⇒ **BACKLOG 593 结案**），`QUICKPICK_MATCH_HIGHLIGHT` 1x 已签收；R498 跑 `41051398635 ↔ d87d258` 读时 **in_progress ⇒ NOT-RUN**（`RTF_HELPER_ORPHAN` 1x 待读）。

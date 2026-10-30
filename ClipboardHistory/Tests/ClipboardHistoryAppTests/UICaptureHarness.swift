@@ -12698,6 +12698,18 @@ final class UICaptureTests: XCTestCase {
                 RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02))
             }
             window.contentView?.displayIfNeeded()
+            // R499：runner 1x 上曾拍到「卡片最后一行 30pt、底留白 0」（同一次跑稍后又读到 12/11），
+            // 即快门打在 SwiftUI 布局尚未落定的相位。这里再补一次**有界**布局落定：
+            // 三轮 layout+display，每轮泵 0.05s；不动任何期望值，只保证拍的是一张静止帧。
+            let layoutStart = Date()
+            for _ in 0..<3 {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.05))
+                window.contentView?.layoutSubtreeIfNeeded()
+                window.contentView?.displayIfNeeded()
+            }
+            CaptureReadings.emit("RECORDER_LAYOUT_SETTLE waited_ms="
+                                 + String(Int(Date().timeIntervalSince(layoutStart) * 1000))
+                                 + " 轮=3")
             CaptureReadings.emit("RECORDER_OVERLAY_SETTLE waited_ms="
                                  + String(Int(Date().timeIntervalSince(overlayStart) * 1000))
                                  + " 上限_ms=300")
@@ -19071,6 +19083,10 @@ final class UICaptureTests: XCTestCase {
         // 空集仍然被 extra/gone 两格钉着：哪天它反侧了 ⇒ `新盲区` 红；哪天有人往这一行里
         // 抄进本机那 13 张 ⇒ 这一台的 `不再反侧` 立刻红。
         "arm64/macOS 15.7/1x": [],
+        // R499：runner OS 升到 15.8 后键漂了。这一台自己的读数来自 run 40922562716：
+        //   `TEXT_SIDE_ROSTER_UNKEYED arm64/macOS 15.8/1x`（实测反侧 0 张；同跑 27/27 夹具判完）。
+        // 空集仍是声明：extra/gone 两格继续钉它；15.7 那行留给旧 runner OS 的账，不合并。
+        "arm64/macOS 15.8/1x": [],
     ]
 
     /// 键的形状也是判据：`arch/macOS 主次版本/倍率` 三段，倍率只准是 `1x` 或 `2x`。
