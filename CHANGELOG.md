@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情时间戳改用与列表同一套日期语言（2026-10-30→2026年10月30日；R509 / 第 508 轮 / Round 506 / U-2015…U-2020 · 产品 1 文件 + 判据）
+
+
 ### 两处搜索入口共用占位文案（QuickPick「搜索历史记录…」→「搜索历史…」；R508 / 第 507 轮 / Round 505 / U-2009…U-2014 · 产品 2 文件 + 判据）
 
 
