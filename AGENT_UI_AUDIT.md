@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2041）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2042）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -449,6 +449,8 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2039：③ 判据与刀。** 新判据 `testSidebarSectionHeaderAlignsWithTheRowIconColumn`：在 `sidebar-pinned-section` 的固定 y 带里分别量分组标题与行首图标的**第一处墨**，要求差 ≤1.5pt；任一臂无墨 ⇒ `SECTION_HEADER_ALIGN_NOT_RUN=band-blank`。刀 `M1375`（退回 22）/`M1376`（对齐到标题列 82）**2/2 CAUGHT**、`RESTORE_CLEAN=yes`。
 - **U-2040：④ 帧卷。** 捕获卷 **332 帧**、`CHANGED=42`：**2 张** `sidebar-pinned-section-300x520-{light,dark}` 是合法结构变化（标题左移 16pt），其余 **40 张**为源图标栅格噪声 ⇒ 只吸收那 2 张（**332 保持**），复核 `CHANGED=40 MISSING=0 ADDED=0`。真窗口当前没有置顶记录 ⇒ 没有「已固定」节可拍（`AXButton desc=[固定…]` 只是操作栏那颗按钮）；本条以离屏帧为像素证人，真窗口不臆造读数。
 - **U-2041：⑤ 八步与电池。** build **0 告警**（增量=0、冷编=0）；预检 `NEEDLE_PRECHECK tables=293 covered=270 arms=718 bad=0`、`ARM_TOTAL files=386 arms=1205`、`HIDDEN_ARMS 表=380 可判=1144 rot=0`；全量 **1330/56/0（621.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库；旧实例先 CONT/TERM）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497；本笔 as-of 511 = 1，last=`5f0807b`/last_round=510）；清账 162/63/0；§1 刷新在生成器后复跑；电池在台账后复跑（683/OK skipped=5）。产品笔 `7ff22a0` 已推（HEAD=origin、ahead=0）。**具名 NOT-RUN / 限制**：① `7ff22a0` 自身跑（推送后取）；② 真窗口置顶分组（当前无置顶记录，只有离屏帧证据）；③ 状态菜单像素通道（system-menu，610）；④ `RTF_HELPER_ORPHAN`（settings-content-blank/595）；⑤ `RECORDING_REREAD` 1x；⑥ 已知在屏/Motion 采样 flake；⑦ 601 噪声与其余未结项仍开。
+
+- **U-2042：⑥ R511 两跑签收。** `41152827425 ↔ 5f0807b` failure **仅 Release**（sources 停旧 + skip 级联 + sources 第二来源；Swift/Capture 全绿）；`41153005362 ↔ cf56783` **success**（R511 的窄窗让位三档、5 把刀、M1365 重锚与 2 张帧基线全绿）⇒ R511 被 runner 签收。`41156774387 ↔ 7ff22a0`（R512 产品）与 `41156931203 ↔ 874d579`（R512 台账）读时 **in_progress ⇒ NOT-RUN**。
 
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 

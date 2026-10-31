@@ -20236,6 +20236,8 @@ R510 结束时 600×492 详情被 middle 截断成 `10月30日 21:09:5…`（秒
 
 `sidebar-pinned-section` 帧里「已固定」左墨 36.5pt，行首星标 20.0、行标题列 96.5 —— 标题落在两列之间。修法：`SidebarSectionHeader` leading 22→6；after light/dark 标题 20.5 vs 图标 20.0（差 0.5）。判据 `testSidebarSectionHeaderAlignsWithTheRowIconColumn`（两档第一处墨、差 ≤1.5、无墨具名 NOT_RUN），M1375/M1376 2/2。捕获 332 帧：2 张 pinned 帧变化（已吸收）+ 40 张噪声，最终 CHANGED=40。预检 293/270/718、ARM 386/1205、HIDDEN 380/1144 rot=0。全量 **1330/56/0（621.1s）**；build 0 告警；换装 419=419；电池 683/5。⓪ push no-op（HEAD=origin=cf56783、ahead=0）；6f43727/d7919e2 success（探针恢复持续）、5f0807b/cf56783 NOT-RUN、3ebc7fc/R509 三跑仅 Release 时序。真窗口无置顶记录，只有离屏帧证据。
 
+⑥ R511 两跑签收：`5f0807b` 仅 Release 时序（Swift/Capture 全绿）、`cf56783` success；R512 两跑 in_progress ⇒ NOT-RUN。
+
 **七维度自评**（恰七行，每格 n/15）：
 
 | 维度 | 分 | 依据 |
