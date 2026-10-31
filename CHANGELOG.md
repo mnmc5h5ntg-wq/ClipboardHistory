@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 侧栏分组标题对齐行图标列（离屏 36.5→20.5pt；R512 / 第 511 轮 / Round 509 / U-2036…U-2041 · 产品 1 文件 + 判据）
+
+
 ### 详情信息窄窗按优先级让位（615 结案；R511 / 第 510 轮 / Round 508 / U-2029…U-2035 · 产品 3 文件 + 判据）
 
 
