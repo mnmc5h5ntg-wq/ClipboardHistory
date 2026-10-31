@@ -345,15 +345,19 @@ class AbsenceTokenBoundaryTests(unittest.TestCase):
     `缺席:...HistorySidebarView.swift=disabled` 判成"词在里面"⇒ ABSENT_CLAIM_FALSE。
     红得不对还不是最坏的：最坏的是人会去换一个更怪的词来绕过，
     于是缺席断言挑的词与被讨论的东西脱钩（尺子量错对象，R90/R100 那一族）。
+
+    R512 / U-2043…U-2049：多选操作栏按选区禁用空操作动词之后，这个文件里**真的**有了 `.disabled(`，
+    原来的样词 `disabled` 于是合法地变成在场 ⇒ 这一格红的是夹具前提，不是边界规则。
+    样词换成 `Effect`：它仍只作为 `focusEffectDisabled` 的一部分出现，判的仍是同一件事。
     """
 
     SIDEBAR = "Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 
     def test_a_word_only_embedded_in_a_longer_identifier_is_not_present(self):
         data = base()
-        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=disabled"
+        data["rows"][0]["evidence"] = u"缺席:" + self.SIDEBAR + u"=Effect"
         self.assertEqual([], codes(gate.check(data)),
-                         u"focusEffectDisabled() 不该把 `disabled` 判成在场")
+                         u"focusEffectDisabled() 不该把 `Effect` 判成在场")
 
     def test_a_standalone_identifier_still_makes_the_claim_false(self):
         """牙还在：`allowsHitTesting` 在这个文件里是独立标识符（两处），写着"没有"必须红。"""

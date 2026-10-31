@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 多选操作栏按选区禁用空操作动词（R513 / 第 512 轮 / Round 510 / U-2043…U-2049 · 产品 3 文件 + 判据）
+
+
 ### 侧栏分组标题对齐行图标列（离屏 36.5→20.5pt；R512 / 第 511 轮 / Round 509 / U-2036…U-2041 · 产品 1 文件 + 判据）
 
 
