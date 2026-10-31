@@ -10734,3 +10734,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 **619 结案（R517）**：批量删除已改走 `BulkDeleteConfirmation`（先问；取消/零选区不删；确认框复用 `DestructiveAlertLayout`，取消默认、删除为破坏性按钮）。4 条策略/接线测试 + M1385/M1386 2/2；真实临时副本点击路径 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（未碰活库）。
 **616 补记（R519）**：`f85aa21`（R519 产品笔）标题中段 `GitHub 项目主页` 带 ASCII 空格，`SUBJECT` 的 `(\S+?)` 跨不过 ⇒ `K_WITHOUT_ROUND_IDENTITY`；已 push 不能改历史，按既有出口登记 `UNPARSED_ROSTER`。退场条件不变（parser 改 `(.+?)` 并复跑合成正对照后删）。
+
+**620. 登录项/Dock 指向仓库开发版 + LaunchServices 里堆了 20+ 份同 id 副本 ⇒ 重启后 Dock 出现大量「时间剪史」空图标**（R522 现读；只查+登记，未动用户 Dock/登录项）
+    现象：用户 20:28 重启后登录项启动的 `/Users/wangziyi/Codex_Project0/时间剪史.app`（PID 927，后为 5811）一个窗口都没有；同一时间 Dock 出现大量「时间剪史」空图标。
+    现读证据：`lsappinfo list` 里运行中的那份 bundle path 是**仓库开发版**（不是 /Applications）；`mdfind "kMDItemCFBundleIdentifier == 'com.clipboardhistory.app'"` 读到 20+ 份同 id 副本：仓库开发版、`/Applications/时间剪史.app`、以及 `~/Documents/Codex_Project0_backups/before-*/时间剪史.app`（R41/R67b/R515b/R516–R520/多次 local-*）。`grep -n lsregister scripts/install_local.sh` 现读 **0 行**。
+    机制：① `install_local.sh` 每轮把旧包 `mv` 到 `~/Documents/Codex_Project0_backups/`（Spotlight 索引区），旧 `.app` 仍是可启动包、仍以同一 CFBundleIdentifier 被 LaunchServices 登记，脚本从不 `lsregister -u` 旧副本、也不 `lsregister -f` 新装副本；② 登录项是 `SMAppService.mainApp.register()`，注册的是**当时运行的那一份** bundle 路径 —— 开发版在仓库里被就地替换，登录项/Dock 固定项的路径与图标缓存跟着旧 inode 走；③ `--dest /tmp/...` 的沙箱安装默认 `launch=1`，脚本只保证"沙箱不发退出指令"，**没有**把非 `/Applications` 目标强制成 `--no-launch`（测试自己都传了，手动沙箱跑一次就会 `open` 一份同 id 临时副本，最小 Info.plist 没有图标）。`launch_smoke.py` 是直接 `Popen([executable])`、不经 `open` ⇒ 冒烟步骤不是这条的锅。
+    候选修法（等用户决定）：① 安装末尾对 `/Applications/时间剪史.app` 执行 `lsregister -f`，本轮备份副本 `lsregister -u`；② 备份目录移出 Spotlight 索引（`.metadata_never_index`）或压成归档（不再可启动）；③ 非 `/Applications` 的 `--dest` 在脚本层强制 `--no-launch`（不靠调用方记得传）；④ 登录项/Dock 固定项改指 `/Applications` 那份（用户在系统设置/Dock 里改，或在设置页显示"当前运行的是开发版"提示）；⑤ 不要把仓库开发版固定到 Dock。

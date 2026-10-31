@@ -8536,3 +8536,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：静置左轴不变（177.5/177.5）；Button 化使静置墨 1928→1898、1886→1792（最佳平移 0,0，无位移）；新增 2 帧，基线 336→338；`M1387`/`M1389` 因代码块换代重锚，新增 `M1391`/`M1392`。
 - 边界：真实按压仍由 `configuration.isPressed` 供，夹具只写 `pressedForCapture`；settings 空白机器上像素判据 NOT_RUN（本地 2x 是证人）。
 
+## D-521 主窗口缺失时由 WindowManager 创建唯一一份（R522）
+
+- 背景：登录项启动时 SwiftUI `WindowGroup` 可能一个窗口都不建；`showMainWindow` 只 present，`applicationDidBecomeActive` 的空数组判断为 true 也无效，300ms 延迟恢复只试一次 ⇒ Dock 点击/菜单/⌘S 全部打不开主窗口，只能退出重开。
+- 决定：① `WindowManager` 持有 `mainWindowFactory`，由 `AppDelegate.init` 安装（工厂知道 store），`showMainWindow(creatingIfNeeded:)` 在弱引用与 identifier 搜索都落空后才创建 **一个** `AppWindow`；弱引用只在窗口仍在 `NSApp.windows` 时才算"有"。② 兜底窗口用 `NSWindow + NSHostingView(MainWindowContent)`，`MainWindowContent`（ContentView + frame + WindowConfigurator）与 `WindowGroup` **同一棵**树，避免两处样式漂移；identifier=`AppWindow`、750×560、min 600×440、透明标题栏/隐藏 title 全走同一个 `WindowConfigurator`。③ 两种语义分开：显式入口（Dock reopen/菜单/⌘S/热键/登录首启恢复）创建；启动后 200ms 的 best-effort `creatingIfNeeded:false`；`applicationDidBecomeActive` 的创建与「启动时打开主窗口」同口径。④ 300ms 延迟恢复后仍无可见窗口再确认一次。
+- 理由：主窗口是产品唯一入口，"没有窗口"必须能被用户动作修好；而"启动时不打开主窗口"是设置，不能被补救路径作废。
+- 兼容性/迁移：macOS 12 可用（NSHostingView）；已有窗口（含隐藏/最小化）路径一字未变；`WindowGroup` 的根视图抽成 `MainWindowContent`，视觉与帧不变（A/B 逐字节相同）；测试用"改名+orderOut+清弱引用"模拟无窗口，不真销毁 ARC 窗口。
+- 边界：工厂未安装时保持"只 present 不创建"（单元测试负臂）；产品真实关窗仍是 orderOut+delegate false（隐藏），reopen 复用同一扇；只在显式入口创建。
+

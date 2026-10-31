@@ -20416,3 +20416,21 @@ R520 的下划线让入口有了悬停反馈，但 `Link` 不吃 `pressedStyle`�
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
+## Round 519 · R522（第 521 轮 · 2026-10-31）：主窗口缺失时创建唯一一份
+
+登录项启动时 WindowGroup 可能一个窗口都不建，而 `showMainWindow` 只会 present：Dock 点击/菜单「显示主窗口 ⌘S」/热键全部打不开，只能退出重开。R522 把创建放进 `WindowManager`：`mainWindowFactory` 由 `AppDelegate.init` 安装，`showMainWindow(creatingIfNeeded:)` 查过弱引用（只认仍在 `NSApp.windows` 的那份）与 identifier 搜索都落空后才建 **一个** `AppWindow`（NSHostingView(`MainWindowContent`) + 同一个 `WindowConfigurator`，macOS 12 可用）；200ms best-effort 不创建，`applicationDidBecomeActive` 的创建与「启动时打开主窗口」同口径，300ms 延迟恢复后再确认一次。`MainWindowCreationTests` 8 条从产品入口（reopen/菜单/关窗→reopen/首次激活/设置关/ best-effort/延迟恢复/同入口接线）；M1393（删创建分支）/M1394（删已有窗口检查）2/2 CAUGHT。预检 302/279/735 bad=0、ARM 395/1222、HIDDEN 389/1161 rot=0；build 0 告警。帧 338，对基线 CHANGED=142 经 A/B 判为重启后会话栅格位移（R521 源码同会话重捕 0 差异），基线吸收、count 338。全量 **1353/56/0（619.5s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。⓪ R521 产品跑唯一失败步是 sources 格时序（非产品回归），台账笔 in_progress NOT-RUN；BACKLOG 620 登记 Dock 空图标（未动用户设置）。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 事故是"无窗口"：三臂帧不适用，改看真窗口/AppWindow 计数与可见性；视觉未变由 A/B 帧 0 差异作证。 |
+| 判据有效性 | 15/15 | 8 条从产品入口 + 删创建/重复创建两刀 2/2；无工厂负臂保留。 |
+| 假绿防御 | 15/15 | 142 张会话位移经 A/B 归因后才吸收；settings 空白 NOT_RUN；全量红不报绿。 |
+| 产品面推进 | 15/15 | 修好用户报的真实事故（登录首启/菜单/⌘S 可打开主窗口）；4 文件。 |
+| 台账一致性 | 15/15 | U-2109…U-2115、D-521、BACKLOG 620、帧/全量/换装/电池都来自命令与测试。 |
+| 交付诚实性 | 15/15 | 事故现场、旧行为负臂、142 张归因、SelectionReveal 红都如实。 |
+| 可复核性 | 15/15 | 8 条测试名、M1393/M1394、precheck 302/279/735、A/B 0 差异都在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
+

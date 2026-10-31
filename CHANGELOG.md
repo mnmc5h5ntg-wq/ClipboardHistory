@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主窗口缺失时创建唯一一份（R522 / 第 521 轮 / Round 519 / U-2109…U-2115 · 产品 4 文件 + 判据）
+
+
 ### 关于页 GitHub 链接补按压反馈（R521 / 第 520 轮 / Round 518 / U-2102…U-2108 · 产品 1 文件 + 判据）
 
 
