@@ -12668,6 +12668,11 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .about)
                 .environment(\.hoveredForCapture, true))
         })
+        // R521：按下臂（只点亮 pressedForCapture；悬停保持关闭 ⇒ 读到的底色只能来自按下那一档）。
+        results.append(Fixture("settings-about-github-pressed", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .about)
+                .environment(\.pressedForCapture, true))
+        })
         // R479：设置页标题图标的负向臂（只关图标，其余与 settings-data 同）。
         results.append(Fixture("settings-data-no-title-icon", NSSize(width: 720, height: 540)) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .data)
@@ -16329,6 +16334,71 @@ final class UICaptureTests: XCTestCase {
             let scale = Double(hover.pixelsWide) / 720.0
             let x0 = max(0, Int(175 * scale)), x1 = min(hover.pixelsWide, Int(430 * scale))
             let y0 = max(0, Int(244 * scale)), y1 = min(hover.pixelsHigh, Int(266 * scale))
+            func readings(_ rep: NSBitmapImageRep) -> (ink: Int, accent: Int, colors: Int) {
+                let bytes = Self.buffer(of: rep)
+                var histogram: [Int: Int] = [:]
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * 4
+                        let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                        + 0.0722 * Double(bytes[i + 2])).rounded())
+                        histogram[luma / 8, default: 0] += 1
+                    }
+                }
+                let paper = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+                var count = 0
+                var accent = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * 4
+                        let r = Int(bytes[i]), g = Int(bytes[i + 1]), b = Int(bytes[i + 2])
+                        let alpha = Int(bytes[i + 3])
+                        let luma = Int((0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)).rounded())
+                        if abs(luma - paper) > 24 { count += 1 }
+                        // R521：下划线是 accent 蓝（0,122,255），悬停底是 primary 灰。R520 那版
+                        // 只数"离纸色 >24"的墨，R521 把同一档底色接进 `pressedStyle` 之后，
+                        // 灰底自己就够 100 像素 ⇒ 那把尺换成 accent 像素才还指着下划线
+                        //（M1389 实测：去线后灰底仍在，读数却从 +419 掉到 −27）。
+                        if alpha > 200 && b > r + 40 && b > g + 20 { accent += 1 }
+                    }
+                }
+                return (count, accent, histogram.count)
+            }
+            let idleR = readings(idle), hoverR = readings(hover)
+            let delta = hoverR.accent - idleR.accent
+            let inkDelta = hoverR.ink - idleR.ink
+            emit("ABOUT_LINK_HOVER \(tag) idle=\(idleR.ink)/\(idleR.accent)"
+                 + " hover=\(hoverR.ink)/\(hoverR.accent) delta=\(inkDelta) accent差=\(delta)"
+                 + " 色数=\(idleR.colors)/\(hoverR.colors)")
+            if idleR.colors <= 2 && hoverR.colors <= 2 {
+                emit("ABOUT_LINK_HOVER_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            XCTAssertGreaterThanOrEqual(delta, 250,
+                                        "\(tag)：悬停只多 \(delta) 个 accent 像素 ⇒ 1pt 下划线没有出现")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("ABOUT_LINK_HOVER_NOT_RUN：两档都找不到关于页") }
+    }
+
+    /// R521：关于页 GitHub 链接的按下臂 —— 按下时整条 label 多一层按下底色（`pressedStyle`），
+    /// 静置没有。只点亮 `pressedForCapture`（悬停关着），所以多出来的墨只能来自按下那一档。
+    func testAboutGitHubLinkPressesWithVisibleFill() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r521-about-press-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = renderFixtureRep("settings-about", appearance, scratch),
+                  let pressed = renderFixtureRep("settings-about-github-pressed", appearance, scratch) else {
+                XCTFail(tag + "：关于页两臂读不回来")
+                continue
+            }
+            let scale = Double(pressed.pixelsWide) / 720.0
+            let x0 = max(0, Int(175 * scale)), x1 = min(pressed.pixelsWide, Int(430 * scale))
+            let y0 = max(0, Int(240 * scale)), y1 = min(pressed.pixelsHigh, Int(270 * scale))
             func ink(_ rep: NSBitmapImageRep) -> (count: Int, colors: Int) {
                 let bytes = Self.buffer(of: rep)
                 var histogram: [Int: Int] = [:]
@@ -16352,19 +16422,19 @@ final class UICaptureTests: XCTestCase {
                 }
                 return (count, histogram.count)
             }
-            let idleInk = ink(idle), hoverInk = ink(hover)
-            let delta = hoverInk.count - idleInk.count
-            emit("ABOUT_LINK_HOVER \(tag) idle=\(idleInk.count) hover=\(hoverInk.count) delta=\(delta)"
-                 + " 色数=\(idleInk.colors)/\(hoverInk.colors)")
-            if idleInk.colors <= 2 && hoverInk.colors <= 2 {
-                emit("ABOUT_LINK_HOVER_NOT_RUN=settings-content-blank \(tag)")
+            let idleInk = ink(idle), pressedInk = ink(pressed)
+            let delta = pressedInk.count - idleInk.count
+            emit("ABOUT_LINK_PRESS \(tag) idle=\(idleInk.count) pressed=\(pressedInk.count) delta=\(delta)"
+                 + " 色数=\(idleInk.colors)/\(pressedInk.colors)")
+            if idleInk.colors <= 2 && pressedInk.colors <= 2 {
+                emit("ABOUT_LINK_PRESS_NOT_RUN=settings-content-blank \(tag)")
                 continue
             }
             XCTAssertGreaterThanOrEqual(delta, 100,
-                                        "\(tag)：悬停只多 \(delta) 个墨像素 ⇒ 1pt 下划线没有出现")
+                                        "\(tag)：按下只多 \(delta) 个墨像素 ⇒ 按下底色没有出现")
             judged += 1
         }
-        if judged == 0 { throw XCTSkip("ABOUT_LINK_HOVER_NOT_RUN：两档都找不到关于页") }
+        if judged == 0 { throw XCTSkip("ABOUT_LINK_PRESS_NOT_RUN：两档都找不到关于页") }
     }
 
     /// R519：关于页的 GitHub 链接行必须落在卡片正文的左轴上，且是一条真实可点行。
@@ -19540,7 +19610,7 @@ final class UICaptureTests: XCTestCase {
         // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
         "settings-privacy-tall", "settings-recommendations-tall",
         // R442：关于页与其余设置页同一棵 vibrant 子树；暗档未选中标签落在错误一侧（看过的同一机制）。
-        "settings-about", "settings-about-github-hover",
+        "settings-about", "settings-about-github-hover", "settings-about-github-pressed",
         // R504：身份头的负向臂与 `settings-general` 是同一棵 settings 侧栏 vibrant 子树
         //（只关身份头）⇒ 同一处合成前极性盲区；这条由判据的 vibrant 前提实测点名（不是顺手补名单）。
         "settings-general-no-identity",

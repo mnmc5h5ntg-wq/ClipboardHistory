@@ -7,17 +7,17 @@ VIEW="Sources/ClipboardHistoryApp/Views/SettingsView.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
   ("M1389","悬停不再画下划线", VIEW,
-   '''                            .overlay(alignment: .bottom) {
-                                Rectangle()
-                                    .fill(Color.accentColor)
-                                    .frame(height: 1)
-                                    .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
-                                                 anchor: .leading)
-                                    .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
-                                    .animation(MotionCatalog.animation(for: .hover),
-                                               value: aboutGitHubLinkHoveredForDrawing)
-                            }''',
-   '''                            // M1389：下划线被删掉'''),
+   '''                                .overlay(alignment: .bottom) {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 1)
+                                        .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
+                                                     anchor: .leading)
+                                        .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
+                                        .animation(MotionCatalog.animation(for: .hover),
+                                                   value: aboutGitHubLinkHoveredForDrawing)
+                                }''',
+   '''                                // M1389：下划线被删掉'''),
   ("M1390","取证悬停状态接不上", VIEW,
    '''        aboutGitHubLinkHovered || (hoveredForCapture ?? false)''',
    '''        aboutGitHubLinkHovered'''),

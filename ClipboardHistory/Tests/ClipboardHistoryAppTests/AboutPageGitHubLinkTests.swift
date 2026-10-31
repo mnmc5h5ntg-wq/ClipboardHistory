@@ -17,8 +17,12 @@ final class AboutPageGitHubLinkTests: XCTestCase {
         XCTAssertEqual(presentation.components(separatedBy: "github.com/mnmc5h5ntg-wq").count - 1, 1,
                        "GitHub URL 只许在 AboutPresentation 里出现一次")
         let settings = try source("Views/SettingsView.swift")
-        XCTAssertTrue(settings.contains("Link(\"GitHub 项目主页 ↗\", destination: githubURL)"),
-                      "关于页没有把 GitHub 入口画成 Link")
+        XCTAssertTrue(settings.contains("NSWorkspace.shared.open(githubURL)"),
+                      "关于页没有把 GitHub 入口接成可打开的控件")
+        XCTAssertTrue(settings.contains(".accessibilityAddTraits(.isLink)"),
+                      "关于页的 GitHub 入口没有保留 link 语义")
+        XCTAssertTrue(settings.contains("pressedStyle("),
+                      "关于页的 GitHub 入口没有走产品按压/悬停反馈")
         XCTAssertTrue(settings.contains("AboutPresentation.githubURLString"),
                       "关于页没有引用唯一的 URL 常量")
         XCTAssertFalse(settings.contains("github.com/mnmc5h5ntg-wq"),

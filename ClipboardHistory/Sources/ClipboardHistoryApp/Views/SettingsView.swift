@@ -832,20 +832,30 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                     Divider()
                     if let githubURL = URL(string: AboutPresentation.githubURLString) {
-                        Link("GitHub 项目主页 ↗", destination: githubURL)
-                            .font(.system(size: VisualFont.body))
-                            // macOS 12 没有 `.underline(_:)`；用 1pt accent 线做同一条 underline。
-                            .overlay(alignment: .bottom) {
-                                Rectangle()
-                                    .fill(Color.accentColor)
-                                    .frame(height: 1)
-                                    .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
-                                                 anchor: .leading)
-                                    .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
-                                    .animation(MotionCatalog.animation(for: .hover),
-                                               value: aboutGitHubLinkHoveredForDrawing)
-                            }
-                            .onHover { aboutGitHubLinkHovered = $0 }
+                        // R521：链接也走产品自己的按压/悬停反馈（R13 那套），保留 link 语义。
+                        Button {
+                            NSWorkspace.shared.open(githubURL)
+                        } label: {
+                            Text("GitHub 项目主页 ↗")
+                                .font(.system(size: VisualFont.body))
+                                .foregroundStyle(Color.accentColor)
+                                // macOS 12 没有 `.underline(_:)`；用 1pt accent 线做同一条 underline。
+                                .overlay(alignment: .bottom) {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 1)
+                                        .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
+                                                     anchor: .leading)
+                                        .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
+                                        .animation(MotionCatalog.animation(for: .hover),
+                                                   value: aboutGitHubLinkHoveredForDrawing)
+                                }
+                        }
+                        .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                                      hoverLevel: VisualFill.controlHover,
+                                      labelPadding: 0)
+                        .accessibilityAddTraits(.isLink)
+                        .onHover { aboutGitHubLinkHovered = $0 }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

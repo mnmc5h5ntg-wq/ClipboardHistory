@@ -8,8 +8,32 @@ PRES="Sources/ClipboardHistoryApp/Utilities/AboutPresentation.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
   ("M1387","关于页把链接画成普通文字", VIEW,
-   '''                        Link("GitHub 项目主页 ↗", destination: githubURL)''',
-   '''                        Text("GitHub 项目主页 ↗")'''),
+   '''                        Button {
+                            NSWorkspace.shared.open(githubURL)
+                        } label: {
+                            Text("GitHub 项目主页 ↗")
+                                .font(.system(size: VisualFont.body))
+                                .foregroundStyle(Color.accentColor)
+                                // macOS 12 没有 `.underline(_:)`；用 1pt accent 线做同一条 underline。
+                                .overlay(alignment: .bottom) {
+                                    Rectangle()
+                                        .fill(Color.accentColor)
+                                        .frame(height: 1)
+                                        .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
+                                                     anchor: .leading)
+                                        .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
+                                        .animation(MotionCatalog.animation(for: .hover),
+                                                   value: aboutGitHubLinkHoveredForDrawing)
+                                }
+                        }
+                        .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                                      hoverLevel: VisualFill.controlHover,
+                                      labelPadding: 0)
+                        .accessibilityAddTraits(.isLink)
+                        .onHover { aboutGitHubLinkHovered = $0 }''',
+   '''                        Text("GitHub 项目主页 ↗")
+                            .font(.system(size: VisualFont.body))
+                            .foregroundStyle(Color.accentColor)'''),
   ("M1388","GitHub URL 指向别处", PRES,
    '''    static let githubURLString = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"''',
    '''    static let githubURLString = "https://example.com/other"'''),
