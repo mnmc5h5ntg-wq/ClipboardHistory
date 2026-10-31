@@ -202,7 +202,9 @@ struct HistorySidebarView: View {
             Button(role: .destructive) {
                 historyStore.perform(.deleteSelection)
             } label: {
-                Image(systemName: "trash")
+                // R514：轮廓 `trash` 在 runner 1x 暗档只读到 2.27:1（细红笔画被抗锯齿摊薄），
+                // 实心图标保证核心像素仍是系统红 ⇒ 1x/2x 都能过 3:1；破坏性动作也更醒目。
+                Image(systemName: "trash.fill")
             }
             .helpLabel("删除所选记录")
             .foregroundStyle(.red)

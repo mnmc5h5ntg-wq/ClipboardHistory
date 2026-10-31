@@ -108,4 +108,62 @@ final class WindowToolbarSidebarClassificationTests: XCTestCase {
         assertClassified(item(identifier: "sideboard"), false, "「side」单独出现不是侧栏线索")
         assertClassified(item(identifier: "navigation-split"), false, "「split」不在关键词里")
     }
+
+    // MARK: - R514 / 614：开关在选区变化后被异步加回工具栏
+
+    private final class ToolbarSource: NSObject, NSToolbarDelegate {
+        var items: [NSToolbarItem] = []
+        func toolbar(_ toolbar: NSToolbar,
+                     itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                     willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+            items.first { $0.itemIdentifier == itemIdentifier }
+        }
+        func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+            items.map(\.itemIdentifier)
+        }
+        func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+            items.map(\.itemIdentifier)
+        }
+    }
+
+    /// 真窗口复现：多选之后 `AXToolbar` 里又出现 `AXButton desc=[隐藏边栏]`。
+    /// 只靠 key/resize 的几次清理抓不到这条异步加回；`willAddItemNotification` 必须接住它，
+    /// 同时普通工具栏项必须留下（误删的代价是用户少一个按钮）。
+    func testToolbarAddObserverRemovesTheSidebarToggleAndKeepsOrdinaryItems() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                              styleMask: [.titled, .closable, .resizable],
+                              backing: .buffered, defer: false)
+        defer { window.orderOut(nil) }
+        let source = ToolbarSource()
+        let sidebar = item(identifier: "com.apple.SwiftUI.navigationSplitView.toggleSidebar",
+                           label: "隐藏边栏")
+        let ordinary = item(identifier: "copy", label: "复制")
+        source.items = [ordinary]
+        let toolbar = NSToolbar(identifier: "r514-toolbar-add")
+        toolbar.delegate = source
+        window.toolbar = toolbar
+
+        let coordinator = coordinator()
+        coordinator.configure(window: window)
+        window.makeKeyAndOrderFront(nil)
+
+        // 先等过 configure 里 0.0/0.05/0.15/0.4/0.9 的五轮清理 —— 否则延迟清理会把下面
+        // 加回的开关摘掉，这条用例就变成"清理还在"而不是"观察者接住了异步加回"。
+        let settled = expectation(description: "scheduled cleanup finished")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+            source.items.append(sidebar)
+            toolbar.insertItem(withItemIdentifier: sidebar.itemIdentifier, at: 0)
+            settled.fulfill()
+        }
+        wait(for: [settled], timeout: 4)
+
+        let done = expectation(description: "toolbar observer cleanup")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { done.fulfill() }
+        wait(for: [done], timeout: 2)
+
+        XCTAssertFalse(toolbar.items.contains { $0.itemIdentifier == sidebar.itemIdentifier },
+                       "选区变化后加回的侧栏开关必须被摘掉（614）")
+        XCTAssertTrue(toolbar.items.contains { $0.itemIdentifier == ordinary.itemIdentifier },
+                      "普通工具栏项不得被误删")
+    }
 }

@@ -16155,49 +16155,155 @@ final class UICaptureTests: XCTestCase {
                 XCTFail(tag + "：两臂读不回来")
                 continue
             }
-            let normalTotal = bulkBarInk(normal, pointWidth: 300, x0: 0, x1: 300)
-            let pinnedTotal = bulkBarInk(pinned, pointWidth: 300, x0: 0, x1: 300)
-            let normalTitle = bulkBarInk(normal, pointWidth: 300, x0: 0, x1: 100)
-            let pinnedTitle = bulkBarInk(pinned, pointWidth: 300, x0: 0, x1: 100)
-            emit("BULK_AVAILABILITY \(tag) 整带墨 普通=\(normalTotal) 固定=\(pinnedTotal)"
-                 + " 标题段 普通=\(normalTitle) 固定=\(pinnedTitle)")
-            if normalTotal == 0 || pinnedTotal == 0 {
+            guard normal.pixelsWide == pinned.pixelsWide,
+                  normal.pixelsHigh == pinned.pixelsHigh else {
+                XCTFail(tag + "：两臂帧尺寸不同 ⇒ 逐像素差没有对象")
+                continue
+            }
+            // R514：R513 的「整带墨」是各臂对**全图底色**计数 —— runner 1x 暗档里
+            // 那一条带整块是材质，6300/6300 全算成墨（量程触顶），固定臂于是"只多 0px"。
+            // 现在改成：① 带内墨只用来当"这一带真有内容"的证人（底色取**带内**众数）；
+            // ② 判「第三颗亮回来」用两臂**逐像素差**，底色相同项自然抵消。
+            let normalBand = bulkBarBandInk(normal, pointWidth: 300, x0: 0, x1: 300)
+            let pinnedBand = bulkBarBandInk(pinned, pointWidth: 300, x0: 0, x1: 300)
+            let titleDiff = bulkBarDiff(normal, pinned, pointWidth: 300, x0: 0, x1: 100)
+            let verbDiff = bulkBarDiff(normal, pinned, pointWidth: 300, x0: 195, x1: 225)
+            emit("BULK_AVAILABILITY \(tag) 带内墨 普通=\(normalBand) 固定=\(pinnedBand)"
+                 + " 标题差=\(titleDiff) 第三颗差=\(verbDiff)")
+            if normalBand == 0 || pinnedBand == 0 {
                 emit("BULK_AVAILABILITY_NOT_RUN=band-blank \(tag)")
                 continue
             }
-            XCTAssertEqual(normalTitle, pinnedTitle, accuracy: 12,
-                           "\(tag)：两帧标题文字应该相同，标题段墨量却差了 \\(normalTitle) vs \\(pinnedTitle)"
-                           + " ⇒ 整带差不是来自第三颗图标")
-            let delta = pinnedTotal - normalTotal
-            XCTAssertGreaterThanOrEqual(delta, 20,
-                                        "\(tag)：固定选区的整带墨只多 \(delta)px ⇒ 「取消固定」没有亮回来")
-            XCTAssertLessThanOrEqual(delta, 200,
-                                     "\(tag)：整带墨差 \(delta)px 超过一颗图标的量级 ⇒ 不只是第三颗在变")
+            XCTAssertLessThanOrEqual(titleDiff, 12,
+                                     "\(tag)：两帧标题段差了 \(titleDiff)px ⇒ 动的不是第三颗图标")
+            XCTAssertGreaterThanOrEqual(verbDiff, 20,
+                                        "\(tag)：两臂在第三颗图标处只差 \(verbDiff)px ⇒ 「取消固定」没有亮回来")
+            let scale = Double(normal.pixelsWide) / 300.0
+            XCTAssertLessThanOrEqual(verbDiff, Int(160 * scale * scale),
+                                     "\(tag)：第三颗图标处差 \(verbDiff)px，超过一颗图标的量级"
+                                     + "（2x 上限 640）⇒ 这一带不止那颗在变")
             judged += 1
         }
         if judged == 0 { throw XCTSkip("BULK_AVAILABILITY_NOT_RUN：两档的批量栏都读不到墨") }
     }
 
-    /// 批量栏那一条 y 带（112..133pt）里的总墨像素。
-    private func bulkBarInk(_ rep: NSBitmapImageRep, pointWidth: CGFloat,
-                            x0: CGFloat, x1: CGFloat) -> Int {
+    /// 批量栏那一条 y 带（112..133pt）里有内容的像素数；底色取**带内**众数。
+    /// 不用全图底色：runner 1x 暗档的材质带与全图底色差 >24，整带会被算成墨。
+    private func bulkBarBandInk(_ rep: NSBitmapImageRep, pointWidth: CGFloat,
+                                x0: CGFloat, x1: CGFloat) -> Int {
         let bytes = Self.buffer(of: rep)
         let width = rep.pixelsWide, height = rep.pixelsHigh
         let scale = Double(width) / Double(pointWidth)
-        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
-                                   bytesPerRow: rep.bytesPerRow)
         let yStart = max(0, Int(112 * scale)), yEnd = min(height, Int(133 * scale))
         let xStart = min(width, Int(x0 * scale)), xEnd = min(width, Int(x1 * scale))
+        var histogram: [Int: Int] = [:]
+        for y in yStart..<yEnd {
+            for x in xStart..<xEnd {
+                let i = y * rep.bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                + 0.0722 * Double(bytes[i + 2])).rounded())
+                histogram[luma / 8, default: 0] += 1
+            }
+        }
+        let background = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
         var ink = 0
         for y in yStart..<yEnd {
             for x in xStart..<xEnd {
                 let i = y * rep.bytesPerRow + x * 4
                 let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
                                 + 0.0722 * Double(bytes[i + 2])).rounded())
-                if abs(luma - paper) > 24 { ink += 1 }
+                if abs(luma - background) > 24 { ink += 1 }
             }
         }
         return ink
+    }
+
+    /// 两臂在批量栏同一条 y 带里的逐像素亮度差计数（>24 算变了）。
+    private func bulkBarDiff(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep,
+                             pointWidth: CGFloat, x0: CGFloat, x1: CGFloat) -> Int {
+        let aBytes = Self.buffer(of: a), bBytes = Self.buffer(of: b)
+        let width = min(a.pixelsWide, b.pixelsWide), height = min(a.pixelsHigh, b.pixelsHigh)
+        let scale = Double(a.pixelsWide) / Double(pointWidth)
+        let yStart = max(0, Int(112 * scale)), yEnd = min(height, Int(133 * scale))
+        let xStart = min(width, Int(x0 * scale)), xEnd = min(width, Int(x1 * scale))
+        // 两态相减的尺子必须读两根轴（MotionFilmstripTests 的 axis 守卫）：这批帧 alpha 恒 255，
+        // 但「只改透明度」的图层在别的通道上会整层消失；并集写法让这根轴有对象时立刻参与判定。
+        let aAlphaFirst = a.bitmapFormat.contains(.alphaFirst)
+        let bAlphaFirst = b.bitmapFormat.contains(.alphaFirst)
+        let aRGB = aAlphaFirst ? 1 : 0, bRGB = bAlphaFirst ? 1 : 0
+        let aAlpha = aAlphaFirst ? 0 : 3, bAlpha = bAlphaFirst ? 0 : 3
+        var changed = 0
+        for y in yStart..<yEnd {
+            for x in xStart..<xEnd {
+                let ia = y * a.bytesPerRow + x * 4
+                let ib = y * b.bytesPerRow + x * 4
+                let la = Int((0.2126 * Double(aBytes[ia + aRGB]) + 0.7152 * Double(aBytes[ia + aRGB + 1])
+                              + 0.0722 * Double(aBytes[ia + aRGB + 2])).rounded())
+                let lb = Int((0.2126 * Double(bBytes[ib + bRGB]) + 0.7152 * Double(bBytes[ib + bRGB + 1])
+                              + 0.0722 * Double(bBytes[ib + bRGB + 2])).rounded())
+                let alphaDelta = abs(Int(aBytes[ia + aAlpha]) - Int(bBytes[ib + bAlpha]))
+                if abs(la - lb) > 24 || alphaDelta > 24 { changed += 1 }
+            }
+        }
+        return changed
+    }
+
+    /// R514：破坏性批量动词必须是**实心核心**，不能只靠 1px 红描边。
+    /// runner 1x 暗档实测：轮廓 `trash` 的静置对比度只有 2.27:1（细红笔画被抗锯齿摊薄，
+    /// 2x 本机 3.15 只是擦线）；`trash.fill` 让核心像素保持系统红，1x/2x 都读得到。
+    /// 负向对照用旁边那颗灰色 `pin`：它不许贡献任何红像素，否则红通道判据在数错东西。
+    func testDestructiveBulkVerbKeepsAFilledCore() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r514-trash-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-multi-select" }) else {
+                XCTFail(tag + "：找不到 sidebar-multi-select ⇒ 这条判据没有对象")
+                continue
+            }
+            let file = scratch.appendingPathComponent("bulk-delete-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail(tag + "：刚拍的帧读不回来")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func coreCount(_ rect: CGRect) -> Int {
+                let x0 = max(0, Int(rect.minX * scale)), x1 = min(rep.pixelsWide, Int(rect.maxX * scale))
+                let y0 = max(0, Int(rect.minY * scale)), y1 = min(rep.pixelsHigh, Int(rect.maxY * scale))
+                var count = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                        let r = Int(base[i + rOff])
+                        let g = Int(base[i + rOff + 1])
+                        let b = Int(base[i + rOff + 2])
+                        // 只数**核心红**：抗锯齿边缘（r 高但 g/b 被底冲淡）不算核心。
+                        if r >= 240, g <= 110, b <= 110 { count += 1 }
+                    }
+                }
+                return count
+            }
+            let deleteCore = coreCount(CGRect(x: 264, y: 112, width: 16, height: 21))
+            let grayControl = coreCount(CGRect(x: 184, y: 112, width: 13, height: 21))
+            emit("BULK_DELETE_FILL \(tag) 核心红=\(deleteCore) 灰对照=\(grayControl)"
+                 + " 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertEqual(grayControl, 0,
+                           "\(tag)：灰色 pin 里出现 \(grayControl) 个核心红像素 ⇒ 红通道负向对照失效")
+            XCTAssertGreaterThanOrEqual(deleteCore, Int(40 * scale * scale),
+                                        "\(tag)：删除动词只有 \(deleteCore) 个核心红像素 ⇒ 不是实心核心"
+                                        + "（2x 下限 160；轮廓版实测 186/145，暗档仍低于 160）")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("BULK_DELETE_FILL_NOT_RUN：两档都拍不出批量栏") }
     }
 
     /// R512：分组标题「已固定」与行首图标列同一左轴 —— 原来 36.5pt 落在

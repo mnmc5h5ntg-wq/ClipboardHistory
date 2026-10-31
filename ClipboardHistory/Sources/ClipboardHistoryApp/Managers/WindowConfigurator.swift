@@ -144,6 +144,7 @@ struct WindowConfigurator: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSWindowDelegate {
         private weak var configuredWindow: NSWindow?
+        private var observesToolbarAdds = false
 
         func configure(window: NSWindow) {
             configuredWindow = window
@@ -152,6 +153,37 @@ struct WindowConfigurator: NSViewRepresentable {
             pinSidebarVisible(in: window)
             // Aggressive follow-up: SwiftUI may recreate the toggle across several frames
             scheduleSidebarCleanup(for: window)
+            // R514 / 614：选区变化会让 SwiftUI 在我们最后一轮清理之后把开关重新加回工具栏
+            //（真窗口复现：选 3 行后 AXToolbar 里又出现 `AXButton desc=[隐藏边栏]`，
+            // 它在那一刻**确实**是 `window.toolbar` 的一项）。监听"项将加入"，加入后当场摘掉；
+            // 只靠 key/resize 的几次清理抓不到这条异步路径。
+            if !observesToolbarAdds {
+                observesToolbarAdds = true
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(toolbarWillAddItem(_:)),
+                    name: NSToolbar.willAddItemNotification,
+                    object: nil
+                )
+            }
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        @objc private func toolbarWillAddItem(_ notification: Notification) {
+            guard let window = configuredWindow,
+                  let toolbar = notification.object as? NSToolbar,
+                  toolbar === window.toolbar,
+                  // `NSToolbarUserInfoKey.itemKey` 要 macOS 13，部署下限是 12；
+                  // 它的 rawValue 就是历史常量 `NSToolbarItemKey` 的 "item"。
+                  let item = notification.userInfo?["item"] as? NSToolbarItem,
+                  isSidebarToolbarItem(item) else { return }
+            DispatchQueue.main.async { [weak self, weak window] in
+                guard let self, let window else { return }
+                self.removeSidebarToolbarButton(from: window)
+            }
         }
 
         func windowDidBecomeKey(_ notification: Notification) {
