@@ -824,6 +824,11 @@ struct SettingsView: View {
                     Text(AboutPresentation.copyright)
                         .font(.system(size: VisualFont.meta))
                         .foregroundStyle(.secondary)
+                    Divider()
+                    if let githubURL = URL(string: AboutPresentation.githubURLString) {
+                        Link("GitHub 项目主页 ↗", destination: githubURL)
+                            .font(.system(size: VisualFont.body))
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .settingsCardInset()

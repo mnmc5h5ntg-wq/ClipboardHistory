@@ -253,7 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAboutPanel() {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2.2beta"
-        let githubURL = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"
+        let githubURL = AboutPresentation.githubURLString
         NSApplication.shared.orderFrontStandardAboutPanel(options: [
             .applicationName: "时间剪史",
             .applicationVersion: version,
@@ -270,7 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openGitHubRepository() {
-        guard let url = URL(string: "https://github.com/mnmc5h5ntg-wq/ClipboardHistory") else { return }
+        guard let url = URL(string: AboutPresentation.githubURLString) else { return }
         NSWorkspace.shared.open(url)
     }
 

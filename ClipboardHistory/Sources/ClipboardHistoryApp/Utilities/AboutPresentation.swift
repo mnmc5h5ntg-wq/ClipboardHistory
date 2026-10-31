@@ -10,6 +10,8 @@ import Foundation
 /// build 与版本分开：版本回答"这是哪一版"，build 回答"这一版的第几次构建"。
 enum AboutPresentation {
     static let appName = "时间剪史"
+    /// GitHub 项目主页的唯一来源：关于页链接、帮助菜单、关于面板都引用它。
+    static let githubURLString = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"
     static let tagline = "轻量、离线、可回溯的剪贴板历史。"
     /// 版权年份写成常量而不是读当前年：帧基线要跨年稳定（跨年时间那条 BACKLOG 456 是另一件事）。
     static let copyright = "© 2026 时间剪史"

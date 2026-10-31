@@ -16307,6 +16307,86 @@ final class UICaptureTests: XCTestCase {
         if judged == 0 { throw XCTSkip("BULK_DELETE_FILL_NOT_RUN：两档都拍不出批量栏") }
     }
 
+    /// R519：关于页的 GitHub 链接行必须落在卡片正文的左轴上，且是一条真实可点行。
+    /// 卡片上原来只有应用名/版本/说明/版权；新增的 Link 是第 5 条文字带。
+    func testAboutPageShowsTheGitHubLinkOnTheCardTextAxis() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r519-about-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let rep = renderFixtureRep("settings-about", appearance, scratch) else {
+                XCTFail(tag + "：settings-about 读不回来")
+                continue
+            }
+            let bytes = Self.buffer(of: rep)
+            let scale = Double(rep.pixelsWide) / 720.0
+            let x0 = max(0, Int(175 * scale)), x1 = min(rep.pixelsWide, Int(705 * scale))
+            let y0 = max(0, Int(190 * scale)), y1 = min(rep.pixelsHigh, Int(335 * scale))
+            var histogram: [Int: Int] = [:]
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let i = y * rep.bytesPerRow + x * 4
+                    let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                    + 0.0722 * Double(bytes[i + 2])).rounded())
+                    histogram[luma / 8, default: 0] += 1
+                }
+            }
+            let paper = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+            var bands: [(top: Int, bottom: Int, left: Int, ink: Int)] = []
+            var y = y0
+            while y < y1 {
+                var ink = 0
+                for x in x0..<x1 {
+                    let i = y * rep.bytesPerRow + x * 4
+                    let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                    + 0.0722 * Double(bytes[i + 2])).rounded())
+                    if abs(luma - paper) > 24 { ink += 1 }
+                }
+                if ink > 3 {
+                    let top = y
+                    var left = rep.pixelsWide
+                    var total = 0
+                    while y < y1 {
+                        var rowInk = 0
+                        for x in x0..<x1 {
+                            let i = y * rep.bytesPerRow + x * 4
+                            let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                            + 0.0722 * Double(bytes[i + 2])).rounded())
+                            if abs(luma - paper) > 24 { rowInk += 1; left = min(left, x) }
+                        }
+                        if rowInk <= 3 { break }
+                        total += rowInk
+                        y += 1
+                    }
+                    let height = y - top
+                    if height >= Int(4 * scale) {
+                        bands.append((top: top, bottom: y - 1, left: left, ink: total))
+                    }
+                } else {
+                    y += 1
+                }
+            }
+            guard bands.count >= 2 else {
+                XCTFail(tag + "：卡片正文只找到 \(bands.count) 条文字带 ⇒ GitHub 链接行没有出现")
+                continue
+            }
+            let copyright = bands[bands.count - 2]
+            let link = bands[bands.count - 1]
+            let leftDelta = Double(link.left - copyright.left) / scale
+            emit("ABOUT_LINK \(tag) 文字带=\(bands.count) 版权左=\(String(format: "%.1f", Double(copyright.left) / scale))pt"
+                 + " 链接左=\(String(format: "%.1f", Double(link.left) / scale))pt 差=\(String(format: "%.1f", leftDelta))pt"
+                 + " 链接墨=\(link.ink)")
+            XCTAssertLessThanOrEqual(abs(leftDelta), 1.5,
+                                     "\(tag)：GitHub 链接行与版权行不在同一左轴（差 \(leftDelta)pt）")
+            XCTAssertGreaterThan(link.ink, 40, "\(tag)：链接行没有墨 ⇒ 只是空白")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("ABOUT_LINK_NOT_RUN：两档都找不到关于页") }
+    }
+
     /// R512：分组标题「已固定」与行首图标列同一左轴 —— 原来 36.5pt 落在
     /// 图标列（20.0）与标题列（96.5）之间，两边都不对齐。
     func testSidebarSectionHeaderAlignsWithTheRowIconColumn() throws {
