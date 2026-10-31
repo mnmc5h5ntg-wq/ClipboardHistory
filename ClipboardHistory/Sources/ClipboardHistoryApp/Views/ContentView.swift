@@ -40,6 +40,9 @@ struct ContentView: View {
                 }
             }
             // 中缝阴影画在**两棵树之上**：折页盖上来时它才是折痕，不被 0.5 的页盖洗掉。
+            // R525：ZStack 必须显式吃满提议尺寸 —— 不加这一行时 runner 1x 的离屏捕获会把
+            // 详情列按"子视图理想宽"重新居中（detail 左轴 20→77pt、meta 0% 墨；R523 同帧是绿的）。
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .leading) {
                 hingeSeam.offset(x: MainWindowCollapsePolicy.sidebarSeamWidth)
             }
