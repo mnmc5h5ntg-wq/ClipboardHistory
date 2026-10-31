@@ -2,18 +2,15 @@ import SwiftUI
 
 @main
 struct ClipboardHistoryApp: App {
-
     @StateObject private var historyStore = AppDelegate.sharedHistoryStore
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
-            ContentView(historyStore: historyStore)
-                .frame(minWidth: 600, minHeight: 440)
+            MainWindowContent(historyStore: historyStore)
                 .onAppear {
                     appDelegate.configure()
                 }
-                .background(WindowConfigurator())
         }
         .windowStyle(.hiddenTitleBar)
         .commands {
@@ -65,3 +62,17 @@ struct ClipboardHistoryApp: App {
         }
     }
 }
+
+/// 主窗口的根视图。R522：登录项启动时 WindowGroup 可能一个窗口都没建，
+/// `WindowManager` 的无窗口兜底必须建出**与 WindowGroup 同一棵**树 ——
+/// 两处各写一份 `ContentView + frame + WindowConfigurator` 迟早漂成两个主窗口。
+struct MainWindowContent: View {
+    @ObservedObject var historyStore: HistoryStore
+
+    var body: some View {
+        ContentView(historyStore: historyStore)
+            .frame(minWidth: 600, minHeight: 440)
+            .background(WindowConfigurator())
+    }
+}
+

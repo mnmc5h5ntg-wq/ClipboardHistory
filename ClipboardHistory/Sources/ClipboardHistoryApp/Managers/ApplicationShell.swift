@@ -120,6 +120,15 @@ final class ApplicationShell {
                         reason: "initial applicationDidBecomeActive deferred",
                         menuBarController: self.menuBarController
                     )
+                    // R522：登录首启时 WindowGroup 可能晚于这一次；旧版只试一次就永不重试，
+                    // 于是"没有窗口"变成终局。现在 restore 会直接创建；仍然看不到就再确认一次。
+                    if !WindowManager.hasVisibleMainWindow {
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        WindowManager.restoreMainWindowIfNeeded(
+                            reason: "initial applicationDidBecomeActive deferred retry",
+                            menuBarController: self.menuBarController
+                        )
+                    }
                 }
             } else {
                 LifecycleDebugLogger.log("showMainWindowOnLaunch=0：跳过启动时的主窗口恢复")
@@ -166,12 +175,16 @@ final class ApplicationShell {
         ensureQuickPick(historyStore: historyStore).toggle()
     }
 
-    func showMainWindow() {
-        WindowManager.showMainWindow(menuBarController: menuBarController)
+    func showMainWindow(creatingIfNeeded: Bool = true) {
+        WindowManager.showMainWindow(creatingIfNeeded: creatingIfNeeded,
+                                     menuBarController: menuBarController)
     }
 
+    /// 启动后 200ms 的 best-effort：只 present 已存在的窗口，绝不创建
+    ///（否则「启动时不打开主窗口」那个设置会被这条路径作废）。
     func showExistingMainWindowIfAvailable() {
-        WindowManager.showMainWindow(menuBarController: menuBarController)
+        WindowManager.showMainWindow(creatingIfNeeded: false,
+                                     menuBarController: menuBarController)
     }
 
     func refreshHistory() {

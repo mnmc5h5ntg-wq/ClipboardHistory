@@ -25,7 +25,10 @@ final class WindowManagerTests: XCTestCase {
         XCTAssertFalse(WindowManager.isAppContentWindow(panel))
     }
 
-    func testShowMainWindowDoesNotCreateFallbackMainWindow() {
+    /// R522：没有装工厂时不许凭空造窗口（WindowManager 不认识视图层）。
+    /// 产品那条「无窗口就创建唯一一个」的路由 `MainWindowCreationTests` 从 AppDelegate 入口测。
+    func testShowMainWindowDoesNotCreateWithoutAnInstalledFactory() {
+        WindowManager.uninstallMainWindowFactoryForTesting()
         let existingMainWindowCount = NSApplication.shared.windows.filter {
             WindowManager.isAppContentWindow($0)
         }.count

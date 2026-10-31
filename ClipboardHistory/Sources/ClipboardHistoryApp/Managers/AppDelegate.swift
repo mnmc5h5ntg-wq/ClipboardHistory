@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -27,6 +28,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     init(historyStore: HistoryStore? = nil) {
         self.historyStore = historyStore ?? AppDelegate.sharedHistoryStore
         super.init()
+        // R522：工厂必须在**任何窗口出现之前**装好 —— 登录项启动时 WindowGroup 可能
+        // 一个窗口都不建，而 Dock/菜单/⌘S 那条路要靠它把唯一主窗口补出来。
+        // 装在 init 而不是 ContentView.onAppear：onAppear 正是这个 bug 里没发生的那一步。
+        let store = self.historyStore
+        WindowManager.installMainWindowFactory {
+            AppDelegate.makeMainWindow(historyStore: store)
+        }
+    }
+
+    /// 与 `WindowGroup` 的根视图同源（`MainWindowContent`）；窗口样式交给同一个
+    /// `WindowConfigurator`（透明标题栏、隐藏 title、750×560、650… 最小尺寸、关闭=隐藏）。
+    @MainActor
+    static func makeMainWindow(historyStore: HistoryStore) -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        // 用户关窗走的是 `WindowConfigurator.Coordinator.windowShouldClose`（orderOut + 返回 false），
+        // 这个 false 只是防"有人绕过 delegate 直接 close()"把窗口在弱引用背后释放掉。
+        window.isReleasedWhenClosed = false
+        window.identifier = WindowManager.mainWindowIdentifier
+        window.contentView = NSHostingView(rootView: MainWindowContent(historyStore: historyStore))
+        WindowManager.registerMainWindow(window)
+        return window
     }
 
     /// 必须显式写出来，不能指望继承 —— 这是 v1.4.8 候选包启动即闪退的原因（D-019 的副作用）。
@@ -161,9 +188,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         LifecycleDebugLogger.log("applicationDidBecomeActive called")
         shell.applicationDidBecomeActive()
         dockBadgeController?.applicationDidBecomeActive()
-        // macOS 12: 从隐藏状态恢复时重新显示窗口
+        // macOS 12: 从隐藏状态恢复时重新显示窗口。
+        // R522：这条也会在"登录首启一个窗口都没有"时触发；是否**创建**必须跟
+        // 「启动时打开主窗口」那个设置同口径，否则关掉它的用户会被这里偷偷打开窗口。
         if NSApp.windows.allSatisfy({ $0.isVisible == false || $0.isMiniaturized }) {
-            shell.showMainWindow()
+            shell.showMainWindow(creatingIfNeeded: shell.showMainWindowOnLaunch)
         }
     }
 
@@ -213,6 +242,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showMainWindow() {
         shell.showMainWindow()
+    }
+
+    /// 启动后 200ms 的 best-effort（只 present、不创建）。测试从产品入口断言这个分界。
+    func showExistingMainWindowIfAvailable() {
+        shell.showExistingMainWindowIfAvailable()
     }
 
     func refreshHistory() {
