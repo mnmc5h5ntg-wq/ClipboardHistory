@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 详情信息窄窗按优先级让位（615 结案；R511 / 第 510 轮 / Round 508 / U-2029…U-2035 · 产品 3 文件 + 判据）
+
+
 ### 详情时间戳沿用列表年份策略 + 最小窗标题栏侧栏开关清理（600×492 时间仍可见；R510 / 第 509 轮 / Round 507 / U-2022…U-2028 · 产品 3 文件 + 判据）
 
 
