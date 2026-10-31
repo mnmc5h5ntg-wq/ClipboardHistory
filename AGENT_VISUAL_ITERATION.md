@@ -20470,9 +20470,9 @@ R523 的折叠是 `setFrame` 一步跳变。R524 把过渡做成**模型驱动 6
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
-## Round 522 · R525（第 524 轮 · 2026-11-01）：折叠/展开补应用菜单与 ⌘\
+## Round 522 · R525（第 524 轮 · 2026-11-01）：折叠/展开补应用菜单与 ⌘\（产品 4 文件）
 
-折叠/展开以前只有状态菜单、标题双击与可见 chevron：应用在前台时 Window 菜单里找不到，也没有键盘键。R525 给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，并在 Window 菜单加一项（状态菜单沿既有 presenter 显示同一个 ⌘\）；两个菜单表面都走 `appDelegate.perform(.toggleMainWindowCollapse)`，是一个 command 的两种呈现，不是第二条触发路径。判据：新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`，旧「折叠无快捷键」断言按新特性换成 ⌘\ 正向断言；M1402（删应用菜单快捷键）CAUGHT、RESTORE_CLEAN；过渡刀 M1399–M1401 仍在册；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；build 0 告警；帧 340 CHANGED=0，基线不变。全量 **1369/56/0（631.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。R524 三跑仍 in_progress ⇒ 折叠过渡 runner 签收 NOT-RUN。
+折叠/展开以前只有状态菜单、标题双击与可见 chevron：应用在前台时 Window 菜单里找不到，也没有键盘键。R525 给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，并在 Window 菜单加一项（状态菜单沿既有 presenter 显示同一个 ⌘\）；两个菜单表面都走 `appDelegate.perform(.toggleMainWindowCollapse)`，是一个 command 的两种呈现，不是第二条触发路径。判据：新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`，旧「折叠无快捷键」断言按新特性换成 ⌘\ 正向断言；M1402（删应用菜单快捷键）CAUGHT、RESTORE_CLEAN；过渡刀 M1399–M1401 仍在册；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；build 0 告警；帧 340 CHANGED=0，基线不变。全量 **1369/56/0（680.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。R524 三跑收口：产品/测试两跑 STEP[9] sources 时序；台账跑 9d882e4 STEP[15] 红在 fold 逐帧地板与 ZStack 1x 布局（已由第二笔 3ddee13 修：地板 ≥1 仍让 M1400 红；ZStack 显式满幅），runner 最终签收待新跑。
 
 **七维度自评**（恰七行，每格 n/15）：
 

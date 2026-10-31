@@ -19,7 +19,7 @@
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
 | 阶段二 **515 轮**审计（R9–R522；以 `curve_from_ledger.py` 的 `PHASE2 n=515` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 522 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-2136（R525 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-2137（R525 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R498**（commit `31d12c7`）—— 本轮是**产品轮**（`Sources/` 3 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R498 那一节为准。上一笔动 `Sources/` 的是 R498（`79e39ee`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R498**（commit `3ddee13`）—— 本轮是**产品轮**（`Sources/` 1 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R498 那一节为准。上一笔动 `Sources/` 的是 R498（`31d12c7`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1466,5 +1466,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R524（主窗口折叠/展开过渡；产品 4 文件 + 判据）**：R523 的一帧跳变改成模型驱动 60Hz 过渡（`MotionCatalog.Role.windowFold` 0.20s/进场曲线）；控制器同拍更新 `foldProgress` 与窗口宽，可中断、reduce 0 时长直切；ContentView 用右页折盖 + 中缝阴影（画在两树之上），p=1 时展开树整棵不渲染。读数：折叠 15 帧/8 中间宽、展开 11 帧/6 中间宽、宽度单调；中断臂 419–751 无半折；过渡胶片 5 帧（中间帧与两端差异 75–128 万像素，hinge 0/0.75/1/0.75/0）。`MainWindowFoldMotionTests` 6 条；M1399–M1401 3/3、M1397 重锚后 M1395–M1398 4/4；预检 304/281/742 bad=0、ARM 397/1229、HIDDEN 391/1168 rot=0；静态帧 340 逐字节不变（CHANGED=0）。全量 1368/56/0（622.4s）；换装 425=425；电池 683/5。Duo 3D 未做（D-523）。
 
-- **R525（折叠/展开补应用菜单与 ⌘\；产品 3 文件 + 判据）**：旧状态只有状态菜单/双击/chevron，Window 菜单无项、无键盘键（Commands 0 处、keyEquivalent 空、presenter nil）。给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，Window 菜单加项，状态菜单同一 presenter 显示；两个表面同一个 perform dispatch。新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`；M1402 CAUGHT；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；帧 340 CHANGED=0，基线不变；R524 正文文件数按 `git show --stat 79e39ee` 校正为 5。全量 1369/56/0（631.0s）；换装 425=425；电池 683/5。
+- **R525（折叠/展开补应用菜单与 ⌘\；产品 4 文件 + 判据）**：旧状态只有状态菜单/双击/chevron，Window 菜单无项、无键盘键（Commands 0 处、keyEquivalent 空、presenter nil）。给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，Window 菜单加项，状态菜单同一 presenter 显示；两个表面同一个 perform dispatch。新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`；M1402 CAUGHT；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；帧 340 CHANGED=0，基线不变；R524 正文文件数按 `git show --stat 79e39ee` 校正为 5。全量 1369/56/0（680.0s）；换装 425=425；电池 683/5。另修 R524 台账跑暴露的两处（fold 逐帧地板对 1x 太硬、ZStack 1x 详情帧重排）⇒ 第二笔 3ddee13。
 
