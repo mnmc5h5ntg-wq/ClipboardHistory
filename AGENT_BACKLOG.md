@@ -10727,3 +10727,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 **614 补记（R514 结案）**：选区变化后 SwiftUI 会把侧栏开关重新加回 `window.toolbar`，旧的 NSButton 视图树清理抓不到，key/resize 的五轮延迟清理也早已结束。修法：观察 `NSToolbar.willAddItemNotification`，只摘 `toolbar === window.toolbar` 且 `isSidebarToolbarItem` 的项，异步清理；真窗口复现序列（选 3 行 → AX 读工具栏）after 无 AXToolbar/「隐藏边栏」。退场条件：真窗口多选后 AX 树不再出现 `AXButton desc=[隐藏边栏]`（本轮已读）；若未来工具栏需要合法的侧栏词项，先收窄谓词再放行。
 
+**619. 多选「删除所选记录」没有确认，实机验证时误删 6 条**（R515 现读）
+    现象：R515 为打开「破坏性确认」表面，AXPress 点了多选栏的「删除所选记录」；产品路径 `historyStore.perform(.deleteSelection)` **立即删除**，没有 NSAlert/撤销，实机历史掉了 6 条。与「清空未收藏」的 `confirmAndClearHistory()`（有 `DestructiveConfirmation`）不对称。
+    已做：用本轮开工副本按 ID 合并恢复 419 条（ROWS=420），恢复方法写在 AGENT_STATE R515 与 U-2060；未打印剪贴板内容。
+    候选修法（等用户决定）：让批量删除复用 `DestructiveConfirmation`，或做可撤销删除；在改产品前，任何实机破坏性路径验证必须把 `CLIPBOARD_HISTORY_DATA_DIR` 指向副本。

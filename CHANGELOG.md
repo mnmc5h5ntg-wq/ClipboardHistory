@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 状态菜单破坏性命令用系统红 + 破坏性批量动词暗档提亮（R515 / 第 514 轮 / Round 512 / U-2059…U-2066 · 产品 4 文件（两笔）+ 判据）
+
+
 ### 破坏性批量动词改实心核心 + 614 侧栏开关回加拦截（R514 / 第 513 轮 / Round 511 / U-2051…U-2058 · 产品 2 文件 + 判据）
 
 
