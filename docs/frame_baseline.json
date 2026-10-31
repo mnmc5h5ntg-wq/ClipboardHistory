@@ -1,5 +1,5 @@
 {
-  "count": 332,
+  "count": 334,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -293,10 +293,12 @@
     "sidebar-favorites-300x520-light.png": "93c49fc90b2071c0337b34bb045769bdc8574326eaf2f9873af78b941e8480f2",
     "sidebar-history-300x520-dark.png": "98a27ca6e14e9cb9c9ac3cf3ff0eb17cb27451e81468c1b60bded48243c7159e",
     "sidebar-history-300x520-light.png": "b5f4def73509301928ee0c191e84abdf6a2c04332fd76bf76958afd57fbbe237",
-    "sidebar-multi-select-300x520-dark.png": "84a1f7b3a951b4164c75af1ddbc1a16a2001a73acc76f84fca0cc312aea2983c",
-    "sidebar-multi-select-300x520-light.png": "f3e12fc5035c8043bde486fabf925f2f01aa41046f2dd3dd89613c3bd58620d2",
-    "sidebar-multi-select-min-250x520-dark.png": "a0687c0673dd8299f7a63e98fce644c6d18e02d52faedd54cdfb86ec6b5c2fec",
-    "sidebar-multi-select-min-250x520-light.png": "229c0336ba96c4fd9512f0ba4ee935760ea080b3fb3a140f62dce63431561971",
+    "sidebar-multi-select-300x520-dark.png": "578342006af3fea0eddfe1ab8f4185596dc3b4e8704e406cedd4b7fc1318fca3",
+    "sidebar-multi-select-300x520-light.png": "14d755cfdc707ed443903f25780f0940f503322b722d931374176a6387cbd444",
+    "sidebar-multi-select-min-250x520-dark.png": "92118b323bf944cbaa84aa9bff3896aa01cf589fb020fc6b758b84042d349856",
+    "sidebar-multi-select-min-250x520-light.png": "cd72ddd9c20de64e36268d0c26b6b8b859c6498ec4d9b15d9f542f0272103d06",
+    "sidebar-multi-select-pinned-300x520-dark.png": "0b51b72ade64b88ff5500344cfef594a28214e3ea06e2c7f807f31e52a9561fb",
+    "sidebar-multi-select-pinned-300x520-light.png": "bd2da84613c6fbe88fc60cf0a4bb5577c461a4f132dd4676df51123b5c6d57af",
     "sidebar-no-results-300x520-dark.png": "e7f237f98801ab2abb3b5e761781a2ffb1be764525a7dc0eef4d41aa92336be0",
     "sidebar-no-results-300x520-light.png": "d028737d2d8d41d0783ec5b970de090348051c95966e5c27742bb1f4ac306a98",
     "sidebar-no-source-300x520-dark.png": "a2c081fa4c6bc7112ccda31013cb0f7f581504b0b3a58bab442ec744aa31ebea",

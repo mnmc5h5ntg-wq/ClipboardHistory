@@ -172,6 +172,11 @@ final class HistoryStore: ObservableObject {
         selectedEntryIDs.count
     }
 
+    /// R513：多选操作栏的可用性只看选中的那几条，不给 Store 加状态。
+    var selectedEntries: [Entry] {
+        entries.filter { selectedEntryIDs.contains($0.id) }
+    }
+
     var hasSelection: Bool {
         !selectedEntryIDs.isEmpty
     }

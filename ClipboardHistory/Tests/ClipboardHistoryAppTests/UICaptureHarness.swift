@@ -176,7 +176,7 @@ final class UICaptureTests: XCTestCase {
         // 横幅本身完好（红底、两行、"知道了"垂直居中、无截断），黑的是左下侧栏那一行。
         "content-with-copy-failure-notice",
         "sidebar-history", "sidebar-no-title-icon", "sidebar-search-placeholder-legacy",
-        "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-favorites",
+        "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-multi-select-pinned", "sidebar-favorites",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -11888,6 +11888,13 @@ final class UICaptureTests: XCTestCase {
         results.append(Fixture("sidebar-multi-select-min", NSSize(width: 250, height: 520)) {
             AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelected), width: 250))
         })
+        // R513：多选里有固定项的那一臂 —— 与 `sidebar-multi-select` 选同样 3 条，
+        // 只差第 0/2 条的 isPinned ⇒ 标题文字相同，批量栏里只有「取消固定」的可用性不同。
+        let multiSelectedPinned = self.makePinnedSidebarStore(selectingIndex: nil)
+        multiSelectedPinned.perform(.setSelection(Set(multiSelectedPinned.entries.prefix(3).map(\.id))))
+        results.append(Fixture("sidebar-multi-select-pinned", NSSize(width: 300, height: 520)) {
+            AnyView(self.sidebarFrame(HistorySidebarView(historyStore: multiSelectedPinned)))
+        })
         // R63：R18 想加、R19 判"加不进去"的三张浮层帧，**现在加进去了**。
         // R19 那句根因是错的（它说 stack 在捕获环境里塌，而"真实 App 里它撑满 420×300"）：
         // 实测两条路都塌 —— `NSStackView` 生下来 `translatesAutoresizingMaskIntoConstraints == false`，
@@ -16133,6 +16140,66 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(lightJudged, 1, "light 档必须可判（它不走 vibrant 合成前极性），当前只判了 \(lightJudged) 档")
     }
 
+    /// R513：多选栏里「取消固定」只在选区含固定项时是亮的 —— 两帧选同样 3 条，
+    /// 标题文字相同；批量栏 y 带里整带墨的差只可能来自第三颗图标（取消固定）的暗化。
+    func testBulkActionBarDimsTheUnpinnableVerb() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r513-bulk-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let normal = renderFixtureRep("sidebar-multi-select", appearance, scratch),
+                  let pinned = renderFixtureRep("sidebar-multi-select-pinned", appearance, scratch) else {
+                XCTFail(tag + "：两臂读不回来")
+                continue
+            }
+            let normalTotal = bulkBarInk(normal, pointWidth: 300, x0: 0, x1: 300)
+            let pinnedTotal = bulkBarInk(pinned, pointWidth: 300, x0: 0, x1: 300)
+            let normalTitle = bulkBarInk(normal, pointWidth: 300, x0: 0, x1: 100)
+            let pinnedTitle = bulkBarInk(pinned, pointWidth: 300, x0: 0, x1: 100)
+            emit("BULK_AVAILABILITY \(tag) 整带墨 普通=\(normalTotal) 固定=\(pinnedTotal)"
+                 + " 标题段 普通=\(normalTitle) 固定=\(pinnedTitle)")
+            if normalTotal == 0 || pinnedTotal == 0 {
+                emit("BULK_AVAILABILITY_NOT_RUN=band-blank \(tag)")
+                continue
+            }
+            XCTAssertEqual(normalTitle, pinnedTitle, accuracy: 12,
+                           "\(tag)：两帧标题文字应该相同，标题段墨量却差了 \\(normalTitle) vs \\(pinnedTitle)"
+                           + " ⇒ 整带差不是来自第三颗图标")
+            let delta = pinnedTotal - normalTotal
+            XCTAssertGreaterThanOrEqual(delta, 20,
+                                        "\(tag)：固定选区的整带墨只多 \(delta)px ⇒ 「取消固定」没有亮回来")
+            XCTAssertLessThanOrEqual(delta, 200,
+                                     "\(tag)：整带墨差 \(delta)px 超过一颗图标的量级 ⇒ 不只是第三颗在变")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("BULK_AVAILABILITY_NOT_RUN：两档的批量栏都读不到墨") }
+    }
+
+    /// 批量栏那一条 y 带（112..133pt）里的总墨像素。
+    private func bulkBarInk(_ rep: NSBitmapImageRep, pointWidth: CGFloat,
+                            x0: CGFloat, x1: CGFloat) -> Int {
+        let bytes = Self.buffer(of: rep)
+        let width = rep.pixelsWide, height = rep.pixelsHigh
+        let scale = Double(width) / Double(pointWidth)
+        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
+                                   bytesPerRow: rep.bytesPerRow)
+        let yStart = max(0, Int(112 * scale)), yEnd = min(height, Int(133 * scale))
+        let xStart = min(width, Int(x0 * scale)), xEnd = min(width, Int(x1 * scale))
+        var ink = 0
+        for y in yStart..<yEnd {
+            for x in xStart..<xEnd {
+                let i = y * rep.bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                + 0.0722 * Double(bytes[i + 2])).rounded())
+                if abs(luma - paper) > 24 { ink += 1 }
+            }
+        }
+        return ink
+    }
+
     /// R512：分组标题「已固定」与行首图标列同一左轴 —— 原来 36.5pt 落在
     /// 图标列（20.0）与标题列（96.5）之间，两边都不对齐。
     func testSidebarSectionHeaderAlignsWithTheRowIconColumn() throws {
@@ -18037,8 +18104,10 @@ final class UICaptureTests: XCTestCase {
                  rect: CGRect(x: 29, y: 145, width: 14, height: 14)),
         InkProbe(fixture: "glass-pill", what: "药丸里的收藏星（`.secondary` 那一档的参照）",
                  rect: CGRect(x: 50, y: 38, width: 20, height: 20)),
+        // R513：批量栏现在会按选区禁用不适用动词 —— x200 那一格是「取消固定」，没有固定项时是**禁用**的，
+        // 不再是"可点笔画"。探针重锚到始终可点的删除（x265.5..277.5），地板 3.0 不动。
         InkProbe(fixture: "sidebar-multi-select", what: "批量操作按钮（侧栏工具排）",
-                 rect: CGRect(x: 200, y: 113, width: 20, height: 20)),
+                 rect: CGRect(x: 265, y: 113, width: 16, height: 20)),
     ]
 
     /// 一块区域里"墨 vs 它自己的底"的 WCAG 对比度，以及这块里有多少墨。

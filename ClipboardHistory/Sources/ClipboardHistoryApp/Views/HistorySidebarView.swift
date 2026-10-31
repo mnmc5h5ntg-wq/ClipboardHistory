@@ -152,13 +152,17 @@ struct HistorySidebarView: View {
         // 而字形之间仍然是 10pt 的视觉距离（比原来的 8pt 略松一点，可接受）。
         // 如果留着 spacing 8 再加 padding 5，两颗高亮之间会露出一条 18pt 的空隙，
         // 读起来像"五个孤立的方块"而不是"一排工具"。
-        HStack(spacing: 0) {
+        // R513：动词按选区可用性点亮 —— 没有固定项时「取消固定」不该是一个可点的空操作。
+        let availability = BulkActionAvailability(selectedEntries: historyStore.selectedEntries)
+        return HStack(spacing: 0) {
             Button {
                 historyStore.perform(.favoriteSelection)
             } label: {
                 Image(systemName: "star")
             }
             .helpLabel("收藏所选记录")
+            .disabled(!availability.canFavorite)
+            .opacity(availability.canFavorite ? 1 : 0.35)
 
             Button {
                 // 固定 = "这条我要长期留着，别被复制顶下去、别被保留策略删掉"（§5 F-5）
@@ -167,6 +171,8 @@ struct HistorySidebarView: View {
                 Image(systemName: PinTogglePresentation.actionSymbolName(isPinning: true))
             }
             .helpLabel(PinTogglePresentation.helpText(isPinned: false))
+            .disabled(!availability.canPin)
+            .opacity(availability.canPin ? 1 : 0.35)
 
             Button {
                 historyStore.perform(.pinSelection(isPinned: false))
@@ -174,6 +180,8 @@ struct HistorySidebarView: View {
                 Image(systemName: PinTogglePresentation.actionSymbolName(isPinning: false))
             }
             .helpLabel(PinTogglePresentation.helpText(isPinned: true))
+            .disabled(!availability.canUnpin)
+            .opacity(availability.canUnpin ? 1 : 0.35)
 
             Button {
                 historyStore.perform(.unfavoriteSelection)
@@ -181,6 +189,8 @@ struct HistorySidebarView: View {
                 Image(systemName: "star.slash")
             }
             .helpLabel("取消收藏所选记录")
+            .disabled(!availability.canUnfavorite)
+            .opacity(availability.canUnfavorite ? 1 : 0.35)
 
             // R436：破坏性动作与其余四颗之间补一条发丝分隔 —— 它们原来在
             // `spacing: 0` 的一排里只靠颜色分开，扫视时要先读红才知道哪颗是删除。
