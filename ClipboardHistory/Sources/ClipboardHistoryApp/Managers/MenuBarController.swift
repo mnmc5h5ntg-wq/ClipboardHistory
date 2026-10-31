@@ -201,6 +201,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         switch command {
         case .showMainWindow:
             return #selector(showMainWindowFromMenu)
+        case .toggleMainWindowCollapse:
+            return #selector(toggleMainWindowCollapseFromMenu)
         case .showSettings:
             return #selector(showSettingsFromMenu)
         case .refreshHistory:
@@ -372,6 +374,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func showMainWindowFromMenu() {
         perform(.showMainWindow)
+    }
+
+    @objc private func toggleMainWindowCollapseFromMenu() {
+        perform(.toggleMainWindowCollapse)
     }
 
     @objc private func showSettingsFromMenu() {

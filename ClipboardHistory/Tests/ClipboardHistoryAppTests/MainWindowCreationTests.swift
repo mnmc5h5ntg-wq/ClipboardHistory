@@ -177,8 +177,9 @@ final class MainWindowCreationTests: XCTestCase {
             persistence: RecordingHistoryPersistence(),
             retentionPolicy: HistoryRetentionPolicy(maxEntries: 10, maxAgeDays: nil)
         )
+        let collapse = MainWindowCollapseController(persists: false)
         WindowManager.installMainWindowFactory {
-            AppDelegate.makeMainWindow(historyStore: self.store)
+            AppDelegate.makeMainWindow(historyStore: self.store, collapse: collapse)
         }
         defer { tearDownProductState() }
         let previous = UserDefaults.standard.object(forKey: "hideMainWindowOnLaunch")

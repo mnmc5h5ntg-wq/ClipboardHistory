@@ -3,6 +3,9 @@ import SwiftUI
 
 struct HistorySidebarView: View {
     @ObservedObject var historyStore: HistoryStore
+    /// R523：折叠态只留列表；默认展开（夹具与旧调用一行不改）。
+    var isCollapsed: Bool = false
+    var toggleCollapse: () -> Void = {}
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
     /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
@@ -120,20 +123,44 @@ struct HistorySidebarView: View {
 
     private var header: some View {
         HStack {
-            // R494：设置页标题与侧栏分类都有图标，主窗口这张标题却只有一行字。
-            // 补一枚时钟/回溯符号，作为同一个身份锚点；纯装饰，读屏不重复念。
-            // R495：批量态标题是「已选 N 条」而不是应用名，时钟图标语义不对；
-            // 250pt 最小宽下它还把选中数挤成「已选…」（R493 帧可见完整文案）。
-            if historyStore.selectedCount <= 1, mainSidebarTitleIconForCapture ?? true {
-                Image(systemName: "clock.arrow.circlepath")
+            // R523：双击标题折叠/展开（与右侧那颗可见按钮同一个 action）。
+            HStack(spacing: 6) {
+                // R494：设置页标题与侧栏分类都有图标，主窗口这张标题却只有一行字。
+                // 补一枚时钟/回溯符号，作为同一个身份锚点；纯装饰，读屏不重复念。
+                // R495：批量态标题是「已选 N 条」而不是应用名，时钟图标语义不对；
+                // 250pt 最小宽下它还把选中数挤成「已选…」（R493 帧可见完整文案）。
+                if historyStore.selectedCount <= 1, mainSidebarTitleIconForCapture ?? true {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: VisualFont.title, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Text(headerTitle)
                     .font(.system(size: VisualFont.title, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                    .lineLimit(1)
             }
-            Text(headerTitle)
-                .font(.system(size: VisualFont.title, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) { toggleCollapse() }
+            .helpLabel("双击折叠或展开窗口")
+
+            // R523：折叠/展开必须有一个**看得见**的入口；双击只是加速通道。
+            // 放在 Spacer 左侧：右侧那排批量按钮/计数保持原来的位置，像素尺不用重锚。
+            Button {
+                toggleCollapse()
+            } label: {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.left")
+                    .font(.system(size: VisualFont.body, weight: .semibold))
+                    // 侧栏在展开态是 vibrant 子树：语义色会被极性翻成白色，浅色档里箭头
+                    // 直接看不见（R523 帧抓到）。显式 labelColor 才是这台机器上的真读数。
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            }
+            .helpLabel(isCollapsed ? "展开窗口" : "折叠窗口")
+            .accessibilityLabel(isCollapsed ? "展开窗口" : "折叠窗口")
+            .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                          hoverLevel: VisualFill.controlHover,
+                          labelPadding: 5)
+            .padding(.leading, 4)
 
             Spacer()
 

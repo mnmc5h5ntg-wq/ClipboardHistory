@@ -77,13 +77,16 @@ final class WindowChromeMetrics: ObservableObject {
 
 /// 透明标题栏 + 禁用原生全屏 + 跨版本窗口尺寸设置
 struct WindowConfigurator: NSViewRepresentable {
+    /// R523：折叠状态。传了它时，尺寸/最小宽由状态决定；不传（组件测试）保持旧的 750×560/600。
+    var collapse: MainWindowCollapseController?
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
     func makeNSView(context: Context) -> NSView {
         let view = ConfigurationHostView()
-        view.configureWindow = { [coordinator = context.coordinator] window in
+        view.configureWindow = { [coordinator = context.coordinator, collapse] window in
             LifecycleDebugLogger.log("WindowConfigurator found window")
             window.identifier = WindowManager.mainWindowIdentifier
             WindowManager.registerMainWindow(window)
@@ -100,8 +103,12 @@ struct WindowConfigurator: NSViewRepresentable {
             }
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = [.managed, .fullScreenNone]
-            window.setContentSize(NSSize(width: 750, height: 560))
-            window.minSize = NSSize(width: 600, height: 440)
+            if let collapse {
+                collapse.applyGeometry(to: window)
+            } else {
+                window.setContentSize(NSSize(width: 750, height: 560))
+                window.minSize = NSSize(width: 600, height: 440)
+            }
             coordinator.configure(window: window)
             window.delegate = coordinator
             if let zoomButton = window.standardWindowButton(.zoomButton) {

@@ -19,28 +19,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     let historyStore: HistoryStore
+    /// R523：折叠/展开的唯一状态（持久化 + 两档宽度）。产品路径读标准键；
+    /// 测试可注入带临时 UserDefaults 的实例，避免碰到用户的窗口状态。
+    let mainWindowCollapse: MainWindowCollapseController
 
     /// 默认仍走全局共享 store（产品路径一字不变）。这个注入接缝是给测试与离屏捕获用的：
     /// 传一个用 `RecordingHistoryPersistence` 造的 store，就能构造 AppDelegate 而**不碰**
     /// `~/Library/Application Support/时间剪史/`。审计第二轮 04 §4.2 N-1 说明为什么必须有它：
     /// 菜单栏面板以前拍不到帧，因为构造 AppDelegate 会读用户真实存档，而 `HOME` 重定向
     /// 实测**不改变** `applicationSupportDirectory`，隔离只能靠注入。
-    init(historyStore: HistoryStore? = nil) {
+    init(historyStore: HistoryStore? = nil,
+         collapseController: MainWindowCollapseController? = nil) {
         self.historyStore = historyStore ?? AppDelegate.sharedHistoryStore
+        self.mainWindowCollapse = collapseController ?? MainWindowCollapseController()
         super.init()
         // R522：工厂必须在**任何窗口出现之前**装好 —— 登录项启动时 WindowGroup 可能
         // 一个窗口都不建，而 Dock/菜单/⌘S 那条路要靠它把唯一主窗口补出来。
         // 装在 init 而不是 ContentView.onAppear：onAppear 正是这个 bug 里没发生的那一步。
         let store = self.historyStore
+        let collapse = self.mainWindowCollapse
         WindowManager.installMainWindowFactory {
-            AppDelegate.makeMainWindow(historyStore: store)
+            AppDelegate.makeMainWindow(historyStore: store, collapse: collapse)
         }
     }
 
     /// 与 `WindowGroup` 的根视图同源（`MainWindowContent`）；窗口样式交给同一个
     /// `WindowConfigurator`（透明标题栏、隐藏 title、750×560、650… 最小尺寸、关闭=隐藏）。
     @MainActor
-    static func makeMainWindow(historyStore: HistoryStore) -> NSWindow {
+    static func makeMainWindow(historyStore: HistoryStore,
+                               collapse: MainWindowCollapseController) -> NSWindow {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -51,8 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 这个 false 只是防"有人绕过 delegate 直接 close()"把窗口在弱引用背后释放掉。
         window.isReleasedWhenClosed = false
         window.identifier = WindowManager.mainWindowIdentifier
-        window.contentView = NSHostingView(rootView: MainWindowContent(historyStore: historyStore))
+        window.contentView = NSHostingView(
+            rootView: MainWindowContent(historyStore: historyStore, collapse: collapse)
+        )
         WindowManager.registerMainWindow(window)
+        collapse.applyGeometry(to: window)
         return window
     }
 
@@ -85,7 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         repeatCopyHotKeySettings: repeatCopyHotKeySettings,
         quickPickHotKeySettings: quickPickHotKeySettings,
         loginItemSettings: loginItemSettings,
-        contextPreferences: contextPreferences
+        contextPreferences: contextPreferences,
+        collapse: mainWindowCollapse
     )
 
     func configure() {

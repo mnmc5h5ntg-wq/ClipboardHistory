@@ -7,7 +7,8 @@ struct ClipboardHistoryApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainWindowContent(historyStore: historyStore)
+            MainWindowContent(historyStore: historyStore,
+                              collapse: appDelegate.mainWindowCollapse)
                 .onAppear {
                     appDelegate.configure()
                 }
@@ -68,11 +69,16 @@ struct ClipboardHistoryApp: App {
 /// 两处各写一份 `ContentView + frame + WindowConfigurator` 迟早漂成两个主窗口。
 struct MainWindowContent: View {
     @ObservedObject var historyStore: HistoryStore
+    @ObservedObject var collapse: MainWindowCollapseController
 
     var body: some View {
-        ContentView(historyStore: historyStore)
-            .frame(minWidth: 600, minHeight: 440)
-            .background(WindowConfigurator())
+        ContentView(historyStore: historyStore,
+                    isCollapsed: collapse.isCollapsed,
+                    toggleCollapse: { collapse.toggle() })
+            // R523：最小宽跟着状态走 —— 折叠后还留 600 会被 SwiftUI 弹回去抖动。
+            .frame(minWidth: MainWindowCollapsePolicy.minWidth(collapsed: collapse.isCollapsed),
+                   minHeight: MainWindowCollapsePolicy.minHeight)
+            .background(WindowConfigurator(collapse: collapse))
     }
 }
 

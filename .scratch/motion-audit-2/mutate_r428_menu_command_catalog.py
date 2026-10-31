@@ -8,8 +8,8 @@ FILE = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Models/AppCommand.swift")
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "MenuShortcutPresentationTests|AppCommandTests|MenuBarPopulationTests"
 
-NEEDLE = "        .showMainWindow,\n        .showQuickPick,\n"
-MUTANT = "        .showMainWindow,\n"
+NEEDLE = "        .showQuickPick,\n"
+MUTANT = ""
 
 MUTATIONS = [
     ("M1164", "快速选择没有进菜单命令区", FILE, NEEDLE, MUTANT, FILTER,

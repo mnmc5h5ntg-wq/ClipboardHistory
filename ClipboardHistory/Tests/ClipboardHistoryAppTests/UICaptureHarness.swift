@@ -177,6 +177,10 @@ final class UICaptureTests: XCTestCase {
         "content-with-copy-failure-notice",
         "sidebar-history", "sidebar-no-title-icon", "sidebar-search-placeholder-legacy",
         "sidebar-multi-select", "sidebar-multi-select-min", "sidebar-multi-select-pinned", "sidebar-favorites",
+        // R523：折叠态帧是同一个 `HistorySidebarView` 单独铺满 420pt（没有 NavigationSplitView 的
+        // 外层材质），黑带仍是已登记的系统 List 选中材质（66pt，y=774..905@2x），不是折叠层画黑的。
+        // 黑带以外已看图：搜索框/筛选段/标题「时间剪史 5 条记录」/折叠箭头/四行条目都完好。
+        "main-collapsed",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -11676,6 +11680,11 @@ final class UICaptureTests: XCTestCase {
             Fixture("content-wide", NSSize(width: 1100, height: 800)) { AnyView(ContentView(historyStore: store)) },
             Fixture("content-empty", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: empty)) },
             Fixture("content-no-results", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: searching)) },
+            // R523：折叠态只留列表，宽度是**单独定义**的 420pt（不是侧栏的 268pt）。
+            // 帧名避开 `settings-` 前缀：这一族不是设置页的 settings-content-blank 通道。
+            Fixture("main-collapsed", NSSize(width: 420, height: 560)) {
+                AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {}))
+            },
         ]
 
         // 菜单栏面板的内容层。以前这里一直标 NOT-RUN（D-019：整块 NSMenu 离屏画不出材质表面，

@@ -5,12 +5,13 @@ final class AppCommandTests: XCTestCase {
     func testMenuBarCommandCatalogKeepsExpectedOrder() {
         XCTAssertEqual(
             AppCommandCatalog.menuBarCommands,
-            [.showMainWindow, .showQuickPick, .showSettings, .clearHistory, .quit]
+            [.showMainWindow, .toggleMainWindowCollapse, .showQuickPick, .showSettings, .clearHistory, .quit]
         )
     }
 
     func testCommandTitlesStayCentralized() {
         XCTAssertEqual(AppCommand.showMainWindow.title, "显示主窗口")
+        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.title, "折叠/展开窗口")
         XCTAssertEqual(AppCommand.showQuickPick.title, "快速选择…")
         XCTAssertEqual(AppCommand.showSettings.title, "设置")
         XCTAssertEqual(AppCommand.refreshHistory.title, "刷新历史")
@@ -27,6 +28,8 @@ final class AppCommandTests: XCTestCase {
         XCTAssertEqual(AppCommand.showSettings.keyEquivalent, ",")
         XCTAssertEqual(AppCommand.quit.keyEquivalent, "q")
         XCTAssertEqual(AppCommand.refreshHistory.keyEquivalent, "")
+        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.keyEquivalent, "",
+                       "折叠/展开只走菜单与界面入口；菜单里再挂本地 key equivalent 会造出第二条路径")
         XCTAssertEqual(AppCommand.showQuickPick.keyEquivalent, "",
                        "快速选择只走全局热键；菜单里再挂本地 key equivalent 会造出第二条路径")
     }

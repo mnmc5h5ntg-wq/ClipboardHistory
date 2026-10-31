@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var historyStore: HistoryStore
+    /// R523：折叠态只留列表；默认展开，离屏夹具不必跟着改。
+    var isCollapsed: Bool = false
+    var toggleCollapse: () -> Void = {}
     /// R417：「暂停记录」以前只在设置页那颗开关上可见 —— 主窗口里复制进不来，
     /// 界面一句话都不说。这里与设置页读同一个键，开关一动横幅就进出。
     @AppStorage("recordingPaused") private var recordingPaused = false
@@ -11,7 +14,20 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             notices
-            if #available(macOS 13, *) {
+            if isCollapsed {
+                // 折叠态**不渲染 detail**：不是把详情列压到 0 宽（那还会留着布局与焦点），
+                // 而是根本不进 NavigationSplitView。
+                HistorySidebarView(historyStore: historyStore,
+                                   isCollapsed: true,
+                                   toggleCollapse: toggleCollapse)
+                    // 折叠态不再套 `windowBackground`（那是给分栏内外两面的材质）；
+                    // 窗口自己的底色就是列表后面这一层，夹具用同色不透明底拍它。
+                    .background(Color(nsColor: .windowBackgroundColor))
+                    .onAppear {
+                        LifecycleDebugLogger.log("collapsed sidebar appeared")
+                        LifecycleDebugLogger.logKeyWindowLayout("collapsed sidebar appear")
+                    }
+            } else if #available(macOS 13, *) {
                 splitView
                     .removeSidebarToggleToolbarItem()
                     .windowBackground()
@@ -21,7 +37,9 @@ struct ContentView: View {
                     }
             } else {
                 NavigationView {
-                    HistorySidebarView(historyStore: historyStore)
+                    HistorySidebarView(historyStore: historyStore,
+                                       isCollapsed: false,
+                                       toggleCollapse: toggleCollapse)
                         .frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
                     DetailView(historyStore: historyStore)
                 }
@@ -101,7 +119,9 @@ struct ContentView: View {
     @available(macOS 13, *)
     private var splitView: some View {
         NavigationSplitView {
-            HistorySidebarView(historyStore: historyStore)
+            HistorySidebarView(historyStore: historyStore,
+                               isCollapsed: false,
+                               toggleCollapse: toggleCollapse)
                 .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
         } detail: {
             DetailView(historyStore: historyStore)

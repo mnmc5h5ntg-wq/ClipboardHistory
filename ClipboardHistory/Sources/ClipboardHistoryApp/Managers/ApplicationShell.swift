@@ -11,6 +11,8 @@ final class ApplicationShell {
     private let quickPickHotKeySettings: HotKeySettings
     private let confirmation: DestructiveConfirming
     private let pasteKey: PasteKeyExecuting
+    /// R523：折叠/展开的唯一状态（产品由 AppDelegate 注入；测试默认给不持久化的实例）。
+    private let collapse: MainWindowCollapseController
     private var isConfigured = false
     private var didDeferInitialActivationRestore = false
     /// 快速选择浮层（§5 F-3）。懒建：没有历史数据时它连列表都填不出来。
@@ -25,12 +27,14 @@ final class ApplicationShell {
         loginItemSettings: LoginItemSettings,
         contextPreferences: ContextPreferenceSettings = ContextPreferenceSettings(),
         confirmation: DestructiveConfirming = SystemDestructiveConfirming(),
-        pasteKey: PasteKeyExecuting = SystemEventsPasteKey()
+        pasteKey: PasteKeyExecuting = SystemEventsPasteKey(),
+        collapse: MainWindowCollapseController = MainWindowCollapseController(persists: false)
     ) {
         self.showMainWindowHotKeySettings = showMainWindowHotKeySettings
         self.quickPickHotKeySettings = quickPickHotKeySettings
         self.confirmation = confirmation
         self.pasteKey = pasteKey
+        self.collapse = collapse
         self.settingsWindowController = SettingsWindowController(
             showMainWindowHotKeySettings: showMainWindowHotKeySettings,
             repeatCopyHotKeySettings: repeatCopyHotKeySettings,
@@ -287,6 +291,8 @@ final class ApplicationShell {
         switch command {
         case .showMainWindow:
             showMainWindow()
+        case .toggleMainWindowCollapse:
+            collapse.toggle()
         case .showQuickPick:
             toggleQuickPick()
         case .showSettings:
