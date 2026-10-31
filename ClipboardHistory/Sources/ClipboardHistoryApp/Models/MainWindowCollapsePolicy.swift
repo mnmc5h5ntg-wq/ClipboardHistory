@@ -11,8 +11,57 @@ enum MainWindowCollapsePolicy {
     static let collapsedMinWidth: CGFloat = 360
     static let expandedMinWidth: CGFloat = 600
     static let minHeight: CGFloat = 440
-    /// R523 只落静态骨架，时长先定义给 R524 的过渡用；reduce 下必须是 0。
-    static let toggleDuration: TimeInterval = 0.22
+    /// R524：展开态侧栏的缝位（`navigationSplitViewColumnWidth` 的 ideal 280）。
+    /// 过渡时折叠列表只从这条缝右侧开始遮罩 —— 否则两棵整树交叉淡会同时画出两套 chrome。
+    static let sidebarSeamWidth: CGFloat = 280
+    /// R524：时长/曲线**只从 MotionCatalog 取**（`.windowFold`），这里不再写第二个常数。
+    /// R523 的 reduce=0 判据继续用 `animationDuration`。
+    static var toggleDuration: TimeInterval { MotionCatalog.duration(for: .windowFold) }
+
+    static var foldControlPoints: [Double] {
+        MotionCatalog.timingControlPoints(for: .windowFold, reduceMotion: false)
+    }
+
+    static func animationDuration(reduceMotion: Bool) -> TimeInterval {
+        reduceMotion ? 0 : toggleDuration
+    }
+
+    /// 三次贝塞尔缓动（与 `Animation.timingCurve` 同一条曲线）。控制器自己按 60Hz 驱动，
+    /// 所以需要把控制点摊成 `t → 进度` 的纯函数；reduce 路径根本不走它（时长为 0）。
+    static func easedProgress(_ linear: Double,
+                              controlPoints: [Double] = foldControlPoints) -> Double {
+        let x = min(max(linear, 0), 1)
+        guard controlPoints.count == 4 else { return x }
+        let x1 = controlPoints[0], y1 = controlPoints[1]
+        let x2 = controlPoints[2], y2 = controlPoints[3]
+        func bezier(_ t: Double, _ a: Double, _ b: Double) -> Double {
+            let u = 1 - t
+            return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t
+        }
+        var low = 0.0, high = 1.0, t = x
+        for _ in 0..<12 {
+            let bx = bezier(t, x1, x2)
+            if abs(bx - x) < 0.0005 { break }
+            if bx < x { low = t } else { high = t }
+            t = (low + high) / 2
+        }
+        return min(max(bezier(t, y1, y2), 0), 1)
+    }
+
+    /// 交叉淡的两端：展开布局 `1−p`、折叠布局 `p`。两端都由各自的 tree 是否挂载兜底
+    ///（p=1 时展开树整棵不渲染，detail 不存在；p=0 时折叠树不渲染）。
+    static func expandedContentOpacity(foldProgress: Double) -> Double {
+        1 - min(max(foldProgress, 0), 1)
+    }
+
+    static func collapsedContentOpacity(foldProgress: Double) -> Double {
+        min(max(foldProgress, 0), 1)
+    }
+
+    /// 中缝折页阴影：两端 0，中段最强（4p(1−p)，p=0.5 时 1）。
+    static func hingeOpacity(foldProgress: Double) -> Double {
+        4 * min(max(foldProgress, 0), 1) * (1 - min(max(foldProgress, 0), 1))
+    }
 
     static func minWidth(collapsed: Bool) -> CGFloat {
         collapsed ? collapsedMinWidth : expandedMinWidth
@@ -21,10 +70,6 @@ enum MainWindowCollapsePolicy {
     static func detailVisible(collapsed: Bool) -> Bool { !collapsed }
 
     static func nextCollapsed(_ current: Bool) -> Bool { !current }
-
-    static func animationDuration(reduceMotion: Bool) -> TimeInterval {
-        reduceMotion ? 0 : toggleDuration
-    }
 
     static func rememberedWidth(collapsed: Bool,
                                 expandedWidth: CGFloat,

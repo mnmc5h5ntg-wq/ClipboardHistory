@@ -74,6 +74,7 @@ struct MainWindowContent: View {
     var body: some View {
         ContentView(historyStore: historyStore,
                     isCollapsed: collapse.isCollapsed,
+                    foldProgress: collapse.foldProgress,
                     toggleCollapse: { collapse.toggle() })
             // R523：最小宽跟着状态走 —— 折叠后还留 600 会被 SwiftUI 弹回去抖动。
             .frame(minWidth: MainWindowCollapsePolicy.minWidth(collapsed: collapse.isCollapsed),

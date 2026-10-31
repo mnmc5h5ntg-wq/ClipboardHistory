@@ -52,6 +52,16 @@ final class MainWindowCollapseTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
+    /// R524：折叠是 0.20s 的逐帧过渡；判定"落定"要等控制器真的停表，不能拍脑袋睡一个数。
+    private func settleTransition(_ timeout: TimeInterval = 1.0) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while controller.isTransitioning, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        }
+        XCTAssertFalse(controller.isTransitioning, "过渡在 \(timeout)s 内没有收尾 ⇒ 留下半折状态")
+        settle(0.03)
+    }
+
     private func makeVisibleWindow() -> NSWindow? {
         WindowManager.showMainWindow()
         settle(0.12)
@@ -78,7 +88,7 @@ final class MainWindowCollapseTests: XCTestCase {
         let topBefore = window.frame.maxY
 
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertTrue(controller.isCollapsed)
         XCTAssertEqual(window.frame.width, MainWindowCollapsePolicy.collapsedWidthDefault, accuracy: 1.0,
                        "折叠宽不是单独定义的 420pt")
@@ -90,7 +100,7 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertEqual(window.frame.maxY, topBefore, accuracy: 1.0, "折叠没有保持左上角（top）")
 
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertFalse(controller.isCollapsed)
         XCTAssertEqual(window.frame.width, 800, accuracy: 1.0,
                        "再展开没有回到用户最近一次 resize 的 800pt")
@@ -104,16 +114,16 @@ final class MainWindowCollapseTests: XCTestCase {
         guard let window = makeVisibleWindow() else { return }
         setWidth(777, of: window)
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
 
         setWidth(450, of: window)
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertEqual(window.frame.width, 777, accuracy: 1.0, "展开宽没记住用户 resize 的 777")
 
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertEqual(window.frame.width, 450, accuracy: 1.0, "折叠宽没记住用户 resize 的 450")
     }
 
@@ -130,13 +140,13 @@ final class MainWindowCollapseTests: XCTestCase {
         guard let window = makeVisibleWindow() else { return }
         setWidth(812, of: window)
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         setWidth(455, of: window)
         // 宽度是在**切换那一刻**记回正要离开的那一档：先展开（记下 455），再折回来。
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertTrue(controller.isCollapsed)
 
         let restored = MainWindowCollapseController(defaults: defaults)
@@ -166,15 +176,18 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertTrue(MainWindowCollapsePolicy.detailVisible(collapsed: false))
         XCTAssertFalse(MainWindowCollapsePolicy.detailVisible(collapsed: true))
         let source = try productSource("Views/ContentView.swift")
-        guard let collapsedStart = source.range(of: "if isCollapsed {"),
-              let expandedStart = source.range(of: "} else if #available(macOS 13, *) {") else {
-            return XCTFail("ContentView 没有折叠/展开两条分支")
+        guard let collapsedStart = source.range(of: "private var collapsedLayout: some View {"),
+              let collapsedEnd = source.range(of: "/// R524",
+                                              range: collapsedStart.upperBound..<source.endIndex) else {
+            return XCTFail("ContentView 没有折叠布局这一段")
         }
-        let collapsedBranch = String(source[collapsedStart.upperBound..<expandedStart.lowerBound])
-        XCTAssertFalse(collapsedBranch.contains("DetailView(historyStore:"),
-                       "折叠分支里仍然渲染了 detail")
-        XCTAssertTrue(collapsedBranch.contains("HistorySidebarView"),
-                      "折叠分支没有列表 ⇒ 折叠后是一块空白")
+        let collapsedBlock = String(source[collapsedStart.lowerBound..<collapsedEnd.lowerBound])
+        XCTAssertFalse(collapsedBlock.contains("DetailView(historyStore:"),
+                       "折叠布局里仍然渲染了 detail")
+        XCTAssertTrue(collapsedBlock.contains("HistorySidebarView"),
+                      "折叠布局没有列表 ⇒ 折叠后是一块空白")
+        XCTAssertTrue(source.contains("if progress < 1 || !isCollapsed"),
+                      "落定折叠时展开树必须整棵不挂载（否则 detail 还在）")
     }
 
     func testDoubleClickTitleAndTheVisibleButtonShareTheSameAction() throws {
@@ -219,7 +232,7 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertTrue(AppCommandCatalog.menuBarCommands.contains(.toggleMainWindowCollapse),
                       "菜单里没有「折叠/展开窗口」这一项")
         delegate.perform(.toggleMainWindowCollapse)
-        settle()
+        settleTransition()
         XCTAssertTrue(controller.isCollapsed)
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
     }

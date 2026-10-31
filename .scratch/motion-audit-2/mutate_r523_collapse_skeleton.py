@@ -18,7 +18,7 @@ ARMS=[
         expandedMinWidth
     }'''),
   ("M1397","切换时不记用户 resize 的宽度", CTRL,
-   '''        if let target { rememberWidth(of: target) }
+   '''        if !isTransitioning, let target { rememberWidth(of: target) }
 ''',
    ''''''),
   ("M1398","reduce 下时长不归零", POLICY,
