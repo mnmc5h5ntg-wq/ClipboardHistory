@@ -8503,3 +8503,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：确认框只在点击后出现，不改变任何离屏帧（334 帧/38 噪声/基线不变）；4 条测试 + 2 把刀；产品 2 文件。
 - 边界：真实临时副本点击路径 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（安装包 AX 树在临时实例上没有 AXOutline）；按钮布局由既有 `DestructiveAlertLayoutTests` 钉住，策略/接线由新测试钉住。后续任何破坏性批量动作都必须走同一策略；验证这类路径只能用 `CLIPBOARD_HISTORY_DATA_DIR` 副本/测试夹具，不许碰活库。
 
+## D-517 确认框的破坏性按钮写明条数（R518）
+
+- 背景：R517 的批量删除确认框只在 message 写「将删除 N 条记录」，破坏性按钮仍只写「删除」。用户点下去时最容易看的是按钮，不是正文；不可逆动作的范围应当写在按钮上。
+- 决定：`BulkDeleteConfirmation.confirm` 的 `confirmTitle` 从「删除」改成 `"删除 \(count) 条"`；message 仍保留条数，取消/零选区/侧栏接线不变；确认框布局仍走 `DestructiveAlertLayout`（取消默认、删除为破坏性按钮）。
+- 理由：按钮标签是用户确认前最后一眼；把条数放在按钮上比放在 message 里更难错过，且不改变任何交互路径。
+- 兼容性/迁移：只改按钮文案；状态菜单/侧栏帧不变；4 条策略测试更新；M1386 重锚；没有 baseline 变化。
+- 边界：确认框的系统真实点击路径仍 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（安装包 AX 树在临时实例上没有 AXOutline）；按钮布局由既有 `DestructiveAlertLayoutTests` 钉住。若未来把确认框改成自定义 sheet，条数必须在按钮/标题上继续可见。
+

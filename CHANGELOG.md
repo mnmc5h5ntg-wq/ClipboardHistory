@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 确认框的破坏性按钮写明条数（R518 / 第 517 轮 / Round 515 / U-2081…U-2087 · 产品 1 文件 + 判据）
+
+
 ### 批量删除所选记录先确认（R517 / 第 516 轮 / Round 514 / U-2074…U-2080 · 产品 2 文件 + 判据）
 
 
