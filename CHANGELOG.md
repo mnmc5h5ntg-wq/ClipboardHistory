@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 状态菜单破坏性命令改用文本警告记号（R516 / 第 515 轮 / Round 513 / U-2067…U-2073 · 产品 3 文件 + 判据）
+
+
 ### 状态菜单破坏性命令用系统红 + 破坏性批量动词暗档提亮（R515 / 第 514 轮 / Round 512 / U-2059…U-2066 · 产品 4 文件（两笔）+ 判据）
 
 
