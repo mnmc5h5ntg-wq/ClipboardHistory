@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主窗口折叠/展开过渡（R524 / 第 523 轮 / Round 521 / U-2123…U-2129 · 产品 5 文件 + 判据）
+
+
 ### 主窗口折叠/展开静态骨架（R523 / 第 522 轮 / Round 520 / U-2116…U-2122 · 产品 12 文件 + 判据）
 
 

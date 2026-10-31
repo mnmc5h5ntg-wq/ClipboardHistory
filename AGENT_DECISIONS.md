@@ -8552,3 +8552,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：R522 的「无窗口创建唯一一个」原样保留（新增 testCreatedWindowAppliesPersistedCollapsedState 从创建路径判折叠态）；登录首启折叠时按持久化宽建窗；默认展开，旧夹具一行不改。
 - 边界：本轮**没有**过渡动画；`animationDuration` 只是纯函数定义（R524 消费）；屏幕比最小宽还窄时屏幕优先；全屏被 `collectionBehavior .fullScreenNone` 禁用、最小化按系统行为（未新增路径）。
 
+## D-523 折叠过渡用模型驱动逐帧动画（R524）
+
+- 背景：R523 的两态是 `setFrame` 一步跳变 + 分支硬切。R524 要有可逐帧量、可中断、reduce 直切的过渡。
+- 决定：① 目录新增 `MotionCatalog.Role.windowFold`（0.20s / 进场曲线，仍 ≤250ms 上限），时长与曲线只从目录取；② `MainWindowCollapsePolicy` 提供三次贝塞尔求值、内容透明度与中缝阴影的纯函数；③ `MainWindowCollapseController` 用 60Hz `DispatchSourceTimer` **自己驱动**：同一拍更新 `foldProgress` 与窗口宽，反向切换从当前进度/宽度起步（无动画队列），reduce-motion 时长 0 一步到位；途中先降 minSize、收尾落回目标档；④ `ContentView` 用"右页折盖"：展开树不动、折叠列表从侧栏右缝被遮罩并按 progress 淡入，中缝阴影画在两棵树之上；端点由树是否挂载兜底（p=1 时展开树整棵不渲染）。
+- 理由：模型驱动才能逐帧读宽度/进度/透明度，且中断不留半折；右页折盖避免整树交叉淡同时画出两套 chrome（第一版胶片已证）。
+- 不做 3D：Duo 式透视在 12/13 会让文字发虚，且与 SwiftUI 重排竞争；克制版已满足"宽度收放＋中缝折页＋内容交叉淡"。如果未来要做 3D，先解决文字栅格化与 minWidth 抖动，再用胶片证。
+- 兼容性/迁移：静态两端与 R523 逐字节相同（帧基线 340 不变）；R523 的 9 条判据改为等过渡停表；R523 的 M1397 因控制器行换代重锚；新增 M1399–M1401。
+- 边界：过渡胶片是独立取证目录（不进帧基线）；reduce 下没有任何中间帧；全屏仍被禁、最小化按系统行为。
+
