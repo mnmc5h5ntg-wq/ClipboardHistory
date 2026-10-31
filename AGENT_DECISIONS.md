@@ -8527,3 +8527,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：静置 `settings-about` 不变；新增 hover 2 帧，基线 334→336；R519 的 M1387 因 Link 块改动重锚到唯一的 Link 行；R520 新增 M1389/M1390。
 - 边界：悬停下划线只在 hover 出现；settings 空白机器上像素判据 NOT_RUN（本地 2x 是证人）；真实指针路径仍由 `.onHover` 供，夹具只写 `hoveredForCapture`。
 
+## D-520 关于页链接改用 Button 承载按压反馈 + 两把尺换对象（R521）
+
+- 背景：R520 给关于页 GitHub 入口补了悬停下划线，但入口是 `Link`，它不吃 `pressedStyle`（`ButtonStyle`），所以全 App 唯一一条文字入口没有"你按到了"的表达；同一枚按下夹具在旧实现上读 `delta=0`（静置与按下逐像素相同）。
+- 决定：把入口改成 `Button + NSWorkspace.shared.open`，接 `pressedStyle(controlHover, labelPadding 0)`（17pt 文字按钮 ⇒ 控件档）、保留 `.accessibilityAddTraits(.isLink)`；悬停下划线与 0.12s 动效不动。
+- 判据随之换对象：① 按下判据数"按下比静置多出的墨"（新灰底就是被量对象），地板 100；② 悬停判据不能再数"离纸色 >24 的墨"——`pressedStyle` 的灰底自己就够 100 像素，旧尺下 M1389/M1390 会 PASSED；改成数 accent 蓝像素差（下划线 0,122,255；底是 primary 灰），地板 250。R520 的 446/446 墨差读数退役为历史，不删账。
+- 名册：`PressFeedbackTests` 的控件档位点计数 8→9，新位点连同理由写进枚举（多一处要红的设计照旧）。
+- 兼容性/迁移：静置左轴不变（177.5/177.5）；Button 化使静置墨 1928→1898、1886→1792（最佳平移 0,0，无位移）；新增 2 帧，基线 336→338；`M1387`/`M1389` 因代码块换代重锚，新增 `M1391`/`M1392`。
+- 边界：真实按压仍由 `configuration.isPressed` 供，夹具只写 `pressedForCapture`；settings 空白机器上像素判据 NOT_RUN（本地 2x 是证人）。
+
