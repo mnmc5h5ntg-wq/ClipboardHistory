@@ -8462,3 +8462,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：`sidebar-multi-select` 两帧（及 -min 两帧）里 unpin/unfavorite 变暗；新增 `sidebar-multi-select-pinned`（选 3 条含固定项）证明第三颗会亮回来；基线 332→334。
 - 边界：可点墨探针原来框在 unpin 上（禁用后 2.02/2.71 <3.0）⇒ 重锚到始终可点的删除（5.86/3.15），地板不动；若未来再加/撤动词，探针要跟着选"始终可点"的那一颗。
 
+## D-512 破坏性批量动词实心核心 + 侧栏开关回加拦截（R514）
+
+- 背景：R513 把可点墨探针从禁用的 unpin 重锚到删除后，runner 1x 暗档读到 **2.27:1**（本机 2x 3.15 只是擦线）—— 1px 红描边被抗锯齿摊薄；同一轮的真窗口多选帧里，顶部中央又出现 SwiftUI 异步加回的侧栏开关（614，`window.toolbar` 里的 `AXButton desc=[隐藏边栏]`）。
+- 决定 A：删除动词 `trash` → `trash.fill`（系统红不变），并加核心红像素判据（`testDestructiveBulkVerbKeepsAFilledCore`，floor 40×scale²，灰 pin 负向对照）——实心核心在 1x/2x 都保持系统红，轮廓版在暗档低于 floor。
+- 决定 B：`WindowConfigurator.Coordinator` 观察 `NSToolbar.willAddItemNotification`；只摘 `toolbar === window.toolbar` 且 `isSidebarToolbarItem` 的项，异步清理；`deinit` 移除观察者。既有的 key/resize 五轮清理继续保留，负责启动期。
+- 理由：两件事都是“对象换了宿主”：红描边的可读性对象是**核心像素**而不是抗锯齿边缘；侧栏开关的宿主是**工具栏项**而不是 contentView 里的 NSButton。按旧宿主做的守卫在 1x/异步路径上各留一朵红。
+- 兼容性/迁移：6 张多选帧同笔更新（基线仍 334）；新增两条测试；`BulkActionAvailability` 与 4.5/3.0 地板未动。
+- 边界：`willAddItem` 按既有字符串谓词认侧栏项；若未来真的需要工具栏里的侧栏词项，必须先收窄谓词（当前 App 不使用任何工具栏项）。实心图标的颜色仍是 `.red`；若未来改色，核心红判据要换成对应色相的核心判据。
+

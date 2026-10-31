@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 破坏性批量动词改实心核心 + 614 侧栏开关回加拦截（R514 / 第 513 轮 / Round 511 / U-2051…U-2058 · 产品 2 文件 + 判据）
+
+
 ### 多选操作栏按选区禁用空操作动词（R513 / 第 512 轮 / Round 510 / U-2043…U-2049 · 产品 3 文件 + 判据）
 
 

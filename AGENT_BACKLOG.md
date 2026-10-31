@@ -10725,3 +10725,5 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：`testActionableInkStaysAboveTheLegibilityFloor` 的 `sidebar-multi-select/批量操作按钮` 框在 x200（取消固定），R513 让它在无固定项的选区里禁用+0.35 ⇒ light 2.02 / dark 2.71 低于 3.0。
     修法：探针重锚到**始终可点**的删除（x265.5..277.5 ⇒ 5.86/3.15），地板 3.0 与"禁用不是可点笔画"的前提都没动；以后批量栏增删动词，探针必须选始终可点的那一颗，不许降地板。
 
+**614 补记（R514 结案）**：选区变化后 SwiftUI 会把侧栏开关重新加回 `window.toolbar`，旧的 NSButton 视图树清理抓不到，key/resize 的五轮延迟清理也早已结束。修法：观察 `NSToolbar.willAddItemNotification`，只摘 `toolbar === window.toolbar` 且 `isSidebarToolbarItem` 的项，异步清理；真窗口复现序列（选 3 行 → AX 读工具栏）after 无 AXToolbar/「隐藏边栏」。退场条件：真窗口多选后 AX 树不再出现 `AXButton desc=[隐藏边栏]`（本轮已读）；若未来工具栏需要合法的侧栏词项，先收窄谓词再放行。
+
