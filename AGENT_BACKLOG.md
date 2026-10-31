@@ -10731,3 +10731,5 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：R515 为打开「破坏性确认」表面，AXPress 点了多选栏的「删除所选记录」；产品路径 `historyStore.perform(.deleteSelection)` **立即删除**，没有 NSAlert/撤销，实机历史掉了 6 条。与「清空未收藏」的 `confirmAndClearHistory()`（有 `DestructiveConfirmation`）不对称。
     已做：用本轮开工副本按 ID 合并恢复 419 条（ROWS=420），恢复方法写在 AGENT_STATE R515 与 U-2060；未打印剪贴板内容。
     候选修法（等用户决定）：让批量删除复用 `DestructiveConfirmation`，或做可撤销删除；在改产品前，任何实机破坏性路径验证必须把 `CLIPBOARD_HISTORY_DATA_DIR` 指向副本。
+
+**619 结案（R517）**：批量删除已改走 `BulkDeleteConfirmation`（先问；取消/零选区不删；确认框复用 `DestructiveAlertLayout`，取消默认、删除为破坏性按钮）。4 条策略/接线测试 + M1385/M1386 2/2；真实临时副本点击路径 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（未碰活库）。

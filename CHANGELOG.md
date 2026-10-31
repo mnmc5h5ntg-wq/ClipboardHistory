@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 批量删除所选记录先确认（R517 / 第 516 轮 / Round 514 / U-2074…U-2080 · 产品 2 文件 + 判据）
+
+
 ### 状态菜单破坏性命令改用文本警告记号（R516 / 第 515 轮 / Round 513 / U-2067…U-2073 · 产品 3 文件 + 判据）
 
 

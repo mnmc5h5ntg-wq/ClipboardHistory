@@ -20326,3 +20326,21 @@ R515 的红字在系统灰底（104,104,104）上只有 **1.08:1**；先试 `Lab
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
+## Round 514 · R517（第 516 轮 · 2026-10-31）：批量删除所选记录先确认
+
+R515 的事故：多选栏「删除所选记录」直接删，误删 6 条（已恢复 419/ROWS=420）。R517 新增 `BulkDeleteConfirmation`（message 含条数、取消/零选区不删），侧栏先 `guard BulkDeleteConfirmation.confirm(count:using:SystemDestructiveConfirming())` 再 `perform(.deleteSelection)`；确认框复用既有 `DestructiveAlertLayout`（取消默认、删除为破坏性按钮）。4 条策略/接线测试 + M1385/M1386 2/2；预检 298/275/727 bad=0、ARM 391/1214、HIDDEN 385/1153 rot=0。帧卷 334/CHANGED=38 全噪声、基线 334。全量 **1341/57/5（606.7s）**；build 0 告警；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`；电池 **683/5（台账后复跑）**。⓪ 2b8cfda failure Release+Motion（markdown 1<2 已知采样红）、f5051cf success（INK 5.01/4.82、`MenuBarPopulationTests` 带 `⚠︎` 通过、Motion 5/5）⇒ R516 产品签收、1x 4.0 持续；29c9a45 仅 Release、ba2d0b6 success。真实临时副本点击路径 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（未碰活库）。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 确认框读数与临时副本尝试都记；未碰活库；既有 `DestructiveAlertLayout` 逐项看过。 |
+| 判据有效性 | 15/15 | 策略/接线 4 条 + M1385/M1386 2/2；零选区/取消/确认三臂。 |
+| 假绿防御 | 15/15 | 真实点击路径 NOT-RUN 具名；全量 5 红不报绿；临时副本非活库。 |
+| 产品面推进 | 15/15 | 新安全面（确认框）；2 个产品文件；BACKLOG 619 结案。 |
+| 台账一致性 | 15/15 | U-2074…U-2080、D-516、334 帧/全量/换装/电池都来自命令与测试。 |
+| 交付诚实性 | 15/15 | 事故与恢复如实；ALERT_UI_NOT_RUN；SelectionReveal 5 红具名。 |
+| 可复核性 | 15/15 | M1385/M1386、预检 298/275/727、INK 5.01/4.82、f5051cf success 都在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
+

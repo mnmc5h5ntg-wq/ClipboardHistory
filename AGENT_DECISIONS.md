@@ -8495,3 +8495,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：状态菜单不进离屏帧，帧卷仍 334、无基线更新；测试把 R515 的「红字」守卫换成「文本前缀」守卫；M1382 退役，M1384 接位。
 - 边界：若未来状态菜单改成 `.window` 自定义视图，可以用图标；文本前缀是 `.menu` 的通道限制，不许把「红字」当回退（1.08 不可读）。
 
+## D-516 批量删除所选记录先确认（R517）
+
+- 背景：R515 的事故（BACKLOG 619）——多选栏的「删除所选记录」直接 `perform(.deleteSelection)`，没有确认也没有撤销；实机验证时误删 6 条（已按开工副本恢复 419 条/ROWS=420）。这是本轮唯一会改动用户数据的入口，必须先问。
+- 决定：新增 `BulkDeleteConfirmation`（title「删除所选记录」、message「将删除 N 条记录。此操作不可撤销。」、confirm「删除」、cancel「取消」、零选区不问）；`HistorySidebarView` 的删除按钮先 `guard BulkDeleteConfirmation.confirm(count:using:SystemDestructiveConfirming())` 再删除。确认框复用 `DestructiveConfirmation`/`DestructiveAlertLayout`：取消在第一颗且拿 Return，删除标 `hasDestructiveAction` 且无键等价物。
+- 理由：批量删除是**不可逆**动作；与「清空未收藏」的既有确认框同一套语言，用户不必学第二套。零选区不问，避免空确认。
+- 兼容性/迁移：确认框只在点击后出现，不改变任何离屏帧（334 帧/38 噪声/基线不变）；4 条测试 + 2 把刀；产品 2 文件。
+- 边界：真实临时副本点击路径 `ALERT_UI_NOT_RUN=ax-tree-no-outline`（安装包 AX 树在临时实例上没有 AXOutline）；按钮布局由既有 `DestructiveAlertLayoutTests` 钉住，策略/接线由新测试钉住。后续任何破坏性批量动作都必须走同一策略；验证这类路径只能用 `CLIPBOARD_HISTORY_DATA_DIR` 副本/测试夹具，不许碰活库。
+
