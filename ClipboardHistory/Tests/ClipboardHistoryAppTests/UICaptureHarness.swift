@@ -499,6 +499,7 @@ final class UICaptureTests: XCTestCase {
                       "HotKeyRecorderEvidenceTests.swift", "MenuBarPopulationTests.swift",
                       "MenuBarSeamReaderIsolationTests.swift", "MenuBarSwiftUIDismissRowInkTests.swift",
                       "MotionDriverTests.swift", "MotionFilmstripTests.swift",
+                      "MainWindowFoldMotionTests.swift",
                       "DetailScrollResetTests.swift",
                       "PressFeedbackTests.swift", "SettingsFailureReceiptTests.swift",
                       "SettingsRowRecordingTests.swift", "SelectionRevealAnimationTests.swift",

@@ -137,7 +137,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(progressIntermediate.count, 3,
                                     "foldProgress 中间帧不足：\(progress)")
         XCTAssertEqual(progress.last ?? 0, 1, accuracy: 0.001)
-        print("FOLD_WIDTH_FILM collapse frames=\(samples.count)"
+        CaptureReadings.emit("FOLD_WIDTH_FILM collapse frames=\(samples.count)"
               + " intermediate=\(intermediate.count) distinct=\(distinct.count)"
               + " widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
               + " progress=[\(progress.map { String(format: "%.2f", $0) }.joined(separator: ","))]"
@@ -166,7 +166,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         }
         XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "展开没有回到 750")
         XCTAssertEqual(window.minSize.width, 600, accuracy: 0.5)
-        print("FOLD_WIDTH_FILM expand frames=\(samples.count)"
+        CaptureReadings.emit("FOLD_WIDTH_FILM expand frames=\(samples.count)"
               + " intermediate=\(intermediate.count)"
               + " widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
               + " final=\(Int(window.frame.width))")
@@ -185,7 +185,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "reduce 下不是 0 时长直切")
         XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001)
         XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5)
-        print("FOLD_REDUCE instant width=\(Int(window.frame.width)) progress=\(controller.foldProgress)"
+        CaptureReadings.emit("FOLD_REDUCE instant width=\(Int(window.frame.width)) progress=\(controller.foldProgress)"
               + " transitioning=\(controller.isTransitioning)")
     }
 
@@ -216,7 +216,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         delegate.perform(.toggleMainWindowCollapse)
         waitForSettled()
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "反向后再折没有落到 420")
-        print("FOLD_INTERRUPT widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
+        CaptureReadings.emit("FOLD_INTERRUPT widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
               + " final=\(Int(window.frame.width))")
     }
 
@@ -295,7 +295,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
                                  "p=\(progress) 与折叠端点几乎相同 ⇒ 这一帧没有过渡内容")
             intermediateDiffs.append("p\(progress)=\(diffFromExpanded)/\(diffFromCollapsed)")
         }
-        print("FOLD_FILM frames=\(progressValues.count) dir=\(outDir.path)"
+        CaptureReadings.emit("FOLD_FILM frames=\(progressValues.count) dir=\(outDir.path)"
               + " intermediateDiffs=\(intermediateDiffs.joined(separator: ";"))"
               + " hinge=\(progressValues.map { String(format: "%.2f", MainWindowCollapsePolicy.hingeOpacity(foldProgress: $0)) }.joined(separator: ","))")
     }
