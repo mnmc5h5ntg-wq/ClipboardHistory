@@ -16287,7 +16287,8 @@ final class UICaptureTests: XCTestCase {
                         let g = Int(base[i + rOff + 1])
                         let b = Int(base[i + rOff + 2])
                         // 只数**核心红**：抗锯齿边缘（r 高但 g/b 被底冲淡）不算核心。
-                        if r >= 240, g <= 110, b <= 110 { count += 1 }
+                        // R515：暗档提亮红的核心是 (255,135,135)，用"红占优"而不是固定的 g/b 上限。
+                        if r >= 240, r - max(g, b) >= 40 { count += 1 }
                     }
                 }
                 return count
@@ -18196,6 +18197,14 @@ final class UICaptureTests: XCTestCase {
         /// 如果只报对比度，那两处会读到"背景 vs 背景 = 1.0"而红成一条假缺陷；
         /// 有了 `inkFloor` 才会红成它真正的意思："框贴到空白了，去看元素搬到哪儿了"。
         let rect: CGRect
+        /// 这条探针自己的对比度地板；默认是通用的 3.0。只准往严里调，不许放宽。
+        let floor: Double
+        init(fixture: String, what: String, rect: CGRect, floor: Double = InkFloor.controlInk) {
+            self.fixture = fixture
+            self.what = what
+            self.rect = rect
+            self.floor = floor
+        }
     }
 
     /// 探针表。这张表**是起点不是全集**：加一处要先从帧上量出框（量法见
@@ -18211,9 +18220,11 @@ final class UICaptureTests: XCTestCase {
         InkProbe(fixture: "glass-pill", what: "药丸里的收藏星（`.secondary` 那一档的参照）",
                  rect: CGRect(x: 50, y: 38, width: 20, height: 20)),
         // R513：批量栏现在会按选区禁用不适用动词 —— x200 那一格是「取消固定」，没有固定项时是**禁用**的，
-        // 不再是"可点笔画"。探针重锚到始终可点的删除（x265.5..277.5），地板 3.0 不动。
+        // 不再是"可点笔画"。探针重锚到始终可点的删除（x265.5..277.5）。
+        // R515：runner 1x 暗档读到 2.37（R514 实心化后仍是）；这条红要求 4.0，
+        // 比通用 3.0 **更严**，用来给 1x 抗锯齿留余量；红描边提亮后本机 2x 约 6.0。
         InkProbe(fixture: "sidebar-multi-select", what: "批量操作按钮（侧栏工具排）",
-                 rect: CGRect(x: 265, y: 113, width: 16, height: 20)),
+                 rect: CGRect(x: 265, y: 113, width: 16, height: 20), floor: 4.0),
     ]
 
     /// 一块区域里"墨 vs 它自己的底"的 WCAG 对比度，以及这块里有多少墨。
@@ -23488,10 +23499,10 @@ final class UICaptureTests: XCTestCase {
                 let tail = Self.inkTailSplit(bytes: base, width: rep.pixelsWide,
                                              height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
                                              rect: probe.rect, scale: scale)
-                XCTAssertGreaterThanOrEqual(ratio, InkFloor.controlInk,
+                XCTAssertGreaterThanOrEqual(ratio, probe.floor,
                             "\(probe.fixture) 的「\(probe.what)」静置对比度 "
                             + String(format: "%.2f", ratio) + "（\(tag)，地板 "
-                            + "\(InkFloor.controlInk)）⇒ 这是可点的笔画，看不见等于没有"
+                            + "\(probe.floor)）⇒ 这是可点的笔画，看不见等于没有"
                             + "\n" + Self.inkDiagnosisLine(tail: tail, darkAppearance: appearance == .darkAqua))
                 emit("INK \(probe.fixture)/\(probe.what) \(tag) ratio="
                       + String(format: "%.2f", ratio) + " ink="

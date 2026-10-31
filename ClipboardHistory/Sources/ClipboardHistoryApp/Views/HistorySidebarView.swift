@@ -7,7 +7,16 @@ struct HistorySidebarView: View {
     @State private var isDropTargeted = false
     /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
     @Environment(\.dropTargetedForCapture) private var dropTargetedForCapture
+    @Environment(\.colorScheme) private var colorScheme
     private var isDropTargetedForDrawing: Bool { isDropTargeted || (dropTargetedForCapture ?? false) }
+
+    /// R515：系统红在 1x 暗档的抗锯齿下核心亮度只剩约 2.37:1（R514 实心化也没清掉这朵红）。
+    /// 暗档换成更亮的珊瑚红（核心亮度约 160 ⇒ 1x 约 4.5:1、2x 约 6:1），亮档维持系统红。
+    private var destructiveActionInk: Color {
+        colorScheme == .dark
+            ? Color(red: 1.0, green: 0.53, blue: 0.53)
+            : Color.red
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -202,12 +211,13 @@ struct HistorySidebarView: View {
             Button(role: .destructive) {
                 historyStore.perform(.deleteSelection)
             } label: {
-                // R514：轮廓 `trash` 在 runner 1x 暗档只读到 2.27:1（细红笔画被抗锯齿摊薄），
-                // 实心图标保证核心像素仍是系统红 ⇒ 1x/2x 都能过 3:1；破坏性动作也更醒目。
+                // R514：轮廓 `trash` 在 runner 1x 暗档只读到 2.27:1；实心化补了核心面积，
+                // 但系统红本身在 1x 抗锯齿下仍只有 2.37:1（R515 新跑实测）⇒ 暗档用上面那颗
+                // 提亮红，1x/2x 都留出 4:1 余量；亮档维持系统红。
                 Image(systemName: "trash.fill")
             }
             .helpLabel("删除所选记录")
-            .foregroundStyle(.red)
+            .foregroundStyle(destructiveActionInk)
         }
         // R13：这里以前是 `.buttonStyle(.borderless)` —— 全 App 唯一一处绕开 `PressedStyle`
         // 的地方，于是这五颗（含**删除**）既没有按压也没有悬停反馈：点下去只有图标自己动一下，
