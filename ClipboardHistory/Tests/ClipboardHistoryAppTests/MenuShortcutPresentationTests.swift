@@ -134,6 +134,21 @@ final class MenuShortcutPresentationTests: XCTestCase {
                       "退出项没有把标准快捷键修饰器挂上去")
     }
 
+    /// R515：破坏性命令「清空未收藏」在两条状态菜单路径上都要用系统红。
+    /// 13+ 的 SwiftUI 菜单把标签拍平但保留文本色；12 的 NSMenuItem 走 attributedTitle。
+    func testDestructiveCommandIsRenderedRedInBothMenuPaths() throws {
+        let app = codeOnly(try productSource(named: "App.swift"))
+        XCTAssertTrue(app.contains("command.isDestructive"),
+                      "13+ 的菜单没有读破坏性标记")
+        XCTAssertTrue(app.contains(".foregroundColor(.red)"),
+                      "13+ 的菜单没有给破坏性命令上系统红")
+        let controller = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
+        XCTAssertTrue(controller.contains("command.isDestructive"),
+                      "12 的 NSMenu 没有读破坏性标记")
+        XCTAssertTrue(controller.contains("NSColor.systemRed"),
+                      "12 的 NSMenu 没有给破坏性命令上系统红")
+    }
+
     private func codeOnly(_ source: String) -> String {
         source.components(separatedBy: "\n")
             .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }

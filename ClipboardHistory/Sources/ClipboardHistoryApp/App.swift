@@ -28,11 +28,20 @@ struct ClipboardHistoryApp: App {
                 MenuBarRecommendationsView(historyStore: historyStore, appDelegate: appDelegate)
                 Divider()
                 ForEach(AppCommandCatalog.menuBarCommands.filter { $0 != .quit }, id: \.self) { command in
-                    Button(MenuShortcutPresentation.title(
-                        command.title,
-                        hint: appDelegate.menuShortcutHint(for: command)
-                    )) {
+                    Button {
                         appDelegate.perform(command)
+                    } label: {
+                        // R515：破坏性命令用系统红。菜单标签最终会被拍平成文本，
+                        // 但文本颜色能留下（R506 的推荐理由副色已经证明这条路）。
+                        let title = MenuShortcutPresentation.title(
+                            command.title,
+                            hint: appDelegate.menuShortcutHint(for: command)
+                        )
+                        if command.isDestructive {
+                            Text(title).foregroundColor(.red)
+                        } else {
+                            Text(title)
+                        }
                     }
                     .modifier(MenuCommandShortcutModifier(command: command))
                 }

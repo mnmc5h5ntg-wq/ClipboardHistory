@@ -176,13 +176,21 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func menuItem(for command: AppCommand) -> NSMenuItem {
+        let title = MenuShortcutPresentation.title(command.title,
+                                                   hint: menuShortcutHints()[command])
         let item = NSMenuItem(
-            title: MenuShortcutPresentation.title(command.title,
-                                                  hint: menuShortcutHints()[command]),
+            title: title,
             action: selector(for: command),
             keyEquivalent: command.keyEquivalent
         )
         item.keyEquivalentModifierMask = command.keyModifiers
+        // R515：12 的 NSMenu 也走同一套危险语言；attributedTitle 保留系统右对齐的键列。
+        if command.isDestructive {
+            item.attributedTitle = NSAttributedString(
+                string: title,
+                attributes: [.foregroundColor: NSColor.systemRed]
+            )
+        }
         return item
     }
 

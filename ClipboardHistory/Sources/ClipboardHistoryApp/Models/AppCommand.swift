@@ -44,6 +44,10 @@ enum AppCommand: CaseIterable, Equatable {
     var keyModifiers: NSEvent.ModifierFlags {
         keyEquivalent.isEmpty ? [] : .command
     }
+
+    /// 菜单里的破坏性命令用系统红：与批量栏垃圾桶、确认弹窗同一套危险语言。
+    /// 只有「清空未收藏」会真的删数据；退出、刷新、打开窗口都不是。
+    var isDestructive: Bool { self == .clearHistory }
 }
 
 enum AppCommandCatalog {
