@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R515 变异表：状态菜单破坏性命令的系统红（M1381–M1382）。"""
+"""R515 变异表：状态菜单破坏性命令的系统红（M1381/M1384）。"""
 import os, subprocess, sys
 ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"
 CMD="Sources/ClipboardHistoryApp/Models/AppCommand.swift"
@@ -10,13 +10,13 @@ ARMS=[
   ("M1381","破坏性标记永远为假", CMD,
    '''    var isDestructive: Bool { self == .clearHistory }''',
    '''    var isDestructive: Bool { false }'''),
-  ("M1382","13+ 菜单不再上红", APP,
-   '''                            Text(title).foregroundColor(.red)''',
-   '''                            Text(title).foregroundColor(.primary)'''),
+  ("M1384","13+ 菜单不再挂文本警告记号", APP,
+   '''                            Text(MenuDestructivePresentation.title(title))''',
+   '''                            Text(title)'''),
 ]
 TESTS={
   "M1381": "AppCommandTests/testOnlyClearHistoryIsDestructive",
-  "M1382": "MenuShortcutPresentationTests/testDestructiveCommandIsRenderedRedInBothMenuPaths",
+  "M1384": "MenuShortcutPresentationTests/testDestructiveCommandCarriesATextWarningPrefixInBothMenuPaths",
 }
 def run(test):
     p=subprocess.run(["swift","test","--filter",test],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)

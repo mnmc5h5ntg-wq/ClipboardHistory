@@ -38,7 +38,7 @@ struct ClipboardHistoryApp: App {
                             hint: appDelegate.menuShortcutHint(for: command)
                         )
                         if command.isDestructive {
-                            Text(title).foregroundColor(.red)
+                            Text(MenuDestructivePresentation.title(title))
                         } else {
                             Text(title)
                         }

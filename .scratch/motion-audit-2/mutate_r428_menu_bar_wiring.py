@@ -8,8 +8,8 @@ FILE = os.path.join(ROOT, "Sources/ClipboardHistoryApp/Managers/MenuBarControlle
 BASE_ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 FILTER = "MenuShortcutPresentationTests|AppCommandTests|MenuBarPopulationTests"
 
-NEEDLE = "                                                   hint: menuShortcutHints()[command])\n"
-MUTANT = "                                                   hint: nil)\n"
+NEEDLE = "                                                  hint: menuShortcutHints()[command])\n"
+MUTANT = "                                                  hint: nil)\n"
 
 MUTATIONS = [
     ("M1162", "菜单项标题丢掉提示", FILE, NEEDLE, MUTANT, FILTER,

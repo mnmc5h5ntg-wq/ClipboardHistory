@@ -120,8 +120,12 @@ final class MenuBarPopulationTests: XCTestCase {
 
         let titles = Set(menu.items.map(\.title))
         for command in AppCommandCatalog.menuBarCommands {
-            XCTAssertTrue(titles.contains(command.title),
-                          "命令 \(command.title) 没进菜单；菜单标题：\(titles)")
+            // R516：破坏性命令的标题在呈现层带文本警告记号；测试跟呈现器，不跟裸标题。
+            let expected = command.isDestructive
+                ? MenuDestructivePresentation.title(command.title)
+                : command.title
+            XCTAssertTrue(titles.contains(expected),
+                          "命令 \(expected) 没进菜单；菜单标题：\(titles)")
         }
         XCTAssertTrue(titles.contains(AppCommand.quit.title))
     }

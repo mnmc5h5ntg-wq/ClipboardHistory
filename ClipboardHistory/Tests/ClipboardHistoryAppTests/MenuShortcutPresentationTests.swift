@@ -134,19 +134,22 @@ final class MenuShortcutPresentationTests: XCTestCase {
                       "退出项没有把标准快捷键修饰器挂上去")
     }
 
-    /// R515：破坏性命令「清空未收藏」在两条状态菜单路径上都要用系统红。
-    /// 13+ 的 SwiftUI 菜单把标签拍平但保留文本色；12 的 NSMenuItem 走 attributedTitle。
-    func testDestructiveCommandIsRenderedRedInBothMenuPaths() throws {
+    /// R516：破坏性命令「清空未收藏」在两条状态菜单路径上都带**文本**警告记号。
+    /// `.menu` 会把 Label 的图标拍平（实测三角消失）；文本字符能留下，且不依赖文字颜色。
+    func testDestructiveCommandCarriesATextWarningPrefixInBothMenuPaths() throws {
+        XCTAssertEqual(MenuDestructivePresentation.warningPrefix, "\u{26A0}\u{FE0E} ")
+        XCTAssertEqual(MenuDestructivePresentation.title("清空未收藏"),
+                       "\u{26A0}\u{FE0E} 清空未收藏")
         let app = codeOnly(try productSource(named: "App.swift"))
-        XCTAssertTrue(app.contains("command.isDestructive"),
-                      "13+ 的菜单没有读破坏性标记")
-        XCTAssertTrue(app.contains(".foregroundColor(.red)"),
-                      "13+ 的菜单没有给破坏性命令上系统红")
+        XCTAssertTrue(app.contains("Text(MenuDestructivePresentation.title(title))"),
+                      "13+ 的菜单没有给破坏性命令加文本警告记号")
+        XCTAssertFalse(app.contains(".foregroundColor(.red)"),
+                       "红字方案已撤：系统灰底上只有 1.08:1")
         let controller = codeOnly(try productSource(named: "Managers/MenuBarController.swift"))
-        XCTAssertTrue(controller.contains("command.isDestructive"),
-                      "12 的 NSMenu 没有读破坏性标记")
-        XCTAssertTrue(controller.contains("NSColor.systemRed"),
-                      "12 的 NSMenu 没有给破坏性命令上系统红")
+        XCTAssertTrue(controller.contains("MenuDestructivePresentation.title(base)"),
+                      "12 的 NSMenu 没有给破坏性命令加文本警告记号")
+        XCTAssertFalse(controller.contains("NSColor.systemRed"),
+                       "红字方案已撤：12 的 NSMenu 也不许再用系统红文字")
     }
 
     private func codeOnly(_ source: String) -> String {
