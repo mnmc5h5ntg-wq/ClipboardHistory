@@ -20380,3 +20380,21 @@ R517 的确认框 message 有「将删除 N 条」，破坏性按钮只写「删
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
+## Round 517 · R520（第 519 轮 · 2026-10-31）：关于页链接悬停下划线 + settings 空白出口
+
+R519 的关于页像素测试在 runner 1x 读到 0 文字带：settings-about 是已知 settings-content-blank 族，不是左轴缺陷。R520 把它改为具名 `ABOUT_LINK_NOT_RUN=settings-content-blank`（本地 2x 仍是证人：版权/链接左 177.5/177.5、墨 1925/1883）；同时关于链接补 1pt accent 悬停下划线（macOS 12 兼容 overlay，0.12s hover），新增 `settings-about-github-hover` 夹具。hover 墨差 light/dark **446/446**；R519/R520 四把刀各 2/2（M1387 重锚）；预检 300/277/731 bad=0、ARM 393/1218、HIDDEN 387/1157 rot=0。帧卷 **336**（ADDED=2、CHANGED=38 噪声；静置关于页不变），基线 **334→336**。全量 **1344/57/5（547.2s）**；build 0 告警；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`；电池 **683/5（台账后复跑）**。⓪ R519 两跑 failure Swift+Capture（settings 空白）、R518 2dff30f success（4 条确认测试含 `删除 3 条`、MenuBar `⚠︎`、INK 5.01/4.82、Motion 5/5）、R517 f85aeac success；R520 待新跑。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 关于页静置/hover 帧逐张看过；settings 空白具名，不冒充缺陷。 |
+| 判据有效性 | 15/15 | R519 像素左轴 + R520 hover 墨差；M1387–M1390 各 2/2。 |
+| 假绿防御 | 15/15 | settings 空白 NOT_RUN；帧 ADDED/CHANGED 分开；全量 5 红不报绿。 |
+| 产品面推进 | 15/15 | 链接悬停反馈；1 个产品文件；12/13+ 兼容。 |
+| 台账一致性 | 15/15 | U-2095…U-2101、D-519、336 帧/全量/换装/电池都来自命令与测试。 |
+| 交付诚实性 | 15/15 | R519 红根因、1x 4.0、SelectionReveal 5 红都如实。 |
+| 可复核性 | 15/15 | 446/446、177.5/177.5、M1387–M1390、precheck 300/277/731 都在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
+

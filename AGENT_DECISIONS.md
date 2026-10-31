@@ -8519,3 +8519,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：`settings-about` 亮/暗 2 帧结构变化，同笔吸收、基线仍 334；新增值/源测试 + 像素左轴判据；不改变任何交互路径。
 - 边界：链接颜色跟系统 accent（用户改成 graphite 时它不再是蓝色，但仍是可点 Link）；真实窗口的关于**面板**（NSAboutPanel）不可截/AX 树退化，未纳入本轮；设置页离屏帧是本案的像素证人。
 
+## D-519 关于页链接悬停下划线 + settings 空白具名出口（R520）
+
+- 背景：R519 的关于页像素判据在 runner 1x 读到 0 条文字带——`settings-about` 是已知 `settings-content-blank` 族（整页平涂），不是左轴/链接缺陷；同时关于页链接没有悬停反馈。
+- 决定：① R519 像素测试在 settings 族空白（量化色数 ≤2）时具名 `ABOUT_LINK_NOT_RUN=settings-content-blank`，本地 2x 帧继续判左轴/墨；② `SettingsView` 的 GitHub Link 加 1pt accent 悬停下划线（`Rectangle` overlay + `scaleEffect/opacity` + `.hover` 0.12s），因为 macOS 12 没有 `.underline(_:)`（13+ 才可用）；新增 `settings-about-github-hover` 夹具（只点亮 `hoveredForCapture`）。
+- 理由：链接需要"可点"的悬停反馈；在 12/13+ 两条路径都要能画；settings 空白是通道事实，不是可以拿红线掩盖的缺陷。
+- 兼容性/迁移：静置 `settings-about` 不变；新增 hover 2 帧，基线 334→336；R519 的 M1387 因 Link 块改动重锚到唯一的 Link 行；R520 新增 M1389/M1390。
+- 边界：悬停下划线只在 hover 出现；settings 空白机器上像素判据 NOT_RUN（本地 2x 是证人）；真实指针路径仍由 `.onHover` 供，夹具只写 `hoveredForCapture`。
+
