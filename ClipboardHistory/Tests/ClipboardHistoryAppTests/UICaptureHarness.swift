@@ -16133,6 +16133,57 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(lightJudged, 1, "light 档必须可判（它不走 vibrant 合成前极性），当前只判了 \(lightJudged) 档")
     }
 
+    /// R512：分组标题「已固定」与行首图标列同一左轴 —— 原来 36.5pt 落在
+    /// 图标列（20.0）与标题列（96.5）之间，两边都不对齐。
+    func testSidebarSectionHeaderAlignsWithTheRowIconColumn() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r512-section-header-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let rep = renderFixtureRep("sidebar-pinned-section", appearance, scratch) else {
+                XCTFail(tag + "：读不回 sidebar-pinned-section")
+                continue
+            }
+            guard let headerLeft = sectionHeaderLeftInk(rep, pointWidth: 300, y0: 154, y1: 172),
+                  let starLeft = sectionHeaderLeftInk(rep, pointWidth: 300, y0: 198, y1: 216, maxX: 40) else {
+                emit("SECTION_HEADER_ALIGN_NOT_RUN=band-blank \(tag)")
+                continue
+            }
+            emit("SECTION_HEADER_ALIGN \(tag) 标题左墨=\(String(format: "%.1f", headerLeft))pt"
+                 + " 行图标左墨=\(String(format: "%.1f", starLeft))pt"
+                 + " 差=\(String(format: "%.1f", abs(headerLeft - starLeft)))pt")
+            XCTAssertLessThanOrEqual(abs(headerLeft - starLeft), 1.5,
+                                     "\(tag)：分组标题左墨 \(headerLeft)pt 与行图标左墨 \(starLeft)pt 不在同一左轴"
+                                     + "（≤1.5pt）⇒ 标题又落回图标列与标题列之间")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("SECTION_HEADER_ALIGN_NOT_RUN：两档都没有可判的分组标题/图标墨") }
+    }
+
+    /// 某条 y 带里第一处墨的 x（pt）。分组标题与行首图标各用一条窄带，互不借用。
+    private func sectionHeaderLeftInk(_ rep: NSBitmapImageRep, pointWidth: CGFloat,
+                                      y0: CGFloat, y1: CGFloat, maxX: CGFloat = 145) -> Double? {
+        let bytes = Self.buffer(of: rep)
+        let width = rep.pixelsWide, height = rep.pixelsHigh
+        let scale = Double(width) / Double(pointWidth)
+        let paper = Self.paperMode(bytes: bytes, width: width, height: height,
+                                   bytesPerRow: rep.bytesPerRow)
+        let xLimit = min(width, Int((maxX * scale).rounded(.up)))
+        let yStart = max(0, Int(y0 * scale)), yEnd = min(height, Int(y1 * scale))
+        for x in 0..<xLimit {
+            for y in yStart..<yEnd {
+                let i = y * rep.bytesPerRow + x * 4
+                let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                + 0.0722 * Double(bytes[i + 2])).rounded())
+                if abs(luma - paper) > 24 { return Double(x) / scale }
+            }
+        }
+        return nil
+    }
+
     /// R429：版本行用**侧栏墨带数**证明（R428 的品红标记在 runner 的 vibrant 侧栏里找不到）。
     /// 正/负帧的带数差 1，多出来的是最下面那一条“时间剪史 1.4.8”；它必须在最后一条导航行之下。
     func testSettingsSidebarShowsTheVersionFooterOnlyInTheProductArm() throws {
