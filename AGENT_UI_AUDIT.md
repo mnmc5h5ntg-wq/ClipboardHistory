@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2049）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2050）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -459,6 +459,8 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2047：④ 判据与刀/探针重锚。** 纯策略 `BulkActionAvailabilityTests`（混合/全普通/全固定收藏三臂）+ 接线守卫（四颗都消费 availability）；像素 `testBulkActionBarDimsTheUnpinnableVerb`：两帧选同样 3 条、标题段墨相等（light 1224/1224、dark 1344/1344），整带差 **117px**（light/dark）只来自第三颗暗化，要求 20..200。刀 `M1377`（删 unpin 的禁用/调暗）/`M1378`（策略永远 canUnpin）**2/2 CAUGHT**、`RESTORE_CLEAN=yes`。**探针重锚**：`testActionableInkStaysAboveTheLegibilityFloor` 的 `sidebar-multi-select/批量操作按钮` 原来框在 x200（正是禁用的 unpin）⇒ 静置对比度 light 2.02 / dark 2.71 低于 3.0；重锚到始终可点的删除（x265.5..277.5）后 **5.86 / 3.15**，地板 3.0 不动（禁用笔画不是可点笔画）。
 - **U-2048：⑤ 帧卷。** 捕获卷 **334 帧**（+2 新帧 `sidebar-multi-select-pinned` 亮暗）：4 张旧多选帧变化 + 2 张新帧 ⇒ 基线 **332→334**；复核 `CHANGED=38 MISSING=0 ADDED=0`（38 张源图标栅格噪声）。`sidebar-multi-select` / `-pinned` 亮暗帧逐张看过：第三颗暗/亮、黑带仍是被登记的系统选中材质盲区。
 - **U-2049：⑥ 八步与电池。** build **0 告警**（增量=0、冷编=0）；预检 `NEEDLE_PRECHECK tables=294 covered=271 arms=720 bad=0`、`ARM_TOTAL files=387 arms=1207`、`HIDDEN_ARMS 表=381 可判=1146 rot=0`；全量 **1333/56/0（640.9s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=419=419`（活库；旧实例先 CONT 再 TERM）；`STORE-SIZE lines=1108 funcs=52 longest=66`；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497；本笔 as-of 512 = 1，last=`7ff22a0`/last_round=511）；清账 162/63/0；§1 刷新在生成器后复跑；电池在台账后复跑（683/OK skipped=5；**首跑 2 红**：`test_motion_surface_gate` 的缺席样词 `disabled` 因本笔产品首次在该文件写入 `.disabled(` 而变成真在场 ⇒ 样词重锚为仍只嵌在 `focusEffectDisabled` 里的 `Effect`，边界规则未动，skip 名册格随之恢复）。产品笔 `8c425f6` 已推（HEAD=origin、ahead=0）。**具名 NOT-RUN / 限制**：① `8c425f6` 自身跑（推送后取）；② 614 的侧栏切换按钮（SwiftUI 实例仍会回来，见 U-2046/BACKLOG 614）；③ 状态菜单像素通道（system-menu，610）；④ `RTF_HELPER_ORPHAN`（settings-content-blank/595）；⑤ `RECORDING_REREAD` 1x；⑥ 已知在屏/Motion 采样 flake；⑦ 601 噪声与其余未结项仍开。
+
+- **U-2050：⑦ 收口补读与新跑登记。** `41160962238 ↔ 8c425f6`（产品笔）读时 **in_progress ⇒ NOT-RUN**；`41161522135 ↔ b29c616`（台账笔）**queued ⇒ NOT-RUN**；`41156774387 ↔ 7ff22a0` 读时 in_progress ⇒ NOT-RUN，收口时已 completed=**failure**（全部失败步骤未读，交 R514 ⓪）；`41156931203 ↔ 874d579` **success**、`41157084122 ↔ 764ea4b` **success**（R512 台账/签收笔不回归）。电池首跑 2 红的夹具样词（`disabled` 被本笔产品合法写进该文件）已重锚为 `Effect` 并复跑 **683/OK skipped=5**。
 
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 

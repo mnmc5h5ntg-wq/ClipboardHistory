@@ -20256,6 +20256,8 @@ R510 结束时 600×492 详情被 middle 截断成 `10月30日 21:09:5…`（秒
 
 批量栏五颗从不禁用：选 3 条普通记录时「取消固定」可点但什么也不发生。新增 `BulkActionAvailability`（四动词各自"选区至少一条适用"）+ `HistoryStore.selectedEntries`，批量栏禁用并 0.35 调暗，删除始终可点。普通选区 unpin/unfavorite 暗、`sidebar-multi-select-pinned` 里 unpin 亮回来（整带差 117px、标题段相等）。真窗口 AX 选 3 行：`取消固定 enabled=false`、其余所选动词 true。判据策略 2 条 + 像素 1 条；M1377/M1378 2/2；可点墨探针从禁用的 unpin 重锚到删除（2.02/2.71→5.86/3.15，地板 3.0 不动）。捕获 334 帧（+2 新、基线 334）、复核 CHANGED=38。预检 294/271/720、ARM 387/1207、HIDDEN 381/1146 rot=0。全量 **1333/56/0（640.9s）**；build 0 告警；换装 419=419；电池 683/5。⓪ push no-op（HEAD=origin=764ea4b、ahead=0）；cf56783 success、5f0807b 仅 Release、三跑 NOT-RUN。同帧顶部中央又现侧栏切换按钮：614 仍未完全关。
 
+⑦ 收口补读：`41160962238 ↔ 8c425f6` in_progress ⇒ NOT-RUN、`41161522135 ↔ b29c616` queued ⇒ NOT-RUN；`41156774387 ↔ 7ff22a0` 收口时 failure 但失败步骤未读（交 R514 ⓪）；`41156931203 ↔ 874d579`/`41157084122 ↔ 764ea4b` success。电池首跑 2 红的夹具样词重锚后复跑 683/OK skipped=5。
+
 **七维度自评**（恰七行，每格 n/15）：
 
 | 维度 | 分 | 依据 |
