@@ -209,6 +209,12 @@ struct HistorySidebarView: View {
                 .padding(.horizontal, 2)
 
             Button(role: .destructive) {
+                // R517 / BACKLOG 619：多选删除先确认；取消或空选区都不删。
+                let count = historyStore.selectedCount
+                guard BulkDeleteConfirmation.confirm(
+                    count: count,
+                    using: SystemDestructiveConfirming()
+                ) else { return }
                 historyStore.perform(.deleteSelection)
             } label: {
                 // R514：轮廓 `trash` 在 runner 1x 暗档只读到 2.27:1；实心化补了核心面积，
