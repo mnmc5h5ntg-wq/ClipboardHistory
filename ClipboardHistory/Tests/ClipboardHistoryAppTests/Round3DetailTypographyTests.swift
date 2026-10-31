@@ -144,6 +144,25 @@ final class Round3DetailTypographyTests: XCTestCase {
                           "紧凑版并不比完整版窄（\(width(compact)) vs \(width(full))）⇒ ViewThatFits 不会选中它")
     }
 
+    /// R511（615 结案）：最窄一档按优先级省掉字符数，时间与来源必须完整 ——
+    /// 否则 600pt 窗口只剩 middle 截断，秒和字符数一起被吃掉。
+    func testNarrowestMetaDropsTheSizeButKeepsTimeAndSource() {
+        let copiedAt = "10月30日 21:09:55"
+        let compact = DetailTypography.metaText(copiedAt: copiedAt, size: "16 个字符",
+                                                sourceAppName: "Safari", includeCopyVerb: false)
+        let narrow = DetailTypography.metaText(copiedAt: copiedAt, size: "16 个字符",
+                                               sourceAppName: "Safari",
+                                               includeCopyVerb: false, includeSize: false)
+        XCTAssertFalse(narrow.contains("复制"), "最窄版不该再带「复制」：\(narrow)")
+        XCTAssertFalse(narrow.contains("16 个字符"), "最窄版必须省掉字符数：\(narrow)")
+        XCTAssertTrue(narrow.contains(copiedAt), "时间必须完整保留：\(narrow)")
+        XCTAssertTrue(narrow.contains("来自 Safari"), "来源必须保留：\(narrow)")
+        let font = NSFont.systemFont(ofSize: DetailTypography.metaFontSize)
+        func width(_ s: String) -> CGFloat { (s as NSString).size(withAttributes: [.font: font]).width }
+        XCTAssertLessThan(width(narrow), width(compact),
+                          "最窄版并不比紧凑版窄（\(width(narrow)) vs \(width(compact))）⇒ ViewThatFits 不会选中它")
+    }
+
     func testNarrowDetailHeaderFallsBackToCompactMeta() throws {
         let detail = codeOnly(try productSource(named: "Views/DetailView.swift"))
         XCTAssertTrue(detail.contains("ViewThatFits(in: .horizontal)"),
@@ -152,6 +171,10 @@ final class Round3DetailTypographyTests: XCTestCase {
                       "没有紧凑版这一臂 ⇒ ViewThatFits 只有一份文案可挑，退不回去")
         XCTAssertTrue(detail.contains("truncationMode(.middle)"),
                       "两条文案仍要保留 middle 截断兜底")
+        XCTAssertTrue(detail.contains("includeSize: false"),
+                      "最窄一档没有省掉字符数 ⇒ 600pt 只能 middle 截断，秒会被吃掉（615）")
+        XCTAssertTrue(detail.contains("includeSeconds: false"),
+                      "600pt 真实窗口里还放不下秒 ⇒ 没有分钟档，middle 截断会吃掉秒（615 结案）")
     }
 
     // MARK: - 组件层：高亮真的打上了、能清掉、不改文本

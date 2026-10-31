@@ -11,8 +11,18 @@ ARMS=[
    '''        formatter.dateFormat = "yyyy年M月d日 HH:mm:ss"''',
    '''        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"'''),
   ("M1365","列表时间戳也改成 ISO 短横线（两处一起漂）",
-   '''        formatter.dateFormat = "yyyy年M月d日 HH:mm"''',
-   '''        formatter.dateFormat = "yyyy-MM-dd HH:mm"'''),
+   '''    static let sidebarTimeWithYear: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        return formatter
+    }()''',
+   '''    static let sidebarTimeWithYear: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()'''),
 ]
 def run():
     p=subprocess.run(["swift","test","--filter",TEST],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)

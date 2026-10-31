@@ -195,6 +195,12 @@ struct DetailView: View {
                             headerMeta(entry, includeIcon: true, includeCopyVerb: false)
                             headerMeta(entry, includeIcon: false, includeCopyVerb: true)
                             headerMeta(entry, includeIcon: false, includeCopyVerb: false)
+                            // R511（615 结案）：600pt 最小窗里连「时间 + 字符数 + 来源」都放不下 ⇒
+                            // 再退一档，按优先级省掉字符数，时间与来源必须完整（否则 middle 截断会吃掉秒）。
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: false, includeSize: false)
+                            // R511：600pt 真实窗口里连「时:分:秒 + 来源」都放不下 ⇒ 再退一档到分钟精度。
+                            headerMeta(entry, includeIcon: false, includeCopyVerb: false,
+                                       includeSize: false, includeSeconds: false)
                         }
                     } else {
                         // 12 没有 `ViewThatFits`：退回按详情宽度判，阈值由紧凑文案 + 图标 + 按钮推出来。
@@ -239,23 +245,30 @@ struct DetailView: View {
     /// 它是 `ViewThatFits` 的候选，不是最终选择 —— 宽度不够时下一档会接手。
     private func headerMeta(_ entry: HistoryStore.Entry,
                             includeIcon: Bool,
-                            includeCopyVerb: Bool) -> some View {
+                            includeCopyVerb: Bool,
+                            includeSize: Bool = true,
+                            includeSeconds: Bool = true) -> some View {
         HStack(spacing: 8) {
             if includeIcon && SourceAppBadgePolicy.isVisible(sourceAppName: entry.sourceAppName) {
                 SourceAppBadge(sourceAppBundleID: entry.sourceAppBundleID)
             }
-            Text(metaText(entry, includeCopyVerb: includeCopyVerb))
+            Text(metaText(entry, includeCopyVerb: includeCopyVerb, includeSize: includeSize,
+                          includeSeconds: includeSeconds))
         }
     }
 
-    private func metaText(_ entry: HistoryStore.Entry, includeCopyVerb: Bool) -> String {
-        DetailTypography.metaText(
-            copiedAt: ClipboardDateFormatters.detailTimestamp(
-                for: entry.timestamp,
-                reference: historyStore.filteredEntries.map(\.timestamp).max()),
+    private func metaText(_ entry: HistoryStore.Entry, includeCopyVerb: Bool,
+                          includeSize: Bool = true, includeSeconds: Bool = true) -> String {
+        let reference = historyStore.filteredEntries.map(\.timestamp).max()
+        let copiedAt = includeSeconds
+            ? ClipboardDateFormatters.detailTimestamp(for: entry.timestamp, reference: reference)
+            : ClipboardDateFormatters.detailTimestampMinute(for: entry.timestamp, reference: reference)
+        return DetailTypography.metaText(
+            copiedAt: copiedAt,
             size: entry.content.sizeDescription,
             sourceAppName: entry.sourceAppName,
-            includeCopyVerb: includeCopyVerb
+            includeCopyVerb: includeCopyVerb,
+            includeSize: includeSize
         )
     }
 

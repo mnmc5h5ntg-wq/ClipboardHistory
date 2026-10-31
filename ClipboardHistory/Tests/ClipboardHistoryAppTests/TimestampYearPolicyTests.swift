@@ -61,6 +61,20 @@ final class TimestampYearPolicyTests: XCTestCase {
         XCTAssertTrue(compact.contains(":55") && withYear.contains(":55"), "秒必须保留")
     }
 
+    /// R511（615 结案）：最窄一档只留到分钟 —— 秒让位，分钟与来源完整，年份策略不变。
+    func testDetailMinuteTimestampDropsSecondsButKeepsTheYearPolicy() {
+        let at = calendar.date(from: DateComponents(year: 2026, month: 10, day: 30,
+                                                    hour: 21, minute: 9, second: 55))!
+        let sameYear = calendar.date(from: DateComponents(year: 2026, month: 12, day: 1))!
+        let nextYear = calendar.date(from: DateComponents(year: 2027, month: 1, day: 1))!
+        let compact = ClipboardDateFormatters.detailTimestampMinute(for: at, reference: sameYear)
+        let withYear = ClipboardDateFormatters.detailTimestampMinute(for: at, reference: nextYear)
+        XCTAssertEqual(compact, "10月30日 21:09", compact)
+        XCTAssertEqual(withYear, "2026年10月30日 21:09", withYear)
+        XCTAssertFalse(compact.contains(":55"), "分钟档不许再带秒：\(compact)")
+        XCTAssertFalse(withYear.contains(":55"), "分钟档不许再带秒：\(withYear)")
+    }
+
     func testFormatterUsesYearOnlyAcrossTheBoundary() {
         let old = date(year: 2025), new = date(year: 2026)
         let compact = ClipboardDateFormatters.sidebarTime(for: old, reference: old)

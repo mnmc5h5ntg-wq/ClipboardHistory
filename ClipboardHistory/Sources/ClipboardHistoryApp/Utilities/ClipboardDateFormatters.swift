@@ -55,4 +55,25 @@ enum ClipboardDateFormatters {
             ? detailTimestamp.string(from: date)
             : detailTimestampCompact.string(from: date)
     }
+
+    /// R511（615 结案）：最小窗的最后一档只留到分钟 —— 秒在窄窗里最先让位，来源与时刻必须完整。
+    static let detailTimestampMinuteWithYear: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy年M月d日 HH:mm"
+        return formatter
+    }()
+
+    static let detailTimestampMinuteCompact: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M月d日 HH:mm"
+        return formatter
+    }()
+
+    static func detailTimestampMinute(for date: Date, reference: Date?) -> String {
+        TimestampYearPolicy.showsYear(for: date, relativeTo: reference)
+            ? detailTimestampMinuteWithYear.string(from: date)
+            : detailTimestampMinuteCompact.string(from: date)
+    }
 }

@@ -63,8 +63,9 @@ enum DetailTypography {
     /// 头部那一行 meta。刻意是**一条**、左对齐、比正文弱（U-4 原本的问题：两行居中 meta
     /// 与正文抢注意力，而且居中的元信息读起来要先找它属于谁）。
     static func metaText(copiedAt: String, size: String, sourceAppName: String?,
-                         includeCopyVerb: Bool = true) -> String {
-        var pieces = [includeCopyVerb ? "\(copiedAt) 复制" : copiedAt, size]
+                         includeCopyVerb: Bool = true, includeSize: Bool = true) -> String {
+        var pieces = [includeCopyVerb ? "\(copiedAt) 复制" : copiedAt]
+        if includeSize { pieces.append(size) }
         if let sourceAppName, !sourceAppName.isEmpty {
             pieces.append("来自 \(sourceAppName)")
         }
