@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 主窗口折叠/展开静态骨架（R523 / 第 522 轮 / Round 520 / U-2116…U-2122 · 产品 12 文件 + 判据）
+
+
 ### 主窗口缺失时创建唯一一份（R522 / 第 521 轮 / Round 519 / U-2109…U-2115 · 产品 4 文件 + 判据）
 
 

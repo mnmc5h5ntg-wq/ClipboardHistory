@@ -8544,3 +8544,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：macOS 12 可用（NSHostingView）；已有窗口（含隐藏/最小化）路径一字未变；`WindowGroup` 的根视图抽成 `MainWindowContent`，视觉与帧不变（A/B 逐字节相同）；测试用"改名+orderOut+清弱引用"模拟无窗口，不真销毁 ARC 窗口。
 - 边界：工厂未安装时保持"只 present 不创建"（单元测试负臂）；产品真实关窗仍是 orderOut+delegate false（隐藏），reopen 复用同一扇；只在显式入口创建。
 
+## D-522 折叠/展开主窗口先落静态骨架（R523）
+
+- 背景：用户点名的新特性 —— 展开态=左列表+右预览，折叠态=只留列表、窗口收到单独定义的折叠宽；触发=双击标题 + 可见按钮 + AppCommand；状态与两档宽度持久化；屏幕放不下要 clamp；最小宽随状态切换。R524 才做过渡动画。
+- 决定：① `MainWindowCollapsePolicy` 纯函数定义折叠宽 **420**（不沿用侧栏 268）、折叠最小宽 **360**、展开最小宽 **600**、reduce 时长 **0**、宽度记忆/屏幕 clamp/左上角保持；② `MainWindowCollapseController` 持久化状态与两宽，切换时把当前宽记回离开的那一档；③ `ContentView` 折叠分支不渲染 detail（不是把详情列压 0 宽）；④ `MainWindowContent.frame(minWidth:)` 与 `WindowConfigurator` 的 `minSize` 都跟状态走，避免折叠后被 SwiftUI 弹回 600；⑤ 标题双击与可见 chevron 共用 `toggleCollapse`，chevron 用显式 `secondaryLabelColor`（vibrant 极性会把语义 primary 翻白）；⑥ `AppCommand.toggleMainWindowCollapse` 进菜单目录，12 的 NSMenu 与 13+ 的 MenuBarExtra 同一 dispatch。
+- 理由：静态两态先稳住宽度/持久化/最小宽，动画才有一张不抖的画布；把 detail 的条件放在视图分支而不是宽度，才能真正保证折叠态不渲染 detail。
+- 兼容性/迁移：R522 的「无窗口创建唯一一个」原样保留（新增 testCreatedWindowAppliesPersistedCollapsedState 从创建路径判折叠态）；登录首启折叠时按持久化宽建窗；默认展开，旧夹具一行不改。
+- 边界：本轮**没有**过渡动画；`animationDuration` 只是纯函数定义（R524 消费）；屏幕比最小宽还窄时屏幕优先；全屏被 `collectionBehavior .fullScreenNone` 禁用、最小化按系统行为（未新增路径）。
+
