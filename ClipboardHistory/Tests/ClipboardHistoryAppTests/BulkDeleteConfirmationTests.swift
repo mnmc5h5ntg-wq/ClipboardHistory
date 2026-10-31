@@ -30,7 +30,8 @@ final class BulkDeleteConfirmationTests: XCTestCase {
         XCTAssertEqual(recorder.calls[0].title, "删除所选记录")
         XCTAssertTrue(recorder.calls[0].message.contains("3 条"),
                       "确认框必须说清将删几条：\(recorder.calls[0].message)")
-        XCTAssertEqual(recorder.calls[0].confirmTitle, "删除")
+        XCTAssertEqual(recorder.calls[0].confirmTitle, "删除 3 条",
+                       "破坏性按钮本身要写明将删几条，不只靠 message")
         XCTAssertEqual(recorder.calls[0].cancelTitle, "取消")
     }
 

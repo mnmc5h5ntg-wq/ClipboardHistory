@@ -18,7 +18,7 @@ enum BulkDeleteConfirmation {
         return confirming.confirm(
             title: title,
             message: message(count: count),
-            confirmTitle: "删除",
+            confirmTitle: "删除 \(count) 条",
             cancelTitle: "取消"
         )
     }
