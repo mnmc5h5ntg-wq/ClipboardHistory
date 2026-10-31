@@ -1,5 +1,5 @@
 {
-  "count": 334,
+  "count": 336,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -334,7 +334,9 @@
     "weights-520x880-dark.png": "4542323c65057ba8d74e5f206132b47d6de829aba009563b2518d70df6f352db",
     "weights-520x880-light.png": "cf9d7afd2fa5d06bdb41728fbccfc1199f285ee2cc6e445accb145a994fe736e",
     "weights-adjusted-520x880-dark.png": "3976b53a1839576e062eff6ef0fbbaec42baf75e1b89d7827ecc6c8293591c7c",
-    "weights-adjusted-520x880-light.png": "9e01566189b882461e1a7b18ba5e0bed93eadd99d34f6526e0a6140581504601"
+    "weights-adjusted-520x880-light.png": "9e01566189b882461e1a7b18ba5e0bed93eadd99d34f6526e0a6140581504601",
+    "settings-about-github-hover-720x540-light.png": "53a5c6562f4cacf46a12d2166ca25f37c9cf147fb3bfc513cba7ab1307f77c03",
+    "settings-about-github-hover-720x540-dark.png": "336f207432f542de99768501cfb292180f66b6c48133d9ab7e09a8b839fd48a1"
   },
   "note": "离屏帧的 sha256 基线。改了界面就在同一个 commit 里跑 update；CI 的 compare 步骤靠它回答“上一版比这一版哪些帧变了”。",
   "schema": 1

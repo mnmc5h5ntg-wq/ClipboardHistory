@@ -8,12 +8,8 @@ PRES="Sources/ClipboardHistoryApp/Utilities/AboutPresentation.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
   ("M1387","关于页把链接画成普通文字", VIEW,
-   '''                    if let githubURL = URL(string: AboutPresentation.githubURLString) {
-                        Link("GitHub 项目主页 ↗", destination: githubURL)
-                            .font(.system(size: VisualFont.body))
-                    }''',
-   '''                    Text("GitHub 项目主页 ↗")
-                        .font(.system(size: VisualFont.body))'''),
+   '''                        Link("GitHub 项目主页 ↗", destination: githubURL)''',
+   '''                        Text("GitHub 项目主页 ↗")'''),
   ("M1388","GitHub URL 指向别处", PRES,
    '''    static let githubURLString = "https://github.com/mnmc5h5ntg-wq/ClipboardHistory"''',
    '''    static let githubURLString = "https://example.com/other"'''),

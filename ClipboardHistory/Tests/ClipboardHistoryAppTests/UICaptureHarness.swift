@@ -12663,6 +12663,11 @@ final class UICaptureTests: XCTestCase {
                 AnyView(self.makeSettingsView(store: store, initialCategory: category))
             })
         }
+        // R520：关于页 GitHub 链接的悬停臂（只点亮 hoveredForCapture，其余与 settings-about 同）。
+        results.append(Fixture("settings-about-github-hover", NSSize(width: 720, height: 540)) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .about)
+                .environment(\.hoveredForCapture, true))
+        })
         // R479：设置页标题图标的负向臂（只关图标，其余与 settings-data 同）。
         results.append(Fixture("settings-data-no-title-icon", NSSize(width: 720, height: 540)) {
             AnyView(self.makeSettingsView(store: store, initialCategory: .data)
@@ -16307,6 +16312,61 @@ final class UICaptureTests: XCTestCase {
         if judged == 0 { throw XCTSkip("BULK_DELETE_FILL_NOT_RUN：两档都拍不出批量栏") }
     }
 
+    /// R520：关于页 GitHub 链接的悬停臂 —— 悬停时多一条 1pt accent 下划线，静置没有。
+    func testAboutGitHubLinkUnderlinesOnHover() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r520-about-hover-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = renderFixtureRep("settings-about", appearance, scratch),
+                  let hover = renderFixtureRep("settings-about-github-hover", appearance, scratch) else {
+                XCTFail(tag + "：关于页两臂读不回来")
+                continue
+            }
+            let scale = Double(hover.pixelsWide) / 720.0
+            let x0 = max(0, Int(175 * scale)), x1 = min(hover.pixelsWide, Int(430 * scale))
+            let y0 = max(0, Int(244 * scale)), y1 = min(hover.pixelsHigh, Int(266 * scale))
+            func ink(_ rep: NSBitmapImageRep) -> (count: Int, colors: Int) {
+                let bytes = Self.buffer(of: rep)
+                var histogram: [Int: Int] = [:]
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * 4
+                        let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                        + 0.0722 * Double(bytes[i + 2])).rounded())
+                        histogram[luma / 8, default: 0] += 1
+                    }
+                }
+                let paper = histogram.max { $0.value < $1.value }.map { $0.key * 8 + 4 } ?? 0
+                var count = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * 4
+                        let luma = Int((0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                                        + 0.0722 * Double(bytes[i + 2])).rounded())
+                        if abs(luma - paper) > 24 { count += 1 }
+                    }
+                }
+                return (count, histogram.count)
+            }
+            let idleInk = ink(idle), hoverInk = ink(hover)
+            let delta = hoverInk.count - idleInk.count
+            emit("ABOUT_LINK_HOVER \(tag) idle=\(idleInk.count) hover=\(hoverInk.count) delta=\(delta)"
+                 + " 色数=\(idleInk.colors)/\(hoverInk.colors)")
+            if idleInk.colors <= 2 && hoverInk.colors <= 2 {
+                emit("ABOUT_LINK_HOVER_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            XCTAssertGreaterThanOrEqual(delta, 100,
+                                        "\(tag)：悬停只多 \(delta) 个墨像素 ⇒ 1pt 下划线没有出现")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("ABOUT_LINK_HOVER_NOT_RUN：两档都找不到关于页") }
+    }
+
     /// R519：关于页的 GitHub 链接行必须落在卡片正文的左轴上，且是一条真实可点行。
     /// 卡片上原来只有应用名/版本/说明/版权；新增的 Link 是第 5 条文字带。
     func testAboutPageShowsTheGitHubLinkOnTheCardTextAxis() throws {
@@ -16370,6 +16430,12 @@ final class UICaptureTests: XCTestCase {
                 }
             }
             guard bands.count >= 2 else {
+                // runner 1x 的 settings 内容整族是已知空白通道（BACKLOG 595 族）：
+                // 区域里只有平涂/卡片底（量化色数 ≤2）⇒ 这条像素判据在这一台机器上没有对象。
+                if histogram.count <= 2 {
+                    emit("ABOUT_LINK_NOT_RUN=settings-content-blank \(tag) 量化色数=\(histogram.count) 文字带=0")
+                    continue
+                }
                 XCTFail(tag + "：卡片正文只找到 \(bands.count) 条文字带 ⇒ GitHub 链接行没有出现")
                 continue
             }
@@ -19474,7 +19540,7 @@ final class UICaptureTests: XCTestCase {
         // 名单由 `testDarkSettingsSidebarTextIsACountedBlindSpot` 的 vibrant 前提决定，手改不改得绿。
         "settings-privacy-tall", "settings-recommendations-tall",
         // R442：关于页与其余设置页同一棵 vibrant 子树；暗档未选中标签落在错误一侧（看过的同一机制）。
-        "settings-about",
+        "settings-about", "settings-about-github-hover",
         // R504：身份头的负向臂与 `settings-general` 是同一棵 settings 侧栏 vibrant 子树
         //（只关身份头）⇒ 同一处合成前极性盲区；这条由判据的 vibrant 前提实测点名（不是顺手补名单）。
         "settings-general-no-identity",

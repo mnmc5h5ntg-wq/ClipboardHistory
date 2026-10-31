@@ -180,6 +180,12 @@ struct SettingsView: View {
     /// R442：关于页的版本/build 注入缝（产品路径读真实 bundle）。
     @Environment(\.settingsSidebarVersionForCapture) private var aboutVersionOverride
     @Environment(\.settingsAboutBuildForCapture) private var aboutBuildOverride
+    /// 关于页 GitHub 链接的悬停取证：产品路径仍由 `.onHover` 供。
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+    @State private var aboutGitHubLinkHovered = false
+    private var aboutGitHubLinkHoveredForDrawing: Bool {
+        aboutGitHubLinkHovered || (hoveredForCapture ?? false)
+    }
     /// R486：数据页导出/导入两颗按钮的图标缝（产品默认 nil ⇒ 画图标）。
     @Environment(\.settingsDataActionIconsForCapture) private var dataActionIconsForCapture
     private var dataActionIconsVisible: Bool { dataActionIconsForCapture ?? true }
@@ -828,6 +834,18 @@ struct SettingsView: View {
                     if let githubURL = URL(string: AboutPresentation.githubURLString) {
                         Link("GitHub 项目主页 ↗", destination: githubURL)
                             .font(.system(size: VisualFont.body))
+                            // macOS 12 没有 `.underline(_:)`；用 1pt accent 线做同一条 underline。
+                            .overlay(alignment: .bottom) {
+                                Rectangle()
+                                    .fill(Color.accentColor)
+                                    .frame(height: 1)
+                                    .scaleEffect(x: aboutGitHubLinkHoveredForDrawing ? 1 : 0,
+                                                 anchor: .leading)
+                                    .opacity(aboutGitHubLinkHoveredForDrawing ? 1 : 0)
+                                    .animation(MotionCatalog.animation(for: .hover),
+                                               value: aboutGitHubLinkHoveredForDrawing)
+                            }
+                            .onHover { aboutGitHubLinkHovered = $0 }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
