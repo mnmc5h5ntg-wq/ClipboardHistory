@@ -8561,3 +8561,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：静态两端与 R523 逐字节相同（帧基线 340 不变）；R523 的 9 条判据改为等过渡停表；R523 的 M1397 因控制器行换代重锚；新增 M1399–M1401。
 - 边界：过渡胶片是独立取证目录（不进帧基线）；reduce 下没有任何中间帧；全屏仍被禁、最小化按系统行为。
 
+## D-524 折叠/展开补应用菜单与 ⌘\（R525）
+
+- 背景：R523/R524 只有状态菜单 + 标题双击 + 可见 chevron；应用在前台时 Window 菜单里没有该命令，也没有键盘键（`keyEquivalent == ""`、presenter 返回 nil、Commands 文件 0 处 toggle）。
+- 决定：给同一个 `AppCommand.toggleMainWindowCollapse` 挂 `\` + Command，并在 Window 菜单（`CommandGroup(after: .windowArrangement)`）加一项；状态菜单沿既有 `MenuCommandShortcutModifier` 显示同一 ⌘\。两个菜单表面都走 `appDelegate.perform(.toggleMainWindowCollapse)`，是一个 command 的两种呈现，不是第二条触发路径。
+- 理由：折叠是高频窗口操作，键盘用户不该只能去状态菜单或鼠标点标题；命令目录本来就是唯一的 dispatch，新增呈现不需要新逻辑。
+- 兼容性/迁移：旧断言「折叠无快捷键」按新特性换成对 ⌘\ 的正向断言（不是放宽）；状态菜单的快捷键列由 presenter 现读，不另写字符串。
+- 边界：⌘\ 不改变折叠/展开的过渡、宽度与持久化语义；不改状态栏热键（⌃⌥V 等）。
+

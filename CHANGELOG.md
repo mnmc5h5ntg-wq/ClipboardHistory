@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠/展开补应用菜单与 ⌘\（R525 / 第 524 轮 / Round 522 / U-2130…U-2136 · 产品 3 文件 + 判据）
+
+
 ### 主窗口折叠/展开过渡（R524 / 第 523 轮 / Round 521 / U-2123…U-2129 · 产品 5 文件 + 判据）
 
 

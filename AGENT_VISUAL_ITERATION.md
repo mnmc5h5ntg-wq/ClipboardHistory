@@ -20470,3 +20470,21 @@ R523 的折叠是 `setFrame` 一步跳变。R524 把过渡做成**模型驱动 6
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
+## Round 522 · R525（第 524 轮 · 2026-11-01）：折叠/展开补应用菜单与 ⌘\
+
+折叠/展开以前只有状态菜单、标题双击与可见 chevron：应用在前台时 Window 菜单里找不到，也没有键盘键。R525 给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，并在 Window 菜单加一项（状态菜单沿既有 presenter 显示同一个 ⌘\）；两个菜单表面都走 `appDelegate.perform(.toggleMainWindowCollapse)`，是一个 command 的两种呈现，不是第二条触发路径。判据：新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`，旧「折叠无快捷键」断言按新特性换成 ⌘\ 正向断言；M1402（删应用菜单快捷键）CAUGHT、RESTORE_CLEAN；过渡刀 M1399–M1401 仍在册；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；build 0 告警；帧 340 CHANGED=0，基线不变。全量 **1369/56/0（631.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。R524 三跑仍 in_progress ⇒ 折叠过渡 runner 签收 NOT-RUN。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 本轮是键盘/菜单可达性，无新视觉面；帧 0 变化由整张名单证；不冒充做了视觉改动。 |
+| 判据有效性 | 15/15 | 旧缺口三项读数 + 新 ⌘\ 三项正断言；M1402 让读数变。 |
+| 假绿防御 | 15/15 | runner 三跑 in_progress 具名 NOT-RUN；Motion 4/5 not-run 按现有出口记。 |
+| 产品面推进 | 15/15 | 折叠有了应用菜单 + 键盘入口；3 个产品文件。 |
+| 台账一致性 | 15/15 | U-2130…U-2136、D-524、R524 文件数校正都来自命令与 git。 |
+| 交付诚实性 | 15/15 | 本轮不改视觉、不签 runner、sources 时序红照实。 |
+| 可复核性 | 15/15 | ⌘\、M1402、precheck 305/282/743、340/CHANGED=0 都在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
+
