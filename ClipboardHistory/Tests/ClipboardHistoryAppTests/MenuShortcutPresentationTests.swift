@@ -122,6 +122,8 @@ final class MenuShortcutPresentationTests: XCTestCase {
     func testStandardShortcutsAreVisibleInTheSwiftUIMenu() throws {
         XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .showSettings), ",")
         XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .quit), "q")
+        XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .toggleMainWindowCollapse), "\\",
+                       "折叠/展开的 ⌘\\ 没有在状态菜单里显示")
         for command in [AppCommand.showMainWindow, .showQuickPick, .refreshHistory,
                         .clearHistory, .dismissAllRecommendations] {
             XCTAssertNil(MenuCommandShortcutPresentation.keyEquivalent(for: command),

@@ -28,8 +28,8 @@ final class AppCommandTests: XCTestCase {
         XCTAssertEqual(AppCommand.showSettings.keyEquivalent, ",")
         XCTAssertEqual(AppCommand.quit.keyEquivalent, "q")
         XCTAssertEqual(AppCommand.refreshHistory.keyEquivalent, "")
-        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.keyEquivalent, "",
-                       "折叠/展开只走菜单与界面入口；菜单里再挂本地 key equivalent 会造出第二条路径")
+        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.keyEquivalent, "\\",
+                       "折叠/展开要有键盘入口：⌘\\ 与应用菜单/状态菜单共用同一个 perform dispatch")
         XCTAssertEqual(AppCommand.showQuickPick.keyEquivalent, "",
                        "快速选择只走全局热键；菜单里再挂本地 key equivalent 会造出第二条路径")
     }

@@ -8,7 +8,7 @@ struct ClipboardHistoryCommands: Commands {
         ClipboardHistoryAppMenuCommands(appDelegate: appDelegate)
         ClipboardHistoryFileMenuCleanupCommands()
         ClipboardHistoryViewMenuCleanupCommands()
-        ClipboardHistoryWindowCommands()
+        ClipboardHistoryWindowCommands(appDelegate: appDelegate)
         ClipboardHistoryHelpCommands(appDelegate: appDelegate)
     }
 }
@@ -69,11 +69,21 @@ private struct ClipboardHistoryViewMenuCleanupCommands: Commands {
 }
 
 private struct ClipboardHistoryWindowCommands: Commands {
+    let appDelegate: AppDelegate
+
     var body: some Commands {
         CommandGroup(replacing: .windowArrangement) {
             Button("全部前置") {
                 NSApplication.shared.arrangeInFront(nil)
             }
+        }
+        // R525：折叠/展开以前只在状态菜单里 —— 应用在前台时 Window 菜单里找不到，
+        // 也没有键盘键。这里补一个应用菜单项 + ⌘\，与状态菜单共用同一个 command dispatch。
+        CommandGroup(after: .windowArrangement) {
+            Button(AppCommand.toggleMainWindowCollapse.title) {
+                appDelegate.perform(.toggleMainWindowCollapse)
+            }
+            .keyboardShortcut("\\", modifiers: .command)
         }
     }
 }

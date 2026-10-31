@@ -37,9 +37,14 @@ enum AppCommand: CaseIterable, Equatable {
             return ","
         case .quit:
             return "q"
+        // R525：折叠/展开以前只有状态菜单与界面入口，没有应用菜单项也没有键盘键。
+        // 补一个应用级 ⌘\：Window 菜单与状态菜单都挂同一个 `perform(.toggleMainWindowCollapse)`，
+        // 不是第二条触发路径（同一个 command 的两种呈现）。
+        case .toggleMainWindowCollapse:
+            return "\\"
         // 快速选择在菜单里没有本地键等价物：它的全局快捷键走 Carbon 注册（⌃⌥⇧V），
         // 在这里再挂一个 ⌘ 组合会凭空造出第二条按键路径，两条路迟早行为不一致。
-        case .showMainWindow, .toggleMainWindowCollapse, .showQuickPick, .refreshHistory,
+        case .showMainWindow, .showQuickPick, .refreshHistory,
              .clearHistory, .dismissAllRecommendations:
             return ""
         }

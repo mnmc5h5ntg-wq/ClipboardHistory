@@ -237,6 +237,19 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
     }
 
+    /// R525：折叠/展开要有**应用菜单 + 键盘**入口（之前只有状态菜单与界面）。
+    /// 两个入口都走同一个 `perform(.toggleMainWindowCollapse)`，不是第二条触发路径。
+    func testCollapseHasAnAppMenuEntryAndKeyboardShortcut() throws {
+        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.keyEquivalent, "\\")
+        XCTAssertEqual(AppCommand.toggleMainWindowCollapse.keyModifiers, .command)
+        XCTAssertEqual(MenuCommandShortcutPresentation.keyEquivalent(for: .toggleMainWindowCollapse), "\\")
+        let commands = try productSource("Managers/ClipboardHistoryCommands.swift")
+        XCTAssertTrue(commands.contains("appDelegate.perform(.toggleMainWindowCollapse)"),
+                      "Window 菜单没有折叠/展开项")
+        XCTAssertTrue(commands.contains(".keyboardShortcut(\"\\\\\", modifiers: .command)"),
+                      "折叠/展开没有挂 ⌘\\")
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

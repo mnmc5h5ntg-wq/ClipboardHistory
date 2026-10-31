@@ -11,7 +11,9 @@ enum MenuCommandShortcutPresentation {
             return ","
         case .quit:
             return "q"
-        case .showMainWindow, .toggleMainWindowCollapse, .showQuickPick, .refreshHistory,
+        case .toggleMainWindowCollapse:
+            return "\\"
+        case .showMainWindow, .showQuickPick, .refreshHistory,
              .clearHistory, .dismissAllRecommendations:
             return nil
         }
