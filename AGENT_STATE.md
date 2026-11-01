@@ -13,9 +13,9 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R532 / 第 531 轮 / Round 529）
-## R533 开工 ⓪（2026-11-01 · 第 532 轮 / Round 530；下一轮读数，尚未开轮）
+## R533 开工 ⓪（2026-11-01 · 第 532 轮 / Round 530）
 
-R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`df43baa`、ahead=0。`41293387308 ↔ 882e30f`（产品）读时 in_progress、`41293578965 ↔ df43baa`（台账）queued ⇒ **NOT-RUN**。
+R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。**网络两路都断**：`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ 记 **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不重试；`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）。R532 收口已读到的最新读数仍有效：`c788299` **success** ⇒ 623 签收（组合臂 idleInk=0 + 组件臂 light 571/706/38308/1803、dark 627/671/21456/1437）；`9bfd943` STEP[9]+[15]（时序 + SelectionReveal）、`adb50c1` STEP[15]+[19]（两条运动 flake）、`6add742` STEP[9]+[15]（时序 + SelectionReveal）。
 - `41289573776 ↔ 9bfd943` **failure STEP[9]+[15]**：STEP[9]=指针/citations/streak 时序 + skip_roster（`9bfd943` 是判据笔，台账未补）；STEP[15] 唯一失败是 `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime`（已知本机会话族，runner 也偶发）⇒ **hover 新见证本身通过**：组合臂 `idleInk=0` 两档、组件臂 light **571/706/38308/1803**、dark **627/671/21456/1437**。
 - `41289753591 ↔ adb50c1` **failure STEP[15]+[19]**：STEP[15] 两条运动 flake（`testCollapseWidthIsMeasuredFrameByFrame` 终宽 0.998838 vs 1.0±0.001；`testCopyReceiptAppearsAndDismissesWithAVisibleProcess` 1x 只有 1 个过渡帧 <2）；STEP[19] Motion coverage floor 由这两条红计；hover 新见证通过。
 - `41289948933 ↔ c788299` **success（整跑无失败）**：与 9bfd943 同一份判据，623 的 runner 签收读数在此：组合臂 light/dark `idleInk=0 hoverInk=0 totalDelta=0` + `TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank`（floor 200）；组件臂 light **571/706/38308/1803**、dark **627/671/21456/1437**（floor 200/1000/200）⇒ **组合臂容器盲区 + 组件臂绿，623 按规则具名签收**。
