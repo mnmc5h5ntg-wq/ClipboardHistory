@@ -40,7 +40,7 @@ RECEIPT_BLOCK = """                        if let message = loginItemSettings.me
                             // 这一行补一枚警示三角，正常的不支持说明不加。
                             HStack(spacing: 4) {
                                 if loginItemSettings.lastActionFailed, loginFailureIconVisible {
-                                    Image(systemName: "exclamationmark.triangle.fill")
+                                    Image(systemName: "exclamationmark.circle.fill")
                                         .font(.system(size: VisualGlyph.badge, weight: .semibold))
                                         .foregroundStyle(loginFailureStyle)
                                 }
