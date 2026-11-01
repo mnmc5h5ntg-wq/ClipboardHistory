@@ -62,8 +62,11 @@ def summarize(items):
     copy_red = sum(1 for x in items if x["copy"] == "RED")
     fold_exec = sum(1 for x in items if x["fold"] in ("PASS", "RED"))
     fold_red = sum(1 for x in items if x["fold"] == "RED")
+    markdown_red = sum(1 for x in items
+                       if x["judged"] is not None
+                       and "testMarkdownModeLabelChangeIsAVisibleProcess" in x["judged"][4].split(","))
     frames = [x["frame"] for x in items if x["frame"] is not None]
-    return {"copy_red": copy_red, "fold_red": fold_red,
+    return {"copy_red": copy_red, "fold_red": fold_red, "markdown_red": markdown_red,
             "fold_exec": fold_exec, "logs": len(items), "frames": frames}
 
 
@@ -97,6 +100,8 @@ def main():
           % (z["copy_red"], z["logs"]))
     print("OCCURRENCE fold reds=%d executed=%d logs=%d"
           % (z["fold_red"], z["fold_exec"], z["logs"]))
+    print("OCCURRENCE markdown reds=%d logs=%d denominator=motion-floor-runs"
+          % (z["markdown_red"], z["logs"]))
     if z["frames"]:
         worst = max(float(f[5]) for f in z["frames"])
         over = max(int(f[6]) for f in z["frames"])

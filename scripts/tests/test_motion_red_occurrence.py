@@ -73,6 +73,7 @@ class MotionRedOccurrenceTests(unittest.TestCase):
         self.assertEqual(1, z["fold_red"])
         self.assertEqual(2, z["fold_exec"])
         self.assertEqual(2, z["logs"])
+        self.assertEqual(0, z["markdown_red"], u"这份合成卷里没有 Motion floor 红名")
 
     def test_cli_reads_logs_and_unreadable_is_not_zero_red(self):
         fd, path = tempfile.mkstemp(suffix=".log")
@@ -84,6 +85,7 @@ class MotionRedOccurrenceTests(unittest.TestCase):
             self.assertEqual(0, proc.returncode, proc.stdout + proc.stderr)
             self.assertIn("copy_receipt reds=1", proc.stdout)
             self.assertIn("fold reds=0 executed=1", proc.stdout)
+            self.assertIn("markdown reds=1", proc.stdout)
             self.assertIn("FRAME_MULTI logs=1 with=1", proc.stdout)
             self.assertIn("over_runs=1", proc.stdout)
             self.assertIn("loaded_p95_max=46.73", proc.stdout)

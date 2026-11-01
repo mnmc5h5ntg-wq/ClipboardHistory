@@ -35,6 +35,14 @@ final class MotionCatalogTests: XCTestCase {
         }
     }
 
+    /// R541：emphasis 的 0.16 在 runner 1x 上曾只读到 1 个过渡帧（copy receipt 2/40、
+    /// markdown label 2/40，见 `scripts/motion_red_occurrence.py` 的 40 跑窗口）。
+    /// 0.20 让本机 copy receipt 的 1x 过渡帧从 2–3 升到 3–4；帧数地板（≥2）没动。
+    func testEmphasisFeedbackSurvivesOneXSampling() {
+        XCTAssertGreaterThanOrEqual(MotionCatalog.duration(for: .emphasis), 0.20,
+                                    "emphasis 退回 0.16 时 1x 短回执会掉到 1 个过渡帧；要改先重跑出现率")
+    }
+
     /// 例外必须**只有一个入口**，否则"上限"就变成了一句可以随便绕过去的话。
     ///
     /// 这条断言的三个方向都是必须的：① 例外集合就是 `skeletonSweep` 那一档（别人想挤进来要红）；
