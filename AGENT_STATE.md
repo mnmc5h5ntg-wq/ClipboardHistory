@@ -12,8 +12,8 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R532 / 第 531 轮 / Round 529）
-## R533 开工 ⓪（2026-11-01 · 第 532 轮 / Round 530）
+最后更新：2026-11-01（本地 · R533 / 第 532 轮 / Round 530）
+## R533 状态（2026-11-01 · 第 532 轮 / Round 530 · 产品 1 文件 + 判据）
 
 R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。**网络两路都断**：`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ 记 **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不重试；`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）。R532 收口已读到的最新读数仍有效：`c788299` **success** ⇒ 623 签收（组合臂 idleInk=0 + 组件臂 light 571/706/38308/1803、dark 627/671/21456/1437）；`9bfd943` STEP[9]+[15]（时序 + SelectionReveal）、`adb50c1` STEP[15]+[19]（两条运动 flake）、`6add742` STEP[9]+[15]（时序 + SelectionReveal）。
 - `41289573776 ↔ 9bfd943` **failure STEP[9]+[15]**：STEP[9]=指针/citations/streak 时序 + skip_roster（`9bfd943` 是判据笔，台账未补）；STEP[15] 唯一失败是 `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime`（已知本机会话族，runner 也偶发）⇒ **hover 新见证本身通过**：组合臂 `idleInk=0` 两档、组件臂 light **571/706/38308/1803**、dark **627/671/21456/1437**。
@@ -23,6 +23,10 @@ R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。*
 - **624**：skip_roster 在 `9bfd943`（非台账笔）红、在 `adb50c1`/`c788299`（台账笔）绿；观察相关「非台账笔红、台账笔绿」仍不能证明成因（嵌套跑时长/负载），保持开单、不改名册。
 - **622**：这四跑都没有 STEP[18]；最近仍是 `9b9cf56` 的 544.1ms/2 颗，本机 4 跑未复现，120ms 与容差不动。
 
+① 产品/旧值：旧 `collapseHintLine` 末尾有 `.accessibilityElement(children: .combine)`，把可点的「知道了」和信息文字合并成一个元素 ⇒ VoiceOver 只剩一段文字、按钮动作被并掉（离屏窗口不建 AX 树，已知盲区，用源码段作证）。产品 **1 文件**：去掉 `.combine`，文字与按钮各自成 AX 元素；装饰信息图标保持隐藏。视觉零变化；另加 360×560 `main-collapsed-hint-min`（亮/暗帧看过，文案与「知道了」完整、不挤掉）作为最小宽负向证人。
+② 判据/刀：`testCollapseHintKeepsDismissButtonActionableForVoiceOver`（切源码段：无 `.combine`、按钮标题/help、图标隐藏）；`M1409` CAUGHT、RESTORE_CLEAN=yes；预检 312/289/750 bad=0、ARM 405/1237、HIDDEN 399/1176 rot=0；build 0 告警。帧 **350**（ADDED=2、CHANGED=0、MISSING=0；基线 348→350）。
+③ 八步：全量 **1377/56/0（591.2s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 52291；真机只读 1 窗口）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 532，`python3 scripts/product_streak.py --streak-for 532` 现读，last=882e30f/531）。
+④ 收口/网络：产品笔 `0720cc6` 只本地提交；`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`，GitHub API 000 而 apple 200 ⇒ **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**；收口前再试一次 push。下一轮 R534（第 533 轮 / Round 531）：先测 ls-remote，通了先推本地提交并复核 ahead=0；623 已结案；624/622 保持开单；继续折叠特性；4.5 地板与 150 上限不动。
 
 ## R532 状态（2026-11-01 · 第 531 轮 / Round 529 · 产品 5 文件 + 判据）
 

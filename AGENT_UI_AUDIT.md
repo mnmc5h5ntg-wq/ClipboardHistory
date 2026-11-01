@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 532 轮（R533 · 2026-11-01 · U-2187…U-2193）：折叠提示的「知道了」改为独立无障碍元素（产品 1 文件 + 判据）
+
+- **U-2187：⓪ 网络与 CI。** HEAD=origin=`039413e`、ahead=0；`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不反复重试，收口前再试一次。`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）；R532 收口已读：`c788299` **success** ⇒ 623 签收；`9bfd943`/`adb50c1`/`6add742` 的失败分别为台账时序 + SelectionReveal、两条运动 flake、时序 + SelectionReveal。
+- **U-2188：① 旧值与产品。** 旧值（源码取证）：`collapseHintLine` 末尾有 `.accessibilityElement(children: .combine)`，把可点的「知道了」和信息文字合并成一个元素 ⇒ VoiceOver 只剩一段文字、按钮动作被并掉（离屏窗口不建 AX 树是已知盲区，和 UI_AUDIT 的无障碍清单同一条限制）。产品 **1 文件**：去掉 `.combine`，文字与按钮各自成无障碍元素；信息图标保持 `accessibilityHidden(true)`（装饰）。视觉零变化。
+- **U-2189：② 判据、刀与 360pt 负向证人。** 新增 `testCollapseHintKeepsDismissButtonActionableForVoiceOver`（切 `collapseHintLine` 源码段：无 `.combine`、按钮标题/help、图标隐藏）；`M1409`（重新合并）**CAUGHT、RESTORE_CLEAN=yes**；预检 **312/289/750 bad=0**、ARM **405/1237**（dupes=0 repeats=0）、HIDDEN **399/1176 rot=0**；build **0 告警**。另加 `main-collapsed-hint-min` 360×560：亮/暗帧逐张看过，文案与「知道了」完整、不互相挤掉 ⇒ 最小宽负向证人。
+- **U-2190：③ 帧卷。** 捕获 **350 帧**：`ADDED=2`（`main-collapsed-hint-min` 亮/暗）、`CHANGED=0`、`MISSING=0`；基线 348→350。无障碍改动不进像素，360 提示帧与 420 版同形。
+- **U-2191：④ 八步与电池。** build 0 告警；全量 **1377/56/0（591.2s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（活库不变、只增不减；PID 52291；真机只读 1 窗口）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 532，`python3 scripts/product_streak.py --streak-for 532` 现读，last=882e30f/531）。
+- **U-2192：⑤ 网络与提交。** 本笔产品 `0720cc6` 只本地提交（API/git 两路都断，未推）；收口前再试一次 `git push`，仍失败就记 PUSH_BLOCKED 收口，不反复重试。
+- **U-2193：⑥ 交接。** 下一轮 R534（第 533 轮 / Round 531）：先测 `git ls-remote`；通了先推本轮本地提交并复核 ahead=0，再读 882e30f/df43baa/039413e 与本轮两跑的全部失败步骤；623 已结案不重开；624（非台账笔红/台账笔绿）与 622（544.1ms/2 颗，本机未复现）保持开单；继续折叠特性；安全红线不变。
+
 ## 第 531 轮（R532 · 2026-11-01 · U-2180…U-2186）：折叠态一次性提示与跨重启记忆（产品 5 文件 + 判据）
 
 - **U-2180：⓪ CI。** HEAD=origin=`c788299`、ahead=0；`41289573776 ↔ 9bfd943`（新见证签收跑）、`41289753591 ↔ adb50c1`、`41289948933 ↔ c788299`、`41290053584 ↔ 6add742` 读时均 **in_progress ⇒ NOT-RUN**；`41287495651 ↔ a13636a`、`41287270623 ↔ 76b24b8`、`41287008886 ↔ ac04e2d`、`41286598804 ↔ 02fa144` 为 STEP[9] 台账时序 + hover 0/0（R531 已收口复读）。sources/streak 时序红与产品红分账；623 的 runner 见证未到，不宣布签收；624 最新五红两绿（间歇）；622 最新仍是 `9b9cf56` 544.1ms/2 颗、本机 4 跑未复现。
