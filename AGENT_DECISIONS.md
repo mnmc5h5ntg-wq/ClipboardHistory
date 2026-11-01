@@ -8729,3 +8729,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：读数不变的产品改动不保留；红名登记让新的匿名红无法混过读数，44 份日志现读 `unregistered=0`。
 - 兼容性/迁移：不影响任何产品；markdown 仍是 contentFade 0.20。
 - 边界：receipt 0.20 的 copy 半由 8d4a36d/c1df1e6 签收（1x=2 + 录制帧 passed），但 b16eacc 的 copy 是 `app-not-active` NOT_RUN；627/629/624 保持开单。
+
+## D-545 fold 终值读 settled 进度，不读采样末帧（R545）
+
+- 背景：`testCollapseWidthIsMeasuredFrameByFrame` 的 `progress.last == 1 ±0.001` 在 runner 上偶发红：`bd96e93` 读到 0.9989289765，而同一跑 `widths` 末段已 421、`final=420`、`min=360`。采样器在过渡结束前一拍停手，末帧不是产品终值。
+- 决定：终值改为 `waitForSettled()` 之后读 `controller.foldProgress`；采样末帧只要求 ≥0.99（仍能抓「采样停在半路」），intermediate ≥1、单调、final 420、min 360 全部保留。
+- 理由：判据要读它声称的那个对象——「过渡是否走完」应由 settle 后的模型状态回答，而不是由任意一次采样末帧回答；旧尺把采样相位当产品性质。
+- 兼容性/迁移：只改 Swift 测试，不改产品；本机旧值 10/10、新值 10/10，M1424 证明新断言会红。
+- 边界：627 的 fold 类红不再由这条采样末帧触发；markdown 1x=1 与 624 的 skip_roster 两臂不受影响。

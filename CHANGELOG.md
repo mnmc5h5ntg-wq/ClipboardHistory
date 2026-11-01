@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### fold 收尾判据改读 settled 进度（R545 / 第 544 轮 / Round 542 / U-2287…U-2294 · 产品 0 文件 + 判据）
+
+`testCollapseWidthIsMeasuredFrameByFrame` 原来读采样末帧，runner `bd96e93` 读到 0.9989（±0.001 红）而窗口已落 420 ⇒ 采样停手早于过渡结束。改为 `waitForSettled()` 后读 `controller.foldProgress`，采样末帧只要求 ≥0.99；intermediate ≥1、单调、final 420、min 360 全部保留。本机旧/新值各 10/10，M1424 CAUGHT。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 691/5。
+
 ### markdown 专用档被证伪 + 红名登记守卫（R544 / 第 543 轮 / Round 541 / U-2278…U-2286 · 产品 0 文件 + 判据）
 
 markdown 试 `.markdownLabel=0.24`：本机 1x 仍 4（旧 contentFade 0.20 也是 4）⇒ 撤回并写回 629。改做判据：`motion_red_occurrence.py` 增 `KNOWN_RED` 与 `--strict`，44 份日志 `unregistered=0`；M1423 CAUGHT。receipt 0.20 的 copy 半由 8d4a36d/c1df1e6 签收（1x=2、录制帧 passed）；markdown contentFade 仍偶发 1x=1。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 691/5。
