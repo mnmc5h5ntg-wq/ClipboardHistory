@@ -110,7 +110,7 @@ def product_commits(limit=400):
     而是问第二个来源（台账节标题里的同一段 U 区间，见 `ledger_round_by_urange`）。
     两个来源都给不出 ⇒ label=None，由 `derive()` 那三条出口去红。
     """
-    out, rc = git("log", "-%d" % limit, "--date=short",
+    out, rc = git("log", "-%d" % limit, "--date=short", u"--abbrev=7",
                   u"--format=%H%x09%h%x09%ad%x09%s", u"--", SOURCES)
     if rc != 0:
         return None

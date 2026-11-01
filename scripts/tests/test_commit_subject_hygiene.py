@@ -71,7 +71,7 @@ def scan_args():
     sha = baseline_sha()
     if sha is None:
         return None
-    return [u"log", u"--format=%h%x00%s", sha + u"~1..HEAD"]
+    return [u"log", u"--abbrev=7", u"--format=%h%x00%s", sha + u"~1..HEAD"]
 # 在册例外：**只能登记「标签比台账新」的那一类**（代码半先于轮次账），每条都要写清由哪一轮补账。
 # 这一格故意要求名单**恰好等于**实际命中的那些 sha —— 多一笔未登记的超前标签仍然红，
 # 而在册的那笔若哪天不再出现在扫描范围里也不会被忘记（放宽必须成对，R74 那一课）。
@@ -220,12 +220,42 @@ class CommitSubjectHygiene(unittest.TestCase):
             return
         args = scan_args()
         self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 豁免退场判据没有对象")
-        out, rc = git(u"log", u"--format=%h", args[-1])
+        out, rc = git(u"log", u"--abbrev=7", u"--format=%h", args[-1])
         self.assertEqual(0, rc, out[-200:])
         in_range = set(out.split()) | {birth_short()}
         stale = sorted((set(AHEAD_ROSTER) | set(NO_LABEL_ROSTER)) - in_range)
         self.assertEqual([], stale,
                          u"这些 sha 已不在扫描范围里，豁免要删掉：" + ", ".join(stale))
+
+    def test_scan_is_pinned_to_seven_digits_on_an_eight_digit_runner(self):
+        """runner 的 `git %h` 会给 8 位（R538 现读）：扫描出的 sha 必须钉在 7 位。
+
+        旧值（不钉 `--abbrev=7`）在 `core.abbrev=8` 下会让 `birth_short()`（7 位）对不上
+        扫描行（8 位），`test_recent_subjects_are_clean` 报「生日那一笔不到」。
+        这里用环境变量模拟 runner，不靠本机默认的 7 位。
+        """
+        args = scan_args()
+        self.assertIsNotNone(args, u"判据的生日提交查不到 ⇒ 这一格没有对象")
+        saved = {k: os.environ.get(k) for k in
+                 (u"GIT_CONFIG_COUNT", u"GIT_CONFIG_KEY_0", u"GIT_CONFIG_VALUE_0")}
+        try:
+            os.environ[u"GIT_CONFIG_COUNT"] = u"1"
+            os.environ[u"GIT_CONFIG_KEY_0"] = u"core.abbrev"
+            os.environ[u"GIT_CONFIG_VALUE_0"] = u"8"
+            out, rc = git(*args)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertEqual(0, rc, out[-200:])
+        shas = [line.split(u"\0", 1)[0] for line in out.splitlines() if u"\0" in line]
+        self.assertTrue(shas, u"8 位 runner 下扫描为空 ⇒ 空对账")
+        self.assertEqual([], [s for s in shas if len(s) != 7],
+                         u"runner 把 core.abbrev 调到 8 时，扫描出的 sha 必须仍是 7 位")
+        self.assertIn(birth_short(), shas,
+                      u"8 位 runner 下生日那一笔必须仍能在扫描范围里被认出")
 
     def test_roster_entries_must_be_registered_in_the_ledger(self):
         """每一条豁免都要在 `AGENT_BACKLOG.md` 里查得到 —— 名单是我自己写的，不能自我批准。"""

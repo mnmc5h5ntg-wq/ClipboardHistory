@@ -185,6 +185,33 @@ class ProductStreakCellTests(unittest.TestCase):
         self.assertEqual(15, ps.streak_at(333, rows_no_source)[0],
                          u"没有第二个来源时 333 轮答 15 —— 这一格是 D-329 的证人：豁免不改变数，派生才改变")
 
+    def test_shorts_are_pinned_to_seven_digits_on_an_eight_digit_runner(self):
+        """runner 的 `git %h` 会给 8 位（R538 现读）：产品提交的短 sha 必须钉在 7 位。
+
+        旧值（不钉 `--abbrev=7`）在 `core.abbrev=8` 下会把 `117f45d` 读成 `117f45d4`，
+        第二来源的证人当场找不到对象（`41308835299` 的 STEP[9]）。这里用环境变量模拟 runner，
+        不靠本机默认的 7 位。
+        """
+        saved = {k: os.environ.get(k) for k in
+                 (u"GIT_CONFIG_COUNT", u"GIT_CONFIG_KEY_0", u"GIT_CONFIG_VALUE_0")}
+        try:
+            os.environ[u"GIT_CONFIG_COUNT"] = u"1"
+            os.environ[u"GIT_CONFIG_KEY_0"] = u"core.abbrev"
+            os.environ[u"GIT_CONFIG_VALUE_0"] = u"8"
+            rows = ps.product_commits()
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.assertIsNotNone(rows, u"8 位 runner 下 git 派生失败")
+        self.assertTrue(rows, u"8 位 runner 下没有产品提交 ⇒ 这一格没有对象")
+        self.assertEqual([], [r[2] for r in rows if len(r[2]) != 7],
+                         u"runner 把 core.abbrev 调到 8 时，产品提交的短 sha 必须仍是 7 位")
+        self.assertEqual(1, len([r for r in rows if r[2] == u"117f45d"]),
+                         u"8 位 runner 下仍要能按 7 位 sha 找到 117f45d")
+
     def test_subject_label_parser_rejects_ambiguous_and_missing(self):
         # derive() 的两条拒绝路径靠这两种输入成立：无标签 / 多标签都不许变成一个数。
         self.assertEqual(ps.rounds_in_subject(u"R290 收尾：把一维拆成两层两尺"), [])

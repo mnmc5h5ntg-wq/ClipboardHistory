@@ -905,6 +905,10 @@ private final class FocusableHintButton: NSButton {
         nextKeyView = first
     }
 
+    // R539（625）：无边框 NSButton 的 `canBecomeKeyView` 默认 false（`acceptsFirstResponder` 虽是 true），
+    // 自动 key-view 环因此不收它；显式放行后 Tab 才会把它当停靠点。
+    override var canBecomeKeyView: Bool { true }
+
     override var focusRingMaskBounds: NSRect { bounds.insetBy(dx: -2, dy: -2) }
 
     override func drawFocusRingMask() {

@@ -496,18 +496,28 @@ final class MainWindowCollapseTests: XCTestCase {
         }
         XCTAssertEqual(button.focusRingType, .default, "「知道了」没有系统焦点环")
         XCTAssertFalse(button.refusesFirstResponder, "「知道了」被拒绝成为第一响应者")
-        var reached = false
-        for _ in 0..<24 {
-            window.selectNextKeyView(nil)
-            if window.firstResponder === button { reached = true; break }
+        // R539（625）：旧值 `canBecomeKeyView=false`（无边框 NSButton 的默认），自动 key-view 环不收它。
+        XCTAssertTrue(button.acceptsFirstResponder, "「知道了」不接受第一响应者")
+        XCTAssertTrue(button.canBecomeKeyView, "「知道了」canBecomeKeyView=false ⇒ Tab 环不会收它")
+        // R539（625）读数换对象：旧值用 `window.selectNextKeyView(nil)` 24 站判「Tab 到不到」，
+        // 但单测窗口从来不是 key（`isKeyWindow=false`、`NSApp.isActive=false`），
+        // 那次调用根本不移动焦点 ⇒ 0/24 是尺的假读数，不是产品结论。
+        // 这里改判**链的结构**：从 initialFirstResponder 沿 nextKeyView 走，按钮必须在链里。
+        var chain: [NSView] = []
+        var walk = window.initialFirstResponder
+        var seen = Set<ObjectIdentifier>()
+        while let view = walk, !seen.contains(ObjectIdentifier(view)), chain.count < 40 {
+            chain.append(view)
+            seen.insert(ObjectIdentifier(view))
+            walk = view.nextKeyView
         }
-        // 625 的 Tab 链在 SwiftUI 宿主里仍未打通（旧值 8 站、本轮 24 站都不到）⇒ 具名读数，
-        // 不把「宿主不遍历」冒充成按钮属性失败；真机安装后另行复核。
-        // 走 XCTAttachment（不占裸 stdout 读数：R536 第一次电池 15≠16 就是这行 print 造成的）。
-        let reading = XCTAttachment(string: "HINT_KEYVIEW_REACHED=\(reached ? 1 : 0) tabStops=24")
+        let inChain = chain.contains { $0 === button }
+        let reading = XCTAttachment(string: "HINT_KEYVIEW_IN_CHAIN=\(inChain ? 1 : 0) chain=\(chain.count)")
         reading.name = "HINT_KEYVIEW"
         reading.lifetime = .keepAlways
         add(reading)
+        XCTAssertTrue(inChain, "「知道了」不在窗口 key-view 链里 ⇒ Tab 到不了")
+        XCTAssertNotNil(button.nextKeyView, "「知道了」的 nextKeyView 为空 ⇒ 链没闭合")
         button.performClick(nil)
         XCTAssertTrue(acknowledged, "「知道了」点击没有走确认动作")
     }
