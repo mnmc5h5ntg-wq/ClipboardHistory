@@ -2140,6 +2140,67 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    /// R547：默认排除项尾部的锁图标与「默认」文字分开计；负向臂只关锁，
+    /// 右列墨差必须能单独证明锁画出来了（而不是靠文字那部分）。
+    func testDefaultExcludedRowsCarryALockIcon() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r547-default-lock-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "settings-privacy-excluded" }),
+                  let negative = fixtures.first(where: { $0.name == "settings-privacy-no-default-lock" }) else {
+                return XCTFail("\(tag)：找不到 privacy lock 两臂 ⇒ 这条判据没有对象")
+            }
+            var scale = 1.0
+            func scan(_ fixture: Fixture) throws -> (ink: Int, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "DEFAULT_LOCK", code: 1) }
+                scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+                let rOff = alphaFirst ? 1 : 0
+                func isInk(_ x: Int, _ y: Int) -> Bool {
+                    let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                    let luma = 0.2126 * Double(base[i + rOff])
+                        + 0.7152 * Double(base[i + rOff + 1])
+                        + 0.0722 * Double(base[i + rOff + 2])
+                    return abs(Int(luma.rounded()) - page) >= 60
+                }
+                var ink = 0
+                for y in Int(Double(rep.pixelsHigh) * 0.30)..<Int(Double(rep.pixelsHigh) * 0.80) {
+                    for x in Int(Double(rep.pixelsWide) * 0.80)..<Int(Double(rep.pixelsWide) * 0.98)
+                        where isInk(x, y) { ink += 1 }
+                }
+                return (ink, page)
+            }
+            guard let neg = try? scan(negative), let pos = try? scan(positive) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            if neg.ink == 0 && pos.ink == 0 {
+                emit("DEFAULT_LOCK_NOT_RUN=settings-content-blank \(tag)")
+                continue
+            }
+            let diff = pos.ink - neg.ink
+            emit("DEFAULT_LOCK \(tag) 负臂右列墨=\(neg.ink) 正臂右列墨=\(pos.ink)"
+                 + " 差=\(diff) 页底=\(neg.page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThan(neg.ink, 0,
+                "\(tag)：负臂右列一个墨都没有 ⇒ 「默认」文字没拍到，尺没有对象")
+            XCTAssertGreaterThan(diff, Int(200.0 * scale * scale),
+                "\(tag)：去掉锁只差 \(diff) 个右列墨 ⇒ 锁图标没有画出来")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("DEFAULT_LOCK_NOT_RUN：两档都没有设置内容") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R488 · 表格列随内容对齐
 
     /// R488：`detail-table-uneven` 的三行源码竖线没有对齐；渲染后第二/第三列的起点
@@ -13112,6 +13173,14 @@ final class UICaptureTests: XCTestCase {
             AnyView(self.makeSettingsView(store: store, initialCategory: .privacy)
                 .environment(\.settingsDefaultExcludedBadgeForCapture, false))
         })
+        // R547：默认排除项「锁」图标的负向臂（标记文字仍在，只关锁）。
+        results.append(Fixture("settings-privacy-no-default-lock", NSSize(width: 720, height: 1040),
+                               seed: (CapturePolicy.userExcludedKey,
+                                      CapturePolicy.encodeUserExcluded(["com.example.writer",
+                                                                        "com.example.design"]))) {
+            AnyView(self.makeSettingsView(store: store, initialCategory: .privacy)
+                .environment(\.settingsDefaultExcludedLockForCapture, false))
+        })
         // 高度 56 → **72**：换成产品自己那句话之后 `contentMustFit` 当场打红
         // （底行 18.4% / 20.2% 有墨 ⇒ 56pt 放不下两行）。这不是"把断言关掉"，是这张帧
         // 一直在裁自己展示的内容 —— 被裁掉的那半行从来没有进过基线，也就从来没有被审过。
@@ -19745,6 +19814,8 @@ final class UICaptureTests: XCTestCase {
         // R479：标题图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关标题图标）。
         "settings-data-no-title-icon", "settings-data-no-action-icons",
         "settings-privacy-no-default-badge", "settings-shortcuts-no-reset-icon",
+        // R547：锁图标的负向臂也是同一棵 settings 侧栏 vibrant 子树（只关锁）。
+        "settings-privacy-no-default-lock",
         // R484：热图今天角标的负向臂也是同一棵 settings 侧栏 vibrant 子树。
         "settings-stats-populated-no-today",
         // R39 新增的两张（禁用态 / 失败回执）也进名单 —— 这条不是"顺手补名单"：

@@ -16,11 +16,21 @@ FILTER = "UICaptureTests/testExcludedAppsStartWithAnIconInsteadOfRawIDs"
 NEEDLE = """                            HStack(spacing: 6) {
                                 ExcludedAppRow(bundleID: id)
                                 if defaultExcludedBadgeVisible {
-                                    Text("默认")
-                                        .font(.system(size: VisualFont.meta))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .accessibilityLabel("默认排除项，不可移除")
+                                    HStack(spacing: 3) {
+                                        // R547：默认项不可移除，光靠灰字「默认」在色盲/低对比下
+                                        // 仍要靠读字；补一枚中性锁，给身份一个形状。
+                                        if defaultExcludedLockVisible {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: VisualGlyph.badge - 1, weight: .semibold))
+                                                .foregroundStyle(.secondary)
+                                                .accessibilityHidden(true)
+                                        }
+                                        Text("默认")
+                                            .font(.system(size: VisualFont.meta))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                            .accessibilityLabel("默认排除项，不可移除")
+                                    }
                                 }
                             }
 """

@@ -192,6 +192,9 @@ struct SettingsView: View {
     /// R489：默认排除项尾部「默认」标记的负向帧缝（产品默认 nil ⇒ 画）。
     @Environment(\.settingsDefaultExcludedBadgeForCapture) private var defaultExcludedBadgeForCapture
     private var defaultExcludedBadgeVisible: Bool { defaultExcludedBadgeForCapture ?? true }
+    /// R547：默认排除项「锁」图标的负向帧缝（产品默认 nil ⇒ 画）。
+    @Environment(\.settingsDefaultExcludedLockForCapture) private var defaultExcludedLockForCapture
+    private var defaultExcludedLockVisible: Bool { defaultExcludedLockForCapture ?? true }
     /// R492：开机启动失败回执图标的负向帧缝（产品默认 nil ⇒ 画）。
     @Environment(\.loginFailureIconForCapture) private var loginFailureIconForCapture
     private var loginFailureIconVisible: Bool { loginFailureIconForCapture ?? true }
@@ -638,11 +641,21 @@ struct SettingsView: View {
                             HStack(spacing: 6) {
                                 ExcludedAppRow(bundleID: id)
                                 if defaultExcludedBadgeVisible {
-                                    Text("默认")
-                                        .font(.system(size: VisualFont.meta))
-                                        .foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .accessibilityLabel("默认排除项，不可移除")
+                                    HStack(spacing: 3) {
+                                        // R547：默认项不可移除，光靠灰字「默认」在色盲/低对比下
+                                        // 仍要靠读字；补一枚中性锁，给身份一个形状。
+                                        if defaultExcludedLockVisible {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: VisualGlyph.badge - 1, weight: .semibold))
+                                                .foregroundStyle(.secondary)
+                                                .accessibilityHidden(true)
+                                        }
+                                        Text("默认")
+                                            .font(.system(size: VisualFont.meta))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                            .accessibilityLabel("默认排除项，不可移除")
+                                    }
                                 }
                             }
                         }
@@ -1637,6 +1650,18 @@ extension EnvironmentValues {
     var settingsDefaultExcludedBadgeForCapture: Bool? {
         get { self[SettingsDefaultExcludedBadgeForCaptureKey.self] }
         set { self[SettingsDefaultExcludedBadgeForCaptureKey.self] = newValue }
+    }
+}
+
+/// R547：默认排除项「锁」图标的负向帧缝（产品默认 nil ⇒ 画）。
+struct SettingsDefaultExcludedLockForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
+extension EnvironmentValues {
+    var settingsDefaultExcludedLockForCapture: Bool? {
+        get { self[SettingsDefaultExcludedLockForCaptureKey.self] }
+        set { self[SettingsDefaultExcludedLockForCaptureKey.self] = newValue }
     }
 }
 
