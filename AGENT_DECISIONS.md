@@ -8737,3 +8737,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：判据要读它声称的那个对象——「过渡是否走完」应由 settle 后的模型状态回答，而不是由任意一次采样末帧回答；旧尺把采样相位当产品性质。
 - 兼容性/迁移：只改 Swift 测试，不改产品；本机旧值 10/10、新值 10/10，M1424 证明新断言会红。
 - 边界：627 的 fold 类红不再由这条采样末帧触发；markdown 1x=1 与 624 的 skip_roster 两臂不受影响。
+
+## D-546 登录失败图标用圆形感叹号，不用警示三角（R546）
+
+- 背景：BACKLOG 584 记着失败回执的图标与文字同错误色、且与横幅同用 `exclamationmark.triangle.fill`，图标身份弱；判据 `LOGIN_FAILURE_ICON` 只能数红色像素差。
+- 决定：回执图标换成 `exclamationmark.circle.fill`，尺寸仍是 `VisualGlyph.badge`、字重 semibold、颜色仍走 `loginFailureStyle`，文案与 HStack 布局不动。
+- 理由：同一错误色下，实心圆感叹号比三角更实、与横幅的三角区分开；`LOGIN_FAILURE_ICON` 旧/新差 257→330（light）、247→313（dark），负臂不变，说明多出来的红来自图标本身。
+- 兼容性/迁移：只改一个 SF Symbol 名；静态帧只有 `settings-general-login-failed` 亮/暗 2 张变化，基线 350→350；录制帧确定性 10/10 diff=0。
+- 边界：runner 1x 的 `LOGIN_FAILURE_ICON` 待签收；627/629/624 不受影响。

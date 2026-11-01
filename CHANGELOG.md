@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 登录失败图标换圆形感叹号（R546 / 第 545 轮 / Round 543 / U-2295…U-2302 · 产品 1 文件 + 判据）
+
+`SettingsView` 的登录失败回执图标由 `exclamationmark.triangle.fill` 换成 `exclamationmark.circle.fill`（同尺寸/字重/错误色，不动文案与布局）。`LOGIN_FAILURE_ICON` 旧/新：light 差 257→330、dark 247→313，负臂不变；亮/暗帧逐张看，圆形感叹号与横幅三角区分更清楚。帧 350、CHANGED=2、基线 350→350；录制确定性 10/10 diff=0；M1425 CAUGHT；全量 1385/56/0；换装 431=431；电池 691/5。
+
 ### fold 收尾判据改读 settled 进度（R545 / 第 544 轮 / Round 542 / U-2287…U-2294 · 产品 0 文件 + 判据）
 
 `testCollapseWidthIsMeasuredFrameByFrame` 原来读采样末帧，runner `bd96e93` 读到 0.9989（±0.001 红）而窗口已落 420 ⇒ 采样停手早于过渡结束。改为 `waitForSettled()` 后读 `controller.foldProgress`，采样末帧只要求 ≥0.99；intermediate ≥1、单调、final 420、min 360 全部保留。本机旧/新值各 10/10，M1424 CAUGHT。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 691/5。
