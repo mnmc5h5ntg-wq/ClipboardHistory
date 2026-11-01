@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠提示支持 Return 激活（R535 / 第 534 轮 / Round 532 / U-2201…U-2207 · 产品 1 文件 + 判据）
+
+「知道了」再挂 `.keyboardShortcut(.return, modifiers: [])`，与 Esc 并存、只在提示可见时存在；视觉不变。旧值真机 Return 0/0；新增键盘判据与 M1411；帧 350 重捕 CHANGED=0；全量 1378/56/0；换装 R535b 431=431。另：Tab focus 与行右键菜单两个候选被真机证伪并撤回（BACKLOG 625/626）。
+
 ### 折叠提示支持 Esc 关闭（R534 / 第 533 轮 / Round 531 / U-2194…U-2200 · 产品 1 文件 + 判据）
 
 「知道了」挂 `.keyboardShortcut(.cancelAction)`（只在提示可见时存在），一次性提示可从键盘关闭；视觉不变。旧值真机折叠 420×492 按 Esc 不写确认键；新增源码段判据与 M1410；帧 350 重捕 CHANGED=0；全量 1378/56/0；换装 431=431。

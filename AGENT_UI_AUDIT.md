@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 534 轮（R535 · 2026-11-01 · U-2201…U-2207）：折叠提示支持 Return 激活 + 两个候选被真机证伪（产品 1 文件 + 判据）
+
+- **U-2201：⓪ CI。** HEAD=origin=`d625b47`、ahead=0；网络通。`d625b47`/`d8c0e44`/`0cce5df`/`8b1ddb9`/`76cbd63` 读时 **in_progress ⇒ NOT-RUN**；`a8f1817` 与 `d8c0e44` 同次推送，GitHub 只给头笔建 run ⇒ **无独立跑/CI_UNREAD**。`039413e` **success**；`df43baa` failure STEP[15]+[18]（SelectionReveal + `testFrameIntervalsUnderStateChanges` **162.2ms**、超锚点 **2/208** ⇒ 622 新值）；STEP[9] 绿。624 非台账笔红/台账笔绿继续。
+- **U-2202：① Tab 到「知道了」——简单 .focusable 被真机证伪。** 旧值（真机只读）：折叠 420×492 下连按 8 次 Tab，聚焦只在 **AXOutline/AXTextField** 循环，从未出现 AXButton。试加 `.focusable(true)+@FocusState+accent 焦点环`：链里多出 **AXGroup（420×472，整个内容视图）**，仍没有 AXButton「知道了」⇒ 简单修饰符买不到按钮可达性（与 R194 筛选段同族）。产品改动已撤回；读数记 **BACKLOG 625**。
+- **U-2203：② 行右键菜单——被系统文本菜单盖住。** 旧值：Sources 里 `.contextMenu` 0 次。试给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）：真机在正文与行尾两次右键都弹 **117×165 的系统文本菜单**（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。产品与配套判据**一并撤回**（不让源码判据冒充真机交付）；读数记 **BACKLOG 626**。
+- **U-2204：③ Return 激活（本轮最终产品位）。** 旧值（真机只读）：折叠 420×492 下按 Return，`mainWindowCollapseHintAcknowledged` 前后都是 0（0/0）⇒ 只能 Esc 或鼠标。产品 **1 文件**：给「知道了」再挂 `.keyboardShortcut(.return, modifiers: [])`，与 Esc 并存、只在提示可见时存在；视觉零变化。`testCollapseHintCanBeDismissedFromTheKeyboard` 同时钉 Esc 与 Return；`M1411` **CAUGHT、RESTORE_CLEAN=yes**；预检 **314/291/752 bad=0**、ARM **407/1239**、HIDDEN **401/1178 rot=0**；build **0 告警**。新值真机按键未演（不消费一次性提示）⇒ 具名 `HINT_RETURN_LIVE_NOT_RUN=defaults-preserved`。
+- **U-2205：④ 帧卷。** 最终产品重捕 **350 帧**：`CHANGED=0 ADDED=0 MISSING=0`（Return/focus/context 都不进静态像素），基线保持 **350**。
+- **U-2206：⑤ 八步与电池。** build 0 告警；全量 **1378/56/0（584.3s）**（中间试过 focus/context 两版，分别被 VisualToken 线宽/收藏字面量与真机读数拦下并撤回；最终版真绿；本机 SelectionReveal 五条会话噪音本轮未出现）；换装：首次 `--label R535` 因备份目录已存在在 `mv` 处失败、**旧包未动**，改 `--label R535b` 成功 `SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 1885；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 534，`python3 scripts/product_streak.py --streak-for 534` 现读，last=a8f1817/533）。
+- **U-2207：⑥ 收口与交接。** 产品笔 `a2579fd` 首次 push 遇 `Connection closed ... port 22`，**重试一次成功**（HEAD=origin=`a2579fd`、ahead=0）。下一轮 R536（第 535 轮 / Round 533）：先 push 并复核 ahead=0；读本轮产品/台账跑与上轮五跑的全部失败步骤；625/626 保持开单（前者要 AppKit key-view，后者要在 Text/cell 层替换菜单），623 不重开；622 记 162.2ms、624 两臂继续；继续折叠特性；安全红线不变。
+
 ## 第 533 轮（R534 · 2026-11-01 · U-2194…U-2200）：折叠提示支持 Esc 关闭（产品 1 文件 + 判据）
 
 - **U-2194：⓪ CI。** HEAD=origin=`8b1ddb9`、ahead=0；网络复核 `git ls-remote` 通、api=200/apple=200。`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63`、`41293901730 ↔ 039413e` 读时 **in_progress ⇒ NOT-RUN**；`41293578965 ↔ df43baa` **failure STEP[15]+[18]**：STEP[15]=SelectionReveal 会话族；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **162.2ms**、超锚点 **2/208**（loaded_p95=16.67、比值 1.000）⇒ **622 再现**（值从 544.1ms 变 162.2ms；120ms 与容差不动）；STEP[9] 绿 ⇒ 624 台账笔绿臂。`882e30f` 仅 STEP[9] 六红已读；623 已签收。

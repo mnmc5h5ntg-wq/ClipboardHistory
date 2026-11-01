@@ -8641,3 +8641,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：Esc 是系统级的「取消/关掉」键，比自造组合键更像平台；不消费提示的自动消失仍不做（D-531），Esc 是显式确认的键盘路径。
 - 兼容性/迁移：不新增 defaults 键；确认仍走 `acknowledgeCollapseHint`（写 `mainWindowCollapseHintAcknowledged`）；帧基线不变。
 - 边界：没有在活 App 上按 Esc 去消费一次性提示（避免替用户改写 defaults），新值按键本身具名 `HINT_ESC_LIVE_NOT_RUN=defaults-preserved`；源码段判据 + M1410 只钉接线。
+
+## D-534 折叠提示的键盘激活用 Return（与 Esc 并存），Tab 焦点/行右键菜单不成立（R535）
+
+- 背景：R534 的 Esc 已能从键盘关提示；真机旧值按 Return 不写确认键（0/0）。另两个候选被真机证伪：`.focusable` 只把整个内容视图变成 AXGroup 停靠点，Tab 链仍没有 AXButton；行 `.contextMenu` 被系统文本菜单盖住。
+- 决定：给「知道了」再挂 `.keyboardShortcut(.return, modifiers: [])`，与 Esc 并存；不改自动消失（D-531），不改提示布局/像素。Tab 焦点与行右键菜单**不作为本轮交付**，分别开 BACKLOG 625/626，后续要走 AppKit key-view 与 Text/cell 层菜单。
+- 理由：Return 是系统默认按钮语义，且不依赖 key-view 链重建；一次性提示的两种显式键盘路径（Esc 关、Return 确认）足够覆盖键盘用户。
+- 兼容性/迁移：确认仍走 `acknowledgeCollapseHint`（写 `mainWindowCollapseHintAcknowledged`）；无新 defaults 键；帧基线不变。
+- 边界：新值真机按键未演（不消费一次性提示），具名 `HINT_RETURN_LIVE_NOT_RUN=defaults-preserved`；源码段判据 + M1411 只钉接线。

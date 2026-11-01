@@ -10755,6 +10755,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R531）：本机按 runner 同条件（`CLIPBOARD_HISTORY_UI_INTERACTION=1`）有界跑 4 次：worst **97.9 / 57.8 / 60.6 / 61.2ms**、超锚点 **0**、比值 2.390/1.716/2.293/2.336（预算 3.00）、n=199/206/204/204。runner `9b9cf56` 的 loaded_p95=27.83、比值 1.670（p95 绿），但 worst=**544.1ms**、超锚点 **2/173** ⇒ 本机未复现，具名 **FRAME_INTERVAL_FLAKE=runner-loaded-2of173-544.1ms-local-max-97.9ms**；120ms 阈值与容差 1 颗不动，不销单。
     复查（R533）：网络两路断开，无新 STEP[18]；120ms 与容差不动。
     复查（R534）：`df43baa` 的 STEP[18] 读到 **162.2ms**、超锚点 **2/208**（容差 1），loaded_p95=16.67、比值 1.000 ⇒ 622 再现（比 544.1ms 低，仍是少数帧超锚点）；120ms 与容差不动，不销单。
+    复查（R535）：本轮五跑未读（in_progress），最近仍是 `df43baa` 的 162.2ms/2/208；120ms 与容差不动。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10777,3 +10778,14 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R533 收口）：网络恢复后读到 `882e30f` STEP[9] 仍红在 skip_roster（同跑 6 红，另 5 条为台账时序）；`df43baa`/`039413e`/`76cbd63` 未读 ⇒ 非台账笔红的形态继续，保持开单。
     复查（R534）：`df43baa`（台账笔）STEP[9] 绿；`882e30f`（非台账笔）STEP[9] 仍红在 skip_roster ⇒ 非台账笔红/台账笔绿两臂继续；不改名册，保持开单。
     复查（R534 收口）：`039413e`（台账/收口笔）**success**，STEP[9] 绿；`882e30f`（非台账笔）STEP[9] 红 ⇒ 两臂继续。
+    复查（R535）：`882e30f`（非台账笔）红、`df43baa`/`039413e`（台账/收口笔）绿；两臂继续，不改名册。
+
+**625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
+    现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
+    现状：简单修饰符买不到按钮可达性（与 R194 的筛选段同族）；产品改动已撤回，R534 的 Esc 与 R535 的 Return 仍是键盘路径。
+    下一步：走 AppKit key-view（真实 NSButton / 显式 keyView 链）或在 List 宿主层重排 key-view；不要再用 `.focusable` 空买。
+
+**626. 行 `.contextMenu` 被系统文本菜单盖住**（R535 现读）
+    现象：给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）后，真机在正文与行尾两次右键都弹 117×165 的系统文本菜单（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。
+    现状：产品与配套判据一并撤回（不让源码判据冒充真机交付）；旧值 Sources 里 `.contextMenu` 0 次。
+    下一步：在 Text/cell 层替换菜单，或 macOS 13 的 List `.contextMenu(forSelectionType:)` / AppKit NSMenu；先做真机右键读数再落产品。
