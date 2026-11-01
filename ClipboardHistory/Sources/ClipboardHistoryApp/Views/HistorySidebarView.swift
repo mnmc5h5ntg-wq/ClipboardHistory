@@ -167,6 +167,8 @@ struct HistorySidebarView: View {
                 // R534：旧值真机折叠 420×492 下按 Esc，确认键前后都未写 ⇒ 提示只能鼠标关。
                 // 一次性的提示不该把人困在鼠标上：Esc 是系统关闭语义，只在提示可见时挂。
                 .keyboardShortcut(.cancelAction)
+                // R535：真机旧值折叠 420×492 下按 Return，确认键前后都未写 ⇒ 再加 Return 激活。
+                .keyboardShortcut(.return, modifiers: [])
                 .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
                               hoverLevel: VisualFill.controlHover,
                               labelPadding: 3)

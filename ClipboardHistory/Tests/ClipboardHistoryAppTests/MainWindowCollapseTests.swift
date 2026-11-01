@@ -428,7 +428,7 @@ final class MainWindowCollapseTests: XCTestCase {
     /// R534：折叠提示要能从键盘关掉（Esc）。
     /// 旧值：真机折叠 420×492 下按 Esc，`mainWindowCollapseHintAcknowledged` 前后都未写 ⇒
     /// 一次性提示只能鼠标点「知道了」。这条切源码段钉住 `.keyboardShortcut(.cancelAction)`。
-    func testCollapseHintCanBeDismissedWithEscape() throws {
+    func testCollapseHintCanBeDismissedFromTheKeyboard() throws {
         let sidebar = try productSource("Views/HistorySidebarView.swift")
         guard let start = sidebar.range(of: "private var collapseHintLine: some View {"),
               let end = sidebar.range(of: "private var headerRow: some View {",
@@ -442,6 +442,8 @@ final class MainWindowCollapseTests: XCTestCase {
                       "「知道了」没有接确认动作")
         XCTAssertTrue(hint.contains(".keyboardShortcut(.cancelAction)"),
                       "「知道了」不能从键盘关闭（Esc）⇒ 一次性提示只能鼠标关")
+        XCTAssertTrue(hint.contains(".keyboardShortcut(.return, modifiers: [])"),
+                      "「知道了」不能从键盘激活（Return）⇒ 键盘用户只能靠 Esc 或鼠标")
     }
 
     private func productSource(_ relative: String) throws -> String {
