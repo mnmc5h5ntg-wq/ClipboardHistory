@@ -10760,6 +10760,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536 收口）：`5bcbd7a` STEP[17] Capture gate 红在 `testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **code-block 半再现（第二次；a71a74c 第一次）**，按退场条件开定位；frame-interval 半仍等新 STEP[18]；不销单。
     复查（R537）：本机 `testCodeBlocksShowTheirLanguage` 10/10 不复现；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。产品改为具体 **Menlo-Bold** 缓存字体（M1413 钉住），但本机不能复现 ⇒ **code-block 半仍待 runner 签收、不销单**；frame-interval 半本轮 `eec86a3` 再读 **175.8ms/2/203**（544.1→162.2→175.8），120ms 与容差不动。
     复查（R537 收口）：`5837d65` 的 STEP[18] 读到 **243.2ms/2/189**（loaded_p95=22.97、比值 0.886）⇒ 622 第四值（544.1→162.2→175.8→243.2），仍是少数帧超锚点；120ms 与容差不动。code-block 半仍待 `21a5440` 新跑签收。
+    复查（R538）：`21a5440`/`b707811`/`8cef540`/`085e4c7`/`9e78221` 读时均 in_progress ⇒ **code-block 半仍没有任何含 `21a5440` 的结论跑**，保持开单；frame 半最近仍是 `5837d65` 的 **243.2ms/2/189**，120ms 与容差不动。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10787,6 +10788,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536 电池）：本地首跑也红在 skip_roster「内层没有结论行」（同卷另一红是新 `print` 15≠16，已改 XCTAttachment）；复跑 683/5 ⇒ 624 的间歇性在本机也出现一次，两臂都记。
     复查（R537）：`eec86a3` STEP[18] 为 frame-interval，无 skip_roster 新读数；非台账笔红/台账笔绿与本地电池偶发一次继续记。
     复查（R537 收口）：skip_roster 在 `5837d65`/`67437eb` 红、在 `e3e0893` 绿（后者整跑 success）；同批 STEP[9] 的裸 stdout 红是 R536 的旧 print，已由 e3e0893 的 XCTAttachment 修好并签收。两臂继续。
+    复查（R538）：本轮五跑 in_progress，无新两臂读数；非台账笔红/台账笔绿继续记，保持开单。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
@@ -10794,12 +10796,14 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     下一步：走 AppKit key-view（真实 NSButton / 显式 keyView 链）或在 List 宿主层重排 key-view；不要再用 `.focusable` 空买。
     复查（R536）：换成真实 AppKit NSButton 并在 viewDidMoveToWindow/layout 手动插入 key-view 链后，单测 24 站仍 `HINT_KEYVIEW_REACHED=0`，真机折叠 420×492 连按 8 次 Tab 仍只在 AXTextField/AXOutline 循环。AppKit 按钮本身（AXButton/焦点环/Return/Esc/鼠标）已落产品，但 **Tab 链仍未打通** ⇒ 625 保持开单；下一步查 SwiftUI 宿主对 key-view 的所有权（可能需要关 autorecalculatesKeyViewLoop 或自建 keyView 链）。
     复查（R537）：无新 Tab 链读数；AppKit 按钮/焦点环保留，Tab 0/8 与 0/24 仍有效；625 保持开单。
+    复查（R538）：本轮未动 Tab 链（产品落在 626），无新读数；AppKit 按钮/焦点环保留，Tab 0/8 与 0/24 仍有效；625 保持开单。
 
 **626. 行 `.contextMenu` 被系统文本菜单盖住**（R535 现读）
     现象：给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）后，真机在正文与行尾两次右键都弹 117×165 的系统文本菜单（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。
     现状：产品与配套判据一并撤回（不让源码判据冒充真机交付）；旧值 Sources 里 `.contextMenu` 0 次。
     下一步：在 Text/cell 层替换菜单，或 macOS 13 的 List `.contextMenu(forSelectionType:)` / AppKit NSMenu；先做真机右键读数再落产品。
     复查（R537）：无新右键读数；系统文本菜单仍会盖住行菜单，626 保持开单。
+    复查（R538）：**本机已落地**——菜单从行内容 `.contextMenu` 改挂 `List` 的 `.contextMenu(forSelectionType:)`（macOS 13+）。真机两行右键：菜单层窗口 **58×58**（旧值 117×165 系统文本菜单）；AX `<AXMenu>` 3 项 = 复制 enabled / 收藏 enabled / 分隔符 disabled；未点菜单项。`RowContextMenuTests` 3 条 + M1414 CAUGHT。runner `9e78221` 未出结论 ⇒ **保持开单、待 runner 签收**。
 
 **627. runner 1x 回执动效只有 1 个过渡帧（Motion floor 未登记红）**（R535 收口现读）
     现象：`8b1ddb9` 的 STEP[19] 唯一失败是 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`：1x 只有 1 个过渡帧（要求 ≥2）⇒ 回执是硬切；同一跑 `MOTION_GATE_RESULT=ok`、`MOTION_FLOOR_FACTS judged=5/5 executed=77`，另 `testNativeRowMoveIsVisibleToTheRuler` 是已登记红。`adb50c1` 也出现过同一条（STEP[15]+[19]）。
@@ -10808,3 +10812,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536）：本轮五跑尚未出结论，627 无新出现率读数；≥2 帧地板不动。
     复查（R537）：`eec86a3` 的 Motion floor `judged=5/5 executed=77 红=-`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
     复查（R537 收口）：`5837d65` 的 Motion floor 是 `judged=4/5 not-run=notice-banner 红=-`，627 仍未再现，保持开单等出现率。
+    复查（R538）：本轮五跑 in_progress，无 Motion floor 新读数；627 未再现，≥2 帧地板不动，保持开单等出现率。

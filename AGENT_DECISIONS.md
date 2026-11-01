@@ -8665,3 +8665,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：崩溃栈落在字体属性处理，不在颜色/文本；具体命名字体有稳定描述符，缓存消除重复创建。本机无法复现，所以这是**栈定位后的字体位处理**，不冒充「已修好」——622 保持开单，等 runner 新跑签收。
 - 兼容性/迁移：代码标签字形/宽度略有变化（6 张代码标签帧变化，基线保持 350）；`CodeLanguageTagFontTests` 钉 fontName/缓存，M1413 钉字体不能被换成非等宽。
 - 边界：本机 10/10 不复现，无法用本地复现证明修复；622 的 frame-interval 半（175.8ms/2/203 第三次）与 code-block 半分开记账，阈值不动。
+
+## D-537 行右键菜单改由 List 选区层接管（R538）
+
+- 背景：626 的旧值——把 `.contextMenu` 挂在行内容上时，真机右键被 `NSTableView` 的 Text/cell 系统文本菜单盖住（两次 117×165：撤销/重做/剪切/复制/粘贴/全选），应用自己的两项根本没机会出现。R535 的产品与源码判据因此一并撤回（不让源码判据冒充真机交付）。
+- 决定：改用 macOS 13+ 的 `List` 级 `.contextMenu(forSelectionType: HistoryStore.Entry.ID.self)`，菜单内容由 `RowContextMenu` 纯模型给出（复制/收藏），按钮经 `historyStore.perform(.copyAndPromote)` / `.toggleFavorite` 落到产品入口；macOS 12 没有该 API，保持无菜单。
+- 理由：右键所有权在列表层（`NSTableView`），行内容的文本菜单不再抢事件；菜单项标题/符号与 `FavoriteTogglePresentation` 同源，收藏文案不会两处漂移。
+- 兼容性/迁移：菜单只在行上出（详情文本自己的右键不受影响）；macOS 12 行为与旧版一致（无应用菜单）；不改任何键盘路径与选中语义。
+- 边界：本轮只做单条行菜单（多选时取 `filteredEntries` 里第一个命中项），不宣称批量动作；真机两行读数已留，但 runner `9e78221` 未出结论 ⇒ 626 保持开单、等签收。

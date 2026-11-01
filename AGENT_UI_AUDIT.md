@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 537 轮（R538 · 2026-11-01 · U-2222…U-2228）：行右键菜单改由列表选区层接管（626 本机落地）（产品 2 文件 + 判据）
+
+- **U-2222：⓪ CI。** HEAD=origin=`8cef540`、ahead=0；网络通。`41308835299 ↔ 21a5440`、`41309008989 ↔ b707811`、`41309189054 ↔ 8cef540` 读时 **in_progress ⇒ NOT-RUN**（三跑都没有失败步骤可列）。已收口：`94dfa27`/`f271cc4`/`e3e0893` **success**；`67437eb` 仅 STEP[9]；`5837d65` STEP[9]+[18]（frame **243.2ms/2/189** ⇒ 622 第四值）；`5bcbd7a` STEP[17] code-block（622 第二次）。**622 code-block 半不能签收**：读时没有任何含 `21a5440` 的新跑出结论；frame 半仍记 243.2ms/2/189，120ms 与容差不动。
+- **U-2223：① 626 旧值与真机读数。** 旧值（R535）：行内容 `.contextMenu` 被 Text/cell 的系统文本菜单盖住，真机两次右键都弹 **117×165**（撤销/重做/剪切/复制/粘贴/全选）。本轮把菜单改挂 `List` 的 `.contextMenu(forSelectionType: HistoryStore.Entry.ID.self)`（macOS 13+；`RowContextMenu` 模型 + 复制/收藏两个按钮；macOS 12 保持无菜单）。换装后真机只读（PID 73364、750×492）两行右键：菜单层窗口 **58×58 @ (451,414)** 与 **(451,494)**；AX 读数 `<AXMenu>` 3 项 = 复制 enabled / 收藏 enabled / 分隔符 disabled，不再是系统文本菜单。**未点任何菜单项**（复制/收藏都不执行），不碰删除/清空/退出。
+- **U-2224：② 判据与刀。** 新增 `RowContextMenuTests` 3 条：标题/符号与 `FavoriteTogglePresentation` 同源、`perform` 路由 copy/favorite、源码用 `contextMenu(forSelectionType:)` 且两个按钮都走 `RowContextMenu.perform`；`M1414`（把「复制」错接到收藏闭包）**CAUGHT、RESTORE_CLEAN=yes**；预检 **317/294/755 bad=0**、ARM **410/1242**（dupes=0 repeats=0）、HIDDEN **404/1181 rot=0**；build **0 告警**。
+- **U-2225：③ 帧卷。** 捕获 **350 帧**：`CHANGED=0 ADDED=0 MISSING=0`，基线保持 **350**（系统菜单是弹出层，不进夹具帧；本轮的真实视觉证据是两张真机右键截图 + AX 菜单项读数）。
+- **U-2226：④ 八步与电池。** build 0 告警；全量 **1383/56/0（584.7s）**（R537 的 1380 + 本轮 3 条新判据；本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 73364；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 537，`python3 scripts/product_streak.py --streak-for 537` 现读，last=21a5440/536）。附注：换装后前台有一条系统 TCC 提示「时间剪史想访问桌面文件夹」（UserNotificationCenter），**未授权、未点按**；提示在前台时行菜单仍能打开（不是 app-modal），不阻断探针。
+- **U-2227：⑤ 622/624/625/626/627。** 622 code-block 半仍等含 `21a5440` 的新跑（本轮五跑 in_progress）；frame 半最近 243.2ms/2/189、阈值不动。624 本轮无新两臂读数（五跑 in_progress），保持开单。625 本轮未动 Tab 链（产品落在 626），Tab 0/8 与 0/24 仍有效、保持开单。626 本机已落地（旧 117×165 系统菜单 → 新 58×58 两项 + AX 3 项），但 `9e78221` 未出结论 ⇒ **保持开单、待 runner 签收**。627 本轮五跑无 Motion floor 新读数，≥2 帧地板不动。
+- **U-2228：⑥ 收口与交接。** 产品笔 `9e78221` 已推（HEAD=origin、ahead=0）。收口时 `41310819996 ↔ 9e78221`、`41309333668 ↔ 085e4c7`、`41309189054 ↔ 8cef540`、`41309008989 ↔ b707811`、`41308835299 ↔ 21a5440` 均 **in_progress ⇒ NOT-RUN**。下一轮 R539（第 538 轮 / Round 536）：先 push 并复核 ahead=0；读这五跑的全部失败步骤；622 的 code-block 只在含 `21a5440` 或更新、且不再抛 `NSInvalidArgumentException` 的跑才可签收；626 等 `9e78221` 跑签收 `RowContextMenuTests`；625/627/624 继续；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 536 轮（R537 · 2026-11-01 · U-2215…U-2221）：代码语言标签改具体缓存字体（622 code-block 定位）（产品 1 文件 + 判据）
 
 - **U-2215：⓪ CI。** HEAD=origin=`f271cc4`、ahead=0；网络通。`5837d65`/`67437eb`/`e3e0893`/`f271cc4` 读时 **in_progress ⇒ NOT-RUN**；`eec86a3` failure **仅 STEP[18]**：`testFrameIntervalsUnderStateChanges` 最差 **175.8ms**、超锚点 **2/203**（loaded_p95=16.67、比值 1.000）⇒ **622 第三次**（544.1→162.2→175.8），120ms 与容差不动；同跑 Motion floor `judged=5/5 executed=77 红=-`（627 未再现）。`789f642` **success**；`a2579fd` 仅 STEP[9]；`5bcbd7a` STEP[17] 的 code-block 崩溃（`ChineseTextContextMenu.swift:653`）为 622 第二次。

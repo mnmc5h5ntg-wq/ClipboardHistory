@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 行右键菜单改由列表选区层接管（R538 / 第 537 轮 / Round 535 / U-2222…U-2228 · 产品 2 文件 + 判据）
+
+旧值：行 `.contextMenu` 被 Text/cell 的系统文本菜单盖住（真机 117×165：撤销/重做/剪切/复制/粘贴/全选）。改为 `List` 的 `.contextMenu(forSelectionType:)`（macOS 13+），由 `RowContextMenu` 提供复制/收藏两项，macOS 12 保持无菜单。真机两行右键读数：菜单层窗口 58×58、AX 菜单 3 项（复制/收藏 enabled）；新增 3 条判据与 M1414；帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431。626 待 runner 签收。
+
 ### 代码语言标签改具体缓存字体（R537 / 第 536 轮 / Round 534 / U-2215…U-2221 · 产品 1 文件 + 判据）
 
 622 的 code-block 崩溃栈指向 CoreText `TAttributes::ApplyFont` 的字体描述符拷贝；本机 10/10 不复现。`CodeLanguageTag.font` 由系统等宽字体改为具体 PostScript 名的 `nonisolated(unsafe) static let Menlo-Bold`（系统等宽兜底），描述符具体、生命周期稳定。新增字体判据与 M1413；帧 350（CHANGED=6 代码标签帧）；全量 1380/56/0；换装 431=431。622 待 runner 签收。
