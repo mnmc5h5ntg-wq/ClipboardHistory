@@ -12,8 +12,8 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R549 / 第 548 轮 / Round 546）
-## R550 开工 ⓪（2026-11-02 · 第 549 轮 / Round 547）
+最后更新：2026-11-02（本地 · R550 / 第 549 轮 / Round 547）
+## R550 状态（2026-11-02 · 第 549 轮 / Round 547 · 产品 1 文件 + 判据）
 
 R550 ⓪ 读数（只登记、不轮询）：HEAD=origin=`181b022`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **354**、全量 **1388/56/0（686.6s）**、预检 **328/295/757 bad=0**、ARM **421/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 548）。
 - 两跑读时 **queued/in_progress ⇒ NOT-RUN**：`41354330740 ↔ bb948db`（台账）、`41354387000 ↔ 181b022`（补记二）；queued/in_progress 不算成功。
@@ -23,6 +23,11 @@ R550 ⓪ 读数（只登记、不轮询）：HEAD=origin=`181b022`、ahead=0、`
 - `41337616903 ↔ 30c7913` failure **仅 STEP[15]**：PerfBudget 274.93ms + 录制帧 dark 9457px（文档笔的 runner flake）；`41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：SelectionReveal 会话 flake。
 - 本轮靶：② 换新类别、产品面且读数必须变——R546 登录失败图标、R547 默认行锁图标、R548 250pt 批量标题、R549 无序列表项目符号四处都不得再动；从 BACKLOG 挑一个未结、可本机落地的产品视觉位，先量旧值（像素/几何/帧数至少一项），改后同一套读数必须变好，否则本轮内撤回换下一个；三条件=独立像素/几何对比 + 逐张看新帧 + 录制帧确定性不新红；图标/符号/字体/控件形状/文字布局改动要同笔查旧刀腐烂、重钉并把新帧登记盲区名册。`.receipt 0.20`、`contentFade 0.20`、emphasis 0.16 不动；624 名册不改；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1429** 起。落台账前先自检 `## R550` 节存在。
 
+① 提示键名：`QuickPickKeyboardHint.text` 的「esc 关闭」改「Esc 关闭」；`Esc` 子串 cap height 5.99→7.85pt（+31%）、宽 5.13→5.22pt，字号/颜色/布局不动。
+② 判据/刀：新 `QuickPickKeyboardHintTests.testCloseKeyUsesAnUppercaseKeyNameWithReadableCaps`（含大写键名、`HINT_KEY_CAPS` 7.85pt ≥7pt）；`M1429` 退回小写 CAUGHT、RESTORE_CLEAN；预检 329/295/757 bad=0、ARM 422/1244、HIDDEN 410/1183 rot=0；build 0 告警；录制确定性 10/10 diff=0。
+③ 帧/全量/换装/电池/清账/streak：帧 **354→354**（CHANGED=26：所有含提示行的 `quickpick-*` 帧亮/暗；ADDED=0）；全量 **1389/56/0（708.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 48908）；电池 **691/5**（台账后复跑）；清账 162/162/0；产品面连续零改动 **1** 轮（as-of 549，`python3 scripts/product_streak.py --streak-for 549` 现读）。
+④ 622/624/627/629：622 frame 新值 196.7ms/2（具名 runner 负载 flake，120ms/容差不动）；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案；BACKLOG 630 同轮结案。
+⑤ CI/交接：⓪ 笔 `c88e12a`、产品笔 `bcea7f6`、台账笔随后；`41354330740 ↔ bb948db` queued、`41354387000 ↔ 181b022` in_progress ⇒ NOT-RUN；`41351367430 ↔ deb28a1` 仅 STEP[15]（SelectionReveal）、`41351231883 ↔ a210a29` STEP[18]+[19]（frame 196.7ms/2、markdown 1x=1）、`41350830308 ↔ f0e9ea0` 仅 STEP[9]（skip_roster+sources）、`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal）；`41351210379 ↔ 19d33b5` success。下一轮 R551（第 550 轮 / Round 548）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `bb948db`/`181b022`/`deb28a1`/`a210a29`/`f0e9ea0` 与已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R549 状态（2026-11-02 · 第 548 轮 / Round 546 · 产品 1 文件 + 判据）
 
 R549 ⓪ 读数（只登记、不轮询）：HEAD=origin=`a210a29`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **352**、全量 **1387/56/0（689.4s）**、预检 **327/295/757 bad=0**、ARM **420/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 547）。

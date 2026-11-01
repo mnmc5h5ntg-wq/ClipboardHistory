@@ -363,6 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 549 轮（R550 · 2026-11-02 · U-2327…U-2334）：浮层键盘提示关闭键改大写 Esc（产品 1 文件 + 判据）
+
+- **U-2327：⓪ CI。** HEAD=origin=`181b022`、ahead=0、`git push` no-op；api=200/apple=200。`41354330740 ↔ bb948db` 读时 **queued**、`41354387000 ↔ 181b022` **in_progress** ⇒ 均 NOT-RUN；queued/in_progress 不算成功。`41351367430 ↔ deb28a1` 仅 STEP[15]（SelectionReveal 会话 flake）、`41351231883 ↔ a210a29` STEP[18]+[19]（frame **196.7ms/2**、markdown 1x=1）、`41350830308 ↔ f0e9ea0` 仅 STEP[9]（skip_roster+sources 时序）、`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal）；`41351210379 ↔ 19d33b5` success。
+- **U-2328：② 提示关闭键改大写。** `QuickPickKeyboardHint.text` 由「↑↓ 选择 · ↵ 粘贴 · esc 关闭」改成「… · Esc 关闭」；全 App 其它提示统一用「Esc」，小写键名像普通单词。纯几何读数：`Esc` 子串 cap height **5.99→7.85pt**（+31%）、宽 5.13→5.22pt；字号 11pt 不变。
+- **U-2329：② 判据/刀/预检。** 新判据 `QuickPickKeyboardHintTests.testCloseKeyUsesAnUppercaseKeyNameWithReadableCaps`：提示必须含「Esc 关闭」且不含「esc 关闭」，`Esc` 子串墨高 ≥7pt；`HINT_KEY_CAPS 高=7.85pt 宽=5.22pt`。`M1429`（退回小写）**CAUGHT、RESTORE_CLEAN=yes**；预检 **329/295/757 bad=0**、ARM **422/1244**（dupes=0 repeats=0）、HIDDEN **410/1183 rot=0**；build **0 告警**；提示文案没有旧刀锚点，无需重钉。
+- **U-2330：③ 帧/录制。** 重捕：CHANGED=**26**（所有含提示行的 `quickpick-*` 帧亮/暗）、MISSING=0、ADDED=0，基线 **354→354**；逐张看 `quickpick-list` 提示行：`Esc` 与中文 cap height 齐平、行未移位。录制帧确定性 **10/10 diff=0**。
+- **U-2331：③④ 全量/换装/电池/清账/streak。** 全量 **1389/56/0（708.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 48908、1 窗口 750×492）；清账 **162/162/0**；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 549，`python3 scripts/product_streak.py --streak-for 549` 现读）。
+- **U-2332：⑤ 622/624/627/629/628/625/626。** 622 第七值 176.6ms/2/204、本轮 frame 新值 **196.7ms/2**（具名 runner 负载 flake，120ms/容差不动）；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案。
+- **U-2333：⑤ BACKLOG 630 新开并结案。** 提示小写 `esc` 是本轮新发现的产品排版位（不是既有开单）；新开 630 记录现象/读法/判据，同轮结案。
+- **U-2334：⑥ 收口与交接。** ⓪ 笔 `c88e12a`、产品笔随后；下一轮 R551（第 550 轮 / Round 548）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `bb948db`/`181b022`/`deb28a1`/`a210a29`/`f0e9ea0` 与其余已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 548 轮（R549 · 2026-11-02 · U-2319…U-2326）：无序列表项目符号换中等点（产品 1 文件 + 判据）
 
 - **U-2319：⓪ CI。** HEAD=origin=`a210a29`、ahead=0、`git push` no-op；api=200/apple=200。三跑读时 **in_progress ⇒ NOT-RUN**：`41350830308 ↔ f0e9ea0`、`41351210379 ↔ 19d33b5`、`41351231883 ↔ a210a29`；queued/in_progress 不算成功。`41347708887 ↔ a7349c0`、`41347728673 ↔ 6d473a4` 均 **success（0 失败步）**；`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）。

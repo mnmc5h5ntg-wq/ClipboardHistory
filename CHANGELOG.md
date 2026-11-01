@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层键盘提示关闭键改大写 Esc（R550 / 第 549 轮 / Round 547 / U-2327…U-2334 · 产品 1 文件 + 判据）
+
+`QuickPickKeyboardHint.text` 由「↑↓ 选择 · ↵ 粘贴 · esc 关闭」改成「… · Esc 关闭」。`Esc` 子串 cap height 5.99→7.85pt（+31%）、宽 5.13→5.22pt；新判据 `HINT_KEY_CAPS` 要求含大写键名且墨高 ≥7pt；M1429 CAUGHT。帧 CHANGED=26（含提示行的浮层帧亮/暗），基线 354→354；录制确定性 10/10 diff=0；全量 1389/56/0；换装 431=431；电池 691/5；BACKLOG 630 同轮结案。
+
 ### 无序列表项目符号换中等点（R549 / 第 548 轮 / Round 546 / U-2319…U-2326 · 产品 1 文件 + 判据）
 
 `MarkdownPresentation.bulletGlyph(depth:0)` 由 `•` 换成同字号更大的 `⦁`（U+2981）。纯几何读数：墨高 2.8→3.9pt，行高 19.0→19.0pt；新判据 `BULLET_INK` 墨高 ≥3.5pt、行高差 ≤0.5pt；M1428 CAUGHT。新夹具 `detail-markdown-bullet`；帧 CHANGED=4、ADDED=2，基线 352→354；录制确定性 10/10 diff=0；全量 1388/56/0；换装 431=431；电池 691/5；BACKLOG 597 结案。

@@ -10864,3 +10864,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R545 补记）：产品侧四杠杆（动画挂载层、contentTransition、2pt 错位过渡、medium 字重）全部证伪或构建受阻，读数均未把 1x 抬到 ≥2；contentFade 0.20 不动，629 继续开单。
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
+
+**630. 浮层键盘提示把关闭键写成小写 `esc`**（R550 发现并同轮结案）
+    现象：`QuickPickKeyboardHint.text` 是「↑↓ 选择 · ↵ 粘贴 · esc 关闭」，而全 App 其它提示统一用「Esc」；11pt 下小写 x-height 5.99pt，键名读起来像普通单词。
+    修法：改「Esc 关闭」；cap height 7.85pt（+31%），宽 5.13→5.22pt；新判据 `HINT_KEY_CAPS`（≥7pt）+ M1429 CAUGHT；含提示行的 26 张浮层帧只差提示行。**同轮结案**。
