@@ -6,9 +6,9 @@ ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILE="Sources/ClipboardHistoryApp/Managers/ClipboardHistoryCommands.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
-  ("M1405","Window 菜单项退回静态标题", FILE,
-   '''            Button(MainWindowCollapsePolicy.menuTitle(collapsed: collapse.isCollapsed)) {''',
-   '''            Button(AppCommand.toggleMainWindowCollapse.title) {'''),
+  ("M1405","Window 菜单项不读折叠状态", FILE,
+   '''                get: { collapse.isCollapsed },''',
+   '''                get: { false },'''),
 ]
 TESTS={"M1405":"MainWindowCollapseTests/testWindowMenuTitleReflectsCollapseState"}
 def run(test):

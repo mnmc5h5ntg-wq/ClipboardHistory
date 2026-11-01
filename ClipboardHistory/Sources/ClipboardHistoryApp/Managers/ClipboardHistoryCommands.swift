@@ -82,9 +82,13 @@ private struct ClipboardHistoryWindowCommands: Commands {
         // R525：折叠/展开以前只在状态菜单里 —— 应用在前台时 Window 菜单里找不到，
         // 也没有键盘键。这里补一个应用菜单项 + ⌘\，与状态菜单共用同一个 command dispatch。
         CommandGroup(after: .windowArrangement) {
-            // R529：标题随状态切换（展开→「折叠窗口」、折叠→「展开窗口」），同一 perform dispatch。
-            Button(MainWindowCollapsePolicy.menuTitle(collapsed: collapse.isCollapsed)) {
-                appDelegate.perform(.toggleMainWindowCollapse)
+            // R530：用 Toggle 让 Window 菜单项带勾选（勾=当前处于折叠态），标题仍随状态切换；
+            // set 不采用新值，统一丢给 perform(.toggleMainWindowCollapse)（同一 dispatch + ⌘\\）。
+            Toggle(isOn: Binding(
+                get: { collapse.isCollapsed },
+                set: { _ in appDelegate.perform(.toggleMainWindowCollapse) }
+            )) {
+                Text(MainWindowCollapsePolicy.menuTitle(collapsed: collapse.isCollapsed))
             }
             .keyboardShortcut("\\", modifiers: .command)
         }

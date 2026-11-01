@@ -268,8 +268,37 @@ final class MainWindowCollapseTests: XCTestCase {
                       "Window 菜单项标题没有跟折叠状态走")
         XCTAssertTrue(commands.contains("appDelegate.perform(.toggleMainWindowCollapse)"),
                       "Window 菜单项没有走同一个折叠 dispatch")
+        XCTAssertTrue(commands.contains("Toggle(isOn: Binding("),
+                      "Window 菜单项不是可勾选的 Toggle ⇒ 看不出当前折叠态")
+        XCTAssertTrue(commands.contains("get: { collapse.isCollapsed }"),
+                      "Toggle 的勾选没有读当前折叠态")
         XCTAssertFalse(commands.contains("Button(AppCommand.toggleMainWindowCollapse.title)"),
                        "Window 菜单项又退回静态标题")
+    }
+
+    /// R530：折叠/展开不许把列表选区弄丢。选区住在 store（`selectedEntryIDs`），
+    /// 折叠只换布局；这里从产品入口切两态并现读 store。
+    func testSelectionSurvivesCollapseAndExpand() {
+        setUpProduct()
+        defer { tearDownProduct() }
+        retireAllMainWindows()
+        guard makeVisibleWindow() != nil else { return }
+        store.add(
+            ClipboardIntake.Entry(content: .text("选区保持夹具"), thumbnail: nil,
+                                  sourceUTIs: ["public.utf8-plain-text"]),
+            timestamp: Date(timeIntervalSince1970: 1_800_000_000)
+        )
+        guard let entry = store.entries.first else { return XCTFail("夹具没有条目") }
+        store.perform(.selectOnly(entry))
+        XCTAssertEqual(store.selectedEntryIDs, [entry.id])
+
+        delegate.perform(.toggleMainWindowCollapse)
+        settleTransition()
+        XCTAssertEqual(store.selectedEntryIDs, [entry.id], "折叠把选区丢了")
+
+        delegate.perform(.toggleMainWindowCollapse)
+        settleTransition()
+        XCTAssertEqual(store.selectedEntryIDs, [entry.id], "再展开把选区丢了")
     }
 
     private func productSource(_ relative: String) throws -> String {
