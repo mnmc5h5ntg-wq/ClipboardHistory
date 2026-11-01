@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 代码语言标签改具体缓存字体（R537 / 第 536 轮 / Round 534 / U-2215…U-2221 · 产品 1 文件 + 判据）
+
+622 的 code-block 崩溃栈指向 CoreText `TAttributes::ApplyFont` 的字体描述符拷贝；本机 10/10 不复现。`CodeLanguageTag.font` 由系统等宽字体改为具体 PostScript 名的 `nonisolated(unsafe) static let Menlo-Bold`（系统等宽兜底），描述符具体、生命周期稳定。新增字体判据与 M1413；帧 350（CHANGED=6 代码标签帧）；全量 1380/56/0；换装 431=431。622 待 runner 签收。
+
 ### 折叠提示改 AppKit 按钮与焦点环（R536 / 第 535 轮 / Round 533 / U-2208…U-2214 · 产品 1 文件 + 判据）
 
 「知道了」由 SwiftUI Button 换成真实 AppKit NSButton：AXButton、系统焦点环 + 遮罩、悬停/按压底、Return keyEquivalent、Esc 监听；视觉与原版一致。诚实边界：Tab key-view 链仍未打通（单测 24 站 0、真机 8 站仍只有 TextField/Outline）⇒ 625 保持开单。帧 350（CHANGED=4 提示帧）；全量 1379/56/0；换装 431=431。

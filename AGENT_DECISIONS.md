@@ -8657,3 +8657,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：AppKit 按钮是真实的无障碍对象，焦点环与动作都正确；Tab 链是宿主级问题，继续用 `.focusable`/插入链只会重复 R194/R535 的失败。
 - 兼容性/迁移：视觉帧只变 4 张提示帧（基线保持 350）；Return/Esc/鼠标三种路径都走 `acknowledgeCollapseHint`；PressFeedback 的 SwiftUI 位点退场（labelPadding 3→2、控件档 12→11）。
 - 边界：625 未签收；AppKit 按钮的 Tab 链在 SwiftUI 宿主里仍不可达（真机 8 站/单测 24 站均为 0）。
+
+## D-536 代码语言标签用具体 PostScript 名的缓存字体（R537）
+
+- 背景：622 的 code-block 崩溃第二次出现在 `testCodeBlocksShowTheirLanguage`；本机 10/10 不复现，runner 栈在 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil，位置是字体描述符拷贝；旧值用 `.monospacedSystemFont`（系统 UI 等宽字体）。
+- 决定：`CodeLanguageTag.font` 改为具体 PostScript 名的 **Menlo-Bold**，用 `nonisolated(unsafe) static let` 缓存（系统等宽兜底），避免在测量/绘制路径里反复创建系统 UI 字体的惰性描述符。
+- 理由：崩溃栈落在字体属性处理，不在颜色/文本；具体命名字体有稳定描述符，缓存消除重复创建。本机无法复现，所以这是**栈定位后的字体位处理**，不冒充「已修好」——622 保持开单，等 runner 新跑签收。
+- 兼容性/迁移：代码标签字形/宽度略有变化（6 张代码标签帧变化，基线保持 350）；`CodeLanguageTagFontTests` 钉 fontName/缓存，M1413 钉字体不能被换成非等宽。
+- 边界：本机 10/10 不复现，无法用本地复现证明修复；622 的 frame-interval 半（175.8ms/2/203 第三次）与 code-block 半分开记账，阈值不动。

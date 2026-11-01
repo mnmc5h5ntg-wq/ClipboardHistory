@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 536 轮（R537 · 2026-11-01 · U-2215…U-2221）：代码语言标签改具体缓存字体（622 code-block 定位）（产品 1 文件 + 判据）
+
+- **U-2215：⓪ CI。** HEAD=origin=`f271cc4`、ahead=0；网络通。`5837d65`/`67437eb`/`e3e0893`/`f271cc4` 读时 **in_progress ⇒ NOT-RUN**；`eec86a3` failure **仅 STEP[18]**：`testFrameIntervalsUnderStateChanges` 最差 **175.8ms**、超锚点 **2/203**（loaded_p95=16.67、比值 1.000）⇒ **622 第三次**（544.1→162.2→175.8），120ms 与容差不动；同跑 Motion floor `judged=5/5 executed=77 红=-`（627 未再现）。`789f642` **success**；`a2579fd` 仅 STEP[9]；`5bcbd7a` STEP[17] 的 code-block 崩溃（`ChineseTextContextMenu.swift:653`）为 622 第二次。
+- **U-2216：① 622 code-block 定位。** 本机用同路径跑 `testCodeBlocksShowTheirLanguage` **10/10 全过**（不能复现）；runner 崩溃栈：`sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `__NSPlaceholderDictionary initWithDictionary:copyItems:` 插 nil，位置在**字体描述符拷贝**。旧值 `CodeLanguageTag.font` 是 `.monospacedSystemFont`（系统 UI 等宽字体）；产品 **1 文件**改成具体 PostScript 名的 **Menlo-Bold** 并缓存（`nonisolated(unsafe) static let`，系统等宽兜底）。这是栈定位后的字体位处理，**622 仍待 runner 签收，不销单**。
+- **U-2217：② 判据与刀。** 新增 `CodeLanguageTagFontTests.testFontIsConcreteCachedMenloBold`（fontName=Menlo-Bold、静态 let 同一对象）；`M1413`（改 Helvetica）**CAUGHT、RESTORE_CLEAN=yes**；预检 **316/293/754 bad=0**、ARM **409/1241**（dupes=0 repeats=0）、HIDDEN **403/1180 rot=0**；build **0 告警**。**过程自伤**：第一版把新测试写进同名 `CodeLanguageTagTests.swift`，覆盖了 R446 的 6 条旧测试，全量计数从 1379 掉到 1374；按套件对比发现后恢复原文件、字体测试放独立 `CodeLanguageTagFontTests.swift`，重跑 **1380**。
+- **U-2218：③ 帧卷。** 捕获 **350 帧**：`CHANGED=6`（`detail-code`/`detail-code-tabs`/`detail-markdown-rendered` 亮暗）、`ADDED=0 MISSING=0`；基线保持 **350**；SWIFT 标签亮/暗帧逐张看过（Menlo-Bold 下仍可读，位置在代码块右上）。
+- **U-2219：④ 八步与电池。** build 0 告警；全量 **1380/56/0（605.5s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 56889；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 536，`python3 scripts/product_streak.py --streak-for 536` 现读，last=5837d65/535）。
+- **U-2220：⑤ 622/627/624。** 622 的 code-block 半已按字体位修、**待 runner 签收**（本机不能复现）；frame-interval 半记 175.8ms/2/203 第三值，120ms 与容差不动。627 在 eec86a3 未再现（Motion floor 绿），保持开单等出现率。624 非台账笔红/台账笔绿继续；本地电池首跑偶发一次 skip_roster 已记。
+- **U-2221：⑥ 收口与交接。** 产品笔 `21a5440` 已推（HEAD=origin、ahead=0）。下一轮 R538（第 537 轮 / Round 535）：先 push 并复核 ahead=0；读本轮产品/台账跑与 eec86a3 的全部失败步骤；622 的 code-block 若在新跑不再崩才可签收，frame-interval 与 627/624 继续；625/626 开单、623 不重开；继续折叠特性；安全红线不变。
+
 ## 第 535 轮（R536 · 2026-11-01 · U-2208…U-2214）：折叠提示改 AppKit 按钮与焦点环（Tab 链仍未打通）（产品 1 文件 + 判据）
 
 - **U-2208：⓪ CI。** HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`、`41303247255 ↔ 5bcbd7a`、`41303403928 ↔ 789f642` 读时 **in_progress ⇒ NOT-RUN**；`20ceacb`/`d625b47`/`d8c0e44`/`0cce5df`/`76cbd63` 全部 **success**；`8b1ddb9` failure **仅 STEP[19] Motion floor**（回执 1x 1 帧 <2，**627**）；`df43baa` STEP[15]+[18]（**622** 162.2ms/2/208）；624 两臂继续，623 已签收。

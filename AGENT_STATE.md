@@ -12,14 +12,18 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R536 / 第 535 轮 / Round 533）
-## R537 开工 ⓪（2026-11-01 · 第 536 轮 / Round 534）
+最后更新：2026-11-01（本地 · R537 / 第 536 轮 / Round 534）
+## R537 状态（2026-11-01 · 第 536 轮 / Round 534 · 产品 1 文件 + 判据）
 
 R537 ⓪ 读数（只登记、不轮询）：HEAD=origin=`f271cc4`、ahead=0；网络通。`41305195885 ↔ 5837d65`、`41305392230 ↔ 67437eb`、`41305791517 ↔ e3e0893`、`41306124581 ↔ f271cc4` 读时 **in_progress ⇒ NOT-RUN**；`41303561874 ↔ eec86a3` failure **仅 STEP[18]**：`testFrameIntervalsUnderStateChanges` 最差 **175.8ms**、超锚点 **2/203**（loaded_p95=16.67、比值 1.000）⇒ **622 第三次**（544.1 → 162.2 → 175.8），120ms 与容差不动；同跑 `MOTION_FLOOR_FACTS judged=5/5 executed=77 红=-`（Motion floor 绿，627 未再现）。
 - 上轮收口：`789f642` **success**；`a2579fd` failure **仅 STEP[9]**（产品笔早于台账的 sources/streak 时序）；`5bcbd7a` failure **STEP[17] Capture gate**：`testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **622 的 code-block 半第二次再现**。
 - code-block 本机复现：`testCodeBlocksShowTheirLanguage` 连跑 **10/10 全过**；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。622 不销单；本轮按字体位修（具体 Menlo + 缓存）。
 - 624：上轮两臂（非台账笔 882e30f 红、台账/收口笔绿）继续；本地电池首跑偶发一次 skip_roster 已记；623 已签收不重开。
 
+① 622 code-block 定位：本机 `testCodeBlocksShowTheirLanguage` **10/10 全过**（不能复现）；runner 栈 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。旧值 `CodeLanguageTag.font = .monospacedSystemFont`；产品 **1 文件**改为具体 PostScript 名的 **Menlo-Bold**（`nonisolated(unsafe) static let` 缓存，系统等宽兜底）。这是栈定位后的字体位处理，**622 仍待 runner 签收、不销单**；frame-interval 半 `eec86a3` 再读 **175.8ms/2/203**（544.1→162.2→175.8），120ms 与容差不动。
+② 判据/刀：`CodeLanguageTagFontTests.testFontIsConcreteCachedMenloBold`；`M1413` CAUGHT、RESTORE_CLEAN；预检 316/293/754 bad=0、ARM 409/1241、HIDDEN 403/1180 rot=0；build 0 告警。**过程自伤**：第一版覆盖了 R446 的 `CodeLanguageTagTests.swift`（6→1），全量从 1379 掉到 1374；按套件对比发现后恢复原文件、字体测试独立成 `CodeLanguageTagFontTests.swift`，重跑 **1380**。
+③ 帧 **350**：CHANGED=6（detail-code/-tabs/markdown-rendered 亮暗）、ADDED/MISSING=0，基线保持 350；SWIFT 标签亮/暗逐张看过。全量 **1380/56/0（605.5s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 56889；真机只读 1 窗口 750×492）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 536，`python3 scripts/product_streak.py --streak-for 536` 现读，last=5837d65/535）。
+④ 收口：产品笔 `21a5440` 已推（HEAD=origin、ahead=0）；新跑待读。下一轮 R538（第 537 轮 / Round 535）：先 push 复核 ahead=0；622 code-block 若新跑不再崩才可签收，frame-interval/627/624 继续；625/626 开单、623 不重开；继续折叠特性；4.5 地板与 150 上限不动。
 ## R536 状态（2026-11-01 · 第 535 轮 / Round 533 · 产品 1 文件 + 判据）
 
 R536 ⓪ 读数（只登记、不轮询）：HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`（产品）、`41303247255 ↔ 5bcbd7a`（台账）、`41303403928 ↔ 789f642`（收口）读时均 **in_progress ⇒ NOT-RUN**。

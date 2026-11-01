@@ -10758,6 +10758,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R535）：本轮五跑未读（in_progress），最近仍是 `df43baa` 的 162.2ms/2/208；120ms 与容差不动。
     复查（R536）：本轮五跑 in_progress，无新 STEP[18]；最近仍是 df43baa 的 162.2ms/2/208，120ms 与容差不动。
     复查（R536 收口）：`5bcbd7a` STEP[17] Capture gate 红在 `testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **code-block 半再现（第二次；a71a74c 第一次）**，按退场条件开定位；frame-interval 半仍等新 STEP[18]；不销单。
+    复查（R537）：本机 `testCodeBlocksShowTheirLanguage` 10/10 不复现；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。产品改为具体 **Menlo-Bold** 缓存字体（M1413 钉住），但本机不能复现 ⇒ **code-block 半仍待 runner 签收、不销单**；frame-interval 半本轮 `eec86a3` 再读 **175.8ms/2/203**（544.1→162.2→175.8），120ms 与容差不动。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10783,20 +10784,24 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R535）：`882e30f`（非台账笔）红、`df43baa`/`039413e`（台账/收口笔）绿；两臂继续，不改名册。
     复查（R536）：无新两臂读数（五跑 in_progress）；非台账笔红/台账笔绿继续。
     复查（R536 电池）：本地首跑也红在 skip_roster「内层没有结论行」（同卷另一红是新 `print` 15≠16，已改 XCTAttachment）；复跑 683/5 ⇒ 624 的间歇性在本机也出现一次，两臂都记。
+    复查（R537）：`eec86a3` STEP[18] 为 frame-interval，无 skip_roster 新读数；非台账笔红/台账笔绿与本地电池偶发一次继续记。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
     现状：简单修饰符买不到按钮可达性（与 R194 的筛选段同族）；产品改动已撤回，R534 的 Esc 与 R535 的 Return 仍是键盘路径。
     下一步：走 AppKit key-view（真实 NSButton / 显式 keyView 链）或在 List 宿主层重排 key-view；不要再用 `.focusable` 空买。
     复查（R536）：换成真实 AppKit NSButton 并在 viewDidMoveToWindow/layout 手动插入 key-view 链后，单测 24 站仍 `HINT_KEYVIEW_REACHED=0`，真机折叠 420×492 连按 8 次 Tab 仍只在 AXTextField/AXOutline 循环。AppKit 按钮本身（AXButton/焦点环/Return/Esc/鼠标）已落产品，但 **Tab 链仍未打通** ⇒ 625 保持开单；下一步查 SwiftUI 宿主对 key-view 的所有权（可能需要关 autorecalculatesKeyViewLoop 或自建 keyView 链）。
+    复查（R537）：无新 Tab 链读数；AppKit 按钮/焦点环保留，Tab 0/8 与 0/24 仍有效；625 保持开单。
 
 **626. 行 `.contextMenu` 被系统文本菜单盖住**（R535 现读）
     现象：给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）后，真机在正文与行尾两次右键都弹 117×165 的系统文本菜单（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。
     现状：产品与配套判据一并撤回（不让源码判据冒充真机交付）；旧值 Sources 里 `.contextMenu` 0 次。
     下一步：在 Text/cell 层替换菜单，或 macOS 13 的 List `.contextMenu(forSelectionType:)` / AppKit NSMenu；先做真机右键读数再落产品。
+    复查（R537）：无新右键读数；系统文本菜单仍会盖住行菜单，626 保持开单。
 
 **627. runner 1x 回执动效只有 1 个过渡帧（Motion floor 未登记红）**（R535 收口现读）
     现象：`8b1ddb9` 的 STEP[19] 唯一失败是 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`：1x 只有 1 个过渡帧（要求 ≥2）⇒ 回执是硬切；同一跑 `MOTION_GATE_RESULT=ok`、`MOTION_FLOOR_FACTS judged=5/5 executed=77`，另 `testNativeRowMoveIsVisibleToTheRuler` 是已登记红。`adb50c1` 也出现过同一条（STEP[15]+[19]）。
     现状：runner 1x 动效采样 flake，未登记；不降 ≥2 帧地板，不把「这跑没抽中」当修好。
     下一步：在 runner 上做有界重复采样量出现率，再决定登记或修产品；没有出现率之前不销单。
     复查（R536）：本轮五跑尚未出结论，627 无新出现率读数；≥2 帧地板不动。
+    复查（R537）：`eec86a3` 的 Motion floor `judged=5/5 executed=77 红=-`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。

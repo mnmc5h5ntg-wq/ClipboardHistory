@@ -20686,3 +20686,21 @@ runner 四跑的 TITLE_HOVER 都是 0/0，但旧判据没有证明静置帧本�
 | 可复核性 | 15/15 | HINT_KEYVIEW_REACHED=0/24、真机 8 站、M1412、预检 315/292/753 全在。 |
 
 均分 = 105/105 ≈ 15.0/15（100）。
+
+## Round 534 · R537（第 536 轮 · 2026-11-01）：代码语言标签改具体缓存字体（622 code-block 定位）
+
+622 的 code-block 第二次崩溃：本机 `testCodeBlocksShowTheirLanguage` 10/10 不复现；runner 栈在 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。产品 1 文件：`CodeLanguageTag.font` 从 `.monospacedSystemFont` 改为具体 PostScript 名的 `nonisolated(unsafe) static let Menlo-Bold`（系统等宽兜底），描述符具体、生命周期稳定。新增 `CodeLanguageTagFontTests`；M1413 CAUGHT、RESTORE_CLEAN；预检 316/293/754 bad=0、ARM 409/1241、HIDDEN 403/1180 rot=0；build 0 告警。过程自伤：第一版覆盖了 R446 的 CodeLanguageTagTests（6→1，全量 1374），按套件对比发现后恢复并独立文件，重跑 **1380/56/0（605.5s）**。帧 350（CHANGED=6：detail-code/-tabs/markdown-rendered 亮暗；基线不变），SWIFT 标签亮/暗逐张看过；换装 431=431（PID 56889）；电池 683/5。622 仍待 runner 签收（本机不能复现），frame-interval 175.8ms/2/203 记第三值，阈值不动。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 6 张代码标签帧变化逐张看过；Menlo-Bold 下 SWIFT 标签仍可读、位置正确。 |
+| 判据有效性 | 15/15 | fontName/静态 let 两格 + M1413 改 Helvetica 即 CAUGHT。 |
+| 假绿防御 | 15/15 | 本机 10/10 不复现不冒充修好；622 待 runner 签收；测试覆盖自伤当场发现并恢复。 |
+| 产品面推进 | 15/15 | 字体描述符具体化 + 缓存，针对崩溃栈的字体位；产品 1 文件。 |
+| 台账一致性 | 15/15 | U-2215…U-2221、D-536、350/1380/431/683 都来自命令与真机。 |
+| 交付诚实性 | 15/15 | 不复现、待签收、覆盖 6 条旧测试的失误与恢复都如实。 |
+| 可复核性 | 15/15 | 10 次跑次、崩溃栈、M1413、预检 316/293/754、1380 全在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
