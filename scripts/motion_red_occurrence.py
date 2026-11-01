@@ -27,6 +27,26 @@ import sys
 COPY = "testCopyReceiptAppearsAndDismissesWithAVisibleProcess"
 FOLD = "testCollapseWidthIsMeasuredFrameByFrame"
 
+# 已登记的运动红名（每一条都要在 BACKLOG 627/629 或对应条目里找得到）。
+KNOWN_RED = {
+    COPY,
+    "testMarkdownModeLabelChangeIsAVisibleProcess",
+    "testBandCaptureIsCheaperAndStillSeesTheMotion",
+    "testNativeRowMoveIsVisibleToTheRuler",
+}
+
+
+def unregistered_reds(items):
+    """返回 Motion floor 红名里不在 KNOWN_RED 的那些（新红必须先登记，不能匿名混过去）。"""
+    names = set()
+    for item in items:
+        if item["judged"] is None:
+            continue
+        for name in item["judged"][4].split(","):
+            if name and name != "-" and name not in KNOWN_RED:
+                names.add(name)
+    return sorted(names)
+
 
 def scan(text):
     """把一份日志归约成四个读数：copy / fold / motion floor / 帧多段。"""
@@ -81,6 +101,8 @@ def main():
     if not args or args[0] in ("-h", "--help"):
         print(__doc__)
         return 0
+    strict = "--strict" in args
+    args = [a for a in args if a != "--strict"]
     items = []
     for path in args:
         text = read(path)
@@ -114,6 +136,10 @@ def main():
                  loaded, min(ratios), max(ratios)))
     else:
         print("FRAME_MULTI logs=%d with=0 ⇒ NOT_RUN" % z["logs"])
+    if strict:
+        bad = unregistered_reds(items)
+        print("RED_ROSTER unregistered=%d names=%s" % (len(bad), ",".join(bad) or "-"))
+        return 1 if bad else 0
     return 0
 
 

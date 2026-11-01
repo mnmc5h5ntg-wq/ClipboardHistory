@@ -36,6 +36,8 @@ FOLD_SKIP = line("Swift tests (executed-count gate)",
                  "Test Case '-[AppTests.MainWindowFoldMotionTests testCollapseWidthIsMeasuredFrameByFrame]' skipped (0.001 seconds).")
 FLOOR = line("Motion coverage floor",
              "MOTION_FLOOR_FACTS judged=5/5 executed=77 not-run=- summary=x 红的用例=- 汇总行报红=0 机器=github-runner")
+FLOOR_NEW = line("Motion coverage floor",
+                 "MOTION_FLOOR_FACTS judged=5/5 executed=77 not-run=- summary=x 红的用例=testSomethingNew 汇总行报红=1 机器=github-runner")
 FLOOR_RED = line("Motion coverage floor",
                  "MOTION_FLOOR_FACTS judged=5/5 executed=77 not-run=- summary=x 红的用例=testMarkdownModeLabelChangeIsAVisibleProcess 汇总行报红=1 机器=github-runner")
 FPS = line("On-screen interaction probes (report-only)",
@@ -67,6 +69,14 @@ class MotionRedOccurrenceTests(unittest.TestCase):
         self.assertEqual("testMarkdownModeLabelChangeIsAVisibleProcess",
                          occ.scan(FLOOR_RED)["judged"][4], u"红的用例名必须被读出来")
 
+    def test_red_roster_names_only_unregistered_reds(self):
+        known = occ.scan(FLOOR_RED)
+        self.assertEqual([], occ.unregistered_reds([known]))
+        self.assertEqual([], occ.unregistered_reds([occ.scan(FLOOR)]),
+                         u"红的用例=- 是「没有红」，不是未登记红名")
+        bad = occ.scan(FLOOR_NEW)
+        self.assertEqual(["testSomethingNew"], occ.unregistered_reds([bad]))
+
     def test_summary_counts_copy_and_fold_separately(self):
         z = occ.summarize([occ.scan(COPY_RED + FOLD_PASS), occ.scan(COPY_SKIP + FOLD_RED)])
         self.assertEqual(1, z["copy_red"])
@@ -90,6 +100,10 @@ class MotionRedOccurrenceTests(unittest.TestCase):
             self.assertIn("over_runs=1", proc.stdout)
             self.assertIn("loaded_p95_max=46.73", proc.stdout)
             self.assertIn("red=testMarkdownModeLabelChangeIsAVisibleProcess", proc.stdout)
+            strict_ok = subprocess.run([sys.executable, SCRIPT, "--strict", path],
+                                       capture_output=True, text=True)
+            self.assertEqual(0, strict_ok.returncode, strict_ok.stdout + strict_ok.stderr)
+            self.assertIn("RED_ROSTER unregistered=0", strict_ok.stdout)
             missing = subprocess.run([sys.executable, SCRIPT, path + ".missing"],
                                      capture_output=True, text=True)
             self.assertEqual(2, missing.returncode, u"一份日志都没读到必须退 2")
