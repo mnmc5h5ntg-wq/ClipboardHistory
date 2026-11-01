@@ -16,7 +16,12 @@ final class MainWindowFoldMotionTests: XCTestCase {
     private var savedReduceOverride: Bool?
     private var savedAnimationsEnabled: Bool?
 
+    /// R526：真实窗口会经 `WindowConfigurator` 改写全局 `WindowChromeMetrics.shared`；
+    /// 不还原会让同一进程后面渲染的详情帧换掉顶部 inset（runner 的 Swift 全量里真的发生了）。
+    private var savedDetailContentTopInset: CGFloat?
+
     private func setUpProduct(_ name: String = UUID().uuidString) {
+        savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
         defaults = UserDefaults(suiteName: "r524-fold-\(name)")!
         defaults.removePersistentDomain(forName: "r524-fold-\(name)")
         savedReduceOverride = MotionCatalog.overrideReduceMotion
@@ -49,6 +54,9 @@ final class MainWindowFoldMotionTests: XCTestCase {
         if let savedAnimationsEnabled { MotionCatalog.animationsEnabled = savedAnimationsEnabled }
         retireAllMainWindows()
         WindowManager.uninstallMainWindowFactoryForTesting()
+        if let savedDetailContentTopInset {
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedDetailContentTopInset)
+        }
         delegate = nil
         store = nil
         controller = nil

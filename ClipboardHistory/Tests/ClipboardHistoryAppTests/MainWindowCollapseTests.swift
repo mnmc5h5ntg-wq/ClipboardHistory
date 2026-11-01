@@ -12,7 +12,12 @@ final class MainWindowCollapseTests: XCTestCase {
     private var controller: MainWindowCollapseController!
     private var delegate: AppDelegate!
 
+    /// R526：真实窗口会经 `WindowConfigurator` 改写全局 `WindowChromeMetrics.shared`；
+    /// 不还原会让同一进程后面渲染的详情帧换掉顶部 inset（runner 的 Swift 全量里真的发生了）。
+    private var savedDetailContentTopInset: CGFloat?
+
     private func setUpProduct(_ name: String = UUID().uuidString) {
+        savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
         defaults = UserDefaults(suiteName: "r523-collapse-\(name)")!
         defaults.removePersistentDomain(forName: "r523-collapse-\(name)")
         controller = MainWindowCollapseController(defaults: defaults)
@@ -28,6 +33,9 @@ final class MainWindowCollapseTests: XCTestCase {
     private func tearDownProduct() {
         retireAllMainWindows()
         WindowManager.uninstallMainWindowFactoryForTesting()
+        if let savedDetailContentTopInset {
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedDetailContentTopInset)
+        }
         delegate = nil
         store = nil
         controller = nil

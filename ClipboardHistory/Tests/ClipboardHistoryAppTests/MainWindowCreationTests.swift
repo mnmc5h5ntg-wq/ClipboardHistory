@@ -11,7 +11,12 @@ final class MainWindowCreationTests: XCTestCase {
     private var store: HistoryStore!
     private var delegate: AppDelegate!
 
+    /// R526：真实窗口会经 `WindowConfigurator` 改写全局 `WindowChromeMetrics.shared`；
+    /// 不还原会让同一进程后面渲染的详情帧换掉顶部 inset（runner 的 Swift 全量里真的发生了）。
+    private var savedDetailContentTopInset: CGFloat?
+
     private func installProductFactory() {
+        savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
         store = HistoryStore(
             clipboardWriter: TestClipboardWriter(),
             persistence: RecordingHistoryPersistence(),
@@ -25,6 +30,9 @@ final class MainWindowCreationTests: XCTestCase {
     private func tearDownProductState() {
         retireAllMainWindows()
         WindowManager.uninstallMainWindowFactoryForTesting()
+        if let savedDetailContentTopInset {
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedDetailContentTopInset)
+        }
         delegate = nil
         store = nil
     }
