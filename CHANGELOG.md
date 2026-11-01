@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### markdown 专用档被证伪 + 红名登记守卫（R544 / 第 543 轮 / Round 541 / U-2278…U-2286 · 产品 0 文件 + 判据）
+
+markdown 试 `.markdownLabel=0.24`：本机 1x 仍 4（旧 contentFade 0.20 也是 4）⇒ 撤回并写回 629。改做判据：`motion_red_occurrence.py` 增 `KNOWN_RED` 与 `--strict`，44 份日志 `unregistered=0`；M1423 CAUGHT。receipt 0.20 的 copy 半由 8d4a36d/c1df1e6 签收（1x=2、录制帧 passed）；markdown contentFade 仍偶发 1x=1。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 691/5。
+
 ### 复制回执专用 receipt 档 0.20（R543 / 第 542 轮 / Round 540 / U-2269…U-2277 · 产品 2 文件 + 判据）
 
 给复制回执单独一档 `MotionCatalog.Role.receipt=0.20`（emphasis 保持 0.16，录制描边不再被牵动）；回执驱动与胶片场景改用 `.receipt`。本机 copy 1x 过渡帧 3–4、2x 4–5；录制帧确定性 10/10 diff=0；markdown 1x=4、fold 中间帧 7–8。CopyReceiptTests 守卫改钉 `.receipt`；M1422 CAUGHT。contentFade 0.20 由 `f7bd865` 签收（markdown 1x=2 + 录制帧 passed），但 `bd96e93` 再现 1x=1 ⇒ 629 继续开单。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 690/5。

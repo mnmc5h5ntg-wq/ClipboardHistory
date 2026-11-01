@@ -8721,3 +8721,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：回执需要更长的可见淡入，但录制描边不需要；把两者拆成不同角色，既拿到 copy 1x 3–4，又让录制帧确定性 10/10 diff=0。
 - 兼容性/迁移：`.receipt` 只影响回执出现/消失（0.20 在 0.25 上限内）；静态帧 CHANGED=0。
 - 边界：receipt 档待 R543 产品跑签收；contentFade 0.20 虽由 f7bd865 签收，但 bd96e93 再现 markdown 1x=1 ⇒ 629 继续开单。
+
+## D-544 markdown 专用 0.24 被证伪；红名必须登记（R544）
+
+- 背景：627/629 的 markdown label 在 1x 仍偶发 1 帧；按 `.receipt` 的经验试专用 `.markdownLabel=0.24`，本机 1x 过渡帧仍=4，与旧 contentFade 0.20 相同（2x 5–6→6）⇒ 长度不是这条采样边界的杠杆。
+- 决定：撤回 `.markdownLabel`（Role/DetailView/胶片场景/判据全还原 contentFade 0.20），写回 BACKLOG 629。另加 `motion_red_occurrence.py --strict`：Motion floor 红名必须在 `KNOWN_RED` 名册里，未登记的红名退 1；修掉「红的用例=-」被误当红名的边界。
+- 理由：读数不变的产品改动不保留；红名登记让新的匿名红无法混过读数，44 份日志现读 `unregistered=0`。
+- 兼容性/迁移：不影响任何产品；markdown 仍是 contentFade 0.20。
+- 边界：receipt 0.20 的 copy 半由 8d4a36d/c1df1e6 签收（1x=2 + 录制帧 passed），但 b16eacc 的 copy 是 `app-not-active` NOT_RUN；627/629/624 保持开单。
