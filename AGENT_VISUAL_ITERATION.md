@@ -20544,7 +20544,7 @@ runner 1x 上 `testSidebarTitleHoverFeedbackIsVisible` 两档都读到 0.0（本
 
 ## Round 526 · R529（第 528 轮 · 2026-11-01）：折叠窗口菜单标题随状态切换
 
-旧值（真机只读）：展开/折叠两态 Window 菜单都叫「折叠/展开窗口」。R529 让 `MainWindowCollapsePolicy.menuTitle(collapsed:)` 输出「折叠窗口/展开窗口」，Window 菜单用 `@ObservedObject` controller 现读状态，仍走同一个 `perform(.toggleMainWindowCollapse)` 与 ⌘\。真机非破坏性复核：750×492「折叠窗口」→ 点击后 420×492「展开窗口」→ 再点回 750×492「折叠窗口」，1 窗口（⌘\ keystroke 本机未送达前台，真机证据走菜单项；快捷键由 source 判据 + 既有 perform 测试覆盖）。`testWindowMenuTitleReflectsCollapseState`；M1405 CAUGHT；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；build 0 告警；帧 342 CHANGED=0，基线不变；全量 **1371/56/0（559.3s）**；换装 429=429（PID 45231）；电池 **683/5**。
+旧值（真机只读）：展开/折叠两态 Window 菜单都叫「折叠/展开窗口」。R529 让 `MainWindowCollapsePolicy.menuTitle(collapsed:)` 输出「折叠窗口/展开窗口」，Window 菜单用 `@ObservedObject` controller 现读状态，仍走同一个 `perform(.toggleMainWindowCollapse)` 与 ⌘\。真机非破坏性复核：750×492「折叠窗口」→ 点击后 420×492「展开窗口」→ 再点回 750×492「折叠窗口」，1 窗口（⌘\ keystroke 本机未送达前台，真机证据走菜单项；快捷键由 source 判据 + 既有 perform 测试覆盖）。`testWindowMenuTitleReflectsCollapseState`；M1405 CAUGHT；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；build 0 告警；帧 342 CHANGED=0，基线不变；另修 R528 在 runner 的 TITLE_HOVER 0.0：扩边顺序改为「正 padding→background→外壳负 padding」，并加显式 `titleHoverForFixture` 取证（不依赖 environment 1x 传播）；本机 light 118429/5792、dark 88166/5494，M1404 重锚后 CAUGHT。全量 **1371/56/0（556.0s，修复后跑）**；换装 429=429（PID 57962）；产品合计 4 文件。；电池 **683/5**。
 
 **七维度自评**（恰七行，每格 n/15）：
 

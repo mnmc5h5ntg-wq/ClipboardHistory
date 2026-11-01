@@ -19,7 +19,7 @@
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
 | 阶段二 **519 轮**审计（R9–R526；以 `curve_from_ledger.py` 的 `PHASE2 n=519` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 526 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-2163（R529 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-2164（R529 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -916,7 +916,7 @@ R143 那批条目里就写着"这份文件没有任何守卫"（§9.3 末条）�
 | 自评曲线 | PHASE2 n=201（第 9..208 轮）mean=89.85 min=58 max=99；`PHASE2_TO_47 n=40 mean=91.30`；`GAPS=none`；近四轮 205=89 206=90 207=89 208=90 | `curve_from_ledger.py` |
 | 帧基线 | **140 张**（工作基线；R206 补进 `content-with-dropped-unreadable-notice` 两档，`FRAME_BASELINE_UPDATED=140`、复验 `COMPARED=140 CHANGED=0 MISSING=0 ADDED=0`，帧目录 `/tmp/shots_r207`；R207/R208 产品 0 文件 ⇒ 未重捕） | `/tmp/shots_r197` + `frame_baseline.py` |
 | 判据/工具 | `scripts/*.py` 19 支；`.scratch/motion-audit-2/*.py` 274 支 | 目录计数（R208 现取） |
-| 最后一次动到 `Sources/` 的轮次 | **R529**（commit `2e7272e`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R529 那一节为准。上一笔动 `Sources/` 的是 R528（`b004545`）。|
+| 最后一次动到 `Sources/` 的轮次 | **R529**（commit `1e3cfaa`）—— 本轮是**产品轮**（`Sources/` 2 个文件）；这一格登记的是仓库里**最近一笔动过源码的提交**，由 `scripts/report_sources_cell.py --write` 从 `git log -- ClipboardHistory/Sources` 派生（不是手抄），改了什么以 `AGENT_UI_AUDIT.md` 里 R529 那一节为准。上一笔动 `Sources/` 的是 R529（`2e7272e`）。|
 
 ### 2. R144…R200 这段真正推进的事（挑有读数的说）
 
@@ -1474,4 +1474,4 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R528（折叠标题悬停的 1x 修复；产品 2 文件 + 判据）**：runner 1x 标题 hover 两档 0.0（本地 7.2/4.4）。浅底改显式 `Color(nsColor: .labelColor)`；新增专用取证键 `mainSidebarTitleHoverForCapture`；尺改侧栏上半区绝对差总和，新读数 147661/7184、110438/6886；M1404 CAUGHT；预检 307/284/745 bad=0、ARM 400/1232、HIDDEN 394/1171 rot=0；帧 342（CHANGED=2 仅 hover）、基线不变；全量 1370/56/0；换装 428=428（PID 32780）；电池 683/5。BACKLOG 622 记本跑环境红。
 
-- **R529（折叠窗口菜单标题随状态切换；产品 2 文件 + 判据）**：旧值两态都写「折叠/展开窗口」；改 `menuTitle(collapsed:)` + Window 菜单 `@ObservedObject` controller，仍走同一 perform + ⌘\。真机非破坏性复核 750×492→420×492→750×492、标题同步往返、1 窗口。M1405 CAUGHT；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；帧 342 CHANGED=0；全量 1371/56/0；换装 429=429（PID 45231）；电池 683/5。BACKLOG 622 两跑未复现（各 1 次）。
+- **R529（折叠窗口菜单标题随状态切换；产品 2 文件 + 判据）**：旧值两态都写「折叠/展开窗口」；改 `menuTitle(collapsed:)` + Window 菜单 `@ObservedObject` controller，仍走同一 perform + ⌘\。真机非破坏性复核 750×492→420×492→750×492、标题同步往返、1 窗口。M1405 CAUGHT；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；帧 342 CHANGED=0；全量 1371/56/0；换装 429=429（PID 57962）；电池 683/5。另修 R528 runner TITLE_HOVER 0.0（扩边顺序 + 显式取证，产品修复笔 1e3cfaa）。BACKLOG 622 两跑未复现（各 1 次）。

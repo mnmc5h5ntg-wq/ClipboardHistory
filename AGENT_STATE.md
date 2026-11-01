@@ -23,8 +23,8 @@ R529 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c64956e`、ahead=0。`
 - 归因：sources 时序红与产品回归分开；detail 探针已由 `a71a74c` 签收；剩余产品红只有 hover 0.0（R528 已修）。
 
 
-① 产品/判据：旧值（真机只读）展开/折叠两态 Window 菜单都叫「折叠/展开窗口」。修：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 给「折叠窗口/展开窗口」，Window 菜单用 `@ObservedObject` controller 现读状态，仍走同一 `perform(.toggleMainWindowCollapse)` + ⌘\。真机非破坏性复核：750×492「折叠窗口」→ 点击后 420×492「展开窗口」→ 再点回 750×492「折叠窗口」，1 窗口（⌘\ keystroke 未送达前台，故走菜单项；快捷键由 source 判据覆盖）。产品 **2 文件**；`M1405` CAUGHT、RESTORE_CLEAN；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；build 0 告警。帧 342（CHANGED=0），基线 342。全量 **1371/56/0（559.3s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（PID 45231）；真机只读 1 窗口；电池 **683/5**。BACKLOG 622 已在 ⓪ 复查（两跑未复现，各 1 次）。产品面连续零改动 **1** 轮（as-of 528，`python3 scripts/product_streak.py` 现读，newest=2e7272e/528）。
-产品笔 `2e7272e` 已推（HEAD=origin、ahead=0）。下一轮编号 R530（第 529 轮 / Round 527）：先 push 并复核 ahead=0；读 R529 产品笔/台账笔与 R528 三跑的全部失败步骤（in_progress/queued ⇒ NOT-RUN）；② 折叠特性继续；③ 4.5 地板与 150 上限不动。
+① 产品/判据：旧值（真机只读）展开/折叠两态 Window 菜单都叫「折叠/展开窗口」。修：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 给「折叠窗口/展开窗口」，Window 菜单用 `@ObservedObject` controller 现读状态，仍走同一 `perform(.toggleMainWindowCollapse)` + ⌘\。真机非破坏性复核：750×492「折叠窗口」→ 点击后 420×492「展开窗口」→ 再点回 750×492「折叠窗口」，1 窗口（⌘\ keystroke 未送达前台，故走菜单项；快捷键由 source 判据覆盖）。产品 **4 文件**（首笔 2 + 修复笔 2）；`M1405` CAUGHT、RESTORE_CLEAN；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；build 0 告警。帧 342（CHANGED=0），基线 342。全量 **1371/56/0（556.0s，修复后跑）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（PID 57962）；真机只读 1 窗口；电池 **683/5**。BACKLOG 622 已在 ⓪ 复查（两跑未复现，各 1 次）。产品面连续零改动 **1** 轮（as-of 528，`python3 scripts/product_streak.py` 现读，newest=1e3cfaa/528）。
+产品笔 `2e7272e` + 修复笔 `1e3cfaa` 已推（HEAD=origin、ahead=0）；后者修 R528 在 runner 的 TITLE_HOVER 0.0（扩边顺序 + 显式取证），本机 light 118429/5792、dark 88166/5494，M1404 重锚后 CAUGHT。下一轮编号 R530（第 529 轮 / Round 527）：先 push 并复核 ahead=0；读 R529 产品笔/台账笔与 R528 三跑的全部失败步骤（in_progress/queued ⇒ NOT-RUN）；② 折叠特性继续；③ 4.5 地板与 150 上限不动。
 
 ## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 产品 2 文件 + 判据）
 

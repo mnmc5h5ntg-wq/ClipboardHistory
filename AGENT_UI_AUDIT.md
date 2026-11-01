@@ -363,15 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 528 轮（R529 · 2026-11-01 · U-2157…U-2163）：折叠窗口菜单标题随状态切换（产品 2 文件 + 判据）
+## 第 528 轮（R529 · 2026-11-01 · U-2157…U-2164）：折叠窗口菜单标题随状态切换（产品 2 文件 + 判据）
 
 - **U-2157：⓪ CI。** HEAD=origin=`c64956e`、ahead=0；`41280543992 ↔ c64956e`、`41280380710 ↔ b004545`、`41279118328 ↔ 9cf95e1` 读时 **in_progress ⇒ NOT-RUN**。`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` failure STEP[15]+[17]：唯一失败是同一条 `testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0.0**（R528 已换新尺）；Capture gate 点名同一测试。BACKLOG 622 复查：`testCodeBlocksShowLineNumbers` 在两跑均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped ⇒ 各 1 次、未复现，不销单。
-- **U-2158：① 旧值与产品。** 旧值（真机只读 AX）：展开态 Window 菜单项叫「折叠/展开窗口」，折叠态同名，看不出当前状态。修法：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 返回「折叠窗口/展开窗口」；`ClipboardHistoryWindowCommands` 用 `@ObservedObject` 的 controller 现读状态，仍走同一个 `perform(.toggleMainWindowCollapse)` 与 ⌘\。产品 **2 文件**（MainWindowCollapsePolicy / ClipboardHistoryCommands）。
+- **U-2158：① 旧值与产品。** 旧值（真机只读 AX）：展开态 Window 菜单项叫「折叠/展开窗口」，折叠态同名，看不出当前状态。修法：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 返回「折叠窗口/展开窗口」；`ClipboardHistoryWindowCommands` 用 `@ObservedObject` 的 controller 现读状态，仍走同一个 `perform(.toggleMainWindowCollapse)` 与 ⌘\。产品 **4 文件**（首笔 2：MainWindowCollapsePolicy / ClipboardHistoryCommands；修复笔 2：HistorySidebarView / ContentView）。
 - **U-2159：② 真机复核（非破坏性入口）。** Window 菜单项点击（不碰删除/清空/退出）：展开态 **750×492**、标题「折叠窗口」→ 点击后 **420×492**、标题「展开窗口」→ 再点回 **750×492**、标题「折叠窗口」，始终 1 窗口。⌘\ 经 System Events keystroke 未送达前台（本机键盘通道未采信），故真机证据走菜单项；快捷键接线由 source 判据与既有 perform 测试覆盖。
 - **U-2160：③ 判据与刀。** 新增 `testWindowMenuTitleReflectsCollapseState`（纯函数两态 + 源码动态标题/同 dispatch 接线）；`M1405`（退回静态标题）**CAUGHT、RESTORE_CLEAN=yes**；M1404 仍在册。预检 **308/285/746 bad=0**、ARM **401/1233**（dupes=0 repeats=0）、HIDDEN **395/1172 rot=0**；build **0 告警**（增量 0、冷编 0）。
 - **U-2161：④ 帧卷。** 捕获 **342 帧**：`CHANGED=0 ADDED=0 MISSING=0`（菜单不进离屏帧），基线保持 **342**。
-- **U-2162：⑤ 八步与电池。** build 0 告警；全量 **1371/56/0（559.3s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（活库只增；PID 45231）；真机只读 1 窗口；电池 **683/5**（台账后复跑）；清账 162 格已清 162/未清 0/不合法 0；product_streak **1** 轮（as-of 528，`python3 scripts/product_streak.py` 现读）。
+- **U-2162：⑤ 八步与电池。** build 0 告警；全量 **1371/56/0（556.0s，修复后跑）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（活库只增；PID 57962）；真机只读 1 窗口；电池 **683/5**（台账后复跑）；清账 162 格已清 162/未清 0/不合法 0；product_streak **1** 轮（as-of 528，`python3 scripts/product_streak.py` 现读）。
 - **U-2163：⑥ 收口与交接。** 产品笔 `2e7272e` 已推（HEAD=origin、ahead=0）；新跑待读（下轮第 ⓪ 全读，重点 R528 的 hover 新尺是否转绿、R529 菜单标题跑、BACKLOG 622 是否再复现）。下一轮 R530（第 529 轮 / Round 527）：继续折叠特性；安全红线不变。
+
+- **U-2164：⑦ runner 0.0 的继续归因与修复笔。** R528 的 `b004545` 在 runner 仍读 `TITLE_HOVER totalDelta=0 changedPixels=0`（两档）；显式 labelColor 不够。根因：负 padding 加在 background 内部等于把浅底**内缩**，1x 下没落墨。修法：改成「先正 padding → 画 background → 外壳负 padding」的正确扩边顺序；另加 `titleHoverForFixture` 显式值取证（ContentView→HistorySidebarView 一路传，不依赖 environment 在 runner 1x 的传播），夹具改用它。读数：light **118429/5792**、dark **88166/5494**；M1404 重锚后 CAUGHT、RESTORE_CLEAN；预检 308/285/746 bad=0；帧 342 CHANGED=0（显式值与 environment 版同一帧）；全量 1371/56/0（556.0s）；换装 429=429（PID 57962）。产品修复笔 `1e3cfaa`。
 
 ## 第 527 轮（R528 · 2026-11-01 · U-2150…U-2156）：折叠标题悬停的 1x 修复（显式 labelColor + 专用取证键；产品 2 文件 + 判据）
 
