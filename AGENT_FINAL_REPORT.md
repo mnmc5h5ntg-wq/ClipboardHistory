@@ -19,7 +19,7 @@
 | 每日复制热图（设置 → 统计） | 已交付并换装本机 | `DailyCopyLedger` + `DailyCopyHeatmapView`，D-068 / U-30，人工批次 17 |
 | 阶段二 **516 轮**审计（R9–R523；以 `curve_from_ledger.py` 的 `PHASE2 n=516` 为准，最新一节是 `AGENT_VISUAL_ITERATION.md` 的 Round 523 —— 旧版这一格停在 94 轮 / R101，那把尺不认新写法的事见 U-249）| 跑满（要求 ≥20），每轮有可编译改动 + 七维自评 + 真实看图；R215–R221 连续七轮自评 73–88（<90 ⇒ 按目标继续修，不收口）| `AGENT_VISUAL_ITERATION.md`（Round 9–221）；本轮起这一格由 `scripts/tests/test_final_report_headline.py` 对活账 |
 | 全量位点清单 | 179 行（主窗口/浮层 89 + 设置/菜单栏约 90） | `.scratch/motion-audit-2/00-inventory.md` |
-| 视觉台账 | U-31 … U-2144（R526 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
+| 视觉台账 | U-31 … U-2145（R526 现读抬到最新一节）（R293：现读刷新到最新一节之后；728 条定义行是 R293 现读的数 —— 那个数**不手抄成下一次**，由下一次现读重数；R236 由 `AGENT_UI_AUDIT.md` 现读；上一版停在 U-756 / 467 条；U-56 在 R34 收回；U-60 由 R36 看图看出、R37 改对；U-61 是流程洞；
 U-63 是「禁用态淡到 1.82:1 而那一支在发行的 app 里不可达」，U-64 是「守卫中止的启动在盘上不留一行字」，
 U-67 是「上一轮那句回执在三种最常见的失败里说了假话」——**R41 修的是自己上一轮交付的东西**；
 U-68 是「三处回执的 `.transition` 有两句从来没供电、一句缺半个键」，而它同时暴露了**旧守卫的粒度错**（文件级抓不到调用级）；
@@ -1468,5 +1468,5 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 
 - **R525（折叠/展开补应用菜单与 ⌘\；产品 4 文件 + 判据）**：旧状态只有状态菜单/双击/chevron，Window 菜单无项、无键盘键（Commands 0 处、keyEquivalent 空、presenter nil）。给同一个 `AppCommand.toggleMainWindowCollapse` 挂 ⌘\，Window 菜单加项，状态菜单同一 presenter 显示；两个表面同一个 perform dispatch。新增 `testCollapseHasAnAppMenuEntryAndKeyboardShortcut`；M1402 CAUGHT；预检 305/282/743 bad=0、ARM 398/1230、HIDDEN 392/1169 rot=0；帧 340 CHANGED=0，基线不变；R524 正文文件数按 `git show --stat 79e39ee` 校正为 5。全量 1369/56/0（680.0s）；换装 425=425；电池 683/5。另修 R524 台账跑暴露的两处（fold 逐帧地板对 1x 太硬、ZStack 1x 详情帧重排）⇒ 第二笔 3ddee13。
 
-- **R526（标题双击补悬停反馈；产品 1 文件 + 判据）**：标题双击旧值与静置逐像素相同（亮 +1.2/暗 −0.8），chevron 早有 hover。标题组加同一档 `controlHover` 浅底（负 padding 不改布局），复用 `hoveredForCapture`；新增 `main-sidebar-title-hover` 夹具与判据（亮/暗 **7.2/4.4**，地板 2.5）；M1403 CAUGHT；`PressFeedbackTests` 名册 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；帧 **342**（ADDED=2、CHANGED=0），基线 340→342。全量 1370/56/0（560.0s）；换装 425=425；电池 683/5。R525 的 3ddee13 签收跑仍 in_progress ⇒ NOT-RUN。
+- **R526（标题双击补悬停反馈；产品 1 文件 + 判据）**：标题双击旧值与静置逐像素相同（亮 +1.2/暗 −0.8），chevron 早有 hover。标题组加同一档 `controlHover` 浅底（负 padding 不改布局），复用 `hoveredForCapture`；新增 `main-sidebar-title-hover` 夹具与判据（亮/暗 **7.2/4.4**，地板 2.5）；M1403 CAUGHT；`PressFeedbackTests` 名册 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；帧 **342**（ADDED=2、CHANGED=0），基线 340→342。另修测试隔离：窗口测试 teardown 还原 `WindowChromeMetrics`（`a71a74c`，产品未改）。全量 1370/56/0（560.0s）；换装 425=425；电池 683/5。R525 的 3ddee13 签收跑仍 in_progress ⇒ NOT-RUN。
 

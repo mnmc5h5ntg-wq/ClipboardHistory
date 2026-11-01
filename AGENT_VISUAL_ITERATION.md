@@ -20490,7 +20490,7 @@ R523 的折叠是 `setFrame` 一步跳变。R524 把过渡做成**模型驱动 6
 
 ## Round 523 · R526（第 525 轮 · 2026-11-01）：标题双击补悬停反馈
 
-折叠/展开的标题双击只有 tooltip：悬停与静置在标题带里逐像素相同（亮档均值差 1.2、暗档 −0.8，噪声级），而右边 chevron 早有 hover/按压 ⇒ 双击不可发现。R526 给标题组加 `onHover` + 与 chevron 同一档的 `PressableAppearance.fillOpacity(controlHover)` 浅底（负 padding 只放大浅底、不改布局），取证复用 `hoveredForCapture`。新增夹具 `main-sidebar-title-hover` + `testSidebarTitleHoverFeedbackIsVisible`（亮/暗 mean luma 绝对差 **7.2/4.4**，地板 2.5）；M1403（浅底永不画）CAUGHT、RESTORE_CLEAN；`PressFeedbackTests` 控件档位点 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；build 0 告警；帧 342（ADDED=2、CHANGED=0），基线 340→342；hover 帧逐张看过，标题与计数/chevron 布局未动；新帧进材质盲区名册（系统 List 选中材质）。全量 **1370/56/0（560.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。R525 的 3ddee13 签收跑仍在 in_progress ⇒ NOT-RUN。
+折叠/展开的标题双击只有 tooltip：悬停与静置在标题带里逐像素相同（亮档均值差 1.2、暗档 −0.8，噪声级），而右边 chevron 早有 hover/按压 ⇒ 双击不可发现。R526 给标题组加 `onHover` + 与 chevron 同一档的 `PressableAppearance.fillOpacity(controlHover)` 浅底（负 padding 只放大浅底、不改布局），取证复用 `hoveredForCapture`。新增夹具 `main-sidebar-title-hover` + `testSidebarTitleHoverFeedbackIsVisible`（亮/暗 mean luma 绝对差 **7.2/4.4**，地板 2.5）；M1403（浅底永不画）CAUGHT、RESTORE_CLEAN；`PressFeedbackTests` 控件档位点 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；build 0 告警；帧 342（ADDED=2、CHANGED=0），基线 340→342；hover 帧逐张看过，标题与计数/chevron 布局未动；新帧进材质盲区名册（系统 List 选中材质）。全量 **1370/56/0（560.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。另修测试隔离：窗口测试 teardown 还原 `WindowChromeMetrics.detailContentTopInset`（R525 runner 详情帧红的最后成因）；同进程 27/27、全量 1370/56/0（560.1s），产品未改（`a71a74c`）。R525 的 3ddee13 签收跑已收口：STEP[9] sources 时序，Swift 步的详情帧红由本修复处理。
 
 **七维度自评**（恰七行，每格 n/15）：
 

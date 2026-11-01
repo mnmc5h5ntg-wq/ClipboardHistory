@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### 标题双击补悬停反馈（R526 / 第 525 轮 / Round 523 / U-2138…U-2144 · 产品 1 文件 + 判据）
+### 标题双击补悬停反馈（R526 / 第 525 轮 / Round 523 / U-2138…U-2145 · 产品 1 文件 + 判据）
 
 
 ### 折叠/展开补应用菜单与 ⌘\（R525 / 第 524 轮 / Round 522 / U-2130…U-2137 · 产品 4 文件 + 判据）
