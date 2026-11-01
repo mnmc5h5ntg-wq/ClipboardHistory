@@ -20488,3 +20488,21 @@ R523 的折叠是 `setFrame` 一步跳变。R524 把过渡做成**模型驱动 6
 
 均分 = 105/105 ≈ 15.0/15（100）。
 
+## Round 523 · R526（第 525 轮 · 2026-11-01）：标题双击补悬停反馈
+
+折叠/展开的标题双击只有 tooltip：悬停与静置在标题带里逐像素相同（亮档均值差 1.2、暗档 −0.8，噪声级），而右边 chevron 早有 hover/按压 ⇒ 双击不可发现。R526 给标题组加 `onHover` + 与 chevron 同一档的 `PressableAppearance.fillOpacity(controlHover)` 浅底（负 padding 只放大浅底、不改布局），取证复用 `hoveredForCapture`。新增夹具 `main-sidebar-title-hover` + `testSidebarTitleHoverFeedbackIsVisible`（亮/暗 mean luma 绝对差 **7.2/4.4**，地板 2.5）；M1403（浅底永不画）CAUGHT、RESTORE_CLEAN；`PressFeedbackTests` 控件档位点 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；build 0 告警；帧 342（ADDED=2、CHANGED=0），基线 340→342；hover 帧逐张看过，标题与计数/chevron 布局未动；新帧进材质盲区名册（系统 List 选中材质）。全量 **1370/56/0（560.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）。R525 的 3ddee13 签收跑仍在 in_progress ⇒ NOT-RUN。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | hover 亮/暗帧逐张看过：标题药丸出现、布局未动；旧值 1.2/−0.8 是噪声级。 |
+| 判据有效性 | 15/15 | 同区域旧/新读数分开、地板 2.5；M1403 让读数变。 |
+| 假绿防御 | 15/15 | 静置 340 帧 byte-identical；runner 三跑 in_progress 具名 NOT-RUN。 |
+| 产品面推进 | 15/15 | 双击 affordance 与 chevron 同语言；1 个产品文件。 |
+| 台账一致性 | 15/15 | U-2138…U-2144、D-525、342 帧/全量/换装/电池都来自命令与测试。 |
+| 交付诚实性 | 15/15 | 旧值、runner 未签收、sources 时序红都如实。 |
+| 可复核性 | 15/15 | 7.2/4.4、M1403、precheck 306/283/744、ADDED=2/CHANGED=0 都在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。
+

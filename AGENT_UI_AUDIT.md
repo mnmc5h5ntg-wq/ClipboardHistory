@@ -363,7 +363,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
-## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2137）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
+## 第 501 轮（R502 · 2026-10-30 · U-1970…U-2144）：主窗口与设置窗口的标题栏统一（真窗口表面；产品 1 文件 + 判据）
 
 - **U-1976：⓪ push 与 CI。** 开工 `git push` no-op、HEAD=origin/main=`2c14a48`、**ahead=0**。`41074949020 ↔ 1633a9d`、`41077528140 ↔ 58cc884`、`41077659382 ↔ 2c14a48` 读时均 **in_progress ⇒ NOT-RUN**；更早：`41063726929 ↔ 817a014` failure 仅 Motion 采样红、`41062934158 ↔ 79eb4fb` Release 2 条已由 817a014 修、`41068373712 ↔ dac7e17` Release 唯一红为旧 skip roster（cutoff 修复前）。436 沿用 R481 跑 reds=0。
 - **U-1977：① 真窗口读数。** 走产品入口打开设置窗口并用 `screencapture -l <windowID>` 只截该窗口：设置窗口标题栏画着「设置」标题（标题带墨 **1915**，标题文字 bbox 到 x=329）并有一条通栏分隔线；同一 App 的主窗口是无标题、无分隔线的自定义 chrome（R502）—— 两扇窗口两套标题栏语言。
@@ -561,6 +561,14 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2136：⑥ 台账校对。** 按 `git show --stat 79e39ee` 现读，R524 产品笔实际改了 5 个 `Sources/` 文件（App/MainWindowCollapseController/MainWindowCollapsePolicy/MotionCatalog/ContentView）；把 AGENT_STATE R524 正文里的「产品 4 文件」校正为「产品 5 文件」（标题与提交标的 5 一致），**不改已推历史**。
 
 - **U-2137：⑦ runner 回归的归因与修复（R524 台账跑 9d882e4 的 STEP[15]）。** 该跑 Swift 步红在两族，**都是 R524 引入、R525 修复**：① `MainWindowFoldMotionTests` 在 runner 1x 只读到折叠 2 个、展开 1 个中间宽（地板 3 ⇒ 红）；本机 2x 是 8/6 ⇒ 是采样分辨率，不是产品跳变。地板改为「至少 1 个」——`M1400`（宽度一帧置终点）仍读到 0 个，刀照样红；本机完整序列（15 帧/8 中间宽、11 帧/6）留在台账。② `UICaptureTests/testActionableInkStaysAboveTheLegibilityFloor`（detail-3-files 展开箭头 2.6% 墨、2.70 对比）、`testCaptionTextStaysOnTheSecondaryTier`（detail-0-text header meta 0% 墨）、`testDetailAreaHasASingleLeftAxis`（正文左轴 20→77pt）在同一跑红，而 R523 的 3e5aa6b 同三条全绿 ⇒ 根因是 R524 的 ZStack 包裹改变了 1x 的尺寸提议（按子视图理想宽重排）。修法：ZStack 显式 `.frame(maxWidth: .infinity, maxHeight: .infinity)`，恢复 R523 的满幅提议。产品第二笔 `3ddee13`（1 文件 + fold 测试地板）；本机复跑六条 fold + 三条详情帧全过、帧卷 340 `CHANGED=0`、build 0 告警、全量 **1369/56/0（680.0s）**、换装 425=425（PID 26692）、真机 1 窗口。runner 上的最终签收仍待 3ddee13 的跑。
+
+- **U-2138：⓪ push 与 CI。** 开工 `git push` no-op（HEAD=origin/main=`f10afe4`、**ahead=0**）。七跑成对读：`41223106790 ↔ 3ddee13`（回归修复跑）、`41221604785 ↔ 4c0eeb6`、`41223261055 ↔ f10afe4` 读时均 **in_progress ⇒ NOT-RUN**（不轮询；下轮第 ⓪ 全读，3ddee13 是 ZStack/fold 地板修复的签收跑）；`41221362532 ↔ 31d12c7` **completed failure 仅 STEP[9]**（sources 时序，非产品）；`41218308733 ↔ 79e39ee`、`41218637052 ↔ 77ed8ef` failure 仅 STEP[9]（sources 时序）；`41218878781 ↔ 9d882e4` failure STEP[15]（fold 逐帧地板 + ZStack 1x 布局，已由 3ddee13 修，最终签收随新跑）。安全红线：未对破坏性控件做 AXPress；真窗口只读；未碰活库。
+- **U-2139：① 缺口读数与产品。** 缺口：折叠/展开的**标题双击**只有 tooltip，悬停与静置逐像素相同 —— 旧值在标题带（x12–210、y138–178pt）亮档均值差 **+1.2**、暗档 **−0.8**（噪声级），而同一行右边的 chevron 早就有 hover/按压反馈 ⇒ 双击不可发现。修法：`HistorySidebarView` 的标题组加 `onHover` + 与 chevron 同一档的 `PressableAppearance.fillOpacity(controlHover)` 浅底（负 padding 只放大浅底、不改布局），取证走既有 `hoveredForCapture`。产品 **1 文件**。
+- **U-2140：② 判据与刀。** 新增夹具 `main-sidebar-title-hover`（750×560，只点亮 `hoveredForCapture`）+ `UICaptureTests/testSidebarTitleHoverFeedbackIsVisible`（标题带亮/暗两档 mean luma 绝对差，地板 2.5；旧值 ≤1.2、新值 **7.2/4.4**）。刀 `M1403`（标题悬停浅底永不画）**CAUGHT、RESTORE_CLEAN=yes**；过渡刀 M1399–M1401 仍在册；`PressFeedbackTests` 控件档位点 10→11（标题药丸与 chevron 同档，已判）。预检 **306/283/744 bad=0**、ARM **399/1231**（dupes=0 repeats=0）、HIDDEN **393/1170 rot=0**；build **0 告警**（增量 0、冷编 0）。
+- **U-2141：③ 帧卷与看图。** 捕获 **342 帧**：`ADDED=2`（`main-sidebar-title-hover` 亮/暗）、`CHANGED=0 MISSING=0`（静置两态一字未动）；基线 **340→342**。逐张看过 hover 帧：标题「🕒 时间剪史」出现浅灰药丸（暗档为提亮药丸）、chevron 各自 hover，标题与计数/chevron 布局未移动。新帧进材质盲区名册（66pt 黑带仍是系统 List 选中材质，带外完好）。
+- **U-2142：④ 八步与电池。** build **0 告警**（增量 0、冷编 0）；全量 **1370/56/0（560.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）；清账 `MOTION_LEDGER 162 格 / 已清账 162 / 未清账 0 / 不合法 0`；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497）。产品笔 `39b67bd` 已推（HEAD=origin、ahead=0）。**具名 NOT-RUN / 限制**：① R526 产品笔/台账笔自身跑（推送后取）；② 3ddee13/4c0eeb6/f10afe4 三跑 in_progress ⇒ NOT-RUN；③ `RTF_HELPER_ORPHAN`（595）；④ `RECORDING_REREAD` 1x；⑤ 状态菜单像素通道（610）；⑥ Motion `not-run=notice-banner` 按现有出口具名；⑦ 已知在屏/SelectionReveal 本机会话 flake。
+- **U-2143：⑤ 收口 CI。** 收口新跑在推送后取。R525 产品跑 `31d12c7` 唯一失败步是 sources 时序（台账笔修好即可，非产品回归）；R524 的 `9d882e4` STEP[15] 两族回归已由 `3ddee13` 修复，签收跑 `41223106790` 待读。
+- **U-2144：⑥ 交接。** 折叠特性现已有两态、模型驱动过渡、应用菜单 + ⌘\、标题/chevron 悬停与按压；下一轮若继续，优先验证 runner 签收与真机逐帧，不再新开视觉面除非有新读数。`M1403` 是本轮新行为的刀；预检/ARM/HIDDEN 计数已刷新。
 
 ## 第 499 轮（R501 · 2026-10-30 · U-1964…U-1969）：判据推进：录制帧重复渲染确定性（无产品变更，不记完成）
 
