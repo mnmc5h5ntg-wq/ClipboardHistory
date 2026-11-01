@@ -13,13 +13,18 @@ final class MainWindowCollapseController: ObservableObject {
     static let collapsedKey = "mainWindowCollapsed"
     static let expandedWidthKey = "mainWindowExpandedWidth"
     static let collapsedWidthKey = "mainWindowCollapsedWidth"
+    /// R532：折叠态一次性提示。确认前每次折叠都显示，确认后永不再显示（跨重启）。
+    static let hintAcknowledgedKey = "mainWindowCollapseHintAcknowledged"
 
     @Published private(set) var isCollapsed: Bool
     /// 0 = 完全展开，1 = 完全折叠。由过渡逐帧推进；两端与 `isCollapsed` 一致。
     @Published private(set) var foldProgress: Double
+    /// R532：折叠态提示是否显示（折叠且用户未确认过）。
+    @Published private(set) var showsCollapseHint: Bool
 
     private let defaults: UserDefaults
     private let persists: Bool
+    private var hintAcknowledged: Bool
 
     private var transitionTimer: DispatchSourceTimer?
     private var transitionStart: CFTimeInterval = 0
@@ -35,8 +40,11 @@ final class MainWindowCollapseController: ObservableObject {
         self.defaults = defaults
         self.persists = persists
         let collapsed = persists ? defaults.bool(forKey: Self.collapsedKey) : false
+        let acknowledged = persists ? defaults.bool(forKey: Self.hintAcknowledgedKey) : false
         self.isCollapsed = collapsed
         self.foldProgress = collapsed ? 1 : 0
+        self.hintAcknowledged = acknowledged
+        self.showsCollapseHint = collapsed && !acknowledged
     }
 
     var expandedWidth: CGFloat {
@@ -57,6 +65,14 @@ final class MainWindowCollapseController: ObservableObject {
         setCollapsed(!isCollapsed)
     }
 
+    /// R532：用户点「知道了」后，折叠提示不再出现（跨重启）。
+    func acknowledgeCollapseHint() {
+        guard showsCollapseHint else { return }
+        showsCollapseHint = false
+        hintAcknowledged = true
+        if persists { defaults.set(true, forKey: Self.hintAcknowledgedKey) }
+    }
+
     /// 切换状态。`window` 不传时用当前主窗口；窗口不存在（登录首启还没建）也允许改状态，
     /// 之后的创建路径会按持久化状态把几何补上。
     func setCollapsed(_ collapsed: Bool, window: NSWindow? = nil) {
@@ -66,6 +82,7 @@ final class MainWindowCollapseController: ObservableObject {
         if !isTransitioning, let target { rememberWidth(of: target) }
 
         isCollapsed = collapsed
+        showsCollapseHint = collapsed && !hintAcknowledged
         if persists { defaults.set(collapsed, forKey: Self.collapsedKey) }
 
         guard let target else {

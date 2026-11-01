@@ -9,6 +9,9 @@ struct HistorySidebarView: View {
     /// R526：标题双击的悬停反馈（与 chevron 同一档浅底）。旧值 hover 与 idle 逐像素相同。
     /// R529：`titleHoverForFixture` 是显式值取证通道（不依赖 environment 在 runner 1x 的传播）。
     var titleHoverForFixture: Bool = false
+    /// R532：折叠态一次性提示。只在 isCollapsed 且控制器说「未确认」时画。
+    var showsCollapseHint: Bool = false
+    var acknowledgeCollapseHint: () -> Void = {}
     @State private var titleHovered = false
     @Environment(\.mainSidebarTitleHoverForCapture) private var titleHoverForCapture
     private var titleHoveredForDrawing: Bool {
@@ -130,6 +133,47 @@ struct HistorySidebarView: View {
     }
 
     private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            headerRow
+            if isCollapsed, showsCollapseHint {
+                collapseHintLine
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(height: isCollapsed && showsCollapseHint ? 58 : 39)
+        .animation(MotionCatalog.animation(for: .selection), value: historyStore.selectedCount > 1)
+        .animation(MotionCatalog.animation(for: .bannerIn), value: showsCollapseHint)
+    }
+
+    /// R532：折叠态一次性提示 —— 第一次折叠（或登录首启就是折叠态）时告诉用户怎么展开；
+    /// 点「知道了」后由控制器持久化，永不再显示。只在折叠态出现，展开态的标题行高度不变。
+    private var collapseHintLine: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Text(CollapseHintPresentation.text)
+                .font(.system(size: VisualFont.meta))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            Button(CollapseHintPresentation.dismissTitle) { acknowledgeCollapseHint() }
+                .font(.system(size: VisualFont.meta, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .helpLabel(CollapseHintPresentation.dismissHelp)
+                .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
+                              hoverLevel: VisualFill.controlHover,
+                              labelPadding: 3)
+        }
+        .padding(.horizontal, 4)
+        .transition(MotionCatalog.transition(for: .contentFade))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var headerRow: some View {
         HStack {
             // R523：双击标题折叠/展开（与右侧那颗可见按钮同一个 action）。
             HStack(spacing: 6) {
@@ -199,10 +243,6 @@ struct HistorySidebarView: View {
                     .transition(MotionCatalog.transition(for: .contentFade))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(height: 39)
-        .animation(MotionCatalog.animation(for: .selection), value: historyStore.selectedCount > 1)
     }
 
 

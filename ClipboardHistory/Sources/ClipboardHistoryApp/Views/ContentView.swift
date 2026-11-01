@@ -10,6 +10,9 @@ struct ContentView: View {
     var toggleCollapse: () -> Void = {}
     /// R529：标题悬停的显式取证值（夹具用；不依赖 environment 传播）。
     var titleHoverForFixture: Bool = false
+    /// R532：折叠态一次性提示（折叠且未确认过时由控制器给 true）。
+    var showsCollapseHint: Bool = false
+    var acknowledgeCollapseHint: () -> Void = {}
     /// R417：「暂停记录」以前只在设置页那颗开关上可见 —— 主窗口里复制进不来，
     /// 界面一句话都不说。这里与设置页读同一个键，开关一动横幅就进出。
     @AppStorage("recordingPaused") private var recordingPaused = false
@@ -69,7 +72,9 @@ struct ContentView: View {
                 HistorySidebarView(historyStore: historyStore,
                                    isCollapsed: false,
                                    toggleCollapse: toggleCollapse,
-                                   titleHoverForFixture: titleHoverForFixture)
+                                   titleHoverForFixture: titleHoverForFixture,
+                                   showsCollapseHint: showsCollapseHint,
+                                   acknowledgeCollapseHint: acknowledgeCollapseHint)
                     .frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
                 DetailView(historyStore: historyStore)
             }
@@ -87,7 +92,9 @@ struct ContentView: View {
         // 而是根本不进 NavigationSplitView。
         HistorySidebarView(historyStore: historyStore,
                            isCollapsed: true,
-                           toggleCollapse: toggleCollapse)
+                           toggleCollapse: toggleCollapse,
+                           showsCollapseHint: showsCollapseHint,
+                           acknowledgeCollapseHint: acknowledgeCollapseHint)
             // 折叠态不再套 `windowBackground`（那是给分栏内外两面的材质）；
             // 窗口自己的底色就是列表后面这一层，夹具用同色不透明底拍它。
             .background(Color(nsColor: .windowBackgroundColor))
@@ -184,7 +191,9 @@ struct ContentView: View {
             HistorySidebarView(historyStore: historyStore,
                                isCollapsed: false,
                                toggleCollapse: toggleCollapse,
-                               titleHoverForFixture: titleHoverForFixture)
+                               titleHoverForFixture: titleHoverForFixture,
+                               showsCollapseHint: showsCollapseHint,
+                               acknowledgeCollapseHint: acknowledgeCollapseHint)
                 .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
         } detail: {
             DetailView(historyStore: historyStore)

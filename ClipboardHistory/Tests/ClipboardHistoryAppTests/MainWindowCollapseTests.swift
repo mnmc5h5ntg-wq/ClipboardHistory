@@ -343,6 +343,67 @@ final class MainWindowCollapseTests: XCTestCase {
         return nil
     }
 
+    /// R532：折叠提示只在「折叠且未确认」时出现；确认后跨重启不再出现。
+    /// 旧值：折叠窗只有箭头与工具提示，没有一行可见说明（帧 `main-collapsed` 无提示行）。
+    func testCollapseHintShowsUntilAcknowledgedAndPersists() {
+        let suite = "r532-collapse-hint-\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        controller = MainWindowCollapseController(defaults: defaults)
+        XCTAssertFalse(controller.showsCollapseHint, "展开态不该有折叠提示")
+        controller.setCollapsed(true)
+        XCTAssertTrue(controller.showsCollapseHint, "第一次折叠没有提示")
+        controller.acknowledgeCollapseHint()
+        XCTAssertFalse(controller.showsCollapseHint, "确认后提示没有消失")
+        XCTAssertTrue(defaults.bool(forKey: MainWindowCollapseController.hintAcknowledgedKey),
+                      "确认没有持久化")
+        controller.setCollapsed(false)
+        controller.setCollapsed(true)
+        XCTAssertFalse(controller.showsCollapseHint, "确认后再次折叠不该再提示")
+        let restored = MainWindowCollapseController(defaults: defaults)
+        XCTAssertFalse(restored.showsCollapseHint, "重启后已确认的提示又出现")
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    /// R532：登录首启就是折叠态时，未确认仍有提示；确认过则不出现。
+    func testCollapsedLaunchShowsHintOnlyWhenNotAcknowledged() {
+        let suite = "r532-collapse-launch-\(UUID().uuidString)"
+        let local = UserDefaults(suiteName: suite)!
+        local.removePersistentDomain(forName: suite)
+        local.set(true, forKey: MainWindowCollapseController.collapsedKey)
+        let fresh = MainWindowCollapseController(defaults: local)
+        XCTAssertTrue(fresh.showsCollapseHint, "折叠首启没有提示")
+        fresh.acknowledgeCollapseHint()
+        local.set(true, forKey: MainWindowCollapseController.collapsedKey)
+        let restored = MainWindowCollapseController(defaults: local)
+        XCTAssertFalse(restored.showsCollapseHint, "已确认的提示在重启后又出现")
+        local.removePersistentDomain(forName: suite)
+    }
+
+    /// R532：提示从控制器 → 主窗口根视图 → ContentView → 侧栏的接线与文案。
+    func testCollapseHintIsWiredFromControllerToSidebar() throws {
+        XCTAssertEqual(CollapseHintPresentation.text, "窗口已折叠 · 点箭头或按 ⌘\\ 展开")
+        XCTAssertEqual(CollapseHintPresentation.dismissTitle, "知道了")
+        let app = try productSource("App.swift")
+        XCTAssertTrue(app.contains("showsCollapseHint: collapse.showsCollapseHint"),
+                      "主窗口根视图没有把提示状态传给 ContentView")
+        XCTAssertTrue(app.contains("acknowledgeCollapseHint: { collapse.acknowledgeCollapseHint() }"),
+                      "主窗口根视图没有把确认动作接到控制器")
+        let content = try productSource("Views/ContentView.swift")
+        XCTAssertTrue(content.contains("var showsCollapseHint: Bool = false"))
+        XCTAssertTrue(content.contains("showsCollapseHint: showsCollapseHint"),
+                      "ContentView 没有把提示状态传给侧栏")
+        XCTAssertTrue(content.contains("acknowledgeCollapseHint: acknowledgeCollapseHint"),
+                      "ContentView 没有把确认动作传给侧栏")
+        let sidebar = try productSource("Views/HistorySidebarView.swift")
+        XCTAssertTrue(sidebar.contains("if isCollapsed, showsCollapseHint {"),
+                      "侧栏没有在折叠且未确认时渲染提示")
+        XCTAssertTrue(sidebar.contains("Text(CollapseHintPresentation.text)"),
+                      "侧栏没有用统一文案")
+        XCTAssertTrue(sidebar.contains("acknowledgeCollapseHint()"),
+                      "提示的「知道了」没有接确认动作")
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

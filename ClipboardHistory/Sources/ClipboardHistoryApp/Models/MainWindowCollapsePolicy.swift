@@ -105,3 +105,11 @@ enum MainWindowCollapsePolicy {
         min(max(top - height, visibleFrame.minY), max(visibleFrame.minY, visibleFrame.maxY - height))
     }
 }
+
+/// R532：折叠态一次性提示的文案。单独成 enum 是为了让「提示说了什么」可被判据现读，
+/// 而不是埋进视图字面量里只能靠人眼核对。
+enum CollapseHintPresentation {
+    static let text = "窗口已折叠 · 点箭头或按 ⌘\\ 展开"
+    static let dismissTitle = "知道了"
+    static let dismissHelp = "不再显示这条提示"
+}

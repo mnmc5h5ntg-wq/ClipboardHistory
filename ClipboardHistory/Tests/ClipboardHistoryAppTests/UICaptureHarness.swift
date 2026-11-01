@@ -183,6 +183,8 @@ final class UICaptureTests: XCTestCase {
         "main-collapsed",
         // R530：360pt 最小折叠窗是同一个 `HistorySidebarView`；黑带仍是系统 List 选中材质（66pt）。
         "main-collapsed-min",
+        // R532：折叠提示帧是同一个 `HistorySidebarView`；黑带仍是系统 List 选中材质（66pt）。
+        "main-collapsed-hint",
         // R526：标题悬停帧是同一个 `HistorySidebarView`（只点亮标题 hover）；黑带仍是已登记的
         // 系统 List 选中材质（同 66pt 带），不是标题浅底画黑的。
         "main-sidebar-title-hover",
@@ -11697,6 +11699,12 @@ final class UICaptureTests: XCTestCase {
             // R530：折叠最小窗（360×560）—— 列表 + 标题/chevron/计数在最小宽下的静态帧。
             Fixture("main-collapsed-min", NSSize(width: 360, height: 560)) {
                 AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {}))
+            },
+            // R532：折叠一次性提示（420×560）—— 旧帧 `main-collapsed` 没有提示行；
+            // 这一帧只把 showsCollapseHint 点亮，确认动作在测试里走控制器。
+            Fixture("main-collapsed-hint", NSSize(width: 420, height: 560)) {
+                AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {},
+                                    showsCollapseHint: true))
             },
 
             // R526：标题双击的悬停臂（只点亮 hoveredForCapture，其余与 content-with-history 同）。
