@@ -12,6 +12,26 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
+最后更新：2026-11-01（本地 · R527 / 第 526 轮 / Round 524）
+
+## R527 状态（2026-11-01 · 第 526 轮 · 台账补正）
+
+R527 记录（台账补正，产品 0 文件）：把被并进第 501 轮的 U-2116…U-2145 按轮次开回第 522–525 轮节，并给 STATE 补 identity 行，让 `current_round()` 读 R527 而不是 R498。
+
+**git log 前 5 笔 ↔ 三本账对照**（subject 的前导 `R498` 是漂移期旧锚点；「第 N 轮」标签才是轮次身份）：
+
+| commit | subject 里的轮次标签 | UI_AUDIT 节 | ITERATION 节 | STATE 节 |
+| --- | --- | --- | --- | --- |
+| `e5e0840` | `R498 补记三…`（U-2145 ⇒ 第 525 轮） | 第 525 轮（R526） | Round 523（R526） | R526 |
+| `a71a74c` | `R498 补记…`（测试隔离，属 R526） | 第 525 轮（R526） | Round 523（R526） | R526 |
+| `57b7614` | `R498 补记二…`（U-2138…U-2144 ⇒ 第 525 轮） | 第 525 轮（R526） | Round 523（R526） | R526 |
+| `39b67bd` | `R498 补记…（第 525 轮 / Round 523）` | 第 525 轮（R526） | Round 523（R526） | R526 |
+| `f10afe4` | `R498 补记二…`（U-2130…U-2137 ⇒ 第 524 轮） | 第 524 轮（R525） | Round 522（R525） | R525 |
+
+产品面连续零改动 **1** 轮（as-of 526，`python3 scripts/product_streak.py` 现读，last_round=525）。
+
+补正内容：`AGENT_UI_AUDIT.md` 第 522/523/524/525 轮节分别收 U-2116…U-2122 / U-2123…U-2129 / U-2130…U-2137 / U-2138…U-2145，第 501 轮节收回 U-1970…U-2115；本轮补正为第 526 轮（R527 · U-2146…U-2149）。守卫结果：五条全 OK：`test_round_batch_consistency` 3/3（STATE↔UI_AUDIT 轮号逐字相符、最近三轮三本账标题、LOOKBACK 窗口）、`test_round_batch_declaration` 6/6、`test_round_claim_consistency` 5/5、`test_commit_subject_hygiene` 6/6、`test_ui_round_interval_parity` 5/5；`current_round()=(527, 526)`，不需要改 LOOKBACK。。电池：Ran 683 / OK（skipped=5）。下一轮编号 R528（第 527 轮 / Round 525）：继续折叠特性的 runner 签收与真机逐帧；不再把新轮次并入旧节。
+
 ## R526 状态（2026-11-01 · 第 525 轮 · 产品 1 文件 + 判据）
 
 R526 记录（产品 1 文件 + 判据）：标题双击补悬停反馈。⓪ push no-op（HEAD=origin/main=`f10afe4`、ahead=0）；`41223106790 ↔ 3ddee13`、`41221604785 ↔ 4c0eeb6`、`41223261055 ↔ f10afe4` 读时 in_progress ⇒ NOT-RUN；`41221362532 ↔ 31d12c7` failure 仅 STEP[9]（sources 时序）、`41218308733 ↔ 79e39ee`/`41218637052 ↔ 77ed8ef` 同 STEP[9]、`41218878781 ↔ 9d882e4` STEP[15]（已由 3ddee13 修）。① 缺口：标题双击悬停与静置逐像素相同（亮 +1.2/暗 −0.8），chevron 早有 hover；给标题组加同档浅底（负 padding 不改布局）。② 产品 1 文件（HistorySidebarView）。③ 新夹具 `main-sidebar-title-hover` + 判据（亮/暗 **7.2/4.4**，地板 2.5）；M1403 CAUGHT；`PressFeedbackTests` 名册 10→11；预检 306/283/744 bad=0、ARM 399/1231、HIDDEN 393/1170 rot=0；build 0 告警。④ 帧 342（ADDED=2、CHANGED=0），基线 340→342；hover 帧逐张看过。⑤ 全量 **1370/56/0（560.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=425=425`；电池 **683/5**（台账后复跑）；清账 162 格已清 162/未清 0/不合法 0；产品面连续零改动 **4** 轮（as-of 501，`python3 scripts/product_streak.py` 现读，last_round=497）。⑥ 交接：折叠两态/过渡/菜单/⌘\/标题与 chevron 反馈已齐；下轮优先 runner 签收与真机逐帧。⑧ **测试隔离修复**（本笔 `a71a74c`，测试 3 文件）：三个建窗/过渡测试类 teardown 还原 `WindowChromeMetrics.shared.detailContentTopInset` —— 这是 R525 Swift 全量详情帧红（meta 0% 墨、左轴 77pt）的最后成因；同进程顺序 27/27、全量 1370/56/0（560.1s），产品未改。产品笔 `39b67bd` 已推（HEAD=origin、ahead=0）。下一轮编号 R527（第 526 轮 / Round 524）：先 push 并复核 ahead=0；读 R526 产品笔/台账笔与 R525 四跑的全部失败步骤（in_progress/queued ⇒ NOT-RUN）；② 产品位按用户指令继续折叠特性；③ 4.5 地板与 150 上限不动。

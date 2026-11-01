@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 轮次身份补正（R527 / 第 526 轮 / Round 524 / U-2146…U-2149 · 台账补正）
+
+把并进第 501 轮的 U-2116…U-2145 按轮次开回第 522–525 轮节；STATE 补 identity 行（R527 / 第 526 轮 / Round 524），`current_round()` 不再读 R498；附 git log 前 5 笔与三本账的对照表。产品 0 文件，不改已推历史。
+
+
 ### 标题双击补悬停反馈（R526 / 第 525 轮 / Round 523 / U-2138…U-2145 · 产品 1 文件 + 判据）
 
 
