@@ -13,6 +13,13 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R534 / 第 533 轮 / Round 531）
+## R535 开工 ⓪（2026-11-01 · 第 534 轮 / Round 532）
+
+R535 ⓪ 读数（只登记、不轮询）：HEAD=origin=`d625b47`、ahead=0；`git ls-remote` 通、api=200/apple=200。`41297283216 ↔ d625b47`、`41297162797 ↔ d8c0e44`、`41295787642 ↔ 0cce5df`、`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63` 读时均 **in_progress ⇒ NOT-RUN**（五跑都无失败步骤可列）。`a8f1817`（R534 产品笔，cff79a9 的 amend）与 `d8c0e44` 同次推送，GitHub 只给头笔建了 run ⇒ **a8f1817 无独立跑（NOT-RUN/CI_UNREAD）**。
+- 已收口：`41293901730 ↔ 039413e` **success**（R532 收口笔整跑绿）；`41293578965 ↔ df43baa` failure **STEP[15]+[18]**（SelectionReveal 会话族 + `testFrameIntervalsUnderStateChanges` **162.2ms**、超锚点 **2/208** ⇒ 622 新值已记、120ms 与容差不动）；STEP[9] 绿。
+- **624**：非台账笔 `882e30f` STEP[9] 红（skip_roster）、台账/收口笔 `df43baa`/`039413e` STEP[9] 绿 ⇒ 两臂继续，不改名册。
+- **622**：本轮五跑未读，最近仍是 df43baa 的 162.2ms/2/208；不因单次改阈值。
+
 ## R534 状态（2026-11-01 · 第 533 轮 / Round 531 · 产品 1 文件 + 判据）
 
 R534 ⓪ 读数（只登记、不轮询）：HEAD=origin=`8b1ddb9`、ahead=0；网络复核 `git ls-remote origin main` 通、api=200/apple=200（上轮断网已恢复）。`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63`、`41293901730 ↔ 039413e` 读时均 **in_progress ⇒ NOT-RUN**。
