@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
@@ -477,13 +478,45 @@ final class Round4MarkdownTests: XCTestCase {
     }
 
     func testMarkersAndGlyphsAreStable() {
-        XCTAssertEqual(MarkdownPresentation.bulletGlyph(depth: 0), "•")
+        XCTAssertEqual(MarkdownPresentation.bulletGlyph(depth: 0), "⦁")
         XCTAssertEqual(MarkdownPresentation.bulletGlyph(depth: 1), "◦")
         XCTAssertEqual(MarkdownPresentation.bulletGlyph(depth: 2), "▪")
         XCTAssertEqual(MarkdownPresentation.bulletGlyph(depth: 99), "▪", "超深没重复最后一档")
         XCTAssertEqual(MarkdownPresentation.taskGlyph(.checked), "☑")
         XCTAssertEqual(MarkdownPresentation.taskGlyph(.unchecked), "☐")
         XCTAssertNil(MarkdownPresentation.taskGlyph(nil))
+    }
+
+    /// R549：BACKLOG 597 —— 无序列表的「•」在 14pt 正文下墨径只有约 3pt。
+    /// 换成同字号更大的 U+2981 后，墨径必须 ≥3.5pt，且行高不得被撑大。
+    func testUnorderedBulletInkIsReadableWithoutGrowingTheLine() {
+        let rendered = MarkdownPresentation.attributedString(for: MarkdownParser.parse("- 第一条\n- 第二条\n- 第三条\n"))
+        guard let font = rendered.attribute(.font, at: 0, effectiveRange: nil) as? NSFont else {
+            return XCTFail("bullet 没有字体属性 ⇒ 这条判据没有对象")
+        }
+        var chars = Array(rendered.string.utf16.prefix(1))
+        var glyphs = [CGGlyph](repeating: 0, count: 1)
+        CTFontGetGlyphsForCharacters(font as CTFont, &chars, &glyphs, 1)
+        let box = CTFontGetBoundingRectsForGlyphs(font as CTFont, .horizontal, &glyphs, nil, 1)
+        func firstLineHeight(_ text: NSAttributedString) -> CGFloat {
+            let storage = NSTextStorage(attributedString: text)
+            let manager = NSLayoutManager()
+            let container = NSTextContainer(size: NSSize(width: 400, height: 1000))
+            container.lineFragmentPadding = 0
+            manager.addTextContainer(container)
+            storage.addLayoutManager(manager)
+            manager.ensureLayout(for: container)
+            return manager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil).height
+        }
+        let bulletLine = firstLineHeight(rendered)
+        let plainLine = firstLineHeight(MarkdownPresentation.attributedString(for: MarkdownParser.parse("第一条\n")))
+        CaptureReadings.emit("BULLET_INK 字符=\(rendered.string.prefix(1)) 墨高=\(String(format: "%.1f", box.height))pt"
+            + " 墨宽=\(String(format: "%.1f", box.width))pt 行高=\(String(format: "%.1f", bulletLine))pt"
+            + " 正文行高=\(String(format: "%.1f", plainLine))pt 字号=\(font.pointSize)pt")
+        XCTAssertGreaterThanOrEqual(box.height, 3.5,
+            "项目符号墨高只有 \(String(format: "%.1f", box.height))pt ⇒ 太小，像一粒灰")
+        XCTAssertEqual(bulletLine, plainLine, accuracy: 0.5,
+            "项目符号把行高从 \(plainLine) 撑到 \(bulletLine) ⇒ 换字形不能改行距")
     }
 
     func testOnlyWebAndMailLinksBecomeClickable() {

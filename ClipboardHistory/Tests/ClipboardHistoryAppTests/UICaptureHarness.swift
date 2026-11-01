@@ -12563,6 +12563,11 @@ final class UICaptureTests: XCTestCase {
             self.assertMarkdownFixturePremise(target, role: "detail-markdown-source")
             return AnyView(DetailView(historyStore: target, initialMarkdownMode: .source))
         })
+        // R549：无序列表项目符号（BACKLOG 597）—— 一张只含三条无序项的帧，
+        // 用来逐张看「•」换「⦁」后的墨径与行距。
+        results.append(Fixture("detail-markdown-bullet", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: self.makeBulletMarkdownStore(), initialMarkdownMode: .rendered))
+        })
         // R471：超过 40k 的 Markdown 尾部会追加「后面的内容没有渲染」说明。
         // 这条说明是**界面说明**，必须是 meta 字号；夹具渲染后滚到底，帧上能看到它。
         results.append(Fixture("detail-markdown-truncated", NSSize(width: 720, height: 520), settle: {
@@ -17455,6 +17460,20 @@ final class UICaptureTests: XCTestCase {
                       "\(role)：正文里没有 Markdown 标记，两帧会是同一张照片", file: file, line: line)
         XCTAssertEqual(MarkdownParser.parse(body).blocks.first?.kind, .heading(level: 1),
                        "\(role)：解析结果的第一块不是 h1，帧上要核对的东西就换了", file: file, line: line)
+    }
+
+    private func makeBulletMarkdownStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text("# 列表\n\n- 第一项内容\n- 第二项内容\n- 第三项内容\n"),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
     }
 
     private func makeMarkdownStore() -> HistoryStore {

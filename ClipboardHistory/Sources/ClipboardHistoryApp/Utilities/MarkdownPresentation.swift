@@ -160,7 +160,7 @@ enum MarkdownPresentation {
     /// 项目符号。深度轮换 `• ◦ ▪`，和 GitHub 的三级嵌套一致；再深就重复最后一个。
     static func bulletGlyph(depth: Int) -> String {
         switch min(max(depth, 0), 2) {
-        case 0: return "•"
+        case 0: return "⦁"
         case 1: return "◦"
         default: return "▪"
         }
