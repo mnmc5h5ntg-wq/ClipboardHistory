@@ -13,6 +13,13 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R536 / 第 535 轮 / Round 533）
+## R537 开工 ⓪（2026-11-01 · 第 536 轮 / Round 534）
+
+R537 ⓪ 读数（只登记、不轮询）：HEAD=origin=`f271cc4`、ahead=0；网络通。`41305195885 ↔ 5837d65`、`41305392230 ↔ 67437eb`、`41305791517 ↔ e3e0893`、`41306124581 ↔ f271cc4` 读时 **in_progress ⇒ NOT-RUN**；`41303561874 ↔ eec86a3` failure **仅 STEP[18]**：`testFrameIntervalsUnderStateChanges` 最差 **175.8ms**、超锚点 **2/203**（loaded_p95=16.67、比值 1.000）⇒ **622 第三次**（544.1 → 162.2 → 175.8），120ms 与容差不动；同跑 `MOTION_FLOOR_FACTS judged=5/5 executed=77 红=-`（Motion floor 绿，627 未再现）。
+- 上轮收口：`789f642` **success**；`a2579fd` failure **仅 STEP[9]**（产品笔早于台账的 sources/streak 时序）；`5bcbd7a` failure **STEP[17] Capture gate**：`testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **622 的 code-block 半第二次再现**。
+- code-block 本机复现：`testCodeBlocksShowTheirLanguage` 连跑 **10/10 全过**；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。622 不销单；本轮按字体位修（具体 Menlo + 缓存）。
+- 624：上轮两臂（非台账笔 882e30f 红、台账/收口笔绿）继续；本地电池首跑偶发一次 skip_roster 已记；623 已签收不重开。
+
 ## R536 状态（2026-11-01 · 第 535 轮 / Round 533 · 产品 1 文件 + 判据）
 
 R536 ⓪ 读数（只登记、不轮询）：HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`（产品）、`41303247255 ↔ 5bcbd7a`（台账）、`41303403928 ↔ 789f642`（收口）读时均 **in_progress ⇒ NOT-RUN**。
