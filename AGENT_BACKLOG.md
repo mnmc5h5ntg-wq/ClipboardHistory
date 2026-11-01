@@ -10793,6 +10793,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R538）：本轮五跑 in_progress，无新两臂读数；非台账笔红/台账笔绿继续记，保持开单。
     复查（R538 收口复读）：`41308835299`（非台账产品笔）STEP[9] 仍红在 skip_roster「内层没有结论行」；同跑另 4 条是 628 的缩写长度族，不混算。两臂继续，保持开单。
     复查（R538 补读）：`41309008989`（台账笔）与 `41309189054`（收口笔）的 STEP[9] 也红在 skip_roster ⇒ 本批「非台账笔红、台账笔绿」不再成立（三跑都红）；保持开单、不改名册。
+    复查（R538 补读二）：`41309333668 ↔ 085e4c7`（⓪ 笔）STEP[9] 也红在 skip_roster ⇒ 同一批台账/⓪/收口三笔都红，非台账笔红/台账笔绿的旧相关不成立；保持开单、不改名册。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
@@ -10820,6 +10821,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R538 收口复读）：`41308835299` 的 Motion coverage floor `judged=5/5 executed=77 REDS=0`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
 
 **628. runner 的 git 缩写从 7 位变 8 位：三条脚本守卫把 7 位当固定长度**（R538 收口现读）
-    现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 3 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）；第 4 条 `test_the_cell_agrees_with_its_own_source` 是产品笔早于台账的 sources 时序（b707811/8cef540 两跑已绿）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。
+    现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 3 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）；第 4 条 `test_the_cell_agrees_with_its_own_source` 是产品笔早于台账的 sources 时序（b707811/8cef540 两跑已绿）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。同一批 `085e4c7`（⓪ 笔）也复现同样 3 条 + skip_roster。
     现状：读取处假设固定 7 位缩写；对象集变化会让同一份账在两台机器上答两个数。
     下一步：把读取处统一成确定性口径（`--abbrev=7`，或前缀比较 / `%H` 再裁剪），先在本地用 8 位模拟样本造红、再在 runner 签收；不放宽任何地板。
