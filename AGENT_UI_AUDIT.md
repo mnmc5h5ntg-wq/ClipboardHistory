@@ -363,6 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 547 轮（R548 · 2026-11-02 · U-2311…U-2318）：250pt 批量标题不再截成省略号（产品 1 文件 + 判据）
+
+- **U-2311：⓪ CI。** HEAD=origin=`6d473a4`、ahead=0、`git push` no-op；api=200/apple=200。`41347708887 ↔ a7349c0` 读时 **in_progress**、`41347728673 ↔ 6d473a4` **queued** ⇒ 均 NOT-RUN（queued 不算成功）。`41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake）；`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）；复读 c5fcf03/c1df1e6/b16eacc/8d4a36d/bd96e93 的红同前。`41341697142 ↔ f58bf8c`、`41341540906 ↔ 54420e0`、`41341586171 ↔ d22f30a` 等 success。
+- **U-2312：② 250pt 批量标题。** `sidebar-multi-select-min`（250pt）里「已选 3 条」被挤成「已选…」：旧帧标题带三枚 2pt 省略号点、右沿 54.5pt。`HistorySidebarView` 改为 `ViewThatFits`：宽度够用「已选 N 条」，不够退「N 条」（macOS 12 保留全称）。新帧标题带 3 段 **7.5/12.5/6.5pt**、最窄 6.5pt、右沿 66.5pt，无省略号点。
+- **U-2313：② 判据/刀/预检。** 新判据 `testBatchTitleFitsAtTheMinimumSidebarWidth`：标题带最窄字形段必须 ≥4pt（省略号点约 2pt），至少 2 段；`BATCH_TITLE_FIT` light/dark 均 3 段、最窄 6.5pt。`M1427`（退回全称）**CAUGHT、RESTORE_CLEAN=yes**；预检 **327/295/757 bad=0**、ARM **420/1244**（dupes=0 repeats=0）、HIDDEN **410/1183 rot=0**；build **0 告警**；无 `headerTitle` 旧刀锚点，无需重钉。
+- **U-2314：③ 帧/录制。** 重捕：CHANGED=**2**（`sidebar-multi-select-min` 亮/暗）、MISSING=0、ADDED=0；基线 **352→352**；宽窗 `sidebar-multi-select` 未被牵动。录制帧确定性 **10/10 diff=0**。
+- **U-2315：③④ 全量/换装/电池/清账/streak。** 全量 **1387/56/0（689.4s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 6647、1 窗口 750×492）；清账 **162/162/0**；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 547，`python3 scripts/product_streak.py --streak-for 547` 现读）。
+- **U-2316：⑤ 622/624/627/629/628/625/626。** 622 第七值 **176.6ms/2/204**、44 跑 worst 262.3 / over 2 / over_runs 17 / loaded_p95 46.73 / 比值 0.585–2.167，120ms/容差不动、frame 半开单；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案。
+- **U-2317：⑤ BACKLOG 589 结案。** 批量态标题完整性第一次有稳定像素判据（最窄字形段 ≥4pt）；250pt 截断已由宽度自适应标题修掉，589 结案。
+- **U-2318：⑥ 收口与交接。** ⓪ 笔 `f58bf8c`、产品笔随后；下一轮 R549（第 548 轮 / Round 546）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `a7349c0`/`6d473a4`/`30c7913`/`8b667ae` 与其余已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 546 轮（R547 · 2026-11-02 · U-2303…U-2310）：默认排除行加锁图标（产品 1 文件 + 判据）
 
 - **U-2303：⓪ CI。** HEAD=origin=`d22f30a`、ahead=0、`git push` no-op；api=200/apple=200。`41341540906 ↔ 54420e0`、`41341586171 ↔ d22f30a` 读时 **in_progress ⇒ NOT-RUN**；产品笔 `feec6cc`、重钉笔 `73fb0fd` 无独立跑。`41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake，非动效取值）；`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）；复读 c5fcf03/c1df1e6/b16eacc/8d4a36d/bd96e93 的红同 R545。`41337778679 ↔ 84d7a9a`、`41337664834 ↔ 9503700`、`41337019426 ↔ 8acec7f`、`41336963006 ↔ 9121760` success。

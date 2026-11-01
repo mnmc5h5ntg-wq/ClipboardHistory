@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 250pt 批量标题不再截成省略号（R548 / 第 547 轮 / Round 545 / U-2311…U-2318 · 产品 1 文件 + 判据）
+
+`HistorySidebarView` 的批量标题改 `ViewThatFits`：宽度够用「已选 N 条」，250pt 最小侧栏退「N 条」（macOS 12 保留全称）。旧帧 250pt 标题带三枚 2pt 省略号点；新帧 3 段 7.5/12.5/6.5pt、最窄 6.5pt、右沿 66.5pt。新增 `BATCH_TITLE_FIT`（最窄字形段 ≥4pt、至少 2 段），M1427 CAUGHT；帧 CHANGED=2（仅 `sidebar-multi-select-min` 亮/暗），基线 352→352；录制确定性 10/10 diff=0；全量 1387/56/0；换装 431=431；电池 691/5；BACKLOG 589 结案。
+
 ### 默认排除行加锁图标（R547 / 第 546 轮 / Round 544 / U-2303…U-2310 · 产品 1 文件 + 判据）
 
 `SettingsView` 在默认排除行的「默认」前补 9pt `lock.fill`（semibold、secondary、a11y 隐藏），文案与布局不动。`DEFAULT_BADGE` 旧/新：light 2844→4320、dark 3591→5085（负臂不变）；新增 `DEFAULT_LOCK`（正臂 vs 只关锁）light 差 1476、dark 1494；产品加 `settingsDefaultExcludedLockForCapture` 缝与 `settings-privacy-no-default-lock` 负向帧；M1426 CAUGHT。帧 CHANGED=6、ADDED=2，基线 350→352；录制确定性 10/10 diff=0；全量 1386/56/0；换装 431=431；电池 691/5。
