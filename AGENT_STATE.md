@@ -14,6 +14,16 @@
 
 最后更新：2026-11-01（本地 · R529 / 第 528 轮 / Round 526）
 
+## R530 状态（2026-11-01 · 第 529 轮 / Round 527 · 开工 ⓪）
+
+R530 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9b9cf56`、ahead=0。`41284186399 ↔ 9b9cf56`、`41284167067 ↔ 2967ce6`、`41284008834 ↔ 1e3cfaa` 读时均 **in_progress ⇒ NOT-RUN**（1e3cfaa 是 hover 扩边修复的签收跑，待读）。已收口：
+- `41282132936 ↔ 2e7272e` **failure STEP[9]+[15]+[17]**：STEP[9]=sources 时序；STEP[15]/[17]=旧 hover 判据 `TITLE_HOVER light/dark totalDelta=0 changedPixels=0`（1e3cfaa 之前的代码），Capture gate 点名同一条。
+- `41282266561 ↔ 5fcb482` **failure STEP[15]+[17]**：同一旧 hover 0.0；`41280978574 ↔ 3c00b75` 同 STEP[9]+[15]+[17]（⓪ 代码早于产品修复）。
+- R528 三跑 `c64956e`/`b004545`/`9cf95e1` 的 STEP[15]+[17] 同族（旧 hover 0.0），detail 已由 a71a74c 签收。
+- **BACKLOG 622 复查**：`testCodeBlocksShowLineNumbers` 在 2e7272e/5fcb482 两跑的 capture 与 Swift 步均 **passed**、`testFrameIntervalsUnderStateChanges` 均 **skipped**（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 两颗仍各 1 次、未复现，不销单。
+- 归因：sources 时序红与产品回归分开；唯一产品红仍是旧 hover 0.0（1e3cfaa 已换扩边顺序 + 显式取证，待跑签收）。
+
+
 ## R529 状态（2026-11-01 · 第 528 轮 / Round 526 · 产品 2 文件 + 判据）
 
 R529 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c64956e`、ahead=0。`41280543992 ↔ c64956e`、`41280380710 ↔ b004545`、`41279118328 ↔ 9cf95e1` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
