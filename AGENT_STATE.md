@@ -13,6 +13,15 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R548 / 第 547 轮 / Round 545）
+## R549 开工 ⓪（2026-11-02 · 第 548 轮 / Round 546）
+
+R549 ⓪ 读数（只登记、不轮询）：HEAD=origin=`a210a29`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **352**、全量 **1387/56/0（689.4s）**、预检 **327/295/757 bad=0**、ARM **420/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 547）。
+- 三跑读时 **in_progress ⇒ NOT-RUN**：`41350830308 ↔ f0e9ea0`（⓪）、`41351210379 ↔ 19d33b5`（台账）、`41351231883 ↔ a210a29`（补记二）；queued/in_progress 不算成功。
+- `41347708887 ↔ a7349c0`、`41347728673 ↔ 6d473a4` 均 **success（0 失败步）**。
+- `41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake，非动效取值）；两红具名，不放宽阈值。
+- `41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：`SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（origin 全 1430 / 无中间值，已知会话 flake）。
+- 本轮靶：② 换新类别、产品面且读数必须变——R546 登录失败图标、R547 默认行锁图标、R548 250pt 批量标题三者都不得再动；从 BACKLOG 挑一个未结、可本机落地的产品视觉位，先量旧值（像素/几何/帧数至少一项），改后同一套读数必须变好，否则本轮内撤回换下一个；三条件=独立像素/几何对比 + 逐张看新帧 + 录制帧确定性不新红；图标/符号/控件形状/文字布局改动要同笔查旧刀腐烂、重钉并把新帧登记盲区名册。`.receipt 0.20`、`contentFade 0.20`、emphasis 0.16 不动；624 名册不改；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1428** 起。落台账前先自检 `## R549` 节存在（R548 漏开工节事故不准重演）。
+
 ## R548 状态（2026-11-02 · 第 547 轮 / Round 545 · 产品 1 文件 + 判据）
 
 R548 ⓪ 读数（只登记、不轮询）：HEAD=origin=`6d473a4`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **352**、全量 **1386/56/0（688.4s）**、预检 **326/295/757 bad=0**、ARM **419/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 546）。
