@@ -26,8 +26,8 @@ final class CopyReceiptTests: XCTestCase {
                       "GlassPill 没有挂回执视图")
         XCTAssertTrue(source.contains(".transition(.opacity.combined(with: .move(edge: .bottom)))"),
                       "回执没有出现/消失过渡 ⇒ 还是一帧硬切")
-        XCTAssertTrue(source.contains(".animation(MotionCatalog.animation(for: .emphasis), value: receipt)"),
-                      "回执没有驱动 ⇒ 过渡声明不会演")
+        XCTAssertTrue(source.contains(".animation(MotionCatalog.animation(for: .receipt), value: receipt)"),
+                      "回执没有驱动 ⇒ 过渡声明不会演（R543：回执用专用 receipt 档）")
         XCTAssertTrue(source.contains("fixedSize(horizontal: true"),
                       "回执又允许被药丸的窄宽折行 ⇒ 会出现竖排的「已复制」")
     }

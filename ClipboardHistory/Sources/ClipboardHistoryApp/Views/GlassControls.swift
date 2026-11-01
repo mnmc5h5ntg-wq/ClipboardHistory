@@ -154,7 +154,7 @@ struct GlassPill: View {
                     .zIndex(1)
             }
         }
-        .animation(MotionCatalog.animation(for: .emphasis), value: receipt)
+        .animation(MotionCatalog.animation(for: .receipt), value: receipt)
         // 分组合成不在这里写：`visualShadow` 按 `VisualShadow.raised` 的规定自己加 ——
         // "材质必须先合成一次再打阴影"是这条投影定义的一部分，留给调用方就一定会被漏
         // （R0 审计在视频控件那处抓到的就是漏了它）。

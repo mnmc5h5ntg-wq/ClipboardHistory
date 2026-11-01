@@ -8164,7 +8164,7 @@ final class MotionFilmstripTests: XCTestCase {
         @MainActor private static func copyReceiptScenario(name: String, from confirmed: Bool) -> Scenario {
             let driver = CopyReceiptDriver(confirmed: confirmed)
             return Scenario(name: name, size: NSSize(width: 120, height: 300),
-                     declaredDurationMilliseconds: MotionCatalog.duration(for: .emphasis) * 1000,
+                     declaredDurationMilliseconds: MotionCatalog.duration(for: .receipt) * 1000,
                      appearance: .aqua,
                      root: { _ in AnyView(CopyReceiptHarness(driver: driver)) },
                      captureRect: { host in
@@ -8175,7 +8175,7 @@ final class MotionFilmstripTests: XCTestCase {
                      // 120×70pt 的带抓一帧只要 ~1.7ms：30 帧 = 51ms，卷子覆盖不到 160ms 的声明时长
                      // （runner 40420998525 只读到 1 个过渡帧）。8ms × 24 帧 ≈ 192ms。
                      minimumSampleSpacingMilliseconds: 8) { _ in
-                withAnimation(MotionCatalog.animation(for: .emphasis)) {
+                withAnimation(MotionCatalog.animation(for: .receipt)) {
                     driver.confirmed.toggle()
                 }
             }

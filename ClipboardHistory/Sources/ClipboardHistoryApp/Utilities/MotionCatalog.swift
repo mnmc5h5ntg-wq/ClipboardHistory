@@ -44,6 +44,10 @@ enum MotionCatalog {
         case bannerIn      // 顶部提示条出现
         case bannerOut     // 顶部提示条消失
         case emphasis      // 状态被改变的确认（收藏 / 固定 / 已复制）
+        /// R543：复制回执的出现/消失单独一档（0.20）。它与 emphasis 分开，
+        /// 因为 emphasis 同时供录制描边使用：R541 把 emphasis 调到 0.20 时，
+        /// 录制帧确定性判据在 runner 上出现新红（dark diff 11667px）。
+        case receipt
         case dropTarget    // 拖入落点框
         case contentFade   // 内容换页（详情换类型、设置分类、菜单栏结果落地、空态）
         /// 分段控件里那颗滑动的胶囊（R12）。**它以前不归目录管** ——
@@ -92,6 +96,9 @@ enum MotionCatalog {
         case .bannerIn: return 0.15
         case .bannerOut: return 0.12
         case .emphasis: return 0.16
+        // 回执是药丸外的短淡入；0.20 让本机 1x 过渡帧从 2–3 升到 3–4，
+        // 且不牵动录制描边（emphasis 保持 0.16）。
+        case .receipt: return 0.20
         case .dropTarget: return 0.12
         case .contentFade: return 0.20
         // 0.20：比 `selection`(0.12) 慢一档、比上限(0.25) 快一档。
@@ -147,7 +154,7 @@ enum MotionCatalog {
     static func shape(for role: Role, reduceMotion: Bool) -> Shape {
         var shape = Shape()
         switch role {
-        case .hover, .selection, .contentFade, .emphasis, .windowFold:
+        case .hover, .selection, .contentFade, .emphasis, .receipt, .windowFold:
             break
         case .skeletonSweep:
             // 常驻循环不"滑"也不"缩"：它只把一条渐变带推过去。

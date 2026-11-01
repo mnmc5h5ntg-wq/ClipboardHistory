@@ -42,6 +42,12 @@ final class MotionCatalogTests: XCTestCase {
                                     "contentFade 退回 0.16 时 markdown label 的 1x 交换会掉到 1 帧")
     }
 
+    /// R543：复制回执单独一档 `.receipt=0.20`；emphasis 保持 0.16，录制描边不再被牵动。
+    func testReceiptFadeSurvivesOneXSampling() {
+        XCTAssertGreaterThanOrEqual(MotionCatalog.duration(for: .receipt), 0.20,
+                                    "receipt 退回 0.16 时 copy receipt 的 1x 过渡帧会掉回 2–3")
+    }
+
     /// 例外必须**只有一个入口**，否则"上限"就变成了一句可以随便绕过去的话。
     ///
     /// 这条断言的三个方向都是必须的：① 例外集合就是 `skeletonSweep` 那一档（别人想挤进来要红）；
