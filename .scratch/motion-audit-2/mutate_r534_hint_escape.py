@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R534 变异表：折叠提示的 Esc 关闭（M1410）。"""
+"""R534 变异表：折叠提示的 Esc 监听（M1410）。R536 换 NSButton 后重锚。"""
 import os, subprocess, sys
 ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILE="Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
-  ("M1410","摘掉折叠提示的 Esc 快捷键（只能鼠标关）", FILE,
-   """                // R534：旧值真机折叠 420×492 下按 Esc，确认键前后都未写 ⇒ 提示只能鼠标关。
-                // 一次性的提示不该把人困在鼠标上：Esc 是系统关闭语义，只在提示可见时挂。
-                .keyboardShortcut(.cancelAction)""",
-   """                // R534：旧值真机折叠 420×492 下按 Esc，确认键前后都未写 ⇒ 提示只能鼠标关。
-                // 一次性的提示不该把人困在鼠标上：Esc 是系统关闭语义，只在提示可见时挂。"""),
+  ("M1410","摘掉折叠提示的 Esc 监听（只能鼠标/Return 关）", FILE,
+   """                guard event.keyCode == 53 else { return event }""",
+   """                guard event.keyCode == 54 else { return event }"""),
 ]
-TESTS={"M1410":"MainWindowCollapseTests/testCollapseHintCanBeDismissedWithEscape"}
+TESTS={"M1410":"MainWindowCollapseTests/testCollapseHintCanBeDismissedFromTheKeyboard"}
 def run(test):
     p=subprocess.run(["swift","test","--filter",test],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)
     out=p.stdout+p.stderr

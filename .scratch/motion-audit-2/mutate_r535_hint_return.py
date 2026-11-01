@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R535 变异表：折叠提示的 Return 激活（M1411）。"""
+"""R535 变异表：折叠提示的 Return 键等价（M1411）。R536 换 NSButton 后重锚。"""
 import os, subprocess, sys
 ROOT="/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILE="Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
-  ("M1411","摘掉折叠提示的 Return 激活（只剩 Esc 或鼠标）", FILE,
-   """                // R535：真机旧值折叠 420×492 下按 Return，确认键前后都未写 ⇒ 再加 Return 激活。
-                .keyboardShortcut(.return, modifiers: [])""",
-   """                // R535：真机旧值折叠 420×492 下按 Return，确认键前后都未写 ⇒ 再加 Return 激活。"""),
+  ("M1411","摘掉折叠提示的 Return 键等价（只剩 Esc/鼠标）", FILE,
+   r'        button.keyEquivalent = "\r"',
+   r'        button.keyEquivalent = ""'),
 ]
 TESTS={"M1411":"MainWindowCollapseTests/testCollapseHintCanBeDismissedFromTheKeyboard"}
 def run(test):

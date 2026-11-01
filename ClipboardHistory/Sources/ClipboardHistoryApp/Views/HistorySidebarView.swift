@@ -160,18 +160,10 @@ struct HistorySidebarView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 4)
-            Button(CollapseHintPresentation.dismissTitle) { acknowledgeCollapseHint() }
-                .font(.system(size: VisualFont.meta, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .helpLabel(CollapseHintPresentation.dismissHelp)
-                // R534：旧值真机折叠 420×492 下按 Esc，确认键前后都未写 ⇒ 提示只能鼠标关。
-                // 一次性的提示不该把人困在鼠标上：Esc 是系统关闭语义，只在提示可见时挂。
-                .keyboardShortcut(.cancelAction)
-                // R535：真机旧值折叠 420×492 下按 Return，确认键前后都未写 ⇒ 再加 Return 激活。
-                .keyboardShortcut(.return, modifiers: [])
-                .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
-                              hoverLevel: VisualFill.controlHover,
-                              labelPadding: 3)
+            // R536（625）：SwiftUI Button 不在真机 key-view 链里（8 站只有 AXOutline/AXTextField），
+            // 换成真实 AppKit NSButton：AXButton 身份、默认焦点环、Return/Esc 与鼠标都走同一个 action。
+            HintDismissButton(action: acknowledgeCollapseHint)
+                .fixedSize()
         }
         .padding(.horizontal, 4)
         // R533：不要把「知道了」合并进一个无障碍元素 —— `.combine` 会把按钮动作并掉，
@@ -776,3 +768,141 @@ extension EnvironmentValues {
         set { self[MainSidebarTitleIconForCaptureKey.self] = newValue }
     }
 }
+
+/// R536（625）：折叠提示的「知道了」用真实 AppKit 按钮，才能进入 key-view 链并被 VoiceOver 当按钮。
+/// SwiftUI Button 的 `.focusable(true)` 只把整个内容视图变成 AXGroup 停靠点（R535 实测）。
+private struct HintDismissButton: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeNSView(context: Context) -> FocusableHintButton {
+        let button = FocusableHintButton(title: CollapseHintPresentation.dismissTitle,
+                                         target: context.coordinator,
+                                         action: #selector(Coordinator.fire))
+        button.isBordered = false
+        button.focusRingType = .default
+        button.refusesFirstResponder = false
+        button.font = .systemFont(ofSize: VisualFont.meta, weight: .semibold)
+        button.attributedTitle = NSAttributedString(
+            string: CollapseHintPresentation.dismissTitle,
+            attributes: [.font: NSFont.systemFont(ofSize: VisualFont.meta, weight: .semibold),
+                         .foregroundColor: NSColor.controlAccentColor])
+        button.keyEquivalent = "\r"
+        button.keyEquivalentModifierMask = []
+        button.toolTip = CollapseHintPresentation.dismissHelp
+        button.setAccessibilityLabel(CollapseHintPresentation.dismissHelp)
+        button.setContentHuggingPriority(.required, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
+        button.sizeToFit()
+        context.coordinator.installEscMonitor()
+        return button
+    }
+
+    func updateNSView(_ button: FocusableHintButton, context: Context) {
+        context.coordinator.action = action
+    }
+
+    static func dismantleNSView(_ button: FocusableHintButton, coordinator: Coordinator) {
+        coordinator.removeEscMonitor()
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        private var monitor: Any?
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func fire() { action() }
+        func installEscMonitor() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard event.keyCode == 53 else { return event }
+                self?.action()
+                return nil
+            }
+        }
+        func removeEscMonitor() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+    }
+}
+
+/// 无边框文本按钮 + 焦点环 + 悬停/按压底；NSButton 默认不画 hover，这里补上同一档浅底。
+private final class FocusableHintButton: NSButton {
+    private var hovered = false
+    private var tracking: NSTrackingArea?
+
+    // R536（625）：SwiftUI 宿主不会自动把这个 NSButton 接进 key-view 链（实测 24 站不到），
+    // 自己把它插到当前链的末尾；窗口重排后再检查一次，丢了就补回。
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        scheduleKeyViewInsert()
+    }
+
+    override func layout() {
+        super.layout()
+        scheduleKeyViewInsert()
+    }
+
+    private func scheduleKeyViewInsert() {
+        DispatchQueue.main.async { [weak self] in self?.insertIntoKeyViewLoopIfNeeded() }
+    }
+
+    private func insertIntoKeyViewLoopIfNeeded() {
+        guard let window, window.firstResponder !== self else { return }
+        var first = window.initialFirstResponder
+        if first == nil { first = window.contentView?.nextKeyView }
+        if first == nil {
+            window.initialFirstResponder = self
+            nextKeyView = self
+            return
+        }
+        var current = first
+        var seen = Set<ObjectIdentifier>()
+        var last: NSView?
+        while let view = current, !seen.contains(ObjectIdentifier(view)) {
+            if view === self { return }
+            seen.insert(ObjectIdentifier(view))
+            last = view
+            current = view.nextKeyView
+        }
+        last?.nextKeyView = self
+        nextKeyView = first
+    }
+
+    override var focusRingMaskBounds: NSRect { bounds.insetBy(dx: -2, dy: -2) }
+
+    override func drawFocusRingMask() {
+        NSBezierPath(roundedRect: focusRingMaskBounds,
+                     xRadius: VisualRadius.control, yRadius: VisualRadius.control).fill()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: bounds,
+                                  options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovered = false
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        if hovered || isHighlighted {
+            NSColor.labelColor.withAlphaComponent(isHighlighted ? 0.12 : 0.08).setFill()
+            NSBezierPath(roundedRect: bounds.insetBy(dx: -3, dy: -2),
+                         xRadius: VisualRadius.control, yRadius: VisualRadius.control).fill()
+        }
+        super.draw(dirtyRect)
+    }
+}
+

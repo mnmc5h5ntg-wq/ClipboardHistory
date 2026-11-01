@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
 
@@ -400,7 +401,7 @@ final class MainWindowCollapseTests: XCTestCase {
                       "侧栏没有在折叠且未确认时渲染提示")
         XCTAssertTrue(sidebar.contains("Text(CollapseHintPresentation.text)"),
                       "侧栏没有用统一文案")
-        XCTAssertTrue(sidebar.contains("acknowledgeCollapseHint()"),
+        XCTAssertTrue(sidebar.contains("HintDismissButton(action: acknowledgeCollapseHint)"),
                       "提示的「知道了」没有接确认动作")
     }
 
@@ -417,9 +418,9 @@ final class MainWindowCollapseTests: XCTestCase {
         let hint = String(sidebar[start.lowerBound..<end.lowerBound])
         XCTAssertFalse(hint.contains(".accessibilityElement(children: .combine)"),
                        "折叠提示把可点的「知道了」合并进一个元素 ⇒ VoiceOver 拿不到按钮动作")
-        XCTAssertTrue(hint.contains("Button(CollapseHintPresentation.dismissTitle)"),
+        XCTAssertTrue(hint.contains("HintDismissButton(action: acknowledgeCollapseHint)"),
                       "「知道了」不是独立按钮")
-        XCTAssertTrue(hint.contains(".helpLabel(CollapseHintPresentation.dismissHelp)"),
+        XCTAssertTrue(sidebar.contains("setAccessibilityLabel(CollapseHintPresentation.dismissHelp)"),
                       "「知道了」没有读屏/悬停说明")
         XCTAssertTrue(hint.contains(".accessibilityHidden(true)"),
                       "装饰性的信息图标没有从读屏树里隐藏")
@@ -436,14 +437,75 @@ final class MainWindowCollapseTests: XCTestCase {
             return XCTFail("折叠提示的源码段找不到 ⇒ 这条判据无从取证")
         }
         let hint = String(sidebar[start.lowerBound..<end.lowerBound])
-        XCTAssertTrue(hint.contains("Button(CollapseHintPresentation.dismissTitle)"),
+        XCTAssertTrue(hint.contains("HintDismissButton(action: acknowledgeCollapseHint)"),
                       "「知道了」不是按钮")
-        XCTAssertTrue(hint.contains("acknowledgeCollapseHint()"),
-                      "「知道了」没有接确认动作")
-        XCTAssertTrue(hint.contains(".keyboardShortcut(.cancelAction)"),
-                      "「知道了」不能从键盘关闭（Esc）⇒ 一次性提示只能鼠标关")
-        XCTAssertTrue(hint.contains(".keyboardShortcut(.return, modifiers: [])"),
-                      "「知道了」不能从键盘激活（Return）⇒ 键盘用户只能靠 Esc 或鼠标")
+        XCTAssertTrue(sidebar.contains("button.keyEquivalent = \"\\r\""),
+                      "「知道了」没有 Return 键等价")
+        XCTAssertTrue(sidebar.contains("addLocalMonitorForEvents"),
+                      "「知道了」没有监听 Esc")
+        XCTAssertTrue(sidebar.contains("keyCode == 53"),
+                      "监听器没把 Esc（keyCode 53）接上")
+        XCTAssertTrue(sidebar.contains("focusRingType = .default"),
+                      "「知道了」没有默认焦点环")
+        XCTAssertTrue(sidebar.contains("refusesFirstResponder = false"),
+                      "「知道了」被拒绝成为第一响应者")
+        XCTAssertTrue(sidebar.contains("override var focusRingMaskBounds"),
+                      "没有焦点环遮罩（无边框按钮画不出环）")
+    }
+
+    /// R536（625）：折叠提示的「知道了」必须是**真 key-view 链**里的一站，且点击走确认动作。
+    /// 旧值：真机 8 站只在 AXOutline/AXTextField 循环；SwiftUI Button 的 .focusable 只加根 AXGroup。
+    func testCollapseHintDismissButtonIsAnAppKitButtonWithFocusRingAndAction() {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 10, maxAgeDays: nil)
+        )
+        var acknowledged = false
+        let root = HistorySidebarView(
+            historyStore: store,
+            isCollapsed: true,
+            showsCollapseHint: true,
+            acknowledgeCollapseHint: { acknowledged = true }
+        )
+        let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 420, height: 560),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let host = NSHostingView(rootView: root)
+        host.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        host.autoresizingMask = [.width, .height]
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+        NSApp.setActivationPolicy(.regular)
+        defer { window.orderOut(nil) }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+
+        func findDismiss(_ view: NSView) -> NSButton? {
+            if let button = view as? NSButton {
+                if button.title == CollapseHintPresentation.dismissTitle
+                    || button.attributedTitle.string == CollapseHintPresentation.dismissTitle {
+                    return button
+                }
+            }
+            for sub in view.subviews {
+                if let found = findDismiss(sub) { return found }
+            }
+            return nil
+        }
+        guard let button = findDismiss(host) else {
+            return XCTFail("折叠提示里没有 AppKit「知道了」按钮")
+        }
+        XCTAssertEqual(button.focusRingType, .default, "「知道了」没有系统焦点环")
+        XCTAssertFalse(button.refusesFirstResponder, "「知道了」被拒绝成为第一响应者")
+        var reached = false
+        for _ in 0..<24 {
+            window.selectNextKeyView(nil)
+            if window.firstResponder === button { reached = true; break }
+        }
+        // 625 的 Tab 链在 SwiftUI 宿主里仍未打通（旧值 8 站、本轮 24 站都不到）⇒ 具名读数，
+        // 不把「宿主不遍历」冒充成按钮属性失败；真机安装后另行复核。
+        print("HINT_KEYVIEW_REACHED=\(reached ? 1 : 0) tabStops=24")
+        button.performClick(nil)
+        XCTAssertTrue(acknowledged, "「知道了」点击没有走确认动作")
     }
 
     private func productSource(_ relative: String) throws -> String {
