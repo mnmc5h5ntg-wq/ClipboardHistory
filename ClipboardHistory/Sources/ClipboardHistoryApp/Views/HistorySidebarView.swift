@@ -7,9 +7,13 @@ struct HistorySidebarView: View {
     var isCollapsed: Bool = false
     var toggleCollapse: () -> Void = {}
     /// R526：标题双击的悬停反馈（与 chevron 同一档浅底）。旧值 hover 与 idle 逐像素相同。
+    /// R529：`titleHoverForFixture` 是显式值取证通道（不依赖 environment 在 runner 1x 的传播）。
+    var titleHoverForFixture: Bool = false
     @State private var titleHovered = false
     @Environment(\.mainSidebarTitleHoverForCapture) private var titleHoverForCapture
-    private var titleHoveredForDrawing: Bool { titleHovered || (titleHoverForCapture ?? false) }
+    private var titleHoveredForDrawing: Bool {
+        titleHovered || titleHoverForFixture || (titleHoverForCapture ?? false)
+    }
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
     /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
@@ -144,19 +148,23 @@ struct HistorySidebarView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .contentShape(Rectangle())
+            // R529：扩边顺序必须是「先正 padding → 画 background → 外壳负 padding」。
+            // R528 把负 padding 加在 background 内部，等于把浅底**内缩**；runner 1x 上
+            // 缩到字形底下后整帧读出 0.0（本机 2x 还能看见边缘）。外壳负 padding 只把
+            // 布局收回原尺寸，浅底仍画在放大后的那一圈上。
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
             .background(
                 VisualShape.rounded(VisualRadius.control)
-                    // R528：显式 labelColor —— 通用 primary 在 runner 1x 的 vibrant 子树里
-                    // 会与底色同侧，帧上读出 0.0；显式色在亮/暗两档都落墨。
                     .fill(Color(nsColor: .labelColor).opacity(
                         PressableAppearance.fillOpacity(isPressed: false,
                                                         isHovered: titleHoveredForDrawing,
                                                         hoverLevel: VisualFill.controlHover,
                                                         dark: colorScheme == .dark)))
-                    // 负 padding 只把浅底放大一圈，不改标题与计数/chevron 的布局。
-                    .padding(-4)
             )
+            .padding(.horizontal, -4)
+            .padding(.vertical, -2)
+            .contentShape(Rectangle())
             .onHover { titleHovered = $0 }
             .onTapGesture(count: 2) { toggleCollapse() }
             .helpLabel("双击折叠或展开窗口")

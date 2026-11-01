@@ -8,6 +8,8 @@ struct ContentView: View {
     /// nil = 静态两态（夹具/旧调用按 `isCollapsed` 取端点）。
     var foldProgress: Double? = nil
     var toggleCollapse: () -> Void = {}
+    /// R529：标题悬停的显式取证值（夹具用；不依赖 environment 传播）。
+    var titleHoverForFixture: Bool = false
     /// R417：「暂停记录」以前只在设置页那颗开关上可见 —— 主窗口里复制进不来，
     /// 界面一句话都不说。这里与设置页读同一个键，开关一动横幅就进出。
     @AppStorage("recordingPaused") private var recordingPaused = false
@@ -66,7 +68,8 @@ struct ContentView: View {
             NavigationView {
                 HistorySidebarView(historyStore: historyStore,
                                    isCollapsed: false,
-                                   toggleCollapse: toggleCollapse)
+                                   toggleCollapse: toggleCollapse,
+                                   titleHoverForFixture: titleHoverForFixture)
                     .frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
                 DetailView(historyStore: historyStore)
             }
@@ -180,7 +183,8 @@ struct ContentView: View {
         NavigationSplitView {
             HistorySidebarView(historyStore: historyStore,
                                isCollapsed: false,
-                               toggleCollapse: toggleCollapse)
+                               toggleCollapse: toggleCollapse,
+                               titleHoverForFixture: titleHoverForFixture)
                 .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
         } detail: {
             DetailView(historyStore: historyStore)

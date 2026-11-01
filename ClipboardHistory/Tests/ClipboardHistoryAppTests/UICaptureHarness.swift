@@ -11691,8 +11691,7 @@ final class UICaptureTests: XCTestCase {
             },
             // R526：标题双击的悬停臂（只点亮 hoveredForCapture，其余与 content-with-history 同）。
             Fixture("main-sidebar-title-hover", NSSize(width: 750, height: 560)) {
-                AnyView(ContentView(historyStore: store)
-                    .environment(\.mainSidebarTitleHoverForCapture, true))
+                AnyView(ContentView(historyStore: store, titleHoverForFixture: true))
             },
         ]
 

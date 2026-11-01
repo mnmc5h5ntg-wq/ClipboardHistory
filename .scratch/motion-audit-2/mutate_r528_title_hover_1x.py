@@ -7,8 +7,8 @@ VIEW="Sources/ClipboardHistoryApp/Views/HistorySidebarView.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
   ("M1404","取证键接不上标题悬停", VIEW,
-   '''    private var titleHoveredForDrawing: Bool { titleHovered || (titleHoverForCapture ?? false) }''',
-   '''    private var titleHoveredForDrawing: Bool { titleHovered }'''),
+   '''        titleHovered || titleHoverForFixture || (titleHoverForCapture ?? false)''',
+   '''        titleHovered || (titleHoverForCapture ?? false)'''),
 ]
 TESTS={"M1404":"UICaptureTests/testSidebarTitleHoverFeedbackIsVisible"}
 def run(test):
