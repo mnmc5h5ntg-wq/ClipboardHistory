@@ -10760,9 +10760,11 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     待判假设：runner 1x 的 `NavigationSplitView` sidebar 在离屏 cacheDisplay 下可能根本不画标题（D 类捕获限制），于是两帧都无标题墨、差恒 0；现有判据只量两帧差，没有「静置帧必须有标题墨」的负臂，分不出「没有 hover 填色」和「整块没画」。
     下一步（R531）：给 hover 判据加静置帧标题墨证人（band ink > floor）；若 runner 静置帧无墨，把夹具从 ContentView 改成独立 `HistorySidebarView`（与 `sidebar-*` 同族）再复跑 runner。不许降地板。
     复查（R531）：静置墨证人已落地（组合臂 idleInk 本机 3207/2020，无墨打 `TITLE_HOVER_COMPOSED_NOT_RUN`），组件臂 `sidebar-history ↔ sidebar-title-hover` 本机读数 light 166565/7192、dark 93008/5811；M1407 CAUGHT。runner 的 `9bfd943` 跑仍待读：若组合臂 idleInk=0 而组件臂绿，则 623 的成因确认为 NavigationSplitView 1x 捕获盲区，判据按组件臂签收；若组件臂也 0，则静置墨地板会红，保持开单。不降 1000/200 地板。
+    复查（R532）：`9bfd943`（新见证的签收跑）与 `adb50c1`/`c788299` 读时仍 in_progress ⇒ NOT-RUN；未读到组合臂 idleInk，623 保持开单。新判据的组件臂与静置墨地板已随 R531 落在盘上，等下一次 runner 读数按原规则判。
 
 **624. runner STEP[9] 的 skip_roster 内层没有结论行**（R531 现读）
     现象：`2e7272e`/`1e3cfaa`/`730dc5e` 三跑的 STEP[9] 都红在 `test_the_roster_matches_what_this_machine_actually_skips` 的「内层没有结论行（Ran / OK (skipped=N)）」；本机电池 683/5 绿，同一卷在本机内层正常。
     现状：runner-only、三次复现；不改名册、不因它放宽任何判据。
     下一步：在 runner 上让内层 subprocess 的退出码与尾部输出落盘（不改判据），定位是崩溃、超时还是输出被截；没有定位前不销单。
     复查（R531 收口）：同一卷在 `ac04e2d`/`76b24b8` 两跑 STEP[9] **绿**，在 `2e7272e`/`1e3cfaa`/`730dc5e`/`02fa144`/`a13636a` 五跑红 ⇒ **间歇性 runner flake**（不是稳定环境红）；两臂都记，继续按「内层退出码/尾部输出落盘」定位，不销单、不改名册。
+    复查（R532）：`9bfd943`/`adb50c1`/`c788299` 仍 in_progress ⇒ 本轮无新两臂读数；R531 的五红两绿仍然有效，间歇性未定，不销单。

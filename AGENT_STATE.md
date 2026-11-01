@@ -12,15 +12,19 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R531 / 第 530 轮 / Round 528）
+最后更新：2026-11-01（本地 · R532 / 第 531 轮 / Round 529）
 
-## R532 状态（2026-11-01 · 第 531 轮 / Round 529 · 开工 ⓪）
+## R532 状态（2026-11-01 · 第 531 轮 / Round 529 · 产品 5 文件 + 判据）
 
 R532 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c788299`、ahead=0。`41289573776 ↔ 9bfd943`（判据笔，新见证的 runner 签收跑）、`41289753591 ↔ adb50c1`（台账）、`41289948933 ↔ c788299`（CI 补记）读时均 **in_progress ⇒ NOT-RUN**（三跑都还在队里，没有可列的失败步骤）。
 - **623 判定未到**：新见证的 `TITLE_HOVER_COMPOSED/COMPONENT` 读数只在 9bfd943 跑里，未读前不宣布签收；规则不变：组合臂 idleInk=0 且组件臂绿 ⇒ 按容器盲区具名签收（`TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank`），组件臂也 0 ⇒ 静置墨地板红、623 保持开单；200×scale² 地板不降。
 - **624 最新已读**（R531 收口）：skip_roster 在 `2e7272e`/`1e3cfaa`/`730dc5e`/`02fa144`/`a13636a` 五跑红、在 `ac04e2d`/`76b24b8` 两跑绿 ⇒ 间歇性 runner flake；新跑 9bfd943 未读，暂不更新两臂。
 - **622 最新已读**：`9b9cf56` 的 STEP[18] 仍是 worst **544.1ms**、超锚点 **2/173**（p95 27.83、比值 1.670 绿）；本机 4 跑未复现（worst ≤97.9ms、超锚点 0），具名 flake，120ms 与容差不动。新跑未读。
 - **已收口四跑**（R531 收口复读）：`02fa144` STEP[9]+[15]+[17]、`ac04e2d`/`76b24b8` 仅 STEP[15]+[17]、`a13636a` STEP[9]+[15]+[17]；STEP[9] 的指针/streak/sources/citations 都是台账时序红（已随台账补齐），与 hover 0/0 分账。
+① 产品/旧值：旧折叠窗只有箭头与工具提示，`main-collapsed` 帧没有提示行，登录首启折叠时用户只能自己找箭头。产品 **5 文件**：`MainWindowCollapseController` 加 `showsCollapseHint`/`acknowledgeCollapseHint`（键 `mainWindowCollapseHintAcknowledged`，确认后跨重启不再显示；未确认时每次折叠都显示）；`HistorySidebarView` 在折叠且未确认时于标题行下画「窗口已折叠 · 点箭头或按 ⌘\ 展开」+「知道了」（header 39→58）；`MainWindowContent`/`ContentView` 全链路接线；`MainWindowCollapsePolicy` 放文案常量。无提示时既有帧几何不变。
+② 判据/刀：3 条产品入口测试（显示→确认→再折叠不显示→重启不显示；折叠首启；控制器→根视图→ContentView→侧栏接线）；`M1408` CAUGHT、RESTORE_CLEAN=yes；预检 311/288/749 bad=0、ARM 404/1236、HIDDEN 398/1175 rot=0；build 0 告警；PressFeedback 名册补 labelPadding 2→3、控件档 11→12，两条守卫单跑通过。帧 **348**（ADDED=2；首轮 CHANGED=17 源图标噪声、修按压反馈后仅 2 张提示帧变化；基线 346→348），亮/暗提示帧逐张看过。
+③ 真机/八步：旧版（R531 二进制）折叠 420×492 无提示；新版折叠 420×492 `screencapture -l 29082` 实拍提示行，再展开 750×492、1 窗口，未点「知道了」（键仍未写）。全量 **1376/56/0（604.4s）**（前两次 1376/56/2 都是 PressFeedback 名册漏登记，修后第三次真绿；本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（活库安装前 430→431，只增不减；PID 28608；真机只读 1 窗口）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **2** 轮（as-of 531，`python3 scripts/product_streak.py --streak-for 531` 现读，last=02fa144/529）。
+④ 收口：产品笔 `882e30f` 已推（HEAD=origin、ahead=0）；新跑待读（下轮第 ⓪ 全读，重点 9bfd943 的新见证：组合臂 idleInk=0 且组件臂绿 ⇒ 容器盲区具名签收；组件臂也 0 ⇒ 地板红、623 保持开单；624 是否复现）。下一轮编号 R533（第 532 轮 / Round 530）：先 push 并复核 ahead=0；继续折叠特性；4.5 地板与 150 上限不动。
 
 ## R531 状态（2026-11-01 · 第 530 轮 / Round 528 · 判据推进，产品 0 文件）
 

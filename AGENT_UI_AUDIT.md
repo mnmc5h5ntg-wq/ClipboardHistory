@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 531 轮（R532 · 2026-11-01 · U-2180…U-2186）：折叠态一次性提示与跨重启记忆（产品 5 文件 + 判据）
+
+- **U-2180：⓪ CI。** HEAD=origin=`c788299`、ahead=0；`41289573776 ↔ 9bfd943`（新见证签收跑）、`41289753591 ↔ adb50c1`、`41289948933 ↔ c788299`、`41290053584 ↔ 6add742` 读时均 **in_progress ⇒ NOT-RUN**；`41287495651 ↔ a13636a`、`41287270623 ↔ 76b24b8`、`41287008886 ↔ ac04e2d`、`41286598804 ↔ 02fa144` 为 STEP[9] 台账时序 + hover 0/0（R531 已收口复读）。sources/streak 时序红与产品红分账；623 的 runner 见证未到，不宣布签收；624 最新五红两绿（间歇）；622 最新仍是 `9b9cf56` 544.1ms/2 颗、本机 4 跑未复现。
+- **U-2181：① 旧值与产品。** 旧值：折叠窗只有箭头与工具提示，`main-collapsed` 帧没有提示行（看图），控制器没有提示状态；登录首启折叠时用户只能自己找箭头。产品 **5 文件**：`MainWindowCollapseController` 增加 `showsCollapseHint`/`acknowledgeCollapseHint`（键 `mainWindowCollapseHintAcknowledged`，确认后跨重启不再显示；未确认时每次折叠都显示）；`HistorySidebarView` 在折叠且未确认时于标题行下画「窗口已折叠 · 点箭头或按 ⌘\ 展开」+「知道了」（header 39→58）；`MainWindowContent`/`ContentView` 全链路传状态与确认动作；`MainWindowCollapsePolicy` 放文案常量。无提示时标题行几何不变（既有 348 帧中除新提示外 CHANGED=0）。
+- **U-2182：② 判据与刀。** 3 条产品入口测试：`testCollapseHintShowsUntilAcknowledgedAndPersists`（折叠显示→确认→再折叠不显示→重启不显示）、`testCollapsedLaunchShowsHintOnlyWhenNotAcknowledged`、`testCollapseHintIsWiredFromControllerToSidebar`（控制器→根视图→ContentView→侧栏 + 文案）。`M1408`（确认后仍记未确认）**CAUGHT、RESTORE_CLEAN=yes**；预检 **311/288/749 bad=0**、ARM **404/1236**（dupes=0 repeats=0）、HIDDEN **398/1175 rot=0**；build **0 告警**（warnings=0 incremental=0 cold=0 build-tests）。PressFeedback 名册补新位点（labelPadding 2→3、控件档 11→12），两条守卫单跑通过。
+- **U-2183：③ 帧卷与看图。** 新夹具 `main-collapsed-hint` 420×560（入材质盲区名册）；捕获 **348 帧**：`ADDED=2 MISSING=0`；首轮 `CHANGED=17` 全是源图标噪声（20×20/27×92px、最大差 2–3、无像素 >8），把「知道了」改成控件档后重捕只 `CHANGED=2`（提示亮/暗）；基线 346→348。亮/暗提示帧逐张看过：提示行、信息图标、「知道了」与列表几何都正常。
+- **U-2184：④ 真机取证（只读）。** 旧版（R531 二进制）折叠 420×492：标题行下无提示；新版装好后折叠 420×492：`screencapture -l 29082` 实拍标题行下出现「窗口已折叠 · 点箭头或按 ⌘\ 展开」+「知道了」；再展开 750×492、1 窗口，未点「知道了」（键仍未写）。未对删除/清空/退出做任何 AXPress，未碰活库内容。
+- **U-2185：⑤ 八步与电池。** build 0 告警；全量 **1376/56/0（604.4s）**（前两次 1376/56/2 都是 PressFeedback 名册漏登记新位点，修后第三次真绿；本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（活库安装前 430→431，只增不减；PID 28608；真机只读 1 窗口）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **2** 轮（as-of 531，`python3 scripts/product_streak.py --streak-for 531` 现读，last=02fa144/529）。
+- **U-2186：⑥ 收口与交接。** 产品笔 `882e30f` 已推（HEAD=origin、ahead=0）；新跑待读（下轮第 ⓪ 全读，重点 9bfd943 的新见证：组合臂 idleInk=0 且组件臂绿 ⇒ 容器盲区具名签收；组件臂也 0 ⇒ 地板红、623 保持开单；624 是否复现）。下一轮 R533（第 532 轮 / Round 530）：先 push 并复核 ahead=0；继续折叠特性；安全红线不变。
+
 ## 第 530 轮（R531 · 2026-11-01 · U-2172…U-2179）：标题悬停静置墨证人与折叠焦点负向证人（产品 0 文件 + 判据）
 
 - **U-2172：⓪ CI。** HEAD=origin=`76b24b8`、ahead=0；`41286598804 ↔ 02fa144`、`41287008886 ↔ ac04e2d`、`41287270623 ↔ 76b24b8` 读时均 **in_progress ⇒ NOT-RUN**。四跑全部失败步骤：`41284008834 ↔ 1e3cfaa` **STEP[9]+[15]+[17]**（STEP[15] hover 0/0 + STEP[17] 点名同一条；STEP[9] sources 时序 + skip_roster 内层无结论行）；`41284186399 ↔ 9b9cf56` **STEP[15]+[17]+[18]**（hover 0/0；STEP[18] 帧间隔 544.1ms、2 颗超锚点）；`41284167067 ↔ 2967ce6` **STEP[15]+[17]**（hover 0/0）；`41282132936 ↔ 2e7272e` **STEP[9]+[15]+[17]**（hover 0/0；STEP[9] sources/streak 时序 + skip_roster）。sources 时序红与产品回归分开；skip_roster 是 runner-only，记 **BACKLOG 624**。

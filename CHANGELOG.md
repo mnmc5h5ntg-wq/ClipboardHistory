@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠态一次性提示与跨重启记忆（R532 / 第 531 轮 / Round 529 / U-2180…U-2186 · 产品 5 文件 + 判据）
+
+折叠且未确认时，标题行下显示「窗口已折叠 · 点箭头或按 ⌘\ 展开」+「知道了」；确认后跨重启不再显示，未确认时每次折叠都显示。真机旧值折叠 420×492 无提示，新版实拍提示行；帧 348（ADDED=2），M1408 CAUGHT；全量 1376/56/0（604.4s；前两次 1376/56/2 为 PressFeedback 名册漏登记）；换装 431=431。
+
 ### 标题悬停静置墨证人与折叠焦点负向证人（R531 / 第 530 轮 / Round 528 / U-2172…U-2179 · 产品 0 文件 + 判据）
 
 TITLE_HOVER 先量静置帧标题墨：无墨时打 `TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank` 并改用组件臂（`sidebar-history ↔ sidebar-title-hover`），把浅底从 NavigationSplitView 的 runner 1x 捕获盲区隔离出来。本机组合臂 118429/88166、组件臂 166565/93008；M1407 CAUGHT；帧 346（ADDED=2、CHANGED=8 源图标噪声）；全量 1373/56/0；换装 430=430。622 本机 4 跑未复现（worst ≤97.9ms、超锚点 0），具名 runner flake，120ms 与容差不动。折叠焦点负向证人通过。
