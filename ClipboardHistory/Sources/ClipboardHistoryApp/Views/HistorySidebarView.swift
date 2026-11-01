@@ -367,7 +367,43 @@ struct HistorySidebarView: View {
     /// 结论：在 `List` 里"把手才拖出、行体拖选"这个分工做不到。
     /// 取舍是**保留整行拖出、去掉拖选**（macOS 侧栏本来也不做橡皮筋多选，Finder 侧栏同样不做），
     /// 选中交给单击 / shift / ⌘ / 方向键 —— 全部由系统 `List` 负责。
+    @ViewBuilder
     private var historyList: some View {
+        if #available(macOS 13.0, *) {
+            // R538（626）：行内容的 .contextMenu 会被 Text/cell 的系统文本菜单盖住；
+            // 挂到 List 的选区菜单，由列表层接管右键（macOS 12 无此 API，保持原行为）。
+            baseHistoryList
+                .contextMenu(forSelectionType: HistoryStore.Entry.ID.self) { ids in
+                    rowContextMenu(for: ids)
+                }
+        } else {
+            baseHistoryList
+        }
+    }
+
+    @ViewBuilder
+    private func rowContextMenu(for ids: Set<HistoryStore.Entry.ID>) -> some View {
+        if let entry = historyStore.filteredEntries.first(where: { ids.contains($0.id) }) {
+            Button {
+                RowContextMenu.perform(.copy,
+                                       copy: { historyStore.perform(.copyAndPromote(entry)) },
+                                       favorite: { historyStore.perform(.toggleFavorite(entry)) })
+            } label: {
+                Label(RowContextMenu.title(for: .copy, isFavorite: entry.isFavorite),
+                      systemImage: RowContextMenu.systemImage(for: .copy, isFavorite: entry.isFavorite))
+            }
+            Button {
+                RowContextMenu.perform(.favorite,
+                                       copy: { historyStore.perform(.copyAndPromote(entry)) },
+                                       favorite: { historyStore.perform(.toggleFavorite(entry)) })
+            } label: {
+                Label(RowContextMenu.title(for: .favorite, isFavorite: entry.isFavorite),
+                      systemImage: RowContextMenu.systemImage(for: .favorite, isFavorite: entry.isFavorite))
+            }
+        }
+    }
+
+    private var baseHistoryList: some View {
         List(selection: selectionBinding) {
             if sectionHeadersForDrawing, !pinnedEntries.isEmpty {
                 // R429：固定条目置顶，但以前与普通条目完全同形。给它们一行分区头，
