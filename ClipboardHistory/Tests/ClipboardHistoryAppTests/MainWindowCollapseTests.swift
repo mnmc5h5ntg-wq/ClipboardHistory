@@ -301,6 +301,48 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertEqual(store.selectedEntryIDs, [entry.id], "再展开把选区丢了")
     }
 
+    /// R531：折叠后焦点不许留在已被移除的详情 text view 上。
+    /// 旧值先现读：详情可聚焦 → 折叠 → 读 `window.firstResponder`；若它仍指向那棵已卸下的视图，
+    /// 键盘输入会落进看不见的控件。负向证人（旧值已正确）时也保留这一条，防止以后回归。
+    func testCollapseDoesNotLeaveFocusInRemovedDetail() {
+        setUpProduct()
+        defer { tearDownProduct() }
+        retireAllMainWindows()
+        guard makeVisibleWindow() != nil else { return }
+        store.add(
+            ClipboardIntake.Entry(content: .text("焦点夹具：折叠后这段正文不该再接收键盘输入。"),
+                                  thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"]),
+            timestamp: Date(timeIntervalSince1970: 1_800_000_100)
+        )
+        guard let entry = store.entries.first else { return XCTFail("夹具没有条目") }
+        store.perform(.selectOnly(entry))
+        settle(0.4)
+        guard let window = mainWindows.first else { return XCTFail("没有主窗口") }
+        guard let textView = firstDetailTextView(in: window.contentView) else {
+            return XCTFail("详情里没有可聚焦的 text view ⇒ 焦点判据无从取证")
+        }
+        XCTAssertTrue(window.makeFirstResponder(textView), "详情 text view 拿不到焦点")
+        XCTAssertTrue(window.firstResponder === textView, "焦点没有落在详情 text view 上")
+
+        delegate.perform(.toggleMainWindowCollapse)
+        settleTransition()
+        let responder = window.firstResponder
+        XCTAssertFalse(responder === textView, "折叠后焦点仍留在已移除的详情 text view 上")
+        if let view = responder as? NSView {
+            XCTAssertTrue(view.isDescendant(of: window.contentView!),
+                          "折叠后焦点落在一个已脱离窗口的视图上：\(type(of: view))")
+        }
+    }
+
+    private func firstDetailTextView(in view: NSView?) -> ChineseSelectableNSTextView? {
+        guard let view else { return nil }
+        if let text = view as? ChineseSelectableNSTextView { return text }
+        for sub in view.subviews {
+            if let found = firstDetailTextView(in: sub) { return found }
+        }
+        return nil
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -186,6 +186,9 @@ final class UICaptureTests: XCTestCase {
         // R526：标题悬停帧是同一个 `HistorySidebarView`（只点亮标题 hover）；黑带仍是已登记的
         // 系统 List 选中材质（同 66pt 带），不是标题浅底画黑的。
         "main-sidebar-title-hover",
+        // R531：组件臂与 `sidebar-history` 同一棵树、同一批选中行，只差 titleHoverForFixture；
+        // 黑带仍是系统 List 选中材质（同 66pt 带）。
+        "sidebar-title-hover",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -11700,6 +11703,12 @@ final class UICaptureTests: XCTestCase {
             Fixture("main-sidebar-title-hover", NSSize(width: 750, height: 560)) {
                 AnyView(ContentView(historyStore: store, titleHoverForFixture: true))
             },
+            // R531：标题悬停的组件臂（同一个 HistorySidebarView 单独铺 300×520）。
+            // 与 sidebar-history 成对，只差 titleHoverForFixture；用来把标题浅底从
+            // NavigationSplitView 在 runner 1x 的捕获盲区里隔离出来（BACKLOG 623）。
+            Fixture("sidebar-title-hover", NSSize(width: 300, height: 520)) {
+                AnyView(self.sidebarFrame(HistorySidebarView(historyStore: store, titleHoverForFixture: true)))
+            },
         ]
 
         // 菜单栏面板的内容层。以前这里一直标 NOT-RUN（D-019：整块 NSMenu 离屏画不出材质表面，
@@ -16407,49 +16416,107 @@ final class UICaptureTests: XCTestCase {
 
     /// R526：标题双击的悬停反馈。旧值：hover 与 idle 在标题带里逐像素相同（双击不可发现）；
     /// 新值：hover 时标题带出现与 chevron 同一档的浅底。
+    /// R531（BACKLOG 623）：先证明**静置帧本身有标题墨**，再量两臂差 —— 否则 runner 1x
+    /// 整块侧栏不画时，0/0 会被读成「没有反馈」。组合臂仍在本机可画时判；组件臂
+    /// （sidebar-history ↔ sidebar-title-hover）把浅底从 NavigationSplitView 的捕获盲区里隔离出来。
     func testSidebarTitleHoverFeedbackIsVisible() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r526-title-hover-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
-        var judged = 0
+        var composedJudged = 0
+        var componentJudged = 0
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let tag = appearance == .darkAqua ? "dark" : "light"
-            guard let idle = renderFixtureRep("content-with-history", appearance, scratch),
-                  let hover = renderFixtureRep("main-sidebar-title-hover", appearance, scratch) else {
-                XCTFail(tag + "：标题带两臂读不回来")
+            guard let composedIdle = renderFixtureRep("content-with-history", appearance, scratch),
+                  let composedHover = renderFixtureRep("main-sidebar-title-hover", appearance, scratch),
+                  let componentIdle = renderFixtureRep("sidebar-history", appearance, scratch),
+                  let componentHover = renderFixtureRep("sidebar-title-hover", appearance, scratch) else {
+                XCTFail(tag + "：标题带四臂读不回来")
                 continue
             }
-            let scale = Double(hover.pixelsWide) / 750.0
-            // R528：不再赌固定 y 带 —— runner 1x 的标题位置与 2x 不同（R526 的判据在那里读出 0.0）。
-            // 取**整条侧栏上半区**（x 0–300pt、y 60–320pt）的逐像素亮度绝对差总和：
-            // 位置怎么漂都还在区域内；两臂只有标题浅底不同（专用取证键），旧值=0。
-            let x0 = 0, x1 = min(hover.pixelsWide, Int(300 * scale))
-            let y0 = max(0, Int(60 * scale)), y1 = min(hover.pixelsHigh, Int(320 * scale))
             func luma(_ rep: NSBitmapImageRep, _ x: Int, _ y: Int) -> Double {
                 let bytes = Self.buffer(of: rep)
                 let i = y * rep.bytesPerRow + x * 4
                 return 0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
                     + 0.0722 * Double(bytes[i + 2])
             }
-            var totalDelta = 0.0
-            var changedPixels = 0
-            for y in y0..<y1 {
-                for x in x0..<x1 {
-                    let delta = abs(luma(idle, x, y) - luma(hover, x, y))
-                    if delta > 8 { changedPixels += 1 }
-                    totalDelta += delta
+            func measure(_ idle: NSBitmapImageRep, _ hover: NSBitmapImageRep,
+                         scale: Double, x1Pt: Double, y0Pt: Double, y1Pt: Double,
+                         inkX1Pt: Double, inkY0Pt: Double, inkY1Pt: Double)
+                -> (delta: Double, changed: Int, idleInk: Int, hoverInk: Int) {
+                let x1 = min(idle.pixelsWide, Int(x1Pt * scale))
+                let y0 = max(0, Int(y0Pt * scale)), y1 = min(idle.pixelsHigh, Int(y1Pt * scale))
+                let ix1 = min(idle.pixelsWide, Int(inkX1Pt * scale))
+                let iy0 = max(0, Int(inkY0Pt * scale)), iy1 = min(idle.pixelsHigh, Int(inkY1Pt * scale))
+                // 纸 = 区域左缘 8 列的众数（与 paperMode 同一条约定）。
+                var histogram: [Int: Int] = [:]
+                for y in y0..<y1 {
+                    for x in 0..<min(8, x1) {
+                        histogram[Int(luma(idle, x, y).rounded()) / 8, default: 0] += 1
+                    }
                 }
+                let paper = (histogram.max { $0.value < $1.value }?.key ?? 0) * 8 + 4
+                var totalDelta = 0.0
+                var changed = 0
+                for y in y0..<y1 {
+                    for x in 0..<x1 {
+                        let delta = abs(luma(idle, x, y) - luma(hover, x, y))
+                        if delta > 8 { changed += 1 }
+                        totalDelta += delta
+                    }
+                }
+                var idleInk = 0
+                var hoverInk = 0
+                for y in iy0..<iy1 {
+                    for x in 0..<ix1 {
+                        if abs(luma(idle, x, y) - Double(paper)) > 24 { idleInk += 1 }
+                        if abs(luma(hover, x, y) - Double(paper)) > 24 { hoverInk += 1 }
+                    }
+                }
+                return (totalDelta, changed, idleInk, hoverInk)
             }
-            emit("TITLE_HOVER \(tag) totalDelta=\(Int(totalDelta.rounded())) changedPixels=\(changedPixels)"
-                 + " region=\(x1 - x0)x\(y1 - y0)px")
-            XCTAssertGreaterThanOrEqual(totalDelta, 1000,
-                                        "\(tag)：标题区悬停亮度绝对差总和只有 \(Int(totalDelta.rounded())) ⇒ 双击没有可见悬停反馈")
-            XCTAssertGreaterThanOrEqual(changedPixels, 200,
-                                        "\(tag)：标题区只有 \(changedPixels) 个像素在动 ⇒ 浅底没有画出来")
-            judged += 1
+            let composedScale = Double(composedIdle.pixelsWide) / 750.0
+            let c = measure(composedIdle, composedHover, scale: composedScale,
+                            x1Pt: 300, y0Pt: 60, y1Pt: 320,
+                            inkX1Pt: 300, inkY0Pt: 140, inkY1Pt: 180)
+            emit("TITLE_HOVER_COMPOSED \(tag) idleInk=\(c.idleInk) hoverInk=\(c.hoverInk)"
+                 + " totalDelta=\(Int(c.delta.rounded())) changedPixels=\(c.changed)")
+            // 组合臂：runner 1x 的 NavigationSplitView sidebar 可能整块不画（D 类捕获限制）。
+            // 静置帧没有标题墨时，0/0 只能读成「这段路没画」，不能读成「标题没有反馈」。
+            let composedInkFloor = Int(200 * composedScale * composedScale)
+            if c.idleInk >= composedInkFloor {
+                XCTAssertGreaterThanOrEqual(c.delta, 1000,
+                                            "\(tag)：组合臂标题区悬停亮度绝对差总和只有 \(Int(c.delta.rounded())) ⇒ 双击没有可见悬停反馈")
+                XCTAssertGreaterThanOrEqual(c.changed, 200,
+                                            "\(tag)：组合臂标题区只有 \(c.changed) 个像素在动 ⇒ 浅底没有画出来")
+                composedJudged += 1
+            } else {
+                emit("TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank \(tag)"
+                     + " idleInk=\(c.idleInk) floor=\(composedInkFloor)")
+            }
+            let componentScale = Double(componentIdle.pixelsWide) / 300.0
+            let s = measure(componentIdle, componentHover, scale: componentScale,
+                            x1Pt: 200, y0Pt: 100, y1Pt: 140,
+                            inkX1Pt: 200, inkY0Pt: 102, inkY1Pt: 138)
+            emit("TITLE_HOVER_COMPONENT \(tag) idleInk=\(s.idleInk) hoverInk=\(s.hoverInk)"
+                 + " totalDelta=\(Int(s.delta.rounded())) changedPixels=\(s.changed)")
+            let componentInkFloor = Int(200 * componentScale * componentScale)
+            XCTAssertGreaterThanOrEqual(s.idleInk, componentInkFloor,
+                                        "\(tag)：组件静置帧标题带只有 \(s.idleInk) 个墨像素（地板 \(componentInkFloor)）"
+                                            + " ⇒ 通道黑，0/0 不能读成没有反馈")
+            XCTAssertGreaterThanOrEqual(s.delta, 1000,
+                                        "\(tag)：组件标题区悬停亮度绝对差总和只有 \(Int(s.delta.rounded())) ⇒ 浅底没有画出来")
+            XCTAssertGreaterThanOrEqual(s.changed, 200,
+                                        "\(tag)：组件标题区只有 \(s.changed) 个像素在动 ⇒ 浅底没有画出来")
+            componentJudged += 1
         }
-        if judged == 0 { throw XCTSkip("TITLE_HOVER_NOT_RUN：两档都读不到标题带") }
+        if composedJudged == 0 && componentJudged == 0 {
+            throw XCTSkip("TITLE_HOVER_NOT_RUN：两档都读不到标题带")
+        }
+        if composedJudged == 0 {
+            emit("TITLE_HOVER_NOT_RUN=composed-arm-not-drawable component=\(componentJudged)/2")
+        }
     }
 
     /// R521：关于页 GitHub 链接的按下臂 —— 按下时整条 label 多一层按下底色（`pressedStyle`），
