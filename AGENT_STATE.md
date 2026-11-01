@@ -12,14 +12,19 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R539 / 第 538 轮 / Round 536）
-## R540 开工 ⓪（2026-11-01 · 第 539 轮 / Round 537）
+最后更新：2026-11-01（本地 · R540 / 第 539 轮 / Round 537）
+## R540 状态（2026-11-01 · 第 539 轮 / Round 537 · 产品 0 文件 + 判据）
 
 R540 ⓪ 读数（只登记、不轮询）：HEAD=origin=`3628685`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1383/56/0（613.2s）**、预检 **319/295/757 bad=0**、ARM **411/1244**、HIDDEN **406/1183 rot=0**、电池 **685/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 538）。
 - 五跑读时均 **in_progress ⇒ NOT-RUN**：`41314618298 ↔ acefc43`（R539 产品，628 签收靠它，读时 526s）、`41312123929 ↔ 40a2a71`（⓪）、`41315145441 ↔ 344c80e`（台账）、`41315167100 ↔ 509c18c`（补记二）、`41315228607 ↔ 3628685`（补记三）。**628 保持开单**，等 `acefc43` 的 STEP[9] 正文。
 - 已收口（R538 批）：`41310819996 ↔ 9e78221` failure STEP[9]+[18]+[19]（STEP[9]=3 缩写 + 624 + sources 时序；STEP[18]=frame **262.3ms/2/175** 第六值 + `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合；STEP[19]=copy receipt ⇒ 627）；`41311271183 ↔ 1f65367`、`41311603175 ↔ 0cc001f`、`41311984162 ↔ e07e78d` 均 **仅 STEP[9]**；`41311818680 ↔ b6394f5` STEP[9]+[15]+[19]（STEP[15] `testCollapseWidthIsMeasuredFrameByFrame` foldProgress `[0,0,0,0.993,0.993]`）。625/626 已结案不重开。
 - 本轮靶：② 至少一件产品或判据——627 出**出现率读数**（copy receipt 与 fold 采样分开记，含各跑 executed/judged 与红名），622 frame 半做**同一次跑多段读数**的确定性证据（不放宽 120ms/容差、不删锚点）；若指向真缺陷则挑一个可本机落地的动效位改产品。624 保持开单、不改名册；刀号从 **M1419** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 
+① 627 出现率（copy / fold / markdown 分开）：15 跑窗口 copy receipt **1/15**（filmstrip 只打印失败 ⇒ 分母受限）、fold **1/15 executed**（b6394f5）、markdown label **1/15**（3628685 的 Motion floor 红，1x 只有 1 个过渡帧）。本机各 10 次：copy 10/10 过（2x 3–4、1x 2–3）、fold 10/10 过（中间帧 7–8、终值 420）。三者不同动效、同属 runner 1x 采样边界；≥2 帧地板不动、627 保持开单。
+② 622 frame 多段：15 跑 `worst_max=262.3`、`over_max=2`、`over_runs=7`、`loaded_p95_max=46.73`、`比值=0.713–2.020`；9e78221 单跑 baseline=16.67/off=42.56/loaded=46.73/ratio=1.098/n=175/worst=262.3/over=2 ⇒ 1–2 颗离群、不是整段慢；120ms/容差 1 不动、frame 半保持开单。
+③ 判据/刀：新增 `motion_red_occurrence.py` + 5 条真值表（copy RED 只认 filmstrip 失败、Swift skip 不是红、fold skip 不进 executed、PROBE_FPS 七字段、红名读出、读不到退 2）；`M1419` CAUGHT、RESTORE_CLEAN；预检 320/295/757 bad=0、ARM 413/1244、HIDDEN 407/1183 rot=0；build 0 告警。
+④ 帧/全量/换装/电池/清账/streak：帧 **350**（CHANGED=0）；全量 **1383/56/0（641.1s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 35059、1 窗口 750×492）；电池 **690/5**（台账后复跑）；清账 162/162/0；产品面连续零改动 **1** 轮（as-of 539，`scripts/product_streak.py --streak-for 539` 现读，last=acefc43/538）。
+⑤ CI/交接：判据笔 `057e2e4`（主）与 `c15377e`（红名补记）已推；628 **签收**（`41314618298 ↔ acefc43` STEP[9] 只剩 skip_roster + sources 时序，修前 `41312123929 ↔ 40a2a71` 4 红）；`41315228607 ↔ 3628685` 仅 STEP[19]（markdown label 采样红）；`41315145441 ↔ 344c80e`/`41315167100 ↔ 509c18c` **success**；`41315396056 ↔ 8c165fb`、`41317878347 ↔ 057e2e4`、`c15377e` 与台账跑读时 in_progress/queued ⇒ NOT-RUN。下一轮 R541（第 540 轮 / Round 538）：先 push 复核 ahead=0；读 `41317878347 ↔ 057e2e4`、`c15377e` 与台账跑、`41315396056 ↔ 8c165fb` 的全部失败步骤；622 frame 半、624、627 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R539 状态（2026-11-01 · 第 538 轮 / Round 536 · 产品 1 文件 + 判据）
 
 R539 ⓪ 读数（只登记、不轮询）：HEAD=origin=`e07e78d`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1383/56/0（584.7s）**、预检 **317/294/755 bad=0**、ARM **410/1242**、HIDDEN **404/1181 rot=0**、电池 **683/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 537）。

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 627 出现率与 622 多段读数（R540 / 第 539 轮 / Round 537 / U-2241…U-2249 · 产品 0 文件 + 判据）
+
+新增 `motion_red_occurrence.py`：把 copy receipt、fold 采样、Motion floor 红名与 `PROBE_FPS` 多段读数分开数。15 跑窗口 copy 1/15（分母受限）、fold 1/15 executed、markdown label 1/15；本机 copy/fold 各 10/10 过（copy 1x 2–3 帧、fold 中间帧 7–8）。622 多段：worst_max 262.3、over_max 2、over_runs 7、loaded_p95_max 46.73、比值 0.713–2.020 ⇒ 1–2 颗离群；120ms/容差不动。5 条真值表 + M1419 CAUGHT；帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431；电池 690/5。628 由 `acefc43` 的 STEP[9] 签收。
+
 ### 折叠提示按钮进入 Tab 链 + git 缩写钉死（R539 / 第 538 轮 / Round 536 / U-2232…U-2240 · 产品 1 文件 + 判据）
 
 625：无边框 NSButton 的 `canBecomeKeyView` 默认 false，折叠提示的「知道了」虽在 key-view 链里却不被 Tab 环收；显式放行后真机 12 次 Tab 有 4 次停在 AXButton「知道了」（旧值 0/12，只在列表/搜索框）。628：runner 的 `git %h` 给 8 位而账上存 7 位，三条脚本守卫红；读取处改钉 `--abbrev=7`，并用 `core.abbrev=8` 环境模拟 runner 的回归判据；M1415–M1418 CAUGHT。帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431；电池 685/5。

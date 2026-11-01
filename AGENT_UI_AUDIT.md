@@ -363,6 +363,18 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 539 轮（R540 · 2026-11-01 · U-2241…U-2249）：627 出现率与 622 多段读数（628 签收）（产品 0 文件 + 判据）
+
+- **U-2241：⓪ CI。** HEAD=origin=`3628685`、ahead=0、`git push` no-op；api=200/apple=200。开工五跑读时 **in_progress ⇒ NOT-RUN**；收口前落地：`41314618298 ↔ acefc43` failure **STEP[9]+[15]**（STEP[9] 只剩 skip_roster + sources 时序 ⇒ **3 条缩写红消失、628 签收**；STEP[15] `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime` 是已知会话/采样 flake）、`41312123929 ↔ 40a2a71` failure **仅 STEP[9]** 4 红（3 缩写 + skip_roster，修前对照）、`41315228607 ↔ 3628685` failure **仅 STEP[19]**（Motion floor 红 `testMarkdownModeLabelChangeIsAVisibleProcess`）。`344c80e`/`509c18c` **success**；`8c165fb`、`057e2e4`、`c15377e` 与台账跑读时 in_progress/queued ⇒ **NOT-RUN**。
+- **U-2242：② 627 出现率（copy / fold / markdown 分开）。** 15 跑窗口（eec86a3…3628685）用 `motion_red_occurrence.py` 现读：copy receipt **红 1/15**（9e78221；filmstrip 只打印失败 ⇒ 分母 `filmstrip-failures-only`，不拿日志条数冒充通过数）；fold **红 1/15 executed**（b6394f5）；markdown label **红 1/15**（3628685）。本机各 10 次：copy **10/10 过**（2x 过渡帧 3–4、1x 2–3，最低 2 贴着 ≥2 地板）；fold **10/10 过**（中间帧 7–8，终值 420）。三种红发生在三条不同动效、三条不同断言，但形态同族：**runner 1x 采样边界**（copy/markdown 掉到 1 帧；fold 采样落在 0 与终值 `[0,0,0,0.993,0.993]`）⇒ 不是产品硬切/不动。≥2 帧地板不动，627 保持开单等出现率继续累积。
+- **U-2243：② 622 frame 多段确定性证据。** 同一次跑的 `PROBE_FPS` 已含 baseline/off/loaded 三段 p95+比值+n+worst+超锚：15 跑 `worst_max=262.3`（9e78221）、`over_max=2`、`over_runs=7`、`loaded_p95_max=46.73`、`比值=0.713–2.020`；9e78221 单跑 `baseline=16.67/off=42.56/loaded=46.73/ratio=1.098/n=175/worst=262.3/over=2`。最差帧是 1–2 颗离群、loaded p95 全在 46.73 以下 ⇒ 不是整段慢；120ms 与容差 1 不动、不删锚点，frame 半保持开单。
+- **U-2244：② 判据与刀。** 新增 `scripts/motion_red_occurrence.py` + 5 条真值表（copy 的 RED 只认 filmstrip 失败、Swift skip 不是红/不进 executed、fold skip 不进分母、`PROBE_FPS` 七字段同源、红名读出、读不到退 2）；`M1419`（fold skip 当执行）**CAUGHT、RESTORE_CLEAN=yes**；预检 **320/295/757 bad=0**、ARM **413/1244**（dupes=0 repeats=0）、HIDDEN **407/1183 rot=0**；build **0 告警**。
+- **U-2245：③ 帧卷。** 捕获 **350 帧**，`--against working`：`CHANGED=0 MISSING=0 ADDED=0`；基线保持 **350**（本轮无产品改动）。
+- **U-2246：④ 八步与电池。** 全量 **1383/56/0（641.1s）**（无 Swift 改动；本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 35059；1 窗口 750×492；活库 431 不增不减）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **690/5**（685+5 条 627/622 判据；台账后复跑）；product_streak **1**（as-of 539，`python3 scripts/product_streak.py --streak-for 539` 现读，last=acefc43/538）。
+- **U-2247：⑤ 628 / 624。** **628 结案**：`acefc43` 的 STEP[9] 从修前 `40a2a71` 的 4 红（3 缩写 + skip_roster）降到 2 红（skip_roster + sources 时序），3 条 git 缩写红消失；7 位/8 位模拟判据在 M1415/M1416 下 CAUGHT。624 在 `acefc43`/`40a2a71` 的 STEP[9] 仍红在 skip_roster，保持开单、不改名册。
+- **U-2248：⑤ 622 / 625 / 626 / 627。** 622 frame 半第六值 262.3ms/2/175 与多段读数见 U-2243，保持开单；code-block 半仍按 `41308835299 ↔ 21a5440` 签收。625/626 已结案不重开。627 见 U-2242，保持开单等出现率。
+- **U-2249：⑥ 收口与交接。** 判据笔 `057e2e4`（主）与 `c15377e`（红名补记）已推；台账笔随后。下一轮 R541（第 540 轮 / Round 538）：先 push 复核 ahead=0；读 `41317878347 ↔ 057e2e4`、`c15377e` 与台账跑、`41315396056 ↔ 8c165fb` 的全部失败步骤；622 frame 半、624、627 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 538 轮（R539 · 2026-11-01 · U-2232…U-2240）：折叠提示按钮进 Tab 链 + git 缩写钉死（625 结案 / 628 本机修）（产品 1 文件 + 判据）
 
 - **U-2232：⓪ CI。** HEAD=origin=`e07e78d`、ahead=0、`git push` no-op；api=200/apple=200。开工五跑读时 **in_progress ⇒ NOT-RUN**；收口前全部落地：`41310819996 ↔ 9e78221` failure **STEP[9]+[18]+[19]**、`41311271183 ↔ 1f65367` failure **仅 STEP[9]**、`41311603175 ↔ 0cc001f` failure **仅 STEP[9]**、`41311818680 ↔ b6394f5` failure **STEP[9]+[15]+[19]**、`41311984162 ↔ e07e78d` failure **仅 STEP[9]**；`41312123929 ↔ 40a2a71`（R539 ⓪）与 `41314618298 ↔ acefc43`（R539 产品）读时 **in_progress ⇒ NOT-RUN**。STEP[9] 的 4/5 红 = 3 条 git 缩写 + 624（产品笔多一条 sources 时序），见 U-2233/2239；STEP[15]/[19] 是折叠动画 runner 采样 flake，见 U-2239。

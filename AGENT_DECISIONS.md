@@ -8689,3 +8689,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：判据要比的是「同一份账里的 sha」，不是「这台机器的 git 恰好给几位」；钉死 7 位与账上/roster 的存储口径一致，且显式参数可覆盖 `core.abbrev`。
 - 兼容性/迁移：不改地板/阈值，不删守卫；7 位与 8 位输入都走同一条断言（8 位环境由新判据钉住）。
 - 边界：本机修复、待 R539 产品跑在 runner 上签收；sources 时序红不在本条内。
+
+## D-540 627/622 的出现率读数：skip 不是红、copy 通过不落日志、frame 取同跑三段（R540）
+
+- 背景：627 的 copy receipt 与 fold 采样是两条不同卷、不同断言的红，过去只用「同一族」一句话带过；622 的 frame 半只看 worst，分不出「1–2 颗离群」与「整段慢」。CI 日志里 copy receipt 的通过不打印，fold 的 passed/failed 都打印。
+- 决定：新增 `motion_red_occurrence.py`：copy 的 RED 只认 Motion filmstrip 的失败行（分母具名 `filmstrip-failures-only`）；fold 的 skipped 不进 executed 分母、RED 优先于 PASS；Motion floor 的红名单独读出；`PROBE_FPS` 的 baseline/off/loaded p95、比值、n、worst、超锚点在同一行取全。5 条真值表 + M1419 钉住 skip 口径。
+- 理由：把「同一族」拆成可复查的三条出现率与同跑多段读数，才能判是采样边界还是产品缺陷；copy 的通过不可见这件事必须写在分母里，不能拿日志条数冒充。
+- 兼容性/迁移：不改任何阈值/地板/锚点；新脚本只读日志。628 由 `acefc43` 的 STEP[9] 签收（修前 `40a2a71` 4 红 → 修后 2 红）。
+- 边界：copy 的分母不是全量跑数；627 仍需继续累积出现率，622 frame 半仍保持开单。
