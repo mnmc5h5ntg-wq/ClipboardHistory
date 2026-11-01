@@ -147,11 +147,17 @@ final class MainWindowFoldMotionTests: XCTestCase {
         XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5, "折叠后最小宽没有跟着切")
         XCTAssertGreaterThanOrEqual(progressIntermediate.count, 1,
                                     "foldProgress 中间帧不足：\(progress)")
-        XCTAssertEqual(progress.last ?? 0, 1, accuracy: 0.001)
+        // 末帧是采样器停手那一刻的值，可能停在过渡结束前一拍（runner bd96e93 读到 0.9989，
+        // 而窗口已经落在 420）⇒ 只要求它离终点足够近；「过渡真的走完」交给 settle 后的模型值。
+        XCTAssertGreaterThanOrEqual(progress.last ?? 0, 0.99,
+                                    "采样末帧离终点太远：\(progress)")
+        XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001,
+                       "过渡结束后模型进度没有落到 1：\(controller.foldProgress)")
         CaptureReadings.emit("FOLD_WIDTH_FILM collapse frames=\(samples.count)"
               + " intermediate=\(intermediate.count) distinct=\(distinct.count)"
               + " widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
               + " progress=[\(progress.map { String(format: "%.2f", $0) }.joined(separator: ","))]"
+              + " settled=\(String(format: "%.4f", controller.foldProgress))"
               + " final=\(Int(window.frame.width)) min=\(Int(window.minSize.width))")
     }
 
