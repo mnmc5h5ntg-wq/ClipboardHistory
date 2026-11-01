@@ -36,6 +36,8 @@ FOLD_SKIP = line("Swift tests (executed-count gate)",
                  "Test Case '-[AppTests.MainWindowFoldMotionTests testCollapseWidthIsMeasuredFrameByFrame]' skipped (0.001 seconds).")
 FLOOR = line("Motion coverage floor",
              "MOTION_FLOOR_FACTS judged=5/5 executed=77 not-run=- summary=x 红的用例=- 汇总行报红=0 机器=github-runner")
+FLOOR_RED = line("Motion coverage floor",
+                 "MOTION_FLOOR_FACTS judged=5/5 executed=77 not-run=- summary=x 红的用例=testMarkdownModeLabelChangeIsAVisibleProcess 汇总行报红=1 机器=github-runner")
 FPS = line("On-screen interaction probes (report-only)",
            "FORWARDED PROBE_FPS 机器=arm64/macOS 15.8/1x baseline_p95=16.67 off_p95=42.56 loaded_p95=46.73 比值=1.098 预算=3.00 n=175 worst=262.3ms 超锚点帧=2")
 
@@ -62,6 +64,8 @@ class MotionRedOccurrenceTests(unittest.TestCase):
         f = occ.scan(FPS)["frame"]
         self.assertEqual(("16.67", "42.56", "46.73", "1.098", "175", "262.3", "2"), f)
         self.assertIsNone(occ.scan(FLOOR)["frame"], u"没有 PROBE_FPS 就是 None（不是 0）")
+        self.assertEqual("testMarkdownModeLabelChangeIsAVisibleProcess",
+                         occ.scan(FLOOR_RED)["judged"][4], u"红的用例名必须被读出来")
 
     def test_summary_counts_copy_and_fold_separately(self):
         z = occ.summarize([occ.scan(COPY_RED + FOLD_PASS), occ.scan(COPY_SKIP + FOLD_RED)])
@@ -74,7 +78,7 @@ class MotionRedOccurrenceTests(unittest.TestCase):
         fd, path = tempfile.mkstemp(suffix=".log")
         os.close(fd)
         with io.open(path, "w", encoding="utf-8") as h:
-            h.write(COPY_RED + FOLD_PASS + FPS)
+            h.write(COPY_RED + FOLD_PASS + FLOOR_RED + FPS)
         try:
             proc = subprocess.run([sys.executable, SCRIPT, path], capture_output=True, text=True)
             self.assertEqual(0, proc.returncode, proc.stdout + proc.stderr)
@@ -83,6 +87,7 @@ class MotionRedOccurrenceTests(unittest.TestCase):
             self.assertIn("FRAME_MULTI logs=1 with=1", proc.stdout)
             self.assertIn("over_runs=1", proc.stdout)
             self.assertIn("loaded_p95_max=46.73", proc.stdout)
+            self.assertIn("red=testMarkdownModeLabelChangeIsAVisibleProcess", proc.stdout)
             missing = subprocess.run([sys.executable, SCRIPT, path + ".missing"],
                                      capture_output=True, text=True)
             self.assertEqual(2, missing.returncode, u"一份日志都没读到必须退 2")

@@ -43,9 +43,9 @@ def scan(text):
         if st == "skipped" and fold == "ABSENT":
             fold = "SKIP"
     judged = None
-    m = re.search(r"MOTION_FLOOR_FACTS judged=(\d+)/(\d+) executed=(\d+) not-run=(\S+)", text)
+    m = re.search(r"MOTION_FLOOR_FACTS judged=(\d+)/(\d+) executed=(\d+) not-run=(\S+)[^\n]*?红的用例=(\S*)", text)
     if m:
-        judged = (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4))
+        judged = (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4), m.group(5))
     frame = None
     f = re.search(
         r"PROBE_FPS .*?baseline_p95=([0-9.]+) off_p95=([0-9.]+) loaded_p95=([0-9.]+) "
@@ -86,7 +86,7 @@ def main():
             continue
         s = scan(text)
         items.append(s)
-        j = "-" if s["judged"] is None else "%d/%d executed=%d not-run=%s" % s["judged"]
+        j = "-" if s["judged"] is None else "%d/%d executed=%d not-run=%s red=%s" % s["judged"]
         fr = "-" if s["frame"] is None else "/".join(s["frame"])
         print("LOG %s copy=%s fold=%s motion=%s frame=%s"
               % (os.path.basename(path), s["copy"], s["fold"], j, fr))
