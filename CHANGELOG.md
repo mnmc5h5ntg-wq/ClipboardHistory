@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠提示支持 Esc 关闭（R534 / 第 533 轮 / Round 531 / U-2194…U-2200 · 产品 1 文件 + 判据）
+
+「知道了」挂 `.keyboardShortcut(.cancelAction)`（只在提示可见时存在），一次性提示可从键盘关闭；视觉不变。旧值真机折叠 420×492 按 Esc 不写确认键；新增源码段判据与 M1410；帧 350 重捕 CHANGED=0；全量 1378/56/0；换装 431=431。
+
 ### 折叠提示的「知道了」改为独立无障碍元素（R533 / 第 532 轮 / Round 530 / U-2187…U-2193 · 产品 1 文件 + 判据）
 
 折叠提示行去掉 `.accessibilityElement(children: .combine)`：文字与「知道了」各自成元素，VoiceOver 能单独聚焦并激活确认；装饰信息图标保持隐藏。新增源码段判据与 M1409；另加 360×560 最小宽提示帧（文案与按钮完整）。帧 350（ADDED=2）；全量 1377/56/0；换装 431=431。

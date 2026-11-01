@@ -12,14 +12,18 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R533 / 第 532 轮 / Round 530）
-## R534 开工 ⓪（2026-11-01 · 第 533 轮 / Round 531）
+最后更新：2026-11-01（本地 · R534 / 第 533 轮 / Round 531）
+## R534 状态（2026-11-01 · 第 533 轮 / Round 531 · 产品 1 文件 + 判据）
 
 R534 ⓪ 读数（只登记、不轮询）：HEAD=origin=`8b1ddb9`、ahead=0；网络复核 `git ls-remote origin main` 通、api=200/apple=200（上轮断网已恢复）。`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63`、`41293901730 ↔ 039413e` 读时均 **in_progress ⇒ NOT-RUN**。
 - `41293578965 ↔ df43baa`（R532 台账）**failure STEP[15]+[18]**：STEP[15] 唯一失败是 `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime`（会话族）；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **162.2ms**、超锚点 **2/208**（容差 1），而 loaded_p95=16.67、比值 1.000 ⇒ **622 再现**（值从 544.1ms 变 162.2ms，形态仍是少数帧超锚点；120ms 与容差不动）。STEP[9] 绿 ⇒ 624 的台账笔绿臂继续。
 - `882e30f` 已读（仅 STEP[9] 六红：台账时序 + skip_roster；Swift/capture 无红）；`c788299` success（623 已签收，不重开）。
 - 归因：sources/指针/streak 时序红与产品红分开；622 记录新值 162.2ms，不改阈值；624 非台账笔红/台账笔绿继续。
 
+① 产品/旧值：真机折叠 420×492 下按 Esc，`mainWindowCollapseHintAcknowledged` 前后都是 0 ⇒ 一次性提示只能鼠标关。产品 **1 文件**：给「知道了」挂 `.keyboardShortcut(.cancelAction)`（Esc 系统关闭语义），只在 `isCollapsed && showsCollapseHint` 时存在；视觉零变化。
+② 判据/刀：`testCollapseHintCanBeDismissedWithEscape`（切源码段：按钮/确认动作/`.keyboardShortcut(.cancelAction)`）；`M1410` CAUGHT、RESTORE_CLEAN=yes；预检 313/290/751 bad=0、ARM 406/1238、HIDDEN 400/1177 rot=0；build 0 告警。帧 **350**（重捕 CHANGED=0/ADDED=0/MISSING=0；基线保持 350）。
+③ 八步：全量 **1378/56/0（591.3s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 68388；真机只读 1 窗口 750×492）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 533，`python3 scripts/product_streak.py --streak-for 533` 现读，last=0720cc6/532）。
+④ 真机/收口：旧值按 Esc 未写确认键；新版只在源码/判据上钉 `.cancelAction`，**没有**在活 App 上按 Esc 去消费一次性提示（避免替用户改写 defaults）⇒ 新值真机按键具名 `HINT_ESC_LIVE_NOT_RUN=defaults-preserved`。产品笔 `a8f1817` 本笔后推；`8b1ddb9`/`76cbd63`/`039413e` 读时 in_progress ⇒ NOT-RUN。下一轮 R535（第 534 轮 / Round 532）：先 push 并复核 ahead=0；622 记 162.2ms 新值、624 两臂继续；623 不重开；继续折叠特性；4.5 地板与 150 上限不动。
 ## R533 状态（2026-11-01 · 第 532 轮 / Round 530 · 产品 1 文件 + 判据）
 
 R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。**网络两路都断**：`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ 记 **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不重试；`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）。R532 收口已读到的最新读数仍有效：`c788299` **success** ⇒ 623 签收（组合臂 idleInk=0 + 组件臂 light 571/706/38308/1803、dark 627/671/21456/1437）；`9bfd943` STEP[9]+[15]（时序 + SelectionReveal）、`adb50c1` STEP[15]+[19]（两条运动 flake）、`6add742` STEP[9]+[15]（时序 + SelectionReveal）。

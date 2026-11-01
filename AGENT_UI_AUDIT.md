@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 533 轮（R534 · 2026-11-01 · U-2194…U-2200）：折叠提示支持 Esc 关闭（产品 1 文件 + 判据）
+
+- **U-2194：⓪ CI。** HEAD=origin=`8b1ddb9`、ahead=0；网络复核 `git ls-remote` 通、api=200/apple=200。`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63`、`41293901730 ↔ 039413e` 读时 **in_progress ⇒ NOT-RUN**；`41293578965 ↔ df43baa` **failure STEP[15]+[18]**：STEP[15]=SelectionReveal 会话族；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **162.2ms**、超锚点 **2/208**（loaded_p95=16.67、比值 1.000）⇒ **622 再现**（值从 544.1ms 变 162.2ms；120ms 与容差不动）；STEP[9] 绿 ⇒ 624 台账笔绿臂。`882e30f` 仅 STEP[9] 六红已读；623 已签收。
+- **U-2195：① 旧值与产品。** 旧值（真机只读）：折叠 **420×492** 下按 Esc，`mainWindowCollapseHintAcknowledged` 前后都未写（0/0）⇒ 一次性提示只能鼠标点「知道了」，键盘用户无法确认。产品 **1 文件**：给「知道了」挂 `.keyboardShortcut(.cancelAction)`（Esc 系统关闭语义），只在提示可见时存在；视觉零变化。
+- **U-2196：② 判据与刀。** 新增 `testCollapseHintCanBeDismissedWithEscape`（切 `collapseHintLine` 源码段：按钮/确认动作/`.keyboardShortcut(.cancelAction)` 三格）；`M1410`（摘掉 Esc）**CAUGHT、RESTORE_CLEAN=yes**；预检 **313/290/751 bad=0**、ARM **406/1238**（dupes=0 repeats=0）、HIDDEN **400/1177 rot=0**；build **0 告警**。
+- **U-2197：③ 帧卷。** 重捕 **350 帧**：`CHANGED=0 ADDED=0 MISSING=0`（Esc 不进像素；提示帧与 R533 已看过的一致），基线保持 **350**。
+- **U-2198：④ 八步与电池。** build 0 告警；全量 **1378/56/0（591.3s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（活库只增不减；PID 68388；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 533，`python3 scripts/product_streak.py --streak-for 533` 现读，last=0720cc6/532）。
+- **U-2199：⑤ 真机边界。** 旧值按下 Esc 未写确认键；新版只在源码/判据上钉住 `.cancelAction`，**没有**在活 App 上按 Esc 去消费一次性提示（避免替用户改写 defaults）⇒ 新值真机按键未演，具名 `HINT_ESC_LIVE_NOT_RUN=defaults-preserved`。
+- **U-2200：⑥ 收口与交接。** 产品笔 `a8f1817` 待推（本笔后 push）；`8b1ddb9`/`76cbd63`/`039413e` 读时 in_progress。下一轮 R535（第 534 轮 / Round 532）：先 push 并复核 ahead=0；读本轮产品/台账跑与上一轮三跑的全部失败步骤；622 记录 162.2ms 新值、624 非台账笔红/台账笔绿继续；623 不重开；继续折叠特性；安全红线不变。
+
 ## 第 532 轮（R533 · 2026-11-01 · U-2187…U-2193）：折叠提示的「知道了」改为独立无障碍元素（产品 1 文件 + 判据）
 
 - **U-2187：⓪ 网络与 CI。** HEAD=origin=`039413e`、ahead=0；`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不反复重试，收口前再试一次。`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）；R532 收口已读：`c788299` **success** ⇒ 623 签收；`9bfd943`/`adb50c1`/`6add742` 的失败分别为台账时序 + SelectionReveal、两条运动 flake、时序 + SelectionReveal。
