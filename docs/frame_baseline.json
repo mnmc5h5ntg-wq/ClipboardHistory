@@ -1,5 +1,5 @@
 {
-  "count": 348,
+  "count": 350,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -143,6 +143,8 @@
     "main-collapsed-420x560-light.png": "2493fcd113bf652f5f4810d0c4dd719bac63189a7959481c0cd858c0fc8fcbf7",
     "main-collapsed-hint-420x560-dark.png": "9dae308d11b71ace472c9058a6283d698b4bed0e47f97cc939f34ca2d1e88df8",
     "main-collapsed-hint-420x560-light.png": "3834de6827bf3589d362d8ef9391b8eaacb5f07545caf87fe57eee2f199de604",
+    "main-collapsed-hint-min-360x560-dark.png": "3a8a791874c41b499b084fb8a5f545433dace4e04e292002a68f7bad82cbea99",
+    "main-collapsed-hint-min-360x560-light.png": "9828122ed0a7237930ffbc26c9832d7d845b0e37c13748b8949e2bc185782d9f",
     "main-collapsed-min-360x560-dark.png": "87f4227f32f23058f715c644f55f66fc107e4a8695aec0803e02ecc4f499a5ad",
     "main-collapsed-min-360x560-light.png": "609cec0a2f9831a56ab5bed8cf15753ac5c167b5e16eac6c8cbd49e20a4b1b4b",
     "main-sidebar-title-hover-750x560-dark.png": "c6c03bf1fe350ac0699c40efc09a9a8f921d7ea906b765c2a1984399c99edfe0",

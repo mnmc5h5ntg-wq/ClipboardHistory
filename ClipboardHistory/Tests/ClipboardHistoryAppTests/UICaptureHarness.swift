@@ -185,6 +185,8 @@ final class UICaptureTests: XCTestCase {
         "main-collapsed-min",
         // R532：折叠提示帧是同一个 `HistorySidebarView`；黑带仍是系统 List 选中材质（66pt）。
         "main-collapsed-hint",
+        // R533：360pt 最小折叠宽下的同一提示；黑带同上。
+        "main-collapsed-hint-min",
         // R526：标题悬停帧是同一个 `HistorySidebarView`（只点亮标题 hover）；黑带仍是已登记的
         // 系统 List 选中材质（同 66pt 带），不是标题浅底画黑的。
         "main-sidebar-title-hover",
@@ -11703,6 +11705,11 @@ final class UICaptureTests: XCTestCase {
             // R532：折叠一次性提示（420×560）—— 旧帧 `main-collapsed` 没有提示行；
             // 这一帧只把 showsCollapseHint 点亮，确认动作在测试里走控制器。
             Fixture("main-collapsed-hint", NSSize(width: 420, height: 560)) {
+                AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {},
+                                    showsCollapseHint: true))
+            },
+            // R533：同一提示在 360pt 最小折叠宽 —— 看文案与「知道了」是否互相挤掉。
+            Fixture("main-collapsed-hint-min", NSSize(width: 360, height: 560)) {
                 AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {},
                                     showsCollapseHint: true))
             },

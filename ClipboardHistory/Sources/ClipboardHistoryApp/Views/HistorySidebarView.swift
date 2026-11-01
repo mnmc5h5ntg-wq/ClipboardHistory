@@ -169,8 +169,9 @@ struct HistorySidebarView: View {
                               labelPadding: 3)
         }
         .padding(.horizontal, 4)
+        // R533：不要把「知道了」合并进一个无障碍元素 —— `.combine` 会把按钮动作并掉，
+        // VoiceOver 只剩一段文字、按不到确认；文字与按钮各自成元素（信息图标是装饰，已隐藏）。
         .transition(MotionCatalog.transition(for: .contentFade))
-        .accessibilityElement(children: .combine)
     }
 
     private var headerRow: some View {

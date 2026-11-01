@@ -404,6 +404,27 @@ final class MainWindowCollapseTests: XCTestCase {
                       "提示的「知道了」没有接确认动作")
     }
 
+    /// R533：折叠提示的「知道了」必须是独立无障碍元素。
+    /// 旧值：提示行用了 `.accessibilityElement(children: .combine)`，把可点按钮并进一段文字；
+    /// 离屏窗口不建 AX 树（已知盲区），所以这里用产品源码段钉住「不许合并」这条契约。
+    func testCollapseHintKeepsDismissButtonActionableForVoiceOver() throws {
+        let sidebar = try productSource("Views/HistorySidebarView.swift")
+        guard let start = sidebar.range(of: "private var collapseHintLine: some View {"),
+              let end = sidebar.range(of: "private var headerRow: some View {",
+                                      range: start.upperBound..<sidebar.endIndex) else {
+            return XCTFail("折叠提示的源码段找不到 ⇒ 这条判据无从取证")
+        }
+        let hint = String(sidebar[start.lowerBound..<end.lowerBound])
+        XCTAssertFalse(hint.contains(".accessibilityElement(children: .combine)"),
+                       "折叠提示把可点的「知道了」合并进一个元素 ⇒ VoiceOver 拿不到按钮动作")
+        XCTAssertTrue(hint.contains("Button(CollapseHintPresentation.dismissTitle)"),
+                      "「知道了」不是独立按钮")
+        XCTAssertTrue(hint.contains(".helpLabel(CollapseHintPresentation.dismissHelp)"),
+                      "「知道了」没有读屏/悬停说明")
+        XCTAssertTrue(hint.contains(".accessibilityHidden(true)"),
+                      "装饰性的信息图标没有从读屏树里隐藏")
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
