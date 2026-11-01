@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 535 轮（R536 · 2026-11-01 · U-2208…U-2214）：折叠提示改 AppKit 按钮与焦点环（Tab 链仍未打通）（产品 1 文件 + 判据）
+
+- **U-2208：⓪ CI。** HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`、`41303247255 ↔ 5bcbd7a`、`41303403928 ↔ 789f642` 读时 **in_progress ⇒ NOT-RUN**；`20ceacb`/`d625b47`/`d8c0e44`/`0cce5df`/`76cbd63` 全部 **success**；`8b1ddb9` failure **仅 STEP[19] Motion floor**（回执 1x 1 帧 <2，**627**）；`df43baa` STEP[15]+[18]（**622** 162.2ms/2/208）；624 两臂继续，623 已签收。
+- **U-2209：① 625 的旧值与尝试。** 旧值（真机只读）：折叠 420×492 连按 8 次 Tab，聚焦只在 **AXTextField/AXOutline** 循环；R535 的 `.focusable` 只多出根 AXGroup（420×472）。本轮把「知道了」换成真实 **AppKit NSButton**（AXButton、`focusRingType=.default` + 自绘遮罩、悬停/按压底、Return `keyEquivalent`、Esc local monitor），并在 `viewDidMoveToWindow/layout` 把它插进当前 key-view 链的末尾。
+- **U-2210：② 诚实边界：Tab 链仍未打通。** 单测 24 站读到 **`HINT_KEYVIEW_REACHED=0`**；真机装好后折叠 420×492 连按 8 次 Tab 仍是 **TextField/Outline**，没有 AXButton。⇒ **625 保持开单**，不宣称 Tab 可达；保留的产品改进是 AppKit 按钮本身（真实 AXButton/系统焦点环/Return/Esc/鼠标同一 action）。
+- **U-2211：③ 判据与刀。** `testCollapseHintDismissButtonIsAnAppKitButtonWithFocusRingAndAction`（真实 NSButton、焦点环、`refusesFirstResponder=false`、点击走确认）；`M1412`（摘掉焦点环）**CAUGHT、RESTORE_CLEAN=yes**；`M1410`/`M1411` 重锚到 Esc monitor/Return keyEquivalent 后均 **CAUGHT**；预检 **315/292/753 bad=0**、ARM **408/1240**（dupes=0 repeats=0）、HIDDEN **402/1179 rot=0**；build **0 告警**；PressFeedback 名册随 SwiftUI 位点退场改为 labelPadding 2、控件档 11。
+- **U-2212：④ 帧卷。** 捕获 **350 帧**：`CHANGED=4`（仅 `main-collapsed-hint`/`-min` 亮/暗两档提示帧）、`ADDED=0 MISSING=0`；基线保持 **350**；亮/暗 420/360 提示帧逐张看过，AppKit 按钮文字/位置与 SwiftUI 版一致。
+- **U-2213：⑤ 八步与电池。** build 0 告警；全量 **1379/56/0（596.5s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 23181；真机只读 1 窗口，折叠 420×492 后展开 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 535，`python3 scripts/product_streak.py --streak-for 535` 现读，last=a2579fd/534）。
+- **U-2214：⑥ 收口与交接。** 产品笔 `5837d65` 已推（HEAD=origin、ahead=0）。下一轮 R537（第 536 轮 / Round 534）：先 push 并复核 ahead=0；读 a2579fd/5bcbd7a/789f642 与 R536 产品/台账跑的全部失败步骤；625 的 Tab 链仍未达成（需查 SwiftUI 宿主对 key-view 的所有权），626/627 保持开单，623 不重开；622/624 继续；继续折叠特性；安全红线不变。
+
 ## 第 534 轮（R535 · 2026-11-01 · U-2201…U-2207）：折叠提示支持 Return 激活 + 两个候选被真机证伪（产品 1 文件 + 判据）
 
 - **U-2201：⓪ CI。** HEAD=origin=`d625b47`、ahead=0；网络通。`d625b47`/`d8c0e44`/`0cce5df`/`8b1ddb9`/`76cbd63` 读时 **in_progress ⇒ NOT-RUN**；`a8f1817` 与 `d8c0e44` 同次推送，GitHub 只给头笔建 run ⇒ **无独立跑/CI_UNREAD**。`039413e` **success**；`df43baa` failure STEP[15]+[18]（SelectionReveal + `testFrameIntervalsUnderStateChanges` **162.2ms**、超锚点 **2/208** ⇒ 622 新值）；STEP[9] 绿。624 非台账笔红/台账笔绿继续。

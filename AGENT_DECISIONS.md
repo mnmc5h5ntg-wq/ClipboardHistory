@@ -8649,3 +8649,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：Return 是系统默认按钮语义，且不依赖 key-view 链重建；一次性提示的两种显式键盘路径（Esc 关、Return 确认）足够覆盖键盘用户。
 - 兼容性/迁移：确认仍走 `acknowledgeCollapseHint`（写 `mainWindowCollapseHintAcknowledged`）；无新 defaults 键；帧基线不变。
 - 边界：新值真机按键未演（不消费一次性提示），具名 `HINT_RETURN_LIVE_NOT_RUN=defaults-preserved`；源码段判据 + M1411 只钉接线。
+
+## D-535 折叠提示的「知道了」用 AppKit NSButton，但不宣称 Tab 可达（R536）
+
+- 背景：SwiftUI Button 加 `.focusable` 只把整个内容视图变成 AXGroup，真机 Tab 链仍只有 AXTextField/AXOutline。换成真实 NSButton 后，按钮有了 AXButton 身份与系统焦点环；但 SwiftUI 宿主仍不把外部 NSButton 纳入 `selectNextKeyView` 的链（单测 0/24、真机 0/8）。
+- 决定：保留 AppKit NSButton（AXButton、focusRingType=.default + 自绘遮罩、悬停/按压底、Return keyEquivalent、Esc local monitor），**把 625 的 Tab 可达性保持开单**，不在台账/报告里宣称 Tab 已通；下一步查 SwiftUI 宿主对 key-view 的所有权（可能需要关 autorecalculatesKeyViewLoop 或自建 keyView 链）。
+- 理由：AppKit 按钮是真实的无障碍对象，焦点环与动作都正确；Tab 链是宿主级问题，继续用 `.focusable`/插入链只会重复 R194/R535 的失败。
+- 兼容性/迁移：视觉帧只变 4 张提示帧（基线保持 350）；Return/Esc/鼠标三种路径都走 `acknowledgeCollapseHint`；PressFeedback 的 SwiftUI 位点退场（labelPadding 3→2、控件档 12→11）。
+- 边界：625 未签收；AppKit 按钮的 Tab 链在 SwiftUI 宿主里仍不可达（真机 8 站/单测 24 站均为 0）。

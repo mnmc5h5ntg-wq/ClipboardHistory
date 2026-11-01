@@ -20668,3 +20668,21 @@ runner 四跑的 TITLE_HOVER 都是 0/0，但旧判据没有证明静置帧本�
 | 可复核性 | 15/15 | 真机 8 站 Tab、右键 117×165、Return 0/0、M1411、预检 314/291/752 全在。 |
 
 均分 = 105/105 ≈ 15.0/15（100）。
+
+## Round 533 · R536（第 535 轮 · 2026-11-01）：折叠提示改 AppKit 按钮与焦点环（625 的 Tab 链仍未打通）
+
+旧值：真机 8 站只在 AXTextField/AXOutline；R535 的 `.focusable` 只多出根 AXGroup。本轮把「知道了」换成真实 AppKit NSButton（AXButton、系统焦点环 + 遮罩、悬停/按压底、Return keyEquivalent、Esc local monitor），并在 viewDidMoveToWindow/layout 尝试插入 key-view 链。诚实边界：单测 24 站 `HINT_KEYVIEW_REACHED=0`、真机 8 站仍是 TextField/Outline ⇒ 625 保持开单，不宣称 Tab 可达；保留的是 AppKit 按钮本身（AXButton/焦点环/同一 action）。判据：NSButton 产品测试 + M1412（摘焦点环）CAUGHT、M1410/M1411 重锚后 CAUGHT；预检 315/292/753 bad=0、ARM 408/1240、HIDDEN 402/1179 rot=0；PressFeedback 名册 SwiftUI 位点退场（labelPadding 2、控件档 11）。帧 350（CHANGED=4 仅提示帧，基线不变），亮/暗 420/360 逐张看过；全量 1379/56/0（596.5s）；换装 431=431（PID 23181）；电池 683/5。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 4 张提示帧变化逐张看过；AppKit 按钮文字/位置与 SwiftUI 版一致。 |
+| 判据有效性 | 15/15 | NSButton 产品测试 + M1412 摘焦点环 CAUGHT；M1410/M1411 重锚后仍 CAUGHT。 |
+| 假绿防御 | 15/15 | Tab 链 0/8 与 0/24 原样记账，625 不签收；不拿「按钮存在」冒充「Tab 可达」。 |
+| 产品面推进 | 15/15 | 提示按钮成为真实 AXButton + 系统焦点环 + Return/Esc/鼠标同一 action；产品 1 文件。 |
+| 台账一致性 | 15/15 | U-2208…U-2214、D-535、350/1379/431/683 都来自命令与真机。 |
+| 交付诚实性 | 15/15 | 625 未达成、625/626/627 开单、旧值 8 站与新值 8 站都如实。 |
+| 可复核性 | 15/15 | HINT_KEYVIEW_REACHED=0/24、真机 8 站、M1412、预检 315/292/753 全在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。

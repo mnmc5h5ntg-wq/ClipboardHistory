@@ -12,14 +12,18 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R535 / 第 534 轮 / Round 532）
-## R536 开工 ⓪（2026-11-01 · 第 535 轮 / Round 533）
+最后更新：2026-11-01（本地 · R536 / 第 535 轮 / Round 533）
+## R536 状态（2026-11-01 · 第 535 轮 / Round 533 · 产品 1 文件 + 判据）
 
 R536 ⓪ 读数（只登记、不轮询）：HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`（产品）、`41303247255 ↔ 5bcbd7a`（台账）、`41303403928 ↔ 789f642`（收口）读时均 **in_progress ⇒ NOT-RUN**。
 - 上轮五跑收口：`41297370322 ↔ 20ceacb`、`41297283216 ↔ d625b47`、`41297162797 ↔ d8c0e44`、`41295787642 ↔ 0cce5df`、`41295422790 ↔ 76cbd63` 全部 **success**。
 - `41295597277 ↔ 8b1ddb9` failure **仅 STEP[19] Motion floor**：`MOTION_FLOOR_FACTS judged=5/5 executed=77`，红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（1x：1 个过渡帧 <2，未登记）+ 已登记 `testNativeRowMoveIsVisibleToTheRuler` ⇒ **BACKLOG 627**；≥2 帧地板不动，需出现率再决定登记/修产品。
 - `41293578965 ↔ df43baa` failure STEP[15]+[18]：SelectionReveal 会话族 + `testFrameIntervalsUnderStateChanges` **162.2ms**、超锚点 **2/208** ⇒ 622 新值；120ms 与容差不动。624 非台账笔红/台账笔绿继续；623 已签收不重开。
 
+① 625 尝试：旧值真机折叠 420×492 连按 8 次 Tab 只在 AXTextField/AXOutline；R535 的 `.focusable` 只多出根 AXGroup。本轮把「知道了」换成真实 AppKit NSButton（AXButton、`focusRingType=.default` + 自绘遮罩、悬停/按压底、Return keyEquivalent、Esc local monitor），并在 viewDidMoveToWindow/layout 尝试插入 key-view 链。**诚实边界：单测 24 站 `HINT_KEYVIEW_REACHED=0`、真机 8 站仍只有 TextField/Outline ⇒ 625 保持开单，不宣称 Tab 可达**；保留的产品改进是 AppKit 按钮本身（真实 AXButton/系统焦点环/同一 action）。
+② 判据/刀：`testCollapseHintDismissButtonIsAnAppKitButtonWithFocusRingAndAction`（真实 NSButton、焦点环、refusesFirstResponder=false、点击走确认）；`M1412` CAUGHT、RESTORE_CLEAN；`M1410`/`M1411` 重锚到 Esc monitor/Return keyEquivalent 后均 CAUGHT；预检 315/292/753 bad=0、ARM 408/1240、HIDDEN 402/1179 rot=0；build 0 告警；PressFeedback 名册 labelPadding 3→2、控件档 12→11。
+③ 帧 **350**：CHANGED=4（仅提示帧）、ADDED/MISSING=0，基线保持 350；亮/暗 420/360 提示帧逐张看过。全量 **1379/56/0（596.5s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 23181；真机只读 1 窗口，折叠 420×492 后展开 750×492）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 535，`python3 scripts/product_streak.py --streak-for 535` 现读，last=a2579fd/534）。
+④ 收口：产品笔 `5837d65` 已推（HEAD=origin、ahead=0）；新跑待读。下一轮 R537（第 536 轮 / Round 534）：先 push 复核 ahead=0；625 的 Tab 链仍未达成（查 SwiftUI 宿主 key-view 所有权），626/627 开单、623 不重开；622/624 继续；继续折叠特性；4.5 地板与 150 上限不动。
 ## R535 状态（2026-11-01 · 第 534 轮 / Round 532 · 产品 1 文件 + 判据）
 
 R535 ⓪ 读数（只登记、不轮询）：HEAD=origin=`d625b47`、ahead=0；`git ls-remote` 通、api=200/apple=200。`41297283216 ↔ d625b47`、`41297162797 ↔ d8c0e44`、`41295787642 ↔ 0cce5df`、`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63` 读时均 **in_progress ⇒ NOT-RUN**（五跑都无失败步骤可列）。`a8f1817`（R534 产品笔，cff79a9 的 amend）与 `d8c0e44` 同次推送，GitHub 只给头笔建了 run ⇒ **a8f1817 无独立跑（NOT-RUN/CI_UNREAD）**。
