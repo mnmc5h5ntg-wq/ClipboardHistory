@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠标题悬停的 1x 修复（R528 / 第 527 轮 / Round 525 / U-2150…U-2156 · 产品 2 文件 + 判据）
+
+标题悬停浅底改显式 `Color(nsColor: .labelColor)`（vibrant 1x 下 primary 不落墨）；新增专用取证键并把尺改成侧栏上半区绝对差总和。新读数 light 147661/7184、dark 110438/6886；M1404 CAUGHT；帧 342（CHANGED=2）；全量 1370/56/0；换装 428=428。
+
+
 ### 轮次身份补正（R527 / 第 526 轮 / Round 524 / U-2146…U-2149 · 台账补正）
 
 把并进第 501 轮的 U-2116…U-2145 按轮次开回第 522–525 轮节；STATE 补 identity 行（R527 / 第 526 轮 / Round 524），`current_round()` 不再读 R498；附 git log 前 5 笔与三本账的对照表。产品 0 文件，不改已推历史。

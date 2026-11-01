@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 527 轮（R528 · 2026-11-01 · U-2150…U-2156）：折叠标题悬停的 1x 修复（显式 labelColor + 专用取证键；产品 2 文件 + 判据）
+
+- **U-2150：⓪ CI。** HEAD=origin=`897db20`、ahead=0；`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` in_progress ⇒ NOT-RUN。`41277554758 ↔ a71a74c` failure STEP[15]（唯一失败：`testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0.0**；三条 detail 探针已绿 ⇒ WindowChromeMetrics 隔离修复生效）、STEP[17] Capture gate（`testCodeBlocksShowLineNumbers` 的 `NSInvalidArgumentException`，`ChineseTextContextMenu.swift:653`）、STEP[18] `testFrameIntervalsUnderStateChanges` 204.6ms>120ms（2 颗超锚点）；`41276567763 ↔ 57b7614` STEP[15]+[17]（detail 4 条 + hover + 同一条 code-block 崩溃）；`41276450081 ↔ 39b67bd` STEP[9]+[15]+[17]+[18]；其余 R525 旧跑 STEP[9]/[15]。sources 时序红与产品回归分开；code-block 崩溃与 frame-interval 记 BACKLOG 622 待复查。
+- **U-2151：① 旧值与修法。** 旧值：runner 1x 的标题 hover 判据两档都读到 **0.0**（本地 2x 是 7.2/4.4）。两处成因一起修：① 产品浅底用通用 `Color.primary`，在 runner 1x 的 vibrant 子树里会与底色同侧 ⇒ 改显式 `Color(nsColor: .labelColor)`；② 判据借通用 `hoveredForCapture`，同帧 chevron/批量按钮的悬停会混进标题带，且固定 y 带在 1x 上对不准 ⇒ 新增专用取证键 `mainSidebarTitleHoverForCapture`，尺改成整条侧栏上半区（x0–300、y60–320pt）的逐像素亮度绝对差总和。
+- **U-2152：② 产品（2 文件）。** `Views/HistorySidebarView.swift`：标题浅底改显式 labelColor、读取专用取证键；`Views/PressableStyle.swift`：新增 `mainSidebarTitleHoverForCapture` 环境键（默认 nil，产品不写）。产品 **2 文件**。
+- **U-2153：③ 判据与刀。** 新尺读数：light `totalDelta=147661 changedPixels=7184`、dark `110438/6886`（旧值=0）。刀 `M1404`（取证键接不上标题悬停）**CAUGHT、RESTORE_CLEAN=yes**；M1403 仍在册。预检 **307/284/745 bad=0**、ARM **400/1232**（dupes=0 repeats=0）、HIDDEN **394/1171 rot=0**；build **0 告警**（增量 0、冷编 0）。
+- **U-2154：④ 帧卷与看图。** 捕获 **342 帧**：`CHANGED=2`（仅 `main-sidebar-title-hover` 亮/暗：改用专用键后 chevron 不再伪悬停）、`ADDED=0 MISSING=0`；基线保持 **342**。逐张看过亮/暗 hover：标题药丸出现（暗档为提亮药丸），chevron/计数/列表几何未动。
+- **U-2155：⑤ 八步与电池。** build 0 告警；全量 **1370/56/0（558.7s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=428=428`（活库条目 425→428，只增不减；PID 32780）；真机只读 1 窗口 title=时间剪史；电池 **683/5**（台账后复跑）；清账 162 格已清 162/未清 0/不合法 0；产品面连续零改动 **2** 轮（as-of 527，`python3 scripts/product_streak.py` 现读，newest=b004545/527）。
+- **U-2156：⑥ 收口 CI 与交接。** 产品笔 `b004545` 已推（HEAD=origin、ahead=0）；新跑待读（下轮第 ⓪ 全读，重点 a71a74c 后 hover 判据是否转绿、code-block/frame-interval 是否复现）。下一轮 R529（第 528 轮 / Round 526）：先 push 并复核 ahead=0；读 R528 产品笔/台账笔与 R527/R526 未读跑的全部失败步骤；继续折叠特性可用性收口；安全红线不变。
+
 ## 第 526 轮（R527 · 2026-11-01 · U-2146…U-2149）：轮次身份补正（台账锚点；产品 0 文件）
 
 - **U-2146：⓪ 轮次身份漂移的读数。** 当前 HEAD=`e5e0840`、ahead=0；`AGENT_STATE.md` 第 132 行的 `最后更新` 仍写 **R498 / 第 497 轮 / Round 495**，于是 `current_round()` 把最近几笔都读成 R498（`3e5aa6b`/`79e39ee`/`31d12c7`/`3ddee13`/`f10afe4` 的 subject 都以 `R498 补记` 开头）。`AGENT_UI_AUDIT.md` 的 U-2116…U-2145 全部并进了 `## 第 501 轮（R502 · U-1970…U-2145）`，没有第 522–525 轮的标题；内容没丢（ITERATION 有 Round 520–523、STATE 有 R523–R526），但按轮次查账看起来停在 R498。**这是锚点漂移，不是内容缺失。**

@@ -10744,3 +10744,8 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **621. 轮次身份被并进旧节，`current_round()` 停在 R498**（R527 现读）
     现象：U-2116…U-2145 连续四轮都并进 `## 第 501 轮（R502 · U-1970…U-2145）`，STATE 的 R523–R526 节没有 `最后更新` 行；`current_round()` 读第 132 行的 R498 / 第 497 轮，最近五笔 subject 全以 `R498 补记` 开头 —— 内容没丢，但按轮次查账看起来停在 R498。
     修法（本笔）：每轮开自己的 `## 第 N 轮（R<r>` 节（U 区间连续），STATE 顶部维护唯一 identity 行（R527 / 第 526 轮 / Round 524），并附 git log 前 5 笔与三本账的对照表；不改已推历史。守卫：`test_round_batch_consistency`（含 LOOKBACK 三次窗口）、`test_round_batch_declaration`、`test_round_claim_consistency`、`test_commit_subject_hygiene`、`test_ui_round_interval_parity`。退场：后续轮次天然按新节写入，本条目在 R530 回顾时结案。
+
+**622. runner 环境红待复查：code-block 崩溃与 frame-interval 超锚点**（R528 现读）
+    现象：a71a74c 跑里 `UICaptureTests/testCodeBlocksShowLineNumbers` 抛 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，Older R525 跑两遍都 passed），并触发 Capture gate；同跑 `testFrameIntervalsUnderStateChanges` 最差 204.6ms>120ms、超锚点 2 颗（容差 1）。
+    现状：与本轮折叠产品改动无交集；先记为**本跑环境红**，不冒充产品回归也不签字。
+    退场：R529 读 R528 新跑；若复现则开单定位（code-block 的 nil 对象来源 / probe 采样负载），不再复现则按一次性环境红归档。

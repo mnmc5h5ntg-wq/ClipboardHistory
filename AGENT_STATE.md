@@ -12,9 +12,9 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R527 / 第 526 轮 / Round 524）
+最后更新：2026-11-01（本地 · R528 / 第 527 轮 / Round 525）
 
-## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 开工 ⓪）
+## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 产品 2 文件 + 判据）
 
 R528 ⓪ 读数（只登记、不轮询）：HEAD=origin=`897db20`、ahead=0。`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
 - `41277554758 ↔ a71a74c`（测试隔离修复）**failure STEP[15] + STEP[17] + STEP[18]**：STEP[15] 唯一失败是 **`testSidebarTitleHoverFeedbackIsVisible` 亮/暗都读到 0.0 亮度差**（同一跑的三条详情帧判据已通过 ⇒ `WindowChromeMetrics` 还原生效）；STEP[17] Capture gate 红在 `testCodeBlocksShowLineNumbers` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，Older R525 跑两遍都 passed ⇒ 本跑环境/数据异常，非折叠产品回归）；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 204.6ms>120ms、超锚点 2 颗（容差 1）。
@@ -22,6 +22,9 @@ R528 ⓪ 读数（只登记、不轮询）：HEAD=origin=`897db20`、ahead=0。`
 - `41276450081 ↔ 39b67bd`（R526 产品）**STEP[9]+[15]+[17]+[18]**：STEP[9]=sources 时序；STEP[15]=SelectionReveal 1 条 + 4 条 detail + hover（隔离修复前）；STEP[17]/[18] 同上面的环境红。
 - `41223261055 ↔ f10afe4`、`41221604785 ↔ 4c0eeb6`、`41223106790 ↔ 3ddee13` 均 **STEP[15]**（detail 探针；3ddee13 另 STEP[9]）——`a71a74c` 后 detail 已绿；`41221362532 ↔ 31d12c7`、`41218878781 ↔ 9d882e4` 为 STEP[9]/[15] 旧账。
 - 归因：① sources 格时序红与产品回归分开；② detail 探针红是测试污染，已由 `a71a74c` 修并在其跑里签收；③ 新红只剩 **title-hover 判据在 runner 1x 读 0.0**（本笔修：专用取证键 + 显式 labelColor 填充 + 宽区绝对差尺，M1404）；④ code-block 崩溃与 frame-interval 超锚点记为本跑环境红，下一轮复查是否复现。
+
+① 产品/判据：旧值 runner 1x 标题 hover 判据两档 **0.0**（本地 2x 7.2/4.4）。修：标题浅底改显式 `Color(nsColor: .labelColor)`（primary 在 vibrant 1x 与底色同侧）；新增专用取证键 `mainSidebarTitleHoverForCapture`（不再借通用 hoveredForCapture）；尺改成侧栏上半区（x0–300、y60–320pt）逐像素亮度绝对差总和。新读数 light **147661/7184**、dark **110438/6886**；旧值=0。产品 **2 文件**（HistorySidebarView / PressableStyle）；M1404 CAUGHT、RESTORE_CLEAN；预检 307/284/745 bad=0、ARM 400/1232、HIDDEN 394/1171 rot=0；build 0 告警。帧 **342**（CHANGED=2 仅 hover 亮/暗，ADDED/MISSING=0），基线保持 342；亮/暗 hover 逐张看过。全量 **1370/56/0（558.7s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=428=428`（PID 32780；活库 425→428 只增）；真机只读 1 窗口；电池 **683/5**。产品面连续零改动 **2** 轮（as-of 527，`python3 scripts/product_streak.py` 现读，newest=b004545/527）。
+② BACKLOG 622 记 code-block 崩溃与 frame-interval 204.6ms（本跑环境红，待复查）。产品笔 `b004545` 已推（HEAD=origin、ahead=0）。下一轮编号 R529（第 528 轮 / Round 526）：先 push 并复核 ahead=0；读 R528 产品笔/台账笔与 R527/R526 未读跑的全部失败步骤（in_progress/queued ⇒ NOT-RUN）；② 折叠特性继续；③ 4.5 地板与 150 上限不动。
 
 ## R527 状态（2026-11-01 · 第 526 轮 · 台账补正）
 
@@ -37,7 +40,7 @@ R527 记录（台账补正，产品 0 文件）：把被并进第 501 轮的 U-2
 | `39b67bd` | `R498 补记…（第 525 轮 / Round 523）` | 第 525 轮（R526） | Round 523（R526） | R526 |
 | `f10afe4` | `R498 补记二…`（U-2130…U-2137 ⇒ 第 524 轮） | 第 524 轮（R525） | Round 522（R525） | R525 |
 
-产品面连续零改动 **1** 轮（as-of 526，`python3 scripts/product_streak.py` 现读，last_round=525）。
+产品面连续零改动 **2** 轮（as-of 527，`python3 scripts/product_streak.py` 现读，last_round=525）。
 
 补正内容：`AGENT_UI_AUDIT.md` 第 522/523/524/525 轮节分别收 U-2116…U-2122 / U-2123…U-2129 / U-2130…U-2137 / U-2138…U-2145，第 501 轮节收回 U-1970…U-2115；本轮补正为第 526 轮（R527 · U-2146…U-2149）。守卫结果：五条全 OK：`test_round_batch_consistency` 3/3（STATE↔UI_AUDIT 轮号逐字相符、最近三轮三本账标题、LOOKBACK 窗口）、`test_round_batch_declaration` 6/6、`test_round_claim_consistency` 5/5、`test_commit_subject_hygiene` 6/6、`test_ui_round_interval_parity` 5/5；`current_round()=(527, 526)`，不需要改 LOOKBACK。。电池：Ran 683 / OK（skipped=5）。下一轮编号 R528（第 527 轮 / Round 525）：继续折叠特性的 runner 签收与真机逐帧；不再把新轮次并入旧节。
 
