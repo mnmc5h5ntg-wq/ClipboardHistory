@@ -10841,6 +10841,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R543）：42 份日志 copy 2/42、fold 2/39 executed、markdown 2/42；新增 `.receipt=0.20` 专用档后本机 copy 1x 3–4、录制帧确定性 10/10 diff=0；contentFade 0.20 在 `f7bd865` 产品跑签收（markdown 1x=2），但 `bd96e93` 再现 markdown 1x=1，且同跑 Motion floor 红 `testBandCaptureIsCheaperAndStillSeesTheMotion`；627/629 继续开单、≥2 帧地板不动。
     复查（R544）：44 份日志 copy 2/44、fold 4/41 executed、markdown 3/44；receipt 0.20 的 copy 半由 `8d4a36d`/`c1df1e6` 签收（1x=2 + 录制帧 passed；`b16eacc` 自身 copy 是 app-not-active NOT_RUN）；markdown 专用 0.24 被证伪撤回（1x 仍 4），contentFade 0.20 仍偶发 1x=1 ⇒ 627 保持开单、≥2 帧地板不动。
     复查（R545）：fold 类红 `bd96e93` 0.998929 是采样末帧早停（final=420），判据改读 settle 后的 `controller.foldProgress`，本机旧/新各 10/10、M1424 CAUGHT；markdown 仍 1x=1（c1df1e6/8d4a36d/bd96e93），copy 1x=2 ⇒ 627 保持开单、≥2 帧地板不动。
+    复查（R545 补记）：markdown 产品侧四次尝试均证伪——① 动画从 Text 移到 Button 层：1x 仍 4、峰值仍 0.0097；② `.contentTransition(.opacity)`：部署目标 macOS 12，API 需 13+，构建即红，撤回；③ 进出各 2pt 错位淡入：1x 仍 4、峰值 0.0097–0.0145；④ 标签 regular→medium：1x 仍 4（个别 5），峰值下限 0.0097→0.0145 但过渡帧数不变，且会波及其他静态帧，不保留。结论：这条 1x=1 是低墨量文字交换的捕获/采样边界，不是时长、挂载位置、过渡形状或字重能修的；产品改动一个也不留，627 保持开单。
 
 **628. runner 的 git 缩写从 7 位变 8 位：三条脚本守卫把 7 位当固定长度**（R538 收口现读）
     现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 3 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）；第 4 条 `test_the_cell_agrees_with_its_own_source` 是产品笔早于台账的 sources 时序（b707811/8cef540 两跑已绿）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。同一批 `085e4c7`（⓪ 笔）也复现同样 3 条 + skip_roster。
@@ -10855,5 +10856,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R543）：新增 `.receipt=0.20` 专用档（copy 本机 1x 3–4，M1422 CAUGHT；emphasis 仍 0.16，录制帧 10/10 diff=0）；contentFade 0.20 在 `f7bd865` 满足签收条件，但 `bd96e93` 复现 markdown 1x=1 ⇒ 629 保持开单等出现率；≥2 帧地板不动。
     复查（R544）：试 `.markdownLabel=0.24` 后本机 1x 仍 4（旧 contentFade 0.20 也是 4），读数不变 ⇒ 撤回并删其判据/M1423，只保留 contentFade 0.20；629 继续开单等出现率；≥2 帧地板不动。
     复查（R545）：markdown 仍三跑 1x=1（c1df1e6/8d4a36d/bd96e93），contentFade 0.20 不动；629 继续开单等出现率；≥2 帧地板不动。
+    复查（R545 补记）：产品侧四杠杆（动画挂载层、contentTransition、2pt 错位过渡、medium 字重）全部证伪或构建受阻，读数均未把 1x 抬到 ≥2；contentFade 0.20 不动，629 继续开单。
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
