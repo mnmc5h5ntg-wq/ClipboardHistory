@@ -372,6 +372,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2205：④ 帧卷。** 最终产品重捕 **350 帧**：`CHANGED=0 ADDED=0 MISSING=0`（Return/focus/context 都不进静态像素），基线保持 **350**。
 - **U-2206：⑤ 八步与电池。** build 0 告警；全量 **1378/56/0（584.3s）**（中间试过 focus/context 两版，分别被 VisualToken 线宽/收藏字面量与真机读数拦下并撤回；最终版真绿；本机 SelectionReveal 五条会话噪音本轮未出现）；换装：首次 `--label R535` 因备份目录已存在在 `mv` 处失败、**旧包未动**，改 `--label R535b` 成功 `SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 1885；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 534，`python3 scripts/product_streak.py --streak-for 534` 现读，last=a8f1817/533）。
 - **U-2207：⑥ 收口与交接。** 产品笔 `a2579fd` 首次 push 遇 `Connection closed ... port 22`，**重试一次成功**（HEAD=origin=`a2579fd`、ahead=0）。下一轮 R536（第 535 轮 / Round 533）：先 push 并复核 ahead=0；读本轮产品/台账跑与上轮五跑的全部失败步骤；625/626 保持开单（前者要 AppKit key-view，后者要在 Text/cell 层替换菜单），623 不重开；622 记 162.2ms、624 两臂继续；继续折叠特性；安全红线不变。
+收口复读：`20ceacb`/`d625b47`/`d8c0e44`/`0cce5df`/`76cbd63` **success**；`8b1ddb9` failure **仅 STEP[19] Motion floor**（`MOTION_FLOOR_FACTS judged=5/5 executed=77`，红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess` 1x 只 1 个过渡帧 <2，未登记；另 `testNativeRowMoveIsVisibleToTheRuler` 已登记）⇒ 新开 **BACKLOG 627**；`a2579fd`/`5bcbd7a` in_progress ⇒ NOT-RUN。
 
 ## 第 533 轮（R534 · 2026-11-01 · U-2194…U-2200）：折叠提示支持 Esc 关闭（产品 1 文件 + 判据）
 

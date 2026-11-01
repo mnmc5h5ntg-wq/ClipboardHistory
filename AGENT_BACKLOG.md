@@ -10789,3 +10789,8 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）后，真机在正文与行尾两次右键都弹 117×165 的系统文本菜单（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。
     现状：产品与配套判据一并撤回（不让源码判据冒充真机交付）；旧值 Sources 里 `.contextMenu` 0 次。
     下一步：在 Text/cell 层替换菜单，或 macOS 13 的 List `.contextMenu(forSelectionType:)` / AppKit NSMenu；先做真机右键读数再落产品。
+
+**627. runner 1x 回执动效只有 1 个过渡帧（Motion floor 未登记红）**（R535 收口现读）
+    现象：`8b1ddb9` 的 STEP[19] 唯一失败是 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`：1x 只有 1 个过渡帧（要求 ≥2）⇒ 回执是硬切；同一跑 `MOTION_GATE_RESULT=ok`、`MOTION_FLOOR_FACTS judged=5/5 executed=77`，另 `testNativeRowMoveIsVisibleToTheRuler` 是已登记红。`adb50c1` 也出现过同一条（STEP[15]+[19]）。
+    现状：runner 1x 动效采样 flake，未登记；不降 ≥2 帧地板，不把「这跑没抽中」当修好。
+    下一步：在 runner 上做有界重复采样量出现率，再决定登记或修产品；没有出现率之前不销单。
