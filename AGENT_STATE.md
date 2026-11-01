@@ -12,9 +12,9 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R530 / 第 529 轮 / Round 527）
+最后更新：2026-11-01（本地 · R531 / 第 530 轮 / Round 528）
 
-## R531 状态（2026-11-01 · 第 530 轮 / Round 528 · 开工 ⓪）
+## R531 状态（2026-11-01 · 第 530 轮 / Round 528 · 判据推进，产品 0 文件）
 
 R531 ⓪ 读数（只登记、不轮询）：HEAD=origin=`76b24b8`、ahead=0。`41286598804 ↔ 02fa144`（产品）、`41287008886 ↔ ac04e2d`（台账）、`41287270623 ↔ 76b24b8`（CI 补记）读时均 **in_progress ⇒ NOT-RUN**（三跑仍排在更早的跑后面）。已收口四跑：
 - `41284008834 ↔ 1e3cfaa` **failure STEP[9]+[15]+[17]**：STEP[15]=`testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0/0**（totalDelta 与 changedPixels 四条）；STEP[17] Capture gate 点名同一条；STEP[9]=sources 格时序（账上 `2e7272e`、git `1e3cfaa`）+ skip_roster 内层无结论行。
@@ -24,6 +24,9 @@ R531 ⓪ 读数（只登记、不轮询）：HEAD=origin=`76b24b8`、ahead=0。`
 - **hover 归因**：四跑都是新尺、都读 0/0 ⇒ R528/R529 两次修法未在 runner 签收（BACKLOG 623 保持开单）。**622**：帧间隔 **544.1ms** 在 `9b9cf56` 复现一次（2 颗超锚点）⇒ 进入定位分支。
 - **skip_roster runner 环境红**：`test_the_roster_matches_what_this_machine_actually_skips` 在 `2e7272e`/`1e3cfaa`/`730dc5e` 三跑都红「内层没有结论行」；本机电池 683/5 绿 ⇒ 记为 runner 环境红，待查。
 - sources 时序红与产品回归分开：hover 0/0 是产品判据红；sources/streak 是台账时序红。
+① 判据/623：runner 四跑的 TITLE_HOVER 都是 0/0，但旧判据没有「静置帧必须有标题墨」的负臂；runner 捕获记录 `main-sidebar-title-hover-750x560-light.png transparent=89.4%`（本机 52.9%）⇒ 0/0 可能只是 NavigationSplitView 这段路没画。修：组合臂先量 idle 标题带墨（地板 200×scale²），无墨打 `TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank`、不判绿；新增组件臂 `sidebar-history ↔ sidebar-title-hover`（同一 HistorySidebarView，只差 titleHoverForFixture），把浅底从容器盲区隔离出来。本机读数：组合臂 light idleInk=3207/delta=118429/changed=5792、dark 2020/88166/5494；组件臂 light 2009/166565/7192、dark 2106/93008/5811；组件亮/暗帧逐张看过。`M1407` CAUGHT、RESTORE_CLEAN=yes；预检 310/287/748 bad=0、ARM 403/1235、HIDDEN 397/1174 rot=0；build 0 告警。帧 **346**（ADDED=2、CHANGED=8 源图标噪声、MISSING=0；基线 344→346）。全量 **1373/56/0（561.3s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=430=430`（活库安装前已 429→430，只增不减；PID 5444；真机只读 1 窗口）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 530，`python3 scripts/product_streak.py --streak-for 530` 现读，last=02fa144/529）。
+①b 622 复现分支：本机同条件（CLIPBOARD_HISTORY_UI_INTERACTION=1）4 跑 worst 97.9/57.8/60.6/61.2ms、超锚点 0、比值 2.390/1.716/2.293/2.336；runner 9b9cf56 loaded_p95=27.83、比值 1.670，但 worst=544.1ms、超锚点 2/173 ⇒ 本机未复现，具名 FRAME_INTERVAL_FLAKE=runner-loaded-2of173-544.1ms-local-max-97.9ms；120ms 与容差不动。② 折叠焦点：新增 testCollapseDoesNotLeaveFocusInRemovedDetail，旧值已正确（折叠后焦点释放），保留负向证人。skip_roster runner 红三次复现，新开 BACKLOG 624。
+③ 收口：判据笔 `9bfd943` 已推（HEAD=origin、ahead=0）；新跑待读（新见证在 runner 是否读到组合臂 idleInk、组件臂是否签收 623、624/622 是否复现）。下一轮编号 R532（第 531 轮 / Round 529）：先 push 并复核 ahead=0；继续折叠特性；4.5 地板与 150 上限不动。
 
 ## R530 状态（2026-11-01 · 第 529 轮 / Round 527 · 产品 1 文件 + 判据）
 

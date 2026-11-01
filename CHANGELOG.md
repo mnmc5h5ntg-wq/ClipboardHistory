@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 标题悬停静置墨证人与折叠焦点负向证人（R531 / 第 530 轮 / Round 528 / U-2172…U-2179 · 产品 0 文件 + 判据）
+
+TITLE_HOVER 先量静置帧标题墨：无墨时打 `TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank` 并改用组件臂（`sidebar-history ↔ sidebar-title-hover`），把浅底从 NavigationSplitView 的 runner 1x 捕获盲区隔离出来。本机组合臂 118429/88166、组件臂 166565/93008；M1407 CAUGHT；帧 346（ADDED=2、CHANGED=8 源图标噪声）；全量 1373/56/0；换装 430=430。622 本机 4 跑未复现（worst ≤97.9ms、超锚点 0），具名 runner flake，120ms 与容差不动。折叠焦点负向证人通过。
+
 ### 折叠窗口菜单勾选与最小窗夹具（R530 / 第 529 轮 / Round 527 / U-2165…U-2171 · 产品 1 文件 + 判据）
 
 Window 菜单的折叠项改为 `Toggle`（勾=当前折叠态），标题仍随状态切换，⌘\ 与状态菜单同一 dispatch。真机 AX：展开「折叠窗口」无勾 → 折叠「展开窗口」✓ → 再展开无勾，1 窗口。新增选区跨折叠保持判据与 360×560 最小折叠帧；M1406/M1405 CAUGHT；帧 344；全量 1372/56/0；换装 429=429。

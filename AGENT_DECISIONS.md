@@ -8609,3 +8609,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：勾是系统菜单的标准状态语言；让 set 走 perform 能保证 Toggle 的显示状态永远等于 controller 的真值，不会先翻转再被纠正。
 - 兼容性/迁移：标题仍由 `MainWindowCollapsePolicy.menuTitle(collapsed:)` 生成；状态菜单（MenuBarExtra/NSMenu）不变；菜单不进离屏帧，基线变化只来自新夹具。
 - 边界：只用真机 AX 的非破坏性菜单点击取证；⌘\ keystroke 本机未送达前台，快捷键仍由 source 判据与既有 perform 测试覆盖。
+
+## D-530 标题悬停判据必须先有静置墨证人，容器画不出时用组件臂（R531）
+
+- 背景：runner 四跑的 TITLE_HOVER 都是 0/0，而旧判据只比较两臂差；同一夹具在 runner 的捕获记录是 89.4% 透明（本机 52.9%），0/0 可能只是 NavigationSplitView 这段路没画，不是标题没有反馈。
+- 决定：① 组合臂先量 idle 标题带墨（地板 `200×scale²`），无墨时打 `TITLE_HOVER_COMPOSED_NOT_RUN=idle-title-band-blank`，不判绿；② 新增组件臂 `sidebar-history ↔ sidebar-title-hover`（同一 HistorySidebarView、同一批选中行，只差 `titleHoverForFixture`），把浅底从容器捕获盲区里隔离出来；组件静置帧无墨仍红。
+- 理由：两臂都 0 不许当通道缺席（R490 同族）；先证明「字在」，差值才有对象。组件臂是**有界替代**，不是把组合状态从判据里放走——组合臂有墨时仍按原地板判。
+- 兼容性/迁移：新夹具只增加 2 帧（346），基线同一笔更新；材质盲区名册登记新夹具；旧组合臂保留。
+- 边界：runner 签收仍待读；在读到组合臂 idleInk 之前不宣布 623 结案，也不降 1000/200 地板。
