@@ -13,6 +13,15 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R546 / 第 545 轮 / Round 543）
+## R547 开工 ⓪（2026-11-02 · 第 546 轮 / Round 544）
+
+R547 ⓪ 读数（只登记、不轮询）：HEAD=origin=`d22f30a`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**（CHANGED=2 已入库）、全量 **1385/56/0（680.2s）**、预检 **325/295/757 bad=0**、ARM **418/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **3**（as-of 545）。
+- 两跑读时 **in_progress ⇒ NOT-RUN**：`41341540906 ↔ 54420e0`（台账）、`41341586171 ↔ d22f30a`（补记三）；产品笔 `feec6cc` 与重钉笔 `73fb0fd` 无独立跑（由 54420e0 覆盖）。
+- `41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake，非动效取值）；两红均具名，不放宽阈值。
+- `41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：`SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（origin=[0.0,1430.0,1430.0,1430.0]，已知会话 flake）。
+- 复读：`41331769689 ↔ c5fcf03` 仅 STEP[19]（markdown 1x=1）；`41331173441 ↔ c1df1e6` 仅 STEP[19]（band 11.73 vs 10.79 + markdown 1x=1；copy 1x=2、录制帧 passed）；`41330618181 ↔ b16eacc` 仅 STEP[9]（skip_roster+sources；copy `app-not-active` NOT-RUN）；`41330637380 ↔ 8d4a36d` STEP[9]+[19]（skip_roster+sources；markdown 1x=1）；`41326398317 ↔ bd96e93` STEP[15]+[19]（fold 0.9989289765 vs 1.0 ±0.001、final=420；band 0.97× + markdown 1x=1）。`41337778679 ↔ 84d7a9a`、`41337664834 ↔ 9503700`、`41337019426 ↔ 8acec7f`、`41336963006 ↔ 9121760` success。
+- 本轮靶：② 换新类别、产品面且读数必须变——不得再改登录失败图标或同一横幅；从 BACKLOG 挑一个未结、可本机落地的产品视觉位（状态栏/侧栏行/详情信息/菜单项等），先量旧值（像素/几何/帧数至少一项），改后同一套读数必须变好，否则本轮内撤回换下一个；三条件=独立像素/几何对比 + 逐张看新帧 + 录制帧确定性不新红；图标/符号改动要同步查旧刀腐烂并在同一笔重钉。`.receipt 0.20`、`contentFade 0.20`、emphasis 0.16 不动；624 名册不改；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1426** 起。
+
 ## R546 状态（2026-11-02 · 第 545 轮 / Round 543 · 产品 1 文件 + 判据）
 
 R546 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9503700`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1385/56/0（681.6s）**、预检 **324/295/757 bad=0**、ARM **417/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **2**（as-of 544）。
