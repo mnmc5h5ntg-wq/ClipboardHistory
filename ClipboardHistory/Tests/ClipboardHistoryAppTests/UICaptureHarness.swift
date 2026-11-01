@@ -11692,7 +11692,7 @@ final class UICaptureTests: XCTestCase {
             // R526：标题双击的悬停臂（只点亮 hoveredForCapture，其余与 content-with-history 同）。
             Fixture("main-sidebar-title-hover", NSSize(width: 750, height: 560)) {
                 AnyView(ContentView(historyStore: store)
-                    .environment(\.hoveredForCapture, true))
+                    .environment(\.mainSidebarTitleHoverForCapture, true))
             },
         ]
 
@@ -16415,32 +16415,32 @@ final class UICaptureTests: XCTestCase {
                 continue
             }
             let scale = Double(hover.pixelsWide) / 750.0
-            let x0 = max(0, Int(12 * scale)), x1 = min(hover.pixelsWide, Int(210 * scale))
-            // 标题带在 y≈140–178pt（R526 帧量的；258–296 是列表行，那里两臂当然一样）。
-            let y0 = max(0, Int(138 * scale)), y1 = min(hover.pixelsHigh, Int(178 * scale))
-            func stats(_ rep: NSBitmapImageRep) -> (mean: Double, ink: Int) {
+            // R528：不再赌固定 y 带 —— runner 1x 的标题位置与 2x 不同（R526 的判据在那里读出 0.0）。
+            // 取**整条侧栏上半区**（x 0–300pt、y 60–320pt）的逐像素亮度绝对差总和：
+            // 位置怎么漂都还在区域内；两臂只有标题浅底不同（专用取证键），旧值=0。
+            let x0 = 0, x1 = min(hover.pixelsWide, Int(300 * scale))
+            let y0 = max(0, Int(60 * scale)), y1 = min(hover.pixelsHigh, Int(320 * scale))
+            func luma(_ rep: NSBitmapImageRep, _ x: Int, _ y: Int) -> Double {
                 let bytes = Self.buffer(of: rep)
-                var total = 0.0, ink = 0, count = 0
-                for y in y0..<y1 {
-                    for x in x0..<x1 {
-                        let i = y * rep.bytesPerRow + x * 4
-                        let luma = 0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
-                            + 0.0722 * Double(bytes[i + 2])
-                        total += luma; count += 1
-                        if abs(luma - 247) > 24 { ink += 1 }
-                    }
-                }
-                return (total / Double(max(count, 1)), ink)
+                let i = y * rep.bytesPerRow + x * 4
+                return 0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                    + 0.0722 * Double(bytes[i + 2])
             }
-            let idleStats = stats(idle), hoverStats = stats(hover)
-            // 亮档浅底压暗、暗档白底提亮 ⇒ 取绝对差，两档同一把尺。
-            // 地板 2.5：旧值（标题无 hover）实测 ≤1.2；新值本机 7.2/4.4。
-            let meanDelta = abs(idleStats.mean - hoverStats.mean)
-            emit("TITLE_HOVER \(tag) idleMean=\(String(format: "%.1f", idleStats.mean))"
-                 + " hoverMean=\(String(format: "%.1f", hoverStats.mean))"
-                 + " meanDelta=\(String(format: "%.1f", meanDelta)) idleInk=\(idleStats.ink) hoverInk=\(hoverStats.ink)")
-            XCTAssertGreaterThanOrEqual(meanDelta, 2.5,
-                                        "\(tag)：标题带悬停只变了 \(String(format: "%.1f", meanDelta)) 亮度 ⇒ 双击没有悬停反馈")
+            var totalDelta = 0.0
+            var changedPixels = 0
+            for y in y0..<y1 {
+                for x in x0..<x1 {
+                    let delta = abs(luma(idle, x, y) - luma(hover, x, y))
+                    if delta > 8 { changedPixels += 1 }
+                    totalDelta += delta
+                }
+            }
+            emit("TITLE_HOVER \(tag) totalDelta=\(Int(totalDelta.rounded())) changedPixels=\(changedPixels)"
+                 + " region=\(x1 - x0)x\(y1 - y0)px")
+            XCTAssertGreaterThanOrEqual(totalDelta, 1000,
+                                        "\(tag)：标题区悬停亮度绝对差总和只有 \(Int(totalDelta.rounded())) ⇒ 双击没有可见悬停反馈")
+            XCTAssertGreaterThanOrEqual(changedPixels, 200,
+                                        "\(tag)：标题区只有 \(changedPixels) 个像素在动 ⇒ 浅底没有画出来")
             judged += 1
         }
         if judged == 0 { throw XCTSkip("TITLE_HOVER_NOT_RUN：两档都读不到标题带") }

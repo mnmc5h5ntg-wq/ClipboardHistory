@@ -8,8 +8,8 @@ struct HistorySidebarView: View {
     var toggleCollapse: () -> Void = {}
     /// R526：标题双击的悬停反馈（与 chevron 同一档浅底）。旧值 hover 与 idle 逐像素相同。
     @State private var titleHovered = false
-    @Environment(\.hoveredForCapture) private var hoveredForCapture
-    private var titleHoveredForDrawing: Bool { titleHovered || (hoveredForCapture ?? false) }
+    @Environment(\.mainSidebarTitleHoverForCapture) private var titleHoverForCapture
+    private var titleHoveredForDrawing: Bool { titleHovered || (titleHoverForCapture ?? false) }
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
     /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
@@ -147,7 +147,9 @@ struct HistorySidebarView: View {
             .contentShape(Rectangle())
             .background(
                 VisualShape.rounded(VisualRadius.control)
-                    .fill(Color.primary.opacity(
+                    // R528：显式 labelColor —— 通用 primary 在 runner 1x 的 vibrant 子树里
+                    // 会与底色同侧，帧上读出 0.0；显式色在亮/暗两档都落墨。
+                    .fill(Color(nsColor: .labelColor).opacity(
                         PressableAppearance.fillOpacity(isPressed: false,
                                                         isHovered: titleHoveredForDrawing,
                                                         hoverLevel: VisualFill.controlHover,

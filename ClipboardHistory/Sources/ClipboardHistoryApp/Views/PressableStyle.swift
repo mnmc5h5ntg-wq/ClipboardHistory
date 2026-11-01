@@ -254,11 +254,23 @@ private struct PausedForCaptureKey: EnvironmentKey {
     static let defaultValue: Bool? = nil
 }
 
+/// R528：标题双击悬停的专用取证键。与通用 `hoveredForCapture` 分开，
+/// 否则同一帧里 chevron/批量按钮的悬停会混进标题带的读数（runner 1x 上曾读出 0.0）。
+private struct MainSidebarTitleHoverForCaptureKey: EnvironmentKey {
+    static let defaultValue: Bool? = nil
+}
+
 extension EnvironmentValues {
     /// 取证用的悬停覆盖。`nil` = 不覆盖（产品路径走的还是 `onHover`）。
     var hoveredForCapture: Bool? {
         get { self[HoveredForCaptureKey.self] }
         set { self[HoveredForCaptureKey.self] = newValue }
+    }
+
+    /// R528：标题悬停的专用取证键（产品路径永远 nil）。
+    var mainSidebarTitleHoverForCapture: Bool? {
+        get { self[MainSidebarTitleHoverForCaptureKey.self] }
+        set { self[MainSidebarTitleHoverForCaptureKey.self] = newValue }
     }
 
     /// 取证用的**按行**悬停覆盖。`nil` = 不覆盖；`n` = 只有第 n 行按悬停画。
