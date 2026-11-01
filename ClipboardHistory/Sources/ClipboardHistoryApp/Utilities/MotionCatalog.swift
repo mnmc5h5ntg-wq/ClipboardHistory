@@ -91,9 +91,9 @@ enum MotionCatalog {
         case .selection: return 0.12
         case .bannerIn: return 0.15
         case .bannerOut: return 0.12
-        case .emphasis: return 0.20
+        case .emphasis: return 0.16
         case .dropTarget: return 0.12
-        case .contentFade: return 0.16
+        case .contentFade: return 0.20
         // 0.20：比 `selection`(0.12) 慢一档、比上限(0.25) 快一档。
         // 依据不是口味：这颗胶囊要走**约半个轨道宽**（两段制 ⇒ 一次约 60–90pt），
         // 而 0.12 那一档是给"底色跟着鼠标"这种零位移反馈的。位移越长，时长越要跟上，

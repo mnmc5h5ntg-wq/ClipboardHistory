@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""R541 变异表：emphasis 回退到 0.16 让 1x 短回执掉帧（M1420）。"""
+"""R542 变异表：contentFade 回退到 0.16 让 markdown 1x 掉帧（M1421）。"""
 import os
 import subprocess
 import sys
@@ -8,9 +8,9 @@ import sys
 ROOT = "/Users/wangziyi/Codex_Project0/ClipboardHistory"
 FILE = "Sources/ClipboardHistoryApp/Utilities/MotionCatalog.swift"
 ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
-TEST = "MotionCatalogTests/testEmphasisFeedbackSurvivesOneXSampling"
-OLD = "        case .emphasis: return 0.20"
-NEW = "        case .emphasis: return 0.16"
+TEST = "MotionCatalogTests/testContentFadeSurvivesOneXSampling"
+OLD = "        case .contentFade: return 0.20"
+NEW = "        case .contentFade: return 0.16"
 
 
 def run():
@@ -39,7 +39,7 @@ def main():
         code, out = run()
     finally:
         open(path, "wb").write(orig)
-    print("M1420:", code)
+    print("M1421:", code)
     clean = open(path, "rb").read() == orig
     print("RESTORE_CLEAN=" + ("yes" if clean else "NO"))
     if code != "CAUGHT" or not clean:

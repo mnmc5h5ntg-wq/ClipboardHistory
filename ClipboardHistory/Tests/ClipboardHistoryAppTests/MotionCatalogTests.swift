@@ -35,12 +35,11 @@ final class MotionCatalogTests: XCTestCase {
         }
     }
 
-    /// R541：emphasis 的 0.16 在 runner 1x 上曾只读到 1 个过渡帧（copy receipt 2/40、
-    /// markdown label 2/40，见 `scripts/motion_red_occurrence.py` 的 40 跑窗口）。
-    /// 0.20 让本机 copy receipt 的 1x 过渡帧从 2–3 升到 3–4；帧数地板（≥2）没动。
-    func testEmphasisFeedbackSurvivesOneXSampling() {
-        XCTAssertGreaterThanOrEqual(MotionCatalog.duration(for: .emphasis), 0.20,
-                                    "emphasis 退回 0.16 时 1x 短回执会掉到 1 个过渡帧；要改先重跑出现率")
+    /// R542：markdown label 走 `.contentFade` 0.16，runner 1x 曾只读到 1 帧（2/40）。
+    /// 0.20 后本机 markdown 1x 过渡帧 3–4→4，2x 5–6→5–7；地板仍是 ≥2。
+    func testContentFadeSurvivesOneXSampling() {
+        XCTAssertGreaterThanOrEqual(MotionCatalog.duration(for: .contentFade), 0.20,
+                                    "contentFade 退回 0.16 时 markdown label 的 1x 交换会掉到 1 帧")
     }
 
     /// 例外必须**只有一个入口**，否则"上限"就变成了一句可以随便绕过去的话。
