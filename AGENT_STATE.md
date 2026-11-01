@@ -12,9 +12,9 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R528 / 第 527 轮 / Round 525）
+最后更新：2026-11-01（本地 · R529 / 第 528 轮 / Round 526）
 
-## R529 状态（2026-11-01 · 第 528 轮 / Round 526 · 开工 ⓪）
+## R529 状态（2026-11-01 · 第 528 轮 / Round 526 · 产品 2 文件 + 判据）
 
 R529 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c64956e`、ahead=0。`41280543992 ↔ c64956e`、`41280380710 ↔ b004545`、`41279118328 ↔ 9cf95e1` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
 - `41278158514 ↔ 897db20`（R527 补正）、`41277658052 ↔ e5e0840`（R526 补记）均 **failure STEP[15] + STEP[17]**：STEP[15] 唯一失败是 `testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0.0**（旧尺）；STEP[17] Capture gate 点名**同一条**测试（红有名字）。R528 的 b004545 已换新尺（宽区绝对差）并改显式 labelColor，待跑签收。
@@ -22,6 +22,9 @@ R529 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c64956e`、ahead=0。`
 - **BACKLOG 622 复查**：`testCodeBlocksShowLineNumbers` 在 `897db20`/`e5e0840` 两跑的 capture 与 Swift 步均 **passed**（崩溃只出现在 a71a74c，1 次）；`testFrameIntervalsUnderStateChanges` 在后续两跑均 **skipped**（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`，204.6ms 只出现在 a71a74c 的 on-screen 步，1 次）⇒ 各 1 次、未复现，**不销单**。
 - 归因：sources 时序红与产品回归分开；detail 探针已由 `a71a74c` 签收；剩余产品红只有 hover 0.0（R528 已修）。
 
+
+① 产品/判据：旧值（真机只读）展开/折叠两态 Window 菜单都叫「折叠/展开窗口」。修：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 给「折叠窗口/展开窗口」，Window 菜单用 `@ObservedObject` controller 现读状态，仍走同一 `perform(.toggleMainWindowCollapse)` + ⌘\。真机非破坏性复核：750×492「折叠窗口」→ 点击后 420×492「展开窗口」→ 再点回 750×492「折叠窗口」，1 窗口（⌘\ keystroke 未送达前台，故走菜单项；快捷键由 source 判据覆盖）。产品 **2 文件**；`M1405` CAUGHT、RESTORE_CLEAN；预检 308/285/746 bad=0、ARM 401/1233、HIDDEN 395/1172 rot=0；build 0 告警。帧 342（CHANGED=0），基线 342。全量 **1371/56/0（559.3s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（PID 45231）；真机只读 1 窗口；电池 **683/5**。BACKLOG 622 已在 ⓪ 复查（两跑未复现，各 1 次）。产品面连续零改动 **1** 轮（as-of 528，`python3 scripts/product_streak.py` 现读，newest=2e7272e/528）。
+产品笔 `2e7272e` 已推（HEAD=origin、ahead=0）。下一轮编号 R530（第 529 轮 / Round 527）：先 push 并复核 ahead=0；读 R529 产品笔/台账笔与 R528 三跑的全部失败步骤（in_progress/queued ⇒ NOT-RUN）；② 折叠特性继续；③ 4.5 地板与 150 上限不动。
 
 ## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 产品 2 文件 + 判据）
 

@@ -8593,3 +8593,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：静置帧不变；hover 两帧因专用键（chevron 不再伪悬停）变化，基线仍 342；M1404 钉取证键接线。
 - 边界：只改标题 hover；chevron/批量按钮的悬停通道未动；本笔产品 2 文件。
 
+## D-528 Window 菜单标题随折叠态切换（R529）
+
+- 背景：展开/折叠两态 Window 菜单都写静态「折叠/展开窗口」，看不出当前状态与下一步动作；真机只读 AX 已读到两态同名。
+- 决定：`MainWindowCollapsePolicy.menuTitle(collapsed:)` 给「折叠窗口/展开窗口」；Window 菜单用 `@ObservedObject` controller 现读状态；仍走同一个 `perform(.toggleMainWindowCollapse)` 与 ⌘\，不新增第二触发路径。
+- 理由：菜单是用户找窗口操作的地方；状态化标题是最小、可复核的发现性修复。
+- 兼容性/迁移：状态菜单（MenuBarExtra/NSMenu）保留通用「折叠/展开窗口」；本笔只改 Window 菜单；帧不进离屏，基线不变。
+- 边界：⌘\ keystroke 经 System Events 在本机未送达前台 ⇒ 真机证据走菜单项点击（非破坏性）；快捷键接线由 source 判据与既有 perform 测试覆盖。
+

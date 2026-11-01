@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠窗口菜单标题随状态切换（R529 / 第 528 轮 / Round 526 / U-2157…U-2163 · 产品 2 文件 + 判据）
+
+Window 菜单项从静态「折叠/展开窗口」改为随状态在「折叠窗口/展开窗口」间切换（同一 perform dispatch + ⌘\）。真机非破坏性复核：750×492→420×492→750×492，标题同步往返，1 窗口。M1405 CAUGHT；帧 342 CHANGED=0；全量 1371/56/0；换装 429=429。
+
+
 ### 折叠标题悬停的 1x 修复（R528 / 第 527 轮 / Round 525 / U-2150…U-2156 · 产品 2 文件 + 判据）
 
 标题悬停浅底改显式 `Color(nsColor: .labelColor)`（vibrant 1x 下 primary 不落墨）；新增专用取证键并把尺改成侧栏上半区绝对差总和。新读数 light 147661/7184、dark 110438/6886；M1404 CAUGHT；帧 342（CHANGED=2）；全量 1370/56/0；换装 428=428。

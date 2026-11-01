@@ -10749,3 +10749,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现象：a71a74c 跑里 `UICaptureTests/testCodeBlocksShowLineNumbers` 抛 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，Older R525 跑两遍都 passed），并触发 Capture gate；同跑 `testFrameIntervalsUnderStateChanges` 最差 204.6ms>120ms、超锚点 2 颗（容差 1）。
     现状：与本轮折叠产品改动无交集；先记为**本跑环境红**，不冒充产品回归也不签字。
     退场：R529 读 R528 新跑；若复现则开单定位（code-block 的 nil 对象来源 / probe 采样负载），不再复现则按一次性环境红归档。
+    复查（R529）：`897db20`/`e5e0840` 两跑的 capture 与 Swift 步里 `testCodeBlocksShowLineNumbers` 均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 两颗各出现 1 次、未复现；不销单，继续在 R530 读 R528/R529 跑复查。
