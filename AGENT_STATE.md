@@ -13,6 +13,13 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R535 / 第 534 轮 / Round 532）
+## R536 开工 ⓪（2026-11-01 · 第 535 轮 / Round 533）
+
+R536 ⓪ 读数（只登记、不轮询）：HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`（产品）、`41303247255 ↔ 5bcbd7a`（台账）、`41303403928 ↔ 789f642`（收口）读时均 **in_progress ⇒ NOT-RUN**。
+- 上轮五跑收口：`41297370322 ↔ 20ceacb`、`41297283216 ↔ d625b47`、`41297162797 ↔ d8c0e44`、`41295787642 ↔ 0cce5df`、`41295422790 ↔ 76cbd63` 全部 **success**。
+- `41295597277 ↔ 8b1ddb9` failure **仅 STEP[19] Motion floor**：`MOTION_FLOOR_FACTS judged=5/5 executed=77`，红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`（1x：1 个过渡帧 <2，未登记）+ 已登记 `testNativeRowMoveIsVisibleToTheRuler` ⇒ **BACKLOG 627**；≥2 帧地板不动，需出现率再决定登记/修产品。
+- `41293578965 ↔ df43baa` failure STEP[15]+[18]：SelectionReveal 会话族 + `testFrameIntervalsUnderStateChanges` **162.2ms**、超锚点 **2/208** ⇒ 622 新值；120ms 与容差不动。624 非台账笔红/台账笔绿继续；623 已签收不重开。
+
 ## R535 状态（2026-11-01 · 第 534 轮 / Round 532 · 产品 1 文件 + 判据）
 
 R535 ⓪ 读数（只登记、不轮询）：HEAD=origin=`d625b47`、ahead=0；`git ls-remote` 通、api=200/apple=200。`41297283216 ↔ d625b47`、`41297162797 ↔ d8c0e44`、`41295787642 ↔ 0cce5df`、`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63` 读时均 **in_progress ⇒ NOT-RUN**（五跑都无失败步骤可列）。`a8f1817`（R534 产品笔，cff79a9 的 amend）与 `d8c0e44` 同次推送，GitHub 只给头笔建了 run ⇒ **a8f1817 无独立跑（NOT-RUN/CI_UNREAD）**。
