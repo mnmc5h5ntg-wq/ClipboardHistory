@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 无序列表项目符号换中等点（R549 / 第 548 轮 / Round 546 / U-2319…U-2326 · 产品 1 文件 + 判据）
+
+`MarkdownPresentation.bulletGlyph(depth:0)` 由 `•` 换成同字号更大的 `⦁`（U+2981）。纯几何读数：墨高 2.8→3.9pt，行高 19.0→19.0pt；新判据 `BULLET_INK` 墨高 ≥3.5pt、行高差 ≤0.5pt；M1428 CAUGHT。新夹具 `detail-markdown-bullet`；帧 CHANGED=4、ADDED=2，基线 352→354；录制确定性 10/10 diff=0；全量 1388/56/0；换装 431=431；电池 691/5；BACKLOG 597 结案。
+
 ### 250pt 批量标题不再截成省略号（R548 / 第 547 轮 / Round 545 / U-2311…U-2318 · 产品 1 文件 + 判据）
 
 `HistorySidebarView` 的批量标题改 `ViewThatFits`：宽度够用「已选 N 条」，250pt 最小侧栏退「N 条」（macOS 12 保留全称）。旧帧 250pt 标题带三枚 2pt 省略号点；新帧 3 段 7.5/12.5/6.5pt、最窄 6.5pt、右沿 66.5pt。新增 `BATCH_TITLE_FIT`（最窄字形段 ≥4pt、至少 2 段），M1427 CAUGHT；帧 CHANGED=2（仅 `sidebar-multi-select-min` 亮/暗），基线 352→352；录制确定性 10/10 diff=0；全量 1387/56/0；换装 431=431；电池 691/5；BACKLOG 589 结案。

@@ -363,6 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 548 轮（R549 · 2026-11-02 · U-2319…U-2326）：无序列表项目符号换中等点（产品 1 文件 + 判据）
+
+- **U-2319：⓪ CI。** HEAD=origin=`a210a29`、ahead=0、`git push` no-op；api=200/apple=200。三跑读时 **in_progress ⇒ NOT-RUN**：`41350830308 ↔ f0e9ea0`、`41351210379 ↔ 19d33b5`、`41351231883 ↔ a210a29`；queued/in_progress 不算成功。`41347708887 ↔ a7349c0`、`41347728673 ↔ 6d473a4` 均 **success（0 失败步）**；`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）。
+- **U-2320：② 无序列表项目符号。** BACKLOG 597：14pt 正文下「•」墨高只有 2.8pt。`MarkdownPresentation.bulletGlyph(depth:0)` 由 `•` 换成同字号更大的 `⦁`（U+2981）。纯几何读数：墨高 **2.8→3.9pt**（+39%）、墨宽同；行高 **19.0→19.0pt**（正文行高 19.0，未被撑大）；字号仍 14pt。
+- **U-2321：② 判据/刀/预检。** 新判据 `testUnorderedBulletInkIsReadableWithoutGrowingTheLine`：项目符号墨高 ≥3.5pt 且行高与正文行高差 ≤0.5pt；`BULLET_INK 字符=⦁ 墨高=3.9pt 行高=19.0pt 正文行高=19.0pt`。`M1428`（退回「•」）**CAUGHT、RESTORE_CLEAN=yes**；预检 **328/295/757 bad=0**、ARM **421/1244**（dupes=0 repeats=0）、HIDDEN **410/1183 rot=0**；build **0 告警**；无 bulletGlyph 旧刀锚点，无需重钉。
+- **U-2322：③ 帧/录制。** 新夹具 `detail-markdown-bullet`（720×520）；重捕：CHANGED=**4**（`detail-headings`、`detail-list-wrap` 各亮/暗）、ADDED=**2**、MISSING=0，基线 **352→354**；逐张看：`⦁` 比 `•` 更实，三条列表的换行与正文列未动。录制帧确定性 **10/10 diff=0**。
+- **U-2323：③④ 全量/换装/电池/清账/streak。** 全量 **1388/56/0（686.6s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 28058、1 窗口 750×492）；清账 **162/162/0**；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 548，`python3 scripts/product_streak.py --streak-for 548` 现读）。
+- **U-2324：⑤ 622/624/627/629/628/625/626。** 622 第七值 **176.6ms/2/204**、120ms/容差不动、frame 半开单；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案。
+- **U-2325：⑤ BACKLOG 597 结案。** 「•」→「⦁」把墨高从 2.8 抬到 3.9pt，行高保持 19.0pt；判据是字体几何量、runner 与本机同源；新帧进基线。**结案**。
+- **U-2326：⑥ 收口与交接。** ⓪ 笔 `deb28a1`、产品笔随后；下一轮 R550（第 549 轮 / Round 547）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `f0e9ea0`/`19d33b5`/`a210a29`/`30c7913`/`8b667ae` 与其余已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 547 轮（R548 · 2026-11-02 · U-2311…U-2318）：250pt 批量标题不再截成省略号（产品 1 文件 + 判据）
 
 - **U-2311：⓪ CI。** HEAD=origin=`6d473a4`、ahead=0、`git push` no-op；api=200/apple=200。`41347708887 ↔ a7349c0` 读时 **in_progress**、`41347728673 ↔ 6d473a4` **queued** ⇒ 均 NOT-RUN（queued 不算成功）。`41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake）；`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）；复读 c5fcf03/c1df1e6/b16eacc/8d4a36d/bd96e93 的红同前。`41341697142 ↔ f58bf8c`、`41341540906 ↔ 54420e0`、`41341586171 ↔ d22f30a` 等 success。
