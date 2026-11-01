@@ -12,9 +12,9 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R529 / 第 528 轮 / Round 526）
+最后更新：2026-11-01（本地 · R530 / 第 529 轮 / Round 527）
 
-## R530 状态（2026-11-01 · 第 529 轮 / Round 527 · 开工 ⓪）
+## R530 状态（2026-11-01 · 第 529 轮 / Round 527 · 产品 1 文件 + 判据）
 
 R530 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9b9cf56`、ahead=0。`41284186399 ↔ 9b9cf56`、`41284167067 ↔ 2967ce6`、`41284008834 ↔ 1e3cfaa` 读时均 **in_progress ⇒ NOT-RUN**（1e3cfaa 是 hover 扩边修复的签收跑，待读）。已收口：
 - `41282132936 ↔ 2e7272e` **failure STEP[9]+[15]+[17]**：STEP[9]=sources 时序；STEP[15]/[17]=旧 hover 判据 `TITLE_HOVER light/dark totalDelta=0 changedPixels=0`（1e3cfaa 之前的代码），Capture gate 点名同一条。
@@ -22,6 +22,8 @@ R530 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9b9cf56`、ahead=0。`
 - R528 三跑 `c64956e`/`b004545`/`9cf95e1` 的 STEP[15]+[17] 同族（旧 hover 0.0），detail 已由 a71a74c 签收。
 - **BACKLOG 622 复查**：`testCodeBlocksShowLineNumbers` 在 2e7272e/5fcb482 两跑的 capture 与 Swift 步均 **passed**、`testFrameIntervalsUnderStateChanges` 均 **skipped**（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 两颗仍各 1 次、未复现，不销单。
 - 归因：sources 时序红与产品回归分开；唯一产品红仍是旧 hover 0.0（1e3cfaa 已换扩边顺序 + 显式取证，待跑签收）。
+① 产品/判据：旧值（源码）R529 的 Window 菜单折叠项是 `Button(...)`，没有绑定状态 ⇒ 两态都不可能画勾，菜单里读不出当前折叠状态。修：改成 `Toggle(isOn: Binding(get: { collapse.isCollapsed }, set: { _ in appDelegate.perform(.toggleMainWindowCollapse) }))`，勾=折叠态，标题仍随状态切换，set 统一走既有 perform（与 ⌘\、状态菜单同一条 dispatch）。真机只读 AX 复核（非破坏性菜单项）：展开 750×492「折叠窗口」无勾 → 折叠后 420×492「展开窗口」✓ → 再展开 750×492 无勾，始终 1 窗口。新增 `testSelectionSurvivesCollapseAndExpand`（产品入口：selectOnly + toggleMainWindowCollapse，折叠/展开各查 selectedEntryIDs；旧实现已通过，它是新判据不是修缺陷）与 360×560 `main-collapsed-min` 夹具（入材质盲区名册，只判几何）。产品 **1 文件**（ClipboardHistoryCommands）；`M1406` CAUGHT、`M1405` 重锚后 CAUGHT；预检 309/286/747 bad=0、ARM 402/1234、HIDDEN 396/1173 rot=0；build 0 告警。帧 **344**（ADDED=2、CHANGED=0；基线 342→344）。全量 **1372/56/0（570.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（PID 80101）；真机只读 1 窗口；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 529，`python3 scripts/product_streak.py` 现读，newest=02fa144/529）。
+② BACKLOG 622 已在 ⓪ 复查（`2e7272e`/`5fcb482` 两跑均 passed/skipped，各 1 次、未复现，不销单）。产品笔 `02fa144` 已推（HEAD=origin、ahead=0）；新跑待读。下一轮编号 R531（第 530 轮 / Round 528）：先 push 并复核 ahead=0；继续折叠特性；4.5 地板与 150 上限不动。
 
 
 ## R529 状态（2026-11-01 · 第 528 轮 / Round 526 · 产品 2 文件 + 判据）

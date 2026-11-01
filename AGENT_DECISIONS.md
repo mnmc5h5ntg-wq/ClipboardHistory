@@ -8601,3 +8601,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：状态菜单（MenuBarExtra/NSMenu）保留通用「折叠/展开窗口」；本笔只改 Window 菜单；帧不进离屏，基线不变。
 - 边界：⌘\ keystroke 经 System Events 在本机未送达前台 ⇒ 真机证据走菜单项点击（非破坏性）；快捷键接线由 source 判据与既有 perform 测试覆盖。
 
+
+## D-529 Window 菜单的折叠项用 Toggle 表达状态（R530）
+
+- 背景：R529 只让标题随状态切换，但菜单项本身没有勾；折叠态与展开态在菜单列表里仍只能靠读标题，状态不是一眼可见的。macOS 菜单里「当前处于某模式」的惯例是勾选。
+- 决定：折叠项改 `Toggle(isOn: Binding(get: { collapse.isCollapsed }, set: { _ in appDelegate.perform(.toggleMainWindowCollapse) }))`；set 不采用 binding 传来的新值，统一走既有 perform（⌘\ 与状态菜单同一条 dispatch），避免出现第二套状态写入。
+- 理由：勾是系统菜单的标准状态语言；让 set 走 perform 能保证 Toggle 的显示状态永远等于 controller 的真值，不会先翻转再被纠正。
+- 兼容性/迁移：标题仍由 `MainWindowCollapsePolicy.menuTitle(collapsed:)` 生成；状态菜单（MenuBarExtra/NSMenu）不变；菜单不进离屏帧，基线变化只来自新夹具。
+- 边界：只用真机 AX 的非破坏性菜单点击取证；⌘\ keystroke 本机未送达前台，快捷键仍由 source 判据与既有 perform 测试覆盖。

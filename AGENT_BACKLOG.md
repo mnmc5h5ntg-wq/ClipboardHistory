@@ -10750,3 +10750,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现状：与本轮折叠产品改动无交集；先记为**本跑环境红**，不冒充产品回归也不签字。
     退场：R529 读 R528 新跑；若复现则开单定位（code-block 的 nil 对象来源 / probe 采样负载），不再复现则按一次性环境红归档。
     复查（R529）：`897db20`/`e5e0840` 两跑的 capture 与 Swift 步里 `testCodeBlocksShowLineNumbers` 均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 两颗各出现 1 次、未复现；不销单，继续在 R530 读 R528/R529 跑复查。
+    复查（R530）：`2e7272e`/`5fcb482` 两跑的 capture 与 Swift 步里 `testCodeBlocksShowLineNumbers` 均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 仍各 1 次、未复现；不销单，继续在下一轮读新跑复查。

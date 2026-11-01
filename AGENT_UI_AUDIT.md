@@ -363,6 +363,16 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 529 轮（R530 · 2026-11-01 · U-2165…U-2171）：折叠态 Window 菜单勾选与最小窗夹具（产品 1 文件 + 判据）
+
+- **U-2165：⓪ CI。** HEAD=origin=`9b9cf56`、ahead=0；`41284186399 ↔ 9b9cf56`、`41284167067 ↔ 2967ce6`、`41284008834 ↔ 1e3cfaa` 读时均 **in_progress ⇒ NOT-RUN**（1e3cfaa 是 hover 扩边修复的签收跑，待读）。已收口：`41282132936 ↔ 2e7272e` **failure STEP[9]+[15]+[17]**（STEP[9]=sources 时序；STEP[15]/[17]=旧 hover 判据 `TITLE_HOVER light/dark totalDelta=0 changedPixels=0`，Capture gate 点名同一条）；`41282266561 ↔ 5fcb482` **failure STEP[15]+[17]**；`41280978574 ↔ 3c00b75` 同 STEP[9]+[15]+[17]。R528 三跑 `c64956e`/`b004545`/`9cf95e1` 的 STEP[15]+[17] 同族（旧 hover 0.0），detail 已由 a71a74c 签收。**BACKLOG 622 复查**：`testCodeBlocksShowLineNumbers` 在两跑的 capture 与 Swift 步均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`）⇒ 两颗各 1 次、未复现，不销单。归因：sources 时序红与产品回归分开；唯一产品红仍是旧 hover 0.0（1e3cfaa 已换扩边顺序 + 显式取证，待跑签收）。
+- **U-2166：① 旧值与产品。** 旧值（源码取证）：R529 的 Window 菜单折叠项是 `Button(MainWindowCollapsePolicy.menuTitle(...))`，没有绑定任何布尔状态 ⇒ 折叠/展开两态都不可能画勾，菜单里读不出当前状态（R529 真机 AX 只读到标题）。修法：改成 `Toggle(isOn: Binding(get: { collapse.isCollapsed }, set: { _ in appDelegate.perform(.toggleMainWindowCollapse) }))`，勾=当前折叠态；标题仍由 `menuTitle(collapsed:)` 现读。set 不采用新值，⌘\ 与状态菜单仍是同一条 dispatch。产品 **1 文件**（ClipboardHistoryCommands）。
+- **U-2167：② 真机只读复核（非破坏性菜单项）。** 安装版 AX：展开 **750×492** 时「折叠窗口」无勾 → 点菜单项后 **420×492**「展开窗口」带 ✓ → 再点回 **750×492**「折叠窗口」无勾，始终 **1 窗口**。可分辨的那一臂正是折叠态的勾；删除/清空/退出未碰，活库未动。
+- **U-2168：③ 判据与刀。** 新增 `testSelectionSurvivesCollapseAndExpand`（产品入口：`HistoryStore.perform(.selectOnly)` + `delegate.perform(.toggleMainWindowCollapse)`，折叠/展开各查一次 `selectedEntryIDs`；旧实现已通过，它是**新判据**不是修缺陷）；`testWindowMenuTitleReflectsCollapseState` 扩到断言源码里的 `Toggle(isOn: Binding(`、`get: { collapse.isCollapsed }`、同一个 `perform(.toggleMainWindowCollapse)`。`M1406`（Toggle→Button）**CAUGHT、RESTORE_CLEAN=yes**；`M1405` 重锚到 `get: { collapse.isCollapsed }`（改成 false）后 **CAUGHT**。预检 **309/286/747 bad=0**、ARM **402/1234**（dupes=0 repeats=0）、HIDDEN **396/1173 rot=0**；build **0 告警**。
+- **U-2169：④ 帧卷。** 新增夹具 `main-collapsed-min` **360×560**（折叠最小宽），入材质盲区名册（66pt List 选中材质不被 cacheDisplay 绘制）⇒ 只拍几何不看颜色；捕获 **344 帧**：`ADDED=2 MISSING=0`、`CHANGED=0`；基线 342→344。
+- **U-2170：⑤ 八步与电池。** build 0 告警；全量 **1372/56/0（570.0s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=429=429`（活库只增；PID 80101）；真机只读 1 窗口；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 529，`python3 scripts/product_streak.py` 现读）。
+- **U-2171：⑥ 收口与交接。** 产品笔 `02fa144` 已推（HEAD=origin、ahead=0）；新跑待读（下轮第 ⓪ 全读，重点 hover 新尺在 runner 是否转绿、Toggle 勾选跑、BACKLOG 622 是否再复现）。下一轮 R531（第 530 轮 / Round 528）：先 push 并复核 ahead=0；继续折叠特性；安全红线不变。
+
 ## 第 528 轮（R529 · 2026-11-01 · U-2157…U-2164）：折叠窗口菜单标题随状态切换（产品 2 文件 + 判据）
 
 - **U-2157：⓪ CI。** HEAD=origin=`c64956e`、ahead=0；`41280543992 ↔ c64956e`、`41280380710 ↔ b004545`、`41279118328 ↔ 9cf95e1` 读时 **in_progress ⇒ NOT-RUN**。`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` failure STEP[15]+[17]：唯一失败是同一条 `testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0.0**（R528 已换新尺）；Capture gate 点名同一测试。BACKLOG 622 复查：`testCodeBlocksShowLineNumbers` 在两跑均 passed、`testFrameIntervalsUnderStateChanges` 均 skipped ⇒ 各 1 次、未复现，不销单。
