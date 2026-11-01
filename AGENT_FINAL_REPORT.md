@@ -1486,3 +1486,4 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
  收口复读：`20ceacb`/`d625b47`/`d8c0e44`/`0cce5df`/`76cbd63` success；`8b1ddb9` 仅 STEP[19] Motion floor（1x 回执 1 帧 <2，未登记 ⇒ 627）；`a2579fd`/`5bcbd7a` in_progress。
 - **R536（折叠提示改 AppKit 按钮与焦点环；产品 1 文件 + 判据）**：旧值真机 8 站只在 AXTextField/AXOutline；换真实 NSButton（AXButton/系统焦点环/悬停按压/Return keyEquivalent/Esc monitor）并尝试插入 key-view 链。单测 24 站 `HINT_KEYVIEW_REACHED=0`、真机 8 站仍只有 TextField/Outline ⇒ **625 保持开单，不宣称 Tab 可达**；保留 AppKit 按钮本身。M1412 CAUGHT、M1410/M1411 重锚后 CAUGHT；预检 315/292/753 bad=0、ARM 408/1240、HIDDEN 402/1179 rot=0；帧 350（CHANGED=4 提示帧）；全量 1379/56/0（596.5s）；换装 431=431（PID 23181）；电池 683/5。
  电池首跑 683/2（裸 stdout 15≠16 + skip_roster 内层无结论行），改 XCTAttachment 后 coverage 15/15、复跑 683/5。
+ 收口复读：789f642 success；a2579fd 仅 STEP[9]；5bcbd7a STEP[17] code-block 崩溃再现（ChineseTextContextMenu.swift:653，622 第二次）；eec86a3/5837d65/67437eb/e3e0893 in_progress。

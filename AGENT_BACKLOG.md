@@ -10757,6 +10757,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R534）：`df43baa` 的 STEP[18] 读到 **162.2ms**、超锚点 **2/208**（容差 1），loaded_p95=16.67、比值 1.000 ⇒ 622 再现（比 544.1ms 低，仍是少数帧超锚点）；120ms 与容差不动，不销单。
     复查（R535）：本轮五跑未读（in_progress），最近仍是 `df43baa` 的 162.2ms/2/208；120ms 与容差不动。
     复查（R536）：本轮五跑 in_progress，无新 STEP[18]；最近仍是 df43baa 的 162.2ms/2/208，120ms 与容差不动。
+    复查（R536 收口）：`5bcbd7a` STEP[17] Capture gate 红在 `testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **code-block 半再现（第二次；a71a74c 第一次）**，按退场条件开定位；frame-interval 半仍等新 STEP[18]；不销单。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。

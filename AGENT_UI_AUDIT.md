@@ -372,6 +372,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2212：④ 帧卷。** 捕获 **350 帧**：`CHANGED=4`（仅 `main-collapsed-hint`/`-min` 亮/暗两档提示帧）、`ADDED=0 MISSING=0`；基线保持 **350**；亮/暗 420/360 提示帧逐张看过，AppKit 按钮文字/位置与 SwiftUI 版一致。
 - **U-2213：⑤ 八步与电池。** build 0 告警；全量 **1379/56/0（596.5s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 23181；真机只读 1 窗口，折叠 420×492 后展开 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池首跑 683 tests / **2 failures**（裸 stdout 15≠16：`HINT_KEYVIEW` 的 print；skip_roster 内层无结论行），把读数改成 XCTAttachment 后 coverage 15/15、复跑 **683/5**（skip_roster 本地也偶发一次，记 624）；product_streak **1** 轮（as-of 535，`python3 scripts/product_streak.py --streak-for 535` 现读，last=a2579fd/534）。
 - **U-2214：⑥ 收口与交接。** 产品笔 `5837d65` 已推（HEAD=origin、ahead=0）。下一轮 R537（第 536 轮 / Round 534）：先 push 并复核 ahead=0；读 a2579fd/5bcbd7a/789f642 与 R536 产品/台账跑的全部失败步骤；625 的 Tab 链仍未达成（需查 SwiftUI 宿主对 key-view 的所有权），626/627 保持开单，623 不重开；622/624 继续；继续折叠特性；安全红线不变。
+收口复读：`789f642` **success**；`a2579fd` failure **仅 STEP[9]**（产品笔早于台账的 sources/streak 时序）；`5bcbd7a` failure **STEP[17] Capture gate**：`testCodeBlocksShowTheirLanguage` 抛 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **622 的 code-block 半再现（第二次；a71a74c 第一次）**，按退场条件开定位、不销单；`eec86a3`/`5837d65`/`67437eb`/`e3e0893` in_progress ⇒ NOT-RUN。
 
 ## 第 534 轮（R535 · 2026-11-01 · U-2201…U-2207）：折叠提示支持 Return 激活 + 两个候选被真机证伪（产品 1 文件 + 判据）
 
