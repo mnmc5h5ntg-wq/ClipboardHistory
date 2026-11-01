@@ -13,6 +13,14 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R545 / 第 544 轮 / Round 542）
+## R546 开工 ⓪（2026-11-02 · 第 545 轮 / Round 543）
+
+R546 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9503700`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1385/56/0（681.6s）**、预检 **324/295/757 bad=0**、ARM **417/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **2**（as-of 544）。
+- 三跑读时 **in_progress ⇒ NOT-RUN**：`41336963006 ↔ 9121760`（台账）、`41337019426 ↔ 8acec7f`（补记二）、`41337616903 ↔ 30c7913`（补记三）；本轮 ⓪ 笔自身跑 push 后取号。
+- `41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：`SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（origin=[0.0,1430.0,1430.0,1430.0] 无中间值）——已知会话 flake、非产品。
+- 复读：`41331769689 ↔ c5fcf03` failure **仅 STEP[19]**（红名仅 markdown 1x=1）；`41331173441 ↔ c1df1e6` failure **仅 STEP[19]**（band 11.73 vs 10.79 + markdown 1x=1；copy 1x=2、录制帧 passed）；`41330618181 ↔ b16eacc` failure **仅 STEP[9]**（skip_roster+sources；copy `app-not-active` NOT-RUN）；`41330637380 ↔ 8d4a36d` failure **STEP[9]+[19]**（STEP[9] skip_roster+sources，Ran 690 failures=2；STEP[19] markdown 1x=1）；`41326398317 ↔ bd96e93` failure **STEP[15]+[19]**（fold 0.9989289765 vs 1.0 ±0.001、final=420；band 0.97× + markdown 1x=1）。`41334225593 ↔ 5589ebe`、`41334244256 ↔ e357708` success。
+- 本轮靶：② 换新类别、产品面且读数必须变——不碰 markdown 标签；从 BACKLOG 挑一个未结、可本机落地的产品视觉位，先量旧值（像素墨量/几何量/帧数至少一项），改产品后同一套读数必须变好，否则本轮内撤回换下一个；三条件=独立像素/几何对比 + 逐张看新帧 + 录制帧确定性不新红。`.receipt 0.20`、`contentFade 0.20`、emphasis 0.16 不动；624 名册不改；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1425** 起。
+
 ## R545 状态（2026-11-02 · 第 544 轮 / Round 542 · 产品 0 文件 + 判据）
 
 R545 ⓪ 读数（只登记、不轮询）：HEAD=origin=`e357708`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1385/56/0（696.8s）**、预检 **323/295/757 bad=0**、ARM **416/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 543）。
