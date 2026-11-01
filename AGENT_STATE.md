@@ -13,6 +13,12 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R537 / 第 536 轮 / Round 534）
+## R538 开工 ⓪（2026-11-01 · 第 537 轮 / Round 535）
+
+R538 ⓪ 读数（只登记、不轮询）：HEAD=origin=`8cef540`、ahead=0；网络通。`41308835299 ↔ 21a5440`（R537 产品 Menlo-Bold）、`41309008989 ↔ b707811`（台账）、`41309189054 ↔ 8cef540`（收口）读时均 **in_progress ⇒ NOT-RUN** ⇒ **622 code-block 半不能签收**（21a5440 未出结论）。
+- 已收口：`94dfa27`/`f271cc4`/`e3e0893` **success**（e3e0893 签收 R536 print→XCTAttachment）；`5837d65` failure STEP[9]+[18]（STEP[9]=旧 print + sources 时序 + skip_roster；STEP[18] **243.2ms/2/189** ⇒ 622 第四值）；`67437eb` 仅 STEP[9]（旧 print + skip_roster）；`eec86a3` 仅 STEP[18]（**175.8ms/2/203** ⇒ 622 第三值）；`5bcbd7a` STEP[17] code-block（622 第二次）；`a2579fd` 仅 STEP[9]。
+- **622**：code-block 半待 21a5440 跑；frame 半第四值 243.2ms/2/189，120ms 与容差不动。**627**：eec86a3 Motion floor `judged=5/5 executed=77 红=-`、5837d65 `judged=4/5 not-run=notice-banner 红=-` ⇒ 未再现，保持开单。**624**：skip_roster 在 5837d65/67437eb 红、e3e0893 绿；两臂继续。623 已签收不重开；625/626 开单。
+
 ## R537 状态（2026-11-01 · 第 536 轮 / Round 534 · 产品 1 文件 + 判据）
 
 R537 ⓪ 读数（只登记、不轮询）：HEAD=origin=`f271cc4`、ahead=0；网络通。`41305195885 ↔ 5837d65`、`41305392230 ↔ 67437eb`、`41305791517 ↔ e3e0893`、`41306124581 ↔ f271cc4` 读时 **in_progress ⇒ NOT-RUN**；`41303561874 ↔ eec86a3` failure **仅 STEP[18]**：`testFrameIntervalsUnderStateChanges` 最差 **175.8ms**、超锚点 **2/203**（loaded_p95=16.67、比值 1.000）⇒ **622 第三次**（544.1 → 162.2 → 175.8），120ms 与容差不动；同跑 `MOTION_FLOOR_FACTS judged=5/5 executed=77 红=-`（Motion floor 绿，627 未再现）。
