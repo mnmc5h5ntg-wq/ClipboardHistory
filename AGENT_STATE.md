@@ -26,7 +26,7 @@ R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。*
 ① 产品/旧值：旧 `collapseHintLine` 末尾有 `.accessibilityElement(children: .combine)`，把可点的「知道了」和信息文字合并成一个元素 ⇒ VoiceOver 只剩一段文字、按钮动作被并掉（离屏窗口不建 AX 树，已知盲区，用源码段作证）。产品 **1 文件**：去掉 `.combine`，文字与按钮各自成 AX 元素；装饰信息图标保持隐藏。视觉零变化；另加 360×560 `main-collapsed-hint-min`（亮/暗帧看过，文案与「知道了」完整、不挤掉）作为最小宽负向证人。
 ② 判据/刀：`testCollapseHintKeepsDismissButtonActionableForVoiceOver`（切源码段：无 `.combine`、按钮标题/help、图标隐藏）；`M1409` CAUGHT、RESTORE_CLEAN=yes；预检 312/289/750 bad=0、ARM 405/1237、HIDDEN 399/1176 rot=0；build 0 告警。帧 **350**（ADDED=2、CHANGED=0、MISSING=0；基线 348→350）。
 ③ 八步：全量 **1377/56/0（591.2s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 52291；真机只读 1 窗口）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 532，`python3 scripts/product_streak.py --streak-for 532` 现读，last=882e30f/531）。
-④ 收口/网络：产品笔 `0720cc6` 只本地提交；`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`，GitHub API 000 而 apple 200 ⇒ **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**；收口前再试一次 push。下一轮 R534（第 533 轮 / Round 531）：先测 ls-remote，通了先推本地提交并复核 ahead=0；623 已结案；624/622 保持开单；继续折叠特性；4.5 地板与 150 上限不动。
+④ 收口/网络：产品笔 `0720cc6` 先本地提交；`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`、API 000 而 apple 200 ⇒ 记 PUSH_BLOCKED/CI_READ_BLOCKED=network；收口前再试一次 `git push`：网络恢复，`039413e..76cbd63` 成功，**HEAD=origin=76cbd63、ahead=0，PUSH_BLOCKED 解除**。随后读到 `882e30f` 仅 STEP[9] 六红（指针/citations/streak/sources 时序 + skip_roster；STEP[15]/Capture 无红 ⇒ 产品与提示 runner 绿）；`df43baa`/`039413e`/`76cbd63` in_progress ⇒ NOT-RUN。下一轮 R534（第 533 轮 / Round 531）：先测 ls-remote，通了先推本地提交并复核 ahead=0；623 已结案；624/622 保持开单；继续折叠特性；4.5 地板与 150 上限不动。
 
 ## R532 状态（2026-11-01 · 第 531 轮 / Round 529 · 产品 5 文件 + 判据）
 
