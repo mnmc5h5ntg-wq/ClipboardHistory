@@ -56,7 +56,11 @@ enum CodeLanguageTag {
         lineTop + max(0, (lineHeight - tagHeight) / 2)
     }
 
-    static var font: NSFont { .monospacedSystemFont(ofSize: fontSize, weight: .semibold) }
+    /// R537：旧值 `.monospacedSystemFont` 在 runner 的 CoreText `TAttributes::ApplyFont`
+    /// 偶发插 nil（622 第二次，`ChineseTextContextMenu.swift:653` 的 `sizeWithAttributes:`）。
+    /// 换成具体 PostScript 名的 **Menlo-Bold** 并缓存：描述符具体、生命周期稳定，不再走系统 UI 字体的惰性描述符。
+    nonisolated(unsafe) static let font: NSFont = NSFont(name: "Menlo-Bold", size: fontSize)
+        ?? .monospacedSystemFont(ofSize: fontSize, weight: .semibold)
     /// 动态色：标签是元信息，不能比代码抢眼，也不许在暗档被烤成黑的。
     static var color: NSColor { .secondaryLabelColor }
 
