@@ -12,14 +12,19 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R541 / 第 540 轮 / Round 538）
-## R542 开工 ⓪（2026-11-01 · 第 541 轮 / Round 539）
+最后更新：2026-11-02（本地 · R542 / 第 541 轮 / Round 539）
+## R542 状态（2026-11-02 · 第 541 轮 / Round 539 · 产品 1 文件 + 判据）
 
 R542 ⓪ 读数（只登记、不轮询）：HEAD=origin=`4521ac3`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1384/56/0（664.5s）**、预检 **321/295/757 bad=0**、ARM **414/1244**、HIDDEN **408/1183 rot=0**、电池 **690/5**、安装 **431=431**、清账 **162/162/0**、product_streak **2**（as-of 540）。
 - 已收口：`41317878347 ↔ 057e2e4`、`41317947527 ↔ c15377e`、`41318132821 ↔ 172d8de`、`41318153433 ↔ fde914e`、`41315396056 ↔ 8c165fb` 均 **success（0 失败步）**；`41318294600 ↔ d984ab7` failure **仅 STEP[18]**（`testFrameIntervalsUnderStateChanges` **176.6ms/2/204** ⇒ 622 第七值；另右击探针心跳未闭合/BACKLOG 132）。
 - 四跑读时 **in_progress ⇒ NOT-RUN**：`41320804339 ↔ 7353513`（emphasis 0.20 产品，627/629 签收靠它，读时 369s）、`41321009857 ↔ cc15c76`（台账）、`41321172002 ↔ 0dc8105`（补记二）、`41321193291 ↔ 4521ac3`（R541 补记三）；本轮 ⓪ 笔自身跑 push 后取号。
 - 本轮靶：② 629 的真实动效位——markdown label 仍 contentFade 0.16，先量本机 1x 过渡帧作旧值，再试与 `.emphasis` 同类的时长调整；copy/markdown/fold 各 10/10 与胶片判据都给读数，若 markdown 被证伪（读数不变或判据变红）就撤回、只保留 emphasis 0.20。627/629 三类（copy receipt / fold / markdown label）继续分开数并写明分母；622 第七值 176.6ms/2/204、120ms/容差不动；624 保持开单、不改名册；628/625/626 不重开；刀号从 **M1421** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 
+① 627/629 扩窗：42 份可用日志 copy **2/42**（9e78221、8b1ddb9；分母受限）、fold **2/39 executed**（41218878781、b6394f5）、markdown **2/42**（b6394f5、3628685）；本机 copy/markdown/fold 各 10/10。emphasis 0.20 在 `7353513` 里 copy 1x=2、Motion floor REDS=0，但同跑新红 `testRecordingCardFrameIsDeterministicAcrossRenders`（dark 11667px；录制描边走 `.emphasis`，SettingsView:1141）⇒ **emphasis 撤回 0.16**、删其判据/M1420。contentFade 0.20 保留：markdown 1x 3–4→4、2x 5–6→5–7，copy 1x 3–4、fold 中间帧 7–8，各 10/10；M1421 CAUGHT。≥2 帧地板不动、627/629 保持开单。
+② 622 跨跑回归：42 跑 `worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；`d984ab7` 第七值 **176.6ms/2/204**（544.1→162.2→175.8→243.2→151.4→262.3→176.6）；120ms/容差 1 不动、frame 半保持开单。
+③ 判据/预检：`MotionCatalogTests.testContentFadeSurvivesOneXSampling` 钉 ≥0.20；M1421 CAUGHT、RESTORE_CLEAN；预检 321/295/757 bad=0、ARM 414/1244、HIDDEN 408/1183 rot=0；build 0 告警。
+④ 帧/全量/换装/电池/清账/streak：帧 **350**（CHANGED=0）；全量 **1384/56/0（698.6s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 71348、1 窗口 750×492）；电池 **690/5**（台账后复跑）；清账 162/162/0；产品面连续零改动 **1** 轮（as-of 541，`python3 scripts/product_streak.py --streak-for 541` 现读，last=7353513/540）。
+⑤ CI/交接：产品笔 `f7bd865` 已推；`41317878347 ↔ 057e2e4`、`41317947527 ↔ c15377e`、`41318132821 ↔ 172d8de`、`41318153433 ↔ fde914e`、`41315396056 ↔ 8c165fb`、`41321009857 ↔ cc15c76`、`41321172002 ↔ 0dc8105`、`41321193291 ↔ 4521ac3`、`41321338166 ↔ 48ef7d7` 全 **success（0 失败步）**；`41320804339 ↔ 7353513` failure **STEP[9]+[15]**（STEP[9]=skip_roster + sources 时序；STEP[15]=录制帧确定性 dark 11667px）、`41318294600 ↔ d984ab7` failure **仅 STEP[18]**（176.6ms/2/204 + 右击探针心跳未闭合）。`f7bd865` 产品跑与台账跑 push 后取号。下一轮 R543（第 542 轮 / Round 540）：先 push 复核 ahead=0；读 `f7bd865` 产品跑与台账跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R541 状态（2026-11-01 · 第 540 轮 / Round 538 · 产品 1 文件 + 判据）
 
 R541 ⓪ 读数（只登记、不轮询）：HEAD=origin=`fde914e`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1383/56/0（641.1s）**、预检 **320/295/757 bad=0**、ARM **413/1244**、HIDDEN **407/1183 rot=0**、电池 **690/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 539）。

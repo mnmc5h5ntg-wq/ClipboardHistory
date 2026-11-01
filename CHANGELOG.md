@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### emphasis 0.20 撤回 + contentFade 0.20（R542 / 第 541 轮 / Round 539 / U-2260…U-2268 · 产品 1 文件 + 判据）
+
+R541 的 emphasis 0.20 在 `7353513` 产品跑里 copy 1x=2、Motion floor 干净，但出现新的录制帧确定性红（dark 11667px；录制描边走 emphasis）⇒ 撤回 emphasis、删其判据与 M1420。markdown 候选改 `contentFade` 0.20：本机 markdown 1x 3–4→4、2x 5–6→5–7，copy/fold 各 10/10；M1421 CAUGHT。42 份日志扩窗：copy 2/42、fold 2/39、markdown 2/42；622 worst_max 262.3、over 2、over_runs 17、loaded_p95 46.73。帧 350（CHANGED=0）；全量 1384/56/0；换装 431=431；电池 690/5。
+
 ### 627 扩窗与 622 回归表 + emphasis 回执 0.20（R541 / 第 540 轮 / Round 538 / U-2250…U-2258 · 产品 1 文件 + 判据）
 
 `motion_red_occurrence.py` 扩到 40 份可用日志：copy receipt 2/40（分母受限）、fold 2/37 executed、markdown label 2/40；622 跨跑 worst_max 262.3、over_max 2、over_runs 16、loaded_p95_max 46.73、比值 0.585–2.167 ⇒ 1–2 颗离群。产品把 `.emphasis` 从 0.16 调到 0.20（收藏/固定/已复制共用，上限 0.25 不变），本机 copy receipt 1x 过渡帧 2–3→3–4；M1420 CAUGHT。帧 350（CHANGED=0）；全量 1384/56/0；换装 431=431；电池 690/5。627 保持开单，新开 629。

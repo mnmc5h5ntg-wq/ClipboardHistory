@@ -8705,3 +8705,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：本机 copy receipt 1x 过渡帧从 2–3 升到 3–4（2x 3–4→4–5），10/10 仍通过；0.20 仍是一次反馈的时长，不改变回执的布局/颜色/文案，也不改帧数地板。
 - 兼容性/迁移：emphasis 同时影响收藏/固定符号动画的时长（+40ms），仍在上限内；静态帧 CHANGED=0。
 - 边界：runner 签收待 `7353513` 跑；markdown label 走 `.contentFade` 0.16 未改，残余 1x 1 帧风险记 BACKLOG 629。
+
+## D-542 emphasis 0.20 撤回、contentFade 0.20 保留（R542）
+
+- 背景：R541 把 `.emphasis` 0.16→0.20 以救 1x copy receipt；产品跑 `7353513` 里 copy receipt 1x 过渡帧=2、Motion floor REDS=0，但 STEP[15] 出现新的 `testRecordingCardFrameIsDeterministicAcrossRenders` 红（dark diff 11667px）。录制描边在 `SettingsView:1141` 用 `.animation(MotionCatalog.animation(for: .emphasis))` ⇒ 新的红与 emphasis 时长直接相关。
+- 决定：撤回 emphasis 0.20（回 0.16），删除 `testEmphasisFeedbackSurvivesOneXSampling` 与 M1420 刀；保留 markdown 候选的 `contentFade` 0.20（本机 markdown 1x 3–4→4、2x 5–6→5–7），并用 `testContentFadeSurvivesOneXSampling` + M1421 钉住。
+- 理由：用户规则是「没有新红才保留」；copy 1x=2 只说明它刚好过线，不能抵消同跑的新红。contentFade 的新值在本机三条动效 10/10 与目录判据全绿，先保留待 runner 签收。
+- 兼容性/迁移：emphasis 回到 0.16（原值）；contentFade 0.20 仍在 0.25 上限内；静态帧 CHANGED=0。
+- 边界：contentFade 0.20 仍需 runner 签收；629 的 copy/markdown 残余 1x 1 帧风险保持开单，≥2 帧地板不动。

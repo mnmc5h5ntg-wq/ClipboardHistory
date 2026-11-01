@@ -10767,6 +10767,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R540）：15 跑 `motion_red_occurrence.py`：`worst_max=262.3`、`over_max=2`、`over_runs=7`、`loaded_p95_max=46.73`、`比值=0.713–2.020`；9e78221 单跑 baseline=16.67/off=42.56/loaded=46.73/ratio=1.098/n=175/worst=262.3/over=2 ⇒ 1–2 颗离群、不是整段慢；120ms 与容差 1 不动、frame 半保持开单。
     复查（R541）：40 跑 `FRAME_MULTI`：`worst_max=262.3`、`over_max=2`、`over_runs=16`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；最差帧仍 1–2 颗离群、loaded p95 全在 46.73 以下 ⇒ 不是整段慢；120ms/容差不动、frame 半保持开单。
     复查（R541 收口）：`41318294600 ↔ d984ab7` 的 STEP[18] 最差 **176.6ms/2/204**（loaded_p95=16.67、比值 1.000）⇒ 第七值（544.1→162.2→175.8→243.2→151.4→262.3→176.6）；120ms/容差不动、frame 半保持开单。
+    复查（R542）：42 跑 `FRAME_MULTI`：`worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；第七值 176.6ms/2/204（d984ab7）；1–2 颗离群、不是整段慢；120ms/容差不动、frame 半保持开单。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10830,6 +10831,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R539）：`9e78221` 的 STEP[19] **再现**：`MOTION_FLOOR_REDS=1`、红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`；另 `b6394f5` STEP[15] 的 `testCollapseWidthIsMeasuredFrameByFrame`（foldProgress `[0,0,0,0.993,0.993]`、终值 0.993 vs 1.0±0.001）是同类 runner 采样 flake，STEP[19] 为其下游。≥2 帧地板不动，保持开单等出现率。
     复查（R540）：15 跑窗口把三种红分开数——copy receipt 1/15（filmstrip 只打印失败，分母受限）、fold 1/15 executed（b6394f5）、markdown label 1/15（3628685 的 Motion floor 红 `testMarkdownModeLabelChangeIsAVisibleProcess`，1x 只有 1 个过渡帧）；本机 copy/fold 各 10/10 过（copy 1x 2–3、fold 中间帧 7–8）。三条不同动效同属 runner 1x 采样边界；≥2 帧地板不动、保持开单等出现率。
     复查（R541）：40 份可用日志扩窗——copy 2/40（9e78221、8b1ddb9；分母受限）、fold 2/37 executed（41218878781、b6394f5）、markdown 2/40（b6394f5、3628685）；本机 copy/fold 各 10/10 过。copy 的 emphasis 已调到 0.20（1x 2–3→3–4），markdown 仍 contentFade 0.16；残余 1x 1 帧风险见 629；≥2 帧地板不动、保持开单。
+    复查（R542）：42 份日志扩窗 copy 2/42、fold 2/39 executed、markdown 2/42；emphasis 0.20 在 `7353513` 里 copy 1x=2、Motion floor REDS=0，但同跑新红 `testRecordingCardFrameIsDeterministicAcrossRenders`（dark 11667px；录制描边走 emphasis）⇒ **emphasis 撤回 0.16**、删其判据/M1420；contentFade 0.20 保留待签收。≥2 帧地板不动、627 保持开单。
 
 **628. runner 的 git 缩写从 7 位变 8 位：三条脚本守卫把 7 位当固定长度**（R538 收口现读）
     现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 3 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）；第 4 条 `test_the_cell_agrees_with_its_own_source` 是产品笔早于台账的 sources 时序（b707811/8cef540 两跑已绿）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。同一批 `085e4c7`（⓪ 笔）也复现同样 3 条 + skip_roster。
@@ -10840,5 +10842,6 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 **629. runner 1x 上短动效仍只有 1 个过渡帧（copy receipt / markdown label）**（R541 现读）
     现象：40 份可用日志里 copy receipt 红 2/40（filmstrip 只打印失败 ⇒ 分母受限）、markdown label 红 2/40（Motion floor 红名：b6394f5、3628685）；本机 copy/fold 各 10/10 过（copy 1x 旧 2–3）。
+    复查（R542）：emphasis 0.20 已撤回（`7353513` 的新录制帧确定性红，dark 11667px）；contentFade 0.20 保留（markdown 本机 1x 3–4→4、2x 5–6→5–7，copy/fold 各 10/10）；M1421 CAUGHT。copy 仍 2/42、markdown 2/42，≥2 帧地板不动、保持开单等 contentFade runner 签收。
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
