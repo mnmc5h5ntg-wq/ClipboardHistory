@@ -24,6 +24,7 @@ R537 ⓪ 读数（只登记、不轮询）：HEAD=origin=`f271cc4`、ahead=0；�
 ② 判据/刀：`CodeLanguageTagFontTests.testFontIsConcreteCachedMenloBold`；`M1413` CAUGHT、RESTORE_CLEAN；预检 316/293/754 bad=0、ARM 409/1241、HIDDEN 403/1180 rot=0；build 0 告警。**过程自伤**：第一版覆盖了 R446 的 `CodeLanguageTagTests.swift`（6→1），全量从 1379 掉到 1374；按套件对比发现后恢复原文件、字体测试独立成 `CodeLanguageTagFontTests.swift`，重跑 **1380**。
 ③ 帧 **350**：CHANGED=6（detail-code/-tabs/markdown-rendered 亮暗）、ADDED/MISSING=0，基线保持 350；SWIFT 标签亮/暗逐张看过。全量 **1380/56/0（605.5s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 56889；真机只读 1 窗口 750×492）；清账 162 格已清 162/未清 0/不合法 0；电池 **683/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 536，`python3 scripts/product_streak.py --streak-for 536` 现读，last=5837d65/535）。
 ④ 收口：产品笔 `21a5440` 已推（HEAD=origin、ahead=0）；新跑待读。下一轮 R538（第 537 轮 / Round 535）：先 push 复核 ahead=0；622 code-block 若新跑不再崩才可签收，frame-interval/627/624 继续；625/626 开单、623 不重开；继续折叠特性；4.5 地板与 150 上限不动。
+ 收口复读：`94dfa27`/`f271cc4`/`e3e0893` **success**（e3e0893 签收 print→XCTAttachment）；`5837d65` STEP[9]+[18]（旧 print + sources 时序 + skip_roster；STEP[18] **243.2ms/2/189** ⇒ 622 第四值）；`67437eb` 仅 STEP[9]（旧 print + skip_roster）；`21a5440` in_progress、`b707811` queued ⇒ NOT-RUN。
 ## R536 状态（2026-11-01 · 第 535 轮 / Round 533 · 产品 1 文件 + 判据）
 
 R536 ⓪ 读数（只登记、不轮询）：HEAD=origin=`789f642`、ahead=0；网络通。`41303073239 ↔ a2579fd`（产品）、`41303247255 ↔ 5bcbd7a`（台账）、`41303403928 ↔ 789f642`（收口）读时均 **in_progress ⇒ NOT-RUN**。

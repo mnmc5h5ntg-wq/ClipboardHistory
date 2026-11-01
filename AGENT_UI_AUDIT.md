@@ -372,6 +372,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2219：④ 八步与电池。** build 0 告警；全量 **1380/56/0（605.5s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 56889；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 536，`python3 scripts/product_streak.py --streak-for 536` 现读，last=5837d65/535）。
 - **U-2220：⑤ 622/627/624。** 622 的 code-block 半已按字体位修、**待 runner 签收**（本机不能复现）；frame-interval 半记 175.8ms/2/203 第三值，120ms 与容差不动。627 在 eec86a3 未再现（Motion floor 绿），保持开单等出现率。624 非台账笔红/台账笔绿继续；本地电池首跑偶发一次 skip_roster 已记。
 - **U-2221：⑥ 收口与交接。** 产品笔 `21a5440` 已推（HEAD=origin、ahead=0）。下一轮 R538（第 537 轮 / Round 535）：先 push 并复核 ahead=0；读本轮产品/台账跑与 eec86a3 的全部失败步骤；622 的 code-block 若在新跑不再崩才可签收，frame-interval 与 627/624 继续；625/626 开单、623 不重开；继续折叠特性；安全红线不变。
+收口复读：`94dfa27`/`f271cc4`/`e3e0893` **success**（e3e0893 签收了 R536 的 print→XCTAttachment 修正）；`5837d65` failure STEP[9]+[18]（STEP[9]=裸 stdout 15≠16 的旧 print + sources 时序 + skip_roster；STEP[18] frame-interval **243.2ms/2/189**，loaded_p95=22.97、比值 0.886 ⇒ **622 第四值**）；`67437eb` failure 仅 STEP[9]（旧 print + skip_roster）；`21a5440` in_progress、`b707811` queued ⇒ NOT-RUN。
 
 ## 第 535 轮（R536 · 2026-11-01 · U-2208…U-2214）：折叠提示改 AppKit 按钮与焦点环（Tab 链仍未打通）（产品 1 文件 + 判据）
 

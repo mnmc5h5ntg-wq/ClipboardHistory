@@ -10759,6 +10759,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536）：本轮五跑 in_progress，无新 STEP[18]；最近仍是 df43baa 的 162.2ms/2/208，120ms 与容差不动。
     复查（R536 收口）：`5bcbd7a` STEP[17] Capture gate 红在 `testCodeBlocksShowTheirLanguage` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，attempt to insert nil object from objects[0]）⇒ **code-block 半再现（第二次；a71a74c 第一次）**，按退场条件开定位；frame-interval 半仍等新 STEP[18]；不销单。
     复查（R537）：本机 `testCodeBlocksShowTheirLanguage` 10/10 不复现；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。产品改为具体 **Menlo-Bold** 缓存字体（M1413 钉住），但本机不能复现 ⇒ **code-block 半仍待 runner 签收、不销单**；frame-interval 半本轮 `eec86a3` 再读 **175.8ms/2/203**（544.1→162.2→175.8），120ms 与容差不动。
+    复查（R537 收口）：`5837d65` 的 STEP[18] 读到 **243.2ms/2/189**（loaded_p95=22.97、比值 0.886）⇒ 622 第四值（544.1→162.2→175.8→243.2），仍是少数帧超锚点；120ms 与容差不动。code-block 半仍待 `21a5440` 新跑签收。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10785,6 +10786,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536）：无新两臂读数（五跑 in_progress）；非台账笔红/台账笔绿继续。
     复查（R536 电池）：本地首跑也红在 skip_roster「内层没有结论行」（同卷另一红是新 `print` 15≠16，已改 XCTAttachment）；复跑 683/5 ⇒ 624 的间歇性在本机也出现一次，两臂都记。
     复查（R537）：`eec86a3` STEP[18] 为 frame-interval，无 skip_roster 新读数；非台账笔红/台账笔绿与本地电池偶发一次继续记。
+    复查（R537 收口）：skip_roster 在 `5837d65`/`67437eb` 红、在 `e3e0893` 绿（后者整跑 success）；同批 STEP[9] 的裸 stdout 红是 R536 的旧 print，已由 e3e0893 的 XCTAttachment 修好并签收。两臂继续。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
@@ -10805,3 +10807,4 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     下一步：在 runner 上做有界重复采样量出现率，再决定登记或修产品；没有出现率之前不销单。
     复查（R536）：本轮五跑尚未出结论，627 无新出现率读数；≥2 帧地板不动。
     复查（R537）：`eec86a3` 的 Motion floor `judged=5/5 executed=77 红=-`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
+    复查（R537 收口）：`5837d65` 的 Motion floor 是 `judged=4/5 not-run=notice-banner 红=-`，627 仍未再现，保持开单等出现率。

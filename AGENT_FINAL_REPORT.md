@@ -1488,3 +1488,4 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
  电池首跑 683/2（裸 stdout 15≠16 + skip_roster 内层无结论行），改 XCTAttachment 后 coverage 15/15、复跑 683/5。
  收口复读：789f642 success；a2579fd 仅 STEP[9]；5bcbd7a STEP[17] code-block 崩溃再现（ChineseTextContextMenu.swift:653，622 第二次）；eec86a3/5837d65/67437eb/e3e0893 in_progress。
 - **R537（代码语言标签改具体缓存字体；产品 1 文件 + 判据）**：622 code-block 第二次崩溃，本机 10/10 不复现；runner 栈在 CoreText ApplyFont 的字体描述符拷贝 ⇒ `CodeLanguageTag.font` 由系统等宽改为具体 PostScript 名 `Menlo-Bold` 缓存（系统等宽兜底）。新增 `CodeLanguageTagFontTests` + M1413 CAUGHT；预检 316/293/754 bad=0、ARM 409/1241、HIDDEN 403/1180 rot=0；帧 350（CHANGED=6 代码标签帧）；全量 1380/56/0（605.5s；中间把旧 CodeLanguageTagTests 覆盖成 1 条被计数发现，恢复后重跑）；换装 431=431（PID 56889）；电池 683/5。622 仍待 runner 签收、不销单；frame 175.8ms/2/203 记第三值。
+ 收口复读：e3e0893/94dfa27/f271cc4 success（print 修复签收）；5837d65 STEP[9]+[18]（旧 print+sources+skip_roster；243.2ms/2/189 ⇒ 622 第四值）；67437eb 仅 STEP[9]；21a5440/b707811 NOT-RUN。
