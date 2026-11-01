@@ -13,6 +13,13 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-01（本地 · R533 / 第 532 轮 / Round 530）
+## R534 开工 ⓪（2026-11-01 · 第 533 轮 / Round 531）
+
+R534 ⓪ 读数（只登记、不轮询）：HEAD=origin=`8b1ddb9`、ahead=0；网络复核 `git ls-remote origin main` 通、api=200/apple=200（上轮断网已恢复）。`41295597277 ↔ 8b1ddb9`、`41295422790 ↔ 76cbd63`、`41293901730 ↔ 039413e` 读时均 **in_progress ⇒ NOT-RUN**。
+- `41293578965 ↔ df43baa`（R532 台账）**failure STEP[15]+[18]**：STEP[15] 唯一失败是 `SelectionRevealAnimationTests.testProductDurationRevealStillMovesOverTime`（会话族）；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **162.2ms**、超锚点 **2/208**（容差 1），而 loaded_p95=16.67、比值 1.000 ⇒ **622 再现**（值从 544.1ms 变 162.2ms，形态仍是少数帧超锚点；120ms 与容差不动）。STEP[9] 绿 ⇒ 624 的台账笔绿臂继续。
+- `882e30f` 已读（仅 STEP[9] 六红：台账时序 + skip_roster；Swift/capture 无红）；`c788299` success（623 已签收，不重开）。
+- 归因：sources/指针/streak 时序红与产品红分开；622 记录新值 162.2ms，不改阈值；624 非台账笔红/台账笔绿继续。
+
 ## R533 状态（2026-11-01 · 第 532 轮 / Round 530 · 产品 1 文件 + 判据）
 
 R533 ⓪ 读数（只登记、不轮询）：HEAD=origin=`039413e`、ahead=0。**网络两路都断**：`git ls-remote origin main` 报 `Connection closed by 20.205.243.166 port 22`；GitHub API `000` 而 apple `200` ⇒ 记 **PUSH_BLOCKED=network / CI_READ_BLOCKED=network**，本轮不重试；`882e30f`/`df43baa`/`039413e` 三跑因此 **未读**（不下绿/红结论）。R532 收口已读到的最新读数仍有效：`c788299` **success** ⇒ 623 签收（组合臂 idleInk=0 + 组件臂 light 571/706/38308/1803、dark 627/671/21456/1437）；`9bfd943` STEP[9]+[15]（时序 + SelectionReveal）、`adb50c1` STEP[15]+[19]（两条运动 flake）、`6add742` STEP[9]+[15]（时序 + SelectionReveal）。
