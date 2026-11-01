@@ -258,6 +258,20 @@ final class MainWindowCollapseTests: XCTestCase {
                       "折叠/展开没有挂 ⌘\\")
     }
 
+    /// R529：Window 菜单项标题随折叠态切换（旧值：两态都写静态「折叠/展开窗口」）。
+    /// 同一 perform dispatch，标题只是呈现；折叠/展开各跑一次。
+    func testWindowMenuTitleReflectsCollapseState() throws {
+        XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: false), "折叠窗口")
+        XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: true), "展开窗口")
+        let commands = try productSource("Managers/ClipboardHistoryCommands.swift")
+        XCTAssertTrue(commands.contains("MainWindowCollapsePolicy.menuTitle(collapsed: collapse.isCollapsed)"),
+                      "Window 菜单项标题没有跟折叠状态走")
+        XCTAssertTrue(commands.contains("appDelegate.perform(.toggleMainWindowCollapse)"),
+                      "Window 菜单项没有走同一个折叠 dispatch")
+        XCTAssertFalse(commands.contains("Button(AppCommand.toggleMainWindowCollapse.title)"),
+                       "Window 菜单项又退回静态标题")
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

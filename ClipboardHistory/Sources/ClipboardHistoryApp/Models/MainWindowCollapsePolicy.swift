@@ -69,6 +69,11 @@ enum MainWindowCollapsePolicy {
 
     static func detailVisible(collapsed: Bool) -> Bool { !collapsed }
 
+    /// R529：Window 菜单项标题随状态在「折叠窗口/展开窗口」间切换（界面入口的同一动作）。
+    static func menuTitle(collapsed: Bool) -> String {
+        collapsed ? "展开窗口" : "折叠窗口"
+    }
+
     static func nextCollapsed(_ current: Bool) -> Bool { !current }
 
     static func rememberedWidth(collapsed: Bool,

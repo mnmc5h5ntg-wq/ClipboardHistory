@@ -8,7 +8,8 @@ struct ClipboardHistoryCommands: Commands {
         ClipboardHistoryAppMenuCommands(appDelegate: appDelegate)
         ClipboardHistoryFileMenuCleanupCommands()
         ClipboardHistoryViewMenuCleanupCommands()
-        ClipboardHistoryWindowCommands(appDelegate: appDelegate)
+        ClipboardHistoryWindowCommands(appDelegate: appDelegate,
+                                       collapse: appDelegate.mainWindowCollapse)
         ClipboardHistoryHelpCommands(appDelegate: appDelegate)
     }
 }
@@ -70,6 +71,7 @@ private struct ClipboardHistoryViewMenuCleanupCommands: Commands {
 
 private struct ClipboardHistoryWindowCommands: Commands {
     let appDelegate: AppDelegate
+    @ObservedObject var collapse: MainWindowCollapseController
 
     var body: some Commands {
         CommandGroup(replacing: .windowArrangement) {
@@ -80,7 +82,8 @@ private struct ClipboardHistoryWindowCommands: Commands {
         // R525：折叠/展开以前只在状态菜单里 —— 应用在前台时 Window 菜单里找不到，
         // 也没有键盘键。这里补一个应用菜单项 + ⌘\，与状态菜单共用同一个 command dispatch。
         CommandGroup(after: .windowArrangement) {
-            Button(AppCommand.toggleMainWindowCollapse.title) {
+            // R529：标题随状态切换（展开→「折叠窗口」、折叠→「展开窗口」），同一 perform dispatch。
+            Button(MainWindowCollapsePolicy.menuTitle(collapsed: collapse.isCollapsed)) {
                 appDelegate.perform(.toggleMainWindowCollapse)
             }
             .keyboardShortcut("\\", modifiers: .command)
