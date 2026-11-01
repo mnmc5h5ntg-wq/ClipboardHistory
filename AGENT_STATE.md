@@ -14,6 +14,15 @@
 
 最后更新：2026-11-01（本地 · R527 / 第 526 轮 / Round 524）
 
+## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 开工 ⓪）
+
+R528 ⓪ 读数（只登记、不轮询）：HEAD=origin=`897db20`、ahead=0。`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
+- `41277554758 ↔ a71a74c`（测试隔离修复）**failure STEP[15] + STEP[17] + STEP[18]**：STEP[15] 唯一失败是 **`testSidebarTitleHoverFeedbackIsVisible` 亮/暗都读到 0.0 亮度差**（同一跑的三条详情帧判据已通过 ⇒ `WindowChromeMetrics` 还原生效）；STEP[17] Capture gate 红在 `testCodeBlocksShowLineNumbers` 的 `NSInvalidArgumentException`（`ChineseTextContextMenu.swift:653`，Older R525 跑两遍都 passed ⇒ 本跑环境/数据异常，非折叠产品回归）；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 204.6ms>120ms、超锚点 2 颗（容差 1）。
+- `41276567763 ↔ 57b7614`（R526 台账）**STEP[15]+[17]**：STEP[15] 红在 4 条 detail 探针 + hover（隔离修复前）；STEP[17] 同一条 code-block 崩溃。
+- `41276450081 ↔ 39b67bd`（R526 产品）**STEP[9]+[15]+[17]+[18]**：STEP[9]=sources 时序；STEP[15]=SelectionReveal 1 条 + 4 条 detail + hover（隔离修复前）；STEP[17]/[18] 同上面的环境红。
+- `41223261055 ↔ f10afe4`、`41221604785 ↔ 4c0eeb6`、`41223106790 ↔ 3ddee13` 均 **STEP[15]**（detail 探针；3ddee13 另 STEP[9]）——`a71a74c` 后 detail 已绿；`41221362532 ↔ 31d12c7`、`41218878781 ↔ 9d882e4` 为 STEP[9]/[15] 旧账。
+- 归因：① sources 格时序红与产品回归分开；② detail 探针红是测试污染，已由 `a71a74c` 修并在其跑里签收；③ 新红只剩 **title-hover 判据在 runner 1x 读 0.0**（本笔修：专用取证键 + 显式 labelColor 填充 + 宽区绝对差尺，M1404）；④ code-block 崩溃与 frame-interval 超锚点记为本跑环境红，下一轮复查是否复现。
+
 ## R527 状态（2026-11-01 · 第 526 轮 · 台账补正）
 
 R527 记录（台账补正，产品 0 文件）：把被并进第 501 轮的 U-2116…U-2145 按轮次开回第 522–525 轮节，并给 STATE 补 identity 行，让 `current_round()` 读 R527 而不是 R498。
