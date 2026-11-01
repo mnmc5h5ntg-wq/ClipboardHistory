@@ -10766,6 +10766,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R539）：`9e78221` 的 STEP[18] frame **262.3ms/2/175**（第六值 544.1→162.2→175.8→243.2→151.4→262.3；loaded_p95=46.73、比值 1.098），120ms 与容差不动；code-block 半已按 `41308835299 ↔ 21a5440` 签收，frame 半保持开单。
     复查（R540）：15 跑 `motion_red_occurrence.py`：`worst_max=262.3`、`over_max=2`、`over_runs=7`、`loaded_p95_max=46.73`、`比值=0.713–2.020`；9e78221 单跑 baseline=16.67/off=42.56/loaded=46.73/ratio=1.098/n=175/worst=262.3/over=2 ⇒ 1–2 颗离群、不是整段慢；120ms 与容差 1 不动、frame 半保持开单。
     复查（R541）：40 跑 `FRAME_MULTI`：`worst_max=262.3`、`over_max=2`、`over_runs=16`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；最差帧仍 1–2 颗离群、loaded p95 全在 46.73 以下 ⇒ 不是整段慢；120ms/容差不动、frame 半保持开单。
+    复查（R541 收口）：`41318294600 ↔ d984ab7` 的 STEP[18] 最差 **176.6ms/2/204**（loaded_p95=16.67、比值 1.000）⇒ 第七值（544.1→162.2→175.8→243.2→151.4→262.3→176.6）；120ms/容差不动、frame 半保持开单。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
