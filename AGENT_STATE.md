@@ -14,6 +14,15 @@
 
 最后更新：2026-11-01（本地 · R528 / 第 527 轮 / Round 525）
 
+## R529 状态（2026-11-01 · 第 528 轮 / Round 526 · 开工 ⓪）
+
+R529 ⓪ 读数（只登记、不轮询）：HEAD=origin=`c64956e`、ahead=0。`41280543992 ↔ c64956e`、`41280380710 ↔ b004545`、`41279118328 ↔ 9cf95e1` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
+- `41278158514 ↔ 897db20`（R527 补正）、`41277658052 ↔ e5e0840`（R526 补记）均 **failure STEP[15] + STEP[17]**：STEP[15] 唯一失败是 `testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0.0**（旧尺）；STEP[17] Capture gate 点名**同一条**测试（红有名字）。R528 的 b004545 已换新尺（宽区绝对差）并改显式 labelColor，待跑签收。
+- `41277554758 ↔ a71a74c` STEP[15] 同一 hover 0.0 + STEP[17]（`testCodeBlocksShowLineNumbers` NSInvalidArgumentException）+ STEP[18] `testFrameIntervalsUnderStateChanges` 204.6ms>120ms。
+- **BACKLOG 622 复查**：`testCodeBlocksShowLineNumbers` 在 `897db20`/`e5e0840` 两跑的 capture 与 Swift 步均 **passed**（崩溃只出现在 a71a74c，1 次）；`testFrameIntervalsUnderStateChanges` 在后续两跑均 **skipped**（未设 `CLIPBOARD_HISTORY_UI_INTERACTION=1`，204.6ms 只出现在 a71a74c 的 on-screen 步，1 次）⇒ 各 1 次、未复现，**不销单**。
+- 归因：sources 时序红与产品回归分开；detail 探针已由 `a71a74c` 签收；剩余产品红只有 hover 0.0（R528 已修）。
+
+
 ## R528 状态（2026-11-01 · 第 527 轮 / Round 525 · 产品 2 文件 + 判据）
 
 R528 ⓪ 读数（只登记、不轮询）：HEAD=origin=`897db20`、ahead=0。`41278158514 ↔ 897db20`、`41277658052 ↔ e5e0840` 读时均 **in_progress ⇒ NOT-RUN**。已收口：
