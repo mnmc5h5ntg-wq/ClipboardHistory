@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 627 扩窗与 622 回归表 + emphasis 回执 0.20（R541 / 第 540 轮 / Round 538 / U-2250…U-2258 · 产品 1 文件 + 判据）
+
+`motion_red_occurrence.py` 扩到 40 份可用日志：copy receipt 2/40（分母受限）、fold 2/37 executed、markdown label 2/40；622 跨跑 worst_max 262.3、over_max 2、over_runs 16、loaded_p95_max 46.73、比值 0.585–2.167 ⇒ 1–2 颗离群。产品把 `.emphasis` 从 0.16 调到 0.20（收藏/固定/已复制共用，上限 0.25 不变），本机 copy receipt 1x 过渡帧 2–3→3–4；M1420 CAUGHT。帧 350（CHANGED=0）；全量 1384/56/0；换装 431=431；电池 690/5。627 保持开单，新开 629。
+
 ### 627 出现率与 622 多段读数（R540 / 第 539 轮 / Round 537 / U-2241…U-2249 · 产品 0 文件 + 判据）
 
 新增 `motion_red_occurrence.py`：把 copy receipt、fold 采样、Motion floor 红名与 `PROBE_FPS` 多段读数分开数。15 跑窗口 copy 1/15（分母受限）、fold 1/15 executed、markdown label 1/15；本机 copy/fold 各 10/10 过（copy 1x 2–3 帧、fold 中间帧 7–8）。622 多段：worst_max 262.3、over_max 2、over_runs 7、loaded_p95_max 46.73、比值 0.713–2.020 ⇒ 1–2 颗离群；120ms/容差不动。5 条真值表 + M1419 CAUGHT；帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431；电池 690/5。628 由 `acefc43` 的 STEP[9] 签收。

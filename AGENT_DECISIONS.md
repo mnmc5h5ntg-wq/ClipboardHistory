@@ -8697,3 +8697,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：把「同一族」拆成可复查的三条出现率与同跑多段读数，才能判是采样边界还是产品缺陷；copy 的通过不可见这件事必须写在分母里，不能拿日志条数冒充。
 - 兼容性/迁移：不改任何阈值/地板/锚点；新脚本只读日志。628 由 `acefc43` 的 STEP[9] 签收（修前 `40a2a71` 4 红 → 修后 2 红）。
 - 边界：copy 的分母不是全量跑数；627 仍需继续累积出现率，622 frame 半仍保持开单。
+
+## D-541 emphasis 从 0.16 调到 0.20，让 1x 回执过渡可见（R541）
+
+- 背景：627 的 40 跑窗口里 copy receipt 2/40、markdown label 2/40 在 runner 1x 上只读到 1 个过渡帧；本机 copy receipt 的 1x 过渡帧是 2–3，贴着 ≥2 地板。
+- 决定：`MotionCatalog` 的 `.emphasis` 从 0.16 调到 0.20（收藏 / 固定 / 已复制共用；仍低于 0.25 上限，与 slider/windowFold 同档）；`MotionCatalogTests.testEmphasisFeedbackSurvivesOneXSampling` 钉住 ≥0.20，M1420 改回 0.16 即 CAUGHT。
+- 理由：本机 copy receipt 1x 过渡帧从 2–3 升到 3–4（2x 3–4→4–5），10/10 仍通过；0.20 仍是一次反馈的时长，不改变回执的布局/颜色/文案，也不改帧数地板。
+- 兼容性/迁移：emphasis 同时影响收藏/固定符号动画的时长（+40ms），仍在上限内；静态帧 CHANGED=0。
+- 边界：runner 签收待 `7353513` 跑；markdown label 走 `.contentFade` 0.16 未改，残余 1x 1 帧风险记 BACKLOG 629。
