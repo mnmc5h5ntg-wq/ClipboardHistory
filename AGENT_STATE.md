@@ -14,6 +14,17 @@
 
 最后更新：2026-11-01（本地 · R530 / 第 529 轮 / Round 527）
 
+## R531 状态（2026-11-01 · 第 530 轮 / Round 528 · 开工 ⓪）
+
+R531 ⓪ 读数（只登记、不轮询）：HEAD=origin=`76b24b8`、ahead=0。`41286598804 ↔ 02fa144`（产品）、`41287008886 ↔ ac04e2d`（台账）、`41287270623 ↔ 76b24b8`（CI 补记）读时均 **in_progress ⇒ NOT-RUN**（三跑仍排在更早的跑后面）。已收口四跑：
+- `41284008834 ↔ 1e3cfaa` **failure STEP[9]+[15]+[17]**：STEP[15]=`testSidebarTitleHoverFeedbackIsVisible` 亮/暗 **0/0**（totalDelta 与 changedPixels 四条）；STEP[17] Capture gate 点名同一条；STEP[9]=sources 格时序（账上 `2e7272e`、git `1e3cfaa`）+ skip_roster 内层无结论行。
+- `41284186399 ↔ 9b9cf56` **failure STEP[15]+[17]+[18]**：hover 同 0/0；STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **544.1ms**、2 颗超 120ms 锚点（容差 1）。
+- `41284167067 ↔ 2967ce6` **failure STEP[15]+[17]**：hover 同 0/0（台账笔，无 STEP[9]）。
+- `41282132936 ↔ 2e7272e` **failure STEP[9]+[15]+[17]**：hover 同 0/0；STEP[9]=sources 格时序 + product_streak 格缺席 + skip_roster 内层无结论行（当时 STATE 未轮换/未补格，sources 与 streak 两条随 R529 台账 `2967ce6` 关闭）。
+- **hover 归因**：四跑都是新尺、都读 0/0 ⇒ R528/R529 两次修法未在 runner 签收（BACKLOG 623 保持开单）。**622**：帧间隔 **544.1ms** 在 `9b9cf56` 复现一次（2 颗超锚点）⇒ 进入定位分支。
+- **skip_roster runner 环境红**：`test_the_roster_matches_what_this_machine_actually_skips` 在 `2e7272e`/`1e3cfaa`/`730dc5e` 三跑都红「内层没有结论行」；本机电池 683/5 绿 ⇒ 记为 runner 环境红，待查。
+- sources 时序红与产品回归分开：hover 0/0 是产品判据红；sources/streak 是台账时序红。
+
 ## R530 状态（2026-11-01 · 第 529 轮 / Round 527 · 产品 1 文件 + 判据）
 
 R530 ⓪ 读数（只登记、不轮询）：HEAD=origin=`9b9cf56`、ahead=0。`41284186399 ↔ 9b9cf56`、`41284167067 ↔ 2967ce6`、`41284008834 ↔ 1e3cfaa` 读时均 **in_progress ⇒ NOT-RUN**（1e3cfaa 是 hover 扩边修复的签收跑，待读）。已收口：
