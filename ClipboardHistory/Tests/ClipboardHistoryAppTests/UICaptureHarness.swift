@@ -1412,6 +1412,79 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    // MARK: - R548 · 250pt 批量标题不得截成省略号
+
+    /// R548：`sidebar-multi-select-min`（250pt）里「已选 N 条」被挤成「已选…」。
+    /// 判据读标题带里每一段字形墨的宽度：省略号三个点各约 2pt，正文汉字/数字 ≥6pt
+    /// ⇒ 任何一段窄于 4pt 就说明标题被截了；同时要求至少两段（标题真的在）。
+    func testBatchTitleFitsAtTheMinimumSidebarWidth() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r548-batch-title-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = self.fixtures(appearance: appearance)
+                .first(where: { $0.name == "sidebar-multi-select-min" }) else {
+                return XCTFail("\(tag)：找不到 sidebar-multi-select-min ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("sidebar-multi-select-min-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：帧读不回来 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                      xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func isInk(_ x: Int, _ y: Int) -> Bool {
+                let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                let luma = 0.2126 * Double(base[i + rOff])
+                    + 0.7152 * Double(base[i + rOff + 1])
+                    + 0.0722 * Double(base[i + rOff + 2])
+                return abs(Int(luma.rounded()) - page) >= 60
+            }
+            // 标题带：x 10..80pt、y 105..138pt（R494 的 112..132pt 外扩一点）。
+            let x0 = Int(10.0 * scale), x1 = Int(80.0 * scale)
+            let y0 = Int(105.0 * scale), y1 = Int(138.0 * scale)
+            var runs: [Int] = []
+            var current = 0
+            var lastInk = 0
+            for x in x0..<x1 {
+                var ink = false
+                for y in y0..<y1 where isInk(x, y) { ink = true; break }
+                if ink {
+                    current += 1
+                    lastInk = x
+                } else if current > 0 {
+                    runs.append(current); current = 0
+                }
+            }
+            if current > 0 { runs.append(current) }
+            if runs.isEmpty {
+                emit("BATCH_TITLE_FIT_NOT_RUN=sidebar-blank \(tag)")
+                continue
+            }
+            let minRun = runs.min() ?? 0
+            let right = lastInk
+            emit("BATCH_TITLE_FIT \(tag) 段=\(runs.count) 宽度=\(runs.map { String(format: "%.1f", Double($0) / scale) }.joined(separator: ","))"
+                 + " 最窄=\(String(format: "%.1f", Double(minRun) / scale))pt"
+                 + " 右沿=\(String(format: "%.1f", Double(right) / scale))pt"
+                 + " 页底=\(page) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(runs.count, 2,
+                "\(tag)：标题带只读到 \(runs.count) 段墨 ⇒ 标题没画全，尺没有对象")
+            XCTAssertGreaterThanOrEqual(minRun, Int(4.0 * scale),
+                "\(tag)：标题带最窄一段只有 \(String(format: "%.1f", Double(minRun) / scale))pt ⇒ 标题被截成省略号：\(runs)")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("BATCH_TITLE_FIT_NOT_RUN：两档都没有侧栏标题") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R493 · 恢复默认按钮图标
 
     /// R493：数据页的导出/导入已有图标，快捷键页的「恢复默认」仍纯文字。

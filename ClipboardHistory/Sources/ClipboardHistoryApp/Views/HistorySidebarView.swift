@@ -185,10 +185,9 @@ struct HistorySidebarView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                 }
-                Text(headerTitle)
+                headerTitleText
                     .font(.system(size: VisualFont.title, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             // R529：扩边顺序必须是「先正 padding → 画 background → 外壳负 padding」。
             // R528 把负 padding 加在 background 内部，等于把浅底**内缩**；runner 1x 上
@@ -328,6 +327,23 @@ struct HistorySidebarView: View {
             return "已选 \(historyStore.selectedCount) 条"
         }
         return "时间剪史"
+    }
+
+    /// R548：250pt 最小侧栏下「已选 N 条」被挤成「已选…」；宽度够就用全称，
+    /// 不够退成「N 条」——批量工具条本身已说明这是选中态。
+    @ViewBuilder private var headerTitleText: some View {
+        if historyStore.selectedCount > 1 {
+            if #available(macOS 13.0, *) {
+                ViewThatFits(in: .horizontal) {
+                    Text(headerTitle).lineLimit(1)
+                    Text("\(historyStore.selectedCount) 条").lineLimit(1)
+                }
+            } else {
+                Text(headerTitle).lineLimit(1)
+            }
+        } else {
+            Text(headerTitle).lineLimit(1)
+        }
     }
 
     private var countText: String {
