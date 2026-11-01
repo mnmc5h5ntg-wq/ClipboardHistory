@@ -10761,6 +10761,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R537）：本机 `testCodeBlocksShowTheirLanguage` 10/10 不复现；runner 栈定位到 `sizeWithAttributes:` → CoreText `TAttributes::ApplyFont` → `NSDictionary initWithDictionary:copyItems:` 插 nil（字体描述符拷贝）。产品改为具体 **Menlo-Bold** 缓存字体（M1413 钉住），但本机不能复现 ⇒ **code-block 半仍待 runner 签收、不销单**；frame-interval 半本轮 `eec86a3` 再读 **175.8ms/2/203**（544.1→162.2→175.8），120ms 与容差不动。
     复查（R537 收口）：`5837d65` 的 STEP[18] 读到 **243.2ms/2/189**（loaded_p95=22.97、比值 0.886）⇒ 622 第四值（544.1→162.2→175.8→243.2），仍是少数帧超锚点；120ms 与容差不动。code-block 半仍待 `21a5440` 新跑签收。
     复查（R538）：`21a5440`/`b707811`/`8cef540`/`085e4c7`/`9e78221` 读时均 in_progress ⇒ **code-block 半仍没有任何含 `21a5440` 的结论跑**，保持开单；frame 半最近仍是 `5837d65` 的 **243.2ms/2/189**，120ms 与容差不动。
+    复查（R538 收口复读）：`41308835299 ↔ 21a5440`（R537 产品笔）**STEP[17] Capture gate success**；`testCodeBlocksShowLineNumbers` 与 `testCodeBlocksShowTheirLanguage` 在 Offscreen 与 Swift steps 各 passed 一遍，`NSInvalidArgumentException`=0 ⇒ **code-block 半签收**。同跑 STEP[18] 红：`testFrameIntervalsUnderStateChanges` 最差 **151.4ms**、超锚点 **2** 颗、n=195（622 第五值 544.1→162.2→175.8→243.2→151.4），120ms 与容差不动；另 `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合（BACKLOG 132）⇒ 6/14 探针没跑。**frame 半保持开单**。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10789,6 +10790,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R537）：`eec86a3` STEP[18] 为 frame-interval，无 skip_roster 新读数；非台账笔红/台账笔绿与本地电池偶发一次继续记。
     复查（R537 收口）：skip_roster 在 `5837d65`/`67437eb` 红、在 `e3e0893` 绿（后者整跑 success）；同批 STEP[9] 的裸 stdout 红是 R536 的旧 print，已由 e3e0893 的 XCTAttachment 修好并签收。两臂继续。
     复查（R538）：本轮五跑 in_progress，无新两臂读数；非台账笔红/台账笔绿继续记，保持开单。
+    复查（R538 收口复读）：`41308835299`（非台账产品笔）STEP[9] 仍红在 skip_roster「内层没有结论行」；同跑另 4 条是 628 的缩写长度族，不混算。两臂继续，保持开单。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
@@ -10813,3 +10815,9 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R537）：`eec86a3` 的 Motion floor `judged=5/5 executed=77 红=-`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
     复查（R537 收口）：`5837d65` 的 Motion floor 是 `judged=4/5 not-run=notice-banner 红=-`，627 仍未再现，保持开单等出现率。
     复查（R538）：本轮五跑 in_progress，无 Motion floor 新读数；627 未再现，≥2 帧地板不动，保持开单等出现率。
+    复查（R538 收口复读）：`41308835299` 的 Motion coverage floor `judged=5/5 executed=77 REDS=0`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
+
+**628. runner 的 git 缩写从 7 位变 8 位：四条脚本守卫把 7 位当固定长度**（R538 收口现读）
+    现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 4 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）、`test_the_cell_agrees_with_its_own_source`（报告格与 git 派生不一致）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。
+    现状：读取处假设固定 7 位缩写；对象集变化会让同一份账在两台机器上答两个数。
+    下一步：把读取处统一成确定性口径（`--abbrev=7`，或前缀比较 / `%H` 再裁剪），先在本地用 8 位模拟样本造红、再在 runner 签收；不放宽任何地板。

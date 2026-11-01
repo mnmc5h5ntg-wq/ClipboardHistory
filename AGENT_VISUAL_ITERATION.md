@@ -20722,3 +20722,7 @@ runner 四跑的 TITLE_HOVER 都是 0/0，但旧判据没有证明静置帧本�
 | 可复核性 | 15/15 | run 号、菜单窗口 id/layer/bounds、AX 菜单项、M1414、预检 317/294/755 全在。 |
 
 均分 = 105/105 ≈ 15.0/15（100）。
+
+### R538 收口复读（`41308835299 ↔ 21a5440`）
+
+收口后 `21a5440` 落地：STEP[15] Swift tests / STEP[16] Motion gate / STEP[17] Capture gate **success**；`testCodeBlocksShowLineNumbers` 与 `testCodeBlocksShowTheirLanguage` 在 Offscreen 与 Swift steps 各 passed 一遍、`NSInvalidArgumentException`=0 ⇒ **622 code-block 半签收**。STEP[18] 红在 `testFrameIntervalsUnderStateChanges` **151.4ms/2/195**（622 第五值）与 `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合（BACKLOG 132，6/14 探针没跑）；frame 半保持开单、阈值不动。STEP[9] 5 红 = 4 条 git 缩写长度（runner `%h`=8 位 vs 账上 7 位）→ 新开 BACKLOG 628 + 624 skip_roster；不是产品回归。
