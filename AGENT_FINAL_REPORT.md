@@ -1481,3 +1481,4 @@ R471–R478 处理详情与浮层的窄面：截断说明降到 meta 字号（R4
 - **R533（折叠提示的「知道了」改为独立无障碍元素；产品 1 文件 + 判据）**：旧值 `collapseHintLine` 用 `.accessibilityElement(children: .combine)` 把可点按钮并进文字；去掉后文字与按钮各自成 AX 元素、装饰图标隐藏；新增源码段判据与 M1409（CAUGHT）；另加 360×560 最小宽提示帧（文案/按钮完整，负向证人）。帧 350（ADDED=2、CHANGED=0）；全量 1377/56/0（591.2s）；换装 431=431（PID 52291）；电池 683/5。网络两路断开，本笔只本地提交（PUSH_BLOCKED=network）。
  收口时网络恢复，`039413e..76cbd63` push 成功（HEAD=origin=76cbd63、ahead=0）；`882e30f` 仅 STEP[9] 六红（台账时序 + skip_roster），Swift/capture 步无红。
 - **R534（折叠提示支持 Esc 关闭；产品 1 文件 + 判据）**：旧值真机折叠 420×492 按 Esc，确认键前后都未写（0/0）；给「知道了」挂 `.keyboardShortcut(.cancelAction)`，只在提示可见时存在，视觉零变化。新增源码段判据与 M1410（CAUGHT）；预检 313/290/751 bad=0、ARM 406/1238、HIDDEN 400/1177 rot=0；帧 350（重捕 CHANGED=0、基线不变）；全量 1378/56/0（591.3s）；换装 431=431（PID 68388）；电池 683/5。新值真机按键未演，具名 HINT_ESC_LIVE_NOT_RUN=defaults-preserved；622 记 162.2ms/2 再现值。
+ 收口复读：`039413e` success、`8b1ddb9`/`76cbd63`/`0cce5df` in_progress、`d8c0e44` queued。

@@ -372,6 +372,7 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 - **U-2198：④ 八步与电池。** build 0 告警；全量 **1378/56/0（591.3s）**（本机 SelectionReveal 五条会话噪音本轮未出现）；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（活库只增不减；PID 68388；真机只读 1 窗口 750×492）；清账 **162 格已清 162/未清 0/不合法 0**；电池 **683/5**（台账后复跑）；product_streak **1** 轮（as-of 533，`python3 scripts/product_streak.py --streak-for 533` 现读，last=0720cc6/532）。
 - **U-2199：⑤ 真机边界。** 旧值按下 Esc 未写确认键；新版只在源码/判据上钉住 `.cancelAction`，**没有**在活 App 上按 Esc 去消费一次性提示（避免替用户改写 defaults）⇒ 新值真机按键未演，具名 `HINT_ESC_LIVE_NOT_RUN=defaults-preserved`。
 - **U-2200：⑥ 收口与交接。** 产品笔 `a8f1817` 待推（本笔后 push）；`8b1ddb9`/`76cbd63`/`039413e` 读时 in_progress。下一轮 R535（第 534 轮 / Round 532）：先 push 并复核 ahead=0；读本轮产品/台账跑与上一轮三跑的全部失败步骤；622 记录 162.2ms 新值、624 非台账笔红/台账笔绿继续；623 不重开；继续折叠特性；安全红线不变。
+收口复读：`41293901730 ↔ 039413e` **success**（R532 收口笔整跑绿）；`8b1ddb9`/`76cbd63`/`0cce5df` in_progress、`d8c0e44` queued ⇒ NOT-RUN。
 
 ## 第 532 轮（R533 · 2026-11-01 · U-2187…U-2193）：折叠提示的「知道了」改为独立无障碍元素（产品 1 文件 + 判据）
 
