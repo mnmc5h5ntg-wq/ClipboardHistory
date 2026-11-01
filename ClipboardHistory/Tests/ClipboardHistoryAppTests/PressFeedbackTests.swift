@@ -241,14 +241,15 @@ final class PressFeedbackTests: XCTestCase {
             consumers += codeOnly(source)
                 .components(separatedBy: "hoverLevel: VisualFill.controlHover").count - 1
         }
-        XCTAssertEqual(consumers, 10,
+        XCTAssertEqual(consumers, 11,
                        "显式抬到控件档的位点从 10 处变成 \(consumers) 处：R15 的三处（侧栏批量按钮、"
                        + "「移除」、回执 ×）+ R20 的四处（行首星标、清除 ×、播放、静音）"
                        + "+ R230 的一处（药丸里的 `GlassPillButton`：它以前不走样式表、自己在 `.compositingGroup()` "
                        + "内部画那一层，同一名义 alpha 实测比共用路径弱 ⇒ 搬进来，第 8 处）"
                        + "+ R521 的一处（关于页 GitHub 链接：文字按钮的 label 只有 17pt 高，"
                        + "6% 铺上去在帧里读不出来 ⇒ 判为控件档，第 9 处）"
-                       + "+ R523 的一处（标题行折叠/展开箭头：16pt 图标按钮 ⇒ 控件档，第 10 处）。"
+                       + "+ R523 的一处（标题行折叠/展开箭头：16pt 图标按钮 ⇒ 控件档，第 10 处）"
+                       + "+ R526 的一处（标题双击的悬停药丸：与 chevron 同一档、贴着 17pt 文字 ⇒ 控件档，第 11 处）。"
                        + "多一处要红（提醒把新位点判一遍），少一处也要红（等于把它退回 6% 那一档）")
     }
 

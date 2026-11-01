@@ -6,6 +6,10 @@ struct HistorySidebarView: View {
     /// R523：折叠态只留列表；默认展开（夹具与旧调用一行不改）。
     var isCollapsed: Bool = false
     var toggleCollapse: () -> Void = {}
+    /// R526：标题双击的悬停反馈（与 chevron 同一档浅底）。旧值 hover 与 idle 逐像素相同。
+    @State private var titleHovered = false
+    @Environment(\.hoveredForCapture) private var hoveredForCapture
+    private var titleHoveredForDrawing: Bool { titleHovered || (hoveredForCapture ?? false) }
     /// 拖放悬停反馈（虚线框）。
     @State private var isDropTargeted = false
     /// 取证通道：离屏捕获送不进 drag session，只有夹具写这颗键（R408）。
@@ -141,6 +145,17 @@ struct HistorySidebarView: View {
                     .lineLimit(1)
             }
             .contentShape(Rectangle())
+            .background(
+                VisualShape.rounded(VisualRadius.control)
+                    .fill(Color.primary.opacity(
+                        PressableAppearance.fillOpacity(isPressed: false,
+                                                        isHovered: titleHoveredForDrawing,
+                                                        hoverLevel: VisualFill.controlHover,
+                                                        dark: colorScheme == .dark)))
+                    // 负 padding 只把浅底放大一圈，不改标题与计数/chevron 的布局。
+                    .padding(-4)
+            )
+            .onHover { titleHovered = $0 }
             .onTapGesture(count: 2) { toggleCollapse() }
             .helpLabel("双击折叠或展开窗口")
 

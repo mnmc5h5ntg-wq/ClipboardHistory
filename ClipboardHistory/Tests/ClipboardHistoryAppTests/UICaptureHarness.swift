@@ -181,6 +181,9 @@ final class UICaptureTests: XCTestCase {
         // 外层材质），黑带仍是已登记的系统 List 选中材质（66pt，y=774..905@2x），不是折叠层画黑的。
         // 黑带以外已看图：搜索框/筛选段/标题「时间剪史 5 条记录」/折叠箭头/四行条目都完好。
         "main-collapsed",
+        // R526：标题悬停帧是同一个 `HistorySidebarView`（只点亮标题 hover）；黑带仍是已登记的
+        // 系统 List 选中材质（同 66pt 带），不是标题浅底画黑的。
+        "main-sidebar-title-hover",
         // R408：drop 目标帧是同一个 `HistorySidebarView` + 同一批选中行；黑带来自已登记的
         // 系统 List 选中材质（不是新增的拖放层）。提示文案在底部空白带，已单独量过。
         "sidebar-drop-target",
@@ -11686,6 +11689,11 @@ final class UICaptureTests: XCTestCase {
             Fixture("main-collapsed", NSSize(width: 420, height: 560)) {
                 AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {}))
             },
+            // R526：标题双击的悬停臂（只点亮 hoveredForCapture，其余与 content-with-history 同）。
+            Fixture("main-sidebar-title-hover", NSSize(width: 750, height: 560)) {
+                AnyView(ContentView(historyStore: store)
+                    .environment(\.hoveredForCapture, true))
+            },
         ]
 
         // 菜单栏面板的内容层。以前这里一直标 NOT-RUN（D-019：整块 NSMenu 离屏画不出材质表面，
@@ -16389,6 +16397,53 @@ final class UICaptureTests: XCTestCase {
             judged += 1
         }
         if judged == 0 { throw XCTSkip("ABOUT_LINK_HOVER_NOT_RUN：两档都找不到关于页") }
+    }
+
+    /// R526：标题双击的悬停反馈。旧值：hover 与 idle 在标题带里逐像素相同（双击不可发现）；
+    /// 新值：hover 时标题带出现与 chevron 同一档的浅底。
+    func testSidebarTitleHoverFeedbackIsVisible() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r526-title-hover-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let idle = renderFixtureRep("content-with-history", appearance, scratch),
+                  let hover = renderFixtureRep("main-sidebar-title-hover", appearance, scratch) else {
+                XCTFail(tag + "：标题带两臂读不回来")
+                continue
+            }
+            let scale = Double(hover.pixelsWide) / 750.0
+            let x0 = max(0, Int(12 * scale)), x1 = min(hover.pixelsWide, Int(210 * scale))
+            // 标题带在 y≈140–178pt（R526 帧量的；258–296 是列表行，那里两臂当然一样）。
+            let y0 = max(0, Int(138 * scale)), y1 = min(hover.pixelsHigh, Int(178 * scale))
+            func stats(_ rep: NSBitmapImageRep) -> (mean: Double, ink: Int) {
+                let bytes = Self.buffer(of: rep)
+                var total = 0.0, ink = 0, count = 0
+                for y in y0..<y1 {
+                    for x in x0..<x1 {
+                        let i = y * rep.bytesPerRow + x * 4
+                        let luma = 0.2126 * Double(bytes[i]) + 0.7152 * Double(bytes[i + 1])
+                            + 0.0722 * Double(bytes[i + 2])
+                        total += luma; count += 1
+                        if abs(luma - 247) > 24 { ink += 1 }
+                    }
+                }
+                return (total / Double(max(count, 1)), ink)
+            }
+            let idleStats = stats(idle), hoverStats = stats(hover)
+            // 亮档浅底压暗、暗档白底提亮 ⇒ 取绝对差，两档同一把尺。
+            // 地板 2.5：旧值（标题无 hover）实测 ≤1.2；新值本机 7.2/4.4。
+            let meanDelta = abs(idleStats.mean - hoverStats.mean)
+            emit("TITLE_HOVER \(tag) idleMean=\(String(format: "%.1f", idleStats.mean))"
+                 + " hoverMean=\(String(format: "%.1f", hoverStats.mean))"
+                 + " meanDelta=\(String(format: "%.1f", meanDelta)) idleInk=\(idleStats.ink) hoverInk=\(hoverStats.ink)")
+            XCTAssertGreaterThanOrEqual(meanDelta, 2.5,
+                                        "\(tag)：标题带悬停只变了 \(String(format: "%.1f", meanDelta)) 亮度 ⇒ 双击没有悬停反馈")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("TITLE_HOVER_NOT_RUN：两档都读不到标题带") }
     }
 
     /// R521：关于页 GitHub 链接的按下臂 —— 按下时整条 label 多一层按下底色（`pressedStyle`），
