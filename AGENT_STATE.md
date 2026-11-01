@@ -13,6 +13,13 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R544 / 第 543 轮 / Round 541）
+## R545 开工 ⓪（2026-11-02 · 第 544 轮 / Round 542）
+
+R545 ⓪ 读数（只登记、不轮询）：HEAD=origin=`e357708`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1385/56/0（696.8s）**、预检 **323/295/757 bad=0**、ARM **416/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 543）。
+- 三跑读时 **in_progress ⇒ NOT-RUN**：`41331769689 ↔ c5fcf03`（判据，已等 1837s）、`41334225593 ↔ 5589ebe`（台账）、`41334244256 ↔ e357708`（补记二）；本轮 ⓪ 笔自身跑 push 后取号。
+- 已收口：`41331173441 ↔ c1df1e6` failure **仅 STEP[19]**（`MOTION_FLOOR_FACTS judged=5/5 executed=77`；红名 `testBandCaptureIsCheaperAndStillSeesTheMotion` 11.73ms 不 < 10.79ms、`testMarkdownModeLabelChangeIsAVisibleProcess` 1x=1；`MOTION_FLOOR_REDS=1`；filmstrip copy 1x=2/峰值 0.0889、markdown 1x=1/0.0193、录制帧 passed diff=0）。`41330637380 ↔ 8d4a36d` failure **STEP[9]+[19]**（STEP[9]=skip_roster+sources 时序，Ran 690 failures=2 skipped=2；STEP[19] 仅 markdown 红；copy 1x=2/0.1000、录制帧 passed；band 本跑 1.66×）。`41330618181 ↔ b16eacc` failure **仅 STEP[9]**（skip_roster+sources；copy 场景 `app-not-active` ⇒ NOT-RUN；录制帧 passed）。`41326398317 ↔ bd96e93` failure **STEP[15]+[19]**（STEP[15] 全量 1384/84 skipped/1 failure=`testCollapseWidthIsMeasuredFrameByFrame` 0.9989289765 vs 1.0 ±0.001、widths=[750,750,750,461,461,427,427,421]、final=420；STEP[19] band 0.97× + markdown 1x=1；copy 1x=2）。`41330986001 ↔ 43c26ea`、`41331007372 ↔ b3ad856`、`41326374225 ↔ 087290d` 均 **success（0 失败步）**。
+- 本轮靶：② 修 `testCollapseWidthIsMeasuredFrameByFrame` 的「终值读采样末帧」这把尺——`bd96e93` 的末帧 0.9989 与已落地的 420 宽并存，是采样停止早于过渡结束；改为 `waitForSettled()` 之后读 `controller.foldProgress`，保留 intermediate ≥1、单调、final 420、min 360 全部地板；先量本机旧值 10 跑，再跑新值 10/10，并配 M1424。627 的 fold 类继续按 executed 分母记；622 第七值 176.6ms/2/204、120ms/容差不动；624 保持开单、不改名册；628/625/626 不重开；刀号从 **M1424** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## R544 状态（2026-11-02 · 第 543 轮 / Round 541 · 产品 0 文件 + 判据）
 
 R544 ⓪ 读数（只登记、不轮询）：HEAD=origin=`b3ad856`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1385/56/0（705.8s）**、预检 **322/295/757 bad=0**、ARM **415/1244**、HIDDEN **409/1183 rot=0**、电池 **690/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 542）。
