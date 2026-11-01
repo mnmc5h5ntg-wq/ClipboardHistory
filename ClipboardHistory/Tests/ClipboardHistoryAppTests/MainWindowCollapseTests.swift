@@ -503,7 +503,11 @@ final class MainWindowCollapseTests: XCTestCase {
         }
         // 625 的 Tab 链在 SwiftUI 宿主里仍未打通（旧值 8 站、本轮 24 站都不到）⇒ 具名读数，
         // 不把「宿主不遍历」冒充成按钮属性失败；真机安装后另行复核。
-        print("HINT_KEYVIEW_REACHED=\(reached ? 1 : 0) tabStops=24")
+        // 走 XCTAttachment（不占裸 stdout 读数：R536 第一次电池 15≠16 就是这行 print 造成的）。
+        let reading = XCTAttachment(string: "HINT_KEYVIEW_REACHED=\(reached ? 1 : 0) tabStops=24")
+        reading.name = "HINT_KEYVIEW"
+        reading.lifetime = .keepAlways
+        add(reading)
         button.performClick(nil)
         XCTAssertTrue(acknowledged, "「知道了」点击没有走确认动作")
     }
