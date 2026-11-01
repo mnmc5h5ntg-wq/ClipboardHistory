@@ -363,6 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 546 轮（R547 · 2026-11-02 · U-2303…U-2310）：默认排除行加锁图标（产品 1 文件 + 判据）
+
+- **U-2303：⓪ CI。** HEAD=origin=`d22f30a`、ahead=0、`git push` no-op；api=200/apple=200。`41341540906 ↔ 54420e0`、`41341586171 ↔ d22f30a` 读时 **in_progress ⇒ NOT-RUN**；产品笔 `feec6cc`、重钉笔 `73fb0fd` 无独立跑。`41337616903 ↔ 30c7913` failure **仅 STEP[15]**：`PerfBudgetTests/testMarkdownRenderCostAtTheArchiveCap` 274.93ms > 250ms（负载 flake）与 `testRecordingCardFrameIsDeterministicAcrossRenders` dark 9457px（文档笔的 runner flake，非动效取值）；`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal 会话 flake）；复读 c5fcf03/c1df1e6/b16eacc/8d4a36d/bd96e93 的红同 R545。`41337778679 ↔ 84d7a9a`、`41337664834 ↔ 9503700`、`41337019426 ↔ 8acec7f`、`41336963006 ↔ 9121760` success。
+- **U-2304：② 默认排除行加锁图标。** BACKLOG 578：默认行尾部只有灰字「默认」，与自定义行红字「移除」靠读字区分。`SettingsView` 在「默认」前补 9pt `lock.fill`（semibold、secondary、a11y 隐藏），HStack 间距 3，文案/布局不动。旧 `DEFAULT_BADGE`：light 正臂 5548 / 差 2844，dark 6723 / 3591（负臂 2704/3132）；新：light 7024 / **4320**，dark 8217 / **5085**，负臂不变。新增 `DEFAULT_LOCK`（正臂 vs 只关锁的负向臂）：light 5548→7024、差 **1476**；dark 6723→8217、差 **1494**。
+- **U-2305：② 判据/缝/刀。** 产品加 `settingsDefaultExcludedLockForCapture` 缝（默认 nil ⇒ 画）；夹具加 `settings-privacy-no-default-lock`（只关锁、文字仍在）；新判据 `testDefaultExcludedRowsCarryALockIcon` 读右列墨差，地板 200·s²（2x=800，实测 1476/1494）。`M1426`（`if false` 隐藏锁）**CAUGHT、RESTORE_CLEAN=yes**。
+- **U-2306：② 预检/构建。** 预检 **326/295/757 bad=0**、ARM **419/1244**（dupes=0 repeats=0）、HIDDEN **410/1183 rot=0**；build **0 告警**。
+- **U-2307：③ 帧/录制。** 重捕：CHANGED=**6**（`settings-privacy-720x540`、`settings-privacy-excluded-720x1040`、`settings-privacy-tall-720x1040` 各亮/暗）、ADDED=**2**（`settings-privacy-no-default-lock` 亮/暗），基线 **350→352**；720×540 与 1040 页逐张看：锁与「默认」对齐、行未被挤坏。录制帧确定性 **10/10 diff=0**。
+- **U-2308：③④ 全量/换装/电池/清账/streak。** 全量 **1386/56/0（688.4s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 84566、1 窗口 750×492）；清账 **162/162/0**；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 546，`python3 scripts/product_streak.py --streak-for 546` 现读）。
+- **U-2309：⑤ 622/624/627/629/628/625/626。** 622 第七值 **176.6ms/2/204**、44 跑 worst 262.3 / over 2 / over_runs 17 / loaded_p95 46.73 / 比值 0.585–2.167，120ms/容差不动、frame 半开单；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案。
+- **U-2310：⑥ 收口与交接。** ⓪ 笔 `f58bf8c`、产品笔随后；下一轮 R548（第 547 轮 / Round 545）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `54420e0`/`d22f30a`/`30c7913`/`8b667ae` 与其余已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 545 轮（R546 · 2026-11-02 · U-2295…U-2302）：登录失败图标换圆形感叹号（产品 1 文件 + 判据）
 
 - **U-2295：⓪ CI。** HEAD=origin=`9503700`、ahead=0、`git push` no-op；api=200/apple=200。三跑读时 **in_progress ⇒ NOT-RUN**：`41336963006 ↔ 9121760`（台账）、`41337019426 ↔ 8acec7f`（补记二）、`41337616903 ↔ 30c7913`（补记三）。`41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：`SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（origin=[0.0,1430.0,1430.0,1430.0]）——已知会话 flake、非产品。复读：`41331769689 ↔ c5fcf03` 仅 STEP[19]（markdown 1x=1）；`41331173441 ↔ c1df1e6` 仅 STEP[19]（band 11.73 vs 10.79 + markdown 1x=1；copy 1x=2、录制帧 passed）；`41330618181 ↔ b16eacc` 仅 STEP[9]（skip_roster+sources；copy `app-not-active` NOT-RUN）；`41330637380 ↔ 8d4a36d` STEP[9]+[19]（skip_roster+sources；markdown 1x=1）；`41326398317 ↔ bd96e93` STEP[15]+[19]（fold 0.9989289765 vs 1.0 ±0.001、final=420；band 0.97× + markdown 1x=1）。`41334225593 ↔ 5589ebe`、`41334244256 ↔ e357708` success。

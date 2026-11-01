@@ -8745,3 +8745,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：同一错误色下，实心圆感叹号比三角更实、与横幅的三角区分开；`LOGIN_FAILURE_ICON` 旧/新差 257→330（light）、247→313（dark），负臂不变，说明多出来的红来自图标本身。
 - 兼容性/迁移：只改一个 SF Symbol 名；静态帧只有 `settings-general-login-failed` 亮/暗 2 张变化，基线 350→350；录制帧确定性 10/10 diff=0。
 - 边界：runner 1x 的 `LOGIN_FAILURE_ICON` 待签收；627/629/624 不受影响。
+
+## D-547 默认排除行用锁图标给「不可移除」一个形状（R547）
+
+- 背景：BACKLOG 578 记着默认行尾部只有灰字「默认」，自定义行是红字「移除」，色盲/低对比用户只能靠读字区分。
+- 决定：在「默认」前补 9pt `lock.fill`（semibold、secondary、`accessibilityHidden`），HStack 间距 3；文案与行布局不动。产品加 `settingsDefaultExcludedLockForCapture` 缝，夹具加 `settings-privacy-no-default-lock`（只关锁、文字仍在）。
+- 理由：锁是「不可移除」的直接形状；`DEFAULT_BADGE` light/dark 正臂差 2844→4320 / 3591→5085，新增 `DEFAULT_LOCK` 1476/1494，负臂不变，说明墨差来自锁本身。
+- 兼容性/迁移：只加一枚图标；静态帧 6 张变化 + 2 张新增，基线 350→352；录制帧确定性 10/10 diff=0。
+- 边界：runner 1x 的 `DEFAULT_LOCK`/`DEFAULT_BADGE` 待签收；627/629/624 不受影响。

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 默认排除行加锁图标（R547 / 第 546 轮 / Round 544 / U-2303…U-2310 · 产品 1 文件 + 判据）
+
+`SettingsView` 在默认排除行的「默认」前补 9pt `lock.fill`（semibold、secondary、a11y 隐藏），文案与布局不动。`DEFAULT_BADGE` 旧/新：light 2844→4320、dark 3591→5085（负臂不变）；新增 `DEFAULT_LOCK`（正臂 vs 只关锁）light 差 1476、dark 1494；产品加 `settingsDefaultExcludedLockForCapture` 缝与 `settings-privacy-no-default-lock` 负向帧；M1426 CAUGHT。帧 CHANGED=6、ADDED=2，基线 350→352；录制确定性 10/10 diff=0；全量 1386/56/0；换装 431=431；电池 691/5。
+
 ### 登录失败图标换圆形感叹号（R546 / 第 545 轮 / Round 543 / U-2295…U-2302 · 产品 1 文件 + 判据）
 
 `SettingsView` 的登录失败回执图标由 `exclamationmark.triangle.fill` 换成 `exclamationmark.circle.fill`（同尺寸/字重/错误色，不动文案与布局）。`LOGIN_FAILURE_ICON` 旧/新：light 差 257→330、dark 247→313，负臂不变；亮/暗帧逐张看，圆形感叹号与横幅三角区分更清楚。帧 350、CHANGED=2、基线 350→350；录制确定性 10/10 diff=0；M1425 CAUGHT；全量 1385/56/0；换装 431=431；电池 691/5。
