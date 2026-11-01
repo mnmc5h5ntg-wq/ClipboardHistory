@@ -13,6 +13,16 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R549 / 第 548 轮 / Round 546）
+## R550 开工 ⓪（2026-11-02 · 第 549 轮 / Round 547）
+
+R550 ⓪ 读数（只登记、不轮询）：HEAD=origin=`181b022`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **354**、全量 **1388/56/0（686.6s）**、预检 **328/295/757 bad=0**、ARM **421/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 548）。
+- 两跑读时 **queued/in_progress ⇒ NOT-RUN**：`41354330740 ↔ bb948db`（台账）、`41354387000 ↔ 181b022`（补记二）；queued/in_progress 不算成功。
+- `41351367430 ↔ deb28a1` failure **仅 STEP[15]**：`SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（origin=[0.0,1430,1430,1430,1430]）——已知会话 flake、非产品。
+- `41351231883 ↔ a210a29` failure **STEP[18]+[19]**：STEP[18] `testFrameIntervalsUnderStateChanges` 最差 **196.7ms** 超 120ms、2 颗超锚点；该提交是纯 STATE 补记（产品/动效 0 文件），且 196.7 落在历史序列 544.1/162.2/175.8/243.2/151.4/262.3/176.6 之内、不是单调回归 ⇒ 具名 **runner 负载 flake**，120ms 阈值与容差 1 不动；STEP[19] markdown 1x=1。
+- `41350830308 ↔ f0e9ea0` failure **仅 STEP[9]**：skip_roster + sources 时序（Ran 691 failures=2 skipped=2）；`41351210379 ↔ 19d33b5` success。
+- `41337616903 ↔ 30c7913` failure **仅 STEP[15]**：PerfBudget 274.93ms + 录制帧 dark 9457px（文档笔的 runner flake）；`41334537980 ↔ 8b667ae` failure **仅 STEP[15]**：SelectionReveal 会话 flake。
+- 本轮靶：② 换新类别、产品面且读数必须变——R546 登录失败图标、R547 默认行锁图标、R548 250pt 批量标题、R549 无序列表项目符号四处都不得再动；从 BACKLOG 挑一个未结、可本机落地的产品视觉位，先量旧值（像素/几何/帧数至少一项），改后同一套读数必须变好，否则本轮内撤回换下一个；三条件=独立像素/几何对比 + 逐张看新帧 + 录制帧确定性不新红；图标/符号/字体/控件形状/文字布局改动要同笔查旧刀腐烂、重钉并把新帧登记盲区名册。`.receipt 0.20`、`contentFade 0.20`、emphasis 0.16 不动；624 名册不改；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1429** 起。落台账前先自检 `## R550` 节存在。
+
 ## R549 状态（2026-11-02 · 第 548 轮 / Round 546 · 产品 1 文件 + 判据）
 
 R549 ⓪ 读数（只登记、不轮询）：HEAD=origin=`a210a29`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **352**、全量 **1387/56/0（689.4s）**、预检 **327/295/757 bad=0**、ARM **420/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 547）。
