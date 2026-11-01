@@ -8713,3 +8713,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：用户规则是「没有新红才保留」；copy 1x=2 只说明它刚好过线，不能抵消同跑的新红。contentFade 的新值在本机三条动效 10/10 与目录判据全绿，先保留待 runner 签收。
 - 兼容性/迁移：emphasis 回到 0.16（原值）；contentFade 0.20 仍在 0.25 上限内；静态帧 CHANGED=0。
 - 边界：contentFade 0.20 仍需 runner 签收；629 的 copy/markdown 残余 1x 1 帧风险保持开单，≥2 帧地板不动。
+
+## D-543 复制回执用专用 receipt 档，emphasis 继续留给录制描边（R543）
+
+- 背景：R541 把 `.emphasis` 0.16→0.20 后，copy 1x 变好但录制帧确定性在 `7353513` 出现新红（dark 11667px），而录制描边正是 `SettingsView:1141` 的 `.animation(for: .emphasis)`；R542 已撤回 emphasis。
+- 决定：新增 `.receipt=0.20`（单档淡入），复制回执的驱动与胶片场景改用它；emphasis 保持 0.16。`CopyReceiptTests` 的源接线守卫改钉 `.receipt`；`testReceiptFadeSurvivesOneXSampling` + M1422 钉住。
+- 理由：回执需要更长的可见淡入，但录制描边不需要；把两者拆成不同角色，既拿到 copy 1x 3–4，又让录制帧确定性 10/10 diff=0。
+- 兼容性/迁移：`.receipt` 只影响回执出现/消失（0.20 在 0.25 上限内）；静态帧 CHANGED=0。
+- 边界：receipt 档待 R543 产品跑签收；contentFade 0.20 虽由 f7bd865 签收，但 bd96e93 再现 markdown 1x=1 ⇒ 629 继续开单。

@@ -12,14 +12,19 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R542 / 第 541 轮 / Round 539）
-## R543 开工 ⓪（2026-11-02 · 第 542 轮 / Round 540）
+最后更新：2026-11-02（本地 · R543 / 第 542 轮 / Round 540）
+## R543 状态（2026-11-02 · 第 542 轮 / Round 540 · 产品 2 文件 + 判据）
 
 R543 ⓪ 读数（只登记、不轮询）：HEAD=origin=`bd96e93`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1384/56/0（698.6s）**、预检 **321/295/757 bad=0**、ARM **414/1244**、HIDDEN **408/1183 rot=0**、电池 **690/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 541）。
 - 已收口：`41321338166 ↔ 48ef7d7`（R542 ⓪）、`41321193291 ↔ 4521ac3`、`41321172002 ↔ 0dc8105`、`41321009857 ↔ cc15c76` 均 **success（0 失败步）**；`41320804339 ↔ 7353513` failure **STEP[9]+[15]**（STEP[9]=skip_roster + sources 时序；STEP[15]=录制帧确定性 dark 11667px，emphasis 0.20 已撤回）；`41318294600 ↔ d984ab7` failure **仅 STEP[18]**（frame 176.6ms/2/204 ⇒ 622 第七值 + 右击探针心跳未闭合）。
 - 三跑读时 **in_progress ⇒ NOT-RUN**：`41326039488 ↔ f7bd865`（contentFade 0.20 产品，627/629 签收靠它，读时 334s）、`41326374225 ↔ 087290d`（台账）、`41326398317 ↔ bd96e93`（补记二）；本轮 ⓪ 笔自身跑 push 后取号。
 - 本轮靶：② 从 627/629 残余读数挑一个可本机落地的 1x 短动效面（copy/markdown 仍有 1 帧残余就量旧值再试一类调整；三面都达标则把出现率表扩到全部可用跑，并把「录制帧确定性不得因动效取值而新红」写成会红判据）；contentFade 0.20 只在 markdown 1x ≥2 且录制帧确定性不再新红时保留，否则写回 BACKLOG 并评估撤回；622 第七值 176.6ms/2/204、120ms/容差不动；624 保持开单、不改名册；628/625/626 不重开；刀号从 **M1422** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 
+① 回执专用档：新增 `.receipt=0.20`（单档淡入），`GlassControls`/胶片场景改 `for: .receipt`；emphasis 保持 0.16，录制描边不再被牵动。本机 copy 1x 过渡帧 3–4、2x 4–5（10/10）；录制帧确定性 10/10 diff_px=0；markdown 1x=4、fold 中间帧 7–8（各 10/10）；CopyReceiptTests 守卫改钉 `.receipt`；M1422 CAUGHT、RESTORE_CLEAN。
+② contentFade 0.20：`f7bd865` 产品跑 markdown 1x=2、录制帧两遍 passed（diff=0）⇒ 签收；但 `bd96e93` 补记跑再现 markdown 1x=1 ⇒ **629 继续开单**；同跑 Motion floor 另红 `testBandCaptureIsCheaperAndStillSeesTheMotion`（band 采样）。
+③ 627/622：42 份日志 copy 2/42（分母受限）、fold 2/39 executed、markdown 2/42；622 42 跑 `worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；第七值 176.6ms/2/204；120ms/容差不动。
+④ 帧/全量/换装/电池/清账/streak：帧 **350**（CHANGED=0）；全量 **1385/56/0（705.8s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（PID 91822、1 窗口 750×492）；电池 **690/5**（台账后复跑）；清账 162/162/0；产品面连续零改动 **1** 轮（as-of 542，`python3 scripts/product_streak.py --streak-for 542` 现读，last=f7bd865/541）。
+⑤ CI/交接：产品笔 `b16eacc`、⓪ 笔 `8d4a36d` 已推；`41326374225 ↔ 087290d`、`41321338166 ↔ 48ef7d7`、`41321193291 ↔ 4521ac3`、`41321172002 ↔ 0dc8105`、`41321009857 ↔ cc15c76` 全 **success**；`41326039488 ↔ f7bd865` failure STEP[9]+[15]（fold 0.998408；markdown 1x=2、录制帧 passed）、`41320804339 ↔ 7353513` failure STEP[9]+[15]（录制帧 dark 11667px）、`41318294600 ↔ d984ab7` failure 仅 STEP[18]（176.6/2/204）、`41326398317 ↔ bd96e93` failure STEP[15]+[19]（fold 0.998929；band capture + markdown 1x=1）。`b16eacc` 产品跑与 `8d4a36d` ⓪ 跑 push 后取号。下一轮 R544（第 543 轮 / Round 541）：先 push 复核 ahead=0；读这两跑与上述已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R542 状态（2026-11-02 · 第 541 轮 / Round 539 · 产品 1 文件 + 判据）
 
 R542 ⓪ 读数（只登记、不轮询）：HEAD=origin=`4521ac3`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1384/56/0（664.5s）**、预检 **321/295/757 bad=0**、ARM **414/1244**、HIDDEN **408/1183 rot=0**、电池 **690/5**、安装 **431=431**、清账 **162/162/0**、product_streak **2**（as-of 540）。

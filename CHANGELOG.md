@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 复制回执专用 receipt 档 0.20（R543 / 第 542 轮 / Round 540 / U-2269…U-2277 · 产品 2 文件 + 判据）
+
+给复制回执单独一档 `MotionCatalog.Role.receipt=0.20`（emphasis 保持 0.16，录制描边不再被牵动）；回执驱动与胶片场景改用 `.receipt`。本机 copy 1x 过渡帧 3–4、2x 4–5；录制帧确定性 10/10 diff=0；markdown 1x=4、fold 中间帧 7–8。CopyReceiptTests 守卫改钉 `.receipt`；M1422 CAUGHT。contentFade 0.20 由 `f7bd865` 签收（markdown 1x=2 + 录制帧 passed），但 `bd96e93` 再现 1x=1 ⇒ 629 继续开单。帧 350（CHANGED=0）；全量 1385/56/0；换装 431=431；电池 690/5。
+
 ### emphasis 0.20 撤回 + contentFade 0.20（R542 / 第 541 轮 / Round 539 / U-2260…U-2268 · 产品 1 文件 + 判据）
 
 R541 的 emphasis 0.20 在 `7353513` 产品跑里 copy 1x=2、Motion floor 干净，但出现新的录制帧确定性红（dark 11667px；录制描边走 emphasis）⇒ 撤回 emphasis、删其判据与 M1420。markdown 候选改 `contentFade` 0.20：本机 markdown 1x 3–4→4、2x 5–6→5–7，copy/fold 各 10/10；M1421 CAUGHT。42 份日志扩窗：copy 2/42、fold 2/39、markdown 2/42；622 worst_max 262.3、over 2、over_runs 17、loaded_p95 46.73。帧 350（CHANGED=0）；全量 1384/56/0；换装 431=431；电池 690/5。
