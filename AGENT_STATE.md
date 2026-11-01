@@ -12,14 +12,19 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-01（本地 · R538 / 第 537 轮 / Round 535）
-## R539 开工 ⓪（2026-11-01 · 第 538 轮 / Round 536）
+最后更新：2026-11-01（本地 · R539 / 第 538 轮 / Round 536）
+## R539 状态（2026-11-01 · 第 538 轮 / Round 536 · 产品 1 文件 + 判据）
 
 R539 ⓪ 读数（只登记、不轮询）：HEAD=origin=`e07e78d`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **350**、全量 **1383/56/0（584.7s）**、预检 **317/294/755 bad=0**、ARM **410/1242**、HIDDEN **404/1181 rot=0**、电池 **683/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 537）。
 - 五跑读时均 **in_progress ⇒ NOT-RUN**：`41310819996 ↔ 9e78221`（R538 产品，626 签收靠它，读时 946s）、`41311271183 ↔ 1f65367`（台账）、`41311603175 ↔ 0cc001f`（补记二）、`41311818680 ↔ b6394f5`（补记三）、`41311984162 ↔ e07e78d`（补记四）。**626 保持开单**，等 `9e78221` 的失败步骤与 `RowContextMenuTests` 正文。
 - 已收口：`41308835299 ↔ 21a5440` failure **STEP[9]+STEP[18]**（STEP[9]=3 条 git 缩写 + sources 时序 + 624；STEP[18]=frame **151.4ms/2/195** + `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合/BACKLOG 132）；**622 code-block 半已签收**（两条 code-block 测试各 passed、零 `NSInvalidArgumentException`），frame 半第五值 151.4ms/2/195、120ms 与容差不动。`41309008989 ↔ b707811`、`41309189054 ↔ 8cef540`、`41309333668 ↔ 085e4c7` 均 failure **仅 STEP[9]**（3 缩写 + 624），STEP[15]–[19] 全绿。
 - 本轮靶：① 修 **628**（runner `%h`=8 位 vs 账上 7 位；`--abbrev=7`/前缀比较，先造旧值红、再刀证修好；不放宽地板）；② 626 若签收则把菜单细项/禁用态落判据，否则 625 查 SwiftUI 宿主 key-view 所有权、627 先出现率；624 保持开单、不改名册；625/626/627 不销单除非有读数。刀号从 **M1415** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 
+① 628 旧值/修：runner `git %h` 给 8 位、账上 7 位，三条脚本守卫红（subject 生日 / roster 退役 / streak 第二来源）。`product_streak` 与 `scan_args`/roster 钉 `--abbrev=7`，两条新判据用 `GIT_CONFIG_COUNT=1 core.abbrev=8` 模拟 runner；`M1415`/`M1416` CAUGHT、RESTORE_CLEAN。628 本机修好、待 R539 产品跑签收。
+② 625 旧值/根因/结案：单测 0/24 是假读数（窗口非 key、`selectNextKeyView` 不移动焦点），链结构本来就是 `NSHostingView → 搜索框 → FocusableHintButton`；真机旧值 12 次 Tab 只在 `AXOutline`↔`AXTextField`，根因是无边框 NSButton 的 `canBecomeKeyView=false`。产品 1 文件放行后真机 12 次 Tab 有 4 次停在 `AXButton「知道了」`；`M1417`/`M1418` CAUGHT。**625 结案**。
+③ 判据/刀/预检：`MainWindowCollapseTests` 改判链结构 + `acceptsFirstResponder`/`canBecomeKeyView`；预检 319/295/757 bad=0、ARM 411/1244、HIDDEN 406/1183 rot=0；build 0 告警。626 由 `9e78221` 的 RowContextMenuTests 3/3 签收（失败步骤 STEP[9]/[18]/[19] 与菜单无关）。
+④ 帧/全量/换装/电池/清账/streak：帧 **350**（CHANGED=0，基线不变）；全量 **1383/56/0（613.2s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=431=431`（安装 PID 6127；探针后常规启动 PID 6240、1 窗口 750×492）；电池 **685/5**（台账后复跑）；清账 162/162/0；产品面连续零改动 **1** 轮（as-of 538，`python3 scripts/product_streak.py --streak-for 538` 现读，last=9e78221/537）。
+⑤ CI/交接：产品笔 `acefc43` 已推（HEAD=origin、ahead=0）；R540 ⓪ 要读的成对：`41314618298 ↔ acefc43`（产品，读时 in_progress ⇒ NOT-RUN）、`41312123929 ↔ 40a2a71`（⓪，in_progress ⇒ NOT-RUN），以及已读的 `41310819996 ↔ 9e78221`（failure STEP[9]+[18]+[19]；626 签收、622 frame 262.3ms/2/175、627 再现）、`41311271183 ↔ 1f65367`（仅 STEP[9]）、`41311603175 ↔ 0cc001f`（仅 STEP[9]）、`41311818680 ↔ b6394f5`（STEP[9]+[15]+[19]，折叠动画采样 flake）、`41311984162 ↔ e07e78d`（仅 STEP[9]）；台账跑 push 后取号。下一轮 R540（第 539 轮 / Round 537）：先 push 复核 ahead=0；读这两跑全部失败步骤；628 只在 R539 产品跑 STEP[9] 不再出现 3 条缩写红时签收；622 frame 半/624/627 继续；625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R538 状态（2026-11-01 · 第 537 轮 / Round 535 · 产品 2 文件 + 判据）
 
 R538 ⓪ 读数（只登记、不轮询）：HEAD=origin=`8cef540`、ahead=0；网络通。`41308835299 ↔ 21a5440`（R537 产品 Menlo-Bold）、`41309008989 ↔ b707811`（台账）、`41309189054 ↔ 8cef540`（收口）读时均 **in_progress ⇒ NOT-RUN** ⇒ **622 code-block 半不能签收**（21a5440 未出结论）。

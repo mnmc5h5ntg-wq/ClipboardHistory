@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 折叠提示按钮进入 Tab 链 + git 缩写钉死（R539 / 第 538 轮 / Round 536 / U-2232…U-2240 · 产品 1 文件 + 判据）
+
+625：无边框 NSButton 的 `canBecomeKeyView` 默认 false，折叠提示的「知道了」虽在 key-view 链里却不被 Tab 环收；显式放行后真机 12 次 Tab 有 4 次停在 AXButton「知道了」（旧值 0/12，只在列表/搜索框）。628：runner 的 `git %h` 给 8 位而账上存 7 位，三条脚本守卫红；读取处改钉 `--abbrev=7`，并用 `core.abbrev=8` 环境模拟 runner 的回归判据；M1415–M1418 CAUGHT。帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431；电池 685/5。
+
 ### 行右键菜单改由列表选区层接管（R538 / 第 537 轮 / Round 535 / U-2222…U-2229 · 产品 2 文件 + 判据）
 
 旧值：行 `.contextMenu` 被 Text/cell 的系统文本菜单盖住（真机 117×165：撤销/重做/剪切/复制/粘贴/全选）。改为 `List` 的 `.contextMenu(forSelectionType:)`（macOS 13+），由 `RowContextMenu` 提供复制/收藏两项，macOS 12 保持无菜单。真机两行右键读数：菜单层窗口 58×58、AX 菜单 3 项（复制/收藏 enabled）；新增 3 条判据与 M1414；帧 350（CHANGED=0）；全量 1383/56/0；换装 431=431。626 待 runner 签收。622 的 code-block 半由 41308835299（21a5440）签收：两条 code-block 测试各 passed 一遍、零 NSInvalidArgumentException；frame 半记第五值 151.4ms/2/195。

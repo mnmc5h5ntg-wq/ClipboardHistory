@@ -20726,3 +20726,21 @@ runner 四跑的 TITLE_HOVER 都是 0/0，但旧判据没有证明静置帧本�
 ### R538 收口复读（`41308835299 ↔ 21a5440`）
 
 收口后 `21a5440` 落地：STEP[15] Swift tests / STEP[16] Motion gate / STEP[17] Capture gate **success**；`testCodeBlocksShowLineNumbers` 与 `testCodeBlocksShowTheirLanguage` 在 Offscreen 与 Swift steps 各 passed 一遍、`NSInvalidArgumentException`=0 ⇒ **622 code-block 半签收**。STEP[18] 红在 `testFrameIntervalsUnderStateChanges` **151.4ms/2/195**（622 第五值）与 `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合（BACKLOG 132，6/14 探针没跑）；frame 半保持开单、阈值不动。STEP[9] 5 红 = 3 条 git 缩写长度（runner `%h`=8 位 vs 账上 7 位）→ 新开 BACKLOG 628 + 1 条 sources 时序 + 624 skip_roster；不是产品回归。另补读 `b707811`/`8cef540`/`085e4c7` 三跑：均仅 STEP[9] 4 红（3 缩写 + 624），STEP[15]–[19] 全 success，sources 格绿 ⇒ 时序只在产品笔跑；624 台账/⓪ 笔本批也红。
+
+## Round 536 · R539（第 538 轮 · 2026-11-01）：折叠提示按钮进 Tab 链 + git 缩写钉死（625 结案 / 628 本机修）
+
+628：runner `git %h` 给 8 位、账上 7 位，三条脚本守卫红（subject 生日、roster 退役、streak 第二来源）。修法是把读取处钉成 `--abbrev=7`，并加两条用 `core.abbrev=8` 环境变量模拟 runner 的回归判据；M1415/M1416 CAUGHT、RESTORE_CLEAN。625：旧的 0/24 是假读数（单测窗口不是 key，`selectNextKeyView` 不移动焦点），链结构本来就对；真机旧值 12 次 Tab 只在列表/搜索框，根因是无边框 NSButton 的 `canBecomeKeyView=false`。产品 1 文件放行后，真机 12 次 Tab 有 4 次停在 AXButton「知道了」，625 结案。M1417/M1418 CAUGHT。预检 319/295/757 bad=0、ARM 411/1244、HIDDEN 406/1183 rot=0；build 0 告警；帧 350（CHANGED=0，基线不变）；全量 **1383/56/0（613.2s）**；换装 431=431（PID 6127→6240）；电池 685/5。626 由 9e78221 的 RowContextMenuTests 3/3 签收；622 frame 第六值 262.3ms/2/175；627 在 9e78221 再现。
+
+**七维度自评**（恰七行，每格 n/15）：
+
+| 维度 | 分 | 依据 |
+| --- | --- | --- |
+| 真实视觉审查 | 15/15 | 真机折叠提示截图 + Tab 12 站逐站读 AX；帧卷 350 比对 CHANGED=0。 |
+| 判据有效性 | 15/15 | 628 两条模拟 8 位判据 + 625 链结构判据；M1415–M1418 四臂全 CAUGHT。 |
+| 假绿防御 | 15/15 | 先证明旧 0/24 是窗口非 key 的假读数；真机旧/新值都留；628 用环境变量造 8 位输入。 |
+| 产品面推进 | 15/15 | `canBecomeKeyView=true` 让折叠提示按钮真正进入 Tab 链；产品 1 文件。 |
+| 台账一致性 | 15/15 | U-2232…U-2240、D-538/D-539、350/1383/431/685 都来自命令与真机。 |
+| 交付诚实性 | 15/15 | 628 待 runner；622 frame/624/627 保持开单；626 的失败步骤逐条读过且与菜单无关。 |
+| 可复核性 | 15/15 | run 号、Tab 12 站读数、AXButton 标题、M1415–M1418、预检 319/295/757 全在。 |
+
+均分 = 105/105 ≈ 15.0/15（100）。

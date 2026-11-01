@@ -8673,3 +8673,19 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：右键所有权在列表层（`NSTableView`），行内容的文本菜单不再抢事件；菜单项标题/符号与 `FavoriteTogglePresentation` 同源，收藏文案不会两处漂移。
 - 兼容性/迁移：菜单只在行上出（详情文本自己的右键不受影响）；macOS 12 行为与旧版一致（无应用菜单）；不改任何键盘路径与选中语义。
 - 边界：本轮只做单条行菜单（多选时取 `filteredEntries` 里第一个命中项），不宣称批量动作；真机两行读数已留，但 runner `9e78221` 未出结论 ⇒ 626 保持开单、等签收。
+
+## D-538 折叠提示按钮用 canBecomeKeyView 放行（R539）
+
+- 背景：625 的旧读数有两层——单测用 `window.selectNextKeyView` 判 0/24，但单测窗口 `isKeyWindow=false`/`NSApp.isActive=false`，调用根本不移动焦点（尺没有对象）；真机 12 次 Tab 也只到列表/搜索框。链结构本身是通的（`NSHostingView → 搜索框 → FocusableHintButton`）。
+- 决定：`FocusableHintButton` 显式 `override var canBecomeKeyView: Bool { true }`；单测改判 **key-view 链结构**（按钮在链里、`nextKeyView` 非空）并断言 `acceptsFirstResponder`/`canBecomeKeyView`。
+- 理由：无边框 NSButton 的 `canBecomeKeyView` 默认 false，自动 key-view 环因此不收它；`acceptsFirstResponder=true` 不足以让它成为 Tab 停靠点。真机新值 12 次 Tab 有 4 次停在 AXButton「知道了」。
+- 兼容性/迁移：只影响折叠提示可见时的窗口 key-view 环；按钮消失后链仍由系统重算。视觉零变化（帧 350/CHANGED=0）。
+- 边界：真机读数是 12 站里 4 次命中，不是每次 Tab 都命中；停止条件与链结构由 M1417/M1418 钉住。
+
+## D-539 git 缩写读取钉成 7 位并用环境变量模拟 runner（R539）
+
+- 背景：628 runner 的 `git %h` 给 8 位、本机/账上 7 位，`test_recent_subjects_are_clean`/`test_roster_must_retire`/`test_the_second_label_source_is_a_derivation_not_a_roster` 三条守卫红；sources 格红是另一条（产品笔早于台账的时序），不混算。
+- 决定：`scripts/product_streak.py` 与 `test_commit_subject_hygiene` 的读取处显式 `--abbrev=7`；新增两条回归判据用 `GIT_CONFIG_COUNT=1 core.abbrev=8` 模拟 runner 的 8 位默认，断言短 sha 仍是 7 位、生日仍可认出。
+- 理由：判据要比的是「同一份账里的 sha」，不是「这台机器的 git 恰好给几位」；钉死 7 位与账上/roster 的存储口径一致，且显式参数可覆盖 `core.abbrev`。
+- 兼容性/迁移：不改地板/阈值，不删守卫；7 位与 8 位输入都走同一条断言（8 位环境由新判据钉住）。
+- 边界：本机修复、待 R539 产品跑在 runner 上签收；sources 时序红不在本条内。

@@ -10763,6 +10763,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R538）：`21a5440`/`b707811`/`8cef540`/`085e4c7`/`9e78221` 读时均 in_progress ⇒ **code-block 半仍没有任何含 `21a5440` 的结论跑**，保持开单；frame 半最近仍是 `5837d65` 的 **243.2ms/2/189**，120ms 与容差不动。
     复查（R538 收口复读）：`41308835299 ↔ 21a5440`（R537 产品笔）**STEP[17] Capture gate success**；`testCodeBlocksShowLineNumbers` 与 `testCodeBlocksShowTheirLanguage` 在 Offscreen 与 Swift steps 各 passed 一遍，`NSInvalidArgumentException`=0 ⇒ **code-block 半签收**。同跑 STEP[18] 红：`testFrameIntervalsUnderStateChanges` 最差 **151.4ms**、超锚点 **2** 颗、n=195（622 第五值 544.1→162.2→175.8→243.2→151.4），120ms 与容差不动；另 `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合（BACKLOG 132）⇒ 6/14 探针没跑。**frame 半保持开单**。
     复查（R538 补读）：`41309008989 ↔ b707811`、`41309189054 ↔ 8cef540` 两跑的 STEP[17] Capture gate 也全 **success**（同样含 21a5440 的 code-block 两测试），STEP[18] 也全绿 ⇒ code-block 签收获两跑旁证，frame 半无新值。
+    复查（R539）：`9e78221` 的 STEP[18] frame **262.3ms/2/175**（第六值 544.1→162.2→175.8→243.2→151.4→262.3；loaded_p95=46.73、比值 1.098），120ms 与容差不动；code-block 半已按 `41308835299 ↔ 21a5440` 签收，frame 半保持开单。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10794,6 +10795,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R538 收口复读）：`41308835299`（非台账产品笔）STEP[9] 仍红在 skip_roster「内层没有结论行」；同跑另 4 条是 628 的缩写长度族，不混算。两臂继续，保持开单。
     复查（R538 补读）：`41309008989`（台账笔）与 `41309189054`（收口笔）的 STEP[9] 也红在 skip_roster ⇒ 本批「非台账笔红、台账笔绿」不再成立（三跑都红）；保持开单、不改名册。
     复查（R538 补读二）：`41309333668 ↔ 085e4c7`（⓪ 笔）STEP[9] 也红在 skip_roster ⇒ 同一批台账/⓪/收口三笔都红，非台账笔红/台账笔绿的旧相关不成立；保持开单、不改名册。
+    复查（R539）：`9e78221`/`1f65367`/`0cc001f`/`b6394f5`/`e07e78d` 五跑 STEP[9] 全红在 skip_roster（产品/台账/补记/收口都红）；旧「非台账红/台账绿」相关不成立，保持开单、不改名册。
 
 **625. Tab 到不了折叠提示的「知道了」：.focusable 只加了一个根 AXGroup 停靠点**（R535 现读）
     现象：真机折叠 420×492 连按 8 次 Tab，聚焦只在 AXOutline/AXTextField 循环；加 `.focusable(true)+@FocusState+accent 焦点环` 后，链里多出 AXGroup（420×472，整个内容视图），仍没有 AXButton「知道了」。
@@ -10802,6 +10804,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R536）：换成真实 AppKit NSButton 并在 viewDidMoveToWindow/layout 手动插入 key-view 链后，单测 24 站仍 `HINT_KEYVIEW_REACHED=0`，真机折叠 420×492 连按 8 次 Tab 仍只在 AXTextField/AXOutline 循环。AppKit 按钮本身（AXButton/焦点环/Return/Esc/鼠标）已落产品，但 **Tab 链仍未打通** ⇒ 625 保持开单；下一步查 SwiftUI 宿主对 key-view 的所有权（可能需要关 autorecalculatesKeyViewLoop 或自建 keyView 链）。
     复查（R537）：无新 Tab 链读数；AppKit 按钮/焦点环保留，Tab 0/8 与 0/24 仍有效；625 保持开单。
     复查（R538）：本轮未动 Tab 链（产品落在 626），无新读数；AppKit 按钮/焦点环保留，Tab 0/8 与 0/24 仍有效；625 保持开单。
+**625 结案（R539）**：旧 0/24 是假读数（单测窗口非 key，`selectNextKeyView` 不移动焦点）；链结构本来就是 `NSHostingView → 搜索框 → FocusableHintButton`。真机旧值 12 次 Tab 只在列表/搜索框，根因是无边框 NSButton 的 `canBecomeKeyView=false`；产品放行后真机 12 次 Tab 有 4 次停在 `AXButton「知道了」`（描述「不再显示这条提示」），单测改判链结构并钉 `acceptsFirstResponder`/`canBecomeKeyView`；M1417/M1418 CAUGHT。视觉零变化（帧 350/CHANGED=0）。
 
 **626. 行 `.contextMenu` 被系统文本菜单盖住**（R535 现读）
     现象：给 `HistoryRowButton` 加「复制/收藏」菜单（模型 + 源码接线测试都过）后，真机在正文与行尾两次右键都弹 117×165 的系统文本菜单（撤销/重做/剪切/复制/粘贴/全选），不是我们的两项。
@@ -10809,6 +10812,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     下一步：在 Text/cell 层替换菜单，或 macOS 13 的 List `.contextMenu(forSelectionType:)` / AppKit NSMenu；先做真机右键读数再落产品。
     复查（R537）：无新右键读数；系统文本菜单仍会盖住行菜单，626 保持开单。
     复查（R538）：**本机已落地**——菜单从行内容 `.contextMenu` 改挂 `List` 的 `.contextMenu(forSelectionType:)`（macOS 13+）。真机两行右键：菜单层窗口 **58×58**（旧值 117×165 系统文本菜单）；AX `<AXMenu>` 3 项 = 复制 enabled / 收藏 enabled / 分隔符 disabled；未点菜单项。`RowContextMenuTests` 3 条 + M1414 CAUGHT。runner `9e78221` 未出结论 ⇒ **保持开单、待 runner 签收**。
+**626 结案（R539，`41310819996 ↔ 9e78221` 跑）**：`RowContextMenuTests` 3/3 passed（Swift tests step 绿）；同跑失败步骤只有 STEP[9]（3 条 git 缩写 + 624 + sources 时序）、STEP[18]（frame 262.3ms + `testRightClickMenusAppKitWouldShowAreChinese` 心跳未闭合）与 STEP[19]（627 回执），与菜单无关。真机读数沿用 R538：两行右键 58×58 + AX 三项（复制/收藏 enabled），旧值 117×165 系统文本菜单。
 
 **627. runner 1x 回执动效只有 1 个过渡帧（Motion floor 未登记红）**（R535 收口现读）
     现象：`8b1ddb9` 的 STEP[19] 唯一失败是 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`：1x 只有 1 个过渡帧（要求 ≥2）⇒ 回执是硬切；同一跑 `MOTION_GATE_RESULT=ok`、`MOTION_FLOOR_FACTS judged=5/5 executed=77`，另 `testNativeRowMoveIsVisibleToTheRuler` 是已登记红。`adb50c1` 也出现过同一条（STEP[15]+[19]）。
@@ -10819,8 +10823,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R537 收口）：`5837d65` 的 Motion floor 是 `judged=4/5 not-run=notice-banner 红=-`，627 仍未再现，保持开单等出现率。
     复查（R538）：本轮五跑 in_progress，无 Motion floor 新读数；627 未再现，≥2 帧地板不动，保持开单等出现率。
     复查（R538 收口复读）：`41308835299` 的 Motion coverage floor `judged=5/5 executed=77 REDS=0`，627 未再现；出现率仍未量，≥2 帧地板不动，保持开单。
+    复查（R539）：`9e78221` 的 STEP[19] **再现**：`MOTION_FLOOR_REDS=1`、红 `testCopyReceiptAppearsAndDismissesWithAVisibleProcess`；另 `b6394f5` STEP[15] 的 `testCollapseWidthIsMeasuredFrameByFrame`（foldProgress `[0,0,0,0.993,0.993]`、终值 0.993 vs 1.0±0.001）是同类 runner 采样 flake，STEP[19] 为其下游。≥2 帧地板不动，保持开单等出现率。
 
 **628. runner 的 git 缩写从 7 位变 8 位：三条脚本守卫把 7 位当固定长度**（R538 收口现读）
     现象：`41308835299 ↔ 21a5440` 的 STEP[9] 5 红中有 3 条同族：`test_recent_subjects_are_clean`（'5225de5' not found in ['21a5440f', … '5225de5a']）、`test_roster_must_retire`（[] != ['07acf2e', …]）、`test_the_second_label_source_is_a_derivation_not_a_roster`（git 里读不到 117f45d）；第 4 条 `test_the_cell_agrees_with_its_own_source` 是产品笔早于台账的 sources 时序（b707811/8cef540 两跑已绿）。runner 的 git 2.56.0 `%h` 现在给 **8 位**（21a5440f），本机给 **7 位**（21a5440）；roster/报告格存的是 7 位。`5837d65` 的跑没有前三条（当时 `%h` 还是 7 位），所以这不是产品回归。同一批 `085e4c7`（⓪ 笔）也复现同样 3 条 + skip_roster。
     现状：读取处假设固定 7 位缩写；对象集变化会让同一份账在两台机器上答两个数。
     下一步：把读取处统一成确定性口径（`--abbrev=7`，或前缀比较 / `%H` 再裁剪），先在本地用 8 位模拟样本造红、再在 runner 签收；不放宽任何地板。
+    本机修复（R539）：`product_streak.product_commits` 与 `test_commit_subject_hygiene` 的 `scan_args`/roster 查询显式 `--abbrev=7`；新增两条回归判据用 `GIT_CONFIG_COUNT=1 core.abbrev=8` 模拟 runner（8 位输入下短 sha 仍 7 位、生日仍可认出）；`M1415`/`M1416` CAUGHT、RESTORE_CLEAN。待 R539 产品跑在 runner 上签收。
