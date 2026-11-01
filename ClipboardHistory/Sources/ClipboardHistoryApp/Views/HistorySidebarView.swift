@@ -164,6 +164,9 @@ struct HistorySidebarView: View {
                 .font(.system(size: VisualFont.meta, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
                 .helpLabel(CollapseHintPresentation.dismissHelp)
+                // R534：旧值真机折叠 420×492 下按 Esc，确认键前后都未写 ⇒ 提示只能鼠标关。
+                // 一次性的提示不该把人困在鼠标上：Esc 是系统关闭语义，只在提示可见时挂。
+                .keyboardShortcut(.cancelAction)
                 .pressedStyle(in: VisualShape.rounded(VisualRadius.control),
                               hoverLevel: VisualFill.controlHover,
                               labelPadding: 3)

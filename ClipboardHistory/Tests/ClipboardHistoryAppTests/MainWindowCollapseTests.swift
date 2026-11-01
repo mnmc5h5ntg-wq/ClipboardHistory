@@ -425,6 +425,25 @@ final class MainWindowCollapseTests: XCTestCase {
                       "装饰性的信息图标没有从读屏树里隐藏")
     }
 
+    /// R534：折叠提示要能从键盘关掉（Esc）。
+    /// 旧值：真机折叠 420×492 下按 Esc，`mainWindowCollapseHintAcknowledged` 前后都未写 ⇒
+    /// 一次性提示只能鼠标点「知道了」。这条切源码段钉住 `.keyboardShortcut(.cancelAction)`。
+    func testCollapseHintCanBeDismissedWithEscape() throws {
+        let sidebar = try productSource("Views/HistorySidebarView.swift")
+        guard let start = sidebar.range(of: "private var collapseHintLine: some View {"),
+              let end = sidebar.range(of: "private var headerRow: some View {",
+                                      range: start.upperBound..<sidebar.endIndex) else {
+            return XCTFail("折叠提示的源码段找不到 ⇒ 这条判据无从取证")
+        }
+        let hint = String(sidebar[start.lowerBound..<end.lowerBound])
+        XCTAssertTrue(hint.contains("Button(CollapseHintPresentation.dismissTitle)"),
+                      "「知道了」不是按钮")
+        XCTAssertTrue(hint.contains("acknowledgeCollapseHint()"),
+                      "「知道了」没有接确认动作")
+        XCTAssertTrue(hint.contains(".keyboardShortcut(.cancelAction)"),
+                      "「知道了」不能从键盘关闭（Esc）⇒ 一次性提示只能鼠标关")
+    }
+
     private func productSource(_ relative: String) throws -> String {
         let url = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
