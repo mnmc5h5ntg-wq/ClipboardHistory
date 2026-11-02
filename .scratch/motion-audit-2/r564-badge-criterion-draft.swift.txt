@@ -1,0 +1,173 @@
+    /// **R564 · 浮层一行里三枚叠层徽标共用同一档盒子。**
+    ///
+    /// 缺陷：`QuickPickController` 的同一格里叠三枚徽标（图钉 / 收藏星 / 内容标记），三枚都按
+    /// `pointSize: 8` 配置符号，**盒子**却是 9 / 10 / 9pt —— R551 当年只把星那一枚从 9 抬到 10，
+    /// 另两枚留在原地。而产品自己给这一族的下限写在 `VisualGlyph.badge`（注释原话：
+    /// 9pt 的 `pin.fill` 在 2× 下笔画会并在一起 ⇒ 9 与 10 收成同一档、把下限抬到 10）。
+    ///
+    /// 盒子不是装饰（落产品改动前先做的实验，本机 2× 成对差集现读）：把两枚的 9 临时改成 10 ⇒
+    /// 内容标记 `8.00×8.00pt → 9.00×9.00pt`、图钉 `9.00×6.00 → 9.50×6.50`，而**星一字未动**
+    /// （`8.50×9.00`，与 R551 账上那个 8.5pt 对上）⇒ 画多大由盒子决定，这一改有可见后果。
+    ///
+    /// 判三条，缺一不可：
+    /// ① **几何**：三枚徽标在**已布局的产品树**里的盒子边长彼此相等，且不低于 `VisualGlyph.badge`。
+    ///    这一条是主判，也是唯一能站在 1x 上判的一条 —— 可见后果只有 1–2px@2x，
+    ///    在 runner 的 1x 预算里会落进像素容差（R555 那条「同一几何量在 2x/1x 不是同一对象」的教训）。
+    /// ② **尺有对象**：每一枚在帧里都要真的有差集墨（正臂有、负臂无）⇒ 不许静态断言空转。
+    /// ③ **墨下界**：差集墨高度 ≥ 4.5pt × 倍率 —— 沿用全仓那道地板，不为这一格新造数。
+    ///
+    /// ⚠ 禁碰 R551「收藏星尺寸」：星那一枚只允许**同值**换成 token（10=10），本判据把它当
+    ///   三枚之一一起判，**不新建任何关于星的口径**，`QUICKPICK_STAR_HEIGHT` 那条判据一字未动。
+    func testQuickPickOverlayBadgesShareOneBadgeBox() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r564-badge-box-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let badgeIDs: [(label: String, id: String, negative: String, positive: String)] = [
+            ("图钉", "quickPickPinnedBadge", "quickpick-no-source", "quickpick-pinned"),
+            ("收藏星", "quickPickFavoriteBadge", "quickpick-no-source", "quickpick-favorite"),
+            ("内容标记", "quickPickContentBadge", "quickpick-plain", "quickpick-link-badge"),
+        ]
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            func fixture(_ name: String) -> Fixture {
+                guard let f = fixtures.first(where: { $0.name == name }) else {
+                    XCTFail("\(tag)：没有夹具 \(name) ⇒ 这条判据没有对象")
+                    fatalError("missing fixture")
+                }
+                return f
+            }
+            // ---- ① 几何：从产品自己那棵已经布局完的树里读盒子边长（不抄字面量） ----
+            var edges: [String: NSSize] = [:]
+            for badge in badgeIDs {
+                let file = scratch.appendingPathComponent("\(badge.positive)-\(tag).png")
+                var found: [String] = []
+                _ = try render(fixture(badge.positive), appearance: appearance, to: file) { root in
+                    var stack: [NSView] = [root]
+                    while let node = stack.popLast() {
+                        if node.identifier?.rawValue == badge.id {
+                            found.append("\(node.frame)|hidden=\(node.isHidden)|cell=\(String(describing: type(of: node.superview as? NSView ?? node)))")
+                        }
+                        stack.append(contentsOf: node.subviews)
+                    }
+                }
+                emit("R564_ALL \(tag) \(badge.id) 命中=\(found.count) 全部=\(found.joined(separator: " ;; "))")
+                // 负臂也走一遍：盒子只在真有那一枚时存在，负臂里应当读不到（读到了就是常显）
+                let negFile = scratch.appendingPathComponent("\(badge.negative)-\(tag).png")
+                _ = try render(fixture(badge.negative), appearance: appearance, to: negFile) { root in
+                    var stack: [NSView] = [root]
+                    while let node = stack.popLast() {
+                        if node.identifier?.rawValue == badge.id {
+                            edges["负臂:" + badge.id] = node.frame.size
+                        }
+                        stack.append(contentsOf: node.subviews)
+                    }
+                }
+            }
+            for badge in badgeIDs {
+                XCTAssertNil(edges["负臂:" + badge.id],
+                             "\(tag)：负臂 \(badge.negative) 的视图树里出现了 \(badge.id) 的布局盒子 ⇒ "
+                             + "徽标从「按需出现」变成常显占位，负臂那张帧不再是任何一格的证人")
+            }
+            let read = badgeIDs.map { edges[$0.id] ?? .zero }
+            emit("QUICKPICK_BADGE_BOX \(tag) "
+                 + badgeIDs.enumerated().map { "\($0.element.label)=\(String(format: "%.1f", read[$0.offset].width))x\(String(format: "%.1f", read[$0.offset].height))pt" }.joined(separator: " ")
+                 + " 规范档=\(String(format: "%.1f", VisualGlyph.badge))pt")
+            for (i, badge) in badgeIDs.enumerated() where read[i] == .zero {
+                XCTFail("\(tag)：产品树里读不到 \(badge.id) 的布局盒子（\(badge.positive) 那一帧没有它）⇒ "
+                        + "判据没有对象；先查 identifier 有没有被改名，不许当成「判过了」")
+            }
+            let floor = Double(VisualGlyph.badge)
+            for (i, badge) in badgeIDs.enumerated() {
+                XCTAssertGreaterThanOrEqual(read[i].width, floor - 0.01,
+                    "\(tag)：\(badge.label)的盒子只有 \(read[i].width)pt，低于产品自己给这一族定的 \(floor)pt 档"
+                    + "（`VisualGlyph.badge` 的注释：9 与 10 收成同一档、把下限抬到 10）")
+                XCTAssertGreaterThanOrEqual(read[i].height, floor - 0.01,
+                    "\(tag)：\(badge.label)的盒子只有 \(read[i].height)pt 高，低于 \(floor)pt 档")
+                if i > 0 {
+                    XCTAssertEqual(read[i].width, read[0].width, accuracy: 0.01,
+                        "\(tag)：同一格里 \(badge.label) 与 \(badgeIDs[0].label) 的盒子宽差 \(read[i].width - read[0].width)pt ⇒ "
+                        + "三枚徽标是同一族（同一个 pointSize 配的符号），两档盒子就是 R551 只抬了一枚留下的裂缝")
+                    XCTAssertEqual(read[i].height, read[0].height, accuracy: 0.01,
+                        "\(tag)：同一格里 \(badge.label) 与 \(badgeIDs[0].label) 的盒子高差 \(read[i].height - read[0].height)pt")
+                }
+            }
+            // ---- ②③ 像素两腿：差集墨（正臂有、负臂无）证明几何变了画面也真的变了 ----
+            for badge in badgeIDs {
+                guard let neg = try? quickPickInkMask(fixture: fixture(badge.negative),
+                                                             appearance: appearance, scratch: scratch, tag: tag),
+                      let pos = try? quickPickInkMask(fixture: fixture(badge.positive),
+                                                             appearance: appearance, scratch: scratch, tag: tag)
+                else {
+                    XCTFail("\(tag)：\(badge.label) 两臂帧读不回来 ⇒ 这条判据没有对象")
+                    continue
+                }
+                var minY = neg.h, maxY = -1, minX = neg.w, maxX = -1, count = 0
+                for y in 0..<min(neg.h, pos.h) {
+                    for x in 0..<min(neg.w, pos.w) {
+                        let k = y * neg.w + x
+                        if pos.on[k] && !neg.on[k] {
+                            count += 1
+                            if y < minY { minY = y }
+                            if y > maxY { maxY = y }
+                            if x < minX { minX = x }
+                            if x > maxX { maxX = x }
+                        }
+                    }
+                }
+                let heightPt = maxY < 0 ? 0 : Double(maxY - minY + 1) / neg.scale
+                emit("QUICKPICK_BADGE_INK \(tag) \(badge.label) 差集墨=\(count) 高=\(String(format: "%.2f", heightPt))pt"
+                     + " 宽=\(maxY < 0 ? "0.00" : String(format: "%.2f", Double(maxX - minX + 1) / neg.scale))pt"
+                     + " 倍率=\(String(format: "%.1f", neg.scale))x")
+                XCTAssertGreaterThan(count, 0,
+                    "\(tag)：\(badge.label) 的正臂比负臂一个墨像素都没多 ⇒ 这一枚没画出来（或两臂内容相同，配对错了）")
+                XCTAssertGreaterThanOrEqual(heightPt, 4.5,
+                    "\(tag)：\(badge.label) 的净墨只有 \(String(format: "%.2f", heightPt))pt 高，跌破全仓那道 4.5pt 墨下界")
+            }
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到帧")
+    }
+
+    /// `testQuickPickOverlayBadgesShareOneBadgeBox` 的像素腿：把一张浮层帧在**类型符号那一列**
+    /// （实测 x20..60pt、y45..100pt；0..30pt 是面板留白，量不到东西 —— R477 死过一次的地方）
+    /// 读成一张布尔墨图，供两臂做差集。口径与 `QUICKPICK_PIN` 那条一致：与页底中位数差 ≥60 算墨。
+    struct QuickPickInkMask {
+        let on: [Bool]
+        let w: Int
+        let h: Int
+        let scale: Double
+    }
+
+    private func quickPickInkMask(fixture: Fixture, appearance: NSAppearance.Name,
+                                  scratch: URL, tag: String) throws -> QuickPickInkMask {
+        let file = scratch.appendingPathComponent("ink-\(fixture.name)-\(tag)-\(UUID().uuidString).png")
+        _ = try render(fixture, appearance: appearance, to: file)
+        guard let image = NSImage(contentsOf: file),
+              let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+              let base = rep.bitmapData else {
+            throw NSError(domain: "QUICKPICK_BADGE_INK", code: 1)
+        }
+        let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+        let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                  xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+        let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+        let rOff = alphaFirst ? 1 : 0
+        let x0 = Int(20.0 * scale), x1 = Int(60.0 * scale)
+        let y0 = Int(45.0 * scale), y1 = min(rep.pixelsHigh, Int(100.0 * scale))
+        var on = [Bool](repeating: false, count: (x1 - x0) * (y1 - y0))
+        for y in y0..<y1 {
+            for x in x0..<x1 {
+                let i = y * rep.bytesPerRow + x * rep.samplesPerPixel
+                let luma = 0.2126 * Double(base[i + rOff])
+                    + 0.7152 * Double(base[i + rOff + 1])
+                    + 0.0722 * Double(base[i + rOff + 2])
+                on[(y - y0) * (x1 - x0) + (x - x0)] = abs(Int(luma.rounded()) - page) >= 60
+            }
+        }
+        return QuickPickInkMask(on: on, w: x1 - x0, h: y1 - y0, scale: scale)
+    }
+
