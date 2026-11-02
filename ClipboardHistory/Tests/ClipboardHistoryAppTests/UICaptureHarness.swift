@@ -2570,6 +2570,64 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
+    /// R551：BACKLOG 569 —— 9pt 收藏星在浮层类型列里的净墨只有 7.5pt 高；
+    /// 加到 10pt 后星形净墨必须 ≥8pt，且标题末列仍不动（叠层不占布局）。
+    func testQuickPickFavoriteStarIsAtLeastEightPointsTall() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r551-star-height-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let positive = fixtures.first(where: { $0.name == "quickpick-favorite" }),
+                  let negative = fixtures.first(where: { $0.name == "quickpick-no-source" }) else {
+                return XCTFail("\(tag)：找不到 quickpick-favorite / quickpick-no-source ⇒ 这条判据没有对象")
+            }
+            func pixels(_ fixture: Fixture) throws -> (base: UnsafeMutablePointer<UInt8>, rep: NSBitmapImageRep, page: Int) {
+                let file = scratch.appendingPathComponent("\(fixture.name)-\(tag).png")
+                _ = try render(fixture, appearance: appearance, to: file)
+                guard let image = NSImage(contentsOf: file),
+                      let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                      let base = rep.bitmapData else { throw NSError(domain: "QUICKPICK_STAR", code: 1) }
+                let page = Self.modalLuma(bytes: base, bytesPerRow: rep.bytesPerRow,
+                                          xRange: 0..<rep.pixelsWide, yRange: 0..<rep.pixelsHigh)
+                return (base, rep, page)
+            }
+            guard let pos = try? pixels(positive), let neg = try? pixels(negative) else {
+                return XCTFail("\(tag)：两臂帧读不回来 ⇒ 这条判据没有对象")
+            }
+            let scale = Double(pos.rep.pixelsWide) / Double(positive.size.width)
+            func isInk(_ p: (base: UnsafeMutablePointer<UInt8>, rep: NSBitmapImageRep, page: Int), _ x: Int, _ y: Int) -> Bool {
+                let i = y * p.rep.bytesPerRow + x * p.rep.samplesPerPixel
+                let rOff = p.rep.bitmapFormat.contains(.alphaFirst) ? 1 : 0
+                let luma = 0.2126 * Double(p.base[i + rOff])
+                    + 0.7152 * Double(p.base[i + rOff + 1])
+                    + 0.0722 * Double(p.base[i + rOff + 2])
+                return abs(Int(luma.rounded()) - p.page) >= 60
+            }
+            var minY = Int.max, maxY = -1, extra = 0
+            for y in Int(45.0 * scale)..<min(pos.rep.pixelsHigh, Int(100.0 * scale)) {
+                for x in Int(20.0 * scale)..<Int(60.0 * scale)
+                    where isInk(pos, x, y) && !isInk(neg, x, y) {
+                    minY = min(minY, y); maxY = max(maxY, y); extra += 1
+                }
+            }
+            if extra == 0 {
+                emit("QUICKPICK_STAR_HEIGHT_NOT_RUN=type-column-empty \(tag)")
+                continue
+            }
+            let height = Double(maxY - minY + 1) / scale
+            emit("QUICKPICK_STAR_HEIGHT \(tag) 星高=\(String(format: "%.1f", height))pt 星墨=\(extra) 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(height, 8.0,
+                "\(tag)：收藏星净墨只有 \(String(format: "%.1f", height))pt 高 ⇒ 还是 9pt 小星，1x 上只剩几粒")
+            judged += 1
+        }
+        if judged == 0 { throw XCTSkip("QUICKPICK_STAR_HEIGHT_NOT_RUN：两档都没有类型列墨") }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
+    }
+
     // MARK: - R478 · 文件兜底态的所在路径
 
     /// R478：非视频文件的兜底态不再只重复文件名（详情头部已经有一份），要说出**它在哪**。
