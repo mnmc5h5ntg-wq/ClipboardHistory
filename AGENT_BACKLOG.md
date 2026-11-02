@@ -10870,6 +10870,12 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
 
+**633. 桌面授权反复弹：签名身份已固定，剩人工验收一格**（R554 现读并新开）
+    现象：用户反复被弹「时间剪史想访问桌面文件夹」，已批准无数次。根因两根：① 构建每轮 ad-hoc 重签 ⇒ CDHash 每轮变 ⇒ TCC 当新 App（R554 已修：固定自签身份，DR 钉在证书上）；② 预览/布局路径主动读受保护目录（另单 632）。
+    现状：`make bundle` 现读 `SIGNATURE_KIND=local`、`flags=0x0(none)`、`Authority=ClipboardHistory Local Signing`；连装两轮（R554 / R554b）`INSTALL_SIGNATURE=local` 且身份不变；改一字节重签后 CDHash 变（3a02a52d→6ffd48b7）而 DR 逐字不变。
+    退场（只能人工）：用户在访达里授权一次「桌面文件夹」之后，**下一轮构建 + 换装**再复制一个桌面文件，不该再弹。用户回执前不销单；不许拿 `codesign --verify --strict` 绿、离屏帧或 DR 文本顶替这一格。
+    关联：若仍弹，则主因转向 632（主动读），而不是签名。
+
 **632. 预览/布局路径主动读受保护目录（桌面授权反复弹的第二格）**（R553 实读并新开，本轮未动产品）
     现象：用户反复被弹「时间剪史想访问桌面文件夹」。采集路径（`ClipboardIntake`）只记 URL，不读文件；读发生在预览与布局：
       · `MediaLoader.filePreviewPayloadSync(url:)` —— `Data(contentsOf:)` 整文件读（图片/文本预览）；

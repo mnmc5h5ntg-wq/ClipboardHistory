@@ -363,6 +363,13 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 553 轮（R554 · 2026-11-02 · U-2358…U-2361）：A 阻塞解除 —— 固定签名身份两轮安装不变（Swift 0 文件）
+
+- **U-2358：⓪ 与前置。** HEAD=origin=`1576e43`、ahead=0、`git push` no-op。用户回「密码已允许」后**实读**：`security find-identity -v -p codesigning` 仍 **0 valid** ⇒ 他放掉的确实是「codesign 想取用私钥」那个框，不是信任设置；`sign_bundle.sh` 的 `-v` 闸门因此一直走回退支（`SIGNATURE_KIND=adhoc`）。把这一格摆到用户面前，用户授权「跑那一条命令」后执行 `security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db <cert>`（只写登录钥匙串；不 sudo、不碰系统域、不 `tccutil reset`）⇒ **1 valid identities found**。
+- **U-2359：① 签名真的换过来了。** `make bundle` ⇒ `SIGNATURE_KIND=local identity=ClipboardHistory Local Signing`；`codesign -dvv` ⇒ `flags=0x0(none)`（不再是 `0x2(adhoc)`）、`Authority=ClipboardHistory Local Signing`。换装两轮：`--label R554` 与 `--label R554b` 都 `INSTALL_RESULT=ok / SHA_MATCH=1 / INSTALL_SIGNATURE=local`（PID 76169 → 76580），`INSTALL_ENTRIES=433=433` 未减 ⇒ **连续两轮安装后签名身份不变**这一格过。
+- **U-2360：① 为什么这一格才是弹窗的根（可复核的机理）。** 同一份包改一个字节再重签：CDHash `3a02a52d…` → `6ffd48b7…`（**每轮构建都会变**），而 designated requirement 逐字不变：`identifier "com.clipboardhistory.app" and certificate root = H"5f6c0955d4543282f5b2b12a3a2b9fb9ff5ce0a7"`。ad-hoc 时 DR 只能钉在 cdhash 上 ⇒ 下一轮换 cdhash ⇒ TCC 当新 App ⇒ 桌面授权作废；钉在证书上之后，授权才可能跨轮活下来。⇒ 剩下唯一没证的是**人工那一格**：用户授权一次桌面后，下一轮构建再复制桌面文件不该再弹（新开 633 跟踪，不许拿 `codesign --verify` 顶替）。
+- **U-2361：③④ 账与交接。** Swift 侧 0 文件 ⇒ 帧 **354** 不动、全量不重跑（沿用 R552 现读 1392/57/1，唯一红 = PerfBudget 并行 flake）；清账 **162/63/0**；电池 **695/5**（台账后复跑）；产品面连续零改动 **2** 轮（as-of 553，`python3 scripts/product_streak.py --streak-for 553` 现读，last=`884e197`/551）。CI：`41390623478↔abc21c6`（R553 台账）与 R552 三跑读时 in_progress ⇒ NOT-RUN，下一轮必读。下一轮 R555（第 554 轮 / Round 552）：② 头两格仍是 **569 的 runner 红怎么收**（星 7.0/6.0pt < 地板 8.0，不许降地板）与 **632 的 B 落地**；633 等用户人工回执；禁碰清单 8 面（R546–R552）；刀号 M1435 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 552 轮（R553 · 2026-11-02 · U-2352…U-2357）：固定本机码签身份（A 具名阻塞）+ B 触点实读（脚本 3 文件 + 电池 4 条）
 
 - **U-2352：⓪ CI。** HEAD=origin=`570042c`、ahead=0、`git push` no-op。基线**全部现读**：帧 354、清账 162/63/0、streak 1（as-of 552，`product_streak.py --streak-for 552` 现读，last=`884e197`/551）、电池 691/5（本轮后变 695/5）、安装 433=433、全量沿用 R552 的 1392/57/1（886.8s）。三跑读时 in_progress ⇒ NOT-RUN：`41388527150↔52f114c`、`41388652895↔75468be`、`41388683958↔570042c`；已 concluded 的 R551/R552 各跑不重取（红名 = 收藏星判据 runner 7.0/6.0pt < 8.0 + 622 frame 207.2ms/2，已写在 R552 节）。

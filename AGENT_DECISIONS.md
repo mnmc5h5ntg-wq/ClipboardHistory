@@ -8801,3 +8801,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：TCC 授权跟着签名身份走。只有身份固定，"授权一次"才可能跨轮活下来；而回退 ad-hoc 必须被报出来，否则同一个洞会以"构建成功"的样子继续存在。
 - 边界（本轮实际卡在哪）：`security find-identity -v -p codesigning` = 0 条，该身份被列成 `CSSMERR_TP_NOT_TRUSTED`，`codesign -s "<身份>"` 挂起不返回 ⇒ **需要用户在「钥匙串访问」里对该证书点一次「始终信任」**。本轮不重试、不改全局信任设置、不 `tccutil reset`（会清掉用户其他授权）、不 sudo、不改回 ad-hoc 交差。A 的验收（连续两轮 `codesign -dvv` 身份不变 + 授权一次后不再弹）只能真机人工确认。
 - 撤回：`security delete-identity -c "ClipboardHistory Local Signing" ~/Library/Keychains/login.keychain-db`，并在「钥匙串访问」里删掉同名私钥；`Makefile` 回到改动前即恢复纯 ad-hoc 构建（`scripts/tests/test_sign_bundle.py` 会红，提醒补账）。
+
+## D-554 固定签名身份落地：信任由用户授权后写入登录钥匙串，验收分自动/人工两格（R554）
+
+- 背景：D-553 把身份建好但卡在 `CSSMERR_TP_NOT_TRUSTED`，按规矩具名停手等用户。用户回「密码已允许」后现读 `find-identity -v` 仍是 0 valid ⇒ 那次允许的是**取用私钥的密码框**，不是信任设置。
+- 决定：把这一格摆回用户并给三个出口（自己点始终信任 / 授权我跑 `security add-trusted-cert` 只写登录钥匙串 / 撤掉身份）；用户选第二条 ⇒ 执行后 `find-identity -v` = 1 valid。
+- 理由：ad-hoc 的 DR 只能钉在 cdhash 上，而 cdhash 每轮换 ⇒ TCC 每次当新 App。改成钉在证书 root 上之后，`codesign -d --requirements` 现读 `identifier "com.clipboardhistory.app" and certificate root = H"5f6c0955…"`，改一字节重签（CDHash 3a02a52d→6ffd48b7）DR 逐字不变。
+- 兼容性/迁移：只影响本机（身份在登录钥匙串、CI 与其他机器没有它 ⇒ `sign_bundle.sh` 照旧 ad-hoc 并打 `SIGNATURE_KIND=adhoc`）；不 sudo、不碰系统钥匙串、不 `tccutil reset`。
+- 边界：自动能证的到此为止（两轮安装身份不变）。**「授权一次后不再弹」只能真机人工确认** ⇒ 另立 BACKLOG 633 跟踪，不提前销 D-553 的阻塞、也不写进"已修好"。
+- 撤回：`security delete-identity -c "ClipboardHistory Local Signing" ~/Library/Keychains/login.keychain-db` + 删同名私钥 + 在钥匙串里删对该证书的信任设置。

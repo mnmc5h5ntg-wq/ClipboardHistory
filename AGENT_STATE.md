@@ -12,7 +12,14 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R553 / 第 552 轮 / Round 550）
+最后更新：2026-11-02（本地 · R554 / 第 553 轮 / Round 551）
+## R554 状态（2026-11-02 · 第 553 轮 / Round 551 · Swift 0 文件 · 构建/安装链 + 真机两轮换装）
+
+① 前置实读：用户回「密码已允许」后 `security find-identity -v -p codesigning` 仍 **0 valid** ⇒ 放掉的是「codesign 想取用私钥」的密码框，不是信任设置；`sign_bundle.sh` 的 `-v` 闸门因此仍走回退支（`SIGNATURE_KIND=adhoc`）—— 没静默绕过。摆回用户、拿到「跑那一条命令」的授权后执行 `security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db <cert>`（只写登录钥匙串，不 sudo、不碰系统域、不 `tccutil reset`）⇒ **1 valid identities found**。
+② 签名换过来了：`make bundle` ⇒ `SIGNATURE_KIND=local identity=ClipboardHistory Local Signing`；`codesign -dvv` ⇒ `flags=0x0(none)`（不再 `0x2(adhoc)`）、`Authority=ClipboardHistory Local Signing`。连装两轮 `--label R554` / `R554b`：`INSTALL_RESULT=ok / SHA_MATCH=1 / INSTALL_SIGNATURE=local`（PID 76169 → 76580）、`INSTALL_ENTRIES=433=433` ⇒ **连续两轮安装签名身份不变**这一格过。
+③ 机理（可复核）：同一份包改一字节再重签 ⇒ CDHash `3a02a52d…`→`6ffd48b7…`（每轮构建都会变），而 DR 逐字不变 = `identifier "com.clipboardhistory.app" and certificate root = H"5f6c0955d4543282f5b2b12a3a2b9fb9ff5ce0a7"`。ad-hoc 的 DR 只能钉 cdhash ⇒ 下一轮换 cdhash ⇒ TCC 当新 App ⇒ 桌面授权作废；钉证书 root 之后授权才可能跨轮活下来。
+④ 没证的只剩人工那一格：用户授权一次桌面后，**下一轮构建 + 换装**再复制桌面文件不该再弹 ⇒ 新开 **BACKLOG 633** 跟踪，不拿 `codesign --verify` 绿 / DR 文本 / 离屏帧顶替，也不提前销 D-553 的阻塞。
+⑤ 账与交接：Swift 0 文件 ⇒ 帧 **354** 不动、全量不重跑（沿用 R552 现读 1392/57/1，唯一红 = PerfBudget 并行 flake）；清账 **162/63/0**；电池 **695/5**（台账后复跑）；产品面连续零改动 **2** 轮（as-of 553，`python3 scripts/product_streak.py --streak-for 553` 现读，last=`884e197`/551）。CI：`41390623478↔abc21c6`（R553 台账）与 R552 三跑（`41388527150↔52f114c`、`41388652895↔75468be`、`41388683958↔570042c`）读时 in_progress ⇒ NOT-RUN，下一轮必读全部失败步骤。下一轮 R555（第 554 轮 / Round 552）：② 头两格 = **569 的 runner 红怎么收**（星 light 7.0 / dark 6.0pt < 地板 8.0，不许降地板）与 **632 的 B 落地**；633 等用户回执；禁碰清单 8 面（R546–R552）；刀号 M1435 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
 ## R553 状态（2026-11-02 · 第 552 轮 / Round 550 · 脚本 3 文件 + 电池 4 条，Swift 0 文件）
 
 R553 ⓪ 读数（只登记、不轮询）：HEAD=origin=`570042c`、ahead=0、`git push` no-op；已跟踪改动=0。基线（**全部本轮现读**）：帧 **354**、清账 **162/63/0**、streak **2**（as-of 553，`python3 scripts/product_streak.py --streak-for 553` 现读，last=`884e197`/551）、全量沿用 R552 现读 **1392/57/1（886.8s）**、电池 **691/5**、安装 **433=433**（PID 41809）。

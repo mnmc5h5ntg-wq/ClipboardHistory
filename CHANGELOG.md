@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 固定签名身份生效：连续两轮安装签名不变（R554 / 第 553 轮 / Round 551 / U-2358…U-2361 · Swift 0 文件）
+
+用户授权后执行 `security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db`（只写登录钥匙串）⇒ `find-identity -v` 从 0 变 1。`make bundle` 现读 `SIGNATURE_KIND=local`、`flags=0x0(none)`、`Authority=ClipboardHistory Local Signing`；连装两轮 `INSTALL_SIGNATURE=local`、`SHA_MATCH=1`、条目 433=433。机理：改一字节重签后 CDHash 变（3a02a52d→6ffd48b7）而 DR 不变（`certificate root = H"5f6c0955…"`）⇒ TCC 授权第一次有可能跨轮活下来。剩人工一格：授权一次后下一轮不该再弹（BACKLOG 633）。帧 354 不动；全量不重跑（Swift 0 文件）；电池 695/5。
+
 ### 固定本机代码签名身份 + 签名种类读数（R553 / 第 552 轮 / Round 550 / U-2352…U-2357 · 脚本 3 文件 + 电池 4 条）
 
 `codesign -dvv` 现读 `Signature=adhoc` ⇒ 每轮换 CDHash，TCC 把 App 当新的，桌面授权反复作废。新增 `scripts/sign_bundle.sh`：优先用登录钥匙串里的自签身份 `ClipboardHistory Local Signing`，没有则回退 ad-hoc，两种都打 `SIGNATURE_KIND=local|identity-refused|adhoc`；`Makefile` 改走它，`install_local.sh` 加 `INSTALL_SIGNATURE=local|adhoc`。**A 具名阻塞**：该身份 `CSSMERR_TP_NOT_TRUSTED`、`codesign -s` 挂起 ⇒ 需要用户在钥匙串访问点一次「始终信任」（不改全局信任 / 不 tccutil reset / 不 sudo）。B（预览/布局主动读受保护目录）四格触点写进 BACKLOG 632，本轮不动产品。电池 691/5→695/5。
