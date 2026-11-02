@@ -12,21 +12,21 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 # NUM 必须在跑之前换成现读数（留 %(KEY)s 会被 NUM_NOT_FILLED 拦下）。
 NUM = {
-    "FULL": "%(FULL)s",
-    "INSTALL": "%(INSTALL)s",
-    "BATTERY": "%(BATTERY)s",
-    "ABSENCE": "%(ABSENCE)s",
-    "STREAK": "%(STREAK)s",
-    "STREAK_RAW": "%(STREAK_RAW)s",
-    "CAPTURE": "%(CAPTURE)s",
-    "FRAMES": "%(FRAMES)s",
-    "FRAME_LIST": "%(FRAME_LIST)s",
-    "PRECHECK": "%(PRECHECK)s",
-    "ARM": "%(ARM)s",
-    "HIDDEN": "%(HIDDEN)s",
-    "CI_CLOSE": "%(CI_CLOSE)s",
-    "TASK_DIM": "%(TASK_DIM)s",
-    "SHOTS": "%(SHOTS)s",
+    "FULL": "1403/57/0（680.8s）",
+    "INSTALL": "`INSTALL_SIGNATURE=local flags=0x0`（固定身份 ⇒ 授权可以跨轮活下来）⇒ `INSTALL_RESULT=ok / INSTALL_SHA_MATCH=1 / INSTALL_ENTRIES=433=433 / SMOKE_OK=1`（版本 1.4.8→1.4.8，PID→68706，启动晚于安装、exe 路径逐字对上，备份 `before-R560`）",
+    "BATTERY": "696/5",
+    "ABSENCE": "162/63/0",
+    "STREAK": "1",
+    "STREAK_RAW": "PRODUCT_STREAK ledger_round=559 streak=1 sections=535 last=3a3c9a9 last_round=558 newest=631f910 newest_round=559 ⇒ 写账时先按“动了产品 ⇒ 0”推了一格，落盘后 `--check` 报 `PRODUCT_STREAK_LEDGER_STALE 报告那一格写的是 0，git 派生是 1` ⇒ 派生格只能落盘后现读",
+    "CAPTURE": "219/4 skipped/0 失败（617.5s）",
+    "FRAMES": "354 张里 CHANGED=4 ⇒ 同一笔 `update` 之后复跑 `CHANGED=0 MISSING=0 ADDED=0`",
+    "FRAME_LIST": "`detail-tasks-720x520-{light,dark}` + `detail-markdown-rendered-720x520-{light,dark}` = **正好是含任务标记的那两个夹具 × 两档外观**，名单外一帧都没有 ⇒ 改动没有漏到别处",
+    "PRECHECK": "tables=355 covered=295 arms=757 bad=0",
+    "ARM": "files=448 arms=1244 dupes=0 repeats=0",
+    "HIDDEN": "表=442 可判=1183 rot=0 抽不出=6 已声明表=6 处置=ok",
+    "CI_CLOSE": "**收口前复述 `queue`：`41501679574 ↔ 7260562` = concluded failure（已等 2593s）⇒ 四格当场从 NOT-RUN 转成读数。** `ci_read.py steps` 只列出一朵红 —— **STEP[18] `On-screen probe coverage floor`**，正文 `PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=7 闭合通道=接 本次跑过=8 红=1` + `FAILED testFrameIntervalsUnderStateChanges：最差帧 219.7ms 超过锚点 120ms，且超锚点的帧有 2 颗（容差 1 颗）` ⇒ **622 第十四值 = 219.7ms / 2 颗**（第十三值 225.3ms/3 颗）。归因对照：同一判据在 `41485625452↔8115ab8` 绿、在 R557 的 `41467585182↔ff15906` 红 ⇒ **同族既有红、按抽样出现**，R559 没碰那一卷 ⇒ 不署名为 R559 的回归；120ms 锚点与容差 1 颗都不动。**⓪(a) 预测被 runner 亲手证实**：`HEAT_LEGEND_NOT_RUN=scale-too-low light/dark 倍率=1.0x 格宽=11px 实心判定 格6px/图例3px`，而 `HEAT_LEGEND_COVERAGE` 在这一跑**没有一行** ⇒ 尺走了具名出口、没有报假红（R559 那次降采样探针量的 36→9 采样点是对的）。**⓪(b) `过渡帧数=` 的第二个 runner 真数 = 5**：`MOTION_MARKDOWN_MODE_FADE scale=1x 帧数=27 过渡帧数=5 相邻差帧数=2 首末连续差=0.0048 峰值=0.0145 声明=200ms 窗口=676ms 每格=26.0ms` ⇒ 这一跑每格 26.0ms（上一跑 71.5ms）⇒ 新口径在 runner 上已有两个数（**2 与 5**），629 那句「余量随钟漂」被两跑实测钉住；STEP[19] 不在失败名单 ⇒ 旧口径那朵红这一跑也没回来。**⓪(c)** STEP[9] `Release script tests` 不在失败名单 ⇒ 634 的修复**连续第二跑**绿。**⓪(d)** `TASK_BOX_SIZE`/`TASK_BOX_NOT_RUN` 在这一跑**没有一行** —— 那条判据属于本轮尚未推的代码 ⇒ 具名「判据不在这跑里（未推）」，**不许读成「没红」**；它的第一次 runner 读数留给 R561。",
+    "TASK_DIM": "旧→新**逐字未变**（`TASK_DIM light 勾选=133.5 未勾选=85.2 差=48.3 墨数=1104/1175`、`dark 勾选=146.4 未勾选=184.3 差=-37.9 墨数=1233/1293`）",
+    "SHOTS": "`/tmp/r560-tasks-oldvsnew.png`（上=旧、下=新，先亮档后暗档，3× 最近邻放大）",
 }
 
 UI = u"""## 第 559 轮（R560 · 2026-11-03 · U-2404…U-2411）：任务勾选框的两个态钉到同一份字体（产品 1 文件 + 判据 1 条 + 两把刀）；顺手量出第三级项目符也落在另一份字体上 ⇒ 新开 636

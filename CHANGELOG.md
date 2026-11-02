@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 任务勾选框的两个态钉到同一份字体；第三级项目符开单 636（R560 / 第 559 轮 / Round 557）
+
+`detail-tasks` 里两行任务项正文逐字相同、只有勾选态不同，但框子实测差 2.5pt（勾选 21×20px=10.50pt、未勾选 16×16px=8.00pt，两档外观同形）。代码里两个态请求的是同一个 `markerFont` —— 成因在字体层：`☑`(U+2611) 系统字体有字形，`☐`(U+2610) 没有 ⇒ AppKit 只给后者换到 AppleSymbols。本轮把**任务标记**钉到一份"两个字形都有、度量相同"的具体字体（`Apple Symbols`，同 pointSize），且只钉在 `markerFont(for:)` 一处（它同时是渲染字体与量制表位的字体）；项目符 `⦁ ◦ ▪` 与编号一字未动。新判据 `UICaptureTests/testTaskCheckboxStatesShareOneGlyphSize` 先红（宽差 5px / 高差 4px，两档 4 条）后绿（0 / 0）。刀 **M1454**（撤钉）、**M1455**（两个态各钉一份字体）全 CAUGHT、RESTORE_CLEAN；M1455 第一版用 Menlo 是**空刀**（差 1px 正落在 ≤1px 容差内），换 Arial Unicode MS 才红 ⇒ 契约是"像素同尺寸"，不是"字体名相同"。新开 **636**：depth2 项目符 `▪` 落到冬青黑体（同一类缺陷），因 R549 是禁碰面 ⇒ 只开单不改面。4.5 / 150 / 120ms / Motion ≥2 帧 / 2x 8.0pt / 1x 6.0pt / `probeInkFraction=3%` 一律未动。
+
 ### 热图图例补上零次档那一块；635 的两条腿各配了一把刀（R559 / 第 558 轮 / Round 556）
 
 `DailyCopyHeatmapView` 页脚的图例从前只画 `VisualHeat.ladder` 那四档蓝，而网格里的零次格用的是 `Color.primary.opacity(VisualHeat.empty)` —— 一张 182 格的图里 46 格（25%）的颜色在图例里查不到。新判据 `UICaptureTests/testHeatmapLegendCoversEveryCellColor`（网格用到的每一种实心色都必须出现在图例带里；格宽、网格下缘、实心判定全部从帧里量，不抄产品常量）先红后绿，产品补一块**同一份常量**的方块并把间距 8→4 吃掉宽度（净宽 56pt 不变）。635 结案：`MarkdownModeButton` 那三行接线由一条 grep 契约钉子钉住（M1452），胶片那一格同时打出 `MOTION_NOT_RUN=markdown-wiring-unjudged`（M1453）。刀 **M1450–M1453** 全 CAUGHT、RESTORE_CLEAN；帧基线同一笔 update；4.5/150/120ms/≥2 帧/2x 8.0pt/1x 6.0pt/`probeInkFraction=3%` 一律未动。

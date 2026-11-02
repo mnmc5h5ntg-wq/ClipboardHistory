@@ -10892,6 +10892,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 
 
 
+**636. 第三级项目符 `▪` 由另一份字体画（与 635/任务框同一类：标记的字形来自回退字体）**（R560 字体探针现读并新开，本轮不改面）
+    现读（系统字体 13pt，一次性探针 `/tmp/r560-bullet-probe.swift`）：`⦁`(U+2981, depth0) advance **8.11×16.00** 由 **.SFNS-Regular**；`◦`(U+25E6, depth1) **6.06×16.00** 由 **.SFNS-Regular**；`▪`(U+25AA, depth2) **12.00×16.00** 由 **.HiraKakuInterface-W4**（冬青黑体 ⇒ 系统字体里没有该字形，AppKit 回退）。⇒ 同一函数 `bulletGlyph(depth:)` 给出的三级项目符里，第三级与前两级不是同一份字体画的 —— 与 R560 修掉的任务勾选框（`☑` 走 .SFNS-Regular、`☐` 走 AppleSymbols，实测框子差 2.5pt）是**同一类缺陷**。
+    为什么本轮只开单：R549（无序列表项目符 `⦁`）在**禁碰清单**里，那一轮的墨高 2.8→3.9pt 是量过并签收的；改 depth2 会动同一个函数与同一族判据，拿"顺手"的名义动它就是破禁碰规矩。
+    下一轮的头一格（**未证的部分写在这里，别当成已知**）：今天**没有任何夹具画到 depth2** ⇒ 帧上有没有对象未证。先现读"有没有含三级列表的帧"：有 ⇒ 按 R560 那条判据的形状量三级的墨 bbox 是否同尺寸，再决定改法（钉具体字体，且必须钉在 `markerFont` 一处，让渲染与制表位同源）；没有 ⇒ 先补夹具再判，不许拿 advance 宽度当帧上判据。
+    退场：要么"三级项目符同尺寸"这条判据配一把会红的刀落地，要么在账上具名"depth2 今天没有帧对象"并保持禁碰。
+
+
 **635. 「原文/渲染」标签的过渡接线没有任何会红的守卫**（R558 探针现读并新开）
     现象：`DetailView.MarkdownModeButton` 里 `.id(title)` + `.transition(.opacity)` + `.animation(MotionCatalog.animation(for: .contentFade), value: title)` 三行是 R400 为"控件名字别一帧硬换"加的；本轮把它们**分别摘、全摘**做成一次性探针（`probe_r558_what_the_film_measures.py`），`MOTION_MARKDOWN_MODE_FADE` 的 `过渡帧数`/`相邻差帧数`/`峰值`/`相邻差序列` 与未变异**逐字相同**（只有 `窗口`/`每格` 随时钟抖 321–330ms / 12.4–12.7ms）⇒ 胶片测到的插值不来自那三行（SwiftUI 对 `Text` 内容变化在事务里另有默认过渡）。
     现读覆盖面：`grep -rl "id(title)" ClipboardHistory/Tests/` 只命中 `MotionFilmstripTests.swift` 自己 ⇒ 既没有管线证人，也没有契约钉子。
