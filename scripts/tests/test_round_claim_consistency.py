@@ -60,12 +60,6 @@ UNPARSED_ROSTER = {
                 u"带着 K 却没有可解析的轮次身份 ⇒ 本尺看不见它（同一处自伤的第二次，"
                 u"另一面记在 test_commit_subject_hygiene 的 NO_LABEL_ROSTER）。"
                 u"登记理由：BACKLOG 416。退场：扫描窗滑过之后必须删。",
-    u"3ebc7fc": u"R510 的产品笔标题中段带空格（`策略 + 最小窗…`），`SUBJECT` 的 `(\S+?)` 跨不过 ⇒ "
-                u"带 K 却认不出轮次；已 push 不能改历史。登记理由：BACKLOG 616。"
-                u"退场：`SUBJECT` 中段改成 `(.+?)` 并复跑合成正对照之后必须删这一条。",
-    u"f85aa21": u"R519 的产品笔标题中段带空格（`GitHub 项目主页`），`SUBJECT` 的 `(\S+?)` 跨不过 ⇒ "
-                u"带 K 却认不出轮次；已 push 不能改历史。登记理由：BACKLOG 616。"
-                u"退场：`SUBJECT` 中段改成 `(.+?)` 并复跑合成正对照之后必须删这一条。",
 }
 
 
@@ -103,13 +97,22 @@ SYNTH = u"\n".join([
     u"bbbb222\tR900 账半（第 899 轮 / Round 896 · 产品 0 文件，判据账）：一句话",
     u"cccc333\tRound 897: 旧形状的一笔（U-1…U-9 · 产品 3 文件，动效主线）",
     u"dddd444\tR901 代码半（第 900 轮 / Round 897 · 产品 2 文件，动效主线）：干净的一笔",
+    # R555 / BACKLOG 616 的第二条正对照：**中段带 ASCII 空格**的一笔必须照样认出轮次身份。
+    # 旧尺 `SUBJECT = …(?: (\S+?))?（…` 跨不过空格 ⇒ 这一行会掉进 unparsed，于是"带着 K 却认不出身份"
+    # 变成一把只会漏读的尺（历史上 3ebc7fc / f85aa21 就是这么被登记进豁免名单的）。
+    u"eeee555\tR903 产品半：标题里带 空格 的一笔（第 902 轮 / Round 899 · 产品 1 文件，动效主线）",
 ])
 
 
 class RoundClaimConsistency(unittest.TestCase):
     def test_positive_control_names_a_contradiction_and_an_unparsed_subject(self):
         by_round, unparsed, scanned = R.parse_rows(SYNTH)
-        self.assertEqual(4, scanned, u"四行带 TAB 的合成数据都要被扫到（少一行就是扫描器漏读）")
+        self.assertEqual(5, scanned, u"五行带 TAB 的合成数据都要被扫到（少一行就是扫描器漏读）")
+        self.assertIn(u"903", by_round,
+                      u"中段带 ASCII 空格的那一笔没被认出轮次 ⇒ `SUBJECT` 又瞎了（616 的修法退场条件）")
+        self.assertEqual([(u"eeee555", u"产品半：标题里带 空格 的一笔", 1)],
+                         [(x[0], x[1], x[2]) for x in by_round[u"903"]],
+                         u"半名或 K 读错了 ⇒ 这一格数的不是它声称的那个对象")
         bad = R.find_inconsistent(by_round)
         self.assertEqual([u"900"], [r[0] for r in bad],
                          u"R900 两笔给出 7 与 0 ⇒ 必须被点名（没点名就是尺坏了）")
