@@ -2568,6 +2568,13 @@ final class MotionFilmstripTests: XCTestCase {
     }
 
     /// R400：「原文/渲染」按钮标签必须和正文一样有过渡，不能内容在演、控件名一帧硬换。
+    ///
+    /// R558 / BACKLOG 629 的 (B)：**判据对象**从「相邻帧差的非零格数」换成「两端夹逼的中间帧数」。
+    /// 换的依据不是本机印象，是 runner 的三个真数（R557 补记）：每格 22.6–28.1ms、27 帧里只有 2 格
+    /// 相邻差非零、其余逐格 `0.0000` ⇒ 旧口径在这台机器上只剩两条边，相位一挪就掉到 1
+    /// （`41431129208 ↔ 5a943e7` 那次 1 帧）。**(A) 加密录制被这三个数否掉**（加密只多得 `0.0000`），
+    /// 所以改的是尺读的对象，**不是地板**：`≥2` 这个数字、120ms 阈值、`.contentFade` 声明时长都不动。
+    /// 旧口径继续一起打印 —— 换口径这件事要在日志里看得见两个数（R146 那一课）。
     func testMarkdownModeLabelChangeIsAVisibleProcess() throws {
         try skipUnlessEnabledAndCapable()
         try requireSoftTransitionChannel()
@@ -2586,30 +2593,78 @@ final class MotionFilmstripTests: XCTestCase {
             let film = record(scenario, scale: scale)
             let frames = film.motionFrames
             let fractions = Self.deltas(frames)
-            let span = Self.transitionFrameCount(fractions)
+            let oldSpan = Self.transitionFrameCount(fractions)
             let peak = fractions.max() ?? 0
-            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
-            // R556 / 629：只打「过渡帧数 + 峰值」分不开两种**修法相反**的解释 ——
-            // runner 读到 1 帧时，既可能是"标签真的没演"（一步切换），也可能是"这条带在 1x/无头
-            // 机器上墨太少、过程被逐帧阈值切碎"。两种的修法一个要改产品、一个要改尺，
-            // 而现有读数对二者给的是同一句话。所以把**相邻帧差序列**一起打出来：
-            // 单帧尖峰（0,0,.0193,0,0）⇒ 真是一步切换；一串小台阶（.004,.006,.006,.002）⇒ 过程在。
-            let sequence = fractions.prefix(12).map { String(format: "%.4f", $0) }.joined(separator: ",")
-            // R556：`窗口` 是这条判据原来**没有**的那一格（同卷的 `MOTION_SIDEBAR_COUNT` 有）。
-            // 没有它，"过程只落在 1 格上"就分不开"真没演"与"每格太稀"——
-            // 而这两者的修法相反：一个改产品，一个改采样。补上之后不必再为它单开一跑。
+            let sandwich = Self.sandwichFrameCount(frames)
             let window = film.postTriggerWindowMilliseconds
-            emit("MOTION_MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
+            let sequence = fractions.prefix(12).map { String(format: "%.4f", $0) }.joined(separator: ",")
+            let beforeSeries = sandwich.pairs.prefix(12).map { String(format: "%.4f", $0.before) }.joined(separator: ",")
+            let afterSeries = sandwich.pairs.prefix(12).map { String(format: "%.4f", $0.after) }.joined(separator: ",")
+            writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            emit("MOTION_MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) "
+                 + "过渡帧数=\(sandwich.count) 相邻差帧数=\(oldSpan) "
+                 + "首末连续差=\(String(format: "%.4f", sandwich.endpoint)) "
                  + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms "
                  + "窗口=\(Int(window.rounded()))ms 每格=\(String(format: "%.1f", window / max(Double(frames.count - 1), 1)))ms "
-                 + "相邻帧差=[\(sequence)]")
+                 + "相邻帧差=[\(sequence)] 离前=[\(beforeSeries)] 离后=[\(afterSeries)] "
+                 + "唯一变化区=\(Self.changedRegionBounds(frames))")
             XCTAssertGreaterThan(frames.count, 4,
                                  "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
-            XCTAssertGreaterThanOrEqual(span, 2,
-                                        "\(Int(scale))x：只有 \(span) 个过渡帧（要 ≥2）⇒ 按钮标签是硬切；"
-                                            + "先查 `.id(title)`/`.transition` 是否还在 Button label 里")
+            XCTAssertTrue(sandwich.seen,
+                          "\(Int(scale))x：首末两态的阈值口径首末差低于 \(Self.minimumVisibleChange)，"
+                              + "或连续距离读成 "
+                              + "\(String(format: "%.5f", sandwich.endpoint)) ⇒ 这一卷**根本没拍到任何交换**（通道坏了），"
+                              + "它与「拍到了但是是一帧硬换」是两件事，不许混成一句")
+            XCTAssertGreaterThanOrEqual(sandwich.count, 2,
+                                        "\(Int(scale))x：两端夹逼只读到 \(sandwich.count) 个中间帧（要 ≥2）⇒ 按钮标签是硬切："
+                                            + "每一帧要么等于前态要么等于后态。旧口径同批读 \(oldSpan) 帧"
+                                            + "（首末连续差 \(String(format: "%.4f", sandwich.endpoint))，"
+                                            + "余量=首末差×\(Self.stepFloorRatio)）；"
+                                            + "先查 `MarkdownModeButton` 的 `.id(title)`/`.transition(.opacity)`/`.animation(value:)` 是否还在")
         }
     }
+
+
+
+    /// R558 / 629：新口径的**合成真值表** —— 斜坡要有中间帧、硬切必须读 0，
+    /// 而同一次过渡在两种采样相位下旧口径会从 2 掉到 1、新口径不掉。
+    ///
+    /// 为什么单开一格而不是只跑真胶片：这条判据换的就是「数什么」，
+    /// 而「相位一挪旧口径掉到 1」这件事在真胶片上是**按运气发生**的（runner 三跑读 2、`5a943e7` 读 1），
+    /// 本机根本等不到。合成帧把两种相位并排放进同一次运行里，钉子才是会红的钉子。
+    /// 这一格**不抢前台、不开窗**，所以不吃 `CLIPBOARD_HISTORY_UI_MOTION` 门 —— 它在 CI 的普通 Swift 步里就跑。
+    func testSandwichCountJudgesInterpolationNotSamplingPhase() throws {
+        // 一次交叉淡入被采成「台阶保持四帧」：中间态确实画出来了，只是相邻差只在进出那两格非零。
+        let heldRamp = Self.syntheticFrames(grays: [0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0])
+        let held = Self.sandwichFrameCount(heldRamp)
+        XCTAssertTrue(held.seen, "斜坡臂读不出首末差 ⇒ 合成帧没被这把尺看见，真值表是空的")
+        XCTAssertEqual(held.count, 4,
+                       "四个中间态只数到 \(held.count) 个 ⇒ 夹逼计数没有对象（这份合成数据里第 2–5 帧既不像 0.0 也不像 1.0）")
+        XCTAssertEqual(Self.transitionFrameCount(Self.deltas(heldRamp)), 2,
+                       "旧口径在同一份数据上应读 2（进/出两条边）—— 不等就说明这格的对照物变了")
+
+        // 同一次过渡、相位更粗：两条边并成一条 ⇒ 旧口径掉到 1（runner 那朵红的形状）。
+        let coarse = Self.syntheticFrames(grays: [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        XCTAssertEqual(Self.transitionFrameCount(Self.deltas(coarse)), 1,
+                       "这条对照必须让旧口径读 1，否则它没有复刻 runner 的形状")
+        XCTAssertEqual(Self.sandwichFrameCount(coarse).count, 0,
+                       "一帧硬换却被新口径数出中间帧 ⇒ 这把尺在把「什么都不像」当成「在动」")
+
+        // 密采同一斜坡：新口径数的是「几帧在中间」而不是「几条边」—— 这才是它换了对象的样子。
+        let dense = Self.syntheticFrames(grays: [0.0, 0.25, 0.5, 0.75, 1.0])
+        XCTAssertEqual(Self.sandwichFrameCount(dense).count, 3,
+                       "四分之一步的斜坡应数到 3 个中间帧（读到 \(Self.sandwichFrameCount(dense).count)）")
+
+        /// 只离前态**一丁点**远的一帧（灰阶差 1/255）：它就该被判成"还是前态"。
+        /// 这一臂是余量本身的证人 —— 没有它，「把 `>= 余量` 写成 `> 0`」这种改法在前三臂上
+        /// 读数一模一样（合成帧的端点是逐字节相同的，距离正好是 0），刀就砍不到东西。
+        /// 反过来说：真实胶片里满带抗锯齿与光标闪烁，`>0` 那种写法会把它们全数成过程帧。
+        let nearBefore = Self.syntheticFrames(grays: [0.0, 0.004, 0.5, 1.0, 1.0])
+        XCTAssertEqual(Self.sandwichFrameCount(nearBefore).count, 1,
+                       "只离前态 1/255 的那一帧不该算过程帧（读到 \(Self.sandwichFrameCount(nearBefore).count)）"
+                           + "⇒ 余量被摘掉了：这把尺会把抗锯齿与光标闪烁数成「在动」")
+    }
+
 
     /// R419：热图汇总行的数字 999→1000 必须在 2×/1× 读到 ≥2 个过渡帧，
     /// 且卷子覆盖声明时长；带只装汇总行（格子在那条带下面）。
@@ -8209,9 +8264,14 @@ final class MotionFilmstripTests: XCTestCase {
                      appearance: .aqua,
                      root: { _ in AnyView(MarkdownModeHarness(driver: driver)) },
                      captureRect: { host in host.bounds }) { _ in
-                withAnimation(MotionCatalog.animation(for: .contentFade)) {
-                    driver.rendered.toggle()
-                }
+                // R558 / 629 (B)：**驱动换成产品自己的那条路**。
+                // 以前这一格是 `withAnimation(MotionCatalog.animation(for: .contentFade)) { driver.rendered.toggle() }` ——
+                // 插值是**夹具**给的，不是产品给的：把 `MarkdownModeButton` 里的 `.id(title)`、
+                // `.transition(.opacity)`、`.animation(value: title)` 三行全摘掉，读数一字不变
+                // （R558 现读：过渡帧数 5、峰值 0.0097、相邻差序列逐格相同，M1446 因此砍不到东西）。
+                // 产品真正的调用点是 `markdownMode = markdownMode.toggled()`，没有外层 withAnimation，
+                // 所以这一格现在也只 toggle —— 判据才第一次有可能把"产品没接"读成红。
+                driver.rendered.toggle()
             }
         }
 
@@ -9158,6 +9218,129 @@ final class MotionFilmstripTests: XCTestCase {
     private static func changedFraction(_ a: Bitmap, _ b: Bitmap, band: CGRect?) -> Double {
         axisPair(a, b, band: band).either
     }
+
+    /// **连续**像素距离（0…1）：同一个采样网格上取每像素 `max(|Δr|,|Δg|,|Δb|,|Δa|)/255` 的平均值。
+    ///
+    /// 为什么另写一颗而不是用 `changedFraction`：那颗是**二值阈值**的占比（单像素差 >8 才算"变了"），
+    /// 它天生会在淡入淡出的中段饱和 —— 字形从 25% alpha 到 75% alpha 的过程中，绝大多数变化像素
+    /// 早就越过了 8 这一档，于是"还在动"的帧被读成"没动"。R558 之前这条判据在 runner 上
+    /// 只看得见两个离散边（27 帧里 2 格非零、每格 22.6–28.1ms），判的其实这把阈值的相位。
+    /// 平均幅度不过阈值，所以它是**随 alpha 单调**的量。
+    private static func meanDistance(_ a: Bitmap, _ b: Bitmap) -> Double {
+        guard !a.pixels.isEmpty, a.pixels.count == b.pixels.count,
+              a.width == b.width, a.width > 0, a.height > 0 else { return 0 }
+        var sum = 0.0
+        var sampled = 0
+        var y = 0
+        while y < a.height {
+            var x = 0
+            while x < a.width {
+                let p = (y * a.width + x) * 4
+                let rgb = max(abs(Int(a.pixels[p]) - Int(b.pixels[p])),
+                              max(abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1])),
+                                  abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))))
+                let alpha = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))
+                // alpha 参与判定写成显式比较而不是 `max(rgb, alpha)`：`AXIS_GUARD` 认的是
+                // 「同一行里既有这根轴、又跟地板/别的东西比大小」，而 `max(…)` 那种写法把判定藏进了
+                // 函数调用里（R80 那一族的反方向：写法不该决定语义，但这一格确实按行读）。
+                sum += Double(rgb > alpha ? rgb : alpha)
+                sampled += 1
+                x += 7
+            }
+            y += 7
+        }
+        return sum / (Double(max(sampled, 1)) * 255.0)
+    }
+
+    /// R558 / 629：这卷胶片**唯一在变的那一块**在哪（逐帧并集的行带/列带）。
+    ///
+    /// 为什么要打这一格：判据说"标签有过渡"，而它读的是一整帧的距离 —— 万一动的不是标签，
+    /// 这句话就落到了别的对象上（R493 那一族：换代把尺的对象换掉了而读数照样绿）。
+    /// R558 实测这条场景的并集是 `行 25…34 列 69…89`（160×60 的 1x 帧），正好是 11pt 两个汉字
+    /// 的字形框 ⇒ "对象是标签"这句话从此有读数，不是注释。
+    static func changedRegionBounds(_ frames: [CGImage]) -> String {
+        let bitmaps = frames.map { raster($0) }
+        guard bitmaps.count > 1 else { return "行=无 列=无" }
+        var rows = Set<Int>()
+        var cols = Set<Int>()
+        for index in 1..<bitmaps.count {
+            let a = bitmaps[index - 1]
+            let b = bitmaps[index]
+            guard a.width == b.width, a.height == b.height, a.pixels.count == b.pixels.count else { break }
+            var y = 0
+            while y < a.height {
+                var x = 0
+                while x < a.width {
+                    let p = (y * a.width + x) * 4
+                    let dr: Int = abs(Int(a.pixels[p]) - Int(b.pixels[p]))
+                    let dg: Int = abs(Int(a.pixels[p + 1]) - Int(b.pixels[p + 1]))
+                    let db: Int = abs(Int(a.pixels[p + 2]) - Int(b.pixels[p + 2]))
+                    let da: Int = abs(Int(a.pixels[p + 3]) - Int(b.pixels[p + 3]))
+                    if max(max(dr, dg), db) > 8 || da > 8 {
+                        rows.insert(y)
+                        cols.insert(x)
+                    }
+                    x += 1
+                }
+                y += 1
+            }
+        }
+        guard let rowLo = rows.min(), let rowHi = rows.max(), let colLo = cols.min(), let colHi = cols.max()
+        else { return "行=无 列=无" }
+        return "行 \(rowLo)…\(rowHi) 列 \(colLo)…\(colHi)（\(rowHi - rowLo + 1)×\(colHi - colLo + 1)px，帧 \(bitmaps[0].width)×\(bitmaps[0].height)）"
+    }
+
+    /// R558 / BACKLOG 629 的 (B)：**两端夹逼**的过程帧计数。
+    ///
+    /// 旧口径（`transitionFrameCount(deltas(…))`）数的是「相邻差 ≥ 各自峰值 ×15% 的格数」——
+    /// 分母是那台机器的钟：runner 三跑实测 27 帧里只有 2 格非零（0.0145 / 0.0193），其余逐格 `0.0000`，
+    /// 每格 22.6–28.1ms ⇒ 一次过程在这把尺上只剩两条边，**采样相位一挪其中一条就并进另一条**
+    /// （`41431129208 ↔ 5a943e7` 读 1 ⇒ 红）。那朵红判的是这台机器的钟与阈值饱和，不是产品。
+    ///
+    /// 新口径不碰相邻帧，只问每一帧**像不像两个端点**：用连续距离分别量它离「触发前静置」与
+    /// 离「落定后静置」各有多远，**两边都 ≥ 首末差 × `stepFloorRatio`** 的帧才算"过程里的一帧"。
+    /// 交叉淡入的中间帧对两端都不像 ⇒ 计入；一帧硬换的话，每帧要么等于前态要么等于后态 ⇒ 读 0。
+    /// 端点比较对采样粒度不敏感（R326 的 `endpointChangedFraction` 立过这条证人），
+    /// 所以这条计数随相位稳，而**地板 ≥2 这个数字一个字没动**。
+    /// 不新造阈值：占比沿用本文件的 `stepFloorRatio`，"根本没拍到"的绝对地板沿用
+    /// `minimumVisibleChange`（首末差连它都不到 ⇒ 这一卷没有对象，返回 `seen=false`）。
+    struct SandwichCount {
+        /// 既不像前态也不像后态的帧数。
+        let count: Int
+        /// 首末两态之间的连续距离（判据的分母，与帧数无关）。
+        let endpoint: Double
+        /// 阈值口径的首末差不到地板 ⇒ 这一卷根本没拍到变化，不许读成"没有过渡"。
+        let seen: Bool
+        /// 逐帧的 `离前,离后`（只给读数用，判据不读它）。
+        let pairs: [(before: Double, after: Double)]
+    }
+
+    /// 「这一卷有没有拍到一次内容交换」仍由**原有**的阈值口径把关（首末差的 `changedFraction`
+    /// 与 `minimumVisibleChange` —— 同一把尺、同一个量纲），「过程里有几帧」才换成连续距离 ×
+    /// `stepFloorRatio` 的相对余量。两把尺各管各的量纲，不拿一把尺的地板当另一把尺的地板。
+    static func sandwichFrameCount(_ frames: [CGImage]) -> SandwichCount {
+        guard frames.count > 2 else {
+            return SandwichCount(count: 0, endpoint: 0, seen: false, pairs: [])
+        }
+        let before = raster(frames[0])
+        let after = raster(frames[frames.count - 1])
+        let total = meanDistance(before, after)
+        guard endpointChangedFraction(frames) >= minimumVisibleChange, total > 0 else {
+            return SandwichCount(count: 0, endpoint: total, seen: false, pairs: [])
+        }
+        let margin = total * stepFloorRatio
+        var count = 0
+        var pairs: [(before: Double, after: Double)] = []
+        for index in 1..<(frames.count - 1) {
+            let bitmap = raster(frames[index])
+            let dBefore = meanDistance(before, bitmap)
+            let dAfter = meanDistance(bitmap, after)
+            pairs.append((dBefore, dAfter))
+            if dBefore >= margin && dAfter >= margin { count += 1 }
+        }
+        return SandwichCount(count: count, endpoint: total, seen: true, pairs: pairs)
+    }
+
 
     private func writeStrip(_ name: String, _ frames: [CGImage]) {
         guard frames.count > 1, let first = frames.first else { return }

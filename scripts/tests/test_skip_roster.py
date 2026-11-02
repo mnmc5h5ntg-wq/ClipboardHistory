@@ -34,6 +34,27 @@ HEADER = re.compile(r'^(test\w+) \(([\w.]+)\)')
 RESULT = re.compile(r'\.\.\. (ok|skipped|fail|expected failure|unexpected success|error)')
 SUMMARY = re.compile(r'^Ran (\d+) tests?', re.M)
 SKIPPED_SUMMARY = re.compile(r'OK \(skipped=(\d+)\)')
+# R558 / 634：结论行有**两种**形状。从前只认 `OK (…)` 那一种，于是内层红的时候
+# 这一格把「有红」读成「没有结论行」—— 现在两种都认，各自说各自的话。
+FAILED_SUMMARY = re.compile(r'^FAILED \(([^\n]*)\)', re.M)
+RED_NAMES = re.compile(r'^(?:FAIL|ERROR): (\S+)', re.M)
+
+
+def inner_summary_verdict(text):
+    u"""把内层那一卷的输出分成**三种**读数（R558 / BACKLOG 634 的形状）。
+
+    从前只有两种（「有 `OK (skipped=N)`」与「没有结论行」），于是「内层自己红了」这一种被并进第二类，
+    而它的正文还说"没跑完" —— 一个成因在红名册里记成两朵，还替那朵红做伪证。
+    返回值：`('no-summary', '')` / `('inner-red', 红名串)` / `('ok', 内层 skipped 数)`。
+    """
+    ran = SUMMARY.findall(text)
+    ok = SKIPPED_SUMMARY.search(text)
+    failed = FAILED_SUMMARY.search(text)
+    if not (ran and (ok or failed)):
+        return 'no-summary', u''
+    if failed:
+        return 'inner-red', u'、'.join(RED_NAMES.findall(text)) or u'未解析到'
+    return 'ok', ok.group(1)
 
 # discover 会把 scripts/tests 放进 sys.path，但 `python3 -m unittest scripts.tests.X` 这种点号形式不会 ——
 # 显式加一次，免得同一卷换一种调用方式就换一种身份（那正是 331 要避免的两种成因混成一个数）。
@@ -161,6 +182,37 @@ class TestReadingKeyHygiene(unittest.TestCase):
             os.unlink(path)
         self.assertEqual([1], hits, u"正对照没抓到已知违规 ⇒ 这一格判不了任何东西（341）")
 
+    def test_inner_summary_has_three_readings_not_two(self):
+        u"""R558 / BACKLOG 634：内层那一卷的读数必须有**三种**，而且「内层有红」不许落在「没结论行」里。
+
+        旧形状只有 `ran and skipped` 一格布尔：`SKIPPED_SUMMARY` 只认 `OK (skipped=N)`，
+        所以内层红了（汇总是 `FAILED (…)`）与内层压根没跑完（连 `Ran` 行都没有）
+        得到的是**同一句**「内层没有结论行」。这一格把三种形状并排放进去，
+        并把「旧形状确实分不清前两种」一起钉住 —— 否则下一轮有人把它合回去，读数还是绿的。
+        """
+        ok_text = u'Ran 5 tests\nOK (skipped=2)\n'
+        red_text = (u'Ran 5 tests\nFAILED (failures=1, skipped=2)\n\n'
+                    u'=====================================================================\n'
+                    u'FAIL: test_the_cell (tests.test_demo.DemoTests.test_the_cell)\n'
+                    u'---------------------------------------------------------------------\n')
+        missing_text = u'... 跑到这里就断了\n'
+
+        self.assertEqual(('ok', u'2'), inner_summary_verdict(ok_text),
+                         u'可对账那一格必须取到内层的跳过数')
+        state, detail = inner_summary_verdict(red_text)
+        self.assertEqual('inner-red', state,
+                         u'内层红却被读成「没有结论行」就是 634 本体：这一格必须单独认出来')
+        self.assertIn(u'test_the_cell', detail,
+                      u'内层红名要原样带出来（%r）⇒ 不带名字就还是替那朵红做伪证' % detail)
+        self.assertEqual('no-summary', inner_summary_verdict(missing_text)[0],
+                         u'真缺席仍然叫缺席，不许与「内层有红」共用一句话')
+
+        # 旧形状为什么错：同一份「内层有红」的文本，在它眼里与「没结论行」不可分辨。
+        self.assertIsNone(SKIPPED_SUMMARY.search(red_text),
+                          u'旧的那颗尺在这份文本上取到 None —— 这正是借红的机制')
+        self.assertIsNotNone(SKIPPED_SUMMARY.search(ok_text),
+                             u'正对照：可对账那份必须取得到数，否则上面三条在比两个 None')
+
 
 class SkipRosterTests(unittest.TestCase):
 
@@ -181,8 +233,27 @@ class SkipRosterTests(unittest.TestCase):
         records = parse_verbose(text)
         ran = SUMMARY.findall(text)
         skipped = SKIPPED_SUMMARY.search(text)
-        self.assertTrue(ran and skipped,
-                        '内层没有结论行（Ran / OK (skipped=N)）⇒ 无从对账，不许把"没解析到"读成"没缺席"')
+        # R558 / BACKLOG 634：原来这一格只写 `assertTrue(ran and skipped, '内层没有结论行…')`。
+        # `SKIPPED_SUMMARY` 只认 `OK (…)` 那一种形状，所以内层只要有**任何**一条红，汇总行就是
+        # `FAILED (…)` ⇒ `skipped` 取到 None ⇒ 这一格以「内层没有结论行」红。那句话是假的：
+        # 结论行在，只是不是 OK。后果有两层 —— ①同一个成因在红名册里记成两朵（runner 三跑实测：
+        # sources-cell 那一族 + 这一格，本机 R553/R554/R556 那三次「flake」标签也是同一件事）；
+        # ②它替真正的那朵红做伪证，读起来像"探针没跑完"。现在拆成三种读数（`inner_summary_verdict`），
+        # 真缺席 ⇒ 具名出口；汇总是 FAILED ⇒ 仍然红，但内层的红名必须原样带出来。
+        state, detail = inner_summary_verdict(text)
+        if state == 'no-summary':
+            self.skipTest('SKIP_ROSTER_INNER_NO_SUMMARY=1 内层连汇总行都没有（键=%s 类=%s）'
+                          '⇒ 无从对账。这是**缺席**，要具名，不许读成"没缺席"，更不许读成"通过"。'
+                          % (key, klass))
+            return
+        if state == 'inner-red':
+            # 不许把 `skipped=` 原样印进消息（R292 / 341：台账生成器拿未锚定的 `skipped=(\d+)`
+            # 取电池的结论行，而这一行印在它前面 ⇒ 借到的是内层那一卷的数）。
+            excerpt = FAILED_SUMMARY.search(text).group(0).replace('skipped=', u'跳过了=')
+            self.fail('内层那一卷自己是红的 ⇒ 这一格没有可对账的对象，红在内层不在这里。'
+                      '汇总行「%s」；内层红名=%s（键=%s 类=%s）。'
+                      '这一句从前写成「内层没有结论行」，那是把被观察者的红借成观察者的缺席（634）。'
+                      % (excerpt, detail, key, klass))
         actual = sorted(n for n, v in records.items() if v == 'skipped')
         # 恒等式闸门：解析到的 id 数必须等于内层汇总的 skipped 数（观察者那一格在嵌套里也 skip，算在里面）
         self.assertEqual(int(skipped.group(1)), len(actual),
