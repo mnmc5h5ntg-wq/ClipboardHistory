@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 收藏星判据按捕获倍率分开口径；受保护目录的读取改成"数出来的"（R555 / 第 554 轮 / Round 552 / U-2362…U-2370 · 产品 3 文件 + 判据 2 文件）
+
+`testQuickPickFavoriteStarIsAtLeastEightPointsTall` 原来把 2x 帧上量的 8.0pt 地板同时发给 1x 机器 ⇒ 本机绿、runner 连红四轮（light 7.0 / dark 6.0）。现在拆成两把尺：**跨度口径**（0.5pt 一格）判 8.0pt 不动、只在倍率 ≥1.5 上判，1x 上留 `QUICKPICK_STAR_SPAN_NOT_JUDGED` 具名读数；**整行口径**（一个 pt 行的全部像素行都落墨）两档同判 6.0pt = 8 − 首末各丢一行，倍率=1 时退化回跨度 ⇒ 没有哪一档被少判。刀 **M1435** 让两把尺同时红（5.5<8.0、5<6.0）。另新增 `ProtectedFileAccessLedger`（四格、只存路径哈希、有界、无全局归零）与 `ProtectedFileAccessTests` 4 条管线判据；`DetailView` 估高度在样本没读满时不再 `attributesOfItem` 探一次路径（旧值 2 次 → 新值 1 次，≥32KB 那一支仍 1 次作负向臂）。刀 M1436/M1437/M1438 CAUGHT。帧 354 `CHANGED=0`；全量 1396/55/0（756.9s）；build 0 告警；换装 `INSTALL_SIGNATURE=local`、433=433；电池 695/5。
+
 ### 固定签名身份生效：连续两轮安装签名不变（R554 / 第 553 轮 / Round 551 / U-2358…U-2361 · Swift 0 文件）
 
 用户授权后执行 `security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db`（只写登录钥匙串）⇒ `find-identity -v` 从 0 变 1。`make bundle` 现读 `SIGNATURE_KIND=local`、`flags=0x0(none)`、`Authority=ClipboardHistory Local Signing`；连装两轮 `INSTALL_SIGNATURE=local`、`SHA_MATCH=1`、条目 433=433。机理：改一字节重签后 CDHash 变（3a02a52d→6ffd48b7）而 DR 不变（`certificate root = H"5f6c0955…"`）⇒ TCC 授权第一次有可能跨轮活下来。剩人工一格：授权一次后下一轮不该再弹（BACKLOG 633）。帧 354 不动；全量不重跑（Swift 0 文件）；电池 695/5。
