@@ -3168,22 +3168,23 @@ final class UICaptureTests: XCTestCase {
                                  "\(tag)：找不到「一行 26 格」的网格行 ⇒ 这张热图没画出来，判据没有对象")
             cellWidthSamples.sort()
             let cellW = cellWidthSamples.isEmpty ? 8 : cellWidthSamples[cellWidthSamples.count / 2]
-            // R559：这道判据今天**只在 2x 判**。不是偷懒，是量出来的：把本轮 2x 帧最近邻降到 1x
-            // 复算同一套实心判定（一次性探针，不入库 ⇒ 不能当证人），"一个方块里放得下的采样点"
-            // 从 2x 的 36 掉到 1x 的 9（采样步长 2、方块 8px 减实心边 3px 只剩 3 个位置），
-            // 于是 `minHits=8` 会把图例五档读到只剩 2 档 ⇒ runner 上会报「缺三种」的**假红**。
-            // 具名出口与 `SETTINGS_HELPER_FONT_NOT_RUN=scale-too-low` 同一族：读数照打，像素断言不判。
-            // 要在 1x 上也判，得拿真 1x 帧把两道 `minHits` 改成按几何派生（`((边长−实心边)/2+1)²` 的一半），
-            // 而不是拿降采样代理去猜参数 —— 这一格留给 R560 ⓪。
             let scale = fixture.size.width > 0 ? Double(w) / fixture.size.width : 0
-            if scale < 1.5 {
-                emit("HEAT_LEGEND_NOT_RUN=scale-too-low \(tag) 倍率=\(String(format: "%.1f", scale))x "
-                     + "格宽=\(cellW)px 实心判定 格\(max(4, cellW * 3 / 5))px/图例\(max(3, cellW / 4))px "
-                     + "⇒ 1x 上一格只剩 ~9 个采样点，绝对命中地板分不出方块与噪声，不判产品")
+            // R561：两道命中地板从**绝对常数**改成**几何派生**（`SolidRuler`，真值表在
+            // `testLegendSolidRulerFloorsAreDerivedFromGeometry`）。
+            // 为什么非改不可：R559 的降采样探针量到"一个方块里放得下的采样点"从 2x 的 36 掉到 1x 的 9，
+            // 而地板当时写死 8 ⇒ 1x 上五档只读到两档 ⇒ runner 会报「缺三种」的**假红**；
+            // R560 的 runner 读数证实它走的是 `scale-too-low` 具名出口（没报假红，但**也没判**）。
+            // 现在不拿倍率当门，只拿"几何上分不出方块与噪声"当门 ⇒ 1x 第一次有判据。
+            // ⚠ 本机拍不出真 1x 帧 ⇒ "1x 判到了"这句话仍要 runner 真数签收（R562 ⓪）。
+            let ruler = Self.SolidRuler(cellW: cellW)
+            if !ruler.resolvable {
+                emit("HEAT_LEGEND_NOT_RUN=solid-unresolved \(tag) 倍率=\(String(format: "%.1f", scale))x "
+                     + "格宽=\(cellW)px 实心判定 格\(ruler.cellSolid)px/图例\(ruler.swatchSolid)px "
+                     + "每图例方块采样点=\(ruler.legendPositions) ⇒ 门限：<4 个采样点就分不出方块与噪声，不判产品")
                 continue
             }
-            let cellSolid = max(4, cellW * 3 / 5)
-            let swatchSolid = max(3, cellW / 4)
+            let cellSolid = ruler.cellSolid
+            let swatchSolid = ruler.swatchSolid
             func solidColors(from y0: Int, to y1: Int, side: Int, minHits: Int) -> [(triple: (Int, Int, Int), hits: Int)] {
                 var counts: [String: (t: (Int, Int, Int), n: Int)] = [:]
                 for y in stride(from: y0, to: y1, by: 2) {
@@ -3205,10 +3206,10 @@ final class UICaptureTests: XCTestCase {
                 return counts.values.filter { $0.n >= minHits }.map { ($0.t, $0.n) }
                     .sorted { $0.1 > $1.1 }
             }
-            let cellColors = solidColors(from: 0, to: gridBottom + 1, side: cellSolid, minHits: 30)
+            let cellColors = solidColors(from: 0, to: gridBottom + 1, side: cellSolid, minHits: ruler.cellFloor)
             XCTAssertGreaterThanOrEqual(cellColors.count, 4,
                 "\(tag)：网格区只数到 \(cellColors.count) 种实心填充色 ⇒ 这张图没画满，包含判断没有对象（不许读成通过）")
-            let legendColors = solidColors(from: gridBottom + 1, to: h, side: swatchSolid, minHits: 8)
+            let legendColors = solidColors(from: gridBottom + 1, to: h, side: swatchSolid, minHits: ruler.legendFloor)
             var missing: [String] = []
             for (t, _) in cellColors where !legendColors.contains(where: { near($0.triple, t, 6) }) {
                 missing.append("(\(t.0),\(t.1),\(t.2))")
@@ -3216,10 +3217,113 @@ final class UICaptureTests: XCTestCase {
             emit("HEAT_LEGEND_COVERAGE \(tag) 格色=\(cellColors.count) 图例色=\(legendColors.count) "
                  + "缺=[\(missing.joined(separator: " "))] 格宽=\(cellW)px 倍率=\(String(format: "%.1f", scale))x "
                  + "网格下缘 y=\(gridBottom) "
-                 + "实心判定 格\(cellSolid)px/图例\(swatchSolid)px")
+                 + "实心判定 格\(cellSolid)px/图例\(swatchSolid)px "
+                 + "地板 格\(ruler.cellFloor)/图例\(ruler.legendFloor) 每方块采样点 格\(ruler.cellPositions)/图例\(ruler.legendPositions)")
             XCTAssertEqual([], missing,
                 "\(tag)：这些网格用过的颜色在图例带里找不到对应方块 ⇒ 图例没覆盖全部档位（缺 \(missing.count) 种：\(missing.joined(separator: " "))）")
         }
+    }
+
+    /// 图例那把尺的**几何派生地板**（R561）。
+    ///
+    /// 为什么要有这个东西：`solidColors` 数的是"一个颜色能放下多少个实心采样点"，而采样点个数
+    /// 由**方块边长**决定 —— 2x 的图例方块 16px 能放 36 个点、1x 的 8px 只放 9 个。
+    /// 把地板写成绝对常数（R559 那版是 `30` / `8`）就等于把**本机倍率**当成普适事实：
+    /// 1x 上五档会被读到只剩两档 ⇒ 报「缺三种」的假红（R560 的 runner 读数证实它当时走的是具名出口）。
+    ///
+    /// 派生式：一个 `edge` 长的方块里，能放下 `side` 长实心方块的**左上角位置数**
+    /// = `((edge − side) / 2 + 1)²`（采样步长是 2）。取它的一半当地板 ——
+    /// 现读分布：2x 图例 `[31,29,27,27,27 | 3,2,2]` ⇒ 地板 18 分得开；
+    /// 1x 图例 `[9,9,7,7,6 | 1]` ⇒ 地板 4 分得开。
+    struct SolidRuler {
+        let cellW: Int
+        /// 格子内切实心方块的边长（文字笔画放不下这个尺寸 ⇒ 标签不会被误当成档位）。
+        var cellSolid: Int { max(4, cellW * 3 / 5) }
+        /// 图例方块内切实心方块的边长（图例方块比格子小，取更松的一档）。
+        var swatchSolid: Int { max(3, cellW / 4) }
+        /// 图例方块本身的边长：产品里方块 = `cell − 3` pt，格子 = `cell` pt ⇒ 8/11。
+        var swatchEdge: Int { cellW * 8 / 11 }
+        static func positions(edge: Int, side: Int) -> Int {
+            let n = max(0, (edge - side) / 2 + 1)
+            return n * n
+        }
+        var cellPositions: Int { Self.positions(edge: cellW, side: cellSolid) }
+        var legendPositions: Int { Self.positions(edge: swatchEdge, side: swatchSolid) }
+        var cellFloor: Int { max(2, cellPositions / 2) }
+        var legendFloor: Int { max(2, legendPositions / 2) }
+        /// 一个方块里连 4 个采样点都放不下 ⇒ 这把尺在这个倍率上**分不出方块与噪声**，
+        /// 只能具名不判。这是"没有对象"，不是"倍率小"：1x（cellW=11）落在 9 个点上，**判得到**。
+        var resolvable: Bool { legendPositions >= 4 }
+    }
+
+    /// R561：**几何派生的真值表** —— 这条不吃 `CLIPBOARD_HISTORY_UI_SHOTS` 门，
+    /// 所以 CI 的普通 Swift 步每轮都跑（本机拍不出真 1x 帧，但派生式不需要帧）。
+    ///
+    /// 三臂各有分工，缺一条就会有一种坏法绿着过去：
+    /// ① cellW=22（本机 2x 实测格宽）钉"新地板与 R559 那版绝对值等价"（18/12 vs 旧的 8/30 ——
+    ///    分得开同一批实测分布，不许因为换了派生式就把 2x 的判定变松）；
+    /// ② cellW=11（runner 的 1x）钉"这一档现在**判得到**"，并把 R559 那台机器的实测分布
+    ///    （五档 6–9、噪声 1）与地板 4 摆在一起 ⇒ 换掉绝对常数之后 1x 不再只剩两档；
+    /// ③ cellW=6 钉"分辨不出时必须 `resolvable=false`" —— 这一臂是**门的证人**：
+    ///    把门写成恒真，这一臂立刻红（M1458）。
+    /// 末臂再钉单调性：地板必须随格宽**增**，写成任何常数都会在这里红。
+    func testLegendSolidRulerFloorsAreDerivedFromGeometry() throws {
+        let at2x = SolidRuler(cellW: 22)
+        XCTAssertEqual(at2x.cellSolid, 13)
+        XCTAssertEqual(at2x.swatchSolid, 5)
+        XCTAssertEqual(at2x.swatchEdge, 16)
+        XCTAssertEqual(at2x.cellPositions, 25)
+        XCTAssertEqual(at2x.legendPositions, 36)
+        XCTAssertEqual(at2x.cellFloor, 12,
+                       "2x 的网格地板换成 \(at2x.cellFloor) ⇒ 与 R559 那版绝对值 30 不同一档；"
+                           + "实测五档命中 397–1060、噪声 45–80，12 与 30 分的是同一批数 ⇒ 允许，"
+                           + "但**换派生式不许把 2x 的判定变严或变松**，这一格就是钉这个的")
+        XCTAssertEqual(at2x.legendFloor, 18,
+                       "2x 的图例地板 18 是照实测分布 `[31,29,27,27,27 | 3,2,2]` 定的：五档全过、噪声全挡")
+        XCTAssertTrue(at2x.resolvable)
+
+        let at1x = SolidRuler(cellW: 11)
+        XCTAssertEqual(at1x.cellSolid, 6)
+        XCTAssertEqual(at1x.swatchSolid, 3)
+        XCTAssertEqual(at1x.swatchEdge, 8)
+        XCTAssertEqual(at1x.legendPositions, 9)
+        XCTAssertEqual(at1x.legendFloor, 4,
+                       "1x 的地板必须是几何派生的 4，不是绝对常数 8 —— R559 探针实测 1x 图例命中 "
+                           + "`[9,9,7,7,6 | 1]`：地板 8 只读到 2 档（假红），地板 4 读到 5 档")
+        XCTAssertTrue(at1x.resolvable,
+                      "1x（cellW=11）必须判得到 ⇒ 这是本轮改派生式的**目的**；它若为 false，"
+                          + "1x 就还走具名出口，这一格要红而不是安静通过")
+
+        let tiny = SolidRuler(cellW: 6)
+        XCTAssertFalse(tiny.resolvable,
+                       "cellW=6 时一个图例方块只放得下 \(tiny.legendPositions) 个采样点 ⇒ 分不出方块与噪声，"
+                           + "必须走具名不判。把 `resolvable` 写成恒真，这一臂就红了（M1458）")
+        // 单调性：格宽翻倍，地板不许变小（写成常数就会在这里红 —— 常数不随 cellW 动）。
+        XCTAssertGreaterThan(SolidRuler(cellW: 44).legendFloor, at2x.legendFloor)
+        XCTAssertGreaterThan(at2x.legendFloor, at1x.legendFloor)
+        // 契约钉子：像素判据必须**用这把尺**，不许有人把地板换回绝对常数。
+        // 区域限定在那条判据自己的函数体（R53/R55 那一族：扫自身源码的守卫会先命中自己写的字面量，
+        // 于是"把被守卫的那行删掉"仍能在守卫自己的消息文本里读到它）。
+        let src = Self.codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8))
+        let lines = src.components(separatedBy: "\n")
+        let declaration = "func testHeatmapLegendCoversEveryCellColor"
+        guard let start = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix(declaration)
+        }) else {
+            return XCTFail("区域取不到：\(declaration) ⇒ 守卫找不到被守卫的东西时必须红，不许空跑给绿")
+        }
+        var end = lines.count
+        var k = start + 1
+        while k < lines.count {
+            if lines[k] == "    }" { end = k; break }
+            k += 1
+        }
+        let body = lines[start..<end].joined(separator: "\n")
+        XCTAssertGreaterThan(body.count, 400,
+                             "区域只切出 \(body.count) 个字符 ⇒ 判据本体没被切进来，下面那句等于没判")
+        XCTAssertTrue(body.contains("SolidRuler("),
+                      "像素判据里没有 `SolidRuler(` ⇒ 地板被换回了写死的常数；"
+                          + "那样 1x 又会回到「要么假红、要么整条不判」，而这正是本轮要修掉的东西")
     }
 
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
