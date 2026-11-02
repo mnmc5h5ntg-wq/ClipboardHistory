@@ -510,9 +510,21 @@ enum MarkdownPresentation {
 
     /// 项目符/编号的字号跟所属块一致（标题里的编号不该突然缩小）。
     private static func markerFont(for block: MarkdownBlock) -> NSFont {
-        font(for: FontPlan(size: size(for: block), weight: blockWeight(for: block),
-                           isItalic: false, isMonospaced: false))
+        let base = font(for: FontPlan(size: size(for: block), weight: blockWeight(for: block),
+                                      isItalic: false, isMonospaced: false))
+        // R560：**只有任务勾选标记**换到一份"两个字形都有"的具体字体。
+        // `☑`(U+2611) 在系统字体里有字形，`☐`(U+2610) 没有 ⇒ AppKit 只给后者换到 Apple Symbols，
+        // 于是同一张清单里两行的框子实测差 2.5pt（勾选 10.50pt 见 `.SFNS-Regular`、未勾选 8.00pt 见
+        // `AppleSymbols`，字体探针现读）。钉到 Apple Symbols 之后两者度量相同（10.79×12.00 两份都是它）。
+        // 必须钉在**这一个函数**里：它既是渲染用的字体，也是 `hangingIndent` 量制表位用的字体 ——
+        // 两处分开就会"画的字宽"与"让出来的位置"对不上（R488 那一族）。
+        // 项目符 `⦁  ▪` 与编号那条路一字不动（R549 是已定档的面）。
+        guard case let .unorderedItem(_, task) = block.kind, task != nil else { return base }
+        return NSFont(name: taskMarkerFontName, size: base.pointSize) ?? base
     }
+
+    /// 承载任务勾选框的字体：现读 `☑`/`☐` 在 13pt 下都是 10.79×12.00，且由同一份 `AppleSymbols` 画。
+    static let taskMarkerFontName = "Apple Symbols"
 
     private static func appendRuns(_ runs: [MarkdownInline], to result: NSMutableAttributedString,
                                    block: MarkdownBlock, dimmed: Bool = false) {

@@ -8425,6 +8425,108 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R560：**同一个勾选控件的两个态，框子必须是同一大小** —— 两行任务项的标记墨 bbox 宽高差 ≤1px。
+    ///
+    /// 缺陷是看图看出来的、成因是探针量出来的：`taskGlyph` 返回 `☑`(U+2611)/`☐`(U+2610) 两个字符，
+    /// 两者都请求同一个 `markerFont`（系统字体），但系统字体里**只有 `☑` 有字形** ⇒ AppKit 给 `☐`
+    /// 换到 AppleSymbols（字体探针现读：`☑`→`.SFNS-Regular` 11.71×16.00、`☐`→`AppleSymbols` 10.79×16.00）。
+    /// 帧上实测两态：勾选 21×22px（10.50×11.00pt）、未勾选 16×16px（8.00×8.00pt）——
+    /// **同一张清单里同一个控件差 2.5pt**，而正文左沿都是 x=73px ⇒ 文字对齐、框子不对齐。
+    ///
+    /// 判据只读像素、不读字体名（字体名是成因，不是验收物）：
+    /// ① 两行带子由整行墨找到（与 `testCheckedTasksDimTheirText` 同一条找法 ⇒ 同一台机器上
+    ///    一条判得到、另一条不会瞎）；② 每行在**标记列**（x 16…36pt）里取墨 bbox；
+    /// ③ 宽高差各 ≤1px（2x 上就是 ≤0.5pt）。
+    /// 具名出口与 R450 同族：runner 的详情帧可能是平的空帧 ⇒ `TASK_BOX_NOT_RUN=runner-detail-frame-plain`。
+    /// ⚠ 阈值全按 `scale` 派生，不写死像素数（R559 那一课：绝对像素地板在 1x 上会把"没有对象"读成红）。
+    func testTaskCheckboxStatesShareOneGlyphSize() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r560-task-box-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-tasks" }) else {
+                return XCTFail("\(tag)：找不到 `detail-tasks` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-tasks-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：`detail-tasks` 读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let bytesPerRow = rep.bytesPerRow
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * bytesPerRow + x * 4
+                return 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+            }
+            let isInk: (Double) -> Bool = appearance == .darkAqua ? { $0 >= 70 } : { $0 <= 210 }
+            func inkAt(_ x: Int, _ y: Int) -> Bool { isInk(luma(x, y)) }
+
+            // ① 两行任务项：整行（x 20…400pt）里有墨的带子，取最后两条
+            let bandX0 = Int((20.0 * scale).rounded())
+            let bandX1 = Int((400.0 * scale).rounded())
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in Int((60.0 * scale))..<rep.pixelsHigh {
+                let has = (bandX0..<bandX1).contains { inkAt($0, y) }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, rep.pixelsHigh - 1)) }
+            let rows = Array(bands.suffix(2))
+            guard rows.count == 2 else {
+                emit("TASK_BOX_NOT_RUN=runner-detail-frame-plain \(tag) 带=\(bands.count)"
+                     + " 倍率=\(String(format: "%.1f", scale))x ⇒ 找不到两行任务项，判据没有对象")
+                continue
+            }
+
+            // ② 每行在标记列里取墨 bbox
+            let markerX0 = Int((16.0 * scale).rounded())
+            let markerX1 = Int((36.0 * scale).rounded())
+            func box(_ band: (top: Int, bottom: Int)) -> (w: Int, h: Int, ink: Int) {
+                var xs: [Int] = []
+                var ys: [Int] = []
+                for y in band.top...band.bottom {
+                    for x in markerX0..<markerX1 where inkAt(x, y) { xs.append(x); ys.append(y) }
+                }
+                guard let minX = xs.min(), let maxX = xs.max(),
+                      let minY = ys.min(), let maxY = ys.max() else { return (0, 0, 0) }
+                return (maxX - minX + 1, maxY - minY + 1, xs.count)
+            }
+            let checked = box(rows[0])
+            let unchecked = box(rows[1])
+            // ③ 对象检查：框子必须真的画出来。墨的下界按 `scale` 派生 —— 一个边长 s 的空方框
+            //    描边周长约 4s，这里只要求"至少像一条描边"（≥ 8pt 周长），不写死像素数。
+            let inkFloor = Int((8.0 * scale).rounded())
+            guard checked.ink >= inkFloor, unchecked.ink >= inkFloor,
+                  checked.w > 0, unchecked.w > 0 else {
+                XCTFail("\(tag)：标记列读不出两个框子（勾选 墨=\(checked.ink) 宽=\(checked.w)、"
+                        + "未勾选 墨=\(unchecked.ink) 宽=\(unchecked.w)，下界 \(inkFloor)）"
+                        + " ⇒ 两行都在、框子却没画 ⇒ 这是产品缺陷，不许读成通道限制")
+                continue
+            }
+            let dw = abs(checked.w - unchecked.w)
+            let dh = abs(checked.h - unchecked.h)
+            emit("TASK_BOX_SIZE \(tag) 勾选=\(checked.w)x\(checked.h)px"
+                 + "(\(String(format: "%.2f", Double(checked.w) / scale))×\(String(format: "%.2f", Double(checked.h) / scale))pt) "
+                 + "未勾选=\(unchecked.w)x\(unchecked.h)px"
+                 + "(\(String(format: "%.2f", Double(unchecked.w) / scale))×\(String(format: "%.2f", Double(unchecked.h) / scale))pt) "
+                 + "宽差=\(dw)px 高差=\(dh)px 墨=\(checked.ink)/\(unchecked.ink) "
+                 + "倍率=\(String(format: "%.1f", scale))x 标记列 x \(markerX0)..\(markerX1)")
+            XCTAssertLessThanOrEqual(dw, 1,
+                "\(tag)：已勾选与未勾选的框子宽差 \(dw)px（\(Double(dw) / scale)pt）—— 勾选 \(checked.w)px、未勾选 \(unchecked.w)px "
+                    + "⇒ 两个态不是同一份字体画的（`☑` 在系统字体里、`☐` 被换到别的字体），"
+                    + "同一张清单里同一个控件会突然变大/变小")
+            XCTAssertLessThanOrEqual(dh, 1,
+                "\(tag)：两个态的框子高差 \(dh)px ⇒ 同上（描边粗细与字形高度都来自那份替代字体）")
+        }
+    }
+
     /// R451：列表项折行后，**续行必须回到首行正文的同一条竖轴**。
     ///
     /// 缺陷形状：`headIndent` 是 16，但首行正文靠**默认制表位** 28 —— 首行正文 28、续行 16，
