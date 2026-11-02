@@ -72,26 +72,28 @@
 改完复跑：`swift build --build-tests` 0 告警、判据仍绿 `图例色=5 缺=[] 倍率=2.0x`（两档外观）。
 ⇒ 图例覆盖这件事**今天没有 runner 读数**，R560 若要在 1x 判：真 1x 帧 + `minHits` 改几何派生。
 
-## 待读（截断的链要重跑）
-- ~~四把刀~~ **已到手**：M1450 / M1451 / M1452 / M1453 **全 CAUGHT、RESTORE_CLEAN=yes**（`/tmp/r559-knife-*.log`）。
-  - M1450（图例退回四块）：`light 格色=8 图例色=4 缺=[(243,243,243)]`、`dark 格色=9 图例色=4 缺=[(41,41,41)]` ⇒ 与"旧值"逐字相同（这一把同时复现了缺陷形状）。
-  - M1451（数量不动、颜色换成 `accentColor.opacity(VisualHeat.empty)`）：`图例色=5 缺=[(243,243,243)]` ⇒ 判据看的是**颜色身份**，不是方块个数。
-  - M1452（摘 `.id(title)`）：`钉子=grep 钉住=2/3`、红名 `缺 1 根：.id(title)`。
-  - M1453（删掉具名不判那行 emit）：红在交叉核对那句。
-- ~~兄弟判据~~ **已到手**（判据卷整卷读数，`/tmp/r559-capture.log`）：
-  - `HEAT_LEGEND_COVERAGE light 格色=8 图例色=5 缺=[] 格宽=22px 网格下缘 y=333 实心判定 格13px/图例5px`；dark `格色=9 图例色=5 缺=[]`（同格宽）。
-  - `HEATMAP_TODAY light/dark 差异像素=60 bbox=1108,408-1115,415 倍率=2.0x 内容墨=47615/33627` ⇒ **与 ⓪ 列的旧值逐字未变**。
-  - `HEATMAP_SUMMARY_CHANGE light 变化=3872 前墨=3696 后墨=3780 前右沿=481 后右沿=494`、`dark 变化=4165 前墨=4151 后墨=4239 前右沿=481 后右沿=494` ⇒ **未变**（右沿 494 未动 = 宽度中性的第二条独立证据）。
-  - `CAPTION_INK … 图例「少 / 多」 light ratio=3.85 参照=3.75 比值=1.03 ink=10.2%`（旧 14.1%）、`dark ratio=6.06 参照=6.06 比值=1.00 ink=11.9%`（旧 15.4%）⇒ **只有 `ink=` 跳档，对比度与比值一字未动**；地板 `probeInkFraction=3%` 未动，余量 3.4×/4.0×。
-    成因（逐像素定位，不是猜）：探针框 `x12..37pt / y176..190pt`（=px 24..74 / 352..380）里，旧帧有 **46 个 (215,232,255)**（最浅那档蓝被挪走）、新帧同一位置 **49 个 (243,243,243)**（新补的零次档），页底 `(255,255,255)` 两边都 **1167 个** ⇒ 换进去的填充更接近页面 ⇒ 覆盖率降；`ratio` 读的是「少」/「多」两枚字（128,128,128 vs 255）所以不变。
-- ~~看图~~ **已到手**：两张帧按像素对切（旧 `/tmp/r558-frames2/…`、新 `/tmp/r559-frames/…`）：
-  light 与 dark **各自 1172 像素变化、bbox 完全相同** `x 70…157 / y 360…375`（2x）= `pt x35.0…78.5 / y180.0…187.5` ⇒ 只有图例那一行变了。
-  放大并排看图 `/tmp/r559-legend-oldvsnew.png`（上旧下新，3× 最近邻）：旧 `少 [淡蓝 蓝 中蓝 深蓝] 多`、新 `少 [灰 淡蓝 蓝 中蓝 深蓝] 多`；`多` 与后面那句「最忙的…」两行同一位置。
-- 判据卷 `UICaptureTests` 汇总行（整卷 Executed/failed/skipped）—— 链上仍在跑。
-- 帧基线 `compare` + `update`（heatmap-populated 两档必然变 ⇒ 与台账同一笔 update）。
-- 全量卷（有界 grep；顺带再看 skipped 57 这一格稳不稳，**不许修回 55**）。
-- 预检三读（`mutate_needle_precheck` / `hidden_arms` / `ARM_TOTAL`）⇒ **必须串行**。
-- 换装本机（`scripts/install_local.sh --yes --label R559`，撞名就 R559b）。
-- 台账 7 本 → 提交 → **再** `report_sources_cell.py --write` → 电池 → **一次性 push**。
-- ⓪ 那跑 `41485625452 ↔ 8115ab8`：**收口前复述仍是 in_progress（已等 1663s）** ⇒ 新口径 runner 读数 + 634 复核两格具名 NOT-RUN，挂进 R560 ⓪（`queue 共=10 queued=0 in_progress=1 concluded=9`）。
-
+## 收口时补：全部到手（本轮没有留 NOT-RUN 的自读格）
+- 判据卷 `UICaptureTests`：**218/4 skipped/0 失败（670.8s）**（R558 是 217/4/0 ⇒ +1 = 本轮那条图例判据）。
+- 帧：`FRAME_BASELINE_COMPARED=354 CHANGED=10 MISSING=0 ADDED=0`，十个名字 = `heatmap-populated`、
+  `heatmap-summary-before/after`、`settings-stats-populated`、`settings-stats-populated-no-today` × 两档外观 ⇒ **全是含热图的夹具**；
+  `update` 之后复跑 `CHANGED=0`。
+- 全量：**1402/57/0（699.0s）**，退出码 0 ⇒ skipped 57 连两跑稳定（只记现读，不动门）。
+- 预检三读（串行）：`NEEDLE_PRECHECK tables=353 covered=295 arms=757 bad=0`、
+  `ARM_TOTAL files=446 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=440 可判=1183 rot=0 抽不出=6 已声明表=6 处置=ok`。
+- 换装：`INSTALL_RESULT=ok / INSTALL_SHA_MATCH=1 / INSTALL_ENTRIES=433=433 / SMOKE_OK=1 / INSTALL_SIGNATURE=local flags=0x0`
+  （版本 1.4.8→1.4.8、PID→24131、备份 `before-R559`）。
+- 清账 **162/63/0**；streak 现读 `PRODUCT_STREAK ledger_round=558 streak=2 …`（⚠ `--streak-for 559` 读 1，
+  因为它按 subject 把本轮 A 笔归进 558 轮 ⇒ 口径差一仍挂 BACKLOG 412；账里用门派生的 2）。
+- **⓪ 那跑到手了**：`41485625452 ↔ 8115ab8` = **concluded success**（收口前复述，不是轮询）⇒
+  新口径 runner 首数 `过渡帧数=2 相邻差帧数=2 首末连续差=0.0048 峰值=0.0193 窗口=1860ms 每格=71.5ms`
+  ⇒ **判到 ≥2 但余量 0**，且每格比 R557 那三跑粗 2.5–3 倍 ⇒ 629 不写结案；
+  STEP[9] `SKIP_ROSTER … 内层Ran=696 名单外=无 名册未跳=无` ⇒ **634 被 runner 签掉**；
+  STEP[19] `MOTION_FLOOR_OK=4/5 MOTION_FLOOR_REDS=0` ⇒ 旧口径那朵红在含新尺的这一跑不见了；STEP[18] success ⇒ 622 无新值。
+- **电池四遍（本轮最重要的自伤记录）**：① 台账前 `Ran 696 / FAILED (failures=2, skipped=5)`
+  （sources 格未派生 + `test_skip_roster` 以 634 的 `inner-red` 形状红，正文带内层汇总与内层红名 ⇒ 634 第一次在真场景说话）；
+  ② 台账后第一遍**涨到** `failures=6, errors=1` ⇒ 多出来的四朵全是本轮写账自造的：
+  **七维表只写六行（漏「可复核性」）**、**CHANGELOG 写成 bullet 而不是 `### …（R559 / ` 标题行**、
+  **streak 抄了 `--streak-for` 的 1 而门派生是 2**、**那一格还没引用 `scripts/product_streak.py`**；
+  ③ 修完剩 streak 两格；④ **`Ran 696 / OK (skipped=5)` 退出码 0**。全程没放宽门、没加豁免、没改期望。
+  ⇒ 教训：**R558 刚为「基线也现读」记过一次，同一族在 streak 那一格又发生**（换个字段就忘了"派生值要带取数口"）。
+- 提交序列（一次性 push 之前全在本地）：⓪ `809b963` → A `3a3c9a9` → A2 `bad7788` → 台账 `73e91f4` → 更正 `2f26d4c` → 补记（本笔）。
