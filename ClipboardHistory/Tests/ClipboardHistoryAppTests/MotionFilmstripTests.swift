@@ -2589,8 +2589,20 @@ final class MotionFilmstripTests: XCTestCase {
             let span = Self.transitionFrameCount(fractions)
             let peak = fractions.max() ?? 0
             writeStrip("\(scenario.name)-\(Int(scale))x", frames)
+            // R556 / 629：只打「过渡帧数 + 峰值」分不开两种**修法相反**的解释 ——
+            // runner 读到 1 帧时，既可能是"标签真的没演"（一步切换），也可能是"这条带在 1x/无头
+            // 机器上墨太少、过程被逐帧阈值切碎"。两种的修法一个要改产品、一个要改尺，
+            // 而现有读数对二者给的是同一句话。所以把**相邻帧差序列**一起打出来：
+            // 单帧尖峰（0,0,.0193,0,0）⇒ 真是一步切换；一串小台阶（.004,.006,.006,.002）⇒ 过程在。
+            let sequence = fractions.prefix(12).map { String(format: "%.4f", $0) }.joined(separator: ",")
+            // R556：`窗口` 是这条判据原来**没有**的那一格（同卷的 `MOTION_SIDEBAR_COUNT` 有）。
+            // 没有它，"过程只落在 1 格上"就分不开"真没演"与"每格太稀"——
+            // 而这两者的修法相反：一个改产品，一个改采样。补上之后不必再为它单开一跑。
+            let window = film.postTriggerWindowMilliseconds
             emit("MOTION_MARKDOWN_MODE_FADE scale=\(Int(scale))x 帧数=\(frames.count) 过渡帧数=\(span) "
-                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms")
+                 + "峰值=\(String(format: "%.4f", peak)) 声明=\(Int(scenario.declaredDurationMilliseconds))ms "
+                 + "窗口=\(Int(window.rounded()))ms 每格=\(String(format: "%.1f", window / max(Double(frames.count - 1), 1)))ms "
+                 + "相邻帧差=[\(sequence)]")
             XCTAssertGreaterThan(frames.count, 4,
                                  "\(Int(scale))x：只抓到 \(frames.count) 帧 ⇒ 这一臂没有对照物")
             XCTAssertGreaterThanOrEqual(span, 2,

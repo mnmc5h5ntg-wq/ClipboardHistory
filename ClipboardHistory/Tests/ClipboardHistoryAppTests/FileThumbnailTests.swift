@@ -130,32 +130,64 @@ final class FileThumbnailTests: XCTestCase {
                        "条目已经不在了还写 = 给不存在的条目补数据")
     }
 
-    /// 端到端：`add` 一条图片文件后，缩略图应当在后台补上。
-    /// 这条测的是**接线** —— 只测真值表的话，"判据对但没人调用"照样能全绿。
-    func testAddAttachesThumbnailAsynchronously() throws {
+    /// 端到端（R556 把契约翻过来）：**采集那一步不许打开那个文件**，行真正显示时按需请求才补图。
+    /// 旧版这条断言的是"`add` 之后 3 秒内必须有缩略图" —— 那等于把"用户刚复制一条桌面图片，
+    /// App 立刻去开它一次"钉成契约，而这正是 BACKLOG 632 的弹窗根因之一。
+    /// 现在两半都判：`add` ⇒ 开 0 次；`requestThumbnail(for:)`（行 `.task` 走的那一步）⇒ 开 1 次并且真的写回。
+    func testAddDoesNotReadTheFileWhileRowDisplayRequestsIt() throws {
         let dir = try makeTempDirectory()
-        let url = try writePNG(in: dir, named: "端到端.png", width: 800, height: 600)
+        let url = try writePNG(in: dir, named: "row-demand.png", width: 800, height: 600)
         let (store, _) = makeStore()
+
         store.add(ClipboardIntake.Entry(
             content: .file(url), thumbnail: nil, sourceUTIs: ["public.file-url"]
         ), timestamp: Date(timeIntervalSince1970: 7), isUserInitiated: true)
+        let afterAdd = ProtectedFileAccessLedger.count(for: url)
+        XCTAssertEqual(afterAdd, 0,
+                       "复制这一步就去开那个图片文件 ⇒ 采集路径主动读受保护目录（632 的原形）")
+        XCTAssertNil(store.entries.first?.thumbnail, "采集就补了图 ⇒ 上面那句 0 是假数")
 
+        let entryID = try XCTUnwrap(store.entries.first?.id, "条目没进 store")
+        store.requestThumbnail(for: entryID)
         let deadline = Date().addingTimeInterval(3)
         while store.entries.first?.thumbnail == nil && Date() < deadline {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
-        XCTAssertNotNil(store.entries.first?.thumbnail,
-                        "3 秒内没补上缩略图：后台任务没排、或写回没回主线程")
+        let opens = ProtectedFileAccessLedger.count(.thumbnailSourceOpen, for: url)
+        XCTAssertEqual(opens, 1,
+                       "行显示按需请求却开了 \(opens) 次 ⇒ 需求路径是空的，缩略图永远补不上")
+        XCTAssertNotNil(store.entries.first?.thumbnail, "按需请求之后 3 秒内没补上缩略图")
     }
 
-    /// 启动回填必须存在并被调用（老历史里那些没有预览的条目靠它）。
-    func testStartupBackfillIsWired() throws {
+    /// 启动**不再全表回填**（R556 翻过来的契约，行为证人 + 接线证人各一半）。
+    /// 旧写法每次启动把历史里每一条"没有行内预览的图片文件"都开一遍；而读失败（没授权）时
+    /// `thumbnail` 仍是 nil ⇒ 下次启动**又全部重来** —— 这就是"已批准无数次还在弹"的重复形状。
+    func testStartupSweepIsGoneAndRowDemandIsWired() throws {
         let shell = codeOnly(try productSource(named: "Managers/ApplicationShell.swift"))
-        XCTAssertTrue(shell.contains("attachMissingFileThumbnails()"),
-                      "启动时不回填，老条目的行内预览会永远空着")
+        XCTAssertFalse(shell.contains("attachMissingFileThumbnails"),
+                       "启动又回到全表回填 ⇒ 每次开 N 个受保护目录里的文件")
         let store = codeOnly(try productSource(named: "Managers/HistoryStore.swift"))
-        XCTAssertTrue(store.contains("attachFileThumbnailIfNeeded(for: entry)"),
-                      "新复制的图片文件条目没接上补图")
+        XCTAssertFalse(store.contains("func attachMissingFileThumbnails"),
+                       "回填 API 还留着 ⇒ 只是暂时没人调，下一轮就会被接回去")
+        XCTAssertTrue(store.contains("func requestThumbnail(for entryID:"),
+                      "按需请求那一格没了 ⇒ 行内缩略图会永久缺失（视觉回归不是隐私修复）")
+        let rows = codeOnly(try productSource(named: "Views/HistorySidebarView.swift"))
+        XCTAssertTrue(rows.contains("requestThumbnail(for: entry.id)"),
+                      "行显示没触发按需请求 ⇒ 采集与启动都不读了，但也永远不读了")
+
+        // 行为那一半：装载三条没有缩略图的图片文件条目 ⇒ 一次文件都不许开。
+        let dir = try makeTempDirectory()
+        var urls: [URL] = []
+        var loaded: [ClipboardEntry] = []
+        for index in 0..<3 {
+            let url = try writePNG(in: dir, named: "sweep\(index).png", width: 40, height: 40)
+            urls.append(url)
+            loaded.append(fileEntry(url: url))
+        }
+        let (store2, _) = makeStore(entriesToLoad: loaded)
+        XCTAssertEqual(store2.entries.count, 3, "夹具没装进 store ⇒ 这一格没有对象")
+        let opens = urls.reduce(0) { $0 + ProtectedFileAccessLedger.count(for: $1) }
+        XCTAssertEqual(opens, 0, "装载历史就去开图片文件 ⇒ 启动那一格又变成 N 次受保护访问")
     }
 
     /// 行首视觉列必须"有缩略图就用图"。补上了缩略图但行里仍然画符号，用户看到的还是原缺陷。

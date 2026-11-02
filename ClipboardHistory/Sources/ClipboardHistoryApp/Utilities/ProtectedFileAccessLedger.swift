@@ -29,6 +29,10 @@ enum ProtectedFileAccessLedger {
         case previewTextSample
         case layoutTextSample
         case layoutFileSizeStat
+        /// R556 / 632 的第三格：行内缩略图 `CGImageSourceCreateWithURL` 打开图片文件。
+        /// 这一格是本轮才找到的触点 —— R553 那句"采集路径只记 URL"对 `ClipboardIntake` 成立，
+        /// 但条目一进 `HistoryStore` 就有人去开那个文件，而启动时还会把全表再开一遍。
+        case thumbnailSourceOpen
     }
 
     /// 一条事件：哪个文件的哪一格被碰了一次（文件只以哈希身份存在）。

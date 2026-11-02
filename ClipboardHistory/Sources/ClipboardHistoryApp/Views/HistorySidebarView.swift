@@ -130,6 +130,10 @@ struct HistorySidebarView: View {
             // R469：跨年的那几条时间行带年份。
             timeReference: newestTimestamp
         )
+        // R556 / BACKLOG 632：这一行**出现在列表里**才去磁盘补那张行内缩略图。
+        // `.task(id:)` 在行滚出列表时会被取消 ⇒ 看不见的那几条不开文件；启动时也不再全表扫
+        // （旧写法是 `attachMissingFileThumbnails()`，读失败就每次启动重来一遍）。
+        .task(id: entry.id) { historyStore.requestThumbnail(for: entry.id) }
     }
 
     private var header: some View {

@@ -30,6 +30,8 @@ enum FileThumbnailPolicy {
     /// 从磁盘上的图片文件解一张小缩略图。读不到 / 解不动 / 不是图片 ⇒ nil（行退回符号图标）。
     /// 必须在后台队列调用：这里会有真实的磁盘读与解码。
     static func thumbnail(for url: URL, maxPixel: Int = FileThumbnailPolicy.maxPixel) -> StoredImage? {
+        // R556 / 632：这一格以前**不在计数器上** —— 所以"启动到底开了几个文件"没人量得出。
+        ProtectedFileAccessLedger.note(.thumbnailSourceOpen, for: url)
         let source = CGImageSourceCreateWithURL(url as CFURL, nil)
             ?? CGImageSourceCreateWithURL(url.standardizedFileURL as CFURL, nil)
         guard let source else { return nil }

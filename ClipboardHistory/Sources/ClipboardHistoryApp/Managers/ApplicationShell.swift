@@ -73,9 +73,11 @@ final class ApplicationShell {
         // 启动后延迟扫描已有图片进行 OCR
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak historyStore] in
             historyStore?.scheduleOCRForExistingImages()
-            // 老历史里"复制过图片文件但没有行内预览"的条目，第一次启动就补上缩略图
-            // （同样是后台解码 + 主线程写回，见 `FileThumbnailPolicy`）。
-            historyStore?.attachMissingFileThumbnails()
+            // R556 / BACKLOG 632：这里**不再**全表回填缩略图。旧写法每次启动把历史里
+            // 每一条"没有行内预览的图片文件"都 `CGImageSourceCreateWithURL` 开一遍 ——
+            // 而读失败（没授权）时条目的 `thumbnail` 仍是 nil ⇒ 下次启动**又全表重来**，
+            // 这正是"已经批准无数次还在弹"的重复形状。补图改由行真正显示时按需请求
+            // （`HistorySidebarView.historyRow` 的 `.task` ⇒ `HistoryStore.requestThumbnail`）。
         }
         LifecycleDebugLogger.log("HistoryStore.startMonitoring scheduled from ApplicationShell.configure")
     }
