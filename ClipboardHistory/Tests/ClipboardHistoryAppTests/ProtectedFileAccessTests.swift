@@ -123,6 +123,55 @@ final class ProtectedFileAccessTests: XCTestCase {
             + "\(String(format: "%.1f", smallHeight))）⇒ 覆盖度那一段被改坏了，不是被省掉的")
     }
 
+    // MARK: - 5 R557：估高度的取样在同一次挂载里只取一次
+
+    /// 旧值（一次性探针现读）：展开一条文本 + 拖窗三次 = 同一份文件被开 **4** 次
+    /// （`recalculateTargetHeight()` 每来一次宽度变化就重新 `FileHandle` 一趟）。
+    /// 新值：同一份取样复用 ⇒ **1** 次；而**高度必须逐次相同**（省读不许改算式）。
+    func testHeightEstimateReusesOneSampleAcrossWidthChanges() throws {
+        let body = (0..<6).map { "第 \($0) 行 短文本\n" }.joined()
+        let url = try makeTextFixture(named: "memo.txt", content: body)
+        var sample: MultiFilePreviewLayout.TextSample? = nil
+        var heights: [CGFloat] = []
+        for width in [320.0, 360.0, 400.0, 440.0] {
+            heights.append(MultiFilePreviewLayout.preferredHeight(for: url,
+                                                                  availableWidth: width,
+                                                                  textSample: &sample))
+        }
+        let opens = ProtectedFileAccessLedger.count(.layoutTextSample, for: url)
+        attach(ProtectedFileAccessLedger.reading("PROTECTED_READS_AT_LAYOUT_MEMO", for: url)
+               + " 高度=" + heights.map { String(format: "%.1f", $0) }.joined(separator: "/"),
+               named: "PROTECTED_READS_AT_LAYOUT_MEMO")
+        XCTAssertEqual(opens, 1,
+                       "四次估高度开了 \(opens) 次同一份文件 ⇒ 取样没被复用（旧形状是 4 次）")
+        // 等价证人：同一份文件、同一批宽度，走"每次重开"的旧入口得到的必须逐个相同
+        // —— 省读只许省次数，不许改算式（改了就是视觉改动，得走帧基线那一关）。
+        let widths = [320.0, 360.0, 400.0, 440.0]
+        let uncached = widths.map { MultiFilePreviewLayout.preferredHeight(for: url, availableWidth: $0) }
+        XCTAssertEqual(heights, uncached,
+                       "复用取样算出的高度与每次重开的不一致：复用=\\(heights) 重开=\\(uncached)"
+                       + " ⇒ 省读顺带改了算式，这是视觉改动不是隐私改动")
+    }
+
+    /// 负向臂：换一份文件（或同一行被别的 URL 顶替）时**不许**复用上一份取样 ——
+    /// `ForEach(id: \.offset)` 会让视图的 `@State` 跨 URL 活下来，只对得上哈希才作数。
+    func testHeightEstimateDoesNotLeakTheSampleToAnotherFile() throws {
+        let first = try makeTextFixture(named: "row-a.txt", content: "甲\n乙\n丙\n")
+        let second = try makeTextFixture(named: "row-b.txt",
+                                         content: "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n")
+        var sample: MultiFilePreviewLayout.TextSample? = nil
+        _ = MultiFilePreviewLayout.preferredHeight(for: first, availableWidth: 420, textSample: &sample)
+        XCTAssertNotNil(sample, "第一份取样没写回 ⇒ 下面那一臂根本没在测复用")
+        _ = MultiFilePreviewLayout.preferredHeight(for: second, availableWidth: 420, textSample: &sample)
+        let secondOpens = ProtectedFileAccessLedger.count(.layoutTextSample, for: second)
+        attach(ProtectedFileAccessLedger.reading("PROTECTED_READS_AT_LAYOUT_SWITCH", for: second),
+               named: "PROTECTED_READS_AT_LAYOUT_SWITCH")
+        XCTAssertEqual(secondOpens, 1,
+                       "换了文件却复用上一行的取样（开 \(secondOpens) 次）⇒ 行内预览会拿甲的高度画乙")
+        XCTAssertEqual(sample?.fileDigest, second.path.hashValue,
+                       "写回的取样对不上现在这个文件 ⇒ 缓存身份漂了")
+    }
+
     // MARK: - 4 隐私红线：读数里不许出现路径
 
     func testLedgerReadingCarriesNoPath() throws {

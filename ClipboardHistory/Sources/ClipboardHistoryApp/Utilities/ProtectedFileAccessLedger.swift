@@ -59,6 +59,15 @@ enum ProtectedFileAccessLedger {
         return events.filter { $0.fileDigest == digest && $0.site == site }.count
     }
 
+    /// 环里现有多少条事件。**跨任意一段代码量增量用这一格** ——
+    /// 判据不许为了"数得干净"去加全局 reset（那会把别的判据正在数的东西抹掉），
+    /// 而 `前后差` 不需要归零就能回答"这一段代码开过几个受保护文件"。
+    static var eventCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return events.count
+    }
+
     /// 这个文件在这一刻总共被碰了几次（四格求和）—— 「选中/预览之前不发生读取」判的就是它为 0。
     static func count(for url: URL) -> Int {
         let digest = url.path.hashValue
