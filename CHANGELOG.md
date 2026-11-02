@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 636 退场第一步落地：三级列表夹具让 `◦`/`▪` 第一次有帧对象，正文列步进判据钉住「回退字体把列推歪」；实测 `▪` 的 advance 被钳位吸收 ⇒ 636 的「列被推歪」这一格被证伪（R562 / 第 561 轮 / Round 559）
+
+R560 开 636 时说第三级项目符 `▪` 由冬青黑体回退画出、"与任务勾选框同一类"，R561 又量出今天没有夹具画到 depth2 ⇒ 只能具名 NOT-RUN。本轮补上夹具（`detail-markdown-bullet-nested`，正文写成转义串以免三引号 dedent 把内容缩进吃掉；产品 0 文件），`◦`/`▪` 第一次有帧对象。看图 + 像素现读：项目符墨 bbox light 8×8 / 7×6 / 8×8 px、dark 9×9 / 7×7 / 8×8 px，正文左沿 73 / 105 / 137 px ⇒ 步进 16.0pt / 16.0pt、**漂移 0px**。机制同向：正文列取 `max(minimumAdvance=16, markerWidth+2)`，`▪` 的 12.00+2=14 被钳位吸收 ⇒ **636 的「列被推歪」这一格不成立**（机制 + 像素两条），本轮落的是第三条判据、**只承认证到的那一半** ⇒ 636 保持开单（原判据形状"三级同尺寸"会把 R549 有意为之的三档三字形钉成缺陷；三级尺寸契约要撞禁碰面 ⇒ 归用户）。新判据 `testNestedBulletLevelsKeepOneUniformTextColumn` 判两格：帧上正文列数 == 产品 `MarkdownParser.parse` 出的深度集合，以及相邻步进等距（容差 1pt、地板 8pt 防塌平）；三级墨 bbox 只印不判。刀 **M1460 / M1461 / M1462** 全 CAUGHT、RESTORE_CLEAN=yes（M1461 把 `minimumAdvance` 降到 12 ⇒ 步进实测翻成 [32,38]px=16/19pt，是这条判据的真牙）；**两把空刀在登记前撤掉并照实进账**。帧 `COMPARED=356 CHANGED=0 ADDED=2` ⇒ 既有 354 张逐字节不变（禁碰面一帧未动），新增两帧走同一笔 update。上 runner 前做一次 1x 降采样体检（本机无真 1x 帧 ⇒ 它只回答四道筛的余量，不回答"判到了"）。全量 1405/57/0（686.4s）；build 0 告警；电池 696/5；4.5 / 150 / 120ms / Motion ≥2 帧 / 2x 8.0pt / 1x 6.0pt / `probeInkFraction=3%` 一律未动。
+
 ### 图例那把尺的命中地板改成几何派生（1x 第一次有判据）；636 的头一格量到「没有夹具画到 depth2」（R561 / 第 560 轮 / Round 558）
 
 R559 那条 `HEAT_LEGEND_COVERAGE` 的两道命中地板从前写死 `30 / 8` —— 那是本机 2x 的形状：一个图例方块在 2x 能放 36 个采样点、在 runner 的 1x 只放 9 个，地板 8 会把五档读到两档 ⇒ R560 的 runner 因此走具名出口（没报假红，但也没判）。本轮改成几何派生 `positions(edge, side) = ((edge − side)/2 + 1)²` 的一半（`swatchEdge = 格宽 × 8/11`），并把"倍率 < 1.5 不判"这道环境门换成"一个方块放不下 4 个采样点才不判"（出口 `HEAT_LEGEND_NOT_RUN=solid-unresolved`）。**2x 的判定没有变**：新读数 `地板 格12/图例18`，结论 `格色=8 图例色=5 缺=[]` 与旧常数逐字相同。新增纯数据真值表 `testLegendSolidRulerFloorsAreDerivedFromGeometry`（不吃截图门 ⇒ CI 每轮跑）钉住 cellW=22/11/6 三档、两条单调性与一根"像素判据必须用 `SolidRuler(`"的契约钉子。刀 **M1457 / M1458 / M1459** 全 CAUGHT、RESTORE_CLEAN=yes（M1459 设计成像素判定不变、只有钉子红）。636 的头一格：扫描 5 段含列表的夹具正文，内容相对缩进全为 0 ⇒ depth 只有 {0} ⇒ `◦`/`▪` 今天没有帧对象 ⇒ 具名 NOT-RUN，退场条件是先补夹具再量。产品 0 文件；4.5 / 150 / 120ms / Motion ≥2 帧 / 2x 8.0pt / 1x 6.0pt / `probeInkFraction=3%` 一律未动。

@@ -1,5 +1,5 @@
 {
-  "count": 354,
+  "count": 356,
   "frames": {
     "cardprobe-groupbox-default-720x140-dark.png": "09c0098c1c3810511e5bede26e92f25ab726b714cd50c3246b1796b074c5071a",
     "cardprobe-groupbox-default-720x140-light.png": "65b99048c61d6666bcbf7ac50f0b6082b477bf9a6d45f9563610281299ca39f8",
@@ -79,6 +79,8 @@
     "detail-loading-composed-720x520-light.png": "99fddb1d3a5d43ea9892ae5a0e2fca0cbf5f1e3ea84f8651f08426d9d65669f6",
     "detail-markdown-bullet-720x520-dark.png": "2c82a2299253b56506a2501c6906d5227eb4842732cf76ae7baf9f02e290f0f2",
     "detail-markdown-bullet-720x520-light.png": "6d4dc409dbabf60730dc2701b738fadf325d39501839d5c2be6844c118a98994",
+    "detail-markdown-bullet-nested-720x520-dark.png": "a94fb59b1aef0d614ddef019d677d6cfd840288e21e69b5ea97a6109438c3179",
+    "detail-markdown-bullet-nested-720x520-light.png": "aa9abd25cc90402990fc8345481a7b1114c8862f002078dc385baa92c98e42a2",
     "detail-markdown-rendered-720x520-dark.png": "7c565edaa044f395af7470dcb80bbb8f10a7c8bce7a245600d70b77721a03e0d",
     "detail-markdown-rendered-720x520-light.png": "547aa91411235195b93e1984be11513de438e5cb763f803632c6f30c9d969cbb",
     "detail-markdown-source-720x520-dark.png": "dc9aebf3c38b931f32fffc5172241942e220657386706b66a16528052a139196",

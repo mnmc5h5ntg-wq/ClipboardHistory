@@ -59,3 +59,14 @@
   三张新表与前几批同形 ⇒ 静态抽不出 needle、不在 `covered` 里，会红性只由上面三把真跑证明。
 - 帧：`FRAME_BASELINE_COMPARED=356 CHANGED=0 MISSING=0 ADDED=2` ⇒ **既有 354 张逐字节不变**
   （= R549 那张 `detail-markdown-bullet` 与全部禁碰面一帧未动），新增的就是这张夹具的两档。
+
+### ⑥ 断点之后（同一 turn 未死：判据卷进程活着跑完 ⇒ 读数来自完整日志，不是截断日志）
+
+- 监督侧判我「turn 结束 ⇒ 那一卷读数抹掉 ⇒ 重跑」；**现读 `pgrep` 得到 pid 22512 的 `xctest` 仍在跑**，日志 `/tmp/r562-capture.log` 在增长 ⇒ 处置是**等它跑完读完整日志**，不重跑（重跑会拿两份读数冒充两件事）。到手：**Executed 221 tests, with 4 tests skipped and 0 failures in 675.061s**（R561 是 220/4/0 ⇒ +1 就是本轮这条）。
+- 帧基线（update 之前）：`COMPARED=356 CHANGED=0 MISSING=0 ADDED=2`，新增的两个名字逐字是
+  `detail-markdown-bullet-nested-720x520-dark.png` / `…-light.png` ⇒ **名单外一个帧也没有**，且既有 354 张逐字节不变（= 产品 0 文件、禁碰面一帧未动的证人）。
+- update 之后复跑：`COMPARED=356 CHANGED=0 MISSING=0 ADDED=0`。
+- **1x 降采样体检**（`probe_r562_1x_preview.py`，LANCZOS 把 2x 帧缩到 1x 再跑同一把尺的四道筛）：
+  `light 1.0x 带=7 行=7 筛后=6 列=3 左沿=[36, 52, 68] 步进=[16, 16] 容差=1px 步进地板=8px`、dark 同形
+  ⇒ 列数不塌、步进等距（漂移 0px vs 容差 1px）、步进 16px ≥ 地板 8px（余量 2 倍）。
+  ⚠ 它**不是**真 1x 渲染 ⇒ 只回答"筛子还剩多少余量"，不回答"runner 判到了"；后者只能由含这条判据那一笔的跑作证。
