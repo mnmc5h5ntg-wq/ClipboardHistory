@@ -20,6 +20,37 @@
 ③ ②(c) 换新类别：R556 留在注释里的"夹具若指向真实图片路径 ⇒ `.task` 异步补图破坏帧确定性"升级成 `UICaptureTests/testCaptureOpensNoProtectedFiles` 两臂 —— 字面量臂现读 **7/存在 0**，运行时臂拍 `sidebar-history` 亮/暗计数增量 **0/0**；为此给计数器加 `eventCount`（只量增量，**仍无全局 reset**）。刀 **M1443**（夹具路径指向真实存在的 `/etc/hosts`）CAUGHT，且只有字面量臂红 ⇒ 两臂独立可证。②(a) **629 = NOT-RUN**：依据那三个数没到，不赌 (A)/(B)、不动 ≥2 帧地板。
 ④ ③ 验证链（顺序未换）：`swift build` 告警 **0**；判据卷 `UICaptureTests` **217/4 skipped/0 失败（655.6s）**；帧重捕 `FRAME_BASELINE_COMPARED=354 CHANGED=0 MISSING=0 ADDED=0`；全量 **1399/55/0（765.8s）**；预检 **tables=345 covered=295 arms=757 bad=0**、`ARM_TOTAL files=438 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=432 可判=1183 rot=0 抽不出=6 处置=ok`；换装 `make bundle` = `SIGNATURE_KIND=local`（identity=ClipboardHistory Local Signing）⇒ `INSTALL_RESULT=ok / SHA_MATCH=1 / INSTALL_SIGNATURE=local / INSTALL_ENTRIES=433=433`（PID 86092 → 33242，`SMOKE_OK=1`）。
 ⑤ ④⑤ 账与交接：清账 **162/63/0**；电池 **695/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 556，`python3 scripts/product_streak.py --streak-for 556` 现读，last=`1a7e31c`/555）⇒ 本轮产品动了 2 文件（`DetailView` + 计数器）。CI：本轮各笔成对号见本节补记；**R558 必读上面那四跑 + 本轮各笔的跑**（全部失败步骤），并且只要 `41450045802` 到手就按 `窗口/每格/相邻帧差` 在 629 的 (A)/(B) 里选一条落地。633 仍等用户回执；622/624/627 继续；628/625/626/569/616 不重开；禁碰清单 9 面不变；刀号 **M1446** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板、2x 8.0pt 与 1x 6.0pt 均不动。
+### R557 补记（2026-11-02 · 第 556 轮 / Round 554 · ⓪ 那四跑到手 + 629 的三个 runner 真数到手）
+
+① ⓪ 挂账四跑 + 本轮两笔的现读（⓪ 时全未读，收口时四跑已 concluded）：
+- `41450045802 ↔ 5ba5b2f` conclusion=**failure**；失败步骤 **STEP[9] Release script tests**，STEP[10]–[14] ⇒ skipped。正文 `Ran 695 tests in 108.977s` ⇒ `FAILED (failures=2, skipped=2)`；红名 `test_skip_roster.SkipRosterTests.test_the_roster_matches_what_this_machine_actually_skips`（`None is not true : 内层没有结论行`）与 `test_sources_cell_second_source.SourcesCellSecondSource.test_the_cell_agrees_with_its_own_source`（`0 != 1 : 报告里那一格与 git 派生的不一致（rc=1）`）。该日志 13791/13791 行步骤名全是 `UNKNOWN STEP` ⇒ 按步骤名过滤恒 0 行，正文只能 grep/emit 通道。
+- `41450081248 ↔ 680aea3` **failure**；同一形状（STEP[9] 红、10–14 skipped）；`Ran 695 tests in 119.049s` ⇒ `FAILED (failures=3, skipped=2)`，比上一跑多一条 `test_final_report_headline.FinalReportSourcesCellTests.test_the_sources_cell_agrees_with_git`。
+- `41450601769 ↔ ccab101` **failure**；同一形状；`Ran 695 tests in 122.714s` ⇒ `FAILED (failures=3, skipped=2)`，同上三条红名。
+- `41452722560 ↔ 58851c2` **cancelled**（13:24:36Z→13:39:37Z = 15m01s），失败步骤 0 条、`--log-failed` 0 行 ⇒ **NOT-RUN**：cancelled 既不是绿，也不是产品结论。
+- `41455782587 ↔ 598b253` **cancelled**（13:45:52Z→14:00:53Z，同样 15m01s）；对它取正文直接 `log not found: 125311960175` ⇒ 这一跑的正文**一格都取不到**（第四种「读到 0 行」的坏法：作业被取消 ⇒ 日志从未落盘）。
+- 本轮自己的两笔 `41464892684 ↔ ce4da8f`、`41465486002 ↔ 5d05578` 均 in_progress ⇒ **NOT-RUN**，R558 必读。
+- **读数工具的盲区（本轮新记）**：`ci_read.py steps` 只列 failure/skipped。这三跑的 STEP[15] Swift tests、STEP[16] Motion gate、STEP[17] Capture gate、STEP[18]–[19] coverage floor **全是 success** —— 只有另用 `gh run view --json jobs` 逐条读才看得到。拿 steps 的输出推「后面的步骤没跑」会推出反话。
+
+② **629 那三个 runner 真数到手**（同判据、同 1x，三跑各一条）：
+
+| run ↔ commit | 过渡帧数 | 峰值 | 窗口 | 每格 | 非零的相邻帧差落在 |
+| --- | --- | --- | --- | --- | --- |
+| `41450045802 ↔ 5ba5b2f` | 2 | 0.0193 | 588ms | 22.6ms | 第 3 格 0.0145、第 9 格 0.0193 |
+| `41450081248 ↔ 680aea3` | 2 | 0.0145 | 676ms | 26.0ms | 第 4 格 0.0145、第 9 格 0.0145 |
+| `41450601769 ↔ ccab101` | 2 | 0.0193 | 731ms | 28.1ms | 第 3 格 0.0145、第 9 格 0.0193 |
+
+三条结论，都是被读数本身给的，不是猜的：
+1. runner 的每格是 **22.6–28.1ms**，不是 R556 推的 ≈44ms（那个数是从别的情景 `窗口=1143ms / 27 格` 借来的 —— 借错了对象）。200ms 的过程在这台机器上跨 7–9 格 ⇒ R556 那条「≥2 帧地板正好压在采样网格边缘」被自己的读数**否掉**。
+2. 但 27 帧里只有 **2 格**相邻差非零，其余逐格 `0.0000` ⇒ `过渡帧数=2` 是**零余量**通过。`5a943e7` 那次读 1，就是这两格里的一格掉零。间歇红的形状不是「采样太稀」，是「这条通道本来只在两个离散时刻给出可测差」。
+3. 因此 **(A) 加密录制被这三个数否掉**：加密只会多得几格 `0.0000`，不会多得非零格，200s 看门狗那一格也不用动。**(B) 换判据对象**才有对象可换 —— 「相邻差的非零计数」是「有没有插值」的代理量，要判的东西应该读成「过程里有没有一帧严格落在两端之间」（两端夹逼 / 累计差），这条形状 R545 读 settled 进度时用过。
+
+③ 选择已经做完，**落地留给 R558**：本轮台账在数未到之前按 NOT-RUN 闭合，收口之后不重写产品与判据、不重跑验证链。R558 头一格 = 按 (B) 落一条新判据 + 一把刀，`≥2 帧地板`、阈值、声明时长全部不动（地板不许降，是这条出口的硬条件）。
+
+④ **自伤一格（写给下一轮的顺序规矩）**：本轮把产品笔与刀表笔**先推**、台账笔**后推** ⇒ 中间那几跑在 STEP[9] 是**注定红**的：`report_sources_cell` 那一格在「产品已进 git、台账还没写」的窗口里必然与 git 派生值不一致。R556 只修了「派生顺序」（`--write` 挪到产品笔之后），没修「推送顺序」。下一轮按 ⑥ 的字面走：产品/刀先 commit **不 push**，等台账 + `--write` + 电池都过了，**一次性 push**。
+另一格是仪器的：`test_skip_roster` 那条「内层没有结论行」**不是 flake** —— `scripts/tests/test_skip_roster.py:36` 的 `SKIPPED_SUMMARY = re.compile(r'OK \(skipped=(\d+)\)')` 只认 OK 汇总行，:184 `assertTrue(ran and skipped)` ⇒ 内层只要有**任何**一条红（本轮就是 sources-cell），汇总行变成 `FAILED (…)`，这格就以「没有结论行」红。同一个成因记成两朵红，而且那句话本身在骗人。已开 **634**。本机 R556 记的那三次「flake」很可能就是当时的 stale-cell 窗口，标签要重审。
+
+⑤ 台账口径不变：本轮 629 仍记 **NOT-RUN**（数是在台账落盘**之后**到手的，不在收口后追改成落地）；632 记「落地 + 剩余具名出口」；禁碰 9 面、4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板、2x 的 8.0pt 跨度地板、1x 的 6.0pt 整行地板一律不动；刀号 **M1446** 起；633 仍等用户人工回执；622/624/627 继续。
+
 ## R557 ⓪ 开工（2026-11-02 · 第 556 轮 / Round 554 · CI 读单 + 基线全现读）
 
 > 本节是**开工节**，不是轮次节（标题不写「状态」两字 —— `product_streak.py` 按第一个 `## Rnnn 状态（` 认当前轮）。
