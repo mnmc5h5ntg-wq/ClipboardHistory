@@ -54,3 +54,12 @@
 
 - A 笔的提交标题前缀写成 **「R562 A：」**（应为 R563）——正文里的轮次身份是对的（`第 562 轮 / Round 560`，`product_streak.py` 读的就是这个），错的只是人看的标签。
   **没有 amend**：未推的本地笔按项目旧例可以改标题，但本轮监工的指令是「不许 amend/重写已存在的标题」，而系统层规矩也是默认新建一笔 —— 两条都指向不 amend ⇒ 代价是历史上留一条错标签，写进账，不偷偷改。
+
+### ⑦ 收尾（全量 → 预检 → 换装 → 台账 → 电池 → 补记 → 一次性 push）
+
+- 全量卷的进程在 turn 边界之后**还活着**（pid 60698、日志 327MB 且在长）⇒ 按规矩等它自己跑完读完整日志：**Executed 1405 tests, with 57 tests skipped and 0 failures in 701.178s**（不是中途输出、不是重跑）。
+- 预检三读**串行**：`tables=361 covered=295 arms=757 bad=0`、`ARM_TOTAL files=454 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=448 可判=1183 rot=0 抽不出=6 已声明表=6 处置=ok`（本轮没登记新表 ⇒ 三个数与 R562 逐字相同，这是"没有新刀"的证人，不是抄来的）。
+- 换装 `--label R563`：`INSTALL_RESULT=ok / SHA_MATCH=1 / ENTRIES=433=433 / SMOKE_OK=1 / SIGNATURE=local flags=0x0`，PID→66415，备份 `before-R563`。
+- ⓪ 那一跑**收口前到数但不是结论**：`41531750912↔75b32d6` = concluded failure，`gh` 现读 job = **cancelled**、`ci_read.py readings` 报 `log not found: 125573433836` ⇒ 四格维持具名 NOT-RUN，这一对进「永不重开」。
+- 派生格全部落盘后现读：streak `ledger_round=562 streak=3` ⇒ `PRODUCT_STREAK_LEDGER_OK`（报告那一格从前写 2 被 STALE 点过一次）、sources `一致=是`、清账 162/63/0、占位符回读 **0**。
+- 电池：台账 + `--write` 之后 **`Ran 696 / OK (skipped=5)`、退出码 0**（本轮没有格式红、没有重复写红 ⇒ R562 那两条教训真的兑现成代码了）。
