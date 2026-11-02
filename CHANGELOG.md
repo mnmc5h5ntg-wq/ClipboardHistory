@@ -6,7 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-- **R559（热图图例补零次档 + 635 两条腿；产品 1 文件 + 判据 2 文件 + 四把刀）**：`DailyCopyHeatmapView` 页脚的图例从前只画 `VisualHeat.ladder` 那四档蓝，而网格里的零次格用的是 `Color.primary.opacity(VisualHeat.empty)` —— 一张 182 格的图里 46 格（25%）的颜色在图例里查不到。新判据 `UICaptureTests/testHeatmapLegendCoversEveryCellColor`（网格用到的每一种实心色都必须出现在图例带里；格宽、网格下缘、实心判定全部从帧里量，不抄产品常量）先红后绿，产品补一块**同一份常量**的方块并把间距 8→4 吃掉宽度（净宽 56pt 不变）。635 结案：`MarkdownModeButton` 那三行接线由一条 grep 契约钉子钉住（M1452），胶片那一格同时打出 `MOTION_NOT_RUN=markdown-wiring-unjudged`（M1453）。刀 **M1450–M1453** 全 CAUGHT、RESTORE_CLEAN；帧基线同一笔 update；4.5/150/120ms/≥2 帧/2x 8.0pt/1x 6.0pt/`probeInkFraction=3%` 一律未动。
+### 热图图例补上零次档那一块；635 的两条腿各配了一把刀（R559 / 第 558 轮 / Round 556）
+
+`DailyCopyHeatmapView` 页脚的图例从前只画 `VisualHeat.ladder` 那四档蓝，而网格里的零次格用的是 `Color.primary.opacity(VisualHeat.empty)` —— 一张 182 格的图里 46 格（25%）的颜色在图例里查不到。新判据 `UICaptureTests/testHeatmapLegendCoversEveryCellColor`（网格用到的每一种实心色都必须出现在图例带里；格宽、网格下缘、实心判定全部从帧里量，不抄产品常量）先红后绿，产品补一块**同一份常量**的方块并把间距 8→4 吃掉宽度（净宽 56pt 不变）。635 结案：`MarkdownModeButton` 那三行接线由一条 grep 契约钉子钉住（M1452），胶片那一格同时打出 `MOTION_NOT_RUN=markdown-wiring-unjudged`（M1453）。刀 **M1450–M1453** 全 CAUGHT、RESTORE_CLEAN；帧基线同一笔 update；4.5/150/120ms/≥2 帧/2x 8.0pt/1x 6.0pt/`probeInkFraction=3%` 一律未动。
 
 ### 629 的判据对象换成「两端夹逼的连续距离」；电池观察者不再借红（R558 / 第 557 轮 / Round 555 / U-2387…U-2394 · 产品 0 文件 + 判据 1 文件 + 观察者 1 文件）
 
