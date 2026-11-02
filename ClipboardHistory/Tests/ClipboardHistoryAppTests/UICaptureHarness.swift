@@ -3168,6 +3168,20 @@ final class UICaptureTests: XCTestCase {
                                  "\(tag)：找不到「一行 26 格」的网格行 ⇒ 这张热图没画出来，判据没有对象")
             cellWidthSamples.sort()
             let cellW = cellWidthSamples.isEmpty ? 8 : cellWidthSamples[cellWidthSamples.count / 2]
+            // R559：这道判据今天**只在 2x 判**。不是偷懒，是量出来的：把本轮 2x 帧最近邻降到 1x
+            // 复算同一套实心判定（一次性探针，不入库 ⇒ 不能当证人），"一个方块里放得下的采样点"
+            // 从 2x 的 36 掉到 1x 的 9（采样步长 2、方块 8px 减实心边 3px 只剩 3 个位置），
+            // 于是 `minHits=8` 会把图例五档读到只剩 2 档 ⇒ runner 上会报「缺三种」的**假红**。
+            // 具名出口与 `SETTINGS_HELPER_FONT_NOT_RUN=scale-too-low` 同一族：读数照打，像素断言不判。
+            // 要在 1x 上也判，得拿真 1x 帧把两道 `minHits` 改成按几何派生（`((边长−实心边)/2+1)²` 的一半），
+            // 而不是拿降采样代理去猜参数 —— 这一格留给 R560 ⓪。
+            let scale = fixture.size.width > 0 ? Double(w) / fixture.size.width : 0
+            if scale < 1.5 {
+                emit("HEAT_LEGEND_NOT_RUN=scale-too-low \(tag) 倍率=\(String(format: "%.1f", scale))x "
+                     + "格宽=\(cellW)px 实心判定 格\(max(4, cellW * 3 / 5))px/图例\(max(3, cellW / 4))px "
+                     + "⇒ 1x 上一格只剩 ~9 个采样点，绝对命中地板分不出方块与噪声，不判产品")
+                continue
+            }
             let cellSolid = max(4, cellW * 3 / 5)
             let swatchSolid = max(3, cellW / 4)
             func solidColors(from y0: Int, to y1: Int, side: Int, minHits: Int) -> [(triple: (Int, Int, Int), hits: Int)] {
@@ -3200,7 +3214,8 @@ final class UICaptureTests: XCTestCase {
                 missing.append("(\(t.0),\(t.1),\(t.2))")
             }
             emit("HEAT_LEGEND_COVERAGE \(tag) 格色=\(cellColors.count) 图例色=\(legendColors.count) "
-                 + "缺=[\(missing.joined(separator: " "))] 格宽=\(cellW)px 网格下缘 y=\(gridBottom) "
+                 + "缺=[\(missing.joined(separator: " "))] 格宽=\(cellW)px 倍率=\(String(format: "%.1f", scale))x "
+                 + "网格下缘 y=\(gridBottom) "
                  + "实心判定 格\(cellSolid)px/图例\(swatchSolid)px")
             XCTAssertEqual([], missing,
                 "\(tag)：这些网格用过的颜色在图例带里找不到对应方块 ⇒ 图例没覆盖全部档位（缺 \(missing.count) 种：\(missing.joined(separator: " "))）")
