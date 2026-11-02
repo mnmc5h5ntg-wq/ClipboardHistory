@@ -13,6 +13,24 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R554 / 第 553 轮 / Round 551）
+## R555 ⓪ 开工（2026-11-02 · 第 554 轮 / Round 552 · CI 五跑读单 + 基线全现读）
+
+> 本节是**开工节**，不是轮次节（标题刻意不写「状态」两字 —— `product_streak.py` 按第一个 `## Rnnn 状态（` 认当前轮，本轮的 streak 格要到收口那笔才存在）。
+
+**前置实读**：`git log --oneline -3` = `57974ec` / `2c4b1ef` / `1576e43`；已跟踪改动 **0**；`git rev-list --count origin/main..HEAD` = **0**（ahead=0，HEAD=origin=`57974ec`）。
+
+**① 必读五跑 —— 全部已 concluded，逐条抄全部失败步骤（不截断、不只盯自己新加那一步）**
+- `41391543033 ↔ 2c4b1ef`（R554 台账笔）conclusion=**failure**：JOB build-and-test ⇒ **STEP[15] Swift tests (executed-count gate)**、**STEP[17] Capture gate (unregistered reds must be zero)**、**STEP[19] Motion coverage floor**（三朵，全部列出）。红名现读（emit 通道 `ASSERTION_RED` 行=6 去重后=4）：`UICaptureTests/testQuickPickFavoriteStarIsAtLeastEightPointsTall` light **7.0pt**、dark **6.0pt**（< 地板 8.0）＋ `MarkdownStripTests/testMarkdownModeLabelChangeIsAVisibleProcess` **1x 只有 1 个过渡帧（要 ≥2）**（629）。
+- `41390623478 ↔ abc21c6`（R553 台账笔）failure：**STEP[15]+[17]**（两朵，无 [18]/[19]）。红名（行=4 去重后=2）：收藏星判据 light **7.0pt** / dark **6.0pt**。
+- `41388527150 ↔ 52f114c`（R552 台账笔）failure：**STEP[15]+[17]**。红名（行=4 去重后=2）：同上两条收藏星读数。
+- `41388652895 ↔ 75468be`（R552 补记笔）failure：**STEP[15]+[17]**。红名（行=4 去重后=2）：同上。
+- `41388683958 ↔ 570042c`（R552 补记二笔）failure：**STEP[15]+[17]+[18] On-screen probe coverage floor**（三朵）。红名（行=6 去重后=4）：收藏星两条 ＋ `SelectionRevealAnimationTests/testProductDurationRevealStillMovesOverTime`（`[0.0, 1430.0, 1430.0, 1430.0, 1430.0]` 瞬移）＋ `testFrameIntervalsUnderStateChanges` **最差帧 189.8ms / 超锚点 2 颗**（622 的**第十一值**，写入 622 而不是拿来当本轮回归）。
+- **归因对照**：这一朵 `testQuickPickFavoriteStarIsAtLeastEightPointsTall` 在**五跑里都红**，且五跑的改动笔都没碰过它 ⇒ 不是本轮引入，是 **R551 那笔产品改动的 runner 签收红**（569 已登记），已连续挂着 R552–R555 四轮。步骤名这一批全是 `UNKNOWN STEP` ⇒ 读数一律走判据自己 emit 的通道串，不按步骤名过滤。
+
+**② 基线（本轮全部现读，不抄上一轮）**：帧 **354**（`docs/frame_baseline.json` 现读 `count`）；清账 **162/63/0**（`LEDGER_ABSENCE_CLAIMS 格=162 声明=63` / `不成立=0/63`）；streak **3**（`product_streak.py --streak-for 554` 现读，last=`884e197`/551 ⇒ R552 之后连续三轮 Swift 0 文件）；HIDDEN **表=421 可判=1183 rot=0 抽不出=6 已声明表=6 已声明死针=0 处置=ok**；预检 **tables=334 covered=295 arms=757 bad=0**、`ARM_TOTAL files=427 arms=1244 dupes=0 repeats=0`；电池 **695/5**（本轮开场即复跑，`Ran 695 tests … OK (skipped=5)`）；安装 **433=433** 且 `INSTALL_SIGNATURE=local` 连续两轮（R554 现读）。全量卷本轮**要重跑**（R553/R554 两轮沿用的 1392/57/1 是 R552 的现读，Swift 面一旦动了就不能再沿用）。
+**③ 禁碰清单（现读逐面，8 面）**：①R546 登录失败图标、②R547 默认排除行锁图标、③R548 250pt 批量标题、④R549 无序列表项目符号、⑤R550 浮层提示键名、⑥R551 收藏星尺寸、⑦R552 折叠/展开过渡、⑧R553 固定本机码签身份链（不许改回 ad-hoc 交差、回退必须被 `SIGNATURE_KIND` 报出来）。账上第 7 面的原文（U-2351）是「R546 登录失败图标、R547 默认行锁、R548 250pt 批量标题、R549 无序列表符号、R550 浮层提示键名、R551 收藏星尺寸、**R552 折叠过渡**」；第 ⑧ 面由 R553 节的具名阻塞段补入。
+**④ 本轮靶（照发令）**：(a) **569 的 runner 红怎么收** —— 走「按捕获倍率把口径分开」，2x 地板 8.0 **不动**，给 1x 一个**会红的**下界 + 一把刀（刀号 **M1435** 起），先量旧值再动，改完必须真读到 runner 那一格的结论；收藏星尺寸本身在第 ⑥ 面里，不许再改。(b) **632 的 B 落地** —— 计数器证人从产品入口进，配 CAUGHT 刀；上不了就写具名出口并续单，不许静默放回。633 只在用户回执时才写结论；628/625/626 不重开；622/624/627/629 继续；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## R554 状态（2026-11-02 · 第 553 轮 / Round 551 · Swift 0 文件 · 构建/安装链 + 真机两轮换装）
 
 ① 前置实读：用户回「密码已允许」后 `security find-identity -v -p codesigning` 仍 **0 valid** ⇒ 放掉的是「codesign 想取用私钥」的密码框，不是信任设置；`sign_bundle.sh` 的 `-v` 闸门因此仍走回退支（`SIGNATURE_KIND=adhoc`）—— 没静默绕过。摆回用户、拿到「跑那一条命令」的授权后执行 `security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db <cert>`（只写登录钥匙串，不 sudo、不碰系统域、不 `tccutil reset`）⇒ **1 valid identities found**。
