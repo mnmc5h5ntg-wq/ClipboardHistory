@@ -12,8 +12,8 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R552 / 第 551 轮 / Round 549）
-## R553 开工 ⓪（2026-11-02 · 第 552 轮 / Round 550）
+最后更新：2026-11-02（本地 · R553 / 第 552 轮 / Round 550）
+## R553 状态（2026-11-02 · 第 552 轮 / Round 550 · 脚本 3 文件 + 电池 4 条，Swift 0 文件）
 
 R553 ⓪ 读数（只登记、不轮询）：HEAD=origin=`570042c`、ahead=0、`git push` no-op；已跟踪改动=0。基线（**全部本轮现读**）：帧 **354**、清账 **162/63/0**、streak **2**（as-of 553，`python3 scripts/product_streak.py --streak-for 553` 现读，last=`884e197`/551）、全量沿用 R552 现读 **1392/57/1（886.8s）**、电池 **691/5**、安装 **433=433**（PID 41809）。
 - 三跑读时 **in_progress ⇒ NOT-RUN**：`41388527150↔52f114c`（R552 台账）、`41388652895↔75468be`（补记）、`41388683958↔570042c`（补记二）。queued/in_progress 不算成功。
@@ -26,7 +26,12 @@ R553 ⓪ 读数（只登记、不轮询）：HEAD=origin=`570042c`、ahead=0、`
 - **B 减少主动读受保护目录**：实读触点 = `MediaLoader.filePreviewPayloadSync`（`Data(contentsOf:)` 整文件）、`DetailView.preferredTextHeight`（**为算高度又开一次文件** `FileHandle`）、`DetailView:606`（为算高度又 `attributesOfItem` stat 一次，而字节其实已在手里）、`HistoryPersistence.isAlreadyOnDisk`（自家容器图片，不算受保护目录）。⇒ 采集路径本身（`ClipboardIntake`）只记 URL，不读文件；弹窗来自**预览/布局**路径。本轮把 B 的边界与四格触点写进 BACKLOG 632，改动与判据留下一轮（不在本轮半做：判据要的是"选中/预览之前不发生读取"的计数器证人，得先定分界）。
 - 编号：用户发令写「R554（第 553 轮 / Round 551）」并把折叠那轮叫作 R553；账上折叠那轮是 **R552（第 551 轮 / Round 549）**，R553 从未开工 ⇒ 按身份链记作 **R553（第 552 轮 / Round 550）**，A/B 两格与验收条件照发令做。
 
-## R552 状态（2026-11-02 · 第 551 轮 / Round 549 · 产品 4 文件 + 真机通道）
+① A 根因与落地：`codesign -dvv` 现读 `flags=0x2(adhoc)`/`Signature=adhoc`/`TeamIdentifier=not set`，`Makefile` 每轮 `--remove-signature` + `-s -` ⇒ CDHash 每轮变 ⇒ TCC 当新 App ⇒ 桌面授权反复作废。新增 `scripts/sign_bundle.sh`（有身份用身份、没有就 ad-hoc，两种都打 `SIGNATURE_KIND=local|identity-refused|adhoc`）、`Makefile` 改走它、`install_local.sh` 加 `INSTALL_SIGNATURE=local|adhoc`；`make bundle` 实跑 = `SIGNATURE_KIND=adhoc`（回退支被走到且被报出来）。身份建在登录钥匙串（p12 只在 /tmp，不入库不留盘）。
+② A 具名阻塞（不许绕过）：`security find-identity -v -p codesigning` = 0 条；不带 `-v` 列该身份 `CSSMERR_TP_NOT_TRUSTED`；`codesign -s "ClipboardHistory Local Signing"` 挂起不返回（等钥匙串/信任授权）⇒ **需要用户在「钥匙串访问」里对该证书点一次「始终信任」**。本轮不重试、不改全局信任、不 `tccutil reset`、不 sudo、不改回 ad-hoc 交差；撤回：`security delete-identity -c "ClipboardHistory Local Signing" ~/Library/Keychains/login.keychain-db` + 删同名私钥。验收（连续两轮身份不变 + 授权一次后不再弹）只能真机人工确认 ⇒ 人工验收批次。
+③ B 只实读不动产品：四格触点 = `MediaLoader.filePreviewPayloadSync`（整文件 `Data(contentsOf:)`）、`DetailView.preferredTextHeight`（为估高度又开一次 `FileHandle`）、`DetailView:606`（为估高度又 `attributesOfItem`，字节已在手里）、`HistoryPersistence.isAlreadyOnDisk`（自家容器图片，不算受保护目录）；采集路径 `ClipboardIntake` 只记 URL。边界、判据口径（计数器证人，不许拿日志正则当分母）与刀的要求写进新开 **BACKLOG 632**。
+④ 账：电池 **695/5**（新增 `scripts/tests/test_sign_bundle.py` 4 条：有身份必须用、回退必须报、`Makefile` 不许裸 `codesign -s -`、`INSTALL_SIGNATURE` 必须在 SHA 核对之后）；清账 **162/63/0**；帧 **354** 不动、全量不重跑（Swift 侧 0 文件 ⇒ 沿用 R552 现读 1392/57/1，理由具名）；产品面连续零改动 **1** 轮（as-of 552，`python3 scripts/product_streak.py --streak-for 552` 现读，last=`884e197`/551；`--streak-for` 的号是「第 N 轮」不是 R 号 ⇒ R553=第 552 轮）。
+⑤ CI/交接：⓪ 节与 A 脚本、BACKLOG 632 同笔 = `039b35f`（本轮没有单独的 ⓪ 小提交）；R552 三跑读时 in_progress ⇒ NOT-RUN：`41388527150↔52f114c`、`41388652895↔75468be`、`41388683958↔570042c`。下一轮 R554（第 553 轮 / Round 551）：先 push 复核 ahead=0；读本轮各笔 + 上述三跑的全部失败步骤；② 头两格 = **569 的 runner 红怎么收**（星 light 7.0 / dark 6.0pt < 地板 8.0，**不许降地板**；要么再加大星标，要么按捕获倍率分开口径并同时给 1x 一个会红的下界 + 一把刀）与 **632 的 B 落地**；A 若用户已点信任 ⇒ 补做"连续两轮 `codesign -dvv` 身份不变"并把 `INSTALL_SIGNATURE` 读数抄进账。禁碰清单 8 面（R546–R552）；刀号 **M1435** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+## R552 状态（2026-11-02 · 第 551 轮 / Round 549 · 产品 5 文件 + 真机通道）
 
 R552 ⓪ 读数（只登记、不轮询）：HEAD=origin=`01421e5`、ahead=0、`git push` no-op；api=200/apple=200；已跟踪改动=0（未跟踪 scratch 为历史遗留）。基线（**全部本轮现读**，R551 的抄数教训）：帧 **354**、全量 **1390/56/0（600.3s）**、预检 **330/295/757 bad=0**、ARM **423/1244**（dupes=0 repeats=0）、HIDDEN **417/1183 rot=0**、电池 **691/5**、安装 **432=432**（PID 99095）、清账 **162/63/0**、product_streak **1**（as-of 551，`--streak-for 551` 现读，last=`77c92ad`/550）。
 - 三跑读时 **in_progress ⇒ NOT-RUN**：`41374412622 ↔ 14ae33a`（R551 台账）、`41374877453 ↔ ca9217b`（R551 补记）、`41374916378 ↔ 01421e5`（R551 补记二）。queued/in_progress 不算成功；R551 产品笔 `77c92ad` 与台账笔同次 push ⇒ 无独立跑。

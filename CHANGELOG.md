@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 固定本机代码签名身份 + 签名种类读数（R553 / 第 552 轮 / Round 550 / U-2352…U-2357 · 脚本 3 文件 + 电池 4 条）
+
+`codesign -dvv` 现读 `Signature=adhoc` ⇒ 每轮换 CDHash，TCC 把 App 当新的，桌面授权反复作废。新增 `scripts/sign_bundle.sh`：优先用登录钥匙串里的自签身份 `ClipboardHistory Local Signing`，没有则回退 ad-hoc，两种都打 `SIGNATURE_KIND=local|identity-refused|adhoc`；`Makefile` 改走它，`install_local.sh` 加 `INSTALL_SIGNATURE=local|adhoc`。**A 具名阻塞**：该身份 `CSSMERR_TP_NOT_TRUSTED`、`codesign -s` 挂起 ⇒ 需要用户在钥匙串访问点一次「始终信任」（不改全局信任 / 不 tccutil reset / 不 sudo）。B（预览/布局主动读受保护目录）四格触点写进 BACKLOG 632，本轮不动产品。电池 691/5→695/5。
+
 ### 折叠/展开撤成一步切换（R552 / 第 551 轮 / Round 549 / U-2343…U-2351 · 产品 5 文件）
 
 真机 60fps 录屏读数：旧折叠过渡在切换那一拍把主线程占住 60ms（折叠）/106ms（展开），屏上只在 50ms 内换 4 帧、17ms 内换 2 帧，右缘一次跳 277pt/322pt ⇒ 用户报的「先卡一下再整块跳」。快照盖子（材质拍成纯黑）与几何交给窗口服务（只给 2–3 档中间宽）两条替代方案同机量过、都不成立 ⇒ 按「做不到平滑就不保留动画」收成一步切换（D-552），并从 `MotionCatalog` 撤掉 `.windowFold`（两把「声明必须有消费者」的守卫现读红）。新判据钉住「布局 1 次 / 几何 1 次 / minSize 1 次 / 中间进度 0 次」；M1431–M1434 CAUGHT；M1397–M1401 重钉复跑。全量 1392/56/0；换装 433=433；电池 691/5。BACKLOG 631 记下重新演必须先解决的两格。

@@ -8793,3 +8793,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：三条候选路都在同一台机器上量过 —— 旧做法屏上 50ms 只换 4 帧且右缘一次跳 277pt；快照盖子把侧栏材质拍成纯黑；几何交给窗口服务只拿到 2–3 档中间宽。**没有中间帧的动画就是跳变**，而一步切换至少不假装在动。
 - 兼容性/迁移：状态、两档宽度（`.windowFold` 撤档后目录少一档，`testEveryRoleHasAConsumer` 与 `MOTION_KIND_UNWIRED` 两把守卫同笔转绿）；、`minSize`、提示、菜单标题、⌘\ 全部不变；`foldProgress` 仍在（只剩 0/1 两档），离屏夹具与帧不受影响；`.windowFold` 仍留在 `MotionCatalog` 目录里，只是折叠不再读它。
 - 边界：要重新演必须先解决 BACKLOG 631 的两格；判据 `testFoldAnimationDurationIsPinnedToZero` + `M1431` 会把「悄悄把时长加回去」的提交判红。
+
+## D-553 本机改用固定自签码签身份；不受信就具名停手（R553）
+
+- 背景：用户反复被弹「时间剪史想访问桌面文件夹」，已批准无数次。根因不是权限点错了，而是**身份每轮变**：构建走 `--remove-signature` + `codesign -s -`（ad-hoc），CDHash 每轮重算 ⇒ TCC 视为新 App ⇒ 上一次的桌面授权作废。
+- 决定：本机建一个固定名字的自签代码签名身份（`ClipboardHistory Local Signing`，登录钥匙串，EKU=codeSigning，p12 只在临时目录、不入库不留盘）；构建与安装统一走 `scripts/sign_bundle.sh`，并把"这一轮到底用了哪种签名"打进读数（`SIGNATURE_KIND=` / `INSTALL_SIGNATURE=`）。
+- 理由：TCC 授权跟着签名身份走。只有身份固定，"授权一次"才可能跨轮活下来；而回退 ad-hoc 必须被报出来，否则同一个洞会以"构建成功"的样子继续存在。
+- 边界（本轮实际卡在哪）：`security find-identity -v -p codesigning` = 0 条，该身份被列成 `CSSMERR_TP_NOT_TRUSTED`，`codesign -s "<身份>"` 挂起不返回 ⇒ **需要用户在「钥匙串访问」里对该证书点一次「始终信任」**。本轮不重试、不改全局信任设置、不 `tccutil reset`（会清掉用户其他授权）、不 sudo、不改回 ad-hoc 交差。A 的验收（连续两轮 `codesign -dvv` 身份不变 + 授权一次后不再弹）只能真机人工确认。
+- 撤回：`security delete-identity -c "ClipboardHistory Local Signing" ~/Library/Keychains/login.keychain-db`，并在「钥匙串访问」里删掉同名私钥；`Makefile` 回到改动前即恢复纯 ad-hoc 构建（`scripts/tests/test_sign_bundle.py` 会红，提醒补账）。

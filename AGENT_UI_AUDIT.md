@@ -363,6 +363,15 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 552 轮（R553 · 2026-11-02 · U-2352…U-2357）：固定本机码签身份（A 具名阻塞）+ B 触点实读（脚本 3 文件 + 电池 4 条）
+
+- **U-2352：⓪ CI。** HEAD=origin=`570042c`、ahead=0、`git push` no-op。基线**全部现读**：帧 354、清账 162/63/0、streak 1（as-of 552，`product_streak.py --streak-for 552` 现读，last=`884e197`/551）、电池 691/5（本轮后变 695/5）、安装 433=433、全量沿用 R552 的 1392/57/1（886.8s）。三跑读时 in_progress ⇒ NOT-RUN：`41388527150↔52f114c`、`41388652895↔75468be`、`41388683958↔570042c`；已 concluded 的 R551/R552 各跑不重取（红名 = 收藏星判据 runner 7.0/6.0pt < 8.0 + 622 frame 207.2ms/2，已写在 R552 节）。
+- **U-2353：A 根因实读。** `codesign -dvv /Applications/时间剪史.app` ⇒ `flags=0x2(adhoc)`、`Signature=adhoc`、`TeamIdentifier=not set`；`Makefile` 每次构建 `--remove-signature` 后 `-s -` ⇒ CDHash 每轮变 ⇒ TCC 当新 App ⇒ 桌面授权作废、反复弹。采集路径不读文件（`ClipboardIntake` 只记 URL），读在预览/布局那一侧。
+- **U-2354：A 落地（脚本 3 文件）。** 登录钥匙串建自签码签身份 `ClipboardHistory Local Signing`（openssl key/cert，EKU=codeSigning、CA:FALSE，pkcs12 导入带 `-T /usr/bin/codesign`；p12 只在 /tmp，不入库不留盘）；新增 `scripts/sign_bundle.sh`：有身份用身份、没有就 ad-hoc，**两种都打读数** `SIGNATURE_KIND=local|identity-refused|adhoc`；`Makefile` 改走它（裸 `codesign -s -` 从构建里消失）；`install_local.sh` 新增 `INSTALL_SIGNATURE=local|adhoc`。`make bundle` 实跑：`SIGNATURE_KIND=adhoc`（回退支被走到且被报出来）。CI 与其他机器无该身份 ⇒ 行为不变。
+- **U-2355：A 具名阻塞（不许绕过）。** `security find-identity -v -p codesigning` = **0 valid identities**；不带 `-v` 列该身份为 **CSSMERR_TP_NOT_TRUSTED**；实测 `codesign -s "ClipboardHistory Local Signing"` **挂起不返回**（等钥匙串/信任授权），已 kill。⇒ **需要用户在「钥匙串访问」里对该证书点一次「始终信任」**（或允许 codesign 取用私钥）。本轮不重试、不改全局信任、不 `tccutil reset`、不 sudo、不改回 ad-hoc 交差。撤回办法写进 D-553：`security delete-identity -c "ClipboardHistory Local Signing" ~/Library/Keychains/login.keychain-db` + 删同名的私钥。
+- **U-2356：B 触点实读 + 新开 632（本轮不动产品）。** 四格：`MediaLoader.filePreviewPayloadSync`（`Data(contentsOf:)` 整文件）、`DetailView.preferredTextHeight`（为估高度**又**开一次 `FileHandle`）、`DetailView:606`（为估高度又 `attributesOfItem` stat，而字节已在手里）、`HistoryPersistence.isAlreadyOnDisk`（自家容器图片，不算受保护目录）。下一轮的边界与判据已写进 **BACKLOG 632**：采集只记 URL；可见/选中/点开预览才读；一次渲染只读一次；判据用计数器证人（不许拿日志正则当分母）+ 把读取搬回采集路径必须红。
+- **U-2357：③④ 账与交接。** 电池 **695/5**（新增 `scripts/tests/test_sign_bundle.py` 4 条：有身份必须用身份、回退必须被报出来、`Makefile` 不许再裸 ad-hoc 签、`INSTALL_SIGNATURE` 必须在 SHA 核对之后报）；清账 162/63/0；Swift 侧 0 文件 ⇒ 帧 354 不动、全量不重跑（沿用 R552 现读，理由已具名）。A 的验收（连续两轮 `codesign -dvv` 身份不变 + 用户授权一次后不再弹）**只能真机人工确认** ⇒ 记进人工验收批次。下一轮 R554（第 553 轮 / Round 551）：先 push 复核 ahead=0；读本轮笔与 R552 三跑（`41388527150↔52f114c`、`41388652895↔75468be`、`41388683958↔570042c`）的全部失败步骤；② 的头两格 = **569 的 runner 红怎么收**（星 7.0/6.0pt < 8.0，不许降地板）与 **632 的 B 落地**；A 若用户已点信任 ⇒ 补做连续两轮验收。刀号 M1435 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 551 轮（R552 · 2026-11-02 · U-2343…U-2351）：折叠/展开撤成一步切换（D-552，产品 5 文件）
 
 - **U-2343：⓪ CI。** HEAD=origin=`01421e5`、ahead=0、`git push` no-op；api=200/apple=200。基线**全部现读**（R551 的抄数教训）：帧 354、全量 1390/56/0（600.3s）、预检 330/295/757 bad=0、ARM 423/1244、HIDDEN 417/1183 rot=0、电池 691/5、安装 432=432、清账 162/63/0、streak 1（as-of 551）。三跑读时 in_progress ⇒ NOT-RUN：`41374412622↔14ae33a`、`41374877453↔ca9217b`、`41374916378↔01421e5`；已 concluded 的九跑不重取（结论在 R551 节 ⑤，已定论的 run 不可变）。
