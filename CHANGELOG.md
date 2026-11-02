@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 图例那把尺的命中地板改成几何派生（1x 第一次有判据）；636 的头一格量到「没有夹具画到 depth2」（R561 / 第 560 轮 / Round 558）
+
+R559 那条 `HEAT_LEGEND_COVERAGE` 的两道命中地板从前写死 `30 / 8` —— 那是本机 2x 的形状：一个图例方块在 2x 能放 36 个采样点、在 runner 的 1x 只放 9 个，地板 8 会把五档读到两档 ⇒ R560 的 runner 因此走具名出口（没报假红，但也没判）。本轮改成几何派生 `positions(edge, side) = ((edge − side)/2 + 1)²` 的一半（`swatchEdge = 格宽 × 8/11`），并把"倍率 < 1.5 不判"这道环境门换成"一个方块放不下 4 个采样点才不判"（出口 `HEAT_LEGEND_NOT_RUN=solid-unresolved`）。**2x 的判定没有变**：新读数 `地板 格12/图例18`，结论 `格色=8 图例色=5 缺=[]` 与旧常数逐字相同。新增纯数据真值表 `testLegendSolidRulerFloorsAreDerivedFromGeometry`（不吃截图门 ⇒ CI 每轮跑）钉住 cellW=22/11/6 三档、两条单调性与一根"像素判据必须用 `SolidRuler(`"的契约钉子。刀 **M1457 / M1458 / M1459** 全 CAUGHT、RESTORE_CLEAN=yes（M1459 设计成像素判定不变、只有钉子红）。636 的头一格：扫描 5 段含列表的夹具正文，内容相对缩进全为 0 ⇒ depth 只有 {0} ⇒ `◦`/`▪` 今天没有帧对象 ⇒ 具名 NOT-RUN，退场条件是先补夹具再量。产品 0 文件；4.5 / 150 / 120ms / Motion ≥2 帧 / 2x 8.0pt / 1x 6.0pt / `probeInkFraction=3%` 一律未动。
+
 ### 任务勾选框的两个态钉到同一份字体；第三级项目符开单 636（R560 / 第 559 轮 / Round 557）
 
 `detail-tasks` 里两行任务项正文逐字相同、只有勾选态不同，但框子实测差 2.5pt（勾选 21×20px=10.50pt、未勾选 16×16px=8.00pt，两档外观同形）。代码里两个态请求的是同一个 `markerFont` —— 成因在字体层：`☑`(U+2611) 系统字体有字形，`☐`(U+2610) 没有 ⇒ AppKit 只给后者换到 AppleSymbols。本轮把**任务标记**钉到一份"两个字形都有、度量相同"的具体字体（`Apple Symbols`，同 pointSize），且只钉在 `markerFont(for:)` 一处（它同时是渲染字体与量制表位的字体）；项目符 `⦁ ◦ ▪` 与编号一字未动。新判据 `UICaptureTests/testTaskCheckboxStatesShareOneGlyphSize` 先红（宽差 5px / 高差 4px，两档 4 条）后绿（0 / 0）。刀 **M1454**（撤钉）、**M1455**（两个态各钉一份字体）全 CAUGHT、RESTORE_CLEAN；M1455 第一版用 Menlo 是**空刀**（差 1px 正落在 ≤1px 容差内），换 Arial Unicode MS 才红 ⇒ 契约是"像素同尺寸"，不是"字体名相同"。新开 **636**：depth2 项目符 `▪` 落到冬青黑体（同一类缺陷），因 R549 是禁碰面 ⇒ 只开单不改面。4.5 / 150 / 120ms / Motion ≥2 帧 / 2x 8.0pt / 1x 6.0pt / `probeInkFraction=3%` 一律未动。
