@@ -363,6 +363,17 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 550 轮（R551 · 2026-11-02 · U-2335…U-2342）：浮层收藏星加到 10pt（产品 1 文件 + 判据）
+
+- **U-2335：⓪ CI。** HEAD=origin=`5e1cccb`、ahead=0、`git push` no-op；api=200/apple=200。`41358196373 ↔ 5588b88`、`41358232108 ↔ 5e1cccb` 读时 **in_progress ⇒ NOT-RUN**。`41354387000 ↔ 181b022` failure **仅 STEP[15]**（SelectionReveal 5 origins，1388 tests 1 failure）、`41351367430 ↔ deb28a1` 仅 STEP[15]（SelectionReveal）、`41351231883 ↔ a210a29` STEP[18]+[19]（frame **196.7ms/2**、markdown 1x=1）、`41350830308 ↔ f0e9ea0` 仅 STEP[9]（skip_roster+sources）、`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal）。
+- **U-2336：② 收藏星 9→10pt。** BACKLOG 569：浮层收藏星 9pt，净墨只有 7.5pt 高。`QuickPickController` 把 `favoriteBadge` 宽高由 9 改成 10（图钉仍 9，叠层不占布局）。判据通道 `QUICKPICK_STAR_HEIGHT`：星高 **7.5→8.5pt**、星墨（正/负臂逐像素差）**115/113→148/147**（+29%/+30%）。帧上另用星形色隔离独立复算：同一窗口同一阈值 7.5→8.5pt、宽 8.0→9.0pt、墨 115/113→147/147（与判据差 ≤1px）。整帧逐像素差只落在 **18×17px** 的徽标窗（rows 104..121、cols 85..102 @2x）⇒ 标题、时间轴、行几何都不动。
+- **U-2337：② 判据/刀/预检。** 新判据 `testQuickPickFavoriteStarIsAtLeastEightPointsTall`：正/负臂成对帧的类型列里星形 bbox 高 ≥8pt，两档各判一次（`judged==2`）。`M1430`（退回 9pt）**CAUGHT、RESTORE_CLEAN=yes**；预检 **330/295/757 bad=0**、ARM **423/1244**（dupes=0 repeats=0）、HIDDEN **417/1183 rot=0**（现读；R546–R550 第 ⓪ 条抄的 410 是刀表数没随每轮新刀更新，可判数与 rot 一致 ⇒ 本轮起写现读值）；build **0 告警**；rot=0 + bad=0 就是"没有旧刀锚在星标尺寸上"的证人，无需重钉。
+- **U-2338：③ 帧/录制。** 重捕：CHANGED=**2**（`quickpick-favorite` 亮/暗）、MISSING=0、ADDED=0，基线 **354→354**；逐张看：星形更大、仍贴类型符号右上角，标题/时间轴未动。录制帧确定性 **10/10 diff=0**。
+- **U-2339：③④ 全量/换装/电池/清账/streak。** 全量 **1390/56/0（600.3s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=432=432`（PID 99095；R550 是 431=431，活库自己长了 1 条 ⇒ 门是前后相等）；清账 **162/63/0**（现读 `格=162 声明=63 不成立=0/63`；R544–R550 写的 162/162/0 是把「格」抄了两遍、声明其实是 63 ⇒ 本轮起写现读值，旧节不回改）；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 550，`python3 scripts/product_streak.py --streak-for 550` 现读）。
+- **U-2340：⑤ 622/624/627/629/628/625/626。** 622 第七值 176.6ms/2/204、本轮 frame 新值 196.7ms/2（runner 负载 flake，120ms/容差不动）；624 两臂继续、不改名册；627/629 保持开单；628/625/626 结案。
+- **U-2341：⑤ BACKLOG 569 / 570。** 本机 2x：星高 7.5→8.5pt、星宽 8.0→9.0pt、星墨 115/113→148/147（`QUICKPICK_STAR_HEIGHT` 现读，与 569 里 R485 那组 +113/+115 不是同一个窗口，别混用）；新判据已钉 ≥8pt；runner 1x 待签收，569 保持开单。570（收藏+置顶同屏没有帧）也保持开单：星标加到 10pt、图钉仍 9pt，两枚同屏时的排布本轮不声明。
+- **U-2342：⑥ 收口与交接。** ⓪ 笔 `f7aeca2`、产品笔随后；下一轮 R552（第 551 轮 / Round 549）：先 push 复核 ahead=0；读本轮产品笔与台账笔、复读 `5588b88`/`5e1cccb`/`181b022`/`deb28a1`/`a210a29`/`f0e9ea0` 与其余已读跑的全部失败步骤；622 frame 半、624、627、629 继续；628/625/626 不重开；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动。
+
 ## 第 549 轮（R550 · 2026-11-02 · U-2327…U-2334）：浮层键盘提示关闭键改大写 Esc（产品 1 文件 + 判据）
 
 - **U-2327：⓪ CI。** HEAD=origin=`181b022`、ahead=0、`git push` no-op；api=200/apple=200。`41354330740 ↔ bb948db` 读时 **queued**、`41354387000 ↔ 181b022` **in_progress** ⇒ 均 NOT-RUN；queued/in_progress 不算成功。`41351367430 ↔ deb28a1` 仅 STEP[15]（SelectionReveal 会话 flake）、`41351231883 ↔ a210a29` STEP[18]+[19]（frame **196.7ms/2**、markdown 1x=1）、`41350830308 ↔ f0e9ea0` 仅 STEP[9]（skip_roster+sources 时序）、`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal）；`41351210379 ↔ 19d33b5` success。

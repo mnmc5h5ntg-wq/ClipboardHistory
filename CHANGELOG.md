@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 浮层收藏星加到 10pt（R551 / 第 550 轮 / Round 548 / U-2335…U-2342 · 产品 1 文件 + 判据）
+
+`QuickPickController` 的 `favoriteBadge` 宽高由 9 改成 10（图钉仍 9，叠层不占布局）。星高 7.5→8.5pt、星宽 8.0→9.0pt、星墨 115/113→148/147（整帧逐像素差只落在 18×17px 徽标窗）；新判据 `QUICKPICK_STAR_HEIGHT` 要求 ≥8pt；M1430 CAUGHT。帧 CHANGED=2（`quickpick-favorite` 亮/暗），基线 354→354；录制确定性 10/10 diff=0；全量 1390/56/0；换装 432=432；电池 691/5；569 待 runner 1x 签收。
+
 ### 浮层键盘提示关闭键改大写 Esc（R550 / 第 549 轮 / Round 547 / U-2327…U-2334 · 产品 1 文件 + 判据）
 
 `QuickPickKeyboardHint.text` 由「↑↓ 选择 · ↵ 粘贴 · esc 关闭」改成「… · Esc 关闭」。`Esc` 子串 cap height 5.99→7.85pt（+31%）、宽 5.13→5.22pt；新判据 `HINT_KEY_CAPS` 要求含大写键名且墨高 ≥7pt；M1429 CAUGHT。帧 CHANGED=26（含提示行的浮层帧亮/暗），基线 354→354；录制确定性 10/10 diff=0；全量 1389/56/0；换装 431=431；电池 691/5；BACKLOG 630 同轮结案。
