@@ -10777,6 +10777,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R543）：42 跑 `FRAME_MULTI` 仍 `worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；第七值 176.6ms/2/204；1–2 颗离群、120ms/容差不动、frame 半保持开单。
     复查（R544）：44 跑 `FRAME_MULTI` 仍 `worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；第七值 176.6ms/2/204；1–2 颗离群、120ms/容差不动、frame 半保持开单。
     复查（R545）：44 跑 `FRAME_MULTI` 仍 `worst_max=262.3`、`over_max=2`、`over_runs=17`、`loaded_p95_max=46.73`、`比值=0.585–2.167`；第七值 176.6ms/2/204；1–2 颗离群、120ms/容差不动、frame 半保持开单。
+    复查（R551）：R546–R550 五轮没往本条追加复查行（值只写进 STATE 的 ④），这半格是漏账，本轮起补回。新读三值：`41351231883 ↔ a210a29` **196.7ms/2**（R550 已读）、`41358196373 ↔ 5588b88` **207.7ms/2/199**（loaded_p95=16.67、比值 1.000）、`41358232108 ↔ 5e1cccb` **156.6ms/2/186**（loaded_p95=38.47、比值 1.034）⇒ 第八/九值；三跑都是纯台账/补记笔（0 产品文件）却仍红，且 loaded p95 全部 ≤46.73、比值≈1 ⇒ 形状仍是「1–2 颗离群、整段不慢」，支持 runner 抖动而不是产品回归；120ms 阈值、容差 1 颗、`over_runs` 口径一律不动，frame 半保持开单。
 
 **623. runner 1x 上标题悬停判据仍读 0/0：两次修法都未签收**（R530 收口现读）
     现象：`1e3cfaa`（扩边顺序 + 显式取证值）、`730dc5e`、`9b9cf56`、`2967ce6` 四跑的 STEP[15] 都只有 `testSidebarTitleHoverFeedbackIsVisible` 一项红：`TITLE_HOVER light/dark totalDelta=0 changedPixels=0 region=300x260px`；Capture gate 点名同一条。本机 2x 读数是 118429/5792、88166/5494，说明 hover 在本地能落墨。
@@ -10863,6 +10864,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R544）：试 `.markdownLabel=0.24` 后本机 1x 仍 4（旧 contentFade 0.20 也是 4），读数不变 ⇒ 撤回并删其判据/M1423，只保留 contentFade 0.20；629 继续开单等出现率；≥2 帧地板不动。
     复查（R545）：markdown 仍三跑 1x=1（c1df1e6/8d4a36d/bd96e93），contentFade 0.20 不动；629 继续开单等出现率；≥2 帧地板不动。
     复查（R545 补记）：产品侧四杠杆（动画挂载层、contentTransition、2pt 错位过渡、medium 字重）全部证伪或构建受阻，读数均未把 1x 抬到 ≥2；contentFade 0.20 不动，629 继续开单。
+    复查（R551）：`41358357437 ↔ f7aeca2`（纯 ⓪ 台账笔）STEP[19] Motion floor 红名 `testMarkdownModeLabelChangeIsAVisibleProcess`：1x 只有 1 个过渡帧（要 ≥2），且该条**不在登记名册里** ⇒ 按未登记红判红；同批三跑 `motion_red_occurrence.py` 读得 markdown reds=1/3、copy=NOT_PRINTED、fold=PASS。不改 `.contentFade` 0.20、不动 ≥2 帧地板、不往名册里加豁免，629 继续开单等出现率。
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
 
