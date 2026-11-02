@@ -153,6 +153,11 @@ def main():
 
     n = "AGENT_UI_AUDIT.md"
     t = rd(n)
+    # 幂等守卫（R562 的自伤：上一次跑到 ITER 那一本时崩在 fill()，UI 那一本**已经写盘**，
+    # 重跑就把同一节写了两份 ⇒ `test_ui_audit_ids_are_unique` 抓出来）。
+    if u"## 第 561 轮（R562" in t:
+        sys.stderr.write("ANCHOR_BAD ui 已经写过 R562 那一节 ⇒ 重跑会写两份，先去重再写\n")
+        return 1
     a = u"## 第 560 轮（R561 · 2026-11-03 · U-2412…U-2418）"
     if t.count(a) != 1:
         sys.stderr.write("ANCHOR_BAD ui\n")
