@@ -70,3 +70,10 @@
   `light 1.0x 带=7 行=7 筛后=6 列=3 左沿=[36, 52, 68] 步进=[16, 16] 容差=1px 步进地板=8px`、dark 同形
   ⇒ 列数不塌、步进等距（漂移 0px vs 容差 1px）、步进 16px ≥ 地板 8px（余量 2 倍）。
   ⚠ 它**不是**真 1x 渲染 ⇒ 只回答"筛子还剩多少余量"，不回答"runner 判到了"；后者只能由含这条判据那一笔的跑作证。
+
+### ⑦ 收尾（全量之后 → 台账 → 补正 → 电池 → 一次性 push）
+
+- 全量 **1405/57/0（686.4s）**；预检三读串行 `tables=361 covered=295 arms=757 bad=0`、`ARM_TOTAL files=454 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=448 可判=1183 rot=0 抽不出=6 已声明表=6 处置=ok`；换装 `INSTALL_RESULT=ok 433=433 SMOKE_OK=1 SIGNATURE=local` PID 30437、备份 `before-R562`。
+- ⓪ 那跑**收口前到数**：`41519677393↔f12f50d` = concluded **success** ⇒ (a) `HEAT_LEGEND_COVERAGE … 倍率=1.0x 地板 格4/图例4 每方块采样点 格9/图例9 缺=[]` ×4 行、`HEAT_LEGEND_NOT_RUN` 零行 ⇒ **R561 的几何派生尺被 runner 签收，预测的两个地板数逐字命中**；(b) `过渡帧数` 第四数 = **5**（每格 28.9ms、STEP[19] success）⇒ 四跑 2/5/0/5；(c) STEP[9] 第四跑绿、STEP[18] success ⇒ 622 无新值。`BULLET_LEVELS` 零行 = **判据未推**（那一跑不含本轮判据），不是通道坏。
+- 台账四步：写手第一次崩在 ITER 的 `fill()`（**账的正文里写了「percent+左括号」字面量 ⇒ 守卫命中自己**），但 UI 那一本已写盘 ⇒ 重跑写成两份 ⇒ `test_ui_audit_ids_are_unique` 真红 ⇒ 去重 + 给写手补幂等守卫（补正笔 `c8c950f`）。电池 4 红（3 时序 + 1 借红报告）→ 2 红（1 真红 + 借红报告）→ **`Ran 696 / OK (skipped=5)`**。
+- 派生格全部落盘后现读：streak **2**（`PRODUCT_STREAK_LEDGER_OK`；报告那一格从前写 1 被 `PRODUCT_STREAK_LEDGER_STALE` 点过一次）、sources `一致=是`、占位符回读 **0**。
