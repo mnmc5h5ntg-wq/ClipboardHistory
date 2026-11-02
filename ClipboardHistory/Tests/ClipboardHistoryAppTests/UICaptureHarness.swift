@@ -167,6 +167,12 @@ final class UICaptureTests: XCTestCase {
         // `content-with-notice` y=896..1027、`content-with-two-notices` y=974..1105、本帧 y=872..1003。
         // ⇒ 同一处已登记的盲区（侧栏最后一行的选中材质在离屏下画成黑），横幅只是把它推上/推下；
         //   登记的是**这一处**，不是给老毛病起一个新名字（名单里每一条都要能被这样追问）。
+        // R563 补一条**另一通道**的读数（这条名单从前只有离屏一侧的证据，所以"黑"到底是产品画的还是通道画的，
+        // 账上没答过）：真机现读主窗口（750×492，`screencapture -R` 只截这一扇窗、量完即删、不入仓），
+        // 沿侧栏一列逐行取背景 —— 非选中行 (52,52,39)、**选中行 (80,80,68)** ⇒ 每通道 +28，选中态在屏上清楚可见；
+        // 同一次现读在离屏帧上量到的是整条 258×66pt 的 (0,0,0)。⇒ **黑的是通道，不是产品**：
+        // 系统 `ListTableRowView` 的选中层是一枚 `NSVisualEffectView material=4`，离屏没有可合成的 backdrop 就落纯黑。
+        // 这条名单因此不许被读成"产品把选中行画黑了"；它说的是**这几张帧里选中行的像素不可用作证据**。
         "content-with-dropped-unreadable-notice",
         "content-with-history", "content-min", "content-wide", "content-with-notice",
         "content-with-two-notices",
