@@ -10787,6 +10787,8 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R555）：⓪ 五跑全读，新增第十一值 —— `41388683958 ↔ 570042c` STEP[18] 最差 **189.8ms**、超锚点 **2 颗**（容差 1）；同一跑另带 SelectionReveal 的 `[0.0, 1430.0, 1430.0, 1430.0, 1430.0]`。其余四跑（`41391543033`、`41390623478`、`41388527150`、`41388652895`）**没有** STEP[18] 红 ⇒ 这一朵仍是偶发而不是每跑必红。120ms 阈值、容差 1 颗、`over_runs` 口径一律不动，frame 半保持开单。
     复查（R558）：新增**第十三值** —— `41467585182 ↔ ff15906` STEP[18] `PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=7 闭合通道=接 本次跑过=8 红=1`，红名 `testFrameIntervalsUnderStateChanges：最差帧 225.3ms 超过锚点 120ms，且超锚点的帧有 3 颗（容差 1 颗）` ⇒ 225.3ms / 3 颗（第十三值，颗数第一次越过 2）。同跑 STEP[19] 另带 629 的未登记红（`MOTION_FLOOR_SUITE_RED=1 … testMarkdownModeLabelChang…`、`MOTION_FLOOR_REDS=1`、`judged=4/5 executed=77 not-run=notice-banner`、`MOTION_FLOOR_NOT_SEEN=2`）⇒ 两朵红同一跑，本轮都没碰这两卷，按同族入账。120ms 阈值、容差 1 颗、`over_runs` 口径一律不动，frame 半继续开单。
     复查（R559）：本轮**没有**新值 —— `41485625452 ↔ 8115ab8` 到收口前仍是 in_progress（已等 1663s）⇒ 622 的 runner 复核与 629 的新口径读数一并具名 NOT-RUN，挂进 R560 ⓪。阈值 120ms、容差 1 颗、`over_runs` 口径一律不动，frame 半继续开单。
+    复查（R560）：**第十四值到手 = 219.7ms / 2 颗** —— `41501679574 ↔ 7260562`（R559 那一批的头笔）**failure**，`ci_read.py steps` 全量列出只有一朵红：**STEP[18] `On-screen probe coverage floor`**，正文 `PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=7 闭合通道=接 本次跑过=8 红=1` + `FAILED testFrameIntervalsUnderStateChanges：最差帧 219.7ms 超过锚点 120ms，且超锚点的帧有 2 颗（容差 1 颗）`。归因对照（同一判据、同一卷）：`41485625452↔8115ab8`（R558 批）绿、`41467585182↔ff15906`（R557 批）红 225.3ms/3 颗 ⇒ **同族既有红、按抽样出现**，R559/R560 都没碰那一卷 ⇒ 不署名为本轮回归。120ms 锚点、容差 1 颗、`over_runs` 口径一律不动，frame 半继续开单。
+
 
 
 
