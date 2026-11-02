@@ -586,6 +586,7 @@ enum MultiFilePreviewLayout {
     }
 
     private static func preferredTextHeight(for url: URL, availableWidth: CGFloat) -> CGFloat? {
+        ProtectedFileAccessLedger.note(.layoutTextSample, for: url)
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
 
@@ -603,8 +604,17 @@ enum MultiFilePreviewLayout {
         let wrappedLineCount = text.components(separatedBy: .newlines).reduce(0) { total, line in
             total + max(Int(ceil(Double(line.count) / Double(charactersPerLine))), 1)
         }
-        let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.doubleValue ?? Double(data.count)
-        let sampleCoverage = min(max(fileSize / Double(max(data.count, 1)), 1), 3)
+        // R555 / BACKLOG 632：样本**没读满**就等于整份文件都已经在手里了，这时候再去路径上 stat 一次
+        //  size 是白要一次受保护目录的访问（比值恒为 1，`min(max(…,1),3)` 也是 1）。
+        //  只有读满上限、确实不知道后面还有多少字节时，才付那一次探路。
+        let sampleCoverage: Double
+        if data.count >= textSampleLimit {
+            ProtectedFileAccessLedger.note(.layoutFileSizeStat, for: url)
+            let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.doubleValue ?? Double(data.count)
+            sampleCoverage = min(max(fileSize / Double(max(data.count, 1)), 1), 3)
+        } else {
+            sampleCoverage = 1
+        }
         let estimatedLineCount = min(CGFloat(wrappedLineCount) * CGFloat(sampleCoverage), 24)
 
         return estimatedLineCount * textLineHeight + previewInnerPadding

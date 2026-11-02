@@ -2571,8 +2571,20 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到成对帧")
     }
 
-    /// R551：BACKLOG 569 —— 9pt 收藏星在浮层类型列里的净墨只有 7.5pt 高；
-    /// 加到 10pt 后星形净墨必须 ≥8pt，且标题末列仍不动（叠层不占布局）。
+    /// R551 开单，R555 按捕获倍率把口径分开（BACKLOG 569 的收口）。
+    ///
+    /// **两套读数、两个对象**（都读浮层类型列里那颗收藏星的净墨，区别在栅格）：
+    /// - `QUICKPICK_STAR_HEIGHT`（**跨度口径**）＝ 星形净墨首墨行到末墨行的距离 ÷ 倍率，单位 pt。
+    ///   分辨率 = 1/(2倍率) pt：本机 2x 现读 light/dark 均 **8.5pt**（0.5pt 一格），runner 1x 五跑逐字
+    ///   相同 = light **7.0** / dark **6.0**（1pt 一格）。地板 **8.0pt 只在倍率 ≥1.5 时判** —— 那个数字
+    ///   是 R551 在 2x 帧上量的，原样发给 1x 机器就是拿 0.5pt 的尺去要求 1pt 的栅格（R551 的签收红就是这件事）。
+    /// - `QUICKPICK_STAR_FULLROWS`（**整行口径**）＝ 一个 pt 行的**全部**像素行都落墨才算这一行有墨。
+    ///   两档判**同一个下界 6.0pt**：真实墨高 ≥8pt 时，1pt 栅格最多在首、末各丢掉一整行（半覆盖的边行
+    ///   过不了阈值）⇒ 整行数 ≥ 8 − 2 = 6。下界由跨度口径减掉栅格损失的上界**推**出来，不是照着读数凑的
+    ///   （凑出来的地板不会红；M1435 就是拿来证明这一格会红）。倍率=1 时"全部像素行"退化成一整行
+    ///   ⇒ 这一格在 1x 机器上就是跨度本身，两档读同一件事，不存在偷偷放宽。
+    ///
+    /// 星形尺寸本身在禁碰清单里（R551 已动过一次 9→10pt），本轮**不改产品**，只把口径分开。
     func testQuickPickFavoriteStarIsAtLeastEightPointsTall() throws {
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r551-star-height-\(UUID().uuidString)", isDirectory: true)
@@ -2609,10 +2621,13 @@ final class UICaptureTests: XCTestCase {
                 return abs(Int(luma.rounded()) - p.page) >= 60
             }
             var minY = Int.max, maxY = -1, extra = 0
-            for y in Int(45.0 * scale)..<min(pos.rep.pixelsHigh, Int(100.0 * scale)) {
+            let scanTop = Int(45.0 * scale), scanBottom = min(pos.rep.pixelsHigh, Int(100.0 * scale))
+            var rowHasInk = [Bool](repeating: false, count: max(scanBottom - scanTop, 0))
+            for y in scanTop..<scanBottom {
                 for x in Int(20.0 * scale)..<Int(60.0 * scale)
                     where isInk(pos, x, y) && !isInk(neg, x, y) {
                     minY = min(minY, y); maxY = max(maxY, y); extra += 1
+                    rowHasInk[y - scanTop] = true
                 }
             }
             if extra == 0 {
@@ -2620,9 +2635,33 @@ final class UICaptureTests: XCTestCase {
                 continue
             }
             let height = Double(maxY - minY + 1) / scale
+            // 整行口径：pt 行 p 覆盖像素行 [floor(p·倍率), ceil((p+1)·倍率)) —— 全部落墨才算这一行有墨。
+            // 倍率=1 时区间就是一行 ⇒ 退化回跨度本身。
+            var fullRows = 0
+            for p in 45..<100 {
+                let lo = Int((Double(p) * scale).rounded(.down))
+                let hi = Int((Double(p + 1) * scale).rounded(.up)) - 1
+                guard lo >= scanTop, hi < scanBottom, lo <= hi else { continue }
+                if (lo...hi).allSatisfy({ rowHasInk[$0 - scanTop] }) { fullRows += 1 }
+            }
             emit("QUICKPICK_STAR_HEIGHT \(tag) 星高=\(String(format: "%.1f", height))pt 星墨=\(extra) 倍率=\(String(format: "%.1f", scale))x")
-            XCTAssertGreaterThanOrEqual(height, 8.0,
-                "\(tag)：收藏星净墨只有 \(String(format: "%.1f", height))pt 高 ⇒ 还是 9pt 小星，1x 上只剩几粒")
+            emit("QUICKPICK_STAR_FULLROWS \(tag) 整行=\(fullRows) 跨度=\(String(format: "%.1f", height))pt"
+                 + " 首墨行=\(minY) 末墨行=\(maxY) 倍率=\(String(format: "%.1f", scale))x")
+            // 跨度地板 8.0pt 只在**亚像素栅格**（2x）上判：那是 R551 量它的那个对象的那个分辨率。
+            if scale >= 1.5 {
+                XCTAssertGreaterThanOrEqual(height, 8.0,
+                    "\(tag)：跨度口径（2x，0.5pt 一格）净墨只有 \(String(format: "%.1f", height))pt 高"
+                    + " ⇒ 地板 8.0 不动，星形又缩回 9pt 那一档了")
+            } else {
+                // 1x 机器上"0.5pt 一格"这个对象**不存在**（栅格没有半行）⇒ 不是跳过，是那一档没有可读的量；
+                // 这一格必须在账里留下名字，不许读成沉默。整行口径在上面照判，两档都不许悄悄少判一格。
+                emit("QUICKPICK_STAR_SPAN_NOT_JUDGED=1x-lattice-has-no-half-row \(tag)"
+                     + " 跨度=\(String(format: "%.1f", height))pt ⇒ 本档只判整行口径（下界 6.0）")
+            }
+            // 整行地板两档都判（1x 机器上它就是跨度本身，不存在吞掉哪一档）。
+            XCTAssertGreaterThanOrEqual(Double(fullRows), 6.0,
+                "\(tag)：整行口径只有 \(fullRows) 个 pt 行是**整行落墨**的 ⇒ 下界 6.0 破了"
+                + "（跨度 \(String(format: "%.1f", height))pt、倍率 \(String(format: "%.1f", scale))x）")
             judged += 1
         }
         if judged == 0 { throw XCTSkip("QUICKPICK_STAR_HEIGHT_NOT_RUN：两档都没有类型列墨") }

@@ -116,9 +116,12 @@ enum MediaLoader {
 
     nonisolated static func filePreviewPayloadSync(url: URL) -> FilePreviewPayload? {
         let ext = url.pathExtension.lowercased()
-        if FileTypeSupport.imageExtensions.contains(ext),
-           let data = try? Data(contentsOf: url) {
-            return .imageData(data)
+        if FileTypeSupport.imageExtensions.contains(ext) {
+            // R555 / 632：预览这一格是**整文件**读，它是四格里最贵的一格，所以先记数再读。
+            ProtectedFileAccessLedger.note(.previewWholeFile, for: url)
+            if let data = try? Data(contentsOf: url) {
+                return .imageData(data)
+            }
         }
 
         if FileTypeSupport.textExtensions.contains(ext),
@@ -168,6 +171,7 @@ enum MediaLoader {
     static let maxPreviewTextBytes = 256_000
 
     nonisolated private static func readTextPreview(_ url: URL) -> String? {
+        ProtectedFileAccessLedger.note(.previewTextSample, for: url)
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
         guard let data = try? handle.read(upToCount: maxPreviewTextBytes) else { return nil }
