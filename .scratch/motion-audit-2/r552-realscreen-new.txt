@@ -1,0 +1,8 @@
+# R552 新值（一步切换，同一条真机通道、同一台机器）
+REALSCREEN_FOLD 录像=2940x1912px 窗口矩形=[240,146,1500,984]px 屏幕=1470pt 帧=479 每列≈2.08pt
+REALSCREEN_FOLD_BURST id=2 起=3.900s 跨=0ms 变化帧=1 间距max=16.7ms 中位=16.7ms ⇒ 一步切换（单帧到位，无中间态）
+REALSCREEN_FOLD_BURST id=3 起=5.317s 跨=50ms 变化帧=2 间距max=16.7ms 中位=16.7ms
+REALSCREEN_FOLD_TICKS 行数=496 宽档数=2 分栏出现档数=2      # 旧值：宽档数 15–19、分栏档数 11–15
+REALSCREEN_FOLD_LAYOUT 分栏消失@t=543ms 窗口宽=420.0pt progress=1.000 折叠=1
+# 对照：旧值 = 折叠 50ms 内 4 帧 / 展开 17ms 内 2 帧 + 右缘一次跳 277pt/322pt + 主线程空窗 60ms/106ms
+# 结论：一步切换 ⇒ 屏上只有 1–2 帧变化、最大帧间距 16.7ms ≤20ms；代价是没有中间态（D-552 明写「宁可不演」）

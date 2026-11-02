@@ -10868,6 +10868,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
 
+**631. 折叠/展开撤成一步切换：屏上中间帧拿不到**（R552 现读并新开，本轮不结案）
+    现象：用户实测「点折叠与点展开都卡顿 + 窗口突变」。真机 60fps 录屏（`scripts/real_screen_fold_transition.py`）旧值：切换那拍主线程空窗 60ms（折叠）/106ms（展开）；屏上只在 50ms 内换 4 帧、17ms 内换 2 帧；右缘一次跳 277pt / 322pt；首帧变化带 [31..410]pt ⇒ detail 当场消失。
+    试过并否掉的两条：① `cacheDisplay` 整窗快照当盖子 ⇒ 侧栏材质在窗口服务里是纯黑（`/tmp/r552f/page250.png`）；② 几何交给窗口服务（`window.animator().setFrame(_, display: false)`）⇒ 屏上右缘只给 3 档（750→535→302）、展开 2 档（750→417），中间帧不存在。
+    现状：R552 撤成一步切换（D-552）。判据 `FOLD_ONE_STEP` / `FOLD_PROGRESS_ROSTER` / `FOLD_NO_OP` 钉住「布局 1 次、几何 1 次、minSize 1 次、中间进度 0 次」；`M1431` 钉时长恒 0。
+    修法（要重新演，先解决这两格）：(a) 窗口服务在真机上给不给连续中间帧 —— 试 `CVDisplayLink`/`NSView.displayLink` 驱动的 `CALayer.position/bounds` 自绘折页，或把宿主视图从窗口 resize 里摘出来（容器 + `autoresizingMask=[]`）；(b) 材质怎么冻成一张位图 —— `cacheDisplay` 不行；`CGWindowListCreateImage` 要屏幕录制授权，不能进产品。参考值（只读思路、未搬代码/素材）：Surface Duo / DuoUX 铰链折叠 —— 折页绕铰链 ~60°（投影 cos60°≈0.5）、透视 m34≈-1/700pt、阴影贴折痕一侧 ~18pt、时长 0.2s、ease-in-out。
+    退场：屏上右缘步进 ≥8 档、最大单步 ≤40pt、t=0 无整窗内容跳变，且折叠/展开双向都过；达不到就保持一步切换，不许拿「比上一版好」交差。
+
 **630. 浮层键盘提示把关闭键写成小写 `esc`**（R550 发现并同轮结案）
     现象：`QuickPickKeyboardHint.text` 是「↑↓ 选择 · ↵ 粘贴 · esc 关闭」，而全 App 其它提示统一用「Esc」；11pt 下小写 x-height 5.99pt，键名读起来像普通单词。
     修法：改「Esc 关闭」；cap height 7.85pt（+31%），宽 5.13→5.22pt；新判据 `HINT_KEY_CAPS`（≥7pt）+ M1429 CAUGHT；含提示行的 26 张浮层帧只差提示行。**同轮结案**。

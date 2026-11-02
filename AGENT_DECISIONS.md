@@ -8785,3 +8785,11 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 理由：星高 7.5→8.5pt、星宽 8.0→9.0pt、星墨 115/113→148/147（+29%/+30%）；新判据 `QUICKPICK_STAR_HEIGHT` 判星形 bbox 高 ≥8pt，整帧逐像素差只落在 18×17px 徽标窗 ⇒ 标题/时间轴不动；M1430 退回 9pt CAUGHT。
 - 兼容性/迁移：只改一颗徽标尺寸；帧 CHANGED=2（`quickpick-favorite` 亮/暗），基线 354→354；录制帧确定性 10/10 diff=0。
 - 边界：runner 1x 待签收，569 保持开单；627/629/624 不受影响。
+
+## D-552 折叠/展开不演动画：宁可不演，也不拿「先卡后跳」交差（R552）
+
+- 背景：用户实测折叠/展开卡顿 + 窗口突变；本轮先用真机 60fps 录屏把它量成读数（旧值见 BACKLOG 631）。
+- 决定：`MainWindowCollapsePolicy.animationDuration` 恒为 0，并撤掉 `MotionCatalog.Role.windowFold`，折叠/展开改成**一步切换**；删掉 60Hz 定时器、逐拍 `setFrame(display:true)`、按 progress 叠两棵树的交叉淡与折痕，以及本轮试过又撤掉的快照盖子（`MainWindowFoldAnimator`）。
+- 理由：三条候选路都在同一台机器上量过 —— 旧做法屏上 50ms 只换 4 帧且右缘一次跳 277pt；快照盖子把侧栏材质拍成纯黑；几何交给窗口服务只拿到 2–3 档中间宽。**没有中间帧的动画就是跳变**，而一步切换至少不假装在动。
+- 兼容性/迁移：状态、两档宽度（`.windowFold` 撤档后目录少一档，`testEveryRoleHasAConsumer` 与 `MOTION_KIND_UNWIRED` 两把守卫同笔转绿）；、`minSize`、提示、菜单标题、⌘\ 全部不变；`foldProgress` 仍在（只剩 0/1 两档），离屏夹具与帧不受影响；`.windowFold` 仍留在 `MotionCatalog` 目录里，只是折叠不再读它。
+- 边界：要重新演必须先解决 BACKLOG 631 的两格；判据 `testFoldAnimationDurationIsPinnedToZero` + `M1431` 会把「悄悄把时长加回去」的提交判红。

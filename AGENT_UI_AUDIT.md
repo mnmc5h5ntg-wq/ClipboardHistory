@@ -363,6 +363,18 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 551 轮（R552 · 2026-11-02 · U-2343…U-2351）：折叠/展开撤成一步切换（D-552，产品 5 文件）
+
+- **U-2343：⓪ CI。** HEAD=origin=`01421e5`、ahead=0、`git push` no-op；api=200/apple=200。基线**全部现读**（R551 的抄数教训）：帧 354、全量 1390/56/0（600.3s）、预检 330/295/757 bad=0、ARM 423/1244、HIDDEN 417/1183 rot=0、电池 691/5、安装 432=432、清账 162/63/0、streak 1（as-of 551）。三跑读时 in_progress ⇒ NOT-RUN：`41374412622↔14ae33a`、`41374877453↔ca9217b`、`41374916378↔01421e5`；已 concluded 的九跑不重取（结论在 R551 节 ⑤，已定论的 run 不可变）。
+- **U-2344：① 先把缺陷量成读数。** 新建真机屏上通道 `scripts/real_screen_fold_transition.py` + `RealScreenFoldTransitionTests`：产品自己那扇窗摆上屏幕，ffmpeg avfoundation 60fps 录屏，逐帧算窗口矩形内的内容差；矩形与屏幕 pt 尺寸由被测物自己印。旧值：折叠那拍主线程空窗 **60ms**、展开 **106ms**；屏上只在 **50ms 内换 4 帧**（折叠）/ **17ms 内换 2 帧**（展开）；右缘一次跳 **277pt**（折叠）/ **322pt**（展开）；首帧变化带 `[31..410]pt` ⇒ detail 当场消失。离屏胶片与进程内模型值序列都答不了这一格（前者没有窗口服务，后者一步写入后就是终值）。
+- **U-2345：② 三条路都被读数否掉。** (a) 旧做法（t=0 翻状态 + 60Hz 逐拍 `setFrame(display:true)`）就是上面那组数；(b) 快照盖子：`cacheDisplay` 拍不出侧栏材质，那一块在窗口服务里是**纯黑**（`/tmp/r552f/page250.png`）；(c) 几何交给窗口服务（`animator().setFrame` + `display:false`）：屏上右缘只给 **3 档**（750→535→302）、展开 **2 档**（750→417）⇒ 中间帧不存在。按靶 ⑤：**撤成一步切换**。
+- **U-2346：② 产品改动。** `MainWindowCollapseController` 删掉定时器与逐帧路径（一次切换 = 布局 1 次 + 几何 1 次 + `minSize` 1 次）；`ContentView` 从「按 progress 叠两棵树 + 遮罩 + 折痕」改成 `if isCollapsed` 二选一（不再逐帧发布进度）；`MainWindowCollapsePolicy.animationDuration` 恒 0；`App.swift` 的最小宽继续按状态取。删掉 `MainWindowFoldAnimator`（盖子撤掉后没有使用者）。
+- **U-2347：② 判据/刀。** 新判据 7 条（`FOLD_ONE_STEP` 双向、`FOLD_PROGRESS_ROSTER` 档数=2、`FOLD_NO_OP`、reduce 同形、时长恒 0、政策真值表）；`M1431–M1434` 四把新刀全 CAUGHT、RESTORE_CLEAN=yes；旧刀 **M1397/M1398/M1399/M1400/M1401** 因源码换形腐烂（HIDDEN rot=5）⇒ 针与描述一起重钉到新等价行并复跑。预检 334/295/757 bad=0、ARM 427/1244（dupes=0 repeats=0）、HIDDEN 421/1183 rot=0。
+- **U-2348：③ 帧/录制。** 重捕：CHANGED=0、ADDED=0、MISSING=0、MISSING=0，基线 354；逐张看图确认。录制帧确定性 通过（全量里 `testRecordingCardFrameIsDeterministicAcrossRenders` 绿）（全量里同一条）。
+- **U-2349：③④ 全量/换装/新值/电池/清账/streak。** 全量 **1392/57/1（886.8s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=433=433`（PID 41809）；**新值（同一台真机、同一条通道）**：折叠 = **1 帧到位**（跨 0ms、间距 16.7ms）、展开 = 2 帧；进程内 `宽档数=2`（旧值 15–19）、`分栏档数=2`（旧 11–15）⇒ 屏上不再有任何中间宽，也就不再有「演到一半卡住」；清账 162/63/0；电池 691/5（台账后复跑）；产品面连续零改动 **1** 轮（as-of 552，`product_streak.py --streak-for 552` 现读）。
+- **U-2350：⑤ 622/624/627/629/628/625/626 + BACKLOG 631。** 622 frame 半第八/九值（207.7、156.6）与本轮无关：那条判据读的是探针自己的 displayLink，不看折叠；624/627/629 保持开单；628/625/626 结案不重开。**新开 631**：折叠要重新演，必须先解决「窗口服务给不给连续中间帧」与「材质怎么冻成位图」这两格，并写下参考值（DuoUX 铰链：折页 ~60°、m34≈-1/700、阴影 ~18pt、0.2s）。
+- **U-2351：⑥ 收口与交接。** ⓪ 笔 `48f1528`、产品笔与台账笔随后；下一轮 R553（第 552 轮 / Round 550）：先 push 复核 ahead=0；读本轮各笔的跑（同次 push 只有头笔建跑）+ 复读 R552 ⓪ 那三跑；622/624/627/629 继续；禁碰清单加到 7 面（R546 登录失败图标、R547 默认行锁、R548 250pt 批量标题、R549 无序列表符号、R550 浮层提示键名、R551 收藏星尺寸、**R552 折叠过渡**）；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号从 **M1435** 起。
+
 ## 第 550 轮（R551 · 2026-11-02 · U-2335…U-2342）：浮层收藏星加到 10pt（产品 1 文件 + 判据）
 
 - **U-2335：⓪ CI。** HEAD=origin=`5e1cccb`、ahead=0、`git push` no-op；api=200/apple=200。`41358196373 ↔ 5588b88`、`41358232108 ↔ 5e1cccb` 读时 **in_progress ⇒ NOT-RUN**。`41354387000 ↔ 181b022` failure **仅 STEP[15]**（SelectionReveal 5 origins，1388 tests 1 failure）、`41351367430 ↔ deb28a1` 仅 STEP[15]（SelectionReveal）、`41351231883 ↔ a210a29` STEP[18]+[19]（frame **196.7ms/2**、markdown 1x=1）、`41350830308 ↔ f0e9ea0` 仅 STEP[9]（skip_roster+sources）、`41337616903 ↔ 30c7913` 仅 STEP[15]（PerfBudget 274.93ms + 录制帧 dark 9457px）、`41334537980 ↔ 8b667ae` 仅 STEP[15]（SelectionReveal）。

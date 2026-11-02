@@ -12,8 +12,8 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R551 / 第 550 轮 / Round 548）
-## R552 开工 ⓪（2026-11-02 · 第 551 轮 / Round 549）
+最后更新：2026-11-02（本地 · R552 / 第 551 轮 / Round 549）
+## R552 状态（2026-11-02 · 第 551 轮 / Round 549 · 产品 4 文件 + 真机通道）
 
 R552 ⓪ 读数（只登记、不轮询）：HEAD=origin=`01421e5`、ahead=0、`git push` no-op；api=200/apple=200；已跟踪改动=0（未跟踪 scratch 为历史遗留）。基线（**全部本轮现读**，R551 的抄数教训）：帧 **354**、全量 **1390/56/0（600.3s）**、预检 **330/295/757 bad=0**、ARM **423/1244**（dupes=0 repeats=0）、HIDDEN **417/1183 rot=0**、电池 **691/5**、安装 **432=432**（PID 99095）、清账 **162/63/0**、product_streak **1**（as-of 551，`--streak-for 551` 现读，last=`77c92ad`/550）。
 - 三跑读时 **in_progress ⇒ NOT-RUN**：`41374412622 ↔ 14ae33a`（R551 台账）、`41374877453 ↔ ca9217b`（R551 补记）、`41374916378 ↔ 01421e5`（R551 补记二）。queued/in_progress 不算成功；R551 产品笔 `77c92ad` 与台账笔同次 push ⇒ 无独立跑。
@@ -29,6 +29,11 @@ R552 ⓪ 读数（只登记、不轮询）：HEAD=origin=`01421e5`、ahead=0、`
 
 **编号说明**：用户发令写「R553（第 552 轮 / Round 550）」，但 R552 从未开工（无提交、无节、origin==HEAD=`01421e5`）⇒ 跳号会在 `curve_from_ledger` 的 Round 序列里留一个洞、并让 `product_streak`/轮次守卫按号找不到本轮节。按仓库身份链记作 **R552（第 551 轮 / Round 549）**，靶与验收条件一字不改。
 
+① 缺陷读数（真机 60fps 录屏，`scripts/real_screen_fold_transition.py` + `RealScreenFoldTransitionTests`）：折叠那拍主线程空窗 60ms、展开 106ms；屏上 50ms 内换 4 帧 / 17ms 内换 2 帧；右缘一次跳 277pt（折叠）/322pt（展开）；首帧变化带 [31..410]pt ⇒ detail 当场消失。
+② 三条路各量各否：旧做法（60Hz 逐拍 `setFrame(display:true)`）＝上面那组数；快照盖子＝侧栏材质在窗口服务里是纯黑；几何交给窗口服务（`animator().setFrame` + `display:false`）＝屏上右缘只给 3 档（750→535→302）、展开 2 档 ⇒ 没有中间帧。按靶 ⑤ 收成**一步切换**（D-552）。全量里 `CodeBlockLineNumbersTests/testFontShrinksOnlyAtThreeDigits` 在并行跑时红、单独跑 4/4 绿 ⇒ 具名并行 flake（R537 那一族字体度量），不改判据不销单。
+③ 产品 5 文件：`MainWindowCollapseController`（删定时器与逐帧路径，计数器 switches/geometryWrites/minSizeWrites/publishedIntermediates）、`ContentView`（`if isCollapsed` 二选一，不再叠两棵树按 progress 交叉淡）、`MainWindowCollapsePolicy`（时长恒 0，删 easedProgress/foldVisual/minSizeTiming）、`App.swift` 的最小宽继续按状态取；`MotionCatalog` 把 `.windowFold` 这一档**从目录里撤掉**（`testEveryRoleHasAConsumer` 与 `MOTION_KIND_UNWIRED` 两把守卫现读「windowFold 没有任何消费者」⇒ 按 R42 的规矩不许留空转声明，接不上就撤）。本轮没有新增产品文件（试过的 `MainWindowFoldAnimator` 随盖子方案一起删掉）。判据 7 条（FOLD_ONE_STEP / FOLD_PROGRESS_ROSTER / FOLD_NO_OP / FOLD_REDUCE / 真值表）；M1431–M1434 四把新刀 CAUGHT、RESTORE_CLEAN；旧刀 M1397–M1401 腐烂（HIDDEN rot=5）⇒ 针与描述重钉并复跑；预检 334/295/757 bad=0、ARM 427/1244（dupes=0 repeats=0）、HIDDEN 421/1183 rot=0；build 0 告警。
+④ 帧/全量/换装/新值/电池/清账/streak：帧 354（CHANGED=0、ADDED=0、MISSING=0）；全量 **1392/57/1（886.8s）**；换装 `ok / SHA_MATCH=1 / INSTALL_ENTRIES=433=433`（PID 41809）；新值（同一条真机通道）：折叠 = **1 帧到位**（跨 0ms、间距 16.7ms）、展开 = 2 帧；进程内 `宽档数=2`（旧值 15–19）、`分栏档数=2`（旧 11–15）⇒ 屏上不再有任何中间宽，也就不再有「演到一半卡住」；清账 162/63/0；电池 **691/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 552，`python3 scripts/product_streak.py --streak-for 552` 现读，last=`884e197`/551）。
+⑤ 622/624/627/629 与交接：622 frame 半第八/九值（207.7、156.6）与本轮无关（那条判据读探针自己的 displayLink，不看折叠）；624/627/629 保持开单；628/625/626 结案；新开 **631**（要重新演必须先解决「窗口服务给不给中间帧」与「材质怎么冻」，参考值已记）。CI/交接：⓪ 笔 `48f1528`、产品笔 `884e197`、台账笔随后；R551 三跑（`41374412622↔14ae33a`、`41374877453↔ca9217b`、`41374916378↔01421e5`）读时 in_progress ⇒ NOT-RUN，下一轮必读。下一轮 R553（第 552 轮 / Round 550）：先 push 复核 ahead=0；读本轮各笔（同次 push 只有头笔建跑）+ 复读上述三跑与 R551 已读九跑；622/624/627/629 继续；禁碰清单 7 面（R546–R552）；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板均不动；刀号 M1435 起。
 ## R551 状态（2026-11-02 · 第 550 轮 / Round 548 · 产品 1 文件 + 判据）
 
 R551 ⓪ 读数（只登记、不轮询）：HEAD=origin=`5e1cccb`、ahead=0、`git push` no-op；api=200/apple=200；无已跟踪改动（未跟踪 scratch 为历史遗留）。基线（STATE 实读）：帧 **354**、全量 **1389/56/0（708.1s）**、预检 **329/295/757 bad=0**、ARM **422/1244**、HIDDEN **410/1183 rot=0**、电池 **691/5**、安装 **431=431**、清账 **162/162/0**、product_streak **1**（as-of 549）。

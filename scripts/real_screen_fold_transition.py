@@ -169,6 +169,7 @@ def analyze(path, crop_px, width_pt, ticks_rows):
             sweep.append(int(hh.min()) * width_pt / FRAME_W if len(hh) else -1)
         steps = len({round(v / 20.0) for v in sweep if v >= 0})
         if len(b) == 1:
+            instant = False
             verdict = u"一步切换（单帧到位，无中间态）"
         else:
             instant = left_pt >= 0 and left_pt < SEAM_PT + 20 and steps <= 2
