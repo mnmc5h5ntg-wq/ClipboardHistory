@@ -1,0 +1,10 @@
+# R552 ① 旧值（真机屏上 + 进程内同拍），通道：scripts/real_screen_fold_transition.py
+REALSCREEN_FOLD file=r552-fold.mov 帧=480 采样=360x200 窗口宽=750pt 每列≈2.08pt
+REALSCREEN_FOLD_BURST id=1 起=2.400s 跨=50ms 变化帧=4 间距max=16.7ms 中位=16.7ms 首帧变化带=[31..410]pt 扫过档数=1 ⇒ detail 当场消失
+REALSCREEN_FOLD_SWEEP id=1 左界序列=31,31,31,31
+REALSCREEN_FOLD_BURST id=2 起=3.850s 跨=17ms 变化帧=2 间距max=16.7ms 中位=16.7ms 首帧变化带=[33..415]pt 扫过档数=1 ⇒ detail 当场消失
+REALSCREEN_FOLD_TICKS 行数=453 宽档数=15 分栏出现档数=15
+REALSCREEN_FOLD_LAYOUT 分栏消失@t=750ms 窗口宽=420.0pt progress=1.000 折叠=1
+# 进程内同拍（同一份 CSV 的逐拍表）
+折叠：切换那拍主线程空窗 60ms（508→568）；p 0.010→0.851 只用 12ms ⇒ 窗口宽一次跳 277pt（747→470），余下 50pt 花 88ms
+展开：空窗 106ms（1913→2019）；宽一次跳 322pt（420→742），余下 8pt 花 60ms

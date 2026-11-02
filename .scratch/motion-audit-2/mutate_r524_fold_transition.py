@@ -7,29 +7,27 @@ CTRL="Sources/ClipboardHistoryApp/Managers/MainWindowCollapseController.swift"
 POLICY="Sources/ClipboardHistoryApp/Models/MainWindowCollapsePolicy.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
-  ("M1399","reduce-motion 仍走过渡", CTRL,
-   '''        let duration = MainWindowCollapsePolicy.animationDuration(
-            reduceMotion: MotionCatalog.motionShouldBeReduced
-        )''',
-   '''        let duration = MainWindowCollapsePolicy.animationDuration(
-            reduceMotion: false
-        )'''),
-  ("M1400","宽度一帧跳到终点（没有收放过程）", CTRL,
-   '''        let width = transitionFromWidth
-            + (transitionToWidth - transitionFromWidth) * CGFloat(eased)''',
-   '''        let width = transitionToWidth'''),
-  ("M1401","中缝阴影永不出现", POLICY,
-   '''    static func hingeOpacity(foldProgress: Double) -> Double {
-        4 * min(max(foldProgress, 0), 1) * (1 - min(max(foldProgress, 0), 1))
-    }''',
-   '''    static func hingeOpacity(foldProgress: Double) -> Double {
-        0
-    }'''),
+  # R552 重钉三臂：折叠改成一步切换（D-552）之后，这三臂原来钉的坏法（reduce 仍走过渡 /
+  # 宽度逐拍收放 / 中缝阴影）在源码里已经没有对应行了。针与描述一起挪到本轮钉的三格：
+  ("M1399","reduce 路径跳过几何（与普通路径不同形）", CTRL,
+   '''        switches += 1
+        applyState(collapsed)''',
+   '''        switches += 1
+        applyState(collapsed)
+        if MotionCatalog.motionShouldBeReduced { return }'''),
+  ("M1400","折叠时仍按展开档算目标宽", CTRL,
+   '''        let width = MainWindowCollapsePolicy.targetWidth(
+            collapsed: isCollapsed,''',
+   '''        let width = MainWindowCollapsePolicy.targetWidth(
+            collapsed: false,'''),
+  ("M1401","折叠时 detail 可见性判断反了", POLICY,
+   '''    static func detailVisible(collapsed: Bool) -> Bool { !collapsed }''',
+   '''    static func detailVisible(collapsed: Bool) -> Bool { collapsed }'''),
 ]
 TESTS={
-  "M1399": "MainWindowFoldMotionTests/testReduceMotionCutsInstantly",
-  "M1400": "MainWindowFoldMotionTests/testCollapseWidthIsMeasuredFrameByFrame",
-  "M1401": "MainWindowFoldMotionTests/testFoldProgressDrivesContentOpacityAndHinge",
+  "M1399": "MainWindowFoldMotionTests/testReduceMotionPathIsTheSameOneStep",
+  "M1400": "MainWindowFoldMotionTests/testCollapseIsOneStepWithNoIntermediateState",
+  "M1401": "MainWindowCollapseTests/testDetailIsNotRenderedWhenCollapsed",
 }
 def run(test):
     p=subprocess.run(["swift","test","--filter",test],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)

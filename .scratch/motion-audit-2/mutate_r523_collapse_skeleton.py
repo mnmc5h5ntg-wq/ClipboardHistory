@@ -17,13 +17,16 @@ ARMS=[
    '''    static func minWidth(collapsed: Bool) -> CGFloat {
         expandedMinWidth
     }'''),
+  # R552 重钉：一步切换之后没有 `isTransitioning` 这一格了，针挪到新的那一行。
   ("M1397","切换时不记用户 resize 的宽度", CTRL,
-   '''        if !isTransitioning, let target { rememberWidth(of: target) }
-''',
-   ''''''),
+   '''        if let target { rememberWidth(of: target) }''',
+   '''        if let target, false { rememberWidth(of: target) }'''),
+  # R552 重钉：时长改成恒 0（D-552），这条坏法重新落在新的函数体上。
   ("M1398","reduce 下时长不归零", POLICY,
-   '''        reduceMotion ? 0 : toggleDuration''',
-   '''        toggleDuration'''),
+   '''    static func animationDuration(reduceMotion: Bool) -> TimeInterval { 0 }''',
+   '''    static func animationDuration(reduceMotion: Bool) -> TimeInterval {
+        reduceMotion ? MotionCatalog.duration(for: .windowFold) : 0
+    }'''),
 ]
 TESTS={
   "M1395": "MainWindowCollapseTests/testCollapseUsesItsOwnWidthAndExpandRestoresResizedWidth",

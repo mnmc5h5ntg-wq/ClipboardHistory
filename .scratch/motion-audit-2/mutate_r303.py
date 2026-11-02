@@ -49,7 +49,7 @@ NEEDLE_CEIL = u'BARE_PRINT_LINE_CEILING = 15'
 REPL_CEIL = u'BARE_PRINT_LINE_CEILING = 16'
 EXPECT_CEIL = u'登记值是 16'
 
-NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift", "QuickPickKeyboardHintTests.swift"]'
+NEEDLE_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift",\n                      "QuickPickPlacementTests.swift", "QuickPickKeyboardHintTests.swift",\n                      "RealScreenFoldTransitionTests.swift"]'
 REPL_ROSTER = u'                      "UICaptureHarness.swift", "UIInteractionProbeTests.swift", "QuickPickPlacementTests.swift"]'
 
 ARMS = [
