@@ -211,10 +211,22 @@ struct DailyCopyHeatmapView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             Text("少")
-            ForEach(0..<VisualHeat.ladder.count, id: \.self) { index in
+            // R559：图例必须覆盖**网格画出来的每一种颜色**。零次格用的是
+            // `Color.primary.opacity(VisualHeat.empty)`（灰），不是 `accentColor` 的浅档 ——
+            // 从前图例只画 `ladder` 那四档蓝，于是 182 格里 46 格（25%）用的颜色在图例里查不到，
+            // 读图的人只能猜"那块灰算不算一种更浅的蓝"。
+            // 补一块的同时把方块间距 8→4：总宽 4×8+3×8=56pt → 5×8+4×4=56pt，**一点没变宽** ——
+            // 页脚那句悬停详情实测已经顶到 x≈494/860px（2x），加宽就会把它挤成省略号，
+            // 那是拿一个可见性问题去换另一个。
+            HStack(spacing: 4) {
                 VisualShape.rounded(VisualRadius.heatCell)
-                    .fill(Color.accentColor.opacity(VisualHeat.ladder[index]))
+                    .fill(Color.primary.opacity(VisualHeat.empty))
                     .frame(width: VisualHeat.cell - 3, height: VisualHeat.cell - 3)
+                ForEach(0..<VisualHeat.ladder.count, id: \.self) { index in
+                    VisualShape.rounded(VisualRadius.heatCell)
+                        .fill(Color.accentColor.opacity(VisualHeat.ladder[index]))
+                        .frame(width: VisualHeat.cell - 3, height: VisualHeat.cell - 3)
+                }
             }
             Text("多")
                 .padding(.trailing, 4)

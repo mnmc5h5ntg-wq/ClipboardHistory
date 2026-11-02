@@ -260,7 +260,11 @@ TABLES = [
             "mutate_r558_label_hard_cut",
             "mutate_r558_sandwich_no_margin",
             "mutate_r558_sandwich_one_sided",
-            "mutate_r558_borrowed_red_returns"]
+            "mutate_r558_borrowed_red_returns",
+            "mutate_r559_legend_back_to_four",
+            "mutate_r559_legend_wrong_color",
+            "mutate_r559_wiring_pin",
+            "mutate_r559_unjudged_line_gone"]
 # R355 / BACKLOG 430：这一格以前只认 **三位** 刀号（`M\d{3}`），而仓库从 R345 起已经在用四位
 # （M1001…）：`arm_sites` 认不出 id ⇒ 整张表被读成「静态抽不出 needle」⇒ 那几把刀**从来没被针预检查过**
 # （R355 自己那把 M1005 就是这么发现隐形的；同一次把 r348 的旧针重钉了）。四位只许往后长，不再加第二位边界。

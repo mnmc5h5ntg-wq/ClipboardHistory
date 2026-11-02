@@ -2588,6 +2588,13 @@ final class MotionFilmstripTests: XCTestCase {
             emit("MOTION_NOT_RUN=markdown-2x 2x 在 runner 上读 1 帧（峰值 0.0193；probe 2x=2/1x=2；本机 2x 4–7）"
                  + " ⇒ 小墨量文字交换的 2x 采样在边界；CI 判 1x，2x 进 extended")
         }
+        // R559 / BACKLOG 635：**这一格签的是"标签有没有中间态"，不签"那三行接线在不在"**。
+        // 四臂探针实测（`.scratch/motion-audit-2/probe_r558_what_the_film_measures.py`）：单摘
+        // `.id(title)` / `.transition(.opacity)` / `.animation(value:)` 与三条全摘，本条读数逐字不变
+        // ⇒ 接线由 `testMarkdownModeLabelWiringIsPinnedBecauseTheFilmCannotSeeIt` 的 grep 钉子签。
+        // 不打这一行就是让这一格的绿冒充"接线被验过"（R555 那一课：具名的不判才算说了实话）。
+        emit("MOTION_NOT_RUN=markdown-wiring-unjudged markdown-mode-label：本格只判标签有没有中间态；"
+             + "那三行接线像素通道判不到（四臂探针逐字相同，BACKLOG 635）⇒ 由 grep 钉子 + M1452 签")
         for scale in scales {
             let scenario = Scenario.markdownModeLabel()
             let film = record(scenario, scale: scale)
@@ -2626,7 +2633,50 @@ final class MotionFilmstripTests: XCTestCase {
 
 
 
-    /// R558 / 629：新口径的**合成真值表** —— 斜坡要有中间帧、硬切必须读 0，
+    /// R559 / BACKLOG 635：**这条胶片判不到那三行接线，所以接线由一根明说的契约钉子钉住。**
+    ///
+    /// 为什么不是像素判据的补充而是替代：R558 的四臂探针
+    /// （`.scratch/motion-audit-2/probe_r558_what_the_film_measures.py`，已入库可重跑）实测 —— 分别摘
+    /// `.id(title)`、`.transition(.opacity)`、`.animation(value: title)`，以及三条全摘，
+    /// `MOTION_MARKDOWN_MODE_FADE` 的 `过渡帧数`/`相邻差帧数`/`峰值`/`相邻差序列` 与未变异**逐字相同**
+    /// （只有 `窗口`/`每格` 随时钟抖 321–330ms / 12.4–12.7ms）⇒ 像素通道对这三行是**盲**的。
+    /// 盲不是缺陷，**假装不盲才是**：所以这一格把话说死 —— 胶片只签"标签有没有中间态"，
+    /// 接线由下面这三根 needle 签，且必须带一个会红的刀（M1452：摘掉 `.id(title)` 这一格必须红）。
+    /// 判据不许因为"反正胶片看不见"就把三行删了；也不许反过来拿胶片的绿冒充接线被验过。
+    func testMarkdownModeLabelWiringIsPinnedBecauseTheFilmCannotSeeIt() throws {
+        let product = try productSource(named: "Views/DetailView.swift")
+        guard let start = product.range(of: "struct MarkdownModeButton") else {
+            return XCTFail("找不到 `MarkdownModeButton` ⇒ 这条钉子没有对象（不许静默给绿）")
+        }
+        let tail = String(product[start.lowerBound...])
+        // 截到第一行**正好四个空格**的 `}`：这个结构体嵌在 `DetailView` 里，成员收尾是八个空格，
+        // 四个空格那一档就是它自己的关门 —— 再往后就是隔壁的视图，那三行接线不该算它数上。
+        let body = codeOnly(tail.components(separatedBy: "\n    }").first ?? tail)
+        let needles = [
+            ".id(title)",
+            ".transition(.opacity)",
+            ".animation(MotionCatalog.animation(for: .contentFade), value: title)",
+        ]
+        var missing: [String] = []
+        for needle in needles where !body.contains(needle) {
+            missing.append(needle)
+        }
+        emit("MOTION_WIRING_UNJUDGED markdown-mode-label 钉子=grep 钉住=\(needles.count - missing.count)/\(needles.count) "
+             + "原因=探针四臂（单摘三行与全摘）胶片读数逐字相同 ⇒ 像素通道判不到接线（BACKLOG 635）")
+        XCTAssertEqual([], missing,
+            "`MarkdownModeButton` 的标签过渡接线缺了 \(missing.count) 根：\(missing.joined(separator: "、"))"
+                + " ⇒ 这条钉子是 635 里**唯一**能看见它们的东西（胶片看不见），删掉就没有任何东西会红。")
+        // 钉子与"不判"这句话必须一起存在：有人把胶片改成能判了（那就该有像素证人），
+        // 必须同时把这里的措辞改掉，否则两处对同一件事说两句话。
+        // **只在胶片那一格的函数体里找**（R53/R55 那一族：扫自身源码的守卫会先命中自己写的那行字面量，
+        // 于是把胶片里的 emit 删掉，这一句仍然绿着在"守卫自己的消息文本"里读到它）。
+        let filmBody = region(in: codeOnly(try String(contentsOf: URL(fileURLWithPath: #filePath), encoding: .utf8)),
+                              named: "func testMarkdownModeLabelChangeIsAVisibleProcess")
+        XCTAssertTrue(filmBody.contains("MOTION_NOT_RUN=markdown-wiring-unjudged"),
+                      "胶片那一格里没有『接线不判』那条具名读数了 ⇒ 要么它已被像素证人覆盖（那这一格的 grep 该撤），"
+                          + "要么它又开始悄悄冒充自己验过接线 —— 两种都要红，不许只留一句注释。")
+    }
+
     /// 而同一次过渡在两种采样相位下旧口径会从 2 掉到 1、新口径不掉。
     ///
     /// 为什么单开一格而不是只跑真胶片：这条判据换的就是「数什么」，

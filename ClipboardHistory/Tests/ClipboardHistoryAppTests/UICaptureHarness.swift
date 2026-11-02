@@ -3091,6 +3091,122 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(judged, 2)
     }
 
+    /// R559 / 第四格：**图例必须覆盖网格画出来的每一种颜色**。
+    ///
+    /// 旧值（本轮现读，`heatmap-populated` 两档）：网格里有五种实心填充 —— 零次档亮 (243,243,243) /
+    /// 暗 (41,41,41)，加四个非零档；图例只画四档蓝（`VisualHeat.ladder`），**零次档在图例里没有对应块**
+    /// ⇒ 一张 182 格的图里 46 格（25%）用的颜色读图者查不到，只能猜"灰的是不是一种更浅的蓝"。
+    ///
+    /// 判据不写死坐标也不抄产品常量，全部从帧里量：
+    /// ①「网格行」= 一行里有 ≥20 段宽度 ≥8px 的游程（每行 26 格；页脚那一行实测只有 14–16 段）；
+    /// ② 格宽由网格行的游程中位数拿到 ⇒ 实心判定随倍率走（runner 是 1x，写死 6px 会把它判成缺）；
+    /// ③「格色」= 网格区里能放下一个 `3/5 格宽` 实心方块的颜色（文字笔画放不下，所以标签不会被误当成档位）；
+    /// ④「图例色」= 网格下缘以下能放下 `1/4 格宽` 实心方块的颜色。
+    /// 正对照内置：四个非零档在两档里都被读到 ⇒ "缺一种"是通道看见之后的缺，不是探测失败。
+    func testHeatmapLegendCoversEveryCellColor() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r559-legend-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            guard let fixture = self.fixtures(appearance: appearance).first(where: { $0.name == "heatmap-populated" }) else {
+                return XCTFail("\(tag)：找不到 `heatmap-populated` 夹具 ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("heatmap-populated-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("\(tag)：帧读不回来")
+            }
+            let w = rep.pixelsWide, h = rep.pixelsHigh, bpr = rep.bytesPerRow, spp = rep.samplesPerPixel
+            let bytes = Array(UnsafeBufferPointer(start: base, count: bpr * h))
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            func triple(_ x: Int, _ y: Int) -> (Int, Int, Int) {
+                let i = y * bpr + x * spp
+                return (Int(bytes[i + rOff]), Int(bytes[i + rOff + 1]), Int(bytes[i + rOff + 2]))
+            }
+            func near(_ a: (Int, Int, Int), _ b: (Int, Int, Int), _ tol: Int) -> Bool {
+                abs(a.0 - b.0) + abs(a.1 - b.1) + abs(a.2 - b.2) <= tol
+            }
+            var freq: [String: Int] = [:]
+            var pageTriple: (Int, Int, Int) = (0, 0, 0)
+            var pageBest = 0
+            for y in stride(from: 0, to: h, by: 2) {
+                for x in stride(from: 0, to: w, by: 2) {
+                    let t = triple(x, y)
+                    let key = "\(t.0),\(t.1),\(t.2)"
+                    let n = (freq[key] ?? 0) + 1
+                    freq[key] = n
+                    if n > pageBest { pageBest = n; pageTriple = t }
+                }
+            }
+            func isPage(_ t: (Int, Int, Int)) -> Bool { near(t, pageTriple, 12) }
+            // ① 网格行：宽游程 ≥20 的那些 y；顺带拿格宽（游程中位数）
+            var gridBottom = -1
+            var cellWidthSamples: [Int] = []
+            for y in 0..<h {
+                var widths: [Int] = []
+                var inRun = false
+                var start = 0
+                for x in 0...w {
+                    let hit = x < w && !isPage(triple(x, y))
+                    if hit, !inRun { inRun = true; start = x }
+                    else if !hit, inRun {
+                        inRun = false
+                        if x - start >= 8 { widths.append(x - start) }
+                    }
+                }
+                if widths.count >= 20 {
+                    gridBottom = max(gridBottom, y)
+                    cellWidthSamples.append(contentsOf: widths)
+                }
+            }
+            XCTAssertGreaterThan(gridBottom, 0,
+                                 "\(tag)：找不到「一行 26 格」的网格行 ⇒ 这张热图没画出来，判据没有对象")
+            cellWidthSamples.sort()
+            let cellW = cellWidthSamples.isEmpty ? 8 : cellWidthSamples[cellWidthSamples.count / 2]
+            let cellSolid = max(4, cellW * 3 / 5)
+            let swatchSolid = max(3, cellW / 4)
+            func solidColors(from y0: Int, to y1: Int, side: Int, minHits: Int) -> [(triple: (Int, Int, Int), hits: Int)] {
+                var counts: [String: (t: (Int, Int, Int), n: Int)] = [:]
+                for y in stride(from: y0, to: y1, by: 2) {
+                    for x in stride(from: 0, to: w - side, by: 2) {
+                        let t = triple(x, y)
+                        if isPage(t) { continue }
+                        var ok = true
+                        var k = 1
+                        while k < side {
+                            if !near(triple(x + k, y), t, 6) { ok = false; break }
+                            if !near(triple(x, y + k), t, 6) { ok = false; break }
+                            k += 1
+                        }
+                        if !ok { continue }
+                        let key = "\(t.0),\(t.1),\(t.2)"
+                        counts[key] = (t, (counts[key]?.n ?? 0) + 1)
+                    }
+                }
+                return counts.values.filter { $0.n >= minHits }.map { ($0.t, $0.n) }
+                    .sorted { $0.1 > $1.1 }
+            }
+            let cellColors = solidColors(from: 0, to: gridBottom + 1, side: cellSolid, minHits: 30)
+            XCTAssertGreaterThanOrEqual(cellColors.count, 4,
+                "\(tag)：网格区只数到 \(cellColors.count) 种实心填充色 ⇒ 这张图没画满，包含判断没有对象（不许读成通过）")
+            let legendColors = solidColors(from: gridBottom + 1, to: h, side: swatchSolid, minHits: 8)
+            var missing: [String] = []
+            for (t, _) in cellColors where !legendColors.contains(where: { near($0.triple, t, 6) }) {
+                missing.append("(\(t.0),\(t.1),\(t.2))")
+            }
+            emit("HEAT_LEGEND_COVERAGE \(tag) 格色=\(cellColors.count) 图例色=\(legendColors.count) "
+                 + "缺=[\(missing.joined(separator: " "))] 格宽=\(cellW)px 网格下缘 y=\(gridBottom) "
+                 + "实心判定 格\(cellSolid)px/图例\(swatchSolid)px")
+            XCTAssertEqual([], missing,
+                "\(tag)：这些网格用过的颜色在图例带里找不到对应方块 ⇒ 图例没覆盖全部档位（缺 \(missing.count) 种：\(missing.joined(separator: " "))）")
+        }
+    }
+
     // MARK: - R318 · BACKLOG 373②：浮层选中底与两枚系统参照色（先当探针拿机制）
 
     /// 一条 RGB 读数（整数 0…255）。
