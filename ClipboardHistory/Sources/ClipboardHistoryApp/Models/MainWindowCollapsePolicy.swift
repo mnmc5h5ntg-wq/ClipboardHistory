@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 /// R523：主窗口折叠/展开的**纯函数**。宽度、最小宽、时长、屏幕 clamp 都在这里判，
-/// 视图与窗口只照着放 —— 这样"折叠宽不许沿用 268pt 侧栏宽"与"reduce 下 0 时长"
+/// 视图与窗口只照着放 —— 这样"折叠宽不许沿用 268pt 侧栏宽"与"折叠不演（时长恒 0）"
 /// 都能被真值表逐格点名，而不是只活在注释里。
 enum MainWindowCollapsePolicy {
     /// 折叠宽是**单独定义**的：268pt 是侧栏在展开态里的列宽，列表挤在那条里读不出条目。
@@ -12,56 +12,17 @@ enum MainWindowCollapsePolicy {
     static let expandedMinWidth: CGFloat = 600
     static let minHeight: CGFloat = 440
     /// R524：展开态侧栏的缝位（`navigationSplitViewColumnWidth` 的 ideal 280）。
-    /// 过渡时折叠列表只从这条缝右侧开始遮罩 —— 否则两棵整树交叉淡会同时画出两套 chrome。
+    /// R552：折叠不再演之后，这一格只剩"侧栏与详情的分界在哪"这一个含义（判据与帧量尺读它）。
     static let sidebarSeamWidth: CGFloat = 280
-    /// R524：时长/曲线**只从 MotionCatalog 取**（`.windowFold`），这里不再写第二个常数。
-    /// R523 的 reduce=0 判据继续用 `animationDuration`。
-    static var toggleDuration: TimeInterval { MotionCatalog.duration(for: .windowFold) }
-
-    static var foldControlPoints: [Double] {
-        MotionCatalog.timingControlPoints(for: .windowFold, reduceMotion: false)
-    }
-
-    static func animationDuration(reduceMotion: Bool) -> TimeInterval {
-        reduceMotion ? 0 : toggleDuration
-    }
-
-    /// 三次贝塞尔缓动（与 `Animation.timingCurve` 同一条曲线）。控制器自己按 60Hz 驱动，
-    /// 所以需要把控制点摊成 `t → 进度` 的纯函数；reduce 路径根本不走它（时长为 0）。
-    static func easedProgress(_ linear: Double,
-                              controlPoints: [Double] = foldControlPoints) -> Double {
-        let x = min(max(linear, 0), 1)
-        guard controlPoints.count == 4 else { return x }
-        let x1 = controlPoints[0], y1 = controlPoints[1]
-        let x2 = controlPoints[2], y2 = controlPoints[3]
-        func bezier(_ t: Double, _ a: Double, _ b: Double) -> Double {
-            let u = 1 - t
-            return 3 * u * u * t * a + 3 * u * t * t * b + t * t * t
-        }
-        var low = 0.0, high = 1.0, t = x
-        for _ in 0..<12 {
-            let bx = bezier(t, x1, x2)
-            if abs(bx - x) < 0.0005 { break }
-            if bx < x { low = t } else { high = t }
-            t = (low + high) / 2
-        }
-        return min(max(bezier(t, y1, y2), 0), 1)
-    }
-
-    /// 交叉淡的两端：展开布局 `1−p`、折叠布局 `p`。两端都由各自的 tree 是否挂载兜底
-    ///（p=1 时展开树整棵不渲染，detail 不存在；p=0 时折叠树不渲染）。
-    static func expandedContentOpacity(foldProgress: Double) -> Double {
-        1 - min(max(foldProgress, 0), 1)
-    }
-
-    static func collapsedContentOpacity(foldProgress: Double) -> Double {
-        min(max(foldProgress, 0), 1)
-    }
-
-    /// 中缝折页阴影：两端 0，中段最强（4p(1−p)，p=0.5 时 1）。
-    static func hingeOpacity(foldProgress: Double) -> Double {
-        4 * min(max(foldProgress, 0), 1) * (1 - min(max(foldProgress, 0), 1))
-    }
+    /// R552：**折叠/展开不再演**（D-552）。时长恒为 0 —— 不是"还没调好"，是三条路都被真机读数否掉了：
+    /// 1. 旧版（t=0 翻状态 + 60Hz 逐拍 `setFrame(display:true)`）：切换那一拍主线程空窗
+    ///    60ms（折叠）/106ms（展开），屏上只在 50ms 内换 4 帧、17ms 内换 2 帧 ⇒ 先卡一下再整窗跳；
+    /// 2. 快照盖子：`cacheDisplay` 拍不出侧栏材质，那一块在窗口服务里是纯黑；
+    /// 3. 几何交给窗口服务（`animator().setFrame`，`display:false`）：本机屏上右缘只给出
+    ///    3 档（750→535→302）、展开方向 2 档（750→417）⇒ 中间帧根本不存在，"演"就还是跳。
+    /// 一步切换至少是**诚实**的：没有中间态可卡，也不会让人以为窗口在动而它其实在跳。
+    /// 下一次要重新演，必须先解决「窗口服务给不给中间帧」与「材质怎么冻」这两格（BACKLOG 631）。
+    static func animationDuration(reduceMotion: Bool) -> TimeInterval { 0 }
 
     static func minWidth(collapsed: Bool) -> CGFloat {
         collapsed ? collapsedMinWidth : expandedMinWidth

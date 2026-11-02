@@ -3,10 +3,23 @@ import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
 
-/// R524：折叠/展开的过渡证人。两件事分开量：
-/// 1. **真实窗口宽**：逐拍读 `window.frame.width`（控制器 60Hz 驱动，可中断、reduce 直切）；
-/// 2. **过渡中间帧**：把 `ContentView` 按一组 `foldProgress` 离屏渲染成胶片，
-///    证明中间帧既不是展开端点也不是折叠端点（不是"只拍端点两张"）。
+/// R552：折叠/展开**一步切换**的证人（D-552「宁可不演也不卡顿」）。
+///
+/// 这一族以前的证人是离屏胶片（按 `foldProgress` 渲染中间态）与进程内逐拍的窗口宽序列 ——
+/// 用户实测反馈说真机上是「点一下先卡住，然后窗口整块跳过去」，而这两把尺都看不见那件事：
+/// 离屏通道压根没有窗口服务，进程内序列读的是模型值（一步写入之后模型就是终值，中间档只活在
+/// 合成画面里）。所以本轮先把量尺换成真实窗口的屏上采样（`scripts/real_screen_fold_transition.py`
+/// + `RealScreenFoldTransitionTests`），量完再决定留不留动画。
+///
+/// 屏上读数（同一台 MacBook Air，60fps 录像）：
+/// - 旧版：主线程空窗 60ms（折叠）/106ms（展开）；屏上只在 50ms 内换 4 帧、17ms 内换 2 帧；
+///   右缘一次跳 277pt（折叠）/322pt（展开）。
+/// - 快照盖子：侧栏材质在 `cacheDisplay` 里是纯黑 ⇒ 撤。
+/// - 几何交给窗口服务：屏上右缘只给 3 档（750→535→302）、展开 2 档 ⇒ 没有中间帧可演，撤。
+///
+/// 于是这一族判据钉的是"可数的形状"：一次切换 = 布局 1 次、几何 1 次、`minSize` 1 次、
+/// 中间进度 0 次；时长恒为 0（这一格由 `testFoldAnimationDurationIsPinnedToZero` 钉住，
+/// 把它改回 0.20 的提交会当场红）。
 @MainActor
 final class MainWindowFoldMotionTests: XCTestCase {
     private var defaults: UserDefaults!
@@ -15,15 +28,14 @@ final class MainWindowFoldMotionTests: XCTestCase {
     private var delegate: AppDelegate!
     private var savedReduceOverride: Bool?
     private var savedAnimationsEnabled: Bool?
-
     /// R526：真实窗口会经 `WindowConfigurator` 改写全局 `WindowChromeMetrics.shared`；
     /// 不还原会让同一进程后面渲染的详情帧换掉顶部 inset（runner 的 Swift 全量里真的发生了）。
     private var savedDetailContentTopInset: CGFloat?
 
     private func setUpProduct(_ name: String = UUID().uuidString) {
         savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
-        defaults = UserDefaults(suiteName: "r524-fold-\(name)")!
-        defaults.removePersistentDomain(forName: "r524-fold-\(name)")
+        defaults = UserDefaults(suiteName: "r552-fold-\(name)")!
+        defaults.removePersistentDomain(forName: "r552-fold-\(name)")
         savedReduceOverride = MotionCatalog.overrideReduceMotion
         savedAnimationsEnabled = MotionCatalog.animationsEnabled
         MotionCatalog.overrideReduceMotion = false
@@ -37,7 +49,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         for index in 0..<4 {
             store.add(
                 ClipboardIntake.Entry(
-                    content: .text("折叠胶片条目 \(index) abcdefghijklmnop"),
+                    content: .text("折叠一步切换取证条目 \(index) abcdefghijklmnop"),
                     thumbnail: nil,
                     sourceUTIs: ["public.utf8-plain-text"]
                 ),
@@ -82,7 +94,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
     }
 
     private func makeWindow(width: CGFloat = 750) -> NSWindow? {
-        WindowManager.showMainWindow()
+        WindowManager.showMainWindow(creatingIfNeeded: true)
         settle(0.12)
         guard let window = mainWindows.first else {
             XCTFail("没有建出主窗口")
@@ -95,225 +107,144 @@ final class MainWindowFoldMotionTests: XCTestCase {
         return window
     }
 
-    private func sampleTransition(seconds: TimeInterval = 0.7) -> [(width: CGFloat, progress: Double)] {
-        var samples: [(width: CGFloat, progress: Double)] = []
-        let deadline = Date().addingTimeInterval(seconds)
-        while Date() < deadline {
-            if let window = WindowManager.currentMainWindow {
-                samples.append((window.frame.width, controller.foldProgress))
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.008))
-            if samples.count > 3, !controller.isTransitioning { break }
-        }
-        return samples
-    }
-
-    private func waitForSettled() {
-        let deadline = Date().addingTimeInterval(1.2)
-        while controller.isTransitioning, Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.01))
-        }
-        XCTAssertFalse(controller.isTransitioning, "过渡没有收尾 ⇒ 留下半折状态")
-        settle(0.03)
-    }
-
-    func testCollapseWidthIsMeasuredFrameByFrame() {
+    /// 折叠：`perform` 返回的那一拍就必须已经是终态 —— 状态、进度、模型宽、最小宽四样一起到位。
+    func testCollapseIsOneStepWithNoIntermediateState() {
         setUpProduct()
         defer { tearDownProduct() }
         retireAllMainWindows()
         guard let window = makeWindow(width: 750) else { return }
 
+        controller.resetTransitionCountersForTesting()
         delegate.perform(.toggleMainWindowCollapse)
-        let samples = sampleTransition()
-        waitForSettled()
+        settle(0.05)
 
-        let widths = samples.map(\.width)
-        let progress = samples.map(\.progress)
-        let intermediate = widths.filter { $0 > 421 && $0 < 749 }
-        let distinct = Set(intermediate.map { Int($0.rounded()) })
-        let progressIntermediate = progress.filter { $0 > 0.02 && $0 < 0.98 }
-        // 1x/负载下的采样分辨率只有 1–2 个中间点（runner 9d882e4 实测 2 个），
-        // 所以地板放在"至少 1 个"：它仍能抓住"一帧跳到终点"（M1400 读到 0 个），
-        // 本机 2x 的完整序列记在台账里，不把机器分辨率当成产品性质。
-        XCTAssertGreaterThanOrEqual(intermediate.count, 1,
-                                    "折叠途中只读到 \(intermediate.count) 帧中间宽 ⇒ 是跳变不是过程：\(widths)")
-        XCTAssertGreaterThanOrEqual(distinct.count, 1, "中间宽只有 \(distinct.count) 个不同值：\(widths)")
-        for pair in zip(widths, widths.dropFirst()) {
-            XCTAssertLessThanOrEqual(pair.1, pair.0 + 1.0,
-                                     "折叠宽度不单调：\(pair.0) → \(pair.1)")
-        }
-        XCTAssertEqual(widths.first ?? 0, 750, accuracy: 1.0, "过渡不是从展开宽开始")
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "折叠没有落到 420")
-        XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5, "折叠后最小宽没有跟着切")
-        XCTAssertGreaterThanOrEqual(progressIntermediate.count, 1,
-                                    "foldProgress 中间帧不足：\(progress)")
-        // 末帧是采样器停手那一刻的值，可能停在过渡结束前一拍（runner bd96e93 读到 0.9989，
-        // 而窗口已经落在 420）⇒ 只要求它离终点足够近；「过渡真的走完」交给 settle 后的模型值。
-        XCTAssertGreaterThanOrEqual(progress.last ?? 0, 0.99,
-                                    "采样末帧离终点太远：\(progress)")
-        XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001,
-                       "过渡结束后模型进度没有落到 1：\(controller.foldProgress)")
-        CaptureReadings.emit("FOLD_WIDTH_FILM collapse frames=\(samples.count)"
-              + " intermediate=\(intermediate.count) distinct=\(distinct.count)"
-              + " widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
-              + " progress=[\(progress.map { String(format: "%.2f", $0) }.joined(separator: ","))]"
-              + " settled=\(String(format: "%.4f", controller.foldProgress))"
-              + " final=\(Int(window.frame.width)) min=\(Int(window.minSize.width))")
+        XCTAssertFalse(controller.isTransitioning, "一步切换不该有『还在过渡』这个状态")
+        XCTAssertTrue(controller.isCollapsed, "状态没跟着这一步走")
+        XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001)
+        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "模型宽没有一步到折叠档")
+        XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5, "最小宽没有一步落到折叠档")
+        XCTAssertEqual(controller.switches, 1, "一次点击切了不止一次布局")
+        XCTAssertEqual(controller.geometryWrites, 1, "一次点击写了一次以上几何（旧版是每拍一次）")
+        XCTAssertEqual(controller.minSizeWrites, 1, "一次点击写了一次以上 minSize")
+        XCTAssertEqual(controller.publishedIntermediates, 0, "发布了中间进度 ⇒ 整棵树会被逐拍重排")
+        CaptureReadings.emit("FOLD_ONE_STEP collapse 切换=\(controller.switches)"
+              + " 几何=\(controller.geometryWrites) minSize=\(controller.minSizeWrites)"
+              + " 中间态=\(controller.publishedIntermediates)"
+              + " 宽=\(Int(window.frame.width)) 最小=\(Int(window.minSize.width))")
     }
 
-    func testExpandWidthIsMeasuredFrameByFrame() {
+    /// 展开：同样一步到位，回到展开档的宽与最小宽。
+    func testExpandIsOneStepBackToExpandedGeometry() {
         setUpProduct()
         defer { tearDownProduct() }
         retireAllMainWindows()
         guard let window = makeWindow(width: 750) else { return }
         delegate.perform(.toggleMainWindowCollapse)
-        waitForSettled()
+        settle(0.05)
         XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
 
+        controller.resetTransitionCountersForTesting()
         delegate.perform(.toggleMainWindowCollapse)
-        let samples = sampleTransition()
-        waitForSettled()
-        let widths = samples.map(\.width)
-        let intermediate = widths.filter { $0 > 421 && $0 < 749 }
-        XCTAssertGreaterThanOrEqual(intermediate.count, 1,
-                                    "展开途中只读到 \(intermediate.count) 帧中间宽：\(widths)")
-        for pair in zip(widths, widths.dropFirst()) {
-            XCTAssertGreaterThanOrEqual(pair.1, pair.0 - 1.0,
-                                        "展开宽度不单调：\(pair.0) → \(pair.1)")
-        }
-        XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "展开没有回到 750")
-        XCTAssertEqual(window.minSize.width, 600, accuracy: 0.5)
-        CaptureReadings.emit("FOLD_WIDTH_FILM expand frames=\(samples.count)"
-              + " intermediate=\(intermediate.count)"
-              + " widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
-              + " final=\(Int(window.frame.width))")
+        settle(0.05)
+
+        XCTAssertFalse(controller.isCollapsed)
+        XCTAssertFalse(controller.isTransitioning)
+        XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "展开没有一步回到 750")
+        XCTAssertEqual(window.minSize.width, 600, accuracy: 0.5, "展开档最小宽没落下")
+        XCTAssertEqual(controller.switches, 1, "一次点击切了不止一次布局")
+        XCTAssertEqual(controller.geometryWrites, 1, "一次点击写了一次以上几何")
+        XCTAssertEqual(controller.minSizeWrites, 1, "一次点击写了一次以上 minSize")
+        XCTAssertEqual(controller.publishedIntermediates, 0)
+        CaptureReadings.emit("FOLD_ONE_STEP expand 切换=\(controller.switches)"
+              + " 几何=\(controller.geometryWrites) minSize=\(controller.minSizeWrites)"
+              + " 宽=\(Int(window.frame.width)) 最小=\(Int(window.minSize.width))")
     }
 
-    func testReduceMotionCutsInstantly() {
+    /// 进度这一辈子只许出现 0 与 1 两档（旧版每拍发布一次，等于每拍重排整棵树）。
+    func testFoldProgressOnlyEverTakesTheTwoEndpoints() {
+        setUpProduct()
+        defer { tearDownProduct() }
+        retireAllMainWindows()
+        guard let window = makeWindow(width: 750) else { return }
+        for _ in 0..<4 {
+            delegate.perform(.toggleMainWindowCollapse)
+            settle(0.05)
+        }
+        let roster = Set(controller.progressRosterForTesting.map { $0.rounded() })
+        XCTAssertEqual(roster, [0, 1], "发布过中间进度：\(controller.progressRosterForTesting)")
+        XCTAssertEqual(controller.publishedIntermediates, 0)
+        XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "四次往返没回到展开档")
+        CaptureReadings.emit("FOLD_PROGRESS_ROSTER 档数=\(roster.count) 值=\(roster.sorted())"
+              + " 切换=\(controller.switches) 中间态=\(controller.publishedIntermediates)")
+    }
+
+    /// 同档重复调用必须是空操作：不写几何、不写 minSize、不切布局。
+    func testSettingTheSameStateAgainWritesNothing() {
+        setUpProduct()
+        defer { tearDownProduct() }
+        retireAllMainWindows()
+        guard let window = makeWindow(width: 750) else { return }
+        controller.resetTransitionCountersForTesting()
+        controller.setCollapsed(true, window: window)
+        XCTAssertEqual(controller.switches, 1)
+        controller.resetTransitionCountersForTesting()
+        controller.setCollapsed(true, window: window)
+        XCTAssertEqual(controller.switches, 0, "同档重复调用又切了一次布局")
+        XCTAssertEqual(controller.geometryWrites, 0, "同档重复调用还会写几何")
+        XCTAssertEqual(controller.minSizeWrites, 0)
+        CaptureReadings.emit("FOLD_NO_OP 重复调用 切换=\(controller.switches) 几何=\(controller.geometryWrites)")
+    }
+
+    /// D-552 的那颗钉子：时长恒为 0。把它改回 `.windowFold` 的 0.20 会让这条红。
+    func testFoldAnimationDurationIsPinnedToZero() {
+        XCTAssertEqual(MainWindowCollapsePolicy.animationDuration(reduceMotion: false), 0, accuracy: 0.001,
+                       "折叠又有了时长 ⇒ 一步切换的决定（D-552）被推翻，但屏上中间帧那两格还没解决")
+        XCTAssertEqual(MainWindowCollapsePolicy.animationDuration(reduceMotion: true), 0, accuracy: 0.001)
+    }
+
+    /// reduce-motion 与普通路径必须**完全同形**：时长两边都是 0，走的也是同一条一步切换。
+    /// （显式把窗口传进去：SwiftPM 并行跑用例，`WindowManager.currentMainWindow` 是全局弱引用，
+    /// 靠它兜底会读到别的用例那扇窗。）
+    func testReduceMotionPathIsTheSameOneStep() {
         setUpProduct()
         defer { tearDownProduct() }
         retireAllMainWindows()
         MotionCatalog.overrideReduceMotion = true
         guard let window = makeWindow(width: 750) else { return }
+        XCTAssertEqual(MainWindowCollapsePolicy.animationDuration(reduceMotion: true),
+                       MainWindowCollapsePolicy.animationDuration(reduceMotion: false),
+                       "reduce 与普通路径拿到了不同的时长")
 
-        delegate.perform(.toggleMainWindowCollapse)
+        controller.resetTransitionCountersForTesting()
+        controller.setCollapsed(true, window: window)
         settle(0.05)
-        XCTAssertFalse(controller.isTransitioning, "reduce 下仍开了过渡计时器")
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "reduce 下不是 0 时长直切")
+        XCTAssertFalse(controller.isTransitioning)
+        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
         XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001)
         XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5)
-        CaptureReadings.emit("FOLD_REDUCE instant width=\(Int(window.frame.width)) progress=\(controller.foldProgress)"
-              + " transitioning=\(controller.isTransitioning)")
+        XCTAssertEqual(controller.switches, 1)
+        XCTAssertEqual(controller.geometryWrites, 1)
+        CaptureReadings.emit("FOLD_REDUCE instant width=\(Int(window.frame.width))"
+              + " 切换=\(controller.switches) 几何=\(controller.geometryWrites)")
     }
 
-    func testInterruptingMidFoldReversesWithoutHalfState() {
-        setUpProduct()
-        defer { tearDownProduct() }
-        retireAllMainWindows()
-        guard let window = makeWindow(width: 750) else { return }
-
-        delegate.perform(.toggleMainWindowCollapse)
-        let deadline = Date().addingTimeInterval(0.5)
-        while controller.foldProgress < 0.2, Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.005))
-        }
-        XCTAssertGreaterThanOrEqual(controller.foldProgress, 0.2, "没能在中途截到过渡")
-        XCTAssertTrue(controller.isTransitioning)
-        delegate.perform(.toggleMainWindowCollapse) // 反向
-        let samples = sampleTransition()
-        waitForSettled()
-
-        XCTAssertFalse(controller.isCollapsed)
-        XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "反向结束后没有回到展开宽")
-        XCTAssertEqual(controller.foldProgress, 0, accuracy: 0.001)
-        let widths = samples.map(\.width)
-        XCTAssertTrue(widths.allSatisfy { $0 >= 419 && $0 <= 751 },
-                      "中途出现过越界宽度（半折留痕）：\(widths)")
-        // 再折一次仍能收口
-        delegate.perform(.toggleMainWindowCollapse)
-        waitForSettled()
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "反向后再折没有落到 420")
-        CaptureReadings.emit("FOLD_INTERRUPT widths=[\(widths.map { String(format: "%.0f", $0) }.joined(separator: ","))]"
-              + " final=\(Int(window.frame.width))")
-    }
-
-    func testFoldProgressDrivesContentOpacityAndHinge() {
-        XCTAssertEqual(MainWindowCollapsePolicy.expandedContentOpacity(foldProgress: 0), 1, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.expandedContentOpacity(foldProgress: 0.5), 0.5, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.expandedContentOpacity(foldProgress: 1), 0, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.collapsedContentOpacity(foldProgress: 0), 0, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.collapsedContentOpacity(foldProgress: 1), 1, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.hingeOpacity(foldProgress: 0), 0, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.hingeOpacity(foldProgress: 0.5), 1, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.hingeOpacity(foldProgress: 1), 0, accuracy: 0.001)
-        XCTAssertGreaterThan(MainWindowCollapsePolicy.hingeOpacity(foldProgress: 0.25), 0.5,
-                             "中缝阴影在中段不够可见")
-    }
-
-    /// 过渡中间帧：按 0/0.25/0.5/0.75/1 渲染真正的 `ContentView` 并落盘。
-    /// 判据是"中间帧既不是展开端点、也不是折叠端点"，不是只看两端的差。
-    func testFoldFilmstripRendersIntermediateProgressFrames() throws {
-        setUpProduct()
-        defer { tearDownProduct() }
-        let progressValues: [Double] = [0, 0.25, 0.5, 0.75, 1]
-        let outDir = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_SHOTS"]
-                         ?? "/tmp/r524_fold_film", isDirectory: true)
-        try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-
-        var reps: [Double: NSBitmapImageRep] = [:]
-        for progress in progressValues {
-            let view = ContentView(historyStore: store,
-                                   isCollapsed: progress >= 1,
-                                   foldProgress: progress)
-                .frame(width: 750, height: 560)
-            let host = NSHostingView(rootView: view)
-            host.frame = NSRect(x: 0, y: 0, width: 750, height: 560)
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
-                                  styleMask: .borderless,
-                                  backing: .buffered,
-                                  defer: false)
-            window.contentView = host
-            host.layoutSubtreeIfNeeded()
-            settle(0.12)
-            guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
-                return XCTFail("progress=\(progress) 读不回帧")
-            }
-            host.cacheDisplay(in: host.bounds, to: rep)
-            reps[progress] = rep
-            if let png = rep.representation(using: .png, properties: [:]) {
-                try png.write(to: outDir.appendingPathComponent(
-                    "fold-progress-\(Int(progress * 100))-750x560.png"))
-            }
-        }
-        guard let expanded = reps[0], let collapsed = reps[1] else { return XCTFail("缺端点帧") }
-        func differingPixels(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep) -> Int {
-            guard let ab = a.bitmapData, let bb = b.bitmapData,
-                  a.pixelsWide == b.pixelsWide, a.pixelsHigh == b.pixelsHigh else { return -1 }
-            var count = 0
-            let total = a.pixelsWide * a.pixelsHigh
-            for i in 0..<total {
-                let offset = i * 4
-                if abs(Int(ab[offset]) - Int(bb[offset])) > 8
-                    || abs(Int(ab[offset + 1]) - Int(bb[offset + 1])) > 8
-                    || abs(Int(ab[offset + 2]) - Int(bb[offset + 2])) > 8 {
-                    count += 1
-                }
-            }
-            return count
-        }
-        var intermediateDiffs: [String] = []
-        for progress in [0.25, 0.5, 0.75] {
-            guard let rep = reps[progress] else { return XCTFail("缺 \(progress) 帧") }
-            let diffFromExpanded = differingPixels(rep, expanded)
-            let diffFromCollapsed = differingPixels(rep, collapsed)
-            XCTAssertGreaterThan(diffFromExpanded, 2000,
-                                 "p=\(progress) 与展开端点几乎相同 ⇒ 这一帧没有过渡内容")
-            XCTAssertGreaterThan(diffFromCollapsed, 2000,
-                                 "p=\(progress) 与折叠端点几乎相同 ⇒ 这一帧没有过渡内容")
-            intermediateDiffs.append("p\(progress)=\(diffFromExpanded)/\(diffFromCollapsed)")
-        }
-        CaptureReadings.emit("FOLD_FILM frames=\(progressValues.count) dir=\(outDir.path)"
-              + " intermediateDiffs=\(intermediateDiffs.joined(separator: ";"))"
-              + " hinge=\(progressValues.map { String(format: "%.2f", MainWindowCollapsePolicy.hingeOpacity(foldProgress: $0)) }.joined(separator: ","))")
+    /// 政策真值表：两档宽/最小宽、菜单标题、detail 可见性 —— 这些与"演不演"无关，继续钉住。
+    func testCollapsePolicyGeometryTruthTable() {
+        XCTAssertEqual(MainWindowCollapsePolicy.collapsedWidthDefault, 420, accuracy: 0.001)
+        XCTAssertEqual(MainWindowCollapsePolicy.expandedWidthDefault, 750, accuracy: 0.001)
+        XCTAssertEqual(MainWindowCollapsePolicy.minWidth(collapsed: true), 360, accuracy: 0.001)
+        XCTAssertEqual(MainWindowCollapsePolicy.minWidth(collapsed: false), 600, accuracy: 0.001)
+        XCTAssertFalse(MainWindowCollapsePolicy.detailVisible(collapsed: true))
+        XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: true), "展开窗口")
+        XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: false), "折叠窗口")
+        XCTAssertEqual(MainWindowCollapsePolicy.targetWidth(collapsed: true,
+                                                            expandedWidth: 750,
+                                                            collapsedWidth: 420,
+                                                            visibleWidth: 1000), 420, accuracy: 0.001)
+        // 屏幕比目标档还窄时屏幕优先（窗口不许跑出屏）
+        XCTAssertEqual(MainWindowCollapsePolicy.targetWidth(collapsed: false,
+                                                            expandedWidth: 750,
+                                                            collapsedWidth: 420,
+                                                            visibleWidth: 700), 700, accuracy: 0.001)
     }
 }

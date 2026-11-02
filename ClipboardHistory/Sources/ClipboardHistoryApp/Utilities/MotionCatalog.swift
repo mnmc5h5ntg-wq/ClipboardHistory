@@ -58,10 +58,6 @@ enum MotionCatalog {
         case slider
         /// 骨架扫光（M9）。**它是常驻循环，不是一次过渡** —— 见 `isAmbient`。
         case skeletonSweep
-        /// R524：主窗口折叠/展开。宽度逐帧收放 + 内容交叉淡 + 中缝阴影，
-        /// **由 `MainWindowCollapseController` 自己按 60Hz 驱动**（不是 SwiftUI 隐式动画）：
-        /// 可中断、能逐帧量、reduce 下直接 0 时长。目录只给时长与曲线控制点。
-        case windowFold
     }
 
     /// 全局上限。任何一档超过它都要在这里改常数，改完 `testEveryRoleStaysUnderTheCeiling` 会红
@@ -107,9 +103,6 @@ enum MotionCatalog {
         // 否则读起来像"它跳过去了"而不是"它移过去了"。上限仍然由
         // `testEveryRoleStaysUnderTheCeiling` 统一管。
         case .slider: return 0.20
-        // R524：窗口宽要收放约 330pt（750↔420），与药丸同档：比 0.12 的零位移反馈慢一档，
-        // 仍在上限 0.25 以内。reduce 下由 `MainWindowCollapsePolicy` 直接给 0（直切）。
-        case .windowFold: return 0.20
         case .skeletonSweep: return 1.5
         }
     }
@@ -154,7 +147,7 @@ enum MotionCatalog {
     static func shape(for role: Role, reduceMotion: Bool) -> Shape {
         var shape = Shape()
         switch role {
-        case .hover, .selection, .contentFade, .emphasis, .receipt, .windowFold:
+        case .hover, .selection, .contentFade, .emphasis, .receipt:
             break
         case .skeletonSweep:
             // 常驻循环不"滑"也不"缩"：它只把一条渐变带推过去。

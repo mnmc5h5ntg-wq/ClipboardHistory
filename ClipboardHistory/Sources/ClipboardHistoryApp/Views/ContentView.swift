@@ -3,10 +3,10 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var historyStore: HistoryStore
     /// R523：折叠态只留列表；默认展开，离屏夹具不必跟着改。
+    /// R552：这一层**只有两个静态端点**。过渡期间屏上看到的是窗口服务上的快照盖子
+    /// （`MainWindowFoldAnimator`），不是这里的中间态 —— 旧版这里按 `foldProgress`
+    /// 每帧发布一次，等于逼整棵 SwiftUI 树 60Hz 重排，那正是「先卡一下再跳一大步」的来源。
     var isCollapsed: Bool = false
-    /// R524：过渡进度（0 展开 → 1 折叠），由 `MainWindowCollapseController` 逐帧推进。
-    /// nil = 静态两态（夹具/旧调用按 `isCollapsed` 取端点）。
-    var foldProgress: Double? = nil
     var toggleCollapse: () -> Void = {}
     /// R529：标题悬停的显式取证值（夹具用；不依赖 environment 传播）。
     var titleHoverForFixture: Bool = false
@@ -19,37 +19,16 @@ struct ContentView: View {
     /// 取证通道：离屏夹具/胶片送不进设置页那次点击，只有它们写这颗键。
     @Environment(\.pausedForCapture) private var pausedForCapture
 
-    private var progress: Double {
-        min(max(foldProgress ?? (isCollapsed ? 1 : 0), 0), 1)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             notices
-            // R524：右页折盖。展开树保持不动；折叠列表是**从侧栏右缝起被遮罩的一页**，
-            // 随 progress 淡入盖住详情 —— 不做两棵整树交叉淡（那会同时画出两套搜索框/标题）。
-            // 端点由"树是否挂载"兜底：p=1 时展开树整棵不渲染（detail 不存在），
-            // p=0 时折叠页不渲染。
-            ZStack {
-                if progress < 1 || !isCollapsed {
-                    expandedLayout
-                }
-                if progress > 0 || isCollapsed {
-                    if isCollapsed, progress >= 1 {
-                        collapsedLayout
-                    } else {
-                        collapsedLayout
-                            .opacity(MainWindowCollapsePolicy.collapsedContentOpacity(foldProgress: progress))
-                            .mask(transitionSheetMask)
-                    }
-                }
-            }
-            // 中缝阴影画在**两棵树之上**：折页盖上来时它才是折痕，不被 0.5 的页盖洗掉。
-            // R525：ZStack 必须显式吃满提议尺寸 —— 不加这一行时 runner 1x 的离屏捕获会把
-            // 详情列按"子视图理想宽"重新居中（detail 左轴 20→77pt、meta 0% 墨；R523 同帧是绿的）。
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .overlay(alignment: .leading) {
-                hingeSeam.offset(x: MainWindowCollapsePolicy.sidebarSeamWidth)
+            // R552：一次过渡只切换这一行的分支**一次**（在快照盖子底下发生）。
+            // 旧版在这里叠两棵树按 progress 交叉淡 + 遮罩 + 折痕，端点还各有一次硬切
+            //（p=1 才换折叠树、p=0 才撤展开树）—— 真机读数里那两次硬切就是「窗口突变」。
+            if isCollapsed {
+                collapsedLayout
+            } else {
+                expandedLayout
             }
         }
         // 提示条进出要有过渡（动效审计 M2）。键是"六条提示各自在不在"的签名，
@@ -102,26 +81,6 @@ struct ContentView: View {
                 LifecycleDebugLogger.log("collapsed sidebar appeared")
                 LifecycleDebugLogger.logKeyWindowLayout("collapsed sidebar appear")
             }
-    }
-
-    /// R524：折叠列表在过渡中的遮罩 —— 只露出缝右侧那一页；左侧 chrome 始终来自展开树。
-    private var transitionSheetMask: some View {
-        GeometryReader { geometry in
-            Rectangle()
-                .frame(width: max(0, geometry.size.width - MainWindowCollapsePolicy.sidebarSeamWidth))
-                .offset(x: MainWindowCollapsePolicy.sidebarSeamWidth)
-        }
-    }
-
-    /// R524：中缝折页的阴影带。两端 0、中段最强（`hingeOpacity`），
-    /// 宽度固定、只动透明度 —— 3D 透视会让 12/13 的文字发虚，这一版不做（D-523）。
-    private var hingeSeam: some View {
-        LinearGradient(colors: [Color.primary.opacity(0.18), Color.primary.opacity(0)],
-                       startPoint: .leading,
-                       endPoint: .trailing)
-            .frame(width: 10)
-            .opacity(MainWindowCollapsePolicy.hingeOpacity(foldProgress: progress))
-            .allowsHitTesting(false)
     }
 
     /// 暂停状态的绘制值：取证键优先，产品路径读 `@AppStorage`。

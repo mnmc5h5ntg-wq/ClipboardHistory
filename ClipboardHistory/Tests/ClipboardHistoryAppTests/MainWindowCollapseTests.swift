@@ -139,7 +139,9 @@ final class MainWindowCollapseTests: XCTestCase {
     func testReduceMotionDurationIsZero() {
         XCTAssertEqual(MainWindowCollapsePolicy.animationDuration(reduceMotion: true), 0,
                        "reduce 下不是 0 时长 ⇒ 会留下动画尾巴")
-        XCTAssertGreaterThan(MainWindowCollapsePolicy.animationDuration(reduceMotion: false), 0)
+        // R552 / D-552：折叠不再演 —— 普通路径也必须是 0 时长（旧版这里是 >0）。
+        XCTAssertEqual(MainWindowCollapsePolicy.animationDuration(reduceMotion: false), 0,
+                       "折叠又有了时长 ⇒ 一步切换的决定（D-552）被推翻，但屏上中间帧那两格还没解决")
     }
 
     func testPersistenceRoundTripKeepsStateAndBothWidths() {
@@ -186,8 +188,9 @@ final class MainWindowCollapseTests: XCTestCase {
         XCTAssertFalse(MainWindowCollapsePolicy.detailVisible(collapsed: true))
         let source = try productSource("Views/ContentView.swift")
         guard let collapsedStart = source.range(of: "private var collapsedLayout: some View {"),
-              let collapsedEnd = source.range(of: "/// R524",
-                                              range: collapsedStart.upperBound..<source.endIndex) else {
+              let collapsedEnd = source.range(of: "private var notices",
+                                              range: collapsedStart.upperBound..<source.endIndex)
+                ?? source.range(of: "/// R552", range: collapsedStart.upperBound..<source.endIndex) else {
             return XCTFail("ContentView 没有折叠布局这一段")
         }
         let collapsedBlock = String(source[collapsedStart.lowerBound..<collapsedEnd.lowerBound])
@@ -195,8 +198,12 @@ final class MainWindowCollapseTests: XCTestCase {
                        "折叠布局里仍然渲染了 detail")
         XCTAssertTrue(collapsedBlock.contains("HistorySidebarView"),
                       "折叠布局没有列表 ⇒ 折叠后是一块空白")
-        XCTAssertTrue(source.contains("if progress < 1 || !isCollapsed"),
-                      "落定折叠时展开树必须整棵不挂载（否则 detail 还在）")
+        // R552：分支从「按 progress 叠两棵树」改成「一次只挂一棵」。
+        // 这条断言钉的还是同一件事：折叠时展开树（含 detail）整棵不在。
+        XCTAssertTrue(source.contains("if isCollapsed {"),
+                      "ContentView 不再按状态二选一 ⇒ 折叠时展开树可能还挂着")
+        XCTAssertFalse(source.contains("var foldProgress"),
+                       "ContentView 还在读中间进度 ⇒ 每次发布都要重排整棵树（旧版的卡顿来源）")
     }
 
     func testDoubleClickTitleAndTheVisibleButtonShareTheSameAction() throws {

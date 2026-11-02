@@ -74,7 +74,6 @@ struct MainWindowContent: View {
     var body: some View {
         ContentView(historyStore: historyStore,
                     isCollapsed: collapse.isCollapsed,
-                    foldProgress: collapse.foldProgress,
                     toggleCollapse: { collapse.toggle() },
                     showsCollapseHint: collapse.showsCollapseHint,
                     acknowledgeCollapseHint: { collapse.acknowledgeCollapseHint() })
