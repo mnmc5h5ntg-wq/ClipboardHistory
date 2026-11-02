@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+- **R559（热图图例补零次档 + 635 两条腿；产品 1 文件 + 判据 2 文件 + 四把刀）**：`DailyCopyHeatmapView` 页脚的图例从前只画 `VisualHeat.ladder` 那四档蓝，而网格里的零次格用的是 `Color.primary.opacity(VisualHeat.empty)` —— 一张 182 格的图里 46 格（25%）的颜色在图例里查不到。新判据 `UICaptureTests/testHeatmapLegendCoversEveryCellColor`（网格用到的每一种实心色都必须出现在图例带里；格宽、网格下缘、实心判定全部从帧里量，不抄产品常量）先红后绿，产品补一块**同一份常量**的方块并把间距 8→4 吃掉宽度（净宽 56pt 不变）。635 结案：`MarkdownModeButton` 那三行接线由一条 grep 契约钉子钉住（M1452），胶片那一格同时打出 `MOTION_NOT_RUN=markdown-wiring-unjudged`（M1453）。刀 **M1450–M1453** 全 CAUGHT、RESTORE_CLEAN；帧基线同一笔 update；4.5/150/120ms/≥2 帧/2x 8.0pt/1x 6.0pt/`probeInkFraction=3%` 一律未动。
+
 ### 629 的判据对象换成「两端夹逼的连续距离」；电池观察者不再借红（R558 / 第 557 轮 / Round 555 / U-2387…U-2394 · 产品 0 文件 + 判据 1 文件 + 观察者 1 文件）
 
 `MOTION_MARKDOWN_MODE_FADE` 的 `过渡帧数` 从前数「相邻差 ≥ 各自峰值 ×15% 的格数」—— 那颗 `changedFraction` 是二值阈值占比，淡入中段就饱和，于是一次过程在 runner 上只剩两条边（27 帧里 2 格非零），相位一挪就掉到 1 ⇒ 判据把采样钟读成产品硬切。现在换成连续距离的两端夹逼：每帧分别量它离「触发前静置」与离「落定后静置」，两边都 ≥ 首末差 × `stepFloorRatio` 才算过程帧；「有没有交换」仍由原有阈值口径把关。`≥2` 地板、120ms 阈值、`.contentFade` 声明时长**全部不动**；旧口径的数与新口径一起打印。场景的驱动同时换成产品自己的 action（从前是夹具 `withAnimation` 给的插值）。新增合成真值表四臂 + 负向臂（title 钉成常量 ⇒ 判据必须红）。**探针实测**：把产品的 `.id(title)`/`.transition(.opacity)`/`.animation(value:)` 三行分别摘、全摘，读数逐字不变 ⇒ 这条胶片不能为那三行接线签字，而全仓没有任何 grep 守卫钉着它们 ⇒ 新开 BACKLOG 635。另把 `test_skip_roster` 从前「内层没有结论行」这一句借红拆成三态读数（`no-summary` 具名出口 / `inner-red` 仍红并带内层红名 / `ok` 照旧对账）+ 真值表（634 结案）。刀 **M1446–M1449** 全 CAUGHT。本轮自己造过一朵红并已修：新尺 `meanDistance` 被既有 AXIS_GUARD 名册点成「只读亮度」（扫到 6 / 名册 5）⇒ **改写法**（`max(rgb, alpha)` → `rgb > alpha ? rgb : alpha`，计算等价）而不是加豁免或放门，复跑名册守卫 0 失败。帧 354 CHANGED=0 MISSING=0 ADDED=0；全量 1400/57/0（748.1s）；build 0 告警；清账 162/63/0；电池 696/5。
