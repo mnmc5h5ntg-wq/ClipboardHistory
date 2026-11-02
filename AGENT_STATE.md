@@ -12,7 +12,14 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R555 / 第 554 轮 / Round 552）
+最后更新：2026-11-02（本地 · R556 / 第 555 轮 / Round 553）
+## R556 状态（2026-11-02 · 第 555 轮 / Round 553 · 产品 5 文件 + 判据 2 文件 + 三把刀）
+
+① ⓪ 与开跑后的两跑：`41439930389 ↔ 78e7ab5`（R555 台账笔）failure = **STEP[15]+[18]**，红名 = SelectionReveal 五值瞬移 + 622 **第十二值 181.6ms/2**；`41440039381 ↔ de58ab0`（R555 补记笔）**conclusion=success、失败步骤 0 条** ⇒ R555 自造的 STEP[9] 在 runner 上**转绿被签收**；`41442000018 ↔ eb883ad`（本轮 ⓪ 笔）in_progress ⇒ NOT-RUN。
+② ②(a) 632 的 eager 读搬到行显示：现读推翻 R553 的边界（真正主动读在 `HistoryStore.add` 的补图与 `ApplicationShell` 的启动全表回填，失败即每启动重来）；旧值 1 条复制=开 1 次、3 条历史=每次启动 3 次 ⇒ 新值 采集 0 / 启动装载 0 / 行显示按需 1（`HistorySidebarView.historyRow` 的 `.task(id: entry.id)` ⇒ `HistoryStore.requestThumbnail(for:)`，幂等、滚出即取消；`attachMissingFileThumbnails()` 整格删除）。同笔翻正被 grep 钉住的旧契约（`testStartupBackfillIsWired` → `testStartupSweepIsGoneAndRowDemandIsWired`，加行为证人；`testAddAttachesThumbnailAsynchronously` → 两半对照）。刀 **M1440/M1441/M1442** 全 CAUGHT、RESTORE_CLEAN。剩余两格具名续单：文本同一次渲染仍开两次、图片预览仍整文件读。
+③ ②(b) 629 真因量出：同一判据同一 1x，`5a943e7` 读 1 帧、`78e7ab5` 读 2 帧、峰值两次同为 0.0193，本机 4 帧 / 峰值 0.0097 / 窗口 322ms / 每格 12.4ms，而 runner 同卷每格 ≈44ms ⇒ "产品硬切"被排除，是 ≥2 帧地板压在那台机器的采样网格边缘（所以间歇）。本轮落**读数**（新增 `窗口=`、`每格=`、`相邻帧差=[…]`），地板/阈值/声明时长一个没动；两条修法相反的出口（加密录制 vs 换判据对象）写进 629 待下一轮选。
+④ ③ 验证链（顺序未换）：`swift build` 告警 **0**；判据卷 `UICaptureTests` **216/4 skipped/0 失败（606.0s）**；帧重捕 `FRAME_BASELINE_COMPARED=354 CHANGED=0 MISSING=0 ADDED=0` ⇒ 画面逐字节不变（并记下一条监控：将来若有夹具把真实图片路径装进侧栏行，`.task` 的异步补图会破坏帧确定性）；全量 **1396/55/0（709.7s）**；预检 **tables=342 covered=295 arms=757 bad=0**、`ARM_TOTAL files=435 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=429 可判=1183 rot=0 抽不出=6 处置=ok`；换装 `make bundle` = `SIGNATURE_KIND=local` ⇒ `INSTALL_RESULT=ok / SHA_MATCH=1 / INSTALL_SIGNATURE=local / INSTALL_ENTRIES=433=433`（PID 39654 → 86092，`SMOKE_OK=1`）。
+⑤ ④⑤ 账与交接：清账 **162/63/0**；电池 **695/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 555，`python3 scripts/product_streak.py --streak-for 555` 现读，last=`6b70474`/554）⇒ 本轮产品 5 文件，下一轮该格仍从 0 起算。CI：本轮 ⓪ 笔 `eb883ad` ⇒ 跑 `41442000018`（取号时 in_progress ⇒ 未读）；代码笔与台账笔的成对号见本节补记。下一轮 R557（第 556 轮 / Round 554）：必读 `41442000018 ↔ eb883ad` + 本轮代码笔/台账笔的跑（全部失败步骤）；② 头一格 = 629 在 (A) 加密录制 / (B) 换判据对象 里选一条落地（≥2 帧地板不许动），第二格 = 632 的"文本一次渲染只开一次"；633 仍等用户回执；622/624/627 继续；628/625/626/569/616 不重开；禁碰清单 9 面不变；刀号 **M1443** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板、2x 的 8.0pt 跨度地板与 1x 的 6.0pt 整行地板均不动。
 ## R556 ⓪ 开工（2026-11-02 · 第 555 轮 / Round 553 · CI 读单 + 基线全现读）
 
 > 本节是**开工节**，不是轮次节（标题刻意不写「状态」两字 —— `product_streak.py` 按第一个 `## Rnnn 状态（` 认当前轮，本轮的 streak 格要到收口那笔才存在）。

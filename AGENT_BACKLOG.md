@@ -10875,6 +10875,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     复查（R551）：`41358357437 ↔ f7aeca2`（纯 ⓪ 台账笔）STEP[19] Motion floor 红名 `testMarkdownModeLabelChangeIsAVisibleProcess`：1x 只有 1 个过渡帧（要 ≥2），且该条**不在登记名册里** ⇒ 按未登记红判红；同批三跑 `motion_red_occurrence.py` 读得 markdown reds=1/3、copy=NOT_PRINTED、fold=PASS。不改 `.contentFade` 0.20、不动 ≥2 帧地板、不往名册里加豁免，629 继续开单等出现率。
     现状：copy receipt 的 `.emphasis` 已从 0.16 调到 0.20（R541 产品 1 文件），本机 1x 过渡帧 2–3→3–4；markdown label 仍走 `.contentFade` 0.16，未改；Motion ≥2 帧地板不动、不改名册。
     退场：runner 连续两跑 copy receipt 不再红，且 markdown 的出现率有可数分母；没有分母前不销单。
+    真因（R556 现读，两条解释被分开）：同一判据、同一 1x —— `41431129208 ↔ 5a943e7` 读 **过渡帧数=1**、`41439930389 ↔ 78e7ab5` 读 **过渡帧数=2**（该跑 STEP[19] 因此没红），**两次峰值同为 0.0193**；本机 1x 读 4 帧、峰值 0.0097、窗口 322ms、每格 12.4ms。⇒ "产品没演（真硬切）"被排除：同一份代码本机读到 4 帧，且两处的总变化量一致；剩下的是 runner 每格 ≈44ms（同卷 `MOTION_SIDEBAR_COUNT` 现读 窗口=1143ms / 27 格）把 200ms 的过程摊到 1–2 格 ⇒ **≥2 帧地板在那台机器上正好压在采样网格边缘**，所以是间歇红而不是稳定红。
+    本轮落读数不动地板：`MOTION_MARKDOWN_MODE_FADE` 新增 `窗口=`、`每格=`、`相邻帧差=[…]`（同卷别的情景早有这几格，只有它没有 —— 没有它就分不开下面两条**修法相反**的路）。
+    两条出口（下一轮选一条落地，不许动 ≥2 帧地板）：(A) 加密这一格的录制，让 runner 也拿到 ≤15ms/格 —— 受 200s 看门狗约束，与 BACKLOG 444 同一格；(B) 换判据对象：不读整带帧差，改读标签自身的逐帧墨量/位置序列（R545 读 settled 进度那一族的形状）。
+
 
 **633. 桌面授权反复弹：签名身份已固定，剩人工验收一格**（R554 现读并新开）
     现象：用户反复被弹「时间剪史想访问桌面文件夹」，已批准无数次。根因两根：① 构建每轮 ad-hoc 重签 ⇒ CDHash 每轮变 ⇒ TCC 当新 App（R554 已修：固定自签身份，DR 钉在证书上）；② 预览/布局路径主动读受保护目录（另单 632）。
@@ -10894,6 +10898,13 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     退场：判据 + 刀落地、且真机人工确认「授权一次后不再弹」（与 633 的签名那半合起来才算完）。
     落地（R555，B 的第一半）：新增 `Sources/…/Utilities/ProtectedFileAccessLedger.swift` —— 四格计数器（`previewWholeFile` / `previewTextSample` / `layoutTextSample` / `layoutFileSizeStat`），只存 `url.path` 的整数哈希与格名（**不存路径、不落盘**），环有界 1024，**没有全局 reset**（判据并行，归零会把别人正在数的东西抹掉）。产品改动一格：`DetailView.preferredTextHeight` 在样本没读满 `textSampleLimit` 时不再 `attributesOfItem` 探路径（旧值一次渲染 2 次受保护访问 → 新值 1 次；≥32KB 那一支仍记 1 次，作负向臂证明这格是按条件省的而不是被删的）。判据 4 条从产品入口进（`ClipboardIntake.refresh(from:)` + 私有命名 pasteboard + 临时目录夹具）：采集 `total=0`、预览正对照 `previewTextSample=1`、估高度两臂、隐私一格（读数里不许有 `/` 或文件名）。刀 **M1436**（读搬回采集路径）/**M1437**（拿掉"读满才探"的条件 = 复现改动前旧形状）/**M1438**（读数带路径）全 CAUGHT。
     剩余两格（下一轮的靶，具名不静默）：① 图片预览那一格仍是 `Data(contentsOf:)` **整文件**读，且它发生在"预览加载"而不是"该行可见/被选中"——要落到可见性边界上（计数器已在，改一行就能看到数变）；② 同一次渲染里文本仍被开两次（`MediaLoader.readTextPreview` 与 `DetailView.preferredTextHeight` 各一次），要合成一次取样把字节传下去。`HistoryPersistence.isAlreadyOnDisk` 是自家容器，按实读**不算**受保护目录，不改口径。退场仍要两半合起来：本单的两格 + 633 的人工回执。
+    落地（R556，B 的第二半 —— 根因位置也换了）。R553 那句"采集路径只记 URL"只对 `ClipboardIntake` 成立：条目一进 `HistoryStore` 就有人去开那个文件。本轮现读并改掉两处 eager 读 ——
+      · `HistoryStore.add` 里的 `attachFileThumbnailIfNeeded(for:)`（复制那一刻 `CGImageSourceCreateWithURL` 打开图片）；
+      · `ApplicationShell` 每次启动的 `attachMissingFileThumbnails()`（全表没有行内预览的图片文件各开一遍；**读失败 ⇒ `thumbnail` 仍是 nil ⇒ 下次启动又全部重来**，这才是"批准无数次还在弹"的重复形状）。
+    新值：补图改由 `HistorySidebarView.historyRow` 的 `.task(id: entry.id)` 按需请求 `HistoryStore.requestThumbnail(for:)`（幂等，滚出列表即取消）。旧值现读：复制 1 条 = 开 1 次；3 条历史 = 每次启动开 3 次。新值：采集 0 次、启动装载 0 次、行显示按需 1 次。判据：`FileThumbnailTests` 里那条**源码 grep 契约**（"启动必须回填"）翻成 `testStartupSweepIsGoneAndRowDemandIsWired`（回填 API 不许存在 + 装载 3 条开 0 次的行为证人），`testAddAttachesThumbnailAsynchronously` 改成"add 开 0 次 / requestThumbnail 恰好 1 次且真写回"。刀 **M1440**（补图搬回采集）/**M1441**（需求路径永不开文件）/**M1442**（缩略图那格从计数器摘掉）全 CAUGHT、RESTORE_CLEAN。
+    剩余两格（仍是本轮实读，具名不静默）：① 文本在同一次渲染里仍被开两次（`MediaLoader.readTextPreview` 与 `DetailView.preferredTextHeight` 各一次）—— 要合成一次取样把字节传下去；② 图片预览仍是 `Data(contentsOf:)` 整文件读（它已在"详情区挂载"之后，属可见才读，但整文件这一格可以换成按需要的尺寸解）。
+    新增监控句：侧栏行的 `.task` 会异步补图 ⇒ 将来若有夹具把**真实存在的图片路径**装进侧栏行，帧就不再确定；本轮 354 帧逐字节不变，说明今天没有这种夹具。
+
 
 
 **631. 折叠/展开撤成一步切换：屏上中间帧拿不到**（R552 现读并新开，本轮不结案）

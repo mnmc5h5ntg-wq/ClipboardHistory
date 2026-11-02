@@ -8819,3 +8819,12 @@ R411 现读：主列表行可点可选中，但整行没有 hover 反馈。`Hist
 - 兼容性/迁移：判据名不变（`KNOWN_RED` 名册与五跑日志里的名字继续可查）；新增通道 `QUICKPICK_STAR_FULLROWS`、`QUICKPICK_STAR_SPAN_NOT_JUDGED`；`QUICKPICK_STAR_HEIGHT` 语义收窄成"亚像素栅格上的跨度"，写在判据的文档注释里。
 - 边界：新下界必须**在本机也会红** —— M1435（星 pointSize 8→5）把两把尺同时咬红（5.5<8.0、5<6.0），且刀脚本把"红了但不是咬在整行那一格"单独报成 `OTHER-RED`，防止拿另一朵红冒充证到了这一格。
 - 撤回：把两条判据合回一条 `height >= 8.0`（无倍率分支）即回到 R551 的形状；`ProtectedFileAccessLedger` 与星判据无耦合，可单独回退。
+
+## D-556 受保护目录的读取时机以"行真正显示"为界；判据契约若把 eager 读钉住，就翻契约（R556）
+
+- 背景：632 的 B。R553 把边界写在 `ClipboardIntake` 上，本轮现读发现真正的主动读在**它后面一格** —— `HistoryStore.add` 补行内缩略图，以及 `ApplicationShell` 每次启动的全表回填（读失败 ⇒ 条目仍是 nil ⇒ 每启动重来）。
+- 决定：① 补图的触发点从"采集 + 启动全表"改成"行出现在列表里"（`HistorySidebarView.historyRow` 的 `.task(id: entry.id)` ⇒ `HistoryStore.requestThumbnail(for:)`，幂等、滚出即取消）；② 删除 `attachMissingFileThumbnails()` 整格（不留"只是暂时没人调"的 API）；③ 把 `FileThumbnailTests` 里那条源码 grep 契约翻过来 —— 它原来断言"启动必须回填"，等于把缺陷钉成契约。
+- 理由：TCC 授权按 App 身份记（R554/R555 已把身份钉住），但**读的次数与频率仍由我们决定**。启动全表回填是"用户什么都没做就开 N 个受保护文件"，而失败重试的形态让它每启动重复一次。可见性边界是产品本来就有的语义（详情区已经这样）。
+- 兼容性/迁移：无存档格式变化；老历史里从未补到缩略图的条目，在用户滚到那一行时才补 —— 视觉结果相同，时点推迟。隐私计数只存路径哈希、不落盘、无全局 reset。
+- 边界：本轮**没有**把"整文件读"换成按需尺寸解码，也没有合并文本的两次取样 —— 两格都写回 632 续单，不静默放回。
+- 撤回：把 `add` 里恢复 `requestThumbnail(for: entry.id)` 即回到 eager 形状（刀 M1440 就是这一把，实测 CAUGHT）；恢复启动回填需要同时把 API 加回来，M1441/M1442 覆盖需求路径与计数器两种瞎法。

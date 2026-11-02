@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 受保护目录的主动读从"采集 + 启动全表"搬到"行真正显示"；629 量出是采样网格（R556 / 第 555 轮 / Round 553 / U-2371…U-2378 · 产品 5 文件 + 判据 2 文件）
+
+R553 记的"采集只记 URL"本轮被现读推翻：`HistoryStore.add` 会立刻 `FileThumbnailPolicy.thumbnail(for:)` 打开那个图片文件，而 `ApplicationShell` 每次启动 `attachMissingFileThumbnails()` 把全表没有预览的图片文件各开一遍 —— 读失败时 `thumbnail` 仍是 nil ⇒ 下次启动再来一次。旧值：1 条复制 = 1 次、3 条历史 = 每次启动 3 次。改法：补图搬到 `HistorySidebarView.historyRow` 的 `.task(id: entry.id)`（可见才读、滚出即取消），`HistoryStore.requestThumbnail(for:)` 幂等，回填 API 整格删除。新值：采集 0 次、启动装载 0 次、行显示按需 1 次。判据契约同步翻转（原来那条 grep 判据把 eager 读钉成契约），刀 M1440/M1441/M1442 全 CAUGHT。629：runner 读 1 帧（`5a943e7`）与 2 帧（`78e7ab5`）而峰值同为 0.0193、本机 4 帧 / 每格 12.4ms ⇒ 是 runner 每格 ≈44ms 的采样网格压在 ≥2 帧地板上，不是产品硬切；本轮补 `窗口/每格/相邻帧差` 三个读数，地板与阈值未动，两条相反修法写进 629。R555 的尺修由 `41440039381 ↔ de58ab0` **整跑 success** 签收。帧 354 CHANGED=0；全量 1396/55/0（709.7s）；build 0 告警；清账 162/63/0；电池 695/5。
+
 ### 收藏星判据按捕获倍率分开口径；受保护目录的读取改成"数出来的"（R555 / 第 554 轮 / Round 552 / U-2362…U-2370 · 产品 3 文件 + 判据 2 文件）
 
 `testQuickPickFavoriteStarIsAtLeastEightPointsTall` 原来把 2x 帧上量的 8.0pt 地板同时发给 1x 机器 ⇒ 本机绿、runner 连红四轮（light 7.0 / dark 6.0）。现在拆成两把尺：**跨度口径**（0.5pt 一格）判 8.0pt 不动、只在倍率 ≥1.5 上判，1x 上留 `QUICKPICK_STAR_SPAN_NOT_JUDGED` 具名读数；**整行口径**（一个 pt 行的全部像素行都落墨）两档同判 6.0pt = 8 − 首末各丢一行，倍率=1 时退化回跨度 ⇒ 没有哪一档被少判。刀 **M1435** 让两把尺同时红（5.5<8.0、5<6.0）。另新增 `ProtectedFileAccessLedger`（四格、只存路径哈希、有界、无全局归零）与 `ProtectedFileAccessTests` 4 条管线判据；`DetailView` 估高度在样本没读满时不再 `attributesOfItem` 探一次路径（旧值 2 次 → 新值 1 次，≥32KB 那一支仍 1 次作负向臂）。刀 M1436/M1437/M1438 CAUGHT。帧 354 `CHANGED=0`；全量 1396/55/0（756.9s）；build 0 告警；换装 `INSTALL_SIGNATURE=local`、433=433；电池 695/5。
