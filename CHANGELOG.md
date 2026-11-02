@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 文本估高度的取样乘数拿掉；帧确定性风险从注释升级成判据（R557 / 第 556 轮 / Round 554 / U-2379…U-2386 · 产品 2 文件 + 判据 2 文件）
+
+`CollapsibleFilePreview` 原来"宽度每变一次就重新打开同一份文件估高度"：现读旧值 = 展开一条文本 + 拖窗三次开 **4** 次，加预览共 5 次。改成视图作用域的一次性取样（`MultiFilePreviewLayout.TextSample` 带 `fileDigest`，防 `ForEach(id:\.offset)` 下 `@State` 跨 URL 复用）⇒ 新值 1 次（+ 预览 1 次）。等价证人：复用与每次重开两条路算出的四个高度逐个相等；负向臂：换文件必须重开、写回的取样必须对得上号。刀 **M1444/M1445** CAUGHT。另把 R556 留在注释里的"夹具若指向真实图片路径会破坏帧确定性"升级成 `UICaptureTests/testCaptureOpensNoProtectedFiles` 两臂（字面量 7/存在 0；拍 `sidebar-history` 前后计数增量 0），刀 **M1443**（夹具路径指向 `/etc/hosts`）CAUGHT。**629 判 NOT-RUN**：(A)/(B) 的依据是 runner 的 `窗口/每格/相邻帧差` 三个新数，`41450045802` 未结束 ⇒ 不赌、≥2 帧地板不动。帧 354 CHANGED=0 MISSING=0 ADDED=0；全量 1399/55/0（765.8s）；build 0 告警；清账 162/63/0；电池 695/5。
+
 ### 受保护目录的主动读从"采集 + 启动全表"搬到"行真正显示"；629 量出是采样网格（R556 / 第 555 轮 / Round 553 / U-2371…U-2378 · 产品 5 文件 + 判据 2 文件）
 
 R553 记的"采集只记 URL"本轮被现读推翻：`HistoryStore.add` 会立刻 `FileThumbnailPolicy.thumbnail(for:)` 打开那个图片文件，而 `ApplicationShell` 每次启动 `attachMissingFileThumbnails()` 把全表没有预览的图片文件各开一遍 —— 读失败时 `thumbnail` 仍是 nil ⇒ 下次启动再来一次。旧值：1 条复制 = 1 次、3 条历史 = 每次启动 3 次。改法：补图搬到 `HistorySidebarView.historyRow` 的 `.task(id: entry.id)`（可见才读、滚出即取消），`HistoryStore.requestThumbnail(for:)` 幂等，回填 API 整格删除。新值：采集 0 次、启动装载 0 次、行显示按需 1 次。判据契约同步翻转（原来那条 grep 判据把 eager 读钉成契约），刀 M1440/M1441/M1442 全 CAUGHT。629：runner 读 1 帧（`5a943e7`）与 2 帧（`78e7ab5`）而峰值同为 0.0193、本机 4 帧 / 每格 12.4ms ⇒ 是 runner 每格 ≈44ms 的采样网格压在 ≥2 帧地板上，不是产品硬切；本轮补 `窗口/每格/相邻帧差` 三个读数，地板与阈值未动，两条相反修法写进 629。R555 的尺修由 `41440039381 ↔ de58ab0` **整跑 success** 签收。帧 354 CHANGED=0；全量 1396/55/0（709.7s）；build 0 告警；清账 162/63/0；电池 695/5。

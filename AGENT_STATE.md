@@ -12,7 +12,14 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-02（本地 · R556 / 第 555 轮 / Round 553）
+最后更新：2026-11-02（本地 · R557 / 第 556 轮 / Round 554）
+## R557 状态（2026-11-02 · 第 556 轮 / Round 554 · 产品 2 文件 + 判据 2 文件 + 三把刀）
+
+① ⓪：`41442000018 ↔ eb883ad`（R556 ⓪ 笔）**success、失败步骤 0 条** ⇒ STEP[9] 连续第二跑绿；其余四跑（`41450045802↔5ba5b2f`、`41450081248↔680aea3`、`41450601769↔ccab101`、`41452722560↔58851c2`）in_progress/queued ⇒ **NOT-RUN**，其中对 in_progress 那跑取日志被 gh 直接拒（"logs will be available when it is complete"）⇒ 629 要的 `窗口/每格/相邻帧差` 三个 runner 真数**一个都没到**。既有红 `41439930389↔78e7ab5` = STEP[15]+[18]（SelectionReveal + 622 第十二值 181.6ms/2）⇒ 同族、本轮未碰该卷，仍入账。
+② ②(b) 632 的乘数拿掉：旧值现读 = 一次估高度 1 次、拖窗三次累计 **4 次**、加预览共 **5 次**（`recalculateTargetHeight()` 每次宽度变化重开同一份文件）⇒ 视图作用域 `TextSample`（带 `fileDigest`，理由：`ForEach(id:\.offset)` 让 `@State` 跨 URL 活下来）复用后新值 **1** 次。等价证人：复用与每次重开两路的四个高度逐个相等；负向臂：换文件必须重开且写回的取样要对得上号。刀 **M1444**（缓存永不命中 ⇒ 回到 4 次）/**M1445**（缓存不看文件身份）CAUGHT、RESTORE_CLEAN。剩余一格两条出口写回 632（preference 上行 vs 合成一个读取器，各自代价列明）。
+③ ②(c) 换新类别：R556 留在注释里的"夹具若指向真实图片路径 ⇒ `.task` 异步补图破坏帧确定性"升级成 `UICaptureTests/testCaptureOpensNoProtectedFiles` 两臂 —— 字面量臂现读 **7/存在 0**，运行时臂拍 `sidebar-history` 亮/暗计数增量 **0/0**；为此给计数器加 `eventCount`（只量增量，**仍无全局 reset**）。刀 **M1443**（夹具路径指向真实存在的 `/etc/hosts`）CAUGHT，且只有字面量臂红 ⇒ 两臂独立可证。②(a) **629 = NOT-RUN**：依据那三个数没到，不赌 (A)/(B)、不动 ≥2 帧地板。
+④ ③ 验证链（顺序未换）：`swift build` 告警 **0**；判据卷 `UICaptureTests` **217/4 skipped/0 失败（655.6s）**；帧重捕 `FRAME_BASELINE_COMPARED=354 CHANGED=0 MISSING=0 ADDED=0`；全量 **1399/55/0（765.8s）**；预检 **tables=345 covered=295 arms=757 bad=0**、`ARM_TOTAL files=438 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=432 可判=1183 rot=0 抽不出=6 处置=ok`；换装 `make bundle` = `SIGNATURE_KIND=local`（identity=ClipboardHistory Local Signing）⇒ `INSTALL_RESULT=ok / SHA_MATCH=1 / INSTALL_SIGNATURE=local / INSTALL_ENTRIES=433=433`（PID 86092 → 33242，`SMOKE_OK=1`）。
+⑤ ④⑤ 账与交接：清账 **162/63/0**；电池 **695/5**（台账后复跑）；产品面连续零改动 **1** 轮（as-of 556，`python3 scripts/product_streak.py --streak-for 556` 现读，last=`1a7e31c`/555）⇒ 本轮产品动了 2 文件（`DetailView` + 计数器）。CI：本轮各笔成对号见本节补记；**R558 必读上面那四跑 + 本轮各笔的跑**（全部失败步骤），并且只要 `41450045802` 到手就按 `窗口/每格/相邻帧差` 在 629 的 (A)/(B) 里选一条落地。633 仍等用户回执；622/624/627 继续；628/625/626/569/616 不重开；禁碰清单 9 面不变；刀号 **M1446** 起；4.5 地板、150 上限、120ms 阈值、Motion ≥2 帧地板、2x 8.0pt 与 1x 6.0pt 均不动。
 ## R557 ⓪ 开工（2026-11-02 · 第 556 轮 / Round 554 · CI 读单 + 基线全现读）
 
 > 本节是**开工节**，不是轮次节（标题不写「状态」两字 —— `product_streak.py` 按第一个 `## Rnnn 状态（` 认当前轮）。

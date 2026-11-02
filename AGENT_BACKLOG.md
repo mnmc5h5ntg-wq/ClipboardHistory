@@ -10878,6 +10878,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     真因（R556 现读，两条解释被分开）：同一判据、同一 1x —— `41431129208 ↔ 5a943e7` 读 **过渡帧数=1**、`41439930389 ↔ 78e7ab5` 读 **过渡帧数=2**（该跑 STEP[19] 因此没红），**两次峰值同为 0.0193**；本机 1x 读 4 帧、峰值 0.0097、窗口 322ms、每格 12.4ms。⇒ "产品没演（真硬切）"被排除：同一份代码本机读到 4 帧，且两处的总变化量一致；剩下的是 runner 每格 ≈44ms（同卷 `MOTION_SIDEBAR_COUNT` 现读 窗口=1143ms / 27 格）把 200ms 的过程摊到 1–2 格 ⇒ **≥2 帧地板在那台机器上正好压在采样网格边缘**，所以是间歇红而不是稳定红。
     本轮落读数不动地板：`MOTION_MARKDOWN_MODE_FADE` 新增 `窗口=`、`每格=`、`相邻帧差=[…]`（同卷别的情景早有这几格，只有它没有 —— 没有它就分不开下面两条**修法相反**的路）。
     两条出口（下一轮选一条落地，不许动 ≥2 帧地板）：(A) 加密这一格的录制，让 runner 也拿到 ≤15ms/格 —— 受 200s 看门狗约束，与 BACKLOG 444 同一格；(B) 换判据对象：不读整带帧差，改读标签自身的逐帧墨量/位置序列（R545 读 settled 进度那一族的形状）。
+    挂起（R557）：选 (A) 还是 (B) 的依据是 R556 新加的 `窗口=/每格=/相邻帧差=` 三个 **runner** 真数，而承载它们的第一跑 `41450045802 ↔ 5ba5b2f` 在 R557 开跑时仍是 in_progress（对它取日志被 gh 直接拒："logs will be available when it is complete"）⇒ **R557 判 NOT-RUN**：不拿本机 4 帧去猜 runner 的采样网格，也不动 ≥2 帧地板。R558 只要那一跑到手，就按那三个数在 (A)/(B) 里选一条落地。
 
 
 **633. 桌面授权反复弹：签名身份已固定，剩人工验收一格**（R554 现读并新开）
@@ -10904,6 +10905,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     新值：补图改由 `HistorySidebarView.historyRow` 的 `.task(id: entry.id)` 按需请求 `HistoryStore.requestThumbnail(for:)`（幂等，滚出列表即取消）。旧值现读：复制 1 条 = 开 1 次；3 条历史 = 每次启动开 3 次。新值：采集 0 次、启动装载 0 次、行显示按需 1 次。判据：`FileThumbnailTests` 里那条**源码 grep 契约**（"启动必须回填"）翻成 `testStartupSweepIsGoneAndRowDemandIsWired`（回填 API 不许存在 + 装载 3 条开 0 次的行为证人），`testAddAttachesThumbnailAsynchronously` 改成"add 开 0 次 / requestThumbnail 恰好 1 次且真写回"。刀 **M1440**（补图搬回采集）/**M1441**（需求路径永不开文件）/**M1442**（缩略图那格从计数器摘掉）全 CAUGHT、RESTORE_CLEAN。
     剩余两格（仍是本轮实读，具名不静默）：① 文本在同一次渲染里仍被开两次（`MediaLoader.readTextPreview` 与 `DetailView.preferredTextHeight` 各一次）—— 要合成一次取样把字节传下去；② 图片预览仍是 `Data(contentsOf:)` 整文件读（它已在"详情区挂载"之后，属可见才读，但整文件这一格可以换成按需要的尺寸解）。
     新增监控句：侧栏行的 `.task` 会异步补图 ⇒ 将来若有夹具把**真实存在的图片路径**装进侧栏行，帧就不再确定；本轮 354 帧逐字节不变，说明今天没有这种夹具。
+    落地（R557，乘数那一格）。旧值现读：`CollapsibleFilePreview.recalculateTargetHeight()` 每次宽度变化都重新 `FileHandle` 开一遍同一份文件 —— 展开一条文本 + 拖窗三次 = **4 次**，加预览那一路共 **5 次**。改法：`MultiFilePreviewLayout.TextSample`（`fileDigest` + `text` + `sampleBytes`，不带路径）作为该行的 `@State`，命中同哈希就复用；带 `fileDigest` 的理由是 `ForEach(id: \.offset)` 会让 `@State` 在同一行换 URL 之后活下来，不对号就会"拿甲的高度画乙"。新值：四次估高度 **1** 次（+ 预览 1 次）。判据两半：`testHeightEstimateReusesOneSampleAcrossWidthChanges`（复用与每次重开两条路的四个高度逐个相等 = 等价证人）与 `testHeightEstimateDoesNotLeakTheSampleToAnotherFile`（负向臂）。刀 **M1444**（缓存永不命中）/**M1445**（缓存不看文件身份）CAUGHT、RESTORE_CLEAN。
+    同一轮补上 R556 自己留的口子（注释→判据）：`UICaptureTests/testCaptureOpensNoProtectedFiles` 两臂 —— 夹具 `fileURLWithPath` 字面量必须都不存在（现读 7/0），拍 `sidebar-history` 前后计数器环增量必须为 0（现读 0/0）；为此给计数器加了 `eventCount`（只量增量，**仍然没有全局 reset**）。刀 **M1443**（把一条夹具路径指向真实存在的文件）CAUGHT，且只有字面量臂红 ⇒ 两臂独立可证。
+    剩余那一格（仍是具名出口，二选一、各有代价）：同一次渲染里估高度与预览仍各开一次（2 次）。(i) 把预览那份字节经 preference 上行给 `CollapsibleFilePreview` ⇒ 高度会在预览到达后二次变化，帧要重基线并逐张看；(ii) 两个入口合成一个 `FileTextSample` 读取器 ⇒ 32KB 与 256KB 的解码边界不同，估高度算式要重钉并配刀。图片预览仍 `Data(contentsOf:)` 整文件读（已在"可见才读"之后，属可接受，另记）。
+
 
 
 
