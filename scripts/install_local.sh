@@ -195,6 +195,15 @@ say "installed = ${installed_sha:0:16}…"
 [ "$staged_sha" = "$installed_sha" ] || fail "装的与验过的不是同一份，回滚"
 codesign --verify --deep --strict "$installed" || fail "装完的签名校验不过，回滚"
 say "INSTALL_SHA_MATCH=1"
+# R553 A：这一轮到底装进去的是**固定身份**还是 ad-hoc —— TCC 的授权跟着签名身份走，
+# 所以「反复弹桌面授权」有没有被修好，第一格读数就是这一行；`adhoc` 意味着 CDHash 每轮变，
+# 用户上一次授权下一轮就作废。验收（连续两轮身份不变 + 用户授权一次后不再弹）只能真机人工确认。
+sig_flags="$(codesign -dvv "$installed" 2>&1 | sed -n 's/^CodeDirectory.*flags=\(0x[0-9a-f]*\).*/\1/p' | head -1)"
+if codesign -dvv "$installed" 2>&1 | grep -q "^Signature=adhoc"; then
+	say "INSTALL_SIGNATURE=adhoc flags=${sig_flags:-未知}（每轮 CDHash 变 ⇒ TCC 会把它当新 App）"
+else
+	say "INSTALL_SIGNATURE=local flags=${sig_flags:-未知}（固定身份 ⇒ 授权可以跨轮活下来）"
+fi
 
 # ---------- 7. 启动，并按身份认（不按 open 的客气话认）----------
 if [ "$launch" = 0 ]; then

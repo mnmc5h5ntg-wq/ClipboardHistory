@@ -34,14 +34,14 @@ bundle: build
 	find "$(STAGE)/$(BUNDLE)" -name "._*" -delete 2>/dev/null || true
 	dot_clean -m "$(STAGE)/$(BUNDLE)" 2>/dev/null || true
 	codesign --remove-signature "$(STAGE)/$(BUNDLE)" 2>/dev/null || true
-	codesign -s - --force --deep "$(STAGE)/$(BUNDLE)" 2>&1
+	scripts/sign_bundle.sh "$(STAGE)/$(BUNDLE)"
 	codesign --verify --deep --strict --verbose=2 "$(STAGE)/$(BUNDLE)"
 	ditto --noextattr --noqtn "$(STAGE)/$(BUNDLE)" "$(BUNDLE)"
 	xattr -cr "$(BUNDLE)"
 	xattr -d com.apple.FinderInfo "$(BUNDLE)" 2>/dev/null || true
 	xattr -d "com.apple.fileprovider.fpfs#P" "$(BUNDLE)" 2>/dev/null || true
 	xattr -d com.apple.macl "$(BUNDLE)" 2>/dev/null || true
-	@echo "✅ $(BUNDLE) ready (ad-hoc signed, quarantine-free)"
+	@echo "✅ $(BUNDLE) ready (签名种类见上面那行 SIGNATURE_KIND, quarantine-free)"
 
 run: bundle
 	open -n "$(STAGE)/$(BUNDLE)"

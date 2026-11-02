@@ -13,6 +13,19 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-02（本地 · R552 / 第 551 轮 / Round 549）
+## R553 开工 ⓪（2026-11-02 · 第 552 轮 / Round 550）
+
+R553 ⓪ 读数（只登记、不轮询）：HEAD=origin=`570042c`、ahead=0、`git push` no-op；已跟踪改动=0。基线（**全部本轮现读**）：帧 **354**、清账 **162/63/0**、streak **2**（as-of 553，`python3 scripts/product_streak.py --streak-for 553` 现读，last=`884e197`/551）、全量沿用 R552 现读 **1392/57/1（886.8s）**、电池 **691/5**、安装 **433=433**（PID 41809）。
+- 三跑读时 **in_progress ⇒ NOT-RUN**：`41388527150↔52f114c`（R552 台账）、`41388652895↔75468be`（补记）、`41388683958↔570042c`（补记二）。queued/in_progress 不算成功。
+- 已 concluded 的 R551/R552 各跑（`48f1528`/`14ae33a`/`ca9217b`/`01421e5` 等）结论已在 R552 节 ⑤/补记逐步骤现读：红名 = `testQuickPickFavoriteStarIsAtLeastEightPointsTall`（runner 1x light **7.0pt** / dark **6.0pt** < 地板 8.0）+ `testFrameIntervalsUnderStateChanges`（622 第十值 207.2ms/2）。已定论的 run 不可变 ⇒ 本轮不重取。
+
+**本轮靶（用户实测：反复弹「时间剪史想访问桌面文件夹」，已批准无数次；用户已明确同意两格都做）**
+- **A 固定本机签名身份**（弹窗根因）：实读 `codesign -dvv /Applications/时间剪史.app` ⇒ `flags=0x2(adhoc)`、`Signature=adhoc`、`TeamIdentifier=not set`；`Makefile` 每次构建先 `--remove-signature` 再 `-s -` ⇒ CDHash 每轮变 ⇒ TCC 当成新 App、"桌面文件夹"授权作废。
+  **已做**：登录钥匙串里建了自签码签身份 `ClipboardHistory Local Signing`（openssl 生 key/cert，EKU=codeSigning，pkcs12 导入，`-T /usr/bin/codesign`；p12 只在 /tmp、不入库不留盘）；`scripts/sign_bundle.sh` 优先用它、否则回退 ad-hoc 并打 `SIGNATURE_KIND=local|identity-refused|adhoc`；`Makefile` 改走它；`install_local.sh` 新增读数 `INSTALL_SIGNATURE=local|adhoc`。
+  **具名阻塞（不许绕过、不许改回 ad-hoc 交差）**：`security find-identity -v -p codesigning` = **0 valid identities**，不带 `-v` 列出该身份为 **CSSMERR_TP_NOT_TRUSTED**；实测 `codesign -s "ClipboardHistory Local Signing"` **挂起不返回**（在等钥匙串/信任授权），已 kill。⇒ 需要用户在「钥匙串访问」里对该证书点一次**始终信任**（或允许 codesign 取用该私钥），本轮不重试、不改信任设置、不 `tccutil reset`、不 sudo。验收（连续两轮 `codesign -dvv` 身份不变 + 授权一次后不再弹）只能真机人工确认 ⇒ 记进人工验收批次。
+- **B 减少主动读受保护目录**：实读触点 = `MediaLoader.filePreviewPayloadSync`（`Data(contentsOf:)` 整文件）、`DetailView.preferredTextHeight`（**为算高度又开一次文件** `FileHandle`）、`DetailView:606`（为算高度又 `attributesOfItem` stat 一次，而字节其实已在手里）、`HistoryPersistence.isAlreadyOnDisk`（自家容器图片，不算受保护目录）。⇒ 采集路径本身（`ClipboardIntake`）只记 URL，不读文件；弹窗来自**预览/布局**路径。本轮把 B 的边界与四格触点写进 BACKLOG 632，改动与判据留下一轮（不在本轮半做：判据要的是"选中/预览之前不发生读取"的计数器证人，得先定分界）。
+- 编号：用户发令写「R554（第 553 轮 / Round 551）」并把折叠那轮叫作 R553；账上折叠那轮是 **R552（第 551 轮 / Round 549）**，R553 从未开工 ⇒ 按身份链记作 **R553（第 552 轮 / Round 550）**，A/B 两格与验收条件照发令做。
+
 ## R552 状态（2026-11-02 · 第 551 轮 / Round 549 · 产品 4 文件 + 真机通道）
 
 R552 ⓪ 读数（只登记、不轮询）：HEAD=origin=`01421e5`、ahead=0、`git push` no-op；api=200/apple=200；已跟踪改动=0（未跟踪 scratch 为历史遗留）。基线（**全部本轮现读**，R551 的抄数教训）：帧 **354**、全量 **1390/56/0（600.3s）**、预检 **330/295/757 bad=0**、ARM **423/1244**（dupes=0 repeats=0）、HIDDEN **417/1183 rot=0**、电池 **691/5**、安装 **432=432**（PID 99095）、清账 **162/63/0**、product_streak **1**（as-of 551，`--streak-for 551` 现读，last=`77c92ad`/550）。
