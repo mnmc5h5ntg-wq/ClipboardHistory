@@ -8631,6 +8631,143 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// R562 / BACKLOG 636：三级无序列表的项目符**第一次有了帧对象** ⇒ 把「回退字体会不会把正文列推歪」钉成判据。
+    ///
+    /// 判的是两件事，两件都不是字形尺寸：
+    /// ① **对象证人**：产品自己解析这段夹具正文得到的深度集合，必须和帧上数到的正文列**一样多**
+    ///    —— 数不到就红。R561 那格的具名出口（「depth2 今天没有帧对象」）正是被这张夹具换掉的，
+    ///    所以这条断言不许退化成"读不到就算了"。
+    /// ② **步进等距**：相邻两列正文左轴之差必须彼此相等（容差 1pt，按 `scale` 派生）。这才是 636 真正的
+    ///    坏法：`▪`(U+25AA) 在系统字体里没有字形 ⇒ AppKit 回退到冬青黑体、advance 12.00pt 比 `⦁` 的
+    ///    8.11pt 宽，而正文列取 `max(minimumAdvance, markerWidth + markerGap)` ⇒ 一旦回退字形比钳位宽，
+    ///    第三级就会比前两级多走一截（列被推歪）。
+    /// 三级项目符各自的墨 bbox **只打印不断言**：R549 有意让三档用三个不同字形（`⦁ ◦ ▪`），
+    /// "三级同尺寸"不是产品契约 —— 拿它当判据会把设计钉成缺陷。
+    func testNestedBulletLevelsKeepOneUniformTextColumn() throws {
+        let depthOfKind: (MarkdownBlock.Kind) -> Int? = { kind in
+            if case let .unorderedItem(depth, task) = kind, task == nil { return depth }
+            return nil
+        }
+        let parsedDepths = Set(MarkdownParser.parse(Self.nestedBulletFixtureBody).blocks
+            .compactMap { depthOfKind($0.kind) })
+        XCTAssertEqual(parsedDepths, Set(0...2),
+            "夹具正文解析出来的深度集合不是 {0,1,2}（实读 \(parsedDepths.sorted())）"
+                + " ⇒ 这条判据没有三级对象，先修夹具再谈判（产品侧 `depth = 行首空格数 / 2`）")
+
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r562-nested-bullets-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let tag = appearance == .darkAqua ? "dark" : "light"
+            guard let fixture = fixtures(appearance: appearance)
+                .first(where: { $0.name == "detail-markdown-bullet-nested" }) else {
+                return XCTFail("\(tag)：找不到 `detail-markdown-bullet-nested` ⇒ 这条判据没有对象")
+            }
+            let file = scratch.appendingPathComponent("detail-markdown-bullet-nested-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let data = try? Data(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: data), let base = rep.bitmapData else {
+                XCTFail("\(tag)：夹具帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / 720.0
+            let bytesPerRow = rep.bytesPerRow
+            func isInk(_ x: Int, _ y: Int) -> Bool {
+                let o = y * bytesPerRow + x * 4
+                let luma = 0.299 * Double(base[o]) + 0.587 * Double(base[o + 1]) + 0.114 * Double(base[o + 2])
+                return appearance == .darkAqua ? luma >= 70 : luma <= 210
+            }
+            let scanX0 = Int((16.0 * scale).rounded())
+            let scanX1 = Int((520.0 * scale).rounded())
+            let yTop = Int((60.0 * scale).rounded())
+
+            // ① 行带：整行有墨就并进当前带
+            var bands: [(top: Int, bottom: Int)] = []
+            var top = -1
+            for y in yTop..<rep.pixelsHigh {
+                let has = (scanX0..<scanX1).contains { isInk($0, y) }
+                if has && top < 0 { top = y }
+                if !has && top >= 0 { bands.append((top, y - 1)); top = -1 }
+            }
+            if top >= 0 { bands.append((top, rep.pixelsHigh - 1)) }
+
+            // ② 每带切成墨段：第一段 = 项目符候选，第二段 = 正文首字
+            struct ListRow { let markerLeft: Int; let markerWidth: Int; let gap: Int; let textLeft: Int
+                             let markerHeight: Int }
+            var rows: [ListRow] = []
+            for band in bands {
+                var inkColumns: [Int] = []
+                for x in scanX0..<scanX1 {
+                    if (band.top...band.bottom).contains(where: { isInk(x, $0) }) { inkColumns.append(x) }
+                }
+                var segments: [(Int, Int)] = []
+                for x in inkColumns {
+                    if let last = segments.last, x == last.1 + 1 {
+                        segments[segments.count - 1] = (last.0, x)
+                    } else {
+                        segments.append((x, x))
+                    }
+                }
+                guard segments.count >= 2 else { continue }
+                let marker = segments[0], text = segments[1]
+                let markerHeight = ((band.top...band.bottom).filter { y in
+                    (marker.0...marker.1).contains { isInk($0, y) }
+                }.count)
+                rows.append(ListRow(markerLeft: marker.0, markerWidth: marker.1 - marker.0 + 1,
+                                    gap: text.0 - marker.1, textLeft: text.0, markerHeight: markerHeight))
+            }
+            // 项目符 = 窄、且与正文之间有明显间隙；标题/正文行的首段是**字**，宽且间隙小 ⇒ 被这两道筛掉
+            let markerWidthMax = Int((8.0 * scale).rounded())
+            let gapMin = Int((4.0 * scale).rounded())
+            let listRows = rows.filter { $0.markerWidth <= markerWidthMax && $0.gap >= gapMin }
+            guard !listRows.isEmpty else {
+                emit("BULLET_LEVELS_NOT_RUN=detail-frame-plain \(tag) 带=\(bands.count) 行=\(rows.count)"
+                     + " 倍率=\(String(format: "%.1f", scale))x ⇒ 一列正文都没落到墨上，判据没有对象")
+                continue
+            }
+
+            // ③ 正文列聚类：同一级的两项必须落在同一列（合并容差 0.5pt）
+            let merge = max(1, Int((0.5 * scale).rounded()))
+            let columns = listRows.map(\.textLeft).sorted().reduce(into: [[Int]]()) { acc, x in
+                if var last = acc.last, let head = last.first, x - head <= merge {
+                    last.append(x)
+                    acc[acc.count - 1] = last
+                } else {
+                    acc.append([x])
+                }
+            }
+            let steps = zip(columns.dropLast().map { $0[0] }, columns.dropFirst().map { $0[0] })
+                .map { $1 - $0 }
+            let perLevel = zip(columns, columns.map { col in
+                listRows.filter { abs($0.textLeft - col[0]) <= merge }.compactMap { $0.markerHeight }.max() ?? 0
+            })
+            let sizes = perLevel.map { "列x=\($0.0[0])px 墨高=\($0.1)px(\(String(format: "%.2f", Double($0.1) / scale))pt)" }
+                .joined(separator: " ")
+            emit("BULLET_LEVELS \(tag) 行=\(listRows.count) 列=\(columns.count) 步进=\(steps)px"
+                 + "(\(steps.map { String(format: "%.1f", Double($0) / scale) }.joined(separator: "/"))pt) "
+                 + "容差=\(max(1, Int((1.0 * scale).rounded())))px 合并=\(merge)px "
+                 + "筛除 宽≤\(markerWidthMax)px 隙≥\(gapMin)px 倍率=\(String(format: "%.1f", scale))x \(sizes)")
+
+            XCTAssertEqual(columns.count, parsedDepths.count,
+                "\(tag)：帧上数到 \(columns.count) 个正文列，产品解析出 \(parsedDepths.count) 级（\(parsedDepths.sorted())）"
+                    + " ⇒ 有一级没画出来（或画出了多余的一级），步进判据失去对象")
+            let tolerance = max(1, Int((1.0 * scale).rounded()))
+            if steps.count >= 2 {
+                let spread = (steps.max() ?? 0) - (steps.min() ?? 0)
+                XCTAssertLessThanOrEqual(spread, tolerance,
+                    "\(tag)：三级列表的正文步进是 \(steps)px，最大差 \(spread)px（\(Double(spread) / scale)pt > 1pt）"
+                        + " ⇒ 某一级的正文列被项目符的宽度推歪了（回退字形的 advance 超出 `minimumAdvance` 钳位）")
+            }
+            for step in steps {
+                XCTAssertGreaterThanOrEqual(step, Int((8.0 * scale).rounded()),
+                    "\(tag)：相邻两级的正文步进只有 \(step)px（\(Double(step) / scale)pt）⇒ 阶梯塌平了，"
+                        + "等距断言会变成恒真（地板 8pt 由实测 16pt 的一半推，不写死像素）")
+            }
+        }
+    }
+
     /// R451：列表项折行后，**续行必须回到首行正文的同一条竖轴**。
     ///
     /// 缺陷形状：`headIndent` 是 16，但首行正文靠**默认制表位** 28 —— 首行正文 28、续行 16，
@@ -13054,6 +13191,12 @@ final class UICaptureTests: XCTestCase {
         // 用来逐张看「•」换「⦁」后的墨径与行距。
         results.append(Fixture("detail-markdown-bullet", NSSize(width: 720, height: 520)) {
             AnyView(DetailView(historyStore: self.makeBulletMarkdownStore(), initialMarkdownMode: .rendered))
+        })
+        // R562 / BACKLOG 636 退场第一步：三级无序列表的**夹具**（产品一行没动）。
+        // 这一张存在的唯一理由：R561 现读出「今天没有任何夹具画到 depth2」⇒ `◦`/`▪` 在帧上
+        // 没有对象，任何关于三级项目符的判据都是空判。先让它有对象，再谈判什么。
+        results.append(Fixture("detail-markdown-bullet-nested", NSSize(width: 720, height: 520)) {
+            AnyView(DetailView(historyStore: self.makeNestedBulletMarkdownStore(), initialMarkdownMode: .rendered))
         })
         // R471：超过 40k 的 Markdown 尾部会追加「后面的内容没有渲染」说明。
         // 这条说明是**界面说明**，必须是 meta 字号；夹具渲染后滚到底，帧上能看到它。
@@ -17957,6 +18100,30 @@ final class UICaptureTests: XCTestCase {
         )
         store.add(ClipboardIntake.Entry(
             content: .text("# 列表\n\n- 第一项内容\n- 第二项内容\n- 第三项内容\n"),
+            thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+            sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
+        ), timestamp: Self.referenceDate)
+        return store
+    }
+
+    /// R562 / BACKLOG 636：三级列表的夹具正文。
+    ///
+    /// 深度在产品侧是 `depth = 行首空格数 / 2`（`MarkdownParsing.listItem`），所以那 2/4 个空格是
+    /// **内容缩进**。这里刻意写成转义串而不是三引号块：三引号会按闭合那一行的缩进整块 dedent，
+    /// 而 R561 扫夹具时命中的正是这个形状 —— 五段含列表的正文 dedent 之后相对缩进全为 0，
+    /// depth 塌成 {0}，`◦`/`▪` 从来没有帧对象。
+    static let nestedBulletFixtureBody: String =
+        "# 三级列表\n\n- 顶层第一项\n  - 第二层第一项\n    - 第三层第一项\n"
+        + "- 顶层第二项\n  - 第二层第二项\n    - 第三层第二项\n"
+
+    private func makeNestedBulletMarkdownStore() -> HistoryStore {
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 50, maxAgeDays: nil)
+        )
+        store.add(ClipboardIntake.Entry(
+            content: .text(Self.nestedBulletFixtureBody),
             thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
             sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"
         ), timestamp: Self.referenceDate)
