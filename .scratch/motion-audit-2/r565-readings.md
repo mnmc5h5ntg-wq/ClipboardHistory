@@ -136,3 +136,30 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - 判据：`test_sign_bundle.py` 4 格 → 5 格（新增现读真钥匙串那一格，CI 无身份 ⇒ 具名 skip）。刀 **M1474 / M1475** 全 CAUGHT、RESTORE_CLEAN=yes、needle 各命中 1；名册 `tables=374 / files=467 / bad=0`、`HIDDEN 表=461 rot=0 处置=ok`。
 - 验证链：build 0；判据卷 222/4-skipped/0（1010.3s）；帧 `CHANGED=135`（**不 update**；漂移规模本身 138→138→135 在动 ⇒ 640 的措辞要跟着改）；全量 **1406/57/1 红**两跑（`PerfBudgetTests/testImageComparisonCostStaysBounded` 255.1 / 294.2ms 对 250.0），同一判据单独重跑 148.29/148.80/149.64ms ⇒ 负载相关，不放宽、不删格；电池 `Ran 720 / OK (skipped=5)`。
 - ⓪ 那七跑（R565 那批）全部 concluded failure，但形状变了：**STEP[9] 不再红**（两处修法被 runner 签收，`SKIP_ROSTER 名单外=无 名册未跳=无 内层Ran=719`），只剩 STEP[15]/[17] = `HINT_CONTRAST` light 3.84:1（639）；最后一跑另加 STEP[19] = `testBandCaptureIsCheaperAndStillSeesTheMotion` 11.394 vs 11.131（**212 的第二次露面、换形状**；同批只这一跑红 ⇒ 判间歇）。
+
+## R565 补全（2026-11-04 · 监工点出「疑似工作到一半的 R565 也要补全」）
+
+一段 = 本笔台账提交（只改五本账 + 本笔记；产品 0 文件、判据 0 条、刀 0 把）。
+
+### 通道：`41691473773 ↔ fa8ae0a`（concluded failure）
+- 逐步现读 `gh run view --json jobs`：STEP[15] `Swift tests (executed-count gate)`、STEP[17] `Capture gate`、STEP[19] `Motion coverage floor` = failure，其余 18 项 success。
+- 对照跑（归因用）：`41691418800↔bc5a2af`、`41691263117↔eeac454` 都是 STEP[15]+[17] failure、**STEP[19] success**（读 `jobs[].steps[].conclusion`，不是从"不在失败名单"推）。
+- `BULLET_LEVELS light/dark 行=6 列=3 步进=[16, 16]px(16.0/16.0pt) 容差=1px 合并=1px 筛除 宽≤8px 隙≥4px 倍率=1.0x 列x=36px 墨高=5px(5.00pt) 列x=52px 墨高=4px(4.00pt) 列x=68px 墨高=5px(5.00pt)`（4 行）；`BULLET_LEVELS_NOT_RUN` 零行 ⇒ 第四次判到，四次数值逐字同（`6ef9ff1` / `4cfcfc6` / `8eecbc7` / 本跑）。
+- `HEAT_LEGEND_COVERAGE light/dark 格色=6 图例色=5 缺=[] 格宽=11px 倍率=1.0x 网格下缘 y=164 实心判定 格6px/图例3px 地板 格4/图例4 每方块采样点 格9/图例9`；`HEAT_LEGEND_NOT_RUN` 零行 ⇒ 第四跑到数。
+- `MOTION_MARKDOWN_MODE_FADE scale=1x 帧数=27 过渡帧数=5 相邻差帧数=2 首末连续差=0.0048 峰值=0.0145 声明=200ms 窗口=691ms 每格=26.6ms` ⇒ 第七数 = 5（2/5/0/5/6/6/5）。
+- `SKIP_ROSTER 键=github-runner 类=github-runner 内层Ran=719 内层skip汇总=3 解析=2 名单外=无 名册未跳=无` ⇒ 634 绿；这一批里第一次真拿到该行（前几跑 STEP[9] 被绝对根打死，观察者按 634 拒给结论）。
+- `CAPTURE_GATE_CASES passed=188 skipped=33 failed=1 有名字的红=1 类未知名单=0 NOT_RUN=181`。
+- `HINT_CONTRAST light 底=236 字芯=(118,118,118) 对比=3.84:1 字芯像素=40 偏差像素=696 地板=4.5 倍率=1.0x` / `dark 底=50 字芯=(163,163,163) 对比=5.08:1 … 倍率=1.0x` ⇒ 现读三跑逐字同值（`c567879` / `6a3542b` / 本跑）⇒ 不是间歇；`118/236=0.500` = `.secondaryLabelColor` 名义 alpha ⇒ 本机 2x 的 10.37:1 含渲染加深。639 的口径选择仍归用户。
+- `MOTION_BAND_SAVING`：`省=2.18×`（6.32/13.78ms，`eeac454`）→ `1.55×`（8.30/12.85，`bc5a2af`）→ `0.98×`（11.39/11.13，本跑红）⇒ 新开 **643**；`线=1.0×` 不动。
+- `MOTION_FLOOR_FACTS judged=4/5 executed=79 not-run=notice-banner summary=… 红的用例=testBandCaptureIsCheaperAndStillSeesTheMotion 汇总行报红=1 机器=github-runner` ⇒ 与 STEP[15] 同一朵。
+- `FRAME_BASELINE_AGAINST=working COMPARED=356 CHANGED=356 MISSING=0 ADDED=0`（STEP[11]，名册门 ⇒ 步 status success 与 CHANGED 无关）；STEP[13] 对 `v1.4.8` = `CHANGED=62 MISSING=6 ADDED=294`（report-only）⇒ 跨机像素通道不给 640 当证人（写进 640 追记二）。
+- 日志：`/tmp/r565-full-fa8ae0a.log`（16610 行，先落盘再切）。
+
+### 三处改账
+1. `## R565 状态` 标题计数：判据 1 条 → 判据/守卫 3 支、刀 2 把 → 8 把（M1466–M1473）、新开 638 → 638/639/640/641（已推笔不 amend，工作树现读改齐；641 追记记第六种形状）。
+2. `### R565 补记` ② 的「连续第三跑」→ 按跑数口径（⑰ 点名）。
+3. `## D-565` 节内圈号撞号（⑤⑥⑦ 各两次）→ 按位置重编 ①…⑩，补段三条 = ⑧⑨⑩，节内留 ⑪ 作对照；逐条引用今天只有 ④，已推 commit 标题里的「D-565 ⑤⑥⑦」按新号读。
+
+### 仍欠
+- D-565 ④ 的跨节对账尺（没落，不塞半条守卫）。
+- 占位符尺的正对照：今天由 R566 的两起真实漏替换补上（`U-2451+1` 撞号、§1 的 `@@UT@@`），**仍无变异刀** ⇒ 具名「无刀、靠活门」。
