@@ -184,3 +184,46 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - `test_skip_roster.py` 的 github-runner 名册登记 `test_this_machine_actually_takes_the_identity_branch`（名字取自 runner 那一行 `名单外=[…]`，不是猜的）。本机 4 格 OK；runner 转绿由后一跑作证 ⇒ 账上只写"已登记"。
 - STATE 顶部「最后更新」从 `2026-11-03（本地 · R565…）` 抬到 `2026-11-04（本地 · R566 / 第 565 轮 / Round 563）`。抬之前 `test_round_batch_consistency` 的三轮窗口是 565/564/563，**从没扫过 R566 的三本标题**；抬之后现读 `^## 第 565 轮（R566`=1、`^## Round 563 · `=1、`^### …（R566 / `=1 ⇒ 门多看见一格（不是放宽）。
 - ⑰ⓘ 那句「两跑复核未到」现在对 `41704430816` 过期 ⇒ forward 指到 `### R566 补记` ④，不回头改已推那一笔的正文。
+
+---
+
+## R567（第 566 轮 / Round 564）：折叠规格 §3 第①段 —— 几何与读数重锚，不动画
+
+### ⓪ 五跑读数（逐条读 conclusion，不靠"不在失败名单"）
+- `41708303631↔d512932`、`41691418800…` 之前那批：STEP[9] failure + STEP[15] + STEP[17]；逐字 `SKIP_ROSTER … 名单外=['test_this_machine_actually_takes_the_identity_branch']` ⇒ 那些树的名册还没补登记（本就该红，不是新缺陷）。
+- `41709217237↔8abe050`：STEP[9]/[15]/[17] failure，STEP[10]-[14] skipped（同一因）；该跑日志取正文时 readings 打空 ⇒ 只登记"逐步现读到 red/skipped"，不写绿。
+- **`41710263993↔f024d72` 与 `41711240581↔fdbf0c0`：STEP[9] = success**，逐字 `名单外=无 名册未跳=无 内层Ran=720` ⇒ R566 那格漏登记被**后两跑**证伪掉（修它那一笔签不了自己，这一次是别人签的）。
+- 两跑仍红的只有 STEP[15]/[17] = 639 那朵，`HINT_CONTRAST light 3.84:1 / dark 5.08:1` 逐字第八/九次同值 ⇒ 本轮改了主窗几何，**没挪动浮层那一格**。
+- `f024d72` 另有 STEP[19] failure：逐字 `红的用例=testMarkdownModeLabelChangeIsAVisibleProcess`、`过渡帧数=0 每格=74.4ms 窗口=1934ms` ⇒ 是 **629** 不是 643；`fdbf0c0` 同格 `过渡帧数=6 每格=28.7ms` 且 STEP[19] success。
+- 643：八个数并排 2.18/1.55/0.98/1.26/1.55/1.86/1.23/2.22 ⇒ "带臂在涨"那句被否，回到 n=2 抖动。
+
+### ② 产品落地（5 个文件）
+- `MainWindowCollapsePolicy`：424/848/高 600、`seamDividerThickness=1`、`columnWidth=(848−1)/2=423.5`、`seamCenter=424`、`aspectRatio(collapsed:)`（横 848:600 ⇄ 竖 424:600）。
+- `AppDelegate` 建窗 848×600；`WindowConfigurator` 无控制器那支同值；`MainWindowCollapseController.applyGeometry` 写 `window.contentAspectRatio`（macOS 13+，12 具名不锁）；`ContentView` 两栏 `navigationSplitViewColumnWidth(min:ideal:max:)` 全钉 423.5（macOS 12 那支 `.frame` 同值）。
+- 旧值→新值（同一条判据、产品入口真窗口）：展开 layout 宽 750→848；折叠 layout 宽 420→424；`contentAspectRatio` 0.000000→1.413333（展开）与 0.000000→0.706667（折叠）；侧栏列 280.00→423.50；详情算得 469.00→423.50；缝中心 280.50→424.00；`setPosition(300,ofDividerAt:0)` 之后侧栏 423.50（**拖不动**，变异 M1478 下变成 300.00）；整窗高 592→632（口径变化随 fullSizeContentView，见 644）。
+- 像素那把尺：`UICaptureTests/testTheSeamInTheRenderedFrameSitsAtHalfTheContentWidth` 明暗两档各判到，缝列 424.5pt（期望 424.0，容差 1.5），左墨 125434/129950、右墨 2105/2304。首版右半读不到墨 ⇒ 判不成（详情是空态）⇒ 改成先 `store.perform(.selectOnly(first))` 再拍。
+- 刀：M1476 折叠档退 420、M1477 比例不翻、M1478 列回 250~340（**AppKit 尺与像素尺一起红**）、M1479 折叠顺手改高。M1479 第一版是空刀（无条件写高 ⇒ 建窗也走同一行 ⇒ 两态一起 560，被测关系不动）⇒ 改成只在 `isCollapsed` 那一支写。
+- 名册对账：M1395 的 needle 因重锚腐烂（`collapsedWidthDefault: CGFloat = 420` 那行没了）⇒ 针预检 `bad=1` 抓到，按同一坏法重钉到 424；`mutate_r567` 已登记进 TABLES ⇒ `tables=375 covered=296 arms=761 bad=0`。
+- 帧：本轮只重锚折叠族 4 张（`main-collapsed` / `main-collapsed-hint` 420×560 → 424×600）；14 支 750×560 的默认态帧留给 **645**（前面挡着 `UICaptureHarness.swift:25436` 那道 ≤750 上界，先要 runner 证人）。
+- 新单：**644**（600 没有可判对象，三口径 632/632/580，归用户）、**645**（余下帧重锚 + 上界取舍）。**642 撤单**（`INSTALL_ENTRIES` 数的是用户存档条数，脚本自己那行写「存档条数」）。
+
+### 验证链（第一遍，之后因测试侧改动重跑，见"重跑"那节）
+- build：touch 十个改过的文件强制重编 app + tests ⇒ `Build complete! (24.30s)`，告警 **0**（`/tmp/r567-build2.log`）。
+- 判据卷 `UICaptureTests`（带 `CLIPBOARD_HISTORY_UI_SHOTS=/tmp/r567-frames`）：**Executed 223 tests, 4 skipped, 0 failures**，922.939s（R566 是 222 ⇒ +1 就是像素尺那一格）。
+- 帧：`COMPARED=356 CHANGED=135 MISSING=4 ADDED=4` ⇒ 归因算式：基线里 `content-*`/`main-*` 共 **34** 张，**30 张变了** + **4 张是本轮改名的折叠族**（missing `main-collapsed(-hint)-420x560` ×4，added `…-424x600` ×4）；其余 **105** 张在 detail/sidebar/row/quickpick/settings 这些**我没碰的面**上 ⇒ 属 640 漂移（今天的数 105，历史 138/138/135）。同一笔 `update`（`FRAME_BASELINE_UPDATED=356`）之后复跑 `356/0/0/0`。
+- 全量：**Executed 1411 tests, 57 skipped, 0 failures**，797.792s（R566 是 1406/57/1 ⇒ +5 = 本轮新判据五格；PerfBudget 那一朵这次没复现）。
+- 预检（串行）：`NEEDLE_PRECHECK tables=375 covered=296 arms=761 bad=0`、`ARM_TOTAL files=468 arms=1248 dupes=0 repeats=0`、`HIDDEN_ARMS 表=462 可判=1187 rot=0 抽不出=6 已声明表=6 处置=ok`。
+- 换装（bash，不是 python —— 第一遍我用 `python3 scripts/install_local.sh` 跑，得到 SyntaxError，退出码 1 才看清；脚本是 bash）：`INSTALL_RESULT=ok 版本=1.4.8→1.4.8 / INSTALL_SHA_MATCH=1 / INSTALL_SIGNATURE=local flags=0x0 / SMOKE_OK=1 / INSTALL_ENTRIES_BEFORE=451 AFTER=451 / INSTALL_RUNNING_PID=99924`，备份 `before-R567`。
+
+### 看图（本轮真看了）
+- `main-collapsed-424x600-light`（新）与 `/tmp/r566-frames/main-collapsed-420x560-light`（上一轮那张）**并排对看**：首行正文的换行点从「…包含足够长度以 / 便观察截断…」变成「…包含足够长度以便 / 观察截断…」⇒ 4pt 宽的可预测后果；多出的 40pt 高度让折叠帧下方空出一截，没有新裁切。
+- 两块**纯黑**（折叠帧中部、展开帧左下）在新旧两帧里位置与形状逐字相同 ⇒ 是 R206 已登记的离屏材质/图片预览盲区，**不是本轮改出来的**。
+- `content-with-history-750x560-light`：中缝目视落在正中（该夹具 750 宽 ⇒ 列锁按公式给 374.5），右侧浮动操作栏、详情 meta 行都在原位。
+
+### 自伤（本轮三处，全是被门抓住的，不是自我表扬）
+1. **台账写手只 fill 了一本**：`ledgers_r567.py` 里 `fill()` 只套在 STATE 那一本上，FINAL_REPORT 的 §18 那一笔是**原文插进去**的 ⇒ 五个 `@@CAPTURE@@/@@FULL@@/@@INSTALL@@…` 键名标记随账落盘，`LEDGER_TOKENS … stray=8` 与 `test_ledger_placeholders` 一起红。这是 R566 那起（§1 的 U 上界格里留键名）的**同一形状第二次**，而且这次是我自己写的写手脚本的洞 ⇒ 规矩补一条：**任何插入台账的文本都必须过同一趟 fill，且写手在返回前自己数一遍未渲染 token**（脚本已补上五本回读 = 0 那一格）。
+2. **新判据的读数走了裸 stdout**：`FoldGeometryReanchorTests` 七行 `print(` 让 `bare_print_lines` 从 15 涨到 22 ⇒ 棘轮 `15 != 22` 红。改走 `CaptureReadings.emit` 并把新文件登记进 `UICaptureHarness.swift` 的 `let roster`（`derived=28 declared=28 未纳管=无`），**没有抬那条 15 的上界**。
+3. **派生格那一趟抢在产品笔之前**：`report_sources_cell.py --write` 在电池前跑，而那时产品改动还没提交 ⇒ 门打 `账上=R565/f6c2a1d git=R565/f6c2a1d 一致=是`（说的是上一轮的账，本轮的账要等产品笔落地再派生）。这一格必须在**产品笔之后**再抄一次。
+
+### 重跑（因为上面 1/2 改了测试侧与账侧，验证链必须重测同一棵树）
+- 判据卷重跑 → `/tmp/r567-capture3.log`；全量重跑 → `/tmp/r567-full2.log`（数若变照实写进 STATE ⑤，不改口径）。
