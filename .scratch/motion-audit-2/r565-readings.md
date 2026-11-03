@@ -72,3 +72,9 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - 于是 bounded 重试立刻返回 `ssh: Could not resolve hostname github.com` ⇒ `fatal: Could not read from remote repository`。
 - **账**：本地 HEAD 是补正笔（amend 之后现读 `9482f86`；本笔记下面那一笔又改了号 ⇒ 以 `git rev-list --count origin/main..HEAD` 与 `git log` 现读为准）未推 ⇒ `ahead=1`；远端 main 仍是 `c567879`（R565 补记笔，已推的那五笔在 runner 上）。**这一轮不能写"已收口"**：推送失败不是"绿"，是通道坏了（R565 之前 R557 那批"派生格排在台账之后"的教训同样适用于这里 —— 没推出去就没有那一跑，什么都没有）。
 - 重试口令（DNS 恢复后）：`git push origin main && git rev-list --count origin/main..HEAD`（期望 0），再 `python3 scripts/ci_read.py latest --workflow CI` 取 `b6c7fce` 的成对号；那一跑要回答的是 R566 读单 (g)「补正笔单独推有没有造出注定红的派生格」。
+
+## 收口前最后一读（补正之后）
+
+- 电池 `/tmp/r565-battery8.log` ⇒ `Ran 710 tests in 88.967s` / `OK (skipped=5)`、退出码 0。
+- 派生格再读：清账 `格=162 声明=63 不成立=0/63`、`PRODUCT_STREAK_LEDGER_OK streak=5`、`SOURCES_CELL 一致=是`、`COMMIT_ROUND_IDENTITY 笔=3 … 不一致=0`。
+- push 第三次尝试（`ConnectTimeout=12`）⇒ 仍 `Could not resolve hostname github.com`；`dscacheutil -q host -a name github.com` 仍空。**这一轮的最后一格因此是"待推"**：本地领先、远端停在 `c567879`，`9482f86`/`ee16e2b`/交接笔 的成对号**还不存在**（不许预支一个号写进账）。
