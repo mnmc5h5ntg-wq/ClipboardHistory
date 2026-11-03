@@ -8443,6 +8443,116 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    /// **R565 · 浮层键盘提示的字芯对比必须过 4.5:1。**
+    ///
+    /// 缺陷：`QuickPickKeyboardHint.color` 用的是 `.tertiaryLabelColor`，而它是面板上**唯一一句
+    /// 功能性文字**（告诉用户 ↑↓/↵/Esc 怎么用）。全仓其余"次要说明"都走 `.secondaryLabelColor`
+    /// （主列表时间行、行内三枚标记、详情 meta），只有这一句弱了两档。
+    ///
+    /// 旧值（本机 2× 现读，`quickpick-list` 帧底部那条带里偏差最大的像素群中位）：
+    /// light 字芯 (140,140,140) / 底 (255,255,255) ⇒ **3.36:1**；dark 字芯 (127,127,127) / 底 (30,30,30)
+    /// ⇒ **4.16:1** —— 两档都低于 WCAG AA 对正文的 4.5:1，而同一张帧里候选行的文字是 16–20:1
+    /// （⇒ 尺不是瞎的，淡的只有这一句）。
+    ///
+    /// 判的是**比值**不是像素数 ⇒ 与捕获倍率无关（R555 那一族"同一几何量在 2x/1x 不是同一对象"
+    /// 在这里不适用；1x 体检仍做，读不到字芯就具名 NOT_RUN，不降地板）。
+    /// ⚠ 禁碰 R550「提示 Esc」= 键名大小写与字高那一面：本判据只读**颜色**，
+    ///   `HINT_KEY_CAPS` 那条一字未动，改完它的读数必须逐字不变。
+    func testQuickPickKeyboardHintClearsTheContrastFloor() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r565-hint-contrast-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixtures = self.fixtures(appearance: appearance)
+            guard let fixture = fixtures.first(where: { $0.name == "quickpick-list" }) else {
+                XCTFail("\(tag)：没有 `quickpick-list` 夹具 ⇒ 这条判据没有对象")
+                continue
+            }
+            let file = scratch.appendingPathComponent("quickpick-list-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                XCTFail("\(tag)：帧读不回字节 ⇒ 这条判据没有对象")
+                continue
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let alphaFirst = rep.bitmapFormat.contains(.alphaFirst)
+            let rOff = alphaFirst ? 1 : 0
+            let bpp = rep.samplesPerPixel
+            func rgbAt(_ x: Int, _ y: Int) -> (Double, Double, Double) {
+                let o = y * rep.bytesPerRow + x * bpp
+                return (Double(base[o + rOff]), Double(base[o + rOff + 1]), Double(base[o + rOff + 2]))
+            }
+            func lin(_ v: Double) -> Double {
+                let c = v / 255.0
+                return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+            }
+            func relLuma(_ p: (Double, Double, Double)) -> Double {
+                0.2126 * lin(p.0) + 0.7152 * lin(p.1) + 0.0722 * lin(p.2)
+            }
+            func contrast(_ a: (Double, Double, Double), _ b: (Double, Double, Double)) -> Double {
+                let l1 = relLuma(a), l2 = relLuma(b)
+                return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+            }
+            // 底色取**这一条带自己的众数**，不取整帧众数：浮层底部那圈阴影/圆角让
+            //   light 档整帧众数(252)与提示所在那一行的局部底(≈244)差出一个常数量，
+            //   第一版因此把带内 99.8% 的像素都算成"偏差"，字芯被抗锯齿边稀释成 163。
+            // 提示那一行：与 `QUICKPICK_HINT` 同一条带（底部 26pt 之内），左右按产品自己的内缩
+            let x0 = Int((QuickPickKeyboardHint.horizontalInset * scale).rounded())
+            let x1 = min(rep.pixelsWide, Int(((Double(fixture.size.width)
+                - QuickPickKeyboardHint.horizontalInset) * scale).rounded()))
+            let y0 = Int(((Double(fixture.size.height) - 26.0) * scale).rounded())
+            // ⚠ 偏差必须在**同一个空间**里量：底色先转成线性光再比。
+            //   第一版拿 `bgLuma/255`（gamma 编码的 0..1）去比 `relLuma`（线性光），
+            //   暗档里两者差一个常数量 ⇒ 带内 41184 个像素"全部偏差"，排序把**背景自己**排成了字芯
+            //   （读数 light 2.46:1 / dark 1.02:1，与 numpy 那条独立通道量的 3.36/4.16 对不上）。
+            var hist = [Int: Int]()
+            for y in y0..<rep.pixelsHigh {
+                for x in x0..<x1 {
+                    let p = rgbAt(x, y)
+                    let g = Int(((0.299 * p.0 + 0.587 * p.1 + 0.114 * p.2)).rounded())
+                    hist[g, default: 0] += 1
+                }
+            }
+            let bgLuma = Double(hist.max { $0.value < $1.value }?.key ?? 255)
+            let bgLin = relLuma((bgLuma, bgLuma, bgLuma))
+            var dev: [(Double, Int, Int)] = []
+            for y in y0..<rep.pixelsHigh {
+                for x in x0..<x1 {
+                    let p = rgbAt(x, y)
+                    let d = abs(relLuma(p) - bgLin)
+                    if d > 0.01 { dev.append((d, x, y)) }
+                }
+            }
+            XCTAssertFalse(dev.isEmpty,
+                           "\(tag)：底部 26pt 带里一个偏差像素都没有 ⇒ 提示没画出来，"
+                           + "这条判据没有对象（不许读成「对比度合格」）")
+            if dev.isEmpty { continue }
+            // 字芯 = 偏差最大的那一小群像素的中位颜色（抗锯齿边不参与，R453 那一族）
+            dev.sort { $0.0 > $1.0 }
+            let coreCount = min(dev.count, max(40, dev.count / 20))
+            func medianChannel(_ pick: ((Double, Double, Double)) -> Double) -> Double {
+                let vals = dev.prefix(coreCount).map { pick(rgbAt($0.1, $0.2)) }.sorted()
+                return vals[vals.count / 2]
+            }
+            let core = (medianChannel { $0.0 }, medianChannel { $0.1 }, medianChannel { $0.2 })
+            let bg = (bgLuma, bgLuma, bgLuma)
+            let ratio = contrast(core, bg)
+            emit("HINT_CONTRAST \(tag) 底=\(Int(bgLuma)) 字芯=(\(Int(core.0)),\(Int(core.1)),\(Int(core.2)))"
+                 + " 对比=\(String(format: "%.2f", ratio)):1 字芯像素=\(coreCount) 偏差像素=\(dev.count)"
+                 + " 地板=4.5 倍率=\(String(format: "%.1f", scale))x")
+            XCTAssertGreaterThanOrEqual(ratio, 4.5,
+                "\(tag)：键盘提示的字芯对比只有 \(String(format: "%.2f", ratio)):1（地板 4.5:1）⇒ "
+                + "这一句是浮层里唯一的功能性说明，弱到看不见等于没有（R449 开这一格就是为了不用猜键）")
+            judged += 1
+        }
+        XCTAssertEqual(judged, 2, "两档里只判成 \(judged) 档 ⇒ 有一档没拿到对象")
+    }
+
     /// R450：Markdown 已完成任务项的**正文**必须比未完成项弱一档。
     ///
     /// 两行任务项的正文逐字相同（`待办事项`），只有 `[x]`/`[ ]` 不同：

@@ -16,5 +16,9 @@ enum QuickPickKeyboardHint {
     /// 与 `QuickPickController` 里其他元信息同一档字号（11pt）。
     static var font: NSFont { .systemFont(ofSize: VisualFont.meta) }
     /// 提示是元信息：比候选行弱一档，暗档用动态色。
-    static var color: NSColor { .tertiaryLabelColor }
+    /// R565：从前是 `.tertiaryLabelColor` —— 帧上现读字芯 light (140,140,140)/底 255 ⇒ **3.36:1**、
+    /// dark (127,127,127)/底 30 ⇒ **4.16:1**，两档都跌破 4.5:1，而这一句是浮层里唯一的功能性说明
+    /// （R449 开它就是为了让用户不用猜键）。改成与全仓其余次要文字同一档的 `.secondaryLabelColor`
+    /// （主列表时间行、行内标记、详情 meta 都是这一档）⇒ 仍然比候选行弱一档，设计意图一字未改。
+    static var color: NSColor { .secondaryLabelColor }
 }
