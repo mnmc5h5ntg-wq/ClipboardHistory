@@ -7,9 +7,15 @@
 "桌面文件夹"授权下一轮就作废。授权跟着**签名身份**走，所以这一格的坏法就是
 「构建又直接 ad-hoc 签了，而没人报出来」。
 
-两臂（用 PATH 上的 `security` / `codesign` 桩，不碰真钥匙串、不签真包）：
+两臂（用 PATH 上的 `security` / `codesign` **桩**，不碰真钥匙串、不签真包）：
   · 有固定身份 ⇒ 必须用 `-s <身份>`，并打 `SIGNATURE_KIND=local`；
   · 没有身份 ⇒ 必须打 `SIGNATURE_KIND=adhoc`（读数里看得见，不许静默）。
+
+第三格是**现读那一台真机器**（`test_this_machine_actually_takes_the_identity_branch`，R566 加）：
+桩测只证明"脚本会选对支"，它证明不了"这台机器今天走得通哪一支"。R553 当时的现读是回退支
+（`find-identity` 给 0 条）；用户在钥匙串里对 `ClipboardHistory Local Signing` 点了「始终信任」
+并放行私钥访问之后，现读换成身份支 ⇒ 这一格把那句话变成会红的事实，**假设一字未改，只换现读值**。
+没有那个身份的机器（CI、别人的机器）走具名 skip（skip 与断言同函数），不许被读成"合格"。
 另加一条源码守卫：`Makefile` 里不许再出现裸的 `codesign -s -` —— 签必须走这个脚本。
 """
 import io
@@ -65,6 +71,55 @@ class SignBundleTests(unittest.TestCase):
         self.assertIn(u"SIGNATURE_KIND=adhoc", proc.stdout,
                       u"回退 ad-hoc 可以，但必须被报出来 —— 静默回退就是这轮要修的洞")
         self.assertIn(u"-s\n-\n", calls, u"回退那一支必须真的用 ad-hoc（-s -）")
+
+    def test_this_machine_actually_takes_the_identity_branch(self):
+        """现读**这台机器**：钥匙串里有那个身份 ⇒ 真签一次必须走 `SIGNATURE_KIND=local`。
+
+        为什么要有这一格：上面两臂喂的是桩，它们永远答"如果身份在/不在"，不答"今天在不在"。
+        R553 写这两臂时那一台的现读是回退支（`0 valid identities found`），所以"授权能跨轮活下来"
+        当时只是一句期望。用户点过「始终信任」并放行私钥之后，现读变成身份支 ⇒ 这一格把它钉住。
+        没有该身份的机器具名 skip（与断言同函数）—— 那不等于合格，只是这一台判不了。
+        """
+        listed = subprocess.run(["security", "find-identity", "-v", "-p", "codesigning"],
+                                capture_output=True, text=True, timeout=60)
+        if IDENTITY not in listed.stdout:
+            self.skipTest(u"SIGN_LIVE_NOT_RUN=no-identity 这一台的钥匙串里没有固定身份"
+                          u"（两臂桩测仍然各自判着两条支）")
+        work = tempfile.mkdtemp(prefix="sign-live-")
+        self.addCleanup(lambda: subprocess.run(["/bin/rm", "-rf", work], check=False))
+        bundle = os.path.join(work, u"\u65f6\u95f4\u526a\u53f2.app")   # 与产品同名的 CJK 包
+        macos = os.path.join(bundle, "Contents", "MacOS")
+        os.makedirs(macos)
+        with io.open(os.path.join(bundle, "Contents", "Info.plist"), "w", encoding="utf-8") as h:
+            h.write(u'<?xml version="1.0" encoding="UTF-8"?>\n'
+                    u'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                    u'"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+                    u'<plist version="1.0"><dict>'
+                    u'<key>CFBundleExecutable</key><string>ClipboardHistoryApp</string>'
+                    u'<key>CFBundleIdentifier</key><string>local.selftest.signlive</string>'
+                    u'<key>CFBundleName</key><string>signlive</string>'
+                    u'<key>CFBundlePackageType</key><string>APPL</string>'
+                    u'</dict></plist>\n')
+        exe = os.path.join(macos, "ClipboardHistoryApp")
+        with io.open(exe, "w", encoding="utf-8") as h:
+            h.write(u"#!/bin/sh\necho live\n")
+        os.chmod(exe, 0o755)
+
+        proc = subprocess.run(["/bin/sh", SCRIPT, bundle],
+                              capture_output=True, text=True, timeout=180)
+        out = proc.stdout + proc.stderr
+        self.assertEqual(0, proc.returncode, out)
+        self.assertIn(u"SIGNATURE_KIND=local identity=%s" % IDENTITY, proc.stdout,
+                      u"这台机器有固定身份却没用 ⇒ CDHash 还会每轮变、桌面授权又会反复弹：" + out)
+        self.assertNotIn(u"SIGNATURE_KIND=adhoc", proc.stdout,
+                        u"同一跑里既报 local 又报 adhoc ⇒ 报的不是被签那一次的种类：" + out)
+        info = subprocess.run(["codesign", "-dvv", bundle],
+                              capture_output=True, text=True, timeout=120)
+        detail = info.stdout + info.stderr
+        self.assertIn(u"Authority=%s" % IDENTITY, detail,
+                      u"`SIGNATURE_KIND=local` 报了但包里没有该 Authority ⇒ 读数与被签对象脱节：" + detail)
+        self.assertIn(u"flags=0x0", detail,
+                      u"固定身份签出来的包 flags 不是 0x0（0x2 才是 adhoc）：" + detail)
 
     def test_makefile_must_route_signing_through_the_script(self):
         text = io.open(os.path.join(REPO, "Makefile"), encoding="utf-8").read()

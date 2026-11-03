@@ -125,3 +125,14 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - ⑯ + BACKLOG 641：连推四笔的 commit subject 与内容不符（`6a3542b`/`e391ddb` 逐字同标题；`5762925`、`d3bc6ec` 标题各抄了上一条）⇒ 已推不 amend，forward 点名；现有身份守卫只判 R 前缀 ⇒ 对"标题说的是哪件事"全盲，可判草稿（同批 subject 逐字重复即红，正对照就是本轮这一对）写进 641。
 
 - ⚠ 641 的形状**当场又犯了一次**：`bc5a2af`（本笔记的收口段）的 subject 第三次逐字重复 `6a3542b`/`e391ddb` 那一条 ⇒ 正对照从一对变成三笔同标题。已推 ⇒ 不 amend，只在 641 的账上再加这一个数据点：**重复不是偶发，是"同一轮连写多笔时我 copy message"这个习惯的必然结果**，那条守卫该落。
+
+
+## R566（第 565 轮 / Round 563）工作笔记 · 签名链
+
+- 身份现读：`security find-identity -v -p codesigning` ⇒ `1 valid identities found` + `5F6C0955D4543282F5B2B12A3A2B9FB9FF5CE0A7 "ClipboardHistory Local Signing"`。
+- `make bundle` ⇒ `/tmp/r566-bundle.log`：`SIGNATURE_KIND=local identity=ClipboardHistory Local Signing`、`codesign --verify --deep --strict` 过、MAKE exit 0。
+- 换装 ⇒ `/tmp/r566-install.log`：`INSTALL_RESULT=ok 1.4.8→1.4.8 / SHA_MATCH=1 / INSTALL_SIGNATURE=local flags=0x0 / SMOKE_OK=1 / ENTRIES=451=451 / PID=7145`；备份 `/Users/wangziyi/Documents/Codex_Project0_backups/before-before-R566`（`--label` 被脚本再加一层前缀）。
+- 跨轮对拍：本轮那份与上一轮备份 `codesign -dvv` 逐字相同（`CodeDirectory v=20400 size=23793 hashes=737+3`、`Signature size=1900`、`Authority=…Local Signing`）⇒ 633 的"身份不变"半边有判据了；人工那一格仍开着。
+- 判据：`test_sign_bundle.py` 4 格 → 5 格（新增现读真钥匙串那一格，CI 无身份 ⇒ 具名 skip）。刀 **M1474 / M1475** 全 CAUGHT、RESTORE_CLEAN=yes、needle 各命中 1；名册 `tables=374 / files=467 / bad=0`、`HIDDEN 表=461 rot=0 处置=ok`。
+- 验证链：build 0；判据卷 222/4-skipped/0（1010.3s）；帧 `CHANGED=135`（**不 update**；漂移规模本身 138→138→135 在动 ⇒ 640 的措辞要跟着改）；全量 **1406/57/1 红**两跑（`PerfBudgetTests/testImageComparisonCostStaysBounded` 255.1 / 294.2ms 对 250.0），同一判据单独重跑 148.29/148.80/149.64ms ⇒ 负载相关，不放宽、不删格；电池 `Ran 720 / OK (skipped=5)`。
+- ⓪ 那七跑（R565 那批）全部 concluded failure，但形状变了：**STEP[9] 不再红**（两处修法被 runner 签收，`SKIP_ROSTER 名单外=无 名册未跳=无 内层Ran=719`），只剩 STEP[15]/[17] = `HINT_CONTRAST` light 3.84:1（639）；最后一跑另加 STEP[19] = `testBandCaptureIsCheaperAndStillSeesTheMotion` 11.394 vs 11.131（**212 的第二次露面、换形状**；同批只这一跑红 ⇒ 判间歇）。

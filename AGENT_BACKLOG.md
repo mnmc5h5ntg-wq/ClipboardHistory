@@ -10980,6 +10980,7 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     现状：`make bundle` 现读 `SIGNATURE_KIND=local`、`flags=0x0(none)`、`Authority=ClipboardHistory Local Signing`；连装两轮（R554 / R554b）`INSTALL_SIGNATURE=local` 且身份不变；改一字节重签后 CDHash 变（3a02a52d→6ffd48b7）而 DR 逐字不变。
     退场（只能人工）：用户在访达里授权一次「桌面文件夹」之后，**下一轮构建 + 换装**再复制一个桌面文件，不该再弹。用户回执前不销单；不许拿 `codesign --verify --strict` 绿、离屏帧或 DR 文本顶替这一格。
     关联：若仍弹，则主因转向 632（主动读），而不是签名。
+    本轮（R566）推进的是**判据那一半**：`test_sign_bundle.py` 新增现读真钥匙串那一格（有身份 ⇒ 真签必须 `local`），刀 M1474/M1475 各钉一种坏法；跨轮对拍（本轮那份 vs 上一轮备份）`CodeDirectory size=23793 hashes=737+3`、`Signature size=1900`、`Authority=ClipboardHistory Local Signing` 逐字相同 ⇒ 身份不再靠一句话。**人工那一格仍开着**：请用户在访达里对桌面文件夹**再授权一次**（签名身份变过 ⇒ 系统当新版本，这一次是最后一次），之后再复制一个桌面文件不该弹；下一次若还弹，先现读 `SIGNATURE_KIND`（若成 `adhoc` 就是构建链回退，不是 TCC 抽风）。用户回执前不销单。
 
 **632. 预览/布局路径主动读受保护目录（桌面授权反复弹的第二格）**（R553 实读并新开，本轮未动产品）
     现象：用户反复被弹「时间剪史想访问桌面文件夹」。采集路径（`ClipboardIntake`）只记 URL，不读文件；读发生在预览与布局：
@@ -11016,3 +11017,10 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
 **630. 浮层键盘提示把关闭键写成小写 `esc`**（R550 发现并同轮结案）
     现象：`QuickPickKeyboardHint.text` 是「↑↓ 选择 · ↵ 粘贴 · esc 关闭」，而全 App 其它提示统一用「Esc」；11pt 下小写 x-height 5.99pt，键名读起来像普通单词。
     修法：改「Esc 关闭」；cap height 7.85pt（+31%），宽 5.13→5.22pt；新判据 `HINT_KEY_CAPS`（≥7pt）+ M1429 CAUGHT；含提示行的 26 张浮层帧只差提示行。**同轮结案**。
+
+
+**642. 安装条目数跨轮从 433 涨到 451 —— 同一版本、产品 `Sources/` 一字未动，而这一格从不判跨轮稳定**（R566 换装现读并新开）
+    读数：R564/R565 两轮 `INSTALL_ENTRIES=433=433`；本轮 `INSTALL_ENTRIES_BEFORE=451 INSTALL_ENTRIES_AFTER=451`（before 数的正是 R565 装上去那一份 ⇒ 376…451 这一跳发生在"R565 打包"与"R566 打包"之间，而不是安装口径变了）。
+    为什么这是个洞而不是噪音：条目数与包内容一起决定 CDHash，而 CDHash 决定 TCC 认不认"同一个 App"（633 的根因就在这条链上）。**授权能跨轮活下来**这句话的前提是包内容稳定；今天它涨了 18 条而**没有任何门说过一句**。
+    现判据的缺口：`install_local.sh` 只判 `before == after`（同一份的两次数），跨轮比较从来不存在 ⇒ 这一格不许被读成"有门保着"。
+    下一步（本轮不做，先数清再决定）：(i) 用备份目录 `before-before-R566` 与 `/Applications/时间剪史.app` 做**逐条名单差集**，数出那 18 条到底是什么（怀疑方向：`make bundle` 从 `.build/debug` 资源目录取 `AppIcon.icns` 之外的东西、`._*` AppleDouble 残留、`dot_clean` 不可用时的静默 `|| true`）；(ii) 分辨完再决定进门形状 —— 若那 18 条是垃圾 ⇒ 修打包并**降**条目数（棘轮只准降），配一把刀钉"垃圾回到包里必须红"；若是产品真需要的资源 ⇒ 把跨轮基准改成由 `make bundle` 自己打印的清单，而不是常量。
