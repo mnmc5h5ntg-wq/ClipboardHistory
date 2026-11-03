@@ -31,8 +31,17 @@ class CommitRoundIdentityTests(unittest.TestCase):
         """正对照：R564 = 第 563 轮 / Round 561（本轮 ⓪ 笔的真实形状）。"""
         self.assertEqual(cri.judge("R564 ⓪ 开工节：基线全现读（第 563 轮 / Round 561）", ""), [])
 
-    def test_round_offset_also_in_body(self):
-        self.assertEqual(cri.judge("R564 台账", "本轮 U-2432…U-2438；D-564（第 563 轮 / Round 561）"), [])
+    def test_identity_comes_from_subject_not_from_body(self):
+        """正文里出现别的轮次号是**合法叙述**，不是这一笔的身份。
+
+        这条是守卫自己抓到的自伤：第一版扫全文，于是本轮 A 笔正文里引用的
+        `64d3192`（「它自己的身份行是 第 562 轮 / Round 560」）被判成"这一笔不一致"。
+        仓库惯例是身份写在标题末尾的括号里 ⇒ 只认 subject。
+        """
+        self.assertEqual(cri.judge("R564 台账", "本轮引用：64d3192 的身份行是 第 562 轮 / Round 560"),
+                         ["身份缺失"])
+        self.assertEqual(cri.judge("R564 台账（第 563 轮 / Round 561）",
+                                   "正文里另提 第 562 轮 / Round 560 那一笔"), [])
 
     def test_prefix_disagrees_with_round_number(self):
         """`64d3192` 那一族的形状：前缀写上一轮的号，身份行是本轮的。"""
@@ -49,6 +58,11 @@ class CommitRoundIdentityTests(unittest.TestCase):
 
     def test_missing_prefix_is_red(self):
         self.assertEqual(cri.judge("台账：本轮七本落盘", "（第 563 轮 / Round 561）"), ["无R前缀"])
+
+    def test_subject_identity_wins_over_body_quotation(self):
+        """正对照的第二半：标题带身份 + 正文引用历史 ⇒ 必须 0 条命中。"""
+        self.assertEqual(cri.judge("R564 A：守卫落地（第 563 轮 / Round 561）",
+                                   "R563 的 A 笔 64d3192 前缀写成 R562，正文身份是 第 562 轮"), [])
 
     def test_prefix_boundary_is_not_greedy(self):
         """`R5640` 这种四位数不许被 `R564` 抢走前缀（负数形状的先验）。"""

@@ -23,6 +23,7 @@
 """
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 import sys
@@ -35,23 +36,28 @@ ROUND_RE = re.compile(r"第\s*(\d+)\s*轮")
 LABEL_RE = re.compile(r"Round\s*(\d+)")
 
 
-def judge(subject: str, body: str) -> list[str]:
-    """返回这一笔的问题清单（空 = 一致）。纯函数，真值表在电池里钉。"""
+def judge(subject: str, body: str = "") -> list[str]:
+    u"""返回这一笔的问题清单（空 = 一致）。纯函数，真值表在电池里钉。
+
+    ⚠ **身份只从 subject 取**（仓库惯例：轮次身份写在这一笔标题末尾那个括号里）。
+    第一版把正文也一起扫，结果它第一个抓到的是**我自己**：A 笔正文里引用了
+    `第 562 轮 / Round 560`（那是 `64d3192` 的历史，不是这一笔的身份）⇒ 判成"不一致"。
+    正文里出现别的轮次号是合法叙述，不是身份声明 —— 尺读错了对象（`body` 参数留着只为兼容调用方）。
+    """
     findings: list[str] = []
-    message = subject + "\n" + body
     prefix = PREFIX_RE.match(subject.strip())
     if prefix is None:
         findings.append("无R前缀")
         return findings
     declared = int(prefix.group(1))
-    rounds = [int(x) for x in ROUND_RE.findall(message)]
+    rounds = [int(x) for x in ROUND_RE.findall(subject)]
     if not rounds:
         findings.append("身份缺失")
         return findings
     for seen in sorted(set(rounds)):
         if seen != declared - 1:
             findings.append("不一致:R%d≠第%d轮" % (declared, seen))
-    labels = [int(x) for x in LABEL_RE.findall(message)]
+    labels = [int(x) for x in LABEL_RE.findall(subject)]
     for seen in sorted(set(labels)):
         if seen != declared - 3:
             findings.append("不一致:R%d≠Round%d" % (declared, seen))
@@ -76,10 +82,22 @@ def collect(scope: str) -> list[tuple[str, str, str]]:
     return out
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(
+        prog="commit_round_identity.py",
+        description="commit subject 的 Rnnn 前缀与标题里的轮次身份行必须一致（只管未推的那一批）。",
+        epilog="退出码：0=一致；1=有不一致/身份缺失/无R前缀/笔=0；2=git 取不到。",
+    )
+    ap.add_argument("--scope", default="origin/main..HEAD",
+                    help="要判的提交范围（默认未推的那一批；范围为空时退化到 HEAD~1..HEAD）")
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     try:
-        commits = collect("origin/main..HEAD")
-        scope = "origin/main..HEAD"
+        commits = collect(args.scope)
+        scope = args.scope
     except RuntimeError as exc:
         print("COMMIT_ROUND_IDENTITY_RESULT=unreadable %s" % exc)
         return 2
