@@ -24,11 +24,15 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
 
-ROOT = "/Users/wangziyi/Codex_Project0"
+# ⚠ 不许写死机器路径：R564 那一版写的是本机绝对路径 ⇒ runner 上 `subprocess.run(cwd=...)`
+#   直接抛异常 ⇒ STEP[9] 电池红、STEP[10]-[14]（含帧基线名册门）整段 skipped，
+#   两跑（`41552571306`/`41552998637`）的信号全被这一格带走。R565 由这条守卫补上名册。
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEP = "\x1e"
 
 PREFIX_RE = re.compile(r"^R(\d{2,4})(?![0-9])")

@@ -26,6 +26,43 @@ BAD_PREFIX = u'/' + u'tmp/' + u'shots_' + u'r'
 BAD_RE = re.compile(re.escape(BAD_PREFIX) + u'[0-9]')
 
 
+# R565 补的第二支：脚本**自己的仓库根常量**不许写死机器路径。
+# 来历：R564 新加的 `scripts/commit_round_identity.py` 把 ROOT 写成
+#   '/' + 'Users/' + 'wangziyi/' + 'Codex_Project0'（本机绝对路径）⇒ runner 上那个目录不存在，
+#   `subprocess.run(cwd=ROOT)` 直接抛异常 ⇒ STEP[9] 电池红、STEP[10]-[14]（含帧基线名册门）整段
+#   skipped，两跑的 CI 信号全被带走。上面那支只盯 `/tmp/shots_rNN`，看不见这一族。
+# 只盯**根常量**这一种形状：`test_mutate_r271_needle.py` 里那些合成路径是测试输入（合法的靶），
+#   docstring 里引用历史也是合法的 —— 抓到它们就等于把守卫变成噪音。
+MACHINE_ROOT_FRAGMENT = '/' + 'Users' + '/' + 'wangziyi'
+ROOT_CONST_RE = re.compile(r'^\s*(?:ROOT|REPO_ROOT|repo_root|REPO)\s*=\s*[\'"]'
+                           + re.escape(MACHINE_ROOT_FRAGMENT))
+
+
+def scan_root_lines(lines):
+    hits = []
+    for i, line in enumerate(lines, 1):
+        if line.lstrip().startswith(u'#'):
+            continue
+        if ROOT_CONST_RE.search(line):
+            hits.append((i, line.rstrip()))
+    return hits
+
+
+def scan_tree_root(scripts_dir):
+    offenders = []
+    for base, _dirs, files in os.walk(scripts_dir):
+        for name in sorted(files):
+            if not name.endswith(u'.py'):
+                continue
+            path = os.path.join(base, name)
+            text = io.open(path, encoding='utf-8', errors='replace').read()
+            hits = scan_root_lines(text.splitlines())
+            if hits:
+                rel = os.path.relpath(path, os.path.dirname(scripts_dir))
+                offenders.append((rel, hits))
+    return offenders
+
+
 def scan_lines(lines):
     """返回 [(行号, 行)] —— 只看非注释行；注释行是"引用历史"，不是"依赖路径"。"""
     hits = []
@@ -73,6 +110,31 @@ class FramesPathHygieneTests(unittest.TestCase):
         legit = u"run('mkdir -p /tmp/shots-ci && python3 x.py')"
         comment = u'# R212 那版指 ' + BAD_PREFIX + u'211，在 runner 上先撞上 FRAME_DIR_MISSING'
         self.assertEqual([], scan_lines([legit, comment, u'']))
+
+
+class MachineRootHygieneTests(unittest.TestCase):
+    def test_no_script_uses_a_hardcoded_machine_root(self):
+        offenders = scan_tree_root(ROOT)
+        self.assertEqual(
+            [], offenders,
+            u'这些脚本把自己的仓库根常量写成机器绝对路径（runner 上目录不存在 ⇒ 脚本抛异常、'
+            u'CI 那一步整段红/跳过）：'
+            + u'；'.join(u'%s:%s' % (rel, [n for n, _ in hits]) for rel, hits in offenders)
+            + u' ⇒ 用 os.path.dirname(os.path.abspath(__file__)) 推出来')
+
+    def test_scanner_catches_the_root_shape_it_is_supposed_to_catch(self):
+        """正对照：这一族必须被点名，否则上面那格的零命中毫无意义。"""
+        bad = u'ROOT = "' + MACHINE_ROOT_FRAGMENT + u'/Codex_Project0"'
+        hits = scan_root_lines([u'# 上一版 ' + bad, bad])
+        self.assertEqual(1, len(hits), u'扫描器抓不到写死的仓库根 ⇒ 这把尺是空的')
+        self.assertEqual(2, hits[0][0], u'抓到了但行号不对（注释行不该算，代码行要算）')
+
+    def test_scanner_does_not_bite_synthetic_paths_or_comments(self):
+        """负对照：测试里的合成路径靶、由 __file__ 推出来的根、注释里的历史引用，都不许被报。"""
+        legit_derived = u"ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))"
+        synthetic = u"MINE = '" + MACHINE_ROOT_FRAGMENT + u"/Codex_Project0/Sources/X.swift'"
+        comment = u'# R564 那版写 ' + MACHINE_ROOT_FRAGMENT + u'/Codex_Project0 ⇒ runner 上炸'
+        self.assertEqual([], scan_root_lines([legit_derived, synthetic, comment, u'']))
 
 
 if __name__ == u'__main__':
