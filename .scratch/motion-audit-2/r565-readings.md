@@ -227,3 +227,9 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 
 ### 重跑（因为上面 1/2 改了测试侧与账侧，验证链必须重测同一棵树）
 - 判据卷重跑 → `/tmp/r567-capture3.log`；全量重跑 → `/tmp/r567-full2.log`（数若变照实写进 STATE ⑤，不改口径）。
+
+### 收口（R567）
+- 两笔同推：A `8d9fb2b`（产品+判据+刀表+帧基线+规格 D5a）、B `ce1904d`（七本+笔记+写手）⇒ GitHub 只给尾笔建跑 `41733244129 ↔ ce1904d`（取号 in_progress ⇒ 复核未到），`8d9fb2b` 无独立跑 ⇒ 具名 `CI_UNREAD`。通道 `api=200 / apple=200 / github.com=200`，`ahead=0`，工作树干净。
+- 台账落盘之后复跑：电池 `Ran 720 / OK (skipped=5)` 退出码 0；`SOURCES_CELL 账上=R567/8d9fb2b git=R567/8d9fb2b 一致=是`；`PRODUCT_STREAK_LEDGER_OK streak=2`；清账 162/63 不成立=0；`LEDGER_TOKENS stray=0`；§1 由 `refresh_report_section1.py` 刷（`n=557 尾轮=564`）。
+- R568 的 ⓪ 写进 `### R567 补记` ②：STEP[9] 是否继续绿、新判据第一次上 runner 走哪条（`ASPECT_LOCK_NOT_RUN=macos<13` / 像素那格的 1x 墨）、STEP[11] 认不认得改名的 4 张帧（并再提醒：STEP[11] 绿≠帧没变）、639 是否被挪动、643 第九个数、640/645、622/629。
+- 下一段靶：规格 §3 第②段（透明与框架，仍一步切换、不写着色器），§4 三问任一不过 ⇒ 停在那里。禁碰 13 面；刀号 M1480 起。
