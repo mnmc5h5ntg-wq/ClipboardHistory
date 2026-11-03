@@ -224,12 +224,12 @@ class MutateArmRegistryTests(unittest.TestCase):
     def test_the_tools_derive_their_repo_root_instead_of_hardcoding_it(self):
         """R262：runner 上这一格只能报 FileNotFoundError —— 预检把仓库根写死成了我本机的路径。
 
-        run 39512069087 / STEP[9] 现读：`check_manifests` 去开 `/Users/wangziyi/Codex_Project0/...`，
+        run 39512069087 / STEP[9] 现读：`check_manifests` 去开**开发机自己的**仓库根（那一版写死的形状），
         而作业树在 `/Users/runner/work/ClipboardHistory/ClipboardHistory` ⇒ 一格"本机绿、
         另一台机器只能报错"的判据不是判据（R100 的夹具绝对路径、R154 的环境差异是同一族）。
 
         扫的是**代码里的字符串常量**：用 `ast`，所以注释里引用那句路径不会被误伤
-        （本文件上面那段 docstring 就写着 `/Users/...`，它不该喂饱这条守卫）。
+        （本文件上面那段 docstring 就写着机器路径的形状，它不该喂饱这条守卫）。
         估计量与 `scripts/mutation_verdict_scan.py` 共用同一颗 = D-247，不另抄一份。
         """
         import ast

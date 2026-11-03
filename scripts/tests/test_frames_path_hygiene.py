@@ -33,9 +33,15 @@ BAD_RE = re.compile(re.escape(BAD_PREFIX) + u'[0-9]')
 #   skipped，两跑的 CI 信号全被带走。上面那支只盯 `/tmp/shots_rNN`，看不见这一族。
 # 只盯**根常量**这一种形状：`test_mutate_r271_needle.py` 里那些合成路径是测试输入（合法的靶），
 #   docstring 里引用历史也是合法的 —— 抓到它们就等于把守卫变成噪音。
-MACHINE_ROOT_FRAGMENT = '/' + 'Users' + '/' + 'wangziyi'
-ROOT_CONST_RE = re.compile(r'^\s*(?:ROOT|REPO_ROOT|repo_root|REPO)\s*=\s*[\'"]'
-                           + re.escape(MACHINE_ROOT_FRAGMENT))
+# R565 补：这一支按**形状**判，不按"某个真用户名"判。
+# 从前它把模式抄成一个真用户名（`'/' + 'Users' + '/' + 'wangziyi'`）—— 于是换一个人的机器、
+# 或者写死的其实是别人的目录，它就抓不到：判据的靶比它要防的缺陷窄。现在 `= "/Users/<任何名字>/…"`
+# 一律算，由 `__file__` 推的那一种不匹配（它不是字面量开头）。
+# 隐私那一半交给 `scripts/ci_channel_hygiene.py` 的 B 格（它按"这台机器上真存在的账号"判），
+# 两支各判一件事：这一支判"换一台机器只能报错"，那一支判"把别人的家目录写进仓库"。
+MACHINE_ROOT_FRAGMENT = '/Users/someone'          # 只给正/负对照当样本用，不参与模式
+ROOT_CONST_RE = re.compile(r'^\s*(?:ROOT|REPO_ROOT|repo_root|REPO|[A-Z_]*ROOT)\s*=\s*[\'"]'
+                           r'/(?:Users|home)/')
 
 
 def scan_root_lines(lines):
@@ -128,6 +134,11 @@ class MachineRootHygieneTests(unittest.TestCase):
         hits = scan_root_lines([u'# 上一版 ' + bad, bad])
         self.assertEqual(1, len(hits), u'扫描器抓不到写死的仓库根 ⇒ 这把尺是空的')
         self.assertEqual(2, hits[0][0], u'抓到了但行号不对（注释行不该算，代码行要算）')
+        # 形状判的第二半：**别人的**用户名（不是这台机器的账号）也必须被抓 —— 从前按真用户名抄，
+        # 这一条是整个洞（换一台机器、或写死的是别人的目录，尺就哑）。
+        other = u'REPO_ROOT = "/home/anyone/Repo"'
+        self.assertEqual(1, len(scan_root_lines([other])),
+                         u'按形状判没做到 ⇒ 模式还是绑在某个具体用户名上')
 
     def test_scanner_does_not_bite_synthetic_paths_or_comments(self):
         """负对照：测试里的合成路径靶、由 __file__ 推出来的根、注释里的历史引用，都不许被报。"""

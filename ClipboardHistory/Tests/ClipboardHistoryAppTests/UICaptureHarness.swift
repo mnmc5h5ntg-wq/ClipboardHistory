@@ -8542,9 +8542,25 @@ final class UICaptureTests: XCTestCase {
             let core = (medianChannel { $0.0 }, medianChannel { $0.1 }, medianChannel { $0.2 })
             let bg = (bgLuma, bgLuma, bgLuma)
             let ratio = contrast(core, bg)
+            let windowGrey = Double(Self.armResolved(.windowBackgroundColor, appearanceName: appearance).r)
+            let blend = core.0 / max(bgLuma, 1.0)
             emit("HINT_CONTRAST \(tag) 底=\(Int(bgLuma)) 字芯=(\(Int(core.0)),\(Int(core.1)),\(Int(core.2)))"
                  + " 对比=\(String(format: "%.2f", ratio)):1 字芯像素=\(coreCount) 偏差像素=\(dev.count)"
-                 + " 地板=4.5 倍率=\(String(format: "%.1f", scale))x")
+                 + " 地板=4.5 倍率=\(String(format: "%.1f", scale))x"
+                 + " 窗口底色现读=\(Int(windowGrey)) 字芯/底=\(String(format: "%.3f", blend))")
+            // R565 补：runner 那一跑把 light 判红成 3.84:1（`底=236 字芯=(118,118,118)`），本机 2x 是 10.37:1
+            // （`底=255 字芯=(64,64,64)`）。两条解释用数分开，不许赌：
+            // ①「倍率把字芯冲淡」被一次性探针**排掉** —— 同一把尺（同一道 0.01 偏差筛、同一个
+            //   `max(40, 偏差/20)` 字芯集合）搬到 1x 代理仍读 light 9.29:1 / dark 11.70:1
+            //   （`/tmp/r565-hint-1x-postchange.log`）⇒ 1x 本身判得出。
+            // ② 差的是**渲染 vs 名义**：本机 窗口底色现读=255、字芯/底=0.251（屏上那层合成 + 字体平滑
+            //   把小字压深），runner 无 backdrop ⇒ 底落 236、字芯正好是底的 0.500（= 名义 secondary 的
+            //   50% 黑）。所以这一台判的是"渲染出来的对比"，那一台判的是"名义色的对比" —— 两个都是真数，
+            //   而名义口径下 secondary 对白底只有 ≈4.0:1，**仍然跌破 4.5**。
+            //   ⇒ 这不是仪器能自己合掉的洞：换口径要改的是"这条判据主张哪一种"，而把它按名义修就得再动
+            //   `QuickPickKeyboardHint.color` —— 那是 R565 刚立的禁碰面 ⇒ **归用户**（BACKLOG 639）。
+            //   本轮只补两格诊断读数（窗口底色、字芯/底），让任何一台机器都能把两种口径对上；
+            //   **没降 4.5、没改期望、没加豁免、没 skip 分支** ⇒ runner 那一朵红原样留着。
             XCTAssertGreaterThanOrEqual(ratio, 4.5,
                 "\(tag)：键盘提示的字芯对比只有 \(String(format: "%.2f", ratio)):1（地板 4.5:1）⇒ "
                 + "这一句是浮层里唯一的功能性说明，弱到看不见等于没有（R449 开这一格就是为了不用猜键）")

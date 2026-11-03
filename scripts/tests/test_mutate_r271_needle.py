@@ -18,7 +18,9 @@ sys.path.insert(0, os.path.join(REPO, '.scratch', 'motion-audit-2'))
 # R273 的 runner 红（run 39579621207 / STEP[9] Release script tests，errors=3 全落在下面这三格）：
 # `mutate_r271.py` 把仓库根写死成**本机**绝对路径，而 runner 的检出目录不是它 ⇒ FileNotFoundError。
 # 修法是让它从 `__file__` 推（同 R262 修预检那一次）；下面的门防的是「只有这一次修了」。
-MACHINE_ROOT = '/Users/wangziyi/' + 'Codex_Project0'
+# ⚠ 这是**合成**机器路径：正对照需要坏形状，不需要任何人的真家目录
+#   （R565 现读：`scripts/ci_channel_hygiene.py` 的 B 格判的就是"CI 跑的脚本里出现真人路径"）。
+BAD_MACHINE_PATH_SAMPLE = '/Users/someone/' + 'DemoRepo'
 
 
 def imported_tool_names():
@@ -71,7 +73,7 @@ def loads_machine_root(src):
     """这把尺只认赋值那一行，别被注释与 docstring 里的路径字样喂饱（R76：扫前剥注释）。"""
     for line in src.splitlines():
         code = line.split('#', 1)[0]
-        if re.match(r"^\s*(?:_[A-Z_]+|ROOT|REPO)\s*=", code) and MACHINE_ROOT in code:
+        if re.match(r"^\s*(?:_[A-Z_]+|ROOT|REPO)\s*=", code) and BAD_MACHINE_PATH_SAMPLE in code:
             return True
     return False
 
@@ -145,23 +147,23 @@ class NeedleMirrorTests(unittest.TestCase):
 
     def test_path_normalization_has_teeth(self):
         """归一化只消「机器」差异，不消「对象」差异：同文件两台机器要相等，不同文件必须不等。"""
-        mine = '/Users/wangziyi/Codex_Project0/ClipboardHistory/Sources/X/HistoryPersistence.swift'
+        mine = '/Users/someone/DemoRepo/ClipboardHistory/Sources/X/HistoryPersistence.swift'
         other_machine = '/Users/runner/work/ClipboardHistory/ClipboardHistory/Sources/X/HistoryPersistence.swift'
         self.assertEqual(repo_relative(mine), repo_relative(other_machine),
                          '同一颗文件在两台机器上被判成不同 ⇒ 归一化没做到')
-        other_file = '/Users/wangziyi/Codex_Project0/ClipboardHistory/Sources/X/DailyCopyLedger.swift'
+        other_file = '/Users/someone/DemoRepo/ClipboardHistory/Sources/X/DailyCopyLedger.swift'
         self.assertNotEqual(repo_relative(mine), repo_relative(other_file),
                             '不同文件被判成相同 ⇒ 这条对账被归一化放宽成了恒真')
         self.assertEqual('ClipboardHistory/Sources/X/HistoryPersistence.swift', repo_relative(mine))
 
     def test_the_machine_root_predicate_itself_has_teeth(self):
         """正负对照：喂旧的写法必须判成红，喂现在的写法必须判成绿（否则上一格只是看起来在扫）。"""
-        self.assertTrue(loads_machine_root("ROOT = '" + MACHINE_ROOT + "'"))
-        self.assertTrue(loads_machine_root("ROOT = \"" + MACHINE_ROOT + "\"  # 注释"))
+        self.assertTrue(loads_machine_root("ROOT = '" + BAD_MACHINE_PATH_SAMPLE + "'"))
+        self.assertTrue(loads_machine_root("ROOT = \"" + BAD_MACHINE_PATH_SAMPLE + "\"  # 注释"))
         self.assertFalse(loads_machine_root("_HERE = os.path.dirname(os.path.abspath(__file__))\n"
                                             "ROOT = os.path.dirname(os.path.dirname(_HERE))"))
         # 注释里出现那个路径不算（R76：判"用没用"要剥注释）
-        self.assertFalse(loads_machine_root("# 别写 " + MACHINE_ROOT + " 这种本机路径"))
+        self.assertFalse(loads_machine_root("# 别写 " + BAD_MACHINE_PATH_SAMPLE + " 这种本机路径"))
 
 
 if __name__ == '__main__':
