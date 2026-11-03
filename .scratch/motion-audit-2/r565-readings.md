@@ -57,3 +57,18 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - ⓪ 两跑到数：`python3 scripts/ci_read.py steps <run>` + `gh run view <run> --json jobs -q '.jobs[].steps[] | "\(.number) \(.name) \(.conclusion)"'`（success 必须逐步读，不许从「不在失败名单」推）。
 - ⓪ 各格正文：`python3 scripts/ci_read.py readings <run> BULLET_LEVELS HEAT_LEGEND_COVERAGE HEAT_LEGEND_NOT_RUN MOTION_MARKDOWN_MODE_FADE SKIP_ROSTER` + STEP[15] 的 `SelectionRevealAnimationTests` 形状（0.0 还是 R412 那个 1430）。
 - 判据卷 / 帧重捕 / 全量 / 换装 / 电池：见 `chain_r565.sh` 的日志路径（跑之前先确认没有别的 swift 卷在跑）。
+
+## 补正笔（收口后第二笔）· 三格改账 + 一格真修
+
+- **ⓐ streak 那一格的解释改齐**（数没动）：门 `scripts/product_streak.py` 的口径是 **as-of** —— 第 N 轮的格 = N −（标签 < N 的最后一笔产品提交的轮次标签）= 564 − 559 = **5** ⇒ 读成「本轮**之前**的连读轮数」，本轮产品笔 `f6c2a1d` 不清零它，清零在下一轮（那时分界变成 564 ⇒ 那一格是 0）。从前写的「未推状态才数到 5、push 之后会变 0」是**错的解释配对的数**：push 之后 `--check` 仍报 `PRODUCT_STREAK_LEDGER_OK streak=5`（日志 `/tmp/r565-streak-post-push.log`）。
+- **ⓑ 刀号互斥（本笔记上面那句「下一轮仍从 M1468 起」作废）**：名册现读 `grep -ho M14[0-9][0-9] .scratch/motion-audit-2/mutate_*.py | sort -u | tail` ⇒ 最高 **M1469**，`mutate_needle_precheck.py` 的 TABLES 里 r565 那一批是 **M1466/M1467/M1468/M1469 四把真刀**（B 笔 `020cef3` 登记的 M1468/M1469 是路径卫生守卫那两把，全 CAUGHT）。那把试完就撤的空刀**从来没占过号** —— 它的草稿临时借过 `mutate_r565_m1468` 这个名字，被 B 笔用掉了 ⇒ 借用作废，R566 从 **M1470** 起。六处账（U-2443 / D-565 ③ / CHANGELOG / ITERATION 正文与七维表 / 补记 ④ / 自伤 ⑥④）由 `.scratch/motion-audit-2/patch_r565_knife_number.py` 一次改齐。这是「同一轮里两处互斥地说一件事」**第三次犯**（R563 的 636、R564 的读单、R565 的刀号），机械形状都一样：后一笔沿用前一笔的草稿措辞，没跟同一轮已落盘的那一笔对账。
+- **ⓒ 真修（判据文本之外的一格）**：`commit_round_identity.py` 把退化说明写进 `范围=` 的**值**里 ⇒ 那一行按空格切成「键=值」，一个 ASCII 空格让判它的测试 `ValueError: dictionary update sequence element #1 has length 1` 崩（不是断言红，是解析崩）。改成 `退化=未推的为空` 另开一格 + 新门 `test_channel_values_contain_no_spaces`。**这把没登记刀**（门自己就是判据：把标签写回带空格立刻红）⇒ 账里具名「无刀、靠活门」。**R564 的绝对根打死 runner、R565 的空格打死本机电池**：同一族第二种坏法 = 通道值里不许含分隔符。
+- **ⓓ 现读**：`COMMIT_ROUND_IDENTITY 范围=HEAD~1..HEAD 退化=未推的为空 笔=1 无R前缀=0 身份缺失=0 不一致=0` / `COMMIT_ROUND_IDENTITY_RESULT=ok`；`PRODUCT_STREAK_LEDGER_OK streak=5`；`SOURCES_CELL 账上=R565/f6c2a1d git=R565/f6c2a1d 一致=是`；清账 `格=162 声明=63 不成立=0/63`；电池 **`Ran 710 / OK (skipped=5)`、退出码 0**（日志 `/tmp/r565-battery6.log`；709→710 = 那条新门，台账里写的 709/5 是它自己那一批的真读数 ⇒ 不改数、只在此补记）；本轮各节未渲染占位符（percent 后接字母）逐节现读 = **0**（脚本按节定位：STATE 3 节 / UI_AUDIT 第 564 轮 / ITERATION Round 562 / CHANGELOG R565 条 / DECISIONS D-565 / FINAL_REPORT R565 笔）。
+
+## 补正笔的 push **没有落地**（通道故障，不是"没红"）
+
+- `git push origin main` 的第一跑挂住 6 分钟：`ps` 现读子进程是 `/usr/bin/ssh git@github.com git-receive-pack …`（state S，etime 一路涨），`lsof` 读不到 TCP 句柄 ⇒ 不是慢，是**连不上**。杀掉重试，仍然不落地。
+- 根因现读（三条互不替代）：`dscacheutil -q host -a name github.com` ⇒ **空**（本机此刻解析不出 github.com）；`dscacheutil … api.github.com` ⇒ `20.205.243.168`（有地址）；`curl --max-time 15 https://github.com` ⇒ `000`，而 `curl … https://api.github.com` ⇒ `200`、`gh api repos/…/git/ref/heads/main` ⇒ `c567879…`（API 通道活着，git 的 SSH 通道靠的那个域名死了）。
+- 于是 bounded 重试立刻返回 `ssh: Could not resolve hostname github.com` ⇒ `fatal: Could not read from remote repository`。
+- **账**：本地 HEAD=`b6c7fce`（补正笔）未推 ⇒ `ahead=1`；远端 main 仍是 `c567879`（R565 补记笔，已推的那五笔在 runner 上）。**这一轮不能写"已收口"**：推送失败不是"绿"，是通道坏了（R565 之前 R557 那批"派生格排在台账之后"的教训同样适用于这里 —— 没推出去就没有那一跑，什么都没有）。
+- 重试口令（DNS 恢复后）：`git push origin main && git rev-list --count origin/main..HEAD`（期望 0），再 `python3 scripts/ci_read.py latest --workflow CI` 取 `b6c7fce` 的成对号；那一跑要回答的是 R566 读单 (g)「补正笔单独推有没有造出注定红的派生格」。

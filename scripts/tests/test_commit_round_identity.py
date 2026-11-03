@@ -80,6 +80,23 @@ class CommitRoundIdentityTests(unittest.TestCase):
                                 "一条都没判到却被读成通过 ⇒ 范围退化那一半坏了：" + out)
         self.assertIn("COMMIT_ROUND_IDENTITY_RESULT=ok", out)
 
+    def test_channel_values_contain_no_spaces(self):
+        """通道行必须是「键=值」按空格切就能解析的形状。
+
+        这一条是活的门，不是文档：R565 实测把退化说明写进 `范围=` 的值里（一个 ASCII 空格），
+        上面那条 `dict(kv.split("=", 1) …)` 就报 `element #1 has length 1` ⇒ 守卫自己是绿的、
+        判它的那一条却崩了。值里不许有空格 ⇒ 退化另开一格 `退化=`。
+        """
+        code, out = self.run_script()
+        self.assertEqual(code, 0, out)
+        head = [ln for ln in out.splitlines() if ln.startswith("COMMIT_ROUND_IDENTITY ")]
+        self.assertEqual(len(head), 1, out)
+        tokens = head[0].split()[1:]
+        loose = [tk for tk in tokens if "=" not in tk]
+        self.assertEqual(loose, [], "通道值里出现了空格 ⇒ 按空格切的解析会断：" + head[0])
+        read = dict(tk.split("=", 1) for tk in tokens)
+        self.assertIn(read["退化"], ("无", "未推的为空"), head[0])
+
     def run_script(self):
         env = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
         env["PYTHONUTF8"] = "1"

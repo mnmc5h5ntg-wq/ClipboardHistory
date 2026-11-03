@@ -105,10 +105,15 @@ def main(argv: list[str] | None = None) -> int:
     except RuntimeError as exc:
         print("COMMIT_ROUND_IDENTITY_RESULT=unreadable %s" % exc)
         return 2
+    degraded = "无"
     if not commits:
         # 已经推齐了（或第一次跑之前）⇒ 退化成只判 HEAD，绝不允许"零条也算通过"。
+        # ⚠ 退化后的范围只能写进**没有 ASCII 空格**的通道值：这一行是「键=值 键=值」按空格切的结构，
+        #   值里夹一个空格就把下游解析打断（R565 实测：`范围=HEAD~1..HEAD（未推的为空 ⇒ 退化）` 让
+        #   测试里的 `dict(kv.split("=", 1) …)` 报 `element #1 has length 1; 2 is required`）。
         commits = collect("HEAD~1..HEAD")
-        scope = "HEAD~1..HEAD（未推的为空 ⇒ 退化）"
+        scope = "HEAD~1..HEAD"
+        degraded = "未推的为空"
     bad: list[str] = []
     no_prefix = 0
     no_identity = 0
@@ -120,8 +125,8 @@ def main(argv: list[str] | None = None) -> int:
             elif f == "身份缺失":
                 no_identity += 1
             bad.append("%s %s：%s" % (sha, f, subject[:60]))
-    print("COMMIT_ROUND_IDENTITY 范围=%s 笔=%d 无R前缀=%d 身份缺失=%d 不一致=%d"
-          % (scope, len(commits), no_prefix, no_identity,
+    print("COMMIT_ROUND_IDENTITY 范围=%s 退化=%s 笔=%d 无R前缀=%d 身份缺失=%d 不一致=%d"
+          % (scope, degraded, len(commits), no_prefix, no_identity,
              sum(1 for line in bad if line.split(" ", 2)[1].startswith("不一致"))))
     for line in bad:
         print("  " + line)
