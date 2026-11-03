@@ -63,6 +63,9 @@
 - **电池两次红的成因是并发争用，不是判据红**（照实记，算自伤不算缺陷）：`/tmp/r565-补-battery4.log`、`-battery5.log` 各 808s / 807s，红在 `test_install_local` 两条 `subprocess.TimeoutExpired(180)` + `test_skip_roster` 的借红（634 的观察者按设计拒绝给结论）；单独重跑那两条 **1.405s OK**，`test_launch_smoke + test_install_local` 合跑 **6.2s OK**，而最终**独占一卷**干净重跑 ⇒ `Ran 719 tests in 155.469s / OK (skipped=5)`、退出码 0（`/tmp/r565-补-battery6.log`，就是记账的这一笔）。**成因是我在电池在跑的时候同时起了别的东西**（预检/诊断/另一卷电池），把这些沙箱装机的时间挤过 180s —— 老规矩"预检与 swift 卷并行必撞锁"本轮以另一种形式又收了一次学费：**python 电池也怕并发**，因为它自己会 spawn 带超时的子进程。
 - 换装仍然是 `SKIP_INSTALL=no-product-change`；帧基线仍然是 `FRAME_BASELINE_DRIFT=138/356 not-updated`（640）；`HINT_CONTRAST` 的 runner 红仍然原样留着，等 639 的定向。
 
+⑮ **收口笔的 subject 写错了一格，按 R563 那一族 forward 处理（不 amend）**：`5762925` 的标题后半句是「push 第三次仍败于 github.com 解析」—— 那是我按**写稿时**的状态抄的；实际顺序是：写这句话之前 `6a3542b..e391ddb` 已经推上去（ahead 归 0），这一笔自己随后也推了（`e391ddb..5762925`）。正文 ⑭ 里的数是对的（`HEAD=origin/main`、ahead=0、成对号 `41689665625↔e391ddb`）⇒ **标题错、正文对、已推 ⇒ 不改写历史，就在这里点名**，并由守卫现读确认没把别的笔带错：`COMMIT_ROUND_IDENTITY 范围=HEAD~1..HEAD 退化=未推的为空 笔=1 无R前缀=0 身份缺失=0 不一致=0`。
+- **R566 ⓪ 因此有三个成对号必读**（`ci_read.py queue` 现读，全部还没结论 ⇒ 一律「复核未到」，不许从"没在失败名单"推绿）：`41689614123 ↔ 6a3542b`（queued）、`41689665625 ↔ e391ddb`（in_progress）、`41690220222 ↔ 5762925`（in_progress，本笔推出后 `git ls-remote`/`gh api` 两侧一致 = `5762925`、ahead=0）。每一跑都要读**全部失败步骤 + `jobs[].steps[].conclusion`**，头四格照 ③：STEP[9] 有没有因补正笔转绿、`HINT_CONTRAST` 在 runner 走哪条（639）、卫生守卫第一次进 CI 的结果、STEP[15] 那朵间歇红第几跑。⚠ 这一格也解释了为什么标题里的"ahead 现读 =6/7"这类自增数我一律只写"写它时的现读值 + 以命令为准"：**会随本笔自增的量不回头改**。
+
 ## R565 ⓪ 开工（2026-11-03 · 第 564 轮 / Round 562 · 读单改账 + 基线全现读 + 两个新取靶扫描的落空名单）
 
 > 本节是**开工节**，不是轮次节（标题不写「状态」两字 —— `product_streak.py` 按第一个 `## Rnnn 状态（` 认当前轮）。
