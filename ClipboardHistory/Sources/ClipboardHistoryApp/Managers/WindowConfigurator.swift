@@ -106,7 +106,8 @@ struct WindowConfigurator: NSViewRepresentable {
             if let collapse {
                 collapse.applyGeometry(to: window)
             } else {
-                window.setContentSize(NSSize(width: 750, height: 560))
+                window.setContentSize(NSSize(width: MainWindowCollapsePolicy.expandedWidthDefault,
+                                             height: MainWindowCollapsePolicy.contentHeightDefault))
                 window.minSize = NSSize(width: 600, height: 440)
             }
             coordinator.configure(window: window)

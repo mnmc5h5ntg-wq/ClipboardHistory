@@ -510,6 +510,7 @@ final class UICaptureTests: XCTestCase {
         // 派生与对账由 `scripts/tests/test_readings_channel_coverage.py` 在脚本电池里钉住：
         // 少一个名字（哪怕只是把名册改短）就红，多一个已经不干净的名字也红。
         let roster = ["CapturePathWriteBudgetTests.swift", "CaptureReadings.swift",
+                      "FoldGeometryReanchorTests.swift",
                       "DailyCopyHeatmapTests.swift", "OffscreenSymbolInkProbeTests.swift",
                       "PerfBudgetTests.swift", "Round4MarkdownTests.swift",
                       "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",
@@ -12587,9 +12588,10 @@ final class UICaptureTests: XCTestCase {
             Fixture("content-wide", NSSize(width: 1100, height: 800)) { AnyView(ContentView(historyStore: store)) },
             Fixture("content-empty", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: empty)) },
             Fixture("content-no-results", NSSize(width: 750, height: 560)) { AnyView(ContentView(historyStore: searching)) },
-            // R523：折叠态只留列表，宽度是**单独定义**的 420pt（不是侧栏的 268pt）。
+            // R523：折叠态只留列表，宽度是**单独定义**的（不是侧栏那一档）。
+            // R567（规格 D5）：折叠 = 高度不变、宽度对折 ⇒ 默认折叠档从 420×560 重锚成 **424×600**。
             // 帧名避开 `settings-` 前缀：这一族不是设置页的 settings-content-blank 通道。
-            Fixture("main-collapsed", NSSize(width: 420, height: 560)) {
+            Fixture("main-collapsed", NSSize(width: 424, height: 600)) {
                 AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {}))
             },
             // R530：折叠最小窗（360×560）—— 列表 + 标题/chevron/计数在最小宽下的静态帧。
@@ -12598,7 +12600,7 @@ final class UICaptureTests: XCTestCase {
             },
             // R532：折叠一次性提示（420×560）—— 旧帧 `main-collapsed` 没有提示行；
             // 这一帧只把 showsCollapseHint 点亮，确认动作在测试里走控制器。
-            Fixture("main-collapsed-hint", NSSize(width: 420, height: 560)) {
+            Fixture("main-collapsed-hint", NSSize(width: 424, height: 600)) {
                 AnyView(ContentView(historyStore: store, isCollapsed: true, toggleCollapse: {},
                                     showsCollapseHint: true))
             },
@@ -24300,6 +24302,96 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(Self.longTextBandOutcome(ink: 0, witnessInk: 0),
                        .capabilityAbsent(witnessInk: 0),
                        "目标带与证人带都空 ⇒ 这台机器拍不出这一页，具名 NOT-RUN/skip")
+    }
+
+    /// R567（规格 D5 的**像素**证人）：帧里那条中缝必须正好落在内容宽的正中。
+    ///
+    /// 为什么另开一格，不停在 AppKit 属性上：`FoldGeometryReanchorTests` 读的是
+    /// `minimumThickness/maximumThickness` 与 `setPosition` —— 那是**机制**；机制被 SwiftUI
+    /// 换算成什么布局，只有像素知道（R456/R487 那一族：换代之后旧尺失去对象，新尺要自己站稳）。
+    ///
+    /// 缝的位置由「列中位亮度沿 x 的最大跳变」测出；左右两半各自必须有字墨当证人
+    /// —— 没墨 = 这一页根本没画 ⇒ 具名不判，不许把读不到写成通过（R99/R488 那条）。
+    /// 帧自己拍自己量，不依赖 `CLIPBOARD_HISTORY_UI_SHOTS`，也不进 356 张工作基线。
+    func testTheSeamInTheRenderedFrameSitsAtHalfTheContentWidth() throws {
+        let store = makePopulatedStore()
+        // 右半必须真的被选中一条 ⇒ 详情区有字可当证人（不选的话详情是空态，
+        // 实测那条带里读不到墨 ⇒ 整格变成"两半之一没墨 ⇒ 谁也没判"）。
+        if let first = store.entries.first {
+            store.perform(.selectOnly(first))
+        }
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r567-seam-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let contentWidth = 848.0, contentHeight = 600.0
+        var judged = 0
+        for (tag, appearance) in [("light", NSAppearance.Name.aqua),
+                                  ("dark", NSAppearance.Name.darkAqua)] {
+            let fixture = Fixture("r567-seam-848x600", NSSize(width: contentWidth, height: contentHeight)) {
+                AnyView(ContentView(historyStore: store))
+            }
+            let file = scratch.appendingPathComponent("r567-seam-\(tag).png")
+            _ = try render(fixture, appearance: appearance, to: file)
+            let image = try XCTUnwrap(NSImage(contentsOf: file), "\(tag)：帧读不出来")
+            let rep = try XCTUnwrap(NSBitmapImageRep(data: image.tiffRepresentation ?? Data()))
+            let base = try XCTUnwrap(rep.bitmapData)
+            let scale = Double(rep.pixelsWide) / contentWidth
+            let rowStart = Int(120 * scale), rowEnd = Int(400 * scale)
+            guard rowEnd < rep.pixelsHigh, rowStart < rowEnd else {
+                XCTFail("\(tag)：带的行窗口跑到帧外（高 \(rep.pixelsHigh)px、带 \(rowStart)..<\(rowEnd)）⇒ 尺的底没对齐")
+                return
+            }
+            func luma(_ x: Int, _ y: Int) -> Double {
+                let o = y * rep.bytesPerRow + x * 4
+                return 0.2126 * Double(base[o]) + 0.7152 * Double(base[o + 1]) + 0.0722 * Double(base[o + 2])
+            }
+            func columnMedian(_ x: Int) -> Double {
+                var values: [Double] = []
+                values.reserveCapacity(rowEnd - rowStart)
+                for y in rowStart..<rowEnd { values.append(luma(x, y)) }
+                values.sort()
+                return values[values.count / 2]
+            }
+            // 最大跳变列：拿 ±2px 的两侧中位差，1pt 的线在 2x 下就是 2px。
+            var bestX = -1, bestStep = 0.0
+            for x in Int(200 * scale)..<Int(640 * scale) {
+                let step = abs(columnMedian(x + 2) - columnMedian(x - 2))
+                if step > bestStep { bestStep = step; bestX = x }
+            }
+            let seamPt = Double(bestX) / scale
+            // 两半的字墨证人（离缝 6pt 以外取，免得把分隔条本身算成墨）。
+            func inkCount(fromPt: Double, toPt: Double) -> Int {
+                let xs = Int(fromPt * scale), xe = min(Int(toPt * scale), rep.pixelsWide)
+                guard xs < xe else { return -1 }
+                var samples: [Double] = []
+                for x in stride(from: xs, to: xe, by: 2) {
+                    for y in rowStart..<rowEnd { samples.append(luma(x, y)) }
+                }
+                samples.sort()
+                let background = samples[samples.count / 2]
+                var ink = 0
+                for x in xs..<xe {
+                    for y in rowStart..<rowEnd where abs(luma(x, y) - background) > 25 { ink += 1 }
+                }
+                return ink
+            }
+            let leftInk = inkCount(fromPt: 20, toPt: seamPt - 6)
+            let rightInk = inkCount(fromPt: seamPt + 6, toPt: contentWidth - 20)
+            CaptureReadings.emit("FOLD_SEAM_PIXEL \(tag) 帧=\(rep.pixelsWide)x\(rep.pixelsHigh)"
+                + " 倍率=\(String(format: "%.2f", scale))x 缝列=\(String(format: "%.1f", seamPt))pt"
+                + " 跳变=\(String(format: "%.1f", bestStep)) 左墨=\(leftInk) 右墨=\(rightInk)"
+                + " 期望=\(contentWidth / 2)pt 地板=8pt")
+            if leftInk <= 0 || rightInk <= 0 || bestStep < 8.0 {
+                continue  // 这一档没判起来：两半之一没墨，或整帧读不出缝 ⇒ 具名不判，最后由 judged 那条红
+            }
+            judged += 1
+            XCTAssertEqual(seamPt, contentWidth / 2, accuracy: 1.5,
+                           "\(tag)：帧里的中缝在 \(seamPt)pt，不在内容宽的正中 \(contentWidth / 2)pt"
+                               + " ⇒ 对折时右半页盖不到左半页（D5 的 50/50 只是属性上成立，像素没跟上）")
+        }
+        XCTAssertEqual(judged, 2,
+                       "两档都没能判这条缝（跳变 <8 或某一半没字墨）⇒ 这一格没有内容，不许读成通过")
     }
 
     /// R399：最窄窗里长正文必须给右下角浮动操作栏让位，不能排到药丸下面。

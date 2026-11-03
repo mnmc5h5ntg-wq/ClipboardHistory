@@ -54,7 +54,9 @@ struct ContentView: View {
                                    titleHoverForFixture: titleHoverForFixture,
                                    showsCollapseHint: showsCollapseHint,
                                    acknowledgeCollapseHint: acknowledgeCollapseHint)
-                    .frame(minWidth: 250, idealWidth: 280, maxWidth: 340)
+                    .frame(minWidth: MainWindowCollapsePolicy.columnWidth,
+                           idealWidth: MainWindowCollapsePolicy.columnWidth,
+                           maxWidth: MainWindowCollapsePolicy.columnWidth)
                 DetailView(historyStore: historyStore)
             }
             .windowBackground()
@@ -153,7 +155,9 @@ struct ContentView: View {
                                titleHoverForFixture: titleHoverForFixture,
                                showsCollapseHint: showsCollapseHint,
                                acknowledgeCollapseHint: acknowledgeCollapseHint)
-                .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 340)
+                .navigationSplitViewColumnWidth(min: MainWindowCollapsePolicy.columnWidth,
+                                                  ideal: MainWindowCollapsePolicy.columnWidth,
+                                                  max: MainWindowCollapsePolicy.columnWidth)
         } detail: {
             DetailView(historyStore: historyStore)
         }

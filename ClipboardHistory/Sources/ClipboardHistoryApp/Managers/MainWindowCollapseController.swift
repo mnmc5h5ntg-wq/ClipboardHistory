@@ -127,7 +127,7 @@ final class MainWindowCollapseController: ObservableObject {
 
     /// 把当前状态一次性套到窗口上：宽度按策略（记住的宽 → 各自最小宽 → 屏幕宽），
     /// `minSize` 跟着状态走（折叠后不许被 SwiftUI 弹回 600），并保持左上角。
-    /// 一次切换 = 一次 `minSize` 写 + 一次 `setFrame`，中间没有任何被逐拍改宽的第三笔。
+    /// 一次切换 = 一次 `minSize` 写 + 一次锁比例写（macOS 13+）+ 一次 `setFrame`，中间没有任何被逐拍改宽的第三笔。
     func applyGeometry(to window: NSWindow) {
         let visible = (window.screen ?? NSScreen.main)?.visibleFrame
         let width = MainWindowCollapsePolicy.targetWidth(
@@ -139,6 +139,12 @@ final class MainWindowCollapseController: ObservableObject {
         window.minSize = NSSize(width: MainWindowCollapsePolicy.minWidth(collapsed: isCollapsed),
                                 height: MainWindowCollapsePolicy.minHeight)
         minSizeWrites += 1
+        // R567（规格 D5）：锁比例走 `NSWindow.contentAspectRatio` —— 拖边角等比、不弹回，
+        // 而这一行就是"随状态翻过去"的那一格：折叠态锁的是竖 √2（424×600），展开态锁横的（848×600）。
+        // macOS 12 没有这个 API ⇒ 12 上不锁（D6 的版本分叉），判据那一侧走具名 skip。
+        if #available(macOS 13.0, *) {
+            window.contentAspectRatio = MainWindowCollapsePolicy.aspectRatio(collapsed: isCollapsed)
+        }
         var frame = window.frame
         let top = frame.maxY
         frame.size.width = width

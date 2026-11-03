@@ -6,14 +6,33 @@ import CoreGraphics
 /// 都能被真值表逐格点名，而不是只活在注释里。
 enum MainWindowCollapsePolicy {
     /// 折叠宽是**单独定义**的：268pt 是侧栏在展开态里的列宽，列表挤在那条里读不出条目。
-    static let collapsedWidthDefault: CGFloat = 420
-    static let expandedWidthDefault: CGFloat = 750
+    /// R567（规格 `docs/FOLD_DUO_SPEC_2026-11-03.md` D5）：展开 **848×600**、折叠 = 高度不变、
+    /// 宽度对折 ⇒ **424×600**；两态各自是一个 √2 矩形（横 / 竖），所以折痕正好落在中缝上。
+    static let collapsedWidthDefault: CGFloat = 424
+    static let expandedWidthDefault: CGFloat = 848
+    /// R567：规格的默认高。折叠不碰它（`applyGeometry` 只写宽度）。
+    static let contentHeightDefault: CGFloat = 600
     static let collapsedMinWidth: CGFloat = 360
     static let expandedMinWidth: CGFloat = 600
     static let minHeight: CGFloat = 440
-    /// R524：展开态侧栏的缝位（`navigationSplitViewColumnWidth` 的 ideal 280）。
-    /// R552：折叠不再演之后，这一格只剩"侧栏与详情的分界在哪"这一个含义（判据与帧量尺读它）。
-    static let sidebarSeamWidth: CGFloat = 280
+    /// R567：中缝那 1pt 是 AppKit 分隔条自己占掉的（`dividerThickness` 真窗实测 1.00）。
+    /// 所以"两栏各半"落到窗口里是 `423.5 + 1 + 423.5`：**分隔条的中心**正好在 424 = 848/2。
+    static let seamDividerThickness: CGFloat = 1
+    static var columnWidth: CGFloat { (expandedWidthDefault - seamDividerThickness) / 2 }
+    static var seamCenter: CGFloat { columnWidth + seamDividerThickness / 2 }
+    /// D5 的"锁比例"：横 √2 与竖 √2 是同一个对折的两侧，切换时**必须把锁的值一起翻过去**。
+    static var expandedAspectRatio: NSSize {
+        NSSize(width: expandedWidthDefault, height: contentHeightDefault)
+    }
+    static var collapsedAspectRatio: NSSize {
+        NSSize(width: collapsedWidthDefault, height: contentHeightDefault)
+    }
+    static func aspectRatio(collapsed: Bool) -> NSSize {
+        collapsed ? collapsedAspectRatio : expandedAspectRatio
+    }
+    /// R524：展开态侧栏的缝位（旧值 `navigationSplitViewColumnWidth` 的 ideal 280）。
+    /// R567 重锚成**半页宽**：折页要的就是"左半页正好是右半页的镜像位置"。
+    static var sidebarSeamWidth: CGFloat { expandedWidthDefault / 2 }
     /// R552：**折叠/展开不再演**（D-552）。时长恒为 0 —— 不是"还没调好"，是三条路都被真机读数否掉了：
     /// 1. 旧版（t=0 翻状态 + 60Hz 逐拍 `setFrame(display:true)`）：切换那一拍主线程空窗
     ///    60ms（折叠）/106ms（展开），屏上只在 50ms 内换 4 帧、17ms 内换 2 帧 ⇒ 先卡一下再整窗跳；

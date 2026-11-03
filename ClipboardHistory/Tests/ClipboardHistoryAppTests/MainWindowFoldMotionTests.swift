@@ -93,7 +93,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
-    private func makeWindow(width: CGFloat = 750) -> NSWindow? {
+    private func makeWindow(width: CGFloat = 848) -> NSWindow? {
         WindowManager.showMainWindow(creatingIfNeeded: true)
         settle(0.12)
         guard let window = mainWindows.first else {
@@ -121,7 +121,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         XCTAssertFalse(controller.isTransitioning, "一步切换不该有『还在过渡』这个状态")
         XCTAssertTrue(controller.isCollapsed, "状态没跟着这一步走")
         XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001)
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0, "模型宽没有一步到折叠档")
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0, "模型宽没有一步到折叠档 424")
         XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5, "最小宽没有一步落到折叠档")
         XCTAssertEqual(controller.switches, 1, "一次点击切了不止一次布局")
         XCTAssertEqual(controller.geometryWrites, 1, "一次点击写了一次以上几何（旧版是每拍一次）")
@@ -138,10 +138,10 @@ final class MainWindowFoldMotionTests: XCTestCase {
         setUpProduct()
         defer { tearDownProduct() }
         retireAllMainWindows()
-        guard let window = makeWindow(width: 750) else { return }
+        guard let window = makeWindow(width: 848) else { return }
         delegate.perform(.toggleMainWindowCollapse)
         settle(0.05)
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0)
 
         controller.resetTransitionCountersForTesting()
         delegate.perform(.toggleMainWindowCollapse)
@@ -149,7 +149,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
 
         XCTAssertFalse(controller.isCollapsed)
         XCTAssertFalse(controller.isTransitioning)
-        XCTAssertEqual(window.frame.width, 750, accuracy: 1.0, "展开没有一步回到 750")
+        XCTAssertEqual(window.frame.width, 848, accuracy: 1.0, "展开没有一步回到 848（R567 规格 D5）")
         XCTAssertEqual(window.minSize.width, 600, accuracy: 0.5, "展开档最小宽没落下")
         XCTAssertEqual(controller.switches, 1, "一次点击切了不止一次布局")
         XCTAssertEqual(controller.geometryWrites, 1, "一次点击写了一次以上几何")
@@ -219,7 +219,7 @@ final class MainWindowFoldMotionTests: XCTestCase {
         controller.setCollapsed(true, window: window)
         settle(0.05)
         XCTAssertFalse(controller.isTransitioning)
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0)
         XCTAssertEqual(controller.foldProgress, 1, accuracy: 0.001)
         XCTAssertEqual(window.minSize.width, 360, accuracy: 0.5)
         XCTAssertEqual(controller.switches, 1)
@@ -230,21 +230,30 @@ final class MainWindowFoldMotionTests: XCTestCase {
 
     /// 政策真值表：两档宽/最小宽、菜单标题、detail 可见性 —— 这些与"演不演"无关，继续钉住。
     func testCollapsePolicyGeometryTruthTable() {
-        XCTAssertEqual(MainWindowCollapsePolicy.collapsedWidthDefault, 420, accuracy: 0.001)
-        XCTAssertEqual(MainWindowCollapsePolicy.expandedWidthDefault, 750, accuracy: 0.001)
+        XCTAssertEqual(MainWindowCollapsePolicy.collapsedWidthDefault, 424, accuracy: 0.001)
+        XCTAssertEqual(MainWindowCollapsePolicy.expandedWidthDefault, 848, accuracy: 0.001)
+        // R567（规格 D5）：折叠 = 高度不变、宽度对折 ⇒ 两档宽必须严格 2:1。
+        XCTAssertEqual(MainWindowCollapsePolicy.expandedWidthDefault,
+                       MainWindowCollapsePolicy.collapsedWidthDefault * 2, accuracy: 0.001)
+        // 两档都是 √2 矩形（一横一竖），差别只有 1pt 以内的取整。
+        let rootTwo = Double(2).squareRoot()
+        let squared = MainWindowCollapsePolicy.expandedAspectRatio.width / MainWindowCollapsePolicy.expandedAspectRatio.height
+        let portrait = MainWindowCollapsePolicy.collapsedAspectRatio.height / MainWindowCollapsePolicy.collapsedAspectRatio.width
+        XCTAssertEqual(Double(squared), rootTwo, accuracy: 0.002)
+        XCTAssertEqual(Double(portrait), rootTwo, accuracy: 0.002)
         XCTAssertEqual(MainWindowCollapsePolicy.minWidth(collapsed: true), 360, accuracy: 0.001)
         XCTAssertEqual(MainWindowCollapsePolicy.minWidth(collapsed: false), 600, accuracy: 0.001)
         XCTAssertFalse(MainWindowCollapsePolicy.detailVisible(collapsed: true))
         XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: true), "展开窗口")
         XCTAssertEqual(MainWindowCollapsePolicy.menuTitle(collapsed: false), "折叠窗口")
         XCTAssertEqual(MainWindowCollapsePolicy.targetWidth(collapsed: true,
-                                                            expandedWidth: 750,
-                                                            collapsedWidth: 420,
-                                                            visibleWidth: 1000), 420, accuracy: 0.001)
+                                                            expandedWidth: 848,
+                                                            collapsedWidth: 424,
+                                                            visibleWidth: 1000), 424, accuracy: 0.001)
         // 屏幕比目标档还窄时屏幕优先（窗口不许跑出屏）
         XCTAssertEqual(MainWindowCollapsePolicy.targetWidth(collapsed: false,
-                                                            expandedWidth: 750,
-                                                            collapsedWidth: 420,
+                                                            expandedWidth: 848,
+                                                            collapsedWidth: 424,
                                                             visibleWidth: 700), 700, accuracy: 0.001)
     }
 }

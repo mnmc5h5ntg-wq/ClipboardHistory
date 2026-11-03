@@ -44,12 +44,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 与 `WindowGroup` 的根视图同源（`MainWindowContent`）；窗口样式交给同一个
-    /// `WindowConfigurator`（透明标题栏、隐藏 title、750×560、650… 最小尺寸、关闭=隐藏）。
+    /// `WindowConfigurator`（透明标题栏、隐藏 title、默认 848×600（R567 规格 D5）、最小尺寸、关闭=隐藏）。
     @MainActor
     static func makeMainWindow(historyStore: HistoryStore,
                                collapse: MainWindowCollapseController) -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
+            contentRect: NSRect(x: 0, y: 0,
+                           width: Int(MainWindowCollapsePolicy.expandedWidthDefault),
+                           height: Int(MainWindowCollapsePolicy.contentHeightDefault)),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false

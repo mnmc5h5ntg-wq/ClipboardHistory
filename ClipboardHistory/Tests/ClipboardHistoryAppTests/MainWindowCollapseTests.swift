@@ -100,9 +100,9 @@ final class MainWindowCollapseTests: XCTestCase {
         settleTransition()
         XCTAssertTrue(controller.isCollapsed)
         XCTAssertEqual(window.frame.width, MainWindowCollapsePolicy.collapsedWidthDefault, accuracy: 1.0,
-                       "折叠宽不是单独定义的 420pt")
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0,
-                       "折叠宽不许沿用侧栏的 268pt")
+                       "折叠宽不是单独定义的 424pt（R567 规格 D5）")
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0,
+                       "折叠宽不许沿用旧的侧栏档（268/420 都不是规格要的半页宽）")
         XCTAssertEqual(window.minSize.width, MainWindowCollapsePolicy.collapsedMinWidth, accuracy: 0.5)
         XCTAssertEqual(window.frame.height, heightBefore, accuracy: 0.5, "折叠改了高度")
         XCTAssertEqual(window.frame.origin.x, leftBefore, accuracy: 1.0, "折叠没有保持左上角（x）")
@@ -124,7 +124,7 @@ final class MainWindowCollapseTests: XCTestCase {
         setWidth(777, of: window)
         delegate.perform(.toggleMainWindowCollapse)
         settleTransition()
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0)
 
         setWidth(450, of: window)
         delegate.perform(.toggleMainWindowCollapse)
@@ -250,7 +250,7 @@ final class MainWindowCollapseTests: XCTestCase {
         delegate.perform(.toggleMainWindowCollapse)
         settleTransition()
         XCTAssertTrue(controller.isCollapsed)
-        XCTAssertEqual(window.frame.width, 420, accuracy: 1.0)
+        XCTAssertEqual(window.frame.width, 424, accuracy: 1.0)
     }
 
     /// R525：折叠/展开要有**应用菜单 + 键盘**入口（之前只有状态菜单与界面）。

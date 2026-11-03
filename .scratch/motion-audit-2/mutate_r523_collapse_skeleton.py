@@ -7,8 +7,10 @@ POLICY="Sources/ClipboardHistoryApp/Models/MainWindowCollapsePolicy.swift"
 CTRL="Sources/ClipboardHistoryApp/Managers/MainWindowCollapseController.swift"
 ENV={k:v for k,v in os.environ.items() if k!="SDKROOT"}
 ARMS=[
+  # R567 重锚：那一行现在写的是 424（规格 D5 的半页宽），针跟着换 ——
+  # 针的**坏法**一字未动（把折叠宽退回侧栏那一档），所以这把刀判的还是同一件事。
   ("M1395","折叠宽沿用侧栏 268pt", POLICY,
-   '''    static let collapsedWidthDefault: CGFloat = 420''',
+   '''    static let collapsedWidthDefault: CGFloat = 424''',
    '''    static let collapsedWidthDefault: CGFloat = 268'''),
   ("M1396","折叠最小宽仍用展开的 600", POLICY,
    '''    static func minWidth(collapsed: Bool) -> CGFloat {
