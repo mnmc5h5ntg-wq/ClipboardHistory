@@ -8542,12 +8542,16 @@ final class UICaptureTests: XCTestCase {
             let core = (medianChannel { $0.0 }, medianChannel { $0.1 }, medianChannel { $0.2 })
             let bg = (bgLuma, bgLuma, bgLuma)
             let ratio = contrast(core, bg)
-            let windowGrey = Double(Self.armResolved(.windowBackgroundColor, appearanceName: appearance).r)
-            let blend = core.0 / max(bgLuma, 1.0)
+            // R565 补段：这一度把两格诊断读数（`窗口底色现读=`、`字芯/底=`）加进来，量到
+            //   light `底=255 窗口底色现读=255 字芯/底=0.251`、dark `底=30 窗口底色现读=30 字芯/底=6.967`
+            //   （`/tmp/r565-补-hint-single2.log`）—— 那正是把 runner 的 3.84:1 与本机 10.37:1 分开的两个数
+            //   （BACKLOG 639）。然后**撤掉**：不是因为它错，而是因为这一段产品 0 文件，而这两格要用的数
+            //   已经量到手；把它们永久留在判据里，等于让每个读比值的判据都往渲染状态里伸一次手。
+            //   ⚠ 撤销前后各拍一整卷 ⇒ 356 张**逐字节相同**（`/tmp/r565-补-frames` vs `-frames3`）
+            //   ⇒ 今天那 138 张漂移与这两格无关（因果由这两臂分开，不许像我第一版注释那样把它写成自己的罪）。
             emit("HINT_CONTRAST \(tag) 底=\(Int(bgLuma)) 字芯=(\(Int(core.0)),\(Int(core.1)),\(Int(core.2)))"
                  + " 对比=\(String(format: "%.2f", ratio)):1 字芯像素=\(coreCount) 偏差像素=\(dev.count)"
-                 + " 地板=4.5 倍率=\(String(format: "%.1f", scale))x"
-                 + " 窗口底色现读=\(Int(windowGrey)) 字芯/底=\(String(format: "%.3f", blend))")
+                 + " 地板=4.5 倍率=\(String(format: "%.1f", scale))x")
             // R565 补：runner 那一跑把 light 判红成 3.84:1（`底=236 字芯=(118,118,118)`），本机 2x 是 10.37:1
             // （`底=255 字芯=(64,64,64)`）。两条解释用数分开，不许赌：
             // ①「倍率把字芯冲淡」被一次性探针**排掉** —— 同一把尺（同一道 0.01 偏差筛、同一个

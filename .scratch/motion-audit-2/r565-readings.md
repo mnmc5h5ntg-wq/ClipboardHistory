@@ -78,3 +78,41 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - 电池 `/tmp/r565-battery8.log` ⇒ `Ran 710 tests in 88.967s` / `OK (skipped=5)`、退出码 0。
 - 派生格再读：清账 `格=162 声明=63 不成立=0/63`、`PRODUCT_STREAK_LEDGER_OK streak=5`、`SOURCES_CELL 一致=是`、`COMMIT_ROUND_IDENTITY 笔=3 … 不一致=0`。
 - push 第三次尝试（`ConnectTimeout=12`）⇒ 仍 `Could not resolve hostname github.com`；`dscacheutil -q host -a name github.com` 仍空。**这一轮的最后一格因此是"待推"**：本地领先、远端停在 `c567879`，`9482f86`/`ee16e2b`/交接笔 的成对号**还不存在**（不许预支一个号写进账）。
+
+
+## 补段 A/C/B（监工发来的同一轮续段）
+
+### A · 绝对根扫干净（现读，不改口径）
+
+- 扫描口令 `grep -rn "/Users/wangziyi" scripts/ .github/workflows/` ⇒ **9 行 / 4 个文件**，逐位判定：
+  - `scripts/tests/test_mutate_arm_registry.py:227,232` —— 文档串里**引用历史**（那一族的原委），不是运行时路径 ⇒ 改成不带真名的说法；
+  - `scripts/tests/test_mutate_r271_needle.py:21,148,152` —— 正/负对照的样本路径 ⇒ 换成合成 `/Users/someone/DemoRepo`，并把那颗常量改名成 `BAD_MACHINE_PATH_SAMPLE`（名字带 ROOT 会被形状判抓到，而它本就是"坏形状样本"，不该长得像活根）；
+  - `scripts/tests/test_frames_path_hygiene.py:36` —— 从前这支扫描器把自己的**模式**抄成真人用户名 ⇒ 判据的靶比它要防的缺陷窄（换一个人/写死别人的目录就抓不到）。改判形状 `(ROOT|REPO_ROOT|repo_root|REPO|*ROOT) = "/(Users|home)/`，正对照补一条 `REPO_ROOT = "/home/anyone/Repo"`；
+  - `scripts/tests/fixtures/r46_motion_local.log` —— 数据夹具（R46 本机日志样本），不是脚本、不参与读数打印 ⇒ 具名不列修。
+- 现读结论：**会进 CI 的脚本里 0 处运行时绝对根**（`CI_CHANNEL_HYGIENE … 绝对根=0 真人路径=0 通道空格=0`）。
+
+### C · 同族两种坏法收成一条守卫（判据 1 支、电池 9 格、刀 4 把）
+
+- 新守卫 `scripts/ci_channel_hygiene.py` 三格：①名单从 `.github/workflows/*.yml` 现读且**不许为空**；②绝对根（按"这台机器上真存在的账号"判，形状判交给 `test_frames_path_hygiene` 那一支，两支各判一件事）；③通道值里不许有裸空格（判法：`键=%s` 槽位喂的那个名字在本文件被赋过含空格的字面量）。
+- **扫描范围是被迫扩出来的**：只按 ci.yml 抽名单会漏掉 R564 那支守卫 —— STEP[9] 跑的是 `unittest discover`，它是被电池 subprocess 调的。⇒ 加 `referenced_by_battery()`（只收真存在的那一颗，避免电池正文里的假样本 `scripts/x.py` 变成幽灵条目）。现读 `ci脚本=14 电池脚本=73 电池引用=24 合计=99`。
+- 自撞两格照实记：① 新测试文件第一版把控制样本写成 `/Users/ziyi/…` ⇒ **被自己的 B 格判红**（守卫抓住我），改成 `/Users/ming/…` 又发现按"形状"判会咬正对照 ⇒ 把账号集合做成可注入参数（`accounts=`），默认仍现读那一台；② 探 `/home` 让守卫**挂死 5 分钟** —— macOS 上 `/home` 是 autofs 挂载点，`os.listdir('/home')` 不返回 ⇒ 杀掉、只探 `/Users`，并把这条写进注释。
+- 刀四把（needle 现读各命中 1、全 CAUGHT、RESTORE_CLEAN=yes）：**M1470** 把绝对根塞回 `commit_round_identity.py` ⇒ `绝对根=1 真人路径=1` 红；**M1471** 把 `if not roster:` 改成 `if False:` ⇒ "零条也算通过"被钉（红话是"空名单被读成绿 ⇒ 这一格是恒真的"）；**M1472** 把退化说明塞回 `范围=` 的值 ⇒ `通道空格=1` 红；**M1473** 在 `make_info_plist.sh` 写死绝对根 ⇒ 非 `.py` 那一支红（上一版扫描器只会 `ast.parse`，喂 shell 就 parse-error ⇒ CI 真跑的 `.sh` 整个在尺外）。
+- 名册：`mutate_needle_precheck.py` TABLES +4 ⇒ 现读 `tables=372 covered=295 arms=757 bad=0`、`ARM_TOTAL files=465 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=459 可判=1183 rot=0 抽不出=6 已声明表=6 处置=ok`。⚠ 这一批仍是**单臂形状**（`ARM/FILE/OLD/NEW`）⇒ `ARM_TOTAL` 的臂数 +0（与 M1466-M1469 同形，抽臂器只认列表形状）—— 具名"臂数不可抽，会红性由四把真跑证明"，不许写成"1244 里含这四把"。
+
+### B · HINT_CONTRAST 在 runner 的那朵红（排掉倍率、撤掉 NOT_RUN、开 639）
+
+- 一次性探针 `.scratch/motion-audit-2/probe_r565_hint_contrast_1x.py`（判据自己的 0.01 偏差筛 + `max(40, 偏差/20)` 字芯集合）⇒ `/tmp/r565-hint-1x-postchange.log`：
+  `light 2x 10.37:1（字芯群 106）` / `light 1x 代理 9.29:1（字芯群 46）`；`dark 2x 10.92:1` / `dark 1x 代理 11.70:1`。
+  对照旧值的同一份 1x 代理 `/tmp/r565-1x-preview.log`（tertiary）= light **3.15** / dark 4.34 ⇒ **1x 判得出这两种颜色的差别** ⇒ 「倍率把字芯冲淡」这条解释被排掉（第一版探针少了 0.01 筛 ⇒ 读出 6.19:1 = 本轮撤掉的那把空刀的读数，已修）。
+- 于是差的不是倍率，是**渲染 vs 名义**：本机 light `底=255 窗口底色现读=255 字芯/底=0.251`；runner `底=236 字芯/底=0.500`（正好是 `.secondaryLabelColor` 名义 50% 黑压在窗口底色上）。名义口径下 secondary 对白底 ≈4.0:1 ⇒ **仍跌破 4.5** ⇒ 这一条不是仪器能合掉的洞。
+- **写过一版具名 `*_NOT_RUN` 并跑过**（条件：底==窗口底色现读 ±2 且 字芯/底≈0.5±0.05；本机两档都不落进去 ⇒ 本地读数逐字不变）—— 然后**撤掉**：它在 runner 上会把一朵真数改成"不判"，那是把红藏起来（R206 那张盲区名单判的是像素不可用，这一格是另一种口径下的合法读数）。撤掉不占刀号。
+- 落地的那半：判据只补两格**诊断读数**（`窗口底色现读=`、`字芯/底=`）⇒ 任何一台机器都能把两种口径对上；判据的期望、地板、断言条数一字未动；本机重跑单条判据仍 `light 10.37 / dark 10.92、Executed 1 test, with 0 failures`。**runner 那一朵红原样留着**。
+- 新开 **BACKLOG 639**（三种口径的代价摆在账里，本轮一条都没选；要改产品颜色就撞第 12 面 ⇒ 归用户）。
+
+### 补段的收尾读数
+
+- build 0 告警 0 错误（三次：带腿 / 撤腿 / 改注释）；判据卷 222/4 skipped/0 失败（779.1s，撤腿后那一卷）；全量 1406/57/0（827.5s，最终树）；预检 `tables=372 covered=295 arms=757 bad=0`、`ARM_TOTAL files=465 arms=1244 dupes=0 repeats=0`、`HIDDEN_ARMS 表=459 可判=1183 rot=0 抽不出=6 处置=ok`。
+- **帧：基线不更新**。`CHANGED=138` 两次连拍同一批名字；撤掉诊断腿前后 356/356 逐字节相同 ⇒ 我自己被排除；`referenceDate` 是常量 ⇒ 时钟被排除；剩下是渲染状态漂移（640）。
+- 电池：台账前 `Ran 719 / OK (skipped=5)`、台账后复跑同数（`/tmp/r565-补-battery1.log`、`-battery2.log`）；占位符逐节回读 = 1（那一处是 U-2447 里反引号内的 `%s` 引用，不是未替换模板）。
+- 派生格：streak 仍 5（本段产品 0 文件 ⇒ 不动分界）、sources `一致=是`（不需要 `--write`）、清账 162/63/0、卫生守卫 ok、身份守卫 `笔=5 不一致=0`。
+- 换装：**跳过并具名 `SKIP_INSTALL=no-product-change`**（没有产品文件可装；重装会打断用户在用的那一扇窗）。
