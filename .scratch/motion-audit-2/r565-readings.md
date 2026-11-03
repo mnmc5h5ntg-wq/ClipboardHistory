@@ -70,5 +70,5 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - `git push origin main` 的第一跑挂住 6 分钟：`ps` 现读子进程是 `/usr/bin/ssh git@github.com git-receive-pack …`（state S，etime 一路涨），`lsof` 读不到 TCP 句柄 ⇒ 不是慢，是**连不上**。杀掉重试，仍然不落地。
 - 根因现读（三条互不替代）：`dscacheutil -q host -a name github.com` ⇒ **空**（本机此刻解析不出 github.com）；`dscacheutil … api.github.com` ⇒ `20.205.243.168`（有地址）；`curl --max-time 15 https://github.com` ⇒ `000`，而 `curl … https://api.github.com` ⇒ `200`、`gh api repos/…/git/ref/heads/main` ⇒ `c567879…`（API 通道活着，git 的 SSH 通道靠的那个域名死了）。
 - 于是 bounded 重试立刻返回 `ssh: Could not resolve hostname github.com` ⇒ `fatal: Could not read from remote repository`。
-- **账**：本地 HEAD=`b6c7fce`（补正笔）未推 ⇒ `ahead=1`；远端 main 仍是 `c567879`（R565 补记笔，已推的那五笔在 runner 上）。**这一轮不能写"已收口"**：推送失败不是"绿"，是通道坏了（R565 之前 R557 那批"派生格排在台账之后"的教训同样适用于这里 —— 没推出去就没有那一跑，什么都没有）。
+- **账**：本地 HEAD 是补正笔（amend 之后现读 `9482f86`；本笔记下面那一笔又改了号 ⇒ 以 `git rev-list --count origin/main..HEAD` 与 `git log` 现读为准）未推 ⇒ `ahead=1`；远端 main 仍是 `c567879`（R565 补记笔，已推的那五笔在 runner 上）。**这一轮不能写"已收口"**：推送失败不是"绿"，是通道坏了（R565 之前 R557 那批"派生格排在台账之后"的教训同样适用于这里 —— 没推出去就没有那一跑，什么都没有）。
 - 重试口令（DNS 恢复后）：`git push origin main && git rev-list --count origin/main..HEAD`（期望 0），再 `python3 scripts/ci_read.py latest --workflow CI` 取 `b6c7fce` 的成对号；那一跑要回答的是 R566 读单 (g)「补正笔单独推有没有造出注定红的派生格」。
