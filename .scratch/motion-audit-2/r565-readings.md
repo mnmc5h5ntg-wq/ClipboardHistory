@@ -169,3 +169,13 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
 - 成对号：`41708303631↔d512932`（本批头笔 = 补全台账笔）取号 in_progress ⇒ `CI_NOT_RUN`；R566 那笔 `41704430816↔f538d2c` 同样 in_progress。
 - 门：清账 162/63 不成立=0；`product_streak --check` OK streak=1；sources 一致=是；`ci_channel_hygiene` ok（绝对根/真人路径/通道空格全 0）；`commit_round_identity` ok；七本 + 报告占位符回读 0；电池 Ran 720 / OK (skipped=5)。
 - R567 的 ⓪ 读单已按到手号改齐（原先那句「现读取号」是抄未推状态 ⇒ 同族第三次，落在 `### R566 补记` ②）。
+
+### 追加：R566 那一跑（41704430816 ↔ f538d2c）收口前到数了
+- 逐步现读：STEP[9] failure（连带 STEP[10]-[14] skipped）+ STEP[15] failure + STEP[17] failure；STEP[19] success。
+- STEP[9] 的逐字红因：`SKIP_ROSTER 键=github-runner 类=github-runner 内层Ran=720 内层skip汇总=4 解析=3 名单外=['test_this_machine_actually_takes_the_identity_branch'] 名册未跳=无`
+  ⇒ `AssertionError: Lists differ: [] != ['test_this_machine_actually_takes_the_identity_branch']`；`FAILED (failures=1, skipped=3)`。
+  那一格本身走的是自己写好的 `SIGN_LIVE_NOT_RUN=no-identity`（日志 4406 行）⇒ **行为对、缺登记** ⇒ 修法只有把名字登记进 `test_skip_roster.py` 的 github-runner 名册。
+- STEP[15]/[17] = 639 那朵，第四次逐字同值（3.84:1 / 5.08:1，`CAPTURE_GATE_CASES passed=188 skipped=33 failed=1 有名字的红=1`）。
+- 643 第四个数：`MOTION_BAND_SAVING 带中位=10.80ms 整窗中位=13.60ms 省=1.26× 线=1.0×`；四数 2.18/1.55/0.98/1.26，带臂 6.32→8.30→11.39→10.80（在涨），整窗臂无趋势。
+- 台账落点：`### R566 补记` 新增 ④；643 追记；② 那张读单把"已读/未读"改到今天的状态。
+- 修的那一笔签不了自己 ⇒ runner 转绿由后一跑作证；本机 `test_skip_roster` 4 格 OK（登记不影响本机承重路径）。

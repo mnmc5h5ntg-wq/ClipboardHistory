@@ -95,6 +95,15 @@ ROSTER = {
         # ⇒ 这一格在 runner 上不承重（本机仍承重：文件在就真跑）。
         'test_the_round_chain_log_reads_as_the_ledger_claims':
             'runner 的 /tmp 没有本机验证链日志（run 39965996188 点名；本机有文件时不跳）',
+        # R566 加的那格「现读真钥匙串必须走身份支」在 runner 上必然缺席：固定签名身份
+        # `ClipboardHistory Local Signing` 装在这台 Mac 的登录钥匙串里，runner 上没有它，
+        # 所以那一格自己打了具名出口 `SIGN_LIVE_NOT_RUN=no-identity`。
+        # 名字是 **runner 自己点出来的**（run 41704430816 / f538d2c 的 STEP[9] 打
+        #   名单外=['test_this_machine_actually_takes_the_identity_branch']），不是我猜的；
+        # 那一跑同时把 ROSTER 闸门红成 STEP[9] failure —— 门是对的，缺的是登记。
+        # 本机仍承重：有身份时真签一次并判 `SIGNATURE_KIND=local` + `Authority=`。
+        'test_this_machine_actually_takes_the_identity_branch':
+            'runner 的钥匙串没有那个固定身份 ⇒ 具名 SIGN_LIVE_NOT_RUN=no-identity（run 41704430816 点名；本机真跑并判 local）',
     },
 }
 
