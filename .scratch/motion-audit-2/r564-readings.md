@@ -45,6 +45,20 @@ turn 边界时若那卷的进程还活着、日志还在长 ⇒ 等它自己跑�
   - ⚠ M1463 第一版 needle 写成 12 空格缩进 ⇒ `needle 命中 0`（刀根本没落下去，跑起来是 exit 1 而不是 CAUGHT）；
     现读实际是 8 空格后改对。**登记前先跑一遍看 needle 命中 1** 这条老规矩本轮又救了一次。
 
+## 已到手（再续 · ⓪ 那一跑收口前到数）
+
+- `CI_RUN 41542718166 ↔ 6ef9ff1`：`latest` ⇒ `status=completed conclusion=failure`；`steps` ⇒ **只有 STEP[15] Swift tests (executed-count gate) failure**；`gh run view --json jobs` 逐步现读 1..19 + 38/39 全 success（含 5/9/11/16/17/18/19）。
+- `⓪(a) BULLET_LEVELS 首验 = 判到`（`ci_read.py readings … BULLET_LEVELS`，日志=终端现读）：light/dark 各两行（STEP[5] 与 STEP[15]）
+  `行=6 列=3 步进=[16, 16]px(16.0/16.0pt) 容差=1px 合并=1px 筛除 宽≤8px 隙≥4px 倍率=1.0x 列x=36px 墨高=5px(5.00pt) 列x=52px 墨高=4px(4.00pt) 列x=68px 墨高=5px(5.00pt)`；`BULLET_LEVELS_NOT_RUN` 零行。
+  本机 2x 同一条判据（`/tmp/r564-frames/capture-readings.log`）：`步进=[32, 32]px(16.0/16.0pt) 容差=2px 合并=1px 倍率=2.0x 列x=73px 墨高=8px(4.00pt) 列x=105px 墨高=6px(3.00pt) 列x=137px 墨高=8px(4.00pt)` ⇒ **pt 口径两档一致（16.0/16.0）**；三档项目符净墨 `⦁=4.00 / ◦=3.00 / ▪=4.00pt`（dark 4.50/3.50/4.00）。
+- `⓪(b) HEAT_LEGEND 复核 = 仍判到`：`HEAT_LEGEND_COVERAGE light/dark 格色=6 图例色=5 缺=[] 格宽=11px 倍率=1.0x 网格下缘 y=164 实心判定 格6px/图例3px 地板 格4/图例4 每方块采样点 格9/图例9`（4 行）；`HEAT_LEGEND_NOT_RUN` **零行** ⇒ 连续第二跑。
+- `⓪(c) 过渡帧数 第五数 = 6`：`MOTION_MARKDOWN_MODE_FADE scale=1x 帧数=27 过渡帧数=6 相邻差帧数=3 首末连续差=0.0048 峰值=0.0145 声明=200ms 窗口=833ms 每格=32.0ms` ⇒ 五数 2/5/0/5/6，每格 71.5/26.0/75.6/28.9/32.0ms。
+- `⓪(d)`：`SKIP_ROSTER 键=github-runner 类=github-runner 内层Ran=696 内层skip汇总=3 解析=2 名单外=无 名册未跳=无` ⇒ 634 连续第五跑绿；STEP[18] success ⇒ 622 无新值。
+- `唯一红 = STEP[15]`：`SelectionRevealAnimationTests.testAnimatedRevealProducesIntermediateOffsets` ⇒ `("0.0") is not greater than ("1.0") - 0.15s 时视口还在起点（中段=0.0）`。
+  对照：同码在 `41519677393↔f12f50d` STEP[15]=success；`41531750912↔75b32d6` cancelled 无日志 ⇒ **间歇**，不署名本轮。
+  这条用例在 runner 上红过第二次（R412 那跑形状是 中段=1430）；本机侧有具名出口 `LOCAL_SCROLL_SESSION_NOT_RUN=full-suite-order`（449），**runner 侧没有** ⇒ 449 的 runner 半边仍是缺口。
+- `账本里这条用例的历史`：`grep -c testAnimatedRevealProducesIntermediateOffsets AGENT_UI_AUDIT.md` ⇒ 3（U-2107 本机 3 条会话族、U-1622 本机 5 断言 + 449 出口、U-1493 runner `40400010978↔2e02c4d` 那次的 中段=1430 形状 + `revealReduceMotionOverride` 修法）。
+
 ## 待读
 
 - 预检三读（串行）：`/tmp/r564-precheck3.log`（`NEEDLE_PRECHECK` + `ARM_TOTAL`）、`/tmp/r564-hidden3.log`（`HIDDEN_ARMS`）—— 后台在跑，完成标记 `/tmp/r564-precheck-done.txt`。
