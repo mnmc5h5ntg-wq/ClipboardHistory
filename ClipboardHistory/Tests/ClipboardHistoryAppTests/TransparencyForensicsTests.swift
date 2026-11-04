@@ -100,27 +100,68 @@ final class TransparencyForensicsTests: XCTestCase {
                       "alpha 相同、R 差 1 也算分得出 —— 这条通道只要有差别就能用，不预设要多大")
     }
 
-    // MARK: - ② 离屏那一把：量出这条通道实际给的那一对数
+    // MARK: - ② 离屏那一把：量出这条通道实际给的那一对数，并按倍率对登记表
 
-    /// R568 现读结论：`cacheDisplay` 那条路把透明半区涂成不透明黑（`a=255`、RGB 全 0），
-    /// 与左半逐字相同 ⇒ 离屏通道分不出真黑与透明。这一格钉的是这条通道现在就是这样；
-    /// 哪天有人把捕获路径换成带 alpha 的写法，这一格会红 ⇒ 逼着重新回答 §4 那一问。
-    func testOffscreenChannelFlattensTransparentToOpaqueBlack() throws {
+    /// R569 的改账（上一轮把这格写成了通用契约，runner 第一跑就判反）：
+    /// 本机 2x 读到 `透明半区=(r0,g0,b0,a255) 分得出=0`，而 runner 1x 读到
+    /// `透明半区=(r0,g0,b0,a0) 分得出=1` ⇒ **"离屏通道能不能保留 alpha" 依捕获倍率而定**
+    /// （R555/R568 那一族的第二次：同一个几何/像素量在 2x 与 1x 不是同一个对象）。
+    /// 所以这一格不再断言"哪一种答案是真理"，而是断言**这台机器的答案必须等于登记过的那一个**：
+    /// 任一台哪天翻了，这一格就红 ⇒ 逼着重新回答 §4 那一问，而不是让结论悄悄过期。
+    /// 登记表里只有两个观测值（2x / 1x），别的倍率一律**不猜**。
+    enum OffscreenAlphaVerdict: Equatable {
+        case flattensToOpaqueBlack
+        case preservesAlpha
+    }
+
+    static func registeredOffscreenVerdict(scale: Double) -> OffscreenAlphaVerdict? {
+        if abs(scale - 2.0) < 0.01 { return .flattensToOpaqueBlack }   // 本机 Retina，R568/R569 两跑同值
+        if abs(scale - 1.0) < 0.01 { return .preservesAlpha }          // CI runner 1x，R569 现读
+        return nil
+    }
+
+    func testTheOffscreenAlphaAnswerIsRegisteredPerScale() {
+        XCTAssertEqual(Self.registeredOffscreenVerdict(scale: 2.0), .flattensToOpaqueBlack,
+                       "2x 那一档的登记被改 ⇒ 上一轮本机那两条逐字读数就没有人管了")
+        XCTAssertEqual(Self.registeredOffscreenVerdict(scale: 1.0), .preservesAlpha,
+                       "1x 那一档的登记被改 ⇒ runner 那朵红（分得出=1）就又变成没人认领的形状")
+        XCTAssertNil(Self.registeredOffscreenVerdict(scale: 3.0),
+                     "没观测过的倍率必须回 nil ⇒ 回一个值是猜的，而猜出来的契约下一轮一定红")
+        XCTAssertNotEqual(Self.registeredOffscreenVerdict(scale: 2.0),
+                          Self.registeredOffscreenVerdict(scale: 1.0),
+                          "两档登记成同一个答案 ⇒ 这一格就不再读'依倍率而定'这件事了")
+    }
+
+    func testOffscreenChannelMatchesTheRegisteredAlphaAnswerForItsScale() throws {
         let size = NSSize(width: 200, height: 120)
         let rep = try captureOffscreen(size: size)
         let black = try XCTUnwrap(pixel(rep, 50, 60), "左半区读不到像素 ⇒ 探针没落地")
         let clear = try XCTUnwrap(pixel(rep, 150, 60), "右半区读不到像素 ⇒ 探针没落地")
         let canTell = distinguishes(black, clear)
+        let scale = Double(rep.pixelsWide) / size.width
+        let measured: OffscreenAlphaVerdict = canTell ? .preservesAlpha : .flattensToOpaqueBlack
+        let registered = Self.registeredOffscreenVerdict(scale: scale)
+        let measuredText = canTell ? "保留 alpha" : "涂成不透明黑"
+        let registeredText = registered == nil ? "未登记"
+            : (registered == .preservesAlpha ? "保留 alpha" : "涂成不透明黑")
         CaptureReadings.emit("TRANSPARENCY_CHANNEL 通道=离屏 位图=\(rep.pixelsWide)x\(rep.pixelsHigh)"
-            + " hasAlpha=\(rep.hasAlpha ? 1 : 0)"
+            + " 倍率=\(String(format: "%.2f", scale))x hasAlpha=\(rep.hasAlpha ? 1 : 0)"
             + " 黑半区=(r\(black.r),g\(black.g),b\(black.b),a\(black.a))"
             + " 透明半区=(r\(clear.r),g\(clear.g),b\(clear.b),a\(clear.a))"
-            + " 分得出=\(canTell ? 1 : 0)")
+            + " 分得出=\(canTell ? 1 : 0) 实测=\(measuredText) 登记=\(registeredText)")
         XCTAssertEqual(black.a, 255,
                        "左半是不透明黑，alpha 却不是 255 ⇒ 这条通道的 alpha 语义与预期不同，下面那格会误判")
-        XCTAssertFalse(canTell,
-                       "离屏通道这次分得出了（透明半区 a=\(clear.a)）⇒ §4 那一问的答案变了，"
-                           + "646 与本节结论要按新读数重写，不许沿用旧结论")
+        guard let registered else {
+            // 这台机器的倍率从没观测过 ⇒ 具名不判，并把两个真数打在上面那行里。
+            // 不许拿另一台的答案替它签字（R555 那条：不同倍率不是同一对象）。
+            CaptureReadings.emit("OFFSCREEN_ALPHA_NOT_RUN=unregistered-scale 倍率=\(String(format: "%.2f", scale))x"
+                + " 分得出=\(canTell ? 1 : 0) ⇒ §4 第三条在这一档没有登记过答案，不判")
+            return
+        }
+        XCTAssertEqual(measured, registered,
+                       "倍率 \(String(format: "%.2f", scale))x 这台的离屏通道给了没登记过的答案："
+                           + "实测「\(measuredText)」而登记的是「\(registeredText)」⇒ "
+                           + "§4 第三条与 646 要按新读数重写（两台里有一台换了行为），不许改登记表来消红")
     }
 
     // MARK: - ③ 真机那一把：合成通道（环境键才跑；隐私上背景用自己的纯色窗）
@@ -359,6 +400,10 @@ final class TransparencyForensicsTests: XCTestCase {
                                         thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
                                         sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
                   timestamp: Date(timeIntervalSince1970: 1))
+        // R569：真建一扇主窗就会把 `detailContentTopInset` 这个**进程内全局**写成那扇窗实测到的值，
+        // 而判据卷里几十张 `detail-*`/`content-*` 帧是在同一个进程里拍的 ⇒ 必须还原（R525 红过一次、
+        // R568 是第二次，见 `testEveryFileThatOpensARealMainWindowRestoresTheChromeMetric`）。
+        let savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
         let controller = MainWindowCollapseController(defaults: defaults)
         let delegate = AppDelegate(historyStore: store, collapseController: controller)
         defer {
@@ -367,6 +412,7 @@ final class TransparencyForensicsTests: XCTestCase {
                 window.orderOut(nil)
             }
             WindowManager.forgetMainWindowForTesting()
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedDetailContentTopInset)
             withExtendedLifetime(delegate) { _ in }
         }
         NSApplication.shared.setActivationPolicy(.regular)
@@ -509,6 +555,10 @@ final class TransparencyForensicsTests: XCTestCase {
                                         thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
                                         sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
                   timestamp: Date(timeIntervalSince1970: 1))
+        // R569：真建一扇主窗就会把 `detailContentTopInset` 这个**进程内全局**写成那扇窗实测到的值，
+        // 而判据卷里几十张 `detail-*`/`content-*` 帧是在同一个进程里拍的 ⇒ 必须还原（R525 红过一次、
+        // R568 是第二次，见 `testEveryFileThatOpensARealMainWindowRestoresTheChromeMetric`）。
+        let savedDetailContentTopInset = WindowChromeMetrics.shared.detailContentTopInset
         let controller = MainWindowCollapseController(defaults: defaults)
         let delegate = AppDelegate(historyStore: store, collapseController: controller)
         NSApplication.shared.setActivationPolicy(.regular)
@@ -518,6 +568,7 @@ final class TransparencyForensicsTests: XCTestCase {
                 window.orderOut(nil)
             }
             WindowManager.forgetMainWindowForTesting()
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedDetailContentTopInset)
             withExtendedLifetime(delegate) { _ in }
         }
         WindowManager.showMainWindow()
@@ -565,6 +616,88 @@ final class TransparencyForensicsTests: XCTestCase {
         XCTAssertEqual(minAlpha, 255,
                        "内容里有 alpha=\(minAlpha) 的像素 ⇒ 底衬没把不透明画到捕获路径上，"
                            + "那 356 张帧会变（透明区在离屏里被涂成黑，R458 那一族）")
+    }
+
+    // MARK: - ⑦ R569 的制度位：谁开真主窗，谁必须还原那条全局
+
+    /// `WindowChromeMetrics.shared.detailContentTopInset` 是**进程内全局**：真建一扇主窗，产品就会把它
+    /// 写成那扇窗实测到的值（52pt 量级），而判据卷里几十张 `detail-*` / `content-*` 帧是在**同一个进程**
+    /// 里拍的。R525 因为"某一格没还原它"红过一次 runner 的详情帧；R568 我自己那一格又做了同一件事
+    /// （`41751994049` 那跑 STEP[15] 里四支 `detail-*` 旧判据后一批整体挪 54pt 并丢墨，
+    /// 本机并行与串行两种排法都不复现）⇒ 这条扫描把"要记得还原"从记忆变成会红的门。
+    ///
+    /// 判的是**源码里的成对出现**：出现 `WindowManager.showMainWindow()` 的文件必须也出现
+    /// `restoreDetailContentTopInsetForTesting`。豁免表里每条都要带理由，而理由里必须写退场。
+    static func chromeMetricFileViolates(text: String) -> Bool {
+        text.contains("WindowManager.showMainWindow()")
+            && !text.contains("restoreDetailContentTopInsetForTesting")
+    }
+
+    /// 扫描本身抽成一个可对任何目录跑的函数 —— 这样它能被**合成目录**锤一次（真建一个违规文件、
+    /// 一个合规文件），而不是只在真目录上"今天没红"。分级：合成目录 = 机制级证人，真目录 = 端到端。
+    static func chromeMetricScan(dir: URL) throws -> (files: Int, openers: [String], violating: [String]) {
+        let files = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+            .filter { $0.hasSuffix(".swift") }.sorted()
+        var openers: [String] = [], violating: [String] = []
+        for name in files {
+            guard let text = try? String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8) else {
+                continue
+            }
+            if text.contains("WindowManager.showMainWindow()") {
+                openers.append(name)
+                if chromeMetricFileViolates(text: text) { violating.append(name) }
+            }
+        }
+        return (files.count, openers, violating)
+    }
+
+    func testTheChromeMetricScanKnowsWhatAViolationLooksLike() throws {
+        let violating = "final class X {\n  func t() { WindowManager.showMainWindow() }\n}\n"
+        let compliant = "final class X {\n  func t() { WindowManager.showMainWindow() }\n"
+            + "  func d() { WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(1) }\n}\n"
+        let unrelated = "final class X {\n  func t() { NSSize(width: 750, height: 560) }\n}\n"
+        XCTAssertTrue(Self.chromeMetricFileViolates(text: violating),
+                      "开真窗而不还原必须被判违规 ⇒ 判不出就是恒绿，这一格就没有对象")
+        XCTAssertFalse(Self.chromeMetricFileViolates(text: compliant),
+                       "还原过的文件被判成违规 ⇒ 这条扫描会把合规当坏，下一轮就会被当成噪声绕开")
+        XCTAssertFalse(Self.chromeMetricFileViolates(text: unrelated),
+                       "没开真窗的文件不该被管 ⇒ 管太宽会让豁免变成常态")
+
+        // 机制级正对照：合成目录里放一个违规 + 一个合规 + 一个无关，扫描必须只点名那一支。
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r569-chrome-scan-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try violating.write(to: dir.appendingPathComponent("AOpenerWithoutRestore.swift"), atomically: true, encoding: .utf8)
+        try compliant.write(to: dir.appendingPathComponent("BOpenenerWithRestore.swift"), atomically: true, encoding: .utf8)
+        try unrelated.write(to: dir.appendingPathComponent("CUnrelated.swift"), atomically: true, encoding: .utf8)
+        let synthetic = try Self.chromeMetricScan(dir: dir)
+        CaptureReadings.emit("CHROME_METRIC_GUARD_SELFTEST 合成文件=\(synthetic.files) 开真窗=\(synthetic.openers.count)"
+            + " 违规=[\(synthetic.violating.joined(separator: ","))]")
+        XCTAssertEqual(3, synthetic.files, "合成目录里只扫到 \(synthetic.files) 个 .swift ⇒ 扫描没看到盘上的东西")
+        XCTAssertEqual(2, synthetic.openers.count, "只认出 \(synthetic.openers.count) 个开真窗的文件 ⇒ 名单空转")
+        XCTAssertEqual(["AOpenerWithoutRestore.swift"], synthetic.violating,
+                       "合成违规没有被点名（或合规的被误点）⇒ 这条扫描不能上真目录")
+    }
+
+    func testEveryFileThatOpensARealMainWindowRestoresTheChromeMetric() throws {
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let scan = try Self.chromeMetricScan(dir: dir)
+        // 唯一豁免：那一格判的正是"没装工厂时 `showMainWindow()` 不建窗"⇒ 没有可泄漏的量。
+        // 退场：若那一格以后真建出窗，这条豁免必须删掉并补还原。
+        let exempt: Set<String> = ["WindowManagerTests.swift"]
+        CaptureReadings.emit("CHROME_METRIC_GUARD 文件=\(scan.files) 开真窗=\(scan.openers.count)"
+            + " 违规=\(scan.violating.count) 名单=[\(scan.violating.joined(separator: ","))]"
+            + " 豁免=[\(exempt.sorted().joined(separator: ","))] "
+            + "未豁免违规=\(scan.violating.filter { !exempt.contains($0) }.count)")
+        XCTAssertGreaterThanOrEqual(scan.openers.count, 4,
+                                    "只认出 \(scan.openers.count) 个开真窗的文件 ⇒ 名单空转（R568 那一格就在里面），"
+                                        + "这条扫描今天看不见任何东西")
+        let unexempted = scan.violating.filter { !exempt.contains($0) }
+        XCTAssertEqual([], unexempted,
+                       "这些文件开了真主窗却没还原 `detailContentTopInset`：[\(unexempted.joined(separator: ","))] ⇒ "
+                           + "同一进程里后面的 `detail-*`/`content-*` 帧会被那扇窗实测到的值挪位"
+                           + "（R525 / R568 两次 runner 红的形状）")
     }
 
 }

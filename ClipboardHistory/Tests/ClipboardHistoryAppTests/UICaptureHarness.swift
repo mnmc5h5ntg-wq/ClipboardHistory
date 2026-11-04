@@ -27109,6 +27109,19 @@ final class UICaptureTests: XCTestCase {
         NSApp.appearance = NSAppearance(named: appearance)
         defer { NSApp.appearance = previousApplicationAppearance }
 
+        // R569 ⓪·6 那四支 `detail-*` 在 runner 上"后一批整体挪 54pt 并丢了墨"，本机并行与串行两种排法
+        // 都不复现 ⇒ 补一条**分岔读数**：拍每一张帧的那一刻，屏上有几扇 app 内容窗。
+        // 正常是 0（这一行就不打）；一旦某格在捕获期间留了真窗口，它会点名夹具与那扇窗的尺寸，
+        // 于是下一跑能分开：(甲) 别的窗把离屏捕获挤坏了 / (乙) 与窗无关，是机器负载或采样。
+        let foreignAppWindows = NSApplication.shared.windows.filter {
+            WindowManager.isAppContentWindow($0) && $0.isVisible
+        }
+        if !foreignAppWindows.isEmpty {
+            emit("CAPTURE_FOREIGN_WINDOW \(fixture.name) 屏上 app 内容窗=\(foreignAppWindows.count)"
+                 + " 尺寸=[\(foreignAppWindows.map { NSStringFromSize($0.frame.size) }.joined(separator: " "))]"
+                 + " 外观=\(appearance == .darkAqua ? "dark" : "light")")
+        }
+
         // 两族夹具的差别**只有"窗口是谁建的"**：
         // SwiftUI 夹具由这里建一个离屏窗口；AppKit 夹具（浮层）拍的是**产品自己的那个窗口**。
         // 这不是风格选择：R19 第一版把浮层的 `contentView` 摘出来搬进新窗口，
