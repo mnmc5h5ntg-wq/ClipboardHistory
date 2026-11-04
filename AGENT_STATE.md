@@ -152,6 +152,19 @@
 - ③ 若用户给了 646/647/653/654 任一条 ⇒ 才把那一格写成判据 + 刀（仍属第②段收尾）。633 仍等人工回执。(丙)/648/649/652 继续挂账、**不占推进格**。
 - 刀号 **M1513** 起；禁碰 **14 面**；4.5 墨地板、150 上限、120ms 锚与容差 1、Motion ≥2、2x 8.0pt、1x 6.0pt、`probeInkFraction=3%`、`.contentFade 0.20`、声明时长、像素格容差 1.5 与跳变地板 8、全量 skipped、离屏 alpha 那张登记表（登记值只由 runner 自己那一跑改）一律不动；`PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED=backing-covers-whole-tree` 不撤；646/650/651/653/654 都不许自宣结案。
 
+### R575 补记（2026-11-04 · 第 574 轮 / Round 572 收口之后 · ⓪ 那两跑**到数了** ⇒ ① 那一格向前补记，原文不回头改）
+
+① **`41828227003 ↔ d544998`（R574 判据笔）现读 `completed / failure`，全部失败步骤逐条抄**：`STEP[15] Swift tests (executed-count gate)` / `STEP[17] Capture gate (unregistered reds must be zero)` / `STEP[18] On-screen probe coverage floor` / `STEP[19] Motion coverage floor` 四朵。**`STEP[9] Release script tests` 不在这份名单里**（这一跑的日志真取到了：`steps` 把四个步骤名逐字解析出来 ⇒ 是一条读数，不是"没红"的推论）⇒ **R574 补的那把 `ROUND_HEADINGS` 尺在 runner 上绿**，它自己那一格由这一跑签到。
+② **R574 的 653 三态在 runner 上落在第二态 ⇒ "第③段逐帧判据不注定空跑"这句由 runner 自己签。** 逐字两行（`倍率=1.00x`，那一台是 1x）：
+    `FRAME_CHANNEL_MECHANISM 树=主窗 夹具=content-with-history 族=swiftui 倍率=1.00x 类=B 根类名=NSHostingView<ModifiedContent<AnyView,__EnvironmentKeyWritingModifier<ColorScheme>>> 子层冷=-1 contents冷=0 宿主层内NSHostingView数=3 通道未画比例=0.8495 产物采样=26320 产物不透明=26320 产物全透明=0 产物中间=0 产物有alpha平面=1 前置判=夹具快门那步_contentView.cacheDisplay 产物判=产物铺平alpha`
+    `FRAME_CHANNEL_MECHANISM 树=浮层 夹具=quickpick-list 族=appkit 倍率=1.00x 类=C 根类名=NSView 子层冷=6 contents冷=0 宿主层内NSHostingView数=0 通道未画比例=0.8187 产物采样=7875 产物不透明=7875 产物全透明=0 产物中间=0 产物有alpha平面=1 前置判=夹具快门那步_contentView.cacheDisplay 产物判=产物铺平alpha`
+    ⇒ 两棵都 `前置判=夹具快门那步_contentView.cacheDisplay`（不是"画不出"）⇒ 653 的第①条结论两台同判；`产物全透明=0` 而通道侧未画 `0.8495` / `0.8187` ⇒ 第②条（产物判不了归零）也在 runner 上成立 ⇒ **653 不结案但它的两条结论今天都有了 runner 证人**。
+③ **一条新的机器差，正好落在 651 欠的那一层上**：主窗那棵在 runner 上读 `子层冷=-1`，而本机读 `子层冷=1` ⇒ 那台机器上按快门之前**连层树都没建**（本机建了但没画进料）。这与 R573 的"类 B 在 runner 上冷态整幅 a=0"是同一条裂缝的两个面；651 仍不结案，但欠的那一格从"为什么画不出"细化成"**为什么层树本身在那台上不建**"。
+④ **红名单去重后仍是那 5 个名字**（`testActionableInkStaysAboveTheLegibilityFloor`、`testCaptionTextStaysOnTheSecondaryTier`、`testDetailAreaHasASingleLeftAxis`、`testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed`、`testQuickPickKeyboardHintClearsTheContrastFloor` = 四朵 `detail-*` 族 + 639），`ASSERTION_RED 行=18 去重后=15`；**本轮那格新判据不在红名单里**（`grep -c "testTheFrameChannelPrerequisite…failed" = 0`）⇒ 与 ② 互证。四朵 STEP 的红照账挂着，本轮一朵没消、也没用登记表消。
+⑤ **`41829014269 ↔ f3e1bf4`（R574 补记笔）现读 `completed / failure`**，失败步骤 `STEP[15] / STEP[17] / STEP[19]` 三朵（比 ① 少 `STEP[18]`）⇒ 按归因口径那三朵在 ① 里都在，**不是本笔引入**；它不替 ① 签任何东西。
+⑥ **本轮自己那一跑 `41843233864 ↔ d7ac364` 现读 `queued / conclusion 空` ⇒ 未读**。它才含 654 的映射表判据（`D12_CHANNEL_MAP_SUMMARY 条=8 runner可判=? 只能真机=? 今天无证人=?` 在 runner 上的分布）⇒ R576 的 ⓪ 头一格就是它；不许拿本补记 ①② 的绿替它签（不同的一棵树）。
+⑦ **push 复核**：`git push origin main` 走 SSH 成功（`f3e1bf4..d7ac364`）⇒ `PUSH_TRANSPORT=ssh-ok` 连续第二轮；`ahead=0`、`HEAD=origin/main=d7ac364`。key 为何 11-04 早间被拒仍没读到成因 = `SSH_KEY_REJECTED_REASON_UNKNOWN`，归用户。
+
 ## R574 状态（2026-11-04 · 第 573 轮 / Round 571 · 产品 0 文件 + 判据 1 格（653：夹具那条通道的机制分类 + 产物 alpha 缺席）+ 尺 1 把（台账逐字重复标题）+ 刀 4 把 M1505–M1508 + 新开 653 · 靶 = 折叠规格 §3 第②段）
 
 ① **⓪ 两跑都还没到数（不轮询、不拿本机的数顶）。** 现读 `41815985543 ↔ cf63079` = `in_progress / conclusion 空`，`41816421295 ↔ 36e96b7` = `in_progress / conclusion 空` ⇒ 都是**未读**。三格 —— R573 那条新判据在 runner 上走哪条、（乙）把前置找回来到底修好没有、STEP[9] 那把修宽的尺是否绿 —— **只由 `cf63079` 那一跑签**，补记那一跑不替它签（R565「修尺那一笔的跑签不了自己」的同一族）。dispatch 说"本轮若到数再读"，这次没兑现 ⇒ 这两对号继续带进 R575 的 ⓪，且顺序不变。
