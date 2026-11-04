@@ -60,9 +60,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 这个 false 只是防"有人绕过 delegate 直接 close()"把窗口在弱引用背后释放掉。
         window.isReleasedWhenClosed = false
         window.identifier = WindowManager.mainWindowIdentifier
-        window.contentView = NSHostingView(
+        let host = NSHostingView(
             rootView: MainWindowContent(historyStore: historyStore, collapse: collapse)
         )
+        // R568：非不透明窗口 + 自己的不透明底衬（见 `WindowBackingView` 的注释：为什么两件事要一起做）。
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.contentView = WindowBackingContainer.wrapping(host)
         WindowManager.registerMainWindow(window)
         collapse.applyGeometry(to: window)
         return window

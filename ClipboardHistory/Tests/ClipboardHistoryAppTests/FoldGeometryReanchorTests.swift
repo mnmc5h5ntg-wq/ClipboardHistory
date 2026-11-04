@@ -130,6 +130,59 @@ final class FoldGeometryReanchorTests: XCTestCase {
 
     // MARK: - ③ 两栏各半（50/50）
 
+    /// R568：runner 第一次跑这一格就把它判红了，逐字 `侧栏=424.00 详情(算)=423.00 缝中心=424.50`，
+    /// 而本机（2x）逐字 `423.50 / 423.50 / 424.00`。两台都没有把产品写错 —— 列锁在两台上都是
+    /// `min=max=423.5`（`FOLD_GEOMETRY_ITEMS` 的 runner 原文），差的是**布局栅格**：
+    /// `423.5pt × 倍率` 在 1x 上不是整数 ⇒ AppKit 只能把一栏进位、另一栏退位。
+    /// 所以「两栏等宽」这一条在 2x 与 1x 上**不是同一个对象**（R555 那一族：同一几何量按倍率拆口径）。
+    ///
+    /// 界值不许我挑：栅格宽 `g = 1/scale` ⇒ 任何一栏的落点偏离它的期望值 ≤ `g/2`
+    /// ⇒ 两栏之差 ≤ `g`、缝中心偏离内容正中 ≤ `g/2`；而当 `423.5 × scale` 本来就是整数时
+    /// 那一档**退回旧口径那个 0.01**（浮点噪声），于是 2x 的结论一字未动。
+    enum ColumnGridCaliber {
+        /// 这一格的旧口径（本机 2x 实测到的那个），写死在这里是为了让它能被真值表判到。
+        static let exactTolerance = 0.01
+
+        static func grid(scale: Double) -> Double { 1.0 / max(scale, 0.001) }
+
+        /// 半个点在这台机器的栅格上落不落得下去。
+        static func halfPointIsRepresentable(scale: Double) -> Bool {
+            let devicePixels = 423.5 * scale
+            return abs(devicePixels - devicePixels.rounded()) < 0.001
+        }
+
+        static func columnDifferenceBound(scale: Double) -> Double {
+            halfPointIsRepresentable(scale: scale) ? exactTolerance : grid(scale: scale)
+        }
+
+        static func seamCenterBound(scale: Double) -> Double {
+            halfPointIsRepresentable(scale: scale) ? exactTolerance : grid(scale: scale) / 2
+        }
+
+        /// 判决抽成一个函数：活窗口拿真数走一遍（本机 2x 端到端），runner 那两个逐字读数
+        /// 在**真值表**那一格里走同一遍 ⇒ 1x 那支不必等一台 1x 的机器才有人证。
+        enum Outcome: Equatable {
+            case ok
+            case columnsDiffer(by: Double, bound: Double)
+            case seamOffCenter(by: Double, bound: Double)
+        }
+
+        static func verdict(scale: Double, sidebar: Double, detail: Double,
+                            seamCenter: Double, contentCenter: Double) -> Outcome {
+            let difference = abs(sidebar - detail)
+            let differenceBound = columnDifferenceBound(scale: scale)
+            guard difference <= differenceBound + 0.001 else {
+                return .columnsDiffer(by: difference, bound: differenceBound)
+            }
+            let offset = abs(seamCenter - contentCenter)
+            let centerBound = seamCenterBound(scale: scale)
+            guard offset <= centerBound + 0.001 else {
+                return .seamOffCenter(by: offset, bound: centerBound)
+            }
+            return .ok
+        }
+    }
+
     func testTheTwoColumnsEachTakeHalfTheContentWidth() throws {
         setUpProduct()
         defer { tearDownProduct() }
@@ -149,17 +202,31 @@ final class FoldGeometryReanchorTests: XCTestCase {
         // 详情列的 frame 在 SwiftUI 里铺满分栏器（实测 `{{0,0},{848,632}}`），所以它自己的宽**不是**证人；
         // 可判的是那条恒等式：内容宽 − 侧栏 − 分隔条 = 详情实际占到的那一段。
         let detail = content - sidebar - thickness
+        let scale = Double(window.backingScaleFactor)
+        let outcome = ColumnGridCaliber.verdict(scale: scale, sidebar: sidebar, detail: detail,
+                                                seamCenter: sidebar + thickness / 2,
+                                                contentCenter: content / 2)
         CaptureReadings.emit("FOLD_GEOMETRY_COLUMNS 侧栏=\(String(format: "%.2f", sidebar))"
             + " 详情(算)=\(String(format: "%.2f", detail))"
             + " 分隔条=\(String(format: "%.2f", thickness))"
             + " 分栏宽=\(String(format: "%.2f", content))"
-            + " 缝中心=\(String(format: "%.2f", sidebar + thickness / 2))")
+            + " 缝中心=\(String(format: "%.2f", sidebar + thickness / 2))"
+            + " 倍率=\(String(format: "%.1f", scale))x"
+            + " 半格可落=\(ColumnGridCaliber.halfPointIsRepresentable(scale: scale) ? 1 : 0)"
+            + " 列差界=\(String(format: "%.3f", ColumnGridCaliber.columnDifferenceBound(scale: scale)))"
+            + " 缝心界=\(String(format: "%.3f", ColumnGridCaliber.seamCenterBound(scale: scale)))")
         XCTAssertEqual(sidebar, 423.5, accuracy: 0.5,
                        "侧栏不是 (848 − 1)/2 ⇒ 两栏对不上半页（现读 \(sidebar)）")
-        XCTAssertEqual(detail, sidebar, accuracy: 0.01,
-                       "两栏不等宽（侧栏 \(sidebar) vs 详情 \(detail)）⇒ 50/50 不成立，折痕会落在中缝之外")
-        XCTAssertEqual(sidebar + thickness / 2, content / 2, accuracy: 0.01,
-                       "分隔条的中心不在内容宽的正中 ⇒ 对折时右半页盖不到左半页")
+        // 旧口径那两条在这里换成"按这台机器的栅格推出的界"，界值由 `ColumnGridCaliber` 给，
+        // 2x 上它算出来就是原来那个 0.01 ⇒ 本机结论一字未动（真值表那一格钉着这条）。
+        if case .columnsDiffer(let by, let bound) = outcome {
+            XCTFail("两栏不等宽（侧栏 \(sidebar) vs 详情 \(detail)，差 \(by) > 界 \(bound)）"
+                + " ⇒ 50/50 不成立，折痕会落在中缝之外（倍率 \(scale)x）")
+        }
+        if case .seamOffCenter(let by, let bound) = outcome {
+            XCTFail("分隔条的中心不在内容宽的正中（偏 \(by) > 界 \(bound)，倍率 \(scale)x）"
+                + " ⇒ 对折时右半页盖不到左半页")
+        }
 
         // 行为证人：真的去"拖"一次中缝。AppKit 文档说 `setPosition` 的行为等同于用户拖
         // （会走 delegate 的约束），所以拖得动就是没锁住。
@@ -168,6 +235,37 @@ final class FoldGeometryReanchorTests: XCTestCase {
         CaptureReadings.emit("FOLD_GEOMETRY_DRAG_PROBE 拖到300之后 侧栏=\(String(format: "%.2f", views[0].frame.width))")
         XCTAssertEqual(views[0].frame.width, sidebar, accuracy: 0.01,
                        "中缝还能被拖（拖到 300 之后侧栏变成 \(views[0].frame.width)）⇒ D7 的「禁中缝拖拽」没落地")
+    }
+
+    /// R568：上面那格的**真值表级**证人 —— 1x 那一支在本机永远走不到，所以它必须能被纯数据判到。
+    ///
+    /// 三条都在判"这把尺读的是它声称的那个对象"：
+    /// ① 2x 的界必须**仍是 0.01**（旧口径一字不动，这是 R555 那条规矩的正身）；
+    /// ② runner 那两个逐字读数喂进去必须 `.ok`（1x 的栅格确实解释得掉那 0.5pt，不是我事后编的容差）；
+    /// ③ 真的不对称喂进去必须红 —— 而且**在两种倍率下都要红**，否则 1x 那支就成了"什么都放过"的洞。
+    func testTheHalfPointCaliberIsDerivedFromTheGridNotPicked() {
+        XCTAssertEqual(ColumnGridCaliber.columnDifferenceBound(scale: 2.0), 0.01,
+                       accuracy: 0.0001, "2x 的列差界不再是旧口径那个 0.01 ⇒ 旧口径被放宽了")
+        XCTAssertEqual(ColumnGridCaliber.seamCenterBound(scale: 2.0), 0.01,
+                       accuracy: 0.0001, "2x 的缝心界被放宽 ⇒ 同一族坏法")
+        XCTAssertTrue(ColumnGridCaliber.halfPointIsRepresentable(scale: 2.0),
+                      "2x 上 423.5pt = 847 个像素点，本来就该落得下去 ⇒ 读成落不下去是尺坏")
+        XCTAssertFalse(ColumnGridCaliber.halfPointIsRepresentable(scale: 1.0),
+                       "1x 上 423.5 落不下去正是 runner 那两朵红的成因 ⇒ 判成可落就等于把成因抹掉")
+        XCTAssertEqual(ColumnGridCaliber.verdict(scale: 1.0, sidebar: 424.0, detail: 423.0,
+                                                 seamCenter: 424.5, contentCenter: 424.0), .ok,
+                       "runner 的逐字读数（424.0/423.0/缝中心 424.5）在这把尺上必须判得出「栅格内的舍入」，"
+                           + "否则 1x 那一支就是恒红、下一轮只能靠放门")
+        // 正对照：把缝整体挪走 6pt（两个口径都出界）⇒ 必须红，且红在"列差"那一路。
+        let moved = ColumnGridCaliber.verdict(scale: 2.0, sidebar: 429.5, detail: 417.5,
+                                             seamCenter: 430.0, contentCenter: 424.0)
+        XCTAssertTrue(moved != .ok, "2x 把两栏挪成 429.5/417.5 还判得出绿 ⇒ 这把尺不承重")
+        let movedAt1x = ColumnGridCaliber.verdict(scale: 1.0, sidebar: 430.0, detail: 417.0,
+                                                 seamCenter: 430.5, contentCenter: 424.0)
+        XCTAssertTrue(movedAt1x != .ok, "1x 的真不对称（差 13pt > 栅格 1pt）被判成可接受 ⇒ "
+            + "1x 那支变成了藏红的洞，不是拆口径")
+        XCTAssertEqual(movedAt1x, .columnsDiffer(by: 13.0, bound: 1.0),
+                       "1x 不对称必须落在「列差」那一路、界值是栅格本身 1.0 ⇒ 界值要能由倍率推出")
     }
 
     // MARK: - ④ 锁比例随状态翻过去

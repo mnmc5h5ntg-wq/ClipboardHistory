@@ -103,6 +103,8 @@ struct WindowConfigurator: NSViewRepresentable {
             }
             window.styleMask.insert(.fullSizeContentView)
             window.collectionBehavior = [.managed, .fullScreenNone]
+            // 非不透明 + 底衬只由**建窗那一处**（`AppDelegate.makeMainWindow`）负责：
+            // 两处写同一件事，刀就只钉得住其中一处，另一处会把变异盖成空刀（本轮实测到这个形状）。
             if let collapse {
                 collapse.applyGeometry(to: window)
             } else {

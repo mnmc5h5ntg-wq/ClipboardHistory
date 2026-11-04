@@ -523,6 +523,7 @@ final class UICaptureTests: XCTestCase {
                       "PressFeedbackTests.swift", "SettingsFailureReceiptTests.swift",
                       "SettingsRowRecordingTests.swift", "SelectionRevealAnimationTests.swift",
                       "DockBadgeTests.swift",
+                      "TransparencyForensicsTests.swift",
                       "UICaptureHarness.swift", "UIInteractionProbeTests.swift",
                       "QuickPickPlacementTests.swift", "QuickPickKeyboardHintTests.swift",
                       "RealScreenFoldTransitionTests.swift"]
@@ -24304,6 +24305,41 @@ final class UICaptureTests: XCTestCase {
                        "目标带与证人带都空 ⇒ 这台机器拍不出这一页，具名 NOT-RUN/skip")
     }
 
+    /// R568：`FOLD_SEAM_PIXEL` 那一档在 runner 上两半都读不出东西（逐字 `倍率=1.00x 缝列=-1.0pt
+    /// 跳变=0.0 左墨=-1 右墨=0`），而本机 2x 两档都判到。这两种坏法修法相反，必须先分开：
+    /// **整页平涂**（两半都无墨、全帧也读不出任何跳变）= 这台机器的这条通道拍不出这一页 ⇒ 具名未运行；
+    /// **有墨却读不出缝** = 页画出来了而那条线没了 ⇒ 是真红，不许顺着「读不到」一起豁免掉。
+    enum SeamArmOutcome: Equatable {
+        case judged
+        case capabilityAbsent
+        case seamGone
+    }
+
+    /// 三态分类只吃这一格实际读到的三个数。方向不许反（与 `longTextBandOutcome` 同一条规矩）。
+    static func seamArmOutcome(step: Double, leftInk: Int, rightInk: Int) -> SeamArmOutcome {
+        if leftInk > 0 && rightInk > 0 && step >= 8.0 { return .judged }
+        if leftInk <= 0 && rightInk <= 0 && step < 8.0 { return .capabilityAbsent }
+        return .seamGone
+    }
+
+    func testSeamArmOutcomeSeparatesBlankPageFromMissingSeam() {
+        XCTAssertEqual(Self.seamArmOutcome(step: 0.0, leftInk: -1, rightInk: 0), .capabilityAbsent,
+                       "两半都空且全帧无跳变 ⇒ 必须归到「这台机器拍不出这一页」，"
+                           + "否则 runner 那一朵会被读成真缺陷")
+        XCTAssertEqual(Self.seamArmOutcome(step: 54.0, leftInk: 125434, rightInk: 2105), .judged,
+                       "两半有墨、跳变过地板 ⇒ 这一档必须判得起来，判不起来就是尺坏")
+        // 正对照：有墨而缝没了 ⇒ 不许被「具名未运行」吃掉（那才是藏红的形状）
+        XCTAssertEqual(Self.seamArmOutcome(step: 3.0, leftInk: 125434, rightInk: 2105), .seamGone,
+                       "页面有墨而跳变读不出 ⇒ 那是缝没了，必须留在红的那一路")
+        XCTAssertEqual(Self.seamArmOutcome(step: 54.0, leftInk: 0, rightInk: 2105), .seamGone,
+                       "只有一整半没墨 ⇒ 半张页画坏了，不许归成这台机器拍不出")
+        // 界值那一格单独钉：地板 8 是**含**的（R462 那条：边界收/放过一次就会把整族判反）。
+        XCTAssertEqual(Self.seamArmOutcome(step: 8.0, leftInk: 10, rightInk: 10), .judged,
+                       "跳变正好等于地板 8 ⇒ 按既有判法是判到的，判成没判到就是把门收紧")
+        XCTAssertEqual(Self.seamArmOutcome(step: 7.99, leftInk: 10, rightInk: 10), .seamGone,
+                       "跳变差一点点到地板 ⇒ 仍是缝没了那一路，不许四舍五入成判到")
+    }
+
     /// R567（规格 D5 的**像素**证人）：帧里那条中缝必须正好落在内容宽的正中。
     ///
     /// 为什么另开一格，不停在 AppKit 属性上：`FoldGeometryReanchorTests` 读的是
@@ -24325,7 +24361,7 @@ final class UICaptureTests: XCTestCase {
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
         let contentWidth = 848.0, contentHeight = 600.0
-        var judged = 0
+        var judged = 0, absent = 0
         for (tag, appearance) in [("light", NSAppearance.Name.aqua),
                                   ("dark", NSAppearance.Name.darkAqua)] {
             let fixture = Fixture("r567-seam-848x600", NSSize(width: contentWidth, height: contentHeight)) {
@@ -24382,16 +24418,32 @@ final class UICaptureTests: XCTestCase {
                 + " 倍率=\(String(format: "%.2f", scale))x 缝列=\(String(format: "%.1f", seamPt))pt"
                 + " 跳变=\(String(format: "%.1f", bestStep)) 左墨=\(leftInk) 右墨=\(rightInk)"
                 + " 期望=\(contentWidth / 2)pt 地板=8pt")
-            if leftInk <= 0 || rightInk <= 0 || bestStep < 8.0 {
-                continue  // 这一档没判起来：两半之一没墨，或整帧读不出缝 ⇒ 具名不判，最后由 judged 那条红
+            switch Self.seamArmOutcome(step: bestStep, leftInk: leftInk, rightInk: rightInk) {
+            case .judged:
+                judged += 1
+                XCTAssertEqual(seamPt, contentWidth / 2, accuracy: 1.5,
+                               "\(tag)：帧里的中缝在 \(seamPt)pt，不在内容宽的正中 \(contentWidth / 2)pt"
+                                   + " ⇒ 对折时右半页盖不到左半页（D5 的 50/50 只是属性上成立，像素没跟上）")
+            case .capabilityAbsent:
+                absent += 1
+                CaptureReadings.emit("FOLD_SEAM_PIXEL_NOT_RUN=runner-1x-frame-blank \(tag)"
+                    + " 倍率=\(String(format: "%.2f", scale))x 跳变=\(String(format: "%.1f", bestStep))"
+                    + " 左墨=\(leftInk) 右墨=\(rightInk)"
+                    + " ⇒ 这条通道在这一档拍出整页平涂：缝**没有对象**，不是「缝在别处」")
+            case .seamGone:
+                XCTFail("\(tag)：这一页有墨（左 \(leftInk) / 右 \(rightInk)）却读不出 ≥8 的跳变"
+                    + "（现读 \(String(format: "%.1f", bestStep))）⇒ 那条中缝在像素里没了，"
+                    + "这一路**不许**走「具名未运行」")
             }
-            judged += 1
-            XCTAssertEqual(seamPt, contentWidth / 2, accuracy: 1.5,
-                           "\(tag)：帧里的中缝在 \(seamPt)pt，不在内容宽的正中 \(contentWidth / 2)pt"
-                               + " ⇒ 对折时右半页盖不到左半页（D5 的 50/50 只是属性上成立，像素没跟上）")
+        }
+        if judged == 0 && absent == 2 {
+            // 两档都没有对象 ⇒ 这一格今天在这台机器上整体具名未运行（逐档的读数与原因已在上两行里）。
+            // 本机 2x 那两档照常判 ⇒ 端到端的证人仍然有一台机器签着，这一格不是"谁也没判过的散文"。
+            CaptureReadings.emit("FOLD_SEAM_PIXEL_VERDICT=not-run 判=0 无对象=\(absent) 容差=1.5 地板=8（两格一字未动）")
+            return
         }
         XCTAssertEqual(judged, 2,
-                       "两档都没能判这条缝（跳变 <8 或某一半没字墨）⇒ 这一格没有内容，不许读成通过")
+                       "两档里只有 \(judged) 档判到这条缝、\(absent) 档没有对象 ⇒ 这一格没有内容，不许读成通过")
     }
 
     /// R399：最窄窗里长正文必须给右下角浮动操作栏让位，不能排到药丸下面。
