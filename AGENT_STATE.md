@@ -13,6 +13,40 @@
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
 最后更新：2026-11-04（本地 · R568 / 第 567 轮 / Round 565）
+## R569 ⓪ 开工（2026-11-04 · 第 568 轮 / Round 566 · 三跑逐字 + 上一轮自己那笔把 STEP[15] 从 4 推到 15）
+
+⓪·0 **身份与顺序（现读，不抄上一轮）**：`current_round()` 读到 UI_AUDIT 最新标题是 `## 第 567 轮（R568` ⇒ 本轮 **R569 = 第 568 轮 / Round 566**；`scripts/tests/test_round_batch_consistency.py` 三格现在 **OK**（R568 的三本标题齐）。**「最后更新」那行照旧不在这里抬** —— 抬了 `back == 0` 那一格就立刻要求三本各有 R569 标题，而这一笔只动 STATE ⇒ 那一跑会拿到一朵注定红（R557 那一族）；抬的时机 = 台账那一笔。刀高水位现读 **M1485** ⇒ 本轮从 **M1486** 起。
+
+⓪·1 **三跑逐字**（`ci_read.py steps` 原样列全部失败步骤；success 的步骤另读 `gh run view --json jobs` 的 `steps[].conclusion`）：
+- `41751994049 ↔ 0a9113c`（R568 尾笔）= **completed / failure**，失败步骤三朵：STEP[15]、STEP[17]、STEP[19]；步骤名**可解析**（真步骤名在直方图里）。逐步结论：STEP[9] `Release script tests`=success、STEP[11]=success、STEP[16] Motion gate=success、**STEP[18] On-screen probe coverage floor=success**。
+- `41740747168 ↔ a15d1ed`（上一轮具名 `CI_READ_BLOCKED=api-eof` 那一跑）**补读到手**：completed / failure，失败步骤**四朵**：STEP[15]、STEP[17]、**STEP[18]**、STEP[19]。⚠ 这一跑的日志 **15259/15259 行全是 `UNKNOWN STEP`** ⇒ "按步骤名切正文"这把尺这一跑不灵（R470 那一族第三次遇到），全部读数改走全文 grep + 判据自己打的 emit 通道。
+- `41752950275 ↔ 1c438ab`（R568 补记笔）取号时 **in_progress（conclusion 空）⇒ 复核未到**，既不读成绿也不读成红。
+
+⓪·2 **(a) 上一轮那两朵 R567 的红，runner 自己签了字：办干净了**
+- 机制那格：逐字 `FOLD_GEOMETRY_COLUMNS 侧栏=424.00 详情(算)=423.00 分隔条=1.00 分栏宽=848.00 缝中心=424.50 倍率=1.0x 半格可落=0 列差界=1.000 缝心界=0.500` ⇒ 界值确实**由栅格推出来**（1x ⇒ 1.000 / 0.500），且 `testTheTwoColumnsEachTakeHalfTheContentWidth` **不在失败名单里**（上一跑它在）。
+- 像素那格：两档逐字 `FOLD_SEAM_PIXEL light/dark … 缝列=-1.0pt 跳变=0.0 左墨=-1 右墨=0` 之后各跟一条 `FOLD_SEAM_PIXEL_NOT_RUN=runner-1x-frame-blank light/dark 倍率=1.00x 跳变=0.0 左墨=-1 右墨=0 ⇒ 这条通道在这一档拍出整页平涂：缝**没有对象**，不是「缝在别处」` ⇒ 具名成立，`容差 1.5`、`跳变地板 8` 一字未动。
+- `CAPTURE_GATE_RESULT=fail 有 1 个用例红了`（上一跑是 2）⇒ 只剩 639 那一朵。**这一格的签字归属要说清：修它的是 `8f679f9`，而给它作证的是尾笔 `0a9113c` 那一跑**（同一棵树、后一笔的跑）—— R555/R567 那条"修尺那一笔签不了自己"在这里继续成立。
+
+⓪·3 **(b) 读单里我预判错的一格，照实写**：STEP[9] 逐字 `SKIP_ROSTER 键=github-runner 类=github-runner 内层Ran=720 内层skip汇总=4 解析=3 名单外=无 名册未跳=无`（连续第五次绿）。上一轮 ⓪ 我写"若点到那三格环境键的名字就登记"—— **机制判断错了**：那张名册读的是 **python 电池**（内层 720 格）的 skip，而 `REALSCREEN_*_NOT_RUN` 是 **swift 卷**的 `XCTSkip`，两边不同源 ⇒ 这一跑没有任何可登记的东西，也不是"登记被签收"。写下来是因为下一次我还会想当然地跨通道对账（[[gate-target-coverage]] 那一族：门的口径要与红所在的那一步同目标）。
+
+⓪·4 **(c) 全量 skipped 到数**：`Executed 1421 tests, with 89 tests skipped and 15 failures in 523.462s` ⇒ 86 → **89**（正是预期 +3 格环境键）；只记现读，不动任何期望。**同一行里的 `15 failures` 是 ⓪·6 那一段的主题，不许被"89 符合预期"盖过去。**
+
+⓪·5 **(d)(e)(f) 三格照抄**
+- 639 第七次逐字同值：`HINT_CONTRAST light 底=236 字芯=(118,118,118) 对比=3.84:1 字芯像素=40 偏差像素=696 地板=4.5 倍率=1.0x`、`dark … 5.08:1 … 712 …` ⇒ 本轮动了 backing，**没挪动它**；口径仍归用户。
+- 643 两个新数（按 push 顺序）：`a15d1ed` 那跑 `带中位=9.60ms 整窗中位=24.02ms 省=2.50×`（在册第十个数，也是迄今最大）；`0a9113c` 那跑 `带中位=9.27ms 整窗中位=12.74ms 省=1.37×`（第十一个）。`线=1.0×` 未动 ⇒ "带臂在涨"仍然没有证人，倒是**整窗那一臂在 24.02 与 12.74 之间摆**（同一台机器两跑）。
+- STEP[19]：两跑各只有 **1** 朵红（`红的用例=testEmptyStateStillFadesWhenMotionIsReduced 汇总行报红=1`），`MOTION_FLOOR_BAD_REASON empty-state 的理由是 witness-snaps-here，而登记过的是 无` 两跑都在；`empty-state=1`、`settings-reset-fade` 在 2/3/4 之间摆；那朵 crossfade 这一轮**没露面**（`MOTION_FLOOR_SUITE_NOT_SEEN=2` 点的是另外两条 354 家族的名字，不许混说）。⇒ 431 追记那"两根杠杆"继续成立：**没为消红动过任何地板**。
+
+⓪·6 **一朵不在读单里、而且必须单独一段的新红：上一轮自己那笔把 STEP[15] 从 4 推到 15**
+- 归因对照逐字：改动前 `41740747168↔a15d1ed` 是 `Executed 1411 tests, with 86 tests skipped and 4 failures`（那 4 朵是 R567 的两栏×2 + 639 + 像素缝）；R568 的 `41751994049` 是 `1421 tests, with 89 tests skipped and 15 failures`。15 个断言红落在 **6 个用例**：`TransparencyForensicsTests testOffscreenChannelFlattensTransparentToOpaqueBlack`、`UICaptureTests testActionableInkStaysAboveTheLegibilityFloor`、`testCaptionTextStaysOnTheSecondaryTier`、`testDetailAreaHasASingleLeftAxis`、`testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed`、`testQuickPickKeyboardHintClearsTheContrastFloor`（639 老账）。
+- **第 1 朵是我自己的判据在 runner 上判反了**：runner 逐字 `TRANSPARENCY_CHANNEL 通道=离屏 位图=200x120 hasAlpha=1 黑半区=(r0,g0,b0,a255) 透明半区=(r0,g0,b0,a0) 分得出=1`，而本机 2x 同一格是 `透明半区=(r0,g0,b0,a255) 分得出=0`。⇒ 上一轮 §4 第三条那句"离屏通道分不出真黑与透明"**只在 2x 那台成立**；同一属性两台给**相反**答案，这不是"界值差半格"，是"这条通道能不能用作 alpha 证人"依机器而定 ⇒ 646 与规格 §4 那句要按新读数**向前重写**（不回头删上一轮的话），而这一格本身按 R555/R568 那条方法处理：**分口径、不放门**。
+- **第 2–5 朵是四支旧判据次次绿、这跑红**，且同一跑内有两批读数：STEP[5] `01:14:55` 那批 `DETAIL_AXIS light/dark 判了 5 块，spread=1.0pt`、`SOURCE_APP_BADGE light/dark 有来源彩色=59 有来源墨=110/139`；STEP[15] `01:32:54` 那批 `spread=57.0pt / 54.0pt`、`有来源彩色=0 有来源墨=22/10`。同一步里 `TRANSPARENCY_STATE`/`TRANSPARENCY_HITTEST` 打在 `01:31:35`（早 79 秒）⇒ 形状是"**后一批离屏捕获整体挪了约 54pt 并丢了墨**"，不是"每次都这样"。
+- 本机两次实验**都没复现**（这是账，不是安慰）：① `TransparencyForensicsTests` + 那四格同进程并行 ⇒ `Executed 12 tests, with 3 tests skipped and 0 failures`；② `swift test --no-parallel` 让 transparency 先跑、再判那两格 ⇒ `Executed 10 tests … 0 failures`，读数正常（`DETAIL_AXIS … spread=0.5pt`、`有来源彩色=124`）。
+- ⇒ **成因未定**，剩下两条解释且修法相反：**(甲)** 本轮新增的"真建一扇主窗"那一格在无头 runner 上改变了后续离屏捕获（本机有真屏 ⇒ 不复现；若成立，修法是让那一格不外泄状态/或让捕获不共享同一渲染面）；**(乙)** 与本轮无关的 runner 负载或采样（同跑内前一批正常、后一批坏）。R525 那一朵"测试没还原 `WindowChromeMetrics` 导致 runner 详情帧红"是 (甲) 的先例，量级也对得上（~52pt），但**本机串行实验没复现 ⇒ 不能拿先例当证据**。
+- 本轮 ② 要落的**分岔读数**（属"补读数"，不动 4.5 / 3% / 2.6023 那些地板）：在那四格的捕获时刻打一行"屏上有几扇 app 内容窗 + 渲染窗自己在不在屏上"—— (甲) 成立则坏的那批这一行非零；(乙) 成立则这一行为零而读数仍坏。
+
+⓪·7 **STEP[18] 在 `a15d1ed` 那跑红、在 `0a9113c` 那跑绿**：逐字 `FAILED testFrameIntervalsUnderStateChanges：XCTAssertFalse failed - 最差帧 190.6ms 超过锚点 120ms，且超锚点的帧有 2 颗（容差 1 颗）` + `PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=7 本次跑过=8 红=1` + `PROBE_QUEUED 6/14 条一次都没轮到` + `PROBE_PULSE_OPEN 1 条有心跳没闭合`。⇒ 120ms 锚与容差 1 一字未动；这一朵是 622 那族的采样/负载形状（两跑之间自己消失），不新开门。
+
+⓪·8 **645 的名单按现读重写**（上一轮那节写"14 支"）：`UICaptureHarness.swift` 里 `NSSize(width: 750, height: 560)` 现读 **11 处调用点**，其中 **10 处是基线帧族**（`content-with-history`、`content-empty`、`content-no-results`、`main-sidebar-title-hover`、`content-with-notice`、`content-with-two-notices`、`content-paused-idle`、`content-paused`、`content-with-dropped-unreadable-notice`、`content-with-copy-failure-notice`）× 明暗 = **20 张**；第 11 处 `content-paused-defaults-<bool>` 只落临时目录、不进基线。挡在前面的那道界在 `UICaptureHarness.swift:25436`（`XCTAssertLessThanOrEqual(fixture.size.width, 750, …)`，钉的是"runner 上宽 >750pt 的帧出现过捕获问题"）。
 ### R568 补记（2026-11-04 · 第 567 轮 / Round 565 · 成对号 + push 通道三读 + R569 读单）
 
 ① **成对号（一次性 push 的自证）**：A 笔 `8f679f9`（产品 3 文件 + 判据 9 格 + 刀 M1480–M1485 + 规格 D4a/D5a 补注 + 刀表登记）与 B 笔 `0a9113c`（七本台账 + 读数笔记 + 两支写手脚本）**同一次 push** ⇒ GitHub 只给**尾笔**建跑：`41751994049 ↔ 0a9113c`，取号时 **in_progress（conclusion 空）⇒ 读数属「复核未到」**，既不读成绿也不读成红；`8f679f9` **没有独立跑** ⇒ 具名 `CI_UNREAD / 同次 push 只有尾笔建跑`。本环自己的 ⓪ 笔 `a15d1ed` 那一跑 = **`41740747168`（completed / failure）**，但**逐步正文未读到**：`gh run view` 两次拿到 `api.github.com … unexpected EOF` ⇒ 具名 `CI_READ_BLOCKED=api-eof`（"没读到"不等于"没红"，也不等于"绿了"，这一格由 R569 补读）。
