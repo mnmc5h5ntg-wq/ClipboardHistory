@@ -27357,6 +27357,211 @@ final class UICaptureTests: XCTestCase {
         emit("FILTER_PILL_JUDGED 真判的档数=\(judgedAppearances)/\(appearances.count) 判不了的档=\(uncapableTags.count)")
     }
 
+    // ---------------------------------------------------------------------
+    // R574 / BACKLOG 653：把 651 那张机制表用到「356 帧走的这条通道」上。
+    //
+    // 为什么要走 `render` 而不是自己搭一棵树再 display：R98 数过，所有拍帧路的**必经点**只有
+    // `render` 这一处；调用方各自复制就是「25 份迟早会漂开的副本」。这一格问的是**那条路**，
+    // 所以它必须站在那条路上量。
+    // ---------------------------------------------------------------------
+
+    /// 三态出口（dispatch 给的三条，一条都不许多）：651 的机制表说「需不需要前置依对象与机器而定」，
+    /// 这一格要回答的是**采集夹具这条路**今天站在哪一态。
+    enum FrameChannelPrerequisite: Equatable {
+        /// 按快门之前那棵树**已经被画过了**（AppKit 族在 `render` 里先 `orderFrontRegardless` + `window.display()`）。
+        case satisfiedByEarlierStep(name: String)
+        /// 画得出，但靠夹具快门那一步自己 —— 名字必须写出来，因为第③段的逐帧判据能不能用这条路，
+        /// 全看它是否继续经过那一步。
+        case satisfiedByCaptureStep(name: String)
+        /// 整幅一个像素都没画 ⇒ 第③段硬判据在这台机器上注定空跑（这一态必须红，并开单写代价）。
+        case cannotDraw
+    }
+
+    /// 纯函数：只吃「冷态有没有画过的料 + 通道自己的未画比例」。
+    /// 冷态为什么看 `contents` 而不是子层数：651 那张表量到的就是这件事 ——
+    /// 递归 `wantsLayer` 只**建层树**（乙臂 `子层=6` 而画不进料），把内容画进 `contents` 的是
+    /// display 通路（丙臂）。所以"子层>0"只说明层树搭好了，不说明谁把它画过。
+    /// 自己再补一次 display 就等于把答案写进问题里（R558 那一族：夹具替产品演过程帧），这一条不做。
+    static func frameChannelPrerequisite(undrawn: Double, coldContents: Bool,
+                                         earlierStep: String) -> FrameChannelPrerequisite {
+        if undrawn >= 1.0 { return .cannotDraw }
+        if coldContents { return .satisfiedByEarlierStep(name: earlierStep) }
+        return .satisfiedByCaptureStep(name: "contentView.cacheDisplay")
+    }
+
+    /// 第二问：这条通道的**产物**能不能承载第③段要判的「alpha 归零」。
+    enum FrameChannelArtifactVerdict: Equatable {
+        /// 解出来的产物根本没有 alpha 平面。
+        case artifactHasNoAlphaPlane
+        /// 产物有 alpha 平面，但通道里那些"未画"的像素在落盘时全被铺成了 255（`flattenedPNG` 那层窗口底色）。
+        case artifactFlattensAlpha
+        /// 产物里真的留着 alpha ⇒ §4 第三问与这条判据的名字都要重签（不许当"更好了所以不用管"）。
+        case artifactKeepsAlpha
+        /// 通道自己一个未画像素都没有 ⇒ 这一格在这台机器上没有对照物，判不了（不许读成"没问题"）。
+        case noPremise
+    }
+
+    /// 前两态合起来才是这一格要钉的那句话：**这条通道今天判不了 alpha 归零**。
+    static func blocksZeroAlphaVerdict(_ verdict: FrameChannelArtifactVerdict) -> Bool {
+        verdict == .artifactHasNoAlphaPlane || verdict == .artifactFlattensAlpha
+    }
+
+    static func frameChannelArtifactVerdict(undrawn: Double, hasAlphaPlane: Bool,
+                                            artifactClear: Int) -> FrameChannelArtifactVerdict {
+        if undrawn <= 0.0 { return .noPremise }
+        if !hasAlphaPlane { return .artifactHasNoAlphaPlane }
+        return artifactClear > 0 ? .artifactKeepsAlpha : .artifactFlattensAlpha
+    }
+
+    /// 数**落盘产物**里 alpha 的三分数。只数总量 ⇒ 与内存行序无关，不重犯 R572 那朵
+    /// 「把这块缓冲的行序当底朝上，于是同一棵树被读成两棵」（探针 `/tmp/r572/orient.log`）。
+    /// 为什么不复用 `TransparencyForensicsTests.AlphaRaster`：那块缓冲的 `bytesPerRow` 恒等于
+    /// `pixelsWide * 4`，而 `NSBitmapImageRep` 给的缓冲不保证这一点 ⇒ 拿它数会让行与行错位。
+    static func artifactAlpha(of rep: NSBitmapImageRep, step: Int)
+        -> (samples: Int, opaque: Int, clear: Int, partial: Int) {
+        guard rep.bitsPerPixel >= 32, rep.samplesPerPixel >= 4, let base = rep.bitmapData else {
+            return (0, 0, 0, 0)
+        }
+        var samples = 0, opaque = 0, clear = 0, partial = 0
+        var y = 0
+        while y < rep.pixelsHigh {
+            var x = 0
+            let row = y * rep.bytesPerRow
+            while x < rep.pixelsWide {
+                let a = Int(base[row + x * 4 + 3])
+                samples += 1
+                if a == 0 { clear += 1 } else if a == 255 { opaque += 1 } else { partial += 1 }
+                x += step
+            }
+            y += step
+        }
+        return (samples, opaque, clear, partial)
+    }
+
+    /// `NSHostingView` 的识别。用 `String(describing:)` 而不是 `NSStringFromClass`：
+    /// 后者给的是**修饰过的 ObjC 名**（这一族泛型类实测不以 `NSHostingView` 开头 ⇒ 前一版把
+    /// 主窗那棵树读成"子树里 0 个 hosting view"），而 `String(describing:)` 给-demangled 的
+    /// `NSHostingView<Content>`。认错的尺会把类判成 A/C，而读数看起来仍然自洽。
+    static func isHostingView(_ view: NSView) -> Bool {
+        String(describing: type(of: view)).hasPrefix("NSHostingView")
+    }
+
+    /// 子树里 `NSHostingView` 的个数。
+    static func countHostingViews(in view: NSView) -> Int {
+        var total = isHostingView(view) ? 1 : 0
+        for child in view.subviews { total += countHostingViews(in: child) }
+        return total
+    }
+
+    /// 通道值里的空格会被 `ci_channel_hygiene` 那一格拦下（R565：值含裸 ASCII 空格会打死解析它的尺），
+    /// 类名这种外部给的串统一先把空格换成下划线再发。
+    static func channelSafe(_ value: String) -> String {
+        value.replacingOccurrences(of: " ", with: "_")
+    }
+
+    /// 651 那张表里的类别，按**量到的结构**给：B = 快门按在 `NSHostingView` 本身上，
+    /// C = 按在容器树上（子树里含 SwiftUI 层），A = 既没有 hosting 层也不是容器。
+    static func frameChannelClass(rootIsHostingView: Bool, hostingViews: Int, coldSublayers: Int) -> String {
+        if rootIsHostingView { return "B" }
+        if hostingViews > 0 { return "C_含B" }
+        if coldSublayers > 0 { return "C" }
+        return "A"
+    }
+
+    func testTheFrameChannelPrerequisiteIsClassifiedPerTreeOnBothMachines() throws {
+        // 这一格**不吃** `CLIPBOARD_HISTORY_UI_SHOTS`：它不进 356 张基线名单（帧写进临时目录、用完即删），
+        // 所以两台机器都会在普通判据卷里真的跑它（R252 那一族的规矩：只有 CI 真跑的读数才算证人）。
+        let targets: [(tree: String, fixture: String, expectedClass: String)] = [
+            ("主窗", "content-with-history", "B"),
+            ("浮层", "quickpick-list", "C"),
+        ]
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r574-frame-channel-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        let appearance = NSAppearance.Name.aqua
+        let pool = self.fixtures(appearance: appearance)
+        for target in targets {
+            guard let fixture = pool.first(where: { $0.name == target.fixture }) else {
+                return XCTFail("\(target.tree)：找不到 `\(target.fixture)` 夹具 ⇒ 这条判据没有对象")
+            }
+            let earlierStep = fixture.appKit == nil ? "无_此族不orderFront"
+                                                    : "orderFrontRegardless+window_display"
+            var coldSublayers = -2
+            var coldContents = -1
+            var hostingViews = -1
+            var coldRootIsHosting = false
+            var rootClass = "未知"
+            let file = scratch.appendingPathComponent("\(fixture.name)-r574.png")
+            let metrics = try render(fixture, appearance: appearance, to: file) { host in
+                coldSublayers = host.layer?.sublayers?.count ?? -1
+                coldContents = (host.layer?.contents != nil) ? 1 : 0
+                hostingViews = Self.countHostingViews(in: host)
+                coldRootIsHosting = Self.isHostingView(host)
+                rootClass = Self.channelSafe(String(describing: type(of: host)))
+            }
+            let data = try Data(contentsOf: file)
+            let rep = try XCTUnwrap(NSBitmapImageRep(data: data),
+                                    "\(target.tree)：读不回刚写的产物 ⇒ 这一格没有对象")
+            let hasPlane = rep.bitsPerPixel >= 32 && rep.samplesPerPixel >= 4
+            let triple = Self.artifactAlpha(of: rep, step: 4)
+            let scale = Double(rep.pixelsWide) / Double(max(fixture.size.width, 1))
+            let pre = Self.frameChannelPrerequisite(undrawn: metrics.transparent,
+                                                    coldContents: coldContents != 0,
+                                                    earlierStep: earlierStep)
+            let artifact = Self.frameChannelArtifactVerdict(undrawn: metrics.transparent,
+                                                            hasAlphaPlane: hasPlane,
+                                                            artifactClear: triple.clear)
+            let cls = Self.frameChannelClass(rootIsHostingView: coldRootIsHosting,
+                                             hostingViews: hostingViews,
+                                             coldSublayers: coldSublayers)
+            emit("FRAME_CHANNEL_MECHANISM 树=\(target.tree) 夹具=\(fixture.name) 族=\(fixture.appKit == nil ? "swiftui" : "appkit")"
+                 + " 倍率=\(String(format: "%.2fx", scale)) 类=\(cls) 根类名=\(rootClass)"
+                 + " 子层冷=\(coldSublayers) contents冷=\(coldContents) 宿主层内NSHostingView数=\(hostingViews)"
+                 + " 通道未画比例=\(String(format: "%.4f", metrics.transparent))"
+                 + " 产物采样=\(triple.samples) 产物不透明=\(triple.opaque) 产物全透明=\(triple.clear) 产物中间=\(triple.partial)"
+                 + " 产物有alpha平面=\(hasPlane ? 1 : 0)"
+                 + " 前置判=\(Self.prerequisiteName(pre)) 产物判=\(Self.artifactName(artifact))")
+
+            XCTAssertEqual(cls, target.expectedClass,
+                           "\(target.tree)：这条通道按快门的那个对象在 651 那张表里被判成 \(cls)，"
+                           + "而现读给的是根类名=\(rootClass)、子树里 hosting view \(hostingViews) 个 ⇒ "
+                           + "类判错会把「谁满足前置」整条结论带偏（前一版用 NSStringFromClass 的前缀认，"
+                           + "把主窗那棵读成 0 个、类=C，而它的根本来就是 NSHostingView）。")
+            XCTAssertGreaterThan(triple.samples, 0,
+                                 "\(target.tree)：产物一个采样都没读到 ⇒ 这一格没有对象（读不到字节不等于"
+                                 + "整幅不透明，R565 那一族：量不到不许伪装成判过）")
+            XCTAssertNotEqual(pre, .cannotDraw,
+                              "\(target.tree)：这条采集通道在这台机器上整幅画不出"
+                              + "（未画比例=\(String(format: "%.4f", metrics.transparent))）⇒ "
+                              + "第③段那条逐帧硬判据在这台上注定空跑。这不是措辞问题，是前置缺席："
+                              + "按 651 的三态它落在第三个出口，必须开单并写代价，不许改判据消红。")
+            XCTAssertTrue(Self.blocksZeroAlphaVerdict(artifact),
+                          "\(target.tree)：这条通道的产物开始携带 alpha（产物判=\(Self.artifactName(artifact))，"
+                          + "通道未画比例=\(String(format: "%.4f", metrics.transparent))）⇒ "
+                          + "「356 帧判不了 alpha 归零」这句账不再成立，必须回去重签规格 §4 第三问与 D12 那条，"
+                          + "而不是把这条断言放宽。")
+        }
+    }
+
+    static func prerequisiteName(_ value: FrameChannelPrerequisite) -> String {
+        switch value {
+        case .satisfiedByEarlierStep(let name): return "更早那步_" + name
+        case .satisfiedByCaptureStep(let name): return "夹具快门那步_" + name
+        case .cannotDraw: return "画不出"
+        }
+    }
+
+    static func artifactName(_ value: FrameChannelArtifactVerdict) -> String {
+        switch value {
+        case .artifactHasNoAlphaPlane: return "产物无alpha平面"
+        case .artifactFlattensAlpha: return "产物铺平alpha"
+        case .artifactKeepsAlpha: return "产物留alpha"
+        case .noPremise: return "无对照物"
+        }
+    }
+
     private func render(
         _ fixture: Fixture,
         appearance: NSAppearance.Name,

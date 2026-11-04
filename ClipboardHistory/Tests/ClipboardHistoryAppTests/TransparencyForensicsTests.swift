@@ -21,12 +21,14 @@ import XCTest
 final class TransparencyForensicsTests: XCTestCase {
     // MARK: - ⑥ D4 的「透明区必须点击穿透」：本轮判得到的那一半
 
-    /// D4 那一串里"点击穿透"这一腿，在产品**有真透明区**之前判不了（第③段才有那块东西）。
+    /// D4 那一串里"点击穿透"这一腿属于**第②段**（R574 按规格 §3 第 2 条收回 —— 之前这里与 D4a 补注
+    /// 都写着"第③段"，而那一腿不需要着色器就判得到，见下面现读的那句）。
     /// 但有一件今天就能判、而且第③段一定要靠它的事：**底衬永远不吃命中**。
     ///
     /// ⚠ 这条判据不假装"点击已经穿透"。同一格里现读的那句是反面事实：
     /// 容器在那块内容没覆盖的空区**仍然返回自己** ⇒ 像素 alpha 不路由鼠标，
-    /// 窗口级穿透必须由第③段用 `contentShape` / `ignoresMouseEvents` 显式做（BACKLOG 647）。
+    /// 窗口级穿透必须由 `contentShape` / `ignoresMouseEvents` 显式做，而**选哪一条归用户**
+    /// （两条各自会改变什么读数、各要什么证人列在 BACKLOG 647 的 R574 追记；本单挂一行具名阻塞）。
     /// 所以这一格判的是"命中落到**谁**"，而它的刀（M1481）改的就是那一个"谁"。
     func testTheBackingLayerNeverWinsAHitTest() throws {
         let container = WindowBackingContainer(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
