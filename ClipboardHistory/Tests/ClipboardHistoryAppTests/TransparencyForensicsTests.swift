@@ -137,7 +137,7 @@ final class TransparencyForensicsTests: XCTestCase {
         // R573 ⓪ 的 runner 读数把这一格的形状改了：`41783402475 ↔ 2232069` 上这一格**两档都读到整幅 a=0**
         // （连黑半区都是 0 ⇒ 什么都没画），而本机两档都是 `分得出=1` ⇒ "两档一致"这句话今天只在**一台机器上**被签过。
         // 所以这里先打一条**冷态**读数（不判，它是"这一格为什么需要前置"的证人），再走前置。
-        let cold = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
+        let cold = try Self.renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
             .profile(step: 5)
         CaptureReadings.emit("OFFSCREEN_ALPHA_LAYER_COLD 位图=\(pw)x\(ph) 倍率="
             + String(format: "%.2fx", scale)
@@ -152,7 +152,7 @@ final class TransparencyForensicsTests: XCTestCase {
         hosting.cacheDisplay(in: hosting.bounds, to: warmRep)
         CaptureReadings.emit("OFFSCREEN_ALPHA_PREREQ_LOCAL_NOOP=本机冷态已能画"
             + " ⇒ 这一步的有效性由 runner 那一签收，不由本机")
-        let raster = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
+        let raster = try Self.renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
         let black = try XCTUnwrap(raster.rgba(topX: Int(size.width * scale * 0.25),
                                               topY: Int(size.height * scale * 0.5)),
                                   "黑半区读不到像素 ⇒ 这条通道的探针没落地")
@@ -165,7 +165,7 @@ final class TransparencyForensicsTests: XCTestCase {
     /// 这条通道的**唯一一块缓冲**从这里出去：`premultipliedLast`、不预先铺底、栅格由参数给。
     /// 「不预先铺底」就是 M1495/M1499 那一刀打的地方 —— 它刻意只有一处，
     /// 免得同一件坏法有两行写法、刀只能钉住其中一行（R568 那族「两处设置只留一处」同一课）。
-    private func renderLayerIntoAlphaRaster(_ layer: CALayer, pixelsWide: Int, pixelsHigh: Int,
+    static func renderLayerIntoAlphaRaster(_ layer: CALayer, pixelsWide: Int, pixelsHigh: Int,
                                             size: NSSize) throws -> AlphaRaster {
         let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
         let context = try XCTUnwrap(CGContext(data: nil, width: pixelsWide, height: pixelsHigh,
@@ -345,7 +345,7 @@ final class TransparencyForensicsTests: XCTestCase {
 
         // 前置缺席那一臂：只打点、不判（它是"为什么必须成对"的证人，不是一条契约 ——
         // 把仪器现状钉成契约是 R465 那一族"静态断言把 bug 钉成规矩"的形状）。
-        let cold = try renderLayerIntoAlphaRaster(layer,
+        let cold = try Self.renderLayerIntoAlphaRaster(layer,
                                                   pixelsWide: max(1, Int((tree.size.width * 2).rounded())),
                                                   pixelsHigh: max(1, Int((tree.size.height * 2).rounded())),
                                                   size: tree.size).profile(step: 5)
@@ -359,7 +359,7 @@ final class TransparencyForensicsTests: XCTestCase {
                                 "\(tree.name)：旧通道拿不到位图 ⇒ 这一格没有内容")
         view.cacheDisplay(in: view.bounds, to: rep)
         let old = alphaProfile(of: rep, step: 5)
-        let raster = try renderLayerIntoAlphaRaster(layer, pixelsWide: rep.pixelsWide,
+        let raster = try Self.renderLayerIntoAlphaRaster(layer, pixelsWide: rep.pixelsWide,
                                                     pixelsHigh: rep.pixelsHigh, size: tree.size)
         let warm = raster.profile(step: 5)
 
@@ -457,7 +457,7 @@ final class TransparencyForensicsTests: XCTestCase {
         for scale in [2.0, 1.0] {
             let pw = max(1, Int((tree.size.width * scale).rounded()))
             let ph = max(1, Int((tree.size.height * scale).rounded()))
-            let prof = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph,
+            let prof = try Self.renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph,
                                                       size: tree.size).profile(step: 5)
             let canTell = prof.opaque > 0 && prof.clear > 0
             CaptureReadings.emit("TRANSPARENCY_PRODUCT_ALPHA 树=浮层 通道=离屏-alpha图层 位图=" + "\(pw)x\(ph)"
@@ -516,7 +516,7 @@ final class TransparencyForensicsTests: XCTestCase {
                                 "旧通道拿不到位图 ⇒ 丙臂没有对象，三臂也就不可比")
         let pw = rep.pixelsWide, ph = rep.pixelsHigh
         func arm(_ name: String) throws -> AlphaTriple {
-            let prof = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph,
+            let prof = try Self.renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph,
                                                       size: size).profile(step: 5)
             CaptureReadings.emit("TRANSPARENCY_PREREQ_MECHANISM 类=C 树=浮层 臂=" + name
                 + " 子层=" + "\(layer.sublayers?.count ?? -1)"

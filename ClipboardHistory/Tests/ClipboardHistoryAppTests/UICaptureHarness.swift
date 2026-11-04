@@ -27562,6 +27562,240 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // R575 / BACKLOG 654：D12 那八条逐帧硬判据 × 判它的通道 × 该通道今天到不到数。
+    //
+    // 为什么必须写成会红的函数而不是注释表：D12 的验收是"硬判据 + 用户手感签字，两边都过才算完成"，
+    // 而"硬判据"这四个字今天第一次被逐条问"你打算拿哪条通道判、那条通道今天到不到数"。
+    // 写在文档里的表不会自己保鲜（R131/R206 那一族）；这一格每轮跑，声明与实测不符就红。
+    // ---------------------------------------------------------------------
+
+    /// 三种结局（dispatch 给的三条，一条都不许多）。
+    enum D12WitnessState: Equatable {
+        /// 这条第③段判据在 runner 上也能拿到读数 ⇒ 能写成逐帧硬判据。
+        case judgeableOnRunner
+        /// 只有带环境键的真机通道判得到 ⇒ runner 永远没有这一格（§4 阴影那一族已先例）。
+        case realScreenOnly
+        /// 今天根本无证人（通道拿不到读数，或通道有而**对象不存在**）⇒ 第③段的真阻塞。
+        case noWitnessToday
+    }
+
+    /// 分类法本体。三条输入全部来自现探针，不是抄来的常数。
+    static func d12WitnessState(channelReads: Bool, objectExists: Bool,
+                                needsRealScreen: Bool) -> D12WitnessState {
+        if !channelReads { return needsRealScreen ? .realScreenOnly : .noWitnessToday }
+        if !objectExists { return .noWitnessToday }
+        return needsRealScreen ? .realScreenOnly : .judgeableOnRunner
+    }
+
+    static func d12StateName(_ value: D12WitnessState) -> String {
+        switch value {
+        case .judgeableOnRunner: return "runner可判"
+        case .realScreenOnly: return "只能真机"
+        case .noWitnessToday: return "今天无证人"
+        }
+    }
+
+    /// 一条 D12 硬判据：判它的通道、该通道的前置由谁满足、要不要真机、以及**声明**的那一态。
+    struct D12Clause {
+        let title: String
+        let channel: String
+        let prerequisite: String
+        let needsRealScreen: Bool
+        let declared: D12WitnessState
+    }
+
+    /// 表体（八条，与规格 D12 那句一一对应，一条不许少 —— M1509 钉这一格）。
+    static var d12Clauses: [D12Clause] {
+        [
+            D12Clause(title: "角度单调", channel: "产品内角度驱动", prerequisite: "不适用",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "投影宽度按余弦律", channel: "逐帧像素", prerequisite: "夹具快门cacheDisplay",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "模糊半径从铰链到自由边递增", channel: "逐帧像素", prerequisite: "夹具快门cacheDisplay",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "亮度随角度单调下降", channel: "逐帧像素", prerequisite: "夹具快门cacheDisplay",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "边框锐度不变", channel: "逐帧像素", prerequisite: "夹具快门cacheDisplay",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "透明区alpha归零", channel: "离屏alpha图层", prerequisite: "夹具快门cacheDisplay",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "框架只在透明之后缩一次", channel: "窗口几何读数", prerequisite: "不适用",
+                      needsRealScreen: false, declared: .noWitnessToday),
+            D12Clause(title: "屏上帧间隔不超标", channel: "真机60fps录屏", prerequisite: "不适用",
+                      needsRealScreen: true, declared: .realScreenOnly),
+        ]
+    }
+
+    /// 折叠**路径**本身在产品源码里出现的文件数（`foldProgress` / `setCollapsed(` / `isTransitioning`）。
+    /// 这一格与下面那一格必须**分开读**：交集为 0 这件事只有从两个独立数推出来才算证据，
+    /// 直接扫"同一个文件里两个词都有"会把 `AppDelegate` 那种"顺手建了折叠控制器、又按 D4a 写了
+    /// `isOpaque=false`"的文件算成"折叠期间改 alpha" —— R575 第一次试写就是这么错的。
+    static func countFoldPathWriters() -> Int {
+        return Self.countProductFiles { text in
+            text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
+        }
+    }
+
+    /// 折叠路径**且**同文件里写窗口 alpha（`alphaValue` / `isOpaque`）的文件数 = D12「透明区」与
+    /// 「透明之后」那两句今天有没有对象。今天预期 0（第③段还没写着色器与 alpha 驱动）。
+    static func countFoldAlphaWriters() -> Int {
+        return Self.countProductFiles { text in
+            let folds = text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
+            let alpha = text.contains("alphaValue") || text.contains("isOpaque")
+            return folds && alpha
+        }
+    }
+
+    /// 现扫产品源码，按调用给的谓词数文件数；目录读不到时返回 -1（**不是 0** —— 那会把"扫不到"
+    /// 伪装成"没有对象"，正是 R565 那一族"量不到冒充判过"）。
+    static func countProductFiles(_ predicate: (String) -> Bool) -> Int {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipboardHistoryApp")
+        guard let enumerator = FileManager.default.enumerator(atPath: sources.path) else { return -1 }
+        var hits = 0
+        for case let rel as String in enumerator where rel.hasSuffix(".swift") {
+            guard let text = try? String(contentsOf: sources.appendingPathComponent(rel), encoding: .utf8)
+            else { continue }
+            if predicate(text) { hits += 1 }
+        }
+        return hits
+    }
+
+    /// 产品源码里引用**角度/模糊驱动**（着色器那一层）的文件数。
+    /// 与 `TransparencyForensicsTests.countMetalLayerUsers` 同一把尺的形状（现扫 + 只数文件），
+    /// 但对象不同：那一把数的是 `CAMetalLayer`/`MTKView`，这一把数的是 D12 前四条要的驱动本身。
+    static func countAngleDriverWriters() -> Int {
+        return Self.countProductFiles { text in
+            text.contains("foldAngle") || text.contains("blurRadius")
+                || text.contains("CAMetalLayer") || text.contains("MTKView")
+        }
+    }
+
+    /// 离屏 alpha 图层那条通道今天能不能拿到读数（对象 = 产品自己的浮层树）。
+    /// 走的是产品入口 `QuickPickCapturePanel.builder`，前置按 651 的丙臂补（递归 wantsLayer + layout + cacheDisplay）。
+    private func probeAlphaLayerChannelOnProductOverlay() throws -> (reads: Bool, samples: Int,
+                                                                     opaque: Int, clear: Int) {
+        let build = QuickPickCapturePanel.builder(store: makePopulatedStore(), query: "")
+        guard let panel = build(), let content = panel.contentView else {
+            return (false, 0, 0, 0)
+        }
+        defer { panel.orderOut(nil) }
+        content.wantsLayer = true
+        func forceLayer(_ view: NSView) {
+            view.wantsLayer = true
+            view.subviews.forEach(forceLayer)
+        }
+        forceLayer(content)
+        content.layoutSubtreeIfNeeded()
+        guard let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) else {
+            return (false, 0, 0, 0)
+        }
+        content.cacheDisplay(in: content.bounds, to: rep)
+        guard let layer = content.layer else { return (false, 0, 0, 0) }
+        let size = content.bounds.size
+        let pw = max(1, Int(round(size.width * 2)))
+        let ph = max(1, Int(round(size.height * 2)))
+        let raster = try TransparencyForensicsTests.renderLayerIntoAlphaRaster(
+            layer, pixelsWide: pw, pixelsHigh: ph, size: size)
+        let profile = raster.profile(step: 5)
+        return (profile.samples > 0 && (profile.opaque + profile.clear) > 0,
+                profile.samples, profile.opaque, profile.clear)
+    }
+
+    func testTheD12HardClausesEachNameAChannelThatEitherReadsOrIsNamed() throws {
+        let rows = Self.d12Clauses
+        XCTAssertEqual(rows.count, 8,
+                       "D12 那句列了八条逐帧硬判据，表里只有 \(rows.count) 条 ⇒ 有人删了一条声明，"
+                       + "而删掉声明不会让判据消失，只会让下一轮以为它不存在（M1509 钉的就是这个形状）")
+
+        // 三条探针（现读）：角度驱动在不在、折叠路径与"折叠期改 alpha"各几个文件、真机那条通道今天开没开。
+        let angleFiles = Self.countAngleDriverWriters()
+        let foldPathFiles = Self.countFoldPathWriters()
+        let foldAlphaFiles = Self.countFoldAlphaWriters()
+        let realScreenOn = ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_REALSCREEN_FOLD"] != nil
+        XCTAssertGreaterThanOrEqual(foldPathFiles, 1,
+                                    "折叠路径本身在产品里一个文件都没有（\(foldPathFiles)）⇒ 上面那条交集为 0 "
+                                    + "就不是「折叠期间没有 alpha 驱动」，而是**扫描扫不到东西**（尺瞎了）")
+        XCTAssertGreaterThanOrEqual(angleFiles, 0,
+                                    "角度驱动那一扫返回 \(angleFiles) ⇒ 目录没读到，不许当「没有对象」")
+
+        // 逐帧像素通道 + 窗口几何通道：都拿**夹具自己的必经点**量一次（主窗那张帧）。
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r575-d12-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        guard let mainFixture = self.fixtures(appearance: .aqua).first(where: { $0.name == "content-with-history" }) else {
+            return XCTFail("找不到 `content-with-history` 夹具 ⇒ 逐帧像素/几何两通道没有对象")
+        }
+        var windowWidth = -1.0
+        let file = scratch.appendingPathComponent("r575-d12.png")
+        _ = try render(mainFixture, appearance: .aqua, to: file) { host in
+            windowWidth = host.window.map { Double($0.frame.width) } ?? -1
+        }
+        let artifactData = try Data(contentsOf: file)
+        let artifactRep = try XCTUnwrap(NSBitmapImageRep(data: artifactData),
+                                        "读不回刚写的产物 ⇒ 逐帧像素通道没有对象")
+        let artifactTriple = Self.artifactAlpha(of: artifactRep, step: 4)
+        let pixelChannelReads = artifactTriple.samples > 0
+        let geometryChannelReads = windowWidth > 0
+        let alphaChannelProbe = try probeAlphaLayerChannelOnProductOverlay()
+
+        var judgeable = 0, realOnly = 0, noWitness = 0
+        for row in rows {
+            let channelReads: Bool
+            let objectExists: Bool
+            switch row.channel {
+            case "产品内角度驱动":
+                channelReads = angleFiles > 0
+                objectExists = angleFiles > 0
+            case "逐帧像素":
+                channelReads = pixelChannelReads
+                objectExists = angleFiles > 0
+            case "离屏alpha图层":
+                channelReads = alphaChannelProbe.reads
+                objectExists = foldAlphaFiles > 0
+            case "窗口几何读数":
+                channelReads = geometryChannelReads
+                objectExists = foldAlphaFiles > 0
+            case "真机60fps录屏":
+                channelReads = realScreenOn
+                objectExists = angleFiles > 0
+            default:
+                return XCTFail("\(row.title)：声明的通道名 \(row.channel) 不在探针认识的集合里 ⇒ "
+                               + "这一格的实测会静默走到 default，等于没判")
+            }
+            let measured = Self.d12WitnessState(channelReads: channelReads, objectExists: objectExists,
+                                                needsRealScreen: row.needsRealScreen)
+            emit("D12_CHANNEL_MAP 条=\(Self.channelSafe(row.title)) 通道=\(row.channel)"
+                 + " 前置=\(row.prerequisite) 需真机=\(row.needsRealScreen ? 1 : 0)"
+                 + " 通道现读=\(channelReads ? "有" : "无") 对象现读=\(objectExists ? "有" : "无")"
+                 + " 声明=\(Self.d12StateName(row.declared)) 实测=\(Self.d12StateName(measured))")
+            XCTAssertEqual(measured, row.declared,
+                           "\(row.title)：声明「\(Self.d12StateName(row.declared))」而实测给的是"
+                           + "「\(Self.d12StateName(measured))」（通道现读=\(channelReads ? "有" : "无") "
+                           + "对象现读=\(objectExists ? "有" : "无") 需真机=\(row.needsRealScreen ? 1 : 0)）"
+                           + " ⇒ 要么这条通道的能力变了、要么有人改了声明。两种都必须重新判一遍再改表，"
+                           + "不许把断言改成恒等。")
+            switch measured {
+            case .judgeableOnRunner: judgeable += 1
+            case .realScreenOnly: realOnly += 1
+            case .noWitnessToday: noWitness += 1
+            }
+        }
+        XCTAssertEqual(judgeable + realOnly + noWitness, rows.count,
+                       "八条里有一条没落到任何一态（分类走到了没覆盖的分支）⇒ 计数与条数不符")
+        emit("D12_CHANNEL_MAP_SUMMARY 条=\(rows.count) runner可判=\(judgeable) 只能真机=\(realOnly)"
+             + " 今天无证人=\(noWitness) 角度驱动文件数=\(angleFiles)"
+             + " 折叠路径文件数=\(foldPathFiles) 折叠期改alpha文件数=\(foldAlphaFiles)"
+             + " 真机键=\(realScreenOn ? "开" : "关")"
+             + " 离屏alpha通道采样=\(alphaChannelProbe.samples)"
+             + " 不透明=\(alphaChannelProbe.opaque) 全透明=\(alphaChannelProbe.clear)"
+             + " 产物采样=\(artifactTriple.samples) 产物全透明=\(artifactTriple.clear)"
+             + " 窗口宽=\(String(format: "%.1f", windowWidth))")
+    }
+
     private func render(
         _ fixture: Fixture,
         appearance: NSAppearance.Name,
