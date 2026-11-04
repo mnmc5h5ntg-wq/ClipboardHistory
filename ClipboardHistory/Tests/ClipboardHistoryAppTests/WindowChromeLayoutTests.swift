@@ -140,6 +140,146 @@ final class WindowChromeLayoutTests: XCTestCase {
                                     + " —— 详情头部会压在交通灯上")
     }
 
+    /// R570 ③ · 真窗实测：从建窗那一刻起，产品把那条全局**依次**发布成什么值。
+    ///
+    /// 为什么要这一格：判据卷那台本机因果实验（`INSET_CAUSAL`）量到"发布 10.0 时详情头部那一行
+    /// 只剩 10pt、带子里 0 墨"，而 runner 那四支 `detail-*` 红的形状就是它（`ink=0.0%` 而同一列有墨）。
+    /// 10 那一档的输入是 **容器高 ≤ 按钮高**（物理上不成立：标题栏容器至少装得下那枚按钮）。
+    /// 于是"该不该在产品里挡掉不可信的实测"这一问，取决于**产品自己会不会走到那一档**：
+    /// 会 ⇒ 那是产品面（首帧那一行会压在交通灯上，正是这套让位机制存在的理由）；
+    /// 不会 ⇒ 那一档只有测试建窗的退化状态造得出来，(甲) 的修法落在测试生命周期，本轮不算产品面。
+    /// 两种结果都得有证人，所以这一格在两种世界里都不会白建。
+    func testTheRealWindowNeverPublishesAnInsetFromAnImpossibleMeasurement() throws {
+        _ = NSApplication.shared
+        let savedInset = WindowChromeMetrics.shared.detailContentTopInset
+        defer { WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedInset) }
+
+        // 先把单例摆成一个"只可能来自不可信实测"的值：真窗如果从没写过它，它就一直留在这儿，
+        // 于是「真窗压根没发布」与「发布过又改回来」这两种情况能分开 —— 只看最终值分不开。
+        let sentinel = WindowChromeLayout.detailContentTopInset(titlebarHeight: 0, buttonHeight: 14)
+        WindowChromeMetrics.shared.noteTrafficLights(titlebarHeight: 0, buttonHeight: 14)
+        XCTAssertEqual(WindowChromeMetrics.shared.detailContentTopInset, sentinel,
+                       "夹具前提：那个来自 容器高=0 的值摆不进去 ⇒ 后面读到的痕迹分不清是谁写的")
+
+        let recorder = InsetTraceRecorder(metric: WindowChromeMetrics.shared)
+        defer { recorder.stop() }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: 560),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable,
+                                          .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        defer { window.orderOut(nil) }
+        window.titlebarAppearsTransparent = true
+        window.toolbar = NSToolbar(identifier: "chrome-trace")
+        let host = NSHostingView(rootView: AnyView(WindowConfigurator().frame(width: 1, height: 1)))
+        host.frame = NSRect(x: 0, y: 0, width: 750, height: 560)
+        window.contentView = host
+        window.makeKeyAndOrderFront(nil)
+
+        let deadline = Date().addingTimeInterval(3.0)
+        while Date() < deadline, window.standardWindowButton(.closeButton)?.superview == nil {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        // 再转一会儿：交通灯重摆会在 resize / 成为 key 时反复发布，要抓的是整条序列而不是首值。
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+
+        // `@Published` 在**订阅那一刻**就把当前值推一次，那一条是我自己刚摆的哨兵，不是真窗发布的。
+        let trace = recorder.values.filter { abs($0 - sentinel) > 0.001 }
+        // 最低那一档的出处不是猜的：由产品自己的公式算"无工具栏实测档（32/14）"的让位量，
+        // 它是真实窗口能给出的**最小**可信值；比它还小就意味着容器高没装得下按钮。
+        let lowestLegitimate = WindowChromeLayout.detailContentTopInset(titlebarHeight: 32,
+                                                                        buttonHeight: 14)
+        CaptureReadings.emit("CHROME_PUBLISH_TRACE 哨兵="
+            + String(format: "%.1f", sentinel) + " 发布次数=\(recorder.values.count)"
+            + " 序列=" + (trace.isEmpty ? "空" : trace.map { String(format: "%.1f", $0) }
+                .joined(separator: "_"))
+            + " 最小=\(String(format: "%.1f", trace.min() ?? -1))"
+            + " 可信下界=\(String(format: "%.1f", lowestLegitimate))")
+        XCTAssertFalse(trace.isEmpty,
+                       "建了一扇真窗（带工具栏、上了屏）而这条全局一次都没被重新发布 ⇒ "
+                           + "详情头部拿不到实测灯带，只能靠兜底值 —— 这条链路今天断了")
+        if let lowest = trace.min() {
+            XCTAssertGreaterThanOrEqual(lowest, lowestLegitimate,
+                                        "真窗在发布过程中写到 \(String(format: "%.1f", lowest))，"
+                                            + "比可信下界 \(String(format: "%.1f", lowestLegitimate)) 还小 ⇒ "
+                                            + "产品会把"
+                                            + "拿不到容器的实测当数发出去，那一档详情头部只剩 "
+                                            + String(format: "%.0f", lowest)
+                                            + "pt，正压在交通灯带上（判据卷 INSET_CAUSAL 量到的正是这一档）")
+        }
+    }
+
+    /// R570 ③ · 同一个问题问**产品自己的入口**：`WindowManager.showMainWindow()` 建出来的那扇窗，
+    /// 从建出来到上屏，依次把这条全局发布成什么值。
+    ///
+    /// 与上面那一格的差别就是这一格存在的理由：上面那扇窗是我手搭的（带工具栏、直接上屏），
+    /// 而 runner 上漏掉的那一批（STEP[15] 全量卷里、比 STEP[5] 的纯捕获卷晚 79 秒的那一批）
+    /// 是**产品那条建窗路**造的 —— R568 新增的两格真窗就在同一个进程里先跑。
+    /// 量哪条路，取决于漏的是哪条路；两格合起来才把"这条路可不可达"说完。
+    func testTheProductMainWindowPathPublishesACredibleInset() throws {
+        _ = NSApplication.shared
+        let savedInset = WindowChromeMetrics.shared.detailContentTopInset
+        let suite = "r570-chrome-trace-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = HistoryStore(
+            clipboardWriter: TestClipboardWriter(),
+            persistence: RecordingHistoryPersistence(),
+            retentionPolicy: HistoryRetentionPolicy(maxEntries: 4, maxAgeDays: nil))
+        store.add(ClipboardIntake.Entry(content: .text("发布链路用的记录，长度够读出侧栏那一列的字墨。"),
+                                        thumbnail: nil, sourceUTIs: ["public.utf8-plain-text"],
+                                        sourceAppBundleID: "com.apple.Notes", sourceAppName: "备忘录"),
+                  timestamp: Date(timeIntervalSince1970: 1))
+        let delegate = AppDelegate(historyStore: store,
+                                   collapseController: MainWindowCollapseController(defaults: defaults))
+        let sentinel = WindowChromeLayout.detailContentTopInset(titlebarHeight: 0, buttonHeight: 14)
+        WindowChromeMetrics.shared.noteTrafficLights(titlebarHeight: 0, buttonHeight: 14)
+        XCTAssertEqual(WindowChromeMetrics.shared.detailContentTopInset, sentinel,
+                       "夹具前提：那个来自 容器高=0 的值摆不进去 ⇒ 后面读到的痕迹分不清是谁写的")
+        let recorder = InsetTraceRecorder(metric: WindowChromeMetrics.shared)
+        defer {
+            recorder.stop()
+            for window in NSApplication.shared.windows where WindowManager.isAppContentWindow(window) {
+                window.delegate = nil
+                window.orderOut(nil)
+            }
+            WindowManager.forgetMainWindowForTesting()
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(savedInset)
+            withExtendedLifetime(delegate) { _ in }
+        }
+        NSApplication.shared.setActivationPolicy(.regular)
+        WindowManager.showMainWindow()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        let mainWindow = try XCTUnwrap(
+            NSApplication.shared.windows.first(where: { WindowManager.isAppContentWindow($0) }),
+            "产品入口没建出主窗 ⇒ 这一格没有对象")
+        mainWindow.makeKeyAndOrderFront(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+
+        let trace = recorder.values.filter { abs($0 - sentinel) > 0.001 }
+        let lowestLegitimate = WindowChromeLayout.detailContentTopInset(titlebarHeight: 32,
+                                                                        buttonHeight: 14)
+        let titlebarContainerHeight = mainWindow.standardWindowButton(.closeButton)?.superview?
+            .bounds.height ?? -1
+        CaptureReadings.emit("CHROME_PUBLISH_TRACE 路=产品主窗 容器高="
+            + String(format: "%.1f", titlebarContainerHeight)
+            + " 序列=" + (trace.isEmpty ? "空" : trace.map { String(format: "%.1f", $0) }
+                .joined(separator: "_"))
+            + " 最小=\(String(format: "%.1f", trace.min() ?? -1))"
+            + " 可信下界=\(String(format: "%.1f", lowestLegitimate))")
+        XCTAssertFalse(trace.isEmpty,
+                       "产品入口建了真主窗而这条全局一次都没被重新发布 ⇒ 详情头部拿不到实测灯带，"
+                           + "只能靠兜底值（那意味着发布链路今天断了，不是"
+                           + "「首帧安全」）")
+        if let lowest = trace.min() {
+            XCTAssertGreaterThanOrEqual(lowest, lowestLegitimate,
+                                        "产品那条建窗路在发布过程中写到 \(String(format: "%.1f", lowest))，"
+                                            + "比可信下界还小 ⇒ 那一档详情头部只剩 "
+                                            + String(format: "%.0f", lowest)
+                                            + "pt，正压在交通灯带上；这是产品面（首帧就该挡掉不可信的实测），"
+                                            + "而判据卷 INSET_CAUSAL 量到 0 墨的正是这一档")
+        }
+    }
+
     /// R502：主窗口标题栏的标题策略。真窗口帧里标题栏是空的（应用名在侧栏标题里），
     /// 而 title 字符串仍要保留给 Mission Control/读屏。把「标题不画」写成显式契约：
     /// 一旦系统默认把 title 画出来，它会与详情头部撞在一起（R502 实拍：title 覆盖来源图标上方）。
@@ -595,6 +735,23 @@ final class WindowChromeLayoutTests: XCTestCase {
             count = 0
             cancellable = metric.$detailContentTopInset.sink { [weak self] _ in
                 self?.count += 1
+            }
+        }
+
+        func stop() { cancellable?.cancel() }
+    }
+
+    /// R570 ③ · 同一根管道，但它记的是**发布出来的值**而不是次数。
+    /// 存在的理由：只看最终值分不开「真窗从没写过它」与「写过又改回来」——
+    /// 而这两件事在 648 那四支红里是完全相反的成因。
+    @MainActor
+    private class InsetTraceRecorder {
+        private var cancellable: AnyCancellable?
+        private(set) var values: [CGFloat] = []
+
+        init(metric: WindowChromeMetrics) {
+            cancellable = metric.$detailContentTopInset.sink { [weak self] next in
+                self?.values.append(next)
             }
         }
 

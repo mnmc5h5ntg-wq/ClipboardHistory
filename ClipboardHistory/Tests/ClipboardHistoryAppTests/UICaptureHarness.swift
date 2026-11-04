@@ -91,6 +91,98 @@ enum UICaptureBlackBands {
     ]
 }
 
+/// R570 ② · 把「捕获那一刻那条进程内全局是什么值」变成每跑都有的直接读数。
+///
+/// 盯的是 `WindowChromeMetrics.shared.detailContentTopInset`：`DetailView.swift:239` 写的是
+/// `.padding(.top, chrome.detailContentTopInset)`，而产品每次重摆交通灯都会由实测的窗口几何把它
+/// 写一遍（`WindowConfigurator.swift:262-265`）。离屏夹具本来永远读到兜底值；同一进程里只要有一格
+/// 建过真主窗又没还原，后面几十张 `detail-*` / `content-*` 帧量的就不是产品那份几何 ——
+/// R525（U-2145：meta 0% 墨、正文左轴读到居中那一档）与 R568 两次都是这个形状，
+/// runner 现在挂着的那四支红贴的也是它。
+///
+/// 上一轮加的那条测的是**屏上有几扇窗**（窗在不在），这一条测的是**值本身** ——
+/// 值才是那四支判据的直接嫌疑，所以它不需要等哪一跑真出窗才有用，也不把结论押在某一次调度上。
+@MainActor
+enum CaptureChromeInset {
+    /// 产品自己用 `!=` 比较后才发布（`noteTrafficLights`），所以等值就是逐位等值。
+    /// 这一档只用来吸收"没人动过它"时的浮点噪声，两条界都有真值表那一格钉住。
+    static let tolerance: CGFloat = 0.001
+
+    static var fallback: CGFloat { WindowChromeLayout.detailContentTopInsetFallback }
+    static var current: CGFloat { WindowChromeMetrics.shared.detailContentTopInset }
+
+    /// 这条读数**该不该说话** —— 纯函数，真值表能钉；坏法有三种，各自会红：
+    /// ①永远沉默（漏还原的那一跑读不到任何东西）②每次拍帧都说一行（干净的一跑刷几百行，
+    /// 于是"点名第一张被带偏的帧"这个用途没了）③把因果实验的故意注入也记成泄漏。
+    enum NoteDecision: Equatable {
+        case silent
+        case emitMatching(value: CGFloat, previous: CGFloat?)
+        case emitDrifted(value: CGFloat, fallback: CGFloat, previous: CGFloat?)
+    }
+
+    static func decideNote(previous: CGFloat?, current: CGFloat, fallback: CGFloat,
+                           deliberate: Bool, tolerance: CGFloat) -> NoteDecision {
+        if deliberate { return .silent }
+        let matchesFallback = abs(current - fallback) <= tolerance
+        guard let before = previous, abs(before - current) <= tolerance else {
+            return matchesFallback ? .emitMatching(value: current, previous: previous)
+                                   : .emitDrifted(value: current, fallback: fallback,
+                                                 previous: previous)
+        }
+        return .silent
+    }
+
+    /// 首拍说一行、值变了再说一行 ⇒ 干净的一跑一共 1 行；漂过的那一跑点名**第一张被带偏的帧**。
+    nonisolated(unsafe) private(set) static var lastEmitted: CGFloat?
+    /// 「通道确实挂在必经点上」的端到端证人：`render` 每走到这里就 +1。
+    /// 判据用的是**增量**而不是绝对值 —— 同一进程里并行会互相看不见对方的数（R555 那四条计数规矩）。
+    nonisolated(unsafe) private(set) static var calls = 0
+    /// 因果实验是**故意**注入的，不许被这条读数误记成泄漏。
+    nonisolated(unsafe) private static var deliberateInjections = 0
+
+    static func note(fixture: String, geometryTag: String) {
+        calls += 1
+        let decision = decideNote(previous: lastEmitted, current: current, fallback: fallback,
+                                  deliberate: deliberateInjections > 0, tolerance: tolerance)
+        let line = "CAPTURE_CHROME_INSET \(fixture) \(geometryTag)"
+            + " 兜底=" + String(format: "%.3f", fallback)
+        switch decision {
+        case .silent:
+            return
+        case .emitMatching(let value, let previous):
+            lastEmitted = value
+            CaptureReadings.emit(line + " 值=" + String(format: "%.3f", value)
+                + " 判=与兜底一致 上一次=" + describe(previous))
+        case .emitDrifted(let value, let base, let previous):
+            lastEmitted = value
+            CaptureReadings.emit(line + " 值=" + String(format: "%.3f", value)
+                + " 判=漂出兜底 差额=" + String(format: "%+.3f", value - base)
+                + " 上一次=" + describe(previous)
+                + " ⇒ 这张帧量的不是产品默认几何，要去找漏还原的那一格")
+        }
+    }
+
+    private static func describe(_ value: CGFloat?) -> String {
+        value.map { String(format: "%.3f", $0) } ?? "首拍"
+    }
+
+    /// 因果实验的驱动：**走产品自己的发布函数**，不是直接写那条全局。
+    /// 理由（R558 那一课）：绕过被测系统自己的驱动路径，实验量到的是夹具的状态而不是产品的状态。
+    static func withInjectedTitlebarHeight<T>(_ titlebarHeight: CGFloat,
+                                              buttonHeight: CGFloat,
+                                              _ body: @MainActor () throws -> T) rethrows -> T {
+        let saved = current
+        deliberateInjections += 1
+        WindowChromeMetrics.shared.noteTrafficLights(titlebarHeight: titlebarHeight,
+                                                     buttonHeight: buttonHeight)
+        defer {
+            deliberateInjections -= 1
+            WindowChromeMetrics.shared.restoreDetailContentTopInsetForTesting(saved)
+        }
+        return try body()
+    }
+}
+
 @MainActor
 final class UICaptureTests: XCTestCase {
     /// 夹具时间戳的固定参考时刻（账本 R2-19）。
@@ -26699,6 +26791,217 @@ final class UICaptureTests: XCTestCase {
         }
     }
 
+    // MARK: - R570 ② 那条进程内全局：直接读数 + 本机因果实验
+
+    /// runner 那批坏读数的**形状**：带子里 0 墨，而同一列仍有墨。
+    /// "列有墨"是那条判据没走 `CAPTION_NOT_RUN`（machineFlat）的前提 —— 它红而不是未运行，
+    /// 说明那一列画着东西、只有这一带空了，也就是**整列被顶走了**，不是这台机器画不出。
+    enum InsetShape: Equatable {
+        case baselineDrawn           // 与兜底一致、带里有墨 ⇒ 正对照
+        case baselineBandBlank       // 与兜底一致而带里没墨 ⇒ 带子今天贴不到那行字（尺先坏）
+        case runnerShapeReproduced   // 漂出兜底、带空而列有墨 ⇒ 与 runner 那批同形
+        case driftedButStillDrawn    // 漂出兜底而带里仍有墨 ⇒ 位移不足以解释那批
+        case columnBlank             // 整列没墨 ⇒ 这台机器没画出这一列，不构成证人
+    }
+
+    /// 四个入口量的组合穷举（带墨/没墨 × 漂/没漂），列空那一档先看。
+    static func insetShape(bandFraction: Double, columnPixels: Int, delta: CGFloat,
+                           tolerance: CGFloat, inkFloor: Double) -> InsetShape {
+        if columnPixels == 0 { return .columnBlank }
+        let drifted = abs(delta) > tolerance
+        let drawn = bandFraction >= inkFloor
+        if !drifted { return drawn ? .baselineDrawn : .baselineBandBlank }
+        return drawn ? .driftedButStillDrawn : .runnerShapeReproduced
+    }
+
+    /// 分类器自己必须先站得住 —— 否则"重现/不重现"那句话是它替我说的，而我以为是我说的。
+    func testTheInsetShapeClassifierSplitsTheFiveCasesItClaims() throws {
+        let tol = CaptureChromeInset.tolerance
+        let floor = InkFloor.probeInkFraction
+        let rows: [(String, Double, Int, CGFloat, InsetShape)] = [
+            ("兜底＋带里有墨", 0.12, 5_000, 0.0, .baselineDrawn),
+            ("兜底＋带里空", 0.0, 5_000, 0.0, .baselineBandBlank),
+            ("漂出 25pt＋带空而列有墨（runner 那批的形状）", 0.0, 5_000, -25.0, .runnerShapeReproduced),
+            ("漂出 25pt＋带里仍有墨", 0.12, 5_000, -25.0, .driftedButStillDrawn),
+            ("整列没墨（这台机器画不出这一列）", 0.0, 0, -25.0, .columnBlank),
+            ("刚好压在墨地板上算有墨", floor, 5_000, 0.0, .baselineDrawn),
+            ("差半格就不算压到", floor - 0.0001, 5_000, 0.0, .baselineBandBlank),
+            ("容差内的小数不算漂", 0.12, 5_000, tol / 2, .baselineDrawn),
+            ("容差外才算漂", 0.12, 5_000, tol * 2, .driftedButStillDrawn),
+        ]
+        for (name, band, column, delta, expected) in rows {
+            let got = Self.insetShape(bandFraction: band, columnPixels: column, delta: delta,
+                                      tolerance: tol, inkFloor: floor)
+            XCTAssertEqual(got, expected, "\(name)：带墨=\(band) 列墨=\(column) 差=\(delta) ⇒ 判成 \(got)")
+        }
+    }
+
+    /// 那条读数该不该说话：三种坏法各由一行钉住（永远沉默 / 每拍必说 / 把实验的注入记成泄漏）。
+    func testTheChromeInsetReadingSpeaksOnlyWhenTheValueMoves() throws {
+        let tol = CaptureChromeInset.tolerance
+        let rows: [(String, CGFloat?, CGFloat, CGFloat, Bool, CaptureChromeInset.NoteDecision)] = [
+            ("首拍就说一行", nil, 35, 35, false, .emitMatching(value: 35, previous: nil)),
+            ("值没动就不重复说", 35, 35, 35, false, .silent),
+            ("漂出去要说并点名差额", 35, 10, 35, false,
+             .emitDrifted(value: 10, fallback: 35, previous: 35)),
+            ("漂回来也要说一行（否则一次性泄漏读不到）", 10, 35, 35, false,
+             .emitMatching(value: 35, previous: 10)),
+            ("因果实验的故意注入不许记成泄漏", 35, 10, 35, true, .silent),
+            ("容差内的抖动不算漂", 35, 35 + tol / 2, 35, false, .silent),
+            ("容差外才算漂", 35, 35 + tol * 2, 35, false,
+             .emitDrifted(value: 35 + tol * 2, fallback: 35, previous: 35)),
+        ]
+        for (name, previous, current, fallback, deliberate, expected) in rows {
+            let got = CaptureChromeInset.decideNote(previous: previous, current: current,
+                                                    fallback: fallback, deliberate: deliberate,
+                                                    tolerance: tol)
+            XCTAssertEqual(got, expected, "\(name)：前=\(String(describing: previous)) "
+                + "今=\(current) ⇒ 判成 \(got)")
+        }
+    }
+
+    /// 本机因果实验：**把那条进程内全局注入成真实主窗会写进去的量级**，
+    /// 看 runner 那四支 `detail-*` 红的形状会不会在本机被造出来。
+    ///
+    /// 为什么要它而不等 `41762634884`：⓪ 那一跑到本轮开工还是 `in_progress` ⇒
+    /// `CAPTURE_FOREIGN_WINDOW` 的行数没有，(甲)/(乙) 谁也不许凭它下判断（硬规矩：不许猜）。
+    /// 而"这条全局到底能不能把详情帧顶歪"是**本机现在就能问的**，与哪一跑、哪种调度都无关。
+    ///
+    /// 两件事必须同时常驻，所以这一格里有两个证人：
+    /// ① 通道真的挂在必经点上（`CaptureChromeInset.calls` 的增量，不是 grep 源码）；
+    /// ② 形状是否重现 —— 有一档"产品自己算得出来的值"把带子清空而列里仍有墨，
+    ///   那么 (甲) 的机制就在本机被造出来，R569 补的那次还原就是对症的修法；
+    ///   没有 ⇒ 这条全局动不了那四支判据，(甲) 要让位，648 的解释按新读数重写。
+    func testARealWindowChromeInsetBreaksCapturedDetailFramesTheWayTheRunnerSaw() throws {
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r570-inset-causal-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+
+        guard let probe = Self.captionInkProbes.first(where: {
+            $0.fixture == "detail-0-text" && $0.what.hasPrefix("详情头部 meta")
+        }) else {
+            return XCTFail("名册里没有「详情头部 meta」那条探针 ⇒ 这条实验没有对象")
+        }
+        guard let fixture = fixtures(appearance: .aqua)
+            .first(where: { $0.name == probe.fixture }) else {
+            return XCTFail("找不到夹具 \(probe.fixture) ⇒ 这条实验没有对象")
+        }
+        // 每一档喂的都是**产品自己那对实测输入**：`alignTrafficLights` 把
+        // `titlebarContainer.bounds.height` 与 `closeButton.frame.height` 原样递进
+        // `noteTrafficLights`（`WindowConfigurator.swift:257-265`）。这台机器在判据卷里不建真窗，
+        // 所以这两列取自 `WindowChromeLayoutTests` 里那两格**实测过的窗口几何**
+        // （带工具栏 52 / 无工具栏 32 / 按钮 14），再加两档边界：容器高 0 = 还没布局、
+        // 无头 runner 上拿不到容器那一档；按钮高 20 = 灯更高那一族（它会让留白**超过**兜底，
+        // 于是上、下两个方向都被扫到，而不是我只赌一个方向）。
+        // 结论不押在某个按钮高上：两档按钮高各有一格，读数里逐档打出来。
+        let rungs: [(height: CGFloat, button: CGFloat, tier: String)] = [
+            (0, 14, "拿不到容器"),
+            (24, 14, "半高"),
+            (32, 14, "无工具栏实测档"),
+            (39, 14, "带工具栏下沿"),
+            (52, 14, "带工具栏实测档"),
+            (0, 20, "灯更高-拿不到容器"),
+            (45, 20, "灯更高-上平台"),
+        ]
+        var ladder: [(height: CGFloat, button: CGFloat, tier: String, inset: CGFloat)] = []
+        var publishedSeen: [CGFloat] = []
+        for rung in rungs {
+            let inset = WindowChromeLayout.detailContentTopInset(titlebarHeight: rung.height,
+                                                                 buttonHeight: rung.button)
+            if !publishedSeen.contains(where: { abs($0 - inset) < CaptureChromeInset.tolerance }) {
+                publishedSeen.append(inset)
+                ladder.append((rung.height, rung.button, rung.tier, inset))
+            }
+        }
+        XCTAssertGreaterThanOrEqual(ladder.count, 4,
+                                    "候选列去重后只剩 \(ladder.count) 档 ⇒ 这一档表太窄，"
+                                        + "重现与否都没有可判的对象")
+
+        let callsBefore = CaptureChromeInset.calls
+        var arms: [(rung: (height: CGFloat, button: CGFloat, tier: String, inset: CGFloat),
+                    inset: CGFloat, band: Double, column: Int, shape: InsetShape)] = []
+        for rung in ladder {
+            let file = scratch.appendingPathComponent(
+                "detail-0-text-h\(Int(rung.height))-b\(Int(rung.button)).png")
+            let published = try CaptureChromeInset.withInjectedTitlebarHeight(
+                rung.height, buttonHeight: rung.button) {
+                _ = try self.render(fixture, appearance: .aqua, to: file)
+                return CaptureChromeInset.current
+            }
+            // "这一档是真实主窗可能写进去的值"不是我声明的：拿产品实测发布的那个数
+            // 与同一个输入按产品公式算出来的那个数对账，对不上就说明档位表推的东西不归它管。
+            XCTAssertEqual(published, rung.inset, accuracy: CaptureChromeInset.tolerance,
+                           "容器高=\(Int(rung.height)) 按钮高=\(Int(rung.button)) 时"
+                               + "产品实测发布 \(published)，而它自己的公式算出 \(rung.inset) ⇒ "
+                               + "这一档不是"
+                               + "主窗可达的值，整张档位表的出处要重核")
+            guard let image = NSImage(contentsOf: file),
+                  let rep = NSBitmapImageRep(data: image.tiffRepresentation ?? Data()),
+                  let base = rep.bitmapData else {
+                return XCTFail("刚拍出来的 \(file.lastPathComponent) 读不回来 ⇒ 捕获通道坏了")
+            }
+            let scale = Double(rep.pixelsWide) / Double(fixture.size.width)
+            let band = Self.inkContrast(bytes: base, width: rep.pixelsWide, height: rep.pixelsHigh,
+                                        bytesPerRow: rep.bytesPerRow, rect: probe.rect, scale: scale)
+            let column = CGRect(x: probe.rect.minX, y: 0, width: probe.rect.width,
+                                height: fixture.size.height)
+            let columnInk = Self.textInkMass(bytes: base, width: rep.pixelsWide,
+                                             height: rep.pixelsHigh, bytesPerRow: rep.bytesPerRow,
+                                             rect: column, scale: scale)
+            let delta = published - CaptureChromeInset.fallback
+            let shape = Self.insetShape(bandFraction: band.inkFraction, columnPixels: columnInk.pixels,
+                                        delta: delta, tolerance: CaptureChromeInset.tolerance,
+                                        inkFloor: InkFloor.probeInkFraction)
+            arms.append((rung, published, band.inkFraction, columnInk.pixels, shape))
+            emit("INSET_CAUSAL 档=\(rung.tier) 容器高=\(Int(rung.height)) 按钮高=\(Int(rung.button))"
+                 + " 发布=\(String(format: "%.1f", published))"
+                 + " 兜底=\(String(format: "%.1f", CaptureChromeInset.fallback))"
+                 + " 差=\(String(format: "%+.1f", delta))"
+                 + " 带墨=" + String(format: "%.1f%%", band.inkFraction * 100)
+                 + " 列墨=\(columnInk.pixels) 形状=\(String(describing: shape))")
+        }
+        XCTAssertGreaterThan(CaptureChromeInset.calls, callsBefore,
+                             "拍了 \(arms.count) 张帧而那条必经点一次都没走到 ⇒ "
+                                 + "CAPTURE_CHROME_INSET 这条读数今天不存在（连印都没有，谈不上判）")
+
+        XCTAssertTrue(arms.contains { $0.shape == .baselineDrawn },
+                      "兜底那一档的带子里就没墨 ⇒ 带子今天贴不到「详情头部 meta」那行字，"
+                          + "这条实验没有基线，先去看尺（现读 "
+                          + arms.map { "\($0.inset)=\(String(format: "%.1f%%", $0.band * 100))" }
+                              .joined(separator: " ") + "）")
+        let reproduced = arms.filter { $0.shape == .runnerShapeReproduced }
+        XCTAssertTrue(reproduced.isEmpty == false,
+                      "把那条全局注入成产品自己算得出来的那些值（现读 "
+                          + arms.map { String(format: "%.1f", $0.inset) }.joined(separator: "/")
+                          + "）之后，「详情头部 meta」那条带子的墨一格都没掉 ⇒ "
+                          + "这条进程内全局动不了那四支 `detail-*` 判据 ⇒ (甲) 的机制不成立，"
+                          + "648 的解释要让位给别的候选并按新读数重写，不许继续把它当主候选")
+        // 另一半结论也必须常驻，否则下一轮只看见"有一档能重现"就会把 (甲) 又扶回主候选：
+        // 真主窗实测发布的那一档（`CHROME_PUBLISH_TRACE 路=产品主窗 容器高=32.0 发布=28.0`）
+        // 在这张表里的形状是**没把带子清空**。也就是说"泄漏了真实主窗的实测值"这个量级
+        // 不足以造出 runner 那批 0 墨 —— 只有不可信实测（容器高 ≤ 按钮高 ⇒ 发布 10）才造得出。
+        if let realWindowArm = arms.first(where: { $0.rung.tier == "无工具栏实测档" }) {
+            XCTAssertNotEqual(realWindowArm.shape, .runnerShapeReproduced,
+                              "真窗实测发布的那一档（\(String(format: "%.1f", realWindowArm.inset))）现在"
+                                  + "就能把「详情头部 meta」那条带子清空 ⇒ (甲) 的量级障碍消失了，"
+                                  + "它重新成为主候选，648 与本节的结论按这一跑重写")
+        } else {
+            XCTFail("档位表里没有「无工具栏实测档」那一档 ⇒ 上面那句结论没有证人")
+        }
+        if let smallest = reproduced.min(by: { abs($0.inset - CaptureChromeInset.fallback)
+            < abs($1.inset - CaptureChromeInset.fallback) }) {
+            // 这一行是**读数**不是判据：它答"最小要挪多少才坏"，而"挪得动挪不动"由上面那格判。
+            // 不在这里再写一条界值断言 —— 每一档都是产品自己算得出来的值，
+            // 任何"位移必须小于某个数"的断言在这种构造下恒真（R565 那一族：恒真门）。
+            emit("INSET_CAUSAL_MIN_DELTA 最小可坏位移="
+                 + String(format: "%+.1f", smallest.inset - CaptureChromeInset.fallback)
+                 + " 发布=\(String(format: "%.1f", smallest.inset))"
+                 + " 容器高=\(Int(smallest.rung.height)) 按钮高=\(Int(smallest.rung.button))"
+                 + " 带墨=" + String(format: "%.1f%%", smallest.band * 100))
+        }
+    }
+
     /// 造浮层夹具的入口，并且**把控制器关在闭包里保命**（R19）。
     ///
     /// 为什么需要这一层：`NSTableView` 的 `dataSource` / `delegate` 都是**弱引用**，
@@ -27121,6 +27424,12 @@ final class UICaptureTests: XCTestCase {
                  + " 尺寸=[\(foreignAppWindows.map { NSStringFromSize($0.frame.size) }.joined(separator: " "))]"
                  + " 外观=\(appearance == .darkAqua ? "dark" : "light")")
         }
+        // R570 ② 同一时刻再读一条**值本身**：那条进程内全局 `detailContentTopInset` 是多少。
+        // 窗在不在只回答"有没有别的窗"，而详情帧那四支判据坏掉的直接嫌疑是这个值 ——
+        // 它由 `DetailView` 直接当顶部留白用，值一变整列就上下移，带子还在原处 ⇒ 读到 0 墨。
+        // 干净的一跑这一行只出现 1 次（首拍），漂过一次的会点名第一张被带偏的帧。
+        CaptureChromeInset.note(fixture: fixture.name,
+                                geometryTag: appearance == .darkAqua ? "dark" : "light")
 
         // 两族夹具的差别**只有"窗口是谁建的"**：
         // SwiftUI 夹具由这里建一个离屏窗口；AppKit 夹具（浮层）拍的是**产品自己的那个窗口**。
