@@ -184,27 +184,37 @@ final class WindowChromeLayoutTests: XCTestCase {
 
         // `@Published` 在**订阅那一刻**就把当前值推一次，那一条是我自己刚摆的哨兵，不是真窗发布的。
         let trace = recorder.values.filter { abs($0 - sentinel) > 0.001 }
-        // 最低那一档的出处不是猜的：由产品自己的公式算"无工具栏实测档（32/14）"的让位量，
-        // 它是真实窗口能给出的**最小**可信值；比它还小就意味着容器高没装得下按钮。
-        let lowestLegitimate = WindowChromeLayout.detailContentTopInset(titlebarHeight: 32,
-                                                                        buttonHeight: 14)
-        CaptureReadings.emit("CHROME_PUBLISH_TRACE 哨兵="
+        // R571：判法与机器解绑。上一轮这里写的是"本机 32/14 那一档 = 28"这个**固定下界**，
+        // 而 runner 那台的标题栏容器实测更矮 ⇒ 把一台合法机器读成产品缺陷（那一跑因此多一朵我的红）。
+        // 现在问两件与机器无关的事：① 发布的值必须等于公式对**这扇窗自己的实测**算出的值；② 那次实测必须自洽。
+        let measuredButton = window.standardWindowButton(.closeButton)?.frame.height ?? -1
+        let measuredContainer = window.standardWindowButton(.closeButton)?.superview?
+            .bounds.height ?? -1
+        let lowestLegitimate = WindowChromeLayout.detailContentTopInset(titlebarHeight: measuredContainer,
+                                                                        buttonHeight: measuredButton)
+        let sequence = trace.isEmpty ? "空"
+            : trace.map { String(format: "%.1f", $0) }.joined(separator: "_")
+        let lowest = String(format: "%.1f", trace.min() ?? -1)
+        let containerText = String(format: "%.1f", measuredContainer)
+        let buttonText = String(format: "%.1f", measuredButton)
+        let expectedText = String(format: "%.1f", lowestLegitimate)
+        CaptureReadings.emit("CHROME_PUBLISH_TRACE 路=手搭真窗 哨兵="
             + String(format: "%.1f", sentinel) + " 发布次数=\(recorder.values.count)"
-            + " 序列=" + (trace.isEmpty ? "空" : trace.map { String(format: "%.1f", $0) }
-                .joined(separator: "_"))
-            + " 最小=\(String(format: "%.1f", trace.min() ?? -1))"
-            + " 可信下界=\(String(format: "%.1f", lowestLegitimate))")
+            + " 序列=" + sequence + " 最小=" + lowest
+            + " 容器高=" + containerText + " 按钮高=" + buttonText
+            + " 公式应发=" + expectedText)
         XCTAssertFalse(trace.isEmpty,
                        "建了一扇真窗（带工具栏、上了屏）而这条全局一次都没被重新发布 ⇒ "
                            + "详情头部拿不到实测灯带，只能靠兜底值 —— 这条链路今天断了")
+        XCTAssertGreaterThanOrEqual(measuredContainer, measuredButton,
+                                    "标题栏容器高 \(String(format: "%.1f", measuredContainer)) 比按钮高 "
+                                        + "\(String(format: "%.1f", measuredButton)) 还矮 ⇒ 这次实测不可信，"
+                                        + "它算出来的让位量不能当几何")
         if let lowest = trace.min() {
-            XCTAssertGreaterThanOrEqual(lowest, lowestLegitimate,
-                                        "真窗在发布过程中写到 \(String(format: "%.1f", lowest))，"
-                                            + "比可信下界 \(String(format: "%.1f", lowestLegitimate)) 还小 ⇒ "
-                                            + "产品会把"
-                                            + "拿不到容器的实测当数发出去，那一档详情头部只剩 "
-                                            + String(format: "%.0f", lowest)
-                                            + "pt，正压在交通灯带上（判据卷 INSET_CAUSAL 量到的正是这一档）")
+            XCTAssertEqual(lowest, lowestLegitimate, accuracy: 0.001,
+                           "真窗发布的 \(String(format: "%.1f", lowest)) 不等于公式对本次实测算出的 "
+                               + "\(String(format: "%.1f", lowestLegitimate)) ⇒ 摆按钮那段与发布那段分叉了，"
+                               + "详情头部躲灯带这件事今天没人管")
         }
     }
 
@@ -256,27 +266,41 @@ final class WindowChromeLayoutTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.6))
 
         let trace = recorder.values.filter { abs($0 - sentinel) > 0.001 }
-        let lowestLegitimate = WindowChromeLayout.detailContentTopInset(titlebarHeight: 32,
-                                                                        buttonHeight: 14)
-        let titlebarContainerHeight = mainWindow.standardWindowButton(.closeButton)?.superview?
-            .bounds.height ?? -1
+        // R571 ⓪ 到数之后改的这两格：上一轮我把"可信"写成一个**固定下界 28**（= 本机 32/14 那一档），
+        // runner 第一跑就给了 `容器高=28.0 序列=24.0` ⇒ 我那把尺把一台合法机器读成了产品缺陷
+        // （那一跑因此多出一朵我自己的红：`1424/89/14` → `1429/89/15`）。
+        // 现在换成两条**与机器无关**的判法：① 恒等式 —— 发布的值必须等于产品公式对它自己实测几何算出的那个值；
+        // ② 可信性 —— 那次实测必须自洽（标题栏容器至少装得下那枚按钮）。
+        // 于是本机 32/14⇒28 与 runner 28/13⇒24 都是绿，而"容器高 0 也照发"仍然红。
+        guard let closeButton = mainWindow.standardWindowButton(.closeButton),
+              let titlebarContainer = closeButton.superview else {
+            return XCTFail("真主窗没有交通灯或标题栏容器 ⇒ 这条轨迹没有对象（发布链路今天根本没走到）")
+        }
+        let measuredContainer = titlebarContainer.bounds.height
+        let measuredButton = closeButton.frame.height
+        let expected = WindowChromeLayout.detailContentTopInset(titlebarHeight: measuredContainer,
+                                                                buttonHeight: measuredButton)
         CaptureReadings.emit("CHROME_PUBLISH_TRACE 路=产品主窗 容器高="
-            + String(format: "%.1f", titlebarContainerHeight)
+            + String(format: "%.1f", measuredContainer)
+            + " 按钮高=" + String(format: "%.1f", measuredButton)
+            + " 公式应发=" + String(format: "%.1f", expected)
             + " 序列=" + (trace.isEmpty ? "空" : trace.map { String(format: "%.1f", $0) }
                 .joined(separator: "_"))
-            + " 最小=\(String(format: "%.1f", trace.min() ?? -1))"
-            + " 可信下界=\(String(format: "%.1f", lowestLegitimate))")
+            + " 最小=\(String(format: "%.1f", trace.min() ?? -1))")
         XCTAssertFalse(trace.isEmpty,
                        "产品入口建了真主窗而这条全局一次都没被重新发布 ⇒ 详情头部拿不到实测灯带，"
-                           + "只能靠兜底值（那意味着发布链路今天断了，不是"
-                           + "「首帧安全」）")
+                           + "只能靠兜底值（那意味着发布链路今天断了，不是「首帧安全」）")
+        XCTAssertGreaterThanOrEqual(measuredContainer, measuredButton,
+                                    "标题栏容器高 \(String(format: "%.1f", measuredContainer)) 比按钮高 "
+                                        + "\(String(format: "%.1f", measuredButton)) 还矮 ⇒ 这次实测不可信，"
+                                        + "它算出来的让位量不能当几何（详情头部会压在交通灯带上）")
         if let lowest = trace.min() {
-            XCTAssertGreaterThanOrEqual(lowest, lowestLegitimate,
-                                        "产品那条建窗路在发布过程中写到 \(String(format: "%.1f", lowest))，"
-                                            + "比可信下界还小 ⇒ 那一档详情头部只剩 "
-                                            + String(format: "%.0f", lowest)
-                                            + "pt，正压在交通灯带上；这是产品面（首帧就该挡掉不可信的实测），"
-                                            + "而判据卷 INSET_CAUSAL 量到 0 墨的正是这一档")
+            XCTAssertEqual(lowest, expected, accuracy: 0.001,
+                           "产品发布的 \(String(format: "%.1f", lowest)) 不等于它自己的公式对"
+                               + "本次实测（容器高 \(String(format: "%.1f", measuredContainer)) / 按钮高 "
+                               + "\(String(format: "%.1f", measuredButton))）算出的 "
+                               + "\(String(format: "%.1f", expected)) ⇒ 摆按钮那段与发布那段分叉了，"
+                               + "详情头部躲灯带这件事今天没人管")
         }
     }
 

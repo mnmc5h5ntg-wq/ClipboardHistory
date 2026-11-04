@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import ClipboardHistoryApp
 
@@ -86,6 +87,69 @@ final class TransparencyForensicsTests: XCTestCase {
         return rep
     }
 
+    // MARK: - ⓪ R571 ③：第二条离屏通道 —— 自己建的带 alpha 位图上下文（规格 §4 第三问 / 646 第一条出路）
+
+    /// 把一棵视图树渲进**我自己建的、带 alpha 的位图上下文**，栅格由参数给（2x / 1x 在同一台机器上都能读到），
+    /// 而不是问 AppKit 要一块 backing store。
+    ///
+    /// 为什么是这一条：上一轮的读数是"离屏通道能不能保留 alpha **依倍率而定**"（本机 2x `分得出=0`、
+    /// runner 1x `分得出=1`），而第③段的 D12「透明区 alpha 归零」需要一条**两档给同一个答案**的通道。
+    /// 本轮用诊断臂逐条排除，剩下这条是唯一走得通的（读数在 `.scratch/motion-audit-2/r571-readings.md`）：
+    /// · `bitmapImageRepForCachingDisplay` 给的位图 `bitmapFormat=0`（**没有 alpha 平面**）⇒ 透明半区被涂成 `a=255`；
+    /// · 自建 alpha 位图喂给 `cacheDisplay` ⇒ 它根本不往里写（四个采样点全 `a=0`，连黑半区也是）；
+    /// · `NSHostingView.draw(_:)` ⇒ SwiftUI 不在 `draw(_:)` 里画 ⇒ 同样全 `a=0`；
+    /// · `dataWithPDF(inside:)` 再栅格化 ⇒ 产品那棵树画不出内容（只有我铺的背景色留下）；
+    /// · `layer.render(in:)` 进 `premultipliedLast` 上下文、且图层声明**非不透明** ⇒ 黑半区 `a=255`、透明半区 `a=0`，
+    ///   2x 与 1x 两种栅格都给同一个答案 —— 这就是下面这条路。
+    ///
+    /// ⚠ 像素读法必须是**原始字节**：同一条通道上 `NSBitmapImageRep.colorAt` 把 raw `a=255` 的那个点读成 `a=0`
+    /// （诊断臂逐字对照过）⇒ 用 `colorAt` 会把"保住了 alpha"读成"整幅全透明"，那是一条假绿。
+    private func captureTwoHalvesViaAlphaLayer(size: NSSize, scale: Double) throws
+        -> (pixelsWide: Int, pixelsHigh: Int, black: (r: Int, g: Int, b: Int, a: Int),
+            clear: (r: Int, g: Int, b: Int, a: Int)) {
+        let hosting = NSHostingView(rootView: AnyView(
+            HStack(spacing: 0) {
+                Color.black
+                Color.clear
+            }
+            .frame(width: size.width, height: size.height)))
+        hosting.frame = NSRect(origin: .zero, size: size)
+        hosting.wantsLayer = true
+        hosting.layer?.isOpaque = false
+        // 载体窗：SwiftUI 的外观解析与图层内容需要一个归属；刻意用 borderless + 不上屏，
+        // 于是它既不会被 `CAPTURE_FOREIGN_WINDOW` 那条读数记成"捕获期间有 app 内容窗"，
+        // 也不碰产品那条建窗路（不会写 `detailContentTopInset` 那格全局）。
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.contentView = hosting
+        defer { window.orderOut(nil) }
+        hosting.layoutSubtreeIfNeeded()
+
+        let pw = max(1, Int((size.width * scale).rounded()))
+        let ph = max(1, Int((size.height * scale).rounded()))
+        let space = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let context = try XCTUnwrap(CGContext(data: nil, width: pw, height: ph, bitsPerComponent: 8,
+                                              bytesPerRow: pw * 4, space: space,
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                    "建不出带 alpha 的位图上下文 ⇒ 这条通道今天不存在")
+        let layer = try XCTUnwrap(hosting.layer,
+                                  "hosting 没有图层 ⇒ layer.render 这条路没有对象")
+        layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        context.scaleBy(x: CGFloat(pw) / size.width, y: CGFloat(ph) / size.height)
+        layer.render(in: context)
+        let buffer = try XCTUnwrap(context.data, "上下文没有缓冲 ⇒ 读不到像素")
+        let bytes = buffer.bindMemory(to: UInt8.self, capacity: pw * ph * 4)
+        func raw(_ x: Int, _ topY: Int) -> (r: Int, g: Int, b: Int, a: Int) {
+            let y = ph - 1 - topY
+            let o = y * pw * 4 + x * 4
+            return (Int(bytes[o]), Int(bytes[o + 1]), Int(bytes[o + 2]), Int(bytes[o + 3]))
+        }
+        return (pw, ph, raw(Int(size.width * scale * 0.25), Int(size.height * scale * 0.5)),
+                raw(Int(size.width * scale * 0.75), Int(size.height * scale * 0.5)))
+    }
+
     // MARK: - ① 分类器：纯数据，CI 每轮跑，不靠截图门
 
     func testTheChannelClassifierIsNotAlwaysTrue() throws {
@@ -130,6 +194,32 @@ final class TransparencyForensicsTests: XCTestCase {
         XCTAssertNotEqual(Self.registeredOffscreenVerdict(scale: 2.0),
                           Self.registeredOffscreenVerdict(scale: 1.0),
                           "两档登记成同一个答案 ⇒ 这一格就不再读'依倍率而定'这件事了")
+    }
+
+    /// R571 ③ · 这条新通道在**同一台机器上**把 2x 与 1x 两种栅格各读一遍：
+    /// 两档都必须 `分得出=1`，透明半区的 a 不是 255，而**黑半区的 a 必须是 255**。
+    /// 三条断言各钉一种坏法：只判 `分得出` 会让"整幅都没画"这种缓冲蒙过去（诊断臂里 C/O 两档就是这个形状），
+    /// 所以黑半区那一档是**正对照**，不是附加要求（R488 那一族：内容不足必须红）。
+    func testTheAlphaLayerChannelSeparatesTrueBlackFromTransparentAtBothScales() throws {
+        let size = NSSize(width: 200, height: 120)
+        for scale in [2.0, 1.0] {
+            let shot = try captureTwoHalvesViaAlphaLayer(size: size, scale: scale)
+            let canTell = distinguishes(shot.black, shot.clear)
+            CaptureReadings.emit("TRANSPARENCY_CHANNEL 通道=离屏-alpha图层 位图=\(shot.pixelsWide)x\(shot.pixelsHigh)"
+                + " 倍率=" + String(format: "%.2fx", scale)
+                + " 黑半区=(r\(shot.black.r),g\(shot.black.g),b\(shot.black.b),a\(shot.black.a))"
+                + " 透明半区=(r\(shot.clear.r),g\(shot.clear.g),b\(shot.clear.b),a\(shot.clear.a))"
+                + " 分得出=\(canTell ? 1 : 0)")
+            XCTAssertTrue(canTell,
+                          "倍率=\(String(format: "%.2f", scale))x：这条通道把透明半区与真黑读成同一个东西 ⇒ "
+                              + "第③段的「右页 alpha 归零」又没有能判的通道了")
+            XCTAssertNotEqual(shot.clear.a, 255,
+                              "倍率=\(String(format: "%.2f", scale))x：透明半区 a=255 ⇒ alpha 又被涂成不透明了")
+            XCTAssertEqual(shot.black.a, 255,
+                           "倍率=\(String(format: "%.2f", scale))x：连画了黑的那半都不是不透明"
+                               + "（读到 a=\(shot.black.a)）⇒ 这条通道根本没画内容，"
+                               + "它给的 a=0 不能算「透明被保住了」")
+        }
     }
 
     func testOffscreenChannelMatchesTheRegisteredAlphaAnswerForItsScale() throws {
