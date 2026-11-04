@@ -132,6 +132,24 @@ final class TransparencyForensicsTests: XCTestCase {
         let layer = try XCTUnwrap(hosting.layer,
                                   "hosting 没有图层 ⇒ layer.render 这条路没有对象")
         layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        // R573 ⓪ 的 runner 读数把这一格的形状改了：`41783402475 ↔ 2232069` 上这一格**两档都读到整幅 a=0**
+        // （连黑半区都是 0 ⇒ 什么都没画），而本机两档都是 `分得出=1` ⇒ "两档一致"这句话今天只在**一台机器上**被签过。
+        // 所以这里先打一条**冷态**读数（不判，它是"这一格为什么需要前置"的证人），再走前置。
+        let cold = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
+            .profile(step: 5)
+        CaptureReadings.emit("OFFSCREEN_ALPHA_LAYER_COLD 位图=\(pw)x\(ph) 倍率="
+            + String(format: "%.2fx", scale)
+            + " 采样=\(cold.samples) 不透明=\(cold.opaque) 全透明=\(cold.clear) 有墨=\(cold.ink)"
+            + " 分得出=\((cold.opaque > 0 && cold.clear > 0) ? 1 : 0)"
+            + " ⇒ 这一臂不判，只留作两台机器的对照")
+        // 前置（651 选的那条路：**判据自己做的步骤**）：先让这棵树真的被画一遍。
+        // 本机冷态就能画 ⇒ 这一步在本机不改变读数（具名 `OFFSCREEN_ALPHA_PREREQ_LOCAL_NOOP`）；
+        // 它的证人只能是 runner 那一跑 —— 那里同一台机器上"走过前置的产品树画得出、没走前置的这棵树整幅 a=0"。
+        let warmRep = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds),
+                                    "前置拿不到位图 ⇒ 这一步没有对象")
+        hosting.cacheDisplay(in: hosting.bounds, to: warmRep)
+        CaptureReadings.emit("OFFSCREEN_ALPHA_PREREQ_LOCAL_NOOP=本机冷态已能画"
+            + " ⇒ 这一步的有效性由 runner 那一签收，不由本机")
         let raster = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph, size: size)
         let black = try XCTUnwrap(raster.rgba(topX: Int(size.width * scale * 0.25),
                                               topY: Int(size.height * scale * 0.5)),
@@ -473,6 +491,88 @@ final class TransparencyForensicsTests: XCTestCase {
             + " 逐点异类=\(pair.disagreements)")
         CaptureReadings.emit("PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED=backing-covers-whole-tree"
             + " ⇒ 第③段有真透明区之后这一格必须重开")
+    }
+
+    /// 651 的机制格：同一棵**产品容器树**（QuickPick 浮层）分三臂量"哪一步让它进入可 render 状态"。
+    /// 甲 = 只给根设 `wantsLayer`（层树没建出来）；乙 = 递归 `wantsLayer` + `layoutSubtreeIfNeeded`
+    /// （层树建出来了，但内容还没画进 `contents`）；丙 = 再走一遍旧通道的 display 通路。
+    /// 判的是**单调链**：`甲.不透明 == 0` 且 `丙.不透明 > 甲.不透明`，乙只打点（它在两台机器上
+    /// 分别读到 178 与 720，本机与 runner 都还没被同口径量过 ⇒ 不拿它当断言）。
+    /// ⚠ 这一格判的是**仪器机制**，对象是产品自己的树（`QuickPickController.windowForCapture`），
+    ///   不是合成夹具 —— 650/651 都不许再拿夹具签第三次。
+    func testTheDisplayPassIsWhatMakesTheProductContainerTreeRenderable() throws {
+        let tree = try productTree("浮层")
+        defer { tree.teardown() }
+        let view = tree.view
+        let size = tree.size
+        view.wantsLayer = true
+        view.layoutSubtreeIfNeeded()
+        let layer = try XCTUnwrap(view.layer, "甲臂：根没有图层 ⇒ 这一格没有对象")
+        layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+        // 三臂必须用**同一块栅格**才可比：栅格取旧通道自己那块（这台机器的 backing scale 决定它）。
+        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds),
+                                "旧通道拿不到位图 ⇒ 丙臂没有对象，三臂也就不可比")
+        let pw = rep.pixelsWide, ph = rep.pixelsHigh
+        func arm(_ name: String) throws -> AlphaTriple {
+            let prof = try renderLayerIntoAlphaRaster(layer, pixelsWide: pw, pixelsHigh: ph,
+                                                      size: size).profile(step: 5)
+            CaptureReadings.emit("TRANSPARENCY_PREREQ_MECHANISM 类=C 树=浮层 臂=" + name
+                + " 子层=" + "\(layer.sublayers?.count ?? -1)"
+                + " contents=" + (layer.contents == nil ? "无" : "有")
+                + " 位图=\(pw)x\(ph) 采样=\(prof.samples) 不透明=\(prof.opaque)"
+                + " 全透明=\(prof.clear) 半透明=\(prof.partial) 有墨=\(prof.ink)")
+            return prof
+        }
+        let cold = try arm("甲_只根wantsLayer")
+        func forceLayer(_ v: NSView) {
+            v.wantsLayer = true
+            v.subviews.forEach(forceLayer)
+        }
+        forceLayer(view)
+        view.layoutSubtreeIfNeeded()
+        let treeOnly = try arm("乙_递归wantsLayer不display")
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let drawn = try arm("丙_走过display通路")
+        XCTAssertEqual(cold.opaque, 0,
+                       "甲臂读到 \(cold.opaque) 颗不透明像素 ⇒ 只给根设 `wantsLayer` 时这棵树就已经能 render，"
+                           + "651 那句「前置决定画不画得出」要按这条读数重写（先查是哪一层提前画了，"
+                           + "不许把断言改成 >0 了事）")
+        XCTAssertGreaterThan(drawn.opaque, cold.opaque,
+                             "丙臂（走过 display 通路）与甲臂读到的不透明数没有差别（\(drawn.opaque) vs \(cold.opaque)）"
+                                 + "⇒ 这条通道今天**不依赖**前置，那 §4 与 650 里「前置」那两句话就是多余的"
+                                 + " ⇒ 先把机制读明白再改账，别把断言放宽")
+        XCTAssertGreaterThanOrEqual(treeOnly.opaque, cold.opaque,
+                                    "乙臂比甲臂还少画（\(treeOnly.opaque) < \(cold.opaque)）⇒ 递归 `wantsLayer` 反而"
+                                        + "把已经画进去的内容擦掉了，这条链的形状不是我以为的那个")
+        // 这一句才是 651 的机制结论落在判据上的形状：**只建层树（乙）与真的画过一遍（丙）之间必须严格有差**。
+        // 本机现读 176 → 2096；runner 那一跑同口径还没签 ⇒ 它若给"相等"，就是"那台机器上递归 wantsLayer 已经
+        // 把内容画进去了"这一条新机制事实，要按它重写本单，而不是把这条断言放宽。
+        XCTAssertGreaterThan(drawn.opaque, treeOnly.opaque,
+                             "丙臂（走过 display 通路）与乙臂（只递归建层树）读到同一个不透明数 "
+                                 + "\(drawn.opaque) ⇒ 这一台机器上前置的那一步**没有额外贡献**，"
+                                 + "651 那句「把内容画进 contents 的是 display 通路」要按这条读数重写"
+                                 + "（先查是哪条路径提前画了，不许把断言改成 >= 了事）")
+        XCTAssertGreaterThan(drawn.opaque, 0,
+                             "丙臂都没画出来 ⇒ 三臂全 0，「单调链」就是两个 0 的自证（R490 那一族）")
+        // D 类：`CAMetalLayer` 今天在产品里不存在 ⇒ 只数"有没有对象"，不编读数。
+        let metalFiles = Self.countMetalLayerUsers()
+        CaptureReadings.emit("TRANSPARENCY_PREREQ_MECHANISM 类=D 图层=CAMetalLayer 产品源码引用文件数="
+            + "\(metalFiles) 判=" + (metalFiles == 0 ? "METAL_LAYER_NOT_RUN=no-shader-yet" : "有对象但本轮没量"))
+    }
+
+    /// 产品源码里引用 `CAMetalLayer` / `MTKView` 的文件数（现扫，不写死）。
+    static func countMetalLayerUsers() -> Int {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/ClipboardHistoryApp")
+        guard let enumerator = FileManager.default.enumerator(atPath: sources.path) else { return -1 }
+        var hits = 0
+        for case let rel as String in enumerator where rel.hasSuffix(".swift") {
+            guard let text = try? String(contentsOf: sources.appendingPathComponent(rel), encoding: .utf8)
+            else { continue }
+            if text.contains("CAMetalLayer") || text.contains("MTKView") { hits += 1 }
+        }
+        return hits
     }
 
     // MARK: - ① 分类器：纯数据，CI 每轮跑，不靠截图门

@@ -101,15 +101,24 @@ SYNTH = u"\n".join([
     # 旧尺 `SUBJECT = …(?: (\S+?))?（…` 跨不过空格 ⇒ 这一行会掉进 unparsed，于是"带着 K 却认不出身份"
     # 变成一把只会漏读的尺（历史上 3ebc7fc / f85aa21 就是这么被登记进豁免名单的）。
     u"eeee555\tR903 产品半：标题里带 空格 的一笔（第 902 轮 / Round 899 · 产品 1 文件，动效主线）",
+    # R573 / STEP[9] 那一朵 runner 红的正对照：**全角冒号紧跟轮次号**、其后没有 ASCII 空格的一笔
+    # 必须照样认出身份。旧尺只认空格 ⇒ `R572：…（产品 0 文件…）` 掉进 unparsed，被报成"带 K 却没有身份"。
+    u"ffff666\tR904：冒号紧跟轮次号的一笔（第 903 轮 / Round 900 · 产品 0 文件，判据账）",
 ])
 
 
 class RoundClaimConsistency(unittest.TestCase):
     def test_positive_control_names_a_contradiction_and_an_unparsed_subject(self):
         by_round, unparsed, scanned = R.parse_rows(SYNTH)
-        self.assertEqual(5, scanned, u"五行带 TAB 的合成数据都要被扫到（少一行就是扫描器漏读）")
+        self.assertEqual(6, scanned, u"六行带 TAB 的合成数据都要被扫到（少一行就是扫描器漏读）")
         self.assertIn(u"903", by_round,
                       u"中段带 ASCII 空格的那一笔没被认出轮次 ⇒ `SUBJECT` 又瞎了（616 的修法退场条件）")
+        self.assertIn(u"904", by_round,
+                      u"全角冒号紧跟 Rnnn 的那一笔没被认出轮次 ⇒ `SUBJECT` 只认 ASCII 空格，"
+                      u"于是 R572 那种合法写法会被报成「带 K 却没有身份」（41795721331 的 STEP[9] 红）")
+        self.assertEqual([(u"ffff666", u"冒号紧跟轮次号的一笔", 0)],
+                         [(x[0], x[1], x[2]) for x in by_round[u"904"]],
+                         u"冒号那一笔的半名或 K 读错了 ⇒ 这一格数的不是它声称的那个对象")
         self.assertEqual([(u"eeee555", u"产品半：标题里带 空格 的一笔", 1)],
                          [(x[0], x[1], x[2]) for x in by_round[u"903"]],
                          u"半名或 K 读错了 ⇒ 这一格数的不是它声称的那个对象")
