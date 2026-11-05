@@ -901,6 +901,69 @@ final class TransparencyForensicsTests: XCTestCase {
     /// 形状：同一扇真产品窗口，先按今天的样子（不透明）拍一张，再按 D4 要的样子
     /// （非不透明 + 透明底）拍一张，比同一条侧栏带的**平均亮度**与**字墨数**。
     /// 两张贴图都在量完立刻删，不入仓。
+    /// R579 / BACKLOG 656：档位由**两条独立通道**给 —— 窗口解析出来的 appearance 名，与偏好键 `AppleInterfaceStyle`
+    /// 的来源值。两通道不一致就返回「不相符…」，调用方那格当场红：**档位不许当常数猜**。
+    /// 这一格存在的理由：656 那朵红有两种成因（产品把品红挡住了 / 这条真机通道今天拍不到品红），
+    /// 旧形状下只能由人在测试外面 `defaults read` —— 那一格就不在被判对象里了。
+    static func materialAppearanceTier(resolvedWindowName: String, preferenceKey: String) -> String {
+        let fromWindow: String
+        if resolvedWindowName.contains("Dark") { fromWindow = "Dark" }
+        else if resolvedWindowName.hasSuffix("Aqua") { fromWindow = "Light" }
+        else { fromWindow = "未知" }
+        let fromPreference: String
+        if preferenceKey == "Dark" { fromPreference = "Dark" }
+        else if preferenceKey == "Light" { fromPreference = "Light" }
+        else { fromPreference = "未知" }
+        if fromWindow == "未知" || fromPreference == "未知" {
+            return "未知_窗口=\(fromWindow)_偏好键=\(fromPreference)"
+        }
+        return fromWindow == fromPreference ? fromWindow : "不相符_窗口=\(fromWindow)_偏好键=\(fromPreference)"
+    }
+
+    /// 同一条品红阈值（与下面 `band` 里那三条分量判据**共用**，免得"正对照用的是另一把尺"）。
+    static func isMagentaSample(_ color: NSColor) -> Bool {
+        return color.redComponent > 0.75 && color.greenComponent < 0.35 && color.blueComponent > 0.75
+    }
+
+    /// 正对照的取样区 = 背景板里**确定在窗口之外**的那条带（那块本来就是纯色品红板）。
+    /// 取四边里面积最大的一条；四条都不够用（任一边 <20pt）就返回 nil ⇒ 调用方那格红，因为**正对照没有对象**
+    /// （R488 那一族：有内容不足必须红，不许静默读 0）。
+    static func magentaControlRegion(backdrop: NSRect, window windowRect: NSRect) -> NSRect? {
+        let candidates: [NSRect] = [
+            NSRect(x: max(backdrop.minX, windowRect.maxX), y: backdrop.minY,
+                   width: backdrop.maxX - max(backdrop.minX, windowRect.maxX), height: backdrop.height),
+            NSRect(x: backdrop.minX, y: backdrop.minY,
+                   width: min(backdrop.maxX, windowRect.minX) - backdrop.minX, height: backdrop.height),
+            NSRect(x: backdrop.minX, y: backdrop.minY,
+                   width: backdrop.width, height: min(backdrop.maxY, windowRect.minY) - backdrop.minY),
+            NSRect(x: backdrop.minX, y: max(backdrop.minY, windowRect.maxY),
+                   width: backdrop.width, height: backdrop.maxY - max(backdrop.minY, windowRect.maxY)),
+        ]
+        var best: NSRect?
+        for rect in candidates where rect.width >= 20 && rect.height >= 20 {
+            if best == nil || rect.width * rect.height > best!.width * best!.height { best = rect }
+        }
+        return best
+    }
+
+    /// 数一块区域里的采样数与品红命中数（每两像素一步，正对照只要"拍得到/拍不到"这个量级）。
+    static func magentaControlCount(in rep: NSBitmapImageRep) -> (samples: Int, magenta: Int) {
+        var samples = 0, hits = 0
+        var y = 0
+        while y < rep.pixelsHigh {
+            var x = 0
+            while x < rep.pixelsWide {
+                if let color = rep.colorAt(x: x, y: y) {
+                    samples += 1
+                    if isMagentaSample(color) { hits += 1 }
+                }
+                x += 2
+            }
+            y += 2
+        }
+        return (samples, hits)
+    }
+
     func testGoingNonOpaqueDoesNotWashOutTheSidebarMaterial() throws {
         guard ProcessInfo.processInfo.environment["CLIPBOARD_HISTORY_UI_REALSCREEN"] == "1" else {
             throw XCTSkip("REALSCREEN_MATERIAL_NOT_RUN=env-off —— 材质这一问离屏通道答不了（R552 实测那块是黑的），"
@@ -989,9 +1052,7 @@ final class TransparencyForensicsTests: XCTestCase {
                         + 0.0722 * color.blueComponent
                     sum += luma; count += 1
                     samples.append(luma)
-                    if color.redComponent > 0.75 && color.greenComponent < 0.35 && color.blueComponent > 0.75 {
-                        magentaPixels += 1
-                    }
+                    if Self.isMagentaSample(color) { magentaPixels += 1 }
                 }
             }
             // 字墨按**偏离本带众数**数，不按绝对阈值：侧栏正文是 secondary 灰（亮度 ~0.55），
@@ -1001,6 +1062,41 @@ final class TransparencyForensicsTests: XCTestCase {
             for value in samples where abs(value - mode) > 0.12 { ink += 1 }
             return (count > 0 ? sum / Double(count) : -1, ink, magentaPixels)
         }
+
+        // R579 / BACKLOG 656：把「这一趟读的是哪一档外观」与「品红在这台机器上今天拍不拍得到」做成**这条判据自己
+        // 打印的读数**。为什么要这两条：656 那朵红有两种成因 —— 暗档材质把品红混合掉了，或者这条真机通道今天
+        // 根本拍不到品红。旧形状下只能由人在测试外面 `defaults read`，那一格就不在被判对象里了。
+        func captureRegion(_ rect: NSRect, _ tag: String) throws -> NSBitmapImageRep {
+            let file = FileManager.default.temporaryDirectory
+                .appendingPathComponent("r568-material-\(tag)-\(UUID().uuidString).png")
+            defer { try? FileManager.default.removeItem(at: file) }
+            let region = "-R\(Int(rect.minX)),\(Int(primaryHeight - (rect.minY + rect.height))),\(Int(rect.width)),\(Int(rect.height))"
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            proc.arguments = ["-x", region, file.path]
+            try proc.run()
+            proc.waitUntilExit()
+            XCTAssertEqual(proc.terminationStatus, 0, "\(tag)：正对照那一块截图失败")
+            let image = try XCTUnwrap(NSImage(contentsOf: file), "\(tag)：正对照读不出图")
+            return try XCTUnwrap(NSBitmapImageRep(data: image.tiffRepresentation ?? Data()))
+        }
+        func channelToken(_ value: String) -> String { value.replacingOccurrences(of: " ", with: "_") }
+
+        let resolvedAppearance = window.effectiveAppearance.name.rawValue
+        let interfaceStyle = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") ?? "Light"
+        let tier = Self.materialAppearanceTier(resolvedWindowName: resolvedAppearance, preferenceKey: interfaceStyle)
+        let controlRect = Self.magentaControlRegion(
+            backdrop: backdrop.frame, window: window.convertToScreen(window.contentView!.bounds))
+        var controlSamples = 0, controlMagenta = 0
+        if let rect = controlRect {
+            let counted = Self.magentaControlCount(in: try captureRegion(rect, "magenta-control"))
+            controlSamples = counted.samples
+            controlMagenta = counted.magenta
+        }
+        CaptureReadings.emit("TRANSPARENCY_MATERIAL_TIER 窗口解析外观=\(channelToken(resolvedAppearance))"
+            + " 偏好键=\(channelToken(interfaceStyle)) 档位=\(channelToken(tier))"
+            + " 正对照区域=\(controlRect == nil ? "无可用区域" : "有")"
+            + " 正对照品红=\(controlMagenta)/\(controlSamples)")
 
         window.isOpaque = true
         window.backgroundColor = .windowBackgroundColor
@@ -1053,6 +1149,88 @@ final class TransparencyForensicsTests: XCTestCase {
                                  "底衬放回去之后带仍然偏 \(String(format: "%.4f", abs(restored.mean - opaque.mean))) ⇒ "
                                      + "这一臂不可逆，读数不能当对照")
         XCTAssertEqual(restored.magenta, 0, "放回底衬后仍漏出 \(restored.magenta) 颗背景像素 ⇒ 撤/放这一臂没收干净")
+
+        // R579：上面那朵 `品红漏出>0` 的红，只有配上这两条才知道它说的是「材质」还是「通道瞎了」。
+        XCTAssertTrue(tier == "Dark" || tier == "Light",
+                      "档位读到的是「\(tier)」⇒ 这一格不知道自己在哪一档上跑。两条独立通道现读：窗口解析 "
+                        + "「\(resolvedAppearance)」、偏好键「\(interfaceStyle)」；任一落到未知、或两者不相符，"
+                        + "都不许把档位当常数猜，也不许改成不判。")
+        XCTAssertGreaterThan(controlMagenta * 2, controlSamples,
+                             "品红正对照只读到 \(controlMagenta)/\(controlSamples) 颗 ⇒ **这条真机通道今天拍不到品红**"
+                        + "（取样区是窗口之外那一条纯色品红背景板，面积 "
+                        + "\(Int((controlRect?.width ?? 0) * (controlRect?.height ?? 0)))pt²）⇒ 撤底衬那臂的"
+                        + "「品红漏出=0」就分不清是材质把它混合掉了还是通道瞎了。R568 那趟 Light 档同一条阈值"
+                        + "在负臂读到 319 颗 ⇒ 正对照必须有对象（M1521 钉这一条）。")
+    }
+
+    /// R579 / BACKLOG 656：品红正对照的**几何**那一半 + 档位那一半的**合成用例** —— 都不需要真机键 ⇒ CI 每轮都跑。
+    /// 几何两条：① 给出的取样区必须与窗口**不相交**（相交就读不到品红，那条活门会把「材质把品红混合掉了」
+    ///   误报成「通道瞎了」）；② 窗口盖满背景板时必须返回 nil —— 不许退化成「读 0 颗也算跑过」（R488 那一族）。
+    /// 档位三条：两通道同档才算数、不一致必须报「不相符」、认不出来必须报「未知」—— 用**合成用例**钉，
+    ///   因为这台机器今天只有一档，拿真读数钉不住另一支（M1522 落在这个纯函数上，与当前外观无关）。
+    func testTheMagentaControlRegionNeverSitsUnderTheWindowAndTheTierNeedsTwoChannels() throws {
+        let backdrop = NSRect(x: 60, y: 200, width: 1200, height: 900)
+        let cases: [NSRect] = [
+            NSRect(x: 300, y: 300, width: 400, height: 300),        // 窗口整块在板子里 ⇒ 四条边里取最大那条
+            backdrop,                                                // 窗口==板子 ⇒ 无可用区域
+            NSRect(x: 56, y: 196, width: 1208, height: 908),         // 窗口把板子盖住还外扩 ⇒ 无可用区域
+            NSRect(x: 1150, y: 1050, width: 300, height: 300),       // 只压住右上角 ⇒ 下方那条带才最大
+            NSRect(x: 1245, y: 200, width: 40, height: 900),         // 只压住右侧 15pt ⇒ 左侧 1050pt 才该留下
+        ]
+        var disjoint = 0, noRegion = 0, widestArea = 0, firstCaseArea = -1
+        for (index, windowRect) in cases.enumerated() {
+            let rect = Self.magentaControlRegion(backdrop: backdrop, window: windowRect)
+            guard let rect else {
+                noRegion += 1
+                continue
+            }
+            XCTAssertFalse(rect.intersects(windowRect),
+                           "正对照取样区 \(rect) 与窗口 \(windowRect) 相交 ⇒ 那块读的是窗口自己的内容，"
+                               + "不是品红板。后果：那条活门会把「暗档材质把品红混合掉了」误报成「这条通道拍不到品红」，"
+                               + "而这两种成因的修法相反（M1521 钉这一条）。")
+            XCTAssertTrue(rect.minX >= backdrop.minX - 0.5 && rect.maxX <= backdrop.maxX + 0.5
+                              && rect.minY >= backdrop.minY - 0.5 && rect.maxY <= backdrop.maxY + 0.5,
+                          "取样区 \(rect) 跑到背景板外面去了 ⇒ 那块根本不是品红，读数没有对象。")
+            XCTAssertGreaterThanOrEqual(rect.width, 20,
+                                        "取样区宽 \(rect.width)pt < 20 ⇒ 窄到采样没意义，这一条必须走「无可用区域」。")
+            XCTAssertGreaterThanOrEqual(rect.height, 20,
+                                        "取样区高 \(rect.height)pt < 20 ⇒ 同上。")
+            disjoint += 1
+            widestArea = max(widestArea, Int(rect.width * rect.height))
+            if index == 0 { firstCaseArea = Int(rect.width * rect.height) }
+        }
+        XCTAssertEqual(cases.count, 5,
+                       "真值表少了用例 ⇒ 这几条断言今天判的还是不是那一个契约")
+        XCTAssertEqual(disjoint, 3,
+                       "五个用例里给出「窗口外区域」的应该是 3 个，今天读到 \(disjoint) ⇒ 几何函数换了行为，"
+                           + "要么把该判「无对象」的两格给了区域（那正对照就落在窗口底下），要么把给的三格判没了。")
+        XCTAssertEqual(noRegion, 2,
+                       "窗口盖满背景板那两格必须返回 nil，今天返回 nil 的有 \(noRegion) 格 ⇒ "
+                           + "「正对照没有对象」这件事会被读成「跑过了、读到 0 颗」。")
+        XCTAssertEqual(firstCaseArea, 600_000,
+                       "第一个用例该给出面积 600000pt² 的那条（上方 1200×500），今天读到 \(firstCaseArea) ⇒ "
+                           + "它没有挑面积最大那条，取样区的定义变了（面积决定品红可不可信）。")
+        XCTAssertEqual(widestArea, 1_066_500,
+                       "五个用例里最大那条应该是 1066500pt²（第五个：窗口只压住右侧 15pt ⇒ 左侧留下 1185×900），"
+                           + "今天读到 \(widestArea) ⇒ 面积比较那一支的行为变了。")
+        // 档位那一半：合成用例（不吃这台机器今天的外观）⇒ M1522 落在这个纯函数上，与当前是哪一档无关。
+        let tierTruth = [
+            Self.materialAppearanceTier(resolvedWindowName: "NSAppearanceNameDarkAqua", preferenceKey: "Dark"),
+            Self.materialAppearanceTier(resolvedWindowName: "NSAppearanceNameAqua", preferenceKey: "Light"),
+            Self.materialAppearanceTier(resolvedWindowName: "NSAppearanceNameDarkAqua", preferenceKey: "Light"),
+            Self.materialAppearanceTier(resolvedWindowName: "NSAppearanceNameCustom", preferenceKey: "Dark"),
+        ]
+        XCTAssertEqual(tierTruth[0], "Dark",
+                       "两通道都说暗档而纯函数不给 Dark ⇒ 档位这一格从今天起没有名字（656 缺的正是这个）。")
+        XCTAssertEqual(tierTruth[1], "Light",
+                       "两通道都说亮档而纯函数不给 Light ⇒ R568 那趟用的那一档读不出来，正对照也没法归档。")
+        XCTAssertEqual(tierTruth[2], "不相符_窗口=Dark_偏好键=Light",
+                       "两条通道互相打脸时必须原样报「不相符」⇒ 折成任何一档都是在猜，而 656 那两种成因恰恰靠这一格分开。")
+        XCTAssertTrue(tierTruth[3].hasPrefix("未知"),
+                      "认不出来的窗口名不许被悄悄归到某一档 ⇒ 必须报「未知」，让调用方那格当场红。")
+        CaptureReadings.emit("MAGENTA_CONTROL_GEOMETRY 用例=\(cases.count) 窗口外区域=\(disjoint)"
+            + " 判为无对象=\(noRegion) 第一用例面积=\(firstCaseArea)pt2 最大面积=\(widestArea)pt2"
+            + " 档位真值=\(tierTruth.joined(separator: "|"))")
     }
 
     // MARK: - ⑤ 产品状态：窗口非不透明，但观感由自己那层底衬保住
