@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import os
 import re
 import shutil
@@ -474,3 +475,119 @@ class RungStepTests(RulerTestCase):
         self.assertIn(u"RUNG_STEP local:fixture dark", out, u"一档出事不许把另一档的读数一起藏掉")
         self.assertNotIn(u"RUNG_STEP local:fixture light", out, u"不一致的那档不许签字")
 
+
+
+class TierSelectionTests(RulerTestCase):
+    """R586 / 靶 B：档位是**段**，不是子串。
+
+    为什么单独有这一类（监工现读到 `hover_two_state_diff.py:104` 那一行 `'light' in b_name`）：
+    真帧名里有两张暗档含 `highlight`（`detail-text-highlight-720x520-dark`、
+    `quickpick-typed-no-highlight-420x300-dark`）⇒ 子串法会给它们拿 `FLOOR_LIGHT`=1.20 去判一个暗档。
+    两个地板数值本轮一字未动（1.20 / 1.10），动的只有"选哪一个"那一步。
+    """
+
+    COLLIDERS = (u"detail-text-highlight-720x520-dark", u"quickpick-typed-no-highlight-420x300-dark")
+
+    def test_frame_tier_parses_segments_not_substrings(self):
+        cases = [
+            (u"glass-pill-120x232-light", u"light"),
+            (u"glass-pill-120x232-dark", u"dark"),
+            (u"glass-pill-120x232-dark.png", u"dark"),
+            (u"detail-text-highlight-720x520-dark", u"dark"),
+            (u"quickpick-typed-no-highlight-420x300-dark", u"dark"),
+            (u"row0-highlight-420x300-light", u"light"),
+            (u"plain-name-10x10", u""),
+            (u"lightbox-10x10", u""),
+            (u"", u""),
+        ]
+        for name, want in cases:
+            self.assertEqual(want, _ruler.frame_tier(name), name)
+
+    def test_substring_rule_would_misread_exactly_the_highlight_names(self):
+        """旧写法的暴露面要数出来，不许只说「有 bug」：356 张里 2 张，今天配不成 hover 对所以是潜在的。"""
+        for name in self.COLLIDERS:
+            self.assertEqual(u"light", _ruler.substring_tier(name), u"旧写法就是会把它读成亮档")
+            self.assertEqual(u"dark", _ruler.frame_tier(name), u"按段解析才是对的")
+
+    @unittest.skipIf(NO_PIL, "缺 PIL：合成帧造不出来，这一格要能被点名")
+    def test_a_dark_frame_named_highlight_gets_the_dark_floor(self):
+        """正对照：喂一张名字含 highlight 的暗档 ⇒ 必须拿 FLOOR_DARK。"""
+        self.add(u"detail-text-highlight-hover-720x520-dark", size=(20, 20),
+                 spots=block(0, 0, 10, 10, LIT))
+        self.add(u"detail-text-highlight-720x520-dark", size=(20, 20))
+        m = _ruler.measure(self.dir, u"detail-text-highlight-hover-720x520-dark",
+                           u"detail-text-highlight-720x520-dark")
+        self.assertEqual(u"dark", m[u"tier"])
+        self.assertEqual(_ruler.FLOOR_DARK, m[u"floor"],
+                         u"暗档拿到了亮档地板 %s（旧子串写法的读数）" % m[u"floor"])
+
+    def test_clean_run_exits_zero_and_reports_zero_collisions(self):
+        """负半证人（两向里的「绿」那一向）：干净的一跑 rc=0，而那条 `HOVER_TIER` 的账必须印出来。"""
+        self.clean_pair()
+        self.add(u"other-hover-20x20-light", size=(20, 20), spots=block(0, 0, 10, 10, LIT))
+        self.add(u"other-20x20-light", size=(20, 20))
+        rc, out = self.cli(extra=[u"--shots", self.dir,
+                                  u"--control", u"pill-hover-20x20-dark,pill-20x20-dark"])
+        self.assertEqual(0, rc, out[-700:])
+        self.assertIn(u"HOVER_TIER 配对=2 按段与末段相符=2 认不出档=0 旧子串写法会读错=0", out, out[-700:])
+
+    def test_the_cli_counts_the_names_the_old_rule_would_misread(self):
+        """端到端：配上一对 highlight 的暗档 ⇒ 那一行的地板是 1.1，而账上把「旧写法会读错 1 张」点名。"""
+        self.clean_pair()
+        self.add(u"highlight-hover-20x20-dark", size=(20, 20), spots=block(0, 0, 10, 10, LIT))
+        self.add(u"highlight-20x20-dark", size=(20, 20))
+        rc, out = self.cli(extra=[u"--shots", self.dir,
+                                  u"--control", u"pill-hover-20x20-dark,pill-20x20-dark"])
+        self.assertEqual(0, rc, out[-700:])
+        self.assertIn(u"旧子串写法会读错=1 名单=highlight-20x20-dark", out, out[-700:])
+        # 断言要钉在**那一对自己那一行**上：上一稿写的是 `assertIn("地板=1.1 ", out)`，
+        # 而另一对（pill）本来就打印 1.1 ⇒ 它被无关的一行满足了，对 M1544 天生瞎（本轮刀的输出教的）。
+        # 空格是必要的：`HOVER_TIER 配对=2 …` 那一行里也含 `对=` 这个子串，
+        # 不加边界就会把汇总行也挑进来（第一版就是这么红的）。
+        line = [l for l in out.splitlines() if u"highlight-20x20-dark" in l and u" 对=" in l]
+        self.assertEqual(1, len(line), u"那一对该只有一行读数：%r" % line)
+        self.assertIn(u"地板=1.1 ", line[0], line[0][:260])
+        self.assertEqual(0, len([l for l in out.splitlines() if u"地板=1.2 " in l and u"highlight" in l]),
+                         u"名字里带 highlight 的暗档被拿 1.2 判了（子串写法的读数）")
+
+    def test_unclassifiable_tier_is_named_and_red_not_defaulted_to_dark(self):
+        """认不出档不许默认成暗档：要具名 `HOVER_TIER_UNKNOWN` 且退非 0。"""
+        self.clean_pair()
+        self.add(u"widget-hover-20x20-mid", size=(20, 20), spots=block(0, 0, 10, 10, LIT))
+        self.add(u"widget-20x20-mid", size=(20, 20))
+        rc, out = self.cli(extra=[u"--shots", self.dir,
+                                  u"--control", u"pill-hover-20x20-dark,pill-20x20-dark"])
+        self.assertEqual(1, rc, out[-700:])
+        self.assertIn(u"HOVER_TIER_UNKNOWN=1 widget-20x20-mid", out, out[-700:])
+        self.assertIn(u"认不出档=1", out, out[-700:])
+
+
+class FloorSelectionScanTests(unittest.TestCase):
+    """同类判定要**扫**，不许只修监工点到的那一处。
+
+    扫描范围是 `scripts/*.py` 的非测试部分（R564/R580 那条「名册/豁免要按扫描作用域对账」）：
+    `.scratch/` 是历轮一次性脚本、`scripts/tests/` 里那些串是**描述坏法的字面量**，都不算产品仪器。
+    """
+
+    PATTERN = re.compile(r"FLOOR_LIGHT\s+if\s+['\"]light['\"]\s+in")
+
+    def scan(self, text):
+        return [l for l in text.splitlines() if self.PATTERN.search(l)]
+
+    def test_scanner_spots_the_old_shape(self):
+        hits = self.scan(u"    floor = FLOOR_LIGHT if 'light' in b_name else FLOOR_DARK")
+        self.assertEqual(1, len(hits), hits)
+
+    def test_no_live_script_selects_a_floor_by_substring(self):
+        root = os.path.join(REPO, "scripts")
+        bad, seen = [], 0
+        for name in sorted(os.listdir(root)):
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(root, name)
+            seen += 1
+            hits = self.scan(io.open(path, encoding="utf-8").read())
+            if hits:
+                bad.append(u"%s :: %s" % (name, hits[0].strip()[:80]))
+        self.assertGreater(seen, 10, u"扫描范围本身要能证明它读到了东西：%d 个文件" % seen)
+        self.assertEqual([], bad, u"按子串选地板的写法又回来了：\n" + u"\n".join(bad))

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 取证通道自己读得对不对对象：基线补上「哪一笔烤的」并让同批自烤会红 + 两态差尺的地板改成按段解析（R586 / 第 585 轮 / Round 583，产品 0 文件）
+    R585 给名册每行补了 `observed`，但**基线文档那一侧的同一个洞没补**：字段只有 `schema/count/machine/note/frames` ⇒
+    `update --for-machine` 拿刚捕的那批帧烤一份 `by_machine/<键>.json`，下一次 `check` 必然 `变帧=0`，
+    而「没人改过界面」与「刚用它自烤了一遍」在输出里逐字相同。同时监工按 `'light' in frame` 数名册数出 9/8（真数 8/8），
+    而 `hover_two_state_diff.py` 选地板用的也是子串 ⇒ `*-dark.png` 里含 `highlight` 的暗档会被拿 1.20（亮档地板）判。
+    本轮：① 基线落三个**运行时观测**字段（`baked_from_commit` / `baked_by_round` / `capture_scale(+frames)`），
+    无任何手填旗标（argparse 现证拒收四个）；② `check` 里「基线与被判帧同一笔」⇒ `FRAME_BASELINE_SAME_BAKE` **进拦路并照报数**，
+    旧文档缺字段 ⇒ `…PROVENANCE=absent` 具名并照判、绝不默认成「这一笔」；③ 倍率不合 ⇒ `SCALE_MISMATCH` 只报数（不新增拦路）；
+    ④ 地板选择改成 `frame_tier()` 按段解析，认不出 ⇒ `HOVER_TIER_UNKNOWN` 并红，另加末段/按段两条通道互校；
+    ⑤ 全仓扫同类：`scripts/*.py` 非测试部分按子串选地板归零，并有守卫自带合成正对照。
+    本机现读（含本笔的树）：`FRAME_BASELINE_BAKE 出处=无 commit=（无） 轮=（无） 倍率=（无） 口径帧数=（无）` / `FRAME_BASELINE_BAKE_PROVENANCE=absent ⇒ 这份基线没有 baked_from_commit（R586 之前烤的旧文档，形状照读、判定照旧）；它答不了「判的就是烤它的那批帧吗」⇒ 不许把 变帧=0 读成「没人改过界面」（BACKLOG 660）` ⇒ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）`；名册 16 行一字未动、工作基线 md5 与 HEAD 同字。
+    判据卷 +11 格（帧门）与 +8 格（两态差尺），刀 M1541–M1546 全 CAUGHT（**两处证人格被刀的输出发现天生瞎、修完整表重跑**）；
+    新开 **660**，655/656/658/659 一条没结、出路一条不代选。
+
 ### 帧基线那条**印给读者的出路**做成真的（R585 / 第 584 轮 / Round 582，产品 0 文件）：`update --for-machine` 落 `by_machine/`、名册补写路径与出处、`check` 能证伪手抄行
     R584 那扇门印的出路是空头支票：`update` 那一支无条件写工作基线，而 `check` 只在
     `docs/frame_baselines/by_machine/<键>.json` 已存在时才走"这台机器自己判"那一支 ⇒ 任何机器照那句话跑完都停在 `判=不判`

@@ -69,6 +69,29 @@ def _open(path):
     return Image.open(path).convert('RGB')
 
 
+TIERS = ('light', 'dark')
+
+
+def frame_tier(name):
+    """按**段**解析档位（R586 / 靶 B）：档位是帧名里独立的一段，不是任意子串。
+
+    为什么不能写 `'light' in name`：现读 356 张帧名里有两张暗档含 `highlight`
+    （`detail-text-highlight-720x520-dark.png`、`quickpick-typed-no-highlight-420x300-dark.png`）
+    ⇒ 子串法把暗档读成亮档，于是拿 `FLOOR_LIGHT`（1.20）去判一个暗档 —— 尺读的不是它声称的那个对象。
+    认不出档 ⇒ 返回空串，由调用方点名并红（不许默认成暗档：那是把「读不出」冒充成「知道是暗的」）。
+    """
+    stem = name[:-4] if name.endswith('.png') else name
+    for seg in reversed(stem.split('-')):
+        if seg in TIERS:
+            return seg
+    return ''
+
+
+def substring_tier(name):
+    """旧写法（子串法），只用来把「今天哪些名字会被它读错」报出来，不参与任何判定。"""
+    return 'light' if 'light' in name else 'dark'
+
+
 def measure(dirpath, a_name, b_name):
     """返回 (两态差的两个口径 + 面积占比)。形状不一致或缺帧 ⇒ None（调用方点名）。"""
     fa, fb = os.path.join(dirpath, a_name + '.png'), os.path.join(dirpath, b_name + '.png')
@@ -101,14 +124,16 @@ def measure(dirpath, a_name, b_name):
     base_share = greys.count(mode_grey) / float(len(greys))
     flat = base_share >= FLAT_SHARE
     med_wcag = statistics.median(per_wcag)
-    floor = FLOOR_LIGHT if 'light' in b_name else FLOOR_DARK
+    tier = frame_tier(b_name)
+    floor = FLOOR_LIGHT if tier == 'light' else FLOOR_DARK
     verdict = ('只报读数（底不平涂）' if not flat
                else ('过线' if med_wcag >= floor else '低于地板'))
     return {'changed': len(changed), 'share': 100.0 * len(changed) / total,
             'band_mean': round(_ratio(means[0], means[1]), 3),
             'per_pixel': round(statistics.median(per), 3),
             'per_pixel_wcag': round(med_wcag, 3), 'bbox': bbox,
-            'idle_flat': flat, 'base_share': round(base_share, 3), 'floor': floor, 'verdict': verdict}
+            'idle_flat': flat, 'base_share': round(base_share, 3), 'floor': floor, 'verdict': verdict,
+            'tier': tier}
 
 
 def find_pairs(dirpath):
@@ -235,8 +260,26 @@ def main():
     if not pairs:
         print('HOVER_DIFF_EMPTY=1 一个「悬停↔静置」配对都没找到 ⇒ 要么帧名形状漂了、要么两态帧不存在。这一支不许在空名单上给绿（R99）')
         return 1
+    tier_rows, tier_bad, tier_collide = 0, 0, []
     for app, hover, idle in pairs:
         m = measure(shots, hover, idle)
+        if m is not None:
+            # 两条独立通道必须给出同一个档：`find_pairs` 的 `app` 是按**末段**切的，
+            # `frame_tier` 是**从右往左找独立一段**——同一件事两处算不一致就先怀疑尺（R580 那一族）。
+            seg = app[1:] if app.startswith('-') else app
+            if m['tier'] == '':
+                print('HOVER_TIER_UNKNOWN=1 %s 的名字里认不出 light/dark 那一段 ⇒ 不许默认成暗档，这一对不算数' % idle)
+                tier_bad += 1
+                rc = 1
+            elif seg != m['tier']:
+                print('HOVER_TIER_MISMATCH=1 %s 末段=%s 按段解析=%s ⇒ 两把尺读到不同的档，上面的地板一律不算'
+                      % (idle, seg or '（无）', m['tier']))
+                tier_bad += 1
+                rc = 1
+            else:
+                tier_rows += 1
+            if substring_tier(idle) != m['tier']:
+                tier_collide.append(idle)
         if m is None:
             print('HOVER_DIFF 缺帧/尺寸不符 %s ↔ %s' % (hover, idle))
             rc = 1
@@ -252,6 +295,11 @@ def main():
             print('HOVER_DIFF_FLOOR_RED=1 %s 的悬停在 WCAG 口径下只有 %s（地板 %s）⇒ 这一档反馈淡到没有读者'
                   % (hover, m['per_pixel_wcag'], m['floor']))
             rc = 1
+    # 档位这一维的账要单独印：`按段=… 相符=… 撞车的子串写法=…` 里最后那个数**只报数不判**，它是「旧写法今天会读错几张」的现场证人（R586 / 靶 B）。今天真帧上是 0 —— 0 不等于永远不会，因为 356 张帧名里已经有 2 张含 `highlight`，只是它们没被配成 hover 对。
+    print('HOVER_TIER 配对=%d 按段与末段相符=%d 认不出档=%d 旧子串写法会读错=%d%s 地板 亮=%s 暗=%s（两个数值本轮一字未动）'
+          % (len(pairs), tier_rows, tier_bad, len(tier_collide),
+             (' 名单=' + ','.join(tier_collide)) if tier_collide else '',
+             FLOOR_LIGHT, FLOOR_DARK))
     neg = measure(shots, pairs[0][1], pairs[0][1])
     if neg is None or neg['changed'] != 0:
         print('HOVER_DIFF_NEG_CONTROL=BAD 帧↔自身应当 0 个变化像素，读到 %s ⇒ 尺坏了，上面的数一律不算' % (

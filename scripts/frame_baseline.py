@@ -21,10 +21,13 @@ CI 已经会把 78 张离屏帧拍出来（D-7 那一轮补的），但它只回
 """
 import argparse
 import hashlib
+import io
 import json
 import os
 import platform
 import re as _re
+import struct
+import subprocess
 import sys
 from typing import Dict, List, Optional, Tuple
 
@@ -376,12 +379,146 @@ def baseline_owner(document: Dict[str, object]) -> str:
     return str(document.get("machine") or "").strip()
 
 
-def write_baseline(path: str, frames: Dict[str, str], machine: Optional[str] = None) -> None:
+def git_head_commit(repo_root: str) -> str:
+    """此刻这一棵树是哪一笔。取不到就返回空串 —— 空串意思是**不知道**，不是"哪笔都算"。
+
+    为什么由工具自己取而不给命令行口子：出处一旦被手填，它就退化成另一句措辞（R585 那条
+    「登记是账，不是措辞」的同一族）。所以这里没有 `--baked-by`／`--commit`：参数是**观测**，不是**声明**。
+    """
+    try:
+        proc = subprocess.Popen(["git", "-C", repo_root, "rev-parse", "HEAD"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, _err = proc.communicate(timeout=20)
+        if proc.returncode != 0:
+            return ""
+        return out.decode("utf-8", "replace").strip()
+    except (OSError, ValueError):
+        return ""
+
+
+def ledger_round(repo_root: str) -> str:
+    """这一份基线是**哪一轮**烤的：读台账自己的轮次标题，不读环境变量、不接受手填。
+
+    口径是「最新已落地那一节的 R 号 + 1」= 正在烤它的那一轮（仓库里 `Rnnn = 第 nnn-1 轮` 那条映射
+    由 `commit_round_identity.py` 钉着，这里只复用它已经写在标题里的那个数，不再新造一套）。
+    两个来源各算各的，谁先有数用谁；都没有 ⇒ 空串 = **不知道**，不许猜一个。
+    """
+    for name in ("AGENT_STATE.md", "AGENT_UI_AUDIT.md"):
+        path = os.path.join(repo_root, name)
+        if not os.path.exists(path):
+            continue
+        text = io.open(path, encoding="utf-8", errors="replace").read()
+        nums = [int(x) for x in _re.findall(r"(?m)^## R(\d+)", text)]
+        if nums:
+            return "R%d" % (max(nums) + 1)
+        rounds = [int(x) for x in _re.findall(r"(?m)^## 第 (\d+) 轮", text)]
+        if rounds:
+            return "R%d" % (max(rounds) + 2)
+    return ""
+
+
+def png_size(path: str) -> Tuple[int, int]:
+    """PNG 的像素尺寸，只读 IHDR 那 8 个字节。
+
+    为什么不用 PIL：这一支门在 CI 里跑在 Pillow 那一步之前也算（R218 之后步骤顺序动过两次），
+    而"这份基线是按什么倍率烤的"不能因为某个解释器缺库就答不出来。
+    """
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(24)
+        if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
+            return (0, 0)
+        width, height = struct.unpack(">II", head[16:24])
+        return (int(width), int(height))
+    except (OSError, struct.error):
+        return (0, 0)
+
+
+def capture_scale(frames_dir: str) -> Tuple[str, int, int]:
+    """这批帧的捕获倍率：帧名里写的是逻辑点尺寸（`…-720x520-dark.png`），PNG 头里是像素尺寸。
+
+    返回 `(倍率字符串, 量到的帧数, 不一致的帧数)`。取众数；一张都量不到 ⇒ `("", 0, 0)` ——
+    那是"不知道"，不是"1.00x"。这一格为什么值得记：R584 已经量到 runner 自印 `倍率=1.00x`
+    而工作基线是本机 2x 烤的 ⇒ 那 356 张变帧的成因就在这一维上，可基线文档自己以前说不出它是何倍率。
+    """
+    ratios = []
+    bad = 0
+    try:
+        names = sorted(os.listdir(frames_dir))
+    except OSError:
+        return ("", 0, 0)
+    for name in names:
+        if not name.endswith(".png"):
+            continue
+        m = _re.search(r"-(\d+)x(\d+)-(?:light|dark)\.png$", name)
+        if not m:
+            continue
+        px, py = png_size(os.path.join(frames_dir, name))
+        lx, ly = int(m.group(1)), int(m.group(2))
+        if px <= 0 or lx <= 0 or ly <= 0:
+            bad += 1
+            continue
+        if py != ly * (px // lx) or px % lx != 0:
+            bad += 1
+        ratios.append(float(px) / float(lx))
+    if not ratios:
+        return ("", 0, bad)
+    mode = max(set(ratios), key=ratios.count)
+    return ("%0.2fx" % mode, len(ratios), bad)
+
+
+def bake_provenance(repo_root: Optional[str], frames_dir: Optional[str],
+                    inherit: Optional[Dict[str, object]] = None) -> Dict[str, str]:
+    """这份基线是**谁在哪一笔、按什么倍率**烤的。全部运行时观测，没有手填口子。"""
+    if inherit is not None:
+        commit = str(inherit.get("baked_from_commit") or "").strip()
+        if commit:
+            return {"commit": commit,
+                    "round": str(inherit.get("baked_by_round") or "").strip(),
+                    "scale": str(inherit.get("capture_scale") or "").strip(),
+                    "scale_frames": str(inherit.get("capture_scale_frames") or "").strip()}
+    commit = git_head_commit(repo_root) if repo_root else ""
+    rnd = ledger_round(repo_root) if repo_root else ""
+    scale, scale_frames, _bad = capture_scale(frames_dir) if frames_dir else ("", 0, 0)
+    return {"commit": commit, "round": rnd, "scale": scale,
+            "scale_frames": str(scale_frames) if scale_frames else ""}
+
+
+def baseline_bake(document: Dict[str, object]) -> Dict[str, str]:
+    """读回一份基线文档的出处；缺字段一律读成空串 = **不知道**，不默认成"新"或"这一笔"。"""
+    return {
+        "commit": str(document.get("baked_from_commit") or "").strip(),
+        "round": str(document.get("baked_by_round") or "").strip(),
+        "scale": str(document.get("capture_scale") or "").strip(),
+        "scale_frames": str(document.get("capture_scale_frames") or "").strip(),
+    }
+
+
+def bake_line(document: Dict[str, object]) -> str:
+    bake = baseline_bake(document)
+    return u"出处=%s commit=%s 轮=%s 倍率=%s 口径帧数=%s" % (
+        u"有" if bake["commit"] else u"无",
+        bake["commit"] or u"（无）",
+        bake["round"] or u"（无）",
+        bake["scale"] or u"（无）",
+        bake["scale_frames"] or u"（无）")
+
+
+def write_baseline(path: str, frames: Dict[str, str], machine: Optional[str] = None,
+                   repo_root: Optional[str] = None, frames_dir: Optional[str] = None,
+                   inherit: Optional[Dict[str, object]] = None) -> None:
+    bake = bake_provenance(repo_root, frames_dir, inherit)
     document = {
         "schema": SCHEMA_VERSION,
         "count": len(frames),
         # 署名是判定的一部分：像素是不是"同一台机器上的同一件事"，只有产出它的那台机器知道。
         "machine": machine_key() if machine is None else machine,
+        # R586 / 靶 A：出处也是判定的一部分。只有 machine 那一格答不了"这份基线是不是拿被判的那批帧
+        # 自己烤的"—— 那种时候 `变帧=0` 与"没人改过界面"逐字相同，门却会给它签绿。
+        "baked_from_commit": bake["commit"],
+        "baked_by_round": bake["round"],
+        "capture_scale": bake["scale"],
+        "capture_scale_frames": bake["scale_frames"],
         "note": "离屏帧的 sha256 基线。改了界面就在同一个 commit 里跑 update；"
                 "CI 的 compare 步骤靠它回答“上一版比这一版哪些帧变了”。",
         "frames": frames,
@@ -422,7 +559,8 @@ def snapshot(repo_root: str, version: str) -> Optional[str]:
     frames = {str(k): str(v) for k, v in document["frames"].items()}
     target = os.path.join(release_dir(repo_root), "%s.json" % ("v%s" % version.lstrip("v")))
     # 继承署名，不重新签：快照冻的是"那份基线对应的界面"，不是"此刻跑 snapshot 的这台机器"。
-    write_baseline(target, frames, machine=baseline_owner(document))
+    # 出处照继承，不重烤：快照冻的是"那份基线对应的那一笔"，不是"此刻跑 snapshot 的这一笔"。
+    write_baseline(target, frames, machine=baseline_owner(document), inherit=document)
     return target
 
 
@@ -500,9 +638,13 @@ def main(argv=None) -> int:
             # 键一律由运行时取（`machine_key()`），没有 `--machine` 这种"我自己说是哪台"的口子。
             key = machine_key()
             target = machine_baseline_path(args.repo_root, key)
-            write_baseline(target, frames, machine=key)
+            write_baseline(target, frames, machine=key,
+                           repo_root=args.repo_root, frames_dir=args.frames_dir)
             print("FRAME_BASELINE_UPDATED=%d" % len(frames))
             print("FRAME_BASELINE_MACHINE_BASELINE=%s 署名=%s" % (target, key))
+            # 印的是**回读**出来的那份文档，不是我以为写进去的那些字段（R580 那一族：
+            # "我签的字"要由盘上那份文件说，不能由写手的变量说）。
+            print("FRAME_BASELINE_BAKE %s" % bake_line(load_baseline_document(target)))
             return 0
         # 工作基线永远写在 docs/frame_baseline.json：逐版本的那份是它的快照，不是替代品。
         write_baseline(manifest_path(args.repo_root), frames)
@@ -543,6 +685,13 @@ def main(argv=None) -> int:
         print("FRAME_BASELINE_ERROR=逐机器基线自相矛盾：文件名=%s 署名=%s" % (machine, owner or "（未署名）"))
         return 2
     judged = (owner != "" and owner == machine)
+    bake = baseline_bake(baseline_document)
+    # 「同批自烤」= 基线文档说它是在**此刻这一笔**上烤的。那种时候 `变帧=0` 不含任何信息：
+    # 它既可以是"没人改过界面"，也可以是"刚拿被判的那批帧自己烤了一遍"，两条在输出里逐字相同。
+    # 上一轮给名册补了 `observed`（手抄行从此可证伪），基线这一侧是同一个洞却没有同一个药 ⇒ 这一格补上。
+    head = git_head_commit(args.repo_root)
+    same_bake = bool(bake["commit"]) and bake["commit"] == head
+    current_scale, current_scale_frames, _bad_scale_frames = capture_scale(args.frames_dir)
 
     current = collect(args.frames_dir)
     changed, missing, added = compare(baseline, current)
@@ -558,6 +707,27 @@ def main(argv=None) -> int:
     print("FRAME_BASELINE_CHANGED=%d" % len(changed))
     print("FRAME_BASELINE_MISSING=%d" % len(missing))
     print("FRAME_BASELINE_ADDED=%d" % len(added))
+    print(u"FRAME_BASELINE_BAKE %s" % bake_line(baseline_document))
+    if not bake["commit"]:
+        # 旧文档读得动，判定也照旧 —— 但它说不出自己是哪一笔烤的，所以"变帧=0"在这份文件上
+        # 从来没有证人。这一支**具名不拦路**（它不是新造成的红），也不许被读成"这份基线没问题"。
+        print(u"FRAME_BASELINE_BAKE_PROVENANCE=absent "
+              u"⇒ 这份基线没有 baked_from_commit（R586 之前烤的旧文档，形状照读、判定照旧）；"
+              u"它答不了「判的就是烤它的那批帧吗」⇒ 不许把 变帧=0 读成「没人改过界面」（BACKLOG 660）")
+    if same_bake:
+        print(u"FRAME_BASELINE_SAME_BAKE=%s" % bake["commit"][:7])
+        print(u"  同批  基线的 baked_from_commit 与此刻 HEAD 同一笔（%s）⇒ 这一趟的 变帧=%d 不给「没变」签字："
+              u"它同样兼容「刚拿被判的这批帧自己烤了一遍」。%s"
+              % (bake["commit"][:7], len(changed),
+                 u"出路 让基线与被判的帧出自不同一笔（例如发布那一笔烤、下一笔判），"
+                 u"或改判逐版本基线 `--against latest-release`；不许为了让这一支绿就把出处字段删掉，也不许调宽任何阈值"))
+    if bake["scale"] and current_scale and bake["scale"] != current_scale:
+        # 只报数不拦路：R584 已经量到 runner 自印 1.00x 而工作基线是本机 2x 烤的那件事，
+        # 这一格把它从"推理"变成基线文档自己说得出来的读数。放宽/收紧都不发生。
+        print(u"FRAME_BASELINE_SCALE_MISMATCH 基线=%s 当轮=%s（当轮量到 %d 张）⇒ 只报数不拦路，"
+              u"它是「变帧那一维是不是同一件事」的现场证人" % (bake["scale"], current_scale, current_scale_frames))
+    elif bake["scale"] and not current_scale:
+        print(u"FRAME_BASELINE_SCALE_NOT_RUN=当轮帧名里推不出倍率 ⇒ 这一维今天没读数，不许读成倍率相符")
     for name in changed:
         print("  changed  %s" % name)
     for name in missing:
@@ -634,7 +804,7 @@ def main(argv=None) -> int:
               u"照旧命令跑完永远停在 `判=不判`；不许改期望、不许调宽阈值、不许把这一格读成「这台机器绿了」）"
               % (machine, sanitize_machine(machine)))
         blockers = len(missing) + len(verdict["unknown"]) + len(verdict["bad_fields"]) \
-                 + len(verdict["rows_without_machine"])
+                 + len(verdict["rows_without_machine"]) + (1 if same_bake else 0)
     else:
         print(u"FRAME_BASELINE_DRIFT %s 已登记=%d 未登记=%d 陈旧行=%d"
               % (common, verdict["registered"], len(verdict["unregistered"]), len(verdict["stale"])))
@@ -645,12 +815,12 @@ def main(argv=None) -> int:
             print(u"  陈旧行（只报数）  %s  <- 这台机器此刻不漂；漂移按机器，删行会逼两台来回改" % name)
         blockers = len(missing) + len(verdict["unregistered"]) + len(verdict["unknown"]) \
                  + len(verdict["bad_fields"]) + len(verdict["rows_without_machine"]) \
-                 + len(verdict["no_proof"]) + len(verdict["mismatch"])
-    print(u"FRAME_BASELINE_RESULT=%s 拦路=%d（缺席%d 未登记%s 对不上%d 缺字段%d 缺机器%d 无出处%d 出处不符%d）"
+                 + len(verdict["no_proof"]) + len(verdict["mismatch"]) + (1 if same_bake else 0)
+    print(u"FRAME_BASELINE_RESULT=%s 拦路=%d（缺席%d 未登记%s 对不上%d 缺字段%d 缺机器%d 无出处%d 出处不符%d 同批%d）"
           % (u"ok" if blockers == 0 else u"red", blockers, len(missing), unreg_word,
              len(verdict["unknown"]), len(verdict["bad_fields"]),
              len(verdict["rows_without_machine"]), len(verdict["no_proof"]),
-             len(verdict["mismatch"])))
+             len(verdict["mismatch"]), (1 if same_bake else 0)))
     return 0 if blockers == 0 else 1
 
 

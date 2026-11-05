@@ -858,3 +858,269 @@ class RemedyDriveTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+try:
+    from PIL import Image as _PILImage
+    NO_PIL = False
+except ImportError:                                  # 与两态差尺那一卷同一口径：缺库要点名，不许静默绿
+    _PILImage = None
+    NO_PIL = True
+
+
+class BakeProvenanceTests(unittest.TestCase):
+    """R586 / 靶 A：**名册有出处了，基线那一侧当时还没有** —— 这一类把它补成会红的。
+
+    为什么这一格值得单独有（监工现读 `write_baseline` 的文档字段只有
+    `schema/count/machine/note/frames`）：`update --for-machine` 拿**刚捕的那批帧**烤一份
+    `by_machine/<键>.json`，下一次 `check` 必然 `变帧=0` —— 而"没人改过界面"与"刚用它自烤了一遍"
+    在输出里**逐字相同**。上一轮给名册每行补了 `observed`（手抄行从此可证伪），
+    同一个洞在基线这一侧却没有同一个药。
+    三个字段全部**运行时观测**（`git rev-parse HEAD` / 台账轮次标题 / PNG 头 vs 帧名里的逻辑尺寸），
+    命令行一个口子都不开 ⇒ 出处不是声明，是观测。
+    """
+
+    SCRIPT = os.path.join(str(Path(__file__).resolve().parents[2]), "scripts", "frame_baseline.py")
+    KEY = u"local:bake-fixture"
+
+    def git(self, root, *args):
+        import subprocess
+        base = ["git", "-C", root, "-c", "commit.gpgsign=false", "-c", "advice.detachedHead=false"]
+        env = dict(os.environ)
+        env.update({"GIT_AUTHOR_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+                    "GIT_COMMITTER_NAME": "fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid"})
+        proc = subprocess.Popen(base + ["-c", "core.autocrlf=false"] + list(args),
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                                universal_newlines=True)
+        out, _ = proc.communicate(timeout=120)
+        self.assertEqual(0, proc.returncode, out[-400:])
+        return out.strip()
+
+    def make_repo(self, root):
+        """真 git 仓：`baked_from_commit` 要由 `git rev-parse HEAD` 取 ⇒ 这一格的隔离前提是真的有一笔。"""
+        self.git(root, "init", "-q")
+        io.open(os.path.join(root, "seed.txt"), "w", encoding="utf-8").write(u"seed\n")
+        io.open(os.path.join(root, "AGENT_STATE.md"), "w", encoding="utf-8").write(u"## R500 状态（占位）\n")
+        self.git(root, "add", "-A")
+        self.git(root, "commit", "-q", "-m", "c1")
+        return self.git(root, "rev-parse", "HEAD")
+
+    def frames(self, root, names=(u"a-10x10-dark.png", u"b-10x10-light.png")):
+        d = os.path.join(root, "frames")
+        if not os.path.isdir(d):
+            os.mkdir(d)
+        for n in names:
+            make_frame(d, n, n.encode("utf-8"))
+        return d
+
+    def cli(self, argv, machine=KEY):
+        import subprocess
+        env = dict(os.environ)
+        env["MOTION_FLOOR_MACHINE_KEY"] = machine
+        proc = subprocess.Popen([sys.executable, self.SCRIPT] + argv,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                                universal_newlines=True)
+        out, _ = proc.communicate(timeout=300)
+        return proc.returncode, out
+
+    # ── 落笔那一侧 ──────────────────────────────────────────────────────────
+    def test_update_for_machine_stamps_the_three_runtime_observations(self):
+        with tempfile.TemporaryDirectory() as root:
+            sha = self.make_repo(root)
+            frames_dir = self.frames(root)
+            rc, out = self.cli([u"update", frames_dir, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            doc = json.load(io.open(machine_baseline_path(root, self.KEY), encoding="utf-8"))
+            self.assertEqual(sha, doc["baked_from_commit"], u"commit 那一格必须等于 git 自己说的 HEAD")
+            self.assertEqual(u"R501", doc["baked_by_round"],
+                             u"轮次由台账标题派生（仓里那份写着 `## R500 状态` ⇒ 正在烤它的是 R501）")
+            self.assertIn(u"FRAME_BASELINE_BAKE 出处=有", out,
+                          u"落笔那一趟要把**回读**出来的出处印出来，不是印我以为写进去的那些")
+
+    def test_no_flag_can_name_the_bake(self):
+        """手填口子一律不存在：出处一旦被声明，它就退化成措辞（R585「登记是账，不是措辞」同族）。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            frames_dir = self.frames(root)
+            for flag in (u"--baked-by", u"--commit", u"--baked-from-commit", u"--capture-scale"):
+                rc, out = self.cli([u"update", frames_dir, u"--for-machine",
+                                    u"--repo-root", root, flag, u"R1"])
+                self.assertEqual(2, rc, u"%s 竟然被接受了：\n%s" % (flag, out[-400:]))
+
+    # ── 判定那一侧：同批自烤 ────────────────────────────────────────────────
+    def test_same_bake_is_named_and_blocks_even_when_nothing_drifted(self):
+        """这一格的靶心：`变帧=0` 而基线就是拿这批帧烤的 ⇒ 不许签绿，要具名并**照报数**。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            frames_dir = self.frames(root)
+            rc, out = self.cli([u"update", frames_dir, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            rc, out = self.cli([u"check", frames_dir, u"--against", u"working", u"--repo-root", root])
+            self.assertEqual(1, rc, u"同批自烤却给了绿：\n" + out[-700:])
+            self.assertIn(u"FRAME_BASELINE_SAME_BAKE=", out, out[-700:])
+            self.assertIn(u"FRAME_BASELINE_CHANGED=0", out, u"数照报 —— 具名不是把读数藏起来")
+            self.assertIn(u"同批1", out, out[-700:])
+
+    def test_a_different_commit_judges_the_dimension_normally(self):
+        """负半证人①：基线与被判帧出自**不同**一笔 ⇒ 不许有 SAME_BAKE 那一格，也不许多拦路。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            frames_dir = self.frames(root)
+            rc, out = self.cli([u"update", frames_dir, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            io.open(os.path.join(root, "seed.txt"), "a", encoding="utf-8").write(u"second\n")
+            self.git(root, "add", "-A")
+            self.git(root, "commit", "-q", "-m", "c2")
+            rc, out = self.cli([u"check", frames_dir, u"--against", u"working", u"--repo-root", root])
+            self.assertNotIn(u"FRAME_BASELINE_SAME_BAKE=", out,
+                             u"下一笔判上一笔烤的基线，本来就是正常流向，不该被这一格拦：%s" % out[-700:])
+            self.assertIn(u"同批0", out, out[-700:])
+
+    def test_same_bake_never_masks_an_existing_red(self):
+        """负半证人②：同批 + 真有未登记漂移 ⇒ 两朵红都要在，具名不许把已有的红改成「不判」。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            frames_dir = self.frames(root)
+            rc, out = self.cli([u"update", frames_dir, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            # 不新增一笔 ⇒ HEAD 仍等于 baked_from_commit（同批成立），而此刻 a 帧自己变了
+            make_frame(frames_dir, u"a-10x10-dark.png", b"different")
+            rc, out = self.cli([u"check", frames_dir, u"--against", u"working", u"--repo-root", root])
+            self.assertEqual(1, rc, out[-700:])
+            self.assertIn(u"未登记  a-10x10-dark.png", out, u"同批那一格不许吃掉未登记的那朵")
+            self.assertIn(u"FRAME_BASELINE_SAME_BAKE=", out, out[-700:])
+            self.assertIn(u"同批1", out, out[-700:])
+
+    # ── 旧文档那一侧 ────────────────────────────────────────────────────────
+    def test_a_legacy_baseline_still_judges_and_is_named_not_treated_as_new(self):
+        """③ 的证人：R586 之前烤的文档没有那三个字段 ⇒ 形状照读、判定照旧，但必须**具名**。
+
+        ⚠ 这一格**必须跑在真 git 仓里**：临时目录不是仓 ⇒ `HEAD` 取不到 ⇒ "缺出处就默认成此刻这一笔"
+        那个坏法会退化成"默认成空串"，什么数都不改 ⇒ 这一格对 M1543 天生瞎（本轮刀的输出教的）。
+        """
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)          # 有了 HEAD，"默认成这一笔"才是一个能被抓到的动作
+            frames_dir = self.frames(root)
+            baseline = dict(collect(frames_dir))
+            baseline[u"b-10x10-light.png"] = u"0" * 64
+            write_baseline(manifest_path(root), baseline, machine=self.KEY)   # 2 参 = 旧形状
+            doc = json.load(io.open(manifest_path(root), encoding="utf-8"))
+            self.assertEqual(u"", str(doc.get("baked_from_commit") or ""), u"旧文档不该被偷偷补字段")
+            rc, out = self.cli([u"check", frames_dir, u"--against", u"working", u"--repo-root", root])
+            self.assertIn(u"FRAME_BASELINE_BAKE 出处=无", out, out[-700:])
+            self.assertIn(u"FRAME_BASELINE_BAKE_PROVENANCE=absent", out, out[-700:])
+            self.assertIn(u"FRAME_BASELINE_RESULT=red", out, u"旧文档照判：那一帧是真漂移")
+            self.assertIn(u"同批0", out, u"「不知道」不许被读成「同批」，那是另一种伪造：%s" % out[-700:])
+            self.assertIn(u"FRAME_BASELINE_DRIFT ", out, u"判定那一维照旧要有人判，具名不许把判本身撤掉")
+
+    def test_missing_provenance_is_never_defaulted_to_this_commit(self):
+        """反面对照：缺字段默认成 HEAD 的话，每一旧文档都会被判成同批自烤 ⇒ 把红改成另一种红。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            frames_dir = self.frames(root)
+            write_baseline(manifest_path(root), collect(frames_dir), machine=self.KEY)
+            rc, out = self.cli([u"check", frames_dir, u"--against", u"working", u"--repo-root", root])
+            self.assertNotIn(u"FRAME_BASELINE_SAME_BAKE=", out,
+                             u"没有出处就被判成同批 ⇒ 这一支会把所有旧基线一起误红：%s" % out[-700:])
+
+    @unittest.skipIf(NO_PIL, "缺 PIL：造不出能被 IHDR 读出尺寸的帧，这一格要能被点名")
+    def test_scale_mismatch_is_a_reading_not_a_new_blocker(self):
+        """倍率那一格的目的：R584 那 356 张变帧的成因（本机 2x 烤、runner 1x 判）从此由基线自己说出来。"""
+        with tempfile.TemporaryDirectory() as root:
+            self.make_repo(root)
+            big = os.path.join(root, "frames_2x")
+            os.mkdir(big)
+            for n in (u"a-10x10-dark.png", u"b-10x10-light.png"):
+                _PILImage.new("RGB", (20, 20), (10, 10, 10)).save(os.path.join(big, n))
+            rc, out = self.cli([u"update", big, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-500:])
+            small = os.path.join(root, "frames_1x")
+            os.mkdir(small)
+            for n in (u"a-10x10-dark.png", u"b-10x10-light.png"):
+                _PILImage.new("RGB", (10, 10), (10, 10, 10)).save(os.path.join(small, n))
+            # 先让 HEAD 走一笔（否则同一批帧既触发倍率对照又触发同批自烤，两件事混在一条红里，
+            # 这一格就不是单边的证人（R577 那一课：一臂里捆两件产品各自会做的事，永远判不出必需是哪一件））
+            io.open(os.path.join(root, "seed.txt"), "a", encoding="utf-8").write(u"second\n")
+            self.git(root, "add", "-A")
+            self.git(root, "commit", "-q", "-m", "c2")
+            rc, out = self.cli([u"check", small, u"--against", u"working", u"--repo-root", root])
+            self.assertIn(u"FRAME_BASELINE_SCALE_MISMATCH 基线=2.00x 当轮=1.00x", out, out[-700:])
+            self.assertIn(u"同批0", out, out[-700:])
+            self.assertEqual(1, rc, u"两批帧的哈希本来就不同（2x 与 1x），未登记那一朵该红：%s" % out[-700:])
+            blockers = int(re.search(r"拦路=(\d+)", out).group(1))
+            unregistered = int(re.search(r"未登记(\d+|不判)", out).group(1))
+            self.assertEqual(unregistered, blockers,
+                             u"倍率不合这一格只许报数，不许进拦路：拦路=%d 未登记=%d\n%s" % (blockers, unregistered, out[-700:]))
+
+
+class BakeSnapshotInheritanceTests(unittest.TestCase):
+    """`snapshot()` 冻的是"那份基线对应的那一笔"，不是"此刻跑 snapshot 的这一笔"。
+
+    没有这一格的话，发布快照会把出处改写成跑它的那台机器/那一笔 ⇒ 逐版本基线从此说不出
+    自己是哪个版本烤的，而 `--against release` 那一支判的正是这件事。
+    """
+
+    def test_snapshot_inherits_the_source_provenance(self):
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = os.path.join(root, "frames")
+            os.mkdir(frames_dir)
+            make_frame(frames_dir, u"a.png", b"1")
+            write_baseline(manifest_path(root), collect(frames_dir), machine=u"local:snap-owner",
+                           repo_root=root, frames_dir=frames_dir)
+            src = json.load(io.open(manifest_path(root), encoding="utf-8"))
+            # 临时目录不是 git 仓 ⇒ commit 该是空串（"不知道"），这一格顺便钉住那条口径
+            self.assertEqual(u"", src["baked_from_commit"], u"取不到 HEAD 时不许猜一个数")
+            target = snapshot(root, u"9.9.9")
+            self.assertTrue(target and os.path.exists(target), target)
+            doc = json.load(io.open(target, encoding="utf-8"))
+            self.assertEqual(src["machine"], doc["machine"], u"署名照继承")
+            for key in ("baked_from_commit", "baked_by_round", "capture_scale"):
+                self.assertEqual(src[key], doc[key], key)
+
+
+class PrintedFlagTests(unittest.TestCase):
+    """R586 / ⑨·7 的证人：本轮新写的那条「出路」里我抄错了一个旗标值。
+
+    派单 ③ 的原话就是这一族的定义：**印出来的东西就是契约**（R585 那一整轮都在还这一笔债），
+    而我在本轮新加的 SAME_BAKE 出路行里写了 `--against release`，真值是 `latest-release`
+    ⇒ 照那句话跑的人会得到 argparse 的 usage 错（退 2），和 R584 那条空头支票同形。
+    所以这里不是加一句注释，而是加两格会红的证人。
+    """
+
+    SCRIPT = os.path.join(str(Path(__file__).resolve().parents[2]), "scripts", "frame_baseline.py")
+
+    def choices_from_argparse(self):
+        """从**源码**里读 `--against` 的 choices，而不是从我记忆里读（抄常量那一族）。"""
+        src = io.open(self.SCRIPT, encoding="utf-8").read()
+        m = re.search(r'add_argument\("--against"[^)]*choices=\[([^\]]+)\]', src)
+        self.assertTrue(m, "读不到 --against 的 choices ⇒ 这一格没有可对账的对象")
+        return {s.strip().strip('"\'') for s in m.group(1).split(",")}
+
+    def test_every_printed_against_value_is_a_real_choice(self):
+        src = io.open(self.SCRIPT, encoding="utf-8").read()
+        printed = set(re.findall(r"--against ([A-Za-z][A-Za-z0-9_-]*)", src))
+        self.assertTrue(printed, "源码里一条 `--against …` 都没印 ⇒ 扫描器读错了对象")
+        choices = self.choices_from_argparse()
+        bad = sorted(printed - choices)
+        self.assertEqual([], bad, u"印给读者的旗标值 argparse 不认：%s（可用：%s）" % (bad, sorted(choices)))
+
+    def test_the_release_branch_actually_runs(self):
+        """出路说了改判哪一支，就得真跑一次那一支：退 2（用法错）与退 0/1（判定）是两种东西。"""
+        import subprocess
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = os.path.join(root, "frames")
+            os.mkdir(frames_dir)
+            make_frame(frames_dir, u"a.png", b"1")
+            os.makedirs(os.path.join(root, "docs", "frame_baselines"))
+            write_baseline(os.path.join(root, "docs", "frame_baselines", "v9.9.9.json"),
+                           collect(frames_dir), machine=u"local:snap-owner")
+            env = dict(os.environ)
+            env["MOTION_FLOOR_MACHINE_KEY"] = u"local:printer"
+            proc = subprocess.Popen([sys.executable, self.SCRIPT, u"check", frames_dir,
+                                     u"--against", u"latest-release", u"--repo-root", root],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                                    universal_newlines=True)
+            out, _ = proc.communicate(timeout=300)
+            self.assertNotEqual(2, proc.returncode, u"用法错（argparse 不认这个值）：\n%s" % out[-400:])
+            self.assertIn(u"FRAME_BASELINE_AGAINST=v9.9.9", out,
+                          u"那一支跑到了别的东西上（说明它没读逐版本基线）：\n%s" % out[-400:])
