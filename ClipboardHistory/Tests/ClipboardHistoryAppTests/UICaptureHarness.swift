@@ -27760,6 +27760,260 @@ final class UICaptureTests: XCTestCase {
              + " 浮层甲=\(Self.layerTreeColdName(overlayCold))"
              + " 夹具那步之后未画比例=\(String(format: "%.4f", undrawnAfterFixtureStep))")
     }
+
+    // ---------------------------------------------------------------------
+    // R577 / BACKLOG 651：解释②「`wantsLayer` 只在窗口上屏之后才置」的最后一格。
+    //
+    // 上轮 runner 那句 `判=被支持_甲无树而乙有树` 是**跨两棵树**比出来的（甲 = 夹具那棵
+    // `content-with-history`，乙 = 判据自己搭的那棵产品树）⇒ 自变量不止「上屏」，还夹了一层夹具差
+    // （R576 的七维表就为这一层扣过分）。本轮把自变量收成一个：**同一套构造代码建出来的树**，
+    // 三个量逐字输出（`子层` / `contents` / 离屏 alpha 栅格里的不透明与全透明数），
+    // **先问两臂分不分得出**，再给结论。
+    //
+    // 三臂各自一个独立实例，每臂只做一件事：甲 = 什么都不做（从未上屏）；
+    // 乙A = 只上屏（`orderFrontRegardless` + 跑一拍，不调显式 display）；
+    // 乙B = 只走显示通路（`window.display()`，**不**上屏）。
+    // 为什么必须把这两件事分开测：②说的是「等**上屏**」，而 `display()` 也会把层建出来 ——
+    // 在同一棵树上依次做两步（上轮乙臂就是这个形状），读到的「有树」根本分不清是哪一步给的，
+    // 于是「等上屏」会被误签成结论。本轮把那个次序污染单独留成**诊断腿**，不进分类器。
+    // ---------------------------------------------------------------------
+
+    /// 同一套构造建出来的树，一次读到的三个量（`samples` 用来挡「通道根本没解开」那种尺坏）。
+    struct SameTreeReadings: Equatable {
+        let sublayers: Int
+        let contentsPresent: Bool
+        let opaque: Int
+        let clear: Int
+        let samples: Int
+    }
+
+    /// ②的结局。dispatch ② 给的三条是 `被支持 / 被否 / 无证人`；这里把「被否」按**哪一步才是分水岭**
+    /// 分成四支（那正是本轮要比的自变量），另加「尺坏」—— 五者修法相反，不许混说。
+    enum ExplanationTwoVerdict: Equatable {
+        case supportedOnScreen          // 被支持：只有上过屏那臂建得出层树
+        case refutedDisplayPass         // 被否：不上屏、只走 display 就建得出，而上屏不 display 建不出
+        case refutedEitherStepSuffices  // 被否：上屏与 display 各自都够 ⇒ 上屏不是必需的那一步
+        case refutedRunloopTurn         // 被否：只有跑一拍 runloop 那臂建得出 ⇒ 等的是隐式显示不是上屏
+        case refutedAlreadyThere        // 被否：从未上屏那臂本来就有层树 ⇒ 它谁也不等
+        case noWitness                  // 无证人：层树那一侧没有任何反差（**不是「不判」**）
+        case rulerBroken                // 尺坏：所有臂三个量逐字相同 ⇒ 先怀疑驱动，不许下结论
+    }
+
+    /// 纯函数：处置只由四臂读数派生，不许抄来的常数。
+    /// 关键那一对是 `displayed`（**不上屏**、只调一次 `window.display()`，连 runloop 都不跑）与
+    /// `onScreenNotDisplayed`（**上了屏**、一次 display 都不调、也不跑 runloop）—— 两臂只差一个自变量。
+    static func explanationTwoVerdict(cold: SameTreeReadings,
+                                      displayed: SameTreeReadings,
+                                      onScreenNotDisplayed: SameTreeReadings,
+                                      runloopOnly: SameTreeReadings) -> ExplanationTwoVerdict {
+        if cold.sublayers > 0 { return .refutedAlreadyThere }
+        let displayedBuilds = displayed.sublayers > 0
+        let onScreenBuilds = onScreenNotDisplayed.sublayers > 0
+        let runloopBuilds = runloopOnly.sublayers > 0
+        if displayedBuilds && !onScreenBuilds { return .refutedDisplayPass }
+        if onScreenBuilds && !displayedBuilds { return .supportedOnScreen }
+        if displayedBuilds && onScreenBuilds { return .refutedEitherStepSuffices }
+        if runloopBuilds { return .refutedRunloopTurn }
+        if displayed == cold && onScreenNotDisplayed == cold && runloopOnly == cold { return .rulerBroken }
+        return .noWitness
+    }
+
+    /// ②的**声明值**（照 `registeredOffscreenVerdict(scale:)` / `registeredLayerTreeCold(tree:scale:)`
+    /// 那个方法：只收已经观测过的那一档倍率，其余具名不判，登记值只由那一跑自己的读数改）。
+    /// 来源逐字记在这里：
+    /// · 2.00x —— 本机本轮矩阵 `乙E走display但不跑runloop 子层=2` 对 `乙D上屏但不跑runloop 子层=-1`
+    ///   ⇒ `解释②=被否_不上屏只走display就建得出而上屏不display建不出`
+    /// · 1.00x —— **还没有观测值**（这把尺第一次上 runner 是含本笔的那一跑）⇒ 返回 nil，
+    ///   由那一跑自己打印读数后再登记；本机不许替它填。
+    static func declaredExplanationTwo(scale: Double) -> ExplanationTwoVerdict? {
+        let rounded = (scale * 100).rounded() / 100
+        guard rounded == 2.00 else { return nil }
+        return .refutedDisplayPass
+    }
+
+    static func explanationTwoName(_ value: ExplanationTwoVerdict) -> String {
+        switch value {
+        case .supportedOnScreen: return "被支持_只有上过屏那臂建得出层树"
+        case .refutedDisplayPass: return "被否_不上屏只走display就建得出而上屏不display建不出"
+        case .refutedEitherStepSuffices: return "被否_上屏与display各自都够"
+        case .refutedRunloopTurn: return "被否_只有跑一拍runloop那臂建得出"
+        case .refutedAlreadyThere: return "被否_从未上屏那臂本来就有层树"
+        case .noWitness: return "无证人_层树那一侧没有反差_LAYER_TREE_ARM_NO_TREE_CONTRAST"
+        case .rulerBroken: return "尺坏_所有臂三个量逐字相同_LAYER_TREE_ONSCREEN_ARMS_INDIFFERENT"
+        }
+    }
+
+    /// 建一扇**从未上屏**的窗、装一棵产品主窗树（`ContentView` → `NSHostingView` → `WindowBackingContainer`）。
+    /// 三臂都从这里出发 ⇒ 构造代码逐字相同，唯一差别是「做哪一步」。
+    private func makeMainTreeWindow() -> (window: NSWindow, container: NSView) {
+        let size = NSSize(width: 420, height: 300)
+        let host = NSHostingView(rootView: AnyView(ContentView(historyStore: makePopulatedStore())))
+        host.frame = NSRect(origin: .zero, size: size)
+        let container = WindowBackingContainer.wrapping(host)
+        container.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.contentView = container
+        window.appearance = NSAppearance(named: .aqua)
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        return (window, container)
+    }
+
+    /// 一次读数：层树那两个量 + 离屏 alpha 栅格的三分数（与 `probeAlphaLayerChannelOnProductOverlay`
+    /// 同一把尺、同一 `step` 口径 ⇒ 两处的数要能对话，不许一个数整幅一个数网格）。
+    private func readSameTreeQuantities(_ container: NSView) throws -> SameTreeReadings {
+        guard let layer = container.layer else {
+            return SameTreeReadings(sublayers: -1, contentsPresent: false, opaque: -1, clear: -1, samples: 0)
+        }
+        let size = container.bounds.size
+        let pw = max(1, Int(round(size.width * 2)))
+        let ph = max(1, Int(round(size.height * 2)))
+        let raster = try TransparencyForensicsTests.renderLayerIntoAlphaRaster(
+            layer, pixelsWide: pw, pixelsHigh: ph, size: size)
+        let profile = raster.profile(step: 5)
+        return SameTreeReadings(sublayers: layer.sublayers?.count ?? -1,
+                                contentsPresent: layer.contents != nil,
+                                opaque: profile.opaque, clear: profile.clear,
+                                samples: profile.samples)
+    }
+
+    private func sameTreeReadingsName(_ arm: String, _ r: SameTreeReadings) -> String {
+        return "SAME_TREE_ONSCREEN 臂=" + arm + " 子层=" + String(r.sublayers)
+            + " contents=" + (r.contentsPresent ? "有" : "无")
+            + " 不透明=" + String(r.opaque) + " 全透明=" + String(r.clear)
+            + " 采样=" + String(r.samples)
+    }
+
+    func testTheThreeArmsOnOneTreeSettleExplanationTwoAboutOnScreenVersusDisplayPass() throws {
+        // 正/负对照：分类器不许恒真，也不许恒假（先把尺本身钉住，再拿它读数）。
+        // 五支结局各一条合成样本 + 一条「全部逐字相同」的尺坏样本 ⇒ 六格。
+        let noTree = SameTreeReadings(sublayers: -1, contentsPresent: false, opaque: 0, clear: 130, samples: 130)
+        let treeFromDisplay = SameTreeReadings(sublayers: 2, contentsPresent: false, opaque: 20, clear: 110, samples: 130)
+        let treeFromOnScreen = SameTreeReadings(sublayers: 3, contentsPresent: false, opaque: 40, clear: 90, samples: 130)
+        let coldHadTree = SameTreeReadings(sublayers: 1, contentsPresent: false, opaque: 40, clear: 90, samples: 130)
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: coldHadTree, displayed: noTree,
+                                                 onScreenNotDisplayed: noTree, runloopOnly: noTree),
+                       .refutedAlreadyThere,
+                       "冷态那臂本来就有树 ⇒ ②直接被否，这一支不许被反差规则吃掉")
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: noTree, displayed: noTree,
+                                                 onScreenNotDisplayed: noTree, runloopOnly: noTree),
+                       .rulerBroken,
+                       "所有臂逐字相同还给出结论 ⇒ 这把尺是恒真的（dispatch ② 那条「两臂逐字相同＝尺坏」）")
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: noTree, displayed: noTree,
+                                                 onScreenNotDisplayed: treeFromOnScreen, runloopOnly: noTree),
+                       .supportedOnScreen,
+                       "只有上过屏那臂建得出层树 ⇒ 这一支必须读成②被支持，否则证人就白排了")
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: noTree, displayed: treeFromDisplay,
+                                                 onScreenNotDisplayed: noTree, runloopOnly: noTree),
+                       .refutedDisplayPass,
+                       "不上屏只走 display 就建得出、而上屏不 display 建不出 ⇒ 本轮本机读到的正是这一支")
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: noTree, displayed: treeFromDisplay,
+                                                 onScreenNotDisplayed: treeFromOnScreen, runloopOnly: noTree),
+                       .refutedEitherStepSuffices,
+                       "两步各自都够 ⇒ 上屏不是必需的那一步，不许读成被支持")
+        XCTAssertEqual(Self.explanationTwoVerdict(cold: noTree, displayed: noTree,
+                                                 onScreenNotDisplayed: noTree, runloopOnly: treeFromDisplay),
+                       .refutedRunloopTurn,
+                       "只有跑一拍 runloop 那臂建得出 ⇒ 等的是隐式显示，不是上屏")
+
+        // 三臂：各自一个独立实例，每臂只做一件事。
+        let cold = try readSameTreeQuantities(makeMainTreeWindow().container)
+        let coldAgain = try readSameTreeQuantities(makeMainTreeWindow().container)
+
+        let onScreenWindow = makeMainTreeWindow()
+        onScreenWindow.window.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let onScreen = try readSameTreeQuantities(onScreenWindow.container)
+
+        let displayWindow = makeMainTreeWindow()
+        displayWindow.window.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        let displayOnly = try readSameTreeQuantities(displayWindow.container)
+
+        // 矩阵补三格（M1516 第一次下刀是**空刀**抓出来的：把 `display()` 摘掉，乙B 照旧读到有树
+        // ⇒ 说明"有树"不是 `display()` 给的，而是这一臂里另一件事 —— 跑一拍主线程 runloop。
+        // 所以自变量必须拆成 {上屏?, display?, runloop?} 三件事，一次只动一件）：
+        let runloopWindow = makeMainTreeWindow()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let runloopOnly = try readSameTreeQuantities(runloopWindow.container)
+
+        let orderFrontNoRunloopWindow = makeMainTreeWindow()
+        orderFrontNoRunloopWindow.window.orderFrontRegardless()
+        let onScreenNoRunloop = try readSameTreeQuantities(orderFrontNoRunloopWindow.container)
+
+        let displayNoRunloopWindow = makeMainTreeWindow()
+        displayNoRunloopWindow.window.display()
+        let displayNoRunloop = try readSameTreeQuantities(displayNoRunloopWindow.container)
+
+        // 诊断腿（**不进分类器**）：同一棵树上先上屏、再 display —— 上轮那句「被支持」读的就是这个累计形状。
+        let accumWindow = makeMainTreeWindow()
+        accumWindow.window.orderFrontRegardless()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let accumAfterOnScreen = try readSameTreeQuantities(accumWindow.container)
+        accumWindow.window.display()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        let accumAfterDisplay = try readSameTreeQuantities(accumWindow.container)
+        for handle in [onScreenWindow, displayWindow, runloopWindow,
+                       orderFrontNoRunloopWindow, displayNoRunloopWindow, accumWindow] {
+            handle.window.orderOut(nil)
+        }
+
+        XCTAssertGreaterThan(displayOnly.samples, 0,
+                             "离屏 alpha 栅格连采样数都是 " + String(displayOnly.samples)
+                             + " ⇒ 通道根本没解开，三臂比较无从谈起"
+                             + "（先按负臂排除自己：尺寸/倍率/profile(step:) 口径）")
+        let verdict = Self.explanationTwoVerdict(cold: cold, displayed: displayNoRunloop,
+                                             onScreenNotDisplayed: onScreenNoRunloop,
+                                             runloopOnly: runloopOnly)
+        XCTAssertNotEqual(verdict, .rulerBroken,
+                          "三臂三个量逐字相同 ⇒ 驱动根本没动到那一步（上屏与显示通路都没做事），"
+                          + "这一格读不出任何结论 ⇒ " + Self.explanationTwoName(verdict))
+
+        // 声明 vs 实测：结论要能被"摘掉证人"这一刀抓住，所以它必须是一条**写下来的声明**，
+        // 而不是每次现推的散文。登记值只由那一跑自己的读数改（本机手改 = 藏红，M1516 钉这一条）。
+        let scaleOfChannelRuler = Double(NSScreen.main?.backingScaleFactor ?? 2.0)
+        let declared = Self.declaredExplanationTwo(scale: scaleOfChannelRuler)
+        var declarationVerdict = "EXPLANATION2_NOT_RUN=unregistered-scale"
+        if let declared = declared {
+            XCTAssertEqual(verdict, declared,
+                           "解释② 在 " + String(format: "%.2fx", scaleOfChannelRuler) + " 这台上读到「"
+                           + Self.explanationTwoName(verdict) + "」而声明登记的是「"
+                           + Self.explanationTwoName(declared) + "」⇒ 这台机器的行为翻了。"
+                           + "唯一合法的修法是由**这一跑的读数**改登记值（先按负臂确认不是自己的驱动没走到那一步）："
+                           + "不许改成不判、不许降地板、不许把另一台的值抄过来。")
+            declarationVerdict = "判=与声明一致"
+        }
+        emit("EXPLANATION2 倍率=" + String(format: "%.2fx", scaleOfChannelRuler)
+             + " 实测=" + Self.explanationTwoName(verdict)
+             + " 声明=" + (declared.map { Self.explanationTwoName($0) } ?? "无")
+             + " " + declarationVerdict)
+
+        for (arm, reading) in [("甲从未上屏", cold), ("甲第二次另一棵", coldAgain),
+                               ("乙A只上屏", onScreen), ("乙B只走显示通路", displayOnly),
+                               ("乙C只跑runloop", runloopOnly), ("乙D上屏但不跑runloop", onScreenNoRunloop),
+                               ("乙E走display但不跑runloop", displayNoRunloop),
+                               ("诊断_同一棵上屏之后", accumAfterOnScreen),
+                               ("诊断_同一棵再走显示通路", accumAfterDisplay)] {
+            emit(sameTreeReadingsName(arm, reading))
+        }
+        emit("SAME_TREE_ONSCREEN_SUMMARY 倍率="
+             + String(format: "%.2fx", Double(NSScreen.main?.backingScaleFactor ?? 2.0))
+             + " 冷子层=" + String(cold.sublayers)
+             + " 只走display不跑runloop子层=" + String(displayNoRunloop.sublayers)
+             + " 只上屏不跑runloop子层=" + String(onScreenNoRunloop.sublayers)
+             + " 只跑runloop子层=" + String(runloopOnly.sublayers)
+             + " 上屏且跑runloop子层=" + String(onScreen.sublayers)
+             + " 走display且跑runloop子层=" + String(displayOnly.sublayers)
+             + " 分水岭=display" + (displayNoRunloop.sublayers > 0 ? "_单独就够" : "_单独不够")
+             + "_上屏单独" + (onScreenNoRunloop.sublayers > 0 ? "也够" : "不够")
+             + "_runloop单独" + (runloopOnly.sublayers > 0 ? "也够" : "不够")
+             + " 同遍两读数相同=" + (cold == coldAgain ? "1" : "0")
+             + " 累计腿与独立乙A相同=" + (accumAfterOnScreen == onScreen ? "1" : "0")
+             + " 正对照=6/6 解释②=" + Self.explanationTwoName(verdict))
+    }
+
     // ---------------------------------------------------------------------
     // R575 / BACKLOG 654：D12 那八条逐帧硬判据 × 判它的通道 × 该通道今天到不到数。
     //
