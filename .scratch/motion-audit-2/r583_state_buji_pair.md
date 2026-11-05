@@ -1,0 +1,13 @@
+### R583 补记（2026-11-06 · 第 582 轮 / Round 580 · 产品 0 文件）：⓪ 的成对号现取现写 —— `FRAME_BASELINE_DRIFT` 那一行的第一证人只能是含本笔的那一跑
+
+· **成对号**：`42077586416 ↔ bce08b4`（本轮主笔）现读 `status=queued`、`conclusion` 空 ⇒ **未到数**。⚠ 没轮询、没拿本机的数顶、没把"每一步 conclusion 也全空"读成"没有失败步骤"，也没对进行中的作业去取日志。本轮 ⓪ 那两跑（`42066364877 ↔ dbd13fb`、`42066695864 ↔ 876bd3a`）**台账之前都到数**，读数已写在 R583 那一节的 ① 里，不回头改。
+· **R584 该带的三条待验形状**（都是"若读到 X 就怎么办"，不是"已经成立"；而且这一格由 `ci_status_r584.py` 从门自己打印的那一行**按前缀反查**，不许我事前挑 —— 上一轮我犯过"把占位文字当读数"，所以这次要求先判"那一行在不在"再判它说什么）：
+  ⑴ 若读到 `FRAME_BASELINE_DRIFT 变帧=0 新帧=0 …` 且 `FRAME_BASELINE_RESULT=ok 拦路=0` ⇒ **新门在第二台机器上跑到了且没有误红** ⇒ "变帧从此有人判"这句话第一次跨机器成立，登记名册那 8 行在 runner 上判成**陈旧行**（只报数）就是它的正常形状；
+  ⑵ 若读到 `FRAME_BASELINE_RESULT=red 拦路=N`（N>0）且 `未登记=N` ⇒ 那台机器上真有变帧而名册没登记 ⇒ 唯一合法处置是**补登记（帧名 + 理由 + 归哪张单）**或先查清"为什么这一台会漂"；**不许**把门改回只判 missing、**不许**调宽阈值/容差、**不许**把这一格改成就近具名 skip（那是把真数藏成不报）；
+  ⑶ 若 `FRAME_BASELINE_COMPARED` 那一行在、而 `FRAME_BASELINE_DRIFT` **命中 0 次** ⇒ **通道没跑**（那一步被跳过、或命令换了写法），要先读 `executed=` 与全部失败步骤再下结论；**不许**把"没有这一行"读成"门在第二台绿了"。
+  ⚠ 还有第四种**环境**出口，它不是上面三条里的任何一种：CI 那一步在帧数 <60 时自己打 `FRAME_BASELINE_SKIPPED=runner-capture-unavailable` 并退 0 ⇒ 那台机器今天**没判**，要具名成"第二台没判（环境缺席）"，不许读成 ⑴ 的成立。
+· **本轮新格在 ⓪ 那两跑上"一行都没有"，而且是数出来的没有**：`FRAME_BASELINE_DRIFT` 在 `42066364877` 上现读命中 0 次 ⇒ 门的登记判定随本笔才上树，**修尺那一笔的跑签不了自己**（R555/R565 那一族）；第一证人只能是上面这一跑。
+· **上一轮交接的三条形状里，⑴ 命中并已结掉**：`D12_SHAPE_SCAN_REGISTRY` 在 `42066364877` 上逐字 `机器=github-runner 登记=1_2 实测=1_2 判=一致 红路=无 另一台已登记=是` ⇒ R582 那句"数值到了、判定那一半没闭合"从今天起不再欠；⑵（判=翻了）与⑶（命中 0 次＝通道没跑）都没触发，但**没有被删** —— 它们现在是门与电池里的规则，不再是我账里的三句话。
+· **push 那一格（本轮现读两次）**：开工一次、推之前一次，`git ls-remote origin HEAD` 都通（远端 HEAD 从 `876bd3aa15cf…` 到 push 后 `bce08b4…`）⇒ `PUSH_TRANSPORT=ssh-ok`；`git push origin main` 落地 `876bd3a..bce08b4`、收口 `ahead=0`、`HEAD=origin/main=bce08b4`。`api=200`、`github=200` 都是 **HTTP 状态码口径**（`curl -w '%{http_code}'`；上一轮我把 `gh api --jq total_count` 当成这一格，已纠正）。⚠ 监工侧那三次读数不一致本轮**没有复现**，但"没复现"不等于"不存在" ⇒ 成因仍归用户；`remote.origin.url`、`~/.ssh`、DNS/hosts 一字未动，没换直连 IP。
+· **电池那一格按派单 ③ 那条规矩办**：账里只写"本机那一趟不回填"，**最终签字归 runner `STEP[9]`**；两趟的数只进收口报告 —— 第一趟 `Ran 749 tests / FAILED (failures=4, skipped=5) @94.453s`（四朵逐条：§1 停在旧数、`test_every_backlog_citation_resolves_to_an_entry` 与 `test_prose_references_to_backlog_items_resolve_too` 两朵是**同一个根**（657 被引用但没有条目形状的那一行 ⇒ R579 那条"开单一律 `NNN. 标题` 且同笔自测一次引用"本轮又犯），第三朵是 skip 名册那一格的**借红**），补上条目 + 跑 `refresh_report_section1.py` 之后第二趟 `Ran 749 tests / OK (skipped=5) @93.457s` ⇒ 没有一朵是靠把期望改成"不判"消掉的。
+· **逐本现读六个数（派单 ④ 专项，不拿"fail-fast 没写脏盘"当证人）**：写之前七本里本轮那六个标题/编号形状各 **0** 次；写之后各 **恰 1** 次（UI_AUDIT 的轮次标题、ITERATION 的 Round 标题、STATE 的 R583 节、DECISIONS 的 D-583、BACKLOG 里 657 那一单、CHANGELOG 的身份括号），逐行现读落在 `/tmp/r583/preapply_counts.txt` 与 `postapply_counts.txt`。
