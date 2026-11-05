@@ -28103,16 +28103,18 @@ final class UICaptureTests: XCTestCase {
     /// 这一格与下面那一格必须**分开读**：交集为 0 这件事只有从两个独立数推出来才算证据，
     /// 直接扫"同一个文件里两个词都有"会把 `AppDelegate` 那种"顺手建了折叠控制器、又按 D4a 写了
     /// `isOpaque=false`"的文件算成"折叠期间改 alpha" —— R575 第一次试写就是这么错的。
-    static func countFoldPathWriters() -> Int {
-        return Self.countProductFiles { text in
+    /// R580 加 `in root:`：活门要能拿一棵**临时树**注入假对象来验证"它真会翻"，不许为了验证去动产品树
+    /// （本轮产品 0 文件）。不传 ⇒ 口径与 R575 那三条现扫逐字相同（同一把尺、同一个目录）。
+    static func countFoldPathWriters(in root: URL? = nil) -> Int {
+        return Self.countProductFiles(in: root) { text in
             text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
         }
     }
 
     /// 折叠路径**且**同文件里写窗口 alpha（`alphaValue` / `isOpaque`）的文件数 = D12「透明区」与
     /// 「透明之后」那两句今天有没有对象。今天预期 0（第③段还没写着色器与 alpha 驱动）。
-    static func countFoldAlphaWriters() -> Int {
-        return Self.countProductFiles { text in
+    static func countFoldAlphaWriters(in root: URL? = nil) -> Int {
+        return Self.countProductFiles(in: root) { text in
             let folds = text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
             let alpha = text.contains("alphaValue") || text.contains("isOpaque")
             return folds && alpha
@@ -28121,14 +28123,15 @@ final class UICaptureTests: XCTestCase {
 
     /// 现扫产品源码，按调用给的谓词数文件数；目录读不到时返回 -1（**不是 0** —— 那会把"扫不到"
     /// 伪装成"没有对象"，正是 R565 那一族"量不到冒充判过"）。
-    static func countProductFiles(_ predicate: (String) -> Bool) -> Int {
-        let sources = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/ClipboardHistoryApp")
-        guard let enumerator = FileManager.default.enumerator(atPath: sources.path) else { return -1 }
+    /// R580 加 `in root:`：活门要能拿一棵**临时树**取数，而不许为了验证去动产品树（那是 `Sources/`，
+    /// 本轮产品 0 文件）。根目录复用上面那一把 `productSourcesRoot()`（R575 口径：只扫
+    /// `Sources/ClipboardHistoryApp`，不扫别的 target —— 口径换了那张表的数就不可比）。
+    static func countProductFiles(in root: URL? = nil, _ predicate: (String) -> Bool) -> Int {
+        guard let dir = (root == nil ? Self.productSourcesRoot() : root) else { return -1 }
+        guard let enumerator = FileManager.default.enumerator(atPath: dir.path) else { return -1 }
         var hits = 0
         for case let rel as String in enumerator where rel.hasSuffix(".swift") {
-            guard let text = try? String(contentsOf: sources.appendingPathComponent(rel), encoding: .utf8)
+            guard let text = try? String(contentsOf: dir.appendingPathComponent(rel), encoding: .utf8)
             else { continue }
             if predicate(text) { hits += 1 }
         }
@@ -28138,11 +28141,98 @@ final class UICaptureTests: XCTestCase {
     /// 产品源码里引用**角度/模糊驱动**（着色器那一层）的文件数。
     /// 与 `TransparencyForensicsTests.countMetalLayerUsers` 同一把尺的形状（现扫 + 只数文件），
     /// 但对象不同：那一把数的是 `CAMetalLayer`/`MTKView`，这一把数的是 D12 前四条要的驱动本身。
-    static func countAngleDriverWriters() -> Int {
-        return Self.countProductFiles { text in
-            text.contains("foldAngle") || text.contains("blurRadius")
-                || text.contains("CAMetalLayer") || text.contains("MTKView")
+    /// R580 探针实测到的事：这一把**原先不剥注释** ⇒ 一句注释就能造出 A=1，于是五行实测被翻面、
+    /// 而「只有B认得」那一条红路被假 A 挡掉（`d12ObjectVerdict` 见 A>0 就短路）。今天产品树两种读法
+    /// 都是 0 ⇒ 补上剥注释**不改本轮任何读数**（口径收了、数没变，对拍见台账），去掉的是那条能被注释灭掉的红。
+    static func angleDriverTextHits(_ rawText: String) -> Bool {
+        let code = Self.codeOnly(rawText)
+        return code.contains("foldAngle") || code.contains("blurRadius")
+            || code.contains("CAMetalLayer") || code.contains("MTKView")
+    }
+
+    static func countAngleDriverWriters(in root: URL? = nil) -> Int {
+        return Self.countProductFiles(in: root) { Self.angleDriverTextHits($0) }
+    }
+
+    /// R580 / BACKLOG 654：**第二条独立通道（形状通道）** —— 不认 A 那四个名字，只认"要做角度驱动的
+    /// 透视 + 渐进模糊 + 暗化"必然落到的形状：要么仓库里有一份 `.metal` 着色器源文件，要么代码里
+    /// 引用了某条真模糊/管线 API（`CIFilter` / `CIGaussianBlur` / `AEAGaussianBlur` /
+    /// `MTLRenderPipelineState` / `CAFilter` / `layer.filters`）。
+    /// 为什么必须有第二条：A 那把尺**按名字**认，第③段用别的写法实现同一个对象时它会读 0 ⇒
+    /// 这张表继续报"runner可判=0"而没人知道对象已经出现了 —— 那正是"看不见违规"冒充"没有违规"，
+    /// 也正是"那一行翻不动"必须红的那一种。
+    /// 与 A 的两处刻意差别：① 对象集合不同（A 数驱动变量名，B 数渲染 API 与 `.metal` 文件）；
+    /// ② B 走 `codeOnly`（剥注释）⇒ 文档注释里提一句「以后可以用 CIFilter」不许把新门判红。
+    static func shaderShapeTextHits(_ rawText: String) -> Bool {
+        let code = Self.codeOnly(rawText)
+        return code.contains("CIFilter") || code.contains("CIGaussianBlur")
+            || code.contains("AEAGaussianBlur") || code.contains("MTLRenderPipelineState")
+            || code.contains("CAFilter") || code.contains("layer.filters")
+    }
+
+    /// 现扫一棵树（默认=产品根）：命中形状通道的 `.swift` 文件数 **+** `.metal` 源文件数。
+    /// 目录读不到 ⇒ -1（同 `countProductFiles`：不许把"扫不到"伪装成"没有对象"）。
+    static func countShaderShapeFiles(in root: URL? = nil) -> Int {
+        guard let dir = (root == nil ? Self.productSourcesRoot() : root) else { return -1 }
+        guard let enumerator = FileManager.default.enumerator(atPath: dir.path) else { return -1 }
+        var hits = 0
+        for case let rel as String in enumerator {
+            if rel.hasSuffix(".metal") { hits += 1; continue }
+            guard rel.hasSuffix(".swift") else { continue }
+            guard let text = try? String(contentsOf: dir.appendingPathComponent(rel), encoding: .utf8)
+            else { continue }
+            if Self.shaderShapeTextHits(text) { hits += 1 }
         }
+        return hits
+    }
+
+    /// 活门的判法（纯函数，两条独立通道 + 目录可读性）。四条分支一条都不许多：
+    /// · `目录读不到` —— 任一通道返回负数 ⇒ 这一格没有对象可判，**不许读成"仍然无证人"**（R565 那一族）；
+    /// · `现扫瞎_只有B认得` —— A 读 0 而 B 认得出对象 ⇒ **必须红**：对象出现了而那张表按 A 翻不动，
+    ///   红的作用是「逼这一轮去重锚 A」，不是「把行改成可判」——B 认得 CIFilter 并不等于角度驱动到位；
+    /// · `由A认得` —— A > 0 ⇒ `d12RowsAwaitingObject` 给的那批行**必须翻面**（翻不动由逐行那条断言红）；
+    /// · `缺席` —— 两边都是 0 ⇒ 今天确实还没有对象，`runner可判=0` 那句话仍然成立。
+    static func d12ObjectVerdict(scanA: Int, scanB: Int) -> String {
+        if scanA < 0 || scanB < 0 { return "目录读不到_A=\(scanA)_B=\(scanB)" }
+        if scanA == 0 && scanB > 0 { return "现扫瞎_只有B认得_B=\(scanB)" }
+        if scanA > 0 { return "由A认得_A=\(scanA)" }
+        return "缺席"
+    }
+
+    /// 表里"今天因为缺对象而判不了"的行（按**通道**派生，不是抄名字）：
+    /// 走 `产品内角度驱动`/`逐帧像素` 的行缺的是驱动本身；走 `离屏alpha图层`/`窗口几何读数` 的行
+    /// 缺的是"折叠期间真的改 alpha"。`真机60fps录屏` 那一行不算 —— 它缺的从来不是对象而是环境。
+    static func d12RowsAwaitingObject(from rows: [D12Clause]) -> [String] {
+        return rows.filter { row in
+            row.declared == .noWitnessToday
+                && ["产品内角度驱动", "逐帧像素", "离屏alpha图层", "窗口几何读数"].contains(row.channel)
+        }.map { $0.title }
+    }
+
+    /// 对象出现之后，这些行**必须**翻成什么（纯函数，供活门与合成注入用）：
+    /// 驱动到位 ⇒ 走驱动/逐帧像素的行变 `runner可判`；alpha 驱动到位 ⇒ 离屏 alpha/几何两行变 `runner可判`；
+    /// 两边都没到位的行保持 `今天无证人`。返回值是"行标题 → 该翻成的态"，空字典 ⇒ 活门今天无事可做。
+    /// ⚠ 这一份的**基线是被判对象之外的东西**：名单从表体（通道列）派生，到达位从**临时树**的扫描来，
+    ///   所以"注入假对象⇒名单非空 / 不注入⇒名单空"两边都可能红（恒真的写法是拿返回值自己当期望）。
+    static func d12RequiredFlips(angleArrived: Bool, alphaArrived: Bool,
+                                 from rows: [D12Clause]) -> [String: String] {
+        var out: [String: String] = [:]
+        for row in rows where row.declared == .noWitnessToday {
+            let driverRows = ["产品内角度驱动", "逐帧像素"].contains(row.channel)
+            let alphaRows = ["离屏alpha图层", "窗口几何读数"].contains(row.channel)
+            if driverRows && angleArrived { out[row.title] = "runner可判" }
+            else if alphaRows && alphaArrived { out[row.title] = "runner可判" }
+        }
+        return out
+    }
+
+    /// 活门的红/不红：把 `d12ObjectVerdict` 那四种判法映成「这一格该不该红」（nil = 放行）。
+    /// 单独拆出来是因为主判据里那句"不许放行"必须和这张真值表用**同一个**函数：否则合成正对照测的
+    /// 是分支的抄本、放行的却是另一份逻辑（R100 / R565 那一族「只测正则不测流水线」）。
+    static func d12GateRedReason(_ verdict: String) -> String? {
+        if verdict.hasPrefix("目录读不到") { return "两条通道里有一条没读到目录_门是瞎的_不许冒充仍然无证人" }
+        if verdict.hasPrefix("现扫瞎") { return "对象已出现而按名字那把尺看不见_那张表翻不动" }
+        return nil
     }
 
     /// 离屏 alpha 图层那条通道今天能不能拿到读数（对象 = 产品自己的浮层树）。
@@ -28315,6 +28405,22 @@ final class UICaptureTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(angleFiles, 0,
                                     "角度驱动那一扫返回 \(angleFiles) ⇒ 目录没读到，不许当「没有对象」")
 
+        // R580 ②：第二条独立通道（形状）+ 活门的红/不红。这一对读数是这张表"活着"的证人：
+        // A=0 而 B>0 时那一行翻不动 ⇒ 必须红；两边都读不到目录时也不许绿（R565 那一族）。
+        let shaderShapeFiles = Self.countShaderShapeFiles()
+        let gateVerdict = Self.d12ObjectVerdict(scanA: angleFiles, scanB: shaderShapeFiles)
+        if let redReason = Self.d12GateRedReason(gateVerdict) {
+            XCTFail("D12 活门判「\(gateVerdict)」⇒ \(redReason) ⇒ 这张表从这一刻起不再是可靠的证人："
+                + "按名字那把尺（A）说没有对象，按形状那把尺（B）说对象在了。要么第③段真的写了驱动、"
+                + "那八条里有行该翻面并同时补逐帧判据；要么 A 的形状集合过期了、要重锚。"
+                + "两种都不许靠把 B 关掉解决（M1523 钉的是把这条红路摘掉必须红）。")
+        }
+        let awaitingRows = Self.d12RowsAwaitingObject(from: rows)
+        XCTAssertEqual(awaitingRows.count, rows.count - 1,
+                       "「等对象的行」读出来是 \(awaitingRows.count)，而八条里只有真机那一行不该等对象 ⇒ "
+                       + "要么有一行的通道名/声明态变了、要么派生规则走漏了分支。分母来自现扫的表体，"
+                       + "不是抄来的常数（M1509 那一条钉的是条数，这一条钉的是「谁在等对象」）。")
+
         // 逐帧像素通道 + 窗口几何通道：都拿**夹具自己的必经点**量一次（主窗那张帧）。
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("r575-d12-\(UUID().uuidString)", isDirectory: true)
@@ -28447,6 +28553,197 @@ final class UICaptureTests: XCTestCase {
              + " 不透明=\(alphaChannelProbe.opaque) 全透明=\(alphaChannelProbe.clear)"
              + " 产物采样=\(artifactTriple.samples) 产物全透明=\(artifactTriple.clear)"
              + " 窗口宽=\(String(format: "%.1f", windowWidth))")
+
+        // R580：活门那一格的读数单独一条通道 —— 它讲的是「这张表还翻不翻得动」，
+        // 与上面那条「八条各落到哪一态」是两个量，混在一条里下一轮就分不出是尺瞎还是对象到了。
+        let requiredFlips = Self.d12RequiredFlips(angleArrived: angleFiles > 0,
+                                                  alphaArrived: foldAlphaFiles > 0, from: rows)
+        XCTAssertEqual(requiredFlips.count, 0,
+                       "有 \(requiredFlips.count) 行（"
+                       + requiredFlips.keys.sorted().prefix(4).joined(separator: "、")
+                       + "）按今天的现扫**该从「今天无证人」翻成「runner可判」**而表里还写着无证人 ⇒ "
+                       + "对象已经落到产品树上了，那张表就从这一刻起不再可信。"
+                       + "修法只有一条：把那一行的逐帧判据真写出来、同时改表体与按行快照，"
+                       + "并把是哪个读数支持翻面写进账（M1524 钉的是把这台翻面机摘掉必须红）。")
+        emit("D12_LIVE_GATE A按名字文件数=\(angleFiles) B按形状文件数=\(shaderShapeFiles)"
+             + " 判=\(Self.channelSafe(gateVerdict)) 红路=\(Self.d12GateRedReason(gateVerdict) ?? "无")"
+             + " 待翻行数=\(awaitingRows.count) 本轮该翻=\(requiredFlips.count) 分母=\(rows.count)")
+    }
+
+    /// R580 ②：活门必须证明它**真会翻**。今天产品里两类对象都不在，于是主判据那条绿有两种可能：
+    /// 「确实没有对象」的绿，和「门瞎了、看不见对象到了」的绿。这一条拿**临时树**注入假对象把两种分开，
+    /// 全程不碰 `Sources/`（本轮产品 0 文件，地基那十四面一字未动）。
+    /// 六件事各证一句：注入 A 的形状⇒驱动那批行翻；注入 alpha 的形状⇒alpha 那两行翻；两者都注入⇒翻七行
+    /// 而真机那行不翻；只注入 B 的形状⇒判=现扫瞎⇒门必须红；什么都不注入⇒判=缺席⇒门不红（今天的真读数）；
+    /// 目录不存在⇒两条通道都给 -1 而不是 0（「量不到」不许冒充「没有」，R565 / R490 那一族）。
+    /// ⚠ 名单（`driverTitles`/`alphaTitles`）是**表体的抄本**、不是返回值：期望与实得来自两侧，
+    ///   否则这条就成了「拿函数自己的输出当期望」的恒真门（R540 / R565 那一族）。
+    func testTheD12LiveGateFlipsWhenAnInjectedObjectArrives() throws {
+        let rows = Self.d12Clauses
+        let driverTitles = ["角度单调", "投影宽度按余弦律", "模糊半径从铰链到自由边递增",
+                            "亮度随角度单调下降", "边框锐度不变"]
+        let alphaTitles = ["透明区alpha归零", "框架只在透明之后缩一次"]
+        XCTAssertEqual(Set(driverTitles + alphaTitles), Set(Self.d12RowsAwaitingObject(from: rows)),
+                       "两条名单的并集与「等对象的行」不符 ⇒ 表体加了行、改了标题、或换了通道名，"
+                       + "而这颗正对照没跟着登记（名册漏登记那一族，R532 / R566 同形）。"
+                       + "后果：注入假对象时名单会少翻一行，而那条「翻不动就红」的门看起来仍然绿。")
+
+        var tracked: [URL] = []
+        defer { for dir in tracked { try? FileManager.default.removeItem(at: dir) } }
+        func tree(named name: String, files: [(String, String)]) throws -> URL {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("r580-d12-\(name)-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            tracked.append(dir)
+            for (fileName, body) in files {
+                try body.write(to: dir.appendingPathComponent(fileName), atomically: true, encoding: .utf8)
+            }
+            return dir
+        }
+        let driverBody = """
+        import SwiftUI
+        enum FoldDriver {
+            static var foldAngle: Double = 0.0
+            static var blurRadius: Double = 1.0
+        }
+        """
+        let alphaBody = """
+        import AppKit
+        struct FoldAlphaGlue {
+            var foldProgress: Double = 0.0
+            func apply(to window: NSWindow) { window.alphaValue = 1.0 - foldProgress }
+        }
+        """
+        let blindBody = """
+        import CoreImage
+        struct BlurShape {
+            func makeFilter() -> CIFilter? { return nil }
+        }
+        """
+
+        // —— 1. 只注入 A 的形状。
+        let driverTree = try tree(named: "driver", files: [("FoldDriver.swift", driverBody)])
+        let a1 = Self.countAngleDriverWriters(in: driverTree)
+        let b1 = Self.countShaderShapeFiles(in: driverTree)
+        XCTAssertEqual(a1, 1,
+                       "注入的假对象没被 A 那把尺看见（实读 \(a1)）⇒「活门真会翻」这句话没有证人："
+                       + "要么尺瞎了，要么我写进去的东西根本不算对象。")
+        XCTAssertEqual(b1, 0,
+                       "B 通道对 A 的对象读到 \(b1) ⇒ 两条通道喂的是同一批词，那「只有B认得」那一态"
+                       + "就没有分辨力了：第二条证人必须独立（对象集合不同才算两条）。")
+        XCTAssertEqual(Self.countFoldAlphaWriters(in: driverTree), 0,
+                       "只注入驱动就让「折叠期改 alpha」也读到对象 ⇒ 两把尺叠了，"
+                       + "于是 alpha 那两行的翻面证人假了。")
+        XCTAssertEqual(Self.d12ObjectVerdict(scanA: a1, scanB: b1), "由A认得_A=1",
+                       "A 读到 1 而判法不叫「由A认得」⇒ 判法与扫描脱钩")
+        let flips1 = Self.d12RequiredFlips(angleArrived: a1 > 0, alphaArrived: false, from: rows)
+        XCTAssertEqual(Set(flips1.keys), Set(driverTitles),
+                       "驱动到位之后该翻的是那五条走「产品内角度驱动/逐帧像素」的行，实得 "
+                       + "\(flips1.keys.sorted()) ⇒ 翻面机没接到对象，或名单与表体脱钩。")
+
+        // —— 1b. 注释里出现那四个名字**不算对象**（R580 探针在真树上实测到的坏法：不剥注释时
+        //        一句注释就能造出 A=1 ⇒ 五行被翻面、而「只有B认得」那条红路被假 A 短路挡掉）。
+        let commentTree = try tree(named: "comment", files: [("Note.swift", """
+        // foldAngle blurRadius CAMetalLayer MTKView 都只是注释里提提
+        struct R580Note {}
+        """)])
+        let aComment = Self.countAngleDriverWriters(in: commentTree)
+        XCTAssertEqual(aComment, 0,
+                       "只写在注释里的四个名字把 A 喂成了 \(aComment) ⇒ 这句注释会被读成「对象到了」："
+                       + "五行实测凭空翻面，而真正该红的「现扫瞎」那一支被假 A 挡掉（M1526 钉这一格）。")
+        XCTAssertEqual(Self.d12RequiredFlips(angleArrived: aComment > 0, alphaArrived: false,
+                                             from: rows).count, 0,
+                       "注释造的假对象仍然让名单非空 ⇒ 翻面机接的不是「对象」而是「出现过这串字」")
+
+        // —— 2. 只注入 alpha 的形状。
+        let alphaTree = try tree(named: "alpha", files: [("FoldAlpha.swift", alphaBody)])
+        let pathHits = Self.countFoldPathWriters(in: alphaTree)
+        let alphaHits = Self.countFoldAlphaWriters(in: alphaTree)
+        XCTAssertEqual(pathHits, 1, "折叠路径那一扫对它自己声称的对象读到 \(pathHits) ⇒ 尺瞎")
+        XCTAssertEqual(alphaHits, 1, "「折叠期改 alpha」那一扫读 \(alphaHits) ⇒ 注入没落地")
+        let flips2 = Self.d12RequiredFlips(angleArrived: false, alphaArrived: alphaHits > 0, from: rows)
+        XCTAssertEqual(Set(flips2.keys), Set(alphaTitles),
+                       "alpha 到位之后该翻的是那两条走「离屏alpha图层/窗口几何读数」的行，实得 "
+                       + "\(flips2.keys.sorted())")
+
+        // —— 3. 两者都注入 ⇒ 七行翻，而真机那一行永远不许被对象翻动。
+        let bothTree = try tree(named: "both", files: [("FoldDriver.swift", driverBody),
+                                                       ("FoldAlpha.swift", alphaBody)])
+        let flips3 = Self.d12RequiredFlips(angleArrived: Self.countAngleDriverWriters(in: bothTree) > 0,
+                                           alphaArrived: Self.countFoldAlphaWriters(in: bothTree) > 0,
+                                           from: rows)
+        XCTAssertEqual(flips3.count, driverTitles.count + alphaTitles.count,
+                       "两类对象都到位时该翻 \(driverTitles.count + alphaTitles.count) 行，实翻 \(flips3.count)")
+        XCTAssertFalse(flips3.keys.contains("屏上帧间隔不超标"),
+                       "真机那一行缺的从来不是对象而是环境 ⇒ 产品里出现驱动不许把它翻成「runner可判」，"
+                       + "翻了就是谎称 runner 能测帧间隔。")
+        for (title, state) in flips3 {
+            XCTAssertEqual(state, "runner可判", "\(title) 该翻成的态不是 runner可判 ⇒ 翻面目标写错了")
+        }
+
+        // —— 4. 只注入 B 的形状（第③段「换写法」那一支）⇒ 这一态门必须红。
+        let blindTree = try tree(named: "blind", files: [("BlurShape.swift", blindBody)])
+        let a4 = Self.countAngleDriverWriters(in: blindTree)
+        let b4 = Self.countShaderShapeFiles(in: blindTree)
+        XCTAssertEqual(a4, 0, "A 竟然认得了 B 的对象 ⇒ 两条通道叠了，第 1 档那条独立性断言作废")
+        XCTAssertEqual(b4, 1,
+                       "B 对它声称的那个形状读 \(b4) ⇒ 形状通道是瞎的：「第③段换写法也逃不过这张表」"
+                       + "这句就是空话（M1525 钉这一格）。")
+        let verdict4 = Self.d12ObjectVerdict(scanA: a4, scanB: b4)
+        XCTAssertTrue(verdict4.hasPrefix("现扫瞎"), "A=0 而 B=1 时判法给的是「\(verdict4)」⇒ 没落到瞎眼那一支")
+        XCTAssertNotNil(Self.d12GateRedReason(verdict4),
+                        "「现扫瞎」这一态被放行 ⇒ 活门摘掉了：对象到了而那张表继续报「runner可判=0」，"
+                        + "下一轮会把这张表当成已经核过的证人（M1523 钉这一格）。")
+
+        // —— 4b. 有一份 `.metal` 源文件也算 B 认得（第③段最可能的写法）。
+        let metalTree = try tree(named: "metal", files: [("Fold.metal", "// kernel\n")])
+        let mA = Self.countAngleDriverWriters(in: metalTree)
+        let mB = Self.countShaderShapeFiles(in: metalTree)
+        XCTAssertEqual(mA, 0, "着色器源文件不该喂饱 A（实读 \(mA)）")
+        XCTAssertEqual(mB, 1, "B 没数到那份 .metal（实读 \(mB)）⇒ 形状通道只认 API 名、不认源文件")
+        XCTAssertNotNil(Self.d12GateRedReason(Self.d12ObjectVerdict(scanA: mA, scanB: mB)),
+                        "有 .metal 而 A 看不见 ⇒ 这一态也必须红")
+
+        // —— 5. 什么都不注入 ⇒ 今天的真读数走的就是这一支。
+        let emptyTree = try tree(named: "empty", files: [])
+        let a5 = Self.countAngleDriverWriters(in: emptyTree)
+        let b5 = Self.countShaderShapeFiles(in: emptyTree)
+        XCTAssertEqual(a5, 0, "空树里 A 读到 \(a5) ⇒ 尺被别处的东西喂饱了")
+        XCTAssertEqual(b5, 0, "空树里 B 读到 \(b5) ⇒ 同上")
+        XCTAssertEqual(Self.d12ObjectVerdict(scanA: a5, scanB: b5), "缺席", "空树不判「缺席」就是判法错了")
+        XCTAssertNil(Self.d12GateRedReason("缺席"), "「缺席」这一态必须放行，否则门会把今天钉成红")
+        XCTAssertTrue(Self.d12RequiredFlips(angleArrived: a5 > 0, alphaArrived: false, from: rows).isEmpty,
+                      "空注入却给出名单 ⇒ 翻面机不看对象就到账，那是恒真")
+
+        // —— 6. 目录读不到：必须是 -1，不许冒充 0。
+        let nowhere = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r580-d12-nope-\(UUID().uuidString)", isDirectory: true)
+        let a6 = Self.countAngleDriverWriters(in: nowhere)
+        let b6 = Self.countShaderShapeFiles(in: nowhere)
+        XCTAssertEqual(a6, -1, "读不到的目录 A 给 \(a6) ⇒ 「扫不到」会被读成「没有对象」（R565 那一族）")
+        XCTAssertEqual(b6, -1, "读不到的目录 B 给 \(b6) ⇒ 同上")
+        XCTAssertNotNil(Self.d12GateRedReason(Self.d12ObjectVerdict(scanA: a6, scanB: b6)),
+                        "目录读不到却被放行 ⇒ 门把「没量到」当成「判过了」")
+
+        // —— 真值表：判法四条分支，一条都不许多（这一格不需要文件系统，runner 上也跑）。
+        let verdictTable: [(Int, Int, String)] = [
+            (0, 0, "缺席"),
+            (2, 0, "由A认得_A=2"),
+            (0, 3, "现扫瞎_只有B认得_B=3"),
+            (-1, 0, "目录读不到_A=-1_B=0"),
+            (0, -1, "目录读不到_A=0_B=-1"),
+        ]
+        for (scanA, scanB, expect) in verdictTable {
+            XCTAssertEqual(Self.d12ObjectVerdict(scanA: scanA, scanB: scanB), expect,
+                           "判法真值表 (A=\(scanA), B=\(scanB)) 期望「\(expect)」")
+        }
+
+        emit("D12_LIVE_GATE_PROBE 树=7 驱动行翻=\(flips1.count) alpha行翻=\(flips2.count)"
+             + " 全翻=\(flips3.count) 真机行被翻=\(flips3.keys.contains("屏上帧间隔不超标") ? "是" : "否")"
+             + " 瞎态判=\(Self.channelSafe(verdict4)) 注释喂A=\(aComment)"
+             + " 空态A=\(a5) 空态B=\(b5)"
+             + " 读不到处数=\((a6 == -1 && b6 == -1) ? 2 : 0) 判法分支数=\(verdictTable.count)"
+             + " 分母=\(rows.count)")
     }
 
     private func render(
