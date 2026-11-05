@@ -28234,6 +28234,72 @@ final class UICaptureTests: XCTestCase {
         return (stripped, raw, raw - stripped)
     }
 
+    // ---------------------------------------------------------------------
+    // R582 / 派单 ②：把 `D12_SHAPE_SCAN` 里**按机器会分岔**的那一对读数（折叠路径：剥注释 / 带注释）
+    // 从"本机事实"做成**按机器登记的观测值**。登记方法照既有那两把同族尺
+    // （`registeredOffscreenVerdict(scale:)`、`registeredLayerTreeCold(tree:scale:)`）：
+    // 只收两个观测值、其余机器具名不判、**任一台的登记值翻了就红，而登记值只由那一台自己那一跑的读数改**。
+    //
+    // ⚠ 这一格只管**数值**，不管语义。两档方向相反的永久断言（驱动翻面的三把钉 `差=0`、
+    //   只做地板的折叠路径钉 `剥注释>=1`）**不从这里取任何输入** —— 把登记值改成与实测相同
+    //   不能让"注释喂尺"变哑。这句不由这段注释作证，由 M1529 落刀后"红的是哪一格"作证。
+    // ---------------------------------------------------------------------
+
+    /// 这台机器的键。**约定与 `scripts/motion_floor_gate.py` 里那支同名函数同一套**
+    /// （显式覆盖 → `GITHUB_ACTIONS` 为真 ⇒ `github-runner` → 否则 `local:<主机名>`），不另发明一种。
+    /// ⚠ 但本轮现读到两边的**取值**并不同字：Swift 的 `ProcessInfo.hostName` 给 `macbook-air.local`，
+    /// python 的 `platform.node()` 给 `MacBook-Air.local`（大小写差）⇒ 两份名册**不许按字节 join**，
+    /// 具名 `MACHINE_KEY_CASE_DIVERGENT`。要不要统一归用户：动 python 那一份会牵动 354 那一族
+    /// 已经按机器登记好的名册，不是本轮能替它改的地基。
+    static func shapeScanMachineKey(env: [String: String] = ProcessInfo.processInfo.environment) -> String {
+        if let explicit = env["MOTION_FLOOR_MACHINE_KEY"], !explicit.isEmpty { return explicit }
+        let actions = (env["GITHUB_ACTIONS"] ?? "").lowercased()
+        if actions == "1" || actions == "true" { return "github-runner" }
+        return "local:" + ProcessInfo.processInfo.hostName
+    }
+
+    /// 已登记的观测值：`(剥注释那一档, 带注释那一档)`，只数**折叠路径**那一把尺。
+    /// **来源逐字记在这里，改它必须拿着那一台自己那一跑的读数改**：
+    /// · `local:macbook-air.local` —— 本机 R581 那一跑逐字 `… 折叠路径剥注释=1 折叠路径带注释=2 折叠路径差=1 …`，
+    ///   本轮（R582）开场复跑同值 ⇒ 两个观测值各被本机签了两次。
+    /// · `github-runner` —— `42053319449 ↔ 6aec151`（R581 主笔那一跑，也是 `D12_SHAPE_SCAN` 的**第一个 runner 证人**）
+    ///   逐字 `折叠路径剥注释=1 折叠路径带注释=2 折叠路径差=1` ⇒ 与本机**逐字同判**，
+    ///   于是预案 ⑴ 命中：`FOLD_PATH_SCAN_COMMENT_FED=1处` 从此是**跨机器已复核**（复核的是「注释存在」，不是产品行为）。
+    ///   ⚠ 这一台的登记值来自**它自己那一跑**打出的两个数（R578 那条 1.00x 的形状），本机没有替它填；
+    ///   而 `D12_SHAPE_SCAN_REGISTRY` 那一格在它上面**还没读数** —— 登记代码是本轮才写的，
+    ///   修尺那一笔的跑签不了自己，那一格的第一证人是含本笔的跑。
+    static func registeredShapeScanFoldPair(machine: String) -> (stripped: Int, raw: Int)? {
+        switch machine {
+        case "local:macbook-air.local", "github-runner": return (1, 2)
+        default: return nil
+        }
+    }
+
+    /// 登记值与实测的判法（纯函数，四个分支一条都不许多）：
+    /// · `一致` —— 那一台自己量到的两个数与登记的逐字相同 ⇒ 放行；
+    /// · `未登记_…` —— 这台机器没有观测值 ⇒ **有名字的待数**，不红、也不许删这一格，
+    ///   也不许读成"这台机器与登记相符"；
+    /// · `目录读不到_…` —— 实测那一档是 -1 ⇒ 量不到不许冒充判过（R565 / R490 那一族），红；
+    /// · `翻了_…` —— 任一边不等 ⇒ 红。这一支钉的是"有人手改了登记值"与"那一台的树真的变了"，
+    ///   两种都得红，因为登记的意义就是它必须只能由读数来改。
+    static func shapeScanRegistryVerdict(registered: (stripped: Int, raw: Int)?,
+                                         measured: (stripped: Int, raw: Int)) -> String {
+        guard let registered else { return "未登记_实测=\(measured.stripped)_\(measured.raw)" }
+        if measured.stripped < 0 || measured.raw < 0 {
+            return "目录读不到_实测=\(measured.stripped)_\(measured.raw)"
+        }
+        if registered.stripped == measured.stripped && registered.raw == measured.raw { return "一致" }
+        return "翻了_登记=\(registered.stripped)_\(registered.raw)_实测=\(measured.stripped)_\(measured.raw)"
+    }
+
+    /// 判法 → 「这一格该不该红」（nil = 放行）。单独拆出来是因为主判据里那句"不许放行"必须和
+    /// 合成真值表用**同一个**函数（R580 那一课：否则正对照测的是分支抄本、放行的却是另一份逻辑）。
+    static func shapeScanRegistryRedReason(_ verdict: String) -> String? {
+        if verdict == "一致" { return nil }
+        if verdict.hasPrefix("未登记_") { return nil }
+        return verdict
+    }
+
     /// 活门的判法（纯函数，两条独立通道 + 目录可读性）。四条分支一条都不许多：
     /// · `目录读不到` —— 任一通道返回负数 ⇒ 这一格没有对象可判，**不许读成"仍然无证人"**（R565 那一族）；
     /// · `现扫瞎_只有B认得` —— A 读 0 而 B 认得出对象 ⇒ **必须红**：对象出现了而那张表按 A 翻不动，
@@ -28491,6 +28557,30 @@ final class UICaptureTests: XCTestCase {
                                         + "上面那条「交集为 0 不是扫不到东西」的证人作废，必须重找对象")
         XCTAssertEqual(foldPathPair.raw, foldPathFiles,
                        "折叠路径那一把的默认口径读到的数与本轮别处引用的不是同一个 ⇒ 两种读法被人混用了")
+
+        // R582 ②：折叠路径那一对读数从今天起是**按机器登记的观测值**，不再是"本机说什么就是什么"。
+        // 登记值是一份**独立抄本**（写死的字面量，来源逐字记在 `registeredShapeScanFoldPair` 的注释里）：
+        // 若拿本轮实测自己当基线，"翻了就红"就永远不响（R578 那条按行独立抄本同一课）。
+        // ⚠ 上面那两条方向相反的永久断言**不从这里取任何输入** ⇒ 把登记值改成与实测相同，
+        //   不能让"注释喂尺"变哑；M1529 落下去红的是这一格，不是那两条。
+        let shapeScanMachine = Self.shapeScanMachineKey()
+        let registeredFoldPair = Self.registeredShapeScanFoldPair(machine: shapeScanMachine)
+        let registryVerdict = Self.shapeScanRegistryVerdict(registered: registeredFoldPair,
+                                                            measured: (stripped: foldPathPair.stripped,
+                                                                       raw: foldPathPair.raw))
+        if let registryRed = Self.shapeScanRegistryRedReason(registryVerdict) {
+            XCTFail("D12_SHAPE_SCAN 登记判「\(registryRed)」⇒ 这台机器（键=\(shapeScanMachine)）量到的两个数与登记值不一致。"
+                + "只有两种合法成因：⑴ 有人**手改了登记值**（那是把观测值当期望抄，R565 那一族）；"
+                + "⑵ 那一台的**产品树真的变了**（注释被删掉 / 折叠路径挪了文件 / 目录换名）。"
+                + "两种都得先把当轮读数逐字抄进账，再拿着那一跑的数改登记 —— 不许反过来拿登记值去改期望，"
+                + "更不许把这一格改成具名不判了事（那是把真数藏成不报）。")
+        }
+        emit("D12_SHAPE_SCAN_REGISTRY 机器=\(Self.channelSafe(shapeScanMachine))"
+             + " 登记=\(registeredFoldPair.map { "\($0.stripped)_\($0.raw)" } ?? "无")"
+             + " 实测=\(foldPathPair.stripped)_\(foldPathPair.raw)"
+             + " 判=\(Self.channelSafe(registryVerdict))"
+             + " 红路=\(Self.shapeScanRegistryRedReason(registryVerdict) == nil ? "无" : "有登记冲突")"
+             + " 另一台已登记=\(Self.registeredShapeScanFoldPair(machine: "github-runner") == nil ? "否" : "是")")
         XCTAssertEqual(awaitingRows.count, rows.count - 1,
                        "「等对象的行」读出来是 \(awaitingRows.count)，而八条里只有真机那一行不该等对象 ⇒ "
                        + "要么有一行的通道名/声明态变了、要么派生规则走漏了分支。分母来自现扫的表体，"
@@ -28650,6 +28740,107 @@ final class UICaptureTests: XCTestCase {
              + " 折叠alpha剥注释=\(foldAlphaPair.stripped) 折叠alpha带注释=\(foldAlphaPair.raw) 折叠alpha差=\(foldAlphaPair.delta)"
              + " 折叠路径被注释喂着处数=\(foldPathPair.delta)"
              + " 块注释只剥成对=是 未闭合斜杠星号不吃代码=是")
+    }
+
+    /// R582 ②：折叠路径那一对读数做成**按机器登记的观测值**之后，三件事各要一个证人，
+    /// 而且都不依赖真机键 ⇒ runner 每轮都跑得到（R579 那一课：新格不依赖环境键才有当轮证人）：
+    /// ⑴ 机器键的真值表（显式覆盖 / `GITHUB_ACTIONS` 两种写法 / 本机那一支）；
+    /// ⑵ 登记判法四分支（一致 / 未登记 / 目录读不到 / 翻了）与红路映射走**同一个函数**
+    ///    （R580 那一课：否则正对照测的是分支抄本、放行的却是另一份逻辑）；
+    /// ⑶ **解耦证人**：一棵「折叠路径只写在注释里」的临时树，登记判「一致」与地板读到 0
+    ///    这两件事**必须同时成立** ⇒ 登记一致不能让「注释喂尺」变哑。
+    /// ⚠ 这里不许出现"登记值等于某个字面量"的断言：那会把登记表抄成第二份基线，
+    ///   以后改登记值要改两处、而漏掉的那处永远不响（同规则两份实现那一族）。
+    func testTheD12ShapeScanRegistryIsPerMachineAndCannotMuteTheRulers() throws {
+        // —— ⑴ 机器键：约定与 python 那一支同形（显式覆盖 → CI → local:主机名）。
+        XCTAssertEqual(Self.shapeScanMachineKey(env: ["MOTION_FLOOR_MACHINE_KEY": "explicit-key"]),
+                       "explicit-key",
+                       "显式覆盖没生效 ⇒ 名册按机器切片时这一台会落进别人的格子（R565 那一族：门的口径要与红所在那一步同目标）")
+        XCTAssertEqual(Self.shapeScanMachineKey(env: ["GITHUB_ACTIONS": "true"]), "github-runner",
+                       "`GITHUB_ACTIONS=true` 没认成 runner ⇒ runner 那一台会被登记成本机，翻了也不红")
+        XCTAssertEqual(Self.shapeScanMachineKey(env: ["GITHUB_ACTIONS": "1"]), "github-runner",
+                       "`GITHUB_ACTIONS=1` 这一种写法没认成 runner（GitHub 两种都发过）⇒ 同一台机器落进两个键")
+        XCTAssertTrue(Self.shapeScanMachineKey(env: [:]).hasPrefix("local:"),
+                      "既没覆盖也不是 CI 时应当落成本机那一支（实读 \(Self.shapeScanMachineKey(env: [:]))）")
+        XCTAssertFalse(Self.shapeScanMachineKey().isEmpty, "这台机器的键是空串 ⇒ 登记表谁都匹配不上")
+
+        // —— ⑵ 判法四分支 + 红路映射（合成读数，不需要文件系统，runner 上也跑）。
+        let consistent = Self.shapeScanRegistryVerdict(registered: (1, 2), measured: (1, 2))
+        XCTAssertEqual(consistent, "一致", "同一对读数判出「\(consistent)」⇒ 登记比对本身坏了")
+        XCTAssertNil(Self.shapeScanRegistryRedReason(consistent), "「一致」被判成红路 ⇒ 这一格今天就会红在本机自己的数上")
+        let unregistered = Self.shapeScanRegistryVerdict(registered: nil, measured: (1, 2))
+        XCTAssertEqual(unregistered, "未登记_实测=1_2",
+                       "未登记那一支读到「\(unregistered)」⇒ 它必须是有名字的待数，不能顺带判成一致或翻了")
+        XCTAssertNil(Self.shapeScanRegistryRedReason(unregistered),
+                     "未登记那一支红 ⇒ 第二台机器还没到数就先把这一跑判死（那是把「没登记」读成「有缺陷」）")
+        XCTAssertNotNil(Self.shapeScanRegistryRedReason(
+            Self.shapeScanRegistryVerdict(registered: (1, 2), measured: (1, 1))),
+            "只有带注释那一档翻了却不红 ⇒ 登记比对只盯了一半（有人删掉 raw 那一半的比较也测不出）")
+        XCTAssertNotNil(Self.shapeScanRegistryRedReason(
+            Self.shapeScanRegistryVerdict(registered: (1, 2), measured: (2, 2))),
+            "只有剥注释那一档翻了却不红 ⇒ 同上，另一侧")
+        let blind = Self.shapeScanRegistryVerdict(registered: (1, 2), measured: (-1, -1))
+        XCTAssertEqual(blind, "目录读不到_实测=-1_-1",
+                       "目录读不到被判成「\(blind)」⇒ 「量不到」在这一格里冒充了「没风险」（R565 / R490 那一族）")
+        XCTAssertNotNil(Self.shapeScanRegistryRedReason(blind), "目录读不到不红 ⇒ 空扫一趟就能给出绿")
+
+        // 登记表自己的不变量：**不抄具体数值**，只抄"登记的那对数必须自洽"。
+        // 未登记那一台不许在这里 `throw XCTSkip` —— 新增具名 skip 要进 SKIP_ROSTER 名册（R566 那一族：
+        // 漏登记 ⇒ runner STEP[9] 注定红），而这一格根本没有"跳过"这件事：真值表与两棵临时树照常跑完，
+        // 「这台机器没登记」由主判据那条 emit 的 `未登记_…` 说出去（照 `EXPLANATION2_NOT_RUN=unregistered-scale` 的形状）。
+        let thisMachine = Self.shapeScanMachineKey()
+        if let entry = Self.registeredShapeScanFoldPair(machine: thisMachine) {
+            XCTAssertLessThanOrEqual(entry.stripped, entry.raw,
+                                     "本机登记的是 (\(entry.stripped), \(entry.raw)) ⇒ 剥掉注释之后不可能比带着注释还多，"
+                                     + "这一对数不是从任何一趟扫描来的（登记值必须能由读数推出）")
+        }
+
+        // —— ⑶ 解耦证人：两棵临时树（产品树一字未动）。
+        var tracked: [URL] = []
+        defer { for dir in tracked { try? FileManager.default.removeItem(at: dir) } }
+        func tree(named name: String, body: String) throws -> URL {
+            let dir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("r582-shape-registry-\(name)-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            tracked.append(dir)
+            try body.write(to: dir.appendingPathComponent("Sample.swift"), atomically: true, encoding: .utf8)
+            return dir
+        }
+        let commentOnlyTree = try tree(named: "comment-only", body: """
+            import SwiftUI
+            // 这一行注释里提到 foldProgress，代码里没有
+            struct CommentOnly {
+                // foldProgress 也在这条注释里
+                var radius: Double = 0.0
+            }
+            """)
+        let commentPair = Self.shapeScanReadingPair { Self.countFoldPathWriters(in: commentOnlyTree, stripping: $0) }
+        XCTAssertEqual(commentPair.stripped, 0,
+                       "只写在注释里的折叠路径，剥注释那一档读到 \(commentPair.stripped) ⇒ 这把尺开始把注释当代码了")
+        XCTAssertEqual(commentPair.raw, 1,
+                       "只写在注释里的折叠路径，带注释那一档读到 \(commentPair.raw) ⇒ 通道瞎了（今天预期 1，预期不是证人）")
+        let commentVerdict = Self.shapeScanRegistryVerdict(registered: (commentPair.stripped, commentPair.raw),
+                                                           measured: (commentPair.stripped, commentPair.raw))
+        XCTAssertEqual(commentVerdict, "一致",
+                       "登记与实测同一对数却判出「\(commentVerdict)」⇒ 登记比对没有对象")
+        XCTAssertLessThan(commentPair.stripped, 1,
+                          "这一档就是「地板只由注释撑着」的形状 ⇒ 主判据那条 `剥注释>=1` 在这里必须红；"
+                          + "它与登记判「一致」**同时成立** ⇒ 登记只管数值，改登记值不能让那把尺变哑（M1529 的对照）")
+        let realCodeTree = try tree(named: "real-code", body: """
+            import SwiftUI
+            struct RealFoldPath {
+                var foldProgress: Double = 0.0
+            }
+            """)
+        let realPair = Self.shapeScanReadingPair { Self.countFoldPathWriters(in: realCodeTree, stripping: $0) }
+        XCTAssertEqual(realPair.stripped, 1,
+                       "真代码里的折叠路径被剥注释那一档读成 \(realPair.stripped) ⇒ 尺把代码吃没了（与上面方向相反的坏法）")
+        XCTAssertEqual(realPair.delta, 0,
+                       "真代码那一棵两档差 \(realPair.delta) ⇒ 同一份代码两种读法不是同一个对象")
+        emit("D12_SHAPE_SCAN_REGISTRY_TABLE 机器键三档=一致 判法四分支=齐 "
+             + "本机键=\(Self.channelSafe(thisMachine)) 本机登记=\(Self.registeredShapeScanFoldPair(machine: thisMachine).map { "\($0.stripped)_\($0.raw)" } ?? "无")"
+             + " 临时树=2 注释树两档=\(commentPair.stripped)_\(commentPair.raw) 真码树两档=\(realPair.stripped)_\(realPair.raw)"
+             + " 解耦=登记一致而地板读0")
     }
 
     /// R580 ②：活门必须证明它**真会翻**。今天产品里两类对象都不在，于是主判据那条绿有两种可能：
