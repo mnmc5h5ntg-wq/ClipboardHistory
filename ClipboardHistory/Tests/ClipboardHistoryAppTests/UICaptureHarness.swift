@@ -27563,6 +27563,204 @@ final class UICaptureTests: XCTestCase {
     }
 
     // ---------------------------------------------------------------------
+    // R576 / BACKLOG 651：上轮那条机器差（主窗 `子层冷=-1` 在 runner、`1` 在本机）做成
+    // **按机器登记的层树冷态观测值** + 三臂机制排除。
+    //
+    // 登记方法照 `registeredOffscreenVerdict(scale:)`：只收两个观测值（2.00x / 1.00x），其余倍率具名不判；
+    // **任一台的登记值翻了就红，而登记值只由那一跑自己改**（本机手改登记值 = 藏红，dispatch ② 明令禁止）。
+    // ---------------------------------------------------------------------
+
+    /// 层树冷态的三态（只这三态）。
+    enum LayerTreeColdVerdict: Equatable {
+        case treeNotBuilt              // `子层=-1`：按快门之前连层树都没有
+        case treeBuiltWithoutContents  // `子层>0` 而 `contents` 无：树搭好了、料没画进
+        case treeBuiltWithContents     // `contents` 有：已经被谁画过一次
+    }
+
+    /// 已登记的观测值。**来源逐字记在这里，改它必须拿着那一跑的读数改**：
+    /// · 主窗 2.00x —— 本机 `FRAME_CHANNEL_MECHANISM 树=主窗 … 子层冷=1 contents冷=0`（R574/R575 两跑同值）
+    /// · 主窗 1.00x —— runner `41828227003 ↔ d544998` 逐字 `树=主窗 倍率=1.00x … 子层冷=-1 contents冷=0`
+    /// · 浮层 两档 —— 本机 `子层冷=6`；runner 同一跑也 `子层冷=6`
+    static func registeredLayerTreeCold(tree: String, scale: Double) -> LayerTreeColdVerdict? {
+        let rounded = (scale * 100).rounded() / 100
+        guard rounded == 2.00 || rounded == 1.00 else { return nil }
+        if tree == "主窗" { return rounded == 2.00 ? .treeBuiltWithoutContents : .treeNotBuilt }
+        return .treeBuiltWithoutContents
+    }
+
+    static func layerTreeColdVerdict(sublayers: Int, contentsPresent: Bool) -> LayerTreeColdVerdict {
+        if contentsPresent { return .treeBuiltWithContents }
+        return sublayers > 0 ? .treeBuiltWithoutContents : .treeNotBuilt
+    }
+
+    static func layerTreeColdName(_ value: LayerTreeColdVerdict) -> String {
+        switch value {
+        case .treeNotBuilt: return "层树没建"
+        case .treeBuiltWithoutContents: return "层树建了没画进料"
+        case .treeBuiltWithContents: return "层树建了且有料"
+        }
+    }
+
+    /// 三种解释的处置。`awaitingRunner` 是**有名字的待数**，不是"不判"：那一台到数之前这一格不许删。
+    enum LayerTreeColdExplanationVerdict: Equatable {
+        case ruledOut(by: String)
+        case supported(by: String)
+        case notRuledOut
+        case awaitingRunner
+    }
+
+    /// 纯函数：三臂读数怎么落到三种解释上。
+    /// 甲 = 只建窗不上屏（走夹具自己的必经点）；乙 = 建窗之后走"上屏那一步"
+    /// （`orderFrontRegardless` + `window.display()`）；丙 = 只递归 `wantsLayer` + layout，不上屏、不 display。
+    static func layerTreeColdExplanations(cold mainArmA: LayerTreeColdVerdict,
+                                          warm mainArmB: LayerTreeColdVerdict,
+                                          layerOnly mainArmC: LayerTreeColdVerdict,
+                                          overlayCold: LayerTreeColdVerdict,
+                                          secondRenderSameProcess: LayerTreeColdVerdict,
+                                          sameMachineCanBuildTree: Bool) -> [String: LayerTreeColdExplanationVerdict] {
+        var out: [String: LayerTreeColdExplanationVerdict] = [:]
+        // ①「那台没有窗口服务」：**由这一台自己的读数判**——同一台上只要"上屏那一步"或另一棵树
+        //   能把层树建出来，这台就不是"根本没有窗口服务"。两台各判各的，所以 runner 那一跑会给出
+        // 它自己的这一格；本机这一格不许替它签（这一条不许写死成 false，否则 ① 永远等不到证人）。
+        if sameMachineCanBuildTree {
+            out["①无窗口服务"] = (mainArmB != .treeNotBuilt || overlayCold != .treeNotBuilt)
+                ? .ruledOut(by: "同台上乙或浮层甲建得出树") : .notRuledOut
+        } else {
+            out["①无窗口服务"] = .awaitingRunner
+        }
+        // ②「wantsLayer 只在窗口上屏之后才置」：丙 就有树 ⇒ 被否；甲 无树而 乙 有树 ⇒ 支持。
+        if mainArmC != .treeNotBuilt {
+            out["②置层要等上屏"] = .ruledOut(by: "丙_只递归wantsLayer就建得出")
+        } else if mainArmA == .treeNotBuilt && mainArmB != .treeNotBuilt {
+            out["②置层要等上屏"] = .supported(by: "甲无树而乙有树")
+        } else {
+            out["②置层要等上屏"] = .notRuledOut
+        }
+        // ③「夹具建窗/赋层顺序」：同进程里第二次渲染与第一次逐字同 ⇒ 顺序这一支被削掉。
+        out["③夹具顺序"] = (secondRenderSameProcess == mainArmA)
+            ? .ruledOut(by: "同进程第二次渲染与第一次逐字同") : .supported(by: "第二次与第一次不同")
+        return out
+    }
+
+    static func layerTreeExplanationName(_ value: LayerTreeColdExplanationVerdict) -> String {
+        switch value {
+        case .ruledOut(let by): return "被否_" + by
+        case .supported(let by): return "被支持_" + by
+        case .notRuledOut: return "未排干"
+        case .awaitingRunner: return "等runner"
+        }
+    }
+
+    /// 建一棵**产品自己的主窗树**（产品的 `ContentView` 装进 `NSHostingView`，再包 `WindowBackingContainer`），
+    /// 按臂做"上屏 / 只赋层 / 什么都不做"，读冷态。对象是产品视图，不是合成夹具。
+    private func readMainTreeCold(arm: String) throws -> LayerTreeColdVerdict {
+        let size = NSSize(width: 420, height: 300)
+        let host = NSHostingView(rootView: AnyView(ContentView(historyStore: makePopulatedStore())))
+        host.frame = NSRect(origin: .zero, size: size)
+        let container = try XCTUnwrap(WindowBackingContainer.wrapping(host), "主窗那棵树包不出容器")
+        container.frame = NSRect(origin: .zero, size: size)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.contentView = container
+        window.appearance = NSAppearance(named: .aqua)
+        defer { window.orderOut(nil) }
+        switch arm {
+        case "乙_上屏那一步":
+            window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+            window.orderFrontRegardless()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            window.display()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        case "丙_只递归wantsLayer":
+            func forceLayer(_ view: NSView) { view.wantsLayer = true; view.subviews.forEach(forceLayer) }
+            forceLayer(container)
+            container.layoutSubtreeIfNeeded()
+        default:
+            break   // 甲：只建窗，什么都不做
+        }
+        return Self.layerTreeColdVerdict(sublayers: container.layer?.sublayers?.count ?? -1,
+                                         contentsPresent: container.layer?.contents != nil)
+    }
+
+    func testTheLayerTreeColdStateIsRegisteredPerMachineAndTheThreeExplanationsAreSeparated() throws {
+        let scaleOfChannelRuler = Double(NSScreen.main?.backingScaleFactor ?? 2.0)
+        var mainCold = LayerTreeColdVerdict.treeNotBuilt
+        var overlayCold = LayerTreeColdVerdict.treeNotBuilt
+        var mainSecond = LayerTreeColdVerdict.treeNotBuilt
+        var undrawnAfterFixtureStep = 1.0
+
+        let scratch = FileManager.default.temporaryDirectory
+            .appendingPathComponent("r576-layer-cold-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let pool = self.fixtures(appearance: .aqua)
+        guard let mainFixture = pool.first(where: { $0.name == "content-with-history" }),
+              let overlayFixture = pool.first(where: { $0.name == "quickpick-list" }) else {
+            return XCTFail("找不到两棵产品树的夹具 ⇒ 这一格没有对象")
+        }
+        // 甲（走夹具自己的必经点，读按快门之前那一刻）+ 同进程第二次（钉"夹具顺序"那一支）。
+        for pass in 1...2 {
+            let file = scratch.appendingPathComponent("r576-pass\(pass).png")
+            let metrics = try render(mainFixture, appearance: .aqua, to: file) { host in
+                let read = Self.layerTreeColdVerdict(sublayers: host.layer?.sublayers?.count ?? -1,
+                                                     contentsPresent: host.layer?.contents != nil)
+                if pass == 1 { mainCold = read } else { mainSecond = read }
+            }
+            if pass == 1 { undrawnAfterFixtureStep = metrics.transparent }
+        }
+        _ = try render(overlayFixture, appearance: .aqua,
+                       to: scratch.appendingPathComponent("r576-overlay.png")) { host in
+            overlayCold = Self.layerTreeColdVerdict(sublayers: host.layer?.sublayers?.count ?? -1,
+                                                    contentsPresent: host.layer?.contents != nil)
+        }
+        // 乙 / 丙 两臂（同一棵产品主窗树，只是走不同的前置）。
+        let mainWarm = try readMainTreeCold(arm: "乙_上屏那一步")
+        let mainLayerOnly = try readMainTreeCold(arm: "丙_只递归wantsLayer")
+
+        for entry in [(tree: "主窗", measured: mainCold), (tree: "浮层", measured: overlayCold)] {
+            let registered = Self.registeredLayerTreeCold(tree: entry.tree, scale: scaleOfChannelRuler)
+            if let registered = registered {
+                XCTAssertEqual(entry.measured, registered,
+                               "\(entry.tree) 在 \(String(format: "%.2fx", scaleOfChannelRuler)) 这台上冷态读到「"
+                               + Self.layerTreeColdName(entry.measured) + "」而登记的是「"
+                               + Self.layerTreeColdName(registered) + "」⇒ 这台机器的行为翻了。"
+                               + "唯一合法的修法是由**这一跑的读数**改登记值（先按负臂确认不是自己的读法错了）："
+                               + "不许把这一格改成不判、不许降地板、不许拿另一台的值填过来。")
+                emit("LAYER_TREE_COLD 树=\(entry.tree) 倍率=\(String(format: "%.2fx", scaleOfChannelRuler))"
+                     + " 实测=\(Self.layerTreeColdName(entry.measured))"
+                     + " 登记=\(Self.layerTreeColdName(registered)) 判=与登记一致")
+            } else {
+                emit("LAYER_TREE_COLD 树=\(entry.tree) 倍率=\(String(format: "%.2fx", scaleOfChannelRuler))"
+                     + " 实测=\(Self.layerTreeColdName(entry.measured)) 登记=无"
+                     + " 判=LAYER_TREE_COLD_NOT_RUN=unregistered-scale")
+            }
+        }
+        XCTAssertLessThan(undrawnAfterFixtureStep, 1.0,
+                          "夹具自己那一步走完，产物仍然整幅没画（未画比例="
+                          + String(format: "%.4f", undrawnAfterFixtureStep) + "）⇒ "
+                          + "「第③段逐帧判据靠夹具必经前置」这句话今天没有证人；先按负臂排除自己，再动判据")
+        let explanations = Self.layerTreeColdExplanations(cold: mainCold, warm: mainWarm,
+                                                          layerOnly: mainLayerOnly,
+                                                          overlayCold: overlayCold,
+                                                          secondRenderSameProcess: mainSecond,
+                                                          sameMachineCanBuildTree: (mainWarm != .treeNotBuilt
+                                              || overlayCold != .treeNotBuilt))
+        XCTAssertEqual(explanations.count, 3,
+                       "三种解释必须逐条给处置，今天只到 \(explanations.count) 条")
+        for key in explanations.keys.sorted() {
+            emit("LAYER_TREE_COLD_MECH 解释=\(key) 判=\(Self.layerTreeExplanationName(explanations[key]!))")
+        }
+        emit("LAYER_TREE_COLD_SUMMARY 倍率=\(String(format: "%.2fx", scaleOfChannelRuler))"
+             + " 主窗甲=\(Self.layerTreeColdName(mainCold))"
+             + " 主窗甲第二次=\(Self.layerTreeColdName(mainSecond))"
+             + " 主窗乙=\(Self.layerTreeColdName(mainWarm))"
+             + " 主窗丙=\(Self.layerTreeColdName(mainLayerOnly))"
+             + " 浮层甲=\(Self.layerTreeColdName(overlayCold))"
+             + " 夹具那步之后未画比例=\(String(format: "%.4f", undrawnAfterFixtureStep))")
+    }
+    // ---------------------------------------------------------------------
     // R575 / BACKLOG 654：D12 那八条逐帧硬判据 × 判它的通道 × 该通道今天到不到数。
     //
     // 为什么必须写成会红的函数而不是注释表：D12 的验收是"硬判据 + 用户手感签字，两边都过才算完成"，
