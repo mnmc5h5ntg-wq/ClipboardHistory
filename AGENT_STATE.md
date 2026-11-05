@@ -165,7 +165,7 @@
 - 字面量落盘后由**真正的消费者**验一次（逐字读数见 `pyverify.txt`）：`py_compile scripts/frame_baseline.py rc=0 ｜ py_compile scripts/tests/test_frame_baseline.py rc=0 ｜ py_compile .scratch/motion-audit-2/mutate_r584.py rc=0 ｜ py_compile .scratch/motion-audit-2/ci_status_r584.py rc=0 ｜ py_compile .scratch/motion-audit-2/ledgers_r584.py rc=0 ｜ json_load docs/frame_baseline.json rc=0 值里含 ASCII 双引号的字符串条数=0 ｜ json_load docs/frame_drift_registry.json rc=0 值里含 ASCII 双引号的字符`
 - port 锚的根因（"以为上轮改过的其实没改"）本轮的处理方式：**换做法** —— 台账写手新写一份（`ledgers_r584.py`），锚一律由正则从盘上现读（`identity_from_disk()` 拿 UI_AUDIT 与 STATE 两处交叉核对，不符就停）；改前对每个锚 `grep -c` 现读命中数（写手里是 `need()`，不等于 1 就 `ANCHOR-MISS` 并停在任何写盘之前）。
 
-⑨ **本轮自伤清单（二十一处，每处都带代价；对账口径见下面那一格）**
+⑨ **本轮自伤清单（二十三处，每处都带代价；对账口径见下面那一格）**
 · **对账口径**（沿用 R582 启用的那一格，本轮不关）：每一条具名红 / 具名不判 / 作废读数要么落到 `⑨·` 编号，要么写 `不计入对账口径` 并带三类名字之一（契约名 / 通道未跑 / 基名在漂）；两者都不写 = **未标**，由 `scripts/red_name_reconciliation.py` 报出并退 1。
 - 逐条自伤（编号即下面红名对账里落的那个）：
   · ⑨·1 刀脚本 `record()` 里把预检那一列印成 `pre_rc and code` ⇒ 预检通过时求值成 `0`，status 文件三行的 precheck 列不可信 ⇒ 代价=修脚本 + 三把刀全部重跑（重跑后 `precheck=PASSED`，第一趟那三行留在 `knife_status_first_pass_void.txt` 作废存证）。
@@ -186,6 +186,8 @@
   · ⑨·17 CHANGELOG 那一笔我写成 `[Unreleased]` 下的 bullet，而 `test_round_batch_consistency` 认的是 `### …（R584 / ` 那种**标题行** ⇒ 红「本轮在 CHANGELOG 里没有标题行 ⇒ 半批已写」。这一格存在的理由就是防这个形状，红得对；改的是我的写法，不是它的判据。
   · ⑨·18 FINAL 与 STATE 的 streak 格我抄的是**台账落盘之前**那一趟（`ledger_round=582 streak=15`），而 STATE 那一格还没带取数口 ⇒ `check_ledger` 同时报「值不符 15 vs 16」与「没引用 scripts/product_streak.py ⇒ 这个数是手抄的」。代价=两格按落盘之后的现读重写（`ledger_round=583 streak=16`）。
   · ⑨·19 通道值我用 `owner.replace(" ", "_")` 去空格，而**那个空格字面量自己**被 `ci_channel_hygiene.py` 的 channel-space 判据抓红（`scripts/frame_baseline.py channel-space L418`）⇒ 改用同一个 `sanitize_machine()`：语义不变（只抹标点、大小写照留），且不再往源码里塞一个空格字面量。
+  · ⑨·22 `gh run list --json …,title` 里那个字段名是我凭记忆抄的（真名 `displayTitle`）⇒ rc=1 + 一句 "Unknown JSON field"，紧跟着 `json.load` 因为空输出炸。同族第四次（R560/R584 ⑨·7/R584 ⑨·11：抄自己家的命令要先现读表）；代价=改走仓库自己那支 `scripts/ci_read.py latest`，它一次就把 run↔sha↔status 给全了。**这条也说明"自家工具优先"不是偏好：它的输出形状是有守卫的，手搓的那一份没有。**
+  · ⑨·23 台账落盘之后我又改了六处正文（⑦ 的真机键读数、⑨·15…⑨·23、U 格、CHANGELOG 标题行、七维表、streak 两格）⇒ 每一次都要重跑"门 + 六个数 + 受影响的那几卷"，不然派生格就指向旧盘。代价=电池跑了三趟（762/8 红 → 762/2 红 → 762 全绿）。
   · ⑨·21 §1 的 U 格我改成 `U-31 … U-2615（R584 现读抬到最新一节：U-2608…U-2615）`，多加的冒号尾巴让 `count_derivation_notes` 把注记读成 **0 条**（它认的是那一条字面形状）。这一格存在的理由正是 R303 量到的"贴纸攒成五连" ⇒ **照形状改号，不加解释**。代价=改回 + 该卷重跑。
   · ⑨·20 `refresh_report_section1.py` 把曲线尺的输出**吞掉**，只留一句 `REFUSED: 曲线尺不是绿的（rc=1）` ⇒ 我不得不直接跑曲线尺才知道红在哪。这是"结果通道本身会坏"那一族（R560）：拒绝要带名字和原因，不能只给退出码。
   · ⑨·13 台账模板里写了个裸 `%s`（第一次在描述 ⑨·1 的那句话里，第二次在描述本条的那句话里 ⇒ **同一族连犯两次，写"哪个字会咬人"的时候正好踩在那个字上**）⇒ `TypeError: not enough arguments for format string`，代价=DRY 重跑两趟。
@@ -212,9 +214,10 @@
   · 红名「电池第一趟 `Ran 762 / FAILED (failures=8, skipped=5)`」→ ⑨·15
   · 红名「`test_the_u_cell_carries_exactly_one_derivation_note`（1 != 0：注记被我读成 0 条）」→ ⑨·21
   · 红名「电池第二趟 `Ran 762 / FAILED (failures=2, skipped=5)`」→ ⑨·21
+  · 红名「`gh run list` 的 Unknown JSON field + 空输出把 json.load 打死」→ ⑨·22
   · 红名「真机键那一趟那 1 朵（`testGoingNonOpaqueDoesNotWashOutTheSidebarMaterial`）」→ **不计入对账口径**（契约名 —— 656 已具名，照实在账上不抹）
   · 红名「`TRANSPARENCY_MATERIAL_NEG 撤掉底衬` 均值 0.2916 vs 账上 0.2936（同会话外不可抄）」→ **不计入对账口径**（基名在漂 —— 本轮新量到的"该格随会话动"，没有为它改任何判据，也没有拿它当结论）
-- 门复算：预览那一趟（`--state` 喂 `state_preview.md`，两趟取不动点 ⇒ 逐字相同）读到 `红名=13 计入行=11 编号去重=10 不计入=2 未标=0`；**落盘之后**因为 ⑨ 那一格又长出六处新自伤（⑨·15…⑨·20），门在真文件上的现读是 `RED_NAME_RECONCILIATION 节=R584 红名=24 计入行=19 编号去重=16 不计入=5 未标=0 对不上=0 口径=已启用`（最后两趟新增的红名是 ⑦ 那两朵：656 契约名 + 反面臂在漂） ⇒ 账上以这一行为准，前一行留着标时刻（R540：会随本笔自增的格子要现读，不回头改旧行）。
+- 门复算：预览那一趟（`--state` 喂 `state_preview.md`，两趟取不动点 ⇒ 逐字相同）读到 `红名=13 计入行=11 编号去重=10 不计入=2 未标=0`；**落盘之后**因为 ⑨ 那一格又长出六处新自伤（⑨·15…⑨·20），门在真文件上的现读是 `RED_NAME_RECONCILIATION 节=R584 红名=25 计入行=20 编号去重=17 不计入=5 未标=0 对不上=0 口径=已启用`（补记笔那一趟又添了一条：⑨·22 的 `gh` 字段名；⑨·23 记的是"派生格每改一次就要重跑门"这件事本身） ⇒ 账上以这一行为准，前一行留着标时刻（R540：会随本笔自增的格子要现读，不回头改旧行）。
 - 逐本现读六个数（派单 ④ 专项，不拿"fail-fast 没写脏盘"当证人）：写之前七本里本轮那六个标题形状各 **0** 次；写之后**每一本恰好命中它那一个形状=1、其余=0**。逐行现读在 `preapply_counts.txt` 与 `postapply_counts.txt`。
 
 ⑦ **验证链（顺序照旧，一处偏差具名）**：`swift build --build-tests` 告警 **0**（包目录内现读）；python 判据卷 `Ran 35 tests in 0.136s / OK`；三把刀**先跑**（它们打在 `scripts/frame_baseline.py` 上、与 swift 构建目录无关 ⇒ 没撞锁；偏差具名 `KNIVES_BEFORE_CAPTURE_PYTHON_ONLY`，沿用上轮同一命名）`M1535 rc=1 caught=1 clean=1 末次=CAUGHT ｜ M1536 rc=1 caught=1 clean=1 末次=CAUGHT ｜ M1537 rc=1 caught=1 clean=1 末次=CAUGHT`；刀全部还原后 python 卷复跑同数；Swift 判据/捕获卷 `CAPTURE_LINES=Executed 233 tests, with 4 tests skipped and 0 failures (0 unexpected) in 755.569 (755.593) seconds`（帧 `FRAMES=356`）；重捕后对新门 `FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=8 新帧=0 本机行=8 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 已登记=8 未登记=0 陈旧行=0` ⇒ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0）`；全量卷 `FULL_LINES=Executed 1441 tests, with 60 tests skipped and 0 failures (0 unexpected) in 794.892 (794.985) seconds`；三支预检**串行** `NEEDLE_PRECHECK tables=392 covered=313 arms=819 bad=0`、`ARM_TOTAL files=485 arms=1306 dupes=0 repeats=0`、`HIDDEN_ARMS 表=479 可判=1245 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 抽不出=6 已声明死针=0 已声明表=6 处置=ok`；真机键那一趟（`CLIPBOARD_HISTORY_UI_REALSCREEN=1 swift test --filter TransparencyForensicsTests`，取值时刻=台账落盘之后）`Executed 17 tests, with 1 failure` ⇒ 那一朵仍是 656 那格（`testGoingNonOpaqueDoesNotWashOutTheSidebarMaterial`），照实在账上不抹；同批三行与 R583 对拍：`TRANSPARENCY_MATERIAL …均值差=0.0000 字墨比=1.000` 与 `…_TIER …正对照品红=361275/370800` **逐字未变**，而反面臂 `TRANSPARENCY_MATERIAL_NEG 撤掉底衬 均值=0.2916 …均值移动=0.1259` 与账上那一行（0.2936 / 0.1279）**不同字** ⇒ 新读出一条仪器事实：撤底衬那一臂的均值是**随会话动**的，而品红漏出与正对照不动 ⇒ 将来任何判据都不许抄上一轮的 0.2936 当期望（R565 那一族：会随会话自增的格子只能现读）。另跑一趟在屏探针（`UI_INTERACTION=1 UI_REALSCREEN=1 --filter UIInteractionProbeTests`）`Executed 14 tests, with 3 skipped, 0 failures`；⚠ 两处口径偏差具名：① 本轮 Swift 判据走的是 `--filter UICaptureTests`（`233 tests / 4 skipped / 0 failures`），与上一轮那一格写的 250/7 **不是同一个 filter** ⇒ 两个数不许互相引用；② 探针那一卷本轮没复现 656 那朵（14 与 17 是两个卷）；换装 `SKIP_INSTALL=no-product-change`（产品 0 文件）；七本台账 → 派生格现读 → 电池（本轮新案 13 格 ⇒ 内层总数由**电池自己那一行**报，账里不预测那个数；本机那趟的数**不回填**，最终签字归 runner `STEP[9]`）；产品文件 0 个，连续零改动 **16** 轮（唯一取数口 `python3 scripts/product_streak.py`，台账落盘之后现读 `PRODUCT_STREAK ledger_round=583 streak=16 sections=559 as_of=last=8f679f9 last_round=567 newest=8f679f9 newest_round=567 date=2026-11-04 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)`；⚠ 这一格本轮被对账门打回过一次：我先抄的是**落盘之前**那一趟（`ledger_round=582 streak=15`）而且没带取数口 ⇒ `check_ledger` 两条同时红（值不符 + 没引用）。代价记在 ⑨·18）；清账 `LEDGER_ABSENCE_RESULT=ok 不成立=0/63`；代码 numstat 现读 `已跟踪：5 文件 +412 / −49 ｜   .scratch/motion-audit-2/mutate_needle_precheck.py +1/−1 ｜   docs/frame_baseline.json +1/−0 ｜   docs/frame_drift_registry.json +9/−1 ｜   scripts/frame_baseline.py +156/−36 ｜   scripts/tests/test_frame_baseline.py +245/−11 ｜   .scratch/motion-audit-2/ci_status_r584.py +171/−0（新文件，未跟踪 ⇒ 由行数派生，不是 git 的真数） ｜   .scratch/motion-audit-2/ledgers_r584.py +535/−0（新文件，未跟踪 ⇒ 由行数派生，不是 git 的真数） ｜   .scratch/motion-audit-2/mutate_r584.py +122/−0（新文件，未跟踪 ⇒ 由行数派生，不是 git 的真数）`；Swift 侧逐字未变的证人 `git diff --name-only HEAD（本轮工作树） ｜ .scratch/motion-audit-2/mutate_needle_precheck.py ｜ docs/frame_baseline.json ｜ docs/frame_drift_registry.json ｜ scripts/frame_baseline.py ｜ scripts/tests/test_frame_baseline.py ｜ Swift 文件改动数=0 ｜ 未跟踪新文件： ｜ .scratch/motion-audit-2/ci_status_r584.py ｜ .scratch/motion-audit-2/ledgers_r584.py ｜ .scratch/motion-audit-2/mutate_r584.py`。
@@ -225,6 +228,23 @@
   · ⚠ 一条仪器自陈，不许被读成"复现了 R583 的数"：本轮想用"亮度>120 算亮墨"重做那条带的分段对照，结果**带内 0.0000% 而对照行也 0.0000%** ⇒ 这把阈值尺今天不灵（暗档的次要文字在该阈值下不计为亮墨），所以本轮**不**写"与 R583 逐字相同"，只写"肉眼同形 + 该重做未做"。下一轮要按 R206 的分段法（`891..924 / 951..959 / 980..984` 那一套）重做才许引用那个数。
   · 本轮推进在像素上不可见，且这是对的：动的是 python 那一侧的门与两份 JSON（产品 0 文件、Swift 一字未动）⇒ 356/356 逐字节不变正是"它没碰产品"的证人。看图这一维本轮看了 2 张（与 R583 同数），八张漂移帧仍是 light ⇒ 暗档债减一格但没还完，账上不许写"暗档看过了"。`
 
+
+### R584 补记（2026-11-06 · 第 583 轮 / Round 581 · 产品 0 文件）：⓪ 的成对号现取现写 —— 「判=不判」那一行的第一证人只能是含本笔的那一跑
+
+· **成对号（取值时刻=push 之后 20 秒，一次取数、没轮询）**：`42093340563 ↔ 3e13d47`（本轮主笔）现读 `status=in_progress`、`conclusion` 空 ⇒ **未到数**。⚠ 没拿本机读数顶替、没把"每步 conclusion 全空"读成"没有失败步骤"、没对进行中的作业去取日志。
+· **push 那一格（现读两次）**：开工一次、推之前一次，`git ls-remote origin HEAD` 都通（远端 HEAD 从 `d80803082b77…` 到 push 后 `3e13d47…`）⇒ `PUSH_TRANSPORT=ssh-ok`；`git push origin main` 落地 `d808030..3e13d47`、收口 `ahead=0`、`HEAD=origin/main=3e13d47`。`api=200`、`github=200` 都是 **HTTP 状态码口径**（`curl -w '%{http_code}'`）。⚠ `gh run list --json title` 那一趟是我的字段名抄错（⑨·22），不是通道坏；`remote.origin.url`、`~/.ssh`、DNS/hosts 一字未动。
+· **随本笔那一跑到数时该读到什么（这是一条可证伪的预测，不是愿望）**：
+  ⑴ `FRAME_BASELINE_AGAINST=working`、`FRAME_BASELINE_MACHINE=github-runner`、`FRAME_BASELINE_OWNER=local:MacBook-Air.local` 三行都在；
+  ⑵ `FRAME_BASELINE_DRIFT … 判=不判 … 变帧=356 … 本机行=0 他机行=8 … 未登记（不判）=356`；
+  ⑶ `FRAME_BASELINE_DRIFT_NOT_JUDGED=baseline-owned-by:local_MacBook_Air_local`（值里无空格，逐字键在表头）；
+  ⑷ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记不判 对不上0 缺字段0 缺机器0）` ⇒ **STEP[11] 不许红**。
+  · 若读到 `判=判` 或 `未登记=348` ⇒ 说明 runner 上的机器键或署名不是本轮以为的那个值 ⇒ **先读 `FRAME_BASELINE_MACHINE=` 与 `FRAME_BASELINE_OWNER=` 两行**再动判据，不许直接改期望。
+  · 若读到 `FRAME_BASELINE_SKIPPED=…` ⇒ 只能读成「这台机器今天没判」（第四条出口），不许读成「第二台绿了」。
+  · 若 `FRAME_BASELINE_DRIFT` 命中 0 次 ⇒ 通道没跑，先读 `executed=` 与全部失败步骤。
+· **上一轮交接的三条形状本轮结掉的方式**：R583 的 ⑵（那一台真有未登记漂移）在 `42077586416`/`42077903445` 上**双双命中**并逐字同数 ⇒ 本轮的 ② 就是照那一行做的；⑴/⑶/⑷ 本轮没触发，但都还在 `ci_status_r584.py` 里当规则，不是散文。
+· **其余红的归属（本轮没修、也没抹）**：`STEP[15]`（5 个名字与 R582 逐字同集合 ⇒ 没有新名字）、`STEP[17]`、`STEP[19]` 同更早；`STEP[18]` 在漂（主笔 `本次跑过=4 红=4` / 补记笔 `本次跑过=8 红=0`，同一份 Swift 树 ⇒ 不署名本轮回归）；`D12_SHAPE_SCAN_REGISTRY` 在两跑仍逐字 `判=一致` ⇒ R582 那格没倒退。
+· **逐本六个数（补记笔自己）**：写之前 `### R584 补记` 在七本里各 0 次；写之后 STATE 恰 1 次、其余各 0 次。R584 主节的六个形状仍各 1（不因为补记而重复）。
+· **R585 的 ⓪ 请照这四格取数**：① `42093340563 ↔ 3e13d47` 到数之后读**全部**失败步骤 + 上面那四条预测逐条对拍；② 若 ⑷ 命中 ⇒ 「变帧维度在 runner 上从今天起有人判了吗」这个问题仍**没**答（不判≠判），下一格要谈的是 658 的三条出路里用户选哪条；③ 若 ⑵ 命中 ⇒ 说明机器维度没生效，那是本轮 ② 的缺陷，按缺陷办而不是按措辞办；④ `STEP[18]` 那一列继续两跑一起读，不许单跑下结论。
 
 ## R583 状态（2026-11-06 · 第 582 轮 / Round 580 · 产品 0 文件 + **一扇门补上了它看不见的量**（`frame_baseline.py check` 的 changed/added 两态从"没人判"变成"逐张登记否则红"，登记名册 `docs/frame_drift_registry.json` 是**可数的账**）+ 电池测试 +10 格（该卷 12→22）+ 刀 3 把 M1532/M1533/M1534 全 CAUGHT + **一条机键成因量成逐字读数并开单 657**（大小写那半是 Swift/Foundation 侧产生的，不是 python）· 靶 = 折叠规格 §3 第②段 / BACKLOG **655** 那个"变帧没人判"的洞 + 派单 ③ 那一问）
 
