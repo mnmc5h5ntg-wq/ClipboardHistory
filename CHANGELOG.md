@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 帧基线那条**印给读者的出路**做成真的（R585 / 第 584 轮 / Round 582，产品 0 文件）：`update --for-machine` 落 `by_machine/`、名册补写路径与出处、`check` 能证伪手抄行
+    R584 那扇门印的出路是空头支票：`update` 那一支无条件写工作基线，而 `check` 只在
+    `docs/frame_baselines/by_machine/<键>.json` 已存在时才走"这台机器自己判"那一支 ⇒ 任何机器照那句话跑完都停在 `判=不判`
+    （目录现读：那个目录当时根本不存在）。名册同样只有读路径 ⇒ 那 8 行的 `machine` 是手抄的字面，
+    谁抄一行 `machine=github-runner:*` 就能把那一台的 `未登记=348` 洗成 0 而一朵红都不许有。
+    本轮：① `update --for-machine` 真写逐机器基线（键一律运行时取，**没有** `--machine` 参数）；
+    ② `register-drift`（含 `--restamp`）成为名册的写路径，每行带 `observed = {frame_sha, baseline_sha}`；
+    ③ `check` 对**此刻正在豁免漂移的本机行**问出处 ⇒ 无出处 / 出处不符都红并逐行点名（陈旧行与他机行仍只报数）；
+    ④ 出路那一行现在印的是真能跑的命令，并由一条**把 stdout 里那句命令原样跑一遍**的测试作证，另配"不带旗标就仍不判"的负臂。
+    本机 before/after 同一棵树：`拦路=8（无出处8）` 退 1 → `register-drift --restamp` 之后 `无出处0 未登记0` 退 0；
+    `update` 对工作基线那份一次没跑（655 不变）、阈值与 `--allow-missing` 一字未动。
+    电池 +13 格（`scripts/tests/test_frame_baseline.py` 35→48，两头都是现数 `def test_` 而不是抄派单），刀 M1538/M1539/M1540 全 CAUGHT；658 补前置、不结案。
+
 ### 帧基线漂移登记名册补上**机器维度**（R584 / 第 583 轮 / Round 581，产品 0 文件）：登记键从「帧」收成 (机器, 帧)，基线带署名，署名不符时变帧那一维具名不判、照报数、给出出路
     上一轮那扇新门第一次上 runner 就红了，逐字 `FRAME_BASELINE_DRIFT 变帧=356 新帧=0 已登记=8 未登记=348` ⇒ `拦路=348`。三条解释逐一排掉后成立的是"判决对象错位"：那份工作基线是本机 2x 烤的（同一帧实测 1440×1040，名义 720×520），而 runner 自己印 `倍率=1.0x` ⇒ 每一帧都不可能同字；`已登记=8` 那 8 行**全是本机的行**，也就是说本机在给别机的漂移背书放行。
     本轮落三件事：① 名册每一行必须写 `machine`（缺字段 ⇒ 门退非 0 并逐行点名，不许当成"适用所有机器"）；② 基线新增 `machine` 署名（`update` 自动写、`snapshot` 继承），`check` 优先读 `docs/frame_baselines/by_machine/<键>.json`，文件名只抹标点不抹大小写（BACKLOG 657 那个咬口由此有了证人）；③ 署名与本机不符 ⇒ 这一维**具名不判**，但数目照报（`未登记（不判）=N`）、名字照印（`FRAME_BASELINE_DRIFT_NOT_JUDGED=…`）、出路写全（一条可复制的 `update` 命令），并自带两条负半证人：缺席照红、那台一旦有自己的基线就照判 ⇒ "不判"不是一扇能长期躲的门。新开 BACKLOG 658（三条出路一条没选）。

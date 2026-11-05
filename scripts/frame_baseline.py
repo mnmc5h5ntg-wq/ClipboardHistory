@@ -119,14 +119,175 @@ def load_drift_registry(path: str) -> List[Dict[str, str]]:
             raise ValueError("登记名册里有一行的 kind 不认识（只允许 %s）：%r" % ("/".join(DRIFT_KINDS), kind))
         out.append({"frame": str(row.get("frame", "")), "kind": kind,
                     "machine": str(row.get("machine", "")),
-                    "reason": str(row.get("reason", "")), "ticket": str(row.get("ticket", ""))})
+                    "reason": str(row.get("reason", "")), "ticket": str(row.get("ticket", "")),
+                    "observed": row.get("observed") if isinstance(row.get("observed"), dict) else None,
+                    "registered_by_round": str(row.get("registered_by_round", ""))})
     return out
+
+
+def baseline_digest(frames: Dict[str, str]) -> str:
+    """把一份基线的**内容**压成一个串 —— 出处的对照物。
+
+    为什么不用文件本身的 sha256：`update` 每次都会重写文件（`count`/`note` 顺序无关，但键序会变），
+    而出处要认的是"这一行当时是对着哪一份**帧集**登记的"。
+    """
+    blob = json.dumps(frames, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+def verify_provenance(rows: List[Dict[str, object]], machine: str,
+                      current: Dict[str, str], digest: str,
+                      drifting: Optional[List[str]] = None) -> Dict[str, List[str]]:
+    """纯函数：本机名册行必须带**它自己观测到的那对哈希**。
+
+    没有这一层，任何一轮手抄一行 `machine=github-runner` 就能把 runner 的 `未登记=348` 洗成 0，
+    而**一朵红都不会有** —— 那正是 R583 那个洞换了个方向（登记从"没人判"变成"谁都能替别人登记"）。
+
+    只问**此刻正在豁免漂移的那几行**：一行陈旧行（这台机器今天不漂）没在替任何人放行，
+    拿"没出处"去红它就是把判定从"这条豁免可不可信"扩成"每一行都得重写过"（那是逼人删账）。
+    他机行不由本机证伪（本机没有那一台的帧，硬判就是拿自己的观测替别人下结论）；
+    那一台的基线进了仓库之后才谈得上跨机证伪 ⇒ 658。
+    """
+    no_proof, mismatch = [], []
+    pool = None if drifting is None else set(drifting)
+    for row in rows:
+        if row.get("machine", "") != machine:
+            continue
+        name = str(row.get("frame", ""))
+        if pool is not None and name not in pool:
+            continue
+        proof = row.get("observed")
+        if not isinstance(proof, dict) or not str(proof.get("frame_sha") or "") \
+                or not str(proof.get("baseline_sha") or ""):
+            no_proof.append(name)
+            continue
+        if str(proof.get("baseline_sha")) != digest or \
+           str(proof.get("frame_sha")) != str(current.get(name, "")):
+            mismatch.append(name)
+    return {"no_proof": no_proof, "mismatch": mismatch}
+
+
+def register_drift(args) -> int:
+    """`register-drift`：给当前**这台机器**观测到的漂移补登记行。
+
+    三条硬规矩：① `machine` 一律取运行时 `machine_key()`，命令行里没有 `--machine` 这种口子；
+    ② 理由与单号缺一就不写（退 2）—— 登记是账，不是措辞；
+    ③ 每一行带 `observed`（这一张帧当时的 sha256 + 当时那份基线的 digest）⇒ `check` 之后能证伪手抄行。
+    """
+    machine = machine_key()
+    if not args.restamp and not ((args.reason or "").strip() and (args.ticket or "").strip()):
+        print(u"FRAME_BASELINE_ERROR=register-drift 必须同时给 --reason 与 --ticket（空理由/空单号不算登记）")
+        return 2
+    path, _label = resolve_baseline_path(args.repo_root, "working")
+    if not os.path.exists(path):
+        print("FRAME_BASELINE_ERROR=基线不存在：%s（先跑 update）" % path)
+        return 2
+    try:
+        document = load_baseline_document(path)
+    except (ValueError, OSError, json.JSONDecodeError) as error:
+        print("FRAME_BASELINE_ERROR=基线读不出来：%s" % error)
+        return 2
+    baseline = {str(k): str(v) for k, v in document["frames"].items()}
+    digest = baseline_digest(baseline)
+    current = collect(args.frames_dir)
+    changed, _missing, added = compare(baseline, current)
+    registry = args.drift_registry or drift_registry_path(args.repo_root)
+    rows = load_drift_registry(registry) if os.path.exists(registry) else []
+    mine = [r for r in rows if r.get("machine", "") == machine]
+    done = set(str(r["frame"]) for r in mine if r["kind"] == "changed") | \
+           set(str(r["frame"]) for r in mine if r["kind"] == "added")
+    if args.restamp:
+        # 只补出处，不新增行；也只碰本机的行。理由/单号必须已经在账上（空着就不许盖戳）。
+        stamped, refused = [], []
+        for row in rows:
+            if row.get("machine", "") != machine:
+                continue
+            name = str(row.get("frame", ""))
+            drifting = name in changed or name in added
+            if not (str(row.get("reason", "")).strip() and str(row.get("ticket", "")).strip()):
+                refused.append(name)
+                continue
+            if not drifting:
+                refused.append(name)
+                continue
+            row["observed"] = {"frame_sha": current.get(name, ""), "baseline_sha": digest}
+            stamped.append(name)
+        if not stamped:
+            print(u"FRAME_BASELINE_RESTAMP=0 本机没有「正在漂且理由/单号齐全」的行可盖出处（拒绝 %d 行）"
+                  % len(refused))
+            return 0 if not refused else 1
+        write_drift_registry(registry, rows, machine)
+        print("FRAME_BASELINE_RESTAMP=%d 机器=%s 基线出处=%s 拒绝=%d"
+              % (len(stamped), machine, digest[:12], len(refused)))
+        for name in refused:
+            print(u"  拒绝盖戳  %s  <- 这一行此刻不在漂移里，或理由/单号是空的 ⇒ 出处只能盖本机真的看见的东西" % name)
+        return 0
+    wanted = [str(f) for f in args.frame] if args.frame else \
+             [n for n in changed + added if n not in done]
+    if not wanted:
+        print(u"FRAME_BASELINE_REGISTER=没东西要登记（本机名下这些漂移都已登记，或点名的帧不在漂移里）")
+        return 0
+    added_rows, skipped = [], []
+    for name in wanted:
+        kind = "changed" if name in changed else ("added" if name in added else "")
+        if not kind:
+            skipped.append(name)
+            continue
+        added_rows.append({"frame": name, "kind": kind, "machine": machine,
+                           "reason": args.reason.strip(), "ticket": args.ticket.strip(),
+                           "registered_by_round": (args.round or "").strip(),
+                           "observed": {"frame_sha": current.get(name, ""), "baseline_sha": digest}})
+    if not added_rows:
+        print(u"FRAME_BASELINE_REGISTER=点名的帧都不在当前漂移里（%s）⇒ 不写" % u",".join(skipped))
+        return 2
+    merged = rows + added_rows
+    write_drift_registry(registry, merged, machine)
+    print("FRAME_BASELINE_REGISTER=%d 机器=%s 基线出处=%s" % (len(added_rows), machine, digest[:12]))
+    for row in added_rows:
+        print("  登记  %s kind=%s 单号=%s" % (row["frame"], row["kind"], row["ticket"]))
+    if skipped:
+        print("  跳过（不在漂移里）  %s" % u",".join(skipped))
+    return 0
+
+
+def write_drift_registry(path: str, rows: List[Dict[str, object]], machine: str) -> None:
+    """名册的**写路径**（上一版只有读路径 ⇒ 那 8 行的 `machine` 值是被抄进去的字面）。
+
+    只允许写运行时的本机键；已有行的内容一字不动（登记是账，重排/改写要人来做，且必须走同一条命令）。
+    ⚠ note 是**人写的句子**，不许被生成器覆盖：本轮第一次跑 `--restamp` 就把 R583 那句
+    "本名册不是重烤基线的替代品" 冲掉了 ⇒ 改成"原文在就留着，只在末尾补一次新句"（改账不删原文）。
+    """
+    extra = (u"R585 起每行带 `observed`（这一行当轮观测到的帧 sha256 + 基线 digest）⇒ 手抄一行 "
+             u"`machine=github-runner:*` 洗不掉那一台的未登记；补登记请走 "
+             u"`python3 scripts/frame_baseline.py register-drift <帧目录> --reason … --ticket …`。")
+    note = (u"帧基线里「变帧 / 新帧」的逐张登记名册（R583 / BACKLOG 655）。"
+            u"登记的键是 (机器, 帧)：本机的行只豁免本机的漂移。")
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                existing = json.load(handle)
+            kept = str(existing.get("note") or "").strip()
+            if kept:
+                note = kept
+        except (ValueError, OSError, json.JSONDecodeError):
+            pass          # 读不出原文就不猜；下面的写会把坏形状照原样交给 load_drift_registry 去红
+    if extra not in note:
+        note = note + extra
+    document = {"schema": 1,
+                "note": note,
+                "written_by_machine": machine,
+                "rows": sorted(rows, key=lambda r: (str(r.get("machine", "")), str(r.get("frame", ""))))}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(document, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
 
 
 def judge_drift(changed: List[str], added: List[str], baseline: Dict[str, str],
                 current: Dict[str, str],
                 rows: Optional[List[Dict[str, str]]],
-                machine: str = "") -> Dict[str, object]:
+                machine: str = "",
+                provenance: Optional[Dict[str, List[str]]] = None) -> Dict[str, object]:
     """纯函数：三态 + 名册（按 (机器, 帧) 取键）⇒ 该红的与只报数的。
 
     ⚠ **陈旧行与「他机行」都只报数、不判**，这不是漏：漂移是**按机器**的（本机那 8 张在 runner
@@ -158,6 +319,8 @@ def judge_drift(changed: List[str], added: List[str], baseline: Dict[str, str],
         "unregistered": unregistered,
         "rows": len(rows), "unknown": unknown, "bad_fields": bad_fields, "stale": stale,
         "mine": len(mine), "foreign": len(foreign), "rows_without_machine": rows_without_machine,
+        "no_proof": list((provenance or {}).get("no_proof") or []),
+        "mismatch": list((provenance or {}).get("mismatch") or []),
     }
 
 
@@ -279,10 +442,25 @@ def resolve_baseline_path(repo_root: str, against: str = "auto") -> Tuple[str, s
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="离屏帧基线的比对与更新")
-    parser.add_argument("action", choices=["compare", "update", "check", "snapshot"])
+    parser.add_argument("action", choices=["compare", "update", "check", "snapshot", "register-drift"])
     parser.add_argument("frames_dir", nargs="?", default=None,
-                        help="compare / check / update 必需；snapshot 只冻结已有的工作基线")
+                        help="compare / check / update / register-drift 必需；"
+                             "snapshot 只冻结已有的工作基线")
     parser.add_argument("--version", default=None, help="snapshot 用：要冻结成哪个版本（如 1.4.8）")
+    parser.add_argument("--for-machine", action="store_true",
+                        help="update 用：把这份帧写成**这台机器自己的**基线 "
+                             "（docs/frame_baselines/by_machine/<键>.json，键一律运行时取，"
+                             "没有 --machine 这种口子）；不加这一句就照旧只写工作基线。")
+    parser.add_argument("--reason", default=None,
+                        help="register-drift 必需：这一张为什么漂（登记是账，空着就不算登记）")
+    parser.add_argument("--ticket", default=None, help="register-drift 必需：归哪张单")
+    parser.add_argument("--round", default=None, help="register-drift 可选：哪一轮登记的")
+    parser.add_argument("--restamp", action="store_true",
+                        help="register-drift 用：不新增行，只给**本机已有**的登记行补上 `observed` 那对哈希"
+                             "（R585 之前那 8 行的 machine 值是手抄的字面 ⇒ 没有出处；"
+                             "只准盖本机当轮真的观测到的东西，别机器行一律不碰）")
+    parser.add_argument("--frame", action="append", default=[],
+                        help="register-drift：只登记点名的那几张（可重复）；不给就登记当前所有未登记的漂移")
     parser.add_argument("--allow-missing", action="append", default=[],
                         help="允许缺席的帧名（可重复）。无头 runner 上有几帧注定拍不出来 —— "
                              "「捕获失效闸门」拒绝把 95%% 空白的帧当证据写盘，那是诚实的行为。"
@@ -316,10 +494,23 @@ def main(argv=None) -> int:
 
     if args.action == "update":
         frames = collect(args.frames_dir)
+        if args.for_machine:
+            # R585 / 658 的前置：上一版这里**永远**写工作基线，而它印给读者的出路写着
+            # "update 会署名并写 by_machine/<键>.json" —— 那句是假的，任何机器照它跑都停在 `判=不判`。
+            # 键一律由运行时取（`machine_key()`），没有 `--machine` 这种"我自己说是哪台"的口子。
+            key = machine_key()
+            target = machine_baseline_path(args.repo_root, key)
+            write_baseline(target, frames, machine=key)
+            print("FRAME_BASELINE_UPDATED=%d" % len(frames))
+            print("FRAME_BASELINE_MACHINE_BASELINE=%s 署名=%s" % (target, key))
+            return 0
         # 工作基线永远写在 docs/frame_baseline.json：逐版本的那份是它的快照，不是替代品。
         write_baseline(manifest_path(args.repo_root), frames)
         print("FRAME_BASELINE_UPDATED=%d" % len(frames))
         return 0
+
+    if args.action == "register-drift":
+        return register_drift(args)
 
     machine = machine_key()
     path = None       # type: Optional[str]
@@ -388,17 +579,35 @@ def main(argv=None) -> int:
         except (ValueError, OSError, json.JSONDecodeError) as error:
             print(u'FRAME_BASELINE_DRIFT_REGISTRY=broken %s ⇒ 名册读不出来时不许当成「没有登记」' % error)
             return 2
-    verdict = judge_drift(changed, added, baseline, current, rows, machine)
+    digest = baseline_digest(baseline)
+    # 出处只在"这一维归本机判"时才可证伪：不判那一支手里那份基线不是本机的观测，
+    # 拿它去证伪本机的登记行就是反过来犯错（R584 ⑵ 那一族的镜像）。数目照报。
+    provenance = verify_provenance(rows or [], machine, current, digest,
+                                   drifting=list(changed) + list(added))
+    verdict = judge_drift(changed, added, baseline, current, rows, machine,
+                          provenance if judged else {"no_proof": [], "mismatch": []})
+    verdict["no_proof_all"] = provenance["no_proof"]
+    verdict["mismatch_all"] = provenance["mismatch"]
     print("FRAME_BASELINE_DRIFT_REGISTRY=%s %s 行=%s" % (registry_state, registry, verdict["rows"]))
+    print("FRAME_BASELINE_REGISTRY_DIGEST=%s" % digest[:12])
     common = (u"本机=%s 基线署名=%s 判=%s 变帧=%d 新帧=%d 本机行=%d 他机行=%d "
-              u"名册对不上帧名=%d 名册空理由或空单号=%d 名册缺机器=%d"
+              u"名册对不上帧名=%d 名册空理由或空单号=%d 名册缺机器=%d "
+              u"名册无出处=%d 出处对不上=%d"
               % (machine, owner or "（未署名）", "判" if judged else "不判",
                  verdict["changed"], verdict["added"], verdict["mine"], verdict["foreign"],
                  len(verdict["unknown"]), len(verdict["bad_fields"]),
-                 len(verdict["rows_without_machine"])))
+                 len(verdict["rows_without_machine"]),
+                 len(verdict["no_proof_all"]) if not judged else len(verdict["no_proof"]),
+                 len(verdict["mismatch_all"]) if not judged else len(verdict["mismatch"])))
     for name in verdict["rows_without_machine"]:
         print(u"  名册缺机器  %s  <- 登记行必须写明它豁免**哪台**机器的漂移；"
               u"没有机器字段就等于本机在给所有机器的漂移背书放行" % name)
+    for name in (verdict["no_proof"] if judged else provenance["no_proof"]):
+        print(u"  名册无出处  %s  <- 这一行没带它当轮观测到的那对哈希 ⇒ 分不清是命令写的还是手抄的；"
+              u"补登记请走 register-drift" % name)
+    for name in (verdict["mismatch"] if judged else provenance["mismatch"]):
+        print(u"  出处对不上  %s  <- 这一行记的帧哈希/基线 digest 与本机当轮观测不同字 ⇒ "
+              u"它不是这台机器这一轮看到的，不许拿它豁免本轮的漂移" % name)
     for name in verdict["bad_fields"]:
         print(u"  名册缺字段  %s  <- 登记必须有理由与单号，否则它只是措辞" % name)
     for name in verdict["unknown"]:
@@ -419,9 +628,10 @@ def main(argv=None) -> int:
               % (common, len(verdict["unregistered"])))
         print(u"FRAME_BASELINE_DRIFT_NOT_JUDGED=%s" % reason)
         print(u"  出路  让这台机器有自己的基线（变帧维度就归它判）：在 %s 上跑 "
-              u"`python3 scripts/frame_baseline.py update <那一台的帧目录>`，"
+              u"`python3 scripts/frame_baseline.py update <那一台的帧目录> --for-machine`，"
               u"它会署名并写 docs/frame_baselines/by_machine/%s.json，随仓库提交即可。"
-              u"（BACKLOG 658；不许改期望、不许调宽阈值、不许把这一格读成「这台机器绿了」）"
+              u"（BACKLOG 658；R585 起这条命令真的会落那个文件 —— 上一版这里少写 `--for-machine`，"
+              u"照旧命令跑完永远停在 `判=不判`；不许改期望、不许调宽阈值、不许把这一格读成「这台机器绿了」）"
               % (machine, sanitize_machine(machine)))
         blockers = len(missing) + len(verdict["unknown"]) + len(verdict["bad_fields"]) \
                  + len(verdict["rows_without_machine"])
@@ -430,15 +640,17 @@ def main(argv=None) -> int:
               % (common, verdict["registered"], len(verdict["unregistered"]), len(verdict["stale"])))
         unreg_word = u"%d" % len(verdict["unregistered"])
         for name in verdict["unregistered"]:
-            print(u"  未登记  %s  <- 既没在这台机器的名册里登记，也没人判它 ⇒ 门红（补登记或查为什么变了，不许调宽阈值）" % name)
+            print(u"  未登记  %s  <- 既没在这台机器的名册里登记，也没人判它 ⇒ 门红（补登记走 register-drift，或查为什么变了；不许调宽阈值）" % name)
         for name in verdict["stale"]:
             print(u"  陈旧行（只报数）  %s  <- 这台机器此刻不漂；漂移按机器，删行会逼两台来回改" % name)
         blockers = len(missing) + len(verdict["unregistered"]) + len(verdict["unknown"]) \
-                 + len(verdict["bad_fields"]) + len(verdict["rows_without_machine"])
-    print(u"FRAME_BASELINE_RESULT=%s 拦路=%d（缺席%d 未登记%s 对不上%d 缺字段%d 缺机器%d）"
+                 + len(verdict["bad_fields"]) + len(verdict["rows_without_machine"]) \
+                 + len(verdict["no_proof"]) + len(verdict["mismatch"])
+    print(u"FRAME_BASELINE_RESULT=%s 拦路=%d（缺席%d 未登记%s 对不上%d 缺字段%d 缺机器%d 无出处%d 出处不符%d）"
           % (u"ok" if blockers == 0 else u"red", blockers, len(missing), unreg_word,
              len(verdict["unknown"]), len(verdict["bad_fields"]),
-             len(verdict["rows_without_machine"])))
+             len(verdict["rows_without_machine"]), len(verdict["no_proof"]),
+             len(verdict["mismatch"])))
     return 0 if blockers == 0 else 1
 
 

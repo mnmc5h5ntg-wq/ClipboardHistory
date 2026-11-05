@@ -11520,3 +11520,30 @@ R345 把身份搬到边界（1pt × 0.12，实测 22 级）之后，两条判据
     · 656：三条出路一条没选；本轮没碰捕获侧 Swift ⇒ 那格当轮读数照旧由本机签（`真机键那一趟` 见 STATE ⑦）。
     · 657：**没统一、没换键、没动 `~/.ssh`/hosts**；本轮只把"键不同字"这件事在**仪器侧**钉成两条会红的证人：三份 python `machine_key()` 同真值表 ⇒ 取值必须相同；`sanitize_machine()` 只抹标点不抹大小写 ⇒ 两份字面落两个文件名。Swift 那份仍差大小写 ⇒ **不 join**。
     · 651/653/654 本轮无新读数改变形状；`STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS=awaiting-654-direction` 照旧等定向。
+
+## R585 追账（第 584 轮 / Round 582 · 2026-11-06）：658 补前置但不结案，655/656/657 一条没结
+
+**658 追记（R585）：出路 ⑵ 当时的前置不成立 —— 工具印出来的那条命令做不到，本轮把它做成真的**
+    现象（取值时刻=R585 开工第一步，三处逐字 + 目录现读）：① `update` 那一支里 `write_baseline(manifest_path(...), frames)` **无条件**执行，注释还写着「工作基线永远写在 docs/frame_baseline.json」；
+    ② `check` 只在 `os.path.exists(by_machine/<键>.json)` 时才走"这台机器自己判"那一支；
+    ③ 而它印给读者的出路写着「跑 `update <帧目录>`，它会署名并写 `docs/frame_baselines/by_machine/<键>.json`」。
+    目录现读：`LS=v1.4.8.json （by_machine 目录本轮由测试误写过一次、已删；现读只有逐版本基线那一份）` ⇒ 那个目录不存在。
+    ⇒ 结论（是读数不是推理）：**任何机器照那句话跑一遍 `update`，都永远停在 `判=不判`** ⇒ 出路 ⑵ 的前置不成立。
+    R585 补的前置（三条出路仍一条不选）：`update --for-machine`（键一律运行时取，没有 `--machine` 这个口子）、
+    `register-drift` / `--restamp`（名册的写路径 + 每行 `observed` 出处）、`check` 的证伪（无出处 / 出处不符都红并点名）。
+    到数证人：`42093340563 ↔ 3e13d47` 的门那一行逐字 `FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=356 新帧=0 本机行=0 他机行=8 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 未登记（不判）=356` ⇒ 那一跑是 `判=不判` 且 **STEP[11] 不红**（R584 补记那条预测成立）。
+    ⚠ 这句不许被读成"runner 的变帧有人判了"：今天仍然**没人判它**，只是不再拿 348 张噪声拦门；
+    真要判，得有人为那一台落 `by_machine/github-runner.json` —— 那仍是 658 的三条出路之一，归用户。
+
+**659. `getbbox()` 对 mode=RGBA 的差值图恒报 `None` ⇒ 包围盒那把尺不能单独当「两个像素面没差异」的证人（R585 现读并新开）**
+    现象（正对照 + 真帧对，两份都在 `/tmp/r585/getbbox.txt`）：真帧对 `GETBBOX_RGBA 真帧对  mode=RGBA getbbox=None extrema=((0, 6), (0, 2), (0, 2), (0, 0)) 非零像素=46`，同一对帧先 `convert("L")` 或拆单通道就有色 `GETBBOX_L    同帧对  mode=L getbbox=(45, 78, 62, 95) extrema=(0, 2)`；合成正对照（4096 颗像素**每一颗**的 R 都差 6、alpha 全同）`GETBBOX_正对照 合成「每颗像素 R 都差 6、alpha 全同」 mode=RGBA getbbox=None extrema=((6, 6), (0, 0), (0, 0), (0, 0)) 非零像素=4096/4096` ⇒ 不是「差量太小」、不是「只有 alpha 差」，是 `getbbox()` 在那种 mode 上**根本不工作**（Pillow 11.3.0 实测）。
+    为什么本轮只开单不动仪器：本轮的差量是**逐像素计数 + `getextrema()`** 量出来的，那条路是通的；而 `现读 `grep -rln getbbox scripts/ ClipboardHistory/Tests` 命中文件数=0（既有仪器里没有人用它） ⇒ 没有任何既有判据正在用它，所以今天没有假绿在账上。出路（都归下一轮或用户定向，本轮一条没选）：⑴任何「包围盒为空 ⇒ 看不见」的句子必须先出示 mode；⑵像素差量一律走 `convert("L")`/分通道后再 `getbbox()`；⑶把这条钉成一格会红的仪器测试（本轮没做 ⇒ 不许写成已修）。
+    ⚠ 与 R579 那条的关系：那次是包围盒**指错带子**（量到了别处），这次是包围盒**拒绝出声**；两次的共同形状是「看图前不定位差量」，两次的修法相反 ⇒ 分两格记。
+
+**655 / 656 / 657 状态（R585）：都不结案，各补一句**
+    · 655：本轮仍**没跑** `update` 到工作基线（那份文件 md5 与 HEAD 逐字相同，证人见 STATE ② 那一格）；HEAD 那 8 行只是多了 `observed` 出处，帧名/理由/单号/机器逐字未变（8/8）；**而漂移集合本身从 8 涨到 16**：新登记的 8 张是暗档 ⇒ 655 原文那句「八张全是 light 档」从本轮起不成立（照实在这里记一句，不改那一节原文）。
+    · 656：三条出路（甲锁 `.aqua`／乙按外观拆两档／丙由另一台或另一次会话补第二档）一条没选；本轮没碰捕获侧 Swift，只重跑了真机键那一趟 ⇒ 那一朵红**照实复现**（`FORENSICS_TOTAL=Executed 17 tests, with 1 failure (0 unexpected) in 7.898 (7.899) seconds`，红名 `testGoingNonOpaqueDoesNotWashOutTheSidebarMaterial`）。
+      本轮新增两条读数：`FORENSICS_TIER=TRANSPARENCY_MATERIAL_TIER 窗口解析外观=NSAppearanceNameDarkAqua 偏好键=Dark 档位=Dark 正对照区域=有 正对照品红=361275/370800`；以及 `FORENSICS_第五趟=本轮同臂撤底衬均值 0.2937，与 R578/R579 已记的四趟 0.2929 / 0.2910 / 0.2918 / 0.2913 同档 ⇒ 五趟跨度 0.0027 ≪ 地板 0.05；⚠ 656 原文那句「均值不是逐字节量 ⇒ 下一轮不许拿逐轮不变当证人」照用：这一行只说「稳定」，不说「未变」`。
+      ⇒ 本单那一格的名字要**改口**（只改口径不改结论）：`FORENSICS_改口=R579 那个名字 `TRANSPARENCY_MATERIAL_APPEARANCE_NOT_RUN=Dark档无当轮证人_Light档有R568数` 的前半句今天**不再成立**：本轮是 Dark 档、有当轮读数（`档位=Dark` 由窗口解析外观与偏好键两条通道互校一致），正对照品红 361275/370800 仍证明通道没瞎；后半句照旧（Light 档只有 R568 那一趟的数）⇒ 这一格现在缺的是**第二档的当轮证人**，不是第一档`
+      `FORENSICS_APPEARANCE=本机全局外观现读 `defaults read -g AppleInterfaceStyle` = Dark；本轮**没写过**这个键（那支测试只在 TransparencyForensicsTests.swift:1086 读它）⇒ 没有为了拿读数动这台机器的外观`（R579 那句"禁止为了拿第二档改这台机器的全局外观"本轮照守）。
+    · 657：没统一、没换键；本轮新增两条**同族证人**（不是统一）：`register-drift` 的键只能取运行时 ⇒ 手填没有口子；`by_machine` 文件名只抹标点不抹大小写 ⇒ 两份字面落两个文件。
