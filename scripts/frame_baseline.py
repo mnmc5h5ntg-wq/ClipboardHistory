@@ -50,6 +50,65 @@ def manifest_path(repo_root: str) -> str:
     return os.path.join(repo_root, BASELINE_RELATIVE)
 
 
+# R583 / BACKLOG 655：`check` 以前**只判 missing**，于是 `changed>0` 与 `added>0` 两态谁都不判 ——
+# 那 8 张变帧不是被豁免，而是没人看。豁免名单是账，"没人判"不是。
+# 现在三态都可数：变帧/新帧必须逐条登记在名册里（帧名 + 理由 + 归哪张单），否则门红。
+DRIFT_REGISTRY_RELATIVE = os.path.join("docs", "frame_drift_registry.json")
+DRIFT_KINDS = ("changed", "added")
+
+
+def drift_registry_path(repo_root: str) -> str:
+    return os.path.join(repo_root, DRIFT_REGISTRY_RELATIVE)
+
+
+def load_drift_registry(path: str) -> List[Dict[str, str]]:
+    """读登记名册。形状坏了要抛出去，不许在调用方手里变成"0 条 ⇒ 全绿"（R99 那一族）。"""
+    with open(path, "r", encoding="utf-8") as handle:
+        document = json.load(handle)
+    rows = document.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("登记名册里没有 rows 列表：%s" % path)
+    out = []  # type: List[Dict[str, str]]
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("登记名册里有一行不是对象：%r" % (row,))
+        kind = str(row.get("kind", ""))
+        if kind not in DRIFT_KINDS:
+            raise ValueError("登记名册里有一行的 kind 不认识（只允许 %s）：%r" % ("/".join(DRIFT_KINDS), kind))
+        out.append({"frame": str(row.get("frame", "")), "kind": kind,
+                    "reason": str(row.get("reason", "")), "ticket": str(row.get("ticket", ""))})
+    return out
+
+
+def judge_drift(changed: List[str], added: List[str], baseline: Dict[str, str],
+                current: Dict[str, str],
+                rows: Optional[List[Dict[str, str]]]) -> Dict[str, object]:
+    """纯函数：三态 + 名册 ⇒ 该红的与只报数的。
+
+    ⚠ **陈旧行只报数、不判**，这不是漏：漂移是**按机器**的（本机那 8 张在 runner 上一张都不漂），
+       另一台此刻不漂不代表这条登记写错了 —— 把它判红等于逼人在两台机器之间来回删名册。
+       真正该红的是**对不上任何帧名的行**（拼错的、夹具改名后留下的），那条与机器无关。
+    """
+    rows = rows or []
+    registered_changed = set(r["frame"] for r in rows if r["kind"] == "changed")
+    registered_added = set(r["frame"] for r in rows if r["kind"] == "added")
+    unregistered = [n for n in changed if n not in registered_changed] + \
+                   [n for n in added if n not in registered_added]
+    unknown = [r["frame"] for r in rows
+               if (r["kind"] == "changed" and r["frame"] not in baseline)
+               or (r["kind"] == "added" and r["frame"] not in current)]
+    bad_fields = [r["frame"] for r in rows if not r["reason"].strip() or not r["ticket"].strip()]
+    stale = [r["frame"] for r in rows
+             if r["kind"] == "changed" and r["frame"] in baseline and r["frame"] not in changed]
+    return {
+        "changed": len(changed), "added": len(added),
+        "registered": len([n for n in changed if n in registered_changed])
+                      + len([n for n in added if n in registered_added]),
+        "unregistered": unregistered,
+        "rows": len(rows), "unknown": unknown, "bad_fields": bad_fields, "stale": stale,
+    }
+
+
 def sha256_of(path: str) -> str:
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -161,6 +220,9 @@ def main(argv=None) -> int:
     parser.add_argument("--repo-root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     parser.add_argument("--against", default="auto", choices=["auto", "working", "latest-release"],
                         help="比对对象：默认 auto，即有逐版本基线就和最新一版比，否则和工作基线比")
+    parser.add_argument("--drift-registry", default=None,
+                        help="变帧/新帧的逐张登记名册（默认 docs/frame_drift_registry.json）。"
+                             "check 用它把 changed 与 added 两态也变成会红的判据 —— 登记是账，不是措辞。")
     args = parser.parse_args(argv)
 
     if args.action != "snapshot":
@@ -222,10 +284,40 @@ def main(argv=None) -> int:
         print("  missing  %s  <- 夹具不再产出这一帧，必须查" % name)
     for name in added:
         print("  added    %s" % name)
-    if args.action == "check":
-        # check = 只要求"一帧不许少"（多帧与变帧交给人判断，因为新功能本来就会加帧）。
-        return 1 if missing else 0
-    return 1 if (changed or missing or added) else 0
+    if args.action != "check":
+        return 1 if (changed or missing or added) else 0
+
+    # —— check：三态都要有人判。以前这里只写 `return 1 if missing else 0`，
+    #    于是 changed/added 两态"命令成功、输出看着齐、其实谁都没判"（R583 / 655 那个洞）。
+    registry = args.drift_registry or drift_registry_path(args.repo_root)
+    rows = None      # type: Optional[List[Dict[str, str]]]
+    registry_state = "absent"
+    if os.path.exists(registry):
+        try:
+            rows = load_drift_registry(registry)
+            registry_state = "loaded"
+        except (ValueError, OSError, json.JSONDecodeError) as error:
+            print(u'FRAME_BASELINE_DRIFT_REGISTRY=broken %s ⇒ 名册读不出来时不许当成「没有登记」' % error)
+            return 2
+    verdict = judge_drift(changed, added, baseline, current, rows)
+    print("FRAME_BASELINE_DRIFT_REGISTRY=%s %s 行=%s" % (registry_state, registry, verdict["rows"]))
+    print("FRAME_BASELINE_DRIFT 变帧=%d 新帧=%d 已登记=%d 未登记=%d 名册对不上帧名=%d 名册空理由或空单号=%d 陈旧行=%d"
+          % (verdict["changed"], verdict["added"], verdict["registered"],
+             len(verdict["unregistered"]), len(verdict["unknown"]),
+             len(verdict["bad_fields"]), len(verdict["stale"])))
+    for name in verdict["unregistered"]:
+        print("  未登记  %s  <- 既没在名册里登记，也没人判它 ⇒ 门红（补登记或查为什么变了，不许调宽阈值）" % name)
+    for name in verdict["unknown"]:
+        print("  名册对不上  %s  <- 名册里这一行既不对应当前基线的变帧、也不对应当前产出的新帧（拼错或夹具改名后留下的）" % name)
+    for name in verdict["bad_fields"]:
+        print("  名册缺字段  %s  <- 登记必须有理由与单号，否则它只是措辞" % name)
+    for name in verdict["stale"]:
+        print("  陈旧行（只报数）  %s  <- 这台机器此刻不漂；漂移按机器，删行会逼两台来回改" % name)
+    blockers = len(missing) + len(verdict["unregistered"]) + len(verdict["unknown"]) + len(verdict["bad_fields"])
+    print("FRAME_BASELINE_RESULT=%s 拦路=%d（缺席%d 未登记%d 对不上%d 缺字段%d）"
+          % ("ok" if blockers == 0 else "red", blockers, len(missing),
+             len(verdict["unregistered"]), len(verdict["unknown"]), len(verdict["bad_fields"])))
+    return 0 if blockers == 0 else 1
 
 
 if __name__ == "__main__":
