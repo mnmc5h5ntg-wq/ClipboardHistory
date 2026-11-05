@@ -18,6 +18,7 @@ import tempfile
 import unittest
 
 import scripts.frame_recording_proof as proof
+from scripts.tier_vocabulary import TIERS        # 档位词表只有一份真值（R587 / 靶 B）
 from scripts.frame_recording_proof import (BBOX_MAX_HEIGHT, DELTA_FLOOR, EDGE_FLOOR,
                                            PillowMissing, judge, main, measure)
 
@@ -190,7 +191,7 @@ class NoPillowExitTests(unittest.TestCase):
         tmp = tempfile.mkdtemp(prefix="r154-nopil-")
         original = proof._load_pil
         try:
-            for shade in ("light", "dark"):
+            for shade in TIERS:      # 档位词表只有一份真值（R587 / 靶 B），这里不再自己列第二份
                 with io.open(os.path.join(tmp, "settings-shortcuts-720x540-%s.png" % shade),
                              "wb") as handle:
                     handle.write(b"")

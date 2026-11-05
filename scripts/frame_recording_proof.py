@@ -22,7 +22,13 @@
 import argparse
 import io
 import json
+import os
 import sys
+# 档位词表只有一份真值（R587 / 靶 B）：这里 import，不再本地声明第二份。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.append(_HERE)
+from tier_vocabulary import TIERS  # noqa: E402
 
 # PIL 是**测量期**依赖，不是**构造期**依赖（R154 / CI run 39118582249 · STEP[8]）。
 # 原来这一行 `from PIL import Image` 写在模块顶上 ⇒ runner 的 python 3.14 没装 Pillow，
@@ -193,7 +199,7 @@ def main(argv=None):
 
     import os
     pairs = []
-    for shade in ("light", "dark"):
+    for shade in TIERS:
         idle = os.path.join(args.frames_dir, "%s-720x540-%s.png" % (args.basename, shade))
         recording = os.path.join(args.frames_dir, "%s-720x540-%s.png" % (args.recording, shade))
         missing = [path for path in (idle, recording) if not os.path.exists(path)]

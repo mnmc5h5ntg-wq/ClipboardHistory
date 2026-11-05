@@ -20,6 +20,13 @@
 """
 import argparse, io, os, re, sys
 
+# 档位词表只有一份真值（R587 / 靶 B）：这一份 `('dark','light')` 是扫描器挖出来的**第三处**，
+# 顺序还与别处不同 —— 正是「两份写法坏了一份不会红」那种。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.append(_HERE)
+from tier_vocabulary import TIERS  # noqa: E402
+
 FLOOR = 18.0
 # 与 Swift 那颗尺同一套常数（`HeatmapHoverEvidenceTests.simulateDeuteranopia`）。
 # 两处各写一份是**故意的**：本脚本读 PNG、判据读 NSBitmapImageRep，本来就在两个运行时；
@@ -148,20 +155,28 @@ def main():
         return 2
 
     reds = []
-    for tag in ('dark', 'light'):
+    stops = 0
+    # 每一档的"输入不足"**各自点名**，不再在第一个 stop 处 return：
+    # 上一版这里是 `return 2`，于是"哪一档被点名"取决于词表里那两档**谁排在前面** ——
+    # R587 把 `('dark','light')` 收成共用词表 `('light','dark')` 时，这条顺序差当场被
+    # `test_log_covering_only_one_appearance_is_not_a_pass` 抓成红（不是测试坏，是脚本本来就只报第一档）。
+    for tag in TIERS:
         path = os.path.join(shots, 'heatmap-cell-strip-still-90x140-%s.png' % tag)
         if not os.path.exists(path):
             print('HEAT_FRAME_INPUT_MISSING 缺帧 %s' % path)
-            return 2
+            stops += 1
+            continue
         try:
             uniq = ladder(path)
         except ValueError as e:
             print('HEAT_FRAME_STRUCTURE %s' % e)
-            return 2
+            stops += 1
+            continue
         fr = steps(uniq)
         if tag not in judg:
             print('HEAT_FRAME_INPUT_MISSING 判据日志里没有 %s 那 4 对 ⇒ 两通道没法对账（不许 KeyError 当成跑过了）' % tag)
-            return 2
+            stops += 1
+            continue
         j_inks, j_steps = judg[tag]
         offs = [tuple(fr_ - j_ for fr_, j_ in zip(uniq[i], j_inks[i])) for i in range(5)]
         gb = max(abs(o[c]) for o in offs for c in (1, 2))
@@ -188,9 +203,12 @@ def main():
         if gb > args.max_col_offset:
             reds.append('%s G/B 两列偏到 %g（上限 %g）⇒ 偏移不再只压在 R 那一列，两通道的口径变了，先查谁换了背景'
                         % (tag, gb, args.max_col_offset))
-    if reds:
+    if reds or stops:
         for r in reds:
             print('HEAT_FRAME_RED ' + r)
+        if stops:
+            print('HEAT_FRAME_VERDICT not-run=%d 有 %d 档输入不足 ⇒ 不许读成"两通道都对上了账"' % (stops, stops))
+            return 2
         print('HEAT_FRAME_VERDICT red=%d' % len(reds))
         return 1
     print('HEAT_FRAME_VERDICT ok 两通道都量到、真帧未越地板、偏移仍压在 R 那一列')

@@ -3,6 +3,7 @@
 这里测的是**分类**：变了 / 少了 / 多了 必须分开，因为三者的处置完全不同。
 如果只报一个"diff 不为零"，那这条守卫和没有一样 —— reviewer 仍然不知道看哪张图。
 """
+import ast
 import contextlib
 import io
 import json
@@ -1096,12 +1097,33 @@ class PrintedFlagTests(unittest.TestCase):
         self.assertTrue(m, "读不到 --against 的 choices ⇒ 这一格没有可对账的对象")
         return {s.strip().strip('"\'') for s in m.group(1).split(",")}
 
+    def printed_strings(self, path):
+        """只取**真的被 print 出去**的字符串常量（AST 级），docstring 与注释一律不算。
+
+        上一稿这里扫的是整份源码文本，于是我在 docstring 里描述"上一轮写错了哪个值"也被抓成红 ——
+        那是守卫读错了对象（R580 那一课的形状：读到 1 要区分「对象在」与「字面在」）。
+        判据的契约是"读者会看到什么"，所以范围就是 print 的参数。
+        """
+        tree = ast.parse(io.open(path, encoding="utf-8").read(), filename=path)
+        out = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print":
+                for arg in node.args:
+                    for lit in ast.walk(arg):
+                        if isinstance(lit, ast.Constant) and isinstance(lit.value, str):
+                            out.append(lit.value)
+                        elif isinstance(lit, ast.JoinedStr):          # f-string 的各段
+                            for part in ast.walk(lit):
+                                if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                                    out.append(part.value)
+        return out
+
     def test_every_printed_against_value_is_a_real_choice(self):
-        src = io.open(self.SCRIPT, encoding="utf-8").read()
-        printed = set(re.findall(r"--against ([A-Za-z][A-Za-z0-9_-]*)", src))
-        self.assertTrue(printed, "源码里一条 `--against …` 都没印 ⇒ 扫描器读错了对象")
+        printed = u"\n".join(self.printed_strings(self.SCRIPT))
+        values = set(re.findall(r"--against ([A-Za-z][A-Za-z0-9_-]*)", printed))
+        self.assertTrue(values, u"print 里一条 `--against …` 都没印 ⇒ 这一格的扫描对象读错了")
         choices = self.choices_from_argparse()
-        bad = sorted(printed - choices)
+        bad = sorted(values - choices)
         self.assertEqual([], bad, u"印给读者的旗标值 argparse 不认：%s（可用：%s）" % (bad, sorted(choices)))
 
     def test_the_release_branch_actually_runs(self):
@@ -1124,3 +1146,179 @@ class PrintedFlagTests(unittest.TestCase):
             self.assertNotEqual(2, proc.returncode, u"用法错（argparse 不认这个值）：\n%s" % out[-400:])
             self.assertIn(u"FRAME_BASELINE_AGAINST=v9.9.9", out,
                           u"那一支跑到了别的东西上（说明它没读逐版本基线）：\n%s" % out[-400:])
+
+
+class ScaleDistributionTests(unittest.TestCase):
+    """R587 / 靶 A：`capture_scale` 取众数没有并列检测 ⇒ 混批会印一个抛硬币来的倍率。
+
+    监工现读到的三处形状（本轮逐一变成读数）：
+      ① `mode = max(set(ratios), key=ratios.count)` 没有任何并列检测；
+      ② 两轴推不出同一倍率的帧 `bad += 1` **之后仍 `ratios.append`**；
+      ③ `_bad` 在两个调用点被下划线丢掉 ⇒ 这个量算了却没人看。
+    """
+
+    SCRIPT = os.path.join(str(Path(__file__).resolve().parents[2]), "scripts", "frame_baseline.py")
+    KEY = u"local:scale-fixture"
+
+    def dir_with(self, root, spec):
+        """spec = [(逻辑宽, 逻辑高, 倍率), ...] ⇒ 造出帧名与像素尺寸一致/不一致的帧。"""
+        from PIL import Image
+        d = os.path.join(root, "frames_%d" % len(os.listdir(root)))
+        os.mkdir(d)
+        for k, (lx, ly, scale) in enumerate(spec):
+            px, py = int(lx * scale), int(ly * scale)
+            name = u"shot-%dx%d-dark.png" % (lx, ly)
+            if name in os.listdir(d):                     # 同尺寸的帧要换个前缀
+                name = u"shot%d-%dx%d-dark.png" % (k, lx, ly)
+            Image.new("RGB", (px, py), (9, 9, 9)).save(os.path.join(d, name))
+        return d
+
+    def info(self, d):
+        from scripts.frame_baseline import capture_scale
+        return capture_scale(d)
+
+    def test_a_mixed_batch_still_names_the_majority_but_the_distribution_is_printed(self):
+        """355:1 那种混批：众数仍是 2.00x（这不是猜），但**分布必须一起交出去**。"""
+        with tempfile.TemporaryDirectory() as root:
+            d = self.dir_with(root, [(10, 10, 2.0)] * 3 + [(20, 20, 1.0)])
+            info = self.info(d)
+            self.assertEqual(u"2.00x", info["scale"])
+            self.assertEqual(u"2.00x:3,1.00x:1", u",".join(u"%s:%d" % kv for kv in info["dist"]))
+            self.assertEqual(u"ok", info["reason"])
+
+    def test_a_tie_is_not_reported_as_a_confident_scale(self):
+        """两档各半 ⇒ 上一版印的是 `set` 遍历顺序决定的那一个；现在一律「不知道」。"""
+        with tempfile.TemporaryDirectory() as root:
+            d = self.dir_with(root, [(10, 10, 2.0), (12, 12, 2.0), (10, 10, 1.0), (12, 12, 1.0)])
+            info = self.info(d)
+            self.assertEqual(u"", info["scale"], u"并列还印一个看起来确定的倍率：%r" % (info,))
+            self.assertEqual(u"tie", info["reason"])
+            self.assertEqual(2, len(info["dist"]), info["dist"])
+
+    def test_unreadable_png_is_counted_as_bad_not_dropped(self):
+        """`px<=0`（读不出 IHDR）那一条 `bad += 1` 当时**没有任何证人** ⇒ M1549 落下去是空刀。
+
+        这一格补的就是那位证人：一张名字合法、内容不是 PNG 的文件。
+        记下来是因为它暴露了一件事：`mutate_needle_precheck.py` 只保证 needle 命中一次，
+        不保证那条分支有人测 ⇒ 落刀之前除了问「我只动了一边吗」，还要问「这一边有证人吗」。
+        """
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "frames_unreadable")
+            os.mkdir(d)
+            from PIL import Image
+            Image.new("RGB", (20, 20), (9, 9, 9)).save(os.path.join(d, u"ok-10x10-dark.png"))
+            io.open(os.path.join(d, u"broken-10x10-dark.png"), "wb").write(b"not a png at all")
+            info = self.info(d)
+            self.assertEqual(1, info["bad"], u"读不出像素尺寸的那张必须进 bad：%r" % (info,))
+            self.assertEqual(1, info["frames"], u"能读出的那一张照常进分布：%r" % (info,))
+            self.assertEqual(u"ok", info["reason"], info)
+
+    def test_sizeless_frame_names_are_counted_not_silently_skipped(self):
+        """**合成**一个没有逻辑尺寸段的帧名 ⇒ 它进不了倍率，但必须照报数。
+
+        名字的来历要说清：`settings-general-min-orphan-dark.png` **不在**现读语料里（现读那一批帧全部带
+        `-宽x高-档` 那一段，真实存在的近似名是 `general-min-orphan-640x540-dark.png`）。
+        我第一版把这个编出来的名字当成"现读确有这种命名"写进了 print 与注释 —— 那是本轮顺账要防的
+        同一种空头支票（措辞里的名字不存在），本轮自己扫出来并撤掉了。
+        这一格的来历同样诚实：它是被测试自己挖出来的 —— 上一稿我把这种形状放进"两侧应给出同一个档"
+        的名单里，结果倍率正则匹配不到它 ⇒ 旧版 `capture_scale` 对它是**静默 continue**，
+        分布的分母少了多少张没人知道（`bad` 之外第二种"算了却没人看"）。
+        """
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "frames_sizeless")
+            os.mkdir(d)
+            Image.new("RGB", (20, 20), (9, 9, 9)).save(os.path.join(d, u"a-10x10-dark.png"))
+            Image.new("RGB", (16, 8), (9, 9, 9)).save(os.path.join(d, u"settings-general-min-orphan-dark.png"))
+            info = self.info(d)
+            self.assertEqual(1, info["frames"], info)
+            self.assertEqual(1, info.get("sizeless"), u"没有尺寸段的那张必须被计数：%r" % (info,))
+            self.assertEqual(u"ok", info["reason"], u"只有一张可量时不该报并列")
+
+    def test_inconsistent_frames_are_counted_and_reported(self):
+        """`bad` 不许再被 `_bad` 丢掉：两轴推不出同一倍率的那张要照报。"""
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, "frames_bad")
+            os.mkdir(d)
+            Image.new("RGB", (20, 20), (9, 9, 9)).save(os.path.join(d, u"a-10x10-dark.png"))   # 2x 对 x 与 y
+            Image.new("RGB", (20, 10), (9, 9, 9)).save(os.path.join(d, u"b-10x10-dark.png"))   # x 是 2x、y 是 1x ⇒ bad
+            info = self.info(d)
+            self.assertEqual(1, info["bad"], info)
+            self.assertEqual(2, info["frames"], u"bad 帧以前也照进分布；现在两边都要看得见")
+
+    def test_check_prints_tie_and_bad_instead_of_a_confident_scale(self):
+        """端到端：拿一批并列的帧跑 `check` ⇒ 印 `SCALE_TIE` + `SCALE_NOT_RUN=tie…`，不印 `倍率=2.00x`。"""
+        import subprocess
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as root:
+            docs = os.path.join(root, "docs")
+            os.makedirs(docs)
+            frames = os.path.join(root, "frames")
+            os.mkdir(frames)
+            for n, size in ((u"a-10x10-dark.png", (20, 20)), (u"b-30x30-dark.png", (30, 30))):
+                Image.new("RGB", size, (9, 9, 9)).save(os.path.join(frames, n))
+            # 先烤一份基线（这批是并列的 ⇒ 烤出来的 scale 该是"不知道"）
+            env = dict(os.environ)
+            env["MOTION_FLOOR_MACHINE_KEY"] = self.KEY
+            def run(argv):
+                proc = subprocess.Popen([sys.executable, self.SCRIPT] + argv,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                                        universal_newlines=True)
+                out, _ = proc.communicate(timeout=300)
+                return proc.returncode, out
+            rc, out = run([u"update", frames, u"--for-machine", u"--repo-root", root])
+            self.assertEqual(0, rc, out[-400:])
+            doc = json.load(io.open(os.path.join(docs, "frame_baselines", "by_machine",
+                                                 "local_scale_fixture.json"), encoding="utf-8"))
+            self.assertEqual(u"", doc["capture_scale"], u"并列批次不该被烤成一个确定倍率：%r" % doc)
+            self.assertEqual(u"tie", doc["capture_scale_reason"], doc)
+            # 分布是**排序后**的：先按计数降序、再按倍率名升序 ⇒ 并列时也有确定形状，
+            # 不再依赖 `set` 的遍历顺序（那正是上一版印出抛硬币倍率的根）。
+            self.assertEqual(u"1.00x:1,2.00x:1", doc["capture_scale_dist"], doc)
+            rc, out = run([u"check", frames, u"--against", u"working", u"--repo-root", root])
+            self.assertIn(u"FRAME_BASELINE_SCALE_TIE", out, out[-600:])
+            self.assertIn(u"FRAME_BASELINE_SCALE_NOT_RUN=tie", out, out[-600:])
+            self.assertNotIn(u"倍率=2.00x", out, out[-600:])
+            self.assertIn(u"原因=tie", out, out[-600:])
+
+    def test_channel_roster_matches_what_is_actually_printed(self):
+        """通道名册要**双向**对账（R579 那一族：名册要靠被引用才红，单向只红一半）。
+
+        加一条通道必须同时改名册 —— 这是"新造一条不判出口"的唯一入口，
+        于是它至少要在这一格里被看见一次；名册里留着一条不再印的通道也算红（腐烂的名册会掩护新通道）。
+        """
+        found = set()
+        for lit in self.printed_of(self.SCRIPT):
+            found |= set(re.findall(r"FRAME_BASELINE_[A-Z_]+", lit))
+        self.assertTrue(found, u"print 里一条 FRAME_BASELINE_* 通道都没有 ⇒ 扫描器读错了对象")
+        missing = sorted(found - set(self.KNOWN_CHANNELS))
+        stale = sorted(set(self.KNOWN_CHANNELS) - found)
+        self.assertEqual([], missing, u"这些通道被印出来但没登记进名册：%s" % missing)
+        self.assertEqual([], stale, u"名册里这些通道已经不再被印：%s（要么删要么改回 print）" % stale)
+
+    def printed_of(self, path):
+        tree = __import__("ast").parse(io.open(path, encoding="utf-8").read(), filename=path)
+        out = []
+        for node in __import__("ast").walk(tree):
+            if isinstance(node, __import__("ast").Call) and isinstance(node.func, __import__("ast").Name) \
+                    and node.func.id == "print":
+                for lit in __import__("ast").walk(node):
+                    if isinstance(lit, __import__("ast").Constant) and isinstance(lit.value, str):
+                        out.append(lit.value)
+        return out
+
+    KNOWN_CHANNELS = frozenset([
+        u"FRAME_BASELINE_AGAINST", u"FRAME_BASELINE_MACHINE", u"FRAME_BASELINE_OWNER",
+        u"FRAME_BASELINE_COMPARED", u"FRAME_BASELINE_ALLOW_MISSING", u"FRAME_BASELINE_CHANGED",
+        u"FRAME_BASELINE_MISSING", u"FRAME_BASELINE_ADDED", u"FRAME_BASELINE_BAKE",
+        u"FRAME_BASELINE_BAKE_PROVENANCE", u"FRAME_BASELINE_SAME_BAKE",
+        u"FRAME_BASELINE_SCALE_MISMATCH", u"FRAME_BASELINE_SCALE_NOT_RUN",
+        u"FRAME_BASELINE_SCALE_TIE", u"FRAME_BASELINE_SCALE_BAD",
+        u"FRAME_BASELINE_SCALE_SIZELESS",
+        u"FRAME_BASELINE_DRIFT", u"FRAME_BASELINE_DRIFT_NOT_JUDGED",
+        u"FRAME_BASELINE_DRIFT_REGISTRY", u"FRAME_BASELINE_REGISTRY_DIGEST",
+        u"FRAME_BASELINE_RESULT", u"FRAME_BASELINE_ERROR", u"FRAME_BASELINE_UPDATED",
+        u"FRAME_BASELINE_MACHINE_BASELINE", u"FRAME_BASELINE_REGISTER", u"FRAME_BASELINE_RESTAMP",
+        u"FRAME_BASELINE_SNAPSHOT",
+    ])

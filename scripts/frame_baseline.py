@@ -31,6 +31,13 @@ import subprocess
 import sys
 from typing import Dict, List, Optional, Tuple
 
+# 档位词表只有一份真值（R587 / 靶 B）：倍率解析里的 `(?:light|dark)` 由它现推，
+# 这样加一档/改名时这一侧不会**静默**退化成「帧名里推不出倍率」（那条出口不红）。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.append(_HERE)
+from tier_vocabulary import TIERS, tier_suffix_pattern  # noqa: E402
+
 BASELINE_RELATIVE = os.path.join("docs", "frame_baseline.json")
 # 发布时冻结的**逐版本**基线放这里（§3 C-2 要的是"和上一版比"，
 # 只有一份可随时 update 的工作基线的话，"上一版"其实是"上一次有人记得 update 的时候"）。
@@ -434,37 +441,64 @@ def png_size(path: str) -> Tuple[int, int]:
         return (0, 0)
 
 
-def capture_scale(frames_dir: str) -> Tuple[str, int, int]:
-    """这批帧的捕获倍率：帧名里写的是逻辑点尺寸（`…-720x520-dark.png`），PNG 头里是像素尺寸。
+def capture_scale(frames_dir: str) -> Dict[str, object]:
+    """这批帧的捕获倍率 —— 报成**分布**，不报成单一读数（R587 / 靶 A）。
 
-    返回 `(倍率字符串, 量到的帧数, 不一致的帧数)`。取众数；一张都量不到 ⇒ `("", 0, 0)` ——
-    那是"不知道"，不是"1.00x"。这一格为什么值得记：R584 已经量到 runner 自印 `倍率=1.00x`
-    而工作基线是本机 2x 烤的 ⇒ 那 356 张变帧的成因就在这一维上，可基线文档自己以前说不出它是何倍率。
+    帧名里写的是逻辑点尺寸（`…-720x520-dark.png`），PNG 头里是像素尺寸 ⇒ 倍率 = 像素宽 ÷ 逻辑宽。
+    上一版这里 `max(set(ratios), key=ratios.count)` 没有任何并列检测，于是：
+      · 355 张 2x + 1 张 1x 这种**混批**照样印 `2.00x`，读者看不出这批是混的；
+      · 两档各半时印的是 `set` 遍历顺序决定的那一个 —— 那是抛硬币，不是读数。
+    所以现在交出去的是 `(倍率或空串, 分布, 不一致帧数, 原因)`：并列 ⇒ 倍率一律当**不知道**（空串），
+    原因里点名 `tie`，由调用方走**已有的那一条** `SCALE_NOT_RUN` 出口（不新造第二个不判出口）。
+    `bad`（x 与 y 推不出同一倍率的帧）以前算完就被 `_bad` 丢掉 ⇒ 现在照报，进文档也进行。
     """
     ratios = []
     bad = 0
+    unreadable = 0
+    sizeless = 0
     try:
         names = sorted(os.listdir(frames_dir))
     except OSError:
-        return ("", 0, 0)
+        return {"scale": "", "frames": 0, "bad": 0, "sizeless": 0, "dist": [], "reason": "no-dir"}
     for name in names:
         if not name.endswith(".png"):
             continue
-        m = _re.search(r"-(\d+)x(\d+)-(?:light|dark)\.png$", name)
+        m = _re.search(r"-(\d+)x(\d+)-(?:%s)\.png$" % "|".join(TIERS), name)
         if not m:
+            # 帧名里没有逻辑尺寸段 ⇒ 这一张**进不了倍率**，但不能当它不存在：计数照报，
+            # 否则"分布只覆盖了一半这批"没人知道。现读语料（本机这一批 + 三份基线名单）里这一支是 **0**
+            # ⇒ 它是**分母完整性**的证人，不是今天的读数（证人用合成帧名，见 ScaleDistributionTests）。
+            sizeless += 1
             continue
         px, py = png_size(os.path.join(frames_dir, name))
         lx, ly = int(m.group(1)), int(m.group(2))
         if px <= 0 or lx <= 0 or ly <= 0:
+            unreadable += 1
             bad += 1
             continue
-        if py != ly * (px // lx) or px % lx != 0:
-            bad += 1
+        if px % lx != 0 or py != ly * (px // lx):
+            bad += 1          # 两轴推不出同一个倍率：这一张既进分布也进 bad，两边都要看得见
         ratios.append(float(px) / float(lx))
     if not ratios:
-        return ("", 0, bad)
-    mode = max(set(ratios), key=ratios.count)
-    return ("%0.2fx" % mode, len(ratios), bad)
+        return {"scale": "", "frames": 0, "bad": bad, "sizeless": sizeless, "dist": [],
+                "reason": "unreadable" if unreadable else "no-frames"}
+    counts = {}
+    for r in ratios:
+        counts["%0.2fx" % r] = counts.get("%0.2fx" % r, 0) + 1
+    dist = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    top = dist[0][1]
+    tied = [name for name, cnt in dist if cnt == top]
+    if len(tied) > 1:
+        return {"scale": "", "frames": len(ratios), "bad": bad, "sizeless": sizeless,
+                "dist": dist, "reason": "tie"}
+    return {"scale": dist[0][0], "frames": len(ratios), "bad": bad, "sizeless": sizeless,
+            "dist": dist, "reason": "ok"}
+
+
+def scale_dist_text(info: Dict[str, object]) -> str:
+    """分布的逐字形状 `2.00x:355,1.00x:1`（值槽里不许有裸 ASCII 空格 —— R565 那条）。"""
+    dist = list((info or {}).get("dist") or [])
+    return u",".join(u"%s:%d" % (name, cnt) for name, cnt in dist) or u"（无）"
 
 
 def bake_provenance(repo_root: Optional[str], frames_dir: Optional[str],
@@ -476,12 +510,21 @@ def bake_provenance(repo_root: Optional[str], frames_dir: Optional[str],
             return {"commit": commit,
                     "round": str(inherit.get("baked_by_round") or "").strip(),
                     "scale": str(inherit.get("capture_scale") or "").strip(),
-                    "scale_frames": str(inherit.get("capture_scale_frames") or "").strip()}
+                    "scale_frames": str(inherit.get("capture_scale_frames") or "").strip(),
+                    "dist": str(inherit.get("capture_scale_dist") or "").strip(),
+                    "bad": str(inherit.get("capture_scale_bad_frames") or "").strip(),
+                    "sizeless": str(inherit.get("capture_scale_sizeless") or "").strip(),
+                    "reason": str(inherit.get("capture_scale_reason") or "").strip()}
     commit = git_head_commit(repo_root) if repo_root else ""
     rnd = ledger_round(repo_root) if repo_root else ""
-    scale, scale_frames, _bad = capture_scale(frames_dir) if frames_dir else ("", 0, 0)
-    return {"commit": commit, "round": rnd, "scale": scale,
-            "scale_frames": str(scale_frames) if scale_frames else ""}
+    info = capture_scale(frames_dir) if frames_dir else {
+        "scale": "", "frames": 0, "bad": 0, "sizeless": 0, "dist": [], "reason": "no-dir"}
+    return {"commit": commit, "round": rnd,
+            "scale": str(info["scale"]),
+            "scale_frames": str(info["frames"]) if info["frames"] else "",
+            "dist": scale_dist_text(info), "bad": str(info["bad"]),
+            "sizeless": str(info.get("sizeless") or ""),
+            "reason": str(info["reason"])}
 
 
 def baseline_bake(document: Dict[str, object]) -> Dict[str, str]:
@@ -491,17 +534,25 @@ def baseline_bake(document: Dict[str, object]) -> Dict[str, str]:
         "round": str(document.get("baked_by_round") or "").strip(),
         "scale": str(document.get("capture_scale") or "").strip(),
         "scale_frames": str(document.get("capture_scale_frames") or "").strip(),
+        "dist": str(document.get("capture_scale_dist") or "").strip(),
+        "bad": str(document.get("capture_scale_bad_frames") or "").strip(),
+        "sizeless": str(document.get("capture_scale_sizeless") or "").strip(),
+        "reason": str(document.get("capture_scale_reason") or "").strip(),
     }
 
 
 def bake_line(document: Dict[str, object]) -> str:
     bake = baseline_bake(document)
-    return u"出处=%s commit=%s 轮=%s 倍率=%s 口径帧数=%s" % (
-        u"有" if bake["commit"] else u"无",
-        bake["commit"] or u"（无）",
-        bake["round"] or u"（无）",
-        bake["scale"] or u"（无）",
-        bake["scale_frames"] or u"（无）")
+    return (u"出处=%s commit=%s 轮=%s 倍率=%s 口径帧数=%s 倍率分布=%s 不一致帧数=%s 无尺寸段=%s 原因=%s"
+            % (u"有" if bake["commit"] else u"无",
+               bake["commit"] or u"（无）",
+               bake["round"] or u"（无）",
+               bake["scale"] or u"（不知道）",
+               bake["scale_frames"] or u"（无）",
+               bake["dist"] or u"（无）",
+               bake["bad"] or u"0",
+               bake["sizeless"] or u"0",
+               bake["reason"] or u"（无）"))
 
 
 def write_baseline(path: str, frames: Dict[str, str], machine: Optional[str] = None,
@@ -519,6 +570,12 @@ def write_baseline(path: str, frames: Dict[str, str], machine: Optional[str] = N
         "baked_by_round": bake["round"],
         "capture_scale": bake["scale"],
         "capture_scale_frames": bake["scale_frames"],
+        # R587 / 靶 A：单一读数会藏住混批与并列 ⇒ 分布、bad、原因一起落盘，
+        # 让"这份基线是按什么倍率烤的"这句话在文档里就是完整的。
+        "capture_scale_dist": bake["dist"],
+        "capture_scale_bad_frames": bake["bad"],
+        "capture_scale_sizeless": bake["sizeless"],
+        "capture_scale_reason": bake["reason"],
         "note": "离屏帧的 sha256 基线。改了界面就在同一个 commit 里跑 update；"
                 "CI 的 compare 步骤靠它回答“上一版比这一版哪些帧变了”。",
         "frames": frames,
@@ -578,7 +635,14 @@ def resolve_baseline_path(repo_root: str, against: str = "auto") -> Tuple[str, s
     return manifest_path(repo_root), "working"
 
 
-def main(argv=None) -> int:
+def build_parser() -> argparse.ArgumentParser:
+    """把参数表单独暴露出来（R587 / 顺账）：
+
+    为什么 —— 上一轮印给读者的出路里那个旗标值写错了（少了 `latest-` 前缀），
+    靠一把刀钉住。这一轮要的是**仪器守卫**：印出去的每条命令串能不能被这份 parser 自己吃下，
+    由 `scripts/tests/test_printed_commands.py` 现读源码里的 print 串、真解析一遍，
+    而不是每犯一次记一笔。措辞里多一个字母就是空头支票（R585/R586 同族，已复发一次）。
+    """
     parser = argparse.ArgumentParser(description="离屏帧基线的比对与更新")
     parser.add_argument("action", choices=["compare", "update", "check", "snapshot", "register-drift"])
     parser.add_argument("frames_dir", nargs="?", default=None,
@@ -609,6 +673,11 @@ def main(argv=None) -> int:
     parser.add_argument("--drift-registry", default=None,
                         help="变帧/新帧的逐张登记名册（默认 docs/frame_drift_registry.json）。"
                              "check 用它把 changed 与 added 两态也变成会红的判据 —— 登记是账，不是措辞。")
+    return parser
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
     if args.action != "snapshot":
@@ -691,7 +760,9 @@ def main(argv=None) -> int:
     # 上一轮给名册补了 `observed`（手抄行从此可证伪），基线这一侧是同一个洞却没有同一个药 ⇒ 这一格补上。
     head = git_head_commit(args.repo_root)
     same_bake = bool(bake["commit"]) and bake["commit"] == head
-    current_scale, current_scale_frames, _bad_scale_frames = capture_scale(args.frames_dir)
+    cur_info = capture_scale(args.frames_dir)
+    current_scale = str(cur_info["scale"])
+    current_scale_frames = int(cur_info["frames"])
 
     current = collect(args.frames_dir)
     changed, missing, added = compare(baseline, current)
@@ -721,13 +792,37 @@ def main(argv=None) -> int:
               % (bake["commit"][:7], len(changed),
                  u"出路 让基线与被判的帧出自不同一笔（例如发布那一笔烤、下一笔判），"
                  u"或改判逐版本基线 `--against latest-release`；不许为了让这一支绿就把出处字段删掉，也不许调宽任何阈值"))
+    # ── 倍率这一维（R587 / 靶 A）：报的是**分布**，不是一个看起来确定的读数。
+    #   并列（两档各半）与"帧名/头读不出"都归**同一条**不判出口 `SCALE_NOT_RUN`，原因写在值里；
+    #   这样"加一档就静默退化"那一族没有第二条门路可走，也不新造第二个不判出口。
+    if cur_info["reason"] == "tie":
+        print(u"FRAME_BASELINE_SCALE_TIE 当轮=%s（%d 张里众数并列）⇒ 倍率按「不知道」处理，"
+              u"下面那条 SCALE_NOT_RUN 是这一支唯一的出口"
+              % (scale_dist_text(cur_info), current_scale_frames))
+    if cur_info.get("sizeless"):
+        print(u"FRAME_BASELINE_SCALE_SIZELESS 当轮=%d 张帧名里没有 `-宽x高-档` 那一段"
+              u"⇒ 它们进不了倍率分布，只报数不拦路（这一支是分布的**分母完整性**证人）" % cur_info["sizeless"])
+    if cur_info["bad"]:
+        # `bad` 以前算完就被 `_bad` 丢掉 ⇒ 现在照报：混批与"两轴推不出同一倍率"都要看得见。
+        print(u"FRAME_BASELINE_SCALE_BAD 当轮=%d/%d 张的两轴推不出同一倍率（只报数不拦路）"
+              % (cur_info["bad"], current_scale_frames))
+    if bake["reason"] == "tie":
+        print(u"FRAME_BASELINE_SCALE_TIE 基线=%s ⇒ 那份基线自己就是说不出倍率的（混批或并列烤的）"
+              % (bake["dist"] or u"（无）"))
     if bake["scale"] and current_scale and bake["scale"] != current_scale:
         # 只报数不拦路：R584 已经量到 runner 自印 1.00x 而工作基线是本机 2x 烤的那件事，
         # 这一格把它从"推理"变成基线文档自己说得出来的读数。放宽/收紧都不发生。
-        print(u"FRAME_BASELINE_SCALE_MISMATCH 基线=%s 当轮=%s（当轮量到 %d 张）⇒ 只报数不拦路，"
-              u"它是「变帧那一维是不是同一件事」的现场证人" % (bake["scale"], current_scale, current_scale_frames))
-    elif bake["scale"] and not current_scale:
-        print(u"FRAME_BASELINE_SCALE_NOT_RUN=当轮帧名里推不出倍率 ⇒ 这一维今天没读数，不许读成倍率相符")
+        print(u"FRAME_BASELINE_SCALE_MISMATCH 基线=%s 当轮=%s（当轮量到 %d 张 分布=%s）⇒ 只报数不拦路，"
+              u"它是「变帧那一维是不是同一件事」的现场证人"
+              % (bake["scale"], current_scale, current_scale_frames, scale_dist_text(cur_info)))
+    if not current_scale:
+        # 这一支是"当轮倍率说不出"的**唯一**出口（R587 / 靶 A ①：并列不许另开第二条不判门路）。
+        # 上一版它挂在 `elif bake["scale"] and …` 下面 ⇒ 基线自己也说不出倍率时（混批/并列烤的）
+        # 两个 unknown 撞在一起，反而一行读数都不印 —— 那是"谁都不知道"被读成"没什么要报的"。
+        print(u"FRAME_BASELINE_SCALE_NOT_RUN=%s（当轮分布=%s 基线倍率=%s）⇒ 这一维今天没读数，"
+              u"不许读成倍率相符，也不许读成倍率不合"
+              % (cur_info["reason"], scale_dist_text(cur_info) or u"（无）",
+                 bake["scale"] or u"（不知道）"))
     for name in changed:
         print("  changed  %s" % name)
     for name in missing:

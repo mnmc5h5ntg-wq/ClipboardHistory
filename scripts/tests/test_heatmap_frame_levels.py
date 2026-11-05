@@ -26,7 +26,12 @@ REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 SCRIPT = os.path.join(REPO, "scripts", "heatmap_frame_levels.py")
 SWIFT = os.path.join(REPO, "ClipboardHistory", "Tests", "ClipboardHistoryAppTests",
                      "HeatmapHoverEvidenceTests.swift")
-TAGS = ("dark", "light")
+# 档位词表只有一份真值（R587 / 靶 B）。旧版这里自己写第二份 `('dark', 'light')`，
+# 顺序还与判定侧相反 —— 而脚本又在第一个 stop 处就 return，于是"哪一档被点名"其实是**循环顺序**
+# 决定的。本轮把两处一起修：词表一份、stop 不再短路（见 test_log_covering_only_one_appearance…）。
+sys.path.insert(0, os.path.join(REPO, 'scripts'))
+from tier_vocabulary import TIERS  # noqa: E402
+TAGS = TIERS
 RUNGS = [(243, 243, 243), (215, 232, 255), (180, 210, 255), (130, 180, 255), (59, 142, 255)]
 
 
@@ -131,13 +136,31 @@ class InputHygieneTests(unittest.TestCase):
         self.assertIn(u'判据日志', out)
 
     def test_log_covering_only_one_appearance_is_not_a_pass(self):
-        """只给一档的判据日志 ⇒ 另一档不许 KeyError 蒙过去（必须 exit 2 并点名缺哪一档）。"""
-        d = tempfile.mkdtemp(prefix='r201-one-')
-        lg = os.path.join(d, 'j.log')
-        write_log(lg, RUNGS, [1.0] * 4, [1.0] * 4, tags=('light',))
-        code, out = run(['--shots', d, '--judgment-log', lg])
-        self.assertEqual(2, code, out[:300])
-        self.assertIn('dark', out)
+        """两档的帧都在、判据日志只覆盖一档 ⇒ 另一档必须被点名，且**与词表顺序无关**。
+
+        R587 之前这一格只在 `('dark','light')` 那个顺序下成立：脚本在第一个 stop 处就 `return 2`，
+        于是"缺席那一档被点名"依赖的是循环顺序而不是契约。本轮把词表收成一份真值（`('light','dark')`）
+        时它当场变红 ⇒ 红得对，只是红在脚本身上（门是既有的这一格，不是我新加的）。
+        现在两档各当一次"在场"，各要求对方被点名。
+        """
+        mod = load_module()
+        b, a = steps_of(mod, RUNGS)
+        for present in TIERS:
+            absent = [t for t in TIERS if t != present][0]
+            with self.subTest(日志覆盖=present):
+                d = tempfile.mkdtemp(prefix='r201-one-')
+                lg = os.path.join(d, 'j.log')
+                for tag in TIERS:      # 帧两档都在 ⇒ 唯一缺的只有日志那一档（旧版是空目录，缺的是帧）
+                    write_strip(os.path.join(d, 'heatmap-cell-strip-still-90x140-%s.png' % tag),
+                                (255, 255, 255), RUNGS)
+                write_log(lg, RUNGS, b, a, tags=(present,))
+                code, out = run(['--shots', d, '--judgment-log', lg])
+                self.assertEqual(2, code, out[:300])
+                self.assertIn(absent, out,
+                              u'日志只覆盖 %s 时，%s 那一档没被点名（顺序漏判）：%s' % (present, absent, out[:400]))
+                self.assertIn(u'判据日志里没有 %s 那 4 对' % absent, out, out[:400])
+                self.assertIn('HEAT_FRAME_VERDICT not-run=1', out,
+                              u'一档输入不足却打出别的结论：%s' % out[:400])
 
     def test_help_runs(self):
         code, out = run(['--help'])

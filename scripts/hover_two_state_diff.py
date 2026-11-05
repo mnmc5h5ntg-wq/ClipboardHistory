@@ -69,22 +69,22 @@ def _open(path):
     return Image.open(path).convert('RGB')
 
 
-TIERS = ('light', 'dark')
+# 档位词表是**一份真值**（R587 / 靶 B）：这里只 import，不再自己声明第二份。
+_HERE = os.path.dirname(os.path.abspath(__file__))
+if _HERE not in sys.path:
+    sys.path.append(_HERE)
+from tier_vocabulary import TIERS, tier_alternation, tier_from_name  # noqa: E402
 
 
 def frame_tier(name):
-    """按**段**解析档位（R586 / 靶 B）：档位是帧名里独立的一段，不是任意子串。
+    """按**段**解析档位（R586 立的规矩，R587 把词表交给自己那一份真值）。
 
     为什么不能写 `'light' in name`：现读 356 张帧名里有两张暗档含 `highlight`
     （`detail-text-highlight-720x520-dark.png`、`quickpick-typed-no-highlight-420x300-dark.png`）
     ⇒ 子串法把暗档读成亮档，于是拿 `FLOOR_LIGHT`（1.20）去判一个暗档 —— 尺读的不是它声称的那个对象。
     认不出档 ⇒ 返回空串，由调用方点名并红（不许默认成暗档：那是把「读不出」冒充成「知道是暗的」）。
     """
-    stem = name[:-4] if name.endswith('.png') else name
-    for seg in reversed(stem.split('-')):
-        if seg in TIERS:
-            return seg
-    return ''
+    return tier_from_name(name)
 
 
 def substring_tier(name):
@@ -174,9 +174,9 @@ def rung_from_readings(text, machine):
     先怀疑尺与环境，不给产品签字），签字时取最保守的那条（最小台阶）。
     """
     pat = re.compile(
-        r'PRESS_LADDER_PROOF (light|dark) 底 idle=(\d+) hover=(\d+) press=(\d+)'
-        r'｜药丸 idle=(\d+) hover=(\d+) press=(\d+)'
-        r'｜比值 ([\d.]+) → ([\d.]+)')
+        (r'PRESS_LADDER_PROOF (%s) 底 idle=(\d+) hover=(\d+) press=(\d+)'
+         r'｜药丸 idle=(\d+) hover=(\d+) press=(\d+)'
+         r'｜比值 ([\d.]+) → ([\d.]+)') % tier_alternation())
     per = {}
     for line in text.splitlines():
         m = pat.search(line)
@@ -191,7 +191,7 @@ def rung_from_readings(text, machine):
         return (['RUNG_STEP_EMPTY=1 日志里一行 PRESS_LADDER_PROOF 都没有 ⇒ 这台机器没量到按下档，'
                  '不许在空名单上给绿（R99）'], 1)
     rows, rc = [], 0
-    for tag in ('light', 'dark'):
+    for tag in TIERS:
         groups = per.get(tag)
         if not groups:
             rc = 1

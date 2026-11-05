@@ -12,7 +12,7 @@
 
 **两条流程教训（本会话反复踩，写给下一次的我）**：批写台账的脚本必须先单独跑完、看退出码，再决定要不要提交（git 链一律 `&&` 接在脚本之后 —— 这次有两笔提交信息写着「+一单追记」而追记当时因 heredoc 里 CJK 串夹 ASCII 双引号触发 SyntaxError 没写进去）；CJK 串里不许出现 ASCII 双引号。
 
-最后更新：2026-11-06（本地 · R586 / 第 585 轮 / Round 583）
+最后更新：2026-11-06（本地 · R587 / 第 586 轮 / Round 584）
 ## R570 ⓪ 开工（2026-11-04 · 第 569 轮 / Round 567 · 分岔证人那一跑还在 `in_progress` ⇒ 七格全部「未到数」，本轮先把证人做成不依赖它）
 
 ⓪·0 **身份现读**：UI_AUDIT 最新标题 = `## 第 568 轮（R569` ⇒ 本轮 **R570 = 第 569 轮 / Round 567**；`test_round_batch_consistency` 三格 OK；刀高水位现读 **M1488** ⇒ 本轮从 **M1489** 起；`PRODUCT_STREAK ledger_round=568 streak=1`（只抄门）。「最后更新」照旧**不在这一笔抬**（抬了 `back == 0` 就要求三本各有 R570 标题，而这一笔只动 STATE ⇒ 中间跑注定红；抬的时机 = 台账那一笔）。
@@ -142,6 +142,84 @@
 ② **本轮唯一向前的一句话**：660 那三条出路里，「基线与被判帧出自不同一笔」这一支在 CI 上今天是不是自然成立？—— **还不知道**：CI 的 STEP[11] 判的是工作基线（旧文档，无出处 ⇒ 走 `absent` 具名那一支），`--against latest-release` 那一支本轮只在临时仓里真跑过（`test_the_release_branch_actually_runs` 断它不退 2），runner 上它读到的倍率会不会与基线不同字（`SCALE_MISMATCH` 第一次响在哪一跑）只能由含本笔的那一跑说。
 ③ **⑨ 的封条**：本节 ⑨ 到 ⑨·10 为止（门复算末态 `红名=13 计入行=10 编号去重=10 不计入=3 未标=0 对不上=0`，由 `red_name_reconciliation.py` 落盘后复算签），本补记**不往 ⑨ 里加新格**；本补记唯一新增的自陈是这一句：⓪·1 那一跑的状态是 push 之后 25 秒取的，它此刻 `in_progress` **不构成**对本轮任何判据的复核。
 ④ **台账计数器（本笔只动 STATE 一本）**：`## R586 补记` 形状写前现读=0、写后=1；UI/ITER/BACKLOG/DEC/FINAL/CHANGE 六本一字未动。禁碰清单照旧逐轮携带：本轮没碰 `Sources/`、没碰捕获侧 Swift、没动三张按机器登记的表与 `registeredOffscreenVerdict(scale:)`、没动两个地板数值（1.20 / 1.10）、第③段着色器一字未写。
+
+## R587 状态（2026-11-06 · 第 586 轮 / Round 584 · 产品 0 文件 + **读数是不是它声称的那个对象**（① 帧的捕获倍率从「取众数」改成「报分布」，并列一律当**不知道**并走**已有的那条**不判出口；② 档位词表收成一份真值，「两份写法坏一份不会红」由 AST 守卫签；③ 印给读者的成句命令由它自己的参数表对账）+ 判据卷 +20 格（帧门 59→66、词表新卷 0→13、热图那一格改成两向）+ 刀 M1547–M1554（**M1549 空刀作废、补证人后以 M1553 重落**）+ ⓪ 三跑全部到数）
+
+⓪ **三跑都到数，其中两跑把「上一轮的账」forward 掉了；本轮还从自己的 ⓪ 脚本里挖出两条会造假的判别**
+- 身份现读：UI_AUDIT 最新一节以「第 585 轮（R586」开头，STATE 最新是 R586 ⇒ 交叉核对通过 ⇒ 本轮 **R587 = 第 586 轮 / Round 584**。刀高水位现读 **M1546**（`mutate_r586_*` 那六把在册）⇒ 本轮从 **M1547** 起，没抄派单里的数。
+- `42118421683 ↔ 0b39576`（R586 主笔）现读 `completed / failure` ⇒ **到数**。全部失败步骤逐字：`JOB build-and-test ⇒ failure / STEP[15] Swift tests (executed-count gate) ⇒ failure / STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure / STEP[19] Motion coverage floor ⇒ failure` ⇒ **STEP[11] 不在里面**。门那一行 `FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=356 新帧=0 本机行=0 他机行=16 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 未登记（不判）=356` ⇒ **出口·乙**（那一维在那台机器上仍没人判），与 R586 那一节同形状。R586 交下来的六条预测由 `ci_status_r587.py` 判、不由我念 ⇒ **六条全中**（逐字见 ①）。
+- `42119000322 ↔ 7837e00`（R586 补记笔）现读 `completed / failure` ⇒ **到数**。R586 那一节写的是「本轮那一跑现取现写而它未到数」⇒ 那句话在它落盘的时刻是对的，本轮**只 forward 补记、不回头改那一格**。失败步骤比主笔多一朵 `STEP[18]`（On-screen probe coverage floor）⇒ 同一轮的两跑里那一步一朵红一朵没红，这是**跑与跑之间的差**，不是本轮引入的回归（本轮没碰捕获侧）。
+- ⚠ **通道分歧一条（具名，不合并）**：`ci_read.py steps` 的头行在 06:41 那一刻对 `42119000322` 打的是 `conclusion=`（空），而 `gh run view --json conclusion` 现在打 `failure`。我没把那一格读成「未到数」，因为 到数 判定用的是 **job/step 级结论行**（R557 那条规矩在这里正好接住）；但 run 级 conclusion 与 job 级结论**不是同一格账**，取数时刻也不同 ⇒ 两处都记，不许只留最终那个数。
+- `42108062173 ↔ ba093be`（R585 补记笔）现在也到数（`completed / failure`），**由本轮签**。这一跑的日志里步骤名恒为 `UNKNOWN STEP` ⇒ 正文只能按通道串取；而**本轮发现自己那条按机器键筛的判别是坏的**：电池那一步的模拟行故意写 `本机=基线署名=github-runner`，与真门同一批前缀 ⇒ 上一版据此报出的四行 DRIFT **全是电池行**。改用「基线署名 == 那一笔提交里 `docs/frame_baseline.json` 自己署的那台机器」筛 ⇒ 排除 17 行合成树，真门那一行逐字 `FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=356 新帧=0 本机行=0 他机行=16 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 未登记（不判）=356` ⇒ **判=不判**，与另两跑同形状（旧版那句「判=判」是借来的读数，作废）。
+- ⚠ **恒真预测一条（具名并修掉）**：六条预测里 `HOVER_TIER 认不出档=0` 第一版写成 `lambda g: True` —— 因为那条通道不在 `gate` 集合里，我就「放行」了它 ⇒ 那是把「我没接上」写成「它中了」（R565 那一族：自我豁免＝恒真门）。现在把通道交给预测本身，取不到行就报「未读到」而不是「中」。
+- 本轮那三条**留给下一跑**的可证伪预测（写在 `ci_status_r587.py` 的 `PREDICTIONS_R588`，由脚本判、不由我念）：①`FRAME_BASELINE_SCALE_NOT_RUN` 是这一支**唯一**出口（并列/读不出都归它，不许新造第二条）；②`FRAME_BASELINE_BAKE` 那一行必须带 `倍率分布=/不一致帧数=/无尺寸段=/原因=` 四个新格子；③名册与基线里的既有字段含义**一字未改**（`capture_scale` 仍是那个众数语义的位置，只是并列时变成空串）。⚠ 这三条**今天一条都没判** —— 含本笔的那一跑还不存在（代码还没推），所以 `ci_status_r587.py` 只把它们的**文本**印进读数、不填任何数；R588 拿它们对含本笔那一跑判。对更早的跑它们只能打印「不适用」，把「还没落地」读成「是假的」是这一族的第三种坏法。
+- 红名单逐字 5 个名字（`42118421683`、`42108062173`）与 6 个名字（`42119000322` 多 `testProductDurationRevealStillMovesOverTime`）⇒ **同集合内的一朵间歇**，本轮不重开也不结案。
+
+① **派单给的三条形状结论：逐条坐实（取值时刻=R587 开工，全部现读）**
+- 靶 A 三处逐字：①`mode = max(set(ratios), key=ratios.count)` —— `set` 的遍历顺序不参与判定，但**并列时它替我选了一个**；②两轴推不出同一倍率的那张 `bad += 1` 之后**仍** `ratios.append(float(px)/float(lx))`；③`_bad` 在 `bake_provenance` 与 `check` 两个调用点被下划线丢掉 ⇒ 这个量算了却没人看。⇒ 一批 355 张 2x + 1 张 1x 会照印 `2.00x`，读者看不出这批是混的。
+- 靶 B 逐字：`hover_two_state_diff.py:72` 的 `TIERS = ('light','dark')` 与 `frame_baseline.py:453` 里硬写的 `-(?:light|dark)\.png$` 是**同一件事实的两份写法**；把其中一份改坏（例如加一档 `-mono`），另一份**不会有任何一格红** —— 倍率那一侧只会静默退化成「帧名里推不出倍率」，而它走的是**不红的** `SCALE_NOT_RUN` 出口。
+- 顺账逐字：`scripts/*.py` 里被 print 出去的成句命令现读 **1 条**（`frame_baseline.py` 自己那条出路）；另有两支脚本印了旗标但不是命令（`ci_red_stability.py` 手写 argv、`create_issues.py` 的 `add_argument(` 与旗标换行）⇒ 这两处是本轮把守卫从「两个文件」扩到「每一支」时**自己撞出来的**，见 ⑨。
+
+② **真实推进（段号=②，靶 A：倍率报成分布，并列当不知道）**
+- `capture_scale()` 的返回从三元组换成**一个字典**：`scale / frames / bad / sizeless / dist / reason`。`dist` 是**排序后**的（先按计数降序、再按倍率名升序）⇒ 并列时也有确定形状，不再依赖 `set` 的遍历顺序（那正是旧版印出抛硬币倍率的根）。
+- **并列 ⇒ `scale=""`、`reason="tie"`**，由调用方走**已有的那一条** `FRAME_BASELINE_SCALE_NOT_RUN=<reason>` 出口 ⇒ 没有新造第二条「不判」门路（派单硬要求）。同时印 `FRAME_BASELINE_SCALE_TIE` 说清是**哪一种**说不出（tie / unreadable / no-frames / no-dir），因为「不知道」有四种成因，混说会给出假的可比性。
+- 上一版那条出口挂在 `elif bake["scale"] and not current_scale` 下面 ⇒ 基线**自己**也说不出倍率时（混批/并列烤的），两个 unknown 撞在一起反而**一行都不印** —— 那是「谁都不知道」被读成「没什么要报的」。现在它是独立的 `if not current_scale`，值槽里带 reason、分布、基线倍率三样。
+- `bad` 不再被 `_bad` 丢掉：印 `FRAME_BASELINE_SCALE_BAD 当轮=N/M`，并落进文档字段 `capture_scale_bad_frames`。`sizeless`（帧名里没有 `-宽x高-档` 那一段）同样照报 —— 它是**分布的分母完整性**证人：现读语料这一支是 **0 张**，所以它是前瞻，不是今天的读数（这句话不许说过头，见 ⑨·3）。
+- 文档新增四个字段（`capture_scale_dist` / `capture_scale_bad_frames` / `capture_scale_sizeless` / `capture_scale_reason`），`bake_line` 一并印出 ⇒ 真语料现读：`SCALE_LIVE 本机 R587 这批=2.00x 分布=2.00x:356 bad=0 sizeless=0 reason=ok`
+- 没动的（派单红线）：`--against` 的默认与 choices、`--allow-missing` 两帧、任何阈值/容差/地板、名册那 16 行的字段与理由、`docs/frame_baseline.json`（`未改（git status 里没有这一行）`）。**没有**因为「报分布好用」去改已有字段的含义：`capture_scale` 仍是「这批帧的倍率」，只是说不出时写空串而不是写一个看起来确定的数。
+
+③ **真实推进（段号=③，靶 B + 顺账：一份真值、一条会红的对账）**
+- 新增 `scripts/tier_vocabulary.py`：`TIERS` 一份 + `tier_from_name()` 按段解析 + `tier_alternation()/tier_suffix_pattern()` 现推正则片段。四处声明（`hover_two_state_diff.py` 的 `TIERS`/两处字面量/那条正则、`frame_baseline.py` 的倍率正则、`frame_recording_proof.py` 的 shade 循环）全部改成 import ⇒ 现读扫描（同一支扫描器跑两遍：HEAD 与工作树）：`TIER_SCAN HEAD 所在文件=6（活脚本 4 ＋ 测试夹具 2）命中处=9` ｜ `TIER_SCAN 工作树 所在文件=1（活脚本 0 ＋ 测试夹具 1）命中处=4` ｜ `TIER_SCAN 净变化 文件数 活脚本=-4 测试夹具=-1；命中处=-5`
+- 守卫 `test_no_live_script_declares_its_own_tier_vocabulary` 扫 `scripts/*.py` 每一支（AST 级，docstring 与注释按行号摘出去）⇒ 「再出现第二份代码层面的声明」当场红并点名文件与行；自带三条对照：三种形状都认得出（正对照）、注释里出现不算声明（反面对照，本轮真实撞过一次）、`tier_alternation()` 是从词表现推不是另抄。
+- 「`substring_tier` 不参与判定」由 AST 签，不由注释签：`test_measure_uses_segment_parse_not_substring` 断判定函数调的是 `frame_tier` 且**没调**子串法；`test_substring_tier_has_exactly_one_caller` 断全仓只剩报表那一处调用点（刀 M1550 把判定改回子串 ⇒ 这两格各红一次，且「只有一个调用点」从 1 变 2 也红）。
+- 顺账那条做成**仪器守卫**而不是一条条追记：`PrintedCommandParsesTests` 扫每一支脚本 print 出去的 `python3 <某脚本.py> <尾巴>`，把尾巴里的 `--选项` 拿去对账**那个脚本自己**的真旗标（`add_argument`，容忍换行；∪ 代码里整条字面量就是一个 `--x` 的那些，覆盖手写 argv），并断言脚本路径真存在。今天全仓这样的命令只有 1 条 ⇒ 范围是「每一支」，不是那一条。
+- 词表的**边界**也做成读数：Swift 捕获侧现读 `SWIFT_TIER_DECLARATIONS 处=11（全部在 UICaptureHarness.swift）⇒ 本轮只收 python 侧，Swift 侧一字未动（派单红线）` ⇒ python 侧那份真值管不到它，本轮红线不许碰捕获侧 ⇒ 新开 **661** 只登记不代选。
+
+⑨ **本轮自伤清单（九处，每处都带代价）与对账**
+· **对账口径**（沿用启用，不关）：每条具名红/具名不判/作废读数要么落到 `⑨·` 编号，要么写 `不计入对账口径` 并带三类名字之一。
+- 逐条：
+  · ⑨·1 **一把空刀（M1549）**：它摘的是「`px<=0` 那张进不进 `bad`」那一支，而那一支**从来没有测试覆盖** ⇒ 末态 `post=PASSED`（PASSED＝空刀）。作废的是**结论**不是刀位：号留着、不复用，补上证人（`test_unreadable_png_is_counted_as_bad_not_dropped`）后在**同一处**以新号 **M1553** 重落 ⇒ CAUGHT。⚠ 两个时刻都要记：补证人之后重跑整张表，M1549 自己也变成 CAUGHT（`knife_status.txt` 那一趟）⇒ 「空刀」这句话的证据是**补证人之前那一趟**的读数文件，不是我现在念的。这是第五种空刀形状（R491 同值、R560 容差、R567 公共行、R577 一臂捆两件事）：**刀没错，证人还没出生**。
+  · ⑨·2 **改尺之后证人搬了门牌，刀还打在旧模块上**：顺账那条守卫从 `test_frame_baseline` 升级成扫 scripts/ 每一支、新家住在 `test_tier_vocabulary` ⇒ M1552 若仍按表默认的模块跑，抓的是一把**已经不认这件事的旧尺**（形状与 ⑨·1 相邻：不是刀错，是证人换了门牌）。代价=臂上补第 5 位（证人模块），并把整张表**重跑一遍**。
+  · ⑨·3 **我印了一个不存在的帧名**：`settings-general-min-orphan-dark.png` 被我写进 `frame_baseline.py` 的 print 与注释，还配了一句「现读确有这种命名」。它不在现读语料里（现读那一批 356 张**全部**带 `-宽x高-档` 那一段；真实存在的近似名是 `general-min-orphan-640x540-dark.png`）。⇒ 本轮顺账要防的就是这种空头支票，而我自己在同一轮里开了一张。代价=撤掉例子、注释改成「现读这一支是 0 张 ⇒ 分母完整性证人」，测试 docstring 写明那是**合成**名。自查方式也记下来：scripts/*.py 里 15 处 `.png` 字面量逐条对现读语料，不在册的 1 处就是它。**没有**为它新立守卫：那 15 处里 12 处是模板/输出文件名（`%s.png`、`real_screen_*.png`），按「名字必须在册」判会把它们读成红 ⇒ 记成读数与措辞规矩，不记成门。
+  · ⑨·4 **把词表收成一份真值改变了迭代顺序，既有测试当场红 —— 红在脚本身上**：`heatmap_frame_levels.py` 原来写 `('dark','light')`，共用词表是 `('light','dark')`；那支脚本在**第一个 stop 处就 `return 2`** ⇒ 「缺席那一档被点名」从来靠的是循环顺序而不是契约。代价=修脚本（stop 不再短路，两档各自点名后再收口，并新增 `HEAT_FRAME_VERDICT not-run=N` 那一行：有一档输入不足就不许印「两通道都对上了账」），把既有那一格改成**两档各当一次在场**（subTest），并补一把刀 **M1554** 钉住「不许回到短路」。这一条的形状值得记：合并两份写法**本身**就是一次改动，它会把「藏在顺序里的依赖」翻出来 —— 那不是回归，是既有缺陷第一次被看见。
+  · ⑨·5 **扫描器第一版扫文本行，把我自己写的注释判成第二份声明**：注释里那句「倍率解析里的 `(?:light|dark)` 由它现推」被数成一处声明 ⇒ 守卫红在我没改过的地方。代价=改成 AST 级、docstring 按行号摘出去，并补一条**反面对照**（注释里出现那三种形状不算声明）。与 R580「读到 1 要区分『对象在』与『字面在』」同族。
+  · ⑨·6 **顺账守卫第一版把两处「存在的」读成「不存在」**：`ci_red_stability.py` 没有 argparse（手写 `if args[0] == "--from-file"`）、`create_issues.py` 的 `add_argument(` 与旗标换了行 ⇒ 按「print 里任何 `--x` 都要在 add_argument 里」判，这两个真旗标都会被判成空头支票。代价=规则从「宽」收窄成「只认成句命令」+ 真旗标集合并入「整条字面量就是一个 `--x`」那一支，并补两条对照（两种真写法都要认成存在；一个不存在的脚本名也要红）。**把存在的读成不存在**比漏读更坏：它会把守卫养成一台专门红自己的机器，然后被人关掉。
+  · ⑨·7 **一次性批量补丁把目标文件写成 `SyntaxError`**：`/tmp/r587/patch_printed_guard.py` 里我在新代码块中写了 `(?:"|')`，而它坐在三引号字符串里 ⇒ `\'` 被吞成 `'`，落盘后那一行直接语法错（import 阶段就炸，没删掉任何内容 —— 与 R577 那次删掉 13,848 字符同族但轻一级）。代价=改一行、并把因此变成死码的两个 helper 删掉。规矩照旧：**批量补丁写完立刻 import 一遍目标模块**，不能只看 diff。
+  · ⑨·8 **我自己的 ⓪ 脚本里两条判别会造假**：①退化日志按「机器键含 github-runner」筛真门 —— 电池的模拟行**也用这个键** ⇒ 借来的四行 DRIFT 被当成真门读数（本轮改用「基线署名等于那一笔文档署的那台机器」，并说出这条判别比按步骤切更弱）；②一条预测写成 `lambda g: True` ⇒ 六条里有一条永远不会不中，而我上一轮把它记成了「全中」。代价=两处都改，并**重跑三跑读数**；旧那份 `ci_status.txt` 的读数被新的覆盖前已另存，账上两句话都在。
+  · ⑨·9 **读数文件里那一格 `P1_RC` 记的是 grep 的退出码，不是脚本的**：生成命令写成「跑脚本 → grep 一行 → echo $?」，而 `$?` 在 echo 那一刻已经是 grep 的状态 ⇒ 这一格从「脚本退出码」被悄悄换成「我有没有抓到一行」。本轮真值恰好也是 0，所以**没有翻面**，但尺已经换了对象（R565 那一族：通道还在，读的不是那件事）。代价=改成显式记数，并在读数文件里把这一格来历写全。
+- **红名对账**：
+  · 红名「M1549 `post=PASSED`（空刀：那一支没有证人）」→ ⑨·1
+  · 红名「M1552 打在旧模块上（证人搬家）」→ ⑨·2
+  · 红名「印出去一个不存在的帧名（`settings-general-min-orphan-dark.png`）」→ ⑨·3
+  · 红名「`AssertionError: 'dark' not found in …HEAT_FRAME_INPUT_MISSING 缺帧 …light.png`（合并词表改变迭代顺序，暴露脚本只报第一档）」→ ⑨·4
+  · 红名「守卫把注释判成第二份声明」→ ⑨·5
+  · 红名「守卫把两个真旗标读成不存在（手写 argv / 换行的 add_argument）」→ ⑨·6
+  · 红名「`SyntaxError`（批量补丁吞掉一个反斜杠）」→ ⑨·7
+  · 红名「`ci_status_r587.py` 的退化筛把电池行当真门 + 一条恒真预测」→ ⑨·8
+  · 红名「读数文件里 `P1_RC` 记成 grep 的退出码（本轮真值也是 0 ⇒ 没翻面，但尺换了对象）」→ ⑨·9
+  · 红名「`42119000322` 比 `42118421683` 多一朵 `STEP[18]`」→ **不计入对账口径**（通道未跑 —— 同一轮两跑之间那一步的通道结果不同，本轮没碰那一面；措辞按名册里那三类之一写，不新类）
+  · 红名「`testProductDurationRevealStillMovesOverTime`（只在 `42119000322` 那一跑出现）」→ **不计入对账口径**（基名在漂 —— 与 R582–R586 同集合内的一朵间歇名，本轮不重开不结案）
+  · 红名「`FRAME_BASELINE_SCALE_TIE` / `…_BAD` / `…_SIZELESS` 本机今天都不出现」→ **不计入对账口径**（通道未跑 —— 真语料是单一倍率、无混批、无无尺寸段名；三格由合成夹具与刀作证，外部证人归下一跑）
+  · 红名「`STEP[15]/[17]/[19]` 那三朵」→ **不计入对账口径**（契约名 —— 逐字同集合，只算「没有新名字」）
+- 门复算（预览 → 落盘 → 复算）：`RED_NAME_RECONCILIATION 节=R586 红名=13 计入行=10 编号去重=10 不计入=3 未标=0 对不上=0 口径=已启用`
+- 逐本现读七个数（写之前各 0 / 写之后每一本恰 1）：`preapply_counts.txt`、`postapply_counts.txt`。
+
+⑦ **验证链（顺序照旧，两处偏差具名）**：`swift build --build-tests`（包目录内）告警 **0**、错误 **0**（`BUILD_WARNINGS=0（现读 /tmp/r587/build.log = `swift build --build-tests` 那一趟，warning: 计数；捕获卷 capture.log 里另有 0）`）；python 判据卷**整目录一趟** `Ran 814 tests in 99.759s / OK (skipped=5)`，分卷现读 `test_frame_baseline Ran 66 tests in 2.099s OK ｜ test_tier_vocabulary Ran 13 tests in 0.206s OK ｜ test_heatmap_frame_levels Ran 10 tests in 0.443s OK ｜ test_frame_recording_proof Ran 9 tests in 0.597s OK ｜ test_hover_two_state_diff Ran 36 tests in 1.020s OK (skipped=2)`；`def test_` 前后计数 `test_frame_baseline 59→66 ｜ test_frame_recording_proof 2→2 ｜ test_heatmap_frame_levels 10→10 ｜ test_hover_two_state_diff 36→36 ｜ test_tier_vocabulary 0→13` ⇒ 净 +20 格（热图那一格是**改成两向**，格数不涨，涨的是 subTest 数 —— 这句话两边都不许说过头）；八把刀**先跑**（全部打在 python 仪器上、不碰 `.build` ⇒ 没撞锁；偏差具名 `KNIVES_BEFORE_CAPTURE_PYTHON_ONLY`，沿用 R586 同一命名）`M1547 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格 ｜ M1548 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1549 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1553 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1552 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1550 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格 ｜ M1551 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1554 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格`；逐把红了哪几格由日志现数 `M1547红2格 ｜ M1548红1格 ｜ M1549红1格 ｜ M1553红1格 ｜ M1552红1格 ｜ M1550红2格 ｜ M1551红1格 ｜ M1554红2格`；`MD5=` 那一行是刀链前后同一批文件的现读（还原证人，四份文件一起核）`before=5e0a1f2697d9b46b582cc2c97d1ed067 e164687e91530e0d40ac0e4c940e6e01 754b3bd683d734d7870259c3592a9009 0ed85312da0d34a7dc85ac67431cb3a5 after=5e0a1f2697d9b46b582cc2c97d1ed067 e164687e91530e0d40ac0e4c940e6e01 754b3bd683d734d7870259c3592a9009 0ed85312da0d34a7dc85ac67431cb3a5 同一份=yes`；Swift 捕获判据卷 `CAPTURE_LINES=Executed 233 tests, with 4 tests skipped and 0 failures (0 unexpected) in 779.347 (779.371) seconds`（帧 `FRAMES=356`）；对新尺在**含本笔的树**上现读 `FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=16 新帧=0 本机行=16 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 已登记=16 未登记=0 陈旧行=0` ⇒ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）`；倍率那一维的真语料读数 `SCALE_LIVE 本机 R587 这批=2.00x 分布=2.00x:356 bad=0 sizeless=0 reason=ok`；全量卷 `FULL_TOTAL=Executed 1441 tests, with 60 tests skipped and 0 failures (0 unexpected) in 783.796 (783.890) seconds`，skipped 只记现读 `FULL_SKIPPED=60 去重后测试名=60（只记现读，不猜成因）`；三道预检**串行**（不与 swift 卷并行）：`NEEDLE_PRECHECK tables=398 covered=319 arms=836 bad=0`、`ARM_TOTAL files=491 arms=1323 dupes=0 repeats=0`、`HIDDEN_ARMS 表=485 可判=1262 rot=0 抽不出=6 已声明表=6 已声明死针=0 上界 rot=0 抽不出=6 已声明死针=0 已声明表=6 处置=ok`；换装 `SKIP_INSTALL=no-product-change`（产品 0 文件）；七本台账 → 派生格**落盘之后**现读 → 电池（本机那一趟的数**不回填**，最终签字归 runner `STEP[9]`）；产品文件 0 个，连续零改动 **19** 轮（唯一取数口 `python3 scripts/product_streak.py`，**台账落盘之后**现读 `PRODUCT_STREAK ledger_round=586 streak=19 sections=562 as_of=last=8f679f9 last_round=567 newest=8f679f9 newest_round=567 date=2026-11-04 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)`；as-of 口径 ⇒ 读作「本轮之前最后一次产品改动在 19 轮前」；取数时刻由 `post_land()` 钉在函数名字上，不在纪律上）；清账 `LEDGER_ABSENCE_RESULT=ok 不成立=0/63`；代码 numstat 现读 `已跟踪：8 文件 +400 / −59`；字面量真验证 `PYCOMPILE ok=1 scripts/frame_baseline.py ｜ PYCOMPILE ok=1 scripts/hover_two_state_diff.py ｜ PYCOMPILE ok=1 scripts/heatmap_frame_levels.py`。
+
+⑧ **看图那一腿**：`LOOK 真看整帧一张：`heatmap-cell-strip-still-90x140-dark.png`（180x280 px = 90x140pt @2x，档位=暗）
+    为什么看这张：本轮 靶 B 的连带修复落在 `scripts/heatmap_frame_levels.py`（把 `('dark','light')` 收成共用词表，并把「第一个 stop 就 return」改成两档各自点名）⇒ 那张帧就是这支脚本**唯一**的真帧输入，改完必须看它。
+    肉眼所见：暗背景上一列 5×7 的蓝色方格，上四行由深到亮、第五行起右下角三格几乎全黑（=「少」那一档），顶部约 1/3 是纯暗背景（脚本把它当夹具背景排掉）。⇒ 版式与颜色档都正常，五档梯度肉眼分得开。
+    这一张的倍率读数（靶 A 的对象）：帧名逻辑尺寸 90x140，PNG IHDR 像素 180x280 ⇒ 2.00x，与这批 356 张的分布逐字相符（见 scale_real.txt）。
+  BYTE_COMPARE R586↔R587 同名=356 逐字节相同=356 不同=0 only_r586=0 only_r587=0
+    ⇒ 本轮产品 0 文件 ⇒ 帧一字未变；没新增漂移 ⇒ 没调用 register-drift，名册那 16 行的 observed 一字未动。
+  看图张数：1 张暗档整帧。暗档债仍没还完 ⇒ 账上不许写「暗档看过了」。
+  HEAT_LIVE 真帧+真判据日志现跑一遍（本轮把 stop 从短路改成两档各自点名，这一跑就是它的回归证人）：
+    HEAT_FRAME_VERDICT ok 两通道都量到、真帧未越地板、偏移仍压在 R 那一列
+    逐档余量：HEAT_FRAME_MARGIN light 真帧最小模拟后=21 判据=25.41 地板=18 ⇒ 余量 真帧=3 判据=7.41 ｜ HEAT_FRAME_MARGIN dark 真帧最小模拟后=29 判据=29.22 地板=18 ⇒ 余量 真帧=11 判据=11.22
+    ⇒ 两档都量到 ⇒ 新的 not-run 那一行**没有**在真输入上误响（它只在有一档输入不足时才印）。`
+
+⑤ **地基一字不动**：4.5 墨、150、2x 8.0pt、1x 6.0pt、120ms 与容差 1、Motion ≥2、`probeInkFraction=3%`、`.contentFade 0.20`、像素格容差 1.5 与跳变地板 8、声明时长、**两态差尺的两个地板 `1.20 / 1.10`**（本轮只换「哪一档」的解析法，数值一字未动 —— 刀 M1550 的负半证人就是「地板那一格不许红」）、全量 skipped 现读、禁碰 14 面不抬不降（本轮没碰捕获侧 Swift ⇒ 逐字证人就是 ⑦ 里那两本 python 卷与全量卷）；`--against` 默认与 choices、`--allow-missing` 两帧原样；本轮新增的读数里**没有一条进拦路**（`SCALE_TIE`/`SCALE_BAD`/`SCALE_SIZELESS` 只报数，并列与读不出都归**已有的** `SCALE_NOT_RUN`），没有任何一格被放宽、改成 skip 或挪阈值。
+
 
 ## R586 状态（2026-11-06 · 第 585 轮 / Round 583 · 产品 0 文件 + **取证通道自己读不读得对对象**（① 基线文档补上「哪一笔、哪一轮、什么倍率烤的」三个**运行时观测**，`check` 从此能分辨「拿被判那批帧自烤」并为此红；② 两态差尺的地板选择从**子串**换成**按段解析**）+ 判据卷 +19 格（帧门 48→59、两态差尺 28→36，两头都现数 `def test_`）+ 刀 M1541–M1546 全 CAUGHT + ⓪ 上一轮主笔到数、补记笔未到数）
 

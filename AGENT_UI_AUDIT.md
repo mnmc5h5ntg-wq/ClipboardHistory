@@ -363,6 +363,44 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 586 轮（R587 · 2026-11-06 · U-2635…U-2646）：把「读数是不是它声称的那个对象」做成三份会红的账（①倍率报分布、并列当不知道并走已有出口；②档位词表一份真值、子串法由 AST 签出判定；③印出去的成句命令由参数表自己对账）
+
+- **U-2635：⓪ 三跑全部到数，其中两跑把上一轮的「未到数」forward 掉**。
+    `42118421683 ↔ 0b39576` 与 `42119000322 ↔ 7837e00` 现读都是 `completed / failure` ⇒ 到数；失败步骤逐字 `JOB build-and-test ⇒ failure / STEP[15] Swift tests (executed-count gate) ⇒ failure / STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure / STEP[19] Motion coverage floor ⇒ failure` ⇒ **STEP[11] 不在里面**；门那一行 `FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=356 新帧=0 本机行=0 他机行=16 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 未登记（不判）=356` ⇒ 出口·乙。`42108062173 ↔ ba093be`（R585 补记笔）也到数，但日志步骤名恒为 `UNKNOWN STEP` ⇒ 正文按通道串取。R586 那一节写的「未到数」在它落盘的时刻是对的 ⇒ 本轮只 forward 补记，不回头改那一格。
+
+- **U-2636：我自己那把读 CI 的尺有两处会造出假读数（都改了，都重跑）**。
+    ①退化日志里按「机器键含 `github-runner`」筛真门是**坏的**：电池那一步的模拟行故意写 `本机=基线署名=github-runner` ⇒ 上一版报出的四行 DRIFT 全是电池行，那句「判=判」是借来的读数（作废）。改用「基线署名 == 那一笔提交里 `docs/frame_baseline.json` 署的那台机器」筛 ⇒ 真门那一行逐字 `FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=356 新帧=0 本机行=0 他机行=16 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 未登记（不判）=356`，与另两跑同形状。这条判别比按步骤切**更弱**，所以逐字说出来。②六条预测里 `HOVER_TIER 认不出档=0` 第一版写成 `lambda g: True` ⇒ 恒真门（R565 那一族）。
+
+- **U-2637：倍率不再是一个众数，而是一个分布；并列一律当「不知道」**。
+    `capture_scale()` 返回 `scale/frames/bad/sizeless/dist/reason`，`dist` 先按计数降序、再按倍率名升序 ⇒ 并列时也有确定形状，不再由 `set` 的遍历顺序替我选一个。并列 ⇒ `scale=空串` + `reason=tie`，走**已有的** `FRAME_BASELINE_SCALE_NOT_RUN=<reason>` ⇒ 没有新造第二条不判出口。真语料现读：`SCALE_LIVE 本机 R587 这批=2.00x 分布=2.00x:356 bad=0 sizeless=0 reason=ok`
+
+- **U-2638：`bad` 与 `sizeless` 从「算了没人看」变成照报照落盘（后者今天是 0，属前瞻）**。
+    旧版 `_bad` 在两个调用点被下划线丢掉；现在印 `FRAME_BASELINE_SCALE_BAD 当轮=N/M` 并落 `capture_scale_bad_frames`。`sizeless`（帧名里没有 `-宽x高-档` 那一段）印 `…_SCALE_SIZELESS` 并落字段。⚠ 现读语料里 `sizeless=0` ⇒ 这一支是**分布的分母完整性**证人，不是今天的读数；我第一版还给它编了一个不存在的帧名当例子（见 ⑨·3），已撤。
+
+- **U-2639：两个 unknown 撞在一起时旧版一行都不印 —— 那条出口改成独立判定**。
+    旧版是 `elif bake[「scale」] and not current_scale` ⇒ 基线自己也说不出倍率（混批/并列烤的）时两个 unknown 互相抵消，「谁都不知道」被读成「没什么要报的」。现在 `if not current_scale` 独立成一条，值槽里带 reason、当轮分布、基线倍率三样。
+
+- **U-2640：档位词表收成一份真值：活脚本里的声明从「四份」变成 0 份，守卫由 AST 签**。
+    新增 `scripts/tier_vocabulary.py`（`TIERS` + 按段解析 + 现推正则片段）。四处 import 它。守卫扫 `scripts/*.py` 每一支，再出现第二份**代码层面**的声明就红并点名文件与行；docstring/注释按行号摘出去（本轮第一版扫文本行，把我自己写的注释判成了声明）。同一支扫描器跑两遍 ⇒ `TIER_SCAN HEAD 所在文件=6（活脚本 4 ＋ 测试夹具 2）命中处=9 ｜ TIER_SCAN 工作树 所在文件=1（活脚本 0 ＋ 测试夹具 1）命中处=4 ｜ TIER_SCAN 净变化 文件数 活脚本=-4 测试夹具=-1；命中处=-5`
+
+- **U-2641：「子串法不参与判定」不再靠注释：两格 AST 证人 + 刀 M1550**。
+    `test_measure_uses_segment_parse_not_substring` 断判定函数调 `frame_tier` 且不调 `substring_tier`；`test_substring_tier_has_exactly_one_caller` 断全仓只剩报表那一处。M1550 把判定改回子串 ⇒ 两格各红一次（调用点从 1 变 2 也红）。`FLOOR_LIGHT=1.20 / FLOOR_DARK=1.10` 一字未动 ⇒ 这把刀不许靠改数值红。
+
+- **U-2642：印给读者的成句命令由它自己的参数表对账（顺账做成门，不再逐条追记）**。
+    新守卫扫每一支脚本 print 出去的 `python3 <某脚本.py> <尾巴>`：脚本路径必须存在，尾巴里每个 `--选项`必须在那个脚本的真旗标集合里（`add_argument` 容忍换行 ∪ 整条字面量就是一个 `--x`）。扩范围时自己撞出两处「把存在的读成不存在」（手写 argv 的 `ci_red_stability.py`、`add_argument(` 换行的 `create_issues.py`）⇒ 规则收窄成「只认成句命令」并补两条对照。今天全仓这样的命令只有 1 条 ⇒ 范围是每一支，不是那一条。
+
+- **U-2643：合并词表把「藏在循环顺序里的依赖」翻了出来：热图那支脚本只报第一档**。
+    `('dark','light')` 换成 `('light','dark')` 之后既有那格 `test_log_covering_only_one_appearance…` 当场红 —— 根因不是合并错，而是脚本在**第一个 stop 处就 return**，所以「缺席那一档被点名」一直靠顺序。修法：stop 不再短路、两档各自点名，新增 `HEAT_FRAME_VERDICT not-run=N`（有一档输入不足就不许印「两通道都对上了账」）；那一格改成两档各当一次在场（subTest）；刀 M1554 钉「不许回到短路」，且只动「日志缺档」那一支、不动「缺帧」那一支。
+
+- **U-2644：词表的边界也是读数：Swift 捕获侧那几处本轮没管（新开 661）**。
+    捕获侧 `UICaptureHarness.swift` 里 `for tag in [light, dark]` 那种循环现读 11 处 ⇒ 派单红线不许碰捕获侧，所以**不拦、不改、只数**：新增 `SwiftSideVocabularyCountTests` 用两条正则（两种顺序）各数一遍并断「两序之和 == 任意顺序合并数」，防止将来有人把两档顺序反过来写而计数器读成 0 —— 那才是「全仓只有一份」这种假声明的来源。661 只登记，出路一条不代选。
+
+- **U-2645：看图那一腿 + 逐字节对照：本轮帧一字未变**。
+    LOOK 真看整帧一张：`heatmap-cell-strip-still-90x140-dark.png`（180x280 px = 90x140pt @2x，档位=暗） ｜ BYTE_COMPARE 与 R586 那批同名 356 张**逐字节相同 356、不同 0** ⇒ 产品 0 文件这句话有像素证人；没新增漂移 ⇒ 没调用 `register-drift`，名册那 16 行的 `observed` 一字未动；工作基线也没被写：`未改（git status 里没有这一行）`
+
+- **U-2646：刀 M1547–M1554：八把里 M1549 是空刀（作废、号不复用），补证人后 M1553 在同一处重落**。
+    `M1547 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格 ｜ M1548 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1549 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1553 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1552 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1550 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格 ｜ M1551 rc=1 预检=PASSED 末次=CAUGHT clean=1 红1格 ｜ M1554 rc=1 预检=PASSED 末次=CAUGHT clean=1 红2格`。逐把红格数由日志现数：M1547 两格（并列那两格，混批那格不动）、M1548 一格、M1549 补证人前两格、M1550 两格、M1551 一格、M1552 一格（证人模块搬到 test_tier_vocabulary 之后重跑）、M1553 一格、M1554 两个 subTest。⚠ M1549 与 M1553 打的是**同一处**：两个时刻的末态都要记（补证人之前 PASSED＝空刀、之后 CAUGHT），只留最终那张就把「这条分支曾经没人测」这件事抹掉了。
+
 ## 第 585 轮（R586 · 2026-11-06 · U-2624…U-2634）：把「取证通道读得对不对对象」拆成两支补上（①基线文档说出自己是哪一笔/哪一轮/什么倍率烤的，同批自烤会红；②两态差尺的地板改成按段解析，档位错认有证人）
 
 - **U-2624：⓪ 上一轮主笔到数并多给一条读数，补记笔照实未到数**。

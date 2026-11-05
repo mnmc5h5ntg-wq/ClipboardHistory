@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 倍率报成分布、档位收成一份词表、印出去的命令由参数表认（R587 / 第 586 轮 / Round 584，产品 0 文件）
+    R586 给基线补了「哪一笔烤的」，但倍率那一格仍是**取众数**：`max(set(ratios), key=ratios.count)` 没有并列检测，
+    355 张 2x + 1 张 1x 照样印 `2.00x`，两档各半时印的是 `set` 遍历顺序决定的那一个；`bad` 算完被 `_bad` 丢掉。
+    同时档位那件事在 python 仪器里有**四份**声明（两态差尺的 `TIERS` 与两处字面量与那条正则、倍率解析里硬写的
+    `(?:light|dark)`、录制态脚本的 shade 循环）⇒ 改坏一份不会有任何一格红。
+    本轮：① `capture_scale()` 交回 `scale/frames/bad/sizeless/dist/reason`，分布排序后输出，**并列⇒倍率当不知道**并走
+    **已有的** `SCALE_NOT_RUN` 出口（不新造第二条），`bad`/`sizeless` 既印也落盘；两个 unknown 撞车时旧版一行不印，
+    现在独立成一条；② 新增 `scripts/tier_vocabulary.py` 一份真值，四处 import，守卫扫每一支活脚本（AST 级、注释不算声明），
+    「子串法不参与判定」由 AST 签；③ 新增「印出去的成句命令必须能被那个脚本解析」的仪器守卫（含脚本路径存在性）；
+    ④ 合并词表暴露热图脚本「只报第一档就 return」⇒ 修成两档各自点名并加 `HEAT_FRAME_VERDICT not-run=N`；
+    ⑤ Swift 捕获侧那 11 处只数不改（新开 **661**，红线不许碰捕获侧）。
+    本机现读（含本笔的树）：`FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=16 新帧=0 本机行=16 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 已登记=16 未登记=0 陈旧行=0` ⇒ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）`；倍率真语料 `SCALE_LIVE 本机 R587 这批=2.00x 分布=2.00x:356 bad=0 sizeless=0 reason=ok`。
+    判据卷 +20 格（帧门 +7、词表新卷 +13、热图那一格改成两向），
+    刀 M1547–M1554 —— **M1549 落下来是空刀（那条分支没有证人），补证人后以 M1553 在同一处重落**；
+    顺账那一轮我自己又印了一张不存在的帧名（⑨·3），已撤并记档。655/656/658/659/660 一条没结、出路一条不代选。
+
 ### 取证通道自己读得对不对对象：基线补上「哪一笔烤的」并让同批自烤会红 + 两态差尺的地板改成按段解析（R586 / 第 585 轮 / Round 583，产品 0 文件）
     R585 给名册每行补了 `observed`，但**基线文档那一侧的同一个洞没补**：字段只有 `schema/count/machine/note/frames` ⇒
     `update --for-machine` 拿刚捕的那批帧烤一份 `by_machine/<键>.json`，下一次 `check` 必然 `变帧=0`，
