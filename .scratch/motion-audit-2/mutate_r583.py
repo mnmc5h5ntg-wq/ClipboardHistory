@@ -35,8 +35,11 @@ ENV = {k: v for k, v in os.environ.items() if k != "SDKROOT"}
 ENV["PYTHONUTF8"] = "1"
 ENV["PYTHONDONTWRITEBYTECODE"] = "1"
 
-BLOCK_OLD = u'    blockers = len(missing) + len(verdict["unregistered"]) + len(verdict["unknown"]) + len(verdict["bad_fields"])\n'
-BLOCK_NEW = u'    blockers = len(missing) + len(verdict["unknown"]) + len(verdict["bad_fields"])  # 刀：未登记不拦门\n'
+# R584 重钉：本轮把 blockers 拆成「判/不判」两条支路 ⇒ 旧针（单行、四空格缩进）命中 0，
+# 由预检 `HIDDEN_ROT mutate_r583.py M1532` 抓到。新针钉的还是**同一条判定**（judged 支路里那个
+# blockers），摘的还是同一项 unregistered —— 语义一字未改，改的是它如今的写法。
+BLOCK_OLD = u'        blockers = len(missing) + len(verdict["unregistered"]) + len(verdict["unknown"]) \\\n'
+BLOCK_NEW = u'        blockers = len(missing) + len(verdict["unknown"]) \\\n'
 
 READ_OLD = u'            rows = load_drift_registry(registry)\n'
 READ_NEW = u'            rows = []  # 刀：名册读成空表\n'

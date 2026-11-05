@@ -1,10 +1,11 @@
 {
   "schema": 1,
-  "note": "帧基线里「变帧 / 新帧」的逐张登记名册（R583 / BACKLOG 655）。frame_baseline.py check 用它把 changed 与 added 两态变成会红的判据：一张帧变了，要么在这里有一行（帧名 + 理由 + 归哪张单），要么门红。登记是账，不是措辞 —— 所以理由与单号缺一行都算没登记。⚠ 本名册不是「重烤基线」的替代品：update 仍然一次都不跑，那三条出路归用户（655）。",
+  "note": "帧基线里「变帧 / 新帧」的逐张登记名册（R583 / BACKLOG 655）。frame_baseline.py check 用它把 changed 与 added 两态变成会红的判据：一张帧变了，要么在这里有一行（机器 + 帧名 + 理由 + 归哪张单），要么门红。R584：登记的键是 (机器, 帧) —— 本机的行只豁免本机的漂移，别的机器漂同一帧必须另登记一行（缺 machine 字段的行会让门退非 0，因为它等于让本机替所有机器背书）。登记是账，不是措辞 —— 所以理由与单号缺一行都算没登记。⚠ 本名册不是「重烤基线」的替代品：update 仍然一次都不跑，那三条出路归用户（655）。",
   "rows": [
     {
       "frame": "detail-0-text-720x520-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "与工作基线逐字节不同；R579/R580/R581/R582 四轮本机重捕同名帧逐字节相同（356/356），而 runner 那一台同一帧不漂 ⇒ 差产生在写基线那一次会话与本会话之间（跨会话一次性差），不是任何一轮引入的回归。归 655 的三条出路，工作侧一条都没选。"
@@ -12,6 +13,7 @@
     {
       "frame": "detail-html-rendered-720x520-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上：连续四轮本机重捕逐字节相同、runner 不漂；差在会话之间。R577 把这一族的可见成因归到 Safari 图标（来源图标由系统按当次会话解析），本轮没有推翻它也没有加强它。"
@@ -19,6 +21,7 @@
     {
       "frame": "detail-html-source-720x520-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上（与 detail-html-rendered 同一棵树、同一批夹具）。本轮差量包围盒在 light 档读到 120,158 颗、(40,74)-(1258,805)，与 R580/R581 逐字相同 ⇒ 两态强可分，不是渲染错位。"
@@ -26,6 +29,7 @@
     {
       "frame": "detail-text-highlight-720x520-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上。搜索命中高亮在 light 与 dark 两档量到同一颗数与同一包围盒（1,904 颗、(207,160)-(262,193)）⇒ 高亮这一维没有坏，坏的只是「与工作基线不同字」这件事本身。"
@@ -33,6 +37,7 @@
     {
       "frame": "quickpick-hover-420x300-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上（浮层那一族四张里的 hover 态）。与 quickpick-list 的差量包围盒 (44,296)-(795,363) 连续四轮逐字相同 ⇒ 悬停带在画，且画在同一行。"
@@ -40,6 +45,7 @@
     {
       "frame": "quickpick-list-420x300-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上。这一张是 hover 那张的对照臂，两张一起漂 ⇒ 差在整帧的公共部分（图标/日期解析），不在悬停那一层。"
@@ -47,6 +53,7 @@
     {
       "frame": "quickpick-search-focus-420x300-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上。⚠ 另记一条与本登记无关的旧读数：这一张与 quickpick-search-hover 逐字节相同（第三次复现「搜索框的 hover 与 focus 在同一通道里画同一个形状」），那句话的免责范围仍只在这一处。"
@@ -54,6 +61,7 @@
     {
       "frame": "quickpick-search-hover-420x300-light.png",
       "kind": "changed",
+      "machine": "local:MacBook-Air.local",
       "ticket": "655",
       "registered_by_round": "R583",
       "reason": "同上（与 search-focus 同一对）。八张全是 light 档 ⇒ 暗档没有漂移证人，这一点不许被读成「暗档已签收」。"

@@ -3,6 +3,8 @@
 这里测的是**分类**：变了 / 少了 / 多了 必须分开，因为三者的处置完全不同。
 如果只报一个"diff 不为零"，那这条守卫和没有一样 —— reviewer 仍然不知道看哪张图。
 """
+import contextlib
+import io
 import json
 import os
 import sys
@@ -14,20 +16,42 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts.frame_baseline import (  # noqa: E402
     BASELINE_RELATIVE,
+    DRIFT_REGISTRY_RELATIVE,
+    baseline_owner,
     collect,
     compare,
     drift_registry_path,
     judge_drift,
     latest_released_baseline,
     load_baseline,
+    load_baseline_document,
     load_drift_registry,
+    machine_baseline_path,
+    machine_key,
     main,
     manifest_path,
     released_baselines,
+    sanitize_machine,
     snapshot,
     version_key,
     write_baseline,
 )
+
+
+@contextlib.contextmanager
+def pinned_machine(key):
+    """把 `machine_key()` 的取值钉成常量再跑。
+
+    凡是判"机器维度"的格子都必须走这里：上一轮 R565 那朵红就是"守卫写死本机口径 ⇒
+    本机绿而 runner 注定红"，测机器的仪器自己先不许依赖它所在的那台机器。
+    """
+    saved = dict(os.environ)
+    os.environ["MOTION_FLOOR_MACHINE_KEY"] = key
+    try:
+        yield key
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
 
 
 def make_frame(directory: str, name: str, payload: bytes) -> str:
@@ -35,6 +59,15 @@ def make_frame(directory: str, name: str, payload: bytes) -> str:
     with open(path, "wb") as handle:
         handle.write(payload)
     return path
+
+
+def run_main(argv):
+    """跑 `main()` 并把它的 stdout 一起拿回来 —— 这一卷新加的判定大多要读**印出来的形状**，
+    只看退出码就会把「判=不判」与「判=判而恰好没东西要判」混成同一个绿。"""
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        rc = main(argv)
+    return rc, buffer.getvalue()
 
 
 class FrameBaselineTests(unittest.TestCase):
@@ -81,11 +114,19 @@ class FrameBaselineTests(unittest.TestCase):
                              "变帧没登记 ⇒ check 必须红（旧语义在这一态上是「命令成功、谁都没判」）")
             registry = os.path.join(root, "docs", "frame_drift_registry.json")
             os.makedirs(os.path.dirname(registry), exist_ok=True)
+            # R584：登记的键是 (机器, 帧)。这一格先按旧形状（没有 machine）跑一次 ⇒ 必须红并指名，
+            #      再补上机器字段跑一次 ⇒ 才许绿。红指的是"这一行没写它豁免哪台机器"，不是判决坏了。
             Path(registry).write_text(json.dumps({"schema": 1, "rows": [
                 {"frame": "row-a.png", "kind": "changed", "ticket": "655",
                  "reason": "合成用例：这张帧在本测试里确实变了"}]}), encoding="utf-8")
-            self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 0,
-                             "同一张变帧登记过之后 check 必须绿 —— 绿要由名册给，不许由「不判」给")
+            with pinned_machine(u"local:fixture-host") as key:
+                self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 1,
+                                 "登记行缺 machine 字段 ⇒ 门红（那一行等于让本机替所有机器背书）")
+                Path(registry).write_text(json.dumps({"schema": 1, "rows": [
+                    {"frame": "row-a.png", "kind": "changed", "machine": key, "ticket": "655",
+                     "reason": "合成用例：这张帧在本测试里确实变了"}]}), encoding="utf-8")
+                self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 0,
+                                 "同一张变帧登记过之后 check 必须绿 —— 绿要由名册给，不许由「不判」给")
 
             os.remove(os.path.join(frames_dir, "row-a.png"))
             self.assertEqual(main(["check", frames_dir, "--repo-root", root,
@@ -191,7 +232,7 @@ class FrameBaselineTests(unittest.TestCase):
         self.assertTrue(all(len(v) == 64 for v in frames.values()), "基线里有不是 sha256 的长度")
 
 
-class DriftRegistryTests(unittest.TestCase):
+class DriftFixture(unittest.TestCase):
     """R583 / 655：`check` 里 changed 与 added 两态从"没人判"变成"逐张登记否则红"。
 
     三件场景是派单点名的，各自钉一条相反的坏法：
@@ -199,9 +240,21 @@ class DriftRegistryTests(unittest.TestCase):
     ② 登记之后 ⇒ 绿，**且**报出「已登记 N 张」，N 等于 changed 里被登记的那部分；
     ③ 把登记名单清空 ⇒ 又红（"名册在但空"不等于"名册缺席"，两者都必须红）。
     另外三件是名册自己会腐烂的形状：拼错的帧名、空理由/空单号、名册形状读不出来。
-    ⚠ 陈旧行（这台机器此刻不漂）**只报数不判** —— 漂移是按机器的，把它判红等于逼人在两台机器之间来回删行；
-      这一格故意写成"断言它不红"，这样哪天有人顺手把陈旧也判红，这里会红一次给他看。
+    ⚠ 陈旧行与「他机行」（这台机器此刻不漂）**只报数不判** —— 漂移是按机器的，把它判红等于
+      逼人在两台机器之间来回删行；这一格故意写成"断言它不红"，哪天有人顺手把不判改成判红，这里会红一次。
+    ⚠ 本卷把机器键**钉成常量**（`FIXTURE_KEY`），不读宿主：上一轮 R565 那朵"守卫写死绝对根 ⇒
+      本机绿而 runner 红"就是这么来的，测机器的仪器自己先不许依赖机器。
     """
+
+    FIXTURE_KEY = "local:fixture-machine"
+
+    def setUp(self):
+        self._saved_env = dict(os.environ)
+        os.environ["MOTION_FLOOR_MACHINE_KEY"] = self.FIXTURE_KEY
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self._saved_env)
 
     def setup(self, root):
         frames_dir = os.path.join(root, "frames")
@@ -221,8 +274,13 @@ class DriftRegistryTests(unittest.TestCase):
         Path(path).write_text(json.dumps({"schema": 1, "rows": rows}, ensure_ascii=False), encoding="utf-8")
         return path
 
-    def row(self, name, kind="changed", reason="合成：这一帧的差有名字有出处", ticket="655"):
-        return {"frame": name, "kind": kind, "reason": reason, "ticket": ticket}
+    def row(self, name, kind="changed", reason="合成：这一帧的差有名字有出处", ticket="655",
+            machine=None):
+        return {"frame": name, "kind": kind, "machine": self.FIXTURE_KEY if machine is None else machine,
+                "reason": reason, "ticket": ticket}
+
+class DriftRegistryTests(DriftFixture):
+    """登记名册那一半的判定（R583 / 655）：三态都得有人判。"""
 
     def test_changed_frame_without_registration_is_red(self):
         with tempfile.TemporaryDirectory() as root:
@@ -255,7 +313,7 @@ class DriftRegistryTests(unittest.TestCase):
             self.assertEqual((changed, missing, added), (["b.png"], [], ["d.png"]))
             self.registry(root, [self.row("b.png")])          # 只登记变帧
             rows = load_drift_registry(os.path.join(root, "docs", "frame_drift_registry.json"))
-            verdict = judge_drift(changed, added, baseline, current, rows)
+            verdict = judge_drift(changed, added, baseline, current, rows, self.FIXTURE_KEY)
             self.assertEqual((verdict["changed"], verdict["added"], verdict["registered"]), (1, 1, 1))
             self.assertEqual(sorted(verdict["unregistered"]), ["d.png"],
                              "N 只数被登记的那部分；没登记的那一张要单独点名")
@@ -279,7 +337,8 @@ class DriftRegistryTests(unittest.TestCase):
             frames_dir = self.setup(root)
             self.registry(root, [self.row("b.png"), self.row("b-_typo.png")])
             verdict = judge_drift(["b.png"], [], {"b.png": "9", "c.png": "3"}, collect(frames_dir),
-                                  load_drift_registry(os.path.join(root, "docs", "frame_drift_registry.json")))
+                                  load_drift_registry(os.path.join(root, "docs", "frame_drift_registry.json")),
+                                  self.FIXTURE_KEY)
             self.assertEqual(verdict["unknown"], ["b-_typo.png"])
             self.assertEqual(main(["check", frames_dir, "--repo-root", root]), 1)
 
@@ -302,7 +361,8 @@ class DriftRegistryTests(unittest.TestCase):
             write_baseline(manifest_path(root), collect(frames_dir))   # 一帧都不漂
             self.registry(root, [self.row("b.png")])                   # 但名册里有一行（另一台漂过）
             verdict = judge_drift([], [], collect(frames_dir), collect(frames_dir),
-                                  load_drift_registry(os.path.join(root, "docs", "frame_drift_registry.json")))
+                                  load_drift_registry(os.path.join(root, "docs", "frame_drift_registry.json")),
+                                  self.FIXTURE_KEY)
             self.assertEqual(verdict["stale"], ["b.png"])
             self.assertEqual(verdict["unknown"], [], "b.png 在基线里 ⇒ 它不是拼错，不许被算成对不上")
             self.assertEqual(verdict["unregistered"], [])
@@ -326,7 +386,7 @@ class DriftRegistryTests(unittest.TestCase):
     def test_pure_verdict_does_not_read_the_filesystem(self):
         """纯函数那一半要能拿内存里的表判：否则正对照测的是文件读法而不是判定。"""
         verdict = judge_drift(["x.png"], ["y.png"], {"x.png": "1"}, {"x.png": "2", "y.png": "3"},
-                              [self.row("x.png"), self.row("y.png", kind="added")])
+                              [self.row("x.png"), self.row("y.png", kind="added")], self.FIXTURE_KEY)
         self.assertEqual((verdict["registered"], verdict["unregistered"], verdict["unknown"],
                           verdict["bad_fields"], verdict["stale"]), (2, [], [], [], []))
 
@@ -342,6 +402,182 @@ class DriftRegistryTests(unittest.TestCase):
                           u"名册里 %s 这一行在基线里找不到（拼错或夹具改名后留下的）" % row["frame"])
             self.assertTrue(row["reason"].strip() and row["ticket"].strip(),
                             u"名册里 %s 缺理由或单号" % row["frame"])
+
+class MachineDimensionTests(DriftFixture):
+    """R584 / BACKLOG 658：登记的键收成 (机器, 帧)，基线带署名。
+
+    动机是一条实测：runner 自己印 `倍率=1.0x`、本机同一帧是 1440×1040（名义 720×520 的两倍），
+    而它拿本机烤的那份工作基线比时 `FRAME_BASELINE_CHANGED=356` —— **每一帧都不同**。
+    上一版没有机器字段，于是本机那 8 行事实上在给任何机器的漂移背书放行；
+    反过来把整条判据在第二台机器上判红又是一张没法逐张处置的红。两条都不许。
+    """
+
+    def test_a_foreign_row_does_not_bless_the_local_drift(self):
+        """纯函数那一半：只有「这台机器那一行」能放行这一帧。"""
+        baseline, current = {"b.png": "9"}, {"b.png": "2"}
+        other = judge_drift(["b.png"], [], baseline, current,
+                            [self.row("b.png", machine="local:other")], self.FIXTURE_KEY)
+        self.assertEqual(other["unregistered"], ["b.png"], "他机行不许豁免本机的漂移")
+        self.assertEqual((other["registered"], other["mine"], other["foreign"]), (0, 0, 1))
+        mine = judge_drift(["b.png"], [], baseline, current,
+                           [self.row("b.png")], self.FIXTURE_KEY)
+        self.assertEqual((mine["registered"], mine["unregistered"], mine["mine"], mine["foreign"]),
+                         (1, [], 1, 0), "同一行换个机器字段就该从放行变成不放行")
+
+    def test_end_to_end_a_foreign_row_does_not_mute_the_local_drift(self):
+        """端到端那一半：只测纯函数会漏掉「门有没有真把机器传进判定」。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            self.registry(root, [self.row("b.png", machine="local:other")])
+            rc, out = run_main(["check", frames_dir, "--repo-root", root])
+            self.assertEqual(rc, 1, "他机行放行本机漂移 ⇒ 必须红（这就是上一版那个洞）")
+            self.assertIn(u"他机行=1", out)
+            self.assertIn(u"未登记=1", out)
+            self.assertIn(u"FRAME_BASELINE_RESULT=red", out)
+
+    def test_row_without_machine_field_is_red_and_names_the_row(self):
+        """缺 `machine` 字段不许当成「适用所有机器」：那是本机给全局背书。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            bad = self.row("b.png")
+            bad.pop("machine")
+            self.registry(root, [bad])
+            rc, out = run_main(["check", frames_dir, "--repo-root", root])
+            self.assertNotEqual(rc, 0, "缺机器字段的行必须让门退非 0")
+            self.assertIn(u"名册缺机器  b.png", out, "红要指名是哪一行，否则下一轮只能整册重读")
+            self.assertIn(u"缺机器1", out)
+
+    def test_foreign_row_alone_is_counted_but_not_red(self):
+        """他机行（本机此刻不漂）只报数不判 —— 与陈旧行同一族，「不判」也得有证人。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            self.registry(root, [self.row("b.png"), self.row("a.png", machine="local:other")])
+            rc, out = run_main(["check", frames_dir, "--repo-root", root])
+            self.assertEqual(rc, 0, "别的机器登记过 a.png 不等于本机那行写错了")
+            self.assertIn(u"他机行=1", out)
+            self.assertIn(u"陈旧行=0", out, "他机行不该被算成本机的陈旧行")
+
+    def test_baseline_from_another_machine_is_not_judged_but_reports_the_count(self):
+        """署名不符 ⇒ 变帧维度**具名不判**：数目照报、出路照印，但这一维不拦门。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            write_baseline(manifest_path(root), load_baseline(manifest_path(root)),
+                           machine="local:other")     # 同一批哈希，换个署名
+            self.registry(root, [])                    # 一台都不许拿空名册放行
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 0, "这台机器没有义务为别人的基线判漂移")
+            self.assertIn(u"判=不判", out)
+            # 值槽走 sanitize_machine（只抹标点、大小写照留）⇒ 逐字键在表头，通道值无空格无冒号
+            self.assertIn(u"FRAME_BASELINE_DRIFT_NOT_JUDGED=baseline-owned-by:local_other", out)
+            self.assertIn(u"基线署名=local:other", out, "表头那一行必须还能读到逐字的键")
+            self.assertIn(u"变帧=1", out, "不判也要报数：把 356 张这类数藏起来就是重新变成「没人判」")
+            self.assertIn(u"未登记（不判）=1", out, "数不许靠措辞变小（R565 那一族），标签里必须带着「不判」")
+            self.assertIn(u"未登记不判", out, "拦路明细里不许出现一个不参与拦路的数字")
+            self.assertIn(u"出路", out)
+            self.assertIn(u"by_machine/%s.json" % sanitize_machine(self.FIXTURE_KEY), out)
+
+    def test_missing_frames_are_still_judged_when_drift_is_not(self):
+        """不判只豁免「变帧」这一维：夹具不再产出一帧与机器无关，照红。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            write_baseline(manifest_path(root), load_baseline(manifest_path(root)),
+                           machine="local:other")
+            os.remove(os.path.join(frames_dir, "c.png"))
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 1, "署名不符不许把缺席一起赦掉（⑷ 那一族：skip 型出口要自带负半证人）")
+            self.assertIn(u"缺席1", out)
+            self.assertIn(u"FRAME_BASELINE_RESULT=red", out)
+
+    def test_unsigned_baseline_is_not_judged_and_is_named_as_unsigned(self):
+        """没署名 ≠ 适用所有机器：它得被读成「不知道这是谁的产物」。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            path = manifest_path(root)
+            document = dict(load_baseline_document(path))
+            document["machine"] = ""
+            write_baseline(path, document["frames"], machine="")
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 0)
+            self.assertIn(u"FRAME_BASELINE_DRIFT_NOT_JUDGED=baseline-unsigned", out)
+            self.assertIn(u"基线署名=（未署名）", out)
+
+    def test_a_machine_with_its_own_baseline_gets_judged(self):
+        """不判不是永久出口：这台机器一旦有自己的基线（by_machine/），它的漂移就归它判。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            drifted = dict(collect(frames_dir))
+            for name in drifted:
+                drifted[name] = "f" * 64
+            write_baseline(machine_baseline_path(root, self.FIXTURE_KEY), drifted,
+                           machine=self.FIXTURE_KEY)
+            self.registry(root, [])
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 1, "有了自己的基线还一帧不登记 ⇒ 必须红")
+            self.assertIn(u"FRAME_BASELINE_AGAINST=by_machine:%s" % self.FIXTURE_KEY, out)
+            self.assertIn(u"判=判", out)
+            self.assertIn(u"未登记=3", out)
+
+    def test_by_machine_file_whose_signature_disagrees_with_its_name_is_an_error(self):
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            write_baseline(machine_baseline_path(root, self.FIXTURE_KEY), collect(frames_dir),
+                           machine="local:other")
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 2, "文件名说一台、里面署另一台 ⇒ 这份东西不可信，谁也不判")
+            self.assertIn(u"自相矛盾", out)
+
+    def test_sanitize_keeps_case_so_two_letterings_are_two_files(self):
+        """657 的咬口在这里：只抹标点可以，抹大小写就会把两份键 join 成一台。"""
+        self.assertEqual(sanitize_machine(self.FIXTURE_KEY), "local_fixture_machine")
+        self.assertNotEqual(sanitize_machine("local:MacBook-Air.local"),
+                            sanitize_machine("local:macbook-air.local"),
+                            "两份只差大小写的键必须落到两个文件名上（BACKLOG 657）")
+
+    def test_not_judged_channel_value_carries_no_bare_space(self):
+        """R565 那一族：含裸空格的通道值会打死解析它的尺；逐字值留在表头那一行。"""
+        with tempfile.TemporaryDirectory() as root:
+            frames_dir = self.setup(root)
+            write_baseline(manifest_path(root), load_baseline(manifest_path(root)),
+                           machine="local:My Air")
+            rc, out = run_main(["check", frames_dir, "--against", "working", "--repo-root", root])
+            self.assertEqual(rc, 0)
+            line = [l for l in out.splitlines() if u"FRAME_BASELINE_DRIFT_NOT_JUDGED=" in l][0]
+            self.assertNotIn(" ", line.split(u"=", 1)[1], "通道值那一格不许有空格：%r" % line)
+            self.assertIn(u"基线署名=local:My Air", out, "表头要能读到逐字的键，包括空格")
+
+    def test_python_machine_key_implementations_agree(self):
+        """这台仓库里 python 侧有三份 machine_key（本文件、motion_floor_gate、test_surface_left_axes）。
+        它们**必须**同字 —— 否则按机器登记的名册会各认各的机器。Swift 那份只差大小写，
+        已由 BACKLOG 657 具名、且只与本文件写的行 join，不与这里三份互认。
+        """
+        from scripts.motion_floor_gate import machine_key as floor_key
+        from scripts.tests.test_surface_left_axes import machine_key as axis_key
+        for env in ({}, {"GITHUB_ACTIONS": "true"}, {"GITHUB_ACTIONS": "TRUE"}):
+            saved = dict(os.environ)
+            os.environ.update(env)
+            os.environ.pop("MOTION_FLOOR_MACHINE_KEY", None)
+            os.environ.pop("LEFT_AXIS_MACHINE_KEY", None)
+            try:
+                self.assertEqual(machine_key(), floor_key(), "两份实现漂移：%r" % env)
+                self.assertEqual(machine_key(), axis_key(), "三份实现漂移：%r" % env)
+            finally:
+                os.environ.clear()
+                os.environ.update(saved)
+
+    def test_the_committed_baseline_is_signed_and_rows_match_its_owner(self):
+        """盘上那两份必须自洽：基线有署名、每一行都有 machine、且 machine 就是署名的那台。
+        ⚠ 这条**不读宿主**（R565：写死本机口径的守卫在 runner 上注定红），只对账两份文件自己。
+        """
+        repo_root = Path(__file__).resolve().parents[2]
+        document = load_baseline_document(os.path.join(repo_root, BASELINE_RELATIVE))
+        owner = baseline_owner(document)
+        self.assertTrue(owner, "docs/frame_baseline.json 没署名 ⇒ 变帧维度在谁那里都不判，等于把洞留回来")
+        rows = load_drift_registry(drift_registry_path(repo_root))
+        self.assertTrue(rows, "盘上名册不该是空的（空名册 = 那 8 张又没人判）")
+        for row in rows:
+            self.assertTrue(row["machine"], "登记行缺机器：%s" % row["frame"])
+            self.assertEqual(row["machine"], owner,
+                             "行上写的机器与基线署名不符（%s vs %s）⇒ 这一行在给谁背书？" % (row["machine"], owner))
 
 
 if __name__ == "__main__":

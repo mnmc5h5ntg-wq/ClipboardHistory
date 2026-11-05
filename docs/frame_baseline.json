@@ -358,6 +358,7 @@
     "weights-adjusted-520x880-dark.png": "3976b53a1839576e062eff6ef0fbbaec42baf75e1b89d7827ecc6c8293591c7c",
     "weights-adjusted-520x880-light.png": "9e01566189b882461e1a7b18ba5e0bed93eadd99d34f6526e0a6140581504601"
   },
+  "machine": "local:MacBook-Air.local",
   "note": "离屏帧的 sha256 基线。改了界面就在同一个 commit 里跑 update；CI 的 compare 步骤靠它回答“上一版比这一版哪些帧变了”。",
   "schema": 1
 }

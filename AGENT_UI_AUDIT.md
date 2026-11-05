@@ -363,6 +363,36 @@ D-8 换掉 `sparkles` 之后，设置侧栏五项都是描线符号；这一条*
 
 ---
 
+## 第 583 轮（R584 · 2026-11-06 · U-2608…U-2615）：漂移名册补上**机器维度**（登记键从「帧」收成 (机器, 帧)，本机行不再给别机背书）；基线带**署名**，署名不符时变帧那一维具名不判、照报数、给出出路；⓪ 两跑都到数并命中出口 ⑵（`变帧=356 已登记=8 未登记=348`）
+
+- **U-2608：⓪ 两跑开场未到数、中段**都到数且命中 ⑵**，而第四条出口实测=没发生**。
+    开场那一读 `in_progress` ⇒ 整格未到数；中段那一读逐字 `⑵`，两跑的 STEP[11] 都红、`FRAME_BASELINE_RESULT` 是同一对数 ⇒ 不是间歇而是那一笔的门在 runner 上注定红。`FRAME_BASELINE_SKIPPED` **命中 0 次**（自己下的日志、剥 ANSI/时间戳、只认行首）⇒ 这一句只能写成「⑷ 没发生」，不许写成「那一格绿了」。红名单 5 个名字与 R582 逐字同集合 ⇒ 没有新名字。
+
+- **U-2609：上一轮补的那个洞，只在**基线主人那台机器**上补上了**。
+    runner 那一跑逐字 `FRAME_BASELINE_DRIFT 变帧=356 新帧=0 已登记=8 未登记=348 名册对不上帧名=0 名册空理由或空单号=0 陈旧行=0`（已登记=8 而**那 8 行是本机的**）。三条解释逐一排：(甲) 真回归 348 张 ⇒ 否（同一台在 R582 的树上就印 `CHANGED=356/COMPARED=356`、`MISSING=0 ADDED=0`）；(乙) 门坏/名册读不出来 ⇒ 否（`FRAME_BASELINE_DRIFT_REGISTRY=loaded … 行=8`）；(丙) 判决对象错位 ⇒ 成立，两个独立通道：runner 自印 `倍率=1.0x`/`机器=arm64/macOS 15.8/1x`，本机同一帧实测 1440×1040（名义 720×520 的两倍）。⇒ 本轮把判决按机器切开，而不是把红改成不报。
+
+- **U-2610：登记的键收成 (机器, 帧)：两向坑各有一条断言挡着**。
+    ⑴ 本机行给别机背书 ⇒ `judge_drift` 只算 `machine==本机` 的行；端到端那格 `rc=1` 且印 `他机行=1 未登记=1`。⑵ runner 注定红而没有出路 ⇒ 署名不符时 `判=不判`、数目照报（`FRAME_BASELINE_DRIFT 本机=github-runner 基线署名=local:MacBook-Air.local 判=不判 变帧=8 新帧=0 本机行=0 他机行=8 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 未登记（不判）=8`）、名字照印、出路把命令写全；配**负半证人**两条：缺席照红（`缺席1`），`by_machine/` 一旦存在就归它判（`未登记=3` 那格红）。⇒ 「不判」不是一扇能长期躲的门。
+
+- **U-2611：数不许靠措辞变小（这一格是新加的，因为它上一版会自相矛盾）**。
+    不判那一支把数字印在**带「不判」的标签**里（`未登记（不判）=8`），而结论行那一格写 `未登记不判`。上一版这里印 `未登记=8` 又印 `拦路=0`，两条读数互相打架；改的是措辞形状，不是把数藏起来。
+
+- **U-2612：刀 M1535/M1536/M1537 全 CAUGHT 且三边互不重叠（现读最高 M1534 ⇒ 没借号）**。
+    `M1535 rc=1 末次=CAUGHT ｜ M1536 rc=1 末次=CAUGHT ｜ M1537 rc=1 末次=CAUGHT`。各自只动一边：M1535 摘分机器过滤（`rows_without_machine` 那一半不动 ⇒ 缺字段那格仍红）；M1536 把缺字段填成通配（`judge_drift` 一字未动 ⇒ 跨机器那两格仍绿）；M1537 把 `judged` 钉成恒真（名册那一半未动，方向与 M1535 相反）。落刀前各自自问过「我只动了这一对量的一边吗」，`RESTORE_CLEAN=yes` 由还原后与落刀前同一 md5 作证 —— **两趟都要写**：第一趟（刀刚落地）`before=5462fa84… after=5462fa84…`；第二趟是 `reason` 那行改用 `sanitize_machine()` 之后重跑的（⑨·19 的代价之一）`before=83909ef2… after=83909ef2…` ⇒ 两趟都 RESTORE_CLEAN=yes，且第二趟才是随本笔提交的那份代码。
+
+- **U-2613：仪器自己差点把读数读错三次（都修在本轮，没让假数进账）**。
+    ① 按 substring 筛把 CI **自己 echo 的脚本行**读成 `FRAME_BASELINE_SKIPPED` ⇒ ⑷ 假命中；② 不归属步骤 ⇒ 把 `Release script tests` 的合成数（`变帧=1 新帧=1 未登记=2`）当成那一跑的数（R575 共现当合取）；③ `readings` 那把尺**每通道只采样几行**，本轮要的正是被采样丢掉的那一行 ⇒ 改成自己 `gh run view --log` 落盘再切。三条共同形状：命令成功、输出看着齐、读的是别的对象。
+
+- **U-2614：658 新开：让 runner 有它自己的基线（三条出路一条没选）**。
+    ① CI 打印逐机器哈希由人写回仓库；② 那一台自己跑 `update` 并由人复核提交；③ 承认基线是逐机器的、「变帧」这一维只归基线主人判。本轮只把**形状与出路命令**做出来（`by_machine/`、署名、`update` 自动签），选哪条归用户。⚠ 开单形状照 R579 那条规矩：单号 + 标题那种加粗条目，与引用它的自测同一笔落地（这里**故意不写成字面形式** —— 名册与六个数都按那一串去搜，正文里出现字面串就会把唯一性检查打穿，本轮就是这么被 `逐本六个数不合格：{新单: 2}` 拦下一次的）。
+
+- **U-2615：看图那一腿：像素面本轮不可见，而「不可见」是有证人的**。
+    本轮真看整帧两张（不是自己切的框）：`detail-0-text-720x520-light.png`（1440×1040，八张已登记漂移帧之一）与 `content-paused-750x560-dark.png`（1500×1120，暗档主窗）。
+· 亮档那张：详情头 `10月9日 16:52:50 复制 · 52 个字符 · 来自 Safari` + 正文两行（中文句 + `abcdefghijklmnop` 等宽行）+ 右侧动作栏四枚（星/图钉/复制/删除珊瑚红）都在；**来源图标这一帧这次画出来了，而且是彩色的 Safari 指南针** ⇒ 那张"已登记漂移帧"的可见内容是完整的 ⇒ 655 那批差的性质是「与工作基线不同字」而不是「这一帧坏了」（与 R583 的包围盒结论同向，本轮没有推翻它）。整帧抽样 `透明=0.0% 暗墨=0.73%`。
+· 暗档那张：横幅 `已暂停记录剪贴板 —— 这段时间的复制不会进入历史。` + 右侧「继续记录」；搜索占位、`全部/收藏` 分段控件、`时间剪史 <` 与 `5 条记录`；前四行（星+类型图标+文本+日期+`来自 Safari/预览/访达`）正常；**第五行仍是那条纯黑带**（星与文档图标在，文本区无墨）⇒ 与 R583 登记的那条**肉眼同形**，属已登记的离屏材质盲区（R206/229 那一族，R583 已把范围收窄到"主窗侧栏列表那一行的选中材质"）。整帧 `亮墨=1.533%`。
+· ⚠ 一条仪器自陈，不许被读成"复现了 R583 的数"：本轮想用"亮度>120 算亮墨"重做那条带的分段对照，结果**带内 0.0000% 而对照行也 0.0000%** ⇒ 这把阈值尺今天不灵（暗档的次要文字在该阈值下不计为亮墨），所以本轮**不**写"与 R583 逐字相同"，只写"肉眼同形 + 该重做未做"。下一轮要按 R206 的分段法（`891..924 / 951..959 / 980..984` 那一套）重做才许引用那个数。
+· 本轮推进在像素上不可见，且这是对的：动的是 python 那一侧的门与两份 JSON（
+
 ## 第 582 轮（R583 · 2026-11-06 · U-2600…U-2607）：基线门 `check` 的 changed/added 两态从**没人判**补成"逐张登记否则红"（登记是可数的账：帧名+理由+单号，名册腐烂三种形状也接上，陈旧行只报数并写明为什么不判）；机键大小写的成因量成逐字读数并开单 **657**；⓪ 两跑开场未到数、台账之前都到数 ⇒ 三条待验形状由脚本反查**命中 ⑴**
 
 - **U-2600：⓪ 两跑开场未到数、台账之前都到数 ⇒ 两句都写**。开场 `开场现读（取值时刻=2026-11-06 本轮 ⓪ 第一步，`gh run view --json status,conclusion,headSha` + `python3 scripts/ci_read.py latest --workflow CI` 各一次）：`42066364877 ↔ dbd13fb`（R582 主笔，`D12_SHAPE_SCAN_REGISTRY` 的第一证人）与 `42066695864 ↔ 876bd3a`（R582 补记笔）两跑 `status=in_progress`、`conclusion` 空 ⇒ **两格都判未到数**；`latest` 给出的尾笔就是 `876bd3a`。⚠ 那一刻没轮询、没拿本机的读数顶替、没把"每一步 conclusion 也全空"读成"没有失败步骤"，也没对进行中的作业去取 `--log-failed`（那会打 0 字节）。`（同一时刻 `同一时刻三条通道现读互不替代：`api=200`、`github=200`（都是 **HTTP 状态码口径** —— `curl -w '%{http_code}'`，不是 `gh api --jq total_count` 那个计数）、`git ls-remote origin HEAD` 通（远端 HEAD=`876bd3aa1…`）⇒ `PUSH_TRANSPORT=ssh-ok`；`ahead=0`、`HEAD=origin/main=876bd3a`、tracked 树 0 行脏；`security find-identity -v` 仍 `1 valid identities found`（与 633 的人工回执是两格）。身份现读：UI_AUDIT 里最新那一节的标题以「第 581 轮（R582 · 2026-11-06」开头（两个井号那一级；这里**故意不写成字面形式** —— 写手与电池都按整行锚去搜它，正文里出现字面串就会把唯一性检查打穿，那是上一轮 ⑨·8 那一族）⇒ 本轮 **R583 = 第 582 轮 / Round 580**；刀高水位现读 **M1531**（`mutate_r582` 表里 M1529/M1530/M1531）⇒ 本轮从 **M1532** 起；`PRODUCT_STREAK` 只现读、不当压力（开工那一刻 = 13，as-of 不含本轮）。⚠ 监工侧昨日那三次 `git ls-remote` 读数不一致本轮开工时**没有复现**，但"没复现"不等于"不存在" ⇒ 那一格成因仍归用户。`）；中段复核 `42066364877 ↔ dbd13fb（R582 主笔：`D12_SHAPE_SCAN_REGISTRY` 的第一证人）现读 到数（`completed / failure`）` ⇒ `JOB build-and-test ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`、`42066695864 ↔ 876bd3a（R582 补记笔：只带台账，不替主笔签）现读 到数（`completed / failure`）` ⇒ `JOB build-and-test ⇒ failure、STEP[15] Swift tests (executed-count gate) ⇒ failure、STEP[17] Capture gate (unregistered reds must be zero) ⇒ failure、STEP[19] Motion coverage floor ⇒ failure`，红名单 `testActionableInkStaysAboveTheLegibilityFloor testCaptionTextStaysOnTheSecondaryTier testDetailAreaHasASingleLeftAxis testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed testQuickPickKeyboardHintClearsTheContrastFloor` / `testActionableInkStaysAboveTheLegibilityFloor testCaptionTextStaysOnTheSecondaryTier testDetailAreaHasASingleLeftAxis testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed testQuickPickKeyboardHintClearsTheContrastFloor`。⇒ 那一刻只写"没读到"，不写任何"没红"；三条待验形状（⑴ 判=一致 / ⑵ 判=翻了 / ⑶ 那一行命中 0 次＝通道没跑，**修法相反**）由脚本反查：`⑴ ⇒ 登记那格**跨机器闭合**：runner 自己读到 `机器=github-runner 登记=1_2 判=一致` ⇒ R582 交接的「数值到了、判定那一半没闭合」就此结掉；下一轮不许再写「等第一证人」（registry 那一行逐字 `D12_SHAPE_SCAN_REGISTRY 机器=github-runner 登记=1_2 实测=1_2 判=一致 红路=无 另一台已登记=是`）`；`另外两条：⑴ 一致 ⑵ 翻了 ⑶ 命中 0 次 —— 逐条试完，命中的只有上面那一条`。**派单 ④ 那条"解包顺序先拿一个已知 run 验"本轮真的做了**（上一轮我把 `conclusion` 当 sha 对拍）：`字段顺序自检（用已知跑 `42066364877`）：`headSha` 前缀逐字 =`dbd13fb`、`conclusion` 取值在 `{空, success, failure, cancelled}` 之内 ⇒ status=completed / conclusion=failure ⇒ 解包没错位`。
