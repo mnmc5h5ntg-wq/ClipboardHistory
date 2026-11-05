@@ -27823,11 +27823,15 @@ final class UICaptureTests: XCTestCase {
     /// 来源逐字记在这里：
     /// · 2.00x —— 本机本轮矩阵 `乙E走display但不跑runloop 子层=2` 对 `乙D上屏但不跑runloop 子层=-1`
     ///   ⇒ `解释②=被否_不上屏只走display就建得出而上屏不display建不出`
-    /// · 1.00x —— **还没有观测值**（这把尺第一次上 runner 是含本笔的那一跑）⇒ 返回 nil，
-    ///   由那一跑自己打印读数后再登记；本机不许替它填。
+    /// · 1.00x —— runner `41994318725 ↔ 1f0e4b2`（R577 主笔）逐字
+    ///   `EXPLANATION2 倍率=1.00x 实测=被否_不上屏只走display就建得出而上屏不display建不出 声明=无
+    ///    EXPLANATION2_NOT_RUN=unregistered-scale`，同一跑 `SAME_TREE_ONSCREEN_SUMMARY 倍率=1.00x
+    ///    冷子层=-1 只走display不跑runloop子层=2 只上屏不跑runloop子层=-1 只跑runloop子层=2 …`
+    ///   ⇒ **由那一跑自己的读数登记**（R578 收口前复核到数时代入），本机没有替它填；
+    ///   两档同值 ⇒ ②被否不是本机特例，而是跨两台成立的一条机制结论。
     static func declaredExplanationTwo(scale: Double) -> ExplanationTwoVerdict? {
         let rounded = (scale * 100).rounded() / 100
-        guard rounded == 2.00 else { return nil }
+        guard rounded == 2.00 || rounded == 1.00 else { return nil }
         return .refutedDisplayPass
     }
 
@@ -28079,6 +28083,22 @@ final class UICaptureTests: XCTestCase {
         ]
     }
 
+    /// **按行**抄一份上一轮的类别快照（值来源：R575 建表那一份，R576/R577 两跑与本机的
+    /// `D12_CHANNEL_MAP … 声明=… 实测=…` 逐字复核过 ⇒ 五处逐字相同）。
+    /// 为什么要一份**独立抄本**而不是直接拿表里的 `declared` 当基线：那样它就是"被判对象"又是"对照基线"，
+    /// 有人把声明改成今天实测的那一态就永远不会红 —— 「一条也没翻面」就会变成一句自满足的话。
+    /// 这份抄本只许由**读数**改：真有一条翻面时，必须同时改表体与这里，并在账上写清是哪一跑哪个读数支持的。
+    static let d12RowCategoriesR577: [String: String] = [
+        "角度单调": "今天无证人",
+        "投影宽度按余弦律": "今天无证人",
+        "模糊半径从铰链到自由边递增": "今天无证人",
+        "亮度随角度单调下降": "今天无证人",
+        "边框锐度不变": "今天无证人",
+        "透明区alpha归零": "今天无证人",
+        "框架只在透明之后缩一次": "今天无证人",
+        "屏上帧间隔不超标": "只能真机",
+    ]
+
     /// 折叠**路径**本身在产品源码里出现的文件数（`foldProgress` / `setCollapsed(` / `isTransitioning`）。
     /// 这一格与下面那一格必须**分开读**：交集为 0 这件事只有从两个独立数推出来才算证据，
     /// 直接扫"同一个文件里两个词都有"会把 `AppDelegate` 那种"顺手建了折叠控制器、又按 D4a 写了
@@ -28156,6 +28176,128 @@ final class UICaptureTests: XCTestCase {
                 profile.samples, profile.opaque, profile.clear)
     }
 
+    // -----------------------------------------------------------------
+    // R578 / BACKLOG 654：用 R577 新命名的那个前置（**一次显示通路**）重判这张表。
+    //
+    // 为什么这件事不需用户定向就能推：R575 那张表是在"还不知道层树等的是哪一步"时做的，
+    // 所以它的「前置」那一列可能记错了功劳（R577 那把空刀就是这么把结论翻出来的）。
+    // 本轮不猜 —— 前置那一列改成**实测**：在同一棵产品树上问三个臂，谁单独够就把名字写成谁。
+    // -----------------------------------------------------------------
+
+    /// 实测出来的前置：冷态（什么都不做）/ 只走一次显示通路 / 只上屏不显示 / 只走夹具快门那一步。
+    /// 第四个臂是本轮的关键：映射表那五行的「前置」写的是 `夹具快门cacheDisplay`，
+    /// 而 R577 量到的分水岭是"一次显示通路" —— **这两个名字是不是同一类**，不靠散文裁定，
+    /// 靠把快门那一步单独做一遍、看它建不建得出层树。
+    struct MeasuredPrerequisite: Equatable {
+        let name: String
+        let coldSublayers: Int
+        let displaySublayers: Int
+        let onScreenSublayers: Int
+        let shutterSublayers: Int
+        let displayBuilds: Bool
+        let onScreenBuilds: Bool
+        let shutterBuilds: Bool
+    }
+
+    /// 纯函数：声明的前置名**只有属于实测成立的那一类**才算相符。
+    /// 今天实测：`window.display()` 与跑一拍 runloop 建得出树；`orderFront`（只上屏）建不出。
+    /// ⇒ `夹具快门cacheDisplay` 只有在快门那一步自己实测建得出树时，才算"显示通路"的一个具名实例；
+    ///   否则它就是记错了功劳的名字（M1518 钉的是把名字换成"上屏那一步"这一支）。
+    static func prerequisiteRowMatches(declared: String, measured: MeasuredPrerequisite) -> Bool {
+        if measured.name == "无需前置" { return declared == "不适用" }
+        switch declared {
+        case "显示通路那一步": return measured.displayBuilds || measured.shutterBuilds
+        case "夹具快门cacheDisplay": return measured.shutterBuilds
+        case "上屏那一步": return measured.onScreenBuilds
+        default: return false
+        }
+    }
+
+    /// 在同一棵产品主窗树上分别只做一件事，读层树那一个量 ⇒ 分水岭由读数给名字。
+    private func measureD12Prerequisite() throws -> MeasuredPrerequisite {
+        let cold = try readSameTreeQuantities(makeMainTreeWindow().container)
+
+        let displayWindow = makeMainTreeWindow()
+        displayWindow.window.display()
+        let displayed = try readSameTreeQuantities(displayWindow.window.contentView ?? displayWindow.container)
+        displayWindow.window.orderOut(nil)
+
+        let onScreenWindow = makeMainTreeWindow()
+        onScreenWindow.window.orderFrontRegardless()
+        let onScreen = try readSameTreeQuantities(onScreenWindow.window.contentView ?? onScreenWindow.container)
+        onScreenWindow.window.orderOut(nil)
+
+        var name = "未定_LAYER_TREE_PREREQ_UNNAMED"
+        if cold.sublayers > 0 {
+            name = "无需前置"
+        } else if displayed.sublayers > 0 && onScreen.sublayers <= 0 {
+            name = "显示通路那一步"
+        } else if onScreen.sublayers > 0 && displayed.sublayers <= 0 {
+            name = "上屏那一步"
+        } else if onScreen.sublayers > 0 && displayed.sublayers > 0 {
+            name = "两步各自都够"
+        }
+        // 第四臂：只做夹具快门那一步（`cacheDisplay(in:to:)`），不建窗、不上屏、不调 window.display()。
+        let shutterHost = NSHostingView(rootView: AnyView(ContentView(historyStore: makePopulatedStore())))
+        shutterHost.frame = NSRect(origin: .zero, size: NSSize(width: 420, height: 300))
+        let shutterContainer = WindowBackingContainer.wrapping(shutterHost)
+        shutterContainer.frame = NSRect(origin: .zero, size: NSSize(width: 420, height: 300))
+        var shutter = SameTreeReadings(sublayers: -1, contentsPresent: false, opaque: -1, clear: -1, samples: 0)
+        if let rep = shutterContainer.bitmapImageRepForCachingDisplay(in: shutterContainer.bounds) {
+            shutterContainer.cacheDisplay(in: shutterContainer.bounds, to: rep)
+            shutter = try readSameTreeQuantities(shutterContainer)
+        }
+        return MeasuredPrerequisite(name: name, coldSublayers: cold.sublayers,
+                                    displaySublayers: displayed.sublayers,
+                                    onScreenSublayers: onScreen.sublayers,
+                                    shutterSublayers: shutter.sublayers,
+                                    displayBuilds: displayed.sublayers > 0,
+                                    onScreenBuilds: onScreen.sublayers > 0,
+                                    shutterBuilds: shutter.sublayers > 0)
+    }
+
+    /// 剥注释：先剥行注释（`///` 与 `//`），**再**剥块注释。
+    /// 顺序反过来会瞎 —— M1519 第一次落下就是空刀（PASSED）抓出来的：这份文件里有一处
+    /// 文档注释写着 `/**禁用**）`，那个 `/*` 让块注释匹配从那里一路吃到下一个 `*/`，
+    /// 中间 86 万个字符（含真实代码）被当成注释剥掉 ⇒ 扫描读到 0 ⇒ 门是瞎的。
+    static func stripCommentsForFloorScan(_ text: String) -> String {
+        var code = text
+        if let line = try? NSRegularExpression(pattern: "//.*$", options: .anchorsMatchLines) {
+            code = line.stringByReplacingMatches(in: code, range: NSRange(location: 0, length: code.utf16.count),
+                                                 withTemplate: "")
+        }
+        if let block = try? NSRegularExpression(pattern: "/\\*.*?\\*/", options: .dotMatchesLineSeparators) {
+            code = block.stringByReplacingMatches(in: code, range: NSRange(location: 0, length: code.utf16.count),
+                                                  withTemplate: "")
+        }
+        return code
+    }
+
+    /// 纯函数：给定文本，数"把 alpha 三分数与整数阈值比较"的写法。
+    /// 单独拆出来是为了能拿**合成样本**测这条流水线本身（只测正则不测剥注释=没测，R100 那一族）。
+    static func countDriftFloorMatches(in text: String) -> Int {
+        let pattern = "\\b(?:clear|opaque|transparent|clearCount|opaqueCount|transparentCount)\\w* *(?:>=|<=|>|<) *[0-9]{2,}\\b"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return -1 }
+        let code = stripCommentsForFloorScan(text)
+        return regex.matches(in: code, range: NSRange(location: 0, length: code.utf16.count)).count
+    }
+
+    /// 漂移那个量不许当证人 ⇒ 扫判据源码里把 alpha 三分数与**非 0/1 的整数字面量**比较的写法。
+    /// ⚠ 覆盖面要说清：这把尺钉的是**写法形状**（同名变量 + 整数阈值），改名绕开是可能的 ⇒
+    ///   它与 645/648 那一族并列观察，不许被读成"这个量已经不可能被当地板"。
+    static func countDriftQuantityUsedAsFloor() -> Int {
+        let dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let files = ["UICaptureHarness.swift", "TransparencyForensicsTests.swift", "MotionFilmstripTests.swift"]
+        var hits = 0
+        for name in files {
+            guard let raw = try? String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8) else {
+                return -1   // 读不到文件不许冒充"没有"
+            }
+            hits += countDriftFloorMatches(in: raw)
+        }
+        return hits
+    }
+
     func testTheD12HardClausesEachNameAChannelThatEitherReadsOrIsNamed() throws {
         let rows = Self.d12Clauses
         XCTAssertEqual(rows.count, 8,
@@ -28195,6 +28337,7 @@ final class UICaptureTests: XCTestCase {
         let alphaChannelProbe = try probeAlphaLayerChannelOnProductOverlay()
 
         var judgeable = 0, realOnly = 0, noWitness = 0
+        var flips = 0, snapshotMismatch = 0, snapshotMissing = 0
         for row in rows {
             let channelReads: Bool
             let objectExists: Bool
@@ -28235,7 +28378,65 @@ final class UICaptureTests: XCTestCase {
             case .realScreenOnly: realOnly += 1
             case .noWitnessToday: noWitness += 1
             }
+            // R578：「翻没翻」拿**上一轮的按行快照**对，不拿本轮的表对 —— 表同时当基线和被判对象时会自满足。
+            if let last = Self.d12RowCategoriesR577[row.title] {
+                if Self.d12StateName(measured) != last { flips += 1 }
+                if Self.d12StateName(row.declared) != last { snapshotMismatch += 1 }
+            } else {
+                snapshotMissing += 1
+            }
         }
+        XCTAssertEqual(snapshotMissing, 0,
+                       "有 \(snapshotMissing) 条在按行快照里没有名字 ⇒ 表体改了标题（或新增了一条）而快照没跟着登记，"
+                       + "「翻面」这一格就退化成没对照的计数。名册漏登记那一族（R532/R566 同形）。")
+        XCTAssertEqual(snapshotMismatch, 0,
+                       "有 \(snapshotMismatch) 条的**声明**与上一轮按行登记（R575 建表、R576/R577 两跑逐字复核）不符 ⇒ "
+                       + "要么今天的读数真让它翻了面（那必须写清是哪一跑、哪个读数，并同时改快照），"
+                       + "要么这一列被人改了而没留痕。两种都不许靠改断言解决（M1520 钉这一格）。")
+        // R578：前置那一列由实测给名字（八条里凡声明了前置的，都必须等于这一轮在同一棵树上量出来的那一个）。
+        let prereq = try measureD12Prerequisite()
+        var prereqChecked = 0
+        var prereqMismatch = 0
+        for row in rows where row.prerequisite != "不适用" {
+            prereqChecked += 1
+            if !Self.prerequisiteRowMatches(declared: row.prerequisite, measured: prereq) { prereqMismatch += 1 }
+            XCTAssertTrue(Self.prerequisiteRowMatches(declared: row.prerequisite, measured: prereq),
+                          "`\(Self.channelSafe(row.title))` 那一条声明的前置是「\(row.prerequisite)」，"
+                          + "而本轮在同一棵产品树上实测：只走一次显示通路子层=\(prereq.displaySublayers)、"
+                          + "只走夹具快门那一步子层=\(prereq.shutterSublayers)、只上屏不显示子层=\(prereq.onScreenSublayers)、"
+                          + "冷态子层=\(prereq.coldSublayers) ⇒ 声明的那一步**不属于实测成立的那一类**"
+                          + "（分水岭实测=「\(prereq.name)」）。后果不是难看：下一轮拿这张表写逐帧判据时，"
+                          + "会把一个建不出层树的步骤当成已满足（M1518 钉的是把它写成「上屏那一步」这一支）。")
+        }
+        // 这条扫描自己的真值表（M1519 第一次是空刀 ⇒ 光有门没有对照，门会瞎着放行）。
+        XCTAssertEqual(Self.countDriftFloorMatches(in: "if " + "clear" + " >= 200 { XCTFail() }"), 1,
+                       "合成正对照读不到 ⇒ 这把尺看不见它声称要抓的写法（瞎门）。⚠ 样本用拼接写：直接写「变量名 + 空格 + 阈值」那种比较式会被这条扫描数进自己的源码（needle 命中守卫自己那一族）")
+        XCTAssertEqual(Self.countDriftFloorMatches(in: "// 注释里写 clear >= 200 不算"), 0,
+                       "注释里的写法被数进来了 ⇒ 这把尺会把文档读成代码")
+        XCTAssertEqual(Self.countDriftFloorMatches(in: "profile.samples > 0 && profile.clear > 0"), 0,
+                       "存在性判断（与 0 比）被数进来了 ⇒ 这一支今天合法，不许一起禁掉")
+        XCTAssertEqual(Self.countDriftFloorMatches(in: "/// 见 /**禁用**）那一档\n        " + "opaque" + " >= 150"), 1,
+                       "文档注释里出现 /* 之后，后面的真实代码就不见了 ⇒ 这正是 M1519 第一次空刀的形状（剥注释顺序错了）")
+
+        let floorUses = Self.countDriftQuantityUsedAsFloor()
+        XCTAssertGreaterThanOrEqual(floorUses, 0,
+                                    "漂移那把尺扫不到源码（返回 \(floorUses)）⇒ 目录没读到，不许读成「没人拿它当地板」")
+        XCTAssertEqual(floorUses, 0,
+                       "有 \(floorUses) 处把 alpha 三分数（`clear`/`opaque`/`transparent`）与整数阈值比较 ⇒ "
+                       + "这个量今天已被人当地板用了，而它**跨会话会漂**（R577 实测 17180→17261，"
+                       + "本轮 runner 同一跑两处 `未画比例=0.8495 / 0.8511` 也在漂）⇒ 具名 "
+                       + "FRAME_ALPHA_TOTAL_CLEAR_DRIFT_NOT_A_WITNESS 不许被绕过（M1519 钉这一条）。")
+        emit("D12_PREREQ 前置实测=\(prereq.name) 冷态子层=\(prereq.coldSublayers)"
+             + " 只走显示通路子层=\(prereq.displaySublayers) 只上屏子层=\(prereq.onScreenSublayers)"
+             + " 只走夹具快门子层=\(prereq.shutterSublayers)"
+             + " 快门算不算显示通路的一个实例=\(prereq.shutterBuilds ? "是" : "否")"
+             + " 带前置的行数=\(prereqChecked) 同类相符=\(prereqChecked - prereqMismatch)/\(prereqChecked)"
+             + " 漂移量被写成地板处数=\(floorUses)")
+        emit("D12_REJUDGED 条=\(rows.count) 翻面=\(flips)"
+             + " 按行声明与快照相符=\(rows.count - snapshotMismatch)/\(rows.count) 快照缺行=\(snapshotMissing)"
+             + " 汇总与上轮逐字相同=\(judgeable == 0 && realOnly == 1 && noWitness == 7 ? 1 : 0)"
+             + " 前置相符=\(prereqChecked - prereqMismatch)/\(prereqChecked) 逐条证人=三条现扫+两条现量通道+一条环境键+一条前置实测")
+
         XCTAssertEqual(judgeable + realOnly + noWitness, rows.count,
                        "八条里有一条没落到任何一态（分类走到了没覆盖的分支）⇒ 计数与条数不符")
         emit("D12_CHANNEL_MAP_SUMMARY 条=\(rows.count) runner可判=\(judgeable) 只能真机=\(realOnly)"
