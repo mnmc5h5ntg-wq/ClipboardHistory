@@ -54,7 +54,10 @@ SHAPE_OLD = ('        return code.contains("CIFilter") || code.contains("CIGauss
              '            || code.contains("CAFilter") || code.contains("layer.filters")\n')
 SHAPE_NEW = '        return code.isEmpty   // 刀：B 那把尺对任何源码都读不出形状\n'
 
-ANNO_OLD = ('        let code = Self.codeOnly(rawText)\n'
+# R581 重钉：R581 把 A/B 两把尺从 `codeOnly` 换成 `stripShapeComments`（并加了 `stripping:` 参数）
+# ⇒ 这根 needle 命中 0（`mutate_needle_precheck` 在**跑之前**抓到，bad=1）。针腐烂重钉必复跑旧表：
+# 下面这对是同一件事在新形状上的钉子（A 退回不剥注释 ⇒ 1b 与 1c 都要红），needle 仍然只命中一次。
+ANNO_OLD = ('        let code = stripping ? Self.stripShapeComments(rawText) : rawText\n'
             '        return code.contains("foldAngle") || code.contains("blurRadius")\n')
 ANNO_NEW = ('        let code = rawText   // 刀：A 退回不剥注释\n'
             '        return code.contains("foldAngle") || code.contains("blurRadius")\n')

@@ -28105,16 +28105,20 @@ final class UICaptureTests: XCTestCase {
     /// `isOpaque=false`"的文件算成"折叠期间改 alpha" —— R575 第一次试写就是这么错的。
     /// R580 加 `in root:`：活门要能拿一棵**临时树**注入假对象来验证"它真会翻"，不许为了验证去动产品树
     /// （本轮产品 0 文件）。不传 ⇒ 口径与 R575 那三条现扫逐字相同（同一把尺、同一个目录）。
-    static func countFoldPathWriters(in root: URL? = nil) -> Int {
-        return Self.countProductFiles(in: root) { text in
-            text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
+    /// R581 加 `stripping:`，**默认 false ⇒ 这两把的口径一字未动**（它们就是 R575 那三条现扫里的两条）；
+    /// 打开只为了把"注释能不能造出折叠期 alpha 对象"量出来，量到的差值进 `D12_SHAPE_SCAN` 那一格。
+    static func countFoldPathWriters(in root: URL? = nil, stripping: Bool = false) -> Int {
+        return Self.countProductFiles(in: root) { raw in
+            let text = stripping ? Self.stripShapeComments(raw) : raw
+            return text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
         }
     }
 
     /// 折叠路径**且**同文件里写窗口 alpha（`alphaValue` / `isOpaque`）的文件数 = D12「透明区」与
     /// 「透明之后」那两句今天有没有对象。今天预期 0（第③段还没写着色器与 alpha 驱动）。
-    static func countFoldAlphaWriters(in root: URL? = nil) -> Int {
-        return Self.countProductFiles(in: root) { text in
+    static func countFoldAlphaWriters(in root: URL? = nil, stripping: Bool = false) -> Int {
+        return Self.countProductFiles(in: root) { raw in
+            let text = stripping ? Self.stripShapeComments(raw) : raw
             let folds = text.contains("foldProgress") || text.contains("setCollapsed(") || text.contains("isTransitioning")
             let alpha = text.contains("alphaValue") || text.contains("isOpaque")
             return folds && alpha
@@ -28138,20 +28142,51 @@ final class UICaptureTests: XCTestCase {
         return hits
     }
 
+    /// R581 ②：形状通道专用剥注释 —— 先剥行注释，再剥**成对**的块注释；**未闭合的 `/*` 不当注释处理**。
+    /// 为什么现成的两把都不能直接用（本轮先量再用，不是挑口味）：
+    /// · `codeOnly` 里那个 `inBlock` **从来没有被置成 true**（现读：只有同一行内成对的 `/* … */` 会被剥）
+    ///   ⇒ 一份跨行的 `/* … CIFilter … */` 文档注释不会被剥掉 ⇒ A/B 都能从注释里造出 1 ⇒ 活门会红在
+    ///     「守卫自己看到的字面」上，而不是红在产品真对象上（派单 ② 预设的那一处尺病，机制在这里）；
+    /// · `stripCommentsForFloorScan` 用 dotAll 的 `/\*.*?\*/` 一路吃到下一个 `*/` ⇒ 代码里一个字符串字面量
+    ///   含 `/*` 就能把后面的真实代码整段吃掉（R579 实测「68 万字符被当注释删掉」那一族）⇒ 那是把真对象读成 0。
+    /// ⇒ 这一把取中间：**只剥成对的块注释，未闭合的原样留着**（宁可多看见代码，不许把代码吃没）。
+    static func stripShapeComments(_ source: String) -> String {
+        // ⚠ 这两个字面串是**拆开写**的：直接写成相邻两字符会在这份文件里落下真的块注释定界符，
+        //   而 `countDriftQuantityUsedAsFloor` 那把尺扫的就是这份文件（R579 实测「一句注释里的 `/*`
+        //   把 68 万字符当注释吃掉」那一族）⇒ 尺自己的源码里不许出现它要匹配的定界符。
+        let openBlock = "/" + "*"
+        let closeBlock = "*" + "/"
+        var text = source
+        if let line = try? NSRegularExpression(pattern: "//.*$", options: .anchorsMatchLines) {
+            let ns = text as NSString
+            text = line.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: ns.length),
+                                                 withTemplate: "")
+        }
+        var searchFrom = text.startIndex
+        while let open = text.range(of: openBlock, range: searchFrom..<text.endIndex) {
+            guard let close = text.range(of: closeBlock, range: open.upperBound..<text.endIndex) else { break }
+            text.removeSubrange(open.lowerBound..<close.upperBound)
+            searchFrom = open.lowerBound
+        }
+        return text
+    }
+
     /// 产品源码里引用**角度/模糊驱动**（着色器那一层）的文件数。
     /// 与 `TransparencyForensicsTests.countMetalLayerUsers` 同一把尺的形状（现扫 + 只数文件），
     /// 但对象不同：那一把数的是 `CAMetalLayer`/`MTKView`，这一把数的是 D12 前四条要的驱动本身。
     /// R580 探针实测到的事：这一把**原先不剥注释** ⇒ 一句注释就能造出 A=1，于是五行实测被翻面、
-    /// 而「只有B认得」那一条红路被假 A 挡掉（`d12ObjectVerdict` 见 A>0 就短路）。今天产品树两种读法
-    /// 都是 0 ⇒ 补上剥注释**不改本轮任何读数**（口径收了、数没变，对拍见台账），去掉的是那条能被注释灭掉的红。
-    static func angleDriverTextHits(_ rawText: String) -> Bool {
-        let code = Self.codeOnly(rawText)
+    /// 而「只有B认得」那一条红路被假 A 挡掉（`d12ObjectVerdict` 见 A>0 就短路）。R581 补的是那一处修得
+    /// 不彻底：`codeOnly` 只认同一行内成对的块注释 ⇒ 跨行的 `/* … */` 仍然能喂饱它 ⇒ 换成
+    /// `stripShapeComments`。今天产品树里 `/*` 出现 **0** 次（现读，不是预期）⇒ 三种读法都是 0，
+    /// **口径收了、读数一字未动**；`stripping:false` 那一档留着只为把"注释能不能造对象"量出来给下一轮看。
+    static func angleDriverTextHits(_ rawText: String, stripping: Bool = true) -> Bool {
+        let code = stripping ? Self.stripShapeComments(rawText) : rawText
         return code.contains("foldAngle") || code.contains("blurRadius")
             || code.contains("CAMetalLayer") || code.contains("MTKView")
     }
 
-    static func countAngleDriverWriters(in root: URL? = nil) -> Int {
-        return Self.countProductFiles(in: root) { Self.angleDriverTextHits($0) }
+    static func countAngleDriverWriters(in root: URL? = nil, stripping: Bool = true) -> Int {
+        return Self.countProductFiles(in: root) { Self.angleDriverTextHits($0, stripping: stripping) }
     }
 
     /// R580 / BACKLOG 654：**第二条独立通道（形状通道）** —— 不认 A 那四个名字，只认"要做角度驱动的
@@ -28162,9 +28197,11 @@ final class UICaptureTests: XCTestCase {
     /// 这张表继续报"runner可判=0"而没人知道对象已经出现了 —— 那正是"看不见违规"冒充"没有违规"，
     /// 也正是"那一行翻不动"必须红的那一种。
     /// 与 A 的两处刻意差别：① 对象集合不同（A 数驱动变量名，B 数渲染 API 与 `.metal` 文件）；
-    /// ② B 走 `codeOnly`（剥注释）⇒ 文档注释里提一句「以后可以用 CIFilter」不许把新门判红。
-    static func shaderShapeTextHits(_ rawText: String) -> Bool {
-        let code = Self.codeOnly(rawText)
+    /// ② B 走 `stripShapeComments`（R581 起）⇒ 文档注释里提一句「以后可以用 CIFilter」不许把新门判红。
+    /// ⚠ R580 那一版用的是 `codeOnly`，而它**看不见跨行的块注释** ⇒ 派单 ② 指的那一处尺病在 B 上确实存在，
+    ///   只是机制不是"没剥注释"而是"只剥了一半"。A 与 B 今天一起换成同一把更强的尺（同口径）。
+    static func shaderShapeTextHits(_ rawText: String, stripping: Bool = true) -> Bool {
+        let code = stripping ? Self.stripShapeComments(rawText) : rawText
         return code.contains("CIFilter") || code.contains("CIGaussianBlur")
             || code.contains("AEAGaussianBlur") || code.contains("MTLRenderPipelineState")
             || code.contains("CAFilter") || code.contains("layer.filters")
@@ -28172,7 +28209,9 @@ final class UICaptureTests: XCTestCase {
 
     /// 现扫一棵树（默认=产品根）：命中形状通道的 `.swift` 文件数 **+** `.metal` 源文件数。
     /// 目录读不到 ⇒ -1（同 `countProductFiles`：不许把"扫不到"伪装成"没有对象"）。
-    static func countShaderShapeFiles(in root: URL? = nil) -> Int {
+    /// ⚠ `.metal` 那一半**不吃注释**（文件存在就是对象，注释造不出一份源文件）⇒ 只有文本那一半有尺病，
+    ///   这也是为什么两档断言要分别钉：注释档不许叫、真代码档必须叫。
+    static func countShaderShapeFiles(in root: URL? = nil, stripping: Bool = true) -> Int {
         guard let dir = (root == nil ? Self.productSourcesRoot() : root) else { return -1 }
         guard let enumerator = FileManager.default.enumerator(atPath: dir.path) else { return -1 }
         var hits = 0
@@ -28181,9 +28220,18 @@ final class UICaptureTests: XCTestCase {
             guard rel.hasSuffix(".swift") else { continue }
             guard let text = try? String(contentsOf: dir.appendingPathComponent(rel), encoding: .utf8)
             else { continue }
-            if Self.shaderShapeTextHits(text) { hits += 1 }
+            if Self.shaderShapeTextHits(text, stripping: stripping) { hits += 1 }
         }
         return hits
+    }
+
+    /// R581 ②「先量再判」那一格：同一棵树上把两种读法各打一次，差值就是"注释能不能造对象"的实测大小。
+    /// 返回 `(剥注释, 带注释, 差)`；目录读不到 ⇒ `(-1, -1, 0)`（不许把"扫不到"读成"差 0 ⇒ 没风险"）。
+    static func shapeScanReadingPair(strippingScan: (Bool) -> Int) -> (stripped: Int, raw: Int, delta: Int) {
+        let stripped = strippingScan(true)
+        let raw = strippingScan(false)
+        if stripped < 0 || raw < 0 { return (-1, -1, 0) }
+        return (stripped, raw, raw - stripped)
     }
 
     /// 活门的判法（纯函数，两条独立通道 + 目录可读性）。四条分支一条都不许多：
@@ -28416,6 +28464,33 @@ final class UICaptureTests: XCTestCase {
                 + "两种都不许靠把 B 关掉解决（M1523 钉的是把这条红路摘掉必须红）。")
         }
         let awaitingRows = Self.d12RowsAwaitingObject(from: rows)
+        // R581 ②「先量再判」：同一棵产品树把两种读法各打一次。四对读数今天应当相等（现读：产品树里
+        // `/*` 出现 0 次），但"应当"不是证人 ⇒ 这一格把**差值**打出来并钉成断言：
+        // 差值 >0 就意味着注释正在造对象，红的作用是"别把 现扫瞎/由A认得 读成真对象"，不是"去放宽判法"。
+        let scanAPair = Self.shapeScanReadingPair { Self.countAngleDriverWriters(stripping: $0) }
+        let scanBPair = Self.shapeScanReadingPair { Self.countShaderShapeFiles(stripping: $0) }
+        let foldPathPair = Self.shapeScanReadingPair { Self.countFoldPathWriters(stripping: $0) }
+        let foldAlphaPair = Self.shapeScanReadingPair { Self.countFoldAlphaWriters(stripping: $0) }
+        for (name, pair) in [("A按名字", scanAPair), ("B按形状", scanBPair), ("折叠期alpha", foldAlphaPair)] {
+            XCTAssertGreaterThanOrEqual(pair.stripped, 0,
+                                        "\(name) 那把尺剥注释那一档读到 \(pair.stripped) ⇒ 目录没读到，"
+                                        + "差值 0 与 没量到 是两行不同的账")
+            XCTAssertEqual(pair.delta, 0,
+                           "\(name) 这一把在**同一棵产品树**上，带注释读法读到 \(pair.raw)、剥注释读法读到 "
+                               + "\(pair.stripped) ⇒ 差 \(pair.delta)：注释里出现了它认的字面，而这一把的读数**直接驱动翻面**"
+                               + "（A/B 决定判法、折叠期 alpha 决定那两行的对象在不在）。后果不是难看：一句注释就能造出"
+                               + "「对象到了」，而 A>0 还会把「现扫瞎」那条红短路挡掉。处置只有「把这把尺收成只数真代码」，"
+                               + "不许去放宽判法四分支、也不许把表里那几行改成可判。")
+        }
+        // 折叠路径那一把**不驱动任何翻面**（它只给「扫描没瞎」那一格当地板），所以这一档不许把上面那条
+        // 零差断言套上去 ⇒ 本轮量到的事实：它今天被一处注释喂着（差 1，`ContentView.swift` 只在注释里
+        // 提到折叠路径），而剥掉注释之后地板仍然成立 ⇒ 具名登记进 654，口径（R575 三条现扫之一）本轮不改。
+        XCTAssertGreaterThanOrEqual(foldPathPair.stripped, 1,
+                                    "折叠路径那一把**剥掉注释**之后读到 \(foldPathPair.stripped) ⇒ 「扫描扫得到东西」"
+                                        + "这句话从今天起只由注释撑着（带注释读到 \(foldPathPair.raw)）："
+                                        + "上面那条「交集为 0 不是扫不到东西」的证人作废，必须重找对象")
+        XCTAssertEqual(foldPathPair.raw, foldPathFiles,
+                       "折叠路径那一把的默认口径读到的数与本轮别处引用的不是同一个 ⇒ 两种读法被人混用了")
         XCTAssertEqual(awaitingRows.count, rows.count - 1,
                        "「等对象的行」读出来是 \(awaitingRows.count)，而八条里只有真机那一行不该等对象 ⇒ "
                        + "要么有一行的通道名/声明态变了、要么派生规则走漏了分支。分母来自现扫的表体，"
@@ -28568,6 +28643,13 @@ final class UICaptureTests: XCTestCase {
         emit("D12_LIVE_GATE A按名字文件数=\(angleFiles) B按形状文件数=\(shaderShapeFiles)"
              + " 判=\(Self.channelSafe(gateVerdict)) 红路=\(Self.d12GateRedReason(gateVerdict) ?? "无")"
              + " 待翻行数=\(awaitingRows.count) 本轮该翻=\(requiredFlips.count) 分母=\(rows.count)")
+        // R581 ②：四对读数逐字留档 —— 这一行是"注释能不能造对象"的当轮证人，也是下一轮不许再说"预期是 0"的凭据。
+        emit("D12_SHAPE_SCAN A剥注释=\(scanAPair.stripped) A带注释=\(scanAPair.raw) A差=\(scanAPair.delta)"
+             + " B剥注释=\(scanBPair.stripped) B带注释=\(scanBPair.raw) B差=\(scanBPair.delta)"
+             + " 折叠路径剥注释=\(foldPathPair.stripped) 折叠路径带注释=\(foldPathPair.raw) 折叠路径差=\(foldPathPair.delta)"
+             + " 折叠alpha剥注释=\(foldAlphaPair.stripped) 折叠alpha带注释=\(foldAlphaPair.raw) 折叠alpha差=\(foldAlphaPair.delta)"
+             + " 折叠路径被注释喂着处数=\(foldPathPair.delta)"
+             + " 块注释只剥成对=是 未闭合斜杠星号不吃代码=是")
     }
 
     /// R580 ②：活门必须证明它**真会翻**。今天产品里两类对象都不在，于是主判据那条绿有两种可能：
@@ -28576,6 +28658,9 @@ final class UICaptureTests: XCTestCase {
     /// 六件事各证一句：注入 A 的形状⇒驱动那批行翻；注入 alpha 的形状⇒alpha 那两行翻；两者都注入⇒翻七行
     /// 而真机那行不翻；只注入 B 的形状⇒判=现扫瞎⇒门必须红；什么都不注入⇒判=缺席⇒门不红（今天的真读数）；
     /// 目录不存在⇒两条通道都给 -1 而不是 0（「量不到」不许冒充「没有」，R565 / R490 那一族）。
+    /// R581 ② 又加三档，全钉在**注释与真代码的分界**上：1b 行注释不许造对象；1c 跨行块注释不许造对象
+    /// （而带注释那一档必须读得出 1 ⇒ 差值就是证人）；1d 未闭合的开定界符不许把真代码吃没
+    /// （⇒ 与 1c 方向相反的坏法）；1e 是这把剥注释尺自己的六格真值表（不需要文件系统，runner 上也跑）。
     /// ⚠ 名单（`driverTitles`/`alphaTitles`）是**表体的抄本**、不是返回值：期望与实得来自两侧，
     ///   否则这条就成了「拿函数自己的输出当期望」的恒真门（R540 / R565 那一族）。
     func testTheD12LiveGateFlipsWhenAnInjectedObjectArrives() throws {
@@ -28589,12 +28674,14 @@ final class UICaptureTests: XCTestCase {
                        + "后果：注入假对象时名单会少翻一行，而那条「翻不动就红」的门看起来仍然绿。")
 
         var tracked: [URL] = []
+        var treeCount = 0
         defer { for dir in tracked { try? FileManager.default.removeItem(at: dir) } }
         func tree(named name: String, files: [(String, String)]) throws -> URL {
             let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("r580-d12-\(name)-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("r581-d12-\(name)-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             tracked.append(dir)
+            treeCount += 1
             for (fileName, body) in files {
                 try body.write(to: dir.appendingPathComponent(fileName), atomically: true, encoding: .utf8)
             }
@@ -28654,6 +28741,78 @@ final class UICaptureTests: XCTestCase {
         XCTAssertEqual(Self.d12RequiredFlips(angleArrived: aComment > 0, alphaArrived: false,
                                              from: rows).count, 0,
                        "注释造的假对象仍然让名单非空 ⇒ 翻面机接的不是「对象」而是「出现过这串字」")
+
+        // —— 1c. R581 ②：**跨行的**块注释也不许造对象。这一档是本轮的靶：R580 给 A/B 配的 `codeOnly`
+        //        里那个 `inBlock` 从来没被置成 true ⇒ 它只认同一行内成对的定界符 ⇒ 一份
+        //        「`/*` 换行 `foldAngle` 换行 `*/`」的文档注释仍然能喂饱两把尺（派单 ② 指的尺病是真的，
+        //        只是机制不是"没剥注释"而是"只剥了一半"）。带注释那一档同时打出来 ⇒ 差值就是证人。
+        let openBlock = "/" + "*"
+        let closeBlock = "*" + "/"
+        let blockNoteBody = "struct R581BlockNote {}\n" + openBlock
+            + "\n 这一段是文档注释，不是代码。"
+            + "\n 以后可能会用到 foldAngle 与 blurRadius。"
+            + "\n 也可能会用 CIFilter 做渐进模糊。"
+            + "\n" + closeBlock + "\n"
+        let blockTree = try tree(named: "blocknote", files: [("Note.swift", blockNoteBody)])
+        let aBlockStripped = Self.countAngleDriverWriters(in: blockTree)
+        let bBlockStripped = Self.countShaderShapeFiles(in: blockTree)
+        let aBlockRaw = Self.countAngleDriverWriters(in: blockTree, stripping: false)
+        let bBlockRaw = Self.countShaderShapeFiles(in: blockTree, stripping: false)
+        XCTAssertEqual(aBlockStripped, 0,
+                       "跨行块注释里的四个名字被 A 读成 \(aBlockStripped) ⇒ 一句文档注释就能凭空翻五行，"
+                       + "而活门会红在「守卫自己看到的字面」上（M1527 钉这一格）")
+        XCTAssertEqual(bBlockStripped, 0,
+                       "跨行块注释里的 CIFilter 被 B 读成 \(bBlockStripped) ⇒ 行会翻成「现扫瞎」而产品里什么都没有")
+        XCTAssertEqual(aBlockRaw, 1,
+                       "带注释那一档读到 \(aBlockRaw)（不是 1）⇒ 这一档没在量它声称的东西：差值证人没了，"
+                       + "「注释造不出对象」这句就退回成预期")
+        XCTAssertEqual(bBlockRaw, 1, "带注释那一档的 B 读到 \(bBlockRaw) ⇒ 同上（B 的差值证人没落地）")
+        XCTAssertEqual(Self.shapeScanReadingPair {
+                            Self.countShaderShapeFiles(in: blockTree, stripping: $0)
+                       }.delta, 1,
+                       "同一棵树两种读法的差不等于 1 ⇒ 「注释能造对象」这句话的大小没被量出来（本轮先量再判的那一步）")
+        XCTAssertEqual(Self.d12ObjectVerdict(scanA: aBlockStripped, scanB: bBlockStripped), "缺席",
+                       "剥注释之后仍然判不出「缺席」⇒ 判法与扫描脱钩")
+        XCTAssertEqual(Self.d12ObjectVerdict(scanA: aBlockRaw, scanB: bBlockRaw), "由A认得_A=1",
+                       "带注释那一档的判法不是「由A认得」⇒ 没复现出那条短路：假 A 一出现，"
+                       + "「现扫瞎」这条红就永远不会响（这就是为什么这一档要钉在 A 上而不是只钉在 B 上）")
+        // 旧那一把尺为什么不够：这一行是"尺病真的存在过"的永久证人（不是我在账里回忆）。
+        XCTAssertTrue(Self.codeOnly(blockNoteBody).contains("CIFilter"),
+                      "R580 那一把 `codeOnly` 现在读不到跨行块注释里的 CIFilter ⇒ 这一档的来历没了证人："
+                      + "本轮换尺换的正是它看不见跨行块注释这一处（`inBlock` 从来没被置成 true）")
+        XCTAssertFalse(Self.stripShapeComments(blockNoteBody).contains("CIFilter"),
+                       "新这把尺反而没剥掉跨行块注释 ⇒ 1c 整档退回 R580 的坏法")
+
+        // —— 1d. 反面：未闭合的定界符**不许把真代码吃没**（R579 实测「68 万字符被当注释删掉」那一族）。
+        //        字符串字面量里出现一个开定界符、后面再没有闭定界符时，真代码必须仍然看得见。
+        let trickyBody = "struct R581Tricky {\n    var marker = \"" + openBlock
+            + "\"\n    func make() -> CIFilter? { return nil }\n}\n"
+        let trickyTree = try tree(named: "tricky", files: [("Tricky.swift", trickyBody)])
+        XCTAssertEqual(Self.countShaderShapeFiles(in: trickyTree), 1,
+                       "未闭合的开定界符让后面的真代码被当注释吃掉了 ⇒ B 从「必须叫」被关成哑巴："
+                       + "这一档与 1c 是相反方向的坏法，各钉一把刀（M1528 钉这一格）")
+        XCTAssertTrue(Self.stripShapeComments(trickyBody).contains("CIFilter"),
+                      "剥注释函数自己就把真代码吃没了 ⇒ 后面所有靠它把关的尺一起变瞎")
+
+        // —— 1e. 剥注释这把尺自己的真值表（不需要文件系统 ⇒ runner 上也跑）。
+        let stripTable: [(String, Bool, String)] = [
+            ("// foldAngle\nstruct A {}", false, "行注释里的名字不算对象"),
+            (openBlock + " CIFilter " + closeBlock + "\nstruct A {}", false, "同一行内的块注释不算对象"),
+            (openBlock + "\n blurRadius \n" + closeBlock + "\nstruct A {}", false,
+             "跨行的块注释不算对象（本轮新加的那一半能力）"),
+            ("let s = \"" + openBlock + "\"\nlet f = CIFilter\n", true,
+             "未闭合的开定界符不许吃后面的真代码"),
+            (openBlock + " a " + closeBlock + " x " + openBlock + " b " + closeBlock + " y\n", false,
+             "两块都剥，中间夹的字面不算"),
+            ("", false, "空文本给「没对象」，不给 nil 也不给 1"),
+        ]
+        for (body, expect, why) in stripTable {
+            let code = Self.stripShapeComments(body)
+            let fired = code.contains("CIFilter") || code.contains("foldAngle") || code.contains("blurRadius")
+            XCTAssertEqual(fired, expect,
+                           "剥注释真值表「\(why)」这一格读成 \(fired)（期望 \(expect)）⇒ 这把尺要么瞎（该看见的看不见）"
+                               + "要么过食（不该看见的看见了），两种都会把活门的红路挪个位置")
+        }
 
         // —— 2. 只注入 alpha 的形状。
         let alphaTree = try tree(named: "alpha", files: [("FoldAlpha.swift", alphaBody)])
@@ -28738,12 +28897,15 @@ final class UICaptureTests: XCTestCase {
                            "判法真值表 (A=\(scanA), B=\(scanB)) 期望「\(expect)」")
         }
 
-        emit("D12_LIVE_GATE_PROBE 树=7 驱动行翻=\(flips1.count) alpha行翻=\(flips2.count)"
+        emit("D12_LIVE_GATE_PROBE 树=\(treeCount) 驱动行翻=\(flips1.count) alpha行翻=\(flips2.count)"
              + " 全翻=\(flips3.count) 真机行被翻=\(flips3.keys.contains("屏上帧间隔不超标") ? "是" : "否")"
              + " 瞎态判=\(Self.channelSafe(verdict4)) 注释喂A=\(aComment)"
              + " 空态A=\(a5) 空态B=\(b5)"
              + " 读不到处数=\((a6 == -1 && b6 == -1) ? 2 : 0) 判法分支数=\(verdictTable.count)"
-             + " 分母=\(rows.count)")
+             + " 分母=\(rows.count)"
+             + " 跨行注释A剥=\(aBlockStripped) 跨行注释A带=\(aBlockRaw)"
+             + " 跨行注释B剥=\(bBlockStripped) 跨行注释B带=\(bBlockRaw)"
+             + " 未闭合B=\(Self.countShaderShapeFiles(in: trickyTree)) 剥注释真值表=\(stripTable.count)格")
     }
 
     private func render(
