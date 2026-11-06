@@ -351,11 +351,12 @@ jobs:
           # 直接 `error: externally-managed-environment`（PEP 668），而 `--break-system-packages`
           # 要动的是作业机器的系统解释器 —— 一把像素尺不该要这个副作用（D-210）。
           # 所以装进一次性 venv，用得上它的每一步**显式**指那台解释器（不指望 PATH）。
-          python3 -m venv /tmp/pilenv || echo "PILLOW_VENV_FAILED=1（下面两步会读成 unavailable / skip，不会伪装成产品结论）"
-          /tmp/pilenv/bin/python -m pip install --quiet pillow || echo "PILLOW_INSTALL_FAILED=1（同上）"
-          /tmp/pilenv/bin/python -c "import PIL, sys; print('PILLOW_OK', PIL.__version__, sys.executable)" || echo "PILLOW_IMPORT_FAILED=1（装了但 import 不到：与「没装」是两种成因，正文要能分开）"
+          python3 -m venv /tmp/pilenv || { echo "PILLOW_VENV_FAILED=1"; echo "  这一格的读法：下面两步会读成 unavailable / skip，不会伪装成产品结论"; }
+          /tmp/pilenv/bin/python -m pip install --quiet pillow || { echo "PILLOW_INSTALL_FAILED=1"; echo "  这一格的读法：同上"; }
+          /tmp/pilenv/bin/python -c "import PIL, sys; print('PILLOW_OK', PIL.__version__, sys.executable)" || { echo "PILLOW_IMPORT_FAILED=1"; echo "  这一格的读法：装了但 import 不到 —— 与「没装」是两种成因，正文要能分开"; }
 
       - name: Release script tests
+        if: always()   # R591 靶 1：整卷判据是最大的一块证据；从前 Build 一红它连一行都不印（现读由 ci_skipped_causes.py 的 static 那一支钉住）
         # R143 审查轮（#32）：原来这三行几乎恒真 —— `grep -q "OK"` 会被自检自己打的
         # `… exit=1   OK` 那十几行喂饱（汇总之后也还有），`Ran [0-9]+ tests` 漏掉单数 `Ran 1 test`，
         # 而没有 `set -o pipefail` 时套件自己的退出码根本到不了这一步。现在：
@@ -380,7 +381,7 @@ jobs:
           PY=python3
           if [ -x /tmp/pilenv/bin/python ]; then PY=/tmp/pilenv/bin/python; fi
           echo "SCRIPT_PYTHON=$PY"
-          "$PY" -c "import PIL, sys; print('SCRIPT_PIL_OK', PIL.__version__, sys.executable)" 2>/dev/null || echo "SCRIPT_PIL_MISSING=1（@NEEDS_PIL 的格子这一跑仍是 skip）"
+          "$PY" -c "import PIL, sys; print('SCRIPT_PIL_OK', PIL.__version__, sys.executable)" 2>/dev/null || { echo "SCRIPT_PIL_MISSING=1"; echo "  这一格的读法：@NEEDS_PIL 的格子这一跑仍是 skip"; }
           "$PY" -m unittest discover -s scripts/tests -v 2>&1 | tee /tmp/py.log
           status=$?
           echo "suite exit: $status"
@@ -424,7 +425,8 @@ jobs:
             "$PY" scripts/hover_two_state_diff.py --shots /tmp/shots-ci --control "$CTL" \
               2>&1 | tee /tmp/hoverdiff.log
             hd=${PIPESTATUS[0]}
-            echo "HOVER_DIFF_EXIT=$hd（0=判过并达标 / 1=配对空或不达地板或正对照无效 / 2=帧目录不可用）"
+            echo "HOVER_DIFF_EXIT=$hd"
+            echo "  这一格的读法：0=判过并达标 / 1=配对空或不达地板或正对照无效 / 2=帧目录不可用"
             grep -E '^HOVER_DIFF ' /tmp/hoverdiff.log || { echo "HOVER_DIFF_READING_MISSING=1 尺没打结论行"; exit 1; }
             [ "$hd" -eq 0 ] || exit 1
           fi
@@ -436,8 +438,15 @@ jobs:
           # 而那一整跑本来就不会有这行 ⇒ 把 absence 当成了 judgement，正是 R588 ⑤·(a) 同一族的第二种坏法）。
           # 修法走 R242 那条老规矩：**把尺接在它被打印的那一步上** —— 在这里直接跑 CLI，读数就归 runner。
           for GUARD in scripts/tier_reporting_shape.py scripts/stage_gate_claims.py; do
+            # R591 ⓪ 现读到的真缺陷（`42167592176` 的 STEP[9] 尾）：这一步开头 `set -o pipefail` + `bash -e`，
+            # 于是工具**合法**返回 2（这台机器没对象）时，管道状态就是 2 ⇒ `set -e` 在下一行之前把整步打死，
+            # 下面那套"三种缺席分开说"的分支**从来没机会执行**（实测：`IDENTICAL_PAIR_RESULT=not-run` 印出来后
+            # 直接 `##[error]Process completed with exit code 2`，`IDENTICAL_WITNESS_EXIT=` 与 `…_NOT_RUN=1` 两行都不在）。
+            # 修法只关这一行的 pipefail：管道状态回到 tee 的 0，真实退出码仍从 PIPESTATUS[0] 取，拦路逻辑一字不改。
+            set +o pipefail
             "$PY" "$GUARD" 2>&1 | tee /tmp/guard_$(basename "$GUARD" .py).log
             g=${PIPESTATUS[0]}
+            set -o pipefail
             echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g"
             echo "  这一格的读法：rc=0 判过 / rc=1 红 / rc=2 扫描器没有对象，不许当绿"
             grep -E '^(TIER_SHAPE_|STAGE_GATE_)RESULT=' "/tmp/guard_$(basename "$GUARD" .py).log" \
@@ -451,10 +460,26 @@ jobs:
             fi
             [ "$g" -eq 0 ] || exit 1
           done
+          # R591 靶 1+2：两支新守卫同样**以 CLI 被调用**（只在测试里跑 = runner 上没有读数行，R589 那一课的第二次用）。
+          # rc=2 在这里**算红**：那一支的 2 是"扫描器没看见对象"（尺坏了），不是"这台机器没数据"——
+          # 后者是下面副本名册那一支的 2，处置相反（具名不判、绿）。两种 2 修法相反，不许并成一条。
+          for GUARD2 in scripts/ci_channel_hygiene.py scripts/ci_skipped_causes.py; do
+            set +o pipefail
+            "$PY" "$GUARD2" 2>&1 | tee /tmp/guard2_$(basename "$GUARD2" .py).log
+            g2=${PIPESTATUS[0]}
+            set -o pipefail
+            echo "SHAPE_GUARD2_EXIT guard=$GUARD2 rc=$g2"
+            echo "  这一格的读法：0=判过 / 1=红 / 2=扫描器没有对象，不许当绿"
+            grep -E '^(CI_CHANNEL_HYGIENE_RESULT|CI_SKIPPED_CAUSES_RESULT)=' "/tmp/guard2_$(basename "$GUARD2" .py).log" \
+              || { echo "SHAPE_GUARD_READING_MISSING=1 $GUARD2 没打结论行 ⇒ 这一格按未读到处理"; exit 1; }
+            [ "$g2" -eq 0 ] || exit 1
+          done
           # 副本名册这条要帧目录 ⇒ 三种"没读到"分开说，不许都算绿，也不许都算红：
           #   没有 png / 本机还没有自己的登记行 ⇒ 具名 NOT_RUN（绿，带读数）；真有红 ⇒ 红；尺崩了没打结论行 ⇒ 红。
+          set +o pipefail
           "$PY" scripts/identical_frame_witness.py --shots /tmp/shots-ci 2>&1 | tee /tmp/identical.log
           id_rc=${PIPESTATUS[0]}
+          set -o pipefail
           echo "IDENTICAL_WITNESS_EXIT=$id_rc"
           echo "  这一格的读法：rc=0 本机全部登记 / rc=1 有红 / rc=2 这台机器没对象或没自己的行"
           grep -E '^IDENTICAL_(PAIRS|PAIR_MACHINE|PAIR_RESULT|PAIR_REFUSED|PAIR_RED)' /tmp/identical.log \
@@ -474,6 +499,7 @@ jobs:
       #   报告型问的才是审计原话"和上一版比哪些帧变了"（基准 = 发布时冻结的逐版本基线）。
       # 改了界面要在同一个 commit 里跑 `scripts/frame_baseline.py update`，硬门就是这条纪律的执行器。
       - name: "Frame baseline vs working manifest (fixture-set gate)"
+        if: always()   # R591 靶 1：证据/报告型步骤必须有机会出声；被上游红连带跳过时它连一行读数都不印
         timeout-minutes: 3
         run: |
           set -o pipefail
@@ -509,6 +535,7 @@ jobs:
       # （not_run=几颗、缺哪些帧），两侧都由 scripts/tests/test_surface_left_axes.py 钉住。
 
       - name: "Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218)"
+        if: always()   # R591 靶 1：证据/报告型步骤必须有机会出声；被上游红连带跳过时它连一行读数都不印
         timeout-minutes: 2
         run: |
           set -o pipefail
@@ -524,6 +551,7 @@ jobs:
       # 基准是发布时由 prepare_release.py 冻结的 docs/frame_baselines/vX.Y.Z.json（auto 取最新一版）。
       # 报告型而不是硬门：新版本本来就该改像素，把"改了 62 帧"挡成红色只会训练人看红不看红。
       - name: "Frame baseline vs previous release (change report, report-only)"
+        if: always()   # R591 靶 1：证据/报告型步骤必须有机会出声；被上游红连带跳过时它连一行读数都不印
         continue-on-error: true
         run: |
           set -o pipefail
@@ -539,6 +567,7 @@ jobs:
       # 判定逻辑本身由 scripts/tests/test_launch_smoke.py 硬门住（上一步的 unittest 里），
       # 所以这一步红与不红都有意义：红可能是环境，但"永远绿"绝不可能是因为判据坏了。
       - name: Runtime launch smoke (report-only)
+        if: always()   # R591 靶 1：证据/报告型步骤必须有机会出声；被上游红连带跳过时它连一行读数都不印
         continue-on-error: true
         timeout-minutes: 6
         run: |

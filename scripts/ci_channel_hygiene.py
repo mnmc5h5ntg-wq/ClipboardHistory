@@ -35,6 +35,52 @@ ABS_HOME_RE = re.compile(r'/Users/[^\'"\s]*')
 # 显式放行：runner 自己的家目录（账里要引用那一台的现场）与示例名。
 SYNTHETIC_USERS = {'runner', 'example', 'demo', 'acme', 'sample'}
 
+# R591 靶 2：值槽与非 ASCII 说明粘连的形状。通道名（≥4 字全大写）之后 60 字符内，
+# 出现「值 token 紧跟全角左括号」就算 —— 值 token 包含 `%s`/`%d`/`%(k)s`/`{}`/`$var`/数字。
+# 之所以允许中间隔 60 字符：真缺陷那一行是 `NAME guard=$GUARD rc=$g（…）`，通道名与值槽之间还有别的键
+# （M1572 第一次落刀只认 `NAME=value（` ⇒ 空刀，抓到的其实是尺自己的扫描面）。
+GLUE_RE = re.compile(
+    u"[A-Z][A-Z0-9_]{3,}\\b[^\\n]{0,60}?"
+    u"(?:%[sd]|%\\([A-Za-z_]+\\)s|\\{\\}|\\$\\{?[A-Za-z_][A-Za-z0-9_]*\\}?|\\d)（")
+
+
+def _classify_glue(lit):
+    """把一处粘连分成**修法相反**的两类（R591 靶 2 的口径，别混成一句"有括号就不许"）。
+
+    · `说明` —— 括号里没有值槽，纯粹是给人看的一句话（`（0=判过 / 1=红）`、`（见上）`、`（先跑 update）`）。
+      runner 的日志通道打死的就是这一类（R590 字节级取证那两条），所以**必须 0**，修法是把说明另起一行。
+    · `读数` —— 括号里还装着 `%s`/`%d`/`$var` 这类**活读数**（`拦路=%d（缺席%d 未登记%d …）`）。
+      它同样是粘连、同样有风险，但拆它会改动台账与别的解析器引用的形状 ⇒ 本尺**具名不判**，
+      把数印出来当下界，而不是悄悄并入 0，也不是借这一格去改一批仪器的输出契约。
+    """
+    m = GLUE_RE.search(lit)
+    if not m:
+        return None
+    tail = lit[m.end() - 1:]
+    if re.search(r"%[sd]|%\([A-Za-z_]+\)s|\{\}|\$\{?[A-Za-z_]", tail):
+        return u'读数'
+    return u'说明'
+
+
+def _strings_of(node):
+    """把这个表达式里的**常量字符串**取出来（相邻字面量拼接在 AST 里已经是一个常量；
+    `+` 连接的常量我手工接上 —— 形状 4「通道名被拆到两行」就是这么住的）。"""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _strings_of(node.left), _strings_of(node.right)
+        if left and right:
+            return [a + b for a in left for b in right]
+        return left + right
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mod):
+        # `"NAME=%s（说明）" % v` —— 模板在左边，粘连就在模板里；右边的值喂进来也看不见形状。
+        return _strings_of(node.left)
+    if isinstance(node, ast.JoinedStr):            # f-string：常量片段照样能看见粘连
+        parts = [v.value for v in node.values if isinstance(v, ast.Constant)]
+        return [u"".join(parts)] if parts else []
+    return []
+
+
 
 def real_local_accounts():
     # 这台机器上**真实存在**的账号目录名（+ 当前用户）。按"存不存在"判而不是按形状判，是因为
@@ -279,6 +325,58 @@ def referenced_by_battery():
     return sorted(out)
 
 
+def channel_glue_risks(text):
+    """值槽与非 ASCII 说明**粘在同一个字段里**的形状（R591 / 靶 2：R590 那把尺只扫接线正文，python 侧没人管）。
+
+    认这几种写法，且**都要求通道名与值槽在同一份字符串里**（可以是相邻字面量拼接后的结果）：
+      · `NAME=%s（说明` / `NAME=%d（说明` / `NAME={}` / `NAME=%(k)s（`
+      · `NAME … rc=$v（说明`（名字后面还有别的键 —— M1572 第一次落刀抓到的就是这种）
+      · 全角括号一直到**字符串末尾**都没闭合
+    不判的写法具名计数，不许并进 0：动态拼出来的通道名、f-string 里的表达式。
+    """
+    hits = []
+    unjudged = 0
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return [], 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = getattr(fn, 'id', None) or getattr(fn, 'attr', None)
+        if name not in ('print', 'print_stderr', 'write'):
+            continue
+        for arg in node.args:
+            for lit in _strings_of(arg):
+                kind = _classify_glue(lit)
+                if kind:
+                    hits.append((kind, getattr(node, 'lineno', 0), lit[:110].replace('\n', ' ')))
+            if not _strings_of(arg):
+                unjudged += 1        # 参数不是常量串 ⇒ 这一格看不见，具名而不是当 0
+    return hits, unjudged
+
+
+def channel_glue_risks_workflow(text):
+    """`echo "NAME=<值>（说明）"` 的 bash 版；跨行续写的字符串具名不判（它的值槽与说明不在同一行）。"""
+    hits = []
+    unjudged = 0
+    for lineno, line in enumerate(text.split('\n'), 1):
+        s = line.strip()
+        if not s or s.startswith('#'):
+            continue
+        if 'echo' not in s and 'printf' not in s:
+            continue
+        if s.count('"') % 2:                      # 字符串在下一行继续 ⇒ 这条本尺看不见
+            unjudged += 1
+            continue
+        for m in GLUE_RE.finditer(s):
+            kind = _classify_glue(s)
+            if kind:
+                hits.append((kind, lineno, s[:110]))
+    return hits, unjudged
+
+
 def scan(paths):
     bad = []
     for rel in paths:
@@ -309,10 +407,47 @@ def scan(paths):
     return bad
 
 
+def glue_census(paths, workflow_text=None):
+    """靶 2 的扫描面 census：python 侧（名单里的 `.py`）+ bash 侧（`ci.yml` 全文的 echo/printf）。
+
+    返回 (命中, 统计)。统计里 `不判` 那一格是**下界**：f-string 表达式、动态拼的通道名、
+    跨行未闭合的 echo 字符串 —— 那些写法本尺看不见，必须印出来，否则 `命中=0` 会被读成"全仓没这形状"。
+    """
+    hits = []
+    py_files = 0
+    unjudged = 0
+    for rel in paths:
+        if not rel.endswith('.py'):
+            continue
+        full = os.path.join(ROOT, rel)
+        if not os.path.exists(full):
+            continue
+        py_files += 1
+        found, skip = channel_glue_risks(io.open(full, encoding='utf-8', errors='replace').read())
+        for kind, lineno, frag in found:
+            hits.append((kind, rel, lineno, frag))
+        unjudged += skip
+    echo_lines = 0
+    if workflow_text is not None:
+        found, skip = channel_glue_risks_workflow(workflow_text)
+        echo_lines = sum(1 for l in workflow_text.split('\n')
+                         if ('echo' in l or 'printf' in l) and not l.strip().startswith('#'))
+        for kind, lineno, frag in found:
+            hits.append((kind, '.github/workflows/ci.yml', lineno, frag))
+        unjudged += skip
+    return hits, {"py_files": py_files, "echo_lines": echo_lines, "unjudged": unjudged}
+
+
+def read(path):
+    return io.open(path, encoding='utf-8', errors='replace').read()
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog='ci_channel_hygiene.py',
-                                 description='判"会进 CI 的脚本"的两条输出契约：不许写死机器根、通道值里不许裸空格')
+                                 description='判"会进 CI 的脚本"的三条输出契约：不许写死机器根、'
+                                             '通道值里不许裸空格、值槽后面不许粘非 ASCII 说明（R591 靶 2）')
     ap.add_argument('--extra', default='', help='额外要扫的相对路径（逗号分隔，电池测试用）')
+    ap.add_argument('--workflow', default='', help='覆盖要扫的工作流正文（电池的正对照用；默认现读 ci.yml）')
     return ap
 
 
@@ -331,11 +466,41 @@ def main(argv=None):
         print('CI_CHANNEL_HYGIENE ROSTER_EMPTY=workflow-scripts=0 ⇒ 从 ci.yml 抽不出任何脚本 ⇒ 这一格没有对象，不许绿')
         return 1
     bad = scan(paths)
+    # R591 靶 2：值槽粘连这一族从前**只扫接线正文那一小段**（`test_ci_shape_guard_wiring` 里那格），
+    # python 侧与 ci.yml 其余 echo 全在同一个坏法里却没人管。这里把扫描面扩到全仓并把面印成读数。
+    wf_path = args.workflow or os.path.join(ROOT, '.github', 'workflows', 'ci.yml')
+    wf_text = read(wf_path) if os.path.exists(wf_path) else None
+    glue, gstat = glue_census(paths, wf_text)
+    prose = [g for g in glue if g[0] == u'说明']
+    census = [g for g in glue if g[0] == u'读数']
+    # **红只判有证据的那一半**：runner 日志里被别的尺**按值读**的通道（= `ci.yml` 的 echo 那一族）。
+    # 为什么不判 python 侧那 16 处（R591 现读推翻了我 R590 写的成因，逐字证据）：
+    #   含全角左括号的行 1257 行，含 U+FFFD 的行 **3 行**，而"值槽紧跟（"且**完好**的行 72 行
+    #   ⇒ 粘连不是充分原因；损坏落在 flush 边界上，而那三行恰好都是被读取器按值解析的 echo。
+    #   所以这一族的规矩按"谁要按值读"划界，不按"有没有括号"划界；脚本侧那 16 处**具名报数**而不是并入 0。
+    wf_prose = [g for g in prose if g[1].startswith('.github/workflows/')]
+    py_prose = [g for g in prose if not g[1].startswith('.github/workflows/')]
+    for kind, rel, lineno, frag in wf_prose:
+        bad.append((rel, 'channel-glue', 'L%s %s' % (lineno, frag)))
     print('CI_CHANNEL_HYGIENE ci脚本=%d 电池脚本=%d 电池引用=%d 合计=%d 绝对根=%d 真人路径=%d 通道空格=%d'
           % (len(roster), len(battery_scripts()), len(battery_refs), len(paths),
              sum(1 for b in bad if b[1] == 'abs-root'),
              sum(1 for b in bad if b[1] == 'real-home-in-script'),
              sum(1 for b in bad if b[1] == 'channel-space')))
+    print('CI_CHANNEL_GLUE_SCOPE python文件=%d echo行=%d 粘连计=%d 其中工作流echo=%d 脚本侧=%d 读数括号=%d 不判=%d 工作流=%s'
+          % (gstat['py_files'], gstat['echo_lines'], len(glue), len(wf_prose), len(py_prose),
+             len(census), gstat['unjudged'],
+             '在场' if wf_text is not None else '缺席(具名不判)'))
+    if py_prose:
+        print('CI_CHANNEL_GLUE_SCRIPT_ONLY=%d ⇒ 脚本侧的"值槽紧跟全角说明"这一族**具名不判**：'
+              'R591 在同一份 runner 日志里现读到 72 行同形状完好打印、3 行损坏，'
+              '损坏与粘连之间没有因果关系 ⇒ 判它红就是拿一个被推翻的成因逼一批仪器改输出契约' % len(py_prose))
+    if census:
+        print('CI_CHANNEL_GLUE_READING_PAREN=%d ⇒ 这些括号里装的是**后续读数**而不是说明（`拦路=%%d（缺席%%d …）` 那一族）,'
+              '同样具名不判：拆它会改动台账与其他解析器引用的形状' % len(census))
+    if gstat['unjudged']:
+        print('CI_CHANNEL_GLUE_PARTIAL=%d ⇒ 这些写法本尺看不见（f-string 表达式 / 动态通道名 / 跨行未闭合的 echo）'
+              '⇒ 上面那个「说明粘连」是**下界**，不是"全仓没这形状"' % gstat['unjudged'])
     for rel, kind, frag in bad:
         print('  %s %s %s' % (rel, kind, frag))
     if bad:

@@ -22,8 +22,12 @@ import sys
 from PIL import Image, ImageChops
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-NOW = "/tmp/r590/frames"
-PREV = "/tmp/r589/frames"
+# 这一腿每轮都要跑，所以目录不许写死在代码里（写死 = 下一轮要么改源码要么拿上一轮的读数冒充本轮）。
+# 默认仍是 R590 那一对；R591 起用 `LOOK_NOW` / `LOOK_PREV` / `LOOK_OUT` 覆盖。
+NOW = os.environ.get("LOOK_NOW", "/tmp/r590/frames")
+PREV = os.environ.get("LOOK_PREV", "/tmp/r589/frames")
+OUT = os.environ.get("LOOK_OUT", "/tmp/r590/look.txt")
+CTL = os.environ.get("LOOK_CTL", os.path.join(os.path.dirname(OUT), "look_ctl"))
 THRESH = 8          # 与既有像素尺同一口径：>8/255 才算差量
 MIN_CHANGED = 1     # 差量像素数下界（0 就是"看不见"）
 
@@ -79,7 +83,7 @@ def main():
                % (len(same), len(differ), len(absent)))
 
     # ② 正对照：尺必须看得见它声称能看见的那种差
-    ctl = "/tmp/r590/look_ctl"
+    ctl = CTL
     if not os.path.isdir(ctl):
         os.mkdir(ctl)
     src = os.path.join(NOW, now[0])
@@ -109,7 +113,7 @@ def main():
                            "compare", NOW, "--against", "working"],
                           cwd=ROOT, capture_output=True, text=True).stdout
     changed = re.findall(u"^  changed  (\\S+\\.png)$", gate, re.M)
-    out.append(u"LOOK_GATE_CHANGED 门报变帧=%d（本轮与 R589 之间没有一张变帧重复出现在差集里=%s）"
+    out.append(u"LOOK_GATE_CHANGED 门报变帧=%d（本轮与上一批之间没有一张变帧重复出现在差集里=%s）"
                % (len(changed), not (set(changed) & set(differ))))
     # 变帧是"这一轮 vs 基线"，基线是 R586 之前烤的那一份；逐张给包围盒与差量像素
     baseline_dir = os.path.join(ROOT, "docs", "frame_baselines")
@@ -128,7 +132,7 @@ def main():
                        % (n, tier_of(n), box, px, ok_size))
     out.append(u"LOOK_WHOLE_FRAMES_TO_OPEN " + u" ".join(now[:2]) )
     text = u"\n".join(out)
-    io.open(u"/tmp/r590/look.txt", u"w", encoding=u"utf-8").write(text + u"\n")
+    io.open(OUT, u"w", encoding=u"utf-8").write(text + u"\n")
     print(text)
     return 0
 

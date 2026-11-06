@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### skipped 拆成甲乙、值槽粘连按谁按值读划界、接线判据卷补上 `bash -e`（R591 / 第 590 轮 / Round 588 · 2026-11-06）
+
+- `.github/workflows/ci.yml`：STEP[11]–[14] 与 `Release script tests` 各加 `if: always()`（证据步骤必须有机会出声；
+  硬门一条没降级）；三处工具调用用 `set +o pipefail` / `set -o pipefail` 括起来 —— 从前工具**合法**返回 2 时
+  `bash -e` 在取 `PIPESTATUS[0]` 之前就把整步打死，"三种缺席分开说"从来没执行（`42167592176` 现读 `exit code 2`）。
+- `scripts/ci_skipped_causes.py`（新）+ `docs/ci_evidence_step_exemptions.json`（新，4 行带理由）：
+  `static` 判"证据型步骤没出声的机会"，`run` 判"skipped 而台账没给成因名字"；空豁免与不命中的豁免都算红。
+- `scripts/ci_channel_hygiene.py`：值槽粘连的扫描面从接线正文扩到全仓（`CI_CHANNEL_GLUE_SCOPE`），
+  认四种形状（含通道名被拆到两行），并**分成两类各报数**：工作流 echo 拦路、脚本侧与读数括号具名不判
+  （同形状 72 行完好、3 行损坏 ⇒ 粘连不是充分原因，R590 那条成因本轮推翻）。
+- `scripts/tests/test_ci_shape_guard_wiring.py`：harness 改 `set -eo pipefail` 与 runner 同语义；粘连尺改为调用共享函数
+  （一处定义）；`scripts/tests/test_ci_skipped_causes.py`（新卷 16 格）。
+- 顺带修的既有输出契约：`ci_capture_gate.py` / `ci_red_stability.py` / `commit_round_identity.py` /
+  `stage_gate_claims.py` 四条通道的说明从值槽里挪到另起一行；`ci.yml` 里 5 条 echo 同形（含 `HOVER_DIFF_EXIT`）。
+- 产品 0 文件；帧名单与四张按机器登记的表一字未动；`update` 一次没跑。
+
 ### 兜底要出声、扫描面要报数、runner 打回的三条错位各配一把刀（R590 / 第 589 轮 / Round 587 · 2026-11-06）
 
 - `scripts/tier_reporting_shape.py`：R3 的 `closed` 从「有没有 `else`」改判为「兜底那一支出不出声」

@@ -114,6 +114,89 @@ class CiChannelHygieneTests(unittest.TestCase):
         line = 'CI_CHANNEL_HYGIENE ci脚本=1 电池脚本=0 合计=1 绝对根=0 真人路径=0 通道空格=1'
         self.assertEqual(1, sum(1 for b in bad if b[1] == 'channel-space'), line)
 
+    # ———————————————————————————————————————————— R591 靶 2：值槽粘连（全仓扫描面）
+    def test_glue_positive_control_covers_four_shapes(self):
+        """四种形状都要认得出（R590 那把尺只认第一种 ⇒ M1572 当场空刀）。
+
+        ① `NAME=%s（说明）` 值槽紧跟格式槽；② 名字后面还有别的键、粘连在第二个键上（bash 的那两行）；
+        ③ 全角括号一直到**字符串末尾**都没闭合；④ 通道名被拆到两行（相邻字面量 / `+` 拼接）。
+        """
+        a = 'print("FOO_RESULT=ok 红=%s（见上）" % n)\n'
+        b = 'echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g（0=判过）"\n'
+        c = 'print("FOO_RESULT=ok 红=%s（说明没有右括号"\n      % n)\n'
+        d = ('print("FOO_" "RESULT=ok 红=%s（粘在拼接后的名字上）" % n)\n'
+             'print("BAR_" + "RESULT=1（+ 号拼接也要接得上）")\n')
+        for name, src in ((u'①', a), (u'③', c), (u'④', d)):
+            hits, unjudged = chi.channel_glue_risks(src)
+            self.assertTrue(hits, u"%s 那种粘连没被抓到 ⇒ 命中=0 是尺盲，不是仓库干净（不判=%d）" % (name, unjudged))
+        hits_b, _u = chi.channel_glue_risks_workflow(b)
+        self.assertTrue(hits_b, u'② bash 的「名字后面还有别的键」那一形没被抓到（M1572 第一次空刀就是这个）')
+
+    def test_glue_negative_control_legit_paren_is_not_a_channel(self):
+        """负对照：没有通道名的括号、以及值与说明之间**有空格**的写法都不许算。
+
+        否则这条门会退化成"禁止一切全角括号"，而真正打死 runner 日志的是"值槽与说明之间没有分隔"。
+        """
+        prose = 'print("这一格（说明）已经写完了")\n'
+        self.assertEqual([], chi.channel_glue_risks(prose)[0], u'纯说明里的括号被当成了通道粘连')
+        spaced = 'echo "IDENTICAL_WITNESS_NOT_RUN=1 这一维在 runner 上今天没人判"\n'
+        self.assertEqual([], chi.channel_glue_risks_workflow(spaced)[0], u'值后面是空格 + 散文，不该算粘连')
+
+    def test_glue_unjudged_is_a_named_lower_bound(self):
+        """看不见的那部分要**具名计数**：动态参数 / f-string 表达式 ⇒ 命中=0 只是下界。"""
+        src = ('msg = build_text()\n'
+               'print(msg)\n'
+               'print(f"FOO_RESULT={v}")\n')
+        hits, unjudged = chi.channel_glue_risks(src)
+        self.assertEqual([], hits)
+        self.assertGreaterEqual(unjudged, 1, u'看不见却报 0 ⇒ 与 R587「门的 0 分不清没有与看不见」同族')
+
+    def test_glue_scope_is_printed_and_the_enforceable_half_is_clean(self):
+        """扫描面要当**读数**印出来（python 文件数 + echo 行数 + 三类计数），且"要拦的那一半"现读为 0。
+
+        R591 的划界（逐字证据写在守卫正文里）：同一份 runner 日志里 1257 行含全角括号、
+        只有 3 行被打坏，而**同形状完好**的有 72 行 ⇒ 粘连不是充分原因。
+        所以红只判 `ci.yml` 的 echo（那些值被读取器**按值解析**的通道），脚本侧那批**具名报数**，
+        既不并入 0，也不借一个被推翻的成因去改一批仪器的输出契约。
+        """
+        code, out = run_tool()
+        self.assertIn('CI_CHANNEL_GLUE_SCOPE', out, out[-800:])
+        scope = [l for l in out.splitlines() if l.startswith('CI_CHANNEL_GLUE_SCOPE')][0]
+        import re as _re
+        got = dict(_re.findall(r'(\S+?)=(\d+)', scope))
+        self.assertGreater(int(got['python文件']), 50, scope)
+        self.assertGreater(int(got['echo行']), 20, scope)
+        self.assertGreater(int(got['粘连计']), 0, scope)      # 尺必须有对象，否则 0 不算数
+        self.assertEqual('0', got['其中工作流echo'], out[-1200:])
+        if int(got['脚本侧']):
+            self.assertIn('CI_CHANNEL_GLUE_SCRIPT_ONLY=', out,
+                          u'脚本侧有命中却不具名报数 ⇒ 会被读成"全仓没这形状"')
+        if int(got['读数括号']):
+            self.assertIn('CI_CHANNEL_GLUE_READING_PAREN=', out, u'读数括号那一族没印出来 ⇒ 并入 0 了')
+        if int(got['不判']):
+            self.assertIn('CI_CHANNEL_GLUE_PARTIAL=', out, u'有看不见的那部分却不印下界')
+        self.assertEqual(0, code, out[-1200:])
+
+    def test_glue_red_scope_is_the_workflow_echoes(self):
+        """要拦的那一半要有牙：往工作流正文里塞一条 `NAME=$v（说明）` ⇒ 必须进 bad 并退红。"""
+        d = tempfile.mkdtemp(prefix="r591_glue_")
+        os.makedirs(os.path.join(d, '.github', 'workflows'))
+        wf = os.path.join(d, 'workflows.yml')
+        with open(wf, 'w', encoding='utf-8') as handle:
+            handle.write('      - name: X\n        run: |\n'
+                         '          echo "SHAPE_GUARD_EXIT guard=$GUARD rc=$g（0=判过）"\n')
+        code, out = run_tool('--workflow', wf)
+        self.assertEqual(1, code, out[-1500:])
+        self.assertIn('channel-glue', out, out[-1500:])
+        self.assertIn('CI_CHANNEL_HYGIENE_RESULT=red', out)
+
+    def test_the_wiring_cell_and_this_scanner_share_one_ruler(self):
+        """一把尺只许有一处定义（R324 那条）：接线卷那一格不许再自带第二条正则。"""
+        text = open(os.path.join(HERE, 'test_ci_shape_guard_wiring.py'), encoding='utf-8').read()
+        self.assertNotIn("GLUE_LOCAL", text)
+        self.assertIn('channel_glue_risks_workflow', text,
+                      u'接线那一格还在用自己的正则 ⇒ 两处定义会各自漂移')
+
 
 if __name__ == '__main__':
     unittest.main()

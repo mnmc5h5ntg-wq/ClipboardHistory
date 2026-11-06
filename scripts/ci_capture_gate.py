@@ -322,8 +322,10 @@ def main(argv=None) -> int:
               f"少的都是连续大块、切点落在行中间）。"
               f"上面那些结论可能已经少了若干条，只是看不出来", flush=True)
         return 1
-    print(f"{args.label}_GATE_RESULT=ok 红=0（已登记的 NOT-RUN 见上）"
+    print(f"{args.label}_GATE_RESULT=ok 红=0"
           f"{'' if scope_all else ' scope=' + ','.join(prefixes)}", flush=True)
+    # R591 靶 2：值槽后面不许粘非 ASCII 说明（runner 的日志通道会把那一段整体弄坏，R590 实测字节级取证）
+    print("  这一格的读法：已登记的 NOT-RUN 见上", flush=True)
     return 0
 
 

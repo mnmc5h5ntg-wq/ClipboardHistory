@@ -131,7 +131,8 @@ def main(argv: list[str] | None = None) -> int:
     for line in bad:
         print("  " + line)
     if not commits:
-        print("COMMIT_ROUND_IDENTITY_RESULT=red 原因=笔=0（一条都没判到，不许读成全绿）")
+        print("COMMIT_ROUND_IDENTITY_RESULT=red 原因=笔=0")
+        print("  这一格的读法：一条都没判到，不许读成全绿")
         return 1
     if bad:
         print("COMMIT_ROUND_IDENTITY_RESULT=red")

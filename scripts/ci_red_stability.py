@@ -104,7 +104,8 @@ def main():
         a_rows = rows_from_file(args[1])
         b_rows = rows_from_file(args[2])
         if a_rows is None or b_rows is None:
-            print("RED_STABILITY_UNREADABLE=1（有一份日志读不到 ⇒ 这不叫『没有红』）")
+            print("RED_STABILITY_UNREADABLE=1")
+            print("  这一格的读法：有一份日志读不到 ⇒ 这不叫『没有红』（R591 靶 2：说明另起一行）")
             return 2
         return compare(a_rows, b_rows, os.path.basename(args[1]), os.path.basename(args[2]))
     if len(args) != 2:
@@ -113,7 +114,8 @@ def main():
     a_rows = rows_from_run(args[0])
     b_rows = rows_from_run(args[1])
     if a_rows is None or b_rows is None:
-        print("RED_STABILITY_UNREADABLE=1（有一份 run 的日志下载不到 ⇒ 这不叫『没有红』）")
+        print("RED_STABILITY_UNREADABLE=1")
+        print("  这一格的读法：有一份 run 的日志下载不到 ⇒ 这不叫『没有红』")
         return 2
     return compare(a_rows, b_rows, args[0], args[1])
 

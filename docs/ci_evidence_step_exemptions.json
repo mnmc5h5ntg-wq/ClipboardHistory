@@ -1,0 +1,27 @@
+{
+ "schema": 1,
+ "note": "R591 靶 1：证据型步骤（正文会印通道串）若没有 `if: always()`，必须在这里有一条**带理由**的豁免。理由为空、名字对不上现读的证据型步骤、或那一步其实已经带 always() ⇒ 门报 red（名册不许当垃圾桶：R587 那条「豁免必须真会命中」的同形规矩）。",
+ "index_caveat": "本名册按步骤**名字**对账，不按序号 —— ci.yml 里 `- name:` 的顺序号与 GitHub 日志里的 STEP[N] 相差 2（后者含 Set up job 与一个隐藏步），所以任何按序号写的豁免都会在下一步改名时腐烂。",
+ "rows": [
+  {
+   "name": "Offscreen frame capture (report-only, gated below)",
+   "reason": "它吃的是第 2 步 Build 的产物；Build 红时没有可抓的 app ⇒ 出声也没有对象。真正拦路的硬门在后面的 Capture gate（已带 if: always()），读数不会因此丢失。",
+   "registered_by_round": "R591"
+  },
+  {
+   "name": "On-screen interaction probes (report-only)",
+   "reason": "探针要启动那份产物；产物不在就没有对象。缺席由后面的 On-screen probe coverage floor（带 if: always()）具名报出来。",
+   "registered_by_round": "R591"
+  },
+  {
+   "name": "Motion filmstrip (report-only)",
+   "reason": "胶片要吃产物与录制路径；Build 红时强跑只会造出第二种红（假红）。硬门在 Motion gate 与 Motion coverage floor（都带 if: always()）。",
+   "registered_by_round": "R591"
+  },
+  {
+   "name": "Pillow for the frame rulers (venv · R218 / BACKLOG 237, moved before the battery in R223)",
+   "reason": "环境准备步：它自己 continue-on-error，印出的三条只是「装不上」的三种成因；下游 @NEEDS_PIL 的格子按 PIL 缺席具名 skip ⇒ 这一步没有「本轮结论」可丢。",
+   "registered_by_round": "R591"
+  }
+ ]
+}

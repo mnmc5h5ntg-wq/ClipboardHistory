@@ -224,7 +224,8 @@ def main(argv=None):
     if reds:
         print(u"STAGE_GATE_RESULT=red 拦路=%d" % len(reds))
         return 1
-    print(u"STAGE_GATE_RESULT=ok 无证断言=0（本轮没有段号形状的断言，或有断言而两个证人齐）")
+    print(u"STAGE_GATE_RESULT=ok 无证断言=0")
+    print(u"  这一格的读法：本轮没有段号形状的断言，或有断言而两个证人齐")
     return 0
 
 

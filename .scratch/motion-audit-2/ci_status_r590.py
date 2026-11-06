@@ -86,8 +86,8 @@ def step_conclusions(run):
     return got
 
 
-def fetch_log(run):
-    log = os.path.join(TMP, "log_%s.txt" % run)
+def fetch_log(run, tmp=None):
+    log = os.path.join(tmp or TMP, "log_%s.txt" % run)
     if os.path.exists(log) and os.path.getsize(log) > 0:
         return log
     fetch = subprocess.Popen([u"gh", u"run", u"view", run, u"--log"], cwd=ROOT,
@@ -117,8 +117,10 @@ def lines_in_step(log, step_needle, prefixes):
             continue
         if parts[1] == u"UNKNOWN STEP":
             degraded = True
-        body = re.sub(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*", u"", parts[2]).strip()
-        body = re.sub(u"\x1b\\[[0-9;]*m", u"", body)
+        body = re.sub(r"^\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*", u"", parts[2])
+        # **先剥 ANSI 再锚定**：runner 的行是 `<时间戳>Z ^[[37;1mFAIL: …`，
+        # 带着色码去 `startswith("FAIL:")` 会恒假 ⇒ 空集合让"红名少掉三条"变成**空真**（R591 ⓪ 实测到的一处假中）。
+        body = re.sub(u"\x1b\\[[0-9;]*m", u"", body).strip()
         for p in prefixes:
             if body.startswith(p):
                 per[p] = per.get(p, 0) + 1

@@ -30,20 +30,37 @@ CI = os.path.join(REPO, '.github', 'workflows', 'ci.yml')
 
 import json  # noqa: E402
 sys.path.insert(0, os.path.join(REPO, 'scripts'))
+from ci_channel_hygiene import channel_glue_risks_workflow  # noqa: E402  ← R591 靶 2：一把尺只在一处定义
 from frame_baseline import machine_key  # noqa: E402
 START = 'for GUARD in scripts/tier_reporting_shape.py'
 END = 'IDENTICAL_WITNESS_NOT_RUN=1'
 
-# 本轮新印出来的名字（派单第三件事①逐条列的九个）
+# 本轮新印出来的名字（派单第三件事①逐条列的九个 + R591 两支新守卫的名字）
 NEW_NAMES = (u'SHAPE_GUARD_EXIT', u'SHAPE_GUARD_READING_MISSING', u'TIER_BRANCH_BLIND',
              u'TIER_BRANCH_NOT_JUDGED', u'IDENTICAL_WITNESS_EXIT', u'IDENTICAL_WITNESS_NOT_RUN',
              u'IDENTICAL_WITNESS_READING_MISSING', u'REALSCREEN_OUTCOME_VERDICT',
-             u'REALSCREEN_NOT_RUN')
+             u'REALSCREEN_NOT_RUN',
+             # R591：值槽粘连的扫描面 / skipped 的两种成因
+             u'SHAPE_GUARD2_EXIT', u'CI_CHANNEL_GLUE_SCOPE', u'CI_CHANNEL_GLUE_SCRIPT_ONLY',
+             u'CI_CHANNEL_GLUE_READING_PAREN', u'CI_CHANNEL_GLUE_PARTIAL', u'CI_CHANNEL_HYGIENE_RESULT',
+             u'CI_SKIPPED_CAUSES', u'CI_SKIPPED_CAUSES_RESULT', u'CI_SKIPPED_NOT_JUDGED',
+             u'CI_EVIDENCE_STEP_SKIPPABLE', u'CI_EVIDENCE_EXEMPT_DEAD', u'CI_EVIDENCE_EXEMPT_BADROW')
 # 由脚本自己印的那些：必须能在脚本源码里找到（找不到就是"印了一个没人产出的名字"）
 PRINTED_BY = {
     u'TIER_BRANCH_NOT_JUDGED': u'scripts/tier_reporting_shape.py',
     u'REALSCREEN_OUTCOME_VERDICT': u'scripts/real_screen_control_chroma.py',
     u'REALSCREEN_NOT_RUN': u'scripts/real_screen_control_chroma.py',
+    u'CI_CHANNEL_GLUE_SCOPE': u'scripts/ci_channel_hygiene.py',
+    u'CI_CHANNEL_GLUE_SCRIPT_ONLY': u'scripts/ci_channel_hygiene.py',
+    u'CI_CHANNEL_GLUE_READING_PAREN': u'scripts/ci_channel_hygiene.py',
+    u'CI_CHANNEL_GLUE_PARTIAL': u'scripts/ci_channel_hygiene.py',
+    u'CI_CHANNEL_HYGIENE_RESULT': u'scripts/ci_channel_hygiene.py',
+    u'CI_SKIPPED_CAUSES': u'scripts/ci_skipped_causes.py',
+    u'CI_SKIPPED_CAUSES_RESULT': u'scripts/ci_skipped_causes.py',
+    u'CI_SKIPPED_NOT_JUDGED': u'scripts/ci_skipped_causes.py',
+    u'CI_EVIDENCE_STEP_SKIPPABLE': u'scripts/ci_skipped_causes.py',
+    u'CI_EVIDENCE_EXEMPT_DEAD': u'scripts/ci_skipped_causes.py',
+    u'CI_EVIDENCE_EXEMPT_BADROW': u'scripts/ci_skipped_causes.py',
 }
 
 
@@ -59,7 +76,8 @@ def step_body(path=CI):
     lines = [l[10:] if l.startswith(u" " * 10) else l.lstrip() for l in raw.split(u"\n")]
     body = u"\n".join(lines)
     for token in (u"tier_reporting_shape.py", u"stage_gate_claims.py", u"identical_frame_witness.py",
-                  u"SHAPE_GUARD_EXIT", u"IDENTICAL_WITNESS_EXIT"):
+                  u"SHAPE_GUARD_EXIT", u"IDENTICAL_WITNESS_EXIT",
+                  u"ci_channel_hygiene.py", u"ci_skipped_causes.py", u"SHAPE_GUARD2_EXIT"):
         if token not in body:
             raise AssertionError(u"抽出来的正文里没有 %s ⇒ 抽取边界漂了" % token)
     return body
@@ -104,26 +122,19 @@ class BashShapeTests(unittest.TestCase):
             `rc=\xef\xbf\xbd\xef\xbf\xbd0=判过 / 1=红 / …`
         而脚本源码里那一行是 `rc=$g（0=判过 …）` ⇒ 值槽与非 ASCII 说明粘在一起时，runner 的日志通道
         会把这一段整体弄坏（R565 那条规矩的 bash 版：值槽只放一个词，说明另起一行）。
-        本格判的是**接线正文里**这个形状，不是 python 源码 —— 所以扫描对象是 step_body()。
+        本格判的是**接线正文里**这个形状；R591 靶 2 把尺本身搬到 `ci_channel_hygiene.py`
+        （`channel_glue_risks_workflow` / `channel_glue_risks` ⇒ 全仓扫描面 + 看不见的那部分具名下界），
+        这里只调用、不再自带第二条正则 —— 两处定义会各自漂移（R324 那条老规矩）。
         """
-        # M1572 那一趟**先把这把尺的盲区抓了出来**：第一版只认 `NAME=value（`，
-        # 而刀落在 `SHAPE_GUARD_EXIT guard=$GUARD rc=$g（` —— 值槽在第二个键上、名字后面还有别的键，
-        # 于是刀 PASSED（空刀）。runner 上被打死的正是这两条，所以尺必须认"整行"而不是"名字后面紧跟 ="。
-        def glued(text):
-            out = []
-            for line in text.splitlines():
-                # 通道名后面**不一定紧跟 =**（`SHAPE_GUARD_EXIT guard=… rc=…` 就是两个键），
-                # 所以这里按"名字 + 词边界"锚，再把整行余下的部分拿去判。
-                m = re.search(r'echo "([A-Z][A-Z0-9_]{3,})\b', line)
-                if not m:
-                    continue
-                if re.search(r'(\$[A-Za-z_][A-Za-z0-9_]*|\d)（', line[m.end():]):
-                    out.append(m.group(1))
-            return out
-        self.assertEqual([u'X_EXIT', u'Y_EXIT'],
-                         glued(u'echo "X_EXIT=$v（0=ok）"\n  echo "Y_EXIT guard=$g rc=$g（0=ok）"'),
-                         u"正对照：两种形状（值槽紧跟名字 / 名字后还有别的键）都要认得出，否则本格的 0 不算数")
-        self.assertEqual([], glued(self.body), u"接线正文里有通道把说明粘在值槽上 ⇒ runner 上读不到值")
+        hits, _unjudged = channel_glue_risks_workflow(self.body)
+        self.assertEqual([], hits, u'接线正文里有通道把说明粘在值槽上 ⇒ runner 上读不到值：%s' % (hits,))
+        self.assertGreaterEqual(
+            len(channel_glue_risks_workflow(u'echo "X_EXIT=$v（0=ok）"\n')[0]), 1,
+            u"正对照：这把尺必须认得出坏写法（否则本格的 0 不算数）")
+        # 名字后面还有别的键那一形（M1572 第一次落刀抓到的是尺自己的盲）
+        self.assertGreaterEqual(
+            len(channel_glue_risks_workflow(u'echo "Y_EXIT guard=$g rc=$g（0=ok）"\n')[0]), 1,
+            u"尺退回「名字紧跟 =」那一版时，第二个键上的粘连就看不见 ⇒ 这一格要响")
 
     def test_the_three_guards_are_invoked_as_cli_not_only_from_tests(self):
         """本轮的根因就是「守卫只在测试里被调用 ⇒ print 被 StringIO 吞在测试里」。
@@ -134,6 +145,13 @@ class BashShapeTests(unittest.TestCase):
         self.assertIn(u'"$PY" "$GUARD"', self.body, u"for 循环里的调用被改写 ⇒ 接线漂了")
         self.assertIn(u'"$PY" scripts/identical_frame_witness.py --shots /tmp/shots-ci',
                       self.body, u"副本名册那条没有以 CLI 被调用")
+        # R591：两支新守卫也要以 CLI 被调用 —— 只在电池里跑的话，`run_main()` 会把它们的 print 吞进 StringIO，
+        # runner 上就又变成"没有读数行"（R589 那一课的第二次复发预防）。
+        self.assertIn(u'for GUARD2 in scripts/ci_channel_hygiene.py scripts/ci_skipped_causes.py;',
+                      self.body, u"R591 那两支守卫不再以 CLI 被调用 ⇒ runner 上没有它们的读数行")
+        self.assertIn(u'"$PY" "$GUARD2"', self.body, u"GUARD2 循环里的调用被改写 ⇒ 接线漂了")
+        self.assertIn(u'[ "$g2" -eq 0 ] || exit 1', self.body,
+                      u"GUARD2 的 rc 不再拦路 ⇒ 把硬门降级成了只报数（派单明令不许）")
 
 
 class ExecutionTests(unittest.TestCase):
@@ -154,7 +172,10 @@ class ExecutionTests(unittest.TestCase):
                                  u'--shots "%s" --roster "%s" ' % (shots, roster))
             assert u"--roster" in body, u"替换没命中 ⇒ 正文的调用形状变了，这一格没有对象"
         path = os.path.join(self.dir, "step.sh")
-        io.open(path, "w", encoding="utf-8").write(u'PY="%s"\nset -o pipefail\n%s\n' % (sys.executable, body))
+        # **必须照 GitHub 默认的 shell 来**：runner 那一步是 `bash -e {0}` ⇒ 这里也得 `-e`。
+        # R591 ⓪ 现读到的真缺陷就是这么漏掉的：正文里 `set -o pipefail` 我抄了、`-e` 没抄，
+        # 于是工具**合法**返回 2 时本机继续跑下面的分支，runner 却直接 `exit code 2` 把整步打死。
+        io.open(path, "w", encoding="utf-8").write(u'PY="%s"\nset -eo pipefail\n%s\n' % (sys.executable, body))
         proc = subprocess.run([u"bash", path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=REPO)
         return proc.returncode, proc.stdout.decode("utf-8", "replace")
 
