@@ -191,10 +191,12 @@ def rung_from_readings(text, machine):
         return (['RUNG_STEP_EMPTY=1 日志里一行 PRESS_LADDER_PROOF 都没有 ⇒ 这台机器没量到按下档，'
                  '不许在空名单上给绿（R99）'], 1)
     rows, rc = [], 0
+    missing_tiers = []
     for tag in TIERS:
         groups = per.get(tag)
         if not groups:
             rc = 1
+            missing_tiers.append(tag)
             rows.append('RUNG_STEP_INCOMPLETE %s 档没有按下态读数 ⇒ 两档对照不存在，'
                         '不许只按有读数的那档下结论' % tag)
             continue
@@ -225,6 +227,11 @@ def rung_from_readings(text, machine):
                     '｜悬停对底=%s 按下对底=%s｜步骤=%d(%s)｜判定=只印不判（305：地板要两机各读一次才推）'
                     % (machine, tag, d['hover'], d['press'], d['bg'], signed_ratio, d['r0'], d['r1'],
                        len(signed), ' ; '.join(sorted({s[1] for s in signed}))[:60]))
+    if missing_tiers:
+        # 「各自点名」之外还要**数得出来**：这一格是 R588 靶 3 那条守卫认的可数缺席格。
+        rows.append('RUNG_STEP_TIER_COVERAGE not-run=%d 缺按下态读数的档=%s ⇒ 两档对照今天只判了 %d 档，'
+                    '不许读成两档都对照过'
+                    % (len(missing_tiers), ','.join(missing_tiers), len(TIERS) - len(missing_tiers)))
     return rows, rc
 
 

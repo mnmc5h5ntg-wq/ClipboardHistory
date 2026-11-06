@@ -199,6 +199,9 @@ def main(argv=None):
 
     import os
     pairs = []
+    stops = 0
+    # 每一档的"帧没到"必须**各自点名**：上一版在这里 `return 1`，于是缺席的那一档能不能被点名
+    # 取决于词表里谁排在前面（R587 在 `heatmap_frame_levels.py` 上修的是同一族，本轮现读全仓还剩这一处）。
     for shade in TIERS:
         idle = os.path.join(args.frames_dir, "%s-720x540-%s.png" % (args.basename, shade))
         recording = os.path.join(args.frames_dir, "%s-720x540-%s.png" % (args.recording, shade))
@@ -206,7 +209,8 @@ def main(argv=None):
         if missing:
             print("FRAME_STATE_NOT_RUN=%s 读不到帧：%s ⇒ 这一格**没量过**，不是"
                   "『量了没问题』" % (shade, ",".join(missing)))
-            return 1
+            stops += 1
+            continue
         pairs.append((shade, idle, recording))
 
     readings, all_ok = {}, True
@@ -226,6 +230,12 @@ def main(argv=None):
     if args.json_out:
         with io.open(args.json_out, "w", encoding="utf-8") as handle:
             handle.write(json.dumps(readings, ensure_ascii=False, sort_keys=True))
+    if stops:
+        # 有一档的帧没到 ⇒ 结论行不许写 ok，也不许只报判过的那一档"没问题"；`not-run=` 是**可数**的那一格。
+        print("FRAME_STATE_STOPS not-run=%d 有 %d 档的帧没到 ⇒ 这一维今天只判了 %d 档，"
+              u"不许读成两档都过了" % (stops, stops, len(pairs)))
+        print("FRAME_STATE_RESULT=not-run pairs=%d" % len(pairs))
+        return 1
     print("FRAME_STATE_RESULT=%s pairs=%d" % ("ok" if all_ok else "red", len(pairs)))
     return 0 if all_ok else 1
 

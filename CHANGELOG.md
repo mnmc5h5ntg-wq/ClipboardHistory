@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 台账的话也要有证人：第③段断言守卫 + 档位缺席逐档点名且可数 + 名册 8 张暗档逐张看整帧（R588 / 第 587 轮 / Round 585，产品 0 文件）
+    R587 的台账写着「段号=③」「段号仍是第②③段」，收口自陈写着「§3 第②③段各落一件」—— 那是假的：
+    那一笔 `Sources/` 为空、`STAGE2_CLICKTHROUGH_BLOCKED` 与 `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS` 一条没撤、
+    规格 §3 那句「三问仍未全过 ⇒ 第③段继续不开工」未划掉。根因不是笔误，是 **STATE 的正文小节编号（⓪①②…）
+    与规格 §3 的段号同字**。本轮：① 新增 `scripts/stage_gate_claims.py` —— 冒充段号一律红、
+    「第③段已开工/落地/完成」必须同时有「三问全过」+「阻塞已撤」两个证人，判最新那一轮（主节 + 补记节并起来判），
+    切不出节就不判并点名；`--section R587` 把「这条守卫抓得住当年那句假话」钉成永久读数；
+    ② 新增 `scripts/tier_reporting_shape.py` —— AST 扫每一支活仪器，R1 档位循环体里不许 `return`、
+    R2 缺席必须可数（`not-run=`），扫不到循环就退 2；现读 HEAD 那一侧「3 处循环 / 1 处带 return / 2 处无可数格」，
+    据此修掉 `frame_recording_proof.py`（缺帧不再短路，新增 `FRAME_STATE_STOPS not-run=N` 与
+    `FRAME_STATE_RESULT=not-run`）与 `hover_two_state_diff.py`（补 `RUNG_STEP_TIER_COVERAGE not-run=N`）；
+    ③ 看图那一腿把名册 16 行里的 **8 张暗档逐张看整帧**，每帧三格（包围盒 / 差量颗数 / 肉眼所见），
+    差量一律同时报 `bbox(RGBA 直取)=None` 与 `bbox(convert L)` ⇒ 659 认过的那条形状在本批是**实测**，
+    三把正对照（42195 / 46625 / 1496422 颗）先证明尺不瞎，「看不见」才算读数。
+    顺带量到一条新事实：`quickpick-search-focus` 与 `quickpick-search-hover` 两档都是**逐字节同一张**
+    （暗 `b38dfe662854`、亮 `e27c77479ac4`）⇒ 夹具注释（R415「与 hover 同一档视觉，取证键分开」）与两条判据
+    各自比「抬起 vs 静置」都在 ⇒ **设计内同档，不开新单**，但这条事实第一次进账。
+    本机现读（含本笔的树）：`FRAME_BASELINE_DRIFT 本机=local:MacBook-Air.local 基线署名=local:MacBook-Air.local 判=判 变帧=16 新帧=0 本机行=16 他机行=0 名册对不上帧名=0 名册空理由或空单号=0 名册缺机器=0 名册无出处=0 出处对不上=0 已登记=16 未登记=0 陈旧行=0` ⇒ `FRAME_BASELINE_RESULT=ok 拦路=0（缺席0 未登记0 对不上0 缺字段0 缺机器0 无出处0 出处不符0 同批0）`；逐字节 `BYTE_COMPARE R587↔R588 同名=356 逐字节相同=356 不同=0 only_r587=0 only_r588=0`。
+    判据卷 +27 格（两支守卫各 18 与 9 格；这一格落盘时取的是 +24，之后又补了三格对照 ⇒ 两个时刻都记），刀 M1555/M1556 全 CAUGHT（互不重叠 ⇒ 两条判据各摘一边），
+    M1557–M1559 三把归**补记那一笔**（它们的预检读的是台账自己，本笔之前落不下）；⓪ 两跑都未到数 ⇒ 三条预测一条不判。
+    655/656/658/659/660/661 一条没结、出路一条不代选；本轮没开新单。
+
 ### 倍率报成分布、档位收成一份词表、印出去的命令由参数表认（R587 / 第 586 轮 / Round 584，产品 0 文件）
     R586 给基线补了「哪一笔烤的」，但倍率那一格仍是**取众数**：`max(set(ratios), key=ratios.count)` 没有并列检测，
     355 张 2x + 1 张 1x 照样印 `2.00x`，两档各半时印的是 `set` 遍历顺序决定的那一个；`bad` 算完被 `_bad` 丢掉。
