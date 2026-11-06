@@ -483,6 +483,62 @@
    没动用户的 Dock 与登录项（那条是人工验收批次 91.1）；帧与日志不含用户真实剪贴板原文。
    §3 第③段仍不开工：两条具名阻塞一字未撤、规格里「三问全过」出现 0 次、`STAGE_GATE_CLAIMS` 现读无证断言=0。
 
+## R593 补记（第 592 轮 / Round 590 · 产品 2 文件）：⓪ 主笔那一跑 `42227982898 ↔ c08d432` 此刻 `in_progress` ⇒ 未到数；落盘后六扇门复算、三条新守卫各带一行、电池四趟（第四趟=本补记落盘之后）
+
+⓪·1 **本轮主笔的成对号（push 之后一次现取，不预测、不轮询）**：
+    逐字 `RUN=42227982898 sha=c08d432 status=in_progress conclusion= title=R593：√2 不变量补上「放得下」那一半 + 三条纪律做成会红的守卫（第 592 轮 / Round 590 · 产品 workflow=CI`
+    取值时刻 `2026-11-06 21:47:34` ⇒ `status=in_progress` ⇒ **未到数**。
+    进行中的 job 打 `--log` 得 0 字节是**通道还没内容**，不是**内容里没有**（R590 ⑨·6 判错过一次），
+    所以 `PREDICTIONS_R594` 那五条今天一条都不判，只登记「该由 R594 去读」。
+⓪·2 **本补记笔自己那一跑** ⇒ `RUN_UNFETCHED=这一笔落地时尚不存在`（改账那一笔的跑签不了自己）。
+    这一格与 ⓪·1 是两种不同的账：⓪·1 是"取了还没到"，⓪·2 是"还没取"。
+⓪·3 **R594 的 ⓪ 要读的六格**（标签、判法、取处、通道四格齐，逐字在 `ci_status_r593.py` 的 `PREDICTIONS_R594`，由脚本判）：
+    ①主笔 `42227982898 ↔ c08d432` 与本补记笔的成对号 —— 由 R594 那一趟现取；
+    ②新硬步骤 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 第一次有读数：
+      `BUNDLE_CONTENT_GATE_RESULT=ok` 且正文里 `APP_DELEGATE_STUB=absent`；
+      ⚠ 反向读法：那一行**印不出来** = 新步骤没落地或 `make bundle` 没跑（`BUNDLE_CONTENT=absent` 只能读成"构建没落地"），
+      **不许读成"产物内容没问题"**；
+    ③`STEP[9]` 里 `SKIP_ROSTER 键=github-runner … 内层判=` 那一行**必须出现**（本轮把 print 挪到所有门之前）。
+      ⚠ 反向读法：还不出现 = print 又被挪回门后面（或那一支根本没跑到），**不是**"runner 又坏了"，
+      也不是"这一维没人判是对的"；
+    ④`STEP[16]` 红名集合不超出那 7 条 ⇒ R592 那朵我自己加的判据红被本轮的夹具前提修掉了；
+      多出来的一朵要先判是不是本笔引入（判法：拿它的名字在 ⓪ 这几跑里现读有没有）；
+    ⑤`STEP[19]`（On-screen probe coverage floor）那一朵 `testFrameIntervalsUnderStateChanges`
+      要么还在要么消失：还在 ⇒ (乙)「runner 采样/负载」拿到第二个真数；消失 ⇒ 与 R591 两跑同形，就是间歇。
+      **两种都不许写成"修好了"或"没事"**；
+    ⑥`STEP[9]` 的电池汇总 `Ran <N>` 比基准 `Ran 932` 多 ⇒ 本轮新增的 python 格（18 格）在 runner 上被数到；
+      基准的逐字出处=主节 ⓪·1 那一跑 `42210166309` 的 STEP[9] 汇总行；口径照旧：Swift 那 3 格不进这一格的分母。
+    另带三条不许从问题开始：帧基线门 `FRAME_BASELINE_RESULT=red 拦路=17`（本轮**红着交出去**，
+    漂移名册是红线不许动，见主节⑤⑥）；`READING_ORDER 登记=4 ok=4`（本机那一支的复算）；
+    以及 **668** —— 交给下一轮的那个预测块今天**只被手工调用过一次**（主节⑨·11），
+    R594 落地它之前，先把五条 `判法` 各喂一次合成输入，`NameError` 就是它自己没被修的证据。
+
+① **落盘之后的门复算**（全部现读，取值时刻 `2026-11-06 21:47:35`）：
+   · 红名对账：`RED_NAME_RECONCILIATION 节=R593 红名=13 计入行=12 编号去重=11 不计入=1 未标=0 对不上=0 口径=已启用`
+   · 清账门：`LEDGER_ABSENCE_RESULT=ok 不成立=0/63`
+   · ⓪ 前置门（本轮新做的仪器，判的是**刚落盘的这一节**）：`LEDGER_PREFLIGHT_RESULT=ok 形状=成对号 逐字=42210166309 ↔ 03b48b2`
+   · 读数行顺序（本轮新做的仪器）：`READING_ORDER 登记=4 ok=4 red=0 not-found=0`
+   · 帧通道盲区（本轮新做的仪器）：`FRAME_GEOMETRY_BLIND_RESULT=ok`
+   · 产物内容那一维：`BUNDLE_CONTENT_GATE_RESULT=ok APP_DELEGATE_STUB=absent 良性桩=3（ClipboardHistoryApp.ChineseSelectableNSTextView,ClipboardHistoryApp.Coordinator,ClipboardHistoryApp.QuickPickController）⇒ 这一维在 runner 上由这一步出声`
+   · `（本轮没改接线，static 那一支的复算在主节②里，不在这里重复取）` —— static 那一支（接线形状）。
+   · `SCORES_BY_ROUND 587=81 588=80 589=90 590=89`（曲线尺绿 ⇒ §1 才允许刷新）
+   · `REFRESH_SECTION1 OK 改=无（已是现读数） n=583 尾轮=590 标题=R9–R590，591 节（Round 口径，与守卫同源）`
+   · `PRODUCT_STREAK ledger_round=592 streak=1 sections=568 as_of=last=03b48b2 last_round=591 newest=c08d432 newest_round=592 date=2026-11-06 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)` —— 与主节 ⑥ 那一格同字（哨兵只在本小节内切）。
+   · `sources` 那一格（跟 push 走）：改之前 `SOURCES_CELL 账上=R592/`03b48b2` git=R593/`c08d432` 一致=否` ⇒ 本趟现刷 `SOURCES_CELL_WRITTEN 复核=一致`。
+
+② **电池各趟（这一格是自指的 ⇒ 记到第几趟就停，最终签字归 runner）**：
+   · 台账落盘之后第一趟：`Ran 950 tests in 125.572s / FAILED (failures=5, skipped=5)；红名=test_positive_control_both_directions_fire、test_still_open_bullet_points_at_the_newest_state_section、test_the_ceilings_equal_the_live_readings、test_the_headline_cells_agree_with_the_live_ledgers、test_the_roster_matches_what_this_machine_actually_skips`；
+   · 第二趟（第一趟红之后改的）：`Ran 950 tests in 125.143s / FAILED (failures=2, skipped=5)；红名=test_the_roster_matches_what_this_machine_actually_skips、test_the_u_cell_carries_exactly_one_derivation_note`；
+   · 第三趟（第二趟还红：U 格那条贴纸不是幂等的）：`Ran 950 tests in 126.232s / OK (skipped=5)（无红）`；
+   · 第四趟（**本补记那一节落盘之后**，取值时刻 21:53）：`Ran 950 tests in 125.189s / OK (skipped=5) exit=0`。
+   记到第四趟就停 —— 这一格是自指的，最终签字归 runner（R580 那一课：不要在提交之后再回来改它）。
+   本轮**没有**并跑捕获/刀/电池（刀链跑着时没改仪器，预检与电池都是串行趟）。
+
+③ **本笔只动 `AGENT_STATE.md` 一本（+ `AGENT_FINAL_REPORT.md` 的 sources 那一格）+ 本轮自己的脚本**；
+   名册、豁免表、四张按机器登记的表（含帧漂移名册）、帧名单一字未动；`update` 一次没跑；
+   没改这台机器的全局外观；没动用户的 Dock 与登录项（批次 91.1 那条仍挂着，本轮新加批次 92 三条人工动作）；
+   帧与日志不含用户真实剪贴板原文。§3 第③段仍不开工：两条具名阻塞未撤、规格里「三问全过」出现 0 次。
+
 ## R593 状态（2026-11-06 · 第 592 轮 / Round 590 · **产品 2 文件**（√2 不变量补上「放得下」那一半）+ 判据 +34 格 + 刀 M1598–M1610 十三把全 CAUGHT + ⓪ R592 主笔那一跑到数、五条预测三中一不中一未读到）
 
 ⓪ **现读两对（`ci_status_r593.py`，取值时刻 20:04–20:11，主笔那一跑 `completed / failure`、补记笔那一跑 `in_progress`）**：
