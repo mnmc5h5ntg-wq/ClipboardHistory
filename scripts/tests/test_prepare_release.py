@@ -18,6 +18,7 @@ from scripts.prepare_release import (
     replace_makefile_version,
 )
 from scripts import prepare_release
+from scripts import repo_root_bundle
 
 
 class PrepareReleaseTests(unittest.TestCase):
@@ -370,11 +371,17 @@ class LaunchGateTests(unittest.TestCase):
                          "良性桩（只在 Swift 侧显式构造的类型）不该挡住发布")
 
     def test_built_bundle_carries_no_app_delegate_stub(self):
-        """端到端：真读一次仓库里已构建的包。这条就是 D-029 当时缺的那一关。"""
+        """端到端：真读一次**这一次构建出来的**包。这条就是 D-029 当时缺的那一关。
+
+        R592 / BACKLOG 620 把构建落点从仓库根搬进暂存目录，这一格的对象必须跟着搬 ——
+        它原先写死 `root / 时间剪史.app`，搬完之后在本机**静默 skip**：一条端到端证人变成"没人判"，
+        是 `SKIP_ROSTER … 名单外=[…]` 那一格把它撞出来的（不是我看出来的）。
+        暂存路径由 `repo_root_bundle.makefile_stage` 从 Makefile 现读，不在这里抄第二份常量。
+        """
         root = Path(__file__).resolve().parents[2]
-        executable = root / "时间剪史.app" / "Contents" / "MacOS" / "ClipboardHistoryApp"
+        executable = Path(repo_root_bundle.makefile_stage(str(root))) / "Contents" / "MacOS" / "ClipboardHistoryApp"
         if not executable.exists():
-            self.skipTest("仓库根目录没有已构建的 .app（先跑 make bundle 再验）")
+            self.skipTest("暂存目录里没有已构建的 .app（先跑 make bundle 再验）：%s" % executable)
         completed = subprocess.run(
             ["otool", "-tvV", "-arch", "arm64", str(executable)],
             capture_output=True, text=True, env=prepare_release.build_child_environment(),

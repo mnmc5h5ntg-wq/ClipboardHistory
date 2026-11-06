@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### 升级用户看不到的那半段第①段：一次性迁移 + √2 不变量；构建产物从仓库根搬进暂存目录（R592 / 第 591 轮 / Round 589 · 2026-11-06）
+
+- `MainWindowCollapsePolicy.swift`：新增 `MainWindowGeometryMigration`（纯函数 `plan` 四档具名出口 +
+  读盘那一层薄胶水）与 `heightLift`（√2 不变量：产品从不记高度，13+ 的 `contentAspectRatio` 锁住比例 ⇒
+  不在 √2 上的高度只能来自锁之前的那一次恢复；macOS 12 那一档不调用）。
+- `MainWindowCollapseController.swift`：迁移排在读状态**之前**（记忆优先，先抬后读才读得到规格档）；
+  `applyGeometry` 在改宽之后按不变量抬高度，并按「顶边不动」回算 origin；`heightLifts` 计数给判据数。
+- 判据：`FoldGeometryMigrationTests.swift`（新卷 10 格 —— 真值表四档、产品入口抬宽度与恢复帧、
+  版本键才是「只抬一次」的闸门、真窗两栏等宽 + 比例≈√2、√2 不变量的两趟语义、恢复帧字符串手术、
+  键匹配只认自己的窗口）。
+- `Makefile`：`BUNDLE := $(STAGE)/$(APP_NAME).app` —— 往仓库根 `ditto` 那一段整删，`run` / `dmg` 改指暂存目录，
+  `clean` 补一行清掉历史留下的仓库根副本（BACKLOG 620 结案）。
+- `scripts/install_local.sh`：默认包 = 暂存目录；装之前查仓库根那一格（有可执行 .app 就一步都不许动）；
+  `--dest` 非 /Applications 时强制不启动那份副本；末态印 `INSTALL_STAGED_BUNDLE` / `INSTALL_REPO_ROOT_BUNDLE`。
+- `scripts/repo_root_bundle.py`（新守卫）+ `scripts/tests/test_repo_root_bundle.py`（新卷 11 格）+
+  `scripts/tests/test_install_local.py`（+3 格：默认落点、违规拒装、沙箱强制不启动）：
+  三态 ok/red/not-run，自带 `READER_SELFTEST` 正对照，红排在 not-run 前面，`make -n bundle` 的配方不许出现
+  不落在暂存目录的那一份。
+- `.github/workflows/ci.yml`：新增硬步骤 `Repo root stays bundle-free after make bundle (BACKLOG 620)`；
+  `Runtime launch smoke` 的冒烟路径从仓库根相对路径改成 `/tmp/时间剪史_bundle/时间剪史.app`。
+- 新开 **664**（备份目录那 20+ 份可启动副本 = 620 的另一半，回滚分支靠它 ⇒ 本笔不动）、
+  **665**（帧基线 16 张与这台机器不一致；HEAD worktree 控制实验证到不是本笔改的；`update` 一次没跑）。
+- 换装两次并现读真窗：`INSTALL_RESULT=ok`、`INSTALL_SHA_MATCH=1`、条数 505→505、`INSTALL_SIGNATURE=local`；
+  装前 `750 / 420 / 无版本键 / 窗口 750×492` ⇒ 装后 `848 / 424 / 版本键=1`，AX 现读窗口 **848×600**、
+  分栏 `423.5×600 / 424.5×600`。没动用户的 Dock 与登录项（人工验收批次 91.1）。
+
 ### skipped 拆成甲乙、值槽粘连按谁按值读划界、接线判据卷补上 `bash -e`（R591 / 第 590 轮 / Round 588 · 2026-11-06）
 
 - `.github/workflows/ci.yml`：STEP[11]–[14] 与 `Release script tests` 各加 `if: always()`（证据步骤必须有机会出声；

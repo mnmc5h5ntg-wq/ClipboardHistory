@@ -18,17 +18,25 @@
 #   4. **活着的 App 会随时写存档**，所以"替换前后逐字节相同"不是有效判据；
 #      这里判的是"条数只增不减 + schema 仍读得动"。
 #   5. **CJK 路径在 `ps`/`lsof` 里是转义输出的**，别把它直接喂给 `shasum`（会假报"文件不存在"）。
+#   6. **仓库根不许再出现一份可执行 .app**（R592 / BACKLOG 620）：`make bundle` 现在只往
+#      `/tmp/时间剪史_bundle` 暂存，装的时候直接进 /Applications。仓库根那份和 /Applications
+#      那份同 bundle id，LaunchServices 两条都登记，登录项当初记住的是仓库根那条 ⇒ 用户重启后
+#      Dock 出现第二个图标，而点开的是随时会被覆盖的构建产物。所以本脚本一开头就查这一格。
+#   7. **备份那一族（`~/Documents/Codex_Project0_backups/before-*/`）不在本笔范围内**：
+#      它是 620 现读数里"20+ 份同 id 可启动副本"的另一半成因。要把旧备份压成归档或
+#      摘掉可启动身份，得先量一遍 `lsregister -dump` 的逐字现读再决定 —— 已另开一单，别在本笔顺手改。
 #
 # 退出码：0 = 换装并验证通过；非 0 = 没做成（若已进入替换阶段则**已自动回滚**到旧包）。
 set -euo pipefail
 
 usage() {
-	sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+	sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 app_name="时间剪史"
-bundle="${repo_root}/${app_name}.app"        # `make bundle` 会在仓库根产出一份
+# R592：默认包 = `make bundle` 的暂存产物，**不是**仓库根那一份（见文件头第 6 条）。
+bundle="/tmp/${app_name}_bundle/${app_name}.app"
 dest_dir="/Applications"
 installed="${dest_dir}/${app_name}.app"
 do_build=1
@@ -66,6 +74,16 @@ sha_of() { shasum -a 256 "$1" | cut -d' ' -f1; }
 # 否则沙箱测试（路径在 /var/folders 下）会永远比不中 —— 表现就是"没在跑"。
 real_path() { python3 -c 'import os,sys; sys.stdout.write(os.path.realpath(sys.argv[1]))' "$1"; }
 
+# R592（620 的第③条成因）：`--dest` 不是 /Applications 时**强制不启动**。
+# 原来只靠调用方记得传 `--no-launch`：脚本自己在第 3 节已经承认"沙箱不该给 App 发退出指令"，
+# 但同一条理由同样适用于"沙箱不该启动一份同 bundle id 的副本"—— 一启动，LaunchServices
+# 就把那个临时路径登记成可启动位置，Dock/登录项的候选列表里就多一条（测试自己都传了这个开关，
+# 手动跑一次沙箱验证就会忘）。现在不靠人记。
+if [ "$dest_dir" != "/Applications" ] && [ "$launch" = 1 ]; then
+	launch=0
+	say "SANDBOX_FORCES_NO_LAUNCH=1 目标不是 /Applications ⇒ 不启动那份副本（620 的登记面）"
+fi
+
 # ---------- 0. 计划 ----------
 backup_root="${HOME}/Documents/Codex_Project0_backups"
 backup_dir="${backup_root}/before-${label}"
@@ -75,6 +93,27 @@ archive="${data_dir}/history.json"
 say "目标        = ${installed}"
 say "新包        = ${bundle}"
 say "备份        = ${backup_dir}"
+# ---------- 0'. 仓库根那一格（620）：有构建产物就不许往下走 ----------
+# `--staged "$bundle"`：拿"这一次真的要装的那一份"当正对照。没有它，"仓库根名单=空"
+# 这句话就退化成"这里根本没构建过"（R590 那一族：扫描面 0 不算数）。
+# 两次调用：plan 阶段（dry-run 也要看得见，此时多半 not-run）与构建之后（有了对象，才算判过）。
+check_repo_root() {
+	local phase rc out
+	phase="$1"
+	rc=0
+	out="$(python3 "${repo_root}/scripts/repo_root_bundle.py" "$repo_root" --staged "$bundle" 2>&1)" || rc=$?
+	printf '%s\n' "$out" | sed "s/^/   [${phase}] /"
+	say "REPO_ROOT_CHECK_PHASE=${phase} rc=${rc}"
+	# R591 那条规矩的另一种写法：`bash -e` 下顶层 `cmd && { …; exit 1; }` 会是假红/假绿，一律用 if。
+	if [ "$rc" = 1 ]; then
+		fail "仓库根还留着构建出来的 .app ⇒ 它和 /Applications 那份同 bundle id，Dock/登录项记住的就是它。先删掉那一份（或 make clean），再来装"
+	fi
+	if [ "$rc" = 2 ]; then
+		say "REPO_ROOT_BUNDLE_NOT_RUN=1 这一格的读法：只印不判（没对象不等于干净）"
+	fi
+	return 0
+}
+check_repo_root plan
 say "模式        = $([ "$dry_run" = 1 ] && echo 'dry-run（不写任何东西）' || echo '真换装')"
 [ "$confirmed" = 1 ] || [ "$dry_run" = 1 ] || fail "内部状态矛盾：既 --yes 又 dry-run"
 if [ "$dry_run" = 1 ] && [ "$confirmed" = 0 ]; then
@@ -122,6 +161,8 @@ if [ "$do_build" = 1 ]; then
 	( cd "$repo_root" && make bundle >/tmp/install_local_build.log 2>&1 ) || { tail -20 /tmp/install_local_build.log >&2; fail "构建失败（日志 /tmp/install_local_build.log）"; }
 fi
 [ -x "$staged_binary" ] || fail "找不到可执行文件 ${staged_binary}（先 make bundle，或用 --bundle 指到已构建的包）"
+# 构建之后再看一次仓库根：这时候"要装的这一份"确实存在，扫描面不为空，那一格才算判过。
+check_repo_root after-build
 staged_sha="$(sha_of "$staged_binary")"
 say "新包 sha    = ${staged_sha:0:16}…"
 
@@ -184,7 +225,7 @@ mkdir -p "$backup_dir"
 if [ -d "$installed" ]; then
 	mv "$installed" "${backup_dir}/${app_name}.app"
 	moved_out=1
-	say "旧包已移入  = ${backup_dir}"
+	say "旧包已移入  = ${backup_dir}（这一族的 20+ 份可启动副本 = BACKLOG 664，本笔不动它）"
 fi
 ditto --noextattr --noqtn "$bundle" "$installed"
 
@@ -250,5 +291,12 @@ if [ -n "$recent_crash" ]; then
 fi
 
 trap - EXIT
+# R592：这一格是"仓库根有没有又被塞进一份可执行 .app"的末态读数（620 的门在脚本里，不在我嘴里）。
+REPO_ROOT_BUNDLE=absent
+if [ -d "${repo_root}/${app_name}.app" ]; then
+	REPO_ROOT_BUNDLE=present
+fi
+say "INSTALL_STAGED_BUNDLE=${bundle}（/tmp 里的构建暂存，仓库根不留副本）"
+say "INSTALL_REPO_ROOT_BUNDLE=${REPO_ROOT_BUNDLE}（期望 absent；present 就是 620 复发）"
 say "INSTALL_RESULT=ok  版本=${old_version}→$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${installed}/Contents/Info.plist" 2>/dev/null || echo '?')"
 say "旧包留在：${backup_dir}（要退回：rm -rf '${installed}' && mv '${backup_dir}/${app_name}.app' '${installed}' && open '${installed}'）"

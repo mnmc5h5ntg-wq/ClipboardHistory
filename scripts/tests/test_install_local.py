@@ -132,6 +132,61 @@ class InstallLocalSelfTest(unittest.TestCase):
         self.assertIn("dry-run", proc.stdout)
         self.assertIn("请加 --yes", proc.stdout)
 
+    def test_the_default_bundle_is_the_staging_dir_not_the_repo_root(self):
+        """R592（620）：不传 `--bundle` 时，那一格必须指向 /tmp 暂存目录。
+
+        仓库根那一份是 620 的成因（同 bundle id 的两条可启动路径之一），
+        而这一格只在"没人传 --bundle"时才走默认值 —— 上面每条沙箱自检都显式传了路径，
+        所以默认值本身从来没被读过。
+        """
+        proc = subprocess.run(["bash", str(SCRIPT), "--no-build", "--dry-run"],
+                              capture_output=True, text=True, timeout=60)
+        self.assertIn("新包        = /tmp/%s_bundle/%s.app" % (APP_NAME, APP_NAME), proc.stdout,
+                      "默认构建产物又指回仓库根了：\n" + proc.stdout[-600:])
+        self.assertNotIn("新包        = %s/%s.app" % (ROOT, APP_NAME), proc.stdout)
+
+    def test_a_bundle_left_at_the_repo_root_refuses_the_whole_install(self):
+        """仓库根还有一份可执行 .app ⇒ 换装脚本一步都不许动（620 的门排在改现场之前）。
+
+        夹具是把脚本连同守卫一起复制到一个临时"仓库根"里：脚本按自己的位置推 `repo_root`，
+        所以只有整体搬走才能让它去查那个根目录 —— 让它在真仓库根上造一份 .app
+        等于自己制造 620 那个缺陷。
+        """
+        fake = self.tmp / "fake-repo"
+        (fake / "scripts").mkdir(parents=True)
+        shutil.copy(SCRIPT, fake / "scripts" / "install_local.sh")
+        shutil.copy(ROOT / "scripts" / "repo_root_bundle.py", fake / "scripts" / "repo_root_bundle.py")
+        make_bundle(fake, "STALE_REPO_ROOT_COPY")        # 违规的那一份
+        proc = subprocess.run(["bash", str(fake / "scripts" / "install_local.sh"),
+                               "--yes", "--no-build", "--skip-smoke",
+                               "--bundle", str(self.new_bundle), "--dest", str(self.dest),
+                               f"--label=repo-root-red-{os.getpid()}"],
+                              capture_output=True, text=True, timeout=120)
+        self.assertNotEqual(proc.returncode, 0,
+                            "仓库根有构建产物却照常装 ⇒ 那一格只是印出来给人看的散文")
+        self.assertIn("REPO_ROOT_BUNDLE=present", proc.stdout)
+        self.assertIn("REPO_ROOT_BUNDLE_RESULT=red", proc.stdout)
+        self.assertEqual([], sorted((self.dest).iterdir()),
+                         "预检红却已经动了目标目录")
+
+    def test_a_non_applications_dest_cannot_launch_a_second_copy(self):
+        """`--dest` 不是 /Applications 时脚本自己把启动关掉（620 机制③：一启动就多一条登记）。
+
+        原来这一格靠调用方记得传 `--no-launch` —— 测试自己传了，所以它从来没被判过"忘了传"。
+        """
+        sandbox = self.tmp / "force-no-launch"
+        sandbox.mkdir()
+        proc = subprocess.run(["bash", str(SCRIPT), "--yes", "--no-build", "--skip-smoke",
+                               f"--bundle={self.new_bundle}", f"--dest={sandbox}",
+                               f"--label=force-no-launch-{os.getpid()}"],
+                              capture_output=True, text=True, timeout=180)
+        self.assertEqual(proc.returncode, 0, proc.stdout[-800:] + proc.stderr[-400:])
+        self.assertIn("SANDBOX_FORCES_NO_LAUNCH=1", proc.stdout,
+                      "沙箱目标仍然允许启动那份副本 ⇒ 620 的登记面又开了一条")
+        self.assertIn("INSTALL_RESULT=sandbox-ok", proc.stdout,
+                      "被强制成不启动之后仍要走那条具名出口，不能假装装完了")
+        self.assertNotIn("open \"", proc.stdout)
+
     def test_it_really_notices_the_running_copy_under_a_cjk_path(self):
         """"要换的那一份在不在跑"必须真的认得出来 —— 认不出来会连锁假失败。
 

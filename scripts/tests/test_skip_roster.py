@@ -87,7 +87,8 @@ ROSTER = {
         # （`时间剪史.app` 不在 runner 的仓库根），而启动冒烟那一格在 runner 上是**跑过的**。
         # 现在填的是读来的名字，不是猜的；两跑同读才签（R83：单次 runner 读数不配签字）。
         'test_built_bundle_carries_no_app_delegate_stub':
-            'runner 的仓库根没有已构建的 时间剪史.app（run 39608106160 与 39607521077 两跑同读）',
+            'runner 的暂存目录里没有已构建的 时间剪史.app（R592/620 起落点是 /tmp/<APP>_bundle，'
+            '电池排在 `make bundle` 之前；历史两跑 run 39608106160 与 39607521077 同读的是仓库根那一份）',
         # R309 新加的那格「拿真产物日志对账」在 runner 上必然缺席：/tmp/r308_chain.log 是本机
         # 验证链留下的，runner 的 /tmp 里没有它。名字是 **runner 自己点出来的**，不是我猜的：
         # run 39965996188（340452f）STEP[9] 打

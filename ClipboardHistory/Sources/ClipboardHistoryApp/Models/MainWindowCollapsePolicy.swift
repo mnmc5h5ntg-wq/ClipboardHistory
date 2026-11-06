@@ -76,6 +76,20 @@ enum MainWindowCollapsePolicy {
         return min(floor, visibleWidth)
     }
 
+    /// R592（用户机上实测之后补的一条不变量）：高度离 √2 超过容差 ⇒ 那是旧恢复通路留下的，抬回来。
+    ///
+    /// 为什么这条能成立而不越界：产品**从不记高度**（`rememberWidth` 只写宽），而 macOS 13+ 的
+    /// `contentAspectRatio` 锁住了比例 ⇒ 用户手动拖出来的一定还在 √2 上；所以"不在 √2 上"这件事
+    /// 只能来自锁出现之前那一次恢复（用户机上现读 848×492，比 1.72）。
+    /// 折叠态同理但方向相反：424 宽对应的规格高仍是 600（D5「折叠 = 高度不变、宽度对折」）。
+    /// macOS 12 没有那条锁 ⇒ 调用方必须**不**用这一支（12 上拖得出任意比例，抬它就是抹用户的调整）。
+    static func heightLift(collapsed: Bool, width: CGFloat, height: CGFloat,
+                           tolerance: CGFloat = 0.02) -> CGFloat? {
+        guard width > 0, height > 0 else { return nil }
+        let target = collapsed ? width * 2.0.squareRoot() : width / 2.0.squareRoot()
+        return abs(height - target) / target > tolerance ? target : nil
+    }
+
     /// 收缩/放宽都保持左上角：x 不越过屏幕左右边，top 不越过屏幕上下边。
     static func originX(clampingX x: CGFloat, width: CGFloat, visibleFrame: CGRect) -> CGFloat {
         min(max(x, visibleFrame.minX), max(visibleFrame.minX, visibleFrame.maxX - width))
@@ -83,6 +97,117 @@ enum MainWindowCollapsePolicy {
 
     static func originY(clampingTop top: CGFloat, height: CGFloat, visibleFrame: CGRect) -> CGFloat {
         min(max(top - height, visibleFrame.minY), max(visibleFrame.minY, visibleFrame.maxY - height))
+    }
+}
+
+/// R592（用户实测反馈）：把"记忆值压住新默认值"这一族一次性抬过去。
+///
+/// 为什么不改 `width(forKey:fallback:)` 的优先序：记忆优先是对的（用户手动 resize 过就该听他的），
+/// 错的是**旧规格的那两档默认值还留在盘上**。2026-11-06 在用户机上现读：
+/// `mainWindowExpandedWidth = 750`、`mainWindowCollapsedWidth = 420`（R567 之前的两档默认），
+/// 而 SwiftUI 还存着窗口帧 `…-AppWindow-1 = "585 368 750 492"` 与分栏子视图帧
+/// `423.5 / 326.5` ⇒ 升级用户看到的既不是 848 宽、两栏也不等分，第①段对他们**根本没发生过**。
+///
+/// 三条边界，都是"不许抹掉用户的东西"：
+/// ① 只在记忆值**恰好等于旧默认对**（750 与 420）时抬 —— 那对值只可能来自旧默认，手动调过宽度的人
+///    落在 `not-legacy-pair`，一律不碰；
+/// ② 抬完立刻打版本键 ⇒ 此后用户再怎么调，这一段都不会再跑第二次（`already-migrated`）；
+/// ③ 窗口帧不删、只改写宽高，并按"顶边不动"回算 origin.y ⇒ 用户放的位置逐字保留。
+@MainActor
+enum MainWindowGeometryMigration {
+    static let versionKey = "mainWindowGeometryMigrationVersion"
+    /// 目前只有一个版本；以后规格再改默认几何，就加一档并在 `plan` 里补一条分支。
+    static let currentVersion = 1
+    /// R567 之前的两档默认宽。判据与变异刀都从这里取，不写字面量。
+    static let legacyExpandedWidth: CGFloat = 750
+    static let legacyCollapsedWidth: CGFloat = 420
+
+    struct Plan: Equatable {
+        let expandedWidth: CGFloat?
+        let collapsedWidth: CGFloat?
+        let rewritesRestoredFrames: Bool
+        let stampsVersion: Bool
+        /// 四种具名出口，判据逐字读它：`legacy-default-pair` / `not-legacy-pair` /
+        /// `no-legacy-memory` / `already-migrated`。
+        let reason: String
+    }
+
+    /// 纯函数真值表：没有记忆值 / 记忆值不是旧默认对 / 已经迁过 ⇒ 一律不改宽高，但前两种要打版本键。
+    static func plan(storedExpanded: CGFloat?, storedCollapsed: CGFloat?, storedVersion: Int?) -> Plan {
+        if let storedVersion, storedVersion >= currentVersion {
+            return Plan(expandedWidth: nil, collapsedWidth: nil,
+                        rewritesRestoredFrames: false, stampsVersion: false,
+                        reason: "already-migrated")
+        }
+        if storedExpanded == legacyExpandedWidth, storedCollapsed == legacyCollapsedWidth {
+            return Plan(expandedWidth: MainWindowCollapsePolicy.expandedWidthDefault,
+                        collapsedWidth: MainWindowCollapsePolicy.collapsedWidthDefault,
+                        rewritesRestoredFrames: true, stampsVersion: true,
+                        reason: "legacy-default-pair")
+        }
+        return Plan(expandedWidth: nil, collapsedWidth: nil,
+                    rewritesRestoredFrames: false, stampsVersion: true,
+                    reason: (storedExpanded == nil && storedCollapsed == nil) ? "no-legacy-memory" : "not-legacy-pair")
+    }
+
+    /// 只有主窗口自己的持久化键才动：两类键的名字里都带 `ClipboardHistoryApp.` 与 `-AppWindow-`，
+    /// 而 `NSWindow Frame NSColorPanel` 那种系统面板键不在这个集合里。
+    static func isMainWindowFrameKey(_ key: String) -> Bool {
+        key.hasPrefix("NSWindow Frame ") && key.contains("ClipboardHistoryApp.") && key.contains("-AppWindow-")
+    }
+
+    static func isMainWindowSplitKey(_ key: String) -> Bool {
+        key.hasPrefix("NSSplitView Subview Frames ") && key.contains("ClipboardHistoryApp.") && key.contains("-AppWindow-")
+    }
+
+    /// `"585 368 750 492 0 0 1470 923 "` → 宽高换成规格档，顶边（origin.y + height）逐字不动。
+    /// 解析不出五个数就原样返回（迁移不许把用户的键改坏）。
+    static func restoredFrameString(_ stored: String, width: CGFloat, height: CGFloat) -> String? {
+        let parts = stored.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard parts.count >= 4, let x = Double(parts[0]), let y = Double(parts[1]),
+              let oldHeight = Double(parts[3]) else { return nil }
+        let top = y + oldHeight
+        let screen = parts.count > 4 ? " " + parts[4...].joined(separator: " ") : ""
+        return String(format: "%.0f %.0f %.0f %.0f", x, top - Double(height),
+                      Double(width), Double(height)) + screen + " "
+    }
+
+    /// 薄胶水那一层：读盘 → 判 → 写。返回值给产品入口的判据现读 `reason`。
+    @discardableResult
+    static func apply(to defaults: UserDefaults) -> Plan {
+        let version = defaults.object(forKey: versionKey) != nil ? defaults.integer(forKey: versionKey) : nil
+        let expanded = storedWidth(defaults, MainWindowCollapseController.expandedWidthKey)
+        let collapsed = storedWidth(defaults, MainWindowCollapseController.collapsedWidthKey)
+        let outcome = plan(storedExpanded: expanded, storedCollapsed: collapsed, storedVersion: version)
+        guard outcome.stampsVersion || outcome.expandedWidth != nil else { return outcome }
+        if let expandedWidth = outcome.expandedWidth {
+            defaults.set(Double(expandedWidth), forKey: MainWindowCollapseController.expandedWidthKey)
+        }
+        if let collapsedWidth = outcome.collapsedWidth {
+            defaults.set(Double(collapsedWidth), forKey: MainWindowCollapseController.collapsedWidthKey)
+        }
+        if outcome.rewritesRestoredFrames {
+            for key in defaults.dictionaryRepresentation().keys where isMainWindowFrameKey(key) {
+                guard let stored = defaults.string(forKey: key),
+                      let rewritten = restoredFrameString(stored,
+                                                          width: MainWindowCollapsePolicy.expandedWidthDefault,
+                                                          height: MainWindowCollapsePolicy.contentHeightDefault)
+                else { continue }
+                defaults.set(rewritten, forKey: key)
+            }
+            // 分栏子视图帧记的是**旧档的不对称**（423.5 / 326.5），没有"该抬成什么"的可算目标；
+            // 删掉它，让 `navigationSplitViewColumnWidth` 的锁等宽约束自己给出 423.5 / 423.5。
+            for key in defaults.dictionaryRepresentation().keys where isMainWindowSplitKey(key) {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        if outcome.stampsVersion { defaults.set(currentVersion, forKey: versionKey) }
+        return outcome
+    }
+
+    private static func storedWidth(_ defaults: UserDefaults, _ key: String) -> CGFloat? {
+        guard defaults.object(forKey: key) != nil else { return nil }
+        return CGFloat(defaults.double(forKey: key))
     }
 }
 

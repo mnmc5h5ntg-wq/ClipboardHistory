@@ -37,6 +37,10 @@ final class MainWindowCollapseController: ObservableObject {
     private let defaults: UserDefaults
     private let persists: Bool
     private var hintAcknowledged: Bool
+    /// R592：一次性几何迁移的结果，给产品入口的判据现读 `reason`（四档具名出口）。
+    private(set) var geometryMigration: MainWindowGeometryMigration.Plan?
+    /// R592：√2 不变量今天生效了几次（判据数这一格；一次切换之后它必须是 0 或 1，不许逐拍涨）。
+    private(set) var heightLifts = 0
 
     /// 一步切换 ⇒ 永远没有"在飞"的过渡。保留这一格是因为菜单项与真机通道要问"现在能不能再点"。
     var isTransitioning: Bool { false }
@@ -44,6 +48,8 @@ final class MainWindowCollapseController: ObservableObject {
     init(defaults: UserDefaults = .standard, persists: Bool = true) {
         self.defaults = defaults
         self.persists = persists
+        // R592：迁移排在读状态**之前** —— 下面两档宽度是"记忆优先"，先抬后读才读得到规格档。
+        if persists { geometryMigration = MainWindowGeometryMigration.apply(to: defaults) }
         let collapsed = persists ? defaults.bool(forKey: Self.collapsedKey) : false
         let acknowledged = persists ? defaults.bool(forKey: Self.hintAcknowledgedKey) : false
         self.isCollapsed = collapsed
@@ -115,6 +121,7 @@ final class MainWindowCollapseController: ObservableObject {
         minSizeWrites = 0
         publishedIntermediates = 0
         publishedProgressValues.removeAll()
+        heightLifts = 0
     }
 
     private func rememberWidth(of window: NSWindow) {
@@ -148,6 +155,17 @@ final class MainWindowCollapseController: ObservableObject {
         var frame = window.frame
         let top = frame.maxY
         frame.size.width = width
+        if #available(macOS 13.0, *) {
+            // R592：√2 那条锁的补漏 —— 高度不在锁允许的比例上 ⇒ 只能是锁出现之前恢复下来的旧尺寸。
+            // 顺序要紧：先改高度，下面那句 `originY(clampingTop:height:)` 才会按新高度回算 origin，
+            // 顶边（用户放的位置）因此逐字不动。
+            if let lifted = MainWindowCollapsePolicy.heightLift(collapsed: isCollapsed,
+                                                                width: width,
+                                                                height: frame.height) {
+                frame.size.height = lifted
+                heightLifts += 1
+            }
+        }
         if let visible {
             frame.origin.x = MainWindowCollapsePolicy.originX(clampingX: frame.origin.x,
                                                               width: width,

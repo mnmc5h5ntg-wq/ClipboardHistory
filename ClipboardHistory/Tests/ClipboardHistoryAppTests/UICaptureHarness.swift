@@ -602,7 +602,7 @@ final class UICaptureTests: XCTestCase {
         // 派生与对账由 `scripts/tests/test_readings_channel_coverage.py` 在脚本电池里钉住：
         // 少一个名字（哪怕只是把名册改短）就红，多一个已经不干净的名字也红。
         let roster = ["CapturePathWriteBudgetTests.swift", "CaptureReadings.swift",
-                      "FoldGeometryReanchorTests.swift",
+                      "FoldGeometryReanchorTests.swift", "FoldGeometryMigrationTests.swift",
                       "DailyCopyHeatmapTests.swift", "OffscreenSymbolInkProbeTests.swift",
                       "PerfBudgetTests.swift", "Round4MarkdownTests.swift",
                       "FrameIntervalBudgetTests.swift", "HeatmapHoverEvidenceTests.swift",

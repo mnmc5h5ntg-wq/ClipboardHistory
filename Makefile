@@ -1,12 +1,16 @@
 APP_NAME := 时间剪史
 VERSION  := 1.4.8
-BUNDLE  := $(APP_NAME).app
+STAGE   := /tmp/$(APP_NAME)_bundle
+# R592（BACKLOG 620）：构建产物**只**落在暂存目录，不再往仓库根 ditto 一份可执行 .app。
+# 为什么这一条要写进 Makefile 而不是只写进文档：仓库根那份和 /Applications 那份同一个
+# CFBundleIdentifier，LaunchServices 会把两条都登记，登录项/Dock 当初记住的是仓库根那条
+# ⇒ 用户重启后看到第二个"时间剪史"图标，而点开的是构建产物（会被下一次 make 覆盖掉）。
+BUNDLE  := $(STAGE)/$(APP_NAME).app
 BINARY  := ClipboardHistoryApp
 BUILD_A := ClipboardHistory/.build/arm64-apple-macosx/debug
 BUILD_X := ClipboardHistory/.build/x86_64-apple-macosx/debug
 UNI     := /tmp/$(BINARY)_universal
 ICONS   := ClipboardHistory/.build/arm64-apple-macosx/debug/ClipboardHistory_ClipboardHistoryApp.bundle/AppIcon.icns
-STAGE   := /tmp/$(APP_NAME)_bundle
 BUILD_HINT := 构建失败：若报错里有 not registered 或 missing inputs: DerivedSources，说明 .build 处于半删除状态；执行 rm -rf ClipboardHistory/.build 后重试
 
 .PHONY: build run clean bundle dmg
@@ -21,37 +25,30 @@ build:
 	@echo "✅ Universal Binary ready (arm64 + x86_64)"
 
 bundle: build
-	rm -rf "$(BUNDLE)"
 	rm -rf "$(STAGE)"
-	mkdir -p "$(STAGE)/$(BUNDLE)/Contents/MacOS"
-	mkdir -p "$(STAGE)/$(BUNDLE)/Contents/Resources"
-	cp "$(UNI)" "$(STAGE)/$(BUNDLE)/Contents/MacOS/$(BINARY)"
+	mkdir -p "$(BUNDLE)/Contents/MacOS" "$(BUNDLE)/Contents/Resources"
+	cp "$(UNI)" "$(BUNDLE)/Contents/MacOS/$(BINARY)"
 	if [ ! -f "$(ICONS)" ]; then echo "❌ 找不到图标 $(ICONS)（先跑 make build）"; exit 1; fi
-	cp "$(ICONS)" "$(STAGE)/$(BUNDLE)/Contents/Resources/AppIcon.icns"
-	scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist "$(STAGE)/$(BUNDLE)/Contents/Info.plist" "$(VERSION)"
-	xattr -cr "$(STAGE)/$(BUNDLE)"
-	find "$(STAGE)/$(BUNDLE)" -name ".DS_Store" -delete 2>/dev/null || true
-	find "$(STAGE)/$(BUNDLE)" -name "._*" -delete 2>/dev/null || true
-	dot_clean -m "$(STAGE)/$(BUNDLE)" 2>/dev/null || true
-	codesign --remove-signature "$(STAGE)/$(BUNDLE)" 2>/dev/null || true
-	scripts/sign_bundle.sh "$(STAGE)/$(BUNDLE)"
-	codesign --verify --deep --strict --verbose=2 "$(STAGE)/$(BUNDLE)"
-	ditto --noextattr --noqtn "$(STAGE)/$(BUNDLE)" "$(BUNDLE)"
+	cp "$(ICONS)" "$(BUNDLE)/Contents/Resources/AppIcon.icns"
+	scripts/make_info_plist.sh ClipboardHistory/Resources/Info.plist "$(BUNDLE)/Contents/Info.plist" "$(VERSION)"
 	xattr -cr "$(BUNDLE)"
-	xattr -d com.apple.FinderInfo "$(BUNDLE)" 2>/dev/null || true
-	xattr -d "com.apple.fileprovider.fpfs#P" "$(BUNDLE)" 2>/dev/null || true
-	xattr -d com.apple.macl "$(BUNDLE)" 2>/dev/null || true
-	@echo "✅ $(BUNDLE) ready (签名种类见上面那行 SIGNATURE_KIND, quarantine-free)"
+	find "$(BUNDLE)" -name ".DS_Store" -delete 2>/dev/null || true
+	find "$(BUNDLE)" -name "._*" -delete 2>/dev/null || true
+	dot_clean -m "$(BUNDLE)" 2>/dev/null || true
+	codesign --remove-signature "$(BUNDLE)" 2>/dev/null || true
+	scripts/sign_bundle.sh "$(BUNDLE)"
+	codesign --verify --deep --strict --verbose=2 "$(BUNDLE)"
+	@echo "✅ $(BUNDLE) ready (签名种类见上面那行 SIGNATURE_KIND, quarantine-free；仓库根不留副本 = 620)"
 
 run: bundle
-	open -n "$(STAGE)/$(BUNDLE)"
+	open -n "$(BUNDLE)"
 
 dmg: bundle
 	rm -rf /tmp/$(APP_NAME)_dmg
 	mkdir -p /tmp/$(APP_NAME)_dmg
-	ditto --noextattr --noqtn "$(STAGE)/$(BUNDLE)" /tmp/$(APP_NAME)_dmg/$(BUNDLE)
+	ditto --noextattr --noqtn "$(BUNDLE)" /tmp/$(APP_NAME)_dmg/$(APP_NAME).app
 	xattr -cr /tmp/$(APP_NAME)_dmg/ 2>/dev/null || true
-	codesign --verify --deep --strict --verbose=2 /tmp/$(APP_NAME)_dmg/$(BUNDLE)
+	codesign --verify --deep --strict --verbose=2 /tmp/$(APP_NAME)_dmg/$(APP_NAME).app
 	sed "s/时间剪史 v.* — 安装说明/时间剪史 v$(VERSION) — 安装说明/" 安装说明.txt > /tmp/$(APP_NAME)_dmg/安装说明.txt
 	ln -s /Applications /tmp/$(APP_NAME)_dmg/Applications
 	hdiutil create -volname "$(APP_NAME)" 		-srcfolder /tmp/$(APP_NAME)_dmg 		-ov -format UDZO 		"$(APP_NAME)_v$(VERSION).dmg"
@@ -60,5 +57,8 @@ dmg: bundle
 	@echo "✅ DMG created: $(APP_NAME)_v$(VERSION).dmg (+ .sha256)"
 
 clean:
-	rm -rf "$(BUNDLE)" "$(APP_NAME)_v$(VERSION).dmg" "$(APP_NAME)_v$(VERSION).dmg.sha256"
+	rm -rf "$(BUNDLE)" "$(STAGE)"
+	# 清掉 R592 之前那一版留在仓库根的构建产物（620 的根因；它是产物不是源码）
+	rm -rf "$(APP_NAME).app"
+	rm -rf "$(APP_NAME)_v$(VERSION).dmg" "$(APP_NAME)_v$(VERSION).dmg.sha256"
 	cd ClipboardHistory && swift package clean

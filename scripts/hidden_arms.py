@@ -43,8 +43,12 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 # R573：`review_round_claims.py` 是**尺本体**（不是变异表），M1504 的针落在它身上；
 # 语料整批排除 `.scratch` 是为了不让每根针被自己的表洗活，这条理由对一份非表工具文件不成立
 # ⇒ 照 R381 为 `make_surface_ledger.py` 开过的同一条例外，只加这一个文件。
+# R592 / BACKLOG 620：M1588 的针住在 `Makefile`（构建配方），不在上面四个语料根里 —— 同 R381/R573
+# 为两份非表工具文件开过的同一条例外，只加这一个文件。加进来之前现读 rot=1，加进来之后 rot 必须归 0，
+# 且**别的箱子里不许有数动**（`Makefile` 只有 12 行配方，拿它"洗活"死针的可能性要由读数说话）。
 EXTRA_FILES = (os.path.join(".scratch", "motion-audit-2", "make_surface_ledger.py"),
-               os.path.join(".scratch", "motion-audit-2", "review_round_claims.py"),)
+               os.path.join(".scratch", "motion-audit-2", "review_round_claims.py"),
+               u"Makefile",)
 
 # 双向棘轮：这三个数**必须**等于现读值（R313 现读）。
 # 注：过滤掉「路径型候选」之前测得 30 / 5 —— 那 3 把是被路径命中洗活的死刀（见 arm_candidates 的注释）。

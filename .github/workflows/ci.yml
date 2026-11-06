@@ -575,9 +575,40 @@ jobs:
           make bundle > /tmp/bundle.log 2>&1 || { echo "打包失败"; tail -20 /tmp/bundle.log; exit 1; }
           # 隔离：数据目录与日志目录都在 /tmp，绝不写用户的 ~/Library/Application Support/时间剪史
           status=0
-          python3 scripts/launch_smoke.py "时间剪史.app" --timeout 30 | tee /tmp/smoke.log || status=$?
+          # R592（BACKLOG 620）：`make bundle` 现在只往 /tmp 暂存目录落那一份，这里就按那个路径冒烟。
+          # 从前传的是仓库根相对路径 "时间剪史.app" —— 那一格正是 620 的成因（同 id 两份可启动副本，
+          # 登录项/Dock 记住的是仓库根那条）。
+          # `SMOKE_TARGET=` 这一行是**通道**不是注释：下一轮的 ⓪ 要按值读它，
+          # 所以"落点真改了没有"在 runner 上是一格读数，不是一句我说过。
+          SMOKE_BUNDLE="/tmp/时间剪史_bundle/时间剪史.app"
+          echo "SMOKE_TARGET=$SMOKE_BUNDLE"
+          python3 scripts/launch_smoke.py "$SMOKE_BUNDLE" --timeout 30 | tee /tmp/smoke.log || status=$?
           grep -E "SMOKE_" /tmp/smoke.log
           exit "$status"
+
+      # R592（BACKLOG 620）：上面那一步刚跑过 `make bundle`，所以"仓库根还留没留可执行副本"
+      # 在这一跑里**有对象可扫**（没有对象就不算判过：见脚本里的 not-run 那一支）。
+      # 这一格是硬门而不是 report-only：它是"构建落点真改了没有"的第一证人，
+      # 而红只有一种可能 —— 有人把 `ditto` 到仓库根那一行加回 Makefile 了。
+      - name: Repo root stays bundle-free after make bundle (BACKLOG 620)
+        if: always()
+        timeout-minutes: 2
+        run: |
+          set -o pipefail
+          status=0
+          python3 scripts/repo_root_bundle.py . | tee /tmp/repo-root-bundle.log || status=$?
+          grep -E '^(READER_SELFTEST|BUNDLE_STAGED|REPO_ROOT_BUNDLE)=' /tmp/repo-root-bundle.log \
+            || { echo "REPO_ROOT_BUNDLE_READING_MISSING=1"; echo "  这一格的读法：尺一行都没印出来 ⇒ 不许把空日志读成干净"; exit 1; }
+          if [ "$status" -eq 2 ]; then
+            echo "REPO_ROOT_BUNDLE_NOT_RUN=1"
+            echo "  这一格的读法：暂存目录里没有构建产物 ⇒ 上面那一步的 make bundle 没落地，这一维没判到（没判到不等于干净）"
+            exit 1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo "REPO_ROOT_BUNDLE_RED=1"
+            echo "  这一格的读法：仓库根有可执行 .app ⇒ 同 id 第二份，登录项/Dock 会指向它（620 复发）"
+            exit 1
+          fi
 
       # R89 / 结构性的一条：硬门全部挪到**所有产证据的步骤之后**，并各自 `if: always()`。
       # 为什么：R88 把 `On-screen probe coverage floor` 留在原位，它红了之后 GitHub 把后面
