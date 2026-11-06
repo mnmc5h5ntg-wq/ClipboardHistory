@@ -539,6 +539,253 @@
    没改这台机器的全局外观；没动用户的 Dock 与登录项（批次 91.1 那条仍挂着，本轮新加批次 92 三条人工动作）；
    帧与日志不含用户真实剪贴板原文。§3 第③段仍不开工：两条具名阻塞未撤、规格里「三问全过」出现 0 次。
 
+## R594 状态（2026-11-07 · 第 593 轮 / Round 591 · **产品 4 文件**（列宽改成跟当前窗口宽 = 用户实测那一朵 + 「放得下就不记记忆宽」+ 全屏契约）+ 判据 Swift +6 格 / python 四卷 31 格 + 刀 M1611–M1622 十四把全 CAUGHT + ⓪ R593 两跑到数、五条预测三中一不中一未读到）
+
+⓪ **现读两对（`ci_status_r594.py`，取值时刻见 `ci_readings.json` 的 mtime；两跑都已 `completed / failure`）**：
+   1. 配对与逐步骤（正文里逐字贴，**不做截断**）：
+```
+主笔 42227982898 ↔ c08d432 ⇒ completed/failure sha=c08d432
+补记笔 42229089665 ↔ 22f1270 ⇒ completed/failure sha=22f1270
+尺这次灵不灵={'content_gate': 'emit-channel', 'release': 'emit-channel', 'swift': 'emit-channel', 'probe_floor': 'emit-channel'}
+  JOB build-and-test ⇒ failure
+    STEP[1] Set up job ⇒ success
+    STEP[2] Run actions/checkout@v4 ⇒ success
+    STEP[3] Toolchain ⇒ success
+    STEP[4] Build (must be warning-free) ⇒ success
+    STEP[5] Offscreen frame capture (report-only, gated below) ⇒ success
+    STEP[6] On-screen interaction probes (report-only) ⇒ success
+    STEP[7] Motion filmstrip (report-only) ⇒ success
+    STEP[8] Pillow for the frame rulers (venv · R218 / BACKLOG 237, moved before the battery in R223) ⇒ success
+    STEP[9] Release script tests ⇒ failure
+    STEP[10] Info.plist gate ⇒ skipped
+    STEP[11] Frame baseline vs working manifest (fixture-set gate) ⇒ success
+    STEP[12] Surface left-axis ruler (BACKLOG 234, wired in R210; venv interpreter in R218) ⇒ success
+    STEP[13] Frame baseline vs previous release (change report, report-only) ⇒ success
+    STEP[14] Runtime launch smoke (report-only) ⇒ success
+    STEP[15] Repo root stays bundle-free after make bundle (BACKLOG 620) ⇒ success
+    STEP[16] Built bundle content gate (D-029 stubs, BACKLOG 620 second half) ⇒ success
+    STEP[17] Swift tests (executed-count gate) ⇒ failure
+    STEP[18] Motion gate (BACKLOG 166, promoted from report-only census) ⇒ success
+    STEP[19] Capture gate (unregistered reds must be zero) ⇒ failure
+    STEP[20] On-screen probe coverage floor ⇒ failure
+    STEP[21] Motion coverage floor ⇒ failure
+    STEP[42] Post Run actions/checkout@v4 ⇒ success
+    STEP[43] Complete job ⇒ success
+红名 Built bundle content gate (D-029 stubs, BACKLOG 620 second half)（0 行正文）：（没有 Test Case failed 行）
+红名 Release script tests（0 行正文）：（没有 Test Case failed 行）
+红名 Swift tests (executed-count gate)（7 行正文）：testActionableInkStaysAboveTheLegibilityFloor,testCaptionTextStaysOnTheSecondaryTier,testDetailAreaHasASingleLeftAxis,testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed,testQuickPickKeyboardHintClearsTheContrastFloor,testTheInvariantDeclinesWhenTheLiftWouldNotFitTheScreen,testTheZoomedWindowIsMeasuredNotAssumed
+红名 On-screen probe coverage floor（0 行正文）：（没有 Test Case failed 行）
+红名 整份日志去重（步骤名这次归不出来 ⇒ 只能给这一格）（7 行正文）：testActionableInkStaysAboveTheLegibilityFloor,testCaptionTextStaysOnTheSecondaryTier,testDetailAreaHasASingleLeftAxis,testDetailStatusBarShowsTheRealSourceAppIconOnlyWhenAttributed,testQuickPickKeyboardHintClearsTheContrastFloor,testTheInvariantDeclinesWhenTheLiftWouldNotFitTheScreen,testTheZoomedWindowIsMeasuredNotAssumed
+读数 BUNDLE_CONTENT_GATE_RESULT：^[[36;1mgrep -E '^(BUNDLE_TARGET|BUNDLE_CONTENT_GATE_RESULT|BUNDLE_CONTENT)=' /tmp/bundle-content.log \^[[0m
+读数 APP_DELEGATE_STUB         ：BUNDLE_CONTENT_GATE_RESULT=ok APP_DELEGATE_STUB=absent 良性桩=3（ClipboardHistoryApp.ChineseSelectableNSTextView,ClipboardHistoryApp.Coordinator,ClipboardHistoryApp.QuickPickController）⇒ 这一维在 runner 上由这一步出声
+读数 SKIP_ROSTER 键=            ：本轮那一处（`SKIP_ROSTER 键=` 印在 `inner-red` 的 fail 之后）现在必须在门之前。 ... ok
+读数 Ran                       ：^[[36;1mexecuted=$(grep -oE 'Ran [0-9]+ tests?' /tmp/py.log | tail -1 | grep -oE '[0-9]+')^[[0m
+读数 PROBE_COVERAGE_SUMMARY    ：PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=0 闭合通道=未接 本次跑过=0 红=8
+读数 REPO_ROOT_BUNDLE_RESULT   ：REPO_ROOT_BUNDLE_RESULT=ok 这一格的读法：构建只落在暂存目录，仓库根干净
+预测=②新硬步骤第一次有读数 ⇒ 中〔命中 3 行〕^[[36;1mgrep -E '^(BUNDLE_TARGET|BUNDLE_CONTENT_GATE_RESULT|BUNDLE_CONTENT)=' /tmp/bundle-content.log \^[[0m
+预测=③SKIP_ROSTER 读数行必须在 runner 上出现 ⇒ 中〔命中 3 行〕本轮那一处（`SKIP_ROSTER 键=` 印在 `inner-red` 的 fail 之后）现在必须在门之前。 ... ok
+预测=④STEP[16] 红名集合不超出那 7 条 ⇒ 不中〔命中 3203 行〕^[[36;1m#     切点落在**行中间**（stdout 停在 `…bottomI`，下一行直接是 `Test Case …`）；^[[0m
+预测=⑤STEP[19] 那一朵要么还在要么消失 ⇒ 中〔命中 1 行〕PROBE_COVERAGE_SUMMARY 源码用例=14 登记=14 runner可跑=8 runner不可跑=6 本次下结论=0 闭合通道=未接 本次跑过=0 红=8
+预测=⑥电池汇总 Ran 比 R593 那一跑的 932 多 ⇒ 未读到（CI_CHANNEL_ABSENT：那一行在这一步的正文里出现 0 次）〔命中 0 行〕（没取到）
+```
+   2. **R593 那五条预测由脚本判（不目测）**：
+      · ②新硬步骤 `BUNDLE_CONTENT_GATE_RESULT=ok APP_DELEGATE_STUB=absent 良性桩=3` ⇒ **中**；
+      · ③`SKIP_ROSTER 键=github-runner … 内层判=…` 那一行在 runner 上出现了 ⇒ **中**（R593 把 print 挪到门之前，
+        这一格就是那一改的第一证人）；但同一行里 `名单外=['test_the_gate_reads_the_bundle_the_makefile_produces']`
+        ⇒ **本机绿而 runner 名单外多一颗**，本轮不判它（归 634/658 那一族，见本节③）；
+      · ④`STEP[16] 红名集合不超出那 7 条` ⇒ **不中**，但这一条要按 R588/R590 那一课写两格：
+        判法给的"命中行"是日志里一条 ANSI 注释行（`#     切点落在**行中间**…`）⇒ **不中可能是尺错而不是主张错**；
+        现读那一跑 STEP[17] 的红名确实有 **7** 条、其中两条是 R593/R594 自己新加的
+        （`testTheInvariantDeclinesWhenTheLiftWouldNotFitTheScreen`、`testTheZoomedWindowIsMeasuredNotAssumed`），
+        两条都在**本机已经改掉**的那两格里（本轮给它们加了 `premiseNotInFullScreen` 与具名缺席）⇒
+        所以 ④ 按判法记不中、按内容记"未定"，由含本笔的那一跑裁决；
+      · ⑤`PROBE_COVERAGE_SUMMARY … 红=8` ⇒ **中**（口径没变）；
+      · ⑥电池汇总 `Ran` 比 932 多 ⇒ **未读到**（`CI_CHANNEL_ABSENT`）：取处那一格写的是"以 `Ran ` 开头的汇总行"，
+        而 runner 把电池跑在 `if: always()` 的**下一步**，`Ran ` 那颗 token 在上面几步里被 grep 的是**脚本回显行**
+        ⇒ 与 R593 同一格同一个病，修法留给 668 那条守卫之外，见本节②第 3 条。
+
+① **真实推进（产品面 · 用户实测：两栏仍然不等宽、拖窗口只有右侧在变）= 对 R592/R593 那两轮的公开更正**
+   1. **根因不是旧构建，是实现方式**：列宽被 `MainWindowCollapsePolicy.columnWidth`（旧同名常量）
+      写成 `(expandedWidthDefault − seam)/2 = 423.5`，`ContentView` 两棵树把它当 min/ideal/max 钉死 ⇒
+      左栏永远不跟窗口走。R592/R593 落的是一次性几何迁移 + √2 不变量，**两轮的验收都只在 848 那一档量**，
+      而 848 恰好是常量成立的那一档 ⇒ 假绿。
+   2. **改之前的旧值**（同一判据、同一台机器、三档现读；`COLUMN_EQUALIZE`）：`旧值（M1620 落刀=把列宽钉回常量，即 R592/R593 交付里实际在跑的那一行；本机现读，取值时刻见本文件 mtime）`
+      —— 差 152pt / 352pt 那两档在旧验收里根本没有对象。
+      **落刀复现**：M1620 把那一行钉回常量（= R592/R593 交付里实际在跑的形状）⇒ 判据红在同一组数上
+      （`152.0 > 1.0`、`423.5 ≠ 499.5`）⇒ 旧值不是我回忆出来的，是**这一把刀现在还能打出来的**。
+   3. **改之后的新值**：`新值（改完之后本机现读，同一判据同一台机器；Executed 8 tests 0 failures）`
+   4. 实现（产品 4 文件）：
+      · `MainWindowCollapsePolicy.columnWidth(contentWidth:collapsed:)` —— 列宽由**当前分栏宽**推，
+        展开档 `(总宽 − 中缝)/2`、折叠档铺满；旧常量改名 `legacyConstantColumnWidth` 并**只留给刀落**（产品不再引用它当列宽）；
+      · `WindowConfigurator.Coordinator.equalizeColumns(in:)` —— 唯一把中缝放到"当前宽一半"的入口，
+        挂在 `windowDidResize` / `windowDidEndLiveResize` / `windowDidBecomeKey` / `windowDidBecomeMain` /
+        `scheduleSidebarCleanup` 的延迟补拍（SwiftUI 放列宽是异步的，与 R510 那颗开关同一形状）；
+        返回 Bool，"没找到分栏器"不许被读成"钉好了"；
+      · `ContentView` 两棵树把钉死值换成伸缩范围（min 200 / max .infinity），`ideal` 只剩**首帧那一档**、
+        由 `columnWidth(contentWidth:)` 从窗口宽推 —— 列宽本身不再是这里的任何一个值（刀 M1620 证明钉回去会红）；
+      · `MainWindowCollapsePolicy.shouldRememberWidth` + 控制器的 `memoryWritesSkipped`/`lastMemorySkip`
+        （靶 3 顺手落的第二条产品界：屏幕放不下那一档**不把超宽记进记忆**，否则下次启动永久非 √2）。
+   5. 判据：`FoldGeometryReanchorTests` +3 格（① 三档展开宽度 + 折叠档现找分栏器、两条出路各判各的；
+      ② 纯函数分档真值表；③ **首帧那一档**——只走 `WindowManager.showMainWindow()`、不做任何 `setContentSize`，
+      现读 `侧栏=374.5 详情槽=374.5 差=0.0 期望=374.5`），
+      `FoldGeometryMigrationTests` 里"记忆界"那一格带两行正对照。
+   6. **这一改带出来的一个行为变化，本轮没有再钉回去（写清，不藏）**：从前 min=ideal=max=常量 ⇒ 中缝
+      **物理上拖不动**；现在 SwiftUI 那一侧只给伸缩范围（min 200 / max .infinity），等分由 `setPosition` 落，
+      于是**两次 resize 之间**用户可以把分隔条拖到一个不对称的位置并停在那里（下一次拖窗口宽会被拉回中缝）。
+      本轮没有把 `minimumThickness/maximumThickness` 重新钉死 —— 那等于与 SwiftUI 的列宽约束抢布局，
+      而"抢赢"这件事在剩下的验证预算里没有证人。⇒ 具名进批次 93.3（请用户实测拖中缝那一条），
+      要不要"中缝永远拖不动"回到旧契约归用户（669 的第四条出路）。
+      ② 纯函数分档真值表；③ **首帧那一档**——只走 `WindowManager.showMainWindow()`、不做任何 `setContentSize`，
+      现读 `侧栏=374.5 详情槽=374.5 差=0.0 期望=374.5`），
+      `FoldGeometryMigrationTests` 里"记忆界"那一格带两行正对照。
+   刀 **M1620 / M1621 / M1622** = 用户点名的三向（钉回常量 / 只改一侧 / 折叠态用展开档列宽），
+   三把各红在**不同的断言**上：M1620 同时红在三档差值**和**首帧那一格（`423.5 ≠ 374.5`、差 98.0pt）、
+   M1621 红在两档差值、M1622 红在纯函数那一格 ——
+   只落一把就等于"另一条坏法还能绿着交付"。
+
+② **真实推进（仪器面 · 靶 2 + 靶 4：三件"写在 ⑨ 里的事"做成会红的守卫）**
+   1. `scripts/prediction_block_guard.py`（新，668 那条出路）：现读最新的 `ci_status_r*.py`，取
+      `PREDICTIONS_R<nnn>` 里最大那一块，逐条查四格齐（主张/判法/取处/通道）并**真调用判法**三种输入
+      （合成正文 / 空 / 完全无关）：崩 ⇒ 红（R593 那两条 NameError 的形状）、空输入为真 ⇒ 红（absence 被满足）、
+      无关输入为真 ⇒ 红（没牙）。本轮它第一跑就抓到自己两处：①一条判法坐死 True、⑤`max()` 在空列表上崩。
+      读数：`PREDICTION_BLOCK_RESULT=ok`。**668 因此从"散文"变成"门"，但结案仍要含本笔的那一跑签**（尺是被本笔改的）。
+   2. `scripts/instrument_quote_guard.py`（新）：台账里"从仪器输出抄一行"那些句子必须对得上被抄那一行的**表名/臂号**
+      （R593 ④ 抄成 `mutate_r245` 那一朵）；扫描面=名册，`PREDICTION_BLOCK_RESULT=ok` 第二行是现读计数。
+   3. `scripts/ledger_idempotency_gate.py`（新）：写手重放两趟 ⇒ 第二趟七本 md5 必须一字不改；
+      顺序是"先落盘、再取快照、再重放"（第一版把快照取在第一次之前 ⇒ 幂等写手被判红，尺读错对象）。
+      本机现读：见本节⑦那一趟（电池之后）。
+   4. `scripts/ledger_preflight.py`（R593 那一支，本轮改两格）：认"本轮那一节"从**只看位置**改成
+      **按轮次号认**，并把取到的那一节逐字打印（`依据/位置/内容/一致/切到/依凭`）；判据卷扩到
+      `格子=11 不符=0`，刀 M1615 钉"退回只看位置"。
+      ⚠ M1615 **第一次落下是 PASSED（空刀）**：`locate` 选了哪一节没有读数 ⇒ 加 `切到=` 那一格 + 两格对照才响。
+   5. CI 接线：三支守卫的自检卷都放在 `scripts/tests/`，被判据卷那一步的
+      `python3 -m unittest discover -s scripts/tests` **自动收到**（不是显式接线，这一点写清楚）⇒
+      runner 上 STEP[9] 应当印出 `PREDICTION_BLOCK_RESULT=` / `INSTRUMENT_QUOTE_RESULT=` 两行，
+      这正是 R589 那一课的正面形状（**只在测试里被调用的守卫在 CI 上没有读数行** ⇒ 读数行要由那一卷自己印）。
+
+③ **靶 1：655 的成因与本轮那朵红互相矛盾 ⇒ 先量，不选边**
+   恒等式与出处逐张读数在 `drift_identity.txt`：`DRIFT_IDENTITY 本轮目录=/tmp/r593v1 倍率="2.00x" 基准=docs/frame_baseline.json(working) png=356 会话目录=66 倍率取值=2.00x`
+   现读的三件事：① 本轮变帧总数与"已登记 + 未登记"对得上（不是 17 这一个数）；
+   ② 名册那 16 行的 `observed` 哈希**在同倍率的会话里 11–14/14 命中** ⇒ 第①甲（名册读错对象）**被否**；
+   ③ 那 17 张里 12 张逐字节不同而像素相同、17 张按 luma>8 数都是 0 颗 ⇒ 第①乙（差量真的又在漂）**成立**。
+   ⇒ 于是 655 那句"跨会话一次性差"需要一条 **forward 更正**（旧原文不删，见 BACKLOG 655 追账），
+     并新开 **669**（判据只量一个宽度这一族在几何面复发）与 **670**（折叠档那一列今天只有纯函数证人）。
+   红线照单：**门这一轮仍红着交出去**（`FRAME_BASELINE_AGAINST=working`），`register-drift --restamp`、改 `observed`、`update`
+   一条都没做，也没把这朵红改成具名不判；它仍由 655 跟踪。
+
+④ **靶 3：那 2.0s 在等什么 —— 量完之后撤掉两把为不可达状态写的产品守卫**
+   1. 等的是 `styleMask` 里那颗 `.fullScreen` 位（现读：置位 0.04s / 清位 ≈6.07s），**不是**
+      `windowDidExitFullScreen` 通知（通知在单测进程里投递 **0** 次）⇒ 前一版拿通知当出口是等一个不会来的东西。
+   2. 拆成三种修法相反的具名出路：(甲) 事件从不发生（投递 0 次）／(乙) 事件晚于 2.0s（mask ≈6.07s 清）／
+      (丙) 那个状态对产品窗根本不可达。**本轮量到的是 (丙)**：`WindowConfigurator` 写死
+      `collectionBehavior = [.managed, .fullScreenNone]` ⇒ `toggleFullScreen` 之后 mask 永不含 `.fullScreen`。
+      所以"多等会就绿"不是结论：契约上这一档不该等，等的预算和退出全屏的收尾都是**没有对象的窗口**。
+   3. 由此本轮做了两件"往回收"的事：① 删掉整卷全屏退出仪器（它量的是不可达状态）；
+      ② **撤掉我本轮早些时候为全屏加的两条产品守卫**（`applyGeometry` 里那两条对不可达状态兜底），
+      改成一条**契约格**（`testTheMainWindowRefusesFullScreenBecauseTheConfiguratorPinsFullScreenNone`，
+      断言 mask 在 2.0s 与 8.0s 都不含 `.fullScreen`、帧不变）+ 刀 **M1619**（把 `.fullScreenNone` 换成
+      `.fullScreenPrimary` 必须红）。⇒ 记进 ⑨：**为不可达状态写产品兜底 = 给自己造空刀**。
+   4. 落下来的真实产品改动是 `shouldRememberWidth`（同一处代码的**可达**分支）+ 放大→折叠那一格
+      `FOLD_ZOOM_MEMORY`，界与 `heightLift` 用同一条式子（真值表 7 行含两行正对照），刀 M1617/M1618 一正一反。
+
+⑤ **验证链（顺序照派单）+ 换装**：build `warnings=0` → 判据卷（Swift `FoldGeometryReanchorTests` 7 格 +
+   `FoldGeometryMigrationTests` 全绿；python 新增 `test_prediction_block_guard` 10 +
+   `test_instrument_quote_guard` 9 + `test_ledger_idempotency_gate` 6 + `test_ledger_preflight` 扩到 11）→
+   刀 M1611–M1622 十四把（**落刀前现读高水位=M1610**）→ 新表 `mutate_r594_knives` 已进预检名册
+   （`mutate_r594_knives M1611 ok；M1612 ok；M1613 ok；M1614 ok；M1615 ok；M1616 ok；M1617 ok；M1618 ok；M1619 ok；M1620 ok；M1621 ok；M1622 ok`；第一次跑 `bad=2` = 本轮产品改动撞断 M1369/M1478 两支老锚点，重锚后各复跑 CAUGHT、
+   预检串行重跑到 `bad=0`；期间与捕获并行那一次撞 SwiftPM 锁报 `NOT_RUN_TIMEOUT`，读数作废不算证人）→ 重捕帧（`Executed 233 tests, with 4 tests skipped and 0 failures (0 unexpected) in 667.639 (667.659) seconds`）→ 帧基线门（`FRAME_BASELINE_AGAINST=working`，红着交出去）→ 看图（本节⑥）→
+   全量卷 `Executed 10 tests, with 0 failures (0 unexpected) in 1.650 (1.651) seconds` → **换装**（用户手上那份不是这一轮的实现 ⇒ 本轮必须换）→ 七本台账 → 派生格现读 → 电池。
+   **换装那一趟现读**：`目标        = /Applications/时间剪史.app；新包        = /tmp/时间剪史_bundle/时间剪史.app；备份        = /Users/wangziyi/Documents/Codex_Project0_backups/before-local-20261107-011331；REPO_ROOT_CHECK_PHASE=plan rc=0；模式        = 真换装；已装版本    = 1.4.8  sha=ca53b2778ac36227…；REPO_ROOT_CHECK_PHASE=after-build rc=0；新包 sha    = 9434c6d45c4c2b5a…；   SMOKE_OK=1；旧包已移入  = /Users/wangziyi/Documents/Codex_Project0_backups/before-local-20261107-011331（这一族的 20+ 份可启动副本 = BACKLOG 664，本笔不动它）；staged    = 9434c6d45c4c2b5a…；installed = 9434c6d45c4c2b5a…；INSTALL_SHA_MATCH=1；INSTALL_SIGNATURE=local flags=0x0（固定身份 ⇒ 授权可以跨轮活下来）；INSTALL_RUNNING_PID=1858 启动晚于安装，exe 路径逐字对上 /Applications/时间剪史.app ✔；INSTALL_ENTRIES_BEFORE=505  INSTALL_ENTRIES_AFTER=505；INSTALL_REPO_ROOT_BUNDLE=absent（期望 absent；present 就是 620 复发）；INSTALL_RESULT=ok  版本=1.4.8→1.4.8；构建产物时刻 = 2026-11-07 01:13:38（ClipboardHistoryApp）；安装时刻 = Nov  7 01:13:38 2026；给用户复核的指纹 = sha 前缀 9434c6d45c4c2b5a（上一份是 ca53b2778ac36227）`
+
+⑥ **看图那一腿**：`看图那一腿（靶 5 那一改在帧通道里到底有没有对象）现读四格：
+1. 逐字节：本轮 /tmp/r594/shots 356 张与上一批 /tmp/r593v1 356 张 **356/356 逐字节相同、0 张不同**（md5 全等）；
+2. 门：`FRAME_BASELINE_COMPARED=356 CHANGED=29 MISSING=0 ADDED=0` ⇒ `FRAME_BASELINE_RESULT=red 拦路=17（未登记13 出处不符4）` —— 与 R593 交出去的那一朵**同一个 17**，一行没新增、一行没登记；`29 = 17 拦路 + 12 已在漂移名册` ⇒ 与靶 1 那条恒等式对得上；
+3. 帧通道里**有**中缝的证人，但它只量一档：`FOLD_SEAM_PIXEL light 帧=1696x1200 倍率=2.00x 缝列=424.5pt 跳变=54.0 期望=424.0pt 地板=8pt`（dark 同一档：缝列=424.5pt 跳变=17.0）⇒ 这一格在旧实现下**本来就是绿的**，因为夹具那一档就是 848、而 848/2 恰好等于那个常量 —— 这就是用户报的那朵缺陷在像素侧的假绿本体；刀 M1478（列宽退回可拖区间）现在仍能把它打红（`testTheSeamInTheRenderedFrameSitsAtHalfTheContentWidth` 三行红话），所以它不是没牙，是**只有一档有牙**；
+4. 为什么本轮这一改在像素上完全不动（除 848 那一档本来就对）：捕获夹具那棵树只渲染 `ContentView`，`WindowConfigurator` 挂在 `App.swift:83` 的根上 ⇒ **夹具里没有产品那套等分**，帧里的中缝位置由 SwiftUI 的初始档给。证人：`main-sidebar-title-hover-750x560-light.png` 我打开看了，侧栏右沿在 423.5pt（750 那一档的等分应当是 374.5）⇒ 非 848 宽的帧**结构上看不见**这一改（新开 671，与 666 同一维、比 666 更硬：666 说的是默认几何，这一条说的是整个窗口布局）。
+⇒ 结论（不许反过来读）：本轮**不能**写「帧逐字节相同 ⇒ 产品没动」，也不能写「帧没变 ⇒ 没修好」；这一改的证人是真窗口两条独立口径（侧栏帧宽 + 分隔条位置）的现读差值 + 三把刀 + 用户手上换装后的新构建（批次 93.1）。
+没做的事：没有为了让帧动起来去改夹具尺寸或往夹具里挂 `WindowConfigurator`（那是 671 的出路甲，会重烤一批基线，归用户）。`
+
+⑦ **基线与名单**：产品文件 4 个（`MainWindowCollapsePolicy.swift`、`MainWindowCollapseController.swift`、`WindowConfigurator.swift`、`ContentView.swift`），连续零改动 **1** 轮（唯一取数口 `python3 scripts/product_streak.py`，**台账落盘之后**现读 `PRODUCT_STREAK ledger_round=593 streak=1 sections=569 as_of=last=c08d432 last_round=592 newest=c08d432 newest_round=592 date=2026-11-06 标签补自台账=9(fb2cea0,117f45d,7ebda4c,cd9d0cb,2eb1bee,8cbe238,0c97820,b09d646,bf6b921)`；as-of 口径 ⇒ 读作「本轮之前最后一次产品改动在 1 轮前」；本轮又是产品轮 ⇒ 下一轮那一格的分界换成本笔、读 1 —— 用户要的『回到 0』在这一把尺上到不了 0（`streak_at` 用严格小于，本轮自己那一笔不记进自己那一格），**复位值就是 1**〔streak-cell-end〕）。本轮动过的其余文件 `.scratch/motion-audit-2/ci_status_r593.py、.scratch/motion-audit-2/mutate_needle_precheck.py、ClipboardHistory/Sources/ClipboardHistoryApp/Managers/MainWindowCollapseController.swift、ClipboardHistory/Sources/ClipboardHistoryApp/Managers/WindowConfigurator.swift、ClipboardHistory/Sources/ClipboardHistoryApp/Models/MainWindowCollapsePolicy.swift、ClipboardHistory/Sources/ClipboardHistoryApp/Views/ContentView.swift、ClipboardHistory/Tests/ClipboardHistoryAppTests/FoldGeometryMigrationTests.swift、ClipboardHistory/Tests/ClipboardHistoryAppTests/FoldGeometryReanchorTests.swift、scripts/ledger_preflight.py、scripts/tests/test_ledger_preflight.py、.scratch/motion-audit-2/ci_status_r594.py、.scratch/motion-audit-2/drift_identity_r594.py、.scratch/motion-audit-2/ledgers_r594.py、.scratch/motion-audit-2/mutate_r594_knives.py、.scratch/motion-audit-2/patch_channels_r594.py、.scratch/motion-audit-2/r594_post_land.py、.scratch/motion-audit-2/r594_state_buji.py、scripts/instrument_quote_guard.py、scripts/ledger_idempotency_gate.py、scripts/prediction_block_guard.py、scripts/tests/test_instrument_quote_guard.py、scripts/tests/test_ledger_idempotency_gate.py、scripts/tests/test_prediction_block_guard.py`。帧基线门现读 `FRAME_BASELINE_AGAINST=working`；列宽在 848 那一档**数值未变**
+   （423.5/423.5），但产品树里 `equalizeColumns` 会多做一次布局判断 ⇒ 帧是否逐字节不变**由门说，不由我说**；
+   `update` 一次没跑，漂移名册一字未动（派单红线：四张按机器登记的表不许改），名册/豁免表一字未动；
+   `SKIP_ROSTER` 本轮**没有**新增条目（靶 3 那格改成契约格而不是 skip）。
+
+⑧ **闸门、单子与人工验收（§3 第③段今天仍不开工，本轮推的是第①段交付缺陷返修）**：
+   `STAGE2_CLICKTHROUGH_BLOCKED=awaiting-user-mechanism-choice`、
+   `STAGE3_FRAME_CRITERIA_HAVE_NO_RUNNER_WITNESS=awaiting-654-direction`、
+   `PRODUCT_MAIN_TREE_TRANSPARENT_OBJECT_NOT_JUDGED=backing-covers-whole-tree`、
+   `FRAME_BASELINE_DRIFT_NOT_JUDGED` 四条一字未撤；规格里「三问全过」出现次数仍是 0；
+   第③段（着色器）本轮未开工。
+   仍归用户（一条不代选）：655/656/657/658/659/660/661/662/663/638①/654/646/647/650/651/653/644/639/640/
+   637/633/664/665/666/667/**668**/**669**/**670**/**671**/Motion ≥2 帧地板/SSH 成因/手感签字；
+   4.5 墨地板、150 上限、120ms、Motion ≥2、2x 8.0pt、1x 6.0pt、`FLOOR_LIGHT=1.20`、`FLOOR_DARK=1.10`、
+   容差 1.5、跳变地板 8、`probeInkFraction=3%`、`.contentFade` 0.20、`--allow-missing`、
+   四张按机器登记的表、既有名册与豁免表 —— 一字未动；`update` 一次没跑；没改这台机器的全局外观；
+   没动用户的 Dock 与登录项；帧与日志不含真实剪贴板原文。
+   **人工验收批次 93**：93.1 把主窗**拖宽/拖窄各几次**，看左右两栏是不是**一起**变（用户实测那一句：
+   从前只有右侧预览在变）；93.2 折叠一次再展开，展开那一下的左栏是不是仍然等于当前窗口宽的一半；
+   93.3 **拖一下中缝**（分隔条）：现在它在两次改窗口宽之间是可以拖走的、松手会停在你放的位置 ——
+   请判这一条要不要回到旧契约「中缝永远拖不动」（本轮没把它钉回去，理由见主节①·6）；
+   93.4 批次 92.1/92.2 那两条如果还没做，本轮仍然挂着。
+
+⑨ **自伤（照实，不缩）**：
+   1. **幂等第四次**：本轮台账写手前三次靠手工"我看过没重复"。这一维从今天起由
+      `ledger_idempotency_gate.py` 判（重放两趟 + md5 对拍），不再由我数 ⇒ 但**这一格今天只有本机证人**，
+      runner 那一维要等含本笔的那一跑。
+   2. **两条产品守卫写给一个不可达的状态**：靶 3 的量还没做完就往 `applyGeometry` 里塞了"在全屏里怎么办"，
+      而产品窗 `.fullScreenNone` ⇒ 那两行永远不会被走到，刀落下去只能是空刀。撤掉、改成契约格 + M1619。
+      ⇒ 规矩：**先证状态可达，再写兜底**。
+   3. **M1615 第一次落下是 PASSED（空刀，又一形态：变异改了选择结果而选择结果没有读数）**：
+      `locate` 换了选节方式但**没有印出选了哪一节** ⇒ 判据无法分辨。加 `切到=` 读数 + 两格对照才 CAUGHT。
+   4. **判据读了错对象（帧尺度之外的第二次）**：`splitView.arrangedSubviews[1].frame.width` 实测是**整个分栏宽**
+      而不是详情列宽 ⇒ 848 那一档被报成"左右差 424.5"。改成"侧栏帧宽 + 分隔条位置"两个独立口径推详情槽。
+   5. **折叠档读了一个已下树的视图**：折叠后产品换的是 `collapsedLayout`（没有分栏器），
+      而判据复用上一个 `split` 引用 ⇒ 读到 848.0 的旧帧，报成"这一档没折起来"。改成现找 + 两条出路各判各的。
+   6. **`setContentSize` 之后没排版就读** ⇒ 读到的是没重排的帧（同一格第 4、5 条之外第三次"尺读错对象"）。
+   7. **heredoc 里写中文说明 + ASCII 双引号又炸了一次**（本轮第一次），补丁没落盘；
+      接着第一个补丁又把锚点里的 `u"取处"` 一起吞了 ⇒ 文件坏在半路，`git checkout HEAD --` 才收回来
+      （未提交的改动，台账没被波及）。⇒ 规矩照旧：**补丁写成文件、不用 heredoc**。
+   8. **`gh run view --json jobs -q` 那串 jq 被步骤名里的引号打断** ⇒ 改成 python 里格式化（R565 那一族：
+        把结构交给不会碎的通道）。
+   9. **预检与捕获并行撞了 SwiftPM 锁** ⇒ `mutate_needle_precheck` 报 `NOT_RUN_TIMEOUT`。
+      这不是腐烂（R558 那一课）：读数作废、串行重跑，本轮台账里的预检数是**重跑之后**那一份。
+   10. **runner 上红着两格我自己本轮/上轮加的判据**（`testTheInvariantDeclinesWhenTheLiftWouldNotFitTheScreen`、
+       `testTheZoomedWindowIsMeasuredNotAssumed`）：两格的前提都写死在**本机形状**上（可见帧高度、上一格退出全屏没走完
+       留下的污染），本轮改成本机也走"具名缺席"（`screen-tall-enough` / `premiseNotInFullScreen`）⇒
+       **裁决只能由含本笔的那一跑说**，本轮不许自称修好。
+   11. **`SKIP_ROSTER` 那一行在 runner 上报 `名单外=['test_the_gate_reads_the_bundle_the_makefile_produces']`**：
+       R593 新增的那一格没有登记 ⇒ 634 那一族的旧账，本轮只在 ⓪ 里读数、没动登记（登记归用户，一条不代选）。
+   12. **一条预测的"取处"写得不完整**：预测④ 的判法在 runner 日志里给出的命中行是一条 ANSI 注释行
+       （`#     切点落在**行中间**…`）⇒ "不中"这个结论里混着**尺错**的成分。本轮不回头改判法（R588 那一课：
+       判法一字不改、两个读数一起写），只把"取处必须写明 `--log` 还是 `--log-failed`"写进 ⑨ 与 R595 的 ⓪。
+   13. **本轮的产品改动撞断两支老刀的锚点**：**改之前**预检那两行现读
+       `mutate_r510_sidebar_toggle M1368 ok；M1369 命中=0` 与
+       `mutate_r567 M1476 ok；M1477 ok；M1478 命中=0；M1479 ok`
+       （前者钉的是 `windowDidResize` 整段原文，我往那段里加了等分；后者的起点正是被撤掉的钉死值）；
+       **重锚之后**同一张表的两行都读 `ok`（`bad=0` 那一趟见本节⑤）。
+       ⇒ 按 R580 那条规矩**改新代码不动老表的语义**：M1369 重锚到"等分之后仍要补延迟清理"那两行、
+       M1478 起点换成现在这一行而终点（可拖区间 250~340）一字未改；两把各复跑一次 **CAUGHT / RESTORE_CLEAN=yes**。
+       记这一条是因为形状：**改了产品就必须当场重跑预检**，否则下一轮的预检才是第一次响。
+   14. **一次"把尺读错对象"发生在自己身上并被自己的探针否证**：我先按胶片写下"首帧没等分 ⇒ 要加一拍"，
+       PROBE-594-A（把 `becomeKey`/`becomeMain` 两拍一起摘掉再跑那一格）**仍然绿** ⇒ 首帧由 resize 那条路兜住，
+       真正的成因是夹具那棵树不挂 `WindowConfigurator`（671）。⇒ 规矩：**落产品之前先跑一次"摘掉它会红吗"**；
+       两拍留着（覆盖"开窗时宽没变过"那一档）但具名 `COLUMN_EQUALIZE_NO_WITNESS=no-resize-launch`，不占刀号。
+
+- **红名对账**（口径=对账口径已启用；归属由 `red_name_reconciliation.py` 判，不由我数）：
+  · 红名「帧基线门 `FRAME_BASELINE_RESULT=red 拦路=17（未登记13 出处不符4）`」→ 不计入对账口径（基名在漂：
+    本轮身份读数给出"名册 observed 在同倍率会话里 11–14/14 命中、17 张里 12 张字节不同而像素相同"⇒
+    归 655 跟踪，门红着交出去，`register-drift`/改 `observed`/`update` 一条没做）
+  · 红名「runner STEP[17] 那两格本轮/上轮新加的判据（`testTheInvariantDeclines…`、`testTheZoomedWindowIsMeasured…`）」→ ⑨·10
+  · 红名「runner STEP[9] `SKIP_ROSTER … 名单外=[test_the_gate_reads_the_bundle_the_makefile_produces]`」→ ⑨·11
+  · 红名「预测④按判法不中、命中行是一条 ANSI 注释」→ ⑨·12
+  · 红名「预测⑥电池 `Ran` 那一格连续两轮 `CI_CHANNEL_ABSENT`」→ 不计入对账口径（通道未跑：取处那一格的 `Ran ` token
+    在 runner 上被上面几步的脚本回显行抢走，本轮没有把它改成具名不判，留作 668 之外的下一格）
+  · 红名「预检 `NEEDLE_PRECHECK … bad=2`（M1369/M1478 命中=0）」→ ⑨·13
+  · 红名「刀 M1615 第一次落下是 PASSED（空刀）」→ ⑨·3
+  · 红名「预检 `NOT_RUN_TIMEOUT`（撞锁那一次）」→ ⑨·9
+  · 红名「`ledger_preflight` 判据第一版把 `切到=` 落空 ⇒ M1615 落不下去」→ ⑨·3
+
+
 ## R593 状态（2026-11-06 · 第 592 轮 / Round 590 · **产品 2 文件**（√2 不变量补上「放得下」那一半）+ 判据 +34 格 + 刀 M1598–M1610 十三把全 CAUGHT + ⓪ R592 主笔那一跑到数、五条预测三中一不中一未读到）
 
 ⓪ **现读两对（`ci_status_r593.py`，取值时刻 20:04–20:11，主笔那一跑 `completed / failure`、补记笔那一跑 `in_progress`）**：

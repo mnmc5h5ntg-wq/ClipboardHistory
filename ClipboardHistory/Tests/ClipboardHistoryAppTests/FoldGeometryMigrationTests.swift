@@ -74,6 +74,19 @@ final class FoldGeometryMigrationTests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))
     }
 
+    /// R594 靶 3 的自伤补丁（本轮实测到的形状）：进全屏在这台机器上做得到，**退出做不到的那一半**
+    /// 会把状态留给下一格 —— 同一格放大单独跑是 `1201×850 / 离√2=0.0013`，接在全屏格后面变成
+    /// `1470×923 / 0.1784`（那是全屏那一帧，不是放大档）。⇒ 前提不许写在注释里，要写成会出声的一格。
+    private func premiseNotInFullScreen(_ label: String) throws {
+        let stuck = NSApp.windows.filter { $0.styleMask.contains(.fullScreen) }
+        guard stuck.isEmpty else {
+            throw XCTSkip("\(label)_NOT_RUN=fullscreen-contamination —— 跑到这一格时还有 \(stuck.count) 扇窗带 "
+                        + ".fullScreen ⇒ 这一格要量的对象不在这个会话里。本轮实测过：一扇**允许**全屏的自建窗"
+                        + "退出要 ≈6s（比 R593 那格的 2.0s 墙钟长得多），任何没走完的转换都会把状态留给下一格；"
+                        + "修法在把观察窗开够并让它自己收尾，不在放宽这一格的断言")
+        }
+    }
+
     private func makeWindow() -> NSWindow? {
         WindowManager.showMainWindow()
         settle(0.12)
@@ -408,6 +421,7 @@ final class FoldGeometryMigrationTests: XCTestCase {
     func testTheZoomedWindowIsMeasuredNotAssumed() throws {
         setUpProduct()
         defer { tearDownProduct() }
+        try premiseNotInFullScreen("FOLD_ZOOM_MEASURE")
         guard #available(macOS 13.0, *) else {
             throw XCTSkip("FOLD_ZOOM_MEASURE_NOT_RUN=pre-13 —— 12 上没有 contentAspectRatio 那条锁，"
                         + "这一档的'放大之后比例还在不在锁上'问的是不存在的锁；本机 13+，这一格只在 12 那台机器上缺席")
@@ -434,61 +448,137 @@ final class FoldGeometryMigrationTests: XCTestCase {
         // 这台机器实测：`zoom` 把窗口铺到可见帧（比例不再是 √2）⇒ `isZoomed` 是真的、且不变量会在下一趟出声。
         // 那么"下一趟 applyGeometry 把用户放大的窗口收回 600 高"就是可观察的产品行为，必须由 D5 说能不能接受。
         XCTAssertTrue(window.isZoomed, "zoom(nil) 之后 isZoomed 还是 false ⇒ 这一格量到的不是放大态，读数作废")
-        // 这台机器实测：放大把窗口铺到可见帧（1201×850），而那一档**仍在 √2 的容差内**（差 0.0013）⇒
-        // 不变量在放大档不出声。这一格钉的是安全性质（放大不会被收回），前提（放大仍等比）由上面那行读数说；
-        // 换一台机器若前提变了，红话要指向前提而不是结论 —— 所以它写成断言，不写成注释。
-        XCTAssertLessThan(abs(Double(zoomed.width / max(zoomed.height, 1)) - 2.0.squareRoot()), 0.02,
-                          "放大档离 √2 超过容差 ⇒ 下一趟 applyGeometry 会把用户放大的窗口收回 600 高，"
-                          + "这件事必须由 D5 说能不能接受（本机实测不该走到这里）")
+        // 这台机器实测：`zoom` 把窗口铺到可见帧（1201×850），那一档**仍在 √2 的容差内**（差 0.0013）
+        // ⇒ 不变量在放大档不出声。但这条"仍在容差内"是**屏形给的**，不是产品的性质：
+        // R593 主笔那一跑在 runner 上就红在这里（`42227982898` STEP[17]，放大档离 √2 出容差）。
+        // 红的话是那两句话互相矛盾：一边写"本机实测不该走到这里"，一边把结论钉成"不许抬"——
+        // 而"放大被收回"到底能不能接受，是 D5/667 交给用户的那一条。⇒ 前提不成立就具名缺席，
+        // 结论只在前提成立时判（记忆 R566/R577：skip 型出口必须与断言同函数、且自带负半证人）。
+        XCTAssertTrue(window.isZoomed, "zoom(nil) 之后 isZoomed 还是 false ⇒ 这一格量到的不是放大态，读数作废")
+        let withinTolerance = abs(Double(zoomed.width / max(zoomed.height, 1)) - 2.0.squareRoot()) <= 0.02
+        if !withinTolerance {
+            throw XCTSkip(String(format:
+                                     "FOLD_ZOOM_MEASURE_NOT_RUN=zoomed-frame-off-ratio —— 这台机器放大档离 √2 %.4f"
+                                     + "（放大档 %.1fx%.1f，可见帧 %.1fx%.1f）出容差 ⇒ 「放大不会被下一次 apply 收回」"
+                                     + "在这一档没有对象。这不是缺陷也不是没事：它正是 D5/667 要用户判的那条让位，"
+                                     + "本轮不代选",
+                                 abs(Double(zoomed.width / max(zoomed.height, 1)) - 2.0.squareRoot()),
+                                 zoomed.width, zoomed.height, visible.width, visible.height))
+        }
         XCTAssertNil(liftedWhileZoomed,
-                     "放大档被不变量判成'要抬' ⇒ 放大这一条合法通路会被抹掉（本机实测是 nil）")
+                     "放大档明明落在 √2 容差内却被判成'要抬' ⇒ 容差那一格被改坏了（本机与 runner 都该在这一句红）")
     }
 
-    /// 第二条合法通路：系统全屏。量的是**退出全屏之后**那扇窗还在不在 √2 上 ——
-    /// 不在 ⇒ 不变量会在下一次 apply 时把它收回规格档（那是修，不是抹）；在 ⇒ 这一条通路根本不构成例外。
-    func testFullScreenExitIsMeasuredNotAssumed() throws {
+    // MARK: - ⑦ R594 靶 3：那一档对产品主窗根本不可达 —— R593 的两格量的是自建窗（对象错位）
+
+    /// R593 的 ⑥ 那两格（放大 / 全屏）都用 `NSWindow(contentRect:styleMask:…)` **自建窗**量，
+    /// 于是留下一句"全屏是一条合法的把宽高一起推到非 √2 的通路"。本轮把同一套动作放到
+    /// **产品自己的窗口**上，读到的不是同一件事：`WindowConfigurator.swift:105` 给主窗写了
+    /// `collectionBehavior = [.managed, .fullScreenNone]` ⇒ 主窗被契约禁止全屏，
+    /// `toggleFullScreen(nil)` 在 2.0s（R593 用的那个时长）与 8.0s 之内都没让 `styleMask` 带上那一位。
+    /// ⇒ 那句"合法通路"**对产品窗口不成立**：1470×923 是一扇产品从不创建的窗。
+    /// 这一格钉的是契约本身 —— 哪天 `.fullScreenNone` 被摘掉，它先红，下一轮才许谈全屏那一档。
+    func testTheMainWindowRefusesFullScreenBecauseTheConfiguratorPinsFullScreenNone() throws {
         setUpProduct()
         defer { tearDownProduct() }
-        guard #available(macOS 13.0, *) else {
-            throw XCTSkip("FOLD_FULLSCREEN_MEASURE_NOT_RUN=pre-13 —— 同放大那一格，12 上没有那条锁")
-        }
-        let visible = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let window = NSWindow(contentRect: NSRect(x: visible.minX + 8, y: visible.maxY - 608,
-                                                  width: 848, height: 600),
-                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                              backing: .buffered, defer: false)
-        controller.applyGeometry(to: window)
+        guard let window = makeWindow() else { return }
+        XCTAssertTrue(window.collectionBehavior.contains(.fullScreenNone),
+                      "主窗的 collectionBehavior 不再含 .fullScreenNone ⇒ 全屏那一档变成可达，"
+                    + "而 §3 第①段的验收没为它写过任何东西：这一格必须先红，全屏那一半要重新量")
         window.makeKeyAndOrderFront(nil)
+        settle(0.1)
         let before = window.contentRect(forFrameRect: window.frame).size
         window.toggleFullScreen(nil)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
-        let inFullScreen = window.styleMask.contains(.fullScreen)
-        let fullSize = window.contentRect(forFrameRect: window.frame).size
-        window.toggleFullScreen(nil)
-        RunLoop.main.run(until: Date().addingTimeInterval(2.0))
+        settle(2.0)                                        // R593 那一格用的就是这一个时长，要对得上
+        let maskAfterOldBudget = window.styleMask.contains(.fullScreen)
+        settle(6.0)                                        // 本轮实测：自建窗退出全屏要 6.07s，这里给足
+        let maskAtEnd = window.styleMask.contains(.fullScreen)
         let after = window.contentRect(forFrameRect: window.frame).size
-        let stillFullScreen = window.styleMask.contains(.fullScreen)
-        let liftedAfterExit = MainWindowCollapsePolicy.heightLift(collapsed: false,
-                                                                  width: after.width,
-                                                                  height: after.height)
         CaptureReadings.emit(String(format:
-                                        "FOLD_FULLSCREEN_PATH 进全屏=%d 全屏档=%.1fx%.1f 退出后=%.1fx%.1f 退出前=%.1fx%.1f 还在全屏=%d 不变量出声=%d 抬到=%.1f 可见帧高=%.1f",
-                                    inFullScreen ? 1 : 0, fullSize.width, fullSize.height,
-                                    after.width, after.height, before.width, before.height,
-                                    stillFullScreen ? 1 : 0,
-                                    liftedAfterExit == nil ? 0 : 1,
-                                    liftedAfterExit ?? 0, visible.height))
-        try XCTSkipIf(!inFullScreen,
-                      "FOLD_FULLSCREEN_MEASURE_NOT_RUN=no-space —— 这台机器进不去全屏（无头/没有可用空间），"
-                        + "这一格在 runner 与本机都是**没跑**，不许读成'全屏无害'")
-        // 退出动画没走完 ⇒ 量到的还是全屏那一档。这一格的前提是"已经退出"，前提不成立就具名不判，
-        // 不许把"还在全屏"读成"退出之后宽度丢了"（那是把仪器没等到写成产品缺陷）。
-        try XCTSkipIf(stillFullScreen,
-                      "FOLD_FULLSCREEN_MEASURE_NOT_RUN=exit-not-settled —— 2.0s 之后 styleMask 仍带 .fullScreen ⇒ "
-                        + "退出没走完，这一格没有对象；不许据此说产品把宽度弄丢了")
-        XCTAssertEqual(after.width, before.width, accuracy: 1.0,
-                       "退出全屏把宽度丢了 ⇒ 用户的全屏回来不是原来那扇窗（本机实测应当回来）")
+                                        "FOLD_MAINWINDOW_FULLSCREEN 契约=fullScreenNone 请求后2.0s mask=%d "
+                                        + "8.0s后 mask=%d 尺寸前=%.1fx%.1f 尺寸后=%.1fx%.1f",
+                                    maskAfterOldBudget ? 1 : 0, maskAtEnd ? 1 : 0,
+                                    before.width, before.height, after.width, after.height))
+        XCTAssertFalse(maskAfterOldBudget,
+                       "产品主窗在 2.0s 内带上了 .fullScreen ⇒ 契约被绕过（上一行是读数）")
+        XCTAssertFalse(maskAtEnd,
+                       "产品主窗在 8.0s 内带上了 .fullScreen ⇒ 全屏那一档从此可达，"
+                     + "R593 留在本节 ⑥ 的那几行读数必须换成产品窗口的重测，不许沿用自建窗的数")
+        XCTAssertEqual(after, before,
+                       "被拒绝的全屏请求改写了主窗尺寸 ⇒ 一次无效的系统请求动了用户的帧")
     }
+
+    /// 全屏不可达，**放大（绿色按钮）可达** —— 但本轮在产品窗口上量到的不是我先想的那个数：
+    /// `放大档=1201.0x850.0`（zoom 铺的是**可见帧**，不是整屏 1470×923 —— 那一档只有被
+    /// `.fullScreenNone` 禁止的自建窗才拿得到），规格高 849.2 ≤ 可见帧高 850.0 ⇒ 这一档**该记**，
+    /// 也确实记了。⇒ "放大把记忆宽撑爆"这条猜想在**这台机器上被自己的读数否掉**（只差 0.8pt）。
+    /// 因此这一格不许判"记/不记"哪一侧，只判**规则本身**：记忆必须跟着那条界走 ——
+    /// 规格高放得下就记（否则记忆功能被废），放不下就不记（否则一次放大变成永久默认），
+    /// 两侧各由这台机器的实际屏形选一边，而另一边由 `testShouldRememberWidthTruthTableIsTheSameBoundAsTheLift`
+    /// 用 1470/1100 那种屏形钉住。**不许把这一格改成"本机这条不判"** —— 屏形一变它就得红。
+    func testZoomThenFoldRemembersOnlyAWidthTheScreenCanFit() throws {
+        setUpProduct()
+        defer { tearDownProduct() }
+        try premiseNotInFullScreen("FOLD_ZOOM_MEMORY")
+        guard let window = makeWindow() else { return }
+        let rememberedBefore = controller.expandedWidth
+        window.zoom(nil)
+        settle(0.2)
+        XCTAssertTrue(window.isZoomed,
+                      "zoom 之后 isZoomed=false ⇒ 这一格摆不出放大态，下面的读数全部作废")
+        let zoomed = window.contentRect(forFrameRect: window.frame).size
+        let visibleHeight = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? -1
+        let specHeight = zoomed.width / 2.0.squareRoot()
+        let fits = specHeight <= visibleHeight
+        controller.resetTransitionCountersForTesting()
+        XCTAssertEqual(rememberedBefore, MainWindowCollapsePolicy.expandedWidthDefault, accuracy: 0.01,
+                       "起点记忆宽不是规格档 ⇒ 这一格摆出的屏形关系不成立，`改记忆` 那一格判的是空对空")
+        delegate.perform(.toggleMainWindowCollapse)        // 产品自己的入口，不是内部纯函数
+        settle(0.2)
+        let rememberedAfter = controller.expandedWidth
+        let changed = rememberedAfter != rememberedBefore
+        CaptureReadings.emit(String(format:
+                                        "FOLD_ZOOM_MEMORY 放大档=%.1fx%.1f 规格高=%.1f 可见帧高=%.1f 放得下=%d "
+                                        + "记忆宽前=%.1f 记忆宽后=%.1f 改记忆=%d 跳写次数=%d 跳写原因=%@",
+                                    zoomed.width, zoomed.height, specHeight, visibleHeight, fits ? 1 : 0,
+                                    rememberedBefore, rememberedAfter, changed ? 1 : 0,
+                                    controller.memoryWritesSkipped, controller.lastMemorySkip ?? "none"))
+        XCTAssertGreaterThan(zoomed.width, rememberedBefore,
+                             "放大没把宽推离规格档 ⇒ 这一格没摆出要判的那个状态（读数见上一行）")
+        XCTAssertEqual(changed, fits,
+                       "记忆跟着'放得下'这条界了吗：放得下=\(fits) 却 \(changed ? "改了" : "没改") ⇒ "
+                     + "两边任意一种都不行：放得下而不记＝记忆功能被关掉；放不下而记＝一次放大变成永久默认")
+        if fits {
+            XCTAssertEqual(controller.memoryWritesSkipped, 0,
+                           "这一档放得下却还是跳写 ⇒ 界被写成了无条件不记（正对照被这一格自己否掉）")
+        } else {
+            XCTAssertEqual(controller.memoryWritesSkipped, 1,
+                           "这一档放不下却没记数 ⇒ 下一轮分不清'没到写的时机'与'故意不写'")
+            XCTAssertEqual(controller.lastMemorySkip ?? "none", "too-wide-for-screen",
+                           "跳写的原因不是 too-wide-for-screen ⇒ 拦下的不是这条界")
+        }
+    }
+
+
+    /// `shouldRememberWidth` 的真值表：这一支的判据是"那一档放得下吗"，不是"宽得离谱吗"。
+    /// 五行里两行是正对照（可记的档必须**允许**记），否则这一支会被写成"什么都不记"而把记忆功能废掉。
+    func testShouldRememberWidthTruthTableIsTheSameBoundAsTheLift() {
+        XCTAssertTrue(MainWindowCollapsePolicy.shouldRememberWidth(848, collapsed: false, visibleHeight: 850),
+                      "规格档 848（规格高 600）在 850 高的屏上不可记 ⇒ 记忆宽这一支变成永不记")
+        XCTAssertFalse(MainWindowCollapsePolicy.shouldRememberWidth(1470, collapsed: false, visibleHeight: 850),
+                       "1470 的规格高 1039 > 850 还记 ⇒ 就是本轮那条缺陷本身")
+        XCTAssertTrue(MainWindowCollapsePolicy.shouldRememberWidth(1470, collapsed: false, visibleHeight: 1100),
+                      "同一档在放得下的机器上不许被拒 ⇒ 这条界写成了按名字拒绝（正对照）")
+        XCTAssertTrue(MainWindowCollapsePolicy.shouldRememberWidth(424, collapsed: true, visibleHeight: 850),
+                      "折叠档 424（规格高 599.7）不可记 ⇒ 折叠的记忆也一起废了")
+        XCTAssertFalse(MainWindowCollapsePolicy.shouldRememberWidth(1470, collapsed: true, visibleHeight: 850),
+                       "折叠态的规格高是宽 × √2 = 2079 > 850 还记 ⇒ 两个方向的口径写反了")
+        XCTAssertTrue(MainWindowCollapsePolicy.shouldRememberWidth(1470, collapsed: false, visibleHeight: nil),
+                      "读不到可见帧高时一律不记 ⇒ 在没有屏幕信息的那条路径上把记忆功能关掉（另一档具名缺席）")
+        XCTAssertFalse(MainWindowCollapsePolicy.shouldRememberWidth(0, collapsed: false, visibleHeight: 850),
+                       "零宽要记 ⇒ 下一次启动照 0 建窗")
+    }
+
 
     /// 产品入口那一档：`visibleHeight` 这条界不是纯函数自说自话 —— 记忆宽被撑到 1470 的窗口，
     /// 在这台机器（可见帧高 850）上必须**不抬**，并且把"为什么不抬"记进可读的那一格。
@@ -519,6 +609,18 @@ final class FoldGeometryMigrationTests: XCTestCase {
                                     visible.height))
         XCTAssertEqual(controller.heightLifts, 0,
                        "放不下还是抬了 ⇒ 窗口比屏幕高，底部够不着（现读 \(controller.heightLifts)）")
+        // 「放不下」这一档是不是真的放不下，由**这台机器的可见帧高**说，不由我写死：
+        // R593 主笔那一跑在 runner 上红在这一格（`42227982898` STEP[17]），因为 runner 的屏比本机矮 ⇒
+        // 但红的原因是"期望被写死成本机那一档"。⇒ 屏够高时目标放得下，这一格就该具名缺席，
+        // 而不是让产品替一台机器保证它做不到的事。
+        let target = 1470.0 / 2.0.squareRoot()
+        if target <= Double(visible.height) {
+            throw XCTSkip(String(format:
+                                     "FOLD_LIFT_DECLINE_NOT_RUN=screen-tall-enough —— 这台机器可见帧高 %.1f ≥ 目标 %.1f"
+                                     + " ⇒ 『放不下就不抬』这一档在这里没有对象（本轮另一台机器实测可见帧高 850.0 才有对象）。"
+                                     + "缺席不是『界没生效』，也不是『不需要界』",
+                                 Double(visible.height), target))
+        }
         XCTAssertEqual(controller.heightLiftDeclines, 1,
                        "不抬这一档没被记下来 ⇒ 读数只剩『抬=0』，下一轮分不清是哪一种（现读 \(controller.heightLiftDeclines)）")
         XCTAssertEqual(controller.heightLiftDecline, "visible-too-short",

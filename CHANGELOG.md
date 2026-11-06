@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows semantic-style version naming for public releases.
 
 ## [Unreleased]
+### 列宽改成跟当前窗口宽（公开更正 R592/R593）；预测块 / 抄行 / 幂等做成会红的守卫（R594 / 第 593 轮 / Round 591）
+
+- 产品（用户实测那一朵的根因）：`MainWindowCollapsePolicy.columnWidth(contentWidth:collapsed:)` 由**当前分栏宽**推
+  （展开 `(总宽−中缝)/2`、折叠铺满）；旧常量改名 `legacyConstantColumnWidth` 并只留给刀落。
+  `WindowConfigurator.Coordinator.equalizeColumns(in:)` 挂在 resize / endLiveResize / becomeKey / becomeMain /
+  延迟补拍五条路上；`ContentView` 两棵树把钉死的 min/ideal/max 换成伸缩范围（min 200 / max .infinity）。
+  证人（旧→新）：`宽=1000 侧栏 423.5 详情槽 575.5 差=152.0` 与 `宽=1200 差=352.0` ⇒ 三档 `差=0.0`（423.5/499.5/599.5）。
+- 产品：`shouldRememberWidth`（屏幕放不下就不把超宽记进记忆）+ 控制器 `memoryWritesSkipped`/`lastMemorySkip`；
+  `FOLD_ZOOM_MEMORY` 现读 `changed==fits`，界与 `heightLift` 用同一条式子。
+- 撤掉：为**不可达**的全屏状态写的两条产品守卫（`WindowConfigurator` 写死 `.fullScreenNone`）；
+  整卷全屏退出仪器删掉，换成契约格 `testTheMainWindowRefusesFullScreenBecauseTheConfiguratorPinsFullScreenNone`。
+- 判据：`FoldGeometryReanchorTests` +3 格（三档宽度 + 折叠档现找分栏器两条出路；纯函数分档真值表；首帧那一档）；
+  新守卫三支 `prediction_block_guard`（668 那条出路）/ `instrument_quote_guard` / `ledger_idempotency_gate`，
+  判据卷 +25 格；`ledger_preflight` 的"本轮那一节"从位置改成**按轮次号认**（`切到=` 读数 + 判据扩到 11 格）。
+- 更正（公开）：R592/R593 那两轮"第①段交付缺陷已修"的结论**只在 848 一档验证过**，而 848 恰好是常量成立的那档 ⇒
+  用户实测的不等宽由本轮修掉并换装；655 那句"跨会话一次性差"按本轮身份读数 forward 更正（旧原文不删）。
+- 单子：新开 **669**（判据只量一个宽度这一族）、**670**（折叠档那列只有纯函数证人）；668 仪器做掉、待 runner 签；
+  帧基线那朵红**仍由 655 跟踪、门红着交出去**，`register-drift`/改 `observed`/`update` 一条没做。
+- 刀：**M1611–M1622 十四把全 CAUGHT**（落刀前现读高水位 M1610；M1615 第一次是空刀，补 `切到=` 之后才响）；
+  换装一次（构建时刻与 SHA 见 `install.txt` 现读）；没动用户的 Dock 与登录项。
+
 ### √2 不变量补上「放得下」那一半；帧通道对默认几何的盲做成会红的守卫（R593 / 第 592 轮 / Round 590）
 
 - 产品：`MainWindowCollapsePolicy.heightLift` 多收 `visibleHeight`，目标高度放不下可见帧就**不抬**；

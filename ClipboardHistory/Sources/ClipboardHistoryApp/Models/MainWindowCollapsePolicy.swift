@@ -18,8 +18,19 @@ enum MainWindowCollapsePolicy {
     /// R567：中缝那 1pt 是 AppKit 分隔条自己占掉的（`dividerThickness` 真窗实测 1.00）。
     /// 所以"两栏各半"落到窗口里是 `423.5 + 1 + 423.5`：**分隔条的中心**正好在 424 = 848/2。
     static let seamDividerThickness: CGFloat = 1
-    static var columnWidth: CGFloat { (expandedWidthDefault - seamDividerThickness) / 2 }
-    static var seamCenter: CGFloat { columnWidth + seamDividerThickness / 2 }
+    /// 旧写法（R567…R593）：把列宽当成**规格档的一半**这一常量。
+    /// ⚠ R594 起这是错的并且**不再被产品使用**：用户实测"拖窗口时只有右侧预览在变"——
+    /// 列宽被 `min=ideal=max=423.5` 钉死之后，窗口 1000/1200 那一档左右差 152/352pt，
+    /// 而 R592/R593 的验收只在 848 这一档量过 ⇒ 那一档正好撞上常量，所以两轮都绿着把缺陷留着。
+    /// 留着这一行只为让"钉回常量"这把刀有处可落（判据里另有一格断言产品不许再用它）。
+    static var legacyConstantColumnWidth: CGFloat { (expandedWidthDefault - seamDividerThickness) / 2 }
+
+    /// R594 的正确形式：列宽是**当前分栏宽**的函数，两栏一起跟着窗口变。
+    /// 折叠态只有一列 ⇒ 那一列铺满分栏宽（不许沿用展开档推出来的半宽：那是另一个对象的一半）。
+    static func columnWidth(contentWidth: CGFloat, collapsed: Bool = false) -> CGFloat {
+        guard contentWidth > 0 else { return 0 }
+        return collapsed ? contentWidth : (contentWidth - seamDividerThickness) / 2
+    }
     /// D5 的"锁比例"：横 √2 与竖 √2 是同一个对折的两侧，切换时**必须把锁的值一起翻过去**。
     static var expandedAspectRatio: NSSize {
         NSSize(width: expandedWidthDefault, height: contentHeightDefault)
@@ -97,6 +108,20 @@ enum MainWindowCollapsePolicy {
         guard abs(height - target) / target > tolerance else { return nil }
         if let visibleHeight, visibleHeight > 0, target > visibleHeight { return nil }
         return target
+    }
+
+    /// R594 靶 3：记忆宽那一侧也要同一条界。`rememberWidth` 记的是"当时那一帧的宽"，
+    /// 而放大（绿色按钮，产品主窗因 `.fullScreenNone` 走的就是 zoom）会把宽推到整屏宽 ⇒
+    /// 记下来之后，下一次启动照这个宽建窗，而按 √2 规格算出的高**放不下** ⇒ 不变量当场"不抬"，
+    /// 于是用户的窗永久停在非 √2 上（本轮真机读数见 `FOLD_ZOOM_MEMORY` 那一行）。
+    /// 判据不是"宽得离谱"，是**这条档放得下吗**：放不下就不记（与 `heightLift` 同一把界，同一个理由）。
+    static func shouldRememberWidth(_ width: CGFloat, collapsed: Bool,
+                                    visibleHeight: CGFloat?) -> Bool {
+        guard width > 0 else { return false }
+        guard let visibleHeight, visibleHeight > 0 else { return true }
+        // 规格高：展开档宽 ÷ √2；折叠档反过来是宽 × √2 —— 与 `heightLift` 的两个 target 同一口径。
+        let specHeight = collapsed ? width * 2.0.squareRoot() : width / 2.0.squareRoot()
+        return specHeight <= visibleHeight
     }
 
     /// 收缩/放宽都保持左上角：x 不越过屏幕左右边，top 不越过屏幕上下边。
@@ -205,7 +230,8 @@ enum MainWindowGeometryMigration {
                 defaults.set(rewritten, forKey: key)
             }
             // 分栏子视图帧记的是**旧档的不对称**（423.5 / 326.5），没有"该抬成什么"的可算目标；
-            // 删掉它，让 `navigationSplitViewColumnWidth` 的锁等宽约束自己给出 423.5 / 423.5。
+            // 删掉它，让下一次几何落点重算（R594 起等分由 `WindowConfigurator.Coordinator.equalizeColumns`
+            // 按**当前分栏宽**落中缝，不再由列宽的锁等宽约束给出 423.5 / 423.5）。
             for key in defaults.dictionaryRepresentation().keys where isMainWindowSplitKey(key) {
                 defaults.removeObject(forKey: key)
             }

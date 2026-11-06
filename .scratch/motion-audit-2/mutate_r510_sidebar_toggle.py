@@ -11,19 +11,15 @@ ARMS=[
    '''            hideSidebarToggleControls(in: window)''',
    '''            // M1368：这里被删掉'''),
   ("M1369","resize 后不再补延迟清理（晚到的开关漏网）",
-   '''        func windowDidResize(_ notification: Notification) {
-            guard let window = notification.object as? NSWindow else { return }
-            alignTrafficLights(in: window)
-            removeSidebarToolbarButton(from: window)
-            pinSidebarVisible(in: window)
+   '''            Self.equalizeColumns(in: window)
             scheduleSidebarCleanup(for: window)
-        }''',
-   '''        func windowDidResize(_ notification: Notification) {
-            guard let window = notification.object as? NSWindow else { return }
-            alignTrafficLights(in: window)
-            removeSidebarToolbarButton(from: window)
-            pinSidebarVisible(in: window)
-        }'''),
+        }
+
+        func windowDidEndLiveResize''',
+   '''            Self.equalizeColumns(in: window)
+        }
+
+        func windowDidEndLiveResize'''),
 ]
 def run():
     p=subprocess.run(["swift","test","--filter",TEST],cwd=ROOT,capture_output=True,text=True,env=ENV,timeout=2400)

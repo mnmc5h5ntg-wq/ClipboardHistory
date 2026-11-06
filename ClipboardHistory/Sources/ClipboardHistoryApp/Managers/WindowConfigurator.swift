@@ -201,6 +201,13 @@ struct WindowConfigurator: NSViewRepresentable {
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            // R594：首启那一档也补一次等分。**这一拍今天没有证人** ——
+            // PROBE-594-A 实测：把 becomeKey/becomeMain 这两拍一起摘掉，
+            // `testAWindowThatNeverResizedStillEqualizesOnLaunch` 仍然绿 ⇒ 从
+            // `WindowManager.showMainWindow()` 进来的那一档由 `windowDidResize` 已经兜住了。
+            // 留着这一拍的理由是"开窗时宽没变过"（状态恢复正好落在记忆宽那一档 ⇒ 没有 resize 回调），
+            // 而那一条路今天量不到 ⇒ 具名 `COLUMN_EQUALIZE_NO_WITNESS=no-resize-launch`，不许读成"已判"。
+            Self.equalizeColumns(in: window)
         }
 
         func windowDidBecomeMain(_ notification: Notification) {
@@ -208,6 +215,7 @@ struct WindowConfigurator: NSViewRepresentable {
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            Self.equalizeColumns(in: window)
         }
 
         func windowDidResize(_ notification: Notification) {
@@ -215,6 +223,8 @@ struct WindowConfigurator: NSViewRepresentable {
             alignTrafficLights(in: window)
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            // R594：拖窗口这一条路上，两栏等分由这里跟（SwiftUI 只留伸缩范围，钉死值已删）。
+            Self.equalizeColumns(in: window)
             scheduleSidebarCleanup(for: window)
         }
 
@@ -222,6 +232,7 @@ struct WindowConfigurator: NSViewRepresentable {
             guard let window = notification.object as? NSWindow else { return }
             removeSidebarToolbarButton(from: window)
             pinSidebarVisible(in: window)
+            Self.equalizeColumns(in: window)
             scheduleSidebarCleanup(for: window)
         }
 
@@ -329,8 +340,39 @@ struct WindowConfigurator: NSViewRepresentable {
                     guard let self, let window else { return }
                     self.removeSidebarToolbarButton(from: window)
                     self.pinSidebarVisible(in: window)
+                    // R594：SwiftUI 放列宽也是异步的（R510 那条同一形状）⇒ 等分跟着补几轮，
+                    // 只在实际偏离中缝时才动（`equalizeColumns` 里那一句 guard 挡住了重复布局）。
+                    Self.equalizeColumns(in: window)
                 }
             }
+        }
+
+        /// R594（用户实测反馈：拖窗口时只有右侧预览在变）：两栏等分必须跟着**当前分栏宽**走。
+        ///
+        /// 为什么落在 AppKit 这一侧：列宽那时被 SwiftUI 钉成常量 ——
+        /// `.frame(minWidth:idealWidth:maxWidth:)` 与 `navigationSplitViewColumnWidth(min:ideal:max:)`
+        /// 三个值全等于 `(expandedWidthDefault − seam)/2 = 423.5` ⇒ 窗口 1000 那一档实测
+        /// 侧栏 423.5 / 详情 575.5（差 152pt），1200 那一档差 352pt，而 848 那一档差 0
+        /// —— 所以 R592/R593 的验收（只在 848 量）两轮都绿着把这个缺陷留在交付里。
+        /// SwiftUI 那一侧现在只留"允许伸缩"（min 200 / max .infinity），**钉死值删掉**；
+        /// 实际落在中缝由这一句 `setPosition` 负责 —— 它是唯一能把分隔条放到"当前宽的一半"的入口。
+        ///
+        /// 返回值必须让调用方分得清"钉好了"与"根本没找到分栏器"（`pinSidebarVisible` 同一规矩：
+        /// 一个找不到东西的实现会永远绿）。
+        @discardableResult
+        static func equalizeColumns(in window: NSWindow) -> Bool {
+            guard let split = splitViewController(in: window), split.splitViewItems.count >= 2 else {
+                return false
+            }
+            let total = split.splitView.bounds.width
+            guard total > 0 else { return false }
+            let want = MainWindowCollapsePolicy.columnWidth(contentWidth: total)
+            // 折叠态只有一列时 `splitViewItems.count < 2` 已经在上面挡住了；
+            // 这里再挡一次"分隔条已经在中缝"以免每拍重复布局（拖窗口时这会变成抖动源）。
+            let current = split.splitView.arrangedSubviews.first?.frame.width ?? -1
+            guard abs(current - want) > 0.5 else { return true }
+            split.splitView.setPosition(want, ofDividerAt: 0)
+            return true
         }
 
         /// 把侧栏钉成"永远在"（对齐系统设置那类 App）：不允许折叠，

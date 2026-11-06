@@ -54,9 +54,10 @@ struct ContentView: View {
                                    titleHoverForFixture: titleHoverForFixture,
                                    showsCollapseHint: showsCollapseHint,
                                    acknowledgeCollapseHint: acknowledgeCollapseHint)
-                    .frame(minWidth: MainWindowCollapsePolicy.columnWidth,
-                           idealWidth: MainWindowCollapsePolicy.columnWidth,
-                           maxWidth: MainWindowCollapsePolicy.columnWidth)
+                    // R594（用户实测）：这里从前把侧栏钉成常量 423.5 ⇒ 窗口变宽只有详情在变。
+                    // 现在只给伸缩范围，实际等分由 `WindowConfigurator.Coordinator.equalizeColumns`
+                    // 在 resize 与折叠两条路上落到中缝（`legacyConstantColumnWidth` 在产品里不再被引用）。
+                    .frame(minWidth: 200, maxWidth: .infinity)
                 DetailView(historyStore: historyStore)
             }
             .windowBackground()
@@ -155,9 +156,13 @@ struct ContentView: View {
                                titleHoverForFixture: titleHoverForFixture,
                                showsCollapseHint: showsCollapseHint,
                                acknowledgeCollapseHint: acknowledgeCollapseHint)
-                .navigationSplitViewColumnWidth(min: MainWindowCollapsePolicy.columnWidth,
-                                                  ideal: MainWindowCollapsePolicy.columnWidth,
-                                                  max: MainWindowCollapsePolicy.columnWidth)
+                // 同上：从前这一行把 min/ideal/max 三个值全钉成常量 423.5 ⇒ "左右等宽"只在窗口
+                // 848 那一档成立（现读 1000 差 152pt、1200 差 352pt），拖窗口时只有右侧在变。
+                // R594 起这里只给**伸缩范围**：min 200 / max .infinity，列宽不再是这里的任何一个值；
+                // `ideal` 是"首帧那一档"，由 `columnWidth(contentWidth:)` 从**窗口宽**
+                //（建窗那一档 848 是窗口宽，不是列宽）推出来，之后每一档都由
+                // `WindowConfigurator.Coordinator.equalizeColumns` 按观察到的分栏宽重落中缝。
+                .navigationSplitViewColumnWidth(min: 200, ideal: MainWindowCollapsePolicy.columnWidth(contentWidth: MainWindowCollapsePolicy.expandedWidthDefault), max: .infinity)
         } detail: {
             DetailView(historyStore: historyStore)
         }

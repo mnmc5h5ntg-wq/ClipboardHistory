@@ -26,9 +26,9 @@ POLICY = "ClipboardHistory/Sources/ClipboardHistoryApp/Models/MainWindowCollapse
 CONTROLLER = "ClipboardHistory/Sources/ClipboardHistoryApp/Managers/MainWindowCollapseController.swift"
 CONTENT = "ClipboardHistory/Sources/ClipboardHistoryApp/Views/ContentView.swift"
 
-COLUMN_OLD = ("                .navigationSplitViewColumnWidth(min: MainWindowCollapsePolicy.columnWidth,\n"
-              "                                                  ideal: MainWindowCollapsePolicy.columnWidth,\n"
-              "                                                  max: MainWindowCollapsePolicy.columnWidth)")
+# R594 重钉：这一行从前是三个值全钉成常量的那一档；R594 把列宽改成跟当前窗口宽之后
+# 钉死值不在了，但**这一把刀要证的还是"列宽回到可拖区间"** ⇒ 起点换成现在这一行，终点一字未改。
+COLUMN_OLD = ("                .navigationSplitViewColumnWidth(min: 200, ideal: MainWindowCollapsePolicy.columnWidth(contentWidth: MainWindowCollapsePolicy.expandedWidthDefault), max: .infinity)")
 FRAME_OLD = ("        var frame = window.frame\n"
              "        let top = frame.maxY\n"
              "        frame.size.width = width")

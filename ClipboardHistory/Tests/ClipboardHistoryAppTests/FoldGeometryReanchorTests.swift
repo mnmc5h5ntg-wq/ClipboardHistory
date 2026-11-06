@@ -93,6 +93,172 @@ final class FoldGeometryReanchorTests: XCTestCase {
         split.splitView.arrangedSubviews.map { $0.frame.width }
     }
 
+    /// R594（用户实测反馈）：两栏等分必须是**当前窗口宽的函数**。
+    ///
+    /// 为什么这一格必须存在并且先红：R592/R593 都宣称"§3 第①段（升级用户的等分）落地了"，
+    /// 而它们的证人只在**一个宽度**（848）上量过 `|左−右|`——列宽那时是常量
+    /// `(expandedWidthDefault − seam)/2 = 423.5`，848 那一档刚好撞上，其余全部偏
+    /// （用户原话：拖窗口时只有右侧预览在变）。"在规格档上等分"与"在任意宽度上等分"
+    /// 是两件事，前者绿着后者坏 —— 这就是记忆里"判据只量了一个宽度"的那种假绿。
+    ///
+    /// 三档展开宽度各判一次：① 左右之差 ≤ 1pt；② 左栏等于 `columnWidth(contentWidth:)`
+    /// （由观察到的总宽推出来的那个值，不是任何常量）；③ 折叠态那一档不许沿用展开态的列宽。
+    /// 每一档都把现读值印出来 ⇒ 旧值（红的时候）也在同一行里，下一轮能复查。
+    func testColumnsFollowTheCurrentWindowWidthNotTheSpecConstant() throws {
+        setUpProduct()
+        defer { tearDownProduct() }
+        guard let window = makeWindow() else { return }
+        guard let split = splitController(of: window) else {
+            throw XCTSkip("COLUMN_EQUALIZE_NOT_RUN=no-split-view —— 真窗口里没找到 NSSplitViewController ⇒ "
+                + "这一格没有对象（`splitViewController` 的两条找法都试过）；"
+                + "不许读成『等分了』，也不许读成『不需要等分』")
+        }
+        var rows: [String] = []
+        for width in [848.0, 1000.0, 1200.0] {
+            window.setContentSize(NSSize(width: width, height: 600))
+            settle(0.3)
+            // 布局要走完一趟再读：`setContentSize` 只改窗口，两列的重排在下一次布局周期里。
+            // 上一版没排就读 ⇒ 详情列读到的是它自己没更新过的旧帧（848 那一档报"左右差 424.5"，
+            // 而产品那一档本来是等宽的）—— 那是**尺错**，不是产品错，旧值必须由排过版的帧量。
+            window.contentView?.layoutSubtreeIfNeeded()
+            split.splitView.layoutSubtreeIfNeeded()
+            settle(0.15)
+            let total = split.splitView.bounds.width
+            let cols = columnWidths(of: split)
+            let thickness = split.splitView.dividerThickness
+            let laidOut = cols.count == 2 && abs(cols[0] + thickness + cols[1] - total) <= 1.5
+            // 尺读的对象要先验明：arrangedSubviews 的第二项实测**不是**详情列的槽位宽（它的 frame 一直是整宽），
+            // 所以"左右两栏各多宽"只能由 ① 侧栏帧宽 与 ② 分隔条位置 两个独立口径推，
+            // 不能拿第 ② 项的 frame.width 当详情宽（那是尺读错对象，会把 848 那一档报成"差 424.5"）。
+            let shape = split.splitView.arrangedSubviews.enumerated().map { idx, view in
+                String(format: "#%d:%@(x=%.1f w=%.1f)", idx,
+                       String(String(describing: type(of: view)).prefix(18)),
+                       Double(view.frame.minX), Double(view.frame.width))
+            }.joined(separator: " ")
+            let dividerRight = cols.isEmpty ? 0 : cols[0] + thickness
+            let detailSlot = total - dividerRight
+            let expected = MainWindowCollapsePolicy.columnWidth(contentWidth: total)
+            let gap = abs(cols[0] - detailSlot)
+            rows.append(String(format: "宽=%.0f 总=%.1f 侧栏=%.1f 详情槽=%.1f 差=%.1f 期望=%.1f 形状[%@]",
+                               width, total, cols.first ?? -1, detailSlot, gap, expected, shape))
+            XCTAssertGreaterThan(detailSlot, 0,
+                "分隔条右侧没有剩余宽度（总 \(total) 分隔条右沿 \(dividerRight)）⇒ 读到的是没重排的帧，"
+              + "这一档的『左右差』不可信（先修尺再谈产品，不许拿它当结论，也不许拿它当『没事』）")
+            XCTAssertEqual(cols.count, 2, "这一档应当是两栏（现读 \(cols.count) 列：\(cols)）")
+            XCTAssertLessThanOrEqual(gap, 1.0,
+                "窗口宽 \(width) 时侧栏与详情槽相差 \(gap)pt ⇒ 只有右侧在跟着窗口变，"
+              + "左栏被钉成常量（侧栏 \(String(format: "%.1f", cols.first ?? -1)) / 详情槽 "
+              + "\(String(format: "%.1f", detailSlot))；这一档期望左右各 \(String(format: "%.1f", expected))）")
+            XCTAssertEqual(cols.first ?? -1, expected, accuracy: 1.0,
+                "侧栏不等于「由当前分栏宽推出来的那一档」⇒ 列宽还是常量（"
+              + "现读 \(cols.first ?? -1) vs 期望 \(String(format: "%.1f", expected))）；"
+              + "常量 `legacyConstantColumnWidth` 不许再当列宽用")
+        }
+        // 折叠那一档从前在这里读**上一个 split 引用** ⇒ 报"折叠后分栏宽还是 848.0"。
+        // 产品折叠态换的是另一棵树（`collapsedLayout` 只有一列，没有分栏器），那句读的是已经下树的
+        // 视图 —— 那是**尺错**（记忆：尺读的是不是它声称的那个对象），不是产品错。
+        // 所以现找、不复用；"找得到"与"找不到"是两条都要判的出路，不许把"没找到"写成"不需要判"。
+        defaults.set(600.0, forKey: MainWindowCollapseController.collapsedWidthKey)
+        window.setContentSize(NSSize(width: 848, height: 600))
+        settle(0.2)
+        delegate.perform(.toggleMainWindowCollapse)
+        settle(0.6)
+        let foldedSplit = splitController(of: window)
+        let foldedTotal = foldedSplit?.splitView.bounds.width ?? -1
+        let foldedCols = foldedSplit.map { columnWidths(of: $0) } ?? []
+        let foldedContent = window.contentView?.frame.width ?? -1
+        CaptureReadings.emit("COLUMN_EQUALIZE 展开三档[" + rows.joined(separator: " ] [ ") + " ]"
+            + String(format: " 折叠态 有分栏器=%d 分栏总宽=%.1f 列宽=[%@] 内容宽=%.1f 记忆宽=600",
+                     foldedSplit == nil ? 0 : 1, foldedTotal,
+                     foldedCols.map { String(format: "%.1f", $0) }.joined(separator: ","),
+                     foldedContent))
+        if let foldedSplit {
+            let cols = columnWidths(of: foldedSplit)
+            let w = foldedSplit.splitView.bounds.width
+            XCTAssertTrue(cols.contains(where: { abs($0 - w) <= 1.0 }),
+                          "折叠态还留着分栏器，且没有一列铺满当前分栏宽（分栏宽 \(w)，现读 \(cols)）"
+                        + "⇒ 折叠那一列被当成『展开档的一半』来算（现找到的分栏器，不是旧引用）")
+        } else {
+            // 没有分栏器 ⇒ 那一列的宽就等于窗口内容宽；它必须还是记忆档 600，不是 600 的一半。
+            // 列宽两个分支各自的值由纯函数那一格钉（`testCollapsedColumnWidthIsNotTheExpandedHalf`）。
+            XCTAssertEqual(foldedContent, 600, accuracy: 2.0,
+                "折叠态窗口内容宽读 \(foldedContent)（期望记忆档 600）⇒ 折叠那一档没按当前宽铺满；"
+              + "旧版把折叠也算成『(宽 − 中缝)/2』就会在这一格现形")
+        }
+    }
+
+    /// 首帧那一档：窗口**从来没有被显式 resize 过**（只走 `WindowManager.showMainWindow()` 建窗）也要等分。
+    ///
+    /// 这一格是被胶片逼出来的，但胶片给的不是我以为的那个读数：
+    /// `main-sidebar-title-hover-750x560-light.png` 里侧栏右沿实测在 423.5pt（750 那一档的等分应当是 374.5），
+    /// 而**成因不是**"首帧没等分" —— 捕获夹具只渲染 `ContentView`，`WindowConfigurator` 挂在
+    /// `App.swift:83` 那棵根上，夹具那棵树里根本没有它 ⇒ 帧里的中缝由 SwiftUI 的初始档给，
+    /// 产品这一整套等分在帧通道里**没有对象**（BACKLOG 666 那一维的第二条更硬的读数，新开 671）。
+    /// ⚠ 本轮实测的另一件事要一起记：把 `windowDidBecomeKey` / `windowDidBecomeMain` 那两拍的
+    /// `equalizeColumns` 一起摘掉（PROBE-594-A），这一格**仍然绿** ⇒ 首帧这一档由 `windowDidResize`
+    /// 那条路兜住；这一格的牙在 resize 那条路上（刀 M1621 能打红它），那两拍今天没有证人。
+    func testAWindowThatNeverResizedStillEqualizesOnLaunch() throws {
+        setUpProduct()
+        defer { tearDownProduct() }
+        // 把"记忆宽"先写成 750，再让产品自己建窗：这一档的对象是**首帧**，不是拖过之后的帧。
+        defaults.set(750.0, forKey: MainWindowCollapseController.expandedWidthKey)
+        guard let window = makeWindow() else { return }
+        let total = window.contentLayoutRect.width
+        guard abs(total - 750.0) <= 2.0 else {
+            throw XCTSkip("COLUMN_EQUALIZE_NOT_RUN=launch-width-not-750 —— 产品没把记忆宽用出来"
+                + "（现读 contentLayoutRect 宽 \(total)）⇒ 这一格要量的对象不在这一档；"
+                + "不许读成『首帧等分了』，也不许读成『不需要等分』")
+        }
+        guard let split = splitController(of: window) else {
+            throw XCTSkip("COLUMN_EQUALIZE_NOT_RUN=no-split-view —— 首帧里没找到 NSSplitViewController ⇒ "
+                + "这一格没有对象（两条找法都试过）；不许读成『等分了』")
+        }
+        split.splitView.layoutSubtreeIfNeeded()
+        settle(1.2)      // 建窗之后那几拍补等分（0.0/0.05/0.15/0.4/0.9）必须全走完
+        let cols = columnWidths(of: split)
+        let thickness = split.splitView.dividerThickness
+        let dividerRight = cols.isEmpty ? 0 : cols[0] + thickness
+        let detailSlot = split.splitView.bounds.width - dividerRight
+        let expected = MainWindowCollapsePolicy.columnWidth(contentWidth: split.splitView.bounds.width)
+        CaptureReadings.emit(String(format:
+            "COLUMN_EQUALIZE 首帧 内容宽=%.1f 分栏宽=%.1f 侧栏=%.1f 详情槽=%.1f 差=%.1f 期望=%.1f（这一档没被 resize 过）",
+            total, split.splitView.bounds.width, cols.first ?? -1, detailSlot,
+            abs((cols.first ?? -1) - detailSlot), expected))
+        XCTAssertGreaterThanOrEqual(detailSlot, 0,
+            "分隔条右侧没有剩余宽度（分栏宽 \(split.splitView.bounds.width) 侧栏右沿 \(dividerRight)）⇒ 读到的是没重排的帧")
+        XCTAssertEqual(cols.first ?? -1, expected, accuracy: 1.0,
+            "首帧（从没被 resize 过）的侧栏是 \(cols.first ?? -1) 而期望 \(expected) ⇒ "
+          + "建窗那一趟没补等分，列宽停在 SwiftUI 的初始档；这一档的证人就在胶片里"
+          + "（`main-sidebar-title-hover-750x560`）")
+        XCTAssertEqual(abs((cols.first ?? -1) - detailSlot), 0.0, accuracy: 1.0,
+            "首帧两栏相差 \(abs((cols.first ?? -1) - detailSlot))pt ⇒ 用户开窗第一眼看到的就是不等宽")
+    }
+
+    /// 折叠态那一档的列宽**不是**展开态那一档的一半 —— 两个分支都在这个纯函数里，
+    /// 所以这里是唯一能分别判它们的地方（产品折叠态只渲染一列，没有分栏器可量）。
+    ///
+    /// 不覆盖管线：管线级那一格是上面的 `testColumnsFollowTheCurrentWindowWidthNotTheSpecConstant`
+    ///（真窗口、真 resize、真折叠动作）；这一格只把 `columnWidth` 的两个分支钉成互不相等的两档，
+    /// 让"折叠复用展开档的算法"这一支变异必须红。
+    func testCollapsedColumnWidthIsNotTheExpandedHalf() {
+        // 600 是特意挑的：折叠默认档 424 ≈ 展开默认档 848 的一半，旧常量 423.5 与它只差 0.5pt
+        // ⇒ 在默认档上"折叠用了展开档的算法"根本量不出来。判据不许把测不出的档当"过"。
+        let collapsed = MainWindowCollapsePolicy.columnWidth(contentWidth: 600, collapsed: true)
+        let expanded = MainWindowCollapsePolicy.columnWidth(contentWidth: 600)
+        CaptureReadings.emit(String(format:
+            "COLUMN_EQUALIZE 纯函数分档 宽=600 折叠档=%.1f 展开档=%.1f 旧常量=%.1f",
+            collapsed, expanded, MainWindowCollapsePolicy.legacyConstantColumnWidth))
+        XCTAssertEqual(collapsed, 600, accuracy: 0.01,
+            "折叠档应当铺满当前宽（600），现读 \(collapsed) ⇒ 折叠那一档走了展开档的『减中缝再减半』")
+        XCTAssertEqual(expanded, 299.5, accuracy: 0.01,
+            "展开档应当是 (600 − 中缝 1)/2 = 299.5，现读 \(expanded)")
+        XCTAssertGreaterThan(abs(collapsed - expanded), 100,
+            "两个分支差 \(abs(collapsed - expanded))pt ⇒ 这一格判不出分支被混用（现读 \(collapsed)/\(expanded)）")
+        XCTAssertGreaterThan(abs(collapsed - MainWindowCollapsePolicy.legacyConstantColumnWidth), 100,
+            "折叠档等于那个旧常量（\(MainWindowCollapsePolicy.legacyConstantColumnWidth)）"
+          + "⇒ 列宽是从展开默认档推出来的，不跟当前窗口宽走")
+    }
+
     // MARK: - ① + ② 默认尺寸与「高度不变、宽度对折」
 
     func testExpandedWidthIs848AndFoldHalvesItWithoutTouchingHeight() throws {

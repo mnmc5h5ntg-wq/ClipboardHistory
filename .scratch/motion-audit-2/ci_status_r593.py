@@ -96,28 +96,34 @@ def judge(pred_name, lines, need, fn):
 PREDICTIONS_R594 = [
     {u"主张": u"新硬步骤 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 第一次有读数："
               u"`BUNDLE_CONTENT_GATE_RESULT=ok` 且正文里 `APP_DELEGATE_STUB=absent` ⇒ 产物内容那一维在 runner 上出声了",
-     u"取处": u"步骤名 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 的正文",
+     u"通道": u"步骤 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 的 stdout：`bundle_content_gate.py` 自己 print 的那两行（`if: always()` ⇒ 上游红也出声；步骤绿时正文只在 --log）",
+             u"取处": u"步骤名 `Built bundle content gate (D-029 stubs, BACKLOG 620 second half)` 的正文",
      u"判法": lambda g: (any(l.startswith(u"BUNDLE_CONTENT_GATE_RESULT=ok") for l in g)
                          and any(u"APP_DELEGATE_STUB=absent" in l for l in g))},
     {u"主张": u"`STEP[9]` 里出现 `SKIP_ROSTER 键=github-runner … 内层判=` 那一行（本轮把 print 挪到了所有门之前）"
               u"⇒ 这一维在 runner 上从此有读数。⚠ 反向读法：**还不出现 = print 又被挪回门后面**，"
               u"不是『runner 又坏了』，也不是『这一维没人判是对的』",
-     u"取处": u"步骤名 `Release script tests` 里以 `SKIP_ROSTER 键=` 开头的行",
+     u"通道": u"步骤 `Release script tests` 的 stdout：`test_skip_roster` 把这一行印在**所有会崩的门之前**（R593 修的那一处）",
+             u"取处": u"步骤名 `Release script tests` 里以 `SKIP_ROSTER 键=` 开头的行",
      u"判法": lambda g: any(u"内层判=" in l for l in g)},
     {u"主张": u"`STEP[16]` 的红名集合**不超出**本轮记下的那 7 条 ⇒ R592 那朵我自己加的判据红"
               u"（`testARestoredOffRatioWindowIsLiftedOntoTheSpecRatio`）被本轮的夹具前提修掉了",
-     u"取处": u"步骤正文里 `Test Case … failed` 的用例名（去重后比对）",
-     u"判法": lambda g: all(any(n in l for n in KNOWN_RUNNER_REDS) for l in g)},
+     u"通道": u"步骤 `Swift tests (executed-count gate)` 的 --log-failed 正文里 `Test Case … failed` 行：由 gh 的日志通道给、不是判据自己印 ⇒ 取不到就是**未读到**，不是「没红」",
+             u"取处": u"步骤正文里 `Test Case … failed` 的用例名（去重后比对）",
+     u"判法": lambda g: bool(g) and all(any(n in l for n in KNOWN_RUNNER_REDS) for l in g)},
     {u"主张": u"`STEP[19]`（On-screen probe coverage floor）那一朵 `testFrameIntervalsUnderStateChanges` "
               u"**要么还在要么消失**：还在 ⇒ (乙)「runner 采样/负载」这一解释拿到第二个真数；"
               u"消失 ⇒ 与 R591 两跑同形，本轮那朵就是间歇。两种都不许写成『修好了』或『没事』",
-     u"取处": u"步骤名 `On-screen probe coverage floor` 正文里 `PROBE_COVERAGE_SUMMARY` 那一行 + `FAILED testFrame…` 行",
+     u"通道": u"步骤 `On-screen probe coverage floor` 的 stdout：`PROBE_COVERAGE_SUMMARY` 由判据 print；失败行在 --log-failed",
+             u"取处": u"步骤名 `On-screen probe coverage floor` 正文里 `PROBE_COVERAGE_SUMMARY` 那一行 + `FAILED testFrame…` 行",
      u"判法": lambda g: any(u"PROBE_COVERAGE_SUMMARY" in l for l in g)},
     {u"主张": u"`STEP[9]` 的电池汇总 `Ran <N>` 比基准 `Ran 932` 多 ⇒ 本轮新增的 python 格在 runner 上被数到；"
               u"基准的出处=本轮 ⓪ 现读的 R592 主笔那一跑 `42210166309` 的 STEP[9] 汇总行（逐字在 STATE 主节 ⓪·1）；"
               u"口径：只加 python 侧那 18 格（6+5+3+4），Swift 那 3 格不进这一格的分母",
-     u"取处": u"步骤名 `Release script tests` 里以 `Ran ` 开头的汇总行",
-     u"判法": lambda g: max(int(m.group(1)) for l in g for m in [re.match(u"Ran (\\d+)", l)] if m) > R592_LOCAL_RAN},
+     u"通道": u"步骤 `Release script tests` 的 stdout：内层电池自己的 `Ran <N>` 汇总行（不是台账里抄来的数）",
+             u"取处": u"步骤名 `Release script tests` 里以 `Ran ` 开头的汇总行",
+     u"判法": lambda g: max([int(m.group(1)) for l in g
+                             for m in [re.match(u"Ran (\\d+)", l)] if m] or [-1]) > R592_LOCAL_RAN},
 ]
 
 ROUTES_R594 = {

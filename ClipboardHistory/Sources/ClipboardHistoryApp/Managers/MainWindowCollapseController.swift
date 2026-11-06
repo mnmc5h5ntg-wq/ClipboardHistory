@@ -45,6 +45,10 @@ final class MainWindowCollapseController: ObservableObject {
     /// 为什么单独记：只印 `抬=0` 分不清"已在比例上"与"屏幕放不下"，而那两种的修法相反。
     private(set) var heightLiftDeclines = 0
     private(set) var heightLiftDecline: String?
+    /// R594 靶 3：`rememberWidth` 被**故意丢掉**的次数与原因（`too-wide-for-screen`）。
+    /// 记数而不是静默 return：静默的"不记"与"没到记的时机"在读数上长得一样，而下一格判据要分得开。
+    private(set) var memoryWritesSkipped = 0
+    private(set) var lastMemorySkip: String?
 
     /// 一步切换 ⇒ 永远没有"在飞"的过渡。保留这一格是因为菜单项与真机通道要问"现在能不能再点"。
     var isTransitioning: Bool { false }
@@ -128,12 +132,24 @@ final class MainWindowCollapseController: ObservableObject {
         heightLifts = 0
         heightLiftDeclines = 0
         heightLiftDecline = nil
+        memoryWritesSkipped = 0
+        lastMemorySkip = nil
     }
 
     private func rememberWidth(of window: NSWindow) {
         let width = window.frame.width
         guard width >= MainWindowCollapsePolicy.minWidth(collapsed: isCollapsed) else { return }
         guard persists else { return }
+        // R594 靶 3：放大（绿色按钮）把宽推到整屏宽，而那一档按 √2 的规格高**放不下**可见帧 ⇒
+        // 记下来就是把一次性的放大变成永久默认（下一次启动照它建窗，不变量此时只能"不抬"）。
+        // 与 `heightLift` 用同一条界、同一个理由。跳写要记数：静默的"不记"与"没到写的时机"读数上一样。
+        let visible = (window.screen ?? NSScreen.main)?.visibleFrame
+        guard MainWindowCollapsePolicy.shouldRememberWidth(width, collapsed: isCollapsed,
+                                                           visibleHeight: visible?.height) else {
+            memoryWritesSkipped += 1
+            lastMemorySkip = "too-wide-for-screen"
+            return
+        }
         defaults.set(Double(width),
                      forKey: isCollapsed ? Self.collapsedWidthKey : Self.expandedWidthKey)
     }

@@ -48,6 +48,11 @@ SCAN_ROOTS = ("ClipboardHistory/Sources", "ClipboardHistory/Tests", "scripts", "
 # 且**别的箱子里不许有数动**（`Makefile` 只有 12 行配方，拿它"洗活"死针的可能性要由读数说话）。
 EXTRA_FILES = (os.path.join(".scratch", "motion-audit-2", "make_surface_ledger.py"),
                os.path.join(".scratch", "motion-audit-2", "review_round_claims.py"),
+               # R594：交接脚本 `ci_status_r593.py` 是 M1611/M1612/M1613 三把刀的**落刀对象**，
+               # 而 `.scratch` 整批不在 SCAN_ROOTS 里 ⇒ 三根活针被静态读成腐烂（现读 needle 命中=1）。
+               # 与 R381 给 make_surface_ledger.py 开的那一格同一形状：**刀砍在非表工具上，语料就得带着它**，
+               # 否则 rot 这一格数的就不是"针活没活"，而是"针住没住在被扫的目录里"。
+               os.path.join(".scratch", "motion-audit-2", "ci_status_r593.py"),
                u"Makefile",)
 
 # 双向棘轮：这三个数**必须**等于现读值（R313 现读）。
