@@ -27,6 +27,32 @@ from ci_status_r589 import PREDICTIONS_R590      # 标签/判法/取处三格逐
 PAIRS = [("42159254212", "5fcac1c", u"R589 主笔：分支穷尽 + 守卫认 if 链 + 副本名册"),
          ("42159607721", "f477d96", u"R589 补记笔：⓪ 成对号 + 落盘后门复算")]
 
+# R591 的 ⓪ 从这里接：**四条都要有判法与取处**，不许只留散文（R588 缺第三格、R589 补成第四格）。
+# 第四格 = 这条通道究竟由哪一步、以什么方式印出去；只在测试里被调用的守卫在 runner 上没有读数。
+PREDICTIONS_R591 = [
+    {u"主张": u"STEP[9] 里 `FAIL:` 四条红名**少掉**本轮修的那三条（`unmatched_corpus` / `working_corpus` / "
+              u"`rows_from_another_machine`），`test_skip_roster` 那条借红要么消失要么只剩内层新红 ⇒ "
+              u"本轮 ③ 那三条落地的**唯一**外部证人",
+     u"取处": u"步骤名 `Release script tests` 的正文行（按 `FAIL:` 前缀数）",
+     u"判法": lambda g: sum(1 for l in g if l.startswith(u"FAIL:") and any(
+         n in l for n in (u"unmatched_corpus", u"working_corpus_either_judges",
+                          u"rows_from_another_machine"))) <= 0},
+    {u"主张": u"STEP[9] 里 `SHAPE_GUARD_EXIT … rc=<数字>` 与 `IDENTICAL_WITNESS_EXIT=<数字>` **读得到值** ⇒ "
+              u"本轮把值槽与说明分开那一格的外部证人（读不到就是还没修好，或 runner 把新形状也弄坏了）",
+     u"取处": u"步骤名 `Release script tests` 里以 SHAPE_GUARD_EXIT / IDENTICAL_WITNESS_EXIT 开头的行",
+     u"判法": lambda g: len([l for l in g if re.search(u"rc=\\d", l)]) >= 2
+                       and len([l for l in g if l.startswith(u"IDENTICAL_WITNESS_EXIT=")
+                                and re.search(u"=\\d", l)]) >= 1},
+    {u"主张": u"STEP[9] 里出现 `WITNESS_SCAN_SCOPE … swift文件=` 且那个数 >0 ⇒ 靶 1 那一维第一次在 runner 上有扫描面读数",
+     u"取处": u"步骤名 `Release script tests` 里以 WITNESS_SCAN_SCOPE 开头的行",
+     u"判法": lambda g: any(int(re.search(u"swift文件=(\\d+)", l).group(1)) > 0
+                            for l in g if u"swift文件=" in l)},
+    {u"主张": u"STEP[11]（Frame baseline vs working manifest）这次**跑到了**（不是 skipped），并且里面出现 "
+              u"`FRAME_BASELINE_SCALE_BASELINE_UNKNOWN` ⇒ R589/R590 两跑都欠着的那第③态今天补齐",
+     u"取处": u"步骤名含 `Frame baseline vs working manifest` 的那一步里以 FRAME_BASELINE_SCALE_ 开头的行",
+     u"判法": lambda g: any(l.startswith(u"FRAME_BASELINE_SCALE_BASELINE_UNKNOWN=") for l in g)},
+]
+
 # 本轮真正要答的那一格：这几条通道在 `Release script tests` 里出现了吗
 WIRE_CHANNELS = (u"SHAPE_GUARD_EXIT", u"TIER_SHAPE_RESULT", u"STAGE_GATE_RESULT",
                  u"IDENTICAL_WITNESS_EXIT", u"IDENTICAL_PAIR_RESULT",
