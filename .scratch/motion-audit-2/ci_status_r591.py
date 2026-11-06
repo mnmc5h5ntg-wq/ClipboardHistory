@@ -72,8 +72,31 @@ def fail_names(lines):
     return [l for l in lines if l.startswith(u"FAIL:")]
 
 
+# R592 的 ⓪ 从这里接：四条各带判法与取处（四格齐：主张 / 判法 / 正文从哪一步取 / 这条通道由哪一步以什么方式印出去）。
+# 本轮修的是 shell 语义与接线顺序 ⇒ 预测全部落在"那两行第一次印得出来"与"skipped 少掉四步"上；
+# ②那一条的**反向读法**要写清：印不出来说明修法没生效，不是"又坏了"。
+PREDICTIONS_R592 = [
+    {u"主张": u"STEP[9] 里 `SHAPE_GUARD2_EXIT guard=… rc=<数字>` 恰好两行 ⇒ 本轮新接的两支守卫第一次在 runner 上有退出码读数",
+     u"取处": u"步骤名 `Release script tests` 里以 SHAPE_GUARD2_EXIT 开头的行",
+     u"判法": lambda g: len([l for l in g if re.search(r"rc=\d", l)]) == 2},
+    {u"主张": u"STEP[9] 里 `IDENTICAL_WITNESS_EXIT=<数字>` 出现 ⇒ pipefail 那一支修好了（从前工具返回 2 时整步先死，"
+              u"这一行从来没印过）；**印不出来=修法没生效**，不是『又坏了』",
+     u"取处": u"步骤名 `Release script tests` 里以 IDENTICAL_WITNESS_EXIT 开头的行",
+     u"判法": lambda g: len([l for l in g if re.search(r"=\d", l)]) >= 1},
+    {u"主张": u"skipped 清单从 5 步缩到 1 步（只剩 `Info.plist gate`，它是硬门、故意不带 `if: always()`）⇒ "
+              u"第③甲这一族在 runner 上确认少掉四步",
+     u"取处": u"`jobs[].steps` 的逐步骤结论（不是 `steps` 视图，也不是日志）",
+     u"判法": lambda g: len([l for l in g if u"skipped" in l]) <= 1},
+    {u"主张": u"STEP[9] 里 `CI_CHANNEL_GLUE_SCOPE … 粘连计=` 与 `CI_SKIPPED_CAUSES … 无声=0` 各出现一次 ⇒ "
+              u"两支守卫的**扫描面**在 runner 上是读数而不是散文",
+     u"取处": u"步骤名 `Release script tests` 里以 CI_CHANNEL_GLUE_SCOPE / CI_SKIPPED_CAUSES 开头的行",
+     u"判法": lambda g: (any(l.startswith(u"CI_CHANNEL_GLUE_SCOPE") for l in g)
+                         and any(l.startswith(u"CI_SKIPPED_CAUSES ") and u"无声=" in l for l in g))},
+]
+
+
 def selfcheck():
-    """已知答案喂一遍：带 ANSI 的 FAIL 行必须被看见，否则"红名少掉三条"会变成**空真**。
+    """已知答案喂一遍：带 ANSI 的 FAIL 行必须被看见，否则「红名少掉三条」会变成**空真**。
 
     R591 ⓪ 第一趟就是这么错的：`lines_in_step` 先 `strip()` 再剥色 ⇒ `startswith("FAIL:")` 恒假、
     集合为空、判法 `<= 0` 成立 ⇒ 报"中"。那条中不是读数，是尺盲。
